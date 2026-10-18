@@ -7,6 +7,7 @@
 // Design 024 slice 2: `attackBanner` opens the sequence — the attack's name
 // sweeps across screen while a ring marks the defender, so an attack reads as
 // name -> target -> impact -> number rather than all at once (see fx-holds).
+import { board3dActive, getBoardScene } from '../../board3d/board3d.js';
 import { getCardRegistry } from '../apply-view.js';
 import {
   animateFrames,
@@ -40,6 +41,7 @@ import {
   hitRecoilPose,
   lungePoseFor,
   screenShakeAmplitude,
+  screenShakeKeyframes,
   screenShakeOffsets,
   shakePose,
   slashPose,
@@ -303,6 +305,12 @@ const sceneSpecFor = (spec, impactType, defenderHit) => (impactType && defenderH
 const shakeTable = (amount) => {
   const amplitude = screenShakeAmplitude(amount);
   if (amplitude === 0) return 0;
+  // Design 074 §D6: the three.js board shakes its camera; the page elements stay put.
+  const scene = board3dActive() ? getBoardScene() : null;
+  if (scene) {
+    scene.shake(screenShakeKeyframes(amplitude, SCREEN_SHAKE_MS));
+    return;
+  }
   const frames = screenShakeOffsets(amplitude).map((translate) => ({ translate }));
   for (const id of SHAKE_TARGET_IDS) {
     document.getElementById(id)?.animate?.(frames, {

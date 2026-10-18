@@ -3,6 +3,7 @@
 // at the claiming side's prize zone. Like every other effect here it draws as
 // a detached parent-page overlay and no-ops when its anchor cannot be found.
 import { oppContainerDocument, selfContainerDocument } from '../../../state.js';
+import { board3dActive, pileRect } from '../../board3d/board-rects.js';
 import { runPose, spawnOverlay } from '../../image-logic/mat-fx.mjs';
 import { visualRectOf } from '../../image-logic/iframe-rect.mjs';
 import { docForSide } from './side-doc.mjs';
@@ -16,7 +17,11 @@ import {
 
 // Same shape as knockout-flight's discard lookup: the zone lives inside the
 // side's playmat iframe, and visualRectOf maps it onto the parent viewport.
+// On the three.js board the prize grid's footprint stands even with no prizes left (the mirror's
+// #prizes is the union of its cards, which an emptied grid no longer has).
 const prizeRectFor = (user) => {
+  const grid = board3dActive() ? pileRect(user, 'prizes') : null;
+  if (grid && grid.width >= 2 && grid.height >= 2) return grid;
   const doc = docForSide(user, selfContainerDocument, oppContainerDocument);
   const zone = doc?.getElementById('prizes');
   if (!zone) return null;

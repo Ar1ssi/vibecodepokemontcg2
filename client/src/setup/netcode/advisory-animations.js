@@ -3,6 +3,7 @@
 // `applyView` in socket-event-listeners.js, so both players — originator
 // included — animate from the SAME server event: one source, no double-play.
 import { systemState } from '../../state.js';
+import { fxSettleHoldMs } from '../board3d/board-rects.js';
 import { rulesState } from '../../../../shared/engine/rules/rules-state.mjs';
 import {
   advisoryAnimationPlan,
@@ -229,6 +230,8 @@ export function handleBeforeApply(events, selfPlayerId) {
   strikesOf = attackStrikes(events);
   strikeKos = strikeKnockouts(events);
   if (!Array.isArray(events) || selfPlayerId == null) return;
+  // Design 074 §D6: on the 3D board the batch's effects start once its moved cards have landed.
+  holdFxQueue(fxSettleHoldMs(events));
   const registry = getCardRegistry();
   seedDamageBaselines(damageBaselinesBefore(events, registry));
   capturePrizeSeats(events, registry, selfPlayerId);

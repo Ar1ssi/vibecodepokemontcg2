@@ -832,6 +832,13 @@ body.fx-off .fx-mega-field {
   mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 70%, transparent 100%);
 }
 
+/* Design 074: the three.js board's mat is a canvas — the field rides above it, clipped to the
+   projected cloth (inline clip-path) and screened so the cards under it stay readable. */
+.fx-mega-field-board3d {
+  overflow: hidden;
+  mix-blend-mode: screen;
+}
+
 .fx-mega-field > * {
   position: absolute;
   will-change: transform, opacity;

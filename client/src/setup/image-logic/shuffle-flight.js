@@ -2,6 +2,7 @@ import {
   oppContainerDocument,
   selfContainerDocument,
 } from '../../state.js';
+import { board3dActive, matRect } from '../board3d/board-rects.js';
 import { cardBackSrcForUser } from '../deck-constructor/hydrate-holo.js';
 import { visualRectOf } from './iframe-rect.mjs';
 import {
@@ -25,6 +26,8 @@ const zoneOriginEl = (user, zoneId) => {
 };
 
 const boardRectOf = () => {
+  const table = board3dActive() ? matRect() : null;
+  if (table) return table;
   const mat = document.getElementById('battleMat');
   if (mat) return mat.getBoundingClientRect();
   const self = document.getElementById('selfContainer');

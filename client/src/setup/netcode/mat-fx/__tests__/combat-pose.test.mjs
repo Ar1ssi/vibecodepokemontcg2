@@ -20,6 +20,8 @@ import {
   lungePoseFor,
   screenShakeAmplitude,
   screenShakeOffsets,
+  screenShakeKeyframes,
+  easingTimeFor,
   shakePose,
   targetRingPose,
 } from '../combat-pose.mjs';
@@ -73,6 +75,28 @@ test('screenShakeOffsets: ends at rest and decays', () => {
   const offsets = screenShakeOffsets(6);
   assert.equal(offsets.at(-1), '0px 0px');
   assert.ok(Math.abs(parseFloat(offsets[0])) > Math.abs(parseFloat(offsets[4])));
+});
+
+test('screenShakeKeyframes: the WAAPI shake as timed px offsets (design 074 D6)', () => {
+  const keys = screenShakeKeyframes(6, 360);
+  const strings = screenShakeOffsets(6);
+  assert.equal(keys.length, strings.length);
+  keys.forEach((key, i) => {
+    const [x, y] = strings[i].split(' ').map(parseFloat);
+    assert.ok(Math.abs(key.x - x) < 0.006 && Math.abs(key.y - y) < 0.006, `key ${i}`);
+  });
+  assert.equal(keys[0].ms, 0);
+  assert.equal(keys.at(-1).ms, 360);
+  assert.deepEqual([keys.at(-1).x, keys.at(-1).y], [0, 0]);
+  for (let i = 1; i < keys.length; i += 1) assert.ok(keys[i].ms > keys[i - 1].ms);
+  // cubic-bezier(0.2, 0.6, 0.4, 1) front-loads progress: half the keys land before 30% of the time.
+  assert.ok(keys[6].ms < 0.3 * 360, `${keys[6].ms}`);
+});
+
+test('easingTimeFor: inverts a cubic-bezier easing (linear is the identity)', () => {
+  assert.ok(Math.abs(easingTimeFor(0.5, [0, 0, 1, 1]) - 0.5) < 1e-6);
+  assert.equal(easingTimeFor(0), 0);
+  assert.equal(easingTimeFor(1), 1);
 });
 
 test('damagePopPose: rises, fully visible early, faded at the end', () => {

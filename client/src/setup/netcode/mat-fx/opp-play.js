@@ -11,6 +11,7 @@ import {
   sampleKeyframes,
   spawnOverlay,
 } from '../../image-logic/mat-fx.mjs';
+import { board3dActive, boardRect } from '../../board3d/board-rects.js';
 import { resolveCardBackSrc } from '../apply-view.js';
 import { viewportRect } from './banner.js';
 import { pileOf } from './card-flight.js';
@@ -29,9 +30,11 @@ const face = (className, src) => {
   return img;
 };
 
-/** The two board iframes' page rects (null for one not laid out). */
+/** The two board halves' page rects (null for one not laid out): the iframes, or the 3D table's halves. */
 export const boardFrameRects = () =>
-  ['oppContainer', 'selfContainer'].map((id) => document.getElementById(id)?.getBoundingClientRect() || null);
+  board3dActive()
+    ? ['opp', 'self'].map(boardRect)
+    : ['oppContainer', 'selfContainer'].map((id) => document.getElementById(id)?.getBoundingClientRect() || null);
 
 /**
  * The two-faced preview card over `rect`: a host overlay holding a 3D card with

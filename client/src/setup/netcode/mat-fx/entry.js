@@ -7,6 +7,7 @@
 // brush strokes (mega-vortex.mjs). Played by `evolve` (lifecycle.js) and by
 // `enter` (a Pokémon put into play from hand, deck or discard). Self-removing
 // layers; no-op when the card is unknown.
+import { board3dActive, matCorners, matRect } from '../../board3d/board-rects.js';
 import { getCardRegistry } from '../apply-view.js';
 import {
   animateFrames,
@@ -114,7 +115,30 @@ const viewportRect = () => ({
  * the mat outline, and the card zones (iframes) stay on top of it. Without a
  * mat surface it floats as a soft-edged overlay around the card.
  */
+/**
+ * Design 074 §D6: on the three.js board the mat is a canvas, so the field cannot slide under
+ * the cards. It goes above the canvas in a top-document layer the size of the projected table,
+ * clipped to the cloth's quad and screened onto it (`mix-blend-mode: screen`), so it lights the
+ * mat and the cards alike instead of covering them.
+ */
+const spawnBoard3dMegaField = (rect) => {
+  const table = matRect();
+  const corners = matCorners();
+  if (!table || !(table.width > 1) || !(table.height > 1)) return null;
+  const place = megaFieldPlacement(rect, table, { width: table.width, height: table.height });
+  if (!place) return null;
+  const clip = spawnOverlay({ rect: table, className: 'fx-overlay fx-mega-field-board3d' });
+  if (corners) {
+    const points = corners.map(({ x, y }) => `${(x - table.left).toFixed(1)}px ${(y - table.top).toFixed(1)}px`);
+    clip.style.clipPath = `polygon(${points.join(', ')})`;
+  }
+  const host = layer('fx-mega-field');
+  clip.appendChild(host);
+  return { host, place, root: clip };
+};
+
 const spawnMegaField = (rect) => {
+  if (board3dActive()) return spawnBoard3dMegaField(rect);
   const surface = document.getElementById('battleMatSurface');
   if (surface?.isConnected && surface.offsetWidth > 1) {
     const place = megaFieldPlacement(rect, surface.getBoundingClientRect(), {
@@ -141,7 +165,7 @@ const spawnMegaField = (rect) => {
 function playMegaField(rect, run) {
   const spawned = spawnMegaField(rect);
   if (!spawned) return [];
-  const { host, place } = spawned;
+  const { host, place, root = host } = spawned;
   const { x, y, unit, reach } = place;
   const wash = layer('fx-mega-field__wash');
   const hexes = [HEX_WHITE_CELLS, HEX_TINT_CELLS].map((cells) => {
@@ -188,7 +212,7 @@ function playMegaField(rect, run) {
     run(wave, scaleFrames(megaWavePose)),
     run(lens, scaleFrames(megaLensPose, 32)),
   ];
-  removeWhen(host, done, MEGA_ENTRY_MS + BACKSTOP_PAD_MS);
+  removeWhen(root, done, MEGA_ENTRY_MS + BACKSTOP_PAD_MS);
   return done;
 }
 
