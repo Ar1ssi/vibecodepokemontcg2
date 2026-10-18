@@ -18,6 +18,7 @@ import {
   setFxVolume,
   setAmbienceOff,
   setCrowdOff,
+  setCameraPreset,
   setHoverPreviewOff,
   setSfxOff,
 } from '../../../setup/image-logic/fx-settings.js';
@@ -99,6 +100,15 @@ export const initializeSettings = () => {
     hoverPreviewCheckbox.checked = !fx.hoverPreviewOff;
     hoverPreviewCheckbox.addEventListener('change', () => {
       setHoverPreviewOff(!hoverPreviewCheckbox.checked);
+    });
+  }
+
+  // Design 074 H3: off = the 12° tilt camera, on = the TCG Live top-down camera; board3d.js hears the change through onFxSettingsChanged.
+  const tcglCameraCheckbox = document.getElementById('tcglCameraCheckbox');
+  if (tcglCameraCheckbox) {
+    tcglCameraCheckbox.checked = fx.cameraPreset === 'tcgl';
+    tcglCameraCheckbox.addEventListener('change', () => {
+      setCameraPreset(tcglCameraCheckbox.checked ? 'tcgl' : 'tilt12');
     });
   }
 

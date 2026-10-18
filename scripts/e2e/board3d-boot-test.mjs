@@ -67,11 +67,11 @@ const stopServer = (child) => {
   }
 };
 
-async function waitFor(page, fn, timeout = 25000) {
+async function waitFor(page, fn, timeout = 25000, arg) {
   const started = Date.now();
   let last;
   while (Date.now() - started < timeout) {
-    last = await page.evaluate(fn);
+    last = await page.evaluate(fn, arg);
     if (last) return last;
     await page.waitForTimeout(150);
   }
@@ -117,6 +117,52 @@ try {
   const retired = await boot(browser, `${server.base}/?e2e=1&board=iframe`);
   T('2a. ?board=iframe is ignored → the 3D board runs', retired.mode === '3d' && retired.active === true, JSON.stringify(retired));
   T('2b. … the canvas host shows', retired.hostShown === true && retired.canvas === true);
+
+  // H3: the TCG Live camera preset looks straight down, so the far seat's zones project as tall
+  // as the near seat's; the 12° tilt shrinks the far ones. The setting re-projects at once.
+  const presets = await (async () => {
+    const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
+    const page = await context.newPage();
+    page.on('pageerror', (err) => console.log('PAGEERROR:', err.message));
+    await page.goto(`${server.base}/?e2e=1`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await waitFor(page, () => window.__ptcg?.ready === true && document.body.classList.contains('board3d-active'), 60000);
+    const heights = () =>
+      page.evaluate(async () => {
+        const { getBoardScene } = await import('/src/setup/board3d/board3d.js');
+        const rects = getBoardScene()?.zoneRects() ?? {};
+        return { near: rects['self:active']?.height ?? null, far: rects['opp:active']?.height ?? null };
+      });
+    const tilted = await waitFor(page, async () => {
+      const { getBoardScene } = await import('/src/setup/board3d/board3d.js');
+      const rects = getBoardScene()?.zoneRects() ?? {};
+      return rects['self:active'] && rects['opp:active'] ? true : null;
+    }, 30000).then(heights);
+    await page.evaluate(async () => {
+      const { setCameraPreset } = await import('/src/setup/image-logic/fx-settings.js');
+      setCameraPreset('tcgl');
+    });
+    const topDown = await waitFor(page, async ([before]) => {
+      const { getBoardScene } = await import('/src/setup/board3d/board3d.js');
+      const rects = getBoardScene()?.zoneRects() ?? {};
+      const far = rects['opp:active']?.height;
+      return far && Math.abs(far - before) > 0.5 ? true : null;
+    }, 15000, [tilted.far]).then(heights).catch(() => null);
+    await page.evaluate(async () => {
+      const { setCameraPreset } = await import('/src/setup/image-logic/fx-settings.js');
+      setCameraPreset('tilt12');
+    });
+    const back = await waitFor(page, async ([before]) => {
+      const { getBoardScene } = await import('/src/setup/board3d/board3d.js');
+      const far = (getBoardScene()?.zoneRects() ?? {})['opp:active']?.height;
+      return far && Math.abs(far - before) < 0.5 ? true : null;
+    }, 15000, [tilted.far]).then(heights).catch(() => null);
+    await context.close();
+    return { tilted, topDown, back };
+  })();
+  T('4a. tilt12: the far Active projects shorter than the near one', presets.tilted.near > presets.tilted.far * 1.02, JSON.stringify(presets.tilted));
+  T('4b. setCameraPreset(\'tcgl\') re-projects at once: far and near Active heights within 1 %',
+    Boolean(presets.topDown) && Math.abs(presets.topDown.near - presets.topDown.far) <= presets.topDown.near * 0.01, JSON.stringify(presets.topDown));
+  T('4c. back to tilt12 restores the tilted projection', Boolean(presets.back) && Math.abs(presets.back.far - presets.tilted.far) < 0.5, JSON.stringify(presets.back));
 } catch (err) {
   failed += 1;
   console.log('TEST ERROR:', err.message);

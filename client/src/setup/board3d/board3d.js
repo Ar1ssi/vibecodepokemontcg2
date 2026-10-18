@@ -1,7 +1,7 @@
 // Boot, wiring and failure reporting for the three.js board (design 074 §D3 "Lifecycle", §D9).
 // Loaded by front-end.js through import(), so the page still boots when this board cannot start;
 // three.js and the scene modules load from here.
-import { cameraFromCssTilt } from './board-camera.mjs';
+import { cameraFromCssTilt, cameraTcgLive } from './board-camera.mjs';
 import { flatLayout, halfFromViewport } from './board-layout.mjs';
 import { CARD_ZONES } from './board-model.mjs';
 
@@ -15,7 +15,7 @@ const unavailableNotice = (reason) => `3D board unavailable: ${reason}; this bro
 const defaultDeps = {
   importThree: () => import('three'),
   loadModules: async () => {
-    const [renderer, textures, scene, clock, table, room, model, applyView, hydrateHolo, matFx, containers, input, hover, dragActions] =
+    const [renderer, textures, scene, clock, table, room, model, applyView, hydrateHolo, matFx, containers, input, hover, dragActions, fxApply, fxModel] =
       await Promise.all([
         import('../gl/gl-renderer.js'),
         import('../gl/gl-textures.js'),
@@ -31,6 +31,8 @@ const defaultDeps = {
         import('./board-input.js'),
         import('../image-logic/hover-preview.js'),
         import('./board-drag-actions.js'),
+        import('../image-logic/fx-settings.js'),
+        import('../image-logic/fx-settings.mjs'),
       ]);
     return {
       createRenderer: renderer.createRenderer,
@@ -47,6 +49,10 @@ const defaultDeps = {
       createBoardInput: input.createBoardInput,
       getHoverPreview: hover.getHoverPreview,
       createBoardDragActions: dragActions.createBoardDragActions,
+      cameraPreset: {
+        current: () => fxModel.readSettings(globalThis.localStorage).cameraPreset,
+        subscribe: (listener) => fxApply.onFxSettingsChanged((settings) => listener(settings.cameraPreset)),
+      },
       loadFoil,
     };
   },
@@ -164,8 +170,10 @@ const freshCanvas = (host, old) => {
  *   RoomEnvironment }`, optionally `boardMirror` (board-mirror.js, the shadow roots apply-view.js
  *   renders into while this board runs: its UI state feeds the scene, the scene's rects feed it),
  *   `createBoardInput` (board-input.js, the canvas's pointer input dispatched to the mirror),
- *   `getHoverPreview` (hover-preview.js, the preview that input feeds) and
- *   `createBoardDragActions` (board-drag-actions.js, the page-side calls a drag ends in).
+ *   `getHoverPreview` (hover-preview.js, the preview that input feeds),
+ *   `createBoardDragActions` (board-drag-actions.js, the page-side calls a drag ends in) and
+ *   `cameraPreset` (`{ current(): 'tilt12'|'tcgl', subscribe(listener(preset)): unsubscribe }`, the
+ *   stored camera setting; absent = 'tilt12').
  * @returns {Promise<{ active: boolean, reason: string|null }>} reasons: 'no-host',
  *   'legacy-netcode', 'load-failed', 'no-webgl2'; a later second context loss reports
  *   'context-lost-twice' after this resolved.
@@ -249,15 +257,31 @@ export async function initializeBoard3d({
     }
   };
 
+  const currentPreset = () => {
+    try {
+      return modules.cameraPreset?.current() === 'tcgl' ? 'tcgl' : 'tilt12';
+    } catch {
+      return 'tilt12';
+    }
+  };
+  let appliedPreset = 'tilt12';
+
   const relayout = () => {
     if (!session) return;
     const viewport = viewportOf(host, win);
     if (!(viewport.w > 0 && viewport.h > 0)) return;
     const half = halfFromViewport(viewport);
     const spec = session.mat;
+    const layout = flatLayout(spec?.profile, half, { viewport, matScale: spec?.scale ?? 1 });
+    appliedPreset = currentPreset();
+    const cameraParams = { viewportW: viewport.w, viewportH: viewport.h, nearHalf: half };
     session.scene.setViewport(viewport);
-    session.scene.setCamera(cameraFromCssTilt({ viewportW: viewport.w, viewportH: viewport.h, nearHalf: half }));
-    session.scene.setLayout(flatLayout(spec?.profile, half, { viewport, matScale: spec?.scale ?? 1 }));
+    session.scene.setCamera(
+      appliedPreset === 'tcgl'
+        ? cameraTcgLive({ ...cameraParams, cardHeightPx: layout.self.cardBox.active.h })
+        : cameraFromCssTilt(cameraParams)
+    );
+    session.scene.setLayout(layout);
     queueMirrorSync();
   };
 
@@ -342,6 +366,14 @@ export async function initializeBoard3d({
   doc.body?.classList.add(ACTIVE_CLASS);
   active = true;
   relayout();
+
+  // The settings checkbox changes the preset: re-project at once (snap, no tween).
+  if (typeof modules.cameraPreset?.subscribe === 'function') {
+    const unsubscribe = modules.cameraPreset.subscribe((preset) => {
+      if (preset !== appliedPreset) relayout();
+    });
+    session.cleanup.push(unsubscribe);
+  }
 
   const onMatApplied = async () => {
     const spec = await readMat();

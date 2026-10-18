@@ -116,3 +116,103 @@ test('projectToScreen returns null behind the eye', () => {
   const camera = cameraFromCssTilt({ viewportW: 1920, viewportH: 1080 });
   assert.equal(projectToScreen(camera, [0, 0, P + 10]), null);
 });
+
+// Design 074 H3: the TCG Live camera.
+import { cameraTcgLive } from '../board-camera.mjs';
+
+const TCGL_VIEWPORTS = [
+  { w: 1920, h: 1080 },
+  { w: 1280, h: 720 },
+  { w: 800, h: 1000 },
+  { w: 600, h: 1200 },
+];
+
+test('both camera presets put the seam centre on the viewport middle line', () => {
+  for (const { w, h } of TCGL_VIEWPORTS) {
+    const seam = { x: 0, y: h * 0.5 * 0.84 };
+    const tilted = cameraFromCssTilt({ viewportW: w, viewportH: h });
+    const topDown = cameraTcgLive({ viewportW: w, viewportH: h });
+    const atTilted = projectToScreen(tilted, tableToWorld(seam, tilted));
+    const atTopDown = projectToScreen(topDown, tableToWorld(seam, topDown));
+    // The 12° table sits in the iframe's 75.5% column (index.css:186), so only y is the middle.
+    close(atTilted.x, (w * 0.755) / 2, `${w}x${h} tilt12 x`, 1);
+    close(atTilted.y, h / 2, `${w}x${h} tilt12 y`, 1);
+    close(atTopDown.x, w / 2, `${w}x${h} tcgl x`, 1);
+    close(atTopDown.y, h / 2, `${w}x${h} tcgl y`, 1);
+  }
+});
+
+test('cameraTcgLive is a straight-down fov-20 pose with no perspective skew between the halves', () => {
+  for (const { w, h } of TCGL_VIEWPORTS) {
+    const camera = cameraTcgLive({ viewportW: w, viewportH: h });
+    const D = h * 0.5 * 0.84;
+    assert.equal(camera.fov, 20);
+    assert.equal(camera.tiltDeg, 0);
+    assert.deepEqual(camera.up, [0, 1, 0]);
+    const at = (point) => projectToScreen(camera, tableToWorld(point, camera));
+    const d = 300;
+    const far = at({ x: 0, y: D + d });
+    const near = at({ x: 0, y: D - d });
+    const centre = at({ x: 0, y: D });
+    close(centre.y - far.y, near.y - centre.y, `${w}x${h} far/near distance from the centre`, 1e-6);
+    // A card's height 130 px up the far half and down the near half projects to the same size.
+    const cardHeight = (y) => at({ x: 0, y }).y - at({ x: 0, y: y + 100 }).y;
+    const farHeight = cardHeight(D + d);
+    const nearHeight = cardHeight(D - d - 100);
+    assert.ok(Math.abs(farHeight - nearHeight) / nearHeight < 0.005, `${w}x${h} ${farHeight} vs ${nearHeight}`);
+  }
+});
+
+test('cameraTcgLive shows the whole table (both playfields and hand strips) and reports the fit', () => {
+  for (const { w, h } of TCGL_VIEWPORTS) {
+    const camera = cameraTcgLive({ viewportW: w, viewportH: h });
+    const half = { w: w * 0.755, h: h * 0.5 };
+    const edgeY = 2 * half.h * 0.84 + half.h * 0.16;
+    const at = (point) => projectToScreen(camera, tableToWorld(point, camera));
+    const farCorner = at({ x: -half.w / 2, y: edgeY });
+    const nearCorner = at({ x: half.w / 2, y: -half.h * 0.16 });
+    assert.ok(farCorner.y >= -1e-6 && farCorner.x >= 0, `${w}x${h} far corner on screen`);
+    assert.ok(nearCorner.y <= h + 1e-6 && nearCorner.x <= w, `${w}x${h} near corner on screen`);
+    assert.ok(camera.distanceScale >= 1);
+  }
+});
+
+test('cameraTcgLive keeps TCG Live scale (183 units per 8.9-unit card) when the table already fits', () => {
+  // A small card makes 183 × cardH / 8.9 shorter than the fit distance: the fit wins and is reported.
+  const fitted = cameraTcgLive({ viewportW: 1920, viewportH: 1080, cardHeightPx: 100 });
+  assert.ok(fitted.distanceScale > 1);
+  // A large card pushes the eye past the fit: the nominal distance is kept as is.
+  const big = cameraTcgLive({ viewportW: 1920, viewportH: 1080, cardHeightPx: 200 });
+  close(big.position[2], 183 * (200 / 8.9), 'nominal distance', 1e-6);
+  assert.equal(big.distanceScale, 1);
+  // The default card size is the sim profile's: 145.152 px at 1080 tall.
+  const dflt = cameraTcgLive({ viewportW: 1920, viewportH: 1080 });
+  const explicit = cameraTcgLive({ viewportW: 1920, viewportH: 1080, cardHeightPx: 145.152 });
+  close(dflt.position[2], explicit.position[2], 'default card height', 1e-6);
+});
+
+test('screenToPlane inverts projectToScreen on the cloth and on lifted planes', async () => {
+  const { screenToPlane } = await import('../board-camera.mjs');
+  for (const broadcast of [false, true]) {
+    const camera = cameraFromCssTilt({ viewportW: 1920, viewportH: 1080, broadcast });
+    for (const planeZ of [0, 1.5, 60, 140]) {
+      for (const [x, y] of [[960, 540], [100, 900], [1800, 120], [400, 300]]) {
+        const world = screenToPlane(camera, { x, y }, planeZ);
+        assert.ok(world, `hit at ${x},${y} z=${planeZ}`);
+        const back = projectToScreen(camera, [world.x, world.y, world.z]);
+        close(back.x, x, `x (z=${planeZ}, broadcast=${broadcast})`, 1e-6);
+        close(back.y, y, `y (z=${planeZ}, broadcast=${broadcast})`, 1e-6);
+        // The hit lies on the plane: undoing tableToWorld's tilt leaves height planeZ.
+        const rad = (camera.tiltDeg * Math.PI) / 180;
+        close(world.y * Math.sin(rad) + world.z * Math.cos(rad), planeZ, 'plane height', 1e-6);
+      }
+    }
+  }
+});
+
+test('screenToPlane is null for a ray that never meets the plane in front of the eye', async () => {
+  const { screenToPlane } = await import('../board-camera.mjs');
+  const camera = cameraFromCssTilt({ viewportW: 1920, viewportH: 1080 });
+  // The eye is P above the cloth: a plane above the eye is behind every ray.
+  assert.equal(screenToPlane(camera, { x: 960, y: 540 }, P + 500), null);
+});

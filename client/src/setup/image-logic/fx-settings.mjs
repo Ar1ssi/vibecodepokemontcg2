@@ -11,6 +11,10 @@ export const AMBIENCE_OFF_KEY = 'ptcg-status-ambience-off';
 export const CROWD_OFF_KEY = 'ptcg-crowd-off';
 // Design 069: the card hover preview is on unless the stored '1' turns it off.
 export const HOVER_PREVIEW_OFF_KEY = 'ptcg-hover-preview-off';
+// Design 074 H3: the 3D board's camera, 'tilt12' (the old CSS tilt) unless the stored value is 'tcgl'.
+export const CAMERA_PRESET_KEY = 'ptcg-camera-preset';
+export const CAMERA_PRESETS = ['tilt12', 'tcgl'];
+export const DEFAULT_CAMERA_PRESET = 'tilt12';
 export const DEFAULT_VOLUME = 0.6;
 
 export const FX_OFF_CLASS = 'fx-off';
@@ -23,6 +27,9 @@ export function normalizeVolume(value) {
   return Math.min(1, Math.max(0, n));
 }
 
+/** Any stored/typed value → a known preset; junk falls back to the default. */
+export const normalizeCameraPreset = (value) => (CAMERA_PRESETS.includes(value) ? value : DEFAULT_CAMERA_PRESET);
+
 const readKey = (storage, key) => {
   try {
     return storage?.getItem?.(key) ?? null;
@@ -31,7 +38,7 @@ const readKey = (storage, key) => {
   }
 };
 
-/** @returns {{fxOff:boolean, sfxOff:boolean, volume:number, ambienceOff:boolean, crowdOff:boolean, hoverPreviewOff:boolean}} defaults when unreadable. */
+/** @returns {{fxOff:boolean, sfxOff:boolean, volume:number, ambienceOff:boolean, crowdOff:boolean, hoverPreviewOff:boolean, cameraPreset:'tilt12'|'tcgl'}} defaults when unreadable. */
 export function readSettings(storage) {
   return {
     fxOff: readKey(storage, FX_OFF_KEY) === '1',
@@ -39,16 +46,24 @@ export function readSettings(storage) {
     ambienceOff: readKey(storage, AMBIENCE_OFF_KEY) === '1',
     crowdOff: readKey(storage, CROWD_OFF_KEY) !== '0',
     hoverPreviewOff: readKey(storage, HOVER_PREVIEW_OFF_KEY) === '1',
+    cameraPreset: normalizeCameraPreset(readKey(storage, CAMERA_PRESET_KEY)),
     volume: normalizeVolume(readKey(storage, VOLUME_KEY)),
   };
 }
 
 /**
- * Persist one setting. Booleans store as '1'/'0', volume as its clamped number.
+ * Persist one setting. Booleans store as '1'/'0', volume as its clamped number, the camera preset as its name.
  * @returns {boolean} false when storage is missing or refused the write.
  */
 export function writeSetting(storage, key, value) {
-  const stored = key === VOLUME_KEY ? String(normalizeVolume(value)) : value ? '1' : '0';
+  const stored =
+    key === VOLUME_KEY
+      ? String(normalizeVolume(value))
+      : key === CAMERA_PRESET_KEY
+        ? normalizeCameraPreset(value)
+        : value
+          ? '1'
+          : '0';
   if (typeof storage?.setItem !== 'function') return false;
   try {
     storage.setItem(key, stored);

@@ -13,6 +13,7 @@ import {
   FX_OFF_KEY,
   FX_REDUCED_CLASS,
   AMBIENCE_OFF_KEY,
+  CAMERA_PRESET_KEY,
   CROWD_OFF_KEY,
   HOVER_PREVIEW_OFF_KEY,
   SFX_OFF_KEY,
@@ -52,7 +53,7 @@ export const onFxSettingsChanged = (listener) => {
 /**
  * Push the stored settings onto the page. Safe to call before the iframes
  * exist (they are simply skipped) — call it again once they do.
- * @returns {{fxOff:boolean, sfxOff:boolean, volume:number, ambienceOff:boolean, crowdOff:boolean, hoverPreviewOff:boolean}} the applied settings
+ * @returns {{fxOff:boolean, sfxOff:boolean, volume:number, ambienceOff:boolean, crowdOff:boolean, hoverPreviewOff:boolean, cameraPreset:'tilt12'|'tcgl'}} the applied settings
  */
 export function applyFxSettings() {
   const stored = readSettings(storage());
@@ -87,6 +88,8 @@ export const setFxVolume = (volume) => setFxSetting(VOLUME_KEY, volume);
 export const setAmbienceOff = (off) => setFxSetting(AMBIENCE_OFF_KEY, off);
 export const setCrowdOff = (off) => setFxSetting(CROWD_OFF_KEY, off);
 export const setHoverPreviewOff = (off) => setFxSetting(HOVER_PREVIEW_OFF_KEY, off);
+/** Design 074 H3: board3d.js hears the change through onFxSettingsChanged and re-projects. */
+export const setCameraPreset = (preset) => setFxSetting(CAMERA_PRESET_KEY, preset);
 
 // The iframes are built after boot, so re-apply when the mats report ready.
 // `systemState` is imported for that hook's existence check only.

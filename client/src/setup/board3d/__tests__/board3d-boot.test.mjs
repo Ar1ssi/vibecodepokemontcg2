@@ -206,3 +206,52 @@ describe('initializeBoard3d', () => {
     assert.equal(syncs.length, 2);
   });
 });
+
+describe('camera preset (design 074 H3)', () => {
+  const withPreset = (deps, initial) => {
+    const state = { preset: initial, listeners: new Set() };
+    const loadModules = deps.loadModules;
+    deps.loadModules = async () => ({
+      ...(await loadModules()),
+      cameraPreset: {
+        current: () => state.preset,
+        subscribe: (listener) => {
+          state.listeners.add(listener);
+          return () => state.listeners.delete(listener);
+        },
+      },
+    });
+    const change = (preset) => {
+      state.preset = preset;
+      for (const listener of state.listeners) listener(preset);
+    };
+    return { state, change };
+  };
+
+  it('defaults to the 12° tilt camera when no preset is offered', async () => {
+    const { host, deps, calls } = setup();
+    await initializeBoard3d({ host, deps });
+    assert.equal(calls.scenes[0].cameras.at(-1).tiltDeg, 12);
+  });
+
+  it('starts on the stored preset and snaps to the other one when the setting changes', async () => {
+    const { host, deps, calls } = setup();
+    const preset = withPreset(deps, 'tcgl');
+    await initializeBoard3d({ host, deps });
+    const scene = calls.scenes[0];
+    assert.equal(scene.cameras.at(-1).fov, 20);
+    assert.equal(scene.cameras.at(-1).tiltDeg, 0);
+
+    preset.change('tilt12');
+    assert.equal(scene.cameras.at(-1).tiltDeg, 12);
+    preset.change('tcgl');
+    assert.equal(scene.cameras.at(-1).fov, 20);
+
+    const count = scene.cameras.length;
+    preset.change('tcgl');
+    assert.equal(scene.cameras.length, count, 'an unrelated settings change does not relayout');
+
+    disposeBoard3d();
+    assert.equal(preset.state.listeners.size, 0, 'the subscription is released with the board');
+  });
+});

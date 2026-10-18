@@ -1,18 +1,18 @@
 // Design 044: plays a draw. Face-up cards (yours) run the TCG Live scene
 // (draw-scene.mjs): out of the deck, flipped face up into a spread over the
 // mat, then down into the hand. Face-down cards (the opponent's) fly from
-// their deck to their hand on design 042's arc, sleeve up. Every card handed
-// in is already hidden in the hand and is shown the moment its overlay lands.
+// their deck to their hand on design 042's arc, sleeve up. Design 074 H1: the
+// card's own mesh flies (card-flight.js playMeshTrack), not a cloned image.
+// Every card handed in is already hidden in the hand and is shown the moment
+// its flight lands.
 // Draws animate even with effects off, like the flight they replace.
 // Design 045: a card with `from` (a taken prize) starts there instead of at
 // the deck, and `from.release` removes the sleeve that stood there as it goes.
 import { selfContainerDocument, oppContainerDocument } from '../../../state.js';
 import { boardRect, rectForInstance as boardCardRect, visualRectOf } from '../../board3d/board-rects.js';
-import { animateFrames, removeWhen, sampleKeyframes, spawnOverlay } from '../../image-logic/mat-fx.mjs';
-import { toHighResCardImageUrl } from '../../image-logic/card-image-url.mjs';
-import { cardBackSrcForUser, imageAnchor } from '../../deck-constructor/hydrate-holo.js';
+import { imageAnchor } from '../../deck-constructor/hydrate-holo.js';
 import { viewportRect } from './banner.js';
-import { playCardTrack } from './card-flight.js';
+import { FLIGHT_LIFT_FRAC, meshCanFly, playMeshTrack } from './card-flight.js';
 import { FLIGHT_MS, FLIGHT_STAGGER_MS, flightPose, planFlight, rectFlightEnds } from './card-flight.mjs';
 import { drawCardTrack, drawSceneTimes, drawSpreadRects } from './draw-scene.mjs';
 import { frameTurnOf } from './evolve-scene.js';
@@ -20,9 +20,7 @@ import { playFxSound } from './fx-audio.js';
 import { matCenter } from './opp-play.mjs';
 import { docForSide } from './side-doc.mjs';
 
-const DEFAULT_SLEEVE = 'https://ptcgsim.online/src/assets/cardback.png';
 const BACKSTOP_PAD_MS = 400;
-const SAMPLES = 60;
 
 const usable = (r) => Boolean(r) && r.width >= 2 && r.height >= 2;
 
@@ -51,16 +49,10 @@ export function handSpotOf(card) {
   return usable(rect) ? { rect, turn: frameTurnOf(card.image) } : null;
 }
 
-const sleeveOf = (user) => cardBackSrcForUser(user) || DEFAULT_SLEEVE;
+const instanceIdOf = (card) => Number(card.image?.dataset?.instanceId);
 
-const cardFace = (className, src) => {
-  const img = document.createElement('img');
-  img.className = className;
-  img.src = src;
-  img.alt = '';
-  img.draggable = false;
-  return img;
-};
+// A flying card rides FLIGHT_LIFT_FRAC of a hand card's height off the cloth.
+const liftFor = (spot, start) => FLIGHT_LIFT_FRAC * (spot?.rect?.height || start?.rect?.height || 0);
 
 // The sleeve standing where a card starts goes the moment its overlay starts.
 const releaseAt = (card, delay) => {
@@ -99,7 +91,6 @@ export function playDrawScene(user, cards, show) {
   }
   const slots = drawSpreadRects(cards.length, matCenter(boardFrameRects(), viewport), viewport);
   const deck = deckOf(user);
-  const sleeve = sleeveOf(user);
   let played = 0;
   cards.forEach((card, index) => {
     const spot = handSpotOf(card);
@@ -114,45 +105,25 @@ export function playDrawScene(user, cards, show) {
       handTurn: spot?.turn || 0,
       fadeIn: !card.from?.release,
     });
-    const src = card.image.currentSrc || card.image.src;
-    if (!track || !src) {
+    const instanceId = instanceIdOf(card);
+    if (!track || !meshCanFly(instanceId)) {
       show(card);
       return;
     }
     played += 1;
     sound('draw-card', user, track.delay);
     const box = slots[index] || spot.rect;
-    const host = spawnOverlay({ rect: box, className: 'fx-overlay fx-draw fx-draw-scene' });
-    const flip = document.createElement('div');
-    flip.className = 'fx-draw-scene__card';
-    flip.append(
-      cardFace('fx-draw-scene__back', sleeve),
-      cardFace('fx-draw-scene__front', toHighResCardImageUrl(src))
-    );
-    host.appendChild(flip);
-    const H = box.height;
-    const timing = { duration: track.duration, delay: track.delay };
-    const done = [
-      animateFrames(
-        flip,
-        sampleKeyframes(
-          track.pose,
-          (p) => ({
-            transform:
-              `translate(${p.x}px, ${p.y}px) perspective(${H * 4}px) rotate(${p.rotate}deg) ` +
-              `rotateX(${p.tiltX}deg) rotateY(${p.flip}deg) scale(${p.scale})`,
-          }),
-          SAMPLES
-        ),
-        timing
-      ),
-      // Opacity on the 3D card would flatten it and hide the sleeve (design 043).
-      animateFrames(host, sampleKeyframes(track.pose, (p) => ({ opacity: p.opacity }), SAMPLES), timing),
-    ];
+    const flown = playMeshTrack({
+      instanceId,
+      rect: box,
+      pose: track.pose,
+      duration: track.duration,
+      delay: track.delay,
+      lift: liftFor(spot, start),
+    });
     const backstop = track.delay + track.duration + BACKSTOP_PAD_MS;
-    removeWhen(host, done, backstop);
     releaseAt(card, track.delay);
-    revealWhen(card, show, done, backstop);
+    revealWhen(card, show, [flown], backstop);
   });
   if (played > 0) sound('draw-start', user);
   return played > 0 ? drawSceneTimes(cards.length).total : 0;
@@ -165,13 +136,13 @@ export function playDrawScene(user, cards, show) {
  */
 export function playOppDrawFlights(user, cards, show) {
   const deck = deckOf(user);
-  const sleeve = sleeveOf(user);
   let last = 0;
   let flown = 0;
   cards.forEach((card) => {
     const spot = handSpotOf(card);
     const start = startOf(card, deck);
-    if (!start || !spot) {
+    const instanceId = instanceIdOf(card);
+    if (!start || !spot || !meshCanFly(instanceId)) {
       show(card);
       return;
     }
@@ -182,13 +153,13 @@ export function playOppDrawFlights(user, cards, show) {
       seed: Math.floor(Math.random() * 1e6),
     });
     releaseAt(card, delay);
-    const landed = playCardTrack({
+    const landed = playMeshTrack({
+      instanceId,
       rect: start.rect,
-      src: sleeve,
-      pose: (u) => ({ ...flightPose(u, flight), opacity: 1 }),
+      pose: (u) => flightPose(u, flight),
       duration: FLIGHT_MS,
       delay,
-      className: 'fx-draw',
+      lift: liftFor(spot, start),
     });
     revealWhen(card, show, [landed], delay + FLIGHT_MS + BACKSTOP_PAD_MS);
     last = delay + FLIGHT_MS;

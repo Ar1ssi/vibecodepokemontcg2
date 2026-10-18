@@ -139,6 +139,8 @@ function offsetAt(keys, elapsed) {
  *   setZoneHighlight: (side: 'self'|'opp'|null, zone: string, on: boolean) => void,
  *   setCardHighlight: (id: number|null) => void,
  *   shake: (offsets: { x: number, y: number, ms: number }[]) => Promise<void>,
+ *   tween: (instanceId: number, poseFn: (t: number) => object, ms: number,
+ *     options?: { ease?: (t: number) => number }) => Promise<void>,
  *   setUiState: (id: number, patch: object) => void, setMat: (spec: object|null) => void,
  *   setHover: (instanceId: number|null) => void, setHandPose: (pose: 'normal'|'lowered') => void,
  *   inspect: () => { scene: import('three').Scene, camera: import('three').PerspectiveCamera,
@@ -268,6 +270,7 @@ export function createBoardScene({
     foil,
     motionReduced,
     onNeedsRender: invalidate,
+    viewOrigin: () => canvasBox() ?? { left: 0, top: 0 },
   });
 
   const piles = createPileMeshes({
@@ -622,8 +625,8 @@ export function createBoardScene({
     ].map(([dx, dy]) => tableToWorld({ x: x + dx, y: y + dy, z }, cameraDesc));
 
   /**
-   * Client-px rects keyed by card instance id (every visible card: the bounding box of its front
-   * face's four corners), `pile:<side>:<zone>` (each deck / discard / Lost Zone footprint at its
+   * Client-px rects keyed by card instance id (every card that stands somewhere, hidden or not:
+   * the bounding box of its front face's four corners), `pile:<side>:<zone>` (each deck / discard / Lost Zone footprint at its
    * stack's top, drawn or empty) and `stadium` (the Stadium zone's card footprint). Projected
    * with the pure camera description (board-camera.mjs `projectToScreen`, the same math
    * `PerspectiveCamera` runs) and offset by the canvas's page position. A running shake is not
@@ -635,7 +638,8 @@ export function createBoardScene({
     advanceCards();
     const box = canvasBox() ?? { left: 0, top: 0 };
     for (const id of pool.ids()) {
-      if (!pool.meshOf(id)?.visible) continue;
+      // A card hidden by an effect (a draw held until its flight) still stands where its pose puts it.
+      if (!pool.placed(id)) continue;
       const rect = screenRectOf(pool.cornersOf(id) ?? [], box);
       if (rect) out[id] = rect;
     }
@@ -930,6 +934,20 @@ export function createBoardScene({
   };
 
   /**
+   * Flies a card's mesh (design 074 H1): for `ms` of scene time each drawn frame calls `poseFn(t)`
+   * (t eased 0 → 1 with `ease`, default easeOutCubic; pass `(t) => t` for a linear track) and
+   * the mesh sits at the pose it returns, `{ rect: {left, top, width, height}, rotateZDeg?,
+   * tiltXDeg?, lift?, flipDeg? }` in viewport px (flight-pose.mjs). The card's own pose is
+   * suspended and the mesh shown, hidden or not. Resolves when t reaches 1, when another tween on
+   * the card replaces it, or when the card leaves the board; resolves at once for a card the scene
+   * does not draw. End a flight at the card's rect: the next frame puts the mesh on its own pose.
+   */
+  const tween = (id, poseFn, ms, options) => {
+    if (disposed) return Promise.resolve();
+    return pool.tween(id, poseFn, ms, options);
+  };
+
+  /**
    * Screen shake as a camera view-offset sequence on the scene clock. `offsets` are keyframes
    * `{ x, y, ms }` in screen px, `ms` from the start (combat-pose.mjs `screenShakeKeyframes`
    * spread over its duration). A new shake replaces a running one. Resolves when it ends.
@@ -1039,6 +1057,7 @@ export function createBoardScene({
     setZoneHighlight,
     setCardHighlight,
     shake,
+    tween,
     setUiState,
     setMat,
     setHover,

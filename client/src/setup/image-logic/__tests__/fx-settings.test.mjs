@@ -9,6 +9,8 @@ import {
   AMBIENCE_OFF_KEY,
   CROWD_OFF_KEY,
   HOVER_PREVIEW_OFF_KEY,
+  CAMERA_PRESET_KEY,
+  normalizeCameraPreset,
   readSettings,
   writeSetting,
 } from '../fx-settings.mjs';
@@ -41,6 +43,7 @@ test('fx-settings: defaults when nothing is stored', () => {
     ambienceOff: false,
     crowdOff: true,
     hoverPreviewOff: false,
+    cameraPreset: 'tilt12',
   });
 });
 
@@ -57,6 +60,7 @@ test('fx-settings: reads each stored flag', () => {
     ambienceOff: false,
     crowdOff: true,
     hoverPreviewOff: false,
+    cameraPreset: 'tilt12',
   });
 });
 
@@ -79,6 +83,7 @@ test('fx-settings: a missing or throwing storage yields defaults, not a throw', 
     ambienceOff: false,
     crowdOff: true,
     hoverPreviewOff: false,
+    cameraPreset: 'tilt12',
   });
   assert.deepEqual(readSettings(undefined).volume, DEFAULT_VOLUME);
   assert.deepEqual(readSettings(throwingStorage), {
@@ -88,6 +93,7 @@ test('fx-settings: a missing or throwing storage yields defaults, not a throw', 
     ambienceOff: false,
     crowdOff: true,
     hoverPreviewOff: false,
+    cameraPreset: 'tilt12',
   });
 });
 
@@ -116,7 +122,7 @@ test('fx-settings: writeSetting stores flags as 1/0 and volume as a number', () 
   assert.equal(storage.data[FX_OFF_KEY], '0');
   writeSetting(storage, VOLUME_KEY, 3);
   assert.equal(storage.data[VOLUME_KEY], '1');
-  assert.deepEqual(readSettings(storage), { fxOff: false, sfxOff: false, ambienceOff: false, crowdOff: true, hoverPreviewOff: false, volume: 1 });
+  assert.deepEqual(readSettings(storage), { fxOff: false, sfxOff: false, ambienceOff: false, crowdOff: true, hoverPreviewOff: false, cameraPreset: 'tilt12', volume: 1 });
 });
 
 test('fx-settings: writeSetting reports failure instead of throwing', () => {
@@ -148,4 +154,25 @@ test('fx-settings: the hover preview toggle round-trips through writeSetting', (
   assert.equal(readSettings(storage).hoverPreviewOff, true);
   writeSetting(storage, HOVER_PREVIEW_OFF_KEY, false);
   assert.equal(readSettings(storage).hoverPreviewOff, false);
+});
+
+test('fx-settings: the camera preset (design 074 H3) defaults to tilt12 and is tcgl only for the stored "tcgl"', () => {
+  assert.equal(readSettings(fakeStorage()).cameraPreset, 'tilt12');
+  assert.equal(readSettings(fakeStorage({ [CAMERA_PRESET_KEY]: 'tcgl' })).cameraPreset, 'tcgl');
+  assert.equal(readSettings(fakeStorage({ [CAMERA_PRESET_KEY]: 'tilt12' })).cameraPreset, 'tilt12');
+  assert.equal(readSettings(fakeStorage({ [CAMERA_PRESET_KEY]: 'TCGL' })).cameraPreset, 'tilt12');
+  assert.equal(readSettings(fakeStorage({ [CAMERA_PRESET_KEY]: '1' })).cameraPreset, 'tilt12');
+  assert.equal(readSettings(throwingStorage).cameraPreset, 'tilt12');
+  assert.equal(normalizeCameraPreset(undefined), 'tilt12');
+});
+
+test('fx-settings: the camera preset round-trips through writeSetting and rejects junk', () => {
+  const storage = fakeStorage();
+  writeSetting(storage, CAMERA_PRESET_KEY, 'tcgl');
+  assert.equal(storage.data[CAMERA_PRESET_KEY], 'tcgl');
+  assert.equal(readSettings(storage).cameraPreset, 'tcgl');
+  writeSetting(storage, CAMERA_PRESET_KEY, 'tilt12');
+  assert.equal(readSettings(storage).cameraPreset, 'tilt12');
+  writeSetting(storage, CAMERA_PRESET_KEY, true);
+  assert.equal(storage.data[CAMERA_PRESET_KEY], 'tilt12');
 });

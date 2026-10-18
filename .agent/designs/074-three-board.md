@@ -539,6 +539,37 @@ Banned in a slice row: "decide", "TBD", "as needed", "appropriate", "handle edge
 
 ## Deviations (Builder appends here during build)
 
+### H1 (a: API + draws; b: KO, retreat/promote, opp Trainer landing)
+- `scene.tween(instanceId, poseFn, ms, { ease })`: pose `{ rect, rotateZDeg, tiltXDeg, lift, flipDeg }` in viewport
+  px (`flight-pose.mjs` `flightPlacement` → position/quaternion/scale on the plane z = lift; `board-camera.mjs`
+  `screenToPlane` is the inverse of `projectToScreen`). While a tween runs the model pose is suspended and the mesh is
+  forced visible; after t = 1 it stays 100 ms then the model pose resumes (end flights at the model rect). `card-flight.js`
+  `playMeshTrack({ instanceId, rect, pose, duration, delay, lift })` maps a 2D track to it (lift rises/falls over the
+  first/last 15 %); `meshCanFly(id)`. `scene.rects()` now reports every posed card, hidden or not (a draw card held
+  hidden by `draw-flight-source` had no rect, so `handSpotOf` found no target and the draw skipped its flight).
+- Draws (own spread → hand, opp face-down deck → hand) fly the mesh; no clone, no fade. Differences to the old clone:
+  the spread preview lies in the table plane (not screen-facing); a small pop when the landed card takes its fan yaw.
+  `.fx-draw-scene*` rules in mat-fx.css are now unused by draws.
+- H1b: KO flies the mesh (clone fallback via `meshCanFly` when the view already buried the card; stars, held ghost, pile
+  catch and streak stay HTML — `playTrailTrack`); retreat/switch slide the whole stack on meshes; promote slides Bench →
+  Active (`origins.mjs` now captures `pokemonPromoted`); the opp Trainer's placing leg flies the mesh after the HTML
+  preview hold (`hideDuring` kept so the real card does not show at its spot during the preview). Known: retreat/promote
+  run after the 200 ms settle hold, so the mesh is already at its new spot and pops back to the origin before sliding
+  (fix needs the moved card held hidden from before the diff: `handleBeforeApply`, outside the three scenes).
+- Verification here: node tests for the pure parts; `test:board3d-overlays`, `test:board3d`, `test:board3d-input/drag/
+  pick`, `test:inspector`, `test:fullview` green; a draw probe (solo deal) saw hand meshes move through the samples with
+  zero `.fx-overlay` clones. The rec-draw capture's fabricated views do not show cards on the 3D board (F1 limit), so it
+  proves the calls run, not the look. Visual sign-off is the user's.
+
+### H3
+- `cameraTcgLive({ viewportW, viewportH, nearHalf, cardHeightPx })`: eye above the seam centre looking straight down, FOV
+  20°, nominal distance 183 × cardH / 8.9 (design 067:30), scaled up to the smallest distance that fits the whole table
+  (hands included) in the viewport: ×1.026 at every viewport tested (height binds). Setting `ptcg-camera-preset`
+  (`'tilt12'` default | `'tcgl'`) through fx-settings (`setCameraPreset`), checkbox "TCG Live camera" next to the hover
+  preview one; `board3d.js relayout()` picks the preset and snaps on change (subscribed to `onFxSettingsChanged`).
+  Not done: hand cards keep the tilt layout's size under the top-down camera. `test:board3d-boot` 4a–4c cover the live
+  toggle (far Active as tall as the near one within 1 % under tcgl; back to tilted).
+
 ### G3
 - Built as five sub-slices (a sizing, b documents/sheets, c geometry, d core, e scattered refs; notes in
   `.agent/scratch/074/g3/G3*.md`), four in parallel on disjoint files, then d. Deleted: `self-/opp-containers.html`,

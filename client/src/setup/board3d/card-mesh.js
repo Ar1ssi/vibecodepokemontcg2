@@ -14,7 +14,8 @@ import {
   cardScaleFor,
   roundedRectShapePoints,
 } from './card-geometry.mjs';
-import { createTween } from './tween.mjs';
+import { flightPlacement } from './flight-pose.mjs';
+import { createTween, easeOutCubic } from './tween.mjs';
 
 const DEG = Math.PI / 180;
 /** Material group indices of every card geometry. */
@@ -31,6 +32,11 @@ const RETRY_MS = 5000;
 /** Resting height of a card's underside above the cloth: over the mat overlay (table-mesh Z.overlay = 1). */
 const CARD_LIFT_PX = 1.5;
 const PLAIN_UV = Object.freeze({ u0: 0, u1: 1, v0: 0, v1: 1 });
+/**
+ * After a flight lands the mesh stays shown this long (scene clock) before the card's own hidden
+ * state applies again: the effect that hid the card reveals it a beat after the flight resolves.
+ */
+const FLIGHT_TAIL_MS = 100;
 /** `.cmd-pending` (index.css): a card whose command is in flight shows at 60 % opacity. */
 const PENDING_OPACITY = 0.6;
 
@@ -95,6 +101,7 @@ function buildCardGeometry(three, widthPx, uv) {
  *     recordFor?: (placement: object) => object|null,
  *     uv?: (() => { u0: number, u1: number, v0: number, v1: number }) | object } | null,
  *   motionReduced?: () => boolean, onNeedsRender?: () => void,
+ *   viewOrigin?: () => { left: number, top: number },
  *   timers?: { set: (fn: () => void, ms: number) => unknown, clear: (id: unknown) => void } }} deps
  *   `foil.createMaterial` is `createFoilMaterial` (tcgl-foil-material.js): its `ready`, `update`
  *   and `release` are used; `uv` is the manifest's card window of the square foil front.
@@ -103,10 +110,12 @@ function buildCardGeometry(three, widthPx, uv) {
  *   setFaces: (id: number, faces: { src?: string|null, backSrc?: string|null,
  *     face?: 'front'|'back', foilRecord?: object|null }) => void,
  *   setPose: (id: number, pose: import('./card-poses.mjs').CardPose, ms: number) => void,
+ *   tween: (id: number, poseFn: (t: number) => object, ms: number, o?: { ease?: (t: number) => number }) =>
+ *     Promise<void>,
  *   setHidden: (id: number, hidden: boolean) => void, setCamera: (desc: object|null) => void,
  *   setTilt: (id: number, tilt: { roll: number, pitch: number }|null) => void,
  *   setDim: (id: number, dim: boolean) => void,
- *   has: (id: number) => boolean, meshOf: (id: number) => import('three').Mesh|null,
+ *   has: (id: number) => boolean, placed: (id: number) => boolean, meshOf: (id: number) => import('three').Mesh|null,
  *   idAt: (object3d: import('three').Object3D|null) => number|null, ids: () => number[],
  *   cornersOf: (id: number) => number[][]|null, update: (nowMs: number) => boolean,
  *   dispose: () => void }}
@@ -114,6 +123,12 @@ function buildCardGeometry(three, widthPx, uv) {
  *   after 5 s (edge case 12); its name label is a text plane of slice C5. `update(now)` places
  *   every moving card and answers whether another frame is needed (a tween is running, or a
  *   visible foil animates while motion is allowed).
+ *   `tween` (design 074 H1) flies a card: for `ms` of scene time `poseFn(t)` (t eased 0 → 1) gives
+ *   `{ rect, rotateZDeg, tiltXDeg, lift, flipDeg }` in viewport px (flight-pose.mjs) and the mesh
+ *   sits there; the card's own pose is suspended and the mesh is shown, hidden or not. It resolves
+ *   when t reaches 1 (one frame after, with motion reduced), when a newer tween on the card
+ *   replaces it, or when the card is released. The next frame after it ends puts the mesh back on
+ *   the card's own pose.
  */
 export function createCardMeshPool({
   group,
@@ -123,6 +138,7 @@ export function createCardMeshPool({
   foil = null,
   motionReduced = () => false,
   onNeedsRender = () => {},
+  viewOrigin = () => ({ left: 0, top: 0 }),
   timers = {
     set: (fn, ms) => globalThis.setTimeout(fn, ms),
     clear: (id) => globalThis.clearTimeout(id),
@@ -365,6 +381,7 @@ export function createCardMeshPool({
   }
 
   const placeMesh = (card, now) => {
+    if (card.flight) return;
     const pose = card.pose.at(now);
     const flipDeg = card.flip ? card.flip.at(now) : 0;
     const scale = pose.s;
@@ -396,6 +413,62 @@ export function createCardMeshPool({
     tableNormal.set(0, Math.sin(tiltDeg * DEG), Math.cos(tiltDeg * DEG));
     mesh.quaternion.premultiply(swing.setFromAxisAngle(tableX, -pitch * DEG));
     mesh.quaternion.premultiply(swing.setFromAxisAngle(tableNormal, -roll * DEG));
+  };
+
+  // ── flights (tween): a card flown by a mat-fx pose instead of its own pose.
+  /** Shown while flying or just after landing, else by the card's own hidden state. */
+  const visibleOf = (card) =>
+    Boolean(card.flight) || card.flightTailUntil > 0 || (Boolean(card.pose) && !card.hidden);
+
+  /** Ends a card's flight; the promise resolves. `now` given = it landed (keep the mesh shown a beat). */
+  const endFlight = (card, now) => {
+    const { flight } = card;
+    if (!flight) return;
+    card.flight = null;
+    if (now !== undefined) card.flightTailUntil = now + FLIGHT_TAIL_MS;
+    card.dirty = true;
+    flight.resolve();
+  };
+
+  /** Puts the mesh at the flight's pose for `now`; true once the flight has reached t = 1. */
+  const placeFlight = (card, now) => {
+    const { flight } = card;
+    const raw = flight.ms > 0 ? Math.min(1, Math.max(0, (now - flight.start) / flight.ms)) : 1;
+    const t = raw >= 1 ? 1 : flight.ease(raw);
+    let pose = null;
+    try {
+      pose = flight.poseFn(t);
+    } catch (error) {
+      console.warn('board3d: card flight pose failed', error?.message || error);
+      return true;
+    }
+    const flipDeg = Number.isFinite(pose?.flipDeg) ? pose.flipDeg : card.flip ? card.flip.at(now) : 0;
+    const placement = flightPlacement(
+      camera,
+      { ...pose, flipDeg },
+      { widthPx: card.geometry.w, heightPx: card.geometry.h },
+      viewOrigin()
+    );
+    if (placement) {
+      card.mesh.position.set(...placement.position);
+      card.mesh.quaternion.set(...placement.quaternion);
+      card.mesh.scale.setScalar(placement.scale);
+    }
+    card.mesh.visible = true;
+    return raw >= 1;
+  };
+
+  const tween = (id, poseFn, ms, { ease = easeOutCubic } = {}) => {
+    const card = disposed ? null : cards.get(id);
+    if (!card?.pose || !camera || typeof poseFn !== 'function') return Promise.resolve();
+    endFlight(card);
+    return new Promise((resolve) => {
+      const now = clock.now();
+      card.flight = { poseFn, ease, start: now, ms: durationFor(ms), resolve };
+      card.flightTailUntil = 0;
+      placeFlight(card, now);
+      onNeedsRender();
+    });
   };
 
   const withCard = (id, fn) => {
@@ -448,6 +521,8 @@ export function createCardMeshPool({
       tilt: null,
       dim: false,
       dimFront: null,
+      flight: null,
+      flightTailUntil: 0,
       dirty: true,
     });
     mesh.visible = false;
@@ -456,6 +531,7 @@ export function createCardMeshPool({
 
   const release = (id) =>
     withCard(id, (card) => {
+      endFlight(card);
       cards.delete(id);
       group.remove(card.mesh);
       dropDimmedFront(card);
@@ -524,7 +600,7 @@ export function createCardMeshPool({
         card.pose.retarget(target, now, duration);
       }
       if (pose.face) setFace(card, pose.face, now);
-      card.mesh.visible = !card.hidden;
+      card.mesh.visible = visibleOf(card);
       card.dirty = true;
       placeMesh(card, now);
       onNeedsRender();
@@ -553,7 +629,7 @@ export function createCardMeshPool({
   const setHidden = (id, hidden) =>
     withCard(id, (card) => {
       card.hidden = Boolean(hidden);
-      card.mesh.visible = Boolean(card.pose) && !card.hidden;
+      card.mesh.visible = visibleOf(card);
       onNeedsRender();
     });
 
@@ -571,6 +647,18 @@ export function createCardMeshPool({
     let foilShown = false;
     for (const card of cards.values()) {
       if (!card.pose) continue;
+      if (card.flight) {
+        if (placeFlight(card, now)) endFlight(card, now);
+        moving = true;
+        continue;
+      }
+      if (card.flightTailUntil > 0) {
+        if (now < card.flightTailUntil) moving = true;
+        else {
+          card.flightTailUntil = 0;
+          card.mesh.visible = visibleOf(card);
+        }
+      }
       const running =
         !card.pose.done(now) || (card.flip && !card.flip.done(now));
       if (running || card.dirty) placeMesh(card, now);
@@ -583,6 +671,8 @@ export function createCardMeshPool({
   };
 
   const has = (id) => cards.has(id);
+  /** True once a card has a pose, i.e. it stands somewhere (hidden or not). */
+  const placed = (id) => Boolean(cards.get(id)?.pose);
   const meshOf = (id) => cards.get(id)?.mesh ?? null;
   const ids = () => [...cards.keys()];
 
@@ -625,11 +715,13 @@ export function createCardMeshPool({
     release,
     setFaces,
     setPose,
+    tween,
     setTilt,
     setDim,
     setHidden,
     setCamera,
     has,
+    placed,
     meshOf,
     idAt,
     ids,

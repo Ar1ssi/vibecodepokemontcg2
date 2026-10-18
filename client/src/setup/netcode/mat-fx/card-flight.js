@@ -3,7 +3,9 @@
 // knockout scene and plain discards share. Every overlay is detached, runs on
 // WAAPI (D103) and removes itself.
 import { oppContainerDocument, selfContainerDocument } from '../../../state.js';
+import { getBoardScene } from '../../board3d/board3d.js';
 import { visualRectOf } from '../../board3d/board-rects.js';
+import { FLIGHT_LIFT_FRAC, flightPoseFromTrack } from '../../board3d/flight-pose.mjs';
 import { animateFrames, removeWhen, sampleKeyframes, spawnOverlay } from '../../image-logic/mat-fx.mjs';
 import { FLIGHT_MS, flightDelays, flightPose, flightTrail, planFlight, rectFlightEnds } from './card-flight.mjs';
 
@@ -74,6 +76,40 @@ export function playCardTrack({ rect, src, pose, trail, duration, delay = 0, cla
   }
   removeWhen(host, done, delay + duration + BACKSTOP_PAD_MS);
   return Promise.all(done);
+}
+
+export { FLIGHT_LIFT_FRAC };
+
+/** True when the 3D board draws card `instanceId`, so a mesh flight can move it. */
+export function meshCanFly(instanceId) {
+  const scene = getBoardScene();
+  if (!scene || !Number.isFinite(instanceId)) return false;
+  return Boolean(scene.inspect().cards.placed(instanceId));
+}
+
+/**
+ * The mesh twin of `playCardTrack` (design 074 H1): the card's own mesh flies the track instead of
+ * a cloned <img>. `pose(u)` is the same track the pose modules return, in px from the centre of
+ * `rect` (opacity has no mesh equivalent and is ignored), played linearly over `duration` after
+ * `delay` ms; the mesh rises `lift` px off the cloth (default FLIGHT_LIFT_FRAC of `rect`'s height)
+ * in flight. Whoever hides the real card keeps it hidden until this resolves; the scene shows the
+ * mesh for the flight. Resolves when the flight ends, at once when the 3D board has no such card.
+ */
+export function playMeshTrack({ instanceId, rect, pose, duration, delay = 0, lift = FLIGHT_LIFT_FRAC * rect.height }) {
+  return new Promise((resolve) => {
+    const fly = () => {
+      const scene = getBoardScene();
+      if (!scene) {
+        resolve();
+        return;
+      }
+      scene
+        .tween(instanceId, (u) => flightPoseFromTrack(rect, pose(u), u, lift), duration, { ease: (u) => u })
+        .then(resolve, resolve);
+    };
+    if (delay > 0) setTimeout(fly, delay);
+    else fly();
+  });
 }
 
 /** A soft gold glow on the pile as a card lands in it. */

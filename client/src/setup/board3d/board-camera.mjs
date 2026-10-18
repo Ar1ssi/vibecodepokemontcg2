@@ -20,7 +20,7 @@ import {
   DEFAULT_TILT_DEG,
   tiltTransforms,
 } from '../sizing/table-tilt.mjs';
-import { HAND_CROP_FRAC, depthOf, halfFromViewport } from './board-layout.mjs';
+import { HAND_CROP_FRAC, depthOf, flatLayout, halfFromViewport } from './board-layout.mjs';
 
 const DEG = Math.PI / 180;
 /** Near plane in px: well inside any lifted card's distance to the eye. */
@@ -197,4 +197,92 @@ export function projectToScreen(camera, worldPoint) {
   const u = (nearX - left) / width;
   const v = (top - nearY) / height;
   return { x: u * view.width, y: v * view.height };
+}
+
+/** TCG Live's `CameraRig/Main Camera` (design 067:30): vertical fov, height above the board, card height. */
+export const TCGL_FOV_DEG = 20;
+const TCGL_CAMERA_HEIGHT = 183;
+const TCGL_CARD_HEIGHT = 8.9;
+
+/**
+ * The TCG Live pose: straight down on the table centre (the seam centre, flat
+ * `(0, depth)`), screen up = far edge, vertical fov 20°. The eye height is
+ * TCG Live's 183 units scaled by our in-play card height over its 8.9, so cards
+ * image at the size they have there; if that cannot show the whole table (both
+ * playfields plus the visible hand strips, `2 * (depth + hand strip)` tall,
+ * `nearHalf.w` wide) the eye backs off to the smallest distance that does.
+ * Tilt is 0 (`tableToWorld` is the identity) and the principal point is the
+ * viewport centre. Same description shape as `cameraFromCssTilt`, plus
+ * `distanceScale` (1 unless the fit pushed the eye out).
+ *
+ * @param {{ viewportW: number, viewportH: number, nearHalf?: { w: number, h: number },
+ *   cardHeightPx?: number }} params `cardHeightPx` is the in-play card height in table px
+ *   (`flatLayout(...).self.cardBox.active.h`; default: the `sim` profile's at this viewport).
+ */
+export function cameraTcgLive({ viewportW, viewportH, nearHalf, cardHeightPx }) {
+  const half = nearHalf || halfFromViewport({ w: viewportW, h: viewportH });
+  const depth = depthOf(half);
+  const cardH =
+    cardHeightPx > 0
+      ? cardHeightPx
+      : flatLayout(undefined, half, { viewport: { w: viewportW, h: viewportH } }).self.cardBox.active.h;
+  const aspect = viewportW / viewportH;
+  const tanHalfFov = Math.tan((TCGL_FOV_DEG * DEG) / 2);
+  const nominal = TCGL_CAMERA_HEIGHT * (cardH / TCGL_CARD_HEIGHT);
+  const fitTall = (depth + half.h * HAND_CROP_FRAC) / tanHalfFov;
+  const fitWide = half.w / 2 / (aspect * tanHalfFov);
+  const distance = Math.max(nominal, fitTall, fitWide);
+  const principalPoint = { x: viewportW / 2, y: viewportH / 2 };
+  return {
+    fov: TCGL_FOV_DEG,
+    aspect,
+    position: [0, depth, distance],
+    target: [0, depth, 0],
+    up: [0, 1, 0],
+    near: distance * 0.05,
+    far: distance * FAR_FACTOR,
+    principalPoint,
+    viewOffset: viewOffsetFor(viewportW, viewportH, principalPoint),
+    viewport: { w: viewportW, h: viewportH },
+    tiltDeg: 0,
+    shiftPx: 0,
+    distanceScale: distance / nominal,
+  };
+}
+
+/**
+ * Inverse of `projectToScreen` on a plane: the world point where the ray through window px
+ * `(x, y)` meets the table plane `planeZ` px above the cloth (the plane `tableToWorld` gives
+ * `z = planeZ`, normal (0, sin a, cos a) at the camera's tilt `a`). The frustum maths mirrors
+ * `projectToScreen`. Null when the ray runs parallel to the plane or meets it behind the eye.
+ * @returns {{ x: number, y: number, z: number } | null}
+ */
+export function screenToPlane(camera, { x, y }, planeZ = 0) {
+  const zAxis = normalize(sub(camera.position, camera.target));
+  const xAxis = normalize(cross(camera.up, zAxis));
+  const yAxis = cross(zAxis, xAxis);
+  const { near, fov, aspect, viewOffset: view } = camera;
+  let top = near * Math.tan((fov * DEG) / 2);
+  let height = 2 * top;
+  let width = aspect * height;
+  let left = -0.5 * width;
+  left += (view.x * width) / view.fullWidth;
+  top -= (view.y * height) / view.fullHeight;
+  width *= view.width / view.fullWidth;
+  height *= view.height / view.fullHeight;
+
+  const nearX = left + (x / view.width) * width;
+  const nearY = top - (y / view.height) * height;
+  const direction = [0, 1, 2].map((i) => (nearX * xAxis[i] + nearY * yAxis[i]) / near - zAxis[i]);
+  const rad = (camera.tiltDeg ?? DEFAULT_TILT_DEG) * DEG;
+  const normal = [0, Math.sin(rad), Math.cos(rad)];
+  const slope = dot(normal, direction);
+  if (Math.abs(slope) < 1e-9) return null;
+  const travel = (planeZ - dot(normal, camera.position)) / slope;
+  if (!(travel > 0)) return null;
+  return {
+    x: camera.position[0] + travel * direction[0],
+    y: camera.position[1] + travel * direction[1],
+    z: camera.position[2] + travel * direction[2],
+  };
 }
