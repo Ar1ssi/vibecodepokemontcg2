@@ -78,6 +78,8 @@ let _pickerTriggerCard = null;
 let _playCoinFlip = null;
 /** Zone owner for the trainer effect currently executing (`self` or `opp`). */
 let _effectOwner = 'self';
+// Set by the discardStadium step so a following requiresStadium step knows whether it ran.
+let _stadiumDiscardedByStep = false;
 
 export function initTrainerExecution(deps) {
   _getZone = deps.getZone;
@@ -1924,7 +1926,18 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
           break;
         }
         case 'discardStadium': {
-          if (!discardStadiumInPlay()) msg('  no Stadium in play to discard');
+          _stadiumDiscardedByStep = discardStadiumInPlay();
+          if (!_stadiumDiscardedByStep) msg('  no Stadium in play to discard');
+          break;
+        }
+        case 'opponentDiscardFromHand': {
+          if (step.requiresStadium && !_stadiumDiscardedByStep) break;
+          const oppSide = _effectOwner === 'self' ? 'opp' : 'self';
+          for (let i = 0; i < step.count; i++) {
+            if (zone(oppSide, 'hand').getCount() === 0) break;
+            moveCardBundle(oppSide, oppSide, 'hand', 'discard', 0, false, 'move');
+          }
+          msg(`  auto: opponent discarded up to ${step.count} card(s)`);
           break;
         }
         case 'putDiscardOnTop': {

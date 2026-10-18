@@ -4525,6 +4525,31 @@ function eachPlayerDiscardFromHand(ctx) {
   return null;
 }
 
+// Delinquent: "Discard any Stadium card in play. If you do, your opponent discards 3 cards
+// from his or her hand." The opponent picks; the discard only happens when a Stadium went.
+function opponentDiscardFromHand(ctx) {
+  const { opponent, step } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const stadiumWent = (ctx.events || []).some(
+    (event) => event.type === 'cardMoved' && event.from === 'stadium'
+  );
+  if (!ctx.selection && step.requiresStadium && !stadiumWent) return skip(ctx, 'no_stadium');
+  if (playerShieldBlocks(ctx, opponent)) return skip(ctx, 'effect_shield');
+  if (ctx.selection) {
+    discardSelectedFromHand(ctx, opponent);
+    return null;
+  }
+  const count = Math.min(step.count || 1, opponent.zones.hand.length);
+  if (count === 0) return skip(ctx, 'empty_hand');
+  return ctx.ask({
+    player: opponent.playerId,
+    prompt: `${sourceName(ctx, 'Trainer')}: Discard ${count} card${count > 1 ? 's' : ''} from your hand`,
+    options: opponent.zones.hand,
+    min: count,
+    max: count,
+  });
+}
+
 // Lt. Surge: a Basic from hand takes the Active Spot; the old Active moves to the Bench.
 function putHandBasicAsActive(ctx) {
   const { player } = ctx;
@@ -6016,6 +6041,7 @@ export const EXTRA_STEP_HANDLERS = {
   flipUntilTailsDraw,
   eachPlayerHandToFive,
   eachPlayerDiscardFromHand,
+  opponentDiscardFromHand,
   putHandBasicAsActive,
   opponentDiscardToLostZonePerPokemon,
   putDiscardOnTop,

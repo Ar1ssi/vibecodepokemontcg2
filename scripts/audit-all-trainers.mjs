@@ -88,6 +88,7 @@ const EXECUTED_STEP_TYPES = new Set([
   'opponentActiveEnergyToDeck',
   'opponentHandToBenchBasic',
   'eachPlayerDiscardFromHand',
+  'opponentDiscardFromHand',
   'eachPlayerDraw',
   'eachPlayerReturnBench',
   'eachPlayerShuffleHandDraw',
