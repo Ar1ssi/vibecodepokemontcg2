@@ -44,7 +44,7 @@ import {
   listConditions,
   ROTATION_CONDITIONS,
 } from '../../../../shared/engine/rules/special-conditions.mjs';
-import { board3dActive } from '../board3d/board3d.js';
+import { board3dActive as board3dFlagActive } from '../board3d/board3d.js';
 
 let lastRenderedVersion = -1;
 const cardRegistry = new Map(); // instanceId -> { instanceId, element, card, side, zone, container }
@@ -77,6 +77,8 @@ let defaultNetcodeContext = {
   cardListeners: null,
   coverListeners: null,
   sortZoneCards: null,
+  // () => boolean — test seam over board3d.js's flag; null reads the real flag.
+  isBoard3dActive: null,
   // { hydrate(card), unhydrate(card) } — hydrate-holo.js, injected because it
   // imports front-end.js, which is unimportable outside a browser.
   holo: null,
@@ -189,6 +191,8 @@ export function setDefaultNetcodeContext(ctx = {}) {
   if (ctx.sortZoneCards !== undefined)
     defaultNetcodeContext.sortZoneCards = ctx.sortZoneCards;
   if (ctx.holo !== undefined) defaultNetcodeContext.holo = ctx.holo;
+  if (ctx.isBoard3dActive !== undefined)
+    defaultNetcodeContext.isBoard3dActive = ctx.isBoard3dActive;
   if (ctx.choicePicker !== undefined)
     defaultNetcodeContext.choicePicker = ctx.choicePicker;
   if (ctx.prizePicker !== undefined)
@@ -217,6 +221,10 @@ export function getDefaultNetcodeContext() {
           null,
     systemState: defaultNetcodeContext.systemState,
   };
+}
+
+function board3dActive() {
+  return (defaultNetcodeContext.isBoard3dActive || board3dFlagActive)();
 }
 
 /**
@@ -249,6 +257,7 @@ export function resetRenderState() {
     cardListeners: null,
     coverListeners: null,
     sortZoneCards: null,
+    isBoard3dActive: null,
     holo: null,
     choicePicker: null,
     prizePicker: null,

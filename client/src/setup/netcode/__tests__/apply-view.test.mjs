@@ -1,10 +1,8 @@
-import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { setImmediate } from 'node:timers';
 import {
   applyView,
   getLastRenderedVersion,
-  resetRenderState,
   getCardRegistry,
   setDefaultNetcodeContext,
   getDefaultNetcodeContext,
@@ -21,224 +19,18 @@ import {
   soloChoiceSeat,
 } from '../apply-view.js';
 import { spectatorPerspective } from '../../spectator/spectator-view.mjs';
+import {
+  MockDocument,
+  fakeHolo,
+  resetRenderState,
+  setupMockDom,
+  sizeRegisteredCards,
+  testInBothBoardModes as test,
+} from './apply-view-fixture.mjs';
 
-class MockClassList {
-  constructor() {
-    this.classes = new Set();
-  }
-  add(...names) {
-    names.forEach((n) => this.classes.add(n));
-  }
-  remove(...names) {
-    names.forEach((n) => this.classes.delete(n));
-  }
-  contains(name) {
-    return this.classes.has(name);
-  }
-}
-
-class MockElement {
-  constructor(tagName = 'div', doc = null) {
-    this.tagName = tagName.toUpperCase();
-    this.nodeName = this.tagName;
-    this.ownerDocument = doc;
-    this.id = '';
-    this.classList = new MockClassList();
-    this.attributes = new Map();
-    this.dataset = {};
-    this.children = [];
-    this.parentNode = null;
-    this.listeners = new Map();
-    this.textContent = '';
-    this.disabled = false;
-    this.style = {};
-  }
-
-  get className() {
-    return Array.from(this.classList.classes).join(' ');
-  }
-
-  set className(val) {
-    this.classList.classes = new Set(String(val).split(' ').filter(Boolean));
-  }
-
-  setAttribute(name, val) {
-    this.attributes.set(name, String(val));
-    if (name === 'id') this.id = String(val);
-    if (name === 'class') {
-      this.className = String(val);
-      this.classList.classes = new Set(String(val).split(' ').filter(Boolean));
-    }
-    if (name === 'src') this.src = String(val);
-  }
-
-  getAttribute(name) {
-    if (name === 'src' && this.src) return this.src;
-    return this.attributes.get(name) || null;
-  }
-
-  removeAttribute(name) {
-    this.attributes.delete(name);
-  }
-
-  appendChild(child) {
-    if (!child) return child;
-    if (child.parentNode) {
-      child.parentNode.removeChild(child);
-    }
-    child.parentNode = this;
-    this.children.push(child);
-    return child;
-  }
-
-  insertBefore(child, reference) {
-    if (!reference) return this.appendChild(child);
-    if (child.parentNode) child.parentNode.removeChild(child);
-    child.parentNode = this;
-    this.children.splice(this.children.indexOf(reference), 0, child);
-    return child;
-  }
-
-  removeChild(child) {
-    const idx = this.children.indexOf(child);
-    if (idx >= 0) {
-      this.children.splice(idx, 1);
-      child.parentNode = null;
-    }
-    return child;
-  }
-
-  append(...nodes) {
-    nodes.forEach((n) => this.appendChild(n));
-  }
-
-  addEventListener(type, fn) {
-    if (!this.listeners.has(type)) {
-      this.listeners.set(type, []);
-    }
-    this.listeners.get(type).push(fn);
-  }
-
-  dispatchEvent(event) {
-    const fns = this.listeners.get(event.type) || [];
-    fns.forEach((fn) => fn(event));
-    return true;
-  }
-
-  querySelector(selector) {
-    return this.querySelectorAll(selector)[0] || null;
-  }
-
-  querySelectorAll(selector) {
-    const results = [];
-    const match = (el) => {
-      if (selector.startsWith('#') && el.id === selector.slice(1)) return true;
-      if (selector.startsWith('.') && el.classList.contains(selector.slice(1))) return true;
-      if (selector === 'img' && el.tagName === 'IMG') return true;
-      if (selector.startsWith('img[data-instance-id=')) {
-        const id = selector.match(/data-instance-id="([^"]+)"/)?.[1];
-        if (el.tagName === 'IMG' && el.dataset.instanceId === id) return true;
-      }
-      return false;
-    };
-
-    const traverse = (node) => {
-      for (const child of node.children) {
-        if (match(child)) results.push(child);
-        traverse(child);
-      }
-    };
-    traverse(this);
-    return results;
-  }
-}
-
-class MockDocument {
-  constructor() {
-    this.body = new MockElement('body', this);
-    this.elementsById = new Map();
-    this.listeners = new Map();
-  }
-
-  addEventListener(type, fn) {
-    if (!this.listeners.has(type)) {
-      this.listeners.set(type, []);
-    }
-    this.listeners.get(type).push(fn);
-  }
-
-  dispatchEvent(event) {
-    const fns = this.listeners.get(event.type) || [];
-    fns.forEach((fn) => fn(event));
-    return true;
-  }
-
-  createElement(tagName) {
-    return new MockElement(tagName, this);
-  }
-
-  getElementById(id) {
-    if (this.elementsById.has(id)) return this.elementsById.get(id);
-    const found = this.body.querySelector(`#${id}`);
-    if (found) return found;
-    return null;
-  }
-
-  registerElement(id, el) {
-    el.id = id;
-    this.elementsById.set(id, el);
-    this.body.appendChild(el);
-    return el;
-  }
-}
-
-const COVER_ZONE_IDS = ['deck', 'discard', 'lostZone'];
-
-function setupMockDom() {
-  const doc = new MockDocument();
-  doc.registerElement('stadium', doc.createElement('div'));
-
-  const selfMat = doc.registerElement('selfMat', doc.createElement('div'));
-  const oppMat = doc.registerElement('oppMat', doc.createElement('div'));
-
-  const selfCovers = {};
-  const oppCovers = {};
-
-  ['hand', 'active', 'bench', 'discard', 'prizes', 'lostZone', 'deck'].forEach((zid) => {
-    const sEl = doc.createElement('div');
-    sEl.id = zid;
-    selfMat.appendChild(sEl);
-
-    const oEl = doc.createElement('div');
-    oEl.id = zid;
-    oppMat.appendChild(oEl);
-
-    if (COVER_ZONE_IDS.includes(zid)) {
-      const sCover = doc.createElement('div');
-      sCover.id = `${zid}Cover`;
-      selfMat.appendChild(sCover);
-      selfCovers[zid] = sCover;
-
-      const oCover = doc.createElement('div');
-      oCover.id = `${zid}Cover`;
-      oppMat.appendChild(oCover);
-      oppCovers[zid] = oCover;
-    }
-  });
-
-  const mockGetZone = (side, zoneId) => {
-    const root = side === 'you' ? selfMat : oppMat;
-    const covers = side === 'you' ? selfCovers : oppCovers;
-    const element = root.querySelector(`#${zoneId}`);
-    return { element, array: [], elementCover: covers[zoneId] || null };
-  };
-
-  return { doc, mockGetZone, selfCovers, oppCovers };
-}
-
-beforeEach(() => {
-  resetRenderState();
-});
+// Every case here runs under both boards (design 074 F2): the 3D board skips only px
+// layout, so registry, attributes, classes and events must match. Px layout cases live in
+// apply-view-dom-layout.test.mjs.
 
 test('§0.2 guard: a renderer with no resolvable zone (real resolveZone fallback, not injected) writes nothing', () => {
   // No options.getZone, no options.document, and no window/window.__getZone in this
@@ -1227,21 +1019,9 @@ test('Row 21: stacked conditions draw one marker each, stacked down the card, an
     { document: doc, getZone: mockGetZone }
   );
   const img = getCardRegistry().get(25).element;
-  // The mock DOM has no layout; give the card a size so marker offsets are measurable.
-  img.getBoundingClientRect = () => ({ left: 0, top: 0, width: 90, height: 126 });
-  applyView(
-    {
-      stateVersion: 2,
-      you: { playerId: 'p1', zones: { active: [card({ specialCondition: 'Asleep', poisoned: true, burned: true })] } },
-      them: { playerId: 'p2', zones: {} },
-    },
-    [],
-    { document: doc, getZone: mockGetZone }
-  );
   const markers = [img.specialCondition, img.poisonMarker, img.burnMarker];
   assert.ok(markers.every(Boolean), 'rotation, poison and burn markers all exist');
   assert.equal(markers.every((m) => m.parentNode === selfActive), true);
-  assert.equal(new Set(markers.map((m) => m.style.top)).size, 3, 'markers do not overlap');
   const burnMarker = img.burnMarker;
 
   applyView(
@@ -1274,7 +1054,6 @@ test('status loop: one overlay per card, a group per held condition, under the m
 
   applyView(view(1, { poisoned: true }), [], options);
   const img = getCardRegistry().get(27).element;
-  img.getBoundingClientRect = () => ({ left: 0, top: 0, width: 126, height: 90 });
   applyView(view(2, { poisoned: true, specialCondition: 'Asleep', rotation: -90 }), [], options);
   const loop = img.statusLoop;
   assert.ok(loop, 'a held condition gets a loop overlay');
@@ -1285,16 +1064,12 @@ test('status loop: one overlay per card, a group per held condition, under the m
   );
   assert.deepEqual(groupKeys(loop.card), ['status-fx-loop__group--poison', 'status-fx-loop__group--sleep']);
   assert.deepEqual(groupKeys(loop.sky), ['status-fx-loop__group--poison', 'status-fx-loop__group--sleep']);
-  assert.equal(loop.style.width, '126px', 'the box is the sideways footprint');
-  assert.equal(loop.card.style.width, '90px', 'the card frame is the card, turned with it');
-  assert.equal(loop.card.style.rotate, '-90deg');
   const poisonGroup = loop.sky.children[0];
 
   applyView(view(3, { poisoned: true, burned: true }), [], options);
   assert.equal(img.statusLoop, loop, 'the same overlay survives a re-render');
   assert.equal(loop.sky.children[0], poisonGroup, 'a still-held condition keeps its running loop');
   assert.deepEqual(groupKeys(loop.sky), ['status-fx-loop__group--poison', 'status-fx-loop__group--burn']);
-  assert.equal(loop.card.style.rotate, '0deg');
 
   applyView(view(4, {}), [], options);
   assert.equal(img.statusLoop, null, 'recovery removes the overlay');
@@ -1304,38 +1079,6 @@ test('status loop: one overlay per card, a group per held condition, under the m
   const burnLoop = img.statusLoop;
   applyView({ stateVersion: 6, you: { playerId: 'p1', zones: { active: [] } }, them: { playerId: 'p2', zones: {} } }, [], options);
   assert.equal(selfActive.children.includes(burnLoop), false, 'a card leaving play takes its loop with it');
-});
-
-// A window resize moves the card without a new view; the Poison/Burn markers must follow it
-// like the rotation marker does (repositionCardOverlays is the resize listener's handler).
-test('Row 21: resize re-positions the Poison and Burn markers, not only the rotation marker', () => {
-  const { doc, mockGetZone } = setupMockDom();
-  const view = {
-    stateVersion: 1,
-    you: {
-      playerId: 'p1',
-      zones: {
-        active: [{ instanceId: 26, name: 'Pikachu', src: '/a.png', specialCondition: 'Asleep', poisoned: true, burned: true }],
-      },
-    },
-    them: { playerId: 'p2', zones: {} },
-  };
-  const options = { document: doc, getZone: mockGetZone };
-  applyView(view, [], options);
-  const img = getCardRegistry().get(26).element;
-  img.getBoundingClientRect = () => ({ left: 0, top: 0, width: 90, height: 126 });
-  applyView({ ...view, stateVersion: 2 }, [], options);
-  const tops = () => [img.specialCondition, img.poisonMarker, img.burnMarker].map((m) => m.style.top);
-  const before = tops();
-
-  img.getBoundingClientRect = () => ({ left: 0, top: 100, width: 150, height: 210 });
-  repositionCardOverlays();
-
-  const after = tops();
-  assert.equal(after.every((top, i) => top !== before[i]), true, `markers moved: ${before} -> ${after}`);
-  assert.equal(new Set(after).size, 3, 'markers still stacked without overlap');
-  assert.equal(img.poisonMarker.style.width, '50px');
-  assert.equal(img.burnMarker.style.width, '50px');
 });
 
 test('Row 21: overlays removed from the zone element when the card itself leaves the registry', () => {
@@ -1748,7 +1491,6 @@ test('I24: hasAuthoritativeView/getAuthoritativeZoneArray/getAuthoritativeStadiu
   assert.deepEqual(getAuthoritativeStadiumArray(), []);
 });
 
-
 // Design 049: the owner's unprinted attacks come from the view; no key keeps the caller's list.
 test('049: getAuthoritativeAttackExtras reads view.you.attackExtras for own in-play Pokémon', () => {
   const { doc, mockGetZone } = setupMockDom();
@@ -1928,29 +1670,6 @@ test('037: applyView dispatches board-view-applied after the advisory events, vi
   assert.deepEqual(order, ['advisory:POKEMON_ENTERED', 'applied:7']);
 });
 
-// Stands in for hydrate-holo.js: wraps the <img> in a `.mat-holo` node the way
-// hydrateHolo does (synchronously here), and unwraps it back in place.
-function fakeHolo(doc) {
-  return {
-    hydrate(card) {
-      if (card.wrapper) return Promise.resolve(card.wrapper);
-      const wrapper = doc.createElement('div');
-      wrapper.className = 'mat-holo';
-      card.image.parentNode.appendChild(wrapper);
-      wrapper.appendChild(card.image);
-      card.wrapper = wrapper;
-      return Promise.resolve(wrapper);
-    },
-    unhydrate(card) {
-      const wrapper = card.wrapper;
-      if (!wrapper) return;
-      wrapper.parentNode?.appendChild(card.image);
-      wrapper.parentNode?.removeChild(wrapper);
-      card.wrapper = undefined;
-    },
-  };
-}
-
 test('holo: a face-up hand card is hydrated and moves as its wrapper', () => {
   const { doc, mockGetZone } = setupMockDom();
   const opts = { document: doc, getZone: mockGetZone, holo: fakeHolo(doc) };
@@ -2036,9 +1755,7 @@ test('energy: attached Energy draws as tokens and fills the parent attachedCards
   assert.equal(lightningImg.getAttribute('src'), '/src/assets/energy/tokens/lightning.png');
   assert.equal(lightningImg.dataset.energyCardSrc, 'l.png');
   assert.equal(lightningImg.classList.contains('energy-token-3d'), true);
-  assert.equal(lightningImg.style.zIndex, '101');
   assert.equal(fireImg.getAttribute('src'), '/src/assets/energy/tokens/fire.png');
-  assert.equal(fireImg.style.zIndex, '102', 'second Energy stacks after the first, skipping the Tool');
   assert.equal(beltImg.getAttribute('src'), 'belt.png', 'Tools keep their card art');
   assert.deepEqual(
     registry.get(10).card.attachedCards.map((c) => [c.instanceId, c.image]),
@@ -2055,45 +1772,9 @@ test('energy: attached Energy draws as tokens and fills the parent attachedCards
     opts
   );
   assert.deepEqual(registry.get(10).card.attachedCards.map((c) => c.instanceId), [13]);
-  assert.equal(fireImg.style.zIndex, '101');
   assert.equal(lightningImg.getAttribute('src'), 'l.png', 'detached Energy shows its card art again');
   assert.equal(lightningImg.dataset.energyCardSrc, undefined);
   assert.equal(lightningImg.classList.contains('energy-token-3d'), false);
-  assert.equal(lightningImg.style.position, '');
-});
-
-// Five tokens ran off a Pokémon's card: past four, each type piles onto one
-// spot with an "Nx" count badge, the next type following the badge.
-test('energy: past four tokens each type piles up behind an Nx badge', () => {
-  const { doc, mockGetZone } = setupMockDom();
-  const opts = { document: doc, getZone: mockGetZone };
-  const view = (stateVersion, zones) => ({ stateVersion, you: { playerId: 'p1', zones } });
-  const pikachu = { instanceId: 10, name: 'Pikachu', src: 'pika.png', type: 'Pokémon' };
-  const fire = (id) => ({ instanceId: id, name: 'Basic Fire Energy', src: 'f.png', type: 'Energy', attachedTo: 10 });
-  const water = { instanceId: 15, name: 'Basic Water Energy', src: 'w.png', type: 'Energy', attachedTo: 10 };
-  const five = [pikachu, fire(11), water, fire(12), fire(13), fire(14)];
-
-  applyView(view(1, { active: five }), [], opts);
-  sizeRegisteredCards(150, 200);
-  applyView(view(2, { active: five }), [], opts);
-
-  const registry = getCardRegistry();
-  const container = registry.get(10).container;
-  const badges = () =>
-    container.children.filter((child) => child.classList.contains('energy-token-count'));
-  const left = (id) => parseFloat(registry.get(id).element.style.left);
-
-  assert.deepEqual([11, 12, 13, 14].map(left), [0, 0, 0, 0], 'the Fire tokens share one spot');
-  assert.equal(registry.get(14).element.style.zIndex, '105', 'newest Fire on top of the pile');
-  assert.deepEqual(badges().map((b) => b.textContent), ['4x']);
-  const [badge] = badges();
-  assert.ok(parseFloat(badge.style.left) >= 36, 'badge after the Fire token');
-  assert.ok(left(15) > parseFloat(badge.style.left), 'Water token follows the 4x badge');
-  assert.equal(badge.style.bottom, registry.get(15).element.style.bottom);
-
-  applyView(view(3, { active: [pikachu, fire(11), water, fire(12)], discard: [] }), [], opts);
-  assert.deepEqual(badges(), [], 'back to four or fewer: no badge');
-  assert.ok(left(15) > left(11) && left(12) > left(15), 'tokens side by side again');
 });
 
 // Live 2P regression (sync log ptcg-sync-log_combined_test_1789677999175): decklists
@@ -2136,14 +1817,12 @@ test('energy: cost-symbol names and untyped Energy rows still draw as tokens', (
   assert.equal(symbolImg.getAttribute('src'), '/src/assets/energy/tokens/fighting.png');
   assert.equal(symbolImg.dataset.energyCardSrc, 'GRI_169_R_EN.png');
   assert.equal(symbolImg.classList.contains('energy-token-3d'), true);
-  assert.equal(symbolImg.style.zIndex, '101');
   assert.equal(
     untypedImg.getAttribute('src'),
     '/src/assets/energy/special/rocky-f-energy.svg',
     'a Special Energy draws its own card-art token'
   );
   assert.equal(untypedImg.classList.contains('energy-token-3d'), true);
-  assert.equal(untypedImg.style.zIndex, '102');
 });
 
 test('energy: a 2-Energy Special Energy draws as a two-orb token, cleared on detach', () => {
@@ -2249,15 +1928,6 @@ test('choice: options without art fall back to the grid modal', () => {
   assert.ok(doc.getElementById('netcodeChoiceModal'));
 });
 
-// Mock elements have no layout; give every registered card a real-looking size
-// and re-apply, the way a loaded image would measure in the browser.
-function sizeRegisteredCards(width, height) {
-  for (const record of getCardRegistry().values()) {
-    record.element.clientWidth = width;
-    record.element.clientHeight = height;
-  }
-}
-
 test('stack: an evolution is the visible card with the Basic peeking out underneath', () => {
   const { doc, mockGetZone } = setupMockDom();
   const opts = { document: doc, getZone: mockGetZone, holo: fakeHolo(doc) };
@@ -2278,17 +1948,6 @@ test('stack: an evolution is the visible card with the Basic peeking out underne
   const registry = getCardRegistry();
   const basic = registry.get(10);
   const stage1 = registry.get(11);
-  assert.equal(stage1.element.style.position || '', '', 'Stage 1 stays in flow as the visible card');
-  assert.equal(basic.element.style.position, 'absolute');
-  assert.equal(basic.element.style.bottom, '10px');
-  assert.equal(basic.element.style.zIndex, '-1');
-
-  const belt = registry.get(12).element;
-  assert.equal(belt.style.left, '25px', 'Tool fans out behind by a sixth of the card');
-  assert.equal(belt.style.zIndex, '-1');
-  assert.equal(basic.container.style.width, '175px', 'slot widens for the Tool');
-  assert.equal(registry.get(13).element.style.width, '36px', 'token sized from the visible card');
-
   const holoWrappers = active.querySelectorAll('.mat-holo');
   assert.equal(holoWrappers.length, 1);
   assert.equal(holoWrappers[0].querySelector('img'), stage1.element, 'only the visible card is foiled');
@@ -2297,13 +1956,6 @@ test('stack: an evolution is the visible card with the Basic peeking out underne
   assert.deepEqual(basic.card.attachedCards, []);
   assert.equal(basic.element.damageCounter.textContent, '30', 'root damage still shown');
   assert.equal(basic.overlayImage, stage1.element, 'overlays measured on the visible card');
-
-  // Evolution discarded: the Basic is back in flow with no stack styling.
-  zones.active = [zones.active[0]];
-  applyView({ stateVersion: 3, you: { playerId: 'p1', zones } }, [], opts);
-  assert.equal(basic.element.style.position, '');
-  assert.equal(basic.element.style.bottom, '');
-  assert.equal(basic.container.style.width, '');
 });
 
 test('stack: an attachment to the stacked evolution stays in the host slot, not the zone', () => {
@@ -2335,7 +1987,6 @@ test('stack: an attachment to the stacked evolution stays in the host slot, not 
   assert.equal(bench.children[0], basic.container);
   assert.equal(energy.element.parentNode, basic.container, 'Energy stays in the host slot');
   assert.equal(registry.get(12).element.parentNode, basic.container, 'Tool stays in the host slot');
-  assert.equal(energy.element.style.width, '36px', 'Energy is drawn as a token on the visible card');
   assert.ok(energy.element.classList.contains('attached-card'));
   assert.deepEqual(stage2.card.attachedCards.map((c) => c.instanceId), [10, 12, 13]);
 });
@@ -2365,9 +2016,6 @@ test('stack: an attachment that precedes its root in view order still joins the 
   const stage2 = registry.get(11);
   assert.equal(active.querySelectorAll('.play-container').length, 1, 'one stack slot, not two');
   assert.equal(stage2.element.parentNode, basic.container, 'Stage 2 stays in the Basic slot');
-  assert.equal(stage2.element.style.position || '', '', 'Stage 2 stays in flow as the visible card');
-  assert.equal(basic.element.style.position, 'absolute');
-  assert.equal(basic.element.style.bottom, '10px');
 });
 
 test('rotation: the root turns its whole stack and clears back to upright', () => {
@@ -2672,29 +2320,6 @@ test('mat choice: declining an optional pick reports an empty selection; a requi
   assert.equal(matPicker.opened[0].cancellable, true);
   await matPicker.opened[0].onCancel();
   assert.deepEqual(resolved, [{ choiceId: 'choice_p1_mat_9', selection: [] }]);
-});
-
-
-test('stack: every under-card is pinned to the slot edge after a swap reorders the stack', () => {
-  // A swap re-emits the stack as [top Evolution, Stage 1, Basic], so the Stage 1 lands
-  // after the visible card in DOM order. An absolute card with `left: auto` keeps its
-  // static position, which drew the Stage 1 beside the Stage 2 instead of under it.
-  const { doc, mockGetZone } = setupMockDom();
-  const opts = { document: doc, getZone: mockGetZone };
-  const basic = { instanceId: 10, name: 'Charmander', src: 'a.png', type: 'Pokémon', stage: 'Basic' };
-  const stage1 = { instanceId: 11, name: 'Charmeleon', src: 'b.png', type: 'Pokémon', stage: 'Stage 1', attachedTo: 10 };
-  const stage2 = { instanceId: 12, name: 'Mega Charizard Y ex', src: 'c.png', type: 'Pokémon', stage: 'Stage 2', attachedTo: 10 };
-  const other = { instanceId: 20, name: 'Pidgey', src: 'p.png', type: 'Pokémon', stage: 'Basic' };
-  const view = (stateVersion, zones) => ({ stateVersion, you: { playerId: 'p1', zones } });
-
-  applyView(view(1, { active: [other], bench: [basic, stage1, stage2] }), [], opts);
-  sizeRegisteredCards(150, 210);
-  applyView(view(2, { active: [stage2, stage1, basic], bench: [other] }), [], opts);
-
-  const registry = getCardRegistry();
-  assert.equal(registry.get(11).element.style.left, '0px', 'Stage 1 sits under the Stage 2');
-  assert.equal(registry.get(10).element.style.left, '0px', 'Basic sits under the Stage 2');
-  assert.equal(registry.get(12).element.style.left || '', '', 'Stage 2 stays in flow');
 });
 
 test('an Evolution played from a duplicate hand stack loses the stack positioning when it attaches onto its Pokémon', () => {
