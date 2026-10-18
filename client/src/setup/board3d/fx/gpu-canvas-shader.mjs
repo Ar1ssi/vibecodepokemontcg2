@@ -180,15 +180,46 @@ void main() {
   vec3 rgb = paint.rgb;
   float alpha = paint.a * coverage;
   vec2 uv = vStage / max(params.w, 1.0);
+  // The scene clock in seconds, wrapped so the noise lattice keeps its float precision.
+  float clock = mod(uTime, 512.0);
   if (style == 1) {
-    float n = fbm(vec3(uv.x * 6.0, uv.y * 6.0 - uTime * params.y, seed));
-    alpha *= smoothstep(params.x - 0.2, params.x + 0.2, paint.a + 0.5 * (n - 0.5));
-    rgb *= 1.0 + params.z * smoothstep(0.75, 1.0, luma(paint.rgb));
+    // flame: noise flowing base → tip erodes the tongue into licks; edges cool, the rest gains.
+    float heat;
+    if (kind == 1) {
+      vec2 axis = geomA.zw - geomA.xy;
+      float span = max(length(axis), 1.0);
+      vec2 dir = axis / span;
+      vec2 local = (q - geomA.xy) / span;
+      float along = dot(local, dir);
+      float across = dot(local, vec2(-dir.y, dir.x));
+      float sway = noise3(vec3(across * 3.0, along * 1.6 - clock * params.y * 0.6, clock * 0.4) + vec3(dir * 3.7, 0.0));
+      vec3 p = vec3((across + 0.12 * (sway - 0.5)) * 6.5, along * 3.2 - clock * params.y * 1.4, clock * 0.5);
+      float n = fbm(p + vec3(dir * 2.9 + geomA.xy / max(params.w, 1.0) * 0.4, 0.0));
+      heat = 1.8 * (n - 0.5) + 0.78 - 0.62 * along - 1.3 * abs(across);
+      // Roots fade: a fan of tongues meets under its own body, which draws the centre.
+      alpha *= mix(0.3, 1.0, smoothstep(0.0, 0.22, along));
+    } else {
+      float n = fbm(vec3(uv.x * 6.0, uv.y * 6.0 - clock * params.y, seed));
+      heat = paint.a + 0.5 * (n - 0.5);
+    }
+    alpha *= smoothstep(params.x - 0.1, params.x + 0.1, heat);
+    float glow = smoothstep(params.x, params.x + 0.4, heat);
+    // A cooling lick deepens toward its strongest channel (any palette), the heart keeps its colour.
+    rgb = pow(max(rgb, vec3(0.0)), vec3(mix(2.4, 1.0, glow)));
+    rgb *= 1.0 + params.z * glow * glow * smoothstep(0.7, 1.0, luma(paint.rgb));
   } else if (style == 2) {
+    // orb: a boiling mantle (turbulence warps the ramp), limb darkening, a small blooming nucleus.
     if (kind == 2) {
-      float boil = fbm(vec3(uv * 5.0 + vec2(uTime * 0.7, 0.0), seed));
-      rgb *= (1.0 - params.y * t * t) + params.x * (boil - 0.5);
-      if (t < 0.3) rgb *= 1.0 + params.z * (1.0 - t / 0.3);
+      vec2 local = (q - geomB.xy) / max(geomB.z, 1.0);
+      vec3 p = vec3(local * 2.6 + geomB.xy / max(params.w, 1.0) * 0.5, clock * 0.9);
+      float warp = fbm(p + vec3(5.2, 1.3, 0.0));
+      float n = fbm(p * 1.4 + vec3(warp * 1.6, -warp * 1.2, clock * 0.6));
+      float mantle = smoothstep(0.04, 0.3, t);
+      float boiled = clamp(t + params.x * 2.0 * (n - 0.5) * mantle, 0.0, 1.0);
+      vec4 boiledPaint = ramp(boiled, count);
+      rgb = boiledPaint.rgb * (1.0 - params.y * boiled * boiled) * mix(1.0, 0.75 + 0.5 * n, mantle);
+      alpha = boiledPaint.a * coverage;
+      rgb *= 1.0 + params.z * (1.0 - smoothstep(0.0, 0.16, boiled));
     }
   } else if (style == 3) {
     if (vEdge.z < 0.0 && vEdge.x < 0.5) rgb += params.x * (1.0 - vEdge.x * 2.0);
