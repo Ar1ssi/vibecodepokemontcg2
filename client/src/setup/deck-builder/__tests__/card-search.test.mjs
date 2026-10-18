@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   buildSummaryQuery,
+  fetchCardDetail,
   newestSummariesFirst,
   normalizeSearchQuery,
   normalizeTcgdexCard,
@@ -482,4 +483,49 @@ test('queryCards still returns every valid card when onProgress throws', async (
   } finally {
     stub.restore();
   }
+});
+
+// TCGdex has no record for the set browser's synthetic `<id>-reverse` ids (404). Card text:
+// out/pkmn-special-energy-cards.json, Prism Energy, Next Destinies 93.
+test('fetchCardDetail reads a Reverse Holo copy from its base print and keeps its own id and rarity', async () => {
+  const stub = stubFetch(async (url) => {
+    if (url.pathname.endsWith('/cards/bw4-93')) {
+      return {
+        id: 'bw4-93',
+        localId: '93',
+        name: 'Prism Energy',
+        category: 'Energy',
+        energyType: 'Special',
+        rarity: 'Uncommon',
+        set: { id: 'bw4', name: 'Next Destinies' },
+      };
+    }
+    throw new Error(`unexpected request ${url}`);
+  });
+  try {
+    const card = await fetchCardDetail('bw4-93-reverse');
+    assert.equal(card.id, 'bw4-93-reverse');
+    assert.equal(card.rarity, 'Reverse Holo');
+    assert.equal(card.name, 'Prism Energy');
+    assert.equal(card.energyType, 'Special');
+    assert.deepEqual(
+      stub.requested.map((url) => url.pathname.split('/').pop()),
+      ['bw4-93']
+    );
+  } finally {
+    stub.restore();
+  }
+});
+
+// bw1-107's TCGdex image carries the Pokémon League stamp; the app serves TCG Live's front instead.
+test('normalizeTcgdexCard swaps in our own art for a League-stamped card', () => {
+  const card = normalizeTcgdexCard({
+    id: 'bw1-107',
+    name: 'Water Energy',
+    category: 'Energy',
+    image: 'https://assets.tcgdex.net/en/bw/bw1/107',
+    set: { id: 'bw1', name: 'Black & White' },
+  });
+  assert.equal(card.image, '/src/assets/card-art/bw/bw1/107/high.webp');
+  assert.equal(card.id, 'bw1-107');
 });

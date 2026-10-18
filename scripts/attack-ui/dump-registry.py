@@ -82,9 +82,65 @@ vstar_dmg, vstar_dmg_short, vstar_dmg_empty, vstar_dmg_empty_short = r.pptr(), r
 vstar_ink, vstar_off_ink = r.color(), r.color()
 assert r.pos == len(r.raw), "registry layout drifted from the C# field order"
 
+# Sprites the overlay HUD, the damage-mod indicator, the stack view and the status popup draw (design
+# 074), written as PNGs the size of their sprite rect. The extract's PNGs are cropped to the packed
+# texture rect, which would stretch an icon the game draws with preserveAspect over its full rect.
+HUD_SPRITES = {
+    "atkOv_Brdr_B1": "list-border-b1.png",
+    "atkOv_DmgMod_Bg": "dmg-mod-bg.png",
+    "atkOv_RetreatBtn_Shadow": "retreat-shadow.png",
+    "accentLarge": "accent-large.png",
+    "accentSmall": "accent-small.png",
+    "btn_Oct_10": "oct-10.png",
+    "btn_Oct_16": "oct-16.png",
+    "btn_Oct_16_Half": "oct-16-half.png",
+    "circle_28": "circle-28.png",
+    "circle_26": "circle-26.png",
+    "circle_32": "circle-32.png",
+    "gradient_Vert": "gradient-vert.png",
+    "healthBarFill_L": "hp-fill.png",
+    "healthBar_L": "hp-bar.png",
+    "icn_Close": "icn-close.png",
+    "icn_CloseShadow": "icn-close-shadow.png",
+    "icn_DropDown": "icn-dropdown.png",
+    "icn_RightArrow": "icn-arrow-right.png",
+    "icn_StackView": "icn-stack.png",
+    "icn_StatusArrow": "icn-status.png",
+    "shadow_32": "shadow-32.png",
+    "shadow_Hex_16": "shadow-hex-16.png",
+    "shadow_60": "shadow-60.png",
+    "statusArrow_Down": "arrow-down.png",
+    "statusArrow_Up": "arrow-up.png",
+    "toolFrame_L": "tool-frame.png",
+}
+resources = UnityPy.load(os.path.join(game, "resources.assets"))
+sprites_res = [o.read() for o in resources.objects if o.type.name == "Sprite"]
+
+
+def write_full_rect(sprite, path):
+    """The sprite's pixels placed on a canvas the size of its rect (Unity's offset is from the bottom)."""
+    from PIL import Image
+
+    image = sprite.image
+    width, height = int(round(sprite.m_Rect.width)), int(round(sprite.m_Rect.height))
+    canvas = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    offset = sprite.m_RD.textureRectOffset
+    canvas.paste(image, (int(round(offset.x)), height - int(round(offset.y)) - image.size[1]))
+    canvas.save(path, optimize=True)
+
+
+written = set()
+for sprite in list(sprites1.values()) + sprites_res:
+    target = HUD_SPRITES.get(sprite.m_Name)
+    if target and target not in written:
+        write_full_rect(sprite, os.path.join(os.path.dirname(out), target))
+        written.add(target)
+missing = sorted(set(HUD_SPRITES.values()) - written)
+assert not missing, "HUD sprites not found: %s" % missing
+
 borders = {}
-for sprite in sprites1.values():
-    if sprite.m_Name.lower().startswith("atkov"):
+for sprite in list(sprites1.values()) + sprites_res:
+    if sprite.m_Name.lower().startswith("atkov") or sprite.m_Name in HUD_SPRITES:
         b = sprite.m_Border  # Unity order: x=left, y=bottom, z=right, w=top
         borders[sprite.m_Name] = {
             "left": int(b.x), "bottom": int(b.y), "right": int(b.z), "top": int(b.w),
@@ -106,6 +162,7 @@ result = {
         "dmgEmpty": vstar_dmg_empty, "dmgEmptyShort": vstar_dmg_empty_short,
     },
     "borders": dict(sorted(borders.items())),
+    "hud": dict(sorted(HUD_SPRITES.items())),
 }
 with open(out, "w", encoding="utf-8", newline="\n") as handle:
     json.dump(result, handle, indent=2)

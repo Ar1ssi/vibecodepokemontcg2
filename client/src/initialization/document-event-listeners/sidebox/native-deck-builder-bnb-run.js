@@ -45,14 +45,16 @@ import {
 } from '../../../setup/deck-builder/core/build-battle-run/run-view.mjs';
 import {
   boxShot,
+  boxUnboxingOptions,
   browserStorage,
   createPoolTab,
   el,
-  mountBoxUnboxing,
+  mountBoxOnStage,
   renderBoxPicker,
   unlimitedEnergyCards,
 } from './native-deck-builder-bb-shared.js';
 import { createStage } from './native-deck-builder-stage.js';
+import { mountUnboxingScene } from './native-deck-builder-unboxing.js';
 
 /**
  * The Run and Pool tabs of the Build & Battle builder tab (design 071): TCG Live's run flow over the
@@ -581,19 +583,10 @@ export const initializeBuildBattleRun = ({
   const renderOpening = (parent) => {
     const { setInfo, cards, data } = loaded;
     const skin = boxSkin({ box: activeBox, setInfo, cards, data });
-    const root = el('div', 'bb-scene bb-scene--stage');
+    const root = el('div', 'bb-scene');
     root.id = 'bbUnboxing';
     root.dataset.era = skin.palette;
-    // Without a workspace to host the stage the scene plays inline, as in the legacy flow.
-    const stageEl = stage.open(`Opening your ${activeBox.name}`);
-    if (stageEl) {
-      stageEl.replaceChildren(root);
-      parent.append(el('p', 'bb-note', 'Your box is being opened.'));
-    } else {
-      root.classList.remove('bb-scene--stage');
-      parent.append(root);
-    }
-    scene = mountBoxUnboxing({
+    const sceneOptions = boxUnboxingOptions({
       root,
       box: activeBox,
       loaded,
@@ -603,6 +596,15 @@ export const initializeBuildBattleRun = ({
       dispatch: dispatchUnboxing,
       onFinish: finishOpening,
     });
+    // Without a workspace to host the stage the DOM scene plays inline, as in the legacy flow.
+    const stageEl = stage.open(`Opening your ${activeBox.name}`);
+    if (stageEl) {
+      parent.append(el('p', 'bb-note', 'Your box is being opened.'));
+      scene = mountBoxOnStage({ stageEl, sceneOptions, box: activeBox, deckRows: boxStartingRows(), storage });
+    } else {
+      parent.append(root);
+      scene = mountUnboxingScene(sceneOptions);
+    }
   };
 
   const renderRun = () => {

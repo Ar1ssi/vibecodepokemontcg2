@@ -6,9 +6,10 @@
 # Pruned or shortened lines, verbatim: .agent/archive/DECISIONS-pruned-2026-10-15.md (grep the D-number).
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
-#   Next id = highest D number in this file and the archives + 1 (next: D219).
+#   Next id = highest D number in this file and the archives + 1 (next: D220).
 
 ## Active
+- D219 2026-10-16 [rules-ui] In-play taps route as TCG Live: own Active, or own Bench with a usable action, open the AttackOverlay; else the stack view. 013 print chrome retired for Pokémon. (Supersedes D210; design 074)
 - D218 2026-10-16 [engine] Commands live in shared/engine/reduce/<domain>.mjs; reduce.mjs is a facade with the 3 exports; handlers get locals explicitly; reduce/ cycles are call-time only, never read at load. (I250)
 - D217 2026-10-16 [board-ui] TCG Live foil/reverse cards wear its own shader+masks; lossless WebP streamed from R2 (`FOIL_TEXTURE_URL`), never in git; others keep CSS holo. (design 069-tcgl-card-foil)
 - D216 2026-10-15 [netcode] SERVER_AUTHORITATIVE defaults on (server/netcode-mode.mjs); only 0/false/off/no runs the legacy relay; shadow mode deleted, room-sweep.mjs frees roomInfo past grace. (supersedes D17)
@@ -17,7 +18,6 @@
 - D213 2026-10-16 [deck-builder] Sleeves are TCG Live's 415 (scripts/import-tcgl-sleeves.py: face crop 73-439 px, webp, ids `cs_*`), not the sleeve database; old stored ETB sleeve id remaps.
 - D212 2026-10-15 [netcode] Opening coin follows TCG Live: caller calls, server flips, the winner picks first or second; a silent or dropped winner goes first. Extends D51. (design 072)
 - D211 2026-10-15 [board-ui] Special Energy tokens are cut from the card's orb art, one per name, never drawn (user); finish = the art printing's; 2-Energy cards: two orbs; Basic-named Metal/Darkness need a Special tag.
-- D210 2026-10-11 [board-ui] Card focus lays the 013 chrome out as the game's overlay (`layout:'focus'`): bottom list, weakness/resistance/retreat strip, HUD left, Energy tokens; reverses 067 O2. (user)
 - D209 2026-10-11 [board-ui] Card focus ignores card/backdrop clicks for 500 ms after opening: a double-click's second click would land on an attack panel. (design 067)
 - D208 2026-10-11 [rules-ui] Single-click on your own Active opens the TCG Live card focus (CSS-3D lift on the game's 20° camera pose, hand drops, 013 panels on it); narrows D53 to Bench/Stadium. (user, design 067)
 - D207 2026-10-08 [mat-fx] Evolutions (non-Mega/Tera) and devolutions play TCG Live's Card_Evolution/Devolution prefabs as pure timelines on one canvas per card (tcgl-canvas.js). (Supersedes D153, D155; design 066)
@@ -73,7 +73,7 @@
 - D57 2026-09-19 [rules-ui] Carousel never sets pointer capture over interactive slide content (`isSwipeBlockedTarget`); verify carousel UI with real input, not `el.click()`. (S189)
 - D56 2026-09-19 [board-ui] Holofoil drifts on every surface while not held by the cursor and ignores prefers-reduced-motion; no holo opt-out (user decisions). (Folds D55; S186-188)
 - D54 2026-09-19 [rules] Ability position gate is in the ENGINE: `requiresActiveSpot` + `listAbilities({zone})` + `validateLegality`; matches only the restrictive conditional wording (design 015). (S182)
-- D53 2026-09-19 [rules-ui] Card inspection and attack/ability selection live on double-click in one inspector; single-click = select-to-move (design 013). Own Active: D208. (S174)
+- D53 2026-09-19 [rules-ui] Card inspection and attack/ability selection live on double-click in one inspector; single-click = select-to-move (design 013). In-play Pokémon: D208, D219. (S174)
 - D52 2026-09-18 [netcode] Client opening sequence is guarded by an `openingStarted` latch, never `rulesState.phase === 'setup'`. (S173)
 - D51 2026-09-18 [netcode] Opening turn order is a server-owned coin call on GameRoom (not GameState); silent caller for 15 s is called for by the server. (S173)
 - D49 2026-09-18 [netcode] "Look at top/bottom N" is a `peekDeck` request to the asker only (no state change); picks leave as moveCard; opponent deck peek only with rules off. (S171)

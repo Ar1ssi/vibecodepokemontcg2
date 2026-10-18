@@ -32,15 +32,17 @@ import {
 import { advanceUnboxing, boxSkin } from '../../../setup/deck-builder/core/build-battle/unboxing.mjs';
 import {
   boxShot,
+  boxUnboxingOptions,
   browserStorage,
   cardImage,
   createPoolTab,
   el,
-  mountBoxUnboxing,
+  mountBoxOnStage,
   renderBoxPicker,
   unlimitedEnergyCards,
 } from './native-deck-builder-bb-shared.js';
 import { createStage } from './native-deck-builder-stage.js';
+import { mountUnboxingScene } from './native-deck-builder-unboxing.js';
 
 /**
  * The Box and Pool tabs of the Build & Battle builder tab (designs 051 § Builder-tab controller,
@@ -446,14 +448,7 @@ export const initializeBuildBattle = ({
     root.id = 'bbUnboxing';
     root.dataset.era = skin.palette;
     const stageEl = unboxingDone() ? null : stage.open(`Opening your ${activeBox.name}`);
-    if (stageEl) {
-      root.classList.add('bb-scene--stage');
-      stageEl.replaceChildren(root);
-      boxPanelEl.append(el('p', 'bb-note', 'Your box is being opened.'));
-    } else {
-      boxPanelEl.append(root);
-    }
-    scene = mountBoxUnboxing({
+    const sceneOptions = boxUnboxingOptions({
       root,
       box: activeBox,
       loaded,
@@ -463,6 +458,13 @@ export const initializeBuildBattle = ({
       dispatch: dispatchUnboxing,
       onFinish: finishOpening,
     });
+    if (stageEl) {
+      boxPanelEl.append(el('p', 'bb-note', 'Your box is being opened.'));
+      scene = mountBoxOnStage({ stageEl, sceneOptions, box: activeBox, deckRows: boxStartingRows(), storage });
+    } else {
+      boxPanelEl.append(root);
+      scene = mountUnboxingScene(sceneOptions);
+    }
   };
 
   const renderBox = () => {

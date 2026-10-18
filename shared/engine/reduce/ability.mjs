@@ -4,10 +4,11 @@
  * the public entry.
  */
 
-import { findCard } from '../state.mjs';
-import { isBasicPokemon } from '../cards.mjs';
+import { findCard, attachmentHostId } from '../state.mjs';
+import { isBasicPokemon, isPokemon } from '../cards.mjs';
 import { shuffleInPlace } from '../rng.mjs';
-import { executeAbility } from '../effects/ability.mjs';
+import { executeAbility, resolveAbilitySteps } from '../effects/ability.mjs';
+import { selfAttachTargets } from '../effects/trainer-steps.mjs';
 import { createPendingChoice } from '../effects/executor.mjs';
 import { isSpecialEnergyCard, parseSpecialEnergyEffects } from '../rules/special-energy-parse.mjs';
 import {
@@ -131,6 +132,49 @@ export function settleAbilityOutcomes(draft, { events }) {
   }
 }
 
+// The hand-attach-as-Energy step (Charjabug Battery, UNB 58) of one of the card's Abilities.
+function handSelfAttachAbility(card) {
+  const abilities = Array.isArray(card?.abilities) ? card.abilities : [];
+  for (let abilityIndex = 0; abilityIndex < abilities.length; abilityIndex += 1) {
+    const ability = abilities[abilityIndex];
+    const text = typeof ability === 'string' ? ability : ability?.text || '';
+    const step = resolveAbilitySteps(text, { selfName: card.name }).steps.find(
+      (s) => s.type === 'selfAttachEnergyAbility' && s.fromHand
+    );
+    if (step) return { abilityIndex, step };
+  }
+  return null;
+}
+
+/**
+ * The client drops a hand card onto a Pokémon as attachCard. A Charjabug dropped onto a Pokémon
+ * its Battery may attach to is that Ability, aimed at the drop target, not a failed evolve.
+ * Any other target (a Grubbin it evolves from) keeps the attachCard.
+ *
+ * @param {object} state GameState
+ * @param {object} command Shape-valid command envelope
+ * @returns {object} The useAbility command, or the original command unchanged
+ */
+export function promoteSelfAttachDrop(state, command) {
+  if (!state.rulesEnabled) return command;
+  const { type, payload, playerId } = command;
+  if (type !== 'attachCard') return command;
+  const cardRef = findCard(state, payload.instanceId);
+  if (!cardRef || cardRef.zoneId !== 'hand' || cardRef.playerId !== playerId) return command;
+  if (!isPokemon(cardRef.card)) return command;
+  const found = handSelfAttachAbility(cardRef.card);
+  if (!found) return command;
+  const hostId = attachmentHostId(state, payload.targetInstanceId);
+  const player = state.players?.[playerId];
+  const targets = selfAttachTargets({ player, step: found.step }, null);
+  if (!targets.some((root) => root.instanceId === hostId)) return command;
+  return {
+    ...command,
+    type: 'useAbility',
+    payload: { instanceId: payload.instanceId, abilityIndex: found.abilityIndex, targetInstanceId: hostId },
+  };
+}
+
 export function useAbilityCommand({ draft, payload, playerId, activeRng, events }) {
   const cardRef = findCard(draft, payload.instanceId);
   if (cardRef && callEnergyStep(cardRef.card)) {
@@ -141,6 +185,7 @@ export function useAbilityCommand({ draft, payload, playerId, activeRng, events 
     const result = executeAbility(draft, {
       card: cardRef.card,
       abilityIndex: payload.abilityIndex ?? 0,
+      targetInstanceId: payload.targetInstanceId ?? null,
       playerId,
       activeRng,
       events,

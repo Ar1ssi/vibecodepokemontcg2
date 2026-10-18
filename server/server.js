@@ -48,6 +48,7 @@ import {
   markSeatDisconnected,
 } from './lobby/seat-presence.mjs';
 import { issueSeatToken } from './lobby/seat-token.mjs';
+import { cardArtProxyHandler, createCardArtProxy } from './card-art-proxy.mjs';
 import { createTcgdexProxy, tcgdexProxyHandler } from './tcgdex-proxy.mjs';
 import { createCardImageHandler } from './card-image-proxy.mjs';
 import { CARD_ART_PROXY_HOSTS } from './card-art-proxy-hosts.mjs';
@@ -276,6 +277,9 @@ async function main() {
   // Card data goes through the server: browsers calling TCGdex directly got
   // Cloudflare-blocked (CORS errors), leaving every card without stage/attacks.
   app.get('/api/tcgdex/*', tcgdexProxyHandler(createTcgdexProxy()));
+  // Card art the tabletop opening draws in WebGL (design 073): TCGdex's image CDN sends a
+  // doubled CORS header that browsers refuse, so those faces come through here.
+  app.get('/api/card-art', cardArtProxyHandler(createCardArtProxy()));
 
   // Design 069: where the client fetches TCG Live foil textures (object storage, or a local import).
   const foilTextures = resolveFoilTextureBase({
@@ -315,6 +319,15 @@ async function main() {
   app.get('/build-and-battle/legacy', (req, res) => {
     const at = req.originalUrl.indexOf('?');
     res.redirect(302, `/build-and-battle-legacy${at === -1 ? '' : req.originalUrl.slice(at)}`);
+  });
+  // Design 073: the standalone unboxing test bench, one static page (its asset URLs are relative,
+  // so a trailing slash would break them, as on /deck-builder).
+  app.get('/unboxing', (req, res) => {
+    if (req.path.endsWith('/')) {
+      const at = req.originalUrl.indexOf('?');
+      return res.redirect(301, `/unboxing${at === -1 ? '' : req.originalUrl.slice(at)}`);
+    }
+    res.sendFile(path.join(clientDir, 'unboxing.html'));
   });
   app.get('/import', (req, res) => {
     const key = req.query.key;

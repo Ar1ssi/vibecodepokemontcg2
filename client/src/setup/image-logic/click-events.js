@@ -19,9 +19,11 @@ import { closeCardPreview, openCardPreview } from './full-view.js';
 import { openDiscardPileViewer } from './discard-pile-viewer.js';
 import { openCarouselViewer } from './card-picker.js';
 import { attachedSlidesOf, openAttachedCardsCarousel } from './attached-carousel.js';
+import { orderAttachedForCarousel } from './carousel-order.mjs';
 import { rulesState, stadiumUsed } from '/shared/engine/rules/rules-state.mjs';
 import { isHandActivatedAbility } from '/shared/engine/rules/ability-executors.mjs';
 import {
+  benchHasUsableAction,
   openCardInspector,
   closeCardInspector,
   stadiumContextFor,
@@ -31,7 +33,10 @@ import {
   closeCardFocus,
   isCardFocusOpen,
 } from '../rules/card-focus.mjs';
-import { shouldOpenCardFocus } from '../rules/card-focus-routing.mjs';
+import { tapRoute } from '../rules/card-focus-routing.mjs';
+import { statusEffectsFor } from '../rules/attack-ui-model.mjs';
+import { isStackViewOpen, openStackView } from '../rules/stack-view.mjs';
+import { liveZoneArray } from '../zones/live-zone-array.js';
 import {
   attack,
   retreat,
@@ -220,25 +225,73 @@ export const openCardContextMenu = (event) => {
 };
 
 
-// Design 067: your own Active opens the TCG Live focus view. The attached cards the old inspector
-// carried as carousel slides sit behind the HUD's Stack button. An attack or retreat closes the
-// focus at once, because it fires at the slot the card would otherwise be flying back to.
-const openOwnActiveFocus = (card) => {
-  const attachedSlides = attachedSlidesOf(card);
+// The card's Buff / Debuff split for the focus HUD and the stack view (design 074). Timed attack
+// effects only count while the Pokémon is Active; the other player's Active is where a
+// presence-scoped effect's source sits.
+const statusesOf = (card, zone, user) =>
+  statusEffectsFor(card, {
+    turnNumber: rulesState.turnNumber,
+    zoneCards: liveZoneArray(user, zone),
+    sourceZoneCards: liveZoneArray(user === 'self' ? 'opp' : 'self', 'active'),
+    active: zone === 'active',
+  });
+
+// The stack view's carousel, left to right: the Pokémon, its evolution line (highest stage first),
+// then its Tools, then its Energy — the carousel order read the other way round.
+const stackCardsOf = (card) => [card, ...orderAttachedForCarousel(attachedSlidesOf(card)).reverse()];
+
+const openStackFor = (card, zone, user) =>
+  openStackView({ card, cards: stackCardsOf(card), zone, statuses: statusesOf(card, zone, user) });
+
+// The TCG Live AttackOverlay for one of your Pokémon (designs 067, 074). The HUD's Stack button
+// closes it and opens the stack view. On the Bench it lists no attacks and Retreat does nothing
+// (AttackOverlay.HideAttacksForBenchedPokemon); an attack or retreat closes the focus at once,
+// because it fires at the slot the card would otherwise be flying back to.
+const openPokemonFocus = (card, zone, retreatUser = systemState.initiator) => {
+  const active = zone === 'active';
   return openCardFocus({
     card,
-    zone: 'active',
-    attachedCount: attachedSlides.length,
-    onAttack: (index) => {
-      closeCardFocus({ immediate: true });
-      attack(rulesState.turnPlayer, true, index);
-    },
-    onRetreat: () => {
-      closeCardFocus({ immediate: true });
-      retreat(systemState.initiator);
-    },
-    onOpenStack: () => openAttachedCardsCarousel(card),
+    zone,
+    statuses: statusesOf(card, zone, 'self'),
+    onAttack: active
+      ? (index) => {
+          closeCardFocus({ immediate: true });
+          attack(rulesState.turnPlayer, true, index);
+        }
+      : null,
+    onRetreat: active
+      ? () => {
+          closeCardFocus({ immediate: true });
+          retreat(retreatUser);
+        }
+      : null,
+    onOpenStack: () => openStackFor(card, zone, 'self'),
   });
+};
+
+/**
+ * Open the AttackOverlay for your Active Pokémon (the sidebox Attack button, design 074 A3).
+ * Returns false when it could not open, so the caller can keep its old path.
+ *
+ * @param {object} card the Active Pokémon (a legacy zone card or a preview card)
+ * @param {string} [retreatUser] who retreats from its Retreat button (the sidebox's side)
+ */
+export const openActiveAttackOverlay = (card, retreatUser = systemState.initiator) =>
+  isCardFocusOpen() || openPokemonFocus(card, 'active', retreatUser);
+
+// PlayerCardOwner.OnCardClicked for an in-play Pokémon (design 074 A1): your Active, or a Benched
+// Pokémon of yours with something usable, opens the overlay; any other in-play Pokémon the stack
+// view. Returns whether the tap was handled.
+const routeInPlayTap = (card, zoneId, cardUser) => {
+  const route = tapRoute({
+    zoneId,
+    cardUser,
+    card,
+    hasUsableAction: zoneId === 'bench' && cardUser === 'self' && benchHasUsableAction(card),
+  });
+  if (route === 'overlay') return isCardFocusOpen() || openPokemonFocus(card, zoneId);
+  if (route === 'stack') return isStackViewOpen() || openStackFor(card, zoneId, cardUser);
+  return false;
 };
 
 export const imageClick = (event) => {
@@ -297,19 +350,11 @@ export const imageClick = (event) => {
     // clicks first, popping, re-popping and then tearing down the overlay before the carousel
     // replaced it. Selection of your own active is also what 008 made unreachable (its R3).
     closePopups(event); //need both because of highlights condition in the if block above
-    // D50/D53 superseded for your own Active (design 067): a single click opens the focus view.
-    // Select-to-move for the Active is drag or the right-click menu.
+    // D50/D53 superseded for in-play Pokémon (designs 067, 074): a single click opens the
+    // overlay or the stack view, as a tap does in TCG Live. Select-to-move for them is drag or the
+    // right-click menu.
     const focusCard = resolvePreviewCard(mouseClick.card, event.target);
-    if (
-      shouldOpenCardFocus({
-        zoneId: mouseClick.zoneId,
-        cardUser: mouseClick.cardUser,
-        card: focusCard,
-      }) &&
-      (isCardFocusOpen() || openOwnActiveFocus(focusCard))
-    ) {
-      return;
-    }
+    if (routeInPlayTap(focusCard, mouseClick.zoneId, mouseClick.cardUser)) return;
     // Select-to-move resolves a legacy card through its zone array; a server-drawn card
     // (never in those arrays) is selected through the authoritative registry.
     if (!mouseClick.card?.image) {
@@ -343,17 +388,8 @@ export const doubleClick = (event) => {
     });
     return;
   }
-  // The second click of a double-click on your own Active: open (or keep) the same focus view.
-  if (
-    shouldOpenCardFocus({
-      zoneId: mouseClick.zoneId,
-      cardUser: mouseClick.cardUser,
-      card,
-    }) &&
-    (isCardFocusOpen() || openOwnActiveFocus(card))
-  ) {
-    return;
-  }
+  // The second click of a double-click on an in-play Pokémon: open (or keep) what the tap opened.
+  if (routeInPlayTap(card, mouseClick.zoneId, mouseClick.cardUser)) return;
   const targetImage = card.image;
   targetImage.classList.remove('highlight');
   // Every zone zooms through the dismissible floating preview, the attached-card carousel or the
@@ -391,31 +427,6 @@ export const doubleClick = (event) => {
         onUse: () => {
           closeCardInspector();
           stadiumEffect(user);
-        },
-      });
-      return;
-    }
-
-    // D50 (design 013): your own board Pokémon open the inspector — the enlarged scan with the
-    // TCG Live readout over it, attached cards as further slides, a payable attack fired by
-    // clicking its panel, and the ability fired by clicking its own. Opponent's Pokémon and
-    // hand cards keep the plain scan: payability and actions are not theirs to show. (The
-    // shared Stadium is handled above, design 018.)
-    if (
-      ['active', 'bench'].includes(mouseClick.zoneId) &&
-      mouseClick.cardUser === 'self'
-    ) {
-      openCardInspector({
-        card,
-        attachedSlides,
-        zone: mouseClick.zoneId,
-        onAttack: (index) => {
-          closeCardInspector();
-          attack(rulesState.turnPlayer, true, index);
-        },
-        onRetreat: () => {
-          closeCardInspector();
-          retreat(systemState.initiator);
         },
       });
       return;

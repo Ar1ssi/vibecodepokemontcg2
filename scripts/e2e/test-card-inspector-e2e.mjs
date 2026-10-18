@@ -413,15 +413,15 @@ try {
     if (!insp) return null;
     return {
       hp: insp.querySelector('.ptcg-hp')?.textContent,
-      atks: [...insp.querySelectorAll('.ptcg-atk')].map((el) => ({
-        name: el.querySelector('.ptcg-atk__name')?.textContent,
-        receded: el.classList.contains('ptcg-atk--recede'),
-        usable: el.classList.contains('ptcg-atk--usable'),
+      atks: [...insp.querySelectorAll('.tcgl-opt--attack')].map((el) => ({
+        name: el.querySelector('.tcgl-opt__name')?.textContent,
+        receded: el.classList.contains('tcgl-opt--off'),
+        usable: el.classList.contains('tcgl-opt--usable'),
         type: el.dataset.ptcgType,
-        hasDmg: Boolean(el.querySelector('.ptcg-atk__dmg')),
+        hasDmg: Boolean(el.querySelector('.tcgl-opt__dmg')?.textContent),
       })),
-      stats: insp.querySelector('.ptcg-stats')?.textContent,
-      retreatType: insp.querySelector('.ptcg-stat[data-ptcg-retreat]')?.dataset.ptcgType,
+      stats: insp.querySelector('.tcgl-wr')?.textContent,
+      retreatType: insp.querySelector('.tcgl-retreat[data-ptcg-retreat]')?.dataset.ptcgType,
     };
   });
   console.log('Focus data (0 energy):', JSON.stringify(inspectorData));
@@ -442,12 +442,12 @@ try {
       host: box('.card-focus__card'),
       chrome: box('.card-focus .ptcg-chrome'),
       stack: box('.card-focus .ptcg-stack--focus'),
-      strip: box('.card-focus .ptcg-stats--focus'),
+      strip: box('.card-focus .tcgl-wr'),
       hp: box('.card-focus .ptcg-hp'),
       hud: box('.card-focus__hud'),
       viewport: { width: window.innerWidth, height: window.innerHeight },
-      stripText: document.querySelector('.card-focus .ptcg-stats--focus')?.textContent ?? '',
-      weakness: document.querySelector('.card-focus .ptcg-wr__row .ptcg-wr__n')?.textContent ?? null,
+      stripText: document.querySelector('.card-focus .tcgl-wr')?.textContent ?? '',
+      weakness: document.querySelector('.card-focus .tcgl-wr__row--weakness .tcgl-wr__amount')?.textContent ?? null,
     };
   });
   const W = layout.host.width;
@@ -471,7 +471,7 @@ try {
     '7e. The bar hangs under the list: 0.43 units above the card bottom, 0.7 tall',
     within(layout.strip.bottom, liftY(layout.chrome.bottom - 0.43 * tu), 3) && within(layout.strip.height, 0.7 * tu * lift, 3)
   );
-  T('7f. The strip repeats weakness and resistance (the print is covered)', /weakness/.test(layout.stripText) && /resistance/.test(layout.stripText) && layout.weakness === '×2', layout.stripText.trim().replace(/\s+/g, ' '));
+  T('7f. The strip repeats weakness and resistance (the print is covered)', /Weakness/.test(layout.stripText) && /Resistance/.test(layout.stripText) && layout.weakness === 'x2', layout.stripText.trim().replace(/\s+/g, ' '));
   T('7g. The HP pill overhangs the card edge, the HUD stands left of it', layout.hp.right > layout.host.right + 0.01 * W && layout.hud.right < layout.host.left);
 
   await actor.page.screenshot({ path: 'out/e2e-focus-open.png' });
@@ -511,78 +511,56 @@ try {
   await clickActive(['click']);
   await actor.page.waitForTimeout(800);
   const withEnergy = await actor.page.evaluate(() => ({
-    atks: [...document.querySelectorAll('.card-focus .ptcg-atk')].map((el) => ({
-      receded: el.classList.contains('ptcg-atk--recede'),
-      usable: el.classList.contains('ptcg-atk--usable'),
+    atks: [...document.querySelectorAll('.card-focus .tcgl-opt--attack')].map((el) => ({
+      receded: el.classList.contains('tcgl-opt--off'),
+      usable: el.classList.contains('tcgl-opt--usable'),
     })),
-    stack: document.querySelector('.card-focus__stack-count')?.textContent ?? null,
+    stack: Boolean(document.querySelector('.card-focus__stack')),
     energies: document.querySelectorAll('.card-focus__energy').length,
   }));
   console.log('Focus data (1 Fire Energy attached):', JSON.stringify(withEnergy));
   T('10. Ember and Scratch are payable once Fire Energy is attached', withEnergy.atks.length === 2 && withEnergy.atks.every((a) => a.usable && !a.receded));
-  T('10b. The HUD shows the Stack button with the attached count', withEnergy.stack === '1');
+  T('10b. The HUD shows the Stack button once a card is attached', withEnergy.stack);
   T('10b2. The attached Fire Energy stands under the card as one large token', withEnergy.energies === 1);
 
   await actor.page.screenshot({ path: 'out/e2e-focus-payable.png' });
   console.log('Screenshot saved: out/e2e-focus-payable.png');
 
-  // 10c. With a payable attack under the cursor, a real double-click on the Active must not fire it:
-  // the Active's slot is under the landed card, so the second click lands on an attack panel.
+  // 10c. A second click inside the 500 ms guard must not fire a payable attack. The TCG Live option
+  // list stands beside the card, so the second click is aimed at the first payable row, not the Active.
   await actor.page.keyboard.press('Escape');
   await waitGone();
-  const { x: px, y: py } = await activeCentre();
-  // The Active sits beside the focus card, so the second click is aimed at the
-  // lowest payable panel (the list reveals upward, so it is hit-testable first). SwiftShader
-  // draws frames so far apart that the card is not even visible inside the 500 ms guard (it is
-  // hidden until its flight starts, one frame after the open), so the page's clock is held at
-  // the open and then moved 350 ms on: the guard is what is tested, not the frame rate.
-  await actor.page.evaluate(() => {
-    window.__realNow = performance.now.bind(performance);
-    window.__heldNow = window.__realNow();
-    performance.now = () => window.__heldNow;
-  });
-  await actor.page.mouse.click(px, py);
-  const secondClick = await waitFor(
-    actor.page,
-    () => {
-      if (!document.querySelector('.card-focus--open')) return null;
-      const r = [...document.querySelectorAll('.card-focus .ptcg-atk--usable')].at(-1)?.getBoundingClientRect();
-      const at = r && { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-      return at && document.elementFromPoint(at.x, at.y)?.closest('.ptcg-atk--usable') ? at : null;
-    },
-    12000
-  ).catch(() => null);
-  await actor.page.evaluate(() => {
-    window.__heldNow += 350;
-  });
-  const onUsablePanel = Boolean(secondClick) && await actor.page.evaluate(
-    ([x, y]) => Boolean(document.elementFromPoint(x, y)?.closest('.ptcg-atk--usable')),
-    [secondClick.x, secondClick.y]
-  );
-  T('10c-pre. The second click of the double-click would land on a payable attack panel', onUsablePanel, JSON.stringify(secondClick));
-  if (secondClick) await actor.page.mouse.click(secondClick.x, secondClick.y);
-  await actor.page.evaluate(() => { performance.now = window.__realNow; });
+  await clickActive(['click']);
+  // A slow double-click: the list has finished revealing, the 500 ms guard has not passed.
+  await actor.page.waitForTimeout(350);
+  const payRow = await actor.page.locator('.tcgl-opt.tcgl-opt--usable').first().boundingBox();
+  T('10c-pre. A payable attack row is on screen inside the guard window', Boolean(payRow));
+  if (payRow) await actor.page.mouse.click(payRow.x + payRow.width / 2, payRow.y + payRow.height / 2);
   await actor.page.waitForTimeout(700);
   T('10c. ...and it does not fire the attack: the focus view is still open', await focusOpen());
 
   await actor.page.locator('.card-focus__stack').click();
   await actor.page.waitForTimeout(800);
-  const slideCount = await actor.page.locator('.card-picker-stage .card-picker-slide').count();
-  T('11. Stack closes the focus and opens the carousel with the attached card', !(await focusOpen()) && slideCount >= 2, `slides=${slideCount}`);
-  const energySlideHasChrome = await actor.page.evaluate(() => {
-    const slides = document.querySelectorAll('.card-picker-stage .card-picker-slide');
-    return !!slides[0]?.querySelector('.ptcg-inspector');
-  });
-  T('12. The attached Energy slide has no inspector chrome', energySlideHasChrome === false);
+  // Design 074: Stack opens TCG Live's stack view — the card carousel beside the info panel.
+  const stackView = await actor.page.evaluate(() => ({
+    open: Boolean(document.querySelector('.tcgl-stack')),
+    dots: document.querySelectorAll('.tcgl-stack__dot').length,
+    energy: document.querySelector('.tcgl-stack__attached--energy .tcgl-stack__attached-total b')?.textContent ?? null,
+    attacks: document.querySelectorAll('.tcgl-stack__list .tcgl-opt--attack').length,
+  }));
+  T('11. Stack closes the focus and opens the stack view with the attached card', !(await focusOpen()) && stackView.open && stackView.dots >= 2, JSON.stringify(stackView));
+  T('12. The stack view lists the attached Energy and the attacks', stackView.energy === '1' && stackView.attacks === 2);
   await actor.page.keyboard.press('Escape');
   await actor.page.waitForTimeout(500);
+  T('12b. Escape closes the stack view', !(await actor.page.evaluate(() => Boolean(document.querySelector('.tcgl-stack')))));
 
   // 13. Click a payable attack with REAL input (locator.click), not el.click(): a programmatic click
   // dispatches no pointerdown, so pointer-capture regressions hide. The focus closes at once.
   console.log('Testing attack click execution...');
   await clickActive(['click']);
   await actor.page.waitForTimeout(800);
-  await actor.page.locator('.ptcg-atk.ptcg-atk--usable').first().click();
+  T('13-pre. The focus view reopens on the Active', await focusOpen());
+  await actor.page.locator('.tcgl-opt.tcgl-opt--usable').first().click({ timeout: 5000 });
   T('13. Clicking a payable attack closes the focus view at once', await waitGone());
   T('13b. ...and the hand is raised again', await handRaised());
 

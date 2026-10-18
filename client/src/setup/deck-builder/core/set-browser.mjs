@@ -2,6 +2,7 @@ import { cachedFetchJson as fetchJson } from './tcgdex-cache.mjs';
 import { GEN_1_2_ORDER } from './gen-1-2-order.generated.mjs';
 import { BLACK_BOLT_WHITE_FLARE_ORDER } from './black-bolt-white-flare-order.generated.mjs';
 import { tcgdexApiBase } from '../../../../../shared/tcgdex/tcgdex-url.mjs';
+import { withCardArt } from '../../../../../shared/tcgdex/card-art.mjs';
 
 const TCGDEX_BASE = tcgdexApiBase();
     
@@ -195,7 +196,8 @@ const TCGDEX_BASE = tcgdexApiBase();
     async function fetchSetRecord(setId, seriesId) {
       const cacheKey = `${seriesId}/${setId}`;
       if (setRecordCache.has(cacheKey)) return setRecordCache.get(cacheKey);
-      const record = await fetchJson(`${TCGDEX_BASE}/sets/${setId}`);
+      const fetched = await fetchJson(`${TCGDEX_BASE}/sets/${setId}`);
+      const record = Array.isArray(fetched?.cards) ? { ...fetched, cards: fetched.cards.map(withCardArt) } : fetched;
       setRecordCache.set(cacheKey, record);
       return record;
     }
@@ -320,7 +322,20 @@ const TCGDEX_BASE = tcgdexApiBase();
 
       return sets;
     }
-    
+
+    // Generations behind the Homebrew pill: Black & White (5) and XY (6).
+    export const HOMEBREW_GENERATIONS = [5, 6];
+
+    // Every real set from the Homebrew generations, newest first. The synthetic
+    // Energy tabs are dropped; Energy cards still show inside their own sets.
+    export async function fetchHomebrewSets(generations = HOMEBREW_GENERATIONS) {
+      const perGeneration = await Promise.all(generations.map((gen) => fetchGenerationSets(gen)));
+      return perGeneration
+        .flat()
+        .filter((set) => !GENERATION_ENERGY_SET_ID_RE.test(set.setId))
+        .sort((a, b) => String(b.releaseDate || '').localeCompare(String(a.releaseDate || '')));
+    }
+
     // Fetch all legal Standard-format sets, newest first, with logo + release date.
     export async function fetchLegalStandardSets() {
       const entries = await Promise.all(
@@ -513,18 +528,16 @@ const TCGDEX_BASE = tcgdexApiBase();
       return sortCardsWithinGroup(allCards, { sortBy: 'name', sortDirection: 'asc' });
     }
 
-    // Sets across Pokémon generations that famously featured Reverse Holo energy cards:
-    // - Gen 8 (swsh): Crown Zenith (swsh12.5) basic energies
-    // - Gen 7 (sm): Sun & Moon (sm1), Guardians Rising (sm2), Burning Shadows (sm3), Crimson Invasion (sm4) basic energies
-    // - Gen 6 (xy): Evolutions (xy12), Generations (g1) basic & special energies
+    // Sets across Pokémon generations where every Energy card has a Reverse Holo print:
+    // - Gen 6 (xy): Evolutions (xy12), Generations (g1) basic & special energies; the
+    //              special energies of xy1–xy10 and dc1 are listed by card id below
     // - Gen 5 (bw): every set with an Energy card — Black & White (bw1) basic energies plus the
     //               special energies in Next Destinies (bw4), Dragons Exalted (bw6), Plasma Storm
     //               (bw8), Plasma Freeze (bw9), Plasma Blast (bw10), Legendary Treasures (bw11)
     // - Gen 3 (ecard/ex): Expedition Base Set (ecard1), EX Ruby & Sapphire (ex1), EX Emerald (ex9),
     //                     EX Holon Phantoms (ex13), EX Power Keepers (ex16) basic energies
+    // Gens 7–9 are listed by card id below.
     export const REVERSE_HOLO_ENERGY_SET_IDS_BY_GENERATION = {
-      8: new Set(['swsh12.5']),
-      7: new Set(['sm1', 'sm2', 'sm3', 'sm4']),
       6: new Set(['xy12', 'g1']),
       5: new Set(['bw1', 'bw4', 'bw6', 'bw8', 'bw9', 'bw10', 'bw11']),
       3: new Set(['ecard1', 'ex1', 'ex9', 'ex13', 'ex16']),
@@ -535,7 +548,77 @@ const TCGDEX_BASE = tcgdexApiBase();
     // energies with gold Hyper Rare and ACE SPEC energies that have no reverse print,
     // so a set-granular sweep would fabricate reverse variants of cards that never had
     // one. Source: TCGdex `variants.reverse` per card (/v2/en/cards/<id>), verified 2026-09.
+    // Gen 6 (xy) is keyed by card id for the same reason: only the special energies
+    // reverse, not the basic energies printed alongside them. TCGdex `variants.reverse`
+    // is false for all of these, so the source is TCG Live's `<set>_<n>_ph` Reverse rows
+    // (card_database_rows.tsv); ids checked against TCGdex 2026-10-18.
+    // Gens 7 (sm) and 8 (swsh) are keyed by card id too: TCG Live reverses their special
+    // energies only. Their secret and ultra rare energies (sm1-162.., swsh12.5-152..) are
+    // `Etched` prints with no reverse. Source: TCG Live `_ph` Reverse rows; ids checked
+    // against TCGdex 2026-10-18 (sm3.5-69/70 and every sve card have no TCGdex image yet,
+    // so the set browser skips them until one is added).
     export const REVERSE_HOLO_ENERGY_CARD_IDS_BY_GENERATION = {
+      7: new Set([
+        'sm1-136', // Double Colorless Energy
+        'sm1-137', // Rainbow Energy
+        'sm3.5-69', // Double Colorless Energy
+        'sm3.5-70', // Warp Energy
+        'sm4-100', // Counter Energy
+        'sm5-137', // Unit Energy {G}{R}{W}
+        'sm5-138', // Unit Energy {L}{P}{M}
+        'sm6-118', // Unit Energy {F}{D}{Y}
+        'sm7-151', // Rainbow Energy
+        'sm8-194', // Memory Energy
+        'sm10-190', // Triple Acceleration Energy
+        'sm11-212', // Recycle Energy
+        'sm11-213', // Weakness Guard Energy
+        'sm12-209', // Draw Energy
+      ]),
+      8: new Set([
+        'swsh1-186', // Aurora Energy
+        'swsh2-171', // Capture Energy
+        'swsh2-172', // Horror Psychic Energy
+        'swsh2-173', // Speed Lightning Energy
+        'swsh2-174', // Twin Energy
+        'swsh3-174', // Heat Fire Energy
+        'swsh3-175', // Hiding Darkness Energy
+        'swsh3-176', // Powerful Colorless Energy
+        'swsh4-162', // Aromatic Grass Energy
+        'swsh4-163', // Coating Metal Energy
+        'swsh4-164', // Stone Fighting Energy
+        'swsh4-165', // Wash Water Energy
+        'swsh5-140', // Rapid Strike Energy
+        'swsh5-141', // Single Strike Energy
+        'swsh6-157', // Impact Energy
+        'swsh6-158', // Lucky Energy
+        'swsh6-159', // Spiral Energy
+        'swsh7-165', // Treasure Energy
+        'swsh8-244', // Fusion Strike Energy
+        'swsh9-151', // Double Turbo Energy
+        'swsh11-171', // Gift Energy
+        'swsh12-168', // Regenerative Energy
+        'swsh12-169', // V Guard Energy
+      ]),
+      6: new Set([
+        'xy1-130', // Double Colorless Energy
+        'xy1-131', // Rainbow Energy
+        'xy3-103', // Herbal Energy
+        'xy3-104', // Strong Energy
+        'xy4-111', // Double Colorless Energy
+        'xy4-112', // Mystery Energy
+        'xy5-143', // Shield Energy
+        'xy5-144', // Wonder Energy
+        'dc1-33', // Double Aqua Energy
+        'dc1-34', // Double Magma Energy
+        'xy6-97', // Double Dragon Energy
+        'xy7-82', // Dangerous Energy
+        'xy7-83', // Flash Energy
+        'xy8-151', // Burning Energy
+        'xy8-152', // Rainbow Energy
+        'xy9-113', // Splash Energy
+        'xy10-114', // Double Colorless Energy
+        'xy10-115', // Strong Energy
+      ]),
       9: new Set([
         'sv02-190', // Jet Energy
         'sv02-191', // Luminous Energy
@@ -548,6 +631,8 @@ const TCGDEX_BASE = tcgdexApiBase();
         'sv10-182', // Team Rocket's Energy
         'sv10.5b-086', // Prism Energy
         'sv10.5w-086', // Ignition Energy
+        // Basic energies (TCG Live sve_<n>_ph): 1–8 Cosmos, 9–16 Flat Silver, 17–24 Tinsel.
+        ...Array.from({ length: 24 }, (_, i) => `sve-${String(i + 1).padStart(3, '0')}`),
       ]),
     };
 
@@ -564,7 +649,7 @@ const TCGDEX_BASE = tcgdexApiBase();
     // across every set in a Pokémon generation. For generations featuring
     // Reverse Holo energy prints (Gen 9, 8, 7, 6, 5, 3), this includes their
     // Reverse Holo variants — by set id where every energy in the set reverses,
-    // or by card id where eligible and ineligible energies coexist (Gen 9).
+    // or by card id where eligible and ineligible energies coexist (Gen 9, 8, 7, 6).
     export async function fetchGenerationEnergyCards(generation) {
       const setEntries = await fetchGenerationSetStubs(generation);
       const cards = await fetchEnergyCardsForSetEntries(setEntries);

@@ -4,7 +4,7 @@
  * Enforces Invariants 2, 3, 6, 7, 8.
  */
 
-import { cloneGameState, findCard, createGameState } from './state.mjs';
+import { clearDetachedCardMarkers, cloneGameState, findCard, createGameState } from './state.mjs';
 import { validateCommandShape } from './commands.mjs';
 import { createRng, withForcedCoin, withForcedCoinOnce } from './rng.mjs';
 import { abilityForcesOpponentTails } from './rules/ability-combat.mjs';
@@ -25,7 +25,7 @@ import {
 import { retreatCommand } from './reduce/retreat.mjs';
 import { attachCardCommand } from './reduce/attach.mjs';
 import { promoteTrainerPlay, playTrainerCommand, stadiumEffectCommand } from './reduce/trainer.mjs';
-import { useAbilityCommand, useVStarGXCommand } from './reduce/ability.mjs';
+import { promoteSelfAttachDrop, useAbilityCommand, useVStarGXCommand } from './reduce/ability.mjs';
 import {
   clearFaceDownOffBoard, moveCardCommand, drawCommand, addDamageCounterCommand,
   updateDamageCounterCommand, removeDamageCounterCommand, addSpecialConditionCommand,
@@ -129,7 +129,7 @@ export function applyCommand(state, command, rng = null) {
     };
   }
 
-  command = promoteTrainerPlay(state, command);
+  command = promoteSelfAttachDrop(state, promoteTrainerPlay(state, command));
   if (command.pendingDataReason) {
     return {
       state,
@@ -445,6 +445,7 @@ export function applyCommand(state, command, rng = null) {
   stampActivePromotions(state, draft);
   stampHealedPokemon(state, draft);
   clearFaceDownOffBoard(draft);
+  clearDetachedCardMarkers(draft);
   settleFossilCards(draft);
   delete draft.__attackEffectPhase;
   delete draft.__attackLostZoneKnockouts;

@@ -6,7 +6,7 @@
     import { withParadoxSubtype } from './paradox-tags.mjs';
     import { legacyTrainerType } from './legacy-trainer-type.mjs';
     import { createCachedFetchJson } from '../../tcgdex/tcgdex-cache.mjs';
-    import { tcgdexApiUrl } from '../../tcgdex/tcgdex-url.mjs';
+    import { isReverseHoloId, tcgdexApiUrl, tcgdexLookupId } from '../../tcgdex/tcgdex-url.mjs';
     import {
       buildSetCardIdCandidates,
       extractTcgdexIdFromImageUrl,
@@ -256,7 +256,7 @@
       if (detailInFlight.has(id)) return detailInFlight.get(id);
       const promise = (async () => {
         try {
-          const detail = await fetchTcgdexJson(tcgdexApiUrl(`/cards/${id}`));
+          const detail = await fetchTcgdexJson(tcgdexApiUrl(`/cards/${tcgdexLookupId(id)}`));
           if (!detail) return null;
           cardDetailCache.set(id, detail);
           return detail;
@@ -511,7 +511,8 @@
           ability: tcgAbilityFromDetail(detail),
           subtypes: detail.subtypes || subtypesFromSuffix(detail.suffix),
           trainerType: detail.trainerType || legacyTrainerType(detail) || null,
-          rarity: printedRarity(detail) || card.rarity || '',
+          // A Reverse Holo copy fetches its base print's detail; keep its own rarity.
+          rarity: isReverseHoloId(card.id) ? 'Reverse Holo' : printedRarity(detail) || card.rarity || '',
           effect: detail.effect || null,
           text: detail.text || detail.effect || null,
         };

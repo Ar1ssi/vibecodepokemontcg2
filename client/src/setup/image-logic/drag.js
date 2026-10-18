@@ -15,7 +15,7 @@ import { readCardInstanceId } from '../netcode/authoritative-dispatch.js';
 import { appendMessage } from '../chatbox/append-message.js';
 import { retreat } from '../../actions/chat-buttons/chat-buttons.js';
 import { manualDeckActionAllowed } from '/shared/engine/rules/rules-state.mjs';
-import { playsOntoBoard, zoneOf } from './drop-zone.mjs';
+import { boardRefuses, playsOntoBoard, zoneOf } from './drop-zone.mjs';
 import { endDragAvatar, startDragAvatar } from './drag-avatar.js';
 import { uiCue } from '../netcode/mat-fx/ui-cue.mjs';
 
@@ -142,6 +142,15 @@ export const dragOver = (event) => {
     document.querySelector('.dragging') ||
     selfContainerDocument.querySelector('.dragging') ||
     oppContainerDocument.querySelector('.dragging');
+
+  if (
+    zoneOf(event.target)?.id === 'board' &&
+    mouseClick.zoneId !== 'board' &&
+    boardRefuses(heldCard(draggedImage))
+  ) {
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'none';
+    return;
+  }
 
   const targetIsNotOwnContainer = event.target !== zoneOf(draggedImage);
   const targetIsContainer = event.target.tagName === 'DIV';
@@ -349,6 +358,22 @@ export const drop = (event) => {
       // silently skipped the retreat branch below (drag-to-retreat onto an
       // empty bench slot never paid the retreat cost).
       dZoneId = zoneOf(event.target)?.id ?? event.target.id;
+    }
+
+    if (
+      dZoneId === 'board' &&
+      mouseClick.zoneId !== 'board' &&
+      boardRefuses(heldCard(draggedImage))
+    ) {
+      uiCue('card-no-match');
+      appendMessage(
+        systemState.initiator,
+        "⛔ Pokémon and Energy cards can't be played onto the Trainer area.",
+        'announcement',
+        false
+      );
+      event.stopPropagation();
+      return;
     }
 
     // Dragging the active Pokémon onto the bench is a retreat, not a plain move:

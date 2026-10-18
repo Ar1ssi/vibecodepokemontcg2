@@ -8,33 +8,17 @@ import { wireButtonCues } from '../../../../setup/netcode/mat-fx/ui-cue.mjs';
 import { rulesState } from '/shared/engine/rules/rules-state.mjs';
 import { getZone } from '../../../../setup/zones/get-zone.js';
 import { getActivePokemonCard } from '/shared/engine/zones/active-pokemon.mjs';
-import {
-  openCardInspector,
-  closeCardInspector,
-} from '../../../../setup/rules/card-inspector.mjs';
+import { openActiveAttackOverlay } from '../../../../setup/image-logic/click-events.js';
 
 export const initializeP1ChatButtons = () => {
   const attackButton = document.getElementById('attackButton');
   attackButton.addEventListener('click', () => {
     const user = systemState.isTwoPlayer ? systemState.initiator : 'self';
-    // D50 (design 013, was 008 Component 7): rules mode opens the same inspector a double-click
-    // on the card opens, rather than attacking directly. One surface, one gesture.
+    // Design 074 A3: rules mode opens the same TCG Live AttackOverlay a tap on the Active opens,
+    // rather than attacking directly. One surface, one gesture.
     if (rulesState.enabled) {
       const active = getActivePokemonCard(getZone(user, 'active'));
-      if (active?.image) {
-        openCardInspector({
-          card: active,
-          onAttack: (index) => {
-            closeCardInspector();
-            attack(rulesState.turnPlayer, true, index);
-          },
-          onRetreat: () => {
-            closeCardInspector();
-            retreat(systemState.initiator);
-          },
-        });
-        return;
-      }
+      if (active?.image && openActiveAttackOverlay(active, systemState.initiator)) return;
     }
     attack(user);
   });

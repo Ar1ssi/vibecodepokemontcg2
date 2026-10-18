@@ -17,6 +17,7 @@ import {
 import { boxArt } from '../../../setup/deck-builder/core/build-battle/unboxing.mjs';
 import { buildModernBasicEnergy } from '../../../setup/deck-builder/core/modern-energy.mjs';
 import { mountUnboxingScene } from './native-deck-builder-unboxing.js';
+import { mountTabletopUnboxing } from './tabletop/tabletop-scene.js';
 
 /**
  * What the two Build & Battle flows share (design 073 § D): the run flow
@@ -107,13 +108,13 @@ export const renderBoxPicker = ({ getActiveBox, onPick, eraRowId = null, selectI
 };
 
 /**
- * The unboxing scene (design 052) for `opened`, the opened box's session, over the box's loaded
- * data. `skin` is the box's `boxSkin`, which the caller has already put on `root`.
+ * The `mountUnboxingScene` options (design 052) for `opened`, the opened box's session, over the
+ * box's loaded data. `skin` is the box's `boxSkin`, which the caller has already put on `root`.
  */
-export const mountBoxUnboxing = ({ root, box, loaded, skin, opened, getUnboxing, dispatch, onFinish }) => {
+export const boxUnboxingOptions = ({ root, box, loaded, skin, opened, getUnboxing, dispatch, onFinish }) => {
   const cardsById = new Map(loaded.cards.map((card) => [card.id, card]));
   const { setInfo, cards, data } = loaded;
-  return mountUnboxingScene({
+  return {
     root,
     getUnboxing,
     dispatch,
@@ -130,7 +131,29 @@ export const mountBoxUnboxing = ({ root, box, loaded, skin, opened, getUnboxing,
     seed: opened.seed,
     promo: boxPromoRow({ box, data, deckKey: opened.deckKey }),
     onFinish,
-  });
+  };
+};
+
+/**
+ * Plays the opening on the fullscreen stage `stageEl`: the tabletop (design 073-tabletop-unboxing),
+ * or the design-052 DOM scene with `?tabletop=0` or when the tabletop cannot run (effects off, no
+ * WebGL 2, a lost context), and the box opens all the same. `sceneOptions` are `boxUnboxingOptions`;
+ * `deckRows` is the box's starting deck, for the leaflet.
+ * @returns {{unmount: () => void}}
+ */
+export const mountBoxOnStage = ({ stageEl, sceneOptions, box, deckRows, storage }) => {
+  const mountDomScene = () => {
+    stageEl.classList.remove('bb-stage--tabletop');
+    sceneOptions.root.classList.add('bb-scene--stage');
+    stageEl.replaceChildren(sceneOptions.root);
+    return mountUnboxingScene(sceneOptions);
+  };
+  // `?tabletop=0` keeps the DOM scene (its recorder, and side-by-side checks).
+  if (new URLSearchParams(window.location.search).get('tabletop') === '0') return mountDomScene();
+  const table = el('div', 'bb-tabletop');
+  stageEl.classList.add('bb-stage--tabletop');
+  stageEl.replaceChildren(table);
+  return mountTabletopUnboxing({ ...sceneOptions, root: table, box, deckRows, storage, fallback: mountDomScene });
 };
 
 /**

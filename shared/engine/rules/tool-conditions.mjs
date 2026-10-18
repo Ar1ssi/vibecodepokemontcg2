@@ -15,7 +15,7 @@
 // `parseToolCondition` returns null when the card prints no condition; a null
 // descriptor is always true, so unconditional tools keep working unchanged.
 
-import { getRetreatCostCount, isEnergy } from '../cards.mjs';
+import { getRetreatCostCount, isEnergy, isAttachedAsTool } from '../cards.mjs';
 import {
   isExCard,
   isGxCard,
@@ -40,7 +40,8 @@ const lower = (v) =>
 
 const textOf = (card) =>
   lower(
-    card?.ability?.text ?? card?.abilityText ?? card?.text ?? card?.effect ?? ''
+    (isAttachedAsTool(card) ? card.asTool.text : null) ??
+      card?.ability?.text ?? card?.abilityText ?? card?.text ?? card?.effect ?? ''
   );
 
 const TYPE_WORDS = {

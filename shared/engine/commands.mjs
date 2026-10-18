@@ -496,6 +496,9 @@ export const COMMAND_SCHEMAS = {
           reason: 'abilityIndex must be a non-negative integer when provided',
         };
       }
+      if (payload.targetInstanceId != null && !Number.isInteger(payload.targetInstanceId)) {
+        return { valid: false, reason: 'targetInstanceId must be an integer when provided' };
+      }
       return { valid: true };
     },
   },

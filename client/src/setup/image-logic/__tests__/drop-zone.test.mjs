@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { DROP_ZONE_SELECTOR, playsOntoBoard, zoneOf } from '../drop-zone.mjs';
+import { DROP_ZONE_SELECTOR, boardRefuses, playsOntoBoard, zoneOf } from '../drop-zone.mjs';
 
 // Minimal element stand-in: `closest` walks up the parent chain and matches
 // the comma-separated `#id` list the real selector is built from.
@@ -81,4 +81,23 @@ test('playsOntoBoard: Pokémon, Energy and unknown cards do not', () => {
   assert.equal(playsOntoBoard({ instanceId: 7 }), false);
   assert.equal(playsOntoBoard(null), false);
   assert.equal(playsOntoBoard(undefined), false);
+});
+
+test('boardRefuses: Pokémon and Energy cards cannot be dropped on the Trainer board', () => {
+  assert.equal(boardRefuses({ supertype: 'Pokémon', stage: 'Basic', hp: 70 }), true);
+  assert.equal(boardRefuses({ type: 'Pokémon' }), true);
+  assert.equal(boardRefuses({ supertype: 'Energy', name: 'Basic Fire Energy' }), true);
+  assert.equal(boardRefuses({ type: 'Energy' }), true);
+});
+
+test('boardRefuses: every Trainer kind, a Pokémon changed to Trainer, and unknown cards pass', () => {
+  assert.equal(boardRefuses({ supertype: 'Trainer', subtypes: ['Item'] }), false);
+  assert.equal(boardRefuses({ type: 'Supporter' }), false);
+  assert.equal(boardRefuses({ type: 'Stadium' }), false);
+  assert.equal(boardRefuses({ supertype: 'Trainer', name: 'Energy Retrieval' }), false);
+  // Legacy changeType rewrites `type` and keeps the old one in `type2`.
+  assert.equal(boardRefuses({ supertype: 'Pokémon', hp: 60, type: 'Trainer', type2: 'Pokémon' }), false);
+  assert.equal(boardRefuses({ instanceId: 7 }), false);
+  assert.equal(boardRefuses(null), false);
+  assert.equal(boardRefuses(undefined), false);
 });

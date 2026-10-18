@@ -12,6 +12,7 @@
 // --rotate-x/y, --tilt-amount.
 
 import { extractTcgdexIdFromImageUrl } from '../../../../../shared/engine/rules/legacy-set-ids.mjs';
+import { cardArtImageParts } from '../../../../../shared/tcgdex/card-art.mjs';
 import { foilCoverage, foilRecordFor } from '../../foil/tcgl-foil-manifest.mjs';
 import { foilManifestNow } from '../../foil/tcgl-foil-store.js';
 import { deferTcglFoil, mountTcglFoil } from '../../foil/tcgl-foil-view.js';
@@ -123,20 +124,41 @@ const cardIdCandidates = (card) =>
     .filter(Boolean)
     .map((id) => String(id).replace(REVERSE_ID_SUFFIX, ''));
 
-/** A card whose rarity names a reverse-holo printing (set browser copies, rarity "Reverse Holo"). */
-export const isReverseHoloCard = (card) => !!card && resolveRarityEffect(card) === 'reverse holo';
+// BW through SV (gens 5–9) Pokémon and Trainers that TCG Live prints NonFoil but also prints as a reverse
+// holo show the reverse printing in place of the plain one (user call, 2026-10-18). Main and special sets
+// only: promos, galleries and vaults have no reverse printing. Energy keeps its separate `-reverse` copies.
+// Needs the manifest: without it a card can't be known to have a reverse printing and stays plain.
+const REVERSE_IN_PLACE_SET = /^(?:bw\d+|xy\d+|dc1|g1|sm\d+(?:\.5)?|sm115|swsh\d+(?:\.5)?|sv\d+(?:\.5[bw]?)?)-/i;
+
+const showsReverseInPlace = (card, manifest) =>
+  !!manifest &&
+  resolveRarityEffect(card) === null &&
+  !isEnergyCard(card) &&
+  cardIdCandidates(card).some(
+    (id) =>
+      REVERSE_IN_PLACE_SET.test(id) &&
+      foilCoverage(manifest, id) === 'flat' &&
+      foilCoverage(manifest, id, { reverse: true }) === 'foil'
+  );
+
+/**
+ * A card shown as a reverse-holo printing: its rarity says so (set browser copies, rarity "Reverse Holo"), or it
+ * is a plain BW/XY card TCG Live also prints as a reverse holo.
+ */
+export const isReverseHoloCard = (card, manifest = foilManifestNow()) =>
+  !!card && (resolveRarityEffect(card) === 'reverse holo' || showsReverseInPlace(card, manifest));
 
 /**
  * The TCGdex id the foil manifest knows this card by (else the first id it has, else null). `reverse` looks in
- * the reverse-holo printings; it defaults to the card's own rarity.
+ * the reverse-holo printings; it defaults to whether the card shows as a reverse holo.
  */
-export function foilCardId(card, manifest = foilManifestNow(), { reverse = isReverseHoloCard(card) } = {}) {
+export function foilCardId(card, manifest = foilManifestNow(), { reverse = isReverseHoloCard(card, manifest) } = {}) {
   const ids = cardIdCandidates(card);
   return ids.find((id) => foilCoverage(manifest, id, { reverse })) ?? ids[0] ?? null;
 }
 
 /** 'foil' | 'flat' | null — see foilCoverage; null for a card without any id. */
-export function tcglFoilCoverage(card, manifest = foilManifestNow(), { reverse = isReverseHoloCard(card) } = {}) {
+export function tcglFoilCoverage(card, manifest = foilManifestNow(), { reverse = isReverseHoloCard(card, manifest) } = {}) {
   if (!card || !manifest) return null;
   return foilCoverage(manifest, foilCardId(card, manifest, { reverse }), { reverse });
 }
@@ -312,6 +334,8 @@ const eraFromCode = (code) => {
 // Returns null for other hosts or unparseable input.
 const cardImageParts = (src) => {
   if (typeof src !== 'string' || !src) return null;
+  const ownArt = cardArtImageParts(src);
+  if (ownArt) return ownArt;
   let url;
   try {
     url = new URL(src);

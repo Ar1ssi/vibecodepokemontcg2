@@ -200,6 +200,8 @@ export function attachCardCommand({ draft, payload, playerId, activeRng, events 
       srcZone.splice(idx, 1);
     }
 
+    // A Shedinja once attached as a Tool (asTool) that came back to the hand evolves as itself.
+    delete cardRef.card.asTool;
     // Set attachment pointer
     cardRef.card.attachedTo = hostRef.card.instanceId;
 

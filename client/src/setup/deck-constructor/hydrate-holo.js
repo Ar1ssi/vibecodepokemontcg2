@@ -111,7 +111,7 @@ export function hydrateHolo(card) {
       const wrapper = buildHoloCard(card.image.src, effect, {
         trainer: isTrainerCard(data),
         cardId: foilCardId(foilCard, foilManifest),
-        reverse: isReverseHoloCard(foilCard),
+        reverse: isReverseHoloCard(foilCard, foilManifest),
         manifest: foilManifest,
         // On the 3D board the card mesh's front material is the foil (card-mesh.js): no blit view.
         mountFoil: !board3dActive(),

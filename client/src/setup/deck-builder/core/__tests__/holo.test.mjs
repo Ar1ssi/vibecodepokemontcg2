@@ -557,6 +557,15 @@ describe('cardEraFromImageUrl', () => {
     assert.equal(cardEraFromImageUrl(tcgdex('hgss', 'hgss1')), 'classic');
   });
 
+  it("reads the series from this app's own card art, like TCGdex's", () => {
+    assert.equal(cardEraFromImageUrl('/src/assets/card-art/sv/sve/001/high.webp'), 'sv');
+    assert.equal(cardEraFromImageUrl('http://localhost:4000/src/assets/card-art/bw/bw1/107/high.webp'), 'xy');
+    assert.equal(
+      cardLayoutFromImageUrl('/src/assets/card-art/sm/sm3.5/69/high.webp'),
+      cardLayoutFromImageUrl('https://assets.tcgdex.net/en/sm/sm3.5/69/high.webp')
+    );
+  });
+
   it('reads the set id from pokemontcg.io URLs', () => {
     const ptcgio = (set) => `https://images.pokemontcg.io/${set}/1_hires.png`;
     assert.equal(cardEraFromImageUrl(ptcgio('sv1')), 'sv');
@@ -850,7 +859,7 @@ describe('resolveFoilEffect (TCG Live foil)', () => {
       assert.equal(isReverseHoloCard(card), true);
       assert.equal(resolveFoilEffect(card, withReverse), TCGL_FOIL_RARITY);
       assert.equal(tcglFoilCoverage(card, withReverse), 'foil');
-      assert.equal(resolveFoilEffect({ id: 'sv01-001', rarity: 'Common' }, withReverse), null, 'base stays flat');
+      assert.equal(resolveFoilEffect({ id: 'sv01-002', rarity: 'Common' }, withReverse), null, 'base stays flat');
     });
 
     it('keeps the CSS reverse holo when TCG Live has no reverse printing', () => {
@@ -875,6 +884,70 @@ describe('resolveFoilEffect (TCG Live foil)', () => {
       assert.equal(base.dataset.tcglFoil, 'fallback', 'sv01-258 has no reverse printing');
       const flat = buildHoloCard(TCGDEX_URL, TCGL_FOIL_RARITY, { cardId: 'sv01-1', manifest: withReverse });
       assert.equal(flat.dataset.tcglFoil, 'fallback', 'sv01-1 has no base foil record');
+    });
+  });
+
+  // BW/XY plain cards with a TCG Live reverse printing show that printing in place of the plain one.
+  describe('BW through SV reverse printing in place of the plain card', () => {
+    const bwxy = parseFoilManifest({
+      v: 1,
+      shaders: ['TPCi/Cards3D/HoloFoil/FlatSilver', 'TPCi/Cards3D/HoloFoil/SunBeam'],
+      materials: ['MAT_Cards3D_FlatSilver', 'MAT_Cards3D_SunBeam'],
+      cards: { 'xy1-26': ['xy1_26', 1, 1, 'xy1_en_026', '', 'xy1_wp_en_026', '', ''] },
+      flat: ['xy1-20', 'xy1-128', 'xy1-132', 'bw1-1', 'xy1-2', 'sv01-1', 'sm3.5-1', 'swsh12.5-1', 'sv10.5b-1', 'svp-1', 'me01-1'],
+      reverse: {
+        'xy1-20': ['xy1_20', 0, 0, 'xy1_en_020', '', 'xy1_wp_ph_en_020', '', ''],
+        'xy1-26': ['xy1_26', 0, 0, 'xy1_en_026', '', 'xy1_wp_ph_en_026', '', ''],
+        'xy1-128': ['xy1_128', 0, 0, 'xy1_en_128', '', 'xy1_wp_ph_en_128', '', ''],
+        'xy1-132': ['xy1_132', 0, 0, 'xy1_en_132', '', 'xy1_wp_ph_en_132', '', ''],
+        'bw1-1': ['bw1_1', 0, 0, 'bw1_en_001', '', 'bw1_wp_ph_en_001', '', ''],
+        'sv01-1': ['sv1_1', 0, 0, 'sv1_en_001', '', 'sv1_wp_ph_en_001', '', ''],
+        'sm3.5-1': ['sm3-5_1', 0, 0, 'sm3-5_en_001', '', 'sm3-5_wp_ph_en_001', '', ''],
+        'swsh12.5-1': ['swsh12-5_1', 0, 0, 'swsh12-5_en_001', '', 'swsh12-5_wp_ph_en_001', '', ''],
+        'sv10.5b-1': ['sv10-5b_1', 0, 0, 'sv10-5b_en_001', '', 'sv10-5b_wp_ph_en_001', '', ''],
+        'svp-1': ['svp_1', 0, 0, 'svp_en_001', '', 'svp_wp_ph_en_001', '', ''],
+        'me01-1': ['me1_1', 0, 0, 'me1_en_001', '', 'me1_wp_ph_en_001', '', ''],
+      },
+    });
+
+    it('a plain Pokémon or Trainer with a reverse printing wears it', () => {
+      const slugma = { id: 'xy1-20', name: 'Slugma', supertype: 'Pokémon', rarity: 'Common' };
+      assert.equal(isReverseHoloCard(slugma, bwxy), true);
+      assert.equal(resolveFoilEffect(slugma, bwxy), TCGL_FOIL_RARITY);
+      assert.equal(tcglFoilCoverage(slugma, bwxy), 'foil');
+      const superPotion = { id: 'xy1-128', name: 'Super Potion', supertype: 'Trainer', rarity: 'Uncommon' };
+      assert.equal(resolveFoilEffect(superPotion, bwxy), TCGL_FOIL_RARITY);
+      assert.equal(isReverseHoloCard({ id: 'bw1-1', name: 'Snivy', rarity: '' }, bwxy), true);
+    });
+
+    it('covers Sun & Moon, Sword & Shield and Scarlet & Violet sets, zero-padded ids included', () => {
+      for (const id of ['sm3.5-1', 'swsh12.5-1', 'sv01-001', 'sv10.5b-001']) {
+        const card = { id, supertype: 'Pokémon', rarity: 'Common' };
+        assert.equal(isReverseHoloCard(card, bwxy), true, id);
+        assert.equal(resolveFoilEffect(card, bwxy), TCGL_FOIL_RARITY, id);
+      }
+    });
+
+    it('finds the printing from the image URL when the card has no id', () => {
+      const card = { name: 'Slugma', image: { src: 'https://assets.tcgdex.net/en/xy/xy1/20/high.webp' } };
+      assert.equal(isReverseHoloCard(card, bwxy), true);
+    });
+
+    it('leaves holo rares, energy, other eras and cards without a reverse printing alone', () => {
+      const delphox = { id: 'xy1-26', name: 'Delphox', rarity: 'Holo Rare' };
+      assert.equal(isReverseHoloCard(delphox, bwxy), false, 'base printing is foil');
+      assert.equal(resolveFoilEffect(delphox, bwxy), TCGL_FOIL_RARITY);
+      assert.equal(isReverseHoloCard({ id: 'xy1-132', name: 'Grass Energy', supertype: 'Energy' }, bwxy), false);
+      assert.equal(isReverseHoloCard({ id: 'me01-1', supertype: 'Pokémon', rarity: 'Common' }, bwxy), false, 'Mega Evolution era');
+      assert.equal(isReverseHoloCard({ id: 'svp-1', supertype: 'Pokémon', rarity: 'Promo' }, bwxy), false, 'promo set');
+      assert.equal(isReverseHoloCard({ id: 'xy1-2', name: 'Ivysaur', rarity: 'Uncommon' }, bwxy), false);
+      assert.equal(resolveFoilEffect({ id: 'xy1-2', name: 'Ivysaur', rarity: 'Uncommon' }, bwxy), null);
+    });
+
+    it('stays plain while the manifest is not loaded', () => {
+      const slugma = { id: 'xy1-20', name: 'Slugma', rarity: 'Common' };
+      assert.equal(isReverseHoloCard(slugma, null), false);
+      assert.equal(resolveFoilEffect(slugma, null), null);
     });
   });
 

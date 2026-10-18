@@ -40,6 +40,7 @@ import {
   hideZoneElements,
 } from '../general/close-popups.js';
 import { closeCardFocus, isCardFocusOpen } from '../../setup/rules/card-focus.mjs';
+import { closeStatusPopup, isStatusPopupOpen } from '../../setup/rules/status-popup.mjs';
 import { flipBoard } from '../general/flip-board.js';
 import { flipCoin } from '../general/flip-coin.js';
 import { reset } from '../general/reset.js';
@@ -131,7 +132,12 @@ export const keyDown = (event) => {
   }
   if (event.key === 'Escape' || event.code === 'Escape') {
     // The card focus closes with its own fly-back; closePopups() would not (it must not close the
-    // focus at all: it also runs on every card move and document click).
+    // focus at all: it also runs on every card move and document click). The status popup sits on
+    // top of the focus, so Escape closes it first.
+    if (isStatusPopupOpen()) {
+      closeStatusPopup();
+      return;
+    }
     if (isCardFocusOpen()) {
       closeCardFocus();
       return;

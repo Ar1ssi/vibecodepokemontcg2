@@ -1,8 +1,9 @@
 /**
  * @file Card focus (design 067) — the TCG Live Active-card popup, the DOM half.
  *
- * Clicking your own Active lifts the card in perspective from its slot to a fixed pose, dims the
- * board, drops the hand, and opens the 013 inspector's attack/ability/Retreat panels on the card.
+ * Clicking your own Active lifts the card in perspective from its slot to a fixed pose, covers the
+ * board (TableCoverPanel), drops the hand, and opens the inspector's TCG Live option rows on the card.
+ * The HUD is AttackOverlayHUD's (design 074): Buff / Debuff (the status popup), Stack, Close.
  * Pose, timings and curves are TCG Live's own (card-focus-geometry.mjs). The card is a
  * `buildSlideContent` holo wrapper decorated by the inspector, so payability, affordances and
  * live re-rendering are the inspector's, unchanged.
@@ -49,6 +50,7 @@ import {
 } from './card-focus-geometry.mjs';
 import { suppressHoverPreview } from '../image-logic/hover-preview-bus.mjs';
 import { flightEase, focusMeshId, focusMeshPose, reversed } from './card-focus-mesh.mjs';
+import { closeStatusPopup, openStatusPopup } from './status-popup.mjs';
 
 const HAND_LOWERED_CLASS = 'hand-lowered';
 const CLOSE_EVENTS = ['rules-turn-began', 'rules-session-reset'];
@@ -135,22 +137,20 @@ const restoreSource = (state) => {
   state.hidden = null;
 };
 
-const HUD_ICONS = {
-  close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg>',
-  // Cards with a magnifier over them: the game's "stack view" button.
-  stack:
-    '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3" width="10" height="14" rx="1.6"/><circle cx="14.5" cy="14.5" r="4.2"/><path d="M17.6 17.6l3.2 3.2"/></svg>',
-};
-
-const hudButton = (className, label, icon, onClick) => {
-  const button = el('button', className);
+// One HUD button: shadow, the raised face and its icon (card-focus.css draws the sprites).
+const hudButton = (className, label, onClick, { enabled = true, filled = false } = {}) => {
+  const button = el('button', `card-focus__btn ${className}`);
   button.type = 'button';
   button.setAttribute('aria-label', label);
   button.title = label;
-  button.innerHTML = icon;
+  button.disabled = !enabled;
+  const face = el('span', 'card-focus__btn-face');
+  face.appendChild(el('span', 'card-focus__btn-icon'));
+  if (filled) face.appendChild(el('span', 'card-focus__btn-fill'));
+  button.appendChild(face);
   button.addEventListener('click', (event) => {
     event.stopPropagation();
-    onClick();
+    if (!button.disabled) onClick();
   });
   return button;
 };
@@ -198,18 +198,39 @@ const startOpenAnimations = (state, from, to) => {
   state.opened = true;
 };
 
-// Stack above, Close at the bottom of the column (the game's order).
-const buildHud = ({ attachedCount, onClose, onStack }) => {
+/**
+ * AttackOverlayHUD: Buff and Debuff (both ShowAllStatusesInPopup; each interactable, and its coloured
+ * arrow lit, only while the card has such effects), then Stack, then Close at the bottom.
+ */
+const buildHud = ({ statuses, onStatus, onClose, onStack }) => {
   const hud = el('div', 'card-focus__hud');
-  if (attachedCount > 0 && onStack) {
-    const stack = hudButton('card-focus__stack', 'Attached cards', HUD_ICONS.stack, onStack);
-    const count = el('span', 'card-focus__stack-count');
-    count.textContent = String(attachedCount);
-    stack.appendChild(count);
-    hud.appendChild(stack);
+  if (statuses) {
+    const hasBuffs = statuses.positive.length > 0;
+    const hasDebuffs = statuses.negative.length > 0;
+    hud.appendChild(
+      hudButton('card-focus__btn--buff', 'Positive effects', onStatus, {
+        enabled: hasBuffs,
+        filled: hasBuffs,
+      })
+    );
+    hud.appendChild(
+      hudButton('card-focus__btn--debuff', 'Negative effects', onStatus, {
+        enabled: hasDebuffs,
+        filled: hasDebuffs,
+      })
+    );
   }
-  hud.appendChild(hudButton('card-focus__close', 'Close', HUD_ICONS.close, onClose));
+  if (onStack) hud.appendChild(hudButton('card-focus__stack', 'Stack view', onStack));
+  hud.appendChild(hudButton('card-focus__close', 'Close', onClose));
   return hud;
+};
+
+const buildCover = () => {
+  const backdrop = el('div', 'card-focus__backdrop');
+  for (const part of ['top', 'middle', 'bottom']) {
+    backdrop.appendChild(el('div', `card-focus__cover card-focus__cover--${part}`));
+  }
+  return backdrop;
 };
 
 // The attached Energy as big tokens under the card, like the game draws it. Anything that is not an
@@ -275,16 +296,17 @@ const watchForPickers = () => {
  * @param {object} options
  * @param {object} options.card a preview card with `.image`
  * @param {'active'|'bench'} [options.zone]
- * @param {number} [options.attachedCount] shows the Stack button when > 0
+ * @param {{ positive: object[], negative: object[] }|null} [options.statuses] the card's effects
+ *   (attack-ui-model statusEffectsFor); null hides the Buff / Debuff buttons
  * @param {(index: number) => void} [options.onAttack] caller closes the focus, then fires
  * @param {() => void} [options.onAbility] defaults to the inspector's ability dispatch
  * @param {() => void} [options.onRetreat] caller closes the focus, then retreats
- * @param {() => void} [options.onOpenStack] opens the attached-cards carousel
+ * @param {() => void} [options.onOpenStack] opens the stack view; null hides the Stack button
  */
 export function openCardFocus({
   card,
   zone = 'active',
-  attachedCount = 0,
+  statuses = null,
   onAttack = null,
   onAbility,
   onRetreat = null,
@@ -325,7 +347,7 @@ export function openCardFocus({
     });
 
     state.root = el('div', 'card-focus');
-    const backdrop = el('div', 'card-focus__backdrop');
+    const backdrop = buildCover();
     state.stage = el('div', 'card-focus__stage');
     state.stage.style.perspective = `${perspectiveFor(viewport.height)}px`;
     state.host = el('div', 'card-focus__card');
@@ -345,7 +367,18 @@ export function openCardFocus({
     state.stage.appendChild(state.host);
 
     const hud = buildHud({
-      attachedCount,
+      statuses,
+      // The overlay stays up under the popup; its backdrop click is off until the popup closes
+      // (AttackOverlay.ToggleBackgroundHitbox).
+      onStatus: () => {
+        if (!statuses) return;
+        state.popupOpen = openStatusPopup({
+          ...statuses,
+          onClose: () => {
+            state.popupOpen = false;
+          },
+        });
+      },
       onClose: () => closeCardFocus(),
       onStack: onOpenStack
         ? () => {
@@ -372,11 +405,11 @@ export function openCardFocus({
 
     backdrop.addEventListener('click', (event) => {
       event.stopPropagation();
-      if (isArmed(state)) closeCardFocus();
+      if (isArmed(state) && !state.popupOpen) closeCardFocus();
     });
     backdrop.addEventListener('contextmenu', (event) => {
       event.preventDefault();
-      if (isArmed(state)) closeCardFocus();
+      if (isArmed(state) && !state.popupOpen) closeCardFocus();
     });
 
     document.body.appendChild(state.root);
@@ -423,6 +456,7 @@ const start = async (state, from) => {
 };
 
 const teardown = (state) => {
+  if (state.popupOpen) closeStatusPopup();
   releaseInspectorCard(state.inspectorWrap);
   state.cleanups?.forEach((cleanup) => cleanup());
   state.cleanups = null;
@@ -456,6 +490,7 @@ export function closeCardFocus({ immediate = false } = {}) {
   if (!state || state.closing) return;
   state.closing = true;
   uiCue('big-card-out');
+  if (state.popupOpen) closeStatusPopup();
 
   if (immediate || !state.opened) {
     teardown(state);
