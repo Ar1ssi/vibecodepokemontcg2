@@ -2,6 +2,7 @@ import { cachedFetchJson as fetchJson } from './tcgdex-cache.mjs';
 import { GEN_1_2_ORDER } from './gen-1-2-order.generated.mjs';
 import { BLACK_BOLT_WHITE_FLARE_ORDER } from './black-bolt-white-flare-order.generated.mjs';
 import { tcgdexApiBase } from '../../../../../shared/tcgdex/tcgdex-url.mjs';
+import { withCardArt } from '../../../../../shared/tcgdex/card-art.mjs';
 
 const TCGDEX_BASE = tcgdexApiBase();
     
@@ -195,7 +196,8 @@ const TCGDEX_BASE = tcgdexApiBase();
     async function fetchSetRecord(setId, seriesId) {
       const cacheKey = `${seriesId}/${setId}`;
       if (setRecordCache.has(cacheKey)) return setRecordCache.get(cacheKey);
-      const record = await fetchJson(`${TCGDEX_BASE}/sets/${setId}`);
+      const fetched = await fetchJson(`${TCGDEX_BASE}/sets/${setId}`);
+      const record = Array.isArray(fetched?.cards) ? { ...fetched, cards: fetched.cards.map(withCardArt) } : fetched;
       setRecordCache.set(cacheKey, record);
       return record;
     }

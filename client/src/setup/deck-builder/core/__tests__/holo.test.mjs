@@ -557,6 +557,15 @@ describe('cardEraFromImageUrl', () => {
     assert.equal(cardEraFromImageUrl(tcgdex('hgss', 'hgss1')), 'classic');
   });
 
+  it("reads the series from this app's own card art, like TCGdex's", () => {
+    assert.equal(cardEraFromImageUrl('/src/assets/card-art/sv/sve/001/high.webp'), 'sv');
+    assert.equal(cardEraFromImageUrl('http://localhost:4000/src/assets/card-art/bw/bw1/107/high.webp'), 'xy');
+    assert.equal(
+      cardLayoutFromImageUrl('/src/assets/card-art/sm/sm3.5/69/high.webp'),
+      cardLayoutFromImageUrl('https://assets.tcgdex.net/en/sm/sm3.5/69/high.webp')
+    );
+  });
+
   it('reads the set id from pokemontcg.io URLs', () => {
     const ptcgio = (set) => `https://images.pokemontcg.io/${set}/1_hires.png`;
     assert.equal(cardEraFromImageUrl(ptcgio('sv1')), 'sv');

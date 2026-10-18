@@ -516,3 +516,16 @@ test('fetchCardDetail reads a Reverse Holo copy from its base print and keeps it
     stub.restore();
   }
 });
+
+// bw1-107's TCGdex image carries the Pokémon League stamp; the app serves TCG Live's front instead.
+test('normalizeTcgdexCard swaps in our own art for a League-stamped card', () => {
+  const card = normalizeTcgdexCard({
+    id: 'bw1-107',
+    name: 'Water Energy',
+    category: 'Energy',
+    image: 'https://assets.tcgdex.net/en/bw/bw1/107',
+    set: { id: 'bw1', name: 'Black & White' },
+  });
+  assert.equal(card.image, '/src/assets/card-art/bw/bw1/107/high.webp');
+  assert.equal(card.id, 'bw1-107');
+});

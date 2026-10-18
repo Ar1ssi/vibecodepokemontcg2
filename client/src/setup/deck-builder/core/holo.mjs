@@ -12,6 +12,7 @@
 // --rotate-x/y, --tilt-amount.
 
 import { extractTcgdexIdFromImageUrl } from '../../../../../shared/engine/rules/legacy-set-ids.mjs';
+import { cardArtImageParts } from '../../../../../shared/tcgdex/card-art.mjs';
 import { foilCoverage, foilRecordFor } from '../../foil/tcgl-foil-manifest.mjs';
 import { foilManifestNow } from '../../foil/tcgl-foil-store.js';
 import { mountTcglFoil } from '../../foil/tcgl-foil-view.js';
@@ -339,6 +340,8 @@ const eraFromCode = (code) => {
 // Returns null for other hosts or unparseable input.
 const cardImageParts = (src) => {
   if (typeof src !== 'string' || !src) return null;
+  const ownArt = cardArtImageParts(src);
+  if (ownArt) return ownArt;
   let url;
   try {
     url = new URL(src);

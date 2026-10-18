@@ -1,6 +1,7 @@
 import { cachedFetchJson as fetchJson } from './tcgdex-cache.mjs';
 import { isReverseHoloId, tcgdexApiUrl, tcgdexLookupId } from '../../../../../shared/tcgdex/tcgdex-url.mjs';
 import { printedRarity } from '../../../../../shared/engine/rules/card-classify.mjs';
+import { cardArtImageBase } from '../../../../../shared/tcgdex/card-art.mjs';
 import { SET_RELEASE_DATES } from './set-release-dates.generated.mjs';
 const HUGE_RESULT_THRESHOLD = 2000;
 const DETAIL_FETCH_LIMIT = 150;
@@ -214,7 +215,7 @@ function getSupertypeFromCategory(category = '') {
 }
 
 export function normalizeTcgdexCard(card) {
-  const imageBase = card.image || '';
+  const imageBase = cardArtImageBase(card.id) || card.image || '';
   const image = imageBase ? `${imageBase}/high.webp` : '';
 
   return {

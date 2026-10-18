@@ -335,7 +335,7 @@ describe('fetchGenerationEnergyCards', () => {
         {
           id: 'sve',
           name: 'Scarlet & Violet Energies',
-          cards: [{ id: 'sve-009', name: 'Grass Energy', localId: '009', image: 'sve-grass' }],
+          cards: [{ id: 'sve-009', name: 'Grass Energy', localId: '009' }],
         },
       ],
       [
@@ -371,6 +371,9 @@ describe('fetchGenerationEnergyCards', () => {
     assert.ok(!ids.includes('sv02-278-reverse'), 'gold Hyper Rare basic energy has no reverse print');
     assert.ok(!ids.includes('sv05-162-reverse'), 'ACE SPEC energy has no reverse print');
     assert.ok(ids.includes('sve-009-reverse'), 'SV basic energy has a reverse print (TCG Live sve_9_ph)');
+    // TCGdex has no sve image; the app serves TCG Live's front (shared/tcgdex/card-art.mjs).
+    assert.equal(cards.find((c) => c.id === 'sve-009').image, '/src/assets/card-art/sv/sve/009/high.webp');
+    assert.equal(cards.find((c) => c.id === 'sve-009-reverse').image, '/src/assets/card-art/sv/sve/009/high.webp');
 
     const rh = cards.find((c) => c.id === 'sv02-190-reverse');
     assert.equal(rh.rarity, 'Reverse Holo');
