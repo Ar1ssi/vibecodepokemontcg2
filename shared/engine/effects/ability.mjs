@@ -182,7 +182,7 @@ export function executeAbility(draft, {
 // Steps that attach the Ability's own card to a Pokémon the player names.
 const SELF_ATTACH_STEPS = new Set(['selfAttachEnergyAbility', 'selfAttachToolAbility']);
 
-const ABILITY_ENDS_TURN =/if you use this ability, your turn ends/;
+const ABILITY_ENDS_TURN = /if you use this ability, your turn ends/;
 
 /** "If you use this Ability, your turn ends." (Koraidon ex Dino Cry and others). */
 export function abilityEndsTurn(text) {

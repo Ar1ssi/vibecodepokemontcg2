@@ -691,6 +691,7 @@ test('ability: a Battery Charjabug back in the hand evolves as a Pokémon, not a
   assert.equal(back.asEnergy, undefined, 'the Energy marker leaves play with it');
 
   inHand.state.players.p1.flags.energyAttached = false;
+  inHand.state.turn.number = 4;
   const evolved = dropOn(inHand.state, rng, 73);
   assert.equal(evolved.error, null);
   const charjabug = evolved.state.players.p1.zones.bench.find((c) => c.instanceId === 70);

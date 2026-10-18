@@ -8,7 +8,7 @@
 
 import { findCard, discardCardToPlayerZone } from '../state.mjs';
 import { shuffleInPlace } from '../rng.mjs';
-import { isEnergy, isPokemon, isTrainer } from '../cards.mjs';
+import { isAttachedAsTool, isEnergy, isPokemon, isTrainer } from '../cards.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
 import { isUltraBeastCard, isRuleBoxPokemon, isVCard } from '../rules/card-classify.mjs';
 import { isAncientCard, isFutureCard } from '../rules/paradox-tags.mjs';
@@ -70,6 +70,8 @@ function textOf(card, field) {
 }
 
 export function isToolCard(card) {
+  // A Pokémon attached as a Tool (Shedinja, Unown Q) is removed and counted like any Tool.
+  if (isAttachedAsTool(card)) return true;
   const kind = `${textOf(card, 'type')} ${textOf(card, 'trainerType')} ${textOf(card, 'subtypes')}`;
   return kind.includes('tool');
 }
@@ -4146,10 +4148,12 @@ function selfAttachToolAbility(ctx) {
         cards: left.map((c) => ({ instanceId: c.instanceId, name: c.name })),
       });
     }
-    // Damage and Special Conditions live on the root, so they left with it; a Pokémon that was
-    // never evolved is its own root.
-    card.damage = 0;
-    clearConditions(card);
+    // Damage and Special Conditions live on the root; neither the discarded root nor the card
+    // carries them on.
+    for (const cleared of new Set([self, card])) {
+      cleared.damage = 0;
+      clearConditions(cleared);
+    }
     card.asTool = {
       text: step.toolText,
       ...(step.discardAfterOpponentTurn

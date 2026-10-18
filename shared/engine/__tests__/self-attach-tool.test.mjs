@@ -18,6 +18,8 @@ import {
 import { abilityPreventsAttackEffects, sideContextFor } from '../rules/ability-combat.mjs';
 import { topPokemonCard } from '../rules/evolved-pokemon.mjs';
 import { isUsableAbilityCard } from '../rules/collect-usable-abilities.mjs';
+import { listConditions } from '../rules/special-conditions.mjs';
+import { isToolCard } from '../effects/trainer-steps.mjs';
 
 const VESSEL_OF_LIFE =
   'Once during your turn (before your attack), you may discard all cards attached to this Pokémon and attach it to 1 of your Pokémon as a Pokémon Tool card. When the Pokémon this card is attached to is Knocked Out, your opponent takes 1 fewer Prize card.';
@@ -191,6 +193,44 @@ test('Shedinja Vessel of Life from the Active Spot: Nincada and Energy are disca
   assert.equal(active?.instanceId, 73, 'Pikachu replaces the Active Pokémon that left');
   const host = find(res.state, 73);
   assert.equal(toolPrizeCountAdjust(host.card, host.zone, 1), 0);
+});
+
+test('Shedinja Vessel of Life: the discarded Nincada keeps no damage or Special Conditions', () => {
+  const { state, rng } = setupGame();
+  state.players.p1.zones.active.push(
+    mon(80, 'Nincada', { damage: 30, specialCondition: 'Asleep' }),
+    withAbility(70, 'Shedinja', 'Vessel of Life', VESSEL_OF_LIFE, { stage: 'Stage 1', attachedTo: 80 })
+  );
+  state.players.p1.zones.bench.push(mon(73, 'Pikachu'));
+  state.players.p2.zones.active.push(mon(71, 'Opp'));
+
+  const res = use(state, rng, 70);
+  assert.equal(res.error, null);
+  const nincada = find(res.state, 80);
+  assert.equal(nincada.zoneId, 'discard');
+  assert.equal(nincada.card.damage, 0);
+  assert.deepEqual(listConditions(nincada.card), []);
+});
+
+test('a card attached as a Tool cannot use its Ability again on a later turn', () => {
+  const { state, rng } = boardWith(withAbility(70, 'Unown Q', 'QUICK', QUICK));
+  const attached = choose(use(state, rng, 70), [72], rng);
+  assert.equal(attached.error, null);
+  attached.state.players.p1.flags.abilitiesUsed = {};
+  delete find(attached.state, 70).card.abilityUsed;
+
+  const again = use(attached.state, rng, 70);
+  assert.ok(again.error, 'refused');
+  assert.equal(find(again.state, 72).zoneId, 'active', 'the host is not discarded');
+  assert.equal(find(again.state, 70).card.attachedTo, 72);
+});
+
+test('Tool effects count and remove a card attached as a Tool', () => {
+  const { state, rng } = boardWith(withAbility(70, 'Unown E', 'EQUIP', EQUIP));
+  const res = choose(use(state, rng, 70), [73], rng);
+  const unown = find(res.state, 70).card;
+  assert.equal(isToolCard(unown), true);
+  assert.equal(isToolCard(withAbility(76, 'Unown E', 'EQUIP', EQUIP)), false, 'not while unattached');
 });
 
 test('Unown G GUARD: attack effects (not damage) done to the host are prevented', () => {

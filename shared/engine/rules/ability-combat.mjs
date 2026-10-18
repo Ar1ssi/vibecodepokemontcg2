@@ -64,7 +64,7 @@ import {
   isVCard,
   isVmaxCard,
 } from './card-classify.mjs';
-import { isBasicPokemon, isPokemon } from '../cards.mjs';
+import { isAttachedAsEnergy, isAttachedAsTool, isBasicPokemon, isPokemon } from '../cards.mjs';
 import { stadiumBlocksToolEffects } from './stadium-effects.mjs';
 import { parseAbility, isAncientTraitAbility } from './abilities.mjs';
 import { isAbilityCard } from './ability-effects.mjs';
@@ -1365,6 +1365,10 @@ export function abilityActivationBlockReason(card, ctx = {}) {
     playedToBenchTurn,
     movedToActiveTurn = card.movedToActiveTurn,
   } = ctx;
+  // A Pokémon attached as a Tool or Energy (Shedinja, Charjabug) is not a Pokémon in play.
+  if (isAttachedAsTool(card) || isAttachedAsEnergy(card)) {
+    return 'This card is attached to a Pokémon; its Ability is not in play.';
+  }
   if (rulesEnabled && used) return 'Ability already used this turn.';
   if (!isActivatedAbility(card, abilityIndex)) {
     return "This Ability can't be activated; it works on its own.";

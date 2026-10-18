@@ -130,7 +130,11 @@ export const dragOver = (event) => {
     selfContainerDocument.querySelector('.dragging') ||
     oppContainerDocument.querySelector('.dragging');
 
-  if (zoneOf(event.target)?.id === 'board' && boardRefuses(heldCard(draggedImage))) {
+  if (
+    zoneOf(event.target)?.id === 'board' &&
+    mouseClick.zoneId !== 'board' &&
+    boardRefuses(heldCard(draggedImage))
+  ) {
     if (event.dataTransfer) event.dataTransfer.dropEffect = 'none';
     return;
   }
