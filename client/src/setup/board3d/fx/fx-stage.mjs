@@ -36,8 +36,8 @@ export function stageToWorldMatrix(tiltDeg = 0) {
 
 /**
  * A card-motion pose in lane terms (card-motion.mjs, × lane.h) → the offset a drive adds to the
- * card's own pose, in flat TABLE px (y up the table). Mirrors move-player.js `ghostTransform`:
- * along/across move the card along the lane and its normal; `lift` raises it off the cloth.
+ * card's own pose, in flat TABLE px (y up the table): along/across move the card along the lane
+ * and its normal (× lane.h); `lift` raises it off the cloth.
  */
 export function driveOffset(lane, pose = {}) {
   const { along = 0, across = 0, lift = 0, scaleAlong = 1, scaleAcross = 1, scale = 1, rotate = 0 } = pose;

@@ -1,6 +1,6 @@
-// Design 075: a move spec played inside the three.js board. The same beats and drawers as the 2D
-// player (move-player.js) draw on the board's GPU recorder, in stage px (flat table px, y down),
-// so the lane maths is unchanged; the real card meshes carry the motion (scene.drive), and the
+// Design 075: the one player every move spec runs through (design 063's, moved into the three.js
+// board). The beats' drawers draw on the board's GPU recorder in stage px (flat table px, y down),
+// so the lane maths is design 063's; the real card meshes carry the motion (scene.drive), and the
 // rim, heat, trails, echo and bursts are drawn in the scene too. One FX entry per scene, on the
 // scene clock (a WAAPI time, so a frozen preview freezes it).
 import { fxDisabled } from '../../../image-logic/mat-fx.mjs';
@@ -17,7 +17,7 @@ import { materialFor } from './materials/index.js';
 import { drawParticle } from './particle-shapes.mjs';
 
 const DEG = Math.PI / 180;
-/** The dash's lagged copies (move-player.js TRAILS). */
+/** The dash's lagged copies: how far each trails the attacker (of the scene) and how strong it shows. */
 const TRAILS = Object.freeze([
   { lag: 0.035, alpha: 0.38 },
   { lag: 0.07, alpha: 0.2 },
@@ -53,7 +53,7 @@ const runBeat = (beat, index, ctx, lane, progress, info) => {
   }
 };
 
-/** The beats of `layer` that are live at `ms`, source-over ones first, as the 2D player draws them. */
+/** The beats of `layer` that are live at `ms`: the source-over ones (veils, smoke) first, then the light. */
 const drawBeats = (ctx, beats, layer, lane, ms, info) => {
   for (const composite of ['source-over', 'lighter']) {
     ctx.globalCompositeOperation = composite;
@@ -68,7 +68,7 @@ const drawBeats = (ctx, beats, layer, lane, ms, info) => {
 
 /**
  * Puts the context's origin at a driven card's centre with its pose: the lane squash about the
- * lane, then its own yaw plus the drive's, then the drive's scale (ghostTransform's order).
+ * lane, then its own yaw plus the drive's, then the drive's scale.
  * `offset` is a drive offset (table px, fx-stage.mjs driveOffset).
  */
 export function cardTransform(ctx, { centre, yawDeg = 0 }, offset = null) {
@@ -108,7 +108,7 @@ const sceneCard = (scene, id) => {
 /**
  * Play `spec` from the attacker's card to the defender's inside the 3D board `scene`
  * (board-scene.js: `cardTablePose`, `cardFrontMap`, `drive`, `fx`, `clock`). Announces the contact
- * moment on `impacts` (combat.js's queue) with `strikeContext`, as `playMove` does. `branches`
+ * moment on `impacts` (combat.js's queue) with `strikeContext`. `branches`
  * (design 069): more cards the attack damages, `{ id, delayMs }` each; the travel beats also fly to
  * them, `delayMs` after the main contact.
  * @returns {{ holdMs: number, durationMs: number, contactMs: number, branchEndMs: number } | null}
@@ -151,7 +151,7 @@ export function playMoveInScene({
     return { along: p.along, across: p.across, lift: p.lift, scaleAlong: p.scaleAlong, scaleAcross: p.scaleAcross, rotate: p.wobble, heat: p.heat };
   };
 
-  /** The summed quake jitter at `ms`, in stage px (drawBack's host translate in the 2D player). */
+  /** The summed quake jitter at `ms`, in stage px: it shakes the whole scene, cards included. */
   const jitterAt = (ms) => {
     let x = 0;
     let y = 0;

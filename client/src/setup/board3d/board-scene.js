@@ -152,7 +152,8 @@ function offsetAt(keys, elapsed) {
  *   unlift: (instanceId: number, options?: { ms?: number, ease?: (t: number) => number }) => Promise<void>,
  *   drive: (instanceId: number, offsetAt: (elapsedMs: number) => object|null, ms: number) => Promise<void>,
  *   cardTablePose: (instanceId: number) => object|null, cardFrontMap: (instanceId: number) => object|null,
- *   fx: { add: Function, active: () => boolean, setImpacts: Function, tiltDeg: () => number },
+ *   fx: { add: Function, active: () => boolean, impactsActive: () => boolean, setImpacts: Function,
+ *     tiltDeg: () => number },
  *   setUiState: (id: number, patch: object) => void, setMat: (spec: object|null) => void,
  *   setHover: (instanceId: number|null) => void, setHandPose: (pose: 'normal'|'lowered') => void,
  *   inspect: () => { scene: import('three').Scene, camera: import('three').PerspectiveCamera,
@@ -320,6 +321,7 @@ export function createBoardScene({
       return remove;
     },
     active: () => fxLayer.active(),
+    impactsActive: () => fxLayer.impactsActive(),
     setImpacts: (host) => {
       fxLayer.setImpacts(host);
       invalidate();

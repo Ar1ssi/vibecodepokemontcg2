@@ -59,8 +59,9 @@ const info = await page.evaluate(
       await import('/src/setup/image-logic/mat-fx.mjs');
     const { attackBanner, announceStrike, damage } =
       await import('/src/setup/netcode/mat-fx/combat.js');
-    const { playMove } =
-      await import('/src/setup/netcode/mat-fx/moves/move-player.js');
+    const { playMoveInScene } =
+      await import('/src/setup/netcode/mat-fx/moves/scene-move-player.js');
+    const { getBoardScene } = await import('/src/setup/board3d/board3d.js');
     const { SPECS } = await import('/src/setup/netcode/mat-fx/moves/specs/index.mjs');
     const { kitchenSink } =
       await import('/src/setup/netcode/mat-fx/moves/specs/__fixtures__/kitchen-sink.mjs');
@@ -68,8 +69,6 @@ const info = await page.evaluate(
       await import('/src/setup/netcode/mat-fx/moves/signature/specs/index.mjs');
     const spec = signature ? SIGNATURE_SPECS[moveId] : moveId === 'kitchen-sink' ? kitchenSink : SPECS[moveId];
     if (!spec) throw new Error(`no spec for ${signature ? 'SIGNATURE' : 'MOVE'}=${moveId}`);
-    const { frameTurnOf } =
-      await import('/src/setup/netcode/mat-fx/evolve-scene.js');
     const { holdFor } = await import('/src/setup/netcode/mat-fx/fx-holds.mjs');
     const card = (instanceId, name, src, types, subtypes, hp) => ({
       instanceId,
@@ -144,15 +143,6 @@ const info = await page.evaluate(
           user: side === 'opp' ? 'opp' : 'self',
         }),
       move: () => {
-        const partyOf = (id) => {
-          const element = registry.get(id)?.element || null;
-          return {
-            rect: rectForInstance(id, registry),
-            src: element?.currentSrc || element?.src,
-            turn: frameTurnOf(element),
-            element,
-          };
-        };
         // Frame-time probe: the scene is judged on pacing, so a slow frame matters.
         const deltas = [];
         let last = performance.now();
@@ -164,10 +154,12 @@ const info = await page.evaluate(
         };
         requestAnimationFrame(probe);
         window.__frameDeltas = deltas;
-        const played = playMove({
+        // Design 075: moves play inside the 3D board, on its card meshes.
+        const played = playMoveInScene({
+          scene: getBoardScene(),
           spec,
-          attacker: partyOf(attackerId),
-          defender: partyOf(defenderId),
+          attackerId,
+          defenderId,
           seed: Number(seed),
           impacts: { strikeIn: announceStrike },
           attackerCard: registry.get(attackerId)?.card || null,

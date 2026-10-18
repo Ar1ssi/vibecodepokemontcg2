@@ -242,9 +242,18 @@ function releaseStage(target) {
   for (const buffer of [target.buffers.position, target.buffers.normal, target.buffers.color, target.buffers.index, ...target.buffers.texcoords]) gl.deleteBuffer(buffer);
 }
 
+/**
+ * Design 075: the stage's own viewport canvas is for the attack FX lab (dev/attack-fx-lab.html),
+ * which has no board; the game draws impacts on the board's context (attachSceneImpacts) only.
+ */
+let ownCanvasAllowed = false;
+export function useOwnImpactCanvas() {
+  ownCanvasAllowed = true;
+}
+
 function ensureStage() {
   if (stage || stageFailed) return stage;
-  if (typeof document === 'undefined') return null;
+  if (!ownCanvasAllowed || typeof document === 'undefined') return null;
   try {
     stage = createStage();
   } catch (error) {
@@ -694,7 +703,8 @@ function drawInScene(target, camera) {
  * board's FX layer drives (`active`, `draw`, `detach`), or null when it cannot be built.
  * @param {{ gl: WebGL2RenderingContext, clockHost: Element,
  *   placementOf: (cardId: number) => ({ centre: number[], table: { x: number[], y: number[], z: number[] },
- *     heightPx: number, far: boolean } | null), invalidate: () => void }} scene
+ *     heightPx: number, turnDeg: number } | null), invalidate: () => void, resetState: () => void }} scene
+ *   `resetState` re-syncs the board renderer after the stage's raw GL (three's `renderer.resetState`).
  */
 export function attachSceneImpacts(scene) {
   if (stage) discardStage(stage);
@@ -706,6 +716,7 @@ export function attachSceneImpacts(scene) {
     stage = null;
   }
   const own = stage;
+  scene.resetState?.();
   if (!own) return null;
   return {
     active: () => stage === own && !own.lost && liveEffects(own).length > 0,
@@ -726,6 +737,7 @@ export function attachSceneImpacts(scene) {
       own.effects = [];
       try {
         releaseStage(own);
+        scene.resetState?.();
       } catch {
         // The context may already be gone with the board.
       }
@@ -784,6 +796,9 @@ export async function prepareImpact(type) {
     brokenTypes.add(type);
     warnOnce(`${type} shaders did not link`, error);
     return false;
+  } finally {
+    // Design 075: on the board's context, three's cached GL state no longer holds after raw calls.
+    stage?.scene?.resetState?.();
   }
   return true;
 }

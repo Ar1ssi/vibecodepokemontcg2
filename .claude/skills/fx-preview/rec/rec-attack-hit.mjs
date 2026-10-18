@@ -88,7 +88,7 @@ const setup = await page.evaluate(
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
     // What showed, watched from inside the page: a screenshot can take longer than the hit lasts.
-    const seen = { stageShown: false, dressing: 0, moveScene: 0, numbers: 0, branchCanvas: 0, recoiled: [], numberTimes: [], frameMs: [] };
+    const seen = { stageShown: false, dressing: 0, moveScene: 0, numbers: 0, recoiled: [], numberTimes: [], frameMs: [] };
     let contactAt = 0;
     const watchSpread = () => {
       new MutationObserver((records) => {
@@ -118,11 +118,13 @@ const setup = await page.evaluate(
       };
       requestAnimationFrame(probe);
     };
+    // Design 075: the move scene and the impact prefab draw inside the 3D board's scene.
+    const { getBoardScene } = await import('/src/setup/board3d/board3d.js');
     const watch = () => {
-      seen.branchCanvas = Math.max(seen.branchCanvas, document.querySelectorAll('canvas.fx-move__canvas--branch').length);
-      seen.stageShown ||= [...document.querySelectorAll('canvas.fx-impact-stage')].some((canvas) => getComputedStyle(canvas).display !== 'none');
+      const fx = getBoardScene()?.fx;
+      seen.stageShown ||= Boolean(fx?.impactsActive());
       seen.dressing = Math.max(seen.dressing, document.querySelectorAll('.fx-hit').length);
-      seen.moveScene = Math.max(seen.moveScene, document.querySelectorAll('.fx-move').length);
+      seen.moveScene = Math.max(seen.moveScene, fx?.active() ? 1 : 0);
       seen.numbers = Math.max(seen.numbers, document.querySelectorAll('.fx-damage-pop').length);
     };
     window.__hit = {
@@ -172,7 +174,7 @@ if (SPREAD_COUNT > 0) {
   const sorted = [...seen.frameMs].sort((a, b) => a - b);
   const at = (q) => (sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))].toFixed(1) : 'n/a');
   console.log('numbers ms after contact', JSON.stringify(seen.numberTimes));
-  console.log('branch canvas', seen.branchCanvas, '· recoiled', JSON.stringify([...new Set(seen.recoiled)]));
+  console.log('recoiled', JSON.stringify([...new Set(seen.recoiled)]));
   console.log('frame ms: median', at(0.5), 'p95', at(0.95));
   if (seen.numberTimes.length < SPREAD_COUNT + 1) problems.push(`${seen.numberTimes.length} numbers for ${SPREAD_COUNT + 1} hits`);
   if (new Set(seen.recoiled).size < SPREAD_COUNT) problems.push('a Bench card did not recoil');

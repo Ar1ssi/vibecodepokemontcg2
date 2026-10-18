@@ -324,29 +324,29 @@ strikeContext = null, branches = [] })` → `{ holdMs, durationMs, contactMs, br
 ## Edge cases & failure modes — the completeness contract; Builder ticks every row
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | empty: spec with 0 beats, 0 particles | cards drive, nothing drawn, contract values returned | [ ] scene-move-player test "beatless spec" |
-| 2 | invalid: unknown drawer name / beat throws | that beat skipped, logged once per `spec:index`, others draw | [ ] scene-move-player test "throwing drawer" |
-| 3 | invalid colour string / unsupported ctx call | transparent / no-op with one debug line, never throws | [ ] gpu-canvas tests "bad colour", "unsupported call" |
-| 4 | boundaries: subpath of 0–2 points; zero-width stroke; r ≤ 0 arc | skipped; no NaN vertices | [ ] gpu-canvas test "degenerate paths" |
-| 5 | boundaries: paint/vertex cap reached | further draws dropped, one debug line per frame | [ ] gpu-canvas test "cap" |
-| 6 | attacker or defender not drawn by the scene (no table pose) | `playMoveInScene` returns null → combat's lunge/aura path | [ ] scene-move-player test "missing card" |
-| 7 | attacker and defender at the same point | `laneGeometry` null → null | [ ] scene-move-player test "coincident" |
-| 8 | repeated: a second scene while one runs (multi-hit impacts, queue misuse) | both entries draw; drives on the same card: the newer replaces (older resolves) | [ ] card-mesh drive test "replace" |
-| 9 | card leaves the board mid-drive (KO applied early) | drive resolves; scene keeps drawing at the last stage rect | [ ] card-mesh drive test "release" |
-| 10 | tween / lift starts on a driven card | drive ends and resolves; tween/lift owns the mesh | [ ] card-mesh drive test "tween wins" |
-| 11 | dependency: UnrealBloomPass missing (node, load failure) | FX render without bloom | [ ] fx-layer test "no bloom" |
-| 12 | dependency: impact assets not ready / shaders fail | `playImpact` null → DOM hit dressing as today | [ ] existing combat tests + impact-stage test "scene host not attached" |
-| 13 | partial failure: entry `frame` throws | entry dropped, logged once, others render | [ ] fx-layer test "throwing entry" |
-| 14 | context lost mid-attack | layer disposed, drives resolved, impact resources detached; queue continues on holdMs | [ ] fx-layer test "dispose resolves" + reasoning (rebuild path, 074 #14) |
-| 15 | frozen time (fx-preview pause) | frame N redraws identically (deterministic recorder for equal `nowMs`) | [ ] scene-move-player test "same time, same recording" |
-| 16 | motion reduced | bloom off; scenes play as today's 2D did under reduced motion (the same gates in combat) | [ ] fx-layer test "reduced" |
-| 17 | far seat attacks (lane points up the screen) | lane maths seat-free; impact Rseat 180° | [ ] fx-stage test "far seat lane"; impact placement test "far seat" |
-| 18 | TCG Live camera preset (tilt 0) / tilt 12° / resize mid-scene | stageToWorld follows `camera.tiltDeg` every frame; target resizes | [ ] fx-stage test "tilt 0 = identity flip"; fx-layer test "resize" |
-| 19 | nothing attacking | `fx.active()` false: zero extra passes, board pixels identical | [ ] fx-layer test "idle renders nothing" |
-| 20 | clip nested > 4 / restore without save | extra clips ignored with one debug line; restore at depth 0 is a no-op | [ ] gpu-canvas test "clip depth" |
-| 21 | self-intersecting / wrong-winding outline (wobbly tongue) | triangulated as given, no crash; holes only when wholly inside | [ ] gpu-canvas test "self-intersecting" |
-| 22 | branch lane to a card the scene no longer draws | that branch skipped | [ ] scene-move-player test "missing branch" |
-| 23 | `fxDisabled()` | in-scene player not called (combat gate) / returns null | [ ] scene-move-player test "fx off" |
+| 1 | empty: spec with 0 beats, 0 particles | cards drive, nothing drawn, contract values returned | [x] covered: scene-move-player "a beatless spec still drives the cards" |
+| 2 | invalid: unknown drawer name / beat throws | that beat skipped, logged once per `spec:index`, others draw | [x] covered: scene-move-player "a throwing drawer is skipped" |
+| 3 | invalid colour string / unsupported ctx call | transparent / no-op with one debug line, never throws | [x] covered: gpu-canvas "colours: rgb, rgba, hex, junk", "unsupported calls are inert and logged once" |
+| 4 | boundaries: subpath of 0–2 points; zero-width stroke; r ≤ 0 arc | skipped; no NaN vertices | [x] covered: gpu-canvas "degenerate paths record nothing" |
+| 5 | boundaries: paint/vertex cap reached | further draws dropped, one debug line per frame | [x] covered: gpu-canvas "the paint cap drops further draws" |
+| 6 | attacker or defender not drawn by the scene (no table pose) | `playMoveInScene` returns null → combat's lunge/aura path | [x] covered: scene-move-player "a card the scene does not draw, coincident cards, or no fx → null" |
+| 7 | attacker and defender at the same point | `laneGeometry` null → null | [x] covered: same test |
+| 8 | repeated: a second scene while one runs (multi-hit impacts, queue misuse) | both entries draw; drives on the same card: the newer replaces (older resolves) | [x] covered: card-mesh-drive "a newer drive replaces the older one" |
+| 9 | card leaves the board mid-drive (KO applied early) | drive resolves; scene keeps drawing at the last stage rect | [x] covered: card-mesh-drive "releasing a driven card resolves its drive" |
+| 10 | tween / lift starts on a driven card | drive ends and resolves; tween/lift owns the mesh | [x] covered: card-mesh-drive "a tween on a driven card ends the drive" |
+| 11 | dependency: UnrealBloomPass missing (node, load failure) | FX render without bloom | [x] covered: fx-layer "without UnrealBloomPass the FX still render" |
+| 12 | dependency: impact assets not ready / shaders fail | `playImpact` null → DOM hit dressing as today | [x] reasoning: `playImpact` returns null while `impactReady` is false or the scene has no placement for the card (impact-stage.js playImpact), and combat's `playImpactPrefab` falls back to `strikeTarget` unchanged |
+| 13 | partial failure: entry `frame` throws | entry dropped, logged once, others render | [x] covered: fx-layer "an entry that finishes or throws is dropped" |
+| 14 | context lost mid-attack | layer disposed, drives resolved, impact resources detached; queue continues on holdMs | [x] covered: fx-layer "resize follows the drawing buffer; dispose drops entries…" (detaches impacts) + card-mesh-drive "releasing…"; holds are time-based (holdMs), so nothing waits on a disposed scene |
+| 15 | frozen time (fx-preview pause) | frame N redraws identically (deterministic recorder for equal `nowMs`) | [x] covered: scene-move-player "the same scene time records the same drawing" |
+| 16 | motion reduced | bloom off; scenes play as today's 2D did under reduced motion (the same gates in combat) | [x] covered: fx-layer "motion reduced skips the bloom only" |
+| 17 | far seat attacks (lane points up the screen) | lane maths seat-free; impact Rseat 180° | [x] covered: fx-stage "a far-seat lane … needs nothing seat-specific"; impact-placement "far seat: X and Z turn round" (the stage turns far prefabs by the card's yaw) |
+| 18 | TCG Live camera preset (tilt 0) / tilt 12° / resize mid-scene | stageToWorld follows `camera.tiltDeg` every frame; target resizes | [x] covered: fx-stage "stage → world is the y flip then tableToWorld" (tilt 12 and 0); fx-layer "resize follows the drawing buffer" |
+| 19 | nothing attacking | `fx.active()` false: zero extra passes, board pixels identical | [x] covered: fx-layer "idle: no entries means no passes at all" |
+| 20 | clip nested > 4 / restore without save | extra clips ignored with one debug line; restore at depth 0 is a no-op | [x] covered: gpu-canvas "clips nest at most MAX_CLIP_DEPTH deep" |
+| 21 | self-intersecting / wrong-winding outline (wobbly tongue) | triangulated as given, no crash; holes only when wholly inside | [x] covered: gpu-canvas "a self-intersecting outline triangulates without throwing" |
+| 22 | branch lane to a card the scene no longer draws | that branch skipped | [x] covered: scene-move-player "branch lanes: … a card not drawn is skipped" |
+| 23 | `fxDisabled()` | in-scene player not called (combat gate) / returns null | [x] reasoning: `playMoveInScene` returns null when `fxDisabled()` (its first guard), and the mat-fx dispatcher skips every scene when effects are off (`mat-fx/index.js` `isDisabled: fxDisabled`) |
 
 ## Test plan
 - Unit (`node --test`): `fx-stage.test.mjs` (frame maths, particle sampler against the 4 keyframes, drive
@@ -402,6 +402,19 @@ slice 8 deletes it; after slice 8, revert the slice-8 commit.
   `resolveBeatColours` moved to `moves/beat-colours.js` now (planned for slice 8). The generic lunge plays in
   the scene from `combat.js playLungeInScene` (a drive of `lungePoseFor` in stage px + art trails). `hitsFor`
   branches carry the card `id`. `fx/fx-layers.mjs` holds `FX_LAYER` / `OCCLUDER_LAYER`.
+- Slice 7: a far-seat prefab takes its 180° from the simulation's root turn (the card's yaw via
+  `impactPlacement().turnDeg`), not from `prefabAxes(…, far)`, which stays for its test only. The host gets a
+  `resetState` callback (three's `renderer.resetState`) called after its raw GL at attach, `prepareImpact` and
+  detach, so three's cached GL state stays true. A GrabPass reads the whole buffer (region = drawing buffer).
+  `fx.impactsActive()` added for fx-preview scripts. Verified in SwiftShader stills: Fire Large on the far
+  Active through the 12° camera; Psychic's lens bends the rendered board.
+- Slice 8: the impact stage's own canvas stays, opt-in (`useOwnImpactCanvas`), for `dev/attack-fx-lab.html`
+  (and `rec-attack-impact.mjs`, which drives it); the game never builds it, so the board's context is the only
+  one. `attack()` no longer needs the card art; `combatSrc` stays for the lab's refraction art. `rec-move.mjs`
+  and `rec-attack-hit.mjs` drive the scene player (rec-attack-hit's branch-canvas count is gone: branch lanes are
+  in the scene). The `--fx-ice-*` CSS variables went with the move CSS (their values live in `card-glow.mjs`).
+  `rec-attack-hit` passes on the 3D board: default (prefab, number, no old dressing) and SPREAD=2 (3 numbers,
+  both Bench cards recoil).
 ## Appendix A — material kit survey (read-only, 2026-10-18)
 
 Paths relative to `client/src/setup/netcode/mat-fx/moves/materials/`; D = `../move-drawers.js`.

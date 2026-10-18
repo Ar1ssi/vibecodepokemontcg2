@@ -36,6 +36,7 @@ void main() {
  *   triangulate?: Function, debug?: (...args: unknown[]) => void }} options
  * @returns {{ add: (entry: { frame: (nowMs: number, ctx: object) => boolean }) => () => void,
  *   active: () => boolean, render: () => boolean, setImpacts: (host: object|null) => void,
+ *   impactsActive: () => boolean,
  *   group: import('three').Group, canvas: object, dispose: () => void }}
  *   `entry.frame` records this frame's drawing on `ctx` (the gpu-canvas recorder) and returns false
  *   when it has finished. `render` is called after the board's own render; it returns whether
@@ -236,6 +237,8 @@ export function createFxLayer({
     setImpacts: (host) => {
       impacts = host ?? null;
     },
+    /** Whether an impact prefab is playing now (fx-preview scripts read it). */
+    impactsActive: () => !disposed && Boolean(impacts?.active?.()),
     group,
     canvas: recorder,
     dispose,

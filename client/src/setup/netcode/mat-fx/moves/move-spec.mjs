@@ -1,6 +1,6 @@
 // Design 063: the MoveSpec schema. A move is data: timing, card-motion presets, and beats
 // that name a drawer from the shared library (move-drawers.js) with parameters; one
-// player (move-player.js) plays any spec. `DRAWER_PARAMS` is the one table of every
+// player (scene-move-player.js, design 075) plays any spec. `DRAWER_PARAMS` is the one table of every
 // drawer's parameters (design § Pinned contracts B); `validateSpec` is the gate every
 // shipped spec passes (specs.test.mjs). Units: lengths in card heights, times in ms on
 // the scene clock, angles in lane space except `direction`/`arms`, which are screen

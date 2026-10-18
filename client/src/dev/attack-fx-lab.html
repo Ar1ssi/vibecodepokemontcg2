@@ -74,7 +74,10 @@
     </div>
     <div id="table"></div>
     <script type="module">
-      import { playImpact, prepareImpact } from '/src/setup/netcode/mat-fx/impact/impact-stage.js';
+      import { playImpact, prepareImpact, useOwnImpactCanvas } from '/src/setup/netcode/mat-fx/impact/impact-stage.js';
+
+      // Design 075: the lab has no board, so the stage draws on its own canvas.
+      useOwnImpactCanvas();
 
       const TYPES = ['fire', 'water', 'grass', 'lightning', 'psychic', 'fighting', 'darkness', 'metal', 'dragon', 'fairy', 'colorless'];
       const VARIANTS = ['Small', 'Medium', 'Large', 'Small_C', 'Medium_C', 'Large_C'];

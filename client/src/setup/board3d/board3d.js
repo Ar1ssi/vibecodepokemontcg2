@@ -338,6 +338,7 @@ export async function initializeBoard3d({
       clockHost: canvas,
       placementOf: scene.impactPlacement,
       invalidate: scene.invalidate,
+      resetState: () => gl.renderer.resetState(),
     });
     if (impactHost) scene.fx.setImpacts(impactHost);
     Object.assign(session, { canvas, gl, textures, clock, scene, input: createInput(canvas, scene) });
