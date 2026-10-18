@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   fetchGenerationSets,
   fetchGenerationEnergyCards,
+  fetchHomebrewSets,
   fetchSetCards,
   filterCardsBySupertype,
   generationEnergySetId,
@@ -119,6 +120,22 @@ describe('fetchGenerationSets', () => {
     const sets = await fetchGenerationSets(96);
     assert.equal(sets.length, 1);
     delete GENERATION_SERIES[96];
+  });
+
+  it('fetchHomebrewSets merges two generations newest first and drops their Energy tabs', async () => {
+    stubFetch([
+      ['/series/hbA', { id: 'hbA', name: 'HB Series A', sets: [{ id: 'hbA1', name: 'HB Set A1' }] }],
+      ['/series/hbB', { id: 'hbB', name: 'HB Series B', sets: [{ id: 'hbB1', name: 'HB Set B1' }] }],
+      ['/sets/hbA1', { id: 'hbA1', name: 'HB Set A1', releaseDate: '2010-01-01', cards: [{ image: 'x' }] }],
+      ['/sets/hbB1', { id: 'hbB1', name: 'HB Set B1', releaseDate: '2012-01-01', cards: [{ image: 'x' }] }],
+      ['/cards?category=Energy', SHARED_ENERGY_SUMMARY],
+    ]);
+    GENERATION_SERIES[89] = ['hbA'];
+    GENERATION_SERIES[88] = ['hbB'];
+    const sets = await fetchHomebrewSets([89, 88]);
+    assert.deepEqual(sets.map((s) => s.setId), ['hbB1', 'hbA1']);
+    delete GENERATION_SERIES[89];
+    delete GENERATION_SERIES[88];
   });
 
   it('returns an empty array for a generation with no reachable series', async () => {

@@ -320,7 +320,20 @@ const TCGDEX_BASE = tcgdexApiBase();
 
       return sets;
     }
-    
+
+    // Generations behind the Homebrew pill: Black & White (5) and XY (6).
+    export const HOMEBREW_GENERATIONS = [5, 6];
+
+    // Every real set from the Homebrew generations, newest first. The synthetic
+    // Energy tabs are dropped; Energy cards still show inside their own sets.
+    export async function fetchHomebrewSets(generations = HOMEBREW_GENERATIONS) {
+      const perGeneration = await Promise.all(generations.map((gen) => fetchGenerationSets(gen)));
+      return perGeneration
+        .flat()
+        .filter((set) => !GENERATION_ENERGY_SET_ID_RE.test(set.setId))
+        .sort((a, b) => String(b.releaseDate || '').localeCompare(String(a.releaseDate || '')));
+    }
+
     // Fetch all legal Standard-format sets, newest first, with logo + release date.
     export async function fetchLegalStandardSets() {
       const entries = await Promise.all(
