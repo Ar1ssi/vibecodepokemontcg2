@@ -92,7 +92,7 @@ describe('createBoardMirror', () => {
     const { calls } = recorder(mirror);
     img.classList.add('highlight');
     await flush();
-    assert.deepEqual(calls, [{ id: 3, patch: { selected: true, glow: null, matPick: null, hidden: false } }]);
+    assert.deepEqual(calls, [{ id: 3, patch: { selected: true, glow: null, matPick: null, hidden: false, pending: false } }]);
   });
 
   it('reports a hidden .mat-holo wrapper as hidden and its glow', async () => {
@@ -110,6 +110,45 @@ describe('createBoardMirror', () => {
     wrapper.style.removeProperty('--glow-rgb');
     await flush();
     assert.equal(calls.at(-1).patch.glow, DEFAULT_GLOW_RGB);
+  });
+
+  it('reports a hand card under its flight (.draw-flight-source, img or wrapper) as hidden', async () => {
+    const { doc, mirror } = setup();
+    const { img } = addCard(doc, mirror.zoneElement('self', 'hand'), 30);
+    const { wrapper } = addCard(doc, mirror.zoneElement('opp', 'hand'), 31, { holo: true });
+    const { calls } = recorder(mirror);
+    img.classList.add('draw-flight-source');
+    wrapper.classList.add('draw-flight-source');
+    await flush();
+    assert.deepEqual(calls.map((call) => [call.id, call.patch.hidden]).sort(), [[30, true], [31, true]]);
+    assert.deepEqual([...mirror.uiState().hidden].sort(), [30, 31]);
+    img.classList.remove('draw-flight-source');
+    await flush();
+    assert.deepEqual(calls.at(-1), { id: 30, patch: { selected: false, glow: null, matPick: null, hidden: false, pending: false } });
+  });
+
+  it('reports .cmd-pending (a command in flight) as pending, and its clearing', async () => {
+    const { doc, mirror } = setup();
+    const { img } = addCard(doc, mirror.zoneElement('self', 'hand'), 8);
+    const { calls } = recorder(mirror);
+    img.classList.add('cmd-pending');
+    await flush();
+    assert.equal(calls.at(-1).patch.pending, true);
+    img.classList.remove('cmd-pending');
+    await flush();
+    assert.equal(calls.at(-1).patch.pending, false);
+  });
+
+  it('a uiState() snapshot between pending and its clearing still lets the clearing report', async () => {
+    const { doc, mirror } = setup();
+    const { img } = addCard(doc, mirror.zoneElement('self', 'hand'), 9);
+    const { calls } = recorder(mirror);
+    img.classList.add('cmd-pending');
+    await flush();
+    mirror.uiState();
+    img.classList.remove('cmd-pending');
+    await flush();
+    assert.deepEqual(calls.map((call) => call.patch.pending), [true, false]);
   });
 
   it('maps data-mat-pick to idle and the green outline to picked', async () => {
@@ -157,7 +196,7 @@ describe('createBoardMirror', () => {
     assert.deepEqual([...mirror.uiState().selected], [13]);
     img.classList.remove('highlight');
     await flush();
-    assert.deepEqual(calls, [{ id: 13, patch: { selected: false, glow: null, matPick: null, hidden: false } }]);
+    assert.deepEqual(calls, [{ id: 13, patch: { selected: false, glow: null, matPick: null, hidden: false, pending: false } }]);
   });
 
   it('keeps an FX-hidden card hidden when the next view moves it to another zone (edge case 22)', () => {

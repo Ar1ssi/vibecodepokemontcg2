@@ -21,7 +21,7 @@ import { readCardInstanceId } from '../netcode/authoritative-dispatch.js';
 import { closeCardPreview, openCardPreview } from './full-view.js';
 import { openDiscardPileViewer } from './discard-pile-viewer.js';
 import { openCarouselViewer } from './card-picker.js';
-import { orderAttachedForCarousel } from './carousel-order.mjs';
+import { attachedSlidesOf, openAttachedCardsCarousel } from './attached-carousel.js';
 import { rulesState, stadiumUsed } from '/shared/engine/rules/rules-state.mjs';
 import { isHandActivatedAbility } from '/shared/engine/rules/ability-executors.mjs';
 import {
@@ -44,7 +44,8 @@ import { uiCue } from '../netcode/mat-fx/ui-cue.mjs';
 import { resolvePreviewCard } from './preview-card.mjs';
 import { isDoubleClickZoomZone } from './double-click-zoom.mjs';
 import { visualRectOf } from './iframe-rect.mjs';
-import { board3dActive } from '../board3d/board3d.js';
+import { board3dActive, getBoardScene } from '../board3d/board3d.js';
+import { selectServerCard, takeServerAttach } from '../netcode/server-card-select.js';
 
 // An iframe document's cards sit under its <body>; a board-mirror shadow root (design 074 D4)
 // holds them directly.
@@ -101,6 +102,16 @@ export const coverClick = (event) => {
   if (selectedZone.elementCover) {
     selectedZone.element.style.display = 'block';
   }
+};
+
+/**
+ * Where the card menu anchors on the 3D board: a mirror card's rect is already on-screen px
+ * (board-mirror.js sync, no iframe offset); the Stadium's twin is the page's `#stadium img`,
+ * hidden while the scene draws the slot, so it anchors on the scene's Stadium footprint.
+ */
+const board3dMenuAnchorRect = (target) => {
+  const stadium = target?.closest?.('#stadium') ? getBoardScene()?.rects?.().stadium : null;
+  return stadium ?? visualRectOf(target);
 };
 
 export const openCardContextMenu = (event) => {
@@ -210,8 +221,7 @@ export const openCardContextMenu = (event) => {
 
   // get the position of the context menu
   if (board3dActive()) {
-    // The mirror card's rect is already on-screen px (board-mirror.js sync): no iframe offset.
-    const rect = visualRectOf(event.target);
+    const rect = board3dMenuAnchorRect(event.target);
     const fitsRight =
       rect.left + rect.width + cardContextMenu.offsetWidth <= window.innerWidth;
     const left = fitsRight
@@ -269,15 +279,6 @@ export const openCardContextMenu = (event) => {
   }
 };
 
-// Attached Energy is rendered on the mat as a small round token (attach-card.js swaps image.src to
-// the icon and stashes the full card art in dataset.energyCardSrc) — show the real card art in the
-// carousel slide, then revert automatically since we never touch the board's own <img>, just a
-// read-only stand-in object here.
-const attachedSlidesOf = (card) =>
-  (card.attachedCards || []).map((attached) => {
-    const fullArtSrc = attached.image?.dataset?.energyCardSrc;
-    return fullArtSrc ? { ...attached, image: { src: fullArtSrc } } : attached;
-  });
 
 // Design 067: your own Active opens the TCG Live focus view. The attached cards the old inspector
 // carried as carousel slides sit behind the HUD's Stack button. An attack or retreat closes the
@@ -296,18 +297,32 @@ const openOwnActiveFocus = (card) => {
       closeCardFocus({ immediate: true });
       retreat(systemState.initiator);
     },
-    onOpenStack: () =>
-      openCarouselViewer({
-        title: card.name || 'Attached Cards',
-        candidates: [...orderAttachedForCarousel(attachedSlides), card],
-        initialIndex: attachedSlides.length,
-      }),
+    onOpenStack: () => openAttachedCardsCarousel(card),
   });
 };
 
 export const imageClick = (event) => {
   event.stopPropagation();
+  // Attach mode on a server-drawn card (keybinds `e`/`q`): this click names the target.
+  const serverAttach = takeServerAttach(event.target);
   identifyCard(event);
+  if (serverAttach) {
+    closePopups(event);
+    const { from, targetId } = serverAttach;
+    moveCardBundle(
+      from.user,
+      systemState.initiator,
+      from.zoneId,
+      mouseClick.zoneId,
+      from.index,
+      mouseClick.cardIndex,
+      'move',
+      true,
+      null,
+      { moving: from.instanceId, target: targetId }
+    );
+    return;
+  }
 
   if (mouseClick.zoneId === 'discard') {
     // I57: `cardIndex` is a legacy zone index and is meaningless for a server-drawn card,
@@ -355,9 +370,12 @@ export const imageClick = (event) => {
     ) {
       return;
     }
-    // Select-to-move resolves the card through the legacy zone arrays, which a
-    // server-authoritative game never populates — nothing to select there.
-    if (!mouseClick.card?.image) return;
+    // Select-to-move resolves a legacy card through its zone array; a server-drawn card
+    // (never in those arrays) is selected through the authoritative registry.
+    if (!mouseClick.card?.image) {
+      selectServerCard();
+      return;
+    }
     mouseClick.card.image.classList.add('highlight');
     mouseClick.selectingCard = true;
   }
@@ -405,7 +423,7 @@ export const doubleClick = (event) => {
   // board. `board` (free-play mat area: played Trainers, manually moved cards)
   // was missing from this list and hit exactly that. Prizes was pulled out to a
   // viewer above for the same reason.
-  if (isDoubleClickZoomZone(mouseClick.zoneId)) {
+  if (isDoubleClickZoomZone(mouseClick.zoneId, { board3d: board3dActive() })) {
     closeCardPreview(null, true);
     const host = fullViewHost(targetImage);
     if (!host?.classList.contains('full-view')) {
@@ -473,11 +491,7 @@ export const doubleClick = (event) => {
       // carousel slides (PTCG Live-style, like the discard pile viewer) — scroll/swipe right to
       // see them, left to return to the main card. Read-only: dragging one out means closing first.
       if (attachedSlides.length) {
-        openCarouselViewer({
-          title: card.name || 'Attached Cards',
-          candidates: [...orderAttachedForCarousel(attachedSlides), card],
-          initialIndex: attachedSlides.length,
-        });
+        openAttachedCardsCarousel(card);
       } else {
         openCardPreview(targetImage, card);
       }

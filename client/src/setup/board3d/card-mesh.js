@@ -31,6 +31,8 @@ const RETRY_MS = 5000;
 /** Resting height of a card's underside above the cloth: over the mat overlay (table-mesh Z.overlay = 1). */
 const CARD_LIFT_PX = 1.5;
 const PLAIN_UV = Object.freeze({ u0: 0, u1: 1, v0: 0, v1: 1 });
+/** `.cmd-pending` (index.css): a card whose command is in flight shows at 60 % opacity. */
+const PENDING_OPACITY = 0.6;
 
 const uvKeyOf = (uv) =>
   uv === PLAIN_UV ? 'plain' : `foil:${uv.u0},${uv.u1},${uv.v0},${uv.v1}`;
@@ -103,6 +105,7 @@ function buildCardGeometry(three, widthPx, uv) {
  *   setPose: (id: number, pose: import('./card-poses.mjs').CardPose, ms: number) => void,
  *   setHidden: (id: number, hidden: boolean) => void, setCamera: (desc: object|null) => void,
  *   setTilt: (id: number, tilt: { roll: number, pitch: number }|null) => void,
+ *   setDim: (id: number, dim: boolean) => void,
  *   has: (id: number) => boolean, meshOf: (id: number) => import('three').Mesh|null,
  *   idAt: (object3d: import('three').Object3D|null) => number|null, ids: () => number[],
  *   cornersOf: (id: number) => number[][]|null, update: (nowMs: number) => boolean,
@@ -318,13 +321,38 @@ export function createCardMeshPool({
     card.mesh.geometry = next.geometry;
   };
 
-  /** Front: foil when ready, else the card image when ready, else the back (loading or failed). */
+  /**
+   * This card's own see-through copy of a shared front material (it shares the texture). A
+   * card keeps one, rebuilt when its front changes, and drops it when it is no longer dimmed.
+   */
+  const dimmedFront = (card, base) => {
+    if (card.dimFront?.base === base && card.dimFront.material.map === base.map) return card.dimFront.material;
+    card.dimFront?.material.dispose();
+    const material = base.clone();
+    material.transparent = true;
+    material.opacity = PENDING_OPACITY;
+    card.dimFront = { base, material };
+    return material;
+  };
+
+  const dropDimmedFront = (card) => {
+    card.dimFront?.material.dispose();
+    card.dimFront = null;
+  };
+
+  /**
+   * Front: foil when ready, else the card image when ready, else the back (loading or failed).
+   * A dimmed card (a command in flight) shows its plain front at PENDING_OPACITY; its foil, a
+   * shared shader, waits until the dim ends.
+   */
   function applyMaterials(card) {
     const back = card.back?.state === 'ready' ? card.back.material : blankBack;
-    const wearsFoil = card.foil?.state === 'ready';
+    const wearsFoil = card.foil?.state === 'ready' && !card.dim;
     let front = back;
     if (wearsFoil) front = card.foil.material;
     else if (card.front?.state === 'ready') front = card.front.material;
+    if (card.dim) front = dimmedFront(card, front);
+    else if (card.dimFront) dropDimmedFront(card);
     const uv = wearsFoil ? foilUv() : PLAIN_UV;
     if (card.geometry.key !== `${widthKeyOf(card.widthPx)}|${uvKeyOf(uv)}`) {
       setGeometry(card, card.widthPx, uv);
@@ -418,6 +446,8 @@ export function createCardMeshPool({
       pose: null,
       flip: null,
       tilt: null,
+      dim: false,
+      dimFront: null,
       dirty: true,
     });
     mesh.visible = false;
@@ -428,6 +458,7 @@ export function createCardMeshPool({
     withCard(id, (card) => {
       cards.delete(id);
       group.remove(card.mesh);
+      dropDimmedFront(card);
       dropArt(fronts, card.front);
       dropArt(backs, card.back);
       dropFoil(card.foil);
@@ -509,6 +540,16 @@ export function createCardMeshPool({
       onNeedsRender();
     });
 
+  /** Dims a card while a command it sent is in flight (`.cmd-pending`); false restores it. */
+  const setDim = (id, dim) =>
+    withCard(id, (card) => {
+      const next = Boolean(dim);
+      if (card.dim === next) return;
+      card.dim = next;
+      applyMaterials(card);
+      onNeedsRender();
+    });
+
   const setHidden = (id, hidden) =>
     withCard(id, (card) => {
       card.hidden = Boolean(hidden);
@@ -585,6 +626,7 @@ export function createCardMeshPool({
     setFaces,
     setPose,
     setTilt,
+    setDim,
     setHidden,
     setCamera,
     has,

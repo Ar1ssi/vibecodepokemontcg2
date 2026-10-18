@@ -4,7 +4,9 @@ import {
   selfContainerDocument,
 } from '../../state.js';
 import { refreshBoard } from '../../setup/sizing/refresh-board.js';
+import { clearServerSelection } from '../../setup/netcode/server-card-select.js';
 import { getZone } from '../../setup/zones/get-zone.js';
+import { zonePopupDisplay } from './zone-popup-display.mjs';
 import { startHoloAnimation } from '../../setup/deck-builder/core/holo.mjs';
 import {
   playDeselectPop,
@@ -66,23 +68,21 @@ export const hideZoneElementsIfEmpty = (event) => {
   users.forEach((user) => {
     zoneIds.forEach((zoneId) => {
       const zone = getZone(user, zoneId);
-      const outsideZoneClick = isOutsideZoneClick(event, zone);
-      if (
-        zone.getCount() === 0 ||
-        (outsideZoneClick && !['attachedCards', 'viewCards'].includes(zoneId))
-      ) {
-        zone.element.style.display = 'none';
-      } else if (
-        zone.getCount() !== 0 &&
-        ['attachedCards', 'viewCards'].includes(zoneId)
-      ) {
-        zone.element.style.display = 'block';
-      }
+      const display = zonePopupDisplay({
+        zoneId,
+        arrayCount: zone.getCount(),
+        renderedCount: zone.getRenderedCount(),
+        outsideClick: isOutsideZoneClick(event, zone),
+      });
+      if (display) zone.element.style.display = display;
     });
   });
 };
 
 export const deselectCard = () => {
+  // Server-drawn cards carry their selection on their registry <img> (design 074 D3).
+  clearServerSelection();
+  if (!mouseClick.card) mouseClick.selectingCard = false;
   if (mouseClick.card) {
     mouseClick.card.image.classList.remove('highlight');
     mouseClick.selectingCard = false;

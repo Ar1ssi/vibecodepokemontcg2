@@ -17,6 +17,7 @@ import { doubleClick } from '../../setup/image-logic/click-events.js';
 import { refreshBoardImages } from '../../setup/sizing/refresh-board.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { dispatchServerCardKey } from '../../setup/netcode/manual-card-dispatch.js';
+import { beginServerAttach } from '../../setup/netcode/server-card-select.js';
 import { isInFullView } from '../../setup/deck-constructor/hydrate-holo.js';
 import { isCardPreviewOpen } from '../../setup/image-logic/full-view.js';
 import { addDamageCounter } from '../counters/damage-counter.js';
@@ -249,6 +250,7 @@ export const keyDown = (event) => {
           mouseClick.cardIndex
         );
       } else {
+        // A server-drawn card moves by its instance id (null for a legacy card: unchanged).
         moveCardBundle(
           mouseClick.cardUser,
           systemState.initiator,
@@ -256,7 +258,10 @@ export const keyDown = (event) => {
           dZoneId,
           mouseClick.cardIndex,
           false,
-          'move'
+          'move',
+          true,
+          null,
+          { moving: mouseClick.cardInstanceId }
         );
       }
     }
@@ -266,6 +271,18 @@ export const keyDown = (event) => {
         event.key === 'q' ||
         event.code === 'KeyQ') &&
       !isAltKeyPressed(event) &&
+      !mouseClick.card &&
+      beginServerAttach()
+    ) {
+      closeFullView(event);
+      hideZoneElements();
+    } else if (
+      (event.key === 'e' ||
+        event.code === 'KeyE' ||
+        event.key === 'q' ||
+        event.code === 'KeyQ') &&
+      !isAltKeyPressed(event) &&
+      mouseClick.card &&
       (!['active', 'bench'].includes(mouseClick.zoneId) ||
         mouseClick.card.image.attached)
     ) {

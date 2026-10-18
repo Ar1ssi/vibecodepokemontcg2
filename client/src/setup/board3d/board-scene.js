@@ -211,6 +211,14 @@ export function createBoardScene({
   let stopShake = null;
   let frameId = null;
   let disposed = false;
+  // rects()/hitTest advance the card tweens between frames; when one does so mid-animation it may
+  // finish a tween the next frame then never sees moving, so that frame reports the cards moved
+  // (else `onRender` listeners, the mirror's rect sync, miss the final pose).
+  let cardsAdvancedOffFrame = false;
+  const advanceCards = () => {
+    if (frameId !== null) cardsAdvancedOffFrame = true;
+    pool.update(clock.now());
+  };
 
   const contextLost = () => {
     try {
@@ -230,7 +238,8 @@ export function createBoardScene({
   const render = () => {
     if (disposed || contextLost()) return;
     const now = clock.now();
-    const cardsMoving = pool.update(now);
+    const cardsMoving = pool.update(now) || cardsAdvancedOffFrame;
+    cardsAdvancedOffFrame = false;
     const pilesMoving = piles.update(now);
     const overlaysMoving = overlays.update(now);
     const animating = cardsMoving || pilesMoving || overlaysMoving;
@@ -387,6 +396,7 @@ export function createBoardScene({
       const card = cardOf(next, id);
       if (!pool.has(id)) {
         pool.acquire(id, { widthPx: pose.widthPx });
+        pool.setDim(id, Boolean(uiState.get(id)?.pending));
         pool.setFaces(id, facesOf(card));
         pool.setHidden(id, hiddenOf(id, pose));
         pool.setPose(id, pose, 0);
@@ -561,7 +571,8 @@ export function createBoardScene({
   };
 
   /**
-   * Selection / glow / mat-pick / hidden state per card instance, merged over the model's (the
+   * Selection / glow / mat-pick / hidden / pending state per card instance (`pending`: a sent
+   * command acts on it, drawn dimmed), merged over the model's (the
    * mirror's read-back, §D4): re-dresses that card's rings and overlays and its visibility now.
    */
   const setUiState = (id, patch) => {
@@ -569,6 +580,7 @@ export function createBoardScene({
     uiState.set(id, { ...(uiState.get(id) || {}), ...patch });
     if (pool.has(id)) {
       pool.setHidden(id, hiddenOf(id, appliedPoses.get(id)));
+      pool.setDim(id, Boolean(uiState.get(id)?.pending));
       syncOverlaysOf(model, id);
     }
     invalidate();
@@ -615,7 +627,7 @@ export function createBoardScene({
   const rects = () => {
     const out = {};
     if (disposed || !cameraDesc) return out;
-    pool.update(clock.now());
+    advanceCards();
     const box = canvasBox() ?? { left: 0, top: 0 };
     for (const id of pool.ids()) {
       if (!pool.meshOf(id)?.visible) continue;
@@ -666,7 +678,7 @@ export function createBoardScene({
   const hitTest = (clientX, clientY, { ignore = null } = {}) => {
     if (disposed || !cameraDesc || !model) return null;
     if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) return null;
-    pool.update(clock.now());
+    advanceCards();
     if (!aimAt(clientX, clientY)) return null;
     const meshes = pool
       .ids()

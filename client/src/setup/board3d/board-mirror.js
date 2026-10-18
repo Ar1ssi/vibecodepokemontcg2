@@ -2,7 +2,8 @@
 // iframe documents while the three.js board runs: they carry the same element ids, so
 // apply-view.js keeps building every card <img> through getZone(...).element, and every
 // consumer of `selfContainerDocument`/`oppContainerDocument` (getElementById, querySelector,
-// event listeners) keeps working. The mirror is invisible (`opacity: 0`, no pointer events);
+// event listeners) keeps working. The mirror is invisible (`opacity: 0`, no pointer events)
+// except the zone list popups, which show and take clicks as HTML panels over the canvas;
 // `sync` writes each card's projected screen rect onto its <img> so getBoundingClientRect on a
 // mirror node is where the scene draws it, and `observe`/`uiState` read the UI state the DOM
 // code paints onto those nodes (selection, glow, mat pick, FX hide) back for the scene.
@@ -12,10 +13,17 @@ const SIDES = ['self', 'opp'];
 const CARD_RECT_ZONES = ['active', 'bench', 'hand', 'prizes', 'board'];
 /** Piles sized to the scene's `pile:<side>:<zone>` footprint: zone, cover, and the deck's stack. */
 const PILE_ELEMENTS = {
-  deck: ['deck', 'deckCover', 'deckStack'],
-  discard: ['discard', 'discardCover'],
-  lostZone: ['lostZone', 'lostZoneCover'],
+  deck: ['deckCover', 'deckStack'],
+  discard: ['discardCover'],
+  lostZone: ['lostZoneCover'],
 };
+/**
+ * The zone list popups (deck/discard/Lost Zone viewers, looked-at and attached cards): visible
+ * HTML panels laid out by `board3d-panels.css`, so `sync` never sizes them or the cards in them.
+ */
+const POPUP_ZONES = ['deck', 'discard', 'lostZone', 'attachedCards', 'viewCards'];
+const POPUP_SELECTOR = POPUP_ZONES.map((id) => `#${id}`).join(', ');
+const PANEL_STYLESHEET = 'src/css/board3d-panels.css';
 const RECT_KEYS = ['left', 'top', 'width', 'height'];
 const SELECTED_CLASSES = ['highlight', 'selectHighlight'];
 // mat-picker.js OUTLINE_IDLE / OUTLINE_SELECTED, as written and as the browser normalizes them.
@@ -24,21 +32,31 @@ const IDLE_OUTLINES = ['#ffd23f', 'rgb(255, 210, 63)'];
 // index.css `.has-glow`: `rgba(var(--glow-rgb, 120, 200, 255), 0.6)`.
 export const DEFAULT_GLOW_RGB = '120, 200, 255';
 const OBSERVED_ATTRIBUTES = ['class', 'style', 'data-mat-pick'];
-const NEUTRAL_STATE = Object.freeze({ selected: false, glow: null, matPick: null, hidden: false });
+const NEUTRAL_STATE = Object.freeze({ selected: false, glow: null, matPick: null, hidden: false, pending: false });
+// cmd-emitter.js `addInFlightAffordance`: the card a sent command acts on, until the next view.
+const PENDING_CLASS = 'cmd-pending';
+// draw-flight.js `hideForFlight`: a hand card hidden while its draw / prize / reveal flight lands
+// on it (self-/opp-containers.css give it `visibility: hidden`).
+const FLIGHT_HIDDEN_CLASS = 'draw-flight-source';
+const isHiddenNode = (node) =>
+  node.style?.visibility === 'hidden' || Boolean(node.classList?.contains(FLIGHT_HIDDEN_CLASS));
 
 // The host is the containing block of everything in its root (the transform makes it one for
 // `position: fixed` too), so every rect `sync` writes is in px from the host's box. Card images
 // are fixed so a zone, `.play-container` or `.mat-holo` between them and the host never offsets
 // them, and untransformed so their box is the projected rect (the scene draws the rotation).
+// Everything is invisible and click-through except the popups, which stay `display: none` until
+// the legacy code shows them inline (their look: board3d-panels.css, linked before this sheet).
 const MIRROR_STYLE = `
 :host { position: absolute; inset: 0; display: block; transform: translateZ(0);
-  opacity: 0; pointer-events: none; }
+  pointer-events: none; }
 #playfield { position: absolute; inset: 0; }
-#playfield > *, #handLabel, #handText, #hand, #attachedCards, #viewCards {
+#playfield > :not(${POPUP_SELECTOR}), #handLabel, #handText, #hand {
   position: absolute; left: 0; top: 0; width: 0; height: 0; margin: 0;
   pointer-events: none; opacity: 0; }
-#deck, #discard, #lostZone, #attachedCards, #viewCards { display: none; }
-img.card-image { position: fixed !important; transform: none !important; margin: 0 !important; }
+${POPUP_SELECTOR} { display: none; }
+img.card-image:not(:is(${POPUP_SELECTOR}) *) {
+  position: fixed !important; transform: none !important; margin: 0 !important; }
 #deckCover > img, #discardCover > img, #lostZoneCover > img {
   position: absolute !important; inset: 0; width: 100% !important; height: 100% !important; }
 `;
@@ -51,10 +69,11 @@ const popupZone = (id, buttons, view) => `
   <div id="${id}" class="zone ${view}-view"><div class="zone-button-container">
     ${zoneButtons(buttons)}
     <input type="checkbox" id="sort${id[0].toUpperCase()}${id.slice(1)}Checkbox">
+    <label for="sort${id[0].toUpperCase()}${id.slice(1)}Checkbox">Sort</label>
   </div></div>`;
 
 /** The id skeleton of `self-containers.html` / `opp-containers.html` (same ids on both sides). */
-const mirrorMarkup = (view) => `<style>${MIRROR_STYLE}</style>
+const mirrorMarkup = (view) => `<link rel="stylesheet" href="${PANEL_STYLESHEET}"><style>${MIRROR_STYLE}</style>
 <div id="playfield">
   <div id="boardCenterDesign"><div id="boardCircle"></div><div id="innerCircle"></div></div>
   ${popupZone('deck', [['shuffleDeckButton', 'Shuffle'], ['closeDeckButton', 'Close']], view)}
@@ -128,6 +147,13 @@ const isRect = (rect) =>
   Boolean(rect) && RECT_KEYS.every((key) => Number.isFinite(rect[key]));
 
 /** Writes a rect (px from `origin`) as inline left/top/width/height, touching only what changed. */
+/** Drops a rect `sync` wrote earlier (a card that moved from the board into a popup). */
+const clearRect = (el) => {
+  for (const key of RECT_KEYS) {
+    if (el.style?.[key]) el.style.removeProperty(key);
+  }
+};
+
 const writeRect = (el, rect, origin) => {
   if (!el?.style || !isRect(rect)) return;
   const values = {
@@ -214,8 +240,9 @@ export function createBoardMirror({ hostSelf, hostOpp, doc = globalThis.document
         ? glowNode.style?.getPropertyValue('--glow-rgb')?.trim() || DEFAULT_GLOW_RGB
         : null,
       matPick: picks.includes('picked') ? 'picked' : picks.includes('idle') ? 'idle' : null,
-      // FX hideDuring and card focus hide the <img> or its `.mat-holo` wrapper.
-      hidden: nodes.slice(0, 2).some((node) => node.style?.visibility === 'hidden'),
+      // FX hideDuring, card focus and hand flights hide the <img> or its `.mat-holo` wrapper.
+      hidden: nodes.slice(0, 2).some(isHiddenNode),
+      pending: nodes.some((node) => node.classList?.contains(PENDING_CLASS)),
     };
   };
 
@@ -223,7 +250,8 @@ export function createBoardMirror({ hostSelf, hostOpp, doc = globalThis.document
     a.selected === b.selected &&
     a.glow === b.glow &&
     a.matPick === b.matPick &&
-    a.hidden === b.hidden;
+    a.hidden === b.hidden &&
+    a.pending === b.pending;
 
   const uiState = () => {
     const state = { selected: new Set(), glows: new Map(), matPick: new Map(), hidden: new Set() };
@@ -232,7 +260,8 @@ export function createBoardMirror({ hostSelf, hostOpp, doc = globalThis.document
         const id = instanceIdOf(img);
         if (id === null) continue;
         const card = stateOf(id);
-        known.set(id, card);
+        // `pending` does not ride on the model, so the scene still learns it from a report.
+        known.set(id, { ...card, pending: known.get(id)?.pending ?? false });
         if (card.selected) state.selected.add(id);
         if (card.glow !== null) state.glows.set(id, card.glow);
         if (card.matPick !== null) state.matPick.set(id, card.matPick);
@@ -283,6 +312,11 @@ export function createBoardMirror({ hostSelf, hostOpp, doc = globalThis.document
     for (const side of SIDES) {
       const origin = hostBox(side) ?? { left: 0, top: 0, width: 0, height: 0 };
       for (const img of roots[side].querySelectorAll('img[data-instance-id]')) {
+        // A popup lays its cards out itself: they show where the panel puts them.
+        if (img.closest(POPUP_SELECTOR)) {
+          clearRect(img);
+          continue;
+        }
         const id = instanceIdOf(img);
         if (id !== null) writeRect(img, rects[id], origin);
       }

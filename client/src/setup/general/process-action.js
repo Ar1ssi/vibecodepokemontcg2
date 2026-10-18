@@ -6,6 +6,13 @@ import { translateActionToCmd } from '../netcode/dual-run-bridge.js';
 import { emitCmd } from '../netcode/cmd-emitter.js';
 import { appendMessage } from '../chatbox/append-message.js';
 import { soloCommandSeat } from '../netcode/solo-seat.mjs';
+import { getCardRegistry } from '../netcode/apply-view.js';
+
+// The server-drawn card a command acts on wears `.cmd-pending` until the next view (cmd-emitter.js).
+const pendingElementFor = (payload) =>
+  payload && Number.isFinite(payload.instanceId)
+    ? (getCardRegistry().get(payload.instanceId)?.element ?? null)
+    : null;
 
 export const processAction = (user, emit, action, parameters) => {
   const notSpectator = !(
@@ -52,6 +59,7 @@ export const processAction = (user, emit, action, parameters) => {
             roomId: systemState.roomId,
             type: cmdSpec.type,
             payload: cmdSpec.payload,
+            element: pendingElementFor(cmdSpec.payload),
             seat,
           }).then((result) => {
             if (!result.success) {
