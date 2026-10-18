@@ -672,6 +672,55 @@ test('ability: a second Battery drop from the same Charjabug instance is refused
   assert.ok(res.state.players.p1.zones.hand.some((c) => c.instanceId === 70));
 });
 
+const moveCard = (state, rng, from, to, instanceId = 70) =>
+  applyCommand(state, { type: 'moveCard', payload: { instanceId, from, to }, playerId: 'p1' }, rng);
+
+test('ability: a Battery Charjabug back in the hand evolves as a Pokémon, not as Energy', async () => {
+  const { isPokemon, isEnergy } = await import('../cards.mjs');
+  const { state, rng } = setupGame();
+  state.players.p1.zones.active.push(mon(72, 'Vikavolt', { stage: 'Stage 2' }));
+  state.players.p1.zones.bench.push(mon(73, 'Grubbin', { stage: 'Basic', enteredPlayTurn: 1 }));
+  state.players.p2.zones.active.push(mon(71, 'Opp'));
+  charjabugInHand(state);
+  const attached = dropOn(state, rng, 72);
+  assert.equal(attached.error, null);
+
+  const inHand = moveCard(attached.state, rng, 'active', 'hand');
+  assert.equal(inHand.error, null);
+  const back = inHand.state.players.p1.zones.hand.find((c) => c.instanceId === 70);
+  assert.equal(back.asEnergy, undefined, 'the Energy marker leaves play with it');
+
+  inHand.state.players.p1.flags.energyAttached = false;
+  const evolved = dropOn(inHand.state, rng, 73);
+  assert.equal(evolved.error, null);
+  const charjabug = evolved.state.players.p1.zones.bench.find((c) => c.instanceId === 70);
+  assert.equal(charjabug?.attachedTo, 73);
+  assert.equal(isPokemon(charjabug), true);
+  assert.equal(isEnergy(charjabug), false);
+  assert.equal(evolved.state.players.p1.flags.energyAttached, false, 'evolving is not an Energy attach');
+});
+
+test('ability: a Buzzap Electrode or face-down Energy that leaves play drops its Energy marker', () => {
+  const { state, rng } = setupGame();
+  state.players.p1.zones.active.push(
+    mon(72, 'Zapdos'),
+    mon(70, 'Electrode', { stage: 'Stage 1', attachedTo: 72, asEnergy: { provides: ['Lightning', 'Lightning'] } }),
+    { ...basicEnergy(74, 'Fire', 72), asEnergy: { provides: ['Colorless'] }, faceDownUntilTurn: 3, faceDownHostId: 72 }
+  );
+  state.players.p2.zones.active.push(mon(71, 'Opp'));
+
+  const toDeck = moveCard(state, rng, 'active', 'deck');
+  assert.equal(toDeck.error, null);
+  assert.equal(toDeck.state.players.p1.zones.deck.find((c) => c.instanceId === 70).asEnergy, undefined);
+  const stillAttached = toDeck.state.players.p1.zones.active.find((c) => c.instanceId === 74);
+  assert.deepEqual(stillAttached.asEnergy.provides, ['Colorless'], 'an Energy still in play keeps its marker');
+
+  const toHand = moveCard(toDeck.state, rng, 'active', 'hand', 74);
+  const faceUp = toHand.state.players.p1.zones.hand.find((c) => c.instanceId === 74);
+  assert.equal(faceUp.asEnergy, undefined);
+  assert.equal(faceUp.faceDownUntilTurn, undefined);
+});
+
 // ── legacy power restrictions ───────────────────────────────────────────
 
 const RAIN_DANCE =
