@@ -34,7 +34,7 @@ export const UNDER_POKEMON_SHIFT = 1 / 15;
  *   (planEnergyTokenRow at width 1, ENERGY_TOKEN_BOTTOM); `zIndex` as apply-view stamps it.
  * @typedef {{ left:number, label:string, fontSize:number, zIndex:number }} EnergyBadge
  *   "Nx" badge past four tokens; `left`/`fontSize` in card widths.
- * @typedef {{ instanceId:number, side:'self'|'opp', zone:ZoneId, index:number,
+ * @typedef {{ instanceId:number, side:'self'|'opp', zone:ZoneId, index:number, slot:number,
  *   face:'front'|'back', src:string|null, name:string, backSrc:string,
  *   role:'root'|'stage'|'tool'|'energy', host:number|null, stackIndex:number,
  *   stackOffset:[number, number],
@@ -44,6 +44,8 @@ export const UNDER_POKEMON_SHIFT = 1 / 15;
  *   `stackOffset` = [right, up] in card widths from the host slot (Stage peeks above at 1/15,
  *   Tools fan right at 1/6). Overlay fields (damage…abilityUsed, energyBadges) sit on the
  *   stack's visible card only, as apply-view draws them over the visible card.
+ *   `slot` = the zone slot the card sits in: its root's rank among the zone's roots, so a stack's
+ *   attached cards (which have their own `index` in the zone array) share their host's slot.
  * @typedef {{ count:number, sleeve:string, layers:number }} DeckPile
  * @typedef {{ count:number, top:Placement|null }} OpenPile
  * @typedef {{ deck:DeckPile, discard:OpenPile, lostZone:OpenPile,
@@ -169,6 +171,7 @@ function basePlacement(card, side, zoneId, index, player, ctx) {
     side,
     zone: zoneId,
     index,
+    slot: index,
     face,
     src: face === 'front' ? card.src || null : null,
     name: face === 'front' ? card.name || '' : '',
@@ -205,21 +208,13 @@ function setOverlays(placement, root, visibleCard) {
 /**
  * One in-play Pokémon's stack (layoutCardStack): the highest Stage is visible; the other
  * Pokémon peek out under it, the one attached last closest; Tools (and token-less Energy)
- * fan out to the right in view order; Energy with a token sits in the token row.
+ * fan out to the right in view order, tucked under the Pokémon; Energy with a token sits in the token row.
  */
 function layoutStack(root, attached, placementOf) {
   const members = [root, ...attached];
   const top = topPokemonCard(members, root);
   const others = members.filter((card) => card !== top && isPokemon(card));
   if (!isPokemon(root) && root !== top && !others.includes(root)) others.unshift(root);
-  const topIndex = others.length;
-
-  others.forEach((card, i) => {
-    const placement = placementOf(card);
-    placement.stackIndex = i;
-    placement.stackOffset = [0, (topIndex - i) * UNDER_POKEMON_SHIFT];
-  });
-  placementOf(top).stackIndex = topIndex;
 
   const tools = [];
   const energy = [];
@@ -230,12 +225,24 @@ function layoutStack(root, attached, placementOf) {
     else tools.push(card);
   }
 
+  // Back to front, as apply-view's negative z-indexes drew it: the Tools tuck under the
+  // Pokémon (the first attached closest), the lower Stages above them, the visible card on top.
+  const underTools = tools.length;
+  const topIndex = underTools + others.length;
+
   tools.forEach((card, i) => {
     const placement = placementOf(card);
     placement.role = 'tool';
-    placement.stackIndex = topIndex + 1 + i;
+    placement.stackIndex = underTools - 1 - i;
     placement.stackOffset = [(i + 1) * ATTACHED_CARD_SHIFT, 0];
   });
+
+  others.forEach((card, i) => {
+    const placement = placementOf(card);
+    placement.stackIndex = underTools + i;
+    placement.stackOffset = [0, (others.length - i) * UNDER_POKEMON_SHIFT];
+  });
+  placementOf(top).stackIndex = topIndex;
 
   const row = planEnergyTokenRow(
     energy.map((entry) => entry.tokenSrc),
@@ -244,7 +251,7 @@ function layoutStack(root, attached, placementOf) {
   energy.forEach(({ card, tokenSrc }, i) => {
     const placement = placementOf(card);
     placement.role = 'energy';
-    placement.stackIndex = topIndex + 1 + tools.length + i;
+    placement.stackIndex = topIndex + 1 + i;
     placement.energyToken = {
       src: tokenSrc,
       double: isDoubleEnergyToken(card),
@@ -294,8 +301,15 @@ function sideZonePlacements(player, side, ctx) {
         placement.rotation = quarterTurn(card.rotation);
       }
     }
-    // Roots before attachments, each group in view order (placeCardInZone).
     const ordered = [...zonePlacements.values()];
+    if (PLAY_ZONES.includes(zoneId)) {
+      const slotOfRoot = new Map();
+      for (const p of ordered) {
+        if (p.host == null) slotOfRoot.set(p.instanceId, slotOfRoot.size);
+      }
+      for (const p of ordered) p.slot = slotOfRoot.get(p.host ?? p.instanceId);
+    }
+    // Roots before attachments, each group in view order (placeCardInZone).
     placements.push(
       ...ordered.filter((p) => p.host == null),
       ...ordered.filter((p) => p.host != null)
@@ -443,7 +457,7 @@ export function placementById(model, instanceId) {
   return indexOf(model).get(instanceId) ?? null;
 }
 
-const MOVE_FIELDS = ['side', 'zone', 'index', 'host', 'stackIndex'];
+const MOVE_FIELDS = ['side', 'zone', 'index', 'slot', 'host', 'stackIndex'];
 const STYLE_FIELDS = [
   'face',
   'src',

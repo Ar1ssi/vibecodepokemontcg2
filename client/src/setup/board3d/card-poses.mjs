@@ -90,7 +90,7 @@ function slotFor(placement, layout, { boardCounts, piles }) {
     return { centre: centreOf(seat.active), widthPx: seat.cardBox.active.w };
   if (zone === 'bench') {
     return {
-      centre: centreOf(benchSlotRect(layout, side, index)),
+      centre: centreOf(benchSlotRect(layout, side, placement.slot ?? index)),
       widthPx: seat.cardBox.bench.w,
     };
   }
