@@ -287,3 +287,105 @@ describe('069 hover preview DOM — board re-render', () => {
     assert.equal(frame.window.document.querySelectorAll(`.${GUTTER_PROBE_CLASS}`).length, 1);
   });
 });
+
+// Design 074 D5: the 3D board names the hovered mirror card through setTarget; its cards sit in
+// a shadow root inside the main document (board-mirror.js), outside the main document's scope.
+const mirrorSetup = (options) => {
+  const env = setup(options);
+  const doc = env.main.window.document;
+  const host = doc.createElement('div');
+  host.id = 'selfBoard';
+  doc.body.appendChild(host);
+  const root = host.attachShadow({ mode: 'open' });
+  const hand = doc.createElement('div');
+  hand.id = 'hand';
+  root.appendChild(hand);
+  return { ...env, doc, root, hand };
+};
+
+describe('074 hover preview DOM — setTarget (3D board)', () => {
+  it('a mirror card set as the target previews after the dwell, despite the #stadium scope', () => {
+    const { main, doc, hand, preview, advance } = mirrorSetup();
+    const img = addCard(doc, hand, card('Pikachu'));
+    preview.setTarget(img);
+    advance(HOVER_DWELL_MS - 1);
+    assert.equal(shownSrc(main), null);
+    advance(1);
+    assert.equal(shownSrc(main), 'https://img.test/Pikachu/low.webp');
+  });
+
+  it('setTarget(null) hides it; re-naming the same card does not restart the dwell', () => {
+    const { main, doc, hand, preview, advance } = mirrorSetup();
+    const img = addCard(doc, hand, card('Pikachu'));
+    preview.setTarget(img);
+    advance(HOVER_DWELL_MS / 2);
+    preview.setTarget(img);
+    advance(HOVER_DWELL_MS / 2);
+    assert.equal(shownSrc(main), 'https://img.test/Pikachu/low.webp');
+    preview.setTarget(null);
+    assert.equal(hostOf(main).classList.contains('is-shown'), false);
+  });
+
+  it('sweeps from one target to the next like native hovers', () => {
+    const { main, doc, hand, preview, advance } = mirrorSetup();
+    const a = addCard(doc, hand, card('Pikachu'));
+    const b = addCard(doc, hand, card('Raichu'));
+    preview.setTarget(a);
+    advance(HOVER_DWELL_MS);
+    preview.setTarget(b);
+    assert.equal(shownSrc(main), 'https://img.test/Raichu/low.webp');
+  });
+
+  it('the document suppressions apply: pointerdown, contextmenu and wheel cancel it', () => {
+    for (const type of ['pointerdown', 'contextmenu', 'wheel']) {
+      const { main, doc, hand, preview, advance } = mirrorSetup();
+      const img = addCard(doc, hand, card('Pikachu'));
+      preview.setTarget(img);
+      advance(HOVER_DWELL_MS);
+      doc.body.dispatchEvent(new main.window.MouseEvent(type, { bubbles: true }));
+      assert.equal(shownSrc(main), null, type);
+      preview.setTarget(img);
+      advance(HOVER_DWELL_MS);
+      assert.equal(shownSrc(main), null, `${type}: still over the same card, no re-arm`);
+    }
+  });
+
+  it('a modal, a held button, a touch pointer or a face-down card never previews', () => {
+    const modal = mirrorSetup({ isModalOpen: () => true });
+    modal.preview.setTarget(addCard(modal.doc, modal.hand, card('Pikachu')));
+    modal.advance(HOVER_DWELL_MS);
+    assert.equal(shownSrc(modal.main), null, 'modal');
+
+    const held = mirrorSetup();
+    held.preview.setTarget(addCard(held.doc, held.hand, card('Pikachu')), { buttons: 1 });
+    held.advance(HOVER_DWELL_MS);
+    assert.equal(shownSrc(held.main), null, 'held button');
+
+    const touch = mirrorSetup();
+    touch.preview.setTarget(addCard(touch.doc, touch.hand, card('Pikachu')), { pointerType: 'touch' });
+    touch.advance(HOVER_DWELL_MS);
+    assert.equal(shownSrc(touch.main), null, 'touch');
+
+    const down = mirrorSetup();
+    down.preview.setTarget(addCard(down.doc, down.hand, { name: '', src: '/src/assets/cardback.png' }));
+    down.advance(HOVER_DWELL_MS);
+    assert.equal(shownSrc(down.main), null, 'face down');
+  });
+
+  it('hides when the shown mirror card is removed from its shadow root', async () => {
+    const { main, doc, hand, preview, advance } = mirrorSetup();
+    const img = addCard(doc, hand, card('Pikachu'));
+    preview.setTarget(img);
+    advance(HOVER_DWELL_MS);
+    img.remove();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(shownSrc(main), null);
+  });
+
+  it('a stray main-document card outside #stadium still never previews', () => {
+    const { main, doc, preview, advance } = mirrorSetup();
+    preview.setTarget(addCard(doc, doc.body, card('Pikachu')));
+    advance(HOVER_DWELL_MS);
+    assert.equal(shownSrc(main), null);
+  });
+});

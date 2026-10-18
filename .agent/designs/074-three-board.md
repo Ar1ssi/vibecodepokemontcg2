@@ -539,6 +539,23 @@ Banned in a slice row: "decide", "TBD", "as needed", "appropriate", "handle edge
 
 ## Deviations (Builder appends here during build)
 
+### D1
+- Acceptance (a) asserts `mouseClick.cardInstanceId`/`zoneId` (the Work-plan row's check), not `.highlight`: under server
+  authority `imageClick` returns before selecting (`mouseClick.card` reads the legacy zone arrays, never populated, I15),
+  on the iframe board too. (b) is checked through closePopups closing `#cardContextMenu` after an empty-table click.
+  (c) plays the Basic with `__ptcg.playFromHand` (setup `options()` lists nothing for the near seat in debug mode).
+- The browser's own `click` on the canvas after a release over a card is stopped at the canvas (else the page's
+  closePopups undoes the card's click); over empty table it bubbles and is the closePopups trigger. Only the primary
+  button clicks; `contextmenu` comes from the canvas's native event (one per gesture, any platform). No `wheel`
+  listener: it bubbles untouched to the hover preview's document-level suppression.
+- `hover-preview-dom.mjs`: a document's `within` scope no longer applies to nodes in a shadow root (mirror cards are
+  the board), and the shown card's MutationObserver watches its shadow root (the body never sees those mutations).
+- The input is built with each canvas (`buildGraphics`) and disposed in `teardownGraphics`, so a context-loss rebuild
+  re-binds it. The hover preview is looked up per change (`getHoverPreview`), so boot order does not matter.
+- Harness timing: SwiftShader draws frames ~0.25–0.5 s apart and the scene clock moves with them, so lift/drop are
+  polled (≤ 6 s), never a fixed sleep. Not covered here (pre-existing): the Stadium's context menu anchors on the
+  page's hidden `#stadium img`.
+
 ### C7
 - The gate is `scripts/e2e/board3d-view-test.mjs` (`pnpm test:board3d`, own authoritative server), not `pnpm test:2p`
   with `BOARD3D=1`: test:2p drives the legacy relay (`SERVER_AUTHORITATIVE=0`), where the 3D board refuses to start

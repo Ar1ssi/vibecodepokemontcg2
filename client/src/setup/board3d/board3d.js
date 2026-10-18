@@ -19,7 +19,7 @@ const CHAT_LINES = {
 const defaultDeps = {
   importThree: () => import('three'),
   loadModules: async () => {
-    const [renderer, textures, scene, clock, table, room, model, applyView, hydrateHolo, matFx, containers] =
+    const [renderer, textures, scene, clock, table, room, model, applyView, hydrateHolo, matFx, containers, input, hover] =
       await Promise.all([
         import('../gl/gl-renderer.js'),
         import('../gl/gl-textures.js'),
@@ -32,6 +32,8 @@ const defaultDeps = {
         import('../deck-constructor/hydrate-holo.js'),
         import('../image-logic/mat-fx.mjs'),
         import('../../initialization/global-variables/containers.js'),
+        import('./board-input.js'),
+        import('../image-logic/hover-preview.js'),
       ]);
     return {
       createRenderer: renderer.createRenderer,
@@ -45,6 +47,8 @@ const defaultDeps = {
       cardBackSrcFor: hydrateHolo.cardBackSrcForUser,
       motionReduced: matFx.motionReduced,
       boardMirror: containers.boardMirror,
+      createBoardInput: input.createBoardInput,
+      getHoverPreview: hover.getHoverPreview,
       loadFoil,
     };
   },
@@ -134,6 +138,11 @@ export function getBoardScene() {
   return session?.scene ?? null;
 }
 
+/** The live pointer input (`board-input.js`), or null when the 3D board is not running. */
+export function getBoardInput() {
+  return session?.input ?? null;
+}
+
 const report = (deps, reason) => {
   console.info(`board3d: ${reason}`);
   const line = CHAT_LINES[reason];
@@ -215,7 +224,9 @@ const freshCanvas = (host, old) => {
  *   `deps` replaces the browser services (tests inject them). `loadModules` resolves
  *   `{ createRenderer, createTextureCache, createMatTextureLoader, createBoardScene, createSceneClock,
  *   RoomEnvironment }`, optionally `boardMirror` (board-mirror.js, the shadow roots apply-view.js
- *   renders into while this board runs: its UI state feeds the scene, the scene's rects feed it).
+ *   renders into while this board runs: its UI state feeds the scene, the scene's rects feed it),
+ *   `createBoardInput` (board-input.js, the canvas's pointer input dispatched to the mirror) and
+ *   `getHoverPreview` (hover-preview.js, the preview that input feeds).
  * @returns {Promise<{ active: boolean, reason: string|null }>} reasons: 'flag-off', 'no-host',
  *   'legacy-netcode', 'load-failed', 'no-webgl2'; a later second context loss falls back with
  *   'context-lost-twice' after this resolved. A fallback after containers.js bound the mirror
@@ -360,16 +371,27 @@ export async function initializeBoard3d({
       motionReduced: modules.motionReduced,
       onRender: onSceneRendered,
     });
-    Object.assign(session, { canvas, gl, textures, clock, scene });
+    Object.assign(session, { canvas, gl, textures, clock, scene, input: createInput(canvas, scene) });
     if (doc.visibilityState !== 'hidden') clock.start();
     return true;
   }
 
+  /** Pointer input on `canvas`, dispatched to the mirror's cards; null without a mirror. */
+  function createInput(canvas, scene) {
+    if (!mirror || typeof modules.createBoardInput !== 'function') return null;
+    // The preview may boot after this board: it is looked up on every hover change.
+    const hover = {
+      setTarget: (el, pointer) => modules.getHoverPreview?.()?.setTarget(el, pointer),
+    };
+    return modules.createBoardInput({ canvas, scene, mirror, hover, doc });
+  }
+
   function teardownGraphics() {
+    session.input?.dispose();
     session.scene?.dispose();
     session.clock?.dispose();
     session.gl?.dispose();
-    Object.assign(session, { gl: null, textures: null, clock: null, scene: null });
+    Object.assign(session, { gl: null, textures: null, clock: null, scene: null, input: null });
   }
 
   const initialCanvas = host.querySelector('canvas') ?? host.appendChild(doc.createElement('canvas'));

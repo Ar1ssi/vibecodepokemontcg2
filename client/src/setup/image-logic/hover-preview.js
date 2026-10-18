@@ -28,6 +28,9 @@ const storage = () => {
 
 let preview = null;
 
+/** The page's hover preview (null before `initializeHoverPreview`): the 3D board feeds it hovers. */
+export const getHoverPreview = () => preview;
+
 const installOnFrame = (frame) => {
   const attach = () => {
     const frameDoc = frame.contentDocument;

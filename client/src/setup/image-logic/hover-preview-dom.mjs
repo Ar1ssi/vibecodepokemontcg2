@@ -36,6 +36,11 @@ export const previewImageOf = (image) => {
   return members.find((member) => member.card === top) ?? image;
 };
 
+const isInShadowRoot = (node) => {
+  const root = node?.getRootNode?.();
+  return Boolean(root && root !== node.ownerDocument && root.host);
+};
+
 const imageSrcOf = (image) => image.getAttribute?.('src') || image.currentSrc || image.src || '';
 
 /**
@@ -70,9 +75,12 @@ export function createHoverPreview({
 
   // Face-down cards never preview (C3): the server redacts them, and a card drawn with its back up is
   // treated the same even when it is not redacted (legacy mode).
+  // A document's scope guards its own tree; the 3D board's mirror cards (design 074 D4) sit in
+  // shadow roots inside the main document and are the board, not a stray legacy `.card`.
   const inScope = (target) => {
     const scope = scopes.get(target?.ownerDocument);
-    return !scope || Boolean(target.closest?.(scope));
+    if (!scope || isInShadowRoot(target)) return true;
+    return Boolean(target.closest?.(scope));
   };
 
   const resolveSource = (target) => {
@@ -154,9 +162,10 @@ export function createHoverPreview({
   const watch = (image) => {
     observer?.disconnect();
     observer = null;
-    // The card's own window: an iframe card is observed from inside its realm.
+    // The card's own window: an iframe card is observed from inside its realm. A mirror card's
+    // mutations stay inside its shadow root, so that root is what is observed.
     const Observer = image?.ownerDocument?.defaultView?.MutationObserver;
-    const root = image?.ownerDocument?.body;
+    const root = isInShadowRoot(image) ? image.getRootNode() : image?.ownerDocument?.body;
     if (!Observer || !root) return;
     observer = new Observer(() => revalidate());
     observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
@@ -214,28 +223,51 @@ export function createHoverPreview({
     if (!stillValid(key)) model.suppress('detached');
   }
 
-  const onOver = (event) => {
-    const source = resolveSource(event.target);
-    if (!source) return;
+  /**
+   * The one path every hover change takes: the pointer left `from` and is over `to` (either may
+   * be null). Moving between a card's own holo layers, or between members of one stack, is
+   * neither a leave nor a new enter.
+   */
+  const targetChanged = (from, to, { pointerType, buttons = 0 } = {}) => {
+    const left = resolveSource(from)?.image ?? null;
+    const entered = resolveSource(to);
+    if (left && left === entered?.image) return;
+    if (left) model.leave(left);
+    if (!entered) return;
     const eligible = isHoverEligible({
-      card: source.card,
+      card: entered.card,
       enabled: isEnabled(),
       modalOpen: isModalOpen(),
-      buttons: event.buttons,
+      buttons,
     });
     if (!eligible) {
-      model.suppress(event.buttons ? 'pointerdown' : 'modal');
+      model.suppress(buttons ? 'pointerdown' : 'modal');
       return;
     }
-    model.enter(source.image, { pointerType: event.pointerType });
+    model.enter(entered.image, { pointerType });
   };
 
+  const onOver = (event) =>
+    targetChanged(null, event.target, { pointerType: event.pointerType, buttons: event.buttons });
+
+  // The enter half of an out/over pair is the `pointerover` that follows.
   const onOut = (event) => {
-    const left = resolveSource(event.target)?.image;
-    if (!left) return;
-    // Moving between a card's own holo layers, or between members of one stack, is not a leave.
-    if (resolveSource(event.relatedTarget)?.image === left) return;
-    model.leave(left);
+    if (resolveSource(event.target)?.image === resolveSource(event.relatedTarget)?.image) return;
+    targetChanged(event.target, null);
+  };
+
+  // The element a non-DOM hover source (the 3D board's raycast, board-input.js) last named.
+  let setTargetEl = null;
+  /**
+   * Hover from outside the DOM's own pointer events: `el` is now under the pointer (null = none).
+   * Same dwell, eligibility and suppression as a native `pointerover`/`pointerout`.
+   * @param {Element|null} el
+   * @param {{ pointerType?: string, buttons?: number }} [pointer]
+   */
+  const setTarget = (el, { pointerType = 'mouse', buttons = 0 } = {}) => {
+    const from = setTargetEl;
+    setTargetEl = el ?? null;
+    targetChanged(from, setTargetEl, { pointerType, buttons });
   };
 
   const suppressFor = (reason) => () => model.suppress(reason);
@@ -268,5 +300,5 @@ export function createHoverPreview({
     if (targetDoc !== doc) appendProbe(targetDoc);
   };
 
-  return { install, suppress, revalidate, state: model.state };
+  return { install, suppress, revalidate, setTarget, state: model.state };
 }
