@@ -84,7 +84,10 @@ export function createGpuCanvasMesh({ three, renderOrder = 10 }) {
       transparent: true,
       depthTest: run.depthTest,
       depthWrite: false,
+      // One pass in recording order: a transparent double-sided material would otherwise draw
+      // back faces then front faces, splitting each fill from its feather band.
       side: three.DoubleSide,
+      forceSinglePass: true,
       colorWrite: run.colorWrite,
       blending: three.CustomBlending,
       blendEquation: three.AddEquation,

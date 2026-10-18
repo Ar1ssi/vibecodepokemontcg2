@@ -415,6 +415,14 @@ slice 8 deletes it; after slice 8, revert the slice-8 commit.
   in the scene). The `--fx-ice-*` CSS variables went with the move CSS (their values live in `card-glow.mjs`).
   `rec-attack-hit` passes on the 3D board: default (prefab, number, no old dressing) and SPREAD=2 (3 numbers,
   both Bench cards recoil).
+- Review (independent agent, review.md) fixes: the impact host unbinds three's vertex array before its raw
+  attribute writes (they corrupted the FX mesh's VAO; verified in stills: beats keep drawing after a prefab
+  starts); FX materials are `forceSinglePass` (three draws transparent double-sided materials back then front,
+  splitting fills from their feather bands); the key light is on every layer (the FX passes saw 0 lights and lit
+  board materials rebuilt programs each frame); a driven card reports its rest corners like a lifted one.
+  Trails and the echo draw in the depth-tested back pass, not "front z − 0.5": cards hide them, as the 2D
+  ghosts' DOM order did. An impact covers the move's front beats as the 2D impact canvas (z 2456) covered the
+  move overlay (z 2450).
 ## Appendix A — material kit survey (read-only, 2026-10-18)
 
 Paths relative to `client/src/setup/netcode/mat-fx/moves/materials/`; D = `../move-drawers.js`.

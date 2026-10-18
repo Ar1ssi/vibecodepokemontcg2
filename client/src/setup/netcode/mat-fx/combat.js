@@ -437,7 +437,7 @@ const playAuraPulse = (rect, rgb) => {
 /**
  * Design 075: the generic lunge on the 3D board — the attacker's own mesh rears back, strikes and
  * recoils (a drive in table px), its lagged art smearing the strike. Null when the scene does not
- * draw both cards (the 2D lunge then plays).
+ * draw both cards (no lunge plays).
  */
 const playLungeInScene = (scene, plan, card, targetId, hits) => {
   const attackerPose = scene.cardTablePose(plan.attackerId);

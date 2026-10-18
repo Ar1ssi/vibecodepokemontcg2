@@ -667,6 +667,9 @@ function drawInScene(target, camera) {
   const { gl } = target;
   target.effects = liveEffects(target);
   if (target.effects.length === 0) return;
+  // Three leaves its last vertex array bound; the stage's attribute and index bindings would be
+  // written into it. With none bound, three's resetState rebinds and re-uploads its own.
+  gl.bindVertexArray(null);
   const out = gl.getParameter(gl.FRAMEBUFFER_BINDING);
   const viewport = gl.getParameter(gl.VIEWPORT);
   camera.updateMatrixWorld();

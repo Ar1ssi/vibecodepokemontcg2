@@ -977,8 +977,8 @@ export function createCardMeshPool({
     if (!card) return null;
     const { w, h, t } = card.geometry;
     let object = card.mesh;
-    if (rest && card.lift && card.pose) {
-      // A lifted card still stands at its slot as far as the board is concerned.
+    // A lifted or driven card (design 075) still stands at its slot as far as the board is concerned.
+    if (rest && (card.lift || card.drive) && card.pose) {
       writeRestPose(card, clock.now(), scratch);
       object = scratch;
       group.updateMatrixWorld();

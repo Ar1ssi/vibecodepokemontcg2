@@ -122,3 +122,13 @@ test('tablePoseOf gives the own pose with its drawn size; frontMapOf is null bef
   assert.equal(pool.tablePoseOf(99), null);
   assert.equal(pool.frontMapOf(7), null);
 });
+
+test('a driven card reports its rest corners to the board (rects stay on its slot)', () => {
+  const { pool, clock } = makePool();
+  const rest = pool.cornersOf(7, { rest: true });
+  pool.drive(7, () => ({ dx: 40, dy: 0, dz: 0, yawDeg: 0, scale: 1, scaleAlong: 1, scaleAcross: 1 }), 500);
+  clock.t = 100;
+  pool.update(100);
+  assert.deepEqual(pool.cornersOf(7, { rest: true }), rest);
+  assert.notDeepEqual(pool.cornersOf(7), rest, 'the mesh itself has moved');
+});
