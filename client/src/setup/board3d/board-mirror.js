@@ -72,7 +72,7 @@ const popupZone = (id, buttons, view) => `
     <label for="sort${id[0].toUpperCase()}${id.slice(1)}Checkbox">Sort</label>
   </div></div>`;
 
-/** The id skeleton of `self-containers.html` / `opp-containers.html` (same ids on both sides). */
+/** The id skeleton the retired `self-containers.html` / `opp-containers.html` had (same ids both sides). */
 const mirrorMarkup = (view) => `<link rel="stylesheet" href="${PANEL_STYLESHEET}"><style>${MIRROR_STYLE}</style>
 <div id="playfield">
   <div id="boardCenterDesign"><div id="boardCircle"></div><div id="innerCircle"></div></div>

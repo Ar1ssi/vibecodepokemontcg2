@@ -187,93 +187,6 @@ test('each profile is offered to the picker exactly once', () => {
   }
 });
 
-// The profiles are only useful if the stylesheets actually read them, so the
-// contract between this module and the container CSS is asserted directly:
-// a variable that nothing consumes, or a zone rule left hardcoded, silently
-// breaks mat fitting without failing anything else.
-const readCss = (name) =>
-  readFileSync(
-    fileURLToPath(new URL(`../../../css/${name}`, import.meta.url)),
-    'utf8'
-  );
-
-const CONTAINER_CSS = {
-  'self-containers.css': readCss('self-containers.css'),
-  'opp-containers.css': readCss('opp-containers.css'),
-};
-
-// The card zones live in the playmat iframes; the stadium and the mat image
-// itself are painted by the parent page, so they are not expected here.
-const PARENT_OWNED = /^--(stadium|mat)-/;
-
-// Design 009 moved the hand off the mat into a fixed, half-cropped strip
-// (--hand-crop-height), so a mat's printed hand height no longer sizes it.
-const NOT_CONSUMED = new Set(['--prizes-columns', '--hand-height']);
-
-test('both container stylesheets consume every zone variable', () => {
-  const emitted = Object.keys(layoutToCssVars(getMatLayout('sim'))).filter(
-    (name) => !PARENT_OWNED.test(name) && !NOT_CONSUMED.has(name)
-  );
-
-  for (const [file, css] of Object.entries(CONTAINER_CSS)) {
-    for (const name of emitted) {
-      assert.ok(
-        css.includes(`var(${name}`),
-        `${file} never reads ${name}`
-      );
-    }
-  }
-});
-
-test('container stylesheet defaults match the sim profile', () => {
-  const vars = layoutToCssVars(getMatLayout('sim'));
-
-  for (const [file, css] of Object.entries(CONTAINER_CSS)) {
-    const root = css.match(/:root\s*\{([^}]*)\}/);
-    assert.ok(root, `${file} has no :root defaults block`);
-
-    const declared = new Map(
-      [...root[1].matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map(([, name, value]) => [
-        name,
-        value.trim(),
-      ])
-    );
-
-    for (const [name, value] of Object.entries(vars)) {
-      if (PARENT_OWNED.test(name) || name === '--prizes-columns') continue;
-      assert.equal(
-        declared.get(name),
-        value,
-        `${file} default for ${name} has drifted from the sim profile`
-      );
-    }
-  }
-});
-
-test('no card zone is still positioned by a hardcoded percentage', () => {
-  const zoneRule =
-    /^(?:#|\.)(bench|active|prizes|deckCover|discardCover|lostZoneCover|hand|board|self-board|opp-board)\s*\{([^}]*)\}/gm;
-
-  // The hand is a strip pinned across the player's near edge on every mat, so
-  // its origin and width are structural rather than mat-dependent; only its
-  // height changes with the layout.
-  const structural = { hand: new Set(['bottom', 'left', 'width']) };
-
-  for (const [file, css] of Object.entries(CONTAINER_CSS)) {
-    for (const [, zone, body] of css.matchAll(zoneRule)) {
-      for (const [, property, value] of body.matchAll(
-        /(?<![\w-])(bottom|left|right|width|height|gap)\s*:\s*([^;]+);/g
-      )) {
-        if (structural[zone]?.has(property)) continue;
-        assert.ok(
-          value.includes('var(--'),
-          `${file}: #${zone} still hardcodes ${property}: ${value.trim()}`
-        );
-      }
-    }
-  }
-});
-
 test('zone rectangles stay inside their own half of the board', () => {
   const percent = (value) =>
     typeof value === 'string' && value.endsWith('%')
@@ -308,41 +221,11 @@ test('zone rectangles stay inside their own half of the board', () => {
   }
 });
 
-test('board zone hides scrollbars across both container stylesheets', () => {
-  for (const [file, css] of Object.entries(CONTAINER_CSS)) {
-    const boardRuleMatch = css.match(/#board\s*\{([^}]*)\}/);
-    assert.ok(boardRuleMatch, `${file} missing #board rule`);
-    const boardRule = boardRuleMatch[1];
-    assert.ok(
-      boardRule.includes('scrollbar-width: none'),
-      `${file} #board should set scrollbar-width: none`
-    );
-    assert.ok(
-      boardRule.includes('-ms-overflow-style: none'),
-      `${file} #board should set -ms-overflow-style: none`
-    );
-    assert.ok(
-      css.includes('#board::-webkit-scrollbar'),
-      `${file} should define #board::-webkit-scrollbar to hide scrollbar`
-    );
-  }
-});
-
-test('bench zone uses 5-column grid layout across both container stylesheets', () => {
-  for (const [file, css] of Object.entries(CONTAINER_CSS)) {
-    const benchRuleMatch = css.match(/#bench\s*\{([^}]*)\}/);
-    assert.ok(benchRuleMatch, `${file} missing #bench rule`);
-    const benchRule = benchRuleMatch[1];
-    assert.ok(
-      benchRule.includes('display: grid'),
-      `${file} #bench should set display: grid`
-    );
-    assert.ok(
-      benchRule.includes('grid-template-columns: repeat(5, 1fr)'),
-      `${file} #bench should define 5 slot columns (repeat(5, 1fr))`
-    );
-  }
-});
+const readCss = (name) =>
+  readFileSync(
+    fileURLToPath(new URL(`../../../css/${name}`, import.meta.url)),
+    'utf8'
+  );
 
 test('index.css expands --mat-container-width to 100vw on :root when drawer is closed', () => {
   const indexCss = readCss('index.css');

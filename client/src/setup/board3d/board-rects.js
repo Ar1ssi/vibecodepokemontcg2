@@ -1,6 +1,6 @@
 // Design 074 §D6: the FX bridge's geometry. Mat effects draw in the top document from page-px
-// rects; on the three.js board those rects come from the scene's projection instead of the
-// playmat iframes' elements. Every reader is null-safe: no scene, no rect.
+// rects; on the three.js board those rects come from the scene's projection. Every reader is
+// null-safe: no scene, no rect.
 import { projectToScreen, tableToWorld } from './board-camera.mjs';
 import { board3dActive, getBoardScene } from './board3d.js';
 import { tableBounds } from './table-uv.mjs';
@@ -40,6 +40,9 @@ const boundsOf = (points) => {
   const top = Math.min(...ys);
   return { left, top, width: Math.max(...xs) - left, height: Math.max(...ys) - top };
 };
+
+/** An element's viewport box as a plain `{ left, top, width, height }` (the FX flights' source rect). */
+export const visualRectOf = (el) => plainRect(el.getBoundingClientRect());
 
 const boxOf = (element) => {
   const box = element?.getBoundingClientRect?.();
@@ -159,8 +162,8 @@ export { board3dActive };
  * apply-view.js runs the advisory loop (which starts the FX queue) before it fires
  * `board-view-applied`, where board3d.js hands the scene the new model; the scene then tweens
  * each moved card to its new spot over board-scene.js CARD_POSE_MS (180 ms, scene clock = wall
- * time). Effects read the card's rect when they start, so on the 3D board a batch that moves
- * cards waits this long first: the iframe board's DOM is already in place by then.
+ * time). Effects read the card's rect when they start, so a batch that moves cards waits
+ * this long first.
  */
 export const BOARD3D_SETTLE_MS = 200;
 
@@ -191,7 +194,7 @@ export function fxSettleHoldMs(events, active = board3dActive()) {
 
 /**
  * Degrees a mirror node's seat is turned on screen: 0 near, 180 far (card-poses.mjs turns the far
- * seat's cards 180°). Null for a node outside the mirror (the iframe board's frame turn applies).
+ * seat's cards 180°). Null for a node outside the mirror.
  */
 export function seatTurnOf(element) {
   const host = element?.getRootNode?.()?.host;

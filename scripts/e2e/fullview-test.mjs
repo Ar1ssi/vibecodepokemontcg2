@@ -1,11 +1,9 @@
-// Card preview flows on the board, on either board: the double-click zoom (openCardPreview) flying
-// out of the card's rect, and "View attached cards" (openAttachedCardsPanel) — the in-place
-// `.full-view` panel on the iframe board, the attachments carousel on the three.js board (design
-// 074 D4). Spawns its own authoritative server, joins a solo room, plays a Basic to each Active and
+// Card preview flows on the three.js board (design 074): the double-click zoom (openCardPreview)
+// flying out of the card's rect, and "View attached cards" (openAttachedCardsPanel), which opens
+// the attachments carousel (D4). Spawns its own authoritative server, joins a solo room, plays a Basic to each Active and
 // attaches an Energy to the near one through moveCardBundle { moving, target }, then drives the
-// previews at the rects `__ptcg.cardRect` reports (real mouse input on the 3D board).
+// previews at the rects `__ptcg.cardRect` reports (real mouse input).
 // Usage: node scripts/e2e/fullview-test.mjs
-//   PTCG_BOARD=3d   the three.js board (`?board=3d`); default `iframe` is the classic board
 //   PTCG_URL=http://host:port   reuse a running server (started with SERVER_AUTHORITATIVE=1 PTCG_E2E=1)
 //   CHROMIUM_PATH=/path/to/chrome   picks the browser, as the other e2e harnesses do
 // Not part of `pnpm test`.
@@ -15,8 +13,6 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
-const BOARD = process.env.PTCG_BOARD === '3d' ? '3d' : 'iframe';
-const IS_3D = BOARD === '3d';
 // No GPU in CI containers: WebGL2 through SwiftShader.
 const GL_ARGS = ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'];
 const FACE = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
@@ -25,9 +21,9 @@ const STADIUM = 'E2E Stadium';
 const RECT_SLACK_PX = 2;
 const GROWN_FACTOR = 1.8;
 // The pop and its retreat are rAF springs stepped by the real frame time (card-pop.mjs). A
-// SwiftShader-drawn 3D page runs a few frames a second, so a step spans many frames and the spring
-// rings (past 1, and back) for several seconds before it settles; the iframe board settles in one.
-const SPRING_SETTLE_MS = IS_3D ? 30000 : 8000;
+// SwiftShader-drawn page runs a few frames a second, so a step spans many frames and the spring
+// rings (past 1, and back) for several seconds before it settles.
+const SPRING_SETTLE_MS = 30000;
 // e2e-mode.mjs fixture rows ([quantity, name, type, image, number, set, tcgId]): set 'e2e' skips
 // live enrichment.
 const deckRows = (prefix) => [
@@ -133,16 +129,11 @@ async function dealSolo(browser, base, attempt) {
   const page = await context.newPage();
   page.on('pageerror', (err) => pageErrors.push(err.message));
   page.on('dialog', (dialog) => dialog.accept());
-  // The board's document: the mirror's open shadow root on the 3D board, the iframe's otherwise.
+  // The board's document: the mirror's open shadow root.
   await page.addInitScript(() => {
-    window.__boardRoot = (side) => {
-      if (window.__ptcg?.boardMode?.() === '3d') {
-        return document.getElementById(side === 'opp' ? 'oppBoard' : 'selfBoard')?.shadowRoot ?? null;
-      }
-      return document.getElementById(side === 'opp' ? 'oppContainer' : 'selfContainer')?.contentDocument ?? null;
-    };
+    window.__boardRoot = (side) => document.getElementById(side === 'opp' ? 'oppBoard' : 'selfBoard')?.shadowRoot ?? null;
   });
-  await page.goto(`${base}/?e2e=1${IS_3D ? '&board=3d' : '&board=iframe'}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await page.goto(`${base}/?e2e=1`, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await waitFor(page, () => window.__ptcg?.ready === true, 30000);
   await page.evaluate((name) => window.__ptcg.joinSolo(name), `Fullview-E2E-${attempt}`);
   await waitFor(page, () => window.__ptcg.soloSeat().solo === true);
@@ -179,7 +170,7 @@ let browser = null;
 try {
   browser = await chromium.launch({
     headless: true,
-    ...(IS_3D ? { args: GL_ARGS } : {}),
+    args: GL_ARGS,
     ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}),
   });
   let dealt = null;
@@ -187,7 +178,7 @@ try {
   T('1. a solo room was dealt with a Basic and an Energy near and a Basic far', Boolean(dealt));
   if (!dealt) throw new Error('no usable deal');
   const { page } = dealt;
-  T(`1b. __ptcg.boardMode() is '${BOARD}'`, (await page.evaluate(() => window.__ptcg.boardMode())) === BOARD);
+  T("1b. __ptcg.boardMode() is '3d'", (await page.evaluate(() => window.__ptcg.boardMode())) === '3d');
 
   // Setup: a Basic in each Active, an Energy attached to the near one (what a drag onto it sends).
   await playFromHand(page, '^Near ', 'active', 'self');
@@ -216,9 +207,7 @@ try {
   const inViewport = (r) => r && r.left >= 0 && r.top >= 0 && r.left + r.width <= viewport.width && r.top + r.height <= viewport.height;
   T('4a. cardRect gives both Actives a rect inside the viewport', Boolean(inViewport(nearRect) && inViewport(farRect)), JSON.stringify({ nearRect, farRect }));
   T('4b. the far Active is above the near one', Boolean(nearRect && farRect) && farRect.top < nearRect.top);
-  const nearLocator = IS_3D
-    ? page.locator(`#selfBoard img[data-instance-id="${nearId}"]`)
-    : page.frameLocator('#selfContainer').locator(`img[data-instance-id="${nearId}"]`);
+  const nearLocator = page.locator(`#selfBoard img[data-instance-id="${nearId}"]`);
   const nearBox = await nearLocator.boundingBox();
   T('4c. cardRect equals Playwright\'s bounding box of the near Active\'s board image',
     Boolean(nearBox && nearRect) && sameRect(nearRect, { left: nearBox.x, top: nearBox.y, width: nearBox.width, height: nearBox.height }, 1.5),
@@ -251,7 +240,7 @@ try {
     };
     requestAnimationFrame(sample);
   }, SPRING_SETTLE_MS);
-  await doubleClickCard(page, 'opp', farId, farAt);
+  await page.mouse.dblclick(farAt.x, farAt.y);
   T('5a. a double-click on the far Active opens the card preview overlay',
     await eventually(page, () => Boolean(document.querySelector('.card-preview-overlay'))));
   T('5b. ... and not an in-place .full-view panel', await page.evaluate(() => !window.__boardRoot('opp').querySelector('.full-view')));
@@ -269,23 +258,18 @@ try {
   const scales = await page.evaluate(() => window.__scales);
   T('5e. the pop starts small', scales[0] <= 0.6, `first=${scales[0]}`);
   // POPOVER_SPRING (card-pop.mjs) is overdamped at 60 fps: the scale climbs to 1 without crossing it.
-  // Stepped by SwiftShader-sized frames it rings, so the 3D board is only held to settling at 1.
-  T(IS_3D ? '5f. the pop settles at exactly 1' : '5f. the pop settles at exactly 1, without overshooting past 1.1',
-    scales.at(-1) === 1 && (IS_3D || Math.max(...scales) <= 1.1), `max=${Math.max(...scales)} last=${scales.at(-1)}`);
+  // Stepped by SwiftShader-sized frames it rings, so the pop is only held to settling at 1.
+  T('5f. the pop settles at exactly 1', scales.at(-1) === 1, `max=${Math.max(...scales)} last=${scales.at(-1)}`);
   const holo = await page.evaluate(() => Boolean(window.__boardRoot('opp').querySelector('#active .mat-holo')));
   console.log(holo ? 'note: the far Active is holo' : 'note: fixture cards carry no rarity, so no .mat-holo: the foil-under-cursor checks have nothing to run on');
   await page.keyboard.press('Escape');
-  if (IS_3D) {
-    // Found: the retreat spring (RETREAT_SPRING, card-pop.mjs) diverges when a step spans ~10+
-    // frames, as on a SwiftShader page (the pop's scale ran to -200000 and the overlay never left),
-    // so Escape is held to starting the close and the immediate path finishes it.
-    T('6a. Escape starts the preview closing (the overlay takes is-closing)',
-      await eventually(page, () => Boolean(document.querySelector('.card-preview-overlay.is-closing')) || !document.querySelector('.card-preview-overlay')));
-    await page.evaluate(async () => (await import('/src/setup/image-logic/full-view.js')).closeCardPreview(null, true));
-    T('6a2. the immediate close removes the overlay', await eventually(page, () => !document.querySelector('.card-preview-overlay')));
-  } else {
-    T('6a. Escape removes the preview overlay', await eventually(page, () => !document.querySelector('.card-preview-overlay'), SPRING_SETTLE_MS));
-  }
+  // Found: the retreat spring (RETREAT_SPRING, card-pop.mjs) diverges when a step spans ~10+
+  // frames, as on a SwiftShader page (the pop's scale ran to -200000 and the overlay never left),
+  // so Escape is held to starting the close and the immediate path finishes it.
+  T('6a. Escape starts the preview closing (the overlay takes is-closing)',
+    await eventually(page, () => Boolean(document.querySelector('.card-preview-overlay.is-closing')) || !document.querySelector('.card-preview-overlay')));
+  await page.evaluate(async () => (await import('/src/setup/image-logic/full-view.js')).closeCardPreview(null, true));
+  T('6a2. the immediate close removes the overlay', await eventually(page, () => !document.querySelector('.card-preview-overlay')));
   const farAfter = await settledRect(page, farId);
   T('6b. the card is back on the board where it was', Boolean(farAfter) && sameRect(farAfter, farBefore, 1), JSON.stringify({ farBefore, farAfter }));
   T('6c. ... and visible again', await eventually(page, () => {
@@ -304,25 +288,14 @@ try {
     return openAttachedCardsPanel(img, resolvePreviewCard(null, img));
   }, nearId);
   T('7a. openAttachedCardsPanel reports it opened', opened === true);
-  if (IS_3D) {
-    const carousel = await eventually(page, () => {
-      const overlay = document.getElementById('cardPickerOverlay');
-      return overlay ? [...overlay.querySelectorAll('img.discard-pile-card')].map((img) => img.alt) : null;
-    });
-    T('7b. the attachments carousel opens with the Energy', Array.isArray(carousel) && carousel.includes(ENERGY), JSON.stringify(carousel));
-    T('7c. ... and no in-place .full-view panel is built', await page.evaluate(() => !window.__boardRoot('self').querySelector('.full-view')));
-    await page.keyboard.press('Escape');
-    T('8a. Escape closes the carousel', await eventually(page, () => !document.getElementById('cardPickerOverlay')));
-  } else {
-    T('7b. the attached panel uses .full-view', await eventually(page, () => window.__boardRoot('self').querySelectorAll('.full-view').length === 1));
-    const grown = await eventually(page, async ([id, before]) => {
-      const rect = window.__ptcg.cardRect(id);
-      return rect && rect.width > before * 1.8 ? rect.width : false;
-    }, 8000, [nearId, nearBefore.width]);
-    T(`7c. the attached panel enlarges the card (> ${GROWN_FACTOR}x)`, Boolean(grown), `${Math.round(nearBefore.width)}px -> ${Math.round(grown || 0)}px`);
-    await page.keyboard.press('Escape');
-    T('8a. Escape closes the panel cleanly', await eventually(page, () => window.__boardRoot('self').querySelectorAll('.full-view').length === 0, 8000));
-  }
+  const carousel = await eventually(page, () => {
+    const overlay = document.getElementById('cardPickerOverlay');
+    return overlay ? [...overlay.querySelectorAll('img.discard-pile-card')].map((img) => img.alt) : null;
+  });
+  T('7b. the attachments carousel opens with the Energy', Array.isArray(carousel) && carousel.includes(ENERGY), JSON.stringify(carousel));
+  T('7c. ... and no in-place .full-view panel is built', await page.evaluate(() => !window.__boardRoot('self').querySelector('.full-view')));
+  await page.keyboard.press('Escape');
+  T('8a. Escape closes the carousel', await eventually(page, () => !document.getElementById('cardPickerOverlay')));
   const nearAfter = await settledRect(page, nearId);
   T('8b. the near Active is back on the board where it was', Boolean(nearAfter) && sameRect(nearAfter, nearBefore, 1), JSON.stringify({ nearBefore, nearAfter }));
 
@@ -339,34 +312,11 @@ console.log(failed ? `FAILED (${failed})` : 'ALL PASS');
 process.exit(failed ? 1 : 0);
 
 /**
- * Double-clicks a card. The 3D board gets real mouse input at `at`, which board-input.js routes to the
- * card's mirror image. The iframe board gets click, click, dblclick dispatched on the card's image: the
- * play-container's own box can sit over the image at its centre, so a real click there misses it.
- */
-async function doubleClickCard(page, side, id, at) {
-  if (IS_3D) {
-    await page.mouse.dblclick(at.x, at.y);
-    return;
-  }
-  await page.evaluate(
-    ([who, cardId]) => {
-      const img = window.__boardRoot(who).querySelector(`img[data-instance-id="${cardId}"]`);
-      const r = img.getBoundingClientRect();
-      const { MouseEvent: BoardMouseEvent } = img.ownerDocument.defaultView;
-      const opts = { bubbles: true, cancelable: true, clientX: r.x + r.width / 2, clientY: r.y + r.height / 2 };
-      for (const name of ['click', 'click', 'dblclick']) img.dispatchEvent(new BoardMouseEvent(name, opts));
-    },
-    [side, id]
-  );
-}
-
-/**
- * A point the pointer reaches the card at. Iframe board: the card's centre. 3D board: the centre if
- * the scene's raycast hits this card there, else the first point of a grid over its rect that does.
+ * A point the pointer reaches the card at: the centre if the scene's raycast hits this card there,
+ * else the first point of a grid over its rect that does.
  */
 async function hoverPoint(page, id, rect) {
   const centre = centreOf(rect);
-  if (!IS_3D) return centre;
   const point = await page.evaluate(
     async ([cardId, box, preferred]) => {
       const { getBoardScene } = await import('/src/setup/board3d/board3d.js');

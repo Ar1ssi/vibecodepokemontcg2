@@ -1,4 +1,4 @@
-// env: PTCG_BOARD=3d (the three.js board, design 074; default iframe), BASE_URL (default http://localhost:4100),
+// env: BASE_URL (default http://localhost:4100),
 //      CHROMIUM / CHROMIUM_PATH, CARD_DIR (a folder of PNGs named like the card images, for no network)
 import { chromium } from 'playwright';
 import { renameSync } from 'node:fs';

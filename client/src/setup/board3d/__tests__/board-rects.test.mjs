@@ -1,7 +1,7 @@
 // Design 074 §D6 (slice E1): the FX bridge's rect providers over an injected scene stub.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BOARD3D_SETTLE_MS, createBoardRects, fxSettleHoldMs, rectForInstance, seatTurnOf } from '../board-rects.js';
+import { BOARD3D_SETTLE_MS, createBoardRects, fxSettleHoldMs, rectForInstance, seatTurnOf, visualRectOf } from '../board-rects.js';
 import { cameraFromCssTilt } from '../board-camera.mjs';
 import { flatLayout, halfFromViewport } from '../board-layout.mjs';
 
@@ -142,4 +142,9 @@ test('fxSettleHoldMs: a card-moving batch waits for the 3D pose tween; nothing e
   assert.equal(fxSettleHoldMs(null, true), 0);
   assert.equal(fxSettleHoldMs([null], true), 0);
   assert.equal(fxSettleHoldMs(moved), 0, 'defaults to the live flag (off under node)');
+});
+
+test('visualRectOf: an element box as a plain rect', () => {
+  const el = { getBoundingClientRect: () => ({ left: 5, top: 6, width: 70, height: 98, right: 75, bottom: 104, x: 5, y: 6 }) };
+  assert.deepEqual(visualRectOf(el), rect(5, 6, 70, 98));
 });

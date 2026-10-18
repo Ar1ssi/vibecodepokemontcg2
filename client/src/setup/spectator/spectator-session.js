@@ -44,19 +44,12 @@ export const spectatorSeatName = (user) => {
   return null;
 };
 
-const BOARD_FRAME_IDS = ['selfContainer', 'oppContainer'];
-
 const syncBodyClasses = () => {
   const body = document.body;
   if (!body) return;
   const broadcast = active && mode === 'broadcast';
   body.classList.toggle('spectating', active);
   body.classList.toggle('spectator-broadcast', broadcast);
-  // The boards draw their own zone plates in the broadcast layout (self/opp-containers.css).
-  for (const id of BOARD_FRAME_IDS) {
-    const root = document.getElementById(id)?.contentDocument?.documentElement;
-    root?.classList.toggle('spectator-broadcast', broadcast);
-  }
 };
 
 const renderSwitch = () => {

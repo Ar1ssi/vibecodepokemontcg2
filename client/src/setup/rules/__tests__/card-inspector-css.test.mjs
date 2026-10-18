@@ -9,8 +9,8 @@ import { fileURLToPath } from 'node:url';
 //   C1 — an opaque field standing in for the card, so the scan stops showing through
 //   C2 — dimming by `opacity`, which makes a panel translucent and lets the printed text
 //        underneath ghost back through the very panel that exists to cover it
-//   C5 — the rules landing in a stylesheet that never reaches the element (board cards live
-//        in the playmat iframes, which load only self-/opp-containers.css)
+//   C5 — the rules landing in a stylesheet that never reaches the element (the 3D board's
+//        mirror shadow roots load only board3d-panels.css, not index.css)
 //
 // Same approach as highlight-parity-css.test.mjs: assert on the stylesheet text, because
 // client/src/setup UI wiring has no jsdom harness in this repo. The DOM half of the hook
@@ -30,8 +30,6 @@ const ruleBody = (css, selector) => {
 };
 
 const INDEX_CSS = readFileSync(`${CSS_DIR}index.css`, 'utf8');
-const SELF_BOARD_CSS = readFileSync(`${CSS_DIR}self-containers.css`, 'utf8');
-const OPP_BOARD_CSS = readFileSync(`${CSS_DIR}opp-containers.css`, 'utf8');
 
 const body = (selector) => ruleBody(INDEX_CSS, selector);
 
@@ -144,21 +142,6 @@ describe('013 C5 — the rules live where the chrome is mounted', () => {
     );
     assert.ok(body('.ptcg-hp'), '.ptcg-hp missing from index.css');
   });
-
-  // The carousel and its decorate hook live in the main document, so index.css is correct
-  // here — but if the chrome is ever moved onto the board, these stylesheets are the trap
-  // that silently renders an unstyled panel.
-  for (const [name, css] of [
-    ['self-containers.css', SELF_BOARD_CSS],
-    ['opp-containers.css', OPP_BOARD_CSS],
-  ]) {
-    it(`${name} does not define inspector chrome (it is main-document only)`, () => {
-      assert.doesNotMatch(
-        css,
-        /\.ptcg-(inspector|chrome|atk|stat|hp|dmg|orb)\b/
-      );
-    });
-  }
 });
 
 describe('013 — the scaling unit the renderer sets', () => {

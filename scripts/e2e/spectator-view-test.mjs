@@ -1,8 +1,8 @@
 // Design 069 e2e: a third browser spectates a server-authoritative game and switches between
 // P1 POV, P2 POV and the side-by-side broadcast layout.
 // Usage: pnpm test:spectator   (spawns its own authoritative server on a free port)
-//   PTCG_BOARD=3d   the three.js board (`?board=3d`, design 074): hands are read from the board
-//                   mirror's shadow roots and `__ptcg.cardRect` instead of the iframes
+// Runs on the three.js board (design 074): hands are read from the board mirror's shadow roots
+// and `__ptcg.cardRect`.
 //   PTCG_URL=http://host:port   reuse a running server (started with SERVER_AUTHORITATIVE=1 PTCG_E2E=1)
 //   CHROMIUM_PATH=/path/to/chrome   picks the browser (PW_CHROMIUM is the older name)
 //   SHOTS=<dir>   saves a screenshot per view
@@ -14,8 +14,6 @@ import { chromium } from 'playwright';
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const ROOM = `spec-${Date.now()}`;
 const SHOTS = process.env.SHOTS || '';
-const BOARD = process.env.PTCG_BOARD === '3d' ? '3d' : 'iframe';
-const IS_3D = BOARD === '3d';
 // No GPU in CI containers: WebGL2 through SwiftShader.
 const GL_ARGS = ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'];
 
@@ -77,17 +75,12 @@ async function openClient(browser, name, base) {
   const page = await context.newPage();
   page.on('pageerror', (err) => console.log(`PAGEERROR ${name}:`, err.message));
   page.on('dialog', (dialog) => dialog.accept());
-  // The board's document for a side: the mirror's open shadow root on the 3D board, the seat's
-  // iframe document otherwise. Installed before any script runs so page.evaluate callbacks can use it.
+  // The board's document for a side: the mirror's open shadow root. Installed before any script
+  // runs so page.evaluate callbacks can use it.
   await page.addInitScript(() => {
-    window.__boardRoot = (side) => {
-      if (window.__ptcg?.boardMode?.() === '3d') {
-        return document.getElementById(side === 'opp' ? 'oppBoard' : 'selfBoard')?.shadowRoot ?? null;
-      }
-      return document.getElementById(side === 'opp' ? 'oppContainer' : 'selfContainer')?.contentDocument ?? null;
-    };
+    window.__boardRoot = (side) => document.getElementById(side === 'opp' ? 'oppBoard' : 'selfBoard')?.shadowRoot ?? null;
   });
-  await page.goto(`${base}/?e2e=1${IS_3D ? '&board=3d' : '&board=iframe'}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await page.goto(`${base}/?e2e=1`, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await waitFor(page, () => window.__ptcg?.ready === true, undefined, 30000);
   return { page, name };
 }
@@ -157,7 +150,7 @@ const chromiumPath = process.env.CHROMIUM_PATH || process.env.PW_CHROMIUM;
 const server = process.env.PTCG_URL ? { base: process.env.PTCG_URL, child: null } : await startServer();
 const browser = await chromium.launch({
   headless: true,
-  ...(IS_3D ? { args: GL_ARGS } : {}),
+  args: GL_ARGS,
   ...(chromiumPath ? { executablePath: chromiumPath } : {}),
 });
 try {
@@ -187,7 +180,7 @@ try {
 
   await waitFor(s.page, () =>
     window.__boardRoot('self').querySelectorAll('img.card-image[data-zone="hand"]').length >= 7);
-  T(`2b. the spectator runs the ${BOARD} board`, (await s.page.evaluate(() => window.__ptcg.boardMode())) === BOARD);
+  T('2b. the spectator runs the 3d board', (await s.page.evaluate(() => window.__ptcg.boardMode())) === '3d');
   let self = await renderedHand(s, 'self');
   let opp = await renderedHand(s, 'opp');
   const unplaced = await s.page.evaluate(

@@ -5,7 +5,7 @@
  *
  * A candidate is an in-play Pokémon whose live `card.image` DOM node is outlined
  * (holo-wrapper aware) and resolved on a capture-phase document click, across the
- * top document and both playmat iframe documents. Resolving reports the picked
+ * top document and both board-mirror shadow roots. Resolving reports the picked
  * candidate; it never moves anything (the server/legacy caller owns the move).
  *
  * Single-pick (`max <= 1`) resolves on the first click. Multi-pick (`max > 1`)
@@ -15,8 +15,6 @@
 import { imageAnchor } from '../deck-constructor/hydrate-holo.js';
 import { buildMatPickEntry, findMatPickHit } from './mat-pick.mjs';
 import {
-  selfContainer,
-  oppContainer,
   selfContainerDocument,
   oppContainerDocument,
 } from '../../state.js';
@@ -203,18 +201,6 @@ export function openMatPick({
   }
   try {
     if (oppContainerDocument) targetDocs.add(oppContainerDocument);
-  } catch {
-    /* cross-realm access can throw; skip that document/element */
-  }
-  try {
-    if (selfContainer?.contentWindow?.document)
-      targetDocs.add(selfContainer.contentWindow.document);
-  } catch {
-    /* cross-realm access can throw; skip that document/element */
-  }
-  try {
-    if (oppContainer?.contentWindow?.document)
-      targetDocs.add(oppContainer.contentWindow.document);
   } catch {
     /* cross-realm access can throw; skip that document/element */
   }

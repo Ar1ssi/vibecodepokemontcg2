@@ -41,10 +41,10 @@ export const systemState = {
   oppReady: false, // true once the opp player has pressed Set Up (ready check)
   replayActionData: [],
   turn: 0,
-  // The user on the bottom half of the screen: 'self' unless flipBoard() swapped the iframes.
+  // The user on the bottom half of the screen: 'self' unless flipBoard() swapped the boards.
   initiator: 'self',
   // Design 074 D7: a solo room is one socket playing both seats; nearSeat is the seat
-  // drawn at the bottom ('self'). A board flip swaps the seat, not the iframes.
+  // drawn at the bottom ('self'). A board flip swaps the seat, not the boards.
   solo: false,
   nearSeat: 'p1',
   roomId: '',

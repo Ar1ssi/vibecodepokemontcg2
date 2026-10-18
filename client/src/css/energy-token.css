@@ -5,10 +5,8 @@
    (attach-card.js); this file only adds shape/shadow. No transform, so the
    drag hit-box stays the element's normal rectangle. */
 
-/* `.play-container img` (self/opp-containers.css) sets its own generic
-   border-radius/box-shadow at equal (0,0,1,1) specificity but later in the
-   cascade, so it would otherwise win outright — outrank it explicitly rather
-   than relying on import order. */
+/* Outranks a generic `.play-container img` border-radius/box-shadow explicitly rather than
+   relying on import order. */
 .play-container img.energy-token-3d,
 img.energy-token-3d {
   border-radius: 50%;

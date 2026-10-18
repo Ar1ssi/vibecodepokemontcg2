@@ -114,14 +114,6 @@ export const EVOLVE_TIMELINE = {
 };
 const T = EVOLVE_TIMELINE;
 
-/** Degrees a 2D matrix turns its content (the opponent's board frame is 180°); mirrors are not turns. */
-export function turnOfMatrix(matrix) {
-  const { a = 1, b = 0, c = 0, d = 1 } = matrix || {};
-  if (![a, b, c, d].every(Number.isFinite) || a * d - b * c <= 0) return 0;
-  const degrees = Math.round((Math.atan2(b, a) * 180) / Math.PI);
-  return degrees === -180 ? 180 : degrees;
-}
-
 // ---- scene: every random pick of one play-through ----
 
 const pick = (rand, list) => list[Math.floor(rand() * list.length) % list.length];

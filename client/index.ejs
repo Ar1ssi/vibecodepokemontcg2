@@ -61,12 +61,8 @@
         </div>
     </div>
     <div id="board3dHost" hidden><canvas id="board3dCanvas" aria-hidden="true"></canvas><div id="boardMirror"><div id="selfBoard" class="self"></div><div id="oppBoard" class="opp"></div></div></div>
-    <iframe id="selfContainer" class="self" src="./self-containers.html" hidden></iframe>
-    <iframe id="oppContainer" class="opp" src="./opp-containers.html" hidden></iframe>
     <div id="stadium" class="outline"></div>
     
-    <div id="selfResizer" class="self-color"></div>
-    <div id="oppResizer" class="opp-color"></div>
 
     <div id="boardButtonContainer">
         <button id="endTurnButton" type="button">End Turn</button>
@@ -1167,25 +1163,5 @@
       </div>
 <!-- Cloudflare Web Analytics --><script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon="{&quot;token&quot;: &quot;2abae72112d74a619e3de341e1d4aa18&quot;}"></script><!-- End Cloudflare Web Analytics -->
 
-<script type="module">
-        // inject playmat animations into both playmat iframes once ready
-        const injectPlaymatAnimations = (frame) => {
-          try {
-            const doc = frame.contentDocument;
-            if (!doc || doc.getElementById('playmatAnimScript')) return;
-            const s = doc.createElement('script');
-            s.id = 'playmatAnimScript';
-            s.type = 'module';
-            s.textContent = "import '/src/setup/playmat-anim.mjs';";
-            doc.body.appendChild(s);
-          } catch (e) { /* cross-origin safe no-op */ }
-        };
-        for (const id of ['selfContainer', 'oppContainer']) {
-          const frame = document.getElementById(id);
-          if (!frame) continue;
-          frame.addEventListener('load', () => injectPlaymatAnimations(frame));
-          if (frame.contentDocument?.readyState === 'complete') injectPlaymatAnimations(frame);
-        }
-        </script>
     </body>
 </html>

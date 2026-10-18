@@ -1,34 +1,24 @@
 import {
-  oppContainer,
+  boardMirror,
   oppContainerDocument,
-  selfContainer,
   selfContainerDocument,
 } from '../../initialization/global-variables/containers.js';
 import { socket, systemState } from '../../initialization/global-variables/global-variables.js';
 import { emitRequestView } from '../../setup/netcode/cmd-emitter.js';
-import { applyTableTilt } from '../../setup/sizing/apply-table-tilt.js';
 import { refreshBoard } from '../../setup/sizing/refresh-board.js';
-import {
-  flippedOppHandleMouseDown,
-  flippedSelfHandleMouseDown,
-  oppHandleMouseDown,
-  selfHandleMouseDown,
-} from '../../setup/sizing/resizer.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { setStadiumFacing } from '../../setup/zones/stadium-facing.mjs';
 import { lookAtCards, stopLookingAtCards } from './reveal-and-hide.js';
 import { applyBoardFlip } from './board-flip-state.mjs';
 
 export const flipBoard = () => {
-  // Design 074 D7: a solo room keeps its iframes; the server redraws the board from the
+  // Design 074 D7: a solo room never swaps its sides; the server redraws the board from the
   // other seat (socket-event-listeners.js clears the old perspective when that view lands).
   if (systemState.solo) {
     const { requestNearSeat } = applyBoardFlip(systemState);
     emitRequestView({ socket, roomId: systemState.roomId, nearSeat: requestNearSeat });
     return;
   }
-  const selfResizer = document.getElementById('selfResizer');
-  const oppResizer = document.getElementById('oppResizer');
   const attackButton = document.getElementById('attackButton');
   const retreatButton = document.getElementById('retreatButton');
   const healButton = document.getElementById('healButton');
@@ -60,11 +50,6 @@ export const flipBoard = () => {
   const oppViewCardsElement = oppContainerDocument.getElementById('viewCards');
 
   if (systemState.initiator === 'self') {
-    selfResizer.removeEventListener('mousedown', selfHandleMouseDown);
-    oppResizer.removeEventListener('mousedown', oppHandleMouseDown);
-    selfResizer.addEventListener('mousedown', flippedSelfHandleMouseDown);
-    oppResizer.addEventListener('mousedown', flippedOppHandleMouseDown);
-
     if (
       systemState.isTwoPlayer ||
       (!systemState.isTwoPlayer &&
@@ -74,11 +59,6 @@ export const flipBoard = () => {
       stopLookingAtCards('self', '', 'hand', false, true);
     }
   } else {
-    selfResizer.addEventListener('mousedown', selfHandleMouseDown);
-    oppResizer.addEventListener('mousedown', oppHandleMouseDown);
-    selfResizer.removeEventListener('mousedown', flippedSelfHandleMouseDown);
-    oppResizer.removeEventListener('mousedown', flippedOppHandleMouseDown);
-
     if (
       systemState.isTwoPlayer ||
       (!systemState.isTwoPlayer &&
@@ -97,10 +77,8 @@ export const flipBoard = () => {
     element.classList.toggle(class2);
   };
 
-  toggleClasses(selfResizer, 'self-color', 'opp-color');
-  toggleClasses(oppResizer, 'opp-color', 'self-color');
-  toggleClasses(selfContainer, 'self', 'opp');
-  toggleClasses(oppContainer, 'opp', 'self');
+  toggleClasses(boardMirror.hosts.self, 'self', 'opp');
+  toggleClasses(boardMirror.hosts.opp, 'opp', 'self');
   applyBoardFlip(systemState);
   toggleClasses(boardElement, 'self-board', 'opp-board');
   toggleClasses(oppBoardElement, 'opp-board', 'self-board');
@@ -195,16 +173,6 @@ export const flipBoard = () => {
     element.classList.toggle('opp-circle');
   });
 
-  // Swap heights
-  let tempHeight = selfContainer.style.height;
-  selfContainer.style.height = oppContainer.style.height;
-  oppContainer.style.height = tempHeight;
-
-  // Swap bottom lengths
-  let tempBottom = selfContainer.style.bottom;
-  selfContainer.style.bottom = oppContainer.style.bottom;
-  oppContainer.style.bottom = tempBottom;
-
   // Flip the stadium
   const stadiumZone = getZone('', 'stadium');
   if (stadiumZone.array[0]) {
@@ -214,7 +182,4 @@ export const flipBoard = () => {
     );
   }
   refreshBoard();
-  // The `.self`/`.opp` classes just swapped between the iframes; the tilt
-  // sign and deck-stack direction follow the class, so they must be rewritten.
-  applyTableTilt();
 };

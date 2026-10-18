@@ -1,12 +1,11 @@
 /**
  * Applies playmats and zone layouts to the board.
  *
- * The board is three separate documents: the parent page (mat artwork +
- * stadium) plus the two playmat iframes (card zones). CSS custom properties
- * do not cross an iframe boundary, so each iframe gets the layout profile for
- * *its* player's mat. In solo mode P1 and P2 can pick different mats with
+ * The mat artwork halves (`#battleMatArt`) and the page-level layout variables
+ * follow each player's mat. In solo mode P1 and P2 can pick different mats with
  * different zone geometry; the coin/sleeve picker already tracks a target,
- * and this module mirrors that split.
+ * and this module mirrors that split. The three.js table reads the applied
+ * mats through `currentMatSpec`.
  */
 
 import {
@@ -31,7 +30,6 @@ import {
 import { processAction } from '../general/process-action.js';
 
 const MAT_STORAGE_KEY = 'ptcg-sim.playmat.v1';
-const MAT_TARGETS = ['self', 'opp'];
 
 /** @type {{ self: object|null, opp: object|null }} */
 let currentMats = { self: null, opp: null };
@@ -71,14 +69,6 @@ const writeStoredMats = (mats) => {
   } catch {
     /* choice simply will not persist */
   }
-};
-
-/** @param {'self'|'opp'} target */
-const frameDocument = (target) => {
-  const id = target === 'opp' ? 'oppContainer' : 'selfContainer';
-  const frame = document.getElementById(id);
-  const doc = frame?.contentDocument;
-  return doc?.documentElement ? doc : null;
 };
 
 /** `--mat-scale` as the page has it, else the stored picker value (percent), else '1'. */
@@ -125,25 +115,19 @@ const activeTwoPlayerMat = () => {
   return null;
 };
 
-const syncIframeLayouts = () => {
+const syncLayouts = () => {
   const halfSelf = document.querySelector('#battleMatArt .mat-half-self');
   const halfOpp = document.querySelector('#battleMatArt .mat-half-opp');
 
   const shared = activeTwoPlayerMat();
   if (shared) {
     const layout = resolveMatLayout(shared.mat);
-    for (const target of MAT_TARGETS) {
-      applyMatLayoutToDoc(layout, frameDocument(target));
-    }
     applyMatLayoutToElement(layout, halfSelf);
     applyMatLayoutToElement(layout, halfOpp);
     applyMatLayoutToDoc(layout, document);
     return;
   }
 
-  for (const target of MAT_TARGETS) {
-    applyMatLayoutToDoc(layoutForTarget(target), frameDocument(target));
-  }
   applyMatLayoutToElement(layoutForTarget('self'), halfSelf);
   applyMatLayoutToElement(layoutForTarget('opp'), halfOpp);
 
@@ -248,7 +232,7 @@ const paintMatImageForTarget = (target, mat) => {
     const aspect = art.naturalWidth / art.naturalHeight;
     if (aspect === matArtAspect[key]) return;
     matArtAspect[key] = aspect;
-    syncIframeLayouts();
+    syncLayouts();
   };
   art.src = primary;
   ambient.src = primary;
@@ -305,10 +289,6 @@ const syncMatArt = () => {
     );
   }
 
-  for (const target of MAT_TARGETS) {
-    frameDocument(target)?.body?.classList.toggle('mat-active', true);
-  }
-
   if (art) {
     if (shared) {
       paintMatImageForTarget(shared.owner, shared.mat);
@@ -334,14 +314,11 @@ export const currentMatSpec = () =>
   });
 
 /**
- * Push a layout profile's variables onto every board document.
+ * Push a layout profile's variables onto the page.
  * Prefer `applyMatForTarget` when zones should differ per player.
  */
 export const applyMatLayout = (layoutId) => {
   const layout = getMatLayout(layoutId);
-  for (const target of MAT_TARGETS) {
-    applyMatLayoutToDoc(layout, frameDocument(target));
-  }
   applyMatLayoutToDoc(layout, document);
   return layout;
 };
@@ -358,7 +335,7 @@ export const applyMatForTarget = (target, mat) => {
   }
 
   writeStoredMats(currentMats);
-  syncIframeLayouts();
+  syncLayouts();
   syncMatArt();
 
   document.dispatchEvent(
@@ -379,7 +356,7 @@ export const applyMatForTarget = (target, mat) => {
 export const applyMat = (mat) => {
   currentMats = { self: mat || null, opp: mat || null };
   writeStoredMats(currentMats);
-  syncIframeLayouts();
+  syncLayouts();
   syncMatArt();
   return layoutForTarget('self');
 };
@@ -410,22 +387,15 @@ export const changePlaymat = (user, matId, emit = true) => {
   processAction(user, emit, 'changePlaymat', [matId]);
 };
 
-/**
- * Re-apply active choices. Iframes reload on board flips and wipe inline
- * variables, so replay whenever a frame comes back.
- */
+/** Re-apply the active mat choices. */
 export const refreshMatLayout = () => {
-  syncIframeLayouts();
+  syncLayouts();
   syncMatArt();
 };
 
 export const initializeMatLayout = () => {
   currentMats = readStoredMats();
   refreshMatLayout();
-
-  for (const id of ['selfContainer', 'oppContainer']) {
-    document.getElementById(id)?.addEventListener('load', refreshMatLayout);
-  }
 
   document.addEventListener('playmat-changed', (event) => {
     applyMatForTarget(

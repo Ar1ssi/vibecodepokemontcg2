@@ -3,25 +3,18 @@
 // canvas stage, EVOLVE_STAGE card heights square, redrawn from its own WAAPI
 // clock (D118/D119) and screened onto the board; the host removes itself when
 // the clock finishes, with a backstop.
-import { board3dActive, seatTurnOf } from '../../board3d/board-rects.js';
-import { readFrameTransform } from '../../image-logic/iframe-rect.mjs';
+import { seatTurnOf } from '../../board3d/board-rects.js';
 import { removeWhen, spawnOverlay } from '../../image-logic/mat-fx.mjs';
 import { playCanvasStage } from './canvas-stage.js';
 import { DEVOLVE_SCENE_MS, buildDevolveScene, devolveOps } from './devolve-scene.mjs';
-import { EVOLVE_SCENE_MS, EVOLVE_STAGE, buildEvolveScene, evolveOps, turnOfMatrix } from './evolve-scene.mjs';
+import { EVOLVE_SCENE_MS, EVOLVE_STAGE, buildEvolveScene, evolveOps } from './evolve-scene.mjs';
 import { createDrawState, drawTcglOps, preloadTcglTextures } from './tcgl-canvas.js';
 import { CARD_UNITS } from './tcgl-fx.mjs';
 
 const BACKSTOP_PAD_MS = 400;
 
-/** Degrees the card's board is turned on screen (the opponent's is 180°). */
-export const frameTurnOf = (element) => {
-  const seatTurn = board3dActive() ? seatTurnOf(element) : null;
-  if (seatTurn !== null) return seatTurn;
-  const frame = element?.ownerDocument?.defaultView?.frameElement;
-  if (!frame) return 0;
-  return turnOfMatrix(readFrameTransform(frame).matrix);
-};
+/** Degrees the card's board is turned on screen: 180 for the far seat's mirror root, else 0. */
+export const frameTurnOf = (element) => seatTurnOf(element) ?? 0;
 
 const validRect = (rect) => Boolean(rect) && rect.width > 1 && rect.height > 1;
 

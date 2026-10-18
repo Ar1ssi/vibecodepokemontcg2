@@ -2,8 +2,6 @@
 // their Active Pokémon and play flip animations on the mat (not full-screen).
 
 import {
-  selfContainer,
-  oppContainer,
   selfContainerDocument,
   oppContainerDocument,
 } from '../../initialization/global-variables/containers.js';
@@ -70,7 +68,7 @@ export const withCatalogCoin = (coinId, play, catalog = COIN_CATALOG) => {
   return play(null);
 };
 
-/** Position is CSS-driven inside each playmat iframe (#matCoinSlot). */
+/** Position is CSS-driven inside each board mirror root (#matCoinSlot). */
 export const positionMatCoinSlots = () => {};
 
 export const renderMatCoinSlot = (target) => {
@@ -96,8 +94,7 @@ export const renderMatCoinSlot = (target) => {
     `</span>`,
   ].join('');
   const coinEl = slot.querySelector('[data-mat-coin-el]');
-  // The mask URL must be resolved the same way as the <img>, or the relative
-  // catalog path would resolve against the iframe's base and 404.
+  // The mask URL must be resolved the same way as the <img>.
   applyCoinEffect(coinEl, { ...coin, thumb: coinArtUrl(coin.thumb) });
   startCoinDrift(coinEl, { phaseOffset: target === 'opp' ? 0.5 : 0 });
 };
@@ -143,7 +140,4 @@ export const initMatCoins = () => {
   loadCoinCatalog().catch((error) => console.warn('[mat coin] coin catalog unavailable.', error));
   hookLayoutRefresh();
   renderMatCoins();
-  for (const container of [selfContainer, oppContainer]) {
-    container?.addEventListener('load', renderMatCoins, { once: true });
-  }
 };

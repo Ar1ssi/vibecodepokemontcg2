@@ -1,3 +1,5 @@
+// Line citations of self-containers.css, table-tilt.mjs and apply-table-tilt.js name the retired
+// iframe board (deleted in design 074 G3) as the source of these constants; the numbers stay.
 /**
  * Zone geometry for the three.js board (design 074 §D2), in FLAT TABLE px.
  *

@@ -36,7 +36,7 @@ import { initializeBuildBattle } from './native-deck-builder-build-battle.js';
 import { initializeBuildBattleRun } from './native-deck-builder-bnb-run.js';
 import { BUILD_BATTLE_DEFAULT_FLOW } from '../../../setup/deck-builder/core/builder-window.mjs';
 import { initializeEliteTrainerBox } from './native-deck-builder-etb.js';
-import { systemState } from '../../../state.js';
+import { systemState, selfContainerDocument, oppContainerDocument } from '../../../state.js';
 import { printedRarity } from '../../../../../shared/engine/rules/card-classify.mjs';
 import { cachedFetchJson } from '../../../../../shared/tcgdex/tcgdex-cache.mjs';
 import { tcgdexApiUrl } from '../../../../../shared/tcgdex/tcgdex-url.mjs';
@@ -907,14 +907,13 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
               // this player's own card back already is — never borrow the
               // default and never touch the other player's playmat
               const resolvedTarget = image || getCardBackForTarget(target) || fallback;
-              const containerId = target === 'opp' ? 'oppContainer' : 'selfContainer';
-              const doc = document.getElementById(containerId)?.contentWindow?.document;
+              const doc = target === 'opp' ? oppContainerDocument : selfContainerDocument;
               if (!doc) return;
               // `img.src` is always the browser-resolved absolute URL; the
               // tracked values here are stored as-typed (often relative),
               // so comparing them raw silently never matches and the stale
               // cover/card-back image is never repainted. Resolve both
-              // sides against the target iframe's own document first.
+              // sides against the target board root's own base URI first.
               const resolve = (src) => {
                 if (!src) return src;
                 try {
@@ -939,7 +938,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
                 if (knownBacks.has(img.src)) img.src = resolvedTarget;
               });
             } catch {
-              // The board iframe is mid-reload; its next build reads the new back.
+              // The board root is unavailable; its next build reads the new back.
             }
           };
           document.addEventListener('deck-sleeve-changed', (e) => applySleeveToPlaymat(e.detail?.image, e.detail?.target || 'self'));

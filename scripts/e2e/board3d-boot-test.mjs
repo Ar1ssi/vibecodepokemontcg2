@@ -1,6 +1,5 @@
-// Design 074 slice G2: the three.js board is the default. A page with no `board` query and
-// nothing stored boots the 3D board and keeps the playmat iframes hidden; `?board=iframe`
-// boots the iframe board and shows them; a stored '0' turns the 3D board off.
+// Design 074 slice G3: the three.js board is the only board. A page boots it with no query, and
+// the retired `?board=iframe` query is ignored: it boots the same board.
 // Usage: pnpm test:board3d-boot   (PTCG_URL=http://host:port reuses a running server;
 //        CHROMIUM_PATH=/path/to/chrome picks the browser, as the other e2e harnesses do)
 import { spawn } from 'node:child_process';
@@ -80,28 +79,20 @@ async function waitFor(page, fn, timeout = 25000) {
 }
 
 /** Boots one page and reports which board it runs and what the page shows. */
-async function boot(browser, url, { stored = null } = {}) {
+async function boot(browser, url) {
   const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
   const page = await context.newPage();
   page.on('pageerror', (err) => console.log('PAGEERROR:', err.message));
-  if (stored !== null) {
-    await context.addInitScript((value) => localStorage.setItem('ptcg-board-3d', value), stored);
-  }
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await waitFor(page, () => window.__ptcg?.ready === true, 30000);
-  // The 3D board starts after the page's own boot (an async import) and only then reports '3d';
-  // the iframe path shows the iframes synchronously (containers.js). Wait for one or the other.
+  // The 3D board starts after the page's own boot (an async import) and only then reports '3d'.
   const state = await waitFor(page, () => {
-    const mode = window.__ptcg.boardMode();
     const active = document.body.classList.contains('board3d-active');
-    const iframe = document.getElementById('selfContainer');
-    if (!active && iframe.hidden) return null;
+    if (!active) return null;
     const host = document.getElementById('board3dHost');
     return {
-      mode,
+      mode: window.__ptcg.boardMode(),
       active,
-      iframeHidden: iframe.hidden,
-      iframeShown: getComputedStyle(iframe).display !== 'none',
       hostShown: !host.hidden && getComputedStyle(host).display !== 'none',
       canvas: Boolean(host.querySelector('canvas')),
     };
@@ -120,15 +111,12 @@ try {
   });
 
   const plain = await boot(browser, `${server.base}/?e2e=1`);
-  T('1a. no query, nothing stored → the 3D board runs', plain.mode === '3d' && plain.active === true, JSON.stringify(plain));
-  T('1b. … the playmat iframes stay hidden and the canvas host shows', plain.iframeShown === false && plain.hostShown === true && plain.canvas === true);
+  T('1a. ?e2e=1 → the 3D board runs', plain.mode === '3d' && plain.active === true, JSON.stringify(plain));
+  T('1b. … the canvas host shows', plain.hostShown === true && plain.canvas === true);
 
-  const iframe = await boot(browser, `${server.base}/?e2e=1&board=iframe`);
-  T('2a. ?board=iframe → the iframe board runs', iframe.mode === 'iframe' && iframe.active === false, JSON.stringify(iframe));
-  T('2b. … the playmat iframes are shown (hidden attribute cleared) and the canvas host is not', iframe.iframeHidden === false && iframe.iframeShown === true && iframe.hostShown === false);
-
-  const killed = await boot(browser, `${server.base}/?e2e=1`, { stored: '0' });
-  T("3. a stored '0' turns the 3D board off", killed.mode === 'iframe' && killed.iframeShown === true, JSON.stringify(killed));
+  const retired = await boot(browser, `${server.base}/?e2e=1&board=iframe`);
+  T('2a. ?board=iframe is ignored → the 3D board runs', retired.mode === '3d' && retired.active === true, JSON.stringify(retired));
+  T('2b. … the canvas host shows', retired.hostShown === true && retired.canvas === true);
 } catch (err) {
   failed += 1;
   console.log('TEST ERROR:', err.message);

@@ -2,9 +2,9 @@
    both mirror shadow roots, where the five panels (#deck, #discard, #lostZone viewers, the
    #viewCards look and #attachedCards move panels) keep the iframe ids and DOM, so every legacy
    module still finds them, shows them inline (`display: block`) and fills them. Only the panels
-   are styled here: the iframe sheets also carry the zone layout, the holo layers and a zoomed,
-   tilted #playfield, which would move the mirror's position-fixed card twins off their
-   projected rects. Rules follow self-containers.css; the placement is new: the host covers the
+   are styled here: a zone layout or a zoomed, tilted #playfield would move the mirror's
+   position-fixed card twins off their projected rects. The panel rules come from the removed
+   playmat-iframe sheets; the placement is new: the host covers the
    viewport, so a panel centres on the mat column (75.5% wide, as the sidebox takes the rest)
    in its seat's half (near seat = bottom), upright for both seats (no 180° iframe to undo). */
 

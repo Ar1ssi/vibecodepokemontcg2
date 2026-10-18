@@ -539,6 +539,34 @@ Banned in a slice row: "decide", "TBD", "as needed", "appropriate", "handle edge
 
 ## Deviations (Builder appends here during build)
 
+### G3
+- Built as five sub-slices (a sizing, b documents/sheets, c geometry, d core, e scattered refs; notes in
+  `.agent/scratch/074/g3/G3*.md`), four in parallel on disjoint files, then d. Deleted: `self-/opp-containers.html`,
+  `css/self-/opp-containers.css`, `playmat-anim.mjs`, `apply-table-tilt.js`, `iframe-rect.mjs`, `board-flag.mjs`,
+  `double-click-zoom.mjs`, `table/resizer.js` (split-resizer handles; `#selfResizer/#oppResizer` too), the card-pop
+  iframe mappers, `turnOfMatrix`, `screenShakeOffsets`, and the CSS tests that only read the deleted sheets
+  (`bench-grid-css`, `board-drop-glow-css` whole; cases listed in G3b.md). `table-tilt.mjs` keeps only what
+  board-camera/card-focus import (`projectFromPivot`, `seamShiftPx`, `tiltTransforms` → `{ mat }` only).
+- Deviations from the row: `visualRectOf` moved to `board-rects.js` as a plain rect, but nothing imports it any more
+  (fx-preview went 3D-only), so it is an export without a caller. `containers.js` builds the mirror unconditionally
+  (no WebGL2 probe: the scene's own init reports). **No fallback board exists**: a page that cannot run the 3D board
+  (no WebGL2, three failed to load, context lost twice, legacy relay netcode) gets `console.error` and one chat line
+  `3D board unavailable: <reason>; this browser needs WebGL2`, and the game keeps running on the hidden mirror DOM.
+  `?board=iframe` / stored `ptcg-board-3d` are ignored. The legacy relay (`SERVER_AUTHORITATIVE=0`) therefore has no
+  visible board (its DOM renders into the hidden mirror); `test:2p` result recorded below.
+- `click-events.js`: every zone takes the zoom path (the legacy `#fullImage` overlay is gone); `close-popups.js`
+  dropped its `#fullImage` guards. `native-deck-builder.js` sleeve repaint read `contentWindow.document` and silently
+  returned on the mirror: it now reads the mirror roots (fix). `flip-board.js` swaps the host classes through
+  `boardMirror.hosts`; `board-flip-state.mjs` `swapIframes` → `swapSides`.
+- Now orphaned (nothing imports them; the scene draws those overlays itself): `mat-ambient.css`, `status-marker.css`,
+  `energy-token.css`, `damage-counter.css`, `mat-coin.css` (+ `fx-kill-switch-css.test.mjs` reads three of them), the
+  `.full-view` panel code in `full-view.js`, the `.hover-gutter-probe` in `hover-preview-dom.mjs`, `index.css` `.self`/
+  `.opp` iframe box rules (overridden by `#boardMirror > #selfBoard/#oppBoard`). Cleanup candidates, not G3's.
+- Exit test: `grep -rnE "contentDocument|contentWindow|frameElement" client/src scripts` = 0 outside `board-mirror.js`
+  (the names `selfContainer`/`oppContainer` stay as the mirror host bindings). Harness results: see the commit message.
+- Incident: one builder ran `git stash`/`git stash pop` in the shared worktree mid-build; every other builder re-checked
+  its edits afterwards and found them intact. Briefs now say never to run stash/checkout/reset.
+
 ### G2
 - `isBoard3dRequested` defaults `defaultOn` to true, so the three callers (front-end.js, containers.js, board3d.js)
   need no change. The iframes carry `hidden` in `index.ejs`; `containers.js` clears it on the page that keeps the

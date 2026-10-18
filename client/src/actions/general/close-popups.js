@@ -42,19 +42,11 @@ const isOutsideZoneClick = (event, zone) => {
     return false;
   } else if (zone.elementCover && zone.elementCover.contains(event.target)) {
     return false;
-  } else if (event.target.id && event.target.id === 'fullImage') {
-    return false;
   } else if (
     event.target.id === 'discardPileViewer' ||
     event.target.closest?.('#discardPileViewer') ||
     event.target.id === 'cardPickerOverlay' ||
     event.target.closest?.('#cardPickerOverlay')
-  ) {
-    return false;
-  } else if (
-    event.target.parentElement &&
-    event.target.parentElement.id &&
-    event.target.parentElement.id === 'fullImage'
   ) {
     return false;
   }

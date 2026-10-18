@@ -2,9 +2,8 @@ import {
   oppContainerDocument,
   selfContainerDocument,
 } from '../../state.js';
-import { board3dActive, matRect } from '../board3d/board-rects.js';
+import { matRect, visualRectOf } from '../board3d/board-rects.js';
 import { cardBackSrcForUser } from '../deck-constructor/hydrate-holo.js';
-import { visualRectOf } from './iframe-rect.mjs';
 import {
   SHUFFLE_DURATION_MS,
   shuffleFlightPlan,
@@ -25,32 +24,14 @@ const zoneOriginEl = (user, zoneId) => {
   return doc.getElementById(zoneId);
 };
 
-const boardRectOf = () => {
-  const table = board3dActive() ? matRect() : null;
-  if (table) return table;
-  const mat = document.getElementById('battleMat');
-  if (mat) return mat.getBoundingClientRect();
-  const self = document.getElementById('selfContainer');
-  const opp = document.getElementById('oppContainer');
-  const a = self?.getBoundingClientRect();
-  const b = opp?.getBoundingClientRect();
-  if (a && b) {
-    const left = Math.min(a.left, b.left);
-    const top = Math.min(a.top, b.top);
-    return {
-      left,
-      top,
-      width: Math.max(a.right, b.right) - left,
-      height: Math.max(a.bottom, b.bottom) - top,
-    };
-  }
-  return {
+const boardRectOf = () =>
+  matRect() ??
+  document.getElementById('battleMat')?.getBoundingClientRect() ?? {
     left: 0,
     top: 0,
     width: globalThis.innerWidth || 0,
     height: globalThis.innerHeight || 0,
   };
-};
 
 const cancelShuffle = (user) => {
   const run = activeByUser[user];

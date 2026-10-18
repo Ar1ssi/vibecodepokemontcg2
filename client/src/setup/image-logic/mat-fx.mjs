@@ -8,8 +8,7 @@
 // pure owner for visuals / sound / volume); the readers below delegate to it
 // and keep their original signatures so no caller changed.
 import { FX_OFF_CLASS, readSettings } from './fx-settings.mjs';
-import { visualRectOf } from './iframe-rect.mjs';
-import { board3dActive, rectForInstance as boardCardRect } from '../board3d/board-rects.js';
+import { board3dActive, rectForInstance as boardCardRect, visualRectOf } from '../board3d/board-rects.js';
 
 export { FX_OFF_CLASS };
 export { FX_OFF_KEY as FX_OFF_STORAGE_KEY } from './fx-settings.mjs';

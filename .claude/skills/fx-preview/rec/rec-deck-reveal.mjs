@@ -6,9 +6,8 @@
 // Search: no reveal event, so no scene). Card faces are drawn on a canvas: no network.
 // usage: PORT=4100 pnpm start, then node .claude/skills/fx-preview/rec/rec-deck-reveal.mjs
 // env: BASE_URL (default http://localhost:4100), CHROMIUM / CHROMIUM_PATH, OUT (default .agent/scratch/deck-reveal),
-//      SIO_JS (a local socket.io.min.js when cdn.socket.io is unreachable; see SKILL.md),
-//      PTCG_BOARD=3d (the three.js board, design 074; default iframe): hand and deck spots are then the
-//      scene's rects (`__ptcg.cardRect`, the mirror's covers) instead of the iframes' elements
+//      SIO_JS (a local socket.io.min.js when cdn.socket.io is unreachable; see SKILL.md).
+//      Hand and deck spots are the scene's rects (`__ptcg.cardRect`, the mirror's covers).
 import { chromium } from 'playwright';
 import { mkdirSync, renameSync } from 'node:fs';
 import path from 'node:path';
@@ -35,8 +34,6 @@ await openBoard(page, BASE_URL);
 await page.evaluate(async () => {
   const { applyView, getCardRegistry } = await import('/src/setup/netcode/apply-view.js');
   const { handleBeforeApply, handleAdvisoryEvent } = await import('/src/setup/netcode/advisory-animations.js');
-  const { visualRectOf } = await import('/src/setup/image-logic/iframe-rect.mjs');
-  const { imageAnchor } = await import('/src/setup/deck-constructor/hydrate-holo.js');
   const face = (label, hue) => {
     const c = document.createElement('canvas');
     c.width = 245;
@@ -92,42 +89,30 @@ await page.evaluate(async () => {
       { onBeforeApply: handleBeforeApply, onAdvisoryEvent: handleAdvisoryEvent }
     );
   push([]);
-  const board3d = window.__ptcg.boardMode() === '3d';
   const selfDoc = window.__fxBoard.root('self');
   const oppDoc = window.__fxBoard.root('opp');
   const centerOf = (r) => ({ x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2), w: Math.round(r.width) });
   // A card the flight hides has no `scene.rects()` entry (a hidden mesh is not drawn) and its mirror
   // image is not re-synced; its pose is still in the scene's card pool, which is where it lands.
-  let poseRect = () => null;
-  if (board3d) {
-    const { getBoardScene } = await import('/src/setup/board3d/board3d.js');
-    const { projectToScreen } = await import('/src/setup/board3d/board-camera.mjs');
-    poseRect = (id) => {
-      const { cards, cameraDesc, canvas } = getBoardScene().inspect();
-      const points = (cards.cornersOf(id) ?? []).map((corner) => projectToScreen(cameraDesc, corner));
-      if (points.length !== 4 || points.some((point) => !point)) return null;
-      const box = canvas.getBoundingClientRect();
-      const [xs, ys] = [points.map((point) => point.x), points.map((point) => point.y)];
-      return { left: box.left + Math.min(...xs), top: box.top + Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) };
-    };
-  }
+  const { getBoardScene } = await import('/src/setup/board3d/board3d.js');
+  const { projectToScreen } = await import('/src/setup/board3d/board-camera.mjs');
+  const poseRect = (id) => {
+    const { cards, cameraDesc, canvas } = getBoardScene().inspect();
+    const points = (cards.cornersOf(id) ?? []).map((corner) => projectToScreen(cameraDesc, corner));
+    if (points.length !== 4 || points.some((point) => !point)) return null;
+    const box = canvas.getBoundingClientRect();
+    const [xs, ys] = [points.map((point) => point.x), points.map((point) => point.y)];
+    return { left: box.left + Math.min(...xs), top: box.top + Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) };
+  };
   const sceneSpot = (id) => {
     const rect = window.__ptcg.cardRect(id) ?? poseRect(id);
     return rect?.width > 0 ? centerOf(rect) : null;
   };
-  const frameRect = (doc, el) => {
-    // The 3D board's mirror images carry page px; an iframe's are local to its frame.
-    if (board3d) return el.getBoundingClientRect();
-    const f = doc === selfDoc ? document.getElementById('selfContainer') : document.getElementById('oppContainer');
-    const fr = f.getBoundingClientRect();
-    const r = el.getBoundingClientRect();
-    return { left: fr.left + r.left, top: fr.top + r.top, width: r.width, height: r.height };
-  };
-  // The real hand card's on-screen spot (iframe turn included), as the scene measures it.
+  // The real hand card's on-screen spot, as the scene measures it.
   const handAt = (id) => {
     const el = getCardRegistry().get(id)?.element;
     if (!el?.isConnected) return null;
-    return board3d ? sceneSpot(id) : centerOf(visualRectOf(imageAnchor(el)));
+    return sceneSpot(id);
   };
   const trace = (ms, watch = []) => {
     const samples = [];
@@ -156,7 +141,7 @@ await page.evaluate(async () => {
         { type: 'cardsRevealed', playerId: 'p1', cards: [{ instanceId: 131, name: 'Raichu', src: revealed.src }] },
         { type: 'deckShuffled', playerId: 'p1' },
       ]);
-      return { hidden: hiddenIds(), deck: centerOf(frameRect(selfDoc, selfDoc.getElementById('deckCover'))) };
+      return { hidden: hiddenIds(), deck: centerOf(selfDoc.getElementById('deckCover').getBoundingClientRect()) };
     },
     opp() {
       state.them = [...state.them, { instanceId: 231 }, { instanceId: 232 }];
@@ -170,7 +155,7 @@ await page.evaluate(async () => {
           cards: theirReveal.map((c) => ({ instanceId: c.instanceId, name: c.name, src: c.src })),
         },
       ]);
-      return { hidden: hiddenIds(), deck: centerOf(frameRect(oppDoc, oppDoc.getElementById('deckCover'))) };
+      return { hidden: hiddenIds(), deck: centerOf(oppDoc.getElementById('deckCover').getBoundingClientRect()) };
     },
     // The revealed card has a hand card's art, so the hand stacks them and re-lays out mid-scene.
     stack() {
@@ -192,7 +177,7 @@ await page.evaluate(async () => {
       const doc = user === 'self' ? selfDoc : oppDoc;
       const img = doc.querySelector(`img[data-instance-id="${instanceId}"]`);
       if (!img) return null;
-      return board3d ? sceneSpot(instanceId) : centerOf(frameRect(doc, img));
+      return sceneSpot(instanceId);
     },
     trace,
     overlays: () => document.querySelectorAll('.fx-deck-reveal').length,

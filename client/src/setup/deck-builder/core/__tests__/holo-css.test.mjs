@@ -224,14 +224,12 @@ describe('regular holo foil', () => {
 });
 
 describe('shiny rare foil', () => {
-  it('is imported by both stylesheets and keeps its own glitter', () => {
-    for (const sheet of ['index.css', 'opp-containers.css']) {
-      const source = readFileSync(
-        fileURLToPath(new URL(`../../../../css/${sheet}`, import.meta.url)),
-        'utf8'
-      );
-      assert.ok(source.includes("@import url('./holo/shiny-rare.css');"), sheet);
-    }
+  it('is imported by the main stylesheet and keeps its own glitter', () => {
+    const source = readFileSync(
+      fileURLToPath(new URL('../../../../css/index.css', import.meta.url)),
+      'utf8'
+    );
+    assert.ok(source.includes("@import url('./holo/shiny-rare.css');"), 'index.css');
     assert.ok(
       readHoloCss('base.css').includes(
         ':not([data-rarity="shiny rare"]):not('

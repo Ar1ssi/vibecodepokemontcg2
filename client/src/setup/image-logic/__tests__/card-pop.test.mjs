@@ -9,8 +9,7 @@ import {
   previewTargetSize,
   prizeFanCardSize,
   prizeFanSlots,
-  iframeIsFlipped,
-  mapIframeRectToPage,
+  viewportRectOf,
 } from '../card-pop.mjs';
 
 const viewport = { width: 1200, height: 800 };
@@ -118,32 +117,7 @@ test('prizeFanCardSize shrinks so six prizes fit the viewport', () => {
   assert.ok(row <= viewport.width * 0.86 + 0.01);
 });
 
-test('mapIframeRectToPage offsets an upright iframe by its page box', () => {
-  const local = { left: 40, top: 80, width: 60, height: 84 };
-  const frame = { left: 100, top: 200, width: 800, height: 400 };
-  assert.deepEqual(mapIframeRectToPage(local, frame, false), {
-    left: 140,
-    top: 280,
-    width: 60,
-    height: 84,
-  });
-});
-
-test('mapIframeRectToPage mirrors a flipped opp iframe so the hand stays at the top', () => {
-  // Opp playmat sits in the top half and is CSS-flipped 180°. A hand card
-  // at the bottom of that iframe document is visually at the top of the page.
-  const local = { left: 100, top: 300, width: 80, height: 80 };
-  const frame = { left: 0, top: 0, width: 800, height: 500 };
-  const page = mapIframeRectToPage(local, frame, true);
-  assert.equal(page.left, 800 - 100 - 80);
-  assert.equal(page.top, 500 - 300 - 80);
-  assert.equal(page.width, 80);
-  assert.equal(page.height, 80);
-  assert.ok(page.top < 150);
-});
-
-test('iframeIsFlipped treats the opp playmat class as flipped', () => {
-  assert.equal(iframeIsFlipped({ classList: { contains: (name) => name === 'opp' } }), true);
-  assert.equal(iframeIsFlipped({ classList: { contains: () => false } }), false);
-  assert.equal(iframeIsFlipped(null), false);
+test('viewportRectOf is the element box as a plain left/top/width/height rect', () => {
+  const el = { getBoundingClientRect: () => ({ left: 40, top: 80, width: 60, height: 84, right: 100, bottom: 164, x: 40, y: 80 }) };
+  assert.deepEqual(viewportRectOf(el), { left: 40, top: 80, width: 60, height: 84 });
 });

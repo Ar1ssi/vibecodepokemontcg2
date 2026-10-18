@@ -146,17 +146,6 @@ function screenShakePoints(amplitude, steps) {
   return out;
 }
 
-/**
- * `translate` values for a whole-table shake: a damped sine, so the motion
- * reads as one impact settling rather than a random jitter.
- * @returns {string[]}
- */
-export function screenShakeOffsets(amplitude, steps = 12) {
-  const out = screenShakePoints(amplitude, steps).map((p) => `${p.x.toFixed(2)}px ${p.y.toFixed(2)}px`);
-  out.push('0px 0px');
-  return out;
-}
-
 /** The table shake's WAAPI easing (combat.js), `cubic-bezier(0.2, 0.6, 0.4, 1)`. */
 export const SCREEN_SHAKE_EASING = [0.2, 0.6, 0.4, 1];
 

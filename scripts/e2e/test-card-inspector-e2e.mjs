@@ -1,8 +1,7 @@
 // Design 067 card focus + design 069 hover preview, in a two-player authoritative room.
 // Usage: pnpm test:inspector   (spawns its own server on a free port)
-//   PTCG_BOARD=3d   the three.js board (`?board=3d`, design 074): cards are read through
-//                   `__ptcg.cardRect` and the board mirror's shadow roots instead of the iframes;
-//                   default `iframe` is the classic board
+// Runs on the three.js board (design 074): cards are read through `__ptcg.cardRect` and the
+// board mirror's shadow roots.
 //   PTCG_URL=http://host:port   reuse a running server (started with SERVER_AUTHORITATIVE=1)
 //   CHROMIUM_PATH=/path/to/chrome   picks the browser, as the other e2e harnesses do
 import { spawn } from 'node:child_process';
@@ -13,8 +12,6 @@ import { chromium } from 'playwright';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const ROOM = process.env.PTCG_ROOM || `e2e-inspector-${Date.now()}`;
-const BOARD = process.env.PTCG_BOARD === '3d' ? '3d' : 'iframe';
-const IS_3D = BOARD === '3d';
 // No GPU in CI containers: WebGL2 through SwiftShader.
 const GL_ARGS = ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'];
 // SwiftShader draws a frame every ~0.3 s and the scene clock moves only with drawn frames.
@@ -84,17 +81,12 @@ async function openClient(browser, name, server) {
       console.log(`[CONSOLE ${name}]`, text);
     }
   });
-  // The board's document: the mirror's open shadow root on the 3D board, the iframe's document
-  // otherwise. Installed before any script runs so page.evaluate callbacks can use it at once.
+  // The board's document: the mirror's open shadow root. Installed before any script runs so
+  // page.evaluate callbacks can use it at once.
   await page.addInitScript(() => {
-    window.__boardRoot = (side) => {
-      if (window.__ptcg?.boardMode?.() === '3d') {
-        return document.getElementById(side === 'opp' ? 'oppBoard' : 'selfBoard')?.shadowRoot ?? null;
-      }
-      return document.getElementById(side === 'opp' ? 'oppContainer' : 'selfContainer')?.contentDocument ?? null;
-    };
+    window.__boardRoot = (side) => document.getElementById(side === 'opp' ? 'oppBoard' : 'selfBoard')?.shadowRoot ?? null;
   });
-  await page.goto(`${server.base}/?e2e=1${IS_3D ? '&board=3d' : '&board=iframe'}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await page.goto(`${server.base}/?e2e=1`, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await waitFor(page, () => window.__ptcg?.ready === true);
   return { context, page, name };
 }
@@ -103,7 +95,7 @@ mkdirSync(new URL('../../out/', import.meta.url), { recursive: true });
 const server = process.env.PTCG_URL ? { base: process.env.PTCG_URL, child: null } : await startServer();
 const browser = await chromium.launch({
   headless: true,
-  ...(IS_3D ? { args: GL_ARGS } : {}),
+  args: GL_ARGS,
   ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}),
 });
 
@@ -210,7 +202,7 @@ try {
     );
   const activeId = (await boardIds('self', '#active img'))[0];
   T('4b. the own Active has an instance id', Number.isInteger(activeId));
-  console.log(`Board mode: ${BOARD}, own Active #${activeId}`);
+  console.log(`Own Active #${activeId}`);
 
   // The card's viewport rect once it stops moving: the 3D scene's clock only advances with drawn
   // frames, so a rect read right after a state change can still be mid-tween.
@@ -261,13 +253,12 @@ try {
       const overlay = document.querySelector('#cardPickerOverlay:not(.card-picker-choose)');
       return Boolean(overlay && getComputedStyle(overlay).display !== 'none');
     });
-  // card-focus.mjs lowerHand: `hand-lowered` on the self iframe's root, or on the mirror's host
-  // plus the scene's hand pose on the 3D board, where both must agree.
+  // card-focus.mjs lowerHand: `hand-lowered` on the mirror's host plus the scene's hand pose,
+  // where both must agree.
   const handState = () =>
     actor.page.evaluate(async () => {
       const root = window.__boardRoot('self');
-      const marked = (root.documentElement ?? root.host).classList.contains('hand-lowered');
-      if (window.__ptcg.boardMode() !== '3d') return { lowered: marked, raised: !marked };
+      const marked = root.host.classList.contains('hand-lowered');
       const { getBoardScene } = await import('/src/setup/board3d/board3d.js');
       const pose = getBoardScene().inspect().handPose;
       return { lowered: marked && pose === 'lowered', raised: !marked && pose === 'normal' };
@@ -280,14 +271,13 @@ try {
     }
     return false;
   };
-  // card-focus.mjs hideSource: the board image (or its holo wrapper) goes visibility:hidden; on the
-  // 3D board the mirror then reports the card hidden to the scene, which hides the mesh.
+  // card-focus.mjs hideSource: the board image (or its holo wrapper) goes visibility:hidden; the
+  // mirror then reports the card hidden to the scene, which hides the mesh.
   const sourceState = () =>
     actor.page.evaluate(async () => {
       const img = window.__boardRoot('self').querySelector('#active img');
       const target = img.closest('.mat-holo') ?? img;
       const dom = getComputedStyle(target).visibility === 'hidden';
-      if (window.__ptcg.boardMode() !== '3d') return { dom, scene: dom };
       const { getBoardScene } = await import('/src/setup/board3d/board3d.js');
       return { dom, scene: getBoardScene().inspect().uiState.get(Number(img.dataset.instanceId))?.hidden === true };
     });
@@ -318,12 +308,11 @@ try {
   T('5. Click on own active opens the focus view', await focusOpen());
   T('5b. ...and not the carousel', !(await carouselVisible()));
   T('5c. Flight finished: backdrop open class set', await actor.page.evaluate(() => document.querySelector('.card-focus')?.classList.contains('card-focus--open')));
-  T(`5d. The hand is lowered ${IS_3D ? 'in the scene and on the mirror host' : 'in the self frame'}`, await handLowered());
+  T('5d. The hand is lowered in the scene and on the mirror host', await handLowered());
   T('5e. The source card is hidden while focused', await sourceHidden());
 
-  // 5f. A human-paced double-click: two REAL clicks 250 ms apart. On the iframe board the first lands
-  // in the mat's iframe and the second in the main document, so the browser reports a click count of
-  // 1 for each: only timing can tell them apart. The second click must not close the view.
+  // 5f. A human-paced double-click: two REAL clicks 250 ms apart. The second click must not close
+  // the view.
   await actor.page.keyboard.press('Escape');
   T('5f-pre. Escape closes the focus view', await waitGone());
   // The fixture game leaves a server choice picker (`card-picker-choose`) open over the mat, which
@@ -505,44 +494,37 @@ try {
   await actor.page.keyboard.press('Escape');
   await waitGone();
   const { x: px, y: py } = await activeCentre();
-  let secondClick = { x: px, y: py };
-  if (!IS_3D) {
-    await actor.page.mouse.click(px, py);
-    // A slow double-click: the list has finished revealing, the 500 ms guard has not passed.
-    await actor.page.waitForTimeout(350);
-  } else {
-    // The 3D board's Active sits beside the focus card, so there the second click is aimed at the
-    // lowest payable panel (the list reveals upward, so it is hit-testable first). SwiftShader
-    // draws frames so far apart that the card is not even visible inside the 500 ms guard (it is
-    // hidden until its flight starts, one frame after the open), so the page's clock is held at
-    // the open and then moved 350 ms on: the guard is what is tested, not the frame rate.
-    await actor.page.evaluate(() => {
-      window.__realNow = performance.now.bind(performance);
-      window.__heldNow = window.__realNow();
-      performance.now = () => window.__heldNow;
-    });
-    await actor.page.mouse.click(px, py);
-    secondClick = await waitFor(
-      actor.page,
-      () => {
-        if (!document.querySelector('.card-focus--open')) return null;
-        const r = [...document.querySelectorAll('.card-focus .ptcg-atk--usable')].at(-1)?.getBoundingClientRect();
-        const at = r && { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-        return at && document.elementFromPoint(at.x, at.y)?.closest('.ptcg-atk--usable') ? at : null;
-      },
-      12000
-    ).catch(() => null);
-    await actor.page.evaluate(() => {
-      window.__heldNow += 350;
-    });
-  }
+  // The Active sits beside the focus card, so the second click is aimed at the
+  // lowest payable panel (the list reveals upward, so it is hit-testable first). SwiftShader
+  // draws frames so far apart that the card is not even visible inside the 500 ms guard (it is
+  // hidden until its flight starts, one frame after the open), so the page's clock is held at
+  // the open and then moved 350 ms on: the guard is what is tested, not the frame rate.
+  await actor.page.evaluate(() => {
+    window.__realNow = performance.now.bind(performance);
+    window.__heldNow = window.__realNow();
+    performance.now = () => window.__heldNow;
+  });
+  await actor.page.mouse.click(px, py);
+  const secondClick = await waitFor(
+    actor.page,
+    () => {
+      if (!document.querySelector('.card-focus--open')) return null;
+      const r = [...document.querySelectorAll('.card-focus .ptcg-atk--usable')].at(-1)?.getBoundingClientRect();
+      const at = r && { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      return at && document.elementFromPoint(at.x, at.y)?.closest('.ptcg-atk--usable') ? at : null;
+    },
+    12000
+  ).catch(() => null);
+  await actor.page.evaluate(() => {
+    window.__heldNow += 350;
+  });
   const onUsablePanel = Boolean(secondClick) && await actor.page.evaluate(
     ([x, y]) => Boolean(document.elementFromPoint(x, y)?.closest('.ptcg-atk--usable')),
     [secondClick.x, secondClick.y]
   );
   T('10c-pre. The second click of the double-click would land on a payable attack panel', onUsablePanel, JSON.stringify(secondClick));
   if (secondClick) await actor.page.mouse.click(secondClick.x, secondClick.y);
-  if (IS_3D) await actor.page.evaluate(() => { performance.now = window.__realNow; });
+  await actor.page.evaluate(() => { performance.now = window.__realNow; });
   await actor.page.waitForTimeout(700);
   T('10c. ...and it does not fire the attack: the focus view is still open', await focusOpen());
 
@@ -572,23 +554,21 @@ try {
   const reopen = async () => {
     await clickActive(['click']);
     await actor.page.waitForTimeout(700);
-    // The flight is WAAPI on the page's own timeline, which a SwiftShader-starved 3D page ticks late.
-    if (IS_3D) {
-      await eventually(() => {
-        const flights = (document.querySelector('.card-focus__card')?.getAnimations() ?? []).filter((a) =>
-          a.effect?.getKeyframes().some((k) => k.transform)
-        );
-        return flights.length > 0 && flights.every((a) => a.playState === 'finished');
-      }, undefined, 10000);
-    }
+    // The flight is WAAPI on the page's own timeline, which a SwiftShader-starved page ticks late.
+    await eventually(() => {
+      const flights = (document.querySelector('.card-focus__card')?.getAnimations() ?? []).filter((a) =>
+        a.effect?.getKeyframes().some((k) => k.transform)
+      );
+      return flights.length > 0 && flights.every((a) => a.playState === 'finished');
+    }, undefined, 10000);
     return focusOpen();
   };
   if (await reopen()) {
     const widthBefore = await actor.page.evaluate(() => document.querySelector('.card-focus__card').getBoundingClientRect().width);
     await actor.page.setViewportSize({ width: 1100, height: 700 });
     await actor.page.waitForTimeout(400);
-    // The resize event reaches a SwiftShader-starved 3D page late; the iframe board answers at once.
-    if (IS_3D) await eventually((before) => document.querySelector('.card-focus__card').getBoundingClientRect().width !== before, widthBefore, 8000);
+    // The resize event reaches a SwiftShader-starved page late.
+    await eventually((before) => document.querySelector('.card-focus__card').getBoundingClientRect().width !== before, widthBefore, 8000);
     const resized = await actor.page.evaluate(async () => {
       const { focusRect } = await import('./src/setup/rules/card-focus-geometry.mjs');
       const r = document.querySelector('.card-focus__card').getBoundingClientRect();
@@ -656,14 +636,13 @@ try {
       },
       [side, selector, index]
     );
-  // A point on the card that the pointer really reaches it at. Iframe board: the horizontal centre,
-  // a quarter down (the hand fan overlaps its cards). 3D board: the same point if the scene's
-  // raycast hits this card there, else the first point of a grid over its rect that does.
+  // A point on the card that the pointer really reaches it at: the horizontal centre, a quarter
+  // down (the hand fan overlaps its cards) if the scene's raycast hits this card there, else the
+  // first point of a grid over its rect that does.
   const hoverPointOn = async (id) => {
     const rect = await settledCardRect(id);
     if (!rect) throw new Error(`no rect for card #${id}`);
     const base = { x: rect.left + rect.width / 2, y: rect.top + Math.min(rect.height * 0.25, 40) };
-    if (!IS_3D) return base;
     const point = await actor.page.evaluate(
       async ([cardId, box, preferred]) => {
         const { getBoardScene } = await import('/src/setup/board3d/board3d.js');
@@ -701,36 +680,18 @@ try {
   await actor.page.waitForTimeout(600);
   const activeHover = await hoverState();
   T('15b. Hovering your Active for 0.8 s shows its card', activeHover?.src === (await artOf('self', '#active img')), JSON.stringify(activeHover));
-  if (IS_3D) {
-    // The canvas has no letterboxed mat art and so no gutter probe (hover-preview-dom.mjs
-    // appendProbe is iframe-only): the preview sits at the board's edge, mirrored to the right
-    // when it would cover the hovered card.
-    const activeRect = await settledCardRect(activeId);
-    const preview = await actor.page.evaluate(() => document.getElementById('hoverPreview').getBoundingClientRect().toJSON());
-    const overlaps =
-      preview.left < activeRect.left + activeRect.width && activeRect.left < preview.right &&
-      preview.top < activeRect.top + activeRect.height && activeRect.top < preview.bottom;
-    T(
-      '15c. At the board edge, clear of the hovered card (no gutter band on the canvas)',
-      /^edge/.test(activeHover?.mode ?? '') && !overlaps,
-      `mode=${activeHover?.mode} preview=${JSON.stringify(preview)} card=${JSON.stringify(activeRect)}`
-    );
-  } else {
-    // The mat art's left edge in page pixels, through the same iframe mapping the board FX use.
-    const probeLeft = await actor.page.evaluate(async () => {
-      const { viewportRectOf } = await import('./src/setup/image-logic/card-pop.mjs');
-      const lefts = ['selfContainer', 'oppContainer'].map((id) => {
-        const probe = document.getElementById(id)?.contentDocument?.querySelector('.hover-gutter-probe');
-        return probe ? viewportRectOf(probe).left : Infinity;
-      });
-      return Math.min(...lefts);
-    });
-    T(
-      '15c. In the blurred band, left of the mat art',
-      activeHover?.mode === 'band' && activeHover.right <= probeLeft + 1,
-      `mode=${activeHover?.mode} right=${activeHover?.right} probeLeft=${probeLeft}`
-    );
-  }
+  // The canvas has no letterboxed mat art and so no gutter band: the preview sits at the board's
+  // edge, mirrored to the right when it would cover the hovered card.
+  const activeRect = await settledCardRect(activeId);
+  const preview = await actor.page.evaluate(() => document.getElementById('hoverPreview').getBoundingClientRect().toJSON());
+  const overlaps =
+    preview.left < activeRect.left + activeRect.width && activeRect.left < preview.right &&
+    preview.top < activeRect.top + activeRect.height && activeRect.top < preview.bottom;
+  T(
+    '15c. At the board edge, clear of the hovered card (no gutter band on the canvas)',
+    /^edge/.test(activeHover?.mode ?? '') && !overlaps,
+    `mode=${activeHover?.mode} preview=${JSON.stringify(preview)} card=${JSON.stringify(activeRect)}`
+  );
 
   const handCount = (await boardIds('self', '#hand img')).length;
   if (handCount >= 2) {

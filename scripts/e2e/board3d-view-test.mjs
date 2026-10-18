@@ -207,6 +207,21 @@ const playBasic = (client) =>
     return { result, instanceId: placement?.instanceId ?? null, name: window.__ptcg.zone('self', 'active').names[0] };
   });
 
+/**
+ * Resolves once every near-hand placement has a scene rect (the deal's draw flights, which hide
+ * each mesh until it lands, have all played); false on timeout. Seven flights queue one after
+ * another and SwiftShader draws a few frames a second, so this can take well over a minute.
+ */
+const handSettled = (client) =>
+  waitFor(client.page, async () => {
+    const { getBoardScene } = await import('/src/setup/board3d/board3d.js');
+    const scene = getBoardScene();
+    if (!scene) return false;
+    const rects = scene.rects();
+    const hand = (scene.inspect().model?.placements ?? []).filter((p) => p.side === 'self' && p.zone === 'hand');
+    return hand.length >= 7 && hand.every((p) => Boolean(rects[p.instanceId]));
+  }, 90000).catch(() => false);
+
 const server = process.env.PTCG_URL ? { base: process.env.PTCG_URL, child: null } : await startServer();
 let browser = null;
 try {
@@ -227,6 +242,10 @@ try {
   await runCoinAndDeal(a, b);
   T('2. both seats were dealt', true);
 
+  // The deal's draw flights hide each card's mesh until it lands (E1), so wait for the scene to
+  // hold a rect for every near-hand card before comparing the mirror against it.
+  T('2b. every near-hand card has a scene rect once the deal flights finish (Alpha)', await handSettled(a));
+  T('2c. … and on Bravo', await handSettled(b));
   await checkPage(a, '3A', { mirrorSides: ['self'] });
   await checkPage(b, '3B', { mirrorSides: ['self'] });
 
@@ -255,6 +274,10 @@ try {
   const s = await openClient(browser, server.base, 'Watcher');
   await joinRoom(s, { spectator: true });
   await waitFor(s.page, () => window.__ptcg.zone('self', 'hand').count >= 7 && window.__ptcg.zone('opp', 'hand').count >= 7, 20000);
+  // The 3D board starts asynchronously after the page boots (three.js, the mat texture) and a
+  // third SwiftShader page is slow to get there; the players' pages had the deal to cover it.
+  T('6. the spectator page started its 3D board', await waitFor(s.page, () => document.body.classList.contains('board3d-active'), 90000).catch(() => false));
+  await handSettled(s);
   const spectator = await checkPage(s, '6S');
   const handCounts = async (client) =>
     client.page.evaluate(() => ({ self: window.__ptcg.zone('self', 'hand').count, opp: window.__ptcg.zone('opp', 'hand').count }));
@@ -268,7 +291,16 @@ try {
 
   // A POV switch clears the rendered board (spectator-session.js clearRenderedBoard) and
   // redraws it from the other seat: the scene must follow.
-  await s.page.click('#spectatorViewSwitch button[data-mode="p2"]');
+  // Three WebGL pages share one SwiftShader browser here, so Playwright's "stable across two
+  // frames" wait can outlast its timeout: assert the button is on top ourselves, then click it.
+  const switchButton = await s.page.evaluate(() => {
+    const el = document.querySelector('#spectatorViewSwitch button[data-mode="p2"]');
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { width: r.width, onTop: document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) === el };
+  });
+  T('7b. the spectator POV switch shows its P2 button on top', Boolean(switchButton?.onTop) && switchButton.width > 0, JSON.stringify(switchButton));
+  await s.page.click('#spectatorViewSwitch button[data-mode="p2"]', { force: true });
   await s.page.waitForTimeout(600);
   const switched = await checkPage(s, '8S (P2 POV)');
   T(

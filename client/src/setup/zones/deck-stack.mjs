@@ -5,8 +5,8 @@
  * image, offset upward by `translateY`, rather than real `translateZ`/
  * `preserve-3d` (rejected: silently flattens under `overflow`/`filter` on an
  * ancestor, and the tilted playfield already has both). `deckStackLayers`
- * only computes the layer count; the DOM renderer lives beside its caller
- * (playmat-anim.mjs).
+ * only computes the layer count; the 3D board's pile stack
+ * (board3d/pile-stack.mjs) draws the layers.
  */
 
 export const DEFAULT_MAX_COUNT = 60;

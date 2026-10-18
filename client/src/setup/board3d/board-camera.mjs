@@ -64,7 +64,7 @@ const viewOffsetFor = (viewportW, viewportH, principalPoint) => ({
 });
 
 /**
- * Today's tilted layout (apply-table-tilt.js:137-157): the near iframe sits at
+ * The retired iframe layout (apply-table-tilt.js:137-157, deleted in G3): the near iframe sat at
  * the viewport's bottom-left (`.self`, index.css:186-193), the pivot is the
  * centre of its playfield's bottom edge (one hand strip above the iframe's
  * bottom), and `tiltTransforms` lifts every plane by the rounded seam shift.

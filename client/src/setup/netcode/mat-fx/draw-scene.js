@@ -7,8 +7,7 @@
 // Design 045: a card with `from` (a taken prize) starts there instead of at
 // the deck, and `from.release` removes the sleeve that stood there as it goes.
 import { selfContainerDocument, oppContainerDocument } from '../../../state.js';
-import { board3dActive, boardRect, rectForInstance as boardCardRect } from '../../board3d/board-rects.js';
-import { visualRectOf } from '../../image-logic/iframe-rect.mjs';
+import { boardRect, rectForInstance as boardCardRect, visualRectOf } from '../../board3d/board-rects.js';
 import { animateFrames, removeWhen, sampleKeyframes, spawnOverlay } from '../../image-logic/mat-fx.mjs';
 import { toHighResCardImageUrl } from '../../image-logic/card-image-url.mjs';
 import { cardBackSrcForUser, imageAnchor } from '../../deck-constructor/hydrate-holo.js';
@@ -27,10 +26,7 @@ const SAMPLES = 60;
 
 const usable = (r) => Boolean(r) && r.width >= 2 && r.height >= 2;
 
-const boardFrameRects = () =>
-  board3dActive()
-    ? ['opp', 'self'].map(boardRect)
-    : ['oppContainer', 'selfContainer'].map((id) => document.getElementById(id)?.getBoundingClientRect() || null);
+const boardFrameRects = () => ['opp', 'self'].map(boardRect);
 
 /** The side's deck cover: its page rect and board turn, or null. */
 function deckOf(user) {
@@ -49,8 +45,8 @@ const handNodeOf = (card) => card.wrapper ?? imageAnchor(card.image);
 export function handSpotOf(card) {
   const node = handNodeOf(card);
   if (!node?.isConnected) return null;
-  // On the 3D board the scene's projection, not the mirror <img> (synced only on a drawn frame).
-  const projected = board3dActive() ? boardCardRect(Number(card.image?.dataset?.instanceId)) : null;
+  // The scene's projection, not the mirror <img> (synced only on a drawn frame).
+  const projected = boardCardRect(Number(card.image?.dataset?.instanceId));
   const rect = projected ?? visualRectOf(node);
   return usable(rect) ? { rect, turn: frameTurnOf(card.image) } : null;
 }

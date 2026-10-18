@@ -50,7 +50,7 @@ The script writes frames `f000.png…` every `stepMs` over `durationMs`. Read a 
 (the Read tool shows images), or tile them into one sheet:
 `ffmpeg -framerate 1 -i f%03d.png -vf "scale=480:-1,tile=5x5" sheet%d.png`.
 
-**Persistent board looks** (Tera crystal skin, holo foil, anything drawn from card state):
+**Persistent board looks** (Tera crystal skin, anything drawn from card state):
 
 ```powershell
 node .claude/skills/fx-preview/capture-board.mjs .agent/scratch/skin
@@ -58,11 +58,10 @@ node .claude/skills/fx-preview/capture-board.mjs .agent/scratch/skin
 
 It writes `<prefix>-board.png` (active and bench, cropped) and `<prefix>-full.png`.
 
-**Which board.** Every capture and `rec/` script below runs on the classic iframe board by default.
-`PTCG_BOARD=3d` opens the three.js board (`?board=3d`, design 074) instead: `PTCG_BOARD=3d node
-.claude/skills/fx-preview/capture-entry.mjs tera out/tera-3d`. The server must be authoritative
-(`SERVER_AUTHORITATIVE=1`; `pnpm start` prints `server-authoritative`) and the browser needs WebGL2 (the
-scripts launch it on SwiftShader). `board-mode.mjs` holds the switch and the page-side `window.__fxBoard`
+**Which board.** Every capture and `rec/` script below runs on the three.js board (design 074); there is no
+board-selection env var. The server must be authoritative (`SERVER_AUTHORITATIVE=1`; `pnpm start`
+prints `server-authoritative`) and the browser needs WebGL2 (the scripts launch it on SwiftShader).
+`board-mode.mjs` holds the launch options and the page-side `window.__fxBoard`
 helpers (`zoneRect`, `pauseAll`, `stepTo`, `pushView`, `imageOf`); `window.__ptcg.cardRect(id)` and
 `boardMode()` are the e2e API. `CHROMIUM_PATH` works wherever `CHROMIUM` does; `CARD_DIR` (a folder of
 PNGs named like the card images) or `CARD_IMG` serve `images.pokemontcg.io` art offline. SwiftShader draws a
@@ -76,22 +75,21 @@ few frames a second: the 3D pages are slower, and frame-time probes (`rec-move`)
   `instanceId, name, src, supertype, subtypes, types, rarity, hp`. Subtypes drive the
   effects: `'Tera'` gives the crystal skin and entry, `'MEGA'` gives the Mega entry. This is the
   same path a server view takes, so what renders is real.
-- **Board DOM** lives in an iframe:
-  `document.getElementById('selfContainer').contentDocument` holds `#active` and `#bench`.
-  Use `visualRectOf` (`/src/setup/image-logic/iframe-rect.mjs`) for page-space rects. On the 3D board
-  the same ids live in the mirror's shadow roots; `window.__fxBoard.root(side)` returns whichever
-  document the board uses and `__fxBoard.zoneRect(side, id)` the zone's page-space rect.
+- **Board DOM** lives in the board mirror's open shadow roots
+  (`document.getElementById('selfBoard').shadowRoot` holds `#active` and `#bench`);
+  `window.__fxBoard.root(side)` returns the root and `__fxBoard.zoneRect(side, id)` the zone's
+  page-space rect. `visualRectOf` (`/src/setup/board3d/board-rects.js`) gives the page-space rect of a
+  mirror element.
 - **Entry effects** are `playSignatureEntry(kind, rect, instanceId, card)` from
   `/src/setup/netcode/mat-fx/entry.js`. Call it directly; there is no need to drive an evolution
   through the rules engine.
-- **Freeze time.** Pause every `document.getAnimations()` (or the iframe document's, for
+- **Freeze time.** Pause every `document.getAnimations()` (or the mirror root's, for
   on-board CSS animations). Set `currentTime = t` and wait two `requestAnimationFrame`s,
   then screenshot. This gives deterministic frames regardless of machine speed. Canvas-drawn
   effects are driven by the same animation clock. Long teardown timers (≥1.5 s) are stubbed
   out so the overlay stays up while time is stepped.
-- **Holo foil** normally hydrates from TCGdex. Fabricated cards don't get that, so
-  `capture-board.mjs` repeats `hydrateHolo`'s DOM moves (`buildHoloCard` + `.mat-holo` +
-  `startHoloAnimation`, then dispatches `holo-wrapper-changed`). Set `HOLO=0` to skip it.
+- **Holo foil** is a scene material fed by the TCG Live foil manifest (`tcgl-foil-store.js`);
+  fabricated cards have no entry, so `capture-board.mjs` shows the Tera skins only.
 - **Offline sandbox?** If `cdn.socket.io` is blocked, set `SIO_JS` to a local copy of
   `socket.io.min.js`; the scripts route the CDN request to it.
 

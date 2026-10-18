@@ -3,7 +3,7 @@
 // knockout scene and plain discards share. Every overlay is detached, runs on
 // WAAPI (D103) and removes itself.
 import { oppContainerDocument, selfContainerDocument } from '../../../state.js';
-import { visualRectOf } from '../../image-logic/iframe-rect.mjs';
+import { visualRectOf } from '../../board3d/board-rects.js';
 import { animateFrames, removeWhen, sampleKeyframes, spawnOverlay } from '../../image-logic/mat-fx.mjs';
 import { FLIGHT_MS, flightDelays, flightPose, flightTrail, planFlight, rectFlightEnds } from './card-flight.mjs';
 
@@ -18,9 +18,8 @@ const CATCH_MS = 420;
 const TRAIL_BASE_PX = 100;
 
 /**
- * A pile's visible face (`#discardCover`, `#deckCover`) inside a side's
- * playmat iframe: its page-space rect and the board's turn, or null when the
- * frame is not laid out yet.
+ * A pile's visible face (`#discardCover`, `#deckCover`) in a side's board mirror: its
+ * page-space rect and the board's turn, or null when it is not laid out yet.
  */
 export function pileOf(user, zoneId) {
   const doc = docForSide(user, selfContainerDocument, oppContainerDocument);

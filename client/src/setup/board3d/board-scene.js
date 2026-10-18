@@ -931,7 +931,7 @@ export function createBoardScene({
 
   /**
    * Screen shake as a camera view-offset sequence on the scene clock. `offsets` are keyframes
-   * `{ x, y, ms }` in screen px, `ms` from the start (combat-pose.mjs `screenShakeOffsets`
+   * `{ x, y, ms }` in screen px, `ms` from the start (combat-pose.mjs `screenShakeKeyframes`
    * spread over its duration). A new shake replaces a running one. Resolves when it ends.
    */
   const shake = (offsets) => {

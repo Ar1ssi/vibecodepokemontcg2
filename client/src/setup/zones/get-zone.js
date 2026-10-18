@@ -33,6 +33,7 @@ const neutralZoneArrays = {
   stadium: [],
 };
 
+// A side's zones live in its board-mirror shadow root (containers.js); the Stadium is on the page.
 export const getZone = (user, zoneId) => {
   let documentType;
   let zoneArrays;

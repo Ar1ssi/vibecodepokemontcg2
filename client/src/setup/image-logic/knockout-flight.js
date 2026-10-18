@@ -9,7 +9,7 @@ import {
   oppContainerDocument,
   selfContainerDocument,
 } from '../../state.js';
-import { visualRectOf } from './iframe-rect.mjs';
+import { visualRectOf } from '../board3d/board-rects.js';
 import { KNOCKOUT_DURATION_MS, knockoutPose } from './knockout-pose.mjs';
 import { fxDisabled, motionReduced, runPose, spawnOverlay } from './mat-fx.mjs';
 import { flightSrcOf } from '../netcode/mat-fx/card-flight.js';

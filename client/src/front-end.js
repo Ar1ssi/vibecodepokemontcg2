@@ -5,35 +5,13 @@ import { loadImportData } from './initialization/load-import-data/load-import-da
 import { initializeMutationObservers } from './initialization/mutation-observers/initialize-mutation-observers.js';
 import { initializeSocketEventListeners } from './initialization/socket-event-listeners/socket-event-listeners.js';
 import { initializeMatLayout } from './setup/sizing/apply-mat-layout.js';
-import { initializeTableTilt } from './setup/sizing/apply-table-tilt.js';
 import { initSyncLogger } from './setup/general/sync-logger-bridge.js';
 import { initDecisionLogger } from './setup/general/decision-logger-bridge.js';
 import { installE2eApi } from './setup/general/e2e-api.js';
 import { initializeRoomFormatPanel } from './setup/general/room-format-panel.js';
 import { applyFxSettings, watchFxSettingTargets } from './setup/image-logic/fx-settings.js';
 import { initializeHoverPreview } from './setup/image-logic/hover-preview.js';
-import {
-  board3dFallbackNotice,
-  isBoard3dRequested,
-  takeBoard3dFallback,
-} from './setup/board3d/board-flag.mjs';
 import { loadFoilManifest } from './setup/foil/tcgl-foil-store.js';
-
-function readLocalStorage() {
-  try {
-    return localStorage;
-  } catch {
-    return null;
-  }
-}
-
-function readSessionStorage() {
-  try {
-    return sessionStorage;
-  } catch {
-    return null;
-  }
-}
 
 applyFxSettings();
 loadFoilManifest();
@@ -45,22 +23,10 @@ initializeRoomFormatPanel();
 initializeDOMEventListeners();
 initializeMutationObservers();
 initializeMatLayout();
-// Design 074: the three.js board loads only when asked for, so the iframe board pays nothing.
-if (isBoard3dRequested(location.search, readLocalStorage())) {
-  import('./setup/board3d/board3d.js')
-    .then((board3d) => board3d.initializeBoard3d())
-    .catch((error) => console.error('board3d failed to start', error));
-}
-// A late 3D-board fallback reloaded this page onto the iframe board (board3d.js): say why, once.
-const board3dFallback = takeBoard3dFallback(readSessionStorage());
-if (board3dFallback) {
-  import('./setup/chatbox/append-message.js')
-    .then(({ appendMessage }) =>
-      appendMessage('', board3dFallbackNotice(board3dFallback), 'announcement', false)
-    )
-    .catch((error) => console.warn('board3d: fallback notice failed', error));
-}
-initializeTableTilt();
+// Design 074: the three.js board loads through import() so the page still boots if it fails.
+import('./setup/board3d/board3d.js')
+  .then((board3d) => board3d.initializeBoard3d())
+  .catch((error) => console.error('board3d failed to start', error));
 initializeHoverPreview();
 loadImportData();
 installE2eApi();

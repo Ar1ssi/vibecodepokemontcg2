@@ -7,8 +7,7 @@
 //      SIDE (self = your Active attacks, opp = the opponent's does; default self),
 //      BASE_URL (default http://localhost:4100), CHROMIUM / CHROMIUM_PATH, OUT (default .agent/scratch/moves/<MOVE>),
 //      SIO_JS (local socket.io.min.js when cdn.socket.io is unreachable), SEED,
-//      CARD_DIR (a folder holding 6_hires.png and 3_hires.png when the browser cannot reach images.pokemontcg.io),
-//      PTCG_BOARD=3d (the three.js board, design 074; default iframe)
+//      CARD_DIR (a folder holding 6_hires.png and 3_hires.png when the browser cannot reach images.pokemontcg.io)
 import { chromium } from 'playwright';
 import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import path from 'node:path';

@@ -35,7 +35,9 @@ export const initializeDeckBuilderMatPicker = ({ panelEl, onChange }) => {
   try {
     const saved = localStorage.getItem(SCALE_KEY);
     if (saved) currentScale = Number(saved) || 100;
-  } catch {}
+  } catch {
+    // storage unavailable: keep the default scale
+  }
   document.documentElement.style.setProperty('--mat-scale', currentScale / 100);
 
   let selectedId = null;
@@ -69,13 +71,11 @@ export const initializeDeckBuilderMatPicker = ({ panelEl, onChange }) => {
     if (zoomVal) zoomVal.textContent = `${currentScale}%`;
     const scaleVal = String(currentScale / 100);
     document.documentElement.style.setProperty('--mat-scale', scaleVal);
-    const selfDoc = document.getElementById('selfContainer')?.contentDocument;
-    const oppDoc = document.getElementById('oppContainer')?.contentDocument;
-    selfDoc?.documentElement?.style.setProperty('--mat-scale', scaleVal);
-    oppDoc?.documentElement?.style.setProperty('--mat-scale', scaleVal);
     try {
       localStorage.setItem(SCALE_KEY, String(currentScale));
-    } catch {}
+    } catch {
+      // storage unavailable: the scale simply is not remembered
+    }
   });
 
   const matImageSrc = (mat) => matThumbFallbackChain(mat).primary;

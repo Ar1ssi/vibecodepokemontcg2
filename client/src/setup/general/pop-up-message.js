@@ -1,5 +1,3 @@
-import { oppContainer, selfContainer } from '../../state.js';
-
 export const showPopup = (message, callback) => {
   const popup = document.createElement('div');
   popup.className = 'custom-popup';
@@ -13,8 +11,6 @@ export const showPopup = (message, callback) => {
   okButton.textContent = 'OK';
   okButton.addEventListener('click', () => {
     document.body.removeChild(popup);
-    selfContainer.style.zIndex = 0;
-    oppContainer.style.zIndex = 0;
     if (callback) {
       callback();
     }
@@ -24,6 +20,4 @@ export const showPopup = (message, callback) => {
   popup.appendChild(popupContent);
 
   document.body.appendChild(popup);
-  selfContainer.style.zIndex = -1;
-  oppContainer.style.zIndex = -1;
 };

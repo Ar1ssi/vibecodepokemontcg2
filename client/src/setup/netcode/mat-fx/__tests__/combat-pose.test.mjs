@@ -19,7 +19,6 @@ import {
   damagePopPose,
   lungePoseFor,
   screenShakeAmplitude,
-  screenShakeOffsets,
   screenShakeKeyframes,
   easingTimeFor,
   shakePose,
@@ -71,20 +70,17 @@ test('screenShakeAmplitude: zero below threshold, grows, capped', () => {
   assert.equal(screenShakeAmplitude(9999), 6);
 });
 
-test('screenShakeOffsets: ends at rest and decays', () => {
-  const offsets = screenShakeOffsets(6);
-  assert.equal(offsets.at(-1), '0px 0px');
-  assert.ok(Math.abs(parseFloat(offsets[0])) > Math.abs(parseFloat(offsets[4])));
-});
-
 test('screenShakeKeyframes: the WAAPI shake as timed px offsets (design 074 D6)', () => {
   const keys = screenShakeKeyframes(6, 360);
-  const strings = screenShakeOffsets(6);
-  assert.equal(keys.length, strings.length);
-  keys.forEach((key, i) => {
-    const [x, y] = strings[i].split(' ').map(parseFloat);
-    assert.ok(Math.abs(key.x - x) < 0.006 && Math.abs(key.y - y) < 0.006, `key ${i}`);
+  assert.equal(keys.length, 13);
+  // A damped sine: keyframe i sits at fraction i/12 of the decay.
+  keys.slice(0, 12).forEach((key, i) => {
+    const f = i / 12;
+    const decay = (1 - f) ** 2;
+    assert.ok(Math.abs(key.x - 6 * Math.cos(f * Math.PI * 5) * decay) < 1e-9, `key ${i} x`);
+    assert.ok(Math.abs(key.y - 6 * 0.6 * Math.sin(f * Math.PI * 4) * decay) < 1e-9, `key ${i} y`);
   });
+  assert.ok(Math.abs(keys[0].x) > Math.abs(keys[4].x));
   assert.equal(keys[0].ms, 0);
   assert.equal(keys.at(-1).ms, 360);
   assert.deepEqual([keys.at(-1).x, keys.at(-1).y], [0, 0]);

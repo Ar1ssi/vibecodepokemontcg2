@@ -1,5 +1,5 @@
-// Design 074 D4: with the 3D board requested, containers.js hands the board mirror's shadow
-// roots to every importer as the container documents, and getZone resolves zones from them.
+// Design 074 D4: containers.js hands the board mirror's shadow roots to every importer as the
+// container documents, and getZone resolves zones from them.
 // containers.js decides at module load, so the page globals are set before it is imported.
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,11 +8,9 @@ import { JSDOM } from 'jsdom';
 const dom = new JSDOM(
   '<body><div id="board3dHost"><div id="boardMirror"><div id="selfBoard" class="self"></div>' +
     '<div id="oppBoard" class="opp"></div></div></div>' +
-    '<iframe id="selfContainer"></iframe><iframe id="oppContainer"></iframe><div id="stadium"></div></body>',
-  { url: 'http://localhost/?board=3d' }
+    '<div id="stadium"></div></body>',
+  { url: 'http://localhost/' }
 );
-// jsdom has no WebGL: a context stand-in passes containers.js's WebGL2 probe.
-dom.window.HTMLCanvasElement.prototype.getContext = (kind) => (kind === 'webgl2' ? { getExtension: () => null } : null);
 globalThis.document = dom.window.document;
 globalThis.location = dom.window.location;
 

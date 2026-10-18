@@ -15,7 +15,7 @@ import {
 // Static contracts for design 067, in the style of card-inspector-css.test.mjs: no jsdom in this
 // repo, so the stylesheet text is the thing under test. They guard the ways the focus view silently
 // stops working: dimming by opacity on the card (flattens its 3D tilt, ghosts the print), timings
-// drifting from the geometry module, and the hand rule landing where the hand never sees it.
+// drifting from the geometry module.
 
 const CSS_DIR = fileURLToPath(new URL('../../../css/', import.meta.url));
 const read = (name) => readFileSync(`${CSS_DIR}${name}`, 'utf8');
@@ -31,7 +31,6 @@ const ruleBody = (css, selector) => {
 
 const FOCUS_CSS = read('card-focus.css');
 const INDEX_CSS = read('index.css');
-const SELF_CSS = read('self-containers.css');
 const focus = (selector) => ruleBody(FOCUS_CSS, selector);
 
 describe('067 — card-focus.css', () => {
@@ -39,7 +38,7 @@ describe('067 — card-focus.css', () => {
     assert.match(INDEX_CSS, /@import url\('\.\/card-focus\.css'\);/);
   });
 
-  it('.card-focus sits at the popup layer (z-index 2400, above the playmat iframes)', () => {
+  it('.card-focus sits at the popup layer (z-index 2400, above the board)', () => {
     const decls = focus('.card-focus');
     assert.ok(decls, '.card-focus is missing');
     assert.match(decls, /position: fixed;/);
@@ -235,31 +234,5 @@ describe('067 — card-focus.css', () => {
     for (const selector of ['.card-focus__hud', '.card-focus__close', '.card-focus__stack']) {
       assert.ok(focus(selector), `${selector} is missing`);
     }
-  });
-});
-
-describe('067 — the hand drops inside the playmat iframe', () => {
-  it('self-containers.css lowers #hand by moving `bottom`, below the viewport', () => {
-    const decls = ruleBody(SELF_CSS, '.hand-lowered #hand');
-    assert.ok(decls, '.hand-lowered #hand is missing from self-containers.css');
-    assert.match(decls, /bottom: calc\(-3\.2 \* var\(--hand-crop-height\)\);/);
-  });
-
-  it('#hand animates `bottom` over the flight duration and never takes a transform', () => {
-    const decls = ruleBody(SELF_CSS, '#hand');
-    assert.match(decls, new RegExp(`transition: bottom ${FLIGHT_MS}ms ${FLIGHT_EASE.replace(/[().,]/g, '\\$&')};`));
-    // A transform would make #hand the containing block of the fixed ::before strip.
-    assert.doesNotMatch(decls, /(^|[;\s])transform\s*:/i);
-    assert.doesNotMatch(ruleBody(SELF_CSS, '.hand-lowered #hand'), /(^|[;\s])transform\s*:/i);
-  });
-
-  it('the fixed hand strip follows the hand down', () => {
-    const decls = ruleBody(SELF_CSS, '.hand-lowered #hand::before');
-    assert.ok(decls, 'the strip would stay on screen while the cards drop');
-    assert.match(decls, /bottom: calc\(-1 \* var\(--hand-crop-height\)\);/);
-  });
-
-  it('the rule is not defined for the main document stylesheet (the hand lives in the iframe)', () => {
-    assert.doesNotMatch(INDEX_CSS, /\.hand-lowered/);
   });
 });

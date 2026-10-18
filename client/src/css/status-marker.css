@@ -171,8 +171,7 @@
    size, tint and timing come inline from status-loop.mjs; this sheet holds the
    textures, how each is painted, and the keyframes. Sizes are `em` of the card
    width (the overlay's font-size). `__card` parts turn with the card; `__sky`
-   parts stay screen-upright (the far seat's frame is turned, see
-   --status-fx-upright in opp-containers.css). */
+   parts stay screen-upright (the far seat's frame is turned). */
 .status-fx-loop {
   position: absolute;
   z-index: 1;
@@ -417,8 +416,7 @@
 }
 
 /* Design 024 slice 5: same kill-switch seam as mat-ambient.css — the status
-   idle loops live inside the playmat iframes, so they read the marker class
-   fx-settings.js writes onto the iframe <html>, not the parent's body.
+   idle loops read the marker class fx-settings.js writes onto <html>, not the body.
    Matches the full selector shape above so it wins on specificity, not on
    source order alone. */
 :root.fx-off .self-circle.status-marker,

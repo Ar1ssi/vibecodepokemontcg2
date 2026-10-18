@@ -1,8 +1,8 @@
 /**
  * @file The state half of the board flip (flip-board.js does the DOM half).
  *
- * `systemState.initiator` names the side drawn at the bottom; a flip of the iframe board
- * swaps it with the iframes. A solo room (design 074 D7) never swaps the iframes: its
+ * `systemState.initiator` names the side drawn at the bottom; a flip swaps it with the
+ * board's two sides. A solo room (design 074 D7) never swaps its sides: its
  * bottom is always 'self', and the flip changes which seat 'self' stands for, so the
  * server's next view draws the other seat at the bottom.
  *
@@ -16,7 +16,7 @@ import { farSeat } from '../../setup/netcode/solo-seat.mjs';
  *
  * @param {{ solo?: boolean, nearSeat?: 'p1'|'p2', initiator?: 'self'|'opp',
  *   p2SelfUsername?: string, p2OppUsername?: string }} systemState
- * @returns {{ swapIframes: true } | { swapIframes: false, requestNearSeat: 'p1'|'p2' }}
+ * @returns {{ swapSides: true } | { swapSides: false, requestNearSeat: 'p1'|'p2' }}
  */
 export function applyBoardFlip(systemState) {
   if (systemState.solo) {
@@ -26,8 +26,8 @@ export function applyBoardFlip(systemState) {
       systemState.p2OppUsername,
       systemState.p2SelfUsername,
     ];
-    return { swapIframes: false, requestNearSeat: systemState.nearSeat };
+    return { swapSides: false, requestNearSeat: systemState.nearSeat };
   }
   systemState.initiator = systemState.initiator === 'opp' ? 'self' : 'opp';
-  return { swapIframes: true };
+  return { swapSides: true };
 }
