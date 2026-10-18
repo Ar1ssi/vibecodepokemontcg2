@@ -110,7 +110,7 @@ export function hydrateHolo(card) {
       const wrapper = buildHoloCard(card.image.src, effect, {
         trainer: isTrainerCard(data),
         cardId: foilCardId(foilCard, foilManifest),
-        reverse: isReverseHoloCard(foilCard),
+        reverse: isReverseHoloCard(foilCard, foilManifest),
         manifest: foilManifest,
       });
       // No inline px size: every zone sizes `.mat-holo` in CSS. A px snapshot
