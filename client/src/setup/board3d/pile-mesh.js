@@ -6,6 +6,7 @@
 // adds `group` to the tilted frame. `three` is the namespace from `import('three')`; this module
 // never imports it statically.
 import { textureUrlFor } from '../gl/card-art-hosts.mjs';
+import { createCardArtMaterial } from '../gl/card-art-material.js';
 import { CARD_UNITS, cardCornerRadius, cardScaleFor, roundedRectShapePoints } from './card-geometry.mjs';
 import { createTween } from './tween.mjs';
 
@@ -134,7 +135,7 @@ export function createPileMeshes({
       state: 'loading',
       texture: null,
       released: false,
-      material: new three.MeshStandardMaterial({ color: 0xffffff, roughness: 0.55, metalness: 0 }),
+      material: createCardArtMaterial(three),
     };
     pile.sleeve = sleeve;
     textures.acquire(sleeve.url, { colorSpace: 'srgb' }).then(
