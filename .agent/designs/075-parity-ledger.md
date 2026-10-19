@@ -119,3 +119,15 @@ karate-chop (fighting, LGPE) — ok: a quick chop flash.
 lands-wrath (ground, sig) — tweak: SV lights the ground gold and bursts gold columns up under the foe; ours fans black spikes at the user → drop the dark fan; the gold columns stay.
 leaf-blade (grass) — ok: a green blade streak.
 GLOBAL — coreCharge `rings` spin tongue arcs round the charge orb: the spinning circle the user rejected → drop `rings` everywhere.
+FIXED (pass 14): judgment lands-wrath · GLOBAL: coreCharge rings dropped
+leaf-storm (grass) — ok: leaves swirl round the foe into a green burst.
+lick (ghost) — tweak: SV licks with a big pink tongue; ours a tiny violet slash → a thick pink tongue sweep (slashArc, pink).
+liquidation (water) — ok: a water crash and splash.
+low-sweep (fighting) — ok: a sweeping kick, an orange spark.
+luster-purge (psychic, sig) — ok: a white-gold light orb and a gold burst (SV is white light too).
+FIXED (pass 15): lick
+lunge (bug) — ok: a lunge and a yellow spark.
+magical-leaf (grass) — ok: glowing leaves fly with sparkles.
+magma-storm (fire, sig) — ok: flame pillars and a fire spiral round the foe (the defender is the top card), cracks under it.
+malignant-chain (poison, sig) — ok: pink-violet chain links wrap the foe (the kept ring is the chain's coil).
+megahorn (bug) — ok: a green horn drives in, a yellow burst.

@@ -50,7 +50,7 @@ export const lick = spec({
     { at: 0, until: 450, layer: 'back', drawer: 'aura', params: { target: 'attacker', alpha: 0.35, hz: 3 } },
     { at: 300, until: 940, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.3 } },
     // The lick leads the flash so it reads before the hit: its tip is two thirds up at contact.
-    { at: 260, until: 580, layer: 'front', drawer: 'slashArc', params: { sweep: -140, radius: 0.38, angle: 0, thick: 0.3 } },
+    { at: 260, until: 580, layer: 'front', drawer: 'slashArc', params: { sweep: -140, radius: 0.5, angle: 0, thick: 0.3, tint: { deep: '#B03A78', body: '#F06AA8', hot: '#FFB8D8', core: '#FFE8F2' } } },
     { at: 450, until: 620, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.75 } },
     { at: 560, until: 940, layer: 'front', drawer: 'smoke', params: { count: 3, rise: 0.6 } },
   ],
