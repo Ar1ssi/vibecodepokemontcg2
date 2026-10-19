@@ -298,10 +298,7 @@ function poisonKit(palette) {
       ctx.fill();
       ctx.fxStyle = null;
     });
-    ctx.strokeStyle = rgbCss(palette.hot, 0.4);
-    ctx.lineWidth = Math.max(1, r * 0.03);
-    ctx.lineJoin = 'round';
-    ctx.stroke();
+    // No stroked rim (design 075 parity): the outlined pool read as clip art; the fill carries it.
     // Hollow bubbles: a faint violet inside and a lilac skin, each fading as it pops.
     ctx.lineWidth = Math.max(1, r * 0.025);
     for (const b of bubbleRise(s, r)) {

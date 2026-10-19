@@ -812,11 +812,11 @@ test('reticleTicks: four ticks that turn and close, locking square to the screen
   assert.ok(reticleTicks(0, 100)[0].to > reticleTicks(1, 100)[0].to, 'closes in');
 });
 
-test('the steel sigil strokes a ring, the ticks and a pip in palette colours only', () => {
+test('the steel sigil is a glow and a filled four-point glint, no stroked reticle (design 075 parity)', () => {
   const rec = recordingContext();
   MATERIALS.steel.sigil(rec.ctx, 100, 100, 60, 0.5);
-  assert.equal(rec.fills.count, 0);
-  assert.equal(strokes(rec), 3);
+  assert.equal(rec.fills.count, 2);
+  assert.equal(strokes(rec), 0);
   for (const css of rec.colours) assert.ok(inPalette(MATERIALS.steel, css), css);
   assert.ok(callsAreFinite(rec.calls));
   const none = recordingContext();
@@ -1316,13 +1316,13 @@ test('bubbleRise: none at either end, at most seven, all above the pool and risi
   assert.ok(bubbleRise(0.47, r)[0].alpha < 1, 'and pops at the end of its life');
 });
 
-test('the poison sigil: a pool fill with a lilac rim, then each bubble filled and skinned, in palette colours only', () => {
+test('the poison sigil: a pool fill (no stroked rim, design 075 parity), then each bubble filled and skinned, in palette colours only', () => {
   const rec = recordingContext();
   MATERIALS.poison.sigil(rec.ctx, 100, 100, 80, 0.5);
   const bubbles = bubbleRise(0.5, 80).length;
   assert.ok(bubbles > 0);
   assert.equal(rec.fills.count, 1 + bubbles);
-  assert.equal(strokes(rec), 1 + bubbles);
+  assert.equal(strokes(rec), bubbles);
   assert.ok(callsAreFinite(rec.calls));
   for (const css of rec.colours) assert.ok(inPalette(MATERIALS.poison, css), css);
   const none = recordingContext();

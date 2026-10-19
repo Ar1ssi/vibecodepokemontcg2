@@ -207,3 +207,7 @@ shadow-punch (ghost) — ok: a violet fist strike.
 shock-wave (electric) — tweak: SV pulses a soft green-yellow sphere off the user, then yellow arcs; our stroked yellow ellipse rings read as clip art → a soft electric aura instead of the rings.
 signal-beam (bug, USUL) — ok: a green-yellow beam.
 silver-wind (silver) — ok: silver powder streams at the foe.
+FIXED (pass 26): shock-wave
+sludge / sludge-bomb / sludge-wave (poison) — tweak: SV splatters magenta-violet sludge; our sludge globs match, but the pool on the foe has a hard stroked outline (clip art) → soften the poison pool's rim (kit-wide).
+smack-down (rock) — ok: a rock knocks the foe down with dust.
+smart-strike (steel) — tweak: SV charges a horn and strikes into a blue-white burst; ours draws a stroked targeting reticle round the attacker (clip art) → no reticle (steel sigil soft).
