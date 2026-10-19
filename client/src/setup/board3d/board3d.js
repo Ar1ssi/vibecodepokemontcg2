@@ -281,6 +281,7 @@ export async function initializeBoard3d({
     const layout = flatLayout(spec?.profile, half, { viewport, matScale: spec?.scale ?? 1 });
     appliedPreset = currentPreset();
     const cameraParams = { viewportW: viewport.w, viewportH: viewport.h, nearHalf: half };
+    session.gl?.syncPixelRatio?.();
     session.scene.setViewport(viewport);
     session.scene.setCamera(
       appliedPreset === 'tcgl'
@@ -474,6 +475,21 @@ export async function initializeBoard3d({
     win.addEventListener('resize', relayout);
     session.cleanup.push(() => win.removeEventListener('resize', relayout));
   }
+
+  // Browser zoom resizes the host, but a window moved to a screen of another pixel density does
+  // not: a resolution query for the current ratio stops matching then, and is re-armed each time.
+  let pixelRatioQuery = null;
+  const onPixelRatioChange = () => {
+    relayout();
+    watchPixelRatio();
+  };
+  const watchPixelRatio = () => {
+    pixelRatioQuery?.removeEventListener?.('change', onPixelRatioChange);
+    pixelRatioQuery = win?.matchMedia?.(`(resolution: ${win.devicePixelRatio || 1}dppx)`) ?? null;
+    pixelRatioQuery?.addEventListener?.('change', onPixelRatioChange);
+  };
+  watchPixelRatio();
+  session.cleanup.push(() => pixelRatioQuery?.removeEventListener?.('change', onPixelRatioChange));
 
   // The host is full-viewport, so collapsing the side menu resizes nothing it observes:
   // relayout when a body class changes the board's width share.

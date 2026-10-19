@@ -59,7 +59,14 @@ const setup = ({ renderer = 'ok', systemState = {}, url = 'http://localhost/' } 
     createRenderer: ({ canvas, onLost }) => {
       calls.onLost.push(onLost);
       if (renderer === null) return null;
-      const gl = { renderer: {}, canvas, disposed: false, dispose: () => (gl.disposed = true) };
+      const gl = {
+        renderer: {},
+        canvas,
+        disposed: false,
+        ratioSyncs: 0,
+        syncPixelRatio: () => (gl.ratioSyncs += 1) > 0,
+        dispose: () => (gl.disposed = true),
+      };
       calls.renderers.push(gl);
       return gl;
     },
@@ -153,6 +160,38 @@ describe('initializeBoard3d', () => {
     doc.body.classList.remove('side-menu-collapsed');
     await flush();
     assert.ok(Math.abs(scene.layouts.at(-1).half.w - 1920 * 0.755) < 1e-9);
+  });
+
+  it('a pixel-ratio change (another screen, no resize) syncs the renderer and relays out; re-arms', async () => {
+    const { host, deps, calls, dom } = setup();
+    const queries = [];
+    dom.window.matchMedia = (media) => {
+      const query = {
+        media,
+        listeners: new Set(),
+        addEventListener: (type, fn) => type === 'change' && query.listeners.add(fn),
+        removeEventListener: (type, fn) => query.listeners.delete(fn),
+      };
+      queries.push(query);
+      return query;
+    };
+    dom.window.devicePixelRatio = 1;
+    await initializeBoard3d({ host, deps });
+    const scene = calls.scenes[0];
+    const gl = calls.renderers[0];
+    assert.equal(queries.at(-1).media, '(resolution: 1dppx)');
+    const viewports = scene.viewports.length;
+    const syncs = gl.ratioSyncs;
+
+    dom.window.devicePixelRatio = 2;
+    for (const fn of [...queries.at(-1).listeners]) fn();
+    assert.equal(scene.viewports.length, viewports + 1);
+    assert.equal(gl.ratioSyncs, syncs + 1);
+    assert.equal(queries.at(-1).media, '(resolution: 2dppx)', 'watches the new ratio');
+    assert.equal(queries.at(-2).listeners.size, 0, 'and lets the old query go');
+
+    disposeBoard3d();
+    assert.equal(queries.at(-1).listeners.size, 0);
   });
 
   it('context lost once rebuilds on a fresh canvas with the last model; twice gives up', async () => {
