@@ -87,8 +87,10 @@ export function createBoardInput({
   };
 
   const setHoverTarget = (hit, el, event) => {
+    const id = hit && !hit.pile && Number.isFinite(hit.instanceId) ? hit.instanceId : null;
     try {
-      scene.setHover(hit && !hit.pile && Number.isFinite(hit.instanceId) ? hit.instanceId : null);
+      scene.setHover(id);
+      scene.setPointerTilt?.(id, event?.clientX, event?.clientY);
     } catch (error) {
       console.warn('board3d: hover lift failed', error?.message || error);
     }

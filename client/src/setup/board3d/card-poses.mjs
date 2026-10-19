@@ -234,11 +234,38 @@ export function stadiumCardPose(model, layout) {
   return pose && { ...pose, face: 'front', hidden: false };
 }
 
+/** mat-ambient.css "Board card hover lift": `scale: 1.045` about the card's bottom edge. */
+export const BOARD_HOVER_SCALE = 1.045;
+/** Its `drop-shadow(0 6px 8px …)`: the scene's shadow grows with height, so the card rises. */
+export const BOARD_HOVER_LIFT_PX = 6;
+
+/**
+ * A hovered Trainer-board card's pose: grown by BOARD_HOVER_SCALE with its bottom edge kept
+ * (`transform-origin: 50% 100%`) and lifted. The iframe rule named Active and Bench too, but
+ * their cards sat in a `.play-container`, out of its `#active > img` reach: only the Trainer
+ * board ever lifted.
+ * @param {CardPose} pose
+ * @returns {CardPose}
+ */
+export function boardHoverPose(pose) {
+  const grow = ((BOARD_HOVER_SCALE - 1) * pose.widthPx * (CARD_UNITS.h / CARD_UNITS.w)) / 2;
+  const yaw = (pose.yawDeg * Math.PI) / 180;
+  // The card's top edge points along +y turned clockwise by its yaw.
+  return {
+    ...pose,
+    x: pose.x + Math.sin(yaw) * grow,
+    y: pose.y + Math.cos(yaw) * grow,
+    z: pose.z + BOARD_HOVER_LIFT_PX,
+    widthPx: pose.widthPx * BOARD_HOVER_SCALE,
+  };
+}
+
 /**
  * Poses of every placed card, by instance id; the Stadium under its own instance id.
  * @param {import('./board-model.mjs').BoardModel|null} model
  * @param {ReturnType<typeof import('./board-layout.mjs').flatLayout>|null} layout
- * @param {{ hover?: { instanceId: number }|null, lowered?: boolean }} [options] see `handPoses`
+ * @param {{ hover?: { instanceId: number }|null, lowered?: boolean }} [options] see `handPoses`;
+ *   a hovered Trainer-board card lifts too (`boardHoverPose`)
  * @returns {Map<number, CardPose>}
  */
 export function posesFor(model, layout, { hover = null, lowered = false } = {}) {
@@ -249,9 +276,12 @@ export function posesFor(model, layout, { hover = null, lowered = false } = {}) 
     if (p.zone === 'board' && p.side in boardCounts) boardCounts[p.side] += 1;
   }
   const fanned = handPoses(model, layout, { hover, lowered });
+  const hoverId = hover?.instanceId ?? null;
   for (const placement of model.placements) {
     const pose = placementPose(placement, layout, { boardCounts, piles: model.piles, handPoses: fanned });
-    if (pose) poses.set(placement.instanceId, pose);
+    if (!pose) continue;
+    const lifted = placement.instanceId === hoverId && placement.zone === 'board';
+    poses.set(placement.instanceId, lifted ? boardHoverPose(pose) : pose);
   }
   const stadium = stadiumCardPose(model, layout);
   if (stadium) poses.set(model.stadium.instanceId, stadium);

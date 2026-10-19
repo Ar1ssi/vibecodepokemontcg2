@@ -47,6 +47,7 @@ const defaultDeps = {
       sortZoneCards: handSort.sortZoneCardsForRender,
       cardBackSrcFor: hydrateHolo.cardBackSrcForUser,
       motionReduced: matFx.motionReduced,
+      fxDisabled: matFx.fxDisabled,
       boardMirror: containers.boardMirror,
       createBoardInput: input.createBoardInput,
       getHoverPreview: hover.getHoverPreview,
@@ -330,6 +331,8 @@ export async function initializeBoard3d({
       RoomEnvironment: modules.RoomEnvironment,
       foil,
       motionReduced: modules.motionReduced,
+      // mat-tilt.mjs's kill switch: the holo tilt is off with the FX.
+      pointerTiltEnabled: () => !modules.fxDisabled?.(),
       onRender: onSceneRendered,
     });
     Object.assign(session, { canvas, gl, textures, clock, scene, input: createInput(canvas, scene) });

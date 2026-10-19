@@ -20,9 +20,11 @@ const setup = ({ hits = {} } = {}) => {
       `<div id="lostZoneCover"><img id="lostZoneCover"></div><div id="lostZone"><img data-instance-id="${side === 'self' ? 5 : 6}"></div>`;
   }
   const hovered = [];
+  const tilts = [];
   const scene = {
     hitTest: (x, y) => hits[`${x},${y}`] ?? null,
     setHover: (id) => hovered.push(id),
+    setPointerTilt: (id, x, y) => tilts.push([id, x, y]),
   };
   const targets = [];
   const hover = { setTarget: (el, pointer) => targets.push({ el, pointer }) };
@@ -50,7 +52,7 @@ const setup = ({ hits = {} } = {}) => {
     for (const type of types) el.addEventListener(type, (event) => seen.push({ type, event }));
     return seen;
   };
-  return { dom, doc, roots, input, fire, click, advance, record, hovered, targets, canvas };
+  return { dom, doc, roots, input, fire, click, advance, record, hovered, tilts, targets, canvas };
 };
 
 const SELF_HAND = { instanceId: 1, side: 'self', zone: 'hand', index: 0 };
@@ -179,6 +181,15 @@ test('mouse hover lifts the card and names its img to the preview; leave clears 
   env.fire('pointerleave');
   assert.equal(env.hovered.at(-1), null);
   assert.equal(env.targets.at(-1).el, null);
+});
+
+test('mouse moves feed the pointer tilt the card and the point; a pile or leaving lays it flat', () => {
+  const env = setup({ hits });
+  env.fire('pointermove', { x: 100, y: 100 });
+  env.fire('pointermove', { x: 100, y: 100 });
+  env.fire('pointermove', { x: 500, y: 500 });
+  env.fire('pointerleave');
+  assert.deepEqual(env.tilts, [[1, 100, 100], [1, 100, 100], [null, 500, 500], [null, undefined, undefined]]);
 });
 
 test('touch and pen moves never hover, but their clicks work', () => {

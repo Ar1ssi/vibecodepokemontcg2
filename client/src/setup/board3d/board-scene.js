@@ -16,6 +16,7 @@ import { pileVisualCount } from './pile-stack.mjs';
 import { createTable } from './table-mesh.js';
 import { easeOutCubic } from './tween.mjs';
 import { DRAG_TILT, DRAG_TILT_STILL, createDragTilt, stepDragTilt } from '../image-logic/drag-tilt.mjs';
+import { matTiltAngles } from '../deck-constructor/mat-tilt.mjs';
 
 const DEG = Math.PI / 180;
 /** A card moving between slots or stacks (design 074 §D3 "Cards"). */
@@ -24,6 +25,8 @@ const CARD_POSE_MS = 180;
 const LIFT_FLIGHT_MS = 180;
 const FOIL_ROLES = new Set(['root', 'stage']);
 const SIDES = ['self', 'opp'];
+/** Zones whose foil cards tilt toward the pointer (mat-ambient.css "Holo mat tilt": the mat's cards). */
+const POINTER_TILT_ZONES = new Set(['active', 'bench', 'board']);
 /** `.self-text { font-size: clamp(10px, 4vh, 20px) }` (self-containers.css), vh of the iframe. */
 const COUNT_FONT = { minPx: 10, vh: 4, maxPx: 20 };
 /** Card height per width of every card mesh (card-geometry.mjs). */
@@ -120,7 +123,7 @@ function offsetAt(keys, elapsed) {
  *   clock: ReturnType<typeof import('./scene-clock.js').createSceneClock>,
  *   three: typeof import('three'), RoomEnvironment?: Function|null,
  *   foil?: { recordFor: (placement: object) => object|null, createMaterial: Function,
- *     uv?: Function|object }|null, motionReduced?: () => boolean,
+ *     uv?: Function|object }|null, motionReduced?: () => boolean, pointerTiltEnabled?: () => boolean,
  *   requestFrame?: (fn: FrameRequestCallback) => number, cancelFrame?: (id: number) => void,
  *   onRender?: ((frame: { cardsMoving: boolean }) => void)|null }} deps
  *   The scene does not own `renderer`, `textures` or `clock`; its `dispose()` leaves them to the caller.
@@ -148,6 +151,7 @@ function offsetAt(keys, elapsed) {
  *   unlift: (instanceId: number, options?: { ms?: number, ease?: (t: number) => number }) => Promise<void>,
  *   setUiState: (id: number, patch: object) => void, setMat: (spec: object|null) => void,
  *   setHover: (instanceId: number|null) => void, setHandPose: (pose: 'normal'|'lowered') => void,
+ *   setPointerTilt: (instanceId: number|null, clientX?: number, clientY?: number) => void,
  *   inspect: () => { scene: import('three').Scene, camera: import('three').PerspectiveCamera,
  *     host: HTMLElement, canvas: HTMLCanvasElement, layout: object|null, cameraDesc: object|null, model: object|null, uiState: Map<number, object>,
  *     cards: ReturnType<typeof createCardMeshPool>, piles: ReturnType<typeof createPileMeshes>,
@@ -166,6 +170,7 @@ export function createBoardScene({
   RoomEnvironment = null,
   foil = null,
   motionReduced = () => false,
+  pointerTiltEnabled = () => true,
   requestFrame = defaultRequestFrame,
   cancelFrame = defaultCancelFrame,
   onRender = null,
@@ -492,6 +497,33 @@ export function createBoardScene({
     hover = next;
     syncCards(model, model);
     invalidate();
+  };
+
+  let pointerTilted = null;
+
+  /**
+   * Tilts a foil card in play toward the pointer over it, up to 5° (mat-tilt.mjs, design 022
+   * slice 5); any other id, or null, lays the last one flat. Measured on the card's flat rect,
+   * so the tilt never moves the edge under the pointer.
+   */
+  const setPointerTilt = (instanceId, clientX, clientY) => {
+    if (disposed) return;
+    const placement = Number.isFinite(instanceId) && model ? placementById(model, instanceId) : null;
+    const tilts =
+      Boolean(placement) &&
+      POINTER_TILT_ZONES.has(placement.zone) &&
+      lifted?.id !== instanceId &&
+      pool.wearsFoil(instanceId) &&
+      !motionReduced() &&
+      pointerTiltEnabled();
+    const next = tilts ? instanceId : null;
+    if (pointerTilted !== null && pointerTilted !== next) pool.setHoverTilt(pointerTilted, null);
+    pointerTilted = next;
+    if (next === null) return;
+    const box = canvasBox();
+    const rect = box ? screenRectOf(pool.cornersOf(next, { rest: true }) ?? [], box) : null;
+    const { x, y } = matTiltAngles(rect, clientX, clientY);
+    pool.setHoverTilt(next, { x, y });
   };
 
   /** 'lowered' drops the near hand below the screen edge (card focus), 'normal' brings it back. */
@@ -1089,6 +1121,7 @@ export function createBoardScene({
     setUiState,
     setMat,
     setHover,
+    setPointerTilt,
     setHandPose,
     inspect,
     dispose,
