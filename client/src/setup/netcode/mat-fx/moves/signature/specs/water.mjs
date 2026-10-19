@@ -33,8 +33,8 @@ export const hydroSteam = Object.freeze({
   defender: { motion: 'knock', params: { strength: 0.3, heat: 0.35 } },
   beats: [
     { at: 0, until: 400, layer: 'front', drawer: 'coreCharge', params: { r0: 0.08, r1: 0.22, from: 0.1, tint: STEAM } },
-    { at: 300, until: 1000, layer: 'front', drawer: 'beam', params: { kind: 'pulse-train', w: 0.3, gap: 0.22, speed: 3, tint: STEAM } },
-    { at: 900, until: 1800, layer: 'front', drawer: 'cloud', params: { count: 5, radius: 0.4, drift: 0.6, alpha: 0.3, tint: MIST } },
+    { at: 300, until: 1000, layer: 'front', drawer: 'beam', params: { kind: 'solid', w: 0.3, tint: STEAM } },
+    { at: 900, until: 1800, layer: 'front', drawer: 'cloud', params: { count: 7, radius: 0.5, drift: 0.6, alpha: 0.5, tint: MIST } },
     { at: 1000, until: 1800, layer: 'front', drawer: 'smoke', params: { count: 3 } },
     { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: FLASH },
     { at: 1200, until: 2000, layer: 'front', drawer: 'splash', params: { count: 5, arc: 140, direction: -90, gravity: 0.7, tint: STEAM } },

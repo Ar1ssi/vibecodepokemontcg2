@@ -94,3 +94,9 @@ head-smash (rock) — tweak: SV glows red-orange, headbutts, and lands a big yel
 heart-swap (psychic, sig) — ok (after the soft dome rim): pink orbs swap, a pink dome on the target.
 hex (ghost) — partial: SV is violet-black smoke tendrils on the foe; ours keeps the ghost eyes (a 063 design rule pinned by tests) — left as is.
 high-horsepower (ground) — partial: SV stamps a gold horseshoe; no horseshoe shape exists, ours reads as a heavy hoof with dust (left).
+FIXED (pass 10): head-smash
+hurricane (flying) — ok: a whirl of white wind round the foe.
+hydro-cannon (water, sig) — tweak: SV rings the user with water and fires a huge water blast; ours is faint bubbles → a thick blue water beam.
+hydro-pump (water) — tweak: SV fires a strong cyan water jet into a white splash; ours is a chain of stacked rings (pulse-train) → a solid widening water beam.
+hydro-steam (water, sig) — tweak: SV is a bright blue-white jet and a white steam cloud on the foe; ours a ring chain → solid beam + white steam cloud.
+hyperspace-fury (dark, sig) — partial: SV opens gold portal rings with many punching arms and magenta bursts; ours magenta shards (no portal shape; left).

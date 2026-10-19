@@ -290,6 +290,7 @@ export const hydroCannon = spec({
     // streaming off it, landing at contact.
     { at: 0, until: 560, layer: 'front', drawer: 'coreCharge', params: { r0: 0.15, r1: 0.36, from: 0.2 } },
     { at: 560, until: 900, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.34, r1: 0.4, bow: 0, tongues: 6 } },
+    { at: 560, until: 1410, layer: 'back', drawer: 'beam', params: { kind: 'widening', w: 0.45, growIn: 0.4, retract: 0.3 } },
     { at: 900, until: 1300, layer: 'front', drawer: 'splash', params: { count: 9, arc: 360, len: [0.6, 1.1], gravity: 0.6 } },
     { at: 1000, until: 1650, layer: 'front', drawer: 'cloud', params: { count: 5, radius: 0.45, drift: 0.5, direction: 90, alpha: 0.3 } },
     { at: 900, until: 1100, layer: 'top', drawer: 'impactFlash', params: FLASH },
@@ -315,7 +316,7 @@ export const hydroPump = spec({
     // The jet: a dense train of water (clear, glossy-edged drops that cover the card under
     // them) round a thin bright core, so it reads as one pressurised stream.
     { at: 350, until: 1150, layer: 'front', drawer: 'beam', params: { kind: 'solid', w: 0.1, growIn: 0.35 } },
-    { at: 350, until: 1150, layer: 'front', drawer: 'beam', params: { kind: 'pulse-train', w: 0.32, gap: 0.2, speed: 3.5, growIn: 0.35 } },
+    { at: 350, until: 1150, layer: 'front', drawer: 'beam', params: { kind: 'widening', w: 0.32, growIn: 0.35 } },
     { at: 650, until: 1000, layer: 'front', drawer: 'splash', params: { count: 7, arc: 140, len: [0.5, 1.0], gravity: 0.6 } },
     { at: 750, until: 1300, layer: 'front', drawer: 'cloud', params: { count: 4, radius: 0.4, drift: 0.6, alpha: 0.3 } },
     { at: 650, until: 850, layer: 'top', drawer: 'impactFlash', params: FLASH },
