@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { getMatLayout } from '../../sizing/mat-layouts.mjs';
 import { benchSlotRect, flatLayout } from '../board-layout.mjs';
 import { CARD_UNITS, cardScaleFor } from '../card-geometry.mjs';
-import { handGroupsOf, handPoses, placementPose, posesFor } from '../card-poses.mjs';
+import { BOARD_HOVER_LIFT_PX, BOARD_HOVER_SCALE, boardHoverPose, handGroupsOf, handPoses, placementPose, posesFor } from '../card-poses.mjs';
 import { pilePose, pileThicknessPx } from '../pile-poses.mjs';
 import { handFanPoses, handLoweredOffset } from '../hand-fan.mjs';
 
@@ -334,4 +334,33 @@ test('bench: a card is placed by its slot, not its array index', () => {
   const rect = benchSlotRect(layout, 'self', 1);
   close(stacked.x, rect.x + rect.w / 2, 'x');
   close(stacked.y, rect.y + rect.h / 2, 'y');
+});
+
+test('boardHoverPose: 1.045× about the bottom edge, lifted; the far seat\'s card grows toward its own top', () => {
+  const near = { x: 100, y: 50, z: 0, yawDeg: 0, face: 'front', hidden: false, widthPx: 80 };
+  const grow = ((BOARD_HOVER_SCALE - 1) * 80 * (CARD_UNITS.h / CARD_UNITS.w)) / 2;
+  const up = boardHoverPose(near);
+  close(up.widthPx, 80 * BOARD_HOVER_SCALE, 'width');
+  close(up.y - near.y, grow, 'centre rises half the growth, so the bottom edge stays');
+  close(up.x, near.x, 'no sideways shift');
+  close(up.z, BOARD_HOVER_LIFT_PX, 'lift');
+  const far = boardHoverPose({ ...near, yawDeg: 180 });
+  close(far.y - near.y, -grow, 'turned 180: its top is down the table', 1e-9);
+});
+
+test('posesFor: a hovered Trainer-board card lifts; a hovered Active does not (as on the iframe board)', () => {
+  const model = {
+    placements: [
+      placement({ instanceId: 1, zone: 'active' }),
+      placement({ instanceId: 2, zone: 'board', index: 0 }),
+    ],
+    piles: {},
+    handStacks: { self: [], opp: [] },
+    stadium: null,
+  };
+  const flat = posesFor(model, layout);
+  const onBoard = posesFor(model, layout, { hover: { instanceId: 2 } });
+  close(onBoard.get(2).widthPx, flat.get(2).widthPx * BOARD_HOVER_SCALE, 'board card grows');
+  assert.deepEqual(onBoard.get(1), flat.get(1));
+  assert.deepEqual(posesFor(model, layout, { hover: { instanceId: 1 } }).get(1), flat.get(1));
 });

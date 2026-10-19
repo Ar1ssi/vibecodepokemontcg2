@@ -4,9 +4,10 @@
 // the board mirror (board-mirror.js), so the existing listeners (click-events.js, keybinds, mat
 // picker, context-menu placement) run unchanged. Hover lifts the hand card in the scene and
 // feeds the hover preview the twin. A press that moves past the click slop drags the card in
-// the scene and drops it through drop-router.mjs into drag.js's own calls (board-drag-actions.js).
+// the scene and drops it through drop-router.mjs into drag.js's own calls (board-drag-actions.js);
+// an HTML5 drag out of an open panel drops on the canvas through the same router.
 import { dropTargetFor, routeDrop } from './drop-router.mjs';
-import { createClickTracker, mirrorSelectorFor } from './input-gestures.mjs';
+import { clickHitFor, createClickTracker, mirrorSelectorFor } from './input-gestures.mjs';
 
 const MOUSE_INIT_KEYS = ['clientX', 'clientY', 'screenX', 'screenY', 'ctrlKey', 'shiftKey', 'altKey', 'metaKey'];
 const PRIMARY_BUTTON = 0;
@@ -86,8 +87,10 @@ export function createBoardInput({
   };
 
   const setHoverTarget = (hit, el, event) => {
+    const id = hit && !hit.pile && Number.isFinite(hit.instanceId) ? hit.instanceId : null;
     try {
-      scene.setHover(hit && !hit.pile && Number.isFinite(hit.instanceId) ? hit.instanceId : null);
+      scene.setHover(id);
+      scene.setPointerTilt?.(id, event?.clientX, event?.clientY);
     } catch (error) {
       console.warn('board3d: hover lift failed', error?.message || error);
     }
@@ -196,13 +199,14 @@ export function createBoardInput({
     const ending = drag;
     drag = null;
     doc.removeEventListener('keydown', onDragKey, true);
-    scene.dropCard?.(ending.id, performed ? { holdMs: DROP_HOLD_MS } : {});
+    // A panel's HTML5 drag lifted no mesh and holds no pointer; drag.js's dragEnd restores it.
+    if (!ending.html5) scene.dropCard?.(ending.id, performed ? { holdMs: DROP_HOLD_MS } : {});
     scene.setCardHighlight?.(null);
     if (ending.litZone) scene.setZoneHighlight?.(ending.litZone.side, ending.litZone.zone, false);
     if (ending.boardReady) scene.setZoneHighlight?.(ending.dragging.side, 'board', false);
     ending.railEl?.classList.remove(RAIL_LIT_CLASS);
     dragActions.end();
-    capture(ending.pointerId, false);
+    if (!ending.html5) capture(ending.pointerId, false);
   };
 
   function cancelDrag() {
@@ -259,14 +263,16 @@ export function createBoardInput({
       swallowNativeClick = true;
       return;
     }
-    const el = elementFor(hitAt(event));
+    const hit = hitAt(event);
+    const el = elementFor(hit);
     const gesture = tracker.up(el, event.clientX, event.clientY, now(), event.button);
     if (event.pointerType === 'mouse') setHoverTarget(last, el, event);
     if (!el) return;
     swallowNativeClick = true;
     if (!gesture.click || event.button !== PRIMARY_BUTTON) return;
-    dispatchMouse(el, 'click', event, { detail: 1 });
-    if (gesture.dblclick) dispatchMouse(el, 'dblclick', event, { detail: 2 });
+    const clickEl = elementFor(clickHitFor(hit)) ?? el;
+    dispatchMouse(clickEl, 'click', event, { detail: 1 });
+    if (gesture.dblclick) dispatchMouse(clickEl, 'dblclick', event, { detail: 2 });
   };
 
   const onPointerMove = (event) => {
@@ -333,6 +339,41 @@ export function createBoardInput({
     dispatchMouse(el, 'contextmenu', event, { button: 2 });
   };
 
+  // ── HTML5 drags out of the mirror's open panels ─────────────────────────
+  // A pile viewer's, Looking at cards' or the attached cards' <img> is still dragged by drag.js;
+  // the board it crosses is the canvas, so the canvas takes the drop through the same router.
+
+  /** The panel <img> drag.js is dragging (it carries `.dragging`), or null. */
+  const draggedPanelImage = () =>
+    mirror?.roots?.self?.querySelector?.('.dragging') ?? mirror?.roots?.opp?.querySelector?.('.dragging') ?? null;
+
+  const onHtmlDragOver = (event) => {
+    if (!dragActions || (drag && !drag.html5)) return;
+    const image = draggedPanelImage();
+    if (!image) return;
+    if (drag?.image !== image) {
+      if (drag) finishDrag(false);
+      const dragging = dragActions.held(image);
+      if (!dragging) return;
+      drag = { html5: true, image, id: null, dragging, state: dragActions.state(), target: null, litZone: null, railEl: null, boardReady: false };
+    }
+    updateTarget(event);
+    if (!drag.target) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+  };
+
+  const onHtmlDragLeave = () => {
+    if (drag?.html5) finishDrag(false);
+  };
+
+  const onHtmlDrop = (event) => {
+    if (!drag?.html5) return;
+    event.preventDefault();
+    event.stopPropagation();
+    commitDrag(event);
+  };
+
   // `wheel` is not listened to: it bubbles past the canvas untouched, to the page's own handlers.
   const listeners = [
     ['pointerdown', onPointerDown],
@@ -343,6 +384,9 @@ export function createBoardInput({
     ['click', onNativeClick],
     ['dblclick', onNativeDblClick],
     ['contextmenu', onContextMenu],
+    ['dragover', onHtmlDragOver],
+    ['dragleave', onHtmlDragLeave],
+    ['drop', onHtmlDrop],
   ];
   for (const [type, fn] of listeners) canvas.addEventListener(type, fn);
 

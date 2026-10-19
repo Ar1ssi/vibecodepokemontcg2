@@ -61,9 +61,21 @@ export function mirrorSelectorFor(hit) {
   if (hit.zone === 'stadium') return { side: null, selector: STADIUM_SELECTOR };
   if (hit.side !== 'self' && hit.side !== 'opp') return null;
   if (hit.pile) {
+    // The listeners (coverClick, the card menu) are on the cover's <img>, which shares the slot's id.
     const cover = PILE_COVER_IDS[hit.zone];
-    return cover ? { side: hit.side, selector: `#${cover}` } : null;
+    return cover ? { side: hit.side, selector: `#${cover} > img` } : null;
   }
   if (!Number.isFinite(hit.instanceId)) return null;
   return { side: hit.side, selector: `img[data-instance-id="${hit.instanceId}"]` };
+}
+
+/**
+ * The hit a click (not a drag or the card menu) goes to: the Lost Zone's face-up top card is
+ * its pile, so a click opens the Lost Zone as its cover did on the iframe board. The card's own
+ * img sits in the hidden #lostZone panel, where a click selects it.
+ * @param {{ zone?: string, pile?: boolean, plane?: boolean }|null} hit
+ */
+export function clickHitFor(hit) {
+  if (hit?.zone === 'lostZone' && !hit.pile && !hit.plane) return { ...hit, pile: true };
+  return hit;
 }

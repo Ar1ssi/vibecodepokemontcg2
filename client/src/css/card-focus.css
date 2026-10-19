@@ -371,6 +371,9 @@
   scrollbar-width: none;
   /* The chrome is click-through; the list takes the wheel so an overflowing list still scrolls. */
   pointer-events: auto;
+  /* The rows are positioned: without their own stacking context here they join the frame's 3D-sorted
+     one, and Chromium hit-tests the scroller's flattened plane over them, so clicks land on .tcgl-opts. */
+  isolation: isolate;
   border-radius: 0;
   box-shadow: none;
 }

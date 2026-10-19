@@ -11,16 +11,19 @@ const DECK_SOURCES = new Set(['deck', 'viewCards']);
 
 /**
  * @typedef {{ instanceId: number|null, side: 'self'|'opp', zone: string, index: number|string,
- *   attached?: boolean, isTrainer?: boolean, isEnergy?: boolean, isPokemon?: boolean }} Dragging
+ *   attached?: boolean, isTrainer?: boolean, isEnergy?: boolean, isPokemon?: boolean,
+ *   boardRefuses?: boolean }} Dragging
  *   The held card as `identifyCard` reads it: its owner (`mouseClick.cardUser`), zone
  *   (`mouseClick.zoneId`) and legacy index (`mouseClick.cardIndex`); `attached` is its <img>'s
- *   `.attached` flag (drag.js `draggedImage.attached`).
+ *   `.attached` flag (drag.js `draggedImage.attached`); `boardRefuses` is drop-zone.mjs's verdict
+ *   on the card (a Pokémon or Energy never goes on the Trainer board).
  * @typedef {{ initiator: 'self'|'opp', isSpectator: boolean, rulesEnabled?: boolean, solo: boolean }} DragState
  * @typedef {{ kind: 'zone'|'card'|'cover'|'rail'|'stadium', side: 'self'|'opp'|null, zone: string,
- *   instanceId: number|null, highlight: 'card'|'zone'|'both'|null, attached?: boolean,
- *   targetIndex?: number }} DropTarget
+ *   instanceId: number|null, highlight: 'card'|'zone'|'both'|null, refused?: boolean,
+ *   attached?: boolean, targetIndex?: number }} DropTarget
  *   `zone` is the destination zone id drag.js would compute (covers as `deckCover` etc.);
- *   `highlight` is what dragOver lights. A caller may add `targetIndex` (the legacy index
+ *   `highlight` is what dragOver lights; `refused` marks the Trainer board turning the card away
+ *   (dragOver lights nothing, drop says why). A caller may add `targetIndex` (the legacy index
  *   `findZoneCardIndex` gives the target <img>) and `attached` (that <img>'s `.attached`).
  */
 
@@ -82,6 +85,9 @@ export function dropTargetFor(hit, dragging, state) {
   if (kind !== 'stadium' && side !== dragging.side) return null;
   const zone = kind === 'rail' ? hit.zone : domZoneOf(hit);
   if (!zone) return null;
+  if (zone === 'board' && dragging.zone !== 'board' && dragging.boardRefuses) {
+    return { kind, side, zone, instanceId: null, highlight: null, refused: true };
+  }
   return {
     kind,
     side,
@@ -105,13 +111,15 @@ const deckGatesFor = (fromZone, dZoneId) => {
  *   passes its <img>; the caller resolves it) or null.
  * - `deckTop`: `moveToDeckTop(...args)`, after `manualDeckActionAllowed` of each `gates` entry.
  * - `move`: `moveCardBundle(...args)`, after the same check of each `gates` entry.
+ * - `refuse`: no call; the Trainer board turns the card away and says why (drag.js :363-377).
  * @param {DropTarget|null} target
  * @param {Dragging} dragging
  * @param {DragState} state
- * @returns {{ kind: 'retreat'|'deckTop'|'move', args: any[], gates: string[] }|null}
+ * @returns {{ kind: 'retreat'|'deckTop'|'move'|'refuse', args: any[], gates: string[] }|null}
  */
 export function routeDrop(target, dragging, state) {
   if (!target || !dragging || !state || state.isSpectator) return null;
+  if (target.refused) return { kind: 'refuse', args: [], gates: [] };
   // Only a bare card <img> or a zone <div> takes a drop (drag.js:298).
   if (target.kind === 'card' && target.attached) return null;
   if (target.kind === 'rail' && target.side !== dragging.side) return null;

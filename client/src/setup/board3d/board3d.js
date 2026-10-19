@@ -15,7 +15,7 @@ const unavailableNotice = (reason) => `3D board unavailable: ${reason}; this bro
 const defaultDeps = {
   importThree: () => import('three'),
   loadModules: async () => {
-    const [renderer, textures, scene, clock, table, room, model, applyView, hydrateHolo, matFx, containers, input, hover, dragActions, fxApply, fxModel] =
+    const [renderer, textures, scene, clock, table, room, model, applyView, hydrateHolo, matFx, containers, input, hover, dragActions, fxApply, fxModel, handSort] =
       await Promise.all([
         import('../gl/gl-renderer.js'),
         import('../gl/gl-textures.js'),
@@ -33,6 +33,7 @@ const defaultDeps = {
         import('./board-drag-actions.js'),
         import('../image-logic/fx-settings.js'),
         import('../image-logic/fx-settings.mjs'),
+        import('../netcode/hand-sort-context.js'),
       ]);
     return {
       createRenderer: renderer.createRenderer,
@@ -43,8 +44,10 @@ const defaultDeps = {
       RoomEnvironment: room.RoomEnvironment,
       boardModelFrom: model.boardModelFrom,
       getLastAppliedView: applyView.getLastAppliedView,
+      sortZoneCards: handSort.sortZoneCardsForRender,
       cardBackSrcFor: hydrateHolo.cardBackSrcForUser,
       motionReduced: matFx.motionReduced,
+      fxDisabled: matFx.fxDisabled,
       boardMirror: containers.boardMirror,
       createBoardInput: input.createBoardInput,
       getHoverPreview: hover.getHoverPreview,
@@ -213,7 +216,10 @@ export async function initializeBoard3d({
   let settleTimer = null;
   const syncMirrorNow = () => {
     if (!session?.scene) return;
-    mirror.sync(current.model, session.scene.rects());
+    // The board's column: the canvas runs on under the side menu (relayout's halfFromViewport).
+    const box = session.canvas?.getBoundingClientRect?.() ?? null;
+    const column = box && { left: box.left, top: box.top, width: box.width * boardWidthFrac(doc.body?.classList), height: box.height };
+    mirror.sync(current.model, session.scene.rects(), session.scene.zoneRects?.() ?? {}, column);
   };
   const queueMirrorSync = () => {
     if (!mirror) return;
@@ -275,6 +281,7 @@ export async function initializeBoard3d({
     const layout = flatLayout(spec?.profile, half, { viewport, matScale: spec?.scale ?? 1 });
     appliedPreset = currentPreset();
     const cameraParams = { viewportW: viewport.w, viewportH: viewport.h, nearHalf: half };
+    session.gl?.syncPixelRatio?.();
     session.scene.setViewport(viewport);
     session.scene.setCamera(
       appliedPreset === 'tcgl'
@@ -328,6 +335,8 @@ export async function initializeBoard3d({
       RoomEnvironment: modules.RoomEnvironment,
       foil,
       motionReduced: modules.motionReduced,
+      // mat-tilt.mjs's kill switch: the holo tilt is off with the FX.
+      pointerTiltEnabled: () => !modules.fxDisabled?.(),
       onRender: onSceneRendered,
     });
     Object.assign(session, { canvas, gl, textures, clock, scene, input: createInput(canvas, scene) });
@@ -405,6 +414,8 @@ export async function initializeBoard3d({
       },
       uiState: mirror?.uiState(),
       previous: current.model,
+      // The hand fans in the order the page renders it (the deck-list sort, apply-view.js).
+      sortHand: view.you ? (side, cards) => modules.sortZoneCards?.(side === 'self' ? 'you' : 'them', 'hand', cards) : null,
       onInvalid: (reason) => {
         if (current.warnedInvalid) return;
         current.warnedInvalid = true;
@@ -423,6 +434,14 @@ export async function initializeBoard3d({
   }
   doc.addEventListener('board-view-applied', onViewApplied);
   session.cleanup.push(() => doc.removeEventListener('board-view-applied', onViewApplied));
+  // Ticking a hand's Sort box re-fans that hand now: under server authority the legacy sort()
+  // it also runs leaves the DOM alone, and the next view would be the first to show it.
+  for (const root of Object.values(mirror?.roots ?? {})) {
+    const sortBox = root?.getElementById?.('sortHandCheckbox');
+    if (!sortBox) continue;
+    sortBox.addEventListener('change', onViewApplied);
+    session.cleanup.push(() => sortBox.removeEventListener('change', onViewApplied));
+  }
   onViewApplied();
 
   if (foil) {
@@ -459,6 +478,21 @@ export async function initializeBoard3d({
     win.addEventListener('resize', relayout);
     session.cleanup.push(() => win.removeEventListener('resize', relayout));
   }
+
+  // Browser zoom resizes the host, but a window moved to a screen of another pixel density does
+  // not: a resolution query for the current ratio stops matching then, and is re-armed each time.
+  let pixelRatioQuery = null;
+  const onPixelRatioChange = () => {
+    relayout();
+    watchPixelRatio();
+  };
+  const watchPixelRatio = () => {
+    pixelRatioQuery?.removeEventListener?.('change', onPixelRatioChange);
+    pixelRatioQuery = win?.matchMedia?.(`(resolution: ${win.devicePixelRatio || 1}dppx)`) ?? null;
+    pixelRatioQuery?.addEventListener?.('change', onPixelRatioChange);
+  };
+  watchPixelRatio();
+  session.cleanup.push(() => pixelRatioQuery?.removeEventListener?.('change', onPixelRatioChange));
 
   // The host is full-viewport, so collapsing the side menu resizes nothing it observes:
   // relayout when a body class changes the board's width share.

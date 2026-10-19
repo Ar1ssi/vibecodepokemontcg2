@@ -72,6 +72,20 @@ export const refuseManualDeckAction = (action) => {
   return true;
 };
 
+/** Whether the held card's <img> is a Pokémon or Energy, which the Trainer board turns away. */
+export const heldCardBoardRefuses = (image) => boardRefuses(heldCard(image));
+
+/** The Trainer board turning a Pokémon or Energy away: the no-match cue and the chat line why. */
+export const refuseBoardDrop = () => {
+  uiCue('card-no-match');
+  appendMessage(
+    systemState.initiator,
+    "⛔ Pokémon and Energy cards can't be played onto the Trainer area.",
+    'announcement',
+    false
+  );
+};
+
 export const dragStart = (event) => {
   if (systemState.isReplay && !systemState.isTwoPlayer) {
     return;
@@ -227,10 +241,11 @@ export const dragLeave = (event) => {
 
 export const dragEnd = (event) => {
   endDragAvatar(event);
+  // The containers are the 3D board mirror's shadow roots, which have no getElementsByClassName.
   const enablePointerEvents = (containerDocument, classNames) => {
-    const counters = containerDocument.getElementsByClassName(...classNames);
-    for (let i = 0; i < counters.length; i++) {
-      counters[i].style.pointerEvents = 'auto';
+    const selector = classNames.map((name) => `.${name}`).join(', ');
+    for (const counter of containerDocument?.querySelectorAll?.(selector) ?? []) {
+      counter.style.pointerEvents = 'auto';
     }
   };
 
@@ -365,13 +380,7 @@ export const drop = (event) => {
       mouseClick.zoneId !== 'board' &&
       boardRefuses(heldCard(draggedImage))
     ) {
-      uiCue('card-no-match');
-      appendMessage(
-        systemState.initiator,
-        "⛔ Pokémon and Energy cards can't be played onto the Trainer area.",
-        'announcement',
-        false
-      );
+      refuseBoardDrop();
       event.stopPropagation();
       return;
     }

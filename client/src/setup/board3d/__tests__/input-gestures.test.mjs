@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createClickTracker, mirrorSelectorFor } from '../input-gestures.mjs';
+import { clickHitFor, createClickTracker, mirrorSelectorFor } from '../input-gestures.mjs';
 
 const tap = (tracker, id, { x = 100, y = 100, t = 0, dx = 0, dy = 0, ms = 50, button = 0, upButton = button, upId = id } = {}) => {
   tracker.down(id, x, y, t, button);
@@ -68,13 +68,13 @@ test('mirrorSelectorFor: a card hit addresses its img in that side\'s root', () 
   });
 });
 
-test('mirrorSelectorFor: pile hits address that side\'s cover', () => {
+test('mirrorSelectorFor: pile hits address that side\'s cover img (its listeners), not the slot div', () => {
   assert.deepEqual(mirrorSelectorFor({ zone: 'deck', side: 'self', instanceId: null, pile: true }), {
     side: 'self',
-    selector: '#deckCover',
+    selector: '#deckCover > img',
   });
-  assert.equal(mirrorSelectorFor({ zone: 'discard', side: 'opp', pile: true }).selector, '#discardCover');
-  assert.equal(mirrorSelectorFor({ zone: 'lostZone', side: 'self', pile: true }).selector, '#lostZoneCover');
+  assert.equal(mirrorSelectorFor({ zone: 'discard', side: 'opp', pile: true }).selector, '#discardCover > img');
+  assert.equal(mirrorSelectorFor({ zone: 'lostZone', side: 'self', pile: true }).selector, '#lostZoneCover > img');
   assert.equal(mirrorSelectorFor({ zone: 'hand', side: 'self', pile: true }), null);
 });
 
@@ -94,4 +94,14 @@ test('mirrorSelectorFor: no hit, an unknown side, or no id gives null', () => {
 test('mirrorSelectorFor: an empty zone footprint (plane) has no twin', () => {
   assert.equal(mirrorSelectorFor({ zone: 'active', side: 'self', instanceId: null, plane: true }), null);
   assert.equal(mirrorSelectorFor({ zone: 'stadium', side: null, instanceId: null, plane: true }), null);
+});
+
+test('clickHitFor: the Lost Zone top card clicks as its pile; other hits are unchanged', () => {
+  const top = { instanceId: 5, side: 'self', zone: 'lostZone', index: 0 };
+  assert.deepEqual(clickHitFor(top), { ...top, pile: true });
+  const discardTop = { instanceId: 6, side: 'opp', zone: 'discard', index: 0 };
+  assert.equal(clickHitFor(discardTop), discardTop);
+  const plane = { zone: 'lostZone', side: 'self', instanceId: null, plane: true };
+  assert.equal(clickHitFor(plane), plane);
+  assert.equal(clickHitFor(null), null);
 });

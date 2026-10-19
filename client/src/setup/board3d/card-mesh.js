@@ -19,6 +19,9 @@ import { flightPlacement } from './flight-pose.mjs';
 import { createTween, easeOutCubic } from './tween.mjs';
 
 const DEG = Math.PI / 180;
+/** mat-ambient.css `.mat-holo .card__rotator { transition: transform 0.12s ease-out }`, as a time constant. */
+const HOVER_TILT_TAU_MS = 40;
+const HOVER_TILT_SNAP_DEG = 0.01;
 /** Material group indices of every card geometry. */
 const FRONT = 0;
 const BACK = 1;
@@ -118,6 +121,8 @@ function buildCardGeometry(three, widthPx, uv) {
  *   liftedId: () => number|null,
  *   setHidden: (id: number, hidden: boolean) => void, setCamera: (desc: object|null) => void,
  *   setTilt: (id: number, tilt: { roll: number, pitch: number }|null) => void,
+ *   setHoverTilt: (id: number, tilt: { x: number, y: number }|null) => void,
+ *   wearsFoil: (id: number) => boolean,
  *   setDim: (id: number, dim: boolean) => void,
  *   has: (id: number) => boolean, placed: (id: number) => boolean, meshOf: (id: number) => import('three').Mesh|null,
  *   idAt: (object3d: import('three').Object3D|null) => number|null, ids: () => number[],
@@ -390,8 +395,11 @@ export function createCardMeshPool({
     card.foilLive = wearsFoil;
   }
 
-  /** Writes the card's own (model) pose for `now` onto `target`: the mesh, or a scratch object. */
-  const writeRestPose = (card, now, target) => {
+  /**
+   * Writes the card's own (model) pose for `now` onto `target`: the mesh, or a scratch object.
+   * `hoverTilt: false` leaves out the pointer tilt (a rect measured for that tilt must not move with it).
+   */
+  const writeRestPose = (card, now, target, { hoverTilt = true } = {}) => {
     const pose = card.pose.at(now);
     const flipDeg = card.flip ? card.flip.at(now) : 0;
     const scale = pose.s;
@@ -409,6 +417,11 @@ export function createCardMeshPool({
       'XZY'
     );
     if (card.tilt) applyTilt(target, card.tilt, tiltDeg);
+    // mat-ambient.css's holo tilt, `rotateY(x) rotateX(y)` about the card itself (its y is up).
+    if (hoverTilt && card.hoverTilt) {
+      target.rotateY(card.hoverTilt.x * DEG);
+      target.rotateX(-card.hoverTilt.y * DEG);
+    }
     target.position.set(x, y, z);
     target.scale.setScalar(scale);
   };
@@ -687,6 +700,9 @@ export function createCardMeshPool({
       pose: null,
       flip: null,
       tilt: null,
+      hoverTilt: null,
+      hoverTiltGoal: null,
+      hoverTiltAt: 0,
       dim: false,
       dimFront: null,
       flight: null,
@@ -776,6 +792,43 @@ export function createCardMeshPool({
       onNeedsRender();
     });
 
+  /**
+   * A card's pointer tilt in degrees (mat-tilt.mjs `matTiltAngles`: x = rotateY, y = rotateX);
+   * null = flat. The card eases there (`stepHoverTilt`).
+   */
+  const setHoverTilt = (id, tilt) =>
+    withCard(id, (card) => {
+      const x = Number(tilt?.x) || 0;
+      const y = Number(tilt?.y) || 0;
+      const heading = card.hoverTiltGoal ?? card.hoverTilt ?? { x: 0, y: 0 };
+      if (heading.x === x && heading.y === y) return;
+      card.hoverTiltGoal = { x, y };
+      card.hoverTiltAt = clock.now();
+      onNeedsRender();
+    });
+
+  /** Eases a card's pointer tilt toward its goal; true while it moved this frame. */
+  const stepHoverTilt = (card, now) => {
+    const goal = card.hoverTiltGoal;
+    if (!goal) return false;
+    const from = card.hoverTilt ?? { x: 0, y: 0 };
+    const k = 1 - Math.exp(-Math.max(0, now - card.hoverTiltAt) / HOVER_TILT_TAU_MS);
+    card.hoverTiltAt = now;
+    const x = from.x + (goal.x - from.x) * k;
+    const y = from.y + (goal.y - from.y) * k;
+    if (Math.abs(goal.x - x) >= HOVER_TILT_SNAP_DEG || Math.abs(goal.y - y) >= HOVER_TILT_SNAP_DEG) {
+      card.hoverTilt = { x, y };
+      return true;
+    }
+    // Arrived: hold the goal (flat = no tilt at all) and stop stepping.
+    card.hoverTilt = goal.x === 0 && goal.y === 0 ? null : { ...goal };
+    card.hoverTiltGoal = null;
+    return true;
+  };
+
+  /** Whether the card shows its TCG Live foil now (the 3D board's holo). */
+  const wearsFoil = (id) => Boolean(cards.get(id)?.foilLive);
+
   /** A held card's swing in degrees (drag-tilt.mjs `stepDragTilt`); null or zeros = upright. */
   const setTilt = (id, tilt) =>
     withCard(id, (card) => {
@@ -843,8 +896,9 @@ export function createCardMeshPool({
           card.mesh.visible = visibleOf(card);
         }
       }
+      const tilting = stepHoverTilt(card, now);
       const running =
-        !card.pose.done(now) || (card.flip && !card.flip.done(now));
+        !card.pose.done(now) || (card.flip && !card.flip.done(now)) || tilting;
       if (running || card.dirty) placeMesh(card, now);
       card.dirty = Boolean(running);
       if (running) moving = true;
@@ -874,9 +928,10 @@ export function createCardMeshPool({
     if (!card) return null;
     const { w, h, t } = card.geometry;
     let object = card.mesh;
-    if (rest && card.lift && card.pose) {
-      // A lifted card still stands at its slot as far as the board is concerned.
-      writeRestPose(card, clock.now(), scratch);
+    if (rest && (card.lift || card.hoverTilt) && card.pose) {
+      // A lifted card still stands at its slot as far as the board is concerned, and a tilted
+      // one lies flat there.
+      writeRestPose(card, clock.now(), scratch, { hoverTilt: false });
       object = scratch;
       group.updateMatrixWorld();
       scratch.updateMatrix();
@@ -914,6 +969,8 @@ export function createCardMeshPool({
     unlift,
     liftedId,
     setTilt,
+    setHoverTilt,
+    wearsFoil,
     setDim,
     setHidden,
     setCamera,

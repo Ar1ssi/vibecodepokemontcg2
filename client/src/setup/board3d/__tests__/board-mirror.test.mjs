@@ -112,6 +112,27 @@ describe('createBoardMirror', () => {
     assert.equal(calls.at(-1).patch.glow, DEFAULT_GLOW_RGB);
   });
 
+  it('reads the page Stadium: its usable glow on #stadium and its img hidden by an FX', async () => {
+    const { doc, mirror } = setup();
+    const stadium = doc.createElement('div');
+    stadium.id = 'stadium';
+    const img = doc.createElement('img');
+    img.dataset.instanceId = '40';
+    stadium.appendChild(img);
+    doc.body.appendChild(stadium);
+    const { calls } = recorder(mirror);
+    stadium.classList.add('has-glow');
+    stadium.style.setProperty('--glow-rgb', '255,210,63');
+    await flush();
+    assert.deepEqual(calls.at(-1), { id: 40, patch: { selected: false, glow: '255,210,63', matPick: null, hidden: false, pending: false } });
+    img.style.visibility = 'hidden';
+    await flush();
+    assert.equal(calls.at(-1).patch.hidden, true);
+    const snapshot = mirror.uiState();
+    assert.equal(snapshot.glows.get(40), '255,210,63');
+    assert.equal(snapshot.hidden.has(40), true);
+  });
+
   it('reports a hand card under its flight (.draw-flight-source, img or wrapper) as hidden', async () => {
     const { doc, mirror } = setup();
     const { img } = addCard(doc, mirror.zoneElement('self', 'hand'), 30);
@@ -266,5 +287,48 @@ describe('createBoardMirror zone list popups (D4)', () => {
     }
     assert.equal(mirror.zoneElement('self', 'lostZoneCover').style.left, '1600px');
     assert.equal(mirror.zoneElement('self', 'discardCover').style.width, '100px');
+  });
+  it('sync pins each hand\'s Sort box and count to its strip: above the near one, below the far one', () => {
+    const { mirror } = setup();
+    const at = (side, id) => {
+      const el = mirror.zoneElement(side, id);
+      return [el.style.left, el.style.top, el.style.transform, el.classList.contains('hand-label-placed')];
+    };
+    mirror.sync({ placements: [] }, {}, {
+      'self:hand': { left: 210, top: 900, width: 1500, height: 160 },
+      'opp:hand': { left: 310, top: 20, width: 1300, height: 120 },
+    });
+    // Host box origin (10, 20); a 4 px gap off the strip.
+    assert.deepEqual(at('self', 'handLabel'), ['200px', '876px', 'translateY(-100%)', true]);
+    assert.deepEqual(at('self', 'handText'), ['1700px', '876px', 'translate(-100%, -100%)', true]);
+    assert.deepEqual(at('opp', 'handLabel'), ['1600px', '124px', 'translateX(-100%)', true]);
+    assert.deepEqual(at('opp', 'handText'), ['300px', '124px', 'none', true]);
+    // A strip wider than the canvas keeps its ends 2% of the canvas in from its edges.
+    mirror.sync({ placements: [] }, {}, { 'self:hand': { left: -40, top: 900, width: 1600, height: 160 } }, {
+      left: 10, top: 20, width: 1450, height: 1060,
+    });
+    assert.deepEqual(at('self', 'handLabel').slice(0, 2), ['29px', '876px']);
+    assert.deepEqual(at('self', 'handText').slice(0, 2), ['1421px', '876px']);
+    mirror.sync({ placements: [] }, {}, { 'self:hand': { left: 210, top: 900, width: 1500, height: 160 } });
+    assert.equal(at('opp', 'handLabel')[3], false, 'no strip, no Sort box');
+    assert.equal(at('opp', 'handText')[3], false);
+    mirror.sync({ placements: [] }, {});
+    assert.equal(at('self', 'handText')[3], false, 'an old caller without zones hides them');
+  });
+  it('sync puts each seat\'s coin beside its Active: past the near one\'s right edge, the far one\'s left', () => {
+    const { mirror } = setup();
+    const slot = (side) => mirror.zoneElement(side, 'matCoinSlot');
+    mirror.sync({ placements: [] }, {}, {
+      'self:active': { left: 900, top: 600, width: 150, height: 200 },
+      'opp:active': { left: 880, top: 250, width: 140, height: 100 },
+    }, { left: 10, top: 20, width: 1000, height: 1000 });
+    // The half is 1000 x 500 (aspect 2): 12% of the Active's height x 2 across, 0.6% of the
+    // column (6 px) out, centred on the Active.
+    const rect = (side) => ['left', 'top', 'width', 'height'].map((key) => slot(side).style[key]);
+    assert.deepEqual(rect('self'), ['1046px', '656px', '48px', '48px']);
+    assert.deepEqual(rect('opp'), ['840px', '268px', '24px', '24px']);
+    assert.equal(slot('self').classList.contains('mat-coin-placed'), true);
+    mirror.sync({ placements: [] }, {}, {});
+    assert.equal(slot('self').classList.contains('mat-coin-placed'), false, 'no Active footprint, no coin');
   });
 });

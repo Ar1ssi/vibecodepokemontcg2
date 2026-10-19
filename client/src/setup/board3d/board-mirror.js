@@ -8,6 +8,8 @@
 // mirror node is where the scene draws it, and `observe`/`uiState` read the UI state the DOM
 // code paints onto those nodes (selection, glow, mat pick, FX hide) back for the scene.
 
+import { IFRAME_HEIGHT_FRAC } from './board-layout.mjs';
+
 const SIDES = ['self', 'opp'];
 /** Zones sized to the union of their cards' rects (the cards the scene draws there). */
 const CARD_RECT_ZONES = ['active', 'bench', 'hand', 'prizes', 'board'];
@@ -24,6 +26,7 @@ const PILE_ELEMENTS = {
 const POPUP_ZONES = ['deck', 'discard', 'lostZone', 'attachedCards', 'viewCards'];
 const POPUP_SELECTOR = POPUP_ZONES.map((id) => `#${id}`).join(', ');
 const PANEL_STYLESHEET = 'src/css/board3d-panels.css';
+const COIN_STYLESHEET = 'src/css/mat-coin.css';
 const RECT_KEYS = ['left', 'top', 'width', 'height'];
 const SELECTED_CLASSES = ['highlight', 'selectHighlight'];
 // mat-picker.js OUTLINE_IDLE / OUTLINE_SELECTED, as written and as the browser normalizes them.
@@ -38,6 +41,18 @@ const PENDING_CLASS = 'cmd-pending';
 // draw-flight.js `hideForFlight`: a hand card hidden while its draw / prize / reveal flight lands
 // on it (self-/opp-containers.css give it `visibility: hidden`).
 const FLIGHT_HIDDEN_CLASS = 'draw-flight-source';
+/** Set on #handLabel / #handText once `sync` has a hand strip to pin them to. */
+const HAND_LABEL_PLACED = 'hand-label-placed';
+/** Gap between a hand's strip and its Sort box / count, in px. */
+const HAND_LABEL_GAP_PX = 4;
+/** How far in from the canvas's edges the strip's ends are kept (the iframe's `right: 2%`). */
+const HAND_LABEL_INSET = 0.02;
+// mat-coin.css's iframe rule: `width: calc(var(--active-height) * 0.12)` is a width, so its percent
+// read against the half's width — 12% of the Active's share of the half's height, times the half's
+// width — and it stood 0.6% of that width out from the Active.
+const COIN_SIZE_OF_ACTIVE = 0.12;
+const COIN_GAP_OF_WIDTH = 0.006;
+const COIN_PLACED = 'mat-coin-placed';
 const isHiddenNode = (node) =>
   node.style?.visibility === 'hidden' || Boolean(node.classList?.contains(FLIGHT_HIDDEN_CLASS));
 
@@ -46,14 +61,23 @@ const isHiddenNode = (node) =>
 // are fixed so a zone, `.play-container` or `.mat-holo` between them and the host never offsets
 // them, and untransformed so their box is the projected rect (the scene draws the rotation).
 // Everything is invisible and click-through except the popups, which stay `display: none` until
-// the legacy code shows them inline (their look: board3d-panels.css, linked before this sheet).
+// the legacy code shows them inline (their look: board3d-panels.css, linked before this sheet),
+// and each hand's Sort box and "(N)" count, which `sync` pins to that hand's strip as the iframe
+// sheets did (Sort at the strip's left end, the count at its right, on the cloth side of it).
 const MIRROR_STYLE = `
 :host { position: absolute; inset: 0; display: block; transform: translateZ(0);
   pointer-events: none; }
 #playfield { position: absolute; inset: 0; }
-#playfield > :not(${POPUP_SELECTOR}), #handLabel, #handText, #hand {
+#playfield > :not(${POPUP_SELECTOR}, #matCoinSlot), #hand {
   position: absolute; left: 0; top: 0; width: 0; height: 0; margin: 0;
   pointer-events: none; opacity: 0; }
+#handLabel, #handText { position: absolute; display: none; margin: 0; white-space: nowrap;
+  font-size: clamp(10px, 2.4vh, 18px); line-height: 1.6; pointer-events: none; }
+#handLabel.${HAND_LABEL_PLACED} { display: flex; align-items: center; gap: 0.3em; }
+#handText.${HAND_LABEL_PLACED} { display: block; }
+#sortHandCheckbox { margin: 0; pointer-events: auto; cursor: pointer; }
+.self-text { color: rgba(90, 110, 188, 0.864); }
+.opp-text { color: rgba(188, 90, 113, 0.864); }
 ${POPUP_SELECTOR} { display: none; }
 img.card-image:not(:is(${POPUP_SELECTOR}) *) {
   position: fixed !important; transform: none !important; margin: 0 !important; }
@@ -73,7 +97,8 @@ const popupZone = (id, buttons, view) => `
   </div></div>`;
 
 /** The id skeleton the retired `self-containers.html` / `opp-containers.html` had (same ids both sides). */
-const mirrorMarkup = (view) => `<link rel="stylesheet" href="${PANEL_STYLESHEET}"><style>${MIRROR_STYLE}</style>
+const mirrorMarkup = (view) => `<link rel="stylesheet" href="${PANEL_STYLESHEET}">
+<link rel="stylesheet" href="${COIN_STYLESHEET}"><style>${MIRROR_STYLE}</style>
 <div id="playfield">
   <div id="boardCenterDesign"><div id="boardCircle"></div><div id="innerCircle"></div></div>
   ${popupZone('deck', [['shuffleDeckButton', 'Shuffle'], ['closeDeckButton', 'Close']], view)}
@@ -125,12 +150,15 @@ const instanceIdOf = (node) => {
   return Number.isFinite(id) ? id : null;
 };
 
+/** The page's Stadium slot (D93): the Stadium's <img> and its usable glow live there, not in a root. */
+const STADIUM_ID = 'stadium';
+
 /** The card instance a mutated node paints for: its own stamp, or the card <img> it wraps. */
 const instanceOfNode = (node) => {
   if (!node || node.nodeType !== 1) return null;
   const own = instanceIdOf(node);
   if (own !== null) return own;
-  if (!node.classList?.contains('mat-holo')) return null;
+  if (!node.classList?.contains('mat-holo') && node.id !== STADIUM_ID) return null;
   return instanceIdOf(node.querySelector?.('img[data-instance-id]'));
 };
 
@@ -160,6 +188,66 @@ const writeRect = (el, rect, origin) => {
   }
 };
 
+/** Puts an element's anchor corner at a point (px from `origin`); `shift` is its CSS translate. */
+const writeAnchor = (el, x, y, shift, origin) => {
+  if (!el?.style) return;
+  const values = { left: `${x - origin.left}px`, top: `${y - origin.top}px`, transform: shift };
+  for (const [key, value] of Object.entries(values)) {
+    if (el.style[key] !== value) el.style[key] = value;
+  }
+  el.classList.add(HAND_LABEL_PLACED);
+};
+
+/**
+ * Pins a side's Sort box and "(N)" count to its hand strip's screen rect: above the near strip,
+ * below the far one (the far half's iframe was the near one turned 180°), Sort at the strip's
+ * left end for the near seat and its right end for the far seat, the count at the other end.
+ * The ends are clamped into `bounds` (the canvas): a fanned strip can run past its edges.
+ */
+const placeHandLabels = (label, count, strip, near, origin, bounds) => {
+  if (!isRect(strip)) {
+    label?.classList.remove(HAND_LABEL_PLACED);
+    count?.classList.remove(HAND_LABEL_PLACED);
+    return;
+  }
+  let left = strip.left;
+  let right = strip.left + strip.width;
+  if (isRect(bounds)) {
+    const inset = Math.max(HAND_LABEL_GAP_PX, bounds.width * HAND_LABEL_INSET);
+    left = Math.max(left, bounds.left + inset);
+    right = Math.min(right, bounds.left + bounds.width - inset);
+  }
+  if (near) {
+    const y = strip.top - HAND_LABEL_GAP_PX;
+    writeAnchor(label, left, y, 'translateY(-100%)', origin);
+    writeAnchor(count, right, y, 'translate(-100%, -100%)', origin);
+  } else {
+    const y = strip.top + strip.height + HAND_LABEL_GAP_PX;
+    writeAnchor(label, right, y, 'translateX(-100%)', origin);
+    writeAnchor(count, left, y, 'none', origin);
+  }
+};
+
+/**
+ * Puts a side's coin token beside its Active zone's screen rect, centred on it: past the Active's
+ * right edge for the near seat, its left edge for the far seat (the player's right on the far
+ * half, which the iframe board turned 180°).
+ */
+const placeCoinSlot = (slot, active, near, origin, bounds) => {
+  if (!slot?.style) return;
+  if (!isRect(active)) {
+    slot.classList.remove(COIN_PLACED);
+    return;
+  }
+  // The half is the board column's width by half the viewport's height (board-layout.mjs).
+  const halfAspect = isRect(bounds) && bounds.height > 0 ? bounds.width / (bounds.height * IFRAME_HEIGHT_FRAC) : 1;
+  const size = active.height * COIN_SIZE_OF_ACTIVE * halfAspect;
+  const gap = (isRect(bounds) ? bounds.width : active.width) * COIN_GAP_OF_WIDTH;
+  const left = near ? active.left + active.width + gap : active.left - gap - size;
+  writeRect(slot, { left, top: active.top + active.height / 2 - size / 2, width: size, height: size }, origin);
+  slot.classList.add(COIN_PLACED);
+};
+
 const outlineState = (node) => {
   const outline = String(node.style?.outline ?? '').toLowerCase();
   if (PICKED_OUTLINES.some((colour) => outline.includes(colour))) return 'picked';
@@ -171,7 +259,9 @@ const outlineState = (node) => {
  * @param {{ hostSelf: HTMLElement, hostOpp: HTMLElement, doc?: Document }} options
  * @returns {{ roots: { self: ShadowRoot, opp: ShadowRoot }, hosts: { self: HTMLElement, opp: HTMLElement },
  *   zoneElement: (side: 'self'|'opp', zoneId: string) => HTMLElement|null,
- *   sync: (model: object|null, rects: Record<string, {left:number,top:number,width:number,height:number}>) => void,
+ *   sync: (model: object|null, rects: Record<string, {left:number,top:number,width:number,height:number}>,
+ *     zones?: Record<string, {left:number,top:number,width:number,height:number}>,
+ *     bounds?: {left:number,top:number,width:number,height:number}|null) => void,
  *   observe: (onUiState: (instanceId: number, patch: object) => void) => () => void,
  *   uiState: () => import('./board-model.mjs').UiState, dispose: () => void }}
  */
@@ -202,21 +292,28 @@ export function createBoardMirror({ hostSelf, hostOpp, doc = globalThis.document
 
   const zoneElement = (side, zoneId) => roots[side]?.getElementById(zoneId) ?? null;
 
+  const stadiumElement = () => doc.getElementById?.(STADIUM_ID) ?? null;
+
   const cardImage = (id) => {
     for (const side of SIDES) {
       const img = roots[side].querySelector(`img[data-instance-id="${id}"]`);
       if (img) return img;
     }
-    return null;
+    return stadiumElement()?.querySelector?.(`img[data-instance-id="${id}"]`) ?? null;
   };
 
-  /** Every mirror node that carries this card's UI state: the <img>, its holo wrapper, its slot. */
+  /**
+   * Every node that carries this card's UI state: the <img>, its holo wrapper, its slot — for
+   * the Stadium, the page's #stadium, where rules-bridge.js puts the usable glow.
+   */
   const nodesOf = (img, id) => {
     const nodes = [img];
     const wrapper = img.parentElement?.closest?.('.mat-holo');
     if (wrapper) nodes.push(wrapper);
     const slot = img.closest?.('.play-container');
     if (slot && instanceIdOf(slot) === id) nodes.push(slot);
+    const stadium = img.closest?.(`#${STADIUM_ID}`);
+    if (stadium) nodes.push(stadium);
     return nodes;
   };
 
@@ -246,20 +343,24 @@ export function createBoardMirror({ hostSelf, hostOpp, doc = globalThis.document
     a.hidden === b.hidden &&
     a.pending === b.pending;
 
+  /** Every card <img> whose state the scene draws: both roots' and the page Stadium's. */
+  const cardImages = () => [
+    ...SIDES.flatMap((side) => [...roots[side].querySelectorAll('img[data-instance-id]')]),
+    ...(stadiumElement()?.querySelectorAll?.('img[data-instance-id]') ?? []),
+  ];
+
   const uiState = () => {
     const state = { selected: new Set(), glows: new Map(), matPick: new Map(), hidden: new Set() };
-    for (const side of SIDES) {
-      for (const img of roots[side].querySelectorAll('img[data-instance-id]')) {
-        const id = instanceIdOf(img);
-        if (id === null) continue;
-        const card = stateOf(id);
-        // `pending` does not ride on the model, so the scene still learns it from a report.
-        known.set(id, { ...card, pending: known.get(id)?.pending ?? false });
-        if (card.selected) state.selected.add(id);
-        if (card.glow !== null) state.glows.set(id, card.glow);
-        if (card.matPick !== null) state.matPick.set(id, card.matPick);
-        if (card.hidden) state.hidden.add(id);
-      }
+    for (const img of cardImages()) {
+      const id = instanceIdOf(img);
+      if (id === null) continue;
+      const card = stateOf(id);
+      // `pending` does not ride on the model, so the scene still learns it from a report.
+      known.set(id, { ...card, pending: known.get(id)?.pending ?? false });
+      if (card.selected) state.selected.add(id);
+      if (card.glow !== null) state.glows.set(id, card.glow);
+      if (card.matPick !== null) state.matPick.set(id, card.matPick);
+      if (card.hidden) state.hidden.add(id);
     }
     return state;
   };
@@ -281,9 +382,10 @@ export function createBoardMirror({ hostSelf, hostOpp, doc = globalThis.document
         onUiState(id, next);
       }
     };
-    const perRoot = SIDES.map((side) => {
+    const stadium = stadiumElement();
+    const perRoot = [...SIDES.map((side) => roots[side]), ...(stadium ? [stadium] : [])].map((target) => {
       const observer = new Observer(onRecords);
-      observer.observe(roots[side], { subtree: true, attributes: true, attributeFilter: OBSERVED_ATTRIBUTES });
+      observer.observe(target, { subtree: true, attributes: true, attributeFilter: OBSERVED_ATTRIBUTES });
       return observer;
     });
     const entry = { disconnect: () => perRoot.forEach((observer) => observer.disconnect()) };
@@ -299,7 +401,10 @@ export function createBoardMirror({ hostSelf, hostOpp, doc = globalThis.document
     return box ? { left: box.left, top: box.top, width: box.width, height: box.height } : null;
   };
 
-  const sync = (model, rects) => {
+  // `zones` is board-scene.js `zoneRects()` (`<side>:<zone>` footprints); its hand strips place
+  // each side's Sort box and count, kept inside `bounds` (the board column's client rect), and
+  // its Active footprints each side's coin token.
+  const sync = (model, rects, zones = {}, bounds = null) => {
     if (disposed || !rects || typeof rects !== 'object') return;
     const placements = Array.isArray(model?.placements) ? model.placements : [];
     for (const side of SIDES) {
@@ -322,6 +427,15 @@ export function createBoardMirror({ hostSelf, hostOpp, doc = globalThis.document
         const rect = rects[`pile:${side}:${pile}`];
         for (const id of ids) writeRect(zoneElement(side, id), isRect(rect) ? rect : origin, origin);
       }
+      placeHandLabels(
+        zoneElement(side, 'handLabel'),
+        zoneElement(side, 'handText'),
+        zones?.[`${side}:hand`],
+        side === 'self',
+        origin,
+        bounds
+      );
+      placeCoinSlot(zoneElement(side, 'matCoinSlot'), zones?.[`${side}:active`], side === 'self', origin, bounds);
     }
   };
 

@@ -3,6 +3,8 @@ import { NeutralToneMapping, SRGBColorSpace, WebGLRenderer } from 'three';
 
 const MAX_PIXEL_RATIO = 2;
 
+const pixelRatio = () => Math.min(globalThis.devicePixelRatio || 1, MAX_PIXEL_RATIO);
+
 const contextAttributes = ({ alpha, antialias }) => ({
   alpha,
   antialias,
@@ -16,7 +18,9 @@ const contextAttributes = ({ alpha, antialias }) => ({
 /**
  * The context is created by hand so a missing WebGL2 is a quiet null, not three's console error.
  * @param {{ canvas: HTMLCanvasElement, onLost?: () => void, alpha?: boolean, antialias?: boolean }} options
- * @returns {{ renderer: WebGLRenderer, resizeTo: (host: Element) => void, dispose: () => void } | null}
+ * @returns {{ renderer: WebGLRenderer, resizeTo: (host: Element) => void, syncPixelRatio: () => boolean,
+ *   dispose: () => void } | null}
+ *   `syncPixelRatio` follows a devicePixelRatio change (browser zoom, another screen); true when it did.
  */
 export function createRenderer({ canvas, onLost = () => {}, alpha = true, antialias = true } = {}) {
   if (!canvas || typeof canvas.getContext !== 'function') return null;
@@ -28,7 +32,7 @@ export function createRenderer({ canvas, onLost = () => {}, alpha = true, antial
   } catch {
     return null;
   }
-  renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio || 1, MAX_PIXEL_RATIO));
+  renderer.setPixelRatio(pixelRatio());
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.toneMapping = NeutralToneMapping;
 
@@ -39,8 +43,17 @@ export function createRenderer({ canvas, onLost = () => {}, alpha = true, antial
   canvas.addEventListener('webglcontextlost', onContextLost);
 
   let disposed = false;
+  const syncPixelRatio = () => {
+    if (disposed) return false;
+    const ratio = pixelRatio();
+    if (renderer.getPixelRatio() === ratio) return false;
+    renderer.setPixelRatio(ratio);
+    return true;
+  };
+
   const resizeTo = (host) => {
     if (disposed || !host) return;
+    syncPixelRatio();
     const width = Math.max(1, Math.round(host.clientWidth || 0));
     const height = Math.max(1, Math.round(host.clientHeight || 0));
     renderer.setSize(width, height, false);
@@ -54,5 +67,5 @@ export function createRenderer({ canvas, onLost = () => {}, alpha = true, antial
     if (!renderer.getContext().isContextLost()) renderer.forceContextLoss();
   };
 
-  return { renderer, resizeTo, dispose };
+  return { renderer, resizeTo, syncPixelRatio, dispose };
 }

@@ -130,3 +130,24 @@ test('bench → active card lights both card and zone (dragOver)', () => {
   assert.equal(dropTargetFor(card('active', 80), held('bench'), STATE).highlight, 'both');
   assert.equal(dropTargetFor(card('prizes', 81), held('hand'), STATE).highlight, 'zone');
 });
+
+test('the Trainer board refuses a Pokémon or Energy: nothing lit, the drop only says why', () => {
+  const pokemon = held('hand', { isPokemon: true, boardRefuses: true });
+  for (const hit of [plane('board'), card('board', 30)]) {
+    const target = dropTargetFor(hit, pokemon, STATE);
+    assert.equal(target.refused, true);
+    assert.equal(target.highlight, null);
+    assert.deepEqual(routeDrop(target, pokemon, STATE), { kind: 'refuse', args: [], gates: [] });
+  }
+  const energy = held('discard', { isEnergy: true, boardRefuses: true });
+  assert.equal(route(plane('board'), energy).kind, 'refuse');
+});
+
+test('a refused card still goes everywhere else, and a card already on the board moves off it', () => {
+  const pokemon = held('hand', { isPokemon: true, boardRefuses: true });
+  assert.equal(route(plane('bench'), pokemon).kind, 'move');
+  assert.equal(dropTargetFor(plane('bench'), pokemon, STATE).refused, undefined);
+  const onBoard = held('board', { isPokemon: true, boardRefuses: true });
+  assert.equal(route(plane('hand'), onBoard).kind, 'move');
+  assert.equal(dropTargetFor(plane('board'), held('hand', { isTrainer: true, boardRefuses: false }), STATE).refused, undefined);
+});

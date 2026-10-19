@@ -4,8 +4,8 @@ import { JSDOM } from 'jsdom';
 
 import { createBoardInput } from '../board-input.js';
 
-// A page with the canvas, the two mirror roots (a hand card each side, a deck cover) and the
-// page-level Stadium. The scene is a stub whose hit test answers from a table of points.
+// A page with the canvas, the two mirror roots (a hand card each side, the deck and Lost Zone
+// covers with their <img>, the hidden Lost Zone panel) and the page-level Stadium. The scene is a stub whose hit test answers from a table of points.
 const setup = ({ hits = {} } = {}) => {
   const dom = new JSDOM('<body><div id="stadium"><img id="stadiumImg"></div><canvas></canvas></body>');
   const doc = dom.window.document;
@@ -14,12 +14,17 @@ const setup = ({ hits = {} } = {}) => {
     const host = doc.createElement('div');
     doc.body.appendChild(host);
     roots[side] = host.attachShadow({ mode: 'open' });
-    roots[side].innerHTML = `<div id="hand"><img data-instance-id="${side === 'self' ? 1 : 2}"></div><div id="deckCover"></div>`;
+    roots[side].innerHTML =
+      `<div id="hand"><img data-instance-id="${side === 'self' ? 1 : 2}"></div>` +
+      '<div id="deckCover"><img id="deckCover"></div>' +
+      `<div id="lostZoneCover"><img id="lostZoneCover"></div><div id="lostZone"><img data-instance-id="${side === 'self' ? 5 : 6}"></div>`;
   }
   const hovered = [];
+  const tilts = [];
   const scene = {
     hitTest: (x, y) => hits[`${x},${y}`] ?? null,
     setHover: (id) => hovered.push(id),
+    setPointerTilt: (id, x, y) => tilts.push([id, x, y]),
   };
   const targets = [];
   const hover = { setTarget: (el, pointer) => targets.push({ el, pointer }) };
@@ -47,7 +52,7 @@ const setup = ({ hits = {} } = {}) => {
     for (const type of types) el.addEventListener(type, (event) => seen.push({ type, event }));
     return seen;
   };
-  return { dom, doc, roots, input, fire, click, advance, record, hovered, targets, canvas };
+  return { dom, doc, roots, input, fire, click, advance, record, hovered, tilts, targets, canvas };
 };
 
 const SELF_HAND = { instanceId: 1, side: 'self', zone: 'hand', index: 0 };
@@ -57,6 +62,7 @@ const hits = {
   '300,100': OPP_HAND,
   '500,500': { zone: 'deck', side: 'self', instanceId: null, pile: true },
   '700,500': { zone: 'stadium', side: null, instanceId: 9 },
+  '900,500': { instanceId: 5, side: 'self', zone: 'lostZone', index: 0 },
 };
 
 test('a click on a card dispatches a composed click on its mirror img and swallows the native one', () => {
@@ -140,14 +146,25 @@ test('a contextmenu on empty table is prevented but still reaches the page (clos
   assert.equal(onPage.length, 1);
 });
 
-test('piles address their cover in that root; the Stadium addresses the page img', () => {
+test('piles address their cover img in that root; the Stadium addresses the page img', () => {
   const env = setup({ hits });
-  const onCover = env.record(env.roots.self.getElementById('deckCover'), ['click']);
+  const onCover = env.record(env.roots.self.querySelector('#deckCover > img'), ['click', 'contextmenu']);
   const onStadium = env.record(env.doc.getElementById('stadiumImg'), ['click']);
   env.click({ x: 500, y: 500 });
   env.click({ x: 700, y: 500 });
-  assert.equal(onCover.length, 1);
+  env.fire('contextmenu', { x: 500, y: 500, button: 2 });
+  assert.deepEqual(onCover.map((entry) => entry.type), ['click', 'contextmenu']);
   assert.equal(onStadium.length, 1);
+});
+
+test('a click on the Lost Zone top card opens its pile (the cover); its card menu stays the card\'s', () => {
+  const env = setup({ hits });
+  const onCover = env.record(env.roots.self.querySelector('#lostZoneCover > img'), ['click', 'dblclick', 'contextmenu']);
+  const onCard = env.record(env.roots.self.querySelector('#lostZone img'), ['click', 'dblclick', 'contextmenu']);
+  env.click({ x: 900, y: 500 });
+  env.fire('contextmenu', { x: 900, y: 500, button: 2 });
+  assert.deepEqual(onCover.map((entry) => entry.type), ['click']);
+  assert.deepEqual(onCard.map((entry) => entry.type), ['contextmenu']);
 });
 
 test('mouse hover lifts the card and names its img to the preview; leave clears both', () => {
@@ -164,6 +181,15 @@ test('mouse hover lifts the card and names its img to the preview; leave clears 
   env.fire('pointerleave');
   assert.equal(env.hovered.at(-1), null);
   assert.equal(env.targets.at(-1).el, null);
+});
+
+test('mouse moves feed the pointer tilt the card and the point; a pile or leaving lays it flat', () => {
+  const env = setup({ hits });
+  env.fire('pointermove', { x: 100, y: 100 });
+  env.fire('pointermove', { x: 100, y: 100 });
+  env.fire('pointermove', { x: 500, y: 500 });
+  env.fire('pointerleave');
+  assert.deepEqual(env.tilts, [[1, 100, 100], [1, 100, 100], [null, 500, 500], [null, undefined, undefined]]);
 });
 
 test('touch and pen moves never hover, but their clicks work', () => {
@@ -224,7 +250,8 @@ const dragSetup = ({ hits: table = {}, state = STATE, perform = () => true } = {
     roots[side] = host.attachShadow({ mode: 'open' });
     roots[side].innerHTML =
       `<div id="hand"><img data-instance-id="${side === 'self' ? 1 : 2}"></div>` +
-      `<div id="bench"><img data-instance-id="${side === 'self' ? 5 : 6}"></div><div id="board"></div>`;
+      `<div id="bench"><img data-instance-id="${side === 'self' ? 5 : 6}"></div><div id="board"></div>` +
+      `<div id="lostZone"><img data-instance-id="${side === 'self' ? 7 : 8}"></div>`;
   }
   const calls = [];
   const scene = {
@@ -249,6 +276,10 @@ const dragSetup = ({ hits: table = {}, state = STATE, perform = () => true } = {
       calls.push(['begin', el]);
       const side = el.getRootNode() === roots.self ? 'self' : 'opp';
       return { instanceId: Number(el.dataset.instanceId), side, zone: el.parentElement.id, index: 0, attached: false };
+    },
+    held: (el) => {
+      calls.push(['held', el]);
+      return { instanceId: Number(el.dataset.instanceId), side: 'self', zone: el.parentElement.id, index: 0, attached: false };
     },
     targetIndexOf: () => -1,
     perform: (route) => {
@@ -433,4 +464,38 @@ test('drag: the release after an Escape is neither a click nor a drop', () => {
   assert.deepEqual(clicks, []);
   assert.equal(env.performed.length, 0);
   assert.equal(env.of('dropCard').length, 1);
+});
+
+// ── HTML5 drags out of an open panel (the Lost Zone panel here) ─────────────
+
+test('a panel card dragged (HTML5) over the canvas lights its target and drops through the router', () => {
+  const env = dragSetup({ hits: dragHits });
+  const panelImg = env.roots.self.querySelector('#lostZone img');
+  panelImg.classList.add('dragging');
+  const over = env.fire('dragover', { x: 100, y: 300 });
+  env.fire('dragover', { x: 100, y: 300 });
+  assert.equal(over.defaultPrevented, true, 'a valid target lets the drop happen');
+  assert.equal(env.of('held').length, 1, 'the card is read once per drag');
+  assert.deepEqual(env.of('zone').at(-1), ['zone', 'self', 'active', true]);
+  const drop = env.fire('drop', { x: 100, y: 300 });
+  assert.equal(drop.defaultPrevented, true);
+  assert.equal(env.performed.length, 1);
+  assert.equal(env.performed[0].kind, 'move');
+  assert.deepEqual(env.performed[0].args.slice(2, 4), ['lostZone', 'active']);
+  assert.equal(env.of('liftCard').length + env.of('dropCard').length, 0, 'no mesh was lifted');
+  assert.deepEqual(env.of('zone').at(-1), ['zone', 'self', 'active', false]);
+  assert.equal(env.input.activeDrag(), null);
+});
+
+test('an HTML5 drag with no panel card, or over no target, is left to the browser', () => {
+  const env = dragSetup({ hits: dragHits });
+  assert.equal(env.fire('dragover', { x: 100, y: 300 }).defaultPrevented, false, 'not a panel card (a file, say)');
+  assert.equal(env.of('held').length, 0);
+  env.roots.self.querySelector('#lostZone img').classList.add('dragging');
+  assert.equal(env.fire('dragover', { x: 1, y: 1 }).defaultPrevented, false, 'nothing under the pointer');
+  env.fire('dragover', { x: 100, y: 300 });
+  env.fire('dragleave', { x: 100, y: 300 });
+  assert.deepEqual(env.of('zone').at(-1), ['zone', 'self', 'active', false], 'leaving the canvas clears the light');
+  env.fire('drop', { x: 100, y: 300 });
+  assert.equal(env.performed.length, 0, 'a drop after the leave makes no call');
 });

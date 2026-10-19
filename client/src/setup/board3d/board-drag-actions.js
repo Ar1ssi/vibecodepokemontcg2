@@ -11,7 +11,13 @@ import { isEnergy, isPokemon, isTrainer } from '/shared/engine/cards.mjs';
 import { getZone } from '../zones/get-zone.js';
 import { identifyCardElement } from '../image-logic/click-events.js';
 import { findZoneCardIndex } from '../image-logic/zone-card-lookup.js';
-import { clearBoardReady, markBoardReady, refuseManualDeckAction } from '../image-logic/drag.js';
+import {
+  clearBoardReady,
+  heldCardBoardRefuses,
+  markBoardReady,
+  refuseBoardDrop,
+  refuseManualDeckAction,
+} from '../image-logic/drag.js';
 import { uiCue } from '../netcode/mat-fx/ui-cue.mjs';
 
 const CALLS = { retreat, deckTop: moveToDeckTop, move: moveCardBundle };
@@ -44,6 +50,23 @@ const begin = (image) => {
   identifyCardElement(image);
   markBoardReady(image);
   uiCue('card-from-hand');
+  return describe(image);
+};
+
+/**
+ * An HTML5 drag drag.js started on an open panel's <img> (a pile viewer, Looking at cards, the
+ * attached cards), now over the canvas. dragStart made the pick-up; this only reads the card.
+ * @param {HTMLImageElement} image the panel <img> (drag.js's `.dragging`)
+ * @returns {import('./drop-router.mjs').Dragging|null}
+ */
+const held = (image) => {
+  if (!image) return null;
+  identifyCardElement(image);
+  return describe(image);
+};
+
+/** The held card as drop-router.mjs reads it, from `mouseClick` once `identifyCardElement` ran. */
+function describe(image) {
   const card = image.card ?? null;
   return {
     instanceId: mouseClick.cardInstanceId,
@@ -54,18 +77,24 @@ const begin = (image) => {
     isTrainer: Boolean(card && isTrainer(card)),
     isEnergy: Boolean(card && isEnergy(card)),
     isPokemon: Boolean(card && isPokemon(card)),
+    boardRefuses: heldCardBoardRefuses(image),
   };
-};
+}
 
 /** The legacy index drag.js passes for a dropped-on card (`findZoneCardIndex`, :322-325). */
 const targetIndexOf = (image, side, zone) => findZoneCardIndex(getZone(side, zone), image);
 
 /**
- * Runs a routed drop (drop-router.mjs `routeDrop`): its rules gates, then the cue and the call.
- * @param {{ kind: 'retreat'|'deckTop'|'move', args: any[], gates: string[] }} route
+ * Runs a routed drop (drop-router.mjs `routeDrop`): its rules gates, then the cue and the call;
+ * a refused drop only says why.
+ * @param {{ kind: 'retreat'|'deckTop'|'move'|'refuse', args: any[], gates: string[] }} route
  * @returns {boolean} whether the call went out
  */
 const perform = (route) => {
+  if (route?.kind === 'refuse') {
+    refuseBoardDrop();
+    return false;
+  }
   const call = CALLS[route?.kind];
   if (!call) return false;
   if ((route.gates ?? []).some((action) => refuseManualDeckAction(action))) return false;
@@ -75,5 +104,5 @@ const perform = (route) => {
 };
 
 export function createBoardDragActions() {
-  return { state: dragState, begin, targetIndexOf, perform, end: clearBoardReady };
+  return { state: dragState, begin, held, targetIndexOf, perform, end: clearBoardReady };
 }
