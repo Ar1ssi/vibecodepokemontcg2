@@ -273,18 +273,10 @@ function fairyKit(palette) {
     if (!(r > 0)) return;
     const rotation = sigilRotation(s);
     const outline = starOutline(x, y, r, rotation);
+    // Design 075 parity: a soft pink bloom with twinkles at the star's points, not a line-drawn
+    // star outline (it read as clip art next to Scarlet/Violet's sparkle).
+    glow(ctx, x, y, r * 1.1, 0.55);
     ctx.fxStyle = SHIMMER;
-    ctx.lineJoin = 'round';
-    ctx.strokeStyle = rgbCss(palette.hot, 0.35);
-    ctx.lineWidth = Math.max(1, r * 0.08);
-    ctx.beginPath();
-    addPolygon(ctx, outline);
-    ctx.stroke();
-    ctx.strokeStyle = rgbCss(palette.gold, 0.75);
-    ctx.lineWidth = Math.max(1, r * 0.025);
-    ctx.beginPath();
-    addPolygon(ctx, outline);
-    ctx.stroke();
     const pulse = twinklePulse(clamp01(s), 0);
     ctx.fillStyle = rgbCss(palette.core, 0.9);
     ctx.beginPath();

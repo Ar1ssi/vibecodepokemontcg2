@@ -69,7 +69,7 @@ export const glacialLance = Object.freeze({
     // The lance: a great crystal (head + two trailing crystals) forms at the flank as the rider
     // winds up and flies whole into the card, landing at contact.
     { at: 300, until: 1000, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.22, r1: 0.3, bow: 0, tongues: 2, tint: LANCE } },
-    { at: 1320, until: 2100, layer: 'back', drawer: 'pillar', params: { from: 'below', height: 2.0, w: 0.4, count: 2, spread: 1.2, stagger: 80, tint: LANCE } },
+    { at: 1320, until: 2100, layer: 'back', drawer: 'pillar', params: { from: 'below', height: 1.2, w: 0.4, count: 2, spread: 1.2, stagger: 80, tint: LANCE } },
     { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: FLASH },
     { at: 1000, until: 1300, layer: 'front', drawer: 'shards', params: { count: 5, arc: 360, distance: 1.1 } },
     { at: 1200, until: 1800, layer: 'front', drawer: 'cloud', params: { count: 5, radius: 0.35, drift: 0.6, alpha: 0.4, tint: MIST } },
@@ -97,7 +97,7 @@ export const glaciate = Object.freeze({
   defender: { motion: 'freeze', params: { heat: 0.35 } },
   beats: [
     { at: 200, until: 700, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.14, r1: 0.4 } },
-    { at: 800, until: 1400, layer: 'front', drawer: 'pillar', params: { from: 'below', height: 1.6, w: 0.9 } },
+    { at: 800, until: 1400, layer: 'front', drawer: 'pillar', params: { from: 'below', height: 1.2, w: 0.5 } },
     { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: FLASH },
     { at: 1200, until: 1800, layer: 'front', drawer: 'shards', params: { count: 5, arc: 360, distance: 1.1 } },
     { at: 1200, until: 1800, layer: 'front', drawer: 'cloud', params: { count: 5, radius: 0.35, drift: 0.6, alpha: 0.4, tint: MIST } },
@@ -132,7 +132,7 @@ export const iceBurn = Object.freeze({
     { at: 1100, until: 1280, layer: 'top', drawer: 'impactFlash', params: FLASH },
     { at: 1100, until: 1400, layer: 'front', drawer: 'starFlare', params: { arms: 'cross', width: 0.3, core: 0.22, size: 0.8, tint: { deep: '#FF3D5A', body: '#FF9A2E', hot: '#FFE0A8', core: '#FFFFFF' } } },
     { at: 1100, until: 1500, layer: 'front', drawer: 'shards', params: { count: 5, arc: 360, distance: 1.1 } },
-    { at: 1500, until: 2300, layer: 'front', drawer: 'starFlare', params: { arms: SIX, width: 0.32, breakAt: 0.6, tint: ICE_WHITE } },
+    { at: 1500, until: 2300, layer: 'front', drawer: 'starFlare', params: { size: 0.6, arms: SIX, width: 0.32, breakAt: 0.6, tint: ICE_WHITE } },
     { at: 1300, until: 2300, layer: 'front', drawer: 'cloud', params: { count: 5, radius: 0.35, drift: 0.6, alpha: 0.4, tint: MIST } },
   ],
   particles: [

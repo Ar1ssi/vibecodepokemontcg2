@@ -114,7 +114,7 @@ export const multiAttack = Object.freeze({
     { at: 0, until: 500, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.12, r1: 0.32, from: 0.15, tint: SLASH } },
     // The crescents sweep round the fist as it winds up: the move's own blades, not an orbit.
     { at: 300, until: 700, layer: 'front', drawer: 'slashArc', params: { target: 'attacker', count: 2, sweep: 140, radius: 0.45, gapDeg: 180, angle: 30, thick: 0.12, tint: SLASH } },
-    { at: 580, until: 1300, layer: 'back', drawer: 'pillar', params: { from: 'below', height: 1.6, w: 0.3, count: 3, spread: 0.8, stagger: 220, tint: SLASH } },
+    { at: 580, until: 1300, layer: 'back', drawer: 'pillar', params: { from: 'below', height: 1.2, w: 0.3, count: 3, spread: 0.8, stagger: 220, tint: SLASH } },
     flash(1050, SLASH),
     { at: 1050, until: 1400, layer: 'front', drawer: 'shards', params: { count: 5, arc: 360, distance: 1.0, tint: SILVALLY } },
     { at: 1050, until: 1500, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.35, tint: SILVALLY } },
@@ -208,7 +208,7 @@ export const teraStarstorm = Object.freeze({
   defender: { motion: 'knock', params: { strength: 0.35, heat: 0.5 } },
   beats: [
     { at: 100, until: 850, layer: 'front', drawer: 'coreCharge', params: { lead: 0.3, r0: 0.1, r1: 0.28, from: 0.1 } },
-    { at: 600, until: 1300, layer: 'back', drawer: 'pillar', params: { target: 'attacker', from: 'below', height: 1.8, w: 0.45 } },
+    { at: 600, until: 1300, layer: 'back', drawer: 'pillar', params: { target: 'attacker', from: 'below', height: 1.2, w: 0.45 } },
     { at: 850, until: 1150, layer: 'back', drawer: 'beam', params: { kind: 'solid', w: 0.26, tint: { body: '#5FF2E0', hot: '#7CFFB2' } } },
     // The crystals fly whole down the starlight and land as the shards burst off the defender.
     { at: 800, until: 1100, layer: 'front', drawer: 'volley', params: { count: 3, stagger: 60, r0: 0.1, r1: 0.14, bow: 0.25, tongues: 0, unit: 'facet' } },

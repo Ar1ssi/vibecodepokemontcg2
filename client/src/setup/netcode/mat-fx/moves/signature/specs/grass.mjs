@@ -24,7 +24,7 @@ export const ivyCudgel = Object.freeze({
     { at: 1000, until: 1800, layer: 'back', drawer: 'vignette', params: { target: 'defender', maxAlpha: 0.45 } },
     { at: 1300, until: 2000, layer: 'front', drawer: 'smoke', params: { count: 4 } },
     { at: 1000, until: 1600, layer: 'front', drawer: 'shards', params: { count: 8, arc: 360, distance: 1.0, hues: ['#7FFFD4', '#FFE14D'] } },
-    { at: 1000, until: 1300, layer: 'front', drawer: 'starFlare', params: { grow: 0.12, arms: 'cross', width: 0.3, tint: { body: '#7FFFD4', hot: '#FFE14D', core: '#FFFFFF' } } },
+    { at: 1000, until: 1300, layer: 'front', drawer: 'starFlare', params: { size: 0.6, grow: 0.12, arms: 'cross', width: 0.3, tint: { body: '#7FFFD4', hot: '#FFE14D', core: '#FFFFFF' } } },
     { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { r1: 0.8,r0: 0.3 } },
   ],
   particles: [
@@ -57,7 +57,7 @@ export const seedFlare = Object.freeze({
     { at: 1000, until: 2000, layer: 'back', drawer: 'vignette', params: { target: 'defender', maxAlpha: 0.45 } },
     { at: 1000, until: 1800, layer: 'front', drawer: 'slashArc', params: { sweep: 120, radius: 0.7, count: 2, gapDeg: 30, angle: 45, tint: BLADE } },
     { at: 1000, until: 1800, layer: 'front', drawer: 'shards', params: { count: 8, arc: 360, distance: 1.2, hues: ['#7CFF5B', '#E9FF5E', '#3FE8FF', '#FF4FD8'] } },
-    { at: 1000, until: 1400, layer: 'front', drawer: 'starFlare', params: { grow: 0.12, arms: 'cross', width: 0.3, tint: { body: '#E9FF5E', hot: '#FFF8B0', core: '#FFFFFF' } } },
+    { at: 1000, until: 1400, layer: 'front', drawer: 'starFlare', params: { size: 0.6, grow: 0.12, arms: 'cross', width: 0.3, tint: { body: '#E9FF5E', hot: '#FFF8B0', core: '#FFFFFF' } } },
     { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { r1: 0.8,r0: 0.3 } },
   ],
   particles: [

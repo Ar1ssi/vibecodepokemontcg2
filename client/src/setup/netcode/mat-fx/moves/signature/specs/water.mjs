@@ -60,7 +60,7 @@ export const originPulse = Object.freeze({
   attacker: { motion: 'dash', params: { wind: 0.3 } },
   defender: { motion: 'knock', params: { strength: 0.3, heat: 0.35 } },
   beats: [
-    { at: 200, until: 900, layer: 'front', drawer: 'starFlare', params: { target: 'attacker', arms: RING5, width: 0.3, tint: ORB } },
+    { at: 200, until: 900, layer: 'front', drawer: 'starFlare', params: { size: 0.6, target: 'attacker', arms: RING5, width: 0.3, tint: ORB } },
     // Landing at 760 … 1000: flight = 400 - 4 x 60 = 160 ms; the last orb lands at contact.
     { at: 600, until: 1000, layer: 'front', drawer: 'volley', params: { count: 5, stagger: 60, r0: 0.12, r1: 0.16, bow: 0.3, tongues: 0, tint: ORB } },
     { at: 900, until: 1800, layer: 'back', drawer: 'vignette', params: { target: 'defender', maxAlpha: 0.45 } },
@@ -93,12 +93,12 @@ export const steamEruption = Object.freeze({
   beats: [
     { at: 0, until: 600, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.14, r1: 0.34, tint: LANCE } },
     { at: 300, until: 1000, layer: 'front', drawer: 'beam', params: { kind: 'solid', w: 0.3, tint: LANCE } },
-    { at: 800, until: 1800, layer: 'front', drawer: 'pillar', params: { from: 'below', height: 1.6, w: 0.6, tint: LANCE } },
+    { at: 800, until: 1800, layer: 'front', drawer: 'pillar', params: { from: 'below', height: 1.2, w: 0.5, tint: LANCE } },
     { at: 800, until: 1800, layer: 'front', drawer: 'cloud', params: { count: 4, radius: 0.35, drift: 0.6, alpha: 0.4, tint: MIST } },
     { at: 1200, until: 1800, layer: 'front', drawer: 'smoke', params: { count: 3 } },
     { at: 900, until: 1600, layer: 'back', drawer: 'vignette', params: { target: 'defender', maxAlpha: 0.45 } },
     { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: FLASH },
-    { at: 1000, until: 1400, layer: 'front', drawer: 'starFlare', params: { arms: RING5, width: 0.46, tint: HOT_STEAM } },
+    { at: 1000, until: 1400, layer: 'front', drawer: 'starFlare', params: { size: 0.6, arms: RING5, width: 0.46, tint: HOT_STEAM } },
   ],
   particles: [
     { at: 1000, anchor: 'defender', count: 10, distance: 1.2, direction: -90, spread: 300, size: [0.04, 0.1], aspect: 0.6, gravity: 0.7, maxDelay: 0.1, durationMs: 760, kind: 'droplet' },
@@ -123,9 +123,9 @@ export const surgingStrikes = Object.freeze({
   attacker: { motion: 'lunge', params: { wind: 0.4, strikes: 3, glow: 0.6 } },
   defender: { motion: 'stagger', params: { hits: 3, gapMs: 200, strength: 0.3, lead: 450 } },
   beats: [
-    { at: 500, until: 700, layer: 'front', drawer: 'starFlare', params: { arms: 'cross', width: 0.3, tint: STRIKE } },
-    { at: 700, until: 950, layer: 'front', drawer: 'starFlare', params: { arms: 'cross', width: 0.3, tint: STRIKE } },
-    { at: 950, until: 1250, layer: 'front', drawer: 'starFlare', params: { arms: RING5, width: 0.46, tint: STRIKE } },
+    { at: 500, until: 700, layer: 'front', drawer: 'starFlare', params: { size: 0.6, arms: 'cross', width: 0.3, tint: STRIKE } },
+    { at: 700, until: 950, layer: 'front', drawer: 'starFlare', params: { size: 0.6, arms: 'cross', width: 0.3, tint: STRIKE } },
+    { at: 950, until: 1250, layer: 'front', drawer: 'starFlare', params: { size: 0.6, arms: RING5, width: 0.46, tint: STRIKE } },
     { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: FLASH },
     { at: 1100, until: 1700, layer: 'front', drawer: 'splash', params: { count: 4, arc: 140, direction: -90, gravity: 0.7 } },
   ],

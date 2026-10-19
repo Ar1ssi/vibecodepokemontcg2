@@ -83,7 +83,7 @@ export const electroDrift = Object.freeze({
     flash(1000, ARC),
     // The column erupting under the defender is the payoff; a sky bolt on the same line summed
     // with it into one white slab.
-    { at: 1000, until: 1500, layer: 'front', drawer: 'pillar', params: { from: 'below', height: 1.6, w: 0.4, tint: ARC } },
+    { at: 1000, until: 1500, layer: 'front', drawer: 'pillar', params: { from: 'below', height: 1.2, w: 0.4, tint: ARC } },
   ],
   particles: [sparks(1000, 8)],
 });

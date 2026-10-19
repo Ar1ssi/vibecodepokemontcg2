@@ -186,7 +186,7 @@ export const dazzlingGleam = spec({
   defender: { motion: 'knock', params: { strength: 0.3, heat: 0.3 } },
   beats: [
     { at: 0, until: 620, layer: 'front', drawer: 'coreCharge', params: { lead: 0.3, r0: 0.1, r1: 0.26, from: 0.2 } },
-    { at: 80, until: 640, layer: 'front', drawer: 'glyph', params: { target: 'attacker', r: 0.55 } },
+    { at: 80, until: 640, layer: 'back', drawer: 'aura', params: { target: 'attacker', hz: 2, alpha: 0.7, r0: 0.7, r1: 0.9, tint: { deep: '#C2457E', body: '#FF9AD0', hot: '#FFE0F2', core: '#FFFFFF' } } },
     { at: 300, until: 900, layer: 'back', drawer: 'cloud', params: { target: 'attacker', count: 4, radius: 0.18, drift: 0.6, alpha: 0.4 } },
     // Five twinkles 40 ms apart: flight = 320 - 4 x 40 = 160 ms, so the first lands at contact.
     { at: 600, until: 920, layer: 'front', drawer: 'volley', params: { count: 5, stagger: 40, r0: 0.08, r1: 0.12, bow: 0.4, tongues: 1 } },

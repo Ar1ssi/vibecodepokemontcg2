@@ -997,15 +997,13 @@ test('a fairy projectile is the moon: haze, sphere, a clipped crescent and a rim
   assert.equal(draw({ tongues: 4 }).fills.count, 4 + 4 * 3);
 });
 
-test('the fairy sigil strokes a star outline twice (pink glow, gold line) and fills the twinkles in one pass', () => {
+test('the fairy sigil is a soft bloom with twinkles at the star\'s points: no stroked outline (design 075 parity)', () => {
   const rec = recordingContext();
   MATERIALS.fairy.sigil(rec.ctx, 100, 100, 80, 0.4);
-  assert.equal(strokes(rec), 2);
-  assert.equal(rec.fills.count, 1);
-  assert.equal(rec.calls.filter(([name]) => name === 'closePath').length, 2 + 2 + 5, 'two outlines, a crossed centre, five tips');
+  assert.equal(strokes(rec), 0, 'no line-drawn star');
+  assert.equal(rec.fills.count, 2, 'the bloom, then the twinkles in one pass');
+  assert.equal(rec.calls.filter(([name]) => name === 'closePath').length, 2 + 5, 'a crossed centre, five tips');
   assert.ok(callsAreFinite(rec.calls));
-  const { hot, gold } = MATERIALS.fairy.palette;
-  assert.deepEqual(rec.colours.slice(0, 2).map(rgbOf), [hot, gold]);
   for (const css of rec.colours) assert.ok(inPalette(MATERIALS.fairy, css), css);
   const none = recordingContext();
   MATERIALS.fairy.sigil(none.ctx, 100, 100, 0, 0.4);
