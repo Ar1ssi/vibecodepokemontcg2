@@ -153,3 +153,9 @@ oblivion-wing (flying, sig) — tweak: SV is Yveltal's crimson beam in a red vor
 octazooka (water; LPA) — tweak: an inky black blob is shot; ours blue bubbles → dark ink tint.
 ominous-wind (ghost; LPA) — ok: violet wind.
 origin-pulse (water, sig) — tweak: SV swarms blue orbs, then rains blue beams; ours a big blue star at the user → orb volley, no star.
+FIXED (pass 18): nihil-light oblivion-wing octazooka origin-pulse
+outrage (dragon) — tweak: SV wraps the user in a violet rage aura, then lands yellow-star impacts on the foe; ours swirls violet blades and shows little at contact → yellow impact streak bursts on the defender.
+peck (flying) — ok: a quick peck.
+petal-dance (petal) — ok: swirling petals.
+phantom-force (ghost) — ok: vanishes into violet haze and strikes (eyes kept per 063 tests).
+pin-missile (bug) — ok: needles fly in.

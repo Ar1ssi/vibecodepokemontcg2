@@ -124,6 +124,8 @@ export const outrage = spec({
     ...blow(1200),
     ...blow(1300, { ring: 1.3, scales: 8, reach: 1.0, flash: 1.25 }),
     { at: 950, until: 1900, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.45 } },
+    { at: 1000, until: 1250, layer: 'front', drawer: 'fan', params: { target: 'defender', count: 6, spread: 360, lenMin: 0.4, lenMax: 0.8, width: 0.14, tint: { deep: '#C88A00', body: '#FFD23F', hot: '#FFF3A0', core: '#FFFCE8' } } },
+    { at: 1200, until: 1450, layer: 'front', drawer: 'fan', params: { target: 'defender', dx: 0.3, dy: -0.2, count: 5, spread: 360, direction: 30, lenMin: 0.3, lenMax: 0.6, width: 0.12, tint: { deep: '#C88A00', body: '#FFD23F', hot: '#FFF3A0', core: '#FFFCE8' } } },
     { at: 1350, until: 1950, layer: 'front', drawer: 'smoke', params: { count: 6, rise: 0.9 } },
   ],
   particles: [ember({ at: 1000, count: 10, distance: 1.1 }), ember({ at: 1300, count: 12, distance: 1.3 })],
