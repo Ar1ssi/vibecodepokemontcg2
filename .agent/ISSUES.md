@@ -6,7 +6,7 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I267). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I271). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Umbrella lines name every member as `(merged I<a>, I<b>…)`: grep any id to find its line.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (`pnpm harness:check`); maintain.md moves older Closed lines to .agent/archive/ISSUES-closed.md.
@@ -14,6 +14,10 @@
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I270 2026-10-19 P3 [rules] Delinquent (PR #222) adds a third "If you do" gate: opponentDiscardFromHand rescans events for a Stadium cardMoved (trainer-steps.mjs:4536) though the executor has `cost` steps and `requiresStadiumDiscard` (executor.mjs:400, :483) — fold into one
+- I269 2026-10-19 P3 [client] trainer-execution.js `_stadiumDiscardedByStep` (:82, PR #222) is module state never reset per runTrainerSteps; a later requiresStadium step with no discardStadium before it reads the last Trainer's value — reset it at run start
+- I268 2026-10-19 P3 [rules] Delinquent no-Stadium test (trainer-steps-missing.test.mjs:186) checks reason `no_stadium`, which discardStadium (trainer-steps.mjs:2190) also emits, so it cannot tell which step skipped — give the gate its own reason
+- I267 2026-10-19 P3 [rules] Delinquent opponentDiscardFromHand (trainer-steps.mjs:4530, PR #222) has no tests for an opponent hand under 3 (count clamps), an empty hand (`empty_hand`) or an effect shield (`effect_shield`)
 - I264 2026-10-18 P2 [client] After 074-three-board G3: legacy relay (SERVER_AUTHORITATIVE=0) has no visible board (DOM goes to the hidden mirror; test:2p checks state only); orphaned sheets mat-ambient/status-marker/energy-token/damage-counter/mat-coin.css, .full-view code, .hover-gutter-probe, index.css .self/.opp
 - I266 2026-10-18 P3 [client] 074-three-board user-check items: TCG Live camera keeps the tilt hand size; focus mesh mode drops the holo tilt; far hand showed the deck rect one sample after the opp draw; deck keys send the legacy index for server cards; 2P join of the second e2e client times out under load
 - I263 2026-10-16 P3 [board-ui] Bench AttackOverlay (074 A2: attacks hidden, Retreat inert) has no DOM or e2e test; test-card-inspector-e2e covers the Active and stack view only (refs: D219, design 074)
