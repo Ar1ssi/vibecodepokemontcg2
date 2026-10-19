@@ -48,6 +48,8 @@ const TEXTS = {
   Carmine:
     'If you go first, you may use this card during your first turn. Discard your hand and draw 5 cards.',
   Beauty: 'If you go first, you may play this card during your first turn. Draw 2 cards.',
+  Wally:
+    'Search your deck for a card that evolves from 1 of your Pokémon (excluding Pokémon-EX) and put it onto that Pokémon. (This counts as evolving that Pokémon.) Shuffle your deck afterward. You can use this card during your first turn or on a Pokémon that was put into play this turn.',
   'Battle VIP Pass':
     'You can use this card only during your first turn. Search your deck for up to 2 Basic Pokémon and put them onto your Bench. Then, shuffle your deck.',
 };
@@ -255,6 +257,15 @@ test('first-turn permission Supporters are playable on turn 1; plain Supporters 
   first.turn.number = 1;
   const carmine = card({ name: 'Carmine', type: 'Trainer', trainerType: 'Supporter', text: TEXTS.Carmine });
   assert.equal(play(first, carmine).error, null);
+});
+
+// Wally (Generations RC27, Roaring Skies 94/107): "You can use this card during your first turn or on a
+// Pokémon that was put into play this turn." Playable on turn 1 with no "If you go first" clause.
+test('Wally: printed first-turn permission makes the Supporter playable on turn 1', () => {
+  assert.equal(parseTrainerEffect(TEXTS.Wally).turnOnePermission, true);
+  assert.equal(blocked('Wally', { turnNumber: 1 }), null);
+  assert.equal(blocked('Wally', { turnNumber: 2 }), null);
+  assert.match(blocked('Kamado', { turnNumber: 1 }), /turn 1/);
 });
 
 // Audit S&M I137: Cyrus Prism Star's "{W} or {M} Active" gate was unparsed.
