@@ -240,3 +240,10 @@ thousand-waves (ground, sig) — ok: its rings are the ground wave itself (kept)
 throat-chop (dark) — ok (ripples now bands): a dark chop.
 GLOBAL — Ground's attacker-side floor rings (charge rings, 5) dropped; its defender quake rings stay.
 FIXED (pass 31): ground attacker rings
+surging-strikes (water, sig) — n/a: the Poképédia download keeps arriving truncated.
+thunder (electric) — tweak: SV drops a yellow bolt into a gold sphere; our bolts bloomed white-cyan → the bolt halo now follows the move's hot colour (yellow), electric-wide.
+thunder-cage (electric, sig) — ok: bolts trap the foe.
+thunder-fang (electric) — ok: a yellow electric bite.
+thunder-shock (electric) — ok: a small spark.
+thunderclap (electric) — ok: a quick bolt.
+FIXED (pass 32): thunder · GLOBAL: electric bolt halo

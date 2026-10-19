@@ -231,7 +231,9 @@ function electricKit(palette) {
     const glowWidth = width * BOLT_GLOW;
     ctx.filter = `blur(${Math.max(1, glowWidth * STROKE_BLUR).toFixed(1)}px)`;
     ctx.fxStyle = ENERGY_HALO;
-    ctx.strokeStyle = rgbCss(palette.edge, 0.35 * alpha);
+    // The move's own hot colour (design 075 parity): the pale-blue edge bloomed every bolt white-cyan,
+    // where Scarlet/Violet's thunder is yellow; a tinted bolt (cyan, violet) still follows its tint.
+    ctx.strokeStyle = rgbCss(palette.hot, 0.35 * alpha);
     ctx.lineWidth = glowWidth;
     trace();
     ctx.stroke();
