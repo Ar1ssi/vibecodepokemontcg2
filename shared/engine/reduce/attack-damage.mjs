@@ -387,6 +387,34 @@ export function attackTargetOptions(draft, defenderPlayerId, scope, filter = nul
   return keep ? roots.filter((root) => keep(inPlayView(draft, root))) : roots;
 }
 
+// Printed units of a chosen-target damage clause: "does 50 damage to 1 of your opponent's Pokémon
+// for each of your Beedrill V in play" and "does 40 damage times the number of Beedrill you have in
+// play to 1 of your opponent's Pokémon".
+const CHOSEN_TARGET_PER_UNIT = [
+  /damage to \d+ of your opponent's [^.(]*? for each ([^.(]+)/i,
+  /damage times the (?:amount|number) of ([^.(]+?) to \d+ of your opponent's/i,
+];
+
+/**
+ * The board count a chosen-target damage clause multiplies by. Null when the printed clause has no
+ * per-unit count or the unit is unread.
+ */
+export function chosenTargetPerUnitCount(draft, text, { attackerPlayerId, defenderPlayerId, attacker, defender, attackerView, attack }) {
+  const normalized = String(text || '').replace(/[‘’]/g, "'");
+  const unit = CHOSEN_TARGET_PER_UNIT.map((re) => re.exec(normalized)?.[1]).find(Boolean);
+  if (!unit) return null;
+  const ctx = buildServerAttackContext(draft, {
+    attackerPlayerId,
+    defenderPlayerId,
+    attacker,
+    defender,
+    attackerView,
+    attack,
+    defenderView: defender ? inPlayView(draft, defender) : null,
+  });
+  return countUnit(normalizeUnit(unit, attackerView?.name || attacker?.name), ctx);
+}
+
 /**
  * A computed counter clause (damage-parser.mjs computedCounterClause) as a counters target:
  * the count read from the board, capped, on the Defending Pokémon or 1 chosen Pokémon.

@@ -520,6 +520,16 @@ export function parseAttackDamage(
     }
   } else if (
     text &&
+    // timesAsForEach has already rewritten "times the number of" to "for each" for non-Energy units.
+    /damage for each [^.(]+? to \d+ of your opponent['’]s pok[ée]mon/.test(text)
+  ) {
+    // 7/108 Beedrill Swarming Sting: the chosen Pokémon takes the per-unit damage (attack-effect.mjs),
+    // so the attack-level total is 0 rather than the printed base.
+    total = 0;
+    components.push('per-chosen-target');
+    notes.push('per-count damage applied to the chosen Pokémon');
+  } else if (
+    text &&
     /discarded in this way/.test(text) &&
     /this attack does \d+ damage for each/.test(text)
   ) {
@@ -1775,6 +1785,13 @@ export function attackTargetClause(attackText) {
       remaining: 0,
       remainingFromDiscard: true,
     };
+  }
+  // 7/108 Beedrill Swarming Sting: "This attack does 40 damage times the number of Beedrill you have
+  // in play to 1 of your opponent's Pokémon." The count is read by the attack effect step.
+  const perNamedCount =
+    /does (\d+) damage times the (?:amount|number) of ([^.(]+?) to (\d+) of your opponent's pok[ée]mon/i.exec(t);
+  if (perNamedCount && !/\benergy\b/i.test(perNamedCount[2])) {
+    return { kind: 'damage', amount: Number(perNamedCount[1]), count: Number(perNamedCount[3]) || 1, scope: 'any' };
   }
   // Alolan Exeggutor-GX Tropical Head: "This attack does 20 damage times the amount of Energy
   // attached to this Pokémon to 1 of your opponent's Pokémon." reduce.mjs multiplies `amount`.

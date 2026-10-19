@@ -52,6 +52,7 @@ import {
   damageBenchedPokemon, abilityEffectShield, resolveAttackTargetClause, attackTargetOptions,
   computedCounterTarget, distributedPrompt, targetPlayerOf, legacyModifiedDamage, prizeFlags,
   trainerIgnoresDefenderEffects, attackAbilityReads, applyRetaliation, applyAttackTargets,
+  chosenTargetPerUnitCount,
 } from './attack-damage.mjs';
 import {
   buildAttackSearchChoice, discardScalingGroups, discardGroupToken, discardScalingEnergy,
@@ -1299,6 +1300,22 @@ export function resolveAttackEffectPhase(draft, ctx) {
       ) {
         const scaledAmount = attackTarget.amount * (energyDiscarded || 0);
         attackTarget = scaledAmount > 0 ? { ...attackTarget, amount: scaledAmount } : null;
+      }
+      // Swarming Sting (Beedrill V): the snipe does its printed amount once per counted Pokémon
+      // ("for each of your Beedrill V in play"), and nothing when the count is 0.
+      if (attackTarget?.kind === 'damage' && !discardScaling && !attackTarget.amountPerEnergy) {
+        const perUnit = chosenTargetPerUnitCount(draft, attack.text, {
+          attackerPlayerId: playerId,
+          defenderPlayerId,
+          attacker,
+          defender,
+          attackerView,
+          attack,
+        });
+        if (perUnit) {
+          const scaledAmount = attackTarget.amount * perUnit.count;
+          attackTarget = scaledAmount > 0 ? { ...attackTarget, amount: scaledAmount } : null;
+        }
       }
       let benchDealt = 0;
 
