@@ -43,6 +43,14 @@
   transform: rotateY(var(--fx-tilt-x, 0deg)) rotateX(var(--fx-tilt-y, 0deg));
   transition: transform 0.12s ease-out;
 }
+/* Bench cards never tilt, so drop the 3D context: any 3D transform makes the
+   browser rasterize the card once and resample it, blurring the printed text. */
+#bench .mat-holo :where(.card, .card__rotator, .fx-tera-crystal__layer, .fx-tera-crystal__aura) {
+  transform: none;
+  transform-style: flat;
+  transition: none;
+  will-change: auto;
+}
 
 /* ── Design 037: Tera crystal skin ────────────────────────────────────
    mat-fx/tera-skin.js puts `.fx-tera-crystal` on every in-play Tera Pokémon's
