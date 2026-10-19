@@ -229,13 +229,77 @@ void main() {
       rgb *= 1.0 + params.z * (1.0 - smoothstep(0.0, 0.14, boiled));
     }
   } else if (style == 3) {
-    if (vEdge.z < 0.0 && vEdge.x < 0.5) rgb += params.x * (1.0 - vEdge.x * 2.0);
+    // liquid (water, venom): a sheet (an axis gradient, base → tip) runs with caustic streaks
+    // flowing toward its tip, gloss riding their crests; a drop (radial) is clear in the middle
+    // by its clarity, glossy at its rim, its specular kept, with a slow caustic shimmer.
+    if (kind == 1) {
+      vec2 axis = geomA.zw - geomA.xy;
+      float span = max(length(axis), 1.0);
+      vec2 dir = axis / span;
+      vec2 local = (q - geomA.xy) / span;
+      float along = dot(local, dir);
+      float across = dot(local, vec2(-dir.y, dir.x));
+      vec3 offset = vec3(geomA.xy / max(params.w, 1.0) * 0.7, seed * 0.13);
+      float n = fbm(vec3(across * 11.0, along * 2.4 - clock * params.y * 2.2, clock * 0.25) + offset);
+      float crest = smoothstep(0.56, 0.74, n);
+      alpha *= mix(1.0, 0.45 + 0.75 * n, params.z);
+      rgb = rgb * (0.82 + 0.3 * n) + params.x * 0.9 * crest;
+    } else if (kind == 2) {
+      float d = length(q - geomB.xy) / max(geomB.z, 1.0);
+      vec2 local = (q - geomB.xy) / max(geomB.z, 1.0);
+      float n = fbm(vec3(local * 2.6 + geomB.xy / max(params.w, 1.0) * 0.5, clock * params.y * 0.5 + seed * 0.1));
+      float clear = mix(1.0, 0.25 + 0.75 * smoothstep(0.25, 0.92, d), params.z * smoothstep(0.08, 0.3, t));
+      float rim = smoothstep(0.76, 0.94, d) * (1.0 - smoothstep(0.94, 1.0, d));
+      alpha *= clear;
+      rgb = rgb * (0.85 + 0.3 * n) + params.x * rim;
+    } else if (vEdge.z < 0.0 && vEdge.x < 0.5) {
+      rgb += params.x * (1.0 - vEdge.x * 2.0);
+    }
   } else if (style == 4) {
-    rgb *= 1.0 + params.x * sin(vAlong * 0.2 - uTime * params.y * 6.0);
-    rgb *= 1.0 + params.z * smoothstep(0.8, 1.0, luma(paint.rgb));
+    // energy: current that crawls. A stroke carries bright packets running along it over a
+    // stepped flicker, hottest on its centre line; a fill crackles with thin ridged-noise
+    // filaments. Only a packet's or filament's hot centre passes 1.0, so stacked passes bloom in
+    // threads, never as a slab.
+    float hot = smoothstep(0.6, 1.0, luma(paint.rgb));
+    if (vEdge.z >= 0.0) {
+      float along = vAlong / max(params.w, 1.0);
+      float across = clamp(abs(vEdge.y) / max(vEdge.z, 1e-3), 0.0, 1.0);
+      float packet = pow(0.5 + 0.5 * sin(along * 9.0 - clock * params.y * 6.0 + seed * 6.28), 6.0);
+      float flicker = noise3(vec3(along * 4.0, floor(clock * 22.0) * 0.37, seed));
+      rgb *= 1.0 - 0.5 * params.x + params.x * (flicker + 1.5 * packet);
+      rgb *= 1.0 + params.z * packet * (1.0 - across * across) * hot;
+    } else {
+      float n = fbm(vec3(uv * 5.0, clock * params.y * 0.35 + seed));
+      float filament = pow(1.0 - abs(2.0 * n - 1.0), 5.0);
+      rgb *= 1.0 - 0.4 * params.x + 1.6 * params.x * filament;
+      rgb *= 1.0 + params.z * filament * hot;
+    }
   } else if (style == 5) {
-    float angle = atan(q.y - geomA.y, q.x - geomA.x);
-    rgb += params.y * pow(abs(sin(angle * params.x * 0.5 + seed)), 8.0);
+    // crystal (ice, gem): a crystal (an axis gradient, base → tip) is cut into flat facets
+    // across its width, each its own shade, and a glint sweeps base → tip; a radial heart (a
+    // flake's centre) twinkles on its points; a stroke (a spoke, an edge, a ring) carries short
+    // glints running along it. Glints stay thin so only they reach the bloom.
+    if (kind == 1) {
+      vec2 axis = geomA.zw - geomA.xy;
+      float span = max(length(axis), 1.0);
+      vec2 dir = axis / span;
+      vec2 local = (q - geomA.xy) / span;
+      float along = dot(local, dir);
+      float across = dot(local, vec2(-dir.y, dir.x));
+      float band = floor(across * params.x * 2.4 + 0.5);
+      float shade = 0.7 + 0.55 * hash3(vec3(band, seed, 3.7));
+      float sweep = fract(clock * params.z * 0.6 + seed * 0.37);
+      float glint = exp(-pow((along - (sweep * 1.6 - 0.3)) * 9.0, 2.0));
+      rgb = rgb * shade + params.y * glint * shade;
+    } else if (kind == 2) {
+      vec2 d = q - geomB.xy;
+      float angle = atan(d.y, d.x);
+      float star = pow(abs(cos(angle * params.x * 0.5 + seed)), 14.0) * (1.0 - smoothstep(0.0, 0.75, t));
+      rgb += params.y * star * (0.65 + 0.35 * sin(clock * params.z * 4.0 + seed * 5.0));
+    } else if (vEdge.z >= 0.0) {
+      float run = sin(vAlong * 0.09 - clock * params.z * 7.0 + seed * 3.0);
+      rgb += params.y * 1.4 * smoothstep(0.82, 1.0, run);
+    }
   } else if (style == 6) {
     alpha *= clamp(mix(1.0, fbm(vec3(uv * 4.0, uTime * 0.3 + seed)) * 2.0, params.x), 0.0, 1.0);
   } else if (style == 7) {

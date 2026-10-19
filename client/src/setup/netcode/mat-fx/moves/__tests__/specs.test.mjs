@@ -458,7 +458,8 @@ test('the Poison row ships whole: poison material, the recipe grain, a local hit
     const pool = spec.beats.find((beat) => beat.drawer === 'glyph');
     assert.ok(pool && (pool.params.target ?? 'defender') === 'defender', `${move}: bubbles rise off the defender`);
     assert.ok(pool.at > spec.contactMs, `${move}: the pool follows the hit (the family stays the hit's)`);
-    assert.ok(spec.defender.params.heat >= 0.5, `${move}: the struck card turns violet`);
+    // Design 075 style pass: the violet sheen stays faint; the pool and its bubbles carry the poisoning.
+    assert.ok(spec.defender.params.heat >= 0.3 && spec.defender.params.heat <= 0.35, `${move}: the struck card takes a faint violet sheen`);
     if (spec.statClass === 'physical') assert.ok(['dash', 'lunge'].includes(spec.attacker.motion), `${move}: the weight is in the card`);
   }
   assert.equal(POISON_SPECS['poison-sting'].family, 'projectile');
@@ -501,9 +502,9 @@ test('the Poison row ships whole: poison material, the recipe grain, a local hit
   const wave = POISON_SPECS['sludge-wave'];
   assert.equal(wave.family, 'splash');
   const flood = wave.beats.find((beat) => beat.drawer === 'beam');
-  assert.equal(flood.params.kind, 'widening');
+  assert.equal(flood.params.kind, 'pulse-train', 'a flood of venom globs (no white beam core)');
   assert.equal(flood.at + flood.params.growIn * (flood.until - flood.at), wave.contactMs, 'the flood lands at contact');
-  assert.ok(wave.beats.some((beat) => beat.drawer === 'terrain' && beat.params.kind === 'wave'), 'the wave rolls over the floor');
+  assert.ok(wave.beats.some((beat) => beat.drawer === 'pillar' && beat.params.target === 'attacker' && beat.at < wave.contactMs), 'sludge wells up behind the attacker');
 });
 
 test('the Ground row ships whole: earth for the quakes, mud for the throws, the recipe grain, a local hit at contact, no sunburst', () => {

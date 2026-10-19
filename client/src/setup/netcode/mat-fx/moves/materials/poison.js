@@ -8,6 +8,14 @@
 // sprite games' poisoned foe: a pool of venom on the lower card with hollow bubbles rising out
 // of it and popping. Palette #9B4DCA #C77DFF #F0D6FF, deep #4B1E6B; grain 0.15. Every call
 // draws on the context it is handed and is otherwise pure.
+//
+// Design 075 slice 10: venom names the GPU liquid style (`ctx.fxStyle`, ignored by Canvas2D),
+// opaque where water is clear: globs, drips and the pool keep their body and gain a glossy rim and
+// a slow shimmer; a stream's ooze band paints a one-stop gradient base to tip (flat on Canvas2D)
+// so its caustics run toward the tip. Rims, glints, barbs and bubbles stay flat. Venom is goo,
+// not light: globs, drips, streams and the pool cover what is under them (`source-over`, inside
+// their own save/restore), so a glob over a bright card face stays violet instead of adding up
+// to white; glints, barbs, bubbles and the haze stay additive.
 import { rgbCss } from '../../fx-colors.mjs';
 import { grainPass, inShadow, shardOutline, tongueOutline, traceOutline } from './_shared.js';
 
@@ -38,6 +46,10 @@ const BUBBLE_LIFE = 0.4;
 const BUBBLE_SPAWN = 0.55;
 const BUBBLE_POP = 0.15;
 const BUBBLE_RISE = 1.15;
+// Style params (gpu-canvas STYLE_PARAMS liquid): thick, slow, opaque goo.
+const VENOM_GLOB = Object.freeze({ id: 'liquid', gloss: 0.45, flow: 0.6, clarity: 0 });
+const VENOM_OOZE = Object.freeze({ id: 'liquid', gloss: 0.4, flow: 1, clarity: 0.35 });
+const VENOM_POOL = Object.freeze({ id: 'liquid', gloss: 0.35, flow: 0.5, clarity: 0 });
 
 const PALETTE = Object.freeze({
   deep: Object.freeze([75, 30, 107]),
@@ -120,6 +132,13 @@ export function bubbleRise(s, r) {
   return out;
 }
 
+/** `rgb` at `alpha` as a one-stop gradient from a stream's base toward its tip (flat on Canvas2D). */
+const alongStream = (ctx, { x, y, angleDeg, length }, rgb, alpha) => {
+  const g = ctx.createLinearGradient(x, y, x + Math.cos(rad(angleDeg)) * length, y + Math.sin(rad(angleDeg)) * length);
+  g.addColorStop(0, rgbCss(rgb, alpha));
+  return g;
+};
+
 /** The poison material drawn in `palette` (any palette with the same keys). */
 function poisonKit(palette) {
   const tracePoints = (ctx, points) => {
@@ -161,18 +180,20 @@ function poisonKit(palette) {
    * `drip`, the dark rim just inside the edge, and a glint up-left when hot.
    */
   function glob(ctx, x, y, r, alpha, hot, phase, { drip = true } = {}) {
-    ctx.fillStyle = globFill(ctx, x, y, r, alpha);
-    tracePoints(ctx, globOutline(x, y, r, phase));
-    ctx.fill();
-    if (drip) {
-      const dr = r * DRIP_R;
-      const dy = y + r * DRIP_DROP;
-      ctx.fillStyle = globFill(ctx, x, dy, dr, alpha);
-      ctx.beginPath();
-      ctx.arc(x, dy, dr, 0, TAU);
-      ctx.fill();
-    }
     inShadow(ctx, () => {
+      ctx.fxStyle = VENOM_GLOB;
+      ctx.fillStyle = globFill(ctx, x, y, r, alpha);
+      tracePoints(ctx, globOutline(x, y, r, phase));
+      ctx.fill();
+      if (drip) {
+        const dr = r * DRIP_R;
+        const dy = y + r * DRIP_DROP;
+        ctx.fillStyle = globFill(ctx, x, dy, dr, alpha);
+        ctx.beginPath();
+        ctx.arc(x, dy, dr, 0, TAU);
+        ctx.fill();
+      }
+      ctx.fxStyle = null;
       ctx.strokeStyle = rgbCss(palette.deep, RIM_ALPHA * alpha);
       ctx.lineWidth = Math.max(1, r * 0.08);
       ctx.lineJoin = 'round';
@@ -210,14 +231,18 @@ function poisonKit(palette) {
       ctx.fill();
       return;
     }
-    ctx.fillStyle = rgbCss(palette.body, OOZE_ALPHA * alpha);
-    traceOutline(ctx, tongueOutline({ ...spec, amp: 0.5 }, 0.8));
-    ctx.fill();
     const globs = streamGlobs(spec);
-    ctx.fillStyle = rgbCss(palette.body, GLOB_ALPHA * alpha);
-    ctx.beginPath();
-    for (const g of globs) addCircle(ctx, g.x, g.y, g.r);
-    ctx.fill();
+    inShadow(ctx, () => {
+      ctx.fxStyle = VENOM_OOZE;
+      ctx.fillStyle = alongStream(ctx, spec, palette.body, OOZE_ALPHA * alpha);
+      traceOutline(ctx, tongueOutline({ ...spec, amp: 0.5 }, 0.8));
+      ctx.fill();
+      ctx.fxStyle = null;
+      ctx.fillStyle = rgbCss(palette.body, GLOB_ALPHA * alpha);
+      ctx.beginPath();
+      for (const g of globs) addCircle(ctx, g.x, g.y, g.r);
+      ctx.fill();
+    });
     const lit = alpha * clamp01(hot);
     if (!(lit > 0)) return;
     ctx.fillStyle = rgbCss(palette.core, GLINT_ALPHA * lit);
@@ -233,18 +258,20 @@ function poisonKit(palette) {
    */
   function projectile(ctx, { x, y, r, headingDeg, time, seed, alpha = 1, tongues = 3, hot = 1 }) {
     if (!(r > 0) || !(alpha > 0)) return;
-    glow(ctx, x, y, r * 2.2, 0.75 * alpha);
+    glow(ctx, x, y, r * 2.2, 0.5 * alpha);
     if (tongues > 0) {
       const back = rad(headingDeg + 180);
-      ctx.fillStyle = rgbCss(palette.body, GLOB_ALPHA * alpha);
-      ctx.beginPath();
-      for (let k = 0; k < tongues; k += 1) {
-        const d = r * (1.15 + DRIP_SPACING * k * 0.9);
-        const sway = r * 0.25 * Math.sin(time * 5 + seed + k * 2.1);
-        const dr = r * Math.max(0.14, 0.42 - 0.09 * k);
-        addCircle(ctx, x + Math.cos(back) * d - Math.sin(back) * sway, y + Math.sin(back) * d + Math.cos(back) * sway, dr);
-      }
-      ctx.fill();
+      inShadow(ctx, () => {
+        ctx.fillStyle = rgbCss(palette.body, GLOB_ALPHA * alpha);
+        ctx.beginPath();
+        for (let k = 0; k < tongues; k += 1) {
+          const d = r * (1.15 + DRIP_SPACING * k * 0.9);
+          const sway = r * 0.25 * Math.sin(time * 5 + seed + k * 2.1);
+          const dr = r * Math.max(0.14, 0.42 - 0.09 * k);
+          addCircle(ctx, x + Math.cos(back) * d - Math.sin(back) * sway, y + Math.sin(back) * d + Math.cos(back) * sway, dr);
+        }
+        ctx.fill();
+      });
     }
     glob(ctx, x, y, r, alpha, hot, time * 4 + seed, { drip: false });
   }
@@ -264,10 +291,14 @@ function poisonKit(palette) {
     g.addColorStop(0, rgbCss(palette.hot, 0.5));
     g.addColorStop(0.6, rgbCss(palette.body, 0.45));
     g.addColorStop(1, rgbCss(palette.deep, 0.3));
-    ctx.fillStyle = g;
-    tracePoints(ctx, outline);
-    ctx.fill();
-    ctx.strokeStyle = rgbCss(palette.hot, 0.7);
+    inShadow(ctx, () => {
+      ctx.fillStyle = g;
+      ctx.fxStyle = VENOM_POOL;
+      tracePoints(ctx, outline);
+      ctx.fill();
+      ctx.fxStyle = null;
+    });
+    ctx.strokeStyle = rgbCss(palette.hot, 0.4);
     ctx.lineWidth = Math.max(1, r * 0.03);
     ctx.lineJoin = 'round';
     ctx.stroke();

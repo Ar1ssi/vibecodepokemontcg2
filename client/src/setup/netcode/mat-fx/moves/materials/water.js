@@ -1,17 +1,28 @@
 // Design 063: the water material (recipe in the design's § Materials). A drop is a
 // translucent sphere with a specular dot up-left and a darker rim; the elongated unit is a
 // *sheet*: the fire tongue's outline with a calm edge (wobble x 0.4), one unblurred fill,
-// a white line along its leading edge and a few droplets shed off the tip. Palette is the
+// a pale glint along its leading edge and a few droplets shed off the tip. Palette is the
 // B2W2 water sheets': #2E7CE6 #52B4FF #B9E8FF #FFFFFF. Every call draws on the context it
 // is handed and is otherwise pure.
+//
+// Design 075 slice 10: drops and sheets name the GPU liquid style (`ctx.fxStyle`, ignored by
+// Canvas2D). A sheet paints a one-stop gradient laid along its axis — the same flat colour on
+// Canvas2D — so the style knows base from tip and runs its caustics toward the tip; a drop is
+// clear in the middle and glossy at its rim. Water is not light: drops, sheets and thrown drops
+// cover what is under them (`source-over`, inside their own save/restore), so a jet over a
+// bright card face tints it blue instead of adding up to white; only the gloss (rim, edge glint,
+// specular dot) stays additive.
 import { rgbCss } from '../../fx-colors.mjs';
-import { grainPass, sphere, tongueOutline, traceOutline, wobble } from './_shared.js';
+import { grainPass, inShadow, sphere, tongueOutline, traceOutline, wobble } from './_shared.js';
 
 const TAU = Math.PI * 2;
 const SHEET_AMP = 0.4;
 const EDGE_PX = 1.5;
 const PROJECTILE_SHEETS = 5;
 const PROJECTILE_DROPLETS = 8;
+// Style params (gpu-canvas STYLE_PARAMS liquid): a drop is clearer than a sheet; a sheet flows faster.
+const LIQUID_DROP = Object.freeze({ id: 'liquid', gloss: 0.35, flow: 1, clarity: 0.3 });
+const LIQUID_SHEET = Object.freeze({ id: 'liquid', gloss: 0.6, flow: 1.6, clarity: 0.2 });
 
 const PALETTE = Object.freeze({
   deep: Object.freeze([46, 124, 230]),
@@ -20,6 +31,14 @@ const PALETTE = Object.freeze({
   core: Object.freeze([228, 247, 255]),
   white: Object.freeze([255, 255, 255]),
 });
+
+/** `rgb` at `alpha` as a one-stop gradient laid from a sheet's base toward its tip (flat on Canvas2D). */
+function alongSheet(ctx, { x, y, angleDeg, length }, rgb, alpha) {
+  const a = (angleDeg * Math.PI) / 180;
+  const g = ctx.createLinearGradient(x, y, x + Math.cos(a) * length, y + Math.sin(a) * length);
+  g.addColorStop(0, rgbCss(rgb, alpha));
+  return g;
+}
 
 /** The water material drawn in `palette` (any palette with the same keys). */
 function waterKit(palette) {
@@ -38,47 +57,53 @@ function waterKit(palette) {
     ctx.fill();
   }
 
-  /** A droplet: translucent sphere lit from 30 % up-left, a deep rim, a white specular dot. */
+  /** A droplet: a translucent covering sphere lit from 30 % up-left, a deep rim, a white specular dot. */
   function body(ctx, x, y, r, alpha, hot = 1) {
     if (!(r > 0) || !(alpha > 0)) return;
-    sphere(
-      ctx,
-      x,
-      y,
-      r,
-      [
-        [0, palette.core, alpha * 0.85],
-        [0.55, palette.hot, alpha * 0.6],
-        [0.85, palette.body, alpha * 0.55],
-        [1, palette.deep, alpha * 0.35],
-      ],
-      0.3
-    );
+    inShadow(ctx, () => {
+      ctx.fxStyle = LIQUID_DROP;
+      sphere(
+        ctx,
+        x,
+        y,
+        r,
+        [
+          [0, palette.core, alpha * 0.6],
+          [0.5, palette.hot, alpha * 0.45],
+          [0.85, palette.body, alpha * 0.6],
+          [1, palette.deep, alpha * 0.5],
+        ],
+        0.3
+      );
+      ctx.fxStyle = null;
+    });
     const rim = Math.min(2, Math.max(0.75, r * 0.12));
-    ctx.strokeStyle = rgbCss(palette.deep, 0.5 * alpha);
+    ctx.strokeStyle = rgbCss(palette.deep, 0.3 * alpha);
     ctx.lineWidth = rim;
     ctx.beginPath();
     ctx.arc(x, y, Math.max(r - rim / 2, rim / 2), 0, TAU);
     ctx.stroke();
     const shine = clamp01(hot);
     if (shine > 0) {
-      ctx.fillStyle = rgbCss(palette.white, 0.9 * alpha * shine);
+      ctx.fillStyle = rgbCss(palette.white, 0.55 * alpha * shine);
       ctx.beginPath();
-      ctx.arc(x - r * 0.3, y - r * 0.3, r * 0.18, 0, TAU);
+      ctx.arc(x - r * 0.3, y - r * 0.3, r * 0.11, 0, TAU);
       ctx.fill();
     }
   }
 
-  /** Small round drops in one path, one fill: `drops` = [[x, y, r]...]. */
+  /** Small round drops in one path, one covering fill: `drops` = [[x, y, r]...]. */
   function fillDrops(ctx, drops, alpha) {
     if (drops.length === 0 || !(alpha > 0)) return;
-    ctx.fillStyle = rgbCss(palette.hot, alpha);
-    ctx.beginPath();
-    for (const [x, y, r] of drops) {
-      ctx.moveTo(x + r, y);
-      ctx.arc(x, y, r, 0, TAU);
-    }
-    ctx.fill();
+    inShadow(ctx, () => {
+      ctx.fillStyle = rgbCss(palette.hot, alpha);
+      ctx.beginPath();
+      for (const [x, y, r] of drops) {
+        ctx.moveTo(x + r, y);
+        ctx.arc(x, y, r, 0, TAU);
+      }
+      ctx.fill();
+    });
   }
 
   /** 3-5 drops flung just past a sheet's tip, scattered across its axis. */
@@ -97,17 +122,22 @@ function waterKit(palette) {
     return drops;
   }
 
-  /** A water sheet: calm-edged tongue, one fill, a white leading edge, drops off the tip. */
+  /** A water sheet: calm-edged tongue, one fill, a pale leading-edge glint, drops off the tip. */
   function tongue(ctx, spec, { alpha = 1, hot = 1 } = {}) {
     if (!(spec.length > 0) || !(spec.width > 0) || !(alpha > 0)) return;
     const sheet = { ...spec, amp: SHEET_AMP };
     const outline = tongueOutline(sheet, 1);
-    ctx.fillStyle = rgbCss(palette.body, 0.55 * alpha);
-    traceOutline(ctx, outline);
-    ctx.fill();
-    const edge = 0.85 * alpha * clamp01(hot);
+    inShadow(ctx, () => {
+      ctx.fxStyle = LIQUID_SHEET;
+      ctx.fillStyle = alongSheet(ctx, sheet, palette.body, 0.55 * alpha);
+      traceOutline(ctx, outline);
+      ctx.fill();
+      ctx.fxStyle = null;
+    });
+    // A pale glint along the leading edge, not a white line: at full white it read as a scribble.
+    const edge = 0.45 * alpha * clamp01(hot);
     if (edge > 0) {
-      ctx.strokeStyle = rgbCss(palette.white, edge);
+      ctx.strokeStyle = rgbCss(palette.hot, edge);
       ctx.lineWidth = EDGE_PX;
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
@@ -116,7 +146,7 @@ function waterKit(palette) {
       ctx.stroke();
     }
     const tip = outline.left[outline.left.length - 1];
-    fillDrops(ctx, shedDrops({ ...sheet, tip }), 0.8 * alpha);
+    fillDrops(ctx, shedDrops({ ...sheet, tip }), 0.55 * alpha);
   }
 
   /**
@@ -146,7 +176,7 @@ function waterKit(palette) {
       const d = r * (1.2 + 0.8 * Math.abs(Math.sin(seed * 1.3 + k * 2.7)));
       drops.push([x + Math.cos(a) * d, y + Math.sin(a) * d, r * 0.1]);
     }
-    fillDrops(ctx, drops, 0.85 * alpha);
+    fillDrops(ctx, drops, 0.6 * alpha);
   }
 
   return Object.freeze({

@@ -6,7 +6,12 @@
 // the psychic wave: three wavy rings rippling out from a lens, standing in for the sprite
 // games' full-screen wave pattern while staying on the card. Palette #C85CDB #F0A5FF
 // #FFE1FF, deep #5B1E7A. Every call draws on the context it is handed and is otherwise pure.
+//
+// Design 075 slice 11: the fills and strokes run the GPU `energy` style slowly (`ctx.fxStyle`,
+// ignored by Canvas2D): the ribbons and rings carry soft pulses round and along them, the haze
+// and lens ripple with slow veins. No gain on the haze, a little on the lens and centre line.
 import { rgbCss } from '../../fx-colors.mjs';
+import { rootFaded } from './_root-fade.js';
 import { grainPass, sphere, tongueOutline, traceOutline } from './_shared.js';
 
 const TAU = Math.PI * 2;
@@ -28,6 +33,9 @@ const WAVE_LOBES = 8;
 const WAVE_AMP = 0.05;
 const WAVE_SAMPLES = 48;
 const SIGIL_LENS = 0.28;
+// Style params (gpu-canvas STYLE_PARAMS energy): a slow, calm current.
+const PSI = Object.freeze({ id: 'energy', streak: 0.45, speed: 1.2, gain: 0.5 });
+const PSI_HAZE = Object.freeze({ id: 'energy', streak: 0.3, speed: 0.8, gain: 0 });
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 const fract = (v) => v - Math.floor(v);
@@ -86,22 +94,28 @@ function psychicKit(palette) {
     g.addColorStop(0.45, rgbCss(palette.hot, alpha * 0.4));
     g.addColorStop(1, rgbCss(palette.body, 0));
     ctx.fillStyle = g;
+    ctx.fxStyle = PSI_HAZE;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, TAU);
     ctx.fill();
+    ctx.fxStyle = null;
   }
 
-  /** The lens: a soft disc, then three broken rings turned `phase` radians (alternating). */
+  /**
+   * The lens: a soft disc (its white heart kept small, so a big orb reads as rings, not a white
+   * slab), then three broken rings turned `phase` radians (alternating).
+   */
   function lens(ctx, x, y, r, alpha, hot, phase) {
+    ctx.fxStyle = PSI;
     sphere(
       ctx,
       x,
       y,
       r,
       [
-        [0, palette.white, alpha * 0.9 * clamp01(hot)],
-        [0.3, palette.core, alpha * 0.8],
-        [0.65, palette.hot, alpha * 0.45],
+        [0, palette.white, alpha * 0.7 * clamp01(hot)],
+        [0.25, palette.core, alpha * 0.6],
+        [0.65, palette.hot, alpha * 0.4],
         [1, palette.body, 0],
       ],
       0
@@ -115,6 +129,7 @@ function psychicKit(palette) {
       ctx.arc(x, y, r * scale, start, start + LENS_ARC);
       ctx.stroke();
     }
+    ctx.fxStyle = null;
   }
 
   // The interface's `body` carries no clock, so a lens turns with where it is and how big it
@@ -125,16 +140,23 @@ function psychicKit(palette) {
     lens(ctx, x, y, r, alpha, hot, x * 0.02 + y * 0.03 + r * 0.15);
   }
 
-  /** A ribbon: calm-edged tongue, one translucent fill, a bright centre line (`hot` 0 drops it). */
+  /**
+   * A ribbon: calm-edged tongue, one translucent fill, a bright centre line (`hot` 0 drops it),
+   * both clear at the root so a fan of ribbons never stacks into a white disc.
+   */
   function tongue(ctx, spec, { alpha = 1, hot = 1 } = {}) {
     if (!(spec.length > 0) || !(spec.width > 0) || !(alpha > 0)) return;
     const outline = tongueOutline({ ...spec, amp: RIBBON_AMP }, 1);
-    ctx.fillStyle = rgbCss(palette.body, RIBBON_ALPHA * alpha);
+    ctx.fxStyle = PSI;
+    ctx.fillStyle = rootFaded(ctx, spec, palette.body, RIBBON_ALPHA * alpha);
     traceOutline(ctx, outline);
     ctx.fill();
     const line = 0.85 * alpha * clamp01(hot);
-    if (!(line > 0)) return;
-    ctx.strokeStyle = rgbCss(palette.core, line);
+    if (!(line > 0)) {
+      ctx.fxStyle = null;
+      return;
+    }
+    ctx.strokeStyle = rootFaded(ctx, spec, palette.core, line);
     ctx.lineWidth = Math.max(1, spec.width * CENTRE_LINE);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -147,6 +169,7 @@ function psychicKit(palette) {
       else ctx.lineTo(mx, my);
     });
     ctx.stroke();
+    ctx.fxStyle = null;
   }
 
   /**
@@ -176,6 +199,7 @@ function psychicKit(palette) {
     if (!(r > 0)) return;
     ctx.lineJoin = 'round';
     ctx.lineWidth = Math.max(1, r * 0.04);
+    ctx.fxStyle = PSI;
     for (const ring of rippleRings(s, r)) {
       if (!(ring.alpha > 0)) continue;
       ctx.strokeStyle = rgbCss(palette[ring.tone], 0.8 * ring.alpha);
@@ -183,6 +207,7 @@ function psychicKit(palette) {
       wavyRing(x, y, ring.radius, ring.phase).forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
       ctx.stroke();
     }
+    ctx.fxStyle = null;
     lens(ctx, x, y, r * SIGIL_LENS, 0.9, 1, clamp01(s) * TAU);
   }
 

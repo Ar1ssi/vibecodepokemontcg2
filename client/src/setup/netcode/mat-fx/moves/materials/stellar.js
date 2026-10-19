@@ -4,6 +4,10 @@
 // accent hues (picked by the tongue's seed); a projectile is a faceted head in a cyan mist
 // trailing fringed crystals. No grain. The accents live in the palette (`accent0`…`accent4`)
 // so a tint can replace them like any other key.
+//
+// Design 075 slice 11: the mist, the faceted head and the prismatic fringe run the GPU `energy`
+// style (`ctx.fxStyle`, ignored by Canvas2D): the fringe carries light running round each
+// crystal, the head shimmers with fine veins. The crystal tongue itself is ice's, styled there.
 import { rgbCss } from '../../fx-colors.mjs';
 import { parseHex, traceOutline } from './_shared.js';
 import { ice, icicleOutline } from './ice.js';
@@ -13,6 +17,9 @@ const TAU = Math.PI * 2;
 const hex = (h) => Object.freeze(parseHex(h));
 export const STELLAR_ACCENTS = Object.freeze(['#FF6FB5', '#FFE07A', '#7CFFB2', '#7FD8FF', '#C59BFF']);
 const ACCENT_KEYS = Object.freeze(STELLAR_ACCENTS.map((_, k) => `accent${k}`));
+// Style params (gpu-canvas STYLE_PARAMS energy): starlight runs round the fringe.
+const STARLIGHT = Object.freeze({ id: 'energy', streak: 0.55, speed: 2, gain: 0.6 });
+const STAR_MIST = Object.freeze({ id: 'energy', streak: 0.3, speed: 1, gain: 0 });
 
 const STELLAR_PALETTE = Object.freeze({
   deep: hex('#0F2A55'),
@@ -39,16 +46,20 @@ function stellarKit(palette) {
     g.addColorStop(0.5, rgbCss(palette.body, alpha * 0.3));
     g.addColorStop(1, rgbCss(palette.deep, 0));
     ctx.fillStyle = g;
+    ctx.fxStyle = STAR_MIST;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, TAU);
     ctx.fill();
+    ctx.fxStyle = null;
   }
 
   function body(ctx, x, y, r, alpha, hot = 1) {
     if (!(r > 0) || !(alpha > 0)) return;
     ctx.save();
     ctx.globalAlpha *= alpha * (0.7 + 0.3 * Math.max(0, Math.min(1, hot)));
+    ctx.fxStyle = STARLIGHT;
     UNITS.facet(ctx, x, y, r, -90, 0, palette);
+    ctx.fxStyle = null;
     ctx.restore();
   }
 
@@ -57,10 +68,12 @@ function stellarKit(palette) {
     if (!(spec.length > 0) || !(spec.width > 0) || !(alpha > 0)) return;
     crystalTongue(ctx, spec, opts);
     // A 1 px fringe vanished at board scale (slice 15 review): it scales with the tongue.
+    ctx.fxStyle = STARLIGHT;
     ctx.strokeStyle = rgbCss(palette[accentKeyFor(spec.seed ?? 0)], alpha);
     ctx.lineWidth = Math.max(1.5, spec.width * 0.16);
     traceOutline(ctx, icicleOutline({ ...spec, width: spec.width * 1.12 }));
     ctx.stroke();
+    ctx.fxStyle = null;
   }
 
   function projectile(ctx, { x, y, r, headingDeg, seed = 0, alpha = 1, tongues = 4, hot = 1 }) {

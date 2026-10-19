@@ -32,9 +32,9 @@ export const STYLE_PARAMS = Object.freeze({
   flat: [],
   flame: [['erode', 0.45], ['speed', 1.6], ['gain', 0.8]],
   orb: [['boil', 0.45], ['limb', 0.35], ['gain', 1.2]],
-  liquid: [['gloss', 0.6]],
-  energy: [['streak', 0.5], ['speed', 3], ['gain', 1.6]],
-  crystal: [['facets', 6], ['sheen', 0.5]],
+  liquid: [['gloss', 0.5], ['flow', 1.2], ['clarity', 0.5]],
+  energy: [['streak', 0.5], ['speed', 3], ['gain', 0.8]],
+  crystal: [['facets', 6], ['sheen', 0.6], ['speed', 1.2]],
   smoke: [['churn', 0.5]],
   shadow: [['depth', 0.3]],
 });
