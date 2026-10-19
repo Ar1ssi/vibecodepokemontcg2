@@ -305,9 +305,9 @@ export const powerGem = spec({
   attacker: { motion: 'rear-lurch', params: { rear: 0.14, lurch: 0.3, glow: 1 } },
   defender: { motion: 'knock', params: { strength: 0.35, heat: 0.35 } },
   beats: [
-    { at: 0, until: 720, layer: 'front', drawer: 'coreCharge', params: { r0: 0.08, r1: 0.22, from: 0.3 } },
+    { at: 0, until: 720, layer: 'front', drawer: 'coreCharge', params: { r0: 0.08, r1: 0.22, from: 0.3, tint: { deep: '#8A0E3A', body: '#E8306A', hot: '#FF9AC0', core: '#FFE0EC' } } },
     // The stream's head reaches the card at 720 + 0.4 x 600 = 960.
-    { at: 720, until: 1320, layer: 'front', drawer: 'beam', params: { kind: 'pulse-train', w: 0.3, gap: 0.35, speed: 3, growIn: 0.4, retract: 0.25 } },
+    { at: 720, until: 1320, layer: 'front', drawer: 'beam', params: { kind: 'pulse-train', w: 0.3, gap: 0.35, speed: 3, growIn: 0.4, retract: 0.25, tint: { deep: '#8A0E3A', body: '#E8306A', hot: '#FF9AC0', core: '#FFE0EC' } } },
     { at: 880, until: 1700, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.4 } },
     { at: 960, until: 1120, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
     // Short sweeps (a chord of ~55 degrees) so they read as crescents, not lines across the card;

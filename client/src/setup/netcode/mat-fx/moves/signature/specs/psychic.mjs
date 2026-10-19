@@ -346,7 +346,7 @@ export const psychoBoost = Object.freeze({
   grain: 0.1,
 });
 
-const STRIKE = Object.freeze({ deep: '#8A3CFF', body: '#FFD84A', hot: '#FF6FD0', core: '#FFFFFF' });
+const STRIKE = Object.freeze({ deep: '#5A1FB0', body: '#B04CFF', hot: '#FF6FD0', core: '#FFE0FA' });
 const PAD = Object.freeze({ deep: '#3A107A', body: '#8A3CFF', hot: '#C9A0FF', core: '#FFFFFF' });
 const FLARE = Object.freeze({ deep: '#C04A10', body: '#FF9A2A', hot: '#FFE0A0', core: '#FFFFFF' });
 
@@ -365,10 +365,11 @@ export const psystrike = Object.freeze({
   pad: 1.8,
   attacker: { motion: 'lunge', params: { wind: 0.4, reach: 0.6, glow: 0.8 } },
   defender: { motion: 'knock', params: { strength: 0.35, heat: 0.35 } },
+  tint: PAD,
   beats: [
     { at: 0, until: 600, layer: 'back', drawer: 'glyph', params: { target: 'attacker', r: 0.9, tint: PAD } },
     { at: 200, until: 600, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.14, r1: 0.36, tint: STRIKE } },
-    { at: 500, until: 1000, layer: 'front', drawer: 'projectile', params: { path: 'arc', bow: 0.5, r0: 0.34, r1: 0.44, tongues: 0, ease: 'linear', unit: 'rings', tint: STRIKE } },
+    { at: 500, until: 1000, layer: 'front', drawer: 'projectile', params: { path: 'arc', bow: 0.5, r0: 0.34, r1: 0.44, tongues: 0, ease: 'linear', tint: STRIKE } },
     flash(1000, FLARE),
     star(1000, 1550, RING5, FLARE),
     { at: 1000, until: 1500, layer: 'back', drawer: 'vignette', params: { target: 'defender', maxAlpha: 0.35, tint: PAD } },

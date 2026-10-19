@@ -165,3 +165,20 @@ plasma-fists (electric, sig) — tweak: SV crackles cyan-blue lightning off the 
 play-rough (fairy) — tweak: SV is a white dust-cloud brawl with gold stars and pink hearts; ours small pink slashes → a white dust cloud on the foe.
 poison-jab (poison) — ok: a violet jab and splash.
 poison-sting (poison) — ok: a violet sting.
+FIXED (pass 20): photon-geyser plasma-fists play-rough
+poison-tail (poison) — ok: a violet tail swipe and splatter.
+powder-snow (ice) — ok after the beam fix: a light powder-snow stream (the pulse-train is test-pinned).
+power-gem (gem) — tweak: SV orbits and fires RED gems with violet-pink glints; ours white needles → red-pink gem tint.
+precipice-blades (ground, sig) — ok: gold stone blades erupt under the foe, then a red one.
+psybeam (psychic) — ok after the beam fix: a pink-violet beam with psychic rings.
+FIXED (pass 21): power-gem
+prismatic-laser (psychic, sig) — ok: rainbow beams onto the foe.
+psyblade (psychic) — ok: violet-pink psychic slashes.
+psychic (psychic) — ok: psychic rings round the foe, a pink burst.
+psycho-boost (psychic, sig) — ok: a violet-white orb and burst.
+psycho-cut (psychic) — ok: a violet crescent blade.
+psystrike (psychic, sig) — tweak: SV strikes the foe with a violet psychic sphere; ours flies a gold atom of spinning rings (unit 'rings') and a white star → a violet orb body, no rings.
+pursuit (dark, USUL) — ok: a dark slash as the foe flees.
+razor-leaf (grass) — ok: leaves cut the foe.
+relic-song (normal, sig) — ok: musical notes and a pastel shimmer (its kept ring is the sound wave).
+rock-blast (rock) — ok: rocks fired one after another.
