@@ -26,8 +26,8 @@ const CARD_POSE_MS = 180;
 const LIFT_FLIGHT_MS = 180;
 const FOIL_ROLES = new Set(['root', 'stage']);
 const SIDES = ['self', 'opp'];
-/** Zones whose foil cards tilt toward the pointer (mat-ambient.css "Holo mat tilt": the mat's cards). */
-const POINTER_TILT_ZONES = new Set(['active', 'bench', 'board']);
+/** Zones whose foil cards tilt toward the pointer (mat-ambient.css "Holo mat tilt"). Active stays flat. */
+const POINTER_TILT_ZONES = new Set(['bench', 'board']);
 /** `.self-text { font-size: clamp(10px, 4vh, 20px) }` (self-containers.css), vh of the iframe. */
 const COUNT_FONT = { minPx: 10, vh: 4, maxPx: 20 };
 /** Card height per width of every card mesh (card-geometry.mjs). */
