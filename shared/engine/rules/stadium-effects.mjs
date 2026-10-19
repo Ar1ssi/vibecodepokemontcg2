@@ -1518,6 +1518,27 @@ export function parseStadiumCostModifier(card) {
 }
 
 /**
+ * Symbol the Stadium cost modifier removes: "{C} less" (Dimension Valley) removes only
+ * Colorless symbols; "N less Energy" / "reduced by N" (Lillie's Room) is untyped (null).
+ */
+export function parseStadiumCostSymbol(card) {
+  const t = textOf(card);
+  if (!t || parseStadiumCostModifier(card) === 0) return null;
+  return /\{c\}\s+less/.test(t) ? 'Colorless' : null;
+}
+
+/**
+ * The attack-cost discount the Stadium gives `attacker`, as a `costDiscountRead`-shaped
+ * `{ count, symbol }`. Null when the Stadium discounts nothing or `attacker` fails its filter
+ * (Dimension Valley: only "{P} Pokémon" attacks).
+ */
+export function stadiumCostDiscountFor(attacker, stadiumCard) {
+  const count = parseStadiumCostModifier(stadiumCard);
+  if (count === 0 || !stadiumFilterMatches(attacker, stadiumCard)) return null;
+  return { count, symbol: parseStadiumCostSymbol(stadiumCard) };
+}
+
+/**
  * Hand protection: "damage counters can't be placed on pokémon in your hand"
  * or "cards in your hand can't be discarded"
  * Returns true if the stadium protects the player's hand.

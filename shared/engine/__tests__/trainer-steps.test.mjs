@@ -534,6 +534,34 @@ test('searchEvolve (Salvatore): Evolution from deck onto the Pokémon it evolves
   assert.equal(zone(done, 'p1', 'active').find((c) => c.instanceId === kirlia.instanceId).attachedTo, game.p1.zones.active[0].instanceId);
 });
 
+// Wally (Roaring Skies 94): the printed "first turn or … put into play this turn" permission.
+const WALLY_TEXT =
+  'Search your deck for a card that evolves from 1 of your Pokémon (excluding Pokémon-EX) and put it onto that Pokémon. (This counts as evolving that Pokémon.) Shuffle your deck afterward. You can use this card during your first turn or on a Pokémon that was put into play this turn.';
+const EVOSODA_TEXT =
+  "Search your deck for a card that evolves from 1 of your Pokémon and put it onto that Pokémon. (This counts as evolving that Pokémon.) Shuffle your deck afterward. You can't use this card during your first turn or on a Pokémon that was put into play this turn.";
+
+test('searchEvolve (Wally): evolves a Pokémon put into play this turn on turn 1', () => {
+  const game = setup();
+  game.state.turn.number = 1;
+  const ralts = game.p1.zones.active[0];
+  ralts.enteredPlayTurn = 1;
+  const kirlia = pokemon('Kirlia', { stage: 'Stage 1', evolvesFrom: 'Ralts' });
+  game.p1.zones.deck.push(kirlia);
+  const { res } = play(game, WALLY_TEXT, { name: 'Wally', trainerType: 'Supporter' });
+  assert.deepEqual(ids(res.pendingChoice.options), [kirlia.instanceId]);
+  const done = resolve(game, res, [kirlia.instanceId]);
+  assert.equal(zone(done, 'p1', 'active').find((c) => c.instanceId === kirlia.instanceId).attachedTo, ralts.instanceId);
+});
+
+test("searchEvolve (Evosoda): the first-turn and just-played bans still block the card on turn 1", () => {
+  const game = setup();
+  game.state.turn.number = 1;
+  game.p1.zones.active[0].enteredPlayTurn = 1;
+  game.p1.zones.deck.push(pokemon('Kirlia', { stage: 'Stage 1', evolvesFrom: 'Ralts' }));
+  const { res } = play(game, EVOSODA_TEXT, { name: 'Evosoda', trainerType: 'Item' });
+  assert.equal(res.error, "You can't use this card during your first turn.");
+});
+
 test('moveEnergy (Energy Switch) and moveEnergyToActive', () => {
   const game = setup();
   const ralts = game.p1.zones.active[0];

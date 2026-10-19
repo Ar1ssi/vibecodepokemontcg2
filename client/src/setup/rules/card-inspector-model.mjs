@@ -462,6 +462,7 @@ export function buildInspectorModel(card, ctx = {}) {
       rulesEnabled,
       abilityUsed: Boolean(abilityUsed),
       stadiumCostModifier: Number(ctx.stadiumCostModifier) || 0,
+      stadiumCostSymbol: ctx.stadiumCostSymbol ?? null,
       extraAttacks: ctx.extraAttacks || [],
       blockedReason: statusBlockReason,
       oncePerGame: ctx.oncePerGame ?? null,

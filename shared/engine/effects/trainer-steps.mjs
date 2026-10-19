@@ -1891,13 +1891,15 @@ function searchEvolve(ctx) {
   const { player, step } = ctx;
   const deck = player.zones.deck;
   // No evolving on the first turn of either player (turns 1–2), whatever searches the evolution.
+  // A printed "first turn or … put into play this turn" card (Wally) lifts that and the just-played gate.
   const gameTurn = ctx.draft?.turn?.number;
   const onFirstTurns = gameTurn != null && gameTurn <= 2;
   // The just-played and once-per-turn gates from canEvolve; an evolution-speed Stadium lifts them.
   const evolvedOrPlayedThisTurn = (root) =>
-    gameTurn != null && (root.enteredPlayTurn === gameTurn || Boolean(player.flags?.evolved?.[root.instanceId]));
+    gameTurn != null &&
+    ((!step.printedEvolveTiming && root.enteredPlayTurn === gameTurn) || Boolean(player.flags?.evolved?.[root.instanceId]));
   const evolveTargets = (card) => {
-    if (onFirstTurns) return [];
+    if (onFirstTurns && !step.printedEvolveTiming) return [];
     return evolvesFromTop(player, card).filter(
       (root) =>
         (!step.ontoSource || root.instanceId === ctx.sourceCard?.instanceId) &&

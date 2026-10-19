@@ -64,7 +64,7 @@
 //   { type: 'damageCounters', count: N, target: '…' }
 //   { type: 'millSelf', count: N }
 //   { type: 'passive', detail?: '…' }
-//   { type: 'searchEvolve', noAbilities?: true }
+//   { type: 'searchEvolve', noAbilities?: true, printedEvolveTiming?: true }
 //   { type: 'prizeBargain', drawCount: N }
 //   { type: 'searchAttachEach', count: N, energy: '…', target: '…', poisonActive?: true }
 // parseTrainerEffect also returns `playCondition` (see parsePlayCondition; e.g. 'opponentPrizes<=N',
@@ -1318,6 +1318,9 @@ export function trainerEndsTurn(card) {
   return /(?:^|[.!)]\s+)your turn ends\.$/i.test(text);
 }
 
+// "You can use this card during your first turn or on a Pokémon that was put into play this turn." (Wally)
+const PRINTED_FIRST_TURN_OR_PLAYED_RE = /you can use this card during your first turn or on a pokémon that was put into play this turn/;
+
 export function parseTrainerEffect(text = '') {
   const lower = rewriteLegacyTrainerWording(normalizeText(text));
   // Fossil Items: the "play as a Basic Pokémon" clause is the whole effect; legacy wordings
@@ -1336,7 +1339,7 @@ export function parseTrainerEffect(text = '') {
   // The other copies played together go to the discard pile with this one (Cross Switcher).
   const copies = playCondition?.match(/^copiesInHand>=(\d+)$/);
   if (copies && result.recognizable) result.steps.unshift({ type: 'playCopies', count: Number(copies[1]) - 1 });
-  if (/if you go first, you may (?:use|play) this card during your first turn/.test(lower)) {
+  if (/if you go first, you may (?:use|play) this card during your first turn/.test(lower) || PRINTED_FIRST_TURN_OR_PLAYED_RE.test(lower)) {
     result.turnOnePermission = true;
   }
   // A leading "Draw N cards." is its own effect whatever branch reads the rest (Daisy's Help,
@@ -1665,6 +1668,8 @@ function parseTrainerStepsInner(lower) {
     steps.push({
       type: 'searchEvolve',
       ...(lower.includes('no abilities') ? { noAbilities: true } : {}),
+      // Wally, Boost Shake, Dusk Stone: printed permission to evolve on the first turn and on a Pokémon played this turn.
+      ...(PRINTED_FIRST_TURN_OR_PLAYED_RE.test(lower) ? { printedEvolveTiming: true } : {}),
       ...(lower.includes('a pokémon-gx that evolves') ? { what: 'Pokémon-GX' } : {}),
     });
     return { steps, recognizable: true };
