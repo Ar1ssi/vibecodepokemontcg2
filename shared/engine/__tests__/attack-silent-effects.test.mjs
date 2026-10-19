@@ -2229,3 +2229,58 @@ test('Unown Hidden Power guess: the opponent\'s prompt carries no hand card id',
   assert.ok(!JSON.stringify(res.state.pendingChoice).includes(`"${potion.instanceId}"`));
   assert.ok(!JSON.stringify(res.state.pendingChoice).includes(`:${potion.instanceId},`));
 });
+
+// Xerneas (XY Steam Siege 81) Geomancy: "Choose 2 of your Benched Pokémon. For each of those
+// Pokémon, search your deck for a Fairy Energy card and attach it to that Pokémon." Corpus text
+// from TCGdex xy11-81.
+const GEOMANCY =
+  'Choose 2 of your Benched Pokémon. For each of those Pokémon, search your deck for a Fairy Energy card and attach it to that Pokémon. Shuffle your deck afterward.';
+const deckEnergy = (state, ...types) => {
+  const cards = types.map((type) => energy(type));
+  state.players.p1.zones.deck.push(...cards);
+  return cards;
+};
+
+test('Xerneas Geomancy (Steam Siege 81): parses to a chosen-exactly-2 Fairy attach from the deck', () => {
+  const parsed = parseAttackSteps(GEOMANCY);
+  const step = [...parsed.before, ...parsed.after].find((s) => s.type === 'atkAttachEachBench');
+  assert.deepEqual(step, { type: 'atkAttachEachBench', source: 'deck', max: 2, exact: true, energyType: 'Y' });
+});
+
+test('Xerneas Geomancy: the player picks exactly 2 Benched Pokémon; each gets a Fairy Energy from the deck, none to hand', () => {
+  let benchA;
+  let benchB;
+  let benchC;
+  let fairy;
+  const { state } = board('Xerneas', GEOMANCY, {
+    setup: (s) => {
+      [benchA, benchB, benchC] = [mon('Riolu'), mon('Eevee'), mon('Snorlax')];
+      s.players.p1.zones.bench.push(benchA, benchB, benchC);
+      fairy = deckEnergy(s, 'Fairy', 'Fairy', 'Fire');
+    },
+  });
+  const offered = attack(state);
+  assert.equal(offered.state.pendingChoice.min, 2);
+  assert.equal(offered.state.pendingChoice.max, 2);
+  const res = choose(offered, [benchA.instanceId, benchC.instanceId]);
+  const hosts = fairy.slice(0, 2).map((e) => hostOf(res.state, e));
+  assert.deepEqual(hosts.sort(), [benchA.instanceId, benchC.instanceId].sort());
+  assert.equal(hostOf(res.state, fairy[2]), undefined);
+  assert.equal(res.state.players.p1.zones.hand.length, 0);
+});
+
+test('Xerneas Geomancy: with only 1 Benched Pokémon, it takes the one Fairy Energy without a prompt', () => {
+  let bench;
+  let fairy;
+  const { state } = board('Xerneas', GEOMANCY, {
+    setup: (s) => {
+      bench = mon('Riolu');
+      s.players.p1.zones.bench.push(bench);
+      fairy = deckEnergy(s, 'Fairy', 'Fairy');
+    },
+  });
+  const res = attack(state);
+  assert.equal(res.state.pendingChoice, null);
+  assert.equal(hostOf(res.state, fairy[0]), bench.instanceId);
+  assert.equal(res.state.players.p1.zones.hand.length, 0);
+});

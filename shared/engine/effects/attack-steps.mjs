@@ -3578,9 +3578,9 @@ function atkAttachEachBench(ctx) {
   } else if (step.max && bench.length > step.max) {
     if (!selection) {
       return ctx.ask({
-        prompt: `${attackName(ctx)}: Choose up to ${step.max} of your Benched Pokémon`,
+        prompt: `${attackName(ctx)}: Choose ${step.exact ? '' : 'up to '}${step.max} of your Benched Pokémon`,
         options: bench,
-        min: 0,
+        min: step.exact ? step.max : 0,
         max: step.max,
       });
     }
