@@ -247,3 +247,16 @@ thunder-fang (electric) — ok: a yellow electric bite.
 thunder-shock (electric) — ok: a small spark.
 thunderclap (electric) — ok: a quick bolt.
 FIXED (pass 32): thunder · GLOBAL: electric bolt halo
+thunderous-kick (fighting, sig) — ok (render predates the 0.4 flare cap): a fiery kick, a gold burst.
+triple-kick (fighting) — ok: small kick sparks (SV's are small too).
+twineedle (bug; LGPE) — ok: two needles.
+twister (dragon) — ok: violet wind blades swirl round the foe.
+v-create (fire, sig) — ok: a flaming V on the user, a fiery strike.
+vacuum-wave (aura) — ok: a quick air blast.
+venoshock (poison) — ok: a violet splash, the pool (its rim stroke went in pass 27).
+vine-whip (grass) — ok: a vine lash.
+water-gun (water) — tweak: SV squirts a thin water stream; ours a ring chain → a thin solid stream.
+water-pledge (water) — ok: water columns burst under the foe.
+waterfall (water) — ok: a rising water crash.
+wave-crash (water) — ok: a water-wrapped tackle.
+FIXED (pass 33): water-gun

@@ -161,7 +161,7 @@ export const waterGun = spec({
   attacker: { motion: 'brace', params: { rear: 0.08, scale: 1.03, glow: 0.6 } },
   defender: { motion: 'knock', params: { strength: 0.2, heat: 0.3 } },
   beats: [
-    { at: 150, until: 800, layer: 'front', drawer: 'beam', params: { kind: 'pulse-train', w: 0.2, gap: 0.22, speed: 3, growIn: 0.4 } },
+    { at: 150, until: 800, layer: 'front', drawer: 'beam', params: { kind: 'solid', w: 0.18, growIn: 0.4 } },
     { at: 450, until: 950, layer: 'front', drawer: 'cloud', params: { count: 3, radius: 0.3, drift: 0.4, alpha: 0.3 } },
     { at: 450, until: 750, layer: 'front', drawer: 'splash', params: { count: 6, arc: 120, len: [0.35, 0.6], gravity: 0.7 } },
     { at: 450, until: 600, layer: 'top', drawer: 'impactFlash', params: FLASH },
