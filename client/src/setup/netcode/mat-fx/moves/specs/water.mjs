@@ -243,7 +243,7 @@ export const scald = spec({
   attacker: { motion: 'rear-lurch', params: { rear: 0.1, lurch: 0.25, glow: 0.8 } },
   defender: { motion: 'knock', params: { strength: 0.3, heat: 0.35 } },
   beats: [
-    { at: 180, until: 800, layer: 'front', drawer: 'beam', params: { kind: 'pulse-train', w: 0.26, gap: 0.24, speed: 3, growIn: 0.4 } },
+    { at: 180, until: 800, layer: 'front', drawer: 'beam', params: { kind: 'widening', w: 0.3, growIn: 0.4 } },
     { at: 480, until: 780, layer: 'front', drawer: 'splash', params: { count: 6, arc: 120, len: [0.4, 0.7], gravity: 0.5 } },
     { at: 630, until: 1200, layer: 'front', drawer: 'cloud', params: { count: 5, radius: 0.4, drift: 0.6, alpha: 0.35 } },
     { at: 480, until: 650, layer: 'top', drawer: 'impactFlash', params: FLASH },

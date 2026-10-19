@@ -133,7 +133,7 @@ export const thousandArrows = Object.freeze({
     { at: 300, until: 800, layer: 'front', drawer: 'shards', params: { target: 'attacker', count: 10, arc: 360, distance: 1.0, spin: 0, tint: ARROWS } },
     { at: 800, until: 1800, layer: 'front', drawer: 'rain', params: { count: 12, height: 1.6, spread: 0.9, tint: ARROWS } },
     { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { r1: 0.8, r0: 0.3, tint: ARROWS } },
-    { at: 1000, until: 1350, layer: 'back', drawer: 'starFlare', params: { size: 0.6, grow: 0.12, core: 0.18, arms: TRIAD, width: 0.3, tint: ARROWS } },
+    { at: 1000, until: 1350, layer: 'back', drawer: 'starFlare', params: { size: 0.4, grow: 0.12, core: 0.12, arms: TRIAD, width: 0.3, tint: ARROWS } },
     { at: 1350, until: 1900, layer: 'front', drawer: 'shards', params: { count: 6, arc: 360, distance: 0.9, tint: LIME } },
     { at: 1000, until: 1800, layer: 'back', drawer: 'vignette', params: { target: 'defender', maxAlpha: 0.45 } },
   ],

@@ -107,7 +107,7 @@ export const dragonAscent = Object.freeze({
     { at: 0, until: 700, layer: 'back', drawer: 'aura', params: { hz: 2, alpha: 0.5, tint: SPHERE } },
     { at: 550, until: 1000, layer: 'front', drawer: 'projectile', params: { from: 'sky', path: 'straight', r0: 0.4, r1: 0.55, tongues: 3, ease: 'in', tint: SPHERE } },
     { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { r1: 0.8, r0: 0.3, tint: LIME } },
-    { at: 1000, until: 1400, layer: 'front', drawer: 'starFlare', params: { size: 0.6, grow: 0.12, core: 0.18, arms: 'cross', width: 0.32, tint: BURST } },
+    { at: 1000, until: 1400, layer: 'front', drawer: 'starFlare', params: { size: 0.4, grow: 0.12, core: 0.12, arms: 'cross', width: 0.32, tint: BURST } },
     { at: 1000, until: 1500, layer: 'front', drawer: 'shards', params: { count: 8, arc: 360, distance: 1.1, tint: LIME } },
     { at: 1200, until: 2000, layer: 'back', drawer: 'smoke', params: { count: 6, tint: SPHERE } },
   ],

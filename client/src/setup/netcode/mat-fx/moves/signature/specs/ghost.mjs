@@ -78,7 +78,7 @@ export const moongeistBeam = Object.freeze({
     { at: 0, until: 800, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.18, r1: 0.5, tint: MOON } },
     { at: 700, until: 1200, layer: 'front', drawer: 'beam', params: { kind: 'solid', w: 0.6, tint: MOON } },
     { at: 1150, until: 1350, layer: 'top', drawer: 'impactFlash', params: { r1: 0.8, r0: 0.3, tint: MOON } },
-    { at: 1150, until: 1500, layer: 'front', drawer: 'starFlare', params: { size: 0.6, grow: 0.12, core: 0.18, arms: 'cross', width: 0.32, tint: MOON } },
+    { at: 1150, until: 1500, layer: 'front', drawer: 'starFlare', params: { size: 0.4, grow: 0.12, core: 0.12, arms: 'cross', width: 0.32, tint: MOON } },
     { at: 1150, until: 1900, layer: 'front', drawer: 'shards', params: { count: 8, arc: 360, distance: 1.1, tint: MOON_CYAN } },
   ],
   particles: [motes(1150, 12, { kind: 'twinkle', durationMs: 800 })],

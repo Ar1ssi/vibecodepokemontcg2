@@ -181,7 +181,7 @@ export const wickedBlow = Object.freeze({
     { at: 267, until: 1000, layer: 'back', drawer: 'spiral', params: { target: 'attacker', turns: 2, r0: 0.2, r1: 0.9, rpm: 180, tongues: 10, tint: URSHIFU } },
     { at: 1000, until: 1250, layer: 'back', drawer: 'beam', params: { kind: 'solid', w: 0.3, tint: URSHIFU } },
     { at: 1150, until: 1350, layer: 'top', drawer: 'impactFlash', params: { r1: 0.8, r0: 0.3, tint: STARBURST } },
-    { at: 1150, until: 1450, layer: 'front', drawer: 'starFlare', params: { size: 0.6, grow: 0.12, core: 0.18, arms: 'cross', width: 0.32, tint: STARBURST } },
+    { at: 1150, until: 1450, layer: 'front', drawer: 'starFlare', params: { size: 0.4, grow: 0.12, core: 0.12, arms: 'cross', width: 0.32, tint: STARBURST } },
     { at: 1150, until: 1500, layer: 'front', drawer: 'shards', params: { count: 6, arc: 360, distance: 0.9, tint: URSHIFU } },
     { at: 1250, until: 2100, layer: 'top', drawer: 'slashArc', params: { sweep: 120, radius: 1.0, count: 3, gapDeg: 30, angle: 45, thick: 0.25, tint: URSHIFU } },
   ],

@@ -188,3 +188,9 @@ rock-slide (rock) — tweak (partial): SV drops several rocks with dust; ours ke
 rock-throw (rock) — ok: a thrown rock.
 rock-tomb (rock) — ok: rocks wall the foe in.
 rock-wrecker (rock) — ok: a huge boulder bursts into debris.
+FIXED (pass 23): roar-of-time rock-slide(partial)
+ruination (dark, sig) — ok: crimson-black spikes erupt round the foe.
+sacred-fire (fire, sig) — tweak: SV flies a magenta-blue sacred fireball into rainbow flames; ours lands a white cross slab → smaller flare, the rainbow flames stay.
+sacred-sword (fighting, sig) — tweak: a quick gold-white slash in SV; ours ends in a big white cross flare → smaller flare.
+sand-tomb (mud) — ok: sand whirls round the foe.
+scald (water) — tweak: SV fires a boiling white-blue water jet with steam; ours a chain of rings → a solid hot-water jet.
