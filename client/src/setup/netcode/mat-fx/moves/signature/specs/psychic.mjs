@@ -239,6 +239,7 @@ export const photonGeyser = Object.freeze({
   pad: 1.9,
   attacker: { motion: 'brace', params: { glow: 0.6 } },
   defender: { motion: 'knock', params: { strength: 0.35, heat: 0.35 } },
+  tint: GEYSER,
   beats: [
     { at: 0, until: 550, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.14, r1: 0.4, from: 0.15, tint: RED_CORE } },
     { at: 500, until: 1000, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.28, r1: 0.36, tongues: 4, ease: 'linear', tint: LIME } },

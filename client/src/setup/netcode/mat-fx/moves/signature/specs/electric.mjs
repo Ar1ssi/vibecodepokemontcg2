@@ -137,6 +137,7 @@ export const plasmaFists = Object.freeze({
   pad: 1.9,
   attacker: { motion: 'lunge', params: { wind: 0.3, reach: 0.9, glow: 1 } },
   defender: { motion: 'knock', params: { strength: 0.45, heat: 0.35 } },
+  tint: PF,
   beats: [
     { at: 0, until: 700, layer: 'front', drawer: 'coreCharge', params: { lead: 0.2, r0: 0.14, r1: 0.38, from: 0.15, tint: PF } },
     { at: 300, until: 700, layer: 'front', drawer: 'bolt', params: { from: 'attacker', segments: 9, jag: 0.12, branches: 1, rerollMs: 45, width: 0.07, tint: PF } },

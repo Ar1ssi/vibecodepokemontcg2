@@ -87,7 +87,7 @@ export const playRough = spec({
   defender: { motion: 'stagger', params: { strength: 0.42, hits: 4, gapMs: 110, heat: 0.3 } },
   beats: [
     { at: 600, until: 1550, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.28 } },
-    { at: 650, until: 1600, layer: 'front', drawer: 'cloud', params: { count: 6, radius: 0.42, drift: 0.15, alpha: 0.28 } },
+    { at: 650, until: 1600, layer: 'front', drawer: 'cloud', params: { count: 7, radius: 0.48, drift: 0.2, alpha: 0.55, tint: { deep: '#C8C2CC', body: '#F2EEF4', hot: '#FFFFFF', core: '#FFFFFF' } } },
     ...scuffle(720, -40),
     ...scuffle(830, 140),
     ...scuffle(940, 20),

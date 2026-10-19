@@ -159,3 +159,9 @@ peck (flying) — ok: a quick peck.
 petal-dance (petal) — ok: swirling petals.
 phantom-force (ghost) — ok: vanishes into violet haze and strikes (eyes kept per 063 tests).
 pin-missile (bug) — ok: needles fly in.
+FIXED (pass 19): outrage
+photon-geyser (psychic, sig) — tweak: SV charges a gold-white light orb, then a green-gold geyser erupts under the foe; ours a white flare and a cyan pillar → gold spec tint.
+plasma-fists (electric, sig) — tweak: SV crackles cyan-blue lightning off the fists; ours glows yellow → cyan spec tint.
+play-rough (fairy) — tweak: SV is a white dust-cloud brawl with gold stars and pink hearts; ours small pink slashes → a white dust cloud on the foe.
+poison-jab (poison) — ok: a violet jab and splash.
+poison-sting (poison) — ok: a violet sting.
