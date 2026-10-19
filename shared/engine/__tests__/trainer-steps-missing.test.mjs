@@ -151,6 +151,41 @@ test('discardStadium: Paint Roller discards the Stadium; no Stadium -> effectSte
   assert.ok(none.events.some((e) => e.type === 'effectStepSkipped' && e.reason === 'no_stadium'));
 });
 
+// Delinquent: BREAKpoint 98b, text verbatim from out/pkmn-trainer-cards.json.
+const DELINQUENT_TEXT = 'Discard any Stadium card in play. If you do, your opponent discards 3 cards from his or her hand.';
+
+test('Delinquent: discards the Stadium, then the opponent chooses 3 cards from hand', () => {
+  const game = setup();
+  const stadium = card({ name: 'Artazon', type: 'Trainer', trainerType: 'Stadium', ownerId: 'p1', playerId: 'p1' });
+  game.state.stadium = stadium;
+  const oppHand = [1, 2, 3, 4].map((i) => card({ name: `P2 Hand ${i}` }));
+  game.p2.zones.hand.push(...oppHand);
+
+  const { res } = play(game, DELINQUENT_TEXT, { name: 'Delinquent' });
+  assert.equal(res.error, null);
+  assert.equal(res.state.stadium, null);
+  assert.ok(zone(res, 'p1', 'discard').some((c) => c.instanceId === stadium.instanceId));
+  assert.ok(res.pendingChoice, 'the opponent is asked to discard');
+  assert.equal(res.pendingChoice.player, 'p2');
+
+  const chosen = oppHand.slice(0, 3).map((c) => c.instanceId);
+  const after = resolve(game, res, chosen);
+  assert.equal(after.error, null);
+  assert.equal(zone(after, 'p2', 'hand').length, 1, 'three of four cards leave the opponent hand');
+  assert.equal(zone(after, 'p2', 'discard').filter((c) => c.name.startsWith('P2 Hand')).length, 3);
+});
+
+test('Delinquent: with no Stadium in play the opponent discards nothing', () => {
+  const game = setup();
+  game.p2.zones.hand.push(card({ name: 'P2 Hand 1' }), card({ name: 'P2 Hand 2' }));
+
+  const { res } = play(game, DELINQUENT_TEXT, { name: 'Delinquent' });
+  assert.equal(res.error, null);
+  assert.ok(!res.pendingChoice, 'no opponent choice when nothing was discarded');
+  assert.equal(zone(res, 'p2', 'hand').length, 2);
+  assert.ok(res.events.some((e) => e.type === 'effectStepSkipped' && e.reason === 'no_stadium'));
+});
+
 test("shuffleDiscardIntoDeck: Karen shuffles only Pokémon in; Lysandre's Trump Card shuffles every card", () => {
   const game = setup();
   const mon = pokemon('Discarded Mon');

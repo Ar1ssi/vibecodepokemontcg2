@@ -2468,7 +2468,19 @@ function parseTrainerStepsInner(lower) {
     return { steps, recognizable: true };
   }
 
-  // Discard a Stadium in play (Paint Roller, Delinquent, Bonnie)
+  // Delinquent (BREAKpoint 98a/98b): discard a Stadium; if you do, the opponent discards N from hand
+  {
+    const m = lower.match(
+      /^\s*discard any stadium card in play\. if you do, your opponent discards (\d+) cards? from (?:his or her|their) hand\.?\s*$/
+    );
+    if (m) {
+      steps.push({ type: 'discardStadium' });
+      steps.push({ type: 'opponentDiscardFromHand', count: Number(m[1]), requiresStadium: true });
+      return { steps, recognizable: true };
+    }
+  }
+
+  // Discard a Stadium in play (Paint Roller, Bonnie)
   if (/(?:discard|remove) any stadium card in play/.test(lower) || /discard that stadium card/.test(lower)) {
     steps.push({ type: 'discardStadium' });
     appendTrailingDraw(steps, lower);
@@ -3725,6 +3737,8 @@ function describeStepBody(step) {
       ? 'Remove all Special Conditions from all of your Pokémon.'
       : 'Remove all Special Conditions from your Active Pokémon.';
     case 'discardStadium': return 'Discard any Stadium card in play.';
+    case 'opponentDiscardFromHand':
+      return `${step.requiresStadium ? 'If you discarded a Stadium, your' : 'Your'} opponent discards ${step.count} card${step.count > 1 ? 's' : ''} from their hand.`;
     case 'putDiscardOnTop': return `Put a ${step.what} from your discard pile on top of your deck.`;
     case 'energyToHand': return 'Return attached Energy cards to your hand.';
     case 'opponentDiscardToHand': return "Put a card from your opponent's discard pile into their hand.";
