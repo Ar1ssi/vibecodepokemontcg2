@@ -604,6 +604,7 @@ async function resolveLiveContext(card, zone = 'active') {
   const {
     energyTypes,
     stadiumCostModifier,
+    stadiumCostSymbol,
     abilityUsedFlag,
     priorAttacks,
     extraAttacks: resolvedExtra,
@@ -633,6 +634,7 @@ async function resolveLiveContext(card, zone = 'active') {
   return {
     energyTypes,
     stadiumCostModifier,
+    stadiumCostSymbol,
     damagePreview,
     abilityUsed: abilityUsedFlag,
     priorAttacks,

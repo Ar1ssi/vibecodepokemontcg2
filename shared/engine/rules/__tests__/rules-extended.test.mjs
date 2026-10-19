@@ -18,7 +18,7 @@ import test from 'node:test';
     const { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, isEnergyCard, effectiveEnergyType, resolveAttachedEnergyType, isLockEnergy, pokemonHasLockedEnergy, isRedirectEnergy, pokemonHasRedirectEnergy, isProtectEnergy, pokemonHasProtectEnergy, applyProtectCap } = await import('../energy-effects.mjs');
     const { classifyAbility, searchTargetType, describeAbilityFamily, applyAbilityEffect, isAbilityCard, ABILITY_FAMILIES } = await import('../ability-effects.mjs');
     const { parseAbility, ancientTraitIn } = await import('../abilities.mjs');
-    const { classifyStadiumEffect, describeStadiumEffect, applyStadiumEffect, isStadiumCard, STADIUM_EFFECT_FAMILIES, parseStadiumSetupDraw, parseStadiumOncePerTurn, parseStadiumDamagePrevention, parseStadiumDamageReduction, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, parseStadiumHpModifier, getStadiumHpBonus, effectiveHp, parseStadiumAttackLock, isStadiumAttackLock, stadiumAttackLockReason, isStadiumTriggered, parseStadiumEvolutionSpeed, getStadiumEvolutionSpeed, parseStadiumRetreatModifier, getStadiumRetreatCost, parseStadiumBenchDamageOnPlay, stadiumBenchDamageApplies, parseStadiumAttackDamageBonus, getStadiumAttackDamageBonus, getStadiumDamageReduction, parseStadiumCheckupPoisonBonus, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, parseStadiumAttackCostIncrease, stadiumPreventionApplies, hasRecognizedPassiveStadiumEffect, getEffectiveBenchLimit, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumEvolveSearch, stadiumActivationStatus, isSingleStrikeCard, isEvolutionCard, isStadiumEnergyAttachHeal, isStadiumGlimwoodReFlip } = await import('../stadium-effects.mjs');
+    const { classifyStadiumEffect, describeStadiumEffect, applyStadiumEffect, isStadiumCard, STADIUM_EFFECT_FAMILIES, parseStadiumSetupDraw, parseStadiumOncePerTurn, parseStadiumDamagePrevention, parseStadiumDamageReduction, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, parseStadiumCostSymbol, stadiumCostDiscountFor, parseStadiumHpModifier, getStadiumHpBonus, effectiveHp, parseStadiumAttackLock, isStadiumAttackLock, stadiumAttackLockReason, isStadiumTriggered, parseStadiumEvolutionSpeed, getStadiumEvolutionSpeed, parseStadiumRetreatModifier, getStadiumRetreatCost, parseStadiumBenchDamageOnPlay, stadiumBenchDamageApplies, parseStadiumAttackDamageBonus, getStadiumAttackDamageBonus, getStadiumDamageReduction, parseStadiumCheckupPoisonBonus, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, parseStadiumAttackCostIncrease, stadiumPreventionApplies, hasRecognizedPassiveStadiumEffect, getEffectiveBenchLimit, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumEvolveSearch, stadiumActivationStatus, isSingleStrikeCard, isEvolutionCard, isStadiumEnergyAttachHeal, isStadiumGlimwoodReFlip } = await import('../stadium-effects.mjs');
     const { classifyAttackEffect, describeAttackEffect, applyAttackEffect, ATTACK_FAMILIES } = await import('../attack-effects.mjs');
     const { parseAttackDamage, describeParsedDamage, healTarget, planHeal, planBenchTarget, drawCount, drawUntilTarget, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, moveEnergyClause, revealHandClause, conditionalKoClause, exactCounterKoThreshold, redirectDamageCount, handScalingDamage, returnEnergyClause, returnEnergyCount, immunityClause, DAMAGE_COMPONENTS } = await import('../damage-parser.mjs');
     const { computeAttackDamage } = await import('../attack-engine.mjs');
@@ -3950,6 +3950,36 @@ import test from 'node:test';
       assert.deepEqual(applyCostDiscount(rawCost, discount), ['Lightning']);
       // No stadium → only the passive discount applies
       assert.deepEqual(applyCostDiscount(rawCost, passiveCostDiscount(passive)), ['Lightning', 'Lightning']);
+    });
+
+    // Regression: Dimension Valley (PHF 93) — "cost {C} less" removes only Colorless, never a typed Energy.
+    test('Dimension Valley "{C} less" reduces Colorless only (PHF 93, text from out/pkmn-stadium-cards.json)', () => {
+      const dimensionValley = { name: 'Dimension Valley', subtypes: ['Stadium'], text: "Each {P} Pokémon's attacks (both yours and your opponent's) cost {C} less." };
+      assert.equal(parseStadiumCostModifier(dimensionValley), 1);
+      assert.equal(parseStadiumCostSymbol(dimensionValley), 'Colorless');
+      const discount = [{ count: parseStadiumCostModifier(dimensionValley), symbol: parseStadiumCostSymbol(dimensionValley) }];
+      assert.deepEqual(applyCostDiscount(['Psychic', 'Psychic'], discount), ['Psychic', 'Psychic']);
+      assert.deepEqual(applyCostDiscount(['Psychic', 'Colorless', 'Colorless'], discount), ['Psychic', 'Colorless']);
+      assert.deepEqual(applyCostDiscount(['Colorless', 'Psychic'], discount), ['Psychic']);
+    });
+
+    test('Dimension Valley only discounts {P} attackers (PHF 93 "Each {P} Pokémon\'s attacks")', () => {
+      const dimensionValley = { name: 'Dimension Valley', subtypes: ['Stadium'], text: "Each {P} Pokémon's attacks (both yours and your opponent's) cost {C} less." };
+      const psychicAttacker = { name: 'Mewtwo', types: ['Psychic'] };
+      const fireAttacker = { name: 'Charmander', types: ['Fire'] };
+      assert.deepEqual(stadiumCostDiscountFor(psychicAttacker, dimensionValley), { count: 1, symbol: 'Colorless' });
+      assert.equal(stadiumCostDiscountFor(fireAttacker, dimensionValley), null);
+      // Lillie's Room has no type filter: any attacker gets the untyped discount.
+      const lillie = { name: "Lillie's Room", subtypes: ['Stadium'], text: 'Attacks by your Active Pokémon cost 1 less Energy.' };
+      assert.deepEqual(stadiumCostDiscountFor(fireAttacker, lillie), { count: 1, symbol: null });
+      assert.equal(stadiumCostDiscountFor(psychicAttacker, { name: 'Pokémon Center', text: 'Heal 30 damage.' }), null);
+    });
+
+    test('parseStadiumCostSymbol: untyped "N less Energy" stays null; no cost reduction → null', () => {
+      const lillie = { name: "Lillie's Room", subtypes: ['Stadium'], text: 'Attacks by your Active Pokémon cost 2 less Energy.' };
+      assert.equal(parseStadiumCostSymbol(lillie), null);
+      assert.equal(parseStadiumCostSymbol({ name: 'Pokémon Center', text: 'Heal 30 damage from your Active Pokémon.' }), null);
+      assert.equal(parseStadiumCostSymbol(null), null);
     });
 
     // ── Stadium HP modifier (continuous) ─────────────────────────────

@@ -56,6 +56,7 @@ export function statusAttackBlock(card) {
  * @param {object} opts   - {
  *   energyTypes:  [{ type, family }]   attached energy entries
  *   stadiumCostModifier: number        from parseStadiumCostModifier
+ *   stadiumCostSymbol:  string|null    from parseStadiumCostSymbol ('Colorless' = "{C} less")
  *   abilityUsed:  boolean              once-per-turn already used?
  *   rulesEnabled: boolean
  *   blockedReason: string              Asleep/Paralyzed text from statusAttackBlock
@@ -74,6 +75,7 @@ export function listAttacks(card, opts = {}) {
   const {
     energyTypes = [],
     stadiumCostModifier = 0,
+    stadiumCostSymbol = null,
     abilityUsed = false,
     rulesEnabled = true,
     priorAttacks = [],
@@ -86,15 +88,18 @@ export function listAttacks(card, opts = {}) {
   // (`parseAttackInheritance`); `extraAttacks` (Stadium inheritance / grants)
   // apply unconditionally.
   const attacks = mergeAttacks(mergeInheritedAttacks(card, priorAttacks), extraAttacks);
-  const discount = rulesEnabled
-    ? passiveCostDiscount(card) + stadiumCostModifier
-    : 0;
+  const passiveDiscount = rulesEnabled ? passiveCostDiscount(card) : 0;
+  const stadiumDiscount = rulesEnabled ? stadiumCostModifier : 0;
+  const discounts = [
+    { count: passiveDiscount, symbol: null },
+    { count: stadiumDiscount, symbol: stadiumCostSymbol },
+  ];
 
   return attacks.map((atk, i) => {
     const rawCost = atk.cost || [];
     const effectiveCost =
-      discount > 0 && rawCost.length > 0
-        ? applyCostDiscount(rawCost, discount)
+      passiveDiscount + stadiumDiscount > 0 && rawCost.length > 0
+        ? applyCostDiscount(rawCost, discounts)
         : rawCost;
 
     const payable = canPayAttackCost(energyTypes, effectiveCost);

@@ -97,6 +97,7 @@ export async function computeActionAffordances({
     const {
       energyTypes,
       stadiumCostModifier,
+      stadiumCostSymbol,
       abilityUsedFlag,
       priorAttacks,
       extraAttacks: resolvedExtra,
@@ -112,6 +113,7 @@ export async function computeActionAffordances({
     const { attacks } = listUsableActions(activeCard, {
       energyTypes,
       stadiumCostModifier,
+      stadiumCostSymbol,
       abilityUsed: abilityUsedFlag,
       rulesEnabled: true,
       priorAttacks,

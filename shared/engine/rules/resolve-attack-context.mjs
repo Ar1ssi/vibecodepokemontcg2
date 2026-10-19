@@ -3,7 +3,7 @@ import {
   resolveAttachedEnergyType,
   rewriteEnergyDescriptor,
 } from './energy-effects.mjs';
-import { parseStadiumCostModifier } from './stadium-effects.mjs';
+import { stadiumCostDiscountFor } from './stadium-effects.mjs';
 import { parseAttackInheritance } from './ability-executors.mjs';
 
 /**
@@ -48,7 +48,9 @@ export async function resolveAttackContext({
     );
   }
 
-  const stadiumCostModifier = stadiumCard ? parseStadiumCostModifier(stadiumCard) : 0;
+  const stadiumCostDiscount = stadiumCard ? stadiumCostDiscountFor(activeCard, stadiumCard) : null;
+  const stadiumCostModifier = stadiumCostDiscount?.count ?? 0;
+  const stadiumCostSymbol = stadiumCostDiscount?.symbol ?? null;
   const abilityUsedFlag = abilityUsed(activeCard);
 
   // `extraAttacks` carries Stadium-granted inheritance (Shrine of Memories,
@@ -61,6 +63,7 @@ export async function resolveAttackContext({
   return {
     energyTypes,
     stadiumCostModifier,
+    stadiumCostSymbol,
     abilityUsedFlag,
     priorAttacks,
     extraAttacks,

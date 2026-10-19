@@ -78,7 +78,7 @@ import {
   resolveTurnBoundary,
 } from '/shared/engine/rules/status.mjs';
 import { addDamageCounter, updateDamageCounter, removeDamageCounter } from '../counters/damage-counter.js';
-import { applyStadiumEffect, parseStadiumOncePerTurn, parseStadiumSetupDraw, parseStadiumDamagePrevention, parseStadiumDamagePreventionDetail, stadiumPreventionApplies, getStadiumDamageReduction, getStadiumAttackDamageBonus, getStadiumAttackCostIncrease, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, effectiveHp, getStadiumRetreatCost, stadiumBlocksStatusApplication, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumSearch, matchesStadiumEvolveSearch, isStadiumGlimwoodReFlip, stadiumBlocksHealing, isRepeatableStadiumAction, stadiumExtraAttacksFromZone, mergeAttacks } from '/shared/engine/rules/stadium-effects.mjs';
+import { applyStadiumEffect, parseStadiumOncePerTurn, parseStadiumSetupDraw, parseStadiumDamagePrevention, parseStadiumDamagePreventionDetail, stadiumPreventionApplies, getStadiumDamageReduction, getStadiumAttackDamageBonus, getStadiumAttackCostIncrease, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, isStadiumRetreatPrevention, isStadiumHandProtect, stadiumCostDiscountFor, effectiveHp, getStadiumRetreatCost, stadiumBlocksStatusApplication, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumSearch, matchesStadiumEvolveSearch, isStadiumGlimwoodReFlip, stadiumBlocksHealing, isRepeatableStadiumAction, stadiumExtraAttacksFromZone, mergeAttacks } from '/shared/engine/rules/stadium-effects.mjs';
 import { flipCoin, parseAttackArgs, parseRetreatArgs, rngFromCoin, splitEmitAndTail, isMirrorReplayCall } from '../../setup/general/sync-action-args.mjs';
 import { dispatchAuthoritativeAction, readCardInstanceId } from '../../setup/netcode/authoritative-dispatch.js';
 import { matchesSearch, filterSearchMatches, energySearchWhat, matchesDiscardCost, isEnergyDiscardCost, searchPickerAllCandidates } from '/shared/engine/rules/search-match.mjs';
@@ -724,16 +724,18 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
           // Stadium cost modifier (taxonomy §E): same hook as the passive
           // discount, stacked on top of it (both applied sequentially).
           const stadiumCard = getStadium()?.card;
-          const stadiumDiscount = stadiumCard
-            ? parseStadiumCostModifier(stadiumCard)
-            : 0;
-          discount += stadiumDiscount;
+          const stadiumDiscount = stadiumCard ? stadiumCostDiscountFor(active, stadiumCard) : null;
+          const stadiumCount = stadiumDiscount?.count ?? 0;
+          discount += stadiumCount;
           if (discount > 0 && rawCost.length > 0) {
-            effectiveCost = applyCostDiscount(rawCost, discount);
+            effectiveCost = applyCostDiscount(rawCost, [
+              { count: discount - stadiumCount, symbol: null },
+              stadiumDiscount,
+            ]);
             if (effectiveCost.length < rawCost.length) {
               const note =
-                stadiumDiscount > 0
-                  ? ` (Stadium: −${stadiumDiscount})`
+                stadiumCount > 0
+                  ? ` (Stadium: −${stadiumCount})`
                   : '';
               appendMessage(user, `✨ ${atk.name}'s cost is reduced by ${discount}${note}!`, 'announcement', false);
             }
@@ -762,8 +764,15 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
                   blockTools: stadiumBlocksToolEffects(),
                 });
                 const altStadiumCard = getStadium()?.card;
-                if (altStadiumCard) altDiscount += parseStadiumCostModifier(altStadiumCard);
-                if (altDiscount > 0 && altCost.length > 0) altCost = applyCostDiscount(altCost, altDiscount);
+                const altStadiumDiscount = altStadiumCard ? stadiumCostDiscountFor(active, altStadiumCard) : null;
+                const altStadiumCount = altStadiumDiscount?.count ?? 0;
+                altDiscount += altStadiumCount;
+                if (altDiscount > 0 && altCost.length > 0) {
+                  altCost = applyCostDiscount(altCost, [
+                    { count: altDiscount - altStadiumCount, symbol: null },
+                    altStadiumDiscount,
+                  ]);
+                }
                 const altIncrease = getStadiumAttackCostIncrease(active, user);
                 if (altIncrease > 0) altCost = [...altCost, ...Array(altIncrease).fill('Colorless')];
               }

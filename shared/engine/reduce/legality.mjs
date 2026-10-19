@@ -32,7 +32,7 @@ import {
 } from '../rules/special-energy-parse.mjs';
 import {
   parseStadiumOncePerTurn, isStadiumCard, isStadiumRetreatPrevention, isStadiumToolNegation,
-  isRepeatableStadiumAction, parseStadiumCostModifier, getStadiumAttackCostIncreaseFor,
+  isRepeatableStadiumAction, stadiumCostDiscountFor, getStadiumAttackCostIncreaseFor,
   stadiumAbilityBlockedFor, stadiumAllowsSameTurnEvolution, stadiumAttackLockReason,
 } from '../rules/stadium-effects.mjs';
 import {
@@ -569,7 +569,8 @@ export function attackCostPayable(state, playerId, active, attack) {
       discounts.push(costDiscountRead(tool, discountCtx));
     }
   }
-  if (stadiumCard) discounts.push({ count: parseStadiumCostModifier(stadiumCard), symbol: null });
+  const stadiumDiscount = stadiumCard ? stadiumCostDiscountFor(activeView, stadiumCard) : null;
+  if (stadiumDiscount) discounts.push(stadiumDiscount);
   let effectiveCost = attack?.cost || [];
   if (effectiveCost.length > 0) {
     effectiveCost = applyCostDiscount(effectiveCost, discounts.filter(Boolean));
