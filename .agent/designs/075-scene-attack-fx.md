@@ -431,6 +431,16 @@ slice 8 deletes it; after slice 8, revert the slice-8 commit.
   defender heat sheen stacks white under the flare; fireball cores still saturate over a light card face. Probe
   note: SwiftShader drew no FX at a 1920×1200 viewport and occasionally none at 1280×800 (no errors) — check on
   real hardware.
+- Slices 10–14 (style passes): groups 10–11 by fx-designer agents (stopped by the user part way,
+  kept after review and green tests); 12–14 by the orchestrator via `styledKit` + by-kind `fxStyle` hints
+  (gpu-canvas `styleFor`), with real smoke/shadow shader branches. The user then asked for parity with
+  the Scarlet/Violet animations (Poképédia); that pass is logged in 075-parity-ledger.md. It added
+  a spec-level `tint` (card rim/heat colours), projectile `flare` + starFlare `size`/`grow: 0`,
+  glow-only `aura`, filled shade/dark/fairy/steel/poison sigils, lighter beam passes, a dragon palette
+  shift and an electric bolt halo in the move colour. It also dropped orbit charges, speed rays, shock /
+  face / floor rings (outside Ground's defender quakes) and coreCharge `rings`, and capped signature
+  flares at 0.4 h (cosmetic, user-directed).
+
 ## Appendix A — material kit survey (read-only, 2026-10-18)
 
 Paths relative to `client/src/setup/netcode/mat-fx/moves/materials/`; D = `../move-drawers.js`.
