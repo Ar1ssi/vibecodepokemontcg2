@@ -72,6 +72,20 @@ export const refuseManualDeckAction = (action) => {
   return true;
 };
 
+/** Whether the held card's <img> is a Pokémon or Energy, which the Trainer board turns away. */
+export const heldCardBoardRefuses = (image) => boardRefuses(heldCard(image));
+
+/** The Trainer board turning a Pokémon or Energy away: the no-match cue and the chat line why. */
+export const refuseBoardDrop = () => {
+  uiCue('card-no-match');
+  appendMessage(
+    systemState.initiator,
+    "⛔ Pokémon and Energy cards can't be played onto the Trainer area.",
+    'announcement',
+    false
+  );
+};
+
 export const dragStart = (event) => {
   if (systemState.isReplay && !systemState.isTwoPlayer) {
     return;
@@ -365,13 +379,7 @@ export const drop = (event) => {
       mouseClick.zoneId !== 'board' &&
       boardRefuses(heldCard(draggedImage))
     ) {
-      uiCue('card-no-match');
-      appendMessage(
-        systemState.initiator,
-        "⛔ Pokémon and Energy cards can't be played onto the Trainer area.",
-        'announcement',
-        false
-      );
+      refuseBoardDrop();
       event.stopPropagation();
       return;
     }

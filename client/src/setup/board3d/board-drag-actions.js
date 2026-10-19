@@ -11,7 +11,13 @@ import { isEnergy, isPokemon, isTrainer } from '/shared/engine/cards.mjs';
 import { getZone } from '../zones/get-zone.js';
 import { identifyCardElement } from '../image-logic/click-events.js';
 import { findZoneCardIndex } from '../image-logic/zone-card-lookup.js';
-import { clearBoardReady, markBoardReady, refuseManualDeckAction } from '../image-logic/drag.js';
+import {
+  clearBoardReady,
+  heldCardBoardRefuses,
+  markBoardReady,
+  refuseBoardDrop,
+  refuseManualDeckAction,
+} from '../image-logic/drag.js';
 import { uiCue } from '../netcode/mat-fx/ui-cue.mjs';
 
 const CALLS = { retreat, deckTop: moveToDeckTop, move: moveCardBundle };
@@ -54,6 +60,7 @@ const begin = (image) => {
     isTrainer: Boolean(card && isTrainer(card)),
     isEnergy: Boolean(card && isEnergy(card)),
     isPokemon: Boolean(card && isPokemon(card)),
+    boardRefuses: heldCardBoardRefuses(image),
   };
 };
 
@@ -61,11 +68,16 @@ const begin = (image) => {
 const targetIndexOf = (image, side, zone) => findZoneCardIndex(getZone(side, zone), image);
 
 /**
- * Runs a routed drop (drop-router.mjs `routeDrop`): its rules gates, then the cue and the call.
- * @param {{ kind: 'retreat'|'deckTop'|'move', args: any[], gates: string[] }} route
+ * Runs a routed drop (drop-router.mjs `routeDrop`): its rules gates, then the cue and the call;
+ * a refused drop only says why.
+ * @param {{ kind: 'retreat'|'deckTop'|'move'|'refuse', args: any[], gates: string[] }} route
  * @returns {boolean} whether the call went out
  */
 const perform = (route) => {
+  if (route?.kind === 'refuse') {
+    refuseBoardDrop();
+    return false;
+  }
   const call = CALLS[route?.kind];
   if (!call) return false;
   if ((route.gates ?? []).some((action) => refuseManualDeckAction(action))) return false;
