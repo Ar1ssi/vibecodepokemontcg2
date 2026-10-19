@@ -1,7 +1,8 @@
 // Design 022 slice 4: lifecycle effects — evolution and devolution (design 066), energy attach snap,
 // retreat/switch slide, trainer/stadium card presentation, discards flying to
-// the pile (design 042). All are detached overlays; every one no-ops when its
-// card or rect cannot be resolved.
+// the pile (design 042). All are detached overlays except the retreat/switch slide and the promote
+// move, which carry the card's own mesh (design 074 H1); every one no-ops when its card or rect
+// cannot be resolved.
 import { getEnergyTokenFront, isEnergyCard } from '../../../actions/move-card-bundle/energy-token-assets.mjs';
 import { getCardRegistry } from '../apply-view.js';
 import {
@@ -32,13 +33,18 @@ import {
   presentSrcFor,
   presentTargetRect,
   promotePose,
-  slidePoseFor,
+  shiftedFromRect,
+  slideIdsForEvent,
+  slideMeshPose,
 } from './lifecycle-pose.mjs';
+import { getBoardScene } from '../../board3d/board3d.js';
+import { flightPoseFromTrack } from '../../board3d/flight-pose.mjs';
+import { createSlidePins } from './slide-pins.mjs';
 import { sweepPose } from './flow-pose.mjs';
 import { holdFor } from './fx-holds.mjs';
-import { discardedIds, takeOrigin, takeZoneSweep } from './origins.mjs';
+import { discardedIds, knockoutStack, takeOrigin, takeZoneSweep } from './origins.mjs';
 import { cardShapedRect } from './card-flight.mjs';
-import { pileOf, playDiscardFlights } from './card-flight.js';
+import { meshCanFly, pileOf, playDiscardFlights, playMeshTrack } from './card-flight.js';
 import { playsOppPreview } from './opp-play.mjs';
 import { playOppTrainer } from './opp-play.js';
 
@@ -152,22 +158,78 @@ export const attach = (plan) => {
   removeWhen(host, done, ENERGY_SNAP_MS * 2 + BACKSTOP_PAD_MS);
 };
 
+// A card sliding between slots stays near the cloth; the second of a swapping pair rides a little higher.
+const SLIDE_LIFT_FRAC = 0.1;
+const SLIDE_LIFT_STEP = 0.08;
+
+// The instance ids of the cards drawn for `id`'s Pokémon: the one on top and the rest of its stack.
+function stackIdsOf(registry, id) {
+  const { shown, rest } = knockoutStack(registry, id);
+  const ids = [shown, ...rest].map((record) => record?.card?.instanceId).filter(Number.isFinite);
+  return ids.length > 0 ? ids : [id];
+}
+
+/**
+ * Slides the meshes of `id`'s stack from where the root stood (`origin`) to where it stands now,
+ * each member keeping its place in the stack. Returns how many meshes flew; none when the card
+ * has no origin, no rect or no mesh.
+ */
+function slideStackMeshes(registry, id, origin, { duration, liftFrac }) {
+  const rootTo = rectForInstance(id, registry);
+  if (!origin?.rect || !rootTo) return 0;
+  const turn = origin.turn ?? frameTurnOf(registry.get(id)?.element);
+  const fromScale = origin.rect.width / rootTo.width;
+  let flown = 0;
+  for (const memberId of stackIdsOf(registry, id)) {
+    const to = rectForInstance(memberId, registry);
+    if (!to || !meshCanFly(memberId)) continue;
+    slidePins.take(memberId);
+    playMeshTrack({
+      instanceId: memberId,
+      rect: to,
+      pose: slideMeshPose(shiftedFromRect(to, origin.rect, rootTo), to, turn, fromScale),
+      duration,
+      lift: liftFrac * to.height,
+    });
+    flown += 1;
+  }
+  return flown;
+}
+
+const slidePins = createSlidePins(
+  (id, poseFn, ms) => getBoardScene()?.tween(id, poseFn, ms) ?? Promise.resolve()
+);
+
+/**
+ * Before the diff (I265): holds the mesh of every card a retreat, switch or promote in `events`
+ * will slide where it stands now, so it does not land in its new slot during the 3D board's
+ * settle hold and jump back when the slide starts. The pin is the slide's own first frame.
+ */
+export function pinSlideOrigins(events, registry) {
+  if (!Array.isArray(events)) return;
+  for (const event of events) {
+    for (const id of slideIdsForEvent(event)) {
+      for (const memberId of stackIdsOf(registry, id)) {
+        const rect = rectForInstance(memberId, registry);
+        if (!rect || !meshCanFly(memberId)) continue;
+        const turn = frameTurnOf(registry.get(memberId)?.element);
+        slidePins.pin(memberId, flightPoseFromTrack(rect, { rotate: turn }, 0, 0));
+      }
+    }
+  }
+}
+
+/** Lets go of pins whose slide never played (the FX queue went idle or was cleared). */
+export const releaseSlidePins = () => slidePins.releaseAll();
+
 export const retreat = (plan) => {
   const registry = getCardRegistry();
-  for (const id of moveIdsForEvent(plan)) {
-    const origin = takeOrigin(id);
-    const to = rectForInstance(id, registry);
-    const pose = origin && to && slidePoseFor(origin.rect, to);
-    if (!pose) continue;
-    const host = spawnOverlay({ rect: to, className: 'fx-overlay fx-slide' });
-    host.appendChild(buildImage(origin.src));
-    const frames = sampleKeyframes(
-      pose,
-      (p) => ({ transform: `translate3d(${p.x}px, ${p.y}px, 0) scale(${p.scale})`, opacity: p.opacity }),
-      24
-    );
-    removeWhen(host, [animateFrames(host, frames, { duration: RETREAT_SLIDE_MS })], RETREAT_SLIDE_MS + BACKSTOP_PAD_MS);
-  }
+  moveIdsForEvent(plan).forEach((id, index) => {
+    slideStackMeshes(registry, id, takeOrigin(id), {
+      duration: RETREAT_SLIDE_MS,
+      liftFrac: SLIDE_LIFT_FRAC + index * SLIDE_LIFT_STEP,
+    });
+  });
 };
 
 const presentCard = (src, fromRect) => {
@@ -238,6 +300,11 @@ export const promote = (plan) => {
   const registry = getCardRegistry();
   const rect = rectForInstance(plan.instanceId, registry);
   if (!rect) return 0;
+  // The card moves on its own mesh; the glow and the rise stay HTML.
+  slideStackMeshes(registry, plan.instanceId, takeOrigin(plan.instanceId), {
+    duration: PROMOTE_MS,
+    liftFrac: SLIDE_LIFT_FRAC,
+  });
   const host = spawnOverlay({ rect, className: 'fx-overlay fx-promote' });
   const glow = document.createElement('div');
   glow.className = 'fx-promote__glow';

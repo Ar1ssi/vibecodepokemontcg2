@@ -36,7 +36,7 @@ export const updateSpecialCondition = (
     index,
     hintIn
   );
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'updateSpecialCondition', [
       zoneId,
       resolved,
@@ -84,7 +84,7 @@ export const removeSpecialCondition = (
     index,
     hintIn
   );
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'removeSpecialCondition', [zoneId, resolved, hint]);
     return;
   }
@@ -136,7 +136,7 @@ export const addSpecialCondition = (
     index,
     hintIn
   );
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'addSpecialCondition', [zoneId, resolved, hint]);
     return;
   }

@@ -8,7 +8,7 @@
 // pure owner for visuals / sound / volume); the readers below delegate to it
 // and keep their original signatures so no caller changed.
 import { FX_OFF_CLASS, readSettings } from './fx-settings.mjs';
-import { visualRectOf } from './iframe-rect.mjs';
+import { board3dActive, rectForInstance as boardCardRect, visualRectOf } from '../board3d/board-rects.js';
 
 export { FX_OFF_CLASS };
 export { FX_OFF_KEY as FX_OFF_STORAGE_KEY } from './fx-settings.mjs';
@@ -97,8 +97,12 @@ export const runPose = (host, durationMs, poseFn, onDone) => {
 /**
  * On-page rect of a board card by instanceId, or null when the card is not in
  * the registry, detached, or collapsed. `registry` is `getCardRegistry()`.
+ * Design 074 §D6: on the three.js board the scene's projection is the card's
+ * rect; a card the scene no longer draws falls back to its mirror <img>.
  */
 export const rectForInstance = (instanceId, registry) => {
+  const projected = board3dActive() ? boardCardRect(instanceId) : null;
+  if (projected && projected.width >= 2 && projected.height >= 2) return projected;
   const el = registry?.get(instanceId)?.element;
   if (!el || el.isConnected === false) return null;
   const rect = visualRectOf(el);

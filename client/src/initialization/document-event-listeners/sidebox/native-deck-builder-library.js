@@ -14,8 +14,11 @@ import {
       setDeckSleeve,
       setDeckCoin,
       setDeckMat,
+      setDeckBox,
       setDeckSprites,
       setDeckWallpaper,
+      setDeckSuggestPrefs,
+      getDeckSuggestPrefs,
       MAX_LIBRARY_DECKS,
     } from '../../../setup/deck-builder/core/deck-library.mjs';
     import {
@@ -25,7 +28,12 @@ import {
     } from '../../../setup/deck-builder/core/deck-sprites.mjs';
     import { resolveDisplaySprites } from '../../../setup/deck-builder/core/card-sprites.mjs';
     import { renderDeckSprites } from './native-deck-builder-renderers.js';
-    import { getStarterDecks, STARTER_DECK_CATALOG } from '../../../setup/deck-builder/core/set-browser.mjs';
+    import {
+      getStarterDeckCatalog,
+      getStarterDecks,
+      loadStarterDecks,
+      starterDecksLoaded,
+    } from '../../../setup/deck-builder/core/starter-decks.mjs';
     import { DECK_FORMAT_BUILD_BATTLE } from '../../../../../shared/engine/formats.mjs';
     
     const escapeHtml = (value = '') => String(value)
@@ -119,13 +127,14 @@ import {
       // Seed premade starter/battle decks so every player has playable lists.
       // Adds any catalog deck missing from the library; backfills sleeve/coin on
       // existing premade decks that were seeded before cosmetics were added.
+      // Returns whether the library changed.
       const seedStarterDecks = () => {
         const starters = getStarterDecks();
         const decksByName = new Map(listDecks(library).map((d) => [d.name, d.id]));
         let nextLibrary = library;
         let changed = false;
 
-        for (const entry of STARTER_DECK_CATALOG) {
+        for (const entry of getStarterDeckCatalog()) {
           const existingId = decksByName.get(entry.name);
           if (existingId) {
             const deck = nextLibrary.decks[existingId];
@@ -184,8 +193,22 @@ import {
           library = nextLibrary;
           saveLibraryToStorage(window.localStorage, library);
         }
+        return changed;
       };
-      seedStarterDecks();
+      // The starter decks are JSON loaded on demand (design 073). Already in memory, they seed now,
+      // before the first render, as they always did; else they seed when they land, over a fresh
+      // read of storage, and the bar redraws.
+      if (starterDecksLoaded()) {
+        seedStarterDecks();
+      } else {
+        loadStarterDecks().then(
+          () => {
+            reload();
+            if (seedStarterDecks()) render();
+          },
+          (error) => console.warn('[deck library] starter decks unavailable.', error)
+        );
+      }
     
       const showStatus = (message) => {
         if (!statusEl) return;
@@ -419,10 +442,17 @@ import {
           setActiveField(target, sleeveId, setDeckSleeve),
         setActiveCoin: (target, coinId) => setActiveField(target, coinId, setDeckCoin),
         setActiveMat: (target, matId) => setActiveField(target, matId, setDeckMat),
+        setActiveDeckBox: (target, deckBoxId) => setActiveField(target, deckBoxId, setDeckBox),
         setActiveSprites: (target, sprites) =>
           setActiveField(target, sprites, setDeckSprites, { silent: false }),
         setActiveWallpaper: (target, wallpaperId) =>
           setActiveField(target, wallpaperId, setDeckWallpaper),
+        // Suggest-tab steering (design 069); false when no saved deck is loaded.
+        setActiveSuggestPrefs: (target, prefs) => setActiveField(target, prefs, setDeckSuggestPrefs),
+        getActiveSuggestPrefs: (target) => {
+          const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+          return activeId && library?.decks?.[activeId] ? getDeckSuggestPrefs(library, activeId) : null;
+        },
         getActiveWallpaper: (target) => {
               const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
               return activeId && library?.decks?.[activeId]
@@ -452,6 +482,10 @@ import {
         getActiveMat: (target) => {
               const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
               return activeId && library?.decks?.[activeId] ? library.decks[activeId].matId || null : null;
+            },
+        getActiveDeckBox: (target) => {
+              const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+              return activeId && library?.decks?.[activeId] ? library.decks[activeId].deckBoxId || null : null;
             },
             saveActiveDeck: (cards) => {
           if (!allowDeckWrites) return false;

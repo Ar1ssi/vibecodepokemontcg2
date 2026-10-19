@@ -1,7 +1,7 @@
 # Area: netcode (client transport, authoritative view adapters, mat FX)
 <!-- Cap 60 lines. Moved out of MAP.md on 2026-09-24 (S286) to keep MAP under cap.
      Server side: server/server.js (HTTP + Socket.IO) → server/game/room.mjs (GameRoom: applies
-     commands to shared/engine state, sends per-player views); shadow.mjs, sync-check.mjs beside it. -->
+     commands to shared/engine state, sends per-player views); deck-packet.mjs, sync-check.mjs beside it. -->
 Purpose: how client actions reach the server and how server views/events render back.
 
 ## Legacy transport (flag-off relay path)
@@ -37,10 +37,11 @@ client/src/setup/netcode/manual-card-commands.mjs — pure planner for the manua
 client/src/setup/netcode/deck-peek.js + deck-peek-request.mjs — "look at top/bottom N cards":
   `peekDeck` socket request (server/game/room.mjs `peekDeck`, shared/engine/view.mjs `deckPeekFor`),
   shown in the card picker; picks leave the deck as moveCard commands (design 012, D49)
-client/src/setup/netcode/turn-order-call.js — transport for the server-owned opening coin call:
-turns `turnOrderCall`/`turnOrderResult`/`turnOrderCallRejected` into `rules-turn-order-*` DOM events and
-caches the resolved flip for a late reader; registered from socket-event-listeners.js, NOT the rules
-bridge, because the call arrives while setupPrizes() is still awaiting dealOrder (design 013, D50)
+client/src/setup/netcode/turn-order-call.js — transport for the server-owned opening coin (TCG Live flow: call,
+flip, the winner chooses first or second; designs 013, 072): turns `turnOrderCall`/`turnOrderFlip`/`turnOrderResult`
+and both `*Rejected` messages into `rules-turn-order-*` DOM events and caches flip and result for a late reader;
+registered from socket-event-listeners.js, NOT the rules bridge, because the call arrives while setupPrizes() is
+still awaiting dealOrder (D50). Server side: server/game/turn-order-transport.mjs (messages, answer timeouts).
 client/src/setup/netcode/card-stats.js — sends printed card data (hp/attacks/types/weakness/
 resistance/retreatCost/stage) to the server as the `cardStats` command (D15, I26); without it the
 server cannot adjudicate a knockout. Sent from build-deck.js once ensureCardData settles

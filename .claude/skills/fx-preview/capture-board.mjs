@@ -3,24 +3,23 @@
 // See SKILL.md in this folder.
 // usage: node .claude/skills/fx-preview/capture-board.mjs [outPrefix]
 // env:   CARD_IMG, TYPE, BASE_URL, CHROMIUM, SIO_JS  (same as capture-entry.mjs)
-//        HOLO=0    skip the emulated holo wrap on the active card
+//        A foil is a scene material fed by the TCG Live foil manifest, which a fabricated card
+//        has no entry in, so this shows the Tera skins only.
 import { chromium } from 'playwright';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
+import { launchOptions, openBoard } from './board-mode.mjs';
 
 const [out = 'fx-board'] = process.argv.slice(2);
 const {
   CARD_IMG,
   TYPE = 'Darkness',
   BASE_URL = 'http://localhost:4000',
-  CHROMIUM,
   SIO_JS,
 } = process.env;
 if (!CARD_IMG) throw new Error('set CARD_IMG to a card image file or URL');
 
-const browser = await chromium.launch(
-  CHROMIUM ? { executablePath: CHROMIUM } : {}
-);
+const browser = await chromium.launch(launchOptions());
 const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
 if (SIO_JS) {
   await page.route('https://cdn.socket.io/**', (r) =>
@@ -36,16 +35,11 @@ if (localImg) {
 }
 page.on('pageerror', (e) => console.log('pageerror', e.message));
 
-await page.goto(`${BASE_URL}/?e2e=1`);
-await page.waitForFunction(() => window.__ptcg?.ready === true, null, {
-  timeout: 30000,
-});
-await page.waitForTimeout(800);
+await openBoard(page, BASE_URL);
 
 const report = await page.evaluate(
-  async ([src, type, holo]) => {
-    const { applyView, getCardRegistry } =
-      await import('/src/setup/netcode/apply-view.js');
+  async ([src, type]) => {
+    const { applyView } = await import('/src/setup/netcode/apply-view.js');
     const tera = (instanceId) => ({
       instanceId,
       name: 'Tera ex',
@@ -87,44 +81,26 @@ const report = await page.evaluate(
     );
     await new Promise((r) => setTimeout(r, 600));
 
-    if (holo) {
-      // TCGdex foil data is not fetched for fabricated cards, so repeat hydrateHolo's
-      // DOM moves by hand for the active card and announce the new wrapper.
-      const { buildHoloCard, startHoloAnimation } =
-        await import('/src/setup/deck-builder/core/holo.mjs');
-      const rec = getCardRegistry().get(101);
-      const img = rec.holoCard.image;
-      const wrapper = buildHoloCard(img.src, 'double rare');
-      wrapper.classList.add('mat-holo');
-      const rotator = wrapper.querySelector('.card__rotator');
-      const { parentElement, nextSibling } = img;
-      rotator.insertBefore(img, rotator.firstChild);
-      rotator.querySelectorAll('img').forEach((el) => {
-        if (el !== img) el.remove();
-      });
-      parentElement.insertBefore(wrapper, nextSibling);
-      rec.holoCard.wrapper = wrapper;
-      startHoloAnimation(wrapper, { auto: true, tilt: false });
-      document.dispatchEvent(new CustomEvent('holo-wrapper-changed'));
-    }
-    await new Promise((r) => setTimeout(r, 900));
-    const doc = document.getElementById('selfContainer').contentDocument;
-    return `${doc.querySelectorAll('.fx-tera-crystal').length} tera skins on the board`;
+    // The 3D scene draws a few frames a second under SwiftShader: give the skins time to paint.
+    await new Promise((r) => setTimeout(r, 3000));
+    const { getBoardScene } = await import('/src/setup/board3d/board3d.js');
+    const skins = [...getBoardScene().inspect().uiState.values()].filter(
+      (state) => state?.teraSkin
+    );
+    return `${skins.length} tera skins on the board`;
   },
-  [localImg ? '/__fx-card' : CARD_IMG, TYPE, process.env.HOLO !== '0']
+  [localImg ? '/__fx-card' : CARD_IMG, TYPE]
 );
 console.log(report);
 
-const clip = await page.evaluate(() => {
-  const frame = document.getElementById('selfContainer');
-  const doc = frame.contentDocument;
-  const fr = frame.getBoundingClientRect();
-  const a = doc.getElementById('active').getBoundingClientRect();
-  const b = doc.getElementById('bench').getBoundingClientRect();
-  const left = fr.left + Math.min(a.left, b.left) - 20;
-  const top = fr.top + Math.min(a.top, b.top) - 20;
-  const width = Math.max(a.right, b.right) - Math.min(a.left, b.left) + 40;
-  const height = Math.max(a.bottom, b.bottom) - Math.min(a.top, b.top) + 40;
+const clip = await page.evaluate(async () => {
+  // The scene's projected zone footprints, already in page px.
+  const a = await window.__fxBoard.zoneRect('self', 'active');
+  const b = await window.__fxBoard.zoneRect('self', 'bench');
+  const left = Math.min(a.left, b.left) - 20;
+  const top = Math.min(a.top, b.top) - 20;
+  const width = Math.max(a.left + a.width, b.left + b.width) - Math.min(a.left, b.left) + 40;
+  const height = Math.max(a.top + a.height, b.top + b.height) - Math.min(a.top, b.top) + 40;
   return { x: Math.max(0, left), y: Math.max(0, top), width, height };
 });
 await page.screenshot({ path: `${out}-board.png`, clip });

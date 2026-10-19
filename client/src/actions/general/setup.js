@@ -8,11 +8,16 @@ import { getZone } from '../../setup/zones/get-zone.js';
 import { drawHand, setOpeningPrizes } from '../zones/hand-actions.js';
 import { shuffleZone } from '../zones/shuffle-zone.js';
 import { reset } from './reset.js';
-import { waitForDealOrder } from '../../setup/netcode/deal-order.js';
+import { OPENING_DEAL_WAIT_MS, waitForDealOrder } from '../../setup/netcode/deal-order.js';
 import { setupShuffleAnimates } from './setup-deal.mjs';
+import { soloCommandSeat } from '../../setup/netcode/solo-seat.mjs';
+
+// In a 2P room the far side is set up by its own client; a solo room sets up both itself.
+const peerSetsUp = (user, emit) =>
+  user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo;
 
 export const setup = async (user, indices, emit = true) => {
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (peerSetsUp(user, emit)) {
     processAction(user, emit, 'setup', [indices]);
     return;
   }
@@ -40,7 +45,7 @@ export const setup = async (user, indices, emit = true) => {
 // Rules-mode setup step 1: shuffle deck and set prize cards only.
 // Opening hands are drawn after the turn-order coin flip (rules-bridge).
 export const setupPrizes = async (user, indices, emit = true) => {
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (peerSetsUp(user, emit)) {
     processAction(user, emit, 'setupPrizes', [indices]);
     return;
   }
@@ -62,11 +67,17 @@ export const setupPrizes = async (user, indices, emit = true) => {
   // that only desyncs a still-inert authoritative simulation, same as today.
   if (
     !indices &&
-    user === 'self' &&
+    (user === 'self' || systemState.solo) &&
     systemState.isTwoPlayer &&
     systemState.serverAuthoritative
   ) {
-    const serverOrder = await waitForDealOrder();
+    // The deal waits behind the opening coin call and the winner's first/second
+    // choice (design 072), so the default 5 s would fall back on every real game.
+    // A solo room waits for the deal of the seat this side stands for (design 074 D7).
+    const serverOrder = await waitForDealOrder(
+      OPENING_DEAL_WAIT_MS,
+      soloCommandSeat({ ...systemState, user }) ?? null
+    );
     // A 0-length order means the server dealt before this player's own deck had
     // loaded (see server.js's allDecksLoaded guard) — never usable as `indices`
     // (an empty array is truthy but is not a deal order — rearrangeArray would

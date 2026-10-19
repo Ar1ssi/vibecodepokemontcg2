@@ -15,7 +15,7 @@ import { readCardInstanceId } from '../netcode/authoritative-dispatch.js';
 import { appendMessage } from '../chatbox/append-message.js';
 import { retreat } from '../../actions/chat-buttons/chat-buttons.js';
 import { manualDeckActionAllowed } from '/shared/engine/rules/rules-state.mjs';
-import { playsOntoBoard, zoneOf } from './drop-zone.mjs';
+import { boardRefuses, playsOntoBoard, zoneOf } from './drop-zone.mjs';
 import { endDragAvatar, startDragAvatar } from './drag-avatar.js';
 import { uiCue } from '../netcode/mat-fx/ui-cue.mjs';
 
@@ -44,7 +44,7 @@ const clearExplicitDropHighlights = () => {
 // pointer reaches it.
 const BOARD_READY_CLASS = 'board-drop-ready';
 
-const clearBoardReady = () => {
+export const clearBoardReady = () => {
   for (const doc of [selfContainerDocument, oppContainerDocument]) {
     doc?.getElementById('board')?.classList.remove(BOARD_READY_CLASS);
   }
@@ -53,10 +53,37 @@ const clearBoardReady = () => {
 const heldCard = (image) =>
   image.card ?? getZone(mouseClick.cardUser, mouseClick.zoneId)?.array?.[mouseClick.cardIndex];
 
-const markBoardReady = (image) => {
+/** Lights the held card's Trainer board when it is an Item/Supporter from the hand (design 046). */
+export const markBoardReady = (image) => {
   clearBoardReady();
   if (mouseClick.zoneId !== 'hand' || !playsOntoBoard(heldCard(image))) return;
   getZone(mouseClick.cardUser, 'board')?.element?.classList.add(BOARD_READY_CLASS);
+};
+
+/**
+ * The rules layer's gate on a manual deck action (`manualDeckActionAllowed`): true when it
+ * refuses, after the no-match cue and the chat line saying why.
+ */
+export const refuseManualDeckAction = (action) => {
+  const check = manualDeckActionAllowed(action);
+  if (check.allowed) return false;
+  uiCue('card-no-match');
+  appendMessage(systemState.initiator, '⛔ ' + check.reason, 'announcement', false);
+  return true;
+};
+
+/** Whether the held card's <img> is a Pokémon or Energy, which the Trainer board turns away. */
+export const heldCardBoardRefuses = (image) => boardRefuses(heldCard(image));
+
+/** The Trainer board turning a Pokémon or Energy away: the no-match cue and the chat line why. */
+export const refuseBoardDrop = () => {
+  uiCue('card-no-match');
+  appendMessage(
+    systemState.initiator,
+    "⛔ Pokémon and Energy cards can't be played onto the Trainer area.",
+    'announcement',
+    false
+  );
 };
 
 export const dragStart = (event) => {
@@ -129,6 +156,15 @@ export const dragOver = (event) => {
     document.querySelector('.dragging') ||
     selfContainerDocument.querySelector('.dragging') ||
     oppContainerDocument.querySelector('.dragging');
+
+  if (
+    zoneOf(event.target)?.id === 'board' &&
+    mouseClick.zoneId !== 'board' &&
+    boardRefuses(heldCard(draggedImage))
+  ) {
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'none';
+    return;
+  }
 
   const targetIsNotOwnContainer = event.target !== zoneOf(draggedImage);
   const targetIsContainer = event.target.tagName === 'DIV';
@@ -205,10 +241,11 @@ export const dragLeave = (event) => {
 
 export const dragEnd = (event) => {
   endDragAvatar(event);
+  // The containers are the 3D board mirror's shadow roots, which have no getElementsByClassName.
   const enablePointerEvents = (containerDocument, classNames) => {
-    const counters = containerDocument.getElementsByClassName(...classNames);
-    for (let i = 0; i < counters.length; i++) {
-      counters[i].style.pointerEvents = 'auto';
+    const selector = classNames.map((name) => `.${name}`).join(', ');
+    for (const counter of containerDocument?.querySelectorAll?.(selector) ?? []) {
+      counter.style.pointerEvents = 'auto';
     }
   };
 
@@ -338,6 +375,16 @@ export const drop = (event) => {
       dZoneId = zoneOf(event.target)?.id ?? event.target.id;
     }
 
+    if (
+      dZoneId === 'board' &&
+      mouseClick.zoneId !== 'board' &&
+      boardRefuses(heldCard(draggedImage))
+    ) {
+      refuseBoardDrop();
+      event.stopPropagation();
+      return;
+    }
+
     // Dragging the active Pokémon onto the bench is a retreat, not a plain move:
     // it must pay the retreat cost (discard energy) and swap with the dropped-on
     // bench Pokémon, the same as clicking the Retreat button.
@@ -365,16 +412,7 @@ export const drop = (event) => {
     ) {
       if (dZoneId === 'deckCover') {
         // Gate the manual deck drop through the rules layer.
-        const deckCheck = manualDeckActionAllowed('moveToDeck');
-        if (!deckCheck.allowed) {
-          uiCue('card-no-match');
-          appendMessage(
-            systemState.initiator,
-            '⛔ ' + deckCheck.reason,
-            'announcement',
-            false
-          );
-        } else {
+        if (!refuseManualDeckAction('moveToDeck')) {
         uiCue('card-place');
         moveToDeckTop(
           mouseClick.cardUser,
@@ -385,53 +423,18 @@ export const drop = (event) => {
         }
       } else {
         const fromZone = mouseClick.zoneId;
-        if (
-          dZoneId === 'hand' &&
-          (fromZone === 'deck' || fromZone === 'viewCards')
-        ) {
-          const drawCheck = manualDeckActionAllowed('draw');
-          if (!drawCheck.allowed) {
-            uiCue('card-no-match');
-            appendMessage(
-              systemState.initiator,
-              '⛔ ' + drawCheck.reason,
-              'announcement',
-              false
-            );
-            event.stopPropagation();
-            return;
-          }
-        }
-        if (
-          dZoneId === 'bench' &&
-          (fromZone === 'deck' || fromZone === 'viewCards')
-        ) {
-          const deckToBenchCheck = manualDeckActionAllowed('deckToBench');
-          if (!deckToBenchCheck.allowed) {
-            uiCue('card-no-match');
-            appendMessage(
-              systemState.initiator,
-              '⛔ ' + deckToBenchCheck.reason,
-              'announcement',
-              false
-            );
-            event.stopPropagation();
-            return;
-          }
-        }
-        if (dZoneId === 'hand' && fromZone === 'bench') {
-          const benchToHandCheck = manualDeckActionAllowed('benchToHand');
-          if (!benchToHandCheck.allowed) {
-            uiCue('card-no-match');
-            appendMessage(
-              systemState.initiator,
-              '⛔ ' + benchToHandCheck.reason,
-              'announcement',
-              false
-            );
-            event.stopPropagation();
-            return;
-          }
+        const fromDeck = fromZone === 'deck' || fromZone === 'viewCards';
+        const gate =
+          dZoneId === 'hand' && fromDeck
+            ? 'draw'
+            : dZoneId === 'bench' && fromDeck
+              ? 'deckToBench'
+              : dZoneId === 'hand' && fromZone === 'bench'
+                ? 'benchToHand'
+                : null;
+        if (gate && refuseManualDeckAction(gate)) {
+          event.stopPropagation();
+          return;
         }
         uiCue('card-place');
         moveCardBundle(

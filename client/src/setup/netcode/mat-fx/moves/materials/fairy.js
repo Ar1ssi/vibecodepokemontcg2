@@ -8,7 +8,12 @@
 // a fifth of a turn over the beat, so it starts and ends upright, with twinkles on its tips.
 // Palette #F48FB1 #FFC2DA #FFF0F7, deep #B83A72, accent #FFE066 (gold); grain 0. Every call
 // draws on the context it is handed and is otherwise pure.
+//
+// Design 075 slice 11: fills and strokes run the GPU `energy` style gently (`ctx.fxStyle`,
+// ignored by Canvas2D): the sparkles and the star shimmer, the trails and the moon ripple with
+// slow veins. Only the sparkles keep a little gain, so the moon never blooms into a white disc.
 import { rgbCss } from '../../fx-colors.mjs';
+import { rootFaded } from './_root-fade.js';
 import { grainPass, sphere, tongueOutline, traceOutline } from './_shared.js';
 
 const TAU = Math.PI * 2;
@@ -25,6 +30,9 @@ const STAR_POINTS = 5;
 const STAR_INNER = 0.42;
 const CRESCENT_SHIFT = 0.3;
 const TRAIL_SPREAD = 40;
+// Style params (gpu-canvas STYLE_PARAMS energy): a shimmer, not a current.
+const SHIMMER = Object.freeze({ id: 'energy', streak: 0.35, speed: 1.5, gain: 0.5 });
+const SHIMMER_SOFT = Object.freeze({ id: 'energy', streak: 0.25, speed: 1, gain: 0 });
 
 const PALETTE = Object.freeze({
   deep: Object.freeze([184, 58, 114]),
@@ -94,9 +102,11 @@ function fairyKit(palette) {
     g.addColorStop(0.45, rgbCss(palette.hot, alpha * 0.45));
     g.addColorStop(1, rgbCss(palette.body, 0));
     ctx.fillStyle = g;
+    ctx.fxStyle = SHIMMER_SOFT;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, TAU);
     ctx.fill();
+    ctx.fxStyle = null;
   }
 
   /**
@@ -106,14 +116,15 @@ function fairyKit(palette) {
    */
   function body(ctx, x, y, r, alpha, hot = 1, time = 0) {
     if (!(r > 0) || !(alpha > 0)) return;
+    ctx.fxStyle = SHIMMER_SOFT;
     sphere(
       ctx,
       x,
       y,
       r * 0.7,
       [
-        [0, palette.core, alpha * 0.7],
-        [0.5, palette.hot, alpha * 0.5],
+        [0, palette.core, alpha * 0.45],
+        [0.5, palette.hot, alpha * 0.35],
         [1, palette.body, 0],
       ],
       0
@@ -121,12 +132,14 @@ function fairyKit(palette) {
     const size = r * twinklePulse(time, x * 0.013 + y * 0.017 + r * 0.05);
     const g = ctx.createRadialGradient(x, y, 0, x, y, size);
     g.addColorStop(0, rgbCss(palette.white, alpha * clamp01(hot)));
-    g.addColorStop(0.3, rgbCss(palette.core, alpha));
-    g.addColorStop(1, rgbCss(palette.hot, alpha * 0.6));
+    g.addColorStop(0.15, rgbCss(palette.core, alpha * 0.85));
+    g.addColorStop(1, rgbCss(palette.hot, alpha * 0.55));
     ctx.fillStyle = g;
+    ctx.fxStyle = SHIMMER;
     ctx.beginPath();
     addSparkle(ctx, x, y, size);
     ctx.fill();
+    ctx.fxStyle = null;
   }
 
   /** A sparkle shard: a four-point star stretched along the tongue's heading, pink then core. */
@@ -136,15 +149,18 @@ function fairyKit(palette) {
     const cx = spec.x + Math.cos(a) * half;
     const cy = spec.y + Math.sin(a) * half;
     const waist = clamp01((spec.width * 0.5) / half) * 0.6;
+    ctx.fxStyle = SHIMMER;
     ctx.fillStyle = rgbCss(palette.hot, 0.85 * alpha);
     ctx.beginPath();
     addPolygon(ctx, stretchedTwinkle(cx, cy, half, spec.width * 0.5, spec.angleDeg, waist));
     ctx.fill();
-    if (!(hot > 0)) return;
-    ctx.fillStyle = rgbCss(palette.core, 0.95 * alpha * Math.min(1, hot));
-    ctx.beginPath();
-    addPolygon(ctx, stretchedTwinkle(cx, cy, half * 0.55, spec.width * 0.3, spec.angleDeg, waist));
-    ctx.fill();
+    if (hot > 0) {
+      ctx.fillStyle = rgbCss(palette.core, 0.95 * alpha * Math.min(1, hot));
+      ctx.beginPath();
+      addPolygon(ctx, stretchedTwinkle(cx, cy, half * 0.55, spec.width * 0.3, spec.angleDeg, waist));
+      ctx.fill();
+    }
+    ctx.fxStyle = null;
   }
 
   /** A four-point star with a long axis `long` along `angleDeg` and a short axis `short`. */
@@ -159,7 +175,8 @@ function fairyKit(palette) {
   };
 
   /**
-   * A sparkle trail: a soft blurred pink ribbon, a narrower pale-pink pass, and gold twinkles
+   * A sparkle trail: a soft blurred pink ribbon, a narrower pale-pink pass (both clear at the
+   * root, so trails fanned out of a moon never stack into a white disc), and gold twinkles
    * strung along its centre that pulse with the clock (`hot` 0 drops the twinkles).
    */
   function tongue(ctx, spec, { alpha = 1, hot = 1, jag = 0 } = {}) {
@@ -171,17 +188,22 @@ function fairyKit(palette) {
     const calm = { ...spec, amp: RIBBON_AMP };
     // One blurred pass only: canvas blur is the costly call (design § Constraints).
     ctx.filter = `blur(${Math.max(1, spec.width * 0.1).toFixed(1)}px)`;
-    ctx.fillStyle = rgbCss(palette.body, 0.5 * alpha);
+    ctx.fxStyle = SHIMMER_SOFT;
+    ctx.fillStyle = rootFaded(ctx, spec, palette.body, 0.5 * alpha);
     traceOutline(ctx, tongueOutline(calm, 1));
     ctx.fill();
     ctx.filter = 'none';
     const inner = tongueOutline(calm, 0.55);
-    ctx.fillStyle = rgbCss(palette.hot, 0.7 * alpha);
+    ctx.fillStyle = rootFaded(ctx, spec, palette.hot, 0.7 * alpha);
     traceOutline(ctx, inner);
     ctx.fill();
     const sparkle = alpha * clamp01(hot);
-    if (!(sparkle > 0)) return;
+    if (!(sparkle > 0)) {
+      ctx.fxStyle = null;
+      return;
+    }
     const last = inner.left.length - 1;
+    ctx.fxStyle = SHIMMER;
     ctx.fillStyle = rgbCss(palette.gold, 0.9 * sparkle);
     ctx.beginPath();
     TRAIL_TWINKLES.forEach((f, k) => {
@@ -192,16 +214,18 @@ function fairyKit(palette) {
       addPolygon(ctx, twinkleOutline(x, y, size));
     });
     ctx.fill();
+    ctx.fxStyle = null;
   }
 
   /**
    * The moon in flight along `headingDeg`: a pink haze, `tongues` sparkle trails streaming
-   * behind it, a pale sphere, a crescent of light on its up-left rim and a twinkle there.
-   * 0 tongues = a bare moon.
+   * behind it, a dim pink disc, a bright crescent of light on its up-left rim and a twinkle
+   * there. The disc stays dim so the crescent carries the shape (a bright disc summed to a white
+   * slab under the bloom). 0 tongues = a bare moon.
    */
   function projectile(ctx, { x, y, r, headingDeg, time, seed, alpha = 1, tongues = 3, hot = 1 }) {
     if (!(r > 0) || !(alpha > 0)) return;
-    glow(ctx, x, y, r * 2.2, 0.35 * alpha);
+    glow(ctx, x, y, r * 1.8, 0.25 * alpha);
     const back = headingDeg + 180;
     for (let k = 0; k < tongues; k += 1) {
       const spread = tongues > 1 ? -TRAIL_SPREAD / 2 + (TRAIL_SPREAD * k) / (tongues - 1) : 0;
@@ -209,22 +233,23 @@ function fairyKit(palette) {
       const length = r * (2.2 + 0.7 * Math.abs(Math.sin(seed * 1.3 + k * 2.1)));
       tongue(
         ctx,
-        { x, y, angleDeg: back + spread + sway, length, width: r * 0.8, time, seed: seed + k * 1.9 },
-        { alpha: alpha * 0.8, hot }
+        { x, y, angleDeg: back + spread + sway, length, width: r * 0.7, time, seed: seed + k * 1.9 },
+        { alpha: alpha * 0.6, hot }
       );
     }
+    ctx.fxStyle = SHIMMER_SOFT;
     sphere(ctx, x, y, r, [
-      [0, palette.white, alpha * 0.6 * clamp01(hot)],
-      [0.35, palette.core, alpha * 0.7],
-      [0.75, palette.hot, alpha * 0.6],
-      [1, palette.body, alpha * 0.3],
+      [0, palette.core, alpha * 0.3 * clamp01(hot)],
+      [0.6, palette.hot, alpha * 0.3],
+      [0.92, palette.body, alpha * 0.35],
+      [1, palette.body, 0],
     ]);
     // The crescent: the disc minus the same disc pushed down-right, so the lit rim is up-left.
     ctx.save();
     ctx.beginPath();
     ctx.arc(x, y, r * 0.94, 0, TAU);
     ctx.clip();
-    ctx.fillStyle = rgbCss(palette.core, 0.6 * alpha);
+    ctx.fillStyle = rgbCss(palette.core, 0.75 * alpha);
     ctx.beginPath();
     ctx.arc(x, y, r * 0.94, 0, TAU);
     const ix = x + r * CRESCENT_SHIFT;
@@ -235,10 +260,12 @@ function fairyKit(palette) {
     ctx.restore();
     const tx = x - r * 0.5;
     const ty = y - r * 0.5;
+    ctx.fxStyle = SHIMMER;
     ctx.fillStyle = rgbCss(palette.white, 0.9 * alpha * clamp01(hot + 0.3));
     ctx.beginPath();
-    addSparkle(ctx, tx, ty, r * 0.5 * twinklePulse(time, seed));
+    addSparkle(ctx, tx, ty, r * 0.4 * twinklePulse(time, seed));
     ctx.fill();
+    ctx.fxStyle = null;
   }
 
   /** The fairy star over (x, y) as the glyph beat runs: a gold outline with twinkling tips. */
@@ -246,23 +273,17 @@ function fairyKit(palette) {
     if (!(r > 0)) return;
     const rotation = sigilRotation(s);
     const outline = starOutline(x, y, r, rotation);
-    ctx.lineJoin = 'round';
-    ctx.strokeStyle = rgbCss(palette.hot, 0.35);
-    ctx.lineWidth = Math.max(1, r * 0.08);
-    ctx.beginPath();
-    addPolygon(ctx, outline);
-    ctx.stroke();
-    ctx.strokeStyle = rgbCss(palette.gold, 0.75);
-    ctx.lineWidth = Math.max(1, r * 0.025);
-    ctx.beginPath();
-    addPolygon(ctx, outline);
-    ctx.stroke();
+    // Design 075 parity: a soft pink bloom with twinkles at the star's points, not a line-drawn
+    // star outline (it read as clip art next to Scarlet/Violet's sparkle).
+    glow(ctx, x, y, r * 1.1, 0.55);
+    ctx.fxStyle = SHIMMER;
     const pulse = twinklePulse(clamp01(s), 0);
     ctx.fillStyle = rgbCss(palette.core, 0.9);
     ctx.beginPath();
     addSparkle(ctx, x, y, r * 0.3 * pulse);
     for (let k = 0; k < outline.length; k += 2) addPolygon(ctx, twinkleOutline(outline[k][0], outline[k][1], r * 0.12 * pulse));
     ctx.fill();
+    ctx.fxStyle = null;
   }
 
   return Object.freeze({

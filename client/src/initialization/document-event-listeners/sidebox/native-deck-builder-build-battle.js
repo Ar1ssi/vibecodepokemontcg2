@@ -1,23 +1,15 @@
+// FROZEN 2026-10-15 per design 073: the legacy flow (/build-and-battle-legacy) must keep working as is,
+// but gets no new features; the live flow is native-deck-builder-bnb-run.js. Do not extend this file.
 import { createRng } from '../../../../../shared/engine/rng.mjs';
 import { DECK_FORMAT_BUILD_BATTLE } from '../../../../../shared/engine/formats.mjs';
-import {
-  BASIC_ENERGY_LABELS,
-  BUILD_BATTLE_ERA_NAMES,
-  BUILD_BATTLE_ERAS,
-  DEFAULT_BOX_KEY,
-  boxesForEra,
-  getBuildBattleBox,
-} from '../../../setup/deck-builder/core/build-battle/box-catalog.mjs';
+import { DEFAULT_BOX_KEY, getBuildBattleBox } from '../../../setup/deck-builder/core/build-battle/box-catalog.mjs';
 import { loadBoxData } from '../../../setup/deck-builder/core/build-battle/box-data.mjs';
 import {
-  boxPromoRow,
   openBox,
   poolFromBox,
   startingDeckRows,
 } from '../../../setup/deck-builder/core/build-battle/pack-opening.mjs';
-import { cardClass, resolvePackModel } from '../../../setup/deck-builder/core/build-battle/pack-models.mjs';
 import {
-  canAddFromPool,
   clearSession,
   createSession,
   deckCardCounts,
@@ -36,13 +28,19 @@ import {
   deckFromCardCounts,
   deckFromRows,
   parseBoxKey,
-  poolRefusalMessage,
-  poolRemaining,
-  showsPlayLevel,
-  unboxingLabels,
 } from '../../../setup/deck-builder/core/build-battle/build-battle-view.mjs';
-import { advanceUnboxing, boxArt, boxSkin } from '../../../setup/deck-builder/core/build-battle/unboxing.mjs';
-import { buildModernBasicEnergy } from '../../../setup/deck-builder/core/modern-energy.mjs';
+import { advanceUnboxing, boxSkin } from '../../../setup/deck-builder/core/build-battle/unboxing.mjs';
+import {
+  boxShot,
+  boxUnboxingOptions,
+  browserStorage,
+  cardImage,
+  createPoolTab,
+  el,
+  mountBoxOnStage,
+  renderBoxPicker,
+  unlimitedEnergyCards,
+} from './native-deck-builder-bb-shared.js';
 import { createStage } from './native-deck-builder-stage.js';
 import { mountUnboxingScene } from './native-deck-builder-unboxing.js';
 
@@ -72,36 +70,6 @@ const STALE_BOX_TEXT =
 const ROOM_WAIT_MS = 800;
 const NEW_BOX_CONFIRM =
   'Discard this pool and open a new box? Your built deck stays in My Decks.';
-const POOL_GROUPS = [
-  ['Pokémon', 'Pokémon'],
-  ['Trainer', 'Trainers'],
-  ['Energy', 'Energy'],
-];
-
-// Reading `window.localStorage` itself throws when site data is blocked.
-const browserStorage = () => {
-  try {
-    return window.localStorage;
-  } catch {
-    return null;
-  }
-};
-
-const el = (tag, className, text) => {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text !== undefined) node.textContent = text;
-  return node;
-};
-
-const cardImage = (card, size = 'small') =>
-  card?.images?.[size] || card?.images?.small || card?.image || '';
-
-const unlimitedEnergyCards = () =>
-  BASIC_ENERGY_LABELS.map((label) => {
-    const { qty: _qty, ...card } = buildModernBasicEnergy(label, 1);
-    return card;
-  });
 
 /**
  * @param {object} options
@@ -152,7 +120,6 @@ export const initializeBuildBattle = ({
   let session = null;
   let pool = [];
   let memoryOnly = false;
-  let poolStatus = '';
   let scene = null;
   // The game tab's room (null outside one); a box belongs to the room it was opened for.
   let currentRoomId = null;
@@ -323,7 +290,7 @@ export const initializeBuildBattle = ({
     });
     session = createSession({ boxKey: activeBox.key, seed, roomId: currentRoomId, ...opened });
     computePool();
-    poolStatus = '';
+    clearPoolStatus();
     newRoomNote = false;
     staleBoxNote = false;
     openBoxDeck();
@@ -362,7 +329,7 @@ export const initializeBuildBattle = ({
     clearSession(storage);
     session = null;
     pool = [];
-    poolStatus = '';
+    clearPoolStatus();
     detachEditor();
     renderAll();
   };
@@ -394,37 +361,13 @@ export const initializeBuildBattle = ({
 
   // Era chips and the era's boxes in release order (design 054 § Builder tab). Only the sealed
   // screen shows the picker, so a box cannot change under an opened session (row 22).
-  const renderPicker = () => {
-    const picker = el('div', 'bb-picker');
-    const eras = el('div', 'bb-era-row');
-    eras.id = 'buildBattleEra';
-    eras.setAttribute('role', 'group');
-    eras.setAttribute('aria-label', 'Era');
-    for (const era of BUILD_BATTLE_ERAS) {
-      const chip = el('button', 'bb-era-chip', era.name);
-      chip.type = 'button';
-      chip.dataset.era = era.key;
-      chip.disabled = !era.boxKeys.length;
-      chip.setAttribute('aria-pressed', String(era.key === activeBox.era));
-      chip.addEventListener('click', () => {
-        if (era.key !== activeBox.era) pickBox(getBuildBattleBox(era.boxKeys[0]));
-      });
-      eras.append(chip);
-    }
-    const label = el('label', 'bb-box-label', 'Box');
-    const select = el('select', 'bb-box-select');
-    select.id = 'buildBattleBox';
-    for (const box of boxesForEra(activeBox.era)) {
-      const option = el('option', '', box.shortName);
-      option.value = box.key;
-      option.selected = box.key === activeBox.key;
-      select.append(option);
-    }
-    select.addEventListener('change', () => pickBox(getBuildBattleBox(select.value)));
-    label.append(select);
-    picker.append(eras, label);
-    return picker;
-  };
+  const renderPicker = () =>
+    renderBoxPicker({
+      getActiveBox: () => activeBox,
+      onPick: pickBox,
+      eraRowId: 'buildBattleEra',
+      selectId: 'buildBattleBox',
+    });
 
   // Every re-render replaces the sealed box's controls; the one the player was on keeps focus.
   const focusedControl = () => {
@@ -446,20 +389,6 @@ export const initializeBuildBattle = ({
     if (pendingSession) return `Loading your ${activeBox.name}…`;
     if (!isLoaded()) return `Loading ${activeBox.name}…`;
     return boxContentsLine(activeBox, loaded.setInfo.name);
-  };
-
-  // The picked box's product shot (design 055 § Every box's art); a missing file drops out quietly.
-  const boxShot = (box) => {
-    const render = boxArt(box)?.render;
-    if (!render) return null;
-    const img = el('img', 'bb-boxshot');
-    img.alt = box.name;
-    img.width = render.width;
-    img.height = render.height;
-    img.draggable = false;
-    img.addEventListener('error', () => img.remove(), { once: true });
-    img.src = `/${render.src}`;
-    return img;
   };
 
   const renderSealedBox = () => {
@@ -501,7 +430,6 @@ export const initializeBuildBattle = ({
   };
 
   const renderOpenedBox = () => {
-    const cardsById = new Map(loaded.cards.map((card) => [card.id, card]));
     const deckEntry = deckEntryOf(session);
     const header = el('div', 'bb-box-header');
     header.append(el('h3', 'bb-title', boxHeadline(activeBox, deckEntry, session.seed)));
@@ -520,31 +448,23 @@ export const initializeBuildBattle = ({
     root.id = 'bbUnboxing';
     root.dataset.era = skin.palette;
     const stageEl = unboxingDone() ? null : stage.open(`Opening your ${activeBox.name}`);
-    if (stageEl) {
-      root.classList.add('bb-scene--stage');
-      stageEl.replaceChildren(root);
-      boxPanelEl.append(el('p', 'bb-note', 'Your box is being opened.'));
-    } else {
-      boxPanelEl.append(root);
-    }
-    scene = mountUnboxingScene({
+    const sceneOptions = boxUnboxingOptions({
       root,
+      box: activeBox,
+      loaded,
+      skin,
+      opened: session,
       getUnboxing: () => session.unboxing,
       dispatch: dispatchUnboxing,
-      packs: session.packs.map((pack) => pack.map((id) => cardsById.get(id) || null)),
-      packModel: resolvePackModel(activeBox.packModelKey, cards, setInfo),
-      classOf: (card) => cardClass(card, activeBox.era, setInfo),
-      look: {
-        skin,
-        labels: unboxingLabels(activeBox, setInfo.name),
-        seriesName: BUILD_BATTLE_ERA_NAMES[activeBox.era],
-        setName: setInfo.name,
-        playLevel: showsPlayLevel(activeBox),
-      },
-      seed: session.seed,
-      promo: boxPromoRow({ box: activeBox, data, deckKey: session.deckKey }),
       onFinish: finishOpening,
     });
+    if (stageEl) {
+      boxPanelEl.append(el('p', 'bb-note', 'Your box is being opened.'));
+      scene = mountBoxOnStage({ stageEl, sceneOptions, box: activeBox, deckRows: boxStartingRows(), storage });
+    } else {
+      boxPanelEl.append(root);
+      scene = mountUnboxingScene(sceneOptions);
+    }
   };
 
   const renderBox = () => {
@@ -562,96 +482,20 @@ export const initializeBuildBattle = ({
   };
 
   // ── Pool tab ────────────────────────────────────────────────────────────
-  const poolTile = (card, badgeText) => {
-    const tile = el('button', 'bb-pool-card');
-    tile.type = 'button';
-    tile.dataset.cardId = card.id;
-    tile.title = `${card.name} · ${card.set?.name || ''}`;
-    const img = el('img', 'bb-pool-card-image');
-    img.src = cardImage(card);
-    img.alt = card.name;
-    img.loading = 'lazy';
-    tile.append(img, el('span', 'bb-pool-badge', badgeText));
-    return tile;
-  };
-
-  const renderPool = () => {
-    if (!poolPanelEl) return;
-    poolPanelEl.replaceChildren();
-    renderBanner(poolPanelEl);
-    const statusEl = el('p', 'bb-pool-status', poolStatus);
-    statusEl.setAttribute('role', 'status');
-    statusEl.dataset.poolStatus = '';
-    poolPanelEl.append(statusEl);
-    if (!session) {
-      statusEl.textContent = 'Open your box first: the Box tab holds your packs.';
-      return;
-    }
-    for (const [supertype, label] of POOL_GROUPS) {
-      const entries = pool.filter((entry) => entry.card.supertype === supertype);
-      const isEnergy = supertype === 'Energy';
-      if (!entries.length && !isEnergy) continue;
-      const group = el('section', 'bb-pool-group');
-      group.append(el('h4', 'bb-pool-group-title', label));
-      const grid = el('div', 'bb-pool-grid');
-      for (const { card } of entries) grid.append(poolTile(card, ''));
-      if (isEnergy) {
-        for (const card of energyCards) {
-          const tile = poolTile(card, '∞');
-          tile.classList.add('is-unlimited');
-          tile.title = `${card.name} · unlimited`;
-          grid.append(tile);
-        }
-      }
-      group.append(grid);
-      poolPanelEl.append(group);
-    }
-    refreshPoolCounts();
-  };
-
-  // Badges only: re-rendering every image on each deck edit would flicker the grid.
-  const refreshPoolCounts = () => {
-    if (!poolPanelEl || !session) return;
-    const left = poolRemaining(getDeck(), pool);
-    poolPanelEl.querySelectorAll('.bb-pool-card:not(.is-unlimited)').forEach((tile) => {
-      const count = left.get(tile.dataset.cardId) ?? 0;
-      tile.querySelector('.bb-pool-badge').textContent = `${count} left`;
-      tile.classList.toggle('is-spent', count === 0);
-    });
-  };
-
-  const setPoolStatus = (text) => {
-    poolStatus = text;
-    const statusEl = poolPanelEl?.querySelector('[data-pool-status]');
-    if (statusEl) statusEl.textContent = text;
-  };
-
-  const findPoolCard = (id) =>
-    pool.find((entry) => entry.card.id === id)?.card ||
-    energyCards.find((card) => card.id === id) ||
-    null;
-
-  poolPanelEl?.addEventListener('click', (event) => {
-    const tile = event.target.closest('.bb-pool-card');
-    const card = tile && findPoolCard(tile.dataset.cardId);
-    if (!card) return;
-    if (!canAddFromPool(getDeck(), pool, card)) {
-      setPoolStatus(poolRefusalMessage(card, pool));
-      return;
-    }
-    setPoolStatus('');
-    addToDeck(card);
-  });
-
-  poolPanelEl?.addEventListener('contextmenu', (event) => {
-    const tile = event.target.closest('.bb-pool-card');
-    const card = tile && findPoolCard(tile.dataset.cardId);
-    if (!card) return;
-    event.preventDefault();
-    // The document-level contextmenu listener runs closePopups, which would
-    // shut the preview in the same event that opened it.
-    event.stopPropagation();
-    onPreviewCard(cardImage(card, 'large'), card, tile);
+  const {
+    render: renderPool,
+    refreshCounts: refreshPoolCounts,
+    clearStatus: clearPoolStatus,
+  } = createPoolTab({
+    poolPanelEl,
+    energyCards,
+    getPool: () => pool,
+    hasPool: () => Boolean(session),
+    emptyText: 'Open your box first: the Box tab holds your packs.',
+    renderBanner,
+    getDeck,
+    addToDeck,
+    onPreviewCard,
   });
 
   boxPanelEl?.addEventListener('contextmenu', (event) => {
@@ -697,7 +541,7 @@ export const initializeBuildBattle = ({
     clearSession(storage);
     session = null;
     pool = [];
-    poolStatus = '';
+    clearPoolStatus();
     newRoomNote = true;
     detachEditor();
     renderAll();

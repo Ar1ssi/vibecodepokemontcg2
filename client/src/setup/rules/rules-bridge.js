@@ -38,6 +38,7 @@ import { statusState } from '/shared/engine/rules/status.mjs';
 import { initTrainerExecution, runTrainerSteps, switchBenchToActive } from './trainer-execution.js';
 import { parseTrainerEffect, describeStep } from '/shared/engine/rules/trainer-effects.mjs';
 import { getDealOrderStarter, resetDealOrder } from '../netcode/deal-order.js';
+import { soloCommandSeat } from '../netcode/solo-seat.mjs';
 import { multiplayerLocksRulesEnabled } from '../general/e2e-mode.mjs';
 function shouldExecuteLocalRulesEffect({
   isTwoPlayer = false,
@@ -76,6 +77,7 @@ import {
 } from '/shared/engine/rules/ability-step-plan.mjs';
 import { decideTurnOrder, resolveTurnOrderCaller } from '/shared/engine/rules/rules-turnorder.mjs';
 import {
+  getTurnOrderFlip,
   getTurnOrderResult,
   resetTurnOrderCall,
 } from '../netcode/turn-order-call.js';
@@ -86,12 +88,12 @@ import { evaluateMulligans, bonusDrawsOwed } from '/shared/engine/rules/mulligan
 import { draw } from '../../actions/zones/deck-actions.js';
 import { shuffleAndDraw, drawOpeningHand } from '../../actions/zones/hand-actions.js';
 import { e2eDelayMs, isE2eMode } from '../general/e2e-mode.mjs';
-import { getCoinById } from '../deck-builder/core/coins.mjs';
 import {
   getSelectedCoin,
   initMatCoins,
   pickDefaultCoin,
   setSelectedCoin,
+  withCatalogCoin,
 } from './mat-coin.js';
 import { playCoinFlipCeremony } from './coin-flip-ceremony.js';
 import { coinCeremonyTimeline } from '../netcode/mat-fx/coin-pose.mjs';
@@ -108,6 +110,7 @@ import { liveActiveCard, liveCardFor, glowNodeFor } from './live-card-sources.mj
 import { isPlayedToBenchTriggerCard, isEvolvePlayedTriggerCard } from './action-affordances.mjs';
 import { computeCardGlows } from './card-glow-model.mjs';
 import { glowColorFor } from './card-glow-colors.mjs';
+import { spectatorSeatName } from '../spectator/spectator-session.js';
     
     let initialized = false;
 
@@ -156,12 +159,18 @@ import { glowColorFor } from './card-glow-colors.mjs';
     // to 'main' (apply-view.js reconcileTurnState) before the client's own
     // opening ceremony has had a chance to run.
     let openingStarted = false;
-    // The server's flip, once it has been shown: the starter it decided, and
-    // whether the coin animation has finished. The game starts only when both
-    // that animation and the local deal ('both-players-ready') are done.
+    // The server's opening coin (designs 013, 072): whether its ceremony has
+    // been shown and has finished, when it ends, the winner's first/second
+    // result and the starter it names. The game starts only when the ceremony,
+    // the result and the local deal ('both-players-ready') are all in.
     let serverTurnOrderStarter = null;
     let serverTurnOrderShown = false;
     let serverTurnOrderAnimationDone = false;
+    let serverCoinCeremonyEndsAt = 0;
+    let serverTurnOrderResult = null;
+    let serverTurnOrderAnnounced = false;
+    // True while this seat's "Do you want to go first?" prompt is open.
+    let turnOrderChoicePending = false;
     let startingActiveSelectionPending = false;
     let startingActiveFinished = false;
     let startingActiveFirstPlayer = null;
@@ -180,6 +189,7 @@ import { glowColorFor } from './card-glow-colors.mjs';
     const OPENING_HAND_TIMEOUT_MS = 20000;
     // The beat between the turn-order coin leaving the screen and the opening deal.
     const OPENING_DEAL_GAP_MS = 300;
+    const TURN_ORDER_CHOICE_OVERLAY_ID = 'rulesTurnOrderChoiceOverlay';
 
     // Events that can bring the opening hand onto the board.
     const OPENING_VIEW_EVENTS = [
@@ -302,7 +312,10 @@ import { glowColorFor } from './card-glow-colors.mjs';
         }
         hud.hidden = false;
         const isMine = rulesState.turnPlayer === 'self';
-        hud.querySelector('.rules-hud-player').textContent = isMine ? 'YOUR TURN' : "OPPONENT'S TURN";
+        const watched = spectatorSeatName(rulesState.turnPlayer);
+        hud.querySelector('.rules-hud-player').textContent = watched
+          ? `${watched.toUpperCase()}'S TURN`
+          : isMine ? 'YOUR TURN' : "OPPONENT'S TURN";
         const phaseText = rulesState.phase === 'attack' ? 'attack used — end turn'
           : rulesState.phase === 'ended' ? 'game over'
           : rulesState.phase === 'draw' ? 'draw phase' : 'main phase';
@@ -670,9 +683,27 @@ import { glowColorFor } from './card-glow-colors.mjs';
       document.addEventListener('rules-turn-order-call', (event) => {
         handleServerTurnOrderCall(event.detail);
       });
+      document.addEventListener('rules-turn-order-flip', (event) => {
+        if (!isServerOwnedTurnOrder()) return;
+        showServerCoinFlip(event.detail);
+      });
       document.addEventListener('rules-turn-order-result', (event) => {
         if (!isServerOwnedTurnOrder()) return;
-        applyServerTurnOrder(event.detail);
+        applyServerTurnOrderResult(event.detail);
+      });
+      document.addEventListener('deal-order-received', () => {
+        if (!isServerOwnedTurnOrder() || !rulesState.enabled) return;
+        maybeBeginServerTurnOrder();
+      });
+      document.addEventListener('rules-turn-order-choice-rejected', (event) => {
+        if (!isServerOwnedTurnOrder() || !rulesState.enabled) return;
+        closeTurnOrderChoicePicker();
+        appendMessage(
+          '',
+          `First/second choice not accepted (${event.detail?.reason || 'unknown'}) — waiting for the server.`,
+          'announcement',
+          false
+        );
       });
       document.addEventListener('rules-turn-order-call-rejected', (event) => {
         if (!isServerOwnedTurnOrder() || !rulesState.enabled) return;
@@ -701,6 +732,10 @@ import { glowColorFor } from './card-glow-colors.mjs';
       serverTurnOrderStarter = null;
       serverTurnOrderShown = false;
       serverTurnOrderAnimationDone = false;
+      serverCoinCeremonyEndsAt = 0;
+      serverTurnOrderResult = null;
+      serverTurnOrderAnnounced = false;
+      closeTurnOrderChoicePicker();
       resetPrizes();
       resetStatuses();
       syncedTurnOrder = null;
@@ -877,7 +912,9 @@ import { glowColorFor } from './card-glow-colors.mjs';
                 return;
               }
 
-              if (!systemState.isTwoPlayer && liveZoneArray('opp', 'active').length === 0) {
+              // One player sets both Actives locally, and in a solo room (design 074 D7).
+              const choosesBoth = !systemState.isTwoPlayer || systemState.solo;
+              if (choosesBoth && liveZoneArray('opp', 'active').length === 0) {
                 setTimeout(() => {
                   promptPlayerActive('opp', "Choose Opponent's Starting Active Pokémon");
                 }, 100);
@@ -888,7 +925,10 @@ import { glowColorFor } from './card-glow-colors.mjs';
 
         if (liveZoneArray('self', 'active').length === 0) {
           await promptPlayerActive('self', 'Choose your Starting Active Pokémon');
-        } else if (!systemState.isTwoPlayer && liveZoneArray('opp', 'active').length === 0) {
+        } else if (
+          (!systemState.isTwoPlayer || systemState.solo) &&
+          liveZoneArray('opp', 'active').length === 0
+        ) {
           await promptPlayerActive('opp', "Choose Opponent's Starting Active Pokémon");
         }
       } finally {
@@ -1023,29 +1063,117 @@ import { glowColorFor } from './card-glow-colors.mjs';
     
     // ── design 013: server-owned turn-order coin call ────────────────────
     // True when the server, not this client, decides turn order.
+    // A solo room keeps a deal per seat (design 074 D7); this client reads the near seat's.
+    const nearDealSeat = () => soloCommandSeat({ ...systemState, user: 'self' }) ?? null;
+
     const isServerOwnedTurnOrder = () =>
       Boolean(systemState.isTwoPlayer && systemState.serverAuthoritative);
 
-    // The opening sequence needs two things that arrive independently: the
-    // server's flip (shown as the coin animation) and the local deal, which
-    // finishes when ready.js raises 'both-players-ready'. Whichever lands last
-    // starts the game.
+    // The opening sequence needs things that arrive independently: the server's
+    // coin (shown as the ceremony), the winner's first/second answer (the
+    // result), and the local deal, which finishes when ready.js raises
+    // 'both-players-ready'. Whichever lands last starts the game.
     const maybeBeginServerTurnOrder = () => {
       if (!serverTurnOrderAnimationDone) return false;
+      if (!serverTurnOrderResult) return false;
+      announceServerTurnOrderResult();
       if (!serverTurnOrderStarter) return false;
       if (!openingSetupReadyForCoinFlip) return false;
+      // The deal follows the result: starting before its view lands would let
+      // that view reset the phase the opening has just set (dealOrder is sent
+      // after the view, so its arrival means the deal is in).
+      if (!getDealOrderStarter(nearDealSeat())) return false;
       const starter = serverTurnOrderStarter;
       serverTurnOrderStarter = null;
       beginSetupWithTurnOrder(starter);
       return true;
     };
 
-    // Shows the server's resolved flip. Deliberately NOT gated on
-    // rulesState.phase: the authoritative post-deal view has usually already
-    // moved it to 'main' by now.
-    const applyServerTurnOrder = (serverResult) => {
-      if (!serverResult) return false;
-      if (!rulesState.enabled) return false;
+    const sideName = (side) => (side === 'self' ? 'You' : 'Your opponent');
+
+    // TCG Live's battle-log lines (blog_loc_going_first/_second) and its
+    // setup_pl_turn / setup_op_turn prompt, once the coin has left the screen.
+    const announceServerTurnOrderResult = () => {
+      if (serverTurnOrderAnnounced || !serverTurnOrderResult) return;
+      serverTurnOrderAnnounced = true;
+      const { winner, goFirst, starter, choiceAuto } = serverTurnOrderResult;
+      appendMessage(
+        '',
+        choiceAuto
+          ? `No choice came in time — ${winner === 'self' ? 'you go' : 'your opponent goes'} first.`
+          : `${sideName(winner)} decided to go ${goFirst ? 'first' : 'second'}.`,
+        'announcement',
+        false
+      );
+      appendMessage(
+        '',
+        starter === 'self' ? 'You will go first.' : 'Your opponent will go first.',
+        'announcement',
+        false
+      );
+    };
+
+    // Answers "Do you want to go first?" for this seat. Only the winner's copy of
+    // the flip carries a choiceId; the server rejects anyone else.
+    // A solo room (design 074 D7) answers for the winner's seat (choiceSeat).
+    const sendTurnOrderChoice = ({ roomId, choiceId, goFirst, choiceSeat }) => {
+      rulesSocket?.emit('turnOrderChoice', {
+        roomId: roomId || systemState.roomId,
+        choiceId,
+        goFirst,
+        ...(choiceSeat ? { seat: choiceSeat } : {}),
+      });
+    };
+
+    const turnOrderChoiceOf = (flip) => ({
+      roomId: flip.roomId,
+      choiceId: flip.choiceId,
+      choiceSeat: flip.choiceSeat,
+    });
+
+    const closeTurnOrderChoicePicker = () => {
+      turnOrderChoicePending = false;
+      document.getElementById(TURN_ORDER_CHOICE_OVERLAY_ID)?.remove();
+    };
+
+    // Runs once the coin has landed and faded: name the winner, then either ask
+    // this seat to choose or tell it the opponent is choosing (TCG Live's
+    // pl_calling_turn / op_calling_turn).
+    const afterServerCoinLands = (flip) => {
+      appendMessage('', `${sideName(flip.winner)} won the coin toss.`, 'announcement', false);
+      if (serverTurnOrderResult) return; // already chosen (auto, or answered early)
+      // A solo player answers for whichever seat won (flip.choiceSeat).
+      if (flip.winner !== 'self' && !flip.choiceSeat) {
+        appendMessage(
+          '',
+          'Your opponent won the coin flip and is deciding who goes first.',
+          'announcement',
+          false
+        );
+        return;
+      }
+      if (!flip.choiceId || turnOrderChoicePending) return;
+      turnOrderChoicePending = true;
+      openTurnOrderChoicePicker({
+        onChoose: (goFirst) => {
+          turnOrderChoicePending = false;
+          sendTurnOrderChoice({ ...turnOrderChoiceOf(flip), goFirst });
+        },
+      });
+    };
+
+    // Shows the server's coin. Deliberately NOT gated on rulesState.phase: the
+    // authoritative view may already have moved it on by now.
+    const showServerCoinFlip = (flip) => {
+      if (!flip) return false;
+      if (!rulesState.enabled) {
+        // Free play shows no ceremony and has nobody to click the prompt; the
+        // deal waits on this answer, so give it at once.
+        if (flip.choiceId) {
+          sendTurnOrderChoice({ ...turnOrderChoiceOf(flip), goFirst: true });
+        }
+        return false;
+      }
       if (serverTurnOrderShown) return false; // one ceremony per game
       serverTurnOrderShown = true;
 
@@ -1055,57 +1183,80 @@ import { glowColorFor } from './card-glow-colors.mjs';
       coinCallPending = false;
       document.getElementById('rulesCoinCallOverlay')?.remove();
 
-      const { caller, call, result, starter, coinId, auto } = serverResult;
-      const coinOwner = caller;
+      // The Playwright harness has nobody to click either; it answers as the
+      // winner always did before the choice existed.
+      if (isE2eMode() && flip.choiceId) {
+        sendTurnOrderChoice({ ...turnOrderChoiceOf(flip), goFirst: true });
+      }
+
+      const { caller, call, result, winner, coinId, auto } = flip;
       // The server echoes the caller's chosen coin so both clients render the
       // same art; fall back to this client's local selection, then a stable
       // default (never a random coin, so repeated flips keep the same face).
-      const coin =
-        (coinId ? getCoinById(coinId) : null) ||
-        getSelectedCoin(coinOwner) ||
-        pickDefaultCoin();
-      const callerLabel = caller === 'self' ? 'You' : 'Opponent';
+      const fallbackCoin = getSelectedCoin(caller) || pickDefaultCoin();
       appendMessage(
         '',
         auto
           ? `No call came in time — the coin was called ${call} automatically.`
-          : `${callerLabel} called ${call}.`,
+          : `${sideName(caller)} chose ${call} for the opening coin flip.`,
         'announcement',
         false
       );
-      playTurnOrderCoinAnimation({
-        coin,
-        result,
-        coinOwner,
-        turnPlayer: starter,
-        isRemote: false,
-      });
-      // The server deals right after this result: the opening hands fly in once
-      // the ceremony has faded out, not underneath it.
-      const opening = coinCeremonyTimeline(1);
-      holdFxQueue(e2eDelayMs(opening.totalMs + OPENING_DEAL_GAP_MS));
+      withCatalogCoin(coinId, (named) =>
+        playCoinFlipCeremony({
+          coin: named || fallbackCoin,
+          result,
+          ownerLabel: caller === 'self' ? 'Your' : "Opponent's",
+          label: auto
+            ? `${call === 'heads' ? 'Heads' : 'Tails'} was called for you. Flipping the coin…`
+            : `${sideName(caller)} chose ${call}. Flipping the coin…`,
+          outcomeLabel: winner === 'self' ? 'You won the coin flip!' : 'Your opponent won the coin flip.',
+        })
+      );
 
-      serverTurnOrderStarter = starter;
+      const ceremonyMs = e2eDelayMs(coinCeremonyTimeline(1).totalMs);
+      serverCoinCeremonyEndsAt = Date.now() + ceremonyMs;
       const session = rulesSessionGeneration;
       setTimeout(() => {
         if (session !== rulesSessionGeneration) return;
         serverTurnOrderAnimationDone = true;
+        afterServerCoinLands(flip);
         maybeBeginServerTurnOrder();
-      }, e2eDelayMs(coinCeremonyTimeline(1).totalMs));
+      }, ceremonyMs);
+      return true;
+    };
+
+    // The winner has chosen (or the server chose for them) and the deal follows
+    // right behind this message.
+    const applyServerTurnOrderResult = (result) => {
+      if (!result) return false;
+      if (!rulesState.enabled) return false;
+      if (serverTurnOrderResult) return false; // one result per game
+      // A seat that missed the flip (rules switched on late) still sees the coin.
+      if (!serverTurnOrderShown) showServerCoinFlip({ ...result, choiceId: null });
+      serverTurnOrderResult = result;
+      serverTurnOrderStarter = result.starter;
+      closeTurnOrderChoicePicker();
+      // The opening hands fly in once the coin has faded out, not underneath it.
+      const ceremonyLeftMs = Math.max(0, serverCoinCeremonyEndsAt - Date.now());
+      holdFxQueue(ceremonyLeftMs + e2eDelayMs(OPENING_DEAL_GAP_MS));
+      maybeBeginServerTurnOrder();
       return true;
     };
 
     // The server nominated a caller. Only the nominated seat gets a callId.
     const handleServerTurnOrderCall = (detail) => {
       if (!isServerOwnedTurnOrder()) return;
-      const { callId, waiting, roomId } = detail || {};
+      // `seat`: a solo room's caller seat (design 074 D7), echoed in the call.
+      const { callId, waiting, roomId, seat } = detail || {};
+      const seatField = seat ? { seat } : {};
       const targetRoomId = roomId || systemState.roomId;
 
       if (waiting || !callId) {
         if (rulesState.enabled) {
           appendMessage(
             '',
-            'Waiting for opponent to call the coin…',
+            'Your opponent is calling the starting coin flip…',
             'announcement',
             false
           );
@@ -1124,6 +1275,7 @@ import { glowColorFor } from './card-glow-colors.mjs';
           callId,
           call: 'heads',
           coinId: getSelectedCoin('self')?.id || null,
+          ...seatField,
         });
         return;
       }
@@ -1131,6 +1283,7 @@ import { glowColorFor } from './card-glow-colors.mjs';
       if (coinCallPending) return;
       coinCallPending = true;
       openCoinCallPicker({
+        subtitle: 'Call the starting coin flip. Choose heads or tails.',
         onCall: (call) => {
           coinCallPending = false;
           rulesSocket?.emit('turnOrderCall', {
@@ -1141,8 +1294,8 @@ import { glowColorFor } from './card-glow-colors.mjs';
             // show the same art during the ceremony (display only; the flip
             // result still comes from the server's seeded rng).
             coinId: getSelectedCoin('self')?.id || null,
+            ...seatField,
           });
-          appendMessage('', `You called ${call} — flipping…`, 'announcement', false);
         },
       });
     };
@@ -1162,8 +1315,9 @@ import { glowColorFor } from './card-glow-colors.mjs';
       // flips. Checked before the guards below because the authoritative view has
       // already moved rulesState.phase off 'setup' by the time we get here.
       if (isServerOwnedTurnOrder()) {
-        if (!maybeBeginServerTurnOrder()) {
-          applyServerTurnOrder(getTurnOrderResult());
+        if (maybeBeginServerTurnOrder()) return;
+        if (!applyServerTurnOrderResult(getTurnOrderResult())) {
+          showServerCoinFlip(getTurnOrderFlip());
         }
         return;
       }
@@ -1275,7 +1429,7 @@ import { glowColorFor } from './card-glow-colors.mjs';
         // runs), use it instead of the local guess so this client's turn-order
         // belief always matches the server's.
         if (systemState.isTwoPlayer && systemState.serverAuthoritative) {
-          const authoritativeStarter = getDealOrderStarter();
+          const authoritativeStarter = getDealOrderStarter(nearDealSeat());
           if (authoritativeStarter) turnPlayer = authoritativeStarter;
         }
 
@@ -1292,39 +1446,78 @@ import { glowColorFor } from './card-glow-colors.mjs';
       });
     };
     
-    // 2-button "call the coin" picker: the caller picks heads or tails
-    // before the turn-order flip. Caller goes first if the coin lands on
-    // the face they called. Mirrors the #rulesChoicePicker overlay styling.
-    const openCoinCallPicker = ({ onCall }) => {
-      document.getElementById('rulesCoinCallOverlay')?.remove();
+    // Two-button opening prompt (call the coin, go first or second). Mirrors the
+    // #rulesChoicePicker overlay styling; a click outside picks nothing.
+    const openTurnOrderPrompt = ({ id, title, subtitle, options, onPick }) => {
+      document.getElementById(id)?.remove();
       const overlay = document.createElement('div');
-      overlay.id = 'rulesCoinCallOverlay';
+      overlay.id = id;
       overlay.style.cssText =
         'position:fixed;inset:0;z-index:2400;display:flex;align-items:center;justify-content:center;background:rgba(8,10,14,.72);';
       const box = document.createElement('div');
       box.style.cssText =
         'background:#1b1f27;border:1px solid #3a4150;border-radius:12px;padding:24px 28px;text-align:center;color:#e8ecf4;min-width:280px;';
-      box.innerHTML = `
-        <div style="font-size:16px;font-weight:600;margin-bottom:6px;">\u{1FA99} Call the coin</div>
-        <div style="font-size:13px;color:#9aa3b2;margin-bottom:16px;">Pick a face \u2014 if the coin lands on it, you go first.</div>
-        <div style="display:flex;gap:12px;justify-content:center;">
-          <button type="button" data-coin-call="heads" style="flex:1;padding:10px 18px;border-radius:8px;border:1px solid #4a5568;background:#2a3040;color:#e8ecf4;font-size:14px;font-weight:600;cursor:pointer;">Heads</button>
-          <button type="button" data-coin-call="tails" style="flex:1;padding:10px 18px;border-radius:8px;border:1px solid #4a5568;background:#2a3040;color:#e8ecf4;font-size:14px;font-weight:600;cursor:pointer;">Tails</button>
-        </div>`;
-      overlay.appendChild(box);
-      box.querySelectorAll('button[data-coin-call]').forEach((btn) => {
-        btn.addEventListener('click', () => {
+      const heading = document.createElement('div');
+      heading.style.cssText = 'font-size:16px;font-weight:600;margin-bottom:6px;';
+      heading.textContent = title;
+      const text = document.createElement('div');
+      text.style.cssText = 'font-size:13px;color:#9aa3b2;margin-bottom:16px;';
+      text.textContent = subtitle;
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;gap:12px;justify-content:center;';
+      for (const option of options) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.style.cssText =
+          'flex:1;padding:10px 18px;border-radius:8px;border:1px solid #4a5568;background:#2a3040;color:#e8ecf4;font-size:14px;font-weight:600;cursor:pointer;';
+        button.textContent = option.label;
+        // Test and bot hook: #rulesCoinCallOverlay button[data-coin-call="heads"].
+        Object.assign(button.dataset, option.data);
+        button.addEventListener('click', () => {
           playUiCue('choose-first-second');
           overlay.remove();
-          onCall(btn.dataset.coinCall);
+          onPick(option.value);
         });
-      });
-      overlay.addEventListener('click', (e) => {
-        if (e.target !== overlay) return; // click outside does not pick a face
-      });
+        row.appendChild(button);
+      }
+      box.append(heading, text, row);
+      overlay.appendChild(box);
       document.body.appendChild(overlay);
     };
-    
+
+    // "Call the coin": the caller picks heads or tails before the turn-order
+    // flip. Legacy flows seat the caller first on a match; under server
+    // authority the coin's winner then chooses (design 072).
+    const openCoinCallPicker = ({
+      onCall,
+      subtitle = 'Pick a face \u2014 if the coin lands on it, you go first.',
+    }) => {
+      openTurnOrderPrompt({
+        id: 'rulesCoinCallOverlay',
+        title: '\u{1FA99} Call the coin',
+        subtitle,
+        options: [
+          { label: 'Heads', value: 'heads', data: { coinCall: 'heads' } },
+          { label: 'Tails', value: 'tails', data: { coinCall: 'tails' } },
+        ],
+        onPick: onCall,
+      });
+    };
+
+    // TCG Live's pl_calling_turn: the toss winner answers Yes (go first) or No.
+    const openTurnOrderChoicePicker = ({ onChoose }) => {
+      openTurnOrderPrompt({
+        id: TURN_ORDER_CHOICE_OVERLAY_ID,
+        title: 'You won the coin flip!',
+        subtitle: 'Do you want to go first?',
+        options: [
+          { label: 'Yes', value: true, data: { turnOrderChoice: 'first' } },
+          { label: 'No', value: false, data: { turnOrderChoice: 'second' } },
+        ],
+        onPick: onChoose,
+      });
+    };
+
     // TCG Live-style full-screen ceremony: dim the board, tumble the chosen
     // coin at centre screen, reveal the call/winner, fade out.
     const playTurnOrderCoinAnimation = ({ coin, result, coinOwner, turnPlayer, isRemote }) => {
@@ -1399,7 +1592,9 @@ import { glowColorFor } from './card-glow-colors.mjs';
       // a player could always peek their deck regardless of the rule below.
       document.addEventListener('click', (event) => {
         if (!rulesState.enabled) return;
-        const target = event.target.closest?.('[id="deck"], [id="deckCover"]');
+        // composedPath: a board-mirror card's click arrives retargeted to its shadow host (design 074 D4).
+        const origin = event.composedPath?.()[0] ?? event.target;
+        const target = origin.closest?.('[id="deck"], [id="deckCover"]');
         if (!target) return;
         if (deckAccess.open) return; // a card effect unlocked it
         const owner = target.id === 'deckCover' ? (target.user || 'self') : rulesState.turnPlayer;
@@ -2238,14 +2433,15 @@ import { glowColorFor } from './card-glow-colors.mjs';
               // may have overridden its local flip with the server's authoritative
               // starter (getDealOrderStarter()), which this recompute could not see.
               const localTurnPlayer = data.turnPlayer === 'self' ? 'opp' : 'self';
-              const coin = data.coinId ? getCoinById(data.coinId) : null;
-              playTurnOrderCoinAnimation({
-                coin,
-                result: data.result,
-                coinOwner: localCoinOwner,
-                turnPlayer: localTurnPlayer,
-                isRemote: true,
-              });
+              withCatalogCoin(data.coinId, (coin) =>
+                playTurnOrderCoinAnimation({
+                  coin,
+                  result: data.result,
+                  coinOwner: localCoinOwner,
+                  turnPlayer: localTurnPlayer,
+                  isRemote: true,
+                })
+              );
               // used when we click our own Set Up, so both sides agree
               syncedTurnOrder = localTurnPlayer;
 
@@ -2306,13 +2502,14 @@ import { glowColorFor } from './card-glow-colors.mjs';
               // The acting client ran an in-game coin flip; show the same coin
               // and result here. Their 'self' is our 'opp'.
               const remoteOwner = data?.playerId === 'opp' ? 'self' : 'opp';
-              const coin = data?.coinId
-                ? getCoinById(data.coinId)
-                : getSelectedCoin(remoteOwner) || pickDefaultCoin();
               const ownerLabel = remoteOwner === 'self' ? 'Your' : "Opponent's";
               const result = data?.result === 'tails' ? 'tails' : 'heads';
-              playCoinFlipCeremony({ coin, result, ownerLabel });
-              appendMessage('', `🪙 ${ownerLabel} coin flip: ${result}.`, 'announcement', false);
+              const playCeremony = (coin) => {
+                playCoinFlipCeremony({ coin, result, ownerLabel });
+                appendMessage('', `🪙 ${ownerLabel} coin flip: ${result}.`, 'announcement', false);
+              };
+              if (data?.coinId) withCatalogCoin(data.coinId, playCeremony);
+              else playCeremony(getSelectedCoin(remoteOwner) || pickDefaultCoin());
             } else if (type === 'mulliganBonus') {
               // Opponent mulliganed — we draw 1 bonus card for ourselves
               if (rulesState.enabled) {

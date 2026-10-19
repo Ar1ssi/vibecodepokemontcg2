@@ -198,7 +198,10 @@ export function preventionForCard(card, attacker, ctx = {}) {
     if (!cardHasAbility(attacker))
       return { preventAll: false, reduce: 0, reduceHp: 0 };
   }
-  if (/evolution pokémon|evolution pokemon/i.test(t)) {
+  // Klefki Wonder Lock (STS 80): "… by attacks from your opponent's Mega Evolution Pokémon."
+  if (/mega evolution pok[eé]mon/i.test(t)) {
+    if (!isMegaCard(attacker)) return { preventAll: false, reduce: 0, reduceHp: 0 };
+  } else if (/evolution pokémon|evolution pokemon/i.test(t)) {
     if (!isEvolutionCard(attacker))
       return { preventAll: false, reduce: 0, reduceHp: 0 };
   }

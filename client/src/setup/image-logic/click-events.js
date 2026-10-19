@@ -6,9 +6,6 @@ import {
 import { moveCardBundle } from '../../actions/move-card-bundle/move-card-bundle.js';
 import {
   mouseClick,
-  oppContainer,
-  oppContainerDocument,
-  selfContainer,
   selfContainerDocument,
   systemState,
 } from '../../state.js';
@@ -21,10 +18,12 @@ import { readCardInstanceId } from '../netcode/authoritative-dispatch.js';
 import { closeCardPreview, openCardPreview } from './full-view.js';
 import { openDiscardPileViewer } from './discard-pile-viewer.js';
 import { openCarouselViewer } from './card-picker.js';
+import { attachedSlidesOf, openAttachedCardsCarousel } from './attached-carousel.js';
 import { orderAttachedForCarousel } from './carousel-order.mjs';
 import { rulesState, stadiumUsed } from '/shared/engine/rules/rules-state.mjs';
 import { isHandActivatedAbility } from '/shared/engine/rules/ability-executors.mjs';
 import {
+  benchHasUsableAction,
   openCardInspector,
   closeCardInspector,
   stadiumContextFor,
@@ -34,7 +33,10 @@ import {
   closeCardFocus,
   isCardFocusOpen,
 } from '../rules/card-focus.mjs';
-import { shouldOpenCardFocus } from '../rules/card-focus-routing.mjs';
+import { tapRoute } from '../rules/card-focus-routing.mjs';
+import { statusEffectsFor } from '../rules/attack-ui-model.mjs';
+import { isStackViewOpen, openStackView } from '../rules/stack-view.mjs';
+import { liveZoneArray } from '../zones/live-zone-array.js';
 import {
   attack,
   retreat,
@@ -42,15 +44,22 @@ import {
 } from '../../actions/chat-buttons/chat-buttons.js';
 import { uiCue } from '../netcode/mat-fx/ui-cue.mjs';
 import { resolvePreviewCard } from './preview-card.mjs';
-import { isDoubleClickZoomZone } from './double-click-zoom.mjs';
+import { visualRectOf } from '../board3d/board-rects.js';
+import { getBoardScene } from '../board3d/board3d.js';
+import { selectServerCard, takeServerAttach } from '../netcode/server-card-select.js';
 
-export const identifyCard = (event) => {
-  mouseClick.cardUser = event.target.user === 'self' ? 'self' : 'opp';
+/**
+ * Fills `mouseClick` with the card a node stands for: its owner, server instance id, zone and
+ * legacy index. Shared by every DOM card event (`identifyCard`) and the 3D board's drag, which
+ * names the card's board-mirror <img> without an event (design 074 D5).
+ */
+export const identifyCardElement = (target) => {
+  mouseClick.cardUser = target.user === 'self' ? 'self' : 'opp';
   // Design 003 slice 1: capture the authoritative renderer's identity stamp alongside
   // the legacy index. Null for a legacy-rendered card, which keeps the gate fail-open.
-  mouseClick.cardInstanceId = readCardInstanceId(event.target);
+  mouseClick.cardInstanceId = readCardInstanceId(target);
   //closest() handles plain cards, play-container cards, and holo-wrapper cards
-  mouseClick.zoneId = event.target.closest(
+  mouseClick.zoneId = target.closest(
     '#deck, #hand, #active, #bench, #prizes, #discard, #lostZone, #attachedCards, #viewCards, #stadium, #board, #deckCover, #discardCover, #lostZoneCover'
   )?.id;
   if (mouseClick.zoneId === 'deckCover') {
@@ -61,10 +70,12 @@ export const identifyCard = (event) => {
   } else {
     mouseClick.cardIndex = findZoneCardIndex(
       getZone(mouseClick.cardUser, mouseClick.zoneId),
-      event.target
+      target
     );
   }
 };
+
+export const identifyCard = (event) => identifyCardElement(event.target);
 
 export const coverClick = (event) => {
   if (event.target.id === 'discardCover') {
@@ -89,6 +100,16 @@ export const coverClick = (event) => {
   }
 };
 
+/**
+ * Where the card menu anchors on the 3D board: a mirror card's rect is already on-screen px
+ * (board-mirror.js sync); the Stadium's twin is the page's `#stadium img`,
+ * hidden while the scene draws the slot, so it anchors on the scene's Stadium footprint.
+ */
+const board3dMenuAnchorRect = (target) => {
+  const stadium = target?.closest?.('#stadium') ? getBoardScene()?.rects?.().stadium : null;
+  return stadium ?? visualRectOf(target);
+};
+
 export const openCardContextMenu = (event) => {
   const cardContextMenu = document.getElementById('cardContextMenu');
 
@@ -102,16 +123,10 @@ export const openCardContextMenu = (event) => {
 
   identifyCard(event);
 
-  const selfView =
-    (selfContainerDocument.body.contains(event.target) &&
-      selfContainer.classList.contains('self')) ||
-    (!selfContainerDocument.body.contains(event.target) &&
-      !selfContainer.classList.contains('self'));
-  const oppView =
-    (!selfContainerDocument.body.contains(event.target) &&
-      selfContainer.classList.contains('self')) ||
-    (selfContainerDocument.body.contains(event.target) &&
-      !selfContainer.classList.contains('self'));
+  // The mirror hosts swap their `self`/`opp` classes when the board is flipped.
+  const inSelfBoard = selfContainerDocument.contains(event.target);
+  const selfView = inSelfBoard === selfContainerDocument.host.classList.contains('self');
+  const oppView = !selfView;
 
   const buttonConditions = {
     abilityCounterButton: [
@@ -198,92 +213,109 @@ export const openCardContextMenu = (event) => {
   if (menuShown) uiCue('card-to-board');
 
   // get the position of the context menu
-  const targetRect = event.target.getBoundingClientRect();
-  const offsetHeight =
-    window.innerHeight -
-    (event.target.user === 'self'
-      ? selfContainer.offsetHeight
-      : oppContainer.offsetHeight);
-  if (document.body.contains(event.target)) {
-    cardContextMenu.style.left = `${targetRect.left + event.target.clientWidth}px`;
-    cardContextMenu.style.top = `${targetRect.top}px`;
-  } else if (selfView) {
-    if (
-      event.target.parentElement.id === 'deckCover' ||
-      event.target.parentElement.id === 'discardCover'
-    ) {
-      cardContextMenu.style.left = `${targetRect.left - cardContextMenu.clientWidth}px`;
-      cardContextMenu.style.top = `${targetRect.top + offsetHeight}px`;
-    } else if (event.target.closest('#hand')) {
-      cardContextMenu.style.left = `${targetRect.left}px`;
-      cardContextMenu.style.top = `${targetRect.top + offsetHeight - cardContextMenu.offsetHeight}px`;
-    } else if (event.target.parentElement.id === 'prizes') {
-      cardContextMenu.style.left = `${targetRect.left}px`;
-      cardContextMenu.style.top = `${targetRect.top + offsetHeight - cardContextMenu.offsetHeight}px`;
-    } else {
-      cardContextMenu.style.left = `${targetRect.left + event.target.clientWidth}px`;
-      cardContextMenu.style.top = `${targetRect.top + offsetHeight}px`;
-    }
-  } else if (oppView) {
-    const adjustment = document.body.offsetWidth - oppContainer.offsetWidth;
-    if (
-      event.target.parentElement.id === 'deckCover' ||
-      event.target.parentElement.id === 'discardCover'
-    ) {
-      cardContextMenu.style.right = `${targetRect.left + adjustment - cardContextMenu.clientWidth}px`;
-      cardContextMenu.style.bottom = `${targetRect.top + offsetHeight - cardContextMenu.offsetHeight + event.target.offsetHeight}px`;
-    } else if (
-      event.target.parentElement.id === 'prizes' ||
-      event.target.parentElement.id === 'lostZoneCover'
-    ) {
-      cardContextMenu.style.right = `${targetRect.left + adjustment + event.target.clientWidth}px`;
-      cardContextMenu.style.bottom = `${targetRect.top + offsetHeight - cardContextMenu.offsetHeight + event.target.offsetHeight}px`;
-    } else {
-      cardContextMenu.style.right = `${targetRect.left + adjustment - cardContextMenu.clientWidth + event.target.clientWidth}px`;
-      cardContextMenu.style.bottom = `${targetRect.top + offsetHeight - cardContextMenu.offsetHeight}px`;
-    }
-  }
+  const rect = board3dMenuAnchorRect(event.target);
+  const fitsRight =
+    rect.left + rect.width + cardContextMenu.offsetWidth <= window.innerWidth;
+  const left = fitsRight
+    ? rect.left + rect.width
+    : rect.left - cardContextMenu.offsetWidth;
+  const top = Math.min(rect.top, window.innerHeight - cardContextMenu.offsetHeight);
+  cardContextMenu.style.left = `${Math.max(0, left)}px`;
+  cardContextMenu.style.top = `${Math.max(0, top)}px`;
 };
 
-// Attached Energy is rendered on the mat as a small round token (attach-card.js swaps image.src to
-// the icon and stashes the full card art in dataset.energyCardSrc) — show the real card art in the
-// carousel slide, then revert automatically since we never touch the board's own <img>, just a
-// read-only stand-in object here.
-const attachedSlidesOf = (card) =>
-  (card.attachedCards || []).map((attached) => {
-    const fullArtSrc = attached.image?.dataset?.energyCardSrc;
-    return fullArtSrc ? { ...attached, image: { src: fullArtSrc } } : attached;
+
+// The card's Buff / Debuff split for the focus HUD and the stack view (design 074). Timed attack
+// effects only count while the Pokémon is Active; the other player's Active is where a
+// presence-scoped effect's source sits.
+const statusesOf = (card, zone, user) =>
+  statusEffectsFor(card, {
+    turnNumber: rulesState.turnNumber,
+    zoneCards: liveZoneArray(user, zone),
+    sourceZoneCards: liveZoneArray(user === 'self' ? 'opp' : 'self', 'active'),
+    active: zone === 'active',
   });
 
-// Design 067: your own Active opens the TCG Live focus view. The attached cards the old inspector
-// carried as carousel slides sit behind the HUD's Stack button. An attack or retreat closes the
-// focus at once, because it fires at the slot the card would otherwise be flying back to.
-const openOwnActiveFocus = (card) => {
-  const attachedSlides = attachedSlidesOf(card);
+// The stack view's carousel, left to right: the Pokémon, its evolution line (highest stage first),
+// then its Tools, then its Energy — the carousel order read the other way round.
+const stackCardsOf = (card) => [card, ...orderAttachedForCarousel(attachedSlidesOf(card)).reverse()];
+
+const openStackFor = (card, zone, user) =>
+  openStackView({ card, cards: stackCardsOf(card), zone, statuses: statusesOf(card, zone, user) });
+
+// The TCG Live AttackOverlay for one of your Pokémon (designs 067, 074). The HUD's Stack button
+// closes it and opens the stack view. On the Bench it lists no attacks and Retreat does nothing
+// (AttackOverlay.HideAttacksForBenchedPokemon); an attack or retreat closes the focus at once,
+// because it fires at the slot the card would otherwise be flying back to.
+const openPokemonFocus = (card, zone, retreatUser = systemState.initiator) => {
+  const active = zone === 'active';
   return openCardFocus({
     card,
-    zone: 'active',
-    attachedCount: attachedSlides.length,
-    onAttack: (index) => {
-      closeCardFocus({ immediate: true });
-      attack(rulesState.turnPlayer, true, index);
-    },
-    onRetreat: () => {
-      closeCardFocus({ immediate: true });
-      retreat(systemState.initiator);
-    },
-    onOpenStack: () =>
-      openCarouselViewer({
-        title: card.name || 'Attached Cards',
-        candidates: [...orderAttachedForCarousel(attachedSlides), card],
-        initialIndex: attachedSlides.length,
-      }),
+    zone,
+    statuses: statusesOf(card, zone, 'self'),
+    onAttack: active
+      ? (index) => {
+          closeCardFocus({ immediate: true });
+          attack(rulesState.turnPlayer, true, index);
+        }
+      : null,
+    onRetreat: active
+      ? () => {
+          closeCardFocus({ immediate: true });
+          retreat(retreatUser);
+        }
+      : null,
+    onOpenStack: () => openStackFor(card, zone, 'self'),
   });
+};
+
+/**
+ * Open the AttackOverlay for your Active Pokémon (the sidebox Attack button, design 074 A3).
+ * Returns false when it could not open, so the caller can keep its old path.
+ *
+ * @param {object} card the Active Pokémon (a legacy zone card or a preview card)
+ * @param {string} [retreatUser] who retreats from its Retreat button (the sidebox's side)
+ */
+export const openActiveAttackOverlay = (card, retreatUser = systemState.initiator) =>
+  isCardFocusOpen() || openPokemonFocus(card, 'active', retreatUser);
+
+// PlayerCardOwner.OnCardClicked for an in-play Pokémon (design 074 A1): your Active, or a Benched
+// Pokémon of yours with something usable, opens the overlay; any other in-play Pokémon the stack
+// view. Returns whether the tap was handled.
+const routeInPlayTap = (card, zoneId, cardUser) => {
+  const route = tapRoute({
+    zoneId,
+    cardUser,
+    card,
+    hasUsableAction: zoneId === 'bench' && cardUser === 'self' && benchHasUsableAction(card),
+  });
+  if (route === 'overlay') return isCardFocusOpen() || openPokemonFocus(card, zoneId);
+  if (route === 'stack') return isStackViewOpen() || openStackFor(card, zoneId, cardUser);
+  return false;
 };
 
 export const imageClick = (event) => {
   event.stopPropagation();
+  // Attach mode on a server-drawn card (keybinds `e`/`q`): this click names the target.
+  const serverAttach = takeServerAttach(event.target);
   identifyCard(event);
+  if (serverAttach) {
+    closePopups(event);
+    const { from, targetId } = serverAttach;
+    moveCardBundle(
+      from.user,
+      systemState.initiator,
+      from.zoneId,
+      mouseClick.zoneId,
+      from.index,
+      mouseClick.cardIndex,
+      'move',
+      true,
+      null,
+      { moving: from.instanceId, target: targetId }
+    );
+    return;
+  }
 
   if (mouseClick.zoneId === 'discard') {
     // I57: `cardIndex` is a legacy zone index and is meaningless for a server-drawn card,
@@ -318,22 +350,17 @@ export const imageClick = (event) => {
     // clicks first, popping, re-popping and then tearing down the overlay before the carousel
     // replaced it. Selection of your own active is also what 008 made unreachable (its R3).
     closePopups(event); //need both because of highlights condition in the if block above
-    // D50/D53 superseded for your own Active (design 067): a single click opens the focus view.
-    // Select-to-move for the Active is drag or the right-click menu.
+    // D50/D53 superseded for in-play Pokémon (designs 067, 074): a single click opens the
+    // overlay or the stack view, as a tap does in TCG Live. Select-to-move for them is drag or the
+    // right-click menu.
     const focusCard = resolvePreviewCard(mouseClick.card, event.target);
-    if (
-      shouldOpenCardFocus({
-        zoneId: mouseClick.zoneId,
-        cardUser: mouseClick.cardUser,
-        card: focusCard,
-      }) &&
-      (isCardFocusOpen() || openOwnActiveFocus(focusCard))
-    ) {
+    if (routeInPlayTap(focusCard, mouseClick.zoneId, mouseClick.cardUser)) return;
+    // Select-to-move resolves a legacy card through its zone array; a server-drawn card
+    // (never in those arrays) is selected through the authoritative registry.
+    if (!mouseClick.card?.image) {
+      selectServerCard();
       return;
     }
-    // Select-to-move resolves the card through the legacy zone arrays, which a
-    // server-authoritative game never populates — nothing to select there.
-    if (!mouseClick.card?.image) return;
     mouseClick.card.image.classList.add('highlight');
     mouseClick.selectingCard = true;
   }
@@ -361,150 +388,57 @@ export const doubleClick = (event) => {
     });
     return;
   }
-  // The second click of a double-click on your own Active: open (or keep) the same focus view.
-  if (
-    shouldOpenCardFocus({
-      zoneId: mouseClick.zoneId,
-      cardUser: mouseClick.cardUser,
-      card,
-    }) &&
-    (isCardFocusOpen() || openOwnActiveFocus(card))
-  ) {
-    return;
-  }
+  // The second click of a double-click on an in-play Pokémon: open (or keep) what the tap opened.
+  if (routeInPlayTap(card, mouseClick.zoneId, mouseClick.cardUser)) return;
   const targetImage = card.image;
   targetImage.classList.remove('highlight');
-  // Zones routed to the dismissible zoom path. The raw #fullImage branch below
-  // is a trap: it appends the overlay to the top document with no z-index, so
-  // the z-index-2 playmat iframes bury the enlarged card and swallow its own
-  // click-to-close, and closePopups() never removes it — it sticks over the
-  // board. `board` (free-play mat area: played Trainers, manually moved cards)
-  // was missing from this list and hit exactly that. Prizes was pulled out to a
-  // viewer above for the same reason.
-  if (isDoubleClickZoomZone(mouseClick.zoneId)) {
-    closeCardPreview(null, true);
-    const host = fullViewHost(targetImage);
-    if (!host?.classList.contains('full-view')) {
-      // Attached Energy is rendered on the mat as a small round token (attach-card.js swaps
-      // image.src to the icon and stashes the full card art in dataset.energyCardSrc) — show
-      // the real card art in the carousel slide, then revert automatically since we never touch
-      // the board's own <img>, just a read-only stand-in object here.
-      // Carousel slide N sits to the right of slide N+1 (higher index = further left, see
-      // computeSlideLayout's `virtualIndex - slideIndex`), so the attached cards go BEFORE the
-      // main card in the array to land on its right, with initialIndex on the main card's slot.
-      const attachedSlides = attachedSlidesOf(card);
+  // Every zone zooms through the dismissible floating preview, the attached-card carousel or the
+  // Stadium/own-board inspector. Prizes opens its viewer above.
+  closeCardPreview(null, true);
+  const host = fullViewHost(targetImage);
+  if (!host?.classList.contains('full-view')) {
+    // Attached Energy is rendered on the mat as a small round token (attach-card.js swaps
+    // image.src to the icon and stashes the full card art in dataset.energyCardSrc) — show
+    // the real card art in the carousel slide, then revert automatically since we never touch
+    // the board's own <img>, just a read-only stand-in object here.
+    // Carousel slide N sits to the right of slide N+1 (higher index = further left, see
+    // computeSlideLayout's `virtualIndex - slideIndex`), so the attached cards go BEFORE the
+    // main card in the array to land on its right, with initialIndex on the main card's slot.
+    const attachedSlides = attachedSlidesOf(card);
 
-      // Design 018: the shared in-play Stadium opens the same module — the effect text as a
-      // content-sized panel, clicked to run the Stadium effect. It has no cardUser (`#stadium`
-      // is neutral), so route on the zone alone; the actor is the local player, exactly the user
-      // the sidebox Stadium button passes. `getContext` reads live flags so the panel's Use
-      // affordance tracks turn/once-per-turn state.
-      if (mouseClick.zoneId === 'stadium') {
-        const user = systemState.initiator;
-        openCardInspector({
-          card,
-          attachedSlides,
-          zone: 'stadium',
-          getContext: () =>
-            stadiumContextFor({
-              rulesEnabled: Boolean(rulesState.enabled),
-              yourTurn: rulesState.turnPlayer === user,
-              usedThisTurn: stadiumUsed(user),
-              flags: rulesState.flags?.[user] || {},
-            }),
-          onUse: () => {
-            closeCardInspector();
-            stadiumEffect(user);
-          },
-        });
-        return;
-      }
-
-      // D50 (design 013): your own board Pokémon open the inspector — the enlarged scan with the
-      // TCG Live readout over it, attached cards as further slides, a payable attack fired by
-      // clicking its panel, and the ability fired by clicking its own. Opponent's Pokémon and
-      // hand cards keep the plain scan: payability and actions are not theirs to show. (The
-      // shared Stadium is handled above, design 018.)
-      if (
-        ['active', 'bench'].includes(mouseClick.zoneId) &&
-        mouseClick.cardUser === 'self'
-      ) {
-        openCardInspector({
-          card,
-          attachedSlides,
-          zone: mouseClick.zoneId,
-          onAttack: (index) => {
-            closeCardInspector();
-            attack(rulesState.turnPlayer, true, index);
-          },
-          onRetreat: () => {
-            closeCardInspector();
-            retreat(systemState.initiator);
-          },
-        });
-        return;
-      }
-
-      // Card carries energies/tools: same zoom, but the attached cards ride along as further
-      // carousel slides (PTCG Live-style, like the discard pile viewer) — scroll/swipe right to
-      // see them, left to return to the main card. Read-only: dragging one out means closing first.
-      if (attachedSlides.length) {
-        openCarouselViewer({
-          title: card.name || 'Attached Cards',
-          candidates: [...orderAttachedForCarousel(attachedSlides), card],
-          initialIndex: attachedSlides.length,
-        });
-      } else {
-        openCardPreview(targetImage, card);
-      }
+    // Design 018: the shared in-play Stadium opens the same module — the effect text as a
+    // content-sized panel, clicked to run the Stadium effect. It has no cardUser (`#stadium`
+    // is neutral), so route on the zone alone; the actor is the local player, exactly the user
+    // the sidebox Stadium button passes. `getContext` reads live flags so the panel's Use
+    // affordance tracks turn/once-per-turn state.
+    if (mouseClick.zoneId === 'stadium') {
+      const user = systemState.initiator;
+      openCardInspector({
+        card,
+        attachedSlides,
+        zone: 'stadium',
+        getContext: () =>
+          stadiumContextFor({
+            rulesEnabled: Boolean(rulesState.enabled),
+            yourTurn: rulesState.turnPlayer === user,
+            usedThisTurn: stadiumUsed(user),
+            flags: rulesState.flags?.[user] || {},
+          }),
+        onUse: () => {
+          closeCardInspector();
+          stadiumEffect(user);
+        },
+      });
+      return;
     }
-  } else {
-    let overlay = document.createElement('div');
-    overlay.id = 'fullImage';
-    overlay.style.position = 'fixed';
-    overlay.style.top = '0';
-    overlay.style.left = '0';
-    overlay.style.width = '100%';
-    overlay.style.height = '100%';
-    overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.5)'; // Semi-transparent
 
-    // Create a new image element
-    let display = document.createElement('img');
-    display.src = targetImage.src;
-    display.alt = targetImage.alt;
-    display.style.position = 'absolute';
-    display.style.top = '50%';
-    display.style.left = '50%';
-    display.style.transform = 'translate(-50%, -50%)'; // Center the image
-    display.style.maxWidth = '90%'; // Keep the image within the viewport
-    display.style.maxHeight = '90%';
-    display.style.borderRadius = '1rem';
-
-    // Append the image to the overlay
-    overlay.appendChild(display);
-
-    // Append the overlay to the body
-    document.body.appendChild(overlay);
-
-    const removeOverlay = () => {
-      if (overlay) {
-        document.body.removeChild(overlay);
-        overlay = null; // Set overlay to null to indicate it's no longer present
-      }
-    };
-    overlay.addEventListener('click', () => removeOverlay());
-    // Listen for the escape key press
-    const documentArray = [
-      selfContainerDocument,
-      oppContainerDocument,
-      document,
-    ];
-    documentArray.forEach((document) =>
-      document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' || event.key === 'v') {
-          removeOverlay();
-        }
-      })
-    );
+    // Card carries energies/tools: same zoom, but the attached cards ride along as further
+    // carousel slides (PTCG Live-style, like the discard pile viewer) — scroll/swipe right to
+    // see them, left to return to the main card. Read-only: dragging one out means closing first.
+    if (attachedSlides.length) {
+      openAttachedCardsCarousel(card);
+    } else {
+      openCardPreview(targetImage, card);
+    }
   }
 };

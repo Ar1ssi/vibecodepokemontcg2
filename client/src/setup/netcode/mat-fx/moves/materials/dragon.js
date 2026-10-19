@@ -4,10 +4,14 @@
 // pink at the heart of a violet flame. `jag` makes it a dragon scale: an angular shard with
 // the same three passes. The round unit is a dragon orb, a violet sphere with a two-strand
 // helix churning inside it; a projectile is the orb trailing flame tongues (a meteor when it
-// falls from the sky). Palette #5A47C9 #8F7CF5 #D2C8FF, deep #2A1F6B, accent #FF9B3D; grain
+// falls from the sky). Palette #8034CE #E25CD6 #FFB8F0, deep #34166E (design 075 parity; was #5A47C9 #8F7CF5 #D2C8FF), accent #FF9B3D; grain
 // 0.25. Every call draws on the context it is handed and is otherwise pure.
 import { rgbCss } from '../../fx-colors.mjs';
-import { grainPass, shardOutline, sphere, traceOutline, tongueOutline, wobble } from './_shared.js';
+import { grainPass, shardOutline, sphere, styledKit, tongueOutline, traceOutline, wobble } from './_shared.js';
+
+// Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
+// Draconic energy: tongues crawl with current, the core boils.
+const DRACONIC = Object.freeze({ byKind: { linear: { id: 'energy', streak: 0.4, speed: 1.6, gain: 0.6 }, radial: { id: 'orb', boil: 0.4, limb: 0.35, gain: 0.8 }, stroke: { id: 'energy', streak: 0.4, speed: 1.6, gain: 0.6 } } });
 
 const TAU = Math.PI * 2;
 const HELIX_SAMPLES = 10;
@@ -19,11 +23,13 @@ const HELIX_HZ = 0.6;
 const HELIX_MIN_R = 3;
 const TRAIL_SPREAD = 70;
 
+// Design 075 parity: Scarlet/Violet's dragon moves run violet to magenta-pink; the old blue-violet
+// with a near-white core bloomed white in the 3D board.
 const PALETTE = Object.freeze({
-  deep: Object.freeze([42, 31, 107]),
-  body: Object.freeze([90, 71, 201]),
-  hot: Object.freeze([143, 124, 245]),
-  core: Object.freeze([210, 200, 255]),
+  deep: Object.freeze([52, 22, 110]),
+  body: Object.freeze([128, 52, 206]),
+  hot: Object.freeze([226, 92, 214]),
+  core: Object.freeze([255, 184, 240]),
   white: Object.freeze([255, 255, 255]),
   ember: Object.freeze([255, 155, 61]),
 });
@@ -155,4 +161,4 @@ function dragonKit(palette) {
   });
 }
 
-export const dragon = dragonKit(PALETTE);
+export const dragon = styledKit(dragonKit(PALETTE), DRACONIC);

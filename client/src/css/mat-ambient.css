@@ -1,14 +1,13 @@
-/* Design 022 slice 5: board ambience. Imported by self-containers.css and
-   opp-containers.css (the cards live in the playmat iframes, so mat-fx.css in
-   the parent page never reaches them). Keyframes/classes are `fx-` prefixed.
+/* Design 022 slice 5: board ambience. No page imports this sheet since the playmat iframes
+   went (design 074 G3); the 3D board draws these looks itself (board3d/), and the sheet stays
+   as the source of the constants it mirrors. Keyframes/classes are `fx-` prefixed.
    `@import` order: after holo/base.css so the tilt rule wins the tie with
    base.css's `.mat-holo .card__rotator { transform: none }`. */
 
 /* ── Active breathing glow ────────────────────────────────────────────
    Zero-specificity (`:where`) so any real ring — `.highlight`,
    `.selectHighlight`, `.has-usable-ability` — and the `body.mat-active`
-   `!important` resets still win. The far side overrides the colour triplet in
-   opp-containers.css. */
+   `!important` resets still win. */
 :root {
   --fx-active-glow: 120, 160, 255;
 }
@@ -38,11 +37,19 @@
 
 /* ── Holo mat tilt ────────────────────────────────────────────────────
    base.css pins the rotator flat on the board. mat-tilt.mjs writes small
-   --fx-tilt-x/y angles from the pointer over the real <img>; the rotator stays
-   pointer-events:none so the <img> remains the sole hit target. */
+   --fx-tilt-x/y angles from the pointer over the untilted .mat-holo wrapper
+   (never the <img> inside this rotator: see mat-tilt.mjs). */
 .mat-holo .card__rotator {
   transform: rotateY(var(--fx-tilt-x, 0deg)) rotateX(var(--fx-tilt-y, 0deg));
   transition: transform 0.12s ease-out;
+}
+/* Bench cards never tilt, so drop the 3D context: any 3D transform makes the
+   browser rasterize the card once and resample it, blurring the printed text. */
+#bench .mat-holo :where(.card, .card__rotator, .fx-tera-crystal__layer, .fx-tera-crystal__aura) {
+  transform: none;
+  transform-style: flat;
+  transition: none;
+  will-change: auto;
 }
 
 /* ── Design 037: Tera crystal skin ────────────────────────────────────
@@ -194,8 +201,7 @@
 /* ── Design 024 slice 5: the kill switch reaches the mats ─────────────────
    Design 022 noted that idle motion here could not see the parent page's
    `body.fx-off`, so "effects off" left the board breathing and tilting.
-   fx-settings.js now mirrors the marker classes onto each iframe's <html>,
-   which is what these rules read. */
+   fx-settings.js mirrors the marker classes onto the <html> these rules read. */
 
 :root.fx-off :where(#active:has(> img, > .mat-holo)),
 :root.fx-reduced :where(#active:has(> img, > .mat-holo)) {

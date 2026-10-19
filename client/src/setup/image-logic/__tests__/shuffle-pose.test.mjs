@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { FLIP_180_MATRIX, IDENTITY_MATRIX, mapIframeLocalToViewport } from '../iframe-rect.mjs';
 import {
   rectCenter,
   shuffleCardPose,
@@ -10,13 +9,12 @@ import {
   visualCardCount,
 } from '../shuffle-pose.mjs';
 
-const selfFrame = { left: 0, top: 400, width: 800, height: 400 };
-const oppFrame = { left: 0, top: 0, width: 800, height: 400 };
-const deckLocal = { left: 720, top: 32, width: 72, height: 112 };
 const boardRect = { left: 0, top: 0, width: 800, height: 800 };
 
-const p1Deck = mapIframeLocalToViewport(deckLocal, selfFrame, IDENTITY_MATRIX);
-const p2Deck = mapIframeLocalToViewport(deckLocal, oppFrame, FLIP_180_MATRIX);
+// A deck cover on each seat's page rect: the near seat's bottom-right, the far seat's (turned
+// 180°) top-left.
+const p1Deck = { left: 720, top: 432, width: 72, height: 112 };
+const p2Deck = { left: 8, top: 256, width: 72, height: 112 };
 
 test('shuffleSpread is stacked at the ends and open in the middle', () => {
   assert.equal(shuffleSpread(0), 0);

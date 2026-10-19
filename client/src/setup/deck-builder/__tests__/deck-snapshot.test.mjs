@@ -4,7 +4,10 @@ import assert from 'node:assert/strict';
 import {
   createDeckInLibrary,
   createEmptyLibrary,
+  parseLibrary,
   saveDeckSnapshot,
+  serializeLibrary,
+  setDeckBox,
 } from '../core/deck-library.mjs';
 
 const CARDS = {
@@ -192,4 +195,39 @@ test('an unusable sprite slug is dropped rather than saved onto the deck', () =>
     2000
   ).library.decks[deckId];
   assert.deepEqual(deck.sprites, [{ slug: 'mew', shiny: false }]);
+});
+
+test('a deck box survives a save that creates the deck', () => {
+  const result = saveDeckSnapshot(
+    createEmptyLibrary(),
+    { deckId: null, name: 'Boxed', cards: CARDS, deckBoxId: 'db_151_sv3-5_etb' },
+    3000
+  );
+  assert.equal(result.library.decks[result.deckId].deckBoxId, 'db_151_sv3-5_etb');
+});
+
+test('a snapshot without deckBoxId leaves the deck box; an explicit null clears it', () => {
+  const { library, deckId } = libraryWithDeck({ deckBoxId: 'db_arceus_swsh9_etb' });
+  const kept = saveDeckSnapshot(library, { deckId, cards: CARDS }, 2000).library.decks[deckId];
+  assert.equal(kept.deckBoxId, 'db_arceus_swsh9_etb');
+  const cleared = saveDeckSnapshot(library, { deckId, cards: CARDS, deckBoxId: null }, 2000).library
+    .decks[deckId];
+  assert.equal(cleared.deckBoxId, null);
+});
+
+test('setDeckBox writes the id, null clears it, and an unknown deck changes nothing', () => {
+  const { library, deckId } = libraryWithDeck();
+  assert.equal(library.decks[deckId].deckBoxId, null);
+  const boxed = setDeckBox(library, deckId, 'db_30thcelebration_me5-5_etb');
+  assert.equal(boxed.decks[deckId].deckBoxId, 'db_30thcelebration_me5-5_etb');
+  assert.equal(setDeckBox(boxed, deckId, null).decks[deckId].deckBoxId, null);
+  assert.deepEqual(setDeckBox(library, 'nope', 'db_x'), library);
+});
+
+test('a library record saved before deck boxes loads and has no deck box', () => {
+  const { library, deckId } = libraryWithDeck();
+  delete library.decks[deckId].deckBoxId;
+  const loaded = parseLibrary(serializeLibrary(library));
+  assert.equal(loaded.decks[deckId].deckBoxId ?? null, null);
+  assert.equal(loaded.decks[deckId].name, 'My Deck');
 });

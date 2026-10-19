@@ -1,19 +1,20 @@
+// env: BASE_URL (default http://localhost:4100),
+//      CHROMIUM / CHROMIUM_PATH, CARD_DIR (a folder of PNGs named like the card images, for no network)
 import { chromium } from 'playwright';
 import { renameSync } from 'node:fs';
+import { launchOptions, openBoard } from '../board-mode.mjs';
+const { BASE_URL = 'http://localhost:4100' } = process.env;
 const FROM = 'https://images.pokemontcg.io/sv3pt5/4_hires.png';
 const TO = 'https://images.pokemontcg.io/sv3pt5/5_hires.png';
-const browser = await chromium.launch();
+const browser = await chromium.launch(launchOptions());
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, recordVideo: { dir: '.agent/scratch/vid', size: { width: 1280, height: 720 } } });
 const page = await ctx.newPage();
 await page.route('https://static.cloudflareinsights.com/**', (r) => r.abort());
 page.on('pageerror', (e) => console.log('pageerror', e.message));
-await page.goto('http://localhost:4100/?e2e=1');
-await page.waitForFunction(() => window.__ptcg?.ready === true, null, { timeout: 30000 });
-await page.waitForTimeout(800);
+await openBoard(page, BASE_URL);
 await page.evaluate(async ([from, to]) => {
-  const { visualRectOf } = await import('/src/setup/image-logic/iframe-rect.mjs');
   const { playEvolveScene } = await import('/src/setup/netcode/mat-fx/evolve-scene.js');
-  const zone = visualRectOf(document.getElementById('selfContainer').contentDocument.getElementById('active'));
+  const zone = await window.__fxBoard.zoneRect('self', 'active');
   const h = Math.min(zone.height * 0.9, 150), w = h * 0.716;
   const rect = { left: zone.left + (zone.width - w) / 2, top: zone.top + (zone.height - h) / 2, width: w, height: h };
   const img = document.createElement('img');

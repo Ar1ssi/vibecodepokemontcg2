@@ -1,18 +1,25 @@
 /**
  * @file Card focus (design 067) — the TCG Live Active-card popup, the DOM half.
  *
- * Clicking your own Active lifts the card in perspective from its slot to a fixed pose, dims the
- * board, drops the hand, and opens the 013 inspector's attack/ability/Retreat panels on the card.
+ * Clicking your own Active lifts the card in perspective from its slot to a fixed pose, covers the
+ * board (TableCoverPanel), drops the hand, and opens the inspector's TCG Live option rows on the card.
+ * The HUD is AttackOverlayHUD's (design 074): Buff / Debuff (the status popup), Stack, Close.
  * Pose, timings and curves are TCG Live's own (card-focus-geometry.mjs). The card is a
  * `buildSlideContent` holo wrapper decorated by the inspector, so payability, affordances and
  * live re-rendering are the inspector's, unchanged.
  *
  * The stage is a CSS perspective container (FOV 20°, as the game's camera). The card is never
  * faded or filtered: opacity or a filter would flatten its preserve-3d tilt (013 C2).
+ *
+ * On the 3D board (design 074 H2) the card face is the card's own mesh: `scene.lift` flies it from
+ * its slot to the focus rect and holds it there, square-on, until the close flies it back. The HTML
+ * host keeps its box and the inspector chrome rides on it, but its card art is not shown. A card
+ * the scene does not draw keeps the HTML card and its flight.
  */
 
 import { uiCue } from '../netcode/mat-fx/ui-cue.mjs';
 import { selfContainerDocument } from '../../state.js';
+import { getBoardScene } from '../board3d/board3d.js';
 import { buildSlideContent } from '../image-logic/card-picker.js';
 import { viewportRectOf } from '../image-logic/card-pop.mjs';
 import {
@@ -41,6 +48,9 @@ import {
   focusRect,
   perspectiveFor,
 } from './card-focus-geometry.mjs';
+import { suppressHoverPreview } from '../image-logic/hover-preview-bus.mjs';
+import { flightEase, focusMeshId, focusMeshPose, reversed } from './card-focus-mesh.mjs';
+import { closeStatusPopup, openStatusPopup } from './status-popup.mjs';
 
 const HAND_LOWERED_CLASS = 'hand-lowered';
 const CLOSE_EVENTS = ['rules-turn-began', 'rules-session-reset'];
@@ -58,6 +68,7 @@ const LIFT_SHADOW_TO = '0 3.2vh 6.4vh rgba(0, 0, 0, 0.62)';
 const REVEAL_START = `${COLLAPSED_FRACTION * 100}%`;
 const REVEAL_END = '100%';
 const REVEALING_CLASS = 'card-focus__card--revealing';
+const MESH_CLASS = 'card-focus--mesh';
 
 /** @type {null | object} */
 let focusState = null;
@@ -99,14 +110,20 @@ const applyPose = (state, rect) => {
   state.root.style.setProperty('--focus-h', `${rect.height}px`);
 };
 
+// The self iframe's root element, or the board mirror's shadow host (design 074 D4), where the
+// 3D scene also drops its near hand.
 const lowerHand = (state) => {
-  const doc = selfContainerDocument?.documentElement ?? null;
+  const doc = selfContainerDocument?.documentElement ?? selfContainerDocument?.host ?? null;
   if (!doc) return;
   doc.classList.add(HAND_LOWERED_CLASS);
   state.handDoc = doc;
+  getBoardScene()?.setHandPose('lowered');
 };
 
-const raiseHand = (state) => state.handDoc?.classList.remove(HAND_LOWERED_CLASS);
+const raiseHand = (state) => {
+  state.handDoc?.classList.remove(HAND_LOWERED_CLASS);
+  getBoardScene()?.setHandPose('normal');
+};
 
 const hideSource = (state) => {
   const target = state.sourceImg.closest?.('.mat-holo') ?? state.sourceImg;
@@ -120,22 +137,20 @@ const restoreSource = (state) => {
   state.hidden = null;
 };
 
-const HUD_ICONS = {
-  close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg>',
-  // Cards with a magnifier over them: the game's "stack view" button.
-  stack:
-    '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3" width="10" height="14" rx="1.6"/><circle cx="14.5" cy="14.5" r="4.2"/><path d="M17.6 17.6l3.2 3.2"/></svg>',
-};
-
-const hudButton = (className, label, icon, onClick) => {
-  const button = el('button', className);
+// One HUD button: shadow, the raised face and its icon (card-focus.css draws the sprites).
+const hudButton = (className, label, onClick, { enabled = true, filled = false } = {}) => {
+  const button = el('button', `card-focus__btn ${className}`);
   button.type = 'button';
   button.setAttribute('aria-label', label);
   button.title = label;
-  button.innerHTML = icon;
+  button.disabled = !enabled;
+  const face = el('span', 'card-focus__btn-face');
+  face.appendChild(el('span', 'card-focus__btn-icon'));
+  if (filled) face.appendChild(el('span', 'card-focus__btn-fill'));
+  button.appendChild(face);
   button.addEventListener('click', (event) => {
     event.stopPropagation();
-    onClick();
+    if (!button.disabled) onClick();
   });
   return button;
 };
@@ -149,13 +164,23 @@ const startOpenAnimations = (state, from, to) => {
     from.width > 0 && from.height > 0
       ? transformString(flightTransform(from, to, { tiltDeg: DEFAULT_TILT_DEG }))
       : 'scale(0.85)';
+  // The mesh casts its own shadow; the host's would frame an empty box.
   state.flight = host.animate(
-    [
-      { transform: fromStart, boxShadow: LIFT_SHADOW_FROM },
-      { transform: 'none', boxShadow: LIFT_SHADOW_TO },
-    ],
+    state.meshId === null
+      ? [
+          { transform: fromStart, boxShadow: LIFT_SHADOW_FROM },
+          { transform: 'none', boxShadow: LIFT_SHADOW_TO },
+        ]
+      : [{ transform: fromStart }, { transform: 'none' }],
     { duration: FLIGHT_MS, easing: FLIGHT_EASE, fill: 'both' }
   );
+  if (state.meshId !== null) {
+    getBoardScene()?.lift(state.meshId, {
+      ...focusMeshPose(to, getBoardScene()),
+      ms: FLIGHT_MS,
+      ease: flightEase,
+    });
+  }
   host.classList.add(REVEALING_CLASS);
   state.reveal = host.animate(
     { '--focus-reveal': [REVEAL_START, REVEAL_END] },
@@ -173,18 +198,39 @@ const startOpenAnimations = (state, from, to) => {
   state.opened = true;
 };
 
-// Stack above, Close at the bottom of the column (the game's order).
-const buildHud = ({ attachedCount, onClose, onStack }) => {
+/**
+ * AttackOverlayHUD: Buff and Debuff (both ShowAllStatusesInPopup; each interactable, and its coloured
+ * arrow lit, only while the card has such effects), then Stack, then Close at the bottom.
+ */
+const buildHud = ({ statuses, onStatus, onClose, onStack }) => {
   const hud = el('div', 'card-focus__hud');
-  if (attachedCount > 0 && onStack) {
-    const stack = hudButton('card-focus__stack', 'Attached cards', HUD_ICONS.stack, onStack);
-    const count = el('span', 'card-focus__stack-count');
-    count.textContent = String(attachedCount);
-    stack.appendChild(count);
-    hud.appendChild(stack);
+  if (statuses) {
+    const hasBuffs = statuses.positive.length > 0;
+    const hasDebuffs = statuses.negative.length > 0;
+    hud.appendChild(
+      hudButton('card-focus__btn--buff', 'Positive effects', onStatus, {
+        enabled: hasBuffs,
+        filled: hasBuffs,
+      })
+    );
+    hud.appendChild(
+      hudButton('card-focus__btn--debuff', 'Negative effects', onStatus, {
+        enabled: hasDebuffs,
+        filled: hasDebuffs,
+      })
+    );
   }
-  hud.appendChild(hudButton('card-focus__close', 'Close', HUD_ICONS.close, onClose));
+  if (onStack) hud.appendChild(hudButton('card-focus__stack', 'Stack view', onStack));
+  hud.appendChild(hudButton('card-focus__close', 'Close', onClose));
   return hud;
+};
+
+const buildCover = () => {
+  const backdrop = el('div', 'card-focus__backdrop');
+  for (const part of ['top', 'middle', 'bottom']) {
+    backdrop.appendChild(el('div', `card-focus__cover card-focus__cover--${part}`));
+  }
+  return backdrop;
 };
 
 // The attached Energy as big tokens under the card, like the game draws it. Anything that is not an
@@ -220,6 +266,11 @@ const onResize = () => {
   state.to = rect;
   state.stage.style.perspective = `${perspectiveFor(viewport.height)}px`;
   applyPose(state, rect);
+  // Re-fit the lifted card to the new rect: no flight.
+  const scene = getBoardScene();
+  if (state.meshId !== null && state.opened && scene) {
+    scene.lift(state.meshId, { ...focusMeshPose(rect, scene), ms: 0 });
+  }
 };
 
 const watchForPickers = () => {
@@ -245,21 +296,23 @@ const watchForPickers = () => {
  * @param {object} options
  * @param {object} options.card a preview card with `.image`
  * @param {'active'|'bench'} [options.zone]
- * @param {number} [options.attachedCount] shows the Stack button when > 0
+ * @param {{ positive: object[], negative: object[] }|null} [options.statuses] the card's effects
+ *   (attack-ui-model statusEffectsFor); null hides the Buff / Debuff buttons
  * @param {(index: number) => void} [options.onAttack] caller closes the focus, then fires
  * @param {() => void} [options.onAbility] defaults to the inspector's ability dispatch
  * @param {() => void} [options.onRetreat] caller closes the focus, then retreats
- * @param {() => void} [options.onOpenStack] opens the attached-cards carousel
+ * @param {() => void} [options.onOpenStack] opens the stack view; null hides the Stack button
  */
 export function openCardFocus({
   card,
   zone = 'active',
-  attachedCount = 0,
+  statuses = null,
   onAttack = null,
   onAbility,
   onRetreat = null,
   onOpenStack = null,
 } = {}) {
+  suppressHoverPreview('modal');
   if (focusState) return false;
   const sourceImg = card?.image;
   if (!sourceImg?.isConnected) return false;
@@ -276,6 +329,8 @@ export function openCardFocus({
     closing: false,
     opened: false,
     openedAt: performance.now(),
+    // The card's mesh stands for its face when the 3D board draws it (design 074 H2).
+    meshId: focusMeshId(getBoardScene(), sourceImg),
   };
   focusState = state;
 
@@ -292,10 +347,14 @@ export function openCardFocus({
     });
 
     state.root = el('div', 'card-focus');
-    const backdrop = el('div', 'card-focus__backdrop');
+    const backdrop = buildCover();
     state.stage = el('div', 'card-focus__stage');
     state.stage.style.perspective = `${perspectiveFor(viewport.height)}px`;
     state.host = el('div', 'card-focus__card');
+    if (state.meshId !== null) {
+      state.root.classList.add(MESH_CLASS);
+      state.host.classList.add('card-focus__card--mesh');
+    }
     applyPose(state, to);
     // Hidden until the flight starts, so the card never shows at its resting pose first.
     state.host.style.visibility = 'hidden';
@@ -308,7 +367,18 @@ export function openCardFocus({
     state.stage.appendChild(state.host);
 
     const hud = buildHud({
-      attachedCount,
+      statuses,
+      // The overlay stays up under the popup; its backdrop click is off until the popup closes
+      // (AttackOverlay.ToggleBackgroundHitbox).
+      onStatus: () => {
+        if (!statuses) return;
+        state.popupOpen = openStatusPopup({
+          ...statuses,
+          onClose: () => {
+            state.popupOpen = false;
+          },
+        });
+      },
       onClose: () => closeCardFocus(),
       onStack: onOpenStack
         ? () => {
@@ -317,7 +387,9 @@ export function openCardFocus({
           }
         : null,
     });
-    state.root.append(backdrop, state.stage, hud);
+    // The dim sits above the canvas, so over the mesh too: it leaves a hole where the card stands.
+    if (state.meshId !== null) state.root.append(backdrop, el('div', 'card-focus__dim'), state.stage, hud);
+    else state.root.append(backdrop, state.stage, hud);
 
     // Capture phase, before the inspector's delegated click handler on the card: panels only see
     // clicks once the guard window has passed.
@@ -333,16 +405,16 @@ export function openCardFocus({
 
     backdrop.addEventListener('click', (event) => {
       event.stopPropagation();
-      if (isArmed(state)) closeCardFocus();
+      if (isArmed(state) && !state.popupOpen) closeCardFocus();
     });
     backdrop.addEventListener('contextmenu', (event) => {
       event.preventDefault();
-      if (isArmed(state)) closeCardFocus();
+      if (isArmed(state) && !state.popupOpen) closeCardFocus();
     });
 
     document.body.appendChild(state.root);
     lowerHand(state);
-    hideSource(state);
+    if (state.meshId === null) hideSource(state);
     state.cleanups = [
       watchForPickers(),
     ];
@@ -350,7 +422,10 @@ export function openCardFocus({
     CLOSE_EVENTS.forEach((name) =>
       document.addEventListener(name, closeImmediately)
     );
-    if (state.holoWrapper) startHoloAnimation(state.holoWrapper, MAT_HOLO_OPTIONS);
+    if (state.holoWrapper && state.meshId === null) {
+      startHoloAnimation(state.holoWrapper, MAT_HOLO_OPTIONS);
+      state.holoStarted = true;
+    }
     uiCue('big-card-in');
   } catch (error) {
     console.error('card focus failed to open', error);
@@ -381,6 +456,7 @@ const start = async (state, from) => {
 };
 
 const teardown = (state) => {
+  if (state.popupOpen) closeStatusPopup();
   releaseInspectorCard(state.inspectorWrap);
   state.cleanups?.forEach((cleanup) => cleanup());
   state.cleanups = null;
@@ -389,8 +465,9 @@ const teardown = (state) => {
     document.removeEventListener(name, closeImmediately)
   );
   raiseHand(state);
-  if (state.holoWrapper) stopHoloAnimation(state.holoWrapper);
+  if (state.holoStarted) stopHoloAnimation(state.holoWrapper);
   restoreSource(state);
+  if (state.meshId !== null) getBoardScene()?.unlift(state.meshId, { ms: 0 });
   state.root?.remove();
   if (focusState === state) focusState = null;
 };
@@ -413,6 +490,7 @@ export function closeCardFocus({ immediate = false } = {}) {
   if (!state || state.closing) return;
   state.closing = true;
   uiCue('big-card-out');
+  if (state.popupOpen) closeStatusPopup();
 
   if (immediate || !state.opened) {
     teardown(state);
@@ -457,10 +535,12 @@ export function closeCardFocus({ immediate = false } = {}) {
       : 'scale(0.85)';
     animations.push(
       state.host.animate(
-        [
-          { transform: 'none', boxShadow: LIFT_SHADOW_TO },
-          { transform: back, boxShadow: LIFT_SHADOW_FROM },
-        ],
+        state.meshId === null
+          ? [
+              { transform: 'none', boxShadow: LIFT_SHADOW_TO },
+              { transform: back, boxShadow: LIFT_SHADOW_FROM },
+            ]
+          : [{ transform: 'none' }, { transform: back }],
         {
           duration: rect ? FLIGHT_MS : collapseDurationMs(1, COLLAPSED_FRACTION),
           easing: rect ? FLIGHT_EASE : COLLAPSE_EASE,
@@ -468,6 +548,19 @@ export function closeCardFocus({ immediate = false } = {}) {
         }
       )
     );
+  }
+
+  if (state.meshId !== null) {
+    const scene = getBoardScene();
+    // Same clock as the host's flight: what is left of it when closed mid-way, else all of it.
+    const flying = state.flight.playState === 'running';
+    const ms = flying ? Number(state.flight.currentTime) || 0 : FLIGHT_MS;
+    const ease = flying ? reversed(flightEase, ms / FLIGHT_MS) : flightEase;
+    if (scene) {
+      animations.push({
+        finished: scene.unlift(state.meshId, { ms, ease }),
+      });
+    }
   }
 
   let finished = false;

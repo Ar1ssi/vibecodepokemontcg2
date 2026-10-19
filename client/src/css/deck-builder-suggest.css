@@ -1,0 +1,280 @@
+/* Suggest tab (design 069). Scoped under .db-live like the rest of the builder (D95); colours come
+   from the theme tokens in deck-builder-live.css, so the light theme follows automatically. */
+
+.db-live .native-deck-builder-suggest {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 14px 16px;
+  color: var(--db-text);
+}
+
+.db-live .db-suggest {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.db-live .db-suggest-goals {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.db-live .db-suggest-goals-label {
+  font-size: 12px;
+  color: var(--db-text-dim);
+  margin-right: 2px;
+}
+
+.db-live .db-suggest-goal {
+  border: 1px solid var(--db-border-strong);
+  background: var(--db-panel-2);
+  color: var(--db-text);
+  border-radius: var(--db-radius-pill);
+  padding: 4px 11px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.db-live .db-suggest-goal:hover {
+  border-color: var(--db-indigo);
+}
+
+.db-live .db-suggest-goal.active {
+  background: var(--db-indigo);
+  border-color: var(--db-indigo);
+  color: #fff;
+}
+
+.db-live .db-suggest-head {
+  margin: 0;
+  font-size: 13px;
+  color: var(--db-text);
+}
+
+.db-live .db-suggest-banner {
+  margin: 0;
+  padding: 7px 10px;
+  border-radius: var(--db-radius-sm);
+  border: 1px solid var(--db-gold-dark);
+  background: color-mix(in srgb, var(--db-gold) 14%, transparent);
+  font-size: 12px;
+}
+
+.db-live .db-suggest-status {
+  margin: 0;
+  min-height: 1em;
+  font-size: 12px;
+  color: var(--db-text-dim);
+}
+
+.db-live .db-suggest-section {
+  background: var(--db-panel);
+  border: 1px solid var(--db-border);
+  border-radius: var(--db-radius);
+  padding: 8px 10px 4px;
+}
+
+.db-live .db-suggest-section-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.db-live .db-suggest-count {
+  font-weight: 400;
+  color: var(--db-text-faint);
+  margin-left: 4px;
+}
+
+.db-live .db-suggest-blurb {
+  margin: 2px 0 6px;
+  font-size: 11px;
+  color: var(--db-text-dim);
+}
+
+.db-live .db-suggest-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.db-live .db-suggest-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-top: 1px solid var(--db-border);
+}
+
+.db-live .db-suggest-row:first-child {
+  border-top: 0;
+}
+
+.db-live .db-suggest-thumb {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 56px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--db-input);
+  cursor: zoom-in;
+}
+
+.db-live .db-suggest-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.db-live .db-suggest-thumb-empty {
+  cursor: default;
+  border: 1px dashed var(--db-border-strong);
+}
+
+.db-live .db-suggest-info {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.db-live .db-suggest-name {
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.db-live .db-suggest-evidence {
+  font-size: 11px;
+  color: var(--db-text-dim);
+  margin-top: 2px;
+}
+
+.db-live .db-suggest-badge {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: var(--db-radius-pill);
+  background: var(--db-raised);
+  border: 1px solid var(--db-border);
+  color: var(--db-text-dim);
+}
+
+.db-live .db-suggest-badge-lock {
+  border-color: var(--db-gold-dark);
+  color: var(--db-gold);
+}
+
+.db-live .db-suggest-price {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--db-green);
+}
+
+.db-live .db-suggest-actions {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 6px;
+}
+
+.db-live .db-suggest-btn {
+  border: 1px solid var(--db-border-strong);
+  background: var(--db-raised);
+  color: var(--db-text);
+  border-radius: var(--db-radius-sm);
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.db-live .db-suggest-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.db-live .db-suggest-btn-primary {
+  background: var(--db-indigo);
+  border-color: var(--db-indigo-dark);
+  color: #fff;
+}
+
+.db-live .db-suggest-btn-quiet {
+  background: transparent;
+  color: var(--db-text-dim);
+}
+
+.db-live .db-suggest-share {
+  height: 4px;
+  margin-top: 4px;
+  border-radius: 2px;
+  background: var(--db-input);
+  overflow: hidden;
+}
+
+.db-live .db-suggest-share span {
+  display: block;
+  height: 100%;
+  background: var(--db-indigo);
+}
+
+.db-live .db-suggest-fold {
+  font-size: 12px;
+}
+
+.db-live .db-suggest-fold summary {
+  cursor: pointer;
+  color: var(--db-text-dim);
+}
+
+.db-live .db-suggest-core,
+.db-live .db-suggest-dismissed {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.db-live .db-suggest-lock {
+  border: 1px solid var(--db-border);
+  background: var(--db-panel-2);
+  color: var(--db-text);
+  border-radius: var(--db-radius-pill);
+  padding: 3px 9px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.db-live .db-suggest-lock.active {
+  border-color: var(--db-gold-dark);
+  color: var(--db-gold);
+}
+
+.db-live .db-suggest-steering {
+  font-size: 12px;
+  color: var(--db-text-dim);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.db-live .db-suggest-empty {
+  margin: 4px 0;
+  font-size: 13px;
+  color: var(--db-text-dim);
+}
+
+.db-live .db-suggest-footer {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--db-text-faint);
+}

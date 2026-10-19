@@ -28,7 +28,7 @@ const CARA_LISS_TEXT =
 
 let nextId = 100;
 const card = (props) => createCard({ instanceId: nextId++, ...props });
-// Deck rows arrive with type 'Trainer' (shadow.mjs / loadDeck), not just a supertype.
+// Deck rows arrive with type 'Trainer' (reduce.mjs loadDeck), not just a supertype.
 const fossilItem = (name, text, props = {}) =>
   card({ name, type: 'Trainer', supertype: 'Trainer', trainerType: 'Item', text, ...props });
 const pokemon = (name, props = {}) => card({ name, supertype: 'Pokémon', type: 'Pokémon', stage: 'Basic', hp: 100, ...props });

@@ -7,7 +7,6 @@ import {
   EVOLVE_TIMELINE,
   buildEvolveScene,
   evolveOps,
-  turnOfMatrix,
 } from '../evolve-scene.mjs';
 import { CARD_UNITS } from '../tcgl-fx.mjs';
 import { HOLD_MS } from '../fx-holds.mjs';
@@ -119,15 +118,6 @@ test('every layer stays local: the whole effect fits the stage (its rim fades th
       assert.ok(size <= stageUnits * 1.2, `${op.kind} ${op.tex || op.noise} is ${size} units at ${t.toFixed(2)}`);
     }
   }
-});
-
-test('turnOfMatrix: the opponent frame turns 180°, identity and mirrors do not turn', () => {
-  assert.equal(turnOfMatrix({ a: 1, b: 0, c: 0, d: 1 }), 0);
-  assert.equal(turnOfMatrix({ a: -1, b: 0, c: 0, d: -1 }), 180);
-  assert.equal(turnOfMatrix({ a: 0, b: 1, c: -1, d: 0 }), 90);
-  assert.equal(turnOfMatrix({ a: -1, b: 0, c: 0, d: 1 }), 0, 'a mirror is not a turn');
-  assert.equal(turnOfMatrix(null), 0);
-  assert.equal(turnOfMatrix({ a: Number.NaN }), 0);
 });
 
 test('the evolve-scene hold lands the next effect after the pop, inside the queue budget', () => {

@@ -119,7 +119,7 @@ export const moveCardBundle = async (
   ) {
     return true;
   }
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     // This client is acting on its (possibly stale) mirror of the
     // opponent's zone and asking the real owner to apply the move via
     // 'requestAction'. Attach the same identity hints the self→opp mirror

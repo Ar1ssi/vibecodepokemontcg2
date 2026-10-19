@@ -2012,7 +2012,8 @@
   },
   "Delinquent#if247p": {
    "steps": [
-    "discardStadium"
+    "discardStadium",
+    "opponentDiscardFromHand"
    ]
   },
   "Delivery Drone#1bc7njk": {

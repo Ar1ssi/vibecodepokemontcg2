@@ -120,6 +120,29 @@ test('a drawer that throws still restores the context state', () => {
   assert.equal(rec.target.filter, 'none');
 });
 
+test('a projectile with a flare flies the flare\'s tongues down the lane instead of the body', () => {
+  const tongues = [];
+  let bodies = 0;
+  const material = {
+    ...MATERIALS.fire,
+    tongue: (_ctx, tongue) => tongues.push(tongue),
+    projectile: () => (bodies += 1),
+  };
+  const fly = (s) => {
+    tongues.length = 0;
+    DRAWERS.projectile.draw(recordingContext().ctx, lane, s, { ...info('projectile', { flare: 'dai', size: 0.8 }), material });
+    const xs = tongues.map((t) => t.x);
+    const ys = tongues.map((t) => t.y);
+    return { count: tongues.length, x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 };
+  };
+  const early = fly(0.1);
+  const late = fly(0.95);
+  assert.equal(bodies, 0, 'no fireball body');
+  assert.equal(early.count, 15, 'a main and two side tongues per 大 arm');
+  assert.equal(tonguesAt('projectile', { flare: 'dai' }), 25);
+  assert.ok(Math.hypot(late.x - lane.bx, late.y - lane.by) < Math.hypot(early.x - lane.bx, early.y - lane.by), 'closes on the defender');
+});
+
 test('a volley from the defender flies back up the lane toward the attacker (drains)', () => {
   const firstBody = (from, s) => {
     const projectiles = [];
@@ -203,7 +226,7 @@ test('every drawer plays on the dark material; its shadow passes switch to sourc
 });
 
 test('design 065: the player resolves a beat tint and hues into materials; drawers never see them', async () => {
-  const { resolveBeatColours, tintCache } = await import('../move-player.js');
+  const { resolveBeatColours, tintCache } = await import('../beat-colours.js');
   const { MATERIALS } = await import('../materials/index.js');
   const fire = MATERIALS.fire;
   const cachedTint = tintCache();

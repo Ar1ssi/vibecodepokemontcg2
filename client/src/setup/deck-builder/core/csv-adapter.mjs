@@ -48,9 +48,9 @@ function deckCardIdentityFields(data = {}) {
   };
 }
 
-// Sleeve/coin choices ride as `#`-prefixed comment lines above the header so
+// Sleeve/coin/deck box choices ride as `#`-prefixed comment lines above the header so
 // simulator CSVs (no comment lines) and older exports parse unchanged.
-const META_LINE_PREFIXES = { sleeveId: '#SLEEVE,', coinId: '#COIN,' };
+const META_LINE_PREFIXES = { sleeveId: '#SLEEVE,', coinId: '#COIN,', deckBoxId: '#DECKBOX,' };
 
 export function serializeDeckToSimCsv(decklist = {}, meta = {}) {
   const rows = [];
@@ -77,15 +77,16 @@ export function serializeDeckToSimCsv(decklist = {}, meta = {}) {
   const metaLines = [];
   if (meta.sleeveId) metaLines.push(`${META_LINE_PREFIXES.sleeveId}${meta.sleeveId}`);
   if (meta.coinId) metaLines.push(`${META_LINE_PREFIXES.coinId}${meta.coinId}`);
+  if (meta.deckBoxId) metaLines.push(`${META_LINE_PREFIXES.deckBoxId}${meta.deckBoxId}`);
   const metaBlock = metaLines.length ? `${metaLines.join('\n')}\n` : '';
 
   return `${metaBlock}${SIM_CSV_HEADER}\n${rows.join('\n')}`;
 }
 
-// Reads the `#SLEEVE`/`#COIN` comment lines a CSV export may carry; absent on
-// simulator CSVs and pre-existing exports, where both come back null.
+// Reads the `#SLEEVE`/`#COIN`/`#DECKBOX` comment lines a CSV export may carry; absent on
+// simulator CSVs and pre-existing exports, where each comes back null.
 export function parseCsvMeta(csvData = '') {
-  const meta = { sleeveId: null, coinId: null };
+  const meta = { sleeveId: null, coinId: null, deckBoxId: null };
   const rows = String(csvData).split('\n');
 
   for (const row of rows) {
@@ -93,6 +94,8 @@ export function parseCsvMeta(csvData = '') {
       meta.sleeveId = row.slice(META_LINE_PREFIXES.sleeveId.length).trim() || null;
     } else if (row.startsWith(META_LINE_PREFIXES.coinId)) {
       meta.coinId = row.slice(META_LINE_PREFIXES.coinId.length).trim() || null;
+    } else if (row.startsWith(META_LINE_PREFIXES.deckBoxId)) {
+      meta.deckBoxId = row.slice(META_LINE_PREFIXES.deckBoxId.length).trim() || null;
     } else if (!row.startsWith('#')) {
       break;
     }

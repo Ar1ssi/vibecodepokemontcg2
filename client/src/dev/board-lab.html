@@ -1,0 +1,417 @@
+<!doctype html>
+<!-- Design 074: a bench for the three.js board scene (board-scene.js + table-mesh.js) outside the
+     game. Open /dev/board-lab (or /src/dev/board-lab.html) with the game server running.
+     ?mat=<catalog id> picks a playmat through the game's own resolution (mat-spec.mjs; default: the
+     sim board with no art), ?viewport=WxH renders at a fixed size. ?cards=N lays N fixture cards
+     (scripts/e2e's fixture deck) over both seats' Active, Bench and Trainer board through
+     boardModelFrom (every 3rd wears its TCG Live foil when the manifest has one for its id);
+     ?stack=1 adds a Basic + Stage 1 + Stage 2 with two Tools in the near Active spot; ?piles=1
+     fills both seats' piles (deck 45/12, discard 7/0, Lost Zone 3/1, six prizes with two face
+     up) and puts a Stadium played by the near seat. ?hand=N deals N different cards to the near
+     hand and ?opphand=M M face-down cards to the far hand; ?handstack=K adds K copies of one
+     printing to the near hand (one hand stack); ?hover=<index> lifts the near hand card at that
+     view index. ?overlays=1 dresses the ?cards Pokémon in turn: 30 damage + Poisoned + Burned;
+     120 + Asleep; 250 + Confused + ability used; Paralyzed + four tokens (one double); six tokens
+     (three Fire → a "3x" badge); selected; glowing (through scene.setUiState); mat pick idle;
+     mat pick picked.
+     Not linked from the game. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Board 3D lab</title>
+    <script type="importmap">{"imports":{"three":"/src/vendor/three/three.module.min.js"}}</script>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #11161c;
+        color: #dfe7ee;
+        font: 14px/1.4 system-ui, sans-serif;
+        overflow: hidden;
+      }
+      #stage {
+        position: fixed;
+        inset: 0;
+      }
+      #stage.lab--fixed {
+        inset: auto;
+        top: 0;
+        left: 0;
+      }
+      #stage canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      .lab__bar {
+        position: fixed;
+        left: 0;
+        right: 0;
+        top: 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        align-items: center;
+        padding: 8px 12px;
+        background: rgba(0, 0, 0, 0.45);
+        z-index: 2;
+      }
+      .lab__bar label {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .lab__bar output {
+        min-width: 4ch;
+        font-variant-numeric: tabular-nums;
+      }
+      #stats {
+        position: fixed;
+        right: 12px;
+        bottom: 12px;
+        margin: 0;
+        padding: 8px 10px;
+        background: rgba(0, 0, 0, 0.55);
+        border-radius: 6px;
+        font: 12px/1.4 ui-monospace, monospace;
+        z-index: 2;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="lab__bar">
+      <label>Tilt <input id="tilt" type="range" min="0" max="40" step="0.5" value="12" /><output id="tiltOut">12</output>°</label>
+      <label>Perspective <input id="perspective" type="range" min="400" max="4000" step="50" value="1400" /><output id="perspectiveOut">1400</output>px</label>
+      <label>Light <input id="light" type="range" min="0" max="4" step="0.1" value="1.4" /><output id="lightOut">1.4</output></label>
+    </div>
+    <div id="stage"><canvas id="labCanvas" aria-hidden="true"></canvas></div>
+    <pre id="stats">loading…</pre>
+    <script type="module">
+      const stats = document.getElementById('stats');
+      const showError = (message) => {
+        stats.textContent = message;
+      };
+
+      const parseViewport = (text) => {
+        const match = /^(\d+)x(\d+)$/i.exec(text || '');
+        if (!match) return null;
+        const w = Number(match[1]);
+        const h = Number(match[2]);
+        return w > 0 && h > 0 ? { w, h } : null;
+      };
+
+      async function boot() {
+        const [
+          THREE,
+          { RoomEnvironment },
+          { createRenderer },
+          { createTextureCache },
+          { createBoardScene },
+          { createSceneClock },
+          { createMatTextureLoader },
+          { flatLayout, halfFromViewport },
+          { cameraFromCssTilt },
+          { matSpecFor, isTwoPlayerMat },
+          { getMatById },
+          { getMatLayout },
+          { boardModelFrom },
+          { e2eFixtureDeck },
+          { loadFoilManifest },
+          { foilRecordFor },
+        ] = await Promise.all([
+          import('three'),
+          import('/src/vendor/three/RoomEnvironment.js'),
+          import('/src/setup/gl/gl-renderer.js'),
+          import('/src/setup/gl/gl-textures.js'),
+          import('/src/setup/board3d/board-scene.js'),
+          import('/src/setup/board3d/scene-clock.js'),
+          import('/src/setup/board3d/table-mesh.js'),
+          import('/src/setup/board3d/board-layout.mjs'),
+          import('/src/setup/board3d/board-camera.mjs'),
+          import('/src/setup/sizing/mat-spec.mjs'),
+          import('/src/setup/deck-builder/core/mats.mjs'),
+          import('/src/setup/sizing/mat-layouts.mjs'),
+          import('/src/setup/board3d/board-model.mjs'),
+          import('/src/setup/general/e2e-mode.mjs'),
+          import('/src/setup/foil/tcgl-foil-store.js'),
+          import('/src/setup/foil/tcgl-foil-manifest.mjs'),
+        ]);
+        const params = new URLSearchParams(location.search);
+        const host = document.getElementById('stage');
+        const fixedViewport = parseViewport(params.get('viewport'));
+        if (fixedViewport) {
+          host.classList.add('lab--fixed');
+          host.style.width = `${fixedViewport.w}px`;
+          host.style.height = `${fixedViewport.h}px`;
+        }
+
+        const canvas = document.getElementById('labCanvas');
+        let contextLost = false;
+        const gl = createRenderer({
+          canvas,
+          onLost: () => {
+            contextLost = true;
+            showError('WebGL context lost (reload the lab)');
+          },
+        });
+        if (!gl) {
+          showError('WebGL2 unavailable');
+          return;
+        }
+        const { renderer } = gl;
+        const clock = createSceneClock(canvas);
+        clock.start();
+        // Foil for every 3rd lab card, once the manifest and the foil shaders have loaded.
+        const foilState = { manifest: null, createMaterial: null, ids: new Map() };
+        const foil = {
+          recordFor: (placement) => {
+            const id = foilState.ids.get(placement.instanceId);
+            return foilState.manifest && id ? foilRecordFor(foilState.manifest, id) : null;
+          },
+          createMaterial: (record) => foilState.createMaterial(record),
+          uv: () => foilState.manifest?.uv ?? null,
+        };
+        const scene = createBoardScene({
+          foil,
+          host,
+          canvas,
+          renderer,
+          textures: createTextureCache({ loader: createMatTextureLoader(THREE) }),
+          clock,
+          three: THREE,
+          RoomEnvironment,
+        });
+
+        // The same records the game's mat picker applies; a one-player mat is shown on both halves.
+        const matId = params.get('mat');
+        const mat = matId ? getMatById(matId) : null;
+        const spec = mat
+          ? matSpecFor({ self: mat, opp: isTwoPlayerMat(mat) ? null : mat })
+          : { mode: 'two-player', src: null, fit: '100% 100%', profile: getMatLayout('sim'), scale: 1 };
+        const matStatus = mat ? `mat: ${mat.id} (${spec.mode}, ${spec.fit})` : matId ? `mat: unknown id ${matId}` : 'mat: sim, no art';
+        scene.setMat(spec);
+
+        const controls = { tilt: 12, perspective: 1400 };
+        const viewportOf = () => fixedViewport || { w: host.clientWidth, h: host.clientHeight };
+        const relayout = () => {
+          const viewport = viewportOf();
+          if (!(viewport.w > 0 && viewport.h > 0)) return;
+          const half = halfFromViewport(viewport);
+          scene.setViewport(viewport);
+          scene.setCamera(
+            cameraFromCssTilt({
+              viewportW: viewport.w,
+              viewportH: viewport.h,
+              tiltDeg: controls.tilt,
+              perspectivePx: controls.perspective,
+              nearHalf: half,
+            })
+          );
+          scene.setLayout(flatLayout(spec.profile, half, { viewport, matScale: spec.scale ?? 1 }));
+        };
+        new ResizeObserver(relayout).observe(host);
+
+        const cardCount = Math.max(0, Math.min(400, Number(params.get('cards')) || 0));
+        const withStack = params.get('stack') === '1';
+        const withPiles = params.get('piles') === '1';
+        const countParam = (name) => Math.max(0, Math.min(60, Number(params.get(name)) || 0));
+        const handCount = countParam('hand');
+        const oppHandCount = countParam('opphand');
+        const handStackCount = countParam('handstack');
+        const hoverIndex = params.has('hover') ? Number(params.get('hover')) : -1;
+        if (cardCount > 0 || withStack || withPiles || handCount + oppHandCount + handStackCount > 0) {
+          const deck = e2eFixtureDeck('Lab').map(([, name, , src, number, set, id]) => ({ name, src, number, set, id }));
+          let nextId = 1;
+          const pokemon = (base, extra = {}) => ({
+            instanceId: nextId++,
+            name: base.name,
+            src: base.src,
+            id: base.id,
+            set: base.set,
+            number: base.number,
+            supertype: 'Pokémon',
+            stage: 'Basic',
+            hp: 60,
+            ...extra,
+          });
+          const trainer = (base, subtypes, extra = {}) => ({
+            instanceId: nextId++,
+            name: base.name,
+            src: base.src,
+            id: base.id,
+            supertype: 'Trainer',
+            subtypes,
+            ...extra,
+          });
+          const zonesFor = () => ({ active: [], bench: [], board: [] });
+          const zones = { you: zonesFor(), them: zonesFor() };
+          const slots = ['active', 'bench', 'bench', 'bench', 'bench', 'bench'];
+          const placed = { you: withStack ? 1 : 0, them: 0 };
+          if (withStack) {
+            const basic = pokemon(deck[0], { name: 'Lab Basic' });
+            zones.you.active.push(
+              basic,
+              pokemon(deck[1], { name: 'Lab Stage 1', stage: 'Stage 1', attachedTo: basic.instanceId }),
+              pokemon(deck[2], { name: 'Lab Stage 2', stage: 'Stage 2', attachedTo: basic.instanceId }),
+              trainer(deck[3], ['Pokémon Tool'], { attachedTo: basic.instanceId }),
+              trainer(deck[4], ['Pokémon Tool'], { attachedTo: basic.instanceId })
+            );
+          }
+          // Near seat first, far seat second: [near, far] per pile.
+          const pileFill = { deck: [45, 12], discard: [7, 0], lostZone: [3, 1] };
+          let stadium = null;
+          if (withPiles) {
+            ['you', 'them'].forEach((side, seat) => {
+              const pileCard = (k) => trainer(deck[(seat * 17 + k) % deck.length], ['Item']);
+              zones[side].deck = { count: pileFill.deck[seat] };
+              zones[side].discard = Array.from({ length: pileFill.discard[seat] }, (_, k) => pileCard(k));
+              zones[side].lostZone = Array.from({ length: pileFill.lostZone[seat] }, (_, k) => pileCard(k + 7));
+              zones[side].prizes = Array.from({ length: 6 }, (_, k) => ({
+                ...pokemon(deck[(seat * 5 + k + 11) % deck.length]),
+                revealed: k === 1 || k === 4,
+              }));
+            });
+            stadium = { ...trainer(deck[9], ['Stadium'], { name: 'Lab Stadium' }), ownerId: 'lab-near' };
+          }
+          zones.you.hand = Array.from({ length: handCount }, (_, k) => pokemon(deck[(k + 23) % deck.length]));
+          for (let k = 0; k < handStackCount; k++) zones.you.hand.push(pokemon(deck[22 % deck.length]));
+          // The far hand as an owner view sends it: redacted to instance ids.
+          zones.them.hand = Array.from({ length: oppHandCount }, () => ({ instanceId: nextId++ }));
+          for (let i = 0; i < cardCount; i++) {
+            const side = i % 2 === 0 ? 'you' : 'them';
+            const slot = slots[placed[side]] ?? 'board';
+            placed[side] += 1;
+            const base = deck[i % deck.length];
+            const card = slot === 'board' ? trainer(base, ['Item']) : pokemon(base);
+            zones[side][slot].push(card);
+            if (i % 3 === 0) foilState.ids.set(card.instanceId, base.id);
+          }
+          const withOverlays = params.get('overlays') === '1';
+          const uiState = { selected: new Set(), glows: new Map(), matPick: new Map(), hidden: new Set() };
+          let glowId = null;
+          if (withOverlays) {
+            const inPlay = [];
+            for (let i = 0; i < 6; i++) {
+              for (const side of ['you', 'them']) {
+                const zone = i === 0 ? zones[side].active : zones[side].bench;
+                const card = i === 0 ? zone[0] : zone.filter((c) => c.attachedTo == null)[i - 1];
+                if (card && card.supertype === 'Pokémon' && card.attachedTo == null) inPlay.push({ side, card });
+              }
+            }
+            const energy = (side, host, name) => {
+              const zone = zones[side].active.includes(host) ? zones[side].active : zones[side].bench;
+              zone.push({ instanceId: nextId++, name, supertype: 'Energy', type: 'Energy', attachedTo: host.instanceId });
+            };
+            const dress = [
+              ({ card }) => Object.assign(card, { damage: 30, poisoned: true, burned: true }),
+              ({ card }) => Object.assign(card, { damage: 120, specialCondition: 'Asleep' }),
+              ({ card }) => Object.assign(card, { damage: 250, specialCondition: 'Confused', abilityUsed: true }),
+              ({ side, card }) => {
+                card.specialCondition = 'Paralyzed';
+                for (const name of ['Fire Energy', 'Water Energy', 'Grass Energy', 'Double Colorless Energy']) energy(side, card, name);
+              },
+              ({ side, card }) => {
+                for (const name of ['Fire Energy', 'Fire Energy', 'Fire Energy', 'Water Energy', 'Lightning Energy', 'Double Colorless Energy']) energy(side, card, name);
+              },
+              ({ card }) => uiState.selected.add(card.instanceId),
+              ({ card }) => {
+                glowId = card.instanceId;
+              },
+              ({ card }) => uiState.matPick.set(card.instanceId, 'idle'),
+              ({ card }) => uiState.matPick.set(card.instanceId, 'picked'),
+            ];
+            inPlay.forEach((entry, i) => dress[i]?.(entry));
+          }
+          const view = {
+            stateVersion: 1,
+            you: { playerId: 'lab-near', zones: zones.you },
+            them: { playerId: 'lab-far', zones: zones.them },
+            stadium,
+          };
+          const model = boardModelFrom(view, {
+            selfPlayerId: 'lab-near',
+            cardBackSrcFor: () => '/src/assets/cardback.png',
+            uiState,
+            onInvalid: (reason) => showError(`lab model invalid: ${reason}`),
+          });
+          scene.applyModel(model);
+          if (glowId !== null) scene.setUiState(glowId, { glow: '255, 196, 64' });
+          const hovered = zones.you.hand[hoverIndex];
+          if (hovered) scene.setHover(hovered.instanceId);
+          Promise.all([loadFoilManifest(), import('/src/setup/foil/tcgl-foil-material.js')])
+            .then(async ([manifest, material]) => {
+              if (!manifest) return;
+              await material.loadFoilData();
+              foilState.manifest = manifest;
+              foilState.createMaterial = material.createFoilMaterial;
+              scene.refreshCards();
+            })
+            .catch((error) => console.warn('board lab: foil unavailable', error?.message || error));
+        }
+
+        const bindSlider = (id, apply) => {
+          const input = document.getElementById(id);
+          const out = document.getElementById(`${id}Out`);
+          const update = () => {
+            out.textContent = input.value;
+            apply(Number(input.value));
+          };
+          input.addEventListener('input', update);
+          update();
+        };
+        bindSlider('tilt', (deg) => {
+          controls.tilt = deg;
+          relayout();
+        });
+        bindSlider('perspective', (px) => {
+          controls.perspective = px;
+          relayout();
+        });
+        const light = scene.inspect().scene.getObjectByName('board3d-key-light');
+        bindSlider('light', (intensity) => {
+          if (light) light.intensity = intensity;
+          scene.invalidate();
+        });
+
+        let lastFrame = renderer.info.render.frame;
+        let lastTime = performance.now();
+        const handCountOf = (side) =>
+          (scene.inspect().model?.placements ?? []).filter((p) => p.side === side && p.zone === 'hand').length;
+        const writeStats = () => {
+          const now = performance.now();
+          const frame = renderer.info.render.frame;
+          const fps = Math.round(((frame - lastFrame) * 1000) / Math.max(1, now - lastTime));
+          lastFrame = frame;
+          lastTime = now;
+          const viewport = viewportOf();
+          const { render, memory, programs } = renderer.info;
+          stats.textContent = [
+            `renders/s  ${fps}`,
+            `cards      ${scene.inspect().cards.ids().length}`,
+            `piles      ${scene.inspect().piles.meshCount()}`,
+            `labels     ${scene.inspect().labels.count()}`,
+            `overlays   ${scene.inspect().overlays.count()}`,
+            `hand       ${handCountOf('self')}/${handCountOf('opp')} (${scene.inspect().badges.count()} stacks)`,
+            `calls      ${render.calls}`,
+            `triangles  ${render.triangles}`,
+            `geometries ${memory.geometries}`,
+            `textures   ${memory.textures}`,
+            `programs   ${programs?.length ?? 0}`,
+            `viewport   ${viewport.w}×${viewport.h}`,
+            matStatus,
+            contextLost ? 'context lost' : '',
+          ]
+            .filter(Boolean)
+            .join('\n');
+        };
+        setInterval(writeStats, 1000);
+        writeStats();
+        window.__boardLab = { scene, renderer };
+      }
+
+      boot().catch((error) => showError(`lab failed: ${error?.message || error}`));
+    </script>
+  </body>
+</html>

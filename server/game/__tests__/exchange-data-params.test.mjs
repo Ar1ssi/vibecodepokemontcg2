@@ -1,7 +1,7 @@
 ﻿import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { GameRoom } from '../room.mjs';
-import { initializePlayerDeck, extractDeckData, extractDeckFormat } from '../shadow.mjs';
+import { extractDeckData, extractDeckFormat } from '../deck-packet.mjs';
 
 function fixtureDeck(prefix = 'Card') {
   return [
@@ -80,12 +80,11 @@ test('Finding 4 authoritative server integration: pushAction with exchangeData i
   assert.equal(Array.isArray(buggyDeckData), false);
   assert.equal(room.state.players.p1.zones.deck.length, 0);
 
-  // Execute with fix via extractDeckData
+  // Execute with fix via extractDeckData, loading it the way server.js does (a loadDeck command)
   const deckData = extractDeckData(pushData.action, pushData.parameters);
   assert.ok(Array.isArray(deckData));
-  if (Array.isArray(deckData)) {
-    initializePlayerDeck(room.state, playerId, deckData);
-  }
+  const result = room.handleCommand('socket-alice', { type: 'loadDeck', payload: { deckData } });
+  assert.equal(result.success, true, result.reason);
 
   // Player 1 deck must now be populated on authoritative GameRoom state
   assert.equal(room.state.players.p1.zones.deck.length, 20);

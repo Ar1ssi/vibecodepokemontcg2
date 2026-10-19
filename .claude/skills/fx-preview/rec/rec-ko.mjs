@@ -1,33 +1,33 @@
 // Design 042 video check: the knockout scene on the opponent's Active (with two
 // Energy attached), then a discard of two cards from your side.
+// env: BASE_URL (default http://localhost:4100),
+//      CHROMIUM / CHROMIUM_PATH, CARD_DIR (a folder of PNGs named like the card images, for no network)
 import { chromium } from 'playwright';
 import { renameSync } from 'node:fs';
+import { launchOptions, openBoard } from '../board-mode.mjs';
+const { BASE_URL = 'http://localhost:4100' } = process.env;
 const CARD = 'https://images.pokemontcg.io/sv3pt5/6_hires.png';
 const FIRE = 'https://images.pokemontcg.io/sve/2_hires.png';
 const TRAINER = 'https://images.pokemontcg.io/sv1/166_hires.png';
-const browser = await chromium.launch();
+const browser = await chromium.launch(launchOptions());
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, recordVideo: { dir: '.agent/scratch/vid', size: { width: 1280, height: 720 } } });
 const page = await ctx.newPage();
 await page.route('https://static.cloudflareinsights.com/**', (r) => r.abort());
 page.on('pageerror', (e) => console.log('pageerror', e.message));
 page.on('console', (m) => m.type() === 'error' && console.log('console', m.text()));
-await page.goto('http://localhost:4100/?e2e=1');
-await page.waitForFunction(() => window.__ptcg?.ready === true, null, { timeout: 30000 });
-await page.waitForTimeout(800);
+await openBoard(page, BASE_URL);
 const info = await page.evaluate(async ([card, fire, trainer]) => {
-  const { visualRectOf } = await import('/src/setup/image-logic/iframe-rect.mjs');
   const { playKnockoutScene } = await import('/src/setup/netcode/mat-fx/ko-scene.js');
   const { pileOf, playDiscardFlights } = await import('/src/setup/netcode/mat-fx/card-flight.js');
   const { frameTurnOf } = await import('/src/setup/netcode/mat-fx/evolve-scene.js');
-  const oppDoc = document.getElementById('oppContainer').contentDocument;
-  const selfDoc = document.getElementById('selfContainer').contentDocument;
-  const slot = (doc) => {
-    const zone = visualRectOf(doc.getElementById('active'));
+  const oppDoc = window.__fxBoard.root('opp');
+  const slot = async (side) => {
+    const zone = await window.__fxBoard.zoneRect(side, 'active');
     const h = Math.min(zone.height * 0.9, 150), w = h * 0.716;
     return { left: zone.left + (zone.width - w) / 2, top: zone.top + (zone.height - h) / 2, width: w, height: h };
   };
-  const oppRect = slot(oppDoc);
-  const selfRect = slot(selfDoc);
+  const oppRect = await slot('opp');
+  const selfRect = await slot('self');
   const turn = frameTurnOf(oppDoc.getElementById('active'));
   const img = document.createElement('img');
   img.src = card;

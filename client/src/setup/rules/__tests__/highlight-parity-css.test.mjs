@@ -5,8 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 // Static contracts for the highlight-parity plan (implementation_plan.md).
 // These guard the two ways this feature silently stops working: a class placed
-// in a stylesheet that never reaches the element it styles (board cards live in
-// the playmat iframes, which load only self-/opp-containers.css), and a marker
+// in a stylesheet that never reaches the element it styles, and a marker
 // painted under a container `opacity` that fades it out of legibility.
 const CSS_DIR = fileURLToPath(new URL('../../../css/', import.meta.url));
 
@@ -63,33 +62,7 @@ const reducedMotionBlocks = (css) => {
   return bodies;
 };
 
-const MAT_SHEETS = ['self-containers.css', 'opp-containers.css'];
-
 describe('highlight-parity CSS contracts', () => {
-  it('styles the board ability glow in every sheet that holds its cards', () => {
-    for (const name of MAT_SHEETS) {
-      const css = normalize(readCss(name));
-      // rules-bridge.js adds `.has-glow` (and the legacy `.has-usable-ability`)
-      // to a card node inside that iframe document; index.css cannot reach it.
-      assert.ok(ruleBody(css, '.has-glow'), `${name} styles the glow`);
-      assert.ok(ruleBody(css, '.has-usable-ability'), `${name} keeps the legacy class styled`);
-      // Each document resolves animation names against its own sheets.
-      assert.match(css, /@keyframes card-glow \{/, `${name} declares the keyframes`);
-    }
-  });
-
-  it('lets a selection ring outrank the ambient glow', () => {
-    for (const name of MAT_SHEETS) {
-      const css = normalize(readCss(name));
-      const glowAt = css.indexOf('.has-glow');
-      const ringAt = css.indexOf('.highlight {');
-      assert.ok(glowAt >= 0 && ringAt >= 0, `${name} defines both rules`);
-      // Same specificity, both set `animation` — the later declaration wins, so
-      // the ring must come last for targeting to stay the louder signal.
-      assert.ok(glowAt < ringAt, `${name} declares the glow before .highlight`);
-    }
-  });
-
   it('marks unusable zones without fading the marker', () => {
     const css = normalize(readCss('index.css'));
     for (const zone of ['.attack-zone--unusable', '.ability-zone--unusable']) {
@@ -125,10 +98,9 @@ describe('highlight-parity CSS contracts', () => {
 });
 
 // Design 023: the glow is one `.has-glow` class reading a per-node `--glow-rgb`,
-// declared in every document that owns a glowing node (both playmat iframes and
-// the top document for the parent-owned #stadium, D93).
+// declared in the document that owns a glowing node (the top document's #stadium, D93).
 describe('card-glow CSS contracts (design 023)', () => {
-  const GLOW_SHEETS = [...MAT_SHEETS, 'index.css'];
+  const GLOW_SHEETS = ['index.css'];
 
   it('reads the per-node --glow-rgb in every sheet', () => {
     for (const name of GLOW_SHEETS) {
@@ -166,13 +138,10 @@ describe('card-glow CSS contracts (design 023)', () => {
   });
 
   // The Live-style look: a lit rim with hotspots flowing along the card edge,
-  // not a breathing halo. A bare <img> has no ::after, so the mat sheets draw
-  // its ring as padding over the gradient; wrappers and #stadium use a masked
-  // ::after. Two angles turning in opposite directions keep the flow irregular.
+  // not a breathing halo. #stadium uses a masked ::after. Two angles turning in
+  // opposite directions keep the flow irregular.
   it('flows hotspots along a lit rim around the card edge', () => {
     const ringNodes = {
-      'self-containers.css': ['img.has-glow', '.mat-holo.has-glow::after'],
-      'opp-containers.css': ['img.has-glow', '.mat-holo.has-glow::after'],
       'index.css': ['#stadium.has-glow::after'],
     };
     for (const [name, selectors] of Object.entries(ringNodes)) {
@@ -206,34 +175,5 @@ describe('card-glow CSS contracts (design 023)', () => {
         assert.match(allRuleBodies(css, selector), /card-glow-drift/, `${selector} runs both layers`);
       }
     }
-    for (const name of MAT_SHEETS) {
-      // A bare <img> runs both angles through the shared `.has-glow` rule.
-      assert.match(ruleBody(readCss(name), '.has-glow'), /card-glow-drift/, `${name} img runs both layers`);
-      const img = allRuleBodies(readCss(name), 'img.has-glow');
-      // Padding inside the border box: the ring never grows the card's layout box.
-      assert.match(img, /box-sizing: border-box/, `${name} keeps the <img> box size`);
-      assert.match(img, /padding: 3px/, `${name} leaves room for the <img> ring`);
-      // Hand cards hold a steady rim: no hotspot layer to move.
-      for (const selector of ['#hand img.has-glow', '#hand .mat-holo.has-glow::after']) {
-        const hand = allRuleBodies(readCss(name), selector);
-        assert.match(hand, /background: rgb\(var\(--glow-rgb/, `${name} ${selector} is a solid rim`);
-        assert.doesNotMatch(hand, /--glow-angle/, `${name} ${selector} does not move`);
-      }
-    }
   });
-});
-
-// A glowing card that is mid draw/play motion carries both `.has-glow` (whose
-// `animation` shorthand is infinite, or paused under reduced motion) and
-// `.tcgl-anim`. Any longhand `.tcgl-anim` leaves unset leaks in from the glow,
-// looping the fade-from-transparent forever so the card flashes or vanishes.
-describe('card motion is not hijacked by the affordance glow', () => {
-  for (const sheet of ['self-containers.css', 'opp-containers.css']) {
-    it(`${sheet}: .tcgl-anim pins iteration count and play state`, () => {
-      const body = ruleBody(readCss(sheet), '.tcgl-anim');
-      assert.ok(body, '.tcgl-anim rule missing');
-      assert.match(body, /animation-iteration-count:\s*1\b/);
-      assert.match(body, /animation-play-state:\s*running\b/);
-    });
-  }
 });

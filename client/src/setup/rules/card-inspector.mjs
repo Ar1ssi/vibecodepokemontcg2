@@ -1,26 +1,19 @@
 /**
- * @file Card inspector (design 013) — the DOM half.
+ * @file Card inspector (designs 013, 067, 074) — the DOM half.
  *
- * Double-clicking one of your own board Pokémon enlarges the card scan and overlays the
- * TCG Live readout on top of it: an HP pill over the printed HP slot, attack panels over the
- * printed attack text box, and a Retreat tile over the printed retreat cost. Attached Energy
- * rides along as further carousel slides.
+ * Decorates a card slide with its TCG Live readout and keeps it live: a Pokémon gets the
+ * AttackOverlay chrome (HP pill, the option rows from attack-options.mjs, the Weakness / Resistance /
+ * Retreat bar) that the card-focus view mounts; the in-play Stadium gets its effect panel over the
+ * printed box, in the carousel. The 013 print-band panels for Pokémon are retired (design 074 A11).
  *
- * The card scan is the background and stays visible. Every piece is opaque only where it
- * replaces print, and dimming uses `filter` rather than `opacity` so a panel never becomes
- * translucent enough for the print underneath to ghost back through (013 C1/C2).
- *
- * The chrome mounts in the main document, inside the carousel (`card-picker.js`) via its
- * `decorate` hook — the playmat boards are separate iframe documents that never load index.css,
- * and only the carousel can carry attached-Energy slides (013 C3/C5).
+ * The card scan is the background and stays visible, and dimming uses `filter` rather than
+ * `opacity` so a panel never becomes translucent enough for the print underneath to ghost back
+ * through (013 C1/C2). The chrome mounts in the main document — the playmat boards are separate
+ * iframe documents that never load index.css (013 C5).
  */
 
 import { uiCue } from '../netcode/mat-fx/ui-cue.mjs';
-import {
-  getEnergyTokenSrcForType,
-  normalizeEnergyType,
-} from '../../actions/move-card-bundle/energy-token-assets.mjs';
-import { TYPE_GLOW } from './card-glow-colors.mjs';
+import { getEnergyTokenSrcForType } from '../../actions/move-card-bundle/energy-token-assets.mjs';
 import { ENERGY_SYMBOL_TO_TYPE } from '../../../../shared/engine/rules/energy-effects.mjs';
 import {
   isStadiumCard,
@@ -52,15 +45,20 @@ import {
 } from '../netcode/apply-view.js';
 import { runAbilitySteps } from './rules-bridge.js';
 import { computeContentBox } from './attack-zone-geometry.js';
+import { buildInspectorModel } from './card-inspector-model.mjs';
+import { damagePreviewAgainst } from './attack-ui-model.mjs';
+import { liveZoneArray } from '../zones/live-zone-array.js';
 import {
-  buildInspectorModel,
-  formatWeakResist,
-} from './card-inspector-model.mjs';
+  buildAbilityOption,
+  buildAttackOption,
+  buildWeakResistBar,
+} from './attack-options.mjs';
 import {
   openCarouselViewer,
   closeCarouselViewer,
 } from '../image-logic/card-picker.js';
 import { orderAttachedForCarousel } from '../image-logic/carousel-order.mjs';
+import { suppressHoverPreview } from '../image-logic/hover-preview-bus.mjs';
 
 // Events that can change what the inspector reports while it is open. Owned here because this
 // module outlives attack-preview.js — slice 3 deletes that file and its copy of this list.
@@ -88,14 +86,6 @@ const TYPE_GLYPHS = {
   Dark: '🌑',
   Dragon: '🐉',
   Fairy: '✨',
-};
-
-// The titlebar, damage tab and Retreat button are TCG Live's own sprites, keyed by the Pokémon's
-// type (AttackEntryAssetRegistry indexes by cardTyping.First()). `data-ptcg-type` selects the set
-// in index.css; a type with no sprites falls back to Colorless, as the game's NONE entry does.
-const barTypeKey = (type) => {
-  const key = normalizeEnergyType(type);
-  return Object.hasOwn(TYPE_GLOW, key) ? key : 'colorless';
 };
 
 const el = (tag, className, text) => {
@@ -188,215 +178,35 @@ const stadiumEl = (model) => {
   return section;
 };
 
-// AttackOption's VPowerBar: the gold strip that titles a VSTAR Power entry.
-const vstarPowerStrip = () => el('span', 'ptcg-atk__vpower', 'VSTAR Power');
-
-// TCG Live's ability entry: a type-coloured titlebar with the name above an "Ability" tag sprite.
-// A passive ability is the ability header tinted with the type colour, a spent one a plain bar with
-// the tag switched off, a VSTAR Power the VSTAR titlebar under its strip.
-const abilityEl = (ability, cardType) => {
-  const section = el(
-    'section',
-    `ptcg-ability${ability.recede ? ' ptcg-ability--recede' : ''}${
-      ability.passive ? ' ptcg-ability--passive' : ''
-    }${ability.vstar ? ' ptcg-ability--vstar' : ''}`
-  );
-  section.dataset.ptcgType = barTypeKey(cardType);
-
-  const head = el('div', 'ptcg-atk__head');
-  if (ability.vstar) head.appendChild(vstarPowerStrip());
-  head.appendChild(el('span', 'ptcg-atk__name', ability.name));
-  head.appendChild(el('span', 'ptcg-atk__badge', 'Ability'));
-  section.appendChild(head);
-
-  if (ability.text) {
-    const body = textBody(ability.text);
-    textWithOrbs(body, ability.text, 'ptcg-orb ptcg-orb--inline');
-    section.appendChild(body);
-  }
-  if (ability.reason) section.title = ability.reason;
-  return section;
-};
-
-const attackEl = (attack, cardType) => {
-  const classes = ['ptcg-atk'];
-  if (attack.recede) classes.push('ptcg-atk--recede');
-  // TCG Live swaps in a shorter titlebar and damage tab when the attack prints effect text.
-  if (attack.text) classes.push('ptcg-atk--text');
-  if (attack.gx) classes.push('ptcg-atk--gx');
-  if (attack.vstar) classes.push('ptcg-atk--vstar');
-  const section = el('section', classes.join(' '));
-  // The delegated click handler resolves which attack was hit from this, so the panel stays
-  // addressable across re-renders that replace the whole chrome subtree.
-  section.dataset.ptcgAttack = String(attack.index);
-  section.dataset.ptcgType = barTypeKey(cardType);
-
-  // Name over the cost row on the left, the damage tab on the right (AttackOption's layout).
-  const head = el('div', 'ptcg-atk__head');
-  if (attack.vstar) head.appendChild(vstarPowerStrip());
-  head.appendChild(el('span', 'ptcg-atk__name', attack.name));
-  const cost = el('span', 'ptcg-atk__right');
-  for (const symbol of attack.cost)
-    cost.appendChild(orb(symbol, 'ptcg-orb ptcg-orb--cost'));
-  head.appendChild(cost);
-  if (attack.damageLabel != null) {
-    head.appendChild(el('span', 'ptcg-atk__dmg', attack.damageLabel));
-  }
-  section.appendChild(head);
-  if (attack.from) section.appendChild(el('p', 'ptcg-atk__from', `from ${attack.from}`));
-
-  if (attack.text) {
-    const body = textBody(attack.text);
-    textWithOrbs(body, attack.text, 'ptcg-orb ptcg-orb--inline');
-    section.appendChild(body);
-  }
-  if (attack.reason) section.title = attack.reason;
-  return section;
-};
-
-const valueTile = (label, render) => {
-  const tile = el('div', 'ptcg-stat');
-  tile.appendChild(el('span', 'ptcg-stat__k', label));
-  const val = el('span', 'ptcg-stat__v');
-  render(val);
-  tile.appendChild(val);
-  return tile;
-};
-
-// The retreat tile is also the Retreat affordance: `data-ptcg-retreat` lets the delegated click
-// resolve it after a re-render, exactly as `data-ptcg-attack` does for attacks. It only becomes
-// clickable when the model says so (see `applyAffordances`); the reason a card cannot retreat
-// rides on the tooltip.
-const retreatTile = (model) => {
-  const tile = valueTile('retreat', (val) => {
-    const symbols = model.retreat || [];
-    if (symbols.length) {
-      for (const symbol of symbols)
-        val.appendChild(orb(symbol, 'ptcg-orb ptcg-orb--sm'));
-    } else {
-      val.appendChild(el('span', 'ptcg-stat__n ptcg-stat__n--none', '—'));
-    }
-  });
-  tile.dataset.ptcgRetreat = '1';
-  tile.dataset.ptcgType = barTypeKey(model.type);
-  // Greyed when the retreat is not available (cost unpaid, already retreated, not your turn);
-  // the reason rides on the tooltip. Only this tile greys — never the card or its HP.
-  tile.classList.toggle('ptcg-stat--recede', Boolean(model.retreatRecede));
-  if (!model.retreatUsable && model.retreatReason)
-    tile.title = model.retreatReason;
-  return tile;
-};
-
 /**
- * The overlay pieces.
- *
- * The stack is anchored at `blockTopPct` (the ability band when the card has an ability, since
- * that text prints above the attacks) and sized by its own content — it no longer stretches to
- * the stat band, because a one-attack card used to leave a foot of empty white where the print
- * should show through. The stat band is positioned separately on the printed weakness strip.
- *
- * `blockTopPct` is null when there is nothing to lay out (no attacks and no ability), in which
- * case no stack is drawn at all.
+ * The overlay pieces. A Pokémon gets the TCG Live overlay chrome (`buildFocusChrome`, design 074 —
+ * the 013 print-band panels are retired). A Stadium keeps its own panel: its effect text laid out
+ * as a content-sized panel anchored over the printed effect box.
  */
-const buildChrome = (model, layout = 'print') => {
-  if (layout === 'focus' && model.kind !== 'stadium') return buildFocusChrome(model);
+const buildChrome = (model) => {
+  if (model.kind !== 'stadium') return buildFocusChrome(model);
   const chrome = el('div', 'ptcg-chrome');
   chrome.dataset.finish = model.finish ?? 'plain';
   chrome.style.setProperty('--ptcg-inset-left', `${model.sideInsetLeftPct ?? 0}%`);
   chrome.style.setProperty('--ptcg-inset-right', `${model.sideInsetRightPct ?? 0}%`);
-
-  // A Stadium has no HP row, attack panels or stat strip — just its effect text, laid out as a
-  // content-sized panel anchored over the printed effect box.
-  if (model.kind === 'stadium') {
-    const stack = el('div', 'ptcg-stack');
-    stack.style.top = `${model.blockTopPct}%`;
-    const panel = stadiumEl(model);
-    if (model.blockHeightPct != null) {
-      // min-height, not height: text longer than the printed box grows the panel, never clips.
-      stack.style.minHeight = `${model.blockHeightPct}%`;
-      panel.style.flexGrow = '1';
-    }
-    stack.appendChild(panel);
-    chrome.appendChild(stack);
-    return chrome;
+  const stack = el('div', 'ptcg-stack');
+  stack.style.top = `${model.blockTopPct}%`;
+  const panel = stadiumEl(model);
+  if (model.blockHeightPct != null) {
+    // min-height, not height: text longer than the printed box grows the panel, never clips.
+    stack.style.minHeight = `${model.blockHeightPct}%`;
+    panel.style.flexGrow = '1';
   }
-
-  const hp = el('div', 'ptcg-hp');
-  hp.appendChild(el('span', 'ptcg-hp__num', model.hp));
-  if (model.type) hp.appendChild(orb(model.type, 'ptcg-orb ptcg-hp__orb'));
-  hp.title = model.damage
-    ? `${model.hp} HP · ${model.damage} damage on it`
-    : `${model.hp} HP`;
-  chrome.appendChild(hp);
-
-  if (model.blockTopPct != null) {
-    const stack = el('div', 'ptcg-stack');
-    if (model.blockBottomPct != null) stack.style.bottom = `${model.blockBottomPct}%`;
-    else stack.style.top = `${model.blockTopPct}%`;
-    if (model.compactStack) stack.classList.add('ptcg-stack--compact');
-    if (model.ability)
-      stack.appendChild(abilityEl(model.ability, model.type));
-    const atks = el('div', 'ptcg-atks');
-    model.attacks.forEach((attack, i) => {
-      const row = attackEl(attack, model.type);
-      // Weighted growth only matters once the stack is stretched over a frame's printed band.
-      if (model.blockHeightPct != null)
-        row.style.flexGrow = String(model.attackWeights[i] ?? 1);
-      atks.appendChild(row);
-    });
-    if (model.blockHeightPct != null) {
-      // min-height, not height: text longer than the printed band grows the stack instead of clipping.
-      stack.style.minHeight = `${model.blockHeightPct}%`;
-      atks.style.flex = '1 1 auto';
-    }
-    stack.appendChild(atks);
-    chrome.appendChild(stack);
-  }
-
-  if (model.retreatCorner) {
-    // Frames that print Retreat alone at the bottom-left: only Retreat is interactive, so it is
-    // the one overlay there; the printed Weakness/Resistance are left showing.
-    const corner = el('footer', 'ptcg-stats ptcg-stats--corner');
-    corner.style.left = `${model.retreatCorner.leftPct}%`;
-    corner.style.width = `${model.retreatCorner.widthPct}%`;
-    corner.style.right = 'auto';
-    corner.style.bottom = `${model.retreatCorner.bottomPct}%`;
-    if (model.retreatInline) corner.classList.add('ptcg-stats--row');
-    corner.appendChild(retreatTile(model));
-    chrome.appendChild(corner);
-  } else {
-    const stats = el('footer', 'ptcg-stats');
-    stats.style.bottom = `${model.footH}%`;
-    // Weakness and Resistance are not interactive, so only Retreat is overlaid: it takes the
-    // right-hand third of the printed strip, where these frames print it.
-    stats.style.left =
-      'calc(var(--ptcg-inset-left, 0%) + (100% - var(--ptcg-inset-left, 0%) - var(--ptcg-inset-right, 0%)) * 2 / 3)';
-    stats.appendChild(retreatTile(model));
-    chrome.appendChild(stats);
-  }
-
-  if (model.damage > 0) chrome.appendChild(el('div', 'ptcg-dmg', model.damage));
+  stack.appendChild(panel);
+  chrome.appendChild(stack);
   return chrome;
-};
-
-// One Weakness / Resistance line of the focus strip: the label, then the type orb and modifier when
-// the card prints one. An absent weakness or resistance keeps its label (the game does the same).
-const weakResistRow = (label, kind, typeValue) => {
-  const row = el('div', 'ptcg-wr__row');
-  row.appendChild(el('span', 'ptcg-wr__k', label));
-  const text = formatWeakResist(kind, typeValue);
-  if (typeValue?.type && text) {
-    row.appendChild(orb(typeValue.type, 'ptcg-orb ptcg-orb--sm'));
-    row.appendChild(el('span', 'ptcg-wr__n', text));
-  }
-  return row;
 };
 
 /**
  * The chrome for the card-focus view (design 067), laid out as TCG Live's attack overlay is rather
  * than over the printed bands: the list is anchored to the bottom of the card, a little wider than
- * it, with a Weakness / Resistance / Retreat strip beneath. It covers the printed text, so the
- * strip repeats the weakness and resistance the print would have shown. Geometry is in card-focus.css.
+ * it, with the Weakness / Resistance / Retreat bar beneath. The rows are the game's option prefabs
+ * (attack-options.mjs, design 074); geometry is in card-focus.css, the rows' skin in attack-options.css.
  */
 const buildFocusChrome = (model) => {
   const chrome = el('div', 'ptcg-chrome ptcg-chrome--focus');
@@ -414,20 +224,15 @@ const buildFocusChrome = (model) => {
   // over its top edge, which the list's own overflow clip would cut off.
   const frame = el('div', 'ptcg-frame ptcg-frame--focus');
   const stack = el('div', 'ptcg-stack ptcg-stack--focus');
-  if (model.ability) stack.appendChild(abilityEl(model.ability, model.type));
-  const atks = el('div', 'ptcg-atks');
-  model.attacks.forEach((attack) => atks.appendChild(attackEl(attack, model.type)));
-  stack.appendChild(atks);
+  if (model.ability) stack.appendChild(buildAbilityOption(model.ability, model.type));
+  const options = el('div', 'tcgl-opts');
+  if (!model.bench) {
+    model.attacks.forEach((attack) => options.appendChild(buildAttackOption(attack, model.type)));
+  }
+  stack.appendChild(options);
   frame.appendChild(stack);
   chrome.appendChild(frame);
-
-  const strip = el('footer', 'ptcg-stats ptcg-stats--focus');
-  const weakResist = el('div', 'ptcg-wr');
-  weakResist.appendChild(weakResistRow('weakness', 'weakness', model.weakness));
-  weakResist.appendChild(weakResistRow('resistance', 'resistance', model.resistance));
-  strip.appendChild(weakResist);
-  strip.appendChild(retreatTile(model));
-  chrome.appendChild(strip);
+  chrome.appendChild(buildWeakResistBar(model));
 
   if (model.damage > 0) chrome.appendChild(el('div', 'ptcg-dmg', model.damage));
   return chrome;
@@ -519,7 +324,7 @@ const rerender = (state) => {
     state.card,
     state.context || state.getContext()
   );
-  const next = buildChrome(model, state.layout);
+  const next = buildChrome(model);
   state.wrap.replaceChild(next, state.chrome);
   state.chrome = next;
   // The delegated handler reads state.model, so refreshing it here is what keeps a click after
@@ -534,13 +339,7 @@ const rerender = (state) => {
  * node in a positioned container and hangs the chrome off it, keeping `holoWrapper` inside the
  * returned node so slideWrapper() and the holo hover sync still resolve.
  */
-export const decorateInspectorSlide = (
-  built,
-  card,
-  getContext,
-  actions = null,
-  { layout = 'print' } = {}
-) => {
+export const decorateInspectorSlide = (built, card, getContext, actions = null) => {
   const model = buildInspectorModel(card, getContext());
   // A non-Pokémon (or unresolved card) gets the bare scan: wrapping it would change the slide's
   // layout box for no benefit.
@@ -548,7 +347,7 @@ export const decorateInspectorSlide = (
 
   const wrap = el('div', 'ptcg-inspector');
   wrap.appendChild(built.node);
-  const chrome = buildChrome(model, layout);
+  const chrome = buildChrome(model);
   wrap.appendChild(chrome);
 
   const state = {
@@ -559,7 +358,6 @@ export const decorateInspectorSlide = (
     actions,
     context: null,
     model,
-    layout,
   };
   state.refresh = () => rerender(state);
   // The chrome is sized from the slide's layout box, so a resize (window, or the focus card's
@@ -587,6 +385,9 @@ export const decorateInspectorSlide = (
   return wrap;
 };
 
+// Each panel's own "usable" modifier: its block class with `--usable` (ptcg-atk, tcgl-opt, …).
+const usableClass = (panel) => `${panel.classList[0]}--usable`;
+
 /**
  * Paint the affordances — which panels look clickable. The click itself is delegated from the
  * wrap (see `wirePanelClicks`), so a re-render that replaces the whole chrome subtree cannot
@@ -602,27 +403,25 @@ const applyAffordances = (state, model) => {
       Boolean(handlers?.onUse) && Boolean(model.usable)
     );
 
-  state.wrap
-    .querySelector('.ptcg-ability')
-    ?.classList.toggle(
-      'ptcg-ability--usable',
-      Boolean(handlers?.onAbility) && Boolean(model.ability?.usable)
-    );
+  const abilityPanel = state.wrap.querySelector('[data-ptcg-ability]');
+  abilityPanel?.classList.toggle(
+    usableClass(abilityPanel),
+    Boolean(handlers?.onAbility) && Boolean(model.ability?.usable)
+  );
 
-  state.wrap.querySelectorAll('.ptcg-atk').forEach((panel) => {
+  state.wrap.querySelectorAll('[data-ptcg-attack]').forEach((panel) => {
     const attack = model.attacks[Number(panel.dataset.ptcgAttack)];
     panel.classList.toggle(
-      'ptcg-atk--usable',
+      usableClass(panel),
       Boolean(handlers?.onAttack) && Boolean(attack?.usable)
     );
   });
 
-  state.wrap
-    .querySelector('.ptcg-stat[data-ptcg-retreat]')
-    ?.classList.toggle(
-      'ptcg-stat--usable',
-      Boolean(handlers?.onRetreat) && Boolean(model.retreatUsable)
-    );
+  const retreatPanel = state.wrap.querySelector('[data-ptcg-retreat]');
+  retreatPanel?.classList.toggle(
+    usableClass(retreatPanel),
+    Boolean(handlers?.onRetreat) && Boolean(model.retreatUsable)
+  );
 };
 
 /**
@@ -631,7 +430,7 @@ const applyAffordances = (state, model) => {
  * that decision is made, so nothing is re-derived here.
  */
 const ACTION_PANEL_SELECTOR =
-  '.ptcg-stadium[data-ptcg-stadium], .ptcg-atk[data-ptcg-attack], .ptcg-ability, .ptcg-stat[data-ptcg-retreat]';
+  '[data-ptcg-stadium], [data-ptcg-attack], [data-ptcg-ability], [data-ptcg-retreat]';
 
 const wirePanelClicks = (state) => {
   // A press and release that land on different children (cursor drift, hover repaint) make the
@@ -655,14 +454,14 @@ const wirePanelClicks = (state) => {
       stopPropagation: () => rawEvent.stopPropagation(),
     };
     pressedTarget = null;
-    const stadiumPanel = event.target.closest?.('.ptcg-stadium[data-ptcg-stadium]');
+    const stadiumPanel = event.target.closest?.('[data-ptcg-stadium]');
     if (stadiumPanel) {
       if (!state.model.usable) return;
       event.stopPropagation();
       state.actions?.onUse?.();
       return;
     }
-    const attackPanel = event.target.closest?.('.ptcg-atk[data-ptcg-attack]');
+    const attackPanel = event.target.closest?.('[data-ptcg-attack]');
     if (attackPanel) {
       const attack =
         state.model.attacks[Number(attackPanel.dataset.ptcgAttack)];
@@ -672,15 +471,13 @@ const wirePanelClicks = (state) => {
       state.actions?.onAttack?.(attack.index);
       return;
     }
-    if (event.target.closest?.('.ptcg-ability')) {
+    if (event.target.closest?.('[data-ptcg-ability]')) {
       if (!state.model.ability?.usable) return;
       event.stopPropagation();
       state.actions?.onAbility?.();
       return;
     }
-    const retreatPanel = event.target.closest?.(
-      '.ptcg-stat[data-ptcg-retreat]'
-    );
+    const retreatPanel = event.target.closest?.('[data-ptcg-retreat]');
     if (retreatPanel) {
       if (!state.model.retreatUsable) return;
       event.stopPropagation();
@@ -713,6 +510,35 @@ const stampContextFor = (card, zone = 'active') => ({
 });
 
 /**
+ * The stack view's info panel (design 074): the same model, read-only — the game's deep inspection
+ * lists the card's entries but acts on none of them. `energyTypes` feeds the Attached Energy row.
+ *
+ * @param {object} card a preview card
+ * @param {'active'|'bench'} [zone]
+ * @returns {{ model: object, energyTypes: Array }}
+ */
+export const stackViewModelFor = (card, zone = 'active') => {
+  const context = { ...stampContextFor(card, zone), readOnly: true };
+  return { model: buildInspectorModel(card, context), energyTypes: context.energyTypes };
+};
+
+/**
+ * BenchController.CanShowActionSelection for one of your Benched Pokémon: whether it has anything
+ * usable from the Bench — an Ability, since a Benched Pokémon cannot attack (design 074 A1).
+ *
+ * @param {object} card a preview card
+ * @returns {boolean}
+ */
+export const benchHasUsableAction = (card) => {
+  const context = {
+    ...stampContextFor(card, 'bench'),
+    rulesEnabled: Boolean(rulesState.enabled),
+    abilityUsed: abilityUsedFor(card, abilityUsed('self', card), rulesState.flags?.self?.abilitiesUsed),
+  };
+  return Boolean(buildInspectorModel(card, context).ability?.usable);
+};
+
+/**
  * The context a Stadium panel needs: the live per-player flags the pure model reads. Unlike a
  * Pokémon this resolves nothing async, so `getContext` is authoritative from first paint and the
  * model stays current across REFRESH_EVENT re-renders.
@@ -729,13 +555,26 @@ export const stadiumContextFor = ({
   flags: flags || {},
 });
 
+// The damage tab reads the outcome against the opponent's Active, Weakness and Resistance included,
+// as TCG Live's AttackOption.SetAttackDamageValue does (design 074 A6) — tinted, so a Weakness hit
+// is told apart from the printed number. A benched Pokémon cannot attack, so it gets none.
+const damagePreviewFor = async (card, zoneId, stadiumCard) => {
+  if (zoneId !== 'active') return null;
+  const defenderZone = liveZoneArray('opp', 'active');
+  // The Defending Pokémon's Weakness / Resistance come from its card data.
+  await Promise.all(defenderZone.map((c) => ensureCardData(c).catch(() => {})));
+  return damagePreviewAgainst({
+    attacker: card,
+    attackerZone: liveZoneArray('self', 'active'),
+    defenderZone,
+    stadium: stadiumCard,
+    turnNumber: rulesState.turnNumber,
+  });
+};
+
 /**
  * The authoritative context the model needs, resolved through the same shared helper the engine
  * path uses so the panel cannot drift from it.
- *
- * `defender` is deliberately absent: this panel reports what an attack DOES, not what it would
- * deal to the current target. Applying the defender's weakness here would print 500 on a card
- * that says 250 and read as a bug.
  */
 async function resolveLiveContext(card, zone = 'active') {
   try {
@@ -789,9 +628,12 @@ async function resolveLiveContext(card, zone = 'active') {
       ),
   });
 
+  const damagePreview = await damagePreviewFor(card, zoneId, stadiumCard).catch(() => null);
+
   return {
     energyTypes,
     stadiumCostModifier,
+    damagePreview,
     abilityUsed: abilityUsedFlag,
     priorAttacks,
     extraAttacks: resolvedExtra,
@@ -828,7 +670,8 @@ const hydrateContext = (state) => {
 };
 
 /**
- * Open the inspector for one of your own board Pokémon.
+ * Open the carousel inspector — today only the in-play Stadium routes here (design 018); a
+ * Pokémon opens the card-focus overlay instead (design 074).
  *
  * @param {object} options
  * @param {object} options.card a preview card — a server stamp or a legacy zone card
@@ -854,6 +697,7 @@ export function openCardInspector({
   onRetreat = null,
   onUse = null,
 } = {}) {
+  suppressHoverPreview('modal');
   if (!card?.image) return false;
 
   // Carousel slide N sits to the right of slide N+1, so the attached cards go BEFORE the main
@@ -932,8 +776,7 @@ export const buildInspectorCard = ({
     built,
     card,
     getContext,
-    { onAttack, onAbility, onRetreat, onUse: null },
-    { layout: 'focus' }
+    { onAttack, onAbility, onRetreat, onUse: null }
   );
 
 /**

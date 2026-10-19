@@ -5,7 +5,7 @@
  *
  * A candidate is an in-play Pokémon whose live `card.image` DOM node is outlined
  * (holo-wrapper aware) and resolved on a capture-phase document click, across the
- * top document and both playmat iframe documents. Resolving reports the picked
+ * top document and both board-mirror shadow roots. Resolving reports the picked
  * candidate; it never moves anything (the server/legacy caller owns the move).
  *
  * Single-pick (`max <= 1`) resolves on the first click. Multi-pick (`max > 1`)
@@ -15,8 +15,6 @@
 import { imageAnchor } from '../deck-constructor/hydrate-holo.js';
 import { buildMatPickEntry, findMatPickHit } from './mat-pick.mjs';
 import {
-  selfContainer,
-  oppContainer,
   selfContainerDocument,
   oppContainerDocument,
 } from '../../state.js';
@@ -206,18 +204,6 @@ export function openMatPick({
   } catch {
     /* cross-realm access can throw; skip that document/element */
   }
-  try {
-    if (selfContainer?.contentWindow?.document)
-      targetDocs.add(selfContainer.contentWindow.document);
-  } catch {
-    /* cross-realm access can throw; skip that document/element */
-  }
-  try {
-    if (oppContainer?.contentWindow?.document)
-      targetDocs.add(oppContainer.contentWindow.document);
-  } catch {
-    /* cross-realm access can throw; skip that document/element */
-  }
 
   for (const entry of entries) {
     if (entry.targetEl?.ownerDocument)
@@ -270,14 +256,17 @@ export function openMatPick({
   };
 
   const onDocClick = (event) => {
-    if (banner.contains(event.target)) {
+    // A click on a board-mirror card (design 074 D4) reaches the page retargeted to the shadow
+    // host; the composed path's first node is the card itself.
+    const target = event.composedPath?.()[0] ?? event.target;
+    if (banner.contains(target)) {
       event.preventDefault();
       event.stopPropagation();
-      if (confirmBtn && event.target === confirmBtn) confirm();
-      else if (cancelBtn && event.target === cancelBtn) cancel();
+      if (confirmBtn && target === confirmBtn) confirm();
+      else if (cancelBtn && target === cancelBtn) cancel();
       return;
     }
-    const hitCard = findMatPickHit(entries, event.target);
+    const hitCard = findMatPickHit(entries, target);
     event.preventDefault();
     event.stopPropagation();
     handleHit(hitCard);

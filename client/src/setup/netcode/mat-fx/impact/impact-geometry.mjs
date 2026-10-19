@@ -42,6 +42,8 @@ export function boardCamera({ target = [0, 0, 0], height = 183, fovDeg = 20 } = 
     forward: [0, -1, 0],
     rotation: quatEuler(90 * DEG, 0, 0),
     viewHeightAt: (distance) => span * Math.max(0, distance),
+    // Distance along the view; design 075's board camera is not always straight down.
+    depthOf: (p) => target[1] + height - p[1],
   };
 }
 
@@ -97,7 +99,7 @@ function particleRotation(particle, align) {
 function screenSizeScale(renderer, particle, camera) {
   const size = Math.max(Math.abs(particle.size[0]), Math.abs(particle.size[1]));
   if (!(size > 0)) return 1;
-  const distance = Math.abs(camera.position[1] - particle.pos[1]);
+  const distance = Math.abs(camera.depthOf(particle.pos));
   const share = size / camera.viewHeightAt(distance);
   if (share > renderer.max) return renderer.max / share;
   if (share < renderer.min) return renderer.min / share;

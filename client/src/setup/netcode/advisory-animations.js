@@ -3,15 +3,19 @@
 // `applyView` in socket-event-listeners.js, so both players — originator
 // included — animate from the SAME server event: one source, no double-play.
 import { systemState } from '../../state.js';
+import { fxSettleHoldMs } from '../board3d/board-rects.js';
 import { rulesState } from '../../../../shared/engine/rules/rules-state.mjs';
 import {
   advisoryAnimationPlan,
   attackLeads,
   coinFlipRuns,
-  dealShuffles,
+  deckShuffles,
+  attackHitIds,
+  attackStrikes,
   deckRevealRuns,
   effectKnockoutIds,
   drawnCards,
+  strikeKnockouts,
   supersededDeals,
 } from './advisory-animations.mjs';
 import {
@@ -22,16 +26,13 @@ import {
 import { shouldAnimateMirror } from '../image-logic/draw-flight-predicate.mjs';
 import { playShuffleFlight } from '../image-logic/shuffle-flight.js';
 import { hideForFlight, playDrawBatch, showAfterFlight, takePrizeHandoff } from '../image-logic/draw-flight.js';
-import {
-  captureKnockoutGhost,
-  holdKnockoutGhost,
-  playKnockoutGhost,
-  releaseKnockoutGhost,
-} from '../image-logic/knockout-flight.js';
+import { captureKnockoutGhost, playKnockoutGhost } from '../image-logic/knockout-flight.js';
 import { fxDisabled, motionReduced } from '../image-logic/mat-fx.mjs';
 import { onFxSettingsChanged } from '../image-logic/fx-settings.js';
 import { playFx } from './mat-fx/index.js';
-import { afterImpact, attackSceneEndsAt } from './mat-fx/combat.js';
+import { pinSlideOrigins, releaseSlidePins } from './mat-fx/lifecycle.js';
+import { afterHit, attackSceneEndsAt, knockoutHoldFor } from './mat-fx/combat.js';
+import { seedDamageBaselines } from './mat-fx/damage-hit.mjs';
 import { playDeckReveal } from './mat-fx/deck-reveal.js';
 import { playFxSound } from './mat-fx/fx-audio.js';
 import { createFxQueue } from './mat-fx/fx-queue.mjs';
@@ -45,12 +46,6 @@ import { captureOrigins, discardOrigins, knockoutStack } from './mat-fx/origins.
 // gone from the DOM diff by then). Edge case 17: capture failure just means
 // no entry lands here, so the plan's lookup falls through to a no-op.
 const pendingKnockoutGhosts = new Map();
-
-// Plans that will not run (queue cleared, mirror skipped) leave no card standing in.
-const releaseKnockoutGhosts = () => {
-  for (const ghost of pendingKnockoutGhosts.values()) releaseKnockoutGhost(ghost);
-  pendingKnockoutGhosts.clear();
-};
 
 const sideFor = (user) => (user === 'self' ? 'you' : 'them');
 
@@ -70,8 +65,8 @@ const HELD_DRAW_BACKSTOP_MS = 9000;
 let prizeSeats = new Map();
 // Coin flips of the batch being applied, merged into one ceremony per run.
 let coinRuns = new Map();
-// The batch's deck shuffles that precede a deal (the opening's only shuffle flight).
-let shufflesBeforeDeals = new Set();
+// The batch's deck shuffles that animate, each mapped to its sound (deckShuffles).
+let shuffleSounds = new Map();
 // Design 059: each player's deck → hand reveals in the batch, keyed by the reveal that plays them.
 let revealRuns = new Map();
 // Design 064: the batch being applied arrived before the opening Active placement finished.
@@ -81,6 +76,21 @@ let effectKnockouts = new Set();
 // The batch's attacks, keyed by the first hit each one plays ahead of (attackLeads).
 let leadingAttacks = new Map();
 let movedAttacks = new Set();
+// Design 069: the cards each of the batch's attacks damaged (attackHitIds).
+let attackHits = new Map();
+// Design 069: the attack each of the batch's attacks, damages and knockouts belongs to.
+let strikesOf = new Map();
+// Design 069: each attack's knockouts, moved after its last damage (strikeKnockouts).
+let strikeKos = { after: new Map(), moved: new Set(), notLast: new Set() };
+
+// Design 069: each damaged card's total before this batch, from its counter on the board (no
+// counter = 0). Read before the diff applies the new totals.
+const damageBaselinesBefore = (events, registry) =>
+  events
+    .filter((event) => event?.type === 'damageUpdated' && event.instanceId != null)
+    .map((event) => ({ event, element: registry.get(event.instanceId)?.element }))
+    .filter(({ element }) => element)
+    .map(({ event, element }) => ({ instanceId: event.instanceId, damage: Number(element.dataset?.damage ?? 0) }));
 
 const capturePrizeSeats = (events, registry, selfPlayerId) => {
   prizeSeats = new Map();
@@ -211,14 +221,20 @@ const playRevealPlan = (plan) => {
 export function handleBeforeApply(events, selfPlayerId) {
   skippedDeals = supersededDeals(events);
   coinRuns = coinFlipRuns(events);
-  shufflesBeforeDeals = dealShuffles(events);
+  shuffleSounds = deckShuffles(events);
   revealRuns = deckRevealRuns(events);
   batchInSetup = !rulesState.startingActiveDone;
   effectKnockouts = effectKnockoutIds(events);
   leadingAttacks = attackLeads(events);
   movedAttacks = new Set(leadingAttacks.values());
+  attackHits = attackHitIds(events);
+  strikesOf = attackStrikes(events);
+  strikeKos = strikeKnockouts(events);
   if (!Array.isArray(events) || selfPlayerId == null) return;
+  // Design 074 §D6: on the 3D board the batch's effects start once its moved cards have landed.
+  holdFxQueue(fxSettleHoldMs(events));
   const registry = getCardRegistry();
+  seedDamageBaselines(damageBaselinesBefore(events, registry));
   capturePrizeSeats(events, registry, selfPlayerId);
   for (const event of events) {
     if (!event || event.type !== 'pokemonKnockedOut' || event.instanceId == null) continue;
@@ -229,13 +245,18 @@ export function handleBeforeApply(events, selfPlayerId) {
     const user = event.playerId === selfPlayerId ? 'self' : 'opp';
     const ghost = captureKnockoutGhost(user, shown.element);
     if (!ghost) continue;
-    const attached = rest.map((member) => ({ src: flightSrcOf(member.element) })).filter((a) => a.src);
-    pendingKnockoutGhosts.set(event.instanceId, holdKnockoutGhost({ ...ghost, attached }));
+    // The ids let the knockout scene fly each card's own mesh on the 3D board (design 074 H1).
+    const attached = rest
+      .map((member) => ({ src: flightSrcOf(member.element), instanceId: member.card?.instanceId }))
+      .filter((a) => a.src);
+    pendingKnockoutGhosts.set(event.instanceId, { ...ghost, attached, instanceId: shown.card?.instanceId });
   }
   if (!fxDisabled() && !motionReduced()) {
     captureOrigins(events, registry, captureKnockoutGhost, (event) =>
       event.playerId === selfPlayerId ? 'self' : 'opp'
     );
+    pinSlideOrigins(events, registry);
+    fxQueue.whenIdle().then(releaseSlidePins);
   }
 }
 
@@ -249,9 +270,9 @@ export function handleBeforeApply(events, selfPlayerId) {
  */
 function runPlan(plan) {
   if (plan.kind === 'shuffle') {
-    playShuffleFlight(plan.user, plan.zoneId, shuffleZoneCount(plan.user, plan.zoneId));
-    soundPlan({ effect: 'shuffle-flight', user: plan.user });
-    return 0;
+    const hold = playShuffleFlight(plan.user, plan.zoneId, shuffleZoneCount(plan.user, plan.zoneId));
+    soundPlan({ effect: plan.sound || 'shuffle-flight', user: plan.user });
+    return hold;
   }
   if (plan.kind === 'draw') return playDrawPlan(plan);
   if (plan.kind === 'reveal') return playRevealPlan(plan);
@@ -260,8 +281,9 @@ function runPlan(plan) {
     pendingKnockoutGhosts.delete(plan.instanceId);
     soundPlan({ effect: 'knockout', user: plan.user, ruleBoxes: plan.ruleBoxes, effectKo: plan.effectKo });
     if (!ghost) return 0;
-    playKnockoutGhost(ghost, { deferStart: afterImpact });
-    return holdFor('knockout');
+    // Design 069: a knockout lands on its own card's hit (a ripple hit lands after the contact).
+    playKnockoutGhost(ghost, { deferStart: (start) => afterHit(plan, start) });
+    return knockoutHoldFor(plan, holdFor('knockout'));
   }
   if (plan.kind === 'fx') return playFx(plan);
   if (plan.kind === 'wait') return plan.ms;
@@ -283,17 +305,11 @@ const fxQueue = createFxQueue({
 // but the queue would keep ticking timers to do it — and a restart or a player
 // leaving, where the plans describe a board that no longer exists.
 onFxSettingsChanged((settings) => {
-  if (settings.fxOff) {
-    fxQueue.clear();
-    releaseKnockoutGhosts();
-  }
+  if (settings.fxOff) fxQueue.clear();
 });
 
 if (typeof document !== 'undefined') {
-  document.addEventListener('game-restarted', () => {
-    fxQueue.clear();
-    releaseKnockoutGhosts();
-  });
+  document.addEventListener('game-restarted', () => fxQueue.clear());
 }
 
 /**
@@ -336,19 +352,23 @@ export function whenFxQueueIdle() {
  * @param {string|null} selfPlayerId
  */
 export function handleAdvisoryEvent(event, selfPlayerId) {
-  if (movedAttacks.has(event)) return;
+  if (movedAttacks.has(event) || strikeKos.moved.has(event)) return;
   const attack = leadingAttacks.get(event);
   if (attack) queueEvent(attack, selfPlayerId);
   queueEvent(event, selfPlayerId);
+  for (const knockout of strikeKos.after.get(event) ?? []) queueEvent(knockout, selfPlayerId);
 }
 
 function queueEvent(event, selfPlayerId) {
   if (skippedDeals.has(event)) return;
   const planned = advisoryAnimationPlan(event, selfPlayerId, coinRuns.get(event), {
-    dealShuffle: shufflesBeforeDeals.has(event),
+    shuffleSound: shuffleSounds.get(event),
     revealRun: revealRuns.get(event),
     setup: batchInSetup,
     effectKo: effectKnockouts,
+    hits: attackHits.get(event) ?? null,
+    strike: strikesOf.get(event) ?? null,
+    moreKnockouts: strikeKos.notLast.has(event),
   });
   if (!planned) return;
   const plans = Array.isArray(planned) ? planned : [planned];
@@ -362,9 +382,7 @@ function queueEvent(event, selfPlayerId) {
     })
   ) {
     for (const plan of plans) {
-      if (plan.kind !== 'knockout') continue;
-      releaseKnockoutGhost(pendingKnockoutGhosts.get(plan.instanceId));
-      pendingKnockoutGhosts.delete(plan.instanceId);
+      if (plan.kind === 'knockout') pendingKnockoutGhosts.delete(plan.instanceId);
     }
     // Once per EVENT: a fanned-out event's plans all share the same origins.
     if (plans.some((plan) => plan.kind === 'fx')) discardOrigins(event);

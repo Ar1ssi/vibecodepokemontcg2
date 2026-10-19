@@ -2,7 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  getTurnOrderFlip,
   getTurnOrderResult,
+  normalizeTurnOrderFlip,
   normalizeTurnOrderResult,
   registerTurnOrderCallListeners,
   resetTurnOrderCall,
@@ -47,15 +49,35 @@ test('normalizeTurnOrderResult accepts a well-formed payload', () => {
       caller: 'opp',
       call: 'tails',
       result: 'heads',
-      starter: 'self',
+      winner: 'self',
+      goFirst: false,
+      starter: 'opp',
       auto: 1,
+      choiceAuto: 0,
     }),
-    { caller: 'opp', call: 'tails', result: 'heads', starter: 'self', coinId: null, auto: true }
+    {
+      caller: 'opp',
+      call: 'tails',
+      result: 'heads',
+      winner: 'self',
+      goFirst: false,
+      starter: 'opp',
+      coinId: null,
+      auto: true,
+      choiceAuto: false,
+    }
   );
 });
 
 test('normalizeTurnOrderResult passes a bounded coinId and drops a bad one', () => {
-  const base = { caller: 'self', call: 'heads', result: 'heads', starter: 'self' };
+  const base = {
+    caller: 'self',
+    call: 'heads',
+    result: 'heads',
+    winner: 'self',
+    goFirst: true,
+    starter: 'self',
+  };
   assert.equal(
     normalizeTurnOrderResult({ ...base, coinId: 'SVC_Gold_Pikachu_Coin' }).coinId,
     'SVC_Gold_Pikachu_Coin'
@@ -66,11 +88,18 @@ test('normalizeTurnOrderResult passes a bounded coinId and drops a bad one', () 
 });
 
 test('normalizeTurnOrderResult rejects a half-valid payload', () => {
-  const good = { caller: 'self', call: 'heads', result: 'heads', starter: 'self' };
+  const good = {
+    caller: 'self',
+    call: 'heads',
+    result: 'heads',
+    winner: 'self',
+    goFirst: true,
+    starter: 'self',
+  };
   assert.equal(normalizeTurnOrderResult(null), null);
   assert.equal(normalizeTurnOrderResult(undefined), null);
   assert.equal(normalizeTurnOrderResult({}), null);
-  for (const key of ['caller', 'call', 'result', 'starter']) {
+  for (const key of ['caller', 'call', 'result', 'winner', 'goFirst', 'starter']) {
     assert.equal(
       normalizeTurnOrderResult({ ...good, [key]: 'nonsense' }),
       null,
@@ -157,18 +186,24 @@ test('turnOrderResult is dispatched and cached for a late reader', () => {
     caller: 'self',
     call: 'heads',
     result: 'tails',
+    winner: 'opp',
+    goFirst: true,
     starter: 'opp',
     coinId: 'SVC_Gold_Pikachu_Coin',
     auto: false,
+    choiceAuto: true,
   });
 
   const expected = {
     caller: 'self',
     call: 'heads',
     result: 'tails',
+    winner: 'opp',
+    goFirst: true,
     starter: 'opp',
     coinId: 'SVC_Gold_Pikachu_Coin',
     auto: false,
+    choiceAuto: true,
   };
   assert.equal(doc.events[0].type, 'rules-turn-order-result');
   assert.deepEqual(doc.events[0].detail, expected);
@@ -205,4 +240,193 @@ test('a rejected call is surfaced with its reason', () => {
       ['rules-turn-order-call-rejected', 'unknown'],
     ]
   );
+});
+
+// Design 072: the coin lands first; the winner's choice comes later.
+const FLIP = {
+  roomId: 'room-1',
+  caller: 'opp',
+  call: 'tails',
+  result: 'tails',
+  winner: 'self',
+  choiceId: 'room-1:1:choice',
+  coinId: 'SVC_Gold_Pikachu_Coin',
+  auto: false,
+  timeoutMs: 25000,
+};
+
+test('normalizeTurnOrderFlip keeps the choiceId only on the winner copy', () => {
+  assert.deepEqual(normalizeTurnOrderFlip(FLIP), {
+    caller: 'opp',
+    call: 'tails',
+    result: 'tails',
+    winner: 'self',
+    choiceId: 'room-1:1:choice',
+    coinId: 'SVC_Gold_Pikachu_Coin',
+    auto: false,
+    timeoutMs: 25000,
+  });
+  assert.equal(normalizeTurnOrderFlip({ ...FLIP, winner: 'opp' }).choiceId, null);
+  assert.equal(normalizeTurnOrderFlip({ ...FLIP, choiceId: 7 }).choiceId, null);
+  assert.equal(normalizeTurnOrderFlip({ ...FLIP, timeoutMs: 'soon' }).timeoutMs, null);
+});
+
+test('normalizeTurnOrderFlip rejects a half-valid payload', () => {
+  assert.equal(normalizeTurnOrderFlip(null), null);
+  for (const key of ['caller', 'call', 'result', 'winner']) {
+    assert.equal(
+      normalizeTurnOrderFlip({ ...FLIP, [key]: 'nonsense' }),
+      null,
+      `expected a bad ${key} to be rejected`
+    );
+  }
+});
+
+test('turnOrderFlip is dispatched with its room and cached until reset', () => {
+  resetTurnOrderCall();
+  const socket = fakeSocket();
+  const doc = fakeDoc();
+  registerTurnOrderCallListeners(socket, doc);
+
+  socket.emitInbound('turnOrderFlip', FLIP);
+  socket.emitInbound('turnOrderFlip', { ...FLIP, winner: 'nobody' });
+
+  assert.equal(doc.events.length, 1);
+  assert.equal(doc.events[0].type, 'rules-turn-order-flip');
+  assert.equal(doc.events[0].detail.roomId, 'room-1');
+  assert.equal(doc.events[0].detail.choiceId, 'room-1:1:choice');
+  assert.equal(getTurnOrderFlip().winner, 'self');
+
+  resetTurnOrderCall();
+  assert.equal(getTurnOrderFlip(), null);
+});
+
+test('a rejected choice is surfaced with its reason', () => {
+  const socket = fakeSocket();
+  const doc = fakeDoc();
+  registerTurnOrderCallListeners(socket, doc);
+
+  socket.emitInbound('turnOrderChoiceRejected', { reason: 'not_winner' });
+  socket.emitInbound('turnOrderChoiceRejected', undefined);
+
+  assert.deepEqual(
+    doc.events.map((e) => [e.type, e.detail.reason]),
+    [
+      ['rules-turn-order-choice-rejected', 'not_winner'],
+      ['rules-turn-order-choice-rejected', 'unknown'],
+    ]
+  );
+});
+
+test('normalizeTurnOrderResult rejects a starter the winner did not choose', () => {
+  const base = { caller: 'self', call: 'heads', result: 'tails', winner: 'opp' };
+  assert.equal(normalizeTurnOrderResult({ ...base, goFirst: true, starter: 'self' }), null);
+  assert.equal(normalizeTurnOrderResult({ ...base, goFirst: false, starter: 'opp' }), null);
+  assert.equal(normalizeTurnOrderResult({ ...base, goFirst: false, starter: 'self' }).starter, 'self');
+});
+
+// Design 074 D7: one solo socket gets p1's copy, then p2's, of every message.
+function soloCopies({ callerSeat, winnerSeat, starterSeat }) {
+  const side = (seat, recipient) => (seat === recipient ? 'self' : 'opp');
+  return ['p1', 'p2'].map((recipient) => ({
+    call: {
+      roomId: 'solo-x',
+      callId: recipient === callerSeat ? 'call-1' : null,
+      waiting: recipient !== callerSeat,
+      timeoutMs: 15000,
+    },
+    flip: {
+      roomId: 'solo-x',
+      caller: side(callerSeat, recipient),
+      call: 'heads',
+      result: 'tails',
+      winner: side(winnerSeat, recipient),
+      choiceId: recipient === winnerSeat ? 'choice-1' : null,
+      timeoutMs: 25000,
+    },
+    result: {
+      roomId: 'solo-x',
+      caller: side(callerSeat, recipient),
+      call: 'heads',
+      result: 'tails',
+      winner: side(winnerSeat, recipient),
+      goFirst: starterSeat === winnerSeat,
+      starter: side(starterSeat, recipient),
+    },
+  }));
+}
+
+function playSolo(nearSeat, seats) {
+  resetTurnOrderCall();
+  const socket = fakeSocket();
+  const doc = fakeDoc();
+  registerTurnOrderCallListeners(socket, doc, { systemState: { solo: true, nearSeat } });
+  const copies = soloCopies(seats);
+  for (const kind of ['call', 'flip', 'result']) {
+    const event = { call: 'turnOrderCall', flip: 'turnOrderFlip', result: 'turnOrderResult' }[kind];
+    for (const copy of copies) socket.emitInbound(event, copy[kind]);
+  }
+  const of = (type) => doc.events.filter((e) => e.type === type).map((e) => e.detail);
+  return {
+    calls: of('rules-turn-order-call'),
+    flips: of('rules-turn-order-flip'),
+    results: of('rules-turn-order-result'),
+  };
+}
+
+test('solo: the call opens once, for the seat holding the callId', () => {
+  for (const nearSeat of ['p1', 'p2']) {
+    for (const callerSeat of ['p1', 'p2']) {
+      const { calls } = playSolo(nearSeat, { callerSeat, winnerSeat: 'p1', starterSeat: 'p1' });
+      assert.equal(calls.length, 1, `${callerSeat}@${nearSeat}`);
+      assert.equal(calls[0].callId, 'call-1');
+      assert.equal(calls[0].waiting, false);
+      assert.equal(calls[0].seat, callerSeat);
+    }
+  }
+});
+
+test('solo: the winner\'s copy opens the prompt, relabeled to the near seat', () => {
+  const { flips } = playSolo('p1', { callerSeat: 'p1', winnerSeat: 'p2', starterSeat: 'p2' });
+  assert.equal(flips.length, 1);
+  assert.equal(flips[0].choiceId, 'choice-1');
+  assert.equal(flips[0].choiceSeat, 'p2');
+  assert.equal(flips[0].winner, 'opp', 'p2 sits across from the near seat p1');
+  assert.equal(flips[0].caller, 'self');
+  assert.equal(getTurnOrderFlip().choiceSeat, 'p2');
+
+  const flipped = playSolo('p2', { callerSeat: 'p1', winnerSeat: 'p2', starterSeat: 'p2' }).flips;
+  assert.equal(flipped[0].winner, 'self');
+  assert.equal(flipped[0].caller, 'opp');
+});
+
+test('solo: both result copies read from the near seat', () => {
+  const { results } = playSolo('p1', { callerSeat: 'p2', winnerSeat: 'p2', starterSeat: 'p1' });
+  assert.equal(results.length, 2);
+  for (const result of results) {
+    assert.equal(result.starter, 'self');
+    assert.equal(result.winner, 'opp');
+    assert.equal(result.caller, 'opp');
+  }
+  assert.equal(getTurnOrderResult().starter, 'self');
+});
+
+test('solo: a copy that names its seat is attributed to it, whatever the order', () => {
+  resetTurnOrderCall();
+  const socket = fakeSocket();
+  const doc = fakeDoc();
+  registerTurnOrderCallListeners(socket, doc, { systemState: { solo: true, nearSeat: 'p1' } });
+  socket.emitInbound('turnOrderCall', { roomId: 'solo-x', callId: 'call-9', seat: 'p2' });
+  assert.equal(doc.events[0].detail.seat, 'p2');
+});
+
+test('a normal room keeps the waiting copy and names no seat', () => {
+  resetTurnOrderCall();
+  const socket = fakeSocket();
+  const doc = fakeDoc();
+  registerTurnOrderCallListeners(socket, doc, { systemState: { solo: false, nearSeat: 'p1' } });
+  socket.emitInbound('turnOrderCall', { roomId: 'r', callId: null, waiting: true });
+  assert.equal(doc.events.length, 1);
+  assert.equal(doc.events[0].detail.waiting, true);
+  assert.equal('seat' in doc.events[0].detail, false);
 });

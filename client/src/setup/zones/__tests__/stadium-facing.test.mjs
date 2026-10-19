@@ -35,9 +35,9 @@ test('setStadiumFacing ignores a missing element', () => {
   assert.doesNotThrow(() => setStadiumFacing({}, true));
 });
 
-// Opponent-played Stadiums vanished: an inline scale(-1,-1) on #stadium replaced
-// the tilt transform and pivoted around the tilt origin, far off-screen.
-test('index.css flips the Stadium image, leaving #stadium on the tilt transform', () => {
+// Opponent-played Stadiums vanished: an inline scale(-1,-1) on #stadium pivoted the
+// whole slot around a far-off origin.
+test('index.css flips the Stadium image, leaving #stadium itself untransformed', () => {
   const css = readFileSync(
     fileURLToPath(new URL('../../../css/index.css', import.meta.url)),
     'utf8'

@@ -212,7 +212,8 @@ export function reconcileHandStacks(user = 'self', options = {}) {
         // Find existing stack element or create a new one
         const firstCardNode = group.cards[0].card.rootNode;
         let stackEl = firstCardNode.closest?.('.hand-card-stack');
-        if (!stackEl || stackEl.ownerDocument !== doc) {
+        // getRootNode: the hand's document, or its board-mirror shadow root (design 074 D4).
+        if (!stackEl || (stackEl.getRootNode?.() ?? stackEl.ownerDocument) !== doc) {
           stackEl = doc.createElement('div');
         }
 

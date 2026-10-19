@@ -12,6 +12,11 @@
 // --rotate-x/y, --tilt-amount.
 
 import { extractTcgdexIdFromImageUrl } from '../../../../../shared/engine/rules/legacy-set-ids.mjs';
+import { cardArtImageParts } from '../../../../../shared/tcgdex/card-art.mjs';
+import { foilCoverage, foilRecordFor } from '../../foil/tcgl-foil-manifest.mjs';
+import { foilManifestNow } from '../../foil/tcgl-foil-store.js';
+import { deferTcglFoil, mountTcglFoil } from '../../foil/tcgl-foil-view.js';
+import { CARD_ART_CORS_HOSTS } from '../../gl/card-art-hosts.mjs';
 
 // Rarity (TCGdex) → simey data-rarity value (per the Bulbapedia rarity guide).
 // Returns null → no holo (plain <img>).
@@ -100,6 +105,72 @@ export function resolveHoloEffect(card = {}) {
   return effect;
 }
 
+// ── TCG Live foil (design 069) ──────────────────────────────────────
+// A card TCG Live prints decides its own foil: its base printing's foil (`'tcgl'`, the game's shader and
+// masks) or none (`null`, a NonFoil printing), whatever the TCGdex rarity says. A reverse-holo card wears TCG
+// Live's reverse printing (MaterialManifest_ph) when the game has one. Cards TCG Live does not cover — or
+// every card while the manifest is not loaded — keep the CSS holo above.
+export const TCGL_FOIL_RARITY = 'tcgl';
+
+// The set browser's reverse-holo copies carry `<tcgdex id>-reverse` (set-browser buildReverseHoloEnergyCard).
+const REVERSE_ID_SUFFIX = /-reverse$/i;
+
+const cardIdCandidates = (card) =>
+  [
+    card?.id,
+    card?.data?.id,
+    extractTcgdexIdFromImageUrl(card?.image?.src ?? card?.imageUrl ?? card?.src),
+  ]
+    .filter(Boolean)
+    .map((id) => String(id).replace(REVERSE_ID_SUFFIX, ''));
+
+// BW through SV (gens 5–9) Pokémon and Trainers that TCG Live prints NonFoil but also prints as a reverse
+// holo show the reverse printing in place of the plain one (user call, 2026-10-18). Main and special sets
+// only: promos, galleries and vaults have no reverse printing. Energy keeps its separate `-reverse` copies.
+// Needs the manifest: without it a card can't be known to have a reverse printing and stays plain.
+const REVERSE_IN_PLACE_SET = /^(?:bw\d+|xy\d+|dc1|g1|sm\d+(?:\.5)?|sm115|swsh\d+(?:\.5)?|sv\d+(?:\.5[bw]?)?)-/i;
+
+const showsReverseInPlace = (card, manifest) =>
+  !!manifest &&
+  resolveRarityEffect(card) === null &&
+  !isEnergyCard(card) &&
+  cardIdCandidates(card).some(
+    (id) =>
+      REVERSE_IN_PLACE_SET.test(id) &&
+      foilCoverage(manifest, id) === 'flat' &&
+      foilCoverage(manifest, id, { reverse: true }) === 'foil'
+  );
+
+/**
+ * A card shown as a reverse-holo printing: its rarity says so (set browser copies, rarity "Reverse Holo"), or it
+ * is a plain BW/XY card TCG Live also prints as a reverse holo.
+ */
+export const isReverseHoloCard = (card, manifest = foilManifestNow()) =>
+  !!card && (resolveRarityEffect(card) === 'reverse holo' || showsReverseInPlace(card, manifest));
+
+/**
+ * The TCGdex id the foil manifest knows this card by (else the first id it has, else null). `reverse` looks in
+ * the reverse-holo printings; it defaults to whether the card shows as a reverse holo.
+ */
+export function foilCardId(card, manifest = foilManifestNow(), { reverse = isReverseHoloCard(card, manifest) } = {}) {
+  const ids = cardIdCandidates(card);
+  return ids.find((id) => foilCoverage(manifest, id, { reverse })) ?? ids[0] ?? null;
+}
+
+/** 'foil' | 'flat' | null — see foilCoverage; null for a card without any id. */
+export function tcglFoilCoverage(card, manifest = foilManifestNow(), { reverse = isReverseHoloCard(card, manifest) } = {}) {
+  if (!card || !manifest) return null;
+  return foilCoverage(manifest, foilCardId(card, manifest, { reverse }), { reverse });
+}
+
+export function resolveFoilEffect(card = {}, manifest = foilManifestNow()) {
+  // A reverse printing TCG Live lacks is never 'flat': the card falls through to the CSS reverse holo.
+  const coverage = tcglFoilCoverage(card, manifest);
+  if (coverage === 'foil') return TCGL_FOIL_RARITY;
+  if (coverage === 'flat') return null;
+  return resolveHoloEffect(card);
+}
+
 function resolveRarityEffect(card) {
   const rarity = String(card.rarity || card?.data?.rarity || '').trim();
   if (!rarity) return null;
@@ -137,14 +208,7 @@ function resolveRarityEffect(card) {
 // (text, HP, attack costs) stays black and foil only lives on bright areas.
 // A CSS mask image that fails to load (e.g. blocked by CORS) renders as
 // transparent black and hides the whole layer, so only hosts verified to send
-// CORS headers (checked 2026-09-15) get the mask.
-const INK_MASK_CORS_HOSTS = new Set([
-  'assets.tcgdex.net',
-  'images.pokemontcg.io',
-  'limitlesstcg.nyc3.digitaloceanspaces.com',
-  'limitlesstcg.nyc3.cdn.digitaloceanspaces.com',
-  'ptcgsim.online',
-]);
+// CORS headers (CARD_ART_CORS_HOSTS, card-art-hosts.mjs) get the mask.
 
 // Characters that could break out of a CSS `url("...")` token.
 const isUnsafeInCssUrl = (src) =>
@@ -167,7 +231,7 @@ export function foilMaskUrl(src, pageOrigin = globalThis.location?.origin) {
   if (url.protocol === 'data:' || url.protocol === 'blob:') return src;
   if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
   if (pageOrigin && url.origin === pageOrigin) return url.href;
-  return INK_MASK_CORS_HOSTS.has(url.hostname) ? url.href : null;
+  return CARD_ART_CORS_HOSTS.has(url.hostname) ? url.href : null;
 }
 
 // ── card era and layout ──────────────────────────────────────────────
@@ -270,6 +334,8 @@ const eraFromCode = (code) => {
 // Returns null for other hosts or unparseable input.
 const cardImageParts = (src) => {
   if (typeof src !== 'string' || !src) return null;
+  const ownArt = cardArtImageParts(src);
+  if (ownArt) return ownArt;
   let url;
   try {
     url = new URL(src);
@@ -341,8 +407,15 @@ export function isTrainerGalleryImageUrl(src) {
   );
 }
 
-// Build the holo card: simey's DOM with a single <img> + shine/glitter/glare/glare2.
-export function buildHoloCard(imageUrl, rarityValue, { trainer = false } = {}) {
+// Build the holo card: simey's DOM with a single <img> + shine/glitter/glare/glare2. Rarity 'tcgl' also
+// mounts the TCG Live foil canvas for `cardId` (else the id in the image URL) — its reverse-holo printing when
+// `reverse` — and its simey layers stay hidden. `mountFoil: false` only notes the record on the wrapper (the
+// 3D board's card mesh draws the foil; a clone of the wrapper still mounts a view of its own).
+export function buildHoloCard(
+  imageUrl,
+  rarityValue,
+  { trainer = false, cardId = null, reverse = false, manifest = foilManifestNow(), mountFoil = true } = {}
+) {
   const card = document.createElement('div');
   card.className = 'card';
   if (rarityValue) card.dataset.rarity = rarityValue;
@@ -391,6 +464,12 @@ export function buildHoloCard(imageUrl, rarityValue, { trainer = false } = {}) {
   translater.appendChild(rotator);
   card.appendChild(translater);
 
+  if (rarityValue === TCGL_FOIL_RARITY) {
+    const record = foilRecordFor(manifest, cardId ?? extractTcgdexIdFromImageUrl(imageUrl), { reverse });
+    if (record && mountFoil) mountTcglFoil(card, record);
+    else if (record) deferTcglFoil(card, record);
+    else card.dataset.tcglFoil = 'fallback';
+  }
   return card;
 }
 
@@ -478,6 +557,20 @@ export class Spring {
 // [-1, 1] per axis (1 = simey's maximum rotation).
 export const MAX_ROTATE_X = 50 / 3.5;
 export const MAX_ROTATE_Y = 25;
+
+// simey's 600px perspective was tuned for a ~460px-tall card. A fixed 600px on a
+// full-view card twice that size turns a 25deg tilt into a trapezoid, so the
+// perspective grows with the card's layout height; smaller cards keep 600px.
+export const HOLO_PERSPECTIVE_MIN_PX = 600;
+export const HOLO_PERSPECTIVE_PER_HEIGHT = 1.3;
+
+export function holoPerspectivePx(cardHeight) {
+  if (!Number.isFinite(cardHeight) || cardHeight <= 0) return HOLO_PERSPECTIVE_MIN_PX;
+  return Math.max(
+    HOLO_PERSPECTIVE_MIN_PX,
+    Math.round(cardHeight * HOLO_PERSPECTIVE_PER_HEIGHT)
+  );
+}
 
 export const LIGHT = Object.freeze({
   originX: 38,
@@ -582,6 +675,11 @@ export function startHoloAnimation(
     const rect = card.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return;
     hovering = true;
+    // offsetHeight is the untransformed layout size; the rect is projected by the tilt itself.
+    card.style.setProperty(
+      '--holo-perspective',
+      `${holoPerspectivePx(card.offsetHeight || rect.height)}px`
+    );
     const percentX = clamp(
       round((100 / rect.width) * (event.clientX - rect.left))
     );
@@ -644,8 +742,11 @@ export function startHoloAnimation(
     if (!auto && !hovering && flat) {
       lightTilt = driftTilt(now + driftOffsetMs, driftAmplitude);
     }
+    // The TCG Live foil view (design 069) shades its mesh at this same angle.
+    const foilTilt = lightTilt ?? rotateTilt;
+    card.__foilTilt = foilTilt;
     applyVars(
-      computeLightVars(lightTilt ?? rotateTilt),
+      computeLightVars(foilTilt),
       springRotate.current.x,
       springRotate.current.y,
       tiltAmountOf(rotateTilt.tiltX, rotateTilt.tiltY)
@@ -653,7 +754,6 @@ export function startHoloAnimation(
     rafId = requestAnimationFrame(tick);
   };
 
-  const onPointerEnter = (event) => interact(event);
   const onPointerMove = (event) => interact(event);
   const onPointerLeave = () => {
     hovering = false;
@@ -662,10 +762,10 @@ export function startHoloAnimation(
 
   const hitTarget = card;
   const innerImg = card.querySelector('img');
+  // Only real motion tilts the card. A preview popping open under a resting cursor gets
+  // pointerenter mid-flight, measured against the small in-flight rect, and with no move to
+  // follow the card leaned into that stale target and stayed there.
   if (!auto) {
-    hitTarget.addEventListener('pointerenter', onPointerEnter, {
-      passive: true,
-    });
     hitTarget.addEventListener('pointermove', onPointerMove, { passive: true });
     hitTarget.addEventListener('pointerleave', onPointerLeave, {
       passive: true,
@@ -683,7 +783,6 @@ export function startHoloAnimation(
     if (rafId != null) cancelAnimationFrame(rafId);
     if (interactEndTimer) clearTimeout(interactEndTimer);
     if (!auto) {
-      hitTarget.removeEventListener('pointerenter', onPointerEnter);
       hitTarget.removeEventListener('pointermove', onPointerMove);
       hitTarget.removeEventListener('pointerleave', onPointerLeave);
       if (innerImg && innerImg !== hitTarget) {

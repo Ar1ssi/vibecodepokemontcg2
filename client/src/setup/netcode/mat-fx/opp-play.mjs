@@ -18,6 +18,22 @@ export const PREVIEW_PLACE_MS = PLACE_MS;
 export const previewPlayMs = (holdMs = OPP_PLAY_HOLD_MS) => GROW_END_MS + Math.max(0, Number(holdMs) || 0) + PLACE_MS;
 export const OPP_PLAY_MS = previewPlayMs();
 
+/**
+ * The last leg of a preview play, where the card shrinks into its spot: when it starts (ms into
+ * the play) and how long it lasts. A card drawn on the 3D board flies this leg on its own mesh.
+ */
+export const previewPlaceLeg = (holdMs = OPP_PLAY_HOLD_MS) => ({
+  startMs: previewPlayMs(holdMs) - PLACE_MS,
+  durationMs: PLACE_MS,
+});
+
+/** `track` (an `oppPlayTrack` over previewPlayMs(holdMs)) cut down to its placing leg, as its own 0..1 track. */
+export const placeLegOf = (track, holdMs = OPP_PLAY_HOLD_MS) => {
+  const total = previewPlayMs(holdMs);
+  const { startMs, durationMs } = previewPlaceLeg(holdMs);
+  return (u) => track((startMs + Math.max(0, Math.min(1, u)) * durationMs) / total);
+};
+
 // Scale (of the preview) where the card lands on the mat before it grows.
 const DROP_SCALE = 0.45;
 // How far from the hand toward the preview the card drops before it grows.

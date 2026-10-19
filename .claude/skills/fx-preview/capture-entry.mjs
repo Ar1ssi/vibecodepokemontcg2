@@ -4,11 +4,13 @@
 // env:   CARD_IMG  local file or URL of the card face (required)
 //        TYPE      energy type for the card, e.g. Fire (default Darkness)
 //        BASE_URL  server origin (default http://localhost:4000)
-//        CHROMIUM  browser executable (omit to use Playwright's own install)
+//        CHROMIUM  browser executable (omit to use Playwright's own install; CHROMIUM_PATH works too)
 //        SIO_JS    local socket.io client file, only where cdn.socket.io is unreachable
+//        The server must run with SERVER_AUTHORITATIVE=1 (the three.js board, design 074).
 import { chromium } from 'playwright';
 import { mkdirSync, rmSync, existsSync } from 'node:fs';
 import path from 'node:path';
+import { launchOptions, openBoard } from './board-mode.mjs';
 
 const [
   kind = 'tera',
@@ -20,16 +22,13 @@ const {
   CARD_IMG,
   TYPE = 'Darkness',
   BASE_URL = 'http://localhost:4000',
-  CHROMIUM,
   SIO_JS,
 } = process.env;
 if (kind !== 'tera' && kind !== 'mega')
   throw new Error(`kind must be tera or mega, got ${kind}`);
 if (!CARD_IMG) throw new Error('set CARD_IMG to a card image file or URL');
 
-const browser = await chromium.launch(
-  CHROMIUM ? { executablePath: CHROMIUM } : {}
-);
+const browser = await chromium.launch(launchOptions());
 const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
 if (SIO_JS) {
   await page.route('https://cdn.socket.io/**', (r) =>
@@ -45,20 +44,14 @@ if (localImg) {
 }
 page.on('pageerror', (e) => console.log('pageerror', e.message));
 
-await page.goto(`${BASE_URL}/?e2e=1`);
-await page.waitForFunction(() => window.__ptcg?.ready === true, null, {
-  timeout: 30000,
-});
-await page.waitForTimeout(800);
+await openBoard(page, BASE_URL);
 
 const clip = await page.evaluate(
   async ([kind, type, src]) => {
-    const { visualRectOf } =
-      await import('/src/setup/image-logic/iframe-rect.mjs');
     const fx = await import('/src/setup/netcode/mat-fx/entry.js');
-    const doc = document.getElementById('selfContainer').contentDocument;
-    const zone = visualRectOf(
-      doc.getElementById(kind === 'mega' ? 'active' : 'bench')
+    const zone = await window.__fxBoard.zoneRect(
+      'self',
+      kind === 'mega' ? 'active' : 'bench'
     );
     const h = 110;
     const w = h * 0.716;
@@ -106,7 +99,7 @@ const clip = await page.evaluate(
       ms >= 1500 ? 0 : realTimeout(fn, ms, ...rest);
     fx.playSignatureEntry(kind, rect, 1, card);
     window.setTimeout = realTimeout;
-    for (const a of document.getAnimations()) a.pause();
+    window.__fxBoard.pauseAll();
 
     const pad = 410;
     return {
@@ -123,14 +116,7 @@ rmSync(outDir, { recursive: true, force: true });
 mkdirSync(outDir, { recursive: true });
 let frame = 0;
 for (let t = 0; t <= Number(durArg); t += Number(stepArg)) {
-  await page.evaluate(
-    (t) =>
-      new Promise((resolve) => {
-        for (const a of document.getAnimations()) a.currentTime = t;
-        requestAnimationFrame(() => requestAnimationFrame(resolve));
-      }),
-    t
-  );
+  await page.evaluate((t) => window.__fxBoard.stepTo(t), t);
   await page.screenshot({
     path: path.join(outDir, `f${String(frame).padStart(3, '0')}.png`),
     clip,

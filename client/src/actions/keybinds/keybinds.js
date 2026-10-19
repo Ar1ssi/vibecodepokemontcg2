@@ -17,6 +17,7 @@ import { doubleClick } from '../../setup/image-logic/click-events.js';
 import { refreshBoardImages } from '../../setup/sizing/refresh-board.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { dispatchServerCardKey } from '../../setup/netcode/manual-card-dispatch.js';
+import { beginServerAttach } from '../../setup/netcode/server-card-select.js';
 import { isInFullView } from '../../setup/deck-constructor/hydrate-holo.js';
 import { isCardPreviewOpen } from '../../setup/image-logic/full-view.js';
 import { addDamageCounter } from '../counters/damage-counter.js';
@@ -39,6 +40,7 @@ import {
   hideZoneElements,
 } from '../general/close-popups.js';
 import { closeCardFocus, isCardFocusOpen } from '../../setup/rules/card-focus.mjs';
+import { closeStatusPopup, isStatusPopupOpen } from '../../setup/rules/status-popup.mjs';
 import { flipBoard } from '../general/flip-board.js';
 import { flipCoin } from '../general/flip-coin.js';
 import { reset } from '../general/reset.js';
@@ -130,7 +132,12 @@ export const keyDown = (event) => {
   }
   if (event.key === 'Escape' || event.code === 'Escape') {
     // The card focus closes with its own fly-back; closePopups() would not (it must not close the
-    // focus at all: it also runs on every card move and document click).
+    // focus at all: it also runs on every card move and document click). The status popup sits on
+    // top of the focus, so Escape closes it first.
+    if (isStatusPopupOpen()) {
+      closeStatusPopup();
+      return;
+    }
     if (isCardFocusOpen()) {
       closeCardFocus();
       return;
@@ -249,6 +256,7 @@ export const keyDown = (event) => {
           mouseClick.cardIndex
         );
       } else {
+        // A server-drawn card moves by its instance id (null for a legacy card: unchanged).
         moveCardBundle(
           mouseClick.cardUser,
           systemState.initiator,
@@ -256,7 +264,10 @@ export const keyDown = (event) => {
           dZoneId,
           mouseClick.cardIndex,
           false,
-          'move'
+          'move',
+          true,
+          null,
+          { moving: mouseClick.cardInstanceId }
         );
       }
     }
@@ -266,6 +277,18 @@ export const keyDown = (event) => {
         event.key === 'q' ||
         event.code === 'KeyQ') &&
       !isAltKeyPressed(event) &&
+      !mouseClick.card &&
+      beginServerAttach()
+    ) {
+      closeFullView(event);
+      hideZoneElements();
+    } else if (
+      (event.key === 'e' ||
+        event.code === 'KeyE' ||
+        event.key === 'q' ||
+        event.code === 'KeyQ') &&
+      !isAltKeyPressed(event) &&
+      mouseClick.card &&
       (!['active', 'bench'].includes(mouseClick.zoneId) ||
         mouseClick.card.image.attached)
     ) {

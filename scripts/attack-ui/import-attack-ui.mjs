@@ -4,8 +4,11 @@
  * Run: node scripts/attack-ui/import-attack-ui.mjs --src <extract dir>          (writes assets)
  *      node scripts/attack-ui/import-attack-ui.mjs --src <extract dir> --check  (exit 1 on drift)
  * <extract dir> is E:/TCGLive_Extract. Sprites come from `Pokemon TCG Live_Data/sharedassets1.assets/Sprite`;
- * the localized Ability tags come from `pokemon_Pokemon TCG Live/propertybadge_en/Sprite`.
- * Colours, ink and 9-slice borders in attack-ui.json come from dump-registry.py (same folder).
+ * the localized Ability tags come from `pokemon_Pokemon TCG Live/propertybadge_en/Sprite`; the cost and
+ * Weakness/Resistance type icons (EnergyCostDisplay's RawImage textures) from
+ * `Pokemon TCG Live_Data/resources.assets/Texture2D`.
+ * Colours, ink and 9-slice borders in attack-ui.json, and the HUD sprites drawn at their full sprite
+ * rect (design 074), come from dump-registry.py (same folder).
  */
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -16,6 +19,27 @@ export const DEFAULT_OUT_DIR = join(ROOT, 'client/src/assets/attack-ui');
 
 const UI_SPRITES = 'Pokemon TCG Live_Data/sharedassets1.assets/Sprite';
 const BADGE_SPRITES = 'pokemon_Pokemon TCG Live/propertybadge_en/Sprite';
+const TYPE_ICONS = 'Pokemon TCG Live_Data/resources.assets/Texture2D';
+const SOURCE_DIRS = { ui: UI_SPRITES, badge: BADGE_SPRITES, icon: TYPE_ICONS };
+
+// [asset key, filled texture, empty texture]. ResourceManager's EnergyIconType names: Colorless is
+// "normal", Darkness "dark", Metal "steel"; `empty` is the no-cost icon, which has no empty variant.
+export const TYPE_ICON_KEYS = [
+  ['colorless', 'type_normal', 'type_Normal_Empty'],
+  ['fire', 'type_fire', 'type_Fire_Empty'],
+  ['grass', 'type_grass', 'type_Grass_Empty'],
+  ['water', 'type_water', 'type_Water_Empty'],
+  ['lightning', 'type_lightning', 'type_Lightning_Empty'],
+  ['psychic', 'type_psychic', 'type_Psychic_Empty'],
+  ['fighting', 'type_fighting', 'type_Fighting_Empty'],
+  ['darkness', 'type_dark', 'type_Dark_Empty'],
+  ['metal', 'type_steel', 'type_Steel_Empty'],
+  ['dragon', 'type_dragon', 'type_Dragon_Empty'],
+  ['fairy', 'type_fairy', 'type_Fairy_Empty'],
+  ['rainbow', 'type_rainbow', 'type_Rainbow_Empty'],
+  ['plus', 'type_plus', 'type_Plus_Empty'],
+  ['empty', 'type_empty', null],
+];
 
 // [asset key, titlebar stem, short-titlebar stem, retreat stem]. The extract spells Fairy "Fariy"
 // in one titlebar sprite and calls Darkness "Dark" on the retreat button.
@@ -33,7 +57,7 @@ const TYPES = [
   ['psychic', 'Psychic', 'Psychic', 'Psychic'],
 ];
 
-/** @returns {{ out: string, from: 'ui'|'badge', source: string }[]} */
+/** @returns {{ out: string, from: 'ui'|'badge'|'icon', source: string }[]} */
 export function spriteMap() {
   const rows = [];
   const ui = (out, source) => rows.push({ out, from: 'ui', source });
@@ -72,6 +96,10 @@ export function spriteMap() {
   ui('row-bg-off.png', 'atkOv_Action_BG_Disabled.png');
   ui('row-shadow.png', 'atkOv_Action_Shadow.png');
   ui('list-shadow.png', 'atkOV_CardShadow.png');
+  for (const [key, filled, empty] of TYPE_ICON_KEYS) {
+    rows.push({ out: `type-${key}.png`, from: 'icon', source: `${filled}.png` });
+    if (empty) rows.push({ out: `type-${key}-empty.png`, from: 'icon', source: `${empty}.png` });
+  }
   rows.push({ out: 'ability-tag-on.png', from: 'badge', source: 'atkOV_AbilityTag_On_EN.png' });
   rows.push({ out: 'ability-tag-off.png', from: 'badge', source: 'atkOV_AbilityTag_Off_EN.png' });
   return rows;
@@ -93,7 +121,7 @@ export function parseArgs(argv, outDefault = DEFAULT_OUT_DIR) {
 }
 
 function sourcePath(src, row) {
-  return join(src, row.from === 'ui' ? UI_SPRITES : BADGE_SPRITES, row.source);
+  return join(src, SOURCE_DIRS[row.from], row.source);
 }
 
 /** Copy (or, with `check`, compare) every sprite; returns the paths that are missing or drifted. */

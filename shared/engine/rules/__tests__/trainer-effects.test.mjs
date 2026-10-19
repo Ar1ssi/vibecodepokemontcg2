@@ -1843,6 +1843,16 @@ describe('recurring-wording coverage (batch 5)', () => {
     assert.equal(r.steps[0].type, 'discardStadium');
   });
 
+  test('Delinquent BREAKpoint 98b (corpus text) → discardStadium, then opponent discards 3 if a Stadium went', () => {
+    const r = parseTrainerEffect(
+      'Discard any Stadium card in play. If you do, your opponent discards 3 cards from his or her hand.'
+    );
+    assert.equal(r.recognizable, true);
+    assert.deepEqual(r.steps.map((s) => s.type), ['discardStadium', 'opponentDiscardFromHand']);
+    assert.equal(r.steps[1].count, 3);
+    assert.equal(r.steps[1].requiresStadium, true);
+  });
+
   test('Max Revive → putDiscardOnTop', () => {
     const r = parseTrainerEffect('Put a Pokémon from your discard pile on top of your deck.');
     assert.equal(r.steps[0].type, 'putDiscardOnTop');

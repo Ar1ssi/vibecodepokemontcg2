@@ -111,7 +111,8 @@
 .card__translater,
 .card__rotator {
   display: grid;
-  perspective: 600px;
+  /* holo.mjs sets --holo-perspective from the card's height while the cursor tilts it. */
+  perspective: var(--holo-perspective, 600px);
   will-change: transform, box-shadow;
   transform-origin: center;
   -webkit-transform-origin: center;

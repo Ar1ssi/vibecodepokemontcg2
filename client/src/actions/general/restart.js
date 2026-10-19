@@ -5,7 +5,7 @@ import { reset } from './reset.js';
 
 // Full match restart: clear both boards, rebuild decks, and reset rules state.
 export const restartGame = (user = 'self', emit = true) => {
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'restartGame', []);
     return;
   }

@@ -51,7 +51,6 @@ export const peck = spec({
   defender: { motion: 'knock', params: { strength: 0.2, heat: 0.35 } },
   beats: [
     { at: 300, until: 900, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.3 } },
-    { at: 450, until: 700, layer: 'back', drawer: 'ring', params: { kind: 'face', count: 1, r0: 0.2, r1: 0.8, width: 0.04 } },
     { at: 450, until: 600, layer: 'top', drawer: 'impactFlash', params: { r0: 0.25, r1: 0.7 } },
     // Last at contact: the jab knocks feathers loose (a punch-family hit).
     { at: 450, until: 750, layer: 'front', drawer: 'shards', params: { count: 5, arc: 200, distance: 0.6, spin: 300 } },
@@ -71,12 +70,12 @@ export const aerialAce = spec({
   // the card from lower left to upper right, flinging wind blades up and away. (The sprite's
   // telegraph line is dropped: slashArc draws a sweeping chord, so a held line would swing.)
   attacker: { motion: 'dash', params: { wind: 0.2, reach: 1.0, overshoot: 0.35, arc: 0.4 } },
-  defender: { motion: 'knock', params: { strength: 0.32, heat: 0.5 } },
+  defender: { motion: 'knock', params: { strength: 0.32, heat: 0.35 } },
   beats: [
     { at: 150, until: 1150, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.38 } },
-    { at: 150, until: 600, layer: 'front', drawer: 'cloud', params: { target: 'attacker', count: 4, radius: 0.25, drift: 0.3, alpha: 0.3 } },
+    { at: 150, until: 600, layer: 'front', drawer: 'cloud', params: { target: 'attacker', count: 4, radius: 0.25, drift: 0.3, alpha: 0.15 } },
     { at: 620, until: 900, layer: 'front', drawer: 'slashArc', params: { sweep: -160, radius: 0.8, angle: 45, thick: 0.18 } },
-    { at: 620, until: 780, layer: 'top', drawer: 'impactFlash', params: { r1: 1.0 } },
+    { at: 620, until: 780, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
     { at: 650, until: 1100, layer: 'front', drawer: 'splash', params: { count: 6, arc: 70, direction: -45, gravity: 0.2, len: [0.4, 0.8] } },
   ],
   particles: [glints({ at: 630, direction: -45, spread: 120, maxDelay: 0.15 })],
@@ -94,14 +93,14 @@ export const wingAttack = spec({
   // right then left, the second the harder; a ring of wind blades bursts off it and feathers
   // tumble down.
   attacker: { motion: 'lunge', params: { wind: 0.18, reach: 0.75 } },
-  defender: { motion: 'stagger', params: { strength: 0.34, hits: 2, gapMs: 200, heat: 0.45 } },
+  defender: { motion: 'stagger', params: { strength: 0.34, hits: 2, gapMs: 200, heat: 0.35 } },
   beats: [
     { at: 0, until: 520, layer: 'front', drawer: 'cloud', params: { target: 'attacker', count: 4, radius: 0.25, drift: 0.25, alpha: 0.3 } },
     { at: 350, until: 1250, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.34 } },
     { at: 600, until: 850, layer: 'front', drawer: 'slashArc', params: { sweep: 130, radius: 0.6, angle: 0, thick: 0.16 } },
-    { at: 600, until: 760, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.85 } },
+    { at: 600, until: 760, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
     { at: 800, until: 1050, layer: 'front', drawer: 'slashArc', params: { sweep: -130, radius: 0.6, angle: 180, thick: 0.16 } },
-    { at: 800, until: 960, layer: 'top', drawer: 'impactFlash', params: { r0: 0.35, r1: 1.0 } },
+    { at: 800, until: 960, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
     { at: 820, until: 1300, layer: 'front', drawer: 'splash', params: { count: 8, arc: 360, gravity: 0, len: [0.3, 0.6] } },
     { at: 820, until: 1300, layer: 'front', drawer: 'shards', params: { count: 6, arc: 160, distance: 0.9, spin: 240 } },
   ],
@@ -120,17 +119,15 @@ export const braveBird = spec({
   // dives down the lane behind a bright head of wind; it slams in: a ring off the card,
   // feathers bursting everywhere, the card knocked hard; curls of wind linger round it.
   attacker: { motion: 'dash', params: { wind: 0.3, reach: 1.1, overshoot: 0.2, arc: 0.35 } },
-  defender: { motion: 'knock', params: { strength: 0.5, heat: 0.6 } },
+  defender: { motion: 'knock', params: { strength: 0.5, heat: 0.35 } },
   beats: [
-    { at: 0, until: 900, layer: 'back', drawer: 'aura', params: { target: 'attacker', alpha: 0.5, hz: 3 } },
-    { at: 0, until: 850, layer: 'front', drawer: 'spiral', params: { target: 'attacker', turns: 2, r0: 0.35, r1: 0.9, rpm: 180, tongues: 10 } },
-    { at: 700, until: 1000, layer: 'back', drawer: 'shockRings', params: { count: 2, r0: 0.3, r1: 1.0 } },
+    { at: 0, until: 900, layer: 'back', drawer: 'aura', params: { target: 'attacker', alpha: 0.5, hz: 3, tint: { deep: '#4E6E00', body: '#B4E62E', hot: '#E6FF7A', core: '#FAFFD8' } } },
+    { at: 0, until: 850, layer: 'front', drawer: 'spiral', params: { target: 'attacker', turns: 2, r0: 0.35, r1: 0.9, rpm: 180, tongues: 10, tint: { deep: '#4E6E00', body: '#B4E62E', hot: '#E6FF7A', core: '#FAFFD8' } } },
     // The head of wind the attacker dives behind (a bare orb: a pinwheel here reads as a
     // thrown blade); it reaches the card at contact.
     { at: 700, until: 1000, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.22, r1: 0.38, bow: 0, tongues: 0 } },
     { at: 850, until: 1800, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.45 } },
-    { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { r1: 1.4 } },
-    { at: 1000, until: 1400, layer: 'back', drawer: 'ring', params: { kind: 'face', count: 2, r0: 0.3, r1: 1.4, width: 0.05 } },
+    { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
     // Last at contact: the dive's burst of feathers (a dash-family hit).
     { at: 1000, until: 1450, layer: 'front', drawer: 'shards', params: { count: 10, distance: 1.3, spin: 540 } },
     { at: 1100, until: 1800, layer: 'front', drawer: 'spiral', params: { turns: 1.5, r0: 0.4, r1: 1.0, rpm: 120, tongues: 10 } },
@@ -175,16 +172,15 @@ export const airCutter = spec({
   // Wind swirls round the attacker; it flings three spinning crescents down the lane; they
   // whirl round and through the card as two cuts cross it, and glints of cut air scatter.
   attacker: { motion: 'rear-lurch', params: { rear: 0.12, lurch: 0.3, glow: 0.7 } },
-  defender: { motion: 'knock', params: { strength: 0.28, heat: 0.5 } },
+  defender: { motion: 'knock', params: { strength: 0.28, heat: 0.35 } },
   beats: [
-    { at: 0, until: 420, layer: 'front', drawer: 'spiral', params: { target: 'attacker', turns: 1.5, r0: 0.3, r1: 0.75, rpm: 200, tongues: 8 } },
     // Landing at 500, 560 and 620: flight = 320 - 2 x 60 = 200 ms; the last crescent lands at contact.
     { at: 300, until: 620, layer: 'front', drawer: 'volley', params: { count: 3, stagger: 60, r0: 0.16, r1: 0.2, bow: 0.35, tongues: 3 } },
     { at: 400, until: 1200, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.35 } },
     { at: 620, until: 1150, layer: 'front', drawer: 'spiral', params: { turns: 1, r0: 0.3, r1: 0.8, rpm: 240, tongues: 6 } },
     // Listed after the whirl so the cuts carry the family (ties go to the last listed).
     { at: 620, until: 860, layer: 'front', drawer: 'slashArc', params: { count: 2, sweep: 100, radius: 0.7, gapDeg: 90, angle: 45, thick: 0.1 } },
-    { at: 620, until: 780, layer: 'top', drawer: 'impactFlash', params: { r1: 1.0 } },
+    { at: 620, until: 780, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
   ],
   particles: [glints({ at: 630, count: 12, distance: 0.9 })],
 });
@@ -204,9 +200,8 @@ export const hurricane = spec({
   // wrapping in front), lifting it and holding it while air and grit rise through the funnel;
   // the wind dies and the card drops.
   attacker: { motion: 'rise', params: {} },
-  defender: { motion: 'float', params: { lift: 0.22, heat: 0.4 } },
+  defender: { motion: 'float', params: { lift: 0.22, heat: 0.35 } },
   beats: [
-    { at: 0, until: 800, layer: 'back', drawer: 'ring', params: { target: 'attacker', kind: 'floor', count: 2, r0: 0.4, r1: 1.2, width: 0.04 } },
     { at: 0, until: 850, layer: 'front', drawer: 'spiral', params: { target: 'attacker', turns: 1.5, r0: 0.35, r1: 0.85, rpm: 160, tongues: 8 } },
     // Landing at 760, 830 and 900: flight = 340 - 2 x 70 = 200 ms.
     { at: 560, until: 900, layer: 'front', drawer: 'volley', params: { count: 3, stagger: 70, r0: 0.14, r1: 0.18, bow: 0.3, tongues: 2 } },
@@ -216,7 +211,7 @@ export const hurricane = spec({
     // wind blades reads as one scythe).
     { at: 760, until: 1750, layer: 'back', drawer: 'pillar', params: { height: 1.6, w: 0.3 } },
     { at: 1000, until: 1800, layer: 'front', drawer: 'spiral', params: { turns: 2, r0: 0.35, r1: 1.0, rpm: 220, tongues: 10 } },
-    { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { r1: 1.2 } },
+    { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
     { at: 1050, until: 1850, layer: 'front', drawer: 'cloud', params: { count: 7, radius: 0.3, drift: 0.8, alpha: 0.35 } },
   ],
   particles: [
@@ -237,17 +232,13 @@ export const aeroblast = spec({
   // fires a coil of air that corkscrews down the lane into the card; the coil wraps the card,
   // rings spreading off it, and slivers of wind are flung away.
   attacker: { motion: 'rear-lurch', params: { rear: 0.16, lurch: 0.35, glow: 1 } },
-  defender: { motion: 'knock', params: { strength: 0.42, heat: 0.6 } },
+  defender: { motion: 'knock', params: { strength: 0.42, heat: 0.35 } },
   beats: [
-    { at: 0, until: 700, layer: 'back', drawer: 'orbitCharge', params: { count: 4, half: 'back', r0: 0.1, r1: 0.14, tongues: 0, tilt: 0.5 } },
     { at: 0, until: 720, layer: 'front', drawer: 'coreCharge', params: { r0: 0.08, r1: 0.3, from: 0.2 } },
-    { at: 0, until: 700, layer: 'front', drawer: 'orbitCharge', params: { count: 4, half: 'front', r0: 0.1, r1: 0.14, tongues: 0, tilt: 0.5 } },
-    { at: 640, until: 960, layer: 'back', drawer: 'shockRings', params: { count: 2, r0: 0.3, r1: 1.1 } },
     // The coil's head reaches the card at 720 + 0.4 x 600 = 960.
     { at: 720, until: 1320, layer: 'front', drawer: 'beam', params: { kind: 'helix', w: 0.4, turns: 3, growIn: 0.4, retract: 0.25 } },
     { at: 880, until: 1750, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.45 } },
-    { at: 960, until: 1140, layer: 'top', drawer: 'impactFlash', params: { r1: 1.2 } },
-    { at: 960, until: 1450, layer: 'back', drawer: 'ring', params: { kind: 'face', count: 3, r0: 0.4, r1: 1.1, width: 0.04 } },
+    { at: 960, until: 1140, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
     { at: 1000, until: 1600, layer: 'front', drawer: 'spiral', params: { turns: 2, r0: 0.35, r1: 1.0, rpm: 200, tongues: 10 } },
     { at: 1100, until: 1700, layer: 'front', drawer: 'splash', params: { count: 6, arc: 360, gravity: 0.1, len: [0.4, 0.8] } },
   ],

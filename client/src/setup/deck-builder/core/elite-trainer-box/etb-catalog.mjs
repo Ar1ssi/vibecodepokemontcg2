@@ -31,7 +31,7 @@ export const ELITE_TRAINER_BOXES = [
     // TCGdex rarity is "Promo" (no reveal flare), but the card is the Illustration Rare art cut
     // from the English set (design 057 § ETB reference), so its lift plays the tier 2 flare.
     promoTier: 2,
-    sleeveId: '08266b9d-1d37-4ddb-a458-9adc302edb62',
+    sleeveId: 'cs_charizardxmega_me2_etb',
     sleeveCount: 65,
     coinId: 'PFLETB_Mega_Charizard_X_Coin',
     // 40 cards; the type split is not published (UNVERIFIED): five of each Basic type until a

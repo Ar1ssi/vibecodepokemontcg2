@@ -23,7 +23,7 @@ export const useAbility = (
   const card = zone?.array?.[resolved];
   const hint = hintIn || buildCardHint(card);
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'useAbility', [oInitiator, zoneId, resolved, hint]);
     return;
   }

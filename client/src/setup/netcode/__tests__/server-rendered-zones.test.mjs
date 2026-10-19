@@ -22,8 +22,17 @@ test('popup and non-card zones are never suppressed', () => {
   }
 });
 
-test('legacy rendering is untouched outside server-authoritative 2P', () => {
+test('legacy rendering is untouched without server authority', () => {
   assert.equal(legacyDomSuppressed('hand', { serverAuthoritative: false, isTwoPlayer: true }), false);
-  assert.equal(legacyDomSuppressed('hand', { serverAuthoritative: true, isTwoPlayer: false }), false);
+  assert.equal(legacyDomSuppressed('hand', { serverAuthoritative: false, isTwoPlayer: false }), false);
   assert.equal(legacyDomSuppressed('hand', undefined), false);
+});
+
+test('design 074 D7: authority alone suppresses the legacy DOM, so a solo room renders from views', () => {
+  const soloRoom = { serverAuthoritative: true, isTwoPlayer: true, solo: true };
+  for (const zoneId of SERVER_RENDERED_ZONES) {
+    assert.equal(legacyDomSuppressed(zoneId, soloRoom), true, zoneId);
+    assert.equal(legacyDomSuppressed(zoneId, { serverAuthoritative: true }), true, zoneId);
+  }
+  assert.equal(legacyDomSuppressed('deck', soloRoom), false);
 });

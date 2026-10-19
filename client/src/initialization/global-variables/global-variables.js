@@ -41,10 +41,12 @@ export const systemState = {
   oppReady: false, // true once the opp player has pressed Set Up (ready check)
   replayActionData: [],
   turn: 0,
-  get initiator() {
-    return selfContainer.classList.contains('self') ? 'self' : 'opp';
-    //refers to the user on the bottom half of the screen, e.g., initiator === 'self' means that the bottom half is the 'self' user
-  },
+  // The user on the bottom half of the screen: 'self' unless flipBoard() swapped the boards.
+  initiator: 'self',
+  // Design 074 D7: a solo room is one socket playing both seats; nearSeat is the seat
+  // drawn at the bottom ('self'). A board flip swaps the seat, not the boards.
+  solo: false,
+  nearSeat: 'p1',
   roomId: '',
   opponentSocketId: '', // multiplayer peer socket.id for synced turn-order coin caller
   p1Username: (user) => {

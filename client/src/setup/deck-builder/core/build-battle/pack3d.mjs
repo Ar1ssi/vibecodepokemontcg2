@@ -168,12 +168,13 @@ export function peelSide(pointerXPx, rect) {
 
 /**
  * How far column `u` of the strip has folded back while the finger is `progress` across: the
- * columns the finger has passed are folded, a `PEEL_BAND` wide crease follows the finger.
+ * columns the finger has passed are folded to `maxDeg`, a `PEEL_BAND` wide crease follows the
+ * finger. (The tabletop's TCG Pocket tear only lets the cut part flex, a few tens of degrees.)
  */
-export function peelAngleDeg(u, progress, side = 1) {
+export function peelAngleDeg(u, progress, side = 1, maxDeg = PEEL_MAX_DEG) {
   const along = side === -1 ? 1 - clamp01(u) : clamp01(u);
   const reach = clamp01(progress) * (1 + PEEL_BAND);
-  return PEEL_MAX_DEG * smoothstep(0, PEEL_BAND, reach - along);
+  return maxDeg * smoothstep(0, PEEL_BAND, reach - along);
 }
 
 /**

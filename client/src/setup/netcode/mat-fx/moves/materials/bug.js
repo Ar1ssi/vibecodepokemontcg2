@@ -13,7 +13,13 @@
 //     scale and whose elongated unit is a soft silver streak.
 // Everything but the needle's dark tip is additive (the player's `lighter`).
 import { rgbCss } from '../../fx-colors.mjs';
-import { grainPass, inShadow, shardOutline, sphere, tongueOutline, traceOutline } from './_shared.js';
+import { grainPass, inShadow, shardOutline, sphere, styledKit, tongueOutline, traceOutline } from './_shared.js';
+
+// Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
+// Shells and wing blades catch a dull sheen; buzzing wings shimmer; silver powder twinkles.
+const CHITIN = Object.freeze({ byKind: { linear: { id: 'crystal', facets: 3, sheen: 0.3, speed: 0.8 }, radial: { id: 'orb', boil: 0.2, limb: 0.4, gain: 0 } } });
+const BUZZ = Object.freeze({ byKind: { linear: { id: 'energy', streak: 0.45, speed: 4, gain: 0.3 }, radial: { id: 'orb', boil: 0.2, limb: 0.4, gain: 0 }, stroke: { id: 'energy', streak: 0.45, speed: 4, gain: 0.3 } } });
+const POWDER = Object.freeze({ byKind: { linear: { id: 'crystal', facets: 4, sheen: 0.7, speed: 1.4 }, radial: { id: 'crystal', facets: 4, sheen: 0.6, speed: 1.4 }, stroke: { id: 'crystal', sheen: 0.6, speed: 1.4 } } });
 
 const TAU = Math.PI * 2;
 // A needle is drawn at 0.6 of the width a drawer hands it: at full width a spindle reads as a leaf.
@@ -269,7 +275,7 @@ function bugKit(palette) {
   });
 }
 
-export const bug = bugKit(BUG_PALETTE);
+export const bug = styledKit(bugKit(BUG_PALETTE), CHITIN);
 
 // ---- buzz ------------------------------------------------------------------------------
 /** The buzz material drawn in `palette` (any palette with the same keys). */
@@ -321,7 +327,7 @@ function buzzKit(palette, base = bugKit(palette)) {
   });
 }
 
-export const buzz = buzzKit(BUG_PALETTE, bug);
+export const buzz = styledKit(buzzKit(BUG_PALETTE, bug), BUZZ);
 
 // ---- silver ----------------------------------------------------------------------------
 /** The silver material drawn in `palette` (any palette with the same keys). */
@@ -424,4 +430,4 @@ function silverKit(palette) {
   });
 }
 
-export const silver = silverKit(SILVER_PALETTE);
+export const silver = styledKit(silverKit(SILVER_PALETTE), POWDER);

@@ -2,8 +2,8 @@ import {
   oppContainerDocument,
   selfContainerDocument,
 } from '../../state.js';
+import { matRect, visualRectOf } from '../board3d/board-rects.js';
 import { cardBackSrcForUser } from '../deck-constructor/hydrate-holo.js';
-import { visualRectOf } from './iframe-rect.mjs';
 import {
   SHUFFLE_DURATION_MS,
   shuffleFlightPlan,
@@ -24,30 +24,14 @@ const zoneOriginEl = (user, zoneId) => {
   return doc.getElementById(zoneId);
 };
 
-const boardRectOf = () => {
-  const mat = document.getElementById('battleMat');
-  if (mat) return mat.getBoundingClientRect();
-  const self = document.getElementById('selfContainer');
-  const opp = document.getElementById('oppContainer');
-  const a = self?.getBoundingClientRect();
-  const b = opp?.getBoundingClientRect();
-  if (a && b) {
-    const left = Math.min(a.left, b.left);
-    const top = Math.min(a.top, b.top);
-    return {
-      left,
-      top,
-      width: Math.max(a.right, b.right) - left,
-      height: Math.max(a.bottom, b.bottom) - top,
-    };
-  }
-  return {
+const boardRectOf = () =>
+  matRect() ??
+  document.getElementById('battleMat')?.getBoundingClientRect() ?? {
     left: 0,
     top: 0,
     width: globalThis.innerWidth || 0,
     height: globalThis.innerHeight || 0,
   };
-};
 
 const cancelShuffle = (user) => {
   const run = activeByUser[user];
@@ -77,14 +61,15 @@ const buildCard = (deckRect, sleeveSrc) => {
   return host;
 };
 
+/** @returns {number} how long the flight runs, so the FX queue holds for it (0 when nothing plays) */
 export const playShuffleFlight = (user, zoneId, zoneCount) => {
-  if (typeof document === 'undefined' || document.hidden) return;
+  if (typeof document === 'undefined' || document.hidden) return 0;
   const count = visualCardCount(zoneCount);
   const originEl = zoneOriginEl(user, zoneId);
-  if (!count || !originEl) return;
+  if (!count || !originEl) return 0;
 
   const deckRect = visualRectOf(originEl);
-  if (deckRect.width < 2 || deckRect.height < 2) return;
+  if (deckRect.width < 2 || deckRect.height < 2) return 0;
 
   cancelShuffle(user);
 
@@ -126,4 +111,5 @@ export const playShuffleFlight = (user, zoneId, zoneCount) => {
   });
   initial.forEach((pose, i) => applyPose(hosts[i], pose));
   run.rafId = requestAnimationFrame(tick);
+  return SHUFFLE_DURATION_MS;
 };

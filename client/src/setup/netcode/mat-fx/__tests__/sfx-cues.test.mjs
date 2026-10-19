@@ -208,42 +208,43 @@ test('coinSoundMaterial: metals ring, everything else clacks', () => {
   for (const material of ['enamel', 'cardboard', 'wood', '', undefined]) assert.equal(coinSoundMaterial(material), 'plastic');
 });
 
-test('coin-flip: one flip tosses at 0 and lands at 2200', () => {
+test('coin-flip: one flip tosses at 0 and lands at 2000', () => {
   assert.deepEqual(plays('coin-flip', { faces: ['heads'], coinMaterial: 'metal' }), [
     ['coin-appear', 0],
     ['coin-toss-metal', 0],
-    ['coin-win', 2200],
+    ['coin-win', 2000],
   ]);
   assert.deepEqual(plays('coin-flip', { face: 'tails', coinMaterial: 'plastic' }), [
     ['coin-appear', 0],
     ['coin-toss-plastic', 0],
-    ['coin-loss', 2200],
+    ['coin-loss', 2000],
   ]);
 });
 
-test('coin-flip: three flips keep the full toss, each starting tossMs before its landing', () => {
+test('coin-flip: each toss cues from its own start; the first is the full throw, repeats spin', () => {
   const list = plays('coin-flip', { faces: ['heads', 'tails', 'heads'], coinMaterial: 'plastic' });
-  const { landsAt, tossMs } = coinCeremonyTimeline(3);
-  assert.equal(tossMs, 1500);
+  const { landsAt, tossesMs } = coinCeremonyTimeline(3);
+  assert.deepEqual(tossesMs, [2000, 1000, 1000]);
   assert.deepEqual(list, [
     ['coin-appear', 0],
-    ['coin-toss-plastic', landsAt[0] - tossMs],
+    ['coin-toss-plastic', landsAt[0] - tossesMs[0]],
     ['coin-win', landsAt[0]],
-    ['coin-toss-plastic', landsAt[1] - tossMs],
+    ['coin-spin-plastic', landsAt[1] - tossesMs[1]],
     ['coin-loss', landsAt[1]],
-    ['coin-toss-plastic', landsAt[2] - tossMs],
+    ['coin-spin-plastic', landsAt[2] - tossesMs[2]],
     ['coin-win', landsAt[2]],
   ]);
 });
 
-test('coin-flip: six flips use the short spin toss (tossMs 1000)', () => {
+test('coin-flip: six flips cue a toss per flip, short repeats spinning', () => {
   const faces = ['heads', 'tails', 'heads', 'tails', 'heads', 'tails'];
-  const { landsAt, tossMs } = coinCeremonyTimeline(6);
-  assert.equal(tossMs, 1000);
+  const { landsAt, tossesMs } = coinCeremonyTimeline(6);
+  assert.deepEqual(tossesMs, [2000, 1000, 1000, 500, 500, 500]);
   const list = plays('coin-flip', { faces, coinMaterial: 'metal' });
   assert.equal(list.length, 1 + 2 * 6);
-  assert.deepEqual(list.slice(1, 3), [['coin-spin-metal', landsAt[0] - tossMs], ['coin-win', landsAt[0]]]);
-  assert.ok(list.every(([key]) => !key.startsWith('coin-toss')));
+  assert.deepEqual(list.slice(1, 3), [['coin-toss-metal', 0], ['coin-win', landsAt[0]]]);
+  assert.deepEqual(list.slice(3, 5), [['coin-spin-metal', landsAt[1] - tossesMs[1]], ['coin-loss', landsAt[1]]]);
+  assert.equal(list.filter(([key]) => key.startsWith('coin-toss')).length, 1, 'only the first flip is the full throw');
 });
 
 test('coin-flip with reduced motion has no toss cues and lands at 0 / 700 / 1400', () => {

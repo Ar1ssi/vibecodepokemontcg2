@@ -16,7 +16,10 @@ export const SPECIAL_CONDITIONS = [
   'Poisoned',
 ];
 
-export const PROTOCOL_VERSION = '2.0.0';
+export const PROTOCOL_VERSION = '2.2.0';
+
+/** Design 074 D7: the seats a solo room's one socket may name on a command (`cmd.seat`). */
+export const COMMAND_SEATS = ['p1', 'p2'];
 
 /**
  * Command schema definitions.
@@ -492,6 +495,9 @@ export const COMMAND_SCHEMAS = {
           valid: false,
           reason: 'abilityIndex must be a non-negative integer when provided',
         };
+      }
+      if (payload.targetInstanceId != null && !Number.isInteger(payload.targetInstanceId)) {
+        return { valid: false, reason: 'targetInstanceId must be an integer when provided' };
       }
       return { valid: true };
     },
@@ -1041,6 +1047,11 @@ export function validateCommandShape(command) {
   const schema = COMMAND_SCHEMAS[command.type];
   if (!schema) {
     return { valid: false, reason: `Unknown command type: ${command.type}` };
+  }
+
+  // Optional on every command: a solo room acts for the named seat; other rooms ignore it.
+  if (command.seat !== undefined && !COMMAND_SEATS.includes(command.seat)) {
+    return { valid: false, reason: `seat must be one of ${COMMAND_SEATS.join(', ')} when provided` };
   }
 
   const payload = command.payload ?? {};

@@ -1,6 +1,6 @@
 # Workflow: Maintain — the harness services itself. You are the Curator.
-Run when: STATE says "maintenance due" (every 10th session), any budget below is blown, or the
-user asks. (Fixing a wrong doc line you stumble on mid-task is NOT this workflow — that's prime
+Run when: `pnpm harness:check` exits 1 (a budget below is blown, or ≥30 commits since the last
+`maintain:` commit), or the user asks. (Fixing a wrong doc line you stumble on mid-task is NOT this workflow — that's prime
 directive 5; just do it.)
 
 ## Budgets — hard caps

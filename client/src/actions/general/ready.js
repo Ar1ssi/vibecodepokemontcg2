@@ -44,7 +44,7 @@ export const updateReadyButtons = () => {
   });
 
   const setupBothButton = document.getElementById('setupBothButton');
-  if (setupBothButton && !systemState.isTwoPlayer) {
+  if (setupBothButton && (!systemState.isTwoPlayer || systemState.solo)) {
     const bothDecksLoaded = hasDeckLoaded('self') && hasDeckLoaded('opp');
     setupBothButton.disabled = !bothDecksLoaded || iAmReady;
     setupBothButton.title = bothDecksLoaded
@@ -94,7 +94,8 @@ const refuseDealOnFormatMismatch = () => {
 // (rules mode: hands wait until after the turn-order coin flip).
 export const readyUp = async (user, emit = true) => {
   // Local Set Up passes initiator; in 2P the local player always sits in self zones.
-  if (emit && systemState.isTwoPlayer && user === systemState.initiator) {
+  // A solo room (design 074 D7) readies each side for its own seat.
+  if (emit && systemState.isTwoPlayer && !systemState.solo && user === systemState.initiator) {
     user = 'self';
   }
 
@@ -119,7 +120,7 @@ export const readyUp = async (user, emit = true) => {
   appendMessage(user, determineUsername(user) + ' is ready', 'player', false);
   updateReadyButtons();
   if (emit) {
-    const syncUser = systemState.isTwoPlayer ? 'self' : user;
+    const syncUser = systemState.isTwoPlayer && !systemState.solo ? 'self' : user;
     processAction(syncUser, emit, 'readyUp', []);
   }
 
@@ -139,7 +140,8 @@ export const readyUp = async (user, emit = true) => {
         false
       );
       await setupPrizes('self');
-      if (!systemState.isTwoPlayer) {
+      // A solo room has no peer client to deal the far side (design 074 D7).
+      if (!systemState.isTwoPlayer || systemState.solo) {
         await setupPrizes('opp');
       }
     } else {
@@ -150,7 +152,7 @@ export const readyUp = async (user, emit = true) => {
         false
       );
       await setup('self');
-      if (!systemState.isTwoPlayer) {
+      if (!systemState.isTwoPlayer || systemState.solo) {
         // In solo/one-player mode there's no separate opponent client to
         // trigger the mirrored setup, so do it locally for both sides.
         await setup('opp');

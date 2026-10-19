@@ -8,7 +8,7 @@
 
 import { findCard, discardCardToPlayerZone } from '../state.mjs';
 import { shuffleInPlace } from '../rng.mjs';
-import { isEnergy, isPokemon, isTrainer } from '../cards.mjs';
+import { isAttachedAsTool, isEnergy, isPokemon, isTrainer } from '../cards.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
 import { isUltraBeastCard, isRuleBoxPokemon, isVCard } from '../rules/card-classify.mjs';
 import { isAncientCard, isFutureCard } from '../rules/paradox-tags.mjs';
@@ -45,6 +45,7 @@ import {
   sideContextFor,
 } from '../rules/ability-combat.mjs';
 import { TYPE_LETTER } from '../rules/tool-combat.mjs';
+import { attachedTools, parseToolCap } from '../rules/ability-executors.mjs';
 import {
   attachTargetAllowed,
   energyRemovalGuarded,
@@ -69,6 +70,8 @@ function textOf(card, field) {
 }
 
 export function isToolCard(card) {
+  // A Pokémon attached as a Tool (Shedinja, Unown Q) is removed and counted like any Tool.
+  if (isAttachedAsTool(card)) return true;
   const kind = `${textOf(card, 'type')} ${textOf(card, 'trainerType')} ${textOf(card, 'subtypes')}`;
   return kind.includes('tool');
 }
@@ -4042,7 +4045,8 @@ function transformAbility(ctx) {
   });
 }
 
-function selfAttachTargets(ctx, self) {
+/** The player's in-play roots a self-attach-as-Energy step (Buzzap, Battery) may attach to. */
+export function selfAttachTargets(ctx, self) {
   const { player, step } = ctx;
   const filter = step.targetFilter || '';
   const names = /\{[a-z]\}|^pok[eé]mon$/.test(filter) ? [] : filter.split(/\s+or\s+/);
@@ -4061,6 +4065,8 @@ function selfAttachTargets(ctx, self) {
  * and Charjabug Battery (attach this card from your hand as a Special Energy). The attached card
  * carries `asEnergy.provides`; the Knock Out itself — Prizes, discarding the rest of the stack,
  * promotion — is the reducer's (`abilitySelfKnockOut`, settleAbilityOutcomes).
+ * A Battery dropped onto a Pokémon (reduce/ability promoteSelfAttachDrop) names that Pokémon
+ * as `step.targetId`, so the drop attaches there instead of asking.
  */
 function selfAttachEnergyAbility(ctx) {
   const { draft, player, step } = ctx;
@@ -4089,8 +4095,9 @@ function selfAttachEnergyAbility(ctx) {
     return null;
   };
 
-  if (ctx.selection) {
-    const target = targets.find((c) => c.instanceId === ctx.selection[0]);
+  const chosenId = ctx.selection ? ctx.selection[0] : step.targetId;
+  if (chosenId != null) {
+    const target = targets.find((c) => c.instanceId === chosenId);
     if (!target) return skip(ctx, 'target_not_found');
     return attach(target);
   }
@@ -4098,6 +4105,75 @@ function selfAttachEnergyAbility(ctx) {
   if (targets.length === 1) return attach(targets[0]);
   return ctx.ask({
     prompt: `${sourceName(ctx, 'Ability')}: Choose a Pokémon to attach this card to as Energy`,
+    options: targets,
+    min: 1,
+    max: 1,
+  });
+}
+
+/** Whether `root` has room for one more Pokémon Tool (θ Double raises the cap). */
+function hasToolRoom(player, root) {
+  const zone = zoneOfRoot(player, root) || [];
+  const cap = 1 + (parseToolCap(topPokemonCard(player, root))?.extra || 0);
+  return attachedTools(root, zone).length < cap;
+}
+
+/**
+ * Shedinja Vessel of Life, Klefki Wonder Lock, Unown Q/G/E (rules/self-attach-tool.mjs): discard
+ * every card attached to this Pokémon, then attach the card itself to another of your Pokémon as
+ * a Pokémon Tool carrying `asTool.text`. The cards it evolved from go to the discard pile with the
+ * rest. Leaving the Active Spot is settled by the reducer (useAbilityCommand). A drop onto a
+ * Pokémon names it as `step.targetId`, so the drop attaches there instead of asking.
+ */
+function selfAttachToolAbility(ctx) {
+  const { draft, player, step } = ctx;
+  const card = findCard(draft, ctx.sourceCard?.instanceId)?.card;
+  const self = sourceRoot(ctx);
+  if (!card || !self) return skip(ctx, 'source_not_found');
+  const targets = rootsOf(player).filter(
+    (root) => root.instanceId !== self.instanceId && hasToolRoom(player, root)
+  );
+
+  const attach = (target) => {
+    const left = [self, ...attachedCards(player, self.instanceId)].filter((c) => c !== card);
+    for (const discarded of left) {
+      removeFromZones(player, discarded);
+      discarded.attachedTo = null;
+      discardCardToPlayerZone(player, discarded);
+    }
+    if (left.length > 0) {
+      ctx.events.push({
+        type: 'cardsDiscarded',
+        playerId: player.playerId,
+        cards: left.map((c) => ({ instanceId: c.instanceId, name: c.name })),
+      });
+    }
+    // Damage and Special Conditions live on the root; neither the discarded root nor the card
+    // carries them on.
+    for (const cleared of new Set([self, card])) {
+      cleared.damage = 0;
+      clearConditions(cleared);
+    }
+    card.asTool = {
+      text: step.toolText,
+      ...(step.discardAfterOpponentTurn
+        ? { discardAtEndOfTurn: (draft.turn?.number || 0) + 1 }
+        : {}),
+    };
+    attachTo(player, card, target, ctx.events);
+    return null;
+  };
+
+  const chosenId = ctx.selection ? ctx.selection[0] : step.targetId;
+  if (chosenId != null) {
+    const target = targets.find((c) => c.instanceId === chosenId);
+    if (!target) return skip(ctx, 'target_not_found');
+    return attach(target);
+  }
+  if (targets.length === 0) return skip(ctx, 'no_attach_target');
+  if (targets.length === 1) return attach(targets[0]);
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Ability')}: Choose a Pokémon to attach this card to as a Pokémon Tool`,
     options: targets,
     min: 1,
     max: 1,
@@ -4447,6 +4523,31 @@ function eachPlayerDiscardFromHand(ctx) {
     });
   }
   return null;
+}
+
+// Delinquent: "Discard any Stadium card in play. If you do, your opponent discards 3 cards
+// from his or her hand." The opponent picks; the discard only happens when a Stadium went.
+function opponentDiscardFromHand(ctx) {
+  const { opponent, step } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const stadiumWent = (ctx.events || []).some(
+    (event) => event.type === 'cardMoved' && event.from === 'stadium'
+  );
+  if (!ctx.selection && step.requiresStadium && !stadiumWent) return skip(ctx, 'no_stadium');
+  if (playerShieldBlocks(ctx, opponent)) return skip(ctx, 'effect_shield');
+  if (ctx.selection) {
+    discardSelectedFromHand(ctx, opponent);
+    return null;
+  }
+  const count = Math.min(step.count || 1, opponent.zones.hand.length);
+  if (count === 0) return skip(ctx, 'empty_hand');
+  return ctx.ask({
+    player: opponent.playerId,
+    prompt: `${sourceName(ctx, 'Trainer')}: Discard ${count} card${count > 1 ? 's' : ''} from your hand`,
+    options: opponent.zones.hand,
+    min: count,
+    max: count,
+  });
 }
 
 // Lt. Surge: a Basic from hand takes the Active Spot; the old Active moves to the Bench.
@@ -5912,6 +6013,7 @@ export const EXTRA_STEP_HANDLERS = {
   stadiumManipAbility,
   transformAbility,
   selfAttachEnergyAbility,
+  selfAttachToolAbility,
   fossilItem,
   searchOrRecover,
   returnPokemonToHand,
@@ -5939,6 +6041,7 @@ export const EXTRA_STEP_HANDLERS = {
   flipUntilTailsDraw,
   eachPlayerHandToFive,
   eachPlayerDiscardFromHand,
+  opponentDiscardFromHand,
   putHandBasicAsActive,
   opponentDiscardToLostZonePerPokemon,
   putDiscardOnTop,

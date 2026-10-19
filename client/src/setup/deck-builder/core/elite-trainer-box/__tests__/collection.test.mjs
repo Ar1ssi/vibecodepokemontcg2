@@ -122,6 +122,14 @@ test('row 2: parseCollection refuses anything this version cannot trust', () => 
   assert.deepEqual(loadCollection(storage), createCollection(), 'unparsable → a fresh collection');
 });
 
+test('row 2b: a stored sleeve id from the sleeve database loads as its TCG Live sleeve', () => {
+  const stored = { ...add(createCollection(), 42), sleeves: ['08266b9d-1d37-4ddb-a458-9adc302edb62', 'other'] };
+  const loaded = parseCollection(JSON.stringify(stored));
+  assert.deepEqual(loaded.sleeves, [etb.sleeveId, 'other']);
+  const twice = { ...stored, sleeves: [etb.sleeveId, '08266b9d-1d37-4ddb-a458-9adc302edb62'] };
+  assert.deepEqual(parseCollection(JSON.stringify(twice)).sleeves, [etb.sleeveId], 'no duplicate after the remap');
+});
+
 test('row 3: 500 products are kept; the 501st drops the oldest and keeps the counts', () => {
   let collection = createCollection();
   const packs = [['me02-001']];

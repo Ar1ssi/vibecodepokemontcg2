@@ -4,7 +4,7 @@ import { curveAt } from '../../../../client/src/setup/netcode/mat-fx/tcgl-fx.mjs
 import { bakeCurve, evaluateUnityCurve, hermite } from '../lib/bake-curve.mjs';
 import { builtinMesh, BUILTIN_PLANE, BUILTIN_QUAD, BUILTIN_SPHERE } from '../lib/builtin-meshes.mjs';
 import { gradient, isZero, minMax, minMaxGradient, normalizePrefab } from '../lib/normalize-system.mjs';
-import { checkStageLink, globalValue, pickVariant, queueFromTag } from '../lib/shader-variant.mjs';
+import { bakeMaterial, checkStageLink, globalValue, pickVariant, queueFromTag, runtimeShader } from '../lib/shader-variant.mjs';
 
 const key = (time, value, inSlope = 0, outSlope = inSlope) => ({ time, value, inSlope, outSlope });
 const unityCurve = (...keys) => ({ m_Curve: keys });
@@ -236,4 +236,37 @@ test('pickVariant takes the variant whose keywords the game has on', () => {
   assert.deepEqual(pickVariant(shader, { variants: [variant([0]), variant([])] }).keywords, []);
   assert.deepEqual(pickVariant(shader, { variants: [variant([1, 2]), variant([1])] }).keywords, [1]);
   assert.throws(() => pickVariant(shader, { variants: [variant([0])] }), /no variant/);
+});
+
+test('pickVariant takes a caller keyword set: a lit object picks its light-probe variant', () => {
+  const shader = { name: 'S', keywordNames: ['SOFTPARTICLES_ON', 'DIRECTIONAL', 'LIGHTPROBE_SH'] };
+  const variant = (keywords) => ({ keywords, asm: 'ps_4_0', params: {} });
+  const lit = new Set(['DIRECTIONAL', 'LIGHTPROBE_SH']);
+  assert.deepEqual(pickVariant(shader, { variants: [variant([1]), variant([1, 2]), variant([0])] }, lit).keywords, [1, 2]);
+});
+
+test('bakeMaterial and runtimeShader take caller built-in tables; the defaults leave them unread', () => {
+  const buffer = (name, params) => ({ uniform: 'fcb0', slot: 0, length: 2, name, params });
+  const shader = {
+    buffers: {
+      v: [],
+      f: [buffer('UnityLighting', [
+        { name: '_WorldSpaceLightPos0', offset: 0, floats: 4 },
+        { name: 'unity_OcclusionMaskSelector', offset: 16, floats: 4 },
+      ])],
+    },
+    textures: [],
+  };
+  const rawShader = { props: [] };
+  const options = { resolveTexture: () => '#gray', textureSize: () => null };
+  const plain = bakeMaterial({ colors: {}, floats: {}, ints: {}, textures: {} }, shader, rawShader, options);
+  assert.deepEqual(plain.missing, ['UnityLighting._WorldSpaceLightPos0', 'UnityLighting.unity_OcclusionMaskSelector']);
+  assert.deepEqual(runtimeShader({ ...shader, name: 'S' }).buffers.f[0].dynamic, []);
+
+  const dynamicParams = { _WorldSpaceLightPos0: 'lightDirection' };
+  const staticParams = { unity_OcclusionMaskSelector: [1, 0, 0, 0] };
+  const lit = bakeMaterial({ colors: {}, floats: {}, ints: {}, textures: {} }, shader, rawShader, { ...options, dynamicParams, staticParams });
+  assert.deepEqual(lit.missing, []);
+  assert.deepEqual(lit.f[0], [0, 0, 0, 0, 1, 0, 0, 0]);
+  assert.deepEqual(runtimeShader({ ...shader, name: 'S' }, { dynamicParams }).buffers.f[0].dynamic, [{ at: 0, kind: 'lightDirection' }]);
 });

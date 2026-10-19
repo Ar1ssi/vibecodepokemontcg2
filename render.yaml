@@ -11,11 +11,15 @@ services:
         value: production
       - key: SERVER_AUTHORITATIVE
         value: '1'
+      # design 069: public URL of the R2 bucket holding the TCG Live foil textures (pnpm foil:upload);
+      # unset = every card keeps the CSS holo. Set in the Render dashboard.
+      - key: FOIL_TEXTURE_URL
+        sync: false
 
   # Staging clone of ptcg-sim with the ?e2e=1 test bridge armed (PTCG_E2E=1), so the
-  # Playwright playtest bot (playtest-bot.mjs) can run against a real Render deploy without
+  # Playwright playtest bot (scripts/e2e/playtest-bot.mjs) can run against a real Render deploy without
   # opening the bridge on the production service (server/server.js's E2E_ENABLED gate).
-  # Run the bot against this service with: PTCG_URL=https://ptcg-sim-staging.onrender.com node playtest-bot.mjs --games=10
+  # Run the bot against this service with: PTCG_URL=https://ptcg-sim-staging.onrender.com node scripts/e2e/playtest-bot.mjs --games=10
   - type: web
     name: ptcg-sim-staging
     runtime: node
@@ -28,5 +32,9 @@ services:
         value: production
       - key: SERVER_AUTHORITATIVE
         value: '1'
+      # design 069: public URL of the R2 bucket holding the TCG Live foil textures (pnpm foil:upload);
+      # unset = every card keeps the CSS holo. Set in the Render dashboard.
+      - key: FOIL_TEXTURE_URL
+        sync: false
       - key: PTCG_E2E
         value: '1'

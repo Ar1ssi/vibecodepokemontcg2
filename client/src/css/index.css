@@ -1,7 +1,12 @@
 /* Holofoil (simey) — @import must precede all other rules in this stylesheet. */
 @import url('./holo/base.css');
+@import url('./holo/tcgl-foil.css');
 @import url('./mat-fx.css');
 @import url('./card-focus.css');
+@import url('./attack-options.css');
+@import url('./status-popup.css');
+@import url('./stack-view.css');
+@import url('./hover-preview.css');
 @import url('./holo/regular-holo.css');
 @import url('./holo/ex-regular.css');
 @import url('./holo/ex-full-art.css');
@@ -22,8 +27,11 @@
 @import url('./deck-builder-live.css');
 @import url('./deck-builder-pc-box.css');
 @import url('./deck-builder-build-battle.css');
+@import url('./deck-builder-bnb-run.css');
 @import url('./deck-builder-unboxing.css');
 @import url('./deck-builder-etb.css');
+@import url('./tabletop-unboxing.css');
+@import url('./deck-builder-suggest.css');
 
 :root {
   --mat-half-height: 50vh;
@@ -196,11 +204,52 @@ ul, li {
   transform: scaleX(-1) scaleY(-1);
   z-index: 2;
 }
+/* Design 074: host for the three.js board. Stays [hidden] until the
+   board3d boot shows it; the mirror holds the off-screen DOM twins (shadow roots) of the cards. */
+#board3dHost {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+}
+#board3dHost[hidden] {
+  display: none;
+}
+#board3dCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+/* No opacity here: the mirror hides its own board twins (board-mirror.js MIRROR_STYLE) so the
+   zone list popups inside it can show as HTML panels over the canvas (D4). */
+#boardMirror {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+/* The mirror hosts keep the `self`/`opp` classes (code reads them as the seat), but
+   not those rules' box or the far seat's 180° flip: board-mirror.js writes viewport rects from the
+   host's box, and its transform makes the host the containing block of the mirror's cards. */
+#boardMirror > #selfBoard,
+#boardMirror > #oppBoard {
+  position: absolute;
+  inset: 0;
+  width: auto;
+  height: auto;
+  transform: translateZ(0);
+}
+/* While the 3D board runs it replaces the mat art and the Stadium slot; they stay in the DOM
+   (board3d.js removes the class on fallback). */
+body.board3d-active #board3dHost {
+  display: block;
+}
+body.board3d-active #battleMat,
+body.board3d-active #stadium {
+  display: none;
+}
 /* ── Battle mat: hexagonal red/blue arena, PTCG Live style ─────────────
-   Sits fixed behind the self/opp iframes (which render transparent
-   card zones on top of it) and in front of the customizable body
+   Sits fixed behind the board and in front of the customizable body
    background. Purely a visual layer — doesn't affect any game logic
-   or zone positioning, which is still driven by the iframes' own CSS. */
+   or zone positioning. */
 #battleMat {
   position: fixed;
   top: 0;
@@ -411,9 +460,9 @@ ul, li {
 }
 /* In-play Stadium whose effect is activatable right now (design 023). The class
    goes on #stadium itself — the parent-owned element (D93), not its child <img>,
-   so this rule lives in index.css rather than a playmat iframe sheet. Colour
-   comes from the node's `--glow-rgb` (green for a Stadium). Same flowing lit rim
-   as the playmat sheets' .mat-holo path: a masked ::after whose hotspots are
+   so this rule is styled on it directly. Colour
+   comes from the node's `--glow-rgb` (green for a Stadium). A flowing lit rim:
+   a masked ::after whose hotspots are
    turned by `--glow-angle`/`--glow-angle-2` (#stadium is fixed-positioned, so
    it contains the ring).
    Declared before `.highlight` below so a selection ring wins the `animation` tie. */
@@ -501,8 +550,7 @@ ul, li {
    property; the animation still outranks the plain `box-shadow` rules on
    cards/zones the way the old `!important` did (author animations beat
    author-normal declarations at any specificity), and `!important` rules that
-   beat it today keep beating it. Stadium cards live in this document; the two
-   playmat iframes mirror this block in self/opp-containers.css. */
+   beat it today keep beating it. Stadium cards live in this document. */
 @keyframes highlight-pulse {
   0%, 100% { box-shadow: 0 0 0 4px rgb(122, 185, 133), 0 0 0 0 rgba(122, 185, 133, 0.45); }
   50% { box-shadow: 0 0 0 4px rgb(122, 185, 133), 0 0 14px 5px rgba(122, 185, 133, 0.55); }
@@ -511,28 +559,6 @@ ul, li {
   box-shadow: 0 0 0 4px rgb(122, 185, 133);
   animation: highlight-pulse 1.8s ease-in-out infinite;
   background-color: rgba(133, 197, 155, 0.3);
-}
-#selfResizer {
-  position: fixed;
-  left: -0.55%;
-  bottom: 50.5%;
-  cursor: row-resize;
-  display: flex;
-  width: 1.3vw;
-  height: 2.5%;
-  border-radius: 50%;
-  transform: translateY(50%) scaleX(-1);
-}
-#oppResizer {
-  position: fixed;
-  left: -0.55%;
-  bottom: 53%;
-  cursor: row-resize;
-  display: flex;
-  width: 1.3vw;
-  height: 2.5%;
-  border-radius: 50%;
-  transform: translateY(50%) scaleX(-1);
 }
 .self-color {
   background: linear-gradient(to bottom, rgba(90, 110, 188, 0.864), rgba(60, 80, 158, 0.864));
@@ -990,6 +1016,99 @@ ul, li {
 }
 #joinRoomButton:hover {
   background: linear-gradient(to bottom, #555, #333);
+}
+/* Design 069: the always-open rooms. */
+#publicRoomList {
+  list-style: none;
+  margin: 1vh 0;
+  padding: 0;
+  max-height: 55vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8vh;
+}
+.public-room {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1vh;
+  padding: 1vh 1.2vh;
+  border-radius: 10px;
+  background: white;
+  box-shadow: 0px 2px 6px rgba(0, 0, 0, 0.15);
+}
+.public-room-details {
+  min-width: 0;
+  font-size: 1.7vh;
+}
+.public-room-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.8vh;
+}
+.public-room-name {
+  font-weight: bold;
+  font-size: 2vh;
+}
+.public-room-format {
+  font-size: 1.4vh;
+  padding: 0.2vh 0.8vh;
+  border-radius: 999px;
+  background: #ece3c4;
+}
+.public-room-status {
+  color: #555;
+}
+.public-room-players,
+.public-room-spectators {
+  color: #777;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.public-room-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.6vh;
+}
+.public-room-button {
+  padding: 0.8vh 1.4vh;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1.7vh;
+  transition: all 0.3s;
+}
+.public-room-join {
+  background: linear-gradient(to bottom, #666, #4c4b46);
+}
+.public-room-join:hover {
+  background: linear-gradient(to bottom, #555, #333);
+}
+.public-room-watch {
+  background: linear-gradient(to bottom, #c2b07f, #ac9c52);
+}
+.public-room-watch:hover {
+  background: linear-gradient(to bottom, #bca668, #8c7e46);
+}
+#privateRoomDetails summary {
+  cursor: pointer;
+  font-size: medium;
+  margin: 1vh 0;
+}
+body.dark-mode-1 .public-room {
+  background: #2f2f2f;
+  color: #eee;
+}
+body.dark-mode-1 .public-room-status,
+body.dark-mode-1 .public-room-players,
+body.dark-mode-1 .public-room-spectators {
+  color: #bbb;
+}
+body.dark-mode-1 .public-room-format {
+  background: #5a5236;
 }
 #connectedRoom {
   display: none;
@@ -2064,7 +2183,7 @@ body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-pane-s
 }
 
 /* Double-click bench/active preview — rendered on the main page so the scrim
-   covers the full viewport (both playmat iframes + chrome). */
+   covers the full viewport (the board + chrome). */
 .card-preview-overlay {
   position: fixed;
   inset: 0;
@@ -2420,11 +2539,6 @@ body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-pane-s
   background: rgba(128, 128, 128, 0.08);
   border-color: rgba(128, 128, 128, 0.2);
 }
-
-/* Board cards are not in this document — they live inside the self/opp playmat
-   iframes, which load only self-/opp-containers.css. The plan C3 board glow
-   (.has-usable-ability) is therefore styled there, not here; only the overlay
-   above (the card preview) and the Stadium belong to this sheet. */
 
 /* Discard pile viewer — PTCG Live-style stacked carousel on single-click. */
 .discard-pile-overlay {
@@ -3681,20 +3795,6 @@ body.side-menu-collapsed .opp {
   width: 100%;
 }
 
-:root.sidebox-hidden #selfResizer,
-:root.side-menu-collapsed #selfResizer,
-.sidebox-hidden #selfResizer,
-body.side-menu-collapsed #selfResizer {
-  left: -0.55%;
-}
-
-:root.sidebox-hidden #oppResizer,
-:root.side-menu-collapsed #oppResizer,
-.sidebox-hidden #oppResizer,
-body.side-menu-collapsed #oppResizer {
-  left: -0.55%;
-}
-
     /* ── Card sleeve picker ─────────────────────────────────────────────── */
     .native-deck-builder-sleeve-filter {
       flex: 0 0 auto;
@@ -4613,11 +4713,16 @@ body.side-menu-collapsed #oppResizer {
       user-select: none;
     }
     .native-deck-builder-coin-empty { grid-column: 1 / -1; text-align: center; opacity: 0.6; padding: 3vh 0; font-style: italic; }
-    .coin-material-filter {
+    .coin-material-filter,
+    .coin-source-switch {
       display: flex;
       gap: 4px;
     }
-    .coin-material-filter button {
+    .coin-material-filter[hidden],
+    .coin-region-filter[hidden],
+    .coin-image-toggle[hidden] { display: none; }
+    .coin-material-filter button,
+    .coin-source-switch button {
       font-size: 1.2vh;
       padding: 0.4vh 0.7vw;
       border-radius: 999px;
@@ -4626,11 +4731,28 @@ body.side-menu-collapsed #oppResizer {
       color: inherit;
       cursor: pointer;
     }
-    .coin-material-filter button.active {
+    .coin-material-filter button.active,
+    .coin-source-switch button.active {
       background: rgba(65, 91, 168, 0.3);
       border-color: rgba(120, 144, 214, 0.7);
     }
+    /* TCG Live coins (design 069): the game's own thumbnail, then its live 3D coin over it */
+    .coin-cell .coin-cell-thumb { width: 84px; height: 84px; object-fit: contain; }
+    .coin-stage-preview { position: relative; width: 120px; height: 120px; flex: 0 0 auto; }
+    .coin-stage-preview img { width: 100%; height: 100%; object-fit: contain; }
+    .coin-stage-preview .coin-stage-canvas { position: absolute; inset: -20%; width: 140%; height: 140%; }
+    .coin-stage-preview.is-live img { visibility: hidden; }
     
+    /* With the 3D stage above, the picker's own preview card is a compact readout: the stage owns the
+       big coin, so the toss headroom and 120px disc would only push the tile grid out of view. */
+    .customize-stage:not([hidden]):not(.is-unavailable) ~ .native-deck-builder-coin-picker .native-deck-builder-coin-preview {
+      padding: 2.6vh 1vw 1vh;
+      margin-bottom: 0.6vh;
+    }
+    .customize-stage:not([hidden]):not(.is-unavailable) ~ .native-deck-builder-coin-picker .native-deck-builder-coin-preview .coin-stage-preview {
+      width: 9vh;
+      height: 9vh;
+    }
     /* coin picker panel: shares the customize pane with sleeves */
     .native-deck-builder-coin-picker {
       flex: 1 1 0;
@@ -4666,6 +4788,14 @@ body.side-menu-collapsed #oppResizer {
     }
     #turnOrderCoinFlipOverlay.fading { opacity: 0; }
     #turnOrderCoinFlipOverlay .coin-3d { width: clamp(150px, 24vh, 260px); height: clamp(150px, 24vh, 260px); }
+    /* TCG Live coin stage (design 069): the WebGL disc sits in the host; the shadow and landing sprites are DOM. */
+    #turnOrderCoinFlipOverlay.stage-mode .coin-toss-wrap { display: none; }
+    #turnOrderCoinFlipOverlay .coin-stage-host { position: relative; width: clamp(180px, 30vh, 330px); height: clamp(180px, 30vh, 330px); }
+    #turnOrderCoinFlipOverlay .coin-stage-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+    #turnOrderCoinFlipOverlay .coin-stage-shadow { position: absolute; left: 50%; top: 88%; width: 70%; transform: translate(-50%, 0); pointer-events: none; }
+    #turnOrderCoinFlipOverlay .coin-stage-ring,
+    #turnOrderCoinFlipOverlay .coin-stage-impact { position: absolute; left: 50%; top: 50%; width: 100%; opacity: 0; transform: translate(-50%, -50%); pointer-events: none; }
+    #turnOrderCoinFlipOverlay .coin-stage-impact { width: 80%; }
     .turn-order-coin-flip-label {
       color: #f2f4ff;
       font-size: 1.9vh;
@@ -5169,8 +5299,7 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
   display: inline-block;
   vertical-align: middle;
 }
-.ptcg-orb--cost { width: calc(var(--u) * 4.8); height: calc(var(--u) * 4.8); }
-.ptcg-orb--sm { width: calc(var(--u) * 4.3); height: calc(var(--u) * 4.3); }
+
 .ptcg-orb--inline { width: calc(var(--u) * 2.9); height: calc(var(--u) * 2.9); vertical-align: -0.4em; }
 .ptcg-orb--missing {
   display: grid;
@@ -5220,17 +5349,11 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
   overflow: hidden;
   box-shadow: 0 calc(var(--u) * 1.2) calc(var(--u) * 3.4) rgba(0, 0, 0, 0.4);
 }
-.ptcg-atks {
-  display: flex;
-  flex-direction: column;
-}
+
 /* Frosted panels: a top-lit fill at ~90% over a heavy backdrop blur lets the card's colour bleed
    through while the printed text beneath stays an illegible smear, never a readable ghost.
    Keep the fill at 85%+ — lower and the blurred print starts to read as shapes again. */
-.ptcg-atk,
-.ptcg-ability,
-.ptcg-stadium,
-.ptcg-stat {
+.ptcg-stadium {
   background: linear-gradient(
     180deg,
     color-mix(in srgb, var(--ptcg-panel-bg, #fff) 92%, transparent) 0%,
@@ -5238,17 +5361,13 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
   );
   backdrop-filter: blur(calc(var(--u) * 2.4)) saturate(1.25);
 }
-.ptcg-atk,
-.ptcg-ability,
 .ptcg-stadium {
   display: flex;
   flex-direction: column;
   border-top: 1px solid #d9d2c5;
   pointer-events: auto;
 }
-.ptcg-stack > .ptcg-ability:first-child,
-.ptcg-stack > .ptcg-stadium:first-child,
-.ptcg-atks > .ptcg-atk:first-child { border-top: 0; }
+.ptcg-stack > .ptcg-stadium:first-child { border-top: 0; }
 .ptcg-atk__head {
   position: relative;
   display: flex;
@@ -5274,7 +5393,6 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
 }
 /* A slow highlight sweeping across the banner — the "flowing" energy the attack bar carries
    in TCG Live. Scoped to attack panels so ability/stadium text bands stay calm. */
-.ptcg-atk > .ptcg-atk__head::after,
 .ptcg-stadium > .ptcg-atk__head::after {
   content: '';
   position: absolute;
@@ -5294,10 +5412,8 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
   55%, 100% { transform: translateX(130%); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .ptcg-atk > .ptcg-atk__head::after,
   .ptcg-stadium > .ptcg-atk__head::after,
-  .ptcg-atk__text::after,
-  .ptcg-stat::after { animation: none; opacity: 0; }
+  .ptcg-atk__text::after { animation: none; opacity: 0; }
 }
 /* The printed card carries a red "Ability" badge before the name; without it an ability panel
    is indistinguishable from an attack that happens to have no damage. */
@@ -5337,337 +5453,6 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.ptcg-atk__right { display: flex; align-items: center; gap: calc(var(--u) * 0.5); }
-/* Design 049: where an unprinted attack comes from ("from Slaking ex"). */
-.ptcg-atk__from {
-  margin: 0;
-  font-size: calc(var(--u) * 2.2);
-  font-style: italic;
-  opacity: 0.8;
-}
-/* The damage tab is AttackOption's AttackDamageBG sprite (slanted left edge) with the number on
-   it in black. Its edges scale with the titlebar height; --atk-dmg-l/-r are the sprite's 9-slice
-   borders, which differ per variant (see the --text/--recede rules below). */
-.ptcg-atk__dmg {
-  grid-area: dmg;
-  align-self: stretch;
-  box-sizing: border-box;
-  display: grid;
-  place-items: center;
-  width: calc(var(--bar-h) * 1.65);
-  border-style: solid;
-  border-color: transparent;
-  border-width: 0 calc(var(--bar-h) * var(--atk-dmg-r) / 106) 0 calc(var(--bar-h) * var(--atk-dmg-l) / 106);
-  border-image: var(--atk-dmg) 0 var(--atk-dmg-r) 0 var(--atk-dmg-l) fill / 0
-    calc(var(--bar-h) * var(--atk-dmg-r) / 106) 0 calc(var(--bar-h) * var(--atk-dmg-l) / 106) stretch;
-  font-size: min(calc(var(--u) * 4.8), calc(var(--bar-h) * 0.46));
-  font-weight: 900;
-  line-height: 1;
-  color: #000;
-  white-space: nowrap;
-}
-/* ── TCG Live attack-overlay skin ──────────────────────────────────────────────
-   Sprites and colours are the game's own (AttackEntryAssetRegistry_AttackOverlay), copied by
-   scripts/attack-ui/import-attack-ui.mjs; the table is client/src/assets/attack-ui/attack-ui.json.
-   `data-ptcg-type` picks the per-type set: titlebar, Retreat button, bar colour, text ink.
-   --bar-h is the titlebar height; every sprite edge is a fraction of it (the sprites are 106px
-   tall), so the bar tracks --u at any zoom. */
-.ptcg-chrome [data-ptcg-type='colorless'] {
-  --atk-bar: url('../assets/attack-ui/bar-colorless.png');
-  --atk-bar-short: url('../assets/attack-ui/bar-colorless-short.png');
-  --atk-retreat: url('../assets/attack-ui/retreat-colorless.png');
-  --atk-color: #d1d0cf;
-  --atk-ink: #000000;
-}
-.ptcg-chrome [data-ptcg-type='fire'] {
-  --atk-bar: url('../assets/attack-ui/bar-fire.png');
-  --atk-bar-short: url('../assets/attack-ui/bar-fire-short.png');
-  --atk-retreat: url('../assets/attack-ui/retreat-fire.png');
-  --atk-color: #d8223b;
-  --atk-ink: #ffffff;
-}
-.ptcg-chrome [data-ptcg-type='grass'] {
-  --atk-bar: url('../assets/attack-ui/bar-grass.png');
-  --atk-bar-short: url('../assets/attack-ui/bar-grass-short.png');
-  --atk-retreat: url('../assets/attack-ui/retreat-grass.png');
-  --atk-color: #13a748;
-  --atk-ink: #ffffff;
-}
-.ptcg-chrome [data-ptcg-type='water'] {
-  --atk-bar: url('../assets/attack-ui/bar-water.png');
-  --atk-bar-short: url('../assets/attack-ui/bar-water-short.png');
-  --atk-retreat: url('../assets/attack-ui/retreat-water.png');
-  --atk-color: #00a8d8;
-  --atk-ink: #ffffff;
-}
-.ptcg-chrome [data-ptcg-type='fighting'] {
-  --atk-bar: url('../assets/attack-ui/bar-fighting.png');
-  --atk-bar-short: url('../assets/attack-ui/bar-fighting-short.png');
-  --atk-retreat: url('../assets/attack-ui/retreat-fighting.png');
-  --atk-color: #b26232;
-  --atk-ink: #ffffff;
-}
-.ptcg-chrome [data-ptcg-type='fairy'] {
-  --atk-bar: url('../assets/attack-ui/bar-fairy.png');
-  --atk-bar-short: url('../assets/attack-ui/bar-fairy-short.png');
-  --atk-retreat: url('../assets/attack-ui/retreat-fairy.png');
-  --atk-color: #d6467e;
-  --atk-ink: #ffffff;
-}
-.ptcg-chrome [data-ptcg-type='darkness'] {
-  --atk-bar: url('../assets/attack-ui/bar-darkness.png');
-  --atk-bar-short: url('../assets/attack-ui/bar-darkness-short.png');
-  --atk-retreat: url('../assets/attack-ui/retreat-darkness.png');
-  --atk-color: #307179;
-  --atk-ink: #ffffff;
-}
-.ptcg-chrome [data-ptcg-type='lightning'] {
-  --atk-bar: url('../assets/attack-ui/bar-lightning.png');
-  --atk-bar-short: url('../assets/attack-ui/bar-lightning-short.png');
-  --atk-retreat: url('../assets/attack-ui/retreat-lightning.png');
-  --atk-color: #fbcf1f;
-  --atk-ink: #000000;
-}
-.ptcg-chrome [data-ptcg-type='dragon'] {
-  --atk-bar: url('../assets/attack-ui/bar-dragon.png');
-  --atk-bar-short: url('../assets/attack-ui/bar-dragon-short.png');
-  --atk-retreat: url('../assets/attack-ui/retreat-dragon.png');
-  --atk-color: #938f31;
-  --atk-ink: #ffffff;
-}
-.ptcg-chrome [data-ptcg-type='metal'] {
-  --atk-bar: url('../assets/attack-ui/bar-metal.png');
-  --atk-bar-short: url('../assets/attack-ui/bar-metal-short.png');
-  --atk-retreat: url('../assets/attack-ui/retreat-metal.png');
-  --atk-color: #afb39d;
-  --atk-ink: #000000;
-}
-.ptcg-chrome [data-ptcg-type='psychic'] {
-  --atk-bar: url('../assets/attack-ui/bar-psychic.png');
-  --atk-bar-short: url('../assets/attack-ui/bar-psychic-short.png');
-  --atk-retreat: url('../assets/attack-ui/retreat-psychic.png');
-  --atk-color: #957ead;
-  --atk-ink: #ffffff;
-}
-
-/* The head is a two-row grid, as AttackOption lays it out: name over the cost row on the left,
-   the damage tab on the right. The sprite sits on ::before, behind the text. */
-.ptcg-atk > .ptcg-atk__head,
-.ptcg-ability > .ptcg-atk__head {
-  --bar-h: calc(var(--u) * 11);
-  --atk-dmg: url('../assets/attack-ui/dmg.png');
-  --atk-dmg-l: 33;
-  --atk-dmg-r: 24;
-  isolation: isolate;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-rows: 1fr 1fr;
-  grid-template-areas: 'name dmg' 'cost dmg';
-  gap: 0;
-  min-height: var(--bar-h);
-  padding: 0 0 0 calc(var(--bar-h) * 0.25);
-  background: none;
-  box-shadow: none;
-  color: var(--atk-ink, #fff);
-}
-.ptcg-ability > .ptcg-atk__head {
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: 'name' 'cost';
-}
-.ptcg-atk > .ptcg-atk__head::before,
-.ptcg-ability > .ptcg-atk__head::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  border-style: solid;
-  border-color: transparent;
-  border-width: 0 calc(var(--bar-h) * 21 / 106) 0 calc(var(--bar-h) * 278 / 106);
-  border-image: var(--atk-bar) 0 21 0 278 fill / 0 calc(var(--bar-h) * 21 / 106) 0
-    calc(var(--bar-h) * 278 / 106) stretch;
-}
-/* An attack with effect text, and every ability, use the shorter titlebar and damage tab. */
-.ptcg-atk--text > .ptcg-atk__head::before,
-.ptcg-ability > .ptcg-atk__head::before { border-image-source: var(--atk-bar-short); }
-.ptcg-atk--text > .ptcg-atk__head { --atk-dmg: url('../assets/attack-ui/dmg-short.png'); --atk-dmg-l: 34; --atk-dmg-r: 24; }
-/* GX attacks have their own, wider titlebar (480px of art before the stretch column). */
-.ptcg-atk--gx > .ptcg-atk__head { --atk-ink: #ffffff; }
-.ptcg-atk--gx > .ptcg-atk__head::before {
-  border-width: 0 calc(var(--bar-h) * 19 / 106) 0 calc(var(--bar-h) * 480 / 106);
-  border-image: url('../assets/attack-ui/bar-gx.png') 0 19 0 480 fill / 0 calc(var(--bar-h) * 19 / 106) 0
-    calc(var(--bar-h) * 480 / 106) stretch;
-}
-/* A VSTAR Power attack or ability: the bar is 230 units tall instead of 200 (titleBarHeight_V), the
-   extra 30 holding the "VSTAR Power" strip, and wears its own titlebar and damage tabs. The titlebar
-   art sits in the 878px right border of a 908 x 173 sprite, so the bar stretches on the left. */
-.ptcg-atk--vstar > .ptcg-atk__head,
-.ptcg-ability--vstar > .ptcg-atk__head {
-  --bar-h-v: calc(var(--bar-h) * 1.15);
-  --atk-ink: #ffffff;
-  --atk-dmg: url('../assets/attack-ui/dmg-vstar.png');
-  --atk-dmg-l: 41;
-  --atk-dmg-r: 22;
-  --atk-vpower-end: url('../assets/attack-ui/vpower-end.png');
-  --atk-vpower-center: url('../assets/attack-ui/vpower-center.png');
-  grid-template-rows: calc(var(--bar-h) * 0.15) 1fr 1fr;
-  grid-template-areas: 'vpower dmg' 'name dmg' 'cost dmg';
-  min-height: var(--bar-h-v);
-}
-.ptcg-ability--vstar > .ptcg-atk__head { grid-template-areas: 'vpower' 'name' 'cost'; }
-.ptcg-atk--vstar.ptcg-atk--text > .ptcg-atk__head {
-  --atk-dmg: url('../assets/attack-ui/dmg-vstar-short.png');
-  --atk-dmg-l: 44;
-  --atk-dmg-r: 22;
-}
-.ptcg-atk--vstar > .ptcg-atk__head::before,
-.ptcg-ability--vstar > .ptcg-atk__head::before {
-  border-width: 0 calc(var(--bar-h-v) * 878 / 173) 0 calc(var(--bar-h-v) * 28 / 173);
-  border-image: url('../assets/attack-ui/bar-vstar.png') 0 878 0 28 fill / 0 calc(var(--bar-h-v) * 878 / 173) 0
-    calc(var(--bar-h-v) * 28 / 173) stretch;
-}
-.ptcg-atk--vstar.ptcg-atk--text > .ptcg-atk__head::before,
-.ptcg-ability--vstar > .ptcg-atk__head::before {
-  border-image-source: url('../assets/attack-ui/bar-vstar-short.png');
-}
-/* The tab runs the bar's full height, so its edges scale with the taller bar. */
-.ptcg-atk--vstar > .ptcg-atk__head > .ptcg-atk__dmg {
-  border-width: 0 calc(var(--bar-h-v) * var(--atk-dmg-r) / 106) 0 calc(var(--bar-h-v) * var(--atk-dmg-l) / 106);
-  border-image-width: 0 calc(var(--bar-h-v) * var(--atk-dmg-r) / 106) 0
-    calc(var(--bar-h-v) * var(--atk-dmg-l) / 106);
-}
-/* The game draws a usable VSTAR Power's name outlined. */
-.ptcg-atk--vstar:not(.ptcg-atk--recede) > .ptcg-atk__head > .ptcg-atk__name,
-.ptcg-ability--vstar:not(.ptcg-ability--recede) > .ptcg-atk__head > .ptcg-atk__name {
-  text-shadow:
-    0 0 calc(var(--bar-h) * 0.03) #000,
-    0 calc(var(--bar-h) * 0.015) calc(var(--bar-h) * 0.02) #000;
-}
-/* VPowerBar: 40 of the 230 units, over the top of the bar and stopping at the damage tab. An end
-   sprite 300 units wide closes each side (the right one mirrored) around the centre tile, which
-   spans the middle 80%. */
-.ptcg-atk__vpower {
-  grid-area: vpower;
-  position: relative;
-  isolation: isolate;
-  align-self: start;
-  display: grid;
-  place-items: center;
-  height: calc(var(--bar-h) * 0.2);
-  margin-left: calc(var(--bar-h) * -0.25);
-  background: var(--atk-vpower-center) center / 80% 100% no-repeat;
-  color: #2b1d00;
-  font-size: calc(var(--bar-h) * 0.13);
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-  overflow: hidden;
-}
-.ptcg-atk__vpower::before,
-.ptcg-atk__vpower::after {
-  content: '';
-  position: absolute;
-  z-index: -1;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: min(calc(var(--bar-h) * 1.5), 50%);
-  background: var(--atk-vpower-end) center / 100% 100% no-repeat;
-}
-.ptcg-atk__vpower::after {
-  left: auto;
-  right: 0;
-  transform: scaleX(-1);
-}
-/* An attack the player cannot use loses its sprite: the game draws a plain light bar (its cantUse
-   grey, #d4d4d4) with black ink and an empty damage tab. The panel's recede filter dims what is
-   drawn by brightness .84 / contrast .94, so white here lands on that grey. */
-.ptcg-atk--recede > .ptcg-atk__head {
-  --atk-ink: #000000;
-  --atk-dmg: url('../assets/attack-ui/dmg-empty.png');
-  --atk-dmg-l: 37;
-  --atk-dmg-r: 20;
-  background: #ffffff;
-}
-.ptcg-atk--text.ptcg-atk--recede > .ptcg-atk__head {
-  --atk-dmg: url('../assets/attack-ui/dmg-empty-short.png');
-  --atk-dmg-r: 27;
-}
-.ptcg-atk--recede > .ptcg-atk__head::before { display: none; }
-.ptcg-atk--gx.ptcg-atk--recede > .ptcg-atk__head { background: none; }
-.ptcg-atk--gx.ptcg-atk--recede > .ptcg-atk__head::before {
-  display: block;
-  border-width: 0 calc(var(--bar-h) * 18 / 106) 0 calc(var(--bar-h) * 480 / 106);
-  border-image: url('../assets/attack-ui/bar-gx-off.png') 0 18 0 480 fill / 0 calc(var(--bar-h) * 18 / 106) 0
-    calc(var(--bar-h) * 480 / 106) stretch;
-}
-/* A spent or unpayable VSTAR Power keeps the VSTAR tab shape, emptied, under the greyed strip. */
-.ptcg-atk--vstar.ptcg-atk--recede > .ptcg-atk__head,
-.ptcg-ability--vstar.ptcg-ability--recede > .ptcg-atk__head {
-  --atk-dmg: url('../assets/attack-ui/dmg-vstar-empty.png');
-  --atk-dmg-l: 32;
-  --atk-dmg-r: 26;
-  --atk-vpower-end: url('../assets/attack-ui/vpower-end-off.png');
-  --atk-vpower-center: url('../assets/attack-ui/vpower-center-off.png');
-}
-.ptcg-atk--vstar.ptcg-atk--text.ptcg-atk--recede > .ptcg-atk__head {
-  --atk-dmg: url('../assets/attack-ui/dmg-vstar-empty-short.png');
-  --atk-dmg-r: 32;
-}
-.ptcg-atk--usable:hover > .ptcg-atk__head,
-.ptcg-ability--usable:hover > .ptcg-atk__head { filter: brightness(1.12) saturate(1.08); }
-
-.ptcg-atk > .ptcg-atk__head > .ptcg-atk__name,
-.ptcg-ability > .ptcg-atk__head > .ptcg-atk__name {
-  grid-area: name;
-  align-self: end;
-  padding-bottom: calc(var(--bar-h) * 0.03);
-  color: var(--atk-ink, #fff);
-  font-size: min(calc(var(--u) * 3.5), calc(var(--bar-h) * 0.34));
-  line-height: 1.2;
-}
-.ptcg-atk > .ptcg-atk__head > .ptcg-atk__right {
-  grid-area: cost;
-  align-self: start;
-  padding-top: calc(var(--bar-h) * 0.03);
-  gap: calc(var(--bar-h) * 0.04);
-}
-.ptcg-atk__right .ptcg-orb--cost {
-  width: calc(var(--bar-h) * 0.38);
-  height: calc(var(--bar-h) * 0.38);
-}
-/* Abilities show the game's "Ability" tag sprite where an attack shows its cost; the badge text is
-   kept for screen readers. A passive ability is the game's ability header (atkOv_Ability_BG, a
-   white round-topped mask) tinted with the type colour. */
-.ptcg-ability > .ptcg-atk__head > .ptcg-atk__badge {
-  grid-area: cost;
-  justify-self: start;
-  align-self: start;
-  width: calc(var(--bar-h) * 2);
-  height: calc(var(--bar-h) * 0.44);
-  padding: 0;
-  border-radius: 0;
-  background: url('../assets/attack-ui/ability-tag-on.png') left center / contain no-repeat;
-  color: transparent;
-  font-size: 0;
-}
-/* The mask's 16px sides, 13px top and 3px bottom are drawn at the row tile's 50 px per unit; where
-   no mask-border is supported the header stays a plain tinted bar. */
-.ptcg-ability--passive > .ptcg-atk__head::before {
-  border-width: calc(var(--bar-h) * 0.26) calc(var(--bar-h) * 0.32) calc(var(--bar-h) * 0.06);
-  border-image: none;
-  background: var(--atk-color);
-  -webkit-mask-box-image: url('../assets/attack-ui/ability-bg.png') 13 16 3 16 fill stretch;
-  mask-border: url('../assets/attack-ui/ability-bg.png') 13 16 3 16 fill stretch;
-}
-.ptcg-ability--recede > .ptcg-atk__head { --atk-ink: #000000; }
-.ptcg-ability--recede > .ptcg-atk__head::before { display: none; }
-.ptcg-ability--recede > .ptcg-atk__head > .ptcg-atk__badge {
-  background-image: url('../assets/attack-ui/ability-tag-off.png');
-}
-.ptcg-stack--compact .ptcg-atk > .ptcg-atk__head,
-.ptcg-stack--compact .ptcg-ability > .ptcg-atk__head { --bar-h: calc(var(--u) * 9.4); }
 
 /* Natural height — the panel is as tall as its text, so the card shows in whatever is left
    below the stack rather than being covered by an opaque void. */
@@ -5680,14 +5465,12 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
   /* Shadow cast down from the raised head band, so the text sits in a recess below it. */
   box-shadow: inset 0 calc(var(--u) * 0.8) calc(var(--u) * 1.2) rgba(0, 0, 0, 0.09);
 }
-/* The white text areas and the Retreat tile carry a faint cool sheen sweep of their own. */
-.ptcg-atk__text,
-.ptcg-stat {
+/* The white text areas carry a faint cool sheen sweep of their own. */
+.ptcg-atk__text {
   position: relative;
   overflow: hidden;
 }
-.ptcg-atk__text::after,
-.ptcg-stat::after {
+.ptcg-atk__text::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -5706,13 +5489,11 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
 .ptcg-chrome[data-finish='holo'] { --ptcg-panel-bg: #f1f6ff; }
 .ptcg-chrome[data-finish='ultra'] { --ptcg-panel-bg: #faf2ff; }
 .ptcg-chrome[data-finish='secret'] { --ptcg-panel-bg: #fff7e2; }
-.ptcg-chrome[data-finish='holo'] .ptcg-atk__text::after,
-.ptcg-chrome[data-finish='holo'] .ptcg-stat::after {
+.ptcg-chrome[data-finish='holo'] .ptcg-atk__text::after {
   background: linear-gradient(100deg, transparent 20%, rgba(110, 165, 255, 0.6) 50%, transparent 80%);
   animation-duration: 4s;
 }
-.ptcg-chrome[data-finish='ultra'] .ptcg-atk__text::after,
-.ptcg-chrome[data-finish='ultra'] .ptcg-stat::after {
+.ptcg-chrome[data-finish='ultra'] .ptcg-atk__text::after {
   /* Two faint colour bands with clear gaps between them: a solid 0.5 rainbow painted the whole
      panel mint/pink at all times and made it the loudest thing on the card. */
   background: linear-gradient(
@@ -5731,8 +5512,7 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
   transform: none;
   animation: ptcg-prism 7s linear infinite;
 }
-.ptcg-chrome[data-finish='secret'] .ptcg-atk__text::after,
-.ptcg-chrome[data-finish='secret'] .ptcg-stat::after {
+.ptcg-chrome[data-finish='secret'] .ptcg-atk__text::after {
   background: linear-gradient(100deg, transparent 20%, rgba(255, 190, 60, 0.7) 50%, transparent 80%);
   animation-duration: 3.4s;
 }
@@ -5741,106 +5521,15 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
   to { background-position: 300% 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .ptcg-chrome[data-finish] .ptcg-atk__text::after,
-  .ptcg-chrome[data-finish] .ptcg-stat::after { animation: none; opacity: 0; }
+  .ptcg-chrome[data-finish] .ptcg-atk__text::after { animation: none; opacity: 0; }
 }
-/* Tighter padding and leading so a stack hung from the bottom stays clear of the rules box above. */
-.ptcg-stack--compact .ptcg-atk__text {
-  padding-top: calc(var(--u) * 0.8);
-  padding-bottom: calc(var(--u) * 0.8);
-  line-height: 1.3;
-}
-.ptcg-stack--compact .ptcg-stadium > .ptcg-atk__head { padding-top: calc(var(--u) * 0.9); padding-bottom: calc(var(--u) * 0.9); }
+
 .ptcg-atk__text--short { font-size: calc(var(--u) * 3.4); }
-.ptcg-atk--recede,
-.ptcg-ability--recede,
-.ptcg-stadium--recede,
-.ptcg-stat--recede { filter: saturate(0.25) brightness(0.84) contrast(0.94); }
-.ptcg-atk--usable,
-.ptcg-ability--usable,
-.ptcg-stadium--usable,
-.ptcg-stat--usable { cursor: pointer; }
-.ptcg-atk--usable:hover,
-.ptcg-ability--usable:hover,
-.ptcg-stadium--usable:hover,
-.ptcg-stat--usable:hover {
+.ptcg-stadium--recede { filter: saturate(0.25) brightness(0.84) contrast(0.94); }
+.ptcg-stadium--usable { cursor: pointer; }
+.ptcg-stadium--usable:hover {
   box-shadow: inset 0 0 0 calc(var(--u) * 0.5) rgba(255, 255, 255, 0.85);
 }
-
-/* Its own band on the printed weakness strip, pinned from the bottom so the space between it
-   and the text stack stays card instead of fill. Hairline dividers keep the tiles reading as
-   three separate pieces without gaps that let the print through. */
-.ptcg-stats {
-  position: absolute;
-  left: var(--ptcg-inset-left, 0%);
-  right: var(--ptcg-inset-right, 0%);
-  display: flex;
-  pointer-events: auto;
-  /* Same float as the text stack, so the strip reads as one raised tile. */
-  border-radius: 0 0 calc(var(--u) * 2.1) calc(var(--u) * 2.1);
-  box-shadow: 0 calc(var(--u) * 1.2) calc(var(--u) * 3.4) rgba(0, 0, 0, 0.4);
-}
-.ptcg-stat {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: calc(var(--u) * 0.5);
-  padding: calc(var(--u) * 1.1) calc(var(--u) * 0.9);
-  border-top: 1px solid #d9d2c5;
-  border-left: 1px solid #d9d2c5;
-}
-.ptcg-stat:first-child { border-left: 0; border-radius: 0 0 0 calc(var(--u) * 2.1); }
-.ptcg-stat:last-child { border-radius: 0 0 calc(var(--u) * 2.1) 0; }
-.ptcg-stat__k {
-  font-size: calc(var(--u) * 1.9);
-  text-transform: lowercase;
-  letter-spacing: 0.02em;
-  color: #8a8272;
-  white-space: nowrap;
-}
-.ptcg-stat__v {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: calc(var(--u) * 0.7);
-}
-.ptcg-stat__n { font-size: calc(var(--u) * 2.7); font-weight: 800; color: #16202b; }
-/* Modern frames print the label left of the cost instead of above it. */
-.ptcg-stats--row .ptcg-stat { flex-direction: row; gap: calc(var(--u) * 1.4); }
-.ptcg-stat__n--none { color: #a3adb8; font-weight: 600; }
-/* The BW/XY corner button sits below the printed Weakness/Resistance row, so it stays short. */
-.ptcg-stats--corner .ptcg-stat { padding-top: calc(var(--u) * 0.4); padding-bottom: calc(var(--u) * 0.4); border-radius: calc(var(--u) * 2.1); }
-
-/* The Retreat tile is TCG Live's Retreat button: the type-coloured octagon sprite (grey once the
-   retreat is unavailable) with its ink from the same table as the attack bars. The sprite is
-   opaque in the middle, so the frosted fill steps aside and the octagon's cut corners show the
-   card. */
-.ptcg-chrome .ptcg-stat[data-ptcg-retreat] {
-  --atk-retreat-slice: 12 15 12 15;
-  background: none;
-  backdrop-filter: none;
-  border-style: solid;
-  border-color: transparent;
-  border-width: calc(var(--u) * 1.5) calc(var(--u) * 1.8);
-  border-image: var(--atk-retreat) var(--atk-retreat-slice) fill / calc(var(--u) * 1.5) calc(var(--u) * 1.8) stretch;
-  padding: calc(var(--u) * 0.2) calc(var(--u) * 0.4);
-  color: var(--atk-ink, #fff);
-}
-.ptcg-chrome .ptcg-stat--recede[data-ptcg-retreat] {
-  --atk-retreat: url('../assets/attack-ui/retreat-disable.png');
-  --atk-retreat-slice: 15;
-  --atk-ink: #000000;
-}
-.ptcg-chrome .ptcg-stat[data-ptcg-retreat]::after { display: none; }
-.ptcg-chrome .ptcg-stat[data-ptcg-retreat] .ptcg-stat__k {
-  color: var(--atk-ink, #fff);
-  text-transform: capitalize;
-}
-.ptcg-chrome .ptcg-stat[data-ptcg-retreat] .ptcg-stat__n { color: var(--atk-ink, #fff); }
-.ptcg-chrome .ptcg-stat--usable[data-ptcg-retreat]:hover { box-shadow: none; filter: brightness(1.12) saturate(1.08); }
 
 .ptcg-dmg {
   position: absolute;
@@ -5865,7 +5554,7 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
    the screen (the board stops at 75.5%, the sidebox fills the rest). This
    host-level rail mirrors both players' Lost Zone piles — top card first —
    and opens the existing full zone view when a side is clicked. The zone
-   itself still lives in the playmat iframes, so drag/drop and netcode are
+   itself still lives on the board, so drag/drop and netcode are
    unchanged; this is a presentation layer only. */
 #lostZoneRail {
   display: none;
@@ -6111,7 +5800,7 @@ body.sidebox-hidden #lostZoneRail {
 }
 
 /* Design 038: the dragged card (drag-avatar.js). A body-level copy so it can
-   cross both playmat iframes; above every popup because it is under the
+   cross the board; above every popup because it is under the
    pointer. Pointer-transparent, or it would swallow the dragover/drop hits. */
 img.drag-avatar {
   position: fixed;
@@ -6129,4 +5818,198 @@ img.drag-avatar {
   user-select: none;
   z-index: 100001;
   will-change: transform;
+}
+
+/* ── Deck customization 3D preview (design 071): TCG Live's box / sleeve / coin trio above the picker ── */
+.customize-stage {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7vh;
+  padding: 0 0.75vw 0.8vh;
+}
+.customize-stage[hidden],
+.customize-stage.is-unavailable { display: none; }
+.customize-stage-viewport {
+  position: relative;
+  width: 100%;
+  height: 36vh;
+  min-height: 220px;
+  overflow: hidden;
+  border-radius: 0.6vw;
+  background: radial-gradient(ellipse at 50% 85%, rgba(120, 150, 220, 0.28), rgba(20, 28, 52, 0.55) 70%);
+  border: 1px solid rgba(65, 91, 168, 0.35);
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+}
+.customize-stage-viewport:active { cursor: grabbing; }
+.customize-stage-objects {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.customize-stage-objects canvas,
+.customize-stage-coin canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.customize-stage-coin {
+  position: absolute;
+  pointer-events: none;
+}
+.customize-stage-coin-shadow {
+  position: absolute;
+  pointer-events: none;
+  background: rgba(43, 45, 61, 0.85);
+  -webkit-mask: url('../assets/deckbox/shadow-coin.webp') center / 100% 100% no-repeat;
+  mask: url('../assets/deckbox/shadow-coin.webp') center / 100% 100% no-repeat;
+}
+.customize-stage-coin[hidden],
+.customize-stage-coin-shadow[hidden] { display: none; }
+.customize-stage-arrow {
+  position: absolute;
+  top: 50%;
+  width: 4.2vh;
+  height: 4.2vh;
+  margin-top: -2.1vh;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  color: #2a3558;
+  font-size: 3vh;
+  line-height: 1;
+  cursor: pointer;
+}
+.customize-stage-arrow:hover { background: #fff; }
+.customize-stage-arrow[data-dir="-1"] { left: 1vw; }
+.customize-stage-arrow[data-dir="1"] { right: 1vw; }
+.customize-stage-bar {
+  display: flex;
+  align-items: center;
+  gap: 1vw;
+}
+.customize-stage-toggle {
+  display: flex;
+  border: 1px solid rgba(65, 91, 168, 0.35);
+  border-radius: 999px;
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+.customize-stage-toggle button {
+  padding: 0.7vh 1.4vw;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 1.4vh;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+}
+.customize-stage-toggle button:hover { background: rgba(65, 91, 168, 0.18); }
+.customize-stage-toggle button.active {
+  background: rgba(65, 91, 168, 0.45);
+  font-weight: 700;
+}
+.customize-stage-caption {
+  flex: 1;
+  min-width: 0;
+  font-size: 1.4vh;
+  opacity: 0.85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* the deck box picker has no title row of its own: the switcher and the shared filter stand in for it */
+.native-deck-builder-box-panel .native-deck-builder-section-title-row { display: none; }
+.native-deck-builder-box-panel .native-deck-builder-sleeve-gallery {
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  grid-auto-rows: 104px;
+}
+
+/* ── Spectator view switch (design 069) ─────────────────────────────────
+   Top-left of the board, only while spectating a server-authoritative room
+   (spectator-session.js toggles body.spectating / body.spectator-broadcast). */
+#spectatorViewSwitch {
+  position: fixed;
+  top: 1.2vh;
+  left: 1vw;
+  z-index: 1310;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 6px;
+  background: rgba(20, 22, 30, 0.55);
+  backdrop-filter: blur(6px);
+  border-radius: 10px;
+  font-family: 'Rodin Condensed', 'Barlow Semi Condensed', sans-serif;
+}
+#spectatorViewSwitch[hidden] {
+  display: none;
+}
+.spectator-view-switch__label {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 1.3vh;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0 0.3vw;
+}
+#spectatorViewSwitch button {
+  font: inherit;
+  font-size: 1.5vh;
+  font-weight: 700;
+  max-width: 10vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0.4vh 0.7vw;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  cursor: pointer;
+}
+#spectatorViewSwitch button:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+#spectatorViewSwitch button.selected {
+  background: linear-gradient(to bottom, rgb(66, 165, 245), rgb(21, 101, 192));
+  border-color: rgb(13, 71, 161);
+}
+
+/* A spectator never acts: no turn, coin or board-flip controls. */
+body.spectating #endTurnButton,
+body.spectating #passBoardButton,
+body.spectating #flipCoinButton,
+body.spectating #flipBoardButton {
+  display: none !important;
+}
+
+/* Broadcast layout (design 069): the two boards turned 90° side by side, stream style.
+   The `you` board turns clockwise into the left half, so its hand sits on
+   the left edge; the `them` board turns the other way into the right half, and the Actives
+   meet at the seam. Each board keeps its usual layout box (board-wide, half the height), so
+   every zone keeps its place, and is scaled by --bc-scale (the board's length fitted to the
+   screen height) about its centre, then shifted so the two boards touch at the seam. */
+body.spectator-broadcast {
+  --board-w: 75.5vw;
+  --bc-scale: 0.75;
+}
+body.spectator-broadcast.sidebox-hidden,
+body.spectator-broadcast.side-menu-collapsed {
+  --board-w: 100vw;
+}
+body.spectator-broadcast #battleMat {
+  transition: none;
+  /* The turned boards leave bands either side; the mat's spread shadow fills them. */
+  box-shadow: 0 0 0 100vmax #000;
+}
+body.spectator-broadcast #stadium {
+  left: calc(var(--board-w) / 2) !important;
+  bottom: 50% !important;
+  transform: translate(-50%, 50%) !important;
+}
+body.spectator-broadcast #battleMatArt {
+  display: none !important;
 }

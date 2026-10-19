@@ -20,7 +20,7 @@ export const takePrizes = (
   emit = true
 ) => {
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'takePrizes', [oInitiator, count]);
     return;
   }
@@ -70,7 +70,7 @@ export const takePrizesByIndex = (
   emit = true
 ) => {
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'takePrizesByIndex', [oInitiator, indices]);
     return;
   }
@@ -119,7 +119,7 @@ export const shufflePrizesToDeckBottom = (
   emit = true
 ) => {
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'shufflePrizesToDeckBottom', [
       oInitiator,
       indices,

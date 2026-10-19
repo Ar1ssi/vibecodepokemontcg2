@@ -35,6 +35,9 @@ const SHEETS = {
   sparkle: [2, 2], ring: [2, 2], pop: [2, 2],
 };
 
+/** The flipbook grids above, for renderers that draw the parts themselves (board3d). */
+export const STATUS_LOOP_SHEETS = Object.freeze(SHEETS);
+
 /**
  * One part from Unity numbers (see status-fx.mjs `unityLayer` for the units):
  * `run` = [cols used, rows used] of a flipbook played every `life`; `cell` = a

@@ -48,10 +48,41 @@ export function discardCardToPlayerZone(player, card) {
     delete card.faceDownUntilTurn;
     delete card.faceDownHostId;
   }
+  // A Pokémon attached as a Tool (Unown Q, Shedinja) is a plain Pokémon card again in the discard.
+  delete card?.asTool;
   const zoneKey = isPrismStarCard(card) ? 'lostZone' : 'discard';
   if (!Array.isArray(player.zones[zoneKey])) player.zones[zoneKey] = [];
   player.zones[zoneKey].push(card);
   return zoneKey;
+}
+
+/**
+ * Clears the "attached as" markers from every card that is no longer attached in play. A
+ * Charjabug (Battery) or Electrode (Buzzap) is Energy only while attached, and a Shedinja or
+ * Unown Q/G/E is a Tool only while attached. A card that left play keeps no marker, so it is
+ * a plain Pokémon if it evolves or is attached again later. A face-down Energy (Unown I Hidden
+ * Power) is face up once it leaves play. Mutates the state.
+ *
+ * @param {{ players?: Record<string, { zones?: Record<string, object[]> }> }} state
+ */
+export function clearDetachedCardMarkers(state) {
+  const clear = (card) => {
+    delete card.asEnergy;
+    delete card.asTool;
+    delete card.faceDownUntilTurn;
+    delete card.faceDownHostId;
+  };
+  const stadium = state?.stadium?.card || state?.stadium;
+  if (stadium && typeof stadium === 'object') clear(stadium);
+  for (const player of Object.values(state?.players || {})) {
+    for (const [zoneId, zone] of Object.entries(player?.zones || {})) {
+      if (!Array.isArray(zone)) continue;
+      const inPlay = zoneId === 'active' || zoneId === 'bench';
+      for (const card of zone) {
+        if (card && !(inPlay && card.attachedTo != null)) clear(card);
+      }
+    }
+  }
 }
 
 /**

@@ -7,7 +7,7 @@ import { isAuthoritativeDispatchActive } from '../../setup/netcode/authoritative
 
 const undoAsync = async (user, filteredActionData, emit = true) => {
   return new Promise((resolve, reject) => {
-    if (user === 'opp' && emit && systemState.isTwoPlayer) {
+    if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
       processAction(user, emit, 'undo', [filteredActionData]);
       return;
     }

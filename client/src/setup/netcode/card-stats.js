@@ -154,12 +154,13 @@ export function buildCardStatsPayload(cards = []) {
  * @param {object} options.socket
  * @param {string} options.roomId
  * @param {Array<object>} options.cards
+ * @param {'p1'|'p2'} [options.seat] whose cards, in a solo room (design 074 D7)
  * @returns {Promise<{ success: boolean, error?: string }>}
  */
-export async function emitCardStats({ socket, roomId, cards = [] } = {}) {
+export async function emitCardStats({ socket, roomId, cards = [], seat } = {}) {
   const payload = buildCardStatsPayload(cards);
   if (payload.stats.length === 0) {
     return { success: false, error: 'no_resolved_card_data' };
   }
-  return emitCmd({ socket, roomId, type: 'cardStats', payload });
+  return emitCmd({ socket, roomId, type: 'cardStats', payload, seat });
 }

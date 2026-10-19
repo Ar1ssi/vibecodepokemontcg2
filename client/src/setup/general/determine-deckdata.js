@@ -5,9 +5,11 @@ export const determineDeckData = (user) => {
   if (user === 'self') {
     deckData = systemState.selfDeckData;
   } else {
-    deckData = !systemState.isTwoPlayer
-      ? systemState.p1OppDeckData
-      : systemState.p2OppDeckData;
+    // A solo room's far deck is the solo "alt" deck (design 074 D7).
+    deckData =
+      !systemState.isTwoPlayer || systemState.solo
+        ? systemState.p1OppDeckData
+        : systemState.p2OppDeckData;
   }
   return deckData;
 };

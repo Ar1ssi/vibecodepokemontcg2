@@ -79,6 +79,11 @@ function parseIds(value) {
   return [...new Set(value)];
 }
 
+// Sleeve ids stored before TCG Live's own sleeves replaced the sleeve database's: the one ETB sleeve.
+const LEGACY_SLEEVE_IDS = { '08266b9d-1d37-4ddb-a458-9adc302edb62': 'cs_charizardxmega_me2_etb' };
+
+const currentSleeveIds = (ids) => ids && [...new Set(ids.map((id) => LEGACY_SLEEVE_IDS[id] ?? id))];
+
 const isProduct = (product) =>
   product &&
   typeof product === 'object' &&
@@ -99,7 +104,7 @@ export function parseCollection(json) {
   if (!value || typeof value !== 'object' || value.version !== COLLECTION_VERSION) return null;
   const cards = parseCounts(value.cards, isId);
   const energy = parseCounts(value.energy, (label) => BASIC_ENERGY_LABELS.includes(label));
-  const sleeves = parseIds(value.sleeves);
+  const sleeves = currentSleeveIds(parseIds(value.sleeves));
   const coins = parseIds(value.coins);
   if (!cards || !energy || !sleeves || !coins) return null;
   const { products } = value;

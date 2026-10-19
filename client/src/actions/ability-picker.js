@@ -8,7 +8,6 @@
 import { getZone } from '../setup/zones/get-zone.js';
 import { rulesState, abilityUsed, canUsePlayedToBenchTrigger, ensureCardData } from '/shared/engine/rules/rules-state.mjs';
 import { appendMessage } from '../setup/chatbox/append-message.js';
-import { selfContainer, oppContainer } from '../state.js';
 import { runAbilitySteps } from '../setup/rules/rules-bridge.js';
 import { parseAbility } from '/shared/engine/rules/abilities.mjs';
 import {
@@ -196,14 +195,10 @@ function showAbilityPopup(user, usable) {
   popup.appendChild(cancelBtn);
 
   document.body.appendChild(popup);
-  selfContainer.style.zIndex = -1;
-  oppContainer.style.zIndex = -1;
 }
 
 function closePopup(popup) {
   if (popup && popup.parentNode) {
     popup.parentNode.removeChild(popup);
   }
-  selfContainer.style.zIndex = 0;
-  oppContainer.style.zIndex = 0;
 }

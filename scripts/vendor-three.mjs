@@ -1,6 +1,6 @@
 /**
- * Vendor the three.js files the Build & Battle 3D packs load (design 055) from the pinned
- * devDependency into client/src/vendor/three/. The browser has no bundler: it loads these copies
+ * Vendor the three.js files the 3D packs (design 055), the board (074) and its attack-FX bloom
+ * (075) load from the pinned devDependency into client/src/vendor/three/. The browser has no bundler: it loads these copies
  * through the import map in client/index.ejs.
  * Run: node scripts/vendor-three.mjs          (copies the files)
  *      node scripts/vendor-three.mjs --check  (exit 1 when a vendored file differs from the package)
@@ -21,6 +21,11 @@ export const VENDORED_FILES = {
   'three.core.min.js': 'build/three.core.min.js',
   'three.module.min.js': 'build/three.module.min.js',
   'RoomEnvironment.js': 'examples/jsm/environments/RoomEnvironment.js',
+  // Design 075 O2: the attack-FX bloom. Subpaths keep the addons' own relative imports working.
+  'addons/postprocessing/UnrealBloomPass.js': 'examples/jsm/postprocessing/UnrealBloomPass.js',
+  'addons/postprocessing/Pass.js': 'examples/jsm/postprocessing/Pass.js',
+  'addons/shaders/CopyShader.js': 'examples/jsm/shaders/CopyShader.js',
+  'addons/shaders/LuminosityHighPassShader.js': 'examples/jsm/shaders/LuminosityHighPassShader.js',
   LICENSE: 'LICENSE',
 };
 
@@ -64,9 +69,10 @@ function main() {
     }
     return;
   }
-  mkdirSync(VENDOR_DIR, { recursive: true });
   for (const [name, source] of Object.entries(VENDORED_FILES)) {
-    copyFileSync(join(PACKAGE_DIR, source), join(VENDOR_DIR, name));
+    const destination = join(VENDOR_DIR, name);
+    mkdirSync(dirname(destination), { recursive: true });
+    copyFileSync(join(PACKAGE_DIR, source), destination);
   }
 }
 

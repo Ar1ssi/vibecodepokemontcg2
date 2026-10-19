@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import {
+  CATALOG_PATH,
   cleanRelease,
   compactDateStamp,
   inferMaterial,
@@ -58,19 +60,14 @@ test('normalizeCoins is idempotent', () => {
   assert.deepEqual(second, first);
 });
 
-test('renderCatalog replaces only the data block', () => {
-  const source = [
-    '// header',
-    'const COIN_CATALOG = [',
-    ' {"id": "old"}',
-    '];',
-    '',
-    'export function x() { return 1; }',
-    '',
-  ].join('\n');
-  const out = renderCatalog(source, [{ id: 'new', name: 'n' }]);
-  assert.ok(out.startsWith('// header\nconst COIN_CATALOG = ['));
-  assert.ok(out.includes('"id": "new"'));
-  assert.ok(!out.includes('"id": "old"'));
-  assert.ok(out.endsWith('export function x() { return 1; }\n'));
+// Design 073: the catalog is a JSON file, so rendering is the whole file, not a block inside a module.
+test('renderCatalog writes the catalog file: indent 1, LF-terminated', () => {
+  assert.equal(renderCatalog([{ id: 'new', name: 'n' }]), '[\n {\n  "id": "new",\n  "name": "n"\n }\n]\n');
+});
+
+test('the committed coin catalog is already normalized and rendered', () => {
+  const source = readFileSync(CATALOG_PATH, 'utf8');
+  const { coins, report } = normalizeCoins(JSON.parse(source));
+  assert.equal(report.total, 939);
+  assert.equal(renderCatalog(coins), source);
 });

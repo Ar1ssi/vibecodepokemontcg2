@@ -6,8 +6,8 @@
 .agent/ — agent harness: state, workflows, designs, journal (human manual: .agent/README.md); spawn-or-inline cost guide: .agent/DELEGATION.md
 .claude/agents/ — project subagents: slice-builder (low effort, pinned-contract slices; D171), fx-designer (high effort, board visuals/CSS in the 041–046 house style; D173)
 client/ — client application (EJS layout, CSS styles, client JS, deck builder, rules engine); entry: client/src/front-end.js
-server/ — Express + Socket.IO + SQLite; entry: server/server.js; game rooms in server/game/room.mjs (GameRoom runs shared/engine commands, sends per-player views)
-shared/tcgdex/ — TCGdex URL builder (browser → server proxy server/tcgdex-proxy.mjs, D164) + IndexedDB JSON cache (D102)
+server/ — Express + Socket.IO + SQLite; entry: server/server.js; game rooms in server/game/room.mjs (GameRoom runs shared/engine commands, sends per-player views); server/netcode-mode.mjs: server authority unless SERVER_AUTHORITATIVE=0|false|off|no; server/game/room-sweep.mjs: idle-room sweep plan
+shared/tcgdex/ — TCGdex URL builder (browser → server proxy server/tcgdex-proxy.mjs, D164) + IndexedDB JSON cache (D102); card-art.mjs maps cards to own fronts in client/src/assets/card-art (TCG Live art for League-stamped/imageless TCGdex cards)
 docs/ — project documentation (card types taxonomy, rule specs); entry: docs/card-types-taxonomy.md
 scripts/ — admin and asset utility scripts (stadium audit, pkmncards scraper + attack/ability corpus audit, mat generator; pkmncards article HTML helper: scripts/lib/pkmn-article-html.mjs, D179)
 scripts/audit-oracle.mjs (`pnpm audit:oracle`, ~2 min) — execution gate: runs every corpus attack/ability through the engine (lib/oracle-harness.mjs), ratchets per-family observed rates vs scripts/oracle-baseline.json (lib/oracle-gate.mjs); family claim lists in lib/executed-families.mjs (I113)
@@ -15,69 +15,47 @@ scripts/audit-ability-behaviour.mjs (`pnpm audit:abilities`, ~2 min) — ability
 scripts/audit-trainer-behaviour.mjs (`pnpm audit:trainers`, seconds) — Trainer gate: per unique corpus Trainer, parse outcome + step kinds with no server executor + play condition (lib/trainer-behaviour.mjs) vs scripts/trainer-behaviour-baseline.json (D124)
 scripts/audit-attack-behaviour.mjs (`pnpm audit:attacks`, ~2 min) — attack gate: classes every unique effect-text attack in out/pkmn-pokemon-cards.json ok/partial/ran-no-effect/engine-error from a rich-board reducer run (lib/attack-harness.mjs) + sentence cross-check (lib/attack-behaviour.mjs), ratchets each row vs scripts/attack-behaviour-baseline.json (design 036 slice 16); also unresolved damage notes, condition-true bonus replay (lib/condition-replay.mjs), lock mechanics and TCGdex typography drift (lib/text-variants.mjs, shared with audit:abilities: clause cross-check, evolved-stack probe boards, per-row `flagged` ratchet) — docs/card-parsing-and-audit-guide.md §8
 scripts/audit-gx-oracle.mjs (`node scripts/audit-gx-oracle.mjs`, ~25 s) — GX-scoped oracle: every attack/ability of out/pkmn-gx-cards.json (pkmncards `is:gx`) through the same harness, per-entry executed/blind/passive/no-effect report (out/gx-oracle-audit.txt) + ratchet scripts/gx-oracle-baseline.json (design 047)
-tools/ — internal dev tools, sync log comparison, asset mappings
+tools/ — compare-sync-logs.mjs + coin id mappings (coindl*.tsv/txt, coinmap.txt)
 client/src/setup/deck-builder/ — deck builder (themes, filters, counter, sprites, wallpapers, coins) → .agent/areas/deck-builder.md
 client/src/setup/netcode/ — client transport, authoritative view renderer (apply-view.js), pickers/adapters, battle log → .agent/areas/netcode.md
 client/src/setup/netcode/mat-fx/ — mat cosmetic effects (D94/D103; Mega/Tera entries D118–D122[mat-fx]; evolution/devolution scenes D207, canvas stage D154) → .agent/areas/netcode.md § Mat FX
+client/src/setup/netcode/mat-fx/slide-pins.mjs — holds retreat/switch/promote meshes at their pre-diff spot (pinSlideOrigins in lifecycle.js, from handleBeforeApply) until the slide takes over (I265)
 client/src/setup/netcode/mat-fx/moves/attack-sound.mjs — attack scene → sound fields (tier, contact, type) for the sampled hit (D206)
 client/src/setup/netcode/mat-fx/sfx-cues.mjs + sample-bank.js + ui-cue.mjs + status-ambience.mjs + crowd.mjs + retreat-lock-watch.mjs — sampled SFX (D203, design 064): cue map, buffer bank, UI chrome cues, status loops, crowd bus
 scripts/sfx/ (`pnpm sfx:import -- --src <extract dir>`) — transcodes the TCG Live SFX extract to committed client/src/assets/sfx/*.ogg + manifest.json (D203/D204); server/sfx-cache.mjs caches only hashed .ogg
 scripts/fx/import-tcgl-status-fx.mjs (`pnpm fx:import-status -- --src <extract dir>`) — copies TCG Live status VFX textures, damage-counter coin and Poison/Burn badges (WebApp/assets/ui WebP) to committed client/src/assets/status-fx/, damage-counter/, status-markers/
+scripts/fx/coin/ (`pnpm fx:import-coins`) and scripts/fx/deckbox/ (`pnpm fx:import-deckbox`) — import TCG Live coins (meshes, translated shaders, textures, thumbs) and all 380 deck boxes into committed client/src/assets/coins/tcgl and assets/deckbox (designs 069, 071)
+scripts/tcgl-foil/ (`pnpm foil:import -- --src <extract>`, `pnpm foil:upload -- --remote r2:ptcg-foil`) — import TCG Live card foil (shaders, materials, masks) into gitignored client/src/assets/tcgl-foil/{cards,tex}; rclone to R2; r2-cors.json; foil-shot.mjs capture (design 069-tcgl-card-foil, D217)
 scripts/attack-ui/ — `import-attack-ui.mjs --src <extract dir>` copies TCG Live's AttackOverlay sprites (titlebars, damage tabs, ability tag and header mask, Retreat button, GX and VSTAR bars, list frame, row tiles) to committed client/src/assets/attack-ui/; `dump-registry.py` (UnityPy) writes attack-ui.json (per-type colour/ink, VSTAR sprite names + 9-slice borders from AttackEntryAssetRegistry_AttackOverlay). index.css pins both: setup/rules/__tests__/attack-ui-assets.test.mjs
-client/src/setup/rules/card-focus.mjs — TCG Live Active-card popup (design 067, D208): CSS-3D flight from the slot to the game's focus pose, hand lowered via `.hand-lowered` on the self iframe, 500 ms click guard (D209), reuses the 013 inspector (`buildInspectorCard`); card-focus-geometry.mjs (pure: pose, flight, curves, tilt), card-focus-routing.mjs (`shouldOpenCardFocus`), css/card-focus.css; routed from click-events.js, Escape in keybinds.js
+scripts/special-energy-tokens/ — `make-tokens.py <card pngs> <out> --write-client` cuts a token per Special Energy name from its card's orb (orb-circles.json, hand-checked; detect-orbs.py first pass), 2-Energy cards as two orbs, holo/reverse finish (card-refs.json) as animated SVG → client/src/assets/energy/special/ + generated move-card-bundle/special-energy-tokens.mjs; fetch-card-refs.py pulls the TCGdex art
+client/src/setup/rules/card-focus.mjs — TCG Live AttackOverlay popup for your in-play Pokémon (designs 067, 074, D208, D219): CSS-3D flight from the slot to the game's focus pose, hand lowered via `.hand-lowered` on the self iframe, 500 ms click guard (D209), rows from `buildInspectorCard`, HUD Buff/Debuff/Stack/Close, TableCover backdrop; card-focus-geometry.mjs (pure: pose, flight, curves, tilt), card-focus-routing.mjs (`tapRoute`: overlay / stack view), css/card-focus.css; routed from click-events.js, Escape in keybinds.js
+client/src/setup/rules/attack-options.mjs — TCG Live option rows (design 074): `buildAttackOption`, `buildAbilityOption`, `buildWeakResistBar`, type icons; skin in css/attack-options.css; pure cost/damage/effect ports in attack-ui-model.mjs
+client/src/setup/rules/stack-view.mjs + stack-view-panel.mjs — TCG Live stack view (StackedCardOverlay_Landscape): carousel + info panel, css/stack-view.css; status-popup.mjs (+css) — Buff/Debuff MatchModalPopup (design 074)
+client/src/setup/zones/live-zone-array.js — `liveZoneArray(user, zoneId)`: the authoritative view's cards once one is applied, else legacy getZone
 client/src/setup/netcode/mat-fx/status-fx.mjs + status.js — condition apply pop / clear sparkle from TCG Live sprites; status-loop.mjs + status-loop.js — held-condition loop overlay, reconciled per card in apply-view.js `reconcileStatusLoopOverlay`; palette in client/src/css/status-fx-palette.css; status-units.mjs — Unity prefab units → card widths (tables keep E:/TCGLive_Extract/vfx_dump numbers)
 
-## Rules engine — pure, DOM-free, headless-tested (~8,900 lines; portable to Node)
-shared/engine/rules/rules-state.mjs — `rulesState` + `canPerformAction()` legality gate (line 597)
-shared/engine/rules/attack-engine.mjs — `computeAttackDamage`, `canPayAttackCost`
-shared/engine/rules/ability-combat.mjs — pure ability-side passive combat reads (damage bonus/reduction/prevention, weakness override, HP/prize/retreat/cost, extra types, energy multiplier); `computeAttackDamage` takes them as named options, built by reduce's attack sites/effectiveHp/handleKnockout/retreat/attack-cost. Slice-3 gates live here too: `isAbilitySuppressed` (wired into every reader), `abilityActivationBlockReason` (the ONE useAbility gate shared by reduce and the picker), `abilityPlayLocks`, `abilityEvolvePermission/Lock`, `abilityRetreatLock`, `abilityCounterMoveLock`, `abilityStatusImmune`, `abilitySummonRestricted`, `abilityFirstTurnAttack`, `abilityExtraAttack` (design 034, D125/D126)
-shared/engine/rules/ability-triggers.mjs — pure ability-trigger planners (design 034 slice 4, D127): `parseCheckupAbilities`/`parseOnOpponentEvolveAbilities`/`parseOnDamageAbilities`/`parseEndOfTurnAbilities` wired in reduce (`resolveCheckup`, evolve site, attack on-damage site); `parseBetweenTurnsAbilities`/`parseOnKoAbilities`/`parseOnPromotionAbilities` are tested readers awaiting their hooks (slice 4b/5)
-shared/engine/rules/special-energy-parse.mjs — special-energy text → structured effect steps (`parseSpecialEnergyEffects`) + pure execution helpers used by `computeAttackDamage` (damage bonus/penalty/reduction) and `effectiveHp` (+HP); audit `scripts/audit-all-special-energy.mjs` (S220)
-shared/engine/rules/special-conditions.mjs — server card conditions: rotation field + Poison/Burn marker keys (D45); every reducer/effect write goes through it, and `addCondition` refuses writes to a card whose own Ability grants immunity (`abilityStatusImmune`, design 034)
-shared/engine/rules/trainer-effects.mjs — text → structured trainer step parser
-shared/engine/rules/reveal-picks.mjs — design 059: `textRevealsPicks`/`stepRevealsPicks`/`effectTextFor` (does an effect reveal its deck picks) + `stampRevealedArt` (src on public `cardsRevealed`, applyCommand tail)
-shared/engine/rules/trainer-play-conditions.mjs — `trainerPlayBlockReason` (turn-1 Supporter, same Stadium, printed play conditions); used by reduce.mjs legality and the bot's e2e-options.mjs
-shared/engine/rules/tool-conditions.mjs — one pure condition layer for Tool modifiers (design 035/D117): `parseToolCondition`/`toolConditionMet` + gated `toolHpBonusFor`/`toolRetreatDeltaFor`; consumed by tool-combat (HP/retreat/bonus/prevention/reduction/prize) and stadium-effects.effectiveHp; holder conditions read the top evolution view
-shared/engine/rules/tool-attacks.mjs — attacks a Tool grants its holder (design 035 slice 7): `parseGrantedAttacks` reads `card.attacks[]` or the printed "→" line of TM/Cube Items; merged into `attackViewFor` in reduce.mjs
-shared/engine/rules/stadium-triggers.mjs — pure Stadium trigger descriptors (design 035 slice 10): `stadiumOnAttachTriggers`/`OnEvolve`/`OnBench`/`OnSwitch` + `stadiumCheckupCoinModifiers` (Wela/Slumbering), `stadiumRetreatCoin` (Mirage), `stadiumTrainerPlayCoin` (Chaos Gym), `stadiumAttackCoinModifier` (Vermilion), `stadiumWeaknessOverrides`/`stadiumResistanceOverrides`; hooks in reduce.mjs (attachCard, evolve, moveCard hand→bench, applyRetreatSwap, resolveCheckup, retreat/playTrainer apply, attack damage) and attack-engine's computeAttackDamage
-shared/engine/effects/stadium-trigger-apply.mjs — applies Stadium trigger descriptors to cards (damage/heal/cure/copyConditions) and `applyStadiumSwitchTriggers`, the one switch hook shared by reduce.mjs and every executor switch site (design 035 slice 10b)
-shared/engine/rules/evolved-pokemon.mjs — `evolvedView` (in-play Pokémon read as its top Evolution card), Rare Candy line tracing, Trainer target counts; used by reduce.mjs, trainer-steps.mjs, the bot
-shared/engine/rules/server-energy.mjs — `serverEnergyDescriptor`: how the server prices attached Energy; the bot uses it too
-shared/engine/effects/executor.mjs — resumable step runner; core step kinds inline, the rest delegated to trainer-steps.mjs
-shared/engine/effects/trainer-steps.mjs — server handlers for the other trainer step kinds; multi-choice progress lives in resumeToken.context
-shared/engine/rules/abilities.mjs + ability-step-plan.mjs - ability parse + ordered step plan (resume seam); Ancient Traits (`ancientTraitIn`: Δ/θ/Ω/α markers or spelled "Delta …") tag EVERY step `trait:'alpha'|'omega'|'delta'|'theta'` with `isAncientTraitAbility` so "no Abilities" gates skip them (App. 23/D72); audit `scripts/audit-all-ancient-traits.mjs` over `out/pkmn-ancient-trait-cards.json` (shared splitter `scripts/lib/split-card-text.mjs`)
-shared/engine/rules/fossil.mjs — Fossil Items played as Basic Pokémon: `becomeFossilPokemon` (type/HP/can't-retreat/no-conditions, Item text set aside so printed Abilities read), `settleFossilCards` post-command sweep reverts them off-board; parses the named-fossil Items (Excavation Map Choose 1, Excavation Kit)
-shared/engine/rules/stadium-effects.mjs - pure stadium classify/parse/apply (`applyStadiumEffect`) + `stadiumActivationStatus` (the inspector stadium Use gate, design 018); server executor in shared/engine/effects/stadium.mjs
-shared/engine/rules/damage-parser.mjs - attack text → damage math; `isGxAttack` name classifier; `parsePrizeOnKo`/`prizeRuleBoxes`/`prizeFilterMatches` for the on-KO "take N more Prize cards" clauses (design 036 A3)
-shared/engine/rules/attack-steps.mjs + effects/attack-steps.mjs - attack text → ordered executor steps (`parseAttackSteps`, design 030/031) and their server handlers; reduce.mjs runs them before/after damage
-shared/engine/rules/attack-text.mjs - `normalizeAttackText` (lowercase, "the/this Defending Pokémon" → opponent's Active, "his or her" → their) and `replaceSelfName` (the attacker's printed name → "this pokémon"), shared by every attack reader
-shared/engine/rules/optional-cost-bonus.mjs - "You may <cost>. If you do, … more damage" offers (`optionalCostBonusClause`: discard / Stadium / drawback / self-counter costs, asked and paid before damage)
-shared/engine/rules/scaling-count.mjs - shared "for each <unit>" counter (`countUnit`, `normalizeUnit`: in-play, hand, discard, Prize units) for damage scaling and board-computed counters
-shared/engine/__tests__/attack-silent-effects.test.mjs + ability-if-you-do.test.mjs - parse-hole sweep: printed attack effects and Ability "If you do," halves that used to do nothing, one corpus row per test
-scripts/lib/typography-parity.test.mjs + ability-if-you-do-coverage.test.mjs - corpus gates: parses identical under curly apostrophes (D3); every "If you do," Ability parses both halves (D4)
-shared/engine/rules/attack-markers.mjs - timed attack markers on cards (`card.attackMarkers`: immunity, prevention/reduction, next-turn bonus, deferred KO, retaliate, prizeBonus); read by computeAttackDamage and handleKnockout (prizeBonus, design 036 A3), cleared on retreat/KO/evolve (design 031)
-shared/engine/rules/attack-conditions.mjs - whole-attack state condition gates (design 036 A1): `parseAttackCondition`/`attackConditionMet`; reduce.mjs evaluates the gate once at the top of the attack effect phase (`conditionChecked` resume flag) against the extended `buildServerAttackContext` (stadium/bench/hand/prize/energy/damage-counter/rule-box reads)
-shared/engine/rules/attack-status.mjs - printed Special-Condition clauses → `{when,target,statuses}` branches (design 036 A2): dual-branch coins, multi-flip thresholds, `always`/self/both-sides; `statusesFromBranches` is reduce.mjs's status source
-shared/engine/rules/attack-copy.mjs - copy-attack parser (`parseCopyAttack`: sources, filters, inline conditions, last-turn via `player.lastAttack`); reduce.mjs offers the copied attack before coins (`offerCopiedAttack`, design 031/039)
-shared/engine/rules/each-filter.mjs - "each of your opponent's Pokémon that …" filters shared by counter-spread steps and reduce damage-each (design 036 A9)
-shared/engine/rules/turn-damage-bonus.mjs - Trainer/Ability "during this turn, your … attacks do N more damage" bonuses (`turnDamageBonusTotal`; possessive, per-Prize, Basic-only, instance-scoped)
-shared/engine/rules/rules-turnorder.mjs — deterministic coin-flip caller selection (flag-OFF 2P only since design 013)
-shared/engine/rules/turn-order-flip.mjs — pure opening-coin helpers in absolute playerId space: `flipCoinFace`, `pickCoinCaller`, `resolveStarterPlayerId`; the server authority's side of the coin call (D50)
-shared/engine/rules/baby-rule.mjs — Baby Rule (attacker flips vs an Active Baby, tails ends the turn) and Baby → Basic evolution table; read by reduce 'attack'/evolve legality and evolution.mjs canEvolve (I230)
-shared/engine/rules/legacy-attached-trainer.mjs — WotC non-Tool attach Trainers (PlusPower, Defender, Charity, Magnifier, Sabrina's ESP, Brock's Protection, Koga's Ninja Trick): attach target, discard timer, damage markers (I224)
-shared/engine/rules/legacy-attack-wording.mjs — WotC attack phrasing → modern phrasing before parseAttackSteps templates (design 062 D, D202)
-shared/engine/rules/legacy-set-ids.mjs — short set code to TCGdex set id mapping
-shared/engine/rules/legacy-power-wording.mjs — WotC Pokémon Power phrasing → modern (applied in parseAbility and cardAbilityText), legacy damage modifiers (Invisible Wall, Kabuto Armor…), Power stop clauses (D202)
-shared/engine/rules/legacy-trainer-wording.mjs — WotC Trainer phrasing → modern twins (Pokémon Trader, Erika's Maids, Lt. Surge's Treaty) before parseTrainerEffect (D202)
-shared/engine/rules/legacy-trainer-type.mjs — `legacyTrainerType`: untyped WotC Trainer → 'Stadium'/'Tool' from its printed rules line (design 062 A)
-shared/engine/rules/card-classify.mjs — single card-classification contract: `isRuleBoxPokemon`, `prizesForKO`, ex/GX/V/VMAX/VSTAR/Tera/Mega/Tag-Team/V-Union/Prism/Radiant/ACE-SPEC/LEGEND/Basic-Energy predicates; ko-flow re-exports, search-match/stadium-effects/tool-combat/reduce use it (rulebook 30c Phase 0); also understands TCGdex `energyType`/`rarity` fallbacks so client deck cards classify without `subtypes` (30c Phase 3); the `cardHasRuleBox` aliases are gone — `isRuleBoxPokemon` is the only rule-box definition (30c 4.2); `isTeamFlareHyperGearCard` is the App. 24 opponent-attaching Tool marker (30c 5.1)
-shared/engine/rules/paradox-tags.mjs — Ancient/Future tag per printing (design 058, D196): `paradoxTagOf` (subtypes, then id/tcgId/image URL/set+number in paradox-tags.generated.mjs, never the name), `isAncientCard`/`isFutureCard`, `withParadoxSubtype`; table baked by scripts/generate-paradox-tags.mjs (`--check` in test:live)
-shared/engine/rules/card-markers.mjs — printed markers TCGdex lacks (I220, D200): Tera, Team Plasma, Single/Rapid/Fusion Strike, Baby, Prism Star, TAG TEAM; `cardMarkersOf`/`hasCardMarker` (subtypes, then paradox-tags `printingIds` in card-markers.generated.mjs); read by search-match and isTeraCard; table baked by scripts/generate-card-markers.mjs (pkmncards is:/stage:, TCGdex number+name check; `--check` in test:live)
+## Rules engine — pure, DOM-free, headless-tested (~47,000 lines; portable to Node)
+shared/engine/rules/ + shared/engine/effects/ — the pure rules modules, one line each in .agent/areas/rules-engine.md: rules-state, attack-engine, ability-combat, ability-triggers, special-energy-parse, special-conditions, trainer-effects, reveal-picks, trainer-play-conditions, tool-conditions, tool-attacks, stadium-triggers, stadium-trigger-apply, evolved-pokemon, server-energy, executor, trainer-steps, abilities, ability-step-plan, fossil, stadium-effects, damage-parser, attack-steps, attack-text, optional-cost-bonus, scaling-count, attack-markers, attack-conditions, attack-status, attack-copy, each-filter, turn-damage-bonus, rules-turnorder, turn-order-flip, turn-order-transport, baby-rule, legacy-* wording, card-classify, paradox-tags, card-markers
+shared/engine/reduce.mjs — public reducer entry: `applyCommand` (shape → choice/turn gate → `validateReferences` → `validateLegality` → one `<type>Command` handler per case → post-command settles) and `undo` replay; re-exports `validateLegality`, `attackExtrasFor`. Body split by command domain into reduce/ (design 073 B, I250)
+shared/engine/reduce/shared.mjs — cross-domain reducer helpers: `inPlayView`, `cardEffectiveHp`, `activeAttackMarkers`, `setGameEnded`/`isGameConcluded`/`isGameFrozen`, once-per-game and tiebreak reads, `rootsIn`
+shared/engine/reduce/legality.mjs — `validateReferences` (stale view) + `validateLegality` (rules gate), `attackCostPayable`, `resolveAttacker`, attach/play/ability/once-per-game lock readers
+shared/engine/reduce/attack.mjs — attack declaration: coins, Ninja Trick, declared/copied attack flows, `attackViewFor`/`attackExtrasFor` (granted, borrowed, Stadium/Tool attacks), GX/VSTAR spend; `attack` command
+shared/engine/reduce/attack-damage.mjs — attack damage placement: bench damage/Thorns, target clauses and options, flat and Active-target damage, retaliation, `applyAttackTargets`
+shared/engine/reduce/attack-steps.mjs — attack-time prompts and executor runs: search, discard/mill scaling, spread attaches, optional costs, `attackResumeContext`, `planAttackSteps`/`runAttackSteps`
+shared/engine/reduce/attack-effect.mjs — `resolveAttackEffectPhase` (the whole attack effect phase) + `finishAttackTail`
+shared/engine/reduce/knockout.mjs — `handleKnockout`, Tool on-KO effects, KO win settles, promotions, KO Energy moves, damage-counter KOs, Prize entitlement/choices; `takePrizes`/`takePrizesByIndex`/`promote`
+shared/engine/reduce/turn.mjs — `resolveCheckup`, between-turns/end-of-turn effects, `advanceTurn`, `endTurnFromEffect`; `setup`/`pass`/`takeTurn`/`loadDeck`/`cardStats`
+shared/engine/reduce/retreat.mjs — `computeEffectiveRetreatCost`, retreat Energy choice, `applyRetreatSwap`; `retreat` command
+shared/engine/reduce/attach.mjs — `attachCard` (Energy/Tool attach and Evolution), Energy attach plan, Energy-attach and opponent-evolve triggers
+shared/engine/reduce/trainer.mjs — `promoteTrainerPlay` (hand→board drop becomes playTrainer), Chaos Gym gate, Trainer turn-end/Prize-win settles; `playTrainer`/`stadium-effect`
+shared/engine/reduce/ability.mjs — Call Energy, ability turn-end and outcome settles; `useAbility`/`useVStarGX`
+shared/engine/reduce/board.mjs — manual board commands (move, draw, counters, conditions, zone shuffles/moves, reveal/hide, board ops), `clearFaceDownOffBoard`
+shared/engine/reduce/choice.mjs — `resolveChoice`: routes a pending choice's `resumeToken.effectType` back to the domain that raised it
 
 ## Rules engine — DOM-coupled glue (NOT portable; the migration's cost centre)
-client/src/setup/rules/rules-bridge.js — 2324 lines; orchestrates rules via document.dispatchEvent + HUD
-client/src/setup/rules/trainer-execution.js — 1549 lines; resolves effects through synchronous UI pickers
-client/src/actions/chat-buttons/chat-buttons.js — 4573 lines; attack/pass/retreat monolith
+client/src/setup/rules/rules-bridge.js — 3527 lines; orchestrates rules via document.dispatchEvent + HUD
+client/src/setup/rules/trainer-execution.js — 2939 lines; resolves effects through synchronous UI pickers
+client/src/actions/chat-buttons/chat-buttons.js — 5421 lines; attack/pass/retreat monolith
 
 ## State / zones
 shared/engine/cards.mjs — pure `Card` model, `mintInstanceId`, DOM-free (replaces DOM-based Card identity); `isBasicPokemon` treats LEGEND/V-UNION/Restored/BREAK as non-Basic (30c 5.4)
@@ -95,31 +73,49 @@ client/src/setup/deck-constructor/own-deck.mjs — `systemState.ownDeck`: the de
 ## Build & Battle and Elite Trainer Box openings (designs 051–055, 057)
 client/src/setup/deck-builder/core/build-battle/pack3d.mjs — pure 3D pack math: pillow shape, peel/rip/strip flight, cards out, tilt/sway, screen↔world, floor reflection bands (design 055)
 client/src/initialization/document-event-listeners/sidebox/native-deck-builder-pack3d.js — WebGL pack stage (three.js, lazy `import()`), mirror layer; falls back to the DOM scene
+client/src/initialization/document-event-listeners/sidebox/tabletop/ — three.js tabletop unboxing (design 073-tabletop-unboxing) on both B&B flows' stage (bb-shared `mountBoxOnStage`): tabletop-scene.js mount + WebGL fallback, tabletop-app.js orchestrator, tt-*.js stage/meshes/print/audio; pure motion/layout in core/build-battle/tabletop/*.mjs
+client/unboxing.html + client/src/unboxing-site/main.js — standalone `/unboxing` test bench for the tabletop (box/era/seed pickers); server/card-art-proxy.mjs — same-origin TCGdex card-image proxy for WebGL textures
 client/src/setup/deck-builder/core/build-battle/box-art.generated.mjs — `BOX_ART`: every box's vendored render, booster fronts (+ measured shapes), ME cuboid faces; built by scripts/build-battle/vendor-box-art.mjs from box-art-sources.mjs (D194)
 client/src/vendor/three/ — vendored three 0.185.0 (import map in index.ejs); scripts/vendor-three.mjs copies/checks it (D193)
 client/src/setup/deck-builder/core/elite-trainer-box/ — Elite Trainer Box (design 057, D195): catalog, opening, collection (`ptcg-sim.collection.v1`), session (`ptcg-sim.etb.v1`), view helpers, promo rows; DOM: sidebox/native-deck-builder-etb.js (Shelf + Collection tabs)
 client/src/initialization/document-event-listeners/sidebox/native-deck-builder-stage.js — the fullscreen stage both box openings play on (`createStage`)
+client/src/assets/catalogs/ — deck-builder catalogs as JSON, loaded on demand (design 073): coins.json (normalize-coin-catalog.mjs), tcgl-coins.json (fx:import-coins), tcgl-sleeves.json (import-tcgl-sleeves.py), starter-decks.json (generate-starter-decks.mjs), starter-deck-catalog.json (hand-kept: names, cosmetics, Gengar/Diancie lists); loader core/catalog-loader.mjs (`loadCatalog`, `whenLoaded`, `deferredPicker`), readers coins.mjs, sleeves.mjs, starter-decks.mjs
+client/src/initialization/document-event-listeners/sidebox/native-deck-builder-bb-shared.js — DOM pieces both Build & Battle flows share (box picker, box shot, unboxing mount, Pool tab); bnb-run.js is the live flow, build-battle.js the legacy one, frozen (design 073)
+client/src/setup/netcode/mat-fx/coin-stage.js — TCG Live coin flips drawn with the game's own coin shaders on a lazy three.js canvas; pure math coin-stage-math.mjs, catalog tcgl-coin-catalog.mjs; host coin-flip-ceremony.js (design 069)
+client/src/setup/deck-builder/core/customize-stage/ — Customize tab 3D preview of deck box, sleeve and coin (Preview All / Focused, drag-rotate); box catalog boxes.mjs; DOM picker sidebox/native-deck-builder-box-picker.js (design 071)
 
 ## Actions (~10,582 lines, ~85% DOM-coupled — every mutation goes through the DOM)
 client/src/actions/move-card-bundle/ — card movement, attach, evolve; primary mutation path
+client/src/actions/move-card-bundle/energy-token-assets.mjs — attached-Energy token per card: Special Energy by name (`specialEnergyTokenFor`, two-orb `energy-token-double`), else type token
 client/src/actions/zones/ — deck/hand/prize/shuffle operations
 client/src/actions/counters/ — damage, special condition, ability counters (DOM overlays)
 client/src/actions/general/ — setup, ready, turn, reveal/hide, reset, undo
+client/src/setup/foil/ — TCG Live card foil renderer: manifest (pure), pose math (pure), store (loads manifest + /api/tcgl-foil/config texture base), three.js material + view; server/tcgl-foil-config.mjs serves FOIL_TEXTURE_URL (D217)
 client/src/setup/image-logic/drag.js + drag-avatar.js + drag-tilt.mjs — native HTML5 card drag/drop; the dragged card is drawn as a swinging body-level avatar (design 038, D124; physics pure in drag-tilt.mjs); a held Item/Supporter lights its board (design 046, drop-zone.mjs playsOntoBoard)
 
+## three.js board (design 074-three-board, D220) — the only board; entry: client/src/setup/board3d/board3d.js
+client/src/setup/board3d/ — board-model.mjs (server view → pure model) · board-layout.mjs + board-camera.mjs (zones, 12° tilt camera, TCG Live preset) · board-scene.js (applyModel/rects/hitTest/tween/lift) · card-mesh.js, pile-mesh.js, overlay-meshes.js · board-input.js + drop-router.mjs (pointer → raycast → synthetic clicks/drags) · board-rects.js + flight-pose.mjs (FX geometry)
+client/src/setup/board3d/board-mirror.js — open shadow roots #selfBoard/#oppBoard carrying the old iframe id set; containers.js exports them as selfContainerDocument/oppContainerDocument, so zone/click/apply-view code is unchanged; css/board3d-panels.css styles the zone list popups inside them
+client/src/setup/gl/ — WebGL renderer, texture cache and card-art hosts for the board (gl-renderer.js, gl-textures.js, texture-cache.mjs); server/card-image-proxy.mjs serves /api/card-image for non-CORS art
+client/src/setup/netcode/solo-room.js, solo-seat.mjs, server-card-select.{js,mjs} — solo as a server room (one socket, both seats, D221); click-to-select/attach for server cards; apply-view.js skips px layout when board3dActive()
+scripts/e2e/board3d-*-test.mjs, test-card-inspector-e2e.mjs, fullview-test.mjs, spectator-view-test.mjs, .claude/skills/fx-preview/board-mode.mjs — every browser harness/capture runs on the 3D board (CHROMIUM_PATH honoured; SwiftShader GL args)
+
 ## Tests & tooling
-**/__tests__/*.test.mjs — plain `node --test`, no jsdom; `pnpm test` runs them all (~3400); run one file with `node --test <path>`
-two-player-sync-test.mjs — Playwright two-browser sync harness (legacy mode, `pnpm test:2p`)
-flip-gate-test.mjs — Playwright two-browser full game under SERVER_AUTHORITATIVE=1: design 002's
+**/__tests__/*.test.mjs — plain `node --test`, no jsdom; `pnpm test` runs them all (~6900); run one file with `node --test <path>`
+scripts/prune-merged-branches.mjs — dry-run/delete remote branches fully contained in origin/main; keeps main, the current branch and open-PR refs (via gh, else --keep); needs local push rights (test: scripts/__tests__/prune-merged-branches.test.mjs)
+scripts/harness-check.mjs — `pnpm harness:check`: measures every .agent budget in workflows/maintain.md plus the 30-commit maintain trigger; exit 1 = OVER (test: scripts/__tests__/harness-check.test.mjs)
+scripts/e2e/two-player-sync-test.mjs — Playwright two-browser sync harness (legacy mode: needs a
+  `SERVER_AUTHORITATIVE=0` server on PTCG_URL, `pnpm test:2p`)
+scripts/e2e/flip-gate-test.mjs — Playwright two-browser full game under SERVER_AUTHORITATIVE=1: design 002's
   3.12 flip gate (`pnpm test:flip`; needs a hand-started authoritative server on PTCG_URL)
-test-card-inspector-e2e.mjs — Playwright two-browser design-013/067 card-inspector + card-focus gate
+scripts/e2e/test-card-inspector-e2e.mjs — Playwright two-browser design-013/067 card-inspector + card-focus gate
   (`pnpm test:inspector`; needs a hand-started authoritative server on PTCG_URL). Step 9 clicks the
   attack panel with REAL input (locator.click), so it catches pointer-capture regressions el.click() hides
-*-audit.mjs (root) — one-off card/attack/trainer/stadium coverage audits
+scripts/e2e/*-test.mjs, explore-ui.mjs, record-legacy-2p-fixture.mjs — the other hand-run Playwright/jsdom harnesses (rooms, spectator, public lobby, Build & Battle, coin flip, opening-coin `pnpm test:opening-coin`, reset `pnpm test:reset-choice`, `pnpm test:spectator`); `record-legacy-2p-fixture.mjs` refreshes the replay-harness fixture
 bot/bot.mjs, bot/heuristic-scorer.mjs — design 004 slice 5: pure-Node playtest bot (never-crash
-  scaffold + greedy scorer), driven by playtest-bot.mjs via __ptcg observe/options/act
-playtest-bot.mjs (root) — design 004 slice 6: the playtest runner. Two Playwright pages, bot vs.
-  bot, legacy mode by default (`node server/server.js` on :4000, then `node playtest-bot.mjs
+  scaffold + greedy scorer), driven by scripts/e2e/playtest-bot.mjs via __ptcg observe/options/act
+scripts/e2e/playtest-bot.mjs — design 004 slice 6: the playtest runner. Two Playwright pages, bot vs.
+  bot, either netcode (`node server/server.js` on :4000, then `node scripts/e2e/playtest-bot.mjs
   --games=N --seed=S`); dumps a replayable trace to out/playtest/ on any failure. Found a real bug
   on first live run (I30, ISSUES.md) — see design 004 slice 6's Acceptance note.
 

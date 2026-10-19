@@ -35,6 +35,7 @@ const NEW_STEP_TYPES = [
   'opponentActiveEnergyToDeck',
   'opponentHandToBenchBasic',
   'eachPlayerDiscardFromHand',
+  'opponentDiscardFromHand',
   'eachPlayerDraw',
   'eachPlayerReturnBench',
   'eachPlayerShuffleHandDraw',

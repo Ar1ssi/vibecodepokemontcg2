@@ -1,0 +1,577 @@
+/* TCG Live attack option rows (design 074): AttackActionOption_L, AbilityActionOption_L and the
+   Weakness / Resistance / Retreat bar, drawn by setup/rules/attack-options.mjs. Numbers are the
+   prefab's (refs/074-tcgl-attack-ui), sprites and colours the game's AttackEntryAssetRegistry
+   (assets/attack-ui/attack-ui.json, pinned by attack-options-css.test.mjs).
+
+   Lengths: --tu is one game unit, set by the surface the rows sit in (the focus chrome, the stack
+   view). Rows are authored in row units and placed at scale 0.75, so --ru = 0.75tu. Sliced sprites
+   draw 25 sprite px per unit times their Image's pixelsPerUnitMultiplier: 4 for the titlebar and
+   damage tab (100 px per row unit), 2 for the row tile and its shadow (50 px per row unit).
+
+   Fonts: the game's TMP faces are Akko Pro Bold Condensed (Display_*) and Akko W1G (Text_*); they
+   ship only as SDF atlases, so the stacks fall back to the vendored Rodin Condensed. */
+
+[data-ptcg-type='colorless'] {
+  --atk-bar: url('../assets/attack-ui/bar-colorless.png');
+  --atk-bar-short: url('../assets/attack-ui/bar-colorless-short.png');
+  --atk-retreat: url('../assets/attack-ui/retreat-colorless.png');
+  --atk-color: #d1d0cf;
+  --atk-ink: #000000;
+}
+[data-ptcg-type='fire'] {
+  --atk-bar: url('../assets/attack-ui/bar-fire.png');
+  --atk-bar-short: url('../assets/attack-ui/bar-fire-short.png');
+  --atk-retreat: url('../assets/attack-ui/retreat-fire.png');
+  --atk-color: #d8223b;
+  --atk-ink: #ffffff;
+}
+[data-ptcg-type='grass'] {
+  --atk-bar: url('../assets/attack-ui/bar-grass.png');
+  --atk-bar-short: url('../assets/attack-ui/bar-grass-short.png');
+  --atk-retreat: url('../assets/attack-ui/retreat-grass.png');
+  --atk-color: #13a748;
+  --atk-ink: #ffffff;
+}
+[data-ptcg-type='water'] {
+  --atk-bar: url('../assets/attack-ui/bar-water.png');
+  --atk-bar-short: url('../assets/attack-ui/bar-water-short.png');
+  --atk-retreat: url('../assets/attack-ui/retreat-water.png');
+  --atk-color: #00a8d8;
+  --atk-ink: #ffffff;
+}
+[data-ptcg-type='fighting'] {
+  --atk-bar: url('../assets/attack-ui/bar-fighting.png');
+  --atk-bar-short: url('../assets/attack-ui/bar-fighting-short.png');
+  --atk-retreat: url('../assets/attack-ui/retreat-fighting.png');
+  --atk-color: #b26232;
+  --atk-ink: #ffffff;
+}
+[data-ptcg-type='fairy'] {
+  --atk-bar: url('../assets/attack-ui/bar-fairy.png');
+  --atk-bar-short: url('../assets/attack-ui/bar-fairy-short.png');
+  --atk-retreat: url('../assets/attack-ui/retreat-fairy.png');
+  --atk-color: #d6467e;
+  --atk-ink: #ffffff;
+}
+[data-ptcg-type='darkness'] {
+  --atk-bar: url('../assets/attack-ui/bar-darkness.png');
+  --atk-bar-short: url('../assets/attack-ui/bar-darkness-short.png');
+  --atk-retreat: url('../assets/attack-ui/retreat-darkness.png');
+  --atk-color: #307179;
+  --atk-ink: #ffffff;
+}
+[data-ptcg-type='lightning'] {
+  --atk-bar: url('../assets/attack-ui/bar-lightning.png');
+  --atk-bar-short: url('../assets/attack-ui/bar-lightning-short.png');
+  --atk-retreat: url('../assets/attack-ui/retreat-lightning.png');
+  --atk-color: #fbcf1f;
+  --atk-ink: #000000;
+}
+[data-ptcg-type='dragon'] {
+  --atk-bar: url('../assets/attack-ui/bar-dragon.png');
+  --atk-bar-short: url('../assets/attack-ui/bar-dragon-short.png');
+  --atk-retreat: url('../assets/attack-ui/retreat-dragon.png');
+  --atk-color: #938f31;
+  --atk-ink: #ffffff;
+}
+[data-ptcg-type='metal'] {
+  --atk-bar: url('../assets/attack-ui/bar-metal.png');
+  --atk-bar-short: url('../assets/attack-ui/bar-metal-short.png');
+  --atk-retreat: url('../assets/attack-ui/retreat-metal.png');
+  --atk-color: #afb39d;
+  --atk-ink: #000000;
+}
+[data-ptcg-type='psychic'] {
+  --atk-bar: url('../assets/attack-ui/bar-psychic.png');
+  --atk-bar-short: url('../assets/attack-ui/bar-psychic-short.png');
+  --atk-retreat: url('../assets/attack-ui/retreat-psychic.png');
+  --atk-color: #957ead;
+  --atk-ink: #ffffff;
+}
+
+/* ── Row: Btn_AttackOption's Shadow under ButtonContent's BaseColor tile ─────────────────────── */
+.tcgl-opt {
+  --ru: calc(var(--tu) * 0.75);
+  position: relative;
+  isolation: isolate;
+  flex: 0 0 auto;
+  font-family: 'Akko W1G', 'Rodin Condensed', 'Barlow Semi Condensed', sans-serif;
+  color: #000000;
+  user-select: none;
+  /* The chrome around the rows passes clicks through to the card; the rows take them back. */
+  pointer-events: auto;
+}
+/* atkOv_Action_BG, 16px edges at 50 px per row unit. */
+.tcgl-opt::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border: 0 solid transparent;
+  border-image: url('../assets/attack-ui/row-bg.png') 16 fill / calc(var(--ru) * 0.32) stretch;
+}
+.tcgl-opt--off::before { border-image-source: url('../assets/attack-ui/row-bg-off.png'); }
+/* atkOv_Action_Shadow tinted black at 50%, 0.23 x 0.15 row units larger than the row, which
+   ButtonContent sits 0.03 above — so more of it shows below than above. */
+.tcgl-opt::after {
+  content: '';
+  position: absolute;
+  inset: calc(var(--ru) * -0.045) calc(var(--ru) * -0.115) calc(var(--ru) * -0.105);
+  z-index: -2;
+  pointer-events: none;
+  border: 0 solid transparent;
+  border-image: url('../assets/attack-ui/row-shadow.png') 16 fill / calc(var(--ru) * 0.32) stretch;
+  filter: brightness(0);
+  opacity: 0.502;
+}
+.tcgl-opt__content { position: relative; }
+
+/* ── Titlebar (PrimaryInfo/AttackInfo): titleBarHeight_D 1, titleBarHeight_V 1.25 ─────────────── */
+.tcgl-opt__bar {
+  --bar-h: var(--ru);
+  --atk-dmg: url('../assets/attack-ui/dmg.png');
+  --atk-dmg-l: 33;
+  --atk-dmg-r: 24;
+  --name-ink: var(--atk-ink, #ffffff);
+  position: relative;
+  isolation: isolate;
+  height: var(--bar-h);
+}
+.tcgl-opt--vstar .tcgl-opt__bar { --bar-h: calc(var(--ru) * 1.25); }
+.tcgl-opt__bar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-style: solid;
+  border-color: transparent;
+  border-width: 0 calc(var(--ru) * 0.21) 0 calc(var(--ru) * 2.78);
+  border-image: var(--atk-bar) 0 21 0 278 fill / 0 calc(var(--ru) * 0.21) 0 calc(var(--ru) * 2.78) stretch;
+}
+/* An attack with effect text, and every ability, wear the short titlebar and tab. */
+.tcgl-opt--text .tcgl-opt__bar::before,
+.tcgl-opt--ability .tcgl-opt__bar::before { border-image-source: var(--atk-bar-short); }
+.tcgl-opt--text .tcgl-opt__bar { --atk-dmg: url('../assets/attack-ui/dmg-short.png'); --atk-dmg-l: 34; --atk-dmg-r: 24; }
+
+/* GX attacks: the wide titlebar, 480px of art before the stretch column. */
+.tcgl-opt--gx .tcgl-opt__bar { --name-ink: #ffffff; }
+.tcgl-opt--gx .tcgl-opt__bar::before {
+  border-width: 0 calc(var(--ru) * 0.19) 0 calc(var(--ru) * 4.8);
+  border-image: url('../assets/attack-ui/bar-gx.png') 0 19 0 480 fill / 0 calc(var(--ru) * 0.19) 0
+    calc(var(--ru) * 4.8) stretch;
+}
+
+/* VSTAR Power: atkOV_Titlebar_VStar is 908 x 173 with its art in an 878px right border, wider than
+   the row at the sprite's own density, so Unity's sliced draw scales both borders down to the bar
+   height; the edges here follow the bar height the same way. */
+.tcgl-opt--vstar .tcgl-opt__bar {
+  --name-ink: #ffffff;
+  --atk-dmg: url('../assets/attack-ui/dmg-vstar.png');
+  --atk-dmg-l: 41;
+  --atk-dmg-r: 22;
+}
+.tcgl-opt--vstar.tcgl-opt--text .tcgl-opt__bar {
+  --atk-dmg: url('../assets/attack-ui/dmg-vstar-short.png');
+  --atk-dmg-l: 44;
+  --atk-dmg-r: 22;
+}
+.tcgl-opt--vstar .tcgl-opt__bar::before {
+  border-width: 0 calc(var(--bar-h) * 878 / 173) 0 calc(var(--bar-h) * 28 / 173);
+  border-image: url('../assets/attack-ui/bar-vstar.png') 0 878 0 28 fill / 0 calc(var(--bar-h) * 878 / 173) 0
+    calc(var(--bar-h) * 28 / 173) stretch;
+}
+.tcgl-opt--vstar.tcgl-opt--text .tcgl-opt__bar::before,
+.tcgl-opt--vstar.tcgl-opt--ability .tcgl-opt__bar::before {
+  border-image-source: url('../assets/attack-ui/bar-vstar-short.png');
+}
+
+/* canUse false: the registry's cantUse bar (#d4d4d4, black ink) with the empty damage tab. */
+.tcgl-opt--off .tcgl-opt__bar {
+  --name-ink: #000000;
+  --atk-dmg: url('../assets/attack-ui/dmg-empty.png');
+  --atk-dmg-l: 37;
+  --atk-dmg-r: 20;
+  background: #d4d4d4;
+}
+.tcgl-opt--off.tcgl-opt--text .tcgl-opt__bar {
+  --atk-dmg: url('../assets/attack-ui/dmg-empty-short.png');
+  --atk-dmg-r: 27;
+}
+.tcgl-opt--off .tcgl-opt__bar::before { display: none; }
+.tcgl-opt--gx.tcgl-opt--off .tcgl-opt__bar { background: none; }
+.tcgl-opt--gx.tcgl-opt--off .tcgl-opt__bar::before {
+  display: block;
+  border-width: 0 calc(var(--ru) * 0.18) 0 calc(var(--ru) * 4.8);
+  border-image: url('../assets/attack-ui/bar-gx-off.png') 0 18 0 480 fill / 0 calc(var(--ru) * 0.18) 0
+    calc(var(--ru) * 4.8) stretch;
+}
+.tcgl-opt--vstar.tcgl-opt--off .tcgl-opt__bar {
+  --atk-dmg: url('../assets/attack-ui/dmg-vstar-empty.png');
+  --atk-dmg-l: 32;
+  --atk-dmg-r: 26;
+}
+.tcgl-opt--vstar.tcgl-opt--text.tcgl-opt--off .tcgl-opt__bar {
+  --atk-dmg: url('../assets/attack-ui/dmg-vstar-empty-short.png');
+  --atk-dmg-r: 32;
+}
+
+/* Passive ability (GetAssetForAbilityEntry): atkOv_Ability_BG tinted with the type colour, its
+   16 / 13 / 3 px edges at 50 px per row unit. */
+.tcgl-opt--passive .tcgl-opt__bar::before {
+  border-width: calc(var(--ru) * 0.26) calc(var(--ru) * 0.32) calc(var(--ru) * 0.06);
+  border-image: none;
+  background: var(--atk-color);
+  -webkit-mask-box-image: url('../assets/attack-ui/ability-bg.png') 13 16 3 16 fill stretch;
+  mask-border: url('../assets/attack-ui/ability-bg.png') 13 16 3 16 fill stretch;
+}
+.tcgl-opt--ability.tcgl-opt--off .tcgl-opt__bar { background: none; }
+
+/* AttackNameAlignment: 0.25 in from each side; the name fills the top half over the cost row, or
+   the whole bar when there is no cost to show. */
+.tcgl-opt__info {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--ru) * 0.25);
+  right: calc(var(--ru) * 0.25);
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  min-width: 0;
+}
+/* actionNameAdjMargin: the name stops short of the damage tab when there is one. */
+.tcgl-opt--damage .tcgl-opt__info { right: calc(var(--ru) * 1.65); }
+.tcgl-opt--vstar .tcgl-opt__info { top: calc(var(--ru) * 0.21); }
+/* AttackName: Display_Bd 0.34 (auto 0.30–0.35), tracking 3. */
+.tcgl-opt__name {
+  align-self: end;
+  overflow: hidden;
+  font-family: 'Akko Pro Condensed', 'Rodin Condensed', 'Barlow Semi Condensed', sans-serif;
+  font-size: calc(var(--ru) * 0.34);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: 0.03em;
+  color: var(--name-ink);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* AttackNameOutlined: a usable VSTAR Power's name is drawn outlined. */
+.tcgl-opt--vstar.tcgl-opt--on .tcgl-opt__name {
+  text-shadow:
+    0 0 calc(var(--ru) * 0.03) #000000,
+    0 calc(var(--ru) * 0.015) calc(var(--ru) * 0.02) #000000;
+}
+/* AttackCost: 0.38 tall, its bottom 0.4 under the bar's middle; icons on a 0.45 pitch. */
+.tcgl-opt__cost {
+  align-self: start;
+  display: flex;
+  gap: calc(var(--ru) * 0.07);
+  height: calc(var(--ru) * 0.38);
+  margin-top: calc(var(--ru) * 0.02);
+}
+.tcgl-opt__cost .tcgl-icon { width: calc(var(--ru) * 0.38); height: calc(var(--ru) * 0.38); }
+
+/* AbilityTag: 2 units wide in the bottom half, 0.25 in, 0.02 up. */
+.tcgl-opt__tag {
+  align-self: center;
+  width: calc(var(--ru) * 2);
+  height: calc(var(--ru) * 0.44);
+  margin-top: calc(var(--ru) * -0.04);
+  background: url('../assets/attack-ui/ability-tag-on.png') left center / contain no-repeat;
+}
+.tcgl-opt__tag--off { background-image: url('../assets/attack-ui/ability-tag-off.png'); }
+
+/* AttackDamageBG: 1.65 wide on the right, the bar's full height; hidden (alpha 0) without a number. */
+.tcgl-opt__tab {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: calc(var(--ru) * 1.65);
+  box-sizing: border-box;
+  border-style: solid;
+  border-color: transparent;
+  border-width: 0 calc(var(--ru) * var(--atk-dmg-r) / 100) 0 calc(var(--ru) * var(--atk-dmg-l) / 100);
+  border-image: var(--atk-dmg) 0 var(--atk-dmg-r) 0 var(--atk-dmg-l) fill / 0
+    calc(var(--ru) * var(--atk-dmg-r) / 100) 0 calc(var(--ru) * var(--atk-dmg-l) / 100) stretch;
+}
+.tcgl-opt--vstar .tcgl-opt__tab {
+  border-width: 0 calc(var(--bar-h) * var(--atk-dmg-r) / 173) 0 calc(var(--bar-h) * var(--atk-dmg-l) / 173);
+  border-image-width: 0 calc(var(--bar-h) * var(--atk-dmg-r) / 173) 0 calc(var(--bar-h) * var(--atk-dmg-l) / 173);
+}
+.tcgl-opt:not(.tcgl-opt--damage) .tcgl-opt__tab { border-image: none; }
+/* AttackDamage: 1.14 wide, 0.15 in from the right, 0.15 clear of top and bottom; Display_Bd,
+   auto-sized 0.30–0.50, black — or weaknessColor / resistanceColor once the outcome hit one. */
+.tcgl-opt__dmg {
+  position: absolute;
+  z-index: 1;
+  top: calc(var(--bar-h) * 0.15);
+  bottom: calc(var(--bar-h) * 0.15);
+  /* Measured from the tab's padding edge, which sits its right border in from the bar's edge. */
+  right: calc(var(--ru) * 0.15 - var(--ru) * var(--atk-dmg-r) / 100);
+  width: calc(var(--ru) * 1.14);
+  display: grid;
+  place-items: center;
+  font-family: 'Akko Pro Condensed', 'Rodin Condensed', 'Barlow Semi Condensed', sans-serif;
+  font-size: calc(var(--ru) * 0.5);
+  font-weight: 700;
+  line-height: 1;
+  color: #1a1a1a;
+  white-space: nowrap;
+}
+.tcgl-opt__dmg--long { font-size: calc(var(--ru) * 0.3); }
+.tcgl-opt__dmg--weakness { color: #0e800e; }
+.tcgl-opt__dmg--resistance { color: #e61717; }
+/* AttackDamageModIndicator: 100 x 100 at scale 0.004 (0.4 units), centred 2.725 right of the bar's
+   middle — the damage tab's centre — and drawn before AttackDamage, so it sits behind the number.
+   atkOv_DmgMod_Bg is 85.35 x 92 dropped 8; the 56px arrow rides 8 up on the buff. */
+.tcgl-opt__mod {
+  position: absolute;
+  top: 50%;
+  right: calc(var(--ru) * 0.575);
+  width: calc(var(--ru) * 0.4);
+  height: calc(var(--ru) * 0.4);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.tcgl-opt__mod-bg,
+.tcgl-opt__mod-icon {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+.tcgl-opt__mod-bg {
+  width: calc(var(--ru) * 0.3414);
+  height: calc(var(--ru) * 0.368);
+  margin-top: calc(var(--ru) * 0.032);
+  background: url('../assets/attack-ui/dmg-mod-bg.png') center / 100% 100% no-repeat;
+}
+.tcgl-opt__mod-icon {
+  width: calc(var(--ru) * 0.224);
+  height: calc(var(--ru) * 0.224);
+  background: center / contain no-repeat;
+}
+.tcgl-opt__mod--buff .tcgl-opt__mod-icon { background-image: url('../assets/attack-ui/arrow-up.png'); }
+.tcgl-opt__mod--debuff .tcgl-opt__mod-icon {
+  margin-top: calc(var(--ru) * 0.032);
+  background-image: url('../assets/attack-ui/arrow-down.png');
+}
+
+/* VPowerBar: 0.21 tall over the bar's top; BG_C spans 10–90 %, BG_L / BG_R (mirrored) are 2 wide.
+   With a damage tab it stops 1.17 short (VStarPowerBarRect). */
+.tcgl-opt__vpower {
+  --vpower-end: url('../assets/attack-ui/vpower-end.png');
+  --vpower-center: url('../assets/attack-ui/vpower-center.png');
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--ru) * 0.21);
+  isolation: isolate;
+  display: grid;
+  place-items: center;
+  background: var(--vpower-center) center / 80% 100% no-repeat;
+}
+.tcgl-opt--damage .tcgl-opt__vpower { right: calc(var(--ru) * 1.17); }
+.tcgl-opt--off .tcgl-opt__vpower {
+  --vpower-end: url('../assets/attack-ui/vpower-end-off.png');
+  --vpower-center: url('../assets/attack-ui/vpower-center-off.png');
+}
+.tcgl-opt__vpower::before,
+.tcgl-opt__vpower::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: min(calc(var(--ru) * 2), 50%);
+  background: var(--vpower-end) left center / auto 100% no-repeat;
+}
+.tcgl-opt__vpower::after {
+  left: auto;
+  right: 0;
+  transform: scaleX(-1);
+}
+/* VStarPowerTitle: Text_BoldItalic 0.22 (here capped to the 0.2 strip), tracking 4, white. */
+.tcgl-opt__vpower-title {
+  font-size: calc(var(--ru) * 0.17);
+  font-style: italic;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  color: #ffffff;
+  white-space: nowrap;
+}
+
+/* Divider: 0.03 of #e1e1e1 along the bar's bottom edge, when a description follows. */
+.tcgl-opt__divider {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(var(--ru) * 0.03);
+  background: #e1e1e1;
+}
+
+/* Description: Text_Medium 0.25, black, margins 0.25 at the sides and bottom and
+   descriptionTextYPadding (0.15) under the bar. */
+.tcgl-opt__text,
+.tcgl-opt__from {
+  margin: 0;
+  padding: calc(var(--ru) * 0.15) calc(var(--ru) * 0.25) calc(var(--ru) * 0.25);
+  font-size: calc(var(--ru) * 0.25);
+  line-height: 1.25;
+  color: #000000;
+}
+.tcgl-opt__from {
+  padding-bottom: 0;
+  font-style: italic;
+  color: #4a4a4a;
+}
+.tcgl-opt__from + .tcgl-opt__text { padding-top: calc(var(--ru) * 0.05); }
+.tcgl-opt__from:last-child { padding-bottom: calc(var(--ru) * 0.15); }
+
+/* EnergyCostDisplay icons: the type texture, or its outline for a slot not yet paid. */
+.tcgl-icon {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 1em;
+  height: 1em;
+  object-fit: contain;
+  pointer-events: none;
+}
+.tcgl-icon--inline {
+  width: 1.1em;
+  height: 1.1em;
+  margin: 0 0.05em;
+  vertical-align: -0.2em;
+}
+
+/* Hover/press: DynamicButtonAnimStates brightens a usable entry. */
+.tcgl-opt--usable { cursor: pointer; }
+.tcgl-opt--usable:hover .tcgl-opt__bar { filter: brightness(1.12) saturate(1.08); }
+.tcgl-opt--usable:active .tcgl-opt__content { transform: scale(0.985); }
+
+/* ── Weakness / Resistance / Retreat bar (WeakResistRetreatBar) ─────────────────────────────────
+   WeakResistRegion is the left half, RetreatButtonRegion the right; the text sizes are the modal
+   prefab's canvas px at 200 per unit (Display_Md 40 = 0.2). */
+.tcgl-wr {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--tu) * 0.4);
+  font-family: 'Akko Pro Condensed', 'Rodin Condensed', 'Barlow Semi Condensed', sans-serif;
+  color: #191919;
+}
+.tcgl-wr__info {
+  flex: 0 0 calc(var(--tu) * 2.89);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}
+.tcgl-wr__row {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--tu) * 0.05);
+  height: calc(var(--tu) * 0.29);
+}
+.tcgl-wr__label {
+  flex: 1 1 auto;
+  font-size: calc(var(--tu) * 0.2);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+.tcgl-wr__icons {
+  display: flex;
+  gap: calc(var(--tu) * 0.05);
+}
+.tcgl-wr__icons .tcgl-icon { width: calc(var(--tu) * 0.29); height: calc(var(--tu) * 0.29); }
+.tcgl-wr__amount {
+  min-width: calc(var(--tu) * 0.35);
+  font-family: 'Akko W1G', 'Rodin Condensed', 'Barlow Semi Condensed', sans-serif;
+  font-size: calc(var(--tu) * 0.2);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-align: right;
+}
+.tcgl-wr__retreat-region {
+  flex: 1 1 auto;
+  display: flex;
+  min-width: 0;
+}
+
+/* Btn_Retreat: the type's octagon (atkOv_RetreatBtn_<Type>, 12 / 15 px edges) over its shadow,
+   raised 0.04 (ButtonContent 8px); the disabled octagon has 15px edges and black ink. */
+.tcgl-retreat {
+  --atk-retreat-slice: 12 15 12 15;
+  position: relative;
+  isolation: isolate;
+  flex: 1 1 auto;
+  height: calc(var(--tu) * 0.5);
+  color: var(--atk-ink, #ffffff);
+}
+.tcgl-retreat--off {
+  --atk-retreat: url('../assets/attack-ui/retreat-disable.png');
+  --atk-retreat-slice: 15;
+  --atk-ink: #000000;
+}
+.tcgl-retreat::before {
+  content: '';
+  position: absolute;
+  inset: calc(var(--tu) * -0.02);
+  z-index: -2;
+  pointer-events: none;
+  border: 0 solid transparent;
+  border-image: url('../assets/attack-ui/retreat-shadow.png') 15 fill / calc(var(--tu) * 0.075) stretch;
+  filter: brightness(0);
+}
+.tcgl-retreat--off::before { display: none; }
+.tcgl-retreat__content {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--tu) * 0.05);
+  padding: 0 calc(var(--tu) * 0.175) 0 calc(var(--tu) * 0.08);
+  box-sizing: border-box;
+  transform: translateY(calc(var(--tu) * -0.04));
+  border-style: solid;
+  border-color: transparent;
+  border-width: calc(var(--tu) * 0.06) calc(var(--tu) * 0.075);
+  border-image: var(--atk-retreat) var(--atk-retreat-slice) fill / calc(var(--tu) * 0.06) calc(var(--tu) * 0.075) stretch;
+}
+/* RetreatTxt: Display_Bd 0.25, tracking 3, the registry ink. */
+.tcgl-retreat__label {
+  font-size: calc(var(--tu) * 0.25);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  line-height: 1;
+}
+.tcgl-retreat__cost,
+.tcgl-retreat__short {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--tu) * 0.05);
+}
+.tcgl-retreat__cost .tcgl-icon,
+.tcgl-retreat__short .tcgl-icon { width: calc(var(--tu) * 0.29); height: calc(var(--tu) * 0.29); }
+/* ShortRetreatCostDisplay: "attached/<b>needed</b>", Display_Md 0.3 in #1a1a1a. */
+.tcgl-retreat__count {
+  font-size: calc(var(--tu) * 0.3);
+  font-weight: 500;
+  line-height: 1;
+  color: #1a1a1a;
+}
+/* The RaycastTarget reaches 0.1 past the button on every side. */
+.tcgl-retreat::after {
+  content: '';
+  position: absolute;
+  inset: calc(var(--tu) * -0.1);
+}
+.tcgl-retreat--usable { cursor: pointer; }
+.tcgl-retreat--usable:hover .tcgl-retreat__content { filter: brightness(1.12) saturate(1.08); }

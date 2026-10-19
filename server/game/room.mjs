@@ -11,18 +11,34 @@ import {
 import { createRng } from '../../shared/engine/rng.mjs';
 import { DECK_FORMAT_TCG } from '../../shared/engine/formats.mjs';
 import { deckFormatMismatch } from '../../shared/engine/setup.mjs';
-import { deckPeekFor, viewFor } from '../../shared/engine/view.mjs';
+import { deckPeekFor, viewFor, viewForSolo } from '../../shared/engine/view.mjs';
 import { applyCommand, attackExtrasFor } from '../../shared/engine/reduce.mjs';
 import { PROTOCOL_VERSION } from '../../shared/engine/commands.mjs';
 import {
   flipCoinFace,
   isCoinFace,
   pickCoinCaller,
-  resolveStarterPlayerId,
+  resolveCoinWinnerPlayerId,
+  resolveStarterFromChoice,
 } from '../../shared/engine/rules/turn-order-flip.mjs';
 
 /** How long the designated caller has to answer before the server calls for them. */
 export const TURN_ORDER_CALL_TIMEOUT_MS = 15000;
+
+/**
+ * How long the toss winner has to say first or second (design 072). The client
+ * opens that prompt only once the ~4 s coin ceremony has played, so this leaves
+ * about the same answer window as the call.
+ */
+export const TURN_ORDER_CHOICE_TIMEOUT_MS = 25000;
+
+const SOLO_SEATS = ['p1', 'p2'];
+
+const BAD_SEAT = 'bad_seat';
+
+function isSoloSeat(seat) {
+  return SOLO_SEATS.includes(seat);
+}
 
 export class GameRoom {
   /**
@@ -61,6 +77,12 @@ export class GameRoom {
     this.playerToSocket = new Map(); // playerId -> socketId
     this.spectatorSockets = new Set(); // Set of socketIds
 
+    // Design 074 D7: one socket plays both seats. Each socket-addressed call names the
+    // seat it acts for (seatFor); views are drawn from soloNearSeat's side.
+    this.solo = false;
+    this.soloSeats = new Set();
+    this.soloNearSeat = 'p1';
+
     // Monotonic sequence tracking per player for deduplication (Edge Case 4)
     this.clientSeqByPlayer = new Map(); // playerId -> lastSeenClientSeq
 
@@ -68,10 +90,11 @@ export class GameRoom {
     // enters commandLog/undo replay; cleared by resetGame.
     this.readyPlayerIds = new Set();
 
-    // Opening turn-order coin call (design 013). Transient handshake state, kept
-    // outside `state` so it never reaches hashState/commandLog/undo replay.
-    // null | { phase: 'awaiting-call'|'resolved', callerPlayerId, callId,
-    //          call, result, starterPlayerId, auto }
+    // Opening turn-order coin call (designs 013, 072). Transient handshake state,
+    // kept outside `state` so it never reaches hashState/commandLog/undo replay.
+    // null | { phase: 'awaiting-call'|'awaiting-choice'|'resolved', callerPlayerId,
+    //          callId, call, coinId, result, auto, winnerPlayerId, choiceId,
+    //          goFirst, choiceAuto, starterPlayerId, dealt }
     this.turnOrder = null;
     this.turnOrderCallCounter = 0;
 
@@ -96,6 +119,8 @@ export class GameRoom {
    */
   addPlayer(socketId, playerId, username = '', deckList = []) {
     if (!socketId || !playerId) return false;
+    // A solo room's seats belong to its one socket (addSoloPlayer).
+    if (this.solo) return false;
     this.touchActivity();
 
     // Edge Case 14 & Hazard H1: Only 2 active players allowed per game room
@@ -125,6 +150,12 @@ export class GameRoom {
     this.playerToSocket.set(playerId, socketId);
     this.spectatorSockets.delete(socketId);
 
+    this.#seatPlayer(playerId, username, deckList);
+    return true;
+  }
+
+  /** Creates the seat's player record on first join, else refreshes its username. */
+  #seatPlayer(playerId, username, deckList) {
     if (!this.state.players[playerId]) {
       this.state.players[playerId] = {
         playerId,
@@ -142,7 +173,105 @@ export class GameRoom {
     } else if (username) {
       this.state.players[playerId].username = username;
     }
+  }
+
+  /**
+   * Design 074 D7: seats one socket as both players — `p1` as `username`, `p2` as
+   * `${username} (far)` — and makes the room solo. Refused when the room has any seated
+   * player or spectator (or a game of seats whose sockets dropped). The same user's new
+   * socket reclaims an existing solo room (page reload), keeping its game.
+   *
+   * @param {string} socketId
+   * @param {string} username
+   * @param {{ p1?: object[], p2?: object[] }} [deckLists] each seat's deck list (stored as addPlayer stores one)
+   * @returns {boolean}
+   */
+  addSoloPlayer(socketId, username, { p1 = [], p2 = [] } = {}) {
+    if (!socketId || typeof username !== 'string' || !username) return false;
+    if (this.solo) {
+      if (this.state.players.p1?.username !== username) return false;
+      const previousSocketId = this.playerToSocket.get('p1');
+      if (previousSocketId) this.socketToPlayer.delete(previousSocketId);
+    } else if (
+      this.playerToSocket.size > 0 ||
+      this.spectatorSockets.size > 0 ||
+      Object.keys(this.state.players || {}).length > 0
+    ) {
+      return false;
+    }
+    this.touchActivity();
+
+    this.#seatPlayer('p1', username, p1);
+    this.#seatPlayer('p2', `${username} (far)`, p2);
+    for (const seat of SOLO_SEATS) {
+      this.playerToSocket.set(seat, socketId);
+      this.clientSeqByPlayer.delete(seat);
+    }
+    this.socketToPlayer.set(socketId, 'p1');
+    this.soloSeats = new Set(SOLO_SEATS);
+    this.solo = true;
     return true;
+  }
+
+  /**
+   * The seat a socket acts for. A normal room ignores `payload.seat` and uses the socket's
+   * own seat; a solo room acts for the named seat and refuses (null) any other value.
+   *
+   * @param {string} socketId
+   * @param {{ seat?: string }} [payload]
+   * @returns {'p1'|'p2'|null}
+   */
+  seatFor(socketId, payload = {}) {
+    if (!this.solo) return this.socketToPlayer.get(socketId) || null;
+    if (!this.socketToPlayer.has(socketId)) return null;
+    const seat = payload?.seat;
+    return isSoloSeat(seat) && this.soloSeats.has(seat) ? seat : null;
+  }
+
+  /**
+   * Which seat a solo room's views are drawn from (the board flip).
+   *
+   * @param {string} socketId
+   * @param {string} seat
+   * @returns {boolean} false outside a solo room, for another socket, or a seat not 'p1'|'p2'
+   */
+  setSoloNearSeat(socketId, seat) {
+    if (!this.solo || !this.socketToPlayer.has(socketId) || !isSoloSeat(seat)) return false;
+    this.soloNearSeat = seat;
+    return true;
+  }
+
+  /**
+   * One entry per connected seated socket — the views to push after a change. A solo room
+   * has one socket, reported as its near seat. Spectators are not included.
+   *
+   * @returns {Array<{ socketId: string, playerId: string }>}
+   */
+  viewTargets() {
+    if (this.solo) {
+      const socketId = this.playerToSocket.get(this.soloNearSeat);
+      return socketId ? [{ socketId, playerId: this.soloNearSeat }] : [];
+    }
+    return [...this.playerToSocket.entries()].map(([playerId, socketId]) => ({
+      socketId,
+      playerId,
+    }));
+  }
+
+  /**
+   * The last clientSeq the socket's client had applied. A solo client stamps both seats'
+   * commands from one counter, so its answer is the higher of the two seats.
+   *
+   * @param {string} socketId
+   * @returns {number}
+   */
+  getClientSeqForSocket(socketId) {
+    if (this.solo) {
+      if (!this.socketToPlayer.has(socketId)) return 0;
+      return Math.max(...SOLO_SEATS.map((seat) => this.getClientSeq(seat)));
+    }
+    const playerId = this.socketToPlayer.get(socketId);
+    return playerId ? this.getClientSeq(playerId) : 0;
   }
 
   /**
@@ -176,15 +305,41 @@ export class GameRoom {
    * Registers a socket as a spectator.
    *
    * @param {string} socketId
+   * @returns {boolean} false for a missing socket id or a solo room
    */
   addSpectator(socketId) {
-    if (!socketId) return;
+    if (!socketId) return false;
+    // Design 074 D7: a solo room shows both hands, so nobody else may watch it.
+    if (this.solo) return false;
     this.spectatorSockets.add(socketId);
     const existingPlayerId = this.socketToPlayer.get(socketId);
     if (existingPlayerId) {
       this.socketToPlayer.delete(socketId);
       this.playerToSocket.delete(existingPlayerId);
     }
+    return true;
+  }
+
+  /**
+   * Drops a spectator socket (it left the room or disconnected). A seated socket is untouched:
+   * a seat survives a dropped connection (Finding 7).
+   *
+   * @param {string} socketId
+   */
+  removeSpectator(socketId) {
+    this.spectatorSockets.delete(socketId);
+  }
+
+  /**
+   * True when the socket is seated or registered as a spectator. Only those may read a view:
+   * a spectator's view shows both hands (design 069).
+   *
+   * @param {string} socketId
+   * @returns {boolean}
+   */
+  canView(socketId) {
+    if (this.solo) return this.socketToPlayer.has(socketId);
+    return this.socketToPlayer.has(socketId) || this.spectatorSockets.has(socketId);
   }
 
   /**
@@ -195,10 +350,13 @@ export class GameRoom {
   removeSocket(socketId) {
     this.spectatorSockets.delete(socketId);
     const playerId = this.socketToPlayer.get(socketId);
-    if (playerId) {
-      this.socketToPlayer.delete(socketId);
-      this.playerToSocket.delete(playerId);
-      this.clientSeqByPlayer.delete(playerId);
+    if (!playerId) return;
+    this.socketToPlayer.delete(socketId);
+    const seats = this.solo ? SOLO_SEATS : [playerId];
+    for (const seat of seats) {
+      if (this.playerToSocket.get(seat) !== socketId) continue;
+      this.playerToSocket.delete(seat);
+      this.clientSeqByPlayer.delete(seat);
     }
   }
 
@@ -217,7 +375,9 @@ export class GameRoom {
    *   events?: object[],
    *   pendingChoice?: object|null,
    *   broadcasts?: Array<{ socketId: string, playerId: string|null, view: object }>
-   * }}
+   * } | { ok: false, success: false, error: 'bad_seat', reason: 'bad_seat', clientSeq?: number }}
+   *   A solo room acts for `cmd.seat`; a missing or unknown seat there is refused as
+   *   `bad_seat` (`success`/`error` ride along for the server's cmdRejected path).
    */
   handleClientCommand(socketId, cmd = {}) {
     // Audit A-9: dedupe keys on clientSeq, so a socket command without one would skip
@@ -231,16 +391,39 @@ export class GameRoom {
         clientSeq: cmd?.clientSeq,
       };
     }
-    return this.handleCommand(socketId, cmd);
+    if (!this.solo) return this.handleCommand(socketId, cmd);
+    const seat = this.seatFor(socketId, cmd);
+    if (!seat) return this.handleCommand(socketId, cmd, this.#badSeatOr(socketId));
+    return this.handleCommand(socketId, cmd, seat);
+  }
+
+  // A stranger's command in a solo room keeps its spectator/unauthorized refusal.
+  #badSeatOr(socketId) {
+    return this.socketToPlayer.has(socketId) ? BAD_SEAT : null;
   }
 
   /**
    * Executes a command for the socket's player: dedupes by clientSeq when present,
    * runs applyCommand, and assembles redacted broadcasts.
+   *
+   * @param {string} socketId
+   * @param {object} [cmd]
+   * @param {string|null} [actingSeat] the seat already resolved by seatFor (solo rooms);
+   *   omitted, the socket's own seat acts — server-internal commands (setup, loadDeck)
    */
-  handleCommand(socketId, cmd = {}) {
+  handleCommand(socketId, cmd = {}, actingSeat = undefined) {
+    if (actingSeat === BAD_SEAT) {
+      return {
+        ok: false,
+        success: false,
+        error: BAD_SEAT,
+        reason: BAD_SEAT,
+        clientSeq: cmd?.clientSeq,
+      };
+    }
     this.touchActivity();
-    const playerId = this.socketToPlayer.get(socketId);
+    const playerId =
+      actingSeat === undefined ? this.socketToPlayer.get(socketId) : actingSeat;
 
     if (!playerId) {
       if (this.spectatorSockets.has(socketId)) {
@@ -279,9 +462,9 @@ export class GameRoom {
           success: true,
           dedupe: true,
           stateVersion: this.state.stateVersion,
-          view: viewFor(this.state, playerId, { attackExtrasFor }),
+          view: this.getViewForSocket(socketId),
           clientSeq: cmd.clientSeq,
-          lastClientSeq: lastSeq,
+          lastClientSeq: this.solo ? this.getClientSeqForSocket(socketId) : lastSeq,
         };
       }
     }
@@ -311,12 +494,14 @@ export class GameRoom {
 
     // Assemble redacted views for all connected sockets
     const broadcasts = [];
-    for (const [pId, sockId] of this.playerToSocket.entries()) {
+    for (const { socketId: sockId, playerId: pId } of this.viewTargets()) {
       broadcasts.push({
         socketId: sockId,
         playerId: pId,
-        view: viewFor(this.state, pId, { attackExtrasFor }),
-        lastClientSeq: this.clientSeqByPlayer.get(pId) ?? 0,
+        view: this.getViewForSocket(sockId),
+        lastClientSeq: this.solo
+          ? this.getClientSeqForSocket(sockId)
+          : (this.clientSeqByPlayer.get(pId) ?? 0),
       });
     }
     for (const sSockId of this.spectatorSockets) {
@@ -356,6 +541,9 @@ export class GameRoom {
    * @returns {object}
    */
   getViewForSocket(socketId) {
+    if (this.solo && this.socketToPlayer.has(socketId)) {
+      return viewForSolo(this.state, this.soloNearSeat, { attackExtrasFor });
+    }
     const playerId = this.socketToPlayer.get(socketId) || null;
     return viewFor(this.state, playerId, { attackExtrasFor });
   }
@@ -365,12 +553,16 @@ export class GameRoom {
    * `deckPeekFor`). A spectator or unknown socket is refused.
    *
    * @param {string} socketId
-   * @param {{ side?: 'you'|'them', count?: number, fromTop?: boolean }} request
+   * @param {{ side?: 'you'|'them', count?: number, fromTop?: boolean, seat?: string }} request
+   *   `seat` names the asking seat in a solo room; `side` is relative to it.
    * @returns {{ ok: true, cards: object[], deckCount: number } | { ok: false, reason: string }}
    */
   peekDeck(socketId, request = {}) {
-    const playerId = this.socketToPlayer.get(socketId);
-    if (!playerId) return { ok: false, reason: 'Only a seated player can look at a deck.' };
+    const playerId = this.seatFor(socketId, request);
+    if (!playerId) {
+      if (this.#badSeatOr(socketId) === BAD_SEAT) return { ok: false, reason: BAD_SEAT };
+      return { ok: false, reason: 'Only a seated player can look at a deck.' };
+    }
     this.touchActivity();
     return deckPeekFor(this.state, playerId, request);
   }
@@ -454,8 +646,13 @@ export class GameRoom {
       call: null,
       coinId: null,
       result: null,
-      starterPlayerId: null,
       auto: false,
+      winnerPlayerId: null,
+      choiceId: null,
+      goFirst: null,
+      choiceAuto: false,
+      starterPlayerId: null,
+      dealt: false,
     };
     this.touchActivity();
     return { callerPlayerId, callId, timeoutMs: TURN_ORDER_CALL_TIMEOUT_MS };
@@ -466,25 +663,34 @@ export class GameRoom {
     return this.turnOrder?.phase === 'awaiting-call';
   }
 
+  /** True once the coin has landed and its winner has not yet chosen first or second. */
+  isAwaitingTurnOrderChoice() {
+    return this.turnOrder?.phase === 'awaiting-choice';
+  }
+
   /**
    * Records the caller's heads/tails pick and flips the coin with the server's
-   * own rng — the client supplies the call, never the result (D10).
+   * own rng — the client supplies the call, never the result (D10). The coin's
+   * winner then decides the order (design 072), so the handshake moves to
+   * 'awaiting-choice' rather than straight to a starter.
    *
    * @param {string} socketId The socket that sent the call.
    * @param {object} [payload]
    * @param {string} [payload.callId]
    * @param {string} [payload.call] 'heads' | 'tails'
    * @param {string} [payload.coinId] The caller's chosen coin art id (display only)
-   * @returns {{ ok: true, callerPlayerId: string, call: string, result: string,
-   *             starterPlayerId: string, auto: false }
-   *          |{ ok: false, reason: string }}
+   * @param {string} [payload.seat] The calling seat in a solo room
+   * @returns {TurnOrderFlip|{ ok: false, reason: string }}
    */
-  submitTurnOrderCall(socketId, { callId = null, call = null, coinId = null } = {}) {
+  submitTurnOrderCall(socketId, { callId = null, call = null, coinId = null, seat = null } = {}) {
     if (!this.turnOrder) return { ok: false, reason: 'no_pending_call' };
     if (this.turnOrder.phase !== 'awaiting-call') {
       return { ok: false, reason: 'already_resolved' };
     }
-    const playerId = this.socketToPlayer.get(socketId);
+    const playerId = this.seatFor(socketId, { seat });
+    if (!playerId && this.#badSeatOr(socketId) === BAD_SEAT) {
+      return { ok: false, reason: BAD_SEAT };
+    }
     if (!playerId || playerId !== this.turnOrder.callerPlayerId) {
       return { ok: false, reason: 'not_caller' };
     }
@@ -492,60 +698,73 @@ export class GameRoom {
       return { ok: false, reason: 'stale_call' };
     }
     if (!isCoinFace(call)) return { ok: false, reason: 'invalid_call' };
-    return this.#resolveTurnOrder(call, false, coinId);
+    return this.#flipTurnOrderCoin(call, false, coinId);
   }
 
   /**
-   * Resolves the open call on the caller's behalf — used when they time out or
+   * Calls the coin on the caller's behalf — used when they time out or
    * disconnect, so a silent seat can never hang the match.
    *
-   * @returns {{ ok: true, callerPlayerId: string, call: string, result: string,
-   *             starterPlayerId: string, auto: true }|{ ok: false, reason: string }}
+   * @returns {TurnOrderFlip|{ ok: false, reason: string }}
    */
   resolveTurnOrderCallAutomatically() {
     if (!this.turnOrder) return { ok: false, reason: 'no_pending_call' };
     if (this.turnOrder.phase !== 'awaiting-call') {
       return { ok: false, reason: 'already_resolved' };
     }
-    return this.#resolveTurnOrder(flipCoinFace(this.rng), true);
+    return this.#flipTurnOrderCoin(flipCoinFace(this.rng), true);
   }
 
   /**
-   * Shared tail of both resolution paths: flip, decide the starter, freeze the
-   * handshake.
+   * @typedef {object} TurnOrderFlip
+   * @property {true} ok
+   * @property {string} callerPlayerId
+   * @property {'heads'|'tails'} call
+   * @property {'heads'|'tails'} result
+   * @property {string} winnerPlayerId Who answers "Do you want to go first?"
+   * @property {string} choiceId Only the winner's socket may be sent this.
+   * @property {string|null} coinId
+   * @property {boolean} auto The call was made by the server.
+   * @property {number} timeoutMs How long the winner has to choose.
+   */
+
+  /**
+   * Shared tail of both call paths: flip, name the winner, open the choice.
    *
    * @param {string} call
    * @param {boolean} auto
    * @param {string|null} [coinId] Display-only coin art id the caller chose.
    *   Echoed back so both clients render the same coin; never trusted for the
    *   flip itself (D10), so a malformed/oversize value is simply dropped.
-   * @returns {{ ok: true, callerPlayerId: string, call: string, result: string,
-   *             starterPlayerId: string, coinId: string|null, auto: boolean }
-   *          |{ ok: false, reason: string }}
+   * @returns {TurnOrderFlip|{ ok: false, reason: string }}
    */
-  #resolveTurnOrder(call, auto, coinId = null) {
+  #flipTurnOrderCoin(call, auto, coinId = null) {
     const result = flipCoinFace(this.rng);
-    const starterPlayerId = resolveStarterPlayerId({
+    const winnerPlayerId = resolveCoinWinnerPlayerId({
       playerIds: Object.keys(this.state.players || {}),
       callerPlayerId: this.turnOrder.callerPlayerId,
       call,
       result,
     });
-    if (!starterPlayerId) return { ok: false, reason: 'no_starter' };
+    if (!winnerPlayerId) return { ok: false, reason: 'no_winner' };
 
     const safeCoinId =
       typeof coinId === 'string' && coinId.length > 0 && coinId.length <= 128
         ? coinId
         : null;
+    // An ordering token, not a secret (the caller can derive it from callId):
+    // the socket check in submitTurnOrderChoice is what limits who may answer.
+    const choiceId = `${this.turnOrder.callId}:choice`;
 
     this.turnOrder = {
       ...this.turnOrder,
-      phase: 'resolved',
+      phase: 'awaiting-choice',
       call,
       result,
       coinId: safeCoinId,
-      starterPlayerId,
       auto,
+      winnerPlayerId,
+      choiceId,
     };
     this.touchActivity();
     return {
@@ -553,10 +772,142 @@ export class GameRoom {
       callerPlayerId: this.turnOrder.callerPlayerId,
       call,
       result,
-      starterPlayerId,
+      winnerPlayerId,
+      choiceId,
       coinId: safeCoinId,
       auto,
+      timeoutMs: TURN_ORDER_CHOICE_TIMEOUT_MS,
     };
+  }
+
+  /**
+   * Records the toss winner's answer to "Do you want to go first?" (design 072).
+   *
+   * @param {string} socketId The socket that sent the answer.
+   * @param {object} [payload]
+   * @param {string} [payload.choiceId]
+   * @param {boolean} [payload.goFirst]
+   * @param {string} [payload.seat] The answering seat in a solo room
+   * @returns {TurnOrderResolution|{ ok: false, reason: string }}
+   */
+  submitTurnOrderChoice(socketId, { choiceId = null, goFirst = null, seat = null } = {}) {
+    const refusal = this.#choiceRefusal();
+    if (refusal) return refusal;
+    const playerId = this.seatFor(socketId, { seat });
+    if (!playerId && this.#badSeatOr(socketId) === BAD_SEAT) {
+      return { ok: false, reason: BAD_SEAT };
+    }
+    if (!playerId || playerId !== this.turnOrder.winnerPlayerId) {
+      return { ok: false, reason: 'not_winner' };
+    }
+    if (choiceId !== this.turnOrder.choiceId) {
+      return { ok: false, reason: 'stale_choice' };
+    }
+    if (typeof goFirst !== 'boolean') return { ok: false, reason: 'invalid_choice' };
+    return this.#resolveTurnOrderChoice(goFirst, false);
+  }
+
+  /**
+   * Chooses for a winner who timed out or left: they go first, which is what
+   * winning the toss meant before the choice existed.
+   *
+   * @returns {TurnOrderResolution|{ ok: false, reason: string }}
+   */
+  resolveTurnOrderChoiceAutomatically() {
+    const refusal = this.#choiceRefusal();
+    if (refusal) return refusal;
+    return this.#resolveTurnOrderChoice(true, true);
+  }
+
+  #choiceRefusal() {
+    if (this.turnOrder?.phase === 'resolved') {
+      return { ok: false, reason: 'already_resolved' };
+    }
+    if (this.turnOrder?.phase !== 'awaiting-choice') {
+      return { ok: false, reason: 'no_pending_choice' };
+    }
+    return null;
+  }
+
+  /**
+   * @typedef {object} TurnOrderResolution
+   * @property {true} ok
+   * @property {string} callerPlayerId
+   * @property {'heads'|'tails'} call
+   * @property {'heads'|'tails'} result
+   * @property {string} winnerPlayerId
+   * @property {boolean} goFirst The winner's answer.
+   * @property {string} starterPlayerId Seated first by the `setup` command.
+   * @property {string|null} coinId
+   * @property {boolean} auto The call was made by the server.
+   * @property {boolean} choiceAuto The first/second answer was made by the server.
+   */
+
+  /**
+   * The resolved order, rebuilt from the handshake — for a deal that has to be
+   * retried because no seat had a socket when the choice resolved.
+   *
+   * @returns {TurnOrderResolution|null} null unless resolved and not yet dealt.
+   */
+  undealtTurnOrderResolution() {
+    if (this.turnOrder?.phase !== 'resolved' || this.turnOrder.dealt) return null;
+    return this.#resolutionFromHandshake();
+  }
+
+  /** @returns {TurnOrderResolution} */
+  #resolutionFromHandshake() {
+    const {
+      callerPlayerId,
+      call,
+      result,
+      winnerPlayerId,
+      goFirst,
+      starterPlayerId,
+      coinId,
+      auto,
+      choiceAuto,
+    } = this.turnOrder;
+    return {
+      ok: true,
+      callerPlayerId,
+      call,
+      result,
+      winnerPlayerId,
+      goFirst,
+      starterPlayerId,
+      coinId,
+      auto,
+      choiceAuto,
+    };
+  }
+
+  /** Records that the opening hands went out for the resolved order. */
+  markTurnOrderDealt() {
+    if (this.turnOrder?.phase === 'resolved') this.turnOrder.dealt = true;
+  }
+
+  /**
+   * @param {boolean} goFirst
+   * @param {boolean} choiceAuto
+   * @returns {TurnOrderResolution|{ ok: false, reason: string }}
+   */
+  #resolveTurnOrderChoice(goFirst, choiceAuto) {
+    const starterPlayerId = resolveStarterFromChoice({
+      playerIds: Object.keys(this.state.players || {}),
+      winnerPlayerId: this.turnOrder.winnerPlayerId,
+      goFirst,
+    });
+    if (!starterPlayerId) return { ok: false, reason: 'no_starter' };
+
+    this.turnOrder = {
+      ...this.turnOrder,
+      phase: 'resolved',
+      goFirst,
+      choiceAuto,
+      starterPlayerId,
+    };
+    this.touchActivity();
+    return this.#resolutionFromHandshake();
   }
 
   /**
@@ -681,7 +1032,7 @@ export class GameRoom {
    * Resolves a pending choice for a player socket.
    *
    * @param {string} socketId
-   * @param {object} payload { choiceId, selection }
+   * @param {object} payload { choiceId, selection, seat? } — `seat` names the answering seat in a solo room
    * @param {number} [clientSeq]
    * @returns {object}
    */
@@ -692,11 +1043,10 @@ export class GameRoom {
         : typeof payload?.clientSeq === 'number'
           ? payload.clientSeq
           : null;
-    return this.handleCommand(socketId, {
-      type: 'resolveChoice',
-      payload,
-      clientSeq: seq,
-    });
+    const cmd = { type: 'resolveChoice', payload, clientSeq: seq };
+    if (!this.solo) return this.handleCommand(socketId, cmd);
+    const seat = this.seatFor(socketId, payload);
+    return this.handleCommand(socketId, cmd, seat ?? this.#badSeatOr(socketId));
   }
 
   /**

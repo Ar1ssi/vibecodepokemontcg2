@@ -6,6 +6,7 @@ import { restoreOwnDeck } from '../../../setup/deck-constructor/own-deck.mjs';
 import { show } from '../../../setup/home-header/header-toggle.js';
 import { handleSpectatorButtons } from '../../../setup/spectator/handle-spectator-buttons.js';
 import { openDeckBuilderFromDeckTab } from './import-deck.js';
+import { joinSoloRoom, leaveSoloRoom } from '../../../setup/netcode/solo-room.js';
 import {
   removeSyncIntervals,
   resetNetcodeForRoomChange,
@@ -17,11 +18,14 @@ export const initializeHeaderButtons = () => {
   const p2Chatbox = document.getElementById('p2Chatbox');
   const p2ExplanationBox = document.getElementById('p2ExplanationBox');
 
+  // Design 074 D7: the Solo tab plays a solo room through the server (solo-room.js); a
+  // server without authority refuses it and the tab keeps the local board.
   const p1Button = document.getElementById('p1Button');
   p1Button.addEventListener('click', () => {
-    if (!systemState.isTwoPlayer) {
+    if (systemState.solo || !systemState.isTwoPlayer) {
       show('p1Box', p1Button);
       closeOverlays();
+      joinSoloRoom();
     } else if (
       window.confirm(
         'Are you sure you want to leave the room? Battle log will be erased.'
@@ -47,6 +51,7 @@ export const initializeHeaderButtons = () => {
       document.getElementById('importState').style.display = 'inline';
       document.getElementById('flipBoardButton').style.display = 'inline-block';
       systemState.isTwoPlayer = false;
+      systemState.serverAuthoritative = false;
       systemState.roomId = '';
       cleanActionData('self');
       cleanActionData('opp');
@@ -79,6 +84,7 @@ export const initializeHeaderButtons = () => {
           systemState.deckFormat.p1Opp,
         ]);
       }
+      joinSoloRoom();
     }
   });
 
@@ -94,6 +100,13 @@ export const initializeHeaderButtons = () => {
 
   const p2Button = document.getElementById('p2Button');
   p2Button.addEventListener('click', () => {
+    if (
+      systemState.solo &&
+      !window.confirm('Are you sure you want to leave the solo game? Its board will be lost.')
+    ) {
+      return;
+    }
+    leaveSoloRoom();
     show('p2Box', p2Button);
     closeOverlays();
   });

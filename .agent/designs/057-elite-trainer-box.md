@@ -35,7 +35,7 @@ and show. Plan only; every slice is buildable by a fresh thread from this file.
 - Storage: `localStorage` through guarded helpers as `build-battle-session.mjs` does; a throwing
   storage means memory-only plus a banner. Counts and ids only, never card bodies. Two builder tabs
   may share the store: every collection write re-reads storage first (area doc, library practice).
-- Sleeve art stays on the pokemon-sleeve-database CDN as the catalog already does (`sleeves.mjs`);
+- Sleeve art was the pokemon-sleeve-database CDN; D213 replaced it with TCG Live's sleeves (`sleeves.mjs`, ids `cs_*`, the Phantasmal Flames ETB is `cs_charizardxmega_me2_etb`);
   the ETB coins are already vendored in `coins.mjs` (`PFLETB_Mega_Charizard_X_Coin` and the other
   `*ETB_*` ids). The app has no dice or condition-marker gameplay: those are scene props only.
 - Reading budget: this design reads 051 § Design, 052 in full, and the files under § Current state.

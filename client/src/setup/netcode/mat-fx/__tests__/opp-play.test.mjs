@@ -10,7 +10,9 @@ import {
   normalizeTurn,
   oppPlayTrack,
   oppPreviewRect,
+  placeLegOf,
   playsOppPreview,
+  previewPlaceLeg,
 } from '../opp-play.mjs';
 
 const close = (actual, expected, msg, eps = 1e-6) =>
@@ -158,4 +160,29 @@ test('oppPlayTrack: toFaceDown turns the card back to the sleeve while it is pla
   assert.ok(mid > 0 && mid < 180, `turning over mid-place: ${mid}`);
   close(into(1).flip, 180, 'sleeve up on landing');
   close(into(1).rotate, 180, 'turned like the board');
+});
+
+test('previewPlaceLeg: the placing leg is the last PREVIEW_PLACE_MS of the play, for any hold', () => {
+  for (const hold of [0, 600, OPP_PLAY_HOLD_MS]) {
+    const { startMs, durationMs } = previewPlaceLeg(hold);
+    assert.equal(durationMs, PREVIEW_PLACE_MS);
+    assert.equal(startMs + durationMs, previewPlayMs(hold));
+  }
+  assert.deepEqual(previewPlaceLeg(), previewPlaceLeg(OPP_PLAY_HOLD_MS));
+});
+
+test('placeLegOf: starts at the hold\'s end on the preview and lands in the spot', () => {
+  const leg = placeLegOf(track());
+  const first = leg(0);
+  close(first.x, 0, 'starts on the preview centre');
+  close(first.y, 0, 'starts on the preview centre');
+  close(first.scale, 1, 'starts at preview size');
+  close(first.flip, 0, 'face up');
+  const last = leg(1);
+  close(last.x, 670 - 500, 'ends at the spot (x from the preview centre)');
+  close(last.y, 342 - 400, 'ends at the spot (y from the preview centre)');
+  close(last.scale, slot.width / preview.width, 'ends at the spot size');
+  close(last.rotate, 180, 'ends turned like the opponent\'s board');
+  assert.deepEqual(leg(-1), first, 'clamped below 0');
+  assert.deepEqual(leg(2), last, 'clamped above 1');
 });

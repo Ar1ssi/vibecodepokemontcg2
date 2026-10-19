@@ -30,7 +30,7 @@ READ design 063 (path below). Your deliverable is one markdown file in the schem
   extract frames yourself into `moves/<slug>/tmp/` (delete it after), e.g.
   `ffmpeg -v error -i <video> -vf "select='between(n\,60\,90)',scale=480:-1,tile=4x4" -frames:v 1 moves/<slug>/tmp/zoom.png`
   and read the PNG.
-- Design 063 (READ ONLY): `/home/user/vibecodepokemontcg2/.agent/designs/063-attack-move-animations.md`.
+- Design 063 (READ ONLY): `/home/user/vibecodepokemontcg2/.agent/designs/archive/063-attack-move-animations.md`.
   Read its sections "What the look test settled", "Drawers", "Card motion" and the materials
   list under "Materials" before your first entry (find them with
   `grep -n "^## \|^### " <file>` then `sed -n <a>,<b>p`). That is the vocabulary your board

@@ -26,7 +26,7 @@ export const shuffleIntoDeck = (
   emit = true
 ) => {
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'shuffleIntoDeck', [
       oInitiator,
       zoneId,
@@ -69,7 +69,7 @@ export const shuffleIntoDeck = (
 
 export const moveToDeckTop = (user, initiator, oZoneId, index, emit = true) => {
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'moveToDeckTop', [oInitiator, oZoneId, index]);
     return;
   }
@@ -108,7 +108,7 @@ export const draw = (user, initiator, drawAmount, emit = true) => {
   drawAmount = Math.min(drawAmount, selectedDeckCount);
 
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'draw', [oInitiator, drawAmount]);
     return;
   }
@@ -171,7 +171,7 @@ export const viewDeck = (
   if (emit && peekServerDeck({ user, count: viewAmount, top })) {
     return;
   }
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'viewDeck', [
       oInitiator,
       viewAmount,
@@ -240,7 +240,7 @@ export const switchWithDeckTop = (
   emit = true
 ) => {
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'switchWithDeckTop', [
       oInitiator,
       oZoneId,

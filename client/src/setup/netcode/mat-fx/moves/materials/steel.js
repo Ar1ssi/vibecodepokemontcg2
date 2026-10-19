@@ -8,7 +8,11 @@
 // Strike). Palette #9AA7B8 #D5DEEA #FFFFFF, deep #4A5563, cool edge #9FC5F0. No grain. Every
 // call draws on the context it is handed and is otherwise pure.
 import { rgbCss } from '../../fx-colors.mjs';
-import { grainPass, shardOutline, sphere, traceOutline } from './_shared.js';
+import { grainPass, shardOutline, sphere, styledKit, traceOutline } from './_shared.js';
+
+// Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
+// Polished metal: hard facets with a glint sweeping each blade; edges carry running glints.
+const METAL = Object.freeze({ byKind: { linear: { id: 'crystal', facets: 3, sheen: 0.8, speed: 1.6 }, radial: { id: 'crystal', facets: 6, sheen: 0.5, speed: 1.2 }, stroke: { id: 'crystal', sheen: 0.7, speed: 1.6 } } });
 
 const TAU = Math.PI * 2;
 const HEEL = 0.22;
@@ -192,27 +196,29 @@ function steelKit(palette) {
     body(ctx, x, y, r, alpha, hot);
   }
 
-  /** A targeting reticle of radius `r` at progress `s`: a ring, four locking ticks, a pip. */
+  /**
+   * A steel glint of radius `r` at progress `s`: a cool glow and a four-point sparkle that flares
+   * and turns as it locks (design 075 parity: the stroked targeting reticle read as clip art).
+   */
   function sigil(ctx, x, y, r, s) {
     if (!(r > 0)) return;
-    ctx.lineCap = 'round';
-    ctx.lineWidth = Math.max(1, r * 0.05);
-    ctx.strokeStyle = rgbCss(palette.hot, 0.85);
+    const lock = Math.sin(Math.PI * Math.max(0, Math.min(1, s)));
+    glow(ctx, x, y, r, 0.45 * lock);
+    const turn = rad(45 * s);
+    const reach = r * (0.35 + 0.45 * lock);
+    const waist = reach * 0.14;
+    ctx.fillStyle = rgbCss(palette.white, 0.85 * lock);
     ctx.beginPath();
-    ctx.arc(x, y, r * 0.86, 0, TAU);
-    ctx.stroke();
-    ctx.strokeStyle = rgbCss(palette.edge, 0.9);
-    ctx.beginPath();
-    for (const tick of reticleTicks(s, r)) {
-      const a = rad(tick.angleDeg);
-      ctx.moveTo(x + Math.cos(a) * tick.from, y + Math.sin(a) * tick.from);
-      ctx.lineTo(x + Math.cos(a) * tick.to, y + Math.sin(a) * tick.to);
+    for (let k = 0; k < 8; k += 1) {
+      const a = turn + (k * Math.PI) / 4;
+      const d = k % 2 === 0 ? reach : waist;
+      const px = x + Math.cos(a) * d;
+      const py = y + Math.sin(a) * d;
+      if (k === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
     }
-    ctx.stroke();
-    ctx.strokeStyle = rgbCss(palette.white, 0.9);
-    ctx.beginPath();
-    ctx.arc(x, y, r * 0.18, 0, TAU);
-    ctx.stroke();
+    ctx.closePath();
+    ctx.fill();
   }
 
   return Object.freeze({
@@ -232,4 +238,4 @@ function steelKit(palette) {
   });
 }
 
-export const steel = steelKit(PALETTE);
+export const steel = styledKit(steelKit(PALETTE), METAL);

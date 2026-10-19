@@ -1,10 +1,8 @@
 /**
  * The Stadium reads upright for whoever played it and upside down for the other
- * player. `#stadium` itself carries the table-tilt transform (apply-table-tilt.js
- * writes `--tilt-transform` with a transform-origin far outside the element), so
- * an inline transform on it would both drop the tilt and pivot the card around
- * that distant origin — off-screen. The flip therefore lives on a class that
- * rotates only the child <img> (index.css).
+ * player. The flip lives on a class that rotates only the child <img> (index.css),
+ * never an inline transform on `#stadium` itself, which would pivot the whole slot
+ * around its own origin and move it off its place on the page.
  */
 export const STADIUM_OPP_FACING_CLASS = 'stadium-opp-facing';
 

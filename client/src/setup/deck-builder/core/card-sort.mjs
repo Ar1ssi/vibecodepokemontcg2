@@ -29,6 +29,23 @@ export function flattenDeckToCardArray(deck = {}) {
   return cardArray;
 }
 
+/** Each distinct card in the deck once — its stored record, without a count — in deck order. */
+export function uniqueDeckCards(deck = {}) {
+  const seenIds = new Set();
+  const records = [];
+
+  for (const group of Object.values(deck || {})) {
+    for (const variant of Object.values(group?.cards || [])) {
+      const record = variant?.data;
+      if (!record?.id || seenIds.has(record.id)) continue;
+      seenIds.add(record.id);
+      records.push(record);
+    }
+  }
+
+  return records;
+}
+
 export function sortCardsBySupertype(cards = []) {
   return [...cards].sort(compareCardsBySupertype);
 }

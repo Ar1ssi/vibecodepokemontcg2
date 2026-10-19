@@ -14,6 +14,8 @@ import {
   foilMaskUrl,
   LIGHT,
   MAX_ROTATE_X,
+  HOLO_PERSPECTIVE_MIN_PX,
+  holoPerspectivePx,
   Spring,
   resolveHoloEffect,
   buildHoloCard,
@@ -21,7 +23,13 @@ import {
   isTrainerCard,
   startHoloAnimation,
   stopHoloAnimation,
+  resolveFoilEffect,
+  foilCardId,
+  isReverseHoloCard,
+  tcglFoilCoverage,
+  TCGL_FOIL_RARITY,
 } from '../holo.mjs';
+import { parseFoilManifest } from '../../../foil/tcgl-foil-manifest.mjs';
 
 const ORIGIN = 'http://localhost:3000';
 const TCGDEX_URL = 'https://assets.tcgdex.net/en/me/me01/077/high.webp';
@@ -462,6 +470,27 @@ describe('startHoloAnimation', () => {
     stopHoloAnimation(card);
   });
 
+  it('a cursor resting where the preview pops open does not tilt it (pointerenter alone)', () => {
+    const card = createFakeElement();
+    startHoloAnimation(card);
+    card.dispatch('pointerenter', { clientX: 50, clientY: 140 });
+    runFrames(600);
+
+    assert.equal(card.properties['--rotate-x'], '0.00deg');
+    assert.equal(card.properties['--rotate-y'], '0.00deg');
+    stopHoloAnimation(card);
+  });
+
+  it('a large tilting card gets a perspective scaled to its height, so it does not warp', () => {
+    const card = createFakeElement();
+    card.offsetHeight = 1000;
+    startHoloAnimation(card);
+    card.dispatch('pointermove', { clientX: 100, clientY: 70 });
+
+    assert.equal(card.properties['--holo-perspective'], '1300px');
+    stopHoloAnimation(card);
+  });
+
   it('interactive light follows card rotation, not cursor position', () => {
     const card = createFakeElement();
     startHoloAnimation(card);
@@ -510,7 +539,6 @@ describe('startHoloAnimation', () => {
     startHoloAnimation(card);
 
     assert.equal(card.listeners.get('pointermove').size, 1);
-    assert.equal(card.listeners.get('pointerenter').size, 1);
     assert.equal(card.listeners.get('pointerleave').size, 1);
     stopHoloAnimation(card);
     assert.equal(card.listeners.get('pointermove').size, 0);
@@ -549,6 +577,15 @@ describe('cardEraFromImageUrl', () => {
     assert.equal(cardEraFromImageUrl(tcgdex('xy', 'xy5')), 'xy');
     assert.equal(cardEraFromImageUrl(tcgdex('bw', 'bw1')), 'xy');
     assert.equal(cardEraFromImageUrl(tcgdex('hgss', 'hgss1')), 'classic');
+  });
+
+  it("reads the series from this app's own card art, like TCGdex's", () => {
+    assert.equal(cardEraFromImageUrl('/src/assets/card-art/sv/sve/001/high.webp'), 'sv');
+    assert.equal(cardEraFromImageUrl('http://localhost:4000/src/assets/card-art/bw/bw1/107/high.webp'), 'xy');
+    assert.equal(
+      cardLayoutFromImageUrl('/src/assets/card-art/sm/sm3.5/69/high.webp'),
+      cardLayoutFromImageUrl('https://assets.tcgdex.net/en/sm/sm3.5/69/high.webp')
+    );
   });
 
   it('reads the set id from pokemontcg.io URLs', () => {
@@ -785,5 +822,187 @@ describe('syncCardAspect', () => {
   it('ignores null arguments', () => {
     assert.doesNotThrow(() => syncCardAspect(null, fakeImage(600, 825)));
     assert.doesNotThrow(() => syncCardAspect(createFakeElement(), null));
+  });
+});
+
+// Design 069: cards TCG Live prints take its foil decision; the rest keep the CSS holo.
+describe('resolveFoilEffect (TCG Live foil)', () => {
+  const manifest = parseFoilManifest({
+    v: 1,
+    shaders: ['TPCi/Cards3D/HoloFoil/SvUltra'],
+    materials: ['MAT_Cards3D_SvUltra'],
+    cards: { 'sv01-258': ['sv1_258', 0, 0, 'sv1_en_258', 'sv1_etch_en_258', 'sv1_wp_en_258', '', ''] },
+    flat: ['sv01-1'],
+  });
+
+  it('picks the TCG Live foil for a covered foil card, by id or image URL', () => {
+    assert.equal(resolveFoilEffect({ id: 'sv01-258', rarity: 'Common' }, manifest), TCGL_FOIL_RARITY);
+    const byUrl = { image: { src: 'https://assets.tcgdex.net/en/sv/sv01/258/high.webp' } };
+    assert.equal(resolveFoilEffect(byUrl, manifest), TCGL_FOIL_RARITY);
+    assert.equal(foilCardId(byUrl, manifest), 'sv01-258');
+  });
+
+  it('gives a covered NonFoil printing no foil, whatever its TCGdex rarity (row 5)', () => {
+    assert.equal(resolveFoilEffect({ id: 'sv01-001', rarity: 'Holo Rare' }, manifest), null);
+    assert.equal(tcglFoilCoverage({ id: 'sv01-001' }, manifest), 'flat');
+  });
+
+  it('keeps the CSS holo for an uncovered card (row 6)', () => {
+    assert.equal(resolveFoilEffect({ id: 'base1-4', rarity: 'Holo Rare' }, manifest), 'rare holo');
+  });
+
+  it('keeps the CSS holo for a card with no id and no parseable image (row 1)', () => {
+    assert.equal(resolveFoilEffect({ rarity: 'Holo Rare', image: { src: 'blob:x' } }, manifest), 'rare holo');
+    assert.equal(foilCardId({}, manifest), null);
+  });
+
+  it('keeps the CSS holo while the manifest is not loaded (rows 2, 3)', () => {
+    assert.equal(resolveFoilEffect({ id: 'sv01-258', rarity: 'Holo Rare' }, null), 'rare holo');
+    assert.equal(resolveFoilEffect({ id: 'sv01-001', rarity: 'Holo Rare' }, null), 'rare holo');
+  });
+
+  it('prefers the id the manifest knows when the card id is not a TCGdex id', () => {
+    const card = { id: 'e2e-7', image: { src: 'https://assets.tcgdex.net/en/sv/sv01/258/high.webp' } };
+    assert.equal(foilCardId(card, manifest), 'sv01-258');
+  });
+
+  describe('reverse-holo printings', () => {
+    const withReverse = parseFoilManifest({
+      v: 1,
+      shaders: ['TPCi/Cards3D/HoloFoil/SvUltra', 'TPCi/Cards3D/HoloFoil/FlatSilver'],
+      materials: ['MAT_Cards3D_SvUltra', 'MAT_Cards3D_FlatSilver'],
+      cards: { 'sv01-258': ['sv1_258', 0, 0, 'sv1_en_258', 'sv1_etch_en_258', 'sv1_wp_en_258', '', ''] },
+      flat: ['sv01-1', 'sv01-2'],
+      reverse: { 'sv01-1': ['sv1_1', 1, 1, 'sv1_en_001', '', 'sv1_wp_ph_en_001', '', ''] },
+    });
+
+    it('a reverse-holo card wears TCG Live reverse printing, even over a flat base', () => {
+      const card = { id: 'sv01-001', rarity: 'Reverse Holo' };
+      assert.equal(isReverseHoloCard(card), true);
+      assert.equal(resolveFoilEffect(card, withReverse), TCGL_FOIL_RARITY);
+      assert.equal(tcglFoilCoverage(card, withReverse), 'foil');
+      assert.equal(resolveFoilEffect({ id: 'sv01-002', rarity: 'Common' }, withReverse), null, 'base stays flat');
+    });
+
+    it('keeps the CSS reverse holo when TCG Live has no reverse printing', () => {
+      assert.equal(resolveFoilEffect({ id: 'sv01-2', rarity: 'Reverse Holo' }, withReverse), 'reverse holo');
+      assert.equal(resolveFoilEffect({ id: 'sv01-258', rarity: 'Reverse Holo' }, withReverse), 'reverse holo');
+      assert.equal(resolveFoilEffect({ id: 'base1-4', rarity: 'Reverse Holo' }, withReverse), 'reverse holo');
+    });
+
+    it('reads through the set browser `-reverse` id suffix', () => {
+      const card = { id: 'sv01-1-reverse', rarity: 'Reverse Holo' };
+      assert.equal(foilCardId(card, withReverse), 'sv01-1');
+      assert.equal(resolveFoilEffect(card, withReverse), TCGL_FOIL_RARITY);
+    });
+
+    it('an explicit reverse flag overrides the rarity (pack reverse slot)', () => {
+      assert.equal(tcglFoilCoverage({ id: 'sv01-1', rarity: 'Common' }, withReverse, { reverse: true }), 'foil');
+      assert.equal(tcglFoilCoverage({ id: 'sv01-258', rarity: 'Common' }, withReverse, { reverse: true }), null);
+    });
+
+    it('buildHoloCard looks the reverse printing up only when asked', () => {
+      const base = buildHoloCard(TCGDEX_URL, TCGL_FOIL_RARITY, { cardId: 'sv01-258', reverse: true, manifest: withReverse });
+      assert.equal(base.dataset.tcglFoil, 'fallback', 'sv01-258 has no reverse printing');
+      const flat = buildHoloCard(TCGDEX_URL, TCGL_FOIL_RARITY, { cardId: 'sv01-1', manifest: withReverse });
+      assert.equal(flat.dataset.tcglFoil, 'fallback', 'sv01-1 has no base foil record');
+    });
+  });
+
+  // BW/XY plain cards with a TCG Live reverse printing show that printing in place of the plain one.
+  describe('BW through SV reverse printing in place of the plain card', () => {
+    const bwxy = parseFoilManifest({
+      v: 1,
+      shaders: ['TPCi/Cards3D/HoloFoil/FlatSilver', 'TPCi/Cards3D/HoloFoil/SunBeam'],
+      materials: ['MAT_Cards3D_FlatSilver', 'MAT_Cards3D_SunBeam'],
+      cards: { 'xy1-26': ['xy1_26', 1, 1, 'xy1_en_026', '', 'xy1_wp_en_026', '', ''] },
+      flat: ['xy1-20', 'xy1-128', 'xy1-132', 'bw1-1', 'xy1-2', 'sv01-1', 'sm3.5-1', 'swsh12.5-1', 'sv10.5b-1', 'svp-1', 'me01-1'],
+      reverse: {
+        'xy1-20': ['xy1_20', 0, 0, 'xy1_en_020', '', 'xy1_wp_ph_en_020', '', ''],
+        'xy1-26': ['xy1_26', 0, 0, 'xy1_en_026', '', 'xy1_wp_ph_en_026', '', ''],
+        'xy1-128': ['xy1_128', 0, 0, 'xy1_en_128', '', 'xy1_wp_ph_en_128', '', ''],
+        'xy1-132': ['xy1_132', 0, 0, 'xy1_en_132', '', 'xy1_wp_ph_en_132', '', ''],
+        'bw1-1': ['bw1_1', 0, 0, 'bw1_en_001', '', 'bw1_wp_ph_en_001', '', ''],
+        'sv01-1': ['sv1_1', 0, 0, 'sv1_en_001', '', 'sv1_wp_ph_en_001', '', ''],
+        'sm3.5-1': ['sm3-5_1', 0, 0, 'sm3-5_en_001', '', 'sm3-5_wp_ph_en_001', '', ''],
+        'swsh12.5-1': ['swsh12-5_1', 0, 0, 'swsh12-5_en_001', '', 'swsh12-5_wp_ph_en_001', '', ''],
+        'sv10.5b-1': ['sv10-5b_1', 0, 0, 'sv10-5b_en_001', '', 'sv10-5b_wp_ph_en_001', '', ''],
+        'svp-1': ['svp_1', 0, 0, 'svp_en_001', '', 'svp_wp_ph_en_001', '', ''],
+        'me01-1': ['me1_1', 0, 0, 'me1_en_001', '', 'me1_wp_ph_en_001', '', ''],
+      },
+    });
+
+    it('a plain Pokémon or Trainer with a reverse printing wears it', () => {
+      const slugma = { id: 'xy1-20', name: 'Slugma', supertype: 'Pokémon', rarity: 'Common' };
+      assert.equal(isReverseHoloCard(slugma, bwxy), true);
+      assert.equal(resolveFoilEffect(slugma, bwxy), TCGL_FOIL_RARITY);
+      assert.equal(tcglFoilCoverage(slugma, bwxy), 'foil');
+      const superPotion = { id: 'xy1-128', name: 'Super Potion', supertype: 'Trainer', rarity: 'Uncommon' };
+      assert.equal(resolveFoilEffect(superPotion, bwxy), TCGL_FOIL_RARITY);
+      assert.equal(isReverseHoloCard({ id: 'bw1-1', name: 'Snivy', rarity: '' }, bwxy), true);
+    });
+
+    it('covers Sun & Moon, Sword & Shield and Scarlet & Violet sets, zero-padded ids included', () => {
+      for (const id of ['sm3.5-1', 'swsh12.5-1', 'sv01-001', 'sv10.5b-001']) {
+        const card = { id, supertype: 'Pokémon', rarity: 'Common' };
+        assert.equal(isReverseHoloCard(card, bwxy), true, id);
+        assert.equal(resolveFoilEffect(card, bwxy), TCGL_FOIL_RARITY, id);
+      }
+    });
+
+    it('finds the printing from the image URL when the card has no id', () => {
+      const card = { name: 'Slugma', image: { src: 'https://assets.tcgdex.net/en/xy/xy1/20/high.webp' } };
+      assert.equal(isReverseHoloCard(card, bwxy), true);
+    });
+
+    it('leaves holo rares, energy, other eras and cards without a reverse printing alone', () => {
+      const delphox = { id: 'xy1-26', name: 'Delphox', rarity: 'Holo Rare' };
+      assert.equal(isReverseHoloCard(delphox, bwxy), false, 'base printing is foil');
+      assert.equal(resolveFoilEffect(delphox, bwxy), TCGL_FOIL_RARITY);
+      assert.equal(isReverseHoloCard({ id: 'xy1-132', name: 'Grass Energy', supertype: 'Energy' }, bwxy), false);
+      assert.equal(isReverseHoloCard({ id: 'me01-1', supertype: 'Pokémon', rarity: 'Common' }, bwxy), false, 'Mega Evolution era');
+      assert.equal(isReverseHoloCard({ id: 'svp-1', supertype: 'Pokémon', rarity: 'Promo' }, bwxy), false, 'promo set');
+      assert.equal(isReverseHoloCard({ id: 'xy1-2', name: 'Ivysaur', rarity: 'Uncommon' }, bwxy), false);
+      assert.equal(resolveFoilEffect({ id: 'xy1-2', name: 'Ivysaur', rarity: 'Uncommon' }, bwxy), null);
+    });
+
+    it('stays plain while the manifest is not loaded', () => {
+      const slugma = { id: 'xy1-20', name: 'Slugma', rarity: 'Common' };
+      assert.equal(isReverseHoloCard(slugma, null), false);
+      assert.equal(resolveFoilEffect(slugma, null), null);
+    });
+  });
+
+  it('tags the wrapper tcgl and marks it fallback when no record exists', () => {
+    const card = buildHoloCard('https://example.com/card.png', TCGL_FOIL_RARITY, { cardId: 'zz-1', manifest });
+    assert.equal(card.dataset.rarity, 'tcgl');
+    assert.equal(card.dataset.tcglFoil, 'fallback');
+  });
+});
+
+describe('startHoloAnimation foil tilt', () => {
+  it('stores the light tilt for the TCG Live foil view each frame', () => {
+    const card = createFakeElement();
+    startHoloAnimation(card, { auto: true, tilt: false });
+    runFrame(1000);
+    assert.deepEqual(card.__foilTilt, driftTilt(1000));
+    stopHoloAnimation(card);
+  });
+});
+
+describe('holoPerspectivePx', () => {
+  it('keeps the 600px floor for cards up to ~460px tall', () => {
+    assert.equal(holoPerspectivePx(140), HOLO_PERSPECTIVE_MIN_PX);
+    assert.equal(holoPerspectivePx(460), HOLO_PERSPECTIVE_MIN_PX);
+  });
+
+  it('grows with the card height past the floor', () => {
+    assert.equal(holoPerspectivePx(800), 1040);
+  });
+
+  it('falls back to the floor for a missing or zero height', () => {
+    assert.equal(holoPerspectivePx(0), HOLO_PERSPECTIVE_MIN_PX);
+    assert.equal(holoPerspectivePx(undefined), HOLO_PERSPECTIVE_MIN_PX);
+    assert.equal(holoPerspectivePx(NaN), HOLO_PERSPECTIVE_MIN_PX);
   });
 });

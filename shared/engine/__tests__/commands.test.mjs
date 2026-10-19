@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateCommandShape, DISPOSITION_TABLE } from '../commands.mjs';
+import { validateCommandShape, DISPOSITION_TABLE, PROTOCOL_VERSION } from '../commands.mjs';
 
 test('commands: validateCommandShape rejects non-objects and unknown command types (Edge Case 2)', () => {
   assert.equal(validateCommandShape(null).valid, false);
@@ -376,4 +376,16 @@ test('commands: Slice 5 schemas validation (attack, retreat, pass, takePrizes, t
     validateCommandShape({ type: 'promote', payload: {} }).valid,
     false
   );
+});
+
+test('commands: an optional seat p1/p2 is accepted on any command (design 074 D7, protocol 2.2.0)', () => {
+  assert.equal(PROTOCOL_VERSION, '2.2.0');
+  assert.equal(validateCommandShape({ type: 'draw', payload: {} }).valid, true);
+  assert.equal(validateCommandShape({ type: 'draw', payload: {}, seat: 'p1' }).valid, true);
+  assert.equal(validateCommandShape({ type: 'pass', payload: {}, seat: 'p2' }).valid, true);
+  for (const seat of ['p3', null, 2, '']) {
+    const res = validateCommandShape({ type: 'draw', payload: {}, seat });
+    assert.equal(res.valid, false);
+    assert.match(res.reason, /seat/);
+  }
 });

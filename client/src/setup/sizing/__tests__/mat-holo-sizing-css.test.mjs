@@ -8,34 +8,6 @@ const rule = (css, selector) => {
   return css.match(new RegExp(`(?:^|\\n)${escaped}\\s*\\{[^}]*\\}`))?.[0] ?? '';
 };
 
-for (const file of ['self-containers.css', 'opp-containers.css']) {
-  const css = read(`../../../css/${file}`);
-
-  // A `1fr` row is minmax(auto, 1fr): it grows to the card image's natural
-  // height, so prize cards at height:100% overflow the prize zone.
-  test(`${file}: #prizes rows cannot grow past the prize zone`, () => {
-    assert.match(rule(css, '#prizes'), /grid-template-rows:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/);
-  });
-
-  // Holo and plain board cards must resolve to the same height; a height:auto
-  // <img> takes its natural size while the holo wrapper has none.
-  test(`${file}: #board sizes plain and holo cards by the same height`, () => {
-    const imgHeight = rule(css, '#board img').match(/\n\s*height:\s*([^;]+);/)?.[1];
-    const holoHeight = rule(css, '#board .mat-holo').match(/\n\s*height:\s*([^;]+);/)?.[1];
-    assert.equal(imgHeight, 'calc(100% - 1.5vh)');
-    assert.equal(holoHeight, imgHeight);
-  });
-
-  // A holo wrapper hydrates into a hand stack after the reconciler's inline
-  // styles; unscoped, `#hand .mat-holo` outranks the stack rule and the card
-  // renders 2/3 size, in flow, below its copies.
-  test(`${file}: hand stack cards outrank the #hand card rules`, () => {
-    const stackCard = rule(css, '#hand .hand-card-stack > .mat-holo');
-    assert.match(stackCard, /position:\s*absolute/);
-    assert.match(stackCard, /height:\s*100%/);
-  });
-}
-
 // Zone rules size the wrapper by one axis only; without an aspect ratio the
 // other axis collapses (it has no intrinsic size of its own).
 test('base.css: .mat-holo keeps the card aspect ratio', () => {

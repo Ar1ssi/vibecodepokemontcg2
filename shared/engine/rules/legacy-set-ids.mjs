@@ -6,6 +6,8 @@
 // TCGdex search can't tell "Piloswine" from EX Team Rocket Returns apart from
 // "Piloswine" from Phantasmal Flames), so it lives here as a DOM-free module
 // both sides import. Keep this as the single source of truth — don't copy it.
+import { cardArtImageParts } from '../../tcgdex/card-art.mjs';
+
 export const LEGACY_SET_CODE_TO_TCGDEX_ID = {
   // the following are taken from pokemontcg.io (v2)'s ptcgoCode
   BS: 'base1',
@@ -267,6 +269,9 @@ export function extractTcgdexIdFromImageUrl(src) {
   // TCGdex CDN: …/en/me/me02/024/high.webp → me02-024
   let m = s.match(/assets\.tcgdex\.net\/en\/[^/]+\/([^/]+)\/([^/.]+)/);
   if (m) return `${m[1]}-${m[2]}`;
+  // This app's own card art (shared/tcgdex/card-art.mjs): /src/assets/card-art/sv/sve/001/high.webp → sve-001
+  const ownArt = cardArtImageParts(s);
+  if (ownArt) return `${ownArt.set}-${ownArt.number}`;
   // pokemontcg.io: …/me02/024_hires.png → me02-024
   m = s.match(/images\.pokemontcg\.io\/([^/]+)\/([^_./]+)/);
   if (m) return `${m[1]}-${m[2]}`;

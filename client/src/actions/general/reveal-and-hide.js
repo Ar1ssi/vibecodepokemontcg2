@@ -487,7 +487,7 @@ export const playRandomCardFaceDown = (
   emit = true
 ) => {
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'playRandomCardFaceDown', [
       oInitiator,
       randomIndex,

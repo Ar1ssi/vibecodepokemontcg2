@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { before, test } from 'node:test';
 import {
+  MAX_SPRING_CATCHUP_FRAMES,
   POPOVER_SPIN_DEGREES,
+  advanceSpring,
   centerDeltaFor,
   createPopoverMotion,
   popoverScaleFor,
@@ -9,8 +11,7 @@ import {
   previewTargetSize,
   prizeFanCardSize,
   prizeFanSlots,
-  iframeIsFlipped,
-  mapIframeRectToPage,
+  viewportRectOf,
 } from '../card-pop.mjs';
 
 const viewport = { width: 1200, height: 800 };
@@ -118,32 +119,47 @@ test('prizeFanCardSize shrinks so six prizes fit the viewport', () => {
   assert.ok(row <= viewport.width * 0.86 + 0.01);
 });
 
-test('mapIframeRectToPage offsets an upright iframe by its page box', () => {
-  const local = { left: 40, top: 80, width: 60, height: 84 };
-  const frame = { left: 100, top: 200, width: 800, height: 400 };
-  assert.deepEqual(mapIframeRectToPage(local, frame, false), {
-    left: 140,
-    top: 280,
-    width: 60,
-    height: 84,
-  });
+test('viewportRectOf is the element box as a plain left/top/width/height rect', () => {
+  const el = { getBoundingClientRect: () => ({ left: 40, top: 80, width: 60, height: 84, right: 100, bottom: 164, x: 40, y: 80 }) };
+  assert.deepEqual(viewportRectOf(el), { left: 40, top: 80, width: 60, height: 84 });
 });
 
-test('mapIframeRectToPage mirrors a flipped opp iframe so the hand stays at the top', () => {
-  // Opp playmat sits in the top half and is CSS-flipped 180°. A hand card
-  // at the bottom of that iframe document is visually at the top of the page.
-  const local = { left: 100, top: 300, width: 80, height: 80 };
-  const frame = { left: 0, top: 0, width: 800, height: 500 };
-  const page = mapIframeRectToPage(local, frame, true);
-  assert.equal(page.left, 800 - 100 - 80);
-  assert.equal(page.top, 500 - 300 - 80);
-  assert.equal(page.width, 80);
-  assert.equal(page.height, 80);
-  assert.ok(page.top < 150);
+// card-pop.mjs RETREAT_SPRING: the stiffest spring, the first to diverge on long frames.
+const RETREAT = { stiffness: 0.12, damping: 0.62, precision: 0.01 };
+
+const runSpring = (opts, from, to, frameMs, frames) => {
+  let state = { value: from, lastValue: from, target: to, opts, invMass: 1, invMassRecoveryRate: 0 };
+  let peak = Math.abs(from - to);
+  for (let i = 0; i < frames; i += 1) {
+    const next = advanceSpring(state, frameMs);
+    state = { ...state, ...next };
+    peak = Math.max(peak, Math.abs(state.value - to));
+    if (next.settled) break;
+  }
+  return { ...state, peak };
+};
+
+test('advanceSpring settles the retreat spring on 1 s frames instead of diverging (I265)', () => {
+  const run = runSpring(RETREAT, 1, 0.55, 1000, 40);
+  assert.equal(run.value, 0.55);
+  assert.ok(run.peak <= 0.45 + 1e-9, `never overshoots past its start (peak offset ${run.peak})`);
 });
 
-test('iframeIsFlipped treats the opp playmat class as flipped', () => {
-  assert.equal(iframeIsFlipped({ classList: { contains: (name) => name === 'opp' } }), true);
-  assert.equal(iframeIsFlipped({ classList: { contains: () => false } }), false);
-  assert.equal(iframeIsFlipped(null), false);
+test('advanceSpring at 60 fps takes one tick per frame (the original motion)', () => {
+  const state = { value: 1, lastValue: 1, target: 0, opts: RETREAT, invMass: 1, invMassRecoveryRate: 0 };
+  const next = advanceSpring(state, 1000 / 60);
+  assert.ok(Math.abs(next.value - (1 - 0.12)) < 1e-6, `one dt=1 step (${next.value})`);
+});
+
+test('advanceSpring substeps a long frame so it lands where 60 fps frames would', () => {
+  const slow = runSpring(RETREAT, 1, 0, 100, 3);
+  const fast = runSpring(RETREAT, 1, 0, 1000 / 60, 18);
+  assert.ok(Math.abs(slow.value - fast.value) < 1e-4, `${slow.value} vs ${fast.value}`);
+});
+
+test('advanceSpring caps a stalled frame at MAX_SPRING_CATCHUP_FRAMES', () => {
+  const state = { value: 1, lastValue: 1, target: 0, opts: RETREAT, invMass: 1, invMassRecoveryRate: 0 };
+  const stalled = advanceSpring(state, 60_000);
+  const capped = advanceSpring(state, (MAX_SPRING_CATCHUP_FRAMES * 1000) / 60);
+  assert.equal(stalled.value, capped.value);
 });

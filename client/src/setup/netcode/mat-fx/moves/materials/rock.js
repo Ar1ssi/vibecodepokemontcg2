@@ -12,7 +12,14 @@
 // Stone is solid matter: rock and ancient fill their stones with `source-over` inside their
 // own save/restore (as ground's clods do); halos, lit edges and dust stay additive.
 import { rgbCss } from '../../fx-colors.mjs';
-import { grainPass, inShadow, shardOutline, traceOutline } from './_shared.js';
+import { grainPass, inShadow, shardOutline, styledKit, traceOutline } from './_shared.js';
+
+// Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
+// Stone: matte faces (few, dim facets), dust halos churn. Ancient: stone with a violet glint.
+// Gem: full faceted sparkle.
+const STONE = Object.freeze({ byKind: { linear: { id: 'crystal', facets: 3, sheen: 0.15, speed: 0.6 }, radial: { id: 'smoke', churn: 0.5, drift: 0.6, folds: 0.6 } } });
+const RELIC = Object.freeze({ byKind: { linear: { id: 'crystal', facets: 3, sheen: 0.4, speed: 0.8 }, radial: { id: 'smoke', churn: 0.45, drift: 0.6, folds: 0.5 } } });
+const FACETED = Object.freeze({ byKind: { linear: { id: 'crystal', facets: 6, sheen: 0.8, speed: 1.2 }, radial: { id: 'crystal', facets: 6, sheen: 0.7, speed: 1.2 }, stroke: { id: 'crystal', sheen: 0.7, speed: 1.2 } } });
 
 const TAU = Math.PI * 2;
 const rad = (deg) => (deg * Math.PI) / 180;
@@ -306,7 +313,7 @@ function rockKit(palette) {
   });
 }
 
-export const rock = rockKit(ROCK_PALETTE);
+export const rock = styledKit(rockKit(ROCK_PALETTE), STONE);
 
 // ---- ancient ---------------------------------------------------------------------------
 /** The ancient material drawn in `palette` (any palette with the same keys). */
@@ -347,7 +354,7 @@ function ancientKit(palette) {
   });
 }
 
-export const ancient = ancientKit(ANCIENT_PALETTE);
+export const ancient = styledKit(ancientKit(ANCIENT_PALETTE), RELIC);
 
 // ---- gem -------------------------------------------------------------------------------
 /** The gem material drawn in `palette` (any palette with the same keys). */
@@ -443,4 +450,4 @@ function gemKit(palette) {
   });
 }
 
-export const gem = gemKit(GEM_PALETTE);
+export const gem = styledKit(gemKit(GEM_PALETTE), FACETED);

@@ -2,6 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   AURA_PULSE_MS,
+  HIT_RECOIL_MS,
+  hitRecoilPose,
   HIT_DRESSING,
   LUNGE_IMPACT,
   SCREEN_SHAKE_MAX_PX,
@@ -17,7 +19,8 @@ import {
   damagePopPose,
   lungePoseFor,
   screenShakeAmplitude,
-  screenShakeOffsets,
+  screenShakeKeyframes,
+  easingTimeFor,
   shakePose,
   targetRingPose,
 } from '../combat-pose.mjs';
@@ -67,10 +70,29 @@ test('screenShakeAmplitude: zero below threshold, grows, capped', () => {
   assert.equal(screenShakeAmplitude(9999), 6);
 });
 
-test('screenShakeOffsets: ends at rest and decays', () => {
-  const offsets = screenShakeOffsets(6);
-  assert.equal(offsets.at(-1), '0px 0px');
-  assert.ok(Math.abs(parseFloat(offsets[0])) > Math.abs(parseFloat(offsets[4])));
+test('screenShakeKeyframes: the WAAPI shake as timed px offsets (design 074 D6)', () => {
+  const keys = screenShakeKeyframes(6, 360);
+  assert.equal(keys.length, 13);
+  // A damped sine: keyframe i sits at fraction i/12 of the decay.
+  keys.slice(0, 12).forEach((key, i) => {
+    const f = i / 12;
+    const decay = (1 - f) ** 2;
+    assert.ok(Math.abs(key.x - 6 * Math.cos(f * Math.PI * 5) * decay) < 1e-9, `key ${i} x`);
+    assert.ok(Math.abs(key.y - 6 * 0.6 * Math.sin(f * Math.PI * 4) * decay) < 1e-9, `key ${i} y`);
+  });
+  assert.ok(Math.abs(keys[0].x) > Math.abs(keys[4].x));
+  assert.equal(keys[0].ms, 0);
+  assert.equal(keys.at(-1).ms, 360);
+  assert.deepEqual([keys.at(-1).x, keys.at(-1).y], [0, 0]);
+  for (let i = 1; i < keys.length; i += 1) assert.ok(keys[i].ms > keys[i - 1].ms);
+  // cubic-bezier(0.2, 0.6, 0.4, 1) front-loads progress: half the keys land before 30% of the time.
+  assert.ok(keys[6].ms < 0.3 * 360, `${keys[6].ms}`);
+});
+
+test('easingTimeFor: inverts a cubic-bezier easing (linear is the identity)', () => {
+  assert.ok(Math.abs(easingTimeFor(0.5, [0, 0, 1, 1]) - 0.5) < 1e-6);
+  assert.equal(easingTimeFor(0), 0);
+  assert.equal(easingTimeFor(1), 1);
 });
 
 test('damagePopPose: rises, fully visible early, faded at the end', () => {
@@ -259,4 +281,16 @@ test('auraPulsePose: a ring that swells off the attacker and fades out', () => {
   assert.deepEqual(auraPulsePose(-4), auraPulsePose(0));
   assert.deepEqual(auraPulsePose(9), auraPulsePose(1));
   assert.ok(AURA_PULSE_MS > 0);
+});
+
+test('hitRecoilPose: rests at both ends and peaks at 0.12 card heights early', () => {
+  assert.equal(hitRecoilPose(0).along, 0);
+  assert.ok(Math.abs(hitRecoilPose(1).along) < 1e-9);
+  assert.ok(Math.abs(hitRecoilPose(0.18).along - 0.12) < 1e-9);
+  for (let t = 0; t <= 1; t += 0.05) {
+    const { along } = hitRecoilPose(t);
+    assert.ok(along >= 0 && along <= 0.12 + 1e-9, `t=${t} along=${along}`);
+  }
+  assert.equal(hitRecoilPose(-1).along, 0);
+  assert.ok(HIT_RECOIL_MS > 0);
 });

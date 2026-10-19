@@ -33,6 +33,16 @@ export function moveIdsForEvent(event) {
   return [];
 }
 
+/**
+ * The ids a view event slides on the 3D board (retreat/switch: both cards; promote: the
+ * promoted card), keyed by the raw event's type. Empty for anything else.
+ */
+export function slideIdsForEvent(event) {
+  if (event?.type === 'cardRetreated' || event?.type === 'pokemonSwapped') return moveIdsForEvent(event);
+  if (event?.type === 'pokemonPromoted' && isId(event.instanceId)) return [event.instanceId];
+  return [];
+}
+
 /** Energy token drops in large and snaps to its size at the card center. */
 export function energySnapPose(t) {
   const c = clamp01(t);
@@ -65,6 +75,34 @@ export function slidePoseFor(fromRect, toRect) {
       opacity: c < 0.75 ? 1 : 1 - (c - 0.75) / 0.25,
     };
   };
+}
+
+/**
+ * The slide as a track for a card's mesh (design 074 H1): `slidePoseFor`'s motion with the
+ * seat's `turn` as its rotation (opacity has no mesh equivalent, the mesh simply lands).
+ * @returns {(t:number) => {x:number,y:number,scale:number,rotate:number}}
+ */
+export function slideMeshPose(fromRect, toRect, turn = 0, fromScale = 1) {
+  const slide = slidePoseFor(fromRect, toRect);
+  const rotate = Number.isFinite(turn) ? turn : 0;
+  // `fromScale` (the card's old size over its new one) starts the mesh at the size it had, so a
+  // card pinned in its old slot (slide-pins.mjs) does not snap to the new slot's size first.
+  const startScale = Number.isFinite(fromScale) && fromScale > 0 ? fromScale : 1;
+  return (t) => {
+    const { x, y, scale } = slide(t);
+    const grow = startScale + (1 - startScale) * easeInOutCubic(clamp01(t));
+    return { x, y, scale: scale * grow, rotate };
+  };
+}
+
+/**
+ * Where a stack member slides from: its own `toRect` moved by however far the stack's root
+ * moved (`rootFrom` to `rootTo`), so the whole stack travels with its layout intact.
+ */
+export function shiftedFromRect(toRect, rootFrom, rootTo) {
+  const a = rectCenter(rootFrom);
+  const b = rectCenter(rootTo);
+  return { ...toRect, left: toRect.left + (a.x - b.x), top: toRect.top + (a.y - b.y) };
 }
 
 /**

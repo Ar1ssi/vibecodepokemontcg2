@@ -35,14 +35,17 @@ function openBuilderTab(name, path) {
   }
   if (!builder) return null;
 
-  let isBlank = true;
+  let needsPage = true;
   try {
-    isBlank = builder.location.href === 'about:blank';
+    // Blank, or the tab's own name on its sibling page (the Build & Battle run tab that followed
+    // "Classic box opener" to the legacy path): take it back to the page this opener means.
+    const { href, pathname } = builder.location;
+    needsPage = href === 'about:blank' || pathname.replace(/\/+$/, '') !== path;
   } catch {
     // A cross-origin document in a tab with our name: take the tab over.
-    isBlank = true;
+    needsPage = true;
   }
-  if (isBlank) builder.location.replace(path);
+  if (needsPage) builder.location.replace(path);
   builder.focus();
   return builder;
 }

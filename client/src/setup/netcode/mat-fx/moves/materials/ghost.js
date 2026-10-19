@@ -11,8 +11,12 @@
 // shadow and close again. Palette #6B4FA8 #9D7CF2 #D9CCFF, deep #1E1238; grain 0.2. Every
 // call draws on the context it is handed and is otherwise pure.
 import { rgbCss } from '../../fx-colors.mjs';
-import { grainPass, inShadow, shardOutline, sphere, tongueOutline, traceOutline } from './_shared.js';
+import { grainPass, inShadow, shardOutline, sphere, styledKit, tongueOutline, traceOutline } from './_shared.js';
 import { wavyRing } from './psychic.js';
+
+// Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
+// Spectral wisps: thinner ink that frays further; the eyes and rings shimmer.
+const WISP = Object.freeze({ byKind: { linear: { id: 'shadow', depth: 0.3, flow: 0.8, fray: 0.6 }, radial: { id: 'shadow', depth: 0.25, flow: 0.5, fray: 0.55 }, stroke: { id: 'energy', streak: 0.3, speed: 0.8, gain: 0.3 } } });
 
 const TAU = Math.PI * 2;
 const rad = (deg) => (deg * Math.PI) / 180;
@@ -288,4 +292,4 @@ function ghostKit(palette) {
   });
 }
 
-export const ghost = ghostKit(PALETTE);
+export const ghost = styledKit(ghostKit(PALETTE), WISP);

@@ -1,7 +1,7 @@
 # Handoff — design 034 slice 4b (on-promotion / on-KO / extra-attack)
 
 Written S280 (2026-09-24) after slice 4a commit. Read
-`.agent/designs/034-ability-behaviour-implementation.md` first, then this. Slice 4a is done and
+`.agent/designs/archive/034-ability-behaviour-implementation.md` first, then this. Slice 4a is done and
 green; 4b is the remainder of the design's slice-4 row.
 
 ## State (trust git over prose)

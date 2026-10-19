@@ -1,6 +1,6 @@
 import { flipBoard } from '../../actions/general/flip-board.js';
 import { reset } from '../../actions/general/reset.js';
-import { shouldRequestViewOnJoin } from '../../setup/netcode/rejoin-view.mjs';
+import { isViewForRoom, shouldRequestViewOnJoin } from '../../setup/netcode/rejoin-view.mjs';
 import { clearReady } from '../../actions/general/ready.js';
 import {
   hideCards,
@@ -22,6 +22,16 @@ import { processAction } from '../../setup/general/process-action.js';
 import { setAuthoritativeDispatchContext } from '../../setup/netcode/authoritative-dispatch.js';
 import { cleanActionData } from '../../setup/general/clean-action-data.js';
 import { spectatorJoin } from '../../setup/spectator/spectator-join.js';
+import {
+  applySpectatorView,
+  endSpectatorSession,
+  isSpectatingAuthoritative,
+  spectatorPlayerNames,
+  startSpectatorSession,
+} from '../../setup/spectator/spectator-session.js';
+import { publicRoomName } from '../../../../shared/lobby/public-rooms.mjs';
+import { seatTokenFor, writeSeatToken } from '../../setup/lobby/seat-token-store.mjs';
+import { rejectEndsSeat, roomRejectMessage } from '../../setup/lobby/public-room-view.mjs';
 import { startKeybindsSleep } from '../../actions/keybinds/keybindSleep.js';
 import { forceRulesEnabledForMultiplayer } from '../../setup/rules/rules-bridge.js';
 import { getStoredMatId } from '../../setup/sizing/apply-mat-layout.js';
@@ -36,8 +46,17 @@ import {
   setDefaultNetcodeContext,
   resetRenderState,
   getLastRenderedVersion,
+  getLastAppliedView,
+  clearRenderedBoard,
   claimGameEndChat,
 } from '../../setup/netcode/apply-view.js';
+import { loadDeckData } from '../../setup/deck-constructor/import.js';
+import {
+  seatForSide,
+  sideForSeat,
+  soloFarName,
+  soloOwnerName,
+} from '../../setup/netcode/solo-seat.mjs';
 import {
   handleAdvisoryEvent,
   handleBeforeApply,
@@ -96,6 +115,8 @@ const requestActionQueue = createRequestActionQueue();
 let requestActionStaleTimer = null;
 
 export const sendSpectatorData = () => {
+  // Design 069: an authoritative room's spectators render server views, not this replay.
+  if (systemState.serverAuthoritative) return;
   if (systemState.isTwoPlayer && systemState.roomId) {
     const data = {
       selfUsername: systemState.p2SelfUsername,
@@ -153,7 +174,11 @@ const startSyncCheckHeartbeat = () => {
       // server-authoritative rendering — this heartbeat only fires when the
       // flag is on (guard above), so the renderer's own view cache is
       // always the live source here.
-      zones: computeSyncCheckZones('self', viewBackedGetZone),
+      // Design 074 D7: the server checks a solo socket against p1, wherever p1 is drawn.
+      zones: computeSyncCheckZones(
+        systemState.solo ? sideForSeat('p1', systemState.nearSeat) : 'self',
+        viewBackedGetZone
+      ),
       // I42: the version the zones above were hashed from, so the server can
       // tell a command landing between hash and compare (stale by design)
       // apart from a real divergence instead of reporting both as 'desync'.
@@ -167,6 +192,18 @@ const stopSyncCheckHeartbeat = () => {
     clearInterval(syncCheckIntervalId);
     syncCheckIntervalId = null;
   }
+};
+
+// Design 074 D7: a solo room's views are drawn from its near seat. After a board flip the
+// first view from the other seat redraws the whole board (every card changes side); a view
+// still drawn from the old seat (a broadcast sent before the server took the flip) is
+// dropped rather than drawn and then undone.
+const acceptSoloPerspective = (view) => {
+  const nearSeat = seatForSide('self', systemState.nearSeat);
+  if (view.you?.playerId && view.you.playerId !== nearSeat) return false;
+  const previous = getLastAppliedView();
+  if (previous?.you?.playerId && previous.you.playerId !== nearSeat) clearRenderedBoard();
+  return true;
 };
 
 // O2-C: the mandatory failure branch for O2-B. No recovery is attempted past
@@ -287,7 +324,12 @@ const seedNetcodeContext = () => {
 // registries and the client-seq counter so a new room starts from a clean
 // slate, then immediately re-seed the netcode context.
 export const resetNetcodeForRoomChange = () => {
+  // Every room change (join, either Leave button) ends a spectator session; spectatorJoin
+  // starts a new one after this.
+  endSpectatorSession();
   resetRenderState();
+  // The next room's seats send their own maps (design 074 D7 keys them by seat).
+  setInstanceMap(null);
   seedNetcodeContext();
   resetClientSeq(0);
 };
@@ -329,6 +371,10 @@ export const initializeSocketEventListeners = () => {
       });
       return;
     }
+    if (data?.solo === true) {
+      handleSoloJoinGame();
+      return;
+    }
     // Design 002 slice 3.10: a fresh room must not inherit the previous
     // room's renderer registries or client-seq counter.
     resetNetcodeForRoomChange();
@@ -339,7 +385,13 @@ export const initializeSocketEventListeners = () => {
     const chatbox = document.getElementById('chatbox');
     const p2ExplanationBox = document.getElementById('p2ExplanationBox');
     const flipBoardButton = document.getElementById('flipBoardButton');
-    roomHeaderText.textContent = 'id: ' + systemState.roomId;
+    // Design 069: a public room shows its name; its seat token lets this tab reclaim the seat.
+    const roomName = publicRoomName(systemState.roomId);
+    roomHeaderText.textContent = roomName ?? 'id: ' + systemState.roomId;
+    document.getElementById('roomHeaderCopyButton').hidden = roomName !== null;
+    if (typeof data?.seatToken === 'string') {
+      writeSeatToken(systemState.roomId, systemState.p2SelfUsername, data.seatToken);
+    }
     chatbox.innerHTML = '';
     connectedRoom.style.display = 'flex';
     lobby.style.display = 'none';
@@ -348,6 +400,7 @@ export const initializeSocketEventListeners = () => {
     if (systemState.initiator === 'opp') {
       flipBoard();
     }
+    systemState.initiator = 'self';
     systemState.isTwoPlayer = true;
     renderRoomFormatPanel();
     // An open Build & Battle tab learns the room, so a box from another room is not reused.
@@ -379,16 +432,58 @@ export const initializeSocketEventListeners = () => {
       emitRequestView({ socket, roomId: systemState.roomId });
     }
   };
+  // Design 074 D7: the server seated this socket as both players of a solo room. The Solo
+  // tab stays as it is (no room lobby or chat); both decks load into their seats.
+  const handleSoloJoinGame = () => {
+    resetNetcodeForRoomChange();
+    document.dispatchEvent(new CustomEvent('room-changed'));
+    // Put 'self' back at the bottom while the iframe flip still applies.
+    if (systemState.initiator === 'opp') flipBoard();
+    systemState.initiator = 'self';
+    systemState.solo = true;
+    systemState.nearSeat = 'p1';
+    systemState.isTwoPlayer = true;
+    systemState.p2OppUsername = soloFarName(systemState.p2SelfUsername);
+    startSyncCheckHeartbeat();
+    forceRulesEnabledForMultiplayer();
+    cleanActionData('self');
+    cleanActionData('opp');
+    if (systemState.selfDeckData) {
+      loadDeckData('self', systemState.selfDeckData, systemState.deckFormat.self);
+    }
+    if (systemState.p1OppDeckData) {
+      loadDeckData('opp', systemState.p1OppDeckData, systemState.deckFormat.p1Opp);
+    }
+    appendMessage('', 'Solo game started — you play both seats.', 'announcement', false);
+  };
   socket.on('requestSpectatorData', () => {
     sendSpectatorData();
   });
-  socket.on('spectatorJoin', () => {
+  socket.on('spectatorJoin', (data) => {
+    systemState.serverAuthoritative = Boolean(data?.serverAuthoritative);
+    resetNetcodeForRoomChange();
     spectatorJoin();
+    if (systemState.serverAuthoritative) {
+      // Design 069: the server's spectator view is the whole board; ask for it now.
+      startSpectatorSession();
+      emitRequestView({ socket, roomId: systemState.roomId });
+      return;
+    }
     if (systemState.roomId) {
       socket.emit('requestSpectatorData', { roomId: systemState.roomId });
     }
   });
-  socket.on('roomReject', () => {
+  socket.on('roomReject', (data) => {
+    // Design 074 D7: a refused solo join (or a solo room lost on reconnect) leaves the Solo
+    // tab on the local board (solo-room.js).
+    if (String(data?.reason).startsWith('solo_')) {
+      document.dispatchEvent(new CustomEvent('solo-room-refused', { detail: { reason: data.reason } }));
+      return;
+    }
+    // Design 069: a reconnect refused because this seat is gone sends the player back to the lobby.
+    if (rejectEndsSeat(data?.reason) && systemState.isTwoPlayer) {
+      document.dispatchEvent(new CustomEvent('room-seat-lost'));
+    }
     let overlay = document.createElement('div');
     overlay.style.position = 'fixed';
     overlay.style.top = '0';
@@ -406,8 +501,8 @@ export const initializeSocketEventListeners = () => {
     container.style.color = '#fff';
 
     let message = document.createElement('p');
-    message.innerHTML =
-      'Room is full.<br>Enable spectator mode to watch the game.';
+    message.textContent = roomRejectMessage(data?.reason);
+    message.style.whiteSpace = 'pre-line';
     message.style.fontSize = '24px';
 
     container.appendChild(message);
@@ -426,8 +521,15 @@ export const initializeSocketEventListeners = () => {
     if (systemState.isTwoPlayer) {
       const data = {
         roomId: systemState.roomId,
-        username: systemState.p2SelfUsername,
+        // A spectator's p2SelfUsername names the watched seat (spectator-session.js); a solo
+        // room is reclaimed by its p1 seat's name (design 074 D7).
+        username: !notSpectator
+          ? systemState.spectatorUsername
+          : systemState.solo
+            ? soloOwnerName(systemState)
+            : systemState.p2SelfUsername,
         notSpectator: notSpectator,
+        seatToken: seatTokenFor(systemState.roomId, systemState.p2SelfUsername),
       };
       socket.emit('userReconnected', data);
       if (!notSpectator) {
@@ -446,6 +548,8 @@ export const initializeSocketEventListeners = () => {
         } else {
           requestPeerLogCatchup();
         }
+      } else if (isSpectatingAuthoritative()) {
+        emitRequestView({ socket, roomId: systemState.roomId });
       }
     }
   });
@@ -483,24 +587,36 @@ export const initializeSocketEventListeners = () => {
   });
 
   socket.on('view', (data) => {
+    if (!isViewForRoom(data, systemState.roomId)) return;
     if (typeof data?.lastClientSeq === 'number') {
       seedClientSeq(data.lastClientSeq);
     }
+    if (data?.view && systemState.solo && !acceptSoloPerspective(data.view)) return;
     if (data?.view) {
-      applyView(data.view, data.events || [], {
+      const options = {
         socket,
         roomId: systemState.roomId,
         onBeforeApply: handleBeforeApply,
         onAdvisoryEvent: (event, selfPlayerId) => {
           handleAdvisoryEvent(event, selfPlayerId);
-          handleServerBattleLog(event, selfPlayerId);
+          if (isSpectatingAuthoritative()) {
+            handleServerBattleLog(event, null, spectatorPlayerNames());
+          } else {
+            handleServerBattleLog(event, selfPlayerId);
+          }
         },
-      });
+      };
+      if (isSpectatingAuthoritative()) {
+        applySpectatorView(data.view, data.events || [], options);
+      } else {
+        applyView(data.view, data.events || [], options);
+      }
     }
   });
 
+  // Design 074 D7: each map names its seat (a solo socket gets both seats').
   socket.on('instanceMap', (data) => {
-    if (data?.map) setInstanceMap(data.map);
+    if (data?.map) setInstanceMap(data.map, data.seat);
   });
 
   // Design 002 I17: the server's authoritative opening-deal order, so this client's
@@ -509,11 +625,14 @@ export const initializeSocketEventListeners = () => {
   // Design 013: the opening coin call reaches us BEFORE the deal, while
   // setupPrizes() is still awaiting dealOrder — so it is wired here, not in the
   // rules bridge's own setup path.
-  registerTurnOrderCallListeners(socket);
+  registerTurnOrderCallListeners(socket, document, { systemState });
 
   socket.on('dealOrder', (data) => {
-    if (Array.isArray(data?.order))
-      setDealOrder(data.order, data?.starter ?? null);
+    if (!Array.isArray(data?.order)) return;
+    // A solo socket gets one deal per seat, each with its seat-relative starter.
+    setDealOrder(data.order, data?.starter ?? null, systemState.solo ? data?.seat ?? null : null);
+    // Design 072: the opening waits for the deal; tell the rules bridge it is in.
+    document.dispatchEvent(new CustomEvent('deal-order-received'));
   });
 
   // Either player's Reset restarted the server game. The peer that didn't click
@@ -547,11 +666,15 @@ export const initializeSocketEventListeners = () => {
       appendMessage('', msg, 'announcement', false);
       const connectedRoom = document.getElementById('connectedRoom');
       const lobby = document.getElementById('lobby');
-      if (connectedRoom) connectedRoom.style.display = 'none';
-      if (lobby) lobby.style.display = 'flex';
+      if (connectedRoom && !systemState.solo) connectedRoom.style.display = 'none';
+      if (lobby && !systemState.solo) lobby.style.display = 'flex';
       systemState.isTwoPlayer = false;
+      systemState.solo = false;
+      systemState.nearSeat = 'p1';
+      systemState.serverAuthoritative = false;
       systemState.roomId = null;
       removeSyncIntervals();
+      endSpectatorSession();
       document.dispatchEvent(new CustomEvent('room-changed'));
       return;
     }

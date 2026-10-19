@@ -17,7 +17,7 @@ import { crescentOutline, featherOutline } from '../materials/flying.js';
 import { auroraAlphas, icicleFacet, icicleOutline, snowflakeSegments } from '../materials/ice.js';
 import { needleOutline, needleTip, soundAlphas, wingOpen } from '../materials/bug.js';
 import { MATERIAL_KEYS } from '../move-spec.mjs';
-import { lighten, parseHex, tintedPalette } from '../materials/_shared.js';
+import { lighten, parseHex, styledKit, tintedPalette } from '../materials/_shared.js';
 import { UNITS } from '../materials/_units.js';
 import { STELLAR_ACCENTS } from '../materials/stellar.js';
 import { callsAreFinite, recordingContext, rgbOf } from './recording-context.mjs';
@@ -129,7 +129,7 @@ test('water uses the recipe palette, a navy shade, mist for smoke and droplet pa
   assert.deepEqual(rgbOf(water.particle.color), [185, 232, 255]);
 });
 
-test('a water sheet never blurs: one fill, a 1.5 px white leading edge, drops shed in one fill', () => {
+test('a water sheet never blurs: one fill, a 1.5 px pale leading-edge glint, drops shed in one fill', () => {
   const rec = recordingContext();
   const filters = [];
   const probe = new Proxy(rec.ctx, {
@@ -143,12 +143,13 @@ test('a water sheet never blurs: one fill, a 1.5 px white leading edge, drops sh
   assert.equal(rec.fills.count, 2);
   assert.equal(rec.calls.filter(([name]) => name === 'stroke').length, 1);
   assert.equal(rec.target.lineWidth, 1.5);
-  assert.ok(rec.colours.some((css) => rgbOf(css)?.every((v) => v === 255)), 'white edge');
+  // Design 075 slice 10: the edge is a pale glint (hot, under half alpha), not a white line.
+  assert.ok(rec.colours.some((css) => String(rgbOf(css)) === String(MATERIALS.water.palette.hot) && /, 0\.45\)$/.test(css)), 'pale edge glint');
   const drops = rec.calls.filter(([name]) => name === 'arc').length;
   assert.ok(drops >= 3 && drops <= 5, `drops ${drops}`);
 });
 
-test('a water sheet with hot 0 drops its white edge', () => {
+test('a water sheet with hot 0 drops its edge glint', () => {
   const rec = recordingContext();
   MATERIALS.water.tongue(rec.ctx, TONGUE, { alpha: 1, hot: 0 });
   assert.equal(rec.calls.filter(([name]) => name === 'stroke').length, 0);
@@ -161,7 +162,7 @@ test('a water droplet is a sphere with a deep rim and a white specular dot up-le
   assert.equal(arcs.length, 3);
   const [x, y, r] = arcs[2];
   assert.ok(x < 100 && y < 100, 'specular up-left');
-  assert.ok(Math.abs(r - 40 * 0.18) < 1e-9);
+  assert.ok(Math.abs(r - 40 * 0.11) < 1e-9);
   assert.equal(rec.calls.filter(([name]) => name === 'stroke').length, 1);
 });
 
@@ -342,8 +343,10 @@ test('an electric jag: a blurred blue glow, a yellow core, a white centre; hot 0
   MATERIALS.electric.tongue(probe.ctx, TONGUE, { alpha: 1, hot: 1 });
   assert.equal(rec.fills.count, 3);
   assert.equal(probe.filters.length, 1);
-  const fillsInOrder = rec.colours.map(rgbOf);
-  assert.deepEqual(fillsInOrder, [MATERIALS.electric.palette.edge, MATERIALS.electric.palette.body, MATERIALS.electric.palette.white]);
+  // Each pass is one colour along the jag, clear at its root (three stops): design 075 slice 11.
+  const { edge, body, white } = MATERIALS.electric.palette;
+  assert.deepEqual(rec.colours.map(rgbOf), [edge, edge, edge, body, body, body, white, white, white]);
+  assert.match(rec.colours[0], /, 0\)$/, 'clear at the root');
   const dim = recordingContext();
   MATERIALS.electric.tongue(dim.ctx, TONGUE, { alpha: 1, hot: 0 });
   assert.equal(dim.fills.count, 2);
@@ -525,8 +528,11 @@ test('a psychic ribbon never blurs: one translucent fill and a bright centre lin
   assert.deepEqual(probe.filters, []);
   assert.equal(rec.fills.count, 1);
   assert.equal(strokes(rec), 1);
-  assert.deepEqual(rec.colours.map(rgbOf), [MATERIALS.psychic.palette.body, MATERIALS.psychic.palette.core]);
-  assert.match(rec.colours[0], /, 0\.45\)$/);
+  // Fill and line are one colour along the ribbon, clear at its root (three stops): design 075 slice 11.
+  const { body, core } = MATERIALS.psychic.palette;
+  assert.deepEqual(rec.colours.map(rgbOf), [body, body, body, core, core, core]);
+  assert.match(rec.colours[0], /, 0\)$/, 'clear at the root');
+  assert.match(rec.colours[1], /, 0\.45\)$/);
   const dim = recordingContext();
   MATERIALS.psychic.tongue(dim.ctx, TONGUE, { alpha: 1, hot: 0 });
   assert.equal(strokes(dim), 0);
@@ -696,15 +702,15 @@ test('pulseRings: three rings between 0.3 r and r, a third of a cycle apart, bor
   assert.ok(pulseRings(0.1, 100)[0].radius > first.radius, 'rings ripple outward');
 });
 
-test('a dark pulse: a shadow core, dark and crimson ring strokes, a pale centre only when hot', () => {
+test('a dark pulse: a shadow core, dark and crimson ripple bands (fills, no strokes), a pale centre only when hot', () => {
   const rec = recordingContext();
   MATERIALS.dark.body(rec.ctx, 100, 100, 40, 1, 1);
-  assert.equal(rec.fills.count, 2, 'shadow core + pale centre');
-  assert.equal(strokes(rec), 6, 'three dark rings, three crimson');
+  assert.equal(rec.fills.count, 2 + 6, 'shadow core + pale centre + three dark and three crimson bands');
+  assert.equal(strokes(rec), 0, 'no stroked reticle rings');
   for (const css of rec.colours) assert.ok(inPalette(MATERIALS.dark, css), css);
   const cold = recordingContext();
   MATERIALS.dark.body(cold.ctx, 100, 100, 40, 1, 0);
-  assert.equal(cold.fills.count, 1);
+  assert.equal(cold.fills.count, 1 + 6);
 });
 
 test('a dark projectile is a bare pulse in a haze at 0 tongues and wreathes `tongues` blades and splinters; it ripples with the clock', () => {
@@ -713,8 +719,8 @@ test('a dark projectile is a bare pulse in a haze at 0 tongues and wreathes `ton
     MATERIALS.dark.projectile(rec.ctx, { ...PROJECTILE, ...over });
     return rec;
   };
-  assert.equal(draw({ tongues: 0 }).fills.count, 3, 'haze + core + centre');
-  assert.equal(draw({ tongues: 4 }).fills.count, 3 + 4 * 2);
+  assert.equal(draw({ tongues: 0 }).fills.count, 3 + 6, 'haze + core + centre + six ripple bands');
+  assert.equal(draw({ tongues: 4 }).fills.count, 3 + 6 + 4 * 2);
   const firstRing = (time) =>
     draw({ tongues: 0, time })
       .calls.filter(([name]) => name === 'arc')
@@ -806,11 +812,11 @@ test('reticleTicks: four ticks that turn and close, locking square to the screen
   assert.ok(reticleTicks(0, 100)[0].to > reticleTicks(1, 100)[0].to, 'closes in');
 });
 
-test('the steel sigil strokes a ring, the ticks and a pip in palette colours only', () => {
+test('the steel sigil is a glow and a filled four-point glint, no stroked reticle (design 075 parity)', () => {
   const rec = recordingContext();
   MATERIALS.steel.sigil(rec.ctx, 100, 100, 60, 0.5);
-  assert.equal(rec.fills.count, 0);
-  assert.equal(strokes(rec), 3);
+  assert.equal(rec.fills.count, 2);
+  assert.equal(strokes(rec), 0);
   for (const css of rec.colours) assert.ok(inPalette(MATERIALS.steel, css), css);
   assert.ok(callsAreFinite(rec.calls));
   const none = recordingContext();
@@ -821,10 +827,11 @@ test('the steel sigil strokes a ring, the ticks and a pip in palette colours onl
 test('dragon uses the recipe palette with the ember accent, a violet-black shade, violet smoke and ember particles', () => {
   const dragon = MATERIALS.dragon;
   assert.equal(materialFor('dragon'), dragon);
-  assert.deepEqual(dragon.palette.deep, [42, 31, 107]);
-  assert.deepEqual(dragon.palette.body, [90, 71, 201]);
-  assert.deepEqual(dragon.palette.hot, [143, 124, 245]);
-  assert.deepEqual(dragon.palette.core, [210, 200, 255]);
+  // Design 075 parity: Scarlet/Violet's violet-to-magenta dragon colours.
+  assert.deepEqual(dragon.palette.deep, [52, 22, 110]);
+  assert.deepEqual(dragon.palette.body, [128, 52, 206]);
+  assert.deepEqual(dragon.palette.hot, [226, 92, 214]);
+  assert.deepEqual(dragon.palette.core, [255, 184, 240]);
   assert.deepEqual(dragon.palette.ember, [255, 155, 61]);
   assert.deepEqual(dragon.smoke, [90, 70, 120]);
   assert.ok(dragon.shade.every((v, i) => v <= dragon.palette.deep[i]), 'shade darker than deep');
@@ -955,7 +962,8 @@ test('a sparkle trail: one blurred pink ribbon, a pale pass, gold twinkles in on
   const { body, hot, gold } = MATERIALS.fairy.palette;
   assert.equal(probe.filters.length, 1);
   assert.equal(rec.fills.count, 3);
-  assert.deepEqual(rec.colours.map(rgbOf), [body, hot, gold]);
+  // The two ribbon passes are clear at their root (three stops each): design 075 slice 11.
+  assert.deepEqual(rec.colours.map(rgbOf), [body, body, body, hot, hot, hot, gold]);
   assert.equal(rec.calls.filter(([name]) => name === 'closePath').length, 2 + 3, 'two ribbon passes + three twinkles');
   const cold = recordingContext();
   MATERIALS.fairy.tongue(cold.ctx, TONGUE, { alpha: 1, hot: 0 });
@@ -990,15 +998,13 @@ test('a fairy projectile is the moon: haze, sphere, a clipped crescent and a rim
   assert.equal(draw({ tongues: 4 }).fills.count, 4 + 4 * 3);
 });
 
-test('the fairy sigil strokes a star outline twice (pink glow, gold line) and fills the twinkles in one pass', () => {
+test('the fairy sigil is a soft bloom with twinkles at the star\'s points: no stroked outline (design 075 parity)', () => {
   const rec = recordingContext();
   MATERIALS.fairy.sigil(rec.ctx, 100, 100, 80, 0.4);
-  assert.equal(strokes(rec), 2);
-  assert.equal(rec.fills.count, 1);
-  assert.equal(rec.calls.filter(([name]) => name === 'closePath').length, 2 + 2 + 5, 'two outlines, a crossed centre, five tips');
+  assert.equal(strokes(rec), 0, 'no line-drawn star');
+  assert.equal(rec.fills.count, 2, 'the bloom, then the twinkles in one pass');
+  assert.equal(rec.calls.filter(([name]) => name === 'closePath').length, 2 + 5, 'a crossed centre, five tips');
   assert.ok(callsAreFinite(rec.calls));
-  const { hot, gold } = MATERIALS.fairy.palette;
-  assert.deepEqual(rec.colours.slice(0, 2).map(rgbOf), [hot, gold]);
   for (const css of rec.colours) assert.ok(inPalette(MATERIALS.fairy, css), css);
   const none = recordingContext();
   MATERIALS.fairy.sigil(none.ctx, 100, 100, 0, 0.4);
@@ -1310,13 +1316,13 @@ test('bubbleRise: none at either end, at most seven, all above the pool and risi
   assert.ok(bubbleRise(0.47, r)[0].alpha < 1, 'and pops at the end of its life');
 });
 
-test('the poison sigil: a pool fill with a lilac rim, then each bubble filled and skinned, in palette colours only', () => {
+test('the poison sigil: a pool fill (no stroked rim, design 075 parity), then each bubble filled and skinned, in palette colours only', () => {
   const rec = recordingContext();
   MATERIALS.poison.sigil(rec.ctx, 100, 100, 80, 0.5);
   const bubbles = bubbleRise(0.5, 80).length;
   assert.ok(bubbles > 0);
   assert.equal(rec.fills.count, 1 + bubbles);
-  assert.equal(strokes(rec), 1 + bubbles);
+  assert.equal(strokes(rec), bubbles);
   assert.ok(callsAreFinite(rec.calls));
   for (const css of rec.colours) assert.ok(inPalette(MATERIALS.poison, css), css);
   const none = recordingContext();
@@ -1881,7 +1887,8 @@ test('ice uses the recipe palette, a navy shade, cold mist for smoke and pale sh
   ice.tongue(rec.ctx, TONGUE, { alpha: 0.9, hot: 1 });
   ice.tongue(rec.ctx, TONGUE, { alpha: 0.9, hot: 1, jag: 1 });
   ice.projectile(rec.ctx, PROJECTILE);
-  assert.deepEqual(rec.state.composite, [], 'additive throughout');
+  // Design 075 slice 10: only a crystal's ice fill covers (source-over, inside its own save).
+  assert.ok(rec.state.composite.length > 0 && rec.state.composite.every((op) => op === 'source-over'), 'crystal fills cover');
   assert.equal(rec.state.depth, 0);
 });
 
@@ -1912,7 +1919,7 @@ test('an ice crystal never blurs: one ice fill, one lit facet, one 1 px white ed
   assert.equal(strokes(rec), 1);
   assert.equal(rec.target.lineWidth, 1);
   assert.deepEqual(rec.colours.map(rgbOf), [body, hot, white]);
-  assert.match(rec.colours[1], /, 0\.6\)$/, 'the facet is hot at alpha 0.6');
+  assert.match(rec.colours[1], /, 0\.45\)$/, 'the facet is hot at alpha 0.45');
   const cold = recordingContext();
   MATERIALS.ice.tongue(cold.ctx, TONGUE, { alpha: 1, hot: 0 });
   assert.equal(cold.fills.count, 1);
@@ -2107,7 +2114,12 @@ test('buzz: the bug needle, but its round unit is three sound rings breathing ou
   const buzz = MATERIALS.buzz;
   assert.equal(materialFor('buzz'), buzz);
   assert.equal(buzz.palette, MATERIALS.bug.palette);
-  assert.equal(buzz.tongue, MATERIALS.bug.tongue);
+  const drawn = (material) => {
+    const rec = recordingContext();
+    material.tongue(rec.ctx, TONGUE);
+    return rec.calls;
+  };
+  assert.deepEqual(drawn(buzz), drawn(MATERIALS.bug), 'the bug needle');
   assert.equal(buzz.smoke, null);
   const rec = recordingContext();
   buzz.body(rec.ctx, 100, 100, 40, 1, 1);
@@ -2266,4 +2278,20 @@ test('every unit draws finitely, in palette colours, with balanced save/restore'
     unit(none.ctx, 40, 50, 0, 30, 0.5, palette);
     assert.equal(none.calls.length, 0, `${name} r 0`);
   }
+});
+
+test('design 075: styledKit runs each drawing method under its hint and restores the caller\'s', () => {
+  const seen = [];
+  const kit = { key: 'k', palette: {}, tongue: (ctx) => seen.push(ctx.fxStyle), grain: (ctx) => seen.push(ctx.fxStyle) };
+  kit.withPalette = () => ({ ...kit });
+  const hint = { byKind: { linear: { id: 'shadow' } } };
+  const styled = styledKit(kit, hint);
+  const outer = { id: 'flame' };
+  const ctx = { fxStyle: outer };
+  styled.tongue(ctx);
+  styled.grain(ctx);
+  styled.withPalette({}).tongue(ctx);
+  assert.deepEqual(seen, [hint, outer, hint], 'grain stays unstyled');
+  assert.equal(ctx.fxStyle, outer);
+  assert.ok(Object.isFrozen(styled));
 });

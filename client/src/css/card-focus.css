@@ -35,7 +35,7 @@
   position: absolute;
   inset: 0;
   /* The game keeps the board crisp and readable behind the card: a dim, no blur. */
-  background: rgba(2, 6, 12, 0.42);
+  background: none;
   opacity: 0;
   transition: opacity var(--focus-flight-ms) var(--focus-flight-ease);
 }
@@ -44,6 +44,48 @@
   transition: opacity var(--focus-collapse-ms) var(--focus-collapse-ease);
   opacity: 0;
 }
+
+/* 3D board (design 074 H2): the card face is the card's own mesh, drawn in the canvas under this
+   layer. The dim would darken it with the rest of the board, so it is a box-shadow around a hole the
+   size of the card instead of a fill; the backdrop stays as the (clear) click target. The host keeps
+   its box for the chrome but not its card art, and the mesh casts the card's shadow. */
+.card-focus--mesh .card-focus__backdrop { background: none; }
+.card-focus__dim {
+  position: absolute;
+  left: var(--focus-left);
+  top: var(--focus-top);
+  width: var(--focus-w);
+  height: var(--focus-h);
+  border-radius: 4.5% / 3.2%;
+  box-shadow: 0 0 0 100vmax rgba(2, 6, 12, 0.42);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--focus-flight-ms) var(--focus-flight-ease);
+}
+.card-focus--open .card-focus__dim { opacity: 1; }
+.card-focus--closing .card-focus__dim {
+  transition: opacity var(--focus-collapse-ms) var(--focus-collapse-ease);
+  opacity: 0;
+}
+.card-focus__card.card-focus__card--mesh { box-shadow: none; }
+.card-focus__card--mesh .mat-holo,
+.card-focus__card--mesh .discard-pile-card { visibility: hidden; }
+
+/* TableCoverPanel (design 074), flipped as the game flips it (scale y -1): nothing over the top
+   quarter, a 50 % black gradient from 45 % to 61.5 % down, and 50 % black below that. */
+.card-focus__cover {
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+}
+.card-focus__cover--top { top: 0; height: 25%; background: transparent; }
+.card-focus__cover--middle {
+  top: 45%;
+  height: 16.5%;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.5));
+}
+.card-focus__cover--bottom { top: 61.5%; bottom: 0; background: rgba(0, 0, 0, 0.5); }
 
 /* perspective is set inline from the viewport height (card-focus-geometry `perspectiveFor`). */
 .card-focus__stage {
@@ -117,70 +159,113 @@
   clip-path: inset(calc(100% - var(--focus-reveal)) -4% -4% -4%);
 }
 
-/* HUD: a column of ring buttons standing left of the card, bottom-aligned just above its lower edge,
-   as AttackOverlayHUD's are in the game. Sizes and offsets are fractions of the card (--focus-*, set
-   by card-focus.mjs). Close is the bottom button, Stack above it. */
+/* HUD (FocusedCardOverlay_Landscape > Buttons): Buff and Debuff over Stack over Close, 60-px
+   buttons 10 apart on a shadow_60 backing (black 70 %, 32 x 38 larger), standing left of the card,
+   bottom-aligned just above its lower edge. Sizes are fractions of the card (--focus-*, set by
+   card-focus.mjs); --hud-b is one button, so 1px of the 60-px prefab is --hud-b / 60. */
 .card-focus__hud {
+  --hud-b: max(44px, calc(var(--focus-w) * 0.103));
+  --hud-px: calc(var(--hud-b) / 60);
   position: absolute;
   left: calc(var(--focus-left) - var(--focus-w) * 0.13);
   top: calc(var(--focus-top) + var(--focus-h) * 0.97);
   display: flex;
   flex-direction: column;
-  gap: calc(var(--focus-w) * 0.021);
+  gap: calc(var(--hud-px) * 10);
   transform: translateY(-100%);
   pointer-events: none;
 }
-.card-focus__close,
-.card-focus__stack {
+.card-focus__hud::before {
+  content: '';
+  position: absolute;
+  inset: calc(var(--hud-px) * -22) calc(var(--hud-px) * -16) calc(var(--hud-px) * -16);
+  z-index: -1;
+  border: 0 solid transparent;
+  border-image: url('../assets/attack-ui/shadow-60.png') 40 fill / calc(var(--hud-px) * 40) stretch;
+  filter: brightness(0);
+  opacity: 0.7;
+}
+/* One HUD button: shadow_32 (black 50 %, 4 larger each side) under ButtonContent raised 4 — the
+   circle_32 white stroke round a circle_28 #f2f2f2 face — and a #333333 icon 80 % tall. */
+.card-focus__btn {
   position: relative;
-  width: calc(var(--focus-w) * 0.103);
-  height: calc(var(--focus-w) * 0.103);
-  min-width: 44px;
-  min-height: 44px;
-  display: grid;
-  place-items: center;
+  isolation: isolate;
+  width: var(--hud-b);
+  height: var(--hud-b);
   padding: 0;
-  border: max(2px, calc(var(--focus-w) * 0.0075)) solid #fff;
-  border-radius: 50%;
-  background: rgba(14, 22, 36, 0.52);
-  color: #fff;
+  border: 0;
+  background: none;
   cursor: pointer;
   pointer-events: auto;
 }
+.card-focus__btn::before {
+  content: '';
+  position: absolute;
+  inset: calc(var(--hud-px) * -4);
+  z-index: -1;
+  background: url('../assets/attack-ui/shadow-32.png') center / 100% 100% no-repeat;
+  filter: brightness(0);
+  opacity: 0.5;
+}
+.card-focus__btn-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  transform: translateY(calc(var(--hud-px) * -4));
+  border-radius: 50%;
+  background: #ffffff;
+}
+.card-focus__btn-face::before {
+  content: '';
+  position: absolute;
+  inset: calc(var(--hud-px) * 4);
+  border-radius: 50%;
+  background: #f2f2f2;
+}
+.card-focus__btn-icon {
+  position: relative;
+  width: calc(var(--hud-px) * 32);
+  height: 80%;
+  background: #333333;
+  -webkit-mask: var(--hud-icon) center / contain no-repeat;
+  mask: var(--hud-icon) center / contain no-repeat;
+}
+/* Buff / Debuff: icn_StatusArrow (the debuff one flipped), with the coloured statusArrow over it
+   while the card has such an effect. A button with nothing to show is not interactable. */
+.card-focus__btn--buff,
+.card-focus__btn--debuff { --hud-icon: url('../assets/attack-ui/icn-status.png'); }
+.card-focus__btn--debuff .card-focus__btn-icon { transform: scaleY(-1); }
+.card-focus__btn-fill {
+  position: absolute;
+  width: calc(var(--hud-px) * 32);
+  height: 80%;
+  background: center / contain no-repeat;
+}
+.card-focus__btn--buff .card-focus__btn-fill { background-image: url('../assets/attack-ui/arrow-up.png'); }
+.card-focus__btn--debuff .card-focus__btn-fill { background-image: url('../assets/attack-ui/arrow-down.png'); }
+.card-focus__btn:disabled { cursor: default; }
+.card-focus__btn:disabled .card-focus__btn-face { filter: brightness(0.78); }
+.card-focus__stack { --hud-icon: url('../assets/attack-ui/icn-stack.png'); }
+/* Close: icn_Close itself is the face, over icn_CloseShadow (8 larger each side). */
+.card-focus__close::before {
+  inset: calc(var(--hud-px) * -8);
+  background-image: url('../assets/attack-ui/icn-close-shadow.png');
+}
+.card-focus__close .card-focus__btn-face {
+  border-radius: 0;
+  background: url('../assets/attack-ui/icn-close.png') center / 100% 100% no-repeat;
+}
+.card-focus__close .card-focus__btn-face::before { display: none; }
 /* Hit area reaches past the ring so the button stays easy to hit on a small card. */
-.card-focus__close::after,
-.card-focus__stack::after {
+.card-focus__btn::after {
   content: '';
   position: absolute;
   inset: -6px;
   border-radius: 50%;
 }
-.card-focus__close svg,
-.card-focus__stack svg {
-  width: 58%;
-  height: 58%;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2.4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.card-focus__stack-count {
-  position: absolute;
-  right: -18%;
-  top: -18%;
-  min-width: 1.5em;
-  padding: 0 0.3em;
-  border-radius: 1em;
-  background: #fff;
-  color: #16202b;
-  font: 800 max(11px, calc(var(--focus-w) * 0.03)) / 1.5 'Segoe UI', system-ui, sans-serif;
-  text-align: center;
-}
-.card-focus__close:hover,
-.card-focus__stack:hover { background: rgba(60, 76, 104, 0.8); }
-.card-focus__close:focus-visible,
-.card-focus__stack:focus-visible { outline: 2px solid #8ecbff; outline-offset: 2px; }
+.card-focus__btn:not(:disabled):hover .card-focus__btn-face { filter: brightness(1.06); }
+.card-focus__btn:focus-visible { outline: 2px solid #8ecbff; outline-offset: 2px; border-radius: 50%; }
 
 /* Attached Energy stands under the card as large tokens overlapping its lower edge, in the game's
    proportions (each 24.6% of the card width, overlapping by 4.5%). They ride the card's tilt. */
@@ -284,146 +369,39 @@
   border-image: url('../assets/attack-ui/list-bg.png') 31 fill / calc(var(--tu) * 1.24) stretch;
   overflow: hidden auto;
   scrollbar-width: none;
+  /* The chrome is click-through; the list takes the wheel so an overflowing list still scrolls. */
+  pointer-events: auto;
+  /* The rows are positioned: without their own stacking context here they join the frame's 3D-sorted
+     one, and Chromium hit-tests the scroller's flattened plane over them, so clicks land on .tcgl-opts. */
+  isolation: isolate;
   border-radius: 0;
   box-shadow: none;
 }
-.card-focus__card .ptcg-chrome--focus .ptcg-atks { gap: calc(var(--tu) * 0.05); }
-/* A row is the atkOv_Action_BG tile over the atkOv_Action_Shadow mask; rows never shrink to fit, the
-   list scrolls. Both sprites draw 50 px per row unit (multiplier 2), so their 16px edges are 0.32
-   row units = 0.24tu at the row's 0.75 scale. They sit on pseudo-elements behind the row's content. */
-.card-focus__card .ptcg-chrome--focus .ptcg-atk,
-.card-focus__card .ptcg-chrome--focus .ptcg-ability {
-  position: relative;
-  isolation: isolate;
+/* The rows are attack-options.css (AttackActionOption_L / AbilityActionOption_L); the list only
+   spaces them 0.05 apart, and they never shrink to fit — the list scrolls. */
+.card-focus__card .ptcg-chrome--focus .tcgl-opts {
+  display: flex;
+  flex-direction: column;
   flex: 0 0 auto;
-  border-top: 0;
-  background: none;
-  backdrop-filter: none;
-}
-.card-focus__card .ptcg-chrome--focus .ptcg-atk::before,
-.card-focus__card .ptcg-chrome--focus .ptcg-ability::before {
-  content: '';
-  position: absolute;
-  pointer-events: none;
-  border: 0 solid transparent;
-  inset: 0;
-  z-index: -1;
-  border-image: url('../assets/attack-ui/row-bg.png') 16 fill / calc(var(--tu) * 0.24) stretch;
-}
-.card-focus__card .ptcg-chrome--focus .ptcg-atk--recede::before,
-.card-focus__card .ptcg-chrome--focus .ptcg-ability--recede::before {
-  border-image-source: url('../assets/attack-ui/row-bg-off.png');
-}
-/* The mask is tinted black at 50% and reaches 0.115 x 0.075 row units past the row. The tile is
-   raised 0.03 row units over it (ButtonContent), so the shadow shows more below than above. */
-.card-focus__card .ptcg-chrome--focus .ptcg-atk::after,
-.card-focus__card .ptcg-chrome--focus .ptcg-ability::after {
-  content: '';
-  position: absolute;
-  pointer-events: none;
-  border: 0 solid transparent;
-  inset: calc(var(--tu) * -0.03375) calc(var(--tu) * -0.08625) calc(var(--tu) * -0.07875);
-  z-index: -2;
-  border-image: url('../assets/attack-ui/row-shadow.png') 16 fill / calc(var(--tu) * 0.24) stretch;
-  filter: brightness(0);
-  opacity: 0.502;
-}
-.card-focus__card .ptcg-chrome--focus .ptcg-atks { flex: 0 0 auto; }
-.card-focus__card .ptcg-chrome--focus .ptcg-atk > .ptcg-atk__head,
-.card-focus__card .ptcg-chrome--focus .ptcg-ability > .ptcg-atk__head { --bar-h: calc(var(--tu) * 0.75); }
-/* AttackName 0.34 and AttackDamage up to 0.5 of the bar; cost icons 0.38 on a 0.45 pitch. */
-.card-focus__card .ptcg-chrome--focus .ptcg-atk > .ptcg-atk__head > .ptcg-atk__name,
-.card-focus__card .ptcg-chrome--focus .ptcg-ability > .ptcg-atk__head > .ptcg-atk__name {
-  font-size: calc(var(--bar-h) * 0.34);
-}
-.card-focus__card .ptcg-chrome--focus .ptcg-atk__dmg { font-size: calc(var(--bar-h) * 0.5); }
-.card-focus__card .ptcg-chrome--focus .ptcg-atk > .ptcg-atk__head > .ptcg-atk__right { gap: calc(var(--bar-h) * 0.07); }
-/* Description: 0.25 text with 0.25 side and bottom margins and 0.15 under the bar (all x 0.75),
-   below the 0.03 #e1e1e1 Divider. Short text is not enlarged here. */
-.card-focus__card .ptcg-chrome--focus .ptcg-atk__text,
-.card-focus__card .ptcg-chrome--focus .ptcg-atk__text--short {
-  padding: calc(var(--tu) * 0.1125) calc(var(--tu) * 0.1875) calc(var(--tu) * 0.1875);
-  border-top: calc(var(--tu) * 0.0225) solid #e1e1e1;
-  font-size: calc(var(--tu) * 0.1875);
-  line-height: 1.25;
-  box-shadow: none;
+  gap: calc(var(--tu) * 0.05);
 }
 
 /* BottomBorderInfo (atkOv_Brdr_B2): the 0.7-unit Weakness / Resistance / Retreat bar hung under the
    list, 0.03 wider on the left and 0.15 on the right, overlapping its bottom edge by 0.08. Same lift
    as the list, whose shadow it shares. Sprite edges 7 / 24 / 23 / 24 px at 150 px per unit. */
-.card-focus__card .ptcg-chrome--focus .ptcg-stats--focus {
+.card-focus__card .ptcg-chrome--focus .tcgl-wr {
+  position: absolute;
   left: calc(var(--tu) * 0.1185);
-  right: auto;
   width: calc(var(--tu) * 6.48);
   bottom: calc(var(--tu) * 0.43);
   height: calc(var(--tu) * 0.7);
   box-sizing: border-box;
-  align-items: center;
-  gap: calc(var(--tu) * 0.4);
   padding: 0 calc(var(--tu) * 0.1) 0 calc(var(--tu) * 0.15);
   border: 0 solid transparent;
   border-image: url('../assets/attack-ui/list-bar.png') 7 24 23 24 fill / calc(var(--tu) * 0.0467)
     calc(var(--tu) * 0.16) calc(var(--tu) * 0.1533) calc(var(--tu) * 0.16) stretch;
-  border-radius: 0;
-  background: none;
-  box-shadow: none;
   transform: translateZ(var(--focus-lift));
-}
-/* WeakResistInfo: two 0.29-unit rows of 0.2 label, 0.28 icons and a 0.25 amount in a 0.35 column. */
-.ptcg-wr {
-  flex: 0 0 calc(var(--tu) * 2.89);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  min-width: 0;
-}
-.ptcg-wr__row {
-  display: flex;
-  align-items: center;
-  gap: calc(var(--tu) * 0.05);
-  height: calc(var(--tu) * 0.29);
-}
-.ptcg-wr__k {
-  flex: 1 1 auto;
-  font-size: calc(var(--tu) * 0.2);
-  color: #191919;
-}
-.ptcg-wr__n {
-  min-width: calc(var(--tu) * 0.35);
-  font-size: calc(var(--tu) * 0.25);
-  font-weight: 800;
-  color: #191919;
-  text-align: right;
-}
-/* Btn_Retreat is 0.5 units tall inside the 0.7 bar; its RaycastTarget reaches 0.1 past it on every
-   side, which ::after reproduces so the whole bar height takes the click. */
-.card-focus__card .ptcg-chrome--focus .ptcg-stat[data-ptcg-retreat] {
-  flex: 1 1 auto;
-  height: calc(var(--tu) * 0.5);
-  box-sizing: border-box;
-  flex-direction: row;
-  justify-content: space-between;
-  gap: calc(var(--tu) * 0.05);
-  padding: 0 calc(var(--tu) * 0.02) 0 calc(var(--tu) * 0.04);
-  overflow: visible;
-}
-.card-focus__card .ptcg-chrome--focus .ptcg-stat[data-ptcg-retreat]::after {
-  display: block;
-  inset: calc(var(--tu) * -0.1 - var(--u) * 1.5) calc(var(--tu) * -0.1 - var(--u) * 1.8);
-  background: none;
-  transform: none;
-  animation: none;
-}
-.card-focus__card .ptcg-chrome--focus .ptcg-stat[data-ptcg-retreat] .ptcg-stat__k {
-  font-size: calc(var(--tu) * 0.25);
-  font-weight: 700;
-  text-transform: none;
-}
-.card-focus__card .ptcg-chrome--focus .ptcg-stat[data-ptcg-retreat] .ptcg-stat__v { gap: calc(var(--tu) * 0.05); }
-.card-focus__card .ptcg-chrome--focus .ptcg-orb--sm {
-  width: calc(var(--tu) * 0.28);
-  height: calc(var(--tu) * 0.28);
+  pointer-events: auto;
 }
 
 /* The HP pill and the damage counter are drawn about 1.5x and 2x the print's size and spill past the

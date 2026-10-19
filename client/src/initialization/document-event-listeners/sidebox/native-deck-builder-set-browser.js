@@ -1,6 +1,7 @@
 import {
       fetchLegalStandardSets,
       fetchGenerationSets,
+      fetchHomebrewSets,
       fetchSetCards,
       filterCardsByName,
       filterCardsBySupertype,
@@ -36,7 +37,8 @@ import {
 
     /**
      * "Browse Sets" panel for the native deck builder. Pills switch between the
-     * current Standard-legal sets, an "other" bucket, and one pill per Pokémon
+     * current Standard-legal sets, an "other" bucket, a "homebrew" pill (every
+     * Black & White and XY set), and one pill per Pokémon
      * generation (9 down to 1) that loads every set from that TCG era via
      * TCGdex's series grouping. Cards are fetched lazily the first time a set is
      * expanded, then cached. Clicking a card adds it to the currently edited deck.
@@ -98,6 +100,7 @@ import {
         '    <div class="native-deck-builder-section-title">Browse Sets</div>',
         '    <button class="native-deck-builder-set-browser-series-tag active" data-category="standard" type="button">Standard 2026-27</button>',
         '    <button class="native-deck-builder-set-browser-series-tag native-deck-builder-set-browser-series-tag--other" data-category="other" type="button">other</button>',
+        '    <button class="native-deck-builder-set-browser-series-tag" data-category="homebrew" type="button">Homebrew</button>',
         generationPillsHtml,
         '  </div>',
         '  <div class="native-deck-builder-set-browser-controls">',
@@ -200,6 +203,9 @@ import {
             sets: state.sets.filter((set) => ((set.category || 'standard') === 'other') === isOther),
           };
         }
+        if (activeCategory === 'homebrew') {
+          return { label: 'Black & White + XY', sets: state.sets };
+        }
         return { label: '', sets: state.sets };
       };
 
@@ -227,8 +233,12 @@ import {
         const scope = scopeFilterSets({ filters: cardFilters, setIds, expandedSetId });
         if (!scope.length) {
           filterMatches = new Map();
+          const picked = cardFilters.sets || [];
+          const pickedElsewhere = picked.length > 0 && !setIds.some((setId) => picked.includes(setId));
           showStatus(
-            'Open a set to apply these filters, or add a Card type, Pokémon type, Stage, HP, Rarity, Format or Regulation mark filter to filter every set.'
+            pickedElsewhere
+              ? 'None of the picked expansions are in this tab.'
+              : 'Open a set to apply these filters, or add a Card type, Pokémon type, Stage, HP, Rarity, Format or Regulation mark filter to filter every set.'
           );
           render();
           return;
@@ -405,9 +415,9 @@ import {
         state.loading = true;
         if (categoryId === activeCategory) {
           showStatus(
-            categoryId.startsWith(GENERATION_CATEGORY_PREFIX)
-              ? 'Loading sets from TCGdex...'
-              : 'Loading Standard-format sets from TCGdex...'
+            categoryId === 'standard' || categoryId === 'other'
+              ? 'Loading Standard-format sets from TCGdex...'
+              : 'Loading sets from TCGdex...'
           );
         }
 
@@ -424,6 +434,10 @@ import {
             otherState.sets = sets;
             otherState.loaded = true;
             otherState.loading = false;
+          } else if (categoryId === 'homebrew') {
+            state.sets = await fetchHomebrewSets();
+            state.loaded = true;
+            state.loading = false;
           } else {
             const generation = Number(categoryId.slice(GENERATION_CATEGORY_PREFIX.length));
             const sets = await fetchGenerationSets(generation);

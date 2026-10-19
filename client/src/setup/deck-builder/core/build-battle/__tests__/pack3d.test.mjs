@@ -175,6 +175,9 @@ test('peelAngleDeg: flat before the drag, fully folded at the end, monotonic, mi
     'the start side folds first'
   );
   close(peelAngleDeg(0.2, 0.4, 1), peelAngleDeg(0.8, 0.4, -1), 1e-12);
+  // A shallower fold (the tabletop's TCG Pocket flex) scales the same crease.
+  assert.equal(peelAngleDeg(0.3, 1, 1, 28), 28);
+  close(peelAngleDeg(0.3, 0.4, 1, 28), (peelAngleDeg(0.3, 0.4, 1) * 28) / PEEL_MAX_DEG, 1e-12);
 });
 
 test('peelVertex: identity at 0°, hinge fixed, 90° lays the strip toward the camera', () => {

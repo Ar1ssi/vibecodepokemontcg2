@@ -1,7 +1,8 @@
 /**
  * @file Authoritative view generation and redaction.
  * Produces redacted per-player (and spectator) views with absolute IDs mapped to { you, them }.
- * Never leaks hidden information (deck contents, opponent hand cards, unrevealed prizes).
+ * A seated player never sees hidden information (deck contents, opponent hand cards, unrevealed
+ * prizes). Spectators see both hands (design 069) but never decks or unrevealed prizes.
  */
 
 import { cloneCard } from './cards.mjs';
@@ -105,23 +106,15 @@ function redactOpponentZones(player) {
 }
 
 /**
- * Redacts a player's zones for a spectator.
+ * Redacts a player's zones for a spectator: both hands are shown so the spectator can follow
+ * either player's point of view or the side-by-side broadcast layout (design 069). The client
+ * hides the off-perspective hand itself; decks and unrevealed prizes stay hidden.
  *
  * @param {object} player
  * @returns {object} Redacted zones
  */
 function redactSpectatorZones(player) {
-  const zones = player.zones || {};
-  return {
-    deck: { count: (zones.deck || []).length },
-    hand: { count: (zones.hand || []).length },
-    prizes: prizeCards(player),
-    active: (zones.active || []).map(sanitizeCard),
-    bench: (zones.bench || []).map(sanitizeCard),
-    discard: (zones.discard || []).map(sanitizeCard),
-    lostZone: (zones.lostZone || []).map(sanitizeCard),
-    board: (zones.board || []).map(boardCard),
-  };
+  return redactOwnerZones(player);
 }
 
 /**
@@ -284,4 +277,41 @@ export function deckPeekFor(state, playerId, request = {}) {
   const shown = Math.min(count, deck.length);
   const slice = request.fromTop === false ? deck.slice(deck.length - shown) : deck.slice(0, shown);
   return { ok: true, cards: slice.map(sanitizeCard), deckCount: deck.length };
+}
+
+/**
+ * Solo mode (design 074 D7): one client plays both seats of a server-authoritative room. The
+ * near seat gets its ordinary `viewFor` view; the far seat (`them`) is then shown as its owner
+ * would see it (full hand, its non-printed attacks), and whichever seat owns the open choice
+ * gets the full choice, named by `choiceSeat`. Decks and face-down unrevealed board cards stay
+ * hidden from both seats, exactly as each owner's own view hides them.
+ *
+ * @param {object} state GameState
+ * @param {string} nearId the seat drawn at the bottom of the board
+ * @param {{ attackExtrasFor?: (state: object, card: object) => object[] }} [options]
+ * @returns {object|null} the solo view, or null when `state` is missing or `nearId` is not seated
+ */
+export function viewForSolo(state, nearId, { attackExtrasFor } = {}) {
+  if (!state || !nearId || !state.players?.[nearId]) return null;
+
+  const view = viewFor(state, nearId, { attackExtrasFor });
+  const farId = Object.keys(state.players).find((id) => id !== nearId) || null;
+  const far = farId ? state.players[farId] : null;
+
+  const choice = state.pendingChoice;
+  const choiceSeat = choice && state.players[choice.player] ? choice.player : null;
+
+  return {
+    ...view,
+    solo: true,
+    choiceSeat,
+    pendingChoice: choiceSeat ? JSON.parse(JSON.stringify(choice)) : view.pendingChoice,
+    them: far
+      ? {
+          ...view.them,
+          zones: redactOwnerZones(far),
+          ...ownerAttackExtras(state, far, attackExtrasFor),
+        }
+      : null,
+  };
 }

@@ -3,17 +3,10 @@
 // instead of the browser's static translucent drag ghost. Drag and drop stay
 // native HTML5 DnD (drag.js); this module only draws.
 //
-// The avatar lives in the parent page so one element can cross both playmat
-// iframes. The pointer is read from `dragover` in every frame's window
-// (pointer events are suppressed during a native drag) and mapped into the
-// parent viewport through the frame's CSS transform — the far iframe is
-// flipped 180°.
+// The pointer is read from `dragover` in the page's window (pointer events are suppressed during
+// a native drag).
 import { animateFrames, fxDisabled, motionReduced } from './mat-fx.mjs';
-import {
-  mapIframePointToViewport,
-  readFrameTransform,
-  visualRectOf,
-} from './iframe-rect.mjs';
+import { visualRectOf } from '../board3d/board-rects.js';
 import {
   DRAG_TILT,
   DRAG_TILT_STILL,
@@ -24,7 +17,6 @@ import {
   stepDragTilt,
 } from './drag-tilt.mjs';
 
-const FRAME_IDS = ['selfContainer', 'oppContainer'];
 const AVATAR_CLASS = 'drag-avatar';
 const RETURN_MS = 180;
 const RETURN_BACKSTOP_MS = 1000;
@@ -43,42 +35,11 @@ const ghostPixel = (() => {
 
 let session = null;
 
-const frameOf = (view) => {
-  if (!view || view === window) return null;
-  try {
-    return view.frameElement ?? null;
-  } catch {
-    return null;
-  }
-};
-
-/** A drag event's pointer in parent-viewport px, or null if it has none. */
-const viewportPoint = (event, frameTransforms) => {
+/** A drag event's pointer in viewport px, or null if it has none. */
+const viewportPoint = (event) => {
   const x = event?.clientX;
   const y = event?.clientY;
-  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-  const frame = frameOf(event.view ?? event.target?.ownerDocument?.defaultView);
-  if (!frame) return { x, y };
-  let transform = frameTransforms.get(frame);
-  if (!transform) {
-    transform = readFrameTransform(frame);
-    frameTransforms.set(frame, transform);
-  }
-  return mapIframePointToViewport(
-    { x, y },
-    transform.frameRect,
-    transform.matrix,
-    transform.origin
-  );
-};
-
-const dragWindows = () => {
-  const views = [window];
-  for (const id of FRAME_IDS) {
-    const view = document.getElementById(id)?.contentWindow;
-    if (view && !views.includes(view)) views.push(view);
-  }
-  return views;
+  return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
 };
 
 const buildAvatar = (source, rect, grab) => {
@@ -102,7 +63,7 @@ const listen = (views, handlers) => {
         view.addEventListener(type, handler, true);
         attached.push([view, type, handler]);
       } catch {
-        // A frame mid-navigation can refuse listeners; the others still work.
+        // A window mid-teardown can refuse listeners.
       }
     }
   }
@@ -152,8 +113,7 @@ export const startDragAvatar = (event) => {
   const src = source.currentSrc || source.src;
   if (!src) return;
 
-  const frameTransforms = new Map();
-  const pointer = viewportPoint(event, frameTransforms);
+  const pointer = viewportPoint(event);
   const rect = visualRectOf(source);
   if (!pointer || !(rect.width > 1 && rect.height > 1)) return;
   try {
@@ -177,15 +137,14 @@ export const startDragAvatar = (event) => {
     pointer,
     tilt,
     params,
-    frameTransforms,
     lastTime: null,
     rafId: null,
     detach: () => {},
   };
   session = current;
-  current.detach = listen(dragWindows(), {
+  current.detach = listen([window], {
     dragover: (overEvent) => {
-      const next = viewportPoint(overEvent, frameTransforms);
+      const next = viewportPoint(overEvent);
       if (next) current.pointer = next;
     },
     // A completed drop: the board re-renders the card where it landed.

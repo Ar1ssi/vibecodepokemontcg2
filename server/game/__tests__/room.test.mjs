@@ -132,8 +132,9 @@ test('GameRoom: successful command produces broadcasts for all players with reda
   assert.equal(p2Broadcast.view.them.zones.hand[0].instanceId, 101);
   assert.equal(p2Broadcast.view.them.zones.hand[0].name, undefined);
 
-  // Spectator sees hand count
-  assert.equal(specBroadcast.view.players.p1.zones.hand.count, 1);
+  // Spectator sees both hands (design 069), never the deck
+  assert.equal(specBroadcast.view.players.p1.zones.hand[0].name, 'Secret Trainer');
+  assert.equal(specBroadcast.view.players.p1.zones.deck.count, 0);
 
   // Broadcasts contain recipient-specific lastClientSeq
   assert.equal(p1Broadcast.lastClientSeq, 10);
@@ -430,14 +431,6 @@ test('loadDeck: a string quantity from a real decklist loads that many cards', (
   assert.deepEqual(cards.map((c) => c.syncInstance), [0, 1, 2, 3, 4, 5]);
 });
 
-test('initializePlayerDeck (shadow): a string quantity loads that many cards', async () => {
-  const { initializePlayerDeck } = await import('../shadow.mjs');
-  const room = new GameRoom({ roomId: 'shadow-quantity', rulesEnabled: false });
-  room.addPlayer('sock-a', 'p1', 'Ash');
-  initializePlayerDeck(room.state, 'p1', [['3', 'Pikachu', 'Pokémon', 'u', '001', 'e2e', 'x-1']]);
-  assert.equal(room.state.players.p1.zones.deck.length, 3);
-});
-
 test('seed: GameRoom initializes with a fresh seed and resetGame generates a new seed so card shuffles differ', () => {
   const fullDeck = Array.from({ length: 60 }, (_, i) => [
     1,
@@ -694,4 +687,31 @@ test('053 row 8: an agreed room format refuses two matching decks of the other f
   room.markReady('p1');
   room.markReady('p2');
   assert.equal(room.isReadyToDeal(), true, 'the same decks deal once the room plays Standard');
+});
+
+// Design 069: spectator views show both hands, so only registered sockets may read one, and a
+// spectator that leaves stops receiving the room's broadcasts.
+test('GameRoom: canView admits seated and spectator sockets only', () => {
+  const room = new GameRoom({ roomId: 'test-room-069-view', rulesEnabled: false });
+  room.addPlayer('socket-p1', 'p1', 'Ash');
+  room.addSpectator('socket-spec');
+  assert.equal(room.canView('socket-p1'), true);
+  assert.equal(room.canView('socket-spec'), true);
+  assert.equal(room.canView('socket-stranger'), false);
+});
+
+test('GameRoom: removeSpectator drops the socket from broadcasts and leaves seats alone', () => {
+  const room = new GameRoom({ roomId: 'test-room-069-leave', rulesEnabled: false });
+  room.addPlayer('socket-p1', 'p1', 'Ash');
+  room.addPlayer('socket-p2', 'p2', 'Gary');
+  room.addSpectator('socket-spec');
+  room.state.players.p1.zones.deck.push(createCard({ instanceId: 201, name: 'Potion' }));
+
+  room.removeSpectator('socket-spec');
+  room.removeSpectator('socket-p1');
+  const res = room.handleCommand('socket-p1', { type: 'draw', payload: { count: 1 }, clientSeq: 1 });
+
+  assert.equal(res.success, true);
+  assert.deepEqual(res.broadcasts.map((b) => b.socketId).sort(), ['socket-p1', 'socket-p2']);
+  assert.equal(room.canView('socket-spec'), false);
 });

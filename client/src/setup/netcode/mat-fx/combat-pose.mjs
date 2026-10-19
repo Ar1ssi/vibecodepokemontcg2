@@ -12,11 +12,25 @@ export const SCREEN_SHAKE_MIN_DAMAGE = 30;
 export const SCREEN_SHAKE_MAX_PX = 6;
 export const TARGET_RING_MS = 620;
 export const AURA_PULSE_MS = 600;
+export const HIT_RECOIL_MS = 320;
 
 const clamp01 = (t) => Math.max(0, Math.min(1, t));
 const easeOutCubic = (t) => 1 - (1 - t) ** 3;
 const easeInOutCubic = (t) => (t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2);
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
+
+const RECOIL_PEAK = 0.12;
+const RECOIL_PEAK_AT = 0.18;
+
+/**
+ * Design 069: a card the attack reaches after its main target is knocked back along the
+ * attacker -> card direction: `along` is the push in card heights, 0 at both ends.
+ */
+export function hitRecoilPose(t) {
+  const c = clamp01(t);
+  if (c <= RECOIL_PEAK_AT) return { along: RECOIL_PEAK * easeOutCubic(c / RECOIL_PEAK_AT) };
+  return { along: RECOIL_PEAK * (1 - easeInOutCubic((c - RECOIL_PEAK_AT) / (1 - RECOIL_PEAK_AT))) };
+}
 
 /**
  * Classify one `damageUpdated` fx plan. The engine's `dealt` / `healed` fields
@@ -118,22 +132,47 @@ export function slashPose(t) {
   };
 }
 
-/**
- * `translate` values for a whole-table shake: a damped sine, so the motion
- * reads as one impact settling rather than a random jitter.
- * @returns {string[]}
- */
-export function screenShakeOffsets(amplitude, steps = 12) {
+/** The shake's damped sine as numeric screen offsets, ending at rest. */
+function screenShakePoints(amplitude, steps) {
   const out = [];
   for (let i = 0; i < steps; i += 1) {
     const f = i / steps;
     const decay = (1 - f) ** 2;
-    const x = (amplitude * Math.cos(f * Math.PI * 5) * decay).toFixed(2);
-    const y = (amplitude * 0.6 * Math.sin(f * Math.PI * 4) * decay).toFixed(2);
-    out.push(`${x}px ${y}px`);
+    out.push({
+      x: amplitude * Math.cos(f * Math.PI * 5) * decay,
+      y: amplitude * 0.6 * Math.sin(f * Math.PI * 4) * decay,
+    });
   }
-  out.push('0px 0px');
   return out;
+}
+
+/** The table shake's WAAPI easing (combat.js), `cubic-bezier(0.2, 0.6, 0.4, 1)`. */
+export const SCREEN_SHAKE_EASING = [0.2, 0.6, 0.4, 1];
+
+const bezierAt = (a, b, s) => 3 * a * s * (1 - s) ** 2 + 3 * b * s ** 2 * (1 - s) + s ** 3;
+
+/** Time fraction at which a CSS cubic-bezier easing reaches `progress` (its y), by bisection. */
+export function easingTimeFor(progress, [x1, y1, x2, y2] = SCREEN_SHAKE_EASING) {
+  if (!(progress > 0)) return 0;
+  if (progress >= 1) return 1;
+  let lo = 0;
+  let hi = 1;
+  for (let i = 0; i < 40; i += 1) {
+    const mid = (lo + hi) / 2;
+    if (bezierAt(y1, y2, mid) < progress) lo = mid;
+    else hi = mid;
+  }
+  return bezierAt(x1, x2, (lo + hi) / 2);
+}
+
+/**
+ * Design 074 §D6: the same shake as `{ x, y, ms }` keyframes for the three.js board's camera
+ * offset (board-scene.js `shake`). Keyframe i sits where the WAAPI shake reaches it: offset
+ * i/steps of the eased progress over `durationMs`.
+ */
+export function screenShakeKeyframes(amplitude, durationMs = SCREEN_SHAKE_MS, steps = 12) {
+  const points = [...screenShakePoints(amplitude, steps), { x: 0, y: 0 }];
+  return points.map((p, i) => ({ x: p.x, y: p.y, ms: easingTimeFor(i / steps) * durationMs }));
 }
 
 const rectCenter = (r) => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 });

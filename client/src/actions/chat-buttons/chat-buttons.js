@@ -541,7 +541,7 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
     maybeEmit
   );
   let attackIndex = parsedAttackIndex;
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'attack', [attackIndex, rngBundle]);
     return;
   }
@@ -929,6 +929,8 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
         let parsed = null;
         let oppHp = 0;
         let totalDmg = 0;
+        // Final damage to the Defending Pokémon, after every modifier (mirror heal reads it).
+        let dmgDealt = 0;
         if (oppActive) {
         await ensureCardData(oppActive);
         await ensureCardData(active);
@@ -1240,6 +1242,8 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
             false
           );
         }
+
+        dmgDealt = dmg.total;
 
         // Read current damage on opponent's active (for KO check)
         let currentDmg = 0;
@@ -2165,7 +2169,7 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
         }
 
         // Mirror heal: heal this Pokémon for damage dealt this attack.
-        if (mirrorHealClause(atk.text) && dmg.total > 0 && stadiumBlocksHealing()) {
+        if (mirrorHealClause(atk.text) && dmgDealt > 0 && stadiumBlocksHealing()) {
           appendMessage(
             user,
             `🏟️ Dyna Tree Hill — all healing is blocked.`,
@@ -2173,12 +2177,12 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
             false
           );
         }
-        if (mirrorHealClause(atk.text) && dmg.total > 0 && !stadiumBlocksHealing()) {
+        if (mirrorHealClause(atk.text) && dmgDealt > 0 && !stadiumBlocksHealing()) {
           const countersEl = active?.image?.damageCounter;
           const current = countersEl
             ? parseInt(countersEl.textContent || '0', 10) || 0
             : 0;
-          const plan = planHeal(current, dmg.total);
+          const plan = planHeal(current, dmgDealt);
           if (plan.removed > 0) {
             if (plan.zeroOut) {
               removeDamageCounter(user, 'active', 0, true);
@@ -2554,7 +2558,7 @@ export const retreat = async (user, emitOrTarget = true, targetOrEmit = null) =>
   const targetBenchImage = target && typeof target === 'object' ? target : null;
   const targetBenchIndexHint = typeof target === 'number' ? target : null;
 
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'retreat', []);
     return;
   }
@@ -4331,7 +4335,7 @@ export const evolveAbility = async (user, emit = true, targetCard = null, opts =
 export const pass = (user, rngOrEmit = true, maybeEmit) => {
   const { emit, tail: rngIn } = splitEmitAndTail(rngOrEmit, maybeEmit);
   const rngBundle = rngIn || {};
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'pass', [rngBundle]);
     return;
   }
@@ -4749,7 +4753,7 @@ const lowerName = (name) => String(name || '').toLowerCase();
 // For setup-once: draw N (one-shot, applied immediately).
 export const stadiumEffect = async (user, payloadOrEmit = true, maybeEmit) => {
   const { emit, tail: payload } = splitEmitAndTail(payloadOrEmit, maybeEmit);
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'stadium-effect', [payload]);
     return;
   }

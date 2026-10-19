@@ -1,3 +1,5 @@
+import { SPECIAL_ENERGY_TOKENS } from './special-energy-tokens.mjs';
+
 /** Front-face images: user-provided type-symbol tokens (colored circle, black glyph, cut
  * from a reference sheet matching the printed card cost-symbol style). */
 export const ENERGY_TOKEN_FRONT = {
@@ -80,10 +82,57 @@ export const getEnergyTokenSrcForType = (type) =>
   ENERGY_TOKEN_FRONT[normalizeEnergyType(type)] || null;
 
 /**
- * Resolve the coin-front image for an Energy card, or null if this Energy
- * type has no token asset (e.g. a Special Energy naming no type at all).
+ * Comparison key for a Special Energy name across the spellings decklists and TCGdex use:
+ * cost symbols as type words ("Rocky {F} Energy" = "Rocky Fighting Energy"), "◇" as
+ * "Prism Star", "δ" as "delta", straight or curly apostrophes, any case and spacing.
+ */
+export const specialEnergyNameKey = (name) =>
+  String(name || '')
+    .toLowerCase()
+    .replace(/\{([a-z])\}/g, (_, symbol) => ` ${TYPE_BY_COST_SYMBOL[symbol] || symbol} `)
+    .replace(/◇/g, ' prism star ')
+    .replace(/δ/g, ' delta ')
+    .replace(/[’']/g, '')
+    .replace(/\bdark\b/g, 'darkness')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
+const SPECIAL_TOKEN_BY_KEY = new Map(
+  SPECIAL_ENERGY_TOKENS.map((token) => [specialEnergyNameKey(token.name), token])
+);
+
+// "Metal Energy" and "Darkness Energy" are also the names of basic Energy; only a card
+// explicitly marked Special (old Metal/Darkness Special Energy) takes the special token.
+const BASIC_ENERGY_NAME = /^(?:basic )?(?:grass|fire|water|lightning|psychic|fighting|darkness|metal|fairy|colorless|dragon) energy$/;
+
+const isMarkedSpecial = (card) => {
+  const subtypes = [card?.subtype, ...(Array.isArray(card?.subtypes) ? card.subtypes : [])];
+  if (subtypes.some((s) => /special/i.test(String(s || '')))) return true;
+  return /^special$/i.test(String(card?.energyType || ''));
+};
+
+/** The Special Energy token entry ({ src, double, finish }) for a card, or null. */
+export const specialEnergyTokenFor = (card) => {
+  const key = specialEnergyNameKey(card?.name);
+  const token = SPECIAL_TOKEN_BY_KEY.get(key);
+  if (!token) return null;
+  if (BASIC_ENERGY_NAME.test(key) && !isMarkedSpecial(card)) return null;
+  return token;
+};
+
+/** Whether the card's token shows two orbs (a Special Energy that provides 2 Energy). */
+export const isDoubleEnergyToken = (card) => specialEnergyTokenFor(card)?.double === true;
+
+/** Extra class on a two-orb token: it is square art with transparent corners, not a disc. */
+export const ENERGY_TOKEN_DOUBLE_CLASS = 'energy-token-double';
+
+/**
+ * Resolve the coin-front image for an Energy card: its own Special Energy token (cut from
+ * the card art) when it has one, else its type token, else null (no type can be found).
  */
 export const getEnergyTokenFront = (card) => {
+  const special = specialEnergyTokenFor(card);
+  if (special) return special.src;
   const key = energyTypeKeyFor(card);
   return key ? ENERGY_TOKEN_FRONT[key] : null;
 };

@@ -1,9 +1,20 @@
 // Design 065 slices 10–11: the Psychic signature specs (tier S). Each spec is its Appendix S
 // entry's board mapping (`.agent/designs/065-signature-move-animations.md` § Appendix S ›
 // Psychic); departures from an entry are listed under the design's Deviations (slices 10–11).
+//
+// Design 075 user pass (slice 11): no orbiting orbs or rings, auras, halo, shock, floor or face
+// rings; the wind-up is the attacker's motion and the move's own orb, dome, portal or wave
+// forming. The orb, beam, blade or column is what lands; the star flares arrive quickly and
+// smaller, orbs are kept small so their white core never blooms into a slab, the flash is small
+// and the heat faint (the TCG Live impact replaces the dressing in a game).
 
 /** Five spikes 72° apart: the entries' "starFlare arms 'ring'" inside the 30-tongue budget. */
 const RING5 = Object.freeze([-90, -18, 54, 126, 198].map((angle) => Object.freeze({ angle, reach: 0.85 })));
+
+/** The small contact flash the signatures keep. */
+const flash = (at, tint) => ({ at, until: at + 150, layer: 'top', drawer: 'impactFlash', params: { r0: 0.2, r1: 0.6, tint } });
+/** A star flare landing smaller and nearly whole, breaking up late. */
+const star = (at, until, arms, tint, over = {}) => ({ at, until, layer: 'front', drawer: 'starFlare', params: { arms, size: 0.4, width: 0.3, core: 0.14, grow: 0.12, breakAt: 0.7, tint, ...over } });
 
 const motes = (at, count, over = {}) =>
   Object.freeze({
@@ -41,19 +52,17 @@ export const freezingGlare = Object.freeze({
   contactMs: 1000,
   pad: 1.8,
   attacker: { motion: 'brace', params: { glow: 0.6 } },
-  defender: { motion: 'knock', params: { strength: 0.35, heat: 0.4 } },
+  defender: { motion: 'knock', params: { strength: 0.35, heat: 0.35 } },
   beats: [
-    { at: 0, until: 800, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.18, r1: 0.5, rings: 1, tint: ORB } },
-    { at: 0, until: 700, layer: 'back', drawer: 'orbitCharge', params: { count: 3, half: 'back', r0: 0.16, r1: 0.24, tongues: 3, tint: ORB } },
+    { at: 0, until: 800, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.14, r1: 0.36, from: 0.2, tint: ORB } },
     { at: 500, until: 750, layer: 'front', drawer: 'beam', params: { kind: 'segmented', w: 0.12, gap: 0.4, tint: ICE_BEAM } },
-    { at: 700, until: 1600, layer: 'front', drawer: 'beam', params: { kind: 'solid', w: 0.5, growIn: 0.25, retract: 0.35, tint: ICE_BEAM } },
-    { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { tint: ICE_BEAM } },
-    { at: 1000, until: 1700, layer: 'back', drawer: 'shards', params: { count: 8, arc: 360, distance: 1.1, tint: SPLINTER } },
-    { at: 1000, until: 1600, layer: 'back', drawer: 'ring', params: { kind: 'face', count: 2, r0: 0.3, r1: 1.4, tint: HAZE } },
-    { at: 1000, until: 2000, layer: 'back', drawer: 'vignette', params: { target: 'defender', maxAlpha: 0.45, tint: HAZE } },
-    { at: 1000, until: 2000, layer: 'back', drawer: 'cloud', params: { count: 6, drift: 0.5, alpha: 0.4, tint: HAZE } },
+    { at: 700, until: 1600, layer: 'front', drawer: 'beam', params: { kind: 'solid', w: 0.42, growIn: 0.25, retract: 0.35, tint: ICE_BEAM } },
+    flash(1000, ICE_BEAM),
+    { at: 1000, until: 1700, layer: 'back', drawer: 'shards', params: { count: 6, arc: 360, distance: 1.0, tint: SPLINTER } },
+    { at: 1000, until: 2000, layer: 'back', drawer: 'vignette', params: { target: 'defender', maxAlpha: 0.35, tint: HAZE } },
+    { at: 1000, until: 2000, layer: 'back', drawer: 'cloud', params: { count: 4, drift: 0.5, alpha: 0.35, tint: HAZE } },
   ],
-  particles: [motes(1000, 12)],
+  particles: [motes(1000, 8)],
   grain: 0.1,
 });
 
@@ -76,16 +85,14 @@ export const heartSwap = Object.freeze({
   attacker: { motion: 'brace', params: { glow: 0.6 } },
   defender: { motion: 'float', params: { lift: 0.15 } },
   beats: [
-    { at: 0, until: 600, layer: 'back', drawer: 'aura', params: { target: 'attacker', hz: 2, alpha: 0.45, tint: SWAP } },
-    { at: 300, until: 650, layer: 'front', drawer: 'coreCharge', params: { target: 'defender', lead: 0, r0: 0.18, r1: 0.4, tint: SWAP } },
-    { at: 450, until: 900, layer: 'front', drawer: 'projectile', params: { from: 'defender', path: 'straight', r0: 0.3, r1: 0.5, tongues: 3, ease: 'linear', tint: SWAP } },
+    { at: 300, until: 650, layer: 'front', drawer: 'coreCharge', params: { target: 'defender', lead: 0, r0: 0.14, r1: 0.32, tint: SWAP } },
+    { at: 450, until: 900, layer: 'front', drawer: 'projectile', params: { from: 'defender', path: 'straight', r0: 0.26, r1: 0.36, tongues: 3, ease: 'linear', tint: SWAP } },
     { at: 850, until: 1300, layer: 'back', drawer: 'shade', params: { target: 'attacker', kind: 'dome', r: 0.85, fill: 'deep', fillAlpha: 0.35, rimAlpha: 0.8, swirl: 30, tint: DOME } },
-    { at: 1050, until: 1500, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.3, r1: 0.5, tongues: 3, ease: 'linear', tint: SWAP } },
+    { at: 1050, until: 1500, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.26, r1: 0.36, tongues: 3, ease: 'linear', tint: SWAP } },
     { at: 1100, until: 1300, layer: 'front', drawer: 'glyph', params: { target: 'attacker', kind: 'heart', r: 0.6, tint: SWAP } },
     { at: 1450, until: 2000, layer: 'back', drawer: 'shade', params: { target: 'defender', kind: 'dome', r: 0.85, fill: 'deep', fillAlpha: 0.35, rimAlpha: 0.8, swirl: 30, tint: DOME } },
-    { at: 1450, until: 1900, layer: 'back', drawer: 'aura', params: { target: 'defender', hz: 2, alpha: 0.6, tint: SWAP } },
   ],
-  particles: [motes(850, 8, { anchor: 'attacker', kind: 'twinkle', durationMs: 600 }), motes(1450, 10, { kind: 'twinkle', durationMs: 600 })],
+  particles: [motes(850, 6, { anchor: 'attacker', kind: 'twinkle', durationMs: 600 }), motes(1450, 6, { kind: 'twinkle', durationMs: 600 })],
   grain: 0.1,
 });
 
@@ -106,28 +113,25 @@ export const hyperspaceHole = Object.freeze({
   contactMs: 1000,
   pad: 1.8,
   attacker: { motion: 'warp', params: {} },
-  defender: { motion: 'knock', params: { strength: 0.35, heat: 0.4 } },
+  defender: { motion: 'knock', params: { strength: 0.35, heat: 0.35 } },
   beats: [
-    { at: 0, until: 650, layer: 'back', drawer: 'shade', params: { target: 'attacker', kind: 'disc', r: 1.0, fill: 'deep', fillAlpha: 0.95, rimAlpha: 0.9, swirl: 60, tint: PORTAL } },
-    { at: 0, until: 650, layer: 'back', drawer: 'ring', params: { target: 'attacker', kind: 'floor', count: 2, r0: 0.3, r1: 1.0, rpm: 120, tint: PORTAL } },
-    { at: 350, until: 1000, layer: 'back', drawer: 'shade', params: { target: 'defender', kind: 'disc', r: 0.9, fill: 'deep', fillAlpha: 0.9, rimAlpha: 0.9, swirl: 60, tint: PORTAL } },
+    { at: 0, until: 650, layer: 'back', drawer: 'shade', params: { target: 'attacker', kind: 'disc', r: 1.0, fill: 'body', fillAlpha: 0.55, rimAlpha: 0.3, swirl: 90, tint: PORTAL } },
+    { at: 350, until: 1000, layer: 'back', drawer: 'shade', params: { target: 'defender', kind: 'disc', r: 0.9, fill: 'body', fillAlpha: 0.55, rimAlpha: 0.3, swirl: 90, tint: PORTAL } },
     { at: 350, until: 1000, layer: 'back', drawer: 'vignette', params: { target: 'defender', maxAlpha: 0.4, tint: PORTAL } },
-    { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { tint: BURST } },
-    { at: 1000, until: 1550, layer: 'front', drawer: 'starFlare', params: { arms: RING5, width: 0.46, tint: BURST } },
-    { at: 1000, until: 1600, layer: 'back', drawer: 'ring', params: { kind: 'face', count: 2, r0: 0.3, r1: 1.4, tint: BURST } },
-    { at: 1000, until: 1800, layer: 'back', drawer: 'shards', params: { count: 5, arc: 360, distance: 1.2, tint: BURST } },
-    { at: 1000, until: 2000, layer: 'back', drawer: 'vignette', params: { target: 'defender', maxAlpha: 0.4, tint: BURST } },
+    flash(1000, BURST),
+    star(1000, 1550, RING5, BURST),
+    { at: 1000, until: 1800, layer: 'back', drawer: 'shards', params: { count: 4, arc: 360, distance: 1.1, tint: BURST } },
+    { at: 1000, until: 2000, layer: 'back', drawer: 'vignette', params: { target: 'defender', maxAlpha: 0.35, tint: BURST } },
   ],
-  particles: [motes(1000, 10, { durationMs: 700 })],
+  particles: [motes(1000, 7, { durationMs: 700 })],
   grain: 0.1,
 });
 
-const RAINBOW = Object.freeze(['#FF5A5A', '#FFF35C', '#7CFF6A', '#5AA8FF']);
 const WHITE_HOT = Object.freeze({ deep: '#C9B24A', body: '#E4F5A0', hot: '#FFFFFE', core: '#FFFFFF' });
 const IMPACT = Object.freeze({ deep: '#8A3A10', body: '#FFF35C', hot: '#FFFBD0', core: '#FFFFFF' });
 const SPD = Object.freeze({ deep: '#2A2E9A', body: '#6468F1', hot: '#B8BAFF', core: '#FFFFFF' });
 
-// Latios: it whitens inside a rainbow halo, flings a white-hot orb high over the lane onto the
+// Latios: it whitens as the orb charges, flings the white-hot orb high over the lane onto the
 // defender, which takes a yellow-white burst with dark orange cracks under a blue haze.
 export const lusterPurge = Object.freeze({
   id: 'luster-purge',
@@ -141,20 +145,16 @@ export const lusterPurge = Object.freeze({
   contactMs: 1000,
   pad: 1.9,
   attacker: { motion: 'rise', params: {} },
-  defender: { motion: 'knock', params: { strength: 0.35, heat: 0.6 } },
+  defender: { motion: 'knock', params: { strength: 0.35, heat: 0.35 } },
   beats: [
-    { at: 0, until: 600, layer: 'back', drawer: 'aura', params: { target: 'attacker', hz: 2, alpha: 0.7, tint: WHITE_HOT } },
-    { at: 0, until: 650, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.18, r1: 0.5, tint: WHITE_HOT } },
-    { at: 100, until: 800, layer: 'back', drawer: 'ring', params: { target: 'attacker', kind: 'face', count: 3, r0: 0.3, r1: 1.2, width: 0.08, hues: RAINBOW } },
-    { at: 200, until: 700, layer: 'back', drawer: 'shockRings', params: { count: 2, delay: 0.3, tint: WHITE_HOT } },
-    { at: 400, until: 1000, layer: 'front', drawer: 'projectile', params: { path: 'arc', bow: 0.6, r0: 0.34, r1: 0.5, tongues: 6, tint: WHITE_HOT } },
-    { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { tint: IMPACT } },
-    { at: 1000, until: 1500, layer: 'front', drawer: 'starFlare', params: { arms: 'cross', width: 0.46, tint: IMPACT } },
+    { at: 0, until: 650, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.12, r1: 0.32, from: 0.2, tint: WHITE_HOT } },
+    { at: 400, until: 1000, layer: 'front', drawer: 'projectile', params: { path: 'arc', bow: 0.6, r0: 0.26, r1: 0.34, tongues: 4, tint: WHITE_HOT } },
+    flash(1000, IMPACT),
+    star(1000, 1500, 'cross', IMPACT),
     { at: 1000, until: 1700, layer: 'back', drawer: 'terrain', params: { kind: 'crack', radius: 1.2, tint: IMPACT } },
-    { at: 1000, until: 1600, layer: 'back', drawer: 'ring', params: { kind: 'floor', count: 3, r0: 0.3, r1: 1.5, tint: IMPACT } },
-    { at: 1200, until: 2100, layer: 'back', drawer: 'aura', params: { target: 'defender', hz: 2, alpha: 0.6, tint: SPD } },
+    { at: 1150, until: 2100, layer: 'back', drawer: 'vignette', params: { target: 'defender', maxAlpha: 0.32, tint: SPD } },
   ],
-  particles: [motes(1000, 12, { kind: 'ember', gravity: 0.3, distance: 1.3, durationMs: 700 }), motes(1300, 8, { kind: 'twinkle' })],
+  particles: [motes(1000, 8, { kind: 'ember', gravity: 0.3, distance: 1.2, durationMs: 700 }), motes(1300, 5, { kind: 'twinkle' })],
   grain: 0.1,
 });
 
@@ -178,24 +178,22 @@ export const mistBall = Object.freeze({
   attacker: { motion: 'brace', params: { glow: 0.6 } },
   defender: { motion: 'float', params: { lift: 0.15 } },
   beats: [
-    { at: 0, until: 500, layer: 'back', drawer: 'aura', params: { target: 'attacker', hz: 2, alpha: 0.5, tint: MIST } },
-    { at: 0, until: 400, layer: 'back', drawer: 'cloud', params: { target: 'attacker', count: 6, radius: 0.3, drift: 0.5, alpha: 0.4, tint: MIST } },
-    { at: 0, until: 450, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.18, r1: 0.5, tint: MIST } },
-    { at: 300, until: 1000, layer: 'front', drawer: 'projectile', params: { path: 'arc', bow: 0.6, r0: 0.34, r1: 0.5, tongues: 6, ease: 'linear', tint: MIST } },
-    { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { tint: STAR } },
-    { at: 1000, until: 1400, layer: 'front', drawer: 'starFlare', params: { arms: 'cross', width: 0.4, tint: STAR } },
-    { at: 1000, until: 1600, layer: 'back', drawer: 'ring', params: { kind: 'face', count: 2, r0: 0.3, r1: 1.4, tint: MIST } },
-    { at: 1100, until: 2100, layer: 'front', drawer: 'cloud', params: { count: 8, radius: 0.4, drift: 0.6, alpha: 0.5, tint: PINK_MIST } },
-    { at: 1000, until: 1900, layer: 'back', drawer: 'spiral', params: { turns: 1.5, r0: 0.2, r1: 0.9, rpm: 90, tongues: 8, tint: MIST } },
+    { at: 0, until: 400, layer: 'back', drawer: 'cloud', params: { target: 'attacker', count: 4, radius: 0.3, drift: 0.5, alpha: 0.35, tint: MIST } },
+    { at: 0, until: 450, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.12, r1: 0.32, from: 0.15, tint: MIST } },
+    { at: 300, until: 1000, layer: 'front', drawer: 'projectile', params: { path: 'arc', bow: 0.6, r0: 0.28, r1: 0.36, tongues: 4, ease: 'linear', tint: MIST } },
+    flash(1000, STAR),
+    star(1000, 1400, 'cross', STAR),
+    { at: 1100, until: 2100, layer: 'front', drawer: 'cloud', params: { count: 5, radius: 0.4, drift: 0.6, alpha: 0.4, tint: PINK_MIST } },
+    { at: 1000, until: 1900, layer: 'back', drawer: 'spiral', params: { turns: 1.5, r0: 0.2, r1: 0.9, rpm: 90, tongues: 6, tint: MIST } },
   ],
-  particles: [motes(1000, 8, { kind: 'ember', gravity: 0.3, durationMs: 600 }), motes(1200, 10, { kind: 'twinkle', gravity: 0.1, durationMs: 900 })],
+  particles: [motes(1000, 6, { kind: 'ember', gravity: 0.3, durationMs: 600 }), motes(1200, 6, { kind: 'twinkle', gravity: 0.1, durationMs: 900 })],
   grain: 0.1,
 });
 
 const RINGS = Object.freeze({ deep: '#B0307A', body: '#FF4FB8', hot: '#7FE7FF', core: '#FFFFFF' });
 const PALE = Object.freeze({ deep: '#7A5AC0', body: '#9FE0FF', hot: '#E8DAFF', core: '#FFFFFF' });
 
-// Azelf / Mesprit / Uxie: a lilac-white aura blooms as it rises, pink-and-cyan rings close
+// Azelf / Mesprit / Uxie: a lilac-white light charges as it rises, the psychic wave closes
 // round the defender, and a magenta-pink starburst bursts on it.
 export const mysticalPower = Object.freeze({
   id: 'mystical-power',
@@ -211,17 +209,14 @@ export const mysticalPower = Object.freeze({
   attacker: { motion: 'rise', params: {} },
   defender: { motion: 'float', params: { lift: 0.15 } },
   beats: [
-    { at: 0, until: 800, layer: 'back', drawer: 'aura', params: { target: 'attacker', hz: 2, alpha: 0.6, tint: PALE } },
-    { at: 0, until: 600, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.18, r1: 0.5, tint: PALE } },
-    { at: 0, until: 600, layer: 'back', drawer: 'orbitCharge', params: { count: 4, half: 'back', r0: 0.16, r1: 0.24, tongues: 3, tint: PALE } },
-    { at: 400, until: 900, layer: 'back', drawer: 'shockRings', params: { count: 2, delay: 0.3, tint: PALE } },
-    { at: 600, until: 1050, layer: 'front', drawer: 'ring', params: { kind: 'face', count: 3, r0: 0.5, r1: 1.0, width: 0.08, rpm: 120, hues: ['#FF4FB8', '#7FE7FF', '#FF4FB8'] } },
-    { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { tint: RINGS } },
-    { at: 1000, until: 1550, layer: 'front', drawer: 'starFlare', params: { arms: RING5, width: 0.46, tint: RINGS } },
-    { at: 1000, until: 1700, layer: 'back', drawer: 'glyph', params: { r: 0.9, tint: RINGS } },
-    { at: 1000, until: 1900, layer: 'back', drawer: 'cloud', params: { count: 8, radius: 0.4, drift: 0.4, alpha: 0.4, tint: PALE } },
+    { at: 0, until: 800, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.12, r1: 0.32, from: 0.2, tint: PALE } },
+    // The wave closes on the defender before the star bursts inside it.
+    { at: 600, until: 1600, layer: 'front', drawer: 'glyph', params: { r: 0.9, tint: RINGS } },
+    flash(1000, RINGS),
+    star(1000, 1550, RING5, RINGS),
+    { at: 1000, until: 1900, layer: 'back', drawer: 'cloud', params: { count: 5, radius: 0.4, drift: 0.4, alpha: 0.35, tint: PALE } },
   ],
-  particles: [motes(1000, 12, { kind: 'twinkle' })],
+  particles: [motes(1000, 8, { kind: 'twinkle' })],
   grain: 0.1,
 });
 
@@ -243,19 +238,18 @@ export const photonGeyser = Object.freeze({
   contactMs: 1000,
   pad: 1.9,
   attacker: { motion: 'brace', params: { glow: 0.6 } },
-  defender: { motion: 'knock', params: { strength: 0.35, heat: 0.5 } },
+  defender: { motion: 'knock', params: { strength: 0.35, heat: 0.35 } },
+  tint: GEYSER,
   beats: [
-    { at: 0, until: 550, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.18, r1: 0.56, rings: 1, tint: RED_CORE } },
-    { at: 0, until: 550, layer: 'back', drawer: 'aura', params: { target: 'attacker', hz: 2, alpha: 0.5, tint: RED_CORE } },
-    { at: 500, until: 1000, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.34, r1: 0.5, tongues: 6, ease: 'linear', tint: LIME } },
-    { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { tint: LIME } },
-    { at: 1000, until: 1450, layer: 'front', drawer: 'starFlare', params: { arms: 'cross', width: 0.46, tint: LIME } },
-    { at: 1000, until: 1700, layer: 'back', drawer: 'shards', params: { count: 5, arc: 360, distance: 1.1, unit: 'body', tint: { deep: '#1E1B1F', body: '#4A4550', hot: '#8A8590', core: '#C8C4CC' } } },
-    { at: 1000, until: 1400, layer: 'back', drawer: 'ring', params: { kind: 'floor', count: 3, r0: 0.3, r1: 1.5, tint: { deep: '#C8C090', body: '#FFF5D0', hot: '#FFFFFF', core: '#FFFFFF' } } },
-    { at: 1100, until: 2000, layer: 'front', drawer: 'pillar', params: { from: 'below', height: 1.8, w: 0.6, tint: GEYSER } },
-    { at: 1000, until: 2000, layer: 'back', drawer: 'vignette', params: { target: 'defender', maxAlpha: 0.45, tint: GEYSER } },
+    { at: 0, until: 550, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.14, r1: 0.4, from: 0.15, tint: RED_CORE } },
+    { at: 500, until: 1000, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.28, r1: 0.36, tongues: 4, ease: 'linear', tint: LIME } },
+    flash(1000, LIME),
+    star(1000, 1450, 'cross', LIME),
+    { at: 1000, until: 1700, layer: 'back', drawer: 'shards', params: { count: 4, arc: 360, distance: 1.0, unit: 'body', tint: { deep: '#1E1B1F', body: '#4A4550', hot: '#8A8590', core: '#C8C4CC' } } },
+    { at: 1100, until: 2000, layer: 'front', drawer: 'pillar', params: { from: 'below', height: 1.2, w: 0.5, tint: GEYSER } },
+    { at: 1000, until: 2000, layer: 'back', drawer: 'vignette', params: { target: 'defender', maxAlpha: 0.35, tint: GEYSER } },
   ],
-  particles: [motes(1000, 8, { durationMs: 900 }), motes(1500, 10, { kind: 'shard', gravity: 0.2, distance: 1.3, durationMs: 700 })],
+  particles: [motes(1000, 6, { durationMs: 900 }), motes(1500, 6, { kind: 'shard', gravity: 0.2, distance: 1.2, durationMs: 700 })],
   grain: 0.1,
 });
 
@@ -263,8 +257,8 @@ const PRISM = Object.freeze(['#FF5FA2', '#FFD84A', '#4DFF9A', '#47E6FF', '#B98CF
 const PRISM_ORB = Object.freeze({ deep: '#B98CFF', body: '#E8F4FF', hot: '#FFFFFF', core: '#FFFFFF' });
 const PRISM_BURST = Object.freeze({ deep: '#B98CFF', body: '#47E6FF', hot: '#E8FFFF', core: '#FFFFFF' });
 
-// Necrozma: the prism throws rainbow streaks into a ring, a white-hot orb flares beside it, and
-// a five-hue column rises from the defender's floor and bursts in sparks.
+// Necrozma: the prism charges a white-hot orb that flares beside it, and a five-hue column rises
+// from the defender's floor and bursts in sparks.
 export const prismaticLaser = Object.freeze({
   id: 'prismatic-laser',
   name: 'Prismatic Laser',
@@ -277,20 +271,17 @@ export const prismaticLaser = Object.freeze({
   contactMs: 1000,
   pad: 1.9,
   attacker: { motion: 'rear-lurch', params: { rear: 0.12, lurch: 0.35, glow: 1 } },
-  defender: { motion: 'knock', params: { strength: 0.35, heat: 0.6 } },
+  defender: { motion: 'knock', params: { strength: 0.35, heat: 0.35 } },
   beats: [
-    { at: 0, until: 650, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.18, r1: 0.5, tint: PRISM_ORB } },
-    { at: 0, until: 600, layer: 'back', drawer: 'orbitCharge', params: { count: 5, half: 'back', r0: 0.16, r1: 0.24, tongues: 3, hues: PRISM } },
-    { at: 350, until: 800, layer: 'back', drawer: 'ring', params: { target: 'attacker', kind: 'face', count: 3, r0: 0.3, r1: 1.1, width: 0.08, hues: PRISM } },
-    { at: 350, until: 750, layer: 'back', drawer: 'shockRings', params: { count: 2, delay: 0.3, tint: PRISM_ORB } },
-    { at: 600, until: 850, layer: 'front', drawer: 'starFlare', params: { target: 'attacker', arms: RING5, width: 0.46, tint: PRISM_ORB } },
-    { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { tint: PRISM_BURST } },
-    { at: 1000, until: 1900, layer: 'front', drawer: 'pillar', params: { from: 'below', height: 1.8, w: 0.4, count: 3, spread: 0.5, stagger: 60, hues: PRISM } },
-    { at: 1000, until: 1450, layer: 'front', drawer: 'starFlare', params: { arms: 'cross', width: 0.46, tint: PRISM_BURST } },
-    { at: 1000, until: 1900, layer: 'back', drawer: 'vignette', params: { target: 'defender', maxAlpha: 0.45, tint: PRISM_BURST } },
-    { at: 1000, until: 1900, layer: 'back', drawer: 'cloud', params: { count: 6, drift: 0.5, alpha: 0.4, tint: PRISM_ORB } },
+    { at: 0, until: 650, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.12, r1: 0.32, from: 0.15, tint: PRISM_ORB } },
+    { at: 600, until: 850, layer: 'front', drawer: 'starFlare', params: { target: 'attacker', arms: RING5, size: 0.4, width: 0.3, core: 0.14, tint: PRISM_ORB } },
+    flash(1000, PRISM_BURST),
+    { at: 1000, until: 1900, layer: 'front', drawer: 'pillar', params: { from: 'below', height: 1.2, w: 0.36, count: 3, spread: 0.5, stagger: 60, hues: PRISM } },
+    star(1000, 1450, 'cross', PRISM_BURST),
+    { at: 1000, until: 1900, layer: 'back', drawer: 'vignette', params: { target: 'defender', maxAlpha: 0.35, tint: PRISM_BURST } },
+    { at: 1000, until: 1900, layer: 'back', drawer: 'cloud', params: { count: 4, drift: 0.5, alpha: 0.35, tint: PRISM_ORB } },
   ],
-  particles: [motes(0, 6, { anchor: 'attacker', kind: 'twinkle', durationMs: 600 }), motes(1000, 10, { kind: 'twinkle', durationMs: 900 })],
+  particles: [motes(0, 5, { anchor: 'attacker', kind: 'twinkle', durationMs: 600 }), motes(1000, 6, { kind: 'twinkle', durationMs: 900 })],
   grain: 0.1,
 });
 
@@ -298,7 +289,7 @@ const BLADE = Object.freeze({ deep: '#4E1288', body: '#B31DB7', hot: '#FF7AF0', 
 const VIOLET_BURST = Object.freeze({ deep: '#4E1288', body: '#DB96FC', hot: '#F4E0FF', core: '#FFFFFF' });
 
 // Iron Leaves: it dashes in, a long magenta psychic crescent crosses the field into the
-// defender, and a violet-pink explosion with pink rings engulfs it.
+// defender, and a violet-pink explosion engulfs it.
 export const psyblade = Object.freeze({
   id: 'psyblade',
   name: 'Psyblade',
@@ -311,26 +302,24 @@ export const psyblade = Object.freeze({
   contactMs: 1000,
   pad: 1.8,
   attacker: { motion: 'dash', params: { wind: 0.3 } },
-  defender: { motion: 'knock', params: { strength: 0.45, heat: 0.5 } },
+  defender: { motion: 'knock', params: { strength: 0.45, heat: 0.35 } },
   beats: [
-    { at: 0, until: 500, layer: 'back', drawer: 'aura', params: { target: 'attacker', hz: 2, alpha: 0.5, tint: BLADE } },
-    { at: 500, until: 1000, layer: 'front', drawer: 'slashArc', params: { target: 'defender', sweep: 120, radius: 1.0, count: 2, gapDeg: 30, angle: 45, thick: 0.25, tint: BLADE } },
-    { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { tint: VIOLET_BURST } },
-    { at: 1000, until: 1600, layer: 'front', drawer: 'shards', params: { count: 8, arc: 360, distance: 1.1, tint: VIOLET_BURST } },
-    { at: 1000, until: 1700, layer: 'back', drawer: 'ring', params: { kind: 'face', count: 2, r0: 0.3, r1: 1.4, hues: ['#FF7AF0', '#3CE8FF'] } },
-    { at: 1000, until: 2000, layer: 'back', drawer: 'vignette', params: { target: 'defender', maxAlpha: 0.45, tint: VIOLET_BURST } },
-    { at: 1000, until: 2000, layer: 'back', drawer: 'cloud', params: { count: 6, drift: 0.5, alpha: 0.4, tint: VIOLET_BURST } },
-    { at: 1000, until: 2000, layer: 'back', drawer: 'spiral', params: { turns: 1, r0: 0.2, r1: 0.8, rpm: 120, tongues: 10, tint: BLADE } },
+    { at: 500, until: 1000, layer: 'front', drawer: 'slashArc', params: { target: 'defender', sweep: 120, radius: 1.0, count: 2, gapDeg: 30, angle: 45, thick: 0.22, tint: BLADE } },
+    flash(1000, VIOLET_BURST),
+    { at: 1000, until: 1500, layer: 'front', drawer: 'shards', params: { count: 5, arc: 360, distance: 1.0, tint: VIOLET_BURST } },
+    { at: 1000, until: 2000, layer: 'back', drawer: 'vignette', params: { target: 'defender', maxAlpha: 0.35, tint: VIOLET_BURST } },
+    { at: 1000, until: 2000, layer: 'back', drawer: 'cloud', params: { count: 4, drift: 0.5, alpha: 0.35, tint: VIOLET_BURST } },
+    { at: 1000, until: 2000, layer: 'back', drawer: 'spiral', params: { turns: 1, r0: 0.2, r1: 0.8, rpm: 120, tongues: 6, tint: BLADE } },
   ],
-  particles: [motes(1100, 12, { kind: 'twinkle', durationMs: 800 })],
+  particles: [motes(1100, 8, { kind: 'twinkle', durationMs: 800 })],
   grain: 0.1,
 });
 
 const BOOST = Object.freeze({ deep: '#2A0A4A', body: '#C23CFF', hot: '#3CE8FF', core: '#FFFFFF' });
 const BOOST_BURST = Object.freeze({ deep: '#C23CFF', body: '#FF4FD8', hot: '#E8F8FF', core: '#FFFFFF' });
 
-// Deoxys: a violet-white orb ringed with cyan arcs forms over it, flies straight down the lane,
-// and bursts on the defender in a white-violet star with pink-cyan rings.
+// Deoxys: a violet-white orb ringed with a cyan arc forms over it, flies straight down the
+// lane, and bursts on the defender in a white-violet star inside the psychic wave.
 export const psychoBoost = Object.freeze({
   id: 'psycho-boost',
   name: 'Psycho Boost',
@@ -345,28 +334,24 @@ export const psychoBoost = Object.freeze({
   attacker: { motion: 'rear-lurch', params: { rear: 0.12, lurch: 0.35, glow: 1 } },
   defender: { motion: 'float', params: { lift: 0.15 } },
   beats: [
-    { at: 0, until: 600, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.18, r1: 0.56, rings: 1, tint: BOOST } },
-    { at: 0, until: 600, layer: 'back', drawer: 'orbitCharge', params: { count: 5, half: 'back', r0: 0.16, r1: 0.24, tongues: 3, tint: BOOST } },
-    { at: 0, until: 600, layer: 'back', drawer: 'cloud', params: { target: 'attacker', count: 5, radius: 0.35, drift: 0.3, alpha: 0.4, tint: BOOST } },
-    { at: 300, until: 700, layer: 'back', drawer: 'shockRings', params: { count: 2, delay: 0.3, tint: BOOST } },
-    { at: 500, until: 1000, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.34, r1: 0.56, tongues: 6, ease: 'linear', tint: BOOST } },
-    { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { tint: BOOST_BURST } },
-    { at: 1000, until: 1550, layer: 'front', drawer: 'starFlare', params: { arms: RING5, width: 0.46, tint: BOOST_BURST } },
-    { at: 1000, until: 1600, layer: 'back', drawer: 'ring', params: { kind: 'face', count: 2, r0: 0.3, r1: 1.4, hues: ['#FF4FD8', '#3CE8FF'] } },
-    { at: 1000, until: 1600, layer: 'back', drawer: 'vignette', params: { target: 'defender', maxAlpha: 0.45, tint: BOOST } },
+    { at: 0, until: 600, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.14, r1: 0.4, from: 0.15, tint: BOOST } },
+    { at: 0, until: 600, layer: 'back', drawer: 'cloud', params: { target: 'attacker', count: 4, radius: 0.35, drift: 0.3, alpha: 0.35, tint: BOOST } },
+    { at: 500, until: 1000, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.3, r1: 0.4, tongues: 4, ease: 'linear', tint: BOOST } },
+    flash(1000, BOOST_BURST),
+    star(1000, 1550, RING5, BOOST_BURST),
+    { at: 1000, until: 1600, layer: 'back', drawer: 'vignette', params: { target: 'defender', maxAlpha: 0.35, tint: BOOST } },
     { at: 1000, until: 1700, layer: 'back', drawer: 'glyph', params: { r: 0.9, tint: BOOST_BURST } },
   ],
-  particles: [motes(1000, 10, { kind: 'twinkle', durationMs: 800 })],
+  particles: [motes(1000, 7, { kind: 'twinkle', durationMs: 800 })],
   grain: 0.1,
 });
 
-const STRIKE_RINGS = Object.freeze(['#FFD84A', '#FF6FD0', '#8A3CFF']);
-const STRIKE = Object.freeze({ deep: '#8A3CFF', body: '#FFD84A', hot: '#FF6FD0', core: '#FFFFFF' });
+const STRIKE = Object.freeze({ deep: '#5A1FB0', body: '#B04CFF', hot: '#FF6FD0', core: '#FFE0FA' });
 const PAD = Object.freeze({ deep: '#3A107A', body: '#8A3CFF', hot: '#C9A0FF', core: '#FFFFFF' });
 const FLARE = Object.freeze({ deep: '#C04A10', body: '#FF9A2A', hot: '#FFE0A0', core: '#FFFFFF' });
 
-// Mewtwo: its hands draw gold, pink and violet rings into a cluster over a violet pad, the
-// cluster is thrown down the lane, and an orange-white flare bursts on the defender.
+// Mewtwo: its hands draw a ringed cluster over a violet pad, the cluster is thrown down the
+// lane, and an orange-white flare bursts on the defender.
 export const psystrike = Object.freeze({
   id: 'psystrike',
   name: 'Psystrike',
@@ -379,20 +364,17 @@ export const psystrike = Object.freeze({
   contactMs: 1000,
   pad: 1.8,
   attacker: { motion: 'lunge', params: { wind: 0.4, reach: 0.6, glow: 0.8 } },
-  defender: { motion: 'knock', params: { strength: 0.35, heat: 0.6 } },
+  defender: { motion: 'knock', params: { strength: 0.35, heat: 0.35 } },
+  tint: PAD,
   beats: [
     { at: 0, until: 600, layer: 'back', drawer: 'glyph', params: { target: 'attacker', r: 0.9, tint: PAD } },
-    { at: 0, until: 600, layer: 'back', drawer: 'orbitCharge', params: { count: 3, half: 'back', r0: 0.2, r1: 0.4, tongues: 3, hues: STRIKE_RINGS } },
-    { at: 200, until: 600, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.18, r1: 0.5, tint: STRIKE } },
-    { at: 200, until: 900, layer: 'back', drawer: 'ring', params: { target: 'attacker', kind: 'floor', count: 1, r0: 0.3, r1: 0.8, tint: PAD } },
-    { at: 350, until: 650, layer: 'back', drawer: 'shockRings', params: { count: 3, delay: 0.2, tint: STRIKE } },
-    { at: 500, until: 1000, layer: 'front', drawer: 'projectile', params: { path: 'arc', bow: 0.5, r0: 0.4, r1: 0.55, tongues: 0, ease: 'linear', unit: 'rings', tint: STRIKE } },
-    { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { tint: FLARE } },
-    { at: 1000, until: 1550, layer: 'front', drawer: 'starFlare', params: { arms: RING5, width: 0.46, tint: FLARE } },
-    { at: 1000, until: 1600, layer: 'back', drawer: 'ring', params: { kind: 'face', count: 3, r0: 0.3, r1: 1.4, width: 0.08, rpm: 120, hues: STRIKE_RINGS } },
-    { at: 1000, until: 1500, layer: 'back', drawer: 'vignette', params: { target: 'defender', maxAlpha: 0.45, tint: PAD } },
+    { at: 200, until: 600, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.14, r1: 0.36, tint: STRIKE } },
+    { at: 500, until: 1000, layer: 'front', drawer: 'projectile', params: { path: 'arc', bow: 0.5, r0: 0.34, r1: 0.44, tongues: 0, ease: 'linear', tint: STRIKE } },
+    flash(1000, FLARE),
+    star(1000, 1550, RING5, FLARE),
+    { at: 1000, until: 1500, layer: 'back', drawer: 'vignette', params: { target: 'defender', maxAlpha: 0.35, tint: PAD } },
   ],
-  particles: [motes(1000, 8, { kind: 'twinkle', durationMs: 700 })],
+  particles: [motes(1000, 6, { kind: 'twinkle', durationMs: 700 })],
   grain: 0.1,
 });
 

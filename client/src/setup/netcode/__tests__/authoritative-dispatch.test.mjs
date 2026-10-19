@@ -13,6 +13,7 @@ import {
   dispatchAuthoritativeAction,
   dispatchAuthoritativeUseAbility,
   isMirrorSuppressedAction,
+  actsForSide,
 } from '../authoritative-dispatch.js';
 import { setInstanceMap } from '../dual-run-bridge.js';
 
@@ -366,6 +367,48 @@ test('moveCardBundle gate: acting on the opponent zone is not gated', () => {
     ),
     false
   );
+});
+
+test('design 074 D7: a solo room dispatches the far side\'s move as the far side', () => {
+  const calls = [];
+  const dispatched = dispatchAuthoritativeMoveCardBundle(
+    moveParams({ user: 'opp' }),
+    moveOptions({
+      systemState: { serverAuthoritative: true, solo: true },
+      processAction: (...args) => calls.push(args),
+    })
+  );
+  assert.equal(dispatched, true);
+  assert.equal(calls[0][0], 'opp', 'processAction learns the acting side, which names the seat');
+  assert.equal(calls[0][3][0], 'self', 'the relay initiator is the other side, as for self');
+});
+
+test('design 074 D7: actsForSide is self everywhere and opp only in a solo room', () => {
+  assert.equal(actsForSide('self', { systemState: {} }), true);
+  assert.equal(actsForSide('opp', { systemState: { solo: false } }), false);
+  assert.equal(actsForSide('opp', { systemState: { solo: true } }), true);
+  assert.equal(actsForSide('spectator', { systemState: { solo: true } }), false);
+});
+
+test('design 074 D7: the action and ability gates act for the far side in a solo room', () => {
+  const calls = [];
+  const options = {
+    systemState: { serverAuthoritative: true, solo: true },
+    translate: ALWAYS_TRANSLATES,
+    processAction: (...args) => calls.push(args),
+  };
+  assert.equal(
+    dispatchAuthoritativeAction('attack', { user: 'opp', emit: true, commandArgs: [0, null] }, options),
+    true
+  );
+  assert.equal(
+    dispatchAuthoritativeUseAbility(
+      { user: 'opp', emit: true, oInitiator: 'self', zoneId: 'active', index: 0, authoritativeId: 5 },
+      { ...options, registry: stubRegistry([{ instanceId: 5, name: 'Popplio', zone: 'active', side: 'them' }]) }
+    ),
+    true
+  );
+  assert.deepEqual(calls.map((call) => call[0]), ['opp', 'opp']);
 });
 
 test('moveCardBundle gate: unidentifiable moving card falls through to legacy', () => {

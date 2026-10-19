@@ -1,6 +1,9 @@
 // DOM twin of status-loop.mjs: builds and syncs the held-condition loop overlay.
 // Only groups whose condition came or went are touched, so a card that gains
 // Burn while Poisoned keeps its poison loop running instead of restarting it.
+// On the 3D board (design 074 §D6) the scene draws the loop from the placement's conditions
+// (board3d/overlay-meshes.js), so nothing here touches the mirror.
+import { board3dActive } from '../../board3d/board3d.js';
 import { STATUS_LOOP_PARTS, loopPartStyle } from './status-loop.mjs';
 
 function div(doc, className) {
@@ -24,8 +27,13 @@ function buildGroup(doc, key, parts) {
   return group;
 }
 
-/** An empty loop overlay: a card frame (turns with the card) and an upright sky. */
+/**
+ * An empty loop overlay: a card frame (turns with the card) and an upright sky. On the 3D board, an
+ * empty DocumentFragment instead: apply-view's `insertBefore` of it inserts nothing, and its
+ * `parentNode` stays null, so the mirror never holds a loop node.
+ */
 export function createStatusLoop(doc) {
+  if (board3dActive()) return doc.createDocumentFragment();
   const loop = div(doc, 'status-fx-loop');
   loop.contentEditable = 'false';
   loop.card = div(doc, 'status-fx-loop__card');
@@ -37,6 +45,7 @@ export function createStatusLoop(doc) {
 
 /** Adds the groups for newly held `keys` and drops those no longer held. */
 export function syncStatusLoop(loop, keys, doc) {
+  if (board3dActive() || !loop?.groups) return;
   const wanted = new Set(keys);
   for (const [key, groups] of loop.groups) {
     if (wanted.has(key)) continue;
@@ -59,6 +68,7 @@ export function syncStatusLoop(loop, keys, doc) {
  * of the card width, so one font size scales every part.
  */
 export function placeStatusLoop(loop, box) {
+  if (board3dActive() || !loop?.card) return;
   loop.style.left = `${box.left}px`;
   loop.style.top = `${box.top}px`;
   loop.style.width = `${box.width}px`;

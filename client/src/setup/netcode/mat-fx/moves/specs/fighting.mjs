@@ -36,15 +36,12 @@ const spec = (over) => Object.freeze({ vgType: 'fighting', material: 'fighting',
 
 /** One blow on the defender at `at`: an impact ring, a fan of shock streaks, a flash on top. */
 const blow = (at, { ring = 0.9, streaks = 5, reach = 0.5, flash = 0.8 } = {}) => [
-  { at, until: at + 240, layer: 'back', drawer: 'ring', params: { kind: 'face', count: 1, r0: 0.3, r1: ring, width: 0.05 } },
   { at, until: at + 260, layer: 'front', drawer: 'shards', params: { count: streaks, arc: 360, distance: reach, spin: 0 } },
   { at, until: at + 140, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: flash } },
 ];
 
 /** Charge motes spiralling in round a card: the two halves of one orbit. */
 const orbit = (at, until, params) => [
-  { at, until, layer: 'back', drawer: 'orbitCharge', params: { half: 'back', ...params } },
-  { at, until, layer: 'front', drawer: 'orbitCharge', params: { half: 'front', ...params } },
 ];
 
 // ---- physical ------------------------------------------------------------------------
@@ -59,7 +56,7 @@ export const armThrust = spec({
   contactMs: 420,
   // A short shove in; the open-palm slaps land on the defender one after another.
   attacker: { motion: 'lunge', params: { wind: 0.12, reach: 0.45 } },
-  defender: { motion: 'stagger', params: { strength: 0.25, hits: 3, gapMs: 90, heat: 0.4 } },
+  defender: { motion: 'stagger', params: { strength: 0.25, hits: 3, gapMs: 90, heat: 0.35 } },
   beats: [
     { at: 0, until: 420, layer: 'back', drawer: 'aura', params: { target: 'attacker', alpha: 0.4, hz: 3 } },
     ...blow(420, { ring: 0.8, streaks: 4, reach: 0.45, flash: 0.7 }),
@@ -79,13 +76,12 @@ export const karateChop = spec({
   contactMs: 560,
   // A hop in and one hard chop down across the defender, top-right to bottom-left.
   attacker: { motion: 'dash', params: { wind: 0.2, reach: 0.8, overshoot: 0, arc: 0.2 } },
-  defender: { motion: 'knock', params: { strength: 0.45, heat: 0.4 } },
+  defender: { motion: 'knock', params: { strength: 0.45, heat: 0.35 } },
   beats: [
     { at: 0, until: 420, layer: 'back', drawer: 'aura', params: { target: 'attacker', alpha: 0.4, hz: 3 } },
     { at: 430, until: 680, layer: 'front', drawer: 'slashArc', params: { sweep: 150, radius: 0.6, angle: 35, thick: 0.16 } },
-    { at: 560, until: 860, layer: 'back', drawer: 'ring', params: { kind: 'face', count: 1, r0: 0.3, r1: 1.1, width: 0.05 } },
     { at: 570, until: 880, layer: 'front', drawer: 'shards', params: { count: 8, arc: 110, direction: 125, distance: 0.75, spin: 0 } },
-    { at: 560, until: 740, layer: 'top', drawer: 'impactFlash', params: { r1: 1.0 } },
+    { at: 560, until: 740, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
     { at: 700, until: 1250, layer: 'front', drawer: 'smoke', params: { count: 4, rise: 0.6 } },
   ],
   particles: [burst({ at: 560, count: 10, direction: 125, spread: 120, distance: 0.9 })],
@@ -101,14 +97,13 @@ export const lowSweep = spec({
   contactMs: 600,
   // A crouch, then the sweep hooks across the defender's base and kicks dust up off the floor.
   attacker: { motion: 'dash', params: { wind: 0.25, reach: 0.8, overshoot: 0, arc: 0.25 } },
-  defender: { motion: 'knock', params: { strength: 0.4, heat: 0.4 } },
+  defender: { motion: 'knock', params: { strength: 0.4, heat: 0.35 } },
   beats: [
     { at: 0, until: 360, layer: 'back', drawer: 'aura', params: { target: 'attacker', alpha: 0.4, hz: 3 } },
     { at: 440, until: 680, layer: 'front', drawer: 'slashArc', params: { sweep: 150, radius: 0.5, angle: 90, thick: 0.15 } },
     { at: 600, until: 1000, layer: 'back', drawer: 'terrain', params: { kind: 'dust', radius: 1.0 } },
-    { at: 600, until: 900, layer: 'back', drawer: 'ring', params: { kind: 'floor', count: 1, r0: 0.4, r1: 1.3 } },
     { at: 600, until: 950, layer: 'front', drawer: 'shards', params: { count: 8, arc: 140, direction: -90, distance: 0.8, spin: 0 } },
-    { at: 600, until: 760, layer: 'top', drawer: 'impactFlash', params: { r1: 1.0 } },
+    { at: 600, until: 760, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
   ],
   particles: [burst({ at: 600, count: 10, spread: 150, distance: 0.9 })],
 });
@@ -123,7 +118,7 @@ export const tripleKick = spec({
   contactMs: 580,
   attacker: { motion: 'dash', params: { wind: 0.2, reach: 0.75, overshoot: 0.05, arc: 0.3 } },
   // Three kicks 200 ms apart; the third is the biggest and springs the card home.
-  defender: { motion: 'stagger', params: { strength: 0.4, hits: 3, gapMs: 200, heat: 0.4 } },
+  defender: { motion: 'stagger', params: { strength: 0.4, hits: 3, gapMs: 200, heat: 0.35 } },
   beats: [
     { at: 0, until: 400, layer: 'back', drawer: 'aura', params: { target: 'attacker', alpha: 0.4, hz: 3 } },
     ...blow(580, { ring: 0.9, streaks: 6, reach: 0.5, flash: 0.8 }),
@@ -143,19 +138,20 @@ export const closeCombat = spec({
   contactMs: 900,
   attacker: { motion: 'dash', params: { wind: 0.3, reach: 1.0, overshoot: 0.1, arc: 0.3 } },
   // The barrage: six blows 80 ms apart from contact, the last the heavy one.
-  defender: { motion: 'stagger', params: { strength: 0.45, hits: 6, gapMs: 80, heat: 0.5 } },
+  defender: { motion: 'stagger', params: { strength: 0.45, hits: 6, gapMs: 80, heat: 0.35 } },
   beats: [
     // The sprite's black-out, kept local and dark round the defender.
     { at: 0, until: 1650, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.42 } },
     { at: 0, until: 600, layer: 'back', drawer: 'aura', params: { target: 'attacker', alpha: 0.5, hz: 3 } },
     // Eight impact stamps at jittered spots over the defender (the fighting sigil).
     { at: 700, until: 1350, layer: 'front', drawer: 'glyph', params: { r: 0.9 } },
+    { at: 900, until: 1150, layer: 'front', drawer: 'fan', params: { target: 'defender', count: 6, spread: 360, lenMin: 0.4, lenMax: 0.8, width: 0.12, tint: { deep: '#C8641E', body: '#FFB13B', hot: '#FFE27A', core: '#FFF8D8' } } },
+    { at: 1100, until: 1350, layer: 'front', drawer: 'fan', params: { target: 'defender', count: 5, spread: 360, direction: 30, lenMin: 0.4, lenMax: 0.9, width: 0.12, tint: { deep: '#C8641E', body: '#FFB13B', hot: '#FFE27A', core: '#FFF8D8' } } },
     { at: 900, until: 1400, layer: 'front', drawer: 'shards', params: { count: 12, arc: 360, distance: 1.0, spin: 0 } },
-    { at: 900, until: 1060, layer: 'top', drawer: 'impactFlash', params: { r1: 1.0 } },
+    { at: 900, until: 1060, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
     // The last blow lands at 900 + 5 x 80.
-    { at: 1300, until: 1650, layer: 'back', drawer: 'ring', params: { kind: 'face', count: 1, r0: 0.4, r1: 1.5, width: 0.06 } },
     { at: 1300, until: 1700, layer: 'front', drawer: 'shards', params: { count: 10, arc: 360, distance: 1.2, spin: 0 } },
-    { at: 1300, until: 1480, layer: 'top', drawer: 'impactFlash', params: { r1: 1.3 } },
+    { at: 1300, until: 1480, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
     { at: 1400, until: 1900, layer: 'front', drawer: 'smoke', params: { count: 5, rise: 0.8 } },
   ],
   particles: [burst({ at: 900, count: 12, distance: 1.1 }), burst({ at: 1300, count: 10, distance: 1.3 })],
@@ -171,17 +167,17 @@ export const meteorAssault = spec({
   contactMs: 1000,
   // The gathering glow, a ram in with the bow-shock ringing off the start, a scorching blast.
   attacker: { motion: 'dash', params: { wind: 0.3, reach: 1.0, overshoot: 0.2, arc: 0.35 } },
-  defender: { motion: 'knock', params: { strength: 0.5, heat: 0.7 } },
+  defender: { motion: 'knock', params: { strength: 0.5, heat: 0.35 } },
+  tint: { deep: '#A86A00', body: '#F5C02E', hot: '#FFE98A', core: '#FFF8D8' },
   beats: [
-    { at: 0, until: 700, layer: 'back', drawer: 'aura', params: { target: 'attacker', alpha: 0.6, hz: 3 } },
-    { at: 0, until: 700, layer: 'front', drawer: 'coreCharge', params: { r0: 0.12, r1: 0.4, from: 0.2 } },
-    { at: 600, until: 1000, layer: 'back', drawer: 'shockRings', params: { count: 3, delay: 0.25, r0: 0.4, r1: 1.4, squash: 0.5 } },
+    { at: 0, until: 700, layer: 'back', drawer: 'aura', params: { target: 'attacker', alpha: 0.6, hz: 3, tint: { deep: '#A86A00', body: '#F5C02E', hot: '#FFE98A', core: '#FFF8D8' } } },
+    { at: 0, until: 700, layer: 'front', drawer: 'coreCharge', params: { r0: 0.12, r1: 0.4, from: 0.2, tint: { deep: '#A86A00', body: '#F5C02E', hot: '#FFE98A', core: '#FFF8D8' } } },
     { at: 800, until: 1800, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.35 } },
     { at: 1000, until: 1600, layer: 'back', drawer: 'terrain', params: { kind: 'crack', radius: 1.3 } },
-    { at: 1000, until: 1450, layer: 'back', drawer: 'ring', params: { kind: 'floor', count: 2, r0: 0.3, r1: 1.7 } },
+    { at: 1000, until: 1300, layer: 'front', drawer: 'fan', params: { target: 'defender', count: 8, spread: 360, lenMin: 0.5, lenMax: 1.0, width: 0.12, tint: { deep: '#A86A00', body: '#F5C02E', hot: '#FFE98A', core: '#FFF8D8' } } },
     { at: 1000, until: 1400, layer: 'front', drawer: 'shards', params: { count: 14, arc: 360, distance: 1.3, spin: 0 } },
     { at: 1100, until: 1700, layer: 'front', drawer: 'shards', params: { count: 8, arc: 140, direction: -90, distance: 1.2, spin: 0 } },
-    { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { r1: 1.3 } },
+    { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
     { at: 1300, until: 2000, layer: 'front', drawer: 'smoke', params: { count: 6 } },
   ],
   particles: [burst({ at: 1000, count: 14, distance: 1.3 }), burst({ at: 1200, count: 8, spread: 140, distance: 1.1, durationMs: 700 })],
@@ -197,15 +193,14 @@ export const superpower = spec({
   contactMs: 1000,
   // Power wells up round the attacker (floor rings, rising heat), then one heavy charge in.
   attacker: { motion: 'dash', params: { wind: 0.3, reach: 1.0, overshoot: 0.15, arc: 0.3 } },
-  defender: { motion: 'knock', params: { strength: 0.5, heat: 0.6 } },
+  defender: { motion: 'knock', params: { strength: 0.5, heat: 0.35 } },
   beats: [
     { at: 0, until: 800, layer: 'back', drawer: 'aura', params: { target: 'attacker', alpha: 0.65, hz: 2.5 } },
-    { at: 0, until: 800, layer: 'back', drawer: 'ring', params: { target: 'attacker', kind: 'floor', count: 2, r0: 0.8, r1: 0.6 } },
     { at: 100, until: 850, layer: 'front', drawer: 'cloud', params: { target: 'attacker', count: 7, radius: 0.3, drift: 0.7, alpha: 0.55 } },
     { at: 900, until: 1700, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.35 } },
-    { at: 1000, until: 1500, layer: 'back', drawer: 'ring', params: { kind: 'face', count: 1, r0: 0.4, r1: 1.6, width: 0.06 } },
+    { at: 1000, until: 1300, layer: 'front', drawer: 'fan', params: { target: 'defender', count: 8, spread: 360, lenMin: 0.5, lenMax: 1.0, width: 0.14, tint: { deep: '#B8501E', body: '#FF9A2E', hot: '#FFD860', core: '#FFF4D0' } } },
     { at: 1000, until: 1400, layer: 'front', drawer: 'shards', params: { count: 14, arc: 360, distance: 1.3, spin: 0 } },
-    { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { r1: 1.3 } },
+    { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
     { at: 1250, until: 2000, layer: 'front', drawer: 'smoke', params: { count: 6 } },
   ],
   particles: [
@@ -228,13 +223,12 @@ export const vacuumWave = kiSpec({
   contactMs: 450,
   // A swing of the arm throws one small swirling ki ball; it bursts in a bubble round the foe.
   attacker: { motion: 'brace', params: { rear: 0.06, scale: 1.04, glow: 0.7 } },
-  defender: { motion: 'knock', params: { strength: 0.2, heat: 0.5 } },
+  defender: { motion: 'knock', params: { strength: 0.2, heat: 0.35 } },
   beats: [
     { at: 0, until: 300, layer: 'back', drawer: 'aura', params: { target: 'attacker', alpha: 0.45, hz: 4 } },
     { at: 150, until: 450, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.12, r1: 0.18, tongues: 2 } },
-    { at: 450, until: 800, layer: 'back', drawer: 'ring', params: { kind: 'face', count: 1, r0: 0.5, r1: 1.1, width: 0.05 } },
     { at: 450, until: 750, layer: 'front', drawer: 'shards', params: { count: 6, arc: 360, distance: 0.5, spin: 0 } },
-    { at: 450, until: 590, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.9 } },
+    { at: 450, until: 590, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
   ],
   particles: [burst({ at: 500, kind: 'mote', count: 8, aspect: 1, size: [0.03, 0.06], spread: 160, distance: 0.7, maxDelay: 0.3, durationMs: 600 })],
 });
@@ -248,17 +242,14 @@ export const auraSphere = kiSpec({
   durationMs: 1500,
   contactMs: 900,
   attacker: { motion: 'rear-lurch', params: { rear: 0.12, lurch: 0.35, glow: 1 } },
-  defender: { motion: 'knock', params: { strength: 0.35, heat: 0.5 } },
+  defender: { motion: 'knock', params: { strength: 0.35, heat: 0.35 } },
   beats: [
     { at: 0, until: 600, layer: 'back', drawer: 'aura', params: { target: 'attacker', alpha: 0.5, hz: 3 } },
     // The blue swirl winding round the white core at the attacker's palms.
-    { at: 100, until: 620, layer: 'front', drawer: 'spiral', params: { target: 'attacker', turns: 2, r0: 0.25, r1: 0.75, rpm: 150, tongues: 8 } },
     { at: 100, until: 620, layer: 'front', drawer: 'coreCharge', params: { r0: 0.12, r1: 0.4, from: 0.15 } },
-    { at: 560, until: 860, layer: 'back', drawer: 'shockRings', params: { count: 2, r0: 0.3, r1: 1.1 } },
     { at: 560, until: 910, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.36, r1: 0.42, tongues: 4 } },
-    { at: 900, until: 1250, layer: 'back', drawer: 'ring', params: { kind: 'face', count: 2, r0: 0.3, r1: 1.3, width: 0.05 } },
     { at: 900, until: 1250, layer: 'front', drawer: 'shards', params: { count: 10, arc: 360, distance: 1.0, spin: 0 } },
-    { at: 900, until: 1080, layer: 'top', drawer: 'impactFlash', params: { r1: 1.2 } },
+    { at: 900, until: 1080, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
   ],
   particles: [
     burst({ at: 900, count: 12, distance: 1.1 }),
@@ -275,20 +266,18 @@ export const focusBlast = kiSpec({
   durationMs: 2100,
   contactMs: 1200,
   attacker: { motion: 'rear-lurch', params: { rear: 0.16, lurch: 0.4, glow: 1 } },
-  defender: { motion: 'knock', params: { strength: 0.45, heat: 0.6 } },
+  defender: { motion: 'knock', params: { strength: 0.45, heat: 0.35 } },
   beats: [
     { at: 0, until: 900, layer: 'back', drawer: 'aura', params: { target: 'attacker', alpha: 0.6, hz: 2.5 } },
     // Motes spiral in and the ki gathers into one big sphere, which leaves slowly and closes fast.
     ...orbit(0, 880, { count: 6, r0: 0.07, r1: 0.11, tongues: 1, tilt: 0.5 }),
-    { at: 250, until: 900, layer: 'front', drawer: 'coreCharge', params: { r0: 0.15, r1: 0.55, from: 0.1 } },
-    { at: 850, until: 1200, layer: 'back', drawer: 'shockRings', params: { count: 2, r0: 0.4, r1: 1.4 } },
-    { at: 880, until: 1210, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.5, r1: 0.6, tongues: 5 } },
+    { at: 250, until: 900, layer: 'front', drawer: 'coreCharge', params: { r0: 0.15, r1: 0.55, from: 0.1, tint: { deep: '#1E6EA8', body: '#5FD8FF', hot: '#C8F4FF', core: '#EEFBFF' } } },
+    { at: 880, until: 1210, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.5, r1: 0.6, tongues: 5, tint: { deep: '#1E6EA8', body: '#5FD8FF', hot: '#C8F4FF', core: '#EEFBFF' } } },
     // The navy vignette stands in for the sprite's red backdrop.
     { at: 1000, until: 1900, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.4 } },
-    { at: 1200, until: 1750, layer: 'back', drawer: 'ring', params: { kind: 'face', count: 2, r0: 0.4, r1: 1.8, width: 0.06 } },
     { at: 1200, until: 1600, layer: 'front', drawer: 'shards', params: { count: 14, arc: 360, distance: 1.3, spin: 0 } },
     { at: 1300, until: 1800, layer: 'front', drawer: 'shards', params: { count: 8, arc: 140, direction: -90, distance: 1.1, spin: 0 } },
-    { at: 1200, until: 1380, layer: 'top', drawer: 'impactFlash', params: { r1: 1.4 } },
+    { at: 1200, until: 1380, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
   ],
   particles: [
     burst({ at: 1200, count: 14, distance: 1.3 }),

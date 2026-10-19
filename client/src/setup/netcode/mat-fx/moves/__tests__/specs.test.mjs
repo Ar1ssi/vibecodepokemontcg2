@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ALL_MOVES, MOVE_TABLE, VG_TYPES } from '../move-table.mjs';
 import { moveFor } from '../move-select.mjs';
-import { validateSpec } from '../move-spec.mjs';
+import { TRAVEL_DRAWERS, travelBeats, validateSpec } from '../move-spec.mjs';
 import { REFERENCE_SPEC_IDS, SPECS } from '../specs/index.mjs';
 import { fireBlast } from '../specs/fire.mjs';
 import { WATER_SPECS } from '../specs/water.mjs';
@@ -373,8 +373,10 @@ test('the Fairy row ships whole: fairy material, no grain, a local hit at contac
   assert.ok(rough.beats.some((beat) => beat.drawer === 'cloud' && beat.layer === 'front' && beat.at < rough.contactMs), 'the fight cloud');
   for (const move of ['disarming-voice', 'draining-kiss', 'dazzling-gleam']) assert.equal(FAIRY_SPECS[move].family, 'chime', move);
   assert.equal(FAIRY_SPECS['fairy-wind'].family, 'wind');
-  const gust = FAIRY_SPECS['fairy-wind'].beats.find((beat) => beat.drawer === 'beam');
-  assert.equal(gust.at + gust.params.growIn * (gust.until - gust.at), FAIRY_SPECS['fairy-wind'].contactMs, 'the gust lands at contact');
+  // Design 075 parity: Scarlet/Violet's Fairy Wind is swirling wind, not a beam; the gusts land at contact.
+  const gust = FAIRY_SPECS['fairy-wind'].beats.find((beat) => beat.drawer === 'volley');
+  assert.equal(gust.until, FAIRY_SPECS['fairy-wind'].contactMs, 'the gusts land at contact');
+  assert.ok(FAIRY_SPECS['fairy-wind'].beats.every((beat) => beat.drawer !== 'beam'));
   const voice = FAIRY_SPECS['disarming-voice'].beats.find((beat) => beat.drawer === 'volley');
   assert.equal(voice.until, FAIRY_SPECS['disarming-voice'].contactMs, 'the last twinkle lands at contact');
   const drain = FAIRY_SPECS['draining-kiss'].beats.find((beat) => beat.drawer === 'volley');
@@ -411,7 +413,10 @@ test('the Ghost row ships whole: ghost material, the recipe grain, a local hit a
     assert.ok(spec.particles.some((burst) => burst.anchor === 'defender' && burst.at >= spec.contactMs), `${move}: motes off the hit`);
     if (spec.statClass === 'physical') assert.ok(['dash', 'lunge'].includes(spec.attacker.motion), `${move}: the weight is in the card`);
   }
-  for (const id of ['astonish', 'phantom-force', 'night-shade', 'hex']) {
+  // Design 075 parity: Scarlet/Violet's Astonish is a violet burst, not the eyes of the sprite games.
+  assert.ok(GHOST_SPECS.astonish.beats.some((beat) => beat.drawer === 'aura' && beat.params.target === 'defender'), 'astonish: a violet burst on the defender');
+  assert.equal(GHOST_SPECS.astonish.family, 'ghost');
+  for (const id of ['phantom-force', 'night-shade', 'hex']) {
     const spec = GHOST_SPECS[id];
     assert.equal(spec.family, 'ghost', `${id}: a curse sounds the ghost voice`);
     const eyes = spec.beats.find((beat) => beat.drawer === 'glyph');
@@ -458,7 +463,8 @@ test('the Poison row ships whole: poison material, the recipe grain, a local hit
     const pool = spec.beats.find((beat) => beat.drawer === 'glyph');
     assert.ok(pool && (pool.params.target ?? 'defender') === 'defender', `${move}: bubbles rise off the defender`);
     assert.ok(pool.at > spec.contactMs, `${move}: the pool follows the hit (the family stays the hit's)`);
-    assert.ok(spec.defender.params.heat >= 0.5, `${move}: the struck card turns violet`);
+    // Design 075 style pass: the violet sheen stays faint; the pool and its bubbles carry the poisoning.
+    assert.ok(spec.defender.params.heat >= 0.3 && spec.defender.params.heat <= 0.35, `${move}: the struck card takes a faint violet sheen`);
     if (spec.statClass === 'physical') assert.ok(['dash', 'lunge'].includes(spec.attacker.motion), `${move}: the weight is in the card`);
   }
   assert.equal(POISON_SPECS['poison-sting'].family, 'projectile');
@@ -501,9 +507,9 @@ test('the Poison row ships whole: poison material, the recipe grain, a local hit
   const wave = POISON_SPECS['sludge-wave'];
   assert.equal(wave.family, 'splash');
   const flood = wave.beats.find((beat) => beat.drawer === 'beam');
-  assert.equal(flood.params.kind, 'widening');
+  assert.equal(flood.params.kind, 'pulse-train', 'a flood of venom globs (no white beam core)');
   assert.equal(flood.at + flood.params.growIn * (flood.until - flood.at), wave.contactMs, 'the flood lands at contact');
-  assert.ok(wave.beats.some((beat) => beat.drawer === 'terrain' && beat.params.kind === 'wave'), 'the wave rolls over the floor');
+  assert.ok(wave.beats.some((beat) => beat.drawer === 'pillar' && beat.params.target === 'attacker' && beat.at < wave.contactMs), 'sludge wells up behind the attacker');
 });
 
 test('the Ground row ships whole: earth for the quakes, mud for the throws, the recipe grain, a local hit at contact, no sunburst', () => {
@@ -779,7 +785,7 @@ test('the Ice row ships whole: ice crystals (aurora for Aurora Beam), a navy vig
   assert.equal(spinner.beats.find((beat) => beat.drawer === 'projectile').until, spinner.contactMs, 'the disc lands at contact');
 
   // Streams and lances: the head reaches the card at contact and carries the family.
-  for (const [id, kind] of [['powder-snow', 'pulse-train'], ['aurora-beam', 'pulse-train'], ['ice-beam', 'solid']]) {
+  for (const [id, kind] of [['powder-snow', 'pulse-train'], ['aurora-beam', 'solid'], ['ice-beam', 'solid']]) {
     const spec = ICE_SPECS[id];
     const beam = spec.beats.find((beat) => beat.drawer === 'beam');
     assert.equal(beam.params.kind, kind, `${id}: beam kind`);
@@ -872,7 +878,7 @@ test('the Bug row ships whole: bug needles (buzz for Bug Buzz, silver for Silver
   assert.equal(horn.params.path, 'straight', 'the horn drives straight in');
   assert.ok(horn.params.r1 >= 0.3, 'a great horn, not a pin');
   assert.ok(BUG_SPECS.megahorn.defender.params.strength >= 0.45, 'Megahorn hits heavy');
-  assert.ok(BUG_SPECS.megahorn.beats.some((beat) => beat.drawer === 'ring' && beat.params.kind === 'floor' && beat.at === BUG_SPECS.megahorn.contactMs), 'a floor ring, not the red backdrop');
+  assert.ok(BUG_SPECS.megahorn.beats.every((beat) => beat.drawer !== 'ring'), 'no ring (design 075 parity: rings read as clip art)');
 
   // Streams: the head reaches the card at contact.
   for (const [id, kind] of [['silver-wind', 'helix'], ['signal-beam', 'segmented'], ['bug-buzz', 'pulse-train']]) {
@@ -903,25 +909,29 @@ test('the Bug row ships whole: bug needles (buzz for Bug Buzz, silver for Silver
   assert.ok(wind.particles.every((burst) => burst.kind === 'mote'), 'silver powder');
 });
 
-test('Fire Blast is the accepted look test: 1900 ms, contact at 1000 ms, 10 beats, one ember burst', () => {
+test('Fire Blast: the 大 flies whole and lands as a held flare, with small contact dressing', () => {
   assert.equal(fireBlast.durationMs, 1900);
   assert.equal(fireBlast.contactMs, 1000);
-  assert.equal(fireBlast.beats.length, 10);
+  assert.equal(fireBlast.beats.length, 4);
   assert.equal(fireBlast.particles.length, 1);
-  assert.equal(fireBlast.particles[0].count, 22);
+  assert.equal(fireBlast.particles[0].count, 10);
   assert.equal(fireBlast.particles[0].kind, 'ember');
   assert.equal(fireBlast.grain, 0.28);
   assert.equal(fireBlast.family, 'burst');
   assert.equal(fireBlast.tier, 3);
   const at = (drawer) => fireBlast.beats.filter((beat) => beat.drawer === drawer).map((beat) => [beat.at, beat.until]);
-  assert.deepEqual(at('orbitCharge'), [[0, 620], [0, 620]]);
-  assert.deepEqual(at('shockRings'), [[560, 940]]);
-  assert.deepEqual(at('projectile'), [[620, 1000]]);
-  assert.deepEqual(at('vignette'), [[820, 1850]]);
-  assert.deepEqual(at('speedRays'), [[1000, 1320]]);
-  assert.deepEqual(at('starFlare'), [[1000, 1750]]);
-  assert.deepEqual(at('impactFlash'), [[1000, 1180]]);
-  assert.deepEqual(at('smoke'), [[1300, 1900]]);
+  assert.deepEqual(at('orbitCharge'), [], 'no orbit charge');
+  assert.deepEqual(at('speedRays'), [], 'no speed rays');
+  assert.deepEqual(at('projectile'), [[160, 1000]]);
+  assert.deepEqual(at('starFlare'), [[1000, 1700]]);
+  assert.deepEqual(at('impactFlash'), [], 'no white flash over the landed 大');
+  const shot = fireBlast.beats.find((beat) => beat.drawer === 'projectile').params;
+  const flare = fireBlast.beats.find((beat) => beat.drawer === 'starFlare').params;
+  assert.equal(shot.flare, 'dai');
+  assert.equal(shot.size, flare.size, 'the landed flare is the size the shot arrives at');
+  assert.equal(shot.flareWidth, flare.width);
+  assert.equal(shot.flareCore, flare.core);
+  assert.equal(flare.grow, 0, 'it arrives whole instead of bursting out at contact');
 });
 
 test('with no specs every attack plays the generic lunge (moveFor yields null)', () => {
@@ -942,4 +952,41 @@ test('moveFor plays the Fire Blast spec once its cell points at it', () => {
 test('a zero-damage attack picks no move even when its spec exists', () => {
   const pointed = Object.fromEntries(FIRE_SPECIAL_AND_PHYSICAL_3.map((move) => [move, fireBlast]));
   assert.equal(moveFor(charizardEx, { instanceId: 101, attackName: 'Rest', damage: 0 }, pointed), null);
+});
+
+test('design 069: travelBeats are each shipped move’s pre-contact lane travellers, memoised', async () => {
+  const { SIGNATURE_SPECS } = await import('../signature/specs/index.mjs');
+  const all = [...Object.values(SPECS), ...Object.values(SIGNATURE_SPECS)].map((entry) => entry.spec ?? entry);
+  let travelling = 0;
+  for (const spec of all) {
+    const beats = travelBeats(spec);
+    assert.equal(travelBeats(spec), beats, `${spec.id}: memoised`);
+    for (const beat of beats) {
+      assert.ok(spec.beats.includes(beat), `${spec.id}: a beat of the spec`);
+      assert.ok(TRAVEL_DRAWERS.includes(beat.drawer), `${spec.id}: ${beat.drawer} travels`);
+      assert.ok(beat.at < spec.contactMs, `${spec.id}: starts before contact`);
+      assert.notEqual(beat.params?.from, 'defender', `${spec.id}: not a drain`);
+    }
+    if (beats.length > 0) travelling += 1;
+  }
+  assert.ok(travelling > 100, `${travelling} specs travel`);
+  assert.deepEqual(travelBeats(SPECS.bulldoze), []);
+  assert.ok(SPECS.absorb.beats.some((beat) => beat.params?.from === 'defender'));
+  assert.ok(travelBeats(SPECS.absorb).every((beat) => beat.params?.from !== 'defender'));
+  assert.deepEqual(travelBeats(null), []);
+});
+
+test('design 069: travelBeats keeps what flies to the defender before contact, nothing else', () => {
+  const beat = (drawer, at, params = {}) => ({ drawer, at, until: at + 200, layer: 'front', params });
+  const charge = beat('coreCharge', 0, { target: 'attacker' });
+  const shot = beat('projectile', 200);
+  const skyBolt = beat('bolt', 300, { from: 'sky' });
+  const beam = beat('beam', 350);
+  const volley = beat('volley', 100);
+  const drain = beat('volley', 250, { from: 'defender' });
+  const afterContact = beat('projectile', 600);
+  const payoff = beat('starFlare', 560, { target: 'defender' });
+  const spec = { id: 'synthetic', contactMs: 560, beats: [charge, shot, skyBolt, beam, volley, drain, afterContact, payoff] };
+  assert.deepEqual(travelBeats(spec), [shot, skyBolt, beam, volley]);
+  assert.deepEqual(travelBeats({ id: 'empty', contactMs: 500 }), []);
 });

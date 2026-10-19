@@ -9,7 +9,10 @@ import {
   ownedFirst,
   groupCoinsByRelease,
   isPlaceholderCoin,
+  loadCoinCatalog,
 } from '../core/coins.mjs';
+
+await loadCoinCatalog();
 
 test('isPlaceholderCoin distinguishes placeholder paths from real art', () => {
   assert.equal(isPlaceholderCoin({ url: 'src/assets/coins/bulbapedia/X.jpg' }), true);

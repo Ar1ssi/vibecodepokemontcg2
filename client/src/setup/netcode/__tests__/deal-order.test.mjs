@@ -5,7 +5,12 @@ import {
   resetDealOrder,
   waitForDealOrder,
   getDealOrderStarter,
+  OPENING_DEAL_WAIT_MS,
 } from '../deal-order.js';
+import {
+  TURN_ORDER_CALL_TIMEOUT_MS,
+  TURN_ORDER_CHOICE_TIMEOUT_MS,
+} from '../../../../../server/game/room.mjs';
 
 test('deal-order: starter round-trips through setDealOrder/getDealOrderStarter', () => {
   resetDealOrder();
@@ -51,3 +56,30 @@ test('deal-order: waitForDealOrder consumes pendingOrder so second call waits fo
   assert.equal(second, null);
 });
 
+
+// Design 072: the server deals only after the coin call and the winner's first/second
+// choice, each with its own timeout. Set Up must outwait both, or it falls back to a
+// local shuffle on every slow answer.
+test('deal-order: the opening wait outlasts the call and choice timeouts', () => {
+  assert.ok(
+    OPENING_DEAL_WAIT_MS >= TURN_ORDER_CALL_TIMEOUT_MS + TURN_ORDER_CHOICE_TIMEOUT_MS + 4000,
+    `${OPENING_DEAL_WAIT_MS} ms must cover both timeouts plus the ceremony`
+  );
+});
+
+test('design 074 D7: a solo room keeps each seat\'s deal and starter apart', async () => {
+  resetDealOrder();
+  setDealOrder([1, 2, 3], 'self', 'p1');
+  setDealOrder([4, 5, 6], 'opp', 'p2');
+  assert.equal(getDealOrderStarter('p1'), 'self');
+  assert.equal(getDealOrderStarter('p2'), 'opp');
+  assert.equal(getDealOrderStarter(), null, 'the unnamed slot is a normal room\'s');
+  assert.deepEqual(await waitForDealOrder(10, 'p2'), [4, 5, 6]);
+  assert.deepEqual(await waitForDealOrder(10, 'p1'), [1, 2, 3]);
+  const later = waitForDealOrder(1000, 'p2');
+  setDealOrder([7], 'self', 'p1');
+  setDealOrder([8], 'self', 'p2');
+  assert.deepEqual(await later, [8]);
+  resetDealOrder();
+  assert.equal(getDealOrderStarter('p1'), null);
+});

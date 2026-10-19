@@ -1,8 +1,11 @@
 import {
       filterSleevesByName,
       getSleeves,
+      loadSleeveCatalog,
       ownedFirst,
+      sleeveCatalogLoaded,
     } from '../../../setup/deck-builder/core/sleeves.mjs';
+    import { deferredPicker } from '../../../setup/deck-builder/core/catalog-loader.mjs';
     import { DEFAULT_CARD_BACK_PATH } from '../../../setup/deck-constructor/default-card-back.mjs';
     
     const escapeHtml = (value = '') => String(value)
@@ -14,7 +17,7 @@ import {
     
     /**
      * Card sleeve picker for the native deck builder. Renders a horizontally
-     * scrollable gallery of Mega Evolution sleeves with image previews; clicking
+     * scrollable gallery of TCG Live sleeves with image previews; clicking
      * a sleeve selects it for the current deck. The selection is communicated to
      * the deck library through the onChange callback.
      *
@@ -24,14 +27,28 @@ import {
      * @param {() => string[]} [options.getOwnedIds] - sleeve ids the player's Elite Trainer Boxes
      *   gave them (design 057): listed first with an "Owned" tag
      * @returns {object|null} controller, or null when the panel is missing
+     *
+     * The catalog is JSON loaded on demand (design 073): until it is in, the panel stays empty and
+     * the controller keeps the selection it is given.
      */
-    export const initializeDeckBuilderSleevePicker = ({
+    export const initializeDeckBuilderSleevePicker = (options) => {
+      if (!options.panelEl) return null;
+      if (sleeveCatalogLoaded()) return buildSleevePicker(options);
+      return deferredPicker({
+        panelEl: options.panelEl,
+        load: loadSleeveCatalog,
+        build: () => buildSleevePicker(options),
+        label: 'sleeve picker',
+        failureText: 'Sleeves could not be loaded.',
+        noteClass: 'native-deck-builder-sleeve-empty',
+      });
+    };
+
+    const buildSleevePicker = ({
       panelEl,
       onChange,
       getOwnedIds = () => [],
     }) => {
-      if (!panelEl) return null;
-    
       const sleeves = getSleeves();
     
       let selectedId = null;
@@ -93,7 +110,7 @@ import {
               const isOwned = ownedIds.has(sleeve.id);
               return [
                 `<button class="native-deck-builder-sleeve-thumb${isSelected ? ' selected' : ''}${isOwned ? ' is-owned' : ''}" data-sleeve-id="${escapeHtml(sleeve.id)}" title="${escapeHtml(sleeve.name || 'Sleeve')}${isOwned ? ' · Owned' : ''}" aria-pressed="${isSelected ? 'true' : 'false'}">`,
-                `  <img src="${escapeHtml(sleeve.image)}" alt="${escapeHtml(sleeve.name)}" loading="lazy" />`,
+                `  <img src="${escapeHtml(sleeve.thumb || sleeve.image)}" alt="${escapeHtml(sleeve.name)}" loading="lazy" />`,
                 isOwned ? '  <span class="native-deck-builder-owned-tag">Owned</span>' : '',
                 `</button>`,
               ].join('');

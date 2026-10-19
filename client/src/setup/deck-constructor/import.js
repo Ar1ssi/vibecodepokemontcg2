@@ -21,12 +21,14 @@ const mainImportHeaderButton = document.getElementById('mainImportHeaderButton')
 // Wire parameters are [deckData, format]; see deck-format-args.mjs for the argument order.
 export const loadDeckData = (user, deckData, format, emitArg) => {
   const { format: deckFormat, emit } = resolveFormatAndEmit(format, emitArg);
-  systemState.deckFormat[deckFormatSlot(user, systemState.isTwoPlayer)] = deckFormat;
+  // Design 074 D7: a solo room's far deck is the solo "alt" deck, not a room opponent's.
+  const roomOpponent = systemState.isTwoPlayer && !systemState.solo;
+  systemState.deckFormat[deckFormatSlot(user, roomOpponent)] = deckFormat;
   if (user === 'self') {
     systemState.selfDeckData = deckData;
     // Replays (emit=false) may carry another player's deck; only a local load is ours.
     if (emit) rememberOwnDeck(systemState, deckData, deckFormat);
-  } else if (systemState.isTwoPlayer) {
+  } else if (roomOpponent) {
     systemState.p2OppDeckData = deckData;
   } else {
     systemState.p1OppDeckData = deckData;

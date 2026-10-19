@@ -1,5 +1,5 @@
 /**
- * Shared runtime state (socket, systemState, playmat iframe refs).
+ * Shared runtime state (socket, systemState, board mirror refs).
  *
  * Import this module instead of `front-end.js` anywhere that only needs
  * state — pulling `front-end.js` from its own dependency tree deadlocks

@@ -153,6 +153,8 @@ export function createCommandEnvelope(type, payload = {}, seq = 0) {
  * @param {string} options.type Command type
  * @param {object} [options.payload={}] Command payload
  * @param {HTMLElement} [options.element=null] Triggering UI element
+ * @param {'p1'|'p2'} [options.seat] The seat acted for — set only in a solo room
+ *   (design 074 D7, `soloCommandSeat`); a normal room's command carries none.
  * @returns {Promise<{ success: boolean, clientSeq?: number, error?: string, command?: object }>}
  */
 export async function emitCmd({
@@ -161,6 +163,7 @@ export async function emitCmd({
   type,
   payload = {},
   element = null,
+  seat,
 }) {
   if (!socket || typeof socket.emit !== 'function') {
     return { success: false, error: 'socket_unavailable' };
@@ -170,6 +173,10 @@ export async function emitCmd({
   }
   if (!type || typeof type !== 'string') {
     return { success: false, error: 'invalid_command_type' };
+  }
+  // Design 069: the server refuses a spectator's command; never send one.
+  if (typeof document !== 'undefined' && document.body?.classList?.contains('spectating')) {
+    return { success: false, error: 'spectator_readonly' };
   }
 
   // Pre-validate command shape if validator available
@@ -199,6 +206,7 @@ export async function emitCmd({
     type,
     payload,
     ...(protocolVersion ? { protocolVersion } : {}),
+    ...(seat ? { seat } : {}),
   };
 
   socket.emit('cmd', command);
@@ -219,6 +227,8 @@ export async function emitCmd({
  * @param {string} options.choiceId
  * @param {number[]} options.selection Array of selected instanceIds
  * @param {HTMLElement} [options.element=null]
+ * @param {'p1'|'p2'|null} [options.choiceSeat] The view's `choiceSeat` (a solo room's
+ *   view names whose choice is open, design 074 D7); sent as `seat` when present.
  * @returns {Promise<{ success: boolean, clientSeq?: number, error?: string }>}
  */
 export async function emitResolveChoice({
@@ -227,6 +237,7 @@ export async function emitResolveChoice({
   choiceId,
   selection = [],
   element = null,
+  choiceSeat = null,
 }) {
   if (!socket || typeof socket.emit !== 'function') {
     return { success: false, error: 'socket_unavailable' };
@@ -246,6 +257,7 @@ export async function emitResolveChoice({
     choiceId,
     selection: Array.isArray(selection) ? selection : [],
     clientSeq: currentSeq,
+    ...(choiceSeat ? { seat: choiceSeat } : {}),
   };
 
   socket.emit('resolveChoice', payload);
@@ -262,13 +274,15 @@ export async function emitResolveChoice({
  * @param {object} options
  * @param {object} options.socket
  * @param {string} options.roomId
+ * @param {'p1'|'p2'} [options.nearSeat] A solo room's board flip: the seat to draw at the
+ *   bottom from now on (design 074 D7).
  * @returns {boolean}
  */
-export function emitRequestView({ socket, roomId }) {
+export function emitRequestView({ socket, roomId, nearSeat }) {
   if (!socket || typeof socket.emit !== 'function' || !roomId) {
     return false;
   }
-  socket.emit('requestView', { gameId: roomId, roomId });
+  socket.emit('requestView', { gameId: roomId, roomId, ...(nearSeat ? { nearSeat } : {}) });
   return true;
 }
 

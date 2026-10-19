@@ -6,7 +6,7 @@
 // the attack path; this module only extracts *what* a card does from its
 // printed ability text.
 
-import { isBasicPokemon, isPokemon, isEnergy } from '../cards.mjs';
+import { isBasicPokemon, isPokemon, isEnergy, isAttachedAsTool } from '../cards.mjs';
 import { isExCard, isGxCard, isVCard, isVmaxCard, isTeraCard } from './card-classify.mjs';
 import { prizesTakenFor } from '../formats.mjs';
 import { rewriteLegacyPowerWording, parseLegacyDamageModifier } from './legacy-power-wording.mjs';
@@ -41,9 +41,11 @@ function modernWording(text) {
   return rewritten;
 }
 
+// A Pokémon attached as a Tool reads as its Tool effect, not its own Ability.
 export const cardAbilityText = (card) =>
   modernWording(
     lower(
+      (isAttachedAsTool(card) ? card.asTool.text : null) ??
       card?.ability?.text ??
         card?.abilityText ??
         card?.text ??
@@ -101,7 +103,11 @@ export function isHandActivatedAbility(card) {
 const BENCH_SPOT_CLAUSE = /if this pok[eé]mon is on your bench\b/;
 
 export function requiresBenchSpot(card) {
-  return BENCH_SPOT_CLAUSE.test(textOf(card));
+  const text = textOf(card);
+  if (BENCH_SPOT_CLAUSE.test(text)) return true;
+  // DP Poké-Powers name the holder: "if Unown Q is on your Bench" (Majestic Dawn 49).
+  const name = lower(card?.name).trim();
+  return Boolean(name) && text.includes(`if ${name} is on your bench`);
 }
 
 // "Once during your turn, if any of your Pokémon were Knocked Out during your opponent's last turn"
@@ -447,6 +453,7 @@ export function mergeDamagePrevention(a, b) {
 /** Pokémon Tool attached to a host (not Energy / Pokémon). */
 export function isPokemonToolCard(card) {
   if (!card) return false;
+  if (isAttachedAsTool(card)) return true;
   const type = String(card.type || '').toLowerCase();
   if (type === 'pokémon' || type === 'pokemon' || type === 'energy')
     return false;

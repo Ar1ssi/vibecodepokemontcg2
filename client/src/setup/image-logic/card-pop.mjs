@@ -46,6 +46,34 @@ const tickSpring = (ctx, lastValue, currentValue, targetValue) => {
   return next;
 };
 
+// A frame's elapsed time is integrated in steps of at most one 60 Hz frame: a single large dt
+// overshoots, and on slow frames (SwiftShader, a busy 3D board) the retreat spring diverged.
+// Past MAX_SPRING_CATCHUP_FRAMES (a stalled or hidden tab) the spring slows down instead of jumping.
+export const MAX_SPRING_CATCHUP_FRAMES = 60;
+
+/**
+ * Advances a spring by `elapsedMs` of wall time. `state` is `{ value, lastValue, target, opts,
+ * invMass, invMassRecoveryRate }` (values: numbers or objects of numbers); returns the new
+ * `{ value, lastValue, invMass, settled }`.
+ */
+export const advanceSpring = (state, elapsedMs) => {
+  const frames = Math.min(Math.max((elapsedMs * 60) / 1000 || 0, 0), MAX_SPRING_CATCHUP_FRAMES);
+  // The epsilon keeps a 16.67 ms frame (1.0000000002 frames in floats) at one step.
+  const steps = Math.max(1, Math.ceil(frames - 1e-6));
+  const dt = frames / steps;
+  let { value, lastValue, invMass } = state;
+  let settled = false;
+  for (let step = 0; step < steps && !settled; step += 1) {
+    invMass = Math.min(invMass + state.invMassRecoveryRate * dt, 1);
+    const ctx = { inv_mass: invMass, opts: state.opts, settled: true, dt };
+    const next = tickSpring(ctx, lastValue, value, state.target);
+    lastValue = value;
+    value = next;
+    settled = ctx.settled;
+  }
+  return { value, lastValue, invMass, settled };
+};
+
 const createSpring = (initial, opts) => {
   const options = { stiffness: 0.15, damping: 0.8, precision: 0.01, ...opts };
   let value = initial;
@@ -71,19 +99,14 @@ const createSpring = (initial, opts) => {
   };
 
   const loop = (now) => {
-    invMass = Math.min(invMass + invMassRecoveryRate, 1);
-    const ctx = {
-      inv_mass: invMass,
-      opts: runOpts,
-      settled: true,
-      dt: ((now - lastTime) * 60) / 1000,
-    };
-    const nextValue = tickSpring(ctx, lastValue, value, targetValue);
+    const next = advanceSpring(
+      { value, lastValue, target: targetValue, opts: runOpts, invMass, invMassRecoveryRate },
+      now - lastTime
+    );
     lastTime = now;
-    lastValue = value;
-    value = nextValue;
+    ({ value, lastValue, invMass } = next);
     notify();
-    if (ctx.settled) {
+    if (next.settled) {
       rafId = null;
       fulfill();
       return;
@@ -150,57 +173,9 @@ const createSpring = (initial, opts) => {
   return spring;
 };
 
-/**
- * Map an iframe-local getBoundingClientRect into the parent page.
- * The `.opp` playmat iframe is CSS-flipped 180° (`scaleX(-1) scaleY(-1)`
- * around its center). Adding frame.top/left alone would land flights at
- * the unflipped seat (P2's hand on P1's screen goes to mid-board).
- */
-export const mapIframeRectToPage = (local, frameRect, flipped) => {
-  if (!flipped) {
-    return {
-      left: local.left + frameRect.left,
-      top: local.top + frameRect.top,
-      width: local.width,
-      height: local.height,
-    };
-  }
-  return {
-    left: frameRect.left + frameRect.width - local.left - local.width,
-    top: frameRect.top + frameRect.height - local.top - local.height,
-    width: local.width,
-    height: local.height,
-  };
-};
-
-export const iframeIsFlipped = (frame) => {
-  if (!frame) return false;
-  if (frame.classList?.contains('opp')) return true;
-  const view = frame.ownerDocument?.defaultView ?? globalThis;
-  const transform = view.getComputedStyle?.(frame)?.transform;
-  if (!transform || transform === 'none') return false;
-  const match = transform.match(/matrix\(([^)]+)\)/);
-  if (!match) return false;
-  const parts = match[1].split(',').map((n) => Number(n.trim()));
-  return parts[0] < 0 && parts[3] < 0;
-};
-
 export const viewportRectOf = (el) => {
-  const local = el.getBoundingClientRect();
-  const frame = el.ownerDocument?.defaultView?.frameElement;
-  if (!frame) {
-    return {
-      left: local.left,
-      top: local.top,
-      width: local.width,
-      height: local.height,
-    };
-  }
-  return mapIframeRectToPage(
-    local,
-    frame.getBoundingClientRect(),
-    iframeIsFlipped(frame)
-  );
+  const { left, top, width, height } = el.getBoundingClientRect();
+  return { left, top, width, height };
 };
 
 export const previewTargetSize = (

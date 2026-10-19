@@ -8,10 +8,12 @@ import {
 } from '../../build-battle/box-catalog.mjs';
 import { loadSetData } from '../../build-battle/box-data.mjs';
 import { PACK_MODELS } from '../../build-battle/pack-models.mjs';
-import { getCoins } from '../../coins.mjs';
-import { getSleeves } from '../../sleeves.mjs';
+import { getCoins, loadCoinCatalog } from '../../coins.mjs';
+import { getSleeves, loadSleeveCatalog } from '../../sleeves.mjs';
 import { ELITE_TRAINER_BOXES, availableEtbs, etbPackSize, getEtb } from '../etb-catalog.mjs';
 import { ETB_PROMOS } from '../etb-promos.generated.mjs';
+
+await Promise.all([loadCoinCatalog(), loadSleeveCatalog()]);
 
 const { cards: me02Cards } = await loadSetData('me02');
 

@@ -1,8 +1,8 @@
 import { cachedFetchJson as fetchJson } from './tcgdex-cache.mjs';
-import { GENERATED_STARTER_DECKS } from './starter-decks.generated.mjs';
 import { GEN_1_2_ORDER } from './gen-1-2-order.generated.mjs';
 import { BLACK_BOLT_WHITE_FLARE_ORDER } from './black-bolt-white-flare-order.generated.mjs';
 import { tcgdexApiBase } from '../../../../../shared/tcgdex/tcgdex-url.mjs';
+import { withCardArt } from '../../../../../shared/tcgdex/card-art.mjs';
 
 const TCGDEX_BASE = tcgdexApiBase();
     
@@ -149,9 +149,10 @@ const TCGDEX_BASE = tcgdexApiBase();
     // category/supertype field — only the per-card detail endpoint does, and
     // fetching that per card would be one request per card. `/cards?category=X`
     // (already used for the Energy tab, D18) returns every card id in that
-    // category in one request, so build one id -> supertype map covering all
-    // three categories, lazily and once per session.
-    const CATEGORY_TO_SUPERTYPE = { Pokemon: 'Pokémon', Trainer: 'Trainer', Energy: 'Energy' };
+    // category in one request, so build one id -> supertype map, lazily and once
+    // per session. Only Trainer and Energy are listed (~370 KB together): a card in
+    // neither is a Pokémon, which skips the Pokémon list (~2 MB on its own).
+    const CATEGORY_TO_SUPERTYPE = { Trainer: 'Trainer', Energy: 'Energy' };
     let cardSupertypeIndexPromise = null;
     function fetchCardSupertypeIndex() {
       if (cardSupertypeIndexPromise) return cardSupertypeIndexPromise;
@@ -195,7 +196,8 @@ const TCGDEX_BASE = tcgdexApiBase();
     async function fetchSetRecord(setId, seriesId) {
       const cacheKey = `${seriesId}/${setId}`;
       if (setRecordCache.has(cacheKey)) return setRecordCache.get(cacheKey);
-      const record = await fetchJson(`${TCGDEX_BASE}/sets/${setId}`);
+      const fetched = await fetchJson(`${TCGDEX_BASE}/sets/${setId}`);
+      const record = Array.isArray(fetched?.cards) ? { ...fetched, cards: fetched.cards.map(withCardArt) } : fetched;
       setRecordCache.set(cacheKey, record);
       return record;
     }
@@ -320,7 +322,48 @@ const TCGDEX_BASE = tcgdexApiBase();
 
       return sets;
     }
-    
+
+    // Generations behind the Homebrew pill: Black & White (5) and XY (6).
+    export const HOMEBREW_GENERATIONS = [5, 6];
+
+    // Synthetic set id for the Homebrew pill's single Energy tab, which combines
+    // the Energy cards of every Homebrew generation.
+    export const HOMEBREW_ENERGY_SET_ID = '__energy_homebrew__';
+
+    // Every real set from the Homebrew generations, newest first, then one combined
+    // Energy tab. The per-generation Energy tabs are folded into it; Energy cards
+    // still show inside their own sets.
+    export async function fetchHomebrewSets(generations = HOMEBREW_GENERATIONS) {
+      const perGeneration = await Promise.all(generations.map((gen) => fetchGenerationSets(gen)));
+      const allSets = perGeneration.flat();
+      const sets = allSets
+        .filter((set) => !GENERATION_ENERGY_SET_ID_RE.test(set.setId))
+        .sort((a, b) => String(b.releaseDate || '').localeCompare(String(a.releaseDate || '')));
+
+      const energyCardCount = allSets
+        .filter((set) => GENERATION_ENERGY_SET_ID_RE.test(set.setId))
+        .reduce((total, set) => total + set.cardCount, 0);
+      if (energyCardCount > 0) {
+        sets.push({
+          setId: HOMEBREW_ENERGY_SET_ID,
+          name: 'Energy',
+          seriesId: '',
+          releaseDate: '',
+          logo: ENERGY_SET_LOGO,
+          symbol: '',
+          cardCount: energyCardCount,
+          category: 'generation',
+        });
+      }
+      return sets;
+    }
+
+    // Every Energy card across the Homebrew generations, A to Z.
+    export async function fetchHomebrewEnergyCards(generations = HOMEBREW_GENERATIONS) {
+      const perGeneration = await Promise.all(generations.map((gen) => fetchGenerationEnergyCards(gen)));
+      return sortCardsWithinGroup(perGeneration.flat(), { sortBy: 'name', sortDirection: 'asc' });
+    }
+
     // Fetch all legal Standard-format sets, newest first, with logo + release date.
     export async function fetchLegalStandardSets() {
       const entries = await Promise.all(
@@ -513,18 +556,16 @@ const TCGDEX_BASE = tcgdexApiBase();
       return sortCardsWithinGroup(allCards, { sortBy: 'name', sortDirection: 'asc' });
     }
 
-    // Sets across Pokémon generations that famously featured Reverse Holo energy cards:
-    // - Gen 8 (swsh): Crown Zenith (swsh12.5) basic energies
-    // - Gen 7 (sm): Sun & Moon (sm1), Guardians Rising (sm2), Burning Shadows (sm3), Crimson Invasion (sm4) basic energies
-    // - Gen 6 (xy): Evolutions (xy12), Generations (g1) basic & special energies
+    // Sets across Pokémon generations where every Energy card has a Reverse Holo print:
+    // - Gen 6 (xy): Evolutions (xy12), Generations (g1) basic & special energies; the
+    //              special energies of xy1–xy10 and dc1 are listed by card id below
     // - Gen 5 (bw): every set with an Energy card — Black & White (bw1) basic energies plus the
     //               special energies in Next Destinies (bw4), Dragons Exalted (bw6), Plasma Storm
     //               (bw8), Plasma Freeze (bw9), Plasma Blast (bw10), Legendary Treasures (bw11)
     // - Gen 3 (ecard/ex): Expedition Base Set (ecard1), EX Ruby & Sapphire (ex1), EX Emerald (ex9),
     //                     EX Holon Phantoms (ex13), EX Power Keepers (ex16) basic energies
+    // Gens 7–9 are listed by card id below.
     export const REVERSE_HOLO_ENERGY_SET_IDS_BY_GENERATION = {
-      8: new Set(['swsh12.5']),
-      7: new Set(['sm1', 'sm2', 'sm3', 'sm4']),
       6: new Set(['xy12', 'g1']),
       5: new Set(['bw1', 'bw4', 'bw6', 'bw8', 'bw9', 'bw10', 'bw11']),
       3: new Set(['ecard1', 'ex1', 'ex9', 'ex13', 'ex16']),
@@ -535,7 +576,77 @@ const TCGDEX_BASE = tcgdexApiBase();
     // energies with gold Hyper Rare and ACE SPEC energies that have no reverse print,
     // so a set-granular sweep would fabricate reverse variants of cards that never had
     // one. Source: TCGdex `variants.reverse` per card (/v2/en/cards/<id>), verified 2026-09.
+    // Gen 6 (xy) is keyed by card id for the same reason: only the special energies
+    // reverse, not the basic energies printed alongside them. TCGdex `variants.reverse`
+    // is false for all of these, so the source is TCG Live's `<set>_<n>_ph` Reverse rows
+    // (card_database_rows.tsv); ids checked against TCGdex 2026-10-18.
+    // Gens 7 (sm) and 8 (swsh) are keyed by card id too: TCG Live reverses their special
+    // energies only. Their secret and ultra rare energies (sm1-162.., swsh12.5-152..) are
+    // `Etched` prints with no reverse. Source: TCG Live `_ph` Reverse rows; ids checked
+    // against TCGdex 2026-10-18 (sm3.5-69/70 and every sve card have no TCGdex image yet,
+    // so the set browser skips them until one is added).
     export const REVERSE_HOLO_ENERGY_CARD_IDS_BY_GENERATION = {
+      7: new Set([
+        'sm1-136', // Double Colorless Energy
+        'sm1-137', // Rainbow Energy
+        'sm3.5-69', // Double Colorless Energy
+        'sm3.5-70', // Warp Energy
+        'sm4-100', // Counter Energy
+        'sm5-137', // Unit Energy {G}{R}{W}
+        'sm5-138', // Unit Energy {L}{P}{M}
+        'sm6-118', // Unit Energy {F}{D}{Y}
+        'sm7-151', // Rainbow Energy
+        'sm8-194', // Memory Energy
+        'sm10-190', // Triple Acceleration Energy
+        'sm11-212', // Recycle Energy
+        'sm11-213', // Weakness Guard Energy
+        'sm12-209', // Draw Energy
+      ]),
+      8: new Set([
+        'swsh1-186', // Aurora Energy
+        'swsh2-171', // Capture Energy
+        'swsh2-172', // Horror Psychic Energy
+        'swsh2-173', // Speed Lightning Energy
+        'swsh2-174', // Twin Energy
+        'swsh3-174', // Heat Fire Energy
+        'swsh3-175', // Hiding Darkness Energy
+        'swsh3-176', // Powerful Colorless Energy
+        'swsh4-162', // Aromatic Grass Energy
+        'swsh4-163', // Coating Metal Energy
+        'swsh4-164', // Stone Fighting Energy
+        'swsh4-165', // Wash Water Energy
+        'swsh5-140', // Rapid Strike Energy
+        'swsh5-141', // Single Strike Energy
+        'swsh6-157', // Impact Energy
+        'swsh6-158', // Lucky Energy
+        'swsh6-159', // Spiral Energy
+        'swsh7-165', // Treasure Energy
+        'swsh8-244', // Fusion Strike Energy
+        'swsh9-151', // Double Turbo Energy
+        'swsh11-171', // Gift Energy
+        'swsh12-168', // Regenerative Energy
+        'swsh12-169', // V Guard Energy
+      ]),
+      6: new Set([
+        'xy1-130', // Double Colorless Energy
+        'xy1-131', // Rainbow Energy
+        'xy3-103', // Herbal Energy
+        'xy3-104', // Strong Energy
+        'xy4-111', // Double Colorless Energy
+        'xy4-112', // Mystery Energy
+        'xy5-143', // Shield Energy
+        'xy5-144', // Wonder Energy
+        'dc1-33', // Double Aqua Energy
+        'dc1-34', // Double Magma Energy
+        'xy6-97', // Double Dragon Energy
+        'xy7-82', // Dangerous Energy
+        'xy7-83', // Flash Energy
+        'xy8-151', // Burning Energy
+        'xy8-152', // Rainbow Energy
+        'xy9-113', // Splash Energy
+        'xy10-114', // Double Colorless Energy
+        'xy10-115', // Strong Energy
+      ]),
       9: new Set([
         'sv02-190', // Jet Energy
         'sv02-191', // Luminous Energy
@@ -548,6 +659,8 @@ const TCGDEX_BASE = tcgdexApiBase();
         'sv10-182', // Team Rocket's Energy
         'sv10.5b-086', // Prism Energy
         'sv10.5w-086', // Ignition Energy
+        // Basic energies (TCG Live sve_<n>_ph): 1–8 Cosmos, 9–16 Flat Silver, 17–24 Tinsel.
+        ...Array.from({ length: 24 }, (_, i) => `sve-${String(i + 1).padStart(3, '0')}`),
       ]),
     };
 
@@ -564,7 +677,7 @@ const TCGDEX_BASE = tcgdexApiBase();
     // across every set in a Pokémon generation. For generations featuring
     // Reverse Holo energy prints (Gen 9, 8, 7, 6, 5, 3), this includes their
     // Reverse Holo variants — by set id where every energy in the set reverses,
-    // or by card id where eligible and ineligible energies coexist (Gen 9).
+    // or by card id where eligible and ineligible energies coexist (Gen 9, 8, 7, 6).
     export async function fetchGenerationEnergyCards(generation) {
       const setEntries = await fetchGenerationSetStubs(generation);
       const cards = await fetchEnergyCardsForSetEntries(setEntries);
@@ -770,10 +883,15 @@ const TCGDEX_BASE = tcgdexApiBase();
       if (setId === ENERGY_SET_ID) return fetchLegalEnergyCards();
       if (setId === OTHER_151_SET_ID) return fetchOther151Cards();
       if (setId === GEN_1_2_SET_ID) return fetchGen12Cards();
+      if (setId === HOMEBREW_ENERGY_SET_ID) return fetchHomebrewEnergyCards();
 
       const generationEnergyMatch = GENERATION_ENERGY_SET_ID_RE.exec(setId);
       if (generationEnergyMatch) return fetchGenerationEnergyCards(Number(generationEnergyMatch[1]));
 
+      // The supertype index downloads alongside the set record, not after it.
+      // Tagging is additive for the summary-bar filter — a lookup failure
+      // shouldn't block browsing the set's cards.
+      const supertypeIndexPromise = fetchCardSupertypeIndex().catch(() => null);
       const record = await fetchSetRecord(setId);
       const set = {
         id: record.id,
@@ -784,14 +902,11 @@ const TCGDEX_BASE = tcgdexApiBase();
         .filter((card) => card?.id && card?.name && card.image)
         .map((card) => normalizeSetCard(card, set));
 
-      try {
-        const supertypeIndex = await fetchCardSupertypeIndex();
+      const supertypeIndex = await supertypeIndexPromise;
+      if (supertypeIndex) {
         for (const card of cards) {
-          card.supertype = supertypeIndex.get(card.id);
+          card.supertype = supertypeIndex.get(card.id) || 'Pokémon';
         }
-      } catch {
-        // Supertype tagging is additive for the summary-bar filter — a lookup
-        // failure shouldn't block browsing the set's cards.
       }
 
       return cards;
@@ -828,949 +943,3 @@ const TCGDEX_BASE = tcgdexApiBase();
         return idA.localeCompare(idB) * direction;
       });
     }
-    
-    // ── Starter decks (Mega Battle Decks + Pokémon TCG Live starter decks) ──
-    // Gengar/Diancie: Bulbapedia Mega Battle Deck lists. TCG Live decks: official
-    // lists from pokemon.com (March 2026 starter strategies + Pitch Black battle pass).
-    // Resolved card data is baked in; GENERATED decks built via scripts/generate-starter-decks.mjs.
-    const STARTER_DECKS = {
-  "gengar": [
-    {
-      "id": "me02-056",
-      "name": "Mega Gengar ex",
-      "supertype": "Pokémon",
-      "localId": "056",
-      "image": "https://assets.tcgdex.net/en/me/me02/056/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me02/056/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me02/056/high.webp"
-      },
-      "set": {
-        "id": "me02",
-        "name": "Phantasmal Flames",
-        "releaseDate": ""
-      },
-      "qty": 2
-    },
-    {
-      "id": "me02-055",
-      "name": "Haunter",
-      "supertype": "Pokémon",
-      "localId": "055",
-      "image": "https://assets.tcgdex.net/en/me/me02/055/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me02/055/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me02/055/high.webp"
-      },
-      "set": {
-        "id": "me02",
-        "name": "Phantasmal Flames",
-        "releaseDate": ""
-      },
-      "qty": 1
-    },
-    {
-      "id": "me03-049",
-      "name": "Haunter",
-      "supertype": "Pokémon",
-      "localId": "049",
-      "image": "https://assets.tcgdex.net/en/me/me03/049/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me03/049/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me03/049/high.webp"
-      },
-      "set": {
-        "id": "me03",
-        "name": "Perfect Order",
-        "releaseDate": ""
-      },
-      "qty": 1
-    },
-    {
-      "id": "me02-054",
-      "name": "Gastly",
-      "supertype": "Pokémon",
-      "localId": "054",
-      "image": "https://assets.tcgdex.net/en/me/me02/054/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me02/054/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me02/054/high.webp"
-      },
-      "set": {
-        "id": "me02",
-        "name": "Phantasmal Flames",
-        "releaseDate": ""
-      },
-      "qty": 4
-    },
-    {
-      "id": "me02-068",
-      "name": "Toxtricity",
-      "supertype": "Pokémon",
-      "localId": "068",
-      "image": "https://assets.tcgdex.net/en/me/me02/068/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me02/068/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me02/068/high.webp"
-      },
-      "set": {
-        "id": "me02",
-        "name": "Phantasmal Flames",
-        "releaseDate": ""
-      },
-      "qty": 2
-    },
-    {
-      "id": "me02-067",
-      "name": "Toxel",
-      "supertype": "Pokémon",
-      "localId": "067",
-      "image": "https://assets.tcgdex.net/en/me/me02/067/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me02/067/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me02/067/high.webp"
-      },
-      "set": {
-        "id": "me02",
-        "name": "Phantasmal Flames",
-        "releaseDate": ""
-      },
-      "qty": 2
-    },
-    {
-      "id": "me02-059",
-      "name": "Sableye",
-      "supertype": "Pokémon",
-      "localId": "059",
-      "image": "https://assets.tcgdex.net/en/me/me02/059/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me02/059/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me02/059/high.webp"
-      },
-      "set": {
-        "id": "me02",
-        "name": "Phantasmal Flames",
-        "releaseDate": ""
-      },
-      "qty": 2
-    },
-    {
-      "id": "me02-062",
-      "name": "Seviper",
-      "supertype": "Pokémon",
-      "localId": "062",
-      "image": "https://assets.tcgdex.net/en/me/me02/062/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me02/062/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me02/062/high.webp"
-      },
-      "set": {
-        "id": "me02",
-        "name": "Phantasmal Flames",
-        "releaseDate": ""
-      },
-      "qty": 2
-    },
-    {
-      "id": "me02-069",
-      "name": "Eternatus",
-      "supertype": "Pokémon",
-      "localId": "069",
-      "image": "https://assets.tcgdex.net/en/me/me02/069/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me02/069/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me02/069/high.webp"
-      },
-      "set": {
-        "id": "me02",
-        "name": "Phantasmal Flames",
-        "releaseDate": ""
-      },
-      "qty": 1
-    },
-    {
-      "id": "me01-119",
-      "name": "Lillie's Determination",
-      "supertype": "Trainer",
-      "localId": "119",
-      "image": "https://assets.tcgdex.net/en/me/me01/119/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me01/119/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me01/119/high.webp"
-      },
-      "set": {
-        "id": "me01",
-        "name": "Mega Evolution",
-        "releaseDate": ""
-      },
-      "qty": 4
-    },
-    {
-      "id": "sv03-186",
-      "name": "Arven",
-      "supertype": "Trainer",
-      "localId": "186",
-      "image": "https://assets.tcgdex.net/en/sv/sv03/186/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/sv/sv03/186/low.webp",
-        "large": "https://assets.tcgdex.net/en/sv/sv03/186/high.webp"
-      },
-      "set": {
-        "id": "sv03",
-        "name": "Obsidian Flames",
-        "releaseDate": ""
-      },
-      "qty": 2
-    },
-    {
-      "id": "me01-114",
-      "name": "Boss's Orders",
-      "supertype": "Trainer",
-      "localId": "114",
-      "image": "https://assets.tcgdex.net/en/me/me01/114/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me01/114/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me01/114/high.webp"
-      },
-      "set": {
-        "id": "me01",
-        "name": "Mega Evolution",
-        "releaseDate": ""
-      },
-      "qty": 2
-    },
-    {
-      "id": "me02-087",
-      "name": "Dawn",
-      "supertype": "Trainer",
-      "localId": "087",
-      "image": "https://assets.tcgdex.net/en/me/me02/087/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me02/087/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me02/087/high.webp"
-      },
-      "set": {
-        "id": "me02",
-        "name": "Phantasmal Flames",
-        "releaseDate": ""
-      },
-      "qty": 1
-    },
-    {
-      "id": "me02-090",
-      "name": "Grimsley's Move",
-      "supertype": "Trainer",
-      "localId": "090",
-      "image": "https://assets.tcgdex.net/en/me/me02/090/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me02/090/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me02/090/high.webp"
-      },
-      "set": {
-        "id": "me02",
-        "name": "Phantasmal Flames",
-        "releaseDate": ""
-      },
-      "qty": 1
-    },
-    {
-      "id": "sv04.5-080",
-      "name": "Iono",
-      "supertype": "Trainer",
-      "localId": "080",
-      "image": "https://assets.tcgdex.net/en/sv/sv04.5/080/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/sv/sv04.5/080/low.webp",
-        "large": "https://assets.tcgdex.net/en/sv/sv04.5/080/high.webp"
-      },
-      "set": {
-        "id": "sv04.5",
-        "name": "Paldean Fates",
-        "releaseDate": ""
-      },
-      "qty": 1
-    },
-    {
-      "id": "sv04.5-084",
-      "name": "Nest Ball",
-      "supertype": "Trainer",
-      "localId": "084",
-      "image": "https://assets.tcgdex.net/en/sv/sv04.5/084/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/sv/sv04.5/084/low.webp",
-        "large": "https://assets.tcgdex.net/en/sv/sv04.5/084/high.webp"
-      },
-      "set": {
-        "id": "sv04.5",
-        "name": "Paldean Fates",
-        "releaseDate": ""
-      },
-      "qty": 3
-    },
-    {
-      "id": "sv05-144",
-      "name": "Buddy-Buddy Poffin",
-      "supertype": "Trainer",
-      "localId": "144",
-      "image": "https://assets.tcgdex.net/en/sv/sv05/144/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/sv/sv05/144/low.webp",
-        "large": "https://assets.tcgdex.net/en/sv/sv05/144/high.webp"
-      },
-      "set": {
-        "id": "sv05",
-        "name": "Temporal Forces",
-        "releaseDate": ""
-      },
-      "qty": 2
-    },
-    {
-      "id": "sv06.5-061",
-      "name": "Night Stretcher",
-      "supertype": "Trainer",
-      "localId": "061",
-      "image": "https://assets.tcgdex.net/en/sv/sv06.5/061/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/sv/sv06.5/061/low.webp",
-        "large": "https://assets.tcgdex.net/en/sv/sv06.5/061/high.webp"
-      },
-      "set": {
-        "id": "sv06.5",
-        "name": "Shrouded Fable",
-        "releaseDate": ""
-      },
-      "qty": 2
-    },
-    {
-      "id": "me01-125",
-      "name": "Rare Candy",
-      "supertype": "Trainer",
-      "localId": "125",
-      "image": "https://assets.tcgdex.net/en/me/me01/125/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me01/125/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me01/125/high.webp"
-      },
-      "set": {
-        "id": "me01",
-        "name": "Mega Evolution",
-        "releaseDate": ""
-      },
-      "qty": 2
-    },
-    {
-      "id": "me01-130",
-      "name": "Switch",
-      "supertype": "Trainer",
-      "localId": "130",
-      "image": "https://assets.tcgdex.net/en/me/me01/130/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me01/130/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me01/130/high.webp"
-      },
-      "set": {
-        "id": "me01",
-        "name": "Mega Evolution",
-        "releaseDate": ""
-      },
-      "qty": 2
-    },
-    {
-      "id": "me01-131",
-      "name": "Ultra Ball",
-      "supertype": "Trainer",
-      "localId": "131",
-      "image": "https://assets.tcgdex.net/en/me/me01/131/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me01/131/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me01/131/high.webp"
-      },
-      "set": {
-        "id": "me01",
-        "name": "Mega Evolution",
-        "releaseDate": ""
-      },
-      "qty": 2
-    },
-    {
-      "id": "sv10.5b-084",
-      "name": "Pokégear 3.0",
-      "supertype": "Trainer",
-      "localId": "084",
-      "image": "https://assets.tcgdex.net/en/sv/sv10.5b/084/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/sv/sv10.5b/084/low.webp",
-        "large": "https://assets.tcgdex.net/en/sv/sv10.5b/084/high.webp"
-      },
-      "set": {
-        "id": "sv10.5b",
-        "name": "Black Bolt",
-        "releaseDate": ""
-      },
-      "qty": 1
-    },
-    {
-      "id": "me01-121",
-      "name": "Mega Signal",
-      "supertype": "Trainer",
-      "localId": "121",
-      "image": "https://assets.tcgdex.net/en/me/me01/121/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me01/121/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me01/121/high.webp"
-      },
-      "set": {
-        "id": "me01",
-        "name": "Mega Evolution",
-        "releaseDate": ""
-      },
-      "qty": 1
-    },
-    {
-      "id": "me02-092",
-      "name": "Punk Helmet",
-      "supertype": "Trainer",
-      "localId": "092",
-      "image": "https://assets.tcgdex.net/en/me/me02/092/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me02/092/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me02/092/high.webp"
-      },
-      "set": {
-        "id": "me02",
-        "name": "Phantasmal Flames",
-        "releaseDate": ""
-      },
-      "qty": 2
-    },
-    {
-      "id": "me01-127",
-      "name": "Risky Ruins",
-      "supertype": "Trainer",
-      "localId": "127",
-      "image": "https://assets.tcgdex.net/en/me/me01/127/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me01/127/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me01/127/high.webp"
-      },
-      "set": {
-        "id": "me01",
-        "name": "Mega Evolution",
-        "releaseDate": ""
-      },
-      "qty": 2
-    },
-    {
-      "id": "sve-007",
-      "name": "Basic Darkness Energy",
-      "supertype": "Energy",
-      "localId": "007",
-      "image": "https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/SVE/SVE_007_R_EN.png",
-      "images": {
-        "small": "https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/SVE/SVE_007_R_EN.png",
-        "large": "https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/SVE/SVE_007_R_EN.png"
-      },
-      "set": {
-        "id": "sve",
-        "name": "Scarlet & Violet Energy",
-        "releaseDate": ""
-      },
-      "qty": 13
-    }
-  ],
-  "diancie": [
-    {
-      "id": "me02-041",
-      "name": "Mega Diancie ex",
-      "supertype": "Pokémon",
-      "localId": "041",
-      "image": "https://assets.tcgdex.net/en/me/me02/041/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me02/041/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me02/041/high.webp"
-      },
-      "set": {
-        "id": "me02",
-        "name": "Phantasmal Flames",
-        "releaseDate": ""
-      },
-      "qty": 2
-    },
-    {
-      "id": "me02-040",
-      "name": "Meloetta",
-      "supertype": "Pokémon",
-      "localId": "040",
-      "image": "https://assets.tcgdex.net/en/me/me02/040/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me02/040/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me02/040/high.webp"
-      },
-      "set": {
-        "id": "me02",
-        "name": "Phantasmal Flames",
-        "releaseDate": ""
-      },
-      "qty": 1
-    },
-    {
-      "id": "me02-040",
-      "name": "Meloetta",
-      "supertype": "Pokémon",
-      "localId": "040",
-      "image": "https://assets.tcgdex.net/en/me/me02/040/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me02/040/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me02/040/high.webp"
-      },
-      "set": {
-        "id": "me02",
-        "name": "Phantasmal Flames",
-        "releaseDate": ""
-      },
-      "qty": 1
-    },
-    {
-      "id": "me01-063",
-      "name": "Grumpig",
-      "supertype": "Pokémon",
-      "localId": "063",
-      "image": "https://assets.tcgdex.net/en/me/me01/063/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me01/063/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me01/063/high.webp"
-      },
-      "set": {
-        "id": "me01",
-        "name": "Mega Evolution",
-        "releaseDate": ""
-      },
-      "qty": 2
-    },
-    {
-      "id": "me01-062",
-      "name": "Spoink",
-      "supertype": "Pokémon",
-      "localId": "062",
-      "image": "https://assets.tcgdex.net/en/me/me01/062/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me01/062/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me01/062/high.webp"
-      },
-      "set": {
-        "id": "me01",
-        "name": "Mega Evolution",
-        "releaseDate": ""
-      },
-      "qty": 2
-    },
-    {
-      "id": "me02-044",
-      "name": "Alcremie",
-      "supertype": "Pokémon",
-      "localId": "044",
-      "image": "https://assets.tcgdex.net/en/me/me02/044/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me02/044/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me02/044/high.webp"
-      },
-      "set": {
-        "id": "me02",
-        "name": "Phantasmal Flames",
-        "releaseDate": ""
-      },
-      "qty": 2
-    },
-    {
-      "id": "me02-043",
-      "name": "Milcery",
-      "supertype": "Pokémon",
-      "localId": "043",
-      "image": "https://assets.tcgdex.net/en/me/me02/043/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me02/043/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me02/043/high.webp"
-      },
-      "set": {
-        "id": "me02",
-        "name": "Phantasmal Flames",
-        "releaseDate": ""
-      },
-      "qty": 2
-    },
-    {
-      "id": "me02-042",
-      "name": "Mimikyu",
-      "supertype": "Pokémon",
-      "localId": "042",
-      "image": "https://assets.tcgdex.net/en/me/me02/042/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me02/042/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me02/042/high.webp"
-      },
-      "set": {
-        "id": "me02",
-        "name": "Phantasmal Flames",
-        "releaseDate": ""
-      },
-      "qty": 2
-    },
-    {
-      "id": "me02-039",
-      "name": "Cresselia",
-      "supertype": "Pokémon",
-      "localId": "039",
-      "image": "https://assets.tcgdex.net/en/me/me02/039/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me02/039/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me02/039/high.webp"
-      },
-      "set": {
-        "id": "me02",
-        "name": "Phantasmal Flames",
-        "releaseDate": ""
-      },
-      "qty": 1
-    },
-    {
-      "id": "me02-045",
-      "name": "Zacian",
-      "supertype": "Pokémon",
-      "localId": "045",
-      "image": "https://assets.tcgdex.net/en/me/me02/045/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me02/045/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me02/045/high.webp"
-      },
-      "set": {
-        "id": "me02",
-        "name": "Phantasmal Flames",
-        "releaseDate": ""
-      },
-      "qty": 1
-    },
-    {
-      "id": "me01-119",
-      "name": "Lillie's Determination",
-      "supertype": "Trainer",
-      "localId": "119",
-      "image": "https://assets.tcgdex.net/en/me/me01/119/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me01/119/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me01/119/high.webp"
-      },
-      "set": {
-        "id": "me01",
-        "name": "Mega Evolution",
-        "releaseDate": ""
-      },
-      "qty": 4
-    },
-    {
-      "id": "sv03-186",
-      "name": "Arven",
-      "supertype": "Trainer",
-      "localId": "186",
-      "image": "https://assets.tcgdex.net/en/sv/sv03/186/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/sv/sv03/186/low.webp",
-        "large": "https://assets.tcgdex.net/en/sv/sv03/186/high.webp"
-      },
-      "set": {
-        "id": "sv03",
-        "name": "Obsidian Flames",
-        "releaseDate": ""
-      },
-      "qty": 2
-    },
-    {
-      "id": "me01-114",
-      "name": "Boss's Orders",
-      "supertype": "Trainer",
-      "localId": "114",
-      "image": "https://assets.tcgdex.net/en/me/me01/114/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me01/114/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me01/114/high.webp"
-      },
-      "set": {
-        "id": "me01",
-        "name": "Mega Evolution",
-        "releaseDate": ""
-      },
-      "qty": 2
-    },
-    {
-      "id": "sv04.5-080",
-      "name": "Iono",
-      "supertype": "Trainer",
-      "localId": "080",
-      "image": "https://assets.tcgdex.net/en/sv/sv04.5/080/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/sv/sv04.5/080/low.webp",
-        "large": "https://assets.tcgdex.net/en/sv/sv04.5/080/high.webp"
-      },
-      "set": {
-        "id": "sv04.5",
-        "name": "Paldean Fates",
-        "releaseDate": ""
-      },
-      "qty": 1
-    },
-    {
-      "id": "sv10.5b-085",
-      "name": "Professor's Research",
-      "supertype": "Trainer",
-      "localId": "085",
-      "image": "https://assets.tcgdex.net/en/sv/sv10.5b/085/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/sv/sv10.5b/085/low.webp",
-        "large": "https://assets.tcgdex.net/en/sv/sv10.5b/085/high.webp"
-      },
-      "set": {
-        "id": "sv10.5b",
-        "name": "Black Bolt",
-        "releaseDate": ""
-      },
-      "qty": 1
-    },
-    {
-      "id": "me01-132",
-      "name": "Wally's Compassion",
-      "supertype": "Trainer",
-      "localId": "132",
-      "image": "https://assets.tcgdex.net/en/me/me01/132/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me01/132/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me01/132/high.webp"
-      },
-      "set": {
-        "id": "me01",
-        "name": "Mega Evolution",
-        "releaseDate": ""
-      },
-      "qty": 1
-    },
-    {
-      "id": "me02-094",
-      "name": "Wondrous Patch",
-      "supertype": "Trainer",
-      "localId": "094",
-      "image": "https://assets.tcgdex.net/en/me/me02/094/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me02/094/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me02/094/high.webp"
-      },
-      "set": {
-        "id": "me02",
-        "name": "Phantasmal Flames",
-        "releaseDate": ""
-      },
-      "qty": 4
-    },
-    {
-      "id": "sv04.5-084",
-      "name": "Nest Ball",
-      "supertype": "Trainer",
-      "localId": "084",
-      "image": "https://assets.tcgdex.net/en/sv/sv04.5/084/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/sv/sv04.5/084/low.webp",
-        "large": "https://assets.tcgdex.net/en/sv/sv04.5/084/high.webp"
-      },
-      "set": {
-        "id": "sv04.5",
-        "name": "Paldean Fates",
-        "releaseDate": ""
-      },
-      "qty": 3
-    },
-    {
-      "id": "sv05-144",
-      "name": "Buddy-Buddy Poffin",
-      "supertype": "Trainer",
-      "localId": "144",
-      "image": "https://assets.tcgdex.net/en/sv/sv05/144/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/sv/sv05/144/low.webp",
-        "large": "https://assets.tcgdex.net/en/sv/sv05/144/high.webp"
-      },
-      "set": {
-        "id": "sv05",
-        "name": "Temporal Forces",
-        "releaseDate": ""
-      },
-      "qty": 2
-    },
-    {
-      "id": "sv06.5-061",
-      "name": "Night Stretcher",
-      "supertype": "Trainer",
-      "localId": "061",
-      "image": "https://assets.tcgdex.net/en/sv/sv06.5/061/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/sv/sv06.5/061/low.webp",
-        "large": "https://assets.tcgdex.net/en/sv/sv06.5/061/high.webp"
-      },
-      "set": {
-        "id": "sv06.5",
-        "name": "Shrouded Fable",
-        "releaseDate": ""
-      },
-      "qty": 2
-    },
-    {
-      "id": "me01-130",
-      "name": "Switch",
-      "supertype": "Trainer",
-      "localId": "130",
-      "image": "https://assets.tcgdex.net/en/me/me01/130/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me01/130/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me01/130/high.webp"
-      },
-      "set": {
-        "id": "me01",
-        "name": "Mega Evolution",
-        "releaseDate": ""
-      },
-      "qty": 2
-    },
-    {
-      "id": "me01-131",
-      "name": "Ultra Ball",
-      "supertype": "Trainer",
-      "localId": "131",
-      "image": "https://assets.tcgdex.net/en/me/me01/131/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me01/131/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me01/131/high.webp"
-      },
-      "set": {
-        "id": "me01",
-        "name": "Mega Evolution",
-        "releaseDate": ""
-      },
-      "qty": 2
-    },
-    {
-      "id": "sv10.5b-079",
-      "name": "Air Balloon",
-      "supertype": "Trainer",
-      "localId": "079",
-      "image": "https://assets.tcgdex.net/en/sv/sv10.5b/079/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/sv/sv10.5b/079/low.webp",
-        "large": "https://assets.tcgdex.net/en/sv/sv10.5b/079/high.webp"
-      },
-      "set": {
-        "id": "sv10.5b",
-        "name": "Black Bolt",
-        "releaseDate": ""
-      },
-      "qty": 2
-    },
-    {
-      "id": "me01-122",
-      "name": "Mystery Garden",
-      "supertype": "Trainer",
-      "localId": "122",
-      "image": "https://assets.tcgdex.net/en/me/me01/122/high.webp",
-      "images": {
-        "small": "https://assets.tcgdex.net/en/me/me01/122/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me01/122/high.webp"
-      },
-      "set": {
-        "id": "me01",
-        "name": "Mega Evolution",
-        "releaseDate": ""
-      },
-      "qty": 2
-    },
-    {
-      "id": "sve-005",
-      "name": "Basic Psychic Energy",
-      "supertype": "Energy",
-      "localId": "005",
-      "image": "https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/SVE/SVE_005_R_EN.png",
-      "images": {
-        "small": "https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/SVE/SVE_005_R_EN.png",
-        "large": "https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/SVE/SVE_005_R_EN.png"
-      },
-      "set": {
-        "id": "sve",
-        "name": "Scarlet & Violet Energy",
-        "releaseDate": ""
-      },
-      "qty": 14
-    }
-  ]
-};
-
-export const STARTER_DECK_CATALOG = [
-  {
-    key: 'gengar',
-    matId: 'custom-mega-gengar-edge-to-edge',
-    sprites: ['toxtricity', 'gengar-mega'],
-    name: 'Mega Gengar ex Battle Deck',
-    sleeveId: 'd92570dc-bbd5-43a4-b7d6-9094993ba975',
-    coinId: 'MBG_Purple_Mega_Gengar_Coin',
-  },
-  {
-    key: 'diancie',
-    sprites: ['diancie-mega', 'meloetta'],
-    name: 'Mega Diancie ex Battle Deck',
-    // No Mega Diancie sleeve in catalog — closest Mega Evolution fairy ETB art.
-    sleeveId: '00b68849-fd1f-4908-a8d8-b44ac392e455',
-    coinId: 'MBD_Magenta_Mega_Diancie_Coin',
-  },
-  {
-    key: 'lucario',
-    matId: 'custom-mega-lucario-edge-to-edge',
-    sprites: ['hariyama', 'lucario-mega'],
-    name: 'Mega Lucario ex Starter Deck',
-    sleeveId: '5341801a-a512-4842-ae15-bd8ce8748f8d',
-    coinId: 'MEGETB_Blue_Mega_Lucario_Coin',
-  },
-  {
-    key: 'charizard',
-    matId: 'custom-mega-charizard-x-edge-to-edge',
-    sprites: ['charizard-mega-y', 'charizard-mega-x'],
-    name: 'Mega Charizard X ex Starter Deck',
-    sleeveId: '5f123df1-82c9-4fae-998c-9e5ce1d7eb9a',
-    coinId: 'PFLETB_Mega_Charizard_X_Coin',
-  },
-  {
-    key: 'darkrai',
-    matId: 'custom-mega-darkrai-edge-to-edge',
-    sprites: ['darkrai-mega', 'gengar-mega'],
-    name: 'Mega Darkrai ex Starter Deck',
-    sleeveId: '52a78878-0457-4619-bc4a-6cba7853998e',
-    // No solo Mega Darkrai coin — best available features Darkrai prominently.
-    coinId: 'TCGBA_Gold_Pikachu_Darkrai_Armarouge_Coin',
-  },
-  {
-    key: 'dragonite',
-    sprites: ['dragonite-mega', 'eelektross-mega'],
-    name: 'Mega Dragonite ex Starter Deck',
-    sleeveId: '86456fdb-d9b2-4990-94c6-5ac3657b8260',
-    coinId: 'ASCETB_Yellow_Mega_Dragonite_Coin',
-  },
-  {
-    key: 'greninja',
-    matId: '3146-rubber-playmat-mega-greninja-1',
-    sprites: ['greninja-mega', 'starmie-mega'],
-    name: 'Mega Greninja ex Starter Deck',
-    sleeveId: 'b4952582-3bc4-4bb8-87f6-07dd88f771ff',
-    // No Mega Greninja coin — normal Greninja variant.
-    coinId: 'M4_Blue_Greninja_Coin',
-  },
-];
-
-export function getStarterDecks() {
-  return {
-    ...STARTER_DECKS,
-    ...GENERATED_STARTER_DECKS,
-  };
-}
-    

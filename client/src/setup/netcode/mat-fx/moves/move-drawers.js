@@ -35,6 +35,7 @@ import {
   glyphPose,
   pillarPose,
   projectilePose,
+  shotFlarePose,
   rainPose,
   raysPose,
   releaseRings,
@@ -130,7 +131,8 @@ const coreCharge = (ctx, lane, s, info) => {
   const x = isSky(target) ? base.x : base.x + lane.ux * core.x + lane.nx * core.y;
   const y = isSky(target) ? base.y : base.y + lane.uy * core.x + lane.ny * core.y;
   info.material.glow(ctx, x, y, core.r * 2, core.alpha * 0.5);
-  info.material.body(ctx, x, y, core.r, core.alpha, 0.9);
+  // A dim white heart (design 075 parity): at .9 the gathering orb bloomed into a white blob.
+  info.material.body(ctx, x, y, core.r, core.alpha, 0.45);
   // Rings: tongue arcs round the body at 1.25 r, one turn a second.
   const rings = p.rings ?? 0;
   if (rings > 0 && core.r > 0 && core.alpha > 0) {
@@ -156,6 +158,28 @@ const shockRings = (ctx, lane, s, info) => {
   }
 };
 
+/** A flarePose / shotFlarePose at (x, y): glow, arm tongues, then the core. `h` scales the glow. */
+const drawFlare = (ctx, info, x, y, flare, h) => {
+  info.material.glow(ctx, x, y, h * 1.3, flare.core.alpha * 0.4);
+  flare.arms.forEach((arm, index) => {
+    const a = (arm.angle * Math.PI) / 180;
+    for (const tongue of armTongues(arm, flare.breakUp)) {
+      drawTongueAt(
+        ctx,
+        info,
+        x + Math.cos(a) * tongue.from,
+        y + Math.sin(a) * tongue.from,
+        tongue.angleDeg,
+        tongue.length,
+        tongue.width,
+        index * 3.3 + tongue.from * 0.01,
+        { alpha: tongue.alpha, hot: 1 - 0.5 * flare.breakUp }
+      );
+    }
+  });
+  info.material.body(ctx, x, y, flare.core.r, flare.core.alpha, 1);
+};
+
 const projectile = (ctx, lane, s, info) => {
   const from = info.params.from ?? 'attacker';
   const ball = projectilePose(s, lane.h, info.params);
@@ -167,6 +191,10 @@ const projectile = (ctx, lane, s, info) => {
     path = laneFromPoint(lane, start.x, start.y);
   }
   const at = lanePoint(path, back ? 1 - ball.f : ball.f, ball.side);
+  if (info.params.flare !== 'none') {
+    drawFlare(ctx, info, at.x, at.y, shotFlarePose(s, lane.h, info.params), lane.h * info.params.size);
+    return;
+  }
   drawUnit(ctx, info.material, info.params.unit, s, {
     x: at.x,
     y: at.y,
@@ -210,26 +238,8 @@ const speedRays = (ctx, lane, s, info) => {
 };
 
 const starFlare = (ctx, lane, s, info) => {
-  const flare = flarePose(s, lane.h, info.params);
   const c = anchorOf(lane, info.params);
-  info.material.glow(ctx, c.x, c.y, lane.h * 1.3, flare.core.alpha * 0.4);
-  flare.arms.forEach((arm, index) => {
-    const a = (arm.angle * Math.PI) / 180;
-    for (const tongue of armTongues(arm, flare.breakUp)) {
-      drawTongueAt(
-        ctx,
-        info,
-        c.x + Math.cos(a) * tongue.from,
-        c.y + Math.sin(a) * tongue.from,
-        tongue.angleDeg,
-        tongue.length,
-        tongue.width,
-        index * 3.3 + tongue.from * 0.01,
-        { alpha: tongue.alpha, hot: 1 - 0.5 * flare.breakUp }
-      );
-    }
-  });
-  info.material.body(ctx, c.x, c.y, flare.core.r, flare.core.alpha, 1);
+  drawFlare(ctx, info, c.x, c.y, flarePose(s, lane.h, info.params), lane.h * info.params.size);
 };
 
 const impactFlash = (ctx, lane, s, info) => {
@@ -272,11 +282,13 @@ const smoke = (ctx, lane, s, info) => {
 const BEAM_ORIGIN_H = 0.3;
 const BEAM_MOTES = 4;
 /** Glow, body, hot and core passes: [palette key, width factor, alpha]. */
+// Design 075 parity: drawn additively and bloomed, the old passes (hot .8, a .26-wide white core and
+// white streaks) summed to a white slab; the body colour now leads and the white is a thin filament.
 const BEAM_PASSES = [
   ['deep', 1.7, 0.22],
-  ['body', 1.1, 0.5],
-  ['hot', 0.62, 0.8],
-  ['white', 0.26, 1],
+  ['body', 1.1, 0.55],
+  ['hot', 0.55, 0.5],
+  ['white', 0.12, 0.8],
 ];
 
 /** The lane point `f` along a beam that starts BEAM_ORIGIN_H back inside the attacker. */
@@ -303,8 +315,8 @@ const beamColumn = (ctx, palette, a, b, width, alpha, time, dashed = false) => {
   const streak = width * (dashed ? 0.9 : 1.6);
   ctx.setLineDash([streak, streak * 1.4]);
   ctx.lineDashOffset = -time * width * 9;
-  ctx.strokeStyle = rgbCss(palette.white ?? palette.core, 0.7 * alpha);
-  ctx.lineWidth = width * 0.42;
+  ctx.strokeStyle = rgbCss(palette.hot ?? palette.core, 0.5 * alpha);
+  ctx.lineWidth = width * 0.3;
   ctx.beginPath();
   ctx.moveTo(a.x, a.y);
   ctx.lineTo(b.x, b.y);
@@ -477,12 +489,8 @@ const aura = (ctx, lane, s, info) => {
   const pose = auraPose(s, lane.h, poseParams(info));
   if (!(pose.alpha > 0)) return;
   const c = centreOf(lane, info.params.target);
-  info.material.glow(ctx, c.x, c.y, pose.r * 1.2, pose.alpha * 0.5);
-  ctx.strokeStyle = rgbCss(info.material.palette.hot, pose.alpha);
-  ctx.lineWidth = lane.h * 0.04;
-  ctx.beginPath();
-  ctx.arc(c.x, c.y, pose.r, 0, TAU);
-  ctx.stroke();
+  // A pulsing glow only: the stroked circle it used to carry read as clip art (design 075 parity).
+  info.material.glow(ctx, c.x, c.y, pose.r * 1.35, pose.alpha * 0.7);
 };
 
 const rain = (ctx, lane, s, info) => {
@@ -703,10 +711,21 @@ const shade = (ctx, lane, s, info) => {
     ctx.fillRect(-reach, -reach, reach * 2, reach * 2);
     ctx.restore();
   }
-  ctx.strokeStyle = rgbCss(palette.body, pose.rimAlpha);
-  ctx.lineWidth = lane.h * 0.04;
-  shadePath(ctx, p.kind, x, y, pose.rx, pose.ry);
-  ctx.stroke();
+  // The rim as a soft inner glow following the shape (design 075 parity: a stroked outline read as
+  // clip art), drawn in a frame squashed so a circular gradient fits the ellipse.
+  if (pose.rimAlpha > 0 && pose.rx > 0 && pose.ry > 0) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(1, pose.ry / pose.rx);
+    const rim = ctx.createRadialGradient(0, 0, pose.rx * 0.5, 0, 0, pose.rx);
+    rim.addColorStop(0, rgbCss(palette.body, 0));
+    rim.addColorStop(0.82, rgbCss(palette.body, pose.rimAlpha * 0.55));
+    rim.addColorStop(1, rgbCss(palette.hot, pose.rimAlpha * 0.2));
+    ctx.fillStyle = rim;
+    shadePath(ctx, p.kind, 0, 0, pose.rx, pose.rx);
+    ctx.fill();
+    ctx.restore();
+  }
   if (p.kind === 'giant' && p.eyes) {
     ctx.fillStyle = rgbCss(GIANT_EYES, pose.alpha);
     for (const side of [-1, 1]) {

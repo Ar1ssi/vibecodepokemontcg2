@@ -10,9 +10,17 @@
 //   aurora — Aurora Beam's light: the same crystals, but the round unit is a ring of three
 //     pastel hues (cyan, mint, lilac) breathing out of phase, so a pulse-train of them reads as
 //     the sprite's train of rainbow rings in one soft palette.
-// Ice is light on the board: everything is additive (the player's `lighter`).
+// Ice is light on the board: everything is additive (the player's `lighter`) except a crystal's
+// ice fill and the aurora rings, which cover what is under them (`source-over`, inside their own
+// save/restore) so pale ice over a bright card face keeps its hue instead of adding up to white.
+//
+// Design 075 slice 10: crystals, flakes and aurora rings name the GPU crystal style
+// (`ctx.fxStyle`, ignored by Canvas2D). A crystal's ice fill is a one-stop gradient laid base to
+// tip — the same flat colour on Canvas2D — so the style cuts it into facets across its width and
+// sweeps a glint down it; edges, spokes and rings carry short running glints; a flake's heart
+// twinkles. The lit facet and the mist stay flat.
 import { rgbCss } from '../../fx-colors.mjs';
-import { grainPass, shardOutline, sphere, traceOutline } from './_shared.js';
+import { grainPass, inShadow, shardOutline, sphere, traceOutline } from './_shared.js';
 
 const TAU = Math.PI * 2;
 const SPOKES = 6;
@@ -27,11 +35,14 @@ const SHOULDER = 0.66;
 const SHOULDER_WIDTH = 0.82;
 const FACET_SPLIT = 0.12;
 const CRYSTAL_ALPHA = 0.55;
-const FACET_ALPHA = 0.6;
-const EDGE_ALPHA = 0.85;
+// Lit facet and edge are additive: kept under the ice fill's weight so 30 crystals meeting in a
+// flare's heart do not stack to white.
+const FACET_ALPHA = 0.45;
+const EDGE_ALPHA = 0.7;
 const TRAIL_SIDE = 0.55;
 // A flying snowflake turns about two thirds of a turn a second (radians per second of scene clock).
 const FLAKE_SPIN = 4;
+const RING_ALPHA = 0.65;
 const AURORA_RINGS = Object.freeze([
   ['body', 1],
   ['mint', 0.8],
@@ -40,6 +51,12 @@ const AURORA_RINGS = Object.freeze([
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 const rad = (deg) => (deg * Math.PI) / 180;
+
+// Style params (gpu-canvas STYLE_PARAMS crystal): the ice body is cut finer than a gem; edges and
+// spokes glint brighter than the faces; aurora rings shimmer slowly.
+const CRYSTAL_BODY = Object.freeze({ id: 'crystal', facets: 6, sheen: 0.55, speed: 1.4 });
+const CRYSTAL_EDGE = Object.freeze({ id: 'crystal', facets: 6, sheen: 0.7, speed: 1.2 });
+const AURORA_SHIMMER = Object.freeze({ id: 'crystal', facets: 6, sheen: 0.45, speed: 0.6 });
 
 const ICE_PALETTE = Object.freeze({
   deep: Object.freeze([62, 143, 209]),
@@ -58,6 +75,13 @@ const AURORA_PALETTE = Object.freeze({
   core: ICE_PALETTE.core,
   white: ICE_PALETTE.white,
 });
+
+/** `rgb` at `alpha` as a one-stop gradient from the crystal's base toward its tip (flat on Canvas2D). */
+const alongCrystal = (ctx, { x, y, angleDeg, length }, rgb, alpha) => {
+  const g = ctx.createLinearGradient(x, y, x + Math.cos(rad(angleDeg)) * length, y + Math.sin(rad(angleDeg)) * length);
+  g.addColorStop(0, rgbCss(rgb, alpha));
+  return g;
+};
 
 /** Map (f along, side across) in units of `length` / `width` from the base (x, y) along `angleDeg`. */
 const framer = ({ x, y, angleDeg, length, width }) => {
@@ -147,6 +171,7 @@ const restingPhase = (x, y, r) => x * 0.02 + y * 0.03 + r * 0.15;
 
 /** A snowflake: a bright centre, a wide ice-blue pass of every stroke, a thin white pass. */
 function snowflake(ctx, pal, x, y, r, alpha, hot, phase) {
+  ctx.fxStyle = CRYSTAL_EDGE;
   sphere(
     ctx,
     x,
@@ -175,6 +200,7 @@ function snowflake(ctx, pal, x, y, r, alpha, hot, phase) {
     }
     ctx.stroke();
   }
+  ctx.fxStyle = null;
 }
 
 /**
@@ -184,9 +210,13 @@ function snowflake(ctx, pal, x, y, r, alpha, hot, phase) {
 function crystal(ctx, pal, spec, { alpha = 1, hot = 1, jag = 0 } = {}) {
   if (!(spec.length > 0) || !(spec.width > 0) || !(alpha > 0)) return;
   const outline = jag ? shardOutline(spec) : icicleOutline(spec);
-  ctx.fillStyle = rgbCss(pal.body, CRYSTAL_ALPHA * alpha);
-  traceOutline(ctx, outline);
-  ctx.fill();
+  inShadow(ctx, () => {
+    ctx.fxStyle = CRYSTAL_BODY;
+    ctx.fillStyle = alongCrystal(ctx, spec, pal.body, CRYSTAL_ALPHA * alpha);
+    traceOutline(ctx, outline);
+    ctx.fill();
+    ctx.fxStyle = null;
+  });
   const lit = FACET_ALPHA * alpha * clamp01(hot);
   if (lit > 0) {
     ctx.fillStyle = rgbCss(pal.hot, lit);
@@ -196,8 +226,10 @@ function crystal(ctx, pal, spec, { alpha = 1, hot = 1, jag = 0 } = {}) {
   ctx.strokeStyle = rgbCss(pal.white, EDGE_ALPHA * alpha);
   ctx.lineWidth = 1;
   ctx.lineJoin = 'miter';
+  ctx.fxStyle = CRYSTAL_EDGE;
   traceOutline(ctx, outline);
   ctx.stroke();
+  ctx.fxStyle = null;
 }
 
 /**
@@ -274,14 +306,20 @@ function auroraKit(palette) {
 
   /** Three concentric rings, cyan outside to lilac inside, in a faint mist, breathing with `phase`. */
   function auroraRing(ctx, x, y, r, alpha, hot, phase) {
-    auroraGlow(ctx, x, y, r * 1.15, 0.5 * alpha);
+    // Faint and thin, and the rings cover (source-over) rather than add: a train of them overlaps,
+    // and additive pastels over a card face stack to white, losing the aurora's hues.
+    auroraGlow(ctx, x, y, r * 1.15, 0.3 * alpha);
     const alphas = auroraAlphas(phase);
-    ctx.lineWidth = Math.max(1, r * 0.12);
-    AURORA_RINGS.forEach(([key, scale], k) => {
-      ctx.strokeStyle = rgbCss(palette[key], alpha * alphas[k] * (0.6 + 0.4 * clamp01(hot)));
-      ctx.beginPath();
-      ctx.arc(x, y, r * scale, 0, TAU);
-      ctx.stroke();
+    inShadow(ctx, () => {
+      ctx.lineWidth = Math.max(1, r * 0.08);
+      ctx.fxStyle = AURORA_SHIMMER;
+      AURORA_RINGS.forEach(([key, scale], k) => {
+        ctx.strokeStyle = rgbCss(palette[key], RING_ALPHA * alpha * alphas[k] * (0.6 + 0.4 * clamp01(hot)));
+        ctx.beginPath();
+        ctx.arc(x, y, r * scale, 0, TAU);
+        ctx.stroke();
+      });
+      ctx.fxStyle = null;
     });
   }
 

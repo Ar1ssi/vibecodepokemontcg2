@@ -139,22 +139,36 @@ export function raysPose(s, h, params) {
  *   width:number, drift:number, alpha:number}[]}}
  */
 export function flarePose(s, h, params) {
-  const { arms, width, core, grow, breakAt } = withDefaults('starFlare', params);
+  const { arms, width, core, grow, breakAt, size } = withDefaults('starFlare', params);
   const c = clamp01(s);
-  const g = easeOutCubic(clamp01(c / grow));
+  const g = grow > 0 ? easeOutCubic(clamp01(c / grow)) : 1;
   const breakUp = clamp01((c - breakAt) / (1 - breakAt));
   const alpha = 1 - easeInCubic(breakUp);
-  return {
-    core: { r: h * core * g * (1 - 0.6 * breakUp), alpha },
-    breakUp,
-    arms: resolveArms(arms).map(({ angle, reach }) => ({
-      angle,
-      length: h * reach * g,
-      width: h * width * (1 - 0.45 * breakUp),
-      drift: h * 0.4 * breakUp,
-      alpha,
-    })),
-  };
+  return flareShape({ arms, width, core, h: h * size, g, breakUp, alpha });
+}
+
+const flareShape = ({ arms, width, core, h, g, breakUp, alpha }) => ({
+  core: { r: h * core * g * (1 - 0.6 * breakUp), alpha },
+  breakUp,
+  arms: resolveArms(arms).map(({ angle, reach }) => ({
+    angle,
+    length: h * reach * g,
+    width: h * width * (1 - 0.45 * breakUp),
+    drift: h * 0.4 * breakUp,
+    alpha,
+  })),
+});
+
+/**
+ * A flare flown down the lane (projectile `flare`): it ignites at a third of its size, grows on
+ * the way and lands whole at `size`, so a `grow: 0` starFlare of the same size takes over at
+ * contact without a jump (give it the starFlare's width and core). Same shape as flarePose.
+ */
+export function shotFlarePose(s, h, params) {
+  const { flare, size, flareWidth, flareCore } = withDefaults('projectile', params);
+  const c = clamp01(s);
+  const g = 0.3 + 0.7 * easeOutCubic(c);
+  return flareShape({ arms: flare, width: flareWidth, core: flareCore, h: h * size, g, breakUp: 0, alpha: clamp01(c / 0.1) });
 }
 
 /**

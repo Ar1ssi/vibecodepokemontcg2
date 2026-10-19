@@ -24,3 +24,22 @@ export function tcgdexApiBase() {
 export function tcgdexApiUrl(path) {
   return `${tcgdexApiBase()}${path}`;
 }
+
+// The set browser's Reverse Holo copies carry a synthetic `<tcgdex id>-reverse` id
+// (set-browser.mjs buildReverseHoloEnergyCard). TCGdex has no record under that id
+// (404), so every `/cards/<id>` lookup must use the base print's id.
+const REVERSE_HOLO_ID_SUFFIX = /-reverse$/i;
+
+/** @param {unknown} id */
+export function isReverseHoloId(id) {
+  return typeof id === 'string' && REVERSE_HOLO_ID_SUFFIX.test(id);
+}
+
+/**
+ * The id TCGdex knows a card by: the base print's id for a Reverse Holo copy, else the id unchanged.
+ * @param {string} id
+ * @returns {string}
+ */
+export function tcgdexLookupId(id) {
+  return isReverseHoloId(id) ? id.replace(REVERSE_HOLO_ID_SUFFIX, '') : id;
+}

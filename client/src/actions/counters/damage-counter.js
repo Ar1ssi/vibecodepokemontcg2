@@ -75,7 +75,7 @@ export const updateDamageCounter = (
     index,
     hintIn
   );
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'updateDamageCounter', [
       zoneId,
       resolved,
@@ -131,7 +131,7 @@ export const removeDamageCounter = (
     index,
     hintIn
   );
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'removeDamageCounter', [zoneId, resolved, hint]);
     return;
   }
@@ -184,7 +184,7 @@ export const addDamageCounter = (
     index,
     hintIn
   );
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'addDamageCounter', [
       zoneId,
       resolved,

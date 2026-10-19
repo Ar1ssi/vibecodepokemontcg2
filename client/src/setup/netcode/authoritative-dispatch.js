@@ -60,6 +60,20 @@ export function isAuthoritativeDispatchActive(options = {}) {
 }
 
 /**
+ * True when this client sends `user`'s actions itself: always its own side, and in a solo
+ * room (design 074 D7) the far side too, since one player owns both seats there.
+ *
+ * @param {string} user 'self' | 'opp'
+ * @param {object} [options={}] Test seam: `options.systemState`.
+ * @returns {boolean}
+ */
+export function actsForSide(user, options = {}) {
+  if (user === 'self') return true;
+  const systemState = options.systemState || dispatchContext.systemState;
+  return user === 'opp' && Boolean(systemState?.solo);
+}
+
+/**
  * Resolves one server `instanceId` to the card-identity hint shape the
  * `dual-run-bridge.js` translators consume (`resolveHintInstanceId` reads `.instanceId`
  * first, so a registry-sourced hint needs no syncInstance translation at all).
@@ -138,7 +152,9 @@ export function buildAuthoritativeCardHints(instanceIds = {}, options = {}) {
  * @param {string} action Legacy action name, e.g. `'moveCardBundle'`.
  * @param {any[]} parameters Parameters exactly as the legacy call site would have passed
  *   them to `processAction`, with registry-sourced hints already in place.
- * @param {object} [options={}] Test seams: `options.processAction`, `options.translate`.
+ * @param {object} [options={}] `options.user` ('self' | 'opp', default 'self'): the side
+ *   acting, which a solo room turns into the command's seat. Test seams:
+ *   `options.processAction`, `options.translate`.
  * @returns {boolean} True when the action was handed to `processAction`.
  */
 export function emitAuthoritativeCommand(
@@ -154,7 +170,7 @@ export function emitAuthoritativeCommand(
   const translate = options.translate || translateActionToCmd;
   if (!translate(action, parameters)) return false;
 
-  processAction('self', true, action, parameters);
+  processAction(options.user === 'opp' ? 'opp' : 'self', true, action, parameters);
   return true;
 }
 
@@ -196,7 +212,8 @@ export function readCardInstanceId(element) {
  * untranslatable action — leaves the caller running exactly the code it runs today.
  *
  * Scope, deliberately tight: only a locally-initiated action on this client's own side
- * (`user === 'self'`, `emit` true, no incoming relay `cardHints`) is gated. A relayed
+ * (`user === 'self'`, or either side in a solo room — `actsForSide`; `emit` true, no
+ * incoming relay `cardHints`) is gated. A relayed
  * opponent action still runs its legacy mirror body; suppressing *that* is a
  * relay-layer question that applies identically to every action family, not a
  * `moveCardBundle` one (see ISSUES I21).
@@ -282,9 +299,9 @@ export function dispatchAuthoritativeAction(action, params = {}, options = {}) {
   const { user, emit, commandArgs = [] } = params;
 
   if (!isAuthoritativeDispatchActive(options)) return false;
-  if (user !== 'self' || !emit) return false;
+  if (!actsForSide(user, options) || !emit) return false;
 
-  return emitAuthoritativeCommand(action, commandArgs, options);
+  return emitAuthoritativeCommand(action, commandArgs, { ...options, user });
 }
 
 /**
@@ -331,7 +348,7 @@ export function dispatchAuthoritativeUseAbility(params = {}, options = {}) {
   } = params;
 
   if (!isAuthoritativeDispatchActive(options)) return false;
-  if (user !== 'self' || !emit) return false;
+  if (!actsForSide(user, options) || !emit) return false;
   if (incomingHint) return false;
 
   const hint = buildAuthoritativeCardHint(authoritativeId, options);
@@ -340,7 +357,7 @@ export function dispatchAuthoritativeUseAbility(params = {}, options = {}) {
   return emitAuthoritativeCommand(
     'useAbility',
     [oInitiator, zoneId, index, hint],
-    options
+    { ...options, user }
   );
 }
 
@@ -384,7 +401,7 @@ export function dispatchAuthoritativeMoveCardBundle(params = {}, options = {}) {
   } = params;
 
   if (!isAuthoritativeDispatchActive(options)) return false;
-  if (user !== 'self' || !emit) return false;
+  if (!actsForSide(user, options) || !emit) return false;
   if (cardHints) return false;
 
   const hints = buildAuthoritativeCardHints(authoritativeIds || {}, options);
@@ -392,11 +409,11 @@ export function dispatchAuthoritativeMoveCardBundle(params = {}, options = {}) {
 
   // `moveCardBundle`'s own relay flips the user before sending, so the mirror applies
   // the move to its copy of the right side. Mirror that exactly.
-  const oInitiator = 'opp';
+  const oInitiator = user === 'self' ? 'opp' : 'self';
 
   return emitAuthoritativeCommand(
     'moveCardBundle',
     [oInitiator, oZoneId, dZoneId, index, targetIndex, action, hints],
-    options
+    { ...options, user }
   );
 }

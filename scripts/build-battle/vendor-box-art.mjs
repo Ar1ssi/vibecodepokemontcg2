@@ -3,6 +3,7 @@
  * or pokesymbols.com, whichever set is sharper) (design 055 § Every box's art) and write
  * `box-art.generated.mjs`.
  * Run: node scripts/build-battle/vendor-box-art.mjs   (needs network on first run; files are cached)
+ * Env: ART_CACHE (download cache) · CHROMIUM (a browser binary when Playwright's own is not installed)
  *
  * Images are processed in Playwright's Chromium (already a devDependency), so no image library is
  * added: a booster JPG's white studio background is keyed out from the border, the pack is trimmed
@@ -75,8 +76,61 @@ const PAGE_HELPERS = () => {
     ctx.drawImage(source, 0, 0, width, height);
     return canvas;
   };
-  // Flood the near-white studio background in from the border and make it transparent; the light
-  // rim it leaves on the pack's edge fades with its whiteness.
+  // Light art that reaches the wrapper's edge (a white Lugia, a silver crimp) floods with the studio
+  // white and would leave bites in the pack. A wrapper is left-right symmetric and its outline
+  // changes slowly down its height (full-width seals, pinched sides), so the outline per row is
+  // the median of the rows' own edges within a quarter of the pack's height, or within 3 % of it
+  // where that sits further out (bites only ever push an edge inward, so a median ignores them;
+  // the long window outlasts long bites, the short one tracks the seals, where a window cut short
+  // by the pack's end errs inward), and a side bitten for longer than that takes the other side's.
+  // Keyed pixels inside it are the wrapper's own: they are kept, and the RGB still under them is
+  // the real print. The rows at the crimp's very tips and a 2 px margin stay as keyed, so no
+  // studio white comes back with them.
+  const restoreOutline = (keyed, w, h) => {
+    const left = new Int32Array(h).fill(-1);
+    const right = new Int32Array(h).fill(-1);
+    const count = new Int32Array(h);
+    let x0 = w;
+    let x1 = -1;
+    for (let y = 0; y < h; y += 1) {
+      for (let x = 0; x < w; x += 1) {
+        if (keyed[y * w + x]) continue;
+        count[y] += 1;
+        if (left[y] < 0) left[y] = x;
+        right[y] = x;
+      }
+      if (left[y] >= 0) { x0 = Math.min(x0, left[y]); x1 = Math.max(x1, right[y]); }
+    }
+    let y0 = 0; while (y0 < h && count[y0] <= w * 0.05) y0 += 1;
+    let y1 = h - 1; while (y1 > y0 && count[y1] <= w * 0.05) y1 -= 1;
+    if (x1 < 0 || y1 - y0 < 20) return;
+    const insetL = new Float64Array(y1 - y0 + 1);
+    const insetR = new Float64Array(y1 - y0 + 1);
+    for (let y = y0; y <= y1; y += 1) {
+      insetL[y - y0] = left[y] < 0 ? x1 - x0 : left[y] - x0;
+      insetR[y - y0] = right[y] < 0 ? x1 - x0 : x1 - right[y];
+    }
+    const spans = [Math.round(0.25 * (y1 - y0)), Math.round(0.03 * (y1 - y0))];
+    const median = (values, from, to) => {
+      const window = values.slice(from, to + 1).sort();
+      return window[window.length >> 1];
+    };
+    const outline = (values, row) =>
+      Math.min(...spans.map((span) => median(values, Math.max(0, row - span), Math.min(y1 - y0, row + span))));
+    const skew = Math.ceil(0.004 * (x1 - x0));
+    for (let y = y0; y <= y1; y += 1) {
+      const t = (y - y0) / (y1 - y0);
+      if (t < 0.015 || t > 0.985) continue;
+      const medL = outline(insetL, y - y0);
+      const medR = outline(insetR, y - y0);
+      const inL = Math.min(medL, medR + skew) + 2;
+      const inR = Math.min(medR, medL + skew) + 2;
+      for (let x = x0 + inL; x <= x1 - inR; x += 1) keyed[y * w + x] = 0;
+    }
+  };
+  // Flood the near-white studio background in from the border and make it transparent (the
+  // wrapper's own light edges given back, `restoreOutline`); the light rim it leaves on the pack's
+  // edge fades with its whiteness.
   const keyBackground = (data, w, h) => {
     const isBackground = (i) => {
       const r = data[i], g = data[i + 1], b = data[i + 2];
@@ -100,6 +154,7 @@ const PAGE_HELPERS = () => {
       if (y > 0) push(x, y - 1);
       if (y < h - 1) push(x, y + 1);
     }
+    restoreOutline(keyed, w, h);
     for (let p = 0; p < w * h; p += 1) {
       if (keyed[p]) { data[p * 4 + 3] = 0; continue; }
       const x = p % w, y = (p - x) / w;
@@ -336,7 +391,7 @@ ${Object.entries(art)
 `;
 
 async function main() {
-  const browser = await chromium.launch();
+  const browser = await chromium.launch(process.env.CHROMIUM ? { executablePath: process.env.CHROMIUM } : {});
   try {
     const page = await browser.newPage();
     await page.setContent('<!doctype html><title>box art</title>');

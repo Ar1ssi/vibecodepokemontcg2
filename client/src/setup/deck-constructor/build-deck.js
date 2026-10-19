@@ -5,6 +5,7 @@ import { Card } from './card.js';
 import { Cover } from './cover.js';
 import { isE2eMode, stampE2eCard } from '../general/e2e-mode.mjs';
 import { emitCardStats } from '../netcode/card-stats.js';
+import { soloCommandSeat } from '../netcode/solo-seat.mjs';
 import { ensureCardData } from '/shared/engine/rules/rules-state.mjs';
 
 
@@ -32,7 +33,7 @@ export const buildDeck = (user) => {
   const targetCardBackSrc =
     user === 'self'
       ? systemState.cardBackSrc
-      : systemState.isTwoPlayer
+      : systemState.isTwoPlayer && !systemState.solo
         ? systemState.p2OppCardBackSrc
         : systemState.p1OppCardBackSrc;
   const cover = new Cover(user, 'deckCover', targetCardBackSrc);
@@ -91,11 +92,14 @@ export const buildDeck = (user) => {
   enriched
     .catch(() => {})
     .then(() => {
-      if (!systemState.serverAuthoritative || user !== 'self') return;
+      // A solo room (design 074 D7) sends the far deck's stats too, for its seat.
+      if (!systemState.serverAuthoritative) return;
+      if (user !== 'self' && !systemState.solo) return;
       return emitCardStats({
         socket,
         roomId: systemState.roomId,
         cards: builtCards,
+        seat: soloCommandSeat({ ...systemState, user }),
       });
     })
     .catch(() => {});

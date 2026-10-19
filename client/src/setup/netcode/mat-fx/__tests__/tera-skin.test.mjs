@@ -308,3 +308,18 @@ test('createSkinReconciler: hold ignores a missing id or a non-positive duration
   assert.equal(r.state.timers.size, 0);
   assert.deepEqual(r.state.log, [['apply', 'img-1', 1]]);
 });
+
+test('teraSkinFacets: each triangle with its fill, as the SVG paints it (3D board facets)', () => {
+  const { svg, triangles, facets } = teraSkinFacets(5, teraPaletteFor('Fire'));
+  assert.equal(facets.length, triangles.length);
+  facets.forEach((facet, i) => {
+    assert.deepEqual(facet.points, triangles[i]);
+    assert.match(facet.fill, /^#[0-9a-f]{6}$/);
+    assert.ok(facet.opacity > 0 && facet.opacity < 1);
+  });
+  const fills = [...svg.matchAll(/fill='(#[0-9a-f]{6})' fill-opacity='([0-9.]+)'/g)];
+  assert.deepEqual(
+    fills.map(([, fill, opacity]) => [fill, Number(opacity)]),
+    facets.map((facet) => [facet.fill, facet.opacity])
+  );
+});

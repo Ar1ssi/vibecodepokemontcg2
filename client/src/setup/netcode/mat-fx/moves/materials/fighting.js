@@ -11,7 +11,12 @@
 // lays over a defender (Close Combat). Every call draws on the context it is handed and is
 // otherwise pure.
 import { rgbCss } from '../../fx-colors.mjs';
-import { grainPass, sphere } from './_shared.js';
+import { grainPass, sphere, styledKit } from './_shared.js';
+
+// Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
+// Force: impact discs boil, motion blades streak. Aura: steady blue current.
+const FORCE = Object.freeze({ byKind: { linear: { id: 'energy', streak: 0.35, speed: 2, gain: 0.4 }, radial: { id: 'orb', boil: 0.3, limb: 0.35, gain: 0.6 }, stroke: { id: 'energy', streak: 0.35, speed: 2, gain: 0.4 } } });
+const AURA = Object.freeze({ byKind: { linear: { id: 'energy', streak: 0.45, speed: 1.4, gain: 0.6 }, radial: { id: 'orb', boil: 0.3, limb: 0.3, gain: 0.9 }, stroke: { id: 'energy', streak: 0.45, speed: 1.4, gain: 0.6 } } });
 
 const TAU = Math.PI * 2;
 const STREAK_BLUR = 0.08;
@@ -226,7 +231,7 @@ function fightingKit(palette) {
   });
 }
 
-export const fighting = fightingKit(fightingPalette);
+export const fighting = styledKit(fightingKit(fightingPalette), FORCE);
 
 // ---- aura (the ki specials) ------------------------------------------------------
 /** The aura material drawn in `palette` (any palette with the same keys). */
@@ -295,4 +300,4 @@ function auraKit(palette) {
   });
 }
 
-export const aura = auraKit(auraPalette);
+export const aura = styledKit(auraKit(auraPalette), AURA);
