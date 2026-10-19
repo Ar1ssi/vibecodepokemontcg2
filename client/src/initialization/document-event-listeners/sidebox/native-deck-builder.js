@@ -100,6 +100,7 @@ import { initializeNativeDeckBuilderLibrary } from './native-deck-builder-librar
 import { initializeNativeDeckBuilderSetBrowser } from './native-deck-builder-set-browser.js';
 import { filterCardsBySupertype } from '../../../setup/deck-builder/core/set-browser.mjs';
 import { initializeNativeDeckBuilderSuggest } from './native-deck-builder-suggest.js';
+import { initializeNativeDeckBuilderCustomSet } from './native-deck-builder-custom-set.js';
 import { EMPTY_PREFS } from '../../../setup/deck-builder/core/deck-suggest/prefs.mjs';
 import { initializeDeckBuilderSleevePicker } from './native-deck-builder-sleeve-picker.js';
 import { initializeDeckBuilderCoinPicker } from './native-deck-builder-coin-picker.js';
@@ -550,6 +551,10 @@ export const initializeNativeDeckBuilder = ({
       const tabBrowse = document.getElementById('nativeDeckBuilderTabBrowse');
 const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       const tabSuggest = document.getElementById('nativeDeckBuilderTabSuggest');
+      const tabCustomSet = document.getElementById('nativeDeckBuilderTabCustomSet');
+      const customSetPanelEl = document.getElementById('nativeDeckBuilderCustomSetPanel');
+      // The Custom Set controller (null outside the Standard builder tab); see the Custom Set tab block below.
+      let customSetPanel = null;
       const tabBox = document.getElementById('buildBattleTabBox');
       const tabPool = document.getElementById('buildBattleTabPool');
       const boxPanel = document.getElementById('buildBattleBoxPanel');
@@ -602,7 +607,10 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         tabSuggest?.classList.toggle('active', mode === 'suggest');
         const isBrowse = mode === 'browse';
         const isCustomize = mode === 'customize';
+        const isCustomSet = mode === 'customset';
         activeMode = mode;
+        tabCustomSet?.classList.toggle('active', isCustomSet);
+        if (customSetPanelEl) customSetPanelEl.hidden = !isCustomSet;
         tabBox?.classList.toggle('active', mode === 'box');
         tabPool?.classList.toggle('active', mode === 'pool');
         if (boxPanel) boxPanel.hidden = mode !== 'box';
@@ -622,9 +630,10 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         if (tabBrowse) tabBrowse.classList.toggle('active', isBrowse);
         if (tabCustomize) tabCustomize.classList.toggle('active', isCustomize);
     
-        // Search pane + results shell only show in search mode
-        if (searchPane) searchPane.style.display = isSearch ? '' : 'none';
-        if (resultsShell) resultsShell.style.display = isSearch ? '' : 'none';
+        // Search pane + results shell show in search mode, and in Custom Set mode (results are added to the set there)
+        const showsSearch = isSearch || isCustomSet;
+        if (searchPane) searchPane.style.display = showsSearch ? '' : 'none';
+        if (resultsShell) resultsShell.style.display = showsSearch ? '' : 'none';
     
         // Set browser only in browse mode (lazy-load on first open)
         if (browserPanel) {
@@ -729,6 +738,24 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
             })
           : null;
       if (tabSuggest && suggestPanel) tabSuggest.addEventListener('click', () => switchMode('suggest'));
+
+      // ── Custom Set tab ────────────────────────────────────────────────────
+      // Search results added here go to the set, not the deck; the set's own cards go to the deck.
+      customSetPanel =
+        isEditor && !isBuildBattle && customSetPanelEl
+          ? initializeNativeDeckBuilderCustomSet({
+              panelEl: customSetPanelEl,
+              storage: window.localStorage,
+              onAddToDeck: (card) => {
+                if (!card) return;
+                deck = addCard(deck, card);
+                deckDirty = true;
+                render();
+                flashDeckStatus();
+              },
+            })
+          : null;
+      if (tabCustomSet && customSetPanel) tabCustomSet.addEventListener('click', () => switchMode('customset'));
     
       // ── Card sleeve picker ────────────────────────────────────────────────
       const sleevePanel = document.getElementById('nativeDeckBuilderSleevePanel');
@@ -1202,7 +1229,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     cardFilters = nextFilters;
     if (activeMode === 'browse') setBrowser?.setCardFilters(cardFilters);
     else browseIsStale = true;
-    if (activeMode === 'search') {
+    if (activeMode === 'search' || activeMode === 'customset') {
       runSearch();
     } else {
       searchIsStale = true;
@@ -1240,12 +1267,18 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     // Re-filter on every render: "In current deck" follows the deck as it changes.
     if (hasSearched) updateVisibleResults();
     if (searchListsDeck) searchStatus.textContent = getSearchStatusText();
+    // In Custom Set mode the tiles add to the set, so the deck's quantities would badge the wrong thing.
+    const inCustomSet = activeMode === 'customset';
     renderSearchResults({
       searchResultsEl: searchResults,
       results: currentResults,
-      quantities: cardQuantities(),
+      quantities: inCustomSet ? {} : cardQuantities(),
       owned: ownedCardCounts(),
       onSelect: (card) => {
+        if (inCustomSet) {
+          customSetPanel?.addFromSearch(card);
+          return;
+        }
         deck = addCard(deck, card);
         deckDirty = true;
         render();

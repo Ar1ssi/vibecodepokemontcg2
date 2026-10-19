@@ -1,0 +1,144 @@
+/* Custom Set tab (Deck Builder). Scoped under .db-live like the rest of the builder; colours come from the
+   theme tokens in deck-builder-live.css, so the light theme follows automatically. */
+
+.db-live .db-custom-set {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px 4px;
+  color: var(--db-text);
+}
+
+.db-live .db-custom-set[hidden] {
+  display: none;
+}
+
+.db-live .db-custom-set-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.db-live .db-custom-set-name-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--db-text-dim);
+}
+
+.db-live .db-custom-set-name {
+  min-width: 220px;
+  padding: 6px 8px;
+  border: 1px solid var(--db-border);
+  border-radius: var(--db-radius-sm);
+  background: var(--db-input);
+  color: var(--db-text);
+}
+
+.db-live .db-custom-set-count {
+  font-size: 12px;
+  color: var(--db-text-dim);
+  padding-bottom: 8px;
+}
+
+.db-live .db-custom-set-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.db-live .db-custom-set-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.db-live .db-custom-set-status {
+  min-height: 1em;
+  margin: 0;
+  font-size: 12px;
+  color: var(--db-text-dim);
+}
+
+.db-live .db-custom-set-status.is-error {
+  color: var(--db-red);
+}
+
+.db-live .db-custom-set-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--db-text-faint);
+}
+
+.db-live .db-custom-set-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 2px 2px 8px;
+}
+
+.db-live .db-custom-set-empty {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 13px;
+  color: var(--db-text-dim);
+}
+
+.db-live .db-custom-set-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.db-live .db-custom-set-add {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.db-live .db-custom-set-add img {
+  display: block;
+  width: 100%;
+  border-radius: var(--db-radius-sm);
+  box-shadow: var(--db-shadow-soft);
+}
+
+.db-live .db-custom-set-noimage {
+  display: block;
+  padding: 24px 6px;
+  border: 1px dashed var(--db-border-strong);
+  border-radius: var(--db-radius-sm);
+  font-size: 11px;
+  text-align: center;
+}
+
+.db-live .db-custom-set-caption {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  color: var(--db-text-dim);
+}
+
+.db-live .db-custom-set-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--db-counter);
+  color: var(--db-text);
+  line-height: 22px;
+  text-align: center;
+  cursor: pointer;
+}

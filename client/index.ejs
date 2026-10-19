@@ -271,9 +271,13 @@
                             <button id="nativeDeckBuilderTabSuggest" class="native-deck-builder-mode-tab" type="button" title="Card suggestions from tournament decklists">Suggest</button>
                             <button id="etbTabShelf" class="native-deck-builder-mode-tab" type="button">Shelf</button>
                             <button id="etbTabCollection" class="native-deck-builder-mode-tab" type="button">Collection</button>
+                            <button id="nativeDeckBuilderTabCustomSet" class="native-deck-builder-mode-tab" type="button" title="Build your own set of cards, then save or export it for others">Custom Set</button>
                             <% } %>
                             <button id="nativeDeckBuilderTabCustomize" class="native-deck-builder-mode-tab" type="button">Customize</button>
                         </div>
+                        <% if (isBuilderWindow && !isBuildBattle) { %>
+                        <div id="nativeDeckBuilderCustomSetPanel" class="db-custom-set" hidden></div>
+                        <% } %>
                         <div class="native-deck-builder-pane-main-header">
                         <div class="native-deck-builder-section-title-row">
                             <div class="native-deck-builder-section-title">Search</div>
