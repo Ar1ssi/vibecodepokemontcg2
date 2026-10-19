@@ -35,10 +35,21 @@ export const STYLE_PARAMS = Object.freeze({
   liquid: [['gloss', 0.5], ['flow', 1.2], ['clarity', 0.5]],
   energy: [['streak', 0.5], ['speed', 3], ['gain', 0.8]],
   crystal: [['facets', 6], ['sheen', 0.6], ['speed', 1.2]],
-  smoke: [['churn', 0.5]],
-  shadow: [['depth', 0.3]],
+  smoke: [['churn', 0.6], ['drift', 1], ['folds', 0.6]],
+  shadow: [['depth', 0.45], ['flow', 1], ['fray', 0.5]],
 });
 const STYLE_NAMES = Object.keys(STYLE_IDS);
+const KIND_NAMES = Object.freeze(['solid', 'linear', 'radial']);
+
+/**
+ * The style a paint runs: `fxStyle` itself, or for a by-kind hint (`{ byKind: { linear, radial,
+ * solid, stroke } }`, one hint round a whole kit method) the entry for this paint's kind. Patterns
+ * and images, and kinds the hint leaves out, run flat.
+ */
+const styleFor = (fx, kind, stroke) => {
+  if (!fx?.byKind) return fx;
+  return (stroke ? fx.byKind.stroke : fx.byKind[KIND_NAMES[kind]]) ?? null;
+};
 
 // ---- colours ------------------------------------------------------------------------
 
@@ -302,7 +313,7 @@ export function createGpuCanvas({ triangulate, size = 4096, maxVertices = MAX_VE
   });
 
   // ---- paint rows ----
-  const writePaint = (style, { dashed = false, image = null } = {}) => {
+  const writePaint = (style, { dashed = false, image = null, stroke = false } = {}) => {
     if (!ensurePaint()) return -1;
     const row = paintCount;
     const o = row * PAINT_FLOATS;
@@ -334,7 +345,7 @@ export function createGpuCanvas({ triangulate, size = 4096, maxVertices = MAX_VE
     } else {
       stops = [{ offset: 0, rgba: parseColour(style) }];
     }
-    const fx = state.fxStyle;
+    const fx = styleFor(state.fxStyle, kind, stroke);
     const styleName = STYLE_NAMES.includes(fx?.id) ? fx.id : STYLE_NAMES[fx?.id] ?? 'flat';
     paints.set([kind, stops.length, STYLE_IDS[styleName], pass.seed + row * 0.618], o);
     // Device (stage px) → paint space, so a gradient follows the transform it is filled under.
@@ -754,7 +765,7 @@ export function createGpuCanvas({ triangulate, size = 4096, maxVertices = MAX_VE
       .filter((line) => line.points.length >= 2);
     if (lines.length === 0) return;
     const dashed = state.dash.length >= 2 && state.dash.some((v) => v > 0);
-    const paint = writePaint(state.strokeStyle, { dashed });
+    const paint = writePaint(state.strokeStyle, { dashed, stroke: true });
     if (paint < 0) return capped();
     const feather = featherNow();
     const reach = halfWidth + feather;

@@ -17,7 +17,7 @@ import { crescentOutline, featherOutline } from '../materials/flying.js';
 import { auroraAlphas, icicleFacet, icicleOutline, snowflakeSegments } from '../materials/ice.js';
 import { needleOutline, needleTip, soundAlphas, wingOpen } from '../materials/bug.js';
 import { MATERIAL_KEYS } from '../move-spec.mjs';
-import { lighten, parseHex, tintedPalette } from '../materials/_shared.js';
+import { lighten, parseHex, styledKit, tintedPalette } from '../materials/_shared.js';
 import { UNITS } from '../materials/_units.js';
 import { STELLAR_ACCENTS } from '../materials/stellar.js';
 import { callsAreFinite, recordingContext, rgbOf } from './recording-context.mjs';
@@ -2115,7 +2115,12 @@ test('buzz: the bug needle, but its round unit is three sound rings breathing ou
   const buzz = MATERIALS.buzz;
   assert.equal(materialFor('buzz'), buzz);
   assert.equal(buzz.palette, MATERIALS.bug.palette);
-  assert.equal(buzz.tongue, MATERIALS.bug.tongue);
+  const drawn = (material) => {
+    const rec = recordingContext();
+    material.tongue(rec.ctx, TONGUE);
+    return rec.calls;
+  };
+  assert.deepEqual(drawn(buzz), drawn(MATERIALS.bug), 'the bug needle');
   assert.equal(buzz.smoke, null);
   const rec = recordingContext();
   buzz.body(rec.ctx, 100, 100, 40, 1, 1);
@@ -2274,4 +2279,20 @@ test('every unit draws finitely, in palette colours, with balanced save/restore'
     unit(none.ctx, 40, 50, 0, 30, 0.5, palette);
     assert.equal(none.calls.length, 0, `${name} r 0`);
   }
+});
+
+test('design 075: styledKit runs each drawing method under its hint and restores the caller\'s', () => {
+  const seen = [];
+  const kit = { key: 'k', palette: {}, tongue: (ctx) => seen.push(ctx.fxStyle), grain: (ctx) => seen.push(ctx.fxStyle) };
+  kit.withPalette = () => ({ ...kit });
+  const hint = { byKind: { linear: { id: 'shadow' } } };
+  const styled = styledKit(kit, hint);
+  const outer = { id: 'flame' };
+  const ctx = { fxStyle: outer };
+  styled.tongue(ctx);
+  styled.grain(ctx);
+  styled.withPalette({}).tongue(ctx);
+  assert.deepEqual(seen, [hint, outer, hint], 'grain stays unstyled');
+  assert.equal(ctx.fxStyle, outer);
+  assert.ok(Object.isFrozen(styled));
 });

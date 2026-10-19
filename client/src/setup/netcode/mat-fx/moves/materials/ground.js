@@ -13,8 +13,13 @@
 //     centre and a sheen, a glob trailing drips.
 // Every call draws on the context it is handed and is otherwise pure.
 import { rgbCss } from '../../fx-colors.mjs';
-import { grainPass, inShadow, shardOutline, tongueOutline, traceOutline } from './_shared.js';
+import { grainPass, inShadow, shardOutline, styledKit, tongueOutline, traceOutline } from './_shared.js';
 import { streamGlobs } from './poison.js';
+
+// Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
+// Earth: dust plumes billow with dark folds. Mud: a thick glossy sludge.
+const DUST = Object.freeze({ byKind: { linear: { id: 'smoke', churn: 0.55, drift: 0.8, folds: 0.65 }, radial: { id: 'smoke', churn: 0.6, drift: 0.8, folds: 0.65 } } });
+const SLUDGE = Object.freeze({ byKind: { linear: { id: 'liquid', gloss: 0.3, flow: 0.5, clarity: 0 }, radial: { id: 'liquid', gloss: 0.35, flow: 0.4, clarity: 0 } } });
 
 const TAU = Math.PI * 2;
 const rad = (deg) => (deg * Math.PI) / 180;
@@ -288,7 +293,7 @@ function groundKit(palette) {
   });
 }
 
-export const ground = groundKit(GROUND_PALETTE);
+export const ground = styledKit(groundKit(GROUND_PALETTE), DUST);
 
 // ---- mud ---------------------------------------------------------------------------
 /** The mud material drawn in `palette` (any palette with the same keys). */
@@ -396,4 +401,4 @@ function mudKit(palette) {
   });
 }
 
-export const mud = mudKit(MUD_PALETTE);
+export const mud = styledKit(mudKit(MUD_PALETTE), SLUDGE);

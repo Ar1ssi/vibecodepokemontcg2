@@ -9,7 +9,11 @@
 // Palette #3B3B4F #6E6E8C #B9B9D6, deep #101018, accent #FF3D6E (crimson) as `hot`. Every
 // call draws on the context it is handed and is otherwise pure.
 import { rgbCss } from '../../fx-colors.mjs';
-import { grainPass, inShadow, shardOutline, sphere, tongueOutline, traceOutline } from './_shared.js';
+import { grainPass, inShadow, shardOutline, sphere, styledKit, tongueOutline, traceOutline } from './_shared.js';
+
+// Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
+// Ink: fraying tendrils and rolling dark bands; the strokes (slashes) stay sharp.
+const INK = Object.freeze({ byKind: { linear: { id: 'shadow', depth: 0.5, flow: 1, fray: 0.5 }, radial: { id: 'shadow', depth: 0.45, flow: 0.6, fray: 0.45 }, solid: { id: 'shadow', depth: 0.35, flow: 0.6, fray: 0.4 } } });
 
 export { shardOutline };
 
@@ -196,4 +200,4 @@ function darkKit(palette) {
   });
 }
 
-export const dark = darkKit(PALETTE);
+export const dark = styledKit(darkKit(PALETTE), INK);

@@ -8,7 +8,11 @@
 // Strike). Palette #9AA7B8 #D5DEEA #FFFFFF, deep #4A5563, cool edge #9FC5F0. No grain. Every
 // call draws on the context it is handed and is otherwise pure.
 import { rgbCss } from '../../fx-colors.mjs';
-import { grainPass, shardOutline, sphere, traceOutline } from './_shared.js';
+import { grainPass, shardOutline, sphere, styledKit, traceOutline } from './_shared.js';
+
+// Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
+// Polished metal: hard facets with a glint sweeping each blade; edges carry running glints.
+const METAL = Object.freeze({ byKind: { linear: { id: 'crystal', facets: 3, sheen: 0.8, speed: 1.6 }, radial: { id: 'crystal', facets: 6, sheen: 0.5, speed: 1.2 }, stroke: { id: 'crystal', sheen: 0.7, speed: 1.6 } } });
 
 const TAU = Math.PI * 2;
 const HEEL = 0.22;
@@ -232,4 +236,4 @@ function steelKit(palette) {
   });
 }
 
-export const steel = steelKit(PALETTE);
+export const steel = styledKit(steelKit(PALETTE), METAL);

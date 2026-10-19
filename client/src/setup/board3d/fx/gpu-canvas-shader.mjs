@@ -300,10 +300,45 @@ void main() {
       float run = sin(vAlong * 0.09 - clock * params.z * 7.0 + seed * 3.0);
       rgb += params.y * 1.4 * smoothstep(0.82, 1.0, run);
     }
-  } else if (style == 6) {
-    alpha *= clamp(mix(1.0, fbm(vec3(uv * 4.0, uTime * 0.3 + seed)) * 2.0, params.x), 0.0, 1.0);
-  } else if (style == 7) {
-    rgb *= 1.0 - params.x * fbm(vec3(uv * 3.0, uTime * 0.2 + seed));
+  } else if (style == 6 || style == 7) {
+    // Noise in the paint's own frame (a puff's radius, a tongue's length) so it scales with the
+    // shape; edge runs 0 at the heart (a radial's centre, a tongue's root) to 1 at its rim / tip.
+    vec2 local = uv;
+    float edge = 0.5;
+    if (kind == 2) {
+      local = (q - geomB.xy) / max(geomB.z, 1.0);
+      edge = t;
+    } else if (kind == 1) {
+      vec2 axis = geomA.zw - geomA.xy;
+      float span = max(length(axis), 1.0);
+      vec2 dir = axis / span;
+      vec2 rel = (q - geomA.xy) / span;
+      local = vec2(dot(rel, vec2(-dir.y, dir.x)) * 2.0, dot(rel, dir));
+      edge = clamp(local.y, 0.0, 1.0);
+    }
+    vec3 offset = vec3(seed * 1.7, seed * 0.9, 0.0);
+    if (style == 6) {
+      // smoke (dust, mud, soot, gusts): billows that roll and drift, frayed at the rim, their
+      // folds shaded darker so a puff has volume instead of a flat gradient.
+      vec3 p = vec3(local * 2.2, clock * 0.25) + offset;
+      p.y += clock * params.y * 0.3;
+      float warp = fbm(p + vec3(3.1, 7.7, 0.0));
+      float n = fbm(p * 1.6 + vec3(warp * 1.4, -warp, clock * 0.15));
+      float body = smoothstep(0.25, 0.7, n + 0.4 * (1.0 - edge));
+      alpha *= mix(1.0, body, params.x);
+      rgb *= mix(1.0, 0.65 + 0.6 * n, params.z);
+    } else {
+      // shadow (dark, ghost): ink that frays into tendrils curling off its rim / tip while the
+      // heart stays solid, rolling darker bands through the body; the paint's own light colour
+      // survives only where the ink thins, so a dark move reads as smoke-black, not grey.
+      vec3 p = vec3(local * vec2(3.0, 2.2), clock * 0.35) + offset;
+      p.y -= clock * params.y * 0.7;
+      float warp = fbm(p + vec3(1.7, 4.2, 0.0));
+      float n = fbm(p * 1.3 + vec3(warp * 2.0, warp, 0.0));
+      float fray = smoothstep(params.z - 0.15, params.z + 0.15, n + 0.55 * (1.0 - edge) - 0.25);
+      alpha *= mix(1.0, fray, smoothstep(0.15, 0.6, edge));
+      rgb *= 1.0 - params.x * smoothstep(0.35, 0.8, n);
+    }
   }
   rgb = max(rgb, vec3(0.0));
   outColor = vec4(rgb * alpha, alpha);

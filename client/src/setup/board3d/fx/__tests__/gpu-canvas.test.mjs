@@ -308,6 +308,35 @@ test('fxStyle hints land in the paint row with their defaults; null returns to f
   assert.equal(paintRow(rec, 1)[2], STYLE_IDS.flat);
 });
 
+test('a by-kind hint styles each paint by its kind; strokes and missing kinds have their own say', () => {
+  const { ctx, recording } = make();
+  ctx.fxStyle = { byKind: { linear: { id: 'shadow', fray: 0.7 }, radial: { id: 'orb' }, stroke: { id: 'energy' } } };
+  const linear = ctx.createLinearGradient(0, 0, 10, 0);
+  linear.addColorStop(0, '#fff');
+  linear.addColorStop(1, '#000');
+  ctx.fillStyle = linear;
+  ctx.fillRect(0, 0, 4, 4);
+  const radial = ctx.createRadialGradient(0, 0, 0, 0, 0, 5);
+  radial.addColorStop(0, '#fff');
+  radial.addColorStop(1, '#000');
+  ctx.fillStyle = radial;
+  ctx.fillRect(0, 0, 4, 4);
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, 4, 4);
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(10, 0);
+  ctx.stroke();
+  const rec = recording();
+  assert.equal(paintRow(rec, 0)[2], STYLE_IDS.shadow);
+  assert.equal(Math.round(paintRow(rec, 0)[22] * 100) / 100, 0.7, 'the entry carries its own params');
+  assert.equal(paintRow(rec, 1)[2], STYLE_IDS.orb);
+  assert.equal(paintRow(rec, 2)[2], STYLE_IDS.flat, 'no solid entry: flat');
+  assert.equal(paintRow(rec, 3)[2], STYLE_IDS.energy);
+});
+
 test('reset empties the recording; begin restarts the drawing state', () => {
   const canvas = make();
   canvas.ctx.fillStyle = '#fff';

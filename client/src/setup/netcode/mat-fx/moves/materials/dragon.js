@@ -7,7 +7,11 @@
 // falls from the sky). Palette #5A47C9 #8F7CF5 #D2C8FF, deep #2A1F6B, accent #FF9B3D; grain
 // 0.25. Every call draws on the context it is handed and is otherwise pure.
 import { rgbCss } from '../../fx-colors.mjs';
-import { grainPass, shardOutline, sphere, traceOutline, tongueOutline, wobble } from './_shared.js';
+import { grainPass, shardOutline, sphere, styledKit, tongueOutline, traceOutline, wobble } from './_shared.js';
+
+// Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
+// Draconic energy: tongues crawl with current, the core boils.
+const DRACONIC = Object.freeze({ byKind: { linear: { id: 'energy', streak: 0.4, speed: 1.6, gain: 0.6 }, radial: { id: 'orb', boil: 0.4, limb: 0.35, gain: 0.8 }, stroke: { id: 'energy', streak: 0.4, speed: 1.6, gain: 0.6 } } });
 
 const TAU = Math.PI * 2;
 const HELIX_SAMPLES = 10;
@@ -155,4 +159,4 @@ function dragonKit(palette) {
   });
 }
 
-export const dragon = dragonKit(PALETTE);
+export const dragon = styledKit(dragonKit(PALETTE), DRACONIC);
