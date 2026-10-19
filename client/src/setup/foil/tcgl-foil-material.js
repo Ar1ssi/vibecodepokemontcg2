@@ -46,10 +46,12 @@ const WRAP = {
 const loader = new THREE.TextureLoader();
 const textureCache = new Map();
 
-function acquireTexture(url, meta = {}, { pinned = false } = {}) {
+// `single`: sampled like the client's card textures — one mip level, bilinear, no anisotropy (the shaders
+// supersample the front themselves with four taps); every other texture keeps mipmaps and anisotropy.
+function acquireTexture(url, meta = {}, { pinned = false, single = false } = {}) {
   // The client renders in linear colour space: sRGB-flagged textures are linearized by the GPU when sampled.
   const srgb = foilData?.linear && meta.srgb !== false;
-  const key = `${url}|${meta.wrapU ?? ''}${meta.wrapV ?? ''}|${srgb ? 's' : 'l'}`;
+  const key = `${url}|${meta.wrapU ?? ''}${meta.wrapV ?? ''}|${srgb ? 's' : 'l'}${single ? '|1' : ''}`;
   let entry = textureCache.get(key);
   if (!entry) {
     let resolve;
@@ -65,6 +67,11 @@ function acquireTexture(url, meta = {}, { pinned = false } = {}) {
     if (meta.filter === 'point') {
       texture.magFilter = THREE.NearestFilter;
       texture.minFilter = THREE.NearestFilter;
+    } else if (single) {
+      texture.generateMipmaps = false;
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      texture.anisotropy = 1;
     } else {
       texture.anisotropy = 16;
     }
@@ -151,7 +158,7 @@ export function createFoilMaterial(record) {
   };
   const cardTexture = (texName, fallback) => {
     const url = textureUrl(texName, foilTextureBase());
-    return url ? hold(acquireTexture(url, {})) : fallback;
+    return url ? hold(acquireTexture(url, {}, { single: true })) : fallback;
   };
   const materialTexture = (name) => {
     const meta = foilData.textures[name];
