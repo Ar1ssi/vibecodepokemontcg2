@@ -114,7 +114,7 @@ export const doomDesire = Object.freeze({
     { at: 0, until: 500, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.18, r1: 0.5, tint: STAR } },
     { at: 700, until: 1000, layer: 'front', drawer: 'pillar', params: { from: 'above', height: 1.2, w: 0.5, tint: MAGENTA } },
     { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { r1: 0.8, r0: 0.3, tint: MAGENTA } },
-    { at: 1000, until: 1300, layer: 'front', drawer: 'starFlare', params: { size: 0.5, grow: 0.12, core: 0.14, arms: 'cross', width: 0.26, tint: MAGENTA } },
+    { at: 1000, until: 1300, layer: 'front', drawer: 'starFlare', params: { size: 0.4, grow: 0.12, core: 0.14, arms: 'cross', width: 0.26, tint: MAGENTA } },
     { at: 1000, until: 1500, layer: 'front', drawer: 'pillar', params: { from: 'above', height: 1.2, w: 0.4, count: 3, spread: 0.9, stagger: 100, tint: MAGENTA } },
     { at: 1300, until: 1800, layer: 'front', drawer: 'shards', params: { count: 8, arc: 360, distance: 1.1, tint: ORB_CYAN } },
     { at: 1000, until: 2000, layer: 'back', drawer: 'cloud', params: { count: 8, radius: 0.4, drift: 0.4, alpha: 0.5, tint: GLINT } },

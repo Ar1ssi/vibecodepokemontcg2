@@ -194,3 +194,10 @@ sacred-fire (fire, sig) — tweak: SV flies a magenta-blue sacred fireball into 
 sacred-sword (fighting, sig) — tweak: a quick gold-white slash in SV; ours ends in a big white cross flare → smaller flare.
 sand-tomb (mud) — ok: sand whirls round the foe.
 scald (water) — tweak: SV fires a boiling white-blue water jet with steam; ours a chain of rings → a solid hot-water jet.
+FIXED (pass 24): sacred-fire sacred-sword scald · GLOBAL: signature cross flares ≤0.4
+sandsear-storm (ground, sig) — tweak: SV whips a sand tornado with embers onto the foe; ours flies shards and a gold cross (now capped) → add a sand spiral column on the defender.
+searing-shot (fire, sig) — n/a: Poképédia has no video.
+secret-sword (fighting, sig) — ok (render predates the flare cap): a bright slash and a gold-white burst.
+seed-flare (grass, sig) — ok: green-white shock, a light burst.
+shadow-claw (ghost) — ok: violet claw strikes.
+NOTE — renders before pass 24 show signature cross flares at 0.6 h; they are 0.4 h now.

@@ -14,7 +14,7 @@ const RING5 = Object.freeze([-90, -18, 54, 126, 198].map((angle) => Object.freez
 /** The small contact flash the signatures keep. */
 const flash = (at, tint) => ({ at, until: at + 150, layer: 'top', drawer: 'impactFlash', params: { r0: 0.2, r1: 0.6, tint } });
 /** A star flare landing smaller and nearly whole, breaking up late. */
-const star = (at, until, arms, tint, over = {}) => ({ at, until, layer: 'front', drawer: 'starFlare', params: { arms, size: 0.75, width: 0.3, core: 0.14, grow: 0.12, breakAt: 0.7, tint, ...over } });
+const star = (at, until, arms, tint, over = {}) => ({ at, until, layer: 'front', drawer: 'starFlare', params: { arms, size: 0.4, width: 0.3, core: 0.14, grow: 0.12, breakAt: 0.7, tint, ...over } });
 
 const motes = (at, count, over = {}) =>
   Object.freeze({
@@ -274,7 +274,7 @@ export const prismaticLaser = Object.freeze({
   defender: { motion: 'knock', params: { strength: 0.35, heat: 0.35 } },
   beats: [
     { at: 0, until: 650, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.12, r1: 0.32, from: 0.15, tint: PRISM_ORB } },
-    { at: 600, until: 850, layer: 'front', drawer: 'starFlare', params: { target: 'attacker', arms: RING5, size: 0.55, width: 0.3, core: 0.14, tint: PRISM_ORB } },
+    { at: 600, until: 850, layer: 'front', drawer: 'starFlare', params: { target: 'attacker', arms: RING5, size: 0.4, width: 0.3, core: 0.14, tint: PRISM_ORB } },
     flash(1000, PRISM_BURST),
     { at: 1000, until: 1900, layer: 'front', drawer: 'pillar', params: { from: 'below', height: 1.2, w: 0.36, count: 3, spread: 0.5, stagger: 60, hues: PRISM } },
     star(1000, 1450, 'cross', PRISM_BURST),

@@ -32,7 +32,7 @@ export const malignantChain = Object.freeze({
     { at: 0, until: 400, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.18, r1: 0.5, tint: CHAIN } },
     { at: 300, until: 1700, layer: 'front', drawer: 'chain', params: { links: 12, r: 0.13, tint: CHAIN } },
     { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: FLASH },
-    { at: 1000, until: 1350, layer: 'back', drawer: 'starFlare', params: { arms: 'cross', width: 0.3, core: 0.2, size: 0.6, tint: BURST } },
+    { at: 1000, until: 1350, layer: 'back', drawer: 'starFlare', params: { arms: 'cross', width: 0.3, core: 0.2, size: 0.4, tint: BURST } },
     { at: 1000, until: 1400, layer: 'back', drawer: 'shards', params: { count: 4, arc: 360, distance: 1.1, tint: BURST } },
     { at: 1000, until: 1800, layer: 'back', drawer: 'vignette', params: { target: 'defender', maxAlpha: 0.45, tint: CAGE } },
     { at: 1100, until: 2000, layer: 'back', drawer: 'ring', params: { kind: 'face', count: 3, r0: 0.5, r1: 1.0, width: 0.06, tint: CAGE } },

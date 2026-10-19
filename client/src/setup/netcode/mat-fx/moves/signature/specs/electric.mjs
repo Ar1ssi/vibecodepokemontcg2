@@ -29,7 +29,7 @@ const CYAN = Object.freeze({ deep: '#1A7FA8', body: '#3FE0FF', hot: '#C9F7FF', c
 /** The small contact flash the signatures keep (the TCG Live impact replaces it in a game). */
 const flash = (at, tint) => ({ at, until: at + 150, layer: 'top', drawer: 'impactFlash', params: { r0: 0.2, r1: 0.6, ...(tint ? { tint } : {}) } });
 /** A four-point flash that lands whole on the defender and breaks up late. */
-const cross = (at, until, tint) => ({ at, until, layer: 'front', drawer: 'starFlare', params: { arms: 'cross', size: 0.7, width: 0.3, core: 0.14, grow: 0.12, breakAt: 0.7, tint } });
+const cross = (at, until, tint) => ({ at, until, layer: 'front', drawer: 'starFlare', params: { arms: 'cross', size: 0.4, width: 0.3, core: 0.14, grow: 0.12, breakAt: 0.7, tint } });
 
 // Zekrom: a cyan sphere charges at the chest and flies down the lane; a bolt drops from the
 // sky onto the defender as it lands.

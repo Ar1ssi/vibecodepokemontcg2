@@ -101,7 +101,6 @@ export const sandsearStorm = Object.freeze({
     { at: 1000, until: 1900, layer: 'front', drawer: 'spiral', params: { turns: 2.5, r0: 0.2, r1: 1.1, rpm: 90, tongues: 10, tint: SAND } },
     { at: 1000, until: 1900, layer: 'front', drawer: 'cloud', params: { count: 8, radius: 0.35, drift: 0.8, alpha: 0.5, tint: SAND } },
     { at: 1000, until: 1800, layer: 'back', drawer: 'vignette', params: { target: 'defender', maxAlpha: 0.45 } },
-    { at: 1500, until: 1800, layer: 'front', drawer: 'starFlare', params: { size: 0.6, grow: 0.12, arms: 'cross', width: 0.32, tint: { deep: '#FF8A1A', body: '#FFE14D', hot: '#FFF6B8', core: '#FFFFFF' } } },
   ],
   particles: [
     { at: 1000, anchor: 'defender', count: 18, distance: 1.2, direction: -90, spread: 300, size: [0.04, 0.09], aspect: 0.6, gravity: 0.3, maxDelay: 0.15, durationMs: 900, kind: 'shard' },
@@ -166,7 +165,7 @@ export const thousandWaves = Object.freeze({
     { at: 300, until: 1000, layer: 'front', drawer: 'shards', params: { target: 'attacker', count: 12, arc: 360, distance: 1.0, unit: 'hex', tint: HEX_GREEN } },
     { at: 500, until: 1100, layer: 'back', drawer: 'terrain', params: { target: 'attacker', kind: 'wave', radius: 1.6, tint: HEX_GREEN } },
     { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { r1: 0.8, r0: 0.3, tint: HEX_GREEN } },
-    { at: 1000, until: 1400, layer: 'front', drawer: 'starFlare', params: { size: 0.6, grow: 0.12, arms: 'cross', width: 0.3, tint: { deep: '#1E5E1E', body: '#7FF7FF', hot: '#E9FFC4', core: '#FFFFFF' } } },
+    { at: 1000, until: 1400, layer: 'front', drawer: 'starFlare', params: { size: 0.4, grow: 0.12, arms: 'cross', width: 0.3, tint: { deep: '#1E5E1E', body: '#7FF7FF', hot: '#E9FFC4', core: '#FFFFFF' } } },
     { at: 1000, until: 1800, layer: 'front', drawer: 'shards', params: { count: 10, arc: 360, distance: 1.1, unit: 'hex', tint: HEX_GREEN } },
     { at: 1000, until: 1800, layer: 'back', drawer: 'vignette', params: { target: 'defender', maxAlpha: 0.45 } },
   ],

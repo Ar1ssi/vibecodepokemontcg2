@@ -99,7 +99,7 @@ export const steamEruption = Object.freeze({
     { at: 1200, until: 1800, layer: 'front', drawer: 'smoke', params: { count: 3 } },
     { at: 900, until: 1600, layer: 'back', drawer: 'vignette', params: { target: 'defender', maxAlpha: 0.45 } },
     { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: FLASH },
-    { at: 1000, until: 1400, layer: 'front', drawer: 'starFlare', params: { size: 0.6, arms: RING5, width: 0.46, tint: HOT_STEAM } },
+    { at: 1000, until: 1400, layer: 'front', drawer: 'starFlare', params: { size: 0.4, arms: RING5, width: 0.46, tint: HOT_STEAM } },
   ],
   particles: [
     { at: 1000, anchor: 'defender', count: 10, distance: 1.2, direction: -90, spread: 300, size: [0.04, 0.1], aspect: 0.6, gravity: 0.7, maxDelay: 0.1, durationMs: 760, kind: 'droplet' },
@@ -124,9 +124,9 @@ export const surgingStrikes = Object.freeze({
   attacker: { motion: 'lunge', params: { wind: 0.4, strikes: 3, glow: 0.6 } },
   defender: { motion: 'stagger', params: { hits: 3, gapMs: 200, strength: 0.3, lead: 450 } },
   beats: [
-    { at: 500, until: 700, layer: 'front', drawer: 'starFlare', params: { size: 0.6, arms: 'cross', width: 0.3, tint: STRIKE } },
-    { at: 700, until: 950, layer: 'front', drawer: 'starFlare', params: { size: 0.6, arms: 'cross', width: 0.3, tint: STRIKE } },
-    { at: 950, until: 1250, layer: 'front', drawer: 'starFlare', params: { size: 0.6, arms: RING5, width: 0.46, tint: STRIKE } },
+    { at: 500, until: 700, layer: 'front', drawer: 'starFlare', params: { size: 0.4, arms: 'cross', width: 0.3, tint: STRIKE } },
+    { at: 700, until: 950, layer: 'front', drawer: 'starFlare', params: { size: 0.4, arms: 'cross', width: 0.3, tint: STRIKE } },
+    { at: 950, until: 1250, layer: 'front', drawer: 'starFlare', params: { size: 0.4, arms: RING5, width: 0.46, tint: STRIKE } },
     { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: FLASH },
     { at: 1100, until: 1700, layer: 'front', drawer: 'splash', params: { count: 4, arc: 140, direction: -90, gravity: 0.7 } },
   ],

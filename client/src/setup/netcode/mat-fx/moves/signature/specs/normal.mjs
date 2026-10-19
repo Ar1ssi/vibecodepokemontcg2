@@ -31,7 +31,7 @@ const RING5 = Object.freeze([-90, -18, 54, 126, 198].map((angle) => Object.freez
 /** The small contact flash the signatures keep (the TCG Live impact replaces it in a game). */
 const flash = (at, tint) => ({ at, until: at + 150, layer: 'top', drawer: 'impactFlash', params: { r0: 0.2, r1: 0.6, tint } });
 /** A star flare landing smaller and nearly whole, breaking up late. */
-const star = (at, until, arms, tint) => ({ at, until, layer: 'front', drawer: 'starFlare', params: { arms, size: 0.75, width: 0.3, core: 0.14, grow: 0.12, breakAt: 0.7, tint } });
+const star = (at, until, arms, tint) => ({ at, until, layer: 'front', drawer: 'starFlare', params: { arms, size: 0.4, width: 0.3, core: 0.14, grow: 0.12, breakAt: 0.7, tint } });
 
 const GLOVE = Object.freeze({ deep: '#E8552B', body: '#FFFFFF', hot: '#FFF5B0', core: '#FFFFFF' });
 const BURST = Object.freeze({ deep: '#E8552B', body: '#F2C230', hot: '#FFF5B0', core: '#FFFFFF' });

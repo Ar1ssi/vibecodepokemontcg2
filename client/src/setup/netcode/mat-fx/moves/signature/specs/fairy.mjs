@@ -13,7 +13,7 @@ const RING5 = Object.freeze([-90, -18, 54, 126, 198].map((angle) => Object.freez
 /** The small contact flash the signatures keep. */
 const flash = (at, tint) => ({ at, until: at + 150, layer: 'top', drawer: 'impactFlash', params: { r0: 0.2, r1: 0.6, tint } });
 /** The five-spike star, landing smaller and nearly whole, breaking up late. */
-const star5 = (at, until, tint, layer = 'front') => ({ at, until, layer, drawer: 'starFlare', params: { arms: RING5, size: 0.75, width: 0.3, core: 0.14, grow: 0.12, breakAt: 0.7, tint } });
+const star5 = (at, until, tint, layer = 'front') => ({ at, until, layer, drawer: 'starFlare', params: { arms: RING5, size: 0.4, width: 0.3, core: 0.14, grow: 0.12, breakAt: 0.7, tint } });
 
 const twinkles = (at, count, over = {}) =>
   Object.freeze({
