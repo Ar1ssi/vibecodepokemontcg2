@@ -198,6 +198,7 @@ export const superpower = spec({
     { at: 0, until: 800, layer: 'back', drawer: 'aura', params: { target: 'attacker', alpha: 0.65, hz: 2.5 } },
     { at: 100, until: 850, layer: 'front', drawer: 'cloud', params: { target: 'attacker', count: 7, radius: 0.3, drift: 0.7, alpha: 0.55 } },
     { at: 900, until: 1700, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.35 } },
+    { at: 1000, until: 1300, layer: 'front', drawer: 'fan', params: { target: 'defender', count: 8, spread: 360, lenMin: 0.5, lenMax: 1.0, width: 0.14, tint: { deep: '#B8501E', body: '#FF9A2E', hot: '#FFD860', core: '#FFF4D0' } } },
     { at: 1000, until: 1400, layer: 'front', drawer: 'shards', params: { count: 14, arc: 360, distance: 1.3, spin: 0 } },
     { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
     { at: 1250, until: 2000, layer: 'front', drawer: 'smoke', params: { count: 6 } },

@@ -173,10 +173,11 @@ export const sunsteelStrike = Object.freeze({
   pad: 1.9,
   attacker: { motion: 'rise', params: {} },
   defender: { motion: 'knock', params: { strength: 0.45, heat: 0.35 } },
+  tint: SUN,
   beats: [
     { at: 0, until: 600, layer: 'back', drawer: 'aura', params: { hz: 2, alpha: 0.6, tint: SUN } },
     { at: 300, until: 650, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.2, r1: 0.55, tint: SUN } },
-    { at: 600, until: 1000, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.5, r1: 0.7, tongues: 6, ease: 'linear', unit: 'spiked', tint: SUN } },
+    { at: 600, until: 1000, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.5, r1: 0.7, tongues: 6, ease: 'linear', tint: SUN } },
     { at: 700, until: 1000, layer: 'back', drawer: 'beam', params: { kind: 'solid', w: 0.3, tint: { deep: '#3A8A2E', body: '#7EE06A', hot: '#D0FFC0' } } },
     { at: 750, until: 1050, layer: 'back', drawer: 'beam', params: { kind: 'solid', w: 0.2, tint: { deep: '#8A1A4A', body: '#E0338A', hot: '#FFC0E0' } } },
     { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { r1: 0.8, r0: 0.3, tint: SUN } },

@@ -220,3 +220,16 @@ spacial-rend (dragon, sig) — tweak: SV rends space in pink-violet; ours a whit
 spectral-thief (ghost, sig) — ok: a shadow rises from the foe's shadow.
 spirit-break (fairy) — ok (star outline now a bloom).
 springtide-storm (fairy, sig) — ok: pink hearts and a pink storm (white star now capped).
+FIXED (pass 28): solar-beam spacial-rend
+steam-eruption (water, sig) — ok-ish: a white steam jet and an orange burst (its star now capped).
+steel-beam (steel) — tweak: SV fires a steel-blue beam with silver shards; ours still blooms white (the steel palette is near-white) → a steel-blue beam tint.
+steel-wing (steel) — ok: steel feathers strike.
+stomping-tantrum (ground) — ok: stomps and ground ripples.
+stone-edge (rock) — ok: stone spikes erupt round the foe.
+FIXED (pass 29): steel-beam
+struggle-bug (bug) — ok: green insect sparks.
+sunsteel-strike (steel, sig) — tweak: SV glows Solgaleo gold and charges as a meteor; ours flies a spiked sun disc (clip art) → a gold fireball body, gold spec tint.
+superpower (fighting) — tweak: SV erupts an orange-blue impact burst on the foe; ours shows almost nothing at contact → orange impact streaks.
+surf (water) — tweak: SV washes a white-blue wave over the foe; ours a ring chain → a solid widening wave beam.
+tachyon-cutter (steel, sig) — n/a: the Poképédia video is a menu screen.
+FIXED (pass 30): sunsteel-strike superpower surf

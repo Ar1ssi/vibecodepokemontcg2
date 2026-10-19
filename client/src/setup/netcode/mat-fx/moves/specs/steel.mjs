@@ -237,9 +237,9 @@ export const steelBeam = spec({
     { at: 0, until: 900, layer: 'back', drawer: 'vignette', params: { target: 'attacker', maxAlpha: 0.42 } },
     { at: 0, until: 900, layer: 'back', drawer: 'aura', params: { target: 'attacker', alpha: 0.55, hz: 4 } },
     ...glints(0, 820, { count: 6, r0: 0.05, r1: 0.1, tongues: 1 }),
-    { at: 150, until: 880, layer: 'front', drawer: 'coreCharge', params: { lead: 0.45, r0: 0.12, r1: 0.36, from: 0.25 } },
+    { at: 150, until: 880, layer: 'front', drawer: 'coreCharge', params: { lead: 0.45, r0: 0.12, r1: 0.36, from: 0.25, tint: { deep: '#24406E', body: '#5A86C8', hot: '#A8C8F0', core: '#E0ECFA' } } },
     // The beam head lands at contact: 900 + 0.2 x 900 = 1080.
-    { at: 900, until: 1800, layer: 'front', drawer: 'beam', params: { kind: 'solid', w: 0.42, growIn: 0.2, retract: 0.25 } },
+    { at: 900, until: 1800, layer: 'front', drawer: 'beam', params: { kind: 'solid', w: 0.42, growIn: 0.2, retract: 0.25, tint: { deep: '#24406E', body: '#5A86C8', hot: '#A8C8F0', core: '#E0ECFA' } } },
     { at: 1080, until: 1260, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
     { at: 1090, until: 1500, layer: 'front', drawer: 'shards', params: { count: 10, distance: 1.1, spin: 300 } },
     { at: 1300, until: 1700, layer: 'front', drawer: 'shards', params: { count: 8, distance: 0.9, spin: 200 } },

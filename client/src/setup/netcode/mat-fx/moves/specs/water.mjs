@@ -341,7 +341,7 @@ export const surf = spec({
     // A wave rises behind the attacker and rolls down the lane as a broad train of water
     // (glossy drops that cover what they cross), breaking over the card.
     { at: 0, until: 700, layer: 'back', drawer: 'pillar', params: { target: 'attacker', height: 1.5, w: 1.0 } },
-    { at: 300, until: 850, layer: 'front', drawer: 'beam', params: { kind: 'pulse-train', w: 0.5, gap: 0.2, speed: 2.5, growIn: 0.4, retract: 0.2 } },
+    { at: 300, until: 850, layer: 'front', drawer: 'beam', params: { kind: 'widening', w: 0.5, growIn: 0.4, retract: 0.2 } },
     { at: 800, until: 1200, layer: 'front', drawer: 'splash', params: { count: 10, arc: 360, len: [0.6, 1.2], gravity: 0.7 } },
     { at: 900, until: 1500, layer: 'front', drawer: 'cloud', params: { count: 5, radius: 0.45, drift: 0.5, direction: 90, alpha: 0.3 } },
     { at: 800, until: 980, layer: 'top', drawer: 'impactFlash', params: FLASH },
