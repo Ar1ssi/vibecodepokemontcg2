@@ -241,10 +241,11 @@ export const dragLeave = (event) => {
 
 export const dragEnd = (event) => {
   endDragAvatar(event);
+  // The containers are the 3D board mirror's shadow roots, which have no getElementsByClassName.
   const enablePointerEvents = (containerDocument, classNames) => {
-    const counters = containerDocument.getElementsByClassName(...classNames);
-    for (let i = 0; i < counters.length; i++) {
-      counters[i].style.pointerEvents = 'auto';
+    const selector = classNames.map((name) => `.${name}`).join(', ');
+    for (const counter of containerDocument?.querySelectorAll?.(selector) ?? []) {
+      counter.style.pointerEvents = 'auto';
     }
   };
 

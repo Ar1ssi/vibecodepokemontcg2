@@ -239,7 +239,8 @@ const dragSetup = ({ hits: table = {}, state = STATE, perform = () => true } = {
     roots[side] = host.attachShadow({ mode: 'open' });
     roots[side].innerHTML =
       `<div id="hand"><img data-instance-id="${side === 'self' ? 1 : 2}"></div>` +
-      `<div id="bench"><img data-instance-id="${side === 'self' ? 5 : 6}"></div><div id="board"></div>`;
+      `<div id="bench"><img data-instance-id="${side === 'self' ? 5 : 6}"></div><div id="board"></div>` +
+      `<div id="lostZone"><img data-instance-id="${side === 'self' ? 7 : 8}"></div>`;
   }
   const calls = [];
   const scene = {
@@ -264,6 +265,10 @@ const dragSetup = ({ hits: table = {}, state = STATE, perform = () => true } = {
       calls.push(['begin', el]);
       const side = el.getRootNode() === roots.self ? 'self' : 'opp';
       return { instanceId: Number(el.dataset.instanceId), side, zone: el.parentElement.id, index: 0, attached: false };
+    },
+    held: (el) => {
+      calls.push(['held', el]);
+      return { instanceId: Number(el.dataset.instanceId), side: 'self', zone: el.parentElement.id, index: 0, attached: false };
     },
     targetIndexOf: () => -1,
     perform: (route) => {
@@ -448,4 +453,38 @@ test('drag: the release after an Escape is neither a click nor a drop', () => {
   assert.deepEqual(clicks, []);
   assert.equal(env.performed.length, 0);
   assert.equal(env.of('dropCard').length, 1);
+});
+
+// ── HTML5 drags out of an open panel (the Lost Zone panel here) ─────────────
+
+test('a panel card dragged (HTML5) over the canvas lights its target and drops through the router', () => {
+  const env = dragSetup({ hits: dragHits });
+  const panelImg = env.roots.self.querySelector('#lostZone img');
+  panelImg.classList.add('dragging');
+  const over = env.fire('dragover', { x: 100, y: 300 });
+  env.fire('dragover', { x: 100, y: 300 });
+  assert.equal(over.defaultPrevented, true, 'a valid target lets the drop happen');
+  assert.equal(env.of('held').length, 1, 'the card is read once per drag');
+  assert.deepEqual(env.of('zone').at(-1), ['zone', 'self', 'active', true]);
+  const drop = env.fire('drop', { x: 100, y: 300 });
+  assert.equal(drop.defaultPrevented, true);
+  assert.equal(env.performed.length, 1);
+  assert.equal(env.performed[0].kind, 'move');
+  assert.deepEqual(env.performed[0].args.slice(2, 4), ['lostZone', 'active']);
+  assert.equal(env.of('liftCard').length + env.of('dropCard').length, 0, 'no mesh was lifted');
+  assert.deepEqual(env.of('zone').at(-1), ['zone', 'self', 'active', false]);
+  assert.equal(env.input.activeDrag(), null);
+});
+
+test('an HTML5 drag with no panel card, or over no target, is left to the browser', () => {
+  const env = dragSetup({ hits: dragHits });
+  assert.equal(env.fire('dragover', { x: 100, y: 300 }).defaultPrevented, false, 'not a panel card (a file, say)');
+  assert.equal(env.of('held').length, 0);
+  env.roots.self.querySelector('#lostZone img').classList.add('dragging');
+  assert.equal(env.fire('dragover', { x: 1, y: 1 }).defaultPrevented, false, 'nothing under the pointer');
+  env.fire('dragover', { x: 100, y: 300 });
+  env.fire('dragleave', { x: 100, y: 300 });
+  assert.deepEqual(env.of('zone').at(-1), ['zone', 'self', 'active', false], 'leaving the canvas clears the light');
+  env.fire('drop', { x: 100, y: 300 });
+  assert.equal(env.performed.length, 0, 'a drop after the leave makes no call');
 });

@@ -50,6 +50,23 @@ const begin = (image) => {
   identifyCardElement(image);
   markBoardReady(image);
   uiCue('card-from-hand');
+  return describe(image);
+};
+
+/**
+ * An HTML5 drag drag.js started on an open panel's <img> (a pile viewer, Looking at cards, the
+ * attached cards), now over the canvas. dragStart made the pick-up; this only reads the card.
+ * @param {HTMLImageElement} image the panel <img> (drag.js's `.dragging`)
+ * @returns {import('./drop-router.mjs').Dragging|null}
+ */
+const held = (image) => {
+  if (!image) return null;
+  identifyCardElement(image);
+  return describe(image);
+};
+
+/** The held card as drop-router.mjs reads it, from `mouseClick` once `identifyCardElement` ran. */
+function describe(image) {
   const card = image.card ?? null;
   return {
     instanceId: mouseClick.cardInstanceId,
@@ -62,7 +79,7 @@ const begin = (image) => {
     isPokemon: Boolean(card && isPokemon(card)),
     boardRefuses: heldCardBoardRefuses(image),
   };
-};
+}
 
 /** The legacy index drag.js passes for a dropped-on card (`findZoneCardIndex`, :322-325). */
 const targetIndexOf = (image, side, zone) => findZoneCardIndex(getZone(side, zone), image);
@@ -87,5 +104,5 @@ const perform = (route) => {
 };
 
 export function createBoardDragActions() {
-  return { state: dragState, begin, targetIndexOf, perform, end: clearBoardReady };
+  return { state: dragState, begin, held, targetIndexOf, perform, end: clearBoardReady };
 }
