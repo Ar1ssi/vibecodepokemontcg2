@@ -260,3 +260,12 @@ water-pledge (water) — ok: water columns burst under the foe.
 waterfall (water) — ok: a rising water crash.
 wave-crash (water) — ok: a water-wrapped tackle.
 FIXED (pass 33): water-gun
+whirlpool (water) — ok: a water vortex round the foe.
+wicked-blow (dark, sig) — ok (flare now capped): a crimson strike and slash.
+wild-charge (electric) — ok: an electric charge into a yellow burst.
+wildbolt-storm (electric, sig) — ok (bolt halo now yellow): a storm of bolts on the foe.
+wing-attack (flying) — ok: wing slashes.
+x-scissor (bug) — ok: an X slash.
+zap-cannon (electric) — ok-ish: SV flies a big electric orb; ours charges and strikes (orb reads small) — candidate for a larger projectile.
+zen-headbutt (psychic) — ok: a psychic aura and a pink-violet hit.
+# COMPLETE: 225 specs reviewed (222 with a video; n/a: searing-shot, surging-strikes, tachyon-cutter).
