@@ -59,7 +59,7 @@ export const bulletPunch = spec({
   beats: [
     { at: 0, until: 420, layer: 'back', drawer: 'aura', params: { target: 'attacker', alpha: 0.35, hz: 4 } },
     // The bullets land at 420, 490, 560 and 630: flight = 350 - 3 x 70 = 140 ms each.
-    { at: 280, until: 630, layer: 'front', drawer: 'volley', params: { count: 4, stagger: 70, r0: 0.08, r1: 0.12, bow: 0.15, tongues: 1 } },
+    { at: 280, until: 630, layer: 'front', drawer: 'volley', params: { count: 4, stagger: 70, r0: 0.12, r1: 0.16, bow: 0.15, tongues: 1, unit: 'fist' } },
     ...blow(420),
     ...blow(490),
     ...blow(560),

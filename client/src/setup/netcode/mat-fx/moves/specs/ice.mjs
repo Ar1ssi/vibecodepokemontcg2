@@ -290,7 +290,7 @@ export const blizzard = spec({
     { at: 1000, until: 1700, layer: 'front', drawer: 'rain', params: { count: 6, height: 1.4, spread: 1.1 } },
     { at: 1000, until: 1800, layer: 'front', drawer: 'spiral', params: { turns: 2, r0: 0.35, r1: 1.05, rpm: 240, tongues: 8 } },
     // Last at contact: the fog of the storm (a wind-family hit).
-    { at: 1000, until: 1900, layer: 'front', drawer: 'cloud', params: { count: 6, radius: 0.35, drift: 0.3, alpha: 0.4 } },
+    { at: 1000, until: 1900, layer: 'front', drawer: 'cloud', params: { count: 8, radius: 0.5, drift: 0.4, alpha: 0.6, tint: { deep: '#9FB8D0', body: '#E8F2FA', hot: '#FFFFFF', core: '#FFFFFF' } } },
   ],
   particles: [flakes({ at: 1010, count: 10, distance: 1.2, spread: 360, gravity: 0.15, maxDelay: 0.3, durationMs: 1100 }), flakes({ at: 1300, count: 6, distance: 0.9 })],
 });

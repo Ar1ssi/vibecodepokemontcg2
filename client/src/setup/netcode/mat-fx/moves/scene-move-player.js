@@ -7,7 +7,7 @@ import { fxDisabled } from '../../../image-logic/mat-fx.mjs';
 import { LAYER_Z, driveOffset, particleState, stageRectOf } from '../../../board3d/fx/fx-stage.mjs';
 import { burstParticles } from '../particles.mjs';
 import { resolveBeatColours, tintCache } from './beat-colours.js';
-import { drawHeat, drawRim } from './card-glow.mjs';
+import { drawHeat, drawRim, tintedGlow } from './card-glow.mjs';
 import { attackerPose, defenderPose } from './card-motion.mjs';
 import { DRAWERS } from './move-drawers.js';
 import { laneGeometry, phaseProgress } from './move-geometry.mjs';
@@ -134,6 +134,7 @@ export function playMoveInScene({
 
   const { durationMs, contactMs } = spec;
   const material = materialFor(spec.material);
+  const glowColours = spec.tint ? tintedGlow(material.key, spec.tint) : null;
   const cachedTint = tintCache();
   const resolve = (beat) => ({ ...beat, ...resolveBeatColours(material, withDefaults(beat.drawer, beat.params), cachedTint) });
   const beats = spec.beats.map(resolve);
@@ -265,7 +266,7 @@ export function playMoveInScene({
         ]) {
           ctx.save();
           cardTransform(ctx, card, offset);
-          drawRim(ctx, { width: card.width, height: card.height, alpha: pose.glow ?? pose.heat ?? 0, material: material.key });
+          drawRim(ctx, { width: card.width, height: card.height, alpha: pose.glow ?? pose.heat ?? 0, material: material.key, colours: glowColours });
           ctx.restore();
         }
         // Heat on the struck card's face, at its height off the cloth.
@@ -273,7 +274,7 @@ export function playMoveInScene({
           pass(canvas, 'front', LAYER_Z.front + (dOffset.dz ?? 0), false);
           ctx.save();
           cardTransform(ctx, defender, dOffset);
-          drawHeat(ctx, { width: defender.width, height: defender.height, alpha: d.heat, material: material.key, cold });
+          drawHeat(ctx, { width: defender.width, height: defender.height, alpha: d.heat, material: material.key, cold, colours: glowColours });
           ctx.restore();
         }
       }

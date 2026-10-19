@@ -111,6 +111,7 @@ export const confusion = spec({
   defender: { motion: 'float', params: { lift: 0.15, heat: 0.25 } },
   beats: [
     { at: 300, until: 950, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.34 } },
+    { at: 350, until: 950, layer: 'back', drawer: 'aura', params: { target: 'defender', hz: 1.5, alpha: 0.75, r0: 0.85, r1: 1.0, tint: { deep: '#B06BD8', body: '#F4C8F0', hot: '#FFF2FB', core: '#FFFFFF' } } },
     { at: 350, until: 920, layer: 'front', drawer: 'glyph', params: { r: 0.75 } },
     flash(600),
   ],

@@ -145,6 +145,8 @@ export const closeCombat = spec({
     { at: 0, until: 600, layer: 'back', drawer: 'aura', params: { target: 'attacker', alpha: 0.5, hz: 3 } },
     // Eight impact stamps at jittered spots over the defender (the fighting sigil).
     { at: 700, until: 1350, layer: 'front', drawer: 'glyph', params: { r: 0.9 } },
+    { at: 900, until: 1150, layer: 'front', drawer: 'fan', params: { target: 'defender', count: 6, spread: 360, lenMin: 0.4, lenMax: 0.8, width: 0.12, tint: { deep: '#C8641E', body: '#FFB13B', hot: '#FFE27A', core: '#FFF8D8' } } },
+    { at: 1100, until: 1350, layer: 'front', drawer: 'fan', params: { target: 'defender', count: 5, spread: 360, direction: 30, lenMin: 0.4, lenMax: 0.9, width: 0.12, tint: { deep: '#C8641E', body: '#FFB13B', hot: '#FFE27A', core: '#FFF8D8' } } },
     { at: 900, until: 1400, layer: 'front', drawer: 'shards', params: { count: 12, arc: 360, distance: 1.0, spin: 0 } },
     { at: 900, until: 1060, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
     // The last blow lands at 900 + 5 x 80.

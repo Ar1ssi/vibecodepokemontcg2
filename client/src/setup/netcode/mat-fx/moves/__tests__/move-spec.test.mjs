@@ -382,3 +382,8 @@ test('design 065: the unit names are the units of materials/_units.js', async ()
   const { UNIT_KEYS } = await import('../materials/_units.js');
   assert.deepEqual([...UNIT_NAMES], [...UNIT_KEYS]);
 });
+
+test('design 075: a spec may carry a tint palette for its card glow; a bad one is an error', () => {
+  assert.deepEqual(validateSpec({ ...clone(fireBlast), tint: { hot: '#4FD8FF' } }), []);
+  assert.ok(validateSpec({ ...clone(fireBlast), tint: { hot: 'blue' } }).some((e) => e.includes('tint')));
+});

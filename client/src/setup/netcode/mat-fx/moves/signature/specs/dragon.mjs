@@ -42,8 +42,9 @@ export const coreEnforcer = Object.freeze({
   pad: 1.8,
   attacker: { motion: 'rise', params: {} },
   defender: { motion: 'knock', params: { strength: 0.35, heat: 0.35 } },
+  tint: ZY_GREEN,
   beats: [
-    { at: 0, until: 520, layer: 'front', drawer: 'coreCharge', params: { lead: 0, r0: 0.18, r1: 0.56, rings: 1, tint: ZY_WHITE } },
+    { at: 0, until: 520, layer: 'front', drawer: 'coreCharge', params: { lead: 0, r0: 0.18, r1: 0.56, rings: 1, tint: ZY_GREEN } },
     { at: 600, until: 1100, layer: 'back', drawer: 'beam', params: { kind: 'widening', w: 0.5, tint: ZY_GREEN } },
     { at: 800, until: 1500, layer: 'front', drawer: 'bolt', params: { from: 'attacker', segments: 3, jag: 0.3, branches: 0, rerollMs: 45, width: 0.18, tint: ZY_WHITE } },
     { at: 1000, until: 1200, layer: 'top', drawer: 'impactFlash', params: { r1: 0.8, r0: 0.3, tint: ZY_WHITE } },

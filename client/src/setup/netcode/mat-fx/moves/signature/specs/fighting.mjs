@@ -39,7 +39,7 @@ export const collisionCourse = Object.freeze({
   attacker: { motion: 'dash', params: { wind: 0.3 } },
   defender: { motion: 'knock', params: { strength: 0.45, heat: 0.35 } },
   beats: [
-    { at: 450, until: 1000, layer: 'front', drawer: 'projectile', params: { path: 'straight', ease: 'linear', r0: 0.45, r1: 0.7, tongues: 8, unit: 'wheel', tint: FLAME_RING } },
+    { at: 450, until: 1000, layer: 'front', drawer: 'projectile', params: { path: 'straight', ease: 'linear', r0: 0.45, r1: 0.7, tongues: 8, unit: 'hoop', tint: FLAME_RING } },
     { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { r1: 0.8, r0: 0.3, tint: FLAME_RING } },
     { at: 1000, until: 1500, layer: 'front', drawer: 'shards', params: { count: 8, arc: 360, distance: 1.1, unit: 'body' } },
     { at: 1000, until: 1800, layer: 'back', drawer: 'vignette', params: { target: 'defender', maxAlpha: 0.45 } },

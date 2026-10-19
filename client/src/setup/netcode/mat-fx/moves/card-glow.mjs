@@ -61,6 +61,20 @@ export const HEAT_VARIANTS = Object.freeze({
 const rgba = ([r, g, b], a) => `rgba(${r}, ${g}, ${b}, ${a})`;
 const coloursOf = (materialKey) => GLOW_COLOURS[materialKey] ?? GLOW_COLOURS.fire;
 
+const hexRgb = (hex) => {
+  const n = Number.parseInt(String(hex).slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+};
+
+/** A material's glow colours with a spec `tint` ('#RRGGBB' per palette key) laid over them. */
+export function tintedGlow(materialKey, tint) {
+  const base = coloursOf(materialKey);
+  if (!tint) return base;
+  const out = { ...base };
+  for (const [key, hex] of Object.entries(tint)) out[key] = hexRgb(hex);
+  return out;
+}
+
 /** The card's corner radius in its own px (CSS .3rem on a ~126 px card). */
 const radiusOf = (w, h) => Math.min(w, h) * 0.04;
 
@@ -85,9 +99,9 @@ const roundedRect = (ctx, x, y, w, h, r) => {
  * Filled, not stroked: a stroke wider than the corner radius folds its inner edge into spokes on
  * the GPU recorder.
  */
-export function drawRim(ctx, { width, height, alpha, material }) {
+export function drawRim(ctx, { width, height, alpha, material, colours = null }) {
   if (!(alpha > 0) || !(width > 0) || !(height > 0)) return;
-  const c = coloursOf(material);
+  const c = colours ?? coloursOf(material);
   const r = radiusOf(width, height);
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
@@ -110,10 +124,10 @@ export function drawRim(ctx, { width, height, alpha, material }) {
  * the farthest side × √2 as CSS's farthest-corner ellipse) clipped to the card. `cold` = the ice
  * sheen of a frozen defender.
  */
-export function drawHeat(ctx, { width, height, alpha, material, cold = false }) {
+export function drawHeat(ctx, { width, height, alpha, material, cold = false, colours: tinted = null }) {
   if (!(alpha > 0) || !(width > 0) || !(height > 0)) return;
   const variant = cold ? HEAT_VARIANTS.cold : HEAT_VARIANTS[material] ?? HEAT_VARIANTS.default;
-  const colours = variant.colours ?? coloursOf(material);
+  const colours = (cold ? null : tinted) ?? variant.colours ?? coloursOf(material);
   const cx = 0;
   const cy = -height / 2 + height * variant.cy;
   const rx = (width / 2) * Math.SQRT2;

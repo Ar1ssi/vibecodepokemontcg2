@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { ShapeUtils, Vector2 } from 'three';
 
 import { VERTEX_FLOATS, createGpuCanvas } from '../../../../board3d/fx/gpu-canvas.mjs';
-import { GLOW_COLOURS, HEAT_VARIANTS, drawHeat, drawRim } from '../card-glow.mjs';
+import { GLOW_COLOURS, HEAT_VARIANTS, drawHeat, drawRim, tintedGlow } from '../card-glow.mjs';
 import { MATERIAL_KEYS, PARTICLE_KINDS } from '../move-spec.mjs';
 import { PARTICLE_SHAPES, drawParticle } from '../particle-shapes.mjs';
 
@@ -73,4 +73,21 @@ test('the rim is two blurred additive fills, never strokes (no corner spokes); z
   const none = recorder();
   drawRim(none.ctx, { width: 90, height: 126, alpha: 0, material: 'fire' });
   assert.equal(none.recording().vertexCount, 0);
+});
+
+test('a spec tint recolours the rim and the heat; a frozen card keeps its ice sheen', () => {
+  const colours = tintedGlow('fire', { hot: '#4FD8FF', body: '#2A7BFF' });
+  assert.deepEqual(colours.hot, [79, 216, 255]);
+  assert.deepEqual(colours.deep, GLOW_COLOURS.fire.deep, 'keys the tint leaves out stay the material\'s');
+  assert.equal(tintedGlow('fire', null), GLOW_COLOURS.fire);
+  const tinted = recorder();
+  drawRim(tinted.ctx, { width: 90, height: 126, alpha: 1, material: 'fire', colours });
+  const plain = recorder();
+  drawRim(plain.ctx, { width: 90, height: 126, alpha: 1, material: 'fire' });
+  assert.notDeepEqual([...tinted.recording().paints], [...plain.recording().paints]);
+  const frozen = recorder();
+  drawHeat(frozen.ctx, { width: 90, height: 126, alpha: 1, material: 'fire', cold: true, colours });
+  const ice = recorder();
+  drawHeat(ice.ctx, { width: 90, height: 126, alpha: 1, material: 'fire', cold: true });
+  assert.deepEqual([...frozen.recording().paints], [...ice.recording().paints]);
 });

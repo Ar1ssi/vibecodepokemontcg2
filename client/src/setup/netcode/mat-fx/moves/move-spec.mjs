@@ -468,6 +468,8 @@ const TOP_KEYS = [
   'beats',
   'particles',
   'grain',
+  // Design 075 parity: the card rim / heat colours of a tinted move (a palette), else the material's.
+  'tint',
 ];
 const REQUIRED_KEYS = [
   'id',
@@ -592,6 +594,7 @@ export function validateSpec(spec) {
   if (spec.tier !== undefined && ![1, 2, 3, 'S'].includes(spec.tier)) errors.push(`tier must be 1, 2, 3 or 'S' (got ${spec.tier})`);
   if (spec.family !== undefined && !FAMILIES.includes(spec.family)) errors.push(`unknown family '${spec.family}'`);
   if (spec.material !== undefined && !MATERIAL_KEYS.includes(spec.material)) errors.push(`unknown material '${spec.material}'`);
+  if (spec.tint !== undefined) errors.push(...checkAgainst({ tint: ['palette', null] }, { tint: spec.tint }, 'spec'));
 
   const band = TIER_BAND[spec.tier];
   if (spec.durationMs !== undefined) {

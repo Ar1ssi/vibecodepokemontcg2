@@ -46,6 +46,7 @@ export const boltStrike = Object.freeze({
   pad: 1.9,
   attacker: { motion: 'rear-lurch', params: { rear: 0.14, lurch: 0.4, glow: 1 } },
   defender: { motion: 'knock', params: { strength: 0.45, heat: 0.35 } },
+  tint: CYAN,
   beats: [
     { at: 0, until: 620, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.14, r1: 0.4, from: 0.2, tint: CYAN } },
     { at: 620, until: 1100, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.3, r1: 0.4, tongues: 5, tint: CYAN } },
