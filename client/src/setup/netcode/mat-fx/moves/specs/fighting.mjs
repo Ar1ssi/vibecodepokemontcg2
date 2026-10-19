@@ -168,11 +168,13 @@ export const meteorAssault = spec({
   // The gathering glow, a ram in with the bow-shock ringing off the start, a scorching blast.
   attacker: { motion: 'dash', params: { wind: 0.3, reach: 1.0, overshoot: 0.2, arc: 0.35 } },
   defender: { motion: 'knock', params: { strength: 0.5, heat: 0.35 } },
+  tint: { deep: '#A86A00', body: '#F5C02E', hot: '#FFE98A', core: '#FFF8D8' },
   beats: [
-    { at: 0, until: 700, layer: 'back', drawer: 'aura', params: { target: 'attacker', alpha: 0.6, hz: 3 } },
-    { at: 0, until: 700, layer: 'front', drawer: 'coreCharge', params: { r0: 0.12, r1: 0.4, from: 0.2 } },
+    { at: 0, until: 700, layer: 'back', drawer: 'aura', params: { target: 'attacker', alpha: 0.6, hz: 3, tint: { deep: '#A86A00', body: '#F5C02E', hot: '#FFE98A', core: '#FFF8D8' } } },
+    { at: 0, until: 700, layer: 'front', drawer: 'coreCharge', params: { r0: 0.12, r1: 0.4, from: 0.2, tint: { deep: '#A86A00', body: '#F5C02E', hot: '#FFE98A', core: '#FFF8D8' } } },
     { at: 800, until: 1800, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.35 } },
     { at: 1000, until: 1600, layer: 'back', drawer: 'terrain', params: { kind: 'crack', radius: 1.3 } },
+    { at: 1000, until: 1300, layer: 'front', drawer: 'fan', params: { target: 'defender', count: 8, spread: 360, lenMin: 0.5, lenMax: 1.0, width: 0.12, tint: { deep: '#A86A00', body: '#F5C02E', hot: '#FFE98A', core: '#FFF8D8' } } },
     { at: 1000, until: 1400, layer: 'front', drawer: 'shards', params: { count: 14, arc: 360, distance: 1.3, spin: 0 } },
     { at: 1100, until: 1700, layer: 'front', drawer: 'shards', params: { count: 8, arc: 140, direction: -90, distance: 1.2, spin: 0 } },
     { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },

@@ -131,3 +131,14 @@ magical-leaf (grass) — ok: glowing leaves fly with sparkles.
 magma-storm (fire, sig) — ok: flame pillars and a fire spiral round the foe (the defender is the top card), cracks under it.
 malignant-chain (poison, sig) — ok: pink-violet chain links wrap the foe (the kept ring is the chain's coil).
 megahorn (bug) — ok: a green horn drives in, a yellow burst.
+metal-claw (steel) — ok: a steel claw slash.
+meteor-assault (fighting, sig) — tweak: SV lights the leek gold, charges and lands a golden impact; ours shows faint orange and cracks → gold tint on the cards, gold impact streaks.
+mighty-cleave (rock, sig) — ok: a gold-orange cleave.
+mist-ball (psychic, sig) — ok: a misty white-violet ball and a violet-white burst.
+moonblast (fairy) — ok (after the star bloom fix): moonlight, a pink-white orb, a pink burst.
+FIXED (pass 16): meteor-assault
+moongeist-beam (ghost, sig) — tweak: SV spreads Lunala's violet crescent wings and fires a white-violet lunar beam; ours is a white slab beam and a white cross → violet spec tint (the beam fix thins the white).
+mud-bomb (ground/mud, USUL) — ok: a brown mud ball, brown splatter.
+mud-shot (mud) — ok: a stream of mud blobs.
+mud-slap (mud) — ok: mud flung at the foe.
+multi-attack (normal, sig) — tweak: SV glows orange-gold and slashes with an orange arc; ours white blades → gold-orange tint.

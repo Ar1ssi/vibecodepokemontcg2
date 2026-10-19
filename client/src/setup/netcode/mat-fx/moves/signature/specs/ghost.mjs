@@ -52,7 +52,7 @@ export const astralBarrage = Object.freeze({
   grain: 0.12,
 });
 
-const MOON = Object.freeze({ deep: '#5FE6F5', body: '#E8F7FF', hot: '#FFFFFF', core: '#FFFFFF' });
+const MOON = Object.freeze({ deep: '#6A3FE0', body: '#B8A4FF', hot: '#E6DEFF', core: '#FAF8FF' });
 const MOON_CYAN = Object.freeze({ deep: '#0B1733', body: '#5FE6F5', hot: '#E8F7FF', core: '#FFFFFF' });
 const WING = Object.freeze({ deep: '#0B1733', body: '#7A4FFF', hot: '#C9B8FF', core: '#FFFFFF' });
 const CREST = Object.freeze({ deep: '#7A4FFF', body: '#FFD86B', hot: '#FFF3C0', core: '#FFFFFF' });
@@ -72,6 +72,7 @@ export const moongeistBeam = Object.freeze({
   pad: 1.8,
   attacker: { motion: 'rise', params: {} },
   defender: { motion: 'knock', params: { strength: 0.35, heat: 0.5 } },
+  tint: WING,
   beats: [
     { at: 0, until: 800, layer: 'back', drawer: 'aura', params: { hz: 2, alpha: 0.7, tint: WING } },
     { at: 0, until: 800, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.18, r1: 0.5, tint: MOON } },

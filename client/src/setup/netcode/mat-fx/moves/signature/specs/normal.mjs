@@ -94,7 +94,7 @@ export const judgment = Object.freeze({
 });
 
 const SILVALLY = Object.freeze({ deep: '#3A2A10', body: '#FFB020', hot: '#FFE066', core: '#FFFFFF' });
-const SLASH = Object.freeze({ deep: '#FF7A1A', body: '#FFE066', hot: '#FFFFFF', core: '#FFFFFF' });
+const SLASH = Object.freeze({ deep: '#C8500E', body: '#FF9A1F', hot: '#FFD060', core: '#FFF2C8' });
 
 // Silvally: two yellow crescent slashes sweep round its glowing fist, then three vertical
 // yellow-white bursts strike the defender one after another.
@@ -111,6 +111,7 @@ export const multiAttack = Object.freeze({
   pad: 1.8,
   attacker: { motion: 'lunge', params: { wind: 0.3, reach: 0.6, strikes: 3 } },
   defender: { motion: 'stagger', params: { hits: 3, strength: 0.45, gapMs: 220, lead: 440, heat: 0.35 } },
+  tint: SILVALLY,
   beats: [
     { at: 0, until: 500, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.12, r1: 0.32, from: 0.15, tint: SLASH } },
     // The crescents sweep round the fist as it winds up: the move's own blades, not an orbit.
