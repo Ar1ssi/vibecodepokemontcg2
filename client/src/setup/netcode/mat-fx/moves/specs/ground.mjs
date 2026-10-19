@@ -116,7 +116,6 @@ export const bulldoze = spec({
   beats: [
     { at: 0, until: 560, layer: 'back', drawer: 'aura', params: { target: 'attacker', alpha: 0.35, hz: 2 } },
     { at: 620, until: 1300, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.35 } },
-    { at: 700, until: 1100, layer: 'back', drawer: 'ring', params: { target: 'attacker', kind: 'floor', count: 2, r0: 0.3, r1: 1.3 } },
     { at: 700, until: 1300, layer: 'back', drawer: 'terrain', params: { kind: 'wave', radius: 1.4 } },
     { at: 700, until: 1250, layer: 'back', drawer: 'terrain', params: { kind: 'crack', radius: 1.2 } },
     { at: 700, until: 870, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
@@ -141,10 +140,7 @@ export const stompingTantrum = spec({
   defender: { motion: 'sink', params: { heat: 0.35 } },
   beats: [
     { at: 0, until: 620, layer: 'back', drawer: 'terrain', params: { target: 'attacker', kind: 'dust', radius: 1.0 } },
-    { at: 120, until: 330, layer: 'back', drawer: 'ring', params: { target: 'attacker', kind: 'floor', count: 1, r0: 0.3, r1: 0.9, width: 0.04 } },
-    { at: 360, until: 570, layer: 'back', drawer: 'ring', params: { target: 'attacker', kind: 'floor', count: 1, r0: 0.3, r1: 0.9, width: 0.04 } },
     { at: 600, until: 1300, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.35 } },
-    { at: 720, until: 1100, layer: 'back', drawer: 'ring', params: { target: 'attacker', kind: 'floor', count: 2, r0: 0.3, r1: 1.4 } },
     { at: 720, until: 1100, layer: 'back', drawer: 'ring', params: { kind: 'floor', count: 2, r0: 0.4, r1: 1.3 } },
     { at: 720, until: 1300, layer: 'back', drawer: 'terrain', params: { kind: 'crack', radius: 1.3 } },
     { at: 720, until: 890, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
@@ -172,7 +168,6 @@ export const earthquake = spec({
   beats: [
     { at: 0, until: 880, layer: 'back', drawer: 'aura', params: { target: 'attacker', alpha: 0.4, hz: 1.5 } },
     { at: 900, until: 1900, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.45 } },
-    { at: 1100, until: 1500, layer: 'back', drawer: 'ring', params: { target: 'attacker', kind: 'floor', count: 2, r0: 0.3, r1: 1.5 } },
     { at: 1100, until: 1550, layer: 'back', drawer: 'ring', params: { kind: 'floor', count: 3, r0: 0.4, r1: 1.6 } },
     { at: 1100, until: 1800, layer: 'back', drawer: 'terrain', params: { kind: 'crack', radius: 1.6 } },
     // Behind the struck card, so the spires frame it instead of hiding it.

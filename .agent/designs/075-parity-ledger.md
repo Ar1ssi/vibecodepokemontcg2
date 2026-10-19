@@ -233,3 +233,10 @@ superpower (fighting) — tweak: SV erupts an orange-blue impact burst on the fo
 surf (water) — tweak: SV washes a white-blue wave over the foe; ours a ring chain → a solid widening wave beam.
 tachyon-cutter (steel, sig) — n/a: the Poképédia video is a menu screen.
 FIXED (pass 30): sunsteel-strike superpower surf
+techno-blast (normal, sig) — ok-ish: a violet-white beam (SV's is violet-white too).
+tera-starstorm (stellar, sig) — ok: teal-cyan charge and prismatic beams.
+thousand-arrows (ground, sig) — ok: green arrows rain on the foe.
+thousand-waves (ground, sig) — ok: its rings are the ground wave itself (kept); green hexes.
+throat-chop (dark) — ok (ripples now bands): a dark chop.
+GLOBAL — Ground's attacker-side floor rings (charge rings, 5) dropped; its defender quake rings stay.
+FIXED (pass 31): ground attacker rings
