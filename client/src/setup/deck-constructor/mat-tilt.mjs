@@ -43,7 +43,7 @@ export function attachMatTilt(wrapper, image, { isEnabled = () => true } = {}) {
   };
   const reset = () => set(0, 0);
   const onMove = (event) => {
-    if (!isEnabled() || image.classList?.contains('dragging')) {
+    if (!isEnabled() || image.classList?.contains('dragging') || image.closest?.('#bench')) {
       reset();
       return;
     }
