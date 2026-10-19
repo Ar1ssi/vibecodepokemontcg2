@@ -14,6 +14,7 @@ import {
   playTrailTrack,
 } from './card-flight.js';
 import { burstParticles } from './particles.mjs';
+import { takeSlidePin } from './lifecycle.js';
 import { KO_FAN_MAX, KO_SCENE_MS, koTrack } from './ko-scene.mjs';
 
 const BACKSTOP_PAD_MS = 400;
@@ -65,6 +66,7 @@ export function playKnockoutScene(ghost) {
       seed,
     });
     if (meshCanFly(cards[index].instanceId)) {
+      takeSlidePin(cards[index].instanceId);
       playMeshTrack({
         instanceId: cards[index].instanceId,
         rect,

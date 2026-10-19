@@ -219,6 +219,27 @@ export function pinSlideOrigins(events, registry) {
   }
 }
 
+/**
+ * Before the diff: holds the meshes of every card a knockout in `events` will fly where they
+ * stand now. The view buries them in the discard pile at once, but their scene waits behind the
+ * attack's banner and move; the scene takes each pin over (`takeSlidePin`).
+ */
+export function pinKnockoutOrigins(events, registry) {
+  if (!Array.isArray(events)) return;
+  for (const event of events) {
+    if (event?.type !== 'pokemonKnockedOut' || event.instanceId == null) continue;
+    for (const memberId of stackIdsOf(registry, event.instanceId)) {
+      const rect = rectForInstance(memberId, registry);
+      if (!rect || !meshCanFly(memberId)) continue;
+      const turn = frameTurnOf(registry.get(memberId)?.element);
+      slidePins.pin(memberId, flightPoseFromTrack(rect, { rotate: turn }, 0, 0));
+    }
+  }
+}
+
+/** The scene flying card `id` takes its pin over, so letting the rest go does not move it back. */
+export const takeSlidePin = (id) => slidePins.take(id);
+
 /** Lets go of pins whose slide never played (the FX queue went idle or was cleared). */
 export const releaseSlidePins = () => slidePins.releaseAll();
 

@@ -3,8 +3,9 @@
 // cards are pinned where they stood from before the diff until their slide takes the mesh over.
 // DOM-free: `tween` is the board scene's `tween(id, poseFn, ms)`.
 
-// Backstop: a pin whose slide never comes (the plan was dropped) lets go after this long.
-export const SLIDE_PIN_MAX_MS = 6000;
+// Backstop: a pin whose slide or knockout never comes (the plan was dropped) lets go after this long;
+// an attack banner, its move and the strike come first.
+export const SLIDE_PIN_MAX_MS = 9000;
 
 export function createSlidePins(tween) {
   const pinned = new Map();
