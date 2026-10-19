@@ -145,13 +145,14 @@ export const electroShot = spec({
   contactMs: 1200,
   attacker: { motion: 'rear-lurch', params: { rear: 0.14, lurch: 0.4, glow: 1 } },
   defender: { motion: 'knock', params: { strength: 0.4, heat: 0.35 } },
+  tint: { deep: '#1F3FB8', body: '#5FA8FF', hot: '#D8ECFF', core: '#F2F8FF' },
   beats: [
     // The shot charges at the muzzle through the whole wind-up, then fires.
-    { at: 0, until: 1150, layer: 'front', drawer: 'coreCharge', params: { r0: 0.08, r1: 0.34, from: 0.15 } },
+    { at: 0, until: 1150, layer: 'front', drawer: 'coreCharge', params: { r0: 0.08, r1: 0.34, from: 0.15, tint: { deep: '#1F3FB8', body: '#5FA8FF', hot: '#D8ECFF', core: '#F2F8FF' } } },
     // The segmented beam reaches the defender at 960 + 0.4 x 600 = contact.
-    { at: 960, until: 1560, layer: 'front', drawer: 'beam', params: { kind: 'segmented', w: 0.4, growIn: 0.4, retract: 0.25 } },
+    { at: 960, until: 1560, layer: 'front', drawer: 'beam', params: { kind: 'segmented', w: 0.32, growIn: 0.4, retract: 0.25, tint: { deep: '#1F3FB8', body: '#5FA8FF', hot: '#D8ECFF', core: '#F2F8FF' } } },
     // The lightning inside the beam: on a short lane the dashes alone read as chevrons.
-    { at: 1150, until: 1550, layer: 'front', drawer: 'bolt', params: { segments: 8, jag: 0.08, branches: 1, width: 0.08 } },
+    { at: 1150, until: 1550, layer: 'front', drawer: 'bolt', params: { segments: 8, jag: 0.08, branches: 1, width: 0.08, tint: { deep: '#1F3FB8', body: '#5FA8FF', hot: '#D8ECFF', core: '#F2F8FF' } } },
     { at: 1200, until: 1550, layer: 'front', drawer: 'shards', params: { count: 7, arc: 360, distance: 1.0, spin: 240 } },
     flash(1200),
   ],

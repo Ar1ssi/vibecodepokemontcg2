@@ -88,6 +88,8 @@ export const dragonEnergy = Object.freeze({
 });
 
 const CANNON = Object.freeze({ deep: '#5A1FA6', body: '#FF2BD6', hot: '#FFC0F0', core: '#FFFFFF' });
+// Eternabeam (design 075 parity): Scarlet/Violet's crimson beam.
+const CRIMSON = Object.freeze({ deep: '#5A0A1E', body: '#E01E3C', hot: '#FF7A8A', core: '#FFD0D6' });
 const CANNON_RED = Object.freeze({ deep: '#5A1FA6', body: '#FF3B6B', hot: '#FFC0D0', core: '#FFFFFF' });
 const LIGHTNING = Object.freeze({ deep: '#7FF7FF', body: '#E0FFFF', hot: '#FFFFFF', core: '#FFFFFF' });
 
@@ -106,11 +108,12 @@ export const dynamaxCannon = Object.freeze({
   pad: 1.8,
   attacker: { motion: 'rise', params: {} },
   defender: { motion: 'knock', params: { strength: 0.35, heat: 0.35 } },
+  tint: CANNON,
   beats: [
     { at: 0, until: 800, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.18, r1: 0.5, rings: 2, tint: CANNON } },
     { at: 300, until: 800, layer: 'back', drawer: 'aura', params: { hz: 2, alpha: 0.6, tint: CANNON_RED } },
     { at: 700, until: 1100, layer: 'front', drawer: 'bolt', params: { from: 'attacker', segments: 5, jag: 0.12, branches: 2, rerollMs: 45, tint: LIGHTNING } },
-    { at: 800, until: 1200, layer: 'front', drawer: 'beam', params: { kind: 'solid', w: 0.6, tint: CANNON } },
+    { at: 800, until: 1200, layer: 'front', drawer: 'beam', params: { kind: 'solid', w: 0.42, tint: CANNON } },
     { at: 1100, until: 1300, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8, tint: CANNON } },
     { at: 1100, until: 1800, layer: 'back', drawer: 'cloud', params: { count: 8, drift: 0.3, alpha: 0.5, tint: CANNON } },
   ],
@@ -131,19 +134,19 @@ export const eternabeam = Object.freeze({
   vgType: 'dragon',
   statClass: 'special',
   tier: 'S',
-  family: 'quake',
+  family: 'roar',
   material: 'dragon',
   durationMs: 2200,
   contactMs: 1100,
   pad: 1.9,
   attacker: { motion: 'spin', params: { turns: 1 } },
   defender: { motion: 'knock', params: { strength: 0.35, heat: 0.35 } },
+  tint: CRIMSON,
   beats: [
     { at: 0, until: 700, layer: 'back', drawer: 'spiral', params: { target: 'attacker', turns: 2.5, r0: 0.2, r1: 1.1, rpm: 90, tongues: 10, tint: VORTEX } },
     { at: 0, until: 900, layer: 'front', drawer: 'coreCharge', params: { lead: 0, r0: 0.14, r1: 0.3, tint: PINK_BEAM } },
-    { at: 100, until: 900, layer: 'front', drawer: 'fan', params: { target: 'attacker', count: 4, spread: 360, lenMin: 0.9, lenMax: 1.2, width: 0.3, grow: 0.3, spin: 90, tint: BLADE } },
     { at: 700, until: 1100, layer: 'back', drawer: 'rain', params: { count: 6, height: 1.6, spread: 0.9, tint: PINK_BEAM } },
-    { at: 850, until: 1400, layer: 'front', drawer: 'pillar', params: { from: 'above', height: 1.2, w: 0.5, tint: WHITE_CYAN } },
+    { at: 850, until: 1500, layer: 'front', drawer: 'beam', params: { kind: 'solid', w: 0.45, growIn: 0.4, retract: 0.25, tint: CRIMSON } },
     { at: 1100, until: 1300, layer: 'top', drawer: 'impactFlash', params: { r1: 0.8, r0: 0.3, tint: PINK_BEAM } },
     { at: 1300, until: 2000, layer: 'back', drawer: 'smoke', params: { count: 5, tint: VORTEX } },
   ],

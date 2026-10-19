@@ -75,6 +75,7 @@ export const electroDrift = Object.freeze({
   pad: 1.9,
   attacker: { motion: 'spin', params: { turns: 1 } },
   defender: { motion: 'knock', params: { strength: 0.35, heat: 0.35 } },
+  tint: VIOLET,
   beats: [
     // The arc crackles off it through the spinning dive, then the hoop is thrown.
     { at: 0, until: 500, layer: 'front', drawer: 'bolt', params: { from: 'attacker', segments: 9, jag: 0.12, branches: 1, rerollMs: 45, width: 0.07, tint: ARC } },

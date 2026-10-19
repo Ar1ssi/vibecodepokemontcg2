@@ -208,6 +208,7 @@ export const dragonPulse = spec({
       drawer: 'volley',
       params: { count: 5, stagger: 80, r0: 0.14, r1: 0.2, bow: 0.08, tongues: 2 },
     },
+    { at: 840, until: 1240, layer: 'back', drawer: 'beam', params: { kind: 'pulse-train', w: 0.4, gap: 0.35, speed: 2, growIn: 0.4 } },
     { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
     { at: 1000, until: 1500, layer: 'front', drawer: 'shards', params: { count: 10, distance: 1.1, spin: 240 } },
     { at: 950, until: 1900, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.45 } },

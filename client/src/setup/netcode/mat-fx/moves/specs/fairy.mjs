@@ -167,7 +167,7 @@ export const drainingKiss = spec({
     { at: 600, until: 880, layer: 'front', drawer: 'shards', params: { count: 4, distance: 0.7, spin: 200 } },
     // The kiss lands as a heart (it starts last at contact, so it is the family).
     { at: 600, until: 1000, layer: 'front', drawer: 'glyph', params: { kind: 'heart', r: 0.45 } },
-    { at: 700, until: 1150, layer: 'front', drawer: 'volley', params: { from: 'defender', count: 5, stagger: 50, r0: 0.07, r1: 0.1, bow: 0.4, tongues: 0 } },
+    { at: 700, until: 1150, layer: 'front', drawer: 'volley', params: { from: 'defender', count: 5, stagger: 50, r0: 0.07, r1: 0.1, bow: 0.4, tongues: 0, tint: { deep: '#2E8A4C', body: '#7CE89A', hot: '#D8FFE0', core: '#F4FFF6' } } },
   ],
   particles: [twinkles({ at: 620, count: 6 }), twinkles({ at: 1150, anchor: 'attacker', count: 6, distance: 0.7, maxDelay: 0.3 })],
 });
