@@ -378,3 +378,22 @@ test('an attachment whose host is missing is drawn as a root', () => {
   assert.equal(p.host, null);
   assert.equal(placementById(model, 404), null);
 });
+
+test('sortHand: the hand fans in the page\'s render order (deck-list sort); a bad sort keeps view order', () => {
+  const hand = [card(1, 'Ultra Ball'), card(2, 'Pikachu'), card(3, 'Ultra Ball')];
+  const view = ownerView({ you: { hand }, them: { hand: [card(10, 'Eevee'), card(11, 'Abra')] } });
+  const byName = (side, cards) => (side === 'self' ? [...cards].sort((a, b) => a.name.localeCompare(b.name)) : cards);
+  const handIds = (model, side) =>
+    model.placements.filter((p) => p.side === side && p.zone === 'hand').sort((a, b) => a.index - b.index).map((p) => p.instanceId);
+  const sorted = boardModelFrom(view, opts({ sortHand: byName }));
+  assert.deepEqual(handIds(sorted, 'self'), [2, 1, 3]);
+  assert.deepEqual(sorted.handStacks.self, [[2], [1, 3]]);
+  assert.deepEqual(handIds(sorted, 'opp'), [10, 11]);
+  assert.deepEqual(hand.map((c) => c.instanceId), [1, 2, 3], 'the view is not mutated');
+  const throwing = () => {
+    throw new Error('no deck list');
+  };
+  assert.deepEqual(handIds(boardModelFrom(view, opts({ sortHand: throwing })), 'self'), [1, 2, 3]);
+  assert.deepEqual(handIds(boardModelFrom(view, opts({ sortHand: () => [] })), 'self'), [1, 2, 3]);
+  assert.deepEqual(handIds(boardModelFrom(view, opts()), 'self'), [1, 2, 3]);
+});

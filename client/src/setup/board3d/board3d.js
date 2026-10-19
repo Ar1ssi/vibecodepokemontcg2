@@ -15,7 +15,7 @@ const unavailableNotice = (reason) => `3D board unavailable: ${reason}; this bro
 const defaultDeps = {
   importThree: () => import('three'),
   loadModules: async () => {
-    const [renderer, textures, scene, clock, table, room, model, applyView, hydrateHolo, matFx, containers, input, hover, dragActions, fxApply, fxModel] =
+    const [renderer, textures, scene, clock, table, room, model, applyView, hydrateHolo, matFx, containers, input, hover, dragActions, fxApply, fxModel, handSort] =
       await Promise.all([
         import('../gl/gl-renderer.js'),
         import('../gl/gl-textures.js'),
@@ -33,6 +33,7 @@ const defaultDeps = {
         import('./board-drag-actions.js'),
         import('../image-logic/fx-settings.js'),
         import('../image-logic/fx-settings.mjs'),
+        import('../netcode/hand-sort-context.js'),
       ]);
     return {
       createRenderer: renderer.createRenderer,
@@ -43,6 +44,7 @@ const defaultDeps = {
       RoomEnvironment: room.RoomEnvironment,
       boardModelFrom: model.boardModelFrom,
       getLastAppliedView: applyView.getLastAppliedView,
+      sortZoneCards: handSort.sortZoneCardsForRender,
       cardBackSrcFor: hydrateHolo.cardBackSrcForUser,
       motionReduced: matFx.motionReduced,
       boardMirror: containers.boardMirror,
@@ -402,6 +404,8 @@ export async function initializeBoard3d({
       },
       uiState: mirror?.uiState(),
       previous: current.model,
+      // The hand fans in the order the page renders it (the deck-list sort, apply-view.js).
+      sortHand: view.you ? (side, cards) => modules.sortZoneCards?.(side === 'self' ? 'you' : 'them', 'hand', cards) : null,
       onInvalid: (reason) => {
         if (current.warnedInvalid) return;
         current.warnedInvalid = true;

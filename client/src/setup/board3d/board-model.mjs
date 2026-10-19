@@ -262,10 +262,21 @@ function layoutStack(root, attached, placementOf) {
   for (const card of members) placementOf(card).rotation = rotation;
 }
 
+/** The hand in the order the page renders it (apply-view's `sortZoneCards`); view order otherwise. */
+function handOrder(cards, side, ctx) {
+  let sorted = null;
+  try {
+    sorted = ctx.sortHand?.(side, cards);
+  } catch {
+    sorted = null;
+  }
+  return Array.isArray(sorted) && sorted.length === cards.length ? sorted : cards;
+}
+
 function sideZonePlacements(player, side, ctx) {
   const placements = [];
   for (const zoneId of CARD_ZONES) {
-    const cards = zoneCards(player, zoneId);
+    const cards = zoneId === 'hand' ? handOrder(zoneCards(player, zoneId), side, ctx) : zoneCards(player, zoneId);
     const byId = new Map(cards.map((card) => [card.instanceId, card]));
     const zonePlacements = new Map();
     cards.forEach((card, index) => {
@@ -366,7 +377,9 @@ function stadiumOf(stadium, localPlayerId) {
  * @param {object} view owner view (`you`/`them`) or spectator view (`players`)
  * @param {{ selfPlayerId?: string|null, cardBackSrcFor?: (side:'self'|'opp') => string,
  *   uiState?: UiState, previous?: BoardModel|null, nearPlayerId?: string|null,
+ *   sortHand?: (side:'self'|'opp', cards: object[]) => object[],
  *   onInvalid?: (reason:string) => void }} [options]
+ *   `sortHand` reorders a hand as the page renders it (the deck-list sort); it must not mutate.
  * @returns {BoardModel} `previous ?? EMPTY_MODEL` when the view is malformed (never throws)
  */
 export function boardModelFrom(
@@ -377,6 +390,7 @@ export function boardModelFrom(
     uiState = EMPTY_UI_STATE,
     previous = null,
     nearPlayerId = null,
+    sortHand = null,
     onInvalid,
   } = {}
 ) {
@@ -384,6 +398,7 @@ export function boardModelFrom(
     if (!view || typeof view !== 'object') fail('view is empty');
     const { near, far, nearSeat } = seatsOf(view, nearPlayerId);
     const ctx = {
+      sortHand,
       uiState: uiState || EMPTY_UI_STATE,
       backSrc: {
         self: String(cardBackSrcFor?.('self') ?? ''),
