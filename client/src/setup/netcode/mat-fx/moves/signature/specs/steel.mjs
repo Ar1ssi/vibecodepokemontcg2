@@ -111,7 +111,7 @@ export const doomDesire = Object.freeze({
   defender: { motion: 'knock', params: { strength: 0.35, heat: 0.35 } },
   tint: MAGENTA,
   beats: [
-    { at: 0, until: 500, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.18, r1: 0.5, rings: 1, tint: STAR } },
+    { at: 0, until: 500, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.18, r1: 0.5, tint: STAR } },
     { at: 700, until: 1000, layer: 'front', drawer: 'pillar', params: { from: 'above', height: 1.2, w: 0.5, tint: MAGENTA } },
     { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { r1: 0.8, r0: 0.3, tint: MAGENTA } },
     { at: 1000, until: 1300, layer: 'front', drawer: 'starFlare', params: { size: 0.5, grow: 0.12, core: 0.14, arms: 'cross', width: 0.26, tint: MAGENTA } },

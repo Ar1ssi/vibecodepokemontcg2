@@ -65,7 +65,7 @@ export const fusionFlare = Object.freeze({
       until: 520,
       layer: 'front',
       drawer: 'coreCharge',
-      params: { target: 'sky-attacker', r0: 0.3, r1: 0.75, rings: 2, tint: { body: '#FF9A1F', hot: '#FFE35A', core: '#FFF8DC' } },
+      params: { target: 'sky-attacker', r0: 0.3, r1: 0.75, tint: { body: '#FF9A1F', hot: '#FFE35A', core: '#FFF8DC' } },
     },
     {
       at: 500,

@@ -26,7 +26,6 @@ export const landsWrath = Object.freeze({
   attacker: { motion: 'stomp', params: {} },
   defender: { motion: 'knock', params: { strength: 0.45, heat: 0.35 } },
   beats: [
-    { at: 0, until: 900, layer: 'front', drawer: 'fan', params: { count: 9, spread: 120, lenMin: 0.8, lenMax: 1.3, width: 0.2, flap: 8, tint: FRONDS } },
     { at: 500, until: 1100, layer: 'back', drawer: 'terrain', params: { target: 'attacker', kind: 'dust', radius: 1.4 } },
     { at: 700, until: 1400, layer: 'front', drawer: 'pillar', params: { from: 'below', height: 1.2, w: 0.5, count: 3, spread: 1.2, stagger: 60, tint: GOLD_LIGHT } },
     { at: 700, until: 1800, layer: 'back', drawer: 'terrain', params: { kind: 'crack', radius: 1.4, tint: GOLD_LIGHT } },

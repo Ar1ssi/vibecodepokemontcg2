@@ -106,3 +106,16 @@ ice-beam (ice) — ok: a blue-white beam, flakes.
 ice-burn (ice, sig) — tweak: SV wreathes Kyurem in cold flame, then an icy blast; ours draws a red GRID lattice round the user (clip art) and a big white ice star → drop the grid, smaller ice star.
 ice-hammer (ice) — ok: an icy hammer falls on the foe.
 ice-shard (ice) — ok: small ice shards thrown.
+FIXED (pass 12): hyperspace-hole ice-burn
+ice-spinner (ice) — ok: spinning on ice into the foe, shards.
+icy-wind (ice) — ok: icy gusts and frost on the foe.
+infestation (bug) — ok: a swarm whirling round the foe.
+iron-head (steel) — tweak: SV glints a steel head and charges in; ours swells a big white orb on the user → steel-blue charge tint (the charge-orb heart fix also helps).
+iron-tail (steel) — ok: a white tail swipe.
+FIXED (pass 13): iron-head
+ivy-cudgel (grass, sig) — ok: a teal-green aura, the swing, a teal burst.
+judgment (normal, sig) — tweak: SV charges a gold orb under a gold ring, then gold beams rain on the foe into an explosion; ours orbits the orb with spinning ring arcs (coreCharge `rings`, the "spinning circle" again) → no rings, gold pillars from above.
+karate-chop (fighting, LGPE) — ok: a quick chop flash.
+lands-wrath (ground, sig) — tweak: SV lights the ground gold and bursts gold columns up under the foe; ours fans black spikes at the user → drop the dark fan; the gold columns stay.
+leaf-blade (grass) — ok: a green blade streak.
+GLOBAL — coreCharge `rings` spin tongue arcs round the charge orb: the spinning circle the user rejected → drop `rings` everywhere.

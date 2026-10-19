@@ -42,7 +42,7 @@ export const darkVoid = Object.freeze({
   defender: { motion: 'sink', params: { heat: 0 } },
   beats: [
     { at: 0, until: 500, layer: 'back', drawer: 'aura', params: { hz: 2, alpha: 0.6, tint: VOID_VIOLET } },
-    { at: 0, until: 650, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.18, r1: 0.4, rings: 1, tint: VOID } },
+    { at: 0, until: 650, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.18, r1: 0.4, tint: VOID } },
     { at: 600, until: 1000, layer: 'front', drawer: 'projectile', params: { path: 'arc', bow: 0.4, r0: 0.34, r1: 0.42, tongues: 3, ease: 'in', tint: VOID } },
     { at: 950, until: 1800, layer: 'front', drawer: 'shade', params: { kind: 'dome', r: 1.05, fill: 'deep', fillAlpha: 0.85, rimAlpha: 0.9, swirl: 40, tint: VOID } },
     { at: 1000, until: 1150, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8, tint: VOID_VIOLET } },

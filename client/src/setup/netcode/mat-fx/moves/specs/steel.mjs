@@ -178,9 +178,9 @@ export const ironHead = spec({
   defender: { motion: 'knock', params: { strength: 0.5, heat: 0.35 } },
   beats: [
     ...glints(0, 640, { count: 4, r0: 0.05, r1: 0.08, tongues: 0 }),
-    { at: 100, until: 620, layer: 'front', drawer: 'coreCharge', params: { lead: 0.3, r0: 0.1, r1: 0.26, from: 0.2 } },
+    { at: 100, until: 620, layer: 'front', drawer: 'coreCharge', params: { lead: 0.3, r0: 0.1, r1: 0.26, from: 0.2, tint: { deep: '#2E4A6E', body: '#7A9CC8', hot: '#C8DCF2', core: '#EEF4FA' } } },
     // The head rides the leading edge: the dash runs 0.3 c -> c.
-    { at: 282, until: 940, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.26, r1: 0.34, tongues: 3 } },
+    { at: 282, until: 940, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.22, r1: 0.28, tongues: 3, tint: { deep: '#2E4A6E', body: '#7A9CC8', hot: '#C8DCF2', core: '#EEF4FA' } } },
     { at: 940, until: 1120, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
     { at: 940, until: 1400, layer: 'front', drawer: 'shards', params: { count: 12, distance: 1.2, spin: 360 } },
     { at: 1100, until: 1700, layer: 'front', drawer: 'cloud', params: { count: 6, radius: 0.3, drift: 0.7, alpha: 0.3 } },

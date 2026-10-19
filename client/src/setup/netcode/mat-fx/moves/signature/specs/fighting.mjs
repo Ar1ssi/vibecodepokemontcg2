@@ -102,7 +102,7 @@ export const secretSword = Object.freeze({
   defender: { motion: 'knock', params: { strength: 0.35, heat: 0.35 } },
   beats: [
     { at: 0, until: 500, layer: 'back', drawer: 'aura', params: { hz: 2, alpha: 0.6, tint: WHITE_GOLD } },
-    { at: 200, until: 720, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.18, r1: 0.5, rings: 1, tint: WHITE_GOLD } },
+    { at: 200, until: 720, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.18, r1: 0.5, tint: WHITE_GOLD } },
     { at: 700, until: 1000, layer: 'front', drawer: 'projectile', params: { path: 'straight', ease: 'linear', r0: 0.3, r1: 0.5, tongues: 4, tint: WHITE_GOLD } },
     { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { r1: 0.8, r0: 0.3, tint: WHITE_GOLD } },
     { at: 1000, until: 1450, layer: 'front', drawer: 'starFlare', params: { size: 0.6, grow: 0.12, core: 0.18, arms: 'cross', width: 0.32, tint: WHITE_GOLD } },

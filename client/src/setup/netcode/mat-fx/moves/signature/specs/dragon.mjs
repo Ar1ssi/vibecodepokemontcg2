@@ -44,7 +44,7 @@ export const coreEnforcer = Object.freeze({
   defender: { motion: 'knock', params: { strength: 0.35, heat: 0.35 } },
   tint: ZY_GREEN,
   beats: [
-    { at: 0, until: 520, layer: 'front', drawer: 'coreCharge', params: { lead: 0, r0: 0.18, r1: 0.56, rings: 1, tint: ZY_GREEN } },
+    { at: 0, until: 520, layer: 'front', drawer: 'coreCharge', params: { lead: 0, r0: 0.18, r1: 0.56, tint: ZY_GREEN } },
     { at: 600, until: 1100, layer: 'back', drawer: 'beam', params: { kind: 'widening', w: 0.5, tint: ZY_GREEN } },
     { at: 800, until: 1500, layer: 'front', drawer: 'bolt', params: { from: 'attacker', segments: 3, jag: 0.3, branches: 0, rerollMs: 45, width: 0.18, tint: ZY_WHITE } },
     { at: 1000, until: 1200, layer: 'top', drawer: 'impactFlash', params: { r1: 0.8, r0: 0.3, tint: ZY_WHITE } },
@@ -76,7 +76,7 @@ export const dragonEnergy = Object.freeze({
   tint: MAGENTA,
   beats: [
     { at: 0, until: 700, layer: 'back', drawer: 'aura', params: { hz: 2, alpha: 0.6, tint: MAGENTA } },
-    { at: 200, until: 700, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.18, r1: 0.45, rings: 1, tint: PINK_WHITE } },
+    { at: 200, until: 700, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.18, r1: 0.45, tint: PINK_WHITE } },
     // Design 075 parity (Scarlet/Violet): a swarm of magenta energy orbs, then a pink beam.
     { at: 500, until: 1100, layer: 'front', drawer: 'volley', params: { count: 6, stagger: 60, r0: 0.12, r1: 0.18, bow: 0.5, tongues: 2, tint: MAGENTA } },
     { at: 700, until: 1700, layer: 'front', drawer: 'beam', params: { kind: 'widening', w: 0.45, growIn: 0.4, retract: 0.3, tint: MAGENTA } },
@@ -110,7 +110,7 @@ export const dynamaxCannon = Object.freeze({
   defender: { motion: 'knock', params: { strength: 0.35, heat: 0.35 } },
   tint: CANNON,
   beats: [
-    { at: 0, until: 800, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.18, r1: 0.5, rings: 2, tint: CANNON } },
+    { at: 0, until: 800, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.18, r1: 0.5, tint: CANNON } },
     { at: 300, until: 800, layer: 'back', drawer: 'aura', params: { hz: 2, alpha: 0.6, tint: CANNON_RED } },
     { at: 700, until: 1100, layer: 'front', drawer: 'bolt', params: { from: 'attacker', segments: 5, jag: 0.12, branches: 2, rerollMs: 45, tint: LIGHTNING } },
     { at: 800, until: 1200, layer: 'front', drawer: 'beam', params: { kind: 'solid', w: 0.42, tint: CANNON } },
@@ -171,7 +171,7 @@ export const nihilLight = Object.freeze({
   defender: { motion: 'knock', params: { strength: 0.35, heat: 0.35 } },
   beats: [
     { at: 0, until: 700, layer: 'front', drawer: 'glyph', params: { target: 'attacker', kind: 'lattice', r: 1.0, tint: ZY_GREEN } },
-    { at: 0, until: 520, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.18, r1: 0.56, rings: 1, tint: ZY_WHITE } },
+    { at: 0, until: 520, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.18, r1: 0.56, tint: ZY_WHITE } },
     { at: 600, until: 1100, layer: 'back', drawer: 'beam', params: { kind: 'solid', w: 0.5, tint: ZY_WHITE } },
     { at: 800, until: 1500, layer: 'front', drawer: 'bolt', params: { from: 'attacker', segments: 3, jag: 0.3, branches: 0, rerollMs: 45, width: 0.16, tint: ZY_GREEN } },
     { at: 1000, until: 1200, layer: 'top', drawer: 'impactFlash', params: { r1: 0.8, r0: 0.3, tint: ZY_WHITE } },
@@ -201,7 +201,7 @@ export const roarOfTime = Object.freeze({
   attacker: { motion: 'rear-lurch', params: { rear: 0.14, lurch: 0.4, glow: 1 } },
   defender: { motion: 'knock', params: { strength: 0.35, heat: 0.35 } },
   beats: [
-    { at: 0, until: 700, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.18, r1: 0.5, rings: 1, tint: TIME } },
+    { at: 0, until: 700, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.18, r1: 0.5, tint: TIME } },
     { at: 300, until: 900, layer: 'back', drawer: 'aura', params: { hz: 2, alpha: 0.6, tint: SKY_BLUE } },
     { at: 700, until: 1200, layer: 'back', drawer: 'beam', params: { kind: 'widening', w: 0.8, tint: TIME_BEAM } },
     { at: 1000, until: 1200, layer: 'top', drawer: 'impactFlash', params: { r1: 0.8, r0: 0.3, tint: TIME_BEAM } },

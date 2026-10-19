@@ -80,8 +80,9 @@ export const judgment = Object.freeze({
   attacker: { motion: 'rear-lurch', params: { rear: 0.12, lurch: 0.3, glow: 1 } },
   defender: { motion: 'knock', params: { strength: 0.35, heat: 0.35 } },
   beats: [
-    { at: 150, until: 750, layer: 'front', drawer: 'coreCharge', params: { target: 'sky-attacker', r0: 0.16, r1: 0.42, from: 0.15, rings: 1, tint: ORB } },
+    { at: 150, until: 750, layer: 'front', drawer: 'coreCharge', params: { target: 'sky-attacker', r0: 0.16, r1: 0.42, from: 0.15, tint: ORB } },
     { at: 700, until: 1100, layer: 'front', drawer: 'projectile', params: { path: 'arc', from: 'sky-attacker', ease: 'linear', bow: 0.5, r0: 0.38, r1: 0.46, tongues: 4, tint: ORB } },
+    { at: 900, until: 1500, layer: 'back', drawer: 'pillar', params: { from: 'above', height: 1.2, w: 0.3, count: 2, spread: 0.8, stagger: 100, tint: ORB } },
     { at: 1000, until: 1700, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.35, tint: ORB } },
     flash(1100, ORB),
     star(1100, 1550, 'cross', ORB),
@@ -176,7 +177,7 @@ export const technoBlast = Object.freeze({
   attacker: { motion: 'rear-lurch', params: { rear: 0.14, lurch: 0.4, glow: 1 } },
   defender: { motion: 'knock', params: { strength: 0.35, heat: 0.6 } },
   beats: [
-    { at: 0, until: 1000, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.12, r1: 0.36, from: 0.25, rings: 1, tint: TECHNO } },
+    { at: 0, until: 1000, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.12, r1: 0.36, from: 0.25, tint: TECHNO } },
     { at: 800, until: 1100, layer: 'front', drawer: 'beam', params: { kind: 'widening', w: 0.5, tint: TECHNO } },
     { at: 1000, until: 1400, layer: 'front', drawer: 'beam', params: { kind: 'solid', w: 0.55, tint: TECHNO } },
     flash(1100, SMOKE),

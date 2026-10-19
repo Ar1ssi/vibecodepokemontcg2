@@ -108,7 +108,7 @@ export const fusionBolt = Object.freeze({
   defender: { motion: 'knock', params: { strength: 0.45, heat: 0.35 } },
   tint: ORB,
   beats: [
-    { at: 0, until: 700, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.14, r1: 0.36, from: 0.15, rings: 1, tint: ORB } },
+    { at: 0, until: 700, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.14, r1: 0.36, from: 0.15, tint: ORB } },
     { at: 700, until: 1100, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.3, r1: 0.36, tongues: 4, tint: ORB } },
     // The column from the sky is the bolt itself: a white pillar and a lane bolt on the same line
     // as the orb summed into one white slab.
@@ -170,7 +170,7 @@ export const thunderCage = Object.freeze({
   defender: { motion: 'knock', params: { strength: 0.35, heat: 0.35 } },
   beats: [
     { at: 0, until: 450, layer: 'front', drawer: 'slashArc', params: { target: 'defender', count: 2, sweep: 180, radius: 0.7, gapDeg: 30, angle: 45, thick: 0.16, tint: ORB_Y } },
-    { at: 350, until: 1000, layer: 'front', drawer: 'coreCharge', params: { target: 'sky', lead: 0, r0: 0.16, r1: 0.34, rings: 1, tint: ORB_Y } },
+    { at: 350, until: 1000, layer: 'front', drawer: 'coreCharge', params: { target: 'sky', lead: 0, r0: 0.16, r1: 0.34, tint: ORB_Y } },
     { at: 450, until: 1000, layer: 'front', drawer: 'bolt', params: { from: 'sky', count: 8, branches: 0, spread: 0.9, curve: 0.4, segments: 9, jag: 0.08, width: 0.04, tint: ORB_Y } },
     flash(1000),
     cross(1000, 1400, { ...ORB_Y, body: '#3FB5FF' }),
@@ -197,7 +197,7 @@ export const thunderclap = Object.freeze({
   attacker: { motion: 'brace', params: { glow: 1 } },
   defender: { motion: 'knock', params: { strength: 0.35, heat: 0.35 } },
   beats: [
-    { at: 0, until: 960, layer: 'front', drawer: 'coreCharge', params: { lead: 0.5, r0: 0.14, r1: 0.36, from: 0.2, rings: 1, tint: CLAP } },
+    { at: 0, until: 960, layer: 'front', drawer: 'coreCharge', params: { lead: 0.5, r0: 0.14, r1: 0.36, from: 0.2, tint: CLAP } },
     // Lightning is instant: the lane bolt fires as the charge lets go and strikes at contact.
     { at: 960, until: 1160, layer: 'front', drawer: 'bolt', params: { from: 'attacker', segments: 9, jag: 0.1, branches: 1, rerollMs: 45, width: 0.07, tint: CLAP } },
     flash(1000, CLAP),

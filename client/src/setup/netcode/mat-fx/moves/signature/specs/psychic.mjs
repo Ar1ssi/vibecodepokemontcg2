@@ -54,7 +54,7 @@ export const freezingGlare = Object.freeze({
   attacker: { motion: 'brace', params: { glow: 0.6 } },
   defender: { motion: 'knock', params: { strength: 0.35, heat: 0.35 } },
   beats: [
-    { at: 0, until: 800, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.14, r1: 0.36, from: 0.2, rings: 1, tint: ORB } },
+    { at: 0, until: 800, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.14, r1: 0.36, from: 0.2, tint: ORB } },
     { at: 500, until: 750, layer: 'front', drawer: 'beam', params: { kind: 'segmented', w: 0.12, gap: 0.4, tint: ICE_BEAM } },
     { at: 700, until: 1600, layer: 'front', drawer: 'beam', params: { kind: 'solid', w: 0.42, growIn: 0.25, retract: 0.35, tint: ICE_BEAM } },
     flash(1000, ICE_BEAM),
@@ -240,7 +240,7 @@ export const photonGeyser = Object.freeze({
   attacker: { motion: 'brace', params: { glow: 0.6 } },
   defender: { motion: 'knock', params: { strength: 0.35, heat: 0.35 } },
   beats: [
-    { at: 0, until: 550, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.14, r1: 0.4, from: 0.15, rings: 1, tint: RED_CORE } },
+    { at: 0, until: 550, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.14, r1: 0.4, from: 0.15, tint: RED_CORE } },
     { at: 500, until: 1000, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.28, r1: 0.36, tongues: 4, ease: 'linear', tint: LIME } },
     flash(1000, LIME),
     star(1000, 1450, 'cross', LIME),
@@ -333,7 +333,7 @@ export const psychoBoost = Object.freeze({
   attacker: { motion: 'rear-lurch', params: { rear: 0.12, lurch: 0.35, glow: 1 } },
   defender: { motion: 'float', params: { lift: 0.15 } },
   beats: [
-    { at: 0, until: 600, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.14, r1: 0.4, from: 0.15, rings: 1, tint: BOOST } },
+    { at: 0, until: 600, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.14, r1: 0.4, from: 0.15, tint: BOOST } },
     { at: 0, until: 600, layer: 'back', drawer: 'cloud', params: { target: 'attacker', count: 4, radius: 0.35, drift: 0.3, alpha: 0.35, tint: BOOST } },
     { at: 500, until: 1000, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.3, r1: 0.4, tongues: 4, ease: 'linear', tint: BOOST } },
     flash(1000, BOOST_BURST),

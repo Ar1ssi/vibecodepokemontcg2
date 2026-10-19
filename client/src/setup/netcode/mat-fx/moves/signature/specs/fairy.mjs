@@ -54,7 +54,7 @@ export const fleurCannon = Object.freeze({
   tint: PINK,
   beats: [
     { at: 0, until: 1000, layer: 'back', drawer: 'shade', params: { target: 'attacker', kind: 'dome', r: 0.85, fill: 'deep', fillAlpha: 0.3, rimAlpha: 0.8, swirl: 30, tint: PINK } },
-    { at: 0, until: 700, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.14, r1: 0.4, from: 0.2, rings: 1, tint: PINK } },
+    { at: 0, until: 700, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.14, r1: 0.4, from: 0.2, tint: PINK } },
     // The beam in a deeper pink than the dome: in the pale PINK its four passes summed to white.
     { at: 600, until: 1400, layer: 'front', drawer: 'beam', params: { kind: 'solid', w: 0.34, tint: BEAM } },
     flash(1000, VIOLET),

@@ -40,7 +40,7 @@ export const aeroblast = Object.freeze({
   defender: { motion: 'float', params: { lift: 0.15 } },
   tint: CYAN,
   beats: [
-    { at: 0, until: 500, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.16, r1: 0.45, rings: 1, tint: CYAN } },
+    { at: 0, until: 500, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.16, r1: 0.45, tint: CYAN } },
     // Design 075 parity (Scarlet/Violet): a cyan tornado beam, not flying rings.
     { at: 450, until: 1950, layer: 'front', drawer: 'beam', params: { kind: 'helix', w: 0.45, turns: 4, growIn: 0.4, retract: 0.3, tint: CYAN } },
     { at: 1000, until: 1700, layer: 'front', drawer: 'spiral', params: { turns: 2.5, r0: 0.2, r1: 1.1, rpm: 90, tongues: 10, tint: VORTEX } },
