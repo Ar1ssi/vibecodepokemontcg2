@@ -827,10 +827,11 @@ test('the steel sigil strokes a ring, the ticks and a pip in palette colours onl
 test('dragon uses the recipe palette with the ember accent, a violet-black shade, violet smoke and ember particles', () => {
   const dragon = MATERIALS.dragon;
   assert.equal(materialFor('dragon'), dragon);
-  assert.deepEqual(dragon.palette.deep, [42, 31, 107]);
-  assert.deepEqual(dragon.palette.body, [90, 71, 201]);
-  assert.deepEqual(dragon.palette.hot, [143, 124, 245]);
-  assert.deepEqual(dragon.palette.core, [210, 200, 255]);
+  // Design 075 parity: Scarlet/Violet's violet-to-magenta dragon colours.
+  assert.deepEqual(dragon.palette.deep, [52, 22, 110]);
+  assert.deepEqual(dragon.palette.body, [128, 52, 206]);
+  assert.deepEqual(dragon.palette.hot, [226, 92, 214]);
+  assert.deepEqual(dragon.palette.core, [255, 184, 240]);
   assert.deepEqual(dragon.palette.ember, [255, 155, 61]);
   assert.deepEqual(dragon.smoke, [90, 70, 120]);
   assert.ok(dragon.shade.every((v, i) => v <= dragon.palette.deep[i]), 'shade darker than deep');

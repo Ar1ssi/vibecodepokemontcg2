@@ -169,7 +169,7 @@ export const dragonBreath = spec({
   beats: [
     { at: 0, until: 560, layer: 'front', drawer: 'coreCharge', params: { lead: 0.45, r0: 0.08, r1: 0.28, from: 0.2 } },
     // The stream's head lands at contact: 520 + 0.25 x 720 = 700.
-    { at: 520, until: 1240, layer: 'front', drawer: 'beam', params: { kind: 'widening', w: 0.55, growIn: 0.25, retract: 0.3 } },
+    { at: 520, until: 1240, layer: 'front', drawer: 'beam', params: { kind: 'widening', w: 0.4, growIn: 0.25, retract: 0.3 } },
     { at: 700, until: 860, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
     { at: 720, until: 1150, layer: 'front', drawer: 'cloud', params: { count: 6, radius: 0.35, drift: 0.4, alpha: 0.45 } },
     { at: 730, until: 1100, layer: 'front', drawer: 'shards', params: { count: 6, distance: 0.9, spin: 200 } },
@@ -233,7 +233,7 @@ export const dracoMeteor = spec({
   beats: [
     { at: 0, until: 900, layer: 'back', drawer: 'vignette', params: { target: 'attacker', maxAlpha: 0.42 } },
     { at: 0, until: 600, layer: 'front', drawer: 'coreCharge', params: { lead: 0, r0: 0.12, r1: 0.4, from: 0.15 } },
-    { at: 460, until: 900, layer: 'front', drawer: 'pillar', params: { target: 'attacker', from: 'below', height: 2.0, w: 0.4 } },
+    { at: 460, until: 900, layer: 'front', drawer: 'pillar', params: { target: 'attacker', from: 'below', height: 1.3, w: 0.35 } },
     // Four meteors, 110 ms apart: flight = 670 - 3 x 110 = 340 ms, so the first lands at 1100.
     {
       at: 760,

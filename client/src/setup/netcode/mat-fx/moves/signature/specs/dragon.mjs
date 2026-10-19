@@ -73,12 +73,14 @@ export const dragonEnergy = Object.freeze({
   pad: 1.8,
   attacker: { motion: 'rear-lurch', params: { rear: 0.12, lurch: 0.35, glow: 1 } },
   defender: { motion: 'knock', params: { strength: 0.35, heat: 0.35 } },
+  tint: MAGENTA,
   beats: [
     { at: 0, until: 700, layer: 'back', drawer: 'aura', params: { hz: 2, alpha: 0.6, tint: MAGENTA } },
     { at: 200, until: 700, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.18, r1: 0.45, rings: 1, tint: PINK_WHITE } },
-    { at: 600, until: 1000, layer: 'front', drawer: 'fan', params: { target: 'attacker', count: 10, spread: 360, lenMin: 0.7, lenMax: 1.2, width: 0.1, grow: 0.3, tint: PINK_WHITE } },
+    // Design 075 parity (Scarlet/Violet): a swarm of magenta energy orbs, then a pink beam.
+    { at: 500, until: 1100, layer: 'front', drawer: 'volley', params: { count: 6, stagger: 60, r0: 0.12, r1: 0.18, bow: 0.5, tongues: 2, tint: MAGENTA } },
+    { at: 700, until: 1700, layer: 'front', drawer: 'beam', params: { kind: 'widening', w: 0.45, growIn: 0.4, retract: 0.3, tint: MAGENTA } },
     { at: 1100, until: 1300, layer: 'top', drawer: 'impactFlash', params: { r1: 0.8, r0: 0.3, tint: PINK_WHITE } },
-    { at: 1100, until: 1450, layer: 'front', drawer: 'starFlare', params: { size: 0.6, grow: 0.12, core: 0.18, arms: RING5, width: 0.32, tint: PINK_WHITE } },
     { at: 1150, until: 2100, layer: 'back', drawer: 'cloud', params: { count: 8, drift: 0.3, alpha: 0.5, tint: MAGENTA } },
   ],
   particles: [motes(1100, 12, { kind: 'twinkle', durationMs: 800 })],

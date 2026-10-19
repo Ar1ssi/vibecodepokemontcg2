@@ -102,6 +102,7 @@ export const dragonAscent = Object.freeze({
   pad: 1.9,
   attacker: { motion: 'rise', params: {} },
   defender: { motion: 'knock', params: { strength: 0.45, heat: 0.35 } },
+  tint: SPHERE,
   beats: [
     { at: 0, until: 700, layer: 'back', drawer: 'aura', params: { hz: 2, alpha: 0.5, tint: SPHERE } },
     { at: 550, until: 1000, layer: 'front', drawer: 'projectile', params: { from: 'sky', path: 'straight', r0: 0.4, r1: 0.55, tongues: 3, ease: 'in', tint: SPHERE } },
