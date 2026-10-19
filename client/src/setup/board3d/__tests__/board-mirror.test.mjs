@@ -294,4 +294,20 @@ describe('createBoardMirror zone list popups (D4)', () => {
     mirror.sync({ placements: [] }, {});
     assert.equal(at('self', 'handText')[3], false, 'an old caller without zones hides them');
   });
+  it('sync puts each seat\'s coin beside its Active: past the near one\'s right edge, the far one\'s left', () => {
+    const { mirror } = setup();
+    const slot = (side) => mirror.zoneElement(side, 'matCoinSlot');
+    mirror.sync({ placements: [] }, {}, {
+      'self:active': { left: 900, top: 600, width: 150, height: 200 },
+      'opp:active': { left: 880, top: 250, width: 140, height: 100 },
+    }, { left: 10, top: 20, width: 1000, height: 1000 });
+    // The half is 1000 x 500 (aspect 2): 12% of the Active's height x 2 across, 0.6% of the
+    // column (6 px) out, centred on the Active.
+    const rect = (side) => ['left', 'top', 'width', 'height'].map((key) => slot(side).style[key]);
+    assert.deepEqual(rect('self'), ['1046px', '656px', '48px', '48px']);
+    assert.deepEqual(rect('opp'), ['840px', '268px', '24px', '24px']);
+    assert.equal(slot('self').classList.contains('mat-coin-placed'), true);
+    mirror.sync({ placements: [] }, {}, {});
+    assert.equal(slot('self').classList.contains('mat-coin-placed'), false, 'no Active footprint, no coin');
+  });
 });

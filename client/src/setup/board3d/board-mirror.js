@@ -8,6 +8,8 @@
 // mirror node is where the scene draws it, and `observe`/`uiState` read the UI state the DOM
 // code paints onto those nodes (selection, glow, mat pick, FX hide) back for the scene.
 
+import { IFRAME_HEIGHT_FRAC } from './board-layout.mjs';
+
 const SIDES = ['self', 'opp'];
 /** Zones sized to the union of their cards' rects (the cards the scene draws there). */
 const CARD_RECT_ZONES = ['active', 'bench', 'hand', 'prizes', 'board'];
@@ -24,6 +26,7 @@ const PILE_ELEMENTS = {
 const POPUP_ZONES = ['deck', 'discard', 'lostZone', 'attachedCards', 'viewCards'];
 const POPUP_SELECTOR = POPUP_ZONES.map((id) => `#${id}`).join(', ');
 const PANEL_STYLESHEET = 'src/css/board3d-panels.css';
+const COIN_STYLESHEET = 'src/css/mat-coin.css';
 const RECT_KEYS = ['left', 'top', 'width', 'height'];
 const SELECTED_CLASSES = ['highlight', 'selectHighlight'];
 // mat-picker.js OUTLINE_IDLE / OUTLINE_SELECTED, as written and as the browser normalizes them.
@@ -44,6 +47,12 @@ const HAND_LABEL_PLACED = 'hand-label-placed';
 const HAND_LABEL_GAP_PX = 4;
 /** How far in from the canvas's edges the strip's ends are kept (the iframe's `right: 2%`). */
 const HAND_LABEL_INSET = 0.02;
+// mat-coin.css's iframe rule: `width: calc(var(--active-height) * 0.12)` is a width, so its percent
+// read against the half's width — 12% of the Active's share of the half's height, times the half's
+// width — and it stood 0.6% of that width out from the Active.
+const COIN_SIZE_OF_ACTIVE = 0.12;
+const COIN_GAP_OF_WIDTH = 0.006;
+const COIN_PLACED = 'mat-coin-placed';
 const isHiddenNode = (node) =>
   node.style?.visibility === 'hidden' || Boolean(node.classList?.contains(FLIGHT_HIDDEN_CLASS));
 
@@ -59,7 +68,7 @@ const MIRROR_STYLE = `
 :host { position: absolute; inset: 0; display: block; transform: translateZ(0);
   pointer-events: none; }
 #playfield { position: absolute; inset: 0; }
-#playfield > :not(${POPUP_SELECTOR}), #hand {
+#playfield > :not(${POPUP_SELECTOR}, #matCoinSlot), #hand {
   position: absolute; left: 0; top: 0; width: 0; height: 0; margin: 0;
   pointer-events: none; opacity: 0; }
 #handLabel, #handText { position: absolute; display: none; margin: 0; white-space: nowrap;
@@ -88,7 +97,8 @@ const popupZone = (id, buttons, view) => `
   </div></div>`;
 
 /** The id skeleton the retired `self-containers.html` / `opp-containers.html` had (same ids both sides). */
-const mirrorMarkup = (view) => `<link rel="stylesheet" href="${PANEL_STYLESHEET}"><style>${MIRROR_STYLE}</style>
+const mirrorMarkup = (view) => `<link rel="stylesheet" href="${PANEL_STYLESHEET}">
+<link rel="stylesheet" href="${COIN_STYLESHEET}"><style>${MIRROR_STYLE}</style>
 <div id="playfield">
   <div id="boardCenterDesign"><div id="boardCircle"></div><div id="innerCircle"></div></div>
   ${popupZone('deck', [['shuffleDeckButton', 'Shuffle'], ['closeDeckButton', 'Close']], view)}
@@ -213,6 +223,26 @@ const placeHandLabels = (label, count, strip, near, origin, bounds) => {
     writeAnchor(label, right, y, 'translateX(-100%)', origin);
     writeAnchor(count, left, y, 'none', origin);
   }
+};
+
+/**
+ * Puts a side's coin token beside its Active zone's screen rect, centred on it: past the Active's
+ * right edge for the near seat, its left edge for the far seat (the player's right on the far
+ * half, which the iframe board turned 180°).
+ */
+const placeCoinSlot = (slot, active, near, origin, bounds) => {
+  if (!slot?.style) return;
+  if (!isRect(active)) {
+    slot.classList.remove(COIN_PLACED);
+    return;
+  }
+  // The half is the board column's width by half the viewport's height (board-layout.mjs).
+  const halfAspect = isRect(bounds) && bounds.height > 0 ? bounds.width / (bounds.height * IFRAME_HEIGHT_FRAC) : 1;
+  const size = active.height * COIN_SIZE_OF_ACTIVE * halfAspect;
+  const gap = (isRect(bounds) ? bounds.width : active.width) * COIN_GAP_OF_WIDTH;
+  const left = near ? active.left + active.width + gap : active.left - gap - size;
+  writeRect(slot, { left, top: active.top + active.height / 2 - size / 2, width: size, height: size }, origin);
+  slot.classList.add(COIN_PLACED);
 };
 
 const outlineState = (node) => {
@@ -357,7 +387,8 @@ export function createBoardMirror({ hostSelf, hostOpp, doc = globalThis.document
   };
 
   // `zones` is board-scene.js `zoneRects()` (`<side>:<zone>` footprints); its hand strips place
-  // each side's Sort box and count, kept inside `bounds` (the canvas's client rect).
+  // each side's Sort box and count, kept inside `bounds` (the board column's client rect), and
+  // its Active footprints each side's coin token.
   const sync = (model, rects, zones = {}, bounds = null) => {
     if (disposed || !rects || typeof rects !== 'object') return;
     const placements = Array.isArray(model?.placements) ? model.placements : [];
@@ -389,6 +420,7 @@ export function createBoardMirror({ hostSelf, hostOpp, doc = globalThis.document
         origin,
         bounds
       );
+      placeCoinSlot(zoneElement(side, 'matCoinSlot'), zones?.[`${side}:active`], side === 'self', origin, bounds);
     }
   };
 
