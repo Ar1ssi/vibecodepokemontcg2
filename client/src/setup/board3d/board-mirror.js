@@ -150,12 +150,15 @@ const instanceIdOf = (node) => {
   return Number.isFinite(id) ? id : null;
 };
 
+/** The page's Stadium slot (D93): the Stadium's <img> and its usable glow live there, not in a root. */
+const STADIUM_ID = 'stadium';
+
 /** The card instance a mutated node paints for: its own stamp, or the card <img> it wraps. */
 const instanceOfNode = (node) => {
   if (!node || node.nodeType !== 1) return null;
   const own = instanceIdOf(node);
   if (own !== null) return own;
-  if (!node.classList?.contains('mat-holo')) return null;
+  if (!node.classList?.contains('mat-holo') && node.id !== STADIUM_ID) return null;
   return instanceIdOf(node.querySelector?.('img[data-instance-id]'));
 };
 
@@ -289,21 +292,28 @@ export function createBoardMirror({ hostSelf, hostOpp, doc = globalThis.document
 
   const zoneElement = (side, zoneId) => roots[side]?.getElementById(zoneId) ?? null;
 
+  const stadiumElement = () => doc.getElementById?.(STADIUM_ID) ?? null;
+
   const cardImage = (id) => {
     for (const side of SIDES) {
       const img = roots[side].querySelector(`img[data-instance-id="${id}"]`);
       if (img) return img;
     }
-    return null;
+    return stadiumElement()?.querySelector?.(`img[data-instance-id="${id}"]`) ?? null;
   };
 
-  /** Every mirror node that carries this card's UI state: the <img>, its holo wrapper, its slot. */
+  /**
+   * Every node that carries this card's UI state: the <img>, its holo wrapper, its slot — for
+   * the Stadium, the page's #stadium, where rules-bridge.js puts the usable glow.
+   */
   const nodesOf = (img, id) => {
     const nodes = [img];
     const wrapper = img.parentElement?.closest?.('.mat-holo');
     if (wrapper) nodes.push(wrapper);
     const slot = img.closest?.('.play-container');
     if (slot && instanceIdOf(slot) === id) nodes.push(slot);
+    const stadium = img.closest?.(`#${STADIUM_ID}`);
+    if (stadium) nodes.push(stadium);
     return nodes;
   };
 
@@ -333,20 +343,24 @@ export function createBoardMirror({ hostSelf, hostOpp, doc = globalThis.document
     a.hidden === b.hidden &&
     a.pending === b.pending;
 
+  /** Every card <img> whose state the scene draws: both roots' and the page Stadium's. */
+  const cardImages = () => [
+    ...SIDES.flatMap((side) => [...roots[side].querySelectorAll('img[data-instance-id]')]),
+    ...(stadiumElement()?.querySelectorAll?.('img[data-instance-id]') ?? []),
+  ];
+
   const uiState = () => {
     const state = { selected: new Set(), glows: new Map(), matPick: new Map(), hidden: new Set() };
-    for (const side of SIDES) {
-      for (const img of roots[side].querySelectorAll('img[data-instance-id]')) {
-        const id = instanceIdOf(img);
-        if (id === null) continue;
-        const card = stateOf(id);
-        // `pending` does not ride on the model, so the scene still learns it from a report.
-        known.set(id, { ...card, pending: known.get(id)?.pending ?? false });
-        if (card.selected) state.selected.add(id);
-        if (card.glow !== null) state.glows.set(id, card.glow);
-        if (card.matPick !== null) state.matPick.set(id, card.matPick);
-        if (card.hidden) state.hidden.add(id);
-      }
+    for (const img of cardImages()) {
+      const id = instanceIdOf(img);
+      if (id === null) continue;
+      const card = stateOf(id);
+      // `pending` does not ride on the model, so the scene still learns it from a report.
+      known.set(id, { ...card, pending: known.get(id)?.pending ?? false });
+      if (card.selected) state.selected.add(id);
+      if (card.glow !== null) state.glows.set(id, card.glow);
+      if (card.matPick !== null) state.matPick.set(id, card.matPick);
+      if (card.hidden) state.hidden.add(id);
     }
     return state;
   };
@@ -368,9 +382,10 @@ export function createBoardMirror({ hostSelf, hostOpp, doc = globalThis.document
         onUiState(id, next);
       }
     };
-    const perRoot = SIDES.map((side) => {
+    const stadium = stadiumElement();
+    const perRoot = [...SIDES.map((side) => roots[side]), ...(stadium ? [stadium] : [])].map((target) => {
       const observer = new Observer(onRecords);
-      observer.observe(roots[side], { subtree: true, attributes: true, attributeFilter: OBSERVED_ATTRIBUTES });
+      observer.observe(target, { subtree: true, attributes: true, attributeFilter: OBSERVED_ATTRIBUTES });
       return observer;
     });
     const entry = { disconnect: () => perRoot.forEach((observer) => observer.disconnect()) };

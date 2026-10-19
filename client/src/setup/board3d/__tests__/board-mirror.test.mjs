@@ -112,6 +112,27 @@ describe('createBoardMirror', () => {
     assert.equal(calls.at(-1).patch.glow, DEFAULT_GLOW_RGB);
   });
 
+  it('reads the page Stadium: its usable glow on #stadium and its img hidden by an FX', async () => {
+    const { doc, mirror } = setup();
+    const stadium = doc.createElement('div');
+    stadium.id = 'stadium';
+    const img = doc.createElement('img');
+    img.dataset.instanceId = '40';
+    stadium.appendChild(img);
+    doc.body.appendChild(stadium);
+    const { calls } = recorder(mirror);
+    stadium.classList.add('has-glow');
+    stadium.style.setProperty('--glow-rgb', '255,210,63');
+    await flush();
+    assert.deepEqual(calls.at(-1), { id: 40, patch: { selected: false, glow: '255,210,63', matPick: null, hidden: false, pending: false } });
+    img.style.visibility = 'hidden';
+    await flush();
+    assert.equal(calls.at(-1).patch.hidden, true);
+    const snapshot = mirror.uiState();
+    assert.equal(snapshot.glows.get(40), '255,210,63');
+    assert.equal(snapshot.hidden.has(40), true);
+  });
+
   it('reports a hand card under its flight (.draw-flight-source, img or wrapper) as hidden', async () => {
     const { doc, mirror } = setup();
     const { img } = addCard(doc, mirror.zoneElement('self', 'hand'), 30);
