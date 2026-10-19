@@ -115,8 +115,8 @@ export const hyperspaceHole = Object.freeze({
   attacker: { motion: 'warp', params: {} },
   defender: { motion: 'knock', params: { strength: 0.35, heat: 0.35 } },
   beats: [
-    { at: 0, until: 650, layer: 'back', drawer: 'shade', params: { target: 'attacker', kind: 'disc', r: 1.0, fill: 'deep', fillAlpha: 0.95, rimAlpha: 0.9, swirl: 60, tint: PORTAL } },
-    { at: 350, until: 1000, layer: 'back', drawer: 'shade', params: { target: 'defender', kind: 'disc', r: 0.9, fill: 'deep', fillAlpha: 0.9, rimAlpha: 0.9, swirl: 60, tint: PORTAL } },
+    { at: 0, until: 650, layer: 'back', drawer: 'shade', params: { target: 'attacker', kind: 'disc', r: 1.0, fill: 'body', fillAlpha: 0.55, rimAlpha: 0.3, swirl: 90, tint: PORTAL } },
+    { at: 350, until: 1000, layer: 'back', drawer: 'shade', params: { target: 'defender', kind: 'disc', r: 0.9, fill: 'body', fillAlpha: 0.55, rimAlpha: 0.3, swirl: 90, tint: PORTAL } },
     { at: 350, until: 1000, layer: 'back', drawer: 'vignette', params: { target: 'defender', maxAlpha: 0.4, tint: PORTAL } },
     flash(1000, BURST),
     star(1000, 1550, RING5, BURST),

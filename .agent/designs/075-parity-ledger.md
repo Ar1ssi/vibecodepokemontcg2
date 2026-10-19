@@ -100,3 +100,9 @@ hydro-cannon (water, sig) — tweak: SV rings the user with water and fires a hu
 hydro-pump (water) — tweak: SV fires a strong cyan water jet into a white splash; ours is a chain of stacked rings (pulse-train) → a solid widening water beam.
 hydro-steam (water, sig) — tweak: SV is a bright blue-white jet and a white steam cloud on the foe; ours a ring chain → solid beam + white steam cloud.
 hyperspace-fury (dark, sig) — partial: SV opens gold portal rings with many punching arms and magenta bursts; ours magenta shards (no portal shape; left).
+FIXED (pass 11): hydro-cannon hydro-pump hydro-steam
+hyperspace-hole (psychic, sig) — tweak: SV opens a dark violet swirling portal by the user, which reappears at the foe; ours draws hard violet ellipse outlines → filled soft portals, no outline.
+ice-beam (ice) — ok: a blue-white beam, flakes.
+ice-burn (ice, sig) — tweak: SV wreathes Kyurem in cold flame, then an icy blast; ours draws a red GRID lattice round the user (clip art) and a big white ice star → drop the grid, smaller ice star.
+ice-hammer (ice) — ok: an icy hammer falls on the foe.
+ice-shard (ice) — ok: small ice shards thrown.

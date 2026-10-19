@@ -128,12 +128,12 @@ export const iceBurn = Object.freeze({
   attacker: { motion: 'lunge', params: { wind: 0.4, glow: 0.6 } },
   defender: { motion: 'knock', params: { strength: 0.3, heat: 0.35 } },
   beats: [
-    { at: 0, until: 1000, layer: 'front', drawer: 'glyph', params: { kind: 'lattice', target: 'attacker', r: 0.9, tint: CAGE } },
+    { at: 0, until: 1000, layer: 'back', drawer: 'aura', params: { target: 'attacker', hz: 2, alpha: 0.7, tint: CAGE } },
     { at: 300, until: 1000, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.14, r1: 0.38, tint: ICE_WHITE } },
     { at: 1100, until: 1280, layer: 'top', drawer: 'impactFlash', params: FLASH },
     { at: 1100, until: 1400, layer: 'front', drawer: 'starFlare', params: { arms: 'cross', width: 0.3, core: 0.22, size: 0.8, tint: { deep: '#FF3D5A', body: '#FF9A2E', hot: '#FFE0A8', core: '#FFFFFF' } } },
     { at: 1100, until: 1500, layer: 'front', drawer: 'shards', params: { count: 5, arc: 360, distance: 1.1 } },
-    { at: 1500, until: 2300, layer: 'front', drawer: 'starFlare', params: { size: 0.6, arms: SIX, width: 0.32, breakAt: 0.6, tint: ICE_WHITE } },
+    { at: 1500, until: 2300, layer: 'front', drawer: 'starFlare', params: { size: 0.45, arms: SIX, width: 0.32, breakAt: 0.6, tint: ICE_WHITE } },
     { at: 1300, until: 2300, layer: 'front', drawer: 'cloud', params: { count: 5, radius: 0.35, drift: 0.6, alpha: 0.4, tint: MIST } },
   ],
   particles: [
