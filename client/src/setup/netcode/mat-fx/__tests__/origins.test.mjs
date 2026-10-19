@@ -8,6 +8,7 @@ import {
   peekCombatOrigin,
   takeOrigin,
   takeZoneSweep,
+  visibleStackId,
   visibleStackRecord,
   zoneCardIds,
 } from '../origins.mjs';
@@ -148,4 +149,13 @@ test('captureOrigins: an evolved attacker is snapshotted as the card on top, und
   captureOrigins([{ type: 'attackExecuted', attackerId: 1, defenderId: 5 }], board(), capture, () => 'self');
   assert.equal(peekCombatOrigin(1).src, 'kakuna.png');
   assert.equal(peekCombatOrigin(5).src, 'makuhita.png');
+});
+
+test('visibleStackId: the top card id, so a 3D scene drives the evolved mesh and not the Basic under it', () => {
+  const registry = board();
+  assert.equal(visibleStackId(registry, 1), 2, 'root Basic -> its Stage 1');
+  assert.equal(visibleStackId(registry, 3), 2, 'an attached Energy');
+  assert.equal(visibleStackId(registry, 5), 5, 'an unevolved Pokémon');
+  assert.equal(visibleStackId(registry, 99), 99, 'unknown id passes through');
+  assert.equal(visibleStackId(null, 1), 1);
 });

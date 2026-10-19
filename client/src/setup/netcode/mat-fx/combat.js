@@ -50,7 +50,7 @@ import { brighten, fxRgbForCard, FX_NEUTRAL_RGB, rgbCss } from './fx-colors.mjs'
 import { frameTurnOf } from './evolve-scene.js';
 import { impactTypeFor, impactVariant, withoutImpactBeats } from './impact/impact-select.mjs';
 import { impactReady, playImpact, prepareImpact } from './impact/impact-stage.js';
-import { knockoutStack, peekCombatOrigin, visibleStackRecord, zoneCardIds } from './origins.mjs';
+import { knockoutStack, peekCombatOrigin, visibleStackId, visibleStackRecord, zoneCardIds } from './origins.mjs';
 import { drawCardArt, playMoveInScene } from './moves/scene-move-player.js';
 import { LAYER_Z, stageRectOf } from '../../board3d/fx/fx-stage.mjs';
 import { hashString, moveFor, speciesFor } from './moves/move-select.mjs';
@@ -439,8 +439,8 @@ const playAuraPulse = (rect, rgb) => {
  * recoils (a drive in table px), its lagged art smearing the strike. Null when the scene does not
  * draw both cards (no lunge plays).
  */
-const playLungeInScene = (scene, plan, card, targetId, hits) => {
-  const attackerPose = scene.cardTablePose(plan.attackerId);
+const playLungeInScene = (scene, attackerId, plan, card, targetId, hits) => {
+  const attackerPose = scene.cardTablePose(attackerId);
   const targetPose = targetId == null ? null : scene.cardTablePose(targetId);
   if (!attackerPose || !targetPose) return null;
   const from = stageRectOf(attackerPose);
@@ -459,7 +459,7 @@ const playLungeInScene = (scene, plan, card, targetId, hits) => {
     const p = pose(ms / LUNGE_MS);
     return { dx: p.x, dy: -p.y, dz: 0, yawDeg: 0, scale: p.scale, scaleAlong: 1, scaleAcross: 1, laneAngleDeg: 0 };
   };
-  scene.drive(plan.attackerId, offsetAt, LUNGE_MS);
+  scene.drive(attackerId, offsetAt, LUNGE_MS);
   const attacker = {
     centre: { x: from.left + from.width / 2, y: from.top + from.height / 2 },
     width: from.width,
@@ -473,7 +473,7 @@ const playLungeInScene = (scene, plan, card, targetId, hits) => {
       if (ms > LUNGE_MS) return false;
       const t = ms / LUNGE_MS;
       canvas.begin({ layer: 'back', z: LAYER_Z.back, depthTest: true, unit: from.height });
-      const map = scene.cardFrontMap(plan.attackerId);
+      const map = scene.cardFrontMap(attackerId);
       for (const { lag, alpha } of TRAILS) {
         drawCardArt(canvas.ctx, map, attacker, offsetAt(Math.max(0, t - lag) * LUNGE_MS), { alpha: alpha * strikeWindow(t), blurPx: 2 });
       }
@@ -511,7 +511,11 @@ const hitsFor = (plan, registry, from) => {
     strikeContext: { attackerRect: from, hitDelays: hitDelaysOf(layout) },
     branches: secondaries
       .filter((secondary) => secondary.lane)
-      .map((secondary) => ({ id: secondary.id, rect: combatRect(secondary.id, registry), delayMs: secondary.delayMs }))
+      .map((secondary) => ({
+        id: visibleStackId(registry, secondary.id),
+        rect: combatRect(secondary.id, registry),
+        delayMs: secondary.delayMs,
+      }))
       .filter((branch) => branch.rect),
     rippleEndMs: (contactMs) => (secondaries.length > 0 ? contactMs + lastDelay + HIT_SPARKS_MS : 0),
   };
@@ -530,15 +534,17 @@ export const attack = (plan) => {
   const announce = { strikeIn: announceFor(plan.strike) };
   const sceneEnd = (played) => Math.max(played.durationMs, played.branchEndMs || 0, hits.rippleEndMs(played.contactMs));
   const to = defenderId == null ? null : combatRect(defenderId, registry);
-  // Design 075: move scenes play inside the 3D board, on its cards.
+  // Design 075: move scenes play inside the 3D board, on the mesh of the card drawn on top of each stack.
+  const attackerSceneId = visibleStackId(registry, plan.attackerId);
+  const defenderSceneId = defenderId == null ? null : visibleStackId(registry, defenderId);
   const scene = getBoardScene();
   const playScene = (spec, impactType) =>
     scene?.fx
       ? playMoveInScene({
           scene,
           spec,
-          attackerId: plan.attackerId,
-          defenderId,
+          attackerId: attackerSceneId,
+          defenderId: defenderSceneId,
           seed: hashString(`${plan.attackerId}|${plan.attackName}|${plan.damage}`),
           impacts: announce,
           attackerCard: card,
@@ -571,7 +577,7 @@ export const attack = (plan) => {
       return played.holdMs;
     }
   }
-  const lunged = scene?.fx ? playLungeInScene(scene, plan, card, defenderId, hits) : null;
+  const lunged = scene?.fx ? playLungeInScene(scene, attackerSceneId, plan, card, defenderSceneId, hits) : null;
   return lunged === null ? 0 : undefined;
 };
 

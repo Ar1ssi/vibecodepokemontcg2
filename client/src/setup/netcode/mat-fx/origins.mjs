@@ -93,6 +93,16 @@ export function visibleStackRecord(registry, instanceId) {
 }
 
 /**
+ * The instanceId of the card drawn on top of the stack holding `instanceId` (the id itself when
+ * the card is unknown). The 3D board keeps one mesh per stack card, so a scene that moves "the
+ * attacker" must address the top card's mesh, not the root Basic's underneath it.
+ */
+export function visibleStackId(registry, instanceId) {
+  const shown = visibleStackRecord(registry, instanceId);
+  return shown?.instanceId ?? shown?.card?.instanceId ?? instanceId;
+}
+
+/**
  * Design 042: the stack a knocked-out Pokémon goes down with — `shown` is the
  * card drawn on top, `rest` every other card in it (lower Stages, Energy,
  * Tools) in stack order. Empty when the card is unknown.
