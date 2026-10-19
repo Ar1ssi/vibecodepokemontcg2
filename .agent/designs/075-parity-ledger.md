@@ -208,6 +208,15 @@ shock-wave (electric) — tweak: SV pulses a soft green-yellow sphere off the us
 signal-beam (bug, USUL) — ok: a green-yellow beam.
 silver-wind (silver) — ok: silver powder streams at the foe.
 FIXED (pass 26): shock-wave
-sludge / sludge-bomb / sludge-wave (poison) — tweak: SV splatters magenta-violet sludge; our sludge globs match, but the pool on the foe has a hard stroked outline (clip art) → soften the poison pool's rim (kit-wide).
+sludge (poison) — tweak: SV splatters magenta-violet sludge; our sludge globs match, but the pool on the foe has a hard stroked outline (clip art) → soften the poison pool's rim (kit-wide).
+sludge-bomb (poison) — tweak: SV splatters magenta-violet sludge; our sludge globs match, but the pool on the foe has a hard stroked outline (clip art) → soften the poison pool's rim (kit-wide).
+sludge-wave (poison) — tweak: SV splatters magenta-violet sludge; our sludge globs match, but the pool on the foe has a hard stroked outline (clip art) → soften the poison pool's rim (kit-wide).
 smack-down (rock) — ok: a rock knocks the foe down with dust.
 smart-strike (steel) — tweak: SV charges a horn and strikes into a blue-white burst; ours draws a stroked targeting reticle round the attacker (clip art) → no reticle (steel sigil soft).
+FIXED (pass 27): sludge sludge-bomb sludge-wave smart-strike · GLOBAL: poison pool rim, steel sigil glint
+snarl (dark) — ok (ripples now soft bands): a dark shout and a crimson hit.
+solar-beam (solar) — tweak: SV's video shows the charge turn (absorbing light); our default-kind floor rings round the attacker survived the floor-ring sweep → dropped (Solar Beam and one more grass spec).
+spacial-rend (dragon, sig) — tweak: SV rends space in pink-violet; ours a white slab at the user → pink spec tint.
+spectral-thief (ghost, sig) — ok: a shadow rises from the foe's shadow.
+spirit-break (fairy) — ok (star outline now a bloom).
+springtide-storm (fairy, sig) — ok: pink hearts and a pink storm (white star now capped).

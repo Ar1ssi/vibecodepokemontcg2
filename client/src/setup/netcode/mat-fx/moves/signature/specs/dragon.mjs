@@ -235,6 +235,7 @@ export const spacialRend = Object.freeze({
   pad: 1.9,
   attacker: { motion: 'rise', params: {} },
   defender: { motion: 'knock', params: { strength: 0.35, heat: 0.35 } },
+  tint: RIFT_PINK,
   beats: [
     { at: 0, until: 500, layer: 'back', drawer: 'cloud', params: { count: 6, radius: 0.4, drift: 0.3, alpha: 0.6, tint: RIFT_DARK } },
     { at: 0, until: 1000, layer: 'front', drawer: 'spiral', params: { target: 'attacker', turns: 2.5, r0: 0.2, r1: 1.1, rpm: 180, tongues: 10, tint: RIFT_GOLD } },

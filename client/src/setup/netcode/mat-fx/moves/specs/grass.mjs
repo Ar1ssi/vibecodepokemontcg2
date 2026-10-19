@@ -150,7 +150,6 @@ export const leafStorm = spec({
     { at: 0, until: 600, layer: 'back', drawer: 'vignette', params: { target: 'attacker', maxAlpha: 0.3, outer: 1.4 } },
     { at: 0, until: 600, layer: 'front', drawer: 'coreCharge', params: { r0: 0.1, r1: 0.3, from: 0.3 } },
     { at: 300, until: 750, layer: 'back', drawer: 'aura', params: { target: 'attacker', alpha: 0.5, hz: 2.5 } },
-    { at: 300, until: 750, layer: 'back', drawer: 'ring', params: { target: 'attacker', count: 2, r0: 0.4, r1: 1.3 } },
     { at: 600, until: 1000, layer: 'front', drawer: 'volley', params: { count: 7, stagger: 30, r0: 0.12, r1: 0.16, bow: 0.45, tongues: 2 } },
     // The storm on the defender: spiky bursts inside a whirl of leaves.
     { at: 1000, until: 1400, layer: 'front', drawer: 'shards', params: { count: 6, distance: 0.9, spin: 360 } },
@@ -175,7 +174,6 @@ export const solarBeam = spec({
   beats: [
     { at: 0, until: 1000, layer: 'back', drawer: 'aura', params: { target: 'attacker', alpha: 0.55, hz: 1.5 } },
     { at: 200, until: 1050, layer: 'front', drawer: 'coreCharge', params: { r0: 0.08, r1: 0.28, from: 0.3 } },
-    { at: 300, until: 800, layer: 'back', drawer: 'ring', params: { target: 'attacker', count: 2, r0: 0.4, r1: 1.3 } },
     // The beam reaches the defender at 1050 + 0.3 x 700 = contact.
     { at: 1050, until: 1750, layer: 'front', drawer: 'beam', params: { kind: 'solid', w: 0.45, growIn: 0.3, retract: 0.25 } },
     { at: 1300, until: 2100, layer: 'front', drawer: 'cloud', params: { count: 6, radius: 0.3, drift: 0.4, alpha: 0.35 } },
