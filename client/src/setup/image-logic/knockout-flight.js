@@ -48,6 +48,42 @@ const applyPose = (host, img, pose, turn) => {
 };
 
 const KO_START_BACKSTOP_MS = 1500;
+// A stand-in whose plan never runs (queue cleared, tab hidden) must not stay on the board.
+const STAND_IN_BACKSTOP_MS = 12000;
+
+const spawnGhostHost = (ghost) => {
+  const host = spawnOverlay({ rect: ghost.rect, className: 'card-knockout-ghost' });
+  const img = document.createElement('img');
+  img.src = ghost.src;
+  img.alt = '';
+  img.draggable = false;
+  host.appendChild(img);
+  host.style.transform = `rotate(${ghost.turn || 0}deg)`;
+  return { host, img };
+};
+
+/**
+ * The diff removes the knocked-out card the moment the view applies, but its scene waits
+ * behind the attack. Draws the ghost over the card's seat now, so the card stays on the
+ * board until `playKnockoutGhost` picks the stand-in up.
+ *
+ * @param {object|null} ghost - from captureKnockoutGhost
+ * @returns {object|null} the ghost, carrying its `standIn`
+ */
+export const holdKnockoutGhost = (ghost) => {
+  if (!ghost || typeof document === 'undefined' || document.hidden) return ghost;
+  const standIn = spawnGhostHost(ghost);
+  standIn.backstop = setTimeout(() => standIn.host.remove(), STAND_IN_BACKSTOP_MS);
+  return { ...ghost, standIn };
+};
+
+/** Removes a held ghost whose scene will not play. */
+export const releaseKnockoutGhost = (ghost) => {
+  const standIn = ghost?.standIn;
+  if (!standIn) return;
+  clearTimeout(standIn.backstop);
+  standIn.host.remove();
+};
 
 /**
  * @param {{rect, src, user, turn?, attached?: {src}[]}} ghost - from
@@ -60,14 +96,9 @@ export const playKnockoutGhost = (ghost, { deferStart } = {}) => {
   if (!ghost || typeof document === 'undefined' || document.hidden) return;
   const toRect = discardRectFor(ghost.user) || ghost.rect;
 
-  const host = spawnOverlay({ rect: ghost.rect, className: 'card-knockout-ghost' });
-  const img = document.createElement('img');
-  img.src = ghost.src;
-  img.alt = '';
-  img.draggable = false;
-  host.appendChild(img);
+  if (ghost.standIn) clearTimeout(ghost.standIn.backstop);
+  const { host, img } = ghost.standIn || spawnGhostHost(ghost);
   const turn = ghost.turn || 0;
-  host.style.transform = `rotate(${turn}deg)`;
 
   let started = false;
   const start = () => {

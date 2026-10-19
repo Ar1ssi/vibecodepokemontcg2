@@ -22,7 +22,12 @@ import {
 import { shouldAnimateMirror } from '../image-logic/draw-flight-predicate.mjs';
 import { playShuffleFlight } from '../image-logic/shuffle-flight.js';
 import { hideForFlight, playDrawBatch, showAfterFlight, takePrizeHandoff } from '../image-logic/draw-flight.js';
-import { captureKnockoutGhost, playKnockoutGhost } from '../image-logic/knockout-flight.js';
+import {
+  captureKnockoutGhost,
+  holdKnockoutGhost,
+  playKnockoutGhost,
+  releaseKnockoutGhost,
+} from '../image-logic/knockout-flight.js';
 import { fxDisabled, motionReduced } from '../image-logic/mat-fx.mjs';
 import { onFxSettingsChanged } from '../image-logic/fx-settings.js';
 import { playFx } from './mat-fx/index.js';
@@ -40,6 +45,12 @@ import { captureOrigins, discardOrigins, knockoutStack } from './mat-fx/origins.
 // gone from the DOM diff by then). Edge case 17: capture failure just means
 // no entry lands here, so the plan's lookup falls through to a no-op.
 const pendingKnockoutGhosts = new Map();
+
+// Plans that will not run (queue cleared, mirror skipped) leave no card standing in.
+const releaseKnockoutGhosts = () => {
+  for (const ghost of pendingKnockoutGhosts.values()) releaseKnockoutGhost(ghost);
+  pendingKnockoutGhosts.clear();
+};
 
 const sideFor = (user) => (user === 'self' ? 'you' : 'them');
 
@@ -219,7 +230,7 @@ export function handleBeforeApply(events, selfPlayerId) {
     const ghost = captureKnockoutGhost(user, shown.element);
     if (!ghost) continue;
     const attached = rest.map((member) => ({ src: flightSrcOf(member.element) })).filter((a) => a.src);
-    pendingKnockoutGhosts.set(event.instanceId, { ...ghost, attached });
+    pendingKnockoutGhosts.set(event.instanceId, holdKnockoutGhost({ ...ghost, attached }));
   }
   if (!fxDisabled() && !motionReduced()) {
     captureOrigins(events, registry, captureKnockoutGhost, (event) =>
@@ -272,11 +283,17 @@ const fxQueue = createFxQueue({
 // but the queue would keep ticking timers to do it — and a restart or a player
 // leaving, where the plans describe a board that no longer exists.
 onFxSettingsChanged((settings) => {
-  if (settings.fxOff) fxQueue.clear();
+  if (settings.fxOff) {
+    fxQueue.clear();
+    releaseKnockoutGhosts();
+  }
 });
 
 if (typeof document !== 'undefined') {
-  document.addEventListener('game-restarted', () => fxQueue.clear());
+  document.addEventListener('game-restarted', () => {
+    fxQueue.clear();
+    releaseKnockoutGhosts();
+  });
 }
 
 /**
@@ -345,7 +362,9 @@ function queueEvent(event, selfPlayerId) {
     })
   ) {
     for (const plan of plans) {
-      if (plan.kind === 'knockout') pendingKnockoutGhosts.delete(plan.instanceId);
+      if (plan.kind !== 'knockout') continue;
+      releaseKnockoutGhost(pendingKnockoutGhosts.get(plan.instanceId));
+      pendingKnockoutGhosts.delete(plan.instanceId);
     }
     // Once per EVENT: a fanned-out event's plans all share the same origins.
     if (plans.some((plan) => plan.kind === 'fx')) discardOrigins(event);
