@@ -140,8 +140,8 @@ export const fairyWind = spec({
     { at: 0, until: 480, layer: 'front', drawer: 'coreCharge', params: { lead: 0.3, r0: 0.06, r1: 0.14, from: 0.25 } },
     // The gust's head lands at contact: 480 + 0.25 x 480 = 600.
     // The gust in the deeper pinks, so its passes do not sum to a white column.
-    { at: 480, until: 960, layer: 'front', drawer: 'beam', params: { kind: 'widening', w: 0.38, growIn: 0.25, retract: 0.3, tint: { body: '#D85A92', hot: '#F48FB1' } } },
-    { at: 500, until: 1000, layer: 'front', drawer: 'spiral', params: { turns: 2, r0: 0.25, r1: 0.85, rpm: 200, tongues: 8 } },
+    { at: 500, until: 1000, layer: 'front', drawer: 'spiral', params: { turns: 2, r0: 0.25, r1: 0.85, rpm: 200, tongues: 8, tint: { body: '#D85A92', hot: '#F48FB1' } } },
+    { at: 380, until: 600, layer: 'front', drawer: 'volley', params: { count: 3, stagger: 40, r0: 0.08, r1: 0.12, bow: 0.5, tongues: 2, tint: { body: '#D85A92', hot: '#F48FB1' } } },
     flash(600),
     { at: 620, until: 1100, layer: 'front', drawer: 'cloud', params: { count: 4, radius: 0.3, drift: 0.3, alpha: 0.35 } },
   ],

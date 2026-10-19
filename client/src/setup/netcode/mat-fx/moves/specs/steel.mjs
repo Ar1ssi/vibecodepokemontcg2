@@ -210,9 +210,9 @@ export const flashCannon = spec({
   beats: [
     { at: 0, until: 680, layer: 'back', drawer: 'vignette', params: { target: 'attacker', maxAlpha: 0.38 } },
     ...glints(0, 600, { count: 5, r0: 0.05, r1: 0.09, tongues: 1 }),
-    { at: 80, until: 620, layer: 'front', drawer: 'coreCharge', params: { lead: 0.45, r0: 0.1, r1: 0.32, from: 0.2 } },
+    { at: 80, until: 620, layer: 'front', drawer: 'coreCharge', params: { lead: 0.45, r0: 0.1, r1: 0.32, from: 0.2, tint: { deep: '#3A6A9A', body: '#9CCBFF', hot: '#E2F2FF', core: '#F6FBFF' } } },
     // The beam head lands at contact: 620 + 0.25 x 480 = 740.
-    { at: 620, until: 1100, layer: 'front', drawer: 'beam', params: { kind: 'solid', w: 0.24, growIn: 0.25, retract: 0.3 } },
+    { at: 620, until: 1100, layer: 'front', drawer: 'beam', params: { kind: 'solid', w: 0.24, growIn: 0.25, retract: 0.3, tint: { deep: '#3A6A9A', body: '#9CCBFF', hot: '#E2F2FF', core: '#F6FBFF' } } },
     { at: 740, until: 890, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
     { at: 750, until: 1150, layer: 'front', drawer: 'shards', params: { count: 8, distance: 1.0, spin: 240 } },
     { at: 700, until: 1300, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.4 } },

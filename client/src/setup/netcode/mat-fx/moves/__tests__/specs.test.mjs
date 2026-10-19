@@ -373,8 +373,10 @@ test('the Fairy row ships whole: fairy material, no grain, a local hit at contac
   assert.ok(rough.beats.some((beat) => beat.drawer === 'cloud' && beat.layer === 'front' && beat.at < rough.contactMs), 'the fight cloud');
   for (const move of ['disarming-voice', 'draining-kiss', 'dazzling-gleam']) assert.equal(FAIRY_SPECS[move].family, 'chime', move);
   assert.equal(FAIRY_SPECS['fairy-wind'].family, 'wind');
-  const gust = FAIRY_SPECS['fairy-wind'].beats.find((beat) => beat.drawer === 'beam');
-  assert.equal(gust.at + gust.params.growIn * (gust.until - gust.at), FAIRY_SPECS['fairy-wind'].contactMs, 'the gust lands at contact');
+  // Design 075 parity: Scarlet/Violet's Fairy Wind is swirling wind, not a beam; the gusts land at contact.
+  const gust = FAIRY_SPECS['fairy-wind'].beats.find((beat) => beat.drawer === 'volley');
+  assert.equal(gust.until, FAIRY_SPECS['fairy-wind'].contactMs, 'the gusts land at contact');
+  assert.ok(FAIRY_SPECS['fairy-wind'].beats.every((beat) => beat.drawer !== 'beam'));
   const voice = FAIRY_SPECS['disarming-voice'].beats.find((beat) => beat.drawer === 'volley');
   assert.equal(voice.until, FAIRY_SPECS['disarming-voice'].contactMs, 'the last twinkle lands at contact');
   const drain = FAIRY_SPECS['draining-kiss'].beats.find((beat) => beat.drawer === 'volley');

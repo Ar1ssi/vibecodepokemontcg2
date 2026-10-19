@@ -52,7 +52,7 @@ export const fellStinger = spec({
   defender: { motion: 'knock', params: { strength: 0.22, heat: 0.35 } },
   beats: [
     // Linear so the stinger is at the card's edge at contact and still in flight (the family's beat).
-    { at: 300, until: 560, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.11, r1: 0.13, tongues: 1, ease: 'linear' } },
+    { at: 300, until: 560, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.16, r1: 0.2, tongues: 1, ease: 'linear', unit: 'spiked', tint: { deep: '#4E6E00', body: '#B4E62E', hot: '#E6FF7A', core: '#FAFFD8' } } },
     { at: 360, until: 960, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.3 } },
     { at: 520, until: 680, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
     { at: 540, until: 820, layer: 'front', drawer: 'shards', params: { count: 6, distance: 0.7, spin: 120 } },
