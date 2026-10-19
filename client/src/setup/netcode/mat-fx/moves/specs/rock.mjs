@@ -131,7 +131,7 @@ export const rockSlide = spec({
   beats: [
     { at: 0, until: 560, layer: 'back', drawer: 'aura', params: { target: 'attacker', alpha: 0.35, hz: 2 } },
     // Landing at 700, 770, 840 and 910: flight = 510 - 3 x 70 = 300 ms.
-    { at: 400, until: 910, layer: 'front', drawer: 'volley', params: { from: 'sky', count: 4, stagger: 70, r0: 0.15, r1: 0.22, bow: 0.25, tongues: 1 } },
+    { at: 400, until: 910, layer: 'front', drawer: 'volley', params: { from: 'sky', count: 4, stagger: 70, r0: 0.18, r1: 0.26, bow: 0.25, tongues: 1 } },
     { at: 560, until: 1300, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.38 } },
     { at: 700, until: 1250, layer: 'back', drawer: 'terrain', params: { kind: 'crack', radius: 1.1 } },
     { at: 700, until: 1300, layer: 'back', drawer: 'terrain', params: { kind: 'dust', radius: 1.2 } },

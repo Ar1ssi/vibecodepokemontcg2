@@ -182,3 +182,9 @@ pursuit (dark, USUL) — ok: a dark slash as the foe flees.
 razor-leaf (grass) — ok: leaves cut the foe.
 relic-song (normal, sig) — ok: musical notes and a pastel shimmer (its kept ring is the sound wave).
 rock-blast (rock) — ok: rocks fired one after another.
+FIXED (pass 22): psystrike
+roar-of-time (dragon, sig) — tweak: SV glows Dialga's blue gem and lands blue-white light streaks into a blue blast; ours a white-cyan cross slab, then blue hexes → blue spec tint, a smaller flare.
+rock-slide (rock) — tweak (partial): SV drops several rocks with dust; ours keeps 4 (one per blow, 063 test-pinned) but larger.
+rock-throw (rock) — ok: a thrown rock.
+rock-tomb (rock) — ok: rocks wall the foe in.
+rock-wrecker (rock) — ok: a huge boulder bursts into debris.
