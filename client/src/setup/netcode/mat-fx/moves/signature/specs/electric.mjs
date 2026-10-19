@@ -106,6 +106,7 @@ export const fusionBolt = Object.freeze({
   pad: 1.9,
   attacker: { motion: 'brace', params: { glow: 1 }, echo: { alpha: 0.35, offset: 0.5, fadeMs: 400 } },
   defender: { motion: 'knock', params: { strength: 0.45, heat: 0.35 } },
+  tint: ORB,
   beats: [
     { at: 0, until: 700, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.14, r1: 0.36, from: 0.15, rings: 1, tint: ORB } },
     { at: 700, until: 1100, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.3, r1: 0.36, tongues: 4, tint: ORB } },

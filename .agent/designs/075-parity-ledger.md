@@ -76,3 +76,21 @@ fell-stinger (bug) — tweak: SV stabs with a needle under a green-yellow ring g
 fiery-wrath (dark, sig) — tweak: SV erupts a dark crimson vortex on the foe; ours pink reticle (now soft bands globally) → crimson tint, a dark shade sphere.
 flash-cannon (steel) — tweak: SV charges a white-cyan orb and fires a blue-white beam; ours a white slab beam → slimmer, blue-white tint.
 FIXED (pass 7): fairy-wind fell-stinger fiery-wrath flash-cannon · feint-attack ok
+fleur-cannon (fairy, sig) — tweak: SV charges pink sparkle and fires a pink beam into a pink burst; ours: pink dome (now soft), white beam slab, star outline (now bloom) → pink beam via the beam fix, spec tint pink.
+focus-blast (aura) — tweak: SV flies a big cyan-white energy ball into a yellow-white burst; ours a white blob → a visible cyan ball, less white.
+freeze-shock (ice, sig) — tweak: SV freezes Kyurem in ice, then shoots a cyan electric ice ball; ours white glow + ice flare → spec tint cyan.
+freezing-glare (psychic, sig) — tweak: SV fires a violet-blue psychic beam from glowing eyes; ours a white-blue slab beam → violet-blue beam via the beam fix.
+fury-cutter (bug) — ok: a lime slash.
+GLOBAL — beams bloom into white slabs: the beam's core pass is too wide/white → narrow the core, lead with the body colour.
+FIXED (pass 8): fleur-cannon focus-blast freeze-shock freezing-glare(beam fix) · GLOBAL: beam passes, charge-orb heart
+fusion-bolt (electric, sig) — tweak: SV turns Zekrom into a cyan electric orb and strikes with cyan bolts; ours glows yellow → spec tint cyan.
+fusion-flare (fire, sig) — ok: a fireball sun over the user, a fiery explosion on the foe.
+future-sight (psychic) — ok: psychic rings on the user, later a vortex on the foe (SV's is darker violet with a green ring).
+glacial-lance (ice, sig) — ok: a thrown lance, ice spikes bursting round the foe.
+glaciate (ice, sig) — ok: the foe encased in an ice block.
+FIXED (pass 9): fusion-bolt
+gust (flying) — ok: wing flap, white wind wisps on the foe.
+head-smash (rock) — tweak: SV glows red-orange, headbutts, and lands a big yellow-orange impact with rock debris; ours shows grey crack lines only → red-orange tint on the cards, orange impact streaks.
+heart-swap (psychic, sig) — ok (after the soft dome rim): pink orbs swap, a pink dome on the target.
+hex (ghost) — partial: SV is violet-black smoke tendrils on the foe; ours keeps the ghost eyes (a 063 design rule pinned by tests) — left as is.
+high-horsepower (ground) — partial: SV stamps a gold horseshoe; no horseshoe shape exists, ours reads as a heavy hoof with dust (left).

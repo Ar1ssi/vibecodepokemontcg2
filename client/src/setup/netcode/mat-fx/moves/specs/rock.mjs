@@ -185,11 +185,13 @@ export const headSmash = spec({
   // (The sprite's orange sunburst and the 3D clip's whiteout are dropped.)
   attacker: { motion: 'dash', params: { wind: 0.3, reach: 1.0, overshoot: 0.15, arc: 0.3 } },
   defender: { motion: 'knock', params: { strength: 0.5, heat: 0.35 } },
+  tint: { deep: '#8A1E0E', body: '#E8501E', hot: '#FFB13B', core: '#FFE8B0' },
   beats: [
-    { at: 0, until: 900, layer: 'back', drawer: 'aura', params: { target: 'attacker', alpha: 0.55, hz: 3 } },
+    { at: 0, until: 900, layer: 'back', drawer: 'aura', params: { target: 'attacker', alpha: 0.55, hz: 3, tint: { deep: '#8A1E0E', body: '#E8501E', hot: '#FFB13B', core: '#FFE8B0' } } },
     { at: 700, until: 1700, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.45 } },
     { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
     { at: 1000, until: 1550, layer: 'back', drawer: 'terrain', params: { kind: 'crack', radius: 1.3 } },
+    { at: 1000, until: 1300, layer: 'front', drawer: 'fan', params: { target: 'defender', count: 7, spread: 360, lenMin: 0.5, lenMax: 0.9, width: 0.14, tint: { deep: '#8A1E0E', body: '#E8501E', hot: '#FFB13B', core: '#FFE8B0' } } },
     { at: 1000, until: 1350, layer: 'front', drawer: 'terrain', params: { kind: 'quake', amp: 0.04 } },
     // Last at contact: the ram's burst of stone (a dash family hit).
     { at: 1000, until: 1450, layer: 'front', drawer: 'shards', params: { count: 12, distance: 1.3, spin: 540 } },
