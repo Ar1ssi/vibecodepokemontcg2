@@ -6,7 +6,7 @@
 // feeds the hover preview the twin. A press that moves past the click slop drags the card in
 // the scene and drops it through drop-router.mjs into drag.js's own calls (board-drag-actions.js).
 import { dropTargetFor, routeDrop } from './drop-router.mjs';
-import { createClickTracker, mirrorSelectorFor } from './input-gestures.mjs';
+import { clickHitFor, createClickTracker, mirrorSelectorFor } from './input-gestures.mjs';
 
 const MOUSE_INIT_KEYS = ['clientX', 'clientY', 'screenX', 'screenY', 'ctrlKey', 'shiftKey', 'altKey', 'metaKey'];
 const PRIMARY_BUTTON = 0;
@@ -259,14 +259,16 @@ export function createBoardInput({
       swallowNativeClick = true;
       return;
     }
-    const el = elementFor(hitAt(event));
+    const hit = hitAt(event);
+    const el = elementFor(hit);
     const gesture = tracker.up(el, event.clientX, event.clientY, now(), event.button);
     if (event.pointerType === 'mouse') setHoverTarget(last, el, event);
     if (!el) return;
     swallowNativeClick = true;
     if (!gesture.click || event.button !== PRIMARY_BUTTON) return;
-    dispatchMouse(el, 'click', event, { detail: 1 });
-    if (gesture.dblclick) dispatchMouse(el, 'dblclick', event, { detail: 2 });
+    const clickEl = elementFor(clickHitFor(hit)) ?? el;
+    dispatchMouse(clickEl, 'click', event, { detail: 1 });
+    if (gesture.dblclick) dispatchMouse(clickEl, 'dblclick', event, { detail: 2 });
   };
 
   const onPointerMove = (event) => {

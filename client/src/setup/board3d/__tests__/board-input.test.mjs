@@ -4,8 +4,8 @@ import { JSDOM } from 'jsdom';
 
 import { createBoardInput } from '../board-input.js';
 
-// A page with the canvas, the two mirror roots (a hand card each side, a deck cover) and the
-// page-level Stadium. The scene is a stub whose hit test answers from a table of points.
+// A page with the canvas, the two mirror roots (a hand card each side, the deck and Lost Zone
+// covers with their <img>, the hidden Lost Zone panel) and the page-level Stadium. The scene is a stub whose hit test answers from a table of points.
 const setup = ({ hits = {} } = {}) => {
   const dom = new JSDOM('<body><div id="stadium"><img id="stadiumImg"></div><canvas></canvas></body>');
   const doc = dom.window.document;
@@ -14,7 +14,10 @@ const setup = ({ hits = {} } = {}) => {
     const host = doc.createElement('div');
     doc.body.appendChild(host);
     roots[side] = host.attachShadow({ mode: 'open' });
-    roots[side].innerHTML = `<div id="hand"><img data-instance-id="${side === 'self' ? 1 : 2}"></div><div id="deckCover"></div>`;
+    roots[side].innerHTML =
+      `<div id="hand"><img data-instance-id="${side === 'self' ? 1 : 2}"></div>` +
+      '<div id="deckCover"><img id="deckCover"></div>' +
+      `<div id="lostZoneCover"><img id="lostZoneCover"></div><div id="lostZone"><img data-instance-id="${side === 'self' ? 5 : 6}"></div>`;
   }
   const hovered = [];
   const scene = {
@@ -57,6 +60,7 @@ const hits = {
   '300,100': OPP_HAND,
   '500,500': { zone: 'deck', side: 'self', instanceId: null, pile: true },
   '700,500': { zone: 'stadium', side: null, instanceId: 9 },
+  '900,500': { instanceId: 5, side: 'self', zone: 'lostZone', index: 0 },
 };
 
 test('a click on a card dispatches a composed click on its mirror img and swallows the native one', () => {
@@ -140,14 +144,25 @@ test('a contextmenu on empty table is prevented but still reaches the page (clos
   assert.equal(onPage.length, 1);
 });
 
-test('piles address their cover in that root; the Stadium addresses the page img', () => {
+test('piles address their cover img in that root; the Stadium addresses the page img', () => {
   const env = setup({ hits });
-  const onCover = env.record(env.roots.self.getElementById('deckCover'), ['click']);
+  const onCover = env.record(env.roots.self.querySelector('#deckCover > img'), ['click', 'contextmenu']);
   const onStadium = env.record(env.doc.getElementById('stadiumImg'), ['click']);
   env.click({ x: 500, y: 500 });
   env.click({ x: 700, y: 500 });
-  assert.equal(onCover.length, 1);
+  env.fire('contextmenu', { x: 500, y: 500, button: 2 });
+  assert.deepEqual(onCover.map((entry) => entry.type), ['click', 'contextmenu']);
   assert.equal(onStadium.length, 1);
+});
+
+test('a click on the Lost Zone top card opens its pile (the cover); its card menu stays the card\'s', () => {
+  const env = setup({ hits });
+  const onCover = env.record(env.roots.self.querySelector('#lostZoneCover > img'), ['click', 'dblclick', 'contextmenu']);
+  const onCard = env.record(env.roots.self.querySelector('#lostZone img'), ['click', 'dblclick', 'contextmenu']);
+  env.click({ x: 900, y: 500 });
+  env.fire('contextmenu', { x: 900, y: 500, button: 2 });
+  assert.deepEqual(onCover.map((entry) => entry.type), ['click']);
+  assert.deepEqual(onCard.map((entry) => entry.type), ['contextmenu']);
 });
 
 test('mouse hover lifts the card and names its img to the preview; leave clears both', () => {
