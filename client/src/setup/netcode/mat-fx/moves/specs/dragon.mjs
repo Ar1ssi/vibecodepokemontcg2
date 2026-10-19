@@ -117,7 +117,6 @@ export const outrage = spec({
   beats: [
     { at: 0, until: 750, layer: 'back', drawer: 'vignette', params: { target: 'attacker', maxAlpha: 0.42 } },
     { at: 0, until: 650, layer: 'back', drawer: 'aura', params: { target: 'attacker', alpha: 0.6, hz: 5 } },
-    { at: 0, until: 650, layer: 'back', drawer: 'ring', params: { target: 'attacker', kind: 'floor', count: 3, r0: 0.3, r1: 1.3 } },
     { at: 0, until: 600, layer: 'front', drawer: 'spiral', params: { target: 'attacker', turns: 1.5, r0: 0.3, r1: 0.85, rpm: 200, tongues: 10 } },
     { at: 300, until: 650, layer: 'front', drawer: 'shards', params: { target: 'attacker', count: 6, distance: 0.6, spin: 300 } },
     ...blow(1000),
@@ -149,7 +148,6 @@ export const twister = spec({
     { at: 0, until: 500, layer: 'back', drawer: 'terrain', params: { kind: 'dust', radius: 0.9 } },
     { at: 120, until: 950, layer: 'front', drawer: 'spiral', params: { turns: 2.5, r0: 0.2, r1: 0.8, rpm: 180, tongues: 10 } },
     { at: 600, until: 760, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
-    { at: 600, until: 900, layer: 'back', drawer: 'ring', params: { kind: 'floor', count: 2, r0: 0.3, r1: 1.1 } },
     { at: 620, until: 950, layer: 'front', drawer: 'shards', params: { count: 6, distance: 0.8, spin: 300 } },
     { at: 650, until: 1100, layer: 'front', drawer: 'smoke', params: { count: 4, rise: 0.6 } },
   ],
@@ -246,7 +244,6 @@ export const dracoMeteor = spec({
     },
     { at: 1100, until: 1280, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
     { at: 1100, until: 1700, layer: 'back', drawer: 'terrain', params: { kind: 'crack', radius: 1.3 } },
-    { at: 1100, until: 1550, layer: 'back', drawer: 'ring', params: { kind: 'floor', count: 3, r0: 0.3, r1: 1.6 } },
     { at: 1100, until: 1450, layer: 'front', drawer: 'shards', params: { count: 6, distance: 0.9, spin: 240 } },
     { at: 1210, until: 1350, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
     { at: 1320, until: 1460, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },

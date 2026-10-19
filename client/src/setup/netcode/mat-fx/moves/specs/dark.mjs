@@ -93,8 +93,8 @@ export const bite = spec({
   defender: { motion: 'knock', params: { strength: 0.3, heat: 0.6 } },
   beats: [
     { at: 420, until: 1200, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.3 } },
-    { at: 500, until: 790, layer: 'front', drawer: 'slashArc', params: { sweep: 150, radius: 0.58, angle: -90, thick: 0.2 } },
-    { at: 500, until: 790, layer: 'front', drawer: 'slashArc', params: { sweep: -150, radius: 0.58, angle: 90, thick: 0.2 } },
+    { at: 500, until: 790, layer: 'front', drawer: 'slashArc', params: { sweep: 150, radius: 0.58, angle: -90, thick: 0.2, tint: { deep: '#7C7C96', body: '#E4E4F0', hot: '#FFFFFF', core: '#FFFFFF' } } },
+    { at: 500, until: 790, layer: 'front', drawer: 'slashArc', params: { sweep: -150, radius: 0.58, angle: 90, thick: 0.2, tint: { deep: '#7C7C96', body: '#E4E4F0', hot: '#FFFFFF', core: '#FFFFFF' } } },
     { at: 680, until: 840, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
     { at: 690, until: 1000, layer: 'front', drawer: 'shards', params: { count: 6, distance: 0.7, spin: 90 } },
   ],
@@ -170,7 +170,6 @@ export const snarl = spec({
   beats: [
     { at: 0, until: 650, layer: 'back', drawer: 'aura', params: { target: 'attacker', alpha: 0.5, hz: 4 } },
     { at: 0, until: 500, layer: 'front', drawer: 'coreCharge', params: { r0: 0.1, r1: 0.32, from: 0.2 } },
-    { at: 300, until: 700, layer: 'back', drawer: 'ring', params: { target: 'attacker', kind: 'floor', count: 3, r0: 0.3, r1: 1.4 } },
     { at: 350, until: 650, layer: 'front', drawer: 'shards', params: { target: 'attacker', count: 8, distance: 0.9, spin: 120 } },
     // The last of the three rings lands at the beat's end, 10 ms after contact.
     { at: 360, until: 660, layer: 'front', drawer: 'volley', params: { count: 3, stagger: 70, r0: 0.16, r1: 0.24, bow: 0.15, tongues: 0 } },
@@ -196,7 +195,6 @@ export const darkPulse = spec({
   defender: { motion: 'knock', params: { strength: 0.35, heat: 0.8 } },
   beats: [
     { at: 0, until: 700, layer: 'back', drawer: 'vignette', params: { target: 'attacker', maxAlpha: 0.4 } },
-    { at: 0, until: 620, layer: 'back', drawer: 'ring', params: { target: 'attacker', kind: 'floor', count: 3, r0: 0.3, r1: 1.3 } },
     { at: 0, until: 620, layer: 'front', drawer: 'spiral', params: { target: 'attacker', turns: 1.5, r0: 0.25, r1: 0.7, rpm: 160, tongues: 8 } },
     { at: 100, until: 620, layer: 'front', drawer: 'coreCharge', params: { r0: 0.16, r1: 0.5, from: 0.25 } },
     { at: 620, until: 1000, layer: 'front', drawer: 'projectile', params: { path: 'arc', bow: 0.12, r0: 0.4, r1: 0.5, tongues: 6 } },

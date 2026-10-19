@@ -72,7 +72,7 @@ export const astonish = spec({
   beats: [
     { at: 0, until: 400, layer: 'front', drawer: 'cloud', params: { target: 'attacker', count: 5, radius: 0.4, drift: 0.1, direction: 90, alpha: 0.65 } },
     { at: 300, until: 900, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.32 } },
-    { at: 380, until: 860, layer: 'front', drawer: 'glyph', params: { r: 0.75 } },
+    { at: 420, until: 820, layer: 'front', drawer: 'aura', params: { target: 'defender', hz: 4, alpha: 0.7, r0: 0.5, r1: 0.7 } },
     { at: 450, until: 600, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
   ],
   particles: [motes({ at: 460, count: 8, distance: 0.9, spread: 140 })],
@@ -123,7 +123,6 @@ export const shadowClaw = spec({
     { at: 780, until: 1100, layer: 'front', drawer: 'slashArc', params: { sweep: 120, radius: 0.48, angle: -45, thick: 0.22 } },
     { at: 800, until: 1120, layer: 'front', drawer: 'slashArc', params: { sweep: 120, radius: 0.34, angle: -45, thick: 0.2 } },
     { at: 900, until: 1080, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
-    { at: 900, until: 1250, layer: 'back', drawer: 'ring', params: { kind: 'floor', count: 2, r0: 0.4, r1: 1.4 } },
     { at: 920, until: 1320, layer: 'front', drawer: 'shards', params: { count: 9, distance: 1.1, spin: 220 } },
     { at: 1100, until: 1650, layer: 'front', drawer: 'smoke', params: { count: 6, rise: 0.9 } },
   ],
@@ -149,7 +148,6 @@ export const phantomForce = spec({
     { at: 600, until: 1250, layer: 'front', drawer: 'glyph', params: { r: 0.85 } },
     { at: 950, until: 1900, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.5 } },
     { at: 1080, until: 1260, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
-    { at: 1080, until: 1500, layer: 'back', drawer: 'ring', params: { kind: 'floor', count: 2, r0: 0.4, r1: 1.6 } },
     { at: 1100, until: 1750, layer: 'front', drawer: 'pillar', params: { height: 1.6, w: 0.6 } },
     { at: 1100, until: 1500, layer: 'front', drawer: 'shards', params: { count: 8, distance: 1.1, spin: 240 } },
     { at: 1400, until: 2000, layer: 'front', drawer: 'smoke', params: { count: 6, rise: 0.9 } },
@@ -175,7 +173,6 @@ export const nightShade = spec({
   attacker: { motion: 'brace', params: { rear: 0.08, scale: 1.06, glow: 1 } },
   defender: { motion: 'knock', params: { strength: 0.2, heat: 1 } },
   beats: [
-    { at: 0, until: 560, layer: 'back', drawer: 'ring', params: { target: 'attacker', kind: 'floor', count: 2, r0: 0.3, r1: 1.2 } },
     { at: 0, until: 600, layer: 'front', drawer: 'spiral', params: { target: 'attacker', turns: 1.5, r0: 0.3, r1: 0.75, rpm: 140, tongues: 8 } },
     { at: 0, until: 620, layer: 'back', drawer: 'vignette', params: { target: 'attacker', maxAlpha: 0.35 } },
     { at: 420, until: 1080, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.5 } },
@@ -247,8 +244,8 @@ export const shadowBall = spec({
   defender: { motion: 'knock', params: { strength: 0.35, heat: 1 } },
   beats: [
     { at: 0, until: 700, layer: 'back', drawer: 'vignette', params: { target: 'attacker', maxAlpha: 0.35 } },
-    { at: 100, until: 700, layer: 'front', drawer: 'coreCharge', params: { r0: 0.12, r1: 0.36, from: 0.2 } },
-    { at: 660, until: 1050, layer: 'front', drawer: 'projectile', params: { path: 'arc', bow: 0.12, r0: 0.34, r1: 0.4, tongues: 4 } },
+    { at: 100, until: 700, layer: 'front', drawer: 'coreCharge', params: { r0: 0.12, r1: 0.36, from: 0.2, tint: { deep: '#14061F', body: '#4A1C7A', hot: '#9A5CFF', core: '#2A0E44' } } },
+    { at: 660, until: 1050, layer: 'front', drawer: 'projectile', params: { path: 'arc', bow: 0.12, r0: 0.34, r1: 0.4, tongues: 4, tint: { deep: '#14061F', body: '#4A1C7A', hot: '#9A5CFF', core: '#2A0E44' } } },
     { at: 860, until: 1850, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.5 } },
     { at: 1050, until: 1230, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
     { at: 1050, until: 1500, layer: 'front', drawer: 'shards', params: { count: 10, distance: 1.2, spin: 240 } },

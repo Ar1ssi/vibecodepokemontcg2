@@ -20,7 +20,7 @@ const motes = (at, count, over = {}) =>
   });
 
 const CROWN = Object.freeze({ deep: '#A8301A', body: '#FF5A2E', hot: '#FFB13B', core: '#FFF27A' });
-const BLAST = Object.freeze({ deep: '#FFB13B', body: '#FFF27A', hot: '#FFFFFF', core: '#FFFFFF' });
+const BLAST = Object.freeze({ deep: '#A8301A', body: '#FF7A1E', hot: '#FFB13B', core: '#FFE08A' });
 const AMBER = Object.freeze({ deep: '#A8501A', body: '#FFB13B', hot: '#FFD98A', core: '#FFFFFF' });
 const FLECK = Object.freeze({ deep: '#1E8AA8', body: '#3FE0FF', hot: '#C8F8FF', core: '#FFFFFF' });
 
@@ -41,11 +41,11 @@ export const behemothBash = Object.freeze({
   defender: { motion: 'knock', params: { strength: 0.45, heat: 0.35 } },
   beats: [
     { at: 0, until: 700, layer: 'back', drawer: 'aura', params: { hz: 2, alpha: 0.6, tint: CROWN } },
-    { at: 0, until: 950, layer: 'front', drawer: 'fan', params: { count: 6, spread: 120, direction: 180, lenMin: 0.4, lenMax: 1.0, width: 0.26, spin: 30, tint: CROWN } },
+    { at: 0, until: 950, layer: 'front', drawer: 'fan', params: { count: 4, spread: 120, direction: 180, lenMin: 0.4, lenMax: 0.8, width: 0.18, spin: 30, tint: CROWN } },
     { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { r1: 0.8, r0: 0.3, tint: BLAST } },
     { at: 1000, until: 1300, layer: 'front', drawer: 'starFlare', params: { grow: 0.12, core: 0.18, arms: 'cross', width: 0.32, tint: BLAST } },
     { at: 1000, until: 1500, layer: 'front', drawer: 'shards', params: { count: 6, arc: 360, distance: 1.1, tint: CROWN } },
-    { at: 1000, until: 1800, layer: 'back', drawer: 'pillar', params: { from: 'below', height: 1.8, w: 0.7, tint: BLAST } },
+    { at: 1000, until: 1800, layer: 'back', drawer: 'pillar', params: { from: 'below', height: 1.2, w: 0.5, tint: BLAST } },
     { at: 1000, until: 2000, layer: 'back', drawer: 'cloud', params: { count: 8, radius: 0.35, drift: 0.6, alpha: 0.5, tint: AMBER } },
     { at: 1400, until: 2200, layer: 'back', drawer: 'aura', params: { target: 'defender', hz: 3, alpha: 0.5, tint: { body: '#FF7A2E', hot: '#FFB13B' } } },
   ],
@@ -53,10 +53,10 @@ export const behemothBash = Object.freeze({
   grain: 0.1,
 });
 
-const SWORD = Object.freeze({ deep: '#C8A84A', body: '#FFF4C2', hot: '#FFFFFF', core: '#FFFFFF' });
+const SWORD = Object.freeze({ deep: '#1E5AC8', body: '#5BB8FF', hot: '#BFE8FF', core: '#E8F6FF' });
 const WING = Object.freeze({ deep: '#2F8CFF', body: '#7FD8FF', hot: '#E0F6FF', core: '#FFFFFF' });
-const VIOLET = Object.freeze({ deep: '#5A2AA8', body: '#B26BFF', hot: '#5BE0FF', core: '#FFFFFF' });
-const BLADE_BURST = Object.freeze({ deep: '#C86A1E', body: '#FFB13B', hot: '#FFD04A', core: '#FFFFFF' });
+const VIOLET = Object.freeze({ deep: '#5A2AA8', body: '#B26BFF', hot: '#5BE0FF', core: '#E8D8FF' });
+const BLADE_BURST = Object.freeze({ deep: '#C86A1E', body: '#FFB13B', hot: '#FFD04A', core: '#FFF0B0' });
 
 // Zacian: it holds a white-gold sword out down the lane, leaps in a violet light-storm and ends
 // in a yellow-orange blade explosion on the defender.
@@ -79,11 +79,9 @@ export const behemothBlade = Object.freeze({
     { at: 400, until: 1000, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.18, r1: 0.45, tint: WING } },
     { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { r1: 0.8, r0: 0.3, tint: VIOLET } },
     { at: 1000, until: 1300, layer: 'front', drawer: 'starFlare', params: { grow: 0.12, core: 0.18, arms: 'cross', width: 0.32, tint: VIOLET } },
-    { at: 1000, until: 1400, layer: 'back', drawer: 'beam', params: { kind: 'solid', w: 0.4, tint: VIOLET } },
     { at: 1000, until: 1400, layer: 'front', drawer: 'shards', params: { count: 8, arc: 360, distance: 1.1, tint: { deep: '#5BE0FF', body: '#FF7AD9', hot: '#FFFFFF', core: '#FFFFFF' } } },
-    { at: 1100, until: 1500, layer: 'back', drawer: 'ring', params: { kind: 'floor', count: 2, r0: 0.3, r1: 1.3, tint: { body: '#5BE0FF', hot: '#E0FAFF' } } },
     { at: 1300, until: 1500, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
-    { at: 1300, until: 1800, layer: 'front', drawer: 'pillar', params: { from: 'below', height: 1.8, w: 0.7, tint: BLADE_BURST } },
+    { at: 1300, until: 1800, layer: 'front', drawer: 'pillar', params: { from: 'below', height: 1.2, w: 0.5, tint: BLADE_BURST } },
     { at: 1300, until: 2000, layer: 'back', drawer: 'cloud', params: { count: 8, radius: 0.4, drift: 0.4, alpha: 0.5, tint: BLADE_BURST } },
     { at: 1400, until: 2200, layer: 'back', drawer: 'aura', params: { target: 'defender', hz: 3, alpha: 0.5, tint: { body: '#FF9A2E', hot: '#FFD04A' } } },
   ],
@@ -120,7 +118,6 @@ export const doomDesire = Object.freeze({
     { at: 1000, until: 1500, layer: 'front', drawer: 'pillar', params: { from: 'above', height: 1.8, w: 0.4, count: 3, spread: 0.9, stagger: 100, tint: MAGENTA } },
     { at: 1300, until: 1800, layer: 'back', drawer: 'pillar', params: { from: 'below', height: 1.6, w: 0.7, tint: ORB_CYAN } },
     { at: 1300, until: 1800, layer: 'front', drawer: 'shards', params: { count: 8, arc: 360, distance: 1.1, tint: ORB_CYAN } },
-    { at: 1000, until: 1800, layer: 'back', drawer: 'ring', params: { kind: 'floor', count: 2, r0: 0.3, r1: 1.2, tint: ORB_CYAN } },
     { at: 1000, until: 2000, layer: 'back', drawer: 'cloud', params: { count: 8, radius: 0.4, drift: 0.4, alpha: 0.5, tint: GLINT } },
   ],
   particles: [motes(1000, 10, { kind: 'twinkle', durationMs: 700 }), motes(1300, 10, { durationMs: 700 })],
@@ -152,7 +149,6 @@ export const doubleIronBash = Object.freeze({
     { at: 500, until: 900, layer: 'front', drawer: 'shards', params: { count: 4, arc: 90, distance: 0.6, unit: 'hex', tint: STEEL } },
     { at: 1000, until: 1200, layer: 'top', drawer: 'impactFlash', params: { r1: 0.8,r0: 0.3 } },
     { at: 1000, until: 1300, layer: 'front', drawer: 'starFlare', params: { grow: 0.12, core: 0.18, arms: 'cross', width: 0.32, tint: STEEL } },
-    { at: 1000, until: 1600, layer: 'back', drawer: 'ring', params: { kind: 'floor', count: 2, r0: 0.3, r1: 1.3, tint: { body: '#FFFFFF', hot: '#FFFFFF', deep: '#D5DEEA' } } },
     { at: 1000, until: 1500, layer: 'front', drawer: 'shards', params: { count: 8, arc: 360, distance: 1.1, tint: SPARK } },
     { at: 1000, until: 1700, layer: 'back', drawer: 'smoke', params: { count: 6, tint: SAND } },
   ],
@@ -186,7 +182,6 @@ export const sunsteelStrike = Object.freeze({
     { at: 750, until: 1050, layer: 'back', drawer: 'beam', params: { kind: 'solid', w: 0.2, tint: { deep: '#8A1A4A', body: '#E0338A', hot: '#FFC0E0' } } },
     { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { r1: 0.8, r0: 0.3, tint: SUN } },
     { at: 1000, until: 1300, layer: 'front', drawer: 'starFlare', params: { grow: 0.12, core: 0.18, arms: 'cross', width: 0.32, tint: SUN } },
-    { at: 1000, until: 1500, layer: 'back', drawer: 'ring', params: { kind: 'floor', count: 3, r0: 0.3, r1: 1.4, tint: SUN } },
     { at: 1000, until: 1500, layer: 'front', drawer: 'shards', params: { count: 8, arc: 360, distance: 1.1, tint: SUN } },
     { at: 1100, until: 1800, layer: 'back', drawer: 'cloud', params: { count: 6, radius: 0.4, drift: 0.4, alpha: 0.5, tint: { body: '#FFB347', hot: '#FFE0A0' } } },
   ],

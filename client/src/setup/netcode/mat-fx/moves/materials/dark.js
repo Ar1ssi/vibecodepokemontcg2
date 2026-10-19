@@ -57,6 +57,22 @@ export function pulseRings(phase, r) {
   return rings;
 }
 
+/** A soft ring: `rgb` peaking at `radius`, fading to clear `half` either side. */
+function band(ctx, x, y, radius, half, rgb, alpha) {
+  if (!(alpha > 0) || !(radius > 0) || !(half > 0)) return;
+  const inner = Math.max(0, radius - half);
+  const outer = radius + half;
+  const g = ctx.createRadialGradient(x, y, inner, x, y, outer);
+  g.addColorStop(0, rgbCss(rgb, 0));
+  g.addColorStop((radius - inner) / (outer - inner), rgbCss(rgb, alpha));
+  g.addColorStop(1, rgbCss(rgb, 0));
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(x, y, outer, 0, TAU);
+  ctx.arc(x, y, inner, 0, TAU, true);
+  ctx.fill();
+}
+
 /** The dark material drawn in `palette` (any palette with the same keys). */
 function darkKit(palette) {
   /** Crimson haze: an additive glow fading to clear. */
@@ -88,23 +104,13 @@ function darkKit(palette) {
         0
       );
     });
+    // Ripples as soft bands (a radial gradient peaking at the ring), not stroked circles: hard
+    // concentric lines read as a target reticle (design 075 parity).
     const rings = pulseRings(phase, r);
     inShadow(ctx, () => {
-      ctx.lineWidth = Math.max(1, r * 0.14);
-      for (const ring of rings) {
-        ctx.strokeStyle = rgbCss(palette.deep, 0.8 * alpha * ring.alpha);
-        ctx.beginPath();
-        ctx.arc(x, y, ring.radius, 0, TAU);
-        ctx.stroke();
-      }
+      for (const ring of rings) band(ctx, x, y, ring.radius, r * 0.12, palette.deep, 0.8 * alpha * ring.alpha);
     });
-    ctx.lineWidth = Math.max(1, r * 0.05);
-    for (const ring of rings) {
-      ctx.strokeStyle = rgbCss(palette.hot, 0.9 * alpha * ring.alpha);
-      ctx.beginPath();
-      ctx.arc(x, y, ring.radius + r * 0.1, 0, TAU);
-      ctx.stroke();
-    }
+    for (const ring of rings) band(ctx, x, y, ring.radius + r * 0.1, r * 0.06, palette.hot, 0.75 * alpha * ring.alpha);
     const spark = alpha * clamp01(hot);
     if (!(spark > 0)) return;
     ctx.fillStyle = rgbCss(palette.core, 0.55 * spark);

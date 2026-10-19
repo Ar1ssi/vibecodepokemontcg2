@@ -199,7 +199,6 @@ export const megahorn = spec({
     // The horn: one great needle (0.8 card long) leading the charge, its tip striking at contact.
     { at: 560, until: 1000, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.3, r1: 0.34, tongues: 2 } },
     { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
-    { at: 1000, until: 1500, layer: 'back', drawer: 'ring', params: { kind: 'floor', count: 2, r0: 0.35, r1: 1.4, width: 0.06 } },
     // Last at contact: the horn's blow bursts into chips (a dash-family hit).
     { at: 1000, until: 1450, layer: 'front', drawer: 'shards', params: { count: 12, distance: 1.3, spin: 300 } },
   ],

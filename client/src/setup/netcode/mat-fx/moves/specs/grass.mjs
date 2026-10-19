@@ -103,7 +103,7 @@ export const absorb = spec({
   family: 'projectile',
   durationMs: 1100,
   contactMs: 450,
-  attacker: { motion: 'brace', params: { rear: 0.06, scale: 1.03, glow: 0.6 } },
+  attacker: { motion: 'brace', params: { rear: 0.06, scale: 1.03 } },
   defender: { motion: 'knock', params: { strength: 0.2, heat: 0.35 } },
   beats: [
     { at: 0, until: 600, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.25, outer: 1.3 } },
@@ -199,7 +199,6 @@ export const seedFlare = spec({
   defender: { motion: 'knock', params: { strength: 0.35, heat: 0.35 } },
   beats: [
     { at: 0, until: 700, layer: 'back', drawer: 'aura', params: { target: 'attacker', alpha: 0.5 } },
-    { at: 0, until: 800, layer: 'back', drawer: 'ring', params: { kind: 'floor', count: 2, r0: 0.8, r1: 0.6 } },
     { at: 150, until: 800, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.3, outer: 1.4 } },
     { at: 300, until: 800, layer: 'back', drawer: 'aura', params: { target: 'defender', alpha: 0.5, hz: 4 } },
     // The seed pod sprouts at the defender's base, then bursts.
@@ -251,7 +250,6 @@ export const energyBall = spec({
   attacker: { motion: 'rear-lurch', params: { rear: 0.12, lurch: 0.35, glow: 0.9 } },
   defender: { motion: 'knock', params: { strength: 0.35, heat: 0.35 } },
   beats: [
-    { at: 0, until: 600, layer: 'back', drawer: 'ring', params: { kind: 'floor', count: 1, r0: 0.3, r1: 1.0 } },
     { at: 0, until: 520, layer: 'front', drawer: 'coreCharge', params: { r0: 0.08, r1: 0.22, from: 0.2 } },
     { at: 450, until: 800, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.22, r1: 0.3, tongues: 4 } },
     { at: 800, until: 1300, layer: 'back', drawer: 'aura', params: { target: 'defender', alpha: 0.45 } },

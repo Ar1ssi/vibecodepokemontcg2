@@ -236,7 +236,6 @@ export const steelBeam = spec({
   beats: [
     { at: 0, until: 900, layer: 'back', drawer: 'vignette', params: { target: 'attacker', maxAlpha: 0.42 } },
     { at: 0, until: 900, layer: 'back', drawer: 'aura', params: { target: 'attacker', alpha: 0.55, hz: 4 } },
-    { at: 0, until: 860, layer: 'back', drawer: 'ring', params: { target: 'attacker', kind: 'floor', count: 3, r0: 0.3, r1: 1.3 } },
     ...glints(0, 820, { count: 6, r0: 0.05, r1: 0.1, tongues: 1 }),
     { at: 150, until: 880, layer: 'front', drawer: 'coreCharge', params: { lead: 0.45, r0: 0.12, r1: 0.36, from: 0.25 } },
     // The beam head lands at contact: 900 + 0.2 x 900 = 1080.

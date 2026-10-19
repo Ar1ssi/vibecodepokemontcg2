@@ -27,7 +27,6 @@ export const landsWrath = Object.freeze({
   defender: { motion: 'knock', params: { strength: 0.45, heat: 0.35 } },
   beats: [
     { at: 0, until: 900, layer: 'front', drawer: 'fan', params: { count: 9, spread: 120, lenMin: 0.8, lenMax: 1.3, width: 0.2, flap: 8, tint: FRONDS } },
-    { at: 450, until: 1000, layer: 'back', drawer: 'ring', params: { target: 'attacker', kind: 'floor', count: 3, r0: 0.3, r1: 1.3, tint: GOLD_LIGHT } },
     { at: 500, until: 1100, layer: 'back', drawer: 'terrain', params: { target: 'attacker', kind: 'dust', radius: 1.4 } },
     { at: 700, until: 1400, layer: 'front', drawer: 'pillar', params: { from: 'below', height: 1.8, w: 0.5, count: 3, spread: 1.2, stagger: 60, tint: GOLD_LIGHT } },
     { at: 700, until: 1800, layer: 'back', drawer: 'terrain', params: { kind: 'crack', radius: 1.4, tint: GOLD_LIGHT } },
@@ -131,7 +130,6 @@ export const thousandArrows = Object.freeze({
   defender: { motion: 'knock', params: { strength: 0.45, heat: 0.35 } },
   beats: [
     { at: 0, until: 600, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.2, r1: 0.5, tint: LIME } },
-    { at: 0, until: 700, layer: 'back', drawer: 'ring', params: { target: 'attacker', kind: 'floor', count: 2, r0: 0.3, r1: 1.0, tint: LIME } },
     { at: 0, until: 700, layer: 'back', drawer: 'aura', params: { hz: 2, alpha: 0.5, tint: LIME } },
     { at: 300, until: 800, layer: 'front', drawer: 'shards', params: { target: 'attacker', count: 10, arc: 360, distance: 1.0, spin: 0, tint: ARROWS } },
     { at: 800, until: 1800, layer: 'front', drawer: 'rain', params: { count: 12, height: 1.6, spread: 0.9, tint: ARROWS } },
@@ -167,12 +165,10 @@ export const thousandWaves = Object.freeze({
     { at: 0, until: 500, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.18, r1: 0.5, tint: HEX_GREEN } },
     { at: 0, until: 600, layer: 'back', drawer: 'aura', params: { hz: 2, alpha: 0.6, tint: HEX_GREEN } },
     { at: 300, until: 1000, layer: 'front', drawer: 'shards', params: { target: 'attacker', count: 12, arc: 360, distance: 1.0, unit: 'hex', tint: HEX_GREEN } },
-    { at: 300, until: 1000, layer: 'back', drawer: 'ring', params: { target: 'attacker', kind: 'floor', count: 2, r0: 0.3, r1: 1.2, tint: HEX_GREEN } },
     { at: 500, until: 1100, layer: 'back', drawer: 'terrain', params: { target: 'attacker', kind: 'wave', radius: 1.6, tint: HEX_GREEN } },
     { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { r1: 0.8, r0: 0.3, tint: HEX_GREEN } },
     { at: 1000, until: 1400, layer: 'front', drawer: 'starFlare', params: { grow: 0.12, arms: 'cross', width: 0.3, tint: { deep: '#1E5E1E', body: '#7FF7FF', hot: '#E9FFC4', core: '#FFFFFF' } } },
     { at: 1000, until: 1800, layer: 'front', drawer: 'shards', params: { count: 10, arc: 360, distance: 1.1, unit: 'hex', tint: HEX_GREEN } },
-    { at: 1000, until: 1800, layer: 'back', drawer: 'ring', params: { kind: 'floor', count: 3, r0: 0.3, r1: 1.5, tint: HEX_GREEN } },
     { at: 1000, until: 1800, layer: 'back', drawer: 'vignette', params: { target: 'defender', maxAlpha: 0.45 } },
   ],
   particles: [

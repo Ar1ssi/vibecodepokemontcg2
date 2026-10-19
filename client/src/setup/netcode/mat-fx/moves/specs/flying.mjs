@@ -73,7 +73,7 @@ export const aerialAce = spec({
   defender: { motion: 'knock', params: { strength: 0.32, heat: 0.35 } },
   beats: [
     { at: 150, until: 1150, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.38 } },
-    { at: 150, until: 600, layer: 'front', drawer: 'cloud', params: { target: 'attacker', count: 4, radius: 0.25, drift: 0.3, alpha: 0.3 } },
+    { at: 150, until: 600, layer: 'front', drawer: 'cloud', params: { target: 'attacker', count: 4, radius: 0.25, drift: 0.3, alpha: 0.15 } },
     { at: 620, until: 900, layer: 'front', drawer: 'slashArc', params: { sweep: -160, radius: 0.8, angle: 45, thick: 0.18 } },
     { at: 620, until: 780, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
     { at: 650, until: 1100, layer: 'front', drawer: 'splash', params: { count: 6, arc: 70, direction: -45, gravity: 0.2, len: [0.4, 0.8] } },
@@ -121,8 +121,8 @@ export const braveBird = spec({
   attacker: { motion: 'dash', params: { wind: 0.3, reach: 1.1, overshoot: 0.2, arc: 0.35 } },
   defender: { motion: 'knock', params: { strength: 0.5, heat: 0.35 } },
   beats: [
-    { at: 0, until: 900, layer: 'back', drawer: 'aura', params: { target: 'attacker', alpha: 0.5, hz: 3 } },
-    { at: 0, until: 850, layer: 'front', drawer: 'spiral', params: { target: 'attacker', turns: 2, r0: 0.35, r1: 0.9, rpm: 180, tongues: 10 } },
+    { at: 0, until: 900, layer: 'back', drawer: 'aura', params: { target: 'attacker', alpha: 0.5, hz: 3, tint: { deep: '#4E6E00', body: '#B4E62E', hot: '#E6FF7A', core: '#FAFFD8' } } },
+    { at: 0, until: 850, layer: 'front', drawer: 'spiral', params: { target: 'attacker', turns: 2, r0: 0.35, r1: 0.9, rpm: 180, tongues: 10, tint: { deep: '#4E6E00', body: '#B4E62E', hot: '#E6FF7A', core: '#FAFFD8' } } },
     // The head of wind the attacker dives behind (a bare orb: a pinwheel here reads as a
     // thrown blade); it reaches the card at contact.
     { at: 700, until: 1000, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.22, r1: 0.38, bow: 0, tongues: 0 } },
@@ -174,7 +174,6 @@ export const airCutter = spec({
   attacker: { motion: 'rear-lurch', params: { rear: 0.12, lurch: 0.3, glow: 0.7 } },
   defender: { motion: 'knock', params: { strength: 0.28, heat: 0.35 } },
   beats: [
-    { at: 0, until: 420, layer: 'front', drawer: 'spiral', params: { target: 'attacker', turns: 1.5, r0: 0.3, r1: 0.75, rpm: 200, tongues: 8 } },
     // Landing at 500, 560 and 620: flight = 320 - 2 x 60 = 200 ms; the last crescent lands at contact.
     { at: 300, until: 620, layer: 'front', drawer: 'volley', params: { count: 3, stagger: 60, r0: 0.16, r1: 0.2, bow: 0.35, tongues: 3 } },
     { at: 400, until: 1200, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.35 } },
@@ -203,7 +202,6 @@ export const hurricane = spec({
   attacker: { motion: 'rise', params: {} },
   defender: { motion: 'float', params: { lift: 0.22, heat: 0.35 } },
   beats: [
-    { at: 0, until: 800, layer: 'back', drawer: 'ring', params: { target: 'attacker', kind: 'floor', count: 2, r0: 0.4, r1: 1.2, width: 0.04 } },
     { at: 0, until: 850, layer: 'front', drawer: 'spiral', params: { target: 'attacker', turns: 1.5, r0: 0.35, r1: 0.85, rpm: 160, tongues: 8 } },
     // Landing at 760, 830 and 900: flight = 340 - 2 x 70 = 200 ms.
     { at: 560, until: 900, layer: 'front', drawer: 'volley', params: { count: 3, stagger: 70, r0: 0.14, r1: 0.18, bow: 0.3, tongues: 2 } },

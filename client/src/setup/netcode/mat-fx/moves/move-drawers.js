@@ -486,12 +486,8 @@ const aura = (ctx, lane, s, info) => {
   const pose = auraPose(s, lane.h, poseParams(info));
   if (!(pose.alpha > 0)) return;
   const c = centreOf(lane, info.params.target);
-  info.material.glow(ctx, c.x, c.y, pose.r * 1.2, pose.alpha * 0.5);
-  ctx.strokeStyle = rgbCss(info.material.palette.hot, pose.alpha);
-  ctx.lineWidth = lane.h * 0.04;
-  ctx.beginPath();
-  ctx.arc(c.x, c.y, pose.r, 0, TAU);
-  ctx.stroke();
+  // A pulsing glow only: the stroked circle it used to carry read as clip art (design 075 parity).
+  info.material.glow(ctx, c.x, c.y, pose.r * 1.35, pose.alpha * 0.7);
 };
 
 const rain = (ctx, lane, s, info) => {
@@ -712,10 +708,21 @@ const shade = (ctx, lane, s, info) => {
     ctx.fillRect(-reach, -reach, reach * 2, reach * 2);
     ctx.restore();
   }
-  ctx.strokeStyle = rgbCss(palette.body, pose.rimAlpha);
-  ctx.lineWidth = lane.h * 0.04;
-  shadePath(ctx, p.kind, x, y, pose.rx, pose.ry);
-  ctx.stroke();
+  // The rim as a soft inner glow following the shape (design 075 parity: a stroked outline read as
+  // clip art), drawn in a frame squashed so a circular gradient fits the ellipse.
+  if (pose.rimAlpha > 0 && pose.rx > 0 && pose.ry > 0) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(1, pose.ry / pose.rx);
+    const rim = ctx.createRadialGradient(0, 0, pose.rx * 0.5, 0, 0, pose.rx);
+    rim.addColorStop(0, rgbCss(palette.body, 0));
+    rim.addColorStop(0.82, rgbCss(palette.body, pose.rimAlpha * 0.55));
+    rim.addColorStop(1, rgbCss(palette.hot, pose.rimAlpha * 0.2));
+    ctx.fillStyle = rim;
+    shadePath(ctx, p.kind, 0, 0, pose.rx, pose.rx);
+    ctx.fill();
+    ctx.restore();
+  }
   if (p.kind === 'giant' && p.eyes) {
     ctx.fillStyle = rgbCss(GIANT_EYES, pose.alpha);
     for (const side of [-1, 1]) {

@@ -88,7 +88,8 @@ export const avalanche = spec({
   beats: [
     { at: 250, until: 1300, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.38 } },
     // Landing at 550, 600, 650 and 700: flight = 320 - 3 x 50 = 170 ms; the last lands at contact.
-    { at: 380, until: 700, layer: 'front', drawer: 'volley', params: { from: 'sky', count: 4, stagger: 50, r0: 0.12, r1: 0.16, bow: 0.1, tongues: 1 } },
+    { at: 380, until: 700, layer: 'front', drawer: 'volley', params: { from: 'sky', count: 7, stagger: 35, r0: 0.16, r1: 0.22, bow: 0.1, tongues: 1 } },
+    { at: 700, until: 1300, layer: 'back', drawer: 'cloud', params: { count: 6, radius: 0.45, drift: 0.4, alpha: 0.55, tint: { deep: '#9FB8D0', body: '#E8F2FA', hot: '#FFFFFF', core: '#FFFFFF' } } },
     { at: 700, until: 860, layer: 'top', drawer: 'impactFlash', params: FLASH },
     { at: 700, until: 1100, layer: 'front', drawer: 'shards', params: { count: 6, arc: 160, distance: 0.9, spin: 360 } },
     { at: 700, until: 1250, layer: 'front', drawer: 'terrain', params: { kind: 'dust', radius: 1.1 } },
@@ -202,7 +203,8 @@ export const auroraBeam = spec({
   beats: [
     { at: 0, until: 460, layer: 'front', drawer: 'coreCharge', params: { r0: 0.06, r1: 0.22, from: 0.2 } },
     // The train's head reaches the card 40 % into the beat: 420 + 0.4 x 700 = 700.
-    { at: 420, until: 1120, layer: 'front', drawer: 'beam', params: { kind: 'pulse-train', w: 0.45, gap: 0.38, speed: 2, growIn: 0.4 } },
+    { at: 420, until: 1120, layer: 'front', drawer: 'beam', params: { kind: 'solid', w: 0.3, growIn: 0.4, tint: { deep: '#2F6BFF', body: '#6FE3FF', hot: '#D8FFF4', core: '#F2FFFF' } } },
+    { at: 440, until: 1120, layer: 'front', drawer: 'beam', params: { kind: 'helix', w: 0.5, turns: 3, growIn: 0.4, tint: { deep: '#B0186E', body: '#FF6FB5', hot: '#FFD36F', core: '#FFF4E0' } } },
     { at: 500, until: 1300, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.4 } },
     { at: 700, until: 860, layer: 'top', drawer: 'impactFlash', params: FLASH },
     { at: 760, until: 1300, layer: 'front', drawer: 'shards', params: { count: 4, distance: 0.7, spin: 240 } },

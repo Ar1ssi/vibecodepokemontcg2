@@ -411,7 +411,10 @@ test('the Ghost row ships whole: ghost material, the recipe grain, a local hit a
     assert.ok(spec.particles.some((burst) => burst.anchor === 'defender' && burst.at >= spec.contactMs), `${move}: motes off the hit`);
     if (spec.statClass === 'physical') assert.ok(['dash', 'lunge'].includes(spec.attacker.motion), `${move}: the weight is in the card`);
   }
-  for (const id of ['astonish', 'phantom-force', 'night-shade', 'hex']) {
+  // Design 075 parity: Scarlet/Violet's Astonish is a violet burst, not the eyes of the sprite games.
+  assert.ok(GHOST_SPECS.astonish.beats.some((beat) => beat.drawer === 'aura' && beat.params.target === 'defender'), 'astonish: a violet burst on the defender');
+  assert.equal(GHOST_SPECS.astonish.family, 'ghost');
+  for (const id of ['phantom-force', 'night-shade', 'hex']) {
     const spec = GHOST_SPECS[id];
     assert.equal(spec.family, 'ghost', `${id}: a curse sounds the ghost voice`);
     const eyes = spec.beats.find((beat) => beat.drawer === 'glyph');
@@ -780,7 +783,7 @@ test('the Ice row ships whole: ice crystals (aurora for Aurora Beam), a navy vig
   assert.equal(spinner.beats.find((beat) => beat.drawer === 'projectile').until, spinner.contactMs, 'the disc lands at contact');
 
   // Streams and lances: the head reaches the card at contact and carries the family.
-  for (const [id, kind] of [['powder-snow', 'pulse-train'], ['aurora-beam', 'pulse-train'], ['ice-beam', 'solid']]) {
+  for (const [id, kind] of [['powder-snow', 'pulse-train'], ['aurora-beam', 'solid'], ['ice-beam', 'solid']]) {
     const spec = ICE_SPECS[id];
     const beam = spec.beats.find((beat) => beat.drawer === 'beam');
     assert.equal(beam.params.kind, kind, `${id}: beam kind`);
@@ -873,7 +876,7 @@ test('the Bug row ships whole: bug needles (buzz for Bug Buzz, silver for Silver
   assert.equal(horn.params.path, 'straight', 'the horn drives straight in');
   assert.ok(horn.params.r1 >= 0.3, 'a great horn, not a pin');
   assert.ok(BUG_SPECS.megahorn.defender.params.strength >= 0.45, 'Megahorn hits heavy');
-  assert.ok(BUG_SPECS.megahorn.beats.some((beat) => beat.drawer === 'ring' && beat.params.kind === 'floor' && beat.at === BUG_SPECS.megahorn.contactMs), 'a floor ring, not the red backdrop');
+  assert.ok(BUG_SPECS.megahorn.beats.every((beat) => beat.drawer !== 'ring'), 'no ring (design 075 parity: rings read as clip art)');
 
   // Streams: the head reaches the card at contact.
   for (const [id, kind] of [['silver-wind', 'helix'], ['signal-beam', 'segmented'], ['bug-buzz', 'pulse-train']]) {

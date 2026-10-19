@@ -39,8 +39,10 @@ export const GLOW_COLOURS = Object.freeze({
   silver: { hot: [232, 238, 242], body: [124, 138, 150], deep: [124, 138, 150], core: [200, 210, 218] },
 });
 
-const SCREEN_DEFAULT = { cy: 0.4, stops: [[0, 'core', 0.75], [0.18, 'core', 0.75], [0.48, 'hot', 0.6], [1, 'deep', 0.35]], blend: 'light' };
-const SHEEN = { cy: 0.45, stops: [[0, 'core', 0.6], [0.22, 'core', 0.6], [0.6, 'body', 0.5], [1, 'deep', 0.3]], blend: 'light' };
+// Design 075 parity pass: the light sheens' near-white core read as a white slab over the struck card
+// in the 3D board (additive, then bloom); the hit colour now leads and the core stays a tint.
+const SCREEN_DEFAULT = { cy: 0.4, stops: [[0, 'core', 0.35], [0.18, 'hot', 0.4], [0.48, 'hot', 0.35], [1, 'deep', 0.25]], blend: 'light' };
+const SHEEN = { cy: 0.45, stops: [[0, 'core', 0.3], [0.22, 'body', 0.35], [0.6, 'body', 0.3], [1, 'deep', 0.2]], blend: 'light' };
 
 /** The heat gradient per material (ellipse centre `cy` of the card height, CSS stops, blend). */
 export const HEAT_VARIANTS = Object.freeze({

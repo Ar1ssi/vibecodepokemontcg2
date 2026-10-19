@@ -49,7 +49,6 @@ export const smackDown = spec({
     { at: 0, until: 300, layer: 'front', drawer: 'coreCharge', params: { r0: 0.06, r1: 0.16, from: 0.2 } },
     { at: 260, until: 520, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.14, r1: 0.18, tongues: 2 } },
     { at: 420, until: 950, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.32 } },
-    { at: 520, until: 820, layer: 'back', drawer: 'ring', params: { kind: 'floor', count: 2, r0: 0.3, r1: 1.2 } },
     { at: 520, until: 900, layer: 'back', drawer: 'terrain', params: { kind: 'dust', radius: 1.0 } },
     { at: 520, until: 680, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
     { at: 520, until: 800, layer: 'front', drawer: 'shards', params: { count: 6, arc: 160, distance: 0.8, spin: 300 } },
@@ -165,7 +164,6 @@ export const rockTomb = spec({
     // Behind the struck card: the tomb walls it in without hiding it.
     { at: 680, until: 1350, layer: 'back', drawer: 'pillar', params: { height: 1.5, w: 0.9 } },
     { at: 680, until: 1200, layer: 'back', drawer: 'terrain', params: { kind: 'dust', radius: 1.1 } },
-    { at: 680, until: 1060, layer: 'back', drawer: 'ring', params: { kind: 'floor', count: 2, r0: 0.4, r1: 1.2 } },
     { at: 680, until: 850, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
     { at: 680, until: 1000, layer: 'front', drawer: 'shards', params: { count: 6, arc: 180, distance: 0.8, spin: 300 } },
     { at: 840, until: 1150, layer: 'front', drawer: 'shards', params: { count: 6, arc: 180, distance: 0.8, spin: 300 } },
@@ -220,7 +218,6 @@ export const stoneEdge = spec({
     { at: 650, until: 1100, layer: 'back', drawer: 'terrain', params: { kind: 'dust', radius: 1.0 } },
     // Behind the struck card, so the spires frame it instead of hiding it.
     { at: 1000, until: 1600, layer: 'back', drawer: 'pillar', params: { height: 2.0, w: 0.55 } },
-    { at: 1000, until: 1400, layer: 'back', drawer: 'ring', params: { kind: 'floor', count: 2, r0: 0.4, r1: 1.4 } },
     { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
     { at: 1000, until: 1400, layer: 'front', drawer: 'shards', params: { count: 12, arc: 120, distance: 1.4, spin: 300 } },
     // Last at contact: the eruption is a quake.
@@ -249,7 +246,6 @@ export const rockWrecker = spec({
     { at: 950, until: 2000, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.45 } },
     { at: 1150, until: 1330, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8 } },
     { at: 1150, until: 1700, layer: 'back', drawer: 'terrain', params: { kind: 'crack', radius: 1.4 } },
-    { at: 1150, until: 1550, layer: 'back', drawer: 'ring', params: { kind: 'floor', count: 2, r0: 0.4, r1: 1.5 } },
     { at: 1150, until: 1600, layer: 'front', drawer: 'terrain', params: { kind: 'quake', amp: 0.04 } },
     { at: 1150, until: 1550, layer: 'front', drawer: 'shards', params: { count: 12, distance: 1.3, spin: 540 } },
     { at: 1200, until: 2000, layer: 'front', drawer: 'cloud', params: { count: 6, radius: 0.45, drift: 0.3, alpha: 0.4 } },

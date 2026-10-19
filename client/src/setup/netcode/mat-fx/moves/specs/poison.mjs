@@ -164,9 +164,9 @@ export const acid = spec({
   attacker: { motion: 'brace', params: { rear: 0.08, scale: 1.05, glow: 0.8 } },
   defender: { motion: 'knock', params: { strength: 0.2, heat: HEAT } },
   beats: [
-    { at: 0, until: 320, layer: 'front', drawer: 'coreCharge', params: { r0: 0.06, r1: 0.16, from: 0.2 } },
+    { at: 0, until: 320, layer: 'front', drawer: 'coreCharge', params: { r0: 0.06, r1: 0.16, from: 0.2, tint: { deep: '#7A2E00', body: '#D9700F', hot: '#F7B02B', core: '#FFF1B8' } } },
     // Landing at 440, 500 and 560 (the last one is the hit).
-    { at: 220, until: 560, layer: 'front', drawer: 'volley', params: { count: 3, stagger: 60, r0: 0.08, r1: 0.11, bow: 0.45, tongues: 1 } },
+    { at: 220, until: 560, layer: 'front', drawer: 'volley', params: { count: 3, stagger: 60, r0: 0.08, r1: 0.11, bow: 0.45, tongues: 1, tint: { deep: '#7A2E00', body: '#D9700F', hot: '#F7B02B', core: '#FFF1B8' } } },
     { at: 400, until: 1000, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.3 } },
     { at: 560, until: 720, layer: 'top', drawer: 'impactFlash', params: FLASH },
     { at: 560, until: 860, layer: 'front', drawer: 'splash', params: { count: 6, arc: 150, gravity: 0.9, len: [0.35, 0.7] } },

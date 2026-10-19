@@ -702,15 +702,15 @@ test('pulseRings: three rings between 0.3 r and r, a third of a cycle apart, bor
   assert.ok(pulseRings(0.1, 100)[0].radius > first.radius, 'rings ripple outward');
 });
 
-test('a dark pulse: a shadow core, dark and crimson ring strokes, a pale centre only when hot', () => {
+test('a dark pulse: a shadow core, dark and crimson ripple bands (fills, no strokes), a pale centre only when hot', () => {
   const rec = recordingContext();
   MATERIALS.dark.body(rec.ctx, 100, 100, 40, 1, 1);
-  assert.equal(rec.fills.count, 2, 'shadow core + pale centre');
-  assert.equal(strokes(rec), 6, 'three dark rings, three crimson');
+  assert.equal(rec.fills.count, 2 + 6, 'shadow core + pale centre + three dark and three crimson bands');
+  assert.equal(strokes(rec), 0, 'no stroked reticle rings');
   for (const css of rec.colours) assert.ok(inPalette(MATERIALS.dark, css), css);
   const cold = recordingContext();
   MATERIALS.dark.body(cold.ctx, 100, 100, 40, 1, 0);
-  assert.equal(cold.fills.count, 1);
+  assert.equal(cold.fills.count, 1 + 6);
 });
 
 test('a dark projectile is a bare pulse in a haze at 0 tongues and wreathes `tongues` blades and splinters; it ripples with the clock', () => {
@@ -719,8 +719,8 @@ test('a dark projectile is a bare pulse in a haze at 0 tongues and wreathes `ton
     MATERIALS.dark.projectile(rec.ctx, { ...PROJECTILE, ...over });
     return rec;
   };
-  assert.equal(draw({ tongues: 0 }).fills.count, 3, 'haze + core + centre');
-  assert.equal(draw({ tongues: 4 }).fills.count, 3 + 4 * 2);
+  assert.equal(draw({ tongues: 0 }).fills.count, 3 + 6, 'haze + core + centre + six ripple bands');
+  assert.equal(draw({ tongues: 4 }).fills.count, 3 + 6 + 4 * 2);
   const firstRing = (time) =>
     draw({ tongues: 0, time })
       .calls.filter(([name]) => name === 'arc')

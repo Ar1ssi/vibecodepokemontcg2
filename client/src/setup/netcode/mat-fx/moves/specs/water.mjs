@@ -137,7 +137,7 @@ export const aquaTail = spec({
   defender: { motion: 'knock', params: { strength: 0.3, heat: 0.3 } },
   beats: [
     // Water swirls up round the attacker as the tail winds back.
-    { at: 300, until: 850, layer: 'back', drawer: 'splash', params: { target: 'attacker', count: 8, arc: 360, len: [0.4, 0.8], gravity: 0.2 } },
+    { at: 300, until: 850, layer: 'back', drawer: 'splash', params: { target: 'attacker', count: 4, arc: 160, len: [0.4, 0.7], gravity: 0.5 } },
     // The tail's water arc sweeps in ahead of the hit so the crescent reads before contact
     // (settled ~0.45 into the beat); the splash follows the cut, so the family stays the slash.
     { at: 820, until: 1300, layer: 'front', drawer: 'slashArc', params: { sweep: 120, radius: 0.6, angle: 30, thick: 0.24 } },

@@ -42,10 +42,8 @@ export const astralBarrage = Object.freeze({
   beats: [
     { at: 0, until: 500, layer: 'back', drawer: 'aura', params: { hz: 2, alpha: 0.7, tint: STEED } },
     { at: 300, until: 900, layer: 'back', drawer: 'pillar', params: { target: 'attacker', from: 'below', height: 1.4, w: 0.35, count: 3, spread: 0.7, stagger: 80, tint: STEED } },
-    { at: 300, until: 900, layer: 'back', drawer: 'ring', params: { target: 'attacker', kind: 'floor', count: 2, r0: 0.3, r1: 1.2, tint: GROUND_FLAME } },
-    { at: 600, until: 1000, layer: 'back', drawer: 'ring', params: { kind: 'floor', count: 2, r0: 0.3, r1: 1.4, tint: GROUND_FLAME } },
     { at: 700, until: 1050, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.3, r1: 0.42, tongues: 5, ease: 'in', tint: STEED } },
-    { at: 850, until: 1750, layer: 'front', drawer: 'shade', params: { kind: 'dome', r: 1.05, fill: 'deep', fillAlpha: 0.9, rimAlpha: 0.9, swirl: 40, tint: ASTRAL_DOME } },
+    { at: 850, until: 1750, layer: 'front', drawer: 'shade', params: { kind: 'dome', r: 1.05, fill: 'deep', fillAlpha: 0.9, rimAlpha: 0.35, swirl: 40, tint: ASTRAL_DOME } },
     { at: 1000, until: 1600, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.55, tint: STEED } },
     { at: 1100, until: 1300, layer: 'top', drawer: 'impactFlash', params: { r0: 0.3, r1: 0.8, tint: ASTRAL_BURST } },
     { at: 1300, until: 2100, layer: 'front', drawer: 'cloud', params: { count: 8, drift: 0.3, alpha: 0.6, tint: GROUND_FLAME } },
