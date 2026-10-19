@@ -268,8 +268,8 @@ export const focusBlast = kiSpec({
     { at: 0, until: 900, layer: 'back', drawer: 'aura', params: { target: 'attacker', alpha: 0.6, hz: 2.5 } },
     // Motes spiral in and the ki gathers into one big sphere, which leaves slowly and closes fast.
     ...orbit(0, 880, { count: 6, r0: 0.07, r1: 0.11, tongues: 1, tilt: 0.5 }),
-    { at: 250, until: 900, layer: 'front', drawer: 'coreCharge', params: { r0: 0.15, r1: 0.55, from: 0.1 } },
-    { at: 880, until: 1210, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.5, r1: 0.6, tongues: 5 } },
+    { at: 250, until: 900, layer: 'front', drawer: 'coreCharge', params: { r0: 0.15, r1: 0.55, from: 0.1, tint: { deep: '#1E6EA8', body: '#5FD8FF', hot: '#C8F4FF', core: '#EEFBFF' } } },
+    { at: 880, until: 1210, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.5, r1: 0.6, tongues: 5, tint: { deep: '#1E6EA8', body: '#5FD8FF', hot: '#C8F4FF', core: '#EEFBFF' } } },
     // The navy vignette stands in for the sprite's red backdrop.
     { at: 1000, until: 1900, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.4 } },
     { at: 1200, until: 1600, layer: 'front', drawer: 'shards', params: { count: 14, arc: 360, distance: 1.3, spin: 0 } },

@@ -33,6 +33,7 @@ export const freezeShock = Object.freeze({
   pad: 1.9,
   attacker: { motion: 'rise', params: {} },
   defender: { motion: 'freeze', params: { heat: 0.35 } },
+  tint: FROST,
   beats: [
     { at: 100, until: 800, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.14, r1: 0.44, from: 0.15, tint: FROST } },
     { at: 600, until: 1000, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.36, r1: 0.48, tongues: 4, unit: 'facet', tint: FROST } },

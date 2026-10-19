@@ -51,6 +51,7 @@ export const fleurCannon = Object.freeze({
   pad: 1.8,
   attacker: { motion: 'brace', params: { glow: 0.8 } },
   defender: { motion: 'knock', params: { strength: 0.35, heat: 0.35 } },
+  tint: PINK,
   beats: [
     { at: 0, until: 1000, layer: 'back', drawer: 'shade', params: { target: 'attacker', kind: 'dome', r: 0.85, fill: 'deep', fillAlpha: 0.3, rimAlpha: 0.8, swirl: 30, tint: PINK } },
     { at: 0, until: 700, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.14, r1: 0.4, from: 0.2, rings: 1, tint: PINK } },

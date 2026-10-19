@@ -131,7 +131,8 @@ const coreCharge = (ctx, lane, s, info) => {
   const x = isSky(target) ? base.x : base.x + lane.ux * core.x + lane.nx * core.y;
   const y = isSky(target) ? base.y : base.y + lane.uy * core.x + lane.ny * core.y;
   info.material.glow(ctx, x, y, core.r * 2, core.alpha * 0.5);
-  info.material.body(ctx, x, y, core.r, core.alpha, 0.9);
+  // A dim white heart (design 075 parity): at .9 the gathering orb bloomed into a white blob.
+  info.material.body(ctx, x, y, core.r, core.alpha, 0.45);
   // Rings: tongue arcs round the body at 1.25 r, one turn a second.
   const rings = p.rings ?? 0;
   if (rings > 0 && core.r > 0 && core.alpha > 0) {
@@ -281,11 +282,13 @@ const smoke = (ctx, lane, s, info) => {
 const BEAM_ORIGIN_H = 0.3;
 const BEAM_MOTES = 4;
 /** Glow, body, hot and core passes: [palette key, width factor, alpha]. */
+// Design 075 parity: drawn additively and bloomed, the old passes (hot .8, a .26-wide white core and
+// white streaks) summed to a white slab; the body colour now leads and the white is a thin filament.
 const BEAM_PASSES = [
   ['deep', 1.7, 0.22],
-  ['body', 1.1, 0.5],
-  ['hot', 0.62, 0.8],
-  ['white', 0.26, 1],
+  ['body', 1.1, 0.55],
+  ['hot', 0.55, 0.5],
+  ['white', 0.12, 0.8],
 ];
 
 /** The lane point `f` along a beam that starts BEAM_ORIGIN_H back inside the attacker. */
@@ -312,8 +315,8 @@ const beamColumn = (ctx, palette, a, b, width, alpha, time, dashed = false) => {
   const streak = width * (dashed ? 0.9 : 1.6);
   ctx.setLineDash([streak, streak * 1.4]);
   ctx.lineDashOffset = -time * width * 9;
-  ctx.strokeStyle = rgbCss(palette.white ?? palette.core, 0.7 * alpha);
-  ctx.lineWidth = width * 0.42;
+  ctx.strokeStyle = rgbCss(palette.hot ?? palette.core, 0.5 * alpha);
+  ctx.lineWidth = width * 0.3;
   ctx.beginPath();
   ctx.moveTo(a.x, a.y);
   ctx.lineTo(b.x, b.y);
