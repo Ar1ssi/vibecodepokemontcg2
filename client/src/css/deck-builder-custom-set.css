@@ -101,6 +101,7 @@
   border: 0;
   background: none;
   cursor: pointer;
+  user-select: none;
 }
 
 .db-live .db-custom-set-add img {

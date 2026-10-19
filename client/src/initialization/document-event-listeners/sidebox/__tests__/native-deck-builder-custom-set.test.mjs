@@ -56,13 +56,47 @@ test('picking the same card twice keeps one copy and says so', () => {
   assert.equal(status(), 'Pikachu is already in this set.');
 });
 
-test('clicking a card in the set sends that card to the deck', () => {
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+test('a single click sends the card to the deck after the double-click window', async () => {
   const sent = [];
   const { controller, tileButtons } = mountPanel(memoryStorage(), (picked) => sent.push(picked.id));
   controller.addFromSearch(card('a'));
   controller.addFromSearch(card('b'));
   tileButtons('add')[1].click();
+  assert.deepEqual(sent, []);
+  await wait(400);
   assert.deepEqual(sent, ['b']);
+});
+
+test('double-clicking a card removes it from the set and does not add it to the deck', async () => {
+  const storage = memoryStorage();
+  const sent = [];
+  const { controller, tileButtons, dom } = mountPanel(storage, (picked) => sent.push(picked.id));
+  controller.addFromSearch(card('a'));
+  controller.addFromSearch(card('b'));
+  const tile = tileButtons('add')[0];
+  tile.click();
+  tile.click();
+  tile.dispatchEvent(new dom.window.MouseEvent('dblclick', { bubbles: true }));
+  await wait(400);
+  assert.deepEqual(sent, []);
+  assert.deepEqual(savedSet(storage).cards.map((c) => c.id), ['b']);
+});
+
+test('double-clicking the remove button removes exactly one card', async () => {
+  const storage = memoryStorage();
+  const { controller, panelEl, dom } = mountPanel(storage);
+  controller.addFromSearch(card('a'));
+  controller.addFromSearch(card('b'));
+  controller.addFromSearch(card('c'));
+  // Mirrors a real double-click on the first ×: click 1 (detail 1) removes, click 2 (detail 2) lands on the next ×.
+  const removeButtons = () => [...panelEl.querySelectorAll('[data-custom-set-remove]')];
+  removeButtons()[0].dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true, detail: 1 }));
+  removeButtons()[0].dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true, detail: 2 }));
+  removeButtons()[0].dispatchEvent(new dom.window.MouseEvent('dblclick', { bubbles: true }));
+  await wait(400);
+  assert.deepEqual(savedSet(storage).cards.map((c) => c.id), ['b', 'c']);
 });
 
 test('removing a card drops it from the set and from storage', () => {

@@ -25,7 +25,7 @@ const tileHtml = (card, index) => {
   const image = card.images?.small || card.image || '';
   const setName = card.set?.name || '';
   return `
-          <div class="db-custom-set-tile" data-custom-set-index="${index}">
+          <div class="db-custom-set-tile" data-custom-set-index="${index}" title="Click to add to the deck. Double-click to remove from the set.">
             <button type="button" class="db-custom-set-add" data-custom-set-add="${index}" title="Add ${escapeHtml(card.name)} to the deck">
               ${image ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(card.name)}" loading="lazy" />` : `<span class="db-custom-set-noimage">${escapeHtml(card.name)}</span>`}
             </button>
@@ -53,6 +53,9 @@ const panelHtml = (customSet) => `
       <div class="db-custom-set-grid">
         ${customSet.cards.length === 0 ? '<p class="db-custom-set-empty">This set is empty. Search for cards below and click them to add.</p>' : customSet.cards.map(tileHtml).join('')}
       </div>`;
+
+// The browser's double-click interval is around 500 ms; a shorter wait would still add on a slow double-click.
+const DOUBLE_CLICK_WINDOW_MS = 300;
 
 const downloadJson = (text, fileName) => {
   const blob = new Blob([text], { type: 'application/json;charset=utf-8' });
@@ -126,14 +129,29 @@ export const initializeNativeDeckBuilderCustomSet = ({ panelEl, storage, onAddTo
     setStatus(`Imported ${addedCount} new card(s) from “${parsed.name}”.${skipped}`);
   };
 
+  // A single click adds to the deck only after the double-click window, so a double-click removes the
+  // card from the set without also adding a copy to the deck.
+  let pendingAddTimer = null;
+  const cancelPendingAdd = () => {
+    clearTimeout(pendingAddTimer);
+    pendingAddTimer = null;
+  };
+
   panelEl.addEventListener('click', (event) => {
     const addButton = event.target.closest('[data-custom-set-add]');
     if (addButton) {
-      onAddToDeck(customSet.cards[Number(addButton.dataset.customSetAdd)]);
+      const card = customSet.cards[Number(addButton.dataset.customSetAdd)];
+      cancelPendingAdd();
+      pendingAddTimer = setTimeout(() => {
+        pendingAddTimer = null;
+        onAddToDeck(card);
+      }, DOUBLE_CLICK_WINDOW_MS);
       return;
     }
     const removeButton = event.target.closest('[data-custom-set-remove]');
     if (removeButton) {
+      // The second click of a double-click lands on the next card's × after the first click re-rendered.
+      if (event.detail > 1) return;
       const card = customSet.cards[Number(removeButton.dataset.customSetRemove)];
       if (card) commit(removeCardFromCustomSet(customSet, card.id));
       return;
@@ -152,6 +170,15 @@ export const initializeNativeDeckBuilderCustomSet = ({ panelEl, storage, onAddTo
       if (customSet.cards.length > 0 && !window.confirm('Start a new set? The current set is discarded unless you exported it.')) return;
       commit(createEmptyCustomSet());
     }
+  });
+
+  panelEl.addEventListener('dblclick', (event) => {
+    const tile = event.target.closest('[data-custom-set-index]');
+    // The × already removed the card on its first click.
+    if (!tile || event.target.closest('[data-custom-set-remove]')) return;
+    cancelPendingAdd();
+    const card = customSet.cards[Number(tile.dataset.customSetIndex)];
+    if (card) commit(removeCardFromCustomSet(customSet, card.id));
   });
 
   panelEl.addEventListener('change', (event) => {
