@@ -7,8 +7,13 @@
 // (the `bolt` drawer) stroke their polylines through `jagStroke` in the same three passes.
 // Palette: #F7D21E #FFF27A #FFFFFF, deep #B98A00, the blue edge #9FD5FF. No grain, no smoke.
 // Every call draws on the context it is handed and is otherwise pure.
+//
+// Design 075 slice 11: every fill and stroke runs the GPU `energy` style (`ctx.fxStyle`, ignored
+// by Canvas2D): bolts carry bright packets running down them over a stepped flicker, fills
+// crackle with thin filaments. The gain stays low so only the packets' centres bloom.
 import { rgbCss } from '../../fx-colors.mjs';
 import { seededRandom } from '../../flow-pose.mjs';
+import { rootFaded } from './_root-fade.js';
 import { grainPass, sphere } from './_shared.js';
 
 const TAU = Math.PI * 2;
@@ -19,7 +24,10 @@ const STROKE_BLUR = 0.12;
 const CORE_WIDTH = 0.45;
 const CENTRE_WIDTH = 0.15;
 const BOLT_GLOW = 2.4;
-const BOLT_CENTRE = 0.3;
+const BOLT_CENTRE = 0.25;
+// Style params (gpu-canvas STYLE_PARAMS energy): fast current; the halo only shimmers.
+const ENERGY = Object.freeze({ id: 'energy', streak: 0.6, speed: 5, gain: 0.7 });
+const ENERGY_HALO = Object.freeze({ id: 'energy', streak: 0.35, speed: 3, gain: 0 });
 
 const freezeAll = (palette) => Object.freeze(Object.fromEntries(Object.entries(palette).map(([k, v]) => [k, Object.freeze(v)])));
 
@@ -101,9 +109,11 @@ function electricKit(palette) {
     g.addColorStop(0.75, rgbCss(palette.edge, alpha * 0.18));
     g.addColorStop(1, rgbCss(palette.edge, 0));
     ctx.fillStyle = g;
+    ctx.fxStyle = ENERGY_HALO;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, TAU);
     ctx.fill();
+    ctx.fxStyle = null;
   }
 
   /** Six short two-kink jags radiating off a ball, all in one path, blue fringe then white. */
@@ -123,22 +133,29 @@ function electricKit(palette) {
     }
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
+    ctx.fxStyle = ENERGY;
     ctx.strokeStyle = rgbCss(palette.edge, 0.55 * alpha);
     ctx.lineWidth = Math.max(1, r * 0.12);
     ctx.stroke();
     ctx.strokeStyle = rgbCss(palette.white, 0.9 * alpha);
     ctx.lineWidth = Math.max(1, r * 0.05);
     ctx.stroke();
+    ctx.fxStyle = null;
   }
 
-  /** The crackling ball: a white-hot sphere fading through yellow to amber, jags round it. */
+  /**
+   * The crackling ball: a small white heart fading through yellow to amber, jags round it. The
+   * white stays inside a quarter of the radius so a big ball reads as a ball, not a white slab.
+   */
   function crackleBall(ctx, x, y, r, alpha, hot, rand) {
+    ctx.fxStyle = ENERGY;
     sphere(ctx, x, y, r, [
-      [0, palette.white, alpha * (0.55 + 0.45 * clamp01(hot))],
-      [0.35, palette.hot, alpha * 0.9],
-      [0.75, palette.body, alpha * 0.6],
+      [0, palette.white, alpha * (0.45 + 0.35 * clamp01(hot))],
+      [0.25, palette.hot, alpha * 0.8],
+      [0.7, palette.body, alpha * 0.5],
       [1, palette.deep, 0],
     ]);
+    ctx.fxStyle = null;
     crackle(ctx, x, y, r, alpha, rand);
   }
 
@@ -150,24 +167,30 @@ function electricKit(palette) {
     crackleBall(ctx, x, y, r, alpha, hot, seededRandom(Math.floor(x / 3) * 92821 + Math.floor(y / 3) * 68917 + Math.floor(r / 2) * 4111));
   }
 
-  /** One jag from its base along `angleDeg`: blurred blue glow, yellow core, white centre. */
+  /**
+   * One jag from its base along `angleDeg`: blurred blue glow, yellow core, white centre, each
+   * clear at the root so a fan of jags (a flare, a ball's trail) never stacks into a white disc.
+   */
   function tongue(ctx, spec, { alpha = 1, hot = 1, jag = 0 } = {}) {
     if (!(spec.length > 0) || !(spec.width > 0) || !(alpha > 0)) return;
     const points = jagOutline(spec, { jag });
     ctx.filter = `blur(${Math.max(1, spec.width * GLOW_BLUR).toFixed(1)}px)`;
-    ctx.fillStyle = rgbCss(palette.edge, 0.45 * alpha);
+    ctx.fxStyle = ENERGY_HALO;
+    ctx.fillStyle = rootFaded(ctx, spec, palette.edge, 0.45 * alpha);
     traceJag(ctx, points, 1);
     ctx.fill();
     ctx.filter = 'none';
-    ctx.fillStyle = rgbCss(palette.body, 0.95 * alpha);
+    ctx.fxStyle = ENERGY;
+    ctx.fillStyle = rootFaded(ctx, spec, palette.body, 0.95 * alpha);
     traceJag(ctx, points, CORE_WIDTH);
     ctx.fill();
     const centre = alpha * clamp01(hot);
     if (centre > 0) {
-      ctx.fillStyle = rgbCss(palette.white, centre);
+      ctx.fillStyle = rootFaded(ctx, spec, palette.white, centre);
       traceJag(ctx, points, CENTRE_WIDTH);
       ctx.fill();
     }
+    ctx.fxStyle = null;
   }
 
   /**
@@ -193,9 +216,9 @@ function electricKit(palette) {
 
   /**
    * Stroke jagged polylines (`lines` = [[x, y]...][]) as lightning: one blurred pale-blue
-   * glow at `width` x 2.4, the saturated yellow core at `width`, a white centre at `width` x 0.3.
-   * Under the additive pass the three sum toward white, so the glow stays faint (0.35) and the
-   * core is the deep yellow, not the pale one, or the bolt reads as a white ribbon.
+   * glow at `width` x 2.4, the saturated yellow core at `width`, a white centre at `width` x 0.25.
+   * Under the additive pass the three sum toward white, so the glow stays faint (0.35), the core
+   * is the deep yellow at 0.8 and the centre 0.85, or the bolt reads as a white ribbon.
    */
   function jagStroke(ctx, lines, { width, alpha = 1 }) {
     if (!(width > 0) || !(alpha > 0) || !lines?.length) return;
@@ -207,17 +230,22 @@ function electricKit(palette) {
     ctx.lineJoin = 'round';
     const glowWidth = width * BOLT_GLOW;
     ctx.filter = `blur(${Math.max(1, glowWidth * STROKE_BLUR).toFixed(1)}px)`;
-    ctx.strokeStyle = rgbCss(palette.edge, 0.35 * alpha);
+    ctx.fxStyle = ENERGY_HALO;
+    // The move's own hot colour (design 075 parity): the pale-blue edge bloomed every bolt white-cyan,
+    // where Scarlet/Violet's thunder is yellow; a tinted bolt (cyan, violet) still follows its tint.
+    ctx.strokeStyle = rgbCss(palette.hot, 0.35 * alpha);
     ctx.lineWidth = glowWidth;
     trace();
     ctx.stroke();
     ctx.filter = 'none';
-    ctx.strokeStyle = rgbCss(palette.body, 0.95 * alpha);
+    ctx.fxStyle = ENERGY;
+    ctx.strokeStyle = rgbCss(palette.body, 0.8 * alpha);
     ctx.lineWidth = Math.max(1, width);
     ctx.stroke();
-    ctx.strokeStyle = rgbCss(palette.white, alpha);
+    ctx.strokeStyle = rgbCss(palette.white, 0.85 * alpha);
     ctx.lineWidth = Math.max(1, width * BOLT_CENTRE);
     ctx.stroke();
+    ctx.fxStyle = null;
   }
 
   return Object.freeze({

@@ -16,6 +16,7 @@ import {
   roundedRectShapePoints,
 } from './card-geometry.mjs';
 import { flightPlacement } from './flight-pose.mjs';
+import { OCCLUDER_LAYER } from './fx/fx-layers.mjs';
 import { createTween, easeOutCubic } from './tween.mjs';
 
 const DEG = Math.PI / 180;
@@ -116,6 +117,10 @@ function buildCardGeometry(three, widthPx, uv) {
  *   setPose: (id: number, pose: import('./card-poses.mjs').CardPose, ms: number) => void,
  *   tween: (id: number, poseFn: (t: number) => object, ms: number, o?: { ease?: (t: number) => number }) =>
  *     Promise<void>,
+ *   drive: (id: number, offsetAt: (elapsedMs: number) => object|null, ms: number) => Promise<void>,
+ *   tablePoseOf: (id: number) => { x: number, y: number, z: number, yawDeg: number, widthPx: number,
+ *     heightPx: number }|null,
+ *   frontMapOf: (id: number) => import('three').Texture|null,
  *   lift: (id: number, pose: object, o?: { ms?: number, ease?: (t: number) => number }) => Promise<void>,
  *   unlift: (id: number, o?: { ms?: number, ease?: (t: number) => number }) => Promise<void>,
  *   liftedId: () => number|null,
@@ -148,6 +153,10 @@ function buildCardGeometry(three, widthPx, uv) {
  *   flies it back to its own (current) pose and releases it, resolving then; `ms` 0, motion reduced,
  *   or the card leaving the board release at once. A lifted card ignores `tween`.
  *   `cornersOf(id, { rest: true })` gives a lifted card's corners at its own pose.
+ *   `drive` (design 075) adds `offsetAt(elapsedMs)` — `{ dx, dy, dz, yawDeg, scale, scaleAlong,
+ *   scaleAcross, laneAngleDeg }` in flat table px (fx/fx-stage.mjs driveOffset) — onto the card's
+ *   own pose every frame for `ms` of scene time, then resolves. A tween, a lift, a newer drive or
+ *   the card's release ends it (resolving); a lifted or flying card is not driven.
  */
 export function createCardMeshPool({
   group,
@@ -397,15 +406,17 @@ export function createCardMeshPool({
 
   /**
    * Writes the card's own (model) pose for `now` onto `target`: the mesh, or a scratch object.
+   * `offset` (a drive, design 075) moves it in flat table px on top of that pose.
    * `hoverTilt: false` leaves out the pointer tilt (a rect measured for that tilt must not move with it).
    */
-  const writeRestPose = (card, now, target, { hoverTilt = true } = {}) => {
+  const writeRestPose = (card, now, target, offset = null, { hoverTilt = true } = {}) => {
     const pose = card.pose.at(now);
     const flipDeg = card.flip ? card.flip.at(now) : 0;
-    const scale = pose.s;
-    const height = pose.z + CARD_LIFT_PX + (card.geometry.t * scale) / 2;
+    const scale = pose.s * (offset?.scale ?? 1);
+    const yawDeg = pose.yawDeg + (offset?.yawDeg ?? 0);
+    const height = pose.z + (offset?.dz ?? 0) + CARD_LIFT_PX + (card.geometry.t * scale) / 2;
     const [x, y, z] = tableToWorld(
-      { x: pose.x, y: pose.y, z: height },
+      { x: pose.x + (offset?.dx ?? 0), y: pose.y + (offset?.dy ?? 0), z: height },
       camera ?? undefined
     );
     const tiltDeg = camera?.tiltDeg ?? DEFAULT_TILT_DEG;
@@ -413,7 +424,7 @@ export function createCardMeshPool({
     target.rotation.set(
       -tiltDeg * DEG,
       flipDeg * DEG,
-      -pose.yawDeg * DEG,
+      -yawDeg * DEG,
       'XZY'
     );
     if (card.tilt) applyTilt(target, card.tilt, tiltDeg);
@@ -424,11 +435,87 @@ export function createCardMeshPool({
     }
     target.position.set(x, y, z);
     target.scale.setScalar(scale);
+    if (offset && (offset.scaleAlong !== 1 || offset.scaleAcross !== 1)) {
+      const [sx, sy] = squashScales(offset, yawDeg);
+      target.scale.set(scale * sx, scale * sy, scale);
+    }
+  };
+
+  /**
+   * A lane squash (scaleAlong / scaleAcross about the lane) as the card's own x / y scales. Exact
+   * when the lane runs along a card axis (Active to Active); a diagonal lane (a Bench snipe) blends
+   * the two by the angle, as a mesh cannot shear.
+   */
+  const squashScales = ({ scaleAlong = 1, scaleAcross = 1, laneAngleDeg = 0 }, yawDeg) => {
+    // The lane in table terms is −laneAngleDeg (stage y points down); the card's x axis is −yawDeg.
+    const phi = (yawDeg - laneAngleDeg) * DEG;
+    const c2 = Math.cos(phi) ** 2;
+    const s2 = 1 - c2;
+    return [scaleAlong * c2 + scaleAcross * s2, scaleAlong * s2 + scaleAcross * c2];
   };
 
   const placeMesh = (card, now) => {
     if (card.flight || card.lift) return;
     writeRestPose(card, now, card.mesh);
+  };
+
+  // ── drives (design 075): an attack scene's lane motion added onto the card's own pose.
+  /** Ends a card's drive; the promise resolves and the next frame puts it back on its pose. */
+  const endDrive = (card) => {
+    const { drive } = card;
+    if (!drive) return;
+    card.drive = null;
+    card.dirty = true;
+    drive.resolve();
+  };
+
+  /** Places a driven card for `now`; true once the drive is over (or its offset failed). */
+  const placeDrive = (card, now) => {
+    const { drive } = card;
+    const elapsed = now - drive.start;
+    if (elapsed >= drive.ms) return true;
+    let offset = null;
+    try {
+      offset = drive.offsetAt(Math.max(0, elapsed));
+    } catch (error) {
+      console.warn('board3d: card drive offset failed', error?.message || error);
+      return true;
+    }
+    writeRestPose(card, now, card.mesh, offset);
+    card.mesh.visible = visibleOf(card);
+    return false;
+  };
+
+  const drive = (id, offsetAt, ms) => {
+    const card = disposed ? null : cards.get(id);
+    if (!card?.pose || card.lift || card.flight || typeof offsetAt !== 'function') return Promise.resolve();
+    endDrive(card);
+    return new Promise((resolve) => {
+      card.drive = { offsetAt, start: clock.now(), ms: Math.max(0, Number(ms) || 0), resolve };
+      card.dirty = true;
+      onNeedsRender();
+    });
+  };
+
+  /** The card's own pose now, in flat table px, with its drawn size; null when it has none. */
+  const tablePoseOf = (id) => {
+    const card = cards.get(id);
+    if (!card?.pose) return null;
+    const pose = card.pose.at(clock.now());
+    return {
+      x: pose.x,
+      y: pose.y,
+      z: pose.z,
+      yawDeg: pose.yawDeg,
+      widthPx: card.geometry.w * pose.s,
+      heightPx: card.geometry.h * pose.s,
+    };
+  };
+
+  /** The card's front art texture once loaded, else null. */
+  const frontMapOf = (id) => {
+    const front = cards.get(id)?.front;
+    return front?.state === 'ready' ? front.texture ?? null : null;
   };
 
   // A held card's swing (drag-tilt.mjs) about the table's own axes, whatever the card's yaw or
@@ -494,6 +581,7 @@ export function createCardMeshPool({
     // A lifted card (card focus) is held by `lift`: a flight does not take it over.
     if (!card?.pose || card.lift || !camera || typeof poseFn !== 'function') return Promise.resolve();
     endFlight(card);
+    endDrive(card);
     return new Promise((resolve) => {
       const now = clock.now();
       card.flight = { poseFn, ease, start: now, ms: durationFor(ms), resolve };
@@ -597,6 +685,7 @@ export function createCardMeshPool({
   const lift = (id, pose, { ms = 0, ease = easeOutCubic } = {}) => {
     const card = disposed ? null : cards.get(id);
     if (!card?.pose || !camera || !isUsableRect(pose?.rect)) return Promise.resolve();
+    endDrive(card);
     const now = clock.now();
     const duration = durationFor(ms);
     const current = card.lift;
@@ -681,6 +770,7 @@ export function createCardMeshPool({
     const mesh = new three.Mesh(geometry.geometry, [blankBack, blankBack, rim]);
     mesh.name = `board3d-card-${id}`;
     mesh.castShadow = true;
+    mesh.layers.enable(OCCLUDER_LAYER);
     mesh.userData.boardCardId = id;
     group.add(mesh);
     cards.set(id, {
@@ -708,6 +798,7 @@ export function createCardMeshPool({
       flight: null,
       flightTailUntil: 0,
       lift: null,
+      drive: null,
       dirty: true,
     });
     mesh.visible = false;
@@ -718,6 +809,7 @@ export function createCardMeshPool({
     withCard(id, (card) => {
       endFlight(card);
       endLift(card);
+      endDrive(card);
       cards.delete(id);
       group.remove(card.mesh);
       dropDimmedFront(card);
@@ -889,6 +981,12 @@ export function createCardMeshPool({
         moving = true;
         continue;
       }
+      if (card.drive) {
+        if (placeDrive(card, now)) endDrive(card);
+        moving = true;
+        if (card.foilLive && card.mesh.visible && card.face === 'front') foilShown = true;
+        if (card.drive) continue;
+      }
       if (card.flightTailUntil > 0) {
         if (now < card.flightTailUntil) moving = true;
         else {
@@ -928,10 +1026,10 @@ export function createCardMeshPool({
     if (!card) return null;
     const { w, h, t } = card.geometry;
     let object = card.mesh;
-    if (rest && (card.lift || card.hoverTilt) && card.pose) {
-      // A lifted card still stands at its slot as far as the board is concerned, and a tilted
-      // one lies flat there.
-      writeRestPose(card, clock.now(), scratch, { hoverTilt: false });
+    // A lifted or driven card (design 075) still stands at its slot as far as the board is concerned,
+    // and a tilted one lies flat there.
+    if (rest && (card.lift || card.drive || card.hoverTilt) && card.pose) {
+      writeRestPose(card, clock.now(), scratch, null, { hoverTilt: false });
       object = scratch;
       group.updateMatrixWorld();
       scratch.updateMatrix();
@@ -965,6 +1063,9 @@ export function createCardMeshPool({
     setFaces,
     setPose,
     tween,
+    drive,
+    tablePoseOf,
+    frontMapOf,
     lift,
     unlift,
     liftedId,

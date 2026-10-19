@@ -3,10 +3,33 @@
 // passes — a blurred orange body, a yellow mid, a near-white core — composited additively;
 // the scene's grain pass eats speckles out of the layer so gradients stop reading as flat
 // discs. Every call draws on the context it is handed and is otherwise pure.
+//
+// Design 075 slice 9: each fill names its GPU style (`ctx.fxStyle`, ignored by Canvas2D).
+// Tongues paint a single-colour gradient laid along their axis — identical on Canvas2D — so
+// the flame style knows base from tip and flows its noise that way.
 import { rgbCss } from '../../fx-colors.mjs';
 import { grainPass, sphere, tonguePath, wobble } from './_shared.js';
 
 const TAU = Math.PI * 2;
+const rad = (deg) => (deg * Math.PI) / 180;
+
+/** `rgb` at `alpha` as a gradient from the tongue's base to its tip: one colour, one axis. */
+function alongTongue(ctx, spec, rgb, alpha) {
+  const a = rad(spec.angleDeg);
+  const g = ctx.createLinearGradient(spec.x, spec.y, spec.x + Math.cos(a) * spec.length, spec.y + Math.sin(a) * spec.length);
+  const colour = rgbCss(rgb, alpha);
+  g.addColorStop(0, colour);
+  g.addColorStop(1, colour);
+  return g;
+}
+
+// Style params (gpu-canvas STYLE_PARAMS): the outer pass erodes least, the core most, so the
+// three passes nest — solid body, licking mid, a torn white-hot filament.
+const FLAME_BODY = Object.freeze({ id: 'flame', erode: 0.3 });
+const FLAME_MID = Object.freeze({ id: 'flame', erode: 0.42 });
+const FLAME_CORE = Object.freeze({ id: 'flame', erode: 0.55 });
+const ORB_BODY = Object.freeze({ id: 'orb' });
+const ORB_GLOW = Object.freeze({ id: 'orb', boil: 0.5, limb: 0, gain: 0 });
 
 const PALETTE = Object.freeze({
   deep: Object.freeze([210, 41, 8]),
@@ -26,14 +49,17 @@ function fireKit(palette) {
     g.addColorStop(0.55, rgbCss(palette.deep, alpha * 0.45));
     g.addColorStop(1, rgbCss(palette.deep, 0));
     ctx.fillStyle = g;
+    ctx.fxStyle = ORB_GLOW;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, TAU);
     ctx.fill();
+    ctx.fxStyle = null;
   }
 
   /** A hot sphere: white core, yellow, orange, falling to nothing. `hot` dims the white. */
   function body(ctx, x, y, r, alpha, hot = 1) {
     if (!(r > 0) || !(alpha > 0)) return;
+    ctx.fxStyle = ORB_BODY;
     sphere(ctx, x, y, r, [
       [0, palette.white, alpha * hot],
       [0.3, palette.core, alpha],
@@ -41,6 +67,7 @@ function fireKit(palette) {
       [0.86, palette.body, alpha * 0.5],
       [1, palette.deep, 0],
     ]);
+    ctx.fxStyle = null;
   }
 
   /** Three-pass flame tongue: blurred body, mid, hot core. `hot` dims the core. */
@@ -48,18 +75,22 @@ function fireKit(palette) {
     if (!(spec.length > 0) || !(spec.width > 0) || !(alpha > 0)) return;
     // One blurred pass only: canvas blur is the costly part of this material.
     ctx.filter = `blur(${Math.max(1, spec.width * 0.12).toFixed(1)}px)`;
-    ctx.fillStyle = rgbCss(palette.body, 0.6 * alpha);
+    ctx.fxStyle = FLAME_BODY;
+    ctx.fillStyle = alongTongue(ctx, spec, palette.body, 0.6 * alpha);
     tonguePath(ctx, spec, 1);
     ctx.fill();
     ctx.filter = 'none';
-    ctx.fillStyle = rgbCss(palette.hot, 0.8 * alpha);
+    ctx.fxStyle = FLAME_MID;
+    ctx.fillStyle = alongTongue(ctx, spec, palette.hot, 0.8 * alpha);
     tonguePath(ctx, spec, 0.66);
     ctx.fill();
     if (hot > 0) {
-      ctx.fillStyle = rgbCss(palette.core, 0.9 * alpha * hot);
+      ctx.fxStyle = FLAME_CORE;
+      ctx.fillStyle = alongTongue(ctx, spec, palette.core, 0.9 * alpha * hot);
       tonguePath(ctx, { ...spec, seed: spec.seed + 0.5 }, 0.4);
       ctx.fill();
     }
+    ctx.fxStyle = null;
   }
 
   /**

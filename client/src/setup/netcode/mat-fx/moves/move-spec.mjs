@@ -1,6 +1,6 @@
 // Design 063: the MoveSpec schema. A move is data: timing, card-motion presets, and beats
 // that name a drawer from the shared library (move-drawers.js) with parameters; one
-// player (move-player.js) plays any spec. `DRAWER_PARAMS` is the one table of every
+// player (scene-move-player.js, design 075) plays any spec. `DRAWER_PARAMS` is the one table of every
 // drawer's parameters (design § Pinned contracts B); `validateSpec` is the gate every
 // shipped spec passes (specs.test.mjs). Units: lengths in card heights, times in ms on
 // the scene clock, angles in lane space except `direction`/`arms`, which are screen
@@ -105,6 +105,11 @@ const BASE_DRAWER_PARAMS = {
     ease: ['enum', ['in', 'linear', 'out'], 'in'],
     from: ['enum', ['attacker', 'defender', 'sky', 'sky-attacker'], 'attacker'],
     unit: UNIT,
+    // A starFlare shape flown down the lane in place of the body (Fire Blast's 大).
+    flare: ['enum', ['none', 'dai', 'cross', 'ring'], 'none'],
+    size: ['num', 0.4, 1.5, 1],
+    flareWidth: ['num', 0.2, 0.7, 0.46],
+    flareCore: ['num', 0.1, 0.7, 0.46],
   },
   vignette: {
     target: TARGET(),
@@ -121,9 +126,11 @@ const BASE_DRAWER_PARAMS = {
   starFlare: {
     arms: ['arms', 'dai'],
     width: ['num', 0.2, 0.7, 0.46],
-    core: ['num', 0.2, 0.7, 0.46],
-    grow: ['num', 0.15, 0.5, 0.3],
+    core: ['num', 0.1, 0.7, 0.46],
+    // 0: the flare arrives whole (a flown flare hands over to it at contact).
+    grow: ['num', 0, 0.5, 0.3],
     breakAt: ['num', 0.4, 0.9, 0.6],
+    size: ['num', 0.4, 1.5, 1],
     ...ANCHORED(),
   },
   impactFlash: {
@@ -318,7 +325,7 @@ export function tonguesAt(drawer, params) {
     case 'orbitCharge':
       return (p.half === 'both' ? p.count : Math.ceil(p.count / 2)) * p.tongues;
     case 'projectile':
-      return p.tongues;
+      return p.flare === 'none' ? p.tongues : resolveArmCount(p.flare) * 5;
     case 'starFlare':
       return resolveArmCount(p.arms) * 5;
     case 'beam':
@@ -461,6 +468,8 @@ const TOP_KEYS = [
   'beats',
   'particles',
   'grain',
+  // Design 075 parity: the card rim / heat colours of a tinted move (a palette), else the material's.
+  'tint',
 ];
 const REQUIRED_KEYS = [
   'id',
@@ -585,6 +594,7 @@ export function validateSpec(spec) {
   if (spec.tier !== undefined && ![1, 2, 3, 'S'].includes(spec.tier)) errors.push(`tier must be 1, 2, 3 or 'S' (got ${spec.tier})`);
   if (spec.family !== undefined && !FAMILIES.includes(spec.family)) errors.push(`unknown family '${spec.family}'`);
   if (spec.material !== undefined && !MATERIAL_KEYS.includes(spec.material)) errors.push(`unknown material '${spec.material}'`);
+  if (spec.tint !== undefined) errors.push(...checkAgainst({ tint: ['palette', null] }, { tint: spec.tint }, 'spec'));
 
   const band = TIER_BAND[spec.tier];
   if (spec.durationMs !== undefined) {

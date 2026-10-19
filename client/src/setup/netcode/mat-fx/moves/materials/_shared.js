@@ -207,3 +207,33 @@ export function tintedPalette(palette, tint) {
   for (const [key, hex] of Object.entries(tint ?? {})) out[key] = Object.freeze(parseHex(hex));
   return Object.freeze(out);
 }
+
+const UNSTYLED = new Set(['grain', 'withPalette']);
+
+/**
+ * Design 075: `kit` with every drawing method run under one by-kind GPU style hint
+ * (`{ byKind: { linear, radial, solid, stroke } }`, gpu-canvas.mjs), so a kit with no per-fill
+ * hints of its own still shades each fill by its paint kind, its projectile's inner tongues and
+ * bodies included. A real 2D context ignores the hint. `withPalette` kits are styled the same.
+ */
+export function styledKit(kit, hint) {
+  const styled = {};
+  for (const [key, value] of Object.entries(kit)) {
+    if (typeof value !== 'function' || UNSTYLED.has(key)) {
+      styled[key] = value;
+      continue;
+    }
+    styled[key] = (ctx, ...args) => {
+      if (!ctx || typeof ctx !== 'object') return value(ctx, ...args);
+      const before = ctx.fxStyle ?? null;
+      ctx.fxStyle = hint;
+      try {
+        return value(ctx, ...args);
+      } finally {
+        ctx.fxStyle = before;
+      }
+    };
+  }
+  if (typeof kit.withPalette === 'function') styled.withPalette = (palette) => styledKit(kit.withPalette(palette), hint);
+  return Object.freeze(styled);
+}

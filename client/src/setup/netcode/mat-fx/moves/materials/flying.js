@@ -10,7 +10,11 @@
 // turning as a pinwheel round a small orb. Palette #CFE3F7 #EAF3FF #FFFFFF, deep #8FB3D9. No
 // grain, no blur. Every call draws on the context it is handed and is otherwise pure.
 import { rgbCss } from '../../fx-colors.mjs';
-import { grainPass, sphere, traceOutline } from './_shared.js';
+import { grainPass, sphere, styledKit, traceOutline } from './_shared.js';
+
+// Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
+// Gusts fray and churn like moving air; their streak lines stay crisp.
+const GUST = Object.freeze({ byKind: { linear: { id: 'smoke', churn: 0.55, drift: 1.6, folds: 0.25 }, radial: { id: 'smoke', churn: 0.5, drift: 1.2, folds: 0.3 } } });
 
 const TAU = Math.PI * 2;
 const SAMPLES = 12;
@@ -231,4 +235,4 @@ function flyingKit(palette) {
   });
 }
 
-export const flying = flyingKit(PALETTE);
+export const flying = styledKit(flyingKit(PALETTE), GUST);

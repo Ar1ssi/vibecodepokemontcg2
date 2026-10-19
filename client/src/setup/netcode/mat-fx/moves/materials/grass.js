@@ -9,7 +9,13 @@
 //          three-pass tongue (one blurred pass) and a hot sphere, as the recipe names
 // Every call draws on the context it is handed and is otherwise pure.
 import { rgbCss } from '../../fx-colors.mjs';
-import { grainPass, sphere, tonguePath, wobble } from './_shared.js';
+import { grainPass, sphere, styledKit, tonguePath, wobble } from './_shared.js';
+
+// Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
+// Blades and leaves: a few broad facets (leaf halves) with a slow glint; seeds and spores boil softly.
+const LEAF = Object.freeze({ byKind: { linear: { id: 'crystal', facets: 2, sheen: 0.35, speed: 0.7 }, radial: { id: 'orb', boil: 0.3, limb: 0.3, gain: 0 } } });
+const PETAL = Object.freeze({ byKind: { linear: { id: 'liquid', gloss: 0.35, flow: 0.6, clarity: 0.2 }, radial: { id: 'orb', boil: 0.25, limb: 0.25, gain: 0 } } });
+const SUNLIGHT = Object.freeze({ byKind: { linear: { id: 'energy', streak: 0.3, speed: 1, gain: 0.5 }, radial: { id: 'orb', boil: 0.35, limb: 0.3, gain: 0.8 }, stroke: { id: 'energy', streak: 0.3, speed: 1, gain: 0.5 } } });
 
 const TAU = Math.PI * 2;
 const LEAF_SAMPLES = 12;
@@ -224,7 +230,7 @@ function grassKit(palette) {
   });
 }
 
-export const grass = grassKit(GRASS_PALETTE);
+export const grass = styledKit(grassKit(GRASS_PALETTE), LEAF);
 
 /** The petal material drawn in `palette` (any palette with the same keys). */
 function petalKit(palette) {
@@ -240,7 +246,7 @@ function petalKit(palette) {
   });
 }
 
-export const petal = petalKit(PETAL_PALETTE);
+export const petal = styledKit(petalKit(PETAL_PALETTE), PETAL);
 
 // ---- solar: the light override (fire's tongue code path) ----------------------------------
 /** The solar material drawn in `palette` (any palette with the same keys). */
@@ -323,4 +329,4 @@ function solarKit(palette) {
   });
 }
 
-export const solar = solarKit(SOLAR_PALETTE);
+export const solar = styledKit(solarKit(SOLAR_PALETTE), SUNLIGHT);

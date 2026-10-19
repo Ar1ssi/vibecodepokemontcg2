@@ -226,6 +226,9 @@ export function createTable({ scene, textures, three, renderer = null, RoomEnvir
 
   const light = new three.DirectionalLight(0xffffff, LIGHT_INTENSITY);
   light.name = 'board3d-key-light';
+  // On every layer, so the attack-FX passes (design 075) see the same lights and lit board
+  // materials keep their programs instead of rebuilding them each frame.
+  light.layers.enableAll();
   light.castShadow = true;
   light.shadow.mapSize.set(SHADOW_MAP_PX, SHADOW_MAP_PX);
   light.shadow.bias = -0.0005;
