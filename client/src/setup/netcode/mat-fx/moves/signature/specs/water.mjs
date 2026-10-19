@@ -59,10 +59,11 @@ export const originPulse = Object.freeze({
   pad: 1.8,
   attacker: { motion: 'dash', params: { wind: 0.3 } },
   defender: { motion: 'knock', params: { strength: 0.3, heat: 0.35 } },
+  tint: ORB,
   beats: [
-    { at: 200, until: 900, layer: 'front', drawer: 'starFlare', params: { size: 0.6, target: 'attacker', arms: RING5, width: 0.3, tint: ORB } },
+    { at: 200, until: 900, layer: 'back', drawer: 'aura', params: { target: 'attacker', hz: 2, alpha: 0.7, tint: ORB } },
     // Landing at 760 … 1000: flight = 400 - 4 x 60 = 160 ms; the last orb lands at contact.
-    { at: 600, until: 1000, layer: 'front', drawer: 'volley', params: { count: 5, stagger: 60, r0: 0.12, r1: 0.16, bow: 0.3, tongues: 0, tint: ORB } },
+    { at: 600, until: 1000, layer: 'front', drawer: 'volley', params: { count: 8, stagger: 40, r0: 0.12, r1: 0.16, bow: 0.4, tongues: 0, tint: ORB } },
     { at: 900, until: 1800, layer: 'back', drawer: 'vignette', params: { target: 'defender', maxAlpha: 0.45 } },
     { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: FLASH },
     { at: 1000, until: 1800, layer: 'front', drawer: 'cloud', params: { count: 4, radius: 0.3, drift: 0.4, alpha: 0.4 } },

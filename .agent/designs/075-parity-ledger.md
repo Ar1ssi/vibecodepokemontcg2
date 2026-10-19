@@ -142,3 +142,14 @@ mud-bomb (ground/mud, USUL) — ok: a brown mud ball, brown splatter.
 mud-shot (mud) — ok: a stream of mud blobs.
 mud-slap (mud) — ok: mud flung at the foe.
 multi-attack (normal, sig) — tweak: SV glows orange-gold and slashes with an orange arc; ours white blades → gold-orange tint.
+FIXED (pass 17): moongeist-beam multi-attack
+mystical-power (psychic, sig) — ok: pink-cyan rings swirl round the foe into a burst.
+natures-madness (fairy, sig) — ok after the global fixes (star bloom, soft dome rim): lightning, then a pink-teal sphere engulfs the foe.
+night-shade (ghost) — partial: SV is dark violet ribbons and a dark burst; ours keeps the ghost eyes (063 rule pinned by tests).
+night-slash (dark) — ok: a pink-violet slash.
+nuzzle (electric) — ok: small cheek sparks.
+nihil-light (dragon, sig; USUL video) — tweak: the reference is a pink-magenta light burst; ours draws a yellow GRID lattice (clip art) and white blobs → drop the lattice, a pink-green charge.
+oblivion-wing (flying, sig) — tweak: SV is Yveltal's crimson beam in a red vortex; ours a pink slab beam and teal wing crescents → crimson tint.
+octazooka (water; LPA) — tweak: an inky black blob is shot; ours blue bubbles → dark ink tint.
+ominous-wind (ghost; LPA) — ok: violet wind.
+origin-pulse (water, sig) — tweak: SV swarms blue orbs, then rains blue beams; ours a big blue star at the user → orb volley, no star.

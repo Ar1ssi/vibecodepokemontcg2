@@ -135,11 +135,12 @@ export const oblivionWing = Object.freeze({
   pad: 1.8,
   attacker: { motion: 'rear-lurch', params: { rear: 0.14, glow: 1 } },
   defender: { motion: 'knock', params: { strength: 0.35, heat: 0.35 } },
+  tint: CRIMSON,
   beats: [
     { at: 0, until: 800, layer: 'back', drawer: 'aura', params: { hz: 2, alpha: 0.6, tint: DARK_WING } },
     { at: 0, until: 900, layer: 'back', drawer: 'vignette', params: { target: 'attacker', maxAlpha: 0.45, tint: SMOKE } },
     { at: 300, until: 800, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.18, r1: 0.5, tint: CRIMSON } },
-    { at: 550, until: 1100, layer: 'front', drawer: 'beam', params: { kind: 'solid', w: 0.75, tint: CRIMSON } },
+    { at: 550, until: 1100, layer: 'front', drawer: 'beam', params: { kind: 'solid', w: 0.5, tint: CRIMSON } },
     { at: 800, until: 1000, layer: 'back', drawer: 'rain', params: { count: 8, height: 1.6, spread: 0.9, tint: { body: '#F0E6E8', hot: '#FFFFFF' } } },
     { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: { r1: 0.8, r0: 0.3, tint: CRIMSON } },
     { at: 1000, until: 1650, layer: 'front', drawer: 'pillar', params: { from: 'below', height: 1.2, w: 0.5, tint: CRIMSON } },

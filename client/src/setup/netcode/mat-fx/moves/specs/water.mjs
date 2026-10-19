@@ -224,7 +224,7 @@ export const octazooka = spec({
   attacker: { motion: 'rear-lurch', params: { rear: 0.12, lurch: 0.3, glow: 0.8 } },
   defender: { motion: 'knock', params: { strength: 0.3, heat: 0.3 } },
   beats: [
-    { at: 350, until: 700, layer: 'front', drawer: 'volley', params: { count: 8, stagger: 35, r0: 0.1, r1: 0.15, bow: 0.15, tongues: 2 } },
+    { at: 350, until: 700, layer: 'front', drawer: 'volley', params: { count: 8, stagger: 35, r0: 0.1, r1: 0.15, bow: 0.15, tongues: 2, tint: { deep: '#0A0A12', body: '#2A2A3A', hot: '#5A5A70', core: '#8A8AA0' } } },
     { at: 700, until: 1050, layer: 'front', drawer: 'splash', params: { count: 8, arc: 360, len: [0.45, 0.8], gravity: 0.6 } },
     { at: 800, until: 1200, layer: 'front', drawer: 'cloud', params: { count: 4, radius: 0.35, drift: 0.5, alpha: 0.3 } },
     { at: 700, until: 860, layer: 'top', drawer: 'impactFlash', params: FLASH },
