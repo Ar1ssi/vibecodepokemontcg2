@@ -215,7 +215,10 @@ export async function initializeBoard3d({
   let settleTimer = null;
   const syncMirrorNow = () => {
     if (!session?.scene) return;
-    mirror.sync(current.model, session.scene.rects());
+    // The board's column: the canvas runs on under the side menu (relayout's halfFromViewport).
+    const box = session.canvas?.getBoundingClientRect?.() ?? null;
+    const column = box && { left: box.left, top: box.top, width: box.width * boardWidthFrac(doc.body?.classList), height: box.height };
+    mirror.sync(current.model, session.scene.rects(), session.scene.zoneRects?.() ?? {}, column);
   };
   const queueMirrorSync = () => {
     if (!mirror) return;
@@ -424,6 +427,14 @@ export async function initializeBoard3d({
   }
   doc.addEventListener('board-view-applied', onViewApplied);
   session.cleanup.push(() => doc.removeEventListener('board-view-applied', onViewApplied));
+  // Ticking a hand's Sort box re-fans that hand now: under server authority the legacy sort()
+  // it also runs leaves the DOM alone, and the next view would be the first to show it.
+  for (const root of Object.values(mirror?.roots ?? {})) {
+    const sortBox = root?.getElementById?.('sortHandCheckbox');
+    if (!sortBox) continue;
+    sortBox.addEventListener('change', onViewApplied);
+    session.cleanup.push(() => sortBox.removeEventListener('change', onViewApplied));
+  }
   onViewApplied();
 
   if (foil) {

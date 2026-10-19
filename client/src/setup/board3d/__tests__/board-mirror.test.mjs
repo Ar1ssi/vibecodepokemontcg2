@@ -267,4 +267,31 @@ describe('createBoardMirror zone list popups (D4)', () => {
     assert.equal(mirror.zoneElement('self', 'lostZoneCover').style.left, '1600px');
     assert.equal(mirror.zoneElement('self', 'discardCover').style.width, '100px');
   });
+  it('sync pins each hand\'s Sort box and count to its strip: above the near one, below the far one', () => {
+    const { mirror } = setup();
+    const at = (side, id) => {
+      const el = mirror.zoneElement(side, id);
+      return [el.style.left, el.style.top, el.style.transform, el.classList.contains('hand-label-placed')];
+    };
+    mirror.sync({ placements: [] }, {}, {
+      'self:hand': { left: 210, top: 900, width: 1500, height: 160 },
+      'opp:hand': { left: 310, top: 20, width: 1300, height: 120 },
+    });
+    // Host box origin (10, 20); a 4 px gap off the strip.
+    assert.deepEqual(at('self', 'handLabel'), ['200px', '876px', 'translateY(-100%)', true]);
+    assert.deepEqual(at('self', 'handText'), ['1700px', '876px', 'translate(-100%, -100%)', true]);
+    assert.deepEqual(at('opp', 'handLabel'), ['1600px', '124px', 'translateX(-100%)', true]);
+    assert.deepEqual(at('opp', 'handText'), ['300px', '124px', 'none', true]);
+    // A strip wider than the canvas keeps its ends 2% of the canvas in from its edges.
+    mirror.sync({ placements: [] }, {}, { 'self:hand': { left: -40, top: 900, width: 1600, height: 160 } }, {
+      left: 10, top: 20, width: 1450, height: 1060,
+    });
+    assert.deepEqual(at('self', 'handLabel').slice(0, 2), ['29px', '876px']);
+    assert.deepEqual(at('self', 'handText').slice(0, 2), ['1421px', '876px']);
+    mirror.sync({ placements: [] }, {}, { 'self:hand': { left: 210, top: 900, width: 1500, height: 160 } });
+    assert.equal(at('opp', 'handLabel')[3], false, 'no strip, no Sort box');
+    assert.equal(at('opp', 'handText')[3], false);
+    mirror.sync({ placements: [] }, {});
+    assert.equal(at('self', 'handText')[3], false, 'an old caller without zones hides them');
+  });
 });

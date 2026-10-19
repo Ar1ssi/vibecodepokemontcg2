@@ -38,6 +38,12 @@ const PENDING_CLASS = 'cmd-pending';
 // draw-flight.js `hideForFlight`: a hand card hidden while its draw / prize / reveal flight lands
 // on it (self-/opp-containers.css give it `visibility: hidden`).
 const FLIGHT_HIDDEN_CLASS = 'draw-flight-source';
+/** Set on #handLabel / #handText once `sync` has a hand strip to pin them to. */
+const HAND_LABEL_PLACED = 'hand-label-placed';
+/** Gap between a hand's strip and its Sort box / count, in px. */
+const HAND_LABEL_GAP_PX = 4;
+/** How far in from the canvas's edges the strip's ends are kept (the iframe's `right: 2%`). */
+const HAND_LABEL_INSET = 0.02;
 const isHiddenNode = (node) =>
   node.style?.visibility === 'hidden' || Boolean(node.classList?.contains(FLIGHT_HIDDEN_CLASS));
 
@@ -46,14 +52,23 @@ const isHiddenNode = (node) =>
 // are fixed so a zone, `.play-container` or `.mat-holo` between them and the host never offsets
 // them, and untransformed so their box is the projected rect (the scene draws the rotation).
 // Everything is invisible and click-through except the popups, which stay `display: none` until
-// the legacy code shows them inline (their look: board3d-panels.css, linked before this sheet).
+// the legacy code shows them inline (their look: board3d-panels.css, linked before this sheet),
+// and each hand's Sort box and "(N)" count, which `sync` pins to that hand's strip as the iframe
+// sheets did (Sort at the strip's left end, the count at its right, on the cloth side of it).
 const MIRROR_STYLE = `
 :host { position: absolute; inset: 0; display: block; transform: translateZ(0);
   pointer-events: none; }
 #playfield { position: absolute; inset: 0; }
-#playfield > :not(${POPUP_SELECTOR}), #handLabel, #handText, #hand {
+#playfield > :not(${POPUP_SELECTOR}), #hand {
   position: absolute; left: 0; top: 0; width: 0; height: 0; margin: 0;
   pointer-events: none; opacity: 0; }
+#handLabel, #handText { position: absolute; display: none; margin: 0; white-space: nowrap;
+  font-size: clamp(10px, 2.4vh, 18px); line-height: 1.6; pointer-events: none; }
+#handLabel.${HAND_LABEL_PLACED} { display: flex; align-items: center; gap: 0.3em; }
+#handText.${HAND_LABEL_PLACED} { display: block; }
+#sortHandCheckbox { margin: 0; pointer-events: auto; cursor: pointer; }
+.self-text { color: rgba(90, 110, 188, 0.864); }
+.opp-text { color: rgba(188, 90, 113, 0.864); }
 ${POPUP_SELECTOR} { display: none; }
 img.card-image:not(:is(${POPUP_SELECTOR}) *) {
   position: fixed !important; transform: none !important; margin: 0 !important; }
@@ -160,6 +175,46 @@ const writeRect = (el, rect, origin) => {
   }
 };
 
+/** Puts an element's anchor corner at a point (px from `origin`); `shift` is its CSS translate. */
+const writeAnchor = (el, x, y, shift, origin) => {
+  if (!el?.style) return;
+  const values = { left: `${x - origin.left}px`, top: `${y - origin.top}px`, transform: shift };
+  for (const [key, value] of Object.entries(values)) {
+    if (el.style[key] !== value) el.style[key] = value;
+  }
+  el.classList.add(HAND_LABEL_PLACED);
+};
+
+/**
+ * Pins a side's Sort box and "(N)" count to its hand strip's screen rect: above the near strip,
+ * below the far one (the far half's iframe was the near one turned 180°), Sort at the strip's
+ * left end for the near seat and its right end for the far seat, the count at the other end.
+ * The ends are clamped into `bounds` (the canvas): a fanned strip can run past its edges.
+ */
+const placeHandLabels = (label, count, strip, near, origin, bounds) => {
+  if (!isRect(strip)) {
+    label?.classList.remove(HAND_LABEL_PLACED);
+    count?.classList.remove(HAND_LABEL_PLACED);
+    return;
+  }
+  let left = strip.left;
+  let right = strip.left + strip.width;
+  if (isRect(bounds)) {
+    const inset = Math.max(HAND_LABEL_GAP_PX, bounds.width * HAND_LABEL_INSET);
+    left = Math.max(left, bounds.left + inset);
+    right = Math.min(right, bounds.left + bounds.width - inset);
+  }
+  if (near) {
+    const y = strip.top - HAND_LABEL_GAP_PX;
+    writeAnchor(label, left, y, 'translateY(-100%)', origin);
+    writeAnchor(count, right, y, 'translate(-100%, -100%)', origin);
+  } else {
+    const y = strip.top + strip.height + HAND_LABEL_GAP_PX;
+    writeAnchor(label, right, y, 'translateX(-100%)', origin);
+    writeAnchor(count, left, y, 'none', origin);
+  }
+};
+
 const outlineState = (node) => {
   const outline = String(node.style?.outline ?? '').toLowerCase();
   if (PICKED_OUTLINES.some((colour) => outline.includes(colour))) return 'picked';
@@ -171,7 +226,9 @@ const outlineState = (node) => {
  * @param {{ hostSelf: HTMLElement, hostOpp: HTMLElement, doc?: Document }} options
  * @returns {{ roots: { self: ShadowRoot, opp: ShadowRoot }, hosts: { self: HTMLElement, opp: HTMLElement },
  *   zoneElement: (side: 'self'|'opp', zoneId: string) => HTMLElement|null,
- *   sync: (model: object|null, rects: Record<string, {left:number,top:number,width:number,height:number}>) => void,
+ *   sync: (model: object|null, rects: Record<string, {left:number,top:number,width:number,height:number}>,
+ *     zones?: Record<string, {left:number,top:number,width:number,height:number}>,
+ *     bounds?: {left:number,top:number,width:number,height:number}|null) => void,
  *   observe: (onUiState: (instanceId: number, patch: object) => void) => () => void,
  *   uiState: () => import('./board-model.mjs').UiState, dispose: () => void }}
  */
@@ -299,7 +356,9 @@ export function createBoardMirror({ hostSelf, hostOpp, doc = globalThis.document
     return box ? { left: box.left, top: box.top, width: box.width, height: box.height } : null;
   };
 
-  const sync = (model, rects) => {
+  // `zones` is board-scene.js `zoneRects()` (`<side>:<zone>` footprints); its hand strips place
+  // each side's Sort box and count, kept inside `bounds` (the canvas's client rect).
+  const sync = (model, rects, zones = {}, bounds = null) => {
     if (disposed || !rects || typeof rects !== 'object') return;
     const placements = Array.isArray(model?.placements) ? model.placements : [];
     for (const side of SIDES) {
@@ -322,6 +381,14 @@ export function createBoardMirror({ hostSelf, hostOpp, doc = globalThis.document
         const rect = rects[`pile:${side}:${pile}`];
         for (const id of ids) writeRect(zoneElement(side, id), isRect(rect) ? rect : origin, origin);
       }
+      placeHandLabels(
+        zoneElement(side, 'handLabel'),
+        zoneElement(side, 'handText'),
+        zones?.[`${side}:hand`],
+        side === 'self',
+        origin,
+        bounds
+      );
     }
   };
 
