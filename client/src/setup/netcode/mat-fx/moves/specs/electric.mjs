@@ -129,7 +129,7 @@ export const shockWave = spec({
   beats: [
     // No projectile: the move is the shockwave. Rings roll off the attacker and wash over the
     // defender (it never misses).
-    { at: 150, until: 650, layer: 'back', drawer: 'shockRings', params: { count: 3, delay: 0.25, r0: 0.3, r1: 1.8, squash: 0.6 } },
+    { at: 150, until: 650, layer: 'back', drawer: 'aura', params: { target: 'attacker', hz: 3, alpha: 0.8, r0: 0.8, r1: 1.1, tint: { deep: '#6A9A1E', body: '#C8F04A', hot: '#F5FF9A', core: '#FCFFE0' } } },
     { at: 500, until: 820, layer: 'front', drawer: 'shards', params: { count: 5, arc: 360, distance: 0.6, spin: 200 } },
     flash(500),
   ],

@@ -201,3 +201,9 @@ secret-sword (fighting, sig) — ok (render predates the flare cap): a bright sl
 seed-flare (grass, sig) — ok: green-white shock, a light burst.
 shadow-claw (ghost) — ok: violet claw strikes.
 NOTE — renders before pass 24 show signature cross flares at 0.6 h; they are 0.4 h now.
+FIXED (pass 25): sandsear-storm · GLOBAL: all signature flares ≤0.45
+shadow-force (ghost, sig) — ok: vanish into shadow, a violet slash.
+shadow-punch (ghost) — ok: a violet fist strike.
+shock-wave (electric) — tweak: SV pulses a soft green-yellow sphere off the user, then yellow arcs; our stroked yellow ellipse rings read as clip art → a soft electric aura instead of the rings.
+signal-beam (bug, USUL) — ok: a green-yellow beam.
+silver-wind (silver) — ok: silver powder streams at the foe.
