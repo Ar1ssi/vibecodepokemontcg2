@@ -157,11 +157,11 @@ test('row 8: Basic + Stage 1 + Stage 2 with 2 Tools and 4 Energy stacks as apply
   const at = (id) => placementById(model, id);
 
   const expected = {
-    1: { role: 'root', host: null, stackIndex: 0, stackOffset: [0, 2 / 15] },
-    2: { role: 'stage', host: 1, stackIndex: 1, stackOffset: [0, 1 / 15] },
-    3: { role: 'stage', host: 1, stackIndex: 2, stackOffset: [0, 0] },
-    4: { role: 'tool', host: 1, stackIndex: 3, stackOffset: [1 / 6, 0] },
-    5: { role: 'tool', host: 1, stackIndex: 4, stackOffset: [2 / 6, 0] },
+    1: { role: 'root', host: null, stackIndex: 2, stackOffset: [0, 2 / 15] },
+    2: { role: 'stage', host: 1, stackIndex: 3, stackOffset: [0, 1 / 15] },
+    3: { role: 'stage', host: 1, stackIndex: 4, stackOffset: [0, 0] },
+    4: { role: 'tool', host: 1, stackIndex: 1, stackOffset: [1 / 6, 0] },
+    5: { role: 'tool', host: 1, stackIndex: 0, stackOffset: [2 / 6, 0] },
     6: { role: 'energy', host: 1, stackIndex: 5, stackOffset: [0, 0] },
     7: { role: 'energy', host: 1, stackIndex: 6, stackOffset: [0, 0] },
     8: { role: 'energy', host: 1, stackIndex: 7, stackOffset: [0, 0] },
@@ -176,6 +176,10 @@ test('row 8: Basic + Stage 1 + Stage 2 with 2 Tools and 4 Energy stacks as apply
     );
     assert.equal(p.rotation, 90, `card ${id} turns with its root`);
   }
+
+  // Back to front: Tools under the Pokémon, then the lower Stages, the visible Stage 2 above all.
+  const depth = (id) => at(id).stackIndex;
+  assert.ok(depth(5) < depth(4) && depth(4) < depth(1) && depth(1) < depth(2) && depth(2) < depth(3));
 
   const srcs = [
     '/src/assets/energy/tokens/fire.png',
@@ -377,4 +381,17 @@ test('an attachment whose host is missing is drawn as a root', () => {
   assert.equal(p.role, 'root');
   assert.equal(p.host, null);
   assert.equal(placementById(model, 404), null);
+});
+
+test('bench: an evolved Pokémon shares its Basic slot; the next Basic takes the next slot', () => {
+  const bench = [
+    pokemon(1, 'Bulbasaur', 'Basic'),
+    pokemon(2, 'Ivysaur', 'Stage 1', { attachedTo: 1 }),
+    tool(3, 'Rescue Board', { attachedTo: 1 }),
+    pokemon(4, 'Squirtle', 'Basic'),
+  ];
+  const model = boardModelFrom(ownerView({ you: { bench } }), opts());
+  const slots = [1, 2, 3, 4].map((id) => placementById(model, id).slot);
+  assert.deepEqual(slots, [0, 0, 0, 1]);
+  assert.equal(placementById(model, 4).index, 3, 'index stays the zone-array position');
 });

@@ -328,3 +328,10 @@ test('hover lifts only the hovered card; lowered drops only the own hand', () =>
   close(flat.get(100).y - lowered.get(100).y, handLoweredOffset(handBox.h), 'own hand drops');
   close(lowered.get(300).y, flat.get(300).y, 'opp hand stays');
 });
+
+test('bench: a card is placed by its slot, not its array index', () => {
+  const stacked = placementPose(placement({ zone: 'bench', index: 3, slot: 1 }), layout);
+  const rect = benchSlotRect(layout, 'self', 1);
+  close(stacked.x, rect.x + rect.w / 2, 'x');
+  close(stacked.y, rect.y + rect.h / 2, 'y');
+});
