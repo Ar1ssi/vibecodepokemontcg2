@@ -684,7 +684,14 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
     }
 
     if (step.type === 'discardCost') {
-      const candidates = zone(_effectOwner, 'hand').array.filter((c) => c !== card);
+      const candidates = zone(_effectOwner, 'hand').array.filter(
+        (c) => c !== card && (!step.what || _matchesSearch(c, step.what))
+      );
+      if (candidates.length < step.count) {
+        msg(`  cost can't be paid — no eligible card in hand`);
+        onComplete?.();
+        return;
+      }
       _openChoicePicker({
         title: `${card.name} — discard ${step.count} cards to pay the cost`,
         candidates,

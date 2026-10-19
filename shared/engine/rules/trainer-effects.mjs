@@ -140,6 +140,8 @@ const LEADING_TRAINER_COSTS = [
   [/^discard (\d+) (?:of the )?other cards (?:from|in) your hand in order to/, (m) => ({ type: 'discardCost', count: Number(m[1]) })],
   [/^discard (\d+) energy cards from your hand in order to/, (m) => ({ type: 'discardCost', count: Number(m[1]), energyOnly: true })],
   [/^discard a card from your hand in order to/, () => ({ type: 'discardCost', count: 1 })],
+  // Typed hand-discard cost: Team Plasma Grunt, Fiery Torch, Engineer's Adjustments.
+  [/^discard an? ((?:team plasma|energy|\{[a-z]\} energy)) card from your hand\./, (m) => ({ type: 'discardCost', count: 1, what: `${m[1]} card` })],
   [/^discard 1 energy card attached to (?:1 of )?your (?:own )?pokémon in order to/, () => ({ type: 'discardOwnAttachedEnergy', cost: true })],
 ];
 
