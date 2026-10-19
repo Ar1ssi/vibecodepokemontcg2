@@ -10,16 +10,18 @@ const defaultLoader = () => {
 
 /**
  * @param {{ loader?: { loadAsync: (url: string) => Promise<import('three').Texture> },
- *           textureUrlFor?: (url: string) => string }} [options]
+ *           textureUrlFor?: (url: string) => string, anisotropy?: number }} [options]
+ *   `anisotropy` (the renderer's max) keeps card art sharp when the tilted table minifies it.
  * @returns {{ acquire: (url: string, options?: { colorSpace?: 'srgb'|'linear' }) => Promise<import('three').Texture>,
  *             release: (url: string, options?: { colorSpace?: 'srgb'|'linear' }) => void,
  *             size: () => number }}
  */
-export function createTextureCache({ loader = defaultLoader(), textureUrlFor = (u) => u } = {}) {
+export function createTextureCache({ loader = defaultLoader(), textureUrlFor = (u) => u, anisotropy = 1 } = {}) {
   return createTextureCacheCore({
     load: async (url, { colorSpace }) => {
       const texture = await loader.loadAsync(textureUrlFor(url));
       texture.colorSpace = colorSpace === 'srgb' ? SRGBColorSpace : NoColorSpace;
+      texture.anisotropy = Math.max(texture.anisotropy, anisotropy);
       texture.needsUpdate = true;
       return texture;
     },

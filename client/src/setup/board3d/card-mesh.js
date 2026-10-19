@@ -5,6 +5,7 @@
 // (card-poses.mjs) placed with board-camera.mjs `tableToWorld` and tweened on the scene clock.
 // `three` is the namespace from `import('three')`; this module never imports it statically.
 import { textureUrlFor } from '../gl/card-art-hosts.mjs';
+import { createCardArtMaterial } from '../gl/card-art-material.js';
 import { DEFAULT_FOIL_UV } from '../foil/tcgl-foil-manifest.mjs';
 import { DEFAULT_TILT_DEG } from '../sizing/table-tilt.mjs';
 import { tableToWorld } from './board-camera.mjs';
@@ -255,11 +256,7 @@ export function createCardMeshPool({
         texture: null,
         retried: false,
         timer: null,
-        material: new three.MeshStandardMaterial({
-          color: 0xffffff,
-          roughness: 0.55,
-          metalness: 0,
-        }),
+        material: createCardArtMaterial(three),
       };
       cache.set(src, entry);
       loadArt(cache, entry);
@@ -357,7 +354,7 @@ export function createCardMeshPool({
   const dimmedFront = (card, base) => {
     if (card.dimFront?.base === base && card.dimFront.material.map === base.map) return card.dimFront.material;
     card.dimFront?.material.dispose();
-    const material = base.clone();
+    const material = createCardArtMaterial(three, { map: base.map });
     material.transparent = true;
     material.opacity = PENDING_OPACITY;
     card.dimFront = { base, material };

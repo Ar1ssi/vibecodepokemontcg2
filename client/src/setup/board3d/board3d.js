@@ -313,7 +313,10 @@ export async function initializeBoard3d({
   function buildGraphics(canvas) {
     const gl = createRenderer({ canvas, onLost });
     if (!gl) return false;
-    const textures = modules.createTextureCache({ loader: modules.createMatTextureLoader?.(three) });
+    const textures = modules.createTextureCache({
+      loader: modules.createMatTextureLoader?.(three),
+      anisotropy: gl.renderer.capabilities?.getMaxAnisotropy?.() ?? 1,
+    });
     const clock = modules.createSceneClock(canvas);
     const scene = modules.createBoardScene({
       host,
