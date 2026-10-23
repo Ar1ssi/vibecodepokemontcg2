@@ -8,6 +8,7 @@ import {
   customSetsManifestHandler,
   loadCustomSets,
   matchesTcgdexQuery,
+  MAX_SET_JSON_BYTES,
   withCustomSets,
 } from '../custom-sets.mjs';
 import { createTcgdexProxy } from '../tcgdex-proxy.mjs';
@@ -160,4 +161,26 @@ test('createCustomSetStore and the manifest handler', () => {
   customSetsManifestHandler(storeOf(sampleSet()))({}, res);
   assert.equal(res.headers['Cache-Control'], 'no-store');
   assert.deepEqual(res.sent.sets.map((s) => s.code), ['HBW']);
+});
+
+test('query keys never read inherited properties, and oversized set.json files are skipped', () => {
+  const card = storeOf(sampleSet()).card('customhbw-001');
+  assert.equal(matchesTcgdexQuery(card, [['constructor', 'like:o']]), false);
+  assert.equal(matchesTcgdexQuery(card, [['__proto__', 'notnull:']]), false);
+  assert.equal(matchesTcgdexQuery(card, [['set.constructor', 'like:o']]), false);
+  assert.equal(matchesTcgdexQuery(card, [['attacks.toString', 'notnull:']]), false);
+  const root = tempRoot();
+  const lines = [];
+  writeSet(root, 'custombig', JSON.stringify(sampleSet({ id: 'custombig', code: 'BIG' })) + ' '.repeat(MAX_SET_JSON_BYTES));
+  const store = loadCustomSets(root, { log: (line) => lines.push(line) });
+  assert.equal(store.size(), 0);
+  assert.match(lines[0], /^custom set custombig skipped: set.json is \d+ bytes, over/);
+});
+
+test('a merged list keeps a gzip thunk for the handler', async () => {
+  const { impl } = fakeUpstream({ status: 200, body: '[]' });
+  const proxy = withCustomSets(createTcgdexProxy({ fetchImpl: impl }), storeOf(sampleSet()));
+  const merged = await proxy.get('/v2/en/cards?name=bill');
+  assert.equal(typeof merged.gzip, 'function');
+  assert.ok((await merged.gzip()).length > 0);
 });

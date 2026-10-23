@@ -10,6 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { validateCustomSet } from '../../shared/custom-sets/custom-set-schema.mjs';
+import { RESERVED_SET_CODES } from '../../server/custom-sets.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_ROOT = path.join(here, '..', '..', 'client', 'src', 'assets', 'custom-sets');
@@ -18,8 +19,14 @@ export const DEFAULT_ROOT = path.join(here, '..', '..', 'client', 'src', 'assets
 export function checkCustomSets(rootDir = DEFAULT_ROOT) {
   const problems = [];
   const sets = [];
-  if (!fs.existsSync(rootDir)) return { sets, problems };
-  for (const entry of fs.readdirSync(rootDir, { withFileTypes: true })) {
+  let entries;
+  try {
+    entries = fs.readdirSync(rootDir, { withFileTypes: true });
+  } catch (error) {
+    if (error.code === 'ENOENT') return { sets, problems };
+    return { sets, problems: [`${rootDir}: ${error.message}`] };
+  }
+  for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     const dir = path.join(rootDir, entry.name);
     const file = path.join(dir, 'set.json');
@@ -34,7 +41,7 @@ export function checkCustomSets(rootDir = DEFAULT_ROOT) {
       problems.push(`${entry.name}/set.json: not valid JSON (${error.message})`);
       continue;
     }
-    const result = validateCustomSet(parsed, { setDirName: entry.name });
+    const result = validateCustomSet(parsed, { setDirName: entry.name, reservedCodes: RESERVED_SET_CODES });
     if (!result.ok) {
       problems.push(...result.errors.map((e) => `${entry.name}/set.json: ${e}`));
       continue;

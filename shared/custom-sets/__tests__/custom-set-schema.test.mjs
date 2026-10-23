@@ -96,3 +96,28 @@ test('extra keys (cardback round-trip block) are allowed', () => {
   const set = withCard({ custom: { source: 'swsh3-88', edits: { hp: '180' } } });
   assert.equal(validateCustomSet(set).ok, true);
 });
+
+test('array- or null-typed fields are errors, not coerced strings (review of design 075)', () => {
+  const errorsOf = (patch, index = 0) => validateCustomSet(withCard(patch, index)).errors.join('\n');
+  assert.match(errorsOf({ localId: ['001'], id: 'customhbw-001' }), /localId: three digits/);
+  assert.match(errorsOf({ weaknesses: [null] }), /weaknesses\[0\]/);
+  assert.match(errorsOf({ resistances: [['Fire']] }), /resistances\[0\]/);
+  assert.match(errorsOf({ attacks: [{ cost: [], name: 'A', damage: ['90'] }] }), /damage/);
+  assert.match(validateCustomSet(sampleSet({ releaseDate: ['2026-10-23'] })).errors.join(), /releaseDate/);
+  assert.match(validateCustomSet(sampleSet({ code: ['HBW'] })).errors.join(), /code: 2–5 capital/);
+  const twins = sampleSet();
+  twins.cards[1] = { ...twins.cards[0] };
+  assert.match(validateCustomSet(twins).errors.join(), /001 is used twice/);
+});
+
+test('Energy cards, too many cards and printed decklist codes are refused', () => {
+  assert.match(validateCustomSet(withCard({ category: 'Energy' })).errors.join(), /category: one of Pokemon, Trainer/);
+  const big = sampleSet();
+  big.cards = Array.from({ length: 1000 }, () => big.cards[0]);
+  assert.match(validateCustomSet(big).errors.join(), /cards: at most 999/);
+  assert.match(
+    validateCustomSet(sampleSet({ id: 'customsvi', code: 'SVI', cards: [] }), { reservedCodes: ['SVI'] }).errors.join(),
+    /code: SVI is a printed set's decklist code/
+  );
+  assert.equal(validateCustomSet(sampleSet(), { reservedCodes: ['SVI'] }).ok, true);
+});

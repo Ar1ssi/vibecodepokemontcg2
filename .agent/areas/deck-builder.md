@@ -36,10 +36,8 @@ client/src/setup/deck-builder/core/build-battle/ — Build & Battle mode (design
   Library records carry `format` ('tcg' | 'build-battle'); a load sends the record's own format.
   Standard builder shows a B&B deck with a 40 counter but does not enforce the pool (by design).
   Decklist lines/TCGdex fetch shared with starter decks: scripts/lib/decklist-lines.mjs (throws on name drift).
-Custom sets (design 075, D223/D224): Browse Sets' Custom pill lists `/api/custom-sets` (set-browser.mjs `fetchCustomSets`);
-  the cards come through the TCGdex proxy like any set's (server/custom-sets.mjs); the import popup passes the manifest's
-  codes to deck-text-import `resolveEntry` (`deps.setIds`) so "4 Tyranitar HBW 1" resolves. Sets are made in the cardback
-  editor (Ar1ssi/cardback, "Download for ptcg-sim") and unzipped into client/src/assets/custom-sets/.
+Custom sets (design 075, D223/D224): Custom pill = `/api/custom-sets` manifest (set-browser.mjs `fetchCustomSets`), cards via the
+  TCGdex proxy (server/custom-sets.mjs); import popup passes manifest codes to `resolveEntry` (`deps.setIds`): "4 Tyranitar HBW 1".
 client/src/setup/deck-builder/core/set-browser-filters.mjs — the same drawer filters on Browse Sets: TCGdex narrows
   each set (`set.id=eq:`), full records decide; filters TCGdex cannot narrow only scan the open set.
 client/src/setup/deck-builder/core/deck-sprites.mjs — deck Pokémon sprite slots (design 024, D97):

@@ -33,21 +33,42 @@ test('a complete set passes; missing images and bad json are reported', () => {
   fs.mkdirSync(path.join(root, 'customnone'));
   const { sets, problems } = checkCustomSets(root);
   assert.deepEqual(sets, ['customhbw (HBW, 2 cards)']);
+  assert.equal(problems.length, 6);
   assert.deepEqual(
-    problems.sort(),
+    problems.filter((p) => !p.startsWith('custombad')).sort(),
     [
       'customabc/001/high.webp: missing',
       'customabc/001/low.webp: missing',
       'customabc/002/high.webp: missing',
       'customabc/002/low.webp: missing',
-      'custombad/set.json: not valid JSON (Expected property name or \'}\' in JSON at position 1 (line 1 column 2))',
       'customnone: no set.json',
-    ].sort()
+    ]
   );
+  assert.match(problems.find((p) => p.startsWith('custombad')), /^custombad\/set\.json: not valid JSON/);
 });
 
-test('a missing root is fine', () => {
+test('a custom code that a printed set uses on decklists is refused', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'custom-check-'));
+  const shadow = sampleSet({ id: 'customsvi', code: 'SVI' });
+  shadow.cards = shadow.cards.map((card) => ({
+    ...card,
+    id: card.id.replace('customhbw', 'customsvi'),
+    image: card.image.replace('customhbw', 'customsvi'),
+  }));
+  writeSet(root, shadow);
+  const { sets, problems } = checkCustomSets(root);
+  assert.deepEqual(sets, []);
+  assert.deepEqual(problems, ["customsvi/set.json: code: SVI is a printed set's decklist code; pick another"]);
+});
+
+test('a missing root is fine; a root that is a file is one problem line', () => {
   assert.deepEqual(checkCustomSets(path.join(os.tmpdir(), 'no-such-custom-sets')), { sets: [], problems: [] });
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'custom-check-')), 'not-a-dir');
+  fs.writeFileSync(file, 'x');
+  const { sets, problems } = checkCustomSets(file);
+  assert.deepEqual(sets, []);
+  assert.equal(problems.length, 1);
+  assert.match(problems[0], /ENOTDIR|not a directory/i);
 });
 
 test('the sets committed in this repo are valid', () => {

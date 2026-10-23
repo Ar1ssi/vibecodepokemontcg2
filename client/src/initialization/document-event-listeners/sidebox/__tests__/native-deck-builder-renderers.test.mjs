@@ -60,18 +60,23 @@ test('search tiles load the low TCGdex scan; the preview keeps the high one', ()
   // TCGdex sv08-057 Pikachu ex, normalized as card-search.mjs does (high.webp for both sizes).
   const high = 'https://assets.tcgdex.net/en/sv/sv08/057/high.webp';
   const custom = 'https://example.test/cards/custom.png';
+  // A custom set card (design 075) mirrors TCGdex's layout under this app's own path.
+  const customSet = '/src/assets/custom-sets/customhbw/001/high.webp';
   renderSearchResults({
     searchResultsEl,
     results: [
       { id: 'sv08-057', name: 'Pikachu ex', images: { small: high, large: high }, image: high },
       { id: 'custom-1', name: 'Custom', images: { small: custom, large: custom }, image: custom },
+      { id: 'customhbw-001', name: 'Tyranitar', images: { small: customSet, large: customSet }, image: customSet },
     ],
     onSelect: () => {},
   });
-  const [tcgdexTile, customTile] = searchResultsEl.querySelectorAll('.native-deck-builder-result');
+  const [tcgdexTile, customTile, customSetTile] = searchResultsEl.querySelectorAll('.native-deck-builder-result');
   assert.equal(tcgdexTile.querySelector('img').getAttribute('src'), 'https://assets.tcgdex.net/en/sv/sv08/057/low.webp');
   assert.equal(tcgdexTile.dataset.previewImage, high);
   assert.equal(customTile.querySelector('img').getAttribute('src'), custom);
+  assert.equal(customSetTile.querySelector('img').getAttribute('src'), '/src/assets/custom-sets/customhbw/001/low.webp');
+  assert.equal(customSetTile.dataset.previewImage, customSet);
 });
 
 // Two TCGdex results as card-search.mjs normalizes them (high.webp for both sizes).

@@ -30,12 +30,14 @@ export const ENERGY_TYPES = Object.freeze([
 ]);
 export const POKEMON_STAGES = Object.freeze(['Basic', 'Stage1', 'Stage2']);
 export const TRAINER_TYPES = Object.freeze(['Item', 'Supporter', 'Stadium', 'Tool']);
-export const CARD_CATEGORIES = Object.freeze(['Pokemon', 'Trainer', 'Energy']);
+// Energy is out of scope (design 075): decks use official Energy, the editor exports none.
+export const CARD_CATEGORIES = Object.freeze(['Pokemon', 'Trainer']);
 
 const MAX_NAME = 60;
 const MAX_ATTACKS = 4;
 const MAX_ABILITIES = 2;
 const MAX_COST = 5;
+export const MAX_CARDS = 999;
 
 export function isCustomSetId(id) {
   return typeof id === 'string' && CUSTOM_SET_ID_RE.test(id);
@@ -70,8 +72,7 @@ function checkTypes(list, where, errors) {
 }
 
 function checkSide(side, where, errors) {
-  if (side == null) return;
-  if (typeof side !== 'object' || !ENERGY_TYPES.includes(side.type) || typeof side.value !== 'string') {
+  if (!side || typeof side !== 'object' || Array.isArray(side) || !ENERGY_TYPES.includes(side.type) || typeof side.value !== 'string') {
     errors.push(`${where}: expected {type: <Energy type>, value: "×2" | "-30" | …}`);
   }
 }
@@ -94,9 +95,9 @@ function checkAttacks(attacks, where, errors) {
     if (Array.isArray(attack.cost) && attack.cost.length > MAX_COST) errors.push(`${at}.cost: at most ${MAX_COST}`);
     if (attack.effect !== undefined && typeof attack.effect !== 'string') errors.push(`${at}.effect: expected text`);
     const damage = attack.damage;
-    if (damage !== undefined && damage !== '' && !isInt(damage) && !/^\d{1,4}[+×x\-−]?$/.test(String(damage))) {
-      errors.push(`${at}.damage: a number, optionally followed by +, × or -`);
-    }
+    const damageOk =
+      damage === undefined || damage === '' || isInt(damage) || (typeof damage === 'string' && /^\d{1,4}[+×x\-−]?$/.test(damage));
+    if (!damageOk) errors.push(`${at}.damage: a number, optionally followed by +, × or -`);
   });
 }
 
@@ -155,8 +156,11 @@ function checkCard(card, setId, where, errors, seenLocalIds) {
     errors.push(`${where}: expected an object`);
     return;
   }
-  if (!LOCAL_ID_RE.test(String(card.localId))) errors.push(`${where}.localId: three digits, like "001"`);
-  else if (seenLocalIds.has(card.localId)) errors.push(`${where}.localId: ${card.localId} is used twice`);
+  if (typeof card.localId !== 'string' || !LOCAL_ID_RE.test(card.localId)) {
+    errors.push(`${where}.localId: three digits, like "001"`);
+    return;
+  }
+  if (seenLocalIds.has(card.localId)) errors.push(`${where}.localId: ${card.localId} is used twice`);
   else seenLocalIds.add(card.localId);
   if (card.id !== `${setId}-${card.localId}`) errors.push(`${where}.id: expected "${setId}-${card.localId}"`);
   if (!isText(card.name)) errors.push(`${where}.name: required, at most ${MAX_NAME} characters`);
@@ -170,10 +174,11 @@ function checkCard(card, setId, where, errors, seenLocalIds) {
 /**
  * Validates one set.json document.
  * @param {unknown} json parsed file content
- * @param {{ setDirName?: string }} [options] folder the file lives in; must equal the set id
+ * @param {{ setDirName?: string, reservedCodes?: Iterable<string> }} [options] folder the file lives in (must equal
+ *   the set id); set codes decklists already use for printed sets (a custom code must not shadow one)
  * @returns {{ ok: boolean, errors: string[], set: object|null }}
  */
-export function validateCustomSet(json, { setDirName } = {}) {
+export function validateCustomSet(json, { setDirName, reservedCodes = [] } = {}) {
   const errors = [];
   if (!json || typeof json !== 'object' || Array.isArray(json)) {
     return { ok: false, errors: ['set.json: expected a JSON object'], set: null };
@@ -182,15 +187,18 @@ export function validateCustomSet(json, { setDirName } = {}) {
   if (json.version !== CUSTOM_SET_DATA_VERSION) errors.push(`version: expected ${CUSTOM_SET_DATA_VERSION}`);
   if (!isCustomSetId(json.id)) errors.push(`id: "custom" followed by 2–5 lowercase letters or digits`);
   else if (setDirName !== undefined && setDirName !== json.id) errors.push(`id: ${json.id} but the folder is ${setDirName}`);
-  if (!CUSTOM_SET_CODE_RE.test(String(json.code))) errors.push('code: 2–5 capital letters or digits');
+  if (typeof json.code !== 'string' || !CUSTOM_SET_CODE_RE.test(json.code)) errors.push('code: 2–5 capital letters or digits');
   else if (isCustomSetId(json.id) && json.code !== setCodeForId(json.id)) {
     errors.push(`code: expected ${setCodeForId(json.id)} for set id ${json.id}`);
+  } else if (new Set(reservedCodes).has(json.code)) {
+    errors.push(`code: ${json.code} is a printed set's decklist code; pick another`);
   }
   if (!isText(json.name)) errors.push(`name: required, at most ${MAX_NAME} characters`);
-  if (json.releaseDate !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(String(json.releaseDate))) {
+  if (json.releaseDate !== undefined && (typeof json.releaseDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(json.releaseDate))) {
     errors.push('releaseDate: YYYY-MM-DD');
   }
   if (!Array.isArray(json.cards) || json.cards.length === 0) errors.push('cards: at least one card');
+  else if (json.cards.length > MAX_CARDS) errors.push(`cards: at most ${MAX_CARDS}`);
   else if (isCustomSetId(json.id)) {
     const seen = new Set();
     json.cards.forEach((card, i) => checkCard(card, json.id, `cards[${i}]`, errors, seen));

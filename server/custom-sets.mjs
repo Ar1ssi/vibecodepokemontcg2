@@ -6,15 +6,24 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { gzip } from 'node:zlib';
+import { promisify } from 'node:util';
 
 import {
   isCustomCardId,
   isCustomSetId,
   validateCustomSet,
 } from '../shared/custom-sets/custom-set-schema.mjs';
+import { PTCGL_SET_IDS } from '../client/src/setup/deck-builder/core/deck-text-import.mjs';
+import { LEGACY_SET_CODE_TO_TCGDEX_ID } from '../shared/engine/rules/legacy-set-ids.mjs';
 
 export const CUSTOM_SERIES = Object.freeze({ id: 'custom', name: 'Custom Sets' });
+// A custom code must not shadow a printed set's decklist code ("4 Pikachu ex SVI 57"): printed wins in resolveEntry.
+export const RESERVED_SET_CODES = Object.freeze([...Object.keys(PTCGL_SET_IDS), ...Object.keys(LEGACY_SET_CODE_TO_TCGDEX_ID)]);
+// A set.json is a few hundred KB at most; anything bigger is a mistake, not a set, and is skipped at boot.
+export const MAX_SET_JSON_BYTES = 4 << 20;
 
+const gzipAsync = promisify(gzip);
 const noStore = (status, body) => ({ status, body, cacheControl: 'no-store', gzip: null });
 const json = (status, value) => noStore(status, JSON.stringify(value));
 const NOT_FOUND = '{"error":"custom_card_not_found"}';
@@ -86,19 +95,20 @@ export function loadCustomSets(rootDir, { log = () => {} } = {}) {
     if (!fs.existsSync(file)) continue;
     let parsed;
     try {
+      const size = fs.statSync(file).size;
+      if (size > MAX_SET_JSON_BYTES) throw new Error(`set.json is ${size} bytes, over ${MAX_SET_JSON_BYTES}`);
       parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
     } catch (error) {
-      log(`custom set ${dir} skipped: set.json is not valid JSON (${error.message})`);
+      log(`custom set ${dir} skipped: ${error instanceof SyntaxError ? `set.json is not valid JSON (${error.message})` : error.message}`);
       continue;
     }
-    const result = validateCustomSet(parsed, { setDirName: dir });
+    const result = validateCustomSet(parsed, { setDirName: dir, reservedCodes: RESERVED_SET_CODES });
     if (!result.ok) {
       log(`custom set ${dir} skipped: ${result.errors.join('; ')}`);
       continue;
     }
     const set = result.set;
-    const record = setRecordOf(set);
-    sets.set(set.id, { set, record, code: set.code, dir: path.join(rootDir, dir) });
+    sets.set(set.id, { set, record: setRecordOf(set) });
     for (const card of set.cards) cards.set(card.id, cardRecordOf(card, set));
   }
   return createCustomSetStore({ sets, cards });
@@ -114,7 +124,6 @@ export function createCustomSetStore({ sets = new Map(), cards = new Map() } = {
     setRecord: (setId) => sets.get(setId)?.record ?? null,
     card: (cardId) => cards.get(cardId) ?? null,
     setBriefs: () => setList.map((entry) => setBriefOf(entry.record)),
-    cardBriefs: () => [...cards.values()].map(cardBriefOf),
     allCards: () => [...cards.values()],
     manifest: () => ({
       sets: setList.map(({ set }) => ({
@@ -141,9 +150,10 @@ function fieldValues(record, dotted) {
     const next = [];
     for (const value of values) {
       if (value == null) continue;
+      // own properties only: "constructor=like:o" must not read Object.prototype
       if (Array.isArray(value)) {
-        for (const item of value) if (item != null && typeof item === 'object') next.push(item[part]);
-      } else if (typeof value === 'object') {
+        for (const item of value) if (item != null && typeof item === 'object' && Object.hasOwn(item, part)) next.push(item[part]);
+      } else if (typeof value === 'object' && Object.hasOwn(value, part)) {
         next.push(value[part]);
       }
     }
@@ -224,11 +234,13 @@ function parseListBody(body) {
 export function withCustomSets(proxy, store) {
   if (!store || store.size() === 0) return proxy;
 
+  // Merged lists are built per request (custom hits in a list query are rare); gzip stays available to the handler.
   async function appendToList(key, extra) {
     const upstream = await proxy.get(key);
     if (!extra.length) return upstream;
     const list = upstream.status === 200 ? parseListBody(upstream.body) : null;
-    return json(200, [...(list || []), ...extra]);
+    const body = JSON.stringify([...(list || []), ...extra]);
+    return { status: 200, body, cacheControl: 'no-store', gzip: () => gzipAsync(body) };
   }
 
   return {

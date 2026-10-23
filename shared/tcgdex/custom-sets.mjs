@@ -13,15 +13,22 @@ export { isCustomCardId, isCustomSetId };
 
 export const CUSTOM_SETS_MANIFEST_PATH = '/api/custom-sets';
 
-/** `/src/assets/custom-sets/customhbw/001/high.webp` (relative or absolute) → "customhbw-001", else null. */
-export function customCardIdFromImageUrl(src) {
+const PLACEHOLDER_ORIGIN = 'http://custom-sets.invalid';
+
+/**
+ * `/src/assets/custom-sets/customhbw/001/high.webp` → "customhbw-001", else null. Relative URLs and this page's own
+ * origin only: another host's copy of the path is not one of our cards.
+ */
+export function customCardIdFromImageUrl(src, pageOrigin = globalThis.location?.origin) {
   if (typeof src !== 'string' || !src) return null;
-  let pathname;
+  let url;
   try {
-    pathname = new URL(src, 'http://custom-sets.invalid').pathname;
+    url = new URL(src, PLACEHOLDER_ORIGIN);
   } catch {
     return null;
   }
+  if (url.origin !== PLACEHOLDER_ORIGIN && url.origin !== pageOrigin) return null;
+  const { pathname } = url;
   if (!pathname.startsWith(`${CUSTOM_SETS_IMAGE_ROOT}/`)) return null;
   const [setId, localId] = pathname.slice(CUSTOM_SETS_IMAGE_ROOT.length + 1).split('/');
   const id = `${setId}-${localId}`;
@@ -58,17 +65,17 @@ export function fetchCustomSetManifest({ fetchImpl = globalThis.fetch, force = f
   if (typeof fetchImpl !== 'function' || typeof origin !== 'string' || !/^https?:\/\//.test(origin)) {
     return Promise.resolve(EMPTY_MANIFEST);
   }
-  manifestPromise = (async () => {
-    try {
-      const response = await fetchImpl(`${origin}${CUSTOM_SETS_MANIFEST_PATH}`);
-      if (!response.ok) throw new Error(`manifest ${response.status}`);
-      return normalizeManifest(await response.json());
-    } catch {
-      manifestPromise = null;
-      return EMPTY_MANIFEST;
-    }
-  })();
-  return manifestPromise;
+  const attempt = (async () => {
+    const response = await fetchImpl(`${origin}${CUSTOM_SETS_MANIFEST_PATH}`);
+    if (!response.ok) throw new Error(`manifest ${response.status}`);
+    return normalizeManifest(await response.json());
+  })().catch(() => {
+    // forget this attempt only if it is still the one being shared (a sync throw settles before the assignment below)
+    if (manifestPromise === attempt) manifestPromise = null;
+    return EMPTY_MANIFEST;
+  });
+  manifestPromise = attempt;
+  return attempt;
 }
 
 /** `{ HBW: "customhbw", … }` — the decklist set codes a manifest adds. */

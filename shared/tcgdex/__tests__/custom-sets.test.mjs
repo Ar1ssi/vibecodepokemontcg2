@@ -10,7 +10,7 @@ import { extractTcgdexIdFromImageUrl } from '../../engine/rules/legacy-set-ids.m
 
 test('custom image paths map back to card ids; other URLs do not', () => {
   assert.equal(customCardIdFromImageUrl('/src/assets/custom-sets/customhbw/001/high.webp'), 'customhbw-001');
-  assert.equal(customCardIdFromImageUrl('http://localhost:4000/src/assets/custom-sets/customhbw/002/low.webp'), 'customhbw-002');
+  assert.equal(customCardIdFromImageUrl('http://localhost:4000/src/assets/custom-sets/customhbw/002/low.webp', 'http://localhost:4000'), 'customhbw-002');
   assert.equal(customCardIdFromImageUrl('/src/assets/custom-sets/customhbw/1/high.webp'), null);
   assert.equal(customCardIdFromImageUrl('/src/assets/card-art/sv/sve/001/high.webp'), null);
   assert.equal(customCardIdFromImageUrl('https://assets.tcgdex.net/en/sv/sv01/001/high.webp'), null);
@@ -43,8 +43,36 @@ test('customSetCodes keeps only well-formed manifest entries', () => {
   assert.deepEqual(customSetCodes(null), {});
 });
 
-test('fetchCustomSetManifest outside a browser resolves to no sets', async () => {
-  assert.deepEqual(await fetchCustomSetManifest({ fetchImpl: async () => ({ ok: true, json: async () => ({ sets: [] }) }) }), { sets: [] });
+test('fetchCustomSetManifest outside a browser resolves to no sets without fetching', async () => {
+  let calls = 0;
+  const fetchImpl = async () => {
+    calls += 1;
+    return { ok: true, json: async () => ({ sets: [{ id: 'customhbw', code: 'HBW', name: 'x', cardCount: 1 }] }) };
+  };
+  assert.deepEqual(await fetchCustomSetManifest({ fetchImpl, force: true }), { sets: [] });
+  assert.equal(calls, 0);
+});
+
+test('a fetch that throws synchronously is not remembered as the manifest', async () => {
+  const saved = globalThis.location;
+  globalThis.location = { origin: 'http://localhost:4000' };
+  try {
+    const throwing = () => {
+      throw new TypeError('fetch is broken');
+    };
+    assert.deepEqual(await fetchCustomSetManifest({ fetchImpl: throwing, force: true }), { sets: [] });
+    const good = async () => ({ ok: true, json: async () => ({ sets: [{ id: 'customhbw', code: 'HBW', name: 'x', cardCount: 1 }] }) });
+    assert.deepEqual((await fetchCustomSetManifest({ fetchImpl: good })).sets.map((s) => s.code), ['HBW']);
+  } finally {
+    if (saved === undefined) delete globalThis.location;
+    else globalThis.location = saved;
+  }
+});
+
+test('custom image URLs on another origin are not our cards', () => {
+  assert.equal(customCardIdFromImageUrl('https://evil.example/src/assets/custom-sets/customhbw/001/high.webp', 'http://localhost:4000'), null);
+  assert.equal(customCardIdFromImageUrl('http://localhost:4000/src/assets/custom-sets/customhbw/001/high.webp', 'http://localhost:4000'), 'customhbw-001');
+  assert.equal(customCardIdFromImageUrl('/src/assets/custom-sets/customhbw/001/high.webp', undefined), 'customhbw-001');
 });
 
 test('fetchCustomSetManifest fetches once per page and forgets failures', async () => {
