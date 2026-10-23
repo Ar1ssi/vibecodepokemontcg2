@@ -50,6 +50,7 @@ import {
 import { issueSeatToken } from './lobby/seat-token.mjs';
 import { cardArtProxyHandler, createCardArtProxy } from './card-art-proxy.mjs';
 import { createTcgdexProxy, tcgdexProxyHandler } from './tcgdex-proxy.mjs';
+import { customSetsManifestHandler, loadCustomSets, withCustomSets } from './custom-sets.mjs';
 import { createCardImageHandler } from './card-image-proxy.mjs';
 import { CARD_ART_PROXY_HOSTS } from './card-art-proxy-hosts.mjs';
 import { cacheControlFor } from './sfx-cache.mjs';
@@ -276,7 +277,18 @@ async function main() {
 
   // Card data goes through the server: browsers calling TCGdex directly got
   // Cloudflare-blocked (CORS errors), leaving every card without stage/attacks.
-  app.get('/api/tcgdex/*', tcgdexProxyHandler(createTcgdexProxy()));
+  // Custom sets (design 075) ride the same route: the repo's client/src/assets/custom-sets/*/set.json
+  // are answered as TCGdex records, so every card consumer treats them like published cards.
+  const customSets = loadCustomSets(path.join(clientDir, 'src', 'assets', 'custom-sets'), {
+    log: (line) => console.error(line),
+  });
+  console.log(
+    customSets.size()
+      ? `custom sets: ${customSets.size()} (${[...customSets.sets.keys()].join(', ')})`
+      : 'custom sets: none'
+  );
+  app.get('/api/tcgdex/*', tcgdexProxyHandler(withCustomSets(createTcgdexProxy(), customSets)));
+  app.get('/api/custom-sets', customSetsManifestHandler(customSets));
   // Card art the tabletop opening draws in WebGL (design 073): TCGdex's image CDN sends a
   // doubled CORS header that browsers refuse, so those faces come through here.
   app.get('/api/card-art', cardArtProxyHandler(createCardArtProxy()));

@@ -7,6 +7,7 @@
 // "Piloswine" from Phantasmal Flames), so it lives here as a DOM-free module
 // both sides import. Keep this as the single source of truth — don't copy it.
 import { cardArtImageParts } from '../../tcgdex/card-art.mjs';
+import { customCardIdFromImageUrl } from '../../tcgdex/custom-sets.mjs';
 
 export const LEGACY_SET_CODE_TO_TCGDEX_ID = {
   // the following are taken from pokemontcg.io (v2)'s ptcgoCode
@@ -272,6 +273,9 @@ export function extractTcgdexIdFromImageUrl(src) {
   // This app's own card art (shared/tcgdex/card-art.mjs): /src/assets/card-art/sv/sve/001/high.webp → sve-001
   const ownArt = cardArtImageParts(s);
   if (ownArt) return `${ownArt.set}-${ownArt.number}`;
+  // Custom sets (design 075): /src/assets/custom-sets/customhbw/001/high.webp → customhbw-001
+  const custom = customCardIdFromImageUrl(s);
+  if (custom) return custom;
   // pokemontcg.io: …/me02/024_hires.png → me02-024
   m = s.match(/images\.pokemontcg\.io\/([^/]+)\/([^_./]+)/);
   if (m) return `${m[1]}-${m[2]}`;

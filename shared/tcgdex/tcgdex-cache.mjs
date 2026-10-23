@@ -14,9 +14,15 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const RECORD_TTL_MS = 7 * DAY_MS;
 const LIST_TTL_MS = 1 * DAY_MS;
 const RECORD_PATH = /\/v2\/[a-z-]+\/(sets|cards)\/[^/?]+$/i;
+// Custom sets (design 075) are files in this repo that the user edits and re-renders; a week-old
+// copy would hide the new text, so their records barely cache.
+const CUSTOM_RECORD_PATH = /\/v2\/[a-z-]+\/(sets|cards)\/custom[a-z0-9]/i;
+const CUSTOM_TTL_MS = 60 * 1000;
 
 export function ttlForUrl(url) {
-  return RECORD_PATH.test(String(url)) ? RECORD_TTL_MS : LIST_TTL_MS;
+  const value = String(url);
+  if (CUSTOM_RECORD_PATH.test(value)) return CUSTOM_TTL_MS;
+  return RECORD_PATH.test(value) ? RECORD_TTL_MS : LIST_TTL_MS;
 }
 
 async function fetchJsonFromNetwork(url) {
