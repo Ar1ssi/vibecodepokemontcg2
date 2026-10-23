@@ -1,0 +1,121 @@
+{
+ "format": "ptcg-sim.custom-set-data",
+ "version": 1,
+ "id": "customdemo",
+ "code": "DEMO",
+ "name": "Demo set",
+ "releaseDate": "2026-10-23",
+ "cards": [
+  {
+   "id": "customdemo-001",
+   "localId": "001",
+   "name": "Alakazam ex",
+   "image": "/src/assets/custom-sets/customdemo/001",
+   "illustrator": "Mitsuhiro Arita",
+   "regulationMark": "G",
+   "legal": {
+    "standard": false,
+    "expanded": false
+   },
+   "custom": {
+    "source": "sv03.5-065",
+    "layout": "modern",
+    "edits": {
+     "attacks": [
+      {
+       "cost": [
+        "Colorless",
+        "Colorless"
+       ],
+       "name": "Mind Jack",
+       "damage": "90+",
+       "effect": "This attack does 30 more damage for each of your opponent's Benched Pokémon."
+      },
+      {
+       "cost": [
+        "Psychic",
+        "Psychic"
+       ],
+       "name": "Spoon Bend",
+       "damage": "120",
+       "effect": "Flip a coin. If heads, your opponent's Active Pokémon is now Confused."
+      }
+     ]
+    },
+    "style": "hybrid",
+    "attacks": true,
+    "foil": false
+   },
+   "category": "Pokemon",
+   "hp": 310,
+   "types": [
+    "Psychic"
+   ],
+   "stage": "Stage2",
+   "attacks": [
+    {
+     "cost": [
+      "Colorless",
+      "Colorless"
+     ],
+     "name": "Mind Jack",
+     "effect": "This attack does 30 more damage for each of your opponent's Benched Pokémon.",
+     "damage": "90+"
+    },
+    {
+     "cost": [
+      "Psychic",
+      "Psychic"
+     ],
+     "name": "Spoon Bend",
+     "effect": "Flip a coin. If heads, your opponent's Active Pokémon is now Confused.",
+     "damage": 120
+    }
+   ],
+   "abilities": [],
+   "weaknesses": [
+    {
+     "type": "Darkness",
+     "value": "×2"
+    }
+   ],
+   "resistances": [
+    {
+     "type": "Fighting",
+     "value": "-30"
+    }
+   ],
+   "retreat": 1,
+   "rarity": "Double rare",
+   "evolveFrom": "Kadabra",
+   "suffix": "ex"
+  },
+  {
+   "id": "customdemo-002",
+   "localId": "002",
+   "name": "Hyper Ball",
+   "image": "/src/assets/custom-sets/customdemo/002",
+   "illustrator": "Ayaka Yoshida",
+   "regulationMark": "G",
+   "legal": {
+    "standard": false,
+    "expanded": false
+   },
+   "custom": {
+    "source": "sv01-196",
+    "layout": "trainer",
+    "edits": {
+     "name": "Hyper Ball",
+     "effect": "You can use this card only if you discard 2 other cards from your hand.\nSearch your deck for a Basic Pokémon, reveal it, and put it into your hand. Then, shuffle your deck."
+    },
+    "style": "hybrid",
+    "attacks": true,
+    "foil": false
+   },
+   "category": "Trainer",
+   "trainerType": "Item",
+   "effect": "You can use this card only if you discard 2 other cards from your hand.\n\nSearch your deck for a Basic Pokémon, reveal it, and put it into your hand. Then, shuffle your deck.",
+   "rarity": "Uncommon"
+  }
+ ]
+}

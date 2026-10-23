@@ -3,13 +3,14 @@
      Every stale line here taxes every session. History belongs to git log (commit messages are the
      journal). Contradicts git log? Trust git: rebuild from `git log -20 main`. -->
 
-Focus: three.js board landed (074-three-board, D220–D222): the iframe board is deleted, the scene draws table/zones/cards, FX fly
-  the card meshes, card focus lifts the mesh, TCG Live camera preset. Merged over main's 074 attack UI (click-events/card-focus by hand).
-Active: user localhost checks — 3D board H1/H2/H3 visuals (mesh flights, focus mesh + dim hole, camera checkbox; I266) and main's
-  TCG Live attack UI (074-tcgl-attack-ui, D219: overlay rows, stack view, Buff/Debuff popup). Status FX (Burn/Sleep) check pending.
-Next: maintenance is due (`pnpm harness:check`: DECISIONS/ISSUES over cap; 60+ commits since the last maintain) → run maintain.md.
-  Then I264 (legacy relay has no board; orphaned sheets), 069 foil on Render (I259),
-  072 coin prompts, B&B run flow, I242, I239, I227; `node scripts/prune-merged-branches.mjs --yes` locally. ETB (057) slice 6 unstarted.
+Focus: custom sets landed (075-custom-sets, D223/D224): cardback's "Download for ptcg-sim" zip → client/src/assets/custom-sets/<setId>/,
+  served as TCGdex records by the proxy; Custom pill in Browse Sets; decklist codes; demo set `customdemo`. Cardback (Ar1ssi/cardback)
+  gained printed-term capitals + Claude "Suggest wording" (ANTHROPIC_API_KEY) and the set export/import.
+Active: user localhost checks — Custom pill shows DEMO, add Alakazam ex / Hyper Ball to a deck, play: Hyper Ball search + Spoon Bend
+  coin flip run in rules mode; 3D board H1/H2/H3 visuals (I266) and TCG Live attack UI (074, D219) still unchecked; status FX pending.
+Next: maintenance is due (`pnpm harness:check`: DECISIONS/ISSUES over cap; 70+ commits since the last maintain) → run maintain.md.
+  Then I271 (custom-set foil), I264 (legacy relay has no board), 069 foil on Render (I259), 072 coin prompts, B&B run flow,
+  I242, I239, I227; `node scripts/prune-merged-branches.mjs --yes` locally. ETB (057) slice 6 unstarted.
 Blocked: I85/I86 need design approval (028/029); I87 needs the user's description; I235 needs a face-down-card design.
 
 ## Watch-outs (≤5)
@@ -20,4 +21,5 @@ Blocked: I85/I86 need design approval (028/029); I87 needs the user's descriptio
 - three.js is vendored; node tests import it only for mesh pools (card-mesh-flight.test): pure math stays in .mjs; bump only via
   `scripts/vendor-three.mjs` (test checks bytes). Box art: rerun `scripts/build-battle/vendor-box-art.mjs`.
 - Bash heredoc eats `\` and mangles é → use the Edit/Write tools. Primary working copy is CRLF.
-- KO event names the root Basic (origins.knockoutStack). Opacity on a preserve-3d card flattens it: fade the host (043).
+- Custom sets: a new/edited set needs a server restart (loaded at boot) and `node scripts/custom-sets/check.mjs`; browser records
+  cache 60 s. KO event names the root Basic (origins.knockoutStack); opacity on a preserve-3d card flattens it: fade the host (043).

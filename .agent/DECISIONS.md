@@ -6,7 +6,10 @@
 # Pruned or shortened lines, verbatim: .agent/archive/DECISIONS-pruned-2026-10-15.md (grep the D-number).
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
-#   Next id = highest D number in this file and the archives + 1 (next: D220).
+#   Next id = highest D number in this file and the archives + 1 (next: D225).
+
+- D224 2026-10-23 [deck-builder] Custom set ids are `custom<code>` (code 2–5 [a-z0-9]), card ids `custom<code>-<nnn>`, files committed under client/src/assets/custom-sets/<setId>/ — one dash per id, no TCGdex collision, small repo-stored sets (user's call). (design 075)
+- D223 2026-10-23 [server] Custom cards enter the sim as TCGdex records served by the TCGdex proxy (server/custom-sets.mjs `withCustomSets`) — one seam; deck builder, enrichment and engine parse them exactly like published cards. (design 075)
 
 ## Active
 - D220 2026-10-18 [client] The board is three.js only (074-three-board; user chose flag-then-delete): board-mirror shadow roots keep the iframe id set so legacy modules work unchanged; no fallback board, WebGL2 required.

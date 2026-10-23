@@ -66,7 +66,8 @@ test('renderCatalog writes the catalog file: indent 1, LF-terminated', () => {
 });
 
 test('the committed coin catalog is already normalized and rendered', () => {
-  const source = readFileSync(CATALOG_PATH, 'utf8');
+  // A core.autocrlf checkout reads the LF file back as CRLF; the committed bytes are LF.
+  const source = readFileSync(CATALOG_PATH, 'utf8').replace(/\r\n/g, '\n');
   const { coins, report } = normalizeCoins(JSON.parse(source));
   assert.equal(report.total, 939);
   assert.equal(renderCatalog(coins), source);

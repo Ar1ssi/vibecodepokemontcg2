@@ -1,5 +1,5 @@
 # 075: Custom sets — cardback cards playable in the sim
-Status: approved (self — user unreachable; autonomous session, summary posted in chat)
+Status: shipped (self-approved — autonomous session, summary posted in chat; see Deviations)
 Date: 2026-10-23 · Session: S-custom-sets
 
 ## Problem
@@ -195,23 +195,23 @@ trainerType ∈ 4 kinds, effect string. Unknown extra keys allowed.
 ## Edge cases & failure modes
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | custom-sets dir missing / empty | store empty, manifest `{sets:[]}`, proxy passes everything upstream, pill shows the empty message | [ ] |
-| 2 | set.json malformed JSON / wrong format / bad id / folder≠id / dup localId | set skipped, one logged line naming the reason; others load | [ ] |
-| 3 | card id with custom prefix unknown | 404 `custom_card_not_found`, no upstream call | [ ] |
-| 4 | `/cards?name=like:x` with upstream 502 | 200 with custom matches only | [ ] |
-| 5 | list query with `set.id=eq:customhbw` | only that set's cards appended; upstream result untouched | [ ] |
-| 6 | query with unknown operator `foo:` | custom card never matches | [ ] |
-| 7 | IndexedDB cached custom record | expires after 60 s | [ ] |
-| 8 | decklist line `4 Tyranitar HBW 1` / `001` | resolves `customhbw-001` via manifest codes; unknown code → name search as today | [ ] |
-| 9 | image path → id | `/src/assets/custom-sets/customhbw/001/high.webp` → `customhbw-001`; non-custom paths unchanged | [ ] |
-| 10 | Mega export with pre-evolution lookup failing | stage `Stage1`, warning in export notes | [ ] |
-| 11 | export with invalid set code / empty list / Energy-only | 400 with message | [ ] |
-| 12 | suggest with no key | 400 "ANTHROPIC_API_KEY is not set"; page button disabled | [ ] |
-| 13 | suggest API error / timeout / non-JSON answer | 502 with message; page shows it, field untouched | [ ] |
-| 14 | fix_terms on `{G}`, names, "Slowpokemon", already-correct text | symbols and inner-word matches untouched; idempotent | [ ] |
-| 15 | round trip: export set.json → cardback import | same ids, edits, options, code restored | [ ] |
-| 16 | concurrent requests | proxy wrapper is stateless over an immutable store; no new shared mutable state | [ ] |
-| 17 | validator: hp not multiple of 10, 5 attacks, 3 abilities, cost type "Fairy" | each one error line | [ ] |
+| 1 | custom-sets dir missing / empty | store empty, manifest `{sets:[]}`, proxy passes everything upstream, pill shows the empty message | [x] covered: custom-sets.test "a missing root is an empty store…"; check.test "a missing root is fine" |
+| 2 | set.json malformed JSON / wrong format / bad id / folder≠id / dup localId | set skipped, one logged line naming the reason; others load | [x] covered: "loads valid sets, skips broken ones with one logged line each" |
+| 3 | card id with custom prefix unknown | 404 `custom_card_not_found`, no upstream call | [x] covered: "custom ids are answered from the store and never reach TCGdex" |
+| 4 | `/cards?name=like:x` with upstream 502 | 200 with custom matches only | [x] covered: "list queries get matching custom cards appended; TCGdex down…" |
+| 5 | list query with `set.id=eq:customhbw` | only that set's cards appended; upstream result untouched | [x] covered: "matchesTcgdexQuery follows TCGdex operators…" (set.id rows) |
+| 6 | query with unknown operator `foo:` | custom card never matches | [x] covered: same test, `foo:x` row |
+| 7 | IndexedDB cached custom record | expires after 60 s | [x] covered: shared/tcgdex custom-sets.test "custom records barely cache" |
+| 8 | decklist line `4 Tyranitar HBW 1` / `001` | resolves `customhbw-001` via manifest codes; unknown code → name search as today | [x] covered: deck-text-import.test "resolveEntry and chooseCandidate resolve custom set codes" |
+| 9 | image path → id | `/src/assets/custom-sets/customhbw/001/high.webp` → `customhbw-001`; non-custom paths unchanged | [x] covered: "custom image paths map back to card ids"; "extractTcgdexIdFromImageUrl understands custom set art" |
+| 10 | Mega export with pre-evolution lookup failing | stage `Stage1`, warning in export notes | [x] covered: cardback test_export "test_mega_stage_follows_the_pre_evolution" |
+| 11 | export with invalid set code / empty list | 400 with message | [x] covered: test_export Zip.test_rejections, Http.test_export_set (Energy-only cannot happen: the editor lists no Energy) |
+| 12 | suggest with no key | 502 "ANTHROPIC_API_KEY is not set"; page button disabled | [x] covered: test_wording Suggest.test_needs_a_key, test_export Http.test_suggest_without_a_key (status 502, not 400: it is the upstream the request lacks) |
+| 13 | suggest API error / timeout / non-JSON answer | 502 with message; page shows it, field untouched | [x] covered: test_wording "api_failures_become_suggestion_errors", "answers_that_are_not_json_are_refused" |
+| 14 | fix_terms on `{G}`, names, "Slowpokemon", already-correct text | symbols and inner-word matches untouched; idempotent | [x] covered: test_wording FixTerms (4 tests) |
+| 15 | round trip: export set.json → cardback import | same ids, edits, options, code restored | [x] covered: test_export "test_round_trip_import" |
+| 16 | concurrent requests | proxy wrapper is stateless over an immutable store; no new shared mutable state | [x] by construction: `withCustomSets` holds no state; the store is built once at boot and only read |
+| 17 | validator: hp not multiple of 10, 5 attacks, 3 abilities, cost type "Fairy" | each one error line | [x] covered: custom-set-schema.test "Pokémon rules…" |
 
 ## Test plan
 - Node: `shared/custom-sets/__tests__/custom-set-schema.test.mjs`, `server/__tests__/custom-sets.test.mjs`
@@ -237,3 +237,13 @@ n/a: additive. Revert = delete `client/src/assets/custom-sets/` and the proxy wr
 | 5 demo set + e2e | create `client/src/assets/custom-sets/customdemo/*`, `scripts/custom-sets/check.mjs`; MAP/DECISIONS/STATE | — | check script exit 0; manual game run | — | `pnpm test`, gates |
 
 ## Deviations (Builder appends here during build)
+- Edge row 12: a missing key answers 502 (the API is the missing dependency), not 400; the page copy is the same.
+- Cardback `modern.read_card` now carries `illustrator`, `reg_mark`, `rarity` (not drawn, exported) so SV/ME cards
+  edited in place export a full record; `export.straight` writes TCGdex's straight apostrophes (the engine also
+  normalises curly ones, attack-text.mjs:89, so this is hygiene).
+- Slice 5's demo set is `customdemo` (code DEMO): Alakazam ex (sv03.5-065) with one reworded attack, Ultra Ball
+  (sv01-196) renamed Hyper Ball searching a Basic Pokémon; built by the real export. Engine proof: the Hyper Ball
+  text parses to `discardCost 2` + `searchDeck Basic Pokémon → hand, reveal`; the attacks resolve through the damage
+  parser / status path like their TCGdex twins (checked with scripts/lib/oracle-harness.mjs, see commit).
+- Cardback `wording.TERMS` includes "Basic" although older sets printed "basic Energy": every Scarlet & Violet /
+  Mega Evolution card prints "Basic" (437 to 0 in the corpora), and the editor targets those frames.
