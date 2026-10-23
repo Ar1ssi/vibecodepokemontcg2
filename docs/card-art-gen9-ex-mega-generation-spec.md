@@ -257,6 +257,9 @@ Gen 9 types. The "Saturated px" column is the share of hero-zone pixels with S>0
 ## 7. Recipes
 
 ### A. 3D-guided (mirrors the real pipeline; the most consistent results)
+Steps 1–6 and 8–9 are implemented in Blender by `tools/blender-card-art/` (see its README). It includes
+a worked Mega Tyranitar ex recipe.
+
 1. **Model:** a 3D model faithful to the Gen 9 game design. Pokémon designs and models are copyrighted, so keep
    this for personal or fan use, and use your own creature designs for anything you distribute.
 2. **Pose** (Blender or Maya): the key frame of the signature move, with the leading limb or jaws toward the
