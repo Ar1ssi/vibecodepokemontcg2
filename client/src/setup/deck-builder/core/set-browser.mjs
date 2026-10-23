@@ -3,6 +3,7 @@ import { GEN_1_2_ORDER } from './gen-1-2-order.generated.mjs';
 import { BLACK_BOLT_WHITE_FLARE_ORDER } from './black-bolt-white-flare-order.generated.mjs';
 import { tcgdexApiBase } from '../../../../../shared/tcgdex/tcgdex-url.mjs';
 import { withCardArt } from '../../../../../shared/tcgdex/card-art.mjs';
+import { fetchCustomSetManifest } from '../../../../../shared/tcgdex/custom-sets.mjs';
 
 const TCGDEX_BASE = tcgdexApiBase();
     
@@ -356,6 +357,26 @@ const TCGDEX_BASE = tcgdexApiBase();
         });
       }
       return sets;
+    }
+
+    // Custom sets (design 075): the sets installed in this repo (client/src/assets/custom-sets),
+    // listed by the server's manifest; their cards come through the TCGdex proxy like any set's.
+    export const CUSTOM_CATEGORY = 'custom';
+
+    export async function fetchCustomSets(manifest = null) {
+      const { sets } = manifest || (await fetchCustomSetManifest());
+      return sets
+        .map((set) => ({
+          setId: set.id,
+          name: set.name,
+          seriesId: CUSTOM_CATEGORY,
+          releaseDate: set.releaseDate || '',
+          logo: '',
+          symbol: '',
+          cardCount: set.cardCount,
+          category: CUSTOM_CATEGORY,
+        }))
+        .sort((a, b) => String(b.releaseDate).localeCompare(String(a.releaseDate)) || a.name.localeCompare(b.name));
     }
 
     // Every Energy card across the Homebrew generations, A to Z.

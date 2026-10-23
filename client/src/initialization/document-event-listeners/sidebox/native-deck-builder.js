@@ -41,6 +41,7 @@ import { printedRarity } from '../../../../../shared/engine/rules/card-classify.
 import { cachedFetchJson } from '../../../../../shared/tcgdex/tcgdex-cache.mjs';
 import { isReverseHoloId, tcgdexApiUrl, tcgdexLookupId } from '../../../../../shared/tcgdex/tcgdex-url.mjs';
 import { fetchCardDetail } from '../../../../../shared/engine/rules/rules-state.mjs';
+import { customSetCodes, fetchCustomSetManifest } from '../../../../../shared/tcgdex/custom-sets.mjs';
 import { warmDeckCardCache } from '../../../setup/deck-builder/core/deck-card-warm.mjs';
 import {
   changeCardBack,
@@ -1551,6 +1552,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         }
         return nameSearches.get(name);
       },
+      // "4 Tyranitar HBW 1": the installed custom sets' codes resolve like printed ones (design 075).
+      setIds: customSetCodes(await fetchCustomSetManifest()),
     };
 
     importListSubmit.disabled = true;

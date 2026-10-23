@@ -7,6 +7,7 @@ import {
   importDeckEntries,
   parseDeckText,
   resolveEntry,
+  setIdForCode,
 } from '../core/deck-text-import.mjs';
 import { addCard } from '../core/deck-state.mjs';
 
@@ -173,4 +174,36 @@ test('importDeckEntries keeps the incoming deck when adding to an existing one',
 test('importDeckEntries with no entries returns the deck untouched', async () => {
   const { deck, imported, failed } = await importDeckEntries([], { deck: {}, addCard, deps: {} });
   assert.deepEqual({ deck, imported, failed }, { deck: {}, imported: 0, failed: [] });
+});
+
+test('setIdForCode knows printed codes first, then the custom sets passed in', () => {
+  assert.equal(setIdForCode('SVI'), 'sv01');
+  assert.equal(setIdForCode('HBW'), undefined);
+  assert.equal(setIdForCode('HBW', { HBW: 'customhbw' }), 'customhbw');
+  assert.equal(setIdForCode('SVI', { SVI: 'customsvi' }), 'sv01', 'a custom code never shadows a printed one');
+  assert.equal(setIdForCode('', { '': 'x' }), undefined);
+  assert.equal(setIdForCode('toString', {}), undefined, 'prototype names are not codes');
+});
+
+test('resolveEntry and chooseCandidate resolve custom set codes from deps.setIds', async () => {
+  const fetched = [];
+  const deps = {
+    fetchCardDetail: async (id) => {
+      fetched.push(id);
+      if (id === 'customhbw-001') return card(id, 'Tyranitar', 'customhbw', '001');
+      throw new Error('404');
+    },
+    searchByName: async () => [card('swsh3-88', 'Tyranitar', 'swsh3', '88'), card('customhbw-001', 'Tyranitar', 'customhbw', '001')],
+    setIds: { HBW: 'customhbw' },
+  };
+  const direct = await resolveEntry({ qty: 1, name: 'Tyranitar', setCode: 'HBW', number: '1' }, deps);
+  assert.equal(direct.card.id, 'customhbw-001');
+  assert.deepEqual(fetched, ['customhbw-001']);
+
+  const picked = chooseCandidate(await deps.searchByName(), { name: 'Tyranitar', setCode: 'HBW', number: '001' }, deps.setIds);
+  assert.equal(picked.id, 'customhbw-001');
+
+  const unknownCode = await resolveEntry({ qty: 1, name: 'Tyranitar', setCode: 'ZZZ', number: '88' }, { ...deps, setIds: {} });
+  assert.equal(unknownCode.card.id, 'swsh3-88', 'an unknown code falls back to the name search as before');
+  assert.deepEqual(fetched, ['customhbw-001'], 'no id lookup for a code nobody knows');
 });

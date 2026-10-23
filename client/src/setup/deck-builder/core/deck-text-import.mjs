@@ -121,12 +121,12 @@ export function parseDeckText(text = '') {
  * exact name (accent/case-insensitive) first, then the printing whose collector
  * number and set match the line, then Standard-legal, then newest.
  */
-export function chooseCandidate(candidates = [], entry = {}) {
+export function chooseCandidate(candidates = [], entry = {}, setIds = {}) {
   const wanted = normalize(entry.name);
   const exact = candidates.filter((card) => normalize(card?.name) === wanted);
   if (!exact.length) return null;
 
-  const wantedSetId = PTCGL_SET_IDS[entry.setCode];
+  const wantedSetId = setIdForCode(entry.setCode, setIds);
   const wantedNumber = stripLeadingZeros(entry.number);
   const rank = (card) => {
     let score = 0;
@@ -157,14 +157,25 @@ function energyDeckCard(label, qty) {
 }
 
 /**
+ * The TCGdex set id a decklist's set code names: the printed codes above, then `setIds` — the
+ * installed custom sets' codes (shared/tcgdex/custom-sets.mjs customSetCodes, design 075).
+ */
+export function setIdForCode(setCode, setIds = {}) {
+  if (!setCode) return undefined;
+  if (Object.hasOwn(PTCGL_SET_IDS, setCode)) return PTCGL_SET_IDS[setCode];
+  return setIds && Object.hasOwn(setIds, setCode) ? setIds[setCode] : undefined;
+}
+
+/**
  * Resolves one parsed entry. `deps.fetchCardDetail(id)` and `deps.searchByName(name)`
- * (→ normalized cards) are the two lookups. Returns `{ card }` or `{ error }`.
+ * (→ normalized cards) are the two lookups; `deps.setIds` adds custom set codes.
+ * Returns `{ card }` or `{ error }`.
  */
 export async function resolveEntry(entry, deps) {
   const label = basicEnergyLabel(entry.name);
   if (label) return { card: energyDeckCard(label, entry.qty) };
 
-  const setId = PTCGL_SET_IDS[entry.setCode];
+  const setId = setIdForCode(entry.setCode, deps.setIds);
   if (setId && entry.number) {
     for (const localId of [padNumber(entry.number), entry.number]) {
       try {
@@ -180,7 +191,8 @@ export async function resolveEntry(entry, deps) {
     const candidates = await deps.searchByName(entry.name);
     const card = chooseCandidate(
       (candidates || []).filter((candidate) => candidate?.image),
-      entry
+      entry,
+      deps.setIds
     );
     return card ? { card } : { error: 'No card with that name' };
   } catch (error) {

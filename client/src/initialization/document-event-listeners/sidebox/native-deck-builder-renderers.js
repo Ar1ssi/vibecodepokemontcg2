@@ -27,7 +27,8 @@ const escapeHtml = (value = '') => String(value)
     // TCGdex serves every scan as low.webp (245 px wide, ~28 KB) and high.webp (600 px,
     // ~100 KB). A result tile is 124 px and up, the same tile Browse Sets fills with
     // the low scan, so the grid loads low; the hover/right-click preview keeps high.
-    const TCGDEX_HIGH_SCAN = /^(https:\/\/assets\.tcgdex\.net\/.+)\/high\.webp$/;
+    // Custom sets (design 075) mirror that layout under /src/assets/custom-sets/<set>/<n>/.
+    const TCGDEX_HIGH_SCAN = /^(https:\/\/assets\.tcgdex\.net\/.+|\/src\/assets\/custom-sets\/[^/]+\/[^/]+)\/high\.webp$/;
     const tileScanUrl = (url = '') => String(url).replace(TCGDEX_HIGH_SCAN, '$1/low.webp');
 
     // Each grid remembers the results it last drew, keyed by card ids, so a re-render with the same

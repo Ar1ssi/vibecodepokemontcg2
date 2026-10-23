@@ -2,6 +2,8 @@ import {
       fetchLegalStandardSets,
       fetchGenerationSets,
       fetchHomebrewSets,
+      fetchCustomSets,
+      CUSTOM_CATEGORY,
       fetchSetCards,
       filterCardsByName,
       filterCardsBySupertype,
@@ -101,6 +103,7 @@ import {
         '    <button class="native-deck-builder-set-browser-series-tag active" data-category="standard" type="button">Standard 2026-27</button>',
         '    <button class="native-deck-builder-set-browser-series-tag native-deck-builder-set-browser-series-tag--other" data-category="other" type="button">other</button>',
         '    <button class="native-deck-builder-set-browser-series-tag" data-category="homebrew" type="button">Homebrew</button>',
+        `    <button class="native-deck-builder-set-browser-series-tag" data-category="${CUSTOM_CATEGORY}" type="button" title="Sets made in the card editor and stored in this repo">Custom</button>`,
         generationPillsHtml,
         '  </div>',
         '  <div class="native-deck-builder-set-browser-controls">',
@@ -206,12 +209,21 @@ import {
         if (activeCategory === 'homebrew') {
           return { label: 'Black & White + XY', sets: state.sets };
         }
+        if (activeCategory === CUSTOM_CATEGORY) {
+          return { label: 'Custom sets', sets: state.sets };
+        }
         return { label: '', sets: state.sets };
       };
 
       const showCategoryStatus = () => {
         const state = categoryState.get(activeCategory);
         if (!state?.loaded) return;
+        if (activeCategory === CUSTOM_CATEGORY && state.sets.length === 0) {
+          showStatus(
+            'No custom sets installed. Drop a set folder from the card editor into client/src/assets/custom-sets/ and restart the server.'
+          );
+          return;
+        }
         const total = state.sets.reduce((sum, s) => sum + s.cardCount, 0);
         showStatus(`${state.sets.length} sets, ${total} cards. Click a set to expand it.`);
       };
@@ -436,6 +448,10 @@ import {
             otherState.loading = false;
           } else if (categoryId === 'homebrew') {
             state.sets = await fetchHomebrewSets();
+            state.loaded = true;
+            state.loading = false;
+          } else if (categoryId === CUSTOM_CATEGORY) {
+            state.sets = await fetchCustomSets();
             state.loaded = true;
             state.loading = false;
           } else {

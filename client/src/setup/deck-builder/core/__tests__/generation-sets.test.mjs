@@ -4,6 +4,8 @@ import {
   fetchGenerationSets,
   fetchGenerationEnergyCards,
   fetchHomebrewSets,
+  fetchCustomSets,
+  CUSTOM_CATEGORY,
   HOMEBREW_ENERGY_SET_ID,
   fetchHomebrewEnergyCards,
   fetchSetCards,
@@ -619,5 +621,57 @@ describe('fetchSetCards routes the Homebrew Energy tab to the Gen 5 and Gen 6 En
       combined.map((c) => c.id).sort(),
       [...gen5, ...gen6].map((c) => c.id).sort()
     );
+  });
+});
+
+describe('fetchCustomSets (design 075)', () => {
+  it('turns the server manifest into set stubs, newest first', async () => {
+    const manifest = {
+      sets: [
+        { id: 'customold', code: 'OLD', name: 'Old Wave', cardCount: 3, releaseDate: '2025-01-01' },
+        { id: 'customhbw', code: 'HBW', name: 'Homebrew Wave 1', cardCount: 2, releaseDate: '2026-10-23' },
+      ],
+    };
+    const sets = await fetchCustomSets(manifest);
+    assert.deepEqual(sets.map((s) => s.setId), ['customhbw', 'customold']);
+    assert.deepEqual(sets[0], {
+      setId: 'customhbw',
+      name: 'Homebrew Wave 1',
+      seriesId: CUSTOM_CATEGORY,
+      releaseDate: '2026-10-23',
+      logo: '',
+      symbol: '',
+      cardCount: 2,
+      category: CUSTOM_CATEGORY,
+    });
+  });
+
+  it('is empty when the manifest lists nothing (outside a browser the manifest is empty)', async () => {
+    assert.deepEqual(await fetchCustomSets({ sets: [] }), []);
+    assert.deepEqual(await fetchCustomSets(), []);
+  });
+
+  it('fetchSetCards reads a custom set through the generic set record path', async () => {
+    stubFetch([
+      [
+        '/sets/customhbw',
+        {
+          id: 'customhbw',
+          name: 'Homebrew Wave 1',
+          releaseDate: '2026-10-23',
+          cards: [
+            { id: 'customhbw-001', localId: '001', name: 'Tyranitar', image: '/src/assets/custom-sets/customhbw/001' },
+            { id: 'customhbw-002', localId: '002', name: 'Bill', image: '/src/assets/custom-sets/customhbw/002' },
+          ],
+        },
+      ],
+    ]);
+    // The supertype index is a module-level cache another test already filled; ids and images are this path's own.
+    const cards = await fetchSetCards('customhbw');
+    assert.deepEqual(cards.map((c) => [c.id, c.image, c.images.small]), [
+      ['customhbw-001', '/src/assets/custom-sets/customhbw/001/high.webp', '/src/assets/custom-sets/customhbw/001/low.webp'],
+      ['customhbw-002', '/src/assets/custom-sets/customhbw/002/high.webp', '/src/assets/custom-sets/customhbw/002/low.webp'],
+    ]);
+    assert.equal(cards[0].set.id, 'customhbw');
   });
 });
