@@ -4684,6 +4684,23 @@ import test from 'node:test';
       assert.deepEqual(usable.map((u) => [u.zone, u.card.name]), [['hand', 'Luxray']]);
     });
 
+    test('filterUsableAbilities: Archen Prehistoric Call (Plasma Blast 53) is offered from the discard pile only', () => {
+      const archen = {
+        name: 'Archen',
+        type: 'Pokémon',
+        ability: {
+          name: 'Prehistoric Call',
+          text:
+            'Once during your turn (before your attack), if this Pokémon is in your discard pile, you may put this Pokémon on the bottom of your deck.',
+        },
+      };
+      const plain = { name: 'Pidgey', type: 'Pokémon' };
+      const fromDiscard = filterUsableAbilities(collectUsableAbilityCandidates(null, [], [], [archen, plain]));
+      assert.deepEqual(fromDiscard.map((u) => [u.zone, u.card.name]), [['discard', 'Archen']]);
+      const onBench = filterUsableAbilities(collectUsableAbilityCandidates(null, [archen]));
+      assert.deepEqual(onBench, []);
+    });
+
     test('filterUsableAbilities: a hand card without a hand-activated ability is not offered', () => {
       const plain = { name: 'Pidgey', type: 'Pokémon' };
       const bench = {

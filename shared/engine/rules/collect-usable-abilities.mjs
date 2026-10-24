@@ -4,7 +4,7 @@
 import { isAbilityCard, classifyAbility } from './ability-effects.mjs';
 import { parseAbility } from './abilities.mjs';
 import { planAbilitySteps, actionableAbilityPlan } from './ability-step-plan.mjs';
-import { cardAbilityText, isHandActivatedAbility } from './ability-executors.mjs';
+import { cardAbilityText, isHandActivatedAbility, isDiscardActivatedAbility } from './ability-executors.mjs';
 import { abilityActivationBlockReason } from './ability-combat.mjs';
 
 /**
@@ -59,7 +59,9 @@ export function isUsableAbilityCard(card, opts = {}) {
   // Luxray Swelling Flash / Charjabug Battery (I155): activated from the hand, but their
   // steps have no client-side executor, so the plan reads them as announce-only. They are
   // still legal commands (the server executes them), so the picker/glow must offer them.
-  return zone === 'hand' && isHandActivatedAbility(card);
+  // Prehistoric Call (Archen / Tirtouga / Lileep) is the same from the discard pile.
+  return (zone === 'hand' && isHandActivatedAbility(card)) ||
+    (zone === 'discard' && isDiscardActivatedAbility(card));
 }
 
 /**
@@ -74,11 +76,12 @@ export function benchCardHasAbility(card) {
 
 /**
  * Build scan candidates from active + bench (bench Pokémon only) plus the hand
- * (hand-activated abilities like Luxray Swelling Flash). The zone gate in
- * `filterUsableAbilities` rejects every hand card whose ability is not
- * hand-activated, so the caller can pass the whole hand safely.
+ * (hand-activated abilities like Luxray Swelling Flash) and the discard pile
+ * (discard-activated ones like Archen Prehistoric Call). The zone gate in
+ * `filterUsableAbilities` rejects every hand or discard card whose ability is
+ * not activated from there, so the caller can pass the whole zone safely.
  */
-export function collectUsableAbilityCandidates(activeCard, benchCards = [], handCards = []) {
+export function collectUsableAbilityCandidates(activeCard, benchCards = [], handCards = [], discardCards = []) {
   const candidates = [];
   if (activeCard) {
     candidates.push({ card: activeCard, zone: 'active', index: 0 });
@@ -91,6 +94,11 @@ export function collectUsableAbilityCandidates(activeCard, benchCards = [], hand
   handCards.forEach((card, index) => {
     if (card?.type === 'Pokémon' || card?.supertype === 'Pokémon') {
       candidates.push({ card, zone: 'hand', index });
+    }
+  });
+  discardCards.forEach((card, index) => {
+    if (card?.type === 'Pokémon' || card?.supertype === 'Pokémon') {
+      candidates.push({ card, zone: 'discard', index });
     }
   });
   return candidates;

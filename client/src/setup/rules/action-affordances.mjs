@@ -59,6 +59,8 @@ export function isEvolvePlayedTriggerCard(card) {
  *   filtered inside)
  * @param {object[]} [opts.handCards] raw hand zone array (only hand-activated
  *   abilities pass the filter — Luxray, Charjabug)
+ * @param {object[]} [opts.discardCards] raw discard pile (only discard-activated
+ *   abilities pass the filter — Archen Prehistoric Call)
  * @param {object|null} [opts.stadiumCard] the Stadium in play
  * @param {object} [opts.board] `specialEnergyBoard` facts for conditional
  *   Special Energy pricing (prizes, Stage 2 count)
@@ -75,6 +77,7 @@ export async function computeActionAffordances({
   attachedEnergyCards = [],
   benchCards = [],
   handCards = [],
+  discardCards = [],
   stadiumCard = null,
   extraAttacks = [],
   board = {},
@@ -125,7 +128,7 @@ export async function computeActionAffordances({
     attackAvailable = attacks.some((a) => a.usable);
   }
 
-  const candidates = collectUsableAbilityCandidates(activeCard, benchCards, handCards);
+  const candidates = collectUsableAbilityCandidates(activeCard, benchCards, handCards, discardCards);
   for (const { card } of candidates) {
     try {
       await ensureCardData(card);

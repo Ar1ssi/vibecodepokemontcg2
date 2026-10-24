@@ -260,6 +260,7 @@ export function installE2eApi() {
       return enumerateOptions({
         user,
         hand: liveZoneArray(user, 'hand'),
+        discard: liveZoneArray(user, 'discard'),
         active,
         bench: boardPokemon(user, 'bench'),
         activeZoneCards: liveZoneArray(user, 'active'),

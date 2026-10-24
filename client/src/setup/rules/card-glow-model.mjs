@@ -51,6 +51,7 @@ const stadiumUsedFlagFor = (user) => {
 export async function computeCardGlows({
   user = 'self',
   handCards = [],
+  discardCards = [],
   activeCard = null,
   attachedEnergyCards = [],
   benchCards = [],
@@ -83,6 +84,7 @@ export async function computeCardGlows({
         attachedEnergyCards,
         benchCards,
         handCards,
+        discardCards,
         stadiumCard,
         extraAttacks,
         board: specialEnergyBoard({
@@ -103,6 +105,7 @@ export async function computeCardGlows({
   const options = await enumerateOptions({
     user,
     hand: handCards,
+    discard: discardCards,
     active: activeCard,
     bench: benchCards,
     activeZoneCards,

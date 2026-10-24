@@ -2247,6 +2247,7 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
               glows = await computeCardGlows({
                 user,
                 handCards,
+                discardCards: user === localUser ? discard : [],
                 activeCard,
                 attachedEnergyCards: attachedEnergiesFor(activeCard, activeZoneCards),
                 benchCards,

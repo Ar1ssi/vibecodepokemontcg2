@@ -119,6 +119,7 @@ function inPlayTargets(active, bench) {
  * @param {object} board
  * @param {'self'|'opp'} board.user
  * @param {Array} board.hand        live hand cards
+ * @param {Array} [board.discard]   live discard pile (discard-activated abilities)
  * @param {object|null} board.active live active Pokémon card
  * @param {Array} board.bench       live bench Pokémon cards
  * @param {Array} board.activeZoneCards  the whole active zone array (retreat-cost modifiers)
@@ -131,6 +132,7 @@ function inPlayTargets(active, bench) {
 export async function enumerateOptions({
   user = 'self',
   hand = [],
+  discard = [],
   active = null,
   bench = [],
   activeZoneCards = [],
@@ -293,7 +295,7 @@ export async function enumerateOptions({
   // ── abilities (once per turn, interactive steps only) ─────────────────
   if (canMove) {
     const usable = filterUsableAbilities(
-      collectUsableAbilityCandidates(active, benchCards, handCards),
+      collectUsableAbilityCandidates(active, benchCards, handCards, Array.isArray(discard) ? discard : []),
       {
         rulesEnabled: rulesState.enabled,
         isUsed: isAbilityUsed,

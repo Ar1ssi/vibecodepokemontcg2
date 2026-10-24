@@ -9,6 +9,7 @@ import { getZone } from '../setup/zones/get-zone.js';
 import { rulesState, abilityUsed, canUsePlayedToBenchTrigger, ensureCardData } from '/shared/engine/rules/rules-state.mjs';
 import { appendMessage } from '../setup/chatbox/append-message.js';
 import { runAbilitySteps } from '../setup/rules/rules-bridge.js';
+import { useAbility } from './counters/use-ability.js';
 import { parseAbility } from '/shared/engine/rules/abilities.mjs';
 import {
   collectUsableAbilityCandidates,
@@ -60,7 +61,8 @@ const FAMILY_LABELS = {
 export async function collectUsableAbilities(user) {
   const activeCard = getZone(user, 'active').array[0];
   const benchCards = getZone(user, 'bench').array;
-  const candidates = collectUsableAbilityCandidates(activeCard, benchCards);
+  const discardCards = getZone(user, 'discard').array || [];
+  const candidates = collectUsableAbilityCandidates(activeCard, benchCards, [], discardCards);
 
   for (const { card } of candidates) {
     try {
@@ -129,13 +131,22 @@ export async function abilityPicker(user) {
 
   // Exactly 1 usable → execute via compound step orchestrator
   if (usable.length === 1) {
-    const { card } = usable[0];
-    await runAbilitySteps(user, card);
+    await runPicked(user, usable[0]);
     return;
   }
 
   // >1 usable → show popup
   showAbilityPopup(user, usable);
+}
+
+// A discard-pile Ability (Prehistoric Call) has no local step runner: it goes through the same
+// useAbility dispatch the card menu uses, which the server executes under authority.
+async function runPicked(user, { card, zone, index }) {
+  if (zone === 'discard') {
+    useAbility(user, user, 'discard', index, true, undefined, card.instanceId ?? null);
+    return;
+  }
+  await runAbilitySteps(user, card);
 }
 
 /**
@@ -163,7 +174,8 @@ function showAbilityPopup(user, usable) {
 
     const nameSpan = document.createElement('span');
     nameSpan.className = 'ability-picker-name';
-    const zoneLabel = zone === 'active' ? ' (Active)' : ` (Bench ${index + 1})`;
+    const zoneLabel =
+      zone === 'active' ? ' (Active)' : zone === 'discard' ? ' (Discard pile)' : ` (Bench ${index + 1})`;
     nameSpan.textContent = `${card.name || 'Pokémon'}${zoneLabel} — ${abilityName}`;
     row.appendChild(nameSpan);
 
@@ -177,7 +189,7 @@ function showAbilityPopup(user, usable) {
     useBtn.textContent = 'Use';
     useBtn.addEventListener('click', async () => {
       closePopup(popup);
-      await runAbilitySteps(user, card);
+      await runPicked(user, { card, zone, index });
     });
     row.appendChild(useBtn);
 
