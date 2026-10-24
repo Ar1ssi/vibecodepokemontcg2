@@ -436,6 +436,23 @@ test('model: ability.passive marks printed-only abilities, not ones the player t
   assert.equal(activated.ability.passive, false);
 });
 
+// customhb Mawile (set.json customhb-160): the printed text has no "during your turn".
+test('model: a "When you play … onto your Bench" ability is activatable from the Bench', () => {
+  const m = buildInspectorModel(
+    {
+      ...CHARMANDER,
+      name: 'Mawile',
+      ability: {
+        name: 'Energy Crunch',
+        text: "When you play this Pokémon from your hand onto your Bench, you may discard 1 Energy from 1 of your opponent's Pokémon.",
+      },
+    },
+    { energyTypes: [], zone: 'bench' }
+  );
+  assert.equal(m.ability.passive, false);
+  assert.equal(m.ability.usable, true);
+});
+
 test('model: attack.gx follows the GX name marker', () => {
   const card = {
     ...ARCANINE,

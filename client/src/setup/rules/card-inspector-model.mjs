@@ -255,9 +255,11 @@ export function dimLevelFor(attacks = []) {
 }
 
 // Wording that marks an ability as one the player triggers; anything else ("As long as…", "If this
-// Pokémon has no Energy…") is passive. Same phrases listAbilities keys the once-per-turn gate on.
+// Pokémon has no Energy…") is passive. Same phrases listAbilities keys the once-per-turn gate on,
+// plus the engine's "When you play … from your hand" trigger (Mawile Energy Crunch prints no
+// "during your turn").
 const ACTIVATED_ABILITY_TEXT =
-  /once during your turn|during your turn,? you may|you may use this ability|as often as you like|once per turn/i;
+  /once during your turn|during your turn,? you may|you may use this ability|as often as you like|once per turn|when you play [^.]*?from your hand/i;
 
 /**
  * Whether the engine would accept a retreat right now (turn, already retreated / attacked, and
