@@ -154,6 +154,9 @@ const TCGDEX_BASE = tcgdexApiBase();
     // per session. Only Trainer and Energy are listed (~370 KB together): a card in
     // neither is a Pokémon, which skips the Pokémon list (~2 MB on its own).
     const CATEGORY_TO_SUPERTYPE = { Trainer: 'Trainer', Energy: 'Energy' };
+    // A custom set's record names each card's category itself: the cached lists above predate it.
+    const supertypeOfCategory = (category) =>
+      category === 'Pokemon' ? 'Pokémon' : CATEGORY_TO_SUPERTYPE[category] || null;
     let cardSupertypeIndexPromise = null;
     function fetchCardSupertypeIndex() {
       if (cardSupertypeIndexPromise) return cardSupertypeIndexPromise;
@@ -925,12 +928,12 @@ const TCGDEX_BASE = tcgdexApiBase();
       };
       const cards = (record.cards || [])
         .filter((card) => card?.id && card?.name && card.image)
-        .map((card) => normalizeSetCard(card, set));
+        .map((card) => normalizeSetCard(card, set, supertypeOfCategory(card.category) || undefined));
 
       const supertypeIndex = await supertypeIndexPromise;
       if (supertypeIndex) {
         for (const card of cards) {
-          card.supertype = supertypeIndex.get(card.id) || 'Pokémon';
+          card.supertype ||= supertypeIndex.get(card.id) || 'Pokémon';
         }
       }
 

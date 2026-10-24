@@ -41,7 +41,15 @@ function setRecordOf(set) {
     abbreviation: { official: set.code },
     logo: '',
     symbol: '',
-    cards: set.cards.map((card) => ({ id: card.id, localId: card.localId, name: card.name, image: card.image })),
+    // `category` rides along (TCGdex's own set record has none) so the set browser sorts Pokémon from Trainers
+    // without the cached /cards?category= lists, which predate any custom set (D226).
+    cards: set.cards.map((card) => ({
+      id: card.id,
+      localId: card.localId,
+      name: card.name,
+      image: card.image,
+      category: card.category,
+    })),
   };
 }
 

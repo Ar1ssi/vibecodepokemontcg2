@@ -80,7 +80,7 @@ test('card and set records look like TCGdex records', () => {
   assert.equal(set.serie.id, 'custom');
   assert.deepEqual(set.abbreviation, { official: 'HBW' });
   assert.deepEqual(set.legal, { standard: false, expanded: false });
-  assert.deepEqual(set.cards[1], { id: 'customhbw-002', localId: '002', name: 'Bill', image: '/src/assets/custom-sets/customhbw/002' });
+  assert.deepEqual(set.cards[1], { id: 'customhbw-002', localId: '002', name: 'Bill', image: '/src/assets/custom-sets/customhbw/002', category: 'Trainer' });
   assert.equal(store.card('customhbw-003'), null);
 });
 
