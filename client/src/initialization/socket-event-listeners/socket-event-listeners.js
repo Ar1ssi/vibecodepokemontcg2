@@ -30,6 +30,7 @@ import {
   startSpectatorSession,
 } from '../../setup/spectator/spectator-session.js';
 import { publicRoomName } from '../../../../shared/lobby/public-rooms.mjs';
+import { CUSTOM_SETS_CHANGED_EVENT, noteCustomSetsChanged } from '../../../../shared/tcgdex/custom-sets.mjs';
 import { seatTokenFor, writeSeatToken } from '../../setup/lobby/seat-token-store.mjs';
 import { rejectEndsSeat, roomRejectMessage } from '../../setup/lobby/public-room-view.mjs';
 import { startKeybindsSleep } from '../../actions/keybinds/keybindSleep.js';
@@ -512,6 +513,10 @@ export const initializeSocketEventListeners = () => {
     overlay.addEventListener('click', () => {
       document.body.removeChild(overlay);
     });
+  });
+  // The card editor pushed a custom set; the server reloaded it (design 075).
+  socket.on(CUSTOM_SETS_CHANGED_EVENT, (change) => {
+    noteCustomSetsChanged(change).catch((error) => console.error('custom set reload notice failed', error));
   });
   socket.on('connect', () => {
     const notSpectator = !(

@@ -21,5 +21,5 @@ Blocked: I85/I86 need design approval (028/029); I87 needs the user's descriptio
 - three.js is vendored; node tests import it only for mesh pools (card-mesh-flight.test): pure math stays in .mjs; bump only via
   `scripts/vendor-three.mjs` (test checks bytes). Box art: rerun `scripts/build-battle/vendor-box-art.mjs`.
 - Bash heredoc eats `\` and mangles é → use the Edit/Write tools. Primary working copy is CRLF.
-- Custom sets: a new/edited set needs a server restart (loaded at boot) and `node scripts/custom-sets/check.mjs`; browser records
-  cache 60 s. KO event names the root Basic (origins.knockoutStack); opacity on a preserve-3d card flattens it: fade the host (043).
+- Custom sets reload live (D227): cardback "Send to ptcg-sim" or an unzipped export into custom-sets/ → server reloads, open
+  deck builders redraw; still run `node scripts/custom-sets/check.mjs` before committing a set. KO event names the root Basic (origins.knockoutStack); opacity on a preserve-3d card flattens it: fade the host (043).

@@ -50,7 +50,8 @@ import {
 import { issueSeatToken } from './lobby/seat-token.mjs';
 import { cardArtProxyHandler, createCardArtProxy } from './card-art-proxy.mjs';
 import { createTcgdexProxy, tcgdexProxyHandler } from './tcgdex-proxy.mjs';
-import { customSetsManifestHandler, loadCustomSets, withCustomSets } from './custom-sets.mjs';
+import { createLiveCustomSets, customSetsManifestHandler, withCustomSets } from './custom-sets.mjs';
+import { CUSTOM_SETS_CHANGED_EVENT } from '../shared/custom-sets/custom-set-schema.mjs';
 import { createCardImageHandler } from './card-image-proxy.mjs';
 import { CARD_ART_PROXY_HOSTS } from './card-art-proxy-hosts.mjs';
 import { cacheControlFor } from './sfx-cache.mjs';
@@ -279,14 +280,19 @@ async function main() {
   // Cloudflare-blocked (CORS errors), leaving every card without stage/attacks.
   // Custom sets (design 075) ride the same route: the repo's client/src/assets/custom-sets/*/set.json
   // are answered as TCGdex records, so every card consumer treats them like published cards.
-  const customSets = loadCustomSets(path.join(clientDir, 'src', 'assets', 'custom-sets'), {
+  // The folder is watched: the card editor's "Send to ptcg-sim" (or an unzipped export) reloads in place,
+  // and open pages hear CUSTOM_SETS_CHANGED_EVENT to refetch.
+  const customSetsDir = path.join(clientDir, 'src', 'assets', 'custom-sets');
+  const describeCustomSets = () =>
+    customSets.size() ? `${customSets.size()} (${[...customSets.sets.keys()].join(', ')})` : 'none';
+  const customSets = createLiveCustomSets(customSetsDir, {
     log: (line) => console.error(line),
+    onChange: (change) => {
+      console.log(`custom sets reloaded (${change.sets.join(', ')} changed): ${describeCustomSets()}`);
+      io.emit(CUSTOM_SETS_CHANGED_EVENT, change);
+    },
   });
-  console.log(
-    customSets.size()
-      ? `custom sets: ${customSets.size()} (${[...customSets.sets.keys()].join(', ')})`
-      : 'custom sets: none'
-  );
+  console.log(`custom sets: ${describeCustomSets()}`);
   app.get('/api/tcgdex/*', tcgdexProxyHandler(withCustomSets(createTcgdexProxy(), customSets)));
   app.get('/api/custom-sets', customSetsManifestHandler(customSets));
   // Card art the tabletop opening draws in WebGL (design 073): TCGdex's image CDN sends a
@@ -299,9 +305,8 @@ async function main() {
     localTexturesPresent: fs.existsSync(path.join(clientDir, 'src', 'assets', 'tcgl-foil', 'tex')),
   });
   if (foilTextures.error) console.error(foilTextures.error);
-  const customSetsDir = path.join(clientDir, 'src', 'assets', 'custom-sets');
-  const customFoil = customFoilSets([...customSets.sets.keys()], (file) => fs.existsSync(path.join(customSetsDir, file)));
   app.get('/api/tcgl-foil/config', (_, res) => {
+    const customFoil = customFoilSets([...customSets.sets.keys()], (file) => fs.existsSync(path.join(customSetsDir, file)));
     res.json({ textureBase: foilTextures.textureBase, customFoil });
   });
 

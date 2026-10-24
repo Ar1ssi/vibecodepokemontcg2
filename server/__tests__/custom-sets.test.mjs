@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   createCustomSetStore,
+  createLiveCustomSets,
   customSetsManifestHandler,
   loadCustomSets,
   matchesTcgdexQuery,
@@ -183,4 +184,96 @@ test('a merged list keeps a gzip thunk for the handler', async () => {
   const merged = await proxy.get('/v2/en/cards?name=bill');
   assert.equal(typeof merged.gzip, 'function');
   assert.ok((await merged.gzip()).length > 0);
+});
+
+// ---------------------------------------------------------------- live reload (card editor pushes)
+function renamedSet(name) {
+  const set = sampleSet();
+  set.cards[0] = { ...set.cards[0], name };
+  return set;
+}
+
+test('a live store reloads an edited set in place and reports which set changed', async () => {
+  const root = tempRoot();
+  writeSet(root, 'customhbw', sampleSet());
+  const changes = [];
+  const live = createLiveCustomSets(root, { watch: false, onChange: (change) => changes.push(change) });
+  const proxy = withCustomSets({ get: async () => ({ status: 200, body: '[]' }), size: () => 0 }, live);
+  assert.equal(JSON.parse((await proxy.get('/v2/en/cards/customhbw-001')).body).name, 'Tyranitar');
+
+  assert.equal(live.reload(), null, 'nothing on disk changed');
+  writeSet(root, 'customhbw', renamedSet('Tyranitar Prime'));
+  assert.deepEqual(live.reload(), { version: 1, sets: ['customhbw'] });
+  assert.deepEqual(changes, [{ version: 1, sets: ['customhbw'] }]);
+  assert.equal(JSON.parse((await proxy.get('/v2/en/cards/customhbw-001')).body).name, 'Tyranitar Prime');
+  assert.equal(live.version(), 1);
+});
+
+test('a re-rendered card front alone counts as a change; a set added or removed is picked up', () => {
+  const root = tempRoot();
+  writeSet(root, 'customhbw', sampleSet());
+  const art = path.join(root, 'customhbw', '001');
+  fs.mkdirSync(art);
+  fs.writeFileSync(path.join(art, 'high.webp'), 'old');
+  const live = createLiveCustomSets(root, { watch: false });
+  fs.writeFileSync(path.join(art, 'high.webp'), 'new art');
+  assert.deepEqual(live.reload()?.sets, ['customhbw']);
+
+  writeSet(root, 'customdup', sampleSet({ id: 'customdup', code: 'DUP', cards: [] }));
+  writeSet(root, 'customnew', { ...sampleSet(), id: 'customnew', code: 'NEW', cards: sampleSet().cards.map((card, i) => ({ ...card, id: `customnew-00${i + 1}`, image: `/src/assets/custom-sets/customnew/00${i + 1}` })) });
+  assert.deepEqual(live.reload()?.sets, ['customdup', 'customnew']);
+  assert.ok(live.card('customnew-002'));
+  assert.deepEqual([...live.sets.keys()].sort(), ['customhbw', 'customnew'], 'the empty set fails validation');
+
+  fs.rmSync(path.join(root, 'customnew'), { recursive: true });
+  assert.deepEqual(live.reload()?.sets, ['customnew']);
+  assert.equal(live.card('customnew-001'), null);
+});
+
+test('a broken save keeps the copy loaded before; an empty live store still wraps the proxy', () => {
+  const root = tempRoot();
+  const lines = [];
+  const proxy = { get: async () => 'inner', size: () => 1 };
+  const live = createLiveCustomSets(root, { watch: false, log: (line) => lines.push(line) });
+  assert.notEqual(withCustomSets(proxy, live), proxy, 'a set may arrive later');
+
+  writeSet(root, 'customhbw', sampleSet());
+  live.reload();
+  writeSet(root, 'customhbw', '{"cards": [');
+  assert.deepEqual(live.reload()?.sets, ['customhbw']);
+  assert.equal(live.card('customhbw-001')?.name, 'Tyranitar');
+  assert.match(lines.at(-1), /^custom set customhbw skipped: set.json is not valid JSON .*; kept the copy loaded before$/);
+});
+
+test('the folder watcher reloads after a write settles', async () => {
+  const root = tempRoot();
+  writeSet(root, 'customhbw', sampleSet());
+  let resolveChange;
+  const changed = new Promise((resolve) => (resolveChange = resolve));
+  const live = createLiveCustomSets(root, { debounceMs: 20, pollMs: 50, onChange: resolveChange });
+  try {
+    writeSet(root, 'customhbw', renamedSet('Tyranitar Prime'));
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('no reload within 5 s')), 5000));
+    assert.deepEqual(await Promise.race([changed, timeout]), { version: 1, sets: ['customhbw'] });
+    assert.equal(live.card('customhbw-001').name, 'Tyranitar Prime');
+  } finally {
+    live.close();
+  }
+});
+
+test('a missing root is watched by polling until the folder appears', async () => {
+  const root = path.join(tempRoot(), 'later');
+  const lines = [];
+  let resolveChange;
+  const changed = new Promise((resolve) => (resolveChange = resolve));
+  const live = createLiveCustomSets(root, { pollMs: 20, log: (line) => lines.push(line), onChange: resolveChange });
+  try {
+    assert.match(lines[0], /^custom sets: cannot watch .*checking every 20 ms instead$/);
+    writeSet(root, 'customhbw', sampleSet());
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('no reload within 5 s')), 5000));
+    assert.deepEqual((await Promise.race([changed, timeout])).sets, ['customhbw']);
+    assert.equal(live.size(), 1);
+  } finally {
+    live.close();
+  }
 });

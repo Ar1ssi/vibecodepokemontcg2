@@ -3,7 +3,7 @@ import { GEN_1_2_ORDER } from './gen-1-2-order.generated.mjs';
 import { BLACK_BOLT_WHITE_FLARE_ORDER } from './black-bolt-white-flare-order.generated.mjs';
 import { tcgdexApiBase } from '../../../../../shared/tcgdex/tcgdex-url.mjs';
 import { withCardArt } from '../../../../../shared/tcgdex/card-art.mjs';
-import { fetchCustomSetManifest } from '../../../../../shared/tcgdex/custom-sets.mjs';
+import { fetchCustomSetManifest, isCustomSetId } from '../../../../../shared/tcgdex/custom-sets.mjs';
 
 const TCGDEX_BASE = tcgdexApiBase();
     
@@ -204,6 +204,13 @@ const TCGDEX_BASE = tcgdexApiBase();
       const record = Array.isArray(fetched?.cards) ? { ...fetched, cards: fetched.cards.map(withCardArt) } : fetched;
       setRecordCache.set(cacheKey, record);
       return record;
+    }
+
+    // A custom set the card editor rewrote is read again on its next open (the server reloads it live).
+    export function forgetCustomSetRecords() {
+      for (const key of [...setRecordCache.keys()]) {
+        if (isCustomSetId(key.slice(key.indexOf('/') + 1))) setRecordCache.delete(key);
+      }
     }
 
     // Generation → TCGdex series id(s). Gen 9 is Scarlet & Violet only (excludes

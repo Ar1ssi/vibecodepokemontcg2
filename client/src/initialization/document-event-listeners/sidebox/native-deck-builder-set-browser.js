@@ -3,6 +3,7 @@ import {
       fetchGenerationSets,
       fetchHomebrewSets,
       fetchCustomSets,
+      forgetCustomSetRecords,
       CUSTOM_CATEGORY,
       HOMEBREW_SETS_CATEGORY,
       fetchSetCards,
@@ -25,6 +26,7 @@ import {
       scopeFilterSets,
     } from '../../../setup/deck-builder/core/set-browser-filters.mjs';
     import { ownedBadgeHtml } from './native-deck-builder-renderers.js';
+    import { isCustomSetId, onCustomSetsChanged } from '../../../../../shared/tcgdex/custom-sets.mjs';
 
     const escapeHtml = (value = '') => String(value)
       .replaceAll('&', '&amp;')
@@ -223,7 +225,7 @@ import {
         if (!state?.loaded) return;
         if ((activeCategory === CUSTOM_CATEGORY || activeCategory === HOMEBREW_SETS_CATEGORY) && state.sets.length === 0) {
           showStatus(
-            'No custom sets installed. Drop a set folder from the card editor into client/src/assets/custom-sets/ and restart the server.'
+            'No custom sets installed. Send a set from the card editor, or drop its folder into client/src/assets/custom-sets/.'
           );
           return;
         }
@@ -523,6 +525,48 @@ import {
         const card = cardId ? findCardById(cardId) : null;
         onPreviewCard?.(target.dataset.previewImage, card, target);
       });
+
+      // The card editor pushed a set and the server reloaded it: drop what this panel holds of custom
+      // sets, then redraw the custom pill (and its open set) on screen with the new cards.
+      const isCustomPill = (category) => category === CUSTOM_CATEGORY || category === HOMEBREW_SETS_CATEGORY;
+      const refreshCustomSets = async () => {
+        forgetCustomSetRecords();
+        categoryState.delete(CUSTOM_CATEGORY);
+        categoryState.delete(HOMEBREW_SETS_CATEGORY);
+        for (const setId of [...cardsBySet.keys()]) if (isCustomSetId(setId)) cardsBySet.delete(setId);
+        for (const setId of [...pendingBySet.keys()]) if (isCustomSetId(setId)) pendingBySet.delete(setId);
+        if (!isCustomPill(activeCategory)) return;
+        const category = activeCategory;
+        await loadCategory(category);
+        const openSetId = expandedSetId;
+        if (activeCategory !== category || !openSetId || !isCustomSetId(openSetId)) return;
+        try {
+          await getCardsForSet(openSetId);
+        } catch (error) {
+          showStatus(`Could not load cards for this set: ${error.message}`);
+          return;
+        }
+        if (expandedSetId === openSetId) render();
+      };
+      // One refresh at a time: a second notice during one reruns it after, so an older fetch never lands last.
+      let refreshing = false;
+      let refreshAgain = false;
+      const runCustomRefresh = async () => {
+        if (refreshing) {
+          refreshAgain = true;
+          return;
+        }
+        refreshing = true;
+        try {
+          do {
+            refreshAgain = false;
+            await refreshCustomSets().catch((error) => showStatus(`Could not reload custom sets: ${error.message}`));
+          } while (refreshAgain);
+        } finally {
+          refreshing = false;
+        }
+      };
+      onCustomSetsChanged(runCustomRefresh);
 
       // Opens one set of the Standard pill, as a click on its tab would (the Elite Trainer Box
       // guide, design 057). A set the pill does not list stays closed.

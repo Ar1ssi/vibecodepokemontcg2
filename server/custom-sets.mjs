@@ -4,6 +4,7 @@
 // makes the deck builder, set browser, enrichment and rules engine treat a custom card exactly
 // like a published one: same record shape, same parsers, nothing else to teach.
 
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { gzip } from 'node:zlib';
@@ -82,11 +83,12 @@ function cardBriefOf(card) {
 
 /**
  * Reads every `<rootDir>/<setId>/set.json`. A set that fails validation is skipped and reported through
- * `log` (one line); a missing root is an empty store.
+ * `log` (one line); a missing root is an empty store. With `previous`, a set that fails now but loaded
+ * before keeps its earlier copy: a half-written or mistyped save must not pull it out of open decks.
  * @param {string} rootDir
- * @param {{ log?: (line: string) => void }} [options]
+ * @param {{ log?: (line: string) => void, previous?: ReturnType<typeof createCustomSetStore> }} [options]
  */
-export function loadCustomSets(rootDir, { log = () => {} } = {}) {
+export function loadCustomSets(rootDir, { log = () => {}, previous = null } = {}) {
   const sets = new Map();
   const cards = new Map();
   let dirs = [];
@@ -99,6 +101,15 @@ export function loadCustomSets(rootDir, { log = () => {} } = {}) {
   } catch {
     dirs = [];
   }
+  const add = (entry) => {
+    sets.set(entry.set.id, entry);
+    for (const card of entry.set.cards) cards.set(card.id, cardRecordOf(card, entry.set));
+  };
+  const skip = (dir, why) => {
+    const kept = previous?.sets.get(dir);
+    log(`custom set ${dir} skipped: ${why}${kept ? '; kept the copy loaded before' : ''}`);
+    if (kept) add(kept);
+  };
   for (const dir of dirs) {
     const file = path.join(rootDir, dir, 'set.json');
     if (!fs.existsSync(file)) continue;
@@ -108,19 +119,175 @@ export function loadCustomSets(rootDir, { log = () => {} } = {}) {
       if (size > MAX_SET_JSON_BYTES) throw new Error(`set.json is ${size} bytes, over ${MAX_SET_JSON_BYTES}`);
       parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
     } catch (error) {
-      log(`custom set ${dir} skipped: ${error instanceof SyntaxError ? `set.json is not valid JSON (${error.message})` : error.message}`);
+      skip(dir, error instanceof SyntaxError ? `set.json is not valid JSON (${error.message})` : error.message);
       continue;
     }
     const result = validateCustomSet(parsed, { setDirName: dir, reservedCodes: RESERVED_SET_CODES });
     if (!result.ok) {
-      log(`custom set ${dir} skipped: ${result.errors.join('; ')}`);
+      skip(dir, result.errors.join('; '));
       continue;
     }
-    const set = result.set;
-    sets.set(set.id, { set, record: setRecordOf(set) });
-    for (const card of set.cards) cards.set(card.id, cardRecordOf(card, set));
+    add({ set: result.set, record: setRecordOf(result.set) });
   }
   return createCustomSetStore({ sets, cards });
+}
+
+// What a set folder holds, cheaply: set.json by content (an edit can keep its size and mtime), every other
+// file (card fronts, foil) by size and mtime. Two equal signatures mean nothing a browser sees changed.
+function setFolderSignature(dir) {
+  const parts = [];
+  const walk = (folder, prefix) => {
+    let entries;
+    try {
+      entries = fs.readdirSync(folder, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+      const full = path.join(folder, entry.name);
+      const rel = `${prefix}${entry.name}`;
+      if (entry.isDirectory()) {
+        walk(full, `${rel}/`);
+        continue;
+      }
+      try {
+        if (rel === 'set.json') {
+          parts.push(`${rel}#${createHash('sha1').update(fs.readFileSync(full)).digest('hex')}`);
+        } else {
+          const stat = fs.statSync(full);
+          parts.push(`${rel}:${stat.size}:${stat.mtimeMs}`);
+        }
+      } catch {
+        // removed between the listing and the read: the next pass sees it gone
+      }
+    }
+  };
+  walk(dir, '');
+  return parts.join('\n');
+}
+
+/** `{ <setDir>: signature }` for every folder under the root that holds a set.json. */
+export function customSetSignatures(rootDir) {
+  const signatures = new Map();
+  let dirs = [];
+  try {
+    dirs = fs.readdirSync(rootDir, { withFileTypes: true }).filter((entry) => entry.isDirectory());
+  } catch {
+    return signatures;
+  }
+  for (const { name } of dirs) {
+    const dir = path.join(rootDir, name);
+    if (fs.existsSync(path.join(dir, 'set.json'))) signatures.set(name, setFolderSignature(dir));
+  }
+  return signatures;
+}
+
+function changedSetDirs(before, after) {
+  const dirs = new Set([...before.keys(), ...after.keys()]);
+  return [...dirs].filter((dir) => before.get(dir) !== after.get(dir)).sort();
+}
+
+/**
+ * Custom sets that follow their folder while the server runs: the card editor writes a set into
+ * `rootDir` and the next lookups answer the new cards, no restart. A change to a set's files (fs.watch backed
+ * by a poll every `safetyPollMs`, else a poll every `pollMs`; settled for `debounceMs` so a many-file write
+ * reloads once) reloads every set, keeping a set's last good copy when its set.json is broken (loadCustomSets `previous`), and calls
+ * `onChange({ version, sets })` with the changed set folders. Same read interface as createCustomSetStore.
+ * @param {string} rootDir
+ * @param {{ log?: (line: string) => void, onChange?: (change: { version: number, sets: string[] }) => void,
+ *   watch?: boolean, debounceMs?: number, pollMs?: number, safetyPollMs?: number }} [options]
+ */
+export function createLiveCustomSets(
+  rootDir,
+  { log = () => {}, onChange = () => {}, watch = true, debounceMs = 300, pollMs = 2000, safetyPollMs = 15000 } = {}
+) {
+  // signatures before the load: a write landing in between is then seen as a change by the next pass
+  let signatures = customSetSignatures(rootDir);
+  let store = loadCustomSets(rootDir, { log });
+  let version = 0;
+  let watcher = null;
+  let poller = null;
+  let settleTimer = null;
+
+  // Runs from timers: a throw here would take the whole game server down, so it is logged and retried next pass.
+  function reload() {
+    try {
+      return reloadChanged();
+    } catch (error) {
+      log(`custom sets: reload failed (${error.message}); keeping the sets loaded before`);
+      return null;
+    }
+  }
+
+  function reloadChanged() {
+    const next = customSetSignatures(rootDir);
+    const changed = changedSetDirs(signatures, next);
+    if (!changed.length) return null;
+    store = loadCustomSets(rootDir, { log, previous: store });
+    signatures = next;
+    version += 1;
+    const change = { version, sets: changed };
+    try {
+      onChange(change);
+    } catch (error) {
+      log(`custom sets: change listener failed: ${error.message}`);
+    }
+    return change;
+  }
+
+  function scheduleReload() {
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(reload, debounceMs);
+    settleTimer.unref?.();
+  }
+
+  function startPolling(everyMs = pollMs) {
+    clearInterval(poller);
+    poller = setInterval(reload, everyMs);
+    poller.unref?.();
+  }
+
+  if (watch) {
+    try {
+      watcher = fs.watch(rootDir, { recursive: true, persistent: false }, scheduleReload);
+      watcher.on('error', (error) => {
+        log(`custom sets: watching ${rootDir} failed (${error.message}); checking every ${pollMs} ms instead`);
+        watcher.close();
+        watcher = null;
+        startPolling();
+      });
+      // a watcher can go quiet without an error (the folder deleted and made again): a slow poll backs it up
+      startPolling(safetyPollMs);
+    } catch (error) {
+      log(`custom sets: cannot watch ${rootDir} (${error.message}); checking every ${pollMs} ms instead`);
+      startPolling();
+    }
+  }
+
+  return {
+    live: true,
+    get sets() {
+      return store.sets;
+    },
+    get cards() {
+      return store.cards;
+    },
+    size: () => store.size(),
+    setRecord: (setId) => store.setRecord(setId),
+    card: (cardId) => store.card(cardId),
+    setBriefs: () => store.setBriefs(),
+    allCards: () => store.allCards(),
+    manifest: () => store.manifest(),
+    version: () => version,
+    reload,
+    close() {
+      clearTimeout(settleTimer);
+      clearInterval(poller);
+      poller = null;
+      watcher?.close();
+      watcher = null;
+    },
+  };
 }
 
 /** A store over already-validated sets (tests build one without a filesystem). */
@@ -242,7 +409,8 @@ function parseListBody(body) {
  * `{ get, size }` interface as createTcgdexProxy, so tcgdexProxyHandler needs no change.
  */
 export function withCustomSets(proxy, store) {
-  if (!store || store.size() === 0) return proxy;
+  // a live store may gain its first set later, so it always wraps
+  if (!store || (!store.live && store.size() === 0)) return proxy;
 
   // Merged lists are built per request (custom hits in a list query are rare); gzip stays available to the handler.
   async function appendToList(key, extra) {

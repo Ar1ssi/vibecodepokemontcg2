@@ -6,8 +6,9 @@
 # Pruned or shortened lines, verbatim: .agent/archive/DECISIONS-pruned-2026-10-15.md (grep the D-number).
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
-#   Next id = highest D number in this file and the archives + 1 (next: D227).
+#   Next id = highest D number in this file and the archives + 1 (next: D228).
 
+- D227 2026-10-25 [server] Custom sets reload live: server watches custom-sets/ (fs.watch, poll fallback), keeps a broken set's last good copy, emits `customSetsChanged`; cardback "Send to ptcg-sim" writes there. Design 075 addendum.
 - D226 2026-10-25 [deck-builder] A custom set's /sets record carries each card's `category`, and fetchSetCards trusts it over the /cards?category= supertype index: those lists sit in IndexedDB for a day, so a set added since marked every custom Trainer as Pokémon.
 - D225 2026-10-25 [deck-builder] Custom-set foil (I271): each set folder may hold foil.json + foil/<nnn>-<kind>.webp (cardback's TCG Live foil export, converted by scripts/custom-sets/import-foil.py); /api/tcgl-foil/config lists those sets and the client merges them into the foil manifest as base-printing records with a `dir`, so card textures load from the repo while shaders and shared material textures still need the texture host. Alternative rejected: upload to R2 keyed by TCGdex id (needs a deploy step per set, collides with the source card's own foil).
 - D224 2026-10-23 [deck-builder] Custom set ids are `custom<code>` (code 2–5 [a-z0-9]), card ids `custom<code>-<nnn>`, files committed under client/src/assets/custom-sets/<setId>/ — one dash per id, no TCGdex collision, small repo-stored sets (user's call). (design 075)

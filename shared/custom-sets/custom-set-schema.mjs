@@ -42,6 +42,8 @@ const MAX_ATTACKS = 4;
 const MAX_ABILITIES = 2;
 const MAX_COST = 5;
 export const MAX_CARDS = 999;
+// Socket.IO broadcast when the server reloads changed set folders: `{ version, sets: [setId] }`.
+export const CUSTOM_SETS_CHANGED_EVENT = 'customSetsChanged';
 
 export function isCustomSetId(id) {
   return typeof id === 'string' && CUSTOM_SET_ID_RE.test(id);

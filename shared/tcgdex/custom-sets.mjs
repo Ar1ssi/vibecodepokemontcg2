@@ -4,6 +4,7 @@
 
 import {
   CUSTOM_CARD_ID_RE,
+  CUSTOM_SETS_CHANGED_EVENT,
   CUSTOM_SETS_IMAGE_ROOT,
   CUSTOM_SET_GROUPS,
   DEFAULT_CUSTOM_SET_GROUP,
@@ -11,7 +12,7 @@ import {
   isCustomSetId,
 } from '../custom-sets/custom-set-schema.mjs';
 
-export { isCustomCardId, isCustomSetId };
+export { CUSTOM_SETS_CHANGED_EVENT, isCustomCardId, isCustomSetId };
 
 export const CUSTOM_SETS_MANIFEST_PATH = '/api/custom-sets';
 
@@ -59,7 +60,8 @@ let manifestPromise = null;
 
 /**
  * The installed custom sets, fetched once per page (a failed fetch is not remembered, so the next
- * call retries). Outside a browser (no `location`), or on any failure, resolves to `{ sets: [] }`.
+ * call retries). Outside a browser (no `location`), or on any failure, resolves to `{ sets: [] }` — except a
+ * forced refetch, which keeps the manifest it was replacing when it fails.
  * @param {{ fetchImpl?: typeof fetch, force?: boolean }} [options]
  */
 export function fetchCustomSetManifest({ fetchImpl = globalThis.fetch, force = false } = {}) {
@@ -68,14 +70,15 @@ export function fetchCustomSetManifest({ fetchImpl = globalThis.fetch, force = f
   if (typeof fetchImpl !== 'function' || typeof origin !== 'string' || !/^https?:\/\//.test(origin)) {
     return Promise.resolve(EMPTY_MANIFEST);
   }
+  const previous = manifestPromise;
   const attempt = (async () => {
     const response = await fetchImpl(`${origin}${CUSTOM_SETS_MANIFEST_PATH}`);
     if (!response.ok) throw new Error(`manifest ${response.status}`);
     return normalizeManifest(await response.json());
   })().catch(() => {
-    // forget this attempt only if it is still the one being shared (a sync throw settles before the assignment below)
-    if (manifestPromise === attempt) manifestPromise = null;
-    return EMPTY_MANIFEST;
+    // only if this attempt is still the one being shared (a sync throw settles before the assignment below)
+    if (manifestPromise === attempt) manifestPromise = previous;
+    return previous || EMPTY_MANIFEST;
   });
   manifestPromise = attempt;
   return attempt;
@@ -86,4 +89,38 @@ export function customSetCodes(manifest) {
   const codes = {};
   for (const set of normalizeManifest(manifest).sets) codes[set.code] = set.id;
   return codes;
+}
+
+// ---------------------------------------------------------------- live changes
+// The server reloads a set folder the card editor rewrote and broadcasts CUSTOM_SETS_CHANGED_EVENT; panels
+// showing custom cards subscribe here instead of to the socket.
+const changeListeners = new Set();
+
+/**
+ * Called with `{ version, sets }` after a set changed on the server, once the manifest has been refetched.
+ * @returns {() => void} unsubscribe
+ */
+export function onCustomSetsChanged(listener) {
+  changeListeners.add(listener);
+  return () => changeListeners.delete(listener);
+}
+
+/**
+ * The socket handler for CUSTOM_SETS_CHANGED_EVENT: refetch the manifest (codes, pills, card counts), then
+ * tell every listener. A listener that throws does not stop the others.
+ * @param {{ version?: number, sets?: string[] }} change
+ * @param {{ fetchImpl?: typeof fetch }} [options]
+ */
+export async function noteCustomSetsChanged(change, { fetchImpl } = {}) {
+  const sets = Array.isArray(change?.sets) ? change.sets.filter(isCustomSetId) : [];
+  const notice = { version: Number.isInteger(change?.version) ? change.version : 0, sets };
+  await fetchCustomSetManifest({ fetchImpl, force: true });
+  for (const listener of [...changeListeners]) {
+    try {
+      listener(notice);
+    } catch (error) {
+      console.error('custom set change listener failed', error);
+    }
+  }
+  return notice;
 }

@@ -14,10 +14,10 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const RECORD_TTL_MS = 7 * DAY_MS;
 const LIST_TTL_MS = 1 * DAY_MS;
 const RECORD_PATH = /\/v2\/[a-z-]+\/(sets|cards)\/[^/?]+$/i;
-// Custom sets (design 075) are files in this repo that the user edits and re-renders; a week-old
-// copy would hide the new text, so their records barely cache.
+// Custom sets (design 075) are files in this repo that the card editor rewrites while the server runs
+// (it reloads them live): their records always come from the server, the stored copy only when it is down.
 const CUSTOM_RECORD_PATH = /\/v2\/[a-z-]+\/(sets|cards)\/custom[a-z0-9]/i;
-const CUSTOM_TTL_MS = 60 * 1000;
+const CUSTOM_TTL_MS = 0;
 
 export function ttlForUrl(url) {
   const value = String(url);
