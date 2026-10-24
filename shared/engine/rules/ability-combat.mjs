@@ -72,8 +72,14 @@ import { evolvedView, topPokemonCard } from './evolved-pokemon.mjs';
 import { isAncientCard, isFutureCard } from './paradox-tags.mjs';
 import { legacyPowerStopCondition, parseLegacyDamageModifier } from './legacy-power-wording.mjs';
 import { normalizeStage } from './evolution.mjs';
+import { hasCardMarker } from './card-markers.mjs';
 
 const lower = (v) => String(v ?? '').toLowerCase();
+
+// Team Plasma by its printed marker (card-markers table), or by a Plasma name or subtype.
+const isTeamPlasmaCard = (card) =>
+  hasCardMarker(card, 'Team Plasma') ||
+  /plasma/.test(`${lower(card?.name)} ${(card?.subtypes || []).map(lower).join(' ')}`);
 
 const rootsOf = (cards) =>
   (cards || []).filter((c) => c && !c.attachedTo && !c.attached);
@@ -264,8 +270,11 @@ function inPlayConditionMet(text, target, ctx) {
       });
       if (!has) return false;
     } else {
-      const has = sideInPlay(ctx).some((c) => lower(c.name).includes(family));
-      if (!has) return false;
+      // "Uxie and Azelf" / "Simisage, Simisear, and Simipour": every named Pokémon must be in play.
+      const names = family.split(/,? and |, /).map((n) => lower(n).trim()).filter(Boolean);
+      const inPlay = sideInPlay(ctx);
+      const everyNamedInPlay = names.every((name) => inPlay.some((c) => lower(c.name).includes(name)));
+      if (!everyNamedInPlay) return false;
     }
   }
   return true;
@@ -386,9 +395,7 @@ function attackerInCategory(category, attacker, holder) {
   }
   if (/\bancient\b/.test(c) && !isAncientCard(attacker)) return false;
   if (/\bfuture\b/.test(c) && !isFutureCard(attacker)) return false;
-  if (/team plasma/.test(c) && !/plasma/.test(`${lower(attacker?.name)} ${subtypes.join(' ')}`)) {
-    return false;
-  }
+  if (/team plasma/.test(c) && !isTeamPlasmaCard(attacker)) return false;
   if (/that evolve from ([a-z]+)/.test(c) && lower(attacker?.evolvesFrom) !== c.match(/that evolve from ([a-z]+)/)[1]) {
     return false;
   }
@@ -557,6 +564,15 @@ export function abilityHandDiscardProtector(defender, ctx = {}) {
 
 // --- damage prevention ---------------------------------------------------
 
+// "… damage done to your {M} Pokémon …" (Klinklang Plasma Steel, PLS 90): only a damaged Pokémon
+// that has one of the printed types is covered.
+function damagedTypeClauseMet(text, defender) {
+  const clause = text.match(/damage done to your ((?:\{[a-z]\}\s*(?:and|or)?\s*)+)pok[eé]mon/)?.[1];
+  if (!clause) return true;
+  const types = attackerTypes(defender);
+  return typeSymbols(clause).some((ty) => types.includes(lower(ty)));
+}
+
 /**
  * Ability damage prevention for the defender as `{ preventAll, reduceHp }`,
  * covering the holder and its team (bench/team wordings).
@@ -572,6 +588,7 @@ export function abilityDamagePrevention(defender, attacker, ctx = {}) {
     if (isAbilitySuppressed(holder, ctx)) continue;
     if (isSelfScoped(t) && !sameCard(holder, defender)) continue;
     if (/to this pok[eé]mon/.test(t) && !sameCard(holder, defender)) continue;
+    if (!damagedTypeClauseMet(t, defender)) continue;
     if (!sourceConditionMet(t, holder, defender, attacker, ctx)) continue;
     const applied = preventionForCard(holder, attacker);
     if (applied.preventAll) out.preventAll = true;
@@ -884,6 +901,13 @@ export function abilityWeaknessOverride(defender, ctx = {}) {
         return { none: true };
       }
 
+      // Mesprit Mental Shroud (PLB 37): "If you have Uxie and Azelf in play, each of your Pokémon
+      // has no Weakness." The condition is on the holder's side, so it reads the defender's side.
+      if (holderSide === 'defender' && /each of your pok[eé]mon has no weakness/.test(t)) {
+        if (inPlayConditionMet(t, holder, holderCtx)) return { none: true };
+        continue;
+      }
+
       const both = t.match(
         /apply weakness for both active pok[eé]mon as [x×](\d)/
       );
@@ -998,6 +1022,15 @@ export function abilityRetreatCost(target, ctx = {}) {
     const t = selfNamedText(card);
     if (isAbilitySuppressed(card, ctx)) continue;
     if (!holderPositionMet(t, card, ctx)) continue;
+    // Glaceon Freeze Zone (PLF 23): "The Retreat Cost of each of your Team Plasma Pokémon in play
+    // is {C}{C} less." (isTeamPlasmaCard: the printed marker first.)
+    const teamPlasmaLess = t.match(
+      /the retreat cost of each of your team plasma pok[eé]mon in play is (?:(\d+)|((?:\{c\})+)) less/
+    );
+    if (teamPlasmaLess) {
+      if (isTeamPlasmaCard(target)) delta -= amount(teamPlasmaLess[1], teamPlasmaLess[2]);
+      continue;
+    }
     // "The Retreat Cost of each of your Pokémon that has any {R} Energy attached is
     // {C}{C} less." (Ninetales Byway of the Nine-Tailed Fox, I161)
     const teamLess = t.match(
@@ -1110,12 +1143,64 @@ export function abilityExtraTypes(card, ctx = {}) {
   const t = cardAbilityText(card);
   if (!t) return [];
   if (isAbilitySuppressed(card, ctx)) return [];
-  if (!/it is .*type|is both .* type/.test(t)) return [];
+  // Lucario Dual Armor (PLS 78): "this Pokémon's type is both {F} and {M}" — only that clause's
+  // symbols; the condition's own "{M} Energy" must not count as a type.
+  const bothClause = t.match(/type is both ((?:\{[a-z]\}\s*(?:and|or)?\s*)+)/)?.[1];
+  if (!bothClause && !/it is .*type|is both .* type/.test(t)) return [];
   if (!inPlayConditionMet(t, card, ctx)) return [];
   const printed = attackerTypes(card);
-  return typeSymbols(t)
-    .filter((ty) => !printed.includes(lower(ty)))
-    .map((ty) => ty[0].toUpperCase() + ty.slice(1));
+  const symbols = bothClause ? typeSymbols(bothClause) : typeSymbols(t);
+  return [...new Set(symbols.filter((ty) => !printed.includes(lower(ty))))].map(
+    (ty) => ty[0].toUpperCase() + ty.slice(1)
+  );
+}
+
+// --- copied types --------------------------------------------------------
+
+/**
+ * The types a Pokémon takes from the opponent's Active Pokémon while it is your Active (Kecleon
+ * Color Change, PLF 94), or null when no Ability copies them. The copy replaces the printed types.
+ */
+export function abilityCopiedTypes(card, ctx = {}) {
+  if (!isPokemon(card) || isAbilitySuppressed(card, ctx)) return null;
+  const t = cardAbilityText(card);
+  if (
+    !/as long as this pok[eé]mon is your active pok[eé]mon, this pok[eé]mon is the same type as (?:the )?your opponent's active pok[eé]mon/.test(
+      t
+    )
+  ) {
+    return null;
+  }
+  if (!containsCard(ctx.sideActive, card)) return null;
+  const [opponentRoot] = rootsOf(ctx.opponentActive);
+  if (!opponentRoot) return null;
+  return [...(evolvedView(ctx.opponentActive, opponentRoot).types || [])];
+}
+
+// --- resistance ----------------------------------------------------------
+
+/**
+ * Whether an Ability on the attacker's side makes this attack ignore Resistance (Machamp Badge of
+ * Discipline, PLB 49: "The damage of each of your {F} Pokémon's attacks isn't affected by
+ * Resistance."). The printed type filter or "this Pokémon" names the attacks it covers.
+ */
+export function abilityIgnoresResistance(attacker, ctx = {}) {
+  if (!isPokemon(attacker)) return false;
+  return dedupe(sideInPlay(ctx)).some((holder) => {
+    const t = selfNamedText(holder);
+    if (!/isn't affected by resistance|is not affected by resistance/.test(t)) return false;
+    if (isAbilitySuppressed(holder, ctx)) return false;
+    return resistanceScopeMet(t, holder, attacker);
+  });
+}
+
+function resistanceScopeMet(text, holder, attacker) {
+  const typed = text.match(/of each of your ((?:\{[a-z]\}\s*(?:and|or)?\s*)+)pok[eé]mon's attacks/)?.[1];
+  if (typed) {
+    const types = attackerTypes(attacker);
+    return typeSymbols(typed).some((ty) => types.includes(lower(ty)));
+  }
+  return /this pok[eé]mon's attacks/.test(text) && sameCard(holder, attacker);
 }
 
 // --- energy multiplier ---------------------------------------------------

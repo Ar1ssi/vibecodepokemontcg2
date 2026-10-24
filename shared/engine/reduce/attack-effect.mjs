@@ -629,6 +629,7 @@ export function resolveAttackEffectPhase(draft, ctx) {
               immunity.ignoreDefenderEffects ||
               abilityReads.ignoreDefenderEffects ||
               trainerIgnoresDefenderEffects(draft, playerId, abilityReads.attacker),
+            ignoreResistance: Boolean(immunity.ignoreResistance) || abilityReads.ignoreResistance,
             // Gyarados Dragon DNA: a borrowed Basic attack does 30 more to the Defending Pokémon
             // (design 049). computeAttackDamage drops every bonus when the attack does no damage.
             abilityBonusBeforeWR:

@@ -18,7 +18,8 @@ import { cardAbilityText } from '../rules/ability-executors.mjs';
 import {
   abilityDamageBonus, abilityDamageReduction, abilityDamagePrevention, abilityLegacyDamageModifiers,
   abilityPreventsAttackEffects, sideContextFor, powersOffActive, abilityWeaknessOverride,
-  abilityIgnoresDefenderEffects, abilityExtraTypes, isAbilitySuppressed,
+  abilityIgnoresDefenderEffects, abilityExtraTypes, abilityCopiedTypes, abilityIgnoresResistance,
+  isAbilitySuppressed,
 } from '../rules/ability-combat.mjs';
 import { parseOnDamageAbilities } from '../rules/ability-triggers.mjs';
 import {
@@ -570,6 +571,7 @@ function activeTargetDamage(draft, { ref, clause, attackerPlayerId, attackName }
         clause.immunity?.ignoreDefenderEffects ||
         abilityReads.ignoreDefenderEffects ||
         trainerIgnoresDefenderEffects(draft, attackerPlayerId, abilityReads.attacker),
+      ignoreResistance: abilityReads.ignoreResistance || Boolean(clause.immunity?.ignoreResistance),
       abilityBonusBeforeWR: abilityReads.abilityBonusBeforeWR,
       abilityReductionBeforeWR: abilityReads.abilityReductionBeforeWR,
       abilityReductionAfterWR: abilityReads.abilityReductionAfterWR,
@@ -610,6 +612,7 @@ export function attackAbilityReads(
     zone: 'active',
     isActive: true,
     attackerIsActive: true,
+    opponentActive: defenderZones.active || [],
     turnNumber: draft.turn?.number,
     opponentHandCount: (defenderZones.hand || []).length,
     ownHandCount: (attackerZones.hand || []).length,
@@ -631,13 +634,18 @@ export function attackAbilityReads(
     turnNumber: draft.turn?.number,
     powersOff: powersOffActive(draft),
   };
+  // Kecleon Color Change replaces the printed types with the opponent's Active's; Lucario Dual
+  // Armor adds its {M} type on top of whatever the attacker's types are.
+  const copiedTypes = abilityCopiedTypes(attacker, attackerCtx);
   const extraTypes = abilityExtraTypes(attacker, attackerCtx);
-  const attackerView = extraTypes.length
-    ? { ...attacker, types: [...(attacker.types || []), ...extraTypes] }
-    : attacker;
+  const attackerView =
+    copiedTypes || extraTypes.length
+      ? { ...attacker, types: [...(copiedTypes ?? attacker.types ?? []), ...extraTypes] }
+      : attacker;
   const reduction = abilityDamageReduction(defender, attackerView, defenderCtx);
   return {
     attacker: attackerView,
+    ignoreResistance: abilityIgnoresResistance(attackerView, attackerCtx),
     abilityBonusBeforeWR: abilityDamageBonus(
       attackerView,
       defender,
