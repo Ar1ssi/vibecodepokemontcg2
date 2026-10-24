@@ -37,9 +37,10 @@ import {
 import { trainerEffectText } from './trainer.mjs';
 
 // Ability On-Knock-Out effects of the victim (Weezing Aftermath, Jellicent Spiteful Spirit, Manaphy
-// Final Wish), in the Tool effect shape applyToolOnKoEffects reads. Only an opponent's attack counts.
-function abilityOnKoEffects(draft, { victimPlayerId, victim, wasActive, byAttack }) {
-  if (!byAttack || draft.turn?.player === victimPlayerId) return [];
+// Final Wish), in the Tool effect shape applyToolOnKoEffects reads. Only damage from an opponent's
+// attack counts ("Knocked Out by damage"), not damage counters an attack places.
+function abilityOnKoEffects(draft, { victimPlayerId, victim, wasActive, byAttack, byDamage }) {
+  if (!byAttack || !byDamage || draft.turn?.player === victimPlayerId) return [];
   const effect = parseOnKoAbilityEffect(inPlayView(draft, victim), abilitySideContext(draft, victimPlayerId));
   if (!effect || (effect.requiresActive && !wasActive)) return [];
   return [{ holder: victim, isVictim: true, ...effect }];
@@ -313,7 +314,7 @@ export function handleKnockout(
           attacker: attackerActive ? inPlayView(draft, attackerActive) : null,
         })
       : []),
-    ...abilityOnKoEffects(draft, { victimPlayerId, victim, wasActive, byAttack }),
+    ...abilityOnKoEffects(draft, { victimPlayerId, victim, wasActive, byAttack, byDamage }),
   ];
   const koToolOutcome = applyToolOnKoEffects(draft, {
     victimPlayerId,

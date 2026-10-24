@@ -105,8 +105,15 @@ const HOLDER_GRANT_CLAUSE = /the (.+?) this card is attached to can also use the
 export function toolGrantHolderMatches(tool, holder) {
   const named = normalizeName(cardTextOf(tool)).match(HOLDER_GRANT_CLAUSE);
   if (!named) return true;
-  return normalizeName(holder?.name) === named[1].trim();
+  const phrase = collapseName(named[1]);
+  const holderName = collapseName(holder?.name);
+  // "The Team Aqua Pokémon this card is attached to" (Aqua Diffuser) names a group, not a card.
+  const group = phrase.match(/^(.+?)pok[eé]mon$/)?.[1];
+  return group ? holderName.includes(group) : holderName === phrase;
 }
+
+// "Genesect-EX" and "Genesect EX" are one name.
+const collapseName = (name) => normalizeName(name).replace(/[\s-]+/g, '');
 
 // TCGdex ships these Technical Machines with an empty `attacks: [{}]` and no "→" line in
 // `effect` (dp6-136, dp6-137), so their attacks come from the pkmncards corpus rows

@@ -241,6 +241,9 @@ export function parseMoveEnergyShape(lower) {
     shape.source = 'bench';
   } else if (/to this pok[eé]mon/.test(lower)) {
     shape.source = /from your active pok[eé]mon to this/.test(lower) ? 'active' : 'others';
+  } else if (/attached to 1 of your pok[eé]mon to (?!another\b)[^.]+\./.test(lower)) {
+    // Legacy Powers name the holder: "… attached to 1 of your Pokémon to Heatran." (Heatran LA).
+    shape.source = 'others';
   } else if (/to your benched pok[eé]mon/.test(lower)) {
     shape.target = 'bench';
     shape.source = 'self';

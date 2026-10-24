@@ -302,7 +302,8 @@ function bonusForTool(
     return 0;
   }
   // Silver Bangle (Plasma Blast 88) prints the hyphenated "Active Pokémon-EX".
-  if (/active pok[eé]mon[- ]ex\b/i.test(t) && !isExCard(defender))
+  // Choice Band's "Active Pokémon-GX or Active Pokémon-EX" also covers GX defenders.
+  if (/active pok[eé]mon[- ]ex\b/i.test(t) && !/active pok[eé]mon-gx/i.test(t) && !isExCard(defender))
     return 0;
   // Silver Bangle: "the Pokémon this card is attached to (excluding Pokémon-EX)" is the holder.
   if (/the pok[eé]mon this card is attached to \(excluding pok[eé]mon-ex\)/i.test(t) && isExCard(attacker))
