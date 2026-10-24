@@ -770,7 +770,13 @@ export function parseAttackDamage(
       components.push('per-each');
       notes.push(`per-${label} scaling — resolve the printed count`);
     }
-  } else if (text && /prize card/.test(text) && !/\b(?:or fewer|or more) prize cards?\b/.test(text)) {
+  } else if (
+    text &&
+    /prize card/.test(text) &&
+    !/\b(?:or fewer|or more) prize cards?\b/.test(text) &&
+    // Prize-count comparisons are conditional bonuses (attack-conditions.mjs), not per-Prize scaling.
+    !/\b(?:more|fewer|less) prize cards? remaining than\b/.test(text)
+  ) {
     const per = amount(text, /(\d+) more damage|does (\d+) damage/);
     total = base + per * opponentPrizes;
     components.push('per-prize');

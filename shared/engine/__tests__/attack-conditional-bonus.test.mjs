@@ -306,6 +306,14 @@ const CASES = [
     { ownPrizes: 4 },
   ],
   [
+    'customhb Pinsir Reckless Throw (customhb-005 set.json)',
+    'Pinsir',
+    '90+',
+    'If you have more Prize cards remaining than your opponent, this attack does 90 more damage.',
+    { ownPrizes: 6, opponentPrizes: 5 },
+    { ownPrizes: 6, opponentPrizes: 6 },
+  ],
+  [
     'Dark Houndoom Fire Payback (Team Rocket Returns 37)',
     'Dark Houndoom',
     '40+',

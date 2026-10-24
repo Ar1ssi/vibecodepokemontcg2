@@ -2589,6 +2589,21 @@ import test from 'node:test';
       assert.ok(turn.components.includes('per-turn'));
     });
 
+    test('parseAttackDamage: "more Prize cards remaining than your opponent" is not per-Prize scaling (customhb Pinsir Reckless Throw)', () => {
+      const reckless = parseAttackDamage(
+        {
+          name: 'Reckless Throw',
+          damage: 90,
+          text: 'If you have more Prize cards remaining than your opponent, this attack does 90 more damage.',
+        },
+        {},
+        {},
+        { opponentPrizes: 6 },
+      );
+      assert.equal(reckless.total, 90);
+      assert.ok(!reckless.components.includes('per-prize'));
+    });
+
     test('parseAttackDamage: per-HP scaling uses the Defending Pokémon\u2019s HP by default', () => {
       const attack = {
         name: 'HP Surge',
