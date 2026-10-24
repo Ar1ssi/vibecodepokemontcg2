@@ -7,6 +7,7 @@
  */
 
 import { hasCondition } from './special-conditions.mjs';
+import { hasCardMarker } from './card-markers.mjs';
 
 const lower = (v) => String(v ?? '').toLowerCase().replace(/[\u2018\u2019]/g, "'");
 const textOf = (card) => lower(card?.text ?? card?.effect ?? card?.cardText ?? '');
@@ -34,7 +35,13 @@ export function stadiumOnAttachTriggers(stadiumCard, { hostTop, fromZone } = {})
   if (/basic non-\{w\} pokémon/.test(t) && isBasic(hostTop) && !hasType(hostTop, 'water')) {
     return [{ kind: 'damage', amount: 20, source }];
   }
-  if (/excluding team plasma pokémon/.test(t) && !nameOf(hostTop).includes('team plasma')) {
+  // Frozen City (Plasma Freeze 100): Team Plasma Pokémon are printed without "Team Plasma" in
+  // the name (Zekrom), so the printed marker is the test; the name check keeps the old reading.
+  if (
+    /excluding team plasma pokémon/.test(t) &&
+    !hasCardMarker(hostTop, 'Team Plasma') &&
+    !nameOf(hostTop).includes('team plasma')
+  ) {
     return [{ kind: 'damage', amount: 20, source }];
   }
   if (/non-\{p\} pokémon/.test(t) && !hasType(hostTop, 'psychic')) {

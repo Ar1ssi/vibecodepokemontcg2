@@ -15,7 +15,7 @@ import {
 import { isPokemonToolCard, attachedTools, isExCard } from '../rules/tool-combat.mjs';
 import {
   parseToolCap, parseUnlimitedHandEnergyAcceleration, costDiscountRead, applyCostDiscount,
-  isHandActivatedAbility,
+  isHandActivatedAbility, isDiscardActivatedAbility,
 } from '../rules/ability-executors.mjs';
 import {
   abilityAttackCostDiscount, applyEnergyMultiplier, abilityActivationBlockReason,
@@ -395,10 +395,11 @@ export function validateReferences(state, command) {
 
     case 'useAbility': {
       const cardRef = findCard(state, payload?.instanceId);
-      // Luxray Swelling Flash / Charjabug Battery are activated from the hand.
-      const legalZones = isHandActivatedAbility(cardRef?.card)
-        ? ['hand']
-        : ['active', 'bench'];
+      // Luxray Swelling Flash / Charjabug Battery are activated from the hand; Archen
+      // Prehistoric Call from the discard pile.
+      let legalZones = ['active', 'bench'];
+      if (isHandActivatedAbility(cardRef?.card)) legalZones = ['hand'];
+      else if (isDiscardActivatedAbility(cardRef?.card)) legalZones = ['discard'];
       if (
         !cardRef ||
         !legalZones.includes(cardRef.zoneId) ||

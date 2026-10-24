@@ -247,7 +247,8 @@ export function parseMoveEnergyShape(lower) {
   } else {
     shape.target = 'between';
     shape.source = 'any';
-    const tag = lower.match(/to 1 of your ([^.]+?)(?: pok[eé]mon)?\./)?.[1];
+    // "to 1 of your Pokémon to another of your Pokémon" (Porygon-Z Plasma Transfer) names no kind.
+    const tag = lower.match(/to 1 of your (?!pok[eé]mon\b)([^.]+?)(?: pok[eé]mon)?\./)?.[1];
     if (tag && !/^(?:other|benched|active)\b/.test(tag)) shape.targetTag = tag;
   }
   return shape;
@@ -1217,6 +1218,15 @@ export function parseAbility(text = '') {
     });
   }
 
+  // Breakwing (Salamence Plasma Blast 64): the evolve trigger's effect. Opponent's Pokémon only,
+  // Tools only (massDiscardAttached also takes Energy and the Stadium).
+  if (/discard all pok[eé]mon tool cards attached to each of your opponent['’]s pok[eé]mon/.test(lower)) {
+    steps.push({
+      type: 'discardOpponentToolsAbility',
+      guidance: "Discard all Pokémon Tools attached to each of your opponent's Pokémon.",
+    });
+  }
+
   // ── 14. End-of-turn trigger ─────────────────────────────────────────────
   if (lower.includes('end of your turn') || lower.includes('at the end of your turn')) {
     steps.push({
@@ -1708,12 +1718,17 @@ export function parseAbility(text = '') {
     /discard all cards (?:attached to |from )[^.]*and put [^.]* on (?:the )?(?:bottom|top) of your deck/.test(lower) ||
     /shuffle that pok[eé]mon back into your deck/.test(lower)
   ) {
+    // Prehistoric Call (Archen / Tirtouga / Lileep, Plasma Blast): the discard-pile form goes to the bottom.
+    const fromDiscard = /if this pok[eé]mon is in your discard pile, you may put this pok[eé]mon on the bottom of your deck/.test(lower);
     steps.push({
       type: 'returnSelfToDeckAbility',
-      // Only the shuffle wording executes; the top/bottom-of-deck variants stay announce-only.
+      // Only the shuffle wording and the discard-pile form execute; the other top/bottom variants stay announce-only.
       shuffleSelf: /\bshuffle\b[^.]*this pokémon[^.]*into your deck/.test(lower),
+      fromDiscard,
       requiresDraw: /if you drew/.test(lower),
-      guidance: 'Once during your turn: shuffle this Pokémon and its attached cards into your deck (as described).',
+      guidance: fromDiscard
+        ? 'Once during your turn: if this Pokémon is in your discard pile, put it on the bottom of your deck.'
+        : 'Once during your turn: shuffle this Pokémon and its attached cards into your deck (as described).',
     });
   }
 

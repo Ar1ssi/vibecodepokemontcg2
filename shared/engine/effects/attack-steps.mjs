@@ -1819,9 +1819,29 @@ function atkPutSelf(ctx) {
   return null;
 }
 
+// Prehistoric Call (Archen / Tirtouga / Lileep, Plasma Blast): from the discard pile, this Pokémon
+// goes to the bottom of its owner's deck (the bottom is the last index).
+function returnSelfFromDiscard(ctx) {
+  const { player, sourceCard } = ctx;
+  const card = (player.zones.discard || []).find((c) => c.instanceId === sourceCard?.instanceId);
+  if (!card) return skip(ctx, 'card_not_in_discard');
+  removeFromZones(player, card);
+  player.zones.deck.push(card);
+  ctx.events.push({
+    type: 'cardMoved',
+    instanceId: card.instanceId,
+    from: 'discard',
+    to: 'deck',
+    playerId: player.playerId,
+    reason: 'ability-self-from-discard',
+  });
+  return null;
+}
+
 /** Ability form (Dudunsparce, Run Away Draw): "If you drew any cards in this way" gates the shuffle. */
 function returnSelfToDeckAbility(ctx) {
   const { step, playerId, events } = ctx;
+  if (step.fromDiscard) return returnSelfFromDiscard(ctx);
   if (!step.shuffleSelf) return skip(ctx, 'unsupported_step');
   if (step.requiresDraw) {
     const drew = events.some((e) => e.type === 'cardsDrawn' && e.playerId === playerId && e.count > 0);

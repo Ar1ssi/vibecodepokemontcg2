@@ -29,6 +29,7 @@ import {
 } from './card-classify.mjs';
 import { priorEvolutionCards } from './evolved-pokemon.mjs';
 import { liveAttackMarkers } from './attack-markers.mjs';
+import { cardAbilityText } from './ability-executors.mjs';
 
 const zoneOf = (player, zoneId) =>
   Array.isArray(player?.zones?.[zoneId]) ? player.zones[zoneId] : [];
@@ -52,11 +53,22 @@ function selfDamageDoubled(own, attacker, attack, turnNumber) {
 // an evolution as the Evolution card attached UNDER the Basic, so the root still carries the
 // Basic's printed data (D40) — `view` is that Pokémon read as its top Evolution card, which is
 // what stage/HP questions must use, while `card` holds the live damage counters.
+// Team Plasma Badge (Plasma Freeze 104): "The Pokémon this card is attached to is a Team Plasma Pokémon."
+const TEAM_PLASMA_BADGE_CLAUSE = /the pok[eé]mon this card is attached to is a team plasma pok[eé]mon/;
+
+// The Badge's grant reads as the group name `ruleBoxKinds` already matches (subtypes).
+function withTeamPlasmaBadge(view, zone, root) {
+  const badged = zone.some(
+    (card) => card.attachedTo === root.instanceId && TEAM_PLASMA_BADGE_CLAUSE.test(cardAbilityText(card))
+  );
+  return badged ? { ...view, subtypes: [...(view.subtypes || []), 'Team Plasma'] } : view;
+}
+
 const rootPokemon = (player, zoneId) => {
   const zone = zoneOf(player, zoneId);
   return zone
     .filter((card) => !card.attachedTo && isPokemon(card))
-    .map((card) => ({ card, view: evolvedView(zone, card) }));
+    .map((card) => ({ card, view: withTeamPlasmaBadge(evolvedView(zone, card), zone, card) }));
 };
 
 /** Every in-play Pokémon on a player's side (active + bench). */

@@ -96,6 +96,18 @@ const normalizeName = (name) =>
     .toLowerCase()
     .trim();
 
+// G Booster / G Scope (Plasma Blast 92, 93): "The Genesect-EX this card is attached to can also use
+// the attack on this card." The clause names the one Pokémon that may use the attack; a Tool without
+// it (a Technical Machine) grants to whichever Pokémon it is attached to.
+const HOLDER_GRANT_CLAUSE = /the (.+?) this card is attached to can also use the attack on this card/;
+
+/** Whether `holder` may use the attacks `tool` grants (see HOLDER_GRANT_CLAUSE). */
+export function toolGrantHolderMatches(tool, holder) {
+  const named = normalizeName(cardTextOf(tool)).match(HOLDER_GRANT_CLAUSE);
+  if (!named) return true;
+  return normalizeName(holder?.name) === named[1].trim();
+}
+
 // TCGdex ships these Technical Machines with an empty `attacks: [{}]` and no "→" line in
 // `effect` (dp6-136, dp6-137), so their attacks come from the pkmncards corpus rows
 // (out/pkmn-trainer-cards.json, Legends Awakened 136/137). The printed cost is {@}: no Energy.
