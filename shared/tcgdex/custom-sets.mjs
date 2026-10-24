@@ -5,6 +5,8 @@
 import {
   CUSTOM_CARD_ID_RE,
   CUSTOM_SETS_IMAGE_ROOT,
+  CUSTOM_SET_GROUPS,
+  DEFAULT_CUSTOM_SET_GROUP,
   isCustomCardId,
   isCustomSetId,
 } from '../custom-sets/custom-set-schema.mjs';
@@ -48,6 +50,7 @@ function normalizeManifest(value) {
         name: set.name,
         cardCount: Number.isInteger(set.cardCount) ? set.cardCount : 0,
         releaseDate: typeof set.releaseDate === 'string' ? set.releaseDate : '',
+        group: CUSTOM_SET_GROUPS.includes(set.group) ? set.group : DEFAULT_CUSTOM_SET_GROUP,
       })),
   };
 }

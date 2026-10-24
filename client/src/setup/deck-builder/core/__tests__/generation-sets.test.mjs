@@ -6,6 +6,7 @@ import {
   fetchHomebrewSets,
   fetchCustomSets,
   CUSTOM_CATEGORY,
+  HOMEBREW_SETS_CATEGORY,
   HOMEBREW_ENERGY_SET_ID,
   fetchHomebrewEnergyCards,
   fetchSetCards,
@@ -644,6 +645,19 @@ describe('fetchCustomSets (design 075)', () => {
       cardCount: 2,
       category: CUSTOM_CATEGORY,
     });
+  });
+
+  it('lists group "homebrew" sets under Homebrew sets only, everything else under Custom', async () => {
+    const manifest = {
+      sets: [
+        { id: 'customhb', code: 'HB', name: 'Homebrew', cardCount: 299, releaseDate: '2026-10-24', group: 'homebrew' },
+        { id: 'customdemo', code: 'DEMO', name: 'Demo set', cardCount: 2, releaseDate: '2026-10-23', group: 'custom' },
+        { id: 'customold', code: 'OLD', name: 'Old Wave', cardCount: 3, releaseDate: '2025-01-01' },
+      ],
+    };
+    assert.deepEqual((await fetchCustomSets(manifest)).map((s) => s.setId), ['customdemo', 'customold']);
+    const homebrew = await fetchCustomSets(manifest, HOMEBREW_SETS_CATEGORY);
+    assert.deepEqual(homebrew.map((s) => [s.setId, s.category]), [['customhb', HOMEBREW_SETS_CATEGORY]]);
   });
 
   it('is empty when the manifest lists nothing (outside a browser the manifest is empty)', async () => {

@@ -32,6 +32,10 @@ export const POKEMON_STAGES = Object.freeze(['Basic', 'Stage1', 'Stage2']);
 export const TRAINER_TYPES = Object.freeze(['Item', 'Supporter', 'Stadium', 'Tool']);
 // Energy is out of scope (design 075): decks use official Energy, the editor exports none.
 export const CARD_CATEGORIES = Object.freeze(['Pokemon', 'Trainer']);
+// Which deck-builder pill lists the set: "custom" (the Custom pill, the default when absent) or
+// "homebrew" (the Homebrew sets pill).
+export const CUSTOM_SET_GROUPS = Object.freeze(['custom', 'homebrew']);
+export const DEFAULT_CUSTOM_SET_GROUP = 'custom';
 
 const MAX_NAME = 60;
 const MAX_ATTACKS = 4;
@@ -196,6 +200,9 @@ export function validateCustomSet(json, { setDirName, reservedCodes = [] } = {})
   if (!isText(json.name)) errors.push(`name: required, at most ${MAX_NAME} characters`);
   if (json.releaseDate !== undefined && (typeof json.releaseDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(json.releaseDate))) {
     errors.push('releaseDate: YYYY-MM-DD');
+  }
+  if (json.group !== undefined && !CUSTOM_SET_GROUPS.includes(json.group)) {
+    errors.push(`group: one of ${CUSTOM_SET_GROUPS.join(', ')}`);
   }
   if (!Array.isArray(json.cards) || json.cards.length === 0) errors.push('cards: at least one card');
   else if (json.cards.length > MAX_CARDS) errors.push(`cards: at most ${MAX_CARDS}`);

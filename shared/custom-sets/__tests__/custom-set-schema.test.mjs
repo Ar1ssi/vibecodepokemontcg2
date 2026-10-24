@@ -105,6 +105,8 @@ test('array- or null-typed fields are errors, not coerced strings (review of des
   assert.match(errorsOf({ attacks: [{ cost: [], name: 'A', damage: ['90'] }] }), /damage/);
   assert.match(validateCustomSet(sampleSet({ releaseDate: ['2026-10-23'] })).errors.join(), /releaseDate/);
   assert.match(validateCustomSet(sampleSet({ code: ['HBW'] })).errors.join(), /code: 2–5 capital/);
+  assert.match(validateCustomSet(sampleSet({ group: 'other' })).errors.join(), /group: one of custom, homebrew/);
+  assert.equal(validateCustomSet(sampleSet({ group: 'homebrew' })).ok, true);
   const twins = sampleSet();
   twins.cards[1] = { ...twins.cards[0] };
   assert.match(validateCustomSet(twins).errors.join(), /001 is used twice/);

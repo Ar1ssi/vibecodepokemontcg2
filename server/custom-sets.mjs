@@ -10,6 +10,7 @@ import { gzip } from 'node:zlib';
 import { promisify } from 'node:util';
 
 import {
+  DEFAULT_CUSTOM_SET_GROUP,
   isCustomCardId,
   isCustomSetId,
   validateCustomSet,
@@ -132,6 +133,7 @@ export function createCustomSetStore({ sets = new Map(), cards = new Map() } = {
         name: set.name,
         cardCount: set.cards.length,
         releaseDate: set.releaseDate || '',
+        group: set.group || DEFAULT_CUSTOM_SET_GROUP,
       })),
     }),
   };

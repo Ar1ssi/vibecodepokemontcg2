@@ -361,11 +361,15 @@ const TCGDEX_BASE = tcgdexApiBase();
 
     // Custom sets (design 075): the sets installed in this repo (client/src/assets/custom-sets),
     // listed by the server's manifest; their cards come through the TCGdex proxy like any set's.
+    // A set.json's `group` picks the pill: "custom" (or none) → Custom, "homebrew" → Homebrew sets.
     export const CUSTOM_CATEGORY = 'custom';
+    export const HOMEBREW_SETS_CATEGORY = 'homebrew-sets';
+    const CATEGORY_BY_GROUP = Object.freeze({ custom: CUSTOM_CATEGORY, homebrew: HOMEBREW_SETS_CATEGORY });
 
-    export async function fetchCustomSets(manifest = null) {
+    export async function fetchCustomSets(manifest = null, category = CUSTOM_CATEGORY) {
       const { sets } = manifest || (await fetchCustomSetManifest());
       return sets
+        .filter((set) => (CATEGORY_BY_GROUP[set.group] ?? CUSTOM_CATEGORY) === category)
         .map((set) => ({
           setId: set.id,
           name: set.name,
@@ -374,7 +378,7 @@ const TCGDEX_BASE = tcgdexApiBase();
           logo: '',
           symbol: '',
           cardCount: set.cardCount,
-          category: CUSTOM_CATEGORY,
+          category,
         }))
         .sort((a, b) => String(b.releaseDate).localeCompare(String(a.releaseDate)) || a.name.localeCompare(b.name));
     }

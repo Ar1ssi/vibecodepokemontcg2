@@ -59,7 +59,7 @@ test('loads valid sets, skips broken ones with one logged line each', () => {
   assert.match(lines[1], /^custom set custombad skipped: set.json is not valid JSON/);
   assert.match(lines[2], /^custom set customdup skipped: .*id: expected "customdup-001".*used twice/);
   assert.deepEqual(store.manifest(), {
-    sets: [{ id: 'customhbw', code: 'HBW', name: 'Homebrew Wave 1', cardCount: 2, releaseDate: '2026-10-23' }],
+    sets: [{ id: 'customhbw', code: 'HBW', name: 'Homebrew Wave 1', cardCount: 2, releaseDate: '2026-10-23', group: 'custom' }],
   });
 });
 

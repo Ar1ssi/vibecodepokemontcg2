@@ -4,6 +4,7 @@ import {
       fetchHomebrewSets,
       fetchCustomSets,
       CUSTOM_CATEGORY,
+      HOMEBREW_SETS_CATEGORY,
       fetchSetCards,
       filterCardsByName,
       filterCardsBySupertype,
@@ -104,6 +105,7 @@ import {
         '    <button class="native-deck-builder-set-browser-series-tag native-deck-builder-set-browser-series-tag--other" data-category="other" type="button">other</button>',
         '    <button class="native-deck-builder-set-browser-series-tag" data-category="homebrew" type="button">Homebrew</button>',
         `    <button class="native-deck-builder-set-browser-series-tag" data-category="${CUSTOM_CATEGORY}" type="button" title="Sets made in the card editor and stored in this repo">Custom</button>`,
+        `    <button class="native-deck-builder-set-browser-series-tag" data-category="${HOMEBREW_SETS_CATEGORY}" type="button" title="Homebrew cards made in the card editor and stored in this repo">Homebrew sets</button>`,
         generationPillsHtml,
         '  </div>',
         '  <div class="native-deck-builder-set-browser-controls">',
@@ -212,13 +214,14 @@ import {
         if (activeCategory === CUSTOM_CATEGORY) {
           return { label: 'Custom sets', sets: state.sets };
         }
+        // Generation pills and Homebrew sets show their sets with no group label.
         return { label: '', sets: state.sets };
       };
 
       const showCategoryStatus = () => {
         const state = categoryState.get(activeCategory);
         if (!state?.loaded) return;
-        if (activeCategory === CUSTOM_CATEGORY && state.sets.length === 0) {
+        if ((activeCategory === CUSTOM_CATEGORY || activeCategory === HOMEBREW_SETS_CATEGORY) && state.sets.length === 0) {
           showStatus(
             'No custom sets installed. Drop a set folder from the card editor into client/src/assets/custom-sets/ and restart the server.'
           );
@@ -450,8 +453,8 @@ import {
             state.sets = await fetchHomebrewSets();
             state.loaded = true;
             state.loading = false;
-          } else if (categoryId === CUSTOM_CATEGORY) {
-            state.sets = await fetchCustomSets();
+          } else if (categoryId === CUSTOM_CATEGORY || categoryId === HOMEBREW_SETS_CATEGORY) {
+            state.sets = await fetchCustomSets(null, categoryId);
             state.loaded = true;
             state.loading = false;
           } else {
