@@ -90,6 +90,62 @@ export function textureUrl(texName, base = FOIL_ASSET_ROOT) {
   return `${base}/cards/${set}/${texName}.webp`;
 }
 
+// ── custom sets (design 075 + I271): a set folder carries its own foil.json and the card textures next to it, so
+// they need no TCG Live extract or object storage. foil.json: { v: 1, cards: { "<localId>": { tcgl?, shader,
+// material, front, etch?, wp?, cf?, cc? } } } — front/etch/wp/cf are `.webp` files in `<set>/foil/`, cc names a
+// pattern in materials.json. The shaders and shared material textures still come from the texture host.
+export const CUSTOM_FOIL_VERSION = 1;
+const CUSTOM_SET_ID = /^[a-z0-9][a-z0-9-]*$/;
+const CUSTOM_TEXTURE_FILE = /^[a-z0-9][a-z0-9._-]*\.webp$/i;
+
+export const CUSTOM_ASSET_ROOT = '/src/assets/custom-sets';
+
+/** URL of a custom card texture: `dir` is the record's folder, `file` a `.webp` name from foil.json. */
+export function customTextureUrl(dir, file) {
+  if (!isNonEmptyString(dir) || !CUSTOM_TEXTURE_FILE.test(file ?? '')) return null;
+  return `${dir}/${file}`;
+}
+
+/** The URL of a card texture for either kind of record: custom records carry a `dir`, TCG Live ones a base. */
+export const recordTextureUrl = (record, texName, base) =>
+  record.dir ? customTextureUrl(record.dir, texName) : textureUrl(texName, base);
+
+/**
+ * One custom set's foil.json → Map of normalized card key → record (same shape parseFoilManifest builds, plus the
+ * `dir` its textures live in). Rows without a shader, material or front texture are skipped.
+ */
+export function parseCustomFoil(setId, json) {
+  const records = new Map();
+  if (!CUSTOM_SET_ID.test(setId ?? '')) throw new Error(`custom foil: bad set id ${setId}`);
+  if (!json || typeof json !== 'object') throw new Error('custom foil: not an object');
+  if (json.v !== CUSTOM_FOIL_VERSION) throw new Error(`custom foil: unsupported version ${json.v}`);
+  const dir = `${CUSTOM_ASSET_ROOT}/${setId}/foil`;
+  const file = (value) => (customTextureUrl(dir, value) ? value : null);
+  for (const [localId, row] of Object.entries(json.cards && typeof json.cards === 'object' ? json.cards : {})) {
+    const key = normalizeCardKey(`${setId}-${localId}`);
+    if (!key || !row || typeof row !== 'object') continue;
+    if (!isNonEmptyString(row.shader) || !isNonEmptyString(row.material) || !file(row.front)) continue;
+    records.set(key, {
+      tcglId: String(row.tcgl ?? ''),
+      shader: row.shader,
+      material: row.material,
+      front: row.front,
+      etch: file(row.etch),
+      wp: file(row.wp),
+      cf: file(row.cf),
+      cc: isNonEmptyString(row.cc) ? row.cc : null,
+      dir,
+    });
+  }
+  return records;
+}
+
+/** Adds custom records to a parsed manifest's base printings (a custom id never collides with a printed one). */
+export function mergeCustomFoil(parsed, records) {
+  for (const [key, record] of records) parsed.records.set(key, record);
+  return parsed;
+}
+
 /** URL of a shared material texture from its materials.json path (`tex/<name>.webp`, relative to the base). */
 export function materialTextureUrl(relativePath, base = FOIL_ASSET_ROOT) {
   if (!isNonEmptyString(relativePath) || !/^tex\/[a-z0-9_-]+\.webp$/i.test(relativePath)) return null;

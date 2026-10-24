@@ -4,6 +4,17 @@
 export const LOCAL_FOIL_TEXTURE_BASE = '/src/assets/tcgl-foil';
 
 /**
+ * Custom sets that ship a foil.json beside their set.json (I271): the client merges each into its foil manifest.
+ * @param {string[]} setIds loaded custom set ids
+ * @param {(file: string) => boolean} hasFile whether `<setId>/foil.json` exists under the custom-sets root
+ * @returns {{setId: string, url: string}[]}
+ */
+export const customFoilSets = (setIds, hasFile) =>
+  setIds
+    .filter((setId) => hasFile(`${setId}/foil.json`))
+    .map((setId) => ({ setId, url: `/src/assets/custom-sets/${setId}/foil.json` }));
+
+/**
  * @param {{envUrl?: string, localTexturesPresent?: boolean}} input
  * @returns {{textureBase: string|null, error: string|null}} error names a FOIL_TEXTURE_URL that was set but unusable.
  */

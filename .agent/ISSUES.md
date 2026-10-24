@@ -15,7 +15,6 @@
 
 ## Open (newest first)
 - I272 2026-10-24 P3 [rules] Homebrew set customhb: every attack/ability runs; only Gloom Drowziness is inert (Asleep cannot retreat). Limits in client/src/assets/custom-sets/customhb/ENGINE-CHECK.md; recheck: node scripts/custom-sets/engine-check.mjs
-- I271 2026-10-23 P3 [deck-builder] Custom sets (design 075) ship without foil: cardback's zip carries TCG Live foil textures per card but the sim keys foil by TCGdex id on R2 (D217) — a custom-set foil path (local textures under the set folder) is unbuilt
 - I270 2026-10-19 P3 [rules] Delinquent (PR #222) adds a third "If you do" gate: opponentDiscardFromHand rescans events for a Stadium cardMoved (trainer-steps.mjs:4536) though the executor has `cost` steps and `requiresStadiumDiscard` (executor.mjs:400, :483) — fold into one
 - I269 2026-10-19 P3 [client] trainer-execution.js `_stadiumDiscardedByStep` (:82, PR #222) is module state never reset per runTrainerSteps; a later requiresStadium step with no discardStadium before it reads the last Trainer's value — reset it at run start
 - I268 2026-10-19 P3 [rules] Delinquent no-Stadium test (trainer-steps-missing.test.mjs:186) checks reason `no_stadium`, which discardStadium (trainer-steps.mjs:2190) also emits, so it cannot tell which step skipped — give the gate its own reason

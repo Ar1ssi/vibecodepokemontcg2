@@ -91,7 +91,7 @@ client/src/actions/move-card-bundle/energy-token-assets.mjs — attached-Energy 
 client/src/actions/zones/ — deck/hand/prize/shuffle operations
 client/src/actions/counters/ — damage, special condition, ability counters (DOM overlays)
 client/src/actions/general/ — setup, ready, turn, reveal/hide, reset, undo
-client/src/setup/foil/ — TCG Live card foil renderer: manifest (pure), pose math (pure), store (loads manifest + /api/tcgl-foil/config texture base), three.js material + view; server/tcgl-foil-config.mjs serves FOIL_TEXTURE_URL (D217)
+client/src/setup/foil/ — TCG Live card foil renderer (custom sets: foil.json merged by the store, D225): manifest (pure), pose math (pure), store (loads manifest + /api/tcgl-foil/config texture base), three.js material + view; server/tcgl-foil-config.mjs serves FOIL_TEXTURE_URL (D217)
 client/src/setup/image-logic/drag.js + drag-avatar.js + drag-tilt.mjs — native HTML5 card drag/drop; the dragged card is drawn as a swinging body-level avatar (design 038, D124; physics pure in drag-tilt.mjs); a held Item/Supporter lights its board (design 046, drop-zone.mjs playsOntoBoard)
 
 ## three.js board (design 074-three-board, D220) — the only board; entry: client/src/setup/board3d/board3d.js
@@ -104,6 +104,7 @@ scripts/e2e/board3d-*-test.mjs, test-card-inspector-e2e.mjs, fullview-test.mjs, 
 ## Tests & tooling
 **/__tests__/*.test.mjs — plain `node --test`, no jsdom; `pnpm test` runs them all (~6900); run one file with `node --test <path>`
 scripts/prune-merged-branches.mjs — dry-run/delete remote branches fully contained in origin/main; keeps main, the current branch and open-PR refs (via gh, else --keep); needs local push rights (test: scripts/__tests__/prune-merged-branches.test.mjs)
+scripts/custom-sets/import-foil.py — cardback foil exports (zip/folder) → <set>/foil.json + foil/*.webp (D225); scripts/custom-sets/check.mjs validates them
 scripts/harness-check.mjs — `pnpm harness:check`: measures every .agent budget in workflows/maintain.md plus the 30-commit maintain trigger; exit 1 = OVER (test: scripts/__tests__/harness-check.test.mjs)
 scripts/e2e/two-player-sync-test.mjs — Playwright two-browser sync harness (legacy mode: needs a
   `SERVER_AUTHORITATIVE=0` server on PTCG_URL, `pnpm test:2p`)

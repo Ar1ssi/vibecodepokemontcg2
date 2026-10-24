@@ -75,3 +75,37 @@ test('the sets committed in this repo are valid', () => {
   const { problems } = checkCustomSets(DEFAULT_ROOT);
   assert.deepEqual(problems, []);
 });
+
+test('a foil.json is checked against the set, the TCG Live bundle and the files on disk', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'custom-check-'));
+  const set = sampleSet();
+  writeSet(root, set);
+  const dir = path.join(root, set.id);
+  const good = { shader: 'TPCi/Cards3D/HoloFoil/FlatSilver', material: 'MAT_Cards3D_FlatSilver', front: '001-front.webp' };
+  fs.mkdirSync(path.join(dir, 'foil'));
+  fs.writeFileSync(path.join(dir, 'foil', '001-front.webp'), 'x');
+  const write = (cards) => fs.writeFileSync(path.join(dir, 'foil.json'), JSON.stringify({ v: 1, cards }));
+
+  write({ '001': good });
+  assert.deepEqual(checkCustomSets(root).problems, []);
+
+  write({
+    '001': { ...good, wp: '001-wp.webp', cc: 'TEX_Nope' },
+    '002': { ...good, shader: 'TPCi/Nope', material: 'MAT_Nope', front: '002-front.webp' },
+    '099': good,
+    '003': { shader: 'x' },
+  });
+  assert.deepEqual(checkCustomSets(root).problems.map((p) => p.replace(`${set.id}/`, '')).sort(), [
+    'foil.json: card 001: unknown pattern TEX_Nope',
+    'foil.json: card 002: unknown material MAT_Nope',
+    'foil.json: card 002: unknown shader TPCi/Nope',
+    'foil.json: card 003 has no usable shader, material and front texture',
+    'foil.json: card 003 is not in set.json',
+    'foil.json: card 099 is not in set.json',
+    'foil/001-wp.webp: missing',
+    'foil/002-front.webp: missing',
+  ]);
+
+  fs.writeFileSync(path.join(dir, 'foil.json'), '{');
+  assert.match(checkCustomSets(root).problems[0], /foil\.json: not valid JSON/);
+});

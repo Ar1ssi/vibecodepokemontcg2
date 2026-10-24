@@ -11,12 +11,61 @@ import { fileURLToPath } from 'node:url';
 
 import { validateCustomSet } from '../../shared/custom-sets/custom-set-schema.mjs';
 import { RESERVED_SET_CODES } from '../../server/custom-sets.mjs';
+import { normalizeCardKey, parseCustomFoil } from '../../client/src/setup/foil/tcgl-foil-manifest.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_ROOT = path.join(here, '..', '..', 'client', 'src', 'assets', 'custom-sets');
 
+const FOIL_DATA_DIR = path.join(here, '..', '..', 'client', 'src', 'assets', 'tcgl-foil');
+
+function loadFoilData() {
+  const read = (file) => JSON.parse(fs.readFileSync(path.join(FOIL_DATA_DIR, file), 'utf8'));
+  return { shaders: read('shaders.json').shaders, materials: read('materials.json') };
+}
+
+/**
+ * A set's optional foil.json (I271): parseable by the client, every card id is a card of the set, every shader and
+ * material exists in the TCG Live bundle, and every texture it names is in <set>/foil/. Returns problem lines.
+ */
+function checkFoil(setName, dir, set, { shaders, materials }) {
+  const file = path.join(dir, 'foil.json');
+  if (!fs.existsSync(file)) return [];
+  const label = `${setName}/foil.json`;
+  let json;
+  try {
+    json = JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch (error) {
+    return [`${label}: not valid JSON (${error.message})`];
+  }
+  const problems = [];
+  let parsed;
+  try {
+    parsed = parseCustomFoil(set.id, json);
+  } catch (error) {
+    return [`${label}: ${error.message}`];
+  }
+  const localIds = new Set(set.cards.map((card) => card.localId));
+  for (const [localId, row] of Object.entries(json.cards ?? {})) {
+    if (!localIds.has(localId)) problems.push(`${label}: card ${localId} is not in set.json`);
+    if (!parsed.has(normalizeCardKey(`${set.id}-${localId}`))) {
+      problems.push(`${label}: card ${localId} has no usable shader, material and front texture`);
+      continue;
+    }
+    if (!shaders[row.shader]) problems.push(`${label}: card ${localId}: unknown shader ${row.shader}`);
+    if (!materials.materials[row.material]) problems.push(`${label}: card ${localId}: unknown material ${row.material}`);
+    if (row.cc && !materials.textures?.[row.cc]) problems.push(`${label}: card ${localId}: unknown pattern ${row.cc}`);
+    for (const kind of ['front', 'etch', 'wp', 'cf']) {
+      if (row[kind] && !fs.existsSync(path.join(dir, 'foil', row[kind]))) {
+        problems.push(`${setName}/foil/${row[kind]}: missing`);
+      }
+    }
+  }
+  return problems;
+}
+
 /** @returns {{ sets: string[], problems: string[] }} */
 export function checkCustomSets(rootDir = DEFAULT_ROOT) {
+  const foilData = loadFoilData();
   const problems = [];
   const sets = [];
   let entries;
@@ -52,6 +101,7 @@ export function checkCustomSets(rootDir = DEFAULT_ROOT) {
         if (!fs.existsSync(path.join(dir, card.localId, name))) missing.push(`${entry.name}/${card.localId}/${name}: missing`);
       }
     }
+    missing.push(...checkFoil(entry.name, dir, result.set, foilData));
     if (missing.length) problems.push(...missing);
     else sets.push(`${entry.name} (${result.set.code}, ${result.set.cards.length} cards)`);
   }

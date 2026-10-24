@@ -9,7 +9,7 @@ Focus: custom sets landed (075-custom-sets, D223/D224): cardback's "Download for
 Active: user localhost checks — Custom pill shows DEMO, add Alakazam ex / Hyper Ball to a deck, play: Hyper Ball search + Spoon Bend
   coin flip run in rules mode; 3D board H1/H2/H3 visuals (I266) and TCG Live attack UI (074, D219) still unchecked; status FX pending.
 Next: maintenance is due (`pnpm harness:check`: DECISIONS/ISSUES over cap; 70+ commits since the last maintain) → run maintain.md.
-  Then I271 (custom-set foil), I264 (legacy relay has no board), 069 foil on Render (I259), 072 coin prompts, B&B run flow,
+  Then I264 (legacy relay has no board), 069 foil on Render (I259), 072 coin prompts, B&B run flow,
   I242, I239, I227; `node scripts/prune-merged-branches.mjs --yes` locally. ETB (057) slice 6 unstarted.
 Blocked: I85/I86 need design approval (028/029); I87 needs the user's description; I235 needs a face-down-card design.
 

@@ -55,7 +55,7 @@ import { createCardImageHandler } from './card-image-proxy.mjs';
 import { CARD_ART_PROXY_HOSTS } from './card-art-proxy-hosts.mjs';
 import { cacheControlFor } from './sfx-cache.mjs';
 import { readServerAuthoritative } from './netcode-mode.mjs';
-import { resolveFoilTextureBase } from './tcgl-foil-config.mjs';
+import { customFoilSets, resolveFoilTextureBase } from './tcgl-foil-config.mjs';
 
 // On unless SERVER_AUTHORITATIVE is 0, false, off or no (the legacy relay, kept until I251 retires it).
 const netcodeMode = readServerAuthoritative(process.env.SERVER_AUTHORITATIVE);
@@ -299,8 +299,10 @@ async function main() {
     localTexturesPresent: fs.existsSync(path.join(clientDir, 'src', 'assets', 'tcgl-foil', 'tex')),
   });
   if (foilTextures.error) console.error(foilTextures.error);
+  const customSetsDir = path.join(clientDir, 'src', 'assets', 'custom-sets');
+  const customFoil = customFoilSets([...customSets.sets.keys()], (file) => fs.existsSync(path.join(customSetsDir, file)));
   app.get('/api/tcgl-foil/config', (_, res) => {
-    res.json({ textureBase: foilTextures.textureBase });
+    res.json({ textureBase: foilTextures.textureBase, customFoil });
   });
 
   app.use('/shared', express.static(sharedDir));

@@ -86,3 +86,38 @@ describe('loadFoilManifest', () => {
     assert.equal(await (await freshStore()).loadFoilManifest(null), null);
   });
 });
+
+describe('custom set foil', () => {
+  const ROW = { shader: 'TPCi/Cards3D/HoloFoil/FlatSilver', material: 'MAT_Cards3D_FlatSilver', front: '015-front.webp' };
+  const withCustom = (files) => {
+    const base = serving({
+      config: {
+        textureBase: 'https://pub-abc.r2.dev',
+        customFoil: Object.keys(files).map((setId) => ({ setId, url: `/src/assets/custom-sets/${setId}/foil.json` })),
+      },
+    });
+    return async (url) => {
+      const setId = /custom-sets\/([^/]+)\/foil\.json/.exec(url)?.[1];
+      if (!setId) return base(url);
+      return files[setId] ? reply(files[setId]) : { ok: false, status: 404 };
+    };
+  };
+
+  it('merges each custom set named by the config into the manifest as base printings', async () => {
+    const store = await freshStore();
+    const parsed = await store.loadFoilManifest(withCustom({ customhb: { v: 1, cards: { '015': ROW } } }));
+    assert.equal(parsed.records.get('customhb-15').dir, '/src/assets/custom-sets/customhb/foil');
+    assert.ok(parsed.flat.has('sv01-1'));
+  });
+
+  it('skips a set whose foil.json is missing or malformed and keeps the rest', async () => {
+    const store = await freshStore();
+    const { value, warnings } = await quietWarn(() =>
+      store.loadFoilManifest(
+        withCustom({ missing: null, broken: { v: 9, cards: {} }, customhb: { v: 1, cards: { '015': ROW } } })
+      )
+    );
+    assert.deepEqual([...value.records.keys()], ['customhb-15']);
+    assert.equal(warnings.length, 2);
+  });
+});

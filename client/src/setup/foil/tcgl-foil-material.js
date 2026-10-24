@@ -5,7 +5,7 @@
 // come from this card's record; spectrum / shine / glitter textures from the material.
 // Loaded only through import() by tcgl-foil-view.js, so three never reaches node tests.
 import * as THREE from 'three';
-import { DEFAULT_FOIL_UV, FOIL_ASSET_ROOT, materialTextureUrl, textureUrl } from './tcgl-foil-manifest.mjs';
+import { DEFAULT_FOIL_UV, FOIL_ASSET_ROOT, materialTextureUrl, recordTextureUrl } from './tcgl-foil-manifest.mjs';
 import { foilTextureBase } from './tcgl-foil-store.js';
 
 let foilData = null;
@@ -157,7 +157,7 @@ export function createFoilMaterial(record) {
     return entry.texture;
   };
   const cardTexture = (texName, fallback) => {
-    const url = textureUrl(texName, foilTextureBase());
+    const url = recordTextureUrl(record, texName, foilTextureBase());
     return url ? hold(acquireTexture(url, {}, { single: true })) : fallback;
   };
   const materialTexture = (name) => {

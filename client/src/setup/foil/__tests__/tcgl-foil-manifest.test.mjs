@@ -2,11 +2,15 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   DEFAULT_FOIL_UV,
+  customTextureUrl,
   foilCoverage,
   foilRecordFor,
   materialTextureUrl,
+  mergeCustomFoil,
   normalizeCardKey,
+  parseCustomFoil,
   parseFoilManifest,
+  recordTextureUrl,
   textureUrl,
 } from '../tcgl-foil-manifest.mjs';
 
@@ -132,5 +136,67 @@ describe('materialTextureUrl', () => {
     for (const bad of [undefined, '', '/src/assets/tcgl-foil/tex/x.webp', 'tex/../x.webp', 'cards/sv1/x.webp', 'https://evil/tex/x.webp']) {
       assert.equal(materialTextureUrl(bad), null, String(bad));
     }
+  });
+});
+
+describe('custom set foil', () => {
+  const ROW = { tcgl: 'me2_2', shader: 'TPCi/Cards3D/HoloFoil/FlatSilver', material: 'MAT_Cards3D_FlatSilver', front: '015-front.webp', wp: '015-wp.webp' };
+
+  it('parses foil.json rows into records keyed like a printed card, with the set folder as their texture dir', () => {
+    const records = parseCustomFoil('customhb', { v: 1, cards: { '015': ROW, '156': { ...ROW, cc: 'TEX_SouthernCross', etch: '156-etch.webp' } } });
+    assert.deepEqual([...records.keys()].sort(), ['customhb-15', 'customhb-156']);
+    assert.deepEqual(records.get('customhb-15'), {
+      tcglId: 'me2_2',
+      shader: ROW.shader,
+      material: ROW.material,
+      front: '015-front.webp',
+      etch: null,
+      wp: '015-wp.webp',
+      cf: null,
+      cc: null,
+      dir: '/src/assets/custom-sets/customhb/foil',
+    });
+    assert.equal(records.get('customhb-156').cc, 'TEX_SouthernCross');
+    assert.equal(records.get('customhb-156').etch, '156-etch.webp');
+  });
+
+  it('skips rows without a shader, material or a safe front file; unsafe mask names become null', () => {
+    const records = parseCustomFoil('customhb', {
+      v: 1,
+      cards: {
+        '001': { ...ROW, shader: '' },
+        '002': { ...ROW, material: undefined },
+        '003': { ...ROW, front: '../front.webp' },
+        '004': { ...ROW, front: 'front.png' },
+        '005': null,
+        '006': { ...ROW, wp: '../../x.webp' },
+      },
+    });
+    assert.deepEqual([...records.keys()], ['customhb-6']);
+    assert.equal(records.get('customhb-6').wp, null);
+  });
+
+  it('throws on a wrong version, a non-object, or a bad set id', () => {
+    assert.throws(() => parseCustomFoil('customhb', { v: 2, cards: {} }), /version/);
+    assert.throws(() => parseCustomFoil('customhb', null), /not an object/);
+    assert.throws(() => parseCustomFoil('../evil', { v: 1, cards: {} }), /bad set id/);
+    assert.deepEqual([...parseCustomFoil('customhb', { v: 1 }).keys()], []);
+  });
+
+  it('merges into base printings and answers foilRecordFor / foilCoverage for the custom id', () => {
+    const parsed = parseFoilManifest({ v: 1, shaders: [], materials: [], cards: {}, flat: [] });
+    mergeCustomFoil(parsed, parseCustomFoil('customhb', { v: 1, cards: { '015': ROW } }));
+    assert.equal(foilRecordFor(parsed, 'customhb-015').front, '015-front.webp');
+    assert.equal(foilCoverage(parsed, 'customhb-015'), 'foil');
+    assert.equal(foilCoverage(parsed, 'customhb-016'), null);
+  });
+
+  it('builds texture urls from the record: its own dir for custom cards, the texture base for TCG Live ones', () => {
+    assert.equal(customTextureUrl('/src/assets/custom-sets/customhb/foil', '015-front.webp'), '/src/assets/custom-sets/customhb/foil/015-front.webp');
+    for (const bad of [null, '', 'a/b.webp', '..webp/../x', 'x.png']) assert.equal(customTextureUrl('/d', bad), null, String(bad));
+    assert.equal(customTextureUrl('', 'x.webp'), null);
+    const custom = { dir: '/d' };
+    assert.equal(recordTextureUrl(custom, 'a.webp', 'https://r2.example'), '/d/a.webp');
+    assert.equal(recordTextureUrl({}, 'sv1_wp_en_001', 'https://r2.example'), 'https://r2.example/cards/sv1/sv1_wp_en_001.webp');
   });
 });
