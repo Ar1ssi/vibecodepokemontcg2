@@ -321,8 +321,8 @@
    The Settings toggle puts `holo-shapes-off` on the parent page's body and on
    each playmat iframe's <html> (fx-settings.js). Only the glitter layer goes;
    the shine and the foil colour stay. */
-:root.holo-shapes-off .card__glitter,
-body.holo-shapes-off .card__glitter {
+:root.holo-shapes-off .card[data-rarity] .card__glitter,
+body.holo-shapes-off .card[data-rarity] .card__glitter {
   display: none;
 }
 

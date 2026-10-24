@@ -169,8 +169,30 @@ test('the unboxing scene sheet guards every idle loop with body.fx-off and reduc
 test('the holo sparkle toggle hides the glitter layer on the parent page and in the mat iframes', () => {
   // Settings puts `holo-shapes-off` on body (parent) and on each iframe's <html> (fx-settings.js).
   const css = read('holo/base.css');
-  assert.ok(css.includes(':root.holo-shapes-off .card__glitter'), 'iframe root guard missing');
-  assert.ok(css.includes('body.holo-shapes-off .card__glitter'), 'parent body guard missing');
+  assert.ok(css.includes(':root.holo-shapes-off .card[data-rarity] .card__glitter'), 'iframe root guard missing');
+  assert.ok(css.includes('body.holo-shapes-off .card[data-rarity] .card__glitter'), 'parent body guard missing');
+});
+
+test('the holo sparkle guard outranks every per-rarity glitter display rule', () => {
+  // ex-regular.css sets display:block on `.card[data-rarity="double rare"] .card__glitter`
+  // and loads after base.css, so the guard needs higher specificity than (0,3,0).
+  const specificity = (selector) => {
+    const ids = (selector.match(/#[\w-]+/g) ?? []).length;
+    const attrs = (selector.match(/\[[^\]]+\]|\.[\w-]+|:(?!:)[\w-]+(?!\()/g) ?? []).length;
+    const types = (selector.replace(/\[[^\]]+\]|[.#:][\w-]+/g, '').match(/(?:^|\s)[a-z]+/gi) ?? []).length;
+    return [ids, attrs, types];
+  };
+  const guard = '.card[data-rarity] .card__glitter';
+  const [, gAttrs] = specificity(':root.holo-shapes-off ' + guard);
+  for (const name of ['ex-regular.css', 'modern-holo.css', 'classic-holo.css']) {
+    for (const rule of rules(read('holo/' + name))) {
+      if (!/display:\s*block/.test(rule.body) || !/card__glitter/.test(rule.selector)) continue;
+      for (const part of splitSelectorList(rule.selector)) {
+        const [, attrs] = specificity(part);
+        assert.ok(gAttrs > attrs, `${name}: "${part}" outranks the holo sparkle guard`);
+      }
+    }
+  }
 });
 
 test('parent-page overlays are still killed by the body class', () => {
