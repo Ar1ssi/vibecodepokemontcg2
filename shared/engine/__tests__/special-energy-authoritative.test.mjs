@@ -721,3 +721,74 @@ test('review: Mist Energy prevents damage counters placed by an opponent attack'
   assert.equal(res.error, null);
   assert.equal(findCard(res.state, 9).card.damage || 0, 0);
 });
+
+// Nitro {R} Energy — text from out/pkmn-special-energy-cards.json (Chaos Rising 086).
+const NITRO_TEXT =
+  'As long as this card is attached to a Pokémon, it provides {R} Energy. If this card is discarded by an effect of an attack used by the {R} Pokémon this card is attached to, put this card into your hand after attack damage and effects.';
+
+function nitroGame(attackText, extraEnergy = 1) {
+  const state = game();
+  state.players.p1.zones.active.push(
+    pokemon({
+      instanceId: 1,
+      name: 'Charmeleon',
+      types: ['Fire'],
+      attacks: [{ name: 'Burn Out', damage: 50, cost: [], text: attackText }],
+    }),
+    specialEnergy({ instanceId: 2, name: 'Nitro {R} Energy', text: NITRO_TEXT, attachedTo: 1 })
+  );
+  for (let i = 0; i < extraEnergy; i += 1) {
+    state.players.p1.zones.active.push(
+      createCard({ instanceId: 3 + i, supertype: 'Energy', subtypes: ['Basic Energy'], name: 'Fire Energy', attachedTo: 1 })
+    );
+  }
+  state.players.p2.zones.active.push(pokemon({ instanceId: 9, name: 'Snorlax', hp: 300 }));
+  return state;
+}
+
+const inZone = (state, zone, id) => state.players.p1.zones[zone].some((c) => c.instanceId === id);
+
+test('Nitro: "Discard all Energy" attack returns Nitro to hand', () => {
+  const res = applyCommand(nitroGame('Discard all Energy from this Pokémon.'), {
+    type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1',
+  });
+  assert.equal(res.error, null);
+  assert.ok(inZone(res.state, 'hand', 2), 'Nitro in hand');
+  assert.ok(!inZone(res.state, 'discard', 2), 'Nitro not discarded');
+  assert.ok(inZone(res.state, 'discard', 3), 'basic Energy discarded');
+});
+
+test('Nitro: "Discard 2 Energy" attack returns Nitro to hand', () => {
+  const res = applyCommand(nitroGame('Discard 2 Energy from this Pokémon.'), {
+    type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1',
+  });
+  assert.equal(res.error, null);
+  assert.ok(inZone(res.state, 'hand', 2), 'Nitro in hand');
+  assert.ok(!inZone(res.state, 'discard', 2), 'Nitro not discarded');
+});
+
+test('Nitro: discard-to-scale attack (chosen Energy) returns Nitro to hand', () => {
+  const state = nitroGame(
+    'Discard up to 2 Energy from this Pokémon. This attack does 50 damage for each card you discarded in this way.'
+  );
+  let res = applyCommand(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' });
+  assert.equal(res.error, null);
+  if (res.state.pendingChoice) {
+    res = applyCommand(res.state, {
+      type: 'resolveChoice',
+      payload: { choiceId: res.state.pendingChoice.choiceId, selection: [2, 3] },
+      playerId: 'p1',
+    });
+    assert.equal(res.error, null);
+  }
+  assert.ok(inZone(res.state, 'hand', 2), 'Nitro in hand');
+  assert.ok(!inZone(res.state, 'discard', 2), 'Nitro not discarded');
+});
+
+test('Nitro: a manual discard outside an attack still goes to the discard pile', () => {
+  const res = applyCommand(nitroGame('Nothing.'), {
+    type: 'moveCard', payload: { instanceId: 2, from: 'active', to: 'discard' }, playerId: 'p1',
+  });
+  assert.equal(res.error, null);
+  assert.ok(inZone(res.state, 'discard', 2));
+});

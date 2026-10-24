@@ -8,6 +8,7 @@ import { findCard, discardCardToPlayerZone } from '../state.mjs';
 import { isEnergy, isPokemon } from '../cards.mjs';
 import { discardCurrentStadium } from '../effects/trainer.mjs';
 import { createPendingChoice, attachToRoot, executeSteps } from '../effects/executor.mjs';
+import { resolveAttackEnergyDiscard } from '../effects/special-energy.mjs';
 import { parseAttackSteps, resolveCoinGates } from '../rules/attack-steps.mjs';
 import { isBasicEnergy } from '../rules/card-classify.mjs';
 import { isAncientCard, isFutureCard } from '../rules/paradox-tags.mjs';
@@ -219,11 +220,19 @@ export function discardScalingEnergy(draft, { playerId, selection, allowedIds, d
     const zone = player.zones[ref.zoneId];
     const idx = zone.findIndex((c) => c.instanceId === id);
     if (idx < 0) continue;
+    const resolution = destination === 'deck' ? null : resolveAttackEnergyDiscard(draft, zone[idx]);
+    if (resolution === 'reattach') {
+      discarded++;
+      continue;
+    }
     const [card] = zone.splice(idx, 1);
     card.attachedTo = null;
     let to = 'deck';
     if (destination === 'deck') player.zones.deck.push(card);
-    else to = discardCardToPlayerZone(player, card);
+    else if (resolution === 'hand') {
+      player.zones.hand.push(card);
+      to = 'hand';
+    } else to = discardCardToPlayerZone(player, card);
     events.push({
       type: 'cardMoved',
       instanceId: id,
@@ -507,10 +516,16 @@ function moveAttachedCards(draft, { playerId, ids, to, reason, events }) {
       const zone = player?.zones?.[zoneKey] || [];
       const idx = zone.findIndex((c) => c.instanceId === id && c.attachedTo != null);
       if (idx < 0) continue;
+      const resolution = to === 'discard' ? resolveAttackEnergyDiscard(draft, zone[idx]) : null;
+      if (resolution === 'reattach') {
+        draft.attackDiscardedForDamage = [...(draft.attackDiscardedForDamage || []), id];
+        moved++;
+        break;
+      }
       const [card] = zone.splice(idx, 1);
       card.attachedTo = null;
       let destination = 'hand';
-      if (to === 'discard') {
+      if (to === 'discard' && resolution !== 'hand') {
         destination = discardCardToPlayerZone(player, card);
         // Flareon Burn Booster / Magcargo Crushing Lava read what the cost discarded.
         draft.attackDiscardedForDamage = [...(draft.attackDiscardedForDamage || []), id];

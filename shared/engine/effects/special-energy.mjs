@@ -594,6 +594,33 @@ export function resolveSpecialEnergyDiscard(draft, { energy, host, hostTop = nul
 }
 
 /**
+ * On-discard resolution for an attached Energy an attack is discarding right now. Callers that
+ * discard outside `resolveAttackEffectPhase` (a resumed choice, an optional cost) have no
+ * `__attackEffectPhase` flag, so the attack gate is forced on. Call BEFORE removing the card from
+ * its zone. Returns `'hand'`, `'reattach'`, or null to discard normally.
+ */
+export function resolveAttackEnergyDiscard(draft, energy) {
+  if (!energy || energy.attachedTo == null || !isSpecialEnergyCard(energy)) return null;
+  const hostRef = findCard(draft, energy.attachedTo);
+  if (!hostRef) return null;
+  const zone = zoneOf(draft, hostRef.playerId, hostRef.zoneId);
+  const previous = draft.__attackEffectPhase;
+  draft.__attackEffectPhase = true;
+  try {
+    return resolveSpecialEnergyDiscard(draft, {
+      energy,
+      host: hostRef.card,
+      hostTop: topPokemonCard(zone, hostRef.card),
+      hostPlayerId: hostRef.playerId,
+      hostZoneId: hostRef.zoneId,
+    });
+  } finally {
+    if (previous === undefined) delete draft.__attackEffectPhase;
+    else draft.__attackEffectPhase = previous;
+  }
+}
+
+/**
  * On-knockout resolution for the KO'd Pokémon's attached special energies.
  * Returns `{ returnToHand, drawUntil }`.
  */

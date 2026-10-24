@@ -36,7 +36,7 @@ import {
   markersBlockCondition, markersPreventEffects, parseDamageImmunity,
 } from '../rules/attack-markers.mjs';
 import { hasSpecialEnergyEffectShield } from '../rules/special-energy-parse.mjs';
-import { runSpecialEnergyTriggers } from '../effects/special-energy.mjs';
+import { runSpecialEnergyTriggers, resolveAttackEnergyDiscard } from '../effects/special-energy.mjs';
 import { stadiumBlocksHealing } from '../rules/stadium-effects.mjs';
 import { addCondition, hasCondition } from '../rules/special-conditions.mjs';
 import { parseNextTurnLock, parseAttackEnergyDiscard } from '../rules/attack-effects.mjs';
@@ -1493,15 +1493,17 @@ export function resolveAttackEffectPhase(draft, ctx) {
             (c) => c.instanceId === card.instanceId
           );
           if (idx >= 0) {
+            // Nitro returns to hand, Boomerang / Burning stay attached (design: on-discard triggers).
+            const resolution = resolveAttackEnergyDiscard(draft, card);
+            if (resolution === 'reattach') continue;
             const [discarded] = draft.players[playerId].zones.active.splice(
               idx,
               1
             );
             discarded.attachedTo = null;
-            const to = discardCardToPlayerZone(
-              draft.players[playerId],
-              discarded
-            );
+            let to = 'hand';
+            if (resolution === 'hand') draft.players[playerId].zones.hand.push(discarded);
+            else to = discardCardToPlayerZone(draft.players[playerId], discarded);
             events.push({
               type: 'cardMoved',
               instanceId: card.instanceId,
