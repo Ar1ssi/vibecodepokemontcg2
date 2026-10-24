@@ -21,7 +21,7 @@ import {
   abilityAttackCostDiscount, applyEnergyMultiplier, abilityActivationBlockReason,
   abilitySupporterLimit, abilitySetupActive, abilityPlayLocks, abilityEvolvePermission,
   abilityEvolveLock, abilityEvolutionCardLock, abilityRetreatLock, abilitySummonRestricted,
-  abilityFirstTurnAttack, extraAttackAvailable,
+  abilityFirstTurnAttack, extraAttackAvailable, abilityBlocksSpecialEnergyAttach,
 } from '../rules/ability-combat.mjs';
 import { handEnergyForDiscard, handCardsForLostZone } from '../effects/attack-steps.mjs';
 import { legacyAttachTargets } from '../effects/trainer-steps.mjs';
@@ -851,6 +851,16 @@ export function validateLegality(state, command) {
         if (isToolOrMachineTrainer(cardRef.card)) {
           const toolLock = abilityPlayLocks(cardRef.card, abilitySideContext(state, playerId));
           if (toolLock) return { allowed: false, reason: toolLock.reason };
+        }
+      }
+      // Froslass Cursed Glare: the opponent's Active Pokémon stops Special Energy from the hand.
+      if (cardRef?.zoneId === 'hand' && isSpecialEnergyCard(cardRef.card)) {
+        const opponentId = Object.keys(state.players || {}).find((id) => id !== playerId);
+        if (opponentId && abilityBlocksSpecialEnergyAttach(abilitySideContext(state, opponentId))) {
+          return {
+            allowed: false,
+            reason: `${cardRef.card.name} can't be attached: the opponent's Active Pokémon's Ability stops Special Energy from your hand.`,
+          };
         }
       }
       // "This card can only be attached to …" (Team Rocket's Energy, Shield Energy, …).

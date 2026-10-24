@@ -1648,6 +1648,22 @@ export function abilityPlayLocks(card, ctx = {}) {
   return null;
 }
 
+// Froslass Cursed Glare (Plasma Blast 23): "As long as this Pokémon is your Active Pokémon, your
+// opponent can't attach any Special Energy cards from his or her hand to his or her Pokémon."
+// `ctx` is the holder's side (the opponent of the player attaching the Energy).
+const SPECIAL_ENERGY_ATTACH_LOCK =
+  /as long as this pok[eé]mon is your active pok[eé]mon, your opponent can'?t attach any special energy cards? from (?:his or her|their) hand/;
+
+/** Whether an Active Pokémon's Ability on `ctx`'s side stops Special Energy from the hand being attached. */
+export function abilityBlocksSpecialEnergyAttach(ctx = {}) {
+  return sideInPlay(ctx).some(
+    (holder) =>
+      holderZone(holder, ctx) === 'active' &&
+      SPECIAL_ENERGY_ATTACH_LOCK.test(selfNamedText(holder)) &&
+      !isAbilitySuppressed(holder, ctx)
+  );
+}
+
 const EVOLVE_LOCK_CLAUSE =
   /can'?t play [^.]*from (?:his or her|their) hand to evolve|neither player can play/;
 

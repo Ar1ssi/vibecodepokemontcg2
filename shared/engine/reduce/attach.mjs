@@ -23,7 +23,8 @@ import { isBasicEnergy } from '../rules/card-classify.mjs';
 import { topPokemonCard } from '../rules/evolved-pokemon.mjs';
 import { requiresTurnEndOnEvolve } from '../rules/evolution.mjs';
 import { removeCondition, clearConditions, listConditions } from '../rules/special-conditions.mjs';
-import { inPlayView, cardEffectiveHp, isGameConcluded, abilitySideContext } from './shared.mjs';
+import { inPlayView, cardEffectiveHp, isGameConcluded, abilitySideContext, rootsIn } from './shared.mjs';
+import { switchBenchToActive } from '../effects/trainer-steps.mjs';
 import { handleKnockout } from './knockout.mjs';
 import { resolveCheckup, advanceTurn } from './turn.mjs';
 import { chaosGymBlocks } from './trainer.mjs';
@@ -102,10 +103,43 @@ function applyOnOpponentEvolve(draft, { evolvedCard, evolvingPlayerId, events })
 }
 
 export const GROWTH_ATTACH_EFFECT = 'alphaGrowth';
+export const SWITCH_OPPONENT_ACTIVE_EFFECT = 'switchOpponentActive';
+
+// Red Signal: "you may switch 1 of your opponent's Benched Pokémon with his or her Active Pokémon."
+// The player picks the Benched Pokémon (min 0 keeps the switch optional); resumeOpponentActiveSwitch applies it.
+function offerOpponentActiveSwitch(draft, { playerId, source }) {
+  const opponentId = Object.keys(draft.players || {}).find((id) => id !== playerId);
+  const benched = rootsIn(draft.players?.[opponentId]?.zones?.bench || []);
+  if (!opponentId || benched.length === 0) return;
+  draft.pendingChoice = createPendingChoice({
+    player: playerId,
+    source,
+    prompt: `${source}: switch 1 of your opponent's Benched Pokémon with their Active Pokémon?`,
+    options: benched,
+    min: 0,
+    max: 1,
+    resumeToken: { effectType: SWITCH_OPPONENT_ACTIVE_EFFECT, initiatorPlayerId: playerId, opponentId },
+  });
+}
+
+export function resumeOpponentActiveSwitch(draft, { token, selection, events }) {
+  draft.pendingChoice = null;
+  const pickedId = Number((selection || [])[0]);
+  if (!Number.isFinite(pickedId)) return;
+  const opponent = draft.players?.[token.opponentId];
+  const benchRoot = rootsIn(opponent?.zones?.bench || []).find((c) => c.instanceId === pickedId);
+  if (!benchRoot) return;
+  switchBenchToActive(draft, opponent, benchRoot, events, { viaTrainer: false });
+}
 
 /** Runs the Ability triggers of an Energy attached from the hand (`parseOnEnergyAttachAbilities`). */
 function applyEnergyAttachTriggers(draft, { host, hostTop, energy, playerId, events }) {
   const effects = parseOnEnergyAttachAbilities(host, energy, abilitySideContext(draft, playerId));
+  for (const effect of effects) {
+    if (effect.kind === SWITCH_OPPONENT_ACTIVE_EFFECT) {
+      offerOpponentActiveSwitch(draft, { playerId, source: effect.source });
+    }
+  }
   for (const { target, recover, heal, source } of effects) {
     if (recover) {
       for (const condition of listConditions(target)) {

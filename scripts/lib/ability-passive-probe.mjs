@@ -43,6 +43,7 @@ import {
   abilitySummonRestricted,
   abilityFirstTurnAttack,
   abilityExtraAttack,
+  abilityBlocksSpecialEnergyAttach,
 } from '../../shared/engine/rules/ability-combat.mjs';
 import {
   inPlayEntries,
@@ -53,6 +54,8 @@ import {
   parseOnDamageStatus,
   parseOnEnergyAttachAbilities,
   parseOnKoAbilities,
+  parseOnKoAbilityEffect,
+  parseBetweenTurnsAbilities,
 } from '../../shared/engine/rules/ability-triggers.mjs';
 import {
   parseToolCap,
@@ -178,6 +181,9 @@ function probeBoard(holder, zone, { bare, partners, stacked, teamPlasma }) {
   oppBench.forEach((c, i) => {
     if (oppKinds[i]) c.subtypes = oppKinds[i];
   });
+  // A Team Plasma opponent (TCGdex bw10-11, the marker table's printing) for "each of your
+  // opponent's Team Plasma Pokémon" counts (Drifblim Drifting Balloon).
+  if (oppBench[0]) oppBench[0].id = 'bw10-11';
   state.players.p2.zones.prizes.splice(0, 2);
   if (bare && holderCard) {
     holderCard.damage = 0;
@@ -266,6 +272,10 @@ function probeAnswers(holder, { turnTrainerName, partners, teamPlasma, opponentE
       ask(`damageBonus:${card.name}`, () => abilityDamageBonus(card, p2Active, attacking));
       ask(`damageReduction:${card.name}`, () => abilityDamageReduction(card, p2Active, ctx));
       ask(`damagePrevention:${card.name}`, () => abilityDamagePrevention(card, p2Active, ctx));
+      // Safeguard-style wordings name a Pokémon-EX attacker (Suicune PLB 20, Sigilyph PLF 118).
+      ask(`damagePreventionFromEx:${card.name}`, () =>
+        abilityDamagePrevention(card, { ...p2Active, subtypes: ['Stage 2', 'ex'] }, ctx)
+      );
       // WotC after-W/R modifiers; Unown D/M/N name the attacker's type.
       for (const type of [null, 'Darkness', 'Metal', 'Colorless']) {
         const attacker = type ? { ...p2Active, types: [type] } : p2Active;
@@ -336,13 +346,19 @@ function probeAnswers(holder, { turnTrainerName, partners, teamPlasma, opponentE
     ask('counterMoveLock', () => abilityCounterMoveLock(p1));
     ask('energyMultiplier', () => abilityEnergyMultiplier(p1.sideCards));
     ask('checkup', () => parseCheckupAbilities(inPlayEntries(state), p1));
+    ask('betweenTurns', () => parseBetweenTurnsAbilities(inPlayEntries(state), p1));
     ask('onOpponentEvolve', () => parseOnOpponentEvolveAbilities(inPlayEntries(state), p1));
     ask('endOfTurn', () => parseEndOfTurnAbilities(inPlayEntries(state), p1));
     ask('onKo', () => parseOnKoAbilities(inPlayEntries(state), p1));
+    ask('specialEnergyAttachLock', () => abilityBlocksSpecialEnergyAttach(p1));
 
     if (!holderCard) continue;
     const ctx = at(p1, holderCard);
     ask('onDamage', () => parseOnDamageAbilities(holderCard, ctx));
+    ask('onKoEffect', () => parseOnKoAbilityEffect(holderCard, ctx));
+    ask('onPlasmaEnergyAttach', () =>
+      parseOnEnergyAttachAbilities(holderCard, createCard({ name: 'Plasma Energy', supertype: 'Energy', subtypes: ['Special'] }), p1)
+    );
     ask('onDamageStatus', () => parseOnDamageStatus(holderCard, ctx));
     ask('onEnergyAttach', () =>
       BASIC_ENERGY_NAMES.map((name) =>

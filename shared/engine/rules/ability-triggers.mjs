@@ -270,6 +270,13 @@ const ATTACH_TEAM = new RegExp(
   "(?:^|\\.\\s)as long as this pokémon is (?:in the active spot|your active pokémon), whenever you attach " +
     "an energy card from your hand to 1 of your pokémon, ([^.]+) from that pokémon\\.(?:\\s|$)"
 );
+// Red Signal (Genesect-EX, Plasma Blast 11 / 97): "When you attach a Plasma Energy from your hand to
+// this Pokémon, you may switch 1 of your opponent's Benched Pokémon with his or her Active Pokémon."
+// Group 1 is the printed Energy name ("plasma").
+const ATTACH_SWITCH_OPPONENT_ACTIVE = new RegExp(
+  "(?:^|\\.\\s)when you attach an? ([a-z]+) energy from your hand to this pokémon, " +
+    "you may switch 1 of your opponent's benched pokémon with his or her active pokémon\\.(?:\\s|$)"
+);
 const SELF_REF = "(?:it|this pokémon)";
 
 function attachEffect(clause, ref) {
@@ -309,6 +316,10 @@ export function parseOnEnergyAttachAbilities(host, energy, ctx = {}) {
       const basicOk = !(self[1] || self[3]) || isBasicEnergy(energy);
       const effect = typeOk && basicOk ? attachEffect(self[4], SELF_REF) : null;
       if (effect) out.push({ target: host, ...effect, source: holder.name });
+    }
+    const swap = sameCard(holder, host) ? text.match(ATTACH_SWITCH_OPPONENT_ACTIVE) : null;
+    if (swap && lower(energy.name) === `${swap[1]} energy`) {
+      out.push({ kind: 'switchOpponentActive', target: host, source: holder.name });
     }
     const team = holderIsActive(holder, ctx) ? text.match(ATTACH_TEAM) : null;
     if (team) {
@@ -555,6 +566,40 @@ export function parseOnKoAbilities(entries = [], ctx = {}) {
     });
   }
   return out;
+}
+
+// On-Knock-Out Abilities applied by the Knock Out flow: Weezing Aftermath (mill the opponent's deck),
+// Jellicent Spiteful Spirit (Attacking Pokémon Confused and Poisoned), Manaphy Final Wish (search the
+// deck for a card). The printed trigger is "Knocked Out by damage from an opponent's attack".
+const ON_KO_BY_ATTACK = new RegExp(
+  "(?:^|\\.\\s)(?:when|if) this pokémon (is your active pokémon and )?is knocked out by damage from an " +
+    "opponent's attack, ([^.]+)\\."
+);
+const KO_ATTACKER_STATUS = new RegExp(
+  `^the attacking pokémon is now (${STATUS_WORD}(?: and ${STATUS_WORD})?)$`
+);
+const FINAL_WISH_SEARCH = 'search your deck for a card and put it into your hand';
+
+/**
+ * The effect of a holder's On-Knock-Out Ability for the Knock Out flow, or null. `requiresActive`
+ * is set for "If this Pokémon is your Active Pokémon and is Knocked Out …" (Spiteful Spirit);
+ * `millOpponent` (Aftermath), `attackerConditions` (Spiteful Spirit), or `searchChoice` (Final Wish).
+ */
+export function parseOnKoAbilityEffect(holder, ctx = {}) {
+  if (!holderCanTrigger(holder, ctx)) return null;
+  const text = selfNamedText(holder).replace(/’/g, "'");
+  const m = text.match(ON_KO_BY_ATTACK);
+  if (!m) return null;
+  const clause = m[2];
+  const base = { requiresActive: Boolean(m[1]), source: holder.name };
+  const mill = clause.match(/^discard the top (\d+) cards? of your opponent's deck$/);
+  if (mill) return { ...base, millOpponent: { deck: Number(mill[1]) || 1, handRandom: 0 } };
+  const status = clause.match(KO_ATTACKER_STATUS);
+  if (status) {
+    return { ...base, attackerConditions: status[1].split(' and ').map(capitalised) };
+  }
+  if (clause === FINAL_WISH_SEARCH) return { ...base, searchChoice: true };
+  return null;
 }
 
 /**
