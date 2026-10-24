@@ -13,6 +13,7 @@ import { normalizeStage } from './evolution.mjs';
 import { evolvedView } from './evolved-pokemon.mjs';
 import { classifyEnergyEffect } from './energy-effects.mjs';
 import { isAncientCard, isFutureCard } from './paradox-tags.mjs';
+import { hasCardMarker } from './card-markers.mjs';
 import { listConditions } from './special-conditions.mjs';
 import {
   isExCard,
@@ -170,10 +171,12 @@ function ruleBoxKinds(view) {
     const word = String(type).toLowerCase();
     kinds.push(`type:${word === 'dark' ? 'darkness' : word}`);
   }
-  // Group names live in the subtypes (Rapid Strike) or the card name (Team Plasma, Team Rocket's).
+  // Group names live in the subtypes (Rapid Strike) or the card name (Team Rocket's). Team Plasma
+  // is a printed marker (card-markers.mjs), not a name.
   const label = `${view.name || ''} ${(view.subtypes || []).join(' ')}`.toLowerCase();
+  const teamPlasma = hasCardMarker(view, 'Team Plasma');
   for (const group of ['single strike', 'rapid strike', 'fusion strike', 'team plasma', 'team aqua', 'team magma', "team rocket's"]) {
-    if (label.includes(group)) kinds.push(`group:${group}`);
+    if (label.includes(group) || (group === 'team plasma' && teamPlasma)) kinds.push(`group:${group}`);
   }
   return kinds;
 }
