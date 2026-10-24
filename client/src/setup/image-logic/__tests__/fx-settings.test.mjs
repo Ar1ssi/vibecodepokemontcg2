@@ -9,6 +9,7 @@ import {
   AMBIENCE_OFF_KEY,
   CROWD_OFF_KEY,
   HOVER_PREVIEW_OFF_KEY,
+  HOLO_SHAPES_OFF_KEY,
   CAMERA_PRESET_KEY,
   normalizeCameraPreset,
   readSettings,
@@ -43,6 +44,7 @@ test('fx-settings: defaults when nothing is stored', () => {
     ambienceOff: false,
     crowdOff: true,
     hoverPreviewOff: false,
+    holoShapesOff: false,
     cameraPreset: 'tilt12',
   });
 });
@@ -60,6 +62,7 @@ test('fx-settings: reads each stored flag', () => {
     ambienceOff: false,
     crowdOff: true,
     hoverPreviewOff: false,
+    holoShapesOff: false,
     cameraPreset: 'tilt12',
   });
 });
@@ -83,6 +86,7 @@ test('fx-settings: a missing or throwing storage yields defaults, not a throw', 
     ambienceOff: false,
     crowdOff: true,
     hoverPreviewOff: false,
+    holoShapesOff: false,
     cameraPreset: 'tilt12',
   });
   assert.deepEqual(readSettings(undefined).volume, DEFAULT_VOLUME);
@@ -93,6 +97,7 @@ test('fx-settings: a missing or throwing storage yields defaults, not a throw', 
     ambienceOff: false,
     crowdOff: true,
     hoverPreviewOff: false,
+    holoShapesOff: false,
     cameraPreset: 'tilt12',
   });
 });
@@ -122,7 +127,7 @@ test('fx-settings: writeSetting stores flags as 1/0 and volume as a number', () 
   assert.equal(storage.data[FX_OFF_KEY], '0');
   writeSetting(storage, VOLUME_KEY, 3);
   assert.equal(storage.data[VOLUME_KEY], '1');
-  assert.deepEqual(readSettings(storage), { fxOff: false, sfxOff: false, ambienceOff: false, crowdOff: true, hoverPreviewOff: false, cameraPreset: 'tilt12', volume: 1 });
+  assert.deepEqual(readSettings(storage), { fxOff: false, sfxOff: false, ambienceOff: false, crowdOff: true, hoverPreviewOff: false, holoShapesOff: false, cameraPreset: 'tilt12', volume: 1 });
 });
 
 test('fx-settings: writeSetting reports failure instead of throwing', () => {
@@ -154,6 +159,23 @@ test('fx-settings: the hover preview toggle round-trips through writeSetting', (
   assert.equal(readSettings(storage).hoverPreviewOff, true);
   writeSetting(storage, HOVER_PREVIEW_OFF_KEY, false);
   assert.equal(readSettings(storage).hoverPreviewOff, false);
+});
+
+test('fx-settings: the holo sparkle shapes are on by default and off only for the stored "1"', () => {
+  assert.equal(readSettings(fakeStorage()).holoShapesOff, false);
+  assert.equal(readSettings(fakeStorage({ [HOLO_SHAPES_OFF_KEY]: '1' })).holoShapesOff, true);
+  assert.equal(readSettings(fakeStorage({ [HOLO_SHAPES_OFF_KEY]: '0' })).holoShapesOff, false);
+  assert.equal(readSettings(fakeStorage({ [HOLO_SHAPES_OFF_KEY]: 'true' })).holoShapesOff, false);
+  assert.equal(readSettings(throwingStorage).holoShapesOff, false);
+});
+
+test('fx-settings: the holo sparkle toggle round-trips through writeSetting', () => {
+  const storage = fakeStorage();
+  writeSetting(storage, HOLO_SHAPES_OFF_KEY, true);
+  assert.equal(storage.data[HOLO_SHAPES_OFF_KEY], '1');
+  assert.equal(readSettings(storage).holoShapesOff, true);
+  writeSetting(storage, HOLO_SHAPES_OFF_KEY, false);
+  assert.equal(readSettings(storage).holoShapesOff, false);
 });
 
 test('fx-settings: the camera preset (design 074 H3) defaults to tilt12 and is tcgl only for the stored "tcgl"', () => {

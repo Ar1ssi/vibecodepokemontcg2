@@ -317,6 +317,15 @@
   opacity: calc(1 - var(--pointer-from-left));
 }
 
+/* ── Holo sparkle shapes setting ───────────────────────────────────────
+   The Settings toggle puts `holo-shapes-off` on the parent page's body and on
+   each playmat iframe's <html> (fx-settings.js). Only the glitter layer goes;
+   the shine and the foil colour stay. */
+:root.holo-shapes-off .card__glitter,
+body.holo-shapes-off .card__glitter {
+  display: none;
+}
+
 /* ── Angle shading ─────────────────────────────────────────────────────
    The whole card dims slightly as it tilts away from the fixed light.
    --tilt-amount only tracks visible rotation, so flat board cards stay at 1. */

@@ -166,6 +166,13 @@ test('the unboxing scene sheet guards every idle loop with body.fx-off and reduc
   assert.ok(read('index.css').includes("@import url('./deck-builder-unboxing.css')"));
 });
 
+test('the holo sparkle toggle hides the glitter layer on the parent page and in the mat iframes', () => {
+  // Settings puts `holo-shapes-off` on body (parent) and on each iframe's <html> (fx-settings.js).
+  const css = read('holo/base.css');
+  assert.ok(css.includes(':root.holo-shapes-off .card__glitter'), 'iframe root guard missing');
+  assert.ok(css.includes('body.holo-shapes-off .card__glitter'), 'parent body guard missing');
+});
+
 test('parent-page overlays are still killed by the body class', () => {
   // mat-fx.css overlays are body children, so they use body.fx-off, not :root.
   assert.ok(read('mat-fx.css').includes('body.fx-off .fx-overlay'));

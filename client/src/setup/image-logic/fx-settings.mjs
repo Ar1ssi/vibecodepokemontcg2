@@ -11,6 +11,8 @@ export const AMBIENCE_OFF_KEY = 'ptcg-status-ambience-off';
 export const CROWD_OFF_KEY = 'ptcg-crowd-off';
 // Design 069: the card hover preview is on unless the stored '1' turns it off.
 export const HOVER_PREVIEW_OFF_KEY = 'ptcg-hover-preview-off';
+// The holo sparkle shapes are on unless the stored '1' turns them off.
+export const HOLO_SHAPES_OFF_KEY = 'ptcg-holo-shapes-off';
 // Design 074 H3: the 3D board's camera, 'tilt12' (the old CSS tilt) unless the stored value is 'tcgl'.
 export const CAMERA_PRESET_KEY = 'ptcg-camera-preset';
 export const CAMERA_PRESETS = ['tilt12', 'tcgl'];
@@ -19,6 +21,7 @@ export const DEFAULT_VOLUME = 0.6;
 
 export const FX_OFF_CLASS = 'fx-off';
 export const FX_REDUCED_CLASS = 'fx-reduced';
+export const HOLO_SHAPES_OFF_CLASS = 'holo-shapes-off';
 
 /** Clamp any stored/typed value into [0, 1]; junk falls back to the default. */
 export function normalizeVolume(value) {
@@ -38,7 +41,7 @@ const readKey = (storage, key) => {
   }
 };
 
-/** @returns {{fxOff:boolean, sfxOff:boolean, volume:number, ambienceOff:boolean, crowdOff:boolean, hoverPreviewOff:boolean, cameraPreset:'tilt12'|'tcgl'}} defaults when unreadable. */
+/** @returns {{fxOff:boolean, sfxOff:boolean, volume:number, ambienceOff:boolean, crowdOff:boolean, hoverPreviewOff:boolean, holoShapesOff:boolean, cameraPreset:'tilt12'|'tcgl'}} defaults when unreadable. */
 export function readSettings(storage) {
   return {
     fxOff: readKey(storage, FX_OFF_KEY) === '1',
@@ -46,6 +49,7 @@ export function readSettings(storage) {
     ambienceOff: readKey(storage, AMBIENCE_OFF_KEY) === '1',
     crowdOff: readKey(storage, CROWD_OFF_KEY) !== '0',
     hoverPreviewOff: readKey(storage, HOVER_PREVIEW_OFF_KEY) === '1',
+    holoShapesOff: readKey(storage, HOLO_SHAPES_OFF_KEY) === '1',
     cameraPreset: normalizeCameraPreset(readKey(storage, CAMERA_PRESET_KEY)),
     volume: normalizeVolume(readKey(storage, VOLUME_KEY)),
   };

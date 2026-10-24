@@ -19,6 +19,7 @@ import {
   setAmbienceOff,
   setCrowdOff,
   setCameraPreset,
+  setHoloShapesOff,
   setHoverPreviewOff,
   setSfxOff,
 } from '../../../setup/image-logic/fx-settings.js';
@@ -100,6 +101,15 @@ export const initializeSettings = () => {
     hoverPreviewCheckbox.checked = !fx.hoverPreviewOff;
     hoverPreviewCheckbox.addEventListener('change', () => {
       setHoverPreviewOff(!hoverPreviewCheckbox.checked);
+    });
+  }
+
+  // Off hides the sparkle shapes on holo cards; the foil colour and sheen stay.
+  const holoShapesCheckbox = document.getElementById('holoShapesCheckbox');
+  if (holoShapesCheckbox) {
+    holoShapesCheckbox.checked = !fx.holoShapesOff;
+    holoShapesCheckbox.addEventListener('change', () => {
+      setHoloShapesOff(!holoShapesCheckbox.checked);
     });
   }
 
