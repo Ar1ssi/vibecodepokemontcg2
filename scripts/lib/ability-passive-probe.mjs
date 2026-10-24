@@ -23,6 +23,8 @@ import {
   abilityAttackCostDiscount,
   abilityIgnoresDefenderEffects,
   abilityExtraTypes,
+  abilityCopiedTypes,
+  abilityIgnoresResistance,
   abilityEnergyMultiplier,
   isAbilitySuppressed,
   abilityPlayLocks,
@@ -69,6 +71,8 @@ const BASIC_ENERGY_NAMES = ['Grass', 'Fire', 'Water', 'Lightning', 'Psychic', 'F
   (type) => `${type} Energy`
 );
 const CONDITIONS = ['asleep', 'burned', 'confused', 'paralyzed', 'poisoned'];
+// Glaceon, Plasma Freeze 23: a Team Plasma printing the generated marker table lists (bw9-23).
+const TEAM_PLASMA_PRINTING = 'bw9-23';
 
 const roots = (cards) => (cards || []).filter((c) => !c.attachedTo);
 
@@ -138,7 +142,7 @@ export function namedPartners(text) {
  * p1's other Benched Pokémon; a `bare` holder has nothing attached and no damage (for "if this
  * Pokémon has no Energy attached" / "has full HP" conditions).
  */
-function probeBoard(holder, zone, { bare, partners, stacked }) {
+function probeBoard(holder, zone, { bare, partners, stacked, teamPlasma }) {
   const state = buildState(holder, zone);
   const z = state.players.p1.zones;
   const holderCard = [...z.active, ...z.bench].find(
@@ -164,6 +168,9 @@ function probeBoard(holder, zone, { bare, partners, stacked }) {
   partners.forEach((name, i) => {
     if (others[i]) others[i].name = name;
   });
+  // "Your Team Plasma Pokémon" wordings need a Team Plasma Pokémon besides the holder (Deoxys-EX
+  // excludes itself). Team Plasma is read from the printing (hasCardMarker), not the name.
+  if (teamPlasma && others[partners.length]) others[partners.length].tcgId = TEAM_PLASMA_PRINTING;
   // An opponent worth reacting to: a V (Rapid Strike), a VMAX and a GX on the Bench, and two
   // Prizes taken, so "if your opponent has any Pokémon V …" / "for each …" clauses can hold.
   const oppBench = state.players.p2.zones.bench.filter((c) => !c.attachedTo);
@@ -216,7 +223,7 @@ function cardShieldAnswers(ask, p1) {
  * Every probe question, answered on each probe board (see `probeBoard`). Returns
  * `{ '<board>:<reader>:<case>': answerKey | 'THROW' }`.
  */
-function probeAnswers(holder, { turnTrainerName, partners }) {
+function probeAnswers(holder, { turnTrainerName, partners, teamPlasma, opponentEx }) {
   const answers = {};
   const boards = [
     ['active', false, false],
@@ -228,7 +235,7 @@ function probeAnswers(holder, { turnTrainerName, partners }) {
   ];
   for (const [zone, bare, stacked] of boards) {
     const board = `${stacked ? 'stack-' : ''}${zone}${bare ? '-bare' : ''}`;
-    const { state, holderCard: holderRoot } = probeBoard(holder, zone, { bare, partners, stacked });
+    const { state, holderCard: holderRoot } = probeBoard(holder, zone, { bare, partners, stacked, teamPlasma });
     const p1 = sideContext(state, 'p1');
     const p2 = sideContext(state, 'p2');
     const own = roots(p1.sideCards);
@@ -238,6 +245,8 @@ function probeAnswers(holder, { turnTrainerName, partners }) {
     const holderCard = holderRoot && viewOf(p1.sideCards, holderRoot);
     // Suppression is only visible on a card that has an Ability of its own.
     p2Active.abilities = [{ name: 'Probe Power', type: 'Ability', text: 'Once during your turn, you may draw a card.' }];
+    // "your opponent's Pokémon-EX" attacker wordings: the opposing Active is a Pokémon ex.
+    if (opponentEx) p2Active.subtypes = [...(p2Active.subtypes || []), 'ex'];
     const played = playedCards();
     const ask = (label, fn) => {
       try {
@@ -251,7 +260,10 @@ function probeAnswers(holder, { turnTrainerName, partners }) {
     for (const root of own) {
       const ctx = at(p1, root);
       const card = viewOf(p1.sideCards, root);
-      ask(`damageBonus:${card.name}`, () => abilityDamageBonus(card, p2Active, ctx));
+      // Attacks are made from the Active spot, so the bonus is asked as if this card attacks from it
+      // (a Benched Team Plasma partner is the attacker in "your Team Plasma Pokémon's attacks").
+      const attacking = { ...ctx, isActive: true };
+      ask(`damageBonus:${card.name}`, () => abilityDamageBonus(card, p2Active, attacking));
       ask(`damageReduction:${card.name}`, () => abilityDamageReduction(card, p2Active, ctx));
       ask(`damagePrevention:${card.name}`, () => abilityDamagePrevention(card, p2Active, ctx));
       // WotC after-W/R modifiers; Unown D/M/N name the attacker's type.
@@ -269,7 +281,11 @@ function probeAnswers(holder, { turnTrainerName, partners }) {
       ask(`prize:${card.name}`, () => abilityPrizeModify(card, ctx));
       ask(`retreat:${card.name}`, () => abilityRetreatCost(card, ctx));
       ask(`costDiscount:${card.name}`, () => abilityAttackCostDiscount(card, ctx));
-      ask(`extraTypes:${card.name}`, () => abilityExtraTypes(card, ctx));
+      // A probe holder carries every type, so an added type shows only on a Colorless copy.
+      const colorless = { ...card, types: ['Colorless'] };
+      ask(`extraTypes:${card.name}`, () => abilityExtraTypes(colorless, ctx));
+      ask(`copiedTypes:${card.name}`, () => abilityCopiedTypes(card, ctx));
+      ask(`ignoresResistance:${card.name}`, () => abilityIgnoresResistance(card, ctx));
       ask(`suppressed:${card.name}`, () => isAbilitySuppressed(card, ctx));
       const zoneCards = ctx.isActive ? p1.sideActive : p1.sideBench;
       ask(`ownRetreat:${card.name}`, () => combinedToolRetreatCost(2, card, zoneCards));
@@ -373,6 +389,8 @@ export function passiveReads(text, { name = 'Probe Holder', abilityName = 'Probe
   const opts = {
     turnTrainerName: String(text).match(/when you use ([^,.]+)/i)?.[1],
     partners: namedPartners(text),
+    teamPlasma: /team plasma/i.test(String(text)),
+    opponentEx: /pok[eé]mon-ex/i.test(String(text)),
   };
   const withAbility = probeAnswers(
     () => mon(name, { hp: 200, abilities: [{ name: abilityName, type: abilityType, text }] }),
