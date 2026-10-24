@@ -36,6 +36,7 @@ import {
   markersBlockCondition, markersPreventEffects, parseDamageImmunity,
 } from '../rules/attack-markers.mjs';
 import { hasSpecialEnergyEffectShield } from '../rules/special-energy-parse.mjs';
+import { resolveAttachedEnergyType } from '../rules/energy-effects.mjs';
 import { runSpecialEnergyTriggers, resolveAttackEnergyDiscard } from '../effects/special-energy.mjs';
 import { stadiumBlocksHealing } from '../rules/stadium-effects.mjs';
 import { addCondition, hasCondition } from '../rules/special-conditions.mjs';
@@ -1472,8 +1473,12 @@ export function resolveAttackEffectPhase(draft, ctx) {
 
         const ofType = (energyType) => (c) => {
           if (!energyType) return true;
+          // A typed special Energy ("Nitro {R} Energy") counts as the type it provides.
+          const provided = resolveAttachedEnergyType(c).toLowerCase();
+          const wanted = energyType.toLowerCase();
+          if (provided === wanted || (provided === 'darkness' && wanted === 'dark')) return true;
           const ty = c.energyType || c.name?.replace(/\s*Energy.*/i, '');
-          return ty && ty.toLowerCase().includes(energyType.toLowerCase());
+          return ty && ty.toLowerCase().includes(wanted);
         };
         let toDiscard = [];
         if (energyDiscardSpec.all) {

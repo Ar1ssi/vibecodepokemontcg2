@@ -792,3 +792,12 @@ test('Nitro: a manual discard outside an attack still goes to the discard pile',
   assert.equal(res.error, null);
   assert.ok(inZone(res.state, 'discard', 2));
 });
+
+test('Nitro: "Discard 2 {R} Energy" counts Nitro {R} Energy as {R} and returns it to hand', () => {
+  const res = applyCommand(nitroGame('Discard 2 {R} Energy from this Pokémon.'), {
+    type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1',
+  });
+  assert.equal(res.error, null);
+  assert.ok(inZone(res.state, 'hand', 2), 'Nitro in hand');
+  assert.ok(inZone(res.state, 'discard', 3), 'basic Fire Energy discarded');
+});
