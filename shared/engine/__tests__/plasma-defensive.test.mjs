@@ -177,13 +177,15 @@ test('Plasma Storm 34 Manaphy Final Wish: when Knocked Out by an opponent attack
   state.players.p1.zones.active.push(charizardEx(1));
   state.players.p2.zones.active.push(basic({ instanceId: 2, name: 'Manaphy', hp: 90, damage: 80, abilities: [ability('Final Wish', "When this Pokémon is Knocked Out by damage from an opponent's attack, search your deck for a card and put it into your hand. Shuffle your deck afterward.")] }));
   state.players.p2.zones.bench.push(basic({ instanceId: 3, name: 'Bench', hp: 60 }));
-  // The top card (60) is p2's turn-start draw, which lands before the search (see the report flag).
   state.players.p2.zones.deck.push(basic({ instanceId: 60, name: 'Deck A' }), basic({ instanceId: 61, name: 'Deck B' }), basic({ instanceId: 62, name: 'Deck C' }));
   const res = applyCommand(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' });
   assert.equal(res.error, null);
   assert.ok(res.state.pendingChoice, 'Final Wish raises a card choice for the owner');
   assert.equal(res.state.pendingChoice.player, 'p2');
-  assert.deepEqual(res.state.pendingChoice.options.map((o) => o.instanceId).sort(), [61, 62]);
+  // The search comes before the turn ends: the whole deck is offered and nothing was drawn yet.
+  assert.equal(res.state.turn.player, 'p1');
+  assert.deepEqual(res.state.pendingChoice.options.map((o) => o.instanceId).sort(), [60, 61, 62]);
+  assert.deepEqual(res.state.players.p2.zones.hand, []);
 
   const picked = applyCommand(res.state, {
     type: 'resolveChoice',
@@ -191,7 +193,11 @@ test('Plasma Storm 34 Manaphy Final Wish: when Knocked Out by an opponent attack
     payload: { choiceId: res.state.pendingChoice.choiceId, selection: [62] },
   });
   assert.equal(picked.error, null);
-  assert.deepEqual(picked.state.players.p2.zones.hand.map((c) => c.instanceId).sort(), [60, 62]);
-  assert.deepEqual(picked.state.players.p2.zones.deck.map((c) => c.instanceId), [61]);
   assert.ok(picked.events.some((e) => e.type === 'deckShuffled' && e.playerId === 'p2'));
+  // Then the turn passes to p2, who draws 1 of the 2 cards left.
+  assert.equal(picked.state.turn.player, 'p2');
+  const hand = picked.state.players.p2.zones.hand.map((c) => c.instanceId);
+  assert.equal(hand.length, 2);
+  assert.ok(hand.includes(62));
+  assert.equal(picked.state.players.p2.zones.deck.length, 1);
 });

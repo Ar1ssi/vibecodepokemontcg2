@@ -81,6 +81,10 @@ export function resolveChoiceCommand({ draft, playerId, activeRng, events, paylo
     resumePrizeAttach(draft, { token, selection: payload.selection, events });
   } else if (token.effectType === KO_SEARCH_EFFECT) {
     resumeKoSearch(draft, { token, selection: payload.selection, activeRng, events });
+    // The attack whose Knock Out owed the search held its turn open; end it after the last search.
+    if (token.endTurn && !draft.pendingChoice) {
+      endTurnAfterAttackChoice(draft, { playerId: token.endTurn.playerId, activeRng, events });
+    }
   } else if (token.effectType === SWITCH_OPPONENT_ACTIVE_EFFECT) {
     resumeOpponentActiveSwitch(draft, { token, selection: payload.selection, events });
   } else if (token.effectType === PRIZE_BENCH_EFFECT) {
@@ -690,4 +694,17 @@ export function resolveChoiceCommand({ draft, playerId, activeRng, events, paylo
   } else {
     draft.pendingChoice = null;
   }
+}
+
+// Ends an attacker's turn that a choice held open: an extra turn (Timeless-GX) skips the Checkup and
+// keeps the turn, as the attack's own auto-end does.
+function endTurnAfterAttackChoice(draft, { playerId, activeRng, events }) {
+  if (isGameConcluded(draft)) return;
+  const attacker = draft.players?.[playerId];
+  if (attacker?.flags?.extraTurn) {
+    delete attacker.flags.extraTurn;
+    advanceTurn(draft, { nextPlayerId: playerId, events });
+    return;
+  }
+  endTurnFromEffect(draft, { playerId, activeRng, events });
 }

@@ -651,6 +651,22 @@ test('discardTools, discardFromOpponent (Blowtorch incl. Stadium), massDiscardAt
   assert.equal(zone(ruffian, 'p2', 'discard').length, 2);
 });
 
+test("Startling Megaphone (Flashfire 97): discards every Tool on the opponent's Pokémon, none of yours", () => {
+  const game = setup();
+  const oppActive = game.p2.zones.active[0];
+  const ownActive = game.p1.zones.active[0];
+  const oppTool = tool();
+  const ownTool = tool();
+  oppTool.attachedTo = oppActive.instanceId;
+  ownTool.attachedTo = ownActive.instanceId;
+  game.p2.zones.active.push(oppTool);
+  game.p1.zones.active.push(ownTool);
+  const { res } = play(game, "Discard all Pokémon Tool cards attached to each of your opponent's Pokémon.");
+  assert.equal(res.pendingChoice, null);
+  assert.deepEqual(ids(zone(res, 'p2', 'discard')), [oppTool.instanceId]);
+  assert.ok(zone(res, 'p1', 'active').some((c) => c.instanceId === ownTool.instanceId));
+});
+
 test('discardEnergyFromOpponent: 1 Pokémon, each Pokémon, and return to hand', () => {
   const game = setup();
   const a = game.p2.zones.active[0];

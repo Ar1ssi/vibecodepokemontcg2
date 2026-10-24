@@ -42,6 +42,7 @@ import {
   toolPrizeCountAdjust,
   attachedToolOnDamageEffects,
   combinedToolRetreatCost,
+  toolWaivesAttackCost,
 } from '/shared/engine/rules/tool-combat.mjs';
 import { parseAbility } from '/shared/engine/rules/abilities.mjs';
 import { canEvolve, markEvolvedThisTurn, normalizeStage, pokemonNamesMatch } from '/shared/engine/rules/evolution.mjs';
@@ -753,6 +754,10 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
               false
             );
           }
+        }
+        // Victory Piece: its named holder attacks regardless of the Energy attached.
+        if (rulesState.enabled && !stadiumBlocksToolEffects() && toolWaivesAttackCost(active, activeZone.array)) {
+          effectiveCost = [];
         }
         if (!canPayAttackCost(energyTypes, effectiveCost)) {
           if (attackIndex === 0 && Array.isArray(attackSource.attacks) && attackSource.attacks.length > 1) {

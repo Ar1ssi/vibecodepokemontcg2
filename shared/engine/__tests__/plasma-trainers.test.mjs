@@ -1,7 +1,5 @@
 // Team Plasma era Tools, Stadiums and Supporters, through the engine readers that apply them.
-// Card text is quoted from out/pkmn-trainer-cards.json (set, number). Victory Piece (Plasma Storm
-// 130) is not here: its waiver of the attack's Energy requirement has no hook on the server's
-// attack legality (canPayAttackCost is reached only from retreat.mjs and the legacy executeAttack).
+// Card text is quoted from out/pkmn-trainer-cards.json (set, number).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createGameState, createPlayerZones } from '../state.mjs';
@@ -13,6 +11,7 @@ import { stadiumOnAttachTriggers } from '../rules/stadium-triggers.mjs';
 import { parseTurnDamageBonus, turnDamageBonusTotal } from '../rules/turn-damage-bonus.mjs';
 import { buildServerAttackContext } from '../rules/attack-damage-context.mjs';
 import { rulesState } from '../rules/rules-state.mjs';
+import { attackCostPayable } from '../reduce/legality.mjs';
 
 const pokemon = (instanceId, name, extra = {}) =>
   createCard({ instanceId, name, hp: 120, supertype: 'Pokémon', stage: 'Basic', types: ['Colorless'], ...extra });
@@ -198,4 +197,21 @@ test('Iris (Plasma Blast 81, 101): +10 per Prize card the opponent has taken, to
   // 6 Prizes remaining = the opponent took 0; 4 remaining = took 2, so +20.
   assert.equal(turnDamageBonusTotal([bonus], attacker, defender, { defenderIsActive: true, defenderPrizesRemaining: 4 }), 20);
   assert.equal(turnDamageBonusTotal([bonus], attacker, defender, { defenderIsActive: false, defenderPrizesRemaining: 4 }), 0);
+});
+
+// Victory Piece, Plasma Storm 130.
+const VICTORY_PIECE =
+  'If this card is attached to Victini-EX, Victini-EX can use its attacks regardless of the amount or type of Energy attached to it.';
+
+test('Victory Piece (Plasma Storm 130): Victini-EX attacks with no Energy; any other holder still pays', () => {
+  const state = basicState();
+  const attack = { name: 'Turbo Energize', cost: ['Fire', 'Fire', 'Colorless'], damage: 100 };
+  const victini = pokemon(10, 'Victini-EX', { subtypes: ['Basic', 'EX'], attacks: [attack] });
+  state.players.p1.zones.active.push(victini, tool(50, 'Victory Piece', VICTORY_PIECE, 10));
+  assert.equal(attackCostPayable(state, 'p1', victini, attack), true);
+
+  const other = basicState();
+  const reshiram = pokemon(11, 'Reshiram', { attacks: [attack] });
+  other.players.p1.zones.active.push(reshiram, tool(51, 'Victory Piece', VICTORY_PIECE, 11));
+  assert.equal(attackCostPayable(other, 'p1', reshiram, attack), false);
 });

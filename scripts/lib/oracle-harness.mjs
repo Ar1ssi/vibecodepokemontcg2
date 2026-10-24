@@ -203,7 +203,19 @@ export function buildState(holder, holderZone) {
     // A discard-activated Ability (Archen Prehistoric Call) is used from the discard pile.
     if (own && holderZone === 'discard') z.discard.unshift(holder());
   }
+  trimHandBelowDrawUntil(state.players.p1.zones.hand, holder());
   return state;
+}
+
+// "Draw cards until you have 4 cards in your hand" (Electrode Magnetic Draw) does nothing from the
+// 5-card hand above, so the hand is cut below the printed size to let the draw show.
+function trimHandBelowDrawUntil(hand, holderCard) {
+  const texts = [...(holderCard.abilities || []), ...(holderCard.attacks || [])].map((a) => a.text || '');
+  const size = Math.min(
+    ...texts.map((t) => Number(/until you have (\d+) cards in your hand/i.exec(t)?.[1]) || Infinity)
+  );
+  if (!Number.isFinite(size) || hand.length < size) return;
+  hand.splice(Math.max(0, size - 2));
 }
 
 /** Total damage on one player's cards in a snapshot. */

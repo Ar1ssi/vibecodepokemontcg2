@@ -60,7 +60,7 @@ import {
   attachMilledCards, attachedEnergyCardsFor, optionalCostOffer, returnAttackerToHand,
   HEAL_STEP_TYPES, planAttackSteps, runAttackSteps,
 } from './attack-steps.mjs';
-import { handleKnockout } from './knockout.mjs';
+import { handleKnockout, settleKoSearches } from './knockout.mjs';
 import { resolveCheckup, advanceTurn } from './turn.mjs';
 import { computeEffectiveRetreatCost } from './retreat.mjs';
 
@@ -1906,6 +1906,13 @@ export function finishAttackTail(draft, { tail, activeRng, events }) {
           stadium: draft.stadium,
           attacksThisTurn: attackerPlayer.flags.attacksThisTurn,
         }).allowed;
+
+      // Manaphy Final Wish: a search owed by this attack's Knock Out is made before the turn ends,
+      // so it lands ahead of the opponent's turn-start draw.
+      if (!searchTriggered && !extraRemains && !isGameConcluded(draft) && draft.__koSearches?.length) {
+        settleKoSearches(draft, { events, endTurn: { playerId } });
+        if (draft.pendingChoice) searchTriggered = true;
+      }
 
       // Auto-end turn after attacking (unless paused by pendingChoice)
       if (!searchTriggered && !extraRemains && !isGameConcluded(draft)) {

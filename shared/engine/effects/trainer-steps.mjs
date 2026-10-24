@@ -1082,6 +1082,7 @@ function allAttachedMatching(ctx, players, predicate) {
 }
 
 function discardTools(ctx) {
+  if (ctx.step.all && ctx.step.side === 'opponent') return discardOpponentTools(ctx);
   const tools = allAttachedMatching(ctx, [ctx.player, ctx.opponent], isToolCard);
   if (ctx.selection) {
     for (const tool of pickById(tools, ctx.selection)) discardCard(ctx.draft, tool, ctx.events);
@@ -1096,8 +1097,8 @@ function discardTools(ctx) {
   });
 }
 
-// Breakwing (Salamence Plasma Blast 64): every Tool on the opponent's Pokémon, no choice.
-function discardOpponentToolsAbility(ctx) {
+// Breakwing (Salamence Plasma Blast 64), Startling Megaphone: every Tool on the opponent's Pokémon, no choice.
+function discardOpponentTools(ctx) {
   const tools = allAttachedMatching(ctx, [ctx.opponent], isToolCard);
   if (tools.length === 0) return skip(ctx, 'no_tools_in_play');
   for (const tool of tools) discardCard(ctx.draft, tool, ctx.events);
@@ -5956,7 +5957,7 @@ export const EXTRA_STEP_HANDLERS = {
   moveEnergyToActive,
   devolve,
   discardTools,
-  discardOpponentToolsAbility,
+  discardOpponentToolsAbility: discardOpponentTools,
   discardFromOpponent,
   massDiscardAttached,
   discardToolAndSpecialEnergy,

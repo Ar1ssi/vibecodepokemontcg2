@@ -1638,6 +1638,8 @@ describe('recurring-wording coverage (batch 3)', () => {
     const r = parseTrainerEffect("Discard all Pokémon Tool cards attached to each of your opponent's Pokémon.");
     assert.equal(r.steps[0].type, 'discardTools');
     assert.equal(r.steps[0].count, 8);
+    assert.equal(r.steps[0].all, true);
+    assert.equal(r.steps[0].side, 'opponent');
   });
 
   test("Cheren's Care: typed put-into-hand → returnPokemonToHand keepAttached", () => {

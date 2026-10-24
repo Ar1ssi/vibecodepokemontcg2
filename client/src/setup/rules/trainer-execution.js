@@ -1513,13 +1513,19 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
         case 'discardTools': {
           (async () => {
             const tools = [];
-            for (const who of ['self', 'opp']) {
+            const opponentOnly = step.all && step.side === 'opponent';
+            for (const who of opponentOnly ? ['opp'] : ['self', 'opp']) {
               for (const entry of collectAttachedForUser(who, (att) => true)) {
                 if (await isPokemonToolCard(entry.card)) tools.push(entry);
               }
             }
             if (!tools.length) {
               msg('  no Pokémon Tools attached');
+              return;
+            }
+            if (opponentOnly) {
+              for (const entry of tools) discardAttachedEntry(entry);
+              msg(`  auto: discarded ${tools.length} Tool(s)`);
               return;
             }
             openMultiPickOnly({

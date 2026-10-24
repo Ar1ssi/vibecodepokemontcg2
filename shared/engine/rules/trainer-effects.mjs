@@ -2317,9 +2317,9 @@ function parseTrainerStepsInner(lower) {
     return { steps, recognizable: true };
   }
 
-  // Startling Megaphone — discard all Tools from each opponent Pokémon
+  // Startling Megaphone (Flashfire 97) — every Tool on the opponent's Pokémon, no choice
   if (lower.includes('discard all pokémon tool cards attached to each')) {
-    steps.push({ type: 'discardTools', count: 8 });
+    steps.push({ type: 'discardTools', count: 8, all: true, side: 'opponent' });
     return { steps, recognizable: true };
   }
 
@@ -3525,7 +3525,9 @@ function describeStepBody(step) {
     case 'moveEnergy': return 'Move a Basic Energy from 1 of your Pokémon to another of your Pokémon.';
     case 'moveEnergyToActive': return `Move up to ${step.count} Energy from your Benched Pokémon to your Active Pokémon.`;
     case 'devolve': return `Devolve ${step.target} by putting its Evolution cards into your hand (it can't evolve this turn).`;
-    case 'discardTools': return `Choose up to ${step.count} Pokémon Tools attached to Pokémon (yours or your opponent's) and discard them.`;
+    case 'discardTools':
+      if (step.all && step.side === 'opponent') return "Discard all Pokémon Tools attached to each of your opponent's Pokémon.";
+      return `Choose up to ${step.count} Pokémon Tools attached to Pokémon (yours or your opponent's) and discard them.`;
     case 'discardFromOpponent': return `Discard ${step.target}.`;
     case 'switchOpponentOut': return "Switch out your opponent's Active Pokémon to the Bench (your opponent chooses the new Active).";
     case 'variableDraw': {

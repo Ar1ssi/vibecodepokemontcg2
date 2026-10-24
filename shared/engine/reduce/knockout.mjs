@@ -858,9 +858,11 @@ export const KO_SEARCH_EFFECT = 'koSearch';
 /**
  * Manaphy Final Wish (Plasma Storm 34): "search your deck for a card and put it into your hand.
  * Shuffle your deck afterward." The owner picks the card (a pendingChoice, as Call Energy does).
- * Obligations queue on the draft and settle at the command tail, like the Energy moves above.
+ * Obligations queue on the draft and settle at the command tail, like the Energy moves above. A
+ * Knock Out by an attack settles them before the turn ends (`endTurn`: the attacker whose turn the
+ * choice holds open; resolveChoiceCommand ends that turn once the last search is made).
  */
-export function settleKoSearches(draft, { events }) {
+export function settleKoSearches(draft, { events, endTurn = null }) {
   if (draft.pendingChoice) return;
   const pending = draft.__koSearches;
   delete draft.__koSearches;
@@ -880,7 +882,7 @@ export function settleKoSearches(draft, { events }) {
     max: 1,
     cancellable: false,
     stateVersion: draft.stateVersion,
-    resumeToken: { effectType: KO_SEARCH_EFFECT, initiatorPlayerId: next.playerId, obligations: rest },
+    resumeToken: { effectType: KO_SEARCH_EFFECT, initiatorPlayerId: next.playerId, obligations: rest, endTurn },
   });
 }
 
@@ -898,7 +900,7 @@ export function resumeKoSearch(draft, { token, selection, activeRng, events }) {
   if (activeRng) shuffleInPlace(activeRng, deck);
   events.push({ type: 'deckShuffled', playerId: token.initiatorPlayerId });
   draft.__koSearches = token.obligations || [];
-  settleKoSearches(draft, { events });
+  settleKoSearches(draft, { events, endTurn: token.endTurn || null });
 }
 
 /**

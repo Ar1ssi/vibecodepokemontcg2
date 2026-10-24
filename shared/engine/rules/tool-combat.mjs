@@ -67,6 +67,20 @@ export {
   attachedTools,
 };
 
+// Victory Piece (Plasma Storm 130): "If this card is attached to Victini-EX, Victini-EX can use its
+// attacks regardless of the amount or type of Energy attached to it."
+const ATTACK_COST_WAIVER =
+  /if this card is attached to (.+?), \1 can use its attacks regardless of the amount or type of energy attached to it/;
+const collapsedName = (name) => String(name || '').toLowerCase().replace(/[\s-]+/g, '');
+
+/** Whether a Tool on `holder` lets it attack with no Energy (Victory Piece). `holder` is the top-evolution view. */
+export function toolWaivesAttackCost(holder, zoneCards) {
+  return attachedTools(holder, zoneCards).some((tool) => {
+    const named = cardAbilityText(tool).toLowerCase().match(ATTACK_COST_WAIVER)?.[1];
+    return Boolean(named) && collapsedName(named) === collapsedName(holder?.name);
+  });
+}
+
 export function attackerTypes(attacker) {
   return (attacker?.types || []).map((t) => String(t).toLowerCase());
 }

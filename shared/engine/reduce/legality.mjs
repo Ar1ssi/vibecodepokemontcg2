@@ -12,7 +12,7 @@ import { legacyAttachedTrainer } from '../rules/legacy-attached-trainer.mjs';
 import {
   mayAttachAnyTechnicalMachine, parseTmAttachRestriction, tmAttachAllowed,
 } from '../rules/tool-attacks.mjs';
-import { isPokemonToolCard, attachedTools, isExCard } from '../rules/tool-combat.mjs';
+import { isPokemonToolCard, attachedTools, isExCard, toolWaivesAttackCost } from '../rules/tool-combat.mjs';
 import {
   parseToolCap, parseUnlimitedHandEnergyAcceleration, costDiscountRead, applyCostDiscount,
   isHandActivatedAbility, isDiscardActivatedAbility,
@@ -552,6 +552,7 @@ export function attackCostPayable(state, playerId, active, attack) {
   // increases. Checking the raw printed cost rejected legally payable attacks.
   const activeView = inPlayView(state, active);
   const blockTools = isStadiumToolNegation(stadiumCard);
+  if (!blockTools && toolWaivesAttackCost({ ...activeView, instanceId: active.instanceId }, activeZoneCards)) return true;
   // The board facts a printed discount condition or "for each" count reads (I160).
   const discountCtx = {
     attacker: activeView,
