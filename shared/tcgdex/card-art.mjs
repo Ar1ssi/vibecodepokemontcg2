@@ -1,11 +1,11 @@
 // Card fronts this app serves itself, in place of TCGdex's image: TCG Live's own art
 // (E:/tcglive_extract card bundles, card area cropped by the foil UV), for TCGdex cards whose
-// image is League-stamped (bw1 Water–Darkness Energy) or missing (sm3.5 69–70, sve 001–024).
+// image is League-stamped (bw1 Water–Darkness Energy) or missing (sm3.5 69–70, sm7.5 1–78, sve 001–024).
 // Files mirror TCGdex's asset layout, `<root>/<series>/<set>/<localId>/{high,low}.webp`, so
 // every `${image}/high.webp` consumer works unchanged.
 export const CARD_ART_ROOT = '/src/assets/card-art';
 
-const SERIES_BY_SET = { bw1: 'bw', 'sm3.5': 'sm', sve: 'sv' };
+const SERIES_BY_SET = { bw1: 'bw', 'sm3.5': 'sm', 'sm7.5': 'sm', sve: 'sv' };
 
 const CARD_ART_IDS = new Set([
   'bw1-107', // Water Energy
@@ -15,6 +15,7 @@ const CARD_ART_IDS = new Set([
   'bw1-111', // Darkness Energy
   'sm3.5-69', // Double Colorless Energy
   'sm3.5-70', // Warp Energy
+  ...Array.from({ length: 78 }, (_, i) => `sm7.5-${i + 1}`), // Dragon Majesty (TCGdex has no image for any)
   ...Array.from({ length: 24 }, (_, i) => `sve-${String(i + 1).padStart(3, '0')}`), // Basic Energy
 ]);
 

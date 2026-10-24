@@ -9,12 +9,15 @@ import { extractTcgdexIdFromImageUrl } from '../../engine/rules/legacy-set-ids.m
 const CLIENT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../client');
 const OWN_ART_IDS = [
   'bw1-107', 'bw1-108', 'bw1-109', 'bw1-110', 'bw1-111', 'sm3.5-69', 'sm3.5-70',
+  ...Array.from({ length: 78 }, (_, i) => `sm7.5-${i + 1}`),
   ...Array.from({ length: 24 }, (_, i) => `sve-${String(i + 1).padStart(3, '0')}`),
 ];
 
 test('League-stamped and imageless cards map to a TCGdex-style base under our own art', () => {
   assert.equal(cardArtImageBase('bw1-107'), `${CARD_ART_ROOT}/bw/bw1/107`);
   assert.equal(cardArtImageBase('sm3.5-69'), `${CARD_ART_ROOT}/sm/sm3.5/69`);
+  assert.equal(cardArtImageBase('sm7.5-70'), `${CARD_ART_ROOT}/sm/sm7.5/70`, 'Dragon Majesty Zinnia');
+  assert.equal(cardArtImageBase('sm7.5-79'), null, 'no card 79 in Dragon Majesty');
   assert.equal(cardArtImageBase('sve-024'), `${CARD_ART_ROOT}/sv/sve/024`);
   assert.equal(cardArtImageBase('bw1-105'), null, 'Grass Energy has no stamp; TCGdex art stays');
   assert.equal(cardArtImageBase(undefined), null);
