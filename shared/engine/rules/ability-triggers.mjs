@@ -88,7 +88,8 @@ const HOLDER_ACTIVE_CLAUSE =
   /(?:if|as long as) this pok[eé]mon is (?:in the active spot|your active pok[eé]mon)/;
 
 function normalizeCheckup(text) {
-  const m = text.match(/put\s+(\d+)\s+(more\s+)?damage/);
+  // "put 1 additional damage counter" (Heatran Burning Will) is the same extra counter as "more".
+  const m = text.match(/put\s+(\d+)\s+(more\s+|additional\s+)?damage/);
   // "put 4 damage counters … instead of 2" (Pyroar) replaces the condition's own counters, which
   // Checkup already puts: the ability adds the difference.
   const instead = text.match(/instead of (\d+)/);
@@ -400,7 +401,7 @@ export function parseBetweenTurnsAbilities(entries = [], ctx = {}) {
     const text = cardAbilityText(printed);
     if (!text) continue;
     const isBetweenTurns = /between turns/.test(text);
-    const isCheckup = /during pok[eé]mon checkup/.test(text);
+    const isCheckup = /during (?:each )?pok[eé]mon checkup/.test(text);
     if (!isBetweenTurns && !isCheckup) continue;
     const named = selfNamedText(printed);
     const holderActive = HOLDER_ACTIVE_CLAUSE.test(named);
@@ -418,11 +419,7 @@ export function parseBetweenTurnsAbilities(entries = [], ctx = {}) {
       });
       continue;
     }
-    // Modern Checkup damage belongs to parseCheckupAbilities; this reader owns the
-    // pre-Checkup "between turns" wording only.
-    if (!isBetweenTurns) continue;
-
-    // "heal N damage from …" / "remove N damage counter(s) from …".
+    // "heal N damage from …" / "remove N damage counter(s) from …" — between turns or during Checkup.
     const heal =
       text.match(/heal (\d+) damage from ([^.]*)/) ||
       text.match(/remove (\d+) damage counters? from ([^.]*)/);
@@ -434,6 +431,10 @@ export function parseBetweenTurnsAbilities(entries = [], ctx = {}) {
       }
       continue;
     }
+
+    // Modern Checkup damage belongs to parseCheckupAbilities; this reader owns the
+    // pre-Checkup "between turns" wording only.
+    if (!isBetweenTurns) continue;
 
     // "Put N [more] damage counters …" — spreads and condition-damage modifiers.
     const put = text.match(
@@ -494,6 +495,11 @@ function betweenTurnsHealTarget(clause, holder) {
   const holderName = lower(holder?.name);
   if (/this pok[eé]mon|itself/.test(t) || (holderName && t.includes(holderName))) {
     return { scope: 'holder' };
+  }
+  // "from each {G} Pokémon in play" (Grassy Surge): every Pokémon of that type, both sides.
+  const typed = t.match(/^each \{([a-z])\} pok[eé]mon in play$/);
+  if (typed) {
+    return { scope: 'both', type: lower(TYPE_LETTER[typed[1]]), bench: false, exceptEx: false };
   }
   const scope = /both yours and your opponent's/.test(t)
     ? 'both'
@@ -590,4 +596,87 @@ export function parseOnPromotionAbilities(entries = [], ctx = {}) {
  */
 export function parsePlayLocks(card, ctx = {}) {
   return abilityPlayLocks(card, ctx);
+}
+
+// Whimsicott Prankster: "Neither Active Pokémon can recover from sleep during Pokémon Checkup,
+// except Whimsicott." Each live holder is a lock on both Active Pokémon, from the Bench too.
+const PRANKSTER_CLAUSE =
+  /neither active pok[eé]mon can recover from sleep during pok[eé]mon checkup, except ([^.]+)/;
+
+/** `{ holder, playerId, source, except }` per live Prankster holder (`except`: the exempt name). */
+export function parseSleepRecoveryLocks(entries = [], ctx = {}) {
+  const out = [];
+  for (const entry of entries) {
+    const printed = printedOf(entry);
+    if (!holderCanTrigger(printed, ctx)) continue;
+    const text = cardAbilityText(printed);
+    const m = text && text.match(PRANKSTER_CLAUSE);
+    if (!m) continue;
+    out.push({ holder: entry.card, playerId: entry.playerId, source: printed.name, except: m[1].trim() });
+  }
+  return out;
+}
+
+/** True when a Prankster lock keeps `pokemon` (a root in play) from recovering from Sleep at Checkup. */
+export function sleepRecoveryBlocked(pokemon, locks = []) {
+  // The holder is the exception even as an Evolution: its root card is named for the Basic below.
+  return locks.some((lock) => pokemon !== lock.holder && lower(pokemon?.name) !== lower(lock.except));
+}
+
+// Landorus Abundance: "As long as this Pokémon is in play, you may draw a card at the start of your
+// opponent's turn." Returns `{ holder, playerId, source, count }` per live holder.
+const OPPONENT_TURN_START_DRAW = /you may draw a card at the start of your opponent's turn/;
+
+export function parseOpponentTurnStartDraws(entries = [], ctx = {}) {
+  const out = [];
+  for (const entry of entries) {
+    const printed = printedOf(entry);
+    if (!holderCanTrigger(printed, ctx)) continue;
+    const text = cardAbilityText(printed);
+    if (!text || !OPPONENT_TURN_START_DRAW.test(text)) continue;
+    out.push({ holder: entry.card, playerId: entry.playerId, source: printed.name });
+  }
+  return out;
+}
+
+// Volcarona Flame Body: "If this Pokémon was attacked last turn, flip a coin. If heads, your
+// opponents Active Pokémon is now Burned." Read at the holder's own Pokémon Checkup: the attack
+// that damaged it was on the opponent's turn, the turn before (`attackDamageTaken`, set by damage).
+const FLAME_BODY_CLAUSE =
+  /if this pok[eé]mon was attacked last turn, flip a coin\. if heads, your opponents? active pok[eé]mon is now burned/;
+
+/** `{ holder, playerId, source }` for each live holder that was damaged by an attack last turn. */
+export function parseAttackedLastTurnBurns(entries = [], ctx = {}) {
+  const out = [];
+  for (const entry of entries) {
+    const printed = printedOf(entry);
+    if (!holderCanTrigger(printed, ctx)) continue;
+    const text = cardAbilityText(printed);
+    if (!text || !FLAME_BODY_CLAUSE.test(text)) continue;
+    const hit = entry.card.attackDamageTaken;
+    if (!hit || Number(hit.turn) !== Number(ctx.turnNumber) - 1) continue;
+    out.push({ holder: entry.card, playerId: entry.playerId, source: printed.name });
+  }
+  return out;
+}
+
+// Hisuian Samurott ex Ancient Hazard: "If your opponent's Active Pokémon is switched, put 3 damage
+// counters on the new Active Pokémon." Holders on the side opposite the switched Active trigger it.
+const ANCIENT_HAZARD_CLAUSE =
+  /if your opponent's active pok[eé]mon is switched, put (\d+) damage counters on the new active pok[eé]mon/;
+
+/** `{ holder, playerId, source, count }` for each live holder that is not on `switchedPlayerId`'s side. */
+export function parseOpponentSwitchDamage(entries = [], ctx = {}, switchedPlayerId) {
+  const out = [];
+  for (const entry of entries) {
+    if (entry.playerId === switchedPlayerId) continue;
+    const printed = printedOf(entry);
+    if (!holderCanTrigger(printed, ctx)) continue;
+    const text = cardAbilityText(printed);
+    const m = text && text.match(ANCIENT_HAZARD_CLAUSE);
+    const count = m ? Number(m[1]) || 0 : 0;
+    if (!(count > 0)) continue;
+    out.push({ holder: entry.card, playerId: entry.playerId, source: printed.name, count });
+  }
+  return out;
 }

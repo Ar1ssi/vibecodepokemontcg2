@@ -103,6 +103,7 @@ import {
   hasAuthoritativeView,
   getAuthoritativeZoneArray,
   getAuthoritativeStadiumArray,
+  getAuthoritativeCostDiscounts,
 } from '../netcode/apply-view.js';
 import { isBasicPokemon, isEnergy, isTrainer } from '/shared/engine/cards.mjs';
 import { attachedEnergiesFor, stadiumCardFor, abilityUsedFor } from './attack-preview-sources.mjs';
@@ -2259,6 +2260,9 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
                   card: activeCard,
                   isActive: true,
                 }),
+                // The server prices board-conditional cost discounts (Kartana, Zapdos ex); its view
+                // carries them for your own Pokémon.
+                costDiscounts: user === 'self' ? getAuthoritativeCostDiscounts(activeCard?.instanceId) : null,
                 isAbilityUsed: (card) => isAbilitySpent(user, card),
                 ensureCardData,
                 prizeCounts: {

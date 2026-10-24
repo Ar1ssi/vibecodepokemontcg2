@@ -42,6 +42,7 @@ import {
   abilityEvolutionCardLock,
   abilityPreventsCardEffects,
   abilityPreventsCardEffectsOnPlayer,
+  healBlockedByAbility,
   sideContextFor,
 } from '../rules/ability-combat.mjs';
 import { TYPE_LETTER } from '../rules/tool-combat.mjs';
@@ -2161,6 +2162,7 @@ function clearStatus(ctx) {
 function healCard(ctx, card, amount) {
   const oldDamage = card.damage || 0;
   if (oldDamage <= 0 || amount <= 0 || healLocked(card, ctx.draft?.turn?.number || 1)) return false;
+  if (healBlockedByAbility(ctx.draft, card)) return false;
   card.damage = Math.max(0, oldDamage - amount);
   ctx.events.push({
     type: 'damageUpdated',

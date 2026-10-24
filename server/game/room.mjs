@@ -12,7 +12,7 @@ import { createRng } from '../../shared/engine/rng.mjs';
 import { DECK_FORMAT_TCG } from '../../shared/engine/formats.mjs';
 import { deckFormatMismatch } from '../../shared/engine/setup.mjs';
 import { deckPeekFor, viewFor, viewForSolo } from '../../shared/engine/view.mjs';
-import { applyCommand, attackExtrasFor } from '../../shared/engine/reduce.mjs';
+import { applyCommand, attackExtrasFor, costDiscountsFor } from '../../shared/engine/reduce.mjs';
 import { PROTOCOL_VERSION } from '../../shared/engine/commands.mjs';
 import {
   flipCoinFace,
@@ -33,6 +33,9 @@ export const TURN_ORDER_CALL_TIMEOUT_MS = 15000;
 export const TURN_ORDER_CHOICE_TIMEOUT_MS = 25000;
 
 const SOLO_SEATS = ['p1', 'p2'];
+
+// The injected readers `viewFor` projects the owner's attack extras and cost discounts with.
+const VIEW_READERS = { attackExtrasFor, costDiscountsFor };
 
 const BAD_SEAT = 'bad_seat';
 
@@ -508,7 +511,7 @@ export class GameRoom {
       broadcasts.push({
         socketId: sSockId,
         playerId: null,
-        view: viewFor(this.state, null, { attackExtrasFor }),
+        view: viewFor(this.state, null, VIEW_READERS),
         lastClientSeq: 0,
       });
     }
@@ -531,7 +534,7 @@ export class GameRoom {
    * @returns {object}
    */
   getView(playerId) {
-    return viewFor(this.state, playerId, { attackExtrasFor });
+    return viewFor(this.state, playerId, VIEW_READERS);
   }
 
   /**
@@ -542,10 +545,10 @@ export class GameRoom {
    */
   getViewForSocket(socketId) {
     if (this.solo && this.socketToPlayer.has(socketId)) {
-      return viewForSolo(this.state, this.soloNearSeat, { attackExtrasFor });
+      return viewForSolo(this.state, this.soloNearSeat, VIEW_READERS);
     }
     const playerId = this.socketToPlayer.get(socketId) || null;
-    return viewFor(this.state, playerId, { attackExtrasFor });
+    return viewFor(this.state, playerId, VIEW_READERS);
   }
 
   /**

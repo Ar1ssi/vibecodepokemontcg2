@@ -109,7 +109,6 @@ export function isStadiumLostCity(card) {
 export function isStadiumBlocksHealing(card) {
   return /can'?t be healed/.test(textOf(card));
 }
-
 /** Whether the in-play Stadium forbids healing (Dyna Tree Hill). */
 export function stadiumBlocksHealing(stadiumOverride = null) {
   const card = stadiumOverride

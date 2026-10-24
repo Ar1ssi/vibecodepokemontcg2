@@ -20,7 +20,10 @@ import { addCondition, clearConditions, hasAnyCondition } from '../rules/special
 import { matchesSearch } from '../rules/search-match.mjs';
 import { isVCard } from '../rules/card-classify.mjs';
 import { effectTextFor, stepRevealsPicks } from '../rules/reveal-picks.mjs';
-import { healLocked } from '../rules/attack-markers.mjs';
+import {
+  healLocked, addAttackMarker, markerFromTurn, markerUntilTurn,
+} from '../rules/attack-markers.mjs';
+import { healBlockedByAbility } from '../rules/ability-combat.mjs';
 import { classifyEnergyEffect, resolveAttachedEnergyType } from '../rules/energy-effects.mjs';
 import {
   isSingleStrikeCard,
@@ -44,7 +47,7 @@ export const MAX_EFFECT_STEPS = 200;
 
 // Step kinds with a case in executeSteps' switch (kept in sync by executor-step-types.test).
 export const EXECUTOR_STEP_TYPES = new Set([
-  'discardCost', 'discardCostAbility', 'searchDeck', 'searchAbility', 'search', 'draw',
+  'evolvePreventAbility', 'discardCost', 'discardCostAbility','searchDeck', 'searchAbility', 'search', 'draw',
   'drawAbility', 'drawUntil', 'millItems', 'discardHand', 'discardHandThenDraw', 'shuffleHandThenDraw',
   'ionoShuffle', 'switchOwn', 'switchAbility', 'switch', 'switchOpponent', 'switchOpponentOut',
   'recursion', 'recursionFromDiscardAbility', 'shuffleFromDiscard', 'heal', 'healAmount',
@@ -554,6 +557,26 @@ export function executeSteps(draft, {
     }
 
     switch (step.type) {
+      case 'evolvePreventAbility': {
+        // Mist Concealment: the holder takes no attack damage or effects during the opponent's next turn.
+        const holder = findCard(draft, sourceCard?.instanceId)?.card;
+        if (!holder) break;
+        // Attack markers are read from the in-play base card; topId ties them to the evolved holder.
+        let base = holder;
+        while (base.attachedTo != null && findCard(draft, base.attachedTo)?.card) {
+          base = findCard(draft, base.attachedTo).card;
+        }
+        const turn = draft.turn?.number || 1;
+        const markerWindow = {
+          fromTurn: markerFromTurn('opponentNextTurn', turn),
+          untilTurn: markerUntilTurn('opponentNextTurn', turn),
+          topId: holder.instanceId,
+        };
+        addAttackMarker(base, { kind: 'incomingPrevent', filter: null, ...markerWindow });
+        addAttackMarker(base, { kind: 'effectPrevent', filter: null, ...markerWindow });
+        break;
+      }
+
       case 'discardCost':
       case 'discardCostAbility': {
         if (stepSelection) {
@@ -1655,7 +1678,9 @@ export function executeSteps(draft, {
         const healOne = (card) => {
           const oldDamage = card.damage || 0;
           // Lunala-GX Moongeist Beam: a heal-locked Pokémon keeps its damage.
-          if (!healLocked(card, draft.turn?.number || 1)) card.damage = Math.max(0, oldDamage - healAmt);
+          if (!healLocked(card, draft.turn?.number || 1) && !healBlockedByAbility(draft, card)) {
+            card.damage = Math.max(0, oldDamage - healAmt);
+          }
           events.push({
             type: 'damageUpdated',
             instanceId: card.instanceId,

@@ -17,18 +17,38 @@ import { toolDiscardsAtEndOfTurn } from '../rules/tool-attacks.mjs';
 import { stadiumCheckupCoinModifiers } from '../rules/stadium-triggers.mjs';
 import {
   inPlayEntries, parseCheckupAbilities, parseBetweenTurnsAbilities, resolveBetweenTurnsTargets,
-  parseEndOfTurnAbilities,
+  parseEndOfTurnAbilities, parseSleepRecoveryLocks, sleepRecoveryBlocked,
+  parseOpponentTurnStartDraws, parseAttackedLastTurnBurns,
 } from '../rules/ability-triggers.mjs';
+import { flipCoin } from '../rng.mjs';
 import { cardEffectShielded } from '../effects/trainer-steps.mjs';
 import {
   runEndOfTurnSpecialEnergies, applySpecialEnergyStatusImmunity, discardEndOfTurnSpecialEnergies,
 } from '../effects/special-energy.mjs';
 import { stadiumBetweenTurnsDamageFor, stadiumBlocksHealing } from '../rules/stadium-effects.mjs';
-import { removeCondition, hasCondition, hasAnyCondition } from '../rules/special-conditions.mjs';
+import { healBlockedByAbility, abilitySleepLock, sideContextFor } from '../rules/ability-combat.mjs';
+import {
+  removeCondition, hasCondition, hasAnyCondition, addCondition, listConditions,
+} from '../rules/special-conditions.mjs';
 import {
   activeAttackMarkers, cardEffectiveHp, setGameEnded, isGameConcluded, abilitySideContext,
 } from './shared.mjs';
 import { settleKnockOutWins, handleKnockout } from './knockout.mjs';
+
+/**
+ * Cresselia Lunar Healing: while its Ability is in play, a side's Active Pokémon can't be Asleep,
+ * and an Asleep Active recovers at once. Conditions land through addCondition, which cannot see the
+ * board, so this sweep settles them after every command and before Pokémon Checkup.
+ */
+export function applyAbilitySleepLocks(draft, { events }) {
+  for (const playerId of Object.keys(draft.players || {})) {
+    const active = (draft.players[playerId]?.zones?.active || []).find((c) => !c.attachedTo);
+    if (!active || !hasCondition(active, 'Asleep')) continue;
+    if (!abilitySleepLock(sideContextFor(draft, playerId))) continue;
+    removeCondition(active, 'Asleep');
+    events.push({ type: 'statusCleared', condition: 'Asleep', instanceId: active.instanceId, playerId, reason: 'ability' });
+  }
+}
 
 /**
  * Resolves Pokémon Checkup between turns, applying every condition the Active holds
@@ -237,9 +257,10 @@ export function discardBenchedAttachedTrainers(draft, { events }) {
  * Pecharunt, Team Rocket's Tyranitar, Trevenant. Applied after the per-condition
  * Checkup damage and before between-turns Stadium damage, with a Knockout sweep.
  */
-function applyCheckupAbilities(draft, { events, ctx, betweenEffects = [] }) {
+function applyCheckupAbilities(draft, { events, ctx, betweenEffects = [], checkupEffects }) {
   const entries = inPlayEntries(draft);
-  const effects = parseCheckupAbilities(entries, ctx).map((effect) => ({ ...effect, fromAbility: true }));
+  // Read before the condition flips: a Burn the flip cures still got its Heatran counter.
+  const effects = (checkupEffects ?? parseCheckupAbilities(entries, ctx)).map((effect) => ({ ...effect, fromAbility: true }));
   for (const effect of betweenEffects) {
     if (effect.kind !== 'damage') continue;
     const targets = resolveBetweenTurnsTargets(effect, entries, effect.playerId);
@@ -256,6 +277,8 @@ function applyCheckupAbilities(draft, { events, ctx, betweenEffects = [] }) {
       ) {
         continue;
       }
+      const zones = draft.players[target.playerId]?.zones;
+      if (![...(zones?.active || []), ...(zones?.bench || [])].includes(target.card)) continue;
       const damage = effect.count * 10;
       target.card.damage = (target.card.damage || 0) + damage;
       events.push({
@@ -276,7 +299,7 @@ function applyCheckupAbilities(draft, { events, ctx, betweenEffects = [] }) {
     const targets = resolveBetweenTurnsTargets(effect, entries, effect.playerId);
     for (const { card } of targets) {
       const before = card.damage || 0;
-      if (before <= 0) continue;
+      if (before <= 0 || healBlockedByAbility(draft, card)) continue;
       card.damage = Math.max(0, before - effect.amount);
       events.push({
         type: 'damageUpdated',
@@ -331,6 +354,35 @@ function applyEndOfTurnAbilities(draft, { events, ctx, endingPlayerId }) {
   }
 }
 
+/**
+ * Volcarona Flame Body, read at its owner's Checkup: the holder's own flip (heads Burns the
+ * opponent's Active). Immunity is `addCondition`'s to refuse.
+ */
+function applyAttackedLastTurnBurns(draft, { rng, events, endingPlayerId, ctx }) {
+  if (!endingPlayerId) return;
+  const entries = inPlayEntries(draft).filter((entry) => entry.playerId === endingPlayerId);
+  for (const burn of parseAttackedLastTurnBurns(entries, ctx)) {
+    const opponentId = Object.keys(draft.players || {}).find((id) => id !== burn.playerId);
+    const target = draft.players[opponentId]?.zones?.active?.find((c) => !c.attachedTo);
+    const face = flipCoin(rng);
+    events.push({
+      type: 'coinFlipped',
+      playerId: burn.playerId,
+      face,
+      source: burn.source,
+      instanceId: burn.holder.instanceId,
+    });
+    if (face !== 'heads' || !target) continue;
+    if (!addCondition(target, 'Burned')) continue;
+    events.push({
+      type: 'specialConditionUpdated',
+      instanceId: target.instanceId,
+      condition: 'Burned',
+      conditions: listConditions(target),
+    });
+  }
+}
+
 export function resolveCheckup(
   draft,
   { rng, events, endingPlayerId = draft.turn?.player }
@@ -339,9 +391,13 @@ export function resolveCheckup(
   // A condition landed this command (the attack that ended the turn) on a Pokémon whose
   // special Energy makes it immune never reaches Checkup.
   applySpecialEnergyStatusImmunity(draft, { events });
+  applyAbilitySleepLocks(draft, { events });
   const triggerCtx = abilitySideContext(draft, endingPlayerId);
   // "Between turns" abilities (I163): the pre-Checkup wording family.
   const betweenEffects = parseBetweenTurnsAbilities(inPlayEntries(draft), triggerCtx);
+  const checkupEffects = parseCheckupAbilities(inPlayEntries(draft), triggerCtx);
+  // Whimsicott Prankster: a sleeping Active the lock names keeps its Sleep and flips no coin.
+  const sleepLocks = parseSleepRecoveryLocks(inPlayEntries(draft), triggerCtx);
   const abilityAsleepFlips = (card) => {
     let flips = 0;
     for (const effect of betweenEffects) {
@@ -395,7 +451,7 @@ export function resolveCheckup(
       const burnedMods = stadiumCheckupCoinModifiers(checkupStadium, { condition: 'Burned' });
       if (flip('Burned') === 'heads' && !burnedMods?.burnedPersists) cleared('Burned');
     }
-    if (hasCondition(active, 'Asleep')) {
+    if (hasCondition(active, 'Asleep') && !sleepRecoveryBlocked(active, sleepLocks)) {
       // Slumbering Forest: 2 coins instead of 1; either tails keeps it Asleep.
       // Stir and Snooze (Snorlax / Slaking) grants the same from the holder (I163).
       const asleepMods = stadiumCheckupCoinModifiers(checkupStadium, { condition: 'Asleep' });
@@ -426,9 +482,13 @@ export function resolveCheckup(
     }
   }
 
+  // Volcarona Flame Body burns after this Checkup's own conditions, so the Burn's damage starts
+  // at the next Checkup, as a condition placed by an ability does.
+  applyAttackedLastTurnBurns(draft, { rng, events, endingPlayerId, ctx: triggerCtx });
+
   // Pokémon Checkup abilities resolve after the conditions and before the
   // between-turns Stadium damage (design 034 slice 4).
-  applyCheckupAbilities(draft, { events, ctx: triggerCtx, betweenEffects });
+  applyCheckupAbilities(draft, { events, ctx: triggerCtx, betweenEffects, checkupEffects });
 
   // Between-turns Stadium damage resolves after Pokémon Checkup.
   applyBetweenTurnsStadiumDamage(draft, { events });
@@ -459,6 +519,30 @@ function returnSetAsideHands(draft, { endingTurn, events }) {
     player.zones.hand.push(...(setAside.cards || []));
     delete player.setAsideHand;
     events.push({ type: 'setAsideHandReturned', playerId: player.playerId, count: (setAside.cards || []).length });
+  }
+}
+
+/**
+ * Landorus Abundance: a holder on the side that is not starting its turn may draw at the start of
+ * that turn. The engine takes the optional draw whenever the deck has a card (no prompt exists for
+ * it), and never draws from an empty deck.
+ */
+function applyOpponentTurnStartDraws(draft, { nextPlayerId, events }) {
+  if (isGameConcluded(draft)) return;
+  const entries = inPlayEntries(draft).filter((entry) => entry.playerId !== nextPlayerId);
+  const draws = parseOpponentTurnStartDraws(entries, abilitySideContext(draft, nextPlayerId));
+  for (const { playerId } of draws) {
+    const deck = draft.players[playerId].zones.deck;
+    // "You may draw": the draw is declined when it would leave no card for the holder's own turn.
+    if (deck.length <= 1) continue;
+    const [card] = deck.splice(0, 1);
+    draft.players[playerId].zones.hand.push(card);
+    events.push({
+      type: 'cardsDrawn',
+      playerId,
+      count: 1,
+      cards: [{ instanceId: card.instanceId }],
+    });
   }
 }
 
@@ -549,6 +633,7 @@ export function advanceTurn(draft, { nextPlayerId, events }) {
       cards: [{ instanceId: card.instanceId }],
     });
   }
+  applyOpponentTurnStartDraws(draft, { nextPlayerId, events });
 }
 
 /**

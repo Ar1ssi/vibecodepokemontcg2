@@ -27,6 +27,7 @@ import {
 } from './attack-effect.mjs';
 import {
   promoteBenchToActive, koEnergyTargets, moveKoEnergy, PRIZE_CHOICE_EFFECT, resolvePrizeChoice,
+  KO_HAND_DISCARD_EFFECT, resolveKoHandDiscard,
   PRIZE_BENCH_EFFECT, PRIZE_ATTACH_EFFECT, resumePrizeAttach, resumePrizeToBench,
 } from './knockout.mjs';
 import { resolveCheckup, advanceTurn, endTurnFromEffect } from './turn.mjs';
@@ -445,6 +446,13 @@ export function resolveChoiceCommand({ draft, playerId, activeRng, events, paylo
       events,
     });
     draft.pendingChoice = null;
+  } else if (token.effectType === KO_HAND_DISCARD_EFFECT) {
+    draft.pendingChoice = null;
+    resolveKoHandDiscard(draft, {
+      playerId: initiatorPlayerId,
+      selection: payload.selection || [],
+      events,
+    });
   } else if (token.effectType === 'koEnergy') {
     // Energy-move-on-KO: the player picked the target for the first pending
     // obligation. Queue the rest so the tail (or the next picker) runs them.

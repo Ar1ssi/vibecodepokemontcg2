@@ -78,6 +78,9 @@ export async function computeActionAffordances({
   stadiumCard = null,
   extraAttacks = [],
   board = {},
+  // The server's passive cost-discount reads for the Active Pokémon (`getAuthoritativeCostDiscounts`);
+  // null prices it from its own text.
+  costDiscounts = null,
   isAbilityUsed = () => false,
   ensureCardData = async () => {},
   // False when the player had no Pokémon Knocked Out during the opponent's last
@@ -118,6 +121,7 @@ export async function computeActionAffordances({
       rulesEnabled: true,
       priorAttacks,
       extraAttacks: resolvedExtra,
+      passiveDiscounts: costDiscounts,
       // Asleep/Paralyzed lock the attack just as the server does. Confused is
       // not a lock (coin flip), so it is intentionally not passed.
       blockedReason: statusAttackBlock(activeCard),

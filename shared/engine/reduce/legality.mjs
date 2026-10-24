@@ -502,6 +502,49 @@ export function resolveAttacker(state, playerId, payload) {
 }
 
 /**
+ * The passive attack-cost discounts of a Pokémon (its own Ability, then its attached Tools), as the
+ * `costDiscountRead` results `applyCostDiscount` takes. One source for the legality check and the
+ * view the client prices attacks from, so the attack panel cannot disagree with the server
+ * (Kartana Beast Boost, Galarian Zapdos ex Fighting Instinct read board facts the client lacks).
+ */
+export function passiveCostDiscountReads(state, playerId, active) {
+  const player = state.players?.[playerId];
+  if (!player || !active) return [];
+  const holderRef = findCard(state, active.instanceId);
+  const zoneCards =
+    (holderRef?.playerId === playerId && holderRef.player?.zones?.[holderRef.zoneId]) ||
+    player.zones?.active ||
+    [];
+  const opponent = state.players?.[Object.keys(state.players || {}).find((id) => id !== playerId)];
+  const activeView = inPlayView(state, active);
+  // The board facts a printed discount condition or "for each" count reads (I160).
+  const discountCtx = {
+    attacker: activeView,
+    ownHandCount: (player.zones?.hand || []).length,
+    ownPrizesLeft: (player.zones?.prizes || []).length,
+    opponentPrizesLeft: (opponent?.zones?.prizes || []).length,
+    opponentDeckFormat: opponent?.deckFormat,
+    ownSideCards: [...(player.zones?.active || []), ...(player.zones?.bench || [])],
+    opponentSideCards: [...(opponent?.zones?.active || []), ...(opponent?.zones?.bench || [])],
+    opponentActive: opponent?.zones?.active || [],
+    ownDiscard: player.zones?.discard || [],
+    turnNumber: state.turn?.number,
+  };
+  const reads = [costDiscountRead(activeView, discountCtx)];
+  if (!isStadiumToolNegation(state.stadium?.card || state.stadium || null)) {
+    for (const tool of attachedTools(active, zoneCards)) reads.push(costDiscountRead(tool, discountCtx));
+  }
+  return reads.filter((read) => read?.count > 0);
+}
+
+/** `passiveCostDiscountReads` for an in-play Pokémon, looked up by card (the view's injected form). */
+export function costDiscountsFor(state, card) {
+  const ref = card ? findCard(state, card.instanceId) : null;
+  if (!ref || !['active', 'bench'].includes(ref.zoneId)) return [];
+  return passiveCostDiscountReads(state, ref.playerId, card);
+}
+
+/**
  * Whether `active` has the Energy for `attack`, priced exactly as the attack
  * preview prices it (ability/Tool/Stadium discounts, then Stadium increases).
  */
@@ -550,25 +593,7 @@ export function attackCostPayable(state, playerId, active, attack) {
   // cost modifier, then ability cost ignores, then Nighttime Mine-style
   // increases. Checking the raw printed cost rejected legally payable attacks.
   const activeView = inPlayView(state, active);
-  const blockTools = isStadiumToolNegation(stadiumCard);
-  // The board facts a printed discount condition or "for each" count reads (I160).
-  const discountCtx = {
-    attacker: activeView,
-    ownHandCount: (player.zones?.hand || []).length,
-    ownPrizesLeft: (player.zones?.prizes || []).length,
-    opponentPrizesLeft: (opponent?.zones?.prizes || []).length,
-    opponentDeckFormat: opponent?.deckFormat,
-    ownSideCards: sideCards,
-    opponentSideCards: [...(opponent?.zones?.active || []), ...(opponent?.zones?.bench || [])],
-    opponentActive: opponent?.zones?.active || [],
-    ownDiscard: player.zones?.discard || [],
-  };
-  const discounts = [costDiscountRead(activeView, discountCtx)];
-  if (!blockTools) {
-    for (const tool of attachedTools(active, activeZoneCards)) {
-      discounts.push(costDiscountRead(tool, discountCtx));
-    }
-  }
+  const discounts = passiveCostDiscountReads(state, playerId, active);
   const stadiumDiscount = stadiumCard ? stadiumCostDiscountFor(activeView, stadiumCard) : null;
   if (stadiumDiscount) discounts.push(stadiumDiscount);
   let effectiveCost = attack?.cost || [];

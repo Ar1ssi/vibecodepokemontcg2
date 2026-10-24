@@ -57,6 +57,8 @@ export async function computeCardGlows({
   activeZoneCards = [],
   stadiumCard = null,
   extraAttacks = [],
+  // The server's passive cost-discount reads for the Active Pokémon, when the view carries them.
+  costDiscounts = null,
   isAbilityUsed = () => false,
   ensureCardData = async () => {},
   // hand-legality context, forwarded verbatim to enumerateOptions
@@ -85,6 +87,7 @@ export async function computeCardGlows({
         handCards,
         stadiumCard,
         extraAttacks,
+        costDiscounts,
         board: specialEnergyBoard({
           ownPrizes: prizeCounts?.self,
           opponentPrizes: prizeCounts?.opponent,

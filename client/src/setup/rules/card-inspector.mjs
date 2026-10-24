@@ -41,6 +41,7 @@ import { getZone } from '../zones/get-zone.js';
 import {
   getAuthoritativeStadiumArray,
   getAuthoritativeAttackExtras,
+  getAuthoritativeCostDiscounts,
   getAuthoritativeOncePerGame,
 } from '../netcode/apply-view.js';
 import { runAbilitySteps } from './rules-bridge.js';
@@ -639,6 +640,8 @@ async function resolveLiveContext(card, zone = 'active') {
     abilityUsed: abilityUsedFlag,
     priorAttacks,
     extraAttacks: resolvedExtra,
+    // The server's own cost-discount reads for this Pokémon (null without an authoritative view).
+    passiveDiscounts: getAuthoritativeCostDiscounts(card?.instanceId),
     oncePerGame: getAuthoritativeOncePerGame(),
     attacker: card,
     zone,

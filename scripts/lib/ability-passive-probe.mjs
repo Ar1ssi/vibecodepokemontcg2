@@ -41,6 +41,15 @@ import {
   abilitySummonRestricted,
   abilityFirstTurnAttack,
   abilityExtraAttack,
+  abilityIgnoresDefenderAbilities,
+  abilityIgnoresAttackerBoosts,
+  abilityFlipPreventsAttackDamage,
+  abilityKoDiscardsOpponentHand,
+  abilityKoConfusesAttacker,
+  abilityEnergyAttachCounters,
+  abilityHealLocked,
+  abilitySleepLock,
+  abilityEnergyAttackerShield,
 } from '../../shared/engine/rules/ability-combat.mjs';
 import {
   inPlayEntries,
@@ -51,6 +60,12 @@ import {
   parseOnDamageStatus,
   parseOnEnergyAttachAbilities,
   parseOnKoAbilities,
+  parseBetweenTurnsAbilities,
+  parseSleepRecoveryLocks,
+  sleepRecoveryBlocked,
+  parseOpponentTurnStartDraws,
+  parseAttackedLastTurnBurns,
+  parseOpponentSwitchDamage,
 } from '../../shared/engine/rules/ability-triggers.mjs';
 import {
   parseToolCap,
@@ -84,6 +99,9 @@ function sideContext(state, pid) {
     opponentActive: other.active,
     opponentBench: other.bench,
     turnNumber: state.turn.number,
+    // The Prize counts reduce.mjs's attack context carries (Kingambit reads the opponent's).
+    ownPrizesLeft: own.prizes.length,
+    opponentPrizesLeft: other.prizes.length,
   };
 }
 
@@ -318,11 +336,55 @@ function probeAnswers(holder, { turnTrainerName, partners }) {
       );
     }
     ask('counterMoveLock', () => abilityCounterMoveLock(p1));
+    // Customhb passives: each reader sees a board that can show it (a Dragon / Metal / EX
+    // opponent, a same-named Bench, the holder as the attacker or the Knocked Out).
+    ask('sleepLock', () => abilitySleepLock(p1));
+    ask('healLocked:p2Active', () => abilityHealLocked(p2Active, p2));
+    for (const root of own) {
+      const ctx = at(p1, root);
+      const card = viewOf(p1.sideCards, root);
+      ask(`ignoresDefenderAbilities:${card.name}`, () => abilityIgnoresDefenderAbilities(card, ctx));
+      ask(`energyAttackerShield:${card.name}`, () => abilityEnergyAttackerShield(card, ['water'], ctx));
+      ask(`flipPreventsDamage:${card.name}`, () => abilityFlipPreventsAttackDamage(card, ctx));
+      ask(`koDiscardsHand:${card.name}`, () => abilityKoDiscardsOpponentHand(card, ctx));
+      ask(`koConfuses:${card.name}`, () => abilityKoConfusesAttacker(card, ctx));
+      ask(`energyAttachCounters:${card.name}`, () => abilityEnergyAttachCounters(card, ctx));
+      ask(`ignoresAttackerBoosts:${card.name}`, () => abilityIgnoresAttackerBoosts(card, ctx));
+      // Magnemite Sparkling Induction: same-named Pokémon on the Bench.
+      const twins = ctx.sideBench.filter((c) => !c.attachedTo).map((c) => ({ ...c, name: card.name }));
+      ask(`retreat:twinBench:${card.name}`, () => abilityRetreatCost(card, { ...ctx, sideBench: twins }));
+      // Ninetales Luminous Barrier: a Pokémon-EX attacker.
+      ask(`effectPrevention:exAttacker:${card.name}`, () =>
+        abilityPreventsAttackEffects(card, { ...p2Active, subtypes: ['Basic', 'EX'] }, ctx)
+      );
+    }
+    for (const root of opp) {
+      const ctx = at(p2, root);
+      const card = viewOf(p2.sideCards, root);
+      // Klefki Fairy Lock: the opponent's {N} Pokémon is the defender.
+      ask(`opp:weakness:dragon:${card.name}`, () => abilityWeaknessOverride({ ...card, types: ['Dragon'] }, ctx));
+      // Magnezone Magnetic Pull: the opponent's {M} Active cannot retreat.
+      ask(`opp:retreatLock:metal:${card.name}`, () => abilityRetreatLock({ ...card, types: ['Metal'] }, ctx));
+    }
     ask('energyMultiplier', () => abilityEnergyMultiplier(p1.sideCards));
     ask('checkup', () => parseCheckupAbilities(inPlayEntries(state), p1));
     ask('onOpponentEvolve', () => parseOnOpponentEvolveAbilities(inPlayEntries(state), p1));
     ask('endOfTurn', () => parseEndOfTurnAbilities(inPlayEntries(state), p1));
     ask('onKo', () => parseOnKoAbilities(inPlayEntries(state), p1));
+    ask('betweenTurns', () => parseBetweenTurnsAbilities(inPlayEntries(state), p1));
+    ask('startOfOpponentTurnDraw', () => parseOpponentTurnStartDraws(inPlayEntries(state), p1));
+    // The opponent's Active was switched in: the holders on the other side read it.
+    ask('opponentSwitched', () => parseOpponentSwitchDamage(inPlayEntries(state), p1, 'p2'));
+    // Damaged by an attack on the opponent's last turn (attackDamageTaken on the holder root).
+    const attackedLastTurn = { turn: state.turn.number - 1, amount: 10 };
+    ask('attackedLastTurn', () =>
+      parseAttackedLastTurnBurns(
+        inPlayEntries(state).map((entry) =>
+          entry.card === holderRoot ? { ...entry, card: { ...entry.card, attackDamageTaken: attackedLastTurn } } : entry
+        ),
+        p1
+      )
+    );
 
     if (!holderCard) continue;
     const ctx = at(p1, holderCard);
@@ -343,19 +405,36 @@ function probeAnswers(holder, { turnTrainerName, partners }) {
     ask('extraAttack', () => abilityExtraAttack(holderCard));
     ask('toolCap', () => parseToolCap(holderCard));
     ask('handEnergyAcceleration', () => parseUnlimitedHandEnergyAcceleration(holderCard));
-    ask('passiveCostDiscount', () =>
-      costDiscountRead(holderCard, {
-        attacker: holderCard,
-        ownHandCount: state.players.p1.zones.hand.length,
-        ownPrizesLeft: state.players.p1.zones.prizes.length,
-        opponentPrizesLeft: state.players.p2.zones.prizes.length,
-        ownSideCards: p1.sideCards,
-        opponentSideCards: p2.sideCards,
-        opponentActive: p2.sideActive,
-        ownDiscard: state.players.p1.zones.discard,
-      })
+    const discountCtx = {
+      attacker: holderCard,
+      ownHandCount: state.players.p1.zones.hand.length,
+      ownPrizesLeft: state.players.p1.zones.prizes.length,
+      opponentPrizesLeft: state.players.p2.zones.prizes.length,
+      ownSideCards: p1.sideCards,
+      opponentSideCards: p2.sideCards,
+      opponentActive: p2.sideActive,
+      ownDiscard: state.players.p1.zones.discard,
+      turnNumber: state.turn.number,
+    };
+    ask('passiveCostDiscount', () => costDiscountRead(holderCard, discountCtx));
+    // Kartana Beast Boost: the holder Knocked Out the opponent's Active on our previous turn.
+    ask('passiveCostDiscount:koedLastTurn', () =>
+      costDiscountRead({ ...holderCard, koedOpponentActiveTurn: state.turn.number - 2 }, discountCtx)
+    );
+    // Galarian Zapdos ex Fighting Instinct: an opponent's Pokémon ex in play.
+    const opposingEx = mon('Probe Opposing ex', { instanceId: 9300, subtypes: ['Basic', 'ex'] });
+    ask('passiveCostDiscount:opponentEx', () =>
+      costDiscountRead(holderCard, { ...discountCtx, opponentSideCards: [...p2.sideCards, opposingEx] })
     );
     ask('attackInheritance', () => parseAttackInheritance(holderCard));
+    // Asleep holder: Drowziness reads its own Retreat Cost (as the Active or from the Bench).
+    addCondition(holderRoot, 'Asleep');
+    const holderZoneCards = at(p1, holderRoot).isActive ? p1.sideActive : p1.sideBench;
+    ask('ownRetreat:asleep', () => combinedToolRetreatCost(2, viewOf(p1.sideCards, holderRoot), holderZoneCards));
+    // Asleep Actives: Prankster keeps both from recovering at Checkup, except Whimsicott.
+    const sleepLocks = parseSleepRecoveryLocks(inPlayEntries(state), p1);
+    for (const active of [p1Active, p2Active]) addCondition(active, 'Asleep');
+    ask('sleepRecovery', () => [p1Active, p2Active].map((active) => sleepRecoveryBlocked(active, sleepLocks)));
     // Last on this board: condition-targeted Checkup damage needs Poisoned/Burned/Asleep targets.
     for (const card of [...own, ...opp]) for (const c of ['Poisoned', 'Burned', 'Asleep']) addCondition(card, c);
     ask('checkup:conditioned', () => parseCheckupAbilities(inPlayEntries(state), p1));

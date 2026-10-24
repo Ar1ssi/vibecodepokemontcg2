@@ -13,6 +13,8 @@ import {
   listConditions,
 } from '../rules/special-conditions.mjs';
 import { stadiumOnSwitchTriggers } from '../rules/stadium-triggers.mjs';
+import { inPlayEntries, parseOpponentSwitchDamage } from '../rules/ability-triggers.mjs';
+import { healBlockedByAbility, sideContextFor } from '../rules/ability-combat.mjs';
 
 /**
  * Applies one Stadium trigger descriptor to a Pokémon. `draft` is accepted for
@@ -37,7 +39,7 @@ export function applyStadiumTriggerEffect(draft, effect, { host, hostPlayerId, e
       attackerPlayerId: null,
       damage: host.damage,
     });
-  } else if (effect.kind === 'heal' && effect.amount > 0) {
+  } else if (effect.kind === 'heal' && effect.amount > 0 && !healBlockedByAbility(draft, host)) {
     const oldDamage = host.damage || 0;
     host.damage = Math.max(0, oldDamage - effect.amount);
     events.push({
@@ -61,8 +63,8 @@ export function applyStadiumTriggerEffect(draft, effect, { host, hostPlayerId, e
 
 /**
  * Fires the Stadium's on-switch triggers for an Active Pokémon that moved to the
- * Bench. Call before the switched-out Pokémon's conditions are cleared so Dust
- * Island still sees its Poisoned state.
+ * Bench, then the Abilities that hit a switched-in Active (Ancient Hazard). Call before the
+ * switched-out Pokémon's conditions are cleared so Dust Island still sees its Poisoned state.
  *
  * @param {object} draft
  * @param {{ switchedOut?: object, switchedIn?: object, switchedOutPlayerId?: string,
@@ -104,6 +106,25 @@ export function applyStadiumSwitchTriggers(
       host,
       hostPlayerId:
         effect.target === 'switchedOut' ? switchedOutPlayerId : switchedInPlayerId,
+      events,
+    });
+  }
+  applyAbilitySwitchDamage(draft, { switchedIn, switchedInPlayerId, switchedOutPlayerId, events });
+}
+
+/**
+ * Pokémon Ability on-switch damage (Hisuian Samurott ex Ancient Hazard): an Active the opponent
+ * switches in takes the holder's counters. Holders are read from the side that did not switch.
+ */
+function applyAbilitySwitchDamage(draft, { switchedIn, switchedInPlayerId, switchedOutPlayerId, events }) {
+  if (!switchedIn || switchedOutPlayerId == null) return;
+  const entries = inPlayEntries(draft);
+  const ctx = sideContextFor(draft, switchedOutPlayerId);
+  for (const hazard of parseOpponentSwitchDamage(entries, ctx, switchedOutPlayerId)) {
+    // `count` is damage counters; the damage path takes HP (one counter is 10).
+    applyStadiumTriggerEffect(draft, { kind: 'damage', amount: hazard.count * 10, source: hazard.source }, {
+      host: switchedIn,
+      hostPlayerId: switchedInPlayerId,
       events,
     });
   }

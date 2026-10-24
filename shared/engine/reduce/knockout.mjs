@@ -16,7 +16,9 @@ import {
 import { parsePrizeModify } from '../rules/ability-executors.mjs';
 import { parseToolCondition, toolConditionMet } from '../rules/tool-conditions.mjs';
 import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
-import { abilityPrizeModify, abilityPrizeToBench } from '../rules/ability-combat.mjs';
+import {
+  abilityPrizeModify, abilityPrizeToBench, abilityKoDiscardsOpponentHand, abilityKoConfusesAttacker,
+} from '../rules/ability-combat.mjs';
 import { inPlayEntries, parseOnKoAbilities } from '../rules/ability-triggers.mjs';
 import { createPendingChoice, attachToRoot } from '../effects/executor.mjs';
 import { clearAttackMarkers } from '../rules/attack-markers.mjs';
@@ -29,7 +31,7 @@ import {
 import { isStadiumLostCity } from '../rules/stadium-effects.mjs';
 import { isBasicEnergy } from '../rules/card-classify.mjs';
 import { topPokemonCard } from '../rules/evolved-pokemon.mjs';
-import { clearConditions } from '../rules/special-conditions.mjs';
+import { addCondition, clearConditions, listConditions } from '../rules/special-conditions.mjs';
 import {
   activeAttackMarkers, inPlayView, cardEffectiveHp, setGameEnded, isGameConcluded,
   abilitySideContext, tiebreakActive, rootsIn,
@@ -312,6 +314,14 @@ export function handleKnockout(
   // Ability counters and counters an attack places are not attack damage (audit SE12).
   const koByAttackDamage = byAttack && byDamage;
   const koByOpponentAttack = koByAttackDamage && draft.turn?.player !== victimPlayerId;
+  applyKnockoutHolderAbilities(draft, {
+    victim,
+    victimPlayerId,
+    wasActive,
+    koByOpponentAttack,
+    attackerActive,
+    events,
+  });
   let prizeCount = toolPrizeCountAdjust(
     victim,
     victimZoneCards,
@@ -356,6 +366,8 @@ export function handleKnockout(
   const koByHolderAttack =
     byAttack && wasActive && draft.turn?.player === attackerPlayerId;
   if (attackerActive && koByHolderAttack) {
+    // Kartana Beast Boost reads the turn its holder last Knocked Out the opponent's Active.
+    attackerActive.koedOpponentActiveTurn = Number(draft.turn?.number) || 1;
     const attackerZone = attacker.zones.active || [];
     const attackerCtx = {
       holder: inPlayView(draft, attackerActive),
@@ -667,7 +679,10 @@ export function stampActivePromotions(prev, next) {
     for (const card of prevActive) {
       if (nextIds.has(card.instanceId)) continue;
       const moved = findCard(next, card.instanceId)?.card;
-      if (moved) delete moved.movedToActiveTurn;
+      if (!moved) continue;
+      delete moved.movedToActiveTurn;
+      // "As long as this Pokémon remains in the Active Spot" effects end when it leaves.
+      if (moved.attackMarkers) moved.attackMarkers = moved.attackMarkers.filter((m) => !m.whileActive);
     }
   }
 }
@@ -1191,4 +1206,88 @@ export function promoteCommand({ draft, playerId, payload, events }) {
     instanceId: payload.instanceId,
     events,
   });
+}
+
+export const KO_HAND_DISCARD_EFFECT = 'koHandDiscard';
+
+/**
+ * On-KO abilities of the Knocked Out holder: Amoonguss Disarming Spore queues a hand discard for
+ * the opponent; Jellicent Spiteful Spirit confuses and poisons the Attacking Pokémon. Runs while
+ * the holder is still in play so the wording reads the live board.
+ */
+function applyKnockoutHolderAbilities(draft, { victim, victimPlayerId, wasActive, koByOpponentAttack, attackerActive, events }) {
+  const holder = inPlayView(draft, victim);
+  const ctx = abilitySideContext(draft, victimPlayerId);
+
+  const discardCount = abilityKoDiscardsOpponentHand(holder, ctx);
+  if (discardCount > 0 && draft.turn?.player !== victimPlayerId) {
+    const opponentId = Object.keys(draft.players).find((id) => id !== victimPlayerId);
+    draft.__koHandDiscards = [
+      ...(draft.__koHandDiscards || []),
+      { playerId: opponentId, count: discardCount, source: holder.name },
+    ];
+  }
+
+  // The printed wording says "if this Pokémon is your Active Pokémon", so the Active check is here.
+  if (wasActive && koByOpponentAttack && attackerActive && abilityKoConfusesAttacker(holder, ctx)) {
+    for (const condition of ['Confused', 'Poisoned']) {
+      if (!addCondition(attackerActive, condition)) continue;
+      events.push({
+        type: 'specialConditionUpdated',
+        instanceId: attackerActive.instanceId,
+        condition,
+        conditions: listConditions(attackerActive),
+      });
+    }
+  }
+}
+
+/**
+ * Runs the queued Knock Out hand discards (Amoonguss) once no other choice is pending. The
+ * opponent picks the cards, as the printed wording reads "discard from your opponent's hand".
+ */
+export function settleKoHandDiscards(draft, { events }) {
+  if (isGameConcluded(draft)) {
+    delete draft.__koHandDiscards;
+    return;
+  }
+  if (draft.pendingChoice) return;
+  const queue = [...(draft.__koHandDiscards || [])];
+  while (queue.length > 0) {
+    const entry = queue.shift();
+    const hand = draft.players?.[entry.playerId]?.zones?.hand || [];
+    const count = Math.min(entry.count, hand.length);
+    if (count === 0) continue;
+    draft.pendingChoice = createPendingChoice({
+      player: entry.playerId,
+      source: entry.source,
+      prompt: `${entry.source}: discard ${count} card${count > 1 ? 's' : ''} from your hand`,
+      options: hand,
+      min: count,
+      max: count,
+      stateVersion: draft.stateVersion || 0,
+      resumeToken: {
+        effectType: KO_HAND_DISCARD_EFFECT,
+        initiatorPlayerId: entry.playerId,
+        count,
+      },
+    });
+    break;
+  }
+  if (queue.length > 0) draft.__koHandDiscards = queue;
+  else delete draft.__koHandDiscards;
+}
+
+/** Discards the chosen cards from the chooser's hand (the Amoonguss Disarming Spore choice). */
+export function resolveKoHandDiscard(draft, { playerId, selection, events }) {
+  const player = draft.players?.[playerId];
+  if (!player) return;
+  for (const instanceId of selection) {
+    const hand = player.zones.hand || [];
+    const index = hand.findIndex((c) => c.instanceId === instanceId);
+    if (index < 0) continue;
+    const [card] = hand.splice(index, 1);
+    discardCardToPlayerZone(player, card);
+    events.push({ type: 'cardMoved', instanceId: card.instanceId, from: 'hand', to: 'discard', playerId });
+  }
 }

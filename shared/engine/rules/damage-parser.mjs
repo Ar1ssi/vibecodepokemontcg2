@@ -2144,6 +2144,10 @@ export function deckMillScaling(attackText) {
   } else if ((m = /discard (up to )?(\d+) cards from the top of your deck/i.exec(text))) {
     count = parseInt(m[2], 10);
     upTo = Boolean(m[1]);
+  } else if ((m = /discard up to the top (\d+) cards? of your deck/i.exec(text))) {
+    // Quagsire Drenched Headbutt: the player picks 0..N, and each card discarded scales the damage.
+    count = parseInt(m[1], 10);
+    upTo = true;
   } else if ((m = /discard cards from the top of your deck until only (\d+) cards? remains?/i.exec(text))) {
     keep = parseInt(m[1], 10);
   } else {
@@ -2284,7 +2288,10 @@ export function parseAttackSearchClause(attackText) {
         )
       : String(attackText || '');
   if (!/search your deck for/i.test(text)) return null;
-  return parseSearchDeckParams(lower(text));
+  // "put them on your Bench" / "place them on your Bench" read as the modern "onto".
+  return parseSearchDeckParams(
+    lower(text).replace(/\b(?:put|place)\s+(it|them)\s+(?:on|onto)\s+your\s+bench/g, 'put $1 onto your bench')
+  );
 }
 
 // Resolve printed attack effect text from the attack object or its parent card.

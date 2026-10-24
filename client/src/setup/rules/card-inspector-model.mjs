@@ -464,6 +464,7 @@ export function buildInspectorModel(card, ctx = {}) {
       stadiumCostModifier: Number(ctx.stadiumCostModifier) || 0,
       stadiumCostSymbol: ctx.stadiumCostSymbol ?? null,
       extraAttacks: ctx.extraAttacks || [],
+      passiveDiscounts: ctx.passiveDiscounts ?? null,
       blockedReason: statusBlockReason,
       oncePerGame: ctx.oncePerGame ?? null,
     });

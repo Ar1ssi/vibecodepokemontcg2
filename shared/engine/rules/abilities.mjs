@@ -96,6 +96,11 @@ const typeChangeText = (t) =>
   /is both \{[a-z]\} and \{[a-z]\}/.test(t);
 
 const OPPONENT_ACTIVE_ENERGY_DISCARD = /when you play [^.]*from your hand to evolve[^.]*, you may discard an energy attached to your opponent's active pok[eé]mon/;
+// Mawile Energy Crunch (HB 160): played onto the Bench, one Energy from any of the opponent's Pokémon.
+const OPPONENT_ANY_ENERGY_DISCARD = /when you play [^.]*from your hand (?:on)?to your bench[^.]*, you may discard (?:1|an?) energy from 1 of your opponent's pok[eé]mon/;
+
+// Mist Concealment (HB 242): the evolve play shields the holder from the opponent's next turn.
+const MIST_CONCEALMENT = /when you play this pok[eé]mon from your hand to evolve 1 of your pok[eé]mon, you may prevent all effects of attacks, including damage, done to this pok[eé]mon by your opponent[’']s pok[eé]mon during your opponent[’']s next turn/;
 
 // Bench ↔ Active swap wording ("switch … Benched … with your Active …").
 export const isBenchActiveSwitchText = (t) =>
@@ -657,8 +662,9 @@ export function parseAbility(text = '') {
     // "…and attach it to 1 of your Benched {D} Pokémon" (Sinister Surge), "…attach them to this
     // Pokémon", "…attach them to your Pokémon in any way you like": the searched cards go onto
     // Pokémon, not into the hand.
+    // "…and attach to one of your Pokémon" (Alolan Golem Electrum Deposit) drops the pronoun.
     const attachClause = lower.match(
-      /search your deck for [^.]*? and attach (?:it|them) to (this pok[eé]mon|(?:1|one) of your [^.]*?pok[eé]mon|your [^.]*?pok[eé]mon in any way you like)/
+      /search your deck for [^.]*? and attach (?:(?:it|them) )?to (this pok[eé]mon|(?:1|one) of your [^.]*?pok[eé]mon|your [^.]*?pok[eé]mon in any way you like)/
     )?.[1];
     const attachEach = Boolean(attachClause?.endsWith('in any way you like'));
     const attachTarget = !attachClause
@@ -944,6 +950,16 @@ export function parseAbility(text = '') {
     });
   }
 
+  if (OPPONENT_ANY_ENERGY_DISCARD.test(lower)) {
+    steps.push({
+      type: 'discardEnergyFromOpponent',
+      energy: 'any Energy',
+      count: 1,
+      scope: '1 Pokémon',
+      guidance: "Discard an Energy attached to 1 of your opponent's Pokémon.",
+    });
+  }
+
   // ── 7. Discard cost (Energy from hand to use ability) ───────────────────
   if (
     lower.includes('discard') &&
@@ -952,7 +968,8 @@ export function parseAbility(text = '') {
     // Haxorus Grind Up: the discarded card is the Stadium in play, not a hand cost.
     !/discard (?:any|a) stadium card in play/.test(lower) &&
     !/(?:to attach|whenever you attach)[^.]*energy card from your hand[^.]*discard an energy card attached/.test(lower) &&
-    !OPPONENT_ACTIVE_ENERGY_DISCARD.test(lower)
+    !OPPONENT_ACTIVE_ENERGY_DISCARD.test(lower) &&
+    !OPPONENT_ANY_ENERGY_DISCARD.test(lower)
   ) {
     const countMatch = lower.match(/discard\s+(?:up to\s+)?(\d+)\s+/);
     const count = countMatch ? Number(countMatch[1]) : 1;
@@ -1203,6 +1220,15 @@ export function parseAbility(text = '') {
   }
 
   // ── 13. When-played (one-shot on play) ──────────────────────────────────
+  // Mist Concealment: the evolve play prevents attack effects and damage during the opponent's
+  // next turn (the window the executor's marker covers).
+  if (MIST_CONCEALMENT.test(lower)) {
+    steps.push({
+      type: 'evolvePreventAbility',
+      guidance: 'When you evolve this Pokémon from your hand: prevent attack effects and damage to it during your opponent\'s next turn.',
+    });
+  }
+
   if (lower.includes('when you play')) {
     // "from your hand to evolve 1 of your Pokémon" is the evolve trigger (Primarina
     // Enriching Melody), gated by the turn that Pokémon evolved — not the played-to-
@@ -1384,10 +1410,12 @@ export function parseAbility(text = '') {
   }
 
   // ── 23. Damage prevention ───────────────────────────────────────────────
+  // Mist Concealment prevents only during the opponent's next turn: its evolvePreventAbility step owns that.
   if (
-    (lower.includes('prevent') && lower.includes('damage')) ||
-    lower.includes("can't be damaged") ||
-    lower.includes('immune to damage')
+    !MIST_CONCEALMENT.test(lower) &&
+    ((lower.includes('prevent') && lower.includes('damage')) ||
+      lower.includes("can't be damaged") ||
+      lower.includes('immune to damage'))
   ) {
     steps.push({
       type: 'damagePreventAbility',
@@ -1439,6 +1467,7 @@ export function parseAbility(text = '') {
   // "This power can't be used if …" restricts use (statusText drops it); it prevents nothing.
   if (
     !isAbilityUsageLimitText(lower) &&
+    !MIST_CONCEALMENT.test(lower) &&
     (((lower.includes('prevent') ||
       statusText.includes("can't") ||
       lower.includes('have no effect') ||

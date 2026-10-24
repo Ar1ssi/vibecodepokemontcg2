@@ -529,6 +529,39 @@ const CLAUSES = [
     /^this pokémon was healed during this turn$/,
     () => ({ desc: { kind: 'healedThisTurn' }, printedNegated: false }),
   ],
+  // Tapu Fini Shining Currents: "If any of your Water Pokémon were healed during this turn".
+  [
+    /^any of your (?:\{([a-z])\} )?pokémon were healed during this turn$/,
+    (m) => ({
+      desc: { kind: 'ownHealedThisTurn', ...(m[1] ? { type: ENERGY_LETTER_TYPES[m[1]] } : {}) },
+      printedNegated: false,
+    }),
+  ],
+  // Rillaboom ex Drum Solo: "If Rillaboom is your only Pokémon in play".
+  [
+    /^this pokémon is your only pokémon in play$/,
+    () => ({ desc: { kind: 'ownInPlayCount', op: 'eq', n: 1 }, printedNegated: false }),
+  ],
+  // Butterfree Bye-Bye Flight: "If your opponent has no Benched Pokémon, this attack does nothing."
+  [
+    /^your opponent has no benched pokémon$/,
+    () => ({ desc: { kind: 'opponentBenchCount', op: 'eq', n: 0 }, printedNegated: false }),
+  ],
+  // Kommo-o War Cry.
+  [
+    /^you have (?:less|fewer) pokémon in play than your opponent$/,
+    () => ({ desc: { kind: 'inPlayVsOpponent', op: 'lt' }, printedNegated: false }),
+  ],
+  // Galarian Moltres ex Fiery Wrath: the Pokémon's remaining HP, not its printed HP.
+  [
+    /^this pokémon has less than (\d+) hp(?: remaining| left)?$/,
+    (m) => ({ desc: { kind: 'attackerRemainingHp', op: 'lt', n: Number(m[1]) }, printedNegated: false }),
+  ],
+  // Alakazam ex Spoon Bend: "If the opponent's Active Pokémon has any {M} Energy attached".
+  [
+    /^(?:your opponent's active pokémon|the defending pokémon) has any \{([a-z])\} energy(?: cards?)? attached(?: to it)?$/,
+    (m) => ({ desc: { kind: 'defenderEnergyType', type: ENERGY_LETTER_TYPES[m[1]] }, printedNegated: false }),
+  ],
   [
     /^you attach(?:ed)? an? (?:\{([a-z])\} )?energy card from your hand to this pokémon during this turn$/,
     (m) => ({
@@ -1037,6 +1070,19 @@ const CHECKS = {
       (type) => cond.type == null || String(type).toLowerCase() === String(cond.type).toLowerCase()
     ),
   healedThisTurn: (cond, ctx) => ctx.attackerHealedThisTurn === true,
+  ownHealedThisTurn: (cond, ctx) =>
+    list(ctx.ownHealedTypesThisTurn).some(
+      (types) => !cond.type || list(types).some((t) => sameType(t, cond.type))
+    ),
+  opponentBenchCount: (cond, ctx) => compare(num(ctx.opponentBenchCount), cond.op, cond.n),
+  ownInPlayCount: (cond, ctx) => compare(num(ctx.ownPokemonInPlayCount), cond.op, cond.n),
+  inPlayVsOpponent: (cond, ctx) =>
+    compare(num(ctx.ownPokemonInPlayCount), cond.op, list(ctx.opponentPokemon).length),
+  attackerRemainingHp: (cond, ctx) => compare(num(ctx.attackerRemainingHp), cond.op, cond.n),
+  defenderEnergyType: (cond, ctx) =>
+    list(ctx.defenderEnergyUnits).some((unit) =>
+      String(unit).toLowerCase().split('|').some((part) => sameType(part, cond.type))
+    ),
   damagedLastOpponentTurn: (cond, ctx) => num(ctx.attackerDamageTakenLastTurn) > 0,
   discardedCardIs: (cond, ctx) => {
     const matches = discardedPhraseMatcher(cond.phrase);
@@ -1111,6 +1157,7 @@ const DEFENDER_KINDS = new Set([
   'defenderResistance',
   'energyVsDefender',
   'defenderEnergyCount',
+  'defenderEnergyType',
   'defenderToolCount',
 ]);
 

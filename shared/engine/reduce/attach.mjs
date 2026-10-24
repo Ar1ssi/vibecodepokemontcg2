@@ -19,6 +19,7 @@ import { runSpecialEnergyTriggers } from '../effects/special-energy.mjs';
 import {
   isStadiumEnergyAttachHeal, isStadiumStatusPersistsOnEvolve,
 } from '../rules/stadium-effects.mjs';
+import { abilityEnergyAttachCounters, healBlockedByAbility } from '../rules/ability-combat.mjs';
 import { isBasicEnergy } from '../rules/card-classify.mjs';
 import { topPokemonCard } from '../rules/evolved-pokemon.mjs';
 import { requiresTurnEndOnEvolve } from '../rules/evolution.mjs';
@@ -103,6 +104,40 @@ function applyOnOpponentEvolve(draft, { evolvedCard, evolvingPlayerId, events })
 
 export const GROWTH_ATTACH_EFFECT = 'alphaGrowth';
 
+/**
+ * Gengar ex Gnawing Curse: an Energy the opponent attaches from hand puts damage counters on the
+ * receiving Pokémon (one counter is 10 damage). The Stadium's version is stadium-triggers
+ * (Old Cemetery). A Knock Out from the counters resolves in the command tail
+ * (resolveDamageCounterKnockouts).
+ */
+function applyGnawingCurseCounters(draft, { host, playerId, events }) {
+  for (const [ownerId, owner] of Object.entries(draft.players || {})) {
+    if (ownerId === playerId) continue;
+    const ctx = abilitySideContext(draft, ownerId);
+    for (const holder of [...(owner.zones?.active || []), ...(owner.zones?.bench || [])]) {
+      if (holder.attachedTo) continue;
+      const counters = abilityEnergyAttachCounters(inPlayView(draft, holder), ctx);
+      if (counters <= 0) continue;
+      host.damage = (host.damage || 0) + counters * 10;
+      events.push({
+        type: 'damageUpdated',
+        instanceId: host.instanceId,
+        damage: host.damage,
+        dealt: counters * 10,
+        source: holder.name,
+      });
+      // Lethal counters become a Knock Out via the reducer's post-command sweep.
+      events.push({
+        type: 'damageCountersPlaced',
+        instanceId: host.instanceId,
+        victimPlayerId: playerId,
+        attackerPlayerId: null,
+        damage: host.damage,
+      });
+    }
+  }
+}
+
 /** Runs the Ability triggers of an Energy attached from the hand (`parseOnEnergyAttachAbilities`). */
 function applyEnergyAttachTriggers(draft, { host, hostTop, energy, playerId, events }) {
   const effects = parseOnEnergyAttachAbilities(host, energy, abilitySideContext(draft, playerId));
@@ -114,7 +149,7 @@ function applyEnergyAttachTriggers(draft, { host, hostTop, energy, playerId, eve
       }
     }
     const before = target.damage || 0;
-    if (heal > 0 && before > 0) {
+    if (heal > 0 && before > 0 && !healBlockedByAbility(draft, target)) {
       target.damage = Math.max(0, before - heal);
       events.push({
         type: 'damageUpdated',
@@ -244,7 +279,7 @@ export function attachCardCommand({ draft, payload, playerId, activeRng, events 
       ) {
         draft.players[playerId].flags.pokemonParkHealedThisTurn = true;
         const before = hostRef.card.damage || 0;
-        if (before > 0) {
+        if (before > 0 && !healBlockedByAbility(draft, hostRef.card)) {
           hostRef.card.damage = Math.max(0, before - 10);
           events.push({
             type: 'damageUpdated',
@@ -270,6 +305,7 @@ export function attachCardCommand({ draft, payload, playerId, activeRng, events 
           playerId,
           events,
         });
+        applyGnawingCurseCounters(draft, { host: hostRef.card, playerId, events });
       }
     } else if (isPokemon(cardRef.card)) {
       if (!draft.players[playerId].flags) {

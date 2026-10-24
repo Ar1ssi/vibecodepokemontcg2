@@ -72,6 +72,8 @@ import { evolvedView, topPokemonCard } from './evolved-pokemon.mjs';
 import { isAncientCard, isFutureCard } from './paradox-tags.mjs';
 import { legacyPowerStopCondition, parseLegacyDamageModifier } from './legacy-power-wording.mjs';
 import { normalizeStage } from './evolution.mjs';
+import { findCard } from '../state.mjs';
+import { prizesTakenFor } from '../formats.mjs';
 
 const lower = (v) => String(v ?? '').toLowerCase();
 
@@ -364,6 +366,7 @@ function bonusScope(text) {
   const team =
     text.match(/(?:attacks used by|the attacks of|attacks by) (?:each of )?your ([^.]*?pok[eé]mon(?:-gx|-ex| ex| v| vmax)?)/) ||
     text.match(/(?:each of )?your ([^.]*?pok[eé]mon(?:-gx|-ex| ex| v| vmax)?)(?:'s| that)[^.]*? do(?:es)? \d+ more damage/) ||
+    text.match(/each of your ([^.]*?pok[eé]mon(?:-gx|-ex| ex| v| vmax)?) does \d+ more damage/) ||
     text.match(/your ([a-z0-9 .’'-]+?)'s (?:and [a-z0-9 .’'-]+?'s )?attacks/);
   if (team) return { kind: 'team', category: team[0] };
   return null;
@@ -467,7 +470,16 @@ function bonusConditionMet(text, holder, attacker, ctx) {
     if (verdicts.every((v) => v === undefined)) return false;
     if (verdicts.some((v) => v === false)) return false;
   }
-  return inPlayConditionMet(text, attacker, ctx);
+  return inPlayConditionMet(text, attacker, ctx) && anyInPlayMet(text, holder, ctx);
+}
+
+// "… for any Beedrill in play (both yours and your opponent's)": a Pokémon with that name on
+// either side. The holder's own name reads as "this pokémon" once folded (selfNamedText).
+function anyInPlayMet(text, holder, ctx) {
+  const wanted = text.match(/for any (.+?) in play/)?.[1];
+  if (!wanted) return true;
+  const name = wanted === 'this pokémon' ? lower(holder?.name) : lower(wanted);
+  return [...sideInPlay(ctx), ...opponentInPlay(ctx)].some((c) => lower(c.name).includes(name));
 }
 
 // The defender a bonus names ("to your opponent's Active Evolution Pokémon", "to {D} Pokémon",
@@ -499,17 +511,33 @@ function defenderQualifies(text, defender) {
 export function abilityDamageBonus(attacker, defender, ctx = {}) {
   if (!attacker) return 0;
   let total = 0;
+  // "for any X in play" bonuses are one effect however many copies of the text are in play.
+  const onceTexts = new Set();
   for (const holder of nonStackingOnce(dedupe([attacker, ...sideInPlay(ctx)]))) {
     const t = selfNamedText(holder);
     if (!t || !parseDamageBonus(holder).bonus) continue;
     if (isAbilitySuppressed(holder, ctx)) continue;
-    if (/for each/.test(t)) continue;
+    // "for each Prize card your opponent has taken" (Kingambit) scales the bonus; any other
+    // "for each" is not read.
+    const perOpponentPrize = /for each prize card your opponent has taken/.test(t);
+    if (/for each/.test(t) && !perOpponentPrize) continue;
     // An activated power's "during your next turn … more damage" is its effect, not a passive.
     if (/^(?:once during your turn|as often as you like)/.test(t)) continue;
     if (!attackerQualifies(t, attacker, holder, ctx)) continue;
     if (!bonusConditionMet(t, holder, attacker, ctx)) continue;
     if (!defenderQualifies(t, defender)) continue;
-    total += parseDamageBonus(holder).bonus;
+    if (/for any .+ in play/.test(t)) {
+      if (onceTexts.has(t)) continue;
+      onceTexts.add(t);
+    }
+    const bonus = parseDamageBonus(holder).bonus;
+    if (!perOpponentPrize) {
+      total += bonus;
+      continue;
+    }
+    // Unknown remaining Prizes fail closed.
+    if (ctx.opponentPrizesLeft == null) continue;
+    total += bonus * prizesTakenFor(ctx.opponentPrizesLeft, ctx.opponentDeckFormat);
   }
   return total;
 }
@@ -556,6 +584,23 @@ export function abilityHandDiscardProtector(defender, ctx = {}) {
 }
 
 // --- damage prevention ---------------------------------------------------
+
+const ENERGY_ATTACKER_SHIELD =
+  /^if this pok[eé]mon is attacked by a pok[eé]mon that has \{([a-z])\} energy attached, prevent all damage done to this pok[eé]mon by that attack and heal (\d+) damage from this pok[eé]mon\.?$/;
+
+/**
+ * Palossand Water Compaction: an attacker with a `{W}` Energy attached deals this Pokémon no damage
+ * and the holder heals. Returns the HP to heal when it applies to `defender` hit by an attacker
+ * carrying `attackerEnergyTypes` (lowercase Energy type words), else null. `ctx` is the defender's
+ * side context.
+ */
+export function abilityEnergyAttackerShield(defender, attackerEnergyTypes = [], ctx = {}) {
+  if (!isPokemon(defender)) return null;
+  const m = selfNamedText(defender).match(ENERGY_ATTACKER_SHIELD);
+  if (!m || isAbilitySuppressed(defender, ctx)) return null;
+  const type = lower(TYPE_LETTER[m[1]]);
+  return attackerEnergyTypes.some((t) => lower(t) === type) ? Number(m[2]) : null;
+}
 
 /**
  * Ability damage prevention for the defender as `{ preventAll, reduceHp }`,
@@ -702,6 +747,18 @@ function effectShieldCovers(target, holder, defender, ctx) {
   return /^pok[eé]mon$/.test(t);
 }
 
+// Alolan Ninetales Luminous Barrier: "Prevent all effects of attacks, including damage, done to this
+// Pokémon by your opponent's Pokémon-EX." (the damage half lives in abilityDamagePrevention).
+const ATTACKER_KIND_SHIELD =
+  /^prevent all effects of attacks, including damage, done to this pok[eé]mon by your opponent's (pok[eé]mon-ex|pok[eé]mon-gx)\.?$/;
+
+function attackerKindShields(holder, defender, attacker, ctx) {
+  if (!sameCard(holder, defender)) return false;
+  const kind = selfNamedText(holder).match(ATTACKER_KIND_SHIELD)?.[1];
+  if (!kind || isAbilitySuppressed(holder, ctx)) return false;
+  return /-gx$/.test(kind) ? isGxCard(attacker) : isExCard(attacker);
+}
+
 /**
  * Does an Ability on the defender (or its side) prevent the effects of `attacker`'s attack done to
  * `defender`? `defender` is the in-play view (the printed Ability sits on the top card); `ctx` is the
@@ -709,6 +766,9 @@ function effectShieldCovers(target, holder, defender, ctx) {
  */
 export function abilityPreventsAttackEffects(defender, attacker, ctx = {}) {
   if (!defender) return false;
+  // Pain Points: an attack that is not affected by Abilities gets past every Ability shield.
+  if (abilityIgnoresDefenderAbilities(attacker)) return toolPreventsAttackEffects(defender, ctx);
+  if (sideInPlay(ctx).concat(defender).some((holder) => attackerKindShields(holder, defender, attacker, ctx))) return true;
   for (const holder of dedupe([defender, ...sideInPlay(ctx)])) {
     const shield = selfNamedText(holder).match(ATTACK_EFFECT_SHIELD);
     // "Prevent all effects done to …" with neither an attack clause nor a damage exclusion is unread.
@@ -905,7 +965,9 @@ export function abilityWeaknessOverride(defender, ctx = {}) {
       if (replace) {
         const from = lower(TYPE_LETTER[replace[1]]);
         if (attackerTypes(defender).includes(from)) {
-          return { type: typeName(replace[2]) };
+          // Klefki Fairy Lock: the printed "(Apply Weakness as x2)" sets the multiplier.
+          const amount = Number(t.match(/apply weakness as [x×](\d)/)?.[1]);
+          return { type: typeName(replace[2]), ...(amount > 0 && amount !== 2 ? { multiplier: amount } : {}) };
         }
       }
     }
@@ -998,6 +1060,20 @@ export function abilityRetreatCost(target, ctx = {}) {
     const t = selfNamedText(card);
     if (isAbilitySuppressed(card, ctx)) continue;
     if (!holderPositionMet(t, card, ctx)) continue;
+    // Magnemite Sparkling Induction: "As long as this Pokémon is your Active Pokémon, its Retreat Cost
+    // is {C} less for each Magnemite on your Bench." Counts the same-named Benched Pokémon.
+    // The printed name is read raw: selfNamedText has already turned it into "this Pokémon".
+    const perBenched = cardAbilityText(card).match(/as long as this pok[eé]mon is your active pok[eé]mon, its retreat cost is (?:(\d+)|((?:\{c\})+)) less for each (.+?) on your bench/);
+    if (perBenched) {
+      if (sameCard(card, target)) {
+        // A Benched Magneton's root card is still named Magnemite: count the Pokémon on top of the stack.
+        const benchedNamed = (ctx.sideBench || []).filter(
+          (c) => !c.attachedTo && lower(evolvedView(ctx.sideBench, c)?.name ?? c.name) === lower(perBenched[3])
+        );
+        delta -= (amount(perBenched[1], perBenched[2]) || 1) * benchedNamed.length;
+      }
+      continue;
+    }
     // "The Retreat Cost of each of your Pokémon that has any {R} Energy attached is
     // {C}{C} less." (Ninetales Byway of the Nine-Tailed Fox, I161)
     const teamLess = t.match(
@@ -1100,6 +1176,87 @@ export function abilityIgnoresDefenderEffects(attacker) {
     /ignore (?:any )?effects on the defending pok[eé]mon/.test(t) ||
     /ignore (?:any )?effects of (?:the )?defending pok[eé]mon/.test(t)
   );
+}
+
+/**
+ * Greninja ex Pain Points: "This Pokémon's attacks are not affected by Abilities or Resistance."
+ * The attack ignores the defending side's Ability reductions, preventions and Weakness changes,
+ * and the defender's Resistance (attackAbilityReads reads the Resistance flag).
+ */
+export function abilityIgnoresDefenderAbilities(attacker, ctx = {}) {
+  if (!isPokemon(attacker)) return false;
+  return (
+    /attacks are not affected by abilities or resistance/.test(cardAbilityText(attacker)) &&
+    !isAbilitySuppressed(attacker, ctx)
+  );
+}
+
+/**
+ * Quagsire Unaware: "This Pokémon ignores all effects that increase damage from your opponent's
+ * Active Pokémon." `ctx` is the defender's side context.
+ */
+export function abilityIgnoresAttackerBoosts(defender, ctx = {}) {
+  if (!isPokemon(defender)) return false;
+  return (
+    /ignores all effects that increase damage from your opponent's active pok[eé]mon/.test(cardAbilityText(defender)) &&
+    !isAbilitySuppressed(defender, ctx)
+  );
+}
+
+/**
+ * Dragapult Infiltrator: "If any damage is done to this Pokémon by attacks, flip a coin. If
+ * heads, prevent that damage." True when the holder carries that wording and is not suppressed.
+ * The caller flips the coin, so the RNG is only consumed when this reader applies.
+ */
+export function abilityFlipPreventsAttackDamage(card, ctx = {}) {
+  if (!isPokemon(card)) return false;
+  return (
+    /if any damage is done to this pok[eé]mon by attacks, flip a coin\. if heads, prevent that damage/.test(
+      cardAbilityText(card)
+    ) && !isAbilitySuppressed(card, ctx)
+  );
+}
+
+/**
+ * Amoonguss Disarming Spore: cards the opponent discards from hand when this Pokémon is Knocked
+ * Out during their turn. 0 when the holder has no such wording or is suppressed. The caller
+ * checks whose turn it was.
+ */
+export function abilityKoDiscardsOpponentHand(card, ctx = {}) {
+  if (!isPokemon(card)) return 0;
+  const match = cardAbilityText(card).match(
+    /if this pok[eé]mon is knocked out during your opponent's turn, discard (\d+) cards? from your opponent's hand/
+  );
+  if (!match || isAbilitySuppressed(card, ctx)) return 0;
+  return Number(match[1]);
+}
+
+/**
+ * Jellicent Spiteful Spirit: the Attacking Pokémon becomes Confused and Poisoned when this
+ * Active Pokémon is Knocked Out by an opponent's attack. True when the holder carries that
+ * wording and is not suppressed; the caller checks the Active and attack conditions.
+ */
+export function abilityKoConfusesAttacker(card, ctx = {}) {
+  if (!isPokemon(card)) return false;
+  return (
+    /if this pok[eé]mon is your active pok[eé]mon and is knocked out by damage from an opponent's attack, the attacking pok[eé]mon is now confused and poisoned/.test(
+      cardAbilityText(card)
+    ) && !isAbilitySuppressed(card, ctx)
+  );
+}
+
+/**
+ * Gengar ex Gnawing Curse: damage counters put on a Pokémon when the opponent attaches an Energy
+ * from their hand to it. 0 when the holder has no such wording or is suppressed. The caller
+ * passes the holder's owner context and checks that the attacher is the other player.
+ */
+export function abilityEnergyAttachCounters(card, ctx = {}) {
+  if (!isPokemon(card)) return 0;
+  const match = cardAbilityText(card).match(
+    /whenever your opponent attaches an energy card from their hand to 1 of their pok[eé]mon, put (\d+) damage counters? on that pok[eé]mon/
+  );
+  if (!match || isAbilitySuppressed(card, ctx)) return 0;
+  return Number(match[1]);
 }
 
 // --- extra types ---------------------------------------------------------
@@ -1617,6 +1774,14 @@ export function abilityRetreatLock(active, ctx = {}) {
   if (!active) return false;
   for (const holder of dedupe(opponentInPlay(ctx))) {
     const t = cardAbilityText(holder);
+    // Magnezone Magnetic Pull: "If your opponents Active Pokémon is a {M} type, it can no longer retreat."
+    const typed = t.match(/if your opponents? active pok[eé]mon is an? \{([a-z])\} type, it can no longer retreat/);
+    if (typed) {
+      if (!isAbilitySuppressed(holder, ctx) && attackerTypes(active).includes(lower(TYPE_LETTER[typed[1]]))) {
+        return true;
+      }
+      continue;
+    }
     if (!t || !/(?:opponent's|defending)[^.]*can'?t retreat/.test(t)) continue;
     if (isAbilitySuppressed(holder, ctx)) continue;
     if (
@@ -1637,6 +1802,38 @@ export function abilityRetreatLock(active, ctx = {}) {
     return true;
   }
   return false;
+}
+
+/**
+ * Heal lock from an opponent's Ability (Yveltal Life-Locked: "If this Pokémon is in play, your
+ * opponent's Active Pokémon can't be healed."). `active` is the healed Pokémon and `ctx` its
+ * owner's side context, so the locking Ability is read from the opponent's side.
+ */
+export function abilityHealLocked(active, ctx = {}) {
+  if (!active || !containsCard(ctx.sideActive, active)) return false;
+  return dedupe(opponentInPlay(ctx)).some(
+    (holder) =>
+      /if this pok[eé]mon is in play, your opponent's active pok[eé]mon can'?t be healed/.test(cardAbilityText(holder)) &&
+      !isAbilitySuppressed(holder, ctx)
+  );
+}
+
+/**
+ * Sleep lock on the side in `ctx` (Cresselia Lunar Healing: "While this Pokémon is in play, your
+ * Active Pokémon can't become Asleep."). True when an unsuppressed Ability on that side says so.
+ */
+export function abilitySleepLock(ctx = {}) {
+  return sideInPlay(ctx).some(
+    (holder) =>
+      /while this pok[eé]mon is in play, your active pok[eé]mon can'?t become asleep/.test(cardAbilityText(holder)) &&
+      !isAbilitySuppressed(holder, ctx)
+  );
+}
+
+/** abilityHealLocked for a Pokémon in `state`: the owner's side context is built from the state. */
+export function healBlockedByAbility(state, card) {
+  const owner = findCard(state, card?.instanceId)?.playerId;
+  return owner ? abilityHealLocked(card, sideContextFor(state, owner)) : false;
 }
 
 /** Patrat CR: damage counters on any in-play Pokémon can't be moved. */
@@ -1792,6 +1989,10 @@ export function abilityStatusImmune(card, condition) {
   const t = cardAbilityText(card);
   if (!t) return false;
   if (/(?:can't|cannot|can not) be affected by (?:any )?special conditions?/.test(t)) {
+    return true;
+  }
+  // Flaaffy Protective Fluff: "This Pokémon is immune to all Special Conditions".
+  if (/is immune to (?:all )?special conditions/.test(t)) {
     return true;
   }
   const word = CONDITION_WORD[condition] || lower(condition);

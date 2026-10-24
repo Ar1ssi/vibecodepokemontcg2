@@ -116,6 +116,9 @@ export function planAbilitySteps(steps = [], { mode = 'auto' } = {}) {
       case 'whenPlayedAbility':
         planned.push({ ...base, action: 'when-played' });
         break;
+      case 'evolvePreventAbility':
+        planned.push({ ...base, action: 'effect-prevent' });
+        break;
       case 'recursionFromDiscardAbility':
         planned.push({
           ...base,

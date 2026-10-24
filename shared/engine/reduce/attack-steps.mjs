@@ -18,6 +18,7 @@ import { matchesSearch } from '../rules/search-match.mjs';
 import { inPlayView, setGameEnded, isGameConcluded, shuffleDeckWithRng } from './shared.mjs';
 import { attackViewFor } from './attack.mjs';
 import { resolveDamageCounterKnockouts } from './knockout.mjs';
+import { applyAttackTargets } from './attack-damage.mjs';
 
 /**
  * Builds the attack deck-search PendingChoice for the first stage (at or after
@@ -703,10 +704,10 @@ export const HEAL_STEP_TYPES = ['atkHealEach', 'atkHealCounted', 'atkMirrorHeal'
  * own coin result applied: "If heads/tails" steps are dropped on the other face and
  * "For each heads" steps scale their count by the heads flipped.
  */
-export function planAttackSteps(attack, attacker, { coin, headsCount }) {
+export function planAttackSteps(attack, attacker, { coin, headsCount, flips = [] }) {
   const parsed = parseAttackSteps(attack?.text, { selfName: attacker?.name });
   const resolve = (steps) =>
-    resolveCoinGates(steps, { coin, headsCount }).map((step) => ({
+    resolveCoinGates(steps, { coin, headsCount, flips }).map((step) => ({
       ...step,
       attackName: attack?.name || 'Attack',
     }));
@@ -767,6 +768,29 @@ export function settleVacatedActive(draft, { playerId, oppId, events }) {
  * are resolved immediately so they count before the turn ends. Returns false while a
  * choice is pending — the `attackSteps` resume continues from the token.
  */
+/**
+ * Applies the `attackDamageRequest` events steps queue (Dragapult Dragon Launcher) as attack damage
+ * through the same path as a chosen-target clause, so damage prevention, Knock Out hooks and
+ * Prize entitlements all run. A step handler cannot call them itself: knockout.mjs imports it.
+ */
+function applyAttackDamageRequests(draft, { events, playerId, activeRng }) {
+  const requests = events.filter((e) => e.type === 'attackDamageRequest');
+  if (requests.length === 0) return;
+  for (let i = events.length - 1; i >= 0; i--) if (events[i].type === 'attackDamageRequest') events.splice(i, 1);
+  for (const request of requests) {
+    if (isGameConcluded(draft)) return;
+    applyAttackTargets(draft, {
+      selection: [request.instanceId],
+      clause: { kind: 'damage', amount: request.amount, activeWR: true, immunity: request.immunity || {} },
+      defenderPlayerId: request.victimPlayerId,
+      attackerPlayerId: playerId,
+      attackName: request.attackName,
+      activeRng,
+      events,
+    });
+  }
+}
+
 export function runAttackSteps(
   draft,
   { steps, fromStepIndex = 0, attackerId, playerId, oppId, activeRng, events, selection = null, context, budget }
@@ -784,6 +808,7 @@ export function runAttackSteps(
     context,
     budget,
   });
+  applyAttackDamageRequests(draft, { events, playerId, activeRng });
   resolveDamageCounterKnockouts(draft, { events });
   // A discard effect (GG End-GX / Big Throw-GX) can wipe a side without any Knock Out event;
   // prize entitlements keep their own tail settlement, so this only reads the board for an

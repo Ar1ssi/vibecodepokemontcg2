@@ -19,7 +19,13 @@ import {
   abilityDamageBonus, abilityDamageReduction, abilityDamagePrevention, abilityLegacyDamageModifiers,
   abilityPreventsAttackEffects, sideContextFor, powersOffActive, abilityWeaknessOverride,
   abilityIgnoresDefenderEffects, abilityExtraTypes, isAbilitySuppressed,
+  abilityIgnoresDefenderAbilities, abilityIgnoresAttackerBoosts, abilityFlipPreventsAttackDamage,
+  abilityEnergyAttackerShield, healBlockedByAbility,
 } from '../rules/ability-combat.mjs';
+import { serverEnergyDescriptor } from '../rules/server-energy.mjs';
+import { stadiumBlocksHealing } from '../rules/stadium-effects.mjs';
+import { isEnergy } from '../cards.mjs';
+import { flipCoin } from '../rng.mjs';
 import { parseOnDamageAbilities } from '../rules/ability-triggers.mjs';
 import {
   attackerMatchesFilter, liveAttackMarkers, markersPreventEffects, parseDamageImmunity,
@@ -163,6 +169,11 @@ export function damageBenchedPokemon(
     }
   }
 
+  if (!countersPlaced && infiltratorPreventsDamage(draft, victim, victimPlayerId, activeRng, events)) {
+    events.push({ type: 'damagePrevented', instanceId: victim.instanceId, attackName, reason: 'infiltrator' });
+    return;
+  }
+
   // Read before the damage lands: the holder may be Knocked Out by it.
   const strikesBack =
     !ownAttack && !countersPlaced ? benchedThornsCounters(draft, victimView, victimPlayerId) : 0;
@@ -237,6 +248,39 @@ export function damageBenchedPokemon(
     });
   }
   thornsOnBenchDamage(draft, { counters: strikesBack, victimPlayerId, attackerPlayerId, activeRng, events });
+}
+
+/**
+ * Palossand Water Compaction: an attacker carrying the printed Energy deals no damage and the holder
+ * heals. Returns true when the attack's damage to `victim` is prevented.
+ */
+export function energyAttackerShieldPrevents(draft, victim, victimPlayerId, attacker, attackerPlayerId, events) {
+  const victimView = inPlayView(draft, victim);
+  const attackerZones = draft.players[attackerPlayerId]?.zones || {};
+  const types = [...(attackerZones.active || []), ...(attackerZones.bench || [])]
+    .filter((c) => c.attachedTo === attacker?.instanceId && isEnergy(c))
+    .map((c) => String(serverEnergyDescriptor(c).type || ''));
+  const heal = abilityEnergyAttackerShield(victimView, types, abilitySideContext(draft, victimPlayerId));
+  if (heal == null) return false;
+  const before = victim.damage || 0;
+  if (before > 0 && !stadiumBlocksHealing(draft.stadium) && !healBlockedByAbility(draft, victim)) {
+    victim.damage = Math.max(0, before - heal);
+    events.push({ type: 'damageUpdated', instanceId: victim.instanceId, damage: victim.damage, healed: before - victim.damage, source: victimView.name });
+  }
+  return true;
+}
+
+/**
+ * Dragapult Infiltrator: damage from an attack to a holder is prevented on heads. Returns true
+ * when the flip prevents it. Without an RNG nothing flips, so nothing is prevented.
+ */
+export function infiltratorPreventsDamage(draft, victim, victimPlayerId, activeRng, events) {
+  if (!activeRng) return false;
+  const victimView = inPlayView(draft, victim);
+  if (!abilityFlipPreventsAttackDamage(victimView, abilitySideContext(draft, victimPlayerId))) return false;
+  const face = flipCoin(activeRng);
+  events.push({ type: 'coinFlipped', playerId: victimPlayerId, face, source: 'Infiltrator' });
+  return face === 'heads';
 }
 
 // Machamp Strikes Back [Base Set 8], read as "If this Pokémon is damaged by an attack from your
@@ -570,6 +614,9 @@ function activeTargetDamage(draft, { ref, clause, attackerPlayerId, attackName }
         clause.immunity?.ignoreDefenderEffects ||
         abilityReads.ignoreDefenderEffects ||
         trainerIgnoresDefenderEffects(draft, attackerPlayerId, abilityReads.attacker),
+      // The clause's own "isn't affected by Resistance" (Dragon Launcher) must survive the Ability read.
+      ignoreResistance: Boolean(clause.immunity?.ignoreResistance) || abilityReads.ignoreResistance,
+      ignoreAttackerBoosts: abilityReads.ignoresAttackerBoosts,
       abilityBonusBeforeWR: abilityReads.abilityBonusBeforeWR,
       abilityReductionBeforeWR: abilityReads.abilityReductionBeforeWR,
       abilityReductionAfterWR: abilityReads.abilityReductionAfterWR,
@@ -615,6 +662,7 @@ export function attackAbilityReads(
     ownHandCount: (attackerZones.hand || []).length,
     ownPrizesLeft: (attackerZones.prizes || []).length,
     opponentPrizesLeft: (defenderZones.prizes || []).length,
+    opponentDeckFormat: draft.players[defenderPlayerId]?.deckFormat,
     powersOff: powersOffActive(draft),
   };
   const defenderCtx = {
@@ -635,22 +683,31 @@ export function attackAbilityReads(
   const attackerView = extraTypes.length
     ? { ...attacker, types: [...(attacker.types || []), ...extraTypes] }
     : attacker;
-  const reduction = abilityDamageReduction(defender, attackerView, defenderCtx);
+  // Greninja ex Pain Points: the defending side's Abilities and Resistance do not touch this attack.
+  const ignoresDefenderAbilities = abilityIgnoresDefenderAbilities(attackerView, attackerCtx);
+  const reduction = ignoresDefenderAbilities
+    ? { beforeWR: 0, afterWR: 0 }
+    : abilityDamageReduction(defender, attackerView, defenderCtx);
+  // Quagsire Unaware: the defender ignores the attacker's Ability damage increases.
+  const ignoresAttackerBoosts = abilityIgnoresAttackerBoosts(defender, defenderCtx);
   return {
     attacker: attackerView,
-    abilityBonusBeforeWR: abilityDamageBonus(
-      attackerView,
-      defender,
-      attackerCtx
-    ),
+    abilityBonusBeforeWR: ignoresAttackerBoosts
+      ? 0
+      : abilityDamageBonus(attackerView, defender, attackerCtx),
     abilityReductionBeforeWR: reduction.beforeWR,
     abilityReductionAfterWR: reduction.afterWR,
-    abilityPrevention: {
-      ...abilityDamagePrevention(defender, attackerView, defenderCtx),
-      legacyModifiers: abilityLegacyDamageModifiers(defender, attackerView, defenderCtx),
-    },
-    weaknessOverride: abilityWeaknessOverride(defender, defenderCtx),
+    abilityPrevention: ignoresDefenderAbilities
+      ? { preventAll: false, reduceHp: 0, legacyModifiers: [] }
+      : {
+          ...abilityDamagePrevention(defender, attackerView, defenderCtx),
+          legacyModifiers: abilityLegacyDamageModifiers(defender, attackerView, defenderCtx),
+        },
+    weaknessOverride: ignoresDefenderAbilities ? null : abilityWeaknessOverride(defender, defenderCtx),
     ignoreDefenderEffects: abilityIgnoresDefenderEffects(attackerView),
+    ignoreResistance: ignoresDefenderAbilities,
+    ignoresDefenderAbilities,
+    ignoresAttackerBoosts,
   };
 }
 
@@ -740,6 +797,7 @@ function retaliationAttackDamage(draft, { marker, striker, strikerView, strikerP
       baseDamage: marker.amount,
       ...prizeFlags(draft, strikerPlayerId, attackerPlayerId),
       ignoreDefenderEffects: abilityReads.ignoreDefenderEffects,
+      ignoreResistance: abilityReads.ignoreResistance,
       abilityBonusBeforeWR: abilityReads.abilityBonusBeforeWR,
       abilityReductionBeforeWR: abilityReads.abilityReductionBeforeWR,
       abilityReductionAfterWR: abilityReads.abilityReductionAfterWR,

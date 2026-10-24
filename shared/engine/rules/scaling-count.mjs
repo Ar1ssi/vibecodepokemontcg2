@@ -171,6 +171,8 @@ function inPlayCount(unit, ctx) {
   if (/^trainer cards? your opponent has in play$/.test(unit) && typeof ctx.opponentTrainersInPlay === 'number') {
     return { count: ctx.opponentTrainersInPlay, label: "opponent's Trainer cards in play" };
   }
+  // Gardevoir Psyshock: "for each Pokémon ex your opponent has in play".
+  if ((m = /^(.+?) your opponent has in play$/.exec(unit))) return count(opp, m[1], `opponent's ${m[1]} in play`);
   return null;
 }
 

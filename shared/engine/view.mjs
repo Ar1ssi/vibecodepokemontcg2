@@ -139,17 +139,27 @@ function redactPendingChoiceForOpponent(choice) {
  * attacks they do not print (Memory Helix, Tool/Stadium grants; design 049), or `{}` when none
  * do or no gatherer was given. Only the owner attacks with them, so the opponent never gets it.
  */
-function ownerAttackExtras(state, owner, attackExtrasFor) {
-  if (typeof attackExtrasFor !== 'function') return {};
+function ownerAttackExtras(state, owner, attackExtrasFor, costDiscountsFor) {
   const extras = {};
+  const discounts = {};
   for (const zoneId of ['active', 'bench']) {
     for (const card of owner?.zones?.[zoneId] || []) {
       if (card?.attachedTo != null || card?.instanceId == null) continue;
-      const attacks = attackExtrasFor(state, card);
-      if (attacks.length > 0) extras[card.instanceId] = JSON.parse(JSON.stringify(attacks));
+      if (typeof attackExtrasFor === 'function') {
+        const attacks = attackExtrasFor(state, card);
+        if (attacks.length > 0) extras[card.instanceId] = JSON.parse(JSON.stringify(attacks));
+      }
+      if (typeof costDiscountsFor === 'function') {
+        const reads = costDiscountsFor(state, card);
+        if (reads.length > 0) discounts[card.instanceId] = reads.map(({ count, symbol }) => ({ count, symbol }));
+      }
     }
   }
-  return Object.keys(extras).length > 0 ? { attackExtras: extras } : {};
+  return {
+    ...(Object.keys(extras).length > 0 ? { attackExtras: extras } : {}),
+    // The passive attack-cost discounts the server prices with (Ability and Tool, per Pokémon).
+    ...(Object.keys(discounts).length > 0 ? { costDiscounts: discounts } : {}),
+  };
 }
 
 /**
@@ -163,7 +173,7 @@ function ownerAttackExtras(state, owner, attackExtrasFor) {
  *   module does not import the reducer (design 049 O2).
  * @returns {object} Redacted view
  */
-export function viewFor(state, playerId, { attackExtrasFor } = {}) {
+export function viewFor(state, playerId, { attackExtrasFor, costDiscountsFor } = {}) {
   if (!state) return null;
 
   const playerIds = Object.keys(state.players || {});
@@ -227,7 +237,7 @@ export function viewFor(state, playerId, { attackExtrasFor } = {}) {
       deckFormat: owner.deckFormat,
       flags: playerFlags(owner),
       zones: redactOwnerZones(owner),
-      ...ownerAttackExtras(state, owner, attackExtrasFor),
+      ...ownerAttackExtras(state, owner, attackExtrasFor, costDiscountsFor),
     },
     them: opponent
       ? {
@@ -291,10 +301,10 @@ export function deckPeekFor(state, playerId, request = {}) {
  * @param {{ attackExtrasFor?: (state: object, card: object) => object[] }} [options]
  * @returns {object|null} the solo view, or null when `state` is missing or `nearId` is not seated
  */
-export function viewForSolo(state, nearId, { attackExtrasFor } = {}) {
+export function viewForSolo(state, nearId, { attackExtrasFor, costDiscountsFor } = {}) {
   if (!state || !nearId || !state.players?.[nearId]) return null;
 
-  const view = viewFor(state, nearId, { attackExtrasFor });
+  const view = viewFor(state, nearId, { attackExtrasFor, costDiscountsFor });
   const farId = Object.keys(state.players).find((id) => id !== nearId) || null;
   const far = farId ? state.players[farId] : null;
 
@@ -310,7 +320,7 @@ export function viewForSolo(state, nearId, { attackExtrasFor } = {}) {
       ? {
           ...view.them,
           zones: redactOwnerZones(far),
-          ...ownerAttackExtras(state, far, attackExtrasFor),
+          ...ownerAttackExtras(state, far, attackExtrasFor, costDiscountsFor),
         }
       : null,
   };

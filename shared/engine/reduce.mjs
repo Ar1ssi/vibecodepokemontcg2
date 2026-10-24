@@ -16,11 +16,13 @@ import { validateReferences, validateLegality } from './reduce/legality.mjs';
 import { attackCommand } from './reduce/attack.mjs';
 import {
   settlePromotionChoices, stampHealedPokemon, stampActivePromotions, settleKoEnergyMoves,
+  settleKoHandDiscards,
   settlePrizeEntitlements, resolveDamageCounterKnockouts, takePrizesCommand,
   takePrizesByIndexCommand, promoteCommand,
 } from './reduce/knockout.mjs';
 import {
   discardBenchedAttachedTrainers, setupCommand, takeTurnCommand, loadDeckCommand, cardStatsCommand,
+  applyAbilitySleepLocks,
 } from './reduce/turn.mjs';
 import { retreatCommand } from './reduce/retreat.mjs';
 import { attachCardCommand } from './reduce/attach.mjs';
@@ -43,6 +45,7 @@ import { resolveChoiceCommand } from './reduce/choice.mjs';
 // The engine's public surface: applyCommand (below), validateLegality and attackExtrasFor.
 export { validateLegality };
 export { attackExtrasFor } from './reduce/attack.mjs';
+export { costDiscountsFor } from './reduce/legality.mjs';
 
 // undo (design 002 slice 3.4e / D6, I16): deterministic commandLog replay minus tail,
 // rebuilt from a fresh seeded state. Returns directly — the replayed state already carries
@@ -436,11 +439,13 @@ export function applyCommand(state, command, rng = null) {
 
   if (draft.rulesEnabled) {
     settleSpecialEnergyPassives(draft, { events });
+    applyAbilitySleepLocks(draft, { events });
     discardBenchedAttachedTrainers(draft, { events });
   }
   resolveDamageCounterKnockouts(draft, { events });
   settlePromotionChoices(draft, { events });
   settleKoEnergyMoves(draft, { events });
+  settleKoHandDiscards(draft, { events });
   settlePrizeEntitlements(draft, { events });
   stampActivePromotions(state, draft);
   stampHealedPokemon(state, draft);

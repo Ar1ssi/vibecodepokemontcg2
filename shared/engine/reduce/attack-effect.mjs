@@ -23,7 +23,7 @@ import { evaluateToolKoPrevention, attachedToolOnDamageEffects } from '../rules/
 import { stadiumAttackCoinModifier } from '../rules/stadium-triggers.mjs';
 import { turnDamageBonusAfterWR } from '../rules/turn-damage-bonus.mjs';
 import { getEnergyValue } from '../rules/retreat.mjs';
-import { abilityHandDiscardProtector, extraAttackAvailable } from '../rules/ability-combat.mjs';
+import { abilityHandDiscardProtector, extraAttackAvailable, healBlockedByAbility } from '../rules/ability-combat.mjs';
 import { parseOnDamageAbilities, parseOnDamageStatus } from '../rules/ability-triggers.mjs';
 import { textRevealsPicks } from '../rules/reveal-picks.mjs';
 import { createPendingChoice } from '../effects/executor.mjs';
@@ -49,7 +49,8 @@ import {
   endTurnAfterFailedAttack, spendGxAttack, spendVstarAttack, withSelfNamedAttack,
 } from './attack.mjs';
 import {
-  damageBenchedPokemon, abilityEffectShield, resolveAttackTargetClause, attackTargetOptions,
+  damageBenchedPokemon, abilityEffectShield, resolveAttackTargetClause, attackTargetOptions, infiltratorPreventsDamage,
+  energyAttackerShieldPrevents,
   computedCounterTarget, distributedPrompt, targetPlayerOf, legacyModifiedDamage, prizeFlags,
   trainerIgnoresDefenderEffects, attackAbilityReads, applyRetaliation, applyAttackTargets,
   chosenTargetPerUnitCount,
@@ -502,7 +503,7 @@ export function resolveAttackEffectPhase(draft, ctx) {
 
   // "Before doing damage, …" clauses (design 030). A gust there moves the damage to the
   // opponent's new Active Pokémon.
-  const attackSteps = planAttackSteps(attack, attacker, { coin, headsCount });
+  const attackSteps = planAttackSteps(attack, attacker, { coin, headsCount, flips });
   if (attackSteps.before.length > 0) {
     if (!ctx.preStepsDone) {
       // An attach the damage counts starts from 0, so "attached none" reads as paid nothing.
@@ -629,6 +630,8 @@ export function resolveAttackEffectPhase(draft, ctx) {
               immunity.ignoreDefenderEffects ||
               abilityReads.ignoreDefenderEffects ||
               trainerIgnoresDefenderEffects(draft, playerId, abilityReads.attacker),
+            ignoreResistance: abilityReads.ignoreResistance,
+            ignoreAttackerBoosts: abilityReads.ignoresAttackerBoosts,
             // Gyarados Dragon DNA: a borrowed Basic attack does 30 more to the Defending Pokémon
             // (design 049). computeAttackDamage drops every bonus when the attack does no damage.
             abilityBonusBeforeWR:
@@ -643,6 +646,21 @@ export function resolveAttackEffectPhase(draft, ctx) {
         );
         dmgDealt = dmgResult.total;
         weaknessApplied = dmgResult.multiplier > 1 || dmgResult.flat > 0;
+        // Dragapult Infiltrator: heads on the flip prevents this attack's damage to the holder.
+        if (dmgDealt > 0 && !abilityReads.ignoresDefenderAbilities && infiltratorPreventsDamage(draft, defender, defenderPlayerId, activeRng, events)) {
+          dmgDealt = 0;
+          dmgResult.prevented = true;
+        }
+
+        // Palossand Water Compaction: an attacker with the printed Energy deals nothing; the holder heals.
+        if (
+          dmgDealt > 0 &&
+          !abilityReads.ignoresDefenderAbilities &&
+          energyAttackerShieldPrevents(draft, defender, defenderPlayerId, attacker, playerId, events)
+        ) {
+          dmgDealt = 0;
+          dmgResult.prevented = true;
+        }
 
         // Flygon ex Psychic Protector: before the damage lands the defending player may discard
         // up to N cards from their hand, each reducing it by M. The attack suspends on that
@@ -708,7 +726,7 @@ export function resolveAttackEffectPhase(draft, ctx) {
         // Misty gym1-18: +20 after Weakness/Resistance to an attack by a Pokémon with Misty in its
         // name that does damage to the Defending Pokémon.
         const afterWrBonus = turnDamageBonusAfterWR(draft.players[playerId]?.flags?.turnDamageBonuses, attackerView);
-        if (afterWrBonus > 0 && dmgDealt > 0) dmgDealt += afterWrBonus;
+        if (afterWrBonus > 0 && dmgDealt > 0 && !abilityReads.ignoresAttackerBoosts) dmgDealt += afterWrBonus;
         let vermilionFace = ctx.vermilionFace;
         if (vermilion) {
           if (vermilionFace === undefined) {
@@ -1143,7 +1161,8 @@ export function resolveAttackEffectPhase(draft, ctx) {
         parsed.heal > 0 &&
         attacker &&
         !HEAL_STEP_TYPES.some((type) => attackSteps.printed.has(type)) &&
-        !stadiumBlocksHealing(draft.stadium)
+        !stadiumBlocksHealing(draft.stadium) &&
+        !healBlockedByAbility(draft, attacker)
       ) {
         const atkRef = findCard(draft, attacker.instanceId);
         if (

@@ -82,18 +82,24 @@ export function listAttacks(card, opts = {}) {
     extraAttacks = [],
     blockedReason = '',
     oncePerGame = null,
+    // The server's own passive cost-discount reads for this Pokémon (`view.you.costDiscounts`):
+    // board-conditional ones (Kartana Beast Boost, Zapdos ex Fighting Instinct) need facts the
+    // client does not hold. Absent (legacy mode, tests), the card's text is read on its own.
+    passiveDiscounts = null,
   } = opts;
 
   // `priorAttacks` are merged only when the card's own text grants inheritance
   // (`parseAttackInheritance`); `extraAttacks` (Stadium inheritance / grants)
   // apply unconditionally.
   const attacks = mergeAttacks(mergeInheritedAttacks(card, priorAttacks), extraAttacks);
-  const passiveDiscount = rulesEnabled ? passiveCostDiscount(card) : 0;
+  const passiveReads = !rulesEnabled
+    ? []
+    : Array.isArray(passiveDiscounts)
+      ? passiveDiscounts
+      : [{ count: passiveCostDiscount(card), symbol: null }];
+  const passiveDiscount = passiveReads.reduce((sum, read) => sum + (read?.count || 0), 0);
   const stadiumDiscount = rulesEnabled ? stadiumCostModifier : 0;
-  const discounts = [
-    { count: passiveDiscount, symbol: null },
-    { count: stadiumDiscount, symbol: stadiumCostSymbol },
-  ];
+  const discounts = [...passiveReads, { count: stadiumDiscount, symbol: stadiumCostSymbol }];
 
   return attacks.map((atk, i) => {
     const rawCost = atk.cost || [];

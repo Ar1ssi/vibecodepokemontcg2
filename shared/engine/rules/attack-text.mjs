@@ -10,10 +10,14 @@ export function escapeRegExp(text) {
 
 // A card may print its own name short: "Charizard G LV.X" as "Charizard G",
 // "Deoxys Defense Forme" as "Deoxys".
-function printedSelfNames(selfName) {
+function printedSelfNames(selfName, { bareSpecies = false } = {}) {
   const name = String(selfName || '').trim().toLowerCase();
   if (!name) return [];
-  return [...new Set([name, name.replace(/ lv\.x$/, ''), name.replace(/\s+\S+\s+forme$/, '')])].filter(Boolean);
+  const variants = [name, name.replace(/ lv\.x$/, ''), name.replace(/\s+\S+\s+forme$/, '')];
+  // Homebrew ex cards print the bare species ("If Rillaboom is your only Pokémon in play"); only the
+  // subject/object positions of replaceSelfName read it, never a count of that name.
+  if (bareSpecies) variants.push(name.replace(/ (?:ex|gx|v|vmax|vstar)$/, ''));
+  return [...new Set(variants)].filter(Boolean);
 }
 
 /**
@@ -24,7 +28,7 @@ function printedSelfNames(selfName) {
  */
 export function replaceSelfName(text, selfName) {
   let out = String(text || '');
-  for (const printed of printedSelfNames(selfName)) {
+  for (const printed of printedSelfNames(selfName, { bareSpecies: true })) {
     const name = escapeRegExp(printed);
     out = out
       .replace(new RegExp(`(\\b(?:to|on|from|under|onto|excluding)\\s+)${name}(?![\\w'])`, 'gi'), '$1this Pokémon')
@@ -97,5 +101,6 @@ export function normalizeAttackText(text, selfName = '') {
   return out
     // Elekid Magnetic Trip prints "this Defending Pokémon".
     .replace(/\b(?:the|this) defending pokémon\b/g, "your opponent's active pokémon")
+    .replace(/\b(?<!your )the opponent's active pokémon\b/g, "your opponent's active pokémon")
     .replace(/\bhis or her\b/g, 'their');
 }

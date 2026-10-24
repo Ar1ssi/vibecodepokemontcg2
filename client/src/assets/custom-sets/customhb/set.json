@@ -14116,7 +14116,7 @@
      "abilities": [
       {
        "name": "Analysis",
-       "effect": "Flip a coin. If heads, your opponent reveals a random card from their hand."
+       "effect": "Once during your turn, you may flip a coin. If heads, your opponent reveals a random card from their hand."
       }
      ],
      "attacks": [
@@ -14185,7 +14185,7 @@
     {
      "type": "Ability",
      "name": "Analysis",
-     "effect": "Flip a coin. If heads, your opponent reveals a random card from their hand."
+     "effect": "Once during your turn, you may flip a coin. If heads, your opponent reveals a random card from their hand."
     }
    ],
    "weaknesses": [
@@ -15860,14 +15860,14 @@
     "edits": {
      "prefix": "",
      "name": "Palossand",
-     "hp": "150",
+     "hp": "130",
      "illustrator": "Uta",
      "evolves_from": "Sandygast",
      "type": "Psychic",
      "abilities": [
       {
        "name": "Water Compaction",
-       "effect": "aaa"
+       "effect": "If this Pokémon is attacked by a Pokémon that has {W} Energy attached, prevent all damage done to this Pokémon by that attack and heal 20 damage from this Pokémon."
       }
      ],
      "attacks": [
@@ -15890,7 +15890,7 @@
       "type": "Fighting",
       "value": "-30"
      },
-     "retreat": 4,
+     "retreat": 3,
      "stage": 1,
      "portrait": ""
     },
@@ -15899,7 +15899,7 @@
     "foil": true
    },
    "category": "Pokemon",
-   "hp": 150,
+   "hp": 130,
    "types": [
     "Psychic"
    ],
@@ -15920,7 +15920,7 @@
     {
      "type": "Ability",
      "name": "Water Compaction",
-     "effect": "aaa"
+     "effect": "If this Pokémon is attacked by a Pokémon that has {W} Energy attached, prevent all damage done to this Pokémon by that attack and heal 20 damage from this Pokémon."
     }
    ],
    "weaknesses": [
@@ -15935,7 +15935,7 @@
      "value": "-30"
     }
    ],
-   "retreat": 4,
+   "retreat": 3,
    "rarity": "Common",
    "evolveFrom": "Sandygast"
   },

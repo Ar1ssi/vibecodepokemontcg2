@@ -221,6 +221,9 @@ const WINDOW_PHRASES = [
   ],
   [/^(.+) during your opponent's next turn$/, 'opponentNextTurn'],
   [/^during your next turn, (.+)$/, 'yourNextTurn'],
+  // Galarian Zapdos ex Bulk Up: lasts while this Pokémon stays in the Active Spot
+  // (stampActivePromotions in reduce/knockout.mjs ends `whileActive` markers when it leaves).
+  [/^as long as this pokémon remains in the active spot, (.+)$/, 'whileActive'],
   // Marshadow Shadow Flicker: "If the Defending Pokémon is Knocked Out during your next
   // turn, take N more Prize cards." Rewrites to the clause form the marker body reads.
   [
@@ -345,6 +348,14 @@ const MARKER_BODIES = [
       whileSourceActive: true,
       ...(m[1] === 'to this pokémon' ? { toSource: true } : {}),
     }),
+  ],
+  // Galarian Zapdos ex Bulk Up: both halves of one "as long as this Pokémon remains in the Active
+  // Spot" effect; the attack phase sums them while it stays Active.
+  [
+    /^its attacks do (\d+) more damage and it takes (\d+) less damage$/,
+    'self',
+    'whileActive',
+    (m) => [{ kind: 'nextTurnBonus', amount: Number(m[1]), attackName: null }, incomingReduce(m[2])],
   ],
   [
     /^this pokémon's (.+?) attack does (\d+) more damage$/,
@@ -580,7 +591,10 @@ export function parseMarkerSentence(sentence, context = {}) {
     // One sentence can set two markers ("… cost {c} more, and its retreat cost is {c} more").
     const [marker, ...alsoMarkers] = Array.isArray(built) ? built : [built];
     if (!marker) return null;
-    return { type: 'atkAddMarker', target, window, marker, ...(alsoMarkers.length ? { alsoMarkers } : {}) };
+    // "As long as this Pokémon remains in the Active Spot" (Bulk Up) follows the Pokémon through an
+    // evolution; the "Benching or evolving ends this effect" markers do not.
+    const presence = /^as long as this pokémon remains in the active spot,/.test(sentence);
+    return { type: 'atkAddMarker', target, window, marker, ...(presence ? { presence: true } : {}), ...(alsoMarkers.length ? { alsoMarkers } : {}) };
   }
   return null;
 }
@@ -588,7 +602,7 @@ export function parseMarkerSentence(sentence, context = {}) {
 // Same [regex, build] shape as rules/attack-steps.mjs TEMPLATES; last in that list.
 export const MARKER_TEMPLATES = [
   [
-    /^(?:during your|at the end of your opponent's next turn|if an attack does damage to this pokémon during|if your opponent's active pokémon attacks this pokémon during your opponent's next turn, |if your opponent's active pokémon is knocked out during your next turn|until the end of your next turn, |.+ (?:during your opponent's|during their|until the end of your) next turn$)/,
+    /^(?:during your|as long as this pokémon remains in the active spot, |at the end of your opponent's next turn|if an attack does damage to this pokémon during|if your opponent's active pokémon attacks this pokémon during your opponent's next turn, |if your opponent's active pokémon is knocked out during your next turn|until the end of your next turn, |.+ (?:during your opponent's|during their|until the end of your) next turn$)/,
     (m, rest, context) => parseMarkerSentence(rest, context),
   ],
   // Locks with no turn window. Ariados Spider Web / Piloswine Freeze print "(Benching or evolving

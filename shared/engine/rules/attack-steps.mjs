@@ -80,6 +80,8 @@ const GATES = [
   [/^if heads, /, { gate: 'heads' }],
   [/^if tails, /, { gate: 'tails' }],
   [/^for each heads, /, { perHeads: true }],
+  // Garchomp ex Scale Shot: every coin of the flip came up heads.
+  [/^if (?:all of them are|both are) heads, /, { allHeads: true }],
   [/^before doing damage, /, { before: true }],
   // Hypno Spiral Aura.
   [/^if your opponent's active pokémon isn't knocked out by the damage from this attack, /, { requiresDefenderSurvived: true }],
@@ -464,13 +466,14 @@ const TEMPLATES = [
   // Discard from the opponent. Exploud ex Derail: "Discard a Special Energy card, if any,
   // attached to the Defending Pokémon"; Typhlosion Evaporating Heat: "Discard a {W} Energy …".
   [
-    /^discard (an?|\d+|all|up to \d+) (?:(special )|\{([a-z])\} )?energy(?: cards?)?(?:, if any,)? (?:from|attached to) your opponent's active pokémon(?:, if any)?$/,
+    /^discard (an?|\d+|all|up to \d+) (?:(special )|(basic )|\{([a-z])\} )?energy(?: cards?)?(?:, if any,)? (?:from|attached to) your opponent's active pokémon(?:, if any)?$/,
     (m) => ({
       type: 'atkDiscardOppEnergy',
       scope: 'active',
       ...discardCount(m[1]),
       ...(m[2] ? { special: true } : {}),
-      ...(m[3] ? { energyType: m[3].toUpperCase() } : {}),
+      ...(m[3] ? { basic: true } : {}),
+      ...(m[4] ? { energyType: m[4].toUpperCase() } : {}),
     }),
   ],
   // Scizor V Hack Off.
@@ -535,6 +538,11 @@ const TEMPLATES = [
   [
     /^(?:discard a random card from your opponent's hand|choose 1 card from your opponent's hand without looking and discard it)$/,
     () => ({ type: 'atkDiscardOppHand', random: true, count: 1 }),
+  ],
+  // Alakazam Card Trick: the opponent discards one card for each {P} Energy on this Pokémon.
+  [
+    /^for each \{([a-z])\} energy attached to this pokémon, discard (an?|\d+) cards? from your opponent's hand$/,
+    (m) => ({ type: 'atkDiscardOppHand', count: countOf(m[2]), perAttachedEnergyType: m[1].toUpperCase() }),
   ],
   [
     /^your opponent discards (an?|\d+) cards? from their hand$/,
@@ -915,7 +923,7 @@ const TEMPLATES = [
     () => ({ type: 'atkCountersByRetreat' }),
   ],
   [
-    /^move all damage counters from 1 of your benched pokémon to your opponent's active pokémon$/,
+    /^move all damage counters from (?:1|one) of your benched pokémon (?:to|onto) your opponent's active pokémon$/,
     () => ({ type: 'atkMoveAllCounters' }),
   ],
   // Design 036 D: your damage counters onto the opponent (Xerneas-GX Sanctuary, Drifloon Transfer Pain).
@@ -1233,6 +1241,32 @@ const BLOCKS = [
   // Brock's Mankey [Gym Heroes 68] Fidget: "Shuffle your deck." as the whole effect. Anchored on
   // the whole text: the same sentence after a deck search is that search's own shuffle.
   [/^shuffle your deck\.$/g, () => ({ type: 'atkShuffleOwnDeck' })],
+  // Klefki Return Keys: the Energy and Pokémon Tools move, then this Pokémon is discarded. Both
+  // sentences are one step, so the discard waits on the move.
+  [
+    /move all attached energy and pokémon tools from this pokémon to 1 of your benched pokémon\. then, discard this pokémon\./g,
+    () => ({ type: 'atkMoveAttachedToBench' }),
+  ],
+  // Weavile Ransack: on at least one heads the opponent's hand is revealed, then the attacker
+  // puts one revealed card per heads on the bottom of their deck.
+  [
+    /if either of them is heads, your opponent reveals their hand\. for each heads, choose a card you find there and put it on the bottom of (?:your opponent's|their) deck in any order\./g,
+    () => [
+      { type: 'atkRevealOppHand', anyHeads: true },
+      { type: 'atkOppHandToDeck', count: 1, perHeads: true, chooser: 'attacker', bottom: true },
+    ],
+  ],
+  // Dragapult Dragon Launcher: discard Benched Dreepy, then 100 damage to a different Pokémon of
+  // the opponent's for each one discarded (see effects/attack-steps.mjs atkBenchDiscardDamageEach).
+  [
+    /discard a number of your benched dreepy up to the number of your opponent's pokémon in play\. then, for each dreepy you discarded in this way, choose 1 of your opponent's pokémon and do (\d+) damage to it\. you can't choose the same pokémon more than once\. this damage isn't affected by weakness or resistance\./g,
+    (m) => ({
+      type: 'atkBenchDiscardDamageEach',
+      name: 'dreepy',
+      amount: Number(m[1]),
+      immunity: { ignoreWeakness: true, ignoreResistance: true },
+    }),
+  ],
   // Moltres [Fossil 12] Wildfire: as many of the opponent's top cards as {R} Energy discarded.
   [
     /you may discard any number of \{([a-z])\} energy cards attached to this pokémon when you use this attack\. if you do, discard that many cards from the top of your opponent's deck\./g,
@@ -1358,6 +1392,12 @@ const BLOCKS = [
   [
     /choose (\d+) of your opponent's benched pokémon\. shuffle those pokémon and all attached cards into your opponent's deck\./g,
     (m) => ({ type: 'atkShuffleOppBench', count: Number(m[1]) }),
+  ],
+  // Butterfree Bye-Bye Flight (customhb): the chosen Benched Pokémon and the attacker both go
+  // back to their decks; the gate "no Benched Pokémon, this attack does nothing" is a condition.
+  [
+    /choose 1 of your opponent's benched pokémon\. shuffle that pokémon and all attached cards into their deck, and then shuffle this pokémon and all attached cards into your deck\./g,
+    () => [{ type: 'atkShuffleOppBench', count: 1, scope: 'bench' }, { type: 'atkShuffleSelf' }],
   ],
   // Mimikyu-GX Dream Fear-GX / Shiftry-GX Den of Iniquity-GX (design 048): the singular
   // "that Pokémon" wording, on the Bench or on any of the opponent's Pokémon.
@@ -1552,6 +1592,11 @@ const BLOCKS = [
     /look at the top (\d+) cards of your opponent's deck and put them back in any order\./g,
     (m) => ({ type: 'atkLookOppDeck', count: Number(m[1]), reorder: true }),
   ],
+  // Metagross Analysis (customhb): one random card from the hand is revealed, not the whole hand.
+  [
+    /(?<=(?:^|\. )(?:(?:if heads|if tails), )?)your opponent reveals a random card from their hand\./g,
+    () => ({ type: 'atkRevealOppHand', random: true }),
+  ],
   // "…reveals their hand. Put a Basic Pokémon (with 70 HP or less) you find there onto their
   // Bench(, and put 3 damage counters on that Pokémon)." (Mandibuzz, Mawile-GX, Dusknoir).
   [
@@ -1723,10 +1768,11 @@ const HOLDER_POSITION =
  * and "For each heads" steps scale their count by the heads flipped.
  *
  * @param {object[]} steps
- * @param {{ coin: 'heads'|'tails'|null, headsCount?: number }} flip
+ * "If all of them are heads" / "If either of them is heads" read every flip of an N-coin attack.
+ * @param {{ coin: 'heads'|'tails'|null, headsCount?: number, flips?: string[] }} flip
  * @returns {object[]}
  */
-export function resolveCoinGates(steps, { coin, headsCount }) {
+export function resolveCoinGates(steps, { coin, headsCount, flips = [] }) {
   const heads = coin === 'heads' ? Math.max(1, headsCount || 0) : headsCount || 0;
   return steps
     .filter((step) => {
@@ -1734,9 +1780,13 @@ export function resolveCoinGates(steps, { coin, headsCount }) {
       if (step.gate === 'tails') return coin === 'tails';
       if (step.perHeads) return heads > 0;
       if (step.headsExactly != null) return (headsCount || 0) === step.headsExactly;
+      if (step.allHeads) return flips.length > 0 && (headsCount || 0) === flips.length;
+      if (step.anyHeads) return (headsCount || 0) > 0;
       return true;
     })
-    .map(({ gate, perHeads, headsExactly, ...step }) => (perHeads ? { ...step, count: (step.count || 1) * heads } : step));
+    .map(({ gate, perHeads, headsExactly, allHeads, anyHeads, ...step }) =>
+      perHeads ? { ...step, count: (step.count || 1) * heads } : step
+    );
 }
 
 const ATTACH_CHAIN = /^if (?:you do|you attached energy (?:to this pokémon )?in this way), /;

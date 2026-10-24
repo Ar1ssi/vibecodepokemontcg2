@@ -75,6 +75,9 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     ignoreWeakness = false,
     ignoreResistance = false,
     ignoreDefenderEffects = false,
+    // Quagsire Unaware: the defender ignores every effect that increases the attacker's damage
+    // (Tools, Abilities, Special Energy, Trainer boosts, next-turn bonuses).
+    ignoreAttackerBoosts = false,
     // Live attack markers on the defender (attack-markers.mjs liveAttackMarkers).
     defenderMarkers = [],
     // Live attack markers on the attacker (next-turn bonuses, "attacks do N less damage").
@@ -118,31 +121,37 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
 
   // Step 2: Attacker tool and ability damage bonuses (e.g. Choice Belt, Maximum Belt, Defiance Band)
   // Applied BEFORE Weakness and Resistance.
-  const attackerBonus = combinedToolAttackBonus(attacker, attackerZoneCards, defender, {
-    blockTools,
-    defenderIsActive,
-    defenderPoisoned,
-    attackerTrailingPrizes,
-    attackerPrizesRemaining,
-    attackerDeckFormat,
-    stadium,
-  });
+  const attackerBonus = ignoreAttackerBoosts
+    ? 0
+    : combinedToolAttackBonus(attacker, attackerZoneCards, defender, {
+        blockTools,
+        defenderIsActive,
+        defenderPoisoned,
+        attackerTrailingPrizes,
+        attackerPrizesRemaining,
+        attackerDeckFormat,
+        stadium,
+      });
 
   // Step 2b: Attacker special-energy damage bonuses / penalties (taxonomy §F,
   // Gap #4c). Applied BEFORE Weakness and Resistance, like tool bonuses.
-  const specialEnergyBonus = getSpecialEnergyAttackBonus(attacker, attackerZoneCards, { defenderIsActive });
+  const specialEnergyBonus = ignoreAttackerBoosts
+    ? 0
+    : getSpecialEnergyAttackBonus(attacker, attackerZoneCards, { defenderIsActive });
   const specialEnergyPenalty = getSpecialEnergyAttackPenalty(attacker, attackerZoneCards);
 
   // Step 2c: Trainer turn boosts (Premium Power Pro), also BEFORE Weakness/Resistance.
-  const turnBonus = turnDamageBonusTotal(turnDamageBonuses, attacker, defender, {
-    defenderIsActive,
-    defenderPrizesRemaining,
-    defenderDeckFormat,
-  });
+  const turnBonus = ignoreAttackerBoosts
+    ? 0
+    : turnDamageBonusTotal(turnDamageBonuses, attacker, defender, {
+        defenderIsActive,
+        defenderPrizesRemaining,
+        defenderDeckFormat,
+      });
 
   // Step 2d: Attack markers placed on earlier turns. A next-turn bonus needs damage to add to.
   const markerBonus =
-    base > 0 && defenderIsActive
+    base > 0 && defenderIsActive && !ignoreAttackerBoosts
       ? markerSum(
           attackerMarkers,
           (m) => m.kind === 'nextTurnBonus' && (m.attackName == null || m.attackName === attackNameLower)
@@ -167,7 +176,7 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
   const damageBeforeWR = Math.max(
     0,
     base + attackerBonus + specialEnergyBonus + turnBonus + markerBonus + incomingBonusBeforeWR +
-      abilityBonusBeforeWR - specialEnergyPenalty - markerReductionBeforeWR -
+      (ignoreAttackerBoosts ? 0 : abilityBonusBeforeWR) - specialEnergyPenalty - markerReductionBeforeWR -
       specialEnergyReductionBeforeWR -
       (ignoreDefenderEffects ? 0 : abilityReductionBeforeWR || 0)
   );
@@ -196,7 +205,8 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     !hasMarker(defenderEffects, 'noWeakness') &&
     // Coating Metal / Weakness Guard / Flash / Holon FF Energy (audit SE7).
     !(!ignoreDefenderEffects && hasSpecialEnergyNoWeakness(defender, defenderZoneCards));
-  if (attacker?.types?.length && defender?.weakness && weaknessType && weaknessApplies) {
+  // An ability can give a Weakness the card does not print (Klefki Fairy Lock).
+  if (attacker?.types?.length && (defender?.weakness || weaknessOverride?.type) && weaknessType && weaknessApplies) {
     // Any of a dual-typed attacker's types triggers Weakness (audit A-5). A
     // weaknessOverride marker (Oranguru) swaps the type and keeps the amount.
     const markerType = defenderEffects.findLast((m) => m.kind === 'weaknessOverride')?.type;
@@ -204,7 +214,7 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
       ? attacker.types.some((t) => String(t).toLowerCase() === markerType)
       : attacker.types.includes(weaknessType);
     if (hasWeakness) {
-      const v = weaknessValue;
+      const v = defender?.weakness ? weaknessValue : 2; // a Weakness only an ability gives is ×2
       if (weaknessOverride?.multiplier != null) {
         multiplier = Math.max(1, weaknessOverride.multiplier);
       } else if (stadiumCard && isStadiumWeaknessTimesTwo(stadiumCard)) {
@@ -265,11 +275,13 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
   const specialEnergyPenaltyAfterWR = getSpecialEnergyAttackPenalty(attacker, attackerZoneCards, { afterWR: true });
   // Darkness Energy AQ/EX: "+10 after applying Weakness and Resistance" only when it damages.
   const specialEnergyBonusAfterWR =
-    damageAfterWR > 0 ? getSpecialEnergyAttackBonus(attacker, attackerZoneCards, { defenderIsActive, afterWR: true }) : 0;
+    damageAfterWR > 0 && !ignoreAttackerBoosts
+      ? getSpecialEnergyAttackBonus(attacker, attackerZoneCards, { defenderIsActive, afterWR: true })
+      : 0;
   // PlusPower (base1-84): "If this Pokémon's attack does damage to the Defending Pokémon (after
   // applying Weakness and Resistance), the attack does 10 more damage to the Defending Pokémon."
   const outgoingBonusAfterWR =
-    damageAfterWR > 0 && defenderIsActive
+    damageAfterWR > 0 && defenderIsActive && !ignoreAttackerBoosts
       ? markerSum(attackerMarkers, (m) => m.kind === 'outgoingBonus' && m.afterWR)
       : 0;
   damageAfterWR = Math.max(
@@ -362,7 +374,7 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     attackerBonus: attackerBonus + outgoingBonusAfterWR,
     specialEnergyBonus: specialEnergyBonus + specialEnergyBonusAfterWR,
     specialEnergyPenalty: specialEnergyPenalty + specialEnergyPenaltyAfterWR,
-    abilityBonus: abilityBonusBeforeWR || 0,
+    abilityBonus: ignoreAttackerBoosts ? 0 : abilityBonusBeforeWR || 0,
     abilityReduction:
       (abilityReductionBeforeWR || 0) + (abilityReductionAfterWR || 0),
     multiplier,

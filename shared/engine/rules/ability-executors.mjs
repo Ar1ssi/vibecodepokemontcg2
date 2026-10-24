@@ -247,6 +247,14 @@ const DISCOUNT_CONDITIONS = [
   (c) => (/is attached to a pok[eé]mon$/.test(c) ? true : undefined),
   // A host filter, checked by discountCoversAttacker.
   (c) => (/this card is attached to has/.test(c) ? true : undefined),
+  // Kartana Beast Boost: the holder Knocked Out the opponent's Active during your previous turn
+  // (`koedOpponentActiveTurn`, stamped by the Knock Out path on the attacking Pokémon).
+  (c, ctx, source) => {
+    if (!/^this pok[eé]mon knocked out your opponent's active pok[eé]mon during your previous turn$/.test(c)) {
+      return undefined;
+    }
+    return ctx.turnNumber != null && source?.koedOpponentActiveTurn === ctx.turnNumber - 2;
+  },
 ];
 
 // "for each …" units the discount scales by, or null when the unit is not read.
@@ -264,6 +272,8 @@ function discountUnits(sentence, ctx) {
     return ctx.opponentPrizesLeft == null ? null : prizesTakenFor(ctx.opponentPrizesLeft, ctx.opponentDeckFormat);
   }
   if (/your opponent's pok[eé]mon v in play/.test(each)) return opp.filter((p) => isVCard(p)).length;
+  // Galarian Zapdos ex Fighting Instinct: "for each of your opponent's Pokémon ex in play".
+  if (/your opponent's pok[eé]mon ex in play/.test(each)) return opp.filter((p) => isExCard(p)).length;
   if (/single strike, rapid strike, and fusion strike/.test(each)) {
     return opp.filter((p) =>
       (p.subtypes || []).some((t) => /single strike|rapid strike|fusion strike/i.test(t))
@@ -296,17 +306,18 @@ export function costDiscountRead(source, ctx = {}) {
   const lead = sentence.trim();
   const clause = (lead.match(/^(?:if|as long as) (.+? in play),/) || lead.match(/^(?:if|as long as) (.+?),/))?.[1];
   if (clause) {
-    const verdicts = DISCOUNT_CONDITIONS.map((check) => check(clause, ctx));
+    const verdicts = DISCOUNT_CONDITIONS.map((check) => check(clause, ctx, source));
     if (verdicts.every((v) => v === undefined) || verdicts.some((v) => v === false)) return null;
   }
   const units = discountUnits(sentence, ctx);
   if (!units) return null;
-  const symbols = sentence.match(/((?:\{[a-z]\})+)\s*(?:energy\s*)?(?:less|fewer)/);
+  // "{C} less" counts its symbols; "2 {M} less" names the count, so the number wins.
+  const symbols = sentence.match(/(?:(\d+)\s+)?((?:\{[a-z]\})+)\s*(?:energy\s*)?(?:less|fewer)/);
   let per = 1;
   let symbol = null;
   if (symbols) {
-    const letters = symbols[1].match(/[a-z]/g);
-    per = letters.length;
+    const letters = symbols[2].match(/[a-z]/g);
+    per = symbols[1] ? Number(symbols[1]) : letters.length;
     symbol = letters[0] === 'c' ? null : COST_SYMBOL_TYPE[letters[0]] || null;
   } else {
     const by = sentence.match(/\bby\s*(\d+)/) || sentence.match(/(\d+)\s+(?:energy\s+)?(?:less|fewer)/);
@@ -394,6 +405,11 @@ export function parseDamagePrevention(card) {
   // WotC thresholds and halving (Invisible Wall, Hard Shell, …) are ability-combat.mjs
   // abilityLegacyDamageModifiers', not a flat reduction.
   if (parseLegacyDamageModifier(t)) return out;
+  // A shield limited to "during your opponent's next turn" is a turn-window marker (Mist Concealment's
+  // evolvePreventAbility step), not a standing prevention on the card.
+  if (/when you play [^.]*during your opponent[’']s next turn/.test(t)) return out;
+  // Palossand Water Compaction depends on the attacker's Energy; abilityEnergyAttackerShield reads it.
+  if (/if this pok[eé]mon is attacked by a pok[eé]mon that has \{[a-z]\} energy attached, prevent all damage/.test(t)) return out;
   // Damage is not an effect: an effect-prevention wording blocks damage only
   // when it says "including damage" (Shuppet/Banette Hide 'n' Sneak, θ Stop and
   // "except damage" wordings leave damage alone).
@@ -701,6 +717,11 @@ const SELF_RETREAT_CONDITIONS = [
   (c, card) => {
     if (!/this pok[eé]mon has any damage counters on it/.test(c)) return undefined;
     return (card?.damage || 0) > 0;
+  },
+  // Gloom Drowziness: "If this Pokémon is Asleep, its Retreat Cost is 1 less."
+  (c, card) => {
+    if (!/^this pok[eé]mon is asleep$/.test(c)) return undefined;
+    return card?.specialCondition === 'Asleep';
   },
   (c, card, b) => {
     if (!/this pok[eé]mon has a pok[eé]mon tool(?: card)? attached/.test(c)) return undefined;

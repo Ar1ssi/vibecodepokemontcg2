@@ -379,6 +379,9 @@ export function buildServerAttackContext(
       ? priorEvolutionCards(attackerZone(own, attacker), attacker).map((card) => card.name || '')
       : [],
     attackerHealedThisTurn: attacker != null && Number(attacker.healedTurn) === turnNumber,
+    ownHealedTypesThisTurn: ownInPlay
+      .filter(({ card }) => Number(card.healedTurn) === turnNumber)
+      .map(({ card, view }) => [...(view?.types || card?.types || [])]),
     attackerDamageTakenLastTurn:
       attacker?.attackDamageTaken && Number(attacker.attackDamageTaken.turn) === turnNumber - 1
         ? Number(attacker.attackDamageTaken.amount) || 0
@@ -463,7 +466,8 @@ export function buildServerAttackContext(
   if (defender) {
     ctx.defenderHp = Number(defenderCard.hp) || 0;
     ctx.defenderDamage = defender.damage || 0;
-    ctx.opponentEnergyCount = energyOn(opponent, defender, { stadiumCard, opponent: own }).length;
+    ctx.defenderEnergyUnits = energyOn(opponent, defender, { stadiumCard, opponent: own });
+    ctx.opponentEnergyCount = ctx.defenderEnergyUnits.length;
     ctx.retreatCostColorless = getRetreatCostCount(defenderCard);
     ctx.opponentStatusCount = listConditions(defender).length;
     ctx.defenderPresent = true;

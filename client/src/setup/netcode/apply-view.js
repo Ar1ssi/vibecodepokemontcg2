@@ -381,9 +381,37 @@ export function getAuthoritativeOncePerGame() {
  * @returns {object[]|null}
  */
 export function getAuthoritativeAttackExtras(instanceId) {
+  const extras = lastAppliedView?.you?.attackExtras;
+  if (!extras || typeof extras !== 'object') return null;
+  const rootId = ownPokemonRootId(instanceId);
+  if (rootId == null) return null;
+  const list = extras[rootId];
+  return Array.isArray(list) ? list : [];
+}
+
+/**
+ * The passive attack-cost discounts the server prices one of your in-play Pokémon with (its Ability
+ * and attached Tools, `[{ count, symbol }]`), keyed like the attack extras by the in-play root.
+ * `[]` when that Pokémon has none; `null` when the card is not your in-play Pokémon or the last view
+ * carries no `costDiscounts` (legacy mode, an older server), so callers price it themselves.
+ *
+ * @param {number} instanceId
+ * @returns {Array<{count: number, symbol: string|null}>|null}
+ */
+export function getAuthoritativeCostDiscounts(instanceId) {
   const you = lastAppliedView?.you;
-  const extras = you?.attackExtras;
-  if (!extras || typeof extras !== 'object' || instanceId == null) return null;
+  if (!you || !Array.isArray(you.zones?.active)) return null;
+  const rootId = ownPokemonRootId(instanceId);
+  if (rootId == null) return null;
+  const list = you.costDiscounts?.[rootId];
+  return Array.isArray(list) ? list : [];
+}
+
+// The in-play root (the Basic) of one of your Pokémon cards: an evolved Pokémon's clickable card is
+// its top Evolution, attached to that root, so the lookup walks `attachedTo` up. null when absent.
+function ownPokemonRootId(instanceId) {
+  const you = lastAppliedView?.you;
+  if (!you || instanceId == null) return null;
   const zone = ['active', 'bench']
     .map((zoneId) => (Array.isArray(you.zones?.[zoneId]) ? you.zones[zoneId] : []))
     .find((cards) => cards.some((card) => card?.instanceId === instanceId));
@@ -396,8 +424,7 @@ export function getAuthoritativeAttackExtras(instanceId) {
     if (!parent) break;
     root = parent;
   }
-  const list = extras[root?.instanceId];
-  return Array.isArray(list) ? list : [];
+  return root?.instanceId ?? null;
 }
 
 /**
