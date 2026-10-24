@@ -31,7 +31,10 @@ import {
 } from './knockout.mjs';
 import { resolveCheckup, advanceTurn, endTurnFromEffect } from './turn.mjs';
 import { continueRetreat, isExactRetreatPayment, applyRetreatSwap } from './retreat.mjs';
-import { GROWTH_ATTACH_EFFECT, resumeGrowthAttach } from './attach.mjs';
+import {
+  GROWTH_ATTACH_EFFECT, resumeGrowthAttach, SWITCH_OPPONENT_ACTIVE_EFFECT, resumeOpponentActiveSwitch,
+} from './attach.mjs';
+import { KO_SEARCH_EFFECT, resumeKoSearch } from './knockout.mjs';
 import { settleTrainerPrizeWin, endTurnAfterTrainer } from './trainer.mjs';
 import {
   CALL_ENERGY_EFFECT, resumeCallEnergy, endTurnAfterAbility, settleAbilityOutcomes,
@@ -76,6 +79,10 @@ export function resolveChoiceCommand({ draft, playerId, activeRng, events, paylo
     resumeCallEnergy(draft, { token, selection: payload.selection, activeRng, events });
   } else if (token.effectType === PRIZE_ATTACH_EFFECT) {
     resumePrizeAttach(draft, { token, selection: payload.selection, events });
+  } else if (token.effectType === KO_SEARCH_EFFECT) {
+    resumeKoSearch(draft, { token, selection: payload.selection, activeRng, events });
+  } else if (token.effectType === SWITCH_OPPONENT_ACTIVE_EFFECT) {
+    resumeOpponentActiveSwitch(draft, { token, selection: payload.selection, events });
   } else if (token.effectType === PRIZE_BENCH_EFFECT) {
     resumePrizeToBench(draft, { token, selection: payload.selection, activeRng, events });
   } else if (token.effectType === PRIZE_CHOICE_EFFECT) {

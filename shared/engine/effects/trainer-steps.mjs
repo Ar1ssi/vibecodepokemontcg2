@@ -2416,7 +2416,7 @@ function pushToLostZone(player, card) {
 }
 
 // Erika's Invitation: the chosen Basic takes the Active Spot, the old Active goes to the Bench.
-function switchBenchToActive(draft, player, benchRoot, events) {
+export function switchBenchToActive(draft, player, benchRoot, events, { viaTrainer = true } = {}) {
   const active = activeOf(player);
   if (!active) {
     promoteToActive(player, benchRoot, events);
@@ -2437,7 +2437,7 @@ function switchBenchToActive(draft, player, benchRoot, events) {
     switchedIn: benchRoot,
     switchedOutPlayerId: player.playerId,
     switchedInPlayerId: player.playerId,
-    viaTrainer: true,
+    viaTrainer,
     duringOwnersTurn: false,
     events,
   });

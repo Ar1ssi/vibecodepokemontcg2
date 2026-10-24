@@ -17,7 +17,7 @@ import { parsePrizeModify } from '../rules/ability-executors.mjs';
 import { parseToolCondition, toolConditionMet } from '../rules/tool-conditions.mjs';
 import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
 import { abilityPrizeModify, abilityPrizeToBench } from '../rules/ability-combat.mjs';
-import { inPlayEntries, parseOnKoAbilities } from '../rules/ability-triggers.mjs';
+import { inPlayEntries, parseOnKoAbilities, parseOnKoAbilityEffect } from '../rules/ability-triggers.mjs';
 import { createPendingChoice, attachToRoot } from '../effects/executor.mjs';
 import { clearAttackMarkers } from '../rules/attack-markers.mjs';
 import {
@@ -29,12 +29,21 @@ import {
 import { isStadiumLostCity } from '../rules/stadium-effects.mjs';
 import { isBasicEnergy } from '../rules/card-classify.mjs';
 import { topPokemonCard } from '../rules/evolved-pokemon.mjs';
-import { clearConditions } from '../rules/special-conditions.mjs';
+import { addCondition, clearConditions } from '../rules/special-conditions.mjs';
 import {
   activeAttackMarkers, inPlayView, cardEffectiveHp, setGameEnded, isGameConcluded,
   abilitySideContext, tiebreakActive, rootsIn,
 } from './shared.mjs';
 import { trainerEffectText } from './trainer.mjs';
+
+// Ability On-Knock-Out effects of the victim (Weezing Aftermath, Jellicent Spiteful Spirit, Manaphy
+// Final Wish), in the Tool effect shape applyToolOnKoEffects reads. Only an opponent's attack counts.
+function abilityOnKoEffects(draft, { victimPlayerId, victim, wasActive, byAttack }) {
+  if (!byAttack || draft.turn?.player === victimPlayerId) return [];
+  const effect = parseOnKoAbilityEffect(inPlayView(draft, victim), abilitySideContext(draft, victimPlayerId));
+  if (!effect || (effect.requiresActive && !wasActive)) return [];
+  return [{ holder: victim, isVictim: true, ...effect }];
+}
 
 // On-Knock-Out Tool effects (design 035 slice 9): return-to-hand, Prize denial,
 // Energy moves, opponent mill, KO search and draw-to-N. Runs before the victim's
@@ -68,6 +77,21 @@ function applyToolOnKoEffects(
   for (const eff of effects) {
     if (eff.returnSelfToHand) outcome.returnToHand = true;
     if (eff.discardPrizes) outcome.discardPrizes = true;
+
+    const attackerActive = attacker?.zones?.active?.find((c) => !c.attachedTo);
+    for (const condition of eff.attackerConditions || []) {
+      if (!attackerActive) break;
+      addCondition(attackerActive, condition);
+      events.push({
+        type: 'statusApplied',
+        playerId: attackerPlayerId,
+        instanceId: attackerActive.instanceId,
+        condition,
+      });
+    }
+    if (eff.searchChoice) {
+      draft.__koSearches = [...(draft.__koSearches || []), { playerId: victimPlayerId, source: eff.source }];
+    }
 
     if (eff.moveEnergyOnKo) {
       const spec = eff.moveEnergyOnKo;
@@ -281,13 +305,16 @@ export function handleKnockout(
   const attackerActive = attacker?.zones?.active?.find((c) => !c.attachedTo);
   // On-KO Tool effects run before the discard sweep so Energy still attached to the
   // victim can be moved (Exp. Share, Energy Pouch, Rescue Scarf's return to hand).
-  const koToolEffects = byAttack
-    ? attachedToolOnKoEffects(victimPlayer, victim, {
-        stadium: draft.stadium,
-        isActive: wasActive,
-        attacker: attackerActive ? inPlayView(draft, attackerActive) : null,
-      })
-    : [];
+  const koToolEffects = [
+    ...(byAttack
+      ? attachedToolOnKoEffects(victimPlayer, victim, {
+          stadium: draft.stadium,
+          isActive: wasActive,
+          attacker: attackerActive ? inPlayView(draft, attackerActive) : null,
+        })
+      : []),
+    ...abilityOnKoEffects(draft, { victimPlayerId, victim, wasActive, byAttack }),
+  ];
   const koToolOutcome = applyToolOnKoEffects(draft, {
     victimPlayerId,
     attackerPlayerId,
@@ -823,6 +850,54 @@ export function settleKoEnergyMoves(draft, { events }) {
     remaining.shift();
   }
   delete draft.__koEnergyMoves;
+}
+
+export const KO_SEARCH_EFFECT = 'koSearch';
+
+/**
+ * Manaphy Final Wish (Plasma Storm 34): "search your deck for a card and put it into your hand.
+ * Shuffle your deck afterward." The owner picks the card (a pendingChoice, as Call Energy does).
+ * Obligations queue on the draft and settle at the command tail, like the Energy moves above.
+ */
+export function settleKoSearches(draft, { events }) {
+  if (draft.pendingChoice) return;
+  const pending = draft.__koSearches;
+  delete draft.__koSearches;
+  if (!Array.isArray(pending)) return;
+  // An obligation whose owner has no deck left has nothing to search and is dropped.
+  const readyAt = pending.findIndex((o) => (draft.players?.[o.playerId]?.zones?.deck || []).length > 0);
+  if (readyAt < 0) return;
+  const next = pending[readyAt];
+  const rest = pending.slice(readyAt + 1);
+  const deck = draft.players[next.playerId].zones.deck;
+  draft.pendingChoice = createPendingChoice({
+    player: next.playerId,
+    source: next.source,
+    prompt: `${next.source}: choose a card from your deck to put into your hand`,
+    options: [...deck],
+    min: 1,
+    max: 1,
+    cancellable: false,
+    stateVersion: draft.stateVersion,
+    resumeToken: { effectType: KO_SEARCH_EFFECT, initiatorPlayerId: next.playerId, obligations: rest },
+  });
+}
+
+export function resumeKoSearch(draft, { token, selection, activeRng, events }) {
+  draft.pendingChoice = null;
+  const player = draft.players?.[token.initiatorPlayerId];
+  const deck = player?.zones?.deck || [];
+  const pickedId = Number((selection || [])[0]);
+  const card = deck.find((c) => c.instanceId === pickedId);
+  if (card) {
+    deck.splice(deck.indexOf(card), 1);
+    player.zones.hand.push(card);
+    events.push({ type: 'cardMoved', instanceId: card.instanceId, from: 'deck', to: 'hand', playerId: token.initiatorPlayerId });
+  }
+  if (activeRng) shuffleInPlace(activeRng, deck);
+  events.push({ type: 'deckShuffled', playerId: token.initiatorPlayerId });
+  draft.__koSearches = token.obligations || [];
+  settleKoSearches(draft, { events });
 }
 
 /**

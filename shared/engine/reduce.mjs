@@ -15,7 +15,7 @@ import { abilitySideContext } from './reduce/shared.mjs';
 import { validateReferences, validateLegality } from './reduce/legality.mjs';
 import { attackCommand } from './reduce/attack.mjs';
 import {
-  settlePromotionChoices, stampHealedPokemon, stampActivePromotions, settleKoEnergyMoves,
+  settlePromotionChoices, stampHealedPokemon, stampActivePromotions, settleKoEnergyMoves, settleKoSearches,
   settlePrizeEntitlements, resolveDamageCounterKnockouts, takePrizesCommand,
   takePrizesByIndexCommand, promoteCommand,
 } from './reduce/knockout.mjs';
@@ -441,6 +441,7 @@ export function applyCommand(state, command, rng = null) {
   resolveDamageCounterKnockouts(draft, { events });
   settlePromotionChoices(draft, { events });
   settleKoEnergyMoves(draft, { events });
+  settleKoSearches(draft, { events });
   settlePrizeEntitlements(draft, { events });
   stampActivePromotions(state, draft);
   stampHealedPokemon(state, draft);

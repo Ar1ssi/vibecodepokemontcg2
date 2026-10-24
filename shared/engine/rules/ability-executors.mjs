@@ -8,6 +8,8 @@
 
 import { isBasicPokemon, isPokemon, isEnergy, isAttachedAsTool } from '../cards.mjs';
 import { isExCard, isGxCard, isVCard, isVmaxCard, isTeraCard } from './card-classify.mjs';
+import { evolvedView } from './evolved-pokemon.mjs';
+import { hasCardMarker } from './card-markers.mjs';
 import { prizesTakenFor } from '../formats.mjs';
 import { rewriteLegacyPowerWording, parseLegacyDamageModifier } from './legacy-power-wording.mjs';
 
@@ -270,7 +272,7 @@ function discountUnits(sentence, ctx) {
     ).length;
   }
   if (/team plasma pok[eé]mon/.test(each)) {
-    return opp.filter((p) => /plasma/.test(`${lower(p.name)} ${lower((p.subtypes || []).join(' '))}`)).length;
+    return opp.filter((p) => hasCardMarker(evolvedView(ctx.opponentSideCards, p), 'Team Plasma')).length;
   }
   return null;
 }
