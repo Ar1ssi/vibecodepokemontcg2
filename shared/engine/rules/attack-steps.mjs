@@ -90,6 +90,9 @@ const GATES = [
   [/^then, /, {}],
 ];
 
+const NAMED_ENERGY_GATE = /^if this pokémon has any ([a-z]+) energy attached to it, /;
+const CLASS_ENERGY_WORDS = new Set(['basic', 'special']);
+
 function stripGates(sentence) {
   let rest = sentence;
   const flags = {};
@@ -112,6 +115,13 @@ function stripGates(sentence) {
         break;
       }
     }
+  }
+  // Thundurus-EX BW81 Thunderous Noise: "If this Pokémon has any Plasma Energy attached to it, …"
+  // gates the step on an Energy named by that word. "Basic" and "Special" name classes, not names.
+  const namedEnergy = NAMED_ENERGY_GATE.exec(rest);
+  if (namedEnergy && !CLASS_ENERGY_WORDS.has(namedEnergy[1])) {
+    rest = rest.slice(namedEnergy[0].length);
+    flags.requiresAttackerEnergy = { name: namedEnergy[1] };
   }
   if (/^you may /.test(rest)) {
     rest = rest.replace(/^you may /, '');

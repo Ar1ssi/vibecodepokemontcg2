@@ -13,6 +13,7 @@
 import { findCard, discardCardToPlayerZone } from '../state.mjs';
 import { getRetreatCostCount, isBasicPokemon, isEnergy, isPokemon, isTrainer } from '../cards.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
+import { hasCardMarker } from '../rules/card-markers.mjs';
 import { parseTrainerEffect } from '../rules/trainer-effects.mjs';
 import { textRevealsPicks } from '../rules/reveal-picks.mjs';
 import {
@@ -210,6 +211,20 @@ export const EXTRA_ENERGY_SELF_GATED = new Set([
 /** Whether an attack step's "at least N extra Energy" requirement holds (executor gate). */
 export function stepExtraEnergySatisfied(ctx) {
   return extraEnergySatisfied(ctx, ctx.step.requiresExtraEnergy);
+}
+
+/**
+ * Whether a step's "If this Pokémon has any <name> Energy attached to it" gate holds: an Energy
+ * card whose name contains the printed word is attached to the attacker (Plasma Energy).
+ */
+export function stepAttackerEnergySatisfied(ctx) {
+  const requirement = ctx.step.requiresAttackerEnergy;
+  if (!requirement) return true;
+  const ref = attackerRef(ctx);
+  if (!ref) return false;
+  return attachedCards(ctx.player, ref.card.instanceId).some(
+    (card) => isEnergy(card) && String(card.name || '').toLowerCase().includes(requirement.name)
+  );
 }
 
 function extraEnergySatisfied(ctx, requirement) {
@@ -1043,10 +1058,12 @@ function atkMillAttachIfEnergy(ctx) {
 
 // ── attach from the discard pile / hand ─────────────────────────────────────
 
-// A printed group or mark on the Pokémon: 'rapid strike' (subtypes), 'team plasma' (the name),
-// 'δ' (Delta Species) — the same places attack-damage-context.mjs ruleBoxKinds reads.
+// A printed group or mark on the Pokémon: 'rapid strike' (subtypes), 'team plasma' (the printed
+// marker, card-markers.mjs: Team Plasma names are not on the card), 'δ' (Delta Species) — the
+// same places attack-damage-context.mjs ruleBoxKinds reads.
 function rootHasTag(player, root, tag) {
   const top = topPokemonCard(player, root) || root;
+  if (tag === 'team plasma' && hasCardMarker(top, 'Team Plasma')) return true;
   const label = `${top.name || ''} ${[top.subtypes || []].flat().join(' ')}`.toLowerCase();
   return tag === 'δ' ? /δ|delta species/.test(label) : label.includes(tag);
 }
