@@ -44,6 +44,7 @@ import {
   requiresBenchSpot,
   powerConditionRestriction,
   isHandActivatedAbility,
+  isDiscardActivatedAbility,
   requiresFirstTurn,
   requiresKoOnOpponentTurn,
   isEvolvePlayedTrigger,
@@ -1381,6 +1382,11 @@ export function abilityActivationBlockReason(card, ctx = {}) {
   }
   if (rulesEnabled && zone !== 'active' && requiresActiveSpot(card)) {
     return 'This ability can only be used from the Active Spot.';
+  }
+  if (rulesEnabled && isDiscardActivatedAbility(card) !== (zone === 'discard')) {
+    return zone === 'discard'
+      ? 'This ability can only be used while the Pokémon is in play.'
+      : 'This ability can only be used from your discard pile.';
   }
   if (rulesEnabled && isHandActivatedAbility(card) !== (zone === 'hand')) {
     return zone === 'hand'

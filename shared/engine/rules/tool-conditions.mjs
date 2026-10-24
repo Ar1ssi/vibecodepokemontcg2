@@ -239,6 +239,8 @@ export function parseToolCondition(card) {
   }
   // Tremendous Bomb: "isn't a Mega Evolution Pokémon ex" / "damage from … a Mega Evolution Pokémon ex".
   if (/isn'?t a mega evolution pok[eé]mon ex/.test(t)) out.holderNotMegaEx = true;
+  // Eviolite (Plasma Storm 122): "If the Pokémon this card is attached to is a Basic Pokémon".
+  if (/the pok[eé]mon this card is attached to is a basic pok[eé]mon/.test(t)) out.holderStage = 'Basic';
   if (/attack from your opponent'?s mega evolution pok[eé]mon ex/.test(t)) out.attackerMegaEx = true;
   const minDamage = t.match(/takes (\d+) or more damage/);
   if (minDamage) out.damageAtLeast = Number(minDamage[1]);

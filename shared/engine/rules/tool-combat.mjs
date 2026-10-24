@@ -29,6 +29,7 @@ import {
 import { stadiumBlocksToolEffects } from './stadium-effects.mjs';
 import { isSpecialEnergyCard } from './special-energy-parse.mjs';
 import { prizesTakenFor } from '../formats.mjs';
+import { hasCardMarker } from './card-markers.mjs';
 import {
   holderView,
   parseToolCondition,
@@ -164,6 +165,9 @@ function attackerMatchesPrintedRuleBox(t, attacker) {
     if (mentionsGx && !mentionsEx && !isGxCard(attacker)) return false;
     return true;
   }
+  // Silver Mirror (Plasma Blast 89): "by your opponent's Team Plasma Pokémon" names a group the
+  // attacker must carry. Without this check the clause had no token and matched every attacker.
+  if (/\bteam plasma\b/.test(clauses) && !hasCardMarker(attacker, 'Team Plasma')) return false;
   const tokens = new Set(
     [...clauses.matchAll(/\b(gx|ex|vmax|vstar|v)\b/gi)].map((m) => m[1].toLowerCase())
   );
@@ -212,10 +216,19 @@ export function preventionForCard(card, attacker, ctx = {}) {
   return base;
 }
 
+// Eviolite (Plasma Storm 122): "any damage done to this Pokémon by attacks is reduced by 20". The
+// shared parser reads only "damage dealt to" wording, and the same clause on a Poké-Body is read
+// by its own reader, so the Tool form is read here.
+function toolSelfAttackReduction(card, text) {
+  if (!isPokemonToolCard(card)) return 0;
+  const m = text.match(/any damage done to this pok[eé]mon by attacks is reduced by (\d+)/);
+  return m ? parseInt(m[1], 10) : 0;
+}
+
 export function reductionForCard(card, defender, attacker, { skipSymbolFilter = false, ...ctx } = {}) {
   if (!card) return 0;
   const t = cardAbilityText(card);
-  const red = parseDamageReduction(card).reduce;
+  const red = parseDamageReduction(card).reduce || toolSelfAttackReduction(card, t);
   if (!red) return 0;
   if (!toolConditionMet(parseToolCondition(card), { ...ctx, defender, attacker })) {
     return 0;
@@ -288,7 +301,11 @@ function bonusForTool(
   if (/active (?:\{[a-z]\}\s*)?pok[eé]mon/i.test(t) && !defenderIsActive) {
     return 0;
   }
-  if (/active pokémon ex|active pokemon ex/i.test(t) && !isExCard(defender))
+  // Silver Bangle (Plasma Blast 88) prints the hyphenated "Active Pokémon-EX".
+  if (/active pok[eé]mon[- ]ex\b/i.test(t) && !isExCard(defender))
+    return 0;
+  // Silver Bangle: "the Pokémon this card is attached to (excluding Pokémon-EX)" is the holder.
+  if (/the pok[eé]mon this card is attached to \(excluding pok[eé]mon-ex\)/i.test(t) && isExCard(attacker))
     return 0;
   if (/active pokémon v\b|active pokemon v\b/i.test(t) && !isVCard(defender))
     return 0;
@@ -640,8 +657,9 @@ export function toolPrizeCountAdjust(
  */
 export function parseToolOnDamageEffect(tool) {
   const t = cardAbilityText(tool);
+  // "damaged by an opponent's attack" (Rock Guard, Rocky Helmet) is the same trigger as "by an attack".
   if (
-    !t.includes('damaged by an attack') &&
+    !/damaged by an (?:opponent['’]s )?attack/.test(t) &&
     !t.includes('knocked out by damage') &&
     !/damage from an attack from your opponent/.test(t)
   ) {
@@ -655,7 +673,8 @@ export function parseToolOnDamageEffect(tool) {
     searchDeckOnKo: 0,
     moveDamage: 0,
     discardTool: false,
-    requiresActive: /active spot/.test(t),
+    // Rock Guard / Rocky Helmet: "is your Active Pokémon and is damaged" (not the KO trigger's clause).
+    requiresActive: /active spot|is your active pok[eé]mon and is damaged/.test(t),
     // "the Pokémon this card is attached to is Knocked Out" vs "your Active Pokémon
     // is Knocked Out" (Exp. Share / Wishful Baton sit on a Benched Pokémon).
     trigger: /your active pok[eé]mon is knocked out/.test(t) ? 'activeKo' : 'selfKo',

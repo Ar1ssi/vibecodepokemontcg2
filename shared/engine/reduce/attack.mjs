@@ -13,7 +13,7 @@ import {
 } from '../rules/legacy-attached-trainer.mjs';
 import { countUnit, normalizeUnit } from '../rules/scaling-count.mjs';
 import { buildServerAttackContext } from '../rules/attack-damage-context.mjs';
-import { parseGrantedAttacks } from '../rules/tool-attacks.mjs';
+import { parseGrantedAttacks, toolGrantHolderMatches } from '../rules/tool-attacks.mjs';
 import { attachedTools, isTeraCard } from '../rules/tool-combat.mjs';
 import {
   isAbilitySuppressed, abilityAttackFlipGate, abilityVictoryStar,
@@ -422,6 +422,7 @@ function toolGrantedAttacksFor(state, card) {
     // Evolution cards sit in the stack attached to the Basic root: their attacks are the
     // previous Evolutions', usable only through a grant (design 049), never as a Tool's.
     if (isPokemon(attached) || isEnergy(attached)) continue;
+    if (!toolGrantHolderMatches(attached, card)) continue;
     out.push(...parseGrantedAttacks(attached));
   }
   return out;

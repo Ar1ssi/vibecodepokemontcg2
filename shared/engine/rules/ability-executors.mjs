@@ -99,6 +99,14 @@ export function isHandActivatedAbility(card) {
   return HAND_ACTIVATION_CLAUSE.test(textOf(card));
 }
 
+// Prehistoric Call (Archen / Tirtouga / Lileep, Plasma Blast): activated from the discard pile.
+const DISCARD_ACTIVATION_CLAUSE =
+  /if this pok[eé]mon is in your discard pile, you may put this pok[eé]mon on the bottom of your deck/;
+
+export function isDiscardActivatedAbility(card) {
+  return DISCARD_ACTIVATION_CLAUSE.test(textOf(card));
+}
+
 // Marshadow Resetting Hole: "if this Pokémon is on your Bench, you may …".
 const BENCH_SPOT_CLAUSE = /if this pok[eé]mon is on your bench\b/;
 
