@@ -27,7 +27,7 @@ const LIFT_FLIGHT_MS = 180;
 const FOIL_ROLES = new Set(['root', 'stage']);
 const SIDES = ['self', 'opp'];
 /** Zones whose foil cards tilt toward the pointer (mat-ambient.css "Holo mat tilt"). Active stays flat. */
-const POINTER_TILT_ZONES = new Set(['bench', 'board']);
+const POINTER_TILT_ZONES = new Set(['board']);
 /** `.self-text { font-size: clamp(10px, 4vh, 20px) }` (self-containers.css), vh of the iframe. */
 const COUNT_FONT = { minPx: 10, vh: 4, maxPx: 20 };
 /** Card height per width of every card mesh (card-geometry.mjs). */
@@ -565,7 +565,7 @@ export function createBoardScene({
   let pointerTilted = null;
 
   /**
-   * Tilts a foil card in play toward the pointer over it, up to 5° (mat-tilt.mjs, design 022
+   * Tilts a foil card in the active/board zone (not the bench) toward the pointer over it, up to 5° (mat-tilt.mjs, design 022
    * slice 5); any other id, or null, lays the last one flat. Measured on the card's flat rect,
    * so the tilt never moves the edge under the pointer.
    */
