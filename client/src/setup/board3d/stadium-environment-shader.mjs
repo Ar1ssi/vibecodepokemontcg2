@@ -631,7 +631,7 @@ void main() {
   pos.x += life * 36.0 + sin(life * 6.0 + aSeed.z * 20.0) * 10.0 * life;
   pos.y += sin(life * 4.0 + aSeed.w * 30.0) * 8.0 * life;
   pos.z += life * (100.0 + 120.0 * aSeed.w);
-  float onTable = smoothstep(uMin.x, uMin.x + 30.0, pos.x) * (1.0 - smoothstep(uMin.x + uSize.x - 30.0, uMin.x + uSize.x, pos.x));
+  float onTable = smoothstep(uMin.x + 20.0, uMin.x + 90.0, pos.x) * (1.0 - smoothstep(uMin.x + uSize.x - 90.0, uMin.x + uSize.x - 20.0, pos.x));
   float shown = revealBurned(pos.xy) * exitKeep(pos.xy) * onTable;
   vec4 mv = modelViewMatrix * vec4(pos, 1.0);
   gl_Position = projectionMatrix * mv;

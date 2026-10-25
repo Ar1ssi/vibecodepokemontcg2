@@ -27,7 +27,7 @@
       </div>
       <label>Heat <input id="heat" type="range" min="0" max="2" step="0.05" value="1" /></label>
       <label>Height <input id="relief" type="range" min="0" max="2" step="0.05" value="1" /></label>
-      <label>Bloom <input id="bloom" type="range" min="0" max="2" step="0.05" value="0.4" /></label>
+      <label>Bloom <input id="bloom" type="range" min="0" max="2" step="0.05" value="0" /></label>
       <label>Scrub reveal <input id="scrub" type="range" min="0" max="1" step="0.01" value="1" /></label>
       <label>Camera
         <select id="camera"><option value="tilt12">Tilt 12° (default)</option><option value="tcgl">TCG Live</option></select>
@@ -71,7 +71,8 @@
 
       // Linear HDR scene target (MSAA) → bloom → tone map + sRGB to the screen.
       let sceneTarget = null;
-      const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.4, 0.35, 0.95);
+      // Off by default: the board pass has no bloom (only design 075's attack FX bloom).
+      const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0, 0.35, 0.95);
       const output = new THREE.Mesh(
         new THREE.PlaneGeometry(2, 2),
         new THREE.ShaderMaterial({
@@ -429,7 +430,7 @@
         renderer.setRenderTarget(sceneTarget);
         renderer.clear();
         renderer.render(scene, camera);
-        bloom.render(renderer, null, sceneTarget, (now - lastFrame) / 1000, false);
+        if (bloom.strength > 0) bloom.render(renderer, null, sceneTarget, (now - lastFrame) / 1000, false);
         lastFrame = now;
         renderer.setRenderTarget(null);
         renderer.render(outputScene, flatCamera);
