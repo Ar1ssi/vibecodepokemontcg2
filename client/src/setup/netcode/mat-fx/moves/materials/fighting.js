@@ -15,8 +15,12 @@
 // streams along its body pass, never a warp. The impact disc and the ki sphere ripple and
 // churn, their halos waver, the rings and swirls stay clean, and every fill names the kit's
 // dissolve edge (its hot tone).
+//
+// Design 076 § Depth: the impact disc and the ki sphere are lit spheres (gpu-canvas `volume`) and
+// their rings and swirls lit tubes riding above them; a streak's passes stand at rising heights
+// over the drawer's lift, so the white centre sits on the body and the cast pass pools light.
 import { rgbCss } from '../../fx-colors.mjs';
-import { withFxMod } from './_mods.js';
+import { mergeFxMods, withFxMod, withLiftZ } from './_mods.js';
 import { grainPass, sphere, styledKit } from './_shared.js';
 
 // Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
@@ -52,6 +56,18 @@ const KI_CHURN = Object.freeze({
   distort: Object.freeze({ strength: 0.1, speed: 1.2, scale: 3, angle: -90 }),
   detail: Object.freeze({ amount: 0.4, speed: 1, scale: 4, angle: -90 }),
 });
+// Heights (lane units) over the drawer's lift.
+const Z_HALO = 0.01;
+const Z_STREAK = 0.03;
+const Z_MID = 0.05;
+const Z_CENTRE = 0.07;
+const Z_SPHERE = 0.05;
+const Z_RING = 0.08;
+const HOT_DISC = Object.freeze({ volume: Object.freeze({ amount: 0.6, spec: 0.6, rim: 0.5, ambient: 0.4, light: 120, bump: 0.3 }) });
+const KI_ORB = Object.freeze({ volume: Object.freeze({ amount: 0.85, spec: 1, rim: 0.7, ambient: 0.3, light: 120, bump: 0.15 }) });
+const RING_TUBE = Object.freeze({ volume: Object.freeze({ amount: 0.7, spec: 0.8, rim: 0.3, ambient: 0.35, light: 120, bump: 0 }) });
+/** `draw` at `z` lane units over the current lift with `mod` merged over the current fxMod. */
+const layered = (ctx, z, mod, draw) => withLiftZ(ctx, z, () => withFxMod(ctx, mod, draw));
 const streakGrain = (angleDeg) => ({ detail: { amount: 0.35, speed: 3, scale: 5, angle: angleDeg } });
 
 /** `draw` with a dissolve edge in `palette`'s hot tone named for every fill it makes. */
@@ -152,7 +168,7 @@ function makeGlow(palette) {
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, TAU);
-    withFxMod(ctx, RIPPLE_HALO, () => ctx.fill());
+    layered(ctx, Z_HALO, RIPPLE_HALO, () => ctx.fill());
   };
 }
 
@@ -163,16 +179,16 @@ function makeTongue(palette) {
     ctx.filter = `blur(${Math.max(1, spec.width * STREAK_BLUR).toFixed(1)}px)`;
     ctx.fillStyle = rgbCss(palette.body, 0.55 * alpha);
     tracePolygon(ctx, streakOutline(spec, 1));
-    withFxMod(ctx, streakGrain(spec.angleDeg), () => ctx.fill());
+    layered(ctx, Z_STREAK, streakGrain(spec.angleDeg), () => ctx.fill());
     ctx.filter = 'none';
     ctx.fillStyle = rgbCss(palette.hot, 0.85 * alpha);
     tracePolygon(ctx, streakOutline(spec, STREAK_MID));
-    ctx.fill();
+    withLiftZ(ctx, Z_MID, () => ctx.fill());
     const centre = 0.9 * alpha * clamp01(hot);
     if (centre > 0) {
       ctx.fillStyle = rgbCss(palette.white, centre);
       tracePolygon(ctx, streakOutline(spec, STREAK_CENTRE));
-      ctx.fill();
+      withLiftZ(ctx, Z_CENTRE, () => ctx.fill());
     }
   };
 }
@@ -200,7 +216,7 @@ function fightingKit(palette) {
   function impactDisc(ctx, x, y, r, alpha, hot = 1) {
     if (!(r > 0) || !(alpha > 0)) return;
     const p = palette;
-    withFxMod(ctx, DISC_CHURN, () =>
+    layered(ctx, Z_SPHERE, mergeFxMods(DISC_CHURN, HOT_DISC), () =>
       sphere(
         ctx,
         x,
@@ -220,7 +236,7 @@ function fightingKit(palette) {
       ctx.strokeStyle = rgbCss(p[tone], strength * alpha);
       ctx.beginPath();
       ctx.arc(x, y, r * scale, 0, TAU);
-      ctx.stroke();
+      layered(ctx, Z_RING, RING_TUBE, () => ctx.stroke());
     }
   }
 
@@ -273,17 +289,17 @@ function auraKit(palette) {
     ctx.strokeStyle = rgbCss(p.body, 0.75 * alpha);
     ctx.beginPath();
     ctx.arc(x, y, ring, phase, phase + SWIRL_SPAN);
-    ctx.stroke();
+    layered(ctx, Z_RING, RING_TUBE, () => ctx.stroke());
     ctx.strokeStyle = rgbCss(p.hot, 0.6 * alpha);
     ctx.beginPath();
     ctx.arc(x, y, ring * 0.8, phase + Math.PI, phase + Math.PI + SWIRL_SPAN * 0.8);
-    ctx.stroke();
+    layered(ctx, Z_RING, RING_TUBE, () => ctx.stroke());
   }
 
   /** The ki sphere: white core, pale blue, the blue rim fading out, a swirl inside. */
   function kiSphere(ctx, x, y, r, alpha, hot, phase) {
     const p = palette;
-    withFxMod(ctx, KI_CHURN, () =>
+    layered(ctx, Z_SPHERE, mergeFxMods(KI_CHURN, KI_ORB), () =>
       sphere(ctx, x, y, r, [
         [0, p.white, alpha * (0.6 + 0.4 * clamp01(hot))],
         [0.4, p.core, alpha * 0.95],

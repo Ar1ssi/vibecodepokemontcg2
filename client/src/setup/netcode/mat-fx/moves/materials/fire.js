@@ -11,8 +11,14 @@
 // Design 076: modifiers (`ctx.fxMod`, ignored by Canvas2D). Heat haze warps the flame body and
 // its halo, a grain streams base to tip through the outer passes so a big tongue never reads
 // flat, the white-hot filament stays clean, and every fill names the orange dissolve edge.
+//
+// Design 076 § Depth: the flame is lit as a billowing solid (gpu-canvas `volume`): a tongue's
+// outer passes are tubes round their axis with a lumpy bump, so the edges fall to deep red and
+// the crest catches the light; the hot sphere is a lumpy lit ball. The core stays emissive. The
+// passes stand at rising heights over the drawer's lift, so the white-hot core rides above the
+// body and the cast pass pools the flame's light on the cloth beside it.
 import { rgbCss } from '../../fx-colors.mjs';
-import { withFxMod } from './_mods.js';
+import { mergeFxMods, withFxMod, withLiftZ } from './_mods.js';
 import { grainPass, sphere, tonguePath, wobble } from './_shared.js';
 
 const TAU = Math.PI * 2;
@@ -45,6 +51,18 @@ const SPHERE_CHURN = Object.freeze({
   distort: Object.freeze({ strength: 0.08, speed: 1.2, scale: 3, angle: -90 }),
   detail: Object.freeze({ amount: 0.35, speed: 0.8, scale: 4, angle: -90 }),
 });
+// Heights (lane units) over the drawer's lift: halo on the cloth, body, mid, core on top.
+const Z_HALO = 0.01;
+const Z_BODY = 0.03;
+const Z_MID = 0.05;
+const Z_CORE = 0.07;
+const Z_SPHERE = 0.06;
+// Flame is matte and lumpy: little glint, a strong bump, a warm rim.
+const FLAME_TUBE = Object.freeze({ amount: 0.65, spec: 0.35, rim: 0.4, ambient: 0.32, light: 120, bump: 0.6, bumpScale: 5, radius: 0.06 });
+const MID_TUBE = Object.freeze({ ...FLAME_TUBE, amount: 0.45, radius: 0.04 });
+const FIREBALL = Object.freeze({ volume: Object.freeze({ amount: 0.7, spec: 0.5, rim: 0.5, ambient: 0.35, light: 120, bump: 0.55, bumpScale: 4 }) });
+/** `draw` at `z` lane units over the current lift with `mod` merged over the current fxMod. */
+const layered = (ctx, z, mod, draw) => withLiftZ(ctx, z, () => withFxMod(ctx, mod, draw));
 const tongueHaze = (haze, grain, angleDeg) => ({ distort: haze, detail: { amount: grain, speed: 1.8, scale: 5, angle: angleDeg } });
 
 const PALETTE = Object.freeze({
@@ -73,7 +91,7 @@ function fireKit(palette) {
     ctx.fxStyle = ORB_GLOW;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, TAU);
-    withFxMod(ctx, HAZE_HALO, () => ctx.fill());
+    layered(ctx, Z_HALO, HAZE_HALO, () => ctx.fill());
     ctx.fxStyle = null;
   }
 
@@ -81,7 +99,7 @@ function fireKit(palette) {
   function body(ctx, x, y, r, alpha, hot = 1) {
     if (!(r > 0) || !(alpha > 0)) return;
     ctx.fxStyle = ORB_BODY;
-    withFxMod(ctx, SPHERE_CHURN, () =>
+    layered(ctx, Z_SPHERE, mergeFxMods(SPHERE_CHURN, FIREBALL), () =>
       sphere(ctx, x, y, r, [
         [0, palette.white, alpha * hot],
         [0.3, palette.core, alpha],
@@ -101,17 +119,17 @@ function fireKit(palette) {
     ctx.fxStyle = FLAME_BODY;
     ctx.fillStyle = alongTongue(ctx, spec, palette.body, 0.6 * alpha);
     tonguePath(ctx, spec, 1);
-    withFxMod(ctx, tongueHaze(HAZE_BODY, 0.5, spec.angleDeg), () => ctx.fill());
+    layered(ctx, Z_BODY, { ...tongueHaze(HAZE_BODY, 0.5, spec.angleDeg), volume: FLAME_TUBE }, () => ctx.fill());
     ctx.filter = 'none';
     ctx.fxStyle = FLAME_MID;
     ctx.fillStyle = alongTongue(ctx, spec, palette.hot, 0.8 * alpha);
     tonguePath(ctx, spec, 0.66);
-    withFxMod(ctx, tongueHaze(HAZE_MID, 0.35, spec.angleDeg), () => ctx.fill());
+    layered(ctx, Z_MID, { ...tongueHaze(HAZE_MID, 0.35, spec.angleDeg), volume: MID_TUBE }, () => ctx.fill());
     if (hot > 0) {
       ctx.fxStyle = FLAME_CORE;
       ctx.fillStyle = alongTongue(ctx, spec, palette.core, 0.9 * alpha * hot);
       tonguePath(ctx, { ...spec, seed: spec.seed + 0.5 }, 0.4);
-      withFxMod(ctx, HAZE_CORE, () => ctx.fill());
+      layered(ctx, Z_CORE, HAZE_CORE, () => ctx.fill());
     }
     ctx.fxStyle = null;
   }

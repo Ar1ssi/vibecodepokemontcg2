@@ -19,6 +19,7 @@ test('stellar mist warps and mottles; the faceted head carries a faint grain, no
     assert.equal(facet.distort, 0, 'a crystal never wavers');
   }
   for (const row of [mist, ...facets]) assert.deepEqual(row.edge, [...stellar.palette.hot]);
+  for (const facet of facets) assert.ok(facet.z > mist.z, 'the head rides above its mist');
   assert.equal(ctx.fxMod, null);
 });
 
@@ -38,5 +39,7 @@ test('stellar tongue: the fringe stroke carries no texture modules', () => {
   stellar.tongue(ctx, { x: 50, y: 50, angleDeg: 0, length: 60, width: 20, seed: 1 });
   const fringe = recordedMods(recording).at(-1);
   assert.equal(fringe.distort + fringe.detail, 0);
+  assert.ok(fringe.volume > 0 && fringe.z > 0, 'the fringe is a lit tube standing off the crystal');
   assert.deepEqual(fringe.edge, [...stellar.palette.hot]);
+  assert.equal(ctx.fxLift, null);
 });

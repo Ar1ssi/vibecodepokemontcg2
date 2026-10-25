@@ -352,10 +352,10 @@ test('an electric jag: a blurred blue glow, a yellow core, a white centre; hot 0
   assert.equal(dim.fills.count, 2);
 });
 
-test('an electric ball is a sphere with six radiating jags; a projectile trails `tongues` jags', () => {
+test('an electric ball is a sphere in a shell with six radiating jags; a projectile trails `tongues` jags', () => {
   const rec = recordingContext();
   MATERIALS.electric.body(rec.ctx, 100, 100, 40, 1, 1);
-  assert.equal(rec.fills.count, 1);
+  assert.equal(rec.fills.count, 2, 'the charge shell, then the sphere (design 076 § Depth)');
   assert.equal(strokes(rec), 2, 'blue fringe then white');
   assert.equal(rec.calls.filter(([name]) => name === 'moveTo').length, 6);
   const draw = (tongues) => {
@@ -363,18 +363,19 @@ test('an electric ball is a sphere with six radiating jags; a projectile trails 
     MATERIALS.electric.projectile(r.ctx, { ...PROJECTILE, tongues });
     return r.fills.count;
   };
-  assert.equal(draw(0), 2, 'halo + ball');
-  assert.equal(draw(3), 2 + 3 * 3);
+  assert.equal(draw(0), 3, 'halo + shell + ball');
+  assert.equal(draw(3), 3 + 3 * 3);
 });
 
-test('electric jagStroke draws lightning in three strokes with one blur, and nothing when empty', () => {
+test('electric jagStroke draws lightning in five strokes with one blur, and nothing when empty', () => {
   const rec = recordingContext();
   const probe = blurProbe(rec);
   const lines = [[[0, 0], [10, 4], [20, -3], [30, 0]], [[10, 4], [16, 12]]];
   MATERIALS.electric.jagStroke(probe.ctx, lines, { width: 10, alpha: 1 });
-  assert.equal(strokes(rec), 3);
+  // Halo, the wrapping filament's back runs, body, centre, its front runs (design 076 § Depth).
+  assert.equal(strokes(rec), 5);
   assert.equal(probe.filters.length, 1);
-  assert.ok(Number(/blur\(([\d.]+)px\)/.exec(probe.filters[0])[1]) <= 0.12 * 24 + 0.05, "blur rounds to 0.1 px");
+  assert.ok(Number(/blur\(([\d.]+)px\)/.exec(probe.filters[0])[1]) <= 0.12 * 32 + 0.05, "blur rounds to 0.1 px (halo 3.2 w, design 076 § Depth)");
   assert.equal(rec.target.filter, 'none');
   for (const css of rec.colours) assert.ok(inPalette(MATERIALS.electric, css), css);
   const none = recordingContext();

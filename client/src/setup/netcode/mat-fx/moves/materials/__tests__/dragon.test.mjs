@@ -18,19 +18,23 @@ test('dragon tongue: plasma warp and grain on the outer passes, warp only on the
     assert.ok(mid.distort > 0 && mid.detail > 0);
     assert.ok(core.distort > 0 && core.detail === 0);
     for (const row of [body, mid, core]) assert.deepEqual(row.edge, [...dragon.palette.hot]);
+    assert.ok(body.volume > 0 && mid.volume > 0 && core.volume === 0);
+    assert.ok(mid.z > body.z && core.z > mid.z);
     assert.equal(ctx.fxMod, null);
+    assert.equal(ctx.fxLift, null);
   }
 });
 
-test('dragon orb: the sphere churns, the helix strokes carry only the edge', () => {
+test('dragon orb: a lit churning sphere, its helix strands lit tubes riding above it', () => {
   const { ctx, recording } = modRecorder();
   dragon.body(ctx, 50, 50, 30, 1, 1, 0.5);
   const [sphere, ...strands] = recordedMods(recording);
-  assert.ok(sphere.distort > 0 && sphere.detail > 0);
+  assert.ok(sphere.distort > 0 && sphere.detail > 0 && sphere.volume > 0);
   assert.equal(strands.length, 2);
   for (const strand of strands) {
     assert.equal(strand.distort, 0);
     assert.equal(strand.detail, 0);
+    assert.ok(strand.volume > 0 && strand.z > sphere.z);
     assert.deepEqual(strand.edge, [...dragon.palette.hot]);
   }
 });
