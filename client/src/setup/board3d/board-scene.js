@@ -15,7 +15,7 @@ import { createPileMeshes } from './pile-mesh.js';
 import { PILE_ZONES, pilePose, pileThicknessPx } from './pile-poses.mjs';
 import { pileVisualCount } from './pile-stack.mjs';
 import { createTable } from './table-mesh.js';
-import { createStadiumEnvironment } from './stadium-environment-mesh.js';
+import { STADIUM_ENV_LAYER, createStadiumEnvironment } from './stadium-environment-mesh.js';
 import { easeOutCubic } from './tween.mjs';
 import { DRAG_TILT, DRAG_TILT_STILL, createDragTilt, stepDragTilt } from '../image-logic/drag-tilt.mjs';
 import { matTiltAngles } from '../deck-constructor/mat-tilt.mjs';
@@ -288,11 +288,31 @@ export function createBoardScene({
     const overlaysMoving = overlays.update(now);
     const environmentMoving = environment.update(now, camera);
     const animating = cardsMoving || pilesMoving || overlaysMoving || environmentMoving;
-    renderer.render(scene, camera);
+    if (environment.active()) renderUnderEnvironment();
+    else renderer.render(scene, camera);
     const fxRunning = fxLayer.active() && fxLayer.render();
     if (animating || fxRunning) invalidate();
     onRender?.({ cardsMoving: cardsMoving || posedSinceRender });
     posedSinceRender = false;
+  };
+
+  /**
+   * Design 077: the environment in a pass of its own, then the board over it with the depth
+   * cleared, so cards, piles and labels always lie on top and the ground under them can rise freely.
+   */
+  const renderUnderEnvironment = () => {
+    const mask = camera.layers.mask;
+    const autoClear = renderer.autoClear;
+    const shadowsAuto = renderer.shadowMap.autoUpdate;
+    camera.layers.set(STADIUM_ENV_LAYER);
+    renderer.shadowMap.autoUpdate = false;
+    renderer.render(scene, camera);
+    renderer.shadowMap.autoUpdate = shadowsAuto;
+    camera.layers.mask = mask;
+    renderer.clearDepth();
+    renderer.autoClear = false;
+    renderer.render(scene, camera);
+    renderer.autoClear = autoClear;
   };
 
   const invalidate = () => {

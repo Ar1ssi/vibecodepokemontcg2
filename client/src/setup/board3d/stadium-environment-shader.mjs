@@ -3,13 +3,15 @@
 // with a few broad facets on rounded shoulders, mid slate greys, cool shadows, thin painted
 // highlights on their rims, and saturated lava glowing in the gaps. No photographic micro-detail.
 // Content after the card art (Ryo Ueda, PRC 138): a volcano spills lava down its flanks into a
-// lava river that splits the two halves along the seam; dark rock rises where no card lies.
+// lava river that splits the two halves along the seam, and its streams cross the table too. The
+// ground has its own lie of plateaus, ridges and hollows, cards or not: the scene draws the
+// environment first and the board over it (board-scene.js), so no card place is marked.
 //
 // Two stages:
 // 1. Bake, once per layout: BAKE_FIELD renders the ground into a half-float target at ~1.6 texels
-//    per table px (R height px, G signed px from the river bank, B card plate (> 0), shelf under a
-//    Trainer-board row or lava on the volcano's slopes (< 0, see FIELD_SLOPE_LAVA), A stone id or
-//    -1 off the stones); BAKE_LIGHT turns it into normals, occlusion and a soft sun shadow.
+//    per table px (R height px, G signed px from the nearest lava bank, B lava on the volcano's
+//    slopes 0..1, A stone id or -1 off the stones); BAKE_LIGHT turns it into normals, occlusion
+//    and a soft sun shadow.
 // 2. Per frame: TERRAIN displaces a dense grid by the baked height; LAVA is one sheet at
 //    LAVA_LEVEL under the whole table that shows wherever the ground dips below it (the river, the
 //    gaps between the stones beside it, the streams' channels); EMBERS and SMOKE rise off it.
@@ -19,23 +21,18 @@
 // CUTOUT_GLSL is the same reveal mask for the table's own materials (table-mesh.js setCutout), so
 // the mat disappears exactly where the environment shows.
 // Geometry is in the table frame of board-layout.mjs (x right, y up the table from the near edge,
-// z off the cloth, 1 unit = 1 flat CSS px). Cards lie at z >= 0, so every plate top stays below it.
+// z off the cloth, 1 unit = 1 flat CSS px).
 
-export const MAX_ZONES = 24;
 /** Lava surface height (px below the cloth). */
 export const LAVA_LEVEL = -10;
 export const BAKE_TEXELS_PER_PX = 1.6;
 export const BAKE_MAX_TEXELS = 4096;
 /** Terrain grid spacing in table px. */
 export const TERRAIN_SPACING_PX = 2.5;
-/** Flagstone size on the shelves under the Trainer-board rows, in table px. */
-const FLAGSTONE_PX = 62;
 /** Key light in the table frame: from the far left, ~48° up (table-mesh.js lights from there too). */
 export const SUN_DIRECTION = [-0.45, 0.5, 0.74];
 /** Volcano proportions, relative to its base radius: height, crater radius, crater depth. */
 export const VOLCANO_SHAPE = { height: 1.2, crater: 0.24, craterDepth: 0.14 };
-/** Field B below this marks lava on the volcano's slopes; shelves use (FIELD_SLOPE_LAVA, 0). */
-const FIELD_SLOPE_LAVA = -2;
 
 export const FULLSCREEN_VERTEX = /* glsl */ `
 varying vec2 vUv;
@@ -171,45 +168,6 @@ float environmentShown(vec2 p) {
 }
 `;
 
-const FOOTPRINTS = /* glsl */ `
-// Card slots first (they get a plate), then Trainer-board rows (a shelf).
-uniform vec4 uZones[${MAX_ZONES}];
-uniform int uSlabCount;
-uniform int uZoneCount;
-float rectDistance(vec2 p, vec4 zone) {
-  vec2 halfSize = zone.zw * 0.5;
-  vec2 d = abs(p - (zone.xy + halfSize)) - halfSize + 6.0;
-  return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - 6.0;
-}
-// Signed px to the nearest footprint of any kind (rounded rects): < 0 inside one.
-float footprintDistance(vec2 p) {
-  float best = 100000.0;
-  for (int i = 0; i < ${MAX_ZONES}; i++) {
-    if (i >= uZoneCount) break;
-    best = min(best, rectDistance(p, uZones[i]));
-  }
-  return best;
-}
-// Signed px to the nearest card slot.
-float slotDistance(vec2 p) {
-  float best = 100000.0;
-  for (int i = 0; i < ${MAX_ZONES}; i++) {
-    if (i >= uSlabCount) break;
-    best = min(best, rectDistance(p, uZones[i]));
-  }
-  return best;
-}
-// Signed px to the nearest Trainer-board row.
-float rowDistance(vec2 p) {
-  float best = 100000.0;
-  for (int i = 0; i < ${MAX_ZONES}; i++) {
-    if (i >= uZoneCount) break;
-    if (i >= uSlabCount) best = min(best, rectDistance(p, uZones[i]));
-  }
-  return best;
-}
-`;
-
 const VOLCANO = /* glsl */ `
 // Centre x, y and base radius (0: no volcano) in table px.
 uniform vec4 uVolcano;
@@ -226,9 +184,9 @@ float craterRadius() {
 float craterRimHeight() {
   return volcanoHeight() * pow(1.0 - ${VOLCANO_SHAPE.crater.toFixed(3)}, 1.25);
 }
-// Lava on and from the volcano: the crater pool and three streams running down its flanks, the
-// middle one downstream into the river, the others toward the near and far sides. x = 1 on lava,
-// y = signed px from its edge.
+// Lava on the volcano: the crater pool and three streams down its flanks, the middle one
+// downstream into the river, the others toward the near and far sides where they run on across
+// the table (STREAMS). x = 1 on lava, y = signed px from its edge.
 vec2 volcanoLava(vec2 p) {
   float r = uVolcano.z;
   if (r <= 0.0) return vec2(0.0, 100000.0);
@@ -239,11 +197,10 @@ vec2 volcanoLava(vec2 p) {
   float angle = atan(rel.y, rel.x);
   for (int k = 0; k < 3; k++) {
     float fk = float(k);
-    float course = (fk - 1.0) * 1.05 + 0.22 * sin(d * 0.05 + fk * 1.7);
-    float width = mix(3.0, 8.5, clamp((d - crater) / r, 0.0, 1.0));
+    float course = (fk - 1.0) * 1.05 + 0.18 * sin(d * 0.04 + fk * 1.7);
+    float width = mix(6.0, 17.0, clamp((d - crater) / r, 0.0, 1.0));
     float across = abs(angleBetween(angle, course)) * d - width;
-    float reach = r * (k == 1 ? 1.3 : 0.98);
-    best = min(best, max(across, max(crater * 0.7 - d, d - reach)));
+    best = min(best, max(across, max(crater * 0.7 - d, d - r * 1.05)));
   }
   return vec2(1.0 - smoothstep(-0.8, 0.8, best), best);
 }
@@ -262,23 +219,40 @@ float riverHalfWidth(float x) {
 }
 `;
 
+const STREAMS = /* glsl */ `
+// The volcano's two side streams run on from its foot across the table to the far end, one
+// through each half, winding as they go. Signed px from the nearest stream bank (< 0 inside).
+float streamDistance(vec2 p) {
+  if (uVolcano.z <= 0.0) return 100000.0;
+  float best = 100000.0;
+  for (int k = 0; k < 2; k++) {
+    float side = k == 0 ? -1.0 : 1.0;
+    vec2 foot = uVolcano.xy + uVolcano.z * vec2(0.5, 0.866 * side);
+    float target = uRiverY * (1.0 + 0.55 * side);
+    float centre = mix(foot.y, target, smoothstep(foot.x, foot.x + 380.0, p.x))
+      + 34.0 * (fbm3(vec2(p.x / 300.0, 5.0 + float(k) * 7.0)) - 0.5) * smoothstep(foot.x, foot.x + 150.0, p.x);
+    float halfWidth = mix(18.0, 30.0, fbm3(vec2(p.x / 260.0, 11.0 + float(k))));
+    best = min(best, abs(p.y - centre) - halfWidth + max(foot.x - p.x, 0.0) * 2.0);
+  }
+  return best;
+}
+`;
+
 /**
- * Bake 1: the ground. The ground beside the river sinks, so the gaps between nearby stones fill
- * with lava the way TCG Live's fire board glows between its rocks. Stones come in three sizes:
- * boulders where there is room, stones between the cards, pebbles filling in toward the banks.
- * The volcano rises out of the river bed with broad sculpted facets, a crater and grooves where
- * its streams run; past its foot the streams cut channels under the lava sheet. Every card slot
- * sits on a flat plate with a raised lip and each Trainer-board row on a basalt shelf, so nothing
- * ever lies on lava or rock.
+ * Bake 1: the ground. The land has its own lie (terraced plateaus, ridges, hollows) and falls to
+ * the lava: the river, the volcano's streams across the table, and the gaps between the stones
+ * beside them, the way TCG Live's fire board glows between its rocks. Stones in three sizes ride
+ * on the land; the volcano rises with broad sculpted facets, a crater and grooves where its
+ * streams run.
  */
 export const BAKE_FIELD_FRAGMENT = /* glsl */ `
 ${TABLE_UNIFORMS}
 varying vec2 vUv;
 ${NOISE}
 ${VORONOI}
-${FOOTPRINTS}
 ${VOLCANO}
 ${RIVER}
+${STREAMS}
 float smin(float a, float b, float k) {
   float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
   return mix(b, a, h) - k * h * (1.0 - h);
@@ -319,42 +293,42 @@ float volcanoCone(vec2 p, float streams) {
   float crater = craterRadius();
   float rim = craterRimHeight();
   if (d < crater) cone = mix(rim - r * ${VOLCANO_SHAPE.craterDepth.toFixed(3)}, rim + 2.0, smoothstep(crater * 0.45, crater, d));
-  cone -= streams * 5.0 * step(crater, d);
+  cone -= streams * 7.0 * step(crater, d);
   return cone * (1.0 - smoothstep(r * 0.92, r * 1.04, d));
+}
+// The land's own lie in px: terraced plateaus with soft cliffs between them, ridges, hollows.
+float landHeight(vec2 p) {
+  float terraces = fbm3(p / 520.0 + 4.1) * 3.2;
+  float level = (floor(terraces) + smoothstep(0.35, 1.0, fract(terraces))) / 3.2;
+  float ridge = 1.0 - abs(2.0 * fbm3(p / 240.0 + 1.7) - 1.0);
+  float hollow = smoothstep(0.62, 0.85, fbm3(p / 300.0 + 8.8));
+  return 46.0 * level + 20.0 * ridge * ridge - 22.0 * hollow - 10.0;
 }
 void main() {
   vec2 p = uMin + vUv * uSize;
-  float yn = vUv.y;
   vec2 warp = vec2(fbm3(p / 260.0), fbm3(p / 260.0 + 17.3)) - 0.5;
   vec2 q = p + warp * 46.0;
+  float wobble = (fbm3(p / 90.0) - 0.5) * 22.0;
 
-  float clearance = footprintDistance(p) + (fbm3(p / 64.0) - 0.5) * 18.0;
-  float riverSD = abs(p.y - riverCenter(p.x)) - riverHalfWidth(p.x) + (fbm3(p / 90.0) - 0.5) * 22.0;
-  float nearRiver = 1.0 - smoothstep(0.0, 110.0, riverSD);
-  float inRiver = 1.0 - smoothstep(-14.0, 0.0, riverSD);
-  float base = mix(0.0, ${LAVA_LEVEL.toFixed(1)} - 7.0, nearRiver) - 16.0 * (1.0 - smoothstep(-26.0, 0.0, riverSD));
+  float riverSD = abs(p.y - riverCenter(p.x)) - riverHalfWidth(p.x) + wobble;
+  float lavaSD = min(riverSD, streamDistance(p) + wobble * 0.5);
+  float nearLava = 1.0 - smoothstep(0.0, 110.0, lavaSD);
+  float inLava = 1.0 - smoothstep(-14.0, 0.0, lavaSD);
+  float bank = 1.0 - smoothstep(-26.0, 0.0, lavaSD);
+  float base = mix(landHeight(p), ${LAVA_LEVEL.toFixed(1)} - 7.0, nearLava) - 16.0 * bank;
 
-  // Lower along the far edge than the open ground allows, so no stone rises into the far hand.
-  float farRidge = smoothstep(0.8, 0.98, yn);
-  float nearRidge = 1.0 - smoothstep(0.02, 0.14, yn);
-  float open = smoothstep(10.0, 44.0, clearance);
-  float roomy = smoothstep(50.0, 120.0, clearance);
-
-  // Hills: broad swells of taller rock and low hollows, so the field is never one even height.
+  // Hills: broad swells of taller rock, so the stones vary with the land.
   float hills = fbm3(p / 340.0 + 2.3);
   float swell = 0.45 + 1.25 * smoothstep(0.25, 0.8, hills);
-  base += 10.0 * (smoothstep(0.35, 0.85, hills) - 0.4) * (1.0 - nearRiver) * open;
   vec2 big = stones(q + 31.0, mix(96.0, 150.0, fbm3(p / 500.0 + 9.0)), 4.0);
   vec2 mid = stones(q, 60.0, 3.0);
   vec2 pebble = stones(q + 113.0, 27.0, 1.6);
-  float bigAmp = (26.0 + 30.0 * farRidge + 14.0 * nearRidge) * roomy * smoothstep(-4.0, 60.0, riverSD);
-  // A few stones stand in the river as islands.
-  float islands = 30.0 * step(0.88, mid.y) * smoothstep(-60.0, -24.0, riverSD) * open;
-  float midAmp = max((16.0 + 12.0 * max(farRidge, nearRidge)) * open * (1.0 - inRiver), islands * inRiver);
-  float pebbleAmp = 8.0 * open * (1.0 - 0.7 * inRiver) * (0.4 + 0.6 * nearRiver);
-  float hBig = big.x * bigAmp * swell;
-  float hMid = mid.x * midAmp * mix(0.7, 1.4, hills);
-  float hPebble = pebble.x * pebbleAmp;
+  float dry = smoothstep(-4.0, 60.0, lavaSD);
+  // A few stones stand in the lava as islands.
+  float islands = 30.0 * step(0.88, mid.y) * smoothstep(-60.0, -24.0, lavaSD);
+  float hBig = big.x * 26.0 * swell * dry;
+  float hMid = mid.x * max(18.0 * mix(0.7, 1.4, hills) * (1.0 - inLava), islands * inLava);
+  float hPebble = pebble.x * 8.0 * (1.0 - 0.7 * inLava) * (0.4 + 0.6 * nearLava);
   float rock = max(max(hBig, hMid), hPebble);
   float id = rock < 0.6 ? -1.0 : (rock == hBig ? big.y : (rock == hMid ? mid.y : pebble.y));
   float height = base + rock;
@@ -365,41 +339,9 @@ void main() {
     height = max(height, base + cone);
     id = 0.61;
   }
-  float vd = distance(p, uVolcano.xy);
-  // Past the cone's foot the streams cut channels under the lava sheet.
-  float channel = lava.x * step(uVolcano.z * 0.9, vd) * step(0.001, uVolcano.z);
-  height = mix(height, min(height, ${LAVA_LEVEL.toFixed(1)} - 5.0), channel);
-  if (channel > 0.5) id = -1.0;
-  float slopeLava = lava.x * step(vd, uVolcano.z * 0.95);
+  float slopeLava = lava.x * step(distance(p, uVolcano.xy), uVolcano.z * 0.95);
 
-  // Shelves: cooled basalt split into flagstones, each tilted a little, with sunken joints.
-  float shelfSD = rowDistance(p) - 14.0 + (fbm3(p / 50.0) - 0.5) * 20.0;
-  float shelf = 1.0 - smoothstep(-3.0, 3.0, shelfSD);
-  // Each flagstone a slab of its own: tops from -5.5 to -0.5 px (under any card), tilted, rounded
-  // into joints deep enough that the lava sheet glows in them.
-  vec4 flag = voronoiCell(p / ${FLAGSTONE_PX.toFixed(1)} + 3.7);
-  float slabTop = -3.0 + (flag.y - 0.5) * 4.0 + dot(-flag.zw, hash22(vec2(flag.y * 31.0, 1.0)) - 0.5) * 3.0;
-  float slabEdge = smoothstep(0.015, 0.11, flag.x);
-  float flagstone = mix(${LAVA_LEVEL.toFixed(1)} - 3.0, min(slabTop, -0.5), sqrt(slabEdge * (2.0 - slabEdge)));
-  height = mix(height, flagstone, shelf);
-  if (shelf > 0.5) id = -1.0;
-
-  // Card places: chunky basalt slabs under each card (neighbouring slots share one bed), each slab
-  // tilted and at its own height, rounded into crevices between them. Every top stays under the
-  // cloth (cards rest at z >= 0); the rough rim rounds down into the ground around it.
-  float plateSD = slotDistance(p) - 14.0 + (fbm3(p / 30.0) - 0.5) * 12.0;
-  float plate = 1.0 - smoothstep(-6.0, 2.0, plateSD);
-  vec4 chip = voronoiCell(p / 40.0 + 8.1);
-  float chipTop = -2.6 + (chip.y - 0.5) * 3.0 + dot(-chip.zw, hash22(vec2(chip.y * 17.0, 4.0)) - 0.5) * 2.5;
-  float chipEdge = smoothstep(0.015, 0.1, chip.x);
-  float plateTop = mix(-7.0, min(chipTop, -0.5), sqrt(chipEdge * (2.0 - chipEdge)));
-  height = mix(height, plateTop, sqrt(plate * (2.0 - plate)));
-  if (plate > 0.5) id = -1.0;
-  shelf *= 1.0 - plate;
-  slopeLava *= (1.0 - plate) * (1.0 - shelf);
-
-  float marks = plate > 0.0 ? plate : (slopeLava > 0.0 ? ${FIELD_SLOPE_LAVA.toFixed(1)} - slopeLava : -shelf);
-  gl_FragColor = vec4(height, riverSD, marks, id);
+  gl_FragColor = vec4(height, lavaSD, slopeLava, id);
 }
 `;
 
@@ -490,7 +432,6 @@ ${NOISE}
 ${VORONOI}
 ${LAVA_RAMP}
 ${REVEAL}
-${FOOTPRINTS}
 ${VOLCANO}
 varying vec2 vPos;
 varying vec2 vUv;
@@ -504,9 +445,7 @@ void main() {
   vec4 light = texture2D(uLight, vUv);
   float ground = field.r;
   float riverSD = field.g;
-  float plate = max(field.b, 0.0);
-  float slopeLava = clamp(${FIELD_SLOPE_LAVA.toFixed(1)} - field.b, 0.0, 1.0);
-  float shelf = field.b < 0.0 && field.b > ${FIELD_SLOPE_LAVA.toFixed(1)} ? -field.b : 0.0;
+  float slopeLava = field.b;
   float id = field.a;
   float isStone = step(0.0, id);
 
@@ -523,8 +462,8 @@ void main() {
   col = mix(col, vec3(0.138, 0.143, 0.16), smoothstep(0.8, 0.92, facing));
   col *= 0.9 + 0.2 * tone;
   col *= 0.88 + 0.16 * smoothstep(-6.0, 50.0, ground);
-  // Bare ground between stones is darker ash; plates and shelves are smooth basalt.
-  col *= mix(0.7, 1.0, max(isStone, max(plate, shelf)));
+  // Bare ground between stones is darker ash.
+  col *= mix(0.72, 1.0, isStone);
 
   // Painted rim: convex edges (negative height Laplacian) catch a light stroke.
   vec2 t2 = uTexel * 3.0;
@@ -536,26 +475,21 @@ void main() {
   // Painted cracks: thin light lines across the tops of some stones.
   vec4 crack = voronoiCell(p / 22.0 + id * 17.0);
   float crackLine = (1.0 - smoothstep(0.015, 0.04, crack.x)) * smoothstep(0.82, 0.95, n.z)
-    * smoothstep(0.55, 0.7, gnoise(p / 26.0 + id * 5.0)) * max(isStone * step(0.4, tone), plate);
+    * smoothstep(0.55, 0.7, gnoise(p / 26.0 + id * 5.0)) * isStone * step(0.4, tone);
   col = mix(col, col * 1.45 + 0.01, crackLine * 0.6);
 
   // Occlusion: crevices and the feet of stones go deep blue-grey.
   col = mix(vec3(0.036, 0.034, 0.046), col, smoothstep(0.3, 0.9, light.b));
 
-  // Lava light: the stones' lower faces and the gaps glow red near the river; flat plates and
-  // shelves, lit from the side only, take a little at their edges.
+  // Lava light: the stones' lower faces and the gaps glow red near the lava.
   float aboveLava = max(vHeight - ${LAVA_LEVEL.toFixed(1)}, 0.0);
   float nearRiver = 1.0 - smoothstep(0.0, 120.0, riverSD);
   float flicker = 0.88 + 0.12 * gnoise(vec2(uTime * 0.8, p.x / 80.0 + p.y / 120.0));
   float sideFacing = 1.0 - smoothstep(0.55, 0.95, n.z);
-  float flatness = max(plate, shelf);
-  float underglow = exp(-aboveLava / 6.0) * nearRiver * mix(1.0, 0.15, flatness);
-  float bounce = exp(-max(riverSD, 0.0) / 45.0) * exp(-aboveLava / 24.0) * mix(0.4, 1.0, sideFacing) * mix(1.0, 0.25, flatness);
+  float underglow = exp(-aboveLava / 6.0) * nearRiver;
+  float bounce = exp(-max(riverSD, 0.0) / 45.0) * exp(-aboveLava / 24.0) * mix(0.4, 1.0, sideFacing);
   col += vec3(1.0, 0.16, 0.02) * (underglow * 0.7 + bounce * 0.28) * flicker;
 
-  // Shelf flagstones: one tone each (the lava sheet fills their joints).
-  vec4 flag = voronoiCell(p / ${FLAGSTONE_PX.toFixed(1)} + 3.7);
-  col *= 1.0 + (flag.y - 0.5) * 0.25 * shelf;
 
   // The volcano: its streams and crater light the rock beside them, then the lava itself, flowing
   // downhill (the baked normal points down the slope).

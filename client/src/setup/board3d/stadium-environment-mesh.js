@@ -7,6 +7,8 @@ import { ENVIRONMENT_KEYS, environmentFootprints, volcanoSpot } from './stadium-
 import { tableBounds } from './table-uv.mjs';
 
 export const INTRO_MS = 1600;
+/** Render layer of the environment: board-scene.js draws it in a pass of its own, under the board. */
+export const STADIUM_ENV_LAYER = 3;
 export const AMBIENT_FPS = 30;
 const EMBER_COUNT = 220;
 const SMOKE_COUNT = 14;
@@ -48,9 +50,6 @@ export function createStadiumEnvironment({
     uTime: { value: 0 },
     uRiverY: { value: 0 },
     uSun: { value: new three.Vector3(...env.SUN_DIRECTION).normalize() },
-    uZones: { value: Array.from({ length: env.MAX_ZONES }, () => new three.Vector4()) },
-    uZoneCount: { value: 0 },
-    uSlabCount: { value: 0 },
     uVolcano: { value: new three.Vector4() },
     uField: { value: null },
     uLight: { value: null },
@@ -100,6 +99,7 @@ export function createStadiumEnvironment({
   embers.renderOrder = 2;
   for (const object of [terrain, lava, embers, smoke]) {
     object.frustumCulled = false;
+    object.layers.set(STADIUM_ENV_LAYER);
     group.add(object);
   }
 
@@ -183,25 +183,17 @@ export function createStadiumEnvironment({
     renderer.setRenderTarget(previous);
   };
 
-  /** Footprints, volcano and river from the layout; rebakes only when they changed. */
+  /** Volcano and river from the layout; rebakes only when they changed. */
   const applyLayout = () => {
     const bounds = tableBounds(layout);
     if (!(bounds.w > 0 && bounds.h > 0)) return false;
-    const footprints = environmentFootprints(layout);
-    const zones = [...footprints.slabs, ...footprints.flats];
-    if (zones.length > env.MAX_ZONES) {
-      console.warn(`board3d: stadium environment keeps ${env.MAX_ZONES} of ${zones.length} card footprints flat`);
-    }
-    const volcano = volcanoSpot(layout, footprints);
+    const volcano = volcanoSpot(layout, environmentFootprints(layout));
     const stadium = layout.stadium;
     const origin = stadium
       ? { x: stadium.x + stadium.w / 2, y: stadium.y + stadium.h / 2 }
       : { x: bounds.x + bounds.w / 2, y: layout.depth };
-    const signature = JSON.stringify([bounds, zones, volcano, origin]);
+    const signature = JSON.stringify([bounds, volcano, origin]);
     if (signature === bakedFor) return true;
-    zones.slice(0, env.MAX_ZONES).forEach((rect, index) => uniforms.uZones.value[index].set(rect.x, rect.y, rect.w, rect.h));
-    uniforms.uZoneCount.value = Math.min(zones.length, env.MAX_ZONES);
-    uniforms.uSlabCount.value = Math.min(footprints.slabs.length, env.MAX_ZONES);
     uniforms.uVolcano.value.set(volcano?.x ?? 0, volcano?.y ?? 0, volcano?.r ?? 0, 0);
     uniforms.uMin.value.set(bounds.x, bounds.y);
     uniforms.uSize.value.set(bounds.w, bounds.h);
