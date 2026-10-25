@@ -106,6 +106,12 @@ test('a foil.json is checked against the set, the TCG Live bundle and the files 
     'foil/002-front.webp: missing',
   ]);
 
+  fs.writeFileSync(path.join(dir, 'foil', '001-wp-ph.webp'), 'x');
+  write({ '001': { ...good, wp: '001-wp-ph.webp' } });
+  assert.deepEqual(checkCustomSets(root).problems, [
+    'customhbw/foil/001-wp-ph.webp: name must be <nnn>-<kind>.webp to publish',
+  ]);
+
   fs.writeFileSync(path.join(dir, 'foil.json'), '{');
   assert.match(checkCustomSets(root).problems[0], /foil\.json: not valid JSON/);
 });

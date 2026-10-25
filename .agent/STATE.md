@@ -3,11 +3,11 @@
      Every stale line here taxes every session. History belongs to git log (commit messages are the
      journal). Contradicts git log? Trust git: rebuild from `git log -20 main`. -->
 
-Focus: custom sets landed (075-custom-sets, D223/D224): cardback's "Download for ptcg-sim" zip → client/src/assets/custom-sets/<setId>/,
-  served as TCGdex records by the proxy; Custom pill in Browse Sets; decklist codes; demo set `customdemo`. Cardback (Ar1ssi/cardback)
-  gained printed-term capitals + Claude "Suggest wording" (ANTHROPIC_API_KEY) and the set export/import.
-Active: user localhost checks — Custom pill shows DEMO, add Alakazam ex / Hyper Ball to a deck, play: Hyper Ball search + Spoon Bend
-  coin flip run in rules mode; 3D board H1/H2/H3 visuals (I266) and TCG Live attack UI (074, D219) still unchecked; status FX pending.
+Focus: custom sets (075, D223/D224) now reach the Render site (076, D228): cardback "Publish to site" → scripts/custom-sets/publish.mjs
+  (rclone, r2:ptcg-foil/custom-sets: blobs/<sha256> + index.json) → the site polls every 10 s, R2 copies overlay git sets; local
+  "Send to ptcg-sim" folder reload stays D227. CUSTOM_SETS_URL defaults to FOIL_TEXTURE_URL/custom-sets (no dashboard step).
+Active: user — first real publish (`pnpm custom-sets:publish -- customhb`, ~93 MB) then check the Render deck builder; restart cardback
+  (start-site.bat) for the button. Older localhost checks: Custom pill/DEMO play, 3D board H1-H3 (I266), TCG Live attack UI (074).
 Next: maintenance is due (`pnpm harness:check`: DECISIONS/ISSUES over cap; 70+ commits since the last maintain) → run maintain.md.
   Then I264 (legacy relay has no board), 069 foil on Render (I259), 072 coin prompts, B&B run flow,
   I242, I239, I227; `node scripts/prune-merged-branches.mjs --yes` locally. ETB (057) slice 6 unstarted.
@@ -21,5 +21,5 @@ Blocked: I85/I86 need design approval (028/029); I87 needs the user's descriptio
 - three.js is vendored; node tests import it only for mesh pools (card-mesh-flight.test): pure math stays in .mjs; bump only via
   `scripts/vendor-three.mjs` (test checks bytes). Box art: rerun `scripts/build-battle/vendor-box-art.mjs`.
 - Bash heredoc eats `\` and mangles é → use the Edit/Write tools. Primary working copy is CRLF.
-- Custom sets reload live (D227): cardback "Send to ptcg-sim" or an unzipped export into custom-sets/ → server reloads, open
-  deck builders redraw; still run `node scripts/custom-sets/check.mjs` before committing a set. KO event names the root Basic (origins.knockoutStack); opacity on a preserve-3d card flattens it: fade the host (043).
+- Custom sets: local folder reload (D227) and bucket publish to Render (D228; `--unpublish <set>` takes one off; a 404 index keeps
+  loaded sets); still run `node scripts/custom-sets/check.mjs` before committing a set. KO event names the root Basic (origins.knockoutStack); opacity on a preserve-3d card flattens it: fade the host (043).

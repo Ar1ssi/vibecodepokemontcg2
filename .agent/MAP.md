@@ -105,6 +105,7 @@ scripts/e2e/board3d-*-test.mjs, test-card-inspector-e2e.mjs, fullview-test.mjs, 
 **/__tests__/*.test.mjs — plain `node --test`, no jsdom; `pnpm test` runs them all (~6900); run one file with `node --test <path>`
 scripts/prune-merged-branches.mjs — dry-run/delete remote branches fully contained in origin/main; keeps main, the current branch and open-PR refs (via gh, else --keep); needs local push rights (test: scripts/__tests__/prune-merged-branches.test.mjs)
 scripts/custom-sets/import-foil.py — cardback foil exports (zip/folder) → <set>/foil.json + foil/*.webp (D225); scripts/custom-sets/check.mjs validates them
+shared/custom-sets/custom-sets-index.mjs — sets published to R2 (design 076, D228): bucket index.json contract (`validateCustomSetsIndex`); scripts/custom-sets/publish.mjs (`pnpm custom-sets:publish`) uploads blobs/<sha256> + swaps the index via rclone; server/custom-sets-remote.mjs makes the site poll it, mirror set.json into the store's second root, serve art from a blob cache
 scripts/harness-check.mjs — `pnpm harness:check`: measures every .agent budget in workflows/maintain.md plus the 30-commit maintain trigger; exit 1 = OVER (test: scripts/__tests__/harness-check.test.mjs)
 scripts/e2e/two-player-sync-test.mjs — Playwright two-browser sync harness (legacy mode: needs a
   `SERVER_AUTHORITATIVE=0` server on PTCG_URL, `pnpm test:2p`)
