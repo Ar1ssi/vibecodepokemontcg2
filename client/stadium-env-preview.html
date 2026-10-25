@@ -7,8 +7,8 @@
     <style>
       html, body { margin: 0; height: 100%; background: #050506; overflow: hidden; font: 13px system-ui, sans-serif; color: #e8e2dc; }
       canvas { display: block; }
-      #panel { position: fixed; top: 12px; left: 12px; background: rgba(12, 10, 10, 0.82); border: 1px solid #3a2a22; border-radius: 8px; padding: 10px 12px; display: grid; gap: 8px; min-width: 240px; z-index: 1; }
-      #panel h1 { font-size: 14px; margin: 0; color: #ffb070; }
+      #panel { position: fixed; top: 12px; left: 12px; background: rgba(12, 10, 10, 0.82); border: 1px solid #3a2a22; border-radius: 8px; padding: 10px 12px; display: grid; gap: 8px; min-width: 250px; z-index: 1; }
+      #panel h1 { font-size: 14px; margin: 0; color: #ffb070; cursor: pointer; }
       #panel button { background: #2a1a12; color: #ffd8b0; border: 1px solid #6a3a20; border-radius: 5px; padding: 6px 8px; cursor: pointer; }
       #panel button:hover { background: #3a2216; }
       #panel label { display: flex; gap: 6px; align-items: center; justify-content: space-between; }
@@ -27,9 +27,13 @@
       </div>
       <label>Heat <input id="heat" type="range" min="0" max="2" step="0.05" value="1" /></label>
       <label>Height <input id="relief" type="range" min="0" max="2" step="0.05" value="1" /></label>
+      <label>Bloom <input id="bloom" type="range" min="0" max="2" step="0.05" value="0.4" /></label>
       <label>Scrub reveal <input id="scrub" type="range" min="0" max="1" step="0.01" value="1" /></label>
       <label>Camera
-        <select id="camera"><option value="tcgl">TCG Live</option><option value="tilt12">Tilt 12°</option></select>
+        <select id="camera"><option value="tilt12">Tilt 12° (default)</option><option value="tcgl">TCG Live</option></select>
+      </label>
+      <label>Board width
+        <select id="width"><option value="0.755">With sidebar</option><option value="1">Full width</option></select>
       </label>
       <label><input id="static" type="checkbox" /> FX off (static frame)</label>
       <label><input id="cards" type="checkbox" checked /> Show cards</label>
@@ -37,34 +41,55 @@
     </div>
     <script type="module">
       import * as THREE from 'three';
-      import {
-        SCORCHED_EARTH_VERTEX,
-        SCORCHED_EARTH_FRAGMENT,
-        EMBER_VERTEX,
-        EMBER_FRAGMENT,
-        MAX_ZONES,
-        RELIEF_SEGMENTS,
-      } from '/src/setup/board3d/stadium-environment-shader.mjs';
+      import { UnrealBloomPass } from '/src/vendor/three/addons/postprocessing/UnrealBloomPass.js';
+      import * as env from '/src/setup/board3d/stadium-environment-shader.mjs';
+      import { environmentFootprints } from '/src/setup/board3d/stadium-environment-layout.mjs';
       import { flatLayout, halfFromViewport } from '/src/setup/board3d/board-layout.mjs';
       import { cameraFromCssTilt, cameraTcgLive } from '/src/setup/board3d/board-camera.mjs';
       import { tableBounds } from '/src/setup/board3d/table-uv.mjs';
       import { getMatLayout } from '/src/setup/sizing/mat-layouts.mjs';
 
-      // Design 077 prototype: the real `sim` layout and board cameras, a stand-in mat and cards,
-      // and the real shader. The board is rebuilt on resize, as board3d.js relayouts.
+      // Design 077 prototype: the real `sim` layout, board cameras and renderer settings
+      // (gl-renderer.js: sRGB out, Neutral tone mapping), stand-in mat and cards, the real shaders.
       const INTRO_MS = 1600;
       const EXIT_MS = 900;
       const AMBIENT_FPS = 30;
-      const EMBER_COUNT = 60;
+      const EMBER_COUNT = 220;
       const DEG = Math.PI / 180;
+      const params = new URLSearchParams(location.search);
 
-      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
       renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.NeutralToneMapping;
       document.body.appendChild(renderer.domElement);
       const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x060607);
       const camera = new THREE.PerspectiveCamera();
       const tableFrame = new THREE.Group();
       scene.add(tableFrame);
+
+      // Linear HDR scene target (MSAA) → bloom → tone map + sRGB to the screen.
+      let sceneTarget = null;
+      const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.4, 0.35, 0.95);
+      const output = new THREE.Mesh(
+        new THREE.PlaneGeometry(2, 2),
+        new THREE.ShaderMaterial({
+          uniforms: { tDiffuse: { value: null } },
+          vertexShader: env.FULLSCREEN_VERTEX,
+          fragmentShader: `uniform sampler2D tDiffuse; varying vec2 vUv;
+            void main() { gl_FragColor = texture2D(tDiffuse, vUv);
+            #include <tonemapping_fragment>
+            #include <colorspace_fragment>
+            }`,
+          depthTest: false,
+          depthWrite: false,
+        })
+      );
+      output.frustumCulled = false;
+      const outputScene = new THREE.Scene();
+      outputScene.add(output);
+      const flatCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
       const loader = new THREE.TextureLoader();
       const textureCache = new Map();
@@ -72,7 +97,7 @@
         if (!textureCache.has(src)) {
           const t = loader.load(src, () => invalidate());
           t.colorSpace = THREE.SRGBColorSpace;
-          t.anisotropy = 8;
+          t.anisotropy = renderer.capabilities.getMaxAnisotropy();
           textureCache.set(src, t);
         }
         return textureCache.get(src);
@@ -81,6 +106,7 @@
       const CARD_BACK = '/src/assets/cardback.png';
       const MAT = '/src/assets/playmats/board/1022-rubber-playmat-dash-eevee-1.webp';
 
+      const sun = new THREE.Vector3(...env.SUN_DIRECTION).normalize();
       const uniforms = {
         uMin: { value: new THREE.Vector2() },
         uSize: { value: new THREE.Vector2() },
@@ -91,24 +117,32 @@
         uHeat: { value: 1 },
         uRelief: { value: 1 },
         uRiverY: { value: 0 },
-        uZones: { value: Array.from({ length: MAX_ZONES }, () => new THREE.Vector4()) },
+        uSun: { value: sun },
+        uZones: { value: Array.from({ length: env.MAX_ZONES }, () => new THREE.Vector4()) },
         uZoneCount: { value: 0 },
-        uPixelRatio: { value: renderer.getPixelRatio() },
+        uSlabCount: { value: 0 },
+        uField: { value: null },
+        uLight: { value: null },
+        uTexel: { value: new THREE.Vector2() },
+        uFocal: { value: 1000 },
+        uMap: { value: null },
       };
-      const environmentMaterial = new THREE.ShaderMaterial({
-        vertexShader: SCORCHED_EARTH_VERTEX,
-        fragmentShader: SCORCHED_EARTH_FRAGMENT,
-        uniforms,
-        transparent: true,
-      });
-      const emberMaterial = new THREE.ShaderMaterial({
-        vertexShader: EMBER_VERTEX,
-        fragmentShader: EMBER_FRAGMENT,
-        uniforms,
+      const shader = (vertexShader, fragmentShader, extra = {}) =>
+        new THREE.ShaderMaterial({ vertexShader, fragmentShader, uniforms, ...extra });
+      const terrainMaterial = shader(env.TERRAIN_VERTEX, env.TERRAIN_FRAGMENT);
+      const lavaMaterial = shader(env.LAVA_VERTEX, env.LAVA_FRAGMENT);
+      const emberMaterial = shader(env.EMBER_VERTEX, env.EMBER_FRAGMENT, {
         transparent: true,
         depthWrite: false,
         blending: THREE.AdditiveBlending,
       });
+      const matMaterial = shader(env.MAT_VERTEX, env.MAT_FRAGMENT);
+      const bakeFieldMaterial = shader(env.FULLSCREEN_VERTEX, env.BAKE_FIELD_FRAGMENT, { depthTest: false, depthWrite: false });
+      const bakeLightMaterial = shader(env.FULLSCREEN_VERTEX, env.BAKE_LIGHT_FRAGMENT, { depthTest: false, depthWrite: false });
+      for (const m of [terrainMaterial, lavaMaterial, emberMaterial, matMaterial, bakeFieldMaterial, bakeLightMaterial]) {
+        m.toneMapped = false;
+      }
+
       const emberGeometry = new THREE.BufferGeometry();
       emberGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(EMBER_COUNT * 3), 3));
       emberGeometry.setAttribute('aSeed', new THREE.BufferAttribute(new Float32Array(EMBER_COUNT * 4).map(() => Math.random()), 4));
@@ -134,6 +168,48 @@
       let layout = null;
       let stadiumMesh = null;
       let cardsGroup = null;
+      let fieldTarget = null;
+      let lightTarget = null;
+      let bakedKey = '';
+
+      function bake(bounds) {
+        const key = JSON.stringify([bounds, uniforms.uZones.value.slice(0, uniforms.uZoneCount.value)]);
+        if (key === bakedKey) return;
+        bakedKey = key;
+        fieldTarget?.dispose();
+        lightTarget?.dispose();
+        const width = Math.min(env.BAKE_MAX_TEXELS, Math.round(bounds.w * env.BAKE_TEXELS_PER_PX));
+        const height = Math.round((width * bounds.h) / bounds.w);
+        fieldTarget = new THREE.WebGLRenderTarget(width, height, {
+          type: THREE.HalfFloatType,
+          minFilter: THREE.LinearFilter,
+          magFilter: THREE.LinearFilter,
+          depthBuffer: false,
+        });
+        lightTarget = new THREE.WebGLRenderTarget(width, height, {
+          type: THREE.UnsignedByteType,
+          minFilter: THREE.LinearMipmapLinearFilter,
+          magFilter: THREE.LinearFilter,
+          generateMipmaps: true,
+          depthBuffer: false,
+        });
+        uniforms.uTexel.value.set(1 / width, 1 / height);
+        const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), bakeFieldMaterial);
+        quad.frustumCulled = false;
+        const bakeScene = new THREE.Scene();
+        bakeScene.add(quad);
+        const started = performance.now();
+        renderer.setRenderTarget(fieldTarget);
+        renderer.render(bakeScene, flatCamera);
+        uniforms.uField.value = fieldTarget.texture;
+        quad.material = bakeLightMaterial;
+        renderer.setRenderTarget(lightTarget);
+        renderer.render(bakeScene, flatCamera);
+        renderer.setRenderTarget(null);
+        quad.geometry.dispose();
+        uniforms.uLight.value = lightTarget.texture;
+        console.info(`stadium-env bake ${width}×${height} in ${(performance.now() - started).toFixed(0)} ms (GPU async)`);
+      }
 
       function buildBoard() {
         if (board) {
@@ -142,40 +218,50 @@
         }
         board = new THREE.Group();
         const viewport = { w: innerWidth, h: innerHeight };
-        const half = halfFromViewport(viewport, 1);
+        const half = halfFromViewport(viewport, Number(document.getElementById('width').value));
         layout = flatLayout(getMatLayout('sim'), half, { viewport });
         const bounds = tableBounds(layout);
         const depth = layout.depth;
 
-        const floor = new THREE.Mesh(new THREE.PlaneGeometry(bounds.w * 2.4, bounds.h * 3), new THREE.MeshBasicMaterial({ color: 0x0a0a0c }));
-        floor.position.set(0, depth, -2);
-        board.add(floor);
-        for (const far of [false, true]) {
-          const mat = new THREE.Mesh(new THREE.PlaneGeometry(bounds.w, depth), new THREE.MeshBasicMaterial({ map: texture(MAT) }));
-          mat.position.set(0, far ? depth * 1.5 : depth / 2, 0);
-          if (far) mat.rotation.z = Math.PI;
-          board.add(mat);
-        }
-
         const self = footprintsOf(layout.self);
         const opp = footprintsOf(layout.opp);
-        const zones = [];
-        for (const side of [self, opp]) zones.push(side.active, ...side.bench, side.prizeArea, side.deck, side.discard, side.lostZone);
-        zones.push(layout.stadium);
+        const footprints = environmentFootprints(layout);
+        const zones = [...footprints.slabs, ...footprints.flats].slice(0, env.MAX_ZONES);
         zones.forEach((r, i) => uniforms.uZones.value[i].set(r.x, r.y, r.w, r.h));
         uniforms.uZoneCount.value = zones.length;
+        uniforms.uSlabCount.value = Math.min(footprints.slabs.length, env.MAX_ZONES);
         uniforms.uMin.value.set(bounds.x, bounds.y);
         uniforms.uSize.value.set(bounds.w, bounds.h);
         uniforms.uRiverY.value = depth;
         uniforms.uOrigin.value.set(layout.stadium.x + layout.stadium.w / 2, layout.stadium.y + layout.stadium.h / 2);
+        bake(bounds);
 
-        const reliefGeometry = new THREE.PlaneGeometry(bounds.w, bounds.h, RELIEF_SEGMENTS.x, RELIEF_SEGMENTS.y);
-        reliefGeometry.translate(bounds.x + bounds.w / 2, bounds.y + bounds.h / 2, 0);
-        const environment = new THREE.Mesh(reliefGeometry, environmentMaterial);
-        environment.position.z = 0.75;
-        environment.frustumCulled = false;
-        environment.renderOrder = 1;
-        board.add(environment);
+        const floor = new THREE.Mesh(new THREE.PlaneGeometry(bounds.w * 3, bounds.h * 4), new THREE.MeshBasicMaterial({ color: 0x060607 }));
+        floor.position.set(0, depth, -80);
+        board.add(floor);
+        uniforms.uMap.value = texture(MAT);
+        for (const far of [false, true]) {
+          const geometry = new THREE.PlaneGeometry(bounds.w, depth);
+          if (far) geometry.rotateZ(Math.PI);
+          geometry.translate(0, far ? depth * 1.5 : depth / 2, 0);
+          board.add(new THREE.Mesh(geometry, matMaterial));
+        }
+
+        const columns = Math.round(bounds.w / env.TERRAIN_SPACING_PX);
+        const rows = Math.round(bounds.h / env.TERRAIN_SPACING_PX);
+        const terrainGeometry = new THREE.PlaneGeometry(bounds.w, bounds.h, columns, rows);
+        terrainGeometry.translate(bounds.x + bounds.w / 2, bounds.y + bounds.h / 2, 0);
+        const terrain = new THREE.Mesh(terrainGeometry, terrainMaterial);
+        terrain.frustumCulled = false;
+        terrain.renderOrder = 0;
+        board.add(terrain);
+
+        const lavaGeometry = new THREE.PlaneGeometry(bounds.w, bounds.h);
+        lavaGeometry.translate(bounds.x + bounds.w / 2, bounds.y + bounds.h / 2, env.LAVA_LEVEL);
+        const lava = new THREE.Mesh(lavaGeometry, lavaMaterial);
+        lava.frustumCulled = false;
+        lava.renderOrder = 1;
+        board.add(lava);
 
         const embers = new THREE.Points(emberGeometry, emberMaterial);
         embers.frustumCulled = false;
@@ -184,12 +270,11 @@
 
         cardsGroup = new THREE.Group();
         cardsGroup.visible = document.getElementById('cards').checked;
-        const addCard = (src, rect, { rotated = false, sideways = false, lift = 3 } = {}) => {
-          const [w, h] = sideways ? [rect.h, rect.w] : [rect.w, rect.h];
-          const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: texture(src) }));
+        // Cards lie on the cloth (z = 0) as on the board; slab tops sit just below.
+        const addCard = (src, rect, { rotated = false, lift = 0.3 } = {}) => {
+          const mesh = new THREE.Mesh(new THREE.PlaneGeometry(rect.w, rect.h), new THREE.MeshBasicMaterial({ map: texture(src) }));
           mesh.position.set(rect.x + rect.w / 2, rect.y + rect.h / 2, lift);
-          mesh.rotation.z = (rotated ? Math.PI : 0) + (sideways ? Math.PI / 2 : 0);
-          mesh.renderOrder = 2;
+          if (rotated) mesh.rotation.z = Math.PI;
           cardsGroup.add(mesh);
           return mesh;
         };
@@ -202,16 +287,25 @@
         addCard(art('074'), opp.bench[2], { rotated: true });
         opp.prizes.forEach((r) => addCard(CARD_BACK, r, { rotated: true }));
         addCard(CARD_BACK, opp.deck, { rotated: true });
-        stadiumMesh = addCard(art('299'), layout.stadium, { lift: 4 });
+        stadiumMesh = addCard(art('299'), layout.stadium, { lift: 0.4 });
         stadiumMesh.visible = inPlay || transition?.kind === 'intro';
         board.add(cardsGroup);
         tableFrame.add(board);
 
+        const pixelRatio = renderer.getPixelRatio();
         renderer.setSize(viewport.w, viewport.h);
-        const params = { viewportW: viewport.w, viewportH: viewport.h, nearHalf: half };
+        sceneTarget?.dispose();
+        sceneTarget = new THREE.WebGLRenderTarget(viewport.w * pixelRatio, viewport.h * pixelRatio, {
+          type: THREE.HalfFloatType,
+          samples: 4,
+        });
+        bloom.setSize(viewport.w * pixelRatio, viewport.h * pixelRatio);
+        output.material.uniforms.tDiffuse.value = sceneTarget.texture;
+
+        const cameraParams = { viewportW: viewport.w, viewportH: viewport.h, nearHalf: half };
         const desc = document.getElementById('camera').value === 'tcgl'
-          ? cameraTcgLive({ ...params, cardHeightPx: layout.self.cardBox.active.h })
-          : cameraFromCssTilt(params);
+          ? cameraTcgLive({ ...cameraParams, cardHeightPx: layout.self.cardBox.active.h })
+          : cameraFromCssTilt(cameraParams);
         camera.fov = desc.fov;
         camera.aspect = desc.aspect;
         camera.near = desc.near;
@@ -223,6 +317,7 @@
         camera.updateProjectionMatrix();
         const view = desc.viewOffset;
         camera.setViewOffset(view.fullWidth, view.fullHeight, view.x, view.y, view.width, view.height);
+        uniforms.uFocal.value = (viewport.h * pixelRatio) / 2 / Math.tan((desc.fov * DEG) / 2);
         invalidate();
       }
 
@@ -274,6 +369,10 @@
           invalidate();
         };
       }
+      document.getElementById('bloom').oninput = (e) => {
+        bloom.strength = Number(e.target.value);
+        invalidate();
+      };
       document.getElementById('scrub').oninput = (e) => {
         transition = null;
         inPlay = true;
@@ -284,16 +383,24 @@
         invalidate();
       };
       document.getElementById('camera').onchange = buildBoard;
+      document.getElementById('width').onchange = buildBoard;
       staticBox.onchange = () => invalidate();
       document.getElementById('cards').onchange = (e) => {
         cardsGroup.visible = e.target.checked;
         invalidate();
       };
+      if (params.get('camera')) document.getElementById('camera').value = params.get('camera');
+      if (params.get('width')) document.getElementById('width').value = params.get('width');
+      if (params.has('bloom')) {
+        document.getElementById('bloom').value = params.get('bloom');
+        bloom.strength = Number(params.get('bloom'));
+      }
 
       // --- render loop: full rate during a transition, 30 fps ambient, none when static ---
       let frameId = null;
       let ambientTimer = null;
       let lastAmbient = 0;
+      let lastFrame = performance.now();
       const startedAt = performance.now();
       let frozenTime = 0;
 
@@ -319,7 +426,13 @@
             transition = null;
           }
         }
+        renderer.setRenderTarget(sceneTarget);
+        renderer.clear();
         renderer.render(scene, camera);
+        bloom.render(renderer, null, sceneTarget, (now - lastFrame) / 1000, false);
+        lastFrame = now;
+        renderer.setRenderTarget(null);
+        renderer.render(outputScene, flatCamera);
         if (transition) {
           invalidate();
           return;
@@ -338,9 +451,17 @@
       addEventListener('resize', buildBoard);
       document.addEventListener('visibilitychange', () => invalidate());
       buildBoard();
-      stadiumMesh.visible = false;
-      setStatus('no Stadium — press Play Stadium');
-      setTimeout(play, 600);
+      if (params.has('reveal')) {
+        inPlay = true;
+        stadiumMesh.visible = true;
+        uniforms.uReveal.value = Number(params.get('reveal'));
+        setStatus('in play');
+        invalidate();
+      } else {
+        stadiumMesh.visible = false;
+        setStatus('no Stadium — press Play Stadium');
+        setTimeout(play, 600);
+      }
     </script>
   </body>
 </html>
