@@ -9,12 +9,13 @@
 //
 // Two stages:
 // 1. Bake, once per layout: BAKE_FIELD renders the ground into a half-float target at ~1.6 texels
-//    per table px (R height px, G signed px from the river bank, B lava on the volcano's
-//    slopes 0..1, A stone id or -1 off the stones); BAKE_LIGHT turns it into normals, occlusion
-//    and a soft sun shadow.
-// 2. Per frame: TERRAIN displaces a dense grid by the baked height; LAVA is one sheet at
-//    LAVA_LEVEL under the whole table that shows wherever the ground dips below it (the river, the
-//    gaps between the stones beside it, the streams' channels); EMBERS and SMOKE rise off it.
+//    per table px (R height px, G signed px from the river bank, B the lava table: the height the
+//    lava in the cracks and the volcano's side streams fills to, A stone id, -1 off the stones,
+//    2 on the volcano); BAKE_LIGHT turns it into normals, occlusion and a soft sun shadow.
+// 2. Per frame: TERRAIN displaces a dense grid by the baked height, raised to the lava table where
+//    the ground dips under it, and paints that lava itself: the cracks between the stones and the
+//    side streams run at the land's own level, the stones standing only a little proud of them.
+//    LAVA is one sheet at LAVA_LEVEL for the river, which sits lower; EMBERS and SMOKE rise off it.
 //    Fragment shaders end in three's tone-mapping and colour-space chunks, so they match the
 //    board's renderer (Neutral tone mapping, sRGB out, gl-renderer.js). Neutral takes ~0.04 off
 //    every channel of a dark colour, so the greys below sit that much above the greys they show as.
@@ -32,7 +33,11 @@ export const TERRAIN_SPACING_PX = 2.5;
 /** Key light in the table frame: from the far left, ~48° up (table-mesh.js lights from there too). */
 export const SUN_DIRECTION = [-0.45, 0.5, 0.74];
 /** Volcano proportions, relative to its base radius: height, crater radius, crater depth. */
-export const VOLCANO_SHAPE = { height: 1.2, crater: 0.24, craterDepth: 0.14 };
+export const VOLCANO_SHAPE = { height: 1.2, crater: 0.24, craterDepth: 0.09 };
+/** Lava table above the bare ground between the stones, px: the cracks fill to here. */
+const CRACK_FILL_PX = 1.2;
+/** Ground level the volcano's side streams run at, px. */
+const STREAM_LEVEL_PX = 4;
 
 export const FULLSCREEN_VERTEX = /* glsl */ `
 varying vec2 vUv;
@@ -172,6 +177,8 @@ const VOLCANO = /* glsl */ `
 // Centre x, y and base radius (0: no volcano) in table px.
 uniform vec4 uVolcano;
 uniform float uRiverY;
+// Angle between the volcano's streams: the middle one runs downstream (+x), one either side of it.
+const float STREAM_SPREAD = 1.05;
 float angleBetween(float a, float b) {
   return mod(a - b + 3.14159265, 6.2831853) - 3.14159265;
 }
@@ -198,7 +205,7 @@ vec2 volcanoLava(vec2 p) {
   for (int k = 0; k < 3; k++) {
     float fk = float(k);
     // A slight wiggle: an angle on the cone, a small constant sway (in px) past its foot.
-    float course = (fk - 1.0) * 1.05 + 0.06 * sin(d * 0.02 + fk * 1.7) * min(1.0, r / max(d, 1.0));
+    float course = (fk - 1.0) * STREAM_SPREAD + 0.06 * sin(d * 0.02 + fk * 1.7) * min(1.0, r / max(d, 1.0));
     float width = mix(3.0, 8.5, clamp((d - crater) / r, 0.0, 1.0));
     float across = abs(angleBetween(angle, course)) * d - width;
     float reach = k == 1 ? r * 1.3 : 100000.0;
@@ -223,10 +230,11 @@ float riverHalfWidth(float x) {
 
 /**
  * Bake 1: the ground. The land has its own lie (terraced plateaus, ridges, hollows) and falls to
- * the lava: the river and the gaps between the stones beside it, the way TCG Live's fire board
- * glows between its rocks. Stones in three sizes ride on the land; the volcano rises with broad
- * sculpted facets, a crater and grooves where its streams run; past its foot the streams cut
- * narrow channels under the lava sheet all the way to the table edge.
+ * the river. Stones in three sizes ride on the land, a little proud of it; every gap between the
+ * big and mid stones holds lava at the land's own level (the lava table), the way TCG Live's fire
+ * board glows between its rocks. The volcano rises with broad sculpted facets, a crater and grooves
+ * where its streams run; past its foot the streams run on at the land's level, in beds cleared of
+ * stones, all the way to the table edge.
  */
 export const BAKE_FIELD_FRAGMENT = /* glsl */ `
 ${TABLE_UNIFORMS}
@@ -261,9 +269,9 @@ vec3 stones(vec2 p, float size, float gapPx) {
   return vec3(max(top, 0.0) * shoulder, id, edge - gapPx);
 }
 // The volcano's cone: a nine-sided pyramid softened toward a cone, so its flanks catch the light
-// in broad panels; a raised rim round a bowl for the crater pool; grooves where the streams run.
-// Zero outside its foot.
-float volcanoCone(vec2 p, float streams) {
+// in broad panels; a raised rim round a flat crater pool; soft grooves where the streams run
+// (streamEdge: volcanoLava's px from a stream's edge). Zero outside its foot.
+float volcanoCone(vec2 p, float streamEdge) {
   float r = uVolcano.z;
   if (r <= 0.0) return 0.0;
   vec2 rel = p - uVolcano.xy;
@@ -273,9 +281,12 @@ float volcanoCone(vec2 p, float streams) {
   float panelled = mix(d, d * cos(offAxis) / cos(sector * 0.5), 0.55) + (fbm3(p / 38.0) - 0.5) * r * 0.08;
   float cone = volcanoHeight() * pow(clamp(1.0 - panelled / r, 0.0, 1.0), 1.25);
   float crater = craterRadius();
+  // Gullies down the flanks between rounded ridges, fading out at the rim and the foot.
+  float gullies = abs(sin(atan(rel.y, rel.x) * 8.0 + fbm3(p / 60.0) * 2.0)) - 0.5;
+  cone += gullies * r * 0.05 * smoothstep(crater, crater * 1.6, d) * (1.0 - smoothstep(r * 0.7, r * 0.95, d));
   float rim = craterRimHeight();
-  if (d < crater) cone = mix(rim - r * ${VOLCANO_SHAPE.craterDepth.toFixed(3)}, rim + 2.0, smoothstep(crater * 0.45, crater, d));
-  cone -= streams * 5.0 * step(crater, d);
+  if (d < crater) cone = mix(rim - r * ${VOLCANO_SHAPE.craterDepth.toFixed(3)}, rim + 2.0, smoothstep(crater * 0.8, crater, d));
+  cone -= 5.0 * (1.0 - smoothstep(-3.0, 6.0, streamEdge)) * step(crater, d);
   return cone * (1.0 - smoothstep(r * 0.92, r * 1.04, d));
 }
 // The land's own lie in px: terraced plateaus with soft cliffs between them, ridges, hollows.
@@ -297,43 +308,55 @@ void main() {
   float inLava = 1.0 - smoothstep(-14.0, 0.0, lavaSD);
   float bank = 1.0 - smoothstep(-26.0, 0.0, lavaSD);
   float base = mix(landHeight(p), ${LAVA_LEVEL.toFixed(1)} - 7.0, nearLava) - 16.0 * bank;
+  // The volcano's side streams run level, down a broad valley eased into the land: over the hills
+  // a straight stream would bow on screen under the tilted camera.
+  vec2 lava = volcanoLava(p);
+  float vd = distance(p, uVolcano.xy);
+  float valley = (1.0 - smoothstep(6.0, 70.0, lava.y)) * smoothstep(uVolcano.z * 0.7, uVolcano.z * 1.1, vd)
+    * step(0.001, uVolcano.z);
+  base = mix(base, ${STREAM_LEVEL_PX.toFixed(1)}, valley * (1.0 - nearLava));
 
   // Hills: broad swells of taller rock, so the stones vary with the land.
   float hills = fbm3(p / 340.0 + 2.3);
   float swell = 0.45 + 1.25 * smoothstep(0.25, 0.8, hills);
-  vec3 big = stones(q + 31.0, mix(96.0, 150.0, fbm3(p / 500.0 + 9.0)), 4.0);
-  vec3 mid = stones(q, 60.0, 3.0);
+  vec3 big = stones(q + 31.0, mix(96.0, 150.0, fbm3(p / 500.0 + 9.0)), 2.5);
+  vec3 mid = stones(q, 60.0, 2.0);
   vec3 pebble = stones(q + 113.0, 27.0, 1.6);
   float dry = smoothstep(-4.0, 60.0, lavaSD);
-  // A few stones stand in the lava as islands.
+  // A few stones stand in the river as islands.
   float islands = 30.0 * step(0.88, mid.y) * smoothstep(-60.0, -24.0, lavaSD);
-  float hBig = big.x * 26.0 * swell * dry;
-  float hMid = mid.x * max(18.0 * mix(0.7, 1.4, hills) * (1.0 - inLava), islands * inLava);
-  float hPebble = pebble.x * 8.0 * (1.0 - 0.7 * inLava) * (0.4 + 0.6 * nearLava);
+  float hBig = big.x * 20.0 * swell * dry;
+  float hMid = mid.x * max(13.0 * mix(0.7, 1.4, hills) * (1.0 - inLava), islands * inLava);
+  float hPebble = pebble.x * 5.0 * (1.0 - 0.7 * inLava) * (0.4 + 0.6 * nearLava);
   float rock = max(max(hBig, hMid), hPebble);
-  float id = rock < 0.6 ? -1.0 : (rock == hBig ? big.y : (rock == hMid ? mid.y : pebble.y));
-  float height = base + rock;
-  // Cracks: the gaps between the larger stones drop below the lava sheet anywhere on the board,
-  // so lava glows through every crack, not only beside the river.
-  vec2 fromEdge = min(vUv, 1.0 - vUv) * uSize;
-  float crack = (1.0 - smoothstep(0.0, 3.5, min(big.z, mid.z))) * smoothstep(12.0, 20.0, min(fromEdge.x, fromEdge.y));
-  height = mix(height, ${LAVA_LEVEL.toFixed(1)} - 4.0, crack);
-  if (crack > 0.5) id = -1.0;
+  float id = rock == hBig ? big.y : (rock == hMid ? mid.y : pebble.y);
 
-  vec2 lava = volcanoLava(p);
-  float cone = volcanoCone(p, lava.x);
+  // Cracks: every gap between the big and mid stones (mid gaps split the big stones too) is carved
+  // down to bare ground, under the lava table; the floor dips toward the gap's middle, where the
+  // lava runs deepest and hottest. None in the last px before the table edge.
+  vec2 fromEdge = min(vUv, 1.0 - vUv) * uSize;
+  float crackOn = smoothstep(12.0, 20.0, min(fromEdge.x, fromEdge.y));
+  float gap = min(big.z, mid.z);
+  rock *= mix(1.0, smoothstep(0.0, 7.0, gap), crackOn);
+  float dip = 2.0 * smoothstep(0.0, -2.0, gap) * crackOn;
+
+  // Past the cone's foot the streams run on in beds cleared of stones.
+  float pastFoot = step(uVolcano.z * 0.9, vd) * step(0.001, uVolcano.z);
+  float bed = (1.0 - smoothstep(0.0, 14.0, lava.y)) * pastFoot;
+  rock *= 1.0 - bed;
+  dip = max(dip, 3.0 * (1.0 - smoothstep(-6.0, 0.0, lava.y)) * pastFoot);
+
+  float height = base + rock - dip;
+  float lavaTable = base + mix(-4.0, ${CRACK_FILL_PX.toFixed(1)}, max(crackOn, bed));
+  if (rock < 0.6) id = -1.0;
+
+  float cone = volcanoCone(p, lava.y);
   if (cone > 0.5) {
     height = max(height, base + cone);
-    id = 0.61;
+    id = 2.0;
   }
-  float vd = distance(p, uVolcano.xy);
-  // Past the cone's foot the streams cut channels under the lava sheet, banks sloping in.
-  float channel = (1.0 - smoothstep(0.0, 18.0, lava.y)) * step(uVolcano.z * 0.9, vd) * step(0.001, uVolcano.z);
-  height = mix(height, min(height, ${LAVA_LEVEL.toFixed(1)} - 5.0), channel);
-  if (lava.x * step(uVolcano.z * 0.9, vd) > 0.5) id = -1.0;
-  float slopeLava = lava.x * step(vd, uVolcano.z * 0.95);
 
-  gl_FragColor = vec4(height, lavaSD, slopeLava, id);
+  gl_FragColor = vec4(height, lavaSD, lavaTable, id);
 }
 `;
 
@@ -398,12 +421,24 @@ ${NOISE}
 ${REVEAL}
 varying vec2 vPos;
 varying vec2 vUv;
-varying float vHeight;
 varying float vGrowth;
+
+// The ground averaged over one grid cell, so a stone's edge crossing the grid at a slant doesn't
+// zig-zag; the shading keeps the full-resolution edge.
+float groundAt(vec2 uv) {
+  vec2 halfCell = vec2(${(TERRAIN_SPACING_PX / 2).toFixed(2)}) / uSize;
+  return 0.5 * texture2D(uField, uv).r + 0.125 * (
+    texture2D(uField, uv + vec2(halfCell.x, 0.0)).r + texture2D(uField, uv - vec2(halfCell.x, 0.0)).r
+    + texture2D(uField, uv + vec2(0.0, halfCell.y)).r + texture2D(uField, uv - vec2(0.0, halfCell.y)).r);
+}
 void main() {
   vec2 p = position.xy;
   vec2 uv = (p - uMin) / uSize;
-  float h = texture2D(uField, uv).r;
+  float ground = groundAt(uv);
+  // Where the ground dips under the lava table the surface is the lava's, flat; the river's own
+  // sheet (LAVA_LEVEL) covers the ground under it instead.
+  float lavaTable = texture2D(uField, uv).b;
+  float h = mix(ground, max(ground, lavaTable), smoothstep(${LAVA_LEVEL.toFixed(1)} + 0.3, ${LAVA_LEVEL.toFixed(1)} + 1.0, lavaTable));
   float rise = 1.0 - smoothstep(revealFront() - 0.12, revealFront(), revealReach(p));
   float growth = rise * rise * (3.0 - 2.0 * rise) * exitKeep(p);
   float height = h * growth;
@@ -413,7 +448,6 @@ void main() {
   height = mix(0.0, height, smoothstep(0.0, 14.0, min(fromEdge.x, fromEdge.y)));
   vPos = p;
   vUv = uv;
-  vHeight = height;
   vGrowth = growth;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(p, height, 1.0);
 }
@@ -428,8 +462,31 @@ ${REVEAL}
 ${VOLCANO}
 varying vec2 vPos;
 varying vec2 vUv;
-varying float vHeight;
 varying float vGrowth;
+
+// Streaks running along a flow (frame: px along it, px across it): two noise phases cross-faded,
+// so they keep moving without stretching.
+float flowStreaks(vec2 frame, float speed, float period) {
+  float phaseA = fract(uTime / period);
+  float phaseB = fract(uTime / period + 0.5);
+  float weightA = 1.0 - abs(2.0 * phaseA - 1.0);
+  vec2 scale = vec2(1.0 / 26.0, 1.0 / 5.0);
+  float a = gnoise((frame - vec2(speed * period * phaseA, 0.0)) * scale);
+  float b = gnoise((frame - vec2(speed * period * phaseB, 0.0)) * scale + vec2(3.7, 1.3));
+  return mix(b, a, weightA);
+}
+
+// The crater pool: lava turning slowly, swirled with bright bands, cooling red toward the shore.
+// rel: px from the volcano's centre.
+vec3 craterPool(vec2 rel, float poolRadius) {
+  float d = length(rel);
+  float spin = uTime * 0.08 + (1.0 - d / poolRadius) * 0.9;
+  vec2 turned = mat2(cos(spin), sin(spin), -sin(spin), cos(spin)) * rel;
+  float churn = fbm3(turned / 14.0 + uTime * 0.12);
+  float swirl = smoothstep(0.45, 0.7, gnoise(turned / 7.0 - uTime * 0.2));
+  float shore = smoothstep(poolRadius * 0.6, poolRadius, d);
+  return lavaColor(0.6 + (churn - 0.5) * 0.5 + swirl * 0.18 - shore * 0.35);
+}
 
 void main() {
   vec2 p = vPos;
@@ -438,9 +495,10 @@ void main() {
   vec4 light = texture2D(uLight, vUv);
   float ground = field.r;
   float riverSD = field.g;
-  float slopeLava = field.b;
+  float lavaTable = field.b;
   float id = field.a;
   float isStone = step(0.0, id);
+  float onVolcano = step(1.5, id);
 
   vec2 nxy = light.rg * 2.0 - 1.0;
   float nz = sqrt(max(1.0 - dot(nxy, nxy), 0.02));
@@ -455,8 +513,8 @@ void main() {
   col = mix(col, vec3(0.138, 0.143, 0.16), smoothstep(0.8, 0.92, facing));
   col *= 0.9 + 0.2 * tone;
   col *= 0.88 + 0.16 * smoothstep(-6.0, 50.0, ground);
-  // Bare ground between stones is darker ash.
-  col *= mix(0.72, 1.0, isStone);
+  // Bare ground between stones is darker ash; the volcano is darker basalt.
+  col *= mix(0.72, 1.0, isStone) * mix(1.0, 0.85, onVolcano);
 
   // Painted rim: convex edges (negative height Laplacian) catch a light stroke.
   vec2 t2 = uTexel * 3.0;
@@ -474,35 +532,54 @@ void main() {
   // Occlusion: crevices and the feet of stones go deep blue-grey.
   col = mix(vec3(0.036, 0.034, 0.046), col, smoothstep(0.3, 0.9, light.b));
 
-  // Lava light: wherever lava lies close below (river, cracks, streams) the rock glows red.
-  float aboveLava = max(vHeight - ${LAVA_LEVEL.toFixed(1)}, 0.0);
-  float nearRiver = 1.0 - smoothstep(0.0, 120.0, riverSD);
+  // Lava light. Lava near the river and the volcano runs hotter than out in the cracks. Rock just
+  // above the lava beside it (the river's sheet, or the lava in its own cracks) glows red, side
+  // faces most; the river throws a broader bounce on the rock along its banks.
+  vec2 rel = p - uVolcano.xy;
+  float vd = length(rel);
+  float hasVolcano = step(0.001, uVolcano.z);
+  float hot = max(1.0 - smoothstep(-20.0, 170.0, riverSD), hasVolcano * (1.0 - smoothstep(uVolcano.z, uVolcano.z * 2.4, vd)));
+  float aboveLava = max(ground - max(lavaTable, ${LAVA_LEVEL.toFixed(1)}), 0.0);
   float flicker = 0.88 + 0.12 * gnoise(vec2(uTime * 0.8, p.x / 80.0 + p.y / 120.0));
   float sideFacing = 1.0 - smoothstep(0.55, 0.95, n.z);
-  float underglow = exp(-aboveLava / 6.0);
-  float bounce = exp(-max(riverSD, 0.0) / 45.0) * exp(-aboveLava / 24.0) * mix(0.4, 1.0, sideFacing);
-  col += vec3(1.0, 0.16, 0.02) * (underglow * 0.7 + bounce * 0.28) * flicker;
+  float underglow = exp(-aboveLava / 3.0) * mix(0.2, 1.0, sideFacing) * mix(0.3, 0.6, hot);
+  float bounce = exp(-max(riverSD, 0.0) / 45.0) * exp(-max(ground - ${LAVA_LEVEL.toFixed(1)}, 0.0) / 24.0) * mix(0.15, 1.0, sideFacing);
+  col += vec3(1.0, 0.16, 0.02) * (underglow + bounce * 0.28) * flicker;
 
-
-  // The volcano: its streams and crater light the rock beside them, then the lava itself, flowing
-  // downhill (the baked normal points down the slope).
+  // The volcano: its streams warm the rock right beside them; the crater lights its rim and inner
+  // walls.
   vec2 volcanic = volcanoLava(p);
-  float besideLava = exp(-max(volcanic.y, 0.0) / 9.0) * (1.0 - slopeLava) * step(0.001, uVolcano.z);
-  col += vec3(1.0, 0.14, 0.01) * besideLava * flicker * 0.75;
-  if (slopeLava > 0.001) {
-    vec2 downhill = length(nxy) > 0.001 ? normalize(nxy) : vec2(1.0, 0.0);
-    float crater = craterRadius();
-    float inPool = 1.0 - smoothstep(crater * 0.6, crater * 0.85, distance(p, uVolcano.xy));
-    float period = 2.4;
-    float phaseA = fract(uTime / period);
-    float phaseB = fract(uTime / period + 0.5);
-    float weightA = 1.0 - abs(2.0 * phaseA - 1.0);
-    vec2 travel = downhill * 22.0 * period * (1.0 - inPool);
-    float streak = mix(gnoise((p - travel * phaseB) / 9.0 + 7.0), gnoise((p - travel * phaseA) / 9.0), weightA);
-    float core = smoothstep(0.0, 4.0, -volcanic.y);
-    float churn = gnoise(p / 8.0 + uTime * 0.6) * inPool;
-    float heat = 0.4 + core * 0.3 + (streak - 0.5) * 0.5 + inPool * (0.25 + churn * 0.3);
-    col = mix(col, lavaColor(heat), slopeLava);
+  float besideLava = exp(-max(volcanic.y, 0.0) / 6.0) * hasVolcano * mix(0.5, 1.0, sideFacing);
+  col += vec3(1.0, 0.14, 0.01) * besideLava * flicker * 0.45;
+  float crater = craterRadius();
+  float craterGlow = (1.0 - smoothstep(crater * 0.85, crater * 1.35, vd)) * hasVolcano * onVolcano;
+  col += vec3(1.0, 0.3, 0.03) * craterGlow * 0.5 * mix(0.4, 1.0, sideFacing) * flicker;
+
+  // Lava the terrain carries itself: the cracks and the side streams, filled flat to the lava table
+  // (above the river's sheet only), and on the cone the crater pool and the streams down its flanks.
+  float lavaDepth = lavaTable - ground;
+  float feather = max(fwidth(lavaDepth), 0.05);
+  float pooled = smoothstep(-feather, feather, lavaDepth - 0.2)
+    * smoothstep(${LAVA_LEVEL.toFixed(1)}, ${LAVA_LEVEL.toFixed(1)} + 0.3, lavaTable) * (1.0 - onVolcano);
+  float slopeLava = volcanic.x * hasVolcano * (1.0 - step(uVolcano.z * 0.95, vd));
+  float lavaCover = max(pooled, slopeLava);
+  if (lavaCover > 0.001) {
+    // Cracks: still lava, crusted dark red at the shore, brighter down the middle, a slow
+    // breathing glow moving through it.
+    float breathe = gnoise(p / 34.0 + vec2(uTime * 0.22, -uTime * 0.17));
+    float grain = gnoise(p / 7.0 + vec2(0.0, uTime * 0.5));
+    float crackHeat = 0.1 + smoothstep(0.5, 3.0, lavaDepth) * 0.22 + hot * 0.14 + (breathe - 0.5) * 0.6
+      + (grain - 0.5) * 0.12;
+    // Streams: running away from the volcano, streaked along their course, a molten core.
+    float inStream = (1.0 - smoothstep(-1.0, 2.0, volcanic.y)) * hasVolcano;
+    float angle = atan(rel.y, rel.x);
+    float course = clamp(floor(angle / STREAM_SPREAD + 0.5), -1.0, 1.0) * STREAM_SPREAD;
+    float streak = flowStreaks(vec2(vd, (angle - course) * vd), 18.0, 3.0);
+    float streamHeat = 0.38 + smoothstep(0.0, 5.0, -volcanic.y) * 0.3 + (streak - 0.5) * 0.5;
+    vec3 lavaCol = lavaColor(mix(crackHeat, streamHeat, inStream));
+    float poolRadius = crater * 0.82;
+    if (vd < poolRadius + 1.0) lavaCol = mix(lavaCol, craterPool(rel, poolRadius), 1.0 - smoothstep(poolRadius - 2.0, poolRadius, vd));
+    col = mix(col, lavaCol, lavaCover);
   }
 
   vec2 edgeUv = min(vUv, 1.0 - vUv);
@@ -587,6 +664,8 @@ void main() {
   float core = smoothstep(-24.0, -58.0, riverSD);
   float heat = smoothstep(1.0, 16.0, smoothDepth) * 0.36 + openRiver * 0.06 + core * 0.16 + (flow.x - 0.5) * 0.6
     + pools * 0.16 + flow.y * 0.38;
+  // Shallow lava and the river's edge stay red like the cracks' lava, never a dark smudge.
+  heat = max(heat, 0.25);
   heat += 0.06 * sin(uTime * 1.1 + p.x / 90.0);
   vec3 col = lavaColor(heat);
 
@@ -598,7 +677,7 @@ void main() {
   float raftRadius = mix(8.0, 16.0, hash12(raftCell + 9.0));
   vec2 fromCentre = (raft - raftCentre) / vec2(1.35, 1.0);
   float raftDistance = length(fromCentre) + (gnoise(raft / 9.0) - 0.5) * 4.0 - raftRadius;
-  float coverage = mix(0.55, 0.16, openRiver) + (fbm3(raft / 220.0) - 0.5) * 0.5;
+  float coverage = mix(0.3, 0.16, openRiver) + (fbm3(raft / 220.0) - 0.5) * 0.4;
   float hasRaft = step(hash12(raftCell + 2.0), coverage) * smoothstep(3.0, 9.0, smoothDepth);
   float body = (1.0 - smoothstep(-1.0, 0.0, raftDistance)) * hasRaft;
   float raftRim = (1.0 - smoothstep(0.0, 3.0, raftDistance)) * hasRaft;
@@ -646,7 +725,7 @@ attribute vec4 aSeed;
 varying float vLife;
 varying float vKind;
 void main() {
-  float fromCrater = step(aSeed.w, 0.3) * step(0.001, uVolcano.z);
+  float fromCrater = step(aSeed.w, 0.12) * step(0.001, uVolcano.z);
   float period = mix(3.5 + aSeed.w * 4.5, 2.2 + aSeed.z * 1.6, fromCrater);
   float life = mod(uTime + aSeed.z * period, period) / period;
   float cycle = floor((uTime + aSeed.z * period) / period);
@@ -658,7 +737,7 @@ void main() {
   pos.y += sin(life * 4.0 + aSeed.w * 30.0) * 8.0 * life;
   pos.z += life * (100.0 + 120.0 * aSeed.w);
   vec2 spread = (hash22(aSeed.zy * 53.0 + cycle) - 0.5) * craterRadius() * 1.2;
-  vec3 crater = vec3(uVolcano.xy + spread + jitter * life * 70.0, craterRimHeight() - 4.0 + life * (130.0 + 90.0 * aSeed.y));
+  vec3 crater = vec3(uVolcano.xy + spread + jitter * life * 170.0, craterRimHeight() - 4.0 + life * (130.0 + 90.0 * aSeed.y));
   pos = mix(pos, crater, fromCrater);
   float onTable = smoothstep(uMin.x + 20.0, uMin.x + 90.0, pos.x) * (1.0 - smoothstep(uMin.x + uSize.x - 90.0, uMin.x + uSize.x - 20.0, pos.x));
   float shown = revealBurned(pos.xy) * exitKeep(pos.xy) * max(onTable, fromCrater);
@@ -679,14 +758,17 @@ void main() {
   float core = 1.0 - smoothstep(0.35, 0.5, d);
   float glow = exp(-d * d * 3.0) * 0.5;
   float fade = smoothstep(0.0, 0.1, vLife) * (1.0 - smoothstep(0.55, 1.0, vLife));
-  vec3 hot = mix(vec3(2.0, 0.55, 0.05), vec3(2.0, 1.3, 0.3), vKind);
+  vec3 hot = mix(vec3(2.0, 0.55, 0.05), vec3(1.8, 0.8, 0.14), vKind);
   vec3 col = mix(hot, vec3(0.7, 0.05, 0.0), smoothstep(0.3, 1.0, vLife));
   gl_FragColor = vec4(col * (core + glow) * fade, 1.0);
 ${OUTPUT}
 }
 `;
 
-/** Smoke from the crater: soft round cartoon puffs, light grey, lit orange from below, drifting right. */
+/**
+ * Smoke from the crater: round cartoon puffs painted in two tones (lit on the sun's side, charcoal
+ * in shadow), warmed by the crater from below while young, drifting off on the wind.
+ */
 export const SMOKE_VERTEX = /* glsl */ `
 ${TABLE_UNIFORMS}
 uniform float uTime;
@@ -701,12 +783,12 @@ void main() {
   float period = 5.0 + aSeed.w * 2.5;
   float life = mod(uTime + aSeed.z * period, period) / period;
   vec2 wobble = vec2(sin(life * 5.0 + aSeed.x * 20.0), cos(life * 4.0 + aSeed.y * 20.0)) * 8.0;
-  vec3 pos = vec3(uVolcano.xy + (aSeed.xy - 0.5) * craterRadius() + wobble + vec2(55.0, 14.0) * life,
-    craterRimHeight() + 6.0 + life * 150.0);
+  vec3 pos = vec3(uVolcano.xy + (aSeed.xy - 0.5) * craterRadius() + wobble + vec2(110.0, 70.0) * life,
+    craterRimHeight() + 6.0 + life * 170.0);
   float shown = step(0.001, uVolcano.z) * revealBurned(uVolcano.xy) * (1.0 - uExit);
   vec4 mv = modelViewMatrix * vec4(pos, 1.0);
   gl_Position = projectionMatrix * mv;
-  float sizePx = mix(18.0, 58.0, sqrt(life)) * (0.8 + 0.4 * aSeed.z) * uVolcano.z / 100.0;
+  float sizePx = mix(10.0, 40.0, sqrt(life)) * (0.8 + 0.4 * aSeed.z) * uVolcano.z / 100.0;
   gl_PointSize = sizePx * uFocal / -mv.z * shown;
   vLife = life;
   vSeed = aSeed.x * 31.0;
@@ -720,13 +802,18 @@ varying float vLife;
 varying float vSeed;
 void main() {
   vec2 c = gl_PointCoord - 0.5;
-  float edge = length(c) * 2.0 + (gnoise(c * 4.0 + vSeed) - 0.5) * 0.35;
-  float puff = 1.0 - smoothstep(0.62, 0.9, edge);
-  float fade = smoothstep(0.0, 0.12, vLife) * (1.0 - smoothstep(0.45, 1.0, vLife));
-  float litFromBelow = smoothstep(-0.1, 0.4, c.y) * (1.0 - smoothstep(0.0, 0.5, vLife));
-  vec3 smoke = mix(vec3(0.2, 0.19, 0.24), vec3(0.38, 0.37, 0.43), smoothstep(0.3, -0.4, c.y));
-  vec3 col = mix(smoke, lavaColor(0.45) * 0.6, litFromBelow * 0.6);
-  gl_FragColor = vec4(col, puff * fade * 0.7);
+  float edge = length(c) * 2.0 + (gnoise(c * 3.0 + vSeed) - 0.5) * 0.25;
+  float puff = 1.0 - smoothstep(0.55, 0.9, edge);
+  // Shade the puff as a ball (point-sprite y runs down the screen), softly so overlapping puffs merge.
+  vec2 disc = c * 2.0;
+  vec3 ball = vec3(disc.x, -disc.y, sqrt(max(1.0 - dot(disc, disc), 0.0)));
+  float key = dot(ball, normalize(vec3(-0.45, 0.5, 0.74)));
+  vec3 smoke = mix(vec3(0.13, 0.125, 0.145), vec3(0.29, 0.28, 0.32), smoothstep(0.0, 0.6, key));
+  float warm = smoothstep(-0.05, 0.4, c.y) * (1.0 - smoothstep(0.0, 0.55, vLife));
+  smoke = mix(smoke, lavaColor(0.45) * 0.55, warm * 0.65);
+  // Thin over the crater, so it stays in sight from above; fuller as the puff drifts off.
+  float fade = smoothstep(0.25, 0.5, vLife) * (1.0 - smoothstep(0.65, 1.0, vLife));
+  gl_FragColor = vec4(smoke, puff * fade * 0.6);
 ${OUTPUT}
 }
 `;

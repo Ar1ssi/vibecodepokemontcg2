@@ -74,7 +74,8 @@ export function createStadiumEnvironment({
   const bakeOptions = { depthTest: false, depthWrite: false, toneMapped: false };
   const materials = {
     terrain: shader(env.TERRAIN_VERTEX, env.TERRAIN_FRAGMENT),
-    lava: shader(env.LAVA_VERTEX, env.LAVA_FRAGMENT),
+    // Pushed back a hair so ground lying right at the river's level wins the depth test, not flickers.
+    lava: shader(env.LAVA_VERTEX, env.LAVA_FRAGMENT, { polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 2 }),
     embers: shader(env.EMBER_VERTEX, env.EMBER_FRAGMENT, {
       transparent: true,
       depthWrite: false,
