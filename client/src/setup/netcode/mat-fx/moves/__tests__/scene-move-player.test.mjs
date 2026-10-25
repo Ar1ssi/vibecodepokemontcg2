@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { ShapeUtils, Vector2 } from 'three';
 
 import { PAINT_TEXELS, createGpuCanvas } from '../../../../board3d/fx/gpu-canvas.mjs';
+import { LAYER_Z } from '../../../../board3d/fx/fx-stage.mjs';
 import { CAST, playMoveInScene } from '../scene-move-player.js';
 import { SPECS } from '../specs/index.mjs';
 import { fireBlast } from '../specs/fire.mjs';
@@ -106,6 +107,40 @@ test('the same scene time records the same drawing (a frozen preview stands stil
   const b = frameAt(scene, 820).recording;
   assert.equal(a.vertexCount, b.vertexCount);
   assert.deepEqual([...a.vertices], [...b.vertices]);
+});
+
+/** The heights (vertex z above the run's pass) of every vertex in `runs`. */
+const heightsOf = (recording, runs, passZ) => {
+  const heights = [];
+  for (const run of runs) {
+    for (let v = run.first; v < run.first + run.count; v += 1) heights.push(recording.vertices[v * 9 + 2] - passZ);
+  }
+  return heights;
+};
+const CARD_H = 126;
+
+test('design 076 depth: burst particles fly up off the struck card and cast onto the cloth', () => {
+  const scene = fakeScene();
+  const particlesOnly = { ...SPECS['zap-cannon'], beats: [] };
+  playMoveInScene({ scene, spec: particlesOnly, attackerId: 1, defenderId: 2, seed: 7 });
+  const { recording } = frameAt(scene, 1000);
+  const top = recording.runs.filter((run) => run.layer === 'top');
+  const lifted = heightsOf(recording, top, LAYER_Z.top);
+  assert.ok(lifted.length > 0, 'particles draw in the top pass');
+  assert.ok(Math.max(...lifted) > 0.3 * CARD_H, `thrown up off the card (${Math.max(...lifted).toFixed(1)} px)`);
+  const cast = recording.runs[0];
+  assert.equal(cast.layer, 'back');
+  assert.ok(cast.count > 0, 'their shadows and light pools are cast');
+  assert.ok(heightsOf(recording, [cast], LAYER_Z.back).every((h) => Math.abs(h) < 1e-6), 'the cast lies on the cloth');
+});
+
+test('design 076 depth: Thunder\'s bolt stands as a column over the defender, not a decal up the table', () => {
+  const scene = fakeScene();
+  playMoveInScene({ scene, spec: SPECS.thunder, attackerId: 1, defenderId: 2, seed: 7 });
+  const { recording } = frameAt(scene, 760);
+  const front = recording.runs.filter((run) => run.layer === 'front' && !run.depthTest);
+  const heights = heightsOf(recording, front, LAYER_Z.front);
+  assert.ok(Math.max(...heights) > CARD_H, `the column stands over a card height tall (${Math.max(...heights).toFixed(1)} px)`);
 });
 
 test('a card the scene does not draw, coincident cards, or no fx → null', () => {

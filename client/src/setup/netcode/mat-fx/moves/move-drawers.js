@@ -8,8 +8,10 @@
 // Design 065: `info.materialAt(i)` is item i's material on the multi-item drawers (beat `hues`),
 // anchored drawers place themselves with `anchorPoint`, and travelling / orbiting drawers draw
 // their `unit` (materials/_units.js; 'body' is the material's own body / projectile).
-// Design 076: travelling and burst drawers own their exit as a GPU dissolve (`burnOut`).
+// Design 076: travelling and burst drawers own their exit as a GPU dissolve (`burnOut`), and
+// every drawer owns its place in height (`ctx.fxLift`, beat-lift.mjs): no beat lies on the cloth.
 import { rgbCss } from '../fx-colors.mjs';
+import { LIFT, anchorLift, bodyLift, burstLift, standOn, travelLift } from './beat-lift.mjs';
 import { LEAD_H, lanePoint, skyLane } from './move-geometry.mjs';
 import { dissolveTail, withFxMod } from './materials/_mods.js';
 import { getNoiseTile } from './materials/_shared.js';
@@ -65,11 +67,12 @@ const isSky = (target) => target === 'sky' || target === 'sky-attacker';
 // Design 076: where each travelling / burst beat starts burning away, as a fraction of its
 // progress. Each starts at or a little before its pose's own alpha fade, so on the GPU canvas
 // the noise eats the shape (rims blooming) while it is still bright; Canvas2D ignores `fxMod`,
-// so there the pose's fade is the exit. Held, anchored and charging beats keep their fades.
+// so there the pose's fade is the exit. Held, anchored and charging beats keep their fades, and
+// glows (impactFlash, every `material.glow` a drawer calls) fade whole: a dissolving soft glow
+// read as dull grey blotches, so only bodies, tongues, strokes and shards burn.
 const BURN_FROM = Object.freeze({
   projectile: 0.85, // lands nearly whole and burns into the target over its last stretch
   volley: 0.7, // per ball, by the lane fraction it has covered (its own progress)
-  impactFlash: 0.3,
   shockRings: 0.4,
   ring: 0.45,
   fins: 0.6,
@@ -85,6 +88,19 @@ const BEAM_BURN_LEAD = 1.25;
 
 /** Runs `draw` with the dissolve at `amount`, merged over whatever the caller set (076 contract). */
 const burnOut = (ctx, amount, draw) => withFxMod(ctx, { dissolve: { amount } }, draw);
+
+const WHOLE = Object.freeze({ dissolve: Object.freeze({ amount: 0 }) });
+/** A drawer's `material.glow`, kept out of any dissolve round it: it fades, it never burns. */
+const glowWhole = (ctx, material, x, y, r, alpha) => withFxMod(ctx, WHOLE, () => material.glow(ctx, x, y, r, alpha));
+
+/**
+ * `draw` lifted as a whole by `liftOf(lane, params)`. A drawer may also assign `ctx.fxLift` itself
+ * (per item); `guarded` puts the caller's lift back after every draw.
+ */
+const lifted = (draw, liftOf) => (ctx, lane, s, info) => {
+  ctx.fxLift = liftOf(lane, info.params);
+  draw(ctx, lane, s, info);
+};
 
 /**
  * A travelling / orbiting body: the material's own projectile for unit 'body' (063), else the
@@ -108,12 +124,14 @@ const guarded = (name, draw) =>
   Object.freeze({
     draw(ctx, lane, s, info) {
       if (!(s >= 0 && s < 1)) return;
+      const lift = ctx.fxLift ?? null;
       ctx.save();
       try {
         draw(ctx, lane, s, info);
       } finally {
         ctx.filter = 'none';
         ctx.restore();
+        ctx.fxLift = lift;
       }
     },
     check: (params) => checkParams(name, params),
@@ -130,7 +148,9 @@ const drawTongueAt = (ctx, info, x, y, angleDeg, length, width, seedOffset, opts
 
 const orbitCharge = (ctx, lane, s, info) => {
   const { params: p } = info;
-  const c = anchorOf(lane, { target: p.target ?? 'attacker', dx: p.dx, dy: p.dy });
+  const target = p.target ?? 'attacker';
+  const c = anchorOf(lane, { target, dx: p.dx, dy: p.dy });
+  ctx.fxLift = anchorLift(lane, target, c, { stand: 0, z: LIFT.travelZ });
   chargeOrbs(s, lane.h, p).forEach((orb, index) => {
     if (p.half === 'front' && orb.depth < 0) return;
     if (p.half === 'back' && orb.depth >= 0) return;
@@ -156,7 +176,9 @@ const coreCharge = (ctx, lane, s, info) => {
   // A sky orb hangs at its point; on a card it builds `lead` h up the lane, as in 063.
   const x = isSky(target) ? base.x : base.x + lane.ux * core.x + lane.nx * core.y;
   const y = isSky(target) ? base.y : base.y + lane.uy * core.x + lane.ny * core.y;
-  info.material.glow(ctx, x, y, core.r * 2, core.alpha * 0.5);
+  // It hangs at chest height facing the camera, where the shot or beam then leaves from.
+  ctx.fxLift = anchorLift(lane, target, { x, y }, { stand: LIFT.bodyStand, z: LIFT.travelZ });
+  glowWhole(ctx, info.material, x, y, core.r * 2, core.alpha * 0.5);
   // A dim white heart (design 075 parity): at .9 the gathering orb bloomed into a white blob.
   info.material.body(ctx, x, y, core.r, core.alpha, 0.45);
   // Rings: tongue arcs round the body at 1.25 r, one turn a second.
@@ -186,7 +208,7 @@ const shockRings = (ctx, lane, s, info) => {
 
 /** A flarePose / shotFlarePose at (x, y): glow, arm tongues, then the core. `h` scales the glow. */
 const drawFlare = (ctx, info, x, y, flare, h) => {
-  info.material.glow(ctx, x, y, h * 1.3, flare.core.alpha * 0.4);
+  glowWhole(ctx, info.material, x, y, h * 1.3, flare.core.alpha * 0.4);
   flare.arms.forEach((arm, index) => {
     const a = (arm.angle * Math.PI) / 180;
     for (const tongue of armTongues(arm, flare.breakUp)) {
@@ -206,6 +228,14 @@ const drawFlare = (ctx, info, x, y, flare, h) => {
   info.material.body(ctx, x, y, flare.core.r, flare.core.alpha, 1);
 };
 
+/**
+ * A body flying along `path` (a drain flies it backwards), drawn at `at`: a drop from the sky
+ * falls out of the air onto the defender; anything else arcs off the attacker at chest height and
+ * comes down on the defender, its disc turned to the camera.
+ */
+const flightLift = (lane, from, path, at) =>
+  from === 'sky' ? standOn({ x: lane.bx, y: lane.by }) : bodyLift(lanePoint(path, 0), lanePoint(path, 1), at);
+
 const projectile = (ctx, lane, s, info) => {
   const from = info.params.from ?? 'attacker';
   const ball = projectilePose(s, lane.h, info.params);
@@ -217,6 +247,7 @@ const projectile = (ctx, lane, s, info) => {
     path = laneFromPoint(lane, start.x, start.y);
   }
   const at = lanePoint(path, back ? 1 - ball.f : ball.f, ball.side);
+  ctx.fxLift = flightLift(lane, from, path, at);
   if (info.params.flare !== 'none') {
     // Lands whole: the starFlare at contact takes it over without a jump (shotFlarePose).
     drawFlare(ctx, info, at.x, at.y, shotFlarePose(s, lane.h, info.params), lane.h * info.params.size);
@@ -382,7 +413,7 @@ const beam = (ctx, lane, s, info) => {
   const segmented = p.kind === 'segmented';
   const tail = toPoint(pose.from);
   const head = toPoint(pose.to);
-  material.glow(ctx, tail.x, tail.y, pose.width * 1.1, 0.4);
+  glowWhole(ctx, material, tail.x, tail.y, pose.width * 1.1, 0.4);
   for (const seg of pose.segments) {
     beamColumn(ctx, material.palette, toPoint(seg.f0), toPoint(seg.f1), pose.width * (segmented ? 0.8 : 1), seg.alpha, info.time, segmented);
   }
@@ -392,7 +423,7 @@ const beam = (ctx, lane, s, info) => {
     const at = beamPoint(lane, f, Math.sin(info.time * 7 + i * 2.1) * pose.width * 0.18);
     material.body(ctx, at.x, at.y, pose.width * 0.3, 0.85, 0.9);
   }
-  material.glow(ctx, head.x, head.y, pose.width * 1.8, 0.5);
+  glowWhole(ctx, material, head.x, head.y, pose.width * 1.8, 0.5);
   material.body(ctx, head.x, head.y, pose.width * 0.55, 0.9, 1);
 };
 
@@ -413,6 +444,8 @@ const pillar = (ctx, lane, s, info) => {
     const x = c.x + column.x + t.x;
     const y = c.y + t.y;
     const seed = index * 4.1;
+    // A column rises off the card's near edge (its base line in the 2D layout).
+    ctx.fxLift = standOn({ x, y: c.y + 0.5 * lane.h });
     burnOut(ctx, dissolveTail(column.s, BURN_FROM.pillar), () => {
       drawTongueAt(ctx, info, x, y, t.angleDeg, t.length, t.width, seed, { alpha: t.alpha, hot: t.hot }, material);
       for (const side of [-1, 1]) {
@@ -487,7 +520,7 @@ const terrain = (ctx, lane, s, info) => {
 const cloud = (ctx, lane, s, info) => {
   const c = anchorOf(lane, info.params);
   for (const puff of cloudPose(s, lane.h, info.seed, info.params)) {
-    info.material.glow(ctx, c.x + puff.dx, c.y + puff.dy, puff.r, puff.alpha);
+    glowWhole(ctx, info.material, c.x + puff.dx, c.y + puff.dy, puff.r, puff.alpha);
   }
 };
 
@@ -503,6 +536,7 @@ const volley = (ctx, lane, s, info) => {
   const path = info.params.from === 'sky' ? skyLane(lane) : lane;
   volleyPose(s, lane.h, poseParams(info)).forEach((ball, index) => {
     const at = lanePoint(path, back ? 1 - ball.f : ball.f, ball.side);
+    ctx.fxLift = flightLift(lane, info.params.from, path, at);
     burnOut(ctx, dissolveTail(ball.f, BURN_FROM.volley), () =>
       drawUnit(ctx, itemMaterial(info, index), info.params.unit, s, {
         x: at.x,
@@ -523,14 +557,14 @@ const aura = (ctx, lane, s, info) => {
   if (!(pose.alpha > 0)) return;
   const c = centreOf(lane, info.params.target);
   // A pulsing glow only: the stroked circle it used to carry read as clip art (design 075 parity).
-  info.material.glow(ctx, c.x, c.y, pose.r * 1.35, pose.alpha * 0.7);
+  glowWhole(ctx, info.material, c.x, c.y, pose.r * 1.35, pose.alpha * 0.7);
 };
 
 const rain = (ctx, lane, s, info) => {
   const c = centreOf(lane, info.params.target);
   rainPose(s, lane.h, info.seed, info.params).forEach((drop, index) => {
     if (drop.splash > 0) {
-      info.material.glow(ctx, c.x + drop.x, c.y + drop.y, lane.h * 0.2 * (0.4 + drop.splash), drop.alpha * 0.6);
+      glowWhole(ctx, info.material, c.x + drop.x, c.y + drop.y, lane.h * 0.2 * (0.4 + drop.splash), drop.alpha * 0.6);
       return;
     }
     drawTongueAt(ctx, info, c.x + drop.x, c.y + drop.y - drop.length, 90, drop.length, drop.width, index * 1.3, {
@@ -541,10 +575,14 @@ const rain = (ctx, lane, s, info) => {
 
 // A burst flies out and burns away; a cluster is held to its end and keeps its fade-in.
 const shards = (ctx, lane, s, info) => {
+  const c = centreOf(lane, info.params.target);
   if (info.params.mode === 'cluster') {
+    // Crystals growing upright out of the card's near edge.
+    ctx.fxLift = standOn({ x: c.x, y: c.y + 0.5 * lane.h });
     drawShards(ctx, lane, s, info, true);
     return;
   }
+  ctx.fxLift = burstLift(c);
   burnOut(ctx, dissolveTail(s, BURN_FROM.shards), () => drawShards(ctx, lane, s, info, false));
 };
 
@@ -571,7 +609,7 @@ const drawShards = (ctx, lane, s, info, cluster) => {
     if (cluster && t.length > 0 && t.alpha > 0) {
       // Lit on the upper edge: a hot glint at each fragment's tip.
       const a = (t.angleDeg * Math.PI) / 180;
-      material.glow(ctx, c.x + t.x + Math.cos(a) * t.length, c.y + t.y + Math.sin(a) * t.length, t.width * 0.9, t.alpha * 0.6);
+      glowWhole(ctx, material, c.x + t.x + Math.cos(a) * t.length, c.y + t.y + Math.sin(a) * t.length, t.width * 0.9, t.alpha * 0.6);
     }
   });
 };
@@ -608,7 +646,11 @@ const bolt = (ctx, lane, s, info) => {
 };
 
 const ring = (ctx, lane, s, info) => {
-  const fins = info.params.kind === 'fins';
+  const { kind } = info.params;
+  const fins = kind === 'fins';
+  // A floor shockwave runs along the cloth; a face-on ring stands up round the target (Psychic).
+  if (kind === 'face') ctx.fxLift = burstLift(anchorOf(lane, info.params), { stand: LIFT.faceStand });
+  else if (fins) ctx.fxLift = burstLift(anchorOf(lane, info.params));
   burnOut(ctx, dissolveTail(s, fins ? BURN_FROM.fins : BURN_FROM.ring), () => (fins ? drawFins : drawRings)(ctx, lane, s, info));
 };
 
@@ -849,35 +891,49 @@ const grip = (ctx, lane, s, info) => {
 const burning = (draw, fromOf) => (ctx, lane, s, info) =>
   burnOut(ctx, dissolveTail(s, fromOf(info.params)), () => draw(ctx, lane, s, info));
 
+// Design 076 § Depth: the whole-beat lifts (beat-lift.mjs). Unlisted drawers lift per item
+// (projectile, volley, pillar, shards, ring, the charges) or stay on the cloth: ground waves and
+// cracks (shockRings, terrain, ring 'floor'), the card-hugging aura and vignette, shade and chain.
+const atAnchor = (lane, p) => anchorLift(lane, p.target, anchorOf(lane, p));
+const atCentre = (lane, p) => burstLift(centreOf(lane, p.target));
+const fromSky = (lane) => standOn({ x: lane.bx, y: lane.by });
+/** A bolt from the sky comes down out of the air onto the defender; a lane bolt arcs to it. */
+const boltLift = (lane, p) =>
+  p.from === 'sky' ? fromSky(lane) : travelLift({ x: lane.ax, y: lane.ay }, { x: lane.bx, y: lane.by }, { arc: LIFT.boltArc });
+const beamLift = (lane) => travelLift(beamPoint(lane, 0), beamPoint(lane, 1), { arc: LIFT.beamArc });
+
 const IMPLEMENTATIONS = {
   orbitCharge,
   coreCharge,
   shockRings: burning(shockRings, () => BURN_FROM.shockRings),
   projectile,
   vignette,
-  speedRays,
+  speedRays: lifted(speedRays, atAnchor),
   // Burns as it breaks up: the arms' alpha only starts to drop there (easeInCubic).
-  starFlare: burning(starFlare, (p) => p.breakAt),
-  impactFlash: burning(impactFlash, () => BURN_FROM.impactFlash),
-  smoke,
-  beam: burning(beam, (p) => 1 - p.retract * BEAM_BURN_LEAD),
-  splash: burning(splash, () => BURN_FROM.splash),
+  starFlare: lifted(burning(starFlare, (p) => p.breakAt), atAnchor),
+  impactFlash: lifted(impactFlash, atCentre),
+  // Soot rises off the struck card.
+  smoke: lifted(smoke, (lane, p) => burstLift(centreOf(lane, p.target), { z: 0.05 })),
+  beam: lifted(burning(beam, (p) => 1 - p.retract * BEAM_BURN_LEAD), beamLift),
+  splash: lifted(burning(splash, () => BURN_FROM.splash), atCentre),
   pillar,
-  slashArc: burning(slashArc, () => BURN_FROM.slashArc),
+  slashArc: lifted(burning(slashArc, () => BURN_FROM.slashArc), atCentre),
   terrain,
-  cloud,
-  spiral,
+  cloud: lifted(cloud, (lane, p) => anchorLift(lane, p.target, anchorOf(lane, p), { stand: 0, z: LIFT.travelZ })),
+  spiral: lifted(spiral, atCentre),
   volley,
   aura,
-  rain,
+  // Rain falls out of the air onto the card.
+  rain: lifted(rain, (lane, p) => standOn(centreOf(lane, p.target))),
   shards,
-  bolt: burning(bolt, () => BURN_FROM.bolt),
+  bolt: lifted(burning(bolt, () => BURN_FROM.bolt), boltLift),
   ring,
-  glyph,
-  fan: burning(fan, () => BURN_FROM.fan),
+  glyph: lifted(glyph, (lane, p) => anchorLift(lane, p.target, anchorOf(lane, p), { stand: LIFT.faceStand })),
+  fan: lifted(burning(fan, () => BURN_FROM.fan), atAnchor),
   shade,
   chain,
-  grip,
+  // The glove comes down out of the air.
+  grip: lifted(grip, fromSky),
 };
 
 /** The drawer registry: `{ draw, check, tonguesAt }` per drawer name. */
