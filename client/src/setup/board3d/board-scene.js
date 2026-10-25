@@ -149,11 +149,13 @@ function offsetAt(keys, elapsed) {
  *   setCardHighlight: (id: number|null) => void,
  *   shake: (offsets: { x: number, y: number, ms: number }[]) => Promise<void>,
  *   tween: (instanceId: number, poseFn: (t: number) => object, ms: number,
- *     options?: { ease?: (t: number) => number }) => Promise<void>,
+ *     options?: { ease?: (t: number) => number, still?: boolean }) => Promise<void>,
  *   lift: (instanceId: number, pose: { rect: object, tiltXDeg?: number, lift?: number,
  *     rotateZDeg?: number, flipDeg?: number, ms?: number, ease?: (t: number) => number }) => Promise<void>,
  *   unlift: (instanceId: number, options?: { ms?: number, ease?: (t: number) => number }) => Promise<void>,
  *   drive: (instanceId: number, offsetAt: (elapsedMs: number) => object|null, ms: number) => Promise<void>,
+ *   cardFx: (instanceId: number, fx: { at: (elapsedMs: number) => ({ dissolve?: number, rim?: number }|null),
+ *     ms: number, cut?: boolean, edgeRgb?: number[], rimRgb?: number[] }) => Promise<void>,
  *   cardTablePose: (instanceId: number) => object|null, cardFrontMap: (instanceId: number) => object|null,
  *   fx: { add: Function, active: () => boolean, impactsActive: () => boolean, setImpacts: Function,
  *     tiltDeg: () => number },
@@ -357,6 +359,21 @@ export function createBoardScene({
     if (disposed) return Promise.resolve();
     const done = pool.drive(id, offsetAt, ms);
     invalidate();
+    return done;
+  };
+
+  /**
+   * Design 076: a shader effect on a card (card-mesh.js `cardFx`: dissolve, rim). While a burn
+   * (`cut`) runs the FX layer stays active, so the card's ember line is drawn and bloomed.
+   */
+  const cardFx = (id, spec) => {
+    if (disposed) return Promise.resolve();
+    let running = true;
+    const done = pool.cardFx(id, spec).then(() => {
+      running = false;
+    });
+    if (spec?.cut) fx.add({ frame: () => running });
+    else invalidate();
     return done;
   };
 
@@ -1183,6 +1200,7 @@ export function createBoardScene({
     lift,
     unlift,
     drive,
+    cardFx,
     cardTablePose: (id) => (disposed ? null : pool.tablePoseOf(id)),
     cardFrontMap: (id) => (disposed ? null : pool.frontMapOf(id)),
     impactPlacement,

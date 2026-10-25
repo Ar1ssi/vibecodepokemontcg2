@@ -3,7 +3,7 @@
 // so the lane maths is design 063's; the real card meshes carry the motion (scene.drive), and the
 // rim, heat, trails, echo and bursts are drawn in the scene too. One FX entry per scene, on the
 // scene clock (a WAAPI time, so a frozen preview freezes it).
-import { fxDisabled } from '../../../image-logic/mat-fx.mjs';
+import { fxDisabled, motionReduced } from '../../../image-logic/mat-fx.mjs';
 import { LAYER_Z, driveOffset, particleState, stageRectOf } from '../../../board3d/fx/fx-stage.mjs';
 import { burstParticles } from '../particles.mjs';
 import { resolveBeatColours, tintCache } from './beat-colours.js';
@@ -225,6 +225,11 @@ export function playMoveInScene({
 
   scene.drive(attackerId, (ms) => offsetWith(attackerAt(ms), ms), durationMs);
   scene.drive(defenderId, (ms) => offsetWith(defenderAt(ms), ms), durationMs);
+  // Design 076: the attacker's own edge glows in the move's colour as it charges and lunges.
+  if (!motionReduced()) {
+    const rimRgb = (glowColours ?? tintedGlow(material.key)).hot;
+    scene.cardFx?.(attackerId, { at: (ms) => ({ rim: attackerAt(ms).glow }), ms: durationMs, rimRgb });
+  }
 
   const start = scene.clock.now();
   const pass = (canvas, layer, z, depthTest) => canvas.begin({ layer, z, depthTest, unit: lane.h, seed });

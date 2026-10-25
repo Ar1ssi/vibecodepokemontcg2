@@ -109,3 +109,29 @@ export function koTrack({ index = 0, dir = -1, turn = 0, pileTurn = turn, cardRe
     },
   };
 }
+
+// Design 076 row 5: the knocked-out card burns away on its own mesh (card-mesh.js cardFx) as it
+// swings back to face the camera and sets off (thrown back it is edge-on, where a burn cannot be
+// seen); it is gone well before the pile, its light streak flies on, and the card re-forms out of
+// the burn in the pile as the pile catches it.
+export const KO_BURN_FROM_MS = 620;
+export const KO_BURN_TO_MS = 1120;
+export const KO_REFORM_MS = 240;
+// Reduced motion: the card holds still where it stood (KO_REDUCED_HOLD_MS) and burns away; the
+// burn runs a beat past the hold, so the card is in its pile before it shows whole again.
+export const KO_REDUCED_HOLD_MS = 700;
+export const KO_REDUCED_BURN_MS = KO_REDUCED_HOLD_MS + 120;
+const REDUCED_BURN_FROM_MS = 80;
+
+/** The knocked-out card's dissolve (0 whole – 1 gone) `ms` into the scene. */
+export function koDissolveAt(ms) {
+  if (!(ms > KO_BURN_FROM_MS)) return 0;
+  const landsAt = koFlightStartMs(0) + FLIGHT_MS;
+  if (ms < landsAt) return easeInOutCubic(span(ms, KO_BURN_FROM_MS, KO_BURN_TO_MS));
+  return 1 - easeOutCubic(span(ms, landsAt, landsAt + KO_REFORM_MS));
+}
+
+/** The reduced-motion burn: still, gone by the end of the hold (the card's pile shows it after). */
+export function koReducedDissolveAt(ms) {
+  return easeInOutCubic(span(ms, REDUCED_BURN_FROM_MS, KO_REDUCED_HOLD_MS - 60));
+}

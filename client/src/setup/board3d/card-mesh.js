@@ -16,6 +16,14 @@ import {
   roundedRectShapePoints,
 } from './card-geometry.mjs';
 import { flightPlacement } from './flight-pose.mjs';
+import { cardFxValuesAt } from './card-mesh-fx.mjs';
+import {
+  burningCopyOf,
+  createBurningDepthMaterial,
+  createCardFxUniforms,
+  createCardGlowTwin,
+  setCardFxShape,
+} from './card-mesh-fx.js';
 import { OCCLUDER_LAYER } from './fx/fx-layers.mjs';
 import { createTween, easeOutCubic } from './tween.mjs';
 
@@ -118,6 +126,9 @@ function buildCardGeometry(three, widthPx, uv) {
  *   tween: (id: number, poseFn: (t: number) => object, ms: number, o?: { ease?: (t: number) => number }) =>
  *     Promise<void>,
  *   drive: (id: number, offsetAt: (elapsedMs: number) => object|null, ms: number) => Promise<void>,
+ *   cardFx: (id: number, fx: { at: (elapsedMs: number) => ({ dissolve?: number, rim?: number }|null),
+ *     ms: number, cut?: boolean, edgeRgb?: number[], rimRgb?: number[] }) => Promise<void>,
+ *   cardFxOf: (id: number) => { dissolve: number, rim: number }|null,
  *   tablePoseOf: (id: number) => { x: number, y: number, z: number, yawDeg: number, widthPx: number,
  *     heightPx: number }|null,
  *   frontMapOf: (id: number) => import('three').Texture|null,
@@ -157,6 +168,15 @@ function buildCardGeometry(three, widthPx, uv) {
  *   scaleAcross, laneAngleDeg }` in flat table px (fx/fx-stage.mjs driveOffset) — onto the card's
  *   own pose every frame for `ms` of scene time, then resolves. A tween, a lift, a newer drive or
  *   the card's release ends it (resolving); a lifted or flying card is not driven.
+ *   `tween(..., { still: true })` is a hold, not a motion: its pose must not move, and it keeps
+ *   its full `ms` with motion reduced (a reduced-motion knockout burns its card where it stood).
+ *   `cardFx` (design 076) runs a shader effect on the card for `ms` of scene time, whatever its
+ *   motion and with motion reduced too: `at(elapsedMs)` gives `dissolve` (0 whole – 1 burnt away,
+ *   the hole rims burn in `edgeRgb`) and `rim` (0–1, an edge glow in `rimRgb`). `cut: true` (needed
+ *   for any dissolve) gives the card its own burning copies of its materials for the whole run (a
+ *   foil card shows its plain art meanwhile); either way a glow twin draws the ember line (on the
+ *   FX layer, bloomed) or the rim (in the board pass, unbloomed). At the end, on a newer `cardFx`, on release or `at` throwing, the
+ *   values go back to 0, the card wears its shared materials again and the promise resolves.
  */
 export function createCardMeshPool({
   group,
@@ -387,22 +407,123 @@ export function createCardMeshPool({
    */
   function applyMaterials(card) {
     const back = card.back?.state === 'ready' ? card.back.material : blankBack;
-    const wearsFoil = card.foil?.state === 'ready' && !card.dim;
+    const burning = Boolean(card.fx?.cut);
+    const wearsFoil = card.foil?.state === 'ready' && !card.dim && !burning;
     let front = back;
     if (wearsFoil) front = card.foil.material;
     else if (card.front?.state === 'ready') front = card.front.material;
-    if (card.dim) front = dimmedFront(card, front);
+    if (card.dim && !burning) front = dimmedFront(card, front);
     else if (card.dimFront) dropDimmedFront(card);
     const uv = wearsFoil ? foilUv() : PLAIN_UV;
     if (card.geometry.key !== `${widthKeyOf(card.widthPx)}|${uvKeyOf(uv)}`) {
       setGeometry(card, card.widthPx, uv);
     }
+    const [frontShown, backShown, rimShown] = burning ? burningMaterials(card, front, back) : [front, back, rim];
     const materials = card.mesh.material;
-    if (materials[FRONT] !== front || materials[BACK] !== back) {
-      card.mesh.material = [front, back, rim];
+    if (materials[FRONT] !== frontShown || materials[BACK] !== backShown || materials[RIM] !== rimShown) {
+      card.mesh.material = [frontShown, backShown, rimShown];
     }
     card.foilLive = wearsFoil;
   }
+
+  // ── card effects (design 076): dissolve and rim through the card's own uniforms.
+  /** The card's burning copy of `base`, made once per base for the effect's run. */
+  const burningCopy = (card, base) => {
+    const { copies } = card.fx;
+    let copy = copies.get(base);
+    if (!copy || (base.map ?? null) !== (copy.map ?? null)) {
+      copy?.dispose();
+      copy = burningCopyOf(three, base, card.fx.uniforms, createCardArtMaterial);
+      copies.set(base, copy);
+    }
+    return copy;
+  };
+
+  const burningMaterials = (card, front, back) => [
+    burningCopy(card, front),
+    burningCopy(card, back),
+    burningCopy(card, rim),
+  ];
+
+  /** Fits the effect's uniforms and twin to the card's current geometry. */
+  const fitCardFx = (card) => {
+    const { geometry } = card;
+    setCardFxShape(card.fx.uniforms, { w: geometry.w, h: geometry.h, radius: cardCornerRadius(geometry.w) });
+    if (card.fx.twin.geometry !== geometry.geometry) card.fx.twin.geometry = geometry.geometry;
+  };
+
+  /** Ends a card's effect: values to 0, shared materials back, its own materials freed; resolves. */
+  const endCardFx = (card) => {
+    const { fx } = card;
+    if (!fx) return;
+    card.fx = null;
+    fx.uniforms.uCardDissolve.value = 0;
+    fx.uniforms.uCardRim.value = 0;
+    card.mesh.remove(fx.twin);
+    fx.twin.material.dispose();
+    if (fx.depth) {
+      card.mesh.customDepthMaterial = undefined;
+      fx.depth.dispose();
+    }
+    applyMaterials(card);
+    for (const copy of fx.copies.values()) copy.dispose();
+    fx.copies.clear();
+    onNeedsRender();
+    fx.resolve();
+  };
+
+  /** Writes a card's effect values for `now`; true once the effect is over (or its `at` failed). */
+  const stepCardFx = (card, now) => {
+    const { fx } = card;
+    const elapsed = now - fx.start;
+    if (elapsed >= fx.ms) return true;
+    let values;
+    try {
+      values = cardFxValuesAt(fx, Math.max(0, elapsed));
+    } catch (error) {
+      console.warn('board3d: card effect failed', error?.message || error);
+      return true;
+    }
+    if (card.fx.twin.geometry !== card.geometry.geometry) fitCardFx(card);
+    fx.uniforms.uCardDissolve.value = values.dissolve;
+    fx.uniforms.uCardRim.value = values.rim;
+    return false;
+  };
+
+  const cardFx = (id, { at, ms, cut = false, edgeRgb = null, rimRgb = null } = {}) => {
+    const card = disposed ? null : cards.get(id);
+    if (!card?.pose || typeof at !== 'function') return Promise.resolve();
+    endCardFx(card);
+    return new Promise((resolve) => {
+      const uniforms = createCardFxUniforms(three);
+      const twin = createCardGlowTwin(three, card.geometry.geometry, uniforms, { bloom: Boolean(cut) });
+      card.mesh.add(twin);
+      card.fx = {
+        at,
+        ms: Math.max(0, Number(ms) || 0),
+        start: clock.now(),
+        cut: Boolean(cut),
+        uniforms,
+        twin,
+        copies: new Map(),
+        depth: cut ? createBurningDepthMaterial(three, uniforms) : null,
+        resolve,
+      };
+      setCardFxShape(uniforms, { w: card.geometry.w, h: card.geometry.h, radius: cardCornerRadius(card.geometry.w), edgeRgb, rimRgb });
+      fitCardFx(card);
+      if (card.fx.depth) card.mesh.customDepthMaterial = card.fx.depth;
+      if (card.fx.cut) applyMaterials(card);
+      if (stepCardFx(card, card.fx.start)) endCardFx(card);
+      onNeedsRender();
+    });
+  };
+
+  /** A card's effect values now (null = none running): what its uniforms hold. */
+  const cardFxOf = (id) => {
+    const fx = cards.get(id)?.fx;
+    if (!fx) return null;
+    return { dissolve: fx.uniforms.uCardDissolve.value, rim: fx.uniforms.uCardRim.value };
+  };
 
   /**
    * Writes the card's own (model) pose for `now` onto `target`: the mesh, or a scratch object.
@@ -576,7 +697,7 @@ export function createCardMeshPool({
     return raw >= 1;
   };
 
-  const tween = (id, poseFn, ms, { ease = easeOutCubic } = {}) => {
+  const tween = (id, poseFn, ms, { ease = easeOutCubic, still = false } = {}) => {
     const card = disposed ? null : cards.get(id);
     // A lifted card (card focus) is held by `lift`: a flight does not take it over.
     if (!card?.pose || card.lift || !camera || typeof poseFn !== 'function') return Promise.resolve();
@@ -584,7 +705,7 @@ export function createCardMeshPool({
     endDrive(card);
     return new Promise((resolve) => {
       const now = clock.now();
-      card.flight = { poseFn, ease, start: now, ms: durationFor(ms), resolve };
+      card.flight = { poseFn, ease, start: now, ms: still ? Math.max(0, Number(ms) || 0) : durationFor(ms), resolve };
       card.flightTailUntil = 0;
       placeFlight(card, now);
       onNeedsRender();
@@ -799,6 +920,7 @@ export function createCardMeshPool({
       flightTailUntil: 0,
       lift: null,
       drive: null,
+      fx: null,
       dirty: true,
     });
     mesh.visible = false;
@@ -810,6 +932,7 @@ export function createCardMeshPool({
       endFlight(card);
       endLift(card);
       endDrive(card);
+      endCardFx(card);
       cards.delete(id);
       group.remove(card.mesh);
       dropDimmedFront(card);
@@ -962,6 +1085,10 @@ export function createCardMeshPool({
     let foilShown = false;
     for (const card of cards.values()) {
       if (!card.pose) continue;
+      if (card.fx) {
+        if (stepCardFx(card, now)) endCardFx(card);
+        else moving = true;
+      }
       if (card.lift) {
         if (placeLift(card, now)) {
           if (card.lift.phase === 'out') endLift(card);
@@ -1064,6 +1191,8 @@ export function createCardMeshPool({
     setPose,
     tween,
     drive,
+    cardFx,
+    cardFxOf,
     tablePoseOf,
     frontMapOf,
     lift,
