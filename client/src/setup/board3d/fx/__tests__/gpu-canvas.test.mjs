@@ -432,6 +432,8 @@ test('a cast pass lays lifted geometry on the cloth, offset by height, shadowing
   assert.deepEqual([...shadow.subarray(36, 40)], [0, 0, 0, 0.5]);
   assert.equal(shadow[FX_MODS.distort.texel * 4], 0, 'no distort in a cast');
   close(shadow[FX_MODS.dissolve.texel * 4], 0.4, 1e-6);
+  const lightStart = rec.runs.find((run) => run.blend === 'add').first;
+  assert.ok(vertexAt(rec, lightStart)[0] < 5, 'a light pool stays under its source');
   const light = paintRow(rec, 1);
   assert.deepEqual([...light.subarray(36, 40)].map((v) => Math.round(v * 100) / 100), [1, 0, 0, 0.2]);
   assert.equal(resolveCast(null), null);

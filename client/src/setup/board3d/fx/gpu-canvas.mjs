@@ -390,10 +390,12 @@ export function createGpuCanvas({ triangulate, size = 4096, maxVertices = MAX_VE
   const pushVertex = (sx, sy, edge, across, halfWidth, feather, along, paint) => {
     const i = vertexCount * VERTEX_FLOATS;
     const { x, y, h } = liftPoint(state.lift, sx, sy, pass.unit);
-    // A cast pass lays everything on the cloth, pushed away from the light by its height.
+    // A cast pass lays everything on the cloth: a shadow is pushed away from the light by its
+    // height, a light pool (additive) stays under its source.
     const cast = pass.cast;
-    vertices[i] = cast ? x + h * cast.dx : x;
-    vertices[i + 1] = cast ? y + h * cast.dy : y;
+    const push = cast && blendOf() !== 'add' ? h : 0;
+    vertices[i] = cast ? x + push * cast.dx : x;
+    vertices[i + 1] = cast ? y + push * cast.dy : y;
     vertices[i + 2] = cast ? pass.z : pass.z + h;
     vertices[i + 3] = edge;
     vertices[i + 4] = across;
