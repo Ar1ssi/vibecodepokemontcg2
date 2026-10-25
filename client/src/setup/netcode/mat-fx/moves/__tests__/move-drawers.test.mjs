@@ -325,3 +325,99 @@ test('design 065: a non-body unit draws in the material palette instead of the m
   drawAll('projectile', { unit: 'facet' }, { material: counting });
   assert.equal(projectiles, 0);
 });
+
+// ---- design 076: dissolve exits ---------------------------------------------------
+
+/** The beats that burn away in their tail, with params that exercise the burning path. */
+const BURNING = [
+  ['projectile', {}],
+  ['volley', {}],
+  ['beam', {}],
+  ['starFlare', {}],
+  ['impactFlash', {}],
+  ['shockRings', {}],
+  ['ring', {}],
+  ['ring', { kind: 'fins' }],
+  ['splash', {}],
+  ['shards', {}],
+  ['slashArc', {}],
+  ['bolt', {}],
+  ['pillar', {}],
+  ['fan', {}],
+];
+/** The caller's own modifiers (a kit's detail), which a drawer's dissolve merges over. */
+const OUTER = Object.freeze({ detail: Object.freeze({ amount: 0.3 }) });
+
+/** Draws one frame on a context that records `ctx.fxMod` at every fill and stroke. */
+const paintMods = (drawer, s, params = {}, over = {}) => {
+  const rec = recordingContext();
+  const mods = [];
+  rec.target.fxMod = OUTER;
+  rec.target.fill = () => mods.push(rec.target.fxMod);
+  rec.target.stroke = () => mods.push(rec.target.fxMod);
+  DRAWERS[drawer].draw(rec.ctx, lane, s, { ...info(drawer, params), ...over });
+  return { mods, after: rec.target.fxMod };
+};
+const amountsOf = (mods) => mods.map((mod) => mod?.dissolve?.amount ?? 0);
+const peakAmount = (drawer, s, params) => Math.max(0, ...amountsOf(paintMods(drawer, s, params).mods));
+
+test('design 076: a travelling or burst beat paints whole early and burns away in its tail', () => {
+  for (const [drawer, params] of BURNING) {
+    const label = `${drawer} ${JSON.stringify(params)}`;
+    const early = paintMods(drawer, 0.2, params);
+    assert.ok(early.mods.length > 0, `${label} paints early`);
+    assert.ok(amountsOf(early.mods).every((amount) => amount === 0), `${label} is whole early`);
+    const tail = paintMods(drawer, 0.95, params);
+    assert.ok(tail.mods.length > 0, `${label} paints in its tail`);
+    assert.ok(Math.max(...amountsOf(tail.mods)) > 0, `${label} dissolves in its tail`);
+    for (const { mods, after } of [early, tail]) {
+      assert.equal(after, OUTER, `${label} restores the caller's fxMod`);
+      assert.ok(mods.every((mod) => mod?.detail?.amount === 0.3), `${label} keeps the caller's modules`);
+    }
+  }
+});
+
+test('design 076: the dissolve rises through the tail and is nearly complete at its end', () => {
+  for (const drawer of ['projectile', 'beam', 'starFlare', 'impactFlash', 'shockRings', 'slashArc', 'bolt', 'fan']) {
+    const mid = peakAmount(drawer, 0.9, {});
+    const late = peakAmount(drawer, 0.99, {});
+    assert.ok(late > mid, `${drawer}: ${late} after ${mid}`);
+    assert.ok(late > 0.85, `${drawer} is nearly gone at its end (${late})`);
+  }
+});
+
+test('design 076: a starFlare starts burning where it breaks up, a beam just before it retracts', () => {
+  assert.equal(peakAmount('starFlare', 0.69, { breakAt: 0.7 }), 0);
+  assert.ok(peakAmount('starFlare', 0.75, { breakAt: 0.7 }) > 0);
+  assert.equal(peakAmount('beam', 0.6, { retract: 0.3 }), 0);
+  assert.ok(peakAmount('beam', 0.72, { retract: 0.3 }) > 0);
+});
+
+test('design 076: a flare projectile lands whole for the starFlare that takes over at contact', () => {
+  const tail = paintMods('projectile', 0.99, { flare: 'dai', size: 0.8 });
+  assert.ok(tail.mods.length > 0);
+  assert.ok(amountsOf(tail.mods).every((amount) => amount === 0));
+});
+
+test('design 076: anchored, held and charging beats never touch the dissolve', () => {
+  const burning = new Set(BURNING.map(([drawer]) => drawer));
+  for (const drawer of Object.keys(DRAWERS)) {
+    if (burning.has(drawer)) continue;
+    for (const s of [0.2, 0.6, 0.95]) {
+      const { mods, after } = paintMods(drawer, s);
+      assert.ok(mods.every((mod) => mod === OUTER), `${drawer} at ${s} paints under the caller's fxMod`);
+      assert.equal(after, OUTER);
+    }
+  }
+  const cluster = paintMods('shards', 0.95, { mode: 'cluster' });
+  assert.ok(cluster.mods.length > 0);
+  assert.ok(amountsOf(cluster.mods).every((amount) => amount === 0), 'a held shard cluster stays whole');
+});
+
+test("design 076: a drawer that throws mid-dissolve still restores the caller's fxMod", () => {
+  const rec = recordingContext();
+  rec.target.fxMod = OUTER;
+  const exploding = { ...MATERIALS.fire, tongue: () => { throw new Error('boom'); } };
+  assert.throws(() => DRAWERS.splash.draw(rec.ctx, lane, 0.95, { ...info('splash'), material: exploding }), /boom/);
+  assert.equal(rec.target.fxMod, OUTER);
+});
