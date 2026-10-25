@@ -16,6 +16,8 @@ import { ECHO_PARAMS, fillDefaults, travelBeats, withDefaults } from './move-spe
 import { materialFor } from './materials/index.js';
 import { drawParticle } from './particle-shapes.mjs';
 
+/** The cast pass (gpu-canvas resolveCast): soft shadows and light pools on the cloth. */
+export const CAST = Object.freeze({ shadow: 0.3, light: 0.18, dx: 0.35, dy: 0.55, blur: 0.08 });
 const DEG = Math.PI / 180;
 /** The dash's lagged copies: how far each trails the attacker (of the scene) and how strong it shows. */
 const TRAILS = Object.freeze([
@@ -246,6 +248,15 @@ export function playMoveInScene({
       const d = live ? defenderAt(elapsed) : null;
       const aOffset = a ? offsetWith(a, elapsed) : null;
       const dOffset = d ? offsetWith(d, elapsed) : null;
+
+      // Cast (design 076): the front and top beats replayed flat on the cloth, where solid paint
+      // shadows it and light pools its colour, pushed off by how high each piece is lifted.
+      canvas.begin({ layer: 'back', z: LAYER_Z.back, depthTest: true, unit: lane.h, seed, cast: CAST });
+      ctx.save();
+      ctx.translate(jitter.x, jitter.y);
+      drawBeats(ctx, beats, 'front', lane, elapsed, info);
+      drawBeats(ctx, beats, 'top', lane, elapsed, info);
+      ctx.restore();
 
       // Back: what the cards hide (depth-tested under their faces), with the rims and trails.
       pass(canvas, 'back', LAYER_Z.back, true);

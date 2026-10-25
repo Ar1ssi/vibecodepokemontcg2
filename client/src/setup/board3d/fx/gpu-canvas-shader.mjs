@@ -353,6 +353,43 @@ void main() {
       rgb *= 1.0 - params.x * smoothstep(0.35, 0.8, n);
     }
   }
+  // volume: the paint lit as a solid so it stops reading as a sticker. A radial is a sphere, a
+  // stroke a tube, an axis gradient a tube of radius units round its axis, anything else a
+  // bumped sheet (normal from the noise slope). Lambert + a white specular glint past 1.0 (it
+  // blooms) + a Fresnel rim in the paint's own colour; light comes from the light angle on screen.
+  vec4 volume = texel(21);
+  if (volume.x > 0.0) {
+    vec4 shape = texel(22);
+    vec3 normal = vec3(0.0, 0.0, 1.0);
+    if (kind == 2) {
+      vec2 local = (q - geomB.xy) / max(geomB.z, 1.0);
+      normal = vec3(local, sqrt(max(1.0 - dot(local, local), 0.0)));
+    } else if (vEdge.z >= 0.0) {
+      float a = clamp(vEdge.y / max(vEdge.z + vEdge.w, 1e-3), -1.0, 1.0);
+      normal = vec3(0.0, a, sqrt(max(1.0 - a * a, 0.0)));
+    } else if (kind == 1) {
+      vec2 axis = geomA.zw - geomA.xy;
+      vec2 dir = axis / max(length(axis), 1.0);
+      vec2 across2 = vec2(-dir.y, dir.x);
+      float a = clamp(dot(q - geomA.xy, across2) / max(shape.z * unit, 1.0), -1.0, 1.0);
+      normal = vec3(across2 * a, sqrt(max(1.0 - a * a, 0.0)));
+    }
+    if (shape.x > 0.0) {
+      vec3 bp = vec3(q / unit * shape.y, seed * 0.23 + 11.0);
+      float e = 0.08;
+      float h0 = fbm(bp);
+      vec2 slope = vec2(fbm(bp + vec3(e, 0.0, 0.0)) - h0, fbm(bp + vec3(0.0, e, 0.0)) - h0) / e;
+      normal = normalize(normal + vec3(-slope * shape.x * 0.35, 0.0));
+    }
+    normal = normalize(normal);
+    // Stage y runs down the screen, so a light "up" on screen has a negative y.
+    vec3 lightDir = normalize(vec3(cos(volume.w), -sin(volume.w), 0.9));
+    float diffuse = max(dot(normal, lightDir), 0.0);
+    float glint = pow(max(dot(reflect(-lightDir, normal), vec3(0.0, 0.0, 1.0)), 0.0), 28.0);
+    float fresnel = pow(1.0 - normal.z, 2.5);
+    vec3 lit = rgb * (shape.w + (1.0 - shape.w) * diffuse) + volume.y * 1.6 * glint + volume.z * 1.4 * fresnel * paint.rgb;
+    rgb = mix(rgb, lit, volume.x);
+  }
   // detail (VFX Essential's second texture layer): scrolling noise multiplied over the result.
   if (detail.x > 0.0) {
     vec2 scroll = vec2(cos(detail.w), sin(detail.w)) * clock * detail.y;

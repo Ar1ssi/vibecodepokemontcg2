@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ShapeUtils, Vector2 } from 'three';
 
-import { createGpuCanvas } from '../../../../board3d/fx/gpu-canvas.mjs';
-import { playMoveInScene } from '../scene-move-player.js';
+import { PAINT_TEXELS, createGpuCanvas } from '../../../../board3d/fx/gpu-canvas.mjs';
+import { CAST, playMoveInScene } from '../scene-move-player.js';
 import { SPECS } from '../specs/index.mjs';
 import { fireBlast } from '../specs/fire.mjs';
 
@@ -84,6 +84,19 @@ test('a frame just after contact records back, front and top runs; the entry end
   assert.ok(recording.runs.some((run) => run.layer === 'back' && run.depthTest));
   assert.ok(recording.vertexCount > 0);
   assert.equal(frameAt(scene, 1900 + 760 + 1001).keep, false);
+});
+
+test('design 076: a cast pass lays the move on the cloth first, as shadow and light pools', () => {
+  const scene = fakeScene();
+  playMoveInScene({ scene, spec: fireBlast, attackerId: 1, defenderId: 2, seed: 7 });
+  const { recording } = frameAt(scene, 1060);
+  const first = recording.runs[0];
+  assert.equal(first.layer, 'back');
+  assert.equal(first.depthTest, true);
+  const vertex = recording.vertices.subarray(first.first * 9, first.first * 9 + 9);
+  const row = recording.paints.subarray(vertex[8] * PAINT_TEXELS * 4, (vertex[8] + 1) * PAINT_TEXELS * 4);
+  assert.equal(row[2], 0, 'cast paints run flat');
+  assert.ok(row[39] <= Math.max(CAST.light, CAST.shadow) + 1e-6, 'cast alpha is scaled down');
 });
 
 test('the same scene time records the same drawing (a frozen preview stands still)', () => {

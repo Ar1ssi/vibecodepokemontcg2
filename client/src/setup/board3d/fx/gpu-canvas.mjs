@@ -12,10 +12,10 @@
 // fragment's coverage is (halfWidth + feather − |across|) / feather.
 
 // Paint row texels: 0 head · 1–2 geometry · 3–4 inverse transform · 5 style params · 6 dash ·
-// 7–8 stop offsets · 9–16 stop colours · 17–20 modifiers (FX_MODS).
+// 7–8 stop offsets · 9–16 stop colours · 17–22 modifiers (FX_MODS).
 
 export const VERTEX_FLOATS = 9;
-export const PAINT_TEXELS = 21;
+export const PAINT_TEXELS = 23;
 const PAINT_FLOATS = PAINT_TEXELS * 4;
 export const MAX_STOPS = 8;
 export const MAX_CLIP_DEPTH = 4;
@@ -57,6 +57,8 @@ export const FX_MODS = Object.freeze({
   dissolve: Object.freeze({ texel: 17, params: [['amount', 0], ['width', 0.12], ['gain', 1.5], ['scale', 3]] }),
   distort: Object.freeze({ texel: 19, params: [['strength', 0], ['speed', 1], ['scale', 3], ['angle', 0]] }),
   detail: Object.freeze({ texel: 20, params: [['amount', 0], ['speed', 1], ['scale', 4], ['angle', -90]] }),
+  volume: Object.freeze({ texel: 21, params: [['amount', 0], ['spec', 0.6], ['rim', 0.5], ['light', 120]] }),
+  volumeShape: Object.freeze({ texel: 22, params: [['bump', 0.35], ['bumpScale', 4], ['radius', 0.15], ['ambient', 0.35]] }),
 });
 const DISSOLVE_EDGE_TEXEL = 18;
 
@@ -80,7 +82,62 @@ const writeMods = (paints, o, fxMod) => {
   detail[0] = clamp01(detail[0]);
   detail[3] = (detail[3] * Math.PI) / 180;
   paints.set(detail, o + FX_MODS.detail.texel * 4);
+  const volume = modParams(fxMod.volume, FX_MODS.volume);
+  volume[0] = clamp01(volume[0]);
+  volume[3] = (volume[3] * Math.PI) / 180;
+  paints.set(volume, o + FX_MODS.volume.texel * 4);
+  paints.set(modParams(fxMod.volume, FX_MODS.volumeShape), o + FX_MODS.volumeShape.texel * 4);
 };
+
+/**
+ * Lift (`ctx.fxLift`): raises geometry off the cloth so the board camera sees it in depth. All
+ * heights in units (lane heights); points are read in the transform current when it is set.
+ * - `z`: a constant height.
+ * - `arc` with `from` / `to` ([x, y]): extra height 4·t·(1 − t)·arc along that segment, so a beam
+ *   or a thrown body rises off the attacker and comes down on the defender.
+ * - `stand` 0–1 with `at` ([x, y]): tilts the shape upright (1 = vertical) about the screen-
+ *   horizontal line through `at`; what sits above `at` on screen rises, facing the camera. Shapes
+ *   reaching below `at` sink under it, so stand them on their base or add `z`.
+ * @returns {{ z: number, arc: number, from: {x:number,y:number}|null, to: {x:number,y:number}|null,
+ *   stand: number, at: {x:number,y:number}|null } | null}
+ */
+const resolveLift = (lift, transform) => {
+  if (!lift || typeof lift !== 'object') return null;
+  const num = (v) => (Number.isFinite(v) ? Number(v) : 0);
+  const point = (p) => (Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]) ? applyTo(transform, p[0], p[1]) : null);
+  const from = point(lift.from);
+  const to = point(lift.to);
+  const at = point(lift.at);
+  return {
+    z: num(lift.z),
+    arc: from && to ? num(lift.arc) : 0,
+    from,
+    to,
+    stand: at ? clamp01(num(lift.stand)) : 0,
+    at,
+  };
+};
+
+/** Where a stage point sits under `lift`: its (possibly folded) x, y and its height in px. */
+export function liftPoint(lift, x, y, unit) {
+  if (!lift) return { x, y, h: 0 };
+  let h = lift.z * unit;
+  if (lift.arc) {
+    const dx = lift.to.x - lift.from.x;
+    const dy = lift.to.y - lift.from.y;
+    const len2 = dx * dx + dy * dy;
+    const t = len2 > 0 ? clamp01(((x - lift.from.x) * dx + (y - lift.from.y) * dy) / len2) : 0;
+    h += 4 * t * (1 - t) * lift.arc * unit;
+  }
+  if (lift.stand > 0) {
+    // Stage y runs down the screen: a point above the base line has a negative offset.
+    const above = lift.at.y - y;
+    const angle = (lift.stand * Math.PI) / 2;
+    y = lift.at.y - above * Math.cos(angle);
+    h += above * Math.sin(angle);
+  }
+  return { x, y, h };
+}
 const KIND_NAMES = Object.freeze(['solid', 'linear', 'radial']);
 
 /**
@@ -229,6 +286,23 @@ const arcSegments = (sweep, radiusPx) => Math.min(96, Math.max(8, Math.ceil((Mat
 
 // ---- the recorder ----------------------------------------------------------------------
 
+/**
+ * A cast pass's settings, defaults filled: `shadow` / `light` scale solid and additive paint
+ * alpha, `dx`, `dy` push a point per px of height (stage px; light from the top-left by default),
+ * `blur` widens every feather to this many units. Null for an ordinary pass.
+ */
+export function resolveCast(cast) {
+  if (!cast || typeof cast !== 'object') return null;
+  const num = (v, fallback) => (Number.isFinite(v) ? Number(v) : fallback);
+  return {
+    shadow: clamp01(num(cast.shadow, 0.35)),
+    light: clamp01(num(cast.light, 0.22)),
+    dx: num(cast.dx, 0.35),
+    dy: num(cast.dy, 0.55),
+    blur: Math.max(0, num(cast.blur, 0.08)),
+  };
+}
+
 const defaultState = () => ({
   transform: IDENTITY,
   fillStyle: '#000',
@@ -244,6 +318,8 @@ const defaultState = () => ({
   dashOffset: 0,
   fxStyle: null,
   fxMod: null,
+  fxLift: null,
+  lift: null,
   clipDepth: 0,
   clips: [],
 });
@@ -263,7 +339,7 @@ export function createGpuCanvas({ triangulate, size = 4096, maxVertices = MAX_VE
   let runs = [];
   let pattern = null;
   let images = [];
-  let pass = { layer: 'front', z: 0, depthTest: false, unit: 100, seed: 0 };
+  let pass = { layer: 'front', z: 0, depthTest: false, unit: 100, seed: 0, cast: null };
   let state = defaultState();
   const stack = [];
   let subpaths = [];
@@ -307,11 +383,14 @@ export function createGpuCanvas({ triangulate, size = 4096, maxVertices = MAX_VE
     }
   };
 
-  const pushVertex = (x, y, edge, across, halfWidth, feather, along, paint) => {
+  const pushVertex = (sx, sy, edge, across, halfWidth, feather, along, paint) => {
     const i = vertexCount * VERTEX_FLOATS;
-    vertices[i] = x;
-    vertices[i + 1] = y;
-    vertices[i + 2] = pass.z;
+    const { x, y, h } = liftPoint(state.lift, sx, sy, pass.unit);
+    // A cast pass lays everything on the cloth, pushed away from the light by its height.
+    const cast = pass.cast;
+    vertices[i] = cast ? x + h * cast.dx : x;
+    vertices[i + 1] = cast ? y + h * cast.dy : y;
+    vertices[i + 2] = cast ? pass.z : pass.z + h;
     vertices[i + 3] = edge;
     vertices[i + 4] = across;
     vertices[i + 5] = halfWidth;
@@ -388,7 +467,14 @@ export function createGpuCanvas({ triangulate, size = 4096, maxVertices = MAX_VE
     } else {
       stops = [{ offset: 0, rgba: parseColour(style) }];
     }
-    const fx = styleFor(state.fxStyle, kind, stroke);
+    const cast = pass.cast;
+    if (cast) {
+      // Solid paint shadows the cloth; light (additive) paint pools its own colour on it.
+      const light = blendOf() === 'add';
+      const k = light ? cast.light : cast.shadow;
+      stops = stops.map(({ offset, rgba }) => ({ offset, rgba: light ? [rgba[0], rgba[1], rgba[2], rgba[3] * k] : [0, 0, 0, rgba[3] * k] }));
+    }
+    const fx = cast ? null : styleFor(state.fxStyle, kind, stroke);
     const styleName = STYLE_NAMES.includes(fx?.id) ? fx.id : STYLE_NAMES[fx?.id] ?? 'flat';
     paints.set([kind, stops.length, STYLE_IDS[styleName], pass.seed + row * 0.618], o);
     // Device (stage px) → paint space, so a gradient follows the transform it is filled under.
@@ -406,7 +492,7 @@ export function createGpuCanvas({ triangulate, size = 4096, maxVertices = MAX_VE
       const [r, g, b, a] = stop.rgba;
       paints.set([r, g, b, a * alpha], o + 36 + i * 4);
     });
-    writeMods(paints, o, state.fxMod);
+    writeMods(paints, o, cast ? (state.fxMod?.dissolve ? { dissolve: state.fxMod.dissolve } : null) : state.fxMod);
     paintCount += 1;
     return row;
   };
@@ -414,7 +500,8 @@ export function createGpuCanvas({ triangulate, size = 4096, maxVertices = MAX_VE
   const featherNow = () => {
     const blur = /blur\(\s*([\d.]+)px\s*\)/.exec(state.filter ?? '');
     const blurPx = blur ? Number(blur[1]) * scaleOf(state.transform) : 0;
-    return Math.max(MIN_FEATHER, blurPx * BLUR_FEATHER);
+    const castBlur = pass.cast ? pass.unit * pass.cast.blur : 0;
+    return Math.max(MIN_FEATHER, blurPx * BLUR_FEATHER, castBlur);
   };
 
   // ---- path building (points stored in stage px) ----
@@ -502,6 +589,14 @@ export function createGpuCanvas({ triangulate, size = 4096, maxVertices = MAX_VE
     },
     set fxMod(v) {
       state.fxMod = v && typeof v === 'object' ? v : null;
+    },
+    /** Lift (resolveLift): raises the geometry that follows off the cloth. */
+    get fxLift() {
+      return state.fxLift;
+    },
+    set fxLift(v) {
+      state.fxLift = v && typeof v === 'object' ? v : null;
+      state.lift = resolveLift(state.fxLift, state.transform);
     },
 
     save() {
@@ -925,9 +1020,20 @@ export function createGpuCanvas({ triangulate, size = 4096, maxVertices = MAX_VE
 
   return {
     ctx,
-    /** Starts a pass: later draws record at its layer, height and depth test; `unit` = lane h. */
-    begin({ layer = 'front', z = 0, depthTest = false, unit: unitPx = 100, seed = 0 } = {}) {
-      pass = { layer, z, depthTest: Boolean(depthTest), unit: unitPx > 0 ? unitPx : 100, seed: Number(seed) || 0 };
+    /**
+     * Starts a pass: later draws record at its layer, height and depth test; `unit` = lane h.
+     * `cast` ({ shadow, light, dx, dy, blur }) makes it a cast pass (resolveCast): the same draws
+     * replayed flat on the cloth as shadow and light pools.
+     */
+    begin({ layer = 'front', z = 0, depthTest = false, unit: unitPx = 100, seed = 0, cast = null } = {}) {
+      pass = {
+        layer,
+        z,
+        depthTest: Boolean(depthTest),
+        unit: unitPx > 0 ? unitPx : 100,
+        seed: Number(seed) || 0,
+        cast: resolveCast(cast),
+      };
       state = defaultState();
       stack.length = 0;
       subpaths = [];

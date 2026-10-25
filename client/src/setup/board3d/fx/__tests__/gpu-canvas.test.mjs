@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ShapeUtils, Vector2 } from 'three';
 
-import { FX_MODS, MAX_CLIP_DEPTH, MAX_IMAGES, PAINT_KIND, PAINT_TEXELS, STYLE_IDS, VERTEX_FLOATS, createGpuCanvas, parseColour } from '../gpu-canvas.mjs';
+import { FX_MODS, MAX_CLIP_DEPTH, liftPoint, resolveCast, MAX_IMAGES, PAINT_KIND, PAINT_TEXELS, STYLE_IDS, VERTEX_FLOATS, createGpuCanvas, parseColour } from '../gpu-canvas.mjs';
 
 const triangulate = (contour, holes) =>
   ShapeUtils.triangulateShape(
@@ -362,6 +362,78 @@ test('a dissolve-only hint leaves distort and detail off', () => {
   assert.equal(row[FX_MODS.distort.texel * 4], 0);
   assert.equal(row[FX_MODS.detail.texel * 4], 0);
   assert.equal(row[18 * 4 + 3], 0, 'no edge colour: the shader uses the paint');
+});
+
+test('fxLift raises vertices: constant z, an arc peaking mid-segment, nothing after null', () => {
+  const { ctx, recording } = make();
+  ctx.fillStyle = '#fff';
+  ctx.fxLift = { z: 0.5, arc: 1, from: [0, 0], to: [200, 0] };
+  ctx.fillRect(98, -1, 4, 2);
+  ctx.fxLift = null;
+  ctx.fillRect(0, 0, 4, 4);
+  const rec = recording();
+  const zs = [];
+  for (let i = 0; i < rec.vertexCount; i += 1) zs.push(vertexAt(rec, i)[2]);
+  const lifted = zs.filter((z) => z > 100);
+  assert.ok(lifted.length > 0, 'the lifted rect sits near 3 + 50 + 100 px');
+  for (const z of lifted) assert.ok(Math.abs(z - 153) < 1, `z ${z}`);
+  assert.ok(zs.some((z) => z === 3), 'the next fill is back on the pass height');
+});
+
+test('liftPoint stands a shape up about its base line; points above it rise, x is kept', () => {
+  const lift = { z: 0, arc: 0, from: null, to: null, stand: 1, at: { x: 0, y: 100 } };
+  const top = liftPoint(lift, 5, 60, 100);
+  close(top.x, 5);
+  close(top.y, 100);
+  close(top.h, 40);
+  const half = liftPoint({ ...lift, stand: 0.5 }, 0, 60, 100);
+  close(half.h, 40 * Math.SQRT1_2);
+  assert.deepEqual(liftPoint(null, 1, 2, 100), { x: 1, y: 2, h: 0 });
+});
+
+test('a lift is read in the transform current when it is set', () => {
+  const { ctx, recording } = make();
+  ctx.translate(100, 0);
+  ctx.fxLift = { arc: 1, from: [0, 0], to: [200, 0] };
+  ctx.resetTransform();
+  ctx.fillRect(198, -1, 4, 2);
+  const rec = recording();
+  const top = Math.max(...Array.from({ length: rec.vertexCount }, (_, i) => vertexAt(rec, i)[2]));
+  assert.ok(Math.abs(top - 103) < 2, `peak sits at stage x 200: ${top}`);
+});
+
+test('a cast pass lays lifted geometry on the cloth, offset by height, shadowing solid and pooling light', () => {
+  const { ctx, recording, begin } = make();
+  begin({ layer: 'back', z: 0.25, unit: 100, cast: { shadow: 0.5, light: 0.2, dx: 1, dy: 0, blur: 0 } });
+  ctx.fillStyle = 'rgba(255, 0, 0, 1)';
+  ctx.fxStyle = { id: 'flame' };
+  ctx.fxMod = { distort: { strength: 0.3 }, dissolve: { amount: 0.4 } };
+  ctx.fxLift = { z: 0.1 };
+  ctx.fillRect(0, 0, 4, 4);
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.fillRect(0, 0, 4, 4);
+  const rec = recording();
+  for (let i = 0; i < rec.vertexCount; i += 1) assert.equal(vertexAt(rec, i)[2], 0.25);
+  assert.ok(vertexAt(rec, 0)[0] >= 10 - 1, 'pushed 10 px along dx');
+  const shadow = paintRow(rec, 0);
+  assert.equal(shadow[2], STYLE_IDS.flat, 'casts run flat');
+  assert.deepEqual([...shadow.subarray(36, 40)], [0, 0, 0, 0.5]);
+  assert.equal(shadow[FX_MODS.distort.texel * 4], 0, 'no distort in a cast');
+  close(shadow[FX_MODS.dissolve.texel * 4], 0.4, 1e-6);
+  const light = paintRow(rec, 1);
+  assert.deepEqual([...light.subarray(36, 40)].map((v) => Math.round(v * 100) / 100), [1, 0, 0, 0.2]);
+  assert.equal(resolveCast(null), null);
+  assert.deepEqual(resolveCast({}), { shadow: 0.35, light: 0.22, dx: 0.35, dy: 0.55, blur: 0.08 });
+});
+
+test('fxMod volume writes lighting and shape texels; the light angle in radians', () => {
+  const { ctx, recording } = make();
+  ctx.fxMod = { volume: { amount: 2, light: 90, bump: 0 } };
+  ctx.fillRect(0, 0, 4, 4);
+  const row = paintRow(recording(), 0);
+  const at = (texel) => [...row.subarray(texel * 4, texel * 4 + 4)].map((v) => Math.round(v * 100) / 100);
+  assert.deepEqual(at(FX_MODS.volume.texel), [1, 0.6, 0.5, 1.57]);
+  assert.deepEqual(at(FX_MODS.volumeShape.texel), [0, 4, 0.15, 0.35]);
 });
 
 test('reset empties the recording; begin restarts the drawing state', () => {
