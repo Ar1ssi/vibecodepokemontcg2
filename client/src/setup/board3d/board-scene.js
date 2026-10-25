@@ -15,6 +15,7 @@ import { createPileMeshes } from './pile-mesh.js';
 import { PILE_ZONES, pilePose, pileThicknessPx } from './pile-poses.mjs';
 import { pileVisualCount } from './pile-stack.mjs';
 import { createTable } from './table-mesh.js';
+import { createStadiumEnvironment } from './stadium-environment-mesh.js';
 import { easeOutCubic } from './tween.mjs';
 import { DRAG_TILT, DRAG_TILT_STILL, createDragTilt, stepDragTilt } from '../image-logic/drag-tilt.mjs';
 import { matTiltAngles } from '../deck-constructor/mat-tilt.mjs';
@@ -196,6 +197,14 @@ export function createBoardScene({
 
   const table = createTable({ scene, textures, three, renderer, RoomEnvironment });
   tableFrame.add(table.group);
+  // Design 077 (prototype): a Stadium's place under the board; off until setStadiumEnvironment.
+  const environment = createStadiumEnvironment({
+    three,
+    renderer,
+    parent: tableFrame,
+    motionReduced,
+    onNeedsRender: () => invalidate(),
+  });
 
   // Piles and count labels sit in the table frame, so they tilt with the cloth.
   const pilesGroup = new three.Group();
@@ -277,7 +286,8 @@ export function createBoardScene({
     cardsAdvancedOffFrame = false;
     const pilesMoving = piles.update(now);
     const overlaysMoving = overlays.update(now);
-    const animating = cardsMoving || pilesMoving || overlaysMoving;
+    const environmentMoving = environment.update(now, camera);
+    const animating = cardsMoving || pilesMoving || overlaysMoving || environmentMoving;
     renderer.render(scene, camera);
     const fxRunning = fxLayer.active() && fxLayer.render();
     if (animating || fxRunning) invalidate();
@@ -405,6 +415,7 @@ export function createBoardScene({
     if (disposed || !next) return;
     layout = next;
     table.setLayout(next);
+    environment.setLayout(next);
     syncZonePlanes();
     syncCards(model, model, { relayout: true });
     syncPiles(model);
@@ -414,6 +425,13 @@ export function createBoardScene({
   const setMat = (spec) => {
     if (disposed) return;
     table.setMat(spec);
+    invalidate();
+  };
+
+  /** Design 077 (prototype): shows the Stadium environment `key` under the board, or none (null). */
+  const setStadiumEnvironment = (key) => {
+    if (disposed || !environment.setKey(key)) return;
+    table.setCutout(environment.active() ? environment.cutout : null);
     invalidate();
   };
 
@@ -1156,6 +1174,7 @@ export function createBoardScene({
     }
     appliedPoses.clear();
     pileTops.clear();
+    environment.dispose();
     table.dispose();
     scene.remove(tableFrame);
     uiState.clear();
@@ -1189,6 +1208,7 @@ export function createBoardScene({
     fx,
     setUiState,
     setMat,
+    setStadiumEnvironment,
     setHover,
     setPointerTilt,
     setHandPose,

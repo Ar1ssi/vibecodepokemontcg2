@@ -4,6 +4,7 @@
 import { cameraFromCssTilt, cameraTcgLive } from './board-camera.mjs';
 import { boardWidthFrac, flatLayout, halfFromViewport } from './board-layout.mjs';
 import { CARD_ZONES } from './board-model.mjs';
+import { environmentOverride } from './stadium-environment-layout.mjs';
 
 const ACTIVE_CLASS = 'board3d-active';
 // Past the scene's longest tween (board-scene.js CARD_POSE_MS 180, card-mesh.js FLIP_MS 300).
@@ -353,6 +354,12 @@ export async function initializeBoard3d({
       resetState: () => gl.renderer.resetState(),
     });
     if (impactHost) scene.fx.setImpacts(impactHost);
+    // Design 077 (prototype): `?stadiumEnv=scorched-earth` (or local storage) shows a Stadium board.
+    try {
+      scene.setStadiumEnvironment?.(environmentOverride(win?.localStorage, win?.location?.search ?? ''));
+    } catch (error) {
+      console.warn('board3d: stadium environment override unreadable', error?.message || error);
+    }
     Object.assign(session, { canvas, gl, textures, clock, scene, input: createInput(canvas, scene) });
     if (doc.visibilityState !== 'hidden') clock.start();
     return true;

@@ -1,17 +1,45 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { CARD_UNITS } from '../card-geometry.mjs';
 import { flatLayout } from '../board-layout.mjs';
+import { placementPose } from '../card-poses.mjs';
+import { pilePose } from '../pile-poses.mjs';
+import { tableBounds } from '../table-uv.mjs';
 import { getMatLayout } from '../../sizing/mat-layouts.mjs';
+import { NO_MAT_LAYOUT_ID } from '../../sizing/mat-spec.mjs';
 import {
   ENVIRONMENT_OVERRIDE_KEY,
+  VOLCANO_MARGIN_PX,
+  VOLCANO_MAX_RADIUS,
+  VOLCANO_MIN_RADIUS,
   environmentFootprints,
   environmentKeyFor,
   environmentOverride,
+  volcanoSpot,
 } from '../stadium-environment-layout.mjs';
 
-// The board width board3d.js lays out beside the sidebox (0.755 of 1920).
-const HALF = { w: 1449.6, h: 540 };
-const simLayout = (half) => flatLayout(getMatLayout('sim'), half);
+// The no-mat profile the board draws by default, and the simulator's own, at the board width
+// board3d.js lays out beside the sidebox (0.755 of 1920) and at full width.
+const PROFILES = [NO_MAT_LAYOUT_ID, 'sim'];
+const HALVES = [
+  { w: 1449.6, h: 540 },
+  { w: 1920, h: 540 },
+];
+const layoutOf = (profile, half) => flatLayout(getMatLayout(profile), half);
+
+const distanceToRect = (x, y, rect) =>
+  Math.hypot(Math.max(rect.x - x, 0, x - (rect.x + rect.w)), Math.max(rect.y - y, 0, y - (rect.y + rect.h)));
+
+const close = (actual, expected, label) => assert.ok(Math.abs(actual - expected) < 1e-9, `${label}: ${actual} vs ${expected}`);
+
+/** The rect of the card a pose draws: centred on it, `widthPx` wide, card-shaped. */
+const drawnRect = (pose) => {
+  const h = (pose.widthPx * CARD_UNITS.h) / CARD_UNITS.w;
+  return { x: pose.x - pose.widthPx / 2, y: pose.y - h / 2, w: pose.widthPx, h };
+};
+const assertSameRect = (actual, expected, label) => {
+  for (const key of ['x', 'y', 'w', 'h']) close(actual[key], expected[key], `${label}.${key}`);
+};
 
 // customhb-299 is Scorched Earth in client/src/assets/custom-sets/customhb/set.json.
 test('environmentKeyFor maps Scorched Earth by id, or by set and number when the id is missing', () => {
@@ -27,25 +55,62 @@ test('environmentKeyFor maps Scorched Earth by id, or by set and number when the
 test('environmentOverride reads the URL first, then storage, and ignores unknown or unreadable values', () => {
   const storage = (value) => ({ getItem: (key) => (key === ENVIRONMENT_OVERRIDE_KEY ? value : null) });
   assert.equal(environmentOverride(storage('scorched-earth')), 'scorched-earth');
-  assert.equal(environmentOverride(storage(null), '?stadiumEnv=scorched-earth'), 'scorched-earth');
+  assert.equal(environmentOverride(storage(null), '?e2e=1&stadiumEnv=scorched-earth'), 'scorched-earth');
   assert.equal(environmentOverride(storage('beach')), null);
   assert.equal(environmentOverride(null), null);
   assert.equal(environmentOverride({ getItem: () => { throw new Error('blocked'); } }), null);
 });
 
-test('environmentFootprints puts a slab under every place the board draws a card', () => {
-  const layout = simLayout(HALF);
-  const { slabs, flats } = environmentFootprints(layout);
-  // Per side: Active, 5 Bench, Prize block, deck, discard, Lost Zone; plus the Stadium.
-  assert.equal(slabs.length, 21);
-  assert.equal(flats.length, 2);
-  const active = layout.self.active;
-  const box = layout.self.cardBox.active;
-  assert.deepEqual(slabs[0], { x: active.x + (active.w - box.w) / 2, y: active.y + (active.h - box.h) / 2, w: box.w, h: box.h });
-  assert.deepEqual(slabs.at(-1), layout.stadium);
-  assert.deepEqual(flats, [layout.self.board, layout.opp.board]);
-});
+for (const profile of PROFILES) {
+  test(`environmentFootprints (${profile}) lies exactly under the cards the board's poses draw`, () => {
+    const layout = layoutOf(profile, HALVES[0]);
+    const { slabs, flats } = environmentFootprints(layout);
+    // Per side: Active, 5 Bench, Prize block, deck, discard, Lost Zone; plus the Stadium.
+    assert.equal(slabs.length, 21);
+    assert.deepEqual(flats, [layout.self.board, layout.opp.board]);
+    const active = placementPose({ side: 'self', zone: 'active', index: 0, instanceId: 1 }, layout);
+    assertSameRect(slabs[0], drawnRect(active), 'self active');
+    const bench = placementPose({ side: 'self', zone: 'bench', index: 2, instanceId: 2 }, layout);
+    assertSameRect(slabs[3], drawnRect(bench), 'self bench 2');
+    const prizes = [0, 1, 2, 3, 4, 5].map((index) =>
+      drawnRect(placementPose({ side: 'self', zone: 'prizes', index, instanceId: 10 + index }, layout))
+    );
+    for (const prize of prizes) {
+      assert.ok(prize.x >= slabs[6].x - 1e-9 && prize.x + prize.w <= slabs[6].x + slabs[6].w + 1e-9, 'prize inside block (x)');
+      assert.ok(prize.y >= slabs[6].y - 1e-9 && prize.y + prize.h <= slabs[6].y + slabs[6].h + 1e-9, 'prize inside block (y)');
+    }
+    assertSameRect(slabs[7], drawnRect(pilePose('self', 'deck', layout)), 'self deck');
+    const stadium = layout.stadium;
+    assertSameRect(slabs.at(-1), drawnRect({ x: stadium.x + stadium.w / 2, y: stadium.y + stadium.h / 2, widthPx: stadium.w }), 'stadium');
+  });
+}
 
 test('environmentFootprints of a missing layout is empty', () => {
   assert.deepEqual(environmentFootprints(null), { slabs: [], flats: [] });
+});
+
+for (const profile of PROFILES) {
+  for (const half of HALVES) {
+    test(`volcanoSpot (${profile}, ${half.w} px half) stands left of the Stadium, clear of every footprint and edge`, () => {
+      const layout = layoutOf(profile, half);
+      const footprints = environmentFootprints(layout);
+      const spot = volcanoSpot(layout, footprints);
+      assert.ok(spot, 'a volcano fits');
+      assert.ok(spot.r >= VOLCANO_MIN_RADIUS && spot.r <= VOLCANO_MAX_RADIUS, `radius ${spot.r}`);
+      assert.ok(spot.x <= layout.stadium.x, 'left of the Stadium');
+      for (const rect of [...footprints.slabs, ...footprints.flats]) {
+        assert.ok(distanceToRect(spot.x, spot.y, rect) >= spot.r + VOLCANO_MARGIN_PX - 1e-9, `clear of ${JSON.stringify(rect)}`);
+      }
+      const bounds = tableBounds(layout);
+      assert.ok(spot.x - spot.r - VOLCANO_MARGIN_PX >= bounds.x - 1e-9);
+      assert.ok(spot.y - spot.r - VOLCANO_MARGIN_PX >= bounds.y - 1e-9);
+      assert.ok(spot.y + spot.r + VOLCANO_MARGIN_PX <= bounds.y + bounds.h + 1e-9);
+    });
+  }
+}
+
+test('volcanoSpot is null without a Stadium rect or when no circle fits', () => {
+  const layout = layoutOf(NO_MAT_LAYOUT_ID, HALVES[0]);
+  assert.equal(volcanoSpot({ ...layout, stadium: null }, environmentFootprints(layout)), null);
+  assert.equal(volcanoSpot(layout, { slabs: [tableBounds(layout)], flats: [] }), null);
 });
