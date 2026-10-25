@@ -7,155 +7,224 @@
     <style>
       html, body { margin: 0; height: 100%; background: #050506; overflow: hidden; font: 13px system-ui, sans-serif; color: #e8e2dc; }
       canvas { display: block; }
-      #panel { position: fixed; top: 12px; left: 12px; background: rgba(12, 10, 10, 0.82); border: 1px solid #3a2a22; border-radius: 8px; padding: 10px 12px; display: grid; gap: 8px; min-width: 230px; }
+      #panel { position: fixed; top: 12px; left: 12px; background: rgba(12, 10, 10, 0.82); border: 1px solid #3a2a22; border-radius: 8px; padding: 10px 12px; display: grid; gap: 8px; min-width: 240px; z-index: 1; }
       #panel h1 { font-size: 14px; margin: 0; color: #ffb070; }
       #panel button { background: #2a1a12; color: #ffd8b0; border: 1px solid #6a3a20; border-radius: 5px; padding: 6px 8px; cursor: pointer; }
       #panel button:hover { background: #3a2216; }
-      #panel label { display: flex; gap: 6px; align-items: center; }
+      #panel label { display: flex; gap: 6px; align-items: center; justify-content: space-between; }
       #panel .row { display: flex; gap: 6px; }
       #panel .row button { flex: 1; }
+      #panel.collapsed > :not(h1) { display: none; }
       #status { color: #a89888; font-size: 12px; }
     </style>
   </head>
   <body>
     <div id="panel">
-      <h1>Scorched Earth — stadium board</h1>
+      <h1 title="click to collapse">Scorched Earth — stadium board</h1>
       <div class="row">
         <button id="play">Play Stadium</button>
         <button id="discard">Discard</button>
       </div>
       <label>Heat <input id="heat" type="range" min="0" max="2" step="0.05" value="1" /></label>
+      <label>Height <input id="relief" type="range" min="0" max="2" step="0.05" value="1" /></label>
       <label>Scrub reveal <input id="scrub" type="range" min="0" max="1" step="0.01" value="1" /></label>
+      <label>Camera
+        <select id="camera"><option value="tcgl">TCG Live</option><option value="tilt12">Tilt 12°</option></select>
+      </label>
       <label><input id="static" type="checkbox" /> FX off (static frame)</label>
       <label><input id="cards" type="checkbox" checked /> Show cards</label>
-      <label><input id="opp" type="checkbox" /> Opponent played it</label>
       <div id="status"></div>
     </div>
     <script type="module">
       import * as THREE from 'three';
       import {
-        ENVIRONMENT_VERTEX,
+        SCORCHED_EARTH_VERTEX,
         SCORCHED_EARTH_FRAGMENT,
         EMBER_VERTEX,
         EMBER_FRAGMENT,
         MAX_ZONES,
+        RELIEF_SEGMENTS,
       } from '/src/setup/board3d/stadium-environment-shader.mjs';
+      import { flatLayout, halfFromViewport } from '/src/setup/board3d/board-layout.mjs';
+      import { cameraFromCssTilt, cameraTcgLive } from '/src/setup/board3d/board-camera.mjs';
+      import { tableBounds } from '/src/setup/board3d/table-uv.mjs';
+      import { getMatLayout } from '/src/setup/sizing/mat-layouts.mjs';
 
-      // Design 077 prototype: a stand-in table (table px, origin near-left) with the real shader.
-      const W = 1600;
-      const H = 1200;
-      const CARD = { w: 120, h: 168 };
+      // Design 077 prototype: the real `sim` layout and board cameras, a stand-in mat and cards,
+      // and the real shader. The board is rebuilt on resize, as board3d.js relayouts.
       const INTRO_MS = 1600;
       const EXIT_MS = 900;
       const AMBIENT_FPS = 30;
-      const EMBER_COUNT = 28;
-
-      const selfZones = {
-        active: [740, 346, CARD.w, CARD.h],
-        bench: [0, 1, 2, 3, 4].map((i) => [800 + (i - 2) * 150 - 60, 16, CARD.w, CARD.h]),
-        deck: [1390, 66, CARD.w, CARD.h],
-        discard: [1390, 276, CARD.w, CARD.h],
-        prizes: [70, 60, 160, 400],
-      };
-      const mirror = ([x, y, w, h]) => [W - x - w, H - y - h, w, h];
-      const stadiumZone = [270, 516, CARD.w, CARD.h];
-      const zoneList = [
-        selfZones.active, ...selfZones.bench, selfZones.deck, selfZones.discard, selfZones.prizes,
-      ];
-      const zones = [...zoneList, ...zoneList.map(mirror), stadiumZone];
+      const EMBER_COUNT = 60;
+      const DEG = Math.PI / 180;
 
       const renderer = new THREE.WebGLRenderer({ antialias: true });
       renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
       document.body.appendChild(renderer.domElement);
       const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(28, 1, 10, 20000);
-      const viewDirection = new THREE.Vector3(0, -0.47, 0.88).normalize();
+      const camera = new THREE.PerspectiveCamera();
+      const tableFrame = new THREE.Group();
+      scene.add(tableFrame);
 
       const loader = new THREE.TextureLoader();
+      const textureCache = new Map();
       const texture = (src) => {
-        const t = loader.load(src, () => invalidate());
-        t.colorSpace = THREE.SRGBColorSpace;
-        t.anisotropy = 8;
-        return t;
+        if (!textureCache.has(src)) {
+          const t = loader.load(src, () => invalidate());
+          t.colorSpace = THREE.SRGBColorSpace;
+          t.anisotropy = 8;
+          textureCache.set(src, t);
+        }
+        return textureCache.get(src);
       };
+      const art = (n) => `/src/assets/custom-sets/customhb/${n}/high.webp`;
+      const CARD_BACK = '/src/assets/cardback.png';
+      const MAT = '/src/assets/playmats/board/1022-rubber-playmat-dash-eevee-1.webp';
 
-      const floor = new THREE.Mesh(new THREE.PlaneGeometry(W * 2.2, H * 2.2), new THREE.MeshBasicMaterial({ color: 0x0a0a0c }));
-      floor.position.z = -2;
-      scene.add(floor);
-
-      const matTexture = texture('/src/assets/playmats/board/1022-rubber-playmat-dash-eevee-1.webp');
-      const matHalf = (rotated) => {
-        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(W, H / 2), new THREE.MeshBasicMaterial({ map: matTexture }));
-        mesh.position.set(0, rotated ? H / 4 : -H / 4, 0);
-        if (rotated) mesh.rotation.z = Math.PI;
-        return mesh;
-      };
-      scene.add(matHalf(false), matHalf(true));
-
-      const zoneUniform = Array.from({ length: MAX_ZONES }, (_, i) => new THREE.Vector4(...(zones[i] ?? [0, 0, 0, 0])));
       const uniforms = {
-        uSize: { value: new THREE.Vector2(W, H) },
-        uOrigin: { value: new THREE.Vector2(stadiumZone[0] + CARD.w / 2, stadiumZone[1] + CARD.h / 2) },
+        uMin: { value: new THREE.Vector2() },
+        uSize: { value: new THREE.Vector2() },
+        uOrigin: { value: new THREE.Vector2() },
         uTime: { value: 0 },
         uReveal: { value: 0 },
         uExit: { value: 0 },
         uHeat: { value: 1 },
-        uZones: { value: zoneUniform },
-        uZoneCount: { value: zones.length },
+        uRelief: { value: 1 },
+        uRiverY: { value: 0 },
+        uZones: { value: Array.from({ length: MAX_ZONES }, () => new THREE.Vector4()) },
+        uZoneCount: { value: 0 },
         uPixelRatio: { value: renderer.getPixelRatio() },
       };
-      const environment = new THREE.Mesh(
-        new THREE.PlaneGeometry(W, H),
-        new THREE.ShaderMaterial({
-          vertexShader: ENVIRONMENT_VERTEX,
-          fragmentShader: SCORCHED_EARTH_FRAGMENT,
-          uniforms,
-          transparent: true,
-          depthWrite: false,
-        })
-      );
-      environment.position.z = 0.75;
-      scene.add(environment);
-
-      const seeds = new Float32Array(EMBER_COUNT * 4).map(() => Math.random());
+      const environmentMaterial = new THREE.ShaderMaterial({
+        vertexShader: SCORCHED_EARTH_VERTEX,
+        fragmentShader: SCORCHED_EARTH_FRAGMENT,
+        uniforms,
+        transparent: true,
+      });
+      const emberMaterial = new THREE.ShaderMaterial({
+        vertexShader: EMBER_VERTEX,
+        fragmentShader: EMBER_FRAGMENT,
+        uniforms,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      });
       const emberGeometry = new THREE.BufferGeometry();
       emberGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(EMBER_COUNT * 3), 3));
-      emberGeometry.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 4));
-      const embers = new THREE.Points(
-        emberGeometry,
-        new THREE.ShaderMaterial({
-          vertexShader: EMBER_VERTEX,
-          fragmentShader: EMBER_FRAGMENT,
-          uniforms,
-          transparent: true,
-          depthWrite: false,
-          blending: THREE.AdditiveBlending,
-        })
-      );
-      embers.frustumCulled = false;
-      scene.add(embers);
+      emberGeometry.setAttribute('aSeed', new THREE.BufferAttribute(new Float32Array(EMBER_COUNT * 4).map(() => Math.random()), 4));
 
-      const cards = new THREE.Group();
-      const cardBack = texture('/src/assets/cardback.png');
-      const addCard = (src, [x, y, w, h], rotated = false, lift = 3) => {
-        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(CARD.w, CARD.h), new THREE.MeshBasicMaterial({ map: src === 'back' ? cardBack : texture(src) }));
-        mesh.position.set(x + w / 2 - W / 2, y + h / 2 - H / 2, lift);
-        if (rotated) mesh.rotation.z = Math.PI;
-        cards.add(mesh);
+      // Where a card actually lies inside a zone rect: the card box, centred.
+      const centred = (rect, box) => ({ x: rect.x + (rect.w - box.w) / 2, y: rect.y + (rect.h - box.h) / 2, w: box.w, h: box.h });
+      const union = (rects) => {
+        const x = Math.min(...rects.map((r) => r.x));
+        const y = Math.min(...rects.map((r) => r.y));
+        return { x, y, w: Math.max(...rects.map((r) => r.x + r.w)) - x, h: Math.max(...rects.map((r) => r.y + r.h)) - y };
       };
-      const art = (n) => `/src/assets/custom-sets/customhb/${n}/high.webp`;
-      addCard(art('083'), selfZones.active);
-      addCard(art('073'), selfZones.bench[1]);
-      addCard(art('086'), selfZones.bench[2]);
-      addCard('back', selfZones.deck);
-      addCard(art('075'), mirror(selfZones.active), true);
-      addCard(art('074'), mirror(selfZones.bench[2]), true);
-      addCard('back', mirror(selfZones.deck), true);
-      const stadiumCard = new THREE.Group();
-      addCard(art('299'), stadiumZone, false, 4);
-      stadiumCard.add(cards.children.at(-1));
-      cards.add(stadiumCard);
-      scene.add(cards);
+      const footprintsOf = (side) => ({
+        active: centred(side.active, side.cardBox.active),
+        bench: side.bench.map((slot) => centred(slot, side.cardBox.bench)),
+        prizes: side.prizes.map((slot) => centred(slot, side.cardBox.prizes)),
+        prizeArea: union(side.prizes),
+        deck: centred(side.deck, side.cardBox.deck),
+        discard: centred(side.discard, side.cardBox.discard),
+        lostZone: side.lostZone,
+      });
+
+      let board = null;
+      let layout = null;
+      let stadiumMesh = null;
+      let cardsGroup = null;
+
+      function buildBoard() {
+        if (board) {
+          tableFrame.remove(board);
+          board.traverse((o) => o.geometry && o.geometry !== emberGeometry && o.geometry.dispose());
+        }
+        board = new THREE.Group();
+        const viewport = { w: innerWidth, h: innerHeight };
+        const half = halfFromViewport(viewport, 1);
+        layout = flatLayout(getMatLayout('sim'), half, { viewport });
+        const bounds = tableBounds(layout);
+        const depth = layout.depth;
+
+        const floor = new THREE.Mesh(new THREE.PlaneGeometry(bounds.w * 2.4, bounds.h * 3), new THREE.MeshBasicMaterial({ color: 0x0a0a0c }));
+        floor.position.set(0, depth, -2);
+        board.add(floor);
+        for (const far of [false, true]) {
+          const mat = new THREE.Mesh(new THREE.PlaneGeometry(bounds.w, depth), new THREE.MeshBasicMaterial({ map: texture(MAT) }));
+          mat.position.set(0, far ? depth * 1.5 : depth / 2, 0);
+          if (far) mat.rotation.z = Math.PI;
+          board.add(mat);
+        }
+
+        const self = footprintsOf(layout.self);
+        const opp = footprintsOf(layout.opp);
+        const zones = [];
+        for (const side of [self, opp]) zones.push(side.active, ...side.bench, side.prizeArea, side.deck, side.discard, side.lostZone);
+        zones.push(layout.stadium);
+        zones.forEach((r, i) => uniforms.uZones.value[i].set(r.x, r.y, r.w, r.h));
+        uniforms.uZoneCount.value = zones.length;
+        uniforms.uMin.value.set(bounds.x, bounds.y);
+        uniforms.uSize.value.set(bounds.w, bounds.h);
+        uniforms.uRiverY.value = depth;
+        uniforms.uOrigin.value.set(layout.stadium.x + layout.stadium.w / 2, layout.stadium.y + layout.stadium.h / 2);
+
+        const reliefGeometry = new THREE.PlaneGeometry(bounds.w, bounds.h, RELIEF_SEGMENTS.x, RELIEF_SEGMENTS.y);
+        reliefGeometry.translate(bounds.x + bounds.w / 2, bounds.y + bounds.h / 2, 0);
+        const environment = new THREE.Mesh(reliefGeometry, environmentMaterial);
+        environment.position.z = 0.75;
+        environment.frustumCulled = false;
+        environment.renderOrder = 1;
+        board.add(environment);
+
+        const embers = new THREE.Points(emberGeometry, emberMaterial);
+        embers.frustumCulled = false;
+        embers.renderOrder = 3;
+        board.add(embers);
+
+        cardsGroup = new THREE.Group();
+        cardsGroup.visible = document.getElementById('cards').checked;
+        const addCard = (src, rect, { rotated = false, sideways = false, lift = 3 } = {}) => {
+          const [w, h] = sideways ? [rect.h, rect.w] : [rect.w, rect.h];
+          const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: texture(src) }));
+          mesh.position.set(rect.x + rect.w / 2, rect.y + rect.h / 2, lift);
+          mesh.rotation.z = (rotated ? Math.PI : 0) + (sideways ? Math.PI / 2 : 0);
+          mesh.renderOrder = 2;
+          cardsGroup.add(mesh);
+          return mesh;
+        };
+        addCard(art('083'), self.active);
+        addCard(art('073'), self.bench[1]);
+        addCard(art('086'), self.bench[3]);
+        self.prizes.forEach((r) => addCard(CARD_BACK, r));
+        addCard(CARD_BACK, self.deck);
+        addCard(art('075'), opp.active, { rotated: true });
+        addCard(art('074'), opp.bench[2], { rotated: true });
+        opp.prizes.forEach((r) => addCard(CARD_BACK, r, { rotated: true }));
+        addCard(CARD_BACK, opp.deck, { rotated: true });
+        stadiumMesh = addCard(art('299'), layout.stadium, { lift: 4 });
+        stadiumMesh.visible = inPlay || transition?.kind === 'intro';
+        board.add(cardsGroup);
+        tableFrame.add(board);
+
+        renderer.setSize(viewport.w, viewport.h);
+        const params = { viewportW: viewport.w, viewportH: viewport.h, nearHalf: half };
+        const desc = document.getElementById('camera').value === 'tcgl'
+          ? cameraTcgLive({ ...params, cardHeightPx: layout.self.cardBox.active.h })
+          : cameraFromCssTilt(params);
+        camera.fov = desc.fov;
+        camera.aspect = desc.aspect;
+        camera.near = desc.near;
+        camera.far = desc.far;
+        camera.position.set(...desc.position);
+        camera.up.set(...desc.up);
+        camera.lookAt(...desc.target);
+        tableFrame.rotation.x = -desc.tiltDeg * DEG;
+        camera.updateProjectionMatrix();
+        const view = desc.viewOffset;
+        camera.setViewOffset(view.fullWidth, view.fullHeight, view.x, view.y, view.width, view.height);
+        invalidate();
+      }
 
       // --- timeline: intro, steady, exit (design 077 § Timeline) ---
       const easeOutCubic = (t) => 1 - (1 - t) ** 3;
@@ -168,7 +237,7 @@
 
       const play = () => {
         inPlay = true;
-        stadiumCard.visible = true;
+        stadiumMesh.visible = true;
         uniforms.uExit.value = 0;
         if (staticBox.checked) {
           uniforms.uReveal.value = 1;
@@ -184,7 +253,7 @@
       const discard = () => {
         if (!inPlay) return;
         inPlay = false;
-        stadiumCard.visible = false;
+        stadiumMesh.visible = false;
         if (staticBox.checked) {
           uniforms.uReveal.value = 0;
           transition = null;
@@ -196,32 +265,29 @@
         invalidate();
       };
 
+      document.querySelector('#panel h1').onclick = () => document.getElementById('panel').classList.toggle('collapsed');
       document.getElementById('play').onclick = play;
       document.getElementById('discard').onclick = discard;
-      document.getElementById('heat').oninput = (e) => {
-        uniforms.uHeat.value = Number(e.target.value);
-        invalidate();
-      };
+      for (const [id, uniform] of [['heat', 'uHeat'], ['relief', 'uRelief']]) {
+        document.getElementById(id).oninput = (e) => {
+          uniforms[uniform].value = Number(e.target.value);
+          invalidate();
+        };
+      }
       document.getElementById('scrub').oninput = (e) => {
         transition = null;
         inPlay = true;
-        stadiumCard.visible = true;
+        stadiumMesh.visible = true;
         uniforms.uExit.value = 0;
         uniforms.uReveal.value = Number(e.target.value);
         setStatus(`reveal ${Number(e.target.value).toFixed(2)}`);
         invalidate();
       };
+      document.getElementById('camera').onchange = buildBoard;
       staticBox.onchange = () => invalidate();
       document.getElementById('cards').onchange = (e) => {
-        cards.visible = e.target.checked;
+        cardsGroup.visible = e.target.checked;
         invalidate();
-      };
-      document.getElementById('opp').onchange = (e) => {
-        // The opponent's Stadium burns out from their side of the zone.
-        const [x, y] = e.target.checked ? mirror(stadiumZone) : stadiumZone;
-        uniforms.uOrigin.value.set(x + CARD.w / 2, y + CARD.h / 2);
-        stadiumCard.rotation.z = e.target.checked ? Math.PI : 0;
-        play();
       };
 
       // --- render loop: full rate during a transition, 30 fps ambient, none when static ---
@@ -269,21 +335,10 @@
         }
       }
 
-      function resize() {
-        const w = innerWidth;
-        const h = innerHeight;
-        renderer.setSize(w, h);
-        camera.aspect = w / h;
-        const distance = 3000 * Math.max(1, 1.55 / camera.aspect);
-        camera.position.copy(viewDirection).multiplyScalar(distance);
-        camera.lookAt(0, 40, 0);
-        camera.updateProjectionMatrix();
-        invalidate();
-      }
-      addEventListener('resize', resize);
+      addEventListener('resize', buildBoard);
       document.addEventListener('visibilitychange', () => invalidate());
-      resize();
-      stadiumCard.visible = false;
+      buildBoard();
+      stadiumMesh.visible = false;
       setStatus('no Stadium — press Play Stadium');
       setTimeout(play, 600);
     </script>
