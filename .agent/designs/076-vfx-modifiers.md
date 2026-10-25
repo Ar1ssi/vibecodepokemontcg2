@@ -20,6 +20,22 @@ off until enabled. Our GPU canvas styles (075 § Styles) are mutually exclusive 
   through `withFxMod`, never assign `ctx.fxMod` directly.
 - Canvas2D fallback ignores `fxMod`; a kit must still look right there (the alpha fade stays the fallback).
 
+## Depth (round 2 — user: "Thunderbolt and Psychic look like clip art; make them significantly more 3D")
+Root cause: every beat drew on a sheet 0.25–4 px above the cloth (fx-stage LAYER_Z), so the tilted camera saw decals.
+Primitives (gpu-canvas.mjs, landed):
+- `ctx.fxLift = { z, arc, from: [x,y], to: [x,y], stand 0–1, at: [x,y] }` — heights in lane units, read in the transform
+  current when set. `arc` peaks mid-segment (beams/projectiles rise off the attacker, land on the defender); `stand`
+  tilts a shape upright about the screen-horizontal line through `at` (faces the camera; above-`at` rises). Lanes run
+  near→far, so a sheet stood about the lane axis would be edge-on: lift lane things with `arc`, stand defender-side
+  bursts/rings with `stand`. Set it like fxStyle (assign, then null after).
+- Cast pass: `begin({ cast })`; scene-move-player replays front + top beats into it each frame (CAST): solid paint →
+  soft shadow, additive → light pool in its colour, offset by lift height. Lifted pieces get offset shadows for free.
+- `fxMod.volume = { amount, spec 0.6, rim 0.5, light 120°, bump 0.35, bumpScale 4, radius 0.15, ambient 0.35 }` —
+  radial = sphere, stroke = tube, axis gradient = tube of `radius` units, else bumped sheet; Lambert + blooming glint +
+  Fresnel rim. Owned by kits.
+Reference look: Scarlet/Violet ("EV") videos, `.agent/designs/refs/063-move-refs.json` `modern.url` (Poképédia mp4);
+frames via `ffmpeg -i <mp4> -vf fps=6 out%02d.png`. Study notes in `refs/063-study/notes/`.
+
 ## Work plan (parallel fx-designer agents, disjoint files)
 | # | Owner files | Work |
 |---|---|---|

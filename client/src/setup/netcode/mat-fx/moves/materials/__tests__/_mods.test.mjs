@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { dissolveTail, mergeFxMods, withFxMod } from '../_mods.js';
+import { dissolveTail, mergeFxMods, withFxMod, withLiftZ } from '../_mods.js';
 
 test('mergeFxMods merges per module and keeps untouched modules', () => {
   const outer = { dissolve: { amount: 0.4 }, detail: { amount: 0.2 } };
@@ -36,4 +36,20 @@ test('dissolveTail ramps from `from` to the end; junk reads as whole', () => {
   assert.equal(dissolveTail(2), 1);
   assert.equal(dissolveTail(NaN), 0);
   assert.equal(dissolveTail(0.9, 1), 0);
+});
+
+test('withLiftZ adds height over the drawer lift, keeps its arc, and restores it', () => {
+  const lift = { z: 0.1, arc: 0.5, from: [0, 0], to: [10, 0] };
+  const ctx = { fxLift: lift };
+  const seen = withLiftZ(ctx, 0.05, () => ctx.fxLift);
+  assert.ok(Math.abs(seen.z - 0.15) < 1e-9);
+  assert.equal(seen.arc, 0.5);
+  assert.equal(ctx.fxLift, lift);
+  const bare = {};
+  withLiftZ(bare, 0.2, () => assert.deepEqual(bare.fxLift, { z: 0.2 }));
+  assert.equal(bare.fxLift, null);
+});
+
+test('volume merges per field like the other modules', () => {
+  assert.deepEqual(mergeFxMods({ volume: { amount: 0.5 } }, { volume: { spec: 1 } }), { volume: { amount: 0.5, spec: 1 } });
 });
