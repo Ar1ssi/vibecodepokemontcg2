@@ -2326,6 +2326,17 @@ function parseTrainerStepsInner(lower) {
   // Blowtorch — discard a Tool/Special Energy from an opponent's Pokémon,
   // or a Stadium in play (opponent-facing, choice-based)
   if (lower.includes('discard a pokémon tool or special energy')) {
+    // Dangerous Drill: "You can play this card only if you discard a {D} Pokémon from your hand."
+    const pokemonCost = lower.match(/only if you discard an? (?:\{([a-z])\} )?pokémon from your hand/);
+    if (pokemonCost) {
+      const type = SYMBOL_ENERGY_WORDS[pokemonCost[1]];
+      steps.push({
+        type: 'discardCost',
+        count: 1,
+        what: 'Pokémon',
+        ...(type ? { pokemonTypes: [type] } : {}),
+      });
+    }
     steps.push({ type: 'discardFromOpponent', target: "a Pokémon Tool or Special Energy from 1 of your opponent's Pokémon, or a Stadium in play" });
     return { steps, recognizable: true };
   }
