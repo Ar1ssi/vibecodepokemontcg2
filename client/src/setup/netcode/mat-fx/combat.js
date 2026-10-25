@@ -7,7 +7,7 @@
 // Design 024 slice 2: `attackBanner` opens the sequence — the attack's name
 // sweeps across screen while a ring marks the defender, so an attack reads as
 // name -> target -> impact -> number rather than all at once (see fx-holds).
-import { getBoardScene } from '../../board3d/board3d.js';
+import { board3dActive, getBoardScene } from '../../board3d/board3d.js';
 import { getCardRegistry } from '../apply-view.js';
 import {
   animateFrames,
@@ -75,11 +75,22 @@ const shownRecord = (instanceId, registry) =>
 /** The shown card's data, or null. */
 const combatCard = (instanceId, registry) => shownRecord(instanceId, registry)?.card || null;
 
+const IN_PLAY_ZONES = new Set(['active', 'bench']);
+
+/**
+ * The card's rect on screen now. On the flat board a knocked-out card's element already lies in
+ * the discard pile, so it has none; the 3D board pins its mesh in its slot until its scene.
+ */
+const liveRect = (instanceId, registry) => {
+  const shown = shownRecord(instanceId, registry);
+  const zone = shown?.element?.dataset?.zone;
+  if (!board3dActive() && zone && !IN_PLAY_ZONES.has(zone)) return null;
+  return rectForInstance(shown?.instanceId ?? instanceId, registry);
+};
+
 /** Live rect, else the pre-diff snapshot (a KO'd card is already gone). */
 const combatRect = (instanceId, registry) =>
-  rectForInstance(shownRecord(instanceId, registry)?.instanceId ?? instanceId, registry) ||
-  peekCombatOrigin(instanceId)?.rect ||
-  null;
+  liveRect(instanceId, registry) || peekCombatOrigin(instanceId)?.rect || null;
 
 const combatSrc = (instanceId, registry) => {
   const element = shownRecord(instanceId, registry)?.element;
@@ -611,6 +622,6 @@ export const attackBanner = (plan) => {
     return;
   }
   // A fizzled attack has no defender; the banner still plays, there is just nothing to ring (edge 9).
-  const defenderRect = rectForInstance(shownRecord(plan.defenderId, registry)?.instanceId ?? plan.defenderId, registry);
+  const defenderRect = liveRect(plan.defenderId, registry) || peekCombatOrigin(plan.defenderId)?.rect;
   if (defenderRect) showTargetRing(defenderRect);
 };

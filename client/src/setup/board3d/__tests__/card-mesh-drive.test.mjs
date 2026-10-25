@@ -132,3 +132,18 @@ test('a driven card reports its rest corners to the board (rects stay on its slo
   assert.deepEqual(pool.cornersOf(7, { rest: true }), rest);
   assert.notDeepEqual(pool.cornersOf(7), rest, 'the mesh itself has moved');
 });
+
+test('a held card answers its pre-diff pose until released (a KO\'d defender stays the target)', () => {
+  const { pool, clock } = makePool();
+  pool.holdTablePose(7);
+  pool.setPose(7, { x: 800, y: -200, z: 0, yawDeg: 0, widthPx: 90 }, 0);
+  clock.t = 50;
+  pool.update(50);
+  assert.equal(pool.tablePoseOf(7).x, 0);
+  assert.equal(pool.tablePoseOf(7).y, 300);
+  pool.releaseTablePose(7);
+  assert.equal(pool.tablePoseOf(7).x, 800);
+  assert.equal(pool.tablePoseOf(7).y, -200);
+  pool.holdTablePose(99);
+  pool.releaseTablePose(99);
+});
