@@ -154,7 +154,7 @@ void main() {
   vec2 stage = vStage;
   if (distort.x > 0.0) {
     vec2 flow = vec2(cos(distort.w), sin(distort.w)) * clock * distort.y;
-    vec3 p = vec3(vStage / unit * distort.z - flow, seed * 0.29);
+    vec3 p = vec3(vStage / unit * distort.z - flow, 0.29);
     vec2 warp = vec2(fbm(p), fbm(p + vec3(5.2, 1.3, 0.0))) - 0.5;
     stage += warp * 2.0 * distort.x * unit;
   }
@@ -375,7 +375,7 @@ void main() {
       normal = vec3(across2 * a, sqrt(max(1.0 - a * a, 0.0)));
     }
     if (shape.x > 0.0) {
-      vec3 bp = vec3(q / unit * shape.y, seed * 0.23 + 11.0);
+      vec3 bp = vec3(q / unit * shape.y, 11.0);
       float e = 0.08;
       float h0 = fbm(bp);
       vec2 slope = vec2(fbm(bp + vec3(e, 0.0, 0.0)) - h0, fbm(bp + vec3(0.0, e, 0.0)) - h0) / e;
@@ -390,16 +390,18 @@ void main() {
     vec3 lit = rgb * (shape.w + (1.0 - shape.w) * diffuse) + volume.y * 1.6 * glint + volume.z * 1.4 * fresnel * paint.rgb;
     rgb = mix(rgb, lit, volume.x);
   }
+  // Modifier noise is keyed to position only, never the paint's row seed: a beat whose paint
+  // count changes between frames would otherwise see its holes and grain jump.
   // detail (VFX Essential's second texture layer): scrolling noise multiplied over the result.
   if (detail.x > 0.0) {
     vec2 scroll = vec2(cos(detail.w), sin(detail.w)) * clock * detail.y;
-    float n = fbm(vec3(q / unit * detail.z - scroll, seed * 0.31 + 2.0));
+    float n = fbm(vec3(q / unit * detail.z - scroll, 2.0));
     rgb *= mix(1.0, 0.35 + 1.3 * n, detail.x);
   }
   // dissolve: noise eats the paint from amount 0 (whole) to 1 (gone); the surviving rim of
   // each hole burns in the edge colour, HDR-boosted so it alone blooms.
   if (dissolve.x > 0.0) {
-    float n = clamp((fbm(vec3(q / unit * dissolve.w, seed * 0.17 + 7.0)) - 0.5) * 1.8 + 0.5, 0.0, 1.0);
+    float n = clamp((fbm(vec3(q / unit * dissolve.w, 7.0)) - 0.5) * 1.8 + 0.5, 0.0, 1.0);
     float width = max(dissolve.y, 1e-3);
     float k = n - mix(-width, 1.0, dissolve.x);
     alpha *= smoothstep(-0.015, 0.015, k);
