@@ -459,6 +459,9 @@ const paintLifts = (drawer, s, params = {}, over = {}, outer = null) => {
   return { lifts, after: rec.target.fxLift };
 };
 const near = (a, b) => Math.abs(a - b) < 1e-9;
+/** Kits stack their passes up to this far over a drawer's lift (withLiftZ, design 076 § Depth). */
+const KIT_LAYERS = 0.15;
+const drawerZ = (z, base) => z >= base - 1e-9 && z <= base + KIT_LAYERS;
 
 test('design 076 depth: a bolt from the sky rises off the defender; a lane bolt arcs', () => {
   const sky = paintLifts('bolt', 0.5, { from: 'sky' });
@@ -486,7 +489,7 @@ test('design 076 depth: travelling beats arc along the lane at chest height', ()
     const { lifts } = paintLifts(drawer, 0.5, params);
     assert.ok(lifts.length > 0, drawer);
     for (const lift of lifts) {
-      assert.equal(lift.z, LIFT.travelZ, drawer);
+      assert.ok(drawerZ(lift.z, LIFT.travelZ), `${drawer} z ${lift.z}`);
       assert.equal(lift.arc, arc, drawer);
       assert.ok(Array.isArray(lift.from) && Array.isArray(lift.to), drawer);
     }
@@ -525,7 +528,7 @@ test('design 076 depth: the charge hangs where the shot leaves, at chest height'
   const { lifts } = paintLifts('coreCharge', 0.9);
   assert.ok(lifts.length > 0);
   for (const lift of lifts) {
-    assert.equal(lift.z, LIFT.travelZ);
+    assert.ok(drawerZ(lift.z, LIFT.travelZ), `z ${lift.z}`);
     assert.equal(lift.stand, LIFT.bodyStand);
   }
 });
@@ -540,7 +543,11 @@ test('design 076 depth: ground waves, cracks and card glows stay on the cloth', 
   ]) {
     const { lifts } = paintLifts(drawer, s, params);
     assert.ok(lifts.length > 0, `${drawer} paints`);
-    assert.ok(lifts.every((lift) => lift === null), `${drawer} lies flat`);
+    // Flat: no arc or stand, and no height beyond the kit's own pass layering.
+    assert.ok(
+      lifts.every((lift) => lift === null || (!lift.arc && !lift.stand && drawerZ(lift.z ?? 0, 0))),
+      `${drawer} lies flat`
+    );
   }
 });
 
