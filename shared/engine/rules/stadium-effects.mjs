@@ -486,7 +486,9 @@ export function isStadiumTriggered(card) {
     (/plays a pokémon from their hand to evolve/.test(t) && /damage counter/.test(t)) ||
     (/burned between turns/.test(t) && /isn't removed/.test(t)) ||
     (/switches their poisoned active pokémon/.test(t) && /special condition/.test(t)) ||
-    (/is asleep, its owner flips 2 coins/.test(t) && /still asleep/.test(t))
+    (/is asleep, its owner flips 2 coins/.test(t) && /still asleep/.test(t)) ||
+    // Forest of Vitality (homebrew): evolve -> search deck for Basic Energy and attach.
+    (/evolves an? {w} pokémon/.test(t) && /search their deck for a basic {w} energy card/.test(t))
   );
 }
 

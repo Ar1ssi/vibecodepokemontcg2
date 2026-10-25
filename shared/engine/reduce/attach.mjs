@@ -7,7 +7,9 @@
 import { findCard, attachmentHostId } from '../state.mjs';
 import { isEnergy, isPokemon } from '../cards.mjs';
 import { isPokemonToolCard } from '../rules/tool-combat.mjs';
-import { stadiumOnAttachTriggers, stadiumOnEvolveTriggers } from '../rules/stadium-triggers.mjs';
+import {
+  stadiumOnAttachTriggers, stadiumOnEvolveTriggers, stadiumEvolveSearchEnergy,
+} from '../rules/stadium-triggers.mjs';
 import { applyStadiumTriggerEffect } from '../effects/stadium-trigger-apply.mjs';
 import {
   inPlayEntries, parseOnOpponentEvolveAbilities, parseOnEnergyAttachAbilities,
@@ -23,6 +25,7 @@ import { abilityEnergyAttachCounters, healBlockedByAbility } from '../rules/abil
 import { isBasicEnergy } from '../rules/card-classify.mjs';
 import { topPokemonCard } from '../rules/evolved-pokemon.mjs';
 import { requiresTurnEndOnEvolve } from '../rules/evolution.mjs';
+import { shuffleInPlace } from '../rng.mjs';
 import { removeCondition, clearConditions, listConditions } from '../rules/special-conditions.mjs';
 import { inPlayView, cardEffectiveHp, isGameConcluded, abilitySideContext } from './shared.mjs';
 import { handleKnockout } from './knockout.mjs';
@@ -103,6 +106,7 @@ function applyOnOpponentEvolve(draft, { evolvedCard, evolvingPlayerId, events })
 }
 
 export const GROWTH_ATTACH_EFFECT = 'alphaGrowth';
+export const STADIUM_EVOLVE_SEARCH_EFFECT = 'stadiumEvolveSearch';
 
 /**
  * Gengar ex Gnawing Curse: an Energy the opponent attaches from hand puts damage counters on the
@@ -201,6 +205,81 @@ export function resumeGrowthAttach(draft, { selection, resumeToken, events }) {
     (c) => wanted.has(c.instanceId) && isEnergy(c)
   );
   for (const card of chosen) attachToRoot(player, card, host, events);
+}
+
+/** Gen 6 Mega Evolution / Primal Reversion: ends the evolving player's turn with a full checkup. */
+function endTurnAfterMegaEvolve(draft, { playerId, instanceId, activeRng, events }) {
+  const oppId = Object.keys(draft.players || {}).find((id) => id !== playerId);
+  events.push({ type: 'turnEndedByMegaEvolve', playerId, instanceId });
+  // Ending the turn runs the full between-turns sequence, as every other turn-ending path does.
+  // Skipping Pokémon Checkup left Poison/Burn damage, status recovery and end-of-turn effects unapplied.
+  if (isGameConcluded(draft)) return;
+  resolveCheckup(draft, { rng: activeRng, events, endingPlayerId: playerId });
+  if (!isGameConcluded(draft)) advanceTurn(draft, { nextPlayerId: oppId, events });
+}
+
+/**
+ * Forest of Vitality: the evolving player may search their deck for a matching Basic Energy and
+ * attach it to the Pokémon that evolved. Shuffles only when a search happened. A Mega Evolution's
+ * turn end waits for the answer (`endTurnInstanceId` in the token).
+ */
+function offerStadiumEvolveSearch(draft, { stadium, hostRef, playerId, evolvingInstanceId, endTurnInstanceId, events }) {
+  const energyType = stadiumEvolveSearchEnergy(stadium, { hostTop: inPlayView(draft, hostRef.card) });
+  if (!energyType) return false;
+  const options = (draft.players[hostRef.playerId]?.zones?.deck || []).filter(
+    (c) => isBasicEnergy(c) && energyOfType(c, energyType)
+  );
+  if (options.length === 0) return false;
+  const name = stadium?.name || 'Stadium';
+  draft.pendingChoice = createPendingChoice({
+    player: hostRef.playerId,
+    prompt: `${name}: search your deck for a Basic ${energyType[0].toUpperCase()}${energyType.slice(1)} Energy card to attach to ${inPlayView(draft, hostRef.card)?.name || 'that Pokémon'}?`,
+    source: name,
+    options,
+    min: 0,
+    max: 1,
+    cancellable: true,
+    stateVersion: draft.stateVersion,
+    resumeToken: {
+      effectType: STADIUM_EVOLVE_SEARCH_EFFECT,
+      initiatorPlayerId: hostRef.playerId,
+      hostInstanceId: hostRef.card.instanceId,
+      energyType,
+      evolvingInstanceId,
+      endTurnInstanceId: endTurnInstanceId ?? null,
+    },
+  });
+  return true;
+}
+
+/** Resumes the Forest of Vitality offer: attach the chosen Energy, shuffle, then end a Mega Evolution's turn. */
+export function resumeStadiumEvolveSearch(draft, { selection, resumeToken, activeRng: rng, events }) {
+  draft.pendingChoice = null;
+  const token = resumeToken || {};
+  const player = draft.players[token.initiatorPlayerId];
+  const host = token.hostInstanceId != null ? findCard(draft, token.hostInstanceId)?.card : null;
+  if (player && host) {
+    const deck = player.zones.deck || [];
+    const picked = deck.find(
+      (c) =>
+        (selection || []).includes(c.instanceId) &&
+        isBasicEnergy(c) &&
+        energyOfType(c, token.energyType)
+    );
+    if (picked) {
+      attachToRoot(player, picked, host, events);
+      if (rng) shuffleInPlace(rng, deck);
+      events.push({ type: 'deckShuffled', playerId: token.initiatorPlayerId });
+    }
+  }
+  if (token.endTurnInstanceId != null) {
+    endTurnAfterMegaEvolve(draft, {
+      playerId: token.initiatorPlayerId,
+      instanceId: token.endTurnInstanceId,
+      activeRng: rng,
+      events,
+    });
+  }
 }
 
 export function attachCardCommand({ draft, payload, playerId, activeRng, events }) {
@@ -361,6 +440,16 @@ export function attachCardCommand({ draft, payload, playerId, activeRng, events 
         });
       }
 
+      // Forest of Vitality: search-and-attach offer. Set before the Mega turn end so it resolves first.
+      const forestOffered = offerStadiumEvolveSearch(draft, {
+        stadium: evolveStadium,
+        hostRef,
+        playerId,
+        evolvingInstanceId: payload.instanceId,
+        endTurnInstanceId: null,
+        events,
+      });
+
       // Opponent-evolves ability trigger (design 034 slice 4).
       applyOnOpponentEvolve(draft, {
         evolvedCard: hostRef.card,
@@ -381,26 +470,15 @@ export function attachCardCommand({ draft, payload, playerId, activeRng, events 
           attachedCards,
         })
       ) {
-        const megaOppId = Object.keys(draft.players || {}).find(
-          (id) => id !== playerId
-        );
-        events.push({
-          type: 'turnEndedByMegaEvolve',
-          playerId,
-          instanceId: payload.instanceId,
-        });
-        // Ending the turn runs the full between-turns sequence, as every
-        // other turn-ending path does. Skipping Pokémon Checkup left Poison/
-        // Burn damage, status recovery and end-of-turn effects unapplied.
-        if (!isGameConcluded(draft)) {
-          resolveCheckup(draft, {
-            rng: activeRng,
+        if (forestOffered && draft.pendingChoice?.resumeToken?.effectType === STADIUM_EVOLVE_SEARCH_EFFECT) {
+          draft.pendingChoice.resumeToken.endTurnInstanceId = payload.instanceId;
+        } else {
+          endTurnAfterMegaEvolve(draft, {
+            playerId,
+            instanceId: payload.instanceId,
+            activeRng,
             events,
-            endingPlayerId: playerId,
           });
-          if (!isGameConcluded(draft)) {
-            advanceTurn(draft, { nextPlayerId: megaOppId, events });
-          }
         }
       }
     }
