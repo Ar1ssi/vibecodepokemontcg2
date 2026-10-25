@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ShapeUtils, Vector2 } from 'three';
 
-import { MAX_CLIP_DEPTH, MAX_IMAGES, PAINT_KIND, PAINT_TEXELS, STYLE_IDS, VERTEX_FLOATS, createGpuCanvas, parseColour } from '../gpu-canvas.mjs';
+import { FX_MODS, MAX_CLIP_DEPTH, MAX_IMAGES, PAINT_KIND, PAINT_TEXELS, STYLE_IDS, VERTEX_FLOATS, createGpuCanvas, parseColour } from '../gpu-canvas.mjs';
 
 const triangulate = (contour, holes) =>
   ShapeUtils.triangulateShape(
@@ -335,6 +335,33 @@ test('a by-kind hint styles each paint by its kind; strokes and missing kinds ha
   assert.equal(paintRow(rec, 1)[2], STYLE_IDS.orb);
   assert.equal(paintRow(rec, 2)[2], STYLE_IDS.flat, 'no solid entry: flat');
   assert.equal(paintRow(rec, 3)[2], STYLE_IDS.energy);
+});
+
+test('fxMod modifiers land in their texels with defaults; null and save/restore return to none', () => {
+  const { ctx, recording } = make();
+  ctx.fillStyle = '#fff';
+  ctx.save();
+  ctx.fxMod = { dissolve: { amount: 1.4, edge: [255, 128, 0] }, distort: { strength: 0.2, angle: 180 }, detail: { amount: 0.5 } };
+  ctx.fillRect(0, 0, 4, 4);
+  ctx.restore();
+  ctx.fillRect(10, 0, 4, 4);
+  const rec = recording();
+  const at = (row, texel) => [...paintRow(rec, row).subarray(texel * 4, texel * 4 + 4)].map((v) => Math.round(v * 100) / 100);
+  assert.deepEqual(at(0, FX_MODS.dissolve.texel), [1, 0.12, 1.5, 3], 'amount clamps to 1, the rest default');
+  assert.deepEqual(at(0, 18), [1, 0.5, 0, 1], 'edge colour normalised, flagged');
+  assert.deepEqual(at(0, FX_MODS.distort.texel), [0.2, 1, 3, 3.14], 'angle in radians');
+  assert.deepEqual(at(0, FX_MODS.detail.texel), [0.5, 1, 4, -1.57]);
+  for (const texel of [17, 18, 19, 20]) assert.deepEqual(at(1, texel), [0, 0, 0, 0], `restored paint has no texel ${texel}`);
+});
+
+test('a dissolve-only hint leaves distort and detail off', () => {
+  const { ctx, recording } = make();
+  ctx.fxMod = { dissolve: { amount: 0.3 } };
+  ctx.fillRect(0, 0, 4, 4);
+  const row = paintRow(recording(), 0);
+  assert.equal(row[FX_MODS.distort.texel * 4], 0);
+  assert.equal(row[FX_MODS.detail.texel * 4], 0);
+  assert.equal(row[18 * 4 + 3], 0, 'no edge colour: the shader uses the paint');
 });
 
 test('reset empties the recording; begin restarts the drawing state', () => {

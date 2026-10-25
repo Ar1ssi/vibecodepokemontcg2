@@ -11,8 +11,11 @@
 // A stroke has halfWidth ≥ 0 and `across` = ±(halfWidth + feather) at its two sides, so the
 // fragment's coverage is (halfWidth + feather − |across|) / feather.
 
+// Paint row texels: 0 head · 1–2 geometry · 3–4 inverse transform · 5 style params · 6 dash ·
+// 7–8 stop offsets · 9–16 stop colours · 17–20 modifiers (FX_MODS).
+
 export const VERTEX_FLOATS = 9;
-export const PAINT_TEXELS = 17;
+export const PAINT_TEXELS = 21;
 const PAINT_FLOATS = PAINT_TEXELS * 4;
 export const MAX_STOPS = 8;
 export const MAX_CLIP_DEPTH = 4;
@@ -39,6 +42,45 @@ export const STYLE_PARAMS = Object.freeze({
   shadow: [['depth', 0.45], ['flow', 1], ['fray', 0.5]],
 });
 const STYLE_NAMES = Object.keys(STYLE_IDS);
+
+/**
+ * Modifiers (`ctx.fxMod`), the VFX Essential Shader's stackable modules ported to the paint row:
+ * each runs on top of any style and is off while its first param is 0. Order in the shader:
+ * distort (warps where the paint is read) → paint → style → detail → dissolve.
+ * - dissolve: `amount` 0 whole … 1 gone, eaten by noise; `width` of the burning edge band (noise
+ *   units), `gain` its HDR boost (> 0 blooms), `scale` noise cells per unit, `edge` [r, g, b]
+ *   0–255 (absent: the paint's own colour).
+ * - distort: `strength` in units (lane heights), `speed`, `scale`, `angle` (deg) the noise flows.
+ * - detail: a second scrolling noise layer multiplied in: `amount` 0–1, `speed`, `scale`, `angle`.
+ */
+export const FX_MODS = Object.freeze({
+  dissolve: Object.freeze({ texel: 17, params: [['amount', 0], ['width', 0.12], ['gain', 1.5], ['scale', 3]] }),
+  distort: Object.freeze({ texel: 19, params: [['strength', 0], ['speed', 1], ['scale', 3], ['angle', 0]] }),
+  detail: Object.freeze({ texel: 20, params: [['amount', 0], ['speed', 1], ['scale', 4], ['angle', -90]] }),
+});
+const DISSOLVE_EDGE_TEXEL = 18;
+
+/** The modifier hint as numbers, defaults filled; out-of-range amounts clamp. */
+const modParams = (hint, { params }) =>
+  params.map(([key, fallback]) => (Number.isFinite(hint?.[key]) ? Number(hint[key]) : fallback));
+
+const writeMods = (paints, o, fxMod) => {
+  if (!fxMod) return;
+  const dissolve = modParams(fxMod.dissolve, FX_MODS.dissolve);
+  dissolve[0] = clamp01(dissolve[0]);
+  paints.set(dissolve, o + FX_MODS.dissolve.texel * 4);
+  const edge = fxMod.dissolve?.edge;
+  if (Array.isArray(edge) && edge.length >= 3 && edge.every(Number.isFinite)) {
+    paints.set([edge[0] / 255, edge[1] / 255, edge[2] / 255, 1], o + DISSOLVE_EDGE_TEXEL * 4);
+  }
+  const distort = modParams(fxMod.distort, FX_MODS.distort);
+  distort[3] = (distort[3] * Math.PI) / 180;
+  paints.set(distort, o + FX_MODS.distort.texel * 4);
+  const detail = modParams(fxMod.detail, FX_MODS.detail);
+  detail[0] = clamp01(detail[0]);
+  detail[3] = (detail[3] * Math.PI) / 180;
+  paints.set(detail, o + FX_MODS.detail.texel * 4);
+};
 const KIND_NAMES = Object.freeze(['solid', 'linear', 'radial']);
 
 /**
@@ -201,6 +243,7 @@ const defaultState = () => ({
   dash: [],
   dashOffset: 0,
   fxStyle: null,
+  fxMod: null,
   clipDepth: 0,
   clips: [],
 });
@@ -363,6 +406,7 @@ export function createGpuCanvas({ triangulate, size = 4096, maxVertices = MAX_VE
       const [r, g, b, a] = stop.rgba;
       paints.set([r, g, b, a * alpha], o + 36 + i * 4);
     });
+    writeMods(paints, o, state.fxMod);
     paintCount += 1;
     return row;
   };
@@ -451,6 +495,13 @@ export function createGpuCanvas({ triangulate, size = 4096, maxVertices = MAX_VE
     },
     set fxStyle(v) {
       state.fxStyle = v && typeof v === 'object' ? v : null;
+    },
+    /** FX_MODS: stackable modifiers for the fills that follow; a real 2D context ignores it. */
+    get fxMod() {
+      return state.fxMod;
+    },
+    set fxMod(v) {
+      state.fxMod = v && typeof v === 'object' ? v : null;
     },
 
     save() {

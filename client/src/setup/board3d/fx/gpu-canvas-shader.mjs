@@ -143,7 +143,22 @@ void main() {
   vec4 inv1 = texel(4);
   vec4 params = texel(5);
   vec4 dash = texel(6);
-  vec2 q = vec2(dot(inv0.xyz, vec3(vStage, 1.0)), dot(inv1.xyz, vec3(vStage, 1.0)));
+  vec4 dissolve = texel(17);
+  vec4 distort = texel(19);
+  vec4 detail = texel(20);
+  float unit = max(params.w, 1.0);
+  // The scene clock in seconds, wrapped so the noise lattice keeps its float precision.
+  float clock = mod(uTime, 512.0);
+  // distort (VFX Essential's UV distortion): flowing noise moves where the paint is read, never
+  // the shape's own outline, so a gradient or card art wavers inside a steady silhouette.
+  vec2 stage = vStage;
+  if (distort.x > 0.0) {
+    vec2 flow = vec2(cos(distort.w), sin(distort.w)) * clock * distort.y;
+    vec3 p = vec3(vStage / unit * distort.z - flow, seed * 0.29);
+    vec2 warp = vec2(fbm(p), fbm(p + vec3(5.2, 1.3, 0.0))) - 0.5;
+    stage += warp * 2.0 * distort.x * unit;
+  }
+  vec2 q = vec2(dot(inv0.xyz, vec3(stage, 1.0)), dot(inv1.xyz, vec3(stage, 1.0)));
 
   vec4 paint = vec4(0.0);
   float t = 0.0;
@@ -179,9 +194,7 @@ void main() {
 
   vec3 rgb = paint.rgb;
   float alpha = paint.a * coverage;
-  vec2 uv = vStage / max(params.w, 1.0);
-  // The scene clock in seconds, wrapped so the noise lattice keeps its float precision.
-  float clock = mod(uTime, 512.0);
+  vec2 uv = vStage / unit;
   if (style == 1) {
     // flame: noise flowing base → tip erodes the tongue into licks; cooling edges deepen, the
     // hottest filament gains past 1.0 so it alone blooms.
@@ -339,6 +352,23 @@ void main() {
       alpha *= mix(1.0, fray, smoothstep(0.15, 0.6, edge));
       rgb *= 1.0 - params.x * smoothstep(0.35, 0.8, n);
     }
+  }
+  // detail (VFX Essential's second texture layer): scrolling noise multiplied over the result.
+  if (detail.x > 0.0) {
+    vec2 scroll = vec2(cos(detail.w), sin(detail.w)) * clock * detail.y;
+    float n = fbm(vec3(q / unit * detail.z - scroll, seed * 0.31 + 2.0));
+    rgb *= mix(1.0, 0.35 + 1.3 * n, detail.x);
+  }
+  // dissolve: noise eats the paint from amount 0 (whole) to 1 (gone); the surviving rim of
+  // each hole burns in the edge colour, HDR-boosted so it alone blooms.
+  if (dissolve.x > 0.0) {
+    float n = clamp((fbm(vec3(q / unit * dissolve.w, seed * 0.17 + 7.0)) - 0.5) * 1.8 + 0.5, 0.0, 1.0);
+    float width = max(dissolve.y, 1e-3);
+    float k = n - mix(-width, 1.0, dissolve.x);
+    alpha *= smoothstep(-0.015, 0.015, k);
+    vec4 edgeTexel = texel(18);
+    vec3 edgeRgb = edgeTexel.w > 0.5 ? edgeTexel.rgb : paint.rgb;
+    rgb = mix(rgb, edgeRgb * (1.0 + dissolve.z), 1.0 - smoothstep(0.0, width, k));
   }
   rgb = max(rgb, vec3(0.0));
   outColor = vec4(rgb * alpha, alpha);
