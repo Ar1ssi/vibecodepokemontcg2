@@ -89,6 +89,8 @@ const writeMods = (paints, o, fxMod) => {
   paints.set(modParams(fxMod.volume, FX_MODS.volumeShape), o + FX_MODS.volumeShape.texel * 4);
 };
 
+const LIFT_STAGE = Symbol('fxLift stage points');
+
 /**
  * Lift (`ctx.fxLift`): raises geometry off the cloth so the board camera sees it in depth. All
  * heights in units (lane heights); points are read in the transform current when it is set.
@@ -105,9 +107,11 @@ const resolveLift = (lift, transform) => {
   if (!lift || typeof lift !== 'object') return null;
   const num = (v) => (Number.isFinite(v) ? Number(v) : 0);
   const point = (p) => (Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]) ? applyTo(transform, p[0], p[1]) : null);
-  const from = point(lift.from);
-  const to = point(lift.to);
-  const at = point(lift.at);
+  // A lift copied from the getter (`{ ...ctx.fxLift, z }`) keeps the points it was set with.
+  const stage = lift[LIFT_STAGE];
+  const from = stage ? stage.from : point(lift.from);
+  const to = stage ? stage.to : point(lift.to);
+  const at = stage ? stage.at : point(lift.at);
   return {
     z: num(lift.z),
     arc: from && to ? num(lift.arc) : 0,
@@ -595,8 +599,8 @@ export function createGpuCanvas({ triangulate, size = 4096, maxVertices = MAX_VE
       return state.fxLift;
     },
     set fxLift(v) {
-      state.fxLift = v && typeof v === 'object' ? v : null;
-      state.lift = resolveLift(state.fxLift, state.transform);
+      state.lift = resolveLift(v && typeof v === 'object' ? v : null, state.transform);
+      state.fxLift = state.lift ? { ...v, [LIFT_STAGE]: { from: state.lift.from, to: state.lift.to, at: state.lift.at } } : null;
     },
 
     save() {

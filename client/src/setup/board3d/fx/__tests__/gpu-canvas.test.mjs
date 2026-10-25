@@ -402,6 +402,18 @@ test('a lift is read in the transform current when it is set', () => {
   assert.ok(Math.abs(top - 103) < 2, `peak sits at stage x 200: ${top}`);
 });
 
+test('a lift copied from the getter keeps its points when re-set under another transform', () => {
+  const { ctx, recording } = make();
+  ctx.fxLift = { arc: 1, from: [0, 0], to: [200, 0] };
+  ctx.translate(500, 0);
+  ctx.fxLift = { ...ctx.fxLift, z: 0 };
+  ctx.resetTransform();
+  ctx.fillRect(98, -1, 4, 2);
+  const rec = recording();
+  const top = Math.max(...Array.from({ length: rec.vertexCount }, (_, i) => vertexAt(rec, i)[2]));
+  assert.ok(Math.abs(top - 103) < 2, `arc still peaks at stage x 100: ${top}`);
+});
+
 test('a cast pass lays lifted geometry on the cloth, offset by height, shadowing solid and pooling light', () => {
   const { ctx, recording, begin } = make();
   begin({ layer: 'back', z: 0.25, unit: 100, cast: { shadow: 0.5, light: 0.2, dx: 1, dy: 0, blur: 0 } });
