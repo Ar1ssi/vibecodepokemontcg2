@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { ancient, gem, rock } from '../rock.js';
+import { litSideLight } from '../_kit-mod.js';
 import { fxModSpy } from './fx-mod-spy.mjs';
 
 const PROJECTILE = { x: 200, y: 200, r: 30, headingDeg: 0, time: 0.4, seed: 3, tongues: 3 };
@@ -60,4 +61,29 @@ test("a drawer's dissolve amount survives the kit's edge and comes back afterwar
   rock.projectile(spy.ctx, PROJECTILE);
   for (const fill of spy.fills()) assert.equal(fill.fxMod.dissolve.amount, 0.5);
   assert.equal(spy.ctx.fxMod, outer);
+});
+
+test('depth: a stone face is an unstyled radial lit as a matte bumped sphere; facets and spires are bumped sheets', () => {
+  const spy = fxModSpy();
+  rock.body(spy.ctx, 100, 100, 40, 1, 1);
+  const [face, facet] = spy.fills();
+  assert.equal(face.fxStyle, null, 'the dust style would fray the face');
+  assert.equal(face.composite, 'source-over', 'solid: it covers and casts a shadow');
+  for (const fill of [face, facet]) {
+    assert.equal(fill.fxMod.volume.amount, 1);
+    assert.ok(fill.fxMod.volume.bump > 0.5, 'knobbly');
+    assert.ok(fill.fxMod.volume.spec < 0.3, 'matte');
+    assert.ok(fill.fxMod.volume.ambient < 0.35, 'a strong dark side');
+  }
+  const spire = fxModSpy();
+  rock.tongue(spire.ctx, SPIRE, { alpha: 1, hot: 1 });
+  assert.ok(spire.fills().every((f) => f.fxMod.volume?.amount === 1));
+  const [column] = spire.fills();
+  assert.ok(column.fxMod.volume.radius > 0, 'the body is lit as a tube round its axis');
+  const light = litSideLight(SPIRE.angleDeg);
+  assert.ok([...spire.fills(), ...spire.strokes()].every((p) => p.fxMod.volume.light === light), 'lit from its drawn lit edge');
+  assert.equal(column.fxStyle, null, "the kit's linear style would facet it like crystal");
+  const [edge] = spire.strokes();
+  assert.equal(edge.fxMod.volume.bump, 0, 'the lit edge is a smooth bevel tube');
+  assert.equal(spire.ctx.fxStyle, null);
 });

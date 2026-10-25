@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { ground, mud } from '../ground.js';
+import { litSideLight } from '../_kit-mod.js';
 import { fxModSpy } from './fx-mod-spy.mjs';
 
 const SPIKE = { x: 100, y: 300, angleDeg: -90, length: 150, width: 60, time: 0, seed: 4 };
@@ -62,4 +63,25 @@ test('a mud glob wobbles wet (distort) with no grit', () => {
   const [glob] = spy.fills();
   assert.ok(glob.fxMod.distort.strength > 0);
   assert.equal(glob.fxMod.detail, undefined);
+});
+
+test('depth: a clod is an unstyled radial lit as a matte bumped sphere; a spike a bumped sheet; a mud glob a wet sphere', () => {
+  const clod = fxModSpy();
+  ground.body(clod.ctx, 100, 100, 40, 1, 1);
+  const [lump] = clod.fills();
+  assert.equal(lump.fxStyle, null);
+  assert.equal(lump.composite, 'source-over');
+  assert.ok(lump.fxMod.volume.bump > 0.5 && lump.fxMod.volume.spec < 0.3);
+  const spike = fxModSpy();
+  ground.tongue(spike.ctx, SPIKE, { alpha: 1, hot: 1 });
+  assert.ok(spike.fills().every((f) => f.fxMod.volume?.amount === 1));
+  const [column] = spike.fills();
+  assert.ok(column.fxMod.volume.radius > 0, 'the body is lit as a tube round its axis');
+  const light = litSideLight(SPIKE.angleDeg);
+  assert.ok([...spike.fills(), ...spike.strokes()].every((p) => p.fxMod.volume.light === light), 'lit from its drawn lit edge');
+  assert.equal(column.fxStyle, null, "the kit's linear style would facet it like crystal");
+  assert.equal(spike.strokes()[0].fxMod.volume.bump, 0, 'a smooth bevel on the lit edge');
+  const glob = fxModSpy();
+  mud.body(glob.ctx, 0, 0, 20, 1, 1);
+  assert.ok(glob.fills()[0].fxMod.volume.spec > 0.5, 'wet: a tight glint');
 });

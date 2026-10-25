@@ -12,8 +12,8 @@
 // Stone is solid matter: rock and ancient fill their stones with `source-over` inside their
 // own save/restore (as ground's clods do); halos, lit edges and dust stay additive.
 import { rgbCss } from '../../fx-colors.mjs';
-import { moddedKit } from './_kit-mod.js';
-import { withFxMod } from './_mods.js';
+import { litSideLight, moddedKit, unstyled } from './_kit-mod.js';
+import { mergeFxMods, withFxMod } from './_mods.js';
 import { grainPass, inShadow, shardOutline, styledKit, traceOutline } from './_shared.js';
 
 // Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
@@ -29,6 +29,21 @@ const FACETED = Object.freeze({ byKind: { linear: { id: 'crystal', facets: 6, sh
 // the shader's clock-long scroll offset and boil). Dissolving stone crumbles at a pale, dull rim
 // (low gain, no bloom); the ancient aura burns violet; gem light rims and blooms.
 const GRIT = Object.freeze({ detail: Object.freeze({ amount: 0.45, speed: 0, scale: 24 }) });
+// Depth (076 § Depth): stone is a lit, bumped, matte solid. The face is a radial paint, which the
+// GPU lights as a sphere, so a boulder gets a strong Lambert side away from the up-left light;
+// facets and spires are bumped sheets. Low spec, faint rim: rock does not shine. The lit edge is
+// a stroke, lit as a tube (a rounded bevel). Canvas2D ignores all of it and keeps the baked tones.
+const SOLID_STONE = Object.freeze({
+  detail: GRIT.detail,
+  volume: Object.freeze({ amount: 1, spec: 0.12, rim: 0.2, bump: 0.8, bumpScale: 8, ambient: 0.25 }),
+});
+const BEVEL = Object.freeze({ volume: Object.freeze({ amount: 1, spec: 0.45, rim: 0, bump: 0, ambient: 0.45 }) });
+// A spire's body is filled along its axis, which the GPU lights as a tube of `radius` lane units
+// round it: a rounded column falling to a dark flank. The radius is a fixed guess under a
+// pillar's half-width (kits draw in px and cannot read the lane unit); past it the surface turns
+// edge-on, which reads as the column's flank. The light comes from the spire's lit edge (its left
+// normal), so the shading and the drawn bevel agree however the spire or shard is turned.
+const SPIRE_RADIUS = 0.12;
 const DUST_DRIFT = Object.freeze({
   distort: Object.freeze({ strength: 0.03, speed: 0.6, scale: 2.5, angle: -90 }),
   detail: Object.freeze({ amount: 0.3, speed: 0.5, scale: 6, angle: -90 }),
@@ -242,10 +257,17 @@ function stone(ctx, pal, rim, x, y, r, alpha, hot, seed, spin) {
   const facet = litFacet(points, x, y, r, seed);
   const shade = shadowFacet(points, x, y, r, seed);
   inShadow(ctx, () => {
-    withFxMod(ctx, GRIT, () => {
-      ctx.fillStyle = rgbCss(pal.body, alpha);
+    withFxMod(ctx, SOLID_STONE, () => {
+      // The face: lit up-left in its own paint (Canvas2D's shading), and a radial, so the GPU
+      // lights it as a sphere round the stone's centre. The kit's radial style (dust smoke) would
+      // fray it, so it fills unstyled.
+      const face = ctx.createRadialGradient(x - r * 0.3, y - r * 0.35, r * 0.05, x, y, r * 1.12);
+      face.addColorStop(0, rgbCss(pal.lit ?? pal.hot, alpha));
+      face.addColorStop(0.55, rgbCss(pal.body, alpha));
+      face.addColorStop(1, rgbCss(pal.body, alpha));
+      ctx.fillStyle = face;
       tracePoints(ctx, points);
-      ctx.fill();
+      unstyled(ctx, () => ctx.fill());
       if (facet.length > 2) {
         ctx.fillStyle = rgbCss(pal.lit ?? pal.hot, FACET_ALPHA * alpha);
         tracePoints(ctx, facet);
@@ -271,6 +293,14 @@ function stone(ctx, pal, rim, x, y, r, alpha, hot, seed, spin) {
   strokeLine(ctx, facet.slice(1));
 }
 
+/** One colour painted along a spire's axis, base to tip (flat on Canvas2D, a lit tube on the GPU). */
+const axisPaint = (ctx, { x, y, angleDeg, length }, css) => {
+  const g = ctx.createLinearGradient(x, y, x + Math.cos(rad(angleDeg)) * length, y + Math.sin(rad(angleDeg)) * length);
+  g.addColorStop(0, css);
+  g.addColorStop(1, css);
+  return g;
+};
+
 /**
  * A stone spire (or with `jag`, a thrown chip): the solid fill, its right half in shadow,
  * then a lit edge down its left side in `rim` (dropped at `hot` 0).
@@ -279,11 +309,12 @@ function spire(ctx, pal, rim, spec, { alpha = 1, hot = 1, jag = 0 } = {}) {
   if (!(spec.length > 0) || !(spec.width > 0) || !(alpha > 0)) return;
   const outline = jag ? shardOutline(spec) : spireOutline(spec);
   const tip = outline.left.at(-1);
+  const litFrom = { volume: { light: litSideLight(spec.angleDeg) } };
   inShadow(ctx, () =>
-    withFxMod(ctx, GRIT, () => {
-      ctx.fillStyle = rgbCss(pal.body, 0.95 * alpha);
+    withFxMod(ctx, mergeFxMods(SOLID_STONE, litFrom), () => {
+      ctx.fillStyle = axisPaint(ctx, spec, rgbCss(pal.body, 0.95 * alpha));
       traceOutline(ctx, outline);
-      ctx.fill();
+      withFxMod(ctx, { volume: { radius: SPIRE_RADIUS } }, () => unstyled(ctx, () => ctx.fill()));
       ctx.fillStyle = rgbCss(pal.deep, FACET_ALPHA * alpha);
       traceOutline(ctx, { left: [[spec.x, spec.y], tip], right: outline.right });
       ctx.fill();
@@ -291,10 +322,10 @@ function spire(ctx, pal, rim, spec, { alpha = 1, hot = 1, jag = 0 } = {}) {
   );
   const lit = alpha * clamp01(hot);
   if (!(lit > 0)) return;
-  ctx.strokeStyle = rgbCss(rim, 0.75 * lit);
+  ctx.strokeStyle = rgbCss(rim, 0.5 * lit);
   ctx.lineWidth = Math.max(1, spec.width * 0.06);
   ctx.lineJoin = 'round';
-  strokeLine(ctx, outline.left);
+  withFxMod(ctx, mergeFxMods(BEVEL, litFrom), () => strokeLine(ctx, outline.left));
 }
 
 /** The rock material drawn in `palette` (any palette with the same keys). */

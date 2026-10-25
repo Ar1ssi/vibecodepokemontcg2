@@ -10,8 +10,8 @@
 // Every call draws on the context it is handed and is otherwise pure.
 import { rgbCss } from '../../fx-colors.mjs';
 import { moddedKit } from './_kit-mod.js';
-import { withFxMod } from './_mods.js';
-import { grainPass, sphere, styledKit, tonguePath, wobble } from './_shared.js';
+import { withFxMod, withLiftZ } from './_mods.js';
+import { grainPass, inShadow, sphere, styledKit, tonguePath, wobble } from './_shared.js';
 
 // Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
 // Blades and leaves: a few broad facets (leaf halves) with a slow glint; seeds and spores boil softly.
@@ -28,6 +28,30 @@ const FIBRE = Object.freeze({
   distort: Object.freeze({ strength: 0.015, speed: 0.6, scale: 4 }),
 });
 const SAP = Object.freeze({ distort: Object.freeze({ strength: 0.03, speed: 0.5, scale: 2.5, angle: -90 }) });
+// Depth (076 § Depth): a leaf is matter, not light. It fills opaque (source-over, so it covers
+// the card art instead of washing it white, and the cast pass gives it a shadow), lit on the GPU
+// as a bumped sheet with a waxy glint; its two halves keep their light and dark side. Each leaf
+// floats at its own height (a lone leaf by its stable seed, a pinwheel's by order, the seed core
+// on top) so a flurry reads in depth. A seed is a lit, glossy sphere.
+const LEAF_SHEET = Object.freeze({
+  ...FIBRE,
+  volume: Object.freeze({ amount: 1, spec: 0.55, rim: 0.25, bump: 0.35, bumpScale: 12, ambient: 0.45 }),
+});
+const SEED_SPHERE = Object.freeze({
+  ...SAP,
+  volume: Object.freeze({ amount: 0.85, spec: 0.6, rim: 0.4, bump: 0.15, bumpScale: 6, ambient: 0.4 }),
+});
+const LEAF_Z = Object.freeze({ low: 0.02, high: 0.12 });
+const PINWHEEL_Z_STEP = 0.02;
+
+/** A stable pseudo-random value in [0, 1) for a seed. */
+const hash = (seed) => {
+  const v = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
+  return v - Math.floor(v);
+};
+
+/** The height (lane units) a lone leaf floats at: stable per seed, so a flurry's layers hold. */
+const leafZ = (seed) => LEAF_Z.low + (LEAF_Z.high - LEAF_Z.low) * hash(Number(seed) || 0);
 const edgeOf = (rgb, gain) => Object.freeze({ dissolve: Object.freeze({ edge: rgb, gain }) });
 
 const TAU = Math.PI * 2;
@@ -155,7 +179,7 @@ function leafKit(palette, shape, { veins }) {
       [0.85, palette.body, alpha * 0.8],
       [1, palette.deep, alpha * 0.6],
     ];
-    withFxMod(ctx, SAP, () => sphere(ctx, x, y, r, stops, 0.25));
+    withFxMod(ctx, SEED_SPHERE, () => sphere(ctx, x, y, r, stops, 0.25));
     const rim = Math.min(2, Math.max(0.75, r * 0.1));
     ctx.strokeStyle = rgbCss(palette.deep, 0.75 * alpha);
     ctx.lineWidth = rim;
@@ -164,34 +188,41 @@ function leafKit(palette, shape, { veins }) {
     ctx.stroke();
   }
 
-  /** One leaf from its base along `angleDeg`: flat body, lit half (`hot`), veins. Never blurs. */
-  function tongue(ctx, spec, { alpha = 1, hot = 1 } = {}) {
+  /** One leaf at its own height (see `leafZ`). */
+  function tongue(ctx, spec, opts) {
+    withLiftZ(ctx, leafZ(spec.seed), () => leafAt(ctx, spec, opts));
+  }
+
+  /** One leaf from its base along `angleDeg`: opaque body, lit half (`hot`), veins. Never blurs. */
+  function leafAt(ctx, spec, { alpha = 1, hot = 1 } = {}) {
     if (!(spec.length > 0) || !(spec.width > 0) || !(alpha > 0)) return;
     const leaf = leafOutline(spec, shape);
-    withFxMod(ctx, FIBRE, () => {
-      ctx.fillStyle = rgbCss(palette.body, 0.9 * alpha);
-      traceLeaf(ctx, leaf);
-      ctx.fill();
-      const lit = 0.75 * alpha * clamp01(hot);
-      if (lit > 0) {
-        ctx.fillStyle = rgbCss(palette.hot, lit);
-        traceHalf(ctx, leaf.sunlitLeft ? leaf.left : leaf.right, leaf.mid);
+    inShadow(ctx, () => {
+      withFxMod(ctx, LEAF_SHEET, () => {
+        ctx.fillStyle = rgbCss(palette.body, 0.9 * alpha);
+        traceLeaf(ctx, leaf);
         ctx.fill();
+        const lit = 0.75 * alpha * clamp01(hot);
+        if (lit > 0) {
+          ctx.fillStyle = rgbCss(palette.hot, lit);
+          traceHalf(ctx, leaf.sunlitLeft ? leaf.left : leaf.right, leaf.mid);
+          ctx.fill();
+        }
+      });
+      if (veins && spec.length >= VEIN_MIN_PX) {
+        ctx.strokeStyle = rgbCss(palette.deep, 0.85 * alpha);
+        ctx.lineWidth = 1;
+        ctx.lineCap = 'round';
+        traceVeins(ctx, leaf);
+        ctx.stroke();
       }
     });
-    if (veins && spec.length >= VEIN_MIN_PX) {
-      ctx.strokeStyle = rgbCss(palette.deep, 0.85 * alpha);
-      ctx.lineWidth = 1;
-      ctx.lineCap = 'round';
-      traceVeins(ctx, leaf);
-      ctx.stroke();
-    }
   }
 
   /** A leaf spun about its own centre (its base trails half a length behind (x, y)). */
   const spunLeaf = (ctx, x, y, angleDeg, length, width, time, seed, opts) => {
     const a = rad(angleDeg);
-    tongue(ctx, { x: x - (Math.cos(a) * length) / 2, y: y - (Math.sin(a) * length) / 2, angleDeg, length, width, time, seed }, opts);
+    leafAt(ctx, { x: x - (Math.cos(a) * length) / 2, y: y - (Math.sin(a) * length) / 2, angleDeg, length, width, time, seed }, opts);
   };
 
   /**
@@ -210,16 +241,14 @@ function leafKit(palette, shape, { veins }) {
       spunLeaf(ctx, x, y, spin, r * 2.2, r * 0.95, time, seed, { alpha, hot });
       return;
     }
+    // Heights by leaf order, not seed: a volley's projectile seed drifts along its path.
     for (let k = 0; k < tongues; k += 1) {
       const a = spin + (k * 360) / tongues;
       const ar = rad(a);
-      tongue(
-        ctx,
-        { x: x + Math.cos(ar) * r * 0.15, y: y + Math.sin(ar) * r * 0.15, angleDeg: a, length: r * 1.6, width: r * 0.7, time, seed: seed + k * 1.3 },
-        { alpha: alpha * 0.95, hot }
-      );
+      const spec = { x: x + Math.cos(ar) * r * 0.15, y: y + Math.sin(ar) * r * 0.15, angleDeg: a, length: r * 1.6, width: r * 0.7, time, seed: seed + k * 1.3 };
+      withLiftZ(ctx, LEAF_Z.low + PINWHEEL_Z_STEP * k, () => leafAt(ctx, spec, { alpha: alpha * 0.95, hot }));
     }
-    body(ctx, x, y, r * 0.45, alpha, hot);
+    withLiftZ(ctx, LEAF_Z.low + PINWHEEL_Z_STEP * tongues, () => body(ctx, x, y, r * 0.45, alpha, hot));
   }
 
   return { glow, body, tongue, projectile };

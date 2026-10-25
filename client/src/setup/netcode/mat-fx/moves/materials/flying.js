@@ -11,7 +11,7 @@
 // grain, no blur. Every call draws on the context it is handed and is otherwise pure.
 import { rgbCss } from '../../fx-colors.mjs';
 import { moddedKit } from './_kit-mod.js';
-import { withFxMod } from './_mods.js';
+import { withFxMod, withLiftZ } from './_mods.js';
 import { grainPass, sphere, styledKit, traceOutline } from './_shared.js';
 
 // Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
@@ -33,6 +33,27 @@ const WISPS = Object.freeze({
 });
 const FIBRE = Object.freeze({ detail: Object.freeze({ amount: 0.25, speed: 0, scale: 18 }) });
 const edgeOf = (rgb) => Object.freeze({ dissolve: Object.freeze({ edge: rgb, gain: 0.6, width: 0.14 }) });
+// Depth (076 § Depth): a gust is a stack of translucent sheets, not one decal. Each blade sits at
+// its own height above whatever lift the drawer gives the beat (a whirl's blades by their stable
+// seed, a projectile's pinwheel by blade order, its orb on top), so the camera sees the layers
+// part and the cast pass pools each one's light on the cloth at its own offset. Inside a blade, a
+// ribbon down its centre line is lit as a tube (the sheen of a curved sheet) and the bright edge
+// as a glossy tube; the halo stays on the cloth.
+const SHEET_Z = Object.freeze({ low: 0.04, high: 0.3 });
+const PINWHEEL_Z_STEP = 0.05;
+const RIBBON = Object.freeze({ volume: Object.freeze({ amount: 1, spec: 0.9, rim: 0.6, bump: 0, ambient: 0.55 }) });
+const GLOSS = Object.freeze({ volume: Object.freeze({ amount: 1, spec: 1, rim: 0.3, bump: 0, ambient: 0.6 }) });
+const RIBBON_ALPHA = 0.35;
+const RIBBON_WIDTH = 0.5;
+
+/** A stable pseudo-random value in [0, 1) for a seed. */
+const hash = (seed) => {
+  const v = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
+  return v - Math.floor(v);
+};
+
+/** The height (lane units) a lone blade's sheet sits at: stable per seed, so a whirl's layers hold. */
+const sheetZ = (seed) => SHEET_Z.low + (SHEET_Z.high - SHEET_Z.low) * hash(Number(seed) || 0);
 
 const TAU = Math.PI * 2;
 const SAMPLES = 12;
@@ -192,19 +213,36 @@ function flyingKit(palette) {
       feather(ctx, spec, alpha);
       return;
     }
+    withLiftZ(ctx, sheetZ(spec.seed), () => blade(ctx, spec, { alpha, hot }));
+  }
+
+  /** One blade's sheet: the wispy fill, its lit centre ribbon, then the glossy outer edge (`hot`). */
+  function blade(ctx, spec, { alpha = 1, hot = 1 } = {}) {
+    if (!(spec.length > 0) || !(spec.width > 0) || !(alpha > 0)) return;
     const outline = crescentOutline(spec);
     ctx.fillStyle = rgbCss(palette.body, BLADE_ALPHA * alpha);
     traceOutline(ctx, outline);
     withFxMod(ctx, WISPS, () => ctx.fill());
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = rgbCss(palette.hot, RIBBON_ALPHA * alpha);
+    ctx.lineWidth = Math.max(1, spec.width * THICKNESS * RIBBON_WIDTH);
+    ctx.beginPath();
+    outline.left.forEach(([lx, ly], i) => {
+      const [rx, ry] = outline.right[i];
+      const mx = (lx + rx) / 2;
+      const my = (ly + ry) / 2;
+      if (i === 0) ctx.moveTo(mx, my);
+      else ctx.lineTo(mx, my);
+    });
+    withFxMod(ctx, RIBBON, () => ctx.stroke());
     const edge = 0.9 * alpha * clamp01(hot);
     if (!(edge > 0)) return;
     ctx.strokeStyle = rgbCss(palette.white, edge);
     ctx.lineWidth = Math.max(1, spec.width * EDGE_WIDTH);
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
     ctx.beginPath();
     outline.left.forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
-    ctx.stroke();
+    withFxMod(ctx, GLOSS, () => ctx.stroke());
   }
 
   /**
@@ -218,17 +256,15 @@ function flyingKit(palette) {
       orb(ctx, x, y, r, alpha, hot, time * TAU * PINWHEEL_HZ + seed);
       return;
     }
+    // Heights by blade order, not seed: a volley's projectile seed drifts along its path.
     const spin = headingDeg + time * 360 * PINWHEEL_HZ + seed * 40;
     for (let k = 0; k < tongues; k += 1) {
       const angleDeg = spin + (k * 360) / tongues;
       const a = rad(angleDeg);
-      tongue(
-        ctx,
-        { x: x + Math.cos(a) * r * 0.15, y: y + Math.sin(a) * r * 0.15, angleDeg, length: r * 1.5, width: r * 0.9, time, seed: seed + k * 1.7 },
-        { alpha: alpha * 0.9, hot }
-      );
+      const spec = { x: x + Math.cos(a) * r * 0.15, y: y + Math.sin(a) * r * 0.15, angleDeg, length: r * 1.5, width: r * 0.9, time, seed: seed + k * 1.7 };
+      withLiftZ(ctx, SHEET_Z.low + PINWHEEL_Z_STEP * k, () => blade(ctx, spec, { alpha: alpha * 0.9, hot }));
     }
-    orb(ctx, x, y, r * PINWHEEL_CORE, alpha, hot, time * TAU * PINWHEEL_HZ + seed);
+    withLiftZ(ctx, SHEET_Z.low + PINWHEEL_Z_STEP * tongues, () => orb(ctx, x, y, r * PINWHEEL_CORE, alpha, hot, time * TAU * PINWHEEL_HZ + seed));
   }
 
   return moddedKit({

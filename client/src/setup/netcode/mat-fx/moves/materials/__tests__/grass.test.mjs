@@ -44,3 +44,22 @@ test('dissolve edges: grass in leaf green, petal in its pink, solar in its light
   assert.deepEqual(edgeOf(petal), [...petal.palette.body]);
   assert.deepEqual(edgeOf(solar), [...solar.palette.hot]);
 });
+
+test('depth: a leaf is an opaque lit sheet at its own height; a pinwheel stacks its leaves under the seed', () => {
+  const lone = fxModSpy();
+  grass.tongue(lone.ctx, LEAF, { alpha: 1, hot: 1 });
+  for (const fill of lone.fills()) {
+    assert.equal(fill.composite, 'source-over', 'matter covers the card art instead of washing it out');
+    assert.equal(fill.fxMod.volume.amount, 1);
+    assert.ok(fill.z >= 0.02 && fill.z <= 0.12);
+  }
+  assert.equal(lone.ctx.globalCompositeOperation, 'lighter', 'the caller pass is back');
+  assert.equal(lone.ctx.fxLift, null);
+  const wheel = fxModSpy();
+  grass.projectile(wheel.ctx, { x: 100, y: 100, r: 20, headingDeg: 0, time: 0, seed: 0, tongues: 3 });
+  const [halo, ...rest] = wheel.fills();
+  assert.equal(halo.z, 0);
+  const seed = rest.at(-1);
+  assert.ok(seed.fxMod.volume.spec > 0.4, 'a glossy seed');
+  assert.ok(rest.every((f) => f.z <= seed.z), 'the seed core on top');
+});
