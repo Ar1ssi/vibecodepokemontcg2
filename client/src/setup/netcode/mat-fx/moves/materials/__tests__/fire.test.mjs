@@ -17,6 +17,8 @@ test('fire tongue: haze and grain on the body and mid passes, haze only on the c
   assert.ok(mid.distort > 0 && mid.detail > 0);
   assert.ok(core.distort > 0 && core.detail === 0, 'the white-hot filament keeps clean');
   assert.ok(body.distort > core.distort, 'haze is strongest where the flame is widest');
+  assert.ok(body.volume > 0 && mid.volume > 0 && core.volume === 0, 'the outer flame is lit, the core glows');
+  assert.ok(body.z > 0 && mid.z > body.z && core.z > mid.z, 'the core rides above the body');
   for (const row of [body, mid, core]) {
     assert.deepEqual(row.edge, [...fire.palette.body]);
     assert.equal(row.dissolve.amount, 0, 'a kit never dissolves on its own');
@@ -29,9 +31,11 @@ test('fire body and glow: the sphere churns with grain, the halo only wavers', (
   fire.body(ctx, 50, 50, 20, 1, 1);
   fire.glow(ctx, 50, 50, 40, 0.5);
   const [body, glow] = recordedMods(recording);
-  assert.ok(body.distort > 0 && body.detail > 0);
-  assert.ok(glow.distort > 0 && glow.detail === 0);
+  assert.ok(body.distort > 0 && body.detail > 0 && body.volume > 0);
+  assert.ok(glow.distort > 0 && glow.detail === 0 && glow.volume === 0);
+  assert.ok(body.z > glow.z);
   assert.equal(ctx.fxMod, null);
+  assert.equal(ctx.fxLift, null);
 });
 
 test('fire projectile keeps a drawer dissolve and restores it after', () => {

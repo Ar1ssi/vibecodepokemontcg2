@@ -15,9 +15,15 @@
 // Design 076: modifiers (`ctx.fxMod`, ignored by Canvas2D). A fast, fine crackle jitter runs
 // through the glow and the yellow core of every jag and bolt (the white centre stays a clean
 // line), the ball carries a charge grain, and every fill names the cyan-white dissolve edge.
+//
+// Design 076 § Depth: a bolt is a lit tube (gpu-canvas `volume`: a stroke shades round its
+// width), a gold body with a white-hot centre riding above it and a soft halo below; the ball is
+// a lit sphere inside a thin fresnel shell of charge. Each pass stands at its own height over the
+// drawer's lift (halo lowest, centre highest), so the camera sees the layers part and the cast
+// pass pools each one's light on the cloth at its own offset.
 import { rgbCss } from '../../fx-colors.mjs';
 import { seededRandom } from '../../flow-pose.mjs';
-import { withFxMod } from './_mods.js';
+import { mergeFxMods, withFxMod, withLiftZ } from './_mods.js';
 import { rootFaded } from './_root-fade.js';
 import { grainPass, sphere } from './_shared.js';
 
@@ -28,8 +34,8 @@ const GLOW_BLUR = 0.1;
 const STROKE_BLUR = 0.12;
 const CORE_WIDTH = 0.45;
 const CENTRE_WIDTH = 0.15;
-const BOLT_GLOW = 2.4;
-const BOLT_CENTRE = 0.25;
+const BOLT_GLOW = 3.2;
+const BOLT_CENTRE = 0.3;
 // Style params (gpu-canvas STYLE_PARAMS energy): fast current; the halo only shimmers.
 const ENERGY = Object.freeze({ id: 'energy', streak: 0.6, speed: 5, gain: 0.7 });
 const ENERGY_HALO = Object.freeze({ id: 'energy', streak: 0.35, speed: 3, gain: 0 });
@@ -43,6 +49,33 @@ const CHARGE_GRAIN = Object.freeze({
   distort: Object.freeze({ strength: 0.08, speed: 5, scale: 6, angle: 0 }),
   detail: Object.freeze({ amount: 0.45, speed: 3, scale: 5, angle: -90 }),
 });
+
+// Heights (lane units) over the drawer's lift: the cloth-hugging glow, the halo, the body, the
+// white centre and the crackle on top.
+const Z_AIR = 0.01;
+const Z_HALO = 0.04;
+const Z_BODY = 0.07;
+const Z_CENTRE = 0.09;
+const Z_SPARK = 0.1;
+// Lit solids: the tube's edges fall to amber (low ambient) and its crest glints white; the
+// centre is mostly emissive; the ball is a sphere with a rim; the shell is nearly all rim.
+const TUBE = Object.freeze({ volume: Object.freeze({ amount: 1, spec: 0.5, rim: 0.25, ambient: 0.18, light: 120, bump: 0.15 }) });
+const CENTRE_TUBE = Object.freeze({ volume: Object.freeze({ amount: 0.6, spec: 1, rim: 0.15, ambient: 0.65, light: 120, bump: 0 }) });
+const ORB = Object.freeze({ volume: Object.freeze({ amount: 1, spec: 0.55, rim: 0.55, ambient: 0.25, light: 120, bump: 0.2 }) });
+const SHELL = Object.freeze({ volume: Object.freeze({ amount: 1, spec: 0.4, rim: 1, ambient: 0.1, light: 120, bump: 0 }) });
+const SHELL_SCALE = 1.35;
+// The filament wrapping a bolt: sway (tube widths), one turn per WRAP_TURN widths, sampled every
+// WRAP_STEP widths; its front runs ride over the bolt, its back runs sink under it.
+const WRAP_REACH = 0.75;
+const WRAP_TURN = 7;
+const WRAP_STEP = 0.5;
+const WRAP_WIDTH = 0.2;
+const Z_WRAP_BACK = 0.03;
+const Z_WRAP_FRONT = 0.11;
+const BOLT_BODY = 1.8;
+
+/** `draw` at `z` lane units over the current lift with `mod` merged over the current fxMod. */
+const layered = (ctx, z, mod, draw) => withLiftZ(ctx, z, () => withFxMod(ctx, mod, draw));
 
 const freezeAll = (palette) => Object.freeze(Object.fromEntries(Object.entries(palette).map(([k, v]) => [k, Object.freeze(v)])));
 
@@ -60,6 +93,51 @@ const rad = (deg) => (deg * Math.PI) / 180;
 
 /** A generator for one flicker frame: the same (seed, time bucket) always rolls the same jags. */
 const flickerRandom = (seed, time) => seededRandom(Math.floor(seed * 1013) + Math.floor(time * REROLL_HZ) * 7919);
+
+/**
+ * A filament spiralling round a bolt's polyline (`line`, [[x, y]…]) of tube width `width`: it
+ * sways `WRAP_REACH` w either side of the line, one turn every `WRAP_TURN` w of length, starting
+ * at `phase` radians. Runs where it passes in front of the tube (sin of its angle ≥ 0) and behind
+ * it are split apart, so a caller can lift the front over the bolt and sink the back under it.
+ * Lines under two points, or a width that is not positive, wrap nothing.
+ * @returns {{front: number[][][], back: number[][][]}}
+ */
+export function wrapStrand(line, width, phase = 0) {
+  const front = [];
+  const back = [];
+  if (!Array.isArray(line) || line.length < 2 || !(width > 0)) return { front, back };
+  const step = Math.max(1, width * WRAP_STEP);
+  let travelled = 0;
+  let run = null;
+  let runFront = null;
+  const push = (x, y, angle) => {
+    const isFront = Math.sin(angle) >= 0;
+    if (run === null || isFront !== runFront) {
+      const joint = run?.at(-1);
+      run = joint ? [joint] : [];
+      runFront = isFront;
+      (isFront ? front : back).push(run);
+    }
+    run.push([x, y]);
+  };
+  for (let i = 0; i < line.length - 1; i += 1) {
+    const [x0, y0] = line[i];
+    const [x1, y1] = line[i + 1];
+    const length = Math.hypot(x1 - x0, y1 - y0);
+    if (!(length > 0)) continue;
+    const nx = -(y1 - y0) / length;
+    const ny = (x1 - x0) / length;
+    const samples = Math.max(1, Math.ceil(length / step));
+    for (let k = i === 0 ? 0 : 1; k <= samples; k += 1) {
+      const f = k / samples;
+      const angle = phase + (TAU * (travelled + f * length)) / (WRAP_TURN * width);
+      const sway = Math.cos(angle) * WRAP_REACH * width;
+      push(x0 + (x1 - x0) * f + nx * sway, y0 + (y1 - y0) * f + ny * sway, angle);
+    }
+    travelled += length;
+  }
+  return { front: front.filter((r) => r.length > 1), back: back.filter((r) => r.length > 1) };
+}
 
 /**
  * One jag's centre line from its base (x, y) along `angleDeg`: `segments` joints thrown
@@ -132,7 +210,7 @@ function electricKit(palette) {
     ctx.fxStyle = ENERGY_HALO;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, TAU);
-    withFxMod(ctx, CHARGED_AIR, () => ctx.fill());
+    layered(ctx, Z_AIR, CHARGED_AIR, () => ctx.fill());
     ctx.fxStyle = null;
   }
 
@@ -156,10 +234,10 @@ function electricKit(palette) {
     ctx.fxStyle = ENERGY;
     ctx.strokeStyle = rgbCss(palette.edge, 0.55 * alpha);
     ctx.lineWidth = Math.max(1, r * 0.12);
-    ctx.stroke();
+    layered(ctx, Z_SPARK, TUBE, () => ctx.stroke());
     ctx.strokeStyle = rgbCss(palette.white, 0.9 * alpha);
     ctx.lineWidth = Math.max(1, r * 0.05);
-    ctx.stroke();
+    layered(ctx, Z_SPARK, CENTRE_TUBE, () => ctx.stroke());
     ctx.fxStyle = null;
   }
 
@@ -169,11 +247,30 @@ function electricKit(palette) {
    */
   function crackleBall(ctx, x, y, r, alpha, hot, rand) {
     ctx.fxStyle = ENERGY;
-    withFxMod(ctx, CHARGE_GRAIN, () =>
+    // The shell: clear inside, a thin bright skin at its edge, lit almost only by its rim.
+    layered(ctx, Z_HALO, SHELL, () =>
+      sphere(
+        ctx,
+        x,
+        y,
+        r * SHELL_SCALE,
+        [
+          [0, palette.edge, 0],
+          [0.62, palette.body, 0],
+          [0.88, palette.hot, alpha * 0.22],
+          [1, palette.edge, 0],
+        ],
+        0
+      )
+    );
+    // Less white than a flat ball: the light (lambert, glint, limb) does the modelling, and a
+    // white slab would bloom it away.
+    layered(ctx, Z_BODY, mergeFxMods(CHARGE_GRAIN, ORB), () =>
       sphere(ctx, x, y, r, [
-        [0, palette.white, alpha * (0.45 + 0.35 * clamp01(hot))],
-        [0.25, palette.hot, alpha * 0.8],
-        [0.7, palette.body, alpha * 0.5],
+        [0, palette.white, alpha * (0.3 + 0.3 * clamp01(hot))],
+        [0.25, palette.hot, alpha * 0.65],
+        [0.7, palette.body, alpha * 0.55],
+        [0.92, palette.deep, alpha * 0.3],
         [1, palette.deep, 0],
       ])
     );
@@ -200,17 +297,17 @@ function electricKit(palette) {
     ctx.fxStyle = ENERGY_HALO;
     ctx.fillStyle = rootFaded(ctx, spec, palette.edge, 0.45 * alpha);
     traceJag(ctx, points, 1);
-    withFxMod(ctx, CRACKLE_HALO, () => ctx.fill());
+    layered(ctx, Z_HALO, CRACKLE_HALO, () => ctx.fill());
     ctx.filter = 'none';
     ctx.fxStyle = ENERGY;
     ctx.fillStyle = rootFaded(ctx, spec, palette.body, 0.95 * alpha);
     traceJag(ctx, points, CORE_WIDTH);
-    withFxMod(ctx, CRACKLE_CORE, () => ctx.fill());
+    layered(ctx, Z_BODY, CRACKLE_CORE, () => ctx.fill());
     const centre = alpha * clamp01(hot);
     if (centre > 0) {
       ctx.fillStyle = rootFaded(ctx, spec, palette.white, centre);
       traceJag(ctx, points, CENTRE_WIDTH);
-      ctx.fill();
+      withLiftZ(ctx, Z_CENTRE, () => ctx.fill());
     }
     ctx.fxStyle = null;
   }
@@ -237,10 +334,12 @@ function electricKit(palette) {
   }
 
   /**
-   * Stroke jagged polylines (`lines` = [[x, y]...][]) as lightning: one blurred pale-blue
-   * glow at `width` x 2.4, the saturated yellow core at `width`, a white centre at `width` x 0.25.
-   * Under the additive pass the three sum toward white, so the glow stays faint (0.35), the core
-   * is the deep yellow at 0.8 and the centre 0.85, or the bolt reads as a white ribbon.
+   * Stroke jagged polylines (`lines` = [[x, y]...][]) as lightning: one blurred glow at `width`
+   * x 3.2, the lit gold tube at `width` x 1.8, a white centre at `width` x 0.3, and a filament
+   * wrapping the tube (its back under, its front over). Under the additive pass these sum toward
+   * white, so the glow stays faint (0.25), the tube is the deep yellow at 0.75 with a soft glint,
+   * and the centre 0.6, or the bolt reads as a white ribbon and its shading is lost (design 076
+   * § Depth: the first depth capture did exactly that).
    */
   function jagStroke(ctx, lines, { width, alpha = 1 }) {
     if (!(width > 0) || !(alpha > 0) || !lines?.length) return;
@@ -255,18 +354,37 @@ function electricKit(palette) {
     ctx.fxStyle = ENERGY_HALO;
     // The move's own hot colour (design 075 parity): the pale-blue edge bloomed every bolt white-cyan,
     // where Scarlet/Violet's thunder is yellow; a tinted bolt (cyan, violet) still follows its tint.
-    ctx.strokeStyle = rgbCss(palette.hot, 0.35 * alpha);
+    ctx.strokeStyle = rgbCss(palette.hot, 0.25 * alpha);
     ctx.lineWidth = glowWidth;
     trace();
-    withFxMod(ctx, CRACKLE_HALO, () => ctx.stroke());
+    layered(ctx, Z_HALO, CRACKLE_HALO, () => ctx.stroke());
     ctx.filter = 'none';
     ctx.fxStyle = ENERGY;
-    ctx.strokeStyle = rgbCss(palette.body, 0.8 * alpha);
-    ctx.lineWidth = Math.max(1, width);
-    withFxMod(ctx, CRACKLE_CORE, () => ctx.stroke());
-    ctx.strokeStyle = rgbCss(palette.white, 0.85 * alpha);
+    // A filament wraps the bolt: its back runs dim under the tube, its front runs bright over it,
+    // so the bolt reads as a round thing with something going round it. Re-rolled with the bolt.
+    const tube = Math.max(1.5, width * BOLT_BODY);
+    const strands = lines.map((line) => wrapStrand(line, tube, (line[0]?.[0] ?? 0) * 0.37 + (line[0]?.[1] ?? 0) * 0.23));
+    const strokeRuns = (runs) => {
+      ctx.beginPath();
+      for (const run of runs) run.forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
+    };
+    ctx.lineWidth = Math.max(1, tube * WRAP_WIDTH);
+    ctx.strokeStyle = rgbCss(palette.hot, 0.35 * alpha);
+    strokeRuns(strands.flatMap((s) => s.back));
+    withLiftZ(ctx, Z_WRAP_BACK, () => ctx.stroke());
+    // The body is a lit gold tube a little wider than the drawer's width, so its shading reads.
+    // No crackle on the tube: a warped read smears its shading; the halo carries the jitter.
+    ctx.strokeStyle = rgbCss(palette.body, 0.75 * alpha);
+    ctx.lineWidth = tube;
+    trace();
+    layered(ctx, Z_BODY, TUBE, () => ctx.stroke());
+    ctx.strokeStyle = rgbCss(palette.white, 0.6 * alpha);
     ctx.lineWidth = Math.max(1, width * BOLT_CENTRE);
-    ctx.stroke();
+    layered(ctx, Z_CENTRE, CENTRE_TUBE, () => ctx.stroke());
+    ctx.lineWidth = Math.max(1, tube * WRAP_WIDTH);
+    ctx.strokeStyle = rgbCss(palette.hot, 0.6 * alpha);
+    strokeRuns(strands.flatMap((s) => s.front));
+    layered(ctx, Z_WRAP_FRONT, CENTRE_TUBE, () => ctx.stroke());
     ctx.fxStyle = null;
   }
 

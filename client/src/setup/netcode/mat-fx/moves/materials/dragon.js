@@ -10,8 +10,13 @@
 // Design 076: modifiers (`ctx.fxMod`, ignored by Canvas2D). The violet flame and the orb waver
 // like plasma and carry a streaming energy grain; the ember core and the helix stay crisp, and
 // every fill names the magenta dissolve edge.
+//
+// Design 076 § Depth: the violet flame is lit as lumpy plasma (gpu-canvas `volume` on its solid
+// fills: a bumped sheet), the orb is a glossy lit sphere and its helix strands are lit tubes
+// riding above it; every pass stands at its own height over the drawer's lift, so the ember core
+// sits on top of the flame and the cast pass pools violet light on the cloth.
 import { rgbCss } from '../../fx-colors.mjs';
-import { withFxMod } from './_mods.js';
+import { mergeFxMods, withFxMod, withLiftZ } from './_mods.js';
 import { grainPass, shardOutline, sphere, styledKit, tongueOutline, traceOutline, wobble } from './_shared.js';
 
 // Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
@@ -27,6 +32,19 @@ const ORB_CHURN = Object.freeze({
   distort: Object.freeze({ strength: 0.1, speed: 0.8, scale: 2.5, angle: 0 }),
   detail: Object.freeze({ amount: 0.4, speed: 0.7, scale: 3.5, angle: -90 }),
 });
+// Heights (lane units) over the drawer's lift.
+const Z_HALO = 0.01;
+const Z_BODY = 0.03;
+const Z_MID = 0.05;
+const Z_CORE = 0.07;
+const Z_ORB = 0.06;
+const Z_HELIX = 0.09;
+const PLASMA_SHEET = Object.freeze({ amount: 0.6, spec: 0.6, rim: 0.45, ambient: 0.3, light: 120, bump: 0.7, bumpScale: 4 });
+const MID_SHEET = Object.freeze({ ...PLASMA_SHEET, amount: 0.45 });
+const GLOSSY_ORB = Object.freeze({ volume: Object.freeze({ amount: 0.85, spec: 0.45, rim: 0.6, ambient: 0.3, light: 120, bump: 0.25 }) });
+const HELIX_TUBE = Object.freeze({ volume: Object.freeze({ amount: 0.85, spec: 0.9, rim: 0.3, ambient: 0.35, light: 120, bump: 0 }) });
+/** `draw` at `z` lane units over the current lift with `mod` merged over the current fxMod. */
+const layered = (ctx, z, mod, draw) => withLiftZ(ctx, z, () => withFxMod(ctx, mod, draw));
 const plasma = (warp, grain, angleDeg) => ({ distort: warp, detail: { amount: grain, speed: 1.2, scale: 4.5, angle: angleDeg } });
 
 const TAU = Math.PI * 2;
@@ -91,7 +109,7 @@ function dragonKit(palette) {
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, TAU);
-    withFxMod(ctx, PLASMA_HALO, () => ctx.fill());
+    layered(ctx, Z_HALO, PLASMA_HALO, () => ctx.fill());
   }
 
   /**
@@ -101,10 +119,12 @@ function dragonKit(palette) {
    */
   function body(ctx, x, y, r, alpha, hot = 1, time = 0) {
     if (!(r > 0) || !(alpha > 0)) return;
-    withFxMod(ctx, ORB_CHURN, () =>
+    // A dimmer white heart than the flat orb had: lit, the sphere models itself, and a full white
+    // heart bloomed it into a white disc (design 076 § Depth capture).
+    layered(ctx, Z_ORB, mergeFxMods(ORB_CHURN, GLOSSY_ORB), () =>
       sphere(ctx, x, y, r, [
-        [0, palette.white, alpha * hot],
-        [0.25, palette.core, alpha],
+        [0, palette.white, alpha * hot * 0.5],
+        [0.25, palette.core, alpha * 0.8],
         [0.6, palette.hot, alpha * 0.9],
         [0.85, palette.body, alpha * 0.6],
         [1, palette.deep, 0],
@@ -119,7 +139,7 @@ function dragonKit(palette) {
       ctx.strokeStyle = rgbCss(index === 0 ? palette.ember : palette.core, 0.85 * alpha);
       ctx.beginPath();
       strand.forEach(([dx, dy], i) => (i === 0 ? ctx.moveTo(x + dx, y + dy) : ctx.lineTo(x + dx, y + dy)));
-      ctx.stroke();
+      layered(ctx, Z_HELIX, HELIX_TUBE, () => ctx.stroke());
     });
   }
 
@@ -136,15 +156,15 @@ function dragonKit(palette) {
     ctx.filter = `blur(${Math.max(1, spec.width * 0.12).toFixed(1)}px)`;
     ctx.fillStyle = rgbCss(palette.body, 0.65 * alpha);
     traceOutline(ctx, passOutline(spec, 1, jag));
-    withFxMod(ctx, plasma(PLASMA_BODY, 0.5, spec.angleDeg), () => ctx.fill());
+    layered(ctx, Z_BODY, { ...plasma(PLASMA_BODY, 0.5, spec.angleDeg), volume: PLASMA_SHEET }, () => ctx.fill());
     ctx.filter = 'none';
     ctx.fillStyle = rgbCss(palette.hot, 0.8 * alpha);
     traceOutline(ctx, passOutline(spec, 0.66, jag));
-    withFxMod(ctx, plasma(PLASMA_MID, 0.35, spec.angleDeg), () => ctx.fill());
+    layered(ctx, Z_MID, { ...plasma(PLASMA_MID, 0.35, spec.angleDeg), volume: MID_SHEET }, () => ctx.fill());
     if (!(hot > 0)) return;
     ctx.fillStyle = rgbCss(palette.ember, 0.85 * alpha * Math.min(1, hot));
     traceOutline(ctx, passOutline({ ...spec, seed: spec.seed + 0.5 }, 0.38, jag));
-    withFxMod(ctx, PLASMA_CORE, () => ctx.fill());
+    layered(ctx, Z_CORE, PLASMA_CORE, () => ctx.fill());
   }
 
   /**

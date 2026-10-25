@@ -12,8 +12,13 @@
 // blade or sphere warps: a slow brushed grain runs along the blade body and over the sphere, a
 // faint cool shimmer moves in the halos, the specular line and rim stay clean, and every fill
 // names the cool-blue dissolve edge (a thin, cold sliver).
+//
+// Design 076 § Depth: the metal sphere is lit as polished metal (gpu-canvas `volume`: hard glint,
+// cool rim, little bump) with its rim a lit tube; a blade's halo, body and specular line stand at
+// rising heights over the drawer's lift. The blade body keeps its own brushed gradient lighting:
+// its gradient runs across the blade, so the volume tube would wrap the wrong axis.
 import { rgbCss } from '../../fx-colors.mjs';
-import { withFxMod } from './_mods.js';
+import { mergeFxMods, withFxMod, withLiftZ } from './_mods.js';
 import { grainPass, shardOutline, sphere, styledKit, traceOutline } from './_shared.js';
 
 // Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
@@ -23,6 +28,18 @@ const METAL = Object.freeze({ byKind: { linear: { id: 'crystal', facets: 3, shee
 const COOL_SHIMMER = Object.freeze({ distort: Object.freeze({ strength: 0.06, speed: 0.8, scale: 2.5, angle: 0 }) });
 const SPHERE_BRUSH = Object.freeze({ detail: Object.freeze({ amount: 0.25, speed: 0.3, scale: 5, angle: 0 }) });
 const bladeBrush = (angleDeg) => ({ detail: { amount: 0.3, speed: 0.4, scale: 6, angle: angleDeg } });
+
+// Heights (lane units) over the drawer's lift.
+const Z_HAZE = 0.01;
+const Z_HALO = 0.02;
+const Z_BLADE = 0.04;
+const Z_SPECULAR = 0.06;
+const Z_SPHERE = 0.05;
+const Z_RIM = 0.07;
+const POLISHED = Object.freeze({ volume: Object.freeze({ amount: 1, spec: 1.2, rim: 0.6, ambient: 0.3, light: 120, bump: 0.05 }) });
+const RIM_TUBE = Object.freeze({ volume: Object.freeze({ amount: 0.8, spec: 1, rim: 0.3, ambient: 0.4, light: 120, bump: 0 }) });
+/** `draw` at `z` lane units over the current lift with `mod` merged over the current fxMod. */
+const layered = (ctx, z, mod, draw) => withLiftZ(ctx, z, () => withFxMod(ctx, mod, draw));
 
 const TAU = Math.PI * 2;
 const HEEL = 0.22;
@@ -105,14 +122,14 @@ function steelKit(palette) {
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, TAU);
-    withFxMod(ctx, COOL_SHIMMER, () => ctx.fill());
+    layered(ctx, Z_HAZE, COOL_SHIMMER, () => ctx.fill());
   }
 
   /** A metal sphere: a hard white highlight up-left, steel shading to deep, a cool blue rim. */
   function body(ctx, x, y, r, alpha, hot = 1) {
     if (!(r > 0) || !(alpha > 0)) return;
     const shine = alpha * clamp01(hot);
-    withFxMod(ctx, SPHERE_BRUSH, () =>
+    layered(ctx, Z_SPHERE, mergeFxMods(SPHERE_BRUSH, POLISHED), () =>
       sphere(
         ctx,
         x,
@@ -132,7 +149,7 @@ function steelKit(palette) {
     ctx.lineWidth = Math.max(1, r * 0.06);
     ctx.beginPath();
     ctx.arc(x, y, r * 0.97, 0, TAU);
-    ctx.stroke();
+    layered(ctx, Z_RIM, RIM_TUBE, () => ctx.stroke());
   }
 
   /**
@@ -147,7 +164,7 @@ function steelKit(palette) {
     ctx.filter = `blur(${Math.max(1, spec.width * HALO_BLUR).toFixed(2)}px)`;
     ctx.fillStyle = rgbCss(palette.edge, HALO_ALPHA * alpha);
     traceOutline(ctx, shape(HALO_WIDTH));
-    withFxMod(ctx, COOL_SHIMMER, () => ctx.fill());
+    layered(ctx, Z_HALO, COOL_SHIMMER, () => ctx.fill());
     ctx.filter = 'none';
 
     const blade = shape(1);
@@ -163,7 +180,7 @@ function steelKit(palette) {
     brush.addColorStop(1, rgbCss(palette.deep, 0.85 * alpha));
     ctx.fillStyle = brush;
     traceOutline(ctx, blade);
-    withFxMod(ctx, bladeBrush(spec.angleDeg), () => ctx.fill());
+    layered(ctx, Z_BLADE, bladeBrush(spec.angleDeg), () => ctx.fill());
 
     const shine = alpha * clamp01(hot);
     if (!(shine > 0)) return;
@@ -177,7 +194,7 @@ function steelKit(palette) {
       spec.x + Math.cos(a) * spec.length * SPECULAR_REACH + nx * lift * 0.3,
       spec.y + Math.sin(a) * spec.length * SPECULAR_REACH + ny * lift * 0.3
     );
-    ctx.stroke();
+    withLiftZ(ctx, Z_SPECULAR, () => ctx.stroke());
   }
 
   /**

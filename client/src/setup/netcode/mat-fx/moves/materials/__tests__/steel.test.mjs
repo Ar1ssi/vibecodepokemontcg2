@@ -17,15 +17,19 @@ test('steel blade: shimmer in the halo, brushed grain on the body, the specular 
   assert.ok(body.detail > 0 && body.distort === 0, 'the blade itself never wavers');
   assert.equal(specular.distort + specular.detail, 0);
   for (const row of [halo, body, specular]) assert.deepEqual(row.edge, [...steel.palette.edge]);
+  assert.equal(body.volume, 0, 'the brushed gradient runs across the blade, so it keeps its own lighting');
+  assert.ok(halo.z > 0 && body.z > halo.z && specular.z > body.z);
   assert.equal(ctx.fxMod, null);
+  assert.equal(ctx.fxLift, null);
 });
 
 test('steel sphere: brushed grain, no warp; the rim stroke clean', () => {
   const { ctx, recording } = modRecorder();
   steel.body(ctx, 50, 50, 30, 1, 1);
   const [sphere, rim] = recordedMods(recording);
-  assert.ok(sphere.detail > 0 && sphere.distort === 0);
+  assert.ok(sphere.detail > 0 && sphere.distort === 0 && sphere.volume > 0);
   assert.equal(rim.distort + rim.detail, 0);
+  assert.ok(rim.volume > 0 && rim.z > sphere.z);
 });
 
 test('steel projectile and sigil keep a drawer dissolve and restore it after', () => {

@@ -13,8 +13,12 @@
 // (a slow warp and a fine grain), the faceted head only glints (a faint grain, never a warp: a
 // crystal is rigid), the prismatic fringe stays a clean line, and every fill names the cyan
 // dissolve edge. The crystal tongue's own modifiers are ice's.
+//
+// Design 076 § Depth: the mist lies lowest, the faceted head above it, and the prismatic fringe is
+// a lit tube riding just over its crystal (gpu-canvas `volume` on the stroke), so the fringe reads
+// as an edge of light standing off the crystal rather than an outline printed on it.
 import { rgbCss } from '../../fx-colors.mjs';
-import { withFxMod } from './_mods.js';
+import { withFxMod, withLiftZ } from './_mods.js';
 import { parseHex, traceOutline } from './_shared.js';
 import { ice, icicleOutline } from './ice.js';
 import { UNITS } from './_units.js';
@@ -32,6 +36,14 @@ const NEBULA = Object.freeze({
   detail: Object.freeze({ amount: 0.45, speed: 0.5, scale: 6, angle: -90 }),
 });
 const FACET_GLINT = Object.freeze({ detail: Object.freeze({ amount: 0.2, speed: 0.4, scale: 5, angle: -90 }) });
+
+// Heights (lane units) over the drawer's lift.
+const Z_MIST = 0.01;
+const Z_HEAD = 0.05;
+const Z_FRINGE = 0.04;
+const FRINGE_TUBE = Object.freeze({ volume: Object.freeze({ amount: 0.8, spec: 1, rim: 0.4, ambient: 0.45, light: 120, bump: 0 }) });
+/** `draw` at `z` lane units over the current lift with `mod` merged over the current fxMod. */
+const layered = (ctx, z, mod, draw) => withLiftZ(ctx, z, () => withFxMod(ctx, mod, draw));
 
 const STELLAR_PALETTE = Object.freeze({
   deep: hex('#0F2A55'),
@@ -65,7 +77,7 @@ function stellarKit(palette) {
     ctx.fxStyle = STAR_MIST;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, TAU);
-    withFxMod(ctx, NEBULA, () => ctx.fill());
+    layered(ctx, Z_MIST, NEBULA, () => ctx.fill());
     ctx.fxStyle = null;
   }
 
@@ -74,7 +86,7 @@ function stellarKit(palette) {
     ctx.save();
     ctx.globalAlpha *= alpha * (0.7 + 0.3 * Math.max(0, Math.min(1, hot)));
     ctx.fxStyle = STARLIGHT;
-    withFxMod(ctx, FACET_GLINT, () => UNITS.facet(ctx, x, y, r, -90, 0, palette));
+    layered(ctx, Z_HEAD, FACET_GLINT, () => UNITS.facet(ctx, x, y, r, -90, 0, palette));
     ctx.fxStyle = null;
     ctx.restore();
   }
@@ -88,7 +100,7 @@ function stellarKit(palette) {
     ctx.strokeStyle = rgbCss(palette[accentKeyFor(spec.seed ?? 0)], alpha);
     ctx.lineWidth = Math.max(1.5, spec.width * 0.16);
     traceOutline(ctx, icicleOutline({ ...spec, width: spec.width * 1.12 }));
-    ctx.stroke();
+    layered(ctx, Z_FRINGE, FRINGE_TUBE, () => ctx.stroke());
     ctx.fxStyle = null;
   }
 

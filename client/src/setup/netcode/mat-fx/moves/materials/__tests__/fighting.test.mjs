@@ -18,7 +18,9 @@ test('shock streak: grain on the body pass only, never a warp', () => {
     assert.equal(body.distort + mid.distort + centre.distort, 0);
     assert.equal(mid.detail + centre.detail, 0);
     for (const row of [body, mid, centre]) assert.deepEqual(row.edge, [...kit.palette.hot]);
+    assert.ok(body.z > 0 && mid.z > body.z && centre.z > mid.z, 'the centre rides above the body');
     assert.equal(ctx.fxMod, null);
+    assert.equal(ctx.fxLift, null);
   }
 });
 
@@ -26,18 +28,24 @@ test('impact disc: the hot disc ripples and churns; its three rings stay clean',
   const { ctx, recording } = modRecorder();
   fighting.body(ctx, 50, 50, 30, 1, 1);
   const [disc, ...rings] = recordedMods(recording);
-  assert.ok(disc.distort > 0 && disc.detail > 0);
+  assert.ok(disc.distort > 0 && disc.detail > 0 && disc.volume > 0);
   assert.equal(rings.length, 3);
-  for (const ring of rings) assert.equal(ring.distort + ring.detail, 0);
+  for (const ring of rings) {
+    assert.equal(ring.distort + ring.detail, 0);
+    assert.ok(ring.volume > 0 && ring.z > disc.z, 'the rings are lit tubes above the disc');
+  }
 });
 
 test('ki sphere churns; its swirl arcs stay clean', () => {
   const { ctx, recording } = modRecorder();
   aura.body(ctx, 50, 50, 30, 1, 1);
   const [sphere, ...swirl] = recordedMods(recording);
-  assert.ok(sphere.distort > 0 && sphere.detail > 0);
+  assert.ok(sphere.distort > 0 && sphere.detail > 0 && sphere.volume > 0);
   assert.equal(swirl.length, 2);
-  for (const arc of swirl) assert.equal(arc.distort + arc.detail, 0);
+  for (const arc of swirl) {
+    assert.equal(arc.distort + arc.detail, 0);
+    assert.ok(arc.volume > 0 && arc.z > sphere.z);
+  }
 });
 
 test('fighting projectile and sigil keep a drawer dissolve and restore it after', () => {
