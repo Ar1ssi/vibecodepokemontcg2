@@ -12,7 +12,13 @@
 // Design 075 slice 11: fills and strokes run the GPU `energy` style gently (`ctx.fxStyle`,
 // ignored by Canvas2D): the sparkles and the star shimmer, the trails and the moon ripple with
 // slow veins. Only the sparkles keep a little gain, so the moon never blooms into a white disc.
+//
+// Design 076: the GPU modifiers (`ctx.fxMod`, ignored by Canvas2D). The soft light shimmers (a slow
+// warp, distort, and a faint second noise layer, detail), a trail's ribbon wavers along it, and
+// the moon's dim disc takes a slow-turning surface (detail). Sparkles stay crisp. A drawer's
+// dissolve burns at a gold edge, the kit's own accent.
 import { rgbCss } from '../../fx-colors.mjs';
+import { withFxMod } from './_mods.js';
 import { rootFaded } from './_root-fade.js';
 import { grainPass, sphere, tongueOutline, traceOutline } from './_shared.js';
 
@@ -33,6 +39,17 @@ const TRAIL_SPREAD = 40;
 // Style params (gpu-canvas STYLE_PARAMS energy): a shimmer, not a current.
 const SHIMMER = Object.freeze({ id: 'energy', streak: 0.35, speed: 1.5, gain: 0.5 });
 const SHIMMER_SOFT = Object.freeze({ id: 'energy', streak: 0.25, speed: 1, gain: 0 });
+// Modifier params (gpu-canvas FX_MODS), strengths in lane heights.
+const LIGHT_MOD = Object.freeze({
+  distort: Object.freeze({ strength: 0.03, speed: 0.6, scale: 3, angle: -90 }),
+  detail: Object.freeze({ amount: 0.15, speed: 0.5, scale: 4, angle: -90 }),
+});
+const MOON_MOD = Object.freeze({ detail: Object.freeze({ amount: 0.2, speed: 0.2, scale: 4, angle: 0 }) });
+/** A trail's ribbon wavering along it. */
+const trailMod = (angleDeg) => ({ distort: { strength: 0.03, speed: 1, scale: 3, angle: angleDeg } });
+/** A kit method run under the kit's own modifiers (its dissolve edge); a non-context passes through. */
+const modded = (draw, mod) => (ctx, ...args) =>
+  ctx && typeof ctx === 'object' ? withFxMod(ctx, mod, () => draw(ctx, ...args)) : draw(ctx, ...args);
 
 const PALETTE = Object.freeze({
   deep: Object.freeze([184, 58, 114]),
@@ -105,7 +122,7 @@ function fairyKit(palette) {
     ctx.fxStyle = SHIMMER_SOFT;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, TAU);
-    ctx.fill();
+    withFxMod(ctx, LIGHT_MOD, () => ctx.fill());
     ctx.fxStyle = null;
   }
 
@@ -191,7 +208,7 @@ function fairyKit(palette) {
     ctx.fxStyle = SHIMMER_SOFT;
     ctx.fillStyle = rootFaded(ctx, spec, palette.body, 0.5 * alpha);
     traceOutline(ctx, tongueOutline(calm, 1));
-    ctx.fill();
+    withFxMod(ctx, trailMod(spec.angleDeg), () => ctx.fill());
     ctx.filter = 'none';
     const inner = tongueOutline(calm, 0.55);
     ctx.fillStyle = rootFaded(ctx, spec, palette.hot, 0.7 * alpha);
@@ -238,12 +255,14 @@ function fairyKit(palette) {
       );
     }
     ctx.fxStyle = SHIMMER_SOFT;
-    sphere(ctx, x, y, r, [
-      [0, palette.core, alpha * 0.3 * clamp01(hot)],
-      [0.6, palette.hot, alpha * 0.3],
-      [0.92, palette.body, alpha * 0.35],
-      [1, palette.body, 0],
-    ]);
+    withFxMod(ctx, MOON_MOD, () =>
+      sphere(ctx, x, y, r, [
+        [0, palette.core, alpha * 0.3 * clamp01(hot)],
+        [0.6, palette.hot, alpha * 0.3],
+        [0.92, palette.body, alpha * 0.35],
+        [1, palette.body, 0],
+      ])
+    );
     // The crescent: the disc minus the same disc pushed down-right, so the lit rim is up-left.
     ctx.save();
     ctx.beginPath();
@@ -286,6 +305,9 @@ function fairyKit(palette) {
     ctx.fxStyle = null;
   }
 
+  // Gold, the kit's accent (its trail twinkles), with a little bloom: the moon goes out in sparkle.
+  const kitMod = Object.freeze({ dissolve: Object.freeze({ edge: palette.gold, width: 0.1, gain: 1.2 }) });
+
   return Object.freeze({
     key: 'fairy',
     palette,
@@ -293,11 +315,11 @@ function fairyKit(palette) {
     shade: Object.freeze([58, 14, 40]),
     smoke: null,
     particle: Object.freeze({ className: 'fx-particle--twinkle', color: rgbCss(palette.hot), aspect: 1 }),
-    glow,
-    body,
-    tongue,
-    projectile,
-    sigil,
+    glow: modded(glow, kitMod),
+    body: modded(body, kitMod),
+    tongue: modded(tongue, kitMod),
+    projectile: modded(projectile, kitMod),
+    sigil: modded(sigil, kitMod),
     grain: grainPass,
     withPalette: (p) => fairyKit(p),
   });

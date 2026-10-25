@@ -10,7 +10,13 @@
 // Design 075 slice 11: the fills and strokes run the GPU `energy` style slowly (`ctx.fxStyle`,
 // ignored by Canvas2D): the ribbons and rings carry soft pulses round and along them, the haze
 // and lens ripple with slow veins. No gain on the haze, a little on the lens and centre line.
+//
+// Design 076: the GPU modifiers (`ctx.fxMod`, ignored by Canvas2D) bend space round the move:
+// the haze and the lens read their colour through slow flowing warps (distort), so their rings
+// of light ripple, and the haze carries a faint second noise layer (detail); a ribbon wavers
+// along its length. A drawer's dissolve burns at a pink-violet edge.
 import { rgbCss } from '../../fx-colors.mjs';
+import { withFxMod } from './_mods.js';
 import { rootFaded } from './_root-fade.js';
 import { grainPass, sphere, tongueOutline, traceOutline } from './_shared.js';
 
@@ -36,6 +42,18 @@ const SIGIL_LENS = 0.28;
 // Style params (gpu-canvas STYLE_PARAMS energy): a slow, calm current.
 const PSI = Object.freeze({ id: 'energy', streak: 0.45, speed: 1.2, gain: 0.5 });
 const PSI_HAZE = Object.freeze({ id: 'energy', streak: 0.3, speed: 0.8, gain: 0 });
+// Modifier params (gpu-canvas FX_MODS), strengths in lane heights.
+const HAZE_MOD = Object.freeze({
+  distort: Object.freeze({ strength: 0.05, speed: 0.5, scale: 2.5, angle: 0 }),
+  detail: Object.freeze({ amount: 0.18, speed: 0.4, scale: 3, angle: 0 }),
+});
+const LENS_MOD = Object.freeze({ distort: Object.freeze({ strength: 0.04, speed: 0.7, scale: 3, angle: 0 }) });
+const RIBBON_WAVER = Object.freeze({ strength: 0.03, speed: 1, scale: 3 });
+/** A ribbon's waver, flowing along it. */
+const ribbonMod = (angleDeg) => ({ distort: { ...RIBBON_WAVER, angle: angleDeg } });
+/** A kit method run under the kit's own modifiers (its dissolve edge); a non-context passes through. */
+const modded = (draw, mod) => (ctx, ...args) =>
+  ctx && typeof ctx === 'object' ? withFxMod(ctx, mod, () => draw(ctx, ...args)) : draw(ctx, ...args);
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 const fract = (v) => v - Math.floor(v);
@@ -97,7 +115,7 @@ function psychicKit(palette) {
     ctx.fxStyle = PSI_HAZE;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, TAU);
-    ctx.fill();
+    withFxMod(ctx, HAZE_MOD, () => ctx.fill());
     ctx.fxStyle = null;
   }
 
@@ -107,18 +125,20 @@ function psychicKit(palette) {
    */
   function lens(ctx, x, y, r, alpha, hot, phase) {
     ctx.fxStyle = PSI;
-    sphere(
-      ctx,
-      x,
-      y,
-      r,
-      [
-        [0, palette.white, alpha * 0.7 * clamp01(hot)],
-        [0.25, palette.core, alpha * 0.6],
-        [0.65, palette.hot, alpha * 0.4],
-        [1, palette.body, 0],
-      ],
-      0
+    withFxMod(ctx, LENS_MOD, () =>
+      sphere(
+        ctx,
+        x,
+        y,
+        r,
+        [
+          [0, palette.white, alpha * 0.7 * clamp01(hot)],
+          [0.25, palette.core, alpha * 0.6],
+          [0.65, palette.hot, alpha * 0.4],
+          [1, palette.body, 0],
+        ],
+        0
+      )
     );
     ctx.lineCap = 'round';
     ctx.lineWidth = Math.max(1, r * 0.07);
@@ -150,7 +170,7 @@ function psychicKit(palette) {
     ctx.fxStyle = PSI;
     ctx.fillStyle = rootFaded(ctx, spec, palette.body, RIBBON_ALPHA * alpha);
     traceOutline(ctx, outline);
-    ctx.fill();
+    withFxMod(ctx, ribbonMod(spec.angleDeg), () => ctx.fill());
     const line = 0.85 * alpha * clamp01(hot);
     if (!(line > 0)) {
       ctx.fxStyle = null;
@@ -211,6 +231,9 @@ function psychicKit(palette) {
     lens(ctx, x, y, r * SIGIL_LENS, 0.9, 1, clamp01(s) * TAU);
   }
 
+  // A pink-violet rim with a little bloom, as the lens rings glow.
+  const kitMod = Object.freeze({ dissolve: Object.freeze({ edge: palette.hot, width: 0.12, gain: 1.3 }) });
+
   return Object.freeze({
     key: 'psychic',
     palette,
@@ -218,11 +241,11 @@ function psychicKit(palette) {
     shade: Object.freeze([42, 24, 64]),
     smoke: null,
     particle: Object.freeze({ className: 'fx-particle--mote', color: rgbCss(palette.hot), aspect: 1 }),
-    glow,
-    body,
-    tongue,
-    projectile,
-    sigil,
+    glow: modded(glow, kitMod),
+    body: modded(body, kitMod),
+    tongue: modded(tongue, kitMod),
+    projectile: modded(projectile, kitMod),
+    sigil: modded(sigil, kitMod),
     grain: grainPass,
     withPalette: (p) => psychicKit(p),
   });

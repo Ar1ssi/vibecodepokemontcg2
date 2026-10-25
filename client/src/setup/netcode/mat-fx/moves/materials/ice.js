@@ -19,7 +19,13 @@
 // tip — the same flat colour on Canvas2D — so the style cuts it into facets across its width and
 // sweeps a glint down it; edges, spokes and rings carry short running glints; a flake's heart
 // twinkles. The lit facet and the mist stay flat.
+//
+// Design 076: the GPU modifiers (`ctx.fxMod`, ignored by Canvas2D). Ice holds still: a crystal's
+// ice fill takes a fine, barely drifting second noise layer (detail) as frost, never a warp; only
+// the cold mist drifts and wavers (distort + detail). A drawer's dissolve burns at a thin pale-cyan
+// frost edge.
 import { rgbCss } from '../../fx-colors.mjs';
+import { withFxMod } from './_mods.js';
 import { grainPass, inShadow, shardOutline, sphere, traceOutline } from './_shared.js';
 
 const TAU = Math.PI * 2;
@@ -57,6 +63,17 @@ const rad = (deg) => (deg * Math.PI) / 180;
 const CRYSTAL_BODY = Object.freeze({ id: 'crystal', facets: 6, sheen: 0.55, speed: 1.4 });
 const CRYSTAL_EDGE = Object.freeze({ id: 'crystal', facets: 6, sheen: 0.7, speed: 1.2 });
 const AURORA_SHIMMER = Object.freeze({ id: 'crystal', facets: 6, sheen: 0.45, speed: 0.6 });
+// Modifier params (gpu-canvas FX_MODS), strengths in lane heights.
+const FROST_MOD = Object.freeze({ detail: Object.freeze({ amount: 0.2, speed: 0.15, scale: 6, angle: -90 }) });
+const MIST_MOD = Object.freeze({
+  distort: Object.freeze({ strength: 0.04, speed: 0.4, scale: 2.5, angle: -90 }),
+  detail: Object.freeze({ amount: 0.2, speed: 0.3, scale: 3, angle: -90 }),
+});
+/** A thin frost rim in `pal`'s pale cyan: a drawer's dissolve burns it. */
+const frostEdge = (pal) => Object.freeze({ dissolve: Object.freeze({ edge: pal.hot, width: 0.08, gain: 1.1 }) });
+/** A kit method run under the kit's own modifiers (its dissolve edge); a non-context passes through. */
+const modded = (draw, mod) => (ctx, ...args) =>
+  ctx && typeof ctx === 'object' ? withFxMod(ctx, mod, () => draw(ctx, ...args)) : draw(ctx, ...args);
 
 const ICE_PALETTE = Object.freeze({
   deep: Object.freeze([62, 143, 209]),
@@ -162,7 +179,7 @@ const mistOf = (pal) =>
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, TAU);
-    ctx.fill();
+    withFxMod(ctx, MIST_MOD, () => ctx.fill());
   };
 
 // The interface's `body` carries no clock, so a lone flake or ring turns with where it is and how
@@ -214,7 +231,7 @@ function crystal(ctx, pal, spec, { alpha = 1, hot = 1, jag = 0 } = {}) {
     ctx.fxStyle = CRYSTAL_BODY;
     ctx.fillStyle = alongCrystal(ctx, spec, pal.body, CRYSTAL_ALPHA * alpha);
     traceOutline(ctx, outline);
-    ctx.fill();
+    withFxMod(ctx, FROST_MOD, () => ctx.fill());
     ctx.fxStyle = null;
   });
   const lit = FACET_ALPHA * alpha * clamp01(hot);
@@ -259,6 +276,7 @@ function crystalVolley(ctx, pal, { x, y, r, headingDeg, seed, alpha, tongues, ho
 function iceKit(palette) {
 
   const iceGlow = mistOf(palette);
+  const edge = frostEdge(palette);
 
   function iceBody(ctx, x, y, r, alpha, hot = 1) {
     if (!(r > 0) || !(alpha > 0)) return;
@@ -287,10 +305,10 @@ function iceKit(palette) {
     // Cold mist (the recipe's smoke).
     smoke: Object.freeze([200, 230, 245]),
     particle: Object.freeze({ className: 'fx-particle--shard', color: rgbCss(palette.hot), aspect: 0.6 }),
-    glow: iceGlow,
-    body: iceBody,
-    tongue: iceTongue,
-    projectile: iceProjectile,
+    glow: modded(iceGlow, edge),
+    body: modded(iceBody, edge),
+    tongue: modded(iceTongue, edge),
+    projectile: modded(iceProjectile, edge),
     grain: grainPass,
     withPalette: (p) => iceKit(p),
   });
@@ -303,6 +321,7 @@ export const ice = iceKit(ICE_PALETTE);
 function auroraKit(palette) {
 
   const auroraGlow = mistOf({ core: palette.core, body: palette.lilac, deep: palette.deep });
+  const edge = frostEdge(palette);
 
   /** Three concentric rings, cyan outside to lilac inside, in a faint mist, breathing with `phase`. */
   function auroraRing(ctx, x, y, r, alpha, hot, phase) {
@@ -349,10 +368,10 @@ function auroraKit(palette) {
     shade: Object.freeze([10, 18, 46]),
     smoke: null,
     particle: Object.freeze({ className: 'fx-particle--twinkle', color: rgbCss(palette.lilac), aspect: 1 }),
-    glow: auroraGlow,
-    body: auroraBody,
-    tongue: auroraTongue,
-    projectile: auroraProjectile,
+    glow: modded(auroraGlow, edge),
+    body: modded(auroraBody, edge),
+    tongue: modded(auroraTongue, edge),
+    projectile: modded(auroraProjectile, edge),
     grain: grainPass,
     withPalette: (p) => auroraKit(p),
   });
