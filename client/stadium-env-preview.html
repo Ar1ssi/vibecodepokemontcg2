@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Stadium board preview — Scorched Earth (design 077)</title>
+    <script type="importmap">{"imports":{"three":"/src/vendor/three/three.module.min.js"}}</script>
+    <style>
+      html, body { margin: 0; height: 100%; background: #050506; overflow: hidden; font: 13px system-ui, sans-serif; color: #e8e2dc; }
+      canvas { display: block; }
+      #panel { position: fixed; top: 12px; left: 12px; background: rgba(12, 10, 10, 0.82); border: 1px solid #3a2a22; border-radius: 8px; padding: 10px 12px; display: grid; gap: 8px; min-width: 230px; }
+      #panel h1 { font-size: 14px; margin: 0; color: #ffb070; }
+      #panel button { background: #2a1a12; color: #ffd8b0; border: 1px solid #6a3a20; border-radius: 5px; padding: 6px 8px; cursor: pointer; }
+      #panel button:hover { background: #3a2216; }
+      #panel label { display: flex; gap: 6px; align-items: center; }
+      #panel .row { display: flex; gap: 6px; }
+      #panel .row button { flex: 1; }
+      #status { color: #a89888; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <div id="panel">
+      <h1>Scorched Earth — stadium board</h1>
+      <div class="row">
+        <button id="play">Play Stadium</button>
+        <button id="discard">Discard</button>
+      </div>
+      <label>Heat <input id="heat" type="range" min="0" max="2" step="0.05" value="1" /></label>
+      <label>Scrub reveal <input id="scrub" type="range" min="0" max="1" step="0.01" value="1" /></label>
+      <label><input id="static" type="checkbox" /> FX off (static frame)</label>
+      <label><input id="cards" type="checkbox" checked /> Show cards</label>
+      <label><input id="opp" type="checkbox" /> Opponent played it</label>
+      <div id="status"></div>
+    </div>
+    <script type="module">
+      import * as THREE from 'three';
+      import {
+        ENVIRONMENT_VERTEX,
+        SCORCHED_EARTH_FRAGMENT,
+        EMBER_VERTEX,
+        EMBER_FRAGMENT,
+        MAX_ZONES,
+      } from '/src/setup/board3d/stadium-environment-shader.mjs';
+
+      // Design 077 prototype: a stand-in table (table px, origin near-left) with the real shader.
+      const W = 1600;
+      const H = 1200;
+      const CARD = { w: 120, h: 168 };
+      const INTRO_MS = 1600;
+      const EXIT_MS = 900;
+      const AMBIENT_FPS = 30;
+      const EMBER_COUNT = 28;
+
+      const selfZones = {
+        active: [740, 346, CARD.w, CARD.h],
+        bench: [0, 1, 2, 3, 4].map((i) => [800 + (i - 2) * 150 - 60, 16, CARD.w, CARD.h]),
+        deck: [1390, 66, CARD.w, CARD.h],
+        discard: [1390, 276, CARD.w, CARD.h],
+        prizes: [70, 60, 160, 400],
+      };
+      const mirror = ([x, y, w, h]) => [W - x - w, H - y - h, w, h];
+      const stadiumZone = [270, 516, CARD.w, CARD.h];
+      const zoneList = [
+        selfZones.active, ...selfZones.bench, selfZones.deck, selfZones.discard, selfZones.prizes,
+      ];
+      const zones = [...zoneList, ...zoneList.map(mirror), stadiumZone];
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+      document.body.appendChild(renderer.domElement);
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(28, 1, 10, 20000);
+      const viewDirection = new THREE.Vector3(0, -0.47, 0.88).normalize();
+
+      const loader = new THREE.TextureLoader();
+      const texture = (src) => {
+        const t = loader.load(src, () => invalidate());
+        t.colorSpace = THREE.SRGBColorSpace;
+        t.anisotropy = 8;
+        return t;
+      };
+
+      const floor = new THREE.Mesh(new THREE.PlaneGeometry(W * 2.2, H * 2.2), new THREE.MeshBasicMaterial({ color: 0x0a0a0c }));
+      floor.position.z = -2;
+      scene.add(floor);
+
+      const matTexture = texture('/src/assets/playmats/board/1022-rubber-playmat-dash-eevee-1.webp');
+      const matHalf = (rotated) => {
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(W, H / 2), new THREE.MeshBasicMaterial({ map: matTexture }));
+        mesh.position.set(0, rotated ? H / 4 : -H / 4, 0);
+        if (rotated) mesh.rotation.z = Math.PI;
+        return mesh;
+      };
+      scene.add(matHalf(false), matHalf(true));
+
+      const zoneUniform = Array.from({ length: MAX_ZONES }, (_, i) => new THREE.Vector4(...(zones[i] ?? [0, 0, 0, 0])));
+      const uniforms = {
+        uSize: { value: new THREE.Vector2(W, H) },
+        uOrigin: { value: new THREE.Vector2(stadiumZone[0] + CARD.w / 2, stadiumZone[1] + CARD.h / 2) },
+        uTime: { value: 0 },
+        uReveal: { value: 0 },
+        uExit: { value: 0 },
+        uHeat: { value: 1 },
+        uZones: { value: zoneUniform },
+        uZoneCount: { value: zones.length },
+        uPixelRatio: { value: renderer.getPixelRatio() },
+      };
+      const environment = new THREE.Mesh(
+        new THREE.PlaneGeometry(W, H),
+        new THREE.ShaderMaterial({
+          vertexShader: ENVIRONMENT_VERTEX,
+          fragmentShader: SCORCHED_EARTH_FRAGMENT,
+          uniforms,
+          transparent: true,
+          depthWrite: false,
+        })
+      );
+      environment.position.z = 0.75;
+      scene.add(environment);
+
+      const seeds = new Float32Array(EMBER_COUNT * 4).map(() => Math.random());
+      const emberGeometry = new THREE.BufferGeometry();
+      emberGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(EMBER_COUNT * 3), 3));
+      emberGeometry.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 4));
+      const embers = new THREE.Points(
+        emberGeometry,
+        new THREE.ShaderMaterial({
+          vertexShader: EMBER_VERTEX,
+          fragmentShader: EMBER_FRAGMENT,
+          uniforms,
+          transparent: true,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+        })
+      );
+      embers.frustumCulled = false;
+      scene.add(embers);
+
+      const cards = new THREE.Group();
+      const cardBack = texture('/src/assets/cardback.png');
+      const addCard = (src, [x, y, w, h], rotated = false, lift = 3) => {
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(CARD.w, CARD.h), new THREE.MeshBasicMaterial({ map: src === 'back' ? cardBack : texture(src) }));
+        mesh.position.set(x + w / 2 - W / 2, y + h / 2 - H / 2, lift);
+        if (rotated) mesh.rotation.z = Math.PI;
+        cards.add(mesh);
+      };
+      const art = (n) => `/src/assets/custom-sets/customhb/${n}/high.webp`;
+      addCard(art('083'), selfZones.active);
+      addCard(art('073'), selfZones.bench[1]);
+      addCard(art('086'), selfZones.bench[2]);
+      addCard('back', selfZones.deck);
+      addCard(art('075'), mirror(selfZones.active), true);
+      addCard(art('074'), mirror(selfZones.bench[2]), true);
+      addCard('back', mirror(selfZones.deck), true);
+      const stadiumCard = new THREE.Group();
+      addCard(art('299'), stadiumZone, false, 4);
+      stadiumCard.add(cards.children.at(-1));
+      cards.add(stadiumCard);
+      scene.add(cards);
+
+      // --- timeline: intro, steady, exit (design 077 § Timeline) ---
+      const easeOutCubic = (t) => 1 - (1 - t) ** 3;
+      const easeInQuad = (t) => t * t;
+      let transition = null;
+      let inPlay = false;
+      const status = document.getElementById('status');
+      const staticBox = document.getElementById('static');
+      const setStatus = (text) => (status.textContent = text);
+
+      const play = () => {
+        inPlay = true;
+        stadiumCard.visible = true;
+        uniforms.uExit.value = 0;
+        if (staticBox.checked) {
+          uniforms.uReveal.value = 1;
+          transition = null;
+          setStatus('in play (static)');
+        } else {
+          uniforms.uReveal.value = 0;
+          transition = { kind: 'intro', start: performance.now(), ms: INTRO_MS };
+          setStatus('intro 1600 ms');
+        }
+        invalidate();
+      };
+      const discard = () => {
+        if (!inPlay) return;
+        inPlay = false;
+        stadiumCard.visible = false;
+        if (staticBox.checked) {
+          uniforms.uReveal.value = 0;
+          transition = null;
+          setStatus('no Stadium');
+        } else {
+          transition = { kind: 'exit', start: performance.now(), ms: EXIT_MS };
+          setStatus('exit 900 ms');
+        }
+        invalidate();
+      };
+
+      document.getElementById('play').onclick = play;
+      document.getElementById('discard').onclick = discard;
+      document.getElementById('heat').oninput = (e) => {
+        uniforms.uHeat.value = Number(e.target.value);
+        invalidate();
+      };
+      document.getElementById('scrub').oninput = (e) => {
+        transition = null;
+        inPlay = true;
+        stadiumCard.visible = true;
+        uniforms.uExit.value = 0;
+        uniforms.uReveal.value = Number(e.target.value);
+        setStatus(`reveal ${Number(e.target.value).toFixed(2)}`);
+        invalidate();
+      };
+      staticBox.onchange = () => invalidate();
+      document.getElementById('cards').onchange = (e) => {
+        cards.visible = e.target.checked;
+        invalidate();
+      };
+      document.getElementById('opp').onchange = (e) => {
+        // The opponent's Stadium burns out from their side of the zone.
+        const [x, y] = e.target.checked ? mirror(stadiumZone) : stadiumZone;
+        uniforms.uOrigin.value.set(x + CARD.w / 2, y + CARD.h / 2);
+        stadiumCard.rotation.z = e.target.checked ? Math.PI : 0;
+        play();
+      };
+
+      // --- render loop: full rate during a transition, 30 fps ambient, none when static ---
+      let frameId = null;
+      let ambientTimer = null;
+      let lastAmbient = 0;
+      const startedAt = performance.now();
+      let frozenTime = 0;
+
+      function invalidate() {
+        if (frameId !== null) return;
+        frameId = requestAnimationFrame(render);
+      }
+
+      function render(now) {
+        frameId = null;
+        if (!staticBox.checked) frozenTime = (now - startedAt) / 1000;
+        uniforms.uTime.value = frozenTime;
+        if (transition) {
+          const t = Math.min(1, (now - transition.start) / transition.ms);
+          if (transition.kind === 'intro') uniforms.uReveal.value = easeOutCubic(t);
+          else uniforms.uExit.value = easeInQuad(t);
+          if (t >= 1) {
+            if (transition.kind === 'exit') {
+              uniforms.uReveal.value = 0;
+              uniforms.uExit.value = 0;
+            }
+            setStatus(transition.kind === 'intro' ? 'in play (ambient 30 fps)' : 'no Stadium');
+            transition = null;
+          }
+        }
+        renderer.render(scene, camera);
+        if (transition) {
+          invalidate();
+          return;
+        }
+        const ambient = inPlay && !staticBox.checked && !document.hidden;
+        if (ambient && ambientTimer === null) {
+          const wait = Math.max(0, 1000 / AMBIENT_FPS - (now - lastAmbient));
+          ambientTimer = setTimeout(() => {
+            ambientTimer = null;
+            lastAmbient = performance.now();
+            invalidate();
+          }, wait);
+        }
+      }
+
+      function resize() {
+        const w = innerWidth;
+        const h = innerHeight;
+        renderer.setSize(w, h);
+        camera.aspect = w / h;
+        const distance = 3000 * Math.max(1, 1.55 / camera.aspect);
+        camera.position.copy(viewDirection).multiplyScalar(distance);
+        camera.lookAt(0, 40, 0);
+        camera.updateProjectionMatrix();
+        invalidate();
+      }
+      addEventListener('resize', resize);
+      document.addEventListener('visibilitychange', () => invalidate());
+      resize();
+      stadiumCard.visible = false;
+      setStatus('no Stadium — press Play Stadium');
+      setTimeout(play, 600);
+    </script>
+  </body>
+</html>
