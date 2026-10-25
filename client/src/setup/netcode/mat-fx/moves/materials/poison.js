@@ -16,7 +16,13 @@
 // not light: globs, drips, streams and the pool cover what is under them (`source-over`, inside
 // their own save/restore), so a glob over a bright card face stays violet instead of adding up
 // to white; glints, barbs, bubbles and the haze stay additive.
+//
+// Design 076: the GPU modifiers (`ctx.fxMod`, ignored by Canvas2D) make the venom bubble: globs,
+// drips and the pool read their colour through a slow rising warp (distort) under a second noise
+// layer (detail), so the goo churns instead of sitting as a flat gradient; a stream's ooze wavers
+// along it. A drawer's dissolve eats the goo with a thick lilac rim.
 import { rgbCss } from '../../fx-colors.mjs';
+import { withFxMod } from './_mods.js';
 import { grainPass, inShadow, shardOutline, tongueOutline, traceOutline } from './_shared.js';
 
 const TAU = Math.PI * 2;
@@ -50,6 +56,20 @@ const BUBBLE_RISE = 1.15;
 const VENOM_GLOB = Object.freeze({ id: 'liquid', gloss: 0.45, flow: 0.6, clarity: 0 });
 const VENOM_OOZE = Object.freeze({ id: 'liquid', gloss: 0.4, flow: 1, clarity: 0.35 });
 const VENOM_POOL = Object.freeze({ id: 'liquid', gloss: 0.35, flow: 0.5, clarity: 0 });
+// Modifier params (gpu-canvas FX_MODS), strengths in lane heights; the bubbling rises.
+const GOO_MOD = Object.freeze({
+  distort: Object.freeze({ strength: 0.035, speed: 0.9, scale: 4, angle: -90 }),
+  detail: Object.freeze({ amount: 0.2, speed: 0.7, scale: 5, angle: -90 }),
+});
+const POOL_MOD = Object.freeze({
+  distort: Object.freeze({ strength: 0.04, speed: 0.8, scale: 4, angle: -90 }),
+  detail: Object.freeze({ amount: 0.22, speed: 0.7, scale: 5, angle: -90 }),
+});
+/** A stream's ooze wavering along it. */
+const oozeMod = (angleDeg) => ({ distort: { strength: 0.03, speed: 1, scale: 4, angle: angleDeg } });
+/** A kit method run under the kit's own modifiers (its dissolve edge); a non-context passes through. */
+const modded = (draw, mod) => (ctx, ...args) =>
+  ctx && typeof ctx === 'object' ? withFxMod(ctx, mod, () => draw(ctx, ...args)) : draw(ctx, ...args);
 
 const PALETTE = Object.freeze({
   deep: Object.freeze([75, 30, 107]),
@@ -182,17 +202,18 @@ function poisonKit(palette) {
   function glob(ctx, x, y, r, alpha, hot, phase, { drip = true } = {}) {
     inShadow(ctx, () => {
       ctx.fxStyle = VENOM_GLOB;
-      ctx.fillStyle = globFill(ctx, x, y, r, alpha);
-      tracePoints(ctx, globOutline(x, y, r, phase));
-      ctx.fill();
-      if (drip) {
+      withFxMod(ctx, GOO_MOD, () => {
+        ctx.fillStyle = globFill(ctx, x, y, r, alpha);
+        tracePoints(ctx, globOutline(x, y, r, phase));
+        ctx.fill();
+        if (!drip) return;
         const dr = r * DRIP_R;
         const dy = y + r * DRIP_DROP;
         ctx.fillStyle = globFill(ctx, x, dy, dr, alpha);
         ctx.beginPath();
         ctx.arc(x, dy, dr, 0, TAU);
         ctx.fill();
-      }
+      });
       ctx.fxStyle = null;
       ctx.strokeStyle = rgbCss(palette.deep, RIM_ALPHA * alpha);
       ctx.lineWidth = Math.max(1, r * 0.08);
@@ -236,7 +257,7 @@ function poisonKit(palette) {
       ctx.fxStyle = VENOM_OOZE;
       ctx.fillStyle = alongStream(ctx, spec, palette.body, OOZE_ALPHA * alpha);
       traceOutline(ctx, tongueOutline({ ...spec, amp: 0.5 }, 0.8));
-      ctx.fill();
+      withFxMod(ctx, oozeMod(spec.angleDeg), () => ctx.fill());
       ctx.fxStyle = null;
       ctx.fillStyle = rgbCss(palette.body, GLOB_ALPHA * alpha);
       ctx.beginPath();
@@ -270,7 +291,7 @@ function poisonKit(palette) {
           const dr = r * Math.max(0.14, 0.42 - 0.09 * k);
           addCircle(ctx, x + Math.cos(back) * d - Math.sin(back) * sway, y + Math.sin(back) * d + Math.cos(back) * sway, dr);
         }
-        ctx.fill();
+        withFxMod(ctx, GOO_MOD, () => ctx.fill());
       });
     }
     glob(ctx, x, y, r, alpha, hot, time * 4 + seed, { drip: false });
@@ -295,7 +316,7 @@ function poisonKit(palette) {
       ctx.fillStyle = g;
       ctx.fxStyle = VENOM_POOL;
       tracePoints(ctx, outline);
-      ctx.fill();
+      withFxMod(ctx, POOL_MOD, () => ctx.fill());
       ctx.fxStyle = null;
     });
     // No stroked rim (design 075 parity): the outlined pool read as clip art; the fill carries it.
@@ -311,6 +332,9 @@ function poisonKit(palette) {
     }
   }
 
+  // A thick lilac rim, little bloom: goo eaten away, not burnt.
+  const kitMod = Object.freeze({ dissolve: Object.freeze({ edge: palette.hot, width: 0.18, gain: 0.9 }) });
+
   return Object.freeze({
     key: 'poison',
     palette,
@@ -319,11 +343,11 @@ function poisonKit(palette) {
     // Toxic fumes (the recipe's [120, 70, 150]).
     smoke: Object.freeze([120, 70, 150]),
     particle: Object.freeze({ className: 'fx-particle--glob', color: rgbCss(palette.hot), aspect: 1 }),
-    glow,
-    body,
-    tongue,
-    projectile,
-    sigil,
+    glow: modded(glow, kitMod),
+    body: modded(body, kitMod),
+    tongue: modded(tongue, kitMod),
+    projectile: modded(projectile, kitMod),
+    sigil: modded(sigil, kitMod),
     grain: grainPass,
     withPalette: (p) => poisonKit(p),
   });

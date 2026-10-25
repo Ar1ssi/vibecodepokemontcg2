@@ -10,7 +10,13 @@
 // violet haze trailing wisps. `sigil` (the `glyph` drawer) is two slit eyes that open in a
 // shadow and close again. Palette #6B4FA8 #9D7CF2 #D9CCFF, deep #1E1238; grain 0.2. Every
 // call draws on the context it is handed and is otherwise pure.
+//
+// Design 076: the GPU modifiers (`ctx.fxMod`, ignored by Canvas2D) make it waver: the wisps, the
+// shadow puffs, the haze and the ball's rim glow read their colour through a slow rising warp
+// (distort), and the wisps and haze carry a drifting second noise layer (detail) so their flat
+// violet breaks into vapour. A drawer's dissolve burns at a violet edge.
 import { rgbCss } from '../../fx-colors.mjs';
+import { withFxMod } from './_mods.js';
 import { grainPass, inShadow, shardOutline, sphere, styledKit, tongueOutline, traceOutline } from './_shared.js';
 import { wavyRing } from './psychic.js';
 
@@ -40,6 +46,16 @@ const RIM_HZ = 0.35;
 const TAIL_SPREAD = 26;
 const EYE_OPEN = 0.25;
 const EYE_CLOSE = 0.8;
+// Modifier params (gpu-canvas FX_MODS), strengths in lane heights; everything drifts upward.
+const WAVER = Object.freeze({ strength: 0.05, speed: 0.6, scale: 2.5, angle: -90 });
+const VAPOUR = Object.freeze({ amount: 0.3, speed: 0.6, scale: 3, angle: -90 });
+const WISP_MOD = Object.freeze({ distort: WAVER, detail: VAPOUR });
+const PUFF_MOD = Object.freeze({ distort: WAVER });
+const HAZE_MOD = Object.freeze({ distort: WAVER, detail: Object.freeze({ ...VAPOUR, amount: 0.2 }) });
+const RIM_MOD = Object.freeze({ distort: Object.freeze({ ...WAVER, strength: 0.04 }) });
+/** A kit method run under the kit's own modifiers (its dissolve edge); a non-context passes through. */
+const modded = (draw, mod) => (ctx, ...args) =>
+  ctx && typeof ctx === 'object' ? withFxMod(ctx, mod, () => draw(ctx, ...args)) : draw(ctx, ...args);
 
 const PALETTE = Object.freeze({
   deep: Object.freeze([30, 18, 56]),
@@ -93,6 +109,11 @@ function ghostKit(palette) {
   /** A shadow puff: deep shadow covering what is under it, ringed by a faint violet fringe. */
   function glow(ctx, x, y, r, alpha) {
     if (!(r > 0) || !(alpha > 0)) return;
+    withFxMod(ctx, PUFF_MOD, () => puff(ctx, x, y, r, alpha));
+  }
+
+  /** The shadow puff's two fills: the covering shadow, then the violet fringe. */
+  function puff(ctx, x, y, r, alpha) {
     inShadow(ctx, () => {
       const g = ctx.createRadialGradient(x, y, 0, x, y, r);
       g.addColorStop(0, rgbCss(palette.deep, alpha * SHADOW_ALPHA));
@@ -122,7 +143,7 @@ function ghostKit(palette) {
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, TAU);
-    ctx.fill();
+    withFxMod(ctx, HAZE_MOD, () => ctx.fill());
   }
 
   /** The shadow ball turned to `phase`: rim glow, dark sphere, ragged violet edge, a glint when hot. */
@@ -134,7 +155,7 @@ function ghostKit(palette) {
     ctx.fillStyle = rim;
     ctx.beginPath();
     ctx.arc(x, y, r * RIM_REACH, 0, TAU);
-    ctx.fill();
+    withFxMod(ctx, RIM_MOD, () => ctx.fill());
     inShadow(ctx, () => {
       sphere(
         ctx,
@@ -187,17 +208,19 @@ function ghostKit(palette) {
     const outline = (scale) =>
       jag ? shardOutline({ ...spec, width: spec.width * scale }) : tongueOutline({ ...spec, amp: WISP_AMP }, scale);
     const outer = outline(1);
-    ctx.filter = `blur(${Math.max(1, spec.width * WISP_BLUR).toFixed(2)}px)`;
-    ctx.fillStyle = rgbCss(palette.body, WISP_ALPHA * alpha);
-    traceOutline(ctx, outer);
-    ctx.fill();
-    ctx.filter = 'none';
-    const lit = alpha * clamp01(hot);
-    if (lit > 0) {
-      ctx.fillStyle = rgbCss(palette.hot, WISP_INNER_ALPHA * lit);
-      traceOutline(ctx, outline(WISP_INNER));
+    withFxMod(ctx, WISP_MOD, () => {
+      ctx.filter = `blur(${Math.max(1, spec.width * WISP_BLUR).toFixed(2)}px)`;
+      ctx.fillStyle = rgbCss(palette.body, WISP_ALPHA * alpha);
+      traceOutline(ctx, outer);
       ctx.fill();
-    }
+      ctx.filter = 'none';
+      const lit = alpha * clamp01(hot);
+      if (lit > 0) {
+        ctx.fillStyle = rgbCss(palette.hot, WISP_INNER_ALPHA * lit);
+        traceOutline(ctx, outline(WISP_INNER));
+        ctx.fill();
+      }
+    });
     inShadow(ctx, () => {
       ctx.strokeStyle = rgbCss(palette.deep, CORE_ALPHA * alpha);
       ctx.lineWidth = Math.max(1, spec.width * CORE_LINE);
@@ -275,6 +298,9 @@ function ghostKit(palette) {
     });
   }
 
+  // A violet rim that blooms a little: the light inside the shadow showing through as it goes.
+  const kitMod = Object.freeze({ dissolve: Object.freeze({ edge: palette.hot, width: 0.14, gain: 1.2 }) });
+
   return Object.freeze({
     key: 'ghost',
     palette,
@@ -282,11 +308,11 @@ function ghostKit(palette) {
     shade: Object.freeze([12, 6, 24]),
     smoke: Object.freeze([60, 40, 90]),
     particle: Object.freeze({ className: 'fx-particle--mote', color: rgbCss(palette.hot), aspect: 1 }),
-    glow,
-    body,
-    tongue,
-    projectile,
-    sigil,
+    glow: modded(glow, kitMod),
+    body: modded(body, kitMod),
+    tongue: modded(tongue, kitMod),
+    projectile: modded(projectile, kitMod),
+    sigil: modded(sigil, kitMod),
     grain: grainPass,
     withPalette: (p) => ghostKit(p),
   });
