@@ -8,8 +8,10 @@
 // Design 065: `info.materialAt(i)` is item i's material on the multi-item drawers (beat `hues`),
 // anchored drawers place themselves with `anchorPoint`, and travelling / orbiting drawers draw
 // their `unit` (materials/_units.js; 'body' is the material's own body / projectile).
+// Design 076: travelling and burst drawers own their exit as a GPU dissolve (`burnOut`).
 import { rgbCss } from '../fx-colors.mjs';
 import { LEAD_H, lanePoint, skyLane } from './move-geometry.mjs';
+import { dissolveTail, withFxMod } from './materials/_mods.js';
 import { getNoiseTile } from './materials/_shared.js';
 import { UNITS } from './materials/_units.js';
 import { DRAWER_PARAMS, checkParams, tonguesAt } from './move-spec.mjs';
@@ -59,6 +61,30 @@ const anchorOf = (lane, p) => anchorPoint(lane, p.target, p.dx, p.dy);
 /** Item i's material: the hued one when the beat has hues, else the beat material. */
 const itemMaterial = (info, i) => (typeof info.materialAt === 'function' ? info.materialAt(i) : info.material);
 const isSky = (target) => target === 'sky' || target === 'sky-attacker';
+
+// Design 076: where each travelling / burst beat starts burning away, as a fraction of its
+// progress. Each starts at or a little before its pose's own alpha fade, so on the GPU canvas
+// the noise eats the shape (rims blooming) while it is still bright; Canvas2D ignores `fxMod`,
+// so there the pose's fade is the exit. Held, anchored and charging beats keep their fades.
+const BURN_FROM = Object.freeze({
+  projectile: 0.85, // lands nearly whole and burns into the target over its last stretch
+  volley: 0.7, // per ball, by the lane fraction it has covered (its own progress)
+  impactFlash: 0.3,
+  shockRings: 0.4,
+  ring: 0.45,
+  fins: 0.6,
+  splash: 0.5,
+  shards: 0.5,
+  slashArc: 0.55,
+  bolt: 0.55,
+  pillar: 0.65, // per column
+  fan: 0.7,
+});
+/** A beam starts burning a quarter of its retract before the retract does. */
+const BEAM_BURN_LEAD = 1.25;
+
+/** Runs `draw` with the dissolve at `amount`, merged over whatever the caller set (076 contract). */
+const burnOut = (ctx, amount, draw) => withFxMod(ctx, { dissolve: { amount } }, draw);
 
 /**
  * A travelling / orbiting body: the material's own projectile for unit 'body' (063), else the
@@ -192,19 +218,22 @@ const projectile = (ctx, lane, s, info) => {
   }
   const at = lanePoint(path, back ? 1 - ball.f : ball.f, ball.side);
   if (info.params.flare !== 'none') {
+    // Lands whole: the starFlare at contact takes it over without a jump (shotFlarePose).
     drawFlare(ctx, info, at.x, at.y, shotFlarePose(s, lane.h, info.params), lane.h * info.params.size);
     return;
   }
-  drawUnit(ctx, info.material, info.params.unit, s, {
-    x: at.x,
-    y: at.y,
-    r: ball.r,
-    headingDeg: path.angleDeg + ball.headingDeg + (back ? 180 : 0),
-    time: info.time,
-    seed: info.seed,
-    alpha: ball.alpha,
-    tongues: info.params.tongues,
-  });
+  burnOut(ctx, dissolveTail(s, BURN_FROM.projectile), () =>
+    drawUnit(ctx, info.material, info.params.unit, s, {
+      x: at.x,
+      y: at.y,
+      r: ball.r,
+      headingDeg: path.angleDeg + ball.headingDeg + (back ? 180 : 0),
+      time: info.time,
+      seed: info.seed,
+      alpha: ball.alpha,
+      tongues: info.params.tongues,
+    })
+  );
 };
 
 const vignette = (ctx, lane, s, info) => {
@@ -384,21 +413,23 @@ const pillar = (ctx, lane, s, info) => {
     const x = c.x + column.x + t.x;
     const y = c.y + t.y;
     const seed = index * 4.1;
-    drawTongueAt(ctx, info, x, y, t.angleDeg, t.length, t.width, seed, { alpha: t.alpha, hot: t.hot }, material);
-    for (const side of [-1, 1]) {
-      drawTongueAt(
-        ctx,
-        info,
-        x + side * t.width * 0.3,
-        y,
-        t.angleDeg + side * 10,
-        t.length * 0.7,
-        t.width * 0.55,
-        side + 2 + seed,
-        { alpha: t.alpha * 0.85, hot: t.hot },
-        material
-      );
-    }
+    burnOut(ctx, dissolveTail(column.s, BURN_FROM.pillar), () => {
+      drawTongueAt(ctx, info, x, y, t.angleDeg, t.length, t.width, seed, { alpha: t.alpha, hot: t.hot }, material);
+      for (const side of [-1, 1]) {
+        drawTongueAt(
+          ctx,
+          info,
+          x + side * t.width * 0.3,
+          y,
+          t.angleDeg + side * 10,
+          t.length * 0.7,
+          t.width * 0.55,
+          side + 2 + seed,
+          { alpha: t.alpha * 0.85, hot: t.hot },
+          material
+        );
+      }
+    });
   });
 };
 
@@ -472,16 +503,18 @@ const volley = (ctx, lane, s, info) => {
   const path = info.params.from === 'sky' ? skyLane(lane) : lane;
   volleyPose(s, lane.h, poseParams(info)).forEach((ball, index) => {
     const at = lanePoint(path, back ? 1 - ball.f : ball.f, ball.side);
-    drawUnit(ctx, itemMaterial(info, index), info.params.unit, s, {
-      x: at.x,
-      y: at.y,
-      r: ball.r,
-      headingDeg: path.angleDeg + ball.headingDeg + (back ? 180 : 0),
-      time: info.time,
-      seed: info.seed + ball.side,
-      alpha: ball.alpha,
-      tongues: info.params.tongues,
-    });
+    burnOut(ctx, dissolveTail(ball.f, BURN_FROM.volley), () =>
+      drawUnit(ctx, itemMaterial(info, index), info.params.unit, s, {
+        x: at.x,
+        y: at.y,
+        r: ball.r,
+        headingDeg: path.angleDeg + ball.headingDeg + (back ? 180 : 0),
+        time: info.time,
+        seed: info.seed + ball.side,
+        alpha: ball.alpha,
+        tongues: info.params.tongues,
+      })
+    );
   });
 };
 
@@ -506,10 +539,18 @@ const rain = (ctx, lane, s, info) => {
   });
 };
 
+// A burst flies out and burns away; a cluster is held to its end and keeps its fade-in.
 const shards = (ctx, lane, s, info) => {
+  if (info.params.mode === 'cluster') {
+    drawShards(ctx, lane, s, info, true);
+    return;
+  }
+  burnOut(ctx, dissolveTail(s, BURN_FROM.shards), () => drawShards(ctx, lane, s, info, false));
+};
+
+const drawShards = (ctx, lane, s, info, cluster) => {
   const c = centreOf(lane, info.params.target);
-  const { unit, mode } = info.params;
-  const cluster = mode === 'cluster';
+  const { unit } = info.params;
   const pose = cluster ? clusterPose(s, lane.h, info.seed, info.params) : shardsPose(s, lane.h, info.seed, info.params);
   pose.forEach((t, index) => {
     const material = itemMaterial(info, index);
@@ -567,13 +608,19 @@ const bolt = (ctx, lane, s, info) => {
 };
 
 const ring = (ctx, lane, s, info) => {
+  const fins = info.params.kind === 'fins';
+  burnOut(ctx, dissolveTail(s, fins ? BURN_FROM.fins : BURN_FROM.ring), () => (fins ? drawFins : drawRings)(ctx, lane, s, info));
+};
+
+const drawFins = (ctx, lane, s, info) => {
   const c = anchorOf(lane, info.params);
-  if (info.params.kind === 'fins') {
-    finsPose(s, lane.h, poseParams(info)).forEach((t, index) => {
-      drawTongueAt(ctx, info, c.x + t.x, c.y + t.y, t.angleDeg, t.length, t.width, index * 1.7, { alpha: t.alpha }, itemMaterial(info, index));
-    });
-    return;
-  }
+  finsPose(s, lane.h, poseParams(info)).forEach((t, index) => {
+    drawTongueAt(ctx, info, c.x + t.x, c.y + t.y, t.angleDeg, t.length, t.width, index * 1.7, { alpha: t.alpha }, itemMaterial(info, index));
+  });
+};
+
+const drawRings = (ctx, lane, s, info) => {
+  const c = anchorOf(lane, info.params);
   const squash = info.params.kind === 'floor' ? 0.45 : 1;
   ringPose(s, lane.h, info.params).forEach((r, index) => {
     ctx.strokeStyle = rgbCss(itemMaterial(info, index).palette.hot, r.alpha);
@@ -798,20 +845,25 @@ const grip = (ctx, lane, s, info) => {
   }
 };
 
+/** `draw` with its whole beat burning away from `fromOf(params)` of its progress. */
+const burning = (draw, fromOf) => (ctx, lane, s, info) =>
+  burnOut(ctx, dissolveTail(s, fromOf(info.params)), () => draw(ctx, lane, s, info));
+
 const IMPLEMENTATIONS = {
   orbitCharge,
   coreCharge,
-  shockRings,
+  shockRings: burning(shockRings, () => BURN_FROM.shockRings),
   projectile,
   vignette,
   speedRays,
-  starFlare,
-  impactFlash,
+  // Burns as it breaks up: the arms' alpha only starts to drop there (easeInCubic).
+  starFlare: burning(starFlare, (p) => p.breakAt),
+  impactFlash: burning(impactFlash, () => BURN_FROM.impactFlash),
   smoke,
-  beam,
-  splash,
+  beam: burning(beam, (p) => 1 - p.retract * BEAM_BURN_LEAD),
+  splash: burning(splash, () => BURN_FROM.splash),
   pillar,
-  slashArc,
+  slashArc: burning(slashArc, () => BURN_FROM.slashArc),
   terrain,
   cloud,
   spiral,
@@ -819,10 +871,10 @@ const IMPLEMENTATIONS = {
   aura,
   rain,
   shards,
-  bolt,
+  bolt: burning(bolt, () => BURN_FROM.bolt),
   ring,
   glyph,
-  fan,
+  fan: burning(fan, () => BURN_FROM.fan),
   shade,
   chain,
   grip,
