@@ -4,6 +4,8 @@
 // disappears where the environment shows. Cards, piles, labels and the zone-outline overlay stay the
 // board's own, where and as large as they always are.
 import * as glsl from './stadium-environment-glsl.mjs';
+import * as forest from './stadium-env-forest.mjs';
+import { MAX_CARD_RECTS, STREAM_POINTS, jungleLeaves, jungleSpots } from './stadium-env-forest-layout.mjs';
 import * as highland from './stadium-env-highland.mjs';
 import * as volcanic from './stadium-env-volcanic.mjs';
 import {
@@ -23,6 +25,7 @@ export const STADIUM_ENV_LAYER = 3;
 export const AMBIENT_FPS = 30;
 const EMBER_COUNT = 220;
 const SMOKE_COUNT = 14;
+const SPORE_COUNT = 150;
 /** Lightning slots: each strikes about once per cycle (s), at a random moment, some cycles not at all. */
 const BOLT_CYCLES_S = [4.6, 6.9];
 const STRIKE_S = 0.6;
@@ -342,7 +345,173 @@ function stormyMountainsBoard({ three, material }) {
   };
 }
 
-const BOARDS = { 'scorched-earth': scorchedEarthBoard, 'stormy-mountains': stormyMountainsBoard };
+/**
+ * Every leaf as one instanced strip: LEAF_SEGMENTS along, three columns across (the midrib between
+ * the halves); position.xy is (across -1..1, along 0..1), the leaf's own data per instance.
+ */
+const leafGeometry = (three, leaves) => {
+  const positions = [];
+  const index = [];
+  for (let i = 0; i <= forest.LEAF_SEGMENTS; i += 1) {
+    for (const across of [-1, 0, 1]) positions.push(across, i / forest.LEAF_SEGMENTS, 0);
+  }
+  for (let i = 0; i < forest.LEAF_SEGMENTS; i += 1) {
+    for (let column = 0; column < 2; column += 1) {
+      const a = i * 3 + column;
+      index.push(a, a + 1, a + 3, a + 1, a + 4, a + 3);
+    }
+  }
+  const root = new Float32Array(leaves.length * 4);
+  const shape = new Float32Array(leaves.length * 4);
+  const bend = new Float32Array(leaves.length * 4);
+  leaves.forEach((leaf, i) => {
+    root.set([leaf.x, leaf.y, leaf.yaw, leaf.follow], i * 4);
+    shape.set([leaf.length, leaf.width, leaf.kind, leaf.tint], i * 4);
+    bend.set([leaf.lift, leaf.droop, leaf.fold, leaf.seed], i * 4);
+  });
+  const geometry = new three.InstancedBufferGeometry();
+  geometry.setAttribute('position', new three.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(index);
+  geometry.setAttribute('aRoot', new three.InstancedBufferAttribute(root, 4));
+  geometry.setAttribute('aShape', new three.InstancedBufferAttribute(shape, 4));
+  geometry.setAttribute('aBend', new three.InstancedBufferAttribute(bend, 4));
+  geometry.instanceCount = leaves.length;
+  return geometry;
+};
+
+/** Indices of a ring-by-ring lathe `around` vertices wide, starting at vertex `first`. */
+const latheIndex = (index, first, rings, around) => {
+  for (let ring = 0; ring < rings; ring += 1) {
+    for (let k = 0; k < around; k += 1) {
+      const a0 = first + ring * around + k;
+      const a1 = first + ring * around + ((k + 1) % around);
+      index.push(a0, a0 + around, a1, a1, a0 + around, a1 + around);
+    }
+  }
+};
+
+/** An instanced geometry: `parts` per vertex (attribute `name`, `size` wide), `index`, and per-instance attributes. */
+const instancedGeometry = (three, { name, size, parts, index }, instances) => {
+  const geometry = new three.InstancedBufferGeometry();
+  geometry.setAttribute('position', new three.Float32BufferAttribute(new Float32Array((parts.length / size) * 3), 3));
+  geometry.setAttribute(name, new three.Float32BufferAttribute(parts, size));
+  geometry.setIndex(index);
+  for (const [attribute, width, values] of instances) {
+    geometry.setAttribute(attribute, new three.InstancedBufferAttribute(Float32Array.from(values), width));
+  }
+  geometry.instanceCount = instances[0][2].length / instances[0][1];
+  return geometry;
+};
+
+/** The bell flowers: per vertex aPart (stem ribbon, then the bell's lathe), per instance root and size. */
+const bellGeometry = (three, bells) => {
+  const { rings, around, stem } = forest.BELL_SEGMENTS;
+  const parts = [];
+  const index = [];
+  for (let i = 0; i <= stem; i += 1) parts.push(0, i / stem, -1, 0, i / stem, 1);
+  for (let i = 0; i < stem; i += 1) index.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 1, i * 2 + 3, i * 2 + 2);
+  const first = (stem + 1) * 2;
+  for (let ring = 0; ring <= rings; ring += 1) {
+    for (let k = 0; k < around; k += 1) parts.push(1, ring / rings, (k / around) * 2 * Math.PI);
+  }
+  latheIndex(index, first, rings, around);
+  return instancedGeometry(three, { name: 'aPart', size: 3, parts, index }, [
+    ['aRoot', 4, bells.flatMap((bell) => [bell.x, bell.y, bell.yaw, bell.seed])],
+    ['aSize', 3, bells.flatMap((bell) => [bell.height, bell.reach, bell.radius])],
+  ]);
+};
+
+/** The flower spikes: per vertex aCone (up and round the lathe), per instance root and size. */
+const spikeGeometry = (three, spikes) => {
+  const { rings, around } = forest.SPIKE_SEGMENTS;
+  const parts = [];
+  const index = [];
+  for (let ring = 0; ring <= rings; ring += 1) {
+    for (let k = 0; k < around; k += 1) parts.push(ring / rings, (k / around) * 2 * Math.PI);
+  }
+  latheIndex(index, 0, rings, around);
+  return instancedGeometry(three, { name: 'aCone', size: 2, parts, index }, [
+    ['aRoot', 4, spikes.flatMap((spike) => [spike.x, spike.y, spike.leanYaw, spike.seed])],
+    ['aSize', 3, spikes.flatMap((spike) => [spike.height, spike.radius, spike.lean])],
+  ]);
+};
+
+/**
+ * Perilous Jungle: the ground and its undergrowth, the poison's sheet, every leaf, the bell flowers
+ * and flower spikes, and the spores.
+ */
+function perilousJungleBoard({ three, material, seeded }) {
+  const own = {
+    uCards: { value: Array.from({ length: MAX_CARD_RECTS }, () => new three.Vector4()) },
+    uTable: { value: new three.Vector4() },
+    uPool: { value: new three.Vector3() },
+    uStream: { value: Array.from({ length: STREAM_POINTS }, () => new three.Vector3()) },
+  };
+  const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
+  const materials = {
+    terrain: make(forest.TERRAIN_VERTEX, forest.TERRAIN_FRAGMENT),
+    // Pushed back a hair so the banks right at the poison's level win the depth test, not flicker.
+    poison: make(forest.POISON_VERTEX, forest.POISON_FRAGMENT, {
+      polygonOffset: true,
+      polygonOffsetFactor: 1,
+      polygonOffsetUnits: 2,
+    }),
+    // Both sides: a leaf curling over shows its underside. Edges by alpha to coverage.
+    leaves: make(forest.LEAF_VERTEX, forest.LEAF_FRAGMENT, { side: three.DoubleSide, alphaToCoverage: true }),
+    bells: make(forest.BELL_VERTEX, forest.BELL_FRAGMENT, { side: three.DoubleSide }),
+    spikes: make(forest.SPIKE_VERTEX, forest.SPIKE_FRAGMENT),
+    spores: make(forest.SPORE_VERTEX, forest.SPORE_FRAGMENT, {
+      transparent: true,
+      depthWrite: false,
+      blending: three.AdditiveBlending,
+    }),
+    bakeField: make(glsl.FULLSCREEN_VERTEX, forest.BAKE_FIELD_FRAGMENT, BAKE_OPTIONS),
+  };
+  const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
+  const poison = new three.Mesh(new three.BufferGeometry(), materials.poison);
+  const leaves = new three.Mesh(new three.BufferGeometry(), materials.leaves);
+  const bells = new three.Mesh(new three.BufferGeometry(), materials.bells);
+  const spikes = new three.Mesh(new three.BufferGeometry(), materials.spikes);
+  const spores = new three.Points(seeded(SPORE_COUNT), materials.spores);
+  spores.renderOrder = 2;
+  return {
+    objects: [terrain, poison, leaves, bells, spikes, spores],
+    materials: Object.values(materials),
+    bakeField: materials.bakeField,
+    spots: (layout) => jungleSpots(layout),
+    apply(spots, bounds) {
+      const { cards, table, pool, stream } = spots;
+      own.uTable.value.set(table.x, table.y, table.x + table.w, table.y + table.h);
+      // Footprints and points not in use lie far off the table, so neither clearing nor water forms
+      // round them.
+      own.uCards.value.forEach((rect, i) =>
+        cards[i] ? rect.set(cards[i].x, cards[i].y, cards[i].x + cards[i].w, cards[i].y + cards[i].h) : rect.set(-1e5, -1e5, -1e5, -1e5)
+      );
+      own.uPool.value.set(pool?.x ?? 0, pool?.y ?? 0, pool?.r ?? 0);
+      own.uStream.value.forEach((point, i) =>
+        stream[i] ? point.set(stream[i].x, stream[i].y, stream[i].w) : point.set(-1e5, -1e5, 0)
+      );
+      replaceGeometry(terrain, terrainGrid(three, bounds));
+      replaceGeometry(
+        poison,
+        new three.PlaneGeometry(bounds.w, bounds.h).translate(
+          bounds.x + bounds.w / 2,
+          bounds.y + bounds.h / 2,
+          forest.WATER_LEVEL
+        )
+      );
+      replaceGeometry(leaves, leafGeometry(three, jungleLeaves(spots, bounds)));
+      replaceGeometry(bells, bellGeometry(three, spots.bells));
+      replaceGeometry(spikes, spikeGeometry(three, spots.spikes));
+    },
+  };
+}
+
+const BOARDS = {
+  'perilous-jungle': perilousJungleBoard,
+  'scorched-earth': scorchedEarthBoard,
+  'stormy-mountains': stormyMountainsBoard,
+};
 
 /**
  * @param {{ three: typeof import('three'), renderer: import('three').WebGLRenderer,

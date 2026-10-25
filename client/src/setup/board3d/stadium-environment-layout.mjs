@@ -8,7 +8,11 @@ import { PILE_ZONES, pilePose, prizeSlotPose } from './pile-poses.mjs';
 import { tableBounds } from './table-uv.mjs';
 
 /** Homebrew Stadiums that have a board, by card id (customhb set.json). */
-const ENVIRONMENT_BY_CARD = { 'customhb-051': 'stormy-mountains', 'customhb-299': 'scorched-earth' };
+const ENVIRONMENT_BY_CARD = {
+  'customhb-051': 'stormy-mountains',
+  'customhb-253': 'perilous-jungle',
+  'customhb-299': 'scorched-earth',
+};
 export const ENVIRONMENT_KEYS = Object.freeze([...new Set(Object.values(ENVIRONMENT_BY_CARD))]);
 /** Dev check on the real board: `?stadiumEnv=` or `localStorage[ENVIRONMENT_OVERRIDE_KEY]` forces one on. */
 export const ENVIRONMENT_OVERRIDE_KEY = 'ptcg-stadium-env';
@@ -16,10 +20,14 @@ export const ENVIRONMENT_OVERRIDE_KEY = 'ptcg-stadium-env';
 /**
  * Room round the table a board's scene runs into, as shares of the table's width (each side) and
  * height (near, far edge). Stormy Mountains' round rim runs past the near and far edges and its cloud
- * sea fills the view round the table: the board's cameras see about this far past the table (both
- * presets, 1366 to 2560 px wide windows); out past it the table's own floor shows.
+ * sea fills the view round the table, as Perilous Jungle's undergrowth does: the board's cameras see
+ * about this far past the table (both presets, 1366 to 2560 px wide windows); out past it the
+ * table's own floor shows.
  */
-const SCENE_MARGINS = { 'stormy-mountains': { side: 0.17, near: 0.2, far: 0.34 } };
+const SCENE_MARGINS = {
+  'stormy-mountains': { side: 0.17, near: 0.2, far: 0.34 },
+  'perilous-jungle': { side: 0.17, near: 0.2, far: 0.34 },
+};
 
 export const VOLCANO_MAX_RADIUS = 210;
 export const VOLCANO_MIN_RADIUS = 48;

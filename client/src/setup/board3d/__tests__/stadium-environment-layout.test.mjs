@@ -135,6 +135,15 @@ test('environmentKeyFor maps Stormy Mountains by id, or by set and number when t
   assert.equal(environmentOverride(null, '?stadiumEnv=stormy-mountains'), 'stormy-mountains');
 });
 
+// customhb-253 is Perilous Jungle in client/src/assets/custom-sets/customhb/set.json.
+test('environmentKeyFor maps Perilous Jungle by id, or by set and number when the id is missing', () => {
+  assert.equal(environmentKeyFor({ id: 'customhb-253' }), 'perilous-jungle');
+  assert.equal(environmentKeyFor({ set: 'customhb', number: '253' }), 'perilous-jungle');
+  assert.equal(environmentOverride(null, '?stadiumEnv=perilous-jungle'), 'perilous-jungle');
+  const layout = layoutOf(NO_MAT_LAYOUT_ID, HALVES[0]);
+  assert.deepEqual(sceneBounds(layout, 'perilous-jungle'), sceneBounds(layout, 'stormy-mountains'));
+});
+
 const cornersOf = (rect) => [
   [rect.x, rect.y],
   [rect.x + rect.w, rect.y],

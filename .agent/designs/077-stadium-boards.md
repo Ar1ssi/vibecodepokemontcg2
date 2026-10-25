@@ -183,7 +183,7 @@ particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
 |---|---|---|
 | volcanic | 299 Scorched Earth, 289 Magma Basin | Lava river along the seam / a lava basin in the middle; sculpted slate stones; basalt shelves |
 | coast | 209 Surfing Beach, 212 Brooklet Hill | Sand and surf rolling in from one end / grassy banks and a brook along the seam with stepping stones |
-| forest | 030 Forest of Vitality, 197 Mystery Garden, 253 Perilous Jungle | Mossy floor, roots and flowers / garden paths and hedges / dark jungle floor with poison pools |
+| forest | 030 Forest of Vitality, 197 Mystery Garden, 253 Perilous Jungle | Mossy floor, roots and flowers / garden paths and hedges / a jungle clearing, a poison pool and its stream |
 | highland | 051 Stormy Mountains, 240 Mountain Ring, 239 Fighting Stadium | A crater high in a storm / a rocky ring on a peak / an arena floor |
 | crystal | 052 Crystal Cave | Cave floor with glowing crystal clusters where no card lies |
 | metal | 162 Steel Shelter, 163 Full Metal Lab | Riveted steel plates / lab deck panels with light strips |
@@ -212,6 +212,16 @@ particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
   glows on the floor (`craterEmblem`); lightning falls on the summits from over the crater or arcs
   between clouds in a table corner, lighting rock and cloud. The card's far peak is left out: past
   the far edge it leans off the top of the screen.
+- Perilous Jungle (built in the prototype, `stadium-env-forest.mjs`; landmarks in
+  `stadium-env-forest-layout.mjs`): after the card art (TEF 156). The cards lie in a clearing of
+  violet earth, teal moss and grass tufts (the footprints merged and grown by 96 px, the edge
+  wandering up to 30 px further, cut off 4 px past the table's near and far edges); undergrowth
+  rises round it in bushes under instanced cel-shaded leaves (one bent strip each, a lit and a
+  shaded half, a dark outline). A pink poison pool with a grassy island lies left of the cards; its
+  stream winds along the seam through the gaps between the cards (routed for clearance) and out
+  past the scene's right edge. Drooping bell flowers arch over the water, pink flower spikes stand
+  on the island and banks; ripple rings, bubbles and spores move on the poison. Same scene margins
+  as Stormy Mountains.
 
 ### Mesh — `stadium-environment-mesh.js`
 `createStadiumEnvironment({ three, renderer, parent, clock, motionReduced, fxDisabled, onNeedsRender })`
