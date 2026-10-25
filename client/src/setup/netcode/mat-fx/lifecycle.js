@@ -197,7 +197,11 @@ function slideStackMeshes(registry, id, origin, { duration, liftFrac }) {
 }
 
 const slidePins = createSlidePins(
-  (id, poseFn, ms) => getBoardScene()?.tween(id, poseFn, ms) ?? Promise.resolve()
+  (id, poseFn, ms) => getBoardScene()?.tween(id, poseFn, ms) ?? Promise.resolve(),
+  {
+    hold: (id) => getBoardScene()?.holdCardTablePose?.(id),
+    release: (id) => getBoardScene()?.releaseCardTablePose?.(id),
+  }
 );
 
 /**
