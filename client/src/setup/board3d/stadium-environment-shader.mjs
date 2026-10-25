@@ -197,8 +197,8 @@ vec2 volcanoLava(vec2 p) {
   float angle = atan(rel.y, rel.x);
   for (int k = 0; k < 3; k++) {
     float fk = float(k);
-    // The wiggle is an angle on the cone and a constant sway (in px) past its foot.
-    float course = (fk - 1.0) * 1.05 + 0.22 * sin(d * 0.05 + fk * 1.7) * min(1.0, r / max(d, 1.0));
+    // A slight wiggle: an angle on the cone, a small constant sway (in px) past its foot.
+    float course = (fk - 1.0) * 1.05 + 0.06 * sin(d * 0.02 + fk * 1.7) * min(1.0, r / max(d, 1.0));
     float width = mix(3.0, 8.5, clamp((d - crater) / r, 0.0, 1.0));
     float across = abs(angleBetween(angle, course)) * d - width;
     float reach = k == 1 ? r * 1.3 : 100000.0;
@@ -239,10 +239,10 @@ float smin(float a, float b, float k) {
   float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
   return mix(b, a, h) - k * h * (1.0 - h);
 }
-// One stone layer: x = height 0..1, y = stone id. Each stone is a sculpted chunk: a flat top and
-// five broad side facets meeting in soft creases, tilted at random, on a rounded shoulder that
-// drops into the gap between neighbours.
-vec2 stones(vec2 p, float size, float gapPx) {
+// One stone layer: x = height 0..1, y = stone id, z = px from the gap to its neighbours. Each stone
+// is a sculpted chunk: a flat top and five broad side facets meeting in soft creases, tilted at
+// random, on a rounded shoulder that drops into the gap.
+vec3 stones(vec2 p, float size, float gapPx) {
   vec4 cell = voronoiCell(p / size);
   float edge = cell.x * size;
   vec2 local = -cell.zw;
@@ -258,7 +258,7 @@ vec2 stones(vec2 p, float size, float gapPx) {
   top = top * mix(0.68, 1.0, fract(id * 7.31)) + dot(local, tilt) * 0.2;
   float inner = clamp((edge - gapPx) / (size * 0.2), 0.0, 1.0);
   float shoulder = sqrt(inner * (2.0 - inner));
-  return vec2(max(top, 0.0) * shoulder, id);
+  return vec3(max(top, 0.0) * shoulder, id, edge - gapPx);
 }
 // The volcano's cone: a nine-sided pyramid softened toward a cone, so its flanks catch the light
 // in broad panels; a raised rim round a bowl for the crater pool; grooves where the streams run.
@@ -301,9 +301,9 @@ void main() {
   // Hills: broad swells of taller rock, so the stones vary with the land.
   float hills = fbm3(p / 340.0 + 2.3);
   float swell = 0.45 + 1.25 * smoothstep(0.25, 0.8, hills);
-  vec2 big = stones(q + 31.0, mix(96.0, 150.0, fbm3(p / 500.0 + 9.0)), 4.0);
-  vec2 mid = stones(q, 60.0, 3.0);
-  vec2 pebble = stones(q + 113.0, 27.0, 1.6);
+  vec3 big = stones(q + 31.0, mix(96.0, 150.0, fbm3(p / 500.0 + 9.0)), 4.0);
+  vec3 mid = stones(q, 60.0, 3.0);
+  vec3 pebble = stones(q + 113.0, 27.0, 1.6);
   float dry = smoothstep(-4.0, 60.0, lavaSD);
   // A few stones stand in the lava as islands.
   float islands = 30.0 * step(0.88, mid.y) * smoothstep(-60.0, -24.0, lavaSD);
@@ -313,6 +313,12 @@ void main() {
   float rock = max(max(hBig, hMid), hPebble);
   float id = rock < 0.6 ? -1.0 : (rock == hBig ? big.y : (rock == hMid ? mid.y : pebble.y));
   float height = base + rock;
+  // Cracks: the gaps between the larger stones drop below the lava sheet anywhere on the board,
+  // so lava glows through every crack, not only beside the river.
+  vec2 fromEdge = min(vUv, 1.0 - vUv) * uSize;
+  float crack = (1.0 - smoothstep(0.0, 3.5, min(big.z, mid.z))) * smoothstep(12.0, 20.0, min(fromEdge.x, fromEdge.y));
+  height = mix(height, ${LAVA_LEVEL.toFixed(1)} - 4.0, crack);
+  if (crack > 0.5) id = -1.0;
 
   vec2 lava = volcanoLava(p);
   float cone = volcanoCone(p, lava.x);
@@ -401,9 +407,10 @@ void main() {
   float rise = 1.0 - smoothstep(revealFront() - 0.12, revealFront(), revealReach(p));
   float growth = rise * rise * (3.0 - 2.0 * rise) * exitKeep(p);
   float height = h * growth;
-  // A skirt rising to the cloth along the table edge, so the sunken river never opens a gap there.
+  // A skirt meeting the cloth along the table edge, so the edge stays one straight line on screen and
+  // the ground never opens a gap against the table's floor there.
   vec2 fromEdge = min(uv, 1.0 - uv) * uSize;
-  height = mix(max(height, 0.0), height, smoothstep(0.0, 8.0, min(fromEdge.x, fromEdge.y)));
+  height = mix(0.0, height, smoothstep(0.0, 14.0, min(fromEdge.x, fromEdge.y)));
   vPos = p;
   vUv = uv;
   vHeight = height;
@@ -467,12 +474,12 @@ void main() {
   // Occlusion: crevices and the feet of stones go deep blue-grey.
   col = mix(vec3(0.036, 0.034, 0.046), col, smoothstep(0.3, 0.9, light.b));
 
-  // Lava light: the stones' lower faces and the gaps glow red near the lava.
+  // Lava light: wherever lava lies close below (river, cracks, streams) the rock glows red.
   float aboveLava = max(vHeight - ${LAVA_LEVEL.toFixed(1)}, 0.0);
   float nearRiver = 1.0 - smoothstep(0.0, 120.0, riverSD);
   float flicker = 0.88 + 0.12 * gnoise(vec2(uTime * 0.8, p.x / 80.0 + p.y / 120.0));
   float sideFacing = 1.0 - smoothstep(0.55, 0.95, n.z);
-  float underglow = exp(-aboveLava / 6.0) * nearRiver;
+  float underglow = exp(-aboveLava / 6.0);
   float bounce = exp(-max(riverSD, 0.0) / 45.0) * exp(-aboveLava / 24.0) * mix(0.4, 1.0, sideFacing);
   col += vec3(1.0, 0.16, 0.02) * (underglow * 0.7 + bounce * 0.28) * flicker;
 
