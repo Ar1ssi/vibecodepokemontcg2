@@ -345,8 +345,11 @@ const BURNING = [
   ['pillar', {}],
   ['fan', {}],
 ];
-/** The caller's own modifiers (a kit's detail), which a drawer's dissolve merges over. */
-const OUTER = Object.freeze({ detail: Object.freeze({ amount: 0.3 }) });
+/**
+ * The caller's own modifiers, which a drawer's dissolve merges over. A probe module no kit sets:
+ * kits own detail / distort / volume and may replace those.
+ */
+const OUTER = Object.freeze({ probe: Object.freeze({ amount: 0.3 }) });
 
 /** Draws one frame on a context that records `ctx.fxMod` at every fill and stroke. */
 const paintMods = (drawer, s, params = {}, over = {}) => {
@@ -372,7 +375,7 @@ test('design 076: a travelling or burst beat paints whole early and burns away i
     assert.ok(Math.max(...amountsOf(tail.mods)) > 0, `${label} dissolves in its tail`);
     for (const { mods, after } of [early, tail]) {
       assert.equal(after, OUTER, `${label} restores the caller's fxMod`);
-      assert.ok(mods.every((mod) => mod?.detail?.amount === 0.3), `${label} keeps the caller's modules`);
+      assert.ok(mods.every((mod) => mod?.probe?.amount === 0.3), `${label} keeps the caller's modules`);
     }
   }
 });
@@ -405,7 +408,9 @@ test('design 076: anchored, held and charging beats never touch the dissolve', (
     if (burning.has(drawer)) continue;
     for (const s of [0.2, 0.6, 0.95]) {
       const { mods, after } = paintMods(drawer, s);
-      assert.ok(mods.every((mod) => mod === OUTER), `${drawer} at ${s} paints under the caller's fxMod`);
+      // A kit may layer its own modules (an edge colour, detail) over the caller's; none adds an amount.
+      assert.ok(amountsOf(mods).every((amount) => amount === 0), `${drawer} at ${s} never dissolves`);
+      assert.ok(mods.every((mod) => mod?.probe?.amount === 0.3), `${drawer} at ${s} keeps the caller's fxMod`);
       assert.equal(after, OUTER);
     }
   }
