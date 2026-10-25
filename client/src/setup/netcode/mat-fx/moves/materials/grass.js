@@ -9,6 +9,8 @@
 //          three-pass tongue (one blurred pass) and a hot sphere, as the recipe names
 // Every call draws on the context it is handed and is otherwise pure.
 import { rgbCss } from '../../fx-colors.mjs';
+import { moddedKit } from './_kit-mod.js';
+import { withFxMod } from './_mods.js';
 import { grainPass, sphere, styledKit, tonguePath, wobble } from './_shared.js';
 
 // Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
@@ -16,6 +18,17 @@ import { grainPass, sphere, styledKit, tonguePath, wobble } from './_shared.js';
 const LEAF = Object.freeze({ byKind: { linear: { id: 'crystal', facets: 2, sheen: 0.35, speed: 0.7 }, radial: { id: 'orb', boil: 0.3, limb: 0.3, gain: 0 } } });
 const PETAL = Object.freeze({ byKind: { linear: { id: 'liquid', gloss: 0.35, flow: 0.6, clarity: 0.2 }, radial: { id: 'orb', boil: 0.25, limb: 0.25, gain: 0 } } });
 const SUNLIGHT = Object.freeze({ byKind: { linear: { id: 'energy', streak: 0.3, speed: 1, gain: 0.5 }, radial: { id: 'orb', boil: 0.35, limb: 0.3, gain: 0.8 }, stroke: { id: 'energy', streak: 0.3, speed: 1, gain: 0.5 } } });
+
+// Design 076 modifiers (GPU canvas only; Canvas2D ignores them). A leaf's body and lit half take
+// a still fibre layer with a faint wobble through it, so a blade reads as leaf, not flat card;
+// its veins stay crisp. Seeds and halos wobble like sap. Dissolving leaves burn at a leaf-green
+// rim (petals at their pink); solar's light at its pale yellow, blooming as light does.
+const FIBRE = Object.freeze({
+  detail: Object.freeze({ amount: 0.35, speed: 0, scale: 14 }),
+  distort: Object.freeze({ strength: 0.015, speed: 0.6, scale: 4 }),
+});
+const SAP = Object.freeze({ distort: Object.freeze({ strength: 0.03, speed: 0.5, scale: 2.5, angle: -90 }) });
+const edgeOf = (rgb, gain) => Object.freeze({ dissolve: Object.freeze({ edge: rgb, gain }) });
 
 const TAU = Math.PI * 2;
 const LEAF_SAMPLES = 12;
@@ -130,25 +143,19 @@ function leafKit(palette, shape, { veins }) {
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, TAU);
-    ctx.fill();
+    withFxMod(ctx, SAP, () => ctx.fill());
   }
 
   /** A seed / spore: a pale sphere lit up-left, ringed in leaf green. `hot` dims the core. */
   function body(ctx, x, y, r, alpha, hot = 1) {
     if (!(r > 0) || !(alpha > 0)) return;
-    sphere(
-      ctx,
-      x,
-      y,
-      r,
-      [
-        [0, palette.core, alpha * (0.4 + 0.6 * clamp01(hot))],
-        [0.5, palette.hot, alpha * 0.85],
-        [0.85, palette.body, alpha * 0.8],
-        [1, palette.deep, alpha * 0.6],
-      ],
-      0.25
-    );
+    const stops = [
+      [0, palette.core, alpha * (0.4 + 0.6 * clamp01(hot))],
+      [0.5, palette.hot, alpha * 0.85],
+      [0.85, palette.body, alpha * 0.8],
+      [1, palette.deep, alpha * 0.6],
+    ];
+    withFxMod(ctx, SAP, () => sphere(ctx, x, y, r, stops, 0.25));
     const rim = Math.min(2, Math.max(0.75, r * 0.1));
     ctx.strokeStyle = rgbCss(palette.deep, 0.75 * alpha);
     ctx.lineWidth = rim;
@@ -161,15 +168,17 @@ function leafKit(palette, shape, { veins }) {
   function tongue(ctx, spec, { alpha = 1, hot = 1 } = {}) {
     if (!(spec.length > 0) || !(spec.width > 0) || !(alpha > 0)) return;
     const leaf = leafOutline(spec, shape);
-    ctx.fillStyle = rgbCss(palette.body, 0.9 * alpha);
-    traceLeaf(ctx, leaf);
-    ctx.fill();
-    const lit = 0.75 * alpha * clamp01(hot);
-    if (lit > 0) {
-      ctx.fillStyle = rgbCss(palette.hot, lit);
-      traceHalf(ctx, leaf.sunlitLeft ? leaf.left : leaf.right, leaf.mid);
+    withFxMod(ctx, FIBRE, () => {
+      ctx.fillStyle = rgbCss(palette.body, 0.9 * alpha);
+      traceLeaf(ctx, leaf);
       ctx.fill();
-    }
+      const lit = 0.75 * alpha * clamp01(hot);
+      if (lit > 0) {
+        ctx.fillStyle = rgbCss(palette.hot, lit);
+        traceHalf(ctx, leaf.sunlitLeft ? leaf.left : leaf.right, leaf.mid);
+        ctx.fill();
+      }
+    });
     if (veins && spec.length >= VEIN_MIN_PX) {
       ctx.strokeStyle = rgbCss(palette.deep, 0.85 * alpha);
       ctx.lineWidth = 1;
@@ -218,7 +227,7 @@ function leafKit(palette, shape, { veins }) {
 
 /** The grass material drawn in `palette` (any palette with the same keys). */
 function grassKit(palette) {
-  return Object.freeze({
+  return moddedKit({
     key: 'grass',
     palette,
     shade: Object.freeze([15, 42, 16]),
@@ -227,14 +236,14 @@ function grassKit(palette) {
     ...leafKit(palette, LEAF_SHAPE, { veins: true }),
     grain: grainPass,
     withPalette: (p) => grassKit(p),
-  });
+  }, edgeOf(palette.body, 0.9));
 }
 
 export const grass = styledKit(grassKit(GRASS_PALETTE), LEAF);
 
 /** The petal material drawn in `palette` (any palette with the same keys). */
 function petalKit(palette) {
-  return Object.freeze({
+  return moddedKit({
     key: 'petal',
     palette,
     shade: Object.freeze([42, 10, 36]),
@@ -243,7 +252,7 @@ function petalKit(palette) {
     ...leafKit(palette, PETAL_SHAPE, { veins: true }),
     grain: grainPass,
     withPalette: (p) => petalKit(p),
-  });
+  }, edgeOf(palette.body, 0.9));
 }
 
 export const petal = styledKit(petalKit(PETAL_PALETTE), PETAL);
@@ -314,7 +323,7 @@ function solarKit(palette) {
     solarBody(ctx, x, y, r, alpha, hot);
   }
 
-  return Object.freeze({
+  return moddedKit({
     key: 'solar',
     palette,
     shade: Object.freeze([30, 40, 8]),
@@ -326,7 +335,7 @@ function solarKit(palette) {
     projectile: solarProjectile,
     grain: grainPass,
     withPalette: (p) => solarKit(p),
-  });
+  }, edgeOf(palette.hot, 1.5));
 }
 
 export const solar = styledKit(solarKit(SOLAR_PALETTE), SUNLIGHT);

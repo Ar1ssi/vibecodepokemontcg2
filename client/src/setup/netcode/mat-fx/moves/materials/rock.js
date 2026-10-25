@@ -12,6 +12,8 @@
 // Stone is solid matter: rock and ancient fill their stones with `source-over` inside their
 // own save/restore (as ground's clods do); halos, lit edges and dust stay additive.
 import { rgbCss } from '../../fx-colors.mjs';
+import { moddedKit } from './_kit-mod.js';
+import { withFxMod } from './_mods.js';
 import { grainPass, inShadow, shardOutline, styledKit, traceOutline } from './_shared.js';
 
 // Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
@@ -20,6 +22,19 @@ import { grainPass, inShadow, shardOutline, styledKit, traceOutline } from './_s
 const STONE = Object.freeze({ byKind: { linear: { id: 'crystal', facets: 3, sheen: 0.15, speed: 0.6 }, radial: { id: 'smoke', churn: 0.5, drift: 0.6, folds: 0.6 } } });
 const RELIC = Object.freeze({ byKind: { linear: { id: 'crystal', facets: 3, sheen: 0.4, speed: 0.8 }, radial: { id: 'smoke', churn: 0.45, drift: 0.6, folds: 0.5 } } });
 const FACETED = Object.freeze({ byKind: { linear: { id: 'crystal', facets: 6, sheen: 0.8, speed: 1.2 }, radial: { id: 'crystal', facets: 6, sheen: 0.7, speed: 1.2 }, stroke: { id: 'crystal', sheen: 0.7, speed: 1.2 } } });
+
+// Design 076 modifiers (GPU canvas only; Canvas2D ignores them). Stone faces take a grit layer
+// that never scrolls (stone is inert; a tumbling boulder rolls through it); its outline stays
+// clean. Dust puffs shimmer and rise (a fixed flow: one turned with a bowed heading would sweep
+// the shader's clock-long scroll offset and boil). Dissolving stone crumbles at a pale, dull rim
+// (low gain, no bloom); the ancient aura burns violet; gem light rims and blooms.
+const GRIT = Object.freeze({ detail: Object.freeze({ amount: 0.45, speed: 0, scale: 24 }) });
+const DUST_DRIFT = Object.freeze({
+  distort: Object.freeze({ strength: 0.03, speed: 0.6, scale: 2.5, angle: -90 }),
+  detail: Object.freeze({ amount: 0.3, speed: 0.5, scale: 6, angle: -90 }),
+});
+const AURA_SHIMMER = Object.freeze({ distort: Object.freeze({ strength: 0.025, speed: 0.7, scale: 3, angle: -90 }) });
+const edgeOf = (rgb, gain) => Object.freeze({ dissolve: Object.freeze({ edge: rgb, gain }) });
 
 const TAU = Math.PI * 2;
 const rad = (deg) => (deg * Math.PI) / 180;
@@ -198,20 +213,22 @@ const haloOf = (pal, strength = 0.45) =>
 /** Puffs trailing behind a flying unit along `headingDeg`, one additive fill each, in `rgb`. */
 const puffTrail = (ctx, rgb, deep, { x, y, r, headingDeg, time, seed, alpha, count }) => {
   const back = rad(headingDeg + 180);
-  for (let k = 0; k < count; k += 1) {
-    const d = r * (1 + 0.7 * k);
-    const sway = r * 0.18 * Math.sin(time * 4 + seed + k * 1.9);
-    const px = x + Math.cos(back) * d - Math.sin(back) * sway;
-    const py = y + Math.sin(back) * d + Math.cos(back) * sway;
-    const pr = r * (0.5 + 0.15 * k);
-    const g = ctx.createRadialGradient(px, py, 0, px, py, pr);
-    g.addColorStop(0, rgbCss(rgb, 0.38 * alpha * (1 - k / (count + 1))));
-    g.addColorStop(1, rgbCss(deep, 0));
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(px, py, pr, 0, TAU);
-    ctx.fill();
-  }
+  withFxMod(ctx, DUST_DRIFT, () => {
+    for (let k = 0; k < count; k += 1) {
+      const d = r * (1 + 0.7 * k);
+      const sway = r * 0.18 * Math.sin(time * 4 + seed + k * 1.9);
+      const px = x + Math.cos(back) * d - Math.sin(back) * sway;
+      const py = y + Math.sin(back) * d + Math.cos(back) * sway;
+      const pr = r * (0.5 + 0.15 * k);
+      const g = ctx.createRadialGradient(px, py, 0, px, py, pr);
+      g.addColorStop(0, rgbCss(rgb, 0.38 * alpha * (1 - k / (count + 1))));
+      g.addColorStop(1, rgbCss(deep, 0));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(px, py, pr, 0, TAU);
+      ctx.fill();
+    }
+  });
 };
 
 // ---- stone (rock, ancient) -------------------------------------------------------------
@@ -225,19 +242,21 @@ function stone(ctx, pal, rim, x, y, r, alpha, hot, seed, spin) {
   const facet = litFacet(points, x, y, r, seed);
   const shade = shadowFacet(points, x, y, r, seed);
   inShadow(ctx, () => {
-    ctx.fillStyle = rgbCss(pal.body, alpha);
-    tracePoints(ctx, points);
-    ctx.fill();
-    if (facet.length > 2) {
-      ctx.fillStyle = rgbCss(pal.lit ?? pal.hot, FACET_ALPHA * alpha);
-      tracePoints(ctx, facet);
+    withFxMod(ctx, GRIT, () => {
+      ctx.fillStyle = rgbCss(pal.body, alpha);
+      tracePoints(ctx, points);
       ctx.fill();
-    }
-    if (shade.length > 2) {
-      ctx.fillStyle = rgbCss(pal.deep, SHADOW_ALPHA * alpha);
-      tracePoints(ctx, shade);
-      ctx.fill();
-    }
+      if (facet.length > 2) {
+        ctx.fillStyle = rgbCss(pal.lit ?? pal.hot, FACET_ALPHA * alpha);
+        tracePoints(ctx, facet);
+        ctx.fill();
+      }
+      if (shade.length > 2) {
+        ctx.fillStyle = rgbCss(pal.deep, SHADOW_ALPHA * alpha);
+        tracePoints(ctx, shade);
+        ctx.fill();
+      }
+    });
     ctx.strokeStyle = rgbCss(pal.deep, 0.85 * alpha);
     ctx.lineWidth = Math.max(1, r * 0.07);
     ctx.lineJoin = 'round';
@@ -260,14 +279,16 @@ function spire(ctx, pal, rim, spec, { alpha = 1, hot = 1, jag = 0 } = {}) {
   if (!(spec.length > 0) || !(spec.width > 0) || !(alpha > 0)) return;
   const outline = jag ? shardOutline(spec) : spireOutline(spec);
   const tip = outline.left.at(-1);
-  inShadow(ctx, () => {
-    ctx.fillStyle = rgbCss(pal.body, 0.95 * alpha);
-    traceOutline(ctx, outline);
-    ctx.fill();
-    ctx.fillStyle = rgbCss(pal.deep, FACET_ALPHA * alpha);
-    traceOutline(ctx, { left: [[spec.x, spec.y], tip], right: outline.right });
-    ctx.fill();
-  });
+  inShadow(ctx, () =>
+    withFxMod(ctx, GRIT, () => {
+      ctx.fillStyle = rgbCss(pal.body, 0.95 * alpha);
+      traceOutline(ctx, outline);
+      ctx.fill();
+      ctx.fillStyle = rgbCss(pal.deep, FACET_ALPHA * alpha);
+      traceOutline(ctx, { left: [[spec.x, spec.y], tip], right: outline.right });
+      ctx.fill();
+    })
+  );
   const lit = alpha * clamp01(hot);
   if (!(lit > 0)) return;
   ctx.strokeStyle = rgbCss(rim, 0.75 * lit);
@@ -296,7 +317,7 @@ function rockKit(palette) {
     stone(ctx, palette, palette.core, x, y, r, alpha, hot, FLIGHT_SHAPE, time * 4 + seed);
   }
 
-  return Object.freeze({
+  return moddedKit({
     key: 'rock',
     palette,
     // The vignette's tint: a slate-black kept local to a card.
@@ -310,7 +331,7 @@ function rockKit(palette) {
     projectile: rockProjectile,
     grain: grainPass,
     withPalette: (p) => rockKit(p),
-  });
+  }, edgeOf(palette.hot, 0.3));
 }
 
 export const rock = styledKit(rockKit(ROCK_PALETTE), STONE);
@@ -318,7 +339,8 @@ export const rock = styledKit(rockKit(ROCK_PALETTE), STONE);
 // ---- ancient ---------------------------------------------------------------------------
 /** The ancient material drawn in `palette` (any palette with the same keys). */
 function ancientKit(palette) {
-  const glow = haloOf(palette, 0.5);
+  const halo = haloOf(palette, 0.5);
+  const glow = (ctx, ...args) => withFxMod(ctx, AURA_SHIMMER, () => halo(ctx, ...args));
 
   /** A stone in its violet aura: the halo behind (additive), the stone, a violet rim. */
   function ancientBody(ctx, x, y, r, alpha, hot = 1) {
@@ -339,7 +361,7 @@ function ancientKit(palette) {
     stone(ctx, palette, palette.hot, x, y, r, alpha, hot, FLIGHT_SHAPE, time * 2.5 + seed);
   }
 
-  return Object.freeze({
+  return moddedKit({
     key: 'ancient',
     palette,
     shade: Object.freeze([26, 16, 34]),
@@ -351,7 +373,7 @@ function ancientKit(palette) {
     projectile: ancientProjectile,
     grain: grainPass,
     withPalette: (p) => ancientKit(p),
-  });
+  }, edgeOf(palette.hot, 1.2));
 }
 
 export const ancient = styledKit(ancientKit(ANCIENT_PALETTE), RELIC);
@@ -435,7 +457,7 @@ function gemKit(palette) {
     crystal(ctx, x, y, r, alpha, hot, headingDeg + 30 * Math.sin(time * 3 + seed));
   }
 
-  return Object.freeze({
+  return moddedKit({
     key: 'gem',
     palette,
     shade: Object.freeze([18, 14, 36]),
@@ -447,7 +469,7 @@ function gemKit(palette) {
     projectile: gemProjectile,
     grain: grainPass,
     withPalette: (p) => gemKit(p),
-  });
+  }, edgeOf(palette.hot, 1.5));
 }
 
 export const gem = styledKit(gemKit(GEM_PALETTE), FACETED);

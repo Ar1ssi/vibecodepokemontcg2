@@ -10,11 +10,29 @@
 // turning as a pinwheel round a small orb. Palette #CFE3F7 #EAF3FF #FFFFFF, deep #8FB3D9. No
 // grain, no blur. Every call draws on the context it is handed and is otherwise pure.
 import { rgbCss } from '../../fx-colors.mjs';
+import { moddedKit } from './_kit-mod.js';
+import { withFxMod } from './_mods.js';
 import { grainPass, sphere, styledKit, traceOutline } from './_shared.js';
 
 // Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
 // Gusts fray and churn like moving air; their streak lines stay crisp.
 const GUST = Object.freeze({ byKind: { linear: { id: 'smoke', churn: 0.55, drift: 1.6, folds: 0.25 }, radial: { id: 'smoke', churn: 0.5, drift: 1.2, folds: 0.3 } } });
+
+// Design 076 modifiers (GPU canvas only; Canvas2D ignores them). Wind shear: a blade's fill and
+// the air of halos and orbs warp, and blades stream wisps, so the air reads as moving, not as
+// flat translucent shapes; the blade's bright edge stays crisp. Feather vanes take a still fibre
+// layer. Dissolving air thins at a pale sky rim (a soft bloom).
+// The flow is one fixed screen direction (up, as rising air): the shader scrolls by the scene
+// clock times the flow, so a flow turned with a blade's spin or a bowed heading would sweep that
+// long offset every frame and boil.
+const FLOW_DEG = -90;
+const SHEAR = Object.freeze({ distort: Object.freeze({ strength: 0.05, speed: 1.6, scale: 2.5, angle: FLOW_DEG }) });
+const WISPS = Object.freeze({
+  distort: Object.freeze({ strength: 0.05, speed: 1.8, scale: 3, angle: FLOW_DEG }),
+  detail: Object.freeze({ amount: 0.5, speed: 1.5, scale: 4, angle: FLOW_DEG }),
+});
+const FIBRE = Object.freeze({ detail: Object.freeze({ amount: 0.25, speed: 0, scale: 18 }) });
+const edgeOf = (rgb) => Object.freeze({ dissolve: Object.freeze({ edge: rgb, gain: 0.6, width: 0.14 }) });
 
 const TAU = Math.PI * 2;
 const SAMPLES = 12;
@@ -116,7 +134,7 @@ function flyingKit(palette) {
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, TAU);
-    ctx.fill();
+    withFxMod(ctx, SHEAR, () => ctx.fill());
   }
 
   /**
@@ -124,19 +142,13 @@ function flyingKit(palette) {
    * swirl arcs turned `phase`.
    */
   function orb(ctx, x, y, r, alpha, hot, phase) {
-    sphere(
-      ctx,
-      x,
-      y,
-      r,
-      [
-        [0, palette.white, alpha * 0.6 * clamp01(hot)],
-        [0.3, palette.hot, alpha * 0.35],
-        [0.7, palette.body, alpha * 0.12],
-        [1, palette.deep, 0],
-      ],
-      0
-    );
+    const stops = [
+      [0, palette.white, alpha * 0.6 * clamp01(hot)],
+      [0.3, palette.hot, alpha * 0.35],
+      [0.7, palette.body, alpha * 0.12],
+      [1, palette.deep, 0],
+    ];
+    withFxMod(ctx, SHEAR, () => sphere(ctx, x, y, r, stops, 0));
     ctx.lineCap = 'round';
     ctx.lineWidth = Math.max(1, r * 0.07);
     ctx.strokeStyle = rgbCss(palette.hot, 0.7 * alpha);
@@ -161,7 +173,7 @@ function flyingKit(palette) {
     const { left, right, rachis } = featherOutline(spec);
     ctx.fillStyle = rgbCss(palette.body, VANE_ALPHA * alpha);
     traceOutline(ctx, { left, right });
-    ctx.fill();
+    withFxMod(ctx, FIBRE, () => ctx.fill());
     ctx.strokeStyle = rgbCss(palette.deep, 0.8 * alpha);
     ctx.lineWidth = Math.max(1, spec.width * 0.06);
     ctx.lineCap = 'round';
@@ -183,7 +195,7 @@ function flyingKit(palette) {
     const outline = crescentOutline(spec);
     ctx.fillStyle = rgbCss(palette.body, BLADE_ALPHA * alpha);
     traceOutline(ctx, outline);
-    ctx.fill();
+    withFxMod(ctx, WISPS, () => ctx.fill());
     const edge = 0.9 * alpha * clamp01(hot);
     if (!(edge > 0)) return;
     ctx.strokeStyle = rgbCss(palette.white, edge);
@@ -219,7 +231,7 @@ function flyingKit(palette) {
     orb(ctx, x, y, r * PINWHEEL_CORE, alpha, hot, time * TAU * PINWHEEL_HZ + seed);
   }
 
-  return Object.freeze({
+  return moddedKit({
     key: 'flying',
     palette,
     // A deep night-sky navy, kept local to a card, so pale wind reads against it.
@@ -232,7 +244,7 @@ function flyingKit(palette) {
     projectile,
     grain: grainPass,
     withPalette: (p) => flyingKit(p),
-  });
+  }, edgeOf(palette.hot));
 }
 
 export const flying = styledKit(flyingKit(PALETTE), GUST);
