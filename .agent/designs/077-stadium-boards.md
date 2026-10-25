@@ -68,13 +68,15 @@ Facts read this session.
   `onFxSettingsChanged`; checkbox in `client/index.ejs` (~:474) wired in
   `initialization/document-event-listeners/sidebox/settings.js:107-113`; `mat-fx.mjs` accessors
   `motionReduced` (:22), `fxDisabled`.
-- **Prototype** (branch `feature/077-stadium-boards`):
-  - `client/stadium-env-preview.html` — the real `sim` layout, board cameras and renderer settings,
-    stand-in mat and cards, intro/exit/ambient timing. Served at `/stadium-env-preview.html`.
+- **Prototype** (branch `feature/077-stadium-boards`), drawn under the real board at
+  `/?stadiumEnv=scorched-earth` (the preview page is gone):
   - `stadium-environment-shader.mjs` — Scorched Earth GLSL: two bakes (ground field, light), a
-    displaced terrain grid, a lava sheet, embers, the mat cutout.
+    displaced terrain grid that paints the lava of its cracks and side streams, a lava sheet for the
+    river, embers, crater smoke, the mat cutout.
+  - `stadium-environment-mesh.js` (`createStadiumEnvironment`), wired in `board-scene.js` and
+    `board3d.js`; `table-mesh.js` cuts the mat, zone outlines and labels where it shows.
   - `stadium-environment-layout.mjs` + test — `environmentKeyFor`, `environmentOverride`,
-    `environmentFootprints`.
+    `environmentFootprints` (from the board's own card poses), `volcanoSpot`.
   - Measured on an RX 7900 XTX at 1920×1080: 60 fps through the intro. The first bake takes ~0.6 s on
     the CPU side, mostly shader compilation.
 
@@ -171,7 +173,8 @@ Each exports one object per environment key:
 `{ key, bakeField, bakeShade, terrainFragment, liquid: { level, fragment } | null,
 particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
 - `bakeField` writes R height px, G signed px from the place's main feature (river bank, shoreline),
-  B plate (> 0) / shelf (< 0), A stone id or −1.
+  B the liquid table (the level its cracks and side channels fill to), A stone id, −1 off stones,
+  2 on a landmark (the volcano).
 - `bakeShade` writes the static colour (linear, pre-tone-mapping) from the field and light bakes.
 - `terrainFragment` reads the shade bake and adds the animated light (lava glow, caustics, ...).
 - Families and their Stadiums (each place follows its card art):
@@ -187,12 +190,15 @@ particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
 | spirit | 198 Old Cemetery, 199 Dimension Valley, 254 Dark City | Misty graveyard ground / floating rock over a purple void / a night street with neon puddles |
 | electric | 278 Levincia | A city plaza with glowing power lines |
 
-- Scorched Earth (built in the prototype): stones in three sizes (124 / 60 / 27 px cells: a flat
-  top and five broad facets on a rounded shoulder), tallest along the far edge; the river winds
-  along the seam, half-width 70 ± 11 px; lava sheet at z −10 with banded colour, flow lines, round
-  crust rafts and bubbles; card places on plates with orange slot outlines; Trainer rows on basalt
-  flagstones whose joints glow near the river; 220 embers off the river. Slate palette sits ~0.04 above
-  the target greys because Neutral tone mapping removes that much from dark colours.
+- Scorched Earth (built in the prototype): the land has its own plateaus, ridges and hollows; stones
+  in three sizes (96–150 / 60 / 27 px cells: a flat top and five broad facets on a rounded shoulder)
+  stand up to ~34 px proud of it, no card places marked; every gap between the big and mid stones holds
+  lava a little above bare ground, so the cracks glow at the surface. A volcano by the river's head
+  (gullied cone, crater pool, smoke) sends three straight streams down its flanks: the middle one
+  into the river, the others on to the near and far edges, run level so they stay straight under the
+  tilted camera. The river winds along the seam, half-width 70 ± 11 px, a lava sheet at z −10 with
+  banded colour, flow lines, crust rafts and bubbles; 220 embers. Slate palette sits ~0.04 above the
+  target greys because Neutral tone mapping removes that much from dark colours.
 
 ### Mesh — `stadium-environment-mesh.js`
 `createStadiumEnvironment({ three, renderer, parent, clock, motionReduced, fxDisabled, onNeedsRender })`
@@ -263,8 +269,8 @@ Constants: `INTRO_MS = 1600`, `EXIT_MS = 900`, `AMBIENT_FPS = 30`.
   `stadiumBoardsOff: readKey(...) === '1'` in `readSettings`; setter `setStadiumBoardsOff` in
   `fx-settings.js`; checkbox "Stadium boards" in `client/index.ejs` next to the hover-preview toggle;
   wiring in `sidebox/settings.js` like `HOVER_PREVIEW_OFF_KEY`.
-- The preview page is deleted once the real board shows Scorched Earth (`?stadiumEnv=scorched-earth`
-  replaces it).
+- `?stadiumEnv=scorched-earth` (or `localStorage['ptcg-stadium-env']`) forces an environment for
+  review; the preview page it replaced is already deleted.
 
 ## Edge cases & failure modes
 | # | Case | Expected behavior | Covered by |
@@ -308,10 +314,10 @@ boards" toggle. Revert: unset the toggle per user, or revert the feature commits
 ## Work plan — slices ≤1 session, each leaving the repo green
 | Slice | Files (create / modify) | Signatures & data shapes | Test cases: input → expected | Rulings used (source) | Green when |
 |---|---|---|---|---|---|
-| 1 Engine split | create `stadium-environment-glsl.mjs`, `stadium-env-volcanic.mjs` (from the prototype shader, plus `bakeShade`), test `__tests__/stadium-environment-glsl.test.mjs`; delete `stadium-environment-shader.mjs`; point the preview page at the new modules | § Engine, § Recipes | every exported shader string contains `void main`; no identifier in `flat half smooth noperspective sample patch` declared; `volcanic['scorched-earth'].liquid.level` = −10 | — | test green; preview renders as before (user check) |
+| 1 Engine split | create `stadium-environment-glsl.mjs`, `stadium-env-volcanic.mjs` (from the prototype shader, plus `bakeShade`), test `__tests__/stadium-environment-glsl.test.mjs`; delete `stadium-environment-shader.mjs` | § Engine, § Recipes | every exported shader string contains `void main`; no identifier in `flat half smooth noperspective sample patch` declared; `volcanic['scorched-earth'].liquid.level` = −10 | — | test green; real board renders as before (user check) |
 | 2 Timeline | create `stadium-environment-timeline.mjs` + test | § Timeline | enter at t=0: `play` → 1600, `frame(800).layers[0].reveal` = 1−(0.5)^3 = 0.875; leave: `play` → 900; swap A→B: `frame(10).layers` = [A{reveal 1}, B{reveal<1}], `frame(1700).layers` = [B]; `setTarget(same)` → false, `play` → 0; `settle()` mid-intro → `frame().layers` = [target at reveal 1], animating false | — | test green |
 | 3 Mesh + cutout | create `stadium-environment-mesh.js` + smoke test; modify `table-mesh.js` (`setCutout`), `board-scene.js` (create, setLayout, render, cutout matrix, dispose, 3 scene methods) | § Mesh, § Mat cutout | smoke: create with vendored three + stub renderer, `setLayout(flatLayout fixture)`, `setTarget({key:'scorched-earth'})`, `play()` → 1600, `update(100)` → true, `dispose()` no throw; `fxDisabled:()=>true` → `play()` = 0 | — | smoke + existing board-scene and table-mesh tests green |
-| 4 Wiring + toggle | modify `board-model.mjs` (`stadiumOf`), `board3d.js`, `advisory-animations.js`, `fx-settings.mjs`, `fx-settings.js`, `client/index.ejs`, `sidebox/settings.js`; delete `client/stadium-env-preview.html`; tests in `board-model`, `fx-settings`, new `__tests__/board-environment-queue.test.mjs` | § Wiring | `stadiumOf({instanceId:1,id:'customhb-299',set:'customhb',number:'299'})` has those fields; `readSettings({getItem:k=>k==='ptcg-stadium-boards-off'?'1':null}).stadiumBoardsOff` = true; queue: push while skipping → `settle` called, `play` not; push then `clearFxQueue()` → `settle` called once | — | `pnpm test:changed` green; lint clean; Scorched Earth on the real board (user check) |
+| 4 Wiring + toggle | modify `board-model.mjs` (`stadiumOf`), `board3d.js`, `advisory-animations.js`, `fx-settings.mjs`, `fx-settings.js`, `client/index.ejs`, `sidebox/settings.js`; tests in `board-model`, `fx-settings`, new `__tests__/board-environment-queue.test.mjs` | § Wiring | `stadiumOf({instanceId:1,id:'customhb-299',set:'customhb',number:'299'})` has those fields; `readSettings({getItem:k=>k==='ptcg-stadium-boards-off'?'1':null}).stadiumBoardsOff` = true; queue: push while skipping → `settle` called, `play` not; push then `clearFxQueue()` → `settle` called once | — | `pnpm test:changed` green; lint clean; Scorched Earth on the real board (user check) |
 | 5a–5h Recipes (fx-designer) | one `stadium-env-<family>.mjs` per family + its `ENVIRONMENT_BY_CARD` rows | § Recipes | registry test: each new id → its key | — | user signs off each place on localhost |
 
 ## Deviations (Builder appends here during build)
