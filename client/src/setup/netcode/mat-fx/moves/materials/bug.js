@@ -13,6 +13,8 @@
 //     scale and whose elongated unit is a soft silver streak.
 // Everything but the needle's dark tip is additive (the player's `lighter`).
 import { rgbCss } from '../../fx-colors.mjs';
+import { moddedKit } from './_kit-mod.js';
+import { withFxMod } from './_mods.js';
 import { grainPass, inShadow, shardOutline, sphere, styledKit, tongueOutline, traceOutline } from './_shared.js';
 
 // Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
@@ -20,6 +22,16 @@ import { grainPass, inShadow, shardOutline, sphere, styledKit, tongueOutline, tr
 const CHITIN = Object.freeze({ byKind: { linear: { id: 'crystal', facets: 3, sheen: 0.3, speed: 0.8 }, radial: { id: 'orb', boil: 0.2, limb: 0.4, gain: 0 } } });
 const BUZZ = Object.freeze({ byKind: { linear: { id: 'energy', streak: 0.45, speed: 4, gain: 0.3 }, radial: { id: 'orb', boil: 0.2, limb: 0.4, gain: 0 }, stroke: { id: 'energy', streak: 0.45, speed: 4, gain: 0.3 } } });
 const POWDER = Object.freeze({ byKind: { linear: { id: 'crystal', facets: 4, sheen: 0.7, speed: 1.4 }, radial: { id: 'crystal', facets: 4, sheen: 0.6, speed: 1.4 }, stroke: { id: 'crystal', sheen: 0.6, speed: 1.4 } } });
+
+// Design 076 modifiers (GPU canvas only; Canvas2D ignores them). Wing membranes take a still,
+// fine detail layer (a film, not a flat tint); halos buzz with a fast, fine shimmer; a silver
+// streak streams powder grain on a fixed flow (one turned with the heading would sweep the
+// shader's clock-long scroll offset and boil). Needles stay clean: they are too thin to read it.
+// Dissolving bug matter burns at a lime rim, silver powder at its pale core.
+const MEMBRANE = Object.freeze({ detail: Object.freeze({ amount: 0.3, speed: 0, scale: 16 }) });
+const BUZZ_AIR = Object.freeze({ distort: Object.freeze({ strength: 0.02, speed: 3, scale: 4 }) });
+const POWDER_GRAIN = Object.freeze({ detail: Object.freeze({ amount: 0.35, speed: 1.2, scale: 9, angle: -90 }) });
+const edgeOf = (rgb, gain) => Object.freeze({ dissolve: Object.freeze({ edge: rgb, gain }) });
 
 const TAU = Math.PI * 2;
 // A needle is drawn at 0.6 of the width a drawer hands it: at full width a spindle reads as a leaf.
@@ -125,7 +137,7 @@ const haloOf = (pal, coreAlpha, bodyAlpha) =>
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, TAU);
-    ctx.fill();
+    withFxMod(ctx, BUZZ_AIR, () => ctx.fill());
   };
 
 // The interface's `body` carries no clock, so a lone disc beats with where it is and how big it
@@ -186,7 +198,7 @@ function wingDisc(ctx, pal, x, y, r, alpha, hot, phase) {
     ctx.moveTo(cx + rx * Math.cos(tilt), cy + rx * Math.sin(tilt));
     ctx.ellipse(cx, cy, rx, r * 0.3, tilt, 0, TAU);
   }
-  ctx.fill();
+  withFxMod(ctx, MEMBRANE, () => ctx.fill());
   ctx.strokeStyle = rgbCss(pal.hot, VEIN_ALPHA * alpha);
   ctx.lineWidth = Math.max(1, r * 0.05);
   ctx.lineCap = 'round';
@@ -260,7 +272,7 @@ function bugKit(palette) {
   // A deep forest black, kept local to a card, so the yellow-green reads against it.
   const bugShade = Object.freeze([14, 22, 4]);
 
-  return Object.freeze({
+  return moddedKit({
     key: 'bug',
     palette,
     shade: bugShade,
@@ -272,7 +284,7 @@ function bugKit(palette) {
     projectile: projectileOf(palette, bugGlow, (ctx, x, y, r, alpha, hot, phase) => wingDisc(ctx, palette, x, y, r, alpha, hot, phase)),
     grain: grainPass,
     withPalette: (p) => bugKit(p),
-  });
+  }, edgeOf(palette.hot, 0.8));
 }
 
 export const bug = styledKit(bugKit(BUG_PALETTE), CHITIN);
@@ -312,7 +324,7 @@ function buzzKit(palette, base = bugKit(palette)) {
     soundDisc(ctx, x, y, r, alpha, hot, time * 9 + seed);
   }
 
-  return Object.freeze({
+  return moddedKit({
     key: 'buzz',
     palette,
     shade: bugShade,
@@ -324,7 +336,7 @@ function buzzKit(palette, base = bugKit(palette)) {
     projectile: buzzProjectile,
     grain: grainPass,
     withPalette: (p) => buzzKit(p),
-  });
+  }, edgeOf(palette.hot, 0.8));
 }
 
 export const buzz = styledKit(buzzKit(BUG_PALETTE, bug), BUZZ);
@@ -383,7 +395,7 @@ function silverKit(palette) {
     }
     ctx.fillStyle = rgbCss(palette.body, STREAK_ALPHA * alpha);
     traceOutline(ctx, tongueOutline({ ...spec, time: spec.time ?? 0, seed: spec.seed ?? 0, amp: STREAK_AMP }));
-    ctx.fill();
+    withFxMod(ctx, POWDER_GRAIN, () => ctx.fill());
     const line = 0.8 * alpha * clamp01(hot);
     if (!(line > 0)) return;
     const at = framer(spec);
@@ -414,7 +426,7 @@ function silverKit(palette) {
     scaleMote(ctx, x, y, r, alpha, hot, time * 4 + seed);
   }
 
-  return Object.freeze({
+  return moddedKit({
     key: 'silver',
     palette,
     // A slate night, kept local to a card, so the pale powder reads against it.
@@ -427,7 +439,7 @@ function silverKit(palette) {
     projectile: silverProjectile,
     grain: grainPass,
     withPalette: (p) => silverKit(p),
-  });
+  }, edgeOf(palette.core, 1));
 }
 
 export const silver = styledKit(silverKit(SILVER_PALETTE), POWDER);

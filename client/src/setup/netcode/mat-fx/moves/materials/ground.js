@@ -13,6 +13,8 @@
 //     centre and a sheen, a glob trailing drips.
 // Every call draws on the context it is handed and is otherwise pure.
 import { rgbCss } from '../../fx-colors.mjs';
+import { moddedKit } from './_kit-mod.js';
+import { withFxMod } from './_mods.js';
 import { grainPass, inShadow, shardOutline, styledKit, tongueOutline, traceOutline } from './_shared.js';
 import { streamGlobs } from './poison.js';
 
@@ -20,6 +22,21 @@ import { streamGlobs } from './poison.js';
 // Earth: dust plumes billow with dark folds. Mud: a thick glossy sludge.
 const DUST = Object.freeze({ byKind: { linear: { id: 'smoke', churn: 0.55, drift: 0.8, folds: 0.65 }, radial: { id: 'smoke', churn: 0.6, drift: 0.8, folds: 0.65 } } });
 const SLUDGE = Object.freeze({ byKind: { linear: { id: 'liquid', gloss: 0.3, flow: 0.5, clarity: 0 }, radial: { id: 'liquid', gloss: 0.35, flow: 0.4, clarity: 0 } } });
+
+// Design 076 modifiers (GPU canvas only; Canvas2D ignores them). Earth (clods, spikes, chips)
+// takes a grit layer that never scrolls, so the masses stop reading as flat brown; lit edges and
+// chips stay clean. Dust shimmers and rises: halos, the fissure's pool and trail puffs (a fixed
+// flow: one turned with a bowed heading would sweep the shader's clock-long scroll offset and
+// boil). Mud globs wobble wet. Dissolving earth crumbles at a sandy rim, mud at its wet brown,
+// both dull (low gain, no bloom).
+const GRIT = Object.freeze({ detail: Object.freeze({ amount: 0.45, speed: 0, scale: 20 }) });
+const SHIMMER = Object.freeze({ distort: Object.freeze({ strength: 0.03, speed: 0.5, scale: 2.5, angle: -90 }) });
+const WET = Object.freeze({ distort: Object.freeze({ strength: 0.02, speed: 0.4, scale: 2 }) });
+const DUST_DRIFT = Object.freeze({
+  distort: Object.freeze({ strength: 0.04, speed: 0.7, scale: 2.5, angle: -90 }),
+  detail: Object.freeze({ amount: 0.3, speed: 0.5, scale: 7, angle: -90 }),
+});
+const edgeOf = (rgb) => Object.freeze({ dissolve: Object.freeze({ edge: rgb, gain: 0.25 }) });
 
 const TAU = Math.PI * 2;
 const rad = (deg) => (deg * Math.PI) / 180;
@@ -150,27 +167,29 @@ const haloOf = (pal) =>
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, TAU);
-    ctx.fill();
+    withFxMod(ctx, SHIMMER, () => ctx.fill());
   };
 
 /** Dust puffs trailing behind a flying unit along `headingDeg`, one fill each (additive). */
 const dustTrail = (ctx, pal, { x, y, r, headingDeg, time, seed, alpha, count }) => {
   const back = rad(headingDeg + 180);
-  for (let k = 0; k < count; k += 1) {
-    const d = r * (0.9 + 0.75 * k);
-    const sway = r * 0.2 * Math.sin(time * 4 + seed + k * 1.9);
-    const px = x + Math.cos(back) * d - Math.sin(back) * sway;
-    const py = y + Math.sin(back) * d + Math.cos(back) * sway;
-    const pr = r * (0.55 + 0.18 * k);
-    const a = 0.4 * alpha * (1 - k / (count + 1));
-    const g = ctx.createRadialGradient(px, py, 0, px, py, pr);
-    g.addColorStop(0, rgbCss(pal.body, a));
-    g.addColorStop(1, rgbCss(pal.deep, 0));
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(px, py, pr, 0, TAU);
-    ctx.fill();
-  }
+  withFxMod(ctx, DUST_DRIFT, () => {
+    for (let k = 0; k < count; k += 1) {
+      const d = r * (0.9 + 0.75 * k);
+      const sway = r * 0.2 * Math.sin(time * 4 + seed + k * 1.9);
+      const px = x + Math.cos(back) * d - Math.sin(back) * sway;
+      const py = y + Math.sin(back) * d + Math.cos(back) * sway;
+      const pr = r * (0.55 + 0.18 * k);
+      const a = 0.4 * alpha * (1 - k / (count + 1));
+      const g = ctx.createRadialGradient(px, py, 0, px, py, pr);
+      g.addColorStop(0, rgbCss(pal.body, a));
+      g.addColorStop(1, rgbCss(pal.deep, 0));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(px, py, pr, 0, TAU);
+      ctx.fill();
+    }
+  });
 };
 
 // ---- ground ------------------------------------------------------------------------
@@ -190,7 +209,7 @@ function groundKit(palette) {
       g.addColorStop(1, rgbCss(palette.deep, alpha));
       ctx.fillStyle = g;
       tracePoints(ctx, clodOutline(x, y, r, seed, spin));
-      ctx.fill();
+      withFxMod(ctx, GRIT, () => ctx.fill());
     });
     const lit = alpha * clamp01(hot);
     if (!(lit > 0)) return;
@@ -216,14 +235,16 @@ function groundKit(palette) {
     if (!(spec.length > 0) || !(spec.width > 0) || !(alpha > 0)) return;
     const outline = jag ? shardOutline(spec) : spikeOutline(spec);
     const tip = outline.left.at(-1);
-    inShadow(ctx, () => {
-      ctx.fillStyle = rgbCss(palette.body, 0.95 * alpha);
-      traceOutline(ctx, outline);
-      ctx.fill();
-      ctx.fillStyle = rgbCss(palette.deep, FACET_ALPHA * alpha);
-      traceOutline(ctx, { left: [[spec.x, spec.y], tip], right: outline.right });
-      ctx.fill();
-    });
+    inShadow(ctx, () =>
+      withFxMod(ctx, GRIT, () => {
+        ctx.fillStyle = rgbCss(palette.body, 0.95 * alpha);
+        traceOutline(ctx, outline);
+        ctx.fill();
+        ctx.fillStyle = rgbCss(palette.deep, FACET_ALPHA * alpha);
+        traceOutline(ctx, { left: [[spec.x, spec.y], tip], right: outline.right });
+        ctx.fill();
+      })
+    );
     const lit = alpha * clamp01(hot);
     if (!(lit > 0)) return;
     ctx.strokeStyle = rgbCss(palette.hot, EDGE_ALPHA * lit);
@@ -257,7 +278,7 @@ function groundKit(palette) {
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.ellipse(px, py, rx, rx * POOL_SQUASH, 0, 0, TAU);
-    ctx.fill();
+    withFxMod(ctx, SHIMMER, () => ctx.fill());
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     const passes = [
@@ -275,7 +296,7 @@ function groundKit(palette) {
     }
   }
 
-  return Object.freeze({
+  return moddedKit({
     key: 'ground',
     palette,
     // The vignette's tint: an umber-black kept local to a card.
@@ -290,7 +311,7 @@ function groundKit(palette) {
     sigil,
     grain: grainPass,
     withPalette: (p) => groundKit(p),
-  });
+  }, edgeOf(palette.hot));
 }
 
 export const ground = styledKit(groundKit(GROUND_PALETTE), DUST);
@@ -309,7 +330,7 @@ function mudKit(palette) {
       ctx.fillStyle = g;
       ctx.beginPath();
       ctx.arc(x, y, r, 0, TAU);
-      ctx.fill();
+      withFxMod(ctx, WET, () => ctx.fill());
     });
     const lit = alpha * clamp01(hot);
     if (!(lit > 0)) return;
@@ -385,7 +406,7 @@ function mudKit(palette) {
     mudGlob(ctx, x, y, r * squish, alpha, hot);
   }
 
-  return Object.freeze({
+  return moddedKit({
     key: 'mud',
     palette,
     shade: Object.freeze([30, 18, 6]),
@@ -398,7 +419,7 @@ function mudKit(palette) {
     projectile: mudProjectile,
     grain: grainPass,
     withPalette: (p) => mudKit(p),
-  });
+  }, edgeOf(palette.core));
 }
 
 export const mud = styledKit(mudKit(MUD_PALETTE), SLUDGE);
