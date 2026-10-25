@@ -8,7 +8,13 @@
 // Design 075 slice 11: the mist, the faceted head and the prismatic fringe run the GPU `energy`
 // style (`ctx.fxStyle`, ignored by Canvas2D): the fringe carries light running round each
 // crystal, the head shimmers with fine veins. The crystal tongue itself is ice's, styled there.
+//
+// Design 076: modifiers (`ctx.fxMod`, ignored by Canvas2D). The cyan mist drifts like a nebula
+// (a slow warp and a fine grain), the faceted head only glints (a faint grain, never a warp: a
+// crystal is rigid), the prismatic fringe stays a clean line, and every fill names the cyan
+// dissolve edge. The crystal tongue's own modifiers are ice's.
 import { rgbCss } from '../../fx-colors.mjs';
+import { withFxMod } from './_mods.js';
 import { parseHex, traceOutline } from './_shared.js';
 import { ice, icicleOutline } from './ice.js';
 import { UNITS } from './_units.js';
@@ -20,6 +26,12 @@ const ACCENT_KEYS = Object.freeze(STELLAR_ACCENTS.map((_, k) => `accent${k}`));
 // Style params (gpu-canvas STYLE_PARAMS energy): starlight runs round the fringe.
 const STARLIGHT = Object.freeze({ id: 'energy', streak: 0.55, speed: 2, gain: 0.6 });
 const STAR_MIST = Object.freeze({ id: 'energy', streak: 0.3, speed: 1, gain: 0 });
+
+const NEBULA = Object.freeze({
+  distort: Object.freeze({ strength: 0.12, speed: 0.6, scale: 2.5, angle: 0 }),
+  detail: Object.freeze({ amount: 0.45, speed: 0.5, scale: 6, angle: -90 }),
+});
+const FACET_GLINT = Object.freeze({ detail: Object.freeze({ amount: 0.2, speed: 0.4, scale: 5, angle: -90 }) });
 
 const STELLAR_PALETTE = Object.freeze({
   deep: hex('#0F2A55'),
@@ -38,6 +50,10 @@ export const accentKeyFor = (seed) => ACCENT_KEYS[((Math.floor(Math.abs(seed)) %
 /** The stellar material drawn in `palette` (any palette with the same keys). */
 function stellarKit(palette) {
   const crystalTongue = ice.withPalette(palette).tongue;
+  const edge = Object.freeze({ dissolve: Object.freeze({ edge: palette.hot, width: 0.1, gain: 1.6 }) });
+  /** `draw` with this kit's dissolve edge named for every fill it makes. */
+  const edged = (draw) => (ctx, ...args) =>
+    ctx && typeof ctx === 'object' ? withFxMod(ctx, edge, () => draw(ctx, ...args)) : draw(ctx, ...args);
 
   function glow(ctx, x, y, r, alpha) {
     if (!(r > 0) || !(alpha > 0)) return;
@@ -49,7 +65,7 @@ function stellarKit(palette) {
     ctx.fxStyle = STAR_MIST;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, TAU);
-    ctx.fill();
+    withFxMod(ctx, NEBULA, () => ctx.fill());
     ctx.fxStyle = null;
   }
 
@@ -58,7 +74,7 @@ function stellarKit(palette) {
     ctx.save();
     ctx.globalAlpha *= alpha * (0.7 + 0.3 * Math.max(0, Math.min(1, hot)));
     ctx.fxStyle = STARLIGHT;
-    UNITS.facet(ctx, x, y, r, -90, 0, palette);
+    withFxMod(ctx, FACET_GLINT, () => UNITS.facet(ctx, x, y, r, -90, 0, palette));
     ctx.fxStyle = null;
     ctx.restore();
   }
@@ -101,10 +117,10 @@ function stellarKit(palette) {
     shade: Object.freeze([6, 14, 40]),
     smoke: null,
     particle: Object.freeze({ className: 'fx-particle--twinkle', color: rgbCss(palette.hot), aspect: 1 }),
-    glow,
-    body,
-    tongue,
-    projectile,
+    glow: edged(glow),
+    body: edged(body),
+    tongue: edged(tongue),
+    projectile: edged(projectile),
     // No grain: the crystal stays clean.
     grain: () => {},
     withPalette: (p) => stellarKit(p),

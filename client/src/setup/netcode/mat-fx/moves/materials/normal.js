@@ -8,7 +8,12 @@
 // Design 075 slice 11: every fill and stroke runs the GPU `energy` style slowly (`ctx.fxStyle`,
 // ignored by Canvas2D): pressure light breathes with slow veins and the rings carry pulses round
 // them. Gain stays off the body so its white core never blooms into a slab.
+//
+// Design 076: modifiers (`ctx.fxMod`, ignored by Canvas2D). Pressure light breathes: a slow warp
+// and grain through the body and the tongue's hot pass, a slow waver in the glow; the white core
+// pass and the rings stay clean, and every fill names the gold dissolve edge.
 import { rgbCss } from '../../fx-colors.mjs';
+import { withFxMod } from './_mods.js';
 import { rootFaded } from './_root-fade.js';
 import { grainPass, parseHex, sphere, tonguePath } from './_shared.js';
 
@@ -17,6 +22,16 @@ const hex = (h) => Object.freeze(parseHex(h));
 // Style params (gpu-canvas STYLE_PARAMS energy): light under pressure, not a current.
 const PRESSURE = Object.freeze({ id: 'energy', streak: 0.35, speed: 1.2, gain: 0.5 });
 const PRESSURE_BODY = Object.freeze({ id: 'energy', streak: 0.3, speed: 1, gain: 0 });
+
+const PRESSURE_HALO = Object.freeze({ distort: Object.freeze({ strength: 0.12, speed: 0.8, scale: 2.5, angle: -90 }) });
+const PRESSURE_SWELL = Object.freeze({
+  distort: Object.freeze({ strength: 0.08, speed: 1, scale: 3, angle: -90 }),
+  detail: Object.freeze({ amount: 0.35, speed: 0.8, scale: 3.5, angle: -90 }),
+});
+const tongueSwell = (angleDeg) => ({
+  distort: { strength: 0.1, speed: 1.2, scale: 3, angle: -90 },
+  detail: { amount: 0.35, speed: 1.5, scale: 4, angle: angleDeg },
+});
 
 const NORMAL_PALETTE = Object.freeze({
   deep: hex('#E8552B'),
@@ -27,6 +42,11 @@ const NORMAL_PALETTE = Object.freeze({
 
 /** The normal material drawn in `palette` (any palette with the same keys). */
 function normalKit(palette) {
+  const edge = Object.freeze({ dissolve: Object.freeze({ edge: palette.body, width: 0.12, gain: 1.4 }) });
+  /** `draw` with this kit's dissolve edge named for every fill it makes. */
+  const edged = (draw) => (ctx, ...args) =>
+    ctx && typeof ctx === 'object' ? withFxMod(ctx, edge, () => draw(ctx, ...args)) : draw(ctx, ...args);
+
   function glow(ctx, x, y, r, alpha) {
     if (!(r > 0) || !(alpha > 0)) return;
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);
@@ -37,20 +57,22 @@ function normalKit(palette) {
     ctx.fxStyle = PRESSURE_BODY;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, TAU);
-    ctx.fill();
+    withFxMod(ctx, PRESSURE_HALO, () => ctx.fill());
     ctx.fxStyle = null;
   }
 
   function body(ctx, x, y, r, alpha, hot = 1) {
     if (!(r > 0) || !(alpha > 0)) return;
     ctx.fxStyle = PRESSURE_BODY;
-    sphere(ctx, x, y, r, [
-      [0, palette.core, alpha],
-      [0.35, palette.core, alpha * (0.6 + 0.4 * hot)],
-      [0.6, palette.hot, alpha * 0.9],
-      [0.85, palette.body, alpha * 0.5],
-      [1, palette.body, 0],
-    ]);
+    withFxMod(ctx, PRESSURE_SWELL, () =>
+      sphere(ctx, x, y, r, [
+        [0, palette.core, alpha],
+        [0.35, palette.core, alpha * (0.6 + 0.4 * hot)],
+        [0.6, palette.hot, alpha * 0.9],
+        [0.85, palette.body, alpha * 0.5],
+        [1, palette.body, 0],
+      ])
+    );
     ctx.fxStyle = null;
   }
 
@@ -60,7 +82,7 @@ function normalKit(palette) {
     ctx.fxStyle = PRESSURE;
     ctx.fillStyle = rootFaded(ctx, spec, palette.hot, 0.75 * alpha);
     tonguePath(ctx, spec, 1);
-    ctx.fill();
+    withFxMod(ctx, tongueSwell(spec.angleDeg), () => ctx.fill());
     ctx.filter = 'none';
     if (hot > 0) {
       ctx.fillStyle = rootFaded(ctx, spec, palette.core, 0.9 * alpha * hot);
@@ -92,10 +114,10 @@ function normalKit(palette) {
     shade: Object.freeze([40, 30, 10]),
     smoke: null,
     particle: Object.freeze({ className: 'fx-particle--streak', color: rgbCss([255, 224, 102]), aspect: 0.3 }),
-    glow,
-    body,
-    tongue,
-    projectile,
+    glow: edged(glow),
+    body: edged(body),
+    tongue: edged(tongue),
+    projectile: edged(projectile),
     grain: grainPass,
     withPalette: (p) => normalKit(p),
   });

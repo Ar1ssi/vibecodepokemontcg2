@@ -10,7 +10,13 @@
 // swirling inner ring. `fighting.sigil` is the barrage of impact stamps the `glyph` drawer
 // lays over a defender (Close Combat). Every call draws on the context it is handed and is
 // otherwise pure.
+//
+// Design 076: modifiers (`ctx.fxMod`, ignored by Canvas2D). A shock streak is rigid: a grain
+// streams along its body pass, never a warp. The impact disc and the ki sphere ripple and
+// churn, their halos waver, the rings and swirls stay clean, and every fill names the kit's
+// dissolve edge (its hot tone).
 import { rgbCss } from '../../fx-colors.mjs';
+import { withFxMod } from './_mods.js';
 import { grainPass, sphere, styledKit } from './_shared.js';
 
 // Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
@@ -36,6 +42,24 @@ const STAMP_FIRST = 0.15;
 const STAMP_LAST = 0.62;
 const STAMP_LIFE = 0.18;
 const GOLDEN_ANGLE = 2.399963;
+
+const RIPPLE_HALO = Object.freeze({ distort: Object.freeze({ strength: 0.1, speed: 1.5, scale: 2.5, angle: -90 }) });
+const DISC_CHURN = Object.freeze({
+  distort: Object.freeze({ strength: 0.1, speed: 2, scale: 3, angle: 0 }),
+  detail: Object.freeze({ amount: 0.4, speed: 1.5, scale: 4, angle: -90 }),
+});
+const KI_CHURN = Object.freeze({
+  distort: Object.freeze({ strength: 0.1, speed: 1.2, scale: 3, angle: -90 }),
+  detail: Object.freeze({ amount: 0.4, speed: 1, scale: 4, angle: -90 }),
+});
+const streakGrain = (angleDeg) => ({ detail: { amount: 0.35, speed: 3, scale: 5, angle: angleDeg } });
+
+/** `draw` with a dissolve edge in `palette`'s hot tone named for every fill it makes. */
+const edgedIn = (palette) => {
+  const edge = Object.freeze({ dissolve: Object.freeze({ edge: palette.hot, width: 0.1, gain: 1.2 }) });
+  return (draw) => (ctx, ...args) =>
+    ctx && typeof ctx === 'object' ? withFxMod(ctx, edge, () => draw(ctx, ...args)) : draw(ctx, ...args);
+};
 
 const freezeAll = (palette) => Object.freeze(Object.fromEntries(Object.entries(palette).map(([k, v]) => [k, Object.freeze(v)])));
 
@@ -128,7 +152,7 @@ function makeGlow(palette) {
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, TAU);
-    ctx.fill();
+    withFxMod(ctx, RIPPLE_HALO, () => ctx.fill());
   };
 }
 
@@ -139,7 +163,7 @@ function makeTongue(palette) {
     ctx.filter = `blur(${Math.max(1, spec.width * STREAK_BLUR).toFixed(1)}px)`;
     ctx.fillStyle = rgbCss(palette.body, 0.55 * alpha);
     tracePolygon(ctx, streakOutline(spec, 1));
-    ctx.fill();
+    withFxMod(ctx, streakGrain(spec.angleDeg), () => ctx.fill());
     ctx.filter = 'none';
     ctx.fillStyle = rgbCss(palette.hot, 0.85 * alpha);
     tracePolygon(ctx, streakOutline(spec, STREAK_MID));
@@ -176,18 +200,20 @@ function fightingKit(palette) {
   function impactDisc(ctx, x, y, r, alpha, hot = 1) {
     if (!(r > 0) || !(alpha > 0)) return;
     const p = palette;
-    sphere(
-      ctx,
-      x,
-      y,
-      r,
-      [
-        [0, p.white, alpha * clamp01(hot)],
-        [0.35, p.core, alpha * 0.9],
-        [0.7, p.hot, alpha * 0.6],
-        [1, p.body, 0],
-      ],
-      0
+    withFxMod(ctx, DISC_CHURN, () =>
+      sphere(
+        ctx,
+        x,
+        y,
+        r,
+        [
+          [0, p.white, alpha * clamp01(hot)],
+          [0.35, p.core, alpha * 0.9],
+          [0.7, p.hot, alpha * 0.6],
+          [1, p.body, 0],
+        ],
+        0
+      )
     );
     ctx.lineWidth = Math.max(1, r * 0.07);
     for (const [scale, tone, strength] of DISC_RINGS) {
@@ -214,6 +240,7 @@ function fightingKit(palette) {
     for (const stamp of barrageStamps(s, r)) impactDisc(ctx, x + stamp.dx, y + stamp.dy, stamp.r, stamp.alpha, stamp.hot);
   }
 
+  const edged = edgedIn(palette);
   return Object.freeze({
     key: 'fighting',
     palette,
@@ -221,11 +248,11 @@ function fightingKit(palette) {
     shade: Object.freeze([36, 16, 10]),
     smoke: Object.freeze([150, 130, 110]),
     particle: Object.freeze({ className: 'fx-particle--streak', color: rgbCss(palette.white), aspect: 0.25 }),
-    glow: fightingGlow,
-    body: impactDisc,
-    tongue: fightingTongue,
-    projectile: fightingProjectile,
-    sigil: barrageSigil,
+    glow: edged(fightingGlow),
+    body: edged(impactDisc),
+    tongue: edged(fightingTongue),
+    projectile: edged(fightingProjectile),
+    sigil: edged(barrageSigil),
     grain: grainPass,
     withPalette: (p) => fightingKit(p),
   });
@@ -256,12 +283,14 @@ function auraKit(palette) {
   /** The ki sphere: white core, pale blue, the blue rim fading out, a swirl inside. */
   function kiSphere(ctx, x, y, r, alpha, hot, phase) {
     const p = palette;
-    sphere(ctx, x, y, r, [
-      [0, p.white, alpha * (0.6 + 0.4 * clamp01(hot))],
-      [0.4, p.core, alpha * 0.95],
-      [0.75, p.body, alpha * 0.7],
-      [1, p.deep, 0],
-    ]);
+    withFxMod(ctx, KI_CHURN, () =>
+      sphere(ctx, x, y, r, [
+        [0, p.white, alpha * (0.6 + 0.4 * clamp01(hot))],
+        [0.4, p.core, alpha * 0.95],
+        [0.75, p.body, alpha * 0.7],
+        [1, p.deep, 0],
+      ])
+    );
     swirl(ctx, x, y, r, alpha, phase);
   }
 
@@ -284,6 +313,7 @@ function auraKit(palette) {
     kiSphere(ctx, x, y, r, alpha, hot, time * TAU * SWIRL_HZ + seed);
   }
 
+  const edged = edgedIn(palette);
   return Object.freeze({
     key: 'aura',
     palette,
@@ -291,10 +321,10 @@ function auraKit(palette) {
     shade: Object.freeze([8, 18, 52]),
     smoke: null,
     particle: Object.freeze({ className: 'fx-particle--streak', color: rgbCss(palette.hot), aspect: 0.25 }),
-    glow: auraGlow,
-    body: auraBody,
-    tongue: auraTongue,
-    projectile: auraProjectile,
+    glow: edged(auraGlow),
+    body: edged(auraBody),
+    tongue: edged(auraTongue),
+    projectile: edged(auraProjectile),
     grain: grainPass,
     withPalette: (p) => auraKit(p),
   });

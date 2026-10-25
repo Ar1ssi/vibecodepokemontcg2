@@ -6,12 +6,28 @@
 // helix churning inside it; a projectile is the orb trailing flame tongues (a meteor when it
 // falls from the sky). Palette #8034CE #E25CD6 #FFB8F0, deep #34166E (design 075 parity; was #5A47C9 #8F7CF5 #D2C8FF), accent #FF9B3D; grain
 // 0.25. Every call draws on the context it is handed and is otherwise pure.
+//
+// Design 076: modifiers (`ctx.fxMod`, ignored by Canvas2D). The violet flame and the orb waver
+// like plasma and carry a streaming energy grain; the ember core and the helix stay crisp, and
+// every fill names the magenta dissolve edge.
 import { rgbCss } from '../../fx-colors.mjs';
+import { withFxMod } from './_mods.js';
 import { grainPass, shardOutline, sphere, styledKit, tongueOutline, traceOutline, wobble } from './_shared.js';
 
 // Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
 // Draconic energy: tongues crawl with current, the core boils.
 const DRACONIC = Object.freeze({ byKind: { linear: { id: 'energy', streak: 0.4, speed: 1.6, gain: 0.6 }, radial: { id: 'orb', boil: 0.4, limb: 0.35, gain: 0.8 }, stroke: { id: 'energy', streak: 0.4, speed: 1.6, gain: 0.6 } } });
+
+// Plasma wavers slower and wider than fire's haze; the grain streams along each tongue.
+const PLASMA_BODY = Object.freeze({ strength: 0.16, speed: 0.9, scale: 2.5, angle: 0 });
+const PLASMA_MID = Object.freeze({ strength: 0.11, speed: 1.1, scale: 3, angle: 0 });
+const PLASMA_CORE = Object.freeze({ distort: Object.freeze({ strength: 0.06, speed: 1.3, scale: 3.5, angle: 0 }) });
+const PLASMA_HALO = Object.freeze({ distort: Object.freeze({ strength: 0.14, speed: 0.7, scale: 2, angle: 0 }) });
+const ORB_CHURN = Object.freeze({
+  distort: Object.freeze({ strength: 0.1, speed: 0.8, scale: 2.5, angle: 0 }),
+  detail: Object.freeze({ amount: 0.4, speed: 0.7, scale: 3.5, angle: -90 }),
+});
+const plasma = (warp, grain, angleDeg) => ({ distort: warp, detail: { amount: grain, speed: 1.2, scale: 4.5, angle: angleDeg } });
 
 const TAU = Math.PI * 2;
 const HELIX_SAMPLES = 10;
@@ -60,6 +76,11 @@ export function helixStrands(r, phase, tiltDeg = HELIX_TILT) {
 
 /** The dragon material drawn in `palette` (any palette with the same keys). */
 function dragonKit(palette) {
+  const edge = Object.freeze({ dissolve: Object.freeze({ edge: palette.hot, width: 0.12, gain: 1.6 }) });
+  /** `draw` with this kit's dissolve edge named for every fill it makes. */
+  const edged = (draw) => (ctx, ...args) =>
+    ctx && typeof ctx === 'object' ? withFxMod(ctx, edge, () => draw(ctx, ...args)) : draw(ctx, ...args);
+
   /** A soft violet halo fading through deep to nothing. */
   function glow(ctx, x, y, r, alpha) {
     if (!(r > 0) || !(alpha > 0)) return;
@@ -70,7 +91,7 @@ function dragonKit(palette) {
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, TAU);
-    ctx.fill();
+    withFxMod(ctx, PLASMA_HALO, () => ctx.fill());
   }
 
   /**
@@ -80,13 +101,15 @@ function dragonKit(palette) {
    */
   function body(ctx, x, y, r, alpha, hot = 1, time = 0) {
     if (!(r > 0) || !(alpha > 0)) return;
-    sphere(ctx, x, y, r, [
-      [0, palette.white, alpha * hot],
-      [0.25, palette.core, alpha],
-      [0.6, palette.hot, alpha * 0.9],
-      [0.85, palette.body, alpha * 0.6],
-      [1, palette.deep, 0],
-    ]);
+    withFxMod(ctx, ORB_CHURN, () =>
+      sphere(ctx, x, y, r, [
+        [0, palette.white, alpha * hot],
+        [0.25, palette.core, alpha],
+        [0.6, palette.hot, alpha * 0.9],
+        [0.85, palette.body, alpha * 0.6],
+        [1, palette.deep, 0],
+      ])
+    );
     if (r < HELIX_MIN_R) return;
     const phase = TAU * HELIX_HZ * time + r * 0.05;
     ctx.lineCap = 'round';
@@ -113,15 +136,15 @@ function dragonKit(palette) {
     ctx.filter = `blur(${Math.max(1, spec.width * 0.12).toFixed(1)}px)`;
     ctx.fillStyle = rgbCss(palette.body, 0.65 * alpha);
     traceOutline(ctx, passOutline(spec, 1, jag));
-    ctx.fill();
+    withFxMod(ctx, plasma(PLASMA_BODY, 0.5, spec.angleDeg), () => ctx.fill());
     ctx.filter = 'none';
     ctx.fillStyle = rgbCss(palette.hot, 0.8 * alpha);
     traceOutline(ctx, passOutline(spec, 0.66, jag));
-    ctx.fill();
+    withFxMod(ctx, plasma(PLASMA_MID, 0.35, spec.angleDeg), () => ctx.fill());
     if (!(hot > 0)) return;
     ctx.fillStyle = rgbCss(palette.ember, 0.85 * alpha * Math.min(1, hot));
     traceOutline(ctx, passOutline({ ...spec, seed: spec.seed + 0.5 }, 0.38, jag));
-    ctx.fill();
+    withFxMod(ctx, PLASMA_CORE, () => ctx.fill());
   }
 
   /**
@@ -152,10 +175,10 @@ function dragonKit(palette) {
     shade: Object.freeze([20, 12, 48]),
     smoke: Object.freeze([90, 70, 120]),
     particle: Object.freeze({ className: 'fx-particle--ember', color: rgbCss(palette.ember), aspect: 0.3 }),
-    glow,
-    body,
-    tongue,
-    projectile,
+    glow: edged(glow),
+    body: edged(body),
+    tongue: edged(tongue),
+    projectile: edged(projectile),
     grain: grainPass,
     withPalette: (p) => dragonKit(p),
   });
