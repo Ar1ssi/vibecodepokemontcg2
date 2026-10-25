@@ -319,7 +319,7 @@ void main() {
   // Hills: broad swells of taller rock, so the stones vary with the land.
   float hills = fbm3(p / 340.0 + 2.3);
   float swell = 0.45 + 1.25 * smoothstep(0.25, 0.8, hills);
-  vec3 big = stones(q + 31.0, mix(96.0, 150.0, fbm3(p / 500.0 + 9.0)), 1.5);
+  vec3 big = stones(q + 31.0, mix(115.0, 175.0, fbm3(p / 500.0 + 9.0)), 1.5);
   vec3 mid = stones(q, 60.0, 1.2);
   vec3 pebble = stones(q + 113.0, 27.0, 1.6);
   float dry = smoothstep(-4.0, 60.0, lavaSD);
@@ -338,13 +338,13 @@ void main() {
   // px before the table edge.
   vec2 fromEdge = min(vUv, 1.0 - vUv) * uSize;
   float crackOn = smoothstep(12.0, 20.0, min(fromEdge.x, fromEdge.y));
-  float split = max(step(0.6, fract(big.y * 23.7)), 1.0 - dry);
+  float split = max(step(0.85, fract(big.y * 23.7)), 1.0 - dry);
   float gap = min(big.z, mix(40.0, mid.z, split));
   rock *= mix(1.0, smoothstep(0.0, 7.0, gap), crackOn);
   float dip = 2.0 * smoothstep(0.0, -1.5, gap) * crackOn;
   float nearHeat = max(1.0 - smoothstep(0.0, 220.0, lavaSD),
     step(0.001, uVolcano.z) * (1.0 - smoothstep(uVolcano.z, uVolcano.z * 2.2, vd)));
-  float crackLava = crackOn * smoothstep(0.52, 0.6, fbm3(p / 230.0 + 13.0) + 0.3 * nearHeat);
+  float crackLava = crackOn * smoothstep(0.6, 0.68, fbm3(p / 230.0 + 13.0) + 0.3 * nearHeat);
 
   // Past the cone's foot the streams run on in beds cleared of stones.
   float pastFoot = step(uVolcano.z * 0.9, vd) * step(0.001, uVolcano.z);
