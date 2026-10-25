@@ -165,7 +165,8 @@ uniform float uCutoutOn;
 ${NOISE}
 ${REVEAL}
 float environmentShown(vec2 p) {
-  vec2 inside = step(uMin, p) * step(p, uMin + uSize);
+  // Inset a few px: along the edge the table's own floor stays under the terrain's skirt.
+  vec2 inside = step(uMin + 4.0, p) * step(p, uMin + uSize - 4.0);
   return uCutoutOn * inside.x * inside.y * revealBurned(p) * exitKeep(p);
 }
 `;
@@ -459,6 +460,9 @@ void main() {
   float rise = 1.0 - smoothstep(revealFront() - 0.12, revealFront(), revealReach(p));
   float growth = rise * rise * (3.0 - 2.0 * rise) * exitKeep(p);
   float height = h * growth;
+  // A skirt rising to the cloth along the table edge, so the sunken river never opens a gap there.
+  vec2 fromEdge = min(uv, 1.0 - uv) * uSize;
+  height = mix(max(height, 0.0), height, smoothstep(0.0, 8.0, min(fromEdge.x, fromEdge.y)));
   vPos = p;
   vUv = uv;
   vHeight = height;
