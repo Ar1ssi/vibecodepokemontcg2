@@ -1,16 +1,20 @@
 # 077: Stadium boards — the table becomes the Stadium's place while it is in play
-Status: draft
+Status: draft, revision 2 (procedural art; Scorched Earth prototype on localhost)
 Date: 2026-10-25 · Session: S—
 
 ## Problem
-TCG Live has full-board "Jumbotron" environments (Water → a beach with waves and foam, Fire → a lava
-field, ...). The user wants the same idea keyed to Stadium cards: while a Homebrew (`customhb`) Stadium
-is in play, the 3D table shows that Stadium's place (Surfing Beach → beach, Scorched Earth → scorched
-lava ground). Today a Stadium only gets the generic `trainer-play` card presentation; the table never
-changes.
+TCG Live has full-board "Jumbotron" environments (Water → a beach, Fire → a lava field, ...). The
+user wants the same idea keyed to Stadium cards: while a Homebrew (`customhb`) Stadium is in play,
+the 3D table becomes that Stadium's place (Scorched Earth → a lava river through dark rock, Surfing
+Beach → a beach). Today a Stadium only gets the generic `trainer-play` card presentation; the table
+never changes.
 
 ## Constraints
-- three.js is the only board, WebGL2 required (D220). The environment lives in the 3D scene.
+- three.js is the only board, WebGL2 required (D220). The environment lives in the 3D scene. GLSL
+  ES 3.00 reserved words (`flat`, `half`, `smooth`, ...) cannot be identifiers.
+- Procedural art only: no TCG Live textures or meshes (user, 2026-10-25). TCG Live's `board_fire`
+  is the style reference: sculpted, painted, stylised, cartoon-like as Pokémon should be. Not
+  photoreal (user feedback on prototype v1).
 - Board animations play one after another through the FX queue (`netcode/advisory-animations.js`);
   an animation's plan returns a hold that lasts until its scene ends (CLAUDE.md § Code standard).
 - Board state is already applied when plans run; FX are cosmetic and never gate input
@@ -18,35 +22,27 @@ changes.
   is dropped (catch-up replay, hidden tab, FX off, restart).
 - Reduced motion is opt-in only (`ptcg-reduce-motion`, D105); never read the OS flag (user memory).
 - FX style: no whiteouts, no spinning sunburst rays, one palette through the payoff (user memory).
-- TCG Live assets are allowed in this repo (D203 sounds, D207 evolution prefabs, D213 sleeves); big
-  binaries go to R2, not git (D217). Budget here: ≤ 4 MB of committed WebP.
 - The render loop is on demand (`board-scene.js:273-294`); a persistent animated layer must not
   keep the GPU at 60 fps for the whole match.
-- Card readability beats spectacle: zones and cards must stay legible on every environment.
+- Card readability beats spectacle: every place the board draws a card keeps flat ground below the
+  cloth plane (z = 0), and no rock or liquid ever covers a card.
+- The board pass has no bloom (bloom exists only in `fx/fx-layer.js` for attack FX), so every glow
+  is painted in the shaders.
 
 ## Current state
 Facts read this session.
 - **TCG Live reference** (`E:\tcglive_extract`): `MatchBoardFXController` + `BoardFXSettings` drive
-  one shared center board. Modes Persistent / OneShot / Dissolve / Pulse / ReducedPersistent. A new
-  layer renders on top of the old one and the old one despawns after 1 s; the reveal is a mask that
-  grows as a hex grid (`Mask_Grow` 3 s, water `M_VFX_Water_HexGrid_Mask_*`); exit is a 3 s
-  dissolve through the type's `*_Mask_Dissolve` texture. Side is shown only by rotating the board
-  0°/180° toward the owner. Type boards exist for 11 types but no live code feeds them a type
-  (only debug controllers); Stadiums get only a 5 s one-shot (`board_stadium`). Composition per
-  type: ground mesh + texture, 1–2 looping overlay layers, one-shot particles, border glow.
-  Ground textures (2:1, Poké Ball at center), already exported as PNG under
-  `E:\tcglive_extract\pokemon_Pokemon TCG Live\board_<type>\Texture2D\`:
-  `board_water/T_VFX_Water_BeachSand_D.png` 2048×1024, `board_fire/T_Jumbotron_Fireboard_D.png`
-  2048×1024 (+ `_BurnMask`), `board_lightning/T_VFX_Lightning_Background_D.png` 2048×1024 (+
-  `ElectricCrack_2x4`), `board_grass/T_Grass_Base_D.png` 1024×512 (+ `Cloud_Shadows`,
-  `Gusts_Mask`, `Leaves_2x2`). `board_metal` holds only a UV atlas plus tileables
-  (`T_VFX_Metal_Hex_D.png` 512², `Sheen_Wipe`); `board_psychic` holds channel-packed
-  `Galaxy_RGBA` + `Swirl`; `board_dark` is empty. Contact sheet: `.agent/scratch/stadium-env/tcgl-boards.png`.
+  one shared center board: a new layer renders over the old one, which despawns after 1 s; the reveal
+  is a growing mask (3 s); exit is a 3 s dissolve. Type boards exist for 11 types but no live code
+  feeds them a type; Stadiums get only a 5 s one-shot (`board_stadium`). Their fire board is one
+  painted 2048×1024 texture with a normal map: rounded slate stones, thin light crack lines,
+  saturated red lava glowing in the gaps. Contact sheet: `.agent/scratch/stadium-env/tcgl-boards.png`.
 - **Homebrew Stadiums** — `client/src/assets/custom-sets/customhb/set.json`, `trainerType === 'Stadium'`,
   17 cards: 030 Forest of Vitality, 051 Stormy Mountains, 052 Crystal Cave, 162 Steel Shelter,
   163 Full Metal Lab, 197 Mystery Garden, 198 Old Cemetery, 199 Dimension Valley, 209 Surfing Beach,
   212 Brooklet Hill, 239 Fighting Stadium, 240 Mountain Ring, 253 Perilous Jungle, 254 Dark City,
-  278 Levincia, 289 Magma Basin, 299 Scorched Earth.
+  278 Levincia, 289 Magma Basin, 299 Scorched Earth. Each card's art is
+  `client/src/assets/custom-sets/customhb/<nnn>/high.webp`.
 - **Stadium state**: one `state.stadium` card or null (`shared/engine/state.mjs:112`), sent as
   `view.stadium` (`shared/engine/view.mjs:203`). Engine cards carry `id`, `set`, `number`, `name`,
   `ownerId` (`shared/engine/cards.mjs:34-44`). Not every Stadium entry emits `cardMoved`
@@ -56,12 +52,15 @@ Facts read this session.
   diff exposes `stadiumChanged` (:565). `onViewApplied` runs after apply-view has handed every
   advisory event to the FX queue (`apply-view.js:2501` then `board-view-applied` at :2513), so a plan
   pushed there lands after the Stadium's `trainer-play`.
-- **Table**: `table-mesh.js` `createTable` — floor, per-half `backing`/`ambient`/`art`/`overlay`
-  meshes at `Z = { floor: -2, backing: 0, ambient: 0.25, art: 0.5, overlay: 1 }` (:15) inside the
-  tilted table `group`; `overlay` is the mat's zone-outline SVG (only when the mat spec has one).
-  `board-scene.js:197` creates it, `:407` `table.setLayout(next)`, `:414` `setMat`.
+- **Table**: `board-scene.js:193-198` puts `table.group` in `tableFrame` (the table frame of
+  `board-layout.mjs`, tilted by the camera). `table-mesh.js` draws a floor at z −2 and per half
+  `backing`/`ambient`/`art`/`overlay` at `Z = { backing: 0, ambient: 0.25, art: 0.5, overlay: 1 }`
+  (:15), all `MeshStandardMaterial`/`MeshBasicMaterial`, lit by one shadow-casting directional light
+  from the far left. Cards rest at z ≥ 0 (`card-poses.mjs:219`); zone pick planes at z 0.3
+  (`board-scene.js:44`).
 - **Render loop**: `board-scene.js:273` `render()` re-arms itself only while `pool`/`piles`/`overlays`
-  `update(now)` or the FX layer report motion.
+  `update(now)` or the FX layer report motion. Renders straight to the canvas (Neutral tone mapping,
+  sRGB out); no scene target.
 - **FX queue**: `advisory-animations.js:297` `createFxQueue({run: runPlan, ...})`; `runPlan` (:272)
   switches on `plan.kind`; skip rule `shouldAnimateMirror` (:378-392) clears the queue; other clears
   at :309 (FX off) and :313 (`game-restarted`). `fx-queue.mjs:106` `push`, :113 `clear`.
@@ -69,6 +68,15 @@ Facts read this session.
   `onFxSettingsChanged`; checkbox in `client/index.ejs` (~:474) wired in
   `initialization/document-event-listeners/sidebox/settings.js:107-113`; `mat-fx.mjs` accessors
   `motionReduced` (:22), `fxDisabled`.
+- **Prototype** (branch `feature/077-stadium-boards`):
+  - `client/stadium-env-preview.html` — the real `sim` layout, board cameras and renderer settings,
+    stand-in mat and cards, intro/exit/ambient timing. Served at `/stadium-env-preview.html`.
+  - `stadium-environment-shader.mjs` — Scorched Earth GLSL: two bakes (ground field, light), a
+    displaced terrain grid, a lava sheet, embers, the mat cutout.
+  - `stadium-environment-layout.mjs` + test — `environmentKeyFor`, `environmentOverride`,
+    `environmentFootprints`.
+  - Measured on an RX 7900 XTX at 1920×1080: 60 fps through the intro. The first bake takes ~0.6 s on
+    the CPU side, mostly shader compilation.
 
 ## Options
 **O1 · What triggers the environment**
@@ -80,163 +88,167 @@ Facts read this session.
 
 **O2 · Persistent or one-shot**
 - A: one-shot takeover like TCG Live's Stadium (5 s, then back to the mat). Cheap, but not what was asked.
-- B: persistent while the Stadium is in play, like TCG Live's type boards. The user's words: "the
-  board changes to a beach".
+- B: persistent while the Stadium is in play, like TCG Live's type boards.
 - **Pick B.** Intro reveal, steady ambient loop, exit dissolve; replacement cross-reveals.
 
 **O3 · Where the art comes from**
-- A: the Stadium card's own illustration stretched over the table. Always on-theme, zero assets, but a
-  ~600 px illustration blurs at board size and fights the cards for attention.
-- B: fully procedural shaders per Stadium. No assets, resolution-free, but 17 bespoke shaders is weeks
-  of taste iteration and won't match TCG Live's look.
-- C: TCG Live's board textures (ground + overlay + dissolve masks), grouped into 7 kits, one shared
-  shader, per-Stadium parameters (tint, intensities, particles). Matches the reference, data-driven,
-  ~3 MB of WebP.
-- **Pick C.** Same source the reference uses; adding a Stadium later is one table row.
+- A: the Stadium card's illustration stretched over the table. Blurs at board size, fights the cards.
+- B: procedural three.js scenes per Stadium. No assets, resolution-free, real 3D.
+- C: TCG Live's board textures. Ruled out by the user.
+- **Pick B** (user's choice). Each Stadium's place follows its own card art, drawn in TCG Live's
+  painted style.
 
-**O4 · How much of the table it covers**
-- A: whole table under the zone outlines (TCG Live covers its whole board).
-- B: a band around the Stadium zone only. Readable but reads as a decal, not a place.
-- **Pick A**, plus "zone wells": the shader darkens and desaturates inside every zone rect so empty
-  zones stay visible on any mat, with or without an outline overlay.
+**O4 · Relief**
+- A: one flat plane with a painted, normal-mapped look (TCG Live's own approach).
+- B: real relief: a baked height field displaces a dense grid; liquids are sheets below the cloth.
+- **Pick B.** The user asked for height where no cards lie ("this is a three.js board, you can do so
+  much better"). Consequence: rivers and gaps sit below the cloth, so the mat must be cut out
+  wherever the environment shows (O6).
 
-**O5 · Rendering cost of the ambient loop**
-- A: render every frame (60 fps) while a Stadium is in play. Simple; costs battery all match.
-- B: ambient frames capped at 30 fps on a timer; intro/exit at full rate; no ambient frames when FX are
-  off, reduced motion is on, or the tab is hidden.
+**O5 · Card places**
+- A: zone wells (darken the ground inside each zone).
+- B: every card place stands on a flat plate (slot outline glowing in the place's accent colour);
+  Trainer-board rows stand on a shelf without outline, styled by the place (Scorched Earth: basalt
+  flagstones with glowing joints).
+- **Pick B.** Cards never sit on rock or liquid, and empty zones stay readable.
+
+**O6 · Hiding the mat where the environment shows**
+- A: hide the table group once revealed and draw a copy of the mat during transitions. Duplicates
+  table-mesh's mat fit (one/two-player, flip, scale, overlays).
+- B: the table's materials discard their fragments by the environment's own reveal/exit mask
+  (`onBeforeCompile` injection, shared uniforms).
+- C: a depth-punch pass and render-order juggling between table, environment and cards.
+- **Pick B.** One mask function on both sides; table fit logic untouched.
+
+**O7 · Frame cost**
+- A: shade everything per frame (prototype). Two Voronoi lookups per terrain fragment: too heavy for
+  integrated GPUs at 30 fps.
+- B: bake all static shading (ramp light, rims, cracks, plates, occlusion) into a colour target once
+  per layout; per frame the terrain reads one texture and adds the animated lava light. Ambient
+  frames capped at 30 fps; none when FX are off, reduced motion is on, or the tab is hidden.
 - **Pick B.**
 
-**O6 · Keeping the environment truthful when its plan is dropped**
+**O8 · Keeping the environment truthful when its plan is dropped**
 - A: snap after a timeout. Fragile while long attack scenes are queued.
 - B: the controller keeps `target` (from the view) apart from `shown`; a queued plan animates
   `shown → target` when it runs; every queue clear and every skipped push calls `settle()`, which
   snaps `shown = target`.
 - **Pick B.**
 
-**O7 · Which cards qualify**
-- A: Homebrew Stadium ids only (`customhb-NNN`), as asked.
-- B: match by name, so real prints of the same Stadium (Dimension Valley PHF, Mountain Ring PRC, …) also
-  get it.
-- **Pick A**, keyed by id. B is a later one-line change in `environmentKeyFor` if wanted.
+**O9 · How Stadiums share code**
+- A: one uber-shader with per-Stadium parameters.
+- B: a shared engine (bake, terrain, liquid sheet, particles, mask, timeline) plus one recipe module
+  per family of places; a family covers several Stadiums by parameters.
+- **Pick B.** The places differ in kind (lava river, surf, forest floor, metal deck), not in numbers.
 
-**O8 · Audio**
-- A: per-kit loop + outro like TCG Live's `jumbotronPersistent`. Loops for a whole match grate.
-- B: no new audio; the Stadium's existing `trainer-play` sound covers the moment.
-- **Pick B.** Ambience audio is an ISSUES line, not this design.
+**O10 · Which cards qualify** — A: Homebrew ids only, as asked. B: by name (real prints too).
+**Pick A**; B is a later one-line change in `environmentKeyFor`.
+
+**O11 · Audio** — no new audio; the Stadium's `trainer-play` sound covers the moment. Ambience is an
+ISSUES line, not this design.
 
 ## Design
-### Data — `client/src/setup/board3d/stadium-environments.mjs` (pure)
-- `environmentKeyFor(card)`: `card.id` when it matches `/^customhb-\d{3}$/`; else, when
-  `card.set === 'customhb'` and `card.number` parses to an integer, `customhb-` + the number padded to
-  3 digits; else `null`. Null/undefined card → `null`.
-- `KITS` — texture paths are relative to `client/src/assets/fx/stadium-env/`:
+### Registry — `stadium-environment-layout.mjs` (pure, exists)
+- `environmentKeyFor(card)`: the environment key for `card.id`, else for `customhb-` + `card.number`
+  padded to 3 digits when `card.set === 'customhb'`; else `null`. One map, `ENVIRONMENT_BY_CARD`,
+  card id → key; each recipe slice adds its rows.
+- `environmentOverride(storage, search)`: `?stadiumEnv=<key>` or `localStorage['ptcg-stadium-env']`
+  forces an environment on (dev check on the real board); unknown keys → null.
+- `environmentFootprints(layout)` → `{ slabs, flats }`: a plate under the Active, each Bench slot, the
+  Prize block, deck, discard, Lost Zone and Stadium of both sides; a shelf under each Trainer-board row.
 
-| Kit | ground | groundTiling | overlay (mode) | dissolve | particles sprite |
-|---|---|---|---|---|---|
-| beach | beach-sand.webp | [1,1] | foam.webp (`scroll`) | water-dissolve.webp | bubbles.webp |
-| volcano | fireboard.webp | [1,1] | fire-burnmask.webp (`pulse`) | fire-dissolve.webp | ember.webp |
-| storm | lightning-ground.webp | [1,1] | electric-crack-2x4.webp (`flipbook`) | lightning-dissolve.webp | mote.webp |
-| plains | grass-base.webp | [1,1] | grass-cloud-shadows.webp (`scroll`) | grass-dissolve.webp | leaves-2x2.webp |
-| metal | metal-hex.webp | [6,3] | metal-sheen.webp (`scroll`) | metal-dissolve.webp | mote.webp |
-| void | (none: `baseColor`) | — | psychic-galaxy.webp (`colorize`) + psychic-swirl.webp (`swirl`) | colorless-dissolve.webp | mote.webp |
-| arena | lightning-ground.webp | [1,1] | fighting-decal.webp (`decal`) | stadium-dissolve.webp | — |
+### Engine — `stadium-environment-glsl.mjs` (pure strings and constants)
+Shared GLSL chunks the recipes compose: `NOISE` (hash, gradient noise, fbm, Voronoi), `FOOTPRINTS`
+(`uZones[24]`, `slotDistance`, `rowDistance`, `footprintDistance`), `REVEAL` (`revealReach`,
+`revealBurned`, `exitKeep`; origin = the Stadium zone centre), `ENVIRONMENT_MASK` (`environmentShown(p)`
+= `revealBurned(p) * exitKeep(p)`), `FULLSCREEN_VERTEX`, `BAKE_LIGHT_FRAGMENT` (normals, occlusion,
+soft sun shadow), `TERRAIN_VERTEX` (displacement, rise during the reveal), `OUTPUT` (three's tone
+mapping + colour space chunks). Constants: `MAX_ZONES = 24`, `BAKE_TEXELS_PER_PX = 1.6`,
+`BAKE_MAX_TEXELS = 4096`, `TERRAIN_SPACING_PX = 2.5`.
 
-- `STADIUM_ENVIRONMENTS` — keyed by card id. `tint` multiplies the ground; `overlayColor` colors the
-  overlay; `overlayStrength` 0–1; `saturation` 0–2 (1 = unchanged); `particles: {count, color} | null`.
+### Recipes — `stadium-env-<family>.mjs`
+Each exports one object per environment key:
+`{ key, bakeField, bakeShade, terrainFragment, liquid: { level, fragment } | null,
+particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
+- `bakeField` writes R height px, G signed px from the place's main feature (river bank, shoreline),
+  B plate (> 0) / shelf (< 0), A stone id or −1.
+- `bakeShade` writes the static colour (linear, pre-tone-mapping) from the field and light bakes.
+- `terrainFragment` reads the shade bake and adds the animated light (lava glow, caustics, ...).
+- Families and their Stadiums (each place follows its card art):
 
-| id | Stadium | kit | tint | overlayColor | overlayStrength | saturation | particles |
-|---|---|---|---|---|---|---|---|
-| customhb-030 | Forest of Vitality | plains | #b8e07a | #1d3a12 | 0.55 | 1.2 | {48, #d8ffa0} |
-| customhb-051 | Stormy Mountains | storm | #8fa0c8 | #bfe0ff | 0.8 | 0.9 | {24, #d0e8ff} |
-| customhb-052 | Crystal Cave | metal | #9fe3ff | #e6b8ff | 0.6 | 1.1 | {64, #e6f8ff} |
-| customhb-162 | Steel Shelter | metal | #c9d2dc | #ffffff | 0.5 | 0.6 | null |
-| customhb-163 | Full Metal Lab | metal | #e8ecf2 | #6ad4ff | 0.7 | 0.8 | null |
-| customhb-197 | Mystery Garden | plains | #c79be0 | #2a1238 | 0.5 | 1.1 | {40, #ffb8f0} |
-| customhb-198 | Old Cemetery | void | #1b1424 | #6b4e8f | 0.45 | 0.7 | {32, #b8a0d8} |
-| customhb-199 | Dimension Valley | void | #120a1e | #b05cff | 0.9 | 1.3 | {48, #e0b8ff} |
-| customhb-209 | Surfing Beach | beach | #ffffff | #ffffff | 0.85 | 1.0 | {24, #c8f0ff} |
-| customhb-212 | Brooklet Hill | beach | #c8e6b0 | #e0fff0 | 0.5 | 1.0 | {16, #c8f0ff} |
-| customhb-239 | Fighting Stadium | arena | #d9a46b | #ffffff | 1.0 | 0.9 | null |
-| customhb-240 | Mountain Ring | arena | #a89c8c | #ffffff | 0.8 | 0.5 | null |
-| customhb-253 | Perilous Jungle | plains | #5f8a3a | #0e1a08 | 0.7 | 1.1 | {40, #b04cff} |
-| customhb-254 | Dark City | void | #0c0a12 | #3a2f5a | 0.35 | 0.6 | {20, #8a78c0} |
-| customhb-278 | Levincia | storm | #ffe27a | #ffd400 | 1.0 | 1.2 | {32, #fff2a0} |
-| customhb-289 | Magma Basin | volcano | #ffffff | #ff5a1a | 1.0 | 1.1 | {64, #ffb060} |
-| customhb-299 | Scorched Earth | volcano | #9a8478 | #ff7a30 | 0.35 | 0.6 | {28, #ffa060} |
+| Family | Stadiums | Place |
+|---|---|---|
+| volcanic | 299 Scorched Earth, 289 Magma Basin | Lava river along the seam / a lava basin in the middle; sculpted slate stones; basalt shelves |
+| coast | 209 Surfing Beach, 212 Brooklet Hill | Sand and surf rolling in from one end / grassy banks and a brook along the seam with stepping stones |
+| forest | 030 Forest of Vitality, 197 Mystery Garden, 253 Perilous Jungle | Mossy floor, roots and flowers / garden paths and hedges / dark jungle floor with poison pools |
+| highland | 051 Stormy Mountains, 240 Mountain Ring, 239 Fighting Stadium | Wet crags with rain / a rocky ring on a peak / an arena floor |
+| crystal | 052 Crystal Cave | Cave floor with glowing crystal clusters where no card lies |
+| metal | 162 Steel Shelter, 163 Full Metal Lab | Riveted steel plates / lab deck panels with light strips |
+| spirit | 198 Old Cemetery, 199 Dimension Valley, 254 Dark City | Misty graveyard ground / floating rock over a purple void / a night street with neon puddles |
+| electric | 278 Levincia | A city plaza with glowing power lines |
 
-  For `void`, `tint` is `baseColor`. Values are first-pass taste; the user tunes on localhost.
-- `environmentFor(card)` → `{ key, kit, ...row, textures }` (textures = the kit row with full URLs)
-  or `null` when the key is null or unknown.
+- Scorched Earth (built in the prototype): stones in three sizes (124 / 60 / 27 px cells: a flat
+  top and five broad facets on a rounded shoulder), tallest along the far edge; the river winds
+  along the seam, half-width 70 ± 11 px; lava sheet at z −10 with banded colour, flow lines, round
+  crust rafts and bubbles; card places on plates with orange slot outlines; Trainer rows on basalt
+  flagstones whose joints glow near the river; 220 embers off the river. Slate palette sits ~0.04 above
+  the target greys because Neutral tone mapping removes that much from dark colours.
 
-### Timeline — `client/src/setup/board3d/stadium-environment-timeline.mjs` (pure)
+### Mesh — `stadium-environment-mesh.js`
+`createStadiumEnvironment({ three, renderer, parent, clock, motionReduced, fxDisabled, onNeedsRender })`
+→ `{ setLayout(layout), setTarget(spec|null), play(): number, settle(), update(now): boolean,
+maskUniforms, dispose() }`.
+- One `three.Group` `board3d-stadium-env` in `parent` (the table group).
+- Per layer (two during a swap): field target (HalfFloat, linear filter), light target (RGBA8,
+  mipmapped), shade target (RGBA8 linear, mipmapped), all `round(min(4096, bounds.w * 1.6))` wide.
+  Baked on `setLayout`/`setTarget` when the key of `[bounds, zones, recipe key]` changes; a resize
+  rebakes after 150 ms without further resizes.
+- Terrain: `PlaneGeometry` over `tableBounds(layout)` with `round(w / 2.5)` × `round(h / 2.5)`
+  segments; liquid sheet and particles when the recipe has them.
+- Programs compile with `renderer.compileAsync` when a recipe is first targeted; the reveal starts
+  once they are ready (the plan's hold stays `INTRO_MS`; a late reveal only runs past it).
+- `update(now)`: copies `timeline.frame(now)` into uniforms; returns `true` while a transition runs.
+  While steady, requests one frame every `1000 / AMBIENT_FPS` ms via `setTimeout(onNeedsRender)` —
+  not when `fxDisabled()` or `motionReduced()` (static frame, time frozen) or `document.hidden`.
+- `play()`: `fxDisabled()` or `motionReduced()` → `settle()` and return `0`; else `timeline.play(now)`
+  and `onNeedsRender()`.
+- WebGL context restored → rebake.
+
+### Mat cutout — `table-mesh.js`
+`table.setCutout(cutout | null)`; `cutout = { uniforms, mask }` from the environment
+(`maskUniforms`, `ENVIRONMENT_MASK`).
+- Floor, backing, ambient, art and overlay materials get an `onBeforeCompile` that adds
+  `uniform mat4 uTableFromWorld`, the mask uniforms and `varying vec2 vTablePos`
+  (`(uTableFromWorld * modelMatrix * vec4(transformed, 1.0)).xy`), and starts the fragment `main`
+  with `if (uCutoutOn > 0.5 && environmentShown(vTablePos) >= 0.5) discard;` (the floor only inside
+  the table bounds). `customProgramCacheKey` → `'stadium-env-cutout'`.
+- `board-scene.js` sets `uTableFromWorld` to the inverse of `table.group.matrixWorld` before each
+  render; `uCutoutOn` is 1 while any environment layer exists.
+
+### Timeline — `stadium-environment-timeline.mjs` (pure)
 Constants: `INTRO_MS = 1600`, `EXIT_MS = 900`, `AMBIENT_FPS = 30`.
 `createEnvironmentTimeline()` returns a state object with methods (all take `now` ms):
-- `setTarget(spec | null)` — records the target; returns `true` when it differs from `target` by `key`
-  (and `facing`).
-- `play(now)` — starts the transition `shown → target` and returns its hold:
-  `INTRO_MS` when entering or swapping, `EXIT_MS` when leaving, `0` when `shown` already equals
-  `target`. A swap keeps the outgoing layer at full strength under the incoming reveal and drops it at
-  the end (TCG Live's overlap).
+- `setTarget(spec | null)` — records the target; returns `true` when it differs from `target` by `key`.
+- `play(now)` — starts the transition `shown → target` and returns its hold: `INTRO_MS` when entering
+  or swapping, `EXIT_MS` when leaving, `0` when `shown` already equals `target`. A swap keeps the
+  outgoing layer under the incoming reveal and drops it at the end (TCG Live's overlap).
 - `settle()` — ends any transition and sets `shown = target`.
 - `frame(now)` → `{ layers: [{ spec, reveal: 0..1, exit: 0..1 }], animating: boolean }`. `reveal` uses
   ease-out-cubic over `INTRO_MS`; `exit` uses ease-in-quad over `EXIT_MS`; after a transition ends,
   `layers` holds only the shown spec at `reveal 1, exit 0`.
 - `current()` → `{ shown, target }` keys, for tests and the debug log.
 
-### Mesh — `client/src/setup/board3d/stadium-environment-mesh.js`
-`createStadiumEnvironment({ three, textures, parent, clock, motionReduced, fxDisabled, onNeedsRender })`
-→ `{ setLayout(layout), setTarget(spec|null), play(): number, settle(), update(now): boolean, dispose() }`.
-- Adds one `three.Group` named `board3d-stadium-env` to `parent` (the table `group`) at `z = 0.75`
-  (new `Z.environment` in `table-mesh.js`: above `art`, below the zone `overlay`).
-- Per layer: one `PlaneGeometry` covering `tableBounds(layout)` (`table-uv.mjs`) — the whole table —
-  with a `ShaderMaterial` from `stadium-environment-shader.mjs`; `transparent`, `depthWrite: false`.
-  A swap shows two layers; otherwise one.
-- Ground UVs cover-fit the 2:1 texture to the table bounds, centered. When the target `facing` is
-  `'opp'` the UVs rotate 180° so the scene faces the Stadium's owner.
-- Zone wells: `setLayout` collects every zone rect of both halves from the layout (active, 5 bench,
-  deck, discard, prizes, stadium) into a `vec4[24]` uniform in table UV space.
-- Particles: one `three.Points` per layer, `count` from the row (max 64), positions seeded once,
-  motion computed in the vertex shader from `uTime` (drift upward + sway); additive blending; none
-  when the row has `particles: null` or motion is reduced.
-- Textures load through the scene's texture cache (`textures.acquire/release`, as `table-mesh.js`
-  does); a layer shows only after its ground (or, for `void`, its overlay) has loaded.
-- `update(now)`: copies `timeline.frame(now)` into uniforms; returns `true` while a transition runs.
-  While a layer is steady, ambient animation requests one frame every `1000 / AMBIENT_FPS` ms via
-  `setTimeout(onNeedsRender)` — not when `fxDisabled()` or `motionReduced()` (static frame, `uTime`
-  frozen) or `document.hidden`.
-- `play()`: `fxDisabled()` or `motionReduced()` → `settle()` and return `0`; else `timeline.play(now)`
-  and `onNeedsRender()`.
-
-### Shader — `client/src/setup/board3d/stadium-environment-shader.mjs` (pure strings + uniform builder)
-`environmentUniforms(three, spec)` and GLSL `VERTEX`/`FRAGMENT`. Fragment, in order:
-1. Ground: `texture(uGround, uv * uTiling) * uTint`, saturation mix toward luma by `uSaturation`;
-   `void` uses `uBaseColor`.
-2. Overlay by `uOverlayMode`: `scroll` — sample at `uv + uTime * vec2(0.012, 0.006)`, add
-   `uOverlayColor * value * uOverlayStrength`; `pulse` — mask × `(0.6 + 0.4 sin(uTime * 1.6))`,
-   added as emissive; `flipbook` — 2×4 frames, one flash every 2.6 s lasting 0.25 s; `colorize` —
-   galaxy R/G/B channels weighted into `uOverlayColor` shades; `swirl` — second overlay rotated by
-   `uTime * 0.05` around the center; `decal` — texture centered at the table center, 0.45 of table
-   height, alpha-blended.
-3. Zone wells: inside any zone rect (6 px soft edge) multiply by 0.62 and desaturate 40 %.
-4. Steady dim: multiply by 0.85.
-5. Reveal: hex grid, cell 48 table px; a cell shows when the distance from its center to `uOrigin`
-   (the Stadium zone center) is below `uReveal * maxDistance`; the 1-cell band at the front adds
-   `uOverlayColor * 0.6` (border glow, the kit's own color — no white flash).
-6. Exit: alpha = `smoothstep(uExit - 0.08, uExit, texture(uDissolve, uv).r)`; the dissolve edge glows
-   `uOverlayColor * 0.5`.
-
 ### Wiring
 - `board-model.mjs` `stadiumOf` adds `cardId` (`stadium.id || ''`), `set` (`stadium.set || ''`) and
   `number` (`stadium.number || ''`) to its result.
-- `board-scene.js`: creates the environment with `parent: table.group` next to `createTable` (:197);
+- `board-scene.js`: creates the environment with `parent: table.group` after `createTable` (:197);
   calls `environment.setLayout(next)` beside `table.setLayout(next)` (:407); adds
-  `environment.update(now)` to `render()`'s `animating` (:279); disposes it with the scene. New scene
-  methods `setStadiumEnvironment(spec|null)`, `playStadiumEnvironment(): number`,
+  `environment.update(now)` to `render()`'s `animating` (:280); `table.setCutout(...)`; disposes it
+  with the scene. New scene methods `setStadiumEnvironment(spec|null)`, `playStadiumEnvironment(): number`,
   `settleStadiumEnvironment()`.
-- `board3d.js` `onViewApplied` (:415): after `applyModel`, when `!readSettings(localStorage).stadiumBoardsOff`,
-  `spec = environmentFor(model.stadium && { id: model.stadium.cardId, set: model.stadium.set, number: model.stadium.number })`
-  with `facing` copied from `model.stadium.facing`; else `spec = null`. If
-  `scene.setStadiumEnvironment(spec)` returns true, call
+- `board3d.js` `onViewApplied` (:415): after `applyModel`, unless `readSettings(localStorage).stadiumBoardsOff`,
+  `key = environmentOverride(localStorage, location.search) ?? environmentKeyFor({ id: stadium.cardId,
+  set: stadium.set, number: stadium.number })`; `spec = key && { key }`, else null. If `scene.setStadiumEnvironment(spec)` returns true, call
   `modules.queueBoardEnvironment({ play: scene.playStadiumEnvironment, settle: scene.settleStadiumEnvironment })`.
   The settings listener re-runs this when `stadiumBoardsOff` flips.
 - `advisory-animations.js`:
@@ -251,72 +263,56 @@ Constants: `INTRO_MS = 1600`, `EXIT_MS = 900`, `AMBIENT_FPS = 30`.
   `stadiumBoardsOff: readKey(...) === '1'` in `readSettings`; setter `setStadiumBoardsOff` in
   `fx-settings.js`; checkbox "Stadium boards" in `client/index.ejs` next to the hover-preview toggle;
   wiring in `sidebox/settings.js` like `HOVER_PREVIEW_OFF_KEY`.
-
-### Assets — `scripts/import-tcgl-board-env.py`
-Reads the PNGs from `E:\tcglive_extract\pokemon_Pokemon TCG Live` (path as first argument), writes
-WebP to `client/src/assets/fx/stadium-env/`: grounds at 2048×1024 q82, everything else at its source
-size capped to 1024 px q85, masks as lossless greyscale. Mapping (source → target):
-`board_water/T_VFX_Water_BeachSand_D` → beach-sand · `T_VFX_Water_Foam_RGB` → foam ·
-`T_VFX_Water_Bubbles_Blue` → bubbles · `T_VFX_Water_Mask_Dissolve` → water-dissolve ·
-`board_fire/T_Jumbotron_Fireboard_D` → fireboard · `_BurnMask` → fire-burnmask ·
-`T_VFX_Fire_Mask_Dissolve` → fire-dissolve · `board_lightning/T_VFX_Lightning_Background_D` →
-lightning-ground · `T_VFX_Lightning_Board_ElectricCrack_2x4` → electric-crack-2x4 ·
-`T_VFX_Lightning_Mask_Dissolve` → lightning-dissolve · `board_grass/T_Grass_Base_D` → grass-base ·
-`T_Grass_Cloud_Shadows` → grass-cloud-shadows · `T_VFX_Grass_Leaves_2x2` → leaves-2x2 ·
-`T_VFX_Grass_Mask_Dissolve` → grass-dissolve · `board_metal/T_VFX_Metal_Hex_D` → metal-hex ·
-`T_VFX_Metal_Sheen_Wipe` → metal-sheen · `T_VFX_Metal_Mask_Dissolve` → metal-dissolve ·
-`board_psychic/T_VFX_Psychic_Galaxy_RGBA` → psychic-galaxy · `T_VFX_Psychic_Swirl` → psychic-swirl ·
-`board_colorless/T_VFX_Colorless_Mask_Dissolve` → colorless-dissolve ·
-`board_colorless/T_VFX_Colorless_Glow_Dot_Hires` → mote · `board_fire/T_VFX_Fire_Gradient_Radial_Spots_Dense` → ember ·
-`board_fighting/T_VFX_Fighting_Impact_Decal_Rock_D` → fighting-decal ·
-`board_stadium/T_VFX_Stadium_Mask_Dissolve` → stadium-dissolve. Prints the total size and exits 1
-above 4 MB. The WebPs are committed (user-approved D203/D213 precedent).
+- The preview page is deleted once the real board shows Scorched Earth (`?stadiumEnv=scorched-earth`
+  replaces it).
 
 ## Edge cases & failure modes
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | No Stadium in play / `view.stadium` null | No environment; player's mat shows | [ ] |
-| 2 | Stadium without a homebrew key (any real print, missing id/set) | `environmentFor` → null; no environment | [ ] |
-| 3 | `card.id` absent but `set: 'customhb', number: '9'` | key `customhb-009` | [ ] |
+| 1 | No Stadium in play / `view.stadium` null | No environment; the player's mat shows | [ ] |
+| 2 | Stadium without a homebrew key (real print, missing id/set) | No environment | [x] layout test |
+| 3 | `card.id` absent but `set: 'customhb', number: '299'` | key `scorched-earth` | [x] layout test |
 | 4 | Homebrew Stadium replaces another homebrew Stadium | One swap: incoming reveals over outgoing in 1600 ms, outgoing dropped | [ ] |
 | 5 | Homebrew Stadium replaced by a non-homebrew Stadium, or discarded | Exit dissolve 900 ms, mat returns | [ ] |
 | 6 | Two Stadium changes before the first plan runs | Plan plays `shown → latest target` once; second plan's `play` returns 0 | [ ] |
 | 7 | Catch-up replay / hidden tab / reconnect | No plan; `settle()` snaps to the view's Stadium | [ ] |
 | 8 | FX turned off mid-transition, or `game-restarted` | `clearFxQueue` settles every pending environment plan; shown = target | [ ] |
 | 9 | FX off or reduced motion when a Stadium is played | `play()` settles, returns 0; static frame, no particles, no ambient frames | [ ] |
-| 10 | "Stadium boards" toggled off with one in play | Environment removed at once (spec null + settle); on again → snaps in | [ ] |
-| 11 | Opponent plays the Stadium | Scene rotated 180° toward them (facing 'opp') | [ ] |
-| 12 | Texture fails to load / 404 | Layer stays hidden, console warn once per URL; board keeps the mat; no throw | [ ] |
-| 13 | Layout change (resize, mat change) while shown | `setLayout` re-fits planes and zone wells; transition continues | [ ] |
-| 14 | Spectator view | Same as players; facing from `ownerId` vs near player | [ ] |
+| 10 | "Stadium boards" toggled off with one in play | Environment removed at once (spec null + settle), cutout off; on again → snaps in | [ ] |
+| 11 | Opponent plays the Stadium | Reveal starts from the Stadium zone; the place is laid out for the camera (tall rock along the far edge), not turned toward the owner | [ ] |
+| 12 | Shader compile fails | Console warn once per recipe; no environment; cutout off; mat shows; no throw | [ ] |
+| 13 | Layout change (resize, mat change) while shown | Rebake after 150 ms idle; transition continues on the old bake meanwhile | [ ] |
+| 14 | Spectator view | Same as players | [ ] |
 | 15 | Tab hidden while steady | No ambient timer frames; resumes on visible | [ ] |
-| 16 | Board disposed mid-transition (leave room) | `dispose` clears ambient timer, releases textures; no frame after dispose | [ ] |
-| 17 | Partial failure midway | Struck: no multi-step persistent state; the view re-derives everything | — |
+| 16 | Board disposed mid-transition (leave room) | `dispose` clears the ambient timer and render targets; no frame after dispose | [ ] |
+| 17 | WebGL context lost and restored | Targets rebaked on restore; until then the mat shows | [ ] |
+| 18 | More than 24 footprints (a future Bench of 8) | Footprints past 24 are dropped with one warn; those cards still lie at z 0 above the ground's base | [ ] |
+| 19 | Partial failure midway | Struck: no multi-step persistent state; the view re-derives everything | — |
 
 ## Test plan
-- Unit (`node --test`): `stadium-environments.test.mjs` (keying, all 17 rows resolve, every texture
-  path exists on disk, unknown → null), `stadium-environment-timeline.test.mjs` (fake clock: holds,
-  easing endpoints, swap layers, settle, repeat targets), `advisory-animations` queue test for
+- Unit (`node --test`): layout registry (exists), `stadium-environment-timeline.test.mjs` (fake clock:
+  holds, easing endpoints, swap layers, settle, repeat targets), `advisory-animations` queue test for
   `queueBoardEnvironment` + `clearFxQueue` settle, `fx-settings.test.mjs` new key, `board-model` test
-  for `cardId/set/number` on `stadiumOf`.
-- Mesh/shader: visual — exempt from tests (CLAUDE.md). One node test that `createStadiumEnvironment`
-  with the vendored three builds, updates and disposes without throwing (pattern: card-mesh-flight.test).
-- Manual (user, localhost): play Surfing Beach, then Scorched Earth on top, then discard it; flip the
-  toggle; check readability on two mats.
+  for `cardId/set/number` on `stadiumOf`, a GLSL test that no shader string declares a GLSL ES 3.00
+  reserved word as an identifier.
+- Mesh/shader/table cutout: visual, exempt from tests (CLAUDE.md). One node test that
+  `createStadiumEnvironment` with the vendored three and a stub renderer builds, updates and disposes
+  without throwing (pattern: card-mesh-flight.test).
+- Manual (user, localhost): each recipe on the real board via `?stadiumEnv=<key>`, then by playing the
+  card; swap two Stadiums; discard; flip the toggle; check readability with every zone filled.
 
 ## Migration / rollout
 n/a for data: client-only, no schema or netcode change. Rollout: on by default behind the "Stadium
-boards" toggle. Revert: unset the toggle per user, or revert the feature commits (assets are a separate
-folder).
+boards" toggle. Revert: unset the toggle per user, or revert the feature commits.
 
 ## Work plan — slices ≤1 session, each leaving the repo green
 | Slice | Files (create / modify) | Signatures & data shapes | Test cases: input → expected | Rulings used (source) | Green when |
 |---|---|---|---|---|---|
-| 1 Assets + data | create `scripts/import-tcgl-board-env.py`, `client/src/assets/fx/stadium-env/*.webp` (24 files), `client/src/setup/board3d/stadium-environments.mjs` + `__tests__/stadium-environments.test.mjs` | `environmentKeyFor(card): string|null`, `KITS`, `STADIUM_ENVIRONMENTS`, `environmentFor(card): spec|null` per § Data | `{id:'customhb-209'}` → kit beach; `{set:'customhb',number:'9'}` → key `customhb-009`; `{id:'sv1-1'}` → null; `null` → null; each of the 17 ids from set.json filtered on `trainerType==='Stadium'` → non-null; every kit texture file exists; total `stadium-env` size ≤ 4 MB | Stadium list: `customhb/set.json` rows 030…299 | `node --test` on the new test; script prints ≤ 4 MB |
+| 1 Engine split | create `stadium-environment-glsl.mjs`, `stadium-env-volcanic.mjs` (from the prototype shader, plus `bakeShade`), test `__tests__/stadium-environment-glsl.test.mjs`; delete `stadium-environment-shader.mjs`; point the preview page at the new modules | § Engine, § Recipes | every exported shader string contains `void main`; no identifier in `flat half smooth noperspective sample patch` declared; `volcanic['scorched-earth'].liquid.level` = −10 | — | test green; preview renders as before (user check) |
 | 2 Timeline | create `stadium-environment-timeline.mjs` + test | § Timeline | enter at t=0: `play` → 1600, `frame(800).layers[0].reveal` = 1−(0.5)^3 = 0.875; leave: `play` → 900; swap A→B: `frame(10).layers` = [A{reveal 1}, B{reveal<1}], `frame(1700).layers` = [B]; `setTarget(same)` → false, `play` → 0; `settle()` mid-intro → `frame().layers` = [target at reveal 1], animating false | — | test green |
-| 3 Mesh + shader | create `stadium-environment-shader.mjs`, `stadium-environment-mesh.js` + smoke test; modify `table-mesh.js` (`Z.environment = 0.75`), `board-scene.js` (create, setLayout, render, dispose, 3 scene methods) | § Mesh, § Shader | smoke: create with vendored three + fake textures, `setLayout(flatLayout fixture)`, `setTarget(spec beach)`, `play()` → 1600, `update(100)` → true, `dispose()` no throw; `fxDisabled:()=>true` → `play()` = 0 | — | smoke + existing board-scene tests green |
-| 4 Wiring + toggle | modify `board-model.mjs` (`stadiumOf`), `board3d.js`, `advisory-animations.js`, `fx-settings.mjs`, `fx-settings.js`, `client/index.ejs`, `sidebox/settings.js`; tests in `board-model`, `fx-settings`, new `__tests__/board-environment-queue.test.mjs` | § Wiring | `stadiumOf({instanceId:1,id:'customhb-209',set:'customhb',number:'209'})` has those fields; `readSettings({getItem:k=>k==='ptcg-stadium-boards-off'?'1':null}).stadiumBoardsOff` = true; queue: push while skipping → `settle` called, `play` not; push then `clearFxQueue()` → `settle` called once | — | `pnpm test:changed` green; lint clean |
-| 5 Tune (fx-designer) | `stadium-environments.mjs` rows, shader constants | values only | user localhost check per Stadium | — | user signs off |
+| 3 Mesh + cutout | create `stadium-environment-mesh.js` + smoke test; modify `table-mesh.js` (`setCutout`), `board-scene.js` (create, setLayout, render, cutout matrix, dispose, 3 scene methods) | § Mesh, § Mat cutout | smoke: create with vendored three + stub renderer, `setLayout(flatLayout fixture)`, `setTarget({key:'scorched-earth'})`, `play()` → 1600, `update(100)` → true, `dispose()` no throw; `fxDisabled:()=>true` → `play()` = 0 | — | smoke + existing board-scene and table-mesh tests green |
+| 4 Wiring + toggle | modify `board-model.mjs` (`stadiumOf`), `board3d.js`, `advisory-animations.js`, `fx-settings.mjs`, `fx-settings.js`, `client/index.ejs`, `sidebox/settings.js`; delete `client/stadium-env-preview.html`; tests in `board-model`, `fx-settings`, new `__tests__/board-environment-queue.test.mjs` | § Wiring | `stadiumOf({instanceId:1,id:'customhb-299',set:'customhb',number:'299'})` has those fields; `readSettings({getItem:k=>k==='ptcg-stadium-boards-off'?'1':null}).stadiumBoardsOff` = true; queue: push while skipping → `settle` called, `play` not; push then `clearFxQueue()` → `settle` called once | — | `pnpm test:changed` green; lint clean; Scorched Earth on the real board (user check) |
+| 5a–5h Recipes (fx-designer) | one `stadium-env-<family>.mjs` per family + its `ENVIRONMENT_BY_CARD` rows | § Recipes | registry test: each new id → its key | — | user signs off each place on localhost |
 
 ## Deviations (Builder appends here during build)
 
