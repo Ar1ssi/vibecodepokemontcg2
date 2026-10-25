@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { poison } from '../poison.js';
-import { assertEdged, detailed, distorted, drawMods } from './fx-mod-rows.mjs';
+import { assertEdged, assertLift, detailed, distorted, drawMods, lit } from './fx-mod-rows.mjs';
 
 test('poison glob: the glob and its drip bubble; the rim and glint hold still', () => {
   const rows = drawMods((ctx) => poison.body(ctx, 50, 50, 30, 1, 1));
@@ -22,4 +22,14 @@ test('poison stream and pool: the ooze wavers along the stream, the pool bubbles
   const pool = drawMods((ctx) => poison.sigil(ctx, 50, 50, 40, 0.5));
   assert.ok(distorted(pool[0]) && detailed(pool[0]), 'the pool');
   assertEdged(pool, poison.palette.hot);
+});
+
+test('poison depth: a glob is a wet lit sphere off the cloth; the pool lies on the card, its bubbles rising off it', () => {
+  const [glob, drip, rim, glint] = drawMods((ctx) => poison.body(ctx, 50, 50, 30, 1, 1));
+  assert.ok(lit(glob) && lit(drip) && glob.volume.spec >= 0.8);
+  for (const row of [glob, drip, rim, glint]) assertLift(row, 0.1, 'the glob stands together');
+  const pool = drawMods((ctx) => poison.sigil(ctx, 50, 50, 40, 0.5));
+  assert.ok(lit(pool[0]));
+  assertLift(pool[0], 0, 'pool on the card');
+  assert.ok(pool.slice(1).every((row) => row.lift > 0), 'bubbles off it');
 });

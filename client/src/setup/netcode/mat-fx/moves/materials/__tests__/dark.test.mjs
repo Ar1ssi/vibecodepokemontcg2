@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { dark } from '../dark.js';
-import { assertEdged, detailed, distorted, drawMods } from './fx-mod-rows.mjs';
+import { assertEdged, assertLift, detailed, distorted, drawMods, lit } from './fx-mod-rows.mjs';
 
 const rad = (deg) => (deg * Math.PI) / 180;
 
@@ -28,4 +28,15 @@ test('dark pulse: the ripple bands waver, the core and spark do not; the haze is
   assertEdged(rows, dark.palette.hot);
   const haze = drawMods((ctx) => dark.glow(ctx, 50, 50, 40, 1));
   assert.ok(distorted(haze[0]) && detailed(haze[0]));
+});
+
+test('dark depth: the pulse core is a glossy lit sphere over its ripples; the blade stands over its halo', () => {
+  const rows = drawMods((ctx) => dark.body(ctx, 50, 50, 30, 1, 1));
+  const core = rows[0];
+  assert.ok(lit(core) && core.volume.spec > 0);
+  assert.ok(rows.slice(1, 7).every((row) => row.lift > 0 && row.lift < core.lift), 'ripples under the core');
+  const [halo, blade, edge] = drawMods((ctx) => dark.tongue(ctx, { x: 50, y: 50, angleDeg: 30, length: 80, width: 20, time: 0.4, seed: 3 }));
+  assert.ok(lit(blade) && lit(edge) && !lit(halo));
+  assert.ok(blade.lift > halo.lift && edge.lift > blade.lift);
+  assertLift(drawMods((ctx) => dark.glow(ctx, 50, 50, 40, 1))[0], 0, 'haze on the cloth');
 });

@@ -21,8 +21,14 @@
 // drips and the pool read their colour through a slow rising warp (distort) under a second noise
 // layer (detail), so the goo churns instead of sitting as a flat gradient; a stream's ooze wavers
 // along it. A drawer's dissolve eats the goo with a thick lilac rim.
+//
+// Design 076 § Depth: venom is wet solid. A glob and its drips are lit spheres (`volume`: a white
+// glint, a rim) floating off the cloth; a stream's ooze is a lit tube with its globs riding just
+// above; the pool lies on the card as a bumped wet bulge with its bubbles rising off it. Heights
+// (lane units) add to the drawer's lift (`withLiftZ`); the cast pass shades the cloth under them.
 import { rgbCss } from '../../fx-colors.mjs';
-import { withFxMod } from './_mods.js';
+import { moddedKit } from './_kit-mod.js';
+import { withFxMod, withLiftZ } from './_mods.js';
 import { grainPass, inShadow, shardOutline, tongueOutline, traceOutline } from './_shared.js';
 
 const TAU = Math.PI * 2;
@@ -57,19 +63,26 @@ const VENOM_GLOB = Object.freeze({ id: 'liquid', gloss: 0.45, flow: 0.6, clarity
 const VENOM_OOZE = Object.freeze({ id: 'liquid', gloss: 0.4, flow: 1, clarity: 0.35 });
 const VENOM_POOL = Object.freeze({ id: 'liquid', gloss: 0.35, flow: 0.5, clarity: 0 });
 // Modifier params (gpu-canvas FX_MODS), strengths in lane heights; the bubbling rises.
+// Light from up-left (120°).
 const GOO_MOD = Object.freeze({
-  distort: Object.freeze({ strength: 0.035, speed: 0.9, scale: 4, angle: -90 }),
-  detail: Object.freeze({ amount: 0.2, speed: 0.7, scale: 5, angle: -90 }),
+  distort: Object.freeze({ strength: 0.05, speed: 0.9, scale: 4, angle: -90 }),
+  detail: Object.freeze({ amount: 0.22, speed: 0.7, scale: 5, angle: -90 }),
+  volume: Object.freeze({ amount: 0.9, spec: 0.85, rim: 0.5, light: 120, bump: 0.35, bumpScale: 4, ambient: 0.35 }),
 });
 const POOL_MOD = Object.freeze({
-  distort: Object.freeze({ strength: 0.04, speed: 0.8, scale: 4, angle: -90 }),
+  distort: Object.freeze({ strength: 0.06, speed: 0.8, scale: 4, angle: -90 }),
   detail: Object.freeze({ amount: 0.22, speed: 0.7, scale: 5, angle: -90 }),
+  volume: Object.freeze({ amount: 0.6, spec: 0.6, rim: 0.2, light: 120, bump: 0.6, bumpScale: 4, ambient: 0.4 }),
 });
-/** A stream's ooze wavering along it. */
-const oozeMod = (angleDeg) => ({ distort: { strength: 0.03, speed: 1, scale: 4, angle: angleDeg } });
-/** A kit method run under the kit's own modifiers (its dissolve edge); a non-context passes through. */
-const modded = (draw, mod) => (ctx, ...args) =>
-  ctx && typeof ctx === 'object' ? withFxMod(ctx, mod, () => draw(ctx, ...args)) : draw(ctx, ...args);
+const SKIN_MOD = Object.freeze({ volume: Object.freeze({ amount: 0.7, spec: 0.5, rim: 0.4, light: 120, bump: 0, ambient: 0.4 }) });
+/** A stream's ooze wavering along it, lit as a tube round its axis. */
+const oozeMod = (angleDeg) => ({
+  distort: { strength: 0.06, speed: 1, scale: 4, angle: angleDeg },
+  volume: { amount: 0.75, spec: 0.6, rim: 0.4, light: 120, bump: 0.3, radius: 0.07, ambient: 0.4 },
+});
+// Heights (lane units) over the drawer's lift: the pool on the card, ooze just above the cloth,
+// its riding globs and glints over it, bubbles off the pool, a glob (a projectile's head) highest.
+const LIFT = Object.freeze({ ooze: 0.04, ride: 0.05, rideGlint: 0.055, bubbles: 0.06, glob: 0.1 });
 
 const PALETTE = Object.freeze({
   deep: Object.freeze([75, 30, 107]),
@@ -199,7 +212,12 @@ function poisonKit(palette) {
    * One glob turned to `phase`: the wobbling lit sphere, a drip under it (screen-down) when
    * `drip`, the dark rim just inside the edge, and a glint up-left when hot.
    */
-  function glob(ctx, x, y, r, alpha, hot, phase, { drip = true } = {}) {
+  function glob(ctx, x, y, r, alpha, hot, phase, options) {
+    withLiftZ(ctx, LIFT.glob, () => litGlob(ctx, x, y, r, alpha, hot, phase, options));
+  }
+
+  /** The glob's fills, rim and glint at the current lift. */
+  function litGlob(ctx, x, y, r, alpha, hot, phase, { drip = true } = {}) {
     inShadow(ctx, () => {
       ctx.fxStyle = VENOM_GLOB;
       withFxMod(ctx, GOO_MOD, () => {
@@ -257,19 +275,19 @@ function poisonKit(palette) {
       ctx.fxStyle = VENOM_OOZE;
       ctx.fillStyle = alongStream(ctx, spec, palette.body, OOZE_ALPHA * alpha);
       traceOutline(ctx, tongueOutline({ ...spec, amp: 0.5 }, 0.8));
-      withFxMod(ctx, oozeMod(spec.angleDeg), () => ctx.fill());
+      withLiftZ(ctx, LIFT.ooze, () => withFxMod(ctx, oozeMod(spec.angleDeg), () => ctx.fill()));
       ctx.fxStyle = null;
       ctx.fillStyle = rgbCss(palette.body, GLOB_ALPHA * alpha);
       ctx.beginPath();
       for (const g of globs) addCircle(ctx, g.x, g.y, g.r);
-      ctx.fill();
+      withLiftZ(ctx, LIFT.ride, () => withFxMod(ctx, GOO_MOD, () => ctx.fill()));
     });
     const lit = alpha * clamp01(hot);
     if (!(lit > 0)) return;
     ctx.fillStyle = rgbCss(palette.core, GLINT_ALPHA * lit);
     ctx.beginPath();
     for (const g of globs) addCircle(ctx, g.x - g.r * 0.3, g.y - g.r * 0.3, g.r * 0.28);
-    ctx.fill();
+    withLiftZ(ctx, LIFT.rideGlint, () => ctx.fill());
   }
 
   /**
@@ -291,7 +309,7 @@ function poisonKit(palette) {
           const dr = r * Math.max(0.14, 0.42 - 0.09 * k);
           addCircle(ctx, x + Math.cos(back) * d - Math.sin(back) * sway, y + Math.sin(back) * d + Math.cos(back) * sway, dr);
         }
-        withFxMod(ctx, GOO_MOD, () => ctx.fill());
+        withLiftZ(ctx, LIFT.ride, () => withFxMod(ctx, GOO_MOD, () => ctx.fill()));
       });
     }
     glob(ctx, x, y, r, alpha, hot, time * 4 + seed, { drip: false });
@@ -322,35 +340,40 @@ function poisonKit(palette) {
     // No stroked rim (design 075 parity): the outlined pool read as clip art; the fill carries it.
     // Hollow bubbles: a faint violet inside and a lilac skin, each fading as it pops.
     ctx.lineWidth = Math.max(1, r * 0.025);
-    for (const b of bubbleRise(s, r)) {
-      ctx.beginPath();
-      ctx.arc(px + b.dx, py + b.dy, b.radius, 0, TAU);
-      ctx.fillStyle = rgbCss(palette.body, 0.25 * b.alpha);
-      ctx.fill();
-      ctx.strokeStyle = rgbCss(palette.hot, 0.9 * b.alpha);
-      ctx.stroke();
-    }
+    withLiftZ(ctx, LIFT.bubbles, () => {
+      for (const b of bubbleRise(s, r)) {
+        ctx.beginPath();
+        ctx.arc(px + b.dx, py + b.dy, b.radius, 0, TAU);
+        ctx.fillStyle = rgbCss(palette.body, 0.25 * b.alpha);
+        ctx.fill();
+        ctx.strokeStyle = rgbCss(palette.hot, 0.9 * b.alpha);
+        withFxMod(ctx, SKIN_MOD, () => ctx.stroke());
+      }
+    });
   }
 
   // A thick lilac rim, little bloom: goo eaten away, not burnt.
   const kitMod = Object.freeze({ dissolve: Object.freeze({ edge: palette.hot, width: 0.18, gain: 0.9 }) });
 
-  return Object.freeze({
-    key: 'poison',
-    palette,
-    // The vignette's tint: a violet-black kept local to a card.
-    shade: Object.freeze([28, 8, 42]),
-    // Toxic fumes (the recipe's [120, 70, 150]).
-    smoke: Object.freeze([120, 70, 150]),
-    particle: Object.freeze({ className: 'fx-particle--glob', color: rgbCss(palette.hot), aspect: 1 }),
-    glow: modded(glow, kitMod),
-    body: modded(body, kitMod),
-    tongue: modded(tongue, kitMod),
-    projectile: modded(projectile, kitMod),
-    sigil: modded(sigil, kitMod),
-    grain: grainPass,
-    withPalette: (p) => poisonKit(p),
-  });
+  return moddedKit(
+    {
+      key: 'poison',
+      palette,
+      // The vignette's tint: a violet-black kept local to a card.
+      shade: Object.freeze([28, 8, 42]),
+      // Toxic fumes (the recipe's [120, 70, 150]).
+      smoke: Object.freeze([120, 70, 150]),
+      particle: Object.freeze({ className: 'fx-particle--glob', color: rgbCss(palette.hot), aspect: 1 }),
+      glow,
+      body,
+      tongue,
+      projectile,
+      sigil,
+      grain: grainPass,
+      withPalette: (p) => poisonKit(p),
+    },
+    kitMod
+  );
 }
 
 export const poison = poisonKit(PALETTE);

@@ -16,8 +16,14 @@
 // Design 076: the GPU modifiers (`ctx.fxMod`, ignored by Canvas2D). A sheet's caustics waver
 // (distort flowing toward its tip); a drop and the spray carry a slow second noise layer (detail)
 // so they stop reading as flat discs. A drawer's dissolve burns at a soft pale-cyan foam edge.
+//
+// Design 076 § Depth: water is glossy solid. A drop is a lit sphere (`volume`: Lambert, a white
+// glint that blooms, a Fresnel rim) floating off the cloth; a sheet is a lit tube round its axis
+// with a bumped, wavering surface, just above the cloth, its glint and shed drops above it. Heights
+// (lane units) add to the drawer's lift (`withLiftZ`); the cast pass shades the cloth under them.
 import { rgbCss } from '../../fx-colors.mjs';
-import { withFxMod } from './_mods.js';
+import { moddedKit } from './_kit-mod.js';
+import { withFxMod, withLiftZ } from './_mods.js';
 import { grainPass, inShadow, sphere, tongueOutline, traceOutline, wobble } from './_shared.js';
 
 const TAU = Math.PI * 2;
@@ -28,21 +34,26 @@ const PROJECTILE_DROPLETS = 8;
 // Style params (gpu-canvas STYLE_PARAMS liquid): a drop is clearer than a sheet; a sheet flows faster.
 const LIQUID_DROP = Object.freeze({ id: 'liquid', gloss: 0.35, flow: 1, clarity: 0.3 });
 const LIQUID_SHEET = Object.freeze({ id: 'liquid', gloss: 0.6, flow: 1.6, clarity: 0.2 });
-// Modifier params (gpu-canvas FX_MODS). Strengths are in lane heights: 0.03 wavers a few px.
-const SHEET_WAVER = Object.freeze({ strength: 0.03, speed: 1.2, scale: 5 });
+// Modifier params (gpu-canvas FX_MODS), strengths in lane heights; light from up-left (120°).
 const DROP_MOD = Object.freeze({
-  distort: Object.freeze({ strength: 0.02, speed: 0.8, scale: 4, angle: -90 }),
+  distort: Object.freeze({ strength: 0.03, speed: 0.8, scale: 4, angle: -90 }),
   detail: Object.freeze({ amount: 0.18, speed: 0.5, scale: 5, angle: -90 }),
+  volume: Object.freeze({ amount: 0.85, spec: 0.9, rim: 0.6, light: 120, bump: 0.3, bumpScale: 4, ambient: 0.45 }),
 });
 const SPRAY_MOD = Object.freeze({
-  distort: Object.freeze({ strength: 0.03, speed: 0.6, scale: 2.5, angle: -90 }),
-  detail: Object.freeze({ amount: 0.22, speed: 0.6, scale: 3, angle: -90 }),
+  distort: Object.freeze({ strength: 0.06, speed: 0.6, scale: 2.5, angle: -90 }),
+  detail: Object.freeze({ amount: 0.25, speed: 0.6, scale: 3, angle: -90 }),
 });
-/** The sheet's waver, flowing along it toward the tip. */
-const sheetMod = (angleDeg) => ({ distort: { ...SHEET_WAVER, angle: angleDeg } });
-/** A kit method run under the kit's own modifiers (its dissolve edge); a non-context passes through. */
-const modded = (draw, mod) => (ctx, ...args) =>
-  ctx && typeof ctx === 'object' ? withFxMod(ctx, mod, () => draw(ctx, ...args)) : draw(ctx, ...args);
+const SHEET_VOLUME = Object.freeze({ amount: 0.75, spec: 0.7, rim: 0.5, light: 120, bump: 0.4, bumpScale: 5, radius: 0.16, ambient: 0.45 });
+/** The sheet: wavering and textured along its axis toward the tip, lit as a glossy tube. */
+const sheetMod = (angleDeg) => ({
+  distort: { strength: 0.07, speed: 1.2, scale: 5, angle: angleDeg },
+  detail: { amount: 0.22, speed: 1.2, scale: 5, angle: angleDeg },
+  volume: SHEET_VOLUME,
+});
+// Heights (lane units) over the drawer's lift: spray on the cloth, sheets just above it, their
+// glint and thrown drops over them, a drop (the projectile's head, a beam's beads) highest.
+const LIFT = Object.freeze({ sheet: 0.04, edge: 0.045, drops: 0.05, drop: 0.1 });
 
 const PALETTE = Object.freeze({
   deep: Object.freeze([46, 124, 230]),
@@ -80,6 +91,11 @@ function waterKit(palette) {
   /** A droplet: a translucent covering sphere lit from 30 % up-left, a deep rim, a white specular dot. */
   function body(ctx, x, y, r, alpha, hot = 1) {
     if (!(r > 0) || !(alpha > 0)) return;
+    withLiftZ(ctx, LIFT.drop, () => droplet(ctx, x, y, r, alpha, hot));
+  }
+
+  /** The droplet's sphere, rim and specular dot at the current lift. */
+  function droplet(ctx, x, y, r, alpha, hot) {
     inShadow(ctx, () => {
       ctx.fxStyle = LIQUID_DROP;
       withFxMod(ctx, DROP_MOD, () =>
@@ -117,7 +133,7 @@ function waterKit(palette) {
   /** Small round drops in one path, one covering fill: `drops` = [[x, y, r]...]. */
   function fillDrops(ctx, drops, alpha) {
     if (drops.length === 0 || !(alpha > 0)) return;
-    inShadow(ctx, () => {
+    withLiftZ(ctx, LIFT.drops, () => inShadow(ctx, () => {
       ctx.fillStyle = rgbCss(palette.hot, alpha);
       ctx.beginPath();
       for (const [x, y, r] of drops) {
@@ -125,7 +141,7 @@ function waterKit(palette) {
         ctx.arc(x, y, r, 0, TAU);
       }
       ctx.fill();
-    });
+    }));
   }
 
   /** 3-5 drops flung just past a sheet's tip, scattered across its axis. */
@@ -153,7 +169,7 @@ function waterKit(palette) {
       ctx.fxStyle = LIQUID_SHEET;
       ctx.fillStyle = alongSheet(ctx, sheet, palette.body, 0.55 * alpha);
       traceOutline(ctx, outline);
-      withFxMod(ctx, sheetMod(spec.angleDeg), () => ctx.fill());
+      withLiftZ(ctx, LIFT.sheet, () => withFxMod(ctx, sheetMod(spec.angleDeg), () => ctx.fill()));
       ctx.fxStyle = null;
     });
     // A pale glint along the leading edge, not a white line: at full white it read as a scribble.
@@ -165,7 +181,7 @@ function waterKit(palette) {
       ctx.lineCap = 'round';
       ctx.beginPath();
       outline.left.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
-      ctx.stroke();
+      withLiftZ(ctx, LIFT.edge, () => ctx.stroke());
     }
     const tip = outline.left[outline.left.length - 1];
     fillDrops(ctx, shedDrops({ ...sheet, tip }), 0.55 * alpha);
@@ -204,19 +220,22 @@ function waterKit(palette) {
   // Water dissolves into foam: a wide, soft rim in the pale cyan, barely past white.
   const kitMod = Object.freeze({ dissolve: Object.freeze({ edge: palette.hot, width: 0.16, gain: 0.6 }) });
 
-  return Object.freeze({
-    key: 'water',
-    palette,
-    shade: Object.freeze([8, 30, 74]),
-    smoke: Object.freeze([190, 215, 235]),
-    particle: Object.freeze({ className: 'fx-particle--droplet', color: rgbCss(palette.hot), aspect: 1 }),
-    glow: modded(glow, kitMod),
-    body: modded(body, kitMod),
-    tongue: modded(tongue, kitMod),
-    projectile: modded(projectile, kitMod),
-    grain: grainPass,
-    withPalette: (p) => waterKit(p),
-  });
+  return moddedKit(
+    {
+      key: 'water',
+      palette,
+      shade: Object.freeze([8, 30, 74]),
+      smoke: Object.freeze([190, 215, 235]),
+      particle: Object.freeze({ className: 'fx-particle--droplet', color: rgbCss(palette.hot), aspect: 1 }),
+      glow,
+      body,
+      tongue,
+      projectile,
+      grain: grainPass,
+      withPalette: (p) => waterKit(p),
+    },
+    kitMod
+  );
 }
 
 export const water = waterKit(PALETTE);

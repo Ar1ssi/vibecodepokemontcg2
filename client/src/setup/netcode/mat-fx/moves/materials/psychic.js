@@ -15,10 +15,21 @@
 // the haze and the lens read their colour through slow flowing warps (distort), so their rings
 // of light ripple, and the haze carries a faint second noise layer (detail); a ribbon wavers
 // along its length. A drawer's dissolve burns at a pink-violet edge.
+//
+// Design 076 § Depth: the shapes are solids standing off the cloth. The lens is a lit sphere
+// (`volume`: Lambert, a glint and a Fresnel rim) floating above its haze, its rings lit tubes
+// stacked inner-highest so the turning rings separate in depth; ribbons are lit tubes and the
+// wave rings thick lit tubes riding above the card (the cast pass lays their light on the cloth
+// under them). Heights are in lane units, added to whatever lift the drawer set (`withLiftZ`).
+// The solid parts (the orb, the ribbons, the wave bands) cover what is under them (`source-over`,
+// inside their own save/restore) so their shading survives over a bright card face, as in
+// Scarlet/Violet where the psychic bands and sphere are dense colour, not glow; the lens rings
+// and the ribbons' centre lines stay additive light.
 import { rgbCss } from '../../fx-colors.mjs';
-import { withFxMod } from './_mods.js';
+import { moddedKit } from './_kit-mod.js';
+import { withFxMod, withLiftZ } from './_mods.js';
 import { rootFaded } from './_root-fade.js';
-import { grainPass, sphere, tongueOutline, traceOutline } from './_shared.js';
+import { grainPass, inShadow, sphere, tongueOutline, traceOutline } from './_shared.js';
 
 const TAU = Math.PI * 2;
 const RIBBON_AMP = 0.3;
@@ -38,22 +49,29 @@ const RIPPLE_INNER = 0.35;
 const WAVE_LOBES = 8;
 const WAVE_AMP = 0.05;
 const WAVE_SAMPLES = 48;
-const SIGIL_LENS = 0.28;
+const SIGIL_LENS = 0.34;
+const WAVE_WIDTH = 0.1;
 // Style params (gpu-canvas STYLE_PARAMS energy): a slow, calm current.
 const PSI = Object.freeze({ id: 'energy', streak: 0.45, speed: 1.2, gain: 0.5 });
 const PSI_HAZE = Object.freeze({ id: 'energy', streak: 0.3, speed: 0.8, gain: 0 });
-// Modifier params (gpu-canvas FX_MODS), strengths in lane heights.
+// Modifier params (gpu-canvas FX_MODS), strengths in lane heights; light from up-left (120°).
 const HAZE_MOD = Object.freeze({
-  distort: Object.freeze({ strength: 0.05, speed: 0.5, scale: 2.5, angle: 0 }),
-  detail: Object.freeze({ amount: 0.18, speed: 0.4, scale: 3, angle: 0 }),
+  distort: Object.freeze({ strength: 0.07, speed: 0.5, scale: 2.5, angle: 0 }),
+  detail: Object.freeze({ amount: 0.22, speed: 0.4, scale: 3, angle: 0 }),
 });
-const LENS_MOD = Object.freeze({ distort: Object.freeze({ strength: 0.04, speed: 0.7, scale: 3, angle: 0 }) });
-const RIBBON_WAVER = Object.freeze({ strength: 0.03, speed: 1, scale: 3 });
-/** A ribbon's waver, flowing along it. */
-const ribbonMod = (angleDeg) => ({ distort: { ...RIBBON_WAVER, angle: angleDeg } });
-/** A kit method run under the kit's own modifiers (its dissolve edge); a non-context passes through. */
-const modded = (draw, mod) => (ctx, ...args) =>
-  ctx && typeof ctx === 'object' ? withFxMod(ctx, mod, () => draw(ctx, ...args)) : draw(ctx, ...args);
+const LENS_MOD = Object.freeze({
+  distort: Object.freeze({ strength: 0.06, speed: 0.7, scale: 3, angle: 0 }),
+  volume: Object.freeze({ amount: 0.9, spec: 0.55, rim: 0.9, light: 120, bump: 0.25, bumpScale: 3, ambient: 0.3 }),
+});
+// Rings and wave bands: tubes with a softer glint, so a ring of them never strings into white beads.
+const TUBE_MOD = Object.freeze({ volume: Object.freeze({ amount: 0.85, spec: 0.35, rim: 0.6, light: 120, bump: 0, ambient: 0.3 }) });
+const RIBBON_WAVER = Object.freeze({ strength: 0.06, speed: 1, scale: 3 });
+const RIBBON_VOLUME = Object.freeze({ amount: 0.8, spec: 0.4, rim: 0.7, light: 120, bump: 0.2, radius: 0.09, ambient: 0.35 });
+/** A ribbon's waver, flowing along it, lit as a tube round its axis. */
+const ribbonMod = (angleDeg) => ({ distort: { ...RIBBON_WAVER, angle: angleDeg }, volume: RIBBON_VOLUME });
+// Heights (lane units) over the drawer's lift: the haze on the cloth, the orb above it, its rings
+// stacked inner-highest, the ribbons between, their centre line on top of them.
+const LIFT = Object.freeze({ lens: 0.14, ringTop: 0.22, ringStep: 0.08, ribbon: 0.07, line: 0.09, wave: 0.1 });
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 const fract = (v) => v - Math.floor(v);
@@ -120,35 +138,43 @@ function psychicKit(palette) {
   }
 
   /**
-   * The lens: a soft disc (its white heart kept small, so a big orb reads as rings, not a white
-   * slab), then three broken rings turned `phase` radians (alternating).
+   * The lens: a lit orb (its white heart kept small and its body violet out to the rim, so the
+   * shading and the Fresnel rim carry the shape, not a white slab), then three broken rings
+   * turned `phase` radians (alternating), lit tubes stacked inner-highest above it.
    */
   function lens(ctx, x, y, r, alpha, hot, phase) {
     ctx.fxStyle = PSI;
-    withFxMod(ctx, LENS_MOD, () =>
-      sphere(
-        ctx,
-        x,
-        y,
-        r,
-        [
-          [0, palette.white, alpha * 0.7 * clamp01(hot)],
-          [0.25, palette.core, alpha * 0.6],
-          [0.65, palette.hot, alpha * 0.4],
-          [1, palette.body, 0],
-        ],
-        0
+    withLiftZ(ctx, LIFT.lens, () =>
+      inShadow(ctx, () =>
+        withFxMod(ctx, LENS_MOD, () =>
+          sphere(
+            ctx,
+            x,
+            y,
+            r,
+            [
+              [0, palette.core, alpha * 0.65 * clamp01(hot)],
+              [0.3, palette.hot, alpha * 0.7],
+              [0.75, palette.body, alpha * 0.75],
+              [0.94, palette.deep, alpha * 0.6],
+              [1, palette.deep, 0],
+            ],
+            0
+          )
+        )
       )
     );
     ctx.lineCap = 'round';
-    ctx.lineWidth = Math.max(1, r * 0.07);
-    for (const [scale, tone, strength, turn] of LENS_RINGS) {
-      const start = phase * turn + scale * 2.1;
-      ctx.strokeStyle = rgbCss(palette[tone], strength * alpha);
-      ctx.beginPath();
-      ctx.arc(x, y, r * scale, start, start + LENS_ARC);
-      ctx.stroke();
-    }
+    ctx.lineWidth = Math.max(1, r * 0.08);
+    withFxMod(ctx, TUBE_MOD, () => {
+      LENS_RINGS.forEach(([scale, tone, strength, turn], k) => {
+        const start = phase * turn + scale * 2.1;
+        ctx.strokeStyle = rgbCss(palette[tone], strength * alpha);
+        ctx.beginPath();
+        ctx.arc(x, y, r * scale, start, start + LENS_ARC);
+        withLiftZ(ctx, LIFT.ringTop - k * LIFT.ringStep, () => ctx.stroke());
+      });
+    });
     ctx.fxStyle = null;
   }
 
@@ -170,7 +196,7 @@ function psychicKit(palette) {
     ctx.fxStyle = PSI;
     ctx.fillStyle = rootFaded(ctx, spec, palette.body, RIBBON_ALPHA * alpha);
     traceOutline(ctx, outline);
-    withFxMod(ctx, ribbonMod(spec.angleDeg), () => ctx.fill());
+    withLiftZ(ctx, LIFT.ribbon, () => inShadow(ctx, () => withFxMod(ctx, ribbonMod(spec.angleDeg), () => ctx.fill())));
     const line = 0.85 * alpha * clamp01(hot);
     if (!(line > 0)) {
       ctx.fxStyle = null;
@@ -188,7 +214,7 @@ function psychicKit(palette) {
       if (i === 0) ctx.moveTo(mx, my);
       else ctx.lineTo(mx, my);
     });
-    ctx.stroke();
+    withLiftZ(ctx, LIFT.line, () => withFxMod(ctx, TUBE_MOD, () => ctx.stroke()));
     ctx.fxStyle = null;
   }
 
@@ -214,19 +240,25 @@ function psychicKit(palette) {
     lens(ctx, x, y, r, alpha, hot, time * TAU * LENS_HZ + seed);
   }
 
-  /** The psychic wave over (x, y) as the glyph beat runs: rippling wavy rings round a lens. */
+  /**
+   * The psychic wave over (x, y) as the glyph beat runs: rippling wavy bands round a lens, thick
+   * lit tubes that sink as they spread (inner rings ride highest), so the wave reads as a vortex
+   * funnelling up round the orb rather than lines drawn on the card.
+   */
   function sigil(ctx, x, y, r, s) {
     if (!(r > 0)) return;
     ctx.lineJoin = 'round';
-    ctx.lineWidth = Math.max(1, r * 0.04);
+    ctx.lineWidth = Math.max(1, r * WAVE_WIDTH);
     ctx.fxStyle = PSI;
-    for (const ring of rippleRings(s, r)) {
-      if (!(ring.alpha > 0)) continue;
-      ctx.strokeStyle = rgbCss(palette[ring.tone], 0.8 * ring.alpha);
-      ctx.beginPath();
-      wavyRing(x, y, ring.radius, ring.phase).forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
-      ctx.stroke();
-    }
+    withFxMod(ctx, TUBE_MOD, () => {
+      for (const ring of rippleRings(s, r)) {
+        if (!(ring.alpha > 0)) continue;
+        ctx.strokeStyle = rgbCss(palette[ring.tone], 0.8 * ring.alpha);
+        ctx.beginPath();
+        wavyRing(x, y, ring.radius, ring.phase).forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
+        withLiftZ(ctx, LIFT.wave * (1.5 - ring.radius / r), () => inShadow(ctx, () => ctx.stroke()));
+      }
+    });
     ctx.fxStyle = null;
     lens(ctx, x, y, r * SIGIL_LENS, 0.9, 1, clamp01(s) * TAU);
   }
@@ -234,21 +266,24 @@ function psychicKit(palette) {
   // A pink-violet rim with a little bloom, as the lens rings glow.
   const kitMod = Object.freeze({ dissolve: Object.freeze({ edge: palette.hot, width: 0.12, gain: 1.3 }) });
 
-  return Object.freeze({
-    key: 'psychic',
-    palette,
-    // The sprite games' near-black violet, kept local to a card.
-    shade: Object.freeze([42, 24, 64]),
-    smoke: null,
-    particle: Object.freeze({ className: 'fx-particle--mote', color: rgbCss(palette.hot), aspect: 1 }),
-    glow: modded(glow, kitMod),
-    body: modded(body, kitMod),
-    tongue: modded(tongue, kitMod),
-    projectile: modded(projectile, kitMod),
-    sigil: modded(sigil, kitMod),
-    grain: grainPass,
-    withPalette: (p) => psychicKit(p),
-  });
+  return moddedKit(
+    {
+      key: 'psychic',
+      palette,
+      // The sprite games' near-black violet, kept local to a card.
+      shade: Object.freeze([42, 24, 64]),
+      smoke: null,
+      particle: Object.freeze({ className: 'fx-particle--mote', color: rgbCss(palette.hot), aspect: 1 }),
+      glow,
+      body,
+      tongue,
+      projectile,
+      sigil,
+      grain: grainPass,
+      withPalette: (p) => psychicKit(p),
+    },
+    kitMod
+  );
 }
 
 export const psychic = psychicKit(PALETTE);
