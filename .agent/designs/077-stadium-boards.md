@@ -184,7 +184,7 @@ particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
 | volcanic | 299 Scorched Earth, 289 Magma Basin | Lava river along the seam / a lava basin in the middle; sculpted slate stones; basalt shelves |
 | coast | 209 Surfing Beach, 212 Brooklet Hill | Sand and surf rolling in from one end / grassy banks and a brook along the seam with stepping stones |
 | forest | 030 Forest of Vitality, 197 Mystery Garden, 253 Perilous Jungle | Mossy floor, roots and flowers / garden paths and hedges / dark jungle floor with poison pools |
-| highland | 051 Stormy Mountains, 240 Mountain Ring, 239 Fighting Stadium | Wet crags with rain / a rocky ring on a peak / an arena floor |
+| highland | 051 Stormy Mountains, 240 Mountain Ring, 239 Fighting Stadium | A crater high in a storm / a rocky ring on a peak / an arena floor |
 | crystal | 052 Crystal Cave | Cave floor with glowing crystal clusters where no card lies |
 | metal | 162 Steel Shelter, 163 Full Metal Lab | Riveted steel plates / lab deck panels with light strips |
 | spirit | 198 Old Cemetery, 199 Dimension Valley, 254 Dark City | Misty graveyard ground / floating rock over a purple void / a night street with neon puddles |
@@ -199,6 +199,19 @@ particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
   tilted camera. The river winds along the seam, half-width 70 ± 11 px, a lava sheet at z −10 with
   banded colour, flow lines, crust rafts and bubbles; 220 embers. Slate palette sits ~0.04 above the
   target greys because Neutral tone mapping removes that much from dark colours.
+- Stormy Mountains (built in the prototype, `stadium-env-highland.mjs`): a round mountain centred on
+  the table with the crater in its middle (`craterBowl`: the floor is the smallest circle round the
+  table's centre holding every Active and Bench card + 14 px, the wall climbs 90 px to the rim, the
+  outer slope falls 170 px to the foot). The Bench rows sit ~42 px from the near and far edges, so
+  the circle runs past them: this board's scene covers the table widened by `SCENE_MARGINS`
+  (0.17 of the width each side, 0.2 / 0.34 of the depth near / far, what both camera presets see
+  at 1366-2560 px windows) and the whole rim closes round the arena. Rock cut into ~92 px flat faces
+  with rounded gullies, a cragged crest, the lesser peak on the left rim and the summit on the
+  right (`mountainPeaks`, clear of every card footprint), snow on the summits, a cyan glow round
+  silhouettes seen edge-on; a low sea of cyan cloud domes round the slopes; the Poke Ball emblem
+  glows on the floor (`craterEmblem`); lightning falls on the summits from over the crater or arcs
+  between clouds in a table corner, lighting rock and cloud. The card's far peak is left out: past
+  the far edge it leans off the top of the screen.
 
 ### Mesh — `stadium-environment-mesh.js`
 `createStadiumEnvironment({ three, renderer, parent, clock, motionReduced, fxDisabled, onNeedsRender })`
@@ -209,8 +222,11 @@ maskUniforms, dispose() }`.
   mipmapped), shade target (RGBA8 linear, mipmapped), all `round(min(4096, bounds.w * 1.6))` wide.
   Baked on `setLayout`/`setTarget` when the key of `[bounds, zones, recipe key]` changes; a resize
   rebakes after 150 ms without further resizes.
-- Terrain: `PlaneGeometry` over `tableBounds(layout)` with `round(w / 2.5)` × `round(h / 2.5)`
-  segments; liquid sheet and particles when the recipe has them.
+- Terrain: `PlaneGeometry` over `sceneBounds(layout, key)` (the table, or the table widened by
+  the key's `SCENE_MARGINS`) with `round(w / 2.5)` × `round(h / 2.5)` segments; liquid sheet and
+  particles when the recipe has them. Bakes hold at most `BAKE_MAX_TEXEL_AREA` (5 M) texels, fewer
+  than 1.6 per px on a wide scene; a recipe may bake a first pass (`bakePre`, read as `uPre`) so
+  its field shader stays small enough to compile quickly.
 - Programs compile with `renderer.compileAsync` when a recipe is first targeted; the reveal starts
   once they are ready (the plan's hold stays `INTRO_MS`; a late reveal only runs past it).
 - `update(now)`: copies `timeline.frame(now)` into uniforms; returns `true` while a transition runs.
@@ -227,7 +243,7 @@ maskUniforms, dispose() }`.
   `uniform mat4 uTableFromWorld`, the mask uniforms and `varying vec2 vTablePos`
   (`(uTableFromWorld * modelMatrix * vec4(transformed, 1.0)).xy`), and starts the fragment `main`
   with `if (uCutoutOn > 0.5 && environmentShown(vTablePos) >= 0.5) discard;` (the floor only inside
-  the table bounds). `customProgramCacheKey` → `'stadium-env-cutout'`.
+  the scene's rect). `customProgramCacheKey` → `'stadium-env-cutout'`.
 - `board-scene.js` sets `uTableFromWorld` to the inverse of `table.group.matrixWorld` before each
   render; `uCutoutOn` is 1 while any environment layer exists.
 
@@ -321,6 +337,17 @@ boards" toggle. Revert: unset the toggle per user, or revert the feature commits
 | 5a–5h Recipes (fx-designer) | one `stadium-env-<family>.mjs` per family + its `ENVIRONMENT_BY_CARD` rows | § Recipes | registry test: each new id → its key | — | user signs off each place on localhost |
 
 ## Deviations (Builder appends here during build)
+- Prototype (Stormy Mountains): a board's scene may run past the table (`sceneBounds`); the
+  environment then covers the table's dark floor there too. Why: a round crater holding both
+  Bench rows can't close inside the table, and the user asked for a circular mountain.
+- Prototype: shader compile, not the bake's GPU time, is the cost of first showing a board under
+  ANGLE D3D11 (measured: Scorched Earth ~2.2 s stall, Stormy Mountains ~1.4 s after splitting its
+  bake in two, 5.2 s before). The prototype compiles synchronously on the first frame; `compileAsync`
+  before the reveal (§ Mesh) stays required.
+- Prototype: the mesh builds each board from its own builder (`BOARDS[key](kit)` → `{ objects,
+  materials, bakePre?, bakeField, bakeLight?, spots(layout), apply(spots, bounds), tick?(seconds) }`),
+  not the § Recipes object: Stormy Mountains needs a cloud sheet, lightning meshes and a two-pass
+  bake that object has no slots for. Revise § Recipes and slice 1 to this shape before approval.
 
 ---
 Self-approval checklist (only when the user is unreachable):
