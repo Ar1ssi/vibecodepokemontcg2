@@ -245,6 +245,64 @@ test('a broken save keeps the copy loaded before; an empty live store still wrap
   assert.match(lines.at(-1), /^custom set customhbw skipped: set.json is not valid JSON .*; kept the copy loaded before$/);
 });
 
+// ---------------------------------------------------------------- several roots (design 076: bucket mirror over the repo)
+test('a later root replaces an earlier root set of the same folder; a broken later copy falls back', () => {
+  const repo = tempRoot();
+  const mirror = tempRoot();
+  const lines = [];
+  writeSet(repo, 'customhbw', sampleSet());
+  writeSet(mirror, 'customhbw', renamedSet('Tyranitar Prime'));
+  const both = loadCustomSets([repo, mirror], { log: (line) => lines.push(line) });
+  assert.equal(both.card('customhbw-001').name, 'Tyranitar Prime');
+  assert.equal(both.size(), 1);
+
+  writeSet(mirror, 'customhbw', '{"cards": [');
+  const fallback = loadCustomSets([repo, mirror], { log: (line) => lines.push(line) });
+  assert.equal(fallback.card('customhbw-001').name, 'Tyranitar', 'no previous: the repo copy');
+  assert.match(lines.at(-1), /^custom set customhbw skipped: set.json is not valid JSON .*; kept the copy loaded before$/);
+
+  const kept = loadCustomSets([repo, mirror], { previous: both });
+  assert.equal(kept.card('customhbw-001').name, 'Tyranitar Prime', 'the copy served before wins over the repo copy');
+  assert.equal(loadCustomSets([path.join(repo, 'nope'), repo]).size(), 1, 'a missing root adds nothing');
+});
+
+test('a live store over two roots reloads when a set appears in, changes in or leaves the later root', () => {
+  const repo = tempRoot();
+  const mirror = tempRoot();
+  writeSet(repo, 'customhbw', sampleSet());
+  const live = createLiveCustomSets([repo, mirror], { watch: false });
+  assert.equal(live.card('customhbw-001').name, 'Tyranitar');
+
+  writeSet(mirror, 'customhbw', renamedSet('Tyranitar Prime'));
+  assert.deepEqual(live.reload()?.sets, ['customhbw']);
+  assert.equal(live.card('customhbw-001').name, 'Tyranitar Prime');
+
+  fs.writeFileSync(path.join(mirror, 'customhbw', 'published.json'), '{"files":{}}');
+  assert.deepEqual(live.reload()?.sets, ['customhbw'], 'a file beside set.json counts, as in one root');
+
+  fs.rmSync(path.join(mirror, 'customhbw'), { recursive: true });
+  assert.deepEqual(live.reload()?.sets, ['customhbw']);
+  assert.equal(live.card('customhbw-001').name, 'Tyranitar', 'the repo copy is back');
+  assert.equal(live.reload(), null);
+});
+
+test('a live store watches every root', async () => {
+  const repo = tempRoot();
+  const mirror = tempRoot();
+  writeSet(repo, 'customhbw', sampleSet());
+  let resolveChange;
+  const changed = new Promise((resolve) => (resolveChange = resolve));
+  const live = createLiveCustomSets([repo, mirror], { debounceMs: 20, onChange: resolveChange });
+  try {
+    writeSet(mirror, 'customhbw', renamedSet('Tyranitar Prime'));
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('no reload within 5 s')), 5000));
+    assert.deepEqual(await Promise.race([changed, timeout]), { version: 1, sets: ['customhbw'] });
+    assert.equal(live.card('customhbw-001').name, 'Tyranitar Prime');
+  } finally {
+    live.close();
+  }
+});
+
 test('the folder watcher reloads after a write settles', async () => {
   const root = tempRoot();
   writeSet(root, 'customhbw', sampleSet());

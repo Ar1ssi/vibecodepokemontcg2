@@ -42,6 +42,9 @@ const MAX_ATTACKS = 4;
 const MAX_ABILITIES = 2;
 const MAX_COST = 5;
 export const MAX_CARDS = 999;
+// A set.json is a few hundred KB at most; anything bigger is a mistake, not a set (the server skips it, the bucket
+// index refuses it).
+export const MAX_SET_JSON_BYTES = 4 << 20;
 // Socket.IO broadcast when the server reloads changed set folders: `{ version, sets: [setId] }`.
 export const CUSTOM_SETS_CHANGED_EVENT = 'customSetsChanged';
 

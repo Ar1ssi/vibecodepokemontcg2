@@ -10,6 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { validateCustomSet } from '../../shared/custom-sets/custom-set-schema.mjs';
+import { PUBLISHED_FILE_RE } from '../../shared/custom-sets/custom-sets-index.mjs';
 import { RESERVED_SET_CODES } from '../../server/custom-sets.mjs';
 import { normalizeCardKey, parseCustomFoil } from '../../client/src/setup/foil/tcgl-foil-manifest.mjs';
 
@@ -55,12 +56,41 @@ function checkFoil(setName, dir, set, { shaders, materials }) {
     if (!materials.materials[row.material]) problems.push(`${label}: card ${localId}: unknown material ${row.material}`);
     if (row.cc && !materials.textures?.[row.cc]) problems.push(`${label}: card ${localId}: unknown pattern ${row.cc}`);
     for (const kind of ['front', 'etch', 'wp', 'cf']) {
-      if (row[kind] && !fs.existsSync(path.join(dir, 'foil', row[kind]))) {
-        problems.push(`${setName}/foil/${row[kind]}: missing`);
+      if (!row[kind]) continue;
+      if (!fs.existsSync(path.join(dir, 'foil', row[kind]))) problems.push(`${setName}/foil/${row[kind]}: missing`);
+      // a texture the bucket index would not carry: the site's foil.json would name a file it never gets (design 076)
+      else if (!PUBLISHED_FILE_RE.test(`foil/${row[kind]}`)) {
+        problems.push(`${setName}/foil/${row[kind]}: name must be <nnn>-<kind>.webp to publish`);
       }
     }
   }
   return problems;
+}
+
+/**
+ * One set folder `<rootDir>/<name>`: its set.json, a front per card and its foil.
+ * @returns {{ set: object|null, problems: string[] }} `set` is the validated set.json when there are no problems
+ */
+export function checkSet(rootDir, name, foilData = loadFoilData()) {
+  const dir = path.join(rootDir, name);
+  const file = path.join(dir, 'set.json');
+  if (!fs.existsSync(file)) return { set: null, problems: [`${name}: no set.json`] };
+  let parsed;
+  try {
+    parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch (error) {
+    return { set: null, problems: [`${name}/set.json: not valid JSON (${error.message})`] };
+  }
+  const result = validateCustomSet(parsed, { setDirName: name, reservedCodes: RESERVED_SET_CODES });
+  if (!result.ok) return { set: null, problems: result.errors.map((e) => `${name}/set.json: ${e}`) };
+  const problems = [];
+  for (const card of result.set.cards) {
+    for (const image of ['high.webp', 'low.webp']) {
+      if (!fs.existsSync(path.join(dir, card.localId, image))) problems.push(`${name}/${card.localId}/${image}: missing`);
+    }
+  }
+  problems.push(...checkFoil(name, dir, result.set, foilData));
+  return { set: problems.length ? null : result.set, problems };
 }
 
 /** @returns {{ sets: string[], problems: string[] }} */
@@ -77,33 +107,9 @@ export function checkCustomSets(rootDir = DEFAULT_ROOT) {
   }
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
-    const dir = path.join(rootDir, entry.name);
-    const file = path.join(dir, 'set.json');
-    if (!fs.existsSync(file)) {
-      problems.push(`${entry.name}: no set.json`);
-      continue;
-    }
-    let parsed;
-    try {
-      parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
-    } catch (error) {
-      problems.push(`${entry.name}/set.json: not valid JSON (${error.message})`);
-      continue;
-    }
-    const result = validateCustomSet(parsed, { setDirName: entry.name, reservedCodes: RESERVED_SET_CODES });
-    if (!result.ok) {
-      problems.push(...result.errors.map((e) => `${entry.name}/set.json: ${e}`));
-      continue;
-    }
-    const missing = [];
-    for (const card of result.set.cards) {
-      for (const name of ['high.webp', 'low.webp']) {
-        if (!fs.existsSync(path.join(dir, card.localId, name))) missing.push(`${entry.name}/${card.localId}/${name}: missing`);
-      }
-    }
-    missing.push(...checkFoil(entry.name, dir, result.set, foilData));
-    if (missing.length) problems.push(...missing);
-    else sets.push(`${entry.name} (${result.set.code}, ${result.set.cards.length} cards)`);
+    const checked = checkSet(rootDir, entry.name, foilData);
+    if (checked.problems.length) problems.push(...checked.problems);
+    else sets.push(`${entry.name} (${checked.set.code}, ${checked.set.cards.length} cards)`);
   }
   return { sets, problems };
 }

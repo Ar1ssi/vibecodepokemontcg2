@@ -9,6 +9,7 @@ import path from 'path';
 import dotenv from 'dotenv';
 import sqlite3 from 'sqlite3';
 import fs from 'fs';
+import os from 'os';
 import { fileURLToPath } from 'url';
 import { GameRoom } from './game/room.mjs';
 import { createTurnOrderTransport } from './game/turn-order-transport.mjs';
@@ -51,6 +52,7 @@ import { issueSeatToken } from './lobby/seat-token.mjs';
 import { cardArtProxyHandler, createCardArtProxy } from './card-art-proxy.mjs';
 import { createTcgdexProxy, tcgdexProxyHandler } from './tcgdex-proxy.mjs';
 import { createLiveCustomSets, customSetsManifestHandler, withCustomSets } from './custom-sets.mjs';
+import { REMOTE_POLL_MS, createRemoteCustomSets, resolveCustomSetsUrl } from './custom-sets-remote.mjs';
 import { CUSTOM_SETS_CHANGED_EVENT } from '../shared/custom-sets/custom-set-schema.mjs';
 import { createCardImageHandler } from './card-image-proxy.mjs';
 import { CARD_ART_PROXY_HOSTS } from './card-art-proxy-hosts.mjs';
@@ -282,10 +284,25 @@ async function main() {
   // are answered as TCGdex records, so every card consumer treats them like published cards.
   // The folder is watched: the card editor's "Send to ptcg-sim" (or an unzipped export) reloads in place,
   // and open pages hear CUSTOM_SETS_CHANGED_EVENT to refetch.
+  // Design 076: sets the card editor published to the bucket (Render's disk keeps nothing) are mirrored into a
+  // second root that wins over the repo's copy; their art is fetched from the bucket on first view.
   const customSetsDir = path.join(clientDir, 'src', 'assets', 'custom-sets');
+  const remoteSetsUrl = resolveCustomSetsUrl({
+    envUrl: process.env.CUSTOM_SETS_URL,
+    foilTextureUrl: process.env.FOIL_TEXTURE_URL,
+  });
+  if (remoteSetsUrl.error) console.error(remoteSetsUrl.error);
+  const remoteSets = remoteSetsUrl.baseUrl
+    ? createRemoteCustomSets({
+        baseUrl: remoteSetsUrl.baseUrl,
+        cacheDir: process.env.CUSTOM_SETS_CACHE_DIR || path.join(os.tmpdir(), 'ptcg-sim-custom-sets'),
+        log: (line) => console.error(line),
+        onUpdate: () => customSets.reload(),
+      })
+    : null;
   const describeCustomSets = () =>
     customSets.size() ? `${customSets.size()} (${[...customSets.sets.keys()].join(', ')})` : 'none';
-  const customSets = createLiveCustomSets(customSetsDir, {
+  const customSets = createLiveCustomSets(remoteSets ? [customSetsDir, remoteSets.setsDir] : customSetsDir, {
     log: (line) => console.error(line),
     onChange: (change) => {
       console.log(`custom sets reloaded (${change.sets.join(', ')} changed): ${describeCustomSets()}`);
@@ -293,6 +310,17 @@ async function main() {
     },
   });
   console.log(`custom sets: ${describeCustomSets()}`);
+  if (remoteSets) {
+    // before express.static: a published set's files come from the bucket, never from the repo copy
+    app.get('/src/assets/custom-sets/:setId/*', remoteSets.fileHandler());
+    remoteSets.start();
+    console.log(`custom sets remote: ${remoteSetsUrl.baseUrl} (every ${REMOTE_POLL_MS / 1000} s)`);
+  }
+  const hasCustomSetFile = (file) => {
+    const [setId, ...rest] = file.split('/');
+    if (remoteSets?.has(setId)) return remoteSets.hasFile(setId, rest.join('/'));
+    return fs.existsSync(path.join(customSetsDir, file));
+  };
   app.get('/api/tcgdex/*', tcgdexProxyHandler(withCustomSets(createTcgdexProxy(), customSets)));
   app.get('/api/custom-sets', customSetsManifestHandler(customSets));
   // Card art the tabletop opening draws in WebGL (design 073): TCGdex's image CDN sends a
@@ -306,7 +334,7 @@ async function main() {
   });
   if (foilTextures.error) console.error(foilTextures.error);
   app.get('/api/tcgl-foil/config', (_, res) => {
-    const customFoil = customFoilSets([...customSets.sets.keys()], (file) => fs.existsSync(path.join(customSetsDir, file)));
+    const customFoil = customFoilSets([...customSets.sets.keys()], hasCustomSetFile);
     res.json({ textureBase: foilTextures.textureBase, customFoil });
   });
 
