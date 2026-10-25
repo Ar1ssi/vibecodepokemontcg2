@@ -33,7 +33,7 @@ const FLAGSTONE_PX = 62;
 /** Key light in the table frame: from the far left, ~48° up (table-mesh.js lights from there too). */
 export const SUN_DIRECTION = [-0.45, 0.5, 0.74];
 /** Volcano proportions, relative to its base radius: height, crater radius, crater depth. */
-export const VOLCANO_SHAPE = { height: 1.1, crater: 0.27, craterDepth: 0.16 };
+export const VOLCANO_SHAPE = { height: 1.2, crater: 0.24, craterDepth: 0.14 };
 /** Field B below this marks lava on the volcano's slopes; shelves use (FIELD_SLOPE_LAVA, 0). */
 const FIELD_SLOPE_LAVA = -2;
 
@@ -340,7 +340,11 @@ void main() {
   float open = smoothstep(10.0, 44.0, clearance);
   float roomy = smoothstep(50.0, 120.0, clearance);
 
-  vec2 big = stones(q + 31.0, 124.0, 4.0);
+  // Hills: broad swells of taller rock and low hollows, so the field is never one even height.
+  float hills = fbm3(p / 340.0 + 2.3);
+  float swell = 0.45 + 1.25 * smoothstep(0.25, 0.8, hills);
+  base += 10.0 * (smoothstep(0.35, 0.85, hills) - 0.4) * (1.0 - nearRiver) * open;
+  vec2 big = stones(q + 31.0, mix(96.0, 150.0, fbm3(p / 500.0 + 9.0)), 4.0);
   vec2 mid = stones(q, 60.0, 3.0);
   vec2 pebble = stones(q + 113.0, 27.0, 1.6);
   float bigAmp = (26.0 + 30.0 * farRidge + 14.0 * nearRidge) * roomy * smoothstep(-4.0, 60.0, riverSD);
@@ -348,8 +352,8 @@ void main() {
   float islands = 30.0 * step(0.88, mid.y) * smoothstep(-60.0, -24.0, riverSD) * open;
   float midAmp = max((16.0 + 12.0 * max(farRidge, nearRidge)) * open * (1.0 - inRiver), islands * inRiver);
   float pebbleAmp = 8.0 * open * (1.0 - 0.7 * inRiver) * (0.4 + 0.6 * nearRiver);
-  float hBig = big.x * bigAmp;
-  float hMid = mid.x * midAmp;
+  float hBig = big.x * bigAmp * swell;
+  float hMid = mid.x * midAmp * mix(0.7, 1.4, hills);
   float hPebble = pebble.x * pebbleAmp;
   float rock = max(max(hBig, hMid), hPebble);
   float id = rock < 0.6 ? -1.0 : (rock == hBig ? big.y : (rock == hMid ? mid.y : pebble.y));
@@ -371,16 +375,25 @@ void main() {
   // Shelves: cooled basalt split into flagstones, each tilted a little, with sunken joints.
   float shelfSD = rowDistance(p) - 14.0 + (fbm3(p / 50.0) - 0.5) * 20.0;
   float shelf = 1.0 - smoothstep(-3.0, 3.0, shelfSD);
+  // Each flagstone a slab of its own: tops from -5.5 to -0.5 px (under any card), tilted, rounded
+  // into joints deep enough that the lava sheet glows in them.
   vec4 flag = voronoiCell(p / ${FLAGSTONE_PX.toFixed(1)} + 3.7);
-  float flagstone = -1.0 + (flag.y - 0.5) * 0.6 + dot(-flag.zw, hash22(vec2(flag.y * 31.0, 1.0)) - 0.5) * 0.8;
-  flagstone -= 1.6 * (1.0 - smoothstep(0.02, 0.06, flag.x));
+  float slabTop = -3.0 + (flag.y - 0.5) * 4.0 + dot(-flag.zw, hash22(vec2(flag.y * 31.0, 1.0)) - 0.5) * 3.0;
+  float slabEdge = smoothstep(0.015, 0.11, flag.x);
+  float flagstone = mix(${LAVA_LEVEL.toFixed(1)} - 3.0, min(slabTop, -0.5), sqrt(slabEdge * (2.0 - slabEdge)));
   height = mix(height, flagstone, shelf);
   if (shelf > 0.5) id = -1.0;
 
-  float plateSD = slotDistance(p) - 12.0;
-  float plate = 1.0 - smoothstep(-1.5, 1.5, plateSD);
-  float lip = smoothstep(-7.0, -5.0, plateSD) * (1.0 - smoothstep(-2.5, -0.5, plateSD));
-  height = mix(height, -0.6 + lip * 1.4, plate);
+  // Card places: chunky basalt slabs under each card (neighbouring slots share one bed), each slab
+  // tilted and at its own height, rounded into crevices between them. Every top stays under the
+  // cloth (cards rest at z >= 0); the rough rim rounds down into the ground around it.
+  float plateSD = slotDistance(p) - 14.0 + (fbm3(p / 30.0) - 0.5) * 12.0;
+  float plate = 1.0 - smoothstep(-6.0, 2.0, plateSD);
+  vec4 chip = voronoiCell(p / 40.0 + 8.1);
+  float chipTop = -2.6 + (chip.y - 0.5) * 3.0 + dot(-chip.zw, hash22(vec2(chip.y * 17.0, 4.0)) - 0.5) * 2.5;
+  float chipEdge = smoothstep(0.015, 0.1, chip.x);
+  float plateTop = mix(-7.0, min(chipTop, -0.5), sqrt(chipEdge * (2.0 - chipEdge)));
+  height = mix(height, plateTop, sqrt(plate * (2.0 - plate)));
   if (plate > 0.5) id = -1.0;
   shelf *= 1.0 - plate;
   slopeLava *= (1.0 - plate) * (1.0 - shelf);
@@ -512,7 +525,6 @@ void main() {
   col *= 0.88 + 0.16 * smoothstep(-6.0, 50.0, ground);
   // Bare ground between stones is darker ash; plates and shelves are smooth basalt.
   col *= mix(0.7, 1.0, max(isStone, max(plate, shelf)));
-  col = mix(col, col * 0.8, plate);
 
   // Painted rim: convex edges (negative height Laplacian) catch a light stroke.
   vec2 t2 = uTexel * 3.0;
@@ -524,7 +536,7 @@ void main() {
   // Painted cracks: thin light lines across the tops of some stones.
   vec4 crack = voronoiCell(p / 22.0 + id * 17.0);
   float crackLine = (1.0 - smoothstep(0.015, 0.04, crack.x)) * smoothstep(0.82, 0.95, n.z)
-    * smoothstep(0.55, 0.7, gnoise(p / 26.0 + id * 5.0)) * isStone * step(0.4, tone);
+    * smoothstep(0.55, 0.7, gnoise(p / 26.0 + id * 5.0)) * max(isStone * step(0.4, tone), plate);
   col = mix(col, col * 1.45 + 0.01, crackLine * 0.6);
 
   // Occlusion: crevices and the feet of stones go deep blue-grey.
@@ -541,12 +553,9 @@ void main() {
   float bounce = exp(-max(riverSD, 0.0) / 45.0) * exp(-aboveLava / 24.0) * mix(0.4, 1.0, sideFacing) * mix(1.0, 0.25, flatness);
   col += vec3(1.0, 0.16, 0.02) * (underglow * 0.7 + bounce * 0.28) * flicker;
 
-  // Shelf flagstones: one tone each, dark joints that still glow near the river.
+  // Shelf flagstones: one tone each (the lava sheet fills their joints).
   vec4 flag = voronoiCell(p / ${FLAGSTONE_PX.toFixed(1)} + 3.7);
-  float joint = (1.0 - smoothstep(0.02, 0.05, flag.x)) * shelf;
-  col *= 1.0 + (flag.y - 0.5) * 0.2 * shelf;
-  col = mix(col, vec3(0.032, 0.03, 0.038), joint);
-  col += lavaColor(0.6) * joint * (1.0 - smoothstep(10.0, 100.0, riverSD)) * flicker * 0.7;
+  col *= 1.0 + (flag.y - 0.5) * 0.25 * shelf;
 
   // The volcano: its streams and crater light the rock beside them, then the lava itself, flowing
   // downhill (the baked normal points down the slope).
@@ -568,9 +577,6 @@ void main() {
     float heat = 0.4 + core * 0.3 + (streak - 0.5) * 0.5 + inPool * (0.25 + churn * 0.3);
     col = mix(col, lavaColor(heat), slopeLava);
   }
-
-  // Card slots: the plate's inner field sits a shade darker than its lip.
-  col *= 1.0 - (1.0 - smoothstep(-5.0, -1.0, slotDistance(p))) * 0.2 * plate;
 
   vec2 edgeUv = min(vUv, 1.0 - vUv);
   col *= mix(0.55, 1.0, smoothstep(0.0, 0.05, min(edgeUv.x, edgeUv.y)));

@@ -9,6 +9,7 @@ import { getMatLayout } from '../../sizing/mat-layouts.mjs';
 import { NO_MAT_LAYOUT_ID } from '../../sizing/mat-spec.mjs';
 import {
   ENVIRONMENT_OVERRIDE_KEY,
+  VOLCANO_EDGE_OVERHANG,
   VOLCANO_MARGIN_PX,
   VOLCANO_MAX_RADIUS,
   VOLCANO_MIN_RADIUS,
@@ -91,7 +92,7 @@ test('environmentFootprints of a missing layout is empty', () => {
 
 for (const profile of PROFILES) {
   for (const half of HALVES) {
-    test(`volcanoSpot (${profile}, ${half.w} px half) stands left of the Stadium, clear of every footprint and edge`, () => {
+    test(`volcanoSpot (${profile}, ${half.w} px half) stands left of the Stadium, clear of every footprint, little past an edge`, () => {
       const layout = layoutOf(profile, half);
       const footprints = environmentFootprints(layout);
       const spot = volcanoSpot(layout, footprints);
@@ -102,9 +103,10 @@ for (const profile of PROFILES) {
         assert.ok(distanceToRect(spot.x, spot.y, rect) >= spot.r + VOLCANO_MARGIN_PX - 1e-9, `clear of ${JSON.stringify(rect)}`);
       }
       const bounds = tableBounds(layout);
-      assert.ok(spot.x - spot.r - VOLCANO_MARGIN_PX >= bounds.x - 1e-9);
-      assert.ok(spot.y - spot.r - VOLCANO_MARGIN_PX >= bounds.y - 1e-9);
-      assert.ok(spot.y + spot.r + VOLCANO_MARGIN_PX <= bounds.y + bounds.h + 1e-9);
+      const inner = spot.r * (1 - VOLCANO_EDGE_OVERHANG);
+      assert.ok(spot.x - inner >= bounds.x - 1e-9);
+      assert.ok(spot.y - inner >= bounds.y - 1e-9);
+      assert.ok(spot.y + inner <= bounds.y + bounds.h + 1e-9);
     });
   }
 }

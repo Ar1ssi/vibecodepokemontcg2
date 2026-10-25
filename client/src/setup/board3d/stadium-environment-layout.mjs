@@ -13,10 +13,12 @@ export const ENVIRONMENT_KEYS = Object.freeze([...new Set(Object.values(ENVIRONM
 /** Dev check on the real board: `?stadiumEnv=` or `localStorage[ENVIRONMENT_OVERRIDE_KEY]` forces one on. */
 export const ENVIRONMENT_OVERRIDE_KEY = 'ptcg-stadium-env';
 
-export const VOLCANO_MAX_RADIUS = 120;
+export const VOLCANO_MAX_RADIUS = 210;
 export const VOLCANO_MIN_RADIUS = 48;
-/** Free ground kept between the volcano's foot and any card footprint or table edge. */
+/** Free ground kept between the volcano's foot and any card footprint. */
 export const VOLCANO_MARGIN_PX = 18;
+/** Share of its radius the volcano may run past a table edge (its foot is cut off there). */
+export const VOLCANO_EDGE_OVERHANG = 0.2;
 const VOLCANO_STEP_PX = 6;
 const VOLCANO_SEAM_SPAN_PX = 230;
 const PRIZE_SLOTS = 6;
@@ -111,9 +113,10 @@ const distanceToRect = (x, y, rect) => {
 };
 
 /**
- * Where the volcano stands: the largest free circle (no footprint, and no table edge, within its
- * radius plus VOLCANO_MARGIN_PX) in the band left of the Stadium around the seam, preferring spots
- * near the seam and the Stadium. Null when no circle of VOLCANO_MIN_RADIUS fits.
+ * Where the volcano stands: the largest circle with no footprint within its radius plus
+ * VOLCANO_MARGIN_PX, running at most VOLCANO_EDGE_OVERHANG of its radius past a table edge, in the
+ * band left of the Stadium around the seam, preferring spots near the seam and the Stadium. Null
+ * when no circle of VOLCANO_MIN_RADIUS fits.
  * @param {ReturnType<typeof import('./board-layout.mjs').flatLayout>|null} layout
  * @param {{ slabs: object[], flats: object[] }} footprints `environmentFootprints(layout)`
  * @returns {{ x: number, y: number, r: number }|null}
@@ -127,9 +130,10 @@ export function volcanoSpot(layout, { slabs = [], flats = [] } = {}) {
   let best = null;
   for (let x = bounds.x; x <= stadium.x; x += VOLCANO_STEP_PX) {
     for (let y = seam - VOLCANO_SEAM_SPAN_PX; y <= seam + VOLCANO_SEAM_SPAN_PX; y += VOLCANO_STEP_PX) {
-      let clearance = Math.min(x - bounds.x, bounds.x + bounds.w - x, y - bounds.y, bounds.y + bounds.h - y);
+      const edge = Math.min(x - bounds.x, bounds.x + bounds.w - x, y - bounds.y, bounds.y + bounds.h - y);
+      let clearance = Infinity;
       for (const rect of rects) clearance = Math.min(clearance, distanceToRect(x, y, rect));
-      const r = Math.min(VOLCANO_MAX_RADIUS, clearance - VOLCANO_MARGIN_PX);
+      const r = Math.min(VOLCANO_MAX_RADIUS, clearance - VOLCANO_MARGIN_PX, edge / (1 - VOLCANO_EDGE_OVERHANG));
       if (r < VOLCANO_MIN_RADIUS) continue;
       const score = r - 0.05 * Math.abs(y - seam) - 0.02 * Math.abs(stadium.x - r - x);
       if (!best || score > best.score) best = { x, y, r, score };

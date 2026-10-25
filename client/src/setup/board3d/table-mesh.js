@@ -436,17 +436,22 @@ export function createTable({ scene, textures, three, renderer = null, RoomEnvir
     placeGeometry();
   };
 
-  /** The materials a Stadium environment covers: the cloth, its art and backdrop, the floor under them. */
+  /** The materials a Stadium environment covers: the cloth, its art, backdrop and zone outlines, the floor. */
   const coveredMaterials = () => [
     floor.material,
-    ...HALVES.flatMap((key) => [halves[key].backing.material, halves[key].ambient.material, halves[key].art.material]),
+    ...HALVES.flatMap((key) => [
+      halves[key].backing.material,
+      halves[key].ambient.material,
+      halves[key].art.material,
+      halves[key].overlay.material,
+    ]),
   ];
 
   /**
    * Design 077: with a cutout, the covered materials discard their fragments wherever the Stadium
    * environment shows (`cutout.glsl` defines `environmentShown(tablePoint)`; `cutout.uniforms`
-   * carries `uTableFromWorld`, world → table frame). The zone-outline overlay is never cut, so
-   * the zones read the same on any environment. Null removes it.
+   * carries `uTableFromWorld`, world → table frame), the zone outlines and labels too (user,
+   * 2026-10-25: the place shows alone). Null removes it.
    * @param {{ glsl: string, uniforms: object }|null} cutout
    */
   const setCutout = (cutout) => {
