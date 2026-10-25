@@ -7,6 +7,7 @@ import { fxDisabled, motionReduced } from '../../../image-logic/mat-fx.mjs';
 import { LAYER_Z, driveOffset, particleState, stageRectOf } from '../../../board3d/fx/fx-stage.mjs';
 import { burstParticles } from '../particles.mjs';
 import { resolveBeatColours, tintCache } from './beat-colours.js';
+import { LIFT, burstLift } from './beat-lift.mjs';
 import { drawHeat, drawRim, tintedGlow } from './card-glow.mjs';
 import { attackerPose, defenderPose } from './card-motion.mjs';
 import { DRAWERS } from './move-drawers.js';
@@ -34,6 +35,31 @@ const isSourceOver = (beat) =>
   (beat.drawer === 'terrain' && beat.params.kind === 'crack');
 
 const centreOf = (rect) => ({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+
+/**
+ * Design 076 § Depth: a burst's particles are thrown up and out of the struck card's centre, not
+ * slid across the cloth; lifted, the cast pass gives them shadows and light pools too.
+ */
+export const particleLift = (centre) => burstLift(centre, { stand: LIFT.particleStand, z: LIFT.particleZ });
+
+/** Every live particle of `bursts` at `elapsed`, each burst lifted off its anchor card. */
+const drawBursts = (ctx, bursts, elapsed, colour) => {
+  for (const { burst, anchor, rows } of bursts) {
+    ctx.save();
+    ctx.fxLift = particleLift(anchor.centre);
+    for (const row of rows) {
+      drawParticle(ctx, burst.kind, particleState(row, elapsed, { durationMs: burst.durationMs, delayMs: burst.at }), {
+        originX: anchor.centre.x,
+        originY: anchor.centre.y,
+        size: row.size,
+        aspect: row.aspect,
+        colour,
+      });
+    }
+    ctx.fxLift = null;
+    ctx.restore();
+  }
+};
 
 const warned = new Set();
 const runBeat = (beat, index, ctx, lane, progress, info) => {
@@ -249,14 +275,16 @@ export function playMoveInScene({
       const aOffset = a ? offsetWith(a, elapsed) : null;
       const dOffset = d ? offsetWith(d, elapsed) : null;
 
-      // Cast (design 076): the front and top beats replayed flat on the cloth, where solid paint
-      // shadows it and light pools its colour, pushed off by how high each piece is lifted.
+      // Cast (design 076): the front and top beats and the burst particles replayed flat on the
+      // cloth, where solid paint shadows it and light pools its colour, pushed off by how high
+      // each piece is lifted.
       canvas.begin({ layer: 'back', z: LAYER_Z.back, depthTest: true, unit: lane.h, seed, cast: CAST });
       ctx.save();
       ctx.translate(jitter.x, jitter.y);
       drawBeats(ctx, beats, 'front', lane, elapsed, info);
       drawBeats(ctx, beats, 'top', lane, elapsed, info);
       ctx.restore();
+      drawBursts(ctx, bursts, elapsed, particleColour);
 
       // Back: what the cards hide (depth-tested under their faces), with the rims and trails.
       pass(canvas, 'back', LAYER_Z.back, true);
@@ -313,17 +341,7 @@ export function playMoveInScene({
       ctx.translate(jitter.x, jitter.y);
       drawBeats(ctx, beats, 'top', lane, elapsed, info);
       ctx.restore();
-      for (const { burst, anchor, rows } of bursts) {
-        for (const row of rows) {
-          drawParticle(ctx, burst.kind, particleState(row, elapsed, { durationMs: burst.durationMs, delayMs: burst.at }), {
-            originX: anchor.centre.x,
-            originY: anchor.centre.y,
-            size: row.size,
-            aspect: row.aspect,
-            colour: particleColour,
-          });
-        }
-      }
+      drawBursts(ctx, bursts, elapsed, particleColour);
       return true;
     },
   });

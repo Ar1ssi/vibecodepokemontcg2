@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { LIFT } from '../beat-lift.mjs';
 import { DRAWERS } from '../move-drawers.js';
 import { laneGeometry, localLane, skyLane } from '../move-geometry.mjs';
 import { MATERIALS } from '../materials/index.js';
@@ -334,7 +335,6 @@ const BURNING = [
   ['volley', {}],
   ['beam', {}],
   ['starFlare', {}],
-  ['impactFlash', {}],
   ['shockRings', {}],
   ['ring', {}],
   ['ring', { kind: 'fins' }],
@@ -381,7 +381,7 @@ test('design 076: a travelling or burst beat paints whole early and burns away i
 });
 
 test('design 076: the dissolve rises through the tail and is nearly complete at its end', () => {
-  for (const drawer of ['projectile', 'beam', 'starFlare', 'impactFlash', 'shockRings', 'slashArc', 'bolt', 'fan']) {
+  for (const drawer of ['projectile', 'beam', 'starFlare', 'shockRings', 'slashArc', 'bolt', 'fan']) {
     const mid = peakAmount(drawer, 0.9, {});
     const late = peakAmount(drawer, 0.99, {});
     assert.ok(late > mid, `${drawer}: ${late} after ${mid}`);
@@ -425,4 +425,133 @@ test("design 076: a drawer that throws mid-dissolve still restores the caller's 
   const exploding = { ...MATERIALS.fire, tongue: () => { throw new Error('boom'); } };
   assert.throws(() => DRAWERS.splash.draw(rec.ctx, lane, 0.95, { ...info('splash'), material: exploding }), /boom/);
   assert.equal(rec.target.fxMod, OUTER);
+});
+
+test('design 076: glows fade whole while the bodies round them burn', () => {
+  const glowMods = [];
+  const material = {
+    ...MATERIALS.fire,
+    glow: (ctx, ...args) => {
+      glowMods.push(ctx.fxMod);
+      return MATERIALS.fire.glow(ctx, ...args);
+    },
+  };
+  for (const drawer of ['starFlare', 'beam']) {
+    glowMods.length = 0;
+    const { mods } = paintMods(drawer, 0.95, {}, { material });
+    assert.ok(glowMods.length > 0, `${drawer} glows`);
+    assert.ok(amountsOf(glowMods).every((amount) => amount === 0), `${drawer}: its glow never dissolves`);
+    assert.ok(Math.max(...amountsOf(mods)) > 0, `${drawer}: its body does`);
+  }
+  assert.ok(amountsOf(paintMods('impactFlash', 0.95).mods).every((amount) => amount === 0), 'an impact flash is a glow');
+});
+
+// ---- design 076 § Depth: beats lifted off the cloth ------------------------------------
+
+/** Draws one frame recording `ctx.fxLift` at every fill and stroke; the caller's lift is `outer`. */
+const paintLifts = (drawer, s, params = {}, over = {}, outer = null) => {
+  const rec = recordingContext();
+  const lifts = [];
+  rec.target.fxLift = outer;
+  rec.target.fill = () => lifts.push(rec.target.fxLift);
+  rec.target.stroke = () => lifts.push(rec.target.fxLift);
+  DRAWERS[drawer].draw(rec.ctx, lane, s, { ...info(drawer, params), ...over });
+  return { lifts, after: rec.target.fxLift };
+};
+const near = (a, b) => Math.abs(a - b) < 1e-9;
+
+test('design 076 depth: a bolt from the sky rises off the defender; a lane bolt arcs', () => {
+  const sky = paintLifts('bolt', 0.5, { from: 'sky' });
+  assert.ok(sky.lifts.length > 0);
+  for (const lift of sky.lifts) {
+    assert.equal(lift.stand, LIFT.upright);
+    assert.deepEqual(lift.at, [lane.bx, lane.by]);
+  }
+  const arcing = paintLifts('bolt', 0.5);
+  for (const lift of arcing.lifts) {
+    assert.equal(lift.arc, LIFT.boltArc);
+    assert.deepEqual(lift.from, [lane.ax, lane.ay]);
+    assert.deepEqual(lift.to, [lane.bx, lane.by]);
+    assert.ok(!lift.stand);
+  }
+});
+
+test('design 076 depth: travelling beats arc along the lane at chest height', () => {
+  for (const [drawer, params, arc] of [
+    ['projectile', {}, LIFT.travelArc],
+    ['projectile', { flare: 'dai', size: 0.8 }, LIFT.travelArc],
+    ['volley', {}, LIFT.travelArc],
+    ['beam', {}, LIFT.beamArc],
+  ]) {
+    const { lifts } = paintLifts(drawer, 0.5, params);
+    assert.ok(lifts.length > 0, drawer);
+    for (const lift of lifts) {
+      assert.equal(lift.z, LIFT.travelZ, drawer);
+      assert.equal(lift.arc, arc, drawer);
+      assert.ok(Array.isArray(lift.from) && Array.isArray(lift.to), drawer);
+    }
+  }
+  const body = paintLifts('projectile', 0.5).lifts[0];
+  assert.equal(body.stand, LIFT.bodyStand, 'the body faces the camera');
+  const meteor = paintLifts('projectile', 0.5, { from: 'sky' }).lifts[0];
+  assert.deepEqual([meteor.stand, meteor.at], [LIFT.upright, [lane.bx, lane.by]], 'a sky drop falls onto the defender');
+});
+
+test('design 076 depth: bursts, flares, splashes and face rings stand up over their anchor; pillars stand most', () => {
+  for (const [drawer, params, stand] of [
+    ['starFlare', {}, LIFT.burstStand],
+    ['impactFlash', {}, LIFT.burstStand],
+    ['splash', {}, LIFT.burstStand],
+    ['shards', {}, LIFT.burstStand],
+    ['slashArc', {}, LIFT.burstStand],
+    ['fan', {}, LIFT.burstStand],
+    ['ring', { kind: 'face' }, LIFT.faceStand],
+    ['ring', { kind: 'fins' }, LIFT.burstStand],
+    ['shards', { mode: 'cluster' }, LIFT.upright],
+    ['pillar', {}, LIFT.upright],
+  ]) {
+    const { lifts } = paintLifts(drawer, 0.4, params);
+    assert.ok(lifts.length > 0, `${drawer} paints`);
+    for (const lift of lifts) assert.equal(lift.stand, stand, `${drawer} ${JSON.stringify(params)}`);
+  }
+  const flash = paintLifts('impactFlash', 0.3).lifts[0];
+  assert.deepEqual(flash.at, [lane.bx, lane.by]);
+  assert.equal(flash.z, LIFT.burstZ);
+  const glyph = paintLifts('glyph', 0.5, {}, { material: MATERIALS.psychic }).lifts;
+  assert.ok(glyph.length > 0 && glyph.every((lift) => near(lift.stand, LIFT.faceStand)), 'a sigil stands nearly upright');
+});
+
+test('design 076 depth: the charge hangs where the shot leaves, at chest height', () => {
+  const { lifts } = paintLifts('coreCharge', 0.9);
+  assert.ok(lifts.length > 0);
+  for (const lift of lifts) {
+    assert.equal(lift.z, LIFT.travelZ);
+    assert.equal(lift.stand, LIFT.bodyStand);
+  }
+});
+
+test('design 076 depth: ground waves, cracks and card glows stay on the cloth', () => {
+  for (const [drawer, params, s] of [
+    ['shockRings', {}, 0.3],
+    ['ring', {}, 0.3],
+    ['terrain', { kind: 'crack' }, 0.5],
+    ['aura', {}, 0.5],
+    ['vignette', {}, 0.5],
+  ]) {
+    const { lifts } = paintLifts(drawer, s, params);
+    assert.ok(lifts.length > 0, `${drawer} paints`);
+    assert.ok(lifts.every((lift) => lift === null), `${drawer} lies flat`);
+  }
+});
+
+test("design 076 depth: every drawer leaves the caller's fxLift as it found it, even when it throws", () => {
+  const outer = Object.freeze({ z: 0.01 });
+  for (const drawer of Object.keys(DRAWERS)) {
+    for (const s of [0.2, 0.6, 0.95]) assert.equal(paintLifts(drawer, s, {}, {}, outer).after, outer, `${drawer} at ${s}`);
+  }
+  const rec = recordingContext();
+  rec.target.fxLift = outer;
+  const exploding = { ...MATERIALS.fire, tongue: () => { throw new Error('boom'); } };
+  assert.throws(() => DRAWERS.splash.draw(rec.ctx, lane, 0.5, { ...info('splash'), material: exploding }), /boom/);
+  assert.equal(rec.target.fxLift, outer);
 });
