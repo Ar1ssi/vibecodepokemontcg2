@@ -11,8 +11,13 @@
 // Design 075 slice 11: every fill and stroke runs the GPU `energy` style (`ctx.fxStyle`, ignored
 // by Canvas2D): bolts carry bright packets running down them over a stepped flicker, fills
 // crackle with thin filaments. The gain stays low so only the packets' centres bloom.
+//
+// Design 076: modifiers (`ctx.fxMod`, ignored by Canvas2D). A fast, fine crackle jitter runs
+// through the glow and the yellow core of every jag and bolt (the white centre stays a clean
+// line), the ball carries a charge grain, and every fill names the cyan-white dissolve edge.
 import { rgbCss } from '../../fx-colors.mjs';
 import { seededRandom } from '../../flow-pose.mjs';
+import { withFxMod } from './_mods.js';
 import { rootFaded } from './_root-fade.js';
 import { grainPass, sphere } from './_shared.js';
 
@@ -28,6 +33,16 @@ const BOLT_CENTRE = 0.25;
 // Style params (gpu-canvas STYLE_PARAMS energy): fast current; the halo only shimmers.
 const ENERGY = Object.freeze({ id: 'energy', streak: 0.6, speed: 5, gain: 0.7 });
 const ENERGY_HALO = Object.freeze({ id: 'energy', streak: 0.35, speed: 3, gain: 0 });
+
+// Crackle: small, fast, fine-grained, so it reads as jitter and never as a wave.
+const crackleMod = (strength, speed, scale) => Object.freeze({ distort: Object.freeze({ strength, speed, scale, angle: 0 }) });
+const CRACKLE_HALO = crackleMod(0.1, 6, 6);
+const CRACKLE_CORE = crackleMod(0.06, 7, 8);
+const CHARGED_AIR = crackleMod(0.1, 4, 4);
+const CHARGE_GRAIN = Object.freeze({
+  distort: Object.freeze({ strength: 0.08, speed: 5, scale: 6, angle: 0 }),
+  detail: Object.freeze({ amount: 0.45, speed: 3, scale: 5, angle: -90 }),
+});
 
 const freezeAll = (palette) => Object.freeze(Object.fromEntries(Object.entries(palette).map(([k, v]) => [k, Object.freeze(v)])));
 
@@ -84,6 +99,11 @@ export function jagOutline({ x, y, angleDeg, length, width, time, seed }, { jag 
 
 /** The electric material drawn in `palette` (any palette with the same keys). */
 function electricKit(palette) {
+  const edge = Object.freeze({ dissolve: Object.freeze({ edge: palette.edge, width: 0.08, gain: 1.6 }) });
+  /** `draw` with this kit's dissolve edge named for every fill it makes. */
+  const edged = (draw) => (ctx, ...args) =>
+    ctx && typeof ctx === 'object' ? withFxMod(ctx, edge, () => draw(ctx, ...args)) : draw(ctx, ...args);
+
   /** Trace a jag outline as a closed polygon, its width scaled by `scale`. */
   function traceJag(ctx, points, scale) {
     ctx.beginPath();
@@ -112,7 +132,7 @@ function electricKit(palette) {
     ctx.fxStyle = ENERGY_HALO;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, TAU);
-    ctx.fill();
+    withFxMod(ctx, CHARGED_AIR, () => ctx.fill());
     ctx.fxStyle = null;
   }
 
@@ -149,12 +169,14 @@ function electricKit(palette) {
    */
   function crackleBall(ctx, x, y, r, alpha, hot, rand) {
     ctx.fxStyle = ENERGY;
-    sphere(ctx, x, y, r, [
-      [0, palette.white, alpha * (0.45 + 0.35 * clamp01(hot))],
-      [0.25, palette.hot, alpha * 0.8],
-      [0.7, palette.body, alpha * 0.5],
-      [1, palette.deep, 0],
-    ]);
+    withFxMod(ctx, CHARGE_GRAIN, () =>
+      sphere(ctx, x, y, r, [
+        [0, palette.white, alpha * (0.45 + 0.35 * clamp01(hot))],
+        [0.25, palette.hot, alpha * 0.8],
+        [0.7, palette.body, alpha * 0.5],
+        [1, palette.deep, 0],
+      ])
+    );
     ctx.fxStyle = null;
     crackle(ctx, x, y, r, alpha, rand);
   }
@@ -178,12 +200,12 @@ function electricKit(palette) {
     ctx.fxStyle = ENERGY_HALO;
     ctx.fillStyle = rootFaded(ctx, spec, palette.edge, 0.45 * alpha);
     traceJag(ctx, points, 1);
-    ctx.fill();
+    withFxMod(ctx, CRACKLE_HALO, () => ctx.fill());
     ctx.filter = 'none';
     ctx.fxStyle = ENERGY;
     ctx.fillStyle = rootFaded(ctx, spec, palette.body, 0.95 * alpha);
     traceJag(ctx, points, CORE_WIDTH);
-    ctx.fill();
+    withFxMod(ctx, CRACKLE_CORE, () => ctx.fill());
     const centre = alpha * clamp01(hot);
     if (centre > 0) {
       ctx.fillStyle = rootFaded(ctx, spec, palette.white, centre);
@@ -236,12 +258,12 @@ function electricKit(palette) {
     ctx.strokeStyle = rgbCss(palette.hot, 0.35 * alpha);
     ctx.lineWidth = glowWidth;
     trace();
-    ctx.stroke();
+    withFxMod(ctx, CRACKLE_HALO, () => ctx.stroke());
     ctx.filter = 'none';
     ctx.fxStyle = ENERGY;
     ctx.strokeStyle = rgbCss(palette.body, 0.8 * alpha);
     ctx.lineWidth = Math.max(1, width);
-    ctx.stroke();
+    withFxMod(ctx, CRACKLE_CORE, () => ctx.stroke());
     ctx.strokeStyle = rgbCss(palette.white, 0.85 * alpha);
     ctx.lineWidth = Math.max(1, width * BOLT_CENTRE);
     ctx.stroke();
@@ -255,11 +277,11 @@ function electricKit(palette) {
     shade: Object.freeze([18, 20, 38]),
     smoke: null,
     particle: Object.freeze({ className: 'fx-particle--streak', color: rgbCss(palette.hot), aspect: 0.2 }),
-    glow,
-    body,
-    tongue,
-    projectile,
-    jagStroke,
+    glow: edged(glow),
+    body: edged(body),
+    tongue: edged(tongue),
+    projectile: edged(projectile),
+    jagStroke: edged(jagStroke),
     grain: grainPass,
     withPalette: (p) => electricKit(p),
   });

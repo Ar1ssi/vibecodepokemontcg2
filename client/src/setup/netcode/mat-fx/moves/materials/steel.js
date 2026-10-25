@@ -7,12 +7,22 @@
 // and a few short spark blades. The sigil is a targeting reticle that turns and locks (Smart
 // Strike). Palette #9AA7B8 #D5DEEA #FFFFFF, deep #4A5563, cool edge #9FC5F0. No grain. Every
 // call draws on the context it is handed and is otherwise pure.
+//
+// Design 076: modifiers (`ctx.fxMod`, ignored by Canvas2D). Metal is rigid, so nothing on a
+// blade or sphere warps: a slow brushed grain runs along the blade body and over the sphere, a
+// faint cool shimmer moves in the halos, the specular line and rim stay clean, and every fill
+// names the cool-blue dissolve edge (a thin, cold sliver).
 import { rgbCss } from '../../fx-colors.mjs';
+import { withFxMod } from './_mods.js';
 import { grainPass, shardOutline, sphere, styledKit, traceOutline } from './_shared.js';
 
 // Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
 // Polished metal: hard facets with a glint sweeping each blade; edges carry running glints.
 const METAL = Object.freeze({ byKind: { linear: { id: 'crystal', facets: 3, sheen: 0.8, speed: 1.6 }, radial: { id: 'crystal', facets: 6, sheen: 0.5, speed: 1.2 }, stroke: { id: 'crystal', sheen: 0.7, speed: 1.6 } } });
+
+const COOL_SHIMMER = Object.freeze({ distort: Object.freeze({ strength: 0.06, speed: 0.8, scale: 2.5, angle: 0 }) });
+const SPHERE_BRUSH = Object.freeze({ detail: Object.freeze({ amount: 0.25, speed: 0.3, scale: 5, angle: 0 }) });
+const bladeBrush = (angleDeg) => ({ detail: { amount: 0.3, speed: 0.4, scale: 6, angle: angleDeg } });
 
 const TAU = Math.PI * 2;
 const HEEL = 0.22;
@@ -80,6 +90,11 @@ export function reticleTicks(s, r) {
 
 /** The steel material drawn in `palette` (any palette with the same keys). */
 function steelKit(palette) {
+  const edge = Object.freeze({ dissolve: Object.freeze({ edge: palette.edge, width: 0.06, gain: 1.2 }) });
+  /** `draw` with this kit's dissolve edge named for every fill it makes. */
+  const edged = (draw) => (ctx, ...args) =>
+    ctx && typeof ctx === 'object' ? withFxMod(ctx, edge, () => draw(ctx, ...args)) : draw(ctx, ...args);
+
   /** A cool haze: the bright steel at the centre fading through the blue edge to clear. */
   function glow(ctx, x, y, r, alpha) {
     if (!(r > 0) || !(alpha > 0)) return;
@@ -90,26 +105,28 @@ function steelKit(palette) {
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, TAU);
-    ctx.fill();
+    withFxMod(ctx, COOL_SHIMMER, () => ctx.fill());
   }
 
   /** A metal sphere: a hard white highlight up-left, steel shading to deep, a cool blue rim. */
   function body(ctx, x, y, r, alpha, hot = 1) {
     if (!(r > 0) || !(alpha > 0)) return;
     const shine = alpha * clamp01(hot);
-    sphere(
-      ctx,
-      x,
-      y,
-      r,
-      [
-        [0, palette.white, shine],
-        [0.16, palette.white, shine * 0.9],
-        [0.22, palette.hot, alpha],
-        [0.62, palette.body, alpha * 0.95],
-        [1, palette.deep, alpha * 0.9],
-      ],
-      0.35
+    withFxMod(ctx, SPHERE_BRUSH, () =>
+      sphere(
+        ctx,
+        x,
+        y,
+        r,
+        [
+          [0, palette.white, shine],
+          [0.16, palette.white, shine * 0.9],
+          [0.22, palette.hot, alpha],
+          [0.62, palette.body, alpha * 0.95],
+          [1, palette.deep, alpha * 0.9],
+        ],
+        0.35
+      )
     );
     ctx.strokeStyle = rgbCss(palette.edge, 0.6 * alpha);
     ctx.lineWidth = Math.max(1, r * 0.06);
@@ -130,7 +147,7 @@ function steelKit(palette) {
     ctx.filter = `blur(${Math.max(1, spec.width * HALO_BLUR).toFixed(2)}px)`;
     ctx.fillStyle = rgbCss(palette.edge, HALO_ALPHA * alpha);
     traceOutline(ctx, shape(HALO_WIDTH));
-    ctx.fill();
+    withFxMod(ctx, COOL_SHIMMER, () => ctx.fill());
     ctx.filter = 'none';
 
     const blade = shape(1);
@@ -146,7 +163,7 @@ function steelKit(palette) {
     brush.addColorStop(1, rgbCss(palette.deep, 0.85 * alpha));
     ctx.fillStyle = brush;
     traceOutline(ctx, blade);
-    ctx.fill();
+    withFxMod(ctx, bladeBrush(spec.angleDeg), () => ctx.fill());
 
     const shine = alpha * clamp01(hot);
     if (!(shine > 0)) return;
@@ -228,11 +245,11 @@ function steelKit(palette) {
     shade: Object.freeze([6, 10, 20]),
     smoke: null,
     particle: Object.freeze({ className: 'fx-particle--streak', color: rgbCss(palette.white), aspect: 0.2 }),
-    glow,
-    body,
-    tongue,
-    projectile,
-    sigil,
+    glow: edged(glow),
+    body: edged(body),
+    tongue: edged(tongue),
+    projectile: edged(projectile),
+    sigil: edged(sigil),
     grain: grainPass,
     withPalette: (p) => steelKit(p),
   });

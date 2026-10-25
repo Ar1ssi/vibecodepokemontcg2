@@ -7,7 +7,12 @@
 // Design 075 slice 9: each fill names its GPU style (`ctx.fxStyle`, ignored by Canvas2D).
 // Tongues paint a single-colour gradient laid along their axis — identical on Canvas2D — so
 // the flame style knows base from tip and flows its noise that way.
+//
+// Design 076: modifiers (`ctx.fxMod`, ignored by Canvas2D). Heat haze warps the flame body and
+// its halo, a grain streams base to tip through the outer passes so a big tongue never reads
+// flat, the white-hot filament stays clean, and every fill names the orange dissolve edge.
 import { rgbCss } from '../../fx-colors.mjs';
+import { withFxMod } from './_mods.js';
 import { grainPass, sphere, tonguePath, wobble } from './_shared.js';
 
 const TAU = Math.PI * 2;
@@ -31,6 +36,17 @@ const FLAME_CORE = Object.freeze({ id: 'flame', erode: 0.55 });
 const ORB_BODY = Object.freeze({ id: 'orb' });
 const ORB_GLOW = Object.freeze({ id: 'orb', boil: 0.5, limb: 0, gain: 0 });
 
+// Haze rises up the stage; the grain streams along each tongue (its angle is set per tongue).
+const HAZE_BODY = Object.freeze({ strength: 0.15, speed: 1.4, scale: 3, angle: -90 });
+const HAZE_MID = Object.freeze({ strength: 0.1, speed: 1.6, scale: 3.5, angle: -90 });
+const HAZE_CORE = Object.freeze({ distort: Object.freeze({ strength: 0.05, speed: 1.8, scale: 4, angle: -90 }) });
+const HAZE_HALO = Object.freeze({ distort: Object.freeze({ strength: 0.15, speed: 1, scale: 2.5, angle: -90 }) });
+const SPHERE_CHURN = Object.freeze({
+  distort: Object.freeze({ strength: 0.08, speed: 1.2, scale: 3, angle: -90 }),
+  detail: Object.freeze({ amount: 0.35, speed: 0.8, scale: 4, angle: -90 }),
+});
+const tongueHaze = (haze, grain, angleDeg) => ({ distort: haze, detail: { amount: grain, speed: 1.8, scale: 5, angle: angleDeg } });
+
 const PALETTE = Object.freeze({
   deep: Object.freeze([210, 41, 8]),
   body: Object.freeze([235, 108, 6]),
@@ -41,6 +57,11 @@ const PALETTE = Object.freeze({
 
 /** The fire material drawn in `palette` (any palette with the same keys). */
 function fireKit(palette) {
+  const edge = Object.freeze({ dissolve: Object.freeze({ edge: palette.body, width: 0.14, gain: 1.8 }) });
+  /** `draw` with this kit's dissolve edge named for every fill it makes. */
+  const edged = (draw) => (ctx, ...args) =>
+    ctx && typeof ctx === 'object' ? withFxMod(ctx, edge, () => draw(ctx, ...args)) : draw(ctx, ...args);
+
   /** A soft radial glow, red at the rim. */
   function glow(ctx, x, y, r, alpha) {
     if (!(r > 0) || !(alpha > 0)) return;
@@ -52,7 +73,7 @@ function fireKit(palette) {
     ctx.fxStyle = ORB_GLOW;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, TAU);
-    ctx.fill();
+    withFxMod(ctx, HAZE_HALO, () => ctx.fill());
     ctx.fxStyle = null;
   }
 
@@ -60,13 +81,15 @@ function fireKit(palette) {
   function body(ctx, x, y, r, alpha, hot = 1) {
     if (!(r > 0) || !(alpha > 0)) return;
     ctx.fxStyle = ORB_BODY;
-    sphere(ctx, x, y, r, [
-      [0, palette.white, alpha * hot],
-      [0.3, palette.core, alpha],
-      [0.62, palette.hot, alpha * 0.9],
-      [0.86, palette.body, alpha * 0.5],
-      [1, palette.deep, 0],
-    ]);
+    withFxMod(ctx, SPHERE_CHURN, () =>
+      sphere(ctx, x, y, r, [
+        [0, palette.white, alpha * hot],
+        [0.3, palette.core, alpha],
+        [0.62, palette.hot, alpha * 0.9],
+        [0.86, palette.body, alpha * 0.5],
+        [1, palette.deep, 0],
+      ])
+    );
     ctx.fxStyle = null;
   }
 
@@ -78,17 +101,17 @@ function fireKit(palette) {
     ctx.fxStyle = FLAME_BODY;
     ctx.fillStyle = alongTongue(ctx, spec, palette.body, 0.6 * alpha);
     tonguePath(ctx, spec, 1);
-    ctx.fill();
+    withFxMod(ctx, tongueHaze(HAZE_BODY, 0.5, spec.angleDeg), () => ctx.fill());
     ctx.filter = 'none';
     ctx.fxStyle = FLAME_MID;
     ctx.fillStyle = alongTongue(ctx, spec, palette.hot, 0.8 * alpha);
     tonguePath(ctx, spec, 0.66);
-    ctx.fill();
+    withFxMod(ctx, tongueHaze(HAZE_MID, 0.35, spec.angleDeg), () => ctx.fill());
     if (hot > 0) {
       ctx.fxStyle = FLAME_CORE;
       ctx.fillStyle = alongTongue(ctx, spec, palette.core, 0.9 * alpha * hot);
       tonguePath(ctx, { ...spec, seed: spec.seed + 0.5 }, 0.4);
-      ctx.fill();
+      withFxMod(ctx, HAZE_CORE, () => ctx.fill());
     }
     ctx.fxStyle = null;
   }
@@ -128,10 +151,10 @@ function fireKit(palette) {
     shade: Object.freeze([70, 6, 0]),
     smoke: Object.freeze([120, 96, 84]),
     particle: Object.freeze({ className: 'fx-particle--ember', color: rgbCss(palette.hot), aspect: 0.3 }),
-    glow,
-    body,
-    tongue,
-    projectile,
+    glow: edged(glow),
+    body: edged(body),
+    tongue: edged(tongue),
+    projectile: edged(projectile),
     grain: grainPass,
     withPalette: (p) => fireKit(p),
   });
