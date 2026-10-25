@@ -3,13 +3,13 @@
 // with a few broad facets on rounded shoulders, mid slate greys, cool shadows, thin painted
 // highlights on their rims, and saturated lava glowing in the gaps. No photographic micro-detail.
 // Content after the card art (Ryo Ueda, PRC 138): a volcano spills lava down its flanks into a
-// lava river that splits the two halves along the seam, and its streams cross the table too. The
+// lava river that splits the two halves along the seam; its side streams run on to the table edge. The
 // ground has its own lie of plateaus, ridges and hollows, cards or not: the scene draws the
 // environment first and the board over it (board-scene.js), so no card place is marked.
 //
 // Two stages:
 // 1. Bake, once per layout: BAKE_FIELD renders the ground into a half-float target at ~1.6 texels
-//    per table px (R height px, G signed px from the nearest lava bank, B lava on the volcano's
+//    per table px (R height px, G signed px from the river bank, B lava on the volcano's
 //    slopes 0..1, A stone id or -1 off the stones); BAKE_LIGHT turns it into normals, occlusion
 //    and a soft sun shadow.
 // 2. Per frame: TERRAIN displaces a dense grid by the baked height; LAVA is one sheet at
@@ -184,9 +184,9 @@ float craterRadius() {
 float craterRimHeight() {
   return volcanoHeight() * pow(1.0 - ${VOLCANO_SHAPE.crater.toFixed(3)}, 1.25);
 }
-// Lava on the volcano: the crater pool and three streams down its flanks, the middle one
-// downstream into the river, the others toward the near and far sides where they run on across
-// the table (STREAMS). x = 1 on lava, y = signed px from its edge.
+// Lava from the volcano: the crater pool and three streams down its flanks, the middle one
+// downstream into the river, the others toward the near and far sides, running on in their own
+// direction to the table edge. x = 1 on lava, y = signed px from its edge.
 vec2 volcanoLava(vec2 p) {
   float r = uVolcano.z;
   if (r <= 0.0) return vec2(0.0, 100000.0);
@@ -197,10 +197,12 @@ vec2 volcanoLava(vec2 p) {
   float angle = atan(rel.y, rel.x);
   for (int k = 0; k < 3; k++) {
     float fk = float(k);
-    float course = (fk - 1.0) * 1.05 + 0.18 * sin(d * 0.04 + fk * 1.7);
-    float width = mix(6.0, 17.0, clamp((d - crater) / r, 0.0, 1.0));
+    // The wiggle is an angle on the cone and a constant sway (in px) past its foot.
+    float course = (fk - 1.0) * 1.05 + 0.22 * sin(d * 0.05 + fk * 1.7) * min(1.0, r / max(d, 1.0));
+    float width = mix(3.0, 8.5, clamp((d - crater) / r, 0.0, 1.0));
     float across = abs(angleBetween(angle, course)) * d - width;
-    best = min(best, max(across, max(crater * 0.7 - d, d - r * 1.05)));
+    float reach = k == 1 ? r * 1.3 : 100000.0;
+    best = min(best, max(across, max(crater * 0.7 - d, d - reach)));
   }
   return vec2(1.0 - smoothstep(-0.8, 0.8, best), best);
 }
@@ -219,31 +221,12 @@ float riverHalfWidth(float x) {
 }
 `;
 
-const STREAMS = /* glsl */ `
-// The volcano's two side streams run on from its foot across the table to the far end, one
-// through each half, winding as they go. Signed px from the nearest stream bank (< 0 inside).
-float streamDistance(vec2 p) {
-  if (uVolcano.z <= 0.0) return 100000.0;
-  float best = 100000.0;
-  for (int k = 0; k < 2; k++) {
-    float side = k == 0 ? -1.0 : 1.0;
-    vec2 foot = uVolcano.xy + uVolcano.z * vec2(0.5, 0.866 * side);
-    float target = uRiverY * (1.0 + 0.55 * side);
-    float centre = mix(foot.y, target, smoothstep(foot.x, foot.x + 380.0, p.x))
-      + 34.0 * (fbm3(vec2(p.x / 300.0, 5.0 + float(k) * 7.0)) - 0.5) * smoothstep(foot.x, foot.x + 150.0, p.x);
-    float halfWidth = mix(18.0, 30.0, fbm3(vec2(p.x / 260.0, 11.0 + float(k))));
-    best = min(best, abs(p.y - centre) - halfWidth + max(foot.x - p.x, 0.0) * 2.0);
-  }
-  return best;
-}
-`;
-
 /**
  * Bake 1: the ground. The land has its own lie (terraced plateaus, ridges, hollows) and falls to
- * the lava: the river, the volcano's streams across the table, and the gaps between the stones
- * beside them, the way TCG Live's fire board glows between its rocks. Stones in three sizes ride
- * on the land; the volcano rises with broad sculpted facets, a crater and grooves where its
- * streams run.
+ * the lava: the river and the gaps between the stones beside it, the way TCG Live's fire board
+ * glows between its rocks. Stones in three sizes ride on the land; the volcano rises with broad
+ * sculpted facets, a crater and grooves where its streams run; past its foot the streams cut
+ * narrow channels under the lava sheet all the way to the table edge.
  */
 export const BAKE_FIELD_FRAGMENT = /* glsl */ `
 ${TABLE_UNIFORMS}
@@ -252,7 +235,6 @@ ${NOISE}
 ${VORONOI}
 ${VOLCANO}
 ${RIVER}
-${STREAMS}
 float smin(float a, float b, float k) {
   float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
   return mix(b, a, h) - k * h * (1.0 - h);
@@ -293,7 +275,7 @@ float volcanoCone(vec2 p, float streams) {
   float crater = craterRadius();
   float rim = craterRimHeight();
   if (d < crater) cone = mix(rim - r * ${VOLCANO_SHAPE.craterDepth.toFixed(3)}, rim + 2.0, smoothstep(crater * 0.45, crater, d));
-  cone -= streams * 7.0 * step(crater, d);
+  cone -= streams * 5.0 * step(crater, d);
   return cone * (1.0 - smoothstep(r * 0.92, r * 1.04, d));
 }
 // The land's own lie in px: terraced plateaus with soft cliffs between them, ridges, hollows.
@@ -310,8 +292,7 @@ void main() {
   vec2 q = p + warp * 46.0;
   float wobble = (fbm3(p / 90.0) - 0.5) * 22.0;
 
-  float riverSD = abs(p.y - riverCenter(p.x)) - riverHalfWidth(p.x) + wobble;
-  float lavaSD = min(riverSD, streamDistance(p) + wobble * 0.5);
+  float lavaSD = abs(p.y - riverCenter(p.x)) - riverHalfWidth(p.x) + wobble;
   float nearLava = 1.0 - smoothstep(0.0, 110.0, lavaSD);
   float inLava = 1.0 - smoothstep(-14.0, 0.0, lavaSD);
   float bank = 1.0 - smoothstep(-26.0, 0.0, lavaSD);
@@ -339,7 +320,12 @@ void main() {
     height = max(height, base + cone);
     id = 0.61;
   }
-  float slopeLava = lava.x * step(distance(p, uVolcano.xy), uVolcano.z * 0.95);
+  float vd = distance(p, uVolcano.xy);
+  // Past the cone's foot the streams cut channels under the lava sheet, banks sloping in.
+  float channel = (1.0 - smoothstep(0.0, 18.0, lava.y)) * step(uVolcano.z * 0.9, vd) * step(0.001, uVolcano.z);
+  height = mix(height, min(height, ${LAVA_LEVEL.toFixed(1)} - 5.0), channel);
+  if (lava.x * step(uVolcano.z * 0.9, vd) > 0.5) id = -1.0;
+  float slopeLava = lava.x * step(vd, uVolcano.z * 0.95);
 
   gl_FragColor = vec4(height, lavaSD, slopeLava, id);
 }
