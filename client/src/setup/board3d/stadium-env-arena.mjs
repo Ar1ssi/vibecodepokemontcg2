@@ -449,8 +449,14 @@ void main() {
     float along = alongStands(p);
     float tierD = mod(length(max(abs(p - uRing.xy) - uBoards, 0.0)) - ${BOARD_PX.thick}.0, ${TIER_PX.run}.0);
     col = seat;
+    // Aisles of stairs climb the stands every so often, empty of the crowd.
+    float aisle = abs(mod(along + 140.0, 280.0) - 140.0);
+    if (aisle < 10.0) {
+      col = mix(vec3(0.03, 0.09, 0.1), vec3(0.07, 0.16, 0.17), smoothstep(0.0, 3.0, mod(tierD, 13.0)) * tierTop);
+    }
     // Two neighbouring seats either side, so a person leaning past their slot isn't cut off.
     for (int k = -1; k <= 1; k++) {
+      if (aisle < 12.0) break;
       float slot = floor(along / 17.0) + float(k);
       float seed = hash12(vec2(slot, id * 97.0));
       if (seed < 0.08) continue;
