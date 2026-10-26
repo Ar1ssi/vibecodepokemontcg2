@@ -108,16 +108,18 @@ test('the rig runs round outside the ropes, a lamp at each of its corners and th
   }
 });
 
-test('laserLights: one high in each far corner, out past the ad boards', () => {
+test('laserLights: one high in each corner, out past the ad boards', () => {
   for (const layout of layouts) {
     const spots = arenaSpots(layout);
     const lights = laserLights(spots);
-    assert.equal(lights.length, 2);
+    assert.equal(lights.length, 4);
     for (const [x, y, z] of lights) {
-      assert.ok(Math.abs(x - spots.ring.x) > spots.boards.hw && y > spots.ring.y + spots.boards.hh, 'past the far corner of the boards');
+      assert.ok(Math.abs(x - spots.ring.x) > spots.boards.hw && Math.abs(y - spots.ring.y) > spots.boards.hh, 'past a corner of the boards');
       assert.ok(z > POST_PX.height, 'high over the ring');
     }
-    assert.ok(lights[0][0] < spots.ring.x && lights[1][0] > spots.ring.x, 'left, then right');
+    const [farLeft, farRight, nearLeft, nearRight] = lights;
+    assert.ok(farLeft[0] < spots.ring.x && farRight[0] > spots.ring.x && nearLeft[0] < spots.ring.x && nearRight[0] > spots.ring.x);
+    assert.ok(farLeft[1] > spots.ring.y && farRight[1] > spots.ring.y && nearLeft[1] < spots.ring.y && nearRight[1] < spots.ring.y);
   }
 });
 

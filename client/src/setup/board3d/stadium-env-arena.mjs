@@ -3,8 +3,8 @@
 // the rig's spotlight and teal toward the ropes, sits on a square white stage edged in a row of
 // white lights; round the stage the arena floor, then a band of glowing LED ad boards, then the dark
 // stands full of the crowd, all under a teal haze. The lighting rig hangs over the ring, a ring of
-// lamps; long lasers in yellow-green, magenta, cyan and white sweep the crowd from lights glaring
-// white high in the far corners.
+// lamps; long lasers in yellow-green, magenta, cyan and white criss-cross the crowd from lights
+// glaring white high in the arena's four corners.
 // The art looks across the arena at the ring; the board looks down into the ring, so the ring's
 // canvas holds every card, its corner posts and three ropes a side stand round them, the rig runs
 // round over the ropes (its height carries it out past them in both camera presets), and the stage,
@@ -47,19 +47,20 @@ export const TIER_PX = { run: 40, rise: 26 };
 export const POST_PX = { height: 96, radius: 7 };
 export const ROPES = { heights: [36, 60, 84], radius: 2.6, sag: 5 };
 /**
- * The lasers: how many (the first eight down the side stands, the rest across the far stands), and
- * the lights they shine from, high in the far corners: px out past the ad boards' corner along x
- * and y, and z over the cloth.
+ * The lasers: how many (laser k shines from light k % 4: the far corners' sweep along their side
+ * stands toward the near end, or for k >= 8 across the far stands; the near corners' along their side
+ * stands toward the far end, so the two sets criss-cross), and the lights they shine from, high in
+ * the four corners: px out past the ad boards' corner along x and along y, and z over the cloth.
  */
-export const LASER_COUNT = 12;
-export const LASER_LIGHT_PX = { out: 150, far: 110, z: 240 };
+export const LASER_COUNT = 16;
+export const LASER_LIGHT_PX = { out: 150, end: 110, z: 240 };
 /**
  * The lighting rig over the ring, as the art's: a truss round it `out` px outside the ropes, `z` px
  * over the canvas and `depth` px deep, its corners cut `cut` px; a lamp about every `lampEvery` px.
  */
 export const RIG_PX = { out: 40, z: 300, depth: 16, cut: 110, lampEvery: 105 };
 /** Half the size of a rig lamp's glow and of a laser light's glare, px. */
-const GLINT_PX = { lamp: 13, light: 64 };
+const GLINT_PX = { lamp: 22, light: 64 };
 
 const POST_STEEL = [0.0, 0.17, 0.38, 0.4];
 const PAD_BLUE = [0.0, 0.2, 0.44, 0.15];
@@ -120,11 +121,16 @@ export function rigLamps(ring) {
   return lamps;
 }
 
-/** The two laser lights high in the far corners: [x, y, z] each, left then right. */
+/** The four laser lights high in the corners: [x, y, z] each, far left, far right, near left, near right. */
 export function laserLights({ ring, boards }) {
-  return [-1, 1].map((side) => [
-    ring.x + side * (boards.hw + LASER_LIGHT_PX.out),
-    ring.y + boards.hh + LASER_LIGHT_PX.far,
+  return [
+    [-1, 1],
+    [1, 1],
+    [-1, -1],
+    [1, -1],
+  ].map(([sx, sy]) => [
+    ring.x + sx * (boards.hw + LASER_LIGHT_PX.out),
+    ring.y + sy * (boards.hh + LASER_LIGHT_PX.end),
     LASER_LIGHT_PX.z,
   ]);
 }
@@ -559,18 +565,21 @@ varying float vLaser;
 ${NOISE}
 varying float vOutside;
 void main() {
-  // As in the art, long lasers cross the arena from the lights high in its far corners (laserLights):
-  // the first eight sweep down the side stands toward the near end, each staying on its own side
-  // past the ad boards; the rest sweep across the far stands to the other side. So none crosses
-  // the ring or the stage.
+  // As in the art, long lasers criss-cross the arena from the lights high in its corners
+  // (laserLights): light k % 4 shines laser k. The far lights' sweep down their side stands toward
+  // the near end, the near lights' up theirs toward the far end, so they cross; past k = 8 the far
+  // lights' sweep across the far stands to the other side instead. Each stays out past the ad
+  // boards, so none crosses the ring or the stage.
   float k = aBeam.z;
   float sweep = sin(uTime * (0.1 + 0.07 * hash12(vec2(k, 2.0))) + hash12(vec2(k, 3.0)) * 6.28);
-  float side = mod(k, 2.0) < 0.5 ? -1.0 : 1.0;
-  vec3 source = vec3(uRing.x + side * (uBoards.x + ${LASER_LIGHT_PX.out}.0), uRing.y + uBoards.y + ${LASER_LIGHT_PX.far}.0, ${LASER_LIGHT_PX.z}.0);
+  float light = mod(k, 4.0);
+  float side = mod(light, 2.0) < 0.5 ? -1.0 : 1.0;
+  float end = light < 1.5 ? 1.0 : -1.0;
+  vec3 source = vec3(uRing.x + side * (uBoards.x + ${LASER_LIGHT_PX.out}.0), uRing.y + end * (uBoards.y + ${LASER_LIGHT_PX.end}.0), ${LASER_LIGHT_PX.z}.0);
   vec2 target;
-  if (k < 7.5) {
+  if (end < 0.0 || k < 7.5) {
     float outward = 60.0 + 110.0 * hash12(vec2(k, 4.0)) + 30.0 * sweep;
-    target = vec2(uRing.x + side * (uBoards.x + outward), uRing.y - uBoards.y * (0.15 + 0.85 * hash12(vec2(k, 5.0))) + 90.0 * sweep);
+    target = vec2(uRing.x + side * (uBoards.x + outward), uRing.y - end * uBoards.y * (0.1 + 0.9 * hash12(vec2(k, 5.0))) + 90.0 * sweep);
   } else {
     float share = 0.2 + 0.75 * hash12(vec2(k, 6.0)) + 0.12 * sweep;
     target = vec2(uRing.x - side * uBoards.x * share, uRing.y + uBoards.y + 50.0 + 90.0 * hash12(vec2(k, 7.0)));
@@ -636,7 +645,7 @@ varying vec2 vCorner;
 varying float vTwinkle;
 void main() {
   float r = length(vCorner);
-  float glow = exp(-r * r * 40.0) * 1.3 + exp(-r * 4.5) * 0.3;
+  float glow = exp(-r * r * 60.0) * 1.6 + exp(-r * 4.5) * 0.35;
   glow *= 1.0 - smoothstep(0.85, 1.0, r);
   float shown = smoothstep(0.6, 1.0, uReveal) * (1.0 - uExit);
   gl_FragColor = vec4(vec3(0.85, 0.97, 1.05) * glow * vTwinkle * shown, 1.0);
