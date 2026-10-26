@@ -440,6 +440,10 @@ void main() {
   if (n.z > 0.5) {
     // A roof: dark tar, its gravel mottled, the city's glow faint on it.
     col = vColor.rgb * 0.24 * (0.8 + 0.4 * gnoise(vWorld.xy / 14.0)) + vec3(0.006, 0.006, 0.014);
+    // The round tower's lit crown, as the art's: a warm light along the rim of each tier's ledge.
+    float fromAxis = distance(vWorld.xy, uRound.xy);
+    float rim = min(min(abs(fromAxis - uRound.z), abs(fromAxis - uRound.z * 0.82)), abs(fromAxis - uRound.z * 0.6));
+    col = mix(col, vec3(1.25, 1.08, 0.78), isRound * (1.0 - smoothstep(2.0, 5.0, rim)));
   } else {
     float along = isRound > 0.5
       ? atan(vWorld.y - uRound.y, vWorld.x - uRound.x) * uRound.z
