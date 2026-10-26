@@ -58,10 +58,11 @@ export const WALL_RUN_PX = 108;
 export const MAX_FALLS = 4;
 /**
  * The lavafalls: only the art's four, down its back wall, so on the far wall (the middle pair
- * beside the opponent's hand, not behind it). Falls on the side walls, seen from above, ran out
- * from the moat like rays. Where each pours, as the side of the basin and a share along that
- * side's straight run (-1 left end, 1 right end), and whether it forks into three strands near its
- * foot (the art's second fall from the right).
+ * beside the opponent's hand, not behind it). Falls on the side walls (tried three times) run
+ * across the screen in both presets, from the screen's edge to the moat, and read as rays. Where
+ * each pours, as the side of the basin and a share along that side's straight run (-1 left end,
+ * 1 right end), and whether it forks into three strands near its foot (the art's second fall from
+ * the right).
  */
 const FALL_RECIPES = [
   { side: 'far', at: -0.9, fork: false },
@@ -72,8 +73,9 @@ const FALL_RECIPES = [
 const FALL_DIP_PX = 14;
 const FALL_OVER_PX = 16;
 const FORK_AT_PX = 58;
-/** Width of the walls' flat faces. */
-const FACET_PX = 66;
+/** Width of the walls' flat faces, and how deep the seams between them are cut. */
+const FACET_PX = 110;
+const SEAM_PX = 7;
 export const EMBER_COUNT = 320;
 
 const SIDE_DIRECTIONS = {
@@ -274,8 +276,8 @@ float basinAt(vec2 p) {
   return texture2D(uPre, (p - uMin) / uSize).r;
 }
 // The rock cut into flat faces: each Voronoi cell takes the basin's plane at its point, leaned a
-// little at random, never far off the basin. x: height, y: the face's id.
-vec2 faceted(vec2 p, float h, float amount) {
+// little at random, never far off the basin. x: height, y: the face's id, z: px to its border.
+vec3 faceted(vec2 p, float h, float amount) {
   vec4 cell = voronoiCell(p / ${FACET_PX}.0 + 17.0);
   vec2 c = p + cell.zw * ${FACET_PX}.0;
   float hc = basinAt(c);
@@ -283,7 +285,7 @@ vec2 faceted(vec2 p, float h, float amount) {
   vec2 lean = (hash22(vec2(cell.y * 71.0, 3.0)) - 0.5) * 0.4 * min(length(g), 1.5);
   float plane = clamp(hc + dot(g + lean, p - c), h - 14.0, h + 14.0);
   float inner = smoothstep(0.0, 7.0, cell.x * ${FACET_PX}.0);
-  return vec2(mix(h, plane, amount * inner), cell.y);
+  return vec3(mix(h, plane, amount * inner), cell.y, cell.x * ${FACET_PX}.0);
 }
 void main() {
   vec2 p = uMin + vUv * uSize;
@@ -327,15 +329,16 @@ void main() {
     }
   } else if (outerSD > 0.0) {
     kind = 0.0;
-    // The art's walls: chunky rounded rocks heaped up the cliff, dark gaps between them, over
-    // broad faces; the falls run down smooth channels between the rocks.
+    // The art's cliffs: chunky angular rock in big flat faces, cut apart by dark seams, a gentle
+    // grain over them; the falls run down smooth channels.
     float onWall = smoothstep(4.0, 26.0, outerSD);
-    vec2 rock = faceted(p, h, onWall * 0.6);
+    vec3 rock = faceted(p, h, onWall);
     vec3 cobble = stones(p + 11.0, mix(42.0, 64.0, fbm3(p / 180.0)), 2.4);
     float channel = smoothstep(0.0, 12.0, fallSD);
-    h = rock.x + (cobble.x * 18.0 + 1.2 * (gnoise(p / 3.5) - 0.5)) * onWall * channel
+    float seam = 1.0 - smoothstep(1.5, 4.5, rock.z);
+    h = rock.x + (cobble.x * 5.0 + 1.2 * (gnoise(p / 3.5) - 0.5) - ${SEAM_PX}.0 * seam) * onWall * channel
       - 4.0 * (1.0 - smoothstep(-2.0, 4.0, fallSD));
-    tone = fract(cobble.y * 3.1 + 0.2 * rock.y);
+    tone = fract(rock.y * 7.3);
   }
   gl_FragColor = vec4(h, tone, joint, kind);
 }
@@ -407,14 +410,13 @@ void main() {
   // The island: charcoal basalt, warmer where lumps catch the light. The walls: dark crimson rock,
   // the tops of its rounded rocks a brighter red to the light. Colours sampled from the art and
   // inverted through Neutral tone mapping, as basinLava's: island (37,26,23), (59,43,37), (85,66,55);
-  // walls (31,13,8), (70,21,18), (111,43,45), the first two lifted a third for the shade and
-  // occlusion that darken them below.
+  // walls (52,22,16) in shade, (90,36,24) on their faces, (138,58,36) on tops turned to the light.
   vec3 islandRock = mix(vec3(0.04, 0.033, 0.031), vec3(0.08, 0.06, 0.054), smoothstep(0.35, 0.75, facing));
   islandRock = mix(islandRock, vec3(0.131, 0.094, 0.078), smoothstep(0.85, 0.97, facing));
   islandRock *= 0.86 + 0.28 * tone;
-  vec3 wallRock = mix(vec3(0.042, 0.028, 0.027), vec3(0.116, 0.045, 0.042), smoothstep(0.4, 0.7, facing));
-  wallRock = mix(wallRock, vec3(0.197, 0.062, 0.064), smoothstep(0.82, 0.95, facing));
-  wallRock *= 0.8 + 0.4 * tone;
+  vec3 wallRock = mix(vec3(0.058, 0.032, 0.029), vec3(0.131, 0.047, 0.038), smoothstep(0.4, 0.7, facing));
+  wallRock = mix(wallRock, vec3(0.29, 0.078, 0.053), smoothstep(0.82, 0.95, facing));
+  wallRock *= 0.85 + 0.3 * tone;
   vec3 col = mix(wallRock, islandRock, onIsland);
   // Painted rims: convex edges (lump tops, crags) catch a warm stroke of light.
   vec2 t2 = uTexel * 2.5;
@@ -439,8 +441,10 @@ void main() {
   float above = max(ground - ${LAVA_LEVEL}.0, 0.0);
   float flicker = 0.85 + 0.15 * gnoise(vec2(uTime * 0.9, p.x / 90.0 + p.y / 130.0));
   // The walls take less of it than the island: their faces lean away from the moat's middle.
-  float moatGlow = exp(-fromMoat / mix(22.0, 38.0, onIsland)) * exp(-above / 60.0) * (0.25 + 0.75 * turned);
-  col += mix(vec3(1.0, 0.22, 0.12), vec3(1.0, 0.35, 0.1), onIsland) * moatGlow * flicker * mix(0.3, 0.55, onIsland);
+  float moatGlow = exp(-fromMoat / mix(34.0, 38.0, onIsland)) * exp(-above / 70.0) * (0.25 + 0.75 * turned);
+  col += mix(vec3(1.0, 0.24, 0.08), vec3(1.0, 0.35, 0.1), onIsland) * moatGlow * flicker * mix(0.55, 0.55, onIsland);
+  // The island's lip catches a bright orange rim of the lava's light.
+  col += vec3(1.0, 0.36, 0.06) * exp(-fromMoat / 7.0) * onIsland * 0.5 * flicker;
   col += vec3(1.0, 0.3, 0.12) * exp(-max(fallSD, 0.0) / 6.0) * onWall * 0.55 * flicker;
 
   // Some of the island's cracks still glow; sparks lie on the rock.
@@ -567,7 +571,7 @@ void main() {
   float middle = sin(across * 3.14159);
   // Pale gold flow lines down the middle; gold out to a thin red-orange lip at both shores, as the
   // art's moat (no bright rim along them).
-  float heat = 0.66 + 0.14 * middle + (flow.x - 0.5) * 0.14 + flow.y * 0.18 * middle;
+  float heat = 0.5 + 0.42 * middle + (flow.x - 0.5) * 0.14 + flow.y * 0.18 * middle;
   heat -= 0.36 * (1.0 - smoothstep(0.0, 14.0, shore));
   // A thin dark crust right against the rock.
   heat -= 0.4 * (1.0 - smoothstep(1.5, 5.0, shore));
