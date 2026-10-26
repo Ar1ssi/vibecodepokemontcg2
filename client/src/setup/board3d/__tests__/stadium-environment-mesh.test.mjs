@@ -5,7 +5,7 @@ import { tableBounds } from '../table-uv.mjs';
 import { getMatLayout } from '../../sizing/mat-layouts.mjs';
 import { NO_MAT_LAYOUT_ID } from '../../sizing/mat-spec.mjs';
 import { craterBowl, mountainPeaks } from '../stadium-environment-layout.mjs';
-import { strikePath, strikePower } from '../stadium-environment-mesh.js';
+import { INTRO_MS, createStadiumEnvironment, strikePath, strikePower } from '../stadium-environment-mesh.js';
 
 // The no-mat profile the board draws by default, at the board width board3d.js lays out beside the
 // sidebox (0.755 of 1920).
@@ -59,4 +59,35 @@ test('strikePath is null without a mountain, and arcs need the table', () => {
     const path = strikePath(index, 0, { bowl, peaks: { left: null, right: null } }, null);
     assert.equal(path, null);
   }
+});
+
+test('createStadiumEnvironment starts the reveal on the frame after the one that compiles its shaders', async () => {
+  const three = await import('../../../vendor/three/three.module.min.js');
+  let compiles = 0;
+  const renderer = {
+    extensions: { has: () => true },
+    compile: () => {
+      compiles += 1;
+    },
+    getRenderTarget: () => null,
+    setRenderTarget: () => {},
+    render: () => {},
+    getDrawingBufferSize: (target) => target.set(1920, 1080),
+  };
+  const environment = createStadiumEnvironment({ three, renderer, parent: new three.Group(), isHidden: () => true });
+  const camera = new three.PerspectiveCamera();
+  const reveal = environment.cutout.uniforms.uReveal;
+  environment.setLayout(layout);
+  environment.setKey('perilous-jungle');
+  assert.equal(environment.update(1000, camera), true, 'the compile frame asks for another');
+  assert.equal(compiles, 1);
+  assert.equal(reveal.value, 0, 'nothing shows while it compiles');
+  // The compile held the screen for 2 s; the reveal starts with this, the next frame.
+  assert.equal(environment.update(3000, camera), true);
+  assert.equal(reveal.value, 0);
+  environment.update(3000 + INTRO_MS / 2, camera);
+  assert.ok(reveal.value > 0.5 && reveal.value < 1, `halfway through the reveal at ${reveal.value}`);
+  assert.equal(environment.update(3000 + INTRO_MS, camera), false, 'revealed');
+  assert.equal(compiles, 1, 'compiled once');
+  environment.dispose();
 });
