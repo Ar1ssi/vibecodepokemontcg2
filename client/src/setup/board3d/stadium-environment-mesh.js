@@ -851,9 +851,9 @@ export function createStadiumEnvironment({
   const compileMeshes = (compile, board, camera) => {
     const mask = camera.layers.mask;
     const previous = renderer.getRenderTarget();
-    camera.layers.set(STADIUM_ENV_LAYER);
-    renderer.setRenderTarget(null);
     try {
+      camera.layers.set(STADIUM_ENV_LAYER);
+      renderer.setRenderTarget(null);
       return compile(board.holder, camera, sceneOf(group));
     } finally {
       camera.layers.mask = mask;
@@ -870,8 +870,8 @@ export function createStadiumEnvironment({
       passes.add(quad);
     }
     const previous = renderer.getRenderTarget();
-    renderer.setRenderTarget(compileTarget);
     try {
+      renderer.setRenderTarget(compileTarget);
       return renderer.compileAsync(passes, bakeCamera);
     } finally {
       renderer.setRenderTarget(previous);
@@ -886,25 +886,38 @@ export function createStadiumEnvironment({
    * reveal. A compile that fails shows the board anyway: three then builds on first draw, as it
    * would without compileAsync.
    */
+  const warnCompile = (error) => console.warn('board3d: stadium environment compile failed', error?.message || error);
+
+  /** Starts one compile; resolves when it ends, a failure (thrown or rejected) only a warning. */
+  const attempt = (start) => {
+    try {
+      return Promise.resolve(start()).catch(warnCompile);
+    } catch (error) {
+      warnCompile(error);
+      return Promise.resolve();
+    }
+  };
+
+  /** A lost context never reports a program linked: compileAsync would poll for ever. */
+  const contextLost = () => renderer.getContext?.()?.isContextLost?.() === true;
+
   const prepare = (board, camera) => {
     if (board.preparing) return;
-    let compiles = [];
-    try {
-      compiles = [compileBakes(board), compileMeshes(renderer.compileAsync.bind(renderer), board, camera)];
-    } catch (error) {
-      console.warn('board3d: stadium environment compile failed', error?.message || error);
+    // Each compile on its own, so one that throws doesn't stop the other; each tracked from the
+    // moment it starts, so dispose knows three still polls its materials.
+    const compiles = contextLost()
+      ? []
+      : [attempt(() => compileBakes(board)), attempt(() => compileMeshes(renderer.compileAsync.bind(renderer), board, camera))];
+    for (const compile of compiles) {
+      inFlight.add(compile);
+      compile.then(() => inFlight.delete(compile));
     }
-    const ready = Promise.all(compiles).catch((error) =>
-      console.warn('board3d: stadium environment compile failed', error?.message || error)
-    );
-    inFlight.add(ready);
-    ready.then(() => inFlight.delete(ready));
-    let timer = null;
     const late = new Promise((resolve) => {
-      timer = setTimeout(resolve, PREPARE_TIMEOUT_MS);
+      board.lateTimer = setTimeout(resolve, PREPARE_TIMEOUT_MS);
     });
-    board.preparing = Promise.race([ready, late]).then(() => {
-      clearTimeout(timer);
+    board.preparing = Promise.race([Promise.all(compiles), late]).then(() => {
+      clearTimeout(board.lateTimer);
+      board.lateTimer = null;
       board.preparing = null;
       board.compiled = true;
       if (disposed) return;
@@ -987,6 +1000,7 @@ export function createStadiumEnvironment({
     parent.remove(group);
     const released = [...boards.values()];
     boards.clear();
+    for (const board of released) clearTimeout(board.lateTimer);
     const release = () => {
       for (const board of released) {
         for (const object of board.objects) object.geometry.dispose();
@@ -998,9 +1012,21 @@ export function createStadiumEnvironment({
       disposeTargets();
       targets = null;
     };
-    // A compile still polling reads its materials' state: they go once it ends.
-    if (inFlight.size) Promise.all(inFlight).then(release);
-    else release();
+    // A compile still polling reads its materials' state: they go once it ends, or after
+    // PREPARE_TIMEOUT_MS if it never does (the context was lost mid-compile: three's poll then
+    // throws once on the released materials and stops).
+    if (!inFlight.size) {
+      release();
+      return;
+    }
+    let timer = null;
+    const late = new Promise((resolve) => {
+      timer = setTimeout(resolve, PREPARE_TIMEOUT_MS);
+    });
+    Promise.race([Promise.all(inFlight), late]).then(() => {
+      clearTimeout(timer);
+      release();
+    });
   };
 
   return { setLayout, setKey, update, active: () => key !== null, cutout, dispose };

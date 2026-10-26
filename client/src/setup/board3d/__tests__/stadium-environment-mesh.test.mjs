@@ -168,17 +168,22 @@ test('createStadiumEnvironment compiles with compileAsync when it can: the mat s
  * A renderer whose compileAsync calls wait until the test settles them, and an environment on it
  * (magma-basin and steel-shelter boards), for the races round a pending compile.
  */
-const pendingCompiles = async () => {
+const pendingCompiles = async ({ throwFirst = false, lost = false } = {}) => {
   const three = await import('../../../vendor/three/three.module.min.js');
   const compiles = [];
+  let calls = 0;
   let target = null;
   const renderer = {
     extensions: { has: () => true },
+    getContext: () => ({ isContextLost: () => lost }),
     compile: () => {},
-    compileAsync: (scene) =>
-      new Promise((resolve) => {
+    compileAsync: (scene) => {
+      calls += 1;
+      if (throwFirst && calls === 1) throw new Error('unresolved #include');
+      return new Promise((resolve) => {
         compiles.push({ scene, resolve });
-      }),
+      });
+    },
     getRenderTarget: () => target,
     setRenderTarget: (next) => {
       target = next;
@@ -201,10 +206,18 @@ const pendingCompiles = async () => {
   const holder = (key) => parent.getObjectByName(`board3d-stadium-env-${key}`);
   const settle = async () => {
     for (const compile of compiles.splice(0)) compile.resolve();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await macrotask();
   };
-  return { three, environment, holder, settle, compiles, state, camera: new three.PerspectiveCamera() };
+  const materialsOf = (key) => {
+    const list = [];
+    holder(key).traverse((object) => object.material && list.push(object.material));
+    return list;
+  };
+  return { three, environment, holder, settle, compiles, state, materialsOf, camera: new three.PerspectiveCamera() };
 };
+
+/** Lets every pending promise chain run (setImmediate: tests mock setTimeout only). */
+const macrotask = () => new Promise((resolve) => setImmediate(resolve));
 
 test('a board whose compile ends after another board was chosen stays hidden; the chosen one shows', async () => {
   const { environment, holder, settle, compiles, camera } = await pendingCompiles();
@@ -253,13 +266,67 @@ test('a compile that never ends (a lost context) shows the board after PREPARE_T
   environment.update(1000, camera);
   const asked = state.needsRender;
   t.mock.timers.tick(PREPARE_TIMEOUT_MS - 1);
-  await Promise.resolve();
+  await macrotask();
   assert.equal(holder('magma-basin').visible, false, 'still waiting');
   t.mock.timers.tick(1);
-  for (let i = 0; i < 5; i += 1) await Promise.resolve();
+  await macrotask();
   assert.equal(holder('magma-basin').visible, true, 'shown anyway');
   assert.equal(state.needsRender, asked + 1);
-  t.mock.timers.reset();
+  environment.dispose();
+});
+
+test('a compile that ends after the timeout changes nothing more: one frame asked for, still shown', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { environment, holder, settle, state, camera } = await pendingCompiles();
+  environment.setKey('magma-basin');
+  environment.update(1000, camera);
+  const asked = state.needsRender;
+  t.mock.timers.tick(PREPARE_TIMEOUT_MS);
+  await macrotask();
+  await settle();
+  assert.equal(holder('magma-basin').visible, true);
+  assert.equal(state.needsRender, asked + 1, 'one frame, from the timeout');
+  environment.dispose();
+});
+
+test('dispose while a compile never ends: materials are released after PREPARE_TIMEOUT_MS', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { environment, materialsOf, camera } = await pendingCompiles();
+  environment.setKey('magma-basin');
+  environment.update(1000, camera);
+  const materials = materialsOf('magma-basin');
+  let released = 0;
+  for (const material of materials) material.addEventListener('dispose', () => (released += 1));
+  environment.dispose();
+  t.mock.timers.tick(PREPARE_TIMEOUT_MS - 1);
+  await macrotask();
+  assert.equal(released, 0, 'kept while three may still poll them');
+  t.mock.timers.tick(1);
+  await macrotask();
+  assert.equal(released, materials.length, 'released anyway');
+});
+
+test('a bake compile that throws still compiles the meshes, and the board shows once they are ready', async (t) => {
+  t.mock.method(console, 'warn', () => {});
+  const { environment, holder, settle, compiles, camera } = await pendingCompiles({ throwFirst: true });
+  environment.setKey('magma-basin');
+  environment.update(1000, camera);
+  assert.equal(compiles.length, 1, 'the meshes compile though the bake passes threw');
+  assert.equal(console.warn.mock.callCount(), 1);
+  assert.equal(holder('magma-basin').visible, false);
+  await settle();
+  assert.equal(holder('magma-basin').visible, true);
+  environment.dispose();
+});
+
+test('a lost context skips compileAsync (it would poll for ever) and shows the board at once', async () => {
+  const { environment, holder, compiles, camera } = await pendingCompiles({ lost: true });
+  environment.setKey('magma-basin');
+  environment.update(1000, camera);
+  await macrotask();
+  assert.equal(compiles.length, 0);
+  assert.equal(holder('magma-basin').visible, true);
+  environment.dispose();
 });
 
 test('a board compiles for the last camera when a frame comes without one', async () => {
