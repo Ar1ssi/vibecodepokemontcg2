@@ -15,7 +15,8 @@ import {
   ringSpots,
 } from '../stadium-env-ring.mjs';
 
-const PROFILES = [NO_MAT_LAYOUT_ID, 'sim'];
+// Every mat profile: the no-mat default, the simulator's, one-player mats, full-size two-player mats.
+const PROFILES = [NO_MAT_LAYOUT_ID, 'sim', 'one-player', 'two-player', 'edge-to-edge-two-player'];
 const HALVES = [
   { w: 1449.6, h: 540 },
   { w: 1920, h: 540 },
