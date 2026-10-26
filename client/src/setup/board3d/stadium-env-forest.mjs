@@ -1,36 +1,41 @@
 // Design 077 (prototype): the forest recipe. Perilous Jungle (customhb-253) after its card art
-// (Ayumi Odashima, TEF 156): a violet jungle round a clearing, a pool of glowing pink poison and the
-// stream that winds out of it, lush teal and violet leaves in deep indigo shade, lit pink wherever
-// they lean over the poison. The cards lie in the clearing and the undergrowth rises round it; the
-// pool lies past the cards' left end, a grassy island in it, and its stream winds along the seam
-// through the gaps between the cards and out through the undergrowth
-// (stadium-env-forest-layout.mjs). Painted in the style of TCG Live's board_grass: cel-shaded leaves
-// with a lit half and a shaded half either side of the midrib, dark outlines, flat tone bands.
+// (Ayumi Odashima, TEF 156): a violet jungle round a clearing, bogs of glowing pink poison, tall
+// trees with violet trunks, deep teal crowns and dark vines fringed in pink, lush teal and violet
+// leaves in deep indigo shade, lit pink wherever they lean over the poison. The cards lie in the
+// clearing; past its edge the jungle floor rises a little under thick grass, dotted with plants; the
+// trees stand outside the cards' columns either side, leaning in over the clearing's edge; two bogs
+// lie in opposite corners, a grassy island in each (stadium-env-forest-layout.mjs). Painted in
+// the style of TCG Live's board_grass: cel-shaded leaves with a lit half and a shaded half either
+// side of the midrib, dark outlines, flat tone bands.
 //
 // Bake, once per layout: BAKE_FIELD writes R height px, G signed px from the water's edge (negative
-// in the water), B px along the stream in and beside the water, a tone 0..1 elsewhere, A the ground's
-// kind (-1 clearing floor, 0 bank mud, 1 undergrowth, 3 stone, 4 island grass); the shared BAKE_LIGHT
-// (stadium-environment-glsl.mjs) adds normals, occlusion and the sun shadow.
-// Per frame: TERRAIN paints the ground; POISON is one sheet at WATER_LEVEL for the pool and the
-// stream; LEAF draws every leaf, one instanced strip each, bent on its midrib; BELL the drooping
-// bell flowers and SPIKE the pink flower spikes of the card art; SPORE the glowing motes rising off
-// the water.
+// in the water), B a tone 0..1, A the ground's kind (-1 clearing floor, 0 bank mud, 1 jungle floor,
+// 2 tree roots, 3 stone, 4 island grass); the shared BAKE_LIGHT (stadium-environment-glsl.mjs) adds
+// normals, occlusion and the sun shadow.
+// Per frame: TERRAIN paints the ground, dappled in the trees' shade; POISON is one sheet at
+// WATER_LEVEL for the bogs; LEAF draws every leaf, one instanced strip each, bent on its midrib; BELL
+// the drooping bell flowers and SPIKE the pink flower spikes of the card art; LIMB the trees' trunks
+// and branches, CROWN the clumps of their foliage, VINE the vines hanging from them; SPORE the
+// glowing motes rising off the water and drifting through the jungle.
 import {
   NOISE,
   OUTPUT,
   REVEAL,
+  SUN_DIRECTION,
   TABLE_UNIFORMS,
   TERRAIN_GROUND,
   TERRAIN_UNIFORMS,
   VORONOI,
 } from './stadium-environment-glsl.mjs';
 import {
+  BOG_BLEND_PX,
   CLEARING_BLEND_PX,
   CLEARING_RADIUS_PX,
   CLEARING_WOBBLE_PX,
-  ISLAND,
+  MAX_BOG_LOBES,
+  MAX_BOGS,
   MAX_CARD_RECTS,
-  STREAM_POINTS,
+  MAX_TREES,
   TABLE_EDGE_HEDGE_PX,
 } from './stadium-env-forest-layout.mjs';
 
@@ -38,86 +43,107 @@ import {
 export const WATER_LEVEL = -4;
 /** Segments along a leaf's strip. */
 export const LEAF_SEGMENTS = 8;
-/** Band beside the water whose B channel holds the px along the stream instead of a tone. */
-const ALONG_BAND_PX = 24;
+/** Rings along a limb (bunched toward its foot) and segments round it. */
+export const LIMB_SEGMENTS = { rings: 16, around: 18 };
+/** Rings from pole to pole of a clump of foliage, and segments round it. */
+export const PUFF_SEGMENTS = { rings: 10, around: 16 };
+/** Segments down a vine. */
+export const VINE_SEGMENTS = 14;
+
+// Where the sun casts a point's shadow on the cloth: this far along x and y per px of its height.
+const SHADOW_DRIFT = [-SUN_DIRECTION[0] / SUN_DIRECTION[2], -SUN_DIRECTION[1] / SUN_DIRECTION[2]];
 
 const JUNGLE = /* glsl */ `
-// The card footprints (x0, y0, x1, y1; unused ones lie far off the table), the table's rect, the
-// pool (centre, radius; 0: none) and the stream's course (centre line and half width per point;
-// unused points lie far off the table).
+// The card footprints and their core (x0, y0, x1, y1; unused ones lie far off the table), the
+// table's rect, every bog's lobes (centre, radius; 0: none) and every bog's island.
 uniform vec4 uCards[${MAX_CARD_RECTS}];
+uniform vec4 uCore;
 uniform vec4 uTable;
-uniform vec3 uPool;
-uniform vec3 uStream[${STREAM_POINTS}];
+uniform vec3 uBogs[${MAX_BOGS * MAX_BOG_LOBES}];
+uniform vec3 uIslands[${MAX_BOGS}];
 // The clearing traced exactly as stadium-env-forest-layout.mjs clearingDistance traces it: the
-// footprints merged softly, grown by the clearing's radius and its edge's wobble, cut off just past
-// the table's near and far edges. Negative inside.
+// footprints and their core merged softly, grown by the clearing's radius and its edge's wobble, cut
+// off just past the table's near and far edges. Negative inside.
 float clearingWobble(vec2 p) {
   return 0.5 + 0.3 * sin(p.x * 0.019 + 1.3) * sin(p.y * 0.023 + 0.4) + 0.2 * sin((p.x - p.y) * 0.011 + 2.2);
 }
+float mergeRect(float near, vec4 rect, vec2 p) {
+  float d = length(max(max(rect.xy - p, p - rect.zw), 0.0));
+  float h = max(${CLEARING_BLEND_PX.toFixed(1)} - abs(near - d), 0.0) / ${CLEARING_BLEND_PX.toFixed(1)};
+  return min(near, d) - h * h * ${(CLEARING_BLEND_PX / 4).toFixed(1)};
+}
 float clearingDistance(vec2 p) {
   float near = 100000.0;
-  for (int i = 0; i < ${MAX_CARD_RECTS}; i++) {
-    vec4 rect = uCards[i];
-    vec2 outside = max(max(rect.xy - p, p - rect.zw), 0.0);
-    float d = length(outside);
-    float h = max(${CLEARING_BLEND_PX.toFixed(1)} - abs(near - d), 0.0) / ${CLEARING_BLEND_PX.toFixed(1)};
-    near = min(near, d) - h * h * ${(CLEARING_BLEND_PX / 4).toFixed(1)};
-  }
+  for (int i = 0; i < ${MAX_CARD_RECTS}; i++) near = mergeRect(near, uCards[i], p);
+  near = mergeRect(near, uCore, p);
   float reach = near - ${CLEARING_RADIUS_PX.toFixed(1)} - ${CLEARING_WOBBLE_PX.toFixed(1)} * clearingWobble(p);
   return max(reach, max(uTable.y - p.y, p.y - uTable.w) - ${TABLE_EDGE_HEDGE_PX.toFixed(1)});
 }
-// The grassy island in the pool: centre and radius.
-vec3 poolIsland() {
-  return vec3(uPool.xy + vec2(${ISLAND.x.toFixed(3)}, ${ISLAND.y.toFixed(3)}) * uPool.z, uPool.z * ${ISLAND.r.toFixed(3)});
+// Signed px from the nearest island's shore, negative on it.
+float islandDistance(vec2 p) {
+  float near = 100000.0;
+  for (int i = 0; i < ${MAX_BOGS}; i++) {
+    vec3 island = uIslands[i];
+    if (island.z > 0.0) near = min(near, distance(p, island.xy) - island.z);
+  }
+  return near;
+}
+`;
+
+const CANOPY = /* glsl */ `
+// The trees: each crown's centre x, y, radius and height off the cloth (radius 0: none), and each
+// trunk's root x, y, radius and side (-1 left of the cards, 1 right).
+uniform vec4 uCrowns[${MAX_TREES}];
+uniform vec4 uTrunks[${MAX_TREES}];
+const vec2 SHADOW_DRIFT = vec2(${SHADOW_DRIFT[0].toFixed(4)}, ${SHADOW_DRIFT[1].toFixed(4)});
+// How deep in the trees' shade a point at height h off the cloth lies, 0..1: the sun casts each
+// crown's shadow and each trunk's down toward the near right.
+float canopyShade(vec2 p, float h) {
+  float shade = 0.0;
+  for (int i = 0; i < ${MAX_TREES}; i++) {
+    vec4 crown = uCrowns[i];
+    if (crown.z <= 0.0) continue;
+    vec2 centre = crown.xy + SHADOW_DRIFT * max(crown.w - h, 0.0);
+    shade = max(shade, 1.0 - smoothstep(0.6, 1.0, distance(p, centre) / crown.z));
+    vec4 trunk = uTrunks[i];
+    vec2 foot = trunk.xy;
+    vec2 top = crown.xy + SHADOW_DRIFT * max(crown.w * 0.6 - h, 0.0);
+    vec2 span = top - foot;
+    float t = clamp(dot(p - foot, span) / max(dot(span, span), 1.0), 0.0, 1.0);
+    shade = max(shade, 1.0 - smoothstep(trunk.z * 0.7, trunk.z * 1.15, distance(p, foot + span * t)));
+  }
+  return shade;
 }
 `;
 
 const WATER = /* glsl */ `
-// Signed px from the pool's edge (negative in it), the shore wobbling round the circle by 6% at most.
-float poolDistance(vec2 p) {
-  if (uPool.z <= 0.0) return 100000.0;
-  vec2 rel = p - uPool.xy;
-  float d = length(rel);
-  return d - uPool.z * (0.94 + 0.12 * clamp(fbm3(rel / max(d, 1.0) * 2.2 + 4.3), 0.0, 1.0));
-}
-// The stream: x signed px from its bank (negative in it), y px along its course from the pool.
-vec2 streamFrame(vec2 p) {
-  float best = 100000.0;
-  float along = 0.0;
-  float run = 0.0;
-  for (int i = 0; i < ${STREAM_POINTS - 1}; i++) {
-    vec3 a = uStream[i];
-    vec3 b = uStream[i + 1];
-    vec2 ab = b.xy - a.xy;
-    float span = length(ab);
-    float t = span > 0.0 ? clamp(dot(p - a.xy, ab) / (span * span), 0.0, 1.0) : 0.0;
-    float d = distance(p, a.xy + ab * t) - mix(a.z, b.z, t);
-    if (d < best) {
-      best = d;
-      along = run + t * span;
-    }
-    run += span;
+// Signed px from the bogs' edge (negative in them): each lobe's shore wobbling round its circle by
+// 6% at most, the lobes merged softly as stadium-env-forest-layout.mjs waterDistance merges them.
+float bogDistance(vec2 p) {
+  float near = 100000.0;
+  for (int i = 0; i < ${MAX_BOGS * MAX_BOG_LOBES}; i++) {
+    vec3 lobe = uBogs[i];
+    if (lobe.z <= 0.0) continue;
+    vec2 rel = p - lobe.xy;
+    float d = length(rel);
+    d -= lobe.z * (0.94 + 0.12 * clamp(fbm3(rel / max(d, 1.0) * 2.2 + 4.3 + float(i) * 1.7), 0.0, 1.0));
+    float h = max(${BOG_BLEND_PX.toFixed(1)} - abs(near - d), 0.0) / ${BOG_BLEND_PX.toFixed(1)};
+    near = min(near, d) - h * h * ${(BOG_BLEND_PX / 4).toFixed(1)};
   }
-  return vec2(best, along);
+  return near;
 }
-// Signed px from the water's edge: the pool and the stream merged where it leaves the pool, the
-// banks a little ragged, the island dry.
-float waterDistance(vec2 p, float streamSD) {
-  float pool = poolDistance(p);
-  float h = clamp(0.5 + 0.5 * (streamSD - pool) / 30.0, 0.0, 1.0);
-  float water = mix(streamSD, pool, h) - 30.0 * h * (1.0 - h) + (fbm3(p / 70.0) - 0.5) * 8.0;
-  vec3 island = poolIsland();
-  if (uPool.z > 0.0) water = max(water, island.z - distance(p, island.xy) + (fbm3(p / 30.0) - 0.5) * 10.0);
-  return water;
+// Signed px from the water's edge: the bogs' shores a little ragged, the islands dry.
+float waterDistance(vec2 p) {
+  float water = bogDistance(p) + (fbm3(p / 70.0) - 0.5) * 8.0;
+  return max(water, -islandDistance(p) + (fbm3(p / 30.0) - 0.5) * 10.0);
 }
 `;
 
 /**
- * Bake 1: the ground. The clearing's floor swells softly in low tussocks; the undergrowth rises past
- * the clearing's edge in round bushes, taller farther out, and falls away to the water; the banks dip
- * to the poison, mossy stones along them; the bed sinks under the sheet, deepest mid-stream; the
- * island in the pool is a low grassy mound.
+ * Bake 1: the ground. The clearing's floor swells softly in low tussocks; past the clearing's edge
+ * the jungle floor rises in a low bank of soft mounds; surface roots spread from every trunk; the
+ * banks dip to the poison, mossy stones along them; the bed sinks under the sheet; the island in
+ * each bog is a low grassy mound.
  */
 export const BAKE_FIELD_FRAGMENT = /* glsl */ `
 ${TABLE_UNIFORMS}
@@ -125,9 +151,10 @@ varying vec2 vUv;
 ${NOISE}
 ${VORONOI}
 ${JUNGLE}
+${CANOPY}
 ${WATER}
-// Round bushes: the soft union of domes in two sizes. x: height px, y: the tallest dome's id.
-vec2 bushes(vec2 p) {
+// Round mounds: the soft union of domes in two sizes. x: height px, y: the tallest dome's id.
+vec2 mounds(vec2 p) {
   float weight = 1.0;
   float top = 0.0;
   float id = 0.0;
@@ -163,28 +190,59 @@ vec2 stones(vec2 p, float size, float share) {
   float across = length(local * vec2(1.0, 1.5)) / radius;
   return vec2(across < 1.0 ? sqrt(1.0 - across * across) * radius * 0.55 : 0.0, cell.y);
 }
+// The mound every trunk's foot stands on (x) and the surface roots winding out from it (y), height
+// px. Roots heading for the cards stop just past the trunk's flare.
+vec2 treeRoots(vec2 p) {
+  float mound = 0.0;
+  float ridges = 0.0;
+  for (int i = 0; i < ${MAX_TREES}; i++) {
+    vec4 trunk = uTrunks[i];
+    if (trunk.z <= 0.0) continue;
+    vec2 rel = p - trunk.xy;
+    float d = length(rel);
+    float reach = trunk.z * 1.3 + 34.0;
+    if (d > reach) continue;
+    mound = max(mound, 8.0 * (1.0 - smoothstep(trunk.z * 0.8, trunk.z * 2.1, d)));
+    float seed = hash12(trunk.xy);
+    for (int k = 0; k < 5; k++) {
+      float heading = (float(k) + 0.6 * hash12(trunk.xy + float(k))) * 1.2566371 + seed * 6.2831853;
+      heading += 0.25 * sin(d * 0.06 + float(k) * 1.7);
+      vec2 dir = vec2(cos(heading), sin(heading));
+      float along = dot(rel, dir);
+      if (along <= 0.0) continue;
+      float rootLength = mix(reach, trunk.z * 1.9, max(dir.x * -trunk.w, 0.0));
+      float t = along / rootLength;
+      if (t >= 1.0) continue;
+      float across = abs(dot(rel, vec2(-dir.y, dir.x)));
+      float width = mix(trunk.z * 0.6, 5.0, t);
+      float ridge = 1.0 - smoothstep(width * 0.55, width, across);
+      ridges = max(ridges, ridge * mix(10.0, 3.0, t) * sqrt(1.0 - t));
+    }
+  }
+  return vec2(mound, ridges);
+}
 void main() {
   vec2 p = uMin + vUv * uSize;
-  vec2 stream = streamFrame(p);
-  float waterSD = waterDistance(p, stream.x);
+  float waterSD = waterDistance(p);
   float outside = clearingDistance(p);
-  vec3 island = poolIsland();
-  float onIsland = uPool.z > 0.0 ? 1.0 - smoothstep(-12.0, 8.0, distance(p, island.xy) - island.z) : 0.0;
+  float onIsland = 1.0 - smoothstep(-12.0, 8.0, islandDistance(p));
 
   // The clearing's floor: soft swells of moss and low tussocks.
   float floorHeight = 4.0 * (fbm3(p / 210.0) - 0.5) + 1.6 * smoothstep(0.55, 0.8, gnoise(p / 24.0 + 9.0));
 
-  // The undergrowth: a bank of bushes rising past the clearing's edge, taller farther out; none on
-  // the island, a grassy mound.
-  vec2 bush = bushes(p);
-  float rise = smoothstep(0.0, 45.0, outside) * (1.0 - onIsland);
-  float wall = rise * (36.0 + bush.x * mix(0.5, 1.0, smoothstep(30.0, 280.0, outside)));
+  // The jungle floor: a low bank rising past the clearing's edge in soft mounds; none on the island.
+  vec2 mound = mounds(p);
+  float rise = smoothstep(0.0, 60.0, outside) * (1.0 - onIsland);
+  float dry = smoothstep(4.0, 110.0, waterSD);
+  float bank = rise * (8.0 + mound.x * 0.28 * mix(0.6, 1.0, smoothstep(40.0, 260.0, outside))) * dry;
+  vec2 rooted = treeRoots(p) * smoothstep(0.0, 12.0, waterSD);
+  float roots = max(rooted.x, rooted.y);
 
   vec2 stone = stones(p, 30.0, 0.35);
-  float onBank = smoothstep(-6.0, 0.0, waterSD) * (1.0 - smoothstep(18.0, 36.0, waterSD));
-  float bankStone = stone.x * onBank * (1.0 - rise);
+  float onShore = smoothstep(-6.0, 0.0, waterSD) * (1.0 - smoothstep(18.0, 36.0, waterSD));
+  float shoreStone = stone.x * onShore * (1.0 - rise);
 
-  float land = floorHeight + bankStone + wall * smoothstep(4.0, 110.0, waterSD) + onIsland * 5.0 * smoothstep(4.0, 30.0, waterSD);
+  float land = floorHeight + shoreStone + bank + roots + onIsland * 5.0 * smoothstep(4.0, 30.0, waterSD);
   float shore = smoothstep(0.0, 24.0, waterSD);
   float bed = ${(WATER_LEVEL - 1).toFixed(1)} - 10.0 * smoothstep(0.0, 28.0, -waterSD);
   // A few stones stand out of the poison.
@@ -193,12 +251,12 @@ void main() {
   float height = waterSD < 0.0 ? max(bed, bed + wetStone * 1.4) : mix(${(WATER_LEVEL - 1).toFixed(1)}, land, shore);
 
   float kind = -1.0;
-  if (wall * smoothstep(4.0, 110.0, waterSD) > 3.0) kind = 1.0;
+  if (bank > 2.0) kind = 1.0;
+  if (rooted.y > max(1.5, rooted.x * 0.6)) kind = 2.0;
   if (onIsland > 0.5) kind = 4.0;
   if (waterSD < mix(16.0, 5.0, onIsland)) kind = 0.0;
-  if (bankStone > 0.6 || wetStone > 0.6) kind = 3.0;
-  float tone = waterSD < ${ALONG_BAND_PX.toFixed(1)} ? stream.y : (kind > 2.5 ? stone.y : bush.y);
-  gl_FragColor = vec4(height, waterSD, tone, kind);
+  if (shoreStone > 0.6 || wetStone > 0.6) kind = 3.0;
+  gl_FragColor = vec4(height, waterSD, kind > 2.5 && kind < 3.5 ? stone.y : mound.y, kind);
 }
 `;
 
@@ -239,6 +297,7 @@ ${NOISE}
 ${VORONOI}
 ${REVEAL}
 ${PALETTE}
+${CANOPY}
 varying vec2 vPos;
 varying vec2 vUv;
 varying float vGrowth;
@@ -250,8 +309,8 @@ void main() {
   vec4 light = texture2D(uLight, vUv);
   float ground = field.r;
   float waterSD = field.g;
+  float tone = field.b;
   float kind = field.a;
-  float tone = waterSD < ${ALONG_BAND_PX.toFixed(1)} ? fract(field.b * 0.013) : field.b;
 
   vec2 nxy = light.rg * 2.0 - 1.0;
   float nz = sqrt(max(1.0 - dot(nxy, nxy), 0.02));
@@ -293,34 +352,53 @@ void main() {
   // Bank mud: dark and wet, the poison's light on it.
   vec3 mud = mix(vec3(0.03, 0.016, 0.04), vec3(0.075, 0.04, 0.09), lit);
   col = mix(col, mud, step(-0.5, kind) * step(kind, 0.5));
-  // Undergrowth between the leaves: deep teal shade.
-  vec3 shade = mix(vec3(0.01, 0.024, 0.036), vec3(0.03, 0.08, 0.085), lit) * (0.8 + 0.4 * tone);
-  col = mix(col, shade, step(0.5, kind) * step(kind, 1.5));
+  // The jungle floor: thick grass, tufts packed edge to edge, their blades fanning up the table to
+  // lit tips over deep teal shade.
+  vec4 clump = voronoiCell(p / 11.0 + 8.3);
+  vec2 fromClump = -clump.zw * 11.0;
+  float clumpAngle = atan(fromClump.x, fromClump.y + 0.001);
+  float clumpRun = length(fromClump) / 9.0;
+  float grass = smoothstep(0.3 + 0.5 * clumpRun, 0.45 + 0.45 * clumpRun, cos(clumpAngle * 7.0 + clump.y * 30.0))
+    * (1.0 - smoothstep(0.85, 1.25, abs(clumpAngle))) * (1.0 - smoothstep(0.8, 1.1, clumpRun));
+  vec3 under = mix(vec3(0.012, 0.022, 0.04), vec3(0.025, 0.05, 0.07), lit) * (0.8 + 0.4 * tone);
+  vec3 grassBlade = mix(vec3(0.02, 0.07, 0.07), vec3(0.06, 0.2, 0.16), smoothstep(0.1, 0.9, clumpRun));
+  grassBlade = mix(grassBlade, vec3(0.1, 0.3, 0.22), bright * 0.5) * mix(0.65, 1.1, lit) * (0.85 + 0.3 * fract(clump.y * 7.3));
+  vec3 jungleFloor = mix(under, grassBlade, grass);
+  col = mix(col, jungleFloor, step(0.5, kind) * step(kind, 1.5));
+  // Roots: violet bark, ridged along their length, moss on their backs.
+  vec3 bark = mix(vec3(0.04, 0.02, 0.075), vec3(0.13, 0.07, 0.21), lit) * (0.85 + 0.3 * gnoise(p / 5.0));
+  bark = mix(bark, vec3(0.04, 0.14, 0.12), smoothstep(0.86, 0.97, n.z) * smoothstep(0.5, 0.65, gnoise(p / 11.0)));
+  col = mix(col, bark, step(1.5, kind) * step(kind, 2.5));
   // Stones: blue-violet, moss on their tops.
   vec3 rock = mix(vec3(0.035, 0.034, 0.08), vec3(0.13, 0.12, 0.25), lit) * (0.85 + 0.3 * fract(tone * 9.0));
   rock = mix(rock, vec3(0.05, 0.16, 0.14), smoothstep(0.82, 0.95, n.z) * smoothstep(0.45, 0.6, gnoise(p / 9.0)));
   col = mix(col, rock, step(2.5, kind) * step(kind, 3.5));
   // The island: lush teal-green grass, thick with pink and white flowers, as in the card art.
-  vec3 grass = mix(vec3(0.03, 0.12, 0.06), vec3(0.08, 0.32, 0.15), lit);
-  grass = mix(grass, vec3(0.18, 0.5, 0.24), bright * 0.7) * (0.85 + 0.3 * grain);
+  vec3 islandGrass = mix(vec3(0.03, 0.12, 0.06), vec3(0.08, 0.32, 0.15), lit);
+  islandGrass = mix(islandGrass, vec3(0.18, 0.5, 0.24), bright * 0.7) * (0.85 + 0.3 * grain);
   vec4 blossom = voronoiCell(p / 9.0 + 2.0);
   float bud = (1.0 - smoothstep(1.2, 2.0, length(blossom.zw) * 9.0)) * step(fract(blossom.y * 17.3), 0.3);
-  grass = mix(grass, fract(blossom.y * 5.3) < 0.55 ? vec3(1.0, 0.3, 0.62) : vec3(0.85, 0.82, 1.0), bud);
-  col = mix(col, grass, step(3.5, kind));
+  islandGrass = mix(islandGrass, fract(blossom.y * 5.3) < 0.55 ? vec3(1.0, 0.3, 0.62) : vec3(0.85, 0.82, 1.0), bud);
+  col = mix(col, islandGrass, step(3.5, kind));
 
   // Convex edges catch a lavender stroke; occlusion sinks into indigo.
   vec2 t2 = uTexel * 3.0;
   float laplace = texture2D(uField, vUv + vec2(t2.x, 0.0)).r + texture2D(uField, vUv - vec2(t2.x, 0.0)).r
     + texture2D(uField, vUv + vec2(0.0, t2.y)).r + texture2D(uField, vUv - vec2(0.0, t2.y)).r - 4.0 * ground;
-  float convex = smoothstep(0.6, 3.0, -laplace) * vGrowth * step(1.5, kind);
+  float convex = smoothstep(0.6, 3.0, -laplace) * vGrowth * step(1.5, kind) * step(kind, 2.5);
   col = mix(col, vec3(0.32, 0.26, 0.55), convex * 0.5);
   col = mix(INDIGO, col, smoothstep(0.25, 0.9, light.b));
 
-  // The poison lights everything near it pink, side faces most, flickering slowly.
+  // The trees' shade, broken by flecks of light through the leaves.
+  float dapple = smoothstep(0.52, 0.68, fbm3(p / 44.0 + vec2(uTime * 0.03, 0.0) + 21.0));
+  col *= 1.0 - mix(0.28, 0.5, step(0.5, kind)) * canopyShade(p, ground) * vGrowth * (1.0 - 0.75 * dapple);
+
+  // The poison tints the banks right by it pink, side faces most, flickering slowly: a faint sheen,
+  // not a halo, so the bogs read as water.
   float flicker = 0.85 + 0.15 * gnoise(vec2(uTime * 0.7, p.x / 90.0 + p.y / 130.0));
   float sideFacing = 1.0 - smoothstep(0.55, 0.95, n.z);
-  float glow = exp(-max(waterSD, 0.0) / 42.0) * exp(-max(ground - ${WATER_LEVEL.toFixed(1)}, 0.0) / 28.0);
-  col += POISON_GLOW * glow * mix(0.18, 0.45, sideFacing) * flicker * mix(1.0, 0.35, step(3.5, kind));
+  float glow = exp(-max(waterSD, 0.0) / 22.0) * exp(-max(ground - ${WATER_LEVEL.toFixed(1)}, 0.0) / 24.0);
+  col += POISON_GLOW * glow * mix(0.08, 0.26, sideFacing) * flicker * mix(1.0, 0.35, step(3.5, kind));
 
   col = edgeHaze(col, vUv);
   vec3 toxic = vec3(1.1, 0.3, 0.85);
@@ -343,9 +421,10 @@ void main() {
 `;
 
 /**
- * The poison: glowing pink in painted bands, deep magenta mid-stream, pale pink streaks running
- * with the flow (the pool turns slowly about its centre), pale cyan ripple rings spreading where
- * drops fall, bubbles swelling and popping, a bright lip of foam along the banks.
+ * The poison: glowing pink in painted bands, deep magenta in the middle, slow marbled currents,
+ * pale lines following the shore and drifting in from it, pale cyan ripple rings spreading where
+ * drops fall, bubbles swelling and popping, a bright lip of foam along the shore, the trees' shade on
+ * it.
  */
 export const POISON_FRAGMENT = /* glsl */ `
 ${TABLE_UNIFORMS}
@@ -356,6 +435,7 @@ uniform float uTime;
 ${NOISE}
 ${REVEAL}
 ${JUNGLE}
+${CANOPY}
 varying vec2 vPos;
 
 vec3 poisonColor(float t) {
@@ -368,16 +448,12 @@ vec3 poisonColor(float t) {
   c = mix(c, lighter, smoothstep(0.58, 0.64, t));
   return mix(c, pale, smoothstep(0.84, 0.9, t));
 }
-// Streaks drifting along a flow frame (px along it, px across it): two noise phases cross-faded,
-// so they keep moving without stretching.
-float drift(vec2 frame, float speed, float period) {
-  float phaseA = fract(uTime / period);
-  float phaseB = fract(uTime / period + 0.5);
-  float weightA = 1.0 - abs(2.0 * phaseA - 1.0);
-  vec2 scale = vec2(1.0 / 30.0, 1.0 / 6.0);
-  float a = gnoise((frame - vec2(speed * period * phaseA, 0.0)) * scale);
-  float b = gnoise((frame - vec2(speed * period * phaseB, 0.0)) * scale + vec2(3.7, 1.3));
-  return mix(b, a, weightA);
+// Pale lines following the shore at even steps out from it, wavering, drifting in from the shore
+// and fading toward the middle: 0..1.
+float shoreLines(vec2 p, float waterSD) {
+  float band = fract(-waterSD / 13.0 - uTime * 0.07 + (fbm3(p / 48.0) - 0.5) * 0.9);
+  float line = 1.0 - smoothstep(0.0, 0.16, band);
+  return line * smoothstep(4.0, 12.0, -waterSD) * (1.0 - smoothstep(28.0, 56.0, -waterSD));
 }
 // Ripple rings round drops falling at random: 0..1 ring strength.
 float ripples(vec2 p) {
@@ -407,19 +483,13 @@ void main() {
   float ground = field.r;
   if (ground > ${WATER_LEVEL.toFixed(1)} + 0.4) discard;
   float waterSD = field.g;
-  float along = field.b;
   float depth = smoothstep(0.0, 30.0, -waterSD);
 
-  // The stream's own frame (px along it, px from its bank); the pool's, turning about its centre.
-  vec2 streamFlow = vec2(along, waterSD);
-  vec2 rel = p - uPool.xy;
-  float poolR = length(rel);
-  float inPool = uPool.z > 0.0 ? 1.0 - smoothstep(uPool.z * 0.75, uPool.z * 1.05, poolR) : 0.0;
-  vec2 poolFlow = vec2(atan(rel.y, rel.x) * poolR, poolR);
-  float streaks = mix(drift(streamFlow, 16.0, 4.0), drift(poolFlow, 5.0, 6.0), inPool);
-  float swirl = fbm3((inPool > 0.5 ? poolFlow : streamFlow) / vec2(90.0, 40.0) + uTime * 0.03);
+  // Slow currents: marbling warped by a drifting field, so the poison seems to stir in place.
+  vec2 warp = vec2(fbm3(p / 90.0 + vec2(uTime * 0.02, 1.7)), fbm3(p / 90.0 + vec2(7.7, -uTime * 0.02)));
+  float swirl = fbm3(p / 60.0 + warp * 1.4 + 3.1);
 
-  float heat = 0.68 - depth * 0.38 + (swirl - 0.5) * 0.62 + smoothstep(0.6, 0.8, streaks) * 0.34;
+  float heat = 0.68 - depth * 0.38 + (swirl - 0.5) * 0.62 + shoreLines(p, waterSD) * 0.3;
   vec3 col = poisonColor(heat);
 
   // Bubbles: swell for most of their life, then pop as a widening ring.
@@ -440,13 +510,13 @@ void main() {
   // Ripples: pale cyan rings, as the card art draws them.
   col = mix(col, vec3(0.78, 0.96, 1.08), ripples(p) * 0.65 * smoothstep(3.0, 12.0, -waterSD));
 
-  // Foam along the banks, broken here and there.
+  // Foam along the shore, broken here and there.
   float lip = 1.0 - smoothstep(1.2, 3.6, -waterSD);
-  float broken = smoothstep(0.35, 0.6, gnoise(vec2(along / 14.0 - uTime * 0.4, waterSD / 6.0) + p / 50.0));
+  float broken = smoothstep(0.35, 0.6, gnoise(p / 14.0 + vec2(0.0, waterSD / 6.0)));
   col = mix(col, vec3(1.06, 0.78, 0.98), lip * mix(0.45, 1.0, broken));
 
-  // The undergrowth's shadow falls on the poison a little.
-  col *= mix(0.78, 1.0, texture2D(uLight, uv).a);
+  // The undergrowth's shadow and the trees' shade fall on the poison a little.
+  col *= mix(0.78, 1.0, texture2D(uLight, uv).a) * (1.0 - 0.3 * canopyShade(p, ${WATER_LEVEL.toFixed(1)}));
 
   vec2 edgeUv = min(uv, 1.0 - uv);
   col *= mix(0.55, 1.0, smoothstep(0.0, 0.035, min(edgeUv.x, edgeUv.y)));
@@ -461,14 +531,15 @@ ${OUTPUT}
  * A leaf: an instanced strip (three columns across: the midrib between its halves) bent into an arc
  * that leaves the ground at `lift` and curls over by `droop` toward its tip; the halves rise from
  * the midrib by `fold`, so each takes the light as one plane. Rooted on the baked ground, turned to
- * face downhill when it follows the ground (the undergrowth's leaves spill off their bushes), nodding
- * on the breeze, unfurling as the reveal passes.
+ * face downhill when it follows the ground, nodding on the breeze, unfurling as the reveal passes,
+ * darker in the trees' shade.
  */
 export const LEAF_VERTEX = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
 ${REVEAL}
 ${TERRAIN_GROUND}
+${CANOPY}
 // Root x, y, heading (rad), follow (1: turn to the ground's downhill).
 attribute vec4 aRoot;
 // Length px, width px, kind, tint.
@@ -520,8 +591,10 @@ void main() {
   vNormalA = normalize(cross(halfA, tangent));
   vNormalB = normalize(cross(tangent, halfB));
   vInfo = vec4(aShape.z, aShape.w, exp(-max(texture2D(uField, uv).g, 0.0) / 40.0), aBend.w);
-  // Px size as drawn (the outline's widths), and the shade deep in the undergrowth at its root.
-  vSize = vec3(leafLength, halfWidth, mix(0.72, 1.0, smoothstep(0.2, 0.8, rootLight.b)));
+  // Px size as drawn (the outline's widths), and the shade at its root: low in the undergrowth, or
+  // under a tree.
+  float treeShade = canopyShade(root, base + 20.0) * growth;
+  vSize = vec3(leafLength, halfWidth, mix(0.72, 1.0, smoothstep(0.2, 0.8, rootLight.b)) * (1.0 - 0.4 * treeShade));
   vUv = uv;
   vHeight = pos.z;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
@@ -599,8 +672,8 @@ void main() {
   col = mix(col, rim, (1.0 - smoothstep(1.2, 2.6, edge)) * 0.55);
   col = mix(col, vec3(0.006, 0.005, 0.018), 1.0 - smoothstep(0.35, 1.1, edge));
   col *= mix(0.45, 1.0, smoothstep(0.0, 0.32, t)) * vSize.z;
-  // The canopy's top catches the light; leaves low in the undergrowth sink into its shade.
-  col *= mix(0.78, 1.12, smoothstep(0.0, 130.0, vHeight));
+  // Leaves standing tall catch the light; low ones sink into the shade.
+  col *= mix(0.8, 1.12, smoothstep(0.0, 90.0, vHeight));
 
   col += POISON_GLOW * vInfo.z * (gl_FrontFacing ? 0.1 : 0.32) * mix(1.0, 0.6, t);
   col = edgeHaze(col, vUv);
@@ -609,7 +682,7 @@ ${OUTPUT}
 }
 `;
 
-/** Glowing motes rising off the poison and drifting up into the leaves. */
+/** Glowing motes rising off the poison, and others drifting up through the jungle like fireflies. */
 export const SPORE_VERTEX = /* glsl */ `
 ${TABLE_UNIFORMS}
 uniform float uTime;
@@ -626,23 +699,30 @@ void main() {
   float cycle = floor((uTime + aSeed.z * period) / period);
   vec2 jitter = hash22(aSeed.xy * 91.0 + cycle);
   vec2 start;
-  if (aSeed.w < 0.35 && uPool.z > 0.0) {
+  float inJungle = 1.0;
+  // A share of the spores rise off the bogs, each cycle off a lobe picked at random.
+  float lobes = 0.0;
+  for (int i = 0; i < ${MAX_BOGS * MAX_BOG_LOBES}; i++) lobes += step(0.001, uBogs[i].z);
+  float pick = floor(fract(jitter.x * 17.0) * lobes);
+  vec3 lobe = vec3(0.0);
+  float seen = 0.0;
+  for (int i = 0; i < ${MAX_BOGS * MAX_BOG_LOBES}; i++) {
+    if (uBogs[i].z <= 0.0) continue;
+    if (seen == pick) lobe = uBogs[i];
+    seen += 1.0;
+  }
+  if (aSeed.w < 0.35 && lobe.z > 0.0) {
     float angle = jitter.x * 6.2831853;
-    start = uPool.xy + vec2(cos(angle), sin(angle)) * sqrt(jitter.y) * uPool.z * 0.9;
+    start = lobe.xy + vec2(cos(angle), sin(angle)) * sqrt(jitter.y) * lobe.z * 0.85;
   } else {
-    float s = jitter.x * ${(STREAM_POINTS - 1).toFixed(1)};
-    int i = int(min(floor(s), ${(STREAM_POINTS - 2).toFixed(1)}));
-    vec3 a = uStream[i];
-    vec3 b = uStream[i + 1];
-    vec2 along = b.xy - a.xy;
-    vec2 across = length(along) > 0.0 ? vec2(-along.y, along.x) / length(along) : vec2(0.0, 1.0);
-    start = mix(a.xy, b.xy, fract(s)) + across * (jitter.y - 0.5) * 1.6 * mix(a.z, b.z, fract(s));
+    start = uMin + jitter * uSize;
+    inJungle = step(0.0, clearingDistance(start));
   }
   vec3 pos = vec3(start, ${(WATER_LEVEL + 1).toFixed(1)});
   pos.xy += vec2(sin(life * 5.0 + aSeed.x * 30.0), cos(life * 4.0 + aSeed.y * 30.0)) * 12.0 * life;
   pos.z += life * (46.0 + 64.0 * aSeed.y);
   vec2 inside = step(uMin + 30.0, start) * step(start, uMin + uSize - 30.0);
-  float shown = revealBurned(start) * exitKeep(start) * inside.x * inside.y;
+  float shown = revealBurned(start) * exitKeep(start) * inside.x * inside.y * inJungle;
   vec4 mv = modelViewMatrix * vec4(pos, 1.0);
   gl_Position = projectionMatrix * mv;
   float sizePx = (1.4 + aSeed.z * 2.2) * (1.0 - life * 0.4);
@@ -878,6 +958,275 @@ void main() {
   col += POISON_GLOW * vWater * 0.18;
   col = edgeHaze(col, vUv);
   gl_FragColor = vec4(col, 1.0);
+${OUTPUT}
+}
+`;
+
+/** Shared by the trees' vertex shaders: a part placed off its tree's root, grown in with the reveal. */
+const TREE_PLACE = /* glsl */ `
+// A point given px off the ground at the tree's root (root x, y), on the baked ground, the whole
+// tree scaled up from its root as the reveal passes.
+vec3 onTree(vec2 root, vec3 local, out vec2 uv) {
+  uv = clamp((root - uMin) / uSize, 0.0, 1.0);
+  float growth = terrainGrowth(root);
+  vec3 grown = vec3(root, 0.0) + (local - vec3(root, 0.0)) * growth;
+  grown.z += groundAt(uv) * growth * edgeSkirt(uv);
+  return grown;
+}
+`;
+
+/**
+ * A trunk or branch: an instanced tube along a quadratic curve, tapering from its foot to its end;
+ * the trunk's foot swells into five buttress roots.
+ */
+export const LIMB_VERTEX = /* glsl */ `
+${TERRAIN_UNIFORMS}
+${NOISE}
+${REVEAL}
+${TERRAIN_GROUND}
+${TREE_PLACE}
+// s (0..1 along the limb), angle round it.
+attribute vec2 aLathe;
+// The tree's root x, y; seed; flare (1: the trunk).
+attribute vec4 aRoot;
+// Foot x, y, z (px off the ground at the root), radius px.
+attribute vec4 aFrom;
+// The curve's control point x, y, z.
+attribute vec4 aVia;
+// End x, y, z, radius px.
+attribute vec4 aTo;
+varying vec3 vNormal;
+varying vec3 vPos;
+varying vec2 vLathe;
+varying vec3 vInfo;
+varying vec2 vUv;
+void main() {
+  float s = aLathe.x;
+  vec3 a = aFrom.xyz;
+  vec3 b = aVia.xyz;
+  vec3 c = aTo.xyz;
+  vec3 spine = mix(mix(a, b, s), mix(b, c, s), s);
+  vec3 tangent = normalize(mix(b - a, c - b, s) + vec3(0.0, 0.0, 0.0001));
+  vec3 side = cross(tangent, vec3(0.0, 0.0, 1.0));
+  side = length(side) > 0.01 ? normalize(side) : vec3(1.0, 0.0, 0.0);
+  vec3 bin = cross(side, tangent);
+  float angle = aLathe.y;
+  vec3 radial = side * cos(angle) + bin * sin(angle);
+  float radius = mix(aFrom.w, aTo.w, s);
+  // Buttress roots: five flanges swelling out of the trunk's foot.
+  float flange = 0.5 + 0.5 * cos(angle * 5.0 + aRoot.z * 6.2831853);
+  float rise = max(spine.z - a.z, 0.0);
+  radius *= 1.0 + aRoot.w * 0.9 * exp(-rise / 15.0) * (0.15 + 0.85 * flange);
+  vec2 uv;
+  vec3 pos = onTree(aRoot.xy, spine + radial * radius, uv);
+  vNormal = normalize(radial + vec3(0.0, 0.0, aRoot.w * 0.7 * exp(-rise / 15.0)));
+  vPos = pos;
+  vLathe = aLathe;
+  vInfo = vec3(aRoot.z, aRoot.w, exp(-max(texture2D(uField, uv).g, 0.0) / 60.0));
+  vUv = uv;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+}
+`;
+
+/**
+ * Bark, painted: violet, ridged along the limb, lavender where the sun catches it, a dark outline,
+ * moss on the upper faces; the trunk darkening up into its crown's shade, lit pink near the poison.
+ */
+export const LIMB_FRAGMENT = /* glsl */ `
+uniform vec3 uSun;
+uniform vec3 uEye;
+${NOISE}
+${PALETTE}
+${FLOWER_SHADING}
+varying vec3 vNormal;
+varying vec3 vPos;
+varying vec2 vLathe;
+varying vec3 vInfo;
+varying vec2 vUv;
+void main() {
+  vec3 toEye = normalize(uEye - vPos);
+  vec3 n = normalize(vNormal);
+  float s = vLathe.x;
+  float ridges = sin(vLathe.y * 8.0 + s * 5.0 * (1.0 + vInfo.x) + 1.6 * sin(s * 11.0 + vLathe.y * 2.0 + vInfo.x * 9.0));
+  vec3 bark = mix(vec3(0.13, 0.07, 0.22), vec3(0.055, 0.028, 0.1), smoothstep(0.4, 0.85, ridges));
+  float mossy = smoothstep(0.5, 0.8, n.z) * smoothstep(0.45, 0.6, gnoise(vPos.xy / 14.0 + vPos.z / 20.0));
+  bark = mix(bark, vec3(0.03, 0.15, 0.12), mossy);
+  vec3 col = celShade(bark, n, toEye);
+  float underCrown = vInfo.y > 0.5 ? smoothstep(0.3, 1.0, s) : 0.85;
+  col *= 1.0 - 0.5 * underCrown;
+  col += POISON_GLOW * vInfo.z * 0.4 * (1.0 - abs(n.z)) * (1.0 - underCrown);
+  col = edgeHaze(col, vUv);
+  gl_FragColor = vec4(col, 1.0);
+${OUTPUT}
+}
+`;
+
+/**
+ * One clump of a crown's foliage: an instanced sphere, flattened a little and lumpy, scaled up from
+ * its tree's root as the reveal passes.
+ */
+export const CROWN_VERTEX = /* glsl */ `
+${TERRAIN_UNIFORMS}
+${NOISE}
+${REVEAL}
+${TERRAIN_GROUND}
+${TREE_PLACE}
+// The unit sphere.
+attribute vec3 aSphere;
+// The tree's root x, y; seed; palette (0 teal, 1 violet).
+attribute vec4 aRoot;
+// Centre x, y, z (px off the ground at the root), radius px.
+attribute vec4 aPuff;
+// Shade 0..1 (0 low and deep in the crown).
+attribute float aShade;
+varying vec3 vNormal;
+varying vec3 vPos;
+varying vec3 vSphere;
+varying vec4 vInfo;
+varying float vRadius;
+varying vec2 vUv;
+void main() {
+  vec3 dir = aSphere;
+  float lumps = sin(dir.x * 4.1 + aRoot.z * 20.0) * sin(dir.y * 3.7 + aPuff.x * 0.05) * sin(dir.z * 3.3 + 1.0);
+  vec3 offset = dir * aPuff.w * (1.0 + 0.12 * lumps);
+  offset.z *= 0.84;
+  vec2 uv;
+  vec3 pos = onTree(aRoot.xy, aPuff.xyz + offset, uv);
+  vNormal = normalize(dir * vec3(1.0, 1.0, 1.0 / 0.84));
+  vPos = pos;
+  vSphere = dir;
+  vInfo = vec4(aRoot.z, aRoot.w, aShade, exp(-max(texture2D(uField, uv).g, 0.0) / 60.0));
+  vRadius = aPuff.w;
+  vUv = uv;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+}
+`;
+
+/**
+ * Foliage blocked in as a painter does: round leaf clusters packed over each clump (one per cell of
+ * a pattern over it), each bulging like a little dome so it takes the light on its own sunward side,
+ * dark hollows between them; deep teal or blue-violet in three flat bands, darker low and deep in the
+ * crown, a dark outline where it turns edge-on, lit pink from below near the poison.
+ */
+export const CROWN_FRAGMENT = /* glsl */ `
+uniform vec3 uSun;
+uniform vec3 uEye;
+${NOISE}
+${VORONOI}
+${PALETTE}
+varying vec3 vNormal;
+varying vec3 vPos;
+varying vec3 vSphere;
+varying vec4 vInfo;
+varying float vRadius;
+varying vec2 vUv;
+void main() {
+  vec3 toEye = normalize(uEye - vPos);
+  vec3 n = normalize(vNormal);
+  vec2 q = vSphere.xy / (1.3 + vSphere.z) * (1.0 + vRadius / 13.0) + vInfo.x * 17.0;
+  vec4 cluster = voronoiCell(q);
+  float fromCentre = length(cluster.zw);
+  float size = 0.5 + 0.2 * fract(cluster.y * 13.0);
+  float inCluster = 1.0 - smoothstep(size - 0.08, size, fromCentre);
+  vec3 bulged = normalize(n - vec3(cluster.zw / size, 0.0) * 0.55 * inCluster);
+  float light = dot(bulged, normalize(uSun));
+  vec3 base = (vInfo.y < 0.5 ? vec3(0.03, 0.16, 0.15) : vec3(0.065, 0.06, 0.22)) * (0.9 + 0.2 * fract(cluster.y * 7.0));
+  vec3 col = mix(base * 0.4, base, smoothstep(0.05, 0.2, light));
+  col = mix(col, base * 1.8 + vec3(0.02, 0.04, 0.05), smoothstep(0.6, 0.72, light));
+  col *= mix(0.5, 1.0, inCluster);
+  col *= mix(0.5, 1.0, vInfo.z);
+  float edgeOn = 1.0 - abs(dot(n, toEye));
+  col = mix(col, vec3(0.006, 0.008, 0.024), smoothstep(0.7, 0.88, edgeOn));
+  col += POISON_GLOW * vInfo.w * 0.35 * max(-n.z, 0.0);
+  col = edgeHaze(col, vUv);
+  gl_FragColor = vec4(col, 1.0);
+${OUTPUT}
+}
+`;
+
+/**
+ * A cluster hanging from a crown on its vine: an instanced ribbon turned to face the eye, swaying
+ * from its anchor.
+ */
+export const VINE_VERTEX = /* glsl */ `
+${TERRAIN_UNIFORMS}
+${NOISE}
+${REVEAL}
+${TERRAIN_GROUND}
+${TREE_PLACE}
+// across (-1..1), t (0 at the anchor, 1 at the tip).
+attribute vec2 aStrip;
+// The tree's root x, y; seed; width px.
+attribute vec4 aRoot;
+// Anchor x, y, z (px off the ground at the root), length px.
+attribute vec4 aVine;
+varying vec2 vStrip;
+varying vec3 vInfo;
+varying vec2 vUv;
+void main() {
+  float t = aStrip.y;
+  float sway = sin(uTime * 0.9 + aRoot.z * 30.0) * 5.0 * t * t;
+  vec3 centre = aVine.xyz + vec3(sway * 0.6, sway * 0.4, -aVine.w * t);
+  vec3 toEye = uEye - centre;
+  vec3 across = cross(vec3(0.0, 0.0, 1.0), toEye);
+  across = length(across) > 0.001 ? normalize(across) : vec3(1.0, 0.0, 0.0);
+  vec2 uv;
+  vec3 pos = onTree(aRoot.xy, centre + across * aStrip.x * aRoot.w * 0.5, uv);
+  vStrip = aStrip;
+  vInfo = vec3(aRoot.z, aVine.w, aRoot.w);
+  vUv = uv;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+}
+`;
+
+/**
+ * A hanging cluster as the card art paints them: a chain of berries, smaller toward the tip, each
+ * cel-shaded dark violet to magenta with a pink highlight and a dark outline. Edges by alpha to
+ * coverage.
+ */
+export const VINE_FRAGMENT = /* glsl */ `
+uniform vec2 uMin;
+uniform vec2 uSize;
+${PALETTE}
+varying vec2 vStrip;
+varying vec3 vInfo;
+varying vec2 vUv;
+// A bead's radius px: its share of the half width, smaller toward the tip.
+float beadRadius(float index, float halfPx, float spacing, float lengthPx) {
+  float t = clamp(index * spacing / lengthPx, 0.0, 1.0);
+  return halfPx * mix(1.0, 0.45, t) * (0.72 + 0.28 * fract(sin(index * 12.9898 + vInfo.x * 78.233) * 43758.5453));
+}
+void main() {
+  float lengthPx = vInfo.y;
+  float halfPx = vInfo.z * 0.5;
+  float along = vStrip.y * lengthPx;
+  float across = vStrip.x * halfPx;
+  float spacing = halfPx * 1.25;
+  float nearest = floor(along / spacing + 0.5);
+  // The nearest bead and its neighbours, so overlapping beads join into one cluster.
+  float edge = -100.0;
+  vec2 local = vec2(0.0);
+  for (int k = -1; k <= 1; k++) {
+    float index = nearest + float(k);
+    if (index < 0.0 || index * spacing > lengthPx) continue;
+    float radius = beadRadius(index, halfPx, spacing, lengthPx);
+    float inside = radius - length(vec2(across, along - index * spacing));
+    if (inside > edge) {
+      edge = inside;
+      local = vec2(across, along - index * spacing) / radius;
+    }
+  }
+  float aa = max(fwidth(edge), 0.05);
+  float coverage = smoothstep(-aa, aa, edge);
+  if (coverage < 0.02) discard;
+  // Each berry a ball lit from above and to one side (down the strip is down).
+  vec3 n = vec3(local.x, -local.y, sqrt(max(1.0 - dot(local, local), 0.0)));
+  float light = dot(n, normalize(vec3(-0.45, 0.5, 0.75)));
+  vec3 col = mix(vec3(0.05, 0.015, 0.08), vec3(0.3, 0.06, 0.28), smoothstep(0.2, 0.35, light));
+  col = mix(col, vec3(0.95, 0.36, 0.75), smoothstep(0.76, 0.86, light));
+  col = mix(col, vec3(0.02, 0.008, 0.035), smoothstep(0.8, 0.95, length(local)));
+  col = edgeHaze(col, vUv);
+  gl_FragColor = vec4(col, coverage);
 ${OUTPUT}
 }
 `;

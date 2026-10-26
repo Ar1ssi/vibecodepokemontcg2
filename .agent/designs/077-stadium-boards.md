@@ -183,7 +183,7 @@ particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
 |---|---|---|
 | volcanic | 299 Scorched Earth, 289 Magma Basin | Lava river along the seam / a lava basin in the middle; sculpted slate stones; basalt shelves |
 | coast | 209 Surfing Beach, 212 Brooklet Hill | Sand and surf rolling in from one end / grassy banks and a brook along the seam with stepping stones |
-| forest | 030 Forest of Vitality, 197 Mystery Garden, 253 Perilous Jungle | Mossy floor, roots and flowers / garden paths and hedges / a jungle clearing, a poison pool and its stream |
+| forest | 030 Forest of Vitality, 197 Mystery Garden, 253 Perilous Jungle | Mossy floor, roots and flowers / garden paths and hedges / a jungle clearing ringed by trees, poison bogs in two corners |
 | highland | 051 Stormy Mountains, 240 Mountain Ring, 239 Fighting Stadium | A crater high in a storm / a rocky ring on a peak / an arena floor |
 | crystal | 052 Crystal Cave | Cave floor with glowing crystal clusters where no card lies |
 | metal | 162 Steel Shelter, 163 Full Metal Lab | Riveted steel plates / lab deck panels with light strips |
@@ -217,11 +217,14 @@ particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
   violet earth, teal moss and grass tufts (the footprints merged and grown by 96 px, the edge
   wandering up to 30 px further, cut off 4 px past the table's near and far edges); undergrowth
   rises round it in bushes under instanced cel-shaded leaves (one bent strip each, a lit and a
-  shaded half, a dark outline). A pink poison pool with a grassy island lies left of the cards; its
-  stream winds along the seam through the gaps between the cards (routed for clearance) and out
-  past the scene's right edge. Drooping bell flowers arch over the water, pink flower spikes stand
-  on the island and banks; ripple rings, bubbles and spores move on the poison. Same scene margins
-  as Stormy Mountains.
+  shaded half, a dark outline); a core box (the cards' bounding box shrunk by 96 px) keeps the
+  gaps between cards clearing. Tall trees (violet trunks, cel-shaded teal or violet crowns, beaded
+  vines) stand outside the cards' columns either side. Two pink poison bogs, each a soft union of up
+  to three lobes with a grassy island in its middle, lie in opposite corners away from the seam (far
+  end left of the cards, near end right; each player gets one at the front right), so the layout
+  shares nothing with Scorched Earth's volcano-and-river. Drooping bell flowers arch over the
+  water, pink flower spikes stand on the islands and banks; marbled currents, shore lines, ripple
+  rings, bubbles and spores move on the poison. Same scene margins as Stormy Mountains.
 - Six more, built on branch `feature/077-six-stadiums`, each in its own module with the Stormy
   Mountains scene margins, each after its card art (set.json row, print named):
   - Magma Basin (`stadium-env-magma.mjs`, BRS 144): every card on a dark lumpy rock island ringed

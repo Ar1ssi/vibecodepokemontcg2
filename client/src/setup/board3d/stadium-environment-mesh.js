@@ -5,7 +5,7 @@
 // board's own, where and as large as they always are.
 import * as glsl from './stadium-environment-glsl.mjs';
 import * as forest from './stadium-env-forest.mjs';
-import { MAX_CARD_RECTS, STREAM_POINTS, jungleLeaves, jungleSpots } from './stadium-env-forest-layout.mjs';
+import { MAX_BOG_LOBES, MAX_BOGS, MAX_CARD_RECTS, MAX_TREES, jungleLeaves, jungleSpots } from './stadium-env-forest-layout.mjs';
 import * as highland from './stadium-env-highland.mjs';
 import { fightingStadiumBoard } from './stadium-env-arena.mjs';
 import { darkCityBoard } from './stadium-env-city.mjs';
@@ -442,16 +442,85 @@ const spikeGeometry = (three, spikes) => {
   ]);
 };
 
+/** Every limb of the trees: per vertex aLathe (along, round), its rings bunched toward the foot. */
+const limbGeometry = (three, trees) => {
+  const { rings, around } = forest.LIMB_SEGMENTS;
+  const parts = [];
+  const index = [];
+  for (let ring = 0; ring <= rings; ring += 1) {
+    // The trunk's buttress roots flare at its foot: more rings there.
+    const s = (ring / rings) ** 1.6;
+    for (let k = 0; k <= around; k += 1) parts.push(s, (k / around) * 2 * Math.PI);
+  }
+  for (let ring = 0; ring < rings; ring += 1) {
+    for (let k = 0; k < around; k += 1) {
+      const a = ring * (around + 1) + k;
+      const b = a + around + 1;
+      index.push(a, b, a + 1, a + 1, b, b + 1);
+    }
+  }
+  const limbs = trees.flatMap((tree) => tree.limbs.map((limb) => ({ tree, limb })));
+  return instancedGeometry(three, { name: 'aLathe', size: 2, parts, index }, [
+    ['aRoot', 4, limbs.flatMap(({ tree, limb }) => [tree.x, tree.y, tree.seed, limb.flare])],
+    ['aFrom', 4, limbs.flatMap(({ limb }) => [...limb.from, limb.r0])],
+    ['aVia', 4, limbs.flatMap(({ limb }) => [...limb.via, 0])],
+    ['aTo', 4, limbs.flatMap(({ limb }) => [...limb.to, limb.r1])],
+  ]);
+};
+
+/** Every clump of the crowns' foliage: per vertex the unit sphere, per instance the clump. */
+const crownGeometry = (three, trees) => {
+  const { rings, around } = forest.PUFF_SEGMENTS;
+  const parts = [];
+  const index = [];
+  for (let ring = 0; ring <= rings; ring += 1) {
+    const latitude = -Math.PI / 2 + (Math.PI * ring) / rings;
+    for (let k = 0; k < around; k += 1) {
+      const longitude = (k / around) * 2 * Math.PI;
+      parts.push(Math.cos(latitude) * Math.cos(longitude), Math.cos(latitude) * Math.sin(longitude), Math.sin(latitude));
+    }
+  }
+  for (let ring = 0; ring < rings; ring += 1) {
+    for (let k = 0; k < around; k += 1) {
+      const a0 = ring * around + k;
+      const a1 = ring * around + ((k + 1) % around);
+      index.push(a0, a1, a0 + around, a1, a1 + around, a0 + around);
+    }
+  }
+  const puffs = trees.flatMap((tree) => tree.puffs.map((puff) => ({ tree, puff })));
+  return instancedGeometry(three, { name: 'aSphere', size: 3, parts, index }, [
+    ['aRoot', 4, puffs.flatMap(({ tree, puff }) => [tree.x, tree.y, tree.seed + puff.r * 0.013, tree.palette])],
+    ['aPuff', 4, puffs.flatMap(({ puff }) => [puff.x, puff.y, puff.z, puff.r])],
+    ['aShade', 1, puffs.map(({ puff }) => puff.shade)],
+  ]);
+};
+
+/** Every vine: per vertex aStrip (across, down), per instance its anchor and size. */
+const vineGeometry = (three, trees) => {
+  const parts = [];
+  const index = [];
+  for (let i = 0; i <= forest.VINE_SEGMENTS; i += 1) parts.push(-1, i / forest.VINE_SEGMENTS, 1, i / forest.VINE_SEGMENTS);
+  for (let i = 0; i < forest.VINE_SEGMENTS; i += 1) index.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 1, i * 2 + 3, i * 2 + 2);
+  const vines = trees.flatMap((tree) => tree.vines.map((vine) => ({ tree, vine })));
+  return instancedGeometry(three, { name: 'aStrip', size: 2, parts, index }, [
+    ['aRoot', 4, vines.flatMap(({ tree, vine }) => [tree.x, tree.y, vine.seed, vine.width])],
+    ['aVine', 4, vines.flatMap(({ vine }) => [vine.x, vine.y, vine.z, vine.length])],
+  ]);
+};
+
 /**
- * Perilous Jungle: the ground and its undergrowth, the poison's sheet, every leaf, the bell flowers
- * and flower spikes, and the spores.
+ * Perilous Jungle: the ground, the poison's sheet, every leaf, the bell flowers and flower spikes,
+ * the trees (limbs, foliage, vines) and the spores.
  */
 function perilousJungleBoard({ three, material, seeded }) {
   const own = {
     uCards: { value: Array.from({ length: MAX_CARD_RECTS }, () => new three.Vector4()) },
+    uCore: { value: new three.Vector4() },
     uTable: { value: new three.Vector4() },
-    uPool: { value: new three.Vector3() },
-    uStream: { value: Array.from({ length: STREAM_POINTS }, () => new three.Vector3()) },
+    uBogs: { value: Array.from({ length: MAX_BOGS * MAX_BOG_LOBES }, () => new three.Vector3()) },
+    uIslands: { value: Array.from({ length: MAX_BOGS }, () => new three.Vector3()) },
+    uCrowns: { value: Array.from({ length: MAX_TREES }, () => new three.Vector4()) },
+    uTrunks: { value: Array.from({ length: MAX_TREES }, () => new three.Vector4()) },
   };
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
   const materials = {
@@ -466,6 +535,10 @@ function perilousJungleBoard({ three, material, seeded }) {
     leaves: make(forest.LEAF_VERTEX, forest.LEAF_FRAGMENT, { side: three.DoubleSide, alphaToCoverage: true }),
     bells: make(forest.BELL_VERTEX, forest.BELL_FRAGMENT, { side: three.DoubleSide }),
     spikes: make(forest.SPIKE_VERTEX, forest.SPIKE_FRAGMENT),
+    limbs: make(forest.LIMB_VERTEX, forest.LIMB_FRAGMENT),
+    crowns: make(forest.CROWN_VERTEX, forest.CROWN_FRAGMENT),
+    // Both sides: a vine turns to face the eye, but its ribbon may still wind either way on screen.
+    vines: make(forest.VINE_VERTEX, forest.VINE_FRAGMENT, { side: three.DoubleSide, alphaToCoverage: true }),
     spores: make(forest.SPORE_VERTEX, forest.SPORE_FRAGMENT, {
       transparent: true,
       depthWrite: false,
@@ -478,24 +551,36 @@ function perilousJungleBoard({ three, material, seeded }) {
   const leaves = new three.Mesh(new three.BufferGeometry(), materials.leaves);
   const bells = new three.Mesh(new three.BufferGeometry(), materials.bells);
   const spikes = new three.Mesh(new three.BufferGeometry(), materials.spikes);
+  const limbs = new three.Mesh(new three.BufferGeometry(), materials.limbs);
+  const crowns = new three.Mesh(new three.BufferGeometry(), materials.crowns);
+  const vines = new three.Mesh(new three.BufferGeometry(), materials.vines);
   const spores = new three.Points(seeded(SPORE_COUNT), materials.spores);
   spores.renderOrder = 2;
   return {
-    objects: [terrain, poison, leaves, bells, spikes, spores],
+    objects: [terrain, poison, leaves, bells, spikes, limbs, crowns, vines, spores],
     materials: Object.values(materials),
     bakeField: materials.bakeField,
     spots: (layout) => jungleSpots(layout),
     apply(spots, bounds) {
-      const { cards, table, pool, stream } = spots;
+      const { cards, core, table, bogs, trees } = spots;
       own.uTable.value.set(table.x, table.y, table.x + table.w, table.y + table.h);
-      // Footprints and points not in use lie far off the table, so neither clearing nor water forms
-      // round them.
-      own.uCards.value.forEach((rect, i) =>
-        cards[i] ? rect.set(cards[i].x, cards[i].y, cards[i].x + cards[i].w, cards[i].y + cards[i].h) : rect.set(-1e5, -1e5, -1e5, -1e5)
+      // Footprints not in use lie far off the table, so no clearing forms round them; lobes, islands
+      // and trees not in use have no radius.
+      const setRect = (vector, rect) =>
+        rect ? vector.set(rect.x, rect.y, rect.x + rect.w, rect.y + rect.h) : vector.set(-1e5, -1e5, -1e5, -1e5);
+      own.uCards.value.forEach((vector, i) => setRect(vector, cards[i]));
+      setRect(own.uCore.value, core);
+      const lobes = bogs.flatMap((bog) => bog.lobes);
+      own.uBogs.value.forEach((vector, i) => (lobes[i] ? vector.set(lobes[i].x, lobes[i].y, lobes[i].r) : vector.set(0, 0, 0)));
+      own.uIslands.value.forEach((vector, i) => {
+        const island = bogs[i]?.island;
+        return island ? vector.set(island.x, island.y, island.r) : vector.set(0, 0, 0);
+      });
+      own.uCrowns.value.forEach((crown, i) =>
+        trees[i] ? crown.set(trees[i].cx, trees[i].cy, trees[i].crown, trees[i].cz) : crown.set(-1e5, -1e5, 0, 0)
       );
-      own.uPool.value.set(pool?.x ?? 0, pool?.y ?? 0, pool?.r ?? 0);
-      own.uStream.value.forEach((point, i) =>
-        stream[i] ? point.set(stream[i].x, stream[i].y, stream[i].w) : point.set(-1e5, -1e5, 0)
+      own.uTrunks.value.forEach((trunk, i) =>
+        trees[i] ? trunk.set(trees[i].x, trees[i].y, trees[i].trunk, trees[i].side) : trunk.set(-1e5, -1e5, 0, 0)
       );
       replaceGeometry(terrain, terrainGrid(three, bounds));
       replaceGeometry(
@@ -506,9 +591,12 @@ function perilousJungleBoard({ three, material, seeded }) {
           forest.WATER_LEVEL
         )
       );
-      replaceGeometry(leaves, leafGeometry(three, jungleLeaves(spots, bounds)));
+      replaceGeometry(leaves, leafGeometry(three, jungleLeaves(spots)));
       replaceGeometry(bells, bellGeometry(three, spots.bells));
       replaceGeometry(spikes, spikeGeometry(three, spots.spikes));
+      replaceGeometry(limbs, limbGeometry(three, trees));
+      replaceGeometry(crowns, crownGeometry(three, trees));
+      replaceGeometry(vines, vineGeometry(three, trees));
     },
   };
 }
@@ -761,19 +849,23 @@ export function createStadiumEnvironment({
       if (!applyLayout()) return false;
       dirty = false;
     }
+    const board = boards.get(key);
+    if (camera && !board.compiled) {
+      // Every program now, hidden meshes too (the lightning shows only when it strikes), so the first
+      // strike doesn't stall a frame compiling its shader. This frame stalls instead: the reveal
+      // starts with the next one, or it would run its course while the compile holds the screen.
+      renderer.compile?.(board.holder, camera, sceneOf(group));
+      board.compiled = true;
+      revealStartedAt = null;
+      uniforms.uReveal.value = 0;
+      return true;
+    }
     const reduced = motionReduced();
     if (revealStartedAt === null) revealStartedAt = now;
     const progress = reduced ? 1 : Math.min(1, Math.max(0, (now - revealStartedAt) / INTRO_MS));
     uniforms.uReveal.value = easeOutCubic(progress);
     uniforms.uTime.value = reduced ? 0 : now / 1000;
-    const board = boards.get(key);
     board.tick?.(reduced ? null : now / 1000);
-    if (camera && !board.compiled) {
-      // Every program now, hidden meshes too (the lightning shows only when it strikes), so the first
-      // strike doesn't stall a frame compiling its shader.
-      renderer.compile?.(board.holder, camera, sceneOf(group));
-      board.compiled = true;
-    }
     if (camera) {
       renderer.getDrawingBufferSize(bufferSize);
       uniforms.uFocal.value = (camera.projectionMatrix.elements[5] * bufferSize.y) / 2;
