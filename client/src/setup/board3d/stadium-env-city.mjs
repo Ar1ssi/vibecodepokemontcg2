@@ -51,7 +51,7 @@ const TOWERS = [
   { side: 'right', from: -1.0, to: -0.3, gap: 44, depth: 280, height: 40, board: 0 },
   { side: 'right', from: -0.18, to: 0.64, gap: 38, depth: 250, height: 270, board: 1 },
   { side: 'right', from: 0.76, to: 1.5, gap: 50, depth: 280, height: 160, board: 0 },
-  { side: 'far', from: 0.08, to: 0.8, gap: 46, depth: 230, height: 110, board: 0 },
+  { side: 'far', from: 0.08, to: 0.8, gap: 46, depth: 230, height: 110, board: 0, hazard: true },
   { side: 'far', from: -1.0, to: -0.68, gap: 60, depth: 220, height: 60, board: 0 },
   { side: 'near', from: -1.2, to: 1.2, gap: 60, depth: 260, height: -110, board: 0 },
 ];
@@ -73,6 +73,8 @@ const DOOR_RED = [0.2, 0.035, 0.04, 0.2];
 const LAMP = [1.4, 1.1, 0.7, 2.6];
 const MACHINE = [0.3, 0.32, 0.35, 0.4];
 const GRILLE = [0.06, 0.065, 0.075, 0.2];
+const HAZARD_YELLOW = [0.75, 0.6, 0.06, 1.7];
+const HAZARD_BLACK = [0.03, 0.03, 0.03, 0.1];
 
 /**
  * Dark City's layout: the roof (round every card footprint, ROOF_GAP_PX clear), the hut, the roof's
@@ -98,7 +100,7 @@ export function citySpots(layout) {
     h: HUT.h,
   };
   const at = ([u, v]) => ({ x: roof.x + u * roof.hw, y: roof.y + v * roof.hh });
-  const towers = TOWERS.map(({ side, from, to, gap, depth, height, board }) => {
+  const towers = TOWERS.map(({ side, from, to, gap, depth, height, board, hazard = false }) => {
     const across = side === 'left' || side === 'right';
     const sign = side === 'left' || side === 'near' ? -1 : 1;
     const run = across ? roof.hh : roof.hw;
@@ -106,8 +108,8 @@ export function citySpots(layout) {
     const middle = ((from + to) / 2) * run;
     const length = (to - from) * run;
     return across
-      ? { x: roof.x + sign * reach, y: roof.y + middle, w: depth, d: length, height, board }
-      : { x: roof.x + middle, y: roof.y + sign * reach, w: length, d: depth, height, board };
+      ? { x: roof.x + sign * reach, y: roof.y + middle, w: depth, d: length, height, board, hazard }
+      : { x: roof.x + middle, y: roof.y + sign * reach, w: length, d: depth, height, board, hazard };
   });
   const round = {
     x: roof.x + ROUND_TOWER.at * roof.hw,
@@ -125,6 +127,17 @@ export function citySpots(layout) {
 export function cityProps({ roof, hut, machines, towers }) {
   const props = createPropBuilder();
   for (const tower of towers) {
+    if (tower.hazard) {
+      // The art's yellow and black hazard band along the roof edge facing the rooftop.
+      const edgeY = tower.y - tower.d / 2 - 1.5;
+      const count = Math.max(2, Math.round(tower.w / 18));
+      for (let k = 0; k < count; k += 1) {
+        const x0 = tower.x - tower.w / 2 + (tower.w * k) / count;
+        const x1 = x0 + tower.w / count;
+        const z1 = tower.height - 2;
+        props.quad([x1, edgeY, z1 - 10], [x0, edgeY, z1 - 10], [x0 + 5, edgeY, z1], [x1 + 5, edgeY, z1], k % 2 ? HAZARD_BLACK : HAZARD_YELLOW);
+      }
+    }
     if (tower.height < 60) continue;
     // On top: a machine room, a water tank, an antenna with its red aircraft light.
     props.box({
