@@ -111,17 +111,17 @@ test('Full Metal Lab shaders declare no GLSL ES 3.00 reserved word and every one
   }
 });
 
-test('labSpots: the pipe clusters stand on the deck, inside the scene, clear of the tanks and consoles', () => {
+test('labSpots: the consoles stand side by side on the deck, off the dais, inside the scene', () => {
   for (const layout of layouts) {
     const spots = labSpots(layout);
     const scene = sceneBounds(layout, LAB_KEY);
-    assert.ok(spots.clusters.length >= 2, `${spots.clusters.length} clusters`);
-    for (const cluster of spots.clusters) {
-      assert.ok(daisDistance(cluster.x, cluster.y, spots.dais) > 30, 'off the dais');
-      assert.ok(cluster.x > scene.x && cluster.x < scene.x + scene.w && cluster.y > scene.y && cluster.y < scene.y + scene.h);
-      for (const tank of spots.tanks) assert.ok(Math.hypot(cluster.x - tank.x, cluster.y - tank.y) > tank.radius + 16);
-      for (const desk of spots.consoles) assert.ok(Math.hypot(cluster.x - desk.x, cluster.y - desk.y) > 70);
-    }
+    assert.equal(spots.consoles.length, 3);
+    spots.consoles.forEach((cabinet, i) => {
+      assert.ok(daisDistance(cabinet.x, cabinet.y, spots.dais) > cabinet.hh, 'off the dais');
+      assert.ok(cabinet.x > scene.x && cabinet.x < scene.x + scene.w && cabinet.y > scene.y && cabinet.y < scene.y + scene.h);
+      const next = spots.consoles[i + 1];
+      if (next) assert.ok(Math.abs(Math.hypot(next.x - cabinet.x, next.y - cabinet.y) - (cabinet.hw + next.hw)) < 2, 'touching its neighbour');
+    });
   }
 });
 
