@@ -228,41 +228,44 @@ particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
 - Six more, built on branch `feature/077-six-stadiums`, each in its own module with the Stormy
   Mountains scene margins, each after its card art (set.json row, print named), its palette
   checked against pixel samples of the art:
-  - Magma Basin (`stadium-env-magma.mjs`, BRS 144): every card on a dark brown lumpy rock island
-    ringed by a moat of molten gold (widest beside the cards); crimson cliffs heaped with rounded
-    rocks rise round it, eight thin lavafalls (one forked) running down smooth channels into the moat; the Poke Ball set in the island as a
-    smooth, slightly raised brick-red disc, its band and button ring cut dark; sparks off the moat
-    and the splashes. Two-pass bake (smooth basin, then facets and lumps).
-  - Steel Shelter (`stadium-env-shelter.mjs`, PHF 105): a white hall; a polished pale-grey hex
-    floor that mirrors the walls and the ceiling's hex lights per pixel, one big hatched hexagon in
-    it, the Poke Ball hologram as cyan rings; white walls over dark louvred vents and shimmering
-    cyan strips lean out a little round the hall, a dark roof past them; on the far wall the gate's
-    chevron frame round a grey two-leaf door with vent slits and hexagon clusters.
+  - Magma Basin (`stadium-env-magma.mjs`, BRS 144): every card on an island of dark brown rock
+    packed with faceted lumps, ringed by a moat of molten gold (white-hot down its middle, deep red
+    at the shores, dark crust drifting); crimson cliffs heaped with rounded rocks rise round it,
+    the art's four lavafalls (one forked) pouring down the far wall only (falls on the side walls
+    read as rays from above); the Poke Ball set in the island as a smooth brick-red disc, its band
+    and button ring cut dark; sparks off the moat and the splashes. Two-pass bake.
+  - Steel Shelter (`stadium-env-shelter.mjs`, PHF 105): a white hall; a glossy pale-grey hex floor
+    that mirrors the walls and the ceiling's hex lights per pixel, one big hexagon outlined in a
+    black hatched band, the Poke Ball hologram as glowing cyan rings and band; walls of white blocks
+    with a louvred band across their middle and hatches low, shimmering cyan strips, leaning out a
+    little round the hall, a pale roof past them; on the far wall the gate's chevron frame round a
+    grey two-leaf door with vent slits and hexagon clusters.
   - Full Metal Lab (`stadium-env-lab.mjs`, TEF 148): a two-tone dais (dark teal disc, the Poke Ball
-    lit blue inside thick white lines, the lens's scan pulse; a band of pale steel plates) holds the
-    Actives, Benches, Stadium and Trainer rows, docking pads the Prize cards and piles; yellow
-    railings, a teal-grey stair with steel nosings at the near right, black cables on the band and
-    a gooseneck lamp; on the deck below pale consoles with dark screens, cyan-steel tanks, pipe
-    arches standing round the dais, bundles of low pipes running out to the edge, ring pipes and
-    big bent pipes rising out of view.
+    lit blue inside thick glowing white lines, the lens's scan pulse; a band of pale steel plates)
+    holds the Actives, Benches, Stadium and Trainer rows, docking pads the Prize cards and piles;
+    thick safety-yellow railings, a teal-grey stair with steel nosings at the near right, black
+    cables on the band and a gooseneck lamp; on the icy steel deck below sloped consoles with lit
+    screens, domed tanks with collared necks and hanging cables between them, banded pipes running
+    round the dais along its tangent, pipe arches, ring pipes and big bent pipes rising out of view.
   - Dark City (`stadium-env-city.mjs`, UNM 193): a moonlit concrete rooftop with a parapet, the
-    stairwell hut and its lamp at the near right, AC units on the left; blue-grey towers with big
-    windows (about a third lit, a few switching on and off) across the streets, each roof with a
-    parapet, tank and red-lit mast; a pink X and Team Skull's red skull sprayed over two printed ads,
-    the far tower's hazard band, the round tower far off; searchlights from the street corners
-    sweep soft shafts across over the roof.
+    stairwell hut with its red door and cold white lamp at the near right, AC units with ring
+    grilles on the left; slate towers with big windows (a fifth lit, a few switching on and off)
+    across the streets, each roof with a parapet, tank and red-lit mast; a pink X and Team Skull's
+    red skull sprayed over two printed ads, the far tower's hazard band, the round tower beside the
+    roof's left side at its far end (the art's is at the back, which the opponent's hand covers);
+    soft searchlight shafts from the street corners sweep across over the roof.
   - Mountain Ring (`stadium-env-ring.mjs`, FFI 97): rows of grey-brown bricks with dark uneven
-    joints, each row shifted its own way, breaking up at the ring's edge; a pale stone Poke Ball
-    set in dark grooves; menhirs of every shape round it, two rope strands wound round each in
-    bands of turns and sagging between, a giant dark iron chain off one; past them rough sandy
-    ground with dark boulders, tall jagged rock spires on the sides and far side, sepia haze
+    joints breaking up at the ring's edge; the art's emblem, a pale stone disc in a dark groove with
+    a dark ring round its centre; menhirs of every shape round it (some with broken tops), two rope
+    strands wound round each and sagging between, a giant dark iron chain off one; past them rough
+    sandy ground with dark boulders, tall jagged rock spires on the sides and far side, sepia haze
     thickening with distance; cloud shadows and mist drift.
-  - Fighting Stadium (`stadium-env-arena.mjs`, FFI 90): a wrestling ring (pale canvas, blue apron
-    and corner posts, three white ropes a side) on a glowing white stage edged in lights that throws
-    cyan light round it, its entrance ramp and truss running off the left side (the art's right,
-    which the sidebox would cover), big round lamps along its edge; LED ad boards round the floor
-    (mostly white with coloured marks), dark teal tiers of the crowd; 24
-    lasers fan out from the rig over the ring and criss-cross from the corners, faint over the ring.
+  - Fighting Stadium (`stadium-env-arena.mjs`, FFI 90): a wrestling ring (cyan-white canvas under the
+    rig's ring of lamp pools, blue apron and corner posts, three white ropes a side) on a glowing
+    white stage edged in big round lamps, its entrance ramp and truss running off the left side (the
+    art's right, which the sidebox would cover); LED ad boards leaning back round the floor (mostly
+    white with coloured marks), dark teal tiers of the crowd; 14 soft lasers sweep the stands from
+    the rig and the corners, faint to nothing over the ring.
 
 ### Mesh — `stadium-environment-mesh.js`
 `createStadiumEnvironment({ three, renderer, parent, clock, motionReduced, fxDisabled, onNeedsRender })`
