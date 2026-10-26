@@ -52,8 +52,8 @@ export const LASER_COUNT = 24;
 export const RAMP = { at: -0.42, half: 52 };
 const LASER_FROM_Z = 520;
 
-const POST_STEEL = [0.55, 0.58, 0.62, 0.8];
-const PAD_BLUE = [0.12, 0.32, 0.75, 0.15];
+const POST_STEEL = [0.0, 0.17, 0.38, 0.4];
+const PAD_BLUE = [0.0, 0.2, 0.44, 0.15];
 const ROPE_WHITE = [0.92, 0.93, 0.95, 0.1];
 const BOARD_FRAME = [0.05, 0.055, 0.065, 0.3];
 const TRUSS = [0.1, 0.14, 0.16, 0.5];
@@ -221,7 +221,7 @@ uniform vec3 uEmblem;
 // The entrance ramp: its middle's y, half width, the x it leaves the stage at, out to the left
 // (arenaSpots).
 uniform vec3 uRamp;
-const vec3 HAZE_TEAL = vec3(0.07, 0.3, 0.34);
+const vec3 HAZE_TEAL = vec3(0.0, 0.07, 0.075);
 // px inside the ramp's edges (negative off it).
 float rampInside(vec2 p) {
   if (uRamp.y <= 0.0 || p.x > uRamp.z) return -100000.0;
@@ -337,7 +337,7 @@ void main() {
   } else if (kind < 0.5) {
     if (d < 3.0 || ground < -${APRON_PX.drop - 2}.0 && d < 5.0) {
       // The apron: the ring's dark navy skirt, a white line along it.
-      col = vec3(0.03, 0.05, 0.1);
+      col = vec3(0.0, 0.16, 0.36);
     } else if (id >= 0.0) {
       // The ramp: the stage's glowing white running out to the left, lights along both edges.
       col = mix(vec3(0.6, 0.84, 0.9), vec3(0.78, 0.93, 0.98), smoothstep(0.0, 30.0, id));
@@ -360,7 +360,7 @@ void main() {
     // The stands: tiers of seats in the dark, packed with the crowd: heads and shoulders in
     // silhouette, shirts a dim teal, a phone's light here and there.
     float tierTop = smoothstep(0.8, 0.95, n.z);
-    vec3 seat = mix(vec3(0.025, 0.07, 0.09), vec3(0.06, 0.15, 0.18), tierTop);
+    vec3 seat = mix(vec3(0.0, 0.025, 0.026), vec3(0.008, 0.06, 0.06), tierTop);
     float along = alongStands(p);
     float tierD = mod(length(max(abs(p - uRing.xy) - uBoards, 0.0)) - ${BOARD_PX.thick}.0, ${TIER_PX.run}.0);
     col = seat;
@@ -375,15 +375,18 @@ void main() {
       float body = 1.0 - smoothstep(4.6, 5.6, length(local * vec2(1.0, 1.5) - vec2(0.0, -6.5)));
       float head = 1.0 - smoothstep(2.8, 3.6, length(local - vec2(0.0, 2.0)));
       float pick = hash12(vec2(slot, id * 53.0));
-      vec3 shirt = pick < 0.6 ? vec3(0.03, 0.1, 0.12) : pick < 0.74 ? vec3(0.26, 0.06, 0.08) : pick < 0.88 ? vec3(0.06, 0.09, 0.24) : vec3(0.32, 0.38, 0.4);
+      vec3 shirt = pick < 0.6 ? vec3(0.0, 0.06, 0.06) : pick < 0.74 ? vec3(0.18, 0.04, 0.06) : pick < 0.88 ? vec3(0.02, 0.06, 0.16) : vec3(0.2, 0.26, 0.27);
       col = mix(col, shirt * (0.7 + 0.3 * smoothstep(-6.0, 2.0, local.y)), body);
-      col = mix(col, vec3(0.06, 0.12, 0.14), head);
+      col = mix(col, vec3(0.02, 0.08, 0.08), head);
       // A raised phone's light here and there, twinkling.
       float phone = step(0.95, hash12(vec2(slot * 3.1, id * 13.0))) * (0.55 + 0.45 * sin(uTime * 2.5 + seed * 40.0));
       col += vec3(0.9, 1.0, 1.1) * phone * (1.0 - smoothstep(0.8, 1.8, length(local - vec2(3.0, 4.0))));
     }
   }
   col = mix(col * 0.55, col, smoothstep(0.3, 0.9, light.b));
+  // The glowing stage throws cyan light across the floor and the front rows, as in the art.
+  float fromStage = max(d - ${STAGE_PX.width}.0, 0.0);
+  col += vec3(0.05, 0.3, 0.38) * exp(-fromStage / 70.0) * step(0.5, kind) * 0.8;
   // The teal haze over the arena, thicker away from the ring.
   col = mix(col, HAZE_TEAL, smoothstep(${STAGE_PX.width}.0, 500.0, d) * 0.45);
   vec2 edgeUv = min(vUv, 1.0 - vUv);
