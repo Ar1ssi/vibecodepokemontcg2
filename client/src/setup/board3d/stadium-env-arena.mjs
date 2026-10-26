@@ -37,14 +37,14 @@ export const APRON_PX = { drop: 34 };
 export const STAGE_PX = { width: 74, drop: 46 };
 export const FLOOR_PX = 64;
 /** The ad boards: height, thickness. */
-export const BOARD_PX = { height: 44, thick: 8 };
+export const BOARD_PX = { height: 44, thick: 8, lean: 30 };
 /** The stands: each tier's run and rise. */
 export const TIER_PX = { run: 40, rise: 26 };
 /** The ring's corner posts and ropes: the posts' height and radius, the ropes' heights, radius, sag. */
 export const POST_PX = { height: 96, radius: 7 };
 export const ROPES = { heights: [36, 60, 84], radius: 2.6, sag: 5 };
 /** The lasers: how many, and where they shine from (z over the cloth). */
-export const LASER_COUNT = 24;
+export const LASER_COUNT = 14;
 /**
  * The entrance ramp off the stage, as in the art (there to the right; here off the left side, which
  * both camera presets see, where the sidebox covers the right): its middle's place as a share of
@@ -159,6 +159,8 @@ export function adBoardGeometry(three, { ring, boards, ramp }) {
   const index = [];
   const z0 = -APRON_PX.drop - STAGE_PX.drop + 2;
   const z1 = z0 + BOARD_PX.height - 6;
+  // Their tops lean back away from the ring, so the boards' faces show from above.
+  const lean = BOARD_PX.lean;
   const lo = { x: ring.x - boards.hw, y: ring.y - boards.hh };
   const hi = { x: ring.x + boards.hw, y: ring.y + boards.hh };
   // Round the band counter-clockwise from the near-left corner, so u runs on round the corners.
@@ -175,7 +177,9 @@ export function adBoardGeometry(three, { ring, boards, ramp }) {
     const length = Math.hypot(bx - ax, by - ay);
     if (length < 1) return;
     const first = positions.length / 3;
-    positions.push(ax, ay, z0, bx, by, z0, bx, by, z1, ax, ay, z1);
+    // Outward is to the run's left as the band runs counter-clockwise.
+    const out = [(by - ay) / length, -(bx - ax) / length];
+    positions.push(ax, ay, z0, bx, by, z0, bx + out[0] * lean, by + out[1] * lean, z1, ax + out[0] * lean, ay + out[1] * lean, z1);
     ads.push(u, 0, 0, u + length, 0, 0, u + length, 1, 0, u, 1, 0);
     index.push(first, first + 1, first + 2, first, first + 2, first + 3);
     u += length;
@@ -335,7 +339,7 @@ void main() {
     // The canvas: pale blue-grey, brightest under the rig in the middle, faint scuffs; a darker
     // band round its edge; the Poke Ball painted on it in light grey lines.
     float spot = exp(-dot(p - uRing.xy, p - uRing.xy) / (2.0 * 420.0 * 420.0));
-    col = mix(vec3(0.42, 0.5, 0.56), vec3(0.72, 0.8, 0.84), spot) * (0.95 + 0.06 * fbm3(p / 50.0));
+    col = mix(vec3(0.4, 0.56, 0.64), vec3(0.7, 0.86, 0.93), spot) * (0.95 + 0.06 * fbm3(p / 50.0));
     // The rig overhead (the art's ring of lamps) lays a ring of soft light pools on the canvas.
     vec2 rel = p - uRing.xy;
     float rigR = min(uRing.z, uRing.w) * 0.78;
@@ -392,7 +396,7 @@ void main() {
       col = mix(col, shirt * (0.7 + 0.3 * smoothstep(-6.0, 2.0, local.y)), body);
       col = mix(col, vec3(0.02, 0.08, 0.08), head);
       // A raised phone's light here and there, twinkling.
-      float phone = step(0.95, hash12(vec2(slot * 3.1, id * 13.0))) * (0.55 + 0.45 * sin(uTime * 2.5 + seed * 40.0));
+      float phone = step(0.985, hash12(vec2(slot * 3.1, id * 13.0))) * (0.35 + 0.25 * sin(uTime * 2.5 + seed * 40.0));
       col += vec3(0.9, 1.0, 1.1) * phone * (1.0 - smoothstep(0.8, 1.8, length(local - vec2(3.0, 4.0))));
     }
   }
@@ -520,11 +524,11 @@ void main() {
   vec3 to = vec3(target, 24.0);
   vec3 here = mix(source, to, aBeam.x);
   vec2 q = abs(here.xy - uRing.xy) - uRing.zw - 40.0;
-  vOutside = mix(0.12, 1.0, smoothstep(0.0, 60.0, max(q.x, q.y)));
+  vOutside = smoothstep(0.0, 80.0, max(q.x, q.y));
   vec4 view = modelViewMatrix * vec4(here, 1.0);
   vec2 tangent = (modelViewMatrix * vec4(to - source, 0.0)).xy;
   vec2 across = length(tangent) > 0.0001 ? normalize(vec2(-tangent.y, tangent.x)) : vec2(1.0, 0.0);
-  view.xy += across * aBeam.y * 3.2;
+  view.xy += across * aBeam.y * 6.0;
   gl_Position = projectionMatrix * view;
   vBeam = aBeam.xy;
   vLaser = k;
@@ -540,11 +544,12 @@ varying float vOutside;
 void main() {
   float which = mod(vLaser, 5.0);
   vec3 tint = which < 0.5 ? vec3(0.3, 1.4, 0.4) : which < 1.5 ? vec3(1.4, 0.3, 1.1) : which < 2.5 ? vec3(1.4, 1.2, 0.3) : which < 3.5 ? vec3(1.3, 1.4, 1.5) : vec3(0.3, 0.6, 1.5);
-  float core = exp(-vBeam.y * vBeam.y * 3.0);
+  // A thin bright core in a soft haze, falling to nothing at the ribbon's edges.
+  float core = exp(-vBeam.y * vBeam.y * 14.0) + 0.35 * (1.0 - vBeam.y * vBeam.y);
   // Brightest where it reaches the crowd, fading up into the haze toward the rig.
   float fade = smoothstep(0.0, 0.6, vBeam.x) * vOutside;
   float shown = smoothstep(0.6, 1.0, uReveal) * (1.0 - uExit);
-  gl_FragColor = vec4(tint * core * fade * 0.75 * shown, 1.0);
+  gl_FragColor = vec4(tint * core * fade * 0.55 * shown, 1.0);
 ${OUTPUT}
 }
 `;
