@@ -30,8 +30,10 @@ export const ENERGY_TYPES = Object.freeze([
 ]);
 export const POKEMON_STAGES = Object.freeze(['Basic', 'Stage1', 'Stage2']);
 export const TRAINER_TYPES = Object.freeze(['Item', 'Supporter', 'Stadium', 'Tool']);
-// Energy is out of scope (design 075): decks use official Energy, the editor exports none.
-export const CARD_CATEGORIES = Object.freeze(['Pokemon', 'Trainer']);
+// Basic Energy stays out of scope (design 075): decks use official Energy. A Special Energy (a restyled Double
+// Colorless Energy, say) is a card of its own, so the editor may export those.
+export const CARD_CATEGORIES = Object.freeze(['Pokemon', 'Trainer', 'Energy']);
+export const ENERGY_KINDS = Object.freeze(['Special']);
 // Which deck-builder pill lists the set: "custom" (the Custom pill, the default when absent) or
 // "homebrew" (the Homebrew sets pill).
 export const CUSTOM_SET_GROUPS = Object.freeze(['custom', 'homebrew']);
@@ -160,6 +162,11 @@ function checkTrainer(card, where, errors) {
   checkAbilities(card.abilities, `${where}.abilities`, errors);
 }
 
+function checkEnergy(card, where, errors) {
+  if (!ENERGY_KINDS.includes(card.energyType)) errors.push(`${where}.energyType: one of ${ENERGY_KINDS.join(', ')}`);
+  if (typeof card.effect !== 'string' || card.effect.trim().length === 0) errors.push(`${where}.effect: required`);
+}
+
 function checkCard(card, setId, where, errors, seenLocalIds) {
   if (!card || typeof card !== 'object') {
     errors.push(`${where}: expected an object`);
@@ -178,6 +185,7 @@ function checkCard(card, setId, where, errors, seenLocalIds) {
   if (card.image !== image) errors.push(`${where}.image: expected "${image}"`);
   if (card.category === 'Pokemon') checkPokemon(card, where, errors);
   if (card.category === 'Trainer') checkTrainer(card, where, errors);
+  if (card.category === 'Energy') checkEnergy(card, where, errors);
 }
 
 /**
