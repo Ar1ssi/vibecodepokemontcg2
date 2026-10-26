@@ -68,8 +68,8 @@ const PEAKS = [
 const GREY_STONE = [0.5, 0.46, 0.4, 0.05];
 const ROPE_LIGHT = [0.4, 0.27, 0.15, 0.05];
 const ROPE_DARK = [0.27, 0.17, 0.09, 0.05];
-const RUST = [0.44, 0.22, 0.1, 0.3];
-const RUST_DARK = [0.3, 0.14, 0.07, 0.25];
+const RUST = [0.27, 0.19, 0.15, 0.35];
+const RUST_DARK = [0.19, 0.13, 0.1, 0.3];
 
 const turnBetween = (a, b) => Math.abs(((a - b + 3 * Math.PI) % (2 * Math.PI)) - Math.PI);
 
