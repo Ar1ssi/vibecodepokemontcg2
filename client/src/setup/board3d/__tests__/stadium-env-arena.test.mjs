@@ -12,6 +12,7 @@ import {
   GLINT_VERTEX,
   LASER_COUNT,
   LASER_VERTEX,
+  POST_PX,
   PROP_FRAGMENT,
   RIG_PX,
   RING_GAP_PX,
@@ -21,6 +22,7 @@ import {
   arenaSpots,
   glintGeometry,
   laserGeometry,
+  laserLights,
   rigLamps,
   rigOutline,
 } from '../stadium-env-arena.mjs';
@@ -99,9 +101,23 @@ test('the rig runs round outside the ropes, a lamp at each of its corners and th
       const gap = Math.hypot(bx - ax, by - ay);
       assert.ok(gap > RIG_PX.lampEvery * 0.6 && gap < RIG_PX.lampEvery * 1.5, `lamp gap ${gap}`);
     }
-    const glints = glintGeometry(three, lamps);
-    assert.equal(glints.attributes.aGlint.array.length / 3, lamps.length * 4);
-    assert.equal(glints.index.length, lamps.length * 6);
+    const lights = laserLights(arenaSpots(layout));
+    const glints = glintGeometry(three, lamps, lights);
+    assert.equal(glints.attributes.aGlint.array.length / 4, (lamps.length + lights.length) * 4);
+    assert.equal(glints.index.length, (lamps.length + lights.length) * 6);
+  }
+});
+
+test('laserLights: one high in each far corner, out past the ad boards', () => {
+  for (const layout of layouts) {
+    const spots = arenaSpots(layout);
+    const lights = laserLights(spots);
+    assert.equal(lights.length, 2);
+    for (const [x, y, z] of lights) {
+      assert.ok(Math.abs(x - spots.ring.x) > spots.boards.hw && y > spots.ring.y + spots.boards.hh, 'past the far corner of the boards');
+      assert.ok(z > POST_PX.height, 'high over the ring');
+    }
+    assert.ok(lights[0][0] < spots.ring.x && lights[1][0] > spots.ring.x, 'left, then right');
   }
 });
 
