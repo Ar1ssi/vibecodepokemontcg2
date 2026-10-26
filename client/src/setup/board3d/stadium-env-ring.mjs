@@ -321,8 +321,8 @@ export function ringProps({ stones, allStones, anchor, spires = [] }) {
 }
 
 const RING = /* glsl */ `
-// The arena: centre x, y, its paving's radius, the standing stones' ring radius (ringSpots).
-uniform vec4 uRing;
+// The arena: centre x, y and its paving's radius (ringSpots).
+uniform vec3 uRing;
 uniform vec3 uEmblem;
 // The Poke Ball in the paving, as in the art: a broad disc of pale stone sunk in a dark groove,
 // a dark band across it, the button a broad dark ring round a pale core. x: 1 on pale stone,
@@ -513,7 +513,7 @@ const NO_SPOTS = { arena: null, ringR: 0, stones: [], anchor: null, spires: [], 
 /** Mountain Ring's board (stadium-environment-mesh.js BOARDS): the ground and the props. */
 export function mountainRingBoard({ three, material, terrainGrid, replaceGeometry, bakeOptions }) {
   const own = {
-    uRing: { value: new three.Vector4() },
+    uRing: { value: new three.Vector3() },
     uEmblem: { value: new three.Vector3() },
   };
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
@@ -532,8 +532,8 @@ export function mountainRingBoard({ three, material, terrainGrid, replaceGeometr
     bakeLight: materials.bakeLight,
     spots: (layout) => ringSpots(layout) ?? NO_SPOTS,
     apply(spots, bounds) {
-      const { arena, ringR, emblem } = spots;
-      own.uRing.value.set(arena?.x ?? 0, arena?.y ?? 0, arena?.r ?? 0, ringR ?? 0);
+      const { arena, emblem } = spots;
+      own.uRing.value.set(arena?.x ?? 0, arena?.y ?? 0, arena?.r ?? 0);
       own.uEmblem.value.set(emblem?.x ?? 0, emblem?.y ?? 0, emblem?.r ?? 0);
       replaceGeometry(terrain, terrainGrid(bounds));
       props.visible = Boolean(arena);
