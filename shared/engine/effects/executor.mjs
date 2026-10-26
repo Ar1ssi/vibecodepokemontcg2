@@ -1665,7 +1665,10 @@ export function executeSteps(draft, {
             !c.attachedTo &&
             ((c.damage || 0) > 0 || (step.cure && hasAnyCondition(c))) &&
             (!typeFilter ||
-              (c.types || []).some((ty) => typeFilter.includes(String(ty).toLowerCase()))) &&
+              // An evolved Pokémon has the type of its top card (Colorless Basic → Metal Stage 1).
+              ((topPokemonCard([...(player.zones.active || []), ...(player.zones.bench || [])], c) || c).types || []).some(
+                (ty) => typeFilter.includes(String(ty).toLowerCase())
+              )) &&
             (step.target === 'attached Pokémon'
               ? c.instanceId === context.attachedTargetId
               : step.target === 'costHost'
