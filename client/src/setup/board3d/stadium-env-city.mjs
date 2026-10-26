@@ -84,8 +84,10 @@ const BEAM_LAMP_PX = 22;
 
 const CONCRETE = [0.26, 0.27, 0.31, 0.05];
 const COPING = [0.42, 0.43, 0.47, 0.15];
-/** The hut's pale concrete, as the art's, lit by its own lamp. */
+/** The hut's pale concrete, as the art's; its face to the near parapet glows in its own lamp's light, the art's (160,178,186). */
 const HUT_WALL = [0.52, 0.53, 0.57, 0.05];
+const HUT_FACE_LIT = [0.345, 0.416, 0.496, 2.0];
+const HUT_ROOF = [0.66, 0.68, 0.72, 0.05];
 const HUT_WINDOW = [0.06, 0.065, 0.08, 0.3];
 /** The art's maroon door. */
 const DOOR_RED = [0.3, 0.07, 0.08, 0.2];
@@ -213,7 +215,7 @@ export function cityProps({ roof, hut, towers, round, beams = [] }) {
   }
   // The hut, as the art's: low concrete walls, a flat roof with a vent; on its face to the near
   // parapet a maroon door at its left end under a bright lamp, two dark windows along the rest.
-  props.box({ x: hut.x, y: hut.y, z0: 0, z1: hut.h, hw: hut.w / 2, hh: hut.d / 2, color: HUT_WALL, topColor: COPING });
+  props.box({ x: hut.x, y: hut.y, z0: 0, z1: hut.h, hw: hut.w / 2, hh: hut.d / 2, color: HUT_WALL, topColor: HUT_ROOF, frontColor: HUT_FACE_LIT });
   props.box({ x: hut.x + 14, y: hut.y + hut.d * 0.2, z0: hut.h, z1: hut.h + 12, hw: 12, hh: 14, color: MACHINE });
   const faceY = hut.y - hut.d / 2 - 0.6;
   const doorX = hut.x - hut.w / 2 + 10;
