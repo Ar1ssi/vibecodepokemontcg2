@@ -434,13 +434,14 @@ void main() {
     float breathe = 0.85 + 0.15 * sin(uTime * 1.1);
     float inside = 1.0 - smoothstep(uEmblem.z - 1.5, uEmblem.z, r);
     float halves = inside * smoothstep(bandHalf, bandHalf + 1.5, abs(rel.y)) * smoothstep(buttonR + 3.0, buttonR + 5.0, r);
-    vec3 hot = mix(vec3(0.22, 0.028, 0.01), vec3(0.52, 0.1, 0.028), smoothstep(0.35, 1.0, r / uEmblem.z));
+    vec3 hot = mix(vec3(0.05, 0.008, 0.005), vec3(0.12, 0.02, 0.009), smoothstep(0.35, 1.0, r / uEmblem.z));
     hot *= breathe * (0.82 + 0.18 * gnoise(p / 14.0));
     float buttonRing = smoothstep(buttonR - 7.0, buttonR - 4.0, r) * (1.0 - smoothstep(buttonR + 3.0, buttonR + 5.0, r));
     float dark = max(inside * (1.0 - halves) * step(buttonR - 4.0, r), buttonRing);
     float core = 1.0 - smoothstep(buttonR - 8.0, buttonR - 6.0, r);
     float outline = 1.0 - smoothstep(1.0, 2.5, abs(r - uEmblem.z));
-    col = mix(col, hot, halves * 0.92);
+    // Dark red-brown rock, its lumps still showing, warming toward the rim.
+    col = mix(col, col * vec3(1.5, 0.5, 0.42) + hot, halves * 0.92);
     col = mix(col, vec3(0.03, 0.018, 0.016), max(dark * 0.65, outline * 0.8));
     col = mix(col, vec3(0.22, 0.04, 0.015) * breathe, core);
     col += vec3(0.5, 0.07, 0.01) * exp(-max(r - uEmblem.z, 0.0) / 14.0) * 0.12 * step(uEmblem.z, r);
