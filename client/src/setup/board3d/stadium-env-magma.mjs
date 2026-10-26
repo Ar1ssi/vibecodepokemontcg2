@@ -325,7 +325,7 @@ void main() {
       float band = (1.0 - smoothstep(bandHalf, bandHalf + 1.5, abs(rel.y))) * step(buttonR, r);
       float ring = smoothstep(buttonR - 7.0, buttonR - 5.0, r) * (1.0 - smoothstep(buttonR + 2.0, buttonR + 4.0, r));
       h = mix(h, pre.r + 1.0 + 6.0 * cushion - 3.0 * max(band, ring), disc);
-      h -= 4.0 * (1.0 - smoothstep(1.0, 4.0, abs(r - uEmblem.z - 1.5)));
+      h -= 5.0 * (1.0 - smoothstep(2.0, 6.0, abs(r - uEmblem.z - 2.5)));
     }
   } else if (outerSD > 0.0) {
     kind = 0.0;
@@ -466,13 +466,14 @@ void main() {
     float crown = clamp(min(min(uEmblem.z - r, abs(rel.y) - bandHalf), r - buttonR - 4.0) / 60.0, 0.0, 1.0);
     // The art's (110,45,35) at the edges, (145,57,45) over the halves, a hotter (150,62,45) on their
     // crowns, inverted through Neutral tone mapping.
-    vec3 stone = mix(vec3(0.191, 0.061, 0.052), vec3(0.38, 0.09, 0.06), sqrt(crown)) + vec3(0.1, 0.03, 0.008) * crown;
+    vec3 stone = mix(vec3(0.16, 0.045, 0.036), vec3(0.3, 0.07, 0.05), sqrt(crown)) + vec3(0.08, 0.02, 0.005) * crown;
     stone *= (0.86 + 0.24 * smoothstep(-uEmblem.z, uEmblem.z, rel.y)) * breathe * (0.92 + 0.16 * fbm3(p / 22.0));
     stone += vec3(0.4, 0.14, 0.05) * smoothstep(0.84, 0.97, r / uEmblem.z) * smoothstep(0.1, 0.7, rel.y / uEmblem.z);
     float buttonRing = smoothstep(buttonR - 7.0, buttonR - 4.0, r) * (1.0 - smoothstep(buttonR + 3.0, buttonR + 5.0, r));
     float dark = max(inside * (1.0 - halves) * step(buttonR - 4.0, r), buttonRing);
     float core = 1.0 - smoothstep(buttonR - 8.0, buttonR - 6.0, r);
-    float outline = 1.0 - smoothstep(3.5, 5.0, abs(r - uEmblem.z - 2.0));
+    // A thick charred groove round the rim, as the art's.
+    float outline = 1.0 - smoothstep(5.5, 7.5, abs(r - uEmblem.z - 3.0));
     col = mix(col, stone, halves);
     col += vec3(1.7, 0.42, 0.05) * specks * halves;
     col = mix(col, vec3(0.035, 0.016, 0.014), max(dark * 0.85, outline * 0.85));
