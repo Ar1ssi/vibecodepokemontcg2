@@ -13,6 +13,7 @@ import {
   LAVA_FRAGMENT,
   MAX_FALLS,
   MOAT_PX,
+  NEAR_REACH_PX,
   TERRAIN_FRAGMENT,
   TERRAIN_VERTEX,
   basinSpots,
@@ -45,6 +46,18 @@ const cornersOf = (rect) => [
 test('environmentKeyFor: Magma Basin by id, and by set and number', () => {
   assert.equal(environmentKeyFor({ id: 'customhb-289' }), 'magma-basin');
   assert.equal(environmentKeyFor({ set: 'customhb', number: '289' }), 'magma-basin');
+});
+
+test('basinSpots: the island runs on past the near cards by NEAR_REACH_PX, under the hand row', () => {
+  for (const layout of layouts) {
+    const { island } = basinSpots(layout);
+    const { slabs, flats } = environmentFootprints(layout);
+    const nearest = Math.min(...[...slabs, ...flats].map((r) => r.y));
+    const farthest = Math.max(...[...slabs, ...flats].map((r) => r.y + r.h));
+    const nearShore = nearest - (island.y - island.hh);
+    const farShore = island.y + island.hh - farthest;
+    assert.ok(Math.abs(nearShore - farShore - NEAR_REACH_PX) < 1e-6, `near ${nearShore}, far ${farShore}`);
+  }
 });
 
 test('basinSpots: the island holds every card footprint, its margin clear inside the shore', () => {

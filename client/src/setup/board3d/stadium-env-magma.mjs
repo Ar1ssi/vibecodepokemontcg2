@@ -41,6 +41,11 @@ const ISLAND_SWELL = 7;
 export const ISLAND_MARGIN_PX = 28;
 /** Corner radius of the island's rounded outline. */
 export const ISLAND_CORNER_PX = 120;
+/**
+ * How much further the island runs on toward the near end: the player's hand row lies over the
+ * board's near edge, and its cards read poorly on bright lava, so the near moat lies past it.
+ */
+export const NEAR_REACH_PX = 140;
 /** Width of the moat along the table's sides (left, right) and its ends (near, far). */
 export const MOAT_PX = { side: 122, end: 80 };
 /** About how far the shores wander out past their rounded outline (the shader's islandWobble). */
@@ -102,9 +107,9 @@ export function basinSpots(layout) {
   const grow = r - (r - ISLAND_MARGIN_PX) / Math.SQRT2;
   const island = {
     x: (block.x0 + block.x1) / 2,
-    y: (block.y0 + block.y1) / 2,
+    y: (block.y0 + block.y1 - NEAR_REACH_PX) / 2,
     hw: (block.x1 - block.x0) / 2 + grow,
-    hh: (block.y1 - block.y0) / 2 + grow,
+    hh: (block.y1 - block.y0 + NEAR_REACH_PX) / 2 + grow,
     r,
   };
   const moat = { side: MOAT_PX.side, end: MOAT_PX.end };
@@ -293,12 +298,12 @@ void main() {
     float inland = smoothstep(0.0, -24.0, islandSD);
     // Lumpy cooled lava, as the art's: broad swells, faceted rocky lumps packed together, a fine
     // grain.
-    vec3 lump = stones(p + 5.0, mix(26.0, 38.0, fbm3(p / 150.0)), 1.0);
-    h += (4.0 * (fbm3(p / 46.0) - 0.5) + 3.2 * lump.x + 0.8 * (gnoise(p / 5.0) - 0.5)) * inland;
+    vec3 lump = stones(p + 5.0, mix(36.0, 52.0, fbm3(p / 150.0)), 1.0);
+    h += (4.0 * (fbm3(p / 46.0) - 0.5) + 2.0 * lump.x + 0.8 * (gnoise(p / 5.0) - 0.5)) * inland;
     // A few long cracks wander across it in broken runs, some still glowing.
     vec2 warped = p + (vec2(fbm3(p / 80.0), fbm3(p / 80.0 + 5.3)) - 0.5) * 70.0;
     vec4 plate = voronoiCell(warped / 170.0 + 3.0);
-    float seam = (1.0 - smoothstep(0.0, 0.016, plate.x)) * smoothstep(0.5, 0.62, gnoise(warped / 90.0 + 4.0));
+    float seam = (1.0 - smoothstep(0.0, 0.016, plate.x)) * smoothstep(0.6, 0.7, gnoise(warped / 90.0 + 4.0));
     h -= 2.4 * seam * inland;
     tone = fract(lump.y * 5.3 + fbm3(p / 70.0) * 0.5);
     joint = seam * step(0.45, fract(plate.y * 7.3));
@@ -414,7 +419,7 @@ void main() {
   float laplace = texture2D(uField, vUv + vec2(t2.x, 0.0)).r + texture2D(uField, vUv - vec2(t2.x, 0.0)).r
     + texture2D(uField, vUv + vec2(0.0, t2.y)).r + texture2D(uField, vUv - vec2(0.0, t2.y)).r - 4.0 * ground;
   float convex = smoothstep(0.4, 2.2, -laplace) * vGrowth;
-  col = mix(col, col * 1.7 + vec3(0.028, 0.016, 0.01), convex * 0.55);
+  col = mix(col, col * 1.7 + vec3(0.028, 0.016, 0.01), convex * mix(0.55, 0.25, onIsland));
   col = mix(vec3(0.026, 0.018, 0.02), col, smoothstep(0.25, 0.9, light.b));
 
   // The lava lights the rock: the moat the island's shore and the wall's foot, faces turned to it
@@ -433,7 +438,7 @@ void main() {
   float flicker = 0.85 + 0.15 * gnoise(vec2(uTime * 0.9, p.x / 90.0 + p.y / 130.0));
   // The walls take less of it than the island: their faces lean away from the moat's middle.
   float moatGlow = exp(-fromMoat / mix(22.0, 38.0, onIsland)) * exp(-above / 60.0) * (0.25 + 0.75 * turned);
-  col += mix(vec3(1.0, 0.22, 0.12), vec3(1.0, 0.35, 0.1), onIsland) * moatGlow * flicker * mix(0.3, 0.8, onIsland);
+  col += mix(vec3(1.0, 0.22, 0.12), vec3(1.0, 0.35, 0.1), onIsland) * moatGlow * flicker * mix(0.3, 0.55, onIsland);
   col += vec3(1.0, 0.3, 0.12) * exp(-max(fallSD, 0.0) / 6.0) * onWall * 0.55 * flicker;
 
   // Some of the island's cracks still glow; sparks lie on the rock.
