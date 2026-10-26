@@ -111,7 +111,7 @@ test('Full Metal Lab shaders declare no GLSL ES 3.00 reserved word and every one
   }
 });
 
-test('labSpots: pipe arches stand on the deck tangent to the dais; bundles run clear of every tank', () => {
+test('labSpots: pipe arches stand on the deck tangent to the dais; pipe runs stay on the deck, clear of every tank', () => {
   for (const layout of layouts) {
     const spots = labSpots(layout);
     const scene = sceneBounds(layout, LAB_KEY);
@@ -126,10 +126,9 @@ test('labSpots: pipe arches stand on the deck tangent to the dais; bundles run c
       }
     }
     for (const bundle of spots.bundles) {
-      const dir = [Math.cos(bundle.angle), Math.sin(bundle.angle)];
-      for (let t = bundle.from; t <= bundle.to; t += 5) {
-        const x = spots.dais.x + dir[0] * t;
-        const y = spots.dais.y + dir[1] * t;
+      for (let t = 0; t <= bundle.length; t += 5) {
+        const x = bundle.x + bundle.dx * t;
+        const y = bundle.y + bundle.dy * t;
         assert.ok(daisDistance(x, y, spots.dais) > 0, 'on the deck');
         for (const tank of spots.tanks) assert.ok(Math.hypot(x - tank.x, y - tank.y) > tank.radius, 'clear of the tanks');
       }
