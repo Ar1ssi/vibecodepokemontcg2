@@ -382,8 +382,12 @@ boards" toggle. Revert: unset the toggle per user, or revert the feature commits
   Bench rows can't close inside the table, and the user asked for a circular mountain.
 - Prototype: shader compile, not the bake's GPU time, is the cost of first showing a board under
   ANGLE D3D11 (measured: Scorched Earth ~2.2 s stall, Stormy Mountains ~1.4 s after splitting its
-  bake in two, 5.2 s before). The prototype compiles synchronously on the first frame; `compileAsync`
-  before the reveal (§ Mesh) stays required.
+  bake in two, 5.2 s before). Built on `feature/077-six-stadiums`: the board's meshes are built,
+  then `compileAsync` compiles its bake passes (a render target bound) and meshes (camera on the
+  env layer, canvas bound, so the cache keys match the draw: three keys programs by light count,
+  render target and geometry attributes); the mat shows until they're ready. The table carries the
+  cutout from the start (`uCutoutOn` gates it) so a board never recompiles the table. Worst frame
+  on first show: 42-135 ms on every board (was 0.5-2.5 s); load compiles the table ~0.25 s longer.
 - Prototype: the mesh builds each board from its own builder (`BOARDS[key](kit)` → `{ objects,
   materials, bakePre?, bakeField, bakeLight?, spots(layout), apply(spots, bounds), tick?(seconds) }`),
   not the § Recipes object: Stormy Mountains needs a cloud sheet, lightning meshes and a two-pass
@@ -393,8 +397,7 @@ boards" toggle. Revert: unset the toggle per user, or revert the feature commits
   quads into one geometry, one draw call; `propFragment` lights them with the board's own light),
   and the kit hands every builder `terrainGrid`, `replaceGeometry`, `bakeOptions`,
   `instancedGeometry` and `latheIndex`. `POKE_BALL` and `FLOW_STREAKS` moved into the shared GLSL;
-  `arenaRects` (every Active and Bench card) into the layout module. Measured link times under
-  ANGLE D3D11: 0.45-0.8 s per board, Magma Basin 1.6 s; the compileAsync flag stands.
+  `arenaRects` (every Active and Bench card) into the layout module.
 
 ---
 Self-approval checklist (only when the user is unreachable):
