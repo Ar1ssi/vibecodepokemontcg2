@@ -33,9 +33,9 @@ test('environmentKeyFor: Dark City by id, and by set and number', () => {
   assert.equal(environmentKeyFor({ set: 'customhb', number: '254' }), CITY_KEY);
 });
 
-test('citySpots: every card lies on the roof, the hut and machinery clear of the cards and the parapet', () => {
+test('citySpots: every card lies on the roof, the hut clear of the cards and the parapet', () => {
   for (const layout of layouts) {
-    const { roof, hut, machines } = citySpots(layout);
+    const { roof, hut } = citySpots(layout);
     const roofBox = { x0: roof.x - roof.hw, x1: roof.x + roof.hw, y0: roof.y - roof.hh, y1: roof.y + roof.hh };
     const { slabs, flats } = environmentFootprints(layout);
     const cards = [...slabs, ...flats].map((r) => ({ x0: r.x, x1: r.x + r.w, y0: r.y, y1: r.y + r.h }));
@@ -43,13 +43,25 @@ test('citySpots: every card lies on the roof, the hut and machinery clear of the
       assert.ok(card.x0 - roofBox.x0 >= ROOF_GAP_PX.side - 1e-6 && roofBox.x1 - card.x1 >= ROOF_GAP_PX.side - 1e-6);
       assert.ok(card.y0 - roofBox.y0 >= ROOF_GAP_PX.end - 1e-6 && roofBox.y1 - card.y1 >= ROOF_GAP_PX.end - 1e-6);
     }
-    for (const thing of [{ x: hut.x, y: hut.y, w: hut.w, d: hut.d }, ...machines]) {
-      const box = boxOf(thing);
-      assert.ok(cards.every((card) => !overlaps(box, card)), 'clear of every card');
-      assert.ok(box.x0 > roofBox.x0 + 12 && box.x1 < roofBox.x1 - 12 && box.y0 > roofBox.y0 + 12 && box.y1 < roofBox.y1 - 12, 'inside the parapet');
-    }
+    const box = boxOf({ x: hut.x, y: hut.y, w: hut.w, d: hut.d });
+    assert.ok(cards.every((card) => !overlaps(box, card)), 'clear of every card');
+    assert.ok(box.x0 > roofBox.x0 + 12 && box.x1 < roofBox.x1 - 12 && box.y0 > roofBox.y0 + 12 && box.y1 < roofBox.y1 - 12, 'inside the parapet');
   }
   assert.equal(citySpots(null), null);
+});
+
+test('citySpots: every searchlight stands on a tower roof, off the roof the cards lie on', () => {
+  for (const layout of layouts) {
+    const { roof, towers, beams } = citySpots(layout);
+    assert.equal(beams.length, 4);
+    for (const beam of beams) {
+      const onTower = towers.some(
+        (tower) => Math.abs(beam.x - tower.x) <= tower.w / 2 && Math.abs(beam.y - tower.y) <= tower.d / 2 && beam.z > tower.height
+      );
+      assert.ok(onTower, 'on a tower roof');
+      assert.ok(Math.abs(beam.x - roof.x) > roof.hw || Math.abs(beam.y - roof.y) > roof.hh, 'off the cards\' roof');
+    }
+  }
 });
 
 test('citySpots: the towers stand off the roof, apart from each other and the round tower', () => {
