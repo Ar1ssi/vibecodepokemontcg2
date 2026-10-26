@@ -30,10 +30,10 @@ export const ENERGY_TYPES = Object.freeze([
 ]);
 export const POKEMON_STAGES = Object.freeze(['Basic', 'Stage1', 'Stage2']);
 export const TRAINER_TYPES = Object.freeze(['Item', 'Supporter', 'Stadium', 'Tool']);
-// Basic Energy stays out of scope (design 075): decks use official Energy. A Special Energy (a restyled Double
-// Colorless Energy, say) is a card of its own, so the editor may export those.
+// Energy cards the editor exports: a Special Energy (a restyled Double Colorless Energy, say) or a Basic Energy (a
+// holofoil Basic Energy print). energyType is TCGdex's: "Normal" is Basic, "Special" has text of its own.
 export const CARD_CATEGORIES = Object.freeze(['Pokemon', 'Trainer', 'Energy']);
-export const ENERGY_KINDS = Object.freeze(['Special']);
+export const ENERGY_KINDS = Object.freeze(['Special', 'Normal']);
 // Which deck-builder pill lists the set: "custom" (the Custom pill, the default when absent) or
 // "homebrew" (the Homebrew sets pill).
 export const CUSTOM_SET_GROUPS = Object.freeze(['custom', 'homebrew']);
@@ -164,7 +164,9 @@ function checkTrainer(card, where, errors) {
 
 function checkEnergy(card, where, errors) {
   if (!ENERGY_KINDS.includes(card.energyType)) errors.push(`${where}.energyType: one of ${ENERGY_KINDS.join(', ')}`);
-  if (typeof card.effect !== 'string' || card.effect.trim().length === 0) errors.push(`${where}.effect: required`);
+  if (card.energyType === 'Special') {
+    if (typeof card.effect !== 'string' || card.effect.trim().length === 0) errors.push(`${where}.effect: required`);
+  } else if (card.effect !== undefined && typeof card.effect !== 'string') errors.push(`${where}.effect: expected text`);
 }
 
 function checkCard(card, setId, where, errors, seenLocalIds) {

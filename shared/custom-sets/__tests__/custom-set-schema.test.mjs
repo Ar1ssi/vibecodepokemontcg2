@@ -112,13 +112,16 @@ test('array- or null-typed fields are errors, not coerced strings (review of des
   assert.match(validateCustomSet(twins).errors.join(), /001 is used twice/);
 });
 
-test('Special Energy rules: kind, effect', () => {
+test("Energy rules: kind, a Special Energy's effect; a Basic Energy needs none", () => {
   const energy = { category: 'Energy', energyType: 'Special', effect: 'Provides {C}{C} Energy.', rarity: 'Uncommon' };
   assert.equal(validateCustomSet(withCard(energy, 1)).ok, true);
   const errorsOf = (patch) => validateCustomSet(withCard({ ...energy, ...patch }, 1)).errors.join();
-  assert.match(errorsOf({ energyType: 'Basic' }), /energyType: one of Special/);
+  assert.match(errorsOf({ energyType: 'Basic' }), /energyType: one of Special, Normal/);
   assert.match(errorsOf({ energyType: undefined }), /energyType/);
   assert.match(errorsOf({ effect: ' ' }), /effect: required/);
+  const basic = { category: 'Energy', energyType: 'Normal', rarity: 'Hyper rare' };
+  assert.equal(validateCustomSet(withCard(basic, 1)).ok, true);
+  assert.match(validateCustomSet(withCard({ ...basic, effect: 5 }, 1)).errors.join(), /effect: expected text/);
 });
 
 test('too many cards and printed decklist codes are refused', () => {
