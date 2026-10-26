@@ -66,14 +66,15 @@ const BEAMS = [
 ];
 const BEAM_LENGTH_PX = 1300;
 
-const CONCRETE = [0.2, 0.21, 0.24, 0.05];
-const COPING = [0.36, 0.37, 0.4, 0.15];
-const HUT_WALL = [0.26, 0.27, 0.3, 0.05];
+const CONCRETE = [0.26, 0.27, 0.31, 0.05];
+const COPING = [0.42, 0.43, 0.47, 0.15];
+const HUT_WALL = [0.34, 0.35, 0.39, 0.05];
 const DOOR_RED = [0.2, 0.035, 0.04, 0.2];
 const LAMP = [1.4, 1.1, 0.7, 2.6];
 const MACHINE = [0.3, 0.32, 0.35, 0.4];
 const GRILLE = [0.06, 0.065, 0.075, 0.2];
 const HAZARD_YELLOW = [0.75, 0.6, 0.06, 1.7];
+const TOWER_PARAPET = [0.3, 0.32, 0.37, 0.05];
 const HAZARD_BLACK = [0.03, 0.03, 0.03, 0.1];
 
 /**
@@ -127,6 +128,19 @@ export function citySpots(layout) {
 export function cityProps({ roof, hut, machines, towers }) {
   const props = createPropBuilder();
   for (const tower of towers) {
+    // A low parapet round every tower's roof.
+    if (tower.height > 0) {
+      const t = 3;
+      const top = tower.height + 8;
+      for (const edge of [
+        { x: tower.x, y: tower.y - tower.d / 2 + t, hw: tower.w / 2, hh: t },
+        { x: tower.x, y: tower.y + tower.d / 2 - t, hw: tower.w / 2, hh: t },
+        { x: tower.x - tower.w / 2 + t, y: tower.y, hw: t, hh: tower.d / 2 - 2 * t },
+        { x: tower.x + tower.w / 2 - t, y: tower.y, hw: t, hh: tower.d / 2 - 2 * t },
+      ]) {
+        props.box({ ...edge, z0: tower.height, z1: top, color: TOWER_PARAPET, topColor: COPING });
+      }
+    }
     if (tower.hazard) {
       // The art's yellow and black hazard band along the roof edge facing the rooftop.
       const edgeY = tower.y - tower.d / 2 - 1.5;
@@ -209,7 +223,7 @@ export function cityBuildings({ towers, round }) {
       z1: tower.height,
       hw: tower.w / 2,
       hh: tower.d / 2,
-      color: [0.16 + 0.04 * (i % 3), 0.17 + 0.04 * (i % 3), 0.21 + 0.03 * (i % 2), (i * 0.137) % 1],
+      color: [0.27 + 0.04 * (i % 3), 0.29 + 0.04 * (i % 3), 0.35 + 0.03 * (i % 2), (i * 0.137) % 1],
     });
   });
   const tiers = [
@@ -333,12 +347,12 @@ vec3 windowAt(float along, float up, float seed) {
   vec2 f = fract(vec2(along / 17.0, up / 24.0));
   float pane = step(0.18, f.x) * step(f.x, 0.82) * step(0.22, f.y) * step(f.y, 0.78);
   float roll = hash12(cell + seed * 131.0);
-  return vec3(pane, step(roll, 0.32) * (0.6 + 0.6 * hash12(cell * 1.7 + seed)), step(0.82, hash12(cell * 3.1 + seed)));
+  return vec3(pane, step(roll, 0.3) * (0.6 + 0.6 * hash12(cell * 1.7 + seed)), step(0.7, hash12(cell * 3.1 + seed)));
 }
 vec3 facadeColor(vec3 wall, float along, float up, float seed) {
   vec3 w = windowAt(along, up, seed);
-  vec3 lamp = mix(vec3(1.25, 0.95, 0.55), vec3(0.8, 1.15, 0.85), w.z);
-  vec3 glass = mix(vec3(0.02, 0.03, 0.055), lamp, w.y);
+  vec3 lamp = mix(vec3(0.85, 1.12, 0.8), vec3(1.25, 0.98, 0.6), w.z);
+  vec3 glass = mix(vec3(0.03, 0.04, 0.065), lamp, w.y);
   return mix(wall, glass, w.x);
 }
 `;
@@ -369,7 +383,7 @@ void main() {
     // The roof: dark concrete slabs with tar seams, worn patches, puddles holding the city's lights.
     vec2 slab = abs(mod(p + 90.0, 180.0) - 90.0);
     float slabTone = 0.92 + 0.16 * hash12(floor((p + 90.0) / 180.0));
-    col = vec3(0.07, 0.074, 0.092) * (0.8 + 0.4 * fbm3(p / 60.0)) * slabTone;
+    col = vec3(0.1, 0.105, 0.125) * (0.8 + 0.4 * fbm3(p / 60.0)) * slabTone;
     col *= 0.92 + 0.12 * gnoise(p / 4.0);
     col = mix(col, vec3(0.032, 0.033, 0.04), (1.0 - smoothstep(0.8, 2.0, min(slab.x, slab.y))) * 0.7);
     // Tar patches where the roof was mended.
@@ -430,7 +444,7 @@ void main() {
     float along = isRound > 0.5
       ? atan(vWorld.y - uRound.y, vWorld.x - uRound.x) * uRound.z
       : (abs(n.x) > abs(n.y) ? vWorld.y : vWorld.x);
-    vec3 wall = vColor.rgb * (0.32 + 0.18 * max(dot(n, normalize(vec3(-0.4, -0.6, 0.3))), 0.0));
+    vec3 wall = vColor.rgb * (0.36 + 0.3 * max(dot(n, normalize(vec3(-0.5, -0.5, 0.4))), 0.0));
     col = facadeColor(wall, along, vWorld.z + ${STREET_PX}.0, seed);
     // The round tower's crown: a lit band under its top.
     col = mix(col, vec3(1.2, 1.05, 0.8), isRound * step(uRound.w - 18.0, vWorld.z) * step(vWorld.z, uRound.w - 8.0));
