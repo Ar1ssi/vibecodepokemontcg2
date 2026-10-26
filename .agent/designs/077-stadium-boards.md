@@ -254,8 +254,9 @@ particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
   - Mountain Ring (`stadium-env-ring.mjs`, FFI 97): rows of grey-brown bricks with dark uneven
     joints, each row shifted its own way, breaking up at the ring's edge; a pale stone Poke Ball
     set in dark grooves; menhirs of every shape round it, two rope strands wound round each in
-    bands of turns and sagging between, a giant dark iron chain off one; past the shelf's lip a cliff drops into sepia
-    haze, crags rising in it; cloud shadows and mist drift.
+    bands of turns and sagging between, a giant dark iron chain off one; past them rough sandy
+    ground with dark boulders, tall jagged rock spires on the sides and far side, sepia haze
+    thickening with distance; cloud shadows and mist drift.
   - Fighting Stadium (`stadium-env-arena.mjs`, FFI 90): a wrestling ring (pale canvas, blue apron
     and corner posts, three white ropes a side) on a glowing white stage edged in lights that throws
     cyan light round it, its entrance ramp and truss running off the left side (the art's right,

@@ -61,3 +61,18 @@ test('Mountain Ring shaders declare no GLSL ES 3.00 reserved word and every one 
     assert.doesNotMatch(shader, reserved);
   }
 });
+
+test('ringSpots: the spires stand past the stones, inside the scene, apart from every stone and each other', () => {
+  for (const layout of layouts) {
+    const { arena, stones, spires } = ringSpots(layout);
+    const scene = sceneBounds(layout, RING_KEY);
+    assert.ok(spires.length >= 2, `${spires.length} spires`);
+    spires.forEach((spire, i) => {
+      assert.ok(spire.x - spire.radius > scene.x && spire.x + spire.radius < scene.x + scene.w);
+      assert.ok(spire.y - spire.radius > scene.y && spire.y + spire.radius < scene.y + scene.h);
+      assert.ok(Math.hypot(spire.x - arena.x, spire.y - arena.y) - spire.radius > arena.r + KERB_PX, 'off the paving');
+      for (const stone of stones) assert.ok(Math.hypot(spire.x - stone.x, spire.y - stone.y) > spire.radius + stone.radius);
+      for (const other of spires.slice(i + 1)) assert.ok(Math.hypot(spire.x - other.x, spire.y - other.y) > spire.radius + other.radius);
+    });
+  }
+});

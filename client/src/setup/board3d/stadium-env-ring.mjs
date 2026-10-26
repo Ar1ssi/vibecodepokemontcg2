@@ -1,16 +1,17 @@
 // Design 077 (prototype): Mountain Ring (customhb-240) after its card art (FFI 97, xy3-97 in
 // set.json; Ryo Ueda): a round arena high in the mountains, paved in rows of grey-brown bricks
 // round the Poké Ball laid in pale stone at its middle; standing stones ring it, thick ropes
-// sagging between them, wound round each; a giant rusty chain lies by it; rough rocky ground with
-// boulders climbs away to crags and snowy peaks, everything in the art's sepia under an overcast sky.
-// The art looks across the ring from its edge; the board looks down into it, so the paving grows
-// round every card on the table, the stones stand just outside it where the table is free of cards,
-// and the mountains rise past them, toward the table's edges and beyond.
+// sagging between them, wound round each; a giant chain lies by it; rough rocky ground with boulders
+// runs on past them, tall dark rock spires standing on it, everything in the art's sepia under an
+// overcast sky. The art looks across the ring from its edge; the board looks down into it, so the
+// paving grows round every card on the table, the stones stand just outside it where the table is
+// free of cards, and the spires rise past them on the sides and the far side, in the haze.
 //
 // Bake, once per layout: BAKE_FIELD writes R height px, G signed px from the arena's edge, B the
 // stone's id (brick or boulder) 0..1, A the kind (-1 paving, 1 ground); the shared light
 // bake adds normals, occlusion and the sun's soft shadow. Per frame: TERRAIN paints stone, rock,
-// snow and the emblem; PROPS are the standing stones, the ropes and the chain (stadium-env-props).
+// dust, the emblem and the haze; PROPS are the standing stones, the spires, the ropes and the chain
+// (stadium-env-props).
 import {
   FULLSCREEN_VERTEX,
   NOISE,
@@ -46,23 +47,23 @@ const ROPES = [
 ];
 /** The chain: which stone it hangs from (turn round the ring, rad), how many links, link size. */
 const CHAIN = { angle: Math.PI * 1.19, links: 15, length: 50, width: 28, thick: 6 };
-/** The shelf the stones stand on, from the kerb to the cliff's lip, and the depths below it. */
-export const SHELF_PX = 96;
-export const DEPTHS_PX = 260;
 /**
- * Peaks rising out of the haze below the ring: turn round it (deg), how far past the cliff's lip,
- * base radius, height of the summit over the depths.
+ * The art's rock spires standing on the ground past the stones: turn round the ring (deg), gap past
+ * the stones' ring, base radius, height, how flattened. A spire with no room in the scene, or
+ * crowding a stone or another spire, is left out.
  */
-const PEAKS = [
-  [176, 150, 150, 195],
-  [204, 90, 110, 160],
-  [150, 100, 120, 170],
-  [8, 120, 140, 190],
-  [338, 90, 105, 150],
-  [34, 90, 115, 165],
-  [96, 140, 150, 185],
-  [66, 110, 110, 150],
+const SPIRES = [
+  [150, 20, 58, 300, 0.8],
+  [180, 40, 66, 340, 0.7],
+  [207, 20, 52, 260, 0.9],
+  [125, 10, 48, 240, 0.75],
+  [30, 30, 62, 320, 0.75],
+  [0, 40, 64, 300, 0.85],
+  [333, 20, 52, 270, 0.8],
+  [57, 10, 48, 230, 0.7],
 ];
+/** The spires' dark rock, darker than the menhirs. */
+const SPIRE_STONE = [0.34, 0.31, 0.28, 0.05];
 
 const GREY_STONE = [0.5, 0.46, 0.4, 0.05];
 const ROPE_LIGHT = [0.4, 0.27, 0.15, 0.05];
@@ -126,14 +127,31 @@ export function ringSpots(layout) {
   // The chain hangs off the stone nearest its turn and lies on out across the ground.
   const turnOf = (stone) => turnBetween(Math.atan2(stone.y - arena.y, stone.x - arena.x), CHAIN.angle);
   const anchor = stones.reduce((best, stone) => (turnOf(stone) < turnOf(best) ? stone : best));
-  const lip = arena.r + KERB_PX + SHELF_PX;
-  const peaks = PEAKS.map(([deg, gap, r, height]) => {
+  const spires = [];
+  SPIRES.forEach(([deg, gap, radius, height, flat], i) => {
     const angle = (deg * Math.PI) / 180;
-    const out = lip + gap + r * 0.6;
-    return { x: arena.x + Math.cos(angle) * out, y: arena.y + Math.sin(angle) * out, r, height };
+    const out = ringR + 60 + gap + radius;
+    const x = arena.x + Math.cos(angle) * out;
+    const y = arena.y + Math.sin(angle) * out;
+    const fits =
+      x - radius > scene.x && x + radius < scene.x + scene.w && y - radius > scene.y && y + radius < scene.y + scene.h;
+    const clear =
+      stones.every((stone) => Math.hypot(x - stone.x, y - stone.y) > stone.radius + radius + 12) &&
+      spires.every((other) => Math.hypot(x - other.x, y - other.y) > other.radius + radius + 12);
+    if (!fits || !clear) return;
+    spires.push({
+      x,
+      y,
+      radius,
+      height,
+      flat,
+      yaw: hashOf(i + 800) * Math.PI,
+      seed: hashOf(i + 900),
+      index: 1000 + i,
+    });
   });
   const emblem = craterEmblem(layout, centre);
-  return { arena, ringR, stones: stones.filter((stone) => stone.inside), allStones: stones.length, anchor, peaks, emblem };
+  return { arena, ringR, stones: stones.filter((stone) => stone.inside), allStones: stones.length, anchor, spires, emblem };
 }
 
 /**
@@ -173,6 +191,49 @@ const standingStone = (props, stone) => {
   for (let k = 0; k < sides; k += 1) props.quad(top[k], top[(k + 1) % sides], apex, apex, color);
 };
 
+/**
+ * One rock spire, as the art's: a tower of rough eight-sided blocks stacked off-centre, narrowing as
+ * it climbs, its top broken off at a slant. Faces flat, so they take the light as broad planes.
+ */
+const rockSpire = (props, spire) => {
+  const sides = 8;
+  const levels = 7;
+  const c = Math.cos(spire.yaw);
+  const sn = Math.sin(spire.yaw);
+  let drift = [0, 0];
+  const rings = [];
+  for (let level = 0; level <= levels; level += 1) {
+    const t = level / levels;
+    const roll = (k) => hashOf(spire.index * 53 + level * 11 + k);
+    // Each block sits a little off the one below: the tower kinks as it climbs.
+    if (level > 0) drift = [drift[0] + (roll(1) - 0.5) * spire.radius * 0.22, drift[1] + (roll(2) - 0.5) * spire.radius * 0.22];
+    const girth = spire.radius * (1.0 - 0.62 * t ** 1.2) * (0.85 + 0.3 * roll(3));
+    // The top breaks off at a slant.
+    const slant = level === levels ? (roll(4) - 0.5) * spire.radius * 0.9 : 0;
+    rings.push(
+      Array.from({ length: sides }, (_, k) => {
+        const angle = (k / sides) * 2 * Math.PI + spire.seed * 6;
+        const r = girth * (0.75 + 0.45 * hashOf(spire.index * 31 + k * 7 + level * 3));
+        const u = Math.cos(angle) * r;
+        const v = Math.sin(angle) * r * spire.flat;
+        const x = u * c - v * sn + drift[0];
+        const y = u * sn + v * c + drift[1];
+        return [spire.x + x, spire.y + y, spire.height * t + (slant * x) / Math.max(spire.radius, 1)];
+      })
+    );
+  }
+  const tone = 0.82 + 0.3 * spire.seed;
+  const color = [SPIRE_STONE[0] * tone, SPIRE_STONE[1] * tone, SPIRE_STONE[2] * tone, SPIRE_STONE[3]];
+  for (let level = 0; level < levels; level += 1) {
+    for (let k = 0; k < sides; k += 1) {
+      props.quad(rings[level][k], rings[level][(k + 1) % sides], rings[level + 1][(k + 1) % sides], rings[level + 1][k], color);
+    }
+  }
+  const top = rings[levels];
+  const middle = top.reduce((sum, point) => [sum[0] + point[0] / sides, sum[1] + point[1] / sides, sum[2] + point[2] / sides], [0, 0, 0]);
+  for (let k = 0; k < sides; k += 1) props.quad(top[k], top[(k + 1) % sides], middle, middle, color);
+};
+
 /** One chain link: an oval loop of tube round its centre, along `axis`, its loop opening toward `up`. */
 const chainLink = (props, centre, axis, up, { length, width, thick }, color) => {
   const points = [];
@@ -186,10 +247,11 @@ const chainLink = (props, centre, axis, up, { length, width, thick }, color) => 
   props.tube(points, thick, color, { sides: 7 });
 };
 
-/** The standing stones, the ropes between them, and the chain. */
-export function ringProps({ stones, allStones, anchor }) {
+/** The standing stones, the spires, the ropes between them, and the chain. */
+export function ringProps({ stones, allStones, anchor, spires = [] }) {
   const props = createPropBuilder();
   for (const stone of stones) standingStone(props, stone);
+  for (const spire of spires) rockSpire(props, spire);
   // Ropes, as in the art: two strands, each wound round every stone in a band of turns and sagging
   // to the next stone where both stand in the scene.
   const ropeColor = (i) => (i % 2 ? ROPE_DARK : ROPE_LIGHT);
@@ -259,11 +321,9 @@ export function ringProps({ stones, allStones, anchor }) {
 }
 
 const RING = /* glsl */ `
-// The arena: centre x, y, its paving's radius, the standing stones' ring radius (ringSpots); the
-// peaks below it (x, y, base radius, summit height over the depths; radius 0 none).
+// The arena: centre x, y, its paving's radius, the standing stones' ring radius (ringSpots).
 uniform vec4 uRing;
 uniform vec3 uEmblem;
-uniform vec4 uPeaks[${PEAKS.length}];
 // The Poke Ball in the paving, as in the art: a broad disc of pale stone sunk in a dark groove,
 // a dark band across it, the button a broad dark ring round a pale core. x: 1 on pale stone,
 // 2 on dark stone, 0 off it; y px from its outline (negative inside).
@@ -283,9 +343,8 @@ vec2 emblemInlay(vec2 p) {
 
 /**
  * Bake: rows of bricks, each a little domed between mortar grooves and breaking up into dust toward
- * the ring's edge, the Poke Ball's pale disc flush with them and its dark lines sunk; then the shelf
- * the stones stand on, a few boulders, and past its lip the cliff down to the hazy depths where
- * the crags rise.
+ * the ring's edge, the Poke Ball's pale disc flush with them and its dark lines sunk; then the
+ * ground the stones and spires stand on, rising in low swells, boulders scattered over it.
  */
 export const BAKE_FIELD_FRAGMENT = /* glsl */ `
 ${TABLE_UNIFORMS}
@@ -327,31 +386,17 @@ void main() {
     }
     kind = missing > 0.5 ? 1.0 : -1.0;
   } else {
-    // The shelf the stones stand on: dusty rock, a few boulders; past its ragged lip a cliff drops
-    // into the haze, where peaks rise from far below.
+    // The ground the stones and spires stand on, as in the art: dusty rock rising in low swells
+    // further out, boulders scattered over it, more of them further out.
     float beyond = d;
-    float lip = ${SHELF_PX + 14}.0 + 26.0 * (fbm3(p / 90.0) - 0.5) + 14.0 * (gnoise(p / 23.0) - 0.5);
-    float shelf = 2.0 + 6.0 * fbm3(p / 70.0) + 2.0 * (gnoise(p / 9.0) - 0.5);
-    float fall = smoothstep(lip - 6.0, lip + 34.0, beyond);
-    h = mix(shelf, -${DEPTHS_PX}.0 + 30.0 * fbm3(p / 140.0), pow(fall, 0.7));
-    vec3 boulder = stones(p + 17.0, 46.0, 3.0);
-    float scatter = step(0.72, fract(boulder.y * 13.1)) * smoothstep(10.0, 30.0, beyond) * (1.0 - fall);
-    h += boulder.x * 16.0 * scatter;
-    id = boulder.y;
-    // Peaks out of the depths: five-faced crags, each face one broad plane.
-    for (int i = 0; i < ${PEAKS.length}; i++) {
-      vec4 peak = uPeaks[i];
-      if (peak.z <= 0.0) continue;
-      vec2 q = p - peak.xy;
-      float reach = 0.0;
-      for (int k = 0; k < 5; k++) {
-        float angle = float(i) * 2.1 + float(k) * 1.2566;
-        reach = max(reach, dot(q, vec2(cos(angle), sin(angle))) / (0.85 + 0.25 * hash12(vec2(float(k), float(i)))));
-      }
-      float t = clamp(1.0 - max(reach, length(q) * 0.82) / peak.z, 0.0, 1.0);
-      float summit = -${DEPTHS_PX}.0 + peak.w * pow(t, 1.1);
-      if (summit > h) { h = summit; id = hash12(vec2(float(i), 3.0)); }
-    }
+    float land = 2.0 + 6.0 * fbm3(p / 70.0) + 2.0 * (gnoise(p / 9.0) - 0.5)
+      + 26.0 * smoothstep(120.0, 520.0, beyond) * fbm3(p / 160.0 + 4.0);
+    vec3 boulder = stones(p + 17.0, 64.0, 4.0);
+    float share = mix(0.88, 0.76, smoothstep(100.0, 400.0, beyond));
+    float scatter = step(share, fract(boulder.y * 13.1)) * smoothstep(10.0, 30.0, beyond);
+    h = land + boulder.x * 22.0 * scatter;
+    // B: a boulder's tone 0.6..1, plain ground 0.3.
+    id = scatter > 0.5 ? 0.6 + 0.4 * boulder.y : 0.3;
     kind = 1.0;
   }
   gl_FragColor = vec4(h, d, id, kind);
@@ -423,26 +468,23 @@ void main() {
     else if (inlay.x > 0.5) stone = vec3(0.4, 0.37, 0.34) * (0.9 + 0.2 * fbm3(p / 18.0));
     col = stone * (0.55 + 0.35 * facing + 0.25 * sky);
   } else {
-    // Rock and dust, faces to the light pale; snow on the peaks' heads.
+    // Rock and dust, faces to the light pale; the boulders a darker grey-brown.
     vec3 rock = mix(vec3(0.17, 0.16, 0.145), vec3(0.37, 0.35, 0.32), smoothstep(0.35, 0.85, facing));
-    rock *= 0.88 + 0.24 * id;
+    float boulder = step(0.55, id);
+    vec3 boulderRock = mix(vec3(0.09, 0.08, 0.07), vec3(0.3, 0.27, 0.235), smoothstep(0.3, 0.9, facing)) * (0.85 + 0.4 * (id - 0.6));
+    rock = mix(rock, boulderRock, boulder);
     vec3 dust = vec3(0.27, 0.245, 0.205) * (0.9 + 0.2 * fbm3(p / 40.0));
-    rock = mix(dust, rock, smoothstep(0.92, 0.75, n.z));
-    // The cliff's lip: bare dark rock where the shelf breaks off.
-    rock *= mix(1.0, 0.62, smoothstep(-4.0, -40.0, ground) * (1.0 - smoothstep(-90.0, -150.0, ground)));
-    // Snow dusts the peaks' heads, grey in the overcast light.
-    float snow = smoothstep(-${DEPTHS_PX - 130}.0, -${DEPTHS_PX - 155}.0, ground + (gnoise(p / 30.0) - 0.5) * 40.0) * step(ground, -10.0) * smoothstep(0.3, 0.6, n.z);
-    rock = mix(rock, mix(vec3(0.42, 0.41, 0.4), vec3(0.62, 0.61, 0.58), smoothstep(0.4, 0.8, facing)), snow * 0.8);
+    rock = mix(dust, rock, max(smoothstep(0.92, 0.75, n.z), boulder));
     col = rock * (0.75 + 0.3 * sky);
   }
   col = mix(col * 0.55, col, smoothstep(0.3, 0.9, light.b));
   // The overcast sky's thicker clouds drift over, their soft shadows crossing the ring.
   float clouds = fbm3((p - vec2(uTime * 9.0, uTime * 4.0)) / 520.0 + 3.7);
   col *= 1.0 - 0.16 * smoothstep(0.48, 0.72, clouds);
-  // The haze filling the depths, in the art's sepia, thicker the deeper, its mist drifting.
-  float depth = smoothstep(-10.0, -${DEPTHS_PX}.0, ground);
+  // The art's sepia haze, thicker with distance from the ring, its mist drifting.
+  float far = smoothstep(140.0, 560.0, d);
   float mist = fbm3((p + vec2(uTime * 14.0, -uTime * 6.0)) / 160.0);
-  col = mix(col, HAZE * (0.9 + 0.25 * mist), depth * (0.62 + 0.2 * mist));
+  col = mix(col, HAZE * (0.92 + 0.22 * mist), far * (0.5 + 0.2 * mist));
   vec2 edgeUv = min(vUv, 1.0 - vUv);
   col *= mix(0.45, 1.0, smoothstep(0.0, 0.05, min(edgeUv.x, edgeUv.y)));
   vec3 dust = vec3(0.75, 0.68, 0.55);
@@ -466,14 +508,13 @@ vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
 
 export const PROP_FRAGMENT = propFragment({ light: PROP_LIGHT, uniforms: OVERCAST, reveal: 'vec3(0.45, 0.4, 0.33)' });
 
-const NO_SPOTS = { arena: null, ringR: 0, stones: [], anchor: null, peaks: [], emblem: null };
+const NO_SPOTS = { arena: null, ringR: 0, stones: [], anchor: null, spires: [], emblem: null };
 
 /** Mountain Ring's board (stadium-environment-mesh.js BOARDS): the ground and the props. */
 export function mountainRingBoard({ three, material, terrainGrid, replaceGeometry, bakeOptions }) {
   const own = {
     uRing: { value: new three.Vector4() },
     uEmblem: { value: new three.Vector3() },
-    uPeaks: { value: Array.from({ length: PEAKS.length }, () => new three.Vector4()) },
   };
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
   const materials = {
@@ -491,13 +532,8 @@ export function mountainRingBoard({ three, material, terrainGrid, replaceGeometr
     bakeLight: materials.bakeLight,
     spots: (layout) => ringSpots(layout) ?? NO_SPOTS,
     apply(spots, bounds) {
-      const { arena, ringR, emblem, peaks = [] } = spots;
+      const { arena, ringR, emblem } = spots;
       own.uRing.value.set(arena?.x ?? 0, arena?.y ?? 0, arena?.r ?? 0, ringR ?? 0);
-      own.uPeaks.value.forEach((slot, i) => {
-        const peak = peaks[i];
-        if (peak) slot.set(peak.x, peak.y, peak.r, peak.height);
-        else slot.set(0, 0, 0, 0);
-      });
       own.uEmblem.value.set(emblem?.x ?? 0, emblem?.y ?? 0, emblem?.r ?? 0);
       replaceGeometry(terrain, terrainGrid(bounds));
       props.visible = Boolean(arena);
