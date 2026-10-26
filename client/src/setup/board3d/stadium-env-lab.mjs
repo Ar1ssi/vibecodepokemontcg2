@@ -83,7 +83,10 @@ const CABLE_RUNS = [
 const LID = [0.45, 0.48, 0.54, 0.25];
 /** The big pipes: turn round the dais (deg) each runs out from the ring before rising. */
 const BIG_PIPES = [100, 120, 238, 262, 292, 72, 200, 160];
-const BIG_PIPE = { radius: 20, run: 150, bend: 40, top: 320 };
+const BIG_PIPE = { radius: 26, run: 150, bend: 46, top: 320 };
+/** The art's thin white bands round its big pipes: spacing along the pipe, how far proud. */
+const PIPE_BAND = { every: 70, proud: 1.6, width: 2.4 };
+const BAND_WHITE = [0.92, 0.95, 0.97, 0.2];
 /** The deck's pipe bundles: candidates every `step` deg, at most `most`, pipes `spread` px apart. */
 const BUNDLE = { step: 20, most: 7, spread: 11, radius: 4.5 };
 /**
@@ -296,6 +299,31 @@ export function labSpots(layout) {
   return { dais, outline, stair, consoles, tanks, arches, bundles, emblem };
 }
 
+/** Thin white bands round a pipe running along `points`, every PIPE_BAND.every px of its length. */
+const pipeBands = (props, points, radius) => {
+  let travelled = 0;
+  let next = PIPE_BAND.every / 2;
+  for (let i = 1; i < points.length; i += 1) {
+    const a = points[i - 1];
+    const b = points[i];
+    const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    const length = Math.hypot(...d);
+    if (length < 1e-6) continue;
+    const dir = d.map((v) => v / length);
+    for (; next <= travelled + length; next += PIPE_BAND.every) {
+      const at = a.map((v, k) => v + dir[k] * (next - travelled));
+      const half = PIPE_BAND.width / 2;
+      props.tube(
+        [at.map((v, k) => v - dir[k] * half), at.map((v, k) => v + dir[k] * half)],
+        radius + PIPE_BAND.proud,
+        BAND_WHITE,
+        { sides: 12 }
+      );
+    }
+    travelled += length;
+  }
+};
+
 /** The railing round the dais (open at the stair), its posts, the stair, consoles, tanks and pipes. */
 export function labProps(spots) {
   const props = createPropBuilder();
@@ -335,6 +363,7 @@ export function labProps(spots) {
       points.push([arch.x + tangent[0] * along, arch.y + tangent[1] * along, -DROP_PX + Math.sin(t) * arch.height]);
     }
     props.tube(points, arch.radius, PIPE, { sides: 12 });
+    pipeBands(props, points, arch.radius);
     for (const side of [-1, 1]) {
       const fx = arch.x + tangent[0] * arch.half * side;
       const fy = arch.y + tangent[1] * arch.half * side;
@@ -413,18 +442,24 @@ export function labProps(spots) {
     }
   }
 
-  // The tanks: steel drums with darker bands; on each lid a rim, a hatch and a pipe stub. A pipe
-  // runs to each from the ring.
+  // The tanks, as in the art: steel drums with darker bands and a domed top, a neck of stacked
+  // collars at its crown under a small cap, a pipe stub beside it. A pipe runs to each from the ring.
   for (const tank of tanks) {
     const body = tank.tint ? BLUE_STEEL : STEEL;
     const top = -DROP_PX + tank.height;
-    props.cylinder({ x: tank.x, y: tank.y, z0: -DROP_PX, z1: top, r: tank.radius, color: body, sides: 28, capColor: LID });
+    const dome = tank.radius * 0.42;
+    props.cylinder({ x: tank.x, y: tank.y, z0: -DROP_PX, z1: top, r: tank.radius, color: body, sides: 28, capColor: LID, domeRise: dome });
     for (const band of [0.2, 0.62]) {
       const z = -DROP_PX + tank.height * band;
       props.ring({ x: tank.x, y: tank.y, z0: z, z1: z + 8, r: tank.radius + 1.8, color: DARK_STEEL, sides: 28 });
     }
-    props.ring({ x: tank.x, y: tank.y, z0: top - 5, z1: top + 3, r: tank.radius + 2, color: STEEL, sides: 28 });
-    props.cylinder({ x: tank.x, y: tank.y, z0: top, z1: top + 5, r: tank.radius * 0.5, color: DARK_STEEL, sides: 20 });
+    props.ring({ x: tank.x, y: tank.y, z0: top - 5, z1: top + 1, r: tank.radius + 2, color: STEEL, sides: 28 });
+    const neck = tank.radius * 0.3;
+    for (let k = 0; k < 3; k += 1) {
+      const z = top + dome * 0.86 + k * 6;
+      props.cylinder({ x: tank.x, y: tank.y, z0: z, z1: z + 5, r: neck * (1 - k * 0.08), color: k % 2 ? DARK_STEEL : STEEL, sides: 18 });
+    }
+    props.cylinder({ x: tank.x, y: tank.y, z0: top + dome * 0.86 + 18, z1: top + dome * 0.86 + 24, r: neck * 0.7, color: DARK_STEEL, capColor: LID, sides: 18 });
     const stub = tank.angle + 2.2;
     props.cylinder({
       x: tank.x + Math.cos(stub) * tank.radius * 0.72,
@@ -546,6 +581,7 @@ export function labProps(spots) {
     }
     for (let up = z + BIG_PIPE.bend + 40; up <= BIG_PIPE.top; up += 40) points.push([corner[0], corner[1], up]);
     props.tube(points, BIG_PIPE.radius, PIPE, { sides: 12 });
+    pipeBands(props, points, BIG_PIPE.radius);
     for (const [x, y, zz] of [points[6], points[14], points[points.length - 2]]) {
       const vertical = zz > z + 1;
       const half = 5;
