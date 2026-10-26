@@ -30,6 +30,8 @@ export const WALL_PX = { height: 245, lean: 105, cap: 60 };
 export const GATE_PX = { half: 300, height: 205 };
 /** The floor's big hex tiles: px per hex unit (inradius half a unit). */
 const FLOOR_HEX_PX = 440;
+/** How far out from each wall's foot its reflection streaks the floor. */
+const STREAK_PX = 150;
 /** How far up the side walls (share of the hall's half height) the corner grooves meet them. */
 const CORNER_CUT = '0.5';
 /** How far in from the side walls the corner strips run (px across the hall). */
@@ -252,8 +254,7 @@ vec3 mirroredAt(vec2 p) {
   if (ray.y < 0.0) { float t = (lo.y - p.y) / ray.y; if (t > 0.0 && t < best) { best = t; hit = vec2(p.x + t * ray.x, t * ray.z); gated = 0.0; } }
   if (best < 100000.0 && hit.y < WALL_HEIGHT) {
     vec3 glow;
-    vec3 wall = wallPaint(hit.x, hit.y, gated, glow);
-    return wall * 0.9 + glow;
+    return wallPaint(hit.x, hit.y, gated, glow) * 0.9;
   }
   return ceilingAt(p + ray.xy * (${CEILING_PX}.0 / ray.z));
 }
@@ -269,6 +270,24 @@ void main() {
   float gloss = mix(0.62, 0.34, smoothstep(30.0, 260.0, min(fromWalls.x, fromWalls.y)));
   vec3 col = vec3(0.68, 0.7, 0.72) * (0.98 + 0.03 * fbm3(p / 220.0));
   col = mix(col, mirroredAt(p) * 0.98, gloss);
+  // The art's floor seen low along it: each wall unit and gate mirrored into a soft streak running
+  // out from the wall's foot across the floor's margin, its white panels, dark louvres and gates
+  // stretched and blurred, fading out toward the cards.
+  vec3 streak = vec3(0.0);
+  float streakWeight = 0.0;
+  for (int i = 0; i < 4; i++) {
+    // Walls 0 and 1 are the side walls (their u runs along y), 2 and 3 the far and near walls.
+    bool alongX = i < 2;
+    float d = alongX ? fromWalls.x : fromWalls.y;
+    float u = alongX ? p.y : p.x;
+    float w = (1.0 - smoothstep(20.0, ${STREAK_PX}.0, d)) * step(0.0, d);
+    if (w <= 0.0) continue;
+    vec3 glow;
+    vec3 seen = wallPaint(u, min(d * 1.2 + 14.0, WALL_HEIGHT - 30.0), alongX ? 1.0 : 0.0, glow);
+    streak += seen * w;
+    streakWeight += w;
+  }
+  col = mix(col, streak / max(streakWeight, 0.0001) * 1.02, min(streakWeight, 1.0) * 0.45);
   vec4 tile = hexTile((p - uHall.xy) / ${FLOOR_HEX_PX}.0);
   col = mix(col, vec3(0.2, 0.22, 0.25), 1.0 - smoothstep(0.5, 1.2, tile.x * ${FLOOR_HEX_PX}.0));
   vec2 rel = abs(p - uHall.xy);
@@ -293,12 +312,14 @@ void main() {
     float button = min(abs(r - uEmblem.z * 0.2), abs(r - uEmblem.z * 0.3));
     float band = r > uEmblem.z * 0.3 && r < uEmblem.z * 0.93 ? abs(rel.y) : 100000.0;
     float line = min(min(ring, button), band);
-    float lit = 1.0 - smoothstep(0.8, 2.0, line);
+    float lit = 1.0 - smoothstep(1.0, 2.6, line);
+    float core = 1.0 - smoothstep(0.2, 0.9, line);
     float shimmer = 0.85 + 0.15 * sin(atan(rel.y, rel.x) * 6.0 - uTime * 1.5);
-    // On the pale floor an added glow would only wash out: the lines are painted a saturated cyan,
-    // the glow a tint round them.
-    col = mix(col, vec3(0.42, 0.8, 1.05), exp(-line / 5.0) * 0.45);
-    col = mix(col, vec3(0.32, 0.88, 1.3) * shimmer, lit);
+    // On the pale floor an added glow would only wash out: the bloom is a blue tint round the lines,
+    // the lines a saturated cyan with a near-white core.
+    col = mix(col, vec3(0.36, 0.7, 1.02), exp(-line / 9.0) * 0.5);
+    col = mix(col, vec3(0.2, 0.78, 1.25) * shimmer, lit);
+    col = mix(col, vec3(0.85, 1.05, 1.15), core * 0.85);
   }
 
   vec2 edgeUv = min((p - uMin) / uSize, 1.0 - (p - uMin) / uSize);
@@ -361,16 +382,18 @@ void main() {
     float beyond = vPaint.y - WALL_HEIGHT;
     col = vec3(0.7, 0.72, 0.76) * mix(0.85, 1.0, smoothstep(0.0, 20.0, beyond));
     glow = STRIP_CYAN * (1.0 - smoothstep(0.8, 2.5, beyond)) * 0.8;
-    // Past the hall, the building's roof: pale grey panels with dark seams, a square vent hood on
-    // some of them.
-    // panel: px from the seams (every 240 px); fromCentre: px from the panel's middle.
+    // Past the hall, the building's roof: pale grey panels with dark seams, and long skylights over
+    // the rooms below glowing with the hall's white light, a cyan line round each.
+    // panel: px from the seams (every 240 px).
     vec2 cellAt = floor(vec2(vPaint.x, beyond) / 240.0);
     vec2 panel = abs(mod(vec2(vPaint.x, beyond) + 120.0, 240.0) - 120.0);
-    vec2 fromCentre = 120.0 - panel;
     vec3 roof = vec3(0.4, 0.42, 0.45) * (0.95 + 0.1 * hash12(cellAt + vec2(vPaint.w * 7.0, 3.0)));
     roof *= mix(0.55, 1.0, smoothstep(0.8, 2.0, min(panel.x, panel.y)));
-    float hood = step(0.6, hash12(cellAt + vec2(vPaint.w * 3.0, 9.0))) * (1.0 - step(26.0, max(fromCentre.x, fromCentre.y)));
-    roof = mix(roof, mix(vec3(0.18, 0.19, 0.21), vec3(0.3, 0.32, 0.35), step(3.0, 26.0 - max(fromCentre.x, fromCentre.y))), hood);
+    float lane = abs(mod(beyond - ${WALL_PX.cap}.0 - 60.0, 160.0) - 80.0);
+    float skylight = (1.0 - smoothstep(13.0, 14.5, lane)) * smoothstep(40.0, 60.0, beyond - ${WALL_PX.cap}.0)
+      * step(16.0, panel.x);
+    roof = mix(roof, vec3(0.94, 0.97, 1.0), skylight);
+    roof = mix(roof, STRIP_CYAN * 0.6, (1.0 - smoothstep(0.6, 1.6, abs(lane - 14.5))) * step(16.0, panel.x) * smoothstep(40.0, 60.0, beyond - ${WALL_PX.cap}.0));
     col = mix(col, roof, smoothstep(${WALL_PX.cap - 20}.0, ${WALL_PX.cap}.0, beyond));
   }
   col += glow;
