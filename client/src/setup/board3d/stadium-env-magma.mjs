@@ -123,14 +123,16 @@ export function basinSpots(layout) {
 
 const BASIN_LAVA = /* glsl */ `
 // The basin's lava in linear HDR, yellower than Scorched Earth's (the card art's moat is molten
-// gold): dark red where it cools, orange, gold, a pale yellow core that stays under white after
-// Neutral tone mapping.
+// gold). Each stop is the art's colour sampled from the print, inverted through Neutral tone
+// mapping (whose toe would otherwise strip the blue from every dark): a red-brown crust (96,39,29),
+// red-orange at the edges (194,72,43), orange (240,128,58), gold (236,176,74), a pale gold core
+// (245,197,102).
 vec3 basinLava(float t) {
   t = clamp(t, 0.0, 1.0);
-  vec3 c = mix(vec3(0.22, 0.012, 0.0), vec3(0.85, 0.07, 0.0), smoothstep(0.08, 0.22, t));
-  c = mix(c, vec3(1.25, 0.34, 0.0), smoothstep(0.32, 0.48, t));
-  c = mix(c, vec3(1.35, 0.62, 0.05), smoothstep(0.55, 0.7, t));
-  return mix(c, vec3(1.45, 0.95, 0.3), smoothstep(0.78, 0.94, t));
+  vec3 c = mix(vec3(0.149, 0.052, 0.044), vec3(0.577, 0.103, 0.062), smoothstep(0.08, 0.22, t));
+  c = mix(c, vec3(1.008, 0.269, 0.073), smoothstep(0.32, 0.48, t));
+  c = mix(c, vec3(0.917, 0.492, 0.107), smoothstep(0.55, 0.7, t));
+  return mix(c, vec3(1.25, 0.76, 0.17), smoothstep(0.78, 0.94, t));
 }
 `;
 
@@ -391,13 +393,16 @@ void main() {
   vec3 sun = normalize(uSun);
   float facing = dot(n, sun) * mix(0.5, 1.0, light.a);
 
-  // The island: dark brown rock, warmer where lumps catch the light. The walls: dark crimson rock,
-  // the tops of its rounded rocks a brighter red to the light.
-  vec3 islandRock = mix(vec3(0.046, 0.028, 0.023), vec3(0.088, 0.053, 0.044), smoothstep(0.35, 0.75, facing));
-  islandRock = mix(islandRock, vec3(0.15, 0.094, 0.052), smoothstep(0.85, 0.97, facing));
+  // The island: dark grey-brown rock, warmer where lumps catch the light. The walls: dark crimson
+  // rock, the tops of its rounded rocks a brighter red to the light. Colours sampled from the art and
+  // inverted through Neutral tone mapping, as basinLava's: island (37,26,23), (70,47,34), (94,70,54);
+  // walls (31,13,8), (70,21,18), (111,43,45), the first two lifted a third for the shade and
+  // occlusion that darken them below.
+  vec3 islandRock = mix(vec3(0.047, 0.039, 0.037), vec3(0.096, 0.063, 0.051), smoothstep(0.35, 0.75, facing));
+  islandRock = mix(islandRock, vec3(0.152, 0.101, 0.077), smoothstep(0.85, 0.97, facing));
   islandRock *= 0.86 + 0.28 * tone;
-  vec3 wallRock = mix(vec3(0.04, 0.008, 0.007), vec3(0.092, 0.017, 0.014), smoothstep(0.4, 0.7, facing));
-  wallRock = mix(wallRock, vec3(0.24, 0.065, 0.05), smoothstep(0.82, 0.95, facing));
+  vec3 wallRock = mix(vec3(0.042, 0.028, 0.027), vec3(0.116, 0.045, 0.042), smoothstep(0.4, 0.7, facing));
+  wallRock = mix(wallRock, vec3(0.197, 0.062, 0.064), smoothstep(0.82, 0.95, facing));
   wallRock *= 0.8 + 0.4 * tone;
   vec3 col = mix(wallRock, islandRock, onIsland);
   // Painted rims: convex edges (lump tops, crags) catch a warm stroke of light.
@@ -424,8 +429,8 @@ void main() {
   float flicker = 0.85 + 0.15 * gnoise(vec2(uTime * 0.9, p.x / 90.0 + p.y / 130.0));
   // The walls take less of it than the island: their faces lean away from the moat's middle.
   float moatGlow = exp(-fromMoat / mix(22.0, 38.0, onIsland)) * exp(-above / 60.0) * (0.25 + 0.75 * turned);
-  col += mix(vec3(1.0, 0.12, 0.05), vec3(1.0, 0.2, 0.03), onIsland) * moatGlow * flicker * mix(0.3, 0.8, onIsland);
-  col += vec3(1.0, 0.26, 0.035) * exp(-max(fallSD, 0.0) / 6.0) * onWall * 0.55 * flicker;
+  col += mix(vec3(1.0, 0.22, 0.12), vec3(1.0, 0.35, 0.1), onIsland) * moatGlow * flicker * mix(0.3, 0.8, onIsland);
+  col += vec3(1.0, 0.3, 0.12) * exp(-max(fallSD, 0.0) / 6.0) * onWall * 0.55 * flicker;
 
   // Some of the island's cracks still glow; sparks lie on the rock.
   col = mix(col, basinLava(0.26 + 0.1 * flicker), field.b * 0.85);
@@ -547,12 +552,13 @@ void main() {
   vec2 flow = mix(flowPhase(p - velocity * phaseB * period + vec2(53.0, 29.0)), flowPhase(p - velocity * phaseA * period), weightA);
 
   float middle = sin(across * 3.14159);
-  // White-hot flow lines down the middle, deep red toward both shores (no bright rim along them).
-  float heat = 0.54 + 0.22 * middle + (flow.x - 0.5) * 0.55 + flow.y * 0.42 * middle;
-  heat -= 0.4 * (1.0 - smoothstep(0.0, 34.0, shore));
+  // Pale gold flow lines down the middle; gold out to a thin red-orange lip at both shores, as the
+  // art's moat (no bright rim along them).
+  float heat = 0.6 + 0.16 * middle + (flow.x - 0.5) * 0.4 + flow.y * 0.42 * middle;
+  heat -= 0.36 * (1.0 - smoothstep(0.0, 14.0, shore));
   // Dark crust plates drifting where the flow runs cool.
-  float skin = smoothstep(0.56, 0.68, fbm3((p - velocity * uTime * 0.6) / 70.0 + 9.0)) * smoothstep(8.0, 30.0, shore);
-  heat -= skin * 0.45;
+  float skin = smoothstep(0.6, 0.7, fbm3((p - velocity * uTime * 0.6) / 70.0 + 9.0)) * smoothstep(8.0, 30.0, shore);
+  heat -= skin * 0.3;
 
   // Each fall's splash where its line meets the outer shore: a hot churning pool, rings running out
   // from it.
