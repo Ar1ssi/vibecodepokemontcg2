@@ -67,10 +67,10 @@ const CONSOLES = [
 ];
 
 const YELLOW = [0.95, 0.68, 0.04, 0.35];
-const STEEL = [0.62, 0.66, 0.72, 0.85];
-const BLUE_STEEL = [0.42, 0.52, 0.68, 0.85];
-const DARK_STEEL = [0.22, 0.24, 0.28, 0.7];
-const PIPE = [0.66, 0.7, 0.76, 0.8];
+const STEEL = [0.78, 0.82, 0.88, 0.85];
+const BLUE_STEEL = [0.58, 0.68, 0.82, 0.85];
+const DARK_STEEL = [0.32, 0.35, 0.4, 0.7];
+const PIPE = [0.82, 0.86, 0.92, 0.85];
 const CABLE = [0.03, 0.03, 0.035, 0.3];
 const LAMP_BLACK = [0.035, 0.037, 0.045, 0.5];
 const LAMP_LIGHT = [1.2, 1.25, 1.3, 2.2];
@@ -81,10 +81,10 @@ const CABLE_RUNS = [
   [128, 14, 4.0],
 ];
 /** Brushed lids: steel that doesn't mirror the lamps overhead as a white disc. */
-const LID = [0.3, 0.33, 0.38, 0.2];
+const LID = [0.45, 0.48, 0.54, 0.25];
 /** The big pipes: turn round the dais (deg) each runs out from the ring before rising. */
-const BIG_PIPES = [100, 120, 238, 262, 292, 72];
-const BIG_PIPE = { radius: 14, run: 150, bend: 34, top: 280 };
+const BIG_PIPES = [100, 120, 238, 262, 292, 72, 200, 160];
+const BIG_PIPE = { radius: 20, run: 150, bend: 40, top: 320 };
 const STEP_BLUE = [0.1, 0.36, 0.8, 0.25];
 const STEP_SIDE = [0.05, 0.16, 0.38, 0.25];
 const SCREEN = [0.3, 0.85, 1.25, 2.4];
@@ -555,11 +555,11 @@ void main() {
     // The deck: dark tread-plate steel in broad plates, shade gathering at the dais's foot.
     vec2 diamond = abs(fract(mat2(0.7071, 0.7071, -0.7071, 0.7071) * p / 7.0 * vec2(1.0, 2.6)) - 0.5);
     float tread = smoothstep(0.32, 0.46, max(diamond.x, diamond.y) - 0.0);
-    col = mix(vec3(0.12, 0.135, 0.16), vec3(0.18, 0.2, 0.235), tread * 0.6);
+    col = mix(vec3(0.26, 0.29, 0.34), vec3(0.34, 0.38, 0.44), tread * 0.6);
     col *= 0.9 + 0.2 * fbm3(p / 90.0);
     vec2 panel = abs(mod(p + 72.0, 144.0) - 72.0);
-    col = mix(vec3(0.02, 0.022, 0.028), col, smoothstep(0.8, 2.0, min(panel.x, panel.y)));
-    col *= mix(0.45, 1.0, smoothstep(0.0, 70.0, d));
+    col = mix(vec3(0.1, 0.11, 0.13), col, smoothstep(0.8, 2.0, min(panel.x, panel.y)));
+    col *= mix(0.55, 1.0, smoothstep(0.0, 70.0, d));
     col += vec3(0.01, 0.022, 0.04) * exp(-d / 160.0);
   }
   col = mix(col * 0.55, col, smoothstep(0.3, 0.9, light.b));
@@ -585,7 +585,7 @@ vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
   // low down, the deck beneath.
   vec3 view = normalize(uEye - world);
   vec3 r = reflect(-view, n);
-  vec3 env = mix(vec3(0.03, 0.035, 0.05), vec3(0.3, 0.36, 0.45), smoothstep(-0.35, 0.25, r.z));
+  vec3 env = mix(vec3(0.16, 0.18, 0.22), vec3(0.62, 0.7, 0.8), smoothstep(-0.35, 0.25, r.z));
   env += vec3(0.55, 0.65, 0.8) * smoothstep(0.82, 1.0, sin(atan(r.y, r.x) * 5.0)) * smoothstep(-0.1, 0.3, r.z) * (1.0 - smoothstep(0.55, 0.85, r.z));
   env = mix(env, vec3(1.25, 1.32, 1.42), smoothstep(0.78, 0.95, r.z));
   vec3 col = mix(diffuse, env * mix(vec3(1.0), albedo * 1.5, 0.45), metal * 0.85);
