@@ -396,7 +396,9 @@ boards" toggle. Revert: unset the toggle per user, or revert the feature commits
   bake in two, 5.2 s before). Built on `feature/077-six-stadiums`: the board's meshes are built,
   then `compileAsync` compiles its bake passes (a render target bound) and meshes (camera on the
   env layer, canvas bound, so the cache keys match the draw: three keys programs by light count,
-  render target and geometry attributes); the mat shows until they're ready. The table carries the
+  render target and geometry attributes); the mat shows until they're ready, at most
+  `PREPARE_TIMEOUT_MS` (8 s; a lost context never reports a link, so it skips compileAsync and dispose
+  stops waiting after that long). The table carries the
   cutout from the start (`uCutoutOn` gates it) so a board never recompiles the table. Worst frame
   on first show: 42-135 ms on every board (was 0.5-2.5 s); load compiles the table ~0.25 s longer.
 - Prototype: the mesh builds each board from its own builder (`BOARDS[key](kit)` → `{ objects,
