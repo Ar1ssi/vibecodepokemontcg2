@@ -10,6 +10,7 @@ import * as highland from './stadium-env-highland.mjs';
 import { darkCityBoard } from './stadium-env-city.mjs';
 import { fullMetalLabBoard } from './stadium-env-lab.mjs';
 import { magmaBasinBoard } from './stadium-env-magma.mjs';
+import { mountainRingBoard } from './stadium-env-ring.mjs';
 import { steelShelterBoard } from './stadium-env-shelter.mjs';
 import * as volcanic from './stadium-env-volcanic.mjs';
 import {
@@ -515,6 +516,7 @@ const BOARDS = {
   'dark-city': darkCityBoard,
   'full-metal-lab': fullMetalLabBoard,
   'magma-basin': magmaBasinBoard,
+  'mountain-ring': mountainRingBoard,
   'perilous-jungle': perilousJungleBoard,
   'scorched-earth': scorchedEarthBoard,
   'steel-shelter': steelShelterBoard,

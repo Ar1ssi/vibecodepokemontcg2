@@ -12,6 +12,7 @@ const ENVIRONMENT_BY_CARD = {
   'customhb-051': 'stormy-mountains',
   'customhb-162': 'steel-shelter',
   'customhb-163': 'full-metal-lab',
+  'customhb-240': 'mountain-ring',
   'customhb-253': 'perilous-jungle',
   'customhb-254': 'dark-city',
   'customhb-289': 'magma-basin',
@@ -29,6 +30,7 @@ export const ENVIRONMENT_OVERRIDE_KEY = 'ptcg-stadium-env';
  * table's own floor shows.
  */
 const SCENE_MARGINS = {
+  'mountain-ring': { side: 0.17, near: 0.2, far: 0.34 },
   'dark-city': { side: 0.17, near: 0.2, far: 0.34 },
   'full-metal-lab': { side: 0.17, near: 0.2, far: 0.34 },
   'magma-basin': { side: 0.17, near: 0.2, far: 0.34 },
