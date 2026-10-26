@@ -486,6 +486,15 @@ float stroke(vec2 uv, vec2 a, vec2 b, float width) {
   float t = clamp(dot(uv - a, ab) / dot(ab, ab), 0.0, 1.0);
   return length(uv - a - ab * t) - width * (0.85 + 0.3 * gnoise(uv * 40.0));
 }
+// Rows of printed words at heights y0..y1 (board uv): dark blocks broken into words.
+float printed(vec2 uv, float y0, float y1, float x0, float x1, float seed) {
+  if (uv.y < y0 || uv.y > y1 || uv.x < x0 || uv.x > x1) return 0.0;
+  float letter = floor(uv.x * 70.0);
+  float gap = step(0.78, hash12(vec2(floor(uv.x * 14.0), seed)));
+  float stem = step(0.2, fract(uv.x * 70.0)) * step(fract(uv.x * 70.0), 0.85);
+  float hole = step(0.6, hash12(vec2(letter, seed + 3.0))) * step(0.4, (uv.y - y0) / (y1 - y0)) * step((uv.y - y0) / (y1 - y0), 0.6);
+  return stem * (1.0 - gap) * (1.0 - hole);
+}
 void main() {
   if (revealBurned(vPos) * exitKeep(vPos) < 0.5) discard;
   vec2 uv = vBoardUv;
@@ -494,9 +503,11 @@ void main() {
   vec3 paint;
   float sprayed;
   if (vBoard < 1.5) {
-    vec2 check = floor(uv * vec2(12.0, 7.0));
-    col = mix(vec3(0.92, 0.92, 0.95), vec3(0.78, 0.8, 0.86), mod(check.x + check.y, 2.0));
-    // The skull: a round head, a jaw, two X eyes, two crossed bones behind.
+    // The art's right board: a checked white ad with two lines of black print, Team Skull's skull
+    // sprayed over it in red, scribbled marks beside it.
+    vec2 check = floor(uv * vec2(9.0, 5.0));
+    col = mix(vec3(0.94, 0.95, 0.97), vec3(0.72, 0.75, 0.8), mod(check.x + check.y, 2.0));
+    col = mix(col, vec3(0.06), max(printed(uv, 0.48, 0.56, 0.18, 0.78, 1.0), printed(uv, 0.32, 0.39, 0.3, 0.62, 2.0)));
     float head = length((q - vec2(0.0, 0.08)) * vec2(1.0, 1.15)) - 0.26;
     float jaw = max(abs(q.x) - 0.15, abs(q.y + 0.2) - 0.07);
     float skull = min(head, jaw);
@@ -504,14 +515,21 @@ void main() {
     float eyes = min(min(stroke(q, vec2(-0.16, 0.13), vec2(-0.05, 0.02), 0.022), stroke(q, vec2(-0.16, 0.02), vec2(-0.05, 0.13), 0.022)),
       min(stroke(q, vec2(0.05, 0.13), vec2(0.16, 0.02), 0.022), stroke(q, vec2(0.05, 0.02), vec2(0.16, 0.13), 0.022)));
     float bones = min(stroke(q, vec2(-0.62, -0.38), vec2(0.62, 0.38), 0.03), stroke(q, vec2(-0.62, 0.38), vec2(0.62, -0.38), 0.03));
-    sprayed = 1.0 - smoothstep(-0.004, 0.006, min(min(ring, eyes), max(bones, -skull)));
-    paint = vec3(0.85, 0.04, 0.05);
+    float scribble = min(stroke(q, vec2(0.42, -0.05), vec2(0.5, 0.18), 0.02), stroke(q, vec2(0.5, 0.18), vec2(0.58, -0.06), 0.02));
+    sprayed = 1.0 - smoothstep(-0.004, 0.006, min(min(min(ring, eyes), max(bones, -skull)), scribble));
+    paint = vec3(0.82, 0.05, 0.06);
   } else {
-    col = mix(vec3(0.42, 0.12, 0.62), vec3(0.85, 0.3, 0.75), uv.y);
-    float x = min(stroke(q, vec2(-0.45, -0.38), vec2(0.45, 0.38), 0.06), stroke(q, vec2(-0.45, 0.38), vec2(0.45, -0.38), 0.06));
-    float tag = stroke(q, vec2(-0.7, -0.42), vec2(-0.2, -0.3), 0.018);
-    sprayed = 1.0 - smoothstep(-0.004, 0.006, min(x, tag));
-    paint = vec3(1.0, 0.25, 0.55);
+    // The art's left board: a dark navy ad, a pale wave along its top, a white logo and lettering;
+    // a pink X sprayed across it.
+    col = mix(vec3(0.06, 0.06, 0.2), vec3(0.2, 0.09, 0.36), uv.x);
+    float wave = abs(uv.y - 0.82 - 0.05 * sin(uv.x * 7.0)) - 0.025;
+    col = mix(col, vec3(0.85, 0.88, 0.95), 1.0 - smoothstep(0.0, 0.01, wave));
+    float logo = abs(length((uv - vec2(0.17, 0.42)) * vec2(1.6, 1.0)) - 0.12) - 0.02;
+    col = mix(col, vec3(0.9, 0.92, 0.98), 1.0 - smoothstep(0.0, 0.012, logo));
+    col = mix(col, vec3(0.92), printed(uv, 0.32, 0.5, 0.42, 0.9, 7.0));
+    float x = min(stroke(q, vec2(-0.45, -0.38), vec2(0.45, 0.38), 0.07), stroke(q, vec2(-0.45, 0.38), vec2(0.45, -0.38), 0.07));
+    sprayed = (1.0 - smoothstep(-0.004, 0.02, x)) * 0.85;
+    paint = vec3(0.78, 0.32, 0.82);
   }
   col = mix(col, paint, sprayed);
   // Lit from below by a spotlight, fading up the board.
