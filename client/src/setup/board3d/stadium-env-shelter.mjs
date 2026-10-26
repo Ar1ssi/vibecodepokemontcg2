@@ -102,32 +102,40 @@ vec3 gateAt(float u, float h) {
   return vec3(1.0, min(outer - local, uGate.w - h), u - uGate.x);
 }
 // The wall's colour at u px along it and h px up it (far: 1 on the far wall); its light strips'
-// glow in glow. White panels over a dark baseboard with a cyan line, a band of dark louvred vents
-// between white piers, panel seams, a cyan light strip near the top under a pale cornice.
+// glow in glow. As in the art: blocks of white panelling one bay wide, dark seams between them,
+// each block a lower panel (a small access hatch in some), a band of dark louvres across its middle
+// and an upper panel; a dark baseboard with a cyan line at the foot, a cyan light strip near the
+// top under a pale cornice.
 vec3 wallPaint(float u, float h, float far, out vec3 glow) {
   glow = vec3(0.0);
-  vec3 col = vec3(0.7, 0.72, 0.75);
-  // Panel seams over the vents: one above each pier, and one across the panels.
-  float pier = abs(mod(u + 85.0, 170.0) - 85.0);
-  col = mix(col, vec3(0.46, 0.48, 0.52), (1.0 - smoothstep(0.8, 2.0, pier)) * step(96.0, h));
-  col = mix(col, vec3(0.5, 0.52, 0.56), 1.0 - smoothstep(0.8, 2.0, abs(h - 152.0)));
   float bay = mod(u, 170.0);
-  if (h > 34.0 && h < 92.0 && bay > 14.0 && bay < 156.0) {
-    float slat = smoothstep(0.3, 0.48, abs(fract(h / 6.5) - 0.5));
-    col = mix(vec3(0.045, 0.05, 0.06), vec3(0.22, 0.24, 0.28), slat * 0.75);
-    float rim = min(min(h - 34.0, 92.0 - h), min(bay - 14.0, 156.0 - bay));
-    col = mix(vec3(0.42, 0.44, 0.48), col, smoothstep(2.0, 3.5, rim));
+  float block = floor(u / 170.0);
+  vec3 col = vec3(0.7, 0.72, 0.75) * (0.97 + 0.06 * hash12(vec2(block, 3.0)));
+  // The louvre band across the block's middle, recessed a little: dark slats.
+  if (h > 98.0 && h < 172.0) {
+    float slat = smoothstep(0.3, 0.48, abs(fract(h / 7.0) - 0.5));
+    col = mix(vec3(0.17, 0.18, 0.2), vec3(0.3, 0.32, 0.35), slat * 0.8);
+    col = mix(vec3(0.08, 0.085, 0.1), col, smoothstep(1.0, 3.0, min(h - 98.0, 172.0 - h)));
   }
+  // A small access hatch low on some blocks.
+  if (hash12(vec2(block, 9.0)) < 0.45 && h > 20.0 && h < 58.0 && bay > 104.0 && bay < 150.0) {
+    float edge = min(min(h - 20.0, 58.0 - h), min(bay - 104.0, 150.0 - bay));
+    col = mix(col, vec3(0.42, 0.44, 0.48), 1.0 - smoothstep(0.8, 1.8, edge));
+  }
+  // Panel seams: dark between blocks, faint across the upper panel.
+  float seam = min(bay, 170.0 - bay);
+  col = mix(col, vec3(0.16, 0.17, 0.2), 1.0 - smoothstep(1.0, 2.6, seam));
+  col = mix(col, vec3(0.52, 0.54, 0.58), (1.0 - smoothstep(0.6, 1.6, abs(h - 196.0))) * 0.8);
   if (h < 12.0) {
     col = vec3(0.14, 0.15, 0.17);
     glow += STRIP_CYAN * (1.0 - smoothstep(0.5, 1.8, abs(h - 6.0))) * 0.7;
   }
-  if (h > 204.0 && h < 216.0) {
+  if (h > 212.0 && h < 222.0) {
     col = vec3(0.55, 0.85, 0.95);
     // A slow shimmer runs along the strip.
     float shimmer = 0.9 + 0.1 * sin(u / 60.0 - uTime * 1.6);
-    glow += STRIP_CYAN * smoothstep(0.0, 3.0, min(h - 204.0, 216.0 - h)) * 1.1 * shimmer;
-  } else if (h >= 216.0) {
+    glow += STRIP_CYAN * smoothstep(0.0, 3.0, min(h - 212.0, 222.0 - h)) * 1.1 * shimmer;
+  } else if (h >= 222.0) {
     col = vec3(0.86, 0.88, 0.91);
   }
   if (far > 0.5) {
