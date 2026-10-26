@@ -12,11 +12,11 @@ const catalogFile = (name) =>
   JSON.parse(readFileSync(new URL(`../../../../assets/catalogs/${name}.json`, import.meta.url), 'utf8'));
 
 test('a catalog loads once: the same promise, then the parsed file in memory', async () => {
-  const first = loadCatalog('tcgl-sleeves');
-  assert.equal(loadCatalog('tcgl-sleeves'), first);
+  const first = loadCatalog('sleeves');
+  assert.equal(loadCatalog('sleeves'), first);
   const data = await first;
-  assert.deepEqual(data, catalogFile('tcgl-sleeves'));
-  assert.equal(loadedCatalog('tcgl-sleeves'), data);
+  assert.deepEqual(data, catalogFile('sleeves'));
+  assert.equal(loadedCatalog('sleeves'), data);
 });
 
 test('a catalog that fails to load is not cached: the next call tries again', async () => {
