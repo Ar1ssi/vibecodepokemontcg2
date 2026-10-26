@@ -84,6 +84,8 @@ const LID = [0.45, 0.48, 0.54, 0.25];
 /** The big pipes: turn round the dais (deg) each runs out from the ring before rising. */
 const BIG_PIPES = [100, 120, 238, 262, 292, 72, 200, 160];
 const BIG_PIPE = { radius: 26, run: 150, bend: 46, top: 320 };
+/** Longest span a hanging cable crosses between two risers or tank tops. */
+const CABLE_SPAN_PX = 300;
 /** The art's thin white bands round its big pipes: spacing along the pipe, how far proud. */
 const PIPE_BAND = { every: 70, proud: 1.6, width: 2.4 };
 const BAND_WHITE = [0.92, 0.95, 0.97, 0.2];
@@ -556,6 +558,7 @@ export function labProps(spots) {
     const t = Math.max(0, Math.min(1, ((point.x - a[0]) * abx + (point.y - a[1]) * aby) / (abx * abx + aby * aby || 1)));
     return Math.hypot(point.x - a[0] - abx * t, point.y - a[1] - aby * t);
   };
+  const risers = [];
   for (const deg of BIG_PIPES) {
     const angle = (deg * Math.PI) / 180;
     if (turnBetween(angle, STAIR.angle) < 0.3) continue;
@@ -582,6 +585,7 @@ export function labProps(spots) {
     for (let up = z + BIG_PIPE.bend + 40; up <= BIG_PIPE.top; up += 40) points.push([corner[0], corner[1], up]);
     props.tube(points, BIG_PIPE.radius, PIPE, { sides: 12 });
     pipeBands(props, points, BIG_PIPE.radius);
+    risers.push({ x: corner[0], y: corner[1], angle });
     for (const [x, y, zz] of [points[6], points[14], points[points.length - 2]]) {
       const vertical = zz > z + 1;
       const half = 5;
@@ -595,6 +599,28 @@ export function labProps(spots) {
       );
     }
   }
+  // As in the art, black cables hang in loops between neighbouring risers and tank tops.
+  const anchors = [
+    ...risers.map((riser) => ({ x: riser.x, y: riser.y, z: 210, angle: riser.angle })),
+    ...tanks.map((tank) => ({ x: tank.x, y: tank.y, z: -DROP_PX + tank.height + tank.radius * 0.42, angle: tank.angle })),
+  ].sort((a, b) => a.angle - b.angle);
+  anchors.forEach((a, i) => {
+    const b = anchors[(i + 1) % anchors.length];
+    const span = Math.hypot(a.x - b.x, a.y - b.y);
+    if (a === b || span > CABLE_SPAN_PX) return;
+    for (const [lift, sag] of [
+      [0, 0.3],
+      [12, 0.2],
+    ]) {
+      const points = [];
+      for (let k = 0; k <= 16; k += 1) {
+        const t = k / 16;
+        const z = a.z + (b.z - a.z) * t + lift - span * sag * 4 * t * (1 - t);
+        points.push([a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, z]);
+      }
+      props.tube(points, 2.4, CABLE, { sides: 6 });
+    }
+  });
   return props;
 }
 
