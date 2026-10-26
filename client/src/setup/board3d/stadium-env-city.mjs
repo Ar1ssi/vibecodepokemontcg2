@@ -69,8 +69,10 @@ const BEAM_LENGTH_PX = 1700;
 const CONCRETE = [0.26, 0.27, 0.31, 0.05];
 const COPING = [0.42, 0.43, 0.47, 0.15];
 const HUT_WALL = [0.34, 0.35, 0.39, 0.05];
-const DOOR_RED = [0.2, 0.035, 0.04, 0.2];
-const LAMP = [1.4, 1.1, 0.7, 2.6];
+const HUT_WINDOW = [0.06, 0.065, 0.08, 0.3];
+const DOOR_RED = [0.26, 0.06, 0.06, 0.2];
+/** The hut's lamp: a cold white floodlight, as in the art. */
+const LAMP = [1.4, 1.45, 1.5, 2.8];
 const MACHINE = [0.3, 0.32, 0.35, 0.4];
 const GRILLE = [0.06, 0.065, 0.075, 0.2];
 const HAZARD_YELLOW = [0.75, 0.6, 0.06, 1.7];
@@ -185,7 +187,13 @@ export function cityProps({ roof, hut, machines, towers }) {
   props.box({ x: hut.x + 10, y: hut.y + 18, z0: hut.h, z1: hut.h + 14, hw: 12, hh: 12, color: MACHINE });
   const doorX = hut.x - hut.w / 2 - 0.6;
   props.quad([doorX, hut.y + 20, 0], [doorX, hut.y - 20, 0], [doorX, hut.y - 20, 58], [doorX, hut.y + 20, 58], DOOR_RED);
-  props.box({ x: doorX - 3, y: hut.y, z0: 64, z1: 70, hw: 3, hh: 9, color: LAMP });
+  props.box({ x: doorX - 3, y: hut.y + 14, z0: 66, z1: 74, hw: 3, hh: 7, color: LAMP });
+  // Two small dark windows along the hut's side to the cards.
+  const sideY = hut.y + hut.d / 2 + 0.6;
+  for (const offset of [-18, 18]) {
+    const x0 = hut.x + offset - 10;
+    props.quad([x0, sideY, 38], [x0 + 20, sideY, 38], [x0 + 20, sideY, 52], [x0, sideY, 52], HUT_WINDOW);
+  }
   for (const machine of machines) {
     props.box({ x: machine.x, y: machine.y, z0: 0, z1: 34, hw: machine.w / 2, hh: machine.d / 2, color: MACHINE, topColor: MACHINE });
     // Two fans on top: a dark grille in a rim, three blades round a hub.
@@ -299,7 +307,9 @@ const ROOF = /* glsl */ `
 uniform vec4 uRoof;
 uniform vec4 uHut;
 const vec3 NEON_PINK = vec3(1.5, 0.16, 0.62);
-const vec3 LAMP_WARM = vec3(1.3, 0.95, 0.55);
+// The hut lamp's cold white light, and the streets' warm lamps far below.
+const vec3 HUT_LAMP = vec3(1.1, 1.15, 1.25);
+const vec3 STREET_LAMP = vec3(1.3, 0.95, 0.55);
 const vec3 NIGHT = vec3(0.03, 0.036, 0.07);
 // Signed px from the roof's edge, negative on it.
 float roofDistance(vec2 p) {
@@ -398,13 +408,13 @@ void main() {
     float neon = exp(-max(p.x - (uRoof.x - uRoof.z), 0.0) / 170.0) * smoothstep(-0.8, 0.4, (p.y - uRoof.y) / uRoof.w);
     col += NEON_PINK * neon * 0.1 * (0.92 + 0.08 * sin(uTime * 7.0) * step(0.7, fract(uTime * 0.13)));
     vec2 door = vec2(uHut.x - uHut.z - 30.0, uHut.y);
-    col += LAMP_WARM * exp(-dot(p - door, p - door) / (2.0 * 70.0 * 70.0)) * 0.35;
+    col += HUT_LAMP * exp(-dot(p - door, p - door) / (2.0 * 70.0 * 70.0)) * 0.35;
   } else {
     // The streets far below: dark, a few street lamps and car lights in the haze.
     col = NIGHT * 0.8 + vec3(0.02, 0.015, 0.03) * fbm3(p / 50.0);
     vec2 lampCell = floor(p / 60.0);
     float lamp = step(0.86, hash12(lampCell)) * (1.0 - smoothstep(1.0, 3.0, length(p - (lampCell + 0.5) * 60.0)));
-    col += LAMP_WARM * lamp * 0.6;
+    col += STREET_LAMP * lamp * 0.6;
   }
   vec2 edgeUv = min(vUv, 1.0 - vUv);
   col *= mix(0.3, 1.0, smoothstep(0.0, 0.05, min(edgeUv.x, edgeUv.y)));
@@ -583,7 +593,7 @@ vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
   vec3 col = albedo * (vec3(0.11, 0.125, 0.155) + vec3(0.18, 0.2, 0.25) * (0.5 + 0.5 * n.z));
   vec3 door = vec3(uHut.x - uHut.z - 26.0, uHut.y, 66.0);
   vec3 toLamp = door - world;
-  col += albedo * LAMP_WARM * max(dot(n, normalize(toLamp)), 0.0) * exp(-length(toLamp) / 90.0) * 1.4;
+  col += albedo * HUT_LAMP * max(dot(n, normalize(toLamp)), 0.0) * exp(-length(toLamp) / 90.0) * 1.4;
   float neon = exp(-max(world.x - (uRoof.x - uRoof.z), 0.0) / 170.0);
   col += albedo * NEON_PINK * neon * 0.25 * max(-n.x * 0.5 + 0.5, 0.0);
   vec3 view = normalize(uEye - world);
