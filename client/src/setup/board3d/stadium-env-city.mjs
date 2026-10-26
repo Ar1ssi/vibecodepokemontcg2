@@ -64,7 +64,7 @@ const TOWERS = [
  * presets see it whole. Its place along that side (share of the roof's half height), street gap,
  * radius, height to its roof (the lantern rises over it).
  */
-const ROUND_TOWER = { at: 0.55, gap: 34, r: 95, height: 200 };
+const ROUND_TOWER = { at: 0.55, gap: 34, r: 95, height: 150 };
 /**
  * The searchlights, as the art's long shafts crossing in pairs over the skyline, never across the
  * cards. All stand on tower roofs (`tower`: its TOWERS index, `at` shares of its half size), the
@@ -96,7 +96,7 @@ const SIGN_POST = [0.12, 0.13, 0.15, 0.4];
  * The ads on the towers' faces: px up the face its foot stands, px up the face it runs (across the
  * screen in the tilted preset, foreshortened about 0.4), px along the face (up the screen).
  */
-const WALL_BOARD_PX = { foot: 40, across: 190, along: 64 };
+const WALL_BOARD_PX = { foot: 30, across: 210, along: 120 };
 
 const CONCRETE = [0.26, 0.27, 0.31, 0.05];
 const COPING = [0.42, 0.43, 0.47, 0.15];
@@ -492,19 +492,19 @@ void main() {
     // seams, a soft stain here and there; the moonlight falls brighter toward the far side.
     vec2 slab = abs(mod(p + 150.0, 300.0) - 150.0);
     float slabTone = 0.95 + 0.1 * hash12(floor((p + 150.0) / 300.0));
-    col = vec3(0.088, 0.1, 0.122) * (0.9 + 0.2 * fbm3(p / 90.0)) * slabTone;
+    col = vec3(0.11, 0.125, 0.15) * (0.94 + 0.12 * fbm3(p / 90.0)) * slabTone;
     col *= 0.96 + 0.06 * gnoise(p / 4.0);
     col *= mix(0.85, 1.12, smoothstep(-1.0, 1.0, (p.y - uRoof.y) / uRoof.w));
-    col = mix(col, vec3(0.04, 0.042, 0.05), (1.0 - smoothstep(0.8, 2.0, min(slab.x, slab.y))) * 0.3);
+    col = mix(col, vec3(0.04, 0.042, 0.05), (1.0 - smoothstep(0.8, 2.0, min(slab.x, slab.y))) * 0.15);
     col = mix(col, col * 0.78, smoothstep(0.74, 0.8, fbm3(p / 70.0 + 9.0)) * 0.7);
     col = mix(col * 0.5, col, smoothstep(0.3, 0.9, light.b));
     // As in the art: a dull red glow along the roof's lower-left edge; the hut lamp's cold light
     // spreading over the roof before its face, a red light at the hut's far end.
     vec2 fromCorner = vec2(p.x - (uRoof.x - uRoof.z), p.y - (uRoof.y - uRoof.w));
-    float lowerLeft = exp(-fromCorner.x / 46.0) * (1.0 - smoothstep(0.0, uRoof.w * 1.2, fromCorner.y));
-    col += vec3(0.72, 0.16, 0.3) * lowerLeft * 0.3;
-    vec2 pool = (p - vec2(uHut.x - uHut.z - 44.0, uHut.y - uHut.w * 0.55)) / vec2(42.0, 66.0);
-    col += HUT_LAMP * exp(-dot(pool, pool)) * 0.32;
+    float lowerLeft = exp(-fromCorner.x / 80.0) * (1.0 - smoothstep(0.0, uRoof.w * 1.3, fromCorner.y));
+    col += vec3(0.72, 0.16, 0.3) * lowerLeft * 0.38;
+    vec2 pool = (p - vec2(uHut.x - uHut.z - 60.0, uHut.y - uHut.w * 0.3)) / vec2(120.0, 150.0);
+    col += HUT_LAMP * exp(-dot(pool, pool)) * 0.26;
     vec2 red = (p - vec2(uHut.x - uHut.z - 18.0, uHut.y + uHut.w * 0.8)) / vec2(36.0, 22.0);
     col += HUT_RED * exp(-dot(red, red)) * 0.18;
   } else {
