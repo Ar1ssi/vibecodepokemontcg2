@@ -94,7 +94,7 @@ vec3 gateAt(float u, float h) {
 // between white piers, panel seams, a cyan light strip near the top under a pale cornice.
 vec3 wallPaint(float u, float h, float far, out vec3 glow) {
   glow = vec3(0.0);
-  vec3 col = vec3(0.8, 0.82, 0.86);
+  vec3 col = vec3(0.7, 0.72, 0.75);
   // Panel seams over the vents: one above each pier, and one across the panels.
   float pier = abs(mod(u + 85.0, 170.0) - 85.0);
   col = mix(col, vec3(0.46, 0.48, 0.52), (1.0 - smoothstep(0.8, 2.0, pier)) * step(96.0, h));
@@ -197,7 +197,7 @@ vec3 ceilingAt(vec2 q) {
   vec4 panel = hexTile(q / ${CEILING_HEX_PX}.0);
   // Seen in a polished floor the panels' frames soften to grey.
   float lit = smoothstep(0.04, 0.1, panel.x);
-  return mix(vec3(0.45, 0.48, 0.53), vec3(1.15, 1.2, 1.27), lit);
+  return mix(vec3(0.4, 0.42, 0.44), vec3(0.86, 0.89, 0.91), lit);
 }
 // What the glossy floor mirrors at p: the nearest wall the mirrored ray meets below the wall's top,
 // else the ceiling over the hall.
@@ -228,13 +228,13 @@ void main() {
   vec2 q = (p - uHall.xy) / ${HEX_SCALE_PX}.0;
   vec4 tile = hexTile(q);
   float edgePx = tile.x * ${HEX_SCALE_PX}.0;
-  vec3 col = mix(vec3(0.7, 0.725, 0.76), vec3(0.76, 0.785, 0.82), tile.y);
+  vec3 col = mix(vec3(0.57, 0.59, 0.6), vec3(0.64, 0.66, 0.67), tile.y);
   float seam = 1.0 - smoothstep(0.6, 1.5, edgePx);
   vec2 rel = abs(p - uHall.xy);
   float bigHex = max(rel.y, dot(rel, vec2(0.8660254, 0.5))) - uBigHex;
   float band = 1.0 - smoothstep(-0.5, 0.8, abs(bigHex) - 7.0);
   float hatch = step(0.5, fract(dot(p, vec2(0.7071, 0.7071)) / 7.0));
-  col = mix(col, mirroredAt(p) * 0.92, 0.5 * (1.0 - seam) * (1.0 - band));
+  col = mix(col, mirroredAt(p) * 0.92, 0.45 * (1.0 - seam) * (1.0 - band));
   col = mix(col, vec3(0.52, 0.55, 0.6), seam * 0.6 * (1.0 - band));
   col = mix(col, mix(vec3(0.03, 0.032, 0.038), vec3(0.16, 0.17, 0.19), hatch), band);
 
