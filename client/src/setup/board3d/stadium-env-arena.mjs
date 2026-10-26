@@ -482,22 +482,31 @@ varying float vLaser;
 ${NOISE}
 varying float vOutside;
 void main() {
-  // Each laser shines from the rig over a corner of the arena down onto the stands along one of
-  // that corner's sides, the spot sweeping slowly along them; never across the ring.
+  // As in the art, the rig high over the ring fans lasers out to the crowd all round (even lasers),
+  // and lights at the corners criss-cross the arena to the stands on the far side (odd ones); every
+  // spot sweeps slowly. Over the ring they dim, so the cards' gaps don't flicker with them.
   float k = aBeam.z;
-  vec2 corner = vec2(mod(k, 2.0) < 0.5 ? -1.0 : 1.0, mod(floor(k / 2.0), 2.0) < 0.5 ? -1.0 : 1.0);
-  bool alongX = mod(floor(k / 4.0), 2.0) < 0.5;
-  vec2 reach = uBoards + 30.0;
-  vec3 source = vec3(uRing.xy + corner * reach, ${LASER_FROM_Z}.0);
-  float sweep = uTime * (0.1 + 0.07 * hash12(vec2(k, 2.0))) + hash12(vec2(k, 3.0)) * 6.28;
-  float slide = 0.15 + 0.7 * (0.5 + 0.5 * sin(sweep));
-  vec2 target = alongX
-    ? vec2(uRing.x + corner.x * reach.x * (1.0 - 2.0 * slide), uRing.y + corner.y * (reach.y + 40.0))
-    : vec2(uRing.x + corner.x * (reach.x + 40.0), uRing.y + corner.y * reach.y * (1.0 - 2.0 * slide));
-  vec3 to = vec3(target, 20.0);
+  float sweep = uTime * (0.08 + 0.06 * hash12(vec2(k, 2.0))) + hash12(vec2(k, 3.0)) * 6.28;
+  vec2 stands = uBoards + 70.0;
+  vec3 source;
+  vec2 dir;
+  if (mod(k, 2.0) < 0.5) {
+    source = vec3(uRing.xy + (hash22(vec2(k, 5.0)) - 0.5) * 60.0, ${LASER_FROM_Z}.0);
+    float angle = hash12(vec2(k, 4.0)) * 6.2831853 + 0.6 * sin(sweep);
+    dir = vec2(cos(angle), sin(angle));
+  } else {
+    vec2 corner = vec2(hash12(vec2(k, 6.0)) < 0.5 ? -1.0 : 1.0, hash12(vec2(k, 7.0)) < 0.5 ? -1.0 : 1.0);
+    source = vec3(uRing.xy + corner * (uBoards + 140.0), ${LASER_FROM_Z - 120}.0);
+    float angle = atan(-corner.y, -corner.x) + 0.55 * sin(sweep);
+    dir = vec2(cos(angle), sin(angle));
+  }
+  // Where the line from the middle along dir meets the stands' rectangle.
+  vec2 hitAt = stands / max(abs(dir), vec2(0.0001));
+  vec2 target = uRing.xy + dir * min(hitAt.x, hitAt.y);
+  vec3 to = vec3(target, 24.0);
   vec3 here = mix(source, to, aBeam.x);
-  vec2 q = abs(here.xy - uRing.xy) - uRing.zw - 60.0;
-  vOutside = smoothstep(0.0, 40.0, max(q.x, q.y));
+  vec2 q = abs(here.xy - uRing.xy) - uRing.zw - 40.0;
+  vOutside = mix(0.12, 1.0, smoothstep(0.0, 60.0, max(q.x, q.y)));
   vec4 view = modelViewMatrix * vec4(here, 1.0);
   vec2 tangent = (modelViewMatrix * vec4(to - source, 0.0)).xy;
   vec2 across = length(tangent) > 0.0001 ? normalize(vec2(-tangent.y, tangent.x)) : vec2(1.0, 0.0);
@@ -518,8 +527,8 @@ void main() {
   float which = mod(vLaser, 5.0);
   vec3 tint = which < 0.5 ? vec3(0.3, 1.4, 0.4) : which < 1.5 ? vec3(1.4, 0.3, 1.1) : which < 2.5 ? vec3(1.4, 1.2, 0.3) : which < 3.5 ? vec3(1.3, 1.4, 1.5) : vec3(0.3, 0.6, 1.5);
   float core = exp(-vBeam.y * vBeam.y * 3.0);
-  // Brightest where it reaches the arena, fading up into the haze toward the rig.
-  float fade = smoothstep(0.05, 0.75, vBeam.x) * vOutside;
+  // Brightest where it reaches the crowd, fading up into the haze toward the rig.
+  float fade = smoothstep(0.0, 0.6, vBeam.x) * vOutside;
   float shown = smoothstep(0.6, 1.0, uReveal) * (1.0 - uExit);
   gl_FragColor = vec4(tint * core * fade * 0.75 * shown, 1.0);
 ${OUTPUT}
