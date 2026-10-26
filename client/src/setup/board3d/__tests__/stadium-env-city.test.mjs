@@ -50,14 +50,13 @@ test('citySpots: every card lies on the roof, the hut clear of the cards and the
   assert.equal(citySpots(null), null);
 });
 
-test('citySpots: every searchlight stands on a tower roof or in a street clear of the towers, off the cards\' roof', () => {
+test('citySpots: every searchlight stands on a tower roof, off the cards\' roof', () => {
   for (const layout of layouts) {
     const { roof, towers, beams } = citySpots(layout);
     assert.equal(beams.length, 6);
     for (const beam of beams) {
       const under = towers.filter((tower) => Math.abs(beam.x - tower.x) <= tower.w / 2 && Math.abs(beam.y - tower.y) <= tower.d / 2);
-      if (beam.z > 0) assert.ok(under.length === 1 && beam.z > under[0].height, 'on a tower roof');
-      else assert.equal(under.length, 0, 'in a street, clear of every tower');
+      assert.ok(under.length === 1 && beam.z > under[0].height, 'on a tower roof');
       assert.ok(Math.abs(beam.x - roof.x) > roof.hw || Math.abs(beam.y - roof.y) > roof.hh, 'off the cards\' roof');
     }
   }

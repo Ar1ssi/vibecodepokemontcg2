@@ -66,21 +66,22 @@ const TOWERS = [
  */
 const ROUND_TOWER = { at: 0.55, gap: 34, r: 95, height: 200 };
 /**
- * The searchlights, as the art's shafts sweeping the night sky, never across the cards. Two stand on
- * the side towers' roofs (`tower`: its TOWERS index, `at` shares of its half size) and climb low
- * along the sides toward the far side: the top-down preset sees them. Two stand down in the streets
- * between the roof's building and the side towers (`at` shares of the roof's half size), two a side,
- * and climb toward the far side, away from the eye, rising past the towers' tops as the art's rise
- * behind its buildings, where the tilted preset sees them. Each its
+ * The searchlights, as the art's long shafts crossing in pairs over the skyline, never across the
+ * cards. All stand on tower roofs (`tower`: its TOWERS index, `at` shares of its half size), the
+ * side pairs on the tallest towers, up in the open sky where no tower hides them, and climb gently
+ * so they run on across the bands both presets see: over each side band a pair crossing in an X
+ * (the inner one bearing outward as it runs toward the far side, the outer one inward), and over the
+ * far skyline a pair fanning out. The tilted preset sees almost no sky (the towers' tops lean out of
+ * its view), so these show in the top-down preset. Each its
  * sweep's centre (rad), how steeply it climbs (rad) and phase.
  */
 const BEAMS = [
-  { tower: 1, at: [0.0, -0.85], heading: 1.75, tip: 0.32, phase: 0 },
-  { tower: 3, at: [0.0, -0.85], heading: 1.4, tip: 0.32, phase: 2.3 },
-  { at: [-1.03, 0.16], heading: 1.75, tip: 0.6, phase: 4.1 },
-  { at: [1.03, 0.22], heading: 1.4, tip: 0.6, phase: 1.2 },
-  { at: [-1.03, -0.42], heading: 1.95, tip: 0.5, phase: 3.3 },
-  { at: [1.03, -0.48], heading: 1.2, tip: 0.5, phase: 5.2 },
+  { tower: 1, at: [0.6, -0.4], heading: 1.8, tip: 0.16, phase: 0 },
+  { tower: 1, at: [-0.6, -0.4], heading: 1.34, tip: 0.16, phase: 2.3 },
+  { tower: 3, at: [-0.6, -0.6], heading: 1.34, tip: 0.16, phase: 4.1 },
+  { tower: 3, at: [0.6, -0.6], heading: 1.8, tip: 0.16, phase: 1.2 },
+  { tower: 5, at: [-0.6, 0.0], heading: 2.55, tip: 0.2, phase: 3.3 },
+  { tower: 5, at: [0.6, 0.0], heading: 0.6, tip: 0.2, phase: 5.2 },
 ];
 /** A searchlight's shaft length, and its lamp's height over the tower's roof. */
 const BEAM_LENGTH_PX = 1250;
@@ -89,7 +90,7 @@ const BEAM_LAMP_PX = 22;
  * The billboards on the side towers' roofs: their extent along the table (most), the design's width
  * over its height, how far they lean back (rad above level), how high their foot stands on its posts.
  */
-const BILLBOARD_PX = { span: 130, aspect: 1.6, slope: 1.0, lift: 18 };
+const BILLBOARD_PX = { span: 130, aspect: 1.6, slope: 1.35, lift: 18 };
 const SIGN_POST = [0.12, 0.13, 0.15, 0.4];
 /**
  * The ads on the towers' faces: px up the face its foot stands, px up the face it runs (across the
@@ -103,6 +104,8 @@ const COPING = [0.42, 0.43, 0.47, 0.15];
 const HUT_WALL = [0.52, 0.53, 0.57, 0.05];
 const HUT_FACE_LIT = [0.345, 0.416, 0.496, 2.0];
 const HUT_ROOF = [0.66, 0.68, 0.72, 0.05];
+/** The art's red-magenta wash on the roof's left low wall, (184,64,90). */
+const PARAPET_RED = [0.8, 0.12, 0.24, 1.6];
 const HUT_WINDOW = [0.06, 0.065, 0.08, 0.3];
 /** The art's maroon door. */
 const DOOR_RED = [0.3, 0.07, 0.08, 0.2];
@@ -160,9 +163,6 @@ export function citySpots(layout) {
     height: ROUND_TOWER.height,
   };
   const beams = BEAMS.map(({ tower: index, at: [u, v], heading, tip, phase }) => {
-    if (index === undefined) {
-      return { x: roof.x + u * roof.hw, y: roof.y + v * roof.hh, z: -STREET_PX + BEAM_LAMP_PX, heading, tip, phase };
-    }
     const tower = towers[index];
     return { x: tower.x + (u * tower.w) / 2, y: tower.y + (v * tower.d) / 2, z: tower.height + BEAM_LAMP_PX, heading, tip, phase };
   });
@@ -184,7 +184,7 @@ export function cityProps({ roof, hut, towers, round, beams = [] }) {
   // Each searchlight: a dark drum on a stand, its lens lit.
   for (const beam of beams) {
     props.cylinder({ x: beam.x, y: beam.y, z0: beam.z - BEAM_LAMP_PX, z1: beam.z - 8, r: 4, color: MACHINE, sides: 8 });
-    props.cylinder({ x: beam.x, y: beam.y, z0: beam.z - 8, z1: beam.z + 4, r: 11, color: [0.08, 0.085, 0.1, 0.5], sides: 16, capColor: LAMP });
+    props.cylinder({ x: beam.x, y: beam.y, z0: beam.z - 8, z1: beam.z + 4, r: 9, color: [0.08, 0.085, 0.1, 0.5], sides: 16 });
   }
   for (const tower of towers) {
     // A low parapet round every tower's roof.
@@ -238,19 +238,25 @@ export function cityProps({ roof, hut, towers, round, beams = [] }) {
     { x: lo.x + t, y: roof.y, hw: t, hh: roof.hh - 2 * t },
     { x: hi.x - t, y: roof.y, hw: t, hh: roof.hh - 2 * t },
   ];
-  for (const wall of walls) {
-    props.box({ ...wall, z0: 0, z1: PARAPET.height, color: CONCRETE, topColor: COPING });
-  }
-  // The hut, as the art's: low concrete walls, a flat roof with a vent; on its face to the near
-  // parapet a maroon door at its left end under a bright lamp, two dark windows along the rest.
-  props.box({ x: hut.x, y: hut.y, z0: 0, z1: hut.h, hw: hut.w / 2, hh: hut.d / 2, color: HUT_WALL, topColor: HUT_ROOF, frontColor: HUT_FACE_LIT });
+  walls.forEach((wall, i) => {
+    if (i !== 2) {
+      props.box({ ...wall, z0: 0, z1: PARAPET.height, color: CONCRETE, topColor: COPING });
+      return;
+    }
+    // The left parapet, turned so its face to the roof takes the art's red-magenta wash.
+    props.box({ x: wall.x, y: wall.y, z0: 0, z1: PARAPET.height, hw: wall.hh, hh: wall.hw, yaw: Math.PI / 2, color: CONCRETE, topColor: COPING, frontColor: PARAPET_RED });
+  });
+  // The hut, as the art's: low concrete walls, a flat roof with a vent; on its face to the cards (the
+  // face both presets see) a maroon door at its near end under a bright lamp, two dark windows
+  // along the rest. The box is turned so that face takes the lamp's light.
+  props.box({ x: hut.x, y: hut.y, z0: 0, z1: hut.h, hw: hut.d / 2, hh: hut.w / 2, yaw: -Math.PI / 2, color: HUT_WALL, topColor: HUT_ROOF, frontColor: HUT_FACE_LIT });
   props.box({ x: hut.x + 14, y: hut.y + hut.d * 0.2, z0: hut.h, z1: hut.h + 12, hw: 12, hh: 14, color: MACHINE });
-  const faceY = hut.y - hut.d / 2 - 0.6;
-  const doorX = hut.x - hut.w / 2 + 10;
-  props.quad([doorX, faceY, 0], [doorX + 30, faceY, 0], [doorX + 30, faceY, 34], [doorX, faceY, 34], DOOR_RED);
-  props.box({ x: doorX + 15, y: faceY - 3, z0: 37, z1: 41, hw: 8, hh: 3, color: LAMP });
-  for (const x0 of [hut.x + 2, hut.x + 28]) {
-    props.quad([x0, faceY, 16], [x0 + 20, faceY, 16], [x0 + 20, faceY, 28], [x0, faceY, 28], HUT_WINDOW);
+  const faceX = hut.x - hut.w / 2 - 0.6;
+  const doorY = hut.y - hut.d / 2 + 10;
+  props.quad([faceX, doorY + 30, 0], [faceX, doorY, 0], [faceX, doorY, 34], [faceX, doorY + 30, 34], DOOR_RED);
+  props.box({ x: faceX - 3, y: doorY + 15, z0: 37, z1: 41, hw: 3, hh: 8, color: LAMP });
+  for (const y0 of [hut.y - 4, hut.y + 24]) {
+    props.quad([faceX, y0 + 20, 16], [faceX, y0, 16], [faceX, y0, 28], [faceX, y0 + 20, 28], HUT_WINDOW);
   }
   // The round tower, as the art's: a pale ledge round every floor, and on its roof a lantern of
   // white-lit glass under a dark dome.
@@ -393,7 +399,7 @@ uniform vec4 uHut;
 const vec3 NEON_PINK = vec3(1.5, 0.16, 0.62);
 // The hut lamp's cold white light, and the streets' warm lamps far below.
 const vec3 HUT_LAMP = vec3(1.1, 1.15, 1.25);
-// The red light at the right end of the hut's face, as the art's.
+// The red light at the far end of the hut's face to the cards, as the art's.
 const vec3 HUT_RED = vec3(1.3, 0.08, 0.1);
 const vec3 STREET_LAMP = vec3(1.3, 0.95, 0.55);
 const vec3 NIGHT = vec3(0.03, 0.036, 0.07);
@@ -448,11 +454,11 @@ vec3 windowAt(float along, float up, float seed) {
   float restless = step(0.89, hash12(cell * 2.3 + seed));
   float hour = floor(uTime / 9.0 + hash12(cell * 5.1 + seed) * 9.0);
   roll = mix(roll, hash12(cell + seed * 131.0 + hour * 7.13), restless);
-  return vec3(pane, step(roll, 0.14) * (0.6 + 0.5 * hash12(cell * 1.7 + seed)), step(0.78, hash12(cell * 3.1 + seed)));
+  return vec3(pane, step(roll, 0.2) * (0.6 + 0.5 * hash12(cell * 1.7 + seed)), step(0.78, hash12(cell * 3.1 + seed)));
 }
 vec3 facadeColor(vec3 wall, float along, float up, float seed) {
   vec3 w = windowAt(along, up, seed);
-  vec3 lamp = mix(vec3(0.92, 1.05, 0.7), vec3(1.1, 1.0, 0.8), w.z);
+  vec3 lamp = mix(vec3(0.82, 1.02, 0.5), vec3(0.95, 1.05, 0.62), w.z);
   // Dark glass only a little darker than the wall, as the art's, so the facade doesn't read as a checkerboard.
   vec3 glass = mix(wall * 0.55 + vec3(0.004, 0.006, 0.012), lamp, w.y);
   return mix(wall, glass, w.x);
@@ -495,18 +501,17 @@ void main() {
     // As in the art: a dull red glow along the roof's lower-left edge; the hut lamp's cold light
     // spreading over the roof before its face, a red light at the hut's far end.
     vec2 fromCorner = vec2(p.x - (uRoof.x - uRoof.z), p.y - (uRoof.y - uRoof.w));
-    float lowerLeft = exp(-fromCorner.x / 40.0) * (1.0 - smoothstep(0.0, uRoof.w * 0.9, fromCorner.y));
-    col += HUT_RED * 0.5 * lowerLeft * 0.25;
-    vec2 pool = (p - vec2(uHut.x - uHut.z * 0.3, uHut.y - uHut.w - 46.0)) / vec2(70.0, 44.0);
+    float lowerLeft = exp(-fromCorner.x / 46.0) * (1.0 - smoothstep(0.0, uRoof.w * 1.2, fromCorner.y));
+    col += vec3(0.72, 0.16, 0.3) * lowerLeft * 0.3;
+    vec2 pool = (p - vec2(uHut.x - uHut.z - 44.0, uHut.y - uHut.w * 0.55)) / vec2(42.0, 66.0);
     col += HUT_LAMP * exp(-dot(pool, pool)) * 0.32;
-    vec2 red = (p - vec2(uHut.x + uHut.z + 10.0, uHut.y - uHut.w + 20.0)) / vec2(16.0, 40.0);
-    col += HUT_RED * exp(-dot(red, red)) * 0.16;
+    vec2 red = (p - vec2(uHut.x - uHut.z - 18.0, uHut.y + uHut.w * 0.8)) / vec2(36.0, 22.0);
+    col += HUT_RED * exp(-dot(red, red)) * 0.18;
   } else {
-    // The streets far below: dark, a few street lamps and car lights in the haze.
-    col = NIGHT * 0.8 + vec3(0.02, 0.015, 0.03) * fbm3(p / 50.0);
-    vec2 lampCell = floor(p / 60.0);
-    float lamp = step(0.86, hash12(lampCell)) * (1.0 - smoothstep(1.0, 3.0, length(p - (lampCell + 0.5) * 60.0)));
-    col += STREET_LAMP * lamp * 0.6;
+    // Down between the buildings, the art's night: near-black blue-violet under a soft purple-grey
+    // haze drifting through (street lamps from above read as stars).
+    float haze = fbm3((p + vec2(uTime * 6.0, uTime * 2.0)) / 260.0);
+    col = mix(vec3(0.016, 0.015, 0.034), vec3(0.06, 0.054, 0.085), smoothstep(0.35, 0.8, haze));
   }
   vec2 edgeUv = min(vUv, 1.0 - vUv);
   col *= mix(0.3, 1.0, smoothstep(0.0, 0.05, min(edgeUv.x, edgeUv.y)));
@@ -655,7 +660,7 @@ varying vec2 vBeam;
 void main() {
   // Each light sweeps slowly to and fro out over the city, tipped up, so its shaft climbs away into
   // the sky as the art's.
-  float sweep = aSource.z + 0.3 * sin(uTime * 0.21 + aSource.w);
+  float sweep = aSource.z + 0.12 * sin(uTime * 0.21 + aSource.w);
   float tip = aBeam.w + 0.06 * sin(uTime * 0.17 + aSource.w * 1.7);
   vec3 axis = normalize(vec3(cos(sweep) * cos(tip), sin(sweep) * cos(tip), sin(tip)));
   vec3 source = vec3(aSource.xy, aBeam.z);
@@ -679,7 +684,7 @@ void main() {
   float across = 1.0 - vBeam.y * vBeam.y;
   float core = exp(-vBeam.y * vBeam.y * 6.0) * across;
   float shaft = across * across * 0.45 + core;
-  float fade = smoothstep(0.0, 0.04, vBeam.x) * (1.0 - smoothstep(0.1, 0.95, vBeam.x));
+  float fade = smoothstep(0.0, 0.04, vBeam.x) * (1.0 - smoothstep(0.55, 1.0, vBeam.x));
   float shown = smoothstep(0.6, 1.0, uReveal) * (1.0 - uExit);
   gl_FragColor = vec4(vec3(0.62, 0.74, 1.0) * shaft * fade * 0.6 * shown, 1.0);
 ${OUTPUT}
@@ -690,9 +695,9 @@ ${OUTPUT}
 const PROP_LIGHT = /* glsl */ `
 vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
   vec3 col = albedo * (vec3(0.11, 0.125, 0.155) + vec3(0.18, 0.2, 0.25) * (0.5 + 0.5 * n.z));
-  vec3 toLamp = vec3(uHut.x - uHut.z + 25.0, uHut.y - uHut.w - 12.0, 39.0) - world;
+  vec3 toLamp = vec3(uHut.x - uHut.z - 12.0, uHut.y - uHut.w + 25.0, 39.0) - world;
   col += albedo * HUT_LAMP * max(dot(n, normalize(toLamp)), 0.0) * exp(-length(toLamp) / 90.0) * 1.4;
-  vec3 toRed = vec3(uHut.x + uHut.z - 10.0, uHut.y - uHut.w - 22.0, 24.0) - world;
+  vec3 toRed = vec3(uHut.x - uHut.z - 22.0, uHut.y + uHut.w - 10.0, 24.0) - world;
   col += albedo * HUT_RED * max(dot(n, normalize(toRed)), 0.0) * exp(-length(toRed) / 60.0) * 1.6;
 
   vec3 view = normalize(uEye - world);
