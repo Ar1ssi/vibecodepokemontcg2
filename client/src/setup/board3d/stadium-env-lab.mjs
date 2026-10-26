@@ -32,7 +32,7 @@ export const LAB_KEY = 'full-metal-lab';
 export const DAIS_MARGIN_PX = 34;
 /** Steel kept round a Prize block or pile on its docking pad. */
 export const PAD_MARGIN_PX = 26;
-const PAD_CORNER_PX = 14;
+const PAD_CORNER_PX = 26;
 // Wide enough that the railing runs on round a docking pad's join without a kink.
 const PAD_BLEND_PX = 80;
 export const MAX_PADS = 6;
@@ -78,7 +78,7 @@ const STEEL = [0.72, 0.8, 0.84, 0.85];
 const BLUE_STEEL = [0.55, 0.68, 0.76, 0.85];
 const DARK_STEEL = [0.32, 0.35, 0.4, 0.7];
 const PIPE = [0.42, 0.54, 0.6, 0.85];
-const BIG_PIPE_STEEL = [0.24, 0.38, 0.45, 0.85];
+const BIG_PIPE_STEEL = [0.36, 0.46, 0.54, 0.85];
 const CABLE = [0.03, 0.03, 0.035, 0.3];
 /** Cable runs on the dais's band: start turn (deg), span (deg), a wobble seed. */
 const CABLE_RUNS = [
@@ -784,7 +784,7 @@ vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
   // stripe along the pipe's crown.
   vec3 view = normalize(uEye - world);
   vec3 r = reflect(-view, n);
-  vec3 env = mix(vec3(0.03, 0.06, 0.1), vec3(0.14, 0.22, 0.28), smoothstep(-0.7, -0.06, r.z));
+  vec3 env = mix(vec3(0.07, 0.11, 0.16), vec3(0.22, 0.3, 0.38), smoothstep(-0.7, -0.06, r.z));
   env = mix(env, vec3(0.62, 0.72, 0.78), smoothstep(-0.06, 0.0, r.z));
   env = mix(env, vec3(0.36, 0.45, 0.5), smoothstep(0.08, 0.5, r.z));
   env += vec3(0.5, 0.62, 0.68) * smoothstep(0.85, 1.0, sin(atan(r.y, r.x) * 5.0)) * smoothstep(0.0, 0.2, r.z) * (1.0 - smoothstep(0.5, 0.8, r.z));
