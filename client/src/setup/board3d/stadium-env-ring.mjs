@@ -42,8 +42,8 @@ const STONE_SPACING_PX = 175;
 const BRICK_PX = { long: 46, high: 23 };
 /** The two rope strands: height on the stones (share of each stone's height), sag, thickness, turns round each stone. */
 const ROPES = [
-  { at: 0.52, sag: 30, radius: 3.6, wraps: 3 },
-  { at: 0.3, sag: 22, radius: 3.2, wraps: 2 },
+  { at: 0.52, sag: 30, radius: 4.2, wraps: 2 },
+  { at: 0.3, sag: 22, radius: 3.8, wraps: 1 },
 ];
 /** The chain: which stone it hangs from (turn round the ring, rad), how many links, link size. */
 const CHAIN = { angle: Math.PI * 1.19, links: 15, length: 50, width: 28, thick: 6 };
@@ -161,8 +161,11 @@ export function ringSpots(layout) {
 const standingStone = (props, stone) => {
   const sides = 10;
   const levels = [0, 0.3, 0.55, 0.72, 0.84, 0.93, 0.98, 1];
+  // About one stone in three ends in a broken slanted top, as some of the art's do.
+  const broken = hashOf(stone.index * 13 + 5) < 0.35;
+  const slant = (hashOf(stone.index * 7 + 2) - 0.5) * 0.5;
   const rings = levels.map((t, level) => {
-    const dome = t < 0.72 ? 1 : Math.sqrt(Math.max(0, 1 - ((t - 0.72) / 0.28) ** 2));
+    const dome = broken ? 1 : t < 0.72 ? 1 : Math.sqrt(Math.max(0, 1 - ((t - 0.72) / 0.28) ** 2));
     const taper = (1.08 - 0.22 * t) * Math.max(dome, level === levels.length - 1 ? 0.12 : 0);
     const lean = stone.lean * t * stone.height;
     return Array.from({ length: sides }, (_, k) => {
@@ -174,10 +177,13 @@ const standingStone = (props, stone) => {
       const v = Math.sin(angle) * r * stone.flat;
       const c = Math.cos(stone.yaw);
       const sn = Math.sin(stone.yaw);
-      return [stone.x + u * c - v * sn + lean, stone.y + u * sn + v * c, stone.height * t];
+      // A broken stone stops at 0.86 of its height, its top ring tilted into a slanted face.
+      const rise = broken ? Math.min(t, 0.86) : t;
+      const tilt = broken && level === levels.length - 1 ? (u * slant * stone.height) / Math.max(stone.radius, 1) / 4 : 0;
+      return [stone.x + u * c - v * sn + lean, stone.y + u * sn + v * c, stone.height * rise + tilt];
     });
   });
-  const tone = 0.85 + 0.3 * stone.seed;
+  const tone = 0.7 + 0.45 * stone.seed;
   const color = [GREY_STONE[0] * tone, GREY_STONE[1] * tone, GREY_STONE[2] * tone, GREY_STONE[3]];
   for (let level = 0; level < rings.length - 1; level += 1) {
     for (let k = 0; k < sides; k += 1) {
@@ -324,9 +330,9 @@ const RING = /* glsl */ `
 // The arena: centre x, y and its paving's radius (ringSpots).
 uniform vec3 uRing;
 uniform vec3 uEmblem;
-// The Poke Ball in the paving, as in the art: a broad disc of pale stone sunk in a dark groove,
-// a dark band across it, the button a broad dark ring round a pale core. x: 1 on pale stone,
-// 2 on dark stone, 0 off it; y px from its outline (negative inside).
+// The emblem in the paving, as in the art: a broad disc of pale stone sunk in a dark groove, a dark
+// ring round its pale centre (no band across it). x: 1 on pale stone, 2 on dark stone, 0 off it;
+// y px from its outline (negative inside).
 vec2 emblemInlay(vec2 p) {
   if (uEmblem.z <= 0.0) return vec2(0.0, 100000.0);
   vec2 rel = p - uEmblem.xy;
@@ -335,9 +341,8 @@ vec2 emblemInlay(vec2 p) {
   if (outline > 6.0) return vec2(0.0, outline);
   float buttonR = uEmblem.z * 0.3;
   bool groove = outline > -2.0;
-  bool band = abs(rel.y) < uEmblem.z * 0.06 && r > buttonR;
   bool buttonRing = r > buttonR * 0.55 && r < buttonR;
-  return vec2(groove || band || buttonRing ? 2.0 : 1.0, outline);
+  return vec2(groove || buttonRing ? 2.0 : 1.0, outline);
 }
 `;
 
@@ -391,10 +396,10 @@ void main() {
     float beyond = d;
     float land = 2.0 + 6.0 * fbm3(p / 70.0) + 2.0 * (gnoise(p / 9.0) - 0.5)
       + 26.0 * smoothstep(120.0, 520.0, beyond) * fbm3(p / 160.0 + 4.0);
-    vec3 boulder = stones(p + 17.0, 64.0, 4.0);
-    float share = mix(0.88, 0.76, smoothstep(100.0, 400.0, beyond));
+    vec3 boulder = stones(p + 17.0, 52.0, 6.0);
+    float share = mix(0.92, 0.84, smoothstep(100.0, 400.0, beyond));
     float scatter = step(share, fract(boulder.y * 13.1)) * smoothstep(10.0, 30.0, beyond);
-    h = land + boulder.x * 22.0 * scatter;
+    h = land + sqrt(boulder.x) * 14.0 * scatter;
     // B: a boulder's tone 0.6..1, plain ground 0.3.
     id = scatter > 0.5 ? 0.6 + 0.4 * boulder.y : 0.3;
     kind = 1.0;
