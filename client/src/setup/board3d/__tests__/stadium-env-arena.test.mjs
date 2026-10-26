@@ -8,15 +8,21 @@ import {
   ARENA_KEY,
   BAKE_FIELD_FRAGMENT,
   BOARD_FRAGMENT,
+  GLINT_FRAGMENT,
+  GLINT_VERTEX,
   LASER_COUNT,
   LASER_VERTEX,
   PROP_FRAGMENT,
+  RIG_PX,
   RING_GAP_PX,
   TERRAIN_FRAGMENT,
   adBoardGeometry,
   arenaProps,
   arenaSpots,
+  glintGeometry,
   laserGeometry,
+  rigLamps,
+  rigOutline,
 } from '../stadium-env-arena.mjs';
 
 // Every mat profile (the no-mat default, the simulator's, one-player and full-size two-player mats)
@@ -76,9 +82,32 @@ test('arenaProps, ad boards and lasers build geometry', () => {
   assert.equal(ids.size, LASER_COUNT);
 });
 
+test('the rig runs round outside the ropes, a lamp at each of its corners and the lamps evenly spread', () => {
+  for (const layout of layouts) {
+    const { ring } = arenaSpots(layout);
+    const outline = rigOutline(ring);
+    assert.equal(outline.length, 8);
+    for (const [x, y] of outline) {
+      const outside = Math.max(Math.abs(x - ring.x) - ring.hw, Math.abs(y - ring.y) - ring.hh);
+      assert.ok(Math.abs(outside - RIG_PX.out) < 1e-6, 'every corner lies on the rig\'s rect, out past the ropes');
+    }
+    const lamps = rigLamps(ring);
+    for (const corner of outline) assert.ok(lamps.some(([x, y]) => x === corner[0] && y === corner[1]));
+    for (let i = 0; i < lamps.length; i += 1) {
+      const [ax, ay] = lamps[i];
+      const [bx, by] = lamps[(i + 1) % lamps.length];
+      const gap = Math.hypot(bx - ax, by - ay);
+      assert.ok(gap > RIG_PX.lampEvery * 0.6 && gap < RIG_PX.lampEvery * 1.5, `lamp gap ${gap}`);
+    }
+    const glints = glintGeometry(three, lamps);
+    assert.equal(glints.attributes.aGlint.array.length / 3, lamps.length * 4);
+    assert.equal(glints.index.length, lamps.length * 6);
+  }
+});
+
 test('Fighting Stadium shaders declare no GLSL ES 3.00 reserved word and every one has a main', () => {
   const reserved = /\b(?:float|vec[234]|int|bool)\s+(?:flat|half|smooth|noperspective|sample|patch|input|output|filter|active|common|fixed|long|short|out|in|inout|round|step)\b/;
-  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_FRAGMENT, BOARD_FRAGMENT, LASER_VERTEX, PROP_FRAGMENT]) {
+  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_FRAGMENT, BOARD_FRAGMENT, LASER_VERTEX, PROP_FRAGMENT, GLINT_VERTEX, GLINT_FRAGMENT]) {
     assert.match(shader, /void main\(\)/);
     assert.doesNotMatch(shader, reserved);
   }
