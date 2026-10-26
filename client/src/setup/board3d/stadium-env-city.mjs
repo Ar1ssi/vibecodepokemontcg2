@@ -347,6 +347,10 @@ vec3 windowAt(float along, float up, float seed) {
   vec2 f = fract(vec2(along / 17.0, up / 24.0));
   float pane = step(0.18, f.x) * step(f.x, 0.82) * step(0.22, f.y) * step(f.y, 0.78);
   float roll = hash12(cell + seed * 131.0);
+  // Now and then someone switches a light on or off: one window in nine keeps its own slow clock.
+  float restless = step(0.89, hash12(cell * 2.3 + seed));
+  float hour = floor(uTime / 9.0 + hash12(cell * 5.1 + seed) * 9.0);
+  roll = mix(roll, hash12(cell + seed * 131.0 + hour * 7.13), restless);
   return vec3(pane, step(roll, 0.3) * (0.6 + 0.6 * hash12(cell * 1.7 + seed)), step(0.7, hash12(cell * 3.1 + seed)));
 }
 vec3 facadeColor(vec3 wall, float along, float up, float seed) {

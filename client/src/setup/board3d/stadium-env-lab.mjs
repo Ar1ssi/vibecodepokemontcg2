@@ -541,8 +541,12 @@ void main() {
     steel = mix(steel, vec3(0.6, 0.64, 0.7), 1.0 - smoothstep(0.8, 2.6, abs(d + 4.0)));
     col = mix(col, steel, rim);
     col = mix(col, vec3(0.02, 0.025, 0.035), (1.0 - smoothstep(0.6, 1.6, abs(d + 26.0))));
-    // The lens overhead lights the middle of the dais blue.
+    // The lens overhead lights the middle of the dais blue; every few seconds its scan runs out
+    // across the disc as a soft ring.
     col += vec3(0.03, 0.07, 0.15) * exp(-fromCentre * fromCentre / (2.0 * 320.0 * 320.0));
+    float scanR = fract(uTime / 4.5) * (uDais.z - 80.0);
+    float scan = exp(-abs(fromCentre - scanR) / 9.0) * (1.0 - fract(uTime / 4.5)) * (1.0 - plates);
+    col += vec3(0.08, 0.2, 0.42) * scan * 0.5;
     // The Poke Ball: a light-blue band round the Actives, its bar and button, glowing.
     float e = emblemDistance(p, uEmblem);
     float band = uEmblem.z > 0.0 ? abs(fromCentre - uEmblem.z * 0.93) - uEmblem.z * 0.07 : 100000.0;

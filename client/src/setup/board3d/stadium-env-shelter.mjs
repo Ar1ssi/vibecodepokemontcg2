@@ -112,7 +112,9 @@ vec3 wallPaint(float u, float h, float far, out vec3 glow) {
   }
   if (h > 204.0 && h < 216.0) {
     col = vec3(0.55, 0.85, 0.95);
-    glow += STRIP_CYAN * smoothstep(0.0, 3.0, min(h - 204.0, 216.0 - h)) * 1.1;
+    // A slow shimmer runs along the strip.
+    float shimmer = 0.9 + 0.1 * sin(u / 60.0 - uTime * 1.6);
+    glow += STRIP_CYAN * smoothstep(0.0, 3.0, min(h - 204.0, 216.0 - h)) * 1.1 * shimmer;
   } else if (h >= 216.0) {
     col = vec3(0.86, 0.88, 0.91);
   }
