@@ -69,7 +69,7 @@ const BEAM_LENGTH_PX = 1300;
 const CONCRETE = [0.2, 0.21, 0.24, 0.05];
 const COPING = [0.36, 0.37, 0.4, 0.15];
 const HUT_WALL = [0.26, 0.27, 0.3, 0.05];
-const DOOR_RED = [0.36, 0.05, 0.06, 0.2];
+const DOOR_RED = [0.2, 0.035, 0.04, 0.2];
 const LAMP = [1.4, 1.1, 0.7, 2.6];
 const MACHINE = [0.3, 0.32, 0.35, 0.4];
 const GRILLE = [0.06, 0.065, 0.075, 0.2];
@@ -320,7 +320,7 @@ vec3 windowAt(float along, float up, float seed) {
   vec2 f = fract(vec2(along / 17.0, up / 24.0));
   float pane = step(0.18, f.x) * step(f.x, 0.82) * step(0.22, f.y) * step(f.y, 0.78);
   float roll = hash12(cell + seed * 131.0);
-  return vec3(pane, step(roll, 0.42) * (0.6 + 0.6 * hash12(cell * 1.7 + seed)), step(0.82, hash12(cell * 3.1 + seed)));
+  return vec3(pane, step(roll, 0.32) * (0.6 + 0.6 * hash12(cell * 1.7 + seed)), step(0.82, hash12(cell * 3.1 + seed)));
 }
 vec3 facadeColor(vec3 wall, float along, float up, float seed) {
   vec3 w = windowAt(along, up, seed);
@@ -362,12 +362,13 @@ void main() {
     // Tar patches where the roof was mended.
     col = mix(col, col * 0.62, smoothstep(0.7, 0.74, fbm3(p / 45.0 + 9.0)));
     // Puddles: still water mirroring the night sky, the neon and the hut lamp in soft streaks.
-    float puddle = smoothstep(0.7, 0.73, fbm3(p / 70.0 + 3.0)) * smoothstep(-20.0, -60.0, d);
+    // A few shallow puddles: darker wet concrete with a faint sheen of the sky and the lights.
+    float puddle = smoothstep(0.74, 0.77, fbm3(p / 90.0 + 3.0)) * smoothstep(-20.0, -60.0, d);
     float side = (p.x - uRoof.x) / uRoof.z;
-    vec3 mirrored = vec3(0.025, 0.03, 0.07)
-      + NEON_PINK * 0.28 * smoothstep(0.1, -0.9, side) * (0.6 + 0.4 * gnoise(vec2(p.x / 60.0, p.y / 8.0)))
-      + LAMP_WARM * 0.2 * smoothstep(0.4, 1.0, side) * (0.6 + 0.4 * gnoise(vec2(p.x / 8.0, p.y / 60.0)));
-    col = mix(col, mirrored * (0.85 + 0.15 * gnoise(p / 7.0 + uTime * 0.4)), puddle * 0.85);
+    vec3 mirrored = vec3(0.03, 0.034, 0.06)
+      + NEON_PINK * 0.06 * smoothstep(0.1, -0.9, side)
+      + LAMP_WARM * 0.05 * smoothstep(0.4, 1.0, side);
+    col = mix(col, mirrored * (0.9 + 0.1 * gnoise(p / 7.0 + uTime * 0.4)), puddle * 0.45);
     col = mix(col * 0.5, col, smoothstep(0.3, 0.9, light.b));
     // Pink neon from the left tower washes the roof's left side; the hut lamp pools by its door.
     float neon = exp(-max(p.x - (uRoof.x - uRoof.z), 0.0) / 170.0) * smoothstep(-0.8, 0.4, (p.y - uRoof.y) / uRoof.w);
@@ -516,7 +517,7 @@ void main() {
   vec4 view = modelViewMatrix * vec4(here, 1.0);
   vec2 tangent = (modelViewMatrix * vec4(axis, 0.0)).xy;
   vec2 across = length(tangent) > 0.0001 ? normalize(vec2(-tangent.y, tangent.x)) : vec2(1.0, 0.0);
-  view.xy += across * aBeam.y * mix(6.0, 120.0, aBeam.x);
+  view.xy += across * aBeam.y * mix(10.0, 90.0, aBeam.x);
   gl_Position = projectionMatrix * view;
   vBeam = aBeam;
 }
@@ -530,7 +531,7 @@ void main() {
   float core = exp(-vBeam.y * vBeam.y * 4.0);
   float fade = smoothstep(0.0, 0.08, vBeam.x) * (1.0 - smoothstep(0.35, 1.0, vBeam.x));
   float shown = smoothstep(0.6, 1.0, uReveal) * (1.0 - uExit);
-  gl_FragColor = vec4(vec3(0.55, 0.65, 0.95) * core * fade * 0.3 * shown, 1.0);
+  gl_FragColor = vec4(vec3(0.6, 0.72, 1.0) * core * fade * 0.55 * shown, 1.0);
 ${OUTPUT}
 }
 `;
