@@ -40,12 +40,12 @@ export const APRON_PX = { drop: 34, slope: 18 };
 export const STAGE_PX = { width: 74, drop: 46 };
 export const FLOOR_PX = 64;
 /** The ad boards: height, thickness, how far their tops lean back from the ring (their faces show from above). */
-export const BOARD_PX = { height: 58, thick: 8, lean: 52 };
+export const BOARD_PX = { height: 42, thick: 8, lean: 30 };
 /** The stands: each tier's run and rise. */
 export const TIER_PX = { run: 40, rise: 26 };
 /** The ring's corner posts and ropes: the posts' height and radius, the ropes' heights, radius, sag. */
 export const POST_PX = { height: 96, radius: 7 };
-export const ROPES = { heights: [36, 60, 84], radius: 2.6, sag: 5 };
+export const ROPES = { heights: [36, 60, 84], radius: 3.2, sag: 5 };
 /**
  * The lasers: how many (laser k shines from light k % 4: the far corners' sweep along their side
  * stands toward the near end, or for k >= 8 across the far stands; the near corners' along their side
@@ -60,14 +60,16 @@ export const LASER_LIGHT_PX = { out: 150, end: 110, z: 240 };
  */
 export const RIG_PX = { out: 40, z: 300, depth: 16, cut: 110, lampEvery: 105 };
 /** Half the size of a rig lamp's glow and of a laser light's glare, px. */
-const GLINT_PX = { lamp: 22, light: 64 };
+const GLINT_PX = { lamp: 22, light: 90 };
 
 const POST_STEEL = [0.0, 0.17, 0.38, 0.4];
 const PAD_BLUE = [0.0, 0.2, 0.44, 0.15];
-const ROPE_WHITE = [0.92, 0.93, 0.95, 0.1];
+/** The art's white ropes: lit by the rig from every side, so drawn at their own brightness. */
+const ROPE_WHITE = [0.92, 0.95, 1.0, 1.9];
 const BOARD_FRAME = [0.05, 0.055, 0.065, 0.3];
-const TRUSS = [0.1, 0.14, 0.16, 0.5];
-const LAMP_CASE = [0.07, 0.09, 0.1, 0.6];
+/** The rig's pale steel, as the art's bright frame of lights. */
+const TRUSS = [0.55, 0.6, 0.63, 0.5];
+const LAMP_CASE = [0.28, 0.31, 0.34, 0.6];
 // The ad boards' foot and leaning top, z px.
 const BOARD_Z = { foot: -APRON_PX.drop - STAGE_PX.drop + 2, top: -APRON_PX.drop - STAGE_PX.drop + BOARD_PX.height - 4 };
 
@@ -417,8 +419,8 @@ void main() {
       vec2 rel = p - uRing.xy;
       float along = abs(rel.x) / (uRing.z + rim) > abs(rel.y) / (uRing.w + rim) ? p.y : p.x;
       // The art's big round lamps along the stage's outer edge, a glow round each.
-      float bulb = length(vec2(mod(along, 32.0) - 16.0, d - rim));
-      col += vec3(1.5, 1.6, 1.7) * (1.0 - smoothstep(5.5, 7.0, bulb)) + vec3(0.3, 0.6, 0.66) * exp(-bulb / 9.0) * 0.7;
+      float bulb = length(vec2(mod(along, 30.0) - 15.0, d - rim));
+      col += vec3(1.6, 1.7, 1.8) * (1.0 - smoothstep(6.5, 8.0, bulb)) + vec3(0.3, 0.6, 0.66) * exp(-bulb / 10.0) * 0.8;
       col = mix(col, vec3(0.08, 0.14, 0.18), smoothstep(${STAGE_PX.width - 3}.0, ${STAGE_PX.width}.0, d));
     }
   } else if (kind < 1.5) {
@@ -462,6 +464,16 @@ void main() {
   // The glowing stage throws cyan light across the floor and the front rows, as in the art.
   float fromStage = max(d - ${STAGE_PX.width}.0, 0.0);
   col += vec3(0.05, 0.3, 0.38) * exp(-fromStage / 70.0) * step(0.5, kind) * 0.8;
+  // The art's big coloured spotlights wash the stands, slowly sweeping: a yellow one on the left
+  // side, a pink one on the right.
+  if (kind > 0.5) {
+    for (int i = 0; i < 2; i++) {
+      float s = i == 0 ? -1.0 : 1.0;
+      vec2 c = vec2(uRing.x + s * (uBoards.x + 140.0), uRing.y + uBoards.y * 0.6 * sin(uTime * 0.21 + float(i) * 2.4));
+      vec2 rel = (p - c) / vec2(120.0, 240.0);
+      col += (i == 0 ? vec3(0.95, 0.8, 0.15) : vec3(0.95, 0.22, 0.62)) * exp(-dot(rel, rel)) * 0.3;
+    }
+  }
   // The teal haze over the arena, thicker away from the ring; the back rows fade into the dark.
   col = mix(col, HAZE_TEAL, smoothstep(${STAGE_PX.width}.0, 500.0, d) * 0.45);
   col *= mix(1.0, 0.45, smoothstep(220.0, 520.0, d) * step(1.5, kind));
@@ -490,9 +502,9 @@ void main() {
 `;
 
 /**
- * The LED ad boards: a run of panels round the band, each one of the art's designs (red with white
- * lettering, white with a red and blue mark, blue with the Poké Ball, yellow with dark lettering),
- * the lettering in blocky bars; a slow sheen runs along them.
+ * The LED ad boards, as the art's thin glowing strip: a run of panels round the band, most white with
+ * a small coloured mark and lettering, now and then a red, green or blue one; a slow sheen runs along
+ * them.
  */
 export const BOARD_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
@@ -515,12 +527,12 @@ float lettering(vec2 q, float y0, float y1, float seed) {
 void main() {
   if (revealBurned(vPos) * exitKeep(vPos) < 0.5) discard;
   float panel = floor(vAd.x / PANEL);
-  // As in the art, most boards are white with a coloured mark and lettering; others red with yellow
+  // As in the art, most boards are white with a coloured mark and lettering; a few red with yellow
   // lettering, green with white, or blue with the Poke Ball.
   float pick = hash12(vec2(panel, 4.0));
   vec2 q = vec2(mod(vAd.x, PANEL), vAd.y * 38.0);
   vec3 col;
-  if (pick < 0.46) {
+  if (pick < 0.7) {
     col = vec3(0.95, 0.96, 0.97);
     float hue = hash12(vec2(panel, 8.0));
     vec3 ink = hue < 0.4 ? vec3(0.12, 0.6, 0.2) : hue < 0.75 ? vec3(0.1, 0.25, 0.75) : vec3(0.85, 0.12, 0.14);
@@ -530,10 +542,10 @@ void main() {
     float mark = hash12(vec2(panel, 9.0)) < 0.5 ? max(swoosh, -(q.y - 12.0)) : disc;
     col = mix(col, ink, 1.0 - smoothstep(-0.5, 0.8, mark));
     col = mix(col, ink * 0.7, lettering(q - vec2(48.0, 0.0), 13.0, 25.0, panel) * step(q.x, 140.0));
-  } else if (pick < 0.64) {
+  } else if (pick < 0.8) {
     col = vec3(0.82, 0.1, 0.1);
     col = mix(col, vec3(1.0, 0.85, 0.2), lettering(q - vec2(14.0, 0.0), 12.0, 26.0, panel + 2.0));
-  } else if (pick < 0.8) {
+  } else if (pick < 0.9) {
     col = vec3(0.08, 0.55, 0.22);
     col = mix(col, vec3(0.95, 1.0, 0.95), lettering(q - vec2(20.0, 0.0), 13.0, 25.0, panel + 5.0));
   } else {
@@ -624,10 +636,12 @@ ${NOISE}
 attribute vec4 aGlint;
 varying vec2 vCorner;
 varying float vTwinkle;
+varying float vFlare;
 void main() {
   vec4 view = modelViewMatrix * vec4(position, 1.0);
   view.xy += aGlint.xy * aGlint.w;
   vCorner = aGlint.xy;
+  vFlare = step(${GLINT_PX.lamp + 1}.0, aGlint.w);
   float seed = hash12(vec2(aGlint.z, 4.0));
   vTwinkle = 0.85 + 0.15 * sin(uTime * (1.1 + 1.4 * seed) + seed * 40.0);
   gl_Position = projectionMatrix * view;
@@ -635,17 +649,28 @@ void main() {
 `;
 
 /**
- * A glow: a rig lamp's round bulb in a small halo, or a laser light's soft white glare; each breathes
- * gently on its own beat. No rays.
+ * A glow: a rig lamp's round bulb in a small halo; a laser light, out in a corner away from the cards,
+ * flares as the art's lights do, four long thin rays crossing as an X and four short ones. Each
+ * breathes gently on its own beat, never turning.
  */
 export const GLINT_FRAGMENT = /* glsl */ `
 uniform float uReveal;
 uniform float uExit;
 varying vec2 vCorner;
 varying float vTwinkle;
+varying float vFlare;
 void main() {
-  float r = length(vCorner);
+  vec2 q = vCorner;
+  float r = length(q);
   float glow = exp(-r * r * 60.0) * 1.6 + exp(-r * 4.5) * 0.35;
+  if (vFlare > 0.5) {
+    vec2 diagonal = vec2(q.x + q.y, q.x - q.y) * 0.7071;
+    float rays = exp(-abs(diagonal.y) * 40.0) * (1.0 - smoothstep(0.0, 1.0, abs(diagonal.x)))
+      + exp(-abs(diagonal.x) * 40.0) * (1.0 - smoothstep(0.0, 1.0, abs(diagonal.y)));
+    rays += 0.5 * (exp(-abs(q.y) * 46.0) * (1.0 - smoothstep(0.0, 0.5, abs(q.x)))
+      + exp(-abs(q.x) * 46.0) * (1.0 - smoothstep(0.0, 0.5, abs(q.y))));
+    glow += rays * 0.9;
+  }
   glow *= 1.0 - smoothstep(0.85, 1.0, r);
   float shown = smoothstep(0.6, 1.0, uReveal) * (1.0 - uExit);
   gl_FragColor = vec4(vec3(0.85, 0.97, 1.05) * glow * vTwinkle * shown, 1.0);
