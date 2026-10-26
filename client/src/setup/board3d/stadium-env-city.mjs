@@ -59,12 +59,12 @@ const TOWERS = [
 const ROUND_TOWER = { at: -0.45, gap: 56, r: 92, height: 330 };
 /** The searchlights: where each stands (shares of the roof's half size), its sweep's centre (rad) and phase. */
 const BEAMS = [
-  { at: [-1.3, 1.3], heading: 0.3, phase: 0 },
-  { at: [1.3, 1.28], heading: 2.85, phase: 2.3 },
-  { at: [1.35, -0.9], heading: 1.75, phase: 4.1 },
-  { at: [-1.35, -0.85], heading: 1.4, phase: 1.2 },
+  { at: [-1.3, 1.3], heading: -0.55, phase: 0 },
+  { at: [1.3, 1.28], heading: -2.55, phase: 2.3 },
+  { at: [1.35, -0.9], heading: 2.5, phase: 4.1 },
+  { at: [-1.35, -0.85], heading: 0.65, phase: 1.2 },
 ];
-const BEAM_LENGTH_PX = 1300;
+const BEAM_LENGTH_PX = 1700;
 
 const CONCRETE = [0.26, 0.27, 0.31, 0.05];
 const COPING = [0.42, 0.43, 0.47, 0.15];
@@ -529,16 +529,16 @@ attribute vec2 aBeam;
 attribute vec4 aSource;
 varying vec2 vBeam;
 void main() {
-  // Each light sweeps slowly round its heading, tipped up off the street across the night.
-  float sweep = aSource.z + 0.32 * sin(uTime * 0.23 + aSource.w);
-  float tip = 0.72 + 0.12 * sin(uTime * 0.17 + aSource.w * 1.7);
+  // Each light sweeps slowly to and fro across the rooftop, tipped up so its shaft passes over it.
+  float sweep = aSource.z + 0.42 * sin(uTime * 0.21 + aSource.w);
+  float tip = 0.42 + 0.08 * sin(uTime * 0.17 + aSource.w * 1.7);
   vec3 axis = normalize(vec3(cos(sweep) * cos(tip), sin(sweep) * cos(tip), sin(tip)));
   vec3 source = vec3(aSource.xy, -${STREET_PX}.0 + 10.0);
   vec3 here = source + axis * aBeam.x * ${BEAM_LENGTH_PX}.0;
   vec4 view = modelViewMatrix * vec4(here, 1.0);
   vec2 tangent = (modelViewMatrix * vec4(axis, 0.0)).xy;
   vec2 across = length(tangent) > 0.0001 ? normalize(vec2(-tangent.y, tangent.x)) : vec2(1.0, 0.0);
-  view.xy += across * aBeam.y * mix(10.0, 90.0, aBeam.x);
+  view.xy += across * aBeam.y * mix(8.0, 70.0, aBeam.x);
   gl_Position = projectionMatrix * view;
   vBeam = aBeam;
 }
@@ -550,9 +550,11 @@ uniform float uExit;
 varying vec2 vBeam;
 void main() {
   float core = exp(-vBeam.y * vBeam.y * 4.0);
-  float fade = smoothstep(0.0, 0.08, vBeam.x) * (1.0 - smoothstep(0.35, 1.0, vBeam.x));
+  float fade = smoothstep(0.0, 0.06, vBeam.x) * (1.0 - smoothstep(0.15, 0.95, vBeam.x));
   float shown = smoothstep(0.6, 1.0, uReveal) * (1.0 - uExit);
-  gl_FragColor = vec4(vec3(0.6, 0.72, 1.0) * core * fade * 0.55 * shown, 1.0);
+  // A bright core in a soft shaft, the art's pale blue-white.
+  float shaft = exp(-vBeam.y * vBeam.y * 1.5) * 0.4 + core;
+  gl_FragColor = vec4(vec3(0.62, 0.74, 1.0) * shaft * fade * 0.32 * shown, 1.0);
 ${OUTPUT}
 }
 `;
