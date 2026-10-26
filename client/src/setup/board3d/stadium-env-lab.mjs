@@ -88,8 +88,10 @@ const BIG_PIPE = { radius: 20, run: 150, bend: 40, top: 320 };
 const STEP_BLUE = [0.14, 0.24, 0.27, 0.35];
 const STEP_BLUE_LIGHT = [0.18, 0.29, 0.32, 0.35];
 const STEP_SIDE = [0.06, 0.1, 0.12, 0.35];
-const SCREEN = [0.3, 0.85, 1.25, 2.4];
-const CONSOLE_GREY = [0.42, 0.45, 0.5, 0.4];
+/** The art's consoles: pale grey bodies, dark teal screens with a faint glow. */
+const SCREEN = [0.16, 0.3, 0.38, 1.9];
+const CONSOLE_GREY = [0.66, 0.7, 0.74, 0.3];
+const BUTTON = [0.25, 0.3, 0.34, 0.3];
 
 const isRect = (rect) => rect && [rect.x, rect.y, rect.w, rect.h].every(Number.isFinite) && rect.w > 0 && rect.h > 0;
 const cornersOf = (rect) => [
@@ -296,14 +298,18 @@ export function labProps(spots) {
     for (const [x, y, z] of [top, foot]) props.cylinder({ x, y, z0: z - 37, z1: z, r: 2.8, color: YELLOW, sides: 8 });
   }
 
-  // The consoles: grey desks, their screens glowing on top.
+  // The consoles: pale grey desks, a dark screen and a row of buttons on top.
   for (const { x, y, angle } of consoles) {
     const yaw = angle + Math.PI / 2;
-    props.box({ x, y, z0: -DROP_PX, z1: -20, hw: 30, hh: 16, yaw, color: CONSOLE_GREY, topColor: DARK_STEEL });
+    props.box({ x, y, z0: -DROP_PX, z1: -20, hw: 30, hh: 16, yaw, color: CONSOLE_GREY, topColor: CONSOLE_GREY });
     const c = Math.cos(yaw);
     const s = Math.sin(yaw);
     const at = (u, v) => [x + u * c - v * s, y + u * s + v * c, -19.5];
-    props.quad(at(-24, -10), at(24, -10), at(24, 10), at(-24, 10), SCREEN);
+    props.quad(at(-24, -2), at(24, -2), at(24, 12), at(-24, 12), SCREEN);
+    for (let k = 0; k < 5; k += 1) {
+      const u = -20 + k * 10;
+      props.quad(at(u - 2.5, -11), at(u + 2.5, -11), at(u + 2.5, -6), at(u - 2.5, -6), BUTTON);
+    }
   }
 
   // The tanks: steel drums with darker bands; on each lid a rim, a hatch and a pipe stub. A pipe

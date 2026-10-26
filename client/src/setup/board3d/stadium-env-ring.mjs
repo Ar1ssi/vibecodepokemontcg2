@@ -40,8 +40,11 @@ const STONE_FOOT_GAP_PX = 8;
 const STONE_SPACING_PX = 175;
 /** Paving: bricks in straight staggered rows, as in the art; their length and height. */
 const BRICK_PX = { long: 46, high: 23 };
-/** Ropes: height on the stones (share of each stone's height), sag, thickness. */
-const ROPE = { at: 0.45, sag: 30, radius: 4.2 };
+/** The two rope strands: height on the stones (share of each stone's height), sag, thickness, turns round each stone. */
+const ROPES = [
+  { at: 0.52, sag: 30, radius: 3.6, wraps: 3 },
+  { at: 0.3, sag: 22, radius: 3.2, wraps: 2 },
+];
 /** The chain: which stone it hangs from (turn round the ring, rad), how many links, link size. */
 const CHAIN = { angle: Math.PI * 1.19, links: 15, length: 50, width: 28, thick: 6 };
 /** The shelf the stones stand on, from the kerb to the cliff's lip, and the depths below it. */
@@ -188,39 +191,41 @@ const chainLink = (props, centre, axis, up, { length, width, thick }, color) => 
 export function ringProps({ stones, allStones, anchor }) {
   const props = createPropBuilder();
   for (const stone of stones) standingStone(props, stone);
-  // Ropes: wound round each stone, sagging to the next where both stand in the scene.
+  // Ropes, as in the art: two strands, each wound round every stone in a band of turns and sagging
+  // to the next stone where both stand in the scene.
   const ropeColor = (i) => (i % 2 ? ROPE_DARK : ROPE_LIGHT);
   const byIndex = new Map(stones.map((stone) => [stone.index, stone]));
+  /** A point of the stone's surface, `share` of its height up, pushed out by `out` px at `angle`. */
+  const onStone = (stone, share, angle, out) => {
+    const r = stone.radius * (1.08 - 0.22 * share) * 1.06 + out;
+    const u = Math.cos(angle) * r;
+    const v = Math.sin(angle) * ((r - out) * stone.flat + out);
+    const c = Math.cos(stone.yaw);
+    const sn = Math.sin(stone.yaw);
+    return [stone.x + u * c - v * sn + stone.lean * share * stone.height, stone.y + u * sn + v * c];
+  };
   for (const stone of stones) {
-    const z = stone.height * ROPE.at;
-    // Wound round twice, the turns a rope's width apart.
-    for (const wrap of [0, 1]) {
-      const loop = [];
-      const zWrap = z - wrap * ROPE.radius * 2.2;
-      for (let k = 0; k <= 18; k += 1) {
-        const angle = (k / 18) * 2 * Math.PI;
-        const r = stone.radius * (1.08 - 0.22 * ROPE.at) * 1.08 + ROPE.radius;
-        const u = Math.cos(angle) * r;
-        const v = Math.sin(angle) * (r - ROPE.radius) * stone.flat + Math.sin(angle) * ROPE.radius;
-        const c = Math.cos(stone.yaw);
-        const sn = Math.sin(stone.yaw);
-        loop.push([stone.x + u * c - v * sn + stone.lean * ROPE.at * stone.height, stone.y + u * sn + v * c, zWrap]);
-      }
-      props.tube(loop, ROPE.radius, ROPE_LIGHT, { sides: 6, colorAt: ropeColor });
-    }
     const next = byIndex.get((stone.index + 1) % allStones);
-    if (!next) continue;
-    const z2 = next.height * ROPE.at;
-    const span = [];
-    for (let k = 0; k <= 14; k += 1) {
-      const t = k / 14;
-      span.push([
-        stone.x + (next.x - stone.x) * t + stone.lean * ROPE.at * stone.height * (1 - t),
-        stone.y + (next.y - stone.y) * t,
-        z + (z2 - z) * t - ROPE.sag * 4 * t * (1 - t),
-      ]);
+    for (const rope of ROPES) {
+      for (let wrap = 0; wrap < rope.wraps; wrap += 1) {
+        const z = stone.height * rope.at - wrap * rope.radius * 2.1;
+        const loop = [];
+        for (let k = 0; k <= 18; k += 1) {
+          const angle = (k / 18) * 2 * Math.PI;
+          loop.push([...onStone(stone, rope.at, angle, rope.radius), z]);
+        }
+        props.tube(loop, rope.radius, ROPE_LIGHT, { sides: 6, colorAt: ropeColor });
+      }
+      if (!next) continue;
+      const from = [...onStone(stone, rope.at, Math.atan2(next.y - stone.y, next.x - stone.x), 0), stone.height * rope.at];
+      const to = [...onStone(next, rope.at, Math.atan2(stone.y - next.y, stone.x - next.x), 0), next.height * rope.at];
+      const span = [];
+      for (let k = 0; k <= 14; k += 1) {
+        const t = k / 14;
+        span.push([0, 1, 2].map((axis) => from[axis] + (to[axis] - from[axis]) * t - (axis === 2 ? rope.sag * 4 * t * (1 - t) : 0)));
+      }
+      props.tube(span, rope.radius * 0.85, ROPE_LIGHT, { sides: 6, colorAt: ropeColor });
     }
-    props.tube(span, ROPE.radius, ROPE_LIGHT, { sides: 6, colorAt: ropeColor });
   }
   // The chain: from the anchor stone's top it drops to the ground and lies on outward.
   if (anchor && stones.includes(anchor)) {
