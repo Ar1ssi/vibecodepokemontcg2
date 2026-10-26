@@ -72,6 +72,14 @@ const BLUE_STEEL = [0.42, 0.52, 0.68, 0.85];
 const DARK_STEEL = [0.22, 0.24, 0.28, 0.7];
 const PIPE = [0.66, 0.7, 0.76, 0.8];
 const CABLE = [0.03, 0.03, 0.035, 0.3];
+const LAMP_BLACK = [0.035, 0.037, 0.045, 0.5];
+const LAMP_LIGHT = [1.2, 1.25, 1.3, 2.2];
+/** Cable runs on the dais's band: start turn (deg), span (deg), a wobble seed. */
+const CABLE_RUNS = [
+  [96, 22, 0.4],
+  [108, 16, 2.1],
+  [128, 14, 4.0],
+];
 /** Brushed lids: steel that doesn't mirror the lamps overhead as a white disc. */
 const LID = [0.3, 0.33, 0.38, 0.2];
 /** The big pipes: turn round the dais (deg) each runs out from the ring before rising. */
@@ -323,6 +331,41 @@ export function labProps(spots) {
     }
     props.tube(points, 3, CABLE, { sides: 6 });
   });
+  // As in the art, black cables lie in loose loops on the dais's steel band inside the railing,
+  // where the far Bench leaves it free, and hang over its edge to the deck.
+  for (const [deg, span, seed] of CABLE_RUNS) {
+    const from = (deg * Math.PI) / 180;
+    const points = [];
+    for (let k = 0; k <= 16; k += 1) {
+      const t = k / 16;
+      const angle = from + ((span * Math.PI) / 180) * t;
+      const edge = outlineAt(outline, angle);
+      const inset = RAIL.inset + 14 + 9 * Math.sin(t * Math.PI * 3 + seed);
+      const radial = Math.atan2(edge.y - dais.y, edge.x - dais.x);
+      points.push([edge.x - Math.cos(radial) * inset, edge.y - Math.sin(radial) * inset, 2.5]);
+    }
+    // Over the lip and down the dais's side to the deck.
+    const last = points[points.length - 1];
+    const radial = Math.atan2(last[1] - dais.y, last[0] - dais.x);
+    const out = (r, z) => [last[0] + Math.cos(radial) * r, last[1] + Math.sin(radial) * r, z];
+    points.push(out(10, 2), out(15, -10), out(17, -30), out(22, -DROP_PX + 3), out(40, -DROP_PX + 3));
+    props.tube(points, 2.6, CABLE, { sides: 6 });
+  }
+  // The art's gooseneck lamp on the dais's rim by the stair, bent over the platform.
+  const lampFoot = outlineAt(outline, STAIR.angle + halfGap + 0.12);
+  const inward = Math.atan2(dais.y - lampFoot.y, dais.x - lampFoot.x);
+  const foot = [lampFoot.x + Math.cos(inward) * 8, lampFoot.y + Math.sin(inward) * 8];
+  const neck = [];
+  for (let k = 0; k <= 10; k += 1) {
+    const t = k / 10;
+    const reach = 46 * Math.sin((t * Math.PI) / 2) ** 2;
+    neck.push([foot[0] + Math.cos(inward) * reach, foot[1] + Math.sin(inward) * reach, 120 * Math.sin((t * Math.PI) / 1.6)]);
+  }
+  props.cylinder({ x: foot[0], y: foot[1], z0: 0, z1: 4, r: 9, color: LAMP_BLACK, sides: 12 });
+  props.tube(neck, 2.4, LAMP_BLACK, { sides: 6 });
+  const head = neck[neck.length - 1];
+  props.cylinder({ x: head[0], y: head[1], z0: head[2] - 10, z1: head[2] + 4, r: 7, color: LAMP_BLACK, sides: 12 });
+  props.cylinder({ x: head[0], y: head[1], z0: head[2] - 11, z1: head[2] - 10, r: 5.5, color: LAMP_LIGHT, sides: 12 });
   const ringPipe = [];
   for (let turn = 0; turn <= 2 * Math.PI - 2 * halfGap + 1e-9; turn += OUTLINE_STEP_RAD * 2) {
     const edge = outlineAt(outline, start + turn);
