@@ -1,7 +1,7 @@
 // Design 077 (prototype): Magma Basin (customhb-289) after its card art (BRS 144, swsh9-144 in
-// set.json; ORBITALLINK): a basin walled by black volcanic cliffs, lava pouring down their faces into
-// a moat of molten gold that rings a dark rock island, the Poké Ball etched in the island's middle,
-// sparks in the air. The art looks across the island at the far wall; the board looks down into the
+// set.json; ORBITALLINK): a basin walled by dark crimson volcanic cliffs, lava pouring down their
+// faces into a moat of molten gold that rings an island of dark brown rock, the Poké Ball set in the
+// island's middle as a smooth brick-red disc, sparks in the air. The art looks across the island at the far wall; the board looks down into the
 // basin, so the island holds every card, the moat rings it (widest along the table's sides, where the
 // table is free of cards) and the walls rise round the moat, their falls on the sides and the far
 // wall, in view of both camera presets.
@@ -9,8 +9,8 @@
 // Bake, once per layout: BAKE_BASIN works out the smooth basin (R height px, G signed px from the
 // island's shore, B signed px from the moat's outer shore, A signed px from the nearest lavafall's
 // edge); BAKE_FIELD cuts the walls into faces and roughens the island (R height px, G the face's tone
-// 0..1, B how much a joint between the island's crust plates glows, A the ground's kind: -1 island,
-// 0 wall, 1 moat bed); the shared light bake adds normals, occlusion and the sun shadow.
+// 0..1, B how much one of the island's long cracks glows, A the ground's kind: -1 island, 0 wall,
+// 1 moat bed); the shared light bake adds normals, occlusion and the sun shadow.
 // Per frame: TERRAIN paints the rock lit by the lava, the falls and the emblem; LAVA is the moat's
 // sheet, flowing round the island; EMBERS rise off the moat and spray off the falls' splashes.
 import {

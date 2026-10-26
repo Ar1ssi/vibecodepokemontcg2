@@ -4,8 +4,9 @@
 // glowing LED ad boards, then the dark stands full of the crowd, all under a teal haze. Lasers in
 // green, magenta, yellow and white sweep across it from the lighting rig high overhead.
 // The art looks across the arena at the ring; the board looks down into the ring, so the ring's
-// canvas holds every card, its corner posts and three ropes a side stand round them, and the stage,
-// the ad boards and the stands ring it out to the scene's edges.
+// canvas holds every card, its corner posts and three ropes a side stand round them, and the stage
+// (its entrance ramp running off one side), the ad boards and the stands ring it out to the scene's
+// edges.
 //
 // Bake, once per layout: BAKE_FIELD writes R height px (the canvas at the cloth, the stage, the floor
 // and the stands below and climbing away in tiers), G signed px from the ring's edge, B the tier's

@@ -1,6 +1,6 @@
 // Design 077 (prototype): Mountain Ring (customhb-240) after its card art (FFI 97, xy3-97 in
-// set.json; Ryo Ueda): a round arena high in the mountains, paved in curved rows of grey stone
-// round the Poké Ball laid in lighter stone at its middle; standing stones ring it, thick ropes
+// set.json; Ryo Ueda): a round arena high in the mountains, paved in rows of grey-brown bricks
+// round the Poké Ball laid in pale stone at its middle; standing stones ring it, thick ropes
 // sagging between them, wound round each; a giant rusty chain lies by it; rough rocky ground with
 // boulders climbs away to crags and snowy peaks, everything in the art's sepia under an overcast sky.
 // The art looks across the ring from its edge; the board looks down into it, so the paving grows
@@ -8,7 +8,7 @@
 // and the mountains rise past them, toward the table's edges and beyond.
 //
 // Bake, once per layout: BAKE_FIELD writes R height px, G signed px from the arena's edge, B the
-// stone's id (paving or boulder) 0..1, A the kind (-1 paving, 0 kerb, 1 ground); the shared light
+// stone's id (brick or boulder) 0..1, A the kind (-1 paving, 1 ground); the shared light
 // bake adds normals, occlusion and the sun's soft shadow. Per frame: TERRAIN paints stone, rock,
 // snow and the emblem; PROPS are the standing stones, the ropes and the chain (stadium-env-props).
 import {

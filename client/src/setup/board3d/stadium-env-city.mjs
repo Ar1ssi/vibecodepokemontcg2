@@ -2,15 +2,15 @@
 // Ryo Ueda): a city at night seen from a rooftop. Office towers with grids of lit windows rise round
 // the roof, the round tower with its lit crown among them; Team Skull has sprayed its marks over two
 // billboards; searchlights sweep the purple-blue night; a stairwell hut with a red door and a lamp
-// stands on the roof, neon glows pink off the puddles. The art looks across the roof at the
+// stands on the roof, pink neon washing its far side. The art looks across the roof at the
 // towers; the board looks down on it, so every card lies on the roof, a low parapet runs round it,
 // the towers stand round it across the gaps of the streets far below (their faces to the roof lean
 // into view), and the hut stands by the cards' near-right corner, as in the art.
 //
 // Bake, once per layout: BAKE_FIELD writes R height px (the roof at the cloth, the streets STREET_PX
 // below), G signed px from the roof's edge; the shared light bake adds normals and occlusion.
-// Per frame: TERRAIN paints the roof (concrete slabs, tar seams, puddles mirroring the neon and the
-// windows, the hut lamp's and the neon's light) and the streets; BUILDINGS paints every tower's
+// Per frame: TERRAIN paints the roof (moonlit concrete slabs, dark seams, faint puddles, the hut
+// lamp's and the neon's light) and the streets; BUILDINGS paints every tower's
 // windows; PROPS is the parapet, the hut and the roof's machinery; BOARDS the two billboards;
 // BEAMS the searchlights.
 import {

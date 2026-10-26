@@ -1,7 +1,7 @@
 // Design 077 (prototype): Steel Shelter (customhb-162) after its card art (PHF 105, xy4-105 in
-// set.json; Ryo Ueda): a bright white hall. A glossy floor of pale hex tiles, some of their edges
-// inlaid in black, mirrors the hex light panels of the ceiling and the walls round it; a cyan
-// hologram of the Poké Ball glows in its middle. The walls are white panels over a band of dark
+// set.json; Ryo Ueda): a bright white hall. A glossy floor of big pale-grey hex tiles, one big
+// hexagon outlined in a dark hatched band round its middle, mirrors the hex light panels of the
+// ceiling and the walls round it; a cyan hologram of the Poké Ball glows in its middle. The walls are white panels over a band of dark
 // louvred vents, a cyan light strip near their top; the far wall holds the art's gate, a white
 // chevron frame with dark striped insets round a grey sliding door. The art looks along the hall at
 // the gate; the board looks down on its floor, so every card lies on the floor, the walls stand
@@ -158,12 +158,6 @@ vec4 hexTile(vec2 q) {
   float edge = 0.5 - max(dot(a, HEX_STEP * 0.5), a.x);
   return vec4(edge, hash12(cell * 7.13), cell.yx);
 }
-// The middle of the tile edge nearest q, in units: the same point from both tiles sharing it.
-vec2 hexEdgeMiddle(vec2 q, vec2 centre) {
-  vec2 rel = (q - centre).yx;
-  float sector = floor(atan(rel.y, rel.x) / 1.0471976 + 0.5) * 1.0471976;
-  return centre + 0.5 * vec2(sin(sector), cos(sector));
-}
 `;
 
 export const FLOOR_VERTEX = /* glsl */ `
@@ -175,10 +169,10 @@ void main() {
 `;
 
 /**
- * The floor: pale hex tiles, each a shade apart and bevelled toward its edges, thin grey seams and
- * a scatter of edges inlaid in black; a gloss that mirrors the ceiling's hex light panels and, near
- * the walls, the walls themselves (their strips and vents) where the mirrored ray meets them below
- * their top; the cyan hologram of the Poké Ball; shade gathering at the walls' feet.
+ * The floor: big pale-grey hex tiles, each a shade apart, faint grey seams, one big hexagon outlined
+ * in a dark hatched band; a gloss that mirrors the ceiling's hex light panels and, near the walls,
+ * the walls themselves (their strips and vents) where the mirrored ray meets them below their top;
+ * the cyan hologram of the Poké Ball; shade gathering at the walls' feet.
  */
 export const FLOOR_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
