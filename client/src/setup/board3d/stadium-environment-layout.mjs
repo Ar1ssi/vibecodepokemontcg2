@@ -11,6 +11,7 @@ import { tableBounds } from './table-uv.mjs';
 const ENVIRONMENT_BY_CARD = {
   'customhb-051': 'stormy-mountains',
   'customhb-253': 'perilous-jungle',
+  'customhb-289': 'magma-basin',
   'customhb-299': 'scorched-earth',
 };
 export const ENVIRONMENT_KEYS = Object.freeze([...new Set(Object.values(ENVIRONMENT_BY_CARD))]);
@@ -25,6 +26,7 @@ export const ENVIRONMENT_OVERRIDE_KEY = 'ptcg-stadium-env';
  * table's own floor shows.
  */
 const SCENE_MARGINS = {
+  'magma-basin': { side: 0.17, near: 0.2, far: 0.34 },
   'stormy-mountains': { side: 0.17, near: 0.2, far: 0.34 },
   'perilous-jungle': { side: 0.17, near: 0.2, far: 0.34 },
 };

@@ -228,6 +228,33 @@ float edgeSkirt(vec2 uv) {
 }
 `;
 
+/** A Poke Ball emblem's lines, after NOISE: its outline, the band across its middle, the button's ring. */
+export const POKE_BALL = /* glsl */ `
+// px from the nearest line of the emblem at emblem.xy with outline radius emblem.z (0: none).
+float emblemDistance(vec2 p, vec3 emblem) {
+  if (emblem.z <= 0.0) return 100000.0;
+  vec2 rel = p - emblem.xy;
+  float r = length(rel);
+  float buttonRadius = emblem.z * 0.22;
+  float band = r > buttonRadius && r < emblem.z ? abs(rel.y) : 100000.0;
+  return min(min(abs(r - emblem.z), abs(r - buttonRadius)), band);
+}
+`;
+
+/** Streaks running along a flow, after NOISE (uTime declared before it). */
+export const FLOW_STREAKS = /* glsl */ `
+// frame: px along the flow, px across it. Two noise phases cross-faded, so the streaks keep moving
+// without stretching; scale is their size along and across (px).
+float flowStreaks(vec2 frame, float speed, float period, vec2 scale) {
+  float phaseA = fract(uTime / period);
+  float phaseB = fract(uTime / period + 0.5);
+  float weightA = 1.0 - abs(2.0 * phaseA - 1.0);
+  float a = gnoise((frame - vec2(speed * period * phaseA, 0.0)) / scale);
+  float b = gnoise((frame - vec2(speed * period * phaseB, 0.0)) / scale + vec2(3.7, 1.3));
+  return mix(b, a, weightA);
+}
+`;
+
 /** Sculpted stones, after VORONOI: TCG Live's chunky board rock. */
 export const STONES = /* glsl */ `
 float smin(float a, float b, float k) {

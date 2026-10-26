@@ -7,6 +7,7 @@ import * as glsl from './stadium-environment-glsl.mjs';
 import * as forest from './stadium-env-forest.mjs';
 import { MAX_CARD_RECTS, STREAM_POINTS, jungleLeaves, jungleSpots } from './stadium-env-forest-layout.mjs';
 import * as highland from './stadium-env-highland.mjs';
+import { magmaBasinBoard } from './stadium-env-magma.mjs';
 import * as volcanic from './stadium-env-volcanic.mjs';
 import {
   ENVIRONMENT_KEYS,
@@ -508,6 +509,7 @@ function perilousJungleBoard({ three, material, seeded }) {
 }
 
 const BOARDS = {
+  'magma-basin': magmaBasinBoard,
   'perilous-jungle': perilousJungleBoard,
   'scorched-earth': scorchedEarthBoard,
   'stormy-mountains': stormyMountainsBoard,
@@ -581,6 +583,12 @@ export function createStadiumEnvironment({
       );
       return geometry;
     },
+    // For boards built in their own modules (stadium-env-<board>.mjs).
+    bakeOptions: BAKE_OPTIONS,
+    terrainGrid: (bounds) => terrainGrid(three, bounds),
+    replaceGeometry,
+    instancedGeometry: (spec, instances) => instancedGeometry(three, spec, instances),
+    latheIndex,
   };
   const bakeLight = kit.material(glsl.FULLSCREEN_VERTEX, glsl.BAKE_LIGHT_FRAGMENT, BAKE_OPTIONS);
   const bakeCamera = new three.OrthographicCamera(-1, 1, 1, -1, 0, 1);
