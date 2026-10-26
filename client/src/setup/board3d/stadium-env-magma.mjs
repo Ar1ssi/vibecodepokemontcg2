@@ -193,12 +193,12 @@ vec3 fallAt(vec2 p, vec4 fall) {
   float t = clamp(along / ${WALL_RUN_PX}.0, 0.0, 1.0);
   float line = across - (gnoise(vec2(along / 46.0, fall.x * 0.013 + fall.z * 3.0)) - 0.5) * 9.0 * t;
   // Wider where it spills out over the moat at its foot.
-  float width = mix(8.0, 5.0, t) + max(14.0 - along, 0.0) * 0.55;
+  float width = mix(4.5, 3.0, t) + max(12.0 - along, 0.0) * 0.4;
   float d = abs(line) - width;
   if (fall.w > 1.5) {
     // Below the fork the stream splits into three strands fanning apart toward the moat.
     float spread = clamp(1.0 - along / ${FORK_AT_PX}.0, 0.0, 1.0);
-    float strandWidth = mix(width, 4.0, spread);
+    float strandWidth = mix(width, 2.6, spread);
     d = 100000.0;
     for (int k = -1; k <= 1; k++) {
       float offset = float(k) * 22.0 * spread * (0.8 + 0.4 * hash12(vec2(float(k), fall.x)));
@@ -298,17 +298,17 @@ void main() {
   if (islandSD < 0.0) {
     kind = -1.0;
     float inland = smoothstep(0.0, -24.0, islandSD);
-    // Lumpy cooled lava, as the art's: broad swells, faceted rocky lumps packed together, a fine
-    // grain.
-    vec3 lump = stones(p + 5.0, mix(36.0, 52.0, fbm3(p / 150.0)), 1.0);
-    h += (4.0 * (fbm3(p / 46.0) - 0.5) + 2.0 * lump.x + 0.8 * (gnoise(p / 5.0) - 0.5)) * inland;
+    // Cooled basalt, as the art's: broad swells under a pebbly grain of small faceted lumps packed
+    // together.
+    vec3 lump = stones(p + 5.0, mix(16.0, 24.0, fbm3(p / 150.0)), 0.3);
+    h += (4.0 * (fbm3(p / 46.0) - 0.5) + 1.6 * lump.x + 0.6 * (gnoise(p / 4.0) - 0.5)) * inland;
     // A few long cracks wander across it in broken runs, some still glowing.
     vec2 warped = p + (vec2(fbm3(p / 80.0), fbm3(p / 80.0 + 5.3)) - 0.5) * 70.0;
     vec4 plate = voronoiCell(warped / 170.0 + 3.0);
     float seam = (1.0 - smoothstep(0.0, 0.016, plate.x)) * smoothstep(0.6, 0.7, gnoise(warped / 90.0 + 4.0));
-    h -= 2.4 * seam * inland;
+    h -= 0.6 * seam * inland;
     tone = fract(lump.y * 5.3 + fbm3(p / 70.0) * 0.5);
-    joint = seam * step(0.45, fract(plate.y * 7.3));
+    joint = 0.0;
     // The Poke Ball, as the art's relief: its two halves domed cushions of stone standing proud of
     // the rock, the band and the button's ring cut deep between them, a deep crevice round it.
     if (uEmblem.z > 0.0) {
@@ -462,13 +462,13 @@ void main() {
     float crown = clamp(min(min(uEmblem.z - r, abs(rel.y) - bandHalf), r - buttonR - 4.0) / 60.0, 0.0, 1.0);
     // The art's (110,45,35) at the edges, (145,57,45) over the halves, a hotter (150,62,45) on their
     // crowns, inverted through Neutral tone mapping.
-    vec3 stone = mix(vec3(0.191, 0.061, 0.052), vec3(0.322, 0.079, 0.065), sqrt(crown)) + vec3(0.06, 0.02, 0.006) * crown;
+    vec3 stone = mix(vec3(0.191, 0.061, 0.052), vec3(0.38, 0.09, 0.06), sqrt(crown)) + vec3(0.1, 0.03, 0.008) * crown;
     stone *= (0.86 + 0.24 * smoothstep(-uEmblem.z, uEmblem.z, rel.y)) * breathe * (0.92 + 0.16 * fbm3(p / 22.0));
     stone += vec3(0.4, 0.14, 0.05) * smoothstep(0.84, 0.97, r / uEmblem.z) * smoothstep(0.1, 0.7, rel.y / uEmblem.z);
     float buttonRing = smoothstep(buttonR - 7.0, buttonR - 4.0, r) * (1.0 - smoothstep(buttonR + 3.0, buttonR + 5.0, r));
     float dark = max(inside * (1.0 - halves) * step(buttonR - 4.0, r), buttonRing);
     float core = 1.0 - smoothstep(buttonR - 8.0, buttonR - 6.0, r);
-    float outline = 1.0 - smoothstep(2.5, 4.5, abs(r - uEmblem.z - 1.5));
+    float outline = 1.0 - smoothstep(3.5, 5.0, abs(r - uEmblem.z - 2.0));
     col = mix(col, stone, halves);
     col += vec3(1.7, 0.42, 0.05) * specks * halves;
     col = mix(col, vec3(0.035, 0.016, 0.014), max(dark * 0.85, outline * 0.85));
@@ -485,8 +485,8 @@ void main() {
       if (f.x < nearest.x) nearest = f;
     }
     float streak = flowStreaks(vec2(-nearest.y, nearest.z), 70.0, 1.6, vec2(30.0, 3.0));
-    float core = smoothstep(0.0, -3.0, fallSD);
-    float heat = 0.58 + 0.3 * core + (streak - 0.5) * 0.45 + 0.1 * smoothstep(40.0, 0.0, nearest.y);
+    float core = smoothstep(0.0, -2.0, fallSD);
+    float heat = 0.55 + 0.42 * core + (streak - 0.5) * 0.3 + 0.1 * smoothstep(40.0, 0.0, nearest.y);
     col = mix(col, basinLava(heat), 1.0 - smoothstep(-0.6, 0.8, fallSD));
   }
 
@@ -567,7 +567,7 @@ void main() {
   float middle = sin(across * 3.14159);
   // Pale gold flow lines down the middle; gold out to a thin red-orange lip at both shores, as the
   // art's moat (no bright rim along them).
-  float heat = 0.62 + 0.16 * middle + (flow.x - 0.5) * 0.22 + flow.y * 0.3 * middle;
+  float heat = 0.66 + 0.14 * middle + (flow.x - 0.5) * 0.14 + flow.y * 0.18 * middle;
   heat -= 0.36 * (1.0 - smoothstep(0.0, 14.0, shore));
   // A thin dark crust right against the rock.
   heat -= 0.4 * (1.0 - smoothstep(1.5, 5.0, shore));
