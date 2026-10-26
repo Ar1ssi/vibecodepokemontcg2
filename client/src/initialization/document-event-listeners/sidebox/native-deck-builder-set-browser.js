@@ -333,8 +333,11 @@ import {
                 if (expanded) {
                   const cardsHtml = filtered.length
                     ? renderCardsGrid(
-                        // These Other-tab sets arrive in their own order; number order would undo it.
-                        KEEP_FETCH_ORDER_SET_IDS.has(set.setId) ? filtered : sortCardsWithinGroup(filtered, { sortBy: 'number', sortDirection: 'asc' }),
+                        // These Other-tab sets arrive in their own order; number order would undo it. So does a custom
+                        // set: its set.json lists the cards in the order its editor wants them shown (ids stay).
+                        KEEP_FETCH_ORDER_SET_IDS.has(set.setId) || isCustomSetId(set.setId)
+                          ? filtered
+                          : sortCardsWithinGroup(filtered, { sortBy: 'number', sortDirection: 'asc' }),
                         quantities,
                         owned
                       )
