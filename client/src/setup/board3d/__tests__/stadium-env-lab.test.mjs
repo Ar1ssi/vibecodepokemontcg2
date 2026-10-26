@@ -68,7 +68,7 @@ test('labSpots: the stair stands on the outline; tanks stand on the deck, apart,
         assert.ok(Math.hypot(tank.x - other.x, tank.y - other.y) > tank.radius + other.radius);
       }
     });
-    assert.ok(spots.tanks.length >= 4, `${spots.tanks.length} tanks`);
+    assert.ok(spots.tanks.length >= 2, `${spots.tanks.length} tanks`);
   }
   assert.equal(labSpots(null), null);
 });
@@ -111,20 +111,9 @@ test('Full Metal Lab shaders declare no GLSL ES 3.00 reserved word and every one
   }
 });
 
-test('labSpots: pipe arches stand on the deck tangent to the dais; pipe runs stay on the deck, clear of every tank', () => {
+test('labSpots: pipe runs stay on the deck, clear of every tank', () => {
   for (const layout of layouts) {
     const spots = labSpots(layout);
-    const scene = sceneBounds(layout, LAB_KEY);
-    for (const arch of spots.arches) {
-      const tangent = [-Math.sin(arch.angle), Math.cos(arch.angle)];
-      for (const side of [-1, 1]) {
-        const x = arch.x + tangent[0] * arch.half * side;
-        const y = arch.y + tangent[1] * arch.half * side;
-        assert.ok(daisDistance(x, y, spots.dais) > arch.radius, 'each foot off the dais');
-        assert.ok(x > scene.x && x < scene.x + scene.w && y > scene.y && y < scene.y + scene.h, 'each foot in the scene');
-        for (const tank of spots.tanks) assert.ok(Math.hypot(x - tank.x, y - tank.y) > tank.radius + arch.radius);
-      }
-    }
     for (const bundle of spots.bundles) {
       for (let t = 0; t <= bundle.length; t += 5) {
         const x = bundle.x + bundle.dx * t;
