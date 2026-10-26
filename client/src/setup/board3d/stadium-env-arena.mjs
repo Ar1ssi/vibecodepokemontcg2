@@ -342,8 +342,8 @@ void main() {
     } else if (id >= 0.0) {
       // The ramp: the stage's glowing white running out to the left, lights along both edges.
       col = mix(vec3(0.6, 0.84, 0.9), vec3(0.78, 0.93, 0.98), smoothstep(0.0, 30.0, id));
-      float bulb = length(vec2(mod(p.x, 26.0) - 13.0, id - 9.0));
-      col += vec3(1.4, 1.5, 1.6) * (1.0 - smoothstep(2.0, 3.5, bulb));
+      float bulb = length(vec2(mod(p.x, 40.0) - 20.0, id - 10.0));
+      col += vec3(1.4, 1.5, 1.6) * (1.0 - smoothstep(4.5, 6.0, bulb)) + vec3(0.3, 0.55, 0.6) * exp(-bulb / 6.0) * 0.5;
       col = mix(vec3(0.08, 0.14, 0.18), col, smoothstep(0.0, 3.0, id));
     } else {
       // The stage: glowing white, a row of white lights along its outer edge.
@@ -351,8 +351,9 @@ void main() {
       float rim = ${STAGE_PX.width - 9}.0;
       vec2 rel = p - uRing.xy;
       float along = abs(rel.x) / (uRing.z + rim) > abs(rel.y) / (uRing.w + rim) ? p.y : p.x;
-      float bulb = length(vec2(mod(along, 26.0) - 13.0, d - rim));
-      col += vec3(1.4, 1.5, 1.6) * (1.0 - smoothstep(2.0, 3.5, bulb));
+      // The art's big round lamps along the stage's outer edge, a glow round each.
+      float bulb = length(vec2(mod(along, 40.0) - 20.0, d - rim));
+      col += vec3(1.4, 1.5, 1.6) * (1.0 - smoothstep(4.5, 6.0, bulb)) + vec3(0.3, 0.55, 0.6) * exp(-bulb / 6.0) * 0.5;
       col = mix(col, vec3(0.08, 0.14, 0.18), smoothstep(${STAGE_PX.width - 3}.0, ${STAGE_PX.width}.0, d));
     }
   } else if (kind < 1.5) {
@@ -438,18 +439,25 @@ float lettering(vec2 q, float y0, float y1, float seed) {
 void main() {
   if (revealBurned(vPos) * exitKeep(vPos) < 0.5) discard;
   float panel = floor(vAd.x / PANEL);
-  float design = floor(hash12(vec2(panel, 4.0)) * 5.0);
+  // As in the art, most boards are white with a coloured mark and lettering; a few are red with
+  // yellow lettering or blue with the Poke Ball.
+  float pick = hash12(vec2(panel, 4.0));
   vec2 q = vec2(mod(vAd.x, PANEL), vAd.y * 38.0);
   vec3 col;
-  if (design < 0.5) {
-    col = vec3(0.85, 0.08, 0.1);
-    col = mix(col, vec3(1.0), lettering(q - vec2(14.0, 0.0), 13.0, 25.0, panel));
-  } else if (design < 1.5) {
-    col = vec3(0.95);
-    float mark = length((q - vec2(28.0, 19.0)) * vec2(1.0, 1.2));
-    col = mix(col, vec3(0.85, 0.1, 0.12), 1.0 - smoothstep(9.0, 10.0, mark));
-    col = mix(col, vec3(0.1, 0.2, 0.75), lettering(q - vec2(48.0, 0.0), 14.0, 24.0, panel) * step(q.x, 140.0));
-  } else if (design < 2.5) {
+  if (pick < 0.62) {
+    col = vec3(0.95, 0.96, 0.97);
+    float hue = hash12(vec2(panel, 8.0));
+    vec3 ink = hue < 0.4 ? vec3(0.12, 0.6, 0.2) : hue < 0.75 ? vec3(0.1, 0.25, 0.75) : vec3(0.85, 0.12, 0.14);
+    // A mark (a swoosh or a disc) then a line of lettering, placed differently on each board.
+    float swoosh = abs(length((q - vec2(26.0, 6.0)) * vec2(0.8, 1.0)) - 15.0) - 2.6;
+    float disc = length(q - vec2(26.0, 19.0)) - 9.0;
+    float mark = hash12(vec2(panel, 9.0)) < 0.5 ? max(swoosh, -(q.y - 12.0)) : disc;
+    col = mix(col, ink, 1.0 - smoothstep(-0.5, 0.8, mark));
+    col = mix(col, ink * 0.7, lettering(q - vec2(48.0, 0.0), 13.0, 25.0, panel) * step(q.x, 140.0));
+  } else if (pick < 0.82) {
+    col = vec3(0.82, 0.1, 0.1);
+    col = mix(col, vec3(1.0, 0.85, 0.2), lettering(q - vec2(14.0, 0.0), 12.0, 26.0, panel + 2.0));
+  } else {
     col = vec3(0.08, 0.25, 0.8);
     vec2 ball = q - vec2(PANEL * 0.5, 19.0);
     float r = length(ball);
@@ -458,12 +466,6 @@ void main() {
     float button = 1.0 - smoothstep(0.8, 1.6, abs(r - 4.0));
     col = mix(col, vec3(1.0), max(max(outline, band), button));
     col = mix(col, vec3(0.95, 0.3, 0.3), step(r, 11.0) * step(1.2, ball.y) * step(5.0, r));
-  } else if (design < 3.5) {
-    col = vec3(0.98, 0.78, 0.1);
-    col = mix(col, vec3(0.08, 0.08, 0.1), lettering(q - vec2(20.0, 0.0), 12.0, 26.0, panel + 9.0));
-  } else {
-    col = vec3(0.1, 0.62, 0.3);
-    col = mix(col, vec3(0.95, 1.0, 0.9), lettering(q - vec2(26.0, 0.0), 14.0, 24.0, panel + 5.0));
   }
   // Seams between panels, a sheen running along the band.
   col *= 0.4 + 0.6 * smoothstep(0.0, 2.0, min(q.x, PANEL - q.x));
