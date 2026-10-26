@@ -28,6 +28,10 @@ export const HALL_GAP_PX = { side: 150, end: 64 };
 export const WALL_PX = { height: 245, lean: 105, cap: 60 };
 /** The gate on each side wall: half its width at its foot, its height. */
 export const GATE_PX = { half: 300, height: 205 };
+/** The floor's big hex tiles: px per hex unit (inradius half a unit). */
+const FLOOR_HEX_PX = 230;
+/** How far up the side walls (share of the hall's half height) the corner grooves meet them. */
+const CORNER_CUT = '0.5';
 /** The ceiling the floor mirrors, px over the floor; its light panels' hex unit. */
 const CEILING_PX = 300;
 const CEILING_HEX_PX = 150;
@@ -87,15 +91,49 @@ uniform vec4 uHall;
 uniform vec3 uGate;
 const vec3 STRIP_CYAN = vec3(0.35, 1.0, 1.45);
 const float WALL_HEIGHT = ${WALL_PX.height}.0;
-// The art's gate on a side wall at u px along it (x) and h px up it: a white chevron frame, its
-// pillars leaning in to a flat lintel, round a grey sliding door filling the opening. x: 1 on the
-// gate, y: px inside its outer outline (under GATE_FRAME on the frame), z: px from its middle.
-const float GATE_FRAME = 64.0;
+// The art's gate on a side wall at u px along it and h px up it: a chunky white frame (GATE_BAND
+// thick) round a trapezoid opening that narrows upward, its legs leaning in to a flat lintel, each
+// corner flaring out into an arm, up and out at the top, out along the floor at the foot, the arm's
+// end ribbed with black slats; the grey double door filling the opening. x: 0 off it, 1 frame,
+// 2 slats, 3 door; y: on the frame px in from its edge, on the slats px along the arm, on the door px
+// in from the opening's edge; z: px from the gate's middle.
+const float GATE_BAND = 30.0;
+float segmentDistance(vec2 q, vec2 a, vec2 b) {
+  vec2 ab = b - a;
+  return length(q - a - ab * clamp(dot(q - a, ab) / dot(ab, ab), 0.0, 1.0));
+}
+float segmentAlong(vec2 q, vec2 a, vec2 b) {
+  vec2 ab = b - a;
+  return dot(q - a, ab) / dot(ab, ab);
+}
+float doorTop() {
+  return uGate.z * 0.62;
+}
 vec3 gateAt(float u, float h) {
-  float local = abs(u - uGate.x);
-  float outer = uGate.y - 0.55 * h;
-  if (h > uGate.z || local > outer) return vec3(0.0);
-  return vec3(1.0, min(outer - local, uGate.z - h), u - uGate.x);
+  vec2 m = vec2(abs(u - uGate.x), h);
+  float bottomWide = uGate.y * 0.42;
+  float topWide = uGate.y * 0.3;
+  float top = doorTop();
+  vec2 legFoot = vec2(bottomWide + GATE_BAND * 0.5, GATE_BAND * 0.5);
+  vec2 legTop = vec2(topWide + GATE_BAND * 0.5, top + GATE_BAND * 0.5);
+  vec2 upperEnd = legTop + vec2(GATE_BAND * 1.9, GATE_BAND * 1.3);
+  vec2 lowerEnd = legFoot + vec2(GATE_BAND * 1.9, -GATE_BAND * 0.15);
+  float upper = segmentDistance(m, legTop, upperEnd);
+  float lower = segmentDistance(m, legFoot, lowerEnd);
+  float frame = min(min(segmentDistance(m, legFoot, legTop), segmentDistance(m, vec2(0.0, legTop.y), legTop)), min(upper, lower));
+  frame -= GATE_BAND * 0.5;
+  if (frame < 0.0) {
+    float upperAt = segmentAlong(m, legTop, upperEnd);
+    float lowerAt = segmentAlong(m, legFoot, lowerEnd);
+    float armLength = length(upperEnd - legTop);
+    if (upper <= GATE_BAND * 0.5 && upperAt > 0.55) return vec3(2.0, upperAt * armLength, u - uGate.x);
+    if (lower <= GATE_BAND * 0.5 && lowerAt > 0.55) return vec3(2.0, lowerAt * armLength, u - uGate.x);
+    return vec3(1.0, -frame, u - uGate.x);
+  }
+  float legX = mix(bottomWide, topWide, clamp(h / top, 0.0, 1.0));
+  float inside = min(legX - m.x, top - h);
+  if (inside > 0.0) return vec3(3.0, inside, u - uGate.x);
+  return vec3(0.0);
 }
 // The wall's colour at u px along it and h px up it (gated: 1 on a side wall, which holds the
 // gate); its light strips'
@@ -139,19 +177,19 @@ vec3 wallPaint(float u, float h, float gated, out vec3 glow) {
     vec3 gate = gateAt(u, h);
     if (gate.x > 0.5) {
       glow = vec3(0.0);
-      if (gate.y < GATE_FRAME) {
-        // The frame: white, three dark insets running down it, a grey edge.
-        float stripe = step(12.0, gate.y) * step(gate.y, 18.0) + step(26.0, gate.y) * step(gate.y, 34.0)
-          + step(42.0, gate.y) * step(gate.y, 50.0);
-        col = mix(vec3(0.88, 0.9, 0.93), vec3(0.2, 0.21, 0.24), stripe * 0.9);
-        col = mix(vec3(0.55, 0.57, 0.6), col, smoothstep(1.0, 3.0, gate.y));
+      if (gate.x < 1.5) {
+        // The frame: chunky and white, a grey bevel along its edges.
+        col = mix(vec3(0.55, 0.57, 0.6), vec3(0.9, 0.92, 0.95), smoothstep(1.0, 6.0, gate.y));
+      } else if (gate.x < 2.5) {
+        // An arm's end: black ribbed slats.
+        col = mix(vec3(0.05, 0.055, 0.065), vec3(0.26, 0.27, 0.3), step(0.6, fract(gate.y / 6.0)));
       } else {
         // The door, as in the art: two grey leaves filling the opening, a dark seam between them
         // and a dark border round them; three vent slits near the top of each leaf, a cluster of
         // hexagon outlines at each leaf's foot by the frame.
-        float inset = gate.y - GATE_FRAME;
+        float inset = gate.y;
         float fromSeam = abs(gate.z);
-        float top = uGate.z - GATE_FRAME;
+        float top = doorTop();
         col = mix(vec3(0.5, 0.52, 0.56), vec3(0.6, 0.62, 0.66), smoothstep(0.0, top, h));
         float vents = step(top - 34.0, h) * step(h, top - 16.0) * step(18.0, fromSeam) * step(fromSeam, 58.0)
           * (1.0 - smoothstep(0.4, 1.2, abs(fract((h - top + 34.0) / 6.0) - 0.5) * 6.0));
@@ -194,9 +232,9 @@ varying vec2 vPos;
 // The ceiling's light panels at q: big hex lights in dark frames.
 vec3 ceilingAt(vec2 q) {
   vec4 panel = hexTile(q / ${CEILING_HEX_PX}.0);
-  // Seen in a polished floor the panels' frames soften to grey.
-  float lit = smoothstep(0.04, 0.1, panel.x);
-  return mix(vec3(0.4, 0.42, 0.44), vec3(0.86, 0.89, 0.91), lit);
+  // Seen in a polished floor the panels' frames soften and blur to a pale grey, as the art's.
+  float lit = smoothstep(0.02, 0.13, panel.x);
+  return mix(vec3(0.6, 0.62, 0.65), vec3(0.88, 0.9, 0.92), lit);
 }
 // What the glossy floor mirrors at p: the nearest wall the mirrored ray meets below the wall's top,
 // else the ceiling over the hall.
@@ -222,10 +260,18 @@ vec3 mirroredAt(vec2 p) {
 void main() {
   vec2 p = vPos;
   if (revealBurned(p) * exitKeep(p) < 0.5) discard;
-  // The art's floor: pale and polished to a mirror, the hexes on it only the ceiling lights'
-  // reflections (they shift as the eye moves).
-  vec3 col = vec3(0.6, 0.62, 0.64) * (0.97 + 0.04 * fbm3(p / 160.0));
-  col = mix(col, mirroredAt(p) * 0.94, 0.66);
+  // The art's floor: pale and polished to a mirror, the ceiling's hex lights reflected in it, its
+  // own big hex tiles' seams faint; black hatched grooves cut across the hall's four corners (the
+  // slanted sides of a great hexagon whose flat sides lie past the near and far walls).
+  vec3 col = vec3(0.64, 0.66, 0.68) * (0.97 + 0.04 * fbm3(p / 160.0));
+  col = mix(col, mirroredAt(p) * 0.96, 0.6);
+  vec4 tile = hexTile((p - uHall.xy) / ${FLOOR_HEX_PX}.0);
+  col *= 1.0 - 0.08 * (1.0 - smoothstep(0.004, 0.012, tile.x));
+  vec2 rel = abs(p - uHall.xy);
+  float corner = dot(rel, vec2(0.8660254, 0.5)) - (0.8660254 * uHall.z + 0.5 * uHall.w * ${CORNER_CUT});
+  float groove = (1.0 - smoothstep(-0.5, 0.8, abs(corner) - 6.0)) * step(rel.y, uHall.w);
+  float hatch = step(0.8, fract(dot(p, vec2(0.7071, 0.7071)) / 9.0));
+  col = mix(col, mix(vec3(0.025, 0.027, 0.032), vec3(0.11, 0.115, 0.13), hatch), groove);
 
   // Shade gathers at the walls' feet; the far reaches of the hall dim a little.
   vec2 fromWall = uHall.zw - abs(p - uHall.xy);
@@ -311,9 +357,9 @@ void main() {
     float beyond = vPaint.y - WALL_HEIGHT;
     col = vec3(0.7, 0.72, 0.76) * mix(0.85, 1.0, smoothstep(0.0, 20.0, beyond));
     glow = STRIP_CYAN * (1.0 - smoothstep(0.8, 2.5, beyond)) * 0.8;
-    vec2 panel = abs(mod(vec2(vPaint.x, beyond) + 60.0, 120.0) - 60.0);
-    // The building's roof past the hall: pale panels, as white as the hall, dark seams.
-    vec3 roof = vec3(0.6, 0.62, 0.66) * mix(0.72, 1.0, smoothstep(0.8, 2.0, min(panel.x, panel.y)));
+    // Past the hall, the art's ceiling: big hex light panels, pale, in dark frames.
+    vec4 panel = hexTile(vec2(vPaint.x, beyond) / ${CEILING_HEX_PX * 0.6}.0);
+    vec3 roof = mix(vec3(0.16, 0.17, 0.2), vec3(0.74, 0.77, 0.8) * (0.95 + 0.08 * panel.y), smoothstep(0.03, 0.07, panel.x));
     col = mix(col, roof, smoothstep(${WALL_PX.cap - 20}.0, ${WALL_PX.cap}.0, beyond));
   }
   col += glow;
