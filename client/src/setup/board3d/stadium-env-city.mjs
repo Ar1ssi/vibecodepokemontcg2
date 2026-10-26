@@ -223,7 +223,7 @@ export function cityBuildings({ towers, round }) {
       z1: tower.height,
       hw: tower.w / 2,
       hh: tower.d / 2,
-      color: [0.27 + 0.04 * (i % 3), 0.29 + 0.04 * (i % 3), 0.35 + 0.03 * (i % 2), (i * 0.137) % 1],
+      color: [0.25 + 0.04 * (i % 3), 0.3 + 0.04 * (i % 3), 0.36 + 0.03 * (i % 2), (i * 0.137) % 1],
     });
   });
   const tiers = [
@@ -380,22 +380,15 @@ void main() {
     col = facadeColor(vec3(0.07, 0.075, 0.095), along, vHeight + ${STREET_PX}.0, 7.0);
     col *= mix(0.35, 1.0, smoothstep(-${STREET_PX}.0, 0.0, vHeight));
   } else if (d < 0.0) {
-    // The roof: dark concrete slabs with tar seams, worn patches, puddles holding the city's lights.
+    // The roof, as in the art: smooth pale grey concrete under the moon in broad slabs with dark
+    // seams, a soft stain here and there; the moonlight falls brighter toward the far side.
     vec2 slab = abs(mod(p + 90.0, 180.0) - 90.0);
-    float slabTone = 0.92 + 0.16 * hash12(floor((p + 90.0) / 180.0));
-    col = vec3(0.1, 0.105, 0.125) * (0.8 + 0.4 * fbm3(p / 60.0)) * slabTone;
-    col *= 0.92 + 0.12 * gnoise(p / 4.0);
-    col = mix(col, vec3(0.032, 0.033, 0.04), (1.0 - smoothstep(0.8, 2.0, min(slab.x, slab.y))) * 0.7);
-    // Tar patches where the roof was mended.
-    col = mix(col, col * 0.62, smoothstep(0.7, 0.74, fbm3(p / 45.0 + 9.0)));
-    // Puddles: still water mirroring the night sky, the neon and the hut lamp in soft streaks.
-    // A few shallow puddles: darker wet concrete with a faint sheen of the sky and the lights.
-    float puddle = smoothstep(0.74, 0.77, fbm3(p / 90.0 + 3.0)) * smoothstep(-20.0, -60.0, d);
-    float side = (p.x - uRoof.x) / uRoof.z;
-    vec3 mirrored = vec3(0.03, 0.034, 0.06)
-      + NEON_PINK * 0.06 * smoothstep(0.1, -0.9, side)
-      + LAMP_WARM * 0.05 * smoothstep(0.4, 1.0, side);
-    col = mix(col, mirrored * (0.9 + 0.1 * gnoise(p / 7.0 + uTime * 0.4)), puddle * 0.45);
+    float slabTone = 0.94 + 0.12 * hash12(floor((p + 90.0) / 180.0));
+    col = vec3(0.13, 0.137, 0.16) * (0.9 + 0.2 * fbm3(p / 90.0)) * slabTone;
+    col *= 0.96 + 0.06 * gnoise(p / 4.0);
+    col *= mix(0.85, 1.12, smoothstep(-1.0, 1.0, (p.y - uRoof.y) / uRoof.w));
+    col = mix(col, vec3(0.04, 0.042, 0.05), (1.0 - smoothstep(0.8, 2.0, min(slab.x, slab.y))) * 0.65);
+    col = mix(col, col * 0.78, smoothstep(0.74, 0.8, fbm3(p / 70.0 + 9.0)) * 0.7);
     col = mix(col * 0.5, col, smoothstep(0.3, 0.9, light.b));
     // Pink neon from the left tower washes the roof's left side; the hut lamp pools by its door.
     float neon = exp(-max(p.x - (uRoof.x - uRoof.z), 0.0) / 170.0) * smoothstep(-0.8, 0.4, (p.y - uRoof.y) / uRoof.w);
@@ -566,7 +559,7 @@ ${OUTPUT}
 /** The props' light: the night's cold fill, the city glow from below, the hut lamp and the neon. */
 const PROP_LIGHT = /* glsl */ `
 vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
-  vec3 col = albedo * (vec3(0.1, 0.11, 0.17) + vec3(0.16, 0.17, 0.26) * (0.5 + 0.5 * n.z));
+  vec3 col = albedo * (vec3(0.11, 0.125, 0.155) + vec3(0.18, 0.2, 0.25) * (0.5 + 0.5 * n.z));
   vec3 door = vec3(uHut.x - uHut.z - 26.0, uHut.y, 66.0);
   vec3 toLamp = door - world;
   col += albedo * LAMP_WARM * max(dot(n, normalize(toLamp)), 0.0) * exp(-length(toLamp) / 90.0) * 1.4;
