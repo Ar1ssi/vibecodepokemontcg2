@@ -342,13 +342,31 @@ const RING = /* glsl */ `
 // The arena: centre x, y and its paving's radius (ringSpots).
 uniform vec3 uRing;
 uniform vec3 uEmblem;
+// The paving's patch at x (in patch units): x its hash, y about how far to its border (half the gap
+// between the nearest two cell points' distances; one pass, so cheap enough per pixel).
+vec2 pavingPatch(vec2 x) {
+  vec2 n = floor(x);
+  vec2 f = fract(x);
+  float best = 8.0;
+  float second = 8.0;
+  vec2 bestCell = vec2(0.0);
+  for (int j = -1; j <= 1; j++) {
+    for (int i = -1; i <= 1; i++) {
+      vec2 g = vec2(float(i), float(j));
+      float d = length(g + hash22(n + g) - f);
+      if (d < best) { second = best; best = d; bestCell = g; }
+      else if (d < second) { second = d; }
+    }
+  }
+  return vec2(hash12(n + bestCell), 0.5 * (second - best));
+}
 // The paving's brick at p: x, y its cell (unique across patches), z px to its nearest mortar line
 // (a patch's border is one), w its row's length px. In each patch the rows run their own way: half
 // the patches along the table, the rest on either diagonal or across it; each row is shifted along
 // by its own share of a brick and has its own brick length.
 vec4 brickAt(vec2 p) {
-  vec4 area = voronoiCell((p - uRing.xy) / ${BRICK_PX.patch}.0 + 5.0);
-  float pick = area.y;
+  vec2 area = pavingPatch((p - uRing.xy) / ${BRICK_PX.patch}.0 + 5.0);
+  float pick = area.x;
   float angle = pick < 0.5 ? 0.0 : pick < 0.7 ? 0.7854 : pick < 0.9 ? -0.7854 : 1.5708;
   vec2 rel = p - uRing.xy + pick * 97.0;
   rel = vec2(cos(angle) * rel.x + sin(angle) * rel.y, cos(angle) * rel.y - sin(angle) * rel.x);
@@ -356,7 +374,7 @@ vec4 brickAt(vec2 p) {
   float brickLong = ${BRICK_PX.long}.0 + ${BRICK_PX.vary}.0 * (2.0 * hash12(vec2(row, 3.0 + pick)) - 1.0);
   vec2 q = vec2(rel.x / brickLong + hash12(vec2(row, 7.0 + pick)), rel.y / ${BRICK_PX.high}.0);
   vec2 edge = (0.5 - abs(fract(q) - 0.5)) * vec2(brickLong, ${BRICK_PX.high}.0);
-  return vec4(floor(q) + pick * 1000.0, min(min(edge.x, edge.y), area.x * ${BRICK_PX.patch}.0), brickLong);
+  return vec4(floor(q) + pick * 1000.0, min(min(edge.x, edge.y), area.y * ${BRICK_PX.patch}.0), brickLong);
 }
 // The emblem in the paving, as in the art: a broad disc of pale stone sunk in a dark groove, a dark
 // ring round its pale centre and a shallower band carved across it from that ring to the rim. x: 1 on
@@ -468,7 +486,6 @@ const vec3 HAZE = vec3(0.42, 0.37, 0.3);
 export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
-${VORONOI}
 ${REVEAL}
 ${RING}
 ${OVERCAST}
