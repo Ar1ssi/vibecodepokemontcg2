@@ -426,8 +426,13 @@ void main() {
     col = rock * (0.75 + 0.3 * sky);
   }
   col = mix(col * 0.55, col, smoothstep(0.3, 0.9, light.b));
-  // The haze filling the depths, in the art's sepia, thicker the deeper.
-  col = mix(col, HAZE, smoothstep(-10.0, -${DEPTHS_PX}.0, ground) * 0.7);
+  // The overcast sky's thicker clouds drift over, their soft shadows crossing the ring.
+  float clouds = fbm3((p - vec2(uTime * 9.0, uTime * 4.0)) / 520.0 + 3.7);
+  col *= 1.0 - 0.16 * smoothstep(0.48, 0.72, clouds);
+  // The haze filling the depths, in the art's sepia, thicker the deeper, its mist drifting.
+  float depth = smoothstep(-10.0, -${DEPTHS_PX}.0, ground);
+  float mist = fbm3((p + vec2(uTime * 14.0, -uTime * 6.0)) / 160.0);
+  col = mix(col, HAZE * (0.9 + 0.25 * mist), depth * (0.62 + 0.2 * mist));
   vec2 edgeUv = min(vUv, 1.0 - vUv);
   col *= mix(0.45, 1.0, smoothstep(0.0, 0.05, min(edgeUv.x, edgeUv.y)));
   vec3 dust = vec3(0.75, 0.68, 0.55);
