@@ -685,8 +685,6 @@ export function createStadiumEnvironment({
     bakeOptions: BAKE_OPTIONS,
     terrainGrid: (bounds) => terrainGrid(three, bounds),
     replaceGeometry,
-    instancedGeometry: (spec, instances) => instancedGeometry(three, spec, instances),
-    latheIndex,
   };
   const bakeLight = kit.material(glsl.FULLSCREEN_VERTEX, glsl.BAKE_LIGHT_FRAGMENT, BAKE_OPTIONS);
   const bakeCamera = new three.OrthographicCamera(-1, 1, 1, -1, 0, 1);

@@ -395,8 +395,7 @@ boards" toggle. Revert: unset the toggle per user, or revert the feature commits
 - Prototype (six more boards): boards made of shapes (railings, tanks, menhirs, ropes, towers, the
   ring) build them with `stadium-env-props.mjs` (`createPropBuilder`: tubes, cylinders, boxes,
   quads into one geometry, one draw call; `propFragment` lights them with the board's own light),
-  and the kit hands every builder `terrainGrid`, `replaceGeometry`, `bakeOptions`,
-  `instancedGeometry` and `latheIndex`. `POKE_BALL` and `FLOW_STREAKS` moved into the shared GLSL;
+  and the kit hands every builder `terrainGrid`, `replaceGeometry` and `bakeOptions`. `POKE_BALL` and `FLOW_STREAKS` moved into the shared GLSL;
   `arenaRects` (every Active and Bench card) into the layout module.
 
 ---
