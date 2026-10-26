@@ -622,6 +622,9 @@ export function resolveChoiceCommand({ draft, playerId, activeRng, events, paylo
         : null;
 
     const searchedToHand = [];
+    // "Shuffle your deck, then put that card on top of it" (Beldum Magnetic Lift): the picks
+    // leave the deck now and go back on top after the shuffle below.
+    const searchedToTop = [];
     for (const sel of selection) {
       const instId = typeof sel === 'object' ? sel.instanceId : sel;
       const idx = player.zones.deck.findIndex(
@@ -629,7 +632,9 @@ export function resolveChoiceCommand({ draft, playerId, activeRng, events, paylo
       );
       if (idx >= 0) {
         const [card] = player.zones.deck.splice(idx, 1);
-        if (dest === 'attach' && attachTarget) {
+        if (dest === 'deckTop') {
+          searchedToTop.push(card);
+        } else if (dest === 'attach' && attachTarget) {
           card.enteredPlayTurn = draft.turn.number;
           attachToRoot(player, card, attachTarget, events);
         } else if (dest === 'bench') {
@@ -685,6 +690,7 @@ export function resolveChoiceCommand({ draft, playerId, activeRng, events, paylo
       zoneId: 'deck',
       playerId: initiatorPlayerId,
     });
+    player.zones.deck.unshift(...searchedToTop);
 
     draft.pendingChoice = null;
 
