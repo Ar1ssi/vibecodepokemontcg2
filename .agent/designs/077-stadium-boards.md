@@ -244,7 +244,7 @@ particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
   - Dark City (`stadium-env-city.mjs`, UNM 193): a moonlit concrete rooftop with a parapet, the
     stairwell hut and its lamp at the near right, AC units on the left; blue-grey towers of lit
     windows (a few switching on and off) across the streets, each roof with a parapet, tank and
-    blinking mast; the pink X and Team Skull's skull sprayed on two billboards, the far tower's
+    red-lit mast; the pink X and Team Skull's skull sprayed on two billboards, the far tower's
     hazard band, the round tower far off, searchlights sweeping the night.
   - Mountain Ring (`stadium-env-ring.mjs`, FFI 97): straight staggered brick rows breaking up at
     the ring's edge, a pale stone Poke Ball set in dark grooves; menhirs of every shape round it, a
