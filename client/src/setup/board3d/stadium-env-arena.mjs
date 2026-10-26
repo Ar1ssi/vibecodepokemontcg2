@@ -271,10 +271,14 @@ void main() {
     id = fract(tier * 0.37);
     kind = 2.0;
   }
-  if (kind > -0.5 && kind < 0.5 && d > ${STAGE_PX.width - 3}.0) h = -${APRON_PX.drop + STAGE_PX.drop}.0;
   // The entrance ramp runs off the stage at its level, out through the boards and the stands; B
   // carries px inside its edges (-1 on the stage itself).
   float ramp = rampInside(p);
+  // The stage's outer wall drops to the floor over a few px, so its rounded corners stay smooth on
+  // the grid; not where the ramp runs on.
+  if (kind > -0.5 && kind < 0.5 && ramp <= 0.0) {
+    h = mix(h, -${APRON_PX.drop + STAGE_PX.drop}.0, smoothstep(${STAGE_PX.width - 9}.0, ${STAGE_PX.width - 1}.0, d));
+  }
   if (ramp > 0.0 && d >= ${STAGE_PX.width - 3}.0) {
     h = ramp < 3.0 ? mix(-${APRON_PX.drop + STAGE_PX.drop}.0, -${APRON_PX.drop}.0, ramp / 3.0) : -${APRON_PX.drop}.0;
     kind = 0.0;
