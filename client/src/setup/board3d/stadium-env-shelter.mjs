@@ -68,6 +68,23 @@ export function shelterSpots(layout) {
   return { hall, gate, emblem, bigHex: Math.min(hall.hh, hall.hw * 0.866) * BIG_HEX_SHARE };
 }
 
+const HEX = /* glsl */ `
+const vec2 HEX_STEP = vec2(1.0, 1.7320508);
+// The hex tile round q (units: a tile's inradius is half a unit; its flat edges run along x): x px
+// to the tile's nearest edge in units, y the tile's hash, zw the tile's centre in units.
+vec4 hexTile(vec2 q) {
+  vec2 p = q.yx;
+  vec4 corners = floor(vec4(p, p - vec2(0.5, 1.0)) / HEX_STEP.xyxy) + 0.5;
+  vec4 h = vec4(p - corners.xy * HEX_STEP, p - (corners.zw + 0.5) * HEX_STEP);
+  bool first = dot(h.xy, h.xy) < dot(h.zw, h.zw);
+  vec2 local = first ? h.xy : h.zw;
+  vec2 cell = first ? corners.xy * HEX_STEP : (corners.zw + 0.5) * HEX_STEP;
+  vec2 a = abs(local);
+  float edge = 0.5 - max(dot(a, HEX_STEP * 0.5), a.x);
+  return vec4(edge, hash12(cell * 7.13), cell.yx);
+}
+`;
+
 const HALL = /* glsl */ `
 // The floor's rect to the walls' feet (centre x, y, half width, half height) and the gate on the
 // far wall (centre x, the wall's y, half width at its foot, height) (shelterSpots).
@@ -76,18 +93,14 @@ uniform vec4 uGate;
 const vec3 STRIP_CYAN = vec3(0.35, 1.0, 1.45);
 const float WALL_HEIGHT = ${WALL_PX.height}.0;
 // The art's gate on the far wall at u px along it (x) and h px up it: a white chevron frame, its
-// pillars leaning in to a flat lintel, dark striped insets down them, round a dark recess holding
-// a grey sliding door with a cyan light over it. x: 1 on the gate, y: its paint (0 recess, 1
-// frame, 2 door), z: px across the pillar or the lintel from its outer edge.
+// pillars leaning in to a flat lintel, round a grey sliding door filling the opening. x: 1 on the
+// gate, y: px inside its outer outline (under GATE_FRAME on the frame), z: px from its middle.
+const float GATE_FRAME = 64.0;
 vec3 gateAt(float u, float h) {
   float local = abs(u - uGate.x);
   float outer = uGate.z - 0.55 * h;
   if (h > uGate.w || local > outer) return vec3(0.0);
-  float lintel = uGate.w - h;
-  float across = min(outer - local, lintel);
-  if (across < 64.0) return vec3(1.0, 1.0, across);
-  if (local < 84.0 && h < 138.0) return vec3(1.0, 2.0, local);
-  return vec3(1.0, 0.0, across);
+  return vec3(1.0, min(outer - local, uGate.w - h), u - uGate.x);
 }
 // The wall's colour at u px along it and h px up it (far: 1 on the far wall); its light strips'
 // glow in glow. White panels over a dark baseboard with a cyan line, a band of dark louvred vents
@@ -121,21 +134,29 @@ vec3 wallPaint(float u, float h, float far, out vec3 glow) {
   if (far > 0.5) {
     vec3 gate = gateAt(u, h);
     if (gate.x > 0.5) {
-      if (gate.y > 1.5) {
-        // The door: two grey leaves meeting in the middle, a cyan light over them.
-        col = mix(vec3(0.36, 0.38, 0.42), vec3(0.52, 0.54, 0.58), smoothstep(0.0, 60.0, h));
-        col = mix(vec3(0.16, 0.17, 0.2), col, smoothstep(1.0, 2.5, gate.z));
-        glow = STRIP_CYAN * (1.0 - smoothstep(0.8, 2.2, abs(h - 131.0))) * 0.9;
-      } else if (gate.y > 0.5) {
+      glow = vec3(0.0);
+      if (gate.y < GATE_FRAME) {
         // The frame: white, three dark insets running down it, a grey edge.
-        float stripe = step(12.0, gate.z) * step(gate.z, 18.0) + step(26.0, gate.z) * step(gate.z, 34.0)
-          + step(42.0, gate.z) * step(gate.z, 50.0);
+        float stripe = step(12.0, gate.y) * step(gate.y, 18.0) + step(26.0, gate.y) * step(gate.y, 34.0)
+          + step(42.0, gate.y) * step(gate.y, 50.0);
         col = mix(vec3(0.88, 0.9, 0.93), vec3(0.2, 0.21, 0.24), stripe * 0.9);
-        col = mix(vec3(0.55, 0.57, 0.6), col, smoothstep(1.0, 3.0, gate.z));
-        glow = vec3(0.0);
+        col = mix(vec3(0.55, 0.57, 0.6), col, smoothstep(1.0, 3.0, gate.y));
       } else {
-        col = vec3(0.12, 0.13, 0.15);
-        glow = vec3(0.0);
+        // The door, as in the art: two grey leaves filling the opening, a dark seam between them
+        // and a dark border round them; three vent slits near the top of each leaf, a cluster of
+        // hexagon outlines at each leaf's foot by the frame.
+        float inset = gate.y - GATE_FRAME;
+        float fromSeam = abs(gate.z);
+        float top = uGate.w - GATE_FRAME;
+        col = mix(vec3(0.5, 0.52, 0.56), vec3(0.6, 0.62, 0.66), smoothstep(0.0, top, h));
+        float vents = step(top - 34.0, h) * step(h, top - 16.0) * step(18.0, fromSeam) * step(fromSeam, 58.0)
+          * (1.0 - smoothstep(0.4, 1.2, abs(fract((h - top + 34.0) / 6.0) - 0.5) * 6.0));
+        col = mix(col, vec3(0.3, 0.31, 0.34), vents);
+        float cluster = step(h, 44.0) * step(inset + h * 0.9, 62.0) * step(4.0, inset);
+        vec4 hex = hexTile(vec2(inset, h) / 17.0 + vec2(0.25, 0.1));
+        col = mix(col, vec3(0.36, 0.38, 0.42), cluster * (1.0 - smoothstep(0.03, 0.08, hex.x)));
+        col = mix(vec3(0.22, 0.23, 0.26), col, smoothstep(0.8, 2.0, fromSeam));
+        col = mix(vec3(0.2, 0.21, 0.24), col, smoothstep(2.0, 4.0, inset));
       }
     }
   }
@@ -143,22 +164,6 @@ vec3 wallPaint(float u, float h, float far, out vec3 glow) {
 }
 `;
 
-const HEX = /* glsl */ `
-const vec2 HEX_STEP = vec2(1.0, 1.7320508);
-// The hex tile round q (units: a tile's inradius is half a unit; its flat edges run along x): x px
-// to the tile's nearest edge in units, y the tile's hash, zw the tile's centre in units.
-vec4 hexTile(vec2 q) {
-  vec2 p = q.yx;
-  vec4 corners = floor(vec4(p, p - vec2(0.5, 1.0)) / HEX_STEP.xyxy) + 0.5;
-  vec4 h = vec4(p - corners.xy * HEX_STEP, p - (corners.zw + 0.5) * HEX_STEP);
-  bool first = dot(h.xy, h.xy) < dot(h.zw, h.zw);
-  vec2 local = first ? h.xy : h.zw;
-  vec2 cell = first ? corners.xy * HEX_STEP : (corners.zw + 0.5) * HEX_STEP;
-  vec2 a = abs(local);
-  float edge = 0.5 - max(dot(a, HEX_STEP * 0.5), a.x);
-  return vec4(edge, hash12(cell * 7.13), cell.yx);
-}
-`;
 
 export const FLOOR_VERTEX = /* glsl */ `
 varying vec2 vPos;
@@ -181,8 +186,8 @@ uniform vec3 uEmblem;
 uniform float uBigHex;
 ${NOISE}
 ${REVEAL}
-${HALL}
 ${HEX}
+${HALL}
 ${POKE_BALL}
 varying vec2 vPos;
 
@@ -292,6 +297,7 @@ export const WALL_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
 ${REVEAL}
+${HEX}
 ${HALL}
 varying vec4 vPaint;
 varying vec3 vNormal;
