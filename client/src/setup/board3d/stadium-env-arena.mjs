@@ -37,8 +37,8 @@ export const ARENA_KEY = 'fighting-stadium';
 export const RING_GAP_PX = { side: 34, end: 30 };
 /** The ring's apron (its skirt down to the stage), the stage round it, the floor to the ad boards. */
 export const APRON_PX = { drop: 34, slope: 18 };
-export const STAGE_PX = { width: 74, drop: 46 };
-export const FLOOR_PX = 64;
+export const STAGE_PX = { width: 100, drop: 46 };
+export const FLOOR_PX = 38;
 /** The ad boards: height, thickness, how far their tops lean back from the ring (their faces show from above). */
 export const BOARD_PX = { height: 42, thick: 8, lean: 30 };
 /** The stands: each tier's run and rise. */
@@ -398,12 +398,12 @@ void main() {
   vec3 n = normalize(vec3(nxy / nz * vGrowth, 1.0));
   vec3 col;
   if (kind < -0.5) {
-    // The canvas: white under the rig's spotlight, as the art's (190,221,242), a pale blue toward the
-    // ropes (120,170,205), both inverted through Neutral tone mapping; faint scuffs; a navy band
-    // round its edge; the Poke Ball painted on it in light grey lines.
+    // The canvas, as the art's: a pale cyan-white (214,230,242) under the rig's spotlight, (178,198,216)
+    // toward the ropes, both inverted through Neutral tone mapping; faint scuffs; a navy band round
+    // its edge; the Poke Ball painted on it in light grey lines.
     vec2 fromMiddle = (p - uRing.xy) / max(uRing.zw, vec2(1.0));
     float spot = exp(-dot(fromMiddle, fromMiddle) * 0.9);
-    col = mix(vec3(0.228, 0.442, 0.65), vec3(0.63, 0.878, 1.074), spot) * (0.97 + 0.04 * fbm3(p / 50.0));
+    col = mix(vec3(0.485, 0.605, 0.727), vec3(0.88, 1.02, 1.14), spot) * (0.97 + 0.04 * fbm3(p / 50.0));
     col = mix(col, vec3(0.022, 0.06, 0.16), smoothstep(-22.0, -16.0, d));
     float e = emblemDistance(p, uEmblem);
     col = mix(col, vec3(0.88, 0.93, 0.96), (1.0 - smoothstep(1.5, 3.0, e)) * 0.85 * step(0.001, uEmblem.z));
@@ -453,8 +453,8 @@ void main() {
       float pick = hash12(vec2(slot, id * 53.0));
       vec3 shirt = pick < 0.55 ? vec3(0.01, 0.085, 0.09) : pick < 0.75 ? vec3(0.02, 0.06, 0.1) : pick < 0.9 ? vec3(0.05, 0.045, 0.065) : vec3(0.05, 0.1, 0.1);
       col = mix(col, shirt * (0.75 + 0.25 * smoothstep(-6.0, 2.0, local.y)), body);
-      // The head: dark hair, its crown catching the rig's light.
-      col = mix(col, mix(vec3(0.012, 0.035, 0.038), vec3(0.035, 0.09, 0.095), smoothstep(-1.5, 2.5, local.y - 2.0)), head);
+      // The head, as the art's crowd speckle: dark hair, the face toward the ring catching the light.
+      col = mix(col, mix(vec3(0.015, 0.04, 0.045), vec3(0.09, 0.2, 0.2), smoothstep(-1.5, 2.5, local.y - 2.0)), head);
       // A raised phone's light here and there, twinkling.
       float phone = step(0.985, hash12(vec2(slot * 3.1, id * 13.0))) * (0.35 + 0.25 * sin(uTime * 2.5 + seed * 40.0));
       col += vec3(0.9, 1.0, 1.1) * phone * (1.0 - smoothstep(0.8, 1.8, length(local - vec2(3.0, 4.0))));
@@ -502,9 +502,10 @@ void main() {
 `;
 
 /**
- * The LED ad boards, as the art's thin glowing strip: a run of panels round the band, most white with
- * a small coloured mark and lettering, now and then a red, green or blue one; a slow sheen runs along
- * them.
+ * The LED ad boards, as the art's glowing strip: an unbroken run of panels round the band, each one
+ * of the art's designs with its logo or print (white with a red and white Poke Ball and dark print,
+ * white with dark print, blue with a white wordmark, orange-red with yellow print, teal-green with
+ * yellow print); a slow sheen runs along them.
  */
 export const BOARD_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
@@ -527,36 +528,35 @@ float lettering(vec2 q, float y0, float y1, float seed) {
 void main() {
   if (revealBurned(vPos) * exitKeep(vPos) < 0.5) discard;
   float panel = floor(vAd.x / PANEL);
-  // As in the art, most boards are white with a coloured mark and lettering; a few red with yellow
-  // lettering, green with white, or blue with the Poke Ball.
   float pick = hash12(vec2(panel, 4.0));
   vec2 q = vec2(mod(vAd.x, PANEL), vAd.y * 38.0);
+  // Print on the panel: two lines of bold word blocks, or one big line.
+  float twoLines = step(0.5, hash12(vec2(panel, 6.0)));
+  float print = twoLines > 0.5
+    ? max(lettering(q - vec2(12.0, 0.0), 21.0, 29.0, panel) * step(q.x, 138.0), lettering(q - vec2(12.0, 0.0), 9.0, 17.0, panel + 1.0) * step(q.x, 110.0))
+    : lettering(q - vec2(12.0, 0.0), 12.0, 26.0, panel) * step(q.x, 138.0);
   vec3 col;
-  if (pick < 0.7) {
+  if (pick < 0.25) {
+    // White, the red and white Poke Ball at its left, dark print beside it.
     col = vec3(0.95, 0.96, 0.97);
-    float hue = hash12(vec2(panel, 8.0));
-    vec3 ink = hue < 0.4 ? vec3(0.12, 0.6, 0.2) : hue < 0.75 ? vec3(0.1, 0.25, 0.75) : vec3(0.85, 0.12, 0.14);
-    // A mark (a swoosh or a disc) then a line of lettering, placed differently on each board.
-    float swoosh = abs(length((q - vec2(26.0, 6.0)) * vec2(0.8, 1.0)) - 15.0) - 2.6;
-    float disc = length(q - vec2(26.0, 19.0)) - 9.0;
-    float mark = hash12(vec2(panel, 9.0)) < 0.5 ? max(swoosh, -(q.y - 12.0)) : disc;
-    col = mix(col, ink, 1.0 - smoothstep(-0.5, 0.8, mark));
-    col = mix(col, ink * 0.7, lettering(q - vec2(48.0, 0.0), 13.0, 25.0, panel) * step(q.x, 140.0));
-  } else if (pick < 0.8) {
-    col = vec3(0.82, 0.1, 0.1);
-    col = mix(col, vec3(1.0, 0.85, 0.2), lettering(q - vec2(14.0, 0.0), 12.0, 26.0, panel + 2.0));
-  } else if (pick < 0.9) {
-    col = vec3(0.08, 0.55, 0.22);
-    col = mix(col, vec3(0.95, 1.0, 0.95), lettering(q - vec2(20.0, 0.0), 13.0, 25.0, panel + 5.0));
-  } else {
-    col = vec3(0.08, 0.25, 0.8);
-    vec2 ball = q - vec2(PANEL * 0.5, 19.0);
+    vec2 ball = q - vec2(22.0, 19.0);
     float r = length(ball);
-    float outline = 1.0 - smoothstep(0.8, 1.6, abs(r - 12.0));
-    float band = (1.0 - smoothstep(0.8, 1.6, abs(ball.y))) * step(r, 12.0);
-    float button = 1.0 - smoothstep(0.8, 1.6, abs(r - 4.0));
-    col = mix(col, vec3(1.0), max(max(outline, band), button));
-    col = mix(col, vec3(0.95, 0.3, 0.3), step(r, 11.0) * step(1.2, ball.y) * step(5.0, r));
+    col = mix(col, vec3(0.88, 0.12, 0.12), step(r, 11.0) * step(0.0, ball.y));
+    col = mix(col, vec3(0.08), max(1.0 - smoothstep(0.8, 1.8, abs(r - 11.0)), (1.0 - smoothstep(0.6, 1.6, abs(ball.y))) * step(r, 11.0)));
+    col = mix(col, vec3(0.08), 1.0 - smoothstep(0.6, 1.4, abs(r - 4.0)));
+    col = mix(col, vec3(0.12, 0.12, 0.14), lettering(q - vec2(42.0, 0.0), 13.0, 25.0, panel) * step(q.x, 140.0));
+  } else if (pick < 0.45) {
+    col = vec3(0.95, 0.96, 0.97);
+    col = mix(col, vec3(0.12, 0.14, 0.2), print);
+  } else if (pick < 0.65) {
+    col = vec3(0.1, 0.3, 0.85);
+    col = mix(col, vec3(0.97, 0.98, 1.0), print);
+  } else if (pick < 0.85) {
+    col = vec3(0.9, 0.22, 0.08);
+    col = mix(col, vec3(1.0, 0.86, 0.2), print);
+  } else {
+    col = vec3(0.04, 0.5, 0.42);
+    col = mix(col, vec3(1.0, 0.9, 0.3), print);
   }
   // Seams between panels, a dark frame along the top and foot, a sheen running along the band.
   col *= 0.4 + 0.6 * smoothstep(0.0, 2.0, min(q.x, PANEL - q.x));
