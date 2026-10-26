@@ -43,8 +43,8 @@ const STONE_SPACING_PX = 225;
 const BRICK_PX = { long: 46, vary: 8, high: 23 };
 /** The two rope strands: height on the stones (share of each stone's height), sag, thickness, turns round each stone. */
 const ROPES = [
-  { at: 0.52, sag: 30, radius: 4.2, wraps: 2 },
-  { at: 0.3, sag: 22, radius: 3.8, wraps: 1 },
+  { at: 0.52, sag: 30, radius: 4.0, wraps: 3 },
+  { at: 0.3, sag: 22, radius: 3.6, wraps: 2 },
 ];
 /** The chain: which stone it hangs from (turn round the ring, rad), how many links, link size. */
 const CHAIN = { angle: Math.PI * 1.19, links: 15, length: 50, width: 28, thick: 6 };
@@ -67,8 +67,9 @@ const SPIRES = [
 const SPIRE_STONE = [0.34, 0.31, 0.28, 0.05];
 
 const GREY_STONE = [0.5, 0.46, 0.4, 0.05];
-const ROPE_LIGHT = [0.4, 0.27, 0.15, 0.05];
-const ROPE_DARK = [0.27, 0.17, 0.09, 0.05];
+// The art's ropes: dark sepia, the strands (69,57,49), the wraps (49,37,29) to (74,61,52).
+const ROPE_LIGHT = [0.2, 0.17, 0.155, 0.05];
+const ROPE_DARK = [0.13, 0.11, 0.1, 0.05];
 const RUST = [0.27, 0.19, 0.15, 0.35];
 const RUST_DARK = [0.19, 0.13, 0.1, 0.3];
 
@@ -266,7 +267,7 @@ export function ringProps({ stones, allStones, anchor, spires = [] }) {
   const byIndex = new Map(stones.map((stone) => [stone.index, stone]));
   /** A point of the stone's surface, `share` of its height up, pushed out by `out` px at `angle`. */
   const onStone = (stone, share, angle, out) => {
-    const r = stone.radius * (1.08 - 0.22 * share) * 1.06 + out;
+    const r = stone.radius * (1.08 - 0.14 * share) * 1.08 + out;
     const u = Math.cos(angle) * r;
     const v = Math.sin(angle) * ((r - out) * stone.flat + out);
     const c = Math.cos(stone.yaw);
@@ -293,7 +294,7 @@ export function ringProps({ stones, allStones, anchor, spires = [] }) {
         const t = k / 14;
         span.push([0, 1, 2].map((axis) => from[axis] + (to[axis] - from[axis]) * t - (axis === 2 ? rope.sag * 4 * t * (1 - t) : 0)));
       }
-      props.tube(span, rope.radius * 0.85, ROPE_LIGHT, { sides: 6, colorAt: ropeColor });
+      props.tube(span, rope.radius * 0.7, ROPE_LIGHT, { sides: 6, colorAt: ropeColor });
     }
   }
   // The chain: from the anchor stone's top it drops to the ground and lies on outward.
