@@ -48,12 +48,13 @@ const SHORE_DRIFT_PX = 22;
 /** Run of the wall from the moat's outer shore up to its crest. */
 export const WALL_RUN_PX = 108;
 /** Most lavafalls a basin has (the uniform array's length). */
-export const MAX_FALLS = 8;
+export const MAX_FALLS = 10;
 /**
- * The lavafalls, after the art's four down its back wall: where each pours, as the side of the basin
- * and a share along that side's straight run (-1 near/left end, 1 far/right end), and whether it
- * forks into three strands near its foot (the art's second fall from the right). None on the near
- * wall: the hand covers it.
+ * The lavafalls: the art's four down its back wall on the far wall (the middle pair beside the
+ * opponent's hand, not behind it), three down each side wall. Where each pours, as the side of the
+ * basin and a share along that side's straight run (-1 near/left end, 1 far/right end), and whether
+ * it forks into three strands near its foot (the art's second fall from the right). None on the
+ * near wall: the hand covers it.
  */
 const FALL_RECIPES = [
   { side: 'left', at: -0.68, fork: false },
@@ -63,6 +64,8 @@ const FALL_RECIPES = [
   { side: 'right', at: -0.08, fork: true },
   { side: 'right', at: -0.7, fork: false },
   { side: 'far', at: -0.9, fork: false },
+  { side: 'far', at: -0.58, fork: false },
+  { side: 'far', at: 0.58, fork: false },
   { side: 'far', at: 0.9, fork: false },
 ];
 const FALL_DIP_PX = 14;
