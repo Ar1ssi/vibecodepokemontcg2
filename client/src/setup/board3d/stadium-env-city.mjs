@@ -47,7 +47,6 @@ const HUT = { w: 92, d: 116, h: 84 };
 const TOWERS = [
   { side: 'left', from: -1.0, to: -0.22, gap: 46, depth: 280, height: 70, board: 0 },
   { side: 'left', from: -0.1, to: 0.62, gap: 38, depth: 250, height: 230, board: 2 },
-  { side: 'left', from: 0.74, to: 1.5, gap: 54, depth: 300, height: 120, board: 0 },
   { side: 'right', from: -1.0, to: -0.3, gap: 44, depth: 280, height: 40, board: 0 },
   { side: 'right', from: -0.18, to: 0.64, gap: 38, depth: 250, height: 270, board: 1 },
   { side: 'right', from: 0.76, to: 1.5, gap: 50, depth: 280, height: 160, board: 0 },
@@ -55,8 +54,13 @@ const TOWERS = [
   { side: 'far', from: -1.0, to: -0.68, gap: 60, depth: 220, height: 60, board: 0 },
   { side: 'near', from: -1.2, to: 1.2, gap: 60, depth: 260, height: -110, board: 0 },
 ];
-/** The round tower beyond the far edge: share of the roof's half width, street gap, radius, height. */
-const ROUND_TOWER = { at: -0.45, gap: 56, r: 92, height: 330 };
+/**
+ * The round tower: in the art it stands at the back, behind the roof's far edge, where the board's
+ * far edge is covered by the opponent's hand; here it stands beside the roof's left side toward its
+ * far end, where both camera presets see it. Its place along that side (share of the roof's half
+ * height), street gap, radius, height.
+ */
+const ROUND_TOWER = { at: 1.0, gap: 50, r: 110, height: 330 };
 /** The searchlights: where each stands (shares of the roof's half size), its sweep's centre (rad) and phase. */
 const BEAMS = [
   { at: [-1.3, 1.3], heading: -0.55, phase: 0 },
@@ -75,6 +79,7 @@ const DOOR_RED = [0.26, 0.06, 0.06, 0.2];
 const LAMP = [1.4, 1.45, 1.5, 2.8];
 const MACHINE = [0.3, 0.32, 0.35, 0.4];
 const GRILLE = [0.06, 0.065, 0.075, 0.2];
+const GRILLE_RING = [0.16, 0.17, 0.19, 0.3];
 const HAZARD_YELLOW = [0.75, 0.6, 0.06, 1.7];
 const TOWER_PARAPET = [0.3, 0.32, 0.37, 0.05];
 const HAZARD_BLACK = [0.03, 0.03, 0.03, 0.1];
@@ -115,8 +120,8 @@ export function citySpots(layout) {
       : { x: roof.x + middle, y: roof.y + sign * reach, w: length, d: depth, height, board, hazard };
   });
   const round = {
-    x: roof.x + ROUND_TOWER.at * roof.hw,
-    y: roof.y + roof.hh + ROUND_TOWER.gap + ROUND_TOWER.r,
+    x: roof.x - roof.hw - ROUND_TOWER.gap - ROUND_TOWER.r,
+    y: roof.y + ROUND_TOWER.at * roof.hh,
     r: ROUND_TOWER.r,
     height: ROUND_TOWER.height,
   };
@@ -196,25 +201,15 @@ export function cityProps({ roof, hut, machines, towers }) {
   }
   for (const machine of machines) {
     props.box({ x: machine.x, y: machine.y, z0: 0, z1: 34, hw: machine.w / 2, hh: machine.d / 2, color: MACHINE, topColor: MACHINE });
-    // Two fans on top: a dark grille in a rim, three blades round a hub.
+    // Two fans on top, each a dark grille of thin rings in a rim, a hub in its middle.
     for (const side of [-1, 1]) {
       const fan = { x: machine.x, y: machine.y + side * machine.d * 0.24, r: machine.w * 0.34 };
       props.cylinder({ x: fan.x, y: fan.y, z0: 33, z1: 34.4, r: fan.r, color: GRILLE, sides: 20 });
       props.ring({ x: fan.x, y: fan.y, z0: 33, z1: 37, r: fan.r + 1.5, color: MACHINE, sides: 20 });
-      for (let blade = 0; blade < 3; blade += 1) {
-        const angle = blade * ((2 * Math.PI) / 3) + side;
-        props.box({
-          x: fan.x + Math.cos(angle) * fan.r * 0.5,
-          y: fan.y + Math.sin(angle) * fan.r * 0.5,
-          z0: 34.4,
-          z1: 35.2,
-          hw: fan.r * 0.42,
-          hh: 3.2,
-          yaw: angle,
-          color: MACHINE,
-        });
+      for (const share of [0.45, 0.72]) {
+        props.ring({ x: fan.x, y: fan.y, z0: 34.4, z1: 35.4, r: fan.r * share, color: GRILLE_RING, sides: 20 });
       }
-      props.cylinder({ x: fan.x, y: fan.y, z0: 34.4, z1: 36, r: fan.r * 0.2, color: MACHINE, sides: 10 });
+      props.cylinder({ x: fan.x, y: fan.y, z0: 34.4, z1: 36, r: fan.r * 0.16, color: MACHINE, sides: 10 });
     }
   }
   return props;
@@ -231,7 +226,7 @@ export function cityBuildings({ towers, round }) {
       z1: tower.height,
       hw: tower.w / 2,
       hh: tower.d / 2,
-      color: [0.17 + 0.03 * (i % 3), 0.26 + 0.03 * (i % 3), 0.4 + 0.04 * (i % 2), (i * 0.137) % 1],
+      color: [0.2 + 0.03 * (i % 3), 0.25 + 0.03 * (i % 3), 0.32 + 0.03 * (i % 2), (i * 0.137) % 1],
     });
   });
   const tiers = [
@@ -361,7 +356,7 @@ vec3 windowAt(float along, float up, float seed) {
   float restless = step(0.89, hash12(cell * 2.3 + seed));
   float hour = floor(uTime / 9.0 + hash12(cell * 5.1 + seed) * 9.0);
   roll = mix(roll, hash12(cell + seed * 131.0 + hour * 7.13), restless);
-  return vec3(pane, step(roll, 0.3) * (0.6 + 0.6 * hash12(cell * 1.7 + seed)), step(0.7, hash12(cell * 3.1 + seed)));
+  return vec3(pane, step(roll, 0.2) * (0.6 + 0.6 * hash12(cell * 1.7 + seed)), step(0.7, hash12(cell * 3.1 + seed)));
 }
 vec3 facadeColor(vec3 wall, float along, float up, float seed) {
   vec3 w = windowAt(along, up, seed);
@@ -577,12 +572,14 @@ uniform float uReveal;
 uniform float uExit;
 varying vec2 vBeam;
 void main() {
-  float core = exp(-vBeam.y * vBeam.y * 4.0);
-  float fade = smoothstep(0.0, 0.06, vBeam.x) * (1.0 - smoothstep(0.15, 0.95, vBeam.x));
+  // A soft shaft with a brighter core, both falling to nothing at the ribbon's edges, rising out of
+  // the streets' haze and fading out along its length: the art's pale blue-white.
+  float across = 1.0 - vBeam.y * vBeam.y;
+  float core = exp(-vBeam.y * vBeam.y * 6.0) * across;
+  float shaft = across * across * 0.45 + core;
+  float fade = smoothstep(0.0, 0.18, vBeam.x) * (1.0 - smoothstep(0.1, 0.9, vBeam.x));
   float shown = smoothstep(0.6, 1.0, uReveal) * (1.0 - uExit);
-  // A bright core in a soft shaft, the art's pale blue-white.
-  float shaft = exp(-vBeam.y * vBeam.y * 1.5) * 0.4 + core;
-  gl_FragColor = vec4(vec3(0.62, 0.74, 1.0) * shaft * fade * 0.32 * shown, 1.0);
+  gl_FragColor = vec4(vec3(0.62, 0.74, 1.0) * shaft * fade * 0.34 * shown, 1.0);
 ${OUTPUT}
 }
 `;
