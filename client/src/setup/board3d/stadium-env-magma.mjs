@@ -135,8 +135,8 @@ vec3 basinLava(float t) {
   t = clamp(t, 0.0, 1.0);
   vec3 c = mix(vec3(0.22, 0.012, 0.0), vec3(0.85, 0.07, 0.0), smoothstep(0.08, 0.22, t));
   c = mix(c, vec3(1.25, 0.34, 0.0), smoothstep(0.32, 0.48, t));
-  c = mix(c, vec3(1.35, 0.72, 0.06), smoothstep(0.55, 0.7, t));
-  return mix(c, vec3(1.45, 1.08, 0.36), smoothstep(0.78, 0.94, t));
+  c = mix(c, vec3(1.35, 0.62, 0.05), smoothstep(0.55, 0.7, t));
+  return mix(c, vec3(1.45, 0.95, 0.3), smoothstep(0.78, 0.94, t));
 }
 `;
 
@@ -304,7 +304,18 @@ void main() {
     h -= 2.4 * seam * inland;
     tone = fract(plate.y * 3.7 + fbm3(p / 70.0) * 0.8);
     joint = seam * step(0.45, fract(plate.y * 7.3));
-    h -= 2.2 * (1.0 - smoothstep(2.0, 4.5, emblemDistance(p, uEmblem))) * inland;
+    // The Poke Ball: a smooth disc a little proud of the rock, its band and button ring cut in, a
+    // crevice round it.
+    if (uEmblem.z > 0.0) {
+      vec2 rel = p - uEmblem.xy;
+      float r = length(rel);
+      float buttonR = uEmblem.z * 0.24;
+      float disc = 1.0 - smoothstep(uEmblem.z - 3.0, uEmblem.z, r);
+      float band = (1.0 - smoothstep(uEmblem.z * 0.075, uEmblem.z * 0.075 + 1.5, abs(rel.y))) * step(buttonR, r);
+      float ring = smoothstep(buttonR - 7.0, buttonR - 5.0, r) * (1.0 - smoothstep(buttonR + 2.0, buttonR + 4.0, r));
+      h = mix(h, pre.r + 1.6 - 2.4 * max(band, ring), disc);
+      h -= 1.5 * (1.0 - smoothstep(0.5, 2.5, abs(r - uEmblem.z - 1.0)));
+    }
   } else if (outerSD > 0.0) {
     kind = 0.0;
     // Rough volcanic rock: broad faces broken by knobbly lumps and a fine grain, the art's walls.
@@ -384,11 +395,11 @@ void main() {
 
   // The island: dark brown-black rock, a warm grey where lumps catch the light. The walls: black
   // basalt with a red-brown cast, faces to the light a muted warm grey under the hazy sky.
-  vec3 islandRock = mix(vec3(0.046, 0.037, 0.037), vec3(0.088, 0.071, 0.067), smoothstep(0.35, 0.75, facing));
-  islandRock = mix(islandRock, vec3(0.15, 0.125, 0.115), smoothstep(0.85, 0.97, facing));
+  vec3 islandRock = mix(vec3(0.046, 0.028, 0.019), vec3(0.088, 0.053, 0.036), smoothstep(0.35, 0.75, facing));
+  islandRock = mix(islandRock, vec3(0.15, 0.094, 0.052), smoothstep(0.85, 0.97, facing));
   islandRock *= 0.86 + 0.28 * tone;
-  vec3 wallRock = mix(vec3(0.04, 0.021, 0.02), vec3(0.09, 0.047, 0.04), smoothstep(0.4, 0.7, facing));
-  wallRock = mix(wallRock, vec3(0.17, 0.1, 0.085), smoothstep(0.82, 0.95, facing));
+  vec3 wallRock = mix(vec3(0.04, 0.008, 0.007), vec3(0.092, 0.017, 0.014), smoothstep(0.4, 0.7, facing));
+  wallRock = mix(wallRock, vec3(0.24, 0.065, 0.05), smoothstep(0.82, 0.95, facing));
   wallRock *= 0.8 + 0.4 * tone;
   vec3 col = mix(wallRock, islandRock, onIsland);
   // Painted rims: convex edges (lump tops, crags) catch a warm stroke of light.
@@ -396,7 +407,7 @@ void main() {
   float laplace = texture2D(uField, vUv + vec2(t2.x, 0.0)).r + texture2D(uField, vUv - vec2(t2.x, 0.0)).r
     + texture2D(uField, vUv + vec2(0.0, t2.y)).r + texture2D(uField, vUv - vec2(0.0, t2.y)).r - 4.0 * ground;
   float convex = smoothstep(0.4, 2.2, -laplace) * vGrowth;
-  col = mix(col, col * 1.7 + vec3(0.028, 0.02, 0.018), convex * 0.55);
+  col = mix(col, col * 1.7 + vec3(0.028, 0.016, 0.01), convex * 0.55);
   col = mix(vec3(0.026, 0.018, 0.02), col, smoothstep(0.25, 0.9, light.b));
 
   // The lava lights the rock: the moat the island's shore and the wall's foot, faces turned to it
@@ -414,8 +425,8 @@ void main() {
   float above = max(ground - ${LAVA_LEVEL}.0, 0.0);
   float flicker = 0.85 + 0.15 * gnoise(vec2(uTime * 0.9, p.x / 90.0 + p.y / 130.0));
   // The walls take less of it than the island: their faces lean away from the moat's middle.
-  float moatGlow = exp(-fromMoat / mix(26.0, 38.0, onIsland)) * exp(-above / 70.0) * (0.25 + 0.75 * turned);
-  col += vec3(1.0, 0.22, 0.03) * moatGlow * flicker * mix(0.55, 0.8, onIsland);
+  float moatGlow = exp(-fromMoat / mix(22.0, 38.0, onIsland)) * exp(-above / 60.0) * (0.25 + 0.75 * turned);
+  col += mix(vec3(1.0, 0.12, 0.05), vec3(1.0, 0.2, 0.03), onIsland) * moatGlow * flicker * mix(0.3, 0.8, onIsland);
   col += vec3(1.0, 0.26, 0.035) * exp(-max(fallSD, 0.0) / 11.0) * onWall * 0.7 * flicker;
 
   // Some of the island's cracks still glow; sparks lie on the rock.
@@ -423,27 +434,29 @@ void main() {
   float specks = speck(p, 12.0, 0.1, 1.0) + speck(p, 27.0, 0.16, 2.0) * 1.5;
   col += vec3(1.7, 0.42, 0.05) * specks * mix(0.35, 1.0, onIsland);
 
-  // The Poke Ball set in the island, as in the art: both halves of hot red rock glowing from
-  // within, brightest toward the rim, a dark band across its middle, the button a dark ring round
-  // a dull red core; it breathes slowly.
+  // The Poke Ball set in the island, as in the art: two smooth halves of glossy red-orange stone,
+  // brighter toward the rim and on the far side, a sheen along the far rim; the band, the button's
+  // ring and the crevice round it dark; the button's core red. It glows faintly, breathing.
   if (uEmblem.z > 0.0 && onIsland > 0.5) {
     vec2 rel = p - uEmblem.xy;
     float r = length(rel);
     float bandHalf = uEmblem.z * 0.075;
     float buttonR = uEmblem.z * 0.24;
-    float breathe = 0.85 + 0.15 * sin(uTime * 1.1);
+    float breathe = 0.93 + 0.07 * sin(uTime * 1.1);
     float inside = 1.0 - smoothstep(uEmblem.z - 1.5, uEmblem.z, r);
     float halves = inside * smoothstep(bandHalf, bandHalf + 1.5, abs(rel.y)) * smoothstep(buttonR + 3.0, buttonR + 5.0, r);
-    vec3 hot = mix(vec3(0.05, 0.008, 0.005), vec3(0.12, 0.02, 0.009), smoothstep(0.35, 1.0, r / uEmblem.z));
-    hot *= breathe * (0.82 + 0.18 * gnoise(p / 14.0));
+    float rim = smoothstep(0.3, 1.0, r / uEmblem.z);
+    vec3 stone = mix(vec3(0.15, 0.032, 0.026), vec3(0.28, 0.052, 0.042), rim);
+    stone *= (0.86 + 0.24 * smoothstep(-uEmblem.z, uEmblem.z, rel.y)) * breathe * (0.92 + 0.16 * fbm3(p / 22.0));
+    stone += vec3(0.4, 0.14, 0.05) * smoothstep(0.84, 0.97, r / uEmblem.z) * smoothstep(0.1, 0.7, rel.y / uEmblem.z);
     float buttonRing = smoothstep(buttonR - 7.0, buttonR - 4.0, r) * (1.0 - smoothstep(buttonR + 3.0, buttonR + 5.0, r));
     float dark = max(inside * (1.0 - halves) * step(buttonR - 4.0, r), buttonRing);
     float core = 1.0 - smoothstep(buttonR - 8.0, buttonR - 6.0, r);
-    float outline = 1.0 - smoothstep(1.0, 2.5, abs(r - uEmblem.z));
-    // Dark red-brown rock, its lumps still showing, warming toward the rim.
-    col = mix(col, col * vec3(1.5, 0.5, 0.42) + hot, halves * 0.92);
-    col = mix(col, vec3(0.03, 0.018, 0.016), max(dark * 0.65, outline * 0.8));
-    col = mix(col, vec3(0.22, 0.04, 0.015) * breathe, core);
+    float outline = 1.0 - smoothstep(1.0, 2.5, abs(r - uEmblem.z - 0.5));
+    col = mix(col, stone, halves);
+    col += vec3(1.7, 0.42, 0.05) * specks * halves;
+    col = mix(col, vec3(0.035, 0.016, 0.014), max(dark * 0.85, outline * 0.85));
+    col = mix(col, vec3(0.5, 0.09, 0.03) * breathe, core);
     col += vec3(0.5, 0.07, 0.01) * exp(-max(r - uEmblem.z, 0.0) / 14.0) * 0.12 * step(uEmblem.z, r);
   }
 
