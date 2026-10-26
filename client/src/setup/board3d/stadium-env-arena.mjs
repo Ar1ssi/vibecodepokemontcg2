@@ -336,6 +336,13 @@ void main() {
     // band round its edge; the Poke Ball painted on it in light grey lines.
     float spot = exp(-dot(p - uRing.xy, p - uRing.xy) / (2.0 * 420.0 * 420.0));
     col = mix(vec3(0.42, 0.5, 0.56), vec3(0.72, 0.8, 0.84), spot) * (0.95 + 0.06 * fbm3(p / 50.0));
+    // The rig overhead (the art's ring of lamps) lays a ring of soft light pools on the canvas.
+    vec2 rel = p - uRing.xy;
+    float rigR = min(uRing.z, uRing.w) * 0.78;
+    float lampTurn = atan(rel.y, rel.x) / 6.2831853 * 16.0;
+    vec2 lampAt = vec2(cos(floor(lampTurn + 0.5) / 16.0 * 6.2831853), sin(floor(lampTurn + 0.5) / 16.0 * 6.2831853)) * rigR;
+    float pool = exp(-dot(rel - lampAt, rel - lampAt) / (2.0 * 34.0 * 34.0));
+    col += vec3(0.1, 0.13, 0.14) * pool;
     col = mix(col, vec3(0.2, 0.26, 0.32), smoothstep(-26.0, -20.0, d));
     float e = emblemDistance(p, uEmblem);
     col = mix(col, vec3(0.88, 0.93, 0.96), (1.0 - smoothstep(1.5, 3.0, e)) * 0.85 * step(0.001, uEmblem.z));
