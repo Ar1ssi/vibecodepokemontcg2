@@ -86,6 +86,7 @@ const LID = [0.45, 0.48, 0.54, 0.25];
 const BIG_PIPES = [100, 120, 238, 262, 292, 72, 200, 160];
 const BIG_PIPE = { radius: 20, run: 150, bend: 40, top: 320 };
 const STEP_BLUE = [0.1, 0.36, 0.8, 0.25];
+const STEP_BLUE_LIGHT = [0.13, 0.42, 0.88, 0.25];
 const STEP_SIDE = [0.05, 0.16, 0.38, 0.25];
 const SCREEN = [0.3, 0.85, 1.25, 2.4];
 const CONSOLE_GREY = [0.42, 0.45, 0.5, 0.4];
@@ -271,7 +272,20 @@ export function labProps(spots) {
       hh: STAIR.width / 2,
       yaw: stair.angle,
       color: STEP_SIDE,
-      topColor: STEP_BLUE,
+      topColor: i % 2 ? STEP_BLUE : STEP_BLUE_LIGHT,
+    });
+    // A steel nosing along each tread's outer edge, so the steps read one by one from above.
+    const edgeRun = STAIR.tread * (i + 1) - 2.5;
+    props.box({
+      x: stair.x + along[0] * edgeRun,
+      y: stair.y + along[1] * edgeRun,
+      z0: -rise * (i + 1),
+      z1: -rise * (i + 1) + 1,
+      hw: 2,
+      hh: STAIR.width / 2,
+      yaw: stair.angle,
+      color: DARK_STEEL,
+      topColor: STEEL,
     });
   }
   for (const side of [-1, 1]) {
