@@ -68,19 +68,33 @@ const ROUND_TOWER = { at: 0.8, gap: 34, r: 100, height: 270 };
  * The searchlights, as the art's shafts sweeping the night sky, never across the cards. Two stand on
  * the side towers' roofs (`tower`: its TOWERS index, `at` shares of its half size) and climb low
  * along the sides toward the far side: the top-down preset sees them. Two stand down in the streets
- * between the roof's building and the tall side towers (`at` shares of the roof's half size) and
- * climb steeply toward the far side, across the towers' faces, where the tilted preset sees them. Each its
+ * between the roof's building and the side towers (`at` shares of the roof's half size), two a side,
+ * and climb steeply toward the far side, criss-crossing over the towers' faces as the art's cross the
+ * sky, where the tilted preset sees them. Each its
  * sweep's centre (rad), how steeply it climbs (rad) and phase.
  */
 const BEAMS = [
-  { tower: 1, at: [0.0, -0.5], heading: 1.75, tip: 0.32, phase: 0 },
-  { tower: 3, at: [0.0, -0.5], heading: 1.4, tip: 0.32, phase: 2.3 },
+  { tower: 1, at: [0.0, -0.85], heading: 1.75, tip: 0.32, phase: 0 },
+  { tower: 3, at: [0.0, -0.85], heading: 1.4, tip: 0.32, phase: 2.3 },
   { at: [-1.03, 0.16], heading: 1.75, tip: 1.15, phase: 4.1 },
   { at: [1.03, 0.22], heading: 1.4, tip: 1.15, phase: 1.2 },
+  { at: [-1.03, -0.42], heading: 1.95, tip: 1.05, phase: 3.3 },
+  { at: [1.03, -0.48], heading: 1.2, tip: 1.05, phase: 5.2 },
 ];
 /** A searchlight's shaft length, and its lamp's height over the tower's roof. */
-const BEAM_LENGTH_PX = 900;
+const BEAM_LENGTH_PX = 1250;
 const BEAM_LAMP_PX = 22;
+/**
+ * The billboards on the side towers' roofs: their extent along the table (most), the design's width
+ * over its height, how far they lean back (rad above level), how high their foot stands on its posts.
+ */
+const BILLBOARD_PX = { span: 150, aspect: 1.6, slope: 0.6, lift: 18 };
+const SIGN_POST = [0.12, 0.13, 0.15, 0.4];
+/**
+ * The ads on the towers' faces: px up the face its foot stands, px up the face it runs (across the
+ * screen in the tilted preset, foreshortened about 0.4), px along the face (up the screen).
+ */
+const WALL_BOARD_PX = { foot: 40, across: 190, along: 64 };
 
 const CONCRETE = [0.26, 0.27, 0.31, 0.05];
 const COPING = [0.42, 0.43, 0.47, 0.15];
@@ -152,9 +166,18 @@ export function citySpots(layout) {
   return { roof, hut, towers, round, beams };
 }
 
-/** The parapet round the roof, the hut with its door and lamp, the towers' rooftops and searchlights, the round tower's crown. */
+/** The parapet round the roof, the hut with its door and lamp, the towers' rooftops, billboards' posts and searchlights, the round tower's crown. */
 export function cityProps({ roof, hut, towers, round, beams = [] }) {
   const props = createPropBuilder();
+  // Each billboard's posts: two at its foot, two longer ones up to its top edge.
+  for (const tower of towers) {
+    if (!tower.board) continue;
+    const { foot, top, y0, y1 } = billboardOf(roof, tower);
+    for (const y of [y0 + 12, y1 - 12]) {
+      props.box({ x: foot.x, y, z0: tower.height, z1: foot.z, hw: 2.5, hh: 2.5, color: SIGN_POST });
+      props.box({ x: top.x, y, z0: tower.height, z1: top.z, hw: 2.5, hh: 2.5, color: SIGN_POST });
+    }
+  }
   // Each searchlight: a dark drum on a stand, its lens lit.
   for (const beam of beams) {
     props.cylinder({ x: beam.x, y: beam.y, z0: beam.z - BEAM_LAMP_PX, z1: beam.z - 8, r: 4, color: MACHINE, sides: 8 });
@@ -185,8 +208,9 @@ export function cityProps({ roof, hut, towers, round, beams = [] }) {
         props.quad([x1, edgeY, z1 - 10], [x0, edgeY, z1 - 10], [x0 + 5, edgeY, z1], [x1 + 5, edgeY, z1], k % 2 ? HAZARD_BLACK : HAZARD_YELLOW);
       }
     }
-    if (tower.height < 60) continue;
-    // On top: a machine room, a water tank, an antenna with its red aircraft light.
+    // On top: a machine room, a water tank, an antenna with its red aircraft light (a billboard's
+    // tower carries the billboard instead).
+    if (tower.height < 60 || tower.board) continue;
     props.box({
       x: tower.x + tower.w * 0.18,
       y: tower.y - tower.d * 0.2,
@@ -257,25 +281,67 @@ export function cityBuildings({ towers, round }) {
   return props;
 }
 
-/** The billboards: one quad each on its tower's face to the roof, uv across it, aBoard its design. */
+/**
+ * A billboard: a sign standing on its tower's roof at the edge toward the cards' roof, leaning back
+ * away from it so its face looks up at both cameras; its design reads upright on screen (its width
+ * across the table, its height along it). Bottom edge (x, z), top edge (x, z), ends along y.
+ */
+export function billboardOf(roof, tower) {
+  const inward = tower.x > roof.x ? -1 : 1;
+  const span = Math.min(tower.d * 0.75, BILLBOARD_PX.span);
+  const across = (span * BILLBOARD_PX.aspect) / Math.cos(BILLBOARD_PX.slope);
+  const foot = { x: tower.x + inward * (tower.w / 2 - 14), z: tower.height + BILLBOARD_PX.lift };
+  const top = { x: foot.x - inward * across * Math.cos(BILLBOARD_PX.slope), z: foot.z + across * Math.sin(BILLBOARD_PX.slope) };
+  return { inward, foot, top, y0: tower.y - span / 2, y1: tower.y + span / 2 };
+}
+
+/**
+ * The billboards, two of each ad: one leaning on its tower's roof (billboardOf), which the top-down
+ * preset sees, and the art's own on the tower's face to the cards' roof, which the tilted preset
+ * sees (there the face's height runs across the screen, so the ad's width runs up the face). uv
+ * runs across each (u left to right on screen, v near to far), aBoard its design.
+ */
 export function billboardGeometry(three, { roof, towers }) {
   const positions = [];
   const uvs = [];
   const designs = [];
   const index = [];
+  const quad = (corners, quadUvs, design) => {
+    const first = positions.length / 3;
+    for (const corner of corners) positions.push(...corner);
+    uvs.push(...quadUvs);
+    designs.push(design, design, design, design);
+    index.push(first, first + 1, first + 2, first, first + 2, first + 3);
+  };
   for (const tower of towers) {
     if (!tower.board) continue;
-    const facesLeft = tower.x > roof.x;
-    const faceX = tower.x + (facesLeft ? -1 : 1) * (tower.w / 2 + 1.5);
-    const w = Math.min(tower.d * 0.7, 210);
-    const h = w * 0.62;
-    const top = Math.min(tower.height - 24, 150);
-    const first = positions.length / 3;
-    const ends = facesLeft ? [tower.y + w / 2, tower.y - w / 2] : [tower.y - w / 2, tower.y + w / 2];
-    positions.push(faceX, ends[0], top - h, faceX, ends[1], top - h, faceX, ends[1], top, faceX, ends[0], top);
-    uvs.push(0, 0, 1, 0, 1, 1, 0, 1);
-    designs.push(tower.board, tower.board, tower.board, tower.board);
-    index.push(first, first + 1, first + 2, first, first + 2, first + 3);
+    const { inward, foot, top, y0, y1 } = billboardOf(roof, tower);
+    // On a left tower the sign's top edge lies to the left on screen, on a right tower to the right.
+    quad(
+      [
+        [foot.x, y0, foot.z],
+        [foot.x, y1, foot.z],
+        [top.x, y1, top.z],
+        [top.x, y0, top.z],
+      ],
+      inward > 0 ? [1, 0, 1, 1, 0, 1, 0, 0] : [0, 0, 0, 1, 1, 1, 1, 0],
+      tower.board
+    );
+    // On the face, higher reads further out from the roof on screen.
+    const faceX = tower.x + inward * (tower.w / 2 + 1.5);
+    const z0 = WALL_BOARD_PX.foot;
+    const z1 = Math.min(tower.height - 20, z0 + WALL_BOARD_PX.across);
+    const half = WALL_BOARD_PX.along / 2;
+    quad(
+      [
+        [faceX, tower.y - half, z0],
+        [faceX, tower.y + half, z0],
+        [faceX, tower.y + half, z1],
+        [faceX, tower.y - half, z1],
+      ],
+      inward > 0 ? [1, 0, 1, 1, 0, 1, 0, 0] : [0, 0, 0, 1, 1, 1, 1, 0],
+      tower.board
+    );
   }
   const geometry = new three.BufferGeometry();
   geometry.setAttribute('position', new three.Float32BufferAttribute(positions, 3));
@@ -379,12 +445,13 @@ vec3 windowAt(float along, float up, float seed) {
   float restless = step(0.89, hash12(cell * 2.3 + seed));
   float hour = floor(uTime / 9.0 + hash12(cell * 5.1 + seed) * 9.0);
   roll = mix(roll, hash12(cell + seed * 131.0 + hour * 7.13), restless);
-  return vec3(pane, step(roll, 0.18) * (0.6 + 0.5 * hash12(cell * 1.7 + seed)), step(0.78, hash12(cell * 3.1 + seed)));
+  return vec3(pane, step(roll, 0.14) * (0.6 + 0.5 * hash12(cell * 1.7 + seed)), step(0.78, hash12(cell * 3.1 + seed)));
 }
 vec3 facadeColor(vec3 wall, float along, float up, float seed) {
   vec3 w = windowAt(along, up, seed);
   vec3 lamp = mix(vec3(0.92, 1.05, 0.7), vec3(1.1, 1.0, 0.8), w.z);
-  vec3 glass = mix(vec3(0.03, 0.04, 0.065), lamp, w.y);
+  // Dark glass only a little darker than the wall, as the art's, so the facade doesn't read as a checkerboard.
+  vec3 glass = mix(wall * 0.55 + vec3(0.004, 0.006, 0.012), lamp, w.y);
   return mix(wall, glass, w.x);
 }
 `;
@@ -414,21 +481,23 @@ void main() {
   } else if (d < 0.0) {
     // The roof, as in the art: smooth pale grey concrete under the moon in broad slabs with dark
     // seams, a soft stain here and there; the moonlight falls brighter toward the far side.
-    vec2 slab = abs(mod(p + 90.0, 180.0) - 90.0);
-    float slabTone = 0.94 + 0.12 * hash12(floor((p + 90.0) / 180.0));
+    vec2 slab = abs(mod(p + 150.0, 300.0) - 150.0);
+    float slabTone = 0.95 + 0.1 * hash12(floor((p + 150.0) / 300.0));
     col = vec3(0.088, 0.1, 0.122) * (0.9 + 0.2 * fbm3(p / 90.0)) * slabTone;
     col *= 0.96 + 0.06 * gnoise(p / 4.0);
     col *= mix(0.85, 1.12, smoothstep(-1.0, 1.0, (p.y - uRoof.y) / uRoof.w));
-    col = mix(col, vec3(0.04, 0.042, 0.05), (1.0 - smoothstep(0.8, 2.0, min(slab.x, slab.y))) * 0.65);
+    col = mix(col, vec3(0.04, 0.042, 0.05), (1.0 - smoothstep(0.8, 2.0, min(slab.x, slab.y))) * 0.3);
     col = mix(col, col * 0.78, smoothstep(0.74, 0.8, fbm3(p / 70.0 + 9.0)) * 0.7);
     col = mix(col * 0.5, col, smoothstep(0.3, 0.9, light.b));
-    // Pink neon from the left tower washes the roof's left side; the hut lamp pools by its door.
-    float neon = exp(-max(p.x - (uRoof.x - uRoof.z), 0.0) / 170.0) * smoothstep(-0.8, 0.4, (p.y - uRoof.y) / uRoof.w);
-    col += NEON_PINK * neon * 0.1 * (0.92 + 0.08 * sin(uTime * 7.0) * step(0.7, fract(uTime * 0.13)));
-    vec2 pool = vec2(uHut.x - uHut.z * 0.4, uHut.y - uHut.w - 18.0);
-    col += HUT_LAMP * exp(-dot(p - pool, p - pool) / (2.0 * 22.0 * 22.0)) * 0.7;
-    vec2 red = vec2(uHut.x + uHut.z - 20.0, uHut.y - uHut.w - 16.0);
-    col += HUT_RED * exp(-dot(p - red, p - red) / (2.0 * 24.0 * 24.0)) * 0.3;
+    // As in the art: a dull red glow along the roof's lower-left edge; the hut lamp's cold light
+    // spreading over the roof before its face, a red light at the hut's far end.
+    vec2 fromCorner = vec2(p.x - (uRoof.x - uRoof.z), p.y - (uRoof.y - uRoof.w));
+    float lowerLeft = exp(-fromCorner.x / 40.0) * (1.0 - smoothstep(0.0, uRoof.w * 0.9, fromCorner.y));
+    col += HUT_RED * 0.5 * lowerLeft * 0.25;
+    vec2 pool = (p - vec2(uHut.x - uHut.z * 0.3, uHut.y - uHut.w - 46.0)) / vec2(70.0, 44.0);
+    col += HUT_LAMP * exp(-dot(pool, pool)) * 0.32;
+    vec2 red = (p - vec2(uHut.x + uHut.z + 10.0, uHut.y - uHut.w + 20.0)) / vec2(16.0, 40.0);
+    col += HUT_RED * exp(-dot(red, red)) * 0.16;
   } else {
     // The streets far below: dark, a few street lamps and car lights in the haze.
     col = NIGHT * 0.8 + vec3(0.02, 0.015, 0.03) * fbm3(p / 50.0);
@@ -465,10 +534,7 @@ void main() {
   if (n.z > 0.5) {
     // A roof: dark tar, its gravel mottled, the city's glow faint on it.
     col = vColor.rgb * 0.24 * (0.8 + 0.4 * gnoise(vWorld.xy / 14.0)) + vec3(0.006, 0.006, 0.014);
-    // The round tower's lit crown, as the art's: a warm light along the rim of each tier's ledge.
-    float fromAxis = distance(vWorld.xy, uRound.xy);
-    float rim = min(min(abs(fromAxis - uRound.z), abs(fromAxis - uRound.z * 0.82)), abs(fromAxis - uRound.z * 0.6));
-    col = mix(col, vec3(1.25, 1.08, 0.78), isRound * (1.0 - smoothstep(2.0, 5.0, rim)));
+
   } else {
     float along = isRound > 0.5
       ? atan(vWorld.y - uRound.y, vWorld.x - uRound.x) * uRound.z
@@ -520,14 +586,17 @@ float stroke(vec2 uv, vec2 a, vec2 b, float width) {
   float t = clamp(dot(uv - a, ab) / dot(ab, ab), 0.0, 1.0);
   return length(uv - a - ab * t) - width * (0.85 + 0.3 * gnoise(uv * 40.0));
 }
-// Rows of printed words at heights y0..y1 (board uv): dark blocks broken into words.
+// A line of printed words at heights y0..y1 from x0 to x1 (board uv): bold words as solid rounded
+// blocks of different lengths (letter detail smears into a barcode at a board's size on screen).
 float printed(vec2 uv, float y0, float y1, float x0, float x1, float seed) {
   if (uv.y < y0 || uv.y > y1 || uv.x < x0 || uv.x > x1) return 0.0;
-  float letter = floor(uv.x * 70.0);
-  float gap = step(0.78, hash12(vec2(floor(uv.x * 14.0), seed)));
-  float stem = step(0.2, fract(uv.x * 70.0)) * step(fract(uv.x * 70.0), 0.85);
-  float hole = step(0.6, hash12(vec2(letter, seed + 3.0))) * step(0.4, (uv.y - y0) / (y1 - y0)) * step((uv.y - y0) / (y1 - y0), 0.6);
-  return stem * (1.0 - gap) * (1.0 - hole);
+  float pitch = (y1 - y0) * 4.0;
+  float word = floor((uv.x - x0) / pitch);
+  float wordLength = pitch * (0.45 + 0.4 * hash12(vec2(word, seed)));
+  float inWord = mod(uv.x - x0, pitch);
+  float radius = (y1 - y0) * 0.5;
+  vec2 rel = vec2(max(abs(inWord - wordLength * 0.5) - (wordLength * 0.5 - radius), 0.0), uv.y - (y0 + radius));
+  return 1.0 - smoothstep(radius * 0.85, radius, length(rel));
 }
 void main() {
   if (revealBurned(vPos) * exitKeep(vPos) < 0.5) discard;
@@ -622,8 +691,7 @@ vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
   col += albedo * HUT_LAMP * max(dot(n, normalize(toLamp)), 0.0) * exp(-length(toLamp) / 90.0) * 1.4;
   vec3 toRed = vec3(uHut.x + uHut.z - 10.0, uHut.y - uHut.w - 22.0, 24.0) - world;
   col += albedo * HUT_RED * max(dot(n, normalize(toRed)), 0.0) * exp(-length(toRed) / 60.0) * 1.6;
-  float neon = exp(-max(world.x - (uRoof.x - uRoof.z), 0.0) / 170.0);
-  col += albedo * NEON_PINK * neon * 0.25 * max(-n.x * 0.5 + 0.5, 0.0);
+
   vec3 view = normalize(uEye - world);
   col += vec3(0.4, 0.45, 0.7) * pow(max(dot(reflect(-view, n), vec3(0.0, 0.0, 1.0)), 0.0), 16.0) * metal * 0.3;
   return col;
