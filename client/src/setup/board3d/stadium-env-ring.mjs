@@ -45,15 +45,15 @@ const STONE_SPACING_PX = 225;
 const BRICK_PX = { long: 46, vary: 8, high: 23, patch: 230 };
 /** The two rope strands: height on the stones (share of each stone's height), sag, thickness, turns round each stone. */
 const ROPES = [
-  { at: 0.52, sag: 30, radius: 5.2, wraps: 3 },
-  { at: 0.3, sag: 22, radius: 4.6, wraps: 2 },
+  { at: 0.5, sag: 30, radius: 5.2, wraps: 2 },
+  { at: 0.3, sag: 22, radius: 4.6, wraps: 1 },
 ];
 /**
  * The chain: which stone it hangs from (turn round the ring, rad), how many links, link size. As in
  * the art's foreground, massive links; they lie along the ground toward the near end, where both
  * camera presets see them.
  */
-const CHAIN = { angle: Math.PI * 1.22, links: 12, length: 86, width: 48, thick: 10 };
+const CHAIN = { angle: Math.PI * 1.06, links: 12, length: 86, width: 48, thick: 10 };
 /**
  * The art's rock spires standing on the ground past the stones: turn round the ring (deg), gap past
  * the stones' ring, base radius, height, how flattened. A spire with no room in the scene, or
@@ -69,8 +69,8 @@ const SPIRES = [
   [333, 20, 52, 270, 0.8],
   [57, 10, 48, 230, 0.7],
 ];
-/** The spires' dark rock, darker than the menhirs. */
-const SPIRE_STONE = [0.34, 0.31, 0.28, 0.05];
+/** The spires' dark rock, as the art's crags (83,73,62), darker than the menhirs. */
+const SPIRE_STONE = [0.24, 0.21, 0.18, 0.05];
 
 const GREY_STONE = [0.5, 0.46, 0.4, 0.05];
 // The art's ropes: dark sepia, the strands (69,57,49), the wraps (49,37,29) to (74,61,52).
@@ -118,15 +118,15 @@ export function ringSpots(layout) {
     const x = arena.x + Math.cos(angle) * out;
     const y = arena.y + Math.sin(angle) * out;
     const inside = x - radius > scene.x && x + radius < scene.x + scene.w && y - radius > scene.y && y + radius < scene.y + scene.h;
-    // As in the art, no two alike: smooth stones a little flattened, of every height, some leaning;
-    // each turned about along the ring, so its broader face looks across the arena.
+    // As in the art, no two alike: flat-faced slabs of every height, some leaning; each turned about
+    // along the ring, so its broad face looks across the arena.
     stones.push({
       x,
       y,
       radius,
-      height: 95 + 105 * hashOf(i + 200),
+      height: 95 + 135 * hashOf(i + 200),
       lean: (hashOf(i + 300) - 0.5) * 0.14,
-      flat: 0.62 + 0.3 * hashOf(i + 500),
+      flat: 0.45 + 0.25 * hashOf(i + 500),
       yaw: angle + Math.PI / 2 + (hashOf(i + 600) - 0.5) * 0.9,
       seed: hashOf(i + 400),
       index: i,
@@ -164,30 +164,36 @@ export function ringSpots(layout) {
 }
 
 /**
- * One standing stone, a menhir as in the art: a smooth twelve-sided column, a little flattened and a
- * little wider at its foot, rounding over to a blunt top; now and then one broken off at a slant.
+ * One standing stone, a menhir as in the art: a slab with broad flat faces (eight sides, flattened),
+ * a little wider at its foot. As the art's, most rise to a point set off to one side (a tooth), some
+ * end cut off at a slant, and the shortest round over; rough edges, no two alike.
  */
 const standingStone = (props, stone) => {
-  const sides = 12;
+  const sides = 8;
   const levels = [0, 0.3, 0.55, 0.72, 0.84, 0.93, 0.98, 1];
-  const broken = hashOf(stone.index * 13 + 5) < 0.15;
-  const slant = (hashOf(stone.index * 7 + 2) < 0.5 ? -1 : 1) * (0.35 + 0.35 * hashOf(stone.index * 7 + 3));
+  const shape = hashOf(stone.index * 13 + 5);
+  const kind = stone.height < 125 ? 'round' : shape < 0.55 ? 'tooth' : 'cut';
+  const side = hashOf(stone.index * 7 + 2) < 0.5 ? -1 : 1;
+  const slant = side * (0.35 + 0.35 * hashOf(stone.index * 7 + 3));
   const rings = levels.map((t, level) => {
-    const dome = broken ? 1 : t < 0.72 ? 1 : Math.sqrt(Math.max(0, 1 - ((t - 0.72) / 0.28) ** 2));
-    const taper = (1.08 - 0.14 * t) * Math.max(dome, level === levels.length - 1 ? 0.12 : 0);
+    // A tooth narrows to its point from half way up, the point drifting to one side.
+    const point = kind === 'tooth' ? Math.max(0.08, 1 - Math.max(0, (t - 0.45) / 0.55) ** 1.4 * 0.92) : 1;
+    const dome = kind === 'round' && t > 0.72 ? Math.sqrt(Math.max(0, 1 - ((t - 0.72) / 0.28) ** 2)) : 1;
+    const taper = (1.08 - 0.14 * t) * Math.max(Math.min(point, dome), level === levels.length - 1 ? 0.08 : 0);
     const lean = stone.lean * t * stone.height;
+    const drift = kind === 'tooth' ? side * stone.radius * 0.45 * Math.max(0, t - 0.45) : 0;
     return Array.from({ length: sides }, (_, k) => {
       const angle = (k / sides) * 2 * Math.PI + stone.seed * 6;
-      const wobble = 0.92 + 0.12 * hashOf(stone.index * 31 + k * 7) + 0.04 * hashOf(stone.index * 17 + k * 3 + level * 5);
+      const wobble = 0.86 + 0.24 * hashOf(stone.index * 31 + k * 7) + 0.06 * hashOf(stone.index * 17 + k * 3 + level * 5);
       const r = stone.radius * taper * wobble;
-      // A flattened section turned by the stone's yaw: slabs, not only columns.
-      const u = Math.cos(angle) * r;
+      // A flattened section turned by the stone's yaw: slabs, not columns.
+      const u = Math.cos(angle) * r + drift;
       const v = Math.sin(angle) * r * stone.flat;
       const c = Math.cos(stone.yaw);
       const sn = Math.sin(stone.yaw);
-      // A broken stone stops at 0.86 of its height, its top ring tilted into a slanted face.
-      const rise = broken ? Math.min(t, 0.86) : t;
-      const tilt = broken && level === levels.length - 1 ? (u * slant * stone.height) / Math.max(stone.radius, 1) / 4 : 0;
+      // A cut stone stops at 0.86 of its height, its top ring tilted into a slanted face.
+      const rise = kind === 'cut' ? Math.min(t, 0.86) : t;
+      const tilt = kind === 'cut' && level === levels.length - 1 ? (u * slant * stone.height) / Math.max(stone.radius, 1) / 4 : 0;
       return [stone.x + u * c - v * sn + lean, stone.y + u * sn + v * c, stone.height * rise + tilt];
     });
   });
@@ -206,11 +212,12 @@ const standingStone = (props, stone) => {
 };
 
 /**
- * One rock spire, as the art's: a tower of rough eight-sided blocks stacked off-centre, narrowing as
- * it climbs, its top broken off at a slant. Faces flat, so they take the light as broad planes.
+ * One rock spire, as the art's dark crags: a tower of ten-sided blocks stacked a little off-centre,
+ * narrowing as it climbs, its top broken off at a slant. Faces flat, so they take the light as broad
+ * planes; the blocks only gently uneven (rougher ones read as crumpled paper from above).
  */
 const rockSpire = (props, spire) => {
-  const sides = 8;
+  const sides = 10;
   const levels = 7;
   const c = Math.cos(spire.yaw);
   const sn = Math.sin(spire.yaw);
@@ -220,14 +227,14 @@ const rockSpire = (props, spire) => {
     const t = level / levels;
     const roll = (k) => hashOf(spire.index * 53 + level * 11 + k);
     // Each block sits a little off the one below: the tower kinks as it climbs.
-    if (level > 0) drift = [drift[0] + (roll(1) - 0.5) * spire.radius * 0.22, drift[1] + (roll(2) - 0.5) * spire.radius * 0.22];
-    const girth = spire.radius * (1.0 - 0.62 * t ** 1.2) * (0.85 + 0.3 * roll(3));
+    if (level > 0) drift = [drift[0] + (roll(1) - 0.5) * spire.radius * 0.12, drift[1] + (roll(2) - 0.5) * spire.radius * 0.12];
+    const girth = spire.radius * (1.0 - 0.7 * t ** 1.1) * (0.92 + 0.14 * roll(3));
     // The top breaks off at a slant.
     const slant = level === levels ? (roll(4) - 0.5) * spire.radius * 0.9 : 0;
     rings.push(
       Array.from({ length: sides }, (_, k) => {
         const angle = (k / sides) * 2 * Math.PI + spire.seed * 6;
-        const r = girth * (0.75 + 0.45 * hashOf(spire.index * 31 + k * 7 + level * 3));
+        const r = girth * (0.9 + 0.18 * hashOf(spire.index * 31 + k * 7 + level * 3));
         const u = Math.cos(angle) * r;
         const v = Math.sin(angle) * r * spire.flat;
         const x = u * c - v * sn + drift[0];
