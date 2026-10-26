@@ -181,13 +181,13 @@ particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
 
 | Family | Stadiums | Place |
 |---|---|---|
-| volcanic | 299 Scorched Earth, 289 Magma Basin | Lava river along the seam / a lava basin in the middle; sculpted slate stones; basalt shelves |
+| volcanic | 299 Scorched Earth, 289 Magma Basin | Lava river along the seam / a rock island in a moat of molten gold, cliffs pouring lavafalls |
 | coast | 209 Surfing Beach, 212 Brooklet Hill | Sand and surf rolling in from one end / grassy banks and a brook along the seam with stepping stones |
 | forest | 030 Forest of Vitality, 197 Mystery Garden, 253 Perilous Jungle | Mossy floor, roots and flowers / garden paths and hedges / a jungle clearing ringed by trees, poison bogs in two corners |
-| highland | 051 Stormy Mountains, 240 Mountain Ring, 239 Fighting Stadium | A crater high in a storm / a rocky ring on a peak / an arena floor |
+| highland | 051 Stormy Mountains, 240 Mountain Ring, 239 Fighting Stadium | A crater high in a storm / a paved ring of roped menhirs among rock spires / a wrestling ring in a laser-lit arena |
 | crystal | 052 Crystal Cave | Cave floor with glowing crystal clusters where no card lies |
-| metal | 162 Steel Shelter, 163 Full Metal Lab | Riveted steel plates / lab deck panels with light strips |
-| spirit | 198 Old Cemetery, 199 Dimension Valley, 254 Dark City | Misty graveyard ground / floating rock over a purple void / a night street with neon puddles |
+| metal | 162 Steel Shelter, 163 Full Metal Lab | A white hall on a mirror-bright hex floor / a steel dais among tanks and pipes |
+| spirit | 198 Old Cemetery, 199 Dimension Valley, 254 Dark City | Misty graveyard ground / floating rock over a purple void / a night rooftop among lit towers |
 | electric | 278 Levincia | A city plaza with glowing power lines |
 
 - Scorched Earth (built in the prototype): the land has its own plateaus, ridges and hollows; stones
