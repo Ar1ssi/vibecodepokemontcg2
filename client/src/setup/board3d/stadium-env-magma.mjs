@@ -44,7 +44,7 @@ export const ISLAND_CORNER_PX = 120;
 /** Width of the moat along the table's sides (left, right) and its ends (near, far). */
 export const MOAT_PX = { side: 122, end: 80 };
 /** About how far the shores wander out past their rounded outline (the shader's islandWobble). */
-const SHORE_DRIFT_PX = 22;
+const SHORE_DRIFT_PX = 34;
 /** Run of the wall from the moat's outer shore up to its crest. */
 export const WALL_RUN_PX = 108;
 /** Most lavafalls a basin has (the uniform array's length). */
@@ -66,7 +66,7 @@ const FALL_DIP_PX = 14;
 const FALL_OVER_PX = 16;
 const FORK_AT_PX = 58;
 /** Width of the walls' flat faces. */
-const FACET_PX = 44;
+const FACET_PX = 66;
 export const EMBER_COUNT = 320;
 
 const SIDE_DIRECTIONS = {
@@ -155,7 +155,7 @@ float sideness(vec2 p) {
 float islandWobble(vec2 p) {
   float broad = clamp(fbm3(p / 210.0 + 3.1) * 1.7 - 0.5, 0.0, 1.0);
   float knobs = clamp(gnoise(p / 120.0 + 9.3) * 1.6 - 0.55, 0.0, 1.0);
-  return mix(24.0, 56.0, sideness(p)) * broad + 22.0 * knobs + 9.0 * gnoise(p / 55.0 + 1.7);
+  return mix(40.0, 84.0, sideness(p)) * broad + 34.0 * knobs + 11.0 * gnoise(p / 55.0 + 1.7);
 }
 // Signed px from the island's shore, negative on the island.
 float islandDistance(vec2 p) {
@@ -163,7 +163,7 @@ float islandDistance(vec2 p) {
 }
 // The moat's width at p: wide beside the cards, narrower at the ends, swelling and pinching.
 float moatWidth(vec2 p) {
-  return mix(uMoat.y, uMoat.x, sideness(p)) + 46.0 * (fbm3(p / 160.0 + 7.7) - 0.5);
+  return mix(uMoat.y, uMoat.x, sideness(p)) + 78.0 * (fbm3(p / 160.0 + 7.7) - 0.5);
 }
 // Signed px from the moat's outer shore, positive on the wall.
 float outerDistance(vec2 p, float islandSD) {
@@ -302,17 +302,21 @@ void main() {
     h -= 2.4 * seam * inland;
     tone = fract(lump.y * 5.3 + fbm3(p / 70.0) * 0.5);
     joint = seam * step(0.45, fract(plate.y * 7.3));
-    // The Poke Ball: a smooth disc a little proud of the rock, its band and button ring cut in, a
-    // crevice round it.
+    // The Poke Ball, as the art's relief: its two halves domed cushions of stone standing proud of
+    // the rock, the band and the button's ring cut deep between them, a deep crevice round it.
     if (uEmblem.z > 0.0) {
       vec2 rel = p - uEmblem.xy;
       float r = length(rel);
       float buttonR = uEmblem.z * 0.24;
+      float bandHalf = uEmblem.z * 0.075;
       float disc = 1.0 - smoothstep(uEmblem.z - 3.0, uEmblem.z, r);
-      float band = (1.0 - smoothstep(uEmblem.z * 0.075, uEmblem.z * 0.075 + 1.5, abs(rel.y))) * step(buttonR, r);
+      // Each half rises to a rounded crown between its edges: the rim, the band, the button's ring.
+      float edge = min(min(uEmblem.z - r, abs(rel.y) - bandHalf), r - buttonR - 4.0);
+      float cushion = sqrt(clamp(edge / 60.0, 0.0, 1.0));
+      float band = (1.0 - smoothstep(bandHalf, bandHalf + 1.5, abs(rel.y))) * step(buttonR, r);
       float ring = smoothstep(buttonR - 7.0, buttonR - 5.0, r) * (1.0 - smoothstep(buttonR + 2.0, buttonR + 4.0, r));
-      h = mix(h, pre.r + 1.6 - 2.4 * max(band, ring), disc);
-      h -= 1.5 * (1.0 - smoothstep(0.5, 2.5, abs(r - uEmblem.z - 1.0)));
+      h = mix(h, pre.r + 1.0 + 6.0 * cushion - 3.0 * max(band, ring), disc);
+      h -= 4.0 * (1.0 - smoothstep(1.0, 4.0, abs(r - uEmblem.z - 1.5)));
     }
   } else if (outerSD > 0.0) {
     kind = 0.0;
@@ -320,9 +324,9 @@ void main() {
     // broad faces; the falls run down smooth channels between the rocks.
     float onWall = smoothstep(4.0, 26.0, outerSD);
     vec2 rock = faceted(p, h, onWall * 0.6);
-    vec3 cobble = stones(p + 11.0, mix(26.0, 40.0, fbm3(p / 180.0)), 2.4);
+    vec3 cobble = stones(p + 11.0, mix(42.0, 64.0, fbm3(p / 180.0)), 2.4);
     float channel = smoothstep(0.0, 12.0, fallSD);
-    h = rock.x + (cobble.x * 13.0 + 1.2 * (gnoise(p / 3.5) - 0.5)) * onWall * channel
+    h = rock.x + (cobble.x * 18.0 + 1.2 * (gnoise(p / 3.5) - 0.5)) * onWall * channel
       - 4.0 * (1.0 - smoothstep(-2.0, 4.0, fallSD));
     tone = fract(cobble.y * 3.1 + 0.2 * rock.y);
   }
@@ -437,9 +441,9 @@ void main() {
   float specks = speck(p, 12.0, 0.1, 1.0) + speck(p, 27.0, 0.16, 2.0) * 1.5;
   col += vec3(1.7, 0.42, 0.05) * specks * mix(0.35, 1.0, onIsland);
 
-  // The Poke Ball set in the island, as in the art: two smooth halves of brick-red stone,
-  // brighter toward the rim and on the far side, a sheen along the far rim; the band, the button's
-  // ring and the crevice round it dark; the button's core red. It glows faintly, breathing.
+  // The Poke Ball set in the island, as in the art: two domed halves of red stone, brightest along
+  // their crowns, warm as if lit from within, a sheen along the far rim; the band, the button's ring
+  // and the thick crevice round it near-black; the button's core red. It glows faintly, breathing.
   if (uEmblem.z > 0.0 && onIsland > 0.5) {
     vec2 rel = p - uEmblem.xy;
     float r = length(rel);
@@ -448,14 +452,16 @@ void main() {
     float breathe = 0.93 + 0.07 * sin(uTime * 1.1);
     float inside = 1.0 - smoothstep(uEmblem.z - 1.5, uEmblem.z, r);
     float halves = inside * smoothstep(bandHalf, bandHalf + 1.5, abs(rel.y)) * smoothstep(buttonR + 3.0, buttonR + 5.0, r);
-    float rim = smoothstep(0.3, 1.0, r / uEmblem.z);
-    vec3 stone = mix(vec3(0.18, 0.06, 0.054), vec3(0.32, 0.092, 0.08), rim);
+    float crown = clamp(min(min(uEmblem.z - r, abs(rel.y) - bandHalf), r - buttonR - 4.0) / 60.0, 0.0, 1.0);
+    // The art's (75,33,30) at the edges, (119,52,40) over the halves, (145,57,45) on their crowns,
+    // inverted through Neutral tone mapping.
+    vec3 stone = mix(vec3(0.075, 0.03, 0.027), vec3(0.2, 0.065, 0.053), sqrt(crown)) + vec3(0.1, 0.012, 0.01) * crown * crown;
     stone *= (0.86 + 0.24 * smoothstep(-uEmblem.z, uEmblem.z, rel.y)) * breathe * (0.92 + 0.16 * fbm3(p / 22.0));
     stone += vec3(0.4, 0.14, 0.05) * smoothstep(0.84, 0.97, r / uEmblem.z) * smoothstep(0.1, 0.7, rel.y / uEmblem.z);
     float buttonRing = smoothstep(buttonR - 7.0, buttonR - 4.0, r) * (1.0 - smoothstep(buttonR + 3.0, buttonR + 5.0, r));
     float dark = max(inside * (1.0 - halves) * step(buttonR - 4.0, r), buttonRing);
     float core = 1.0 - smoothstep(buttonR - 8.0, buttonR - 6.0, r);
-    float outline = 1.0 - smoothstep(1.0, 2.5, abs(r - uEmblem.z - 0.5));
+    float outline = 1.0 - smoothstep(2.5, 4.5, abs(r - uEmblem.z - 1.5));
     col = mix(col, stone, halves);
     col += vec3(1.7, 0.42, 0.05) * specks * halves;
     col = mix(col, vec3(0.035, 0.016, 0.014), max(dark * 0.85, outline * 0.85));
@@ -556,6 +562,8 @@ void main() {
   // art's moat (no bright rim along them).
   float heat = 0.6 + 0.16 * middle + (flow.x - 0.5) * 0.4 + flow.y * 0.42 * middle;
   heat -= 0.36 * (1.0 - smoothstep(0.0, 14.0, shore));
+  // A thin dark crust right against the rock.
+  heat -= 0.4 * (1.0 - smoothstep(1.5, 5.0, shore));
   // Dark crust plates drifting where the flow runs cool.
   float skin = smoothstep(0.6, 0.7, fbm3((p - velocity * uTime * 0.6) / 70.0 + 9.0)) * smoothstep(8.0, 30.0, shore);
   heat -= skin * 0.3;
