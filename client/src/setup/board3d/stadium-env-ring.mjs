@@ -38,9 +38,8 @@ export const STONE_RING_GAP_PX = 30;
 const STONE_FOOT_GAP_PX = 8;
 /** Spacing of the standing stones round the ring (px of arc). */
 const STONE_SPACING_PX = 124;
-/** Paving: radial width of a row, arc length of a stone. */
-const ROW_PX = 32;
-const STONE_PX = 48;
+/** Paving: bricks in straight staggered rows, as in the art; their length and height. */
+const BRICK_PX = { long: 46, high: 23 };
 /** Ropes: height on the stones (share of each stone's height), sag, thickness. */
 const ROPE = { at: 0.5, sag: 16, radius: 3.4 };
 /** The chain: which stone it hangs from (turn round the ring, rad), how many links, link size. */
@@ -63,7 +62,7 @@ const PEAKS = [
   [66, 90, 110, 190],
 ];
 
-const GREY_STONE = [0.43, 0.415, 0.385, 0.05];
+const GREY_STONE = [0.52, 0.5, 0.46, 0.05];
 const ROPE_LIGHT = [0.4, 0.27, 0.15, 0.05];
 const ROPE_DARK = [0.27, 0.17, 0.09, 0.05];
 const RUST = [0.44, 0.22, 0.1, 0.3];
@@ -102,13 +101,13 @@ export function ringSpots(layout) {
   const stones = [];
   for (let i = 0; i < count; i += 1) {
     const angle = ((i + (hashOf(i) - 0.5) * 0.3) / count) * 2 * Math.PI;
-    const radius = 17 + 12 * hashOf(i + 100);
+    const radius = 21 + 11 * hashOf(i + 100);
     // Each stone's foot clears the kerb by at least STONE_FOOT_GAP_PX.
     const out = arena.r + KERB_PX + STONE_FOOT_GAP_PX + radius + 12 * hashOf(i + 50);
     const x = arena.x + Math.cos(angle) * out;
     const y = arena.y + Math.sin(angle) * out;
     const inside = x - radius > scene.x && x + radius < scene.x + scene.w && y - radius > scene.y && y + radius < scene.y + scene.h;
-    stones.push({ x, y, radius, height: 78 + 74 * hashOf(i + 200), lean: (hashOf(i + 300) - 0.5) * 0.25, seed: hashOf(i + 400), index: i, inside });
+    stones.push({ x, y, radius, height: 100 + 80 * hashOf(i + 200), lean: (hashOf(i + 300) - 0.5) * 0.18, seed: hashOf(i + 400), index: i, inside });
   }
   // The chain hangs off the stone nearest its turn and lies on out across the ground.
   const turnOf = (stone) => turnBetween(Math.atan2(stone.y - arena.y, stone.x - arena.x), CHAIN.angle);
@@ -123,18 +122,22 @@ export function ringSpots(layout) {
   return { arena, ringR, stones: stones.filter((stone) => stone.inside), allStones: stones.length, anchor, peaks, emblem };
 }
 
-/** One standing stone: an irregular seven-sided prism tapering to a ragged top, faces flat. */
+/**
+ * One standing stone, a menhir as in the art: a rough ten-sided column, a little wider at its foot,
+ * rounding over to a blunt top, its faces flat so they catch the light as broad planes.
+ */
 const standingStone = (props, stone) => {
-  const sides = 7;
-  const levels = [0, 0.35, 0.7, 0.92, 1];
+  const sides = 10;
+  const levels = [0, 0.3, 0.55, 0.72, 0.84, 0.93, 0.98, 1];
   const rings = levels.map((t, level) => {
-    const taper = level === levels.length - 1 ? 0.18 : 1 - 0.45 * t * t;
+    const dome = t < 0.72 ? 1 : Math.sqrt(Math.max(0, 1 - ((t - 0.72) / 0.28) ** 2));
+    const taper = (1.08 - 0.22 * t) * Math.max(dome, level === levels.length - 1 ? 0.12 : 0);
     const lean = stone.lean * t * stone.height;
     return Array.from({ length: sides }, (_, k) => {
       const angle = (k / sides) * 2 * Math.PI + stone.seed * 6;
-      const wobble = 0.75 + 0.5 * hashOf(stone.index * 31 + k * 7 + level * 3);
+      const wobble = 0.82 + 0.3 * hashOf(stone.index * 31 + k * 7) + 0.1 * hashOf(stone.index * 17 + k * 3 + level * 5);
       const r = stone.radius * taper * wobble;
-      return [stone.x + Math.cos(angle) * r + lean, stone.y + Math.sin(angle) * r, stone.height * t * (0.94 + 0.12 * hashOf(k + level * 9 + stone.index))];
+      return [stone.x + Math.cos(angle) * r + lean, stone.y + Math.sin(angle) * r, stone.height * t];
     });
   });
   const tone = 0.85 + 0.3 * stone.seed;
@@ -173,13 +176,17 @@ export function ringProps({ stones, allStones, anchor }) {
   const byIndex = new Map(stones.map((stone) => [stone.index, stone]));
   for (const stone of stones) {
     const z = stone.height * ROPE.at;
-    const loop = [];
-    for (let k = 0; k <= 16; k += 1) {
-      const angle = (k / 16) * 2 * Math.PI;
-      const r = stone.radius * (1 - 0.45 * ROPE.at * ROPE.at) * 0.98 + ROPE.radius;
-      loop.push([stone.x + Math.cos(angle) * r + stone.lean * ROPE.at * stone.height, stone.y + Math.sin(angle) * r, z]);
+    // Wound round twice, the turns a rope's width apart.
+    for (const wrap of [0, 1]) {
+      const loop = [];
+      const zWrap = z - wrap * ROPE.radius * 2.2;
+      for (let k = 0; k <= 18; k += 1) {
+        const angle = (k / 18) * 2 * Math.PI;
+        const r = stone.radius * (1.08 - 0.22 * ROPE.at) * 1.06 + ROPE.radius;
+        loop.push([stone.x + Math.cos(angle) * r + stone.lean * ROPE.at * stone.height, stone.y + Math.sin(angle) * r, zWrap]);
+      }
+      props.tube(loop, ROPE.radius, ROPE_LIGHT, { sides: 6, colorAt: ropeColor });
     }
-    props.tube(loop, ROPE.radius, ROPE_LIGHT, { sides: 6, colorAt: ropeColor });
     const next = byIndex.get((stone.index + 1) % allStones);
     if (!next) continue;
     const z2 = next.height * ROPE.at;
@@ -232,6 +239,21 @@ const RING = /* glsl */ `
 uniform vec4 uRing;
 uniform vec3 uEmblem;
 uniform vec4 uPeaks[${PEAKS.length}];
+// The Poke Ball in the paving, as in the art: a broad disc of pale stone sunk in a dark groove,
+// a dark band across it, the button a broad dark ring round a pale core. x: 1 on pale stone,
+// 2 on dark stone, 0 off it; y px from its outline (negative inside).
+vec2 emblemInlay(vec2 p) {
+  if (uEmblem.z <= 0.0) return vec2(0.0, 100000.0);
+  vec2 rel = p - uEmblem.xy;
+  float r = length(rel);
+  float outline = r - uEmblem.z;
+  if (outline > 6.0) return vec2(0.0, outline);
+  float buttonR = uEmblem.z * 0.3;
+  bool groove = outline > -2.0;
+  bool band = abs(rel.y) < uEmblem.z * 0.06 && r > buttonR;
+  bool buttonRing = r > buttonR * 0.55 && r < buttonR;
+  return vec2(groove || band || buttonRing ? 2.0 : 1.0, outline);
+}
 `;
 
 /**
@@ -259,30 +281,31 @@ void main() {
   float id;
   float kind;
   if (d < 0.0) {
-    // Rows of paving round the middle, each stone offset half a stone from the row inside it.
-    float row = floor(r / ${ROW_PX}.0);
-    float rowR = (row + 0.5) * ${ROW_PX}.0;
-    float count = max(6.0, floor(6.2831853 * rowR / ${STONE_PX}.0));
-    float turn = (atan(rel.y, rel.x) / 6.2831853 + 0.5) * count + 0.5 * mod(row, 2.0);
-    float stone = floor(turn);
-    float acrossRow = (0.5 - abs(fract(r / ${ROW_PX}.0) - 0.5)) * ${ROW_PX}.0;
-    float alongRow = (0.5 - abs(fract(turn) - 0.5)) * 6.2831853 * r / count;
-    float mortar = min(acrossRow, alongRow);
-    id = hash12(vec2(row, mod(stone, count)));
-    h = 1.6 * smoothstep(0.0, 3.0, mortar) + 0.5 * (gnoise(p / 9.0) - 0.5) - 0.4 * id;
-    // The emblem stands a hair proud in its lighter stone.
-    h += 0.8 * (1.0 - smoothstep(2.5, 4.5, emblemDistance(p, uEmblem)));
-    kind = -1.0;
-  } else if (d < ${KERB_PX}.0) {
-    float block = floor(atan(rel.y, rel.x) / 6.2831853 * floor(6.2831853 * uRing.z / 60.0));
-    id = hash12(vec2(block, 7.0));
-    h = 4.0 + 2.0 * id + 1.5 * sin(3.14159 * d / ${KERB_PX}.0);
-    kind = 0.0;
+    // Bricks in straight rows, each row staggered half a brick, laid from the middle out.
+    vec2 q = (p - uRing.xy) / vec2(${BRICK_PX.long}.0, ${BRICK_PX.high}.0);
+    q.x += 0.5 * mod(floor(q.y), 2.0);
+    vec2 cell = floor(q);
+    vec2 edge = (0.5 - abs(fract(q) - 0.5)) * vec2(${BRICK_PX.long}.0, ${BRICK_PX.high}.0);
+    float mortar = min(edge.x, edge.y);
+    id = hash12(cell + 0.5);
+    // Toward the edge the paving breaks up: bricks go missing into the dust.
+    float missing = step(hash12(cell + 9.0), smoothstep(-70.0, 0.0, d + 26.0 * (gnoise(p / 60.0) - 0.5)) * 0.95);
+    h = missing > 0.5
+      ? -1.0 + 1.5 * fbm3(p / 30.0)
+      : 1.8 * smoothstep(0.0, 2.6, mortar) + 0.5 * (gnoise(p / 9.0) - 0.5) - 0.5 * id;
+    // The emblem's pale stone lies flush, smooth; its dark lines a little sunk.
+    vec2 inlay = emblemInlay(p);
+    if (inlay.x > 0.5) {
+      h = inlay.x > 1.5 ? -0.6 : 0.6 + 0.3 * (gnoise(p / 12.0) - 0.5);
+      missing = 0.0;
+      id = 0.5;
+    }
+    kind = missing > 0.5 ? 1.0 : -1.0;
   } else {
     // The shelf the stones stand on: dusty rock, a few boulders; past its ragged lip a cliff drops
     // into the haze, where peaks rise from far below.
-    float beyond = d - ${KERB_PX}.0;
-    float lip = ${SHELF_PX}.0 + 26.0 * (fbm3(p / 90.0) - 0.5) + 14.0 * (gnoise(p / 23.0) - 0.5);
+    float beyond = d;
+    float lip = ${SHELF_PX + 14}.0 + 26.0 * (fbm3(p / 90.0) - 0.5) + 14.0 * (gnoise(p / 23.0) - 0.5);
     float shelf = 2.0 + 6.0 * fbm3(p / 70.0) + 2.0 * (gnoise(p / 9.0) - 0.5);
     float fall = smoothstep(lip - 6.0, lip + 34.0, beyond);
     h = mix(shelf, -${DEPTHS_PX}.0 + 30.0 * fbm3(p / 140.0), pow(fall, 0.7));
@@ -361,16 +384,14 @@ void main() {
   float sky = 0.55 + 0.45 * n.z;
   vec3 col;
   if (kind < -0.5) {
-    // Paving: grey-beige stones each a shade apart, darker mortar; the emblem in paler stone.
+    // Paving: grey-beige stones each a shade apart, darker mortar; the emblem's pale stone and its
+    // dark grooves.
     vec3 stone = mix(vec3(0.23, 0.21, 0.185), vec3(0.38, 0.35, 0.31), id);
     stone *= 0.88 + 0.24 * fbm3(p / 23.0);
-    float e = emblemDistance(p, uEmblem);
-    float inlay = 1.0 - smoothstep(2.5, 4.0, e);
-    stone = mix(stone, vec3(0.42, 0.41, 0.38), inlay);
-    stone = mix(stone, vec3(0.12, 0.115, 0.11), (1.0 - smoothstep(0.5, 1.5, abs(e - 3.8))) * 0.7);
+    vec2 inlay = emblemInlay(p);
+    if (inlay.x > 1.5) stone = vec3(0.11, 0.1, 0.09) * (0.85 + 0.3 * gnoise(p / 6.0));
+    else if (inlay.x > 0.5) stone = vec3(0.44, 0.42, 0.38) * (0.9 + 0.2 * fbm3(p / 18.0));
     col = stone * (0.55 + 0.35 * facing + 0.25 * sky);
-  } else if (kind < 0.5) {
-    col = mix(vec3(0.26, 0.25, 0.23), vec3(0.36, 0.35, 0.32), id) * (0.55 + 0.4 * facing + 0.2 * sky);
   } else {
     // Rock and dust, faces to the light pale; snow on the peaks' heads.
     vec3 rock = mix(vec3(0.17, 0.16, 0.145), vec3(0.37, 0.35, 0.32), smoothstep(0.35, 0.85, facing));
