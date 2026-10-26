@@ -223,7 +223,7 @@ export function cityBuildings({ towers, round }) {
       z1: tower.height,
       hw: tower.w / 2,
       hh: tower.d / 2,
-      color: [0.25 + 0.04 * (i % 3), 0.3 + 0.04 * (i % 3), 0.36 + 0.03 * (i % 2), (i * 0.137) % 1],
+      color: [0.17 + 0.03 * (i % 3), 0.26 + 0.03 * (i % 3), 0.4 + 0.04 * (i % 2), (i * 0.137) % 1],
     });
   });
   const tiers = [
@@ -343,8 +343,8 @@ const WINDOWS = /* glsl */ `
 // A facade's windows at px along it and px up it: x 1 in a pane, y how lit it is (0 dark, warm or a
 // cold green-white), seeded per tower.
 vec3 windowAt(float along, float up, float seed) {
-  vec2 cell = floor(vec2(along / 17.0, up / 24.0));
-  vec2 f = fract(vec2(along / 17.0, up / 24.0));
+  vec2 cell = floor(vec2(along / 22.0, up / 30.0));
+  vec2 f = fract(vec2(along / 22.0, up / 30.0));
   float pane = step(0.18, f.x) * step(f.x, 0.82) * step(0.22, f.y) * step(f.y, 0.78);
   float roll = hash12(cell + seed * 131.0);
   // Now and then someone switches a light on or off: one window in nine keeps its own slow clock.
@@ -388,7 +388,7 @@ void main() {
     // seams, a soft stain here and there; the moonlight falls brighter toward the far side.
     vec2 slab = abs(mod(p + 90.0, 180.0) - 90.0);
     float slabTone = 0.94 + 0.12 * hash12(floor((p + 90.0) / 180.0));
-    col = vec3(0.13, 0.137, 0.16) * (0.9 + 0.2 * fbm3(p / 90.0)) * slabTone;
+    col = vec3(0.088, 0.1, 0.122) * (0.9 + 0.2 * fbm3(p / 90.0)) * slabTone;
     col *= 0.96 + 0.06 * gnoise(p / 4.0);
     col *= mix(0.85, 1.12, smoothstep(-1.0, 1.0, (p.y - uRoof.y) / uRoof.w));
     col = mix(col, vec3(0.04, 0.042, 0.05), (1.0 - smoothstep(0.8, 2.0, min(slab.x, slab.y))) * 0.65);
@@ -396,7 +396,7 @@ void main() {
     col = mix(col * 0.5, col, smoothstep(0.3, 0.9, light.b));
     // Pink neon from the left tower washes the roof's left side; the hut lamp pools by its door.
     float neon = exp(-max(p.x - (uRoof.x - uRoof.z), 0.0) / 170.0) * smoothstep(-0.8, 0.4, (p.y - uRoof.y) / uRoof.w);
-    col += NEON_PINK * neon * 0.16 * (0.92 + 0.08 * sin(uTime * 7.0) * step(0.7, fract(uTime * 0.13)));
+    col += NEON_PINK * neon * 0.1 * (0.92 + 0.08 * sin(uTime * 7.0) * step(0.7, fract(uTime * 0.13)));
     vec2 door = vec2(uHut.x - uHut.z - 30.0, uHut.y);
     col += LAMP_WARM * exp(-dot(p - door, p - door) / (2.0 * 70.0 * 70.0)) * 0.35;
   } else {
@@ -439,7 +439,7 @@ void main() {
     float along = isRound > 0.5
       ? atan(vWorld.y - uRound.y, vWorld.x - uRound.x) * uRound.z
       : (abs(n.x) > abs(n.y) ? vWorld.y : vWorld.x);
-    vec3 wall = vColor.rgb * (0.36 + 0.3 * max(dot(n, normalize(vec3(-0.5, -0.5, 0.4))), 0.0));
+    vec3 wall = vColor.rgb * (0.3 + 0.32 * max(dot(n, normalize(vec3(-0.5, -0.5, 0.4))), 0.0));
     col = facadeColor(wall, along, vWorld.z + ${STREET_PX}.0, seed);
     // The round tower's crown: a lit band under its top.
     col = mix(col, vec3(1.2, 1.05, 0.8), isRound * step(uRound.w - 18.0, vWorld.z) * step(vWorld.z, uRound.w - 8.0));
