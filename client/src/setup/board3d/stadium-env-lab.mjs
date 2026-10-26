@@ -330,6 +330,11 @@ export function labProps(spots) {
     ringPipe.push([edge.x + Math.cos(angle) * 22, edge.y + Math.sin(angle) * 22, -DROP_PX + 10]);
   }
   props.tube(ringPipe, 9, PIPE, { sides: 10 });
+  // A second, thinner pipe runs beside it, and a bundle of three low along the deck's far side.
+  props.tube(ringPipe.map(([x, y, z]) => {
+    const angle = Math.atan2(y - dais.y, x - dais.x);
+    return [x + Math.cos(angle) * 19, y + Math.sin(angle) * 19, z - 3];
+  }), 5.5, PIPE, { sides: 8 });
   ringPipe.forEach((point, i) => {
     if (i % 9 !== 4) return;
     const next = ringPipe[Math.min(i + 1, ringPipe.length - 1)];
@@ -476,11 +481,18 @@ void main() {
   float fromCentre = length(rel);
   vec3 col;
   if (d < 0.0) {
-    // The dais: dark navy panels, a steel rim round its edge, shallow grooves picked out in blue.
+    // The dais, as in the art: a dark navy disc in its middle, shallow grooves picked out in blue;
+    // round it a band of pale steel plates out to the edge, its own steel rim; the pads steel too.
     col = vec3(0.022, 0.04, 0.085) * (0.92 + 0.16 * fbm3(p / 140.0));
     float ringGroove = abs(mod(fromCentre + 32.0, 64.0) - 32.0);
     float spoke = abs(mod(atan(rel.y, rel.x) * fromCentre + 1000.0, max(fromCentre * 0.2618, 1.0)) - fromCentre * 0.1309);
     col = mix(col, vec3(0.05, 0.1, 0.2), (1.0 - smoothstep(0.6, 1.8, min(ringGroove, spoke))) * step(d, -30.0) * 0.8);
+    float plates = smoothstep(uDais.z - 82.0, uDais.z - 79.0, fromCentre);
+    float plateSeam = abs(mod(atan(rel.y, rel.x) * uDais.z + 1000.0, 58.0) - 29.0);
+    vec3 paleSteel = mix(vec3(0.3, 0.33, 0.38), vec3(0.4, 0.43, 0.48), fbm3(p / 60.0));
+    paleSteel = mix(vec3(0.12, 0.13, 0.16), paleSteel, smoothstep(0.6, 1.6, plateSeam));
+    col = mix(col, paleSteel, plates);
+    col = mix(col, vec3(0.02, 0.025, 0.035), (1.0 - smoothstep(0.8, 2.2, abs(fromCentre - uDais.z + 80.5))) * step(-60.0, d) * 0.9);
     float rim = smoothstep(-28.0, -24.0, d);
     vec3 steel = mix(vec3(0.16, 0.18, 0.22), vec3(0.34, 0.37, 0.42), smoothstep(-24.0, -8.0, d));
     steel = mix(steel, vec3(0.6, 0.64, 0.7), 1.0 - smoothstep(0.8, 2.6, abs(d + 4.0)));
@@ -500,7 +512,7 @@ void main() {
     // The deck: dark tread-plate steel in broad plates, shade gathering at the dais's foot.
     vec2 diamond = abs(fract(mat2(0.7071, 0.7071, -0.7071, 0.7071) * p / 7.0 * vec2(1.0, 2.6)) - 0.5);
     float tread = smoothstep(0.32, 0.46, max(diamond.x, diamond.y) - 0.0);
-    col = mix(vec3(0.07, 0.078, 0.092), vec3(0.11, 0.12, 0.138), tread * 0.6);
+    col = mix(vec3(0.12, 0.135, 0.16), vec3(0.18, 0.2, 0.235), tread * 0.6);
     col *= 0.9 + 0.2 * fbm3(p / 90.0);
     vec2 panel = abs(mod(p + 72.0, 144.0) - 72.0);
     col = mix(vec3(0.02, 0.022, 0.028), col, smoothstep(0.8, 2.0, min(panel.x, panel.y)));
