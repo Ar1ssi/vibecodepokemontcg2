@@ -8,6 +8,7 @@ import {
   ARENA_KEY,
   BAKE_FIELD_FRAGMENT,
   BOARD_FRAGMENT,
+  LATTICE_VERTEX,
   GLINT_FRAGMENT,
   GLINT_VERTEX,
   LASER_COUNT,
@@ -23,6 +24,8 @@ import {
   glintGeometry,
   laserGeometry,
   laserLights,
+  latticeCrossings,
+  latticeGeometry,
   rigLamps,
   rigOutline,
 } from '../stadium-env-arena.mjs';
@@ -108,6 +111,22 @@ test('the rig runs round outside the ropes, a lamp at each of its corners and th
   }
 });
 
+test('latticeCrossings: the white shafts cross over the side stands, out past the ad boards', () => {
+  for (const layout of layouts) {
+    const spots = arenaSpots(layout);
+    const crossings = latticeCrossings(spots);
+    assert.equal(crossings.length, 4);
+    for (const [x, y] of crossings) {
+      assert.ok(Math.abs(x - spots.ring.x) > spots.boards.hw, 'past the ad boards');
+      assert.ok(Math.abs(y - spots.ring.y) < spots.boards.hh, 'beside the ring');
+    }
+    const lattice = latticeGeometry(three, spots);
+    const count = lattice.attributes.position.array.length / 3;
+    assert.equal(lattice.attributes.aFrom.array.length / 3, count);
+    assert.equal(lattice.attributes.aBeam.array.length / 2, count);
+  }
+});
+
 test('laserLights: one high in each corner, out past the ad boards', () => {
   for (const layout of layouts) {
     const spots = arenaSpots(layout);
@@ -125,7 +144,7 @@ test('laserLights: one high in each corner, out past the ad boards', () => {
 
 test('Fighting Stadium shaders declare no GLSL ES 3.00 reserved word and every one has a main', () => {
   const reserved = /\b(?:float|vec[234]|int|bool)\s+(?:flat|half|smooth|noperspective|sample|patch|input|output|filter|active|common|fixed|long|short|out|in|inout|round|step)\b/;
-  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_FRAGMENT, BOARD_FRAGMENT, LASER_VERTEX, PROP_FRAGMENT, GLINT_VERTEX, GLINT_FRAGMENT]) {
+  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_FRAGMENT, BOARD_FRAGMENT, LASER_VERTEX, PROP_FRAGMENT, GLINT_VERTEX, GLINT_FRAGMENT, LATTICE_VERTEX]) {
     assert.match(shader, /void main\(\)/);
     assert.doesNotMatch(shader, reserved);
   }

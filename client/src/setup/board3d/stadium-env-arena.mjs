@@ -40,12 +40,12 @@ export const APRON_PX = { drop: 34, slope: 18 };
 export const STAGE_PX = { width: 100, drop: 46 };
 export const FLOOR_PX = 38;
 /** The ad boards: height, thickness, how far their tops lean back from the ring (their faces show from above). */
-export const BOARD_PX = { height: 42, thick: 8, lean: 30 };
+export const BOARD_PX = { height: 54, thick: 8, lean: 40 };
 /** The stands: each tier's run and rise. */
 export const TIER_PX = { run: 40, rise: 26 };
 /** The ring's corner posts and ropes: the posts' height and radius, the ropes' heights, radius, sag. */
 export const POST_PX = { height: 96, radius: 7 };
-export const ROPES = { heights: [36, 60, 84], radius: 3.2, sag: 5 };
+export const ROPES = { heights: [30, 58, 86], radius: 4.2, sag: 5 };
 /**
  * The lasers: how many (laser k shines from light k % 4: the far corners' sweep along their side
  * stands toward the near end, or for k >= 8 across the far stands; the near corners' along their side
@@ -121,6 +121,56 @@ export function rigLamps(ring) {
     for (let k = 0; k < steps; k += 1) lamps.push([ax + ((bx - ax) * k) / steps, ay + ((by - ay) * k) / steps]);
   });
   return lamps;
+}
+
+/**
+ * The art's lattice of white light over the stands: on each side two X's of straight white shafts,
+ * each X crossing at a point out past the ad boards (px out, share of their half height along, z),
+ * its shafts reaching `reach` px either way. A flare marks every crossing.
+ */
+export const LATTICE = { out: 120, along: [-0.45, 0.4], z: 150, reach: [70, 300, 110] };
+
+/** The lattice's crossings: [x, y, z] each. */
+export function latticeCrossings({ ring, boards }) {
+  return [-1, 1].flatMap((side) =>
+    LATTICE.along.map((share) => [ring.x + side * (boards.hw + LATTICE.out), ring.y + share * boards.hh, LATTICE.z])
+  );
+}
+
+/** The lattice's shafts: one camera-facing strip each, aFrom, aTo and aBeam (along 0..1, across -1..1). */
+export function latticeGeometry(three, spots) {
+  const positions = [];
+  const froms = [];
+  const tos = [];
+  const beams = [];
+  const index = [];
+  const [dx, dy, dz] = LATTICE.reach;
+  for (const [x, y, z] of latticeCrossings(spots)) {
+    for (const lean of [-1, 1]) {
+      const from = [x - lean * dx, y - dy, z - lean * dz];
+      const to = [x + lean * dx, y + dy, z + lean * dz];
+      const first = positions.length / 3;
+      for (let i = 0; i <= 6; i += 1) {
+        for (const side of [-1, 1]) {
+          positions.push(x, y, z);
+          froms.push(...from);
+          tos.push(...to);
+          beams.push(i / 6, side);
+        }
+      }
+      for (let i = 0; i < 6; i += 1) {
+        const a = first + i * 2;
+        index.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+      }
+    }
+  }
+  const geometry = new three.BufferGeometry();
+  geometry.setAttribute('position', new three.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('aFrom', new three.Float32BufferAttribute(froms, 3));
+  geometry.setAttribute('aTo', new three.Float32BufferAttribute(tos, 3));
+  geometry.setAttribute('aBeam', new three.Float32BufferAttribute(beams, 2));
+  geometry.setIndex(index);
+  return geometry;
 }
 
 /** The four laser lights high in the corners: [x, y, z] each, far left, far right, near left, near right. */
@@ -444,9 +494,9 @@ void main() {
       if (aisle < 12.0) break;
       float slot = floor(along / 17.0) + float(k);
       float seed = hash12(vec2(slot, id * 97.0));
-      if (seed < 0.08) continue;
+      if (seed < 0.2) continue;
       float size = 1.3 + 0.35 * hash12(vec2(slot, id * 31.0 + 5.0));
-      vec2 at = vec2((slot + 0.5) * 17.0 + (hash12(vec2(slot, id + 7.0)) - 0.5) * 5.0, 23.0 + (hash12(vec2(slot, id + 9.0)) - 0.5) * 5.0);
+      vec2 at = vec2((slot + 0.5) * 17.0 + (hash12(vec2(slot, id + 7.0)) - 0.5) * 9.0, 23.0 + (hash12(vec2(slot, id + 9.0)) - 0.5) * 11.0);
       vec2 local = (vec2(along, tierD) - at) / size;
       float body = 1.0 - smoothstep(4.6, 5.8, length(local * vec2(1.0, 1.5) - vec2(0.0, -5.5)));
       float head = 1.0 - smoothstep(2.9, 3.7, length(local - vec2(0.0, 2.0)));
@@ -530,24 +580,18 @@ void main() {
   float panel = floor(vAd.x / PANEL);
   float pick = hash12(vec2(panel, 4.0));
   vec2 q = vec2(mod(vAd.x, PANEL), vAd.y * 38.0);
-  // Print on the panel: two lines of bold word blocks, or one big line.
-  float twoLines = step(0.5, hash12(vec2(panel, 6.0)));
-  float print = twoLines > 0.5
-    ? max(lettering(q - vec2(12.0, 0.0), 21.0, 29.0, panel) * step(q.x, 138.0), lettering(q - vec2(12.0, 0.0), 9.0, 17.0, panel + 1.0) * step(q.x, 110.0))
-    : lettering(q - vec2(12.0, 0.0), 12.0, 26.0, panel) * step(q.x, 138.0);
+  // One bold logo on each panel, as the art's: a big wordmark of two or three chunky word blocks
+  // across its middle.
+  float print = lettering(q - vec2(16.0, 0.0), 10.0, 28.0, panel) * step(q.x, 136.0);
   vec3 col;
-  if (pick < 0.25) {
-    // White, the red and white Poke Ball at its left, dark print beside it.
+  if (pick < 0.4) {
+    // White with the big red and white Poke Ball in its middle.
     col = vec3(0.95, 0.96, 0.97);
-    vec2 ball = q - vec2(22.0, 19.0);
+    vec2 ball = q - vec2(PANEL * 0.5, 19.0);
     float r = length(ball);
-    col = mix(col, vec3(0.88, 0.12, 0.12), step(r, 11.0) * step(0.0, ball.y));
-    col = mix(col, vec3(0.08), max(1.0 - smoothstep(0.8, 1.8, abs(r - 11.0)), (1.0 - smoothstep(0.6, 1.6, abs(ball.y))) * step(r, 11.0)));
-    col = mix(col, vec3(0.08), 1.0 - smoothstep(0.6, 1.4, abs(r - 4.0)));
-    col = mix(col, vec3(0.12, 0.12, 0.14), lettering(q - vec2(42.0, 0.0), 13.0, 25.0, panel) * step(q.x, 140.0));
-  } else if (pick < 0.45) {
-    col = vec3(0.95, 0.96, 0.97);
-    col = mix(col, vec3(0.12, 0.14, 0.2), print);
+    col = mix(col, vec3(0.88, 0.12, 0.12), step(r, 15.0) * step(0.0, ball.y));
+    col = mix(col, vec3(0.08), max(1.0 - smoothstep(1.0, 2.2, abs(r - 15.0)), (1.0 - smoothstep(0.8, 2.0, abs(ball.y))) * step(r, 15.0)));
+    col = mix(col, vec3(0.08), 1.0 - smoothstep(0.8, 1.8, abs(r - 5.0)));
   } else if (pick < 0.65) {
     col = vec3(0.1, 0.3, 0.85);
     col = mix(col, vec3(0.97, 0.98, 1.0), print);
@@ -607,6 +651,29 @@ void main() {
   gl_Position = projectionMatrix * view;
   vBeam = aBeam.xy;
   vLaser = k;
+}
+`;
+
+/** A lattice shaft: a thin camera-facing strip from aFrom to aTo, drawn as a white laser. */
+export const LATTICE_VERTEX = /* glsl */ `
+${TERRAIN_UNIFORMS}
+attribute vec3 aFrom;
+attribute vec3 aTo;
+attribute vec2 aBeam;
+varying vec2 vBeam;
+varying float vLaser;
+varying float vOutside;
+void main() {
+  vec3 here = mix(aFrom, aTo, aBeam.x);
+  vec4 view = modelViewMatrix * vec4(here, 1.0);
+  vec2 tangent = (modelViewMatrix * vec4(aTo - aFrom, 0.0)).xy;
+  vec2 across = length(tangent) > 0.0001 ? normalize(vec2(-tangent.y, tangent.x)) : vec2(1.0, 0.0);
+  view.xy += across * aBeam.y * 2.4;
+  gl_Position = projectionMatrix * view;
+  vBeam = aBeam;
+  // LASER_FRAGMENT's white.
+  vLaser = 4.0;
+  vOutside = 1.0;
 }
 `;
 
@@ -710,6 +777,12 @@ export function fightingStadiumBoard({ three, material, terrainGrid, replaceGeom
       blending: three.AdditiveBlending,
       side: three.DoubleSide,
     }),
+    lattice: make(LATTICE_VERTEX, LASER_FRAGMENT, {
+      transparent: true,
+      depthWrite: false,
+      blending: three.AdditiveBlending,
+      side: three.DoubleSide,
+    }),
     glints: make(GLINT_VERTEX, GLINT_FRAGMENT, {
       transparent: true,
       depthWrite: false,
@@ -726,10 +799,12 @@ export function fightingStadiumBoard({ three, material, terrainGrid, replaceGeom
   const boards = new three.Mesh(new three.BufferGeometry(), materials.boards);
   const lasers = new three.Mesh(laserGeometry(three), materials.lasers);
   lasers.renderOrder = 2;
+  const lattice = new three.Mesh(new three.BufferGeometry(), materials.lattice);
+  lattice.renderOrder = 2;
   const glints = new three.Mesh(new three.BufferGeometry(), materials.glints);
   glints.renderOrder = 2;
   return {
-    objects: [terrain, props, boards, lasers, glints],
+    objects: [terrain, props, boards, lasers, lattice, glints],
     materials: Object.values(materials),
     bakeField: materials.bakeField,
     bakeLight: materials.bakeLight,
@@ -740,11 +815,12 @@ export function fightingStadiumBoard({ three, material, terrainGrid, replaceGeom
       own.uBoards.value.set(spots.boards?.hw ?? 0, spots.boards?.hh ?? 0);
       own.uEmblem.value.set(emblem?.x ?? 0, emblem?.y ?? 0, emblem?.r ?? 0);
       replaceGeometry(terrain, terrainGrid(bounds));
-      for (const mesh of [props, boards, lasers, glints]) mesh.visible = Boolean(ring);
+      for (const mesh of [props, boards, lasers, lattice, glints]) mesh.visible = Boolean(ring);
       if (!ring) return;
       replaceGeometry(props, arenaProps(spots).build(three));
       replaceGeometry(boards, adBoardGeometry(three, spots));
-      replaceGeometry(glints, glintGeometry(three, rigLamps(ring), laserLights(spots)));
+      replaceGeometry(lattice, latticeGeometry(three, spots));
+      replaceGeometry(glints, glintGeometry(three, rigLamps(ring), [...laserLights(spots), ...latticeCrossings(spots)]));
     },
   };
 }
