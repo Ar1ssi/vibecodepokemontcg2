@@ -226,35 +226,39 @@ particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
   water, pink flower spikes stand on the islands and banks; marbled currents, shore lines, ripple
   rings, bubbles and spores move on the poison. Same scene margins as Stormy Mountains.
 - Six more, built on branch `feature/077-six-stadiums`, each in its own module with the Stormy
-  Mountains scene margins, each after its card art (set.json row, print named):
-  - Magma Basin (`stadium-env-magma.mjs`, BRS 144): every card on a dark lumpy rock island ringed
-    by a moat of molten gold (widest beside the cards); knobbly red-brown walls rise round it with
-    eight lavafalls (one forked) splashing into the moat; the Poke Ball set in the island in dark
-    red-brown rock round a dark band and button; sparks off the moat and the splashes. Two-pass
-    bake (smooth basin, then facets and lumps).
-  - Steel Shelter (`stadium-env-shelter.mjs`, PHF 105): a white hall; a polished hex floor that
-    mirrors the walls and the ceiling's hex lights per pixel, one big hatched hexagon in it, the
-    Poke Ball hologram as cyan rings; white walls over dark louvred vents and shimmering cyan strips
-    lean out a little round the hall, a dark roof past them; the gate's chevron frame on the far wall.
-  - Full Metal Lab (`stadium-env-lab.mjs`, TEF 148): a two-tone dais (navy disc with the glowing
-    Poke Ball and the lens's scan pulse, a band of pale steel plates) holds the Actives, Benches,
-    Stadium and Trainer rows, docking pads the Prize cards and piles; yellow railings, a blue stair
-    with steel nosings at the near right, black cables on the band and a gooseneck lamp; consoles,
-    silver tanks, ring pipes and big bent pipes on the pale deck below.
+  Mountains scene margins, each after its card art (set.json row, print named), its palette
+  checked against pixel samples of the art:
+  - Magma Basin (`stadium-env-magma.mjs`, BRS 144): every card on a dark brown lumpy rock island
+    ringed by a moat of molten gold (widest beside the cards); knobbly crimson walls rise round it
+    with eight lavafalls (one forked) splashing into the moat; the Poke Ball set in the island as a
+    smooth, slightly raised brick-red disc, its band and button ring cut dark; sparks off the moat
+    and the splashes. Two-pass bake (smooth basin, then facets and lumps).
+  - Steel Shelter (`stadium-env-shelter.mjs`, PHF 105): a white hall; a polished pale-grey hex
+    floor that mirrors the walls and the ceiling's hex lights per pixel, one big hatched hexagon in
+    it, the Poke Ball hologram as cyan rings; white walls over dark louvred vents and shimmering
+    cyan strips lean out a little round the hall, a dark roof past them; the gate's chevron frame
+    on the far wall.
+  - Full Metal Lab (`stadium-env-lab.mjs`, TEF 148): a two-tone dais (dark teal disc, the Poke Ball
+    lit blue inside thick white lines, the lens's scan pulse; a band of pale steel plates) holds the
+    Actives, Benches, Stadium and Trainer rows, docking pads the Prize cards and piles; yellow
+    railings, a teal-grey stair with steel nosings at the near right, black cables on the band and
+    a gooseneck lamp; consoles, cyan-steel tanks, ring pipes and big bent pipes on the deck below.
   - Dark City (`stadium-env-city.mjs`, UNM 193): a moonlit concrete rooftop with a parapet, the
-    stairwell hut and its lamp at the near right, AC units on the left; blue-grey towers of lit
-    windows (a few switching on and off) across the streets, each roof with a parapet, tank and
-    red-lit mast; the pink X and Team Skull's skull sprayed on two billboards, the far tower's
-    hazard band, the round tower far off, searchlights sweeping the night.
-  - Mountain Ring (`stadium-env-ring.mjs`, FFI 97): straight staggered brick rows breaking up at
-    the ring's edge, a pale stone Poke Ball set in dark grooves; menhirs of every shape round it, a
-    thick rope wound twice round each and sagging between, a giant rusty chain off one; past the
-    shelf's lip a cliff drops into sepia haze, crags rising in it; cloud shadows and mist drift.
-  - Fighting Stadium (`stadium-env-arena.mjs`, FFI 90): a wrestling ring (pale canvas, corner posts
-    with blue pads, three white ropes a side) on a glowing white stage edged in lights, its entrance
-    ramp and truss running off the left side (the art's right, which the sidebox would cover); LED
-    ad boards round the floor, tiers of the crowd in a teal haze, 24 lasers sweeping the stands from
-    the rig's corners, never across the ring.
+    stairwell hut and its lamp at the near right, AC units on the left; blue-grey towers with big
+    windows (about a third lit, a few switching on and off) across the streets, each roof with a
+    parapet, tank and red-lit mast; the pink X and Team Skull's skull sprayed on two billboards,
+    the far tower's hazard band, the round tower far off; searchlights from the street corners
+    sweep soft shafts across over the roof.
+  - Mountain Ring (`stadium-env-ring.mjs`, FFI 97): rows of grey-brown bricks with dark uneven
+    joints, each row shifted its own way, breaking up at the ring's edge; a pale stone Poke Ball
+    set in dark grooves; menhirs of every shape round it, a thick rope wound twice round each and
+    sagging between, a giant rusty chain off one; past the shelf's lip a cliff drops into sepia
+    haze, crags rising in it; cloud shadows and mist drift.
+  - Fighting Stadium (`stadium-env-arena.mjs`, FFI 90): a wrestling ring (pale canvas, blue apron
+    and corner posts, three white ropes a side) on a glowing white stage edged in lights that throws
+    cyan light round it, its entrance ramp and truss running off the left side (the art's right,
+    which the sidebox would cover); LED ad boards round the floor, dark teal tiers of the crowd; 24
+    lasers fan out from the rig over the ring and criss-cross from the corners, faint over the ring.
 
 ### Mesh — `stadium-environment-mesh.js`
 `createStadiumEnvironment({ three, renderer, parent, clock, motionReduced, fxDisabled, onNeedsRender })`
