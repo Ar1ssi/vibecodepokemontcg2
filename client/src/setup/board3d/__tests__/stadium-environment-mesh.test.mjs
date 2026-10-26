@@ -5,7 +5,13 @@ import { tableBounds } from '../table-uv.mjs';
 import { getMatLayout } from '../../sizing/mat-layouts.mjs';
 import { NO_MAT_LAYOUT_ID } from '../../sizing/mat-spec.mjs';
 import { craterBowl, mountainPeaks } from '../stadium-environment-layout.mjs';
-import { INTRO_MS, createStadiumEnvironment, strikePath, strikePower } from '../stadium-environment-mesh.js';
+import {
+  INTRO_MS,
+  PREPARE_TIMEOUT_MS,
+  createStadiumEnvironment,
+  strikePath,
+  strikePower,
+} from '../stadium-environment-mesh.js';
 
 // The no-mat profile the board draws by default, at the board width board3d.js lays out beside the
 // sidebox (0.755 of 1920).
@@ -92,7 +98,7 @@ test('createStadiumEnvironment starts the reveal on the frame after the one that
   environment.dispose();
 });
 
-test('createStadiumEnvironment compiles off the main thread when it can: the mat shows until the programs are ready', async () => {
+test('createStadiumEnvironment compiles with compileAsync when it can: the mat shows until the programs are ready', async () => {
   const three = await import('../../../vendor/three/three.module.min.js');
   const asyncCompiles = [];
   let syncCompiles = 0;
@@ -155,5 +161,115 @@ test('createStadiumEnvironment compiles off the main thread when it can: the mat
   environment.update(5000 + INTRO_MS / 2, camera);
   assert.ok(reveal.value > 0.5 && reveal.value < 1, `halfway through the reveal at ${reveal.value}`);
   assert.equal(syncCompiles, 0, 'never compiled on the main thread');
+  environment.dispose();
+});
+
+/**
+ * A renderer whose compileAsync calls wait until the test settles them, and an environment on it
+ * (magma-basin and steel-shelter boards), for the races round a pending compile.
+ */
+const pendingCompiles = async () => {
+  const three = await import('../../../vendor/three/three.module.min.js');
+  const compiles = [];
+  let target = null;
+  const renderer = {
+    extensions: { has: () => true },
+    compile: () => {},
+    compileAsync: (scene) =>
+      new Promise((resolve) => {
+        compiles.push({ scene, resolve });
+      }),
+    getRenderTarget: () => target,
+    setRenderTarget: (next) => {
+      target = next;
+    },
+    render: () => {},
+    getDrawingBufferSize: (size) => size.set(1920, 1080),
+  };
+  const parent = new three.Group();
+  const state = { needsRender: 0 };
+  const environment = createStadiumEnvironment({
+    three,
+    renderer,
+    parent,
+    isHidden: () => true,
+    onNeedsRender: () => {
+      state.needsRender += 1;
+    },
+  });
+  environment.setLayout(layout);
+  const holder = (key) => parent.getObjectByName(`board3d-stadium-env-${key}`);
+  const settle = async () => {
+    for (const compile of compiles.splice(0)) compile.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  };
+  return { three, environment, holder, settle, compiles, state, camera: new three.PerspectiveCamera() };
+};
+
+test('a board whose compile ends after another board was chosen stays hidden; the chosen one shows', async () => {
+  const { environment, holder, settle, compiles, camera } = await pendingCompiles();
+  environment.setKey('magma-basin');
+  environment.update(1000, camera);
+  environment.setKey('steel-shelter');
+  environment.update(1100, camera);
+  assert.equal(compiles.length, 4, 'both boards compiling');
+  await settle();
+  assert.equal(holder('magma-basin').visible, false, 'the board no longer chosen stays hidden');
+  assert.equal(holder('steel-shelter').visible, true);
+  environment.dispose();
+});
+
+test('a board taken away while it compiles stays hidden once the compile ends', async () => {
+  const { environment, holder, settle, camera } = await pendingCompiles();
+  environment.setKey('magma-basin');
+  environment.update(1000, camera);
+  environment.setKey(null);
+  await settle();
+  assert.equal(holder('magma-basin').visible, false);
+  assert.equal(environment.active(), false);
+  environment.dispose();
+});
+
+test('dispose while a compile runs: materials stay until it ends, then go; no frame is asked for', async () => {
+  const { environment, holder, settle, state, camera } = await pendingCompiles();
+  environment.setKey('magma-basin');
+  environment.update(1000, camera);
+  const materials = [];
+  holder('magma-basin').traverse((object) => object.material && materials.push(object.material));
+  let disposedCount = 0;
+  for (const material of materials) material.addEventListener('dispose', () => (disposedCount += 1));
+  const asked = state.needsRender;
+  environment.dispose();
+  assert.equal(disposedCount, 0, 'kept while three still polls them');
+  await settle();
+  assert.equal(disposedCount, materials.length, 'released once the compile ended');
+  assert.equal(state.needsRender, asked, 'no frame asked for after dispose');
+});
+
+test('a compile that never ends (a lost context) shows the board after PREPARE_TIMEOUT_MS', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { environment, holder, state, camera } = await pendingCompiles();
+  environment.setKey('magma-basin');
+  environment.update(1000, camera);
+  const asked = state.needsRender;
+  t.mock.timers.tick(PREPARE_TIMEOUT_MS - 1);
+  await Promise.resolve();
+  assert.equal(holder('magma-basin').visible, false, 'still waiting');
+  t.mock.timers.tick(1);
+  for (let i = 0; i < 5; i += 1) await Promise.resolve();
+  assert.equal(holder('magma-basin').visible, true, 'shown anyway');
+  assert.equal(state.needsRender, asked + 1);
+  t.mock.timers.reset();
+});
+
+test('a board compiles for the last camera when a frame comes without one', async () => {
+  const { environment, compiles, camera } = await pendingCompiles();
+  environment.setKey('steel-shelter');
+  environment.update(1000);
+  assert.equal(compiles.length, 0, 'no camera seen yet');
+  environment.update(1100, camera);
+  environment.setKey('magma-basin');
+  environment.update(1200);
+  assert.equal(compiles.length, 4, 'the second board compiled for the camera seen before');
   environment.dispose();
 });

@@ -29,6 +29,12 @@ export const INTRO_MS = 1600;
 /** Render layer of the environment: board-scene.js draws it in a pass of its own, under the board. */
 export const STADIUM_ENV_LAYER = 3;
 export const AMBIENT_FPS = 30;
+/**
+ * Longest wait for a board's programs before it shows anyway (three then builds what is missing
+ * on first draw): compileAsync polls each program until the driver reports it linked, which never
+ * happens on a lost context.
+ */
+export const PREPARE_TIMEOUT_MS = 8000;
 const EMBER_COUNT = 220;
 const SMOKE_COUNT = 14;
 const SPORE_COUNT = 150;
@@ -708,6 +714,10 @@ export function createStadiumEnvironment({
   let ambientTimer = null;
   let disposed = false;
   let unsupported = false;
+  /** The last camera update was given: a board compiles for it even on a frame given none. */
+  let lastCamera = null;
+  /** Compiles still running: three polls their materials, so dispose waits for them. */
+  const inFlight = new Set();
 
   const boardOf = (wanted) => {
     if (!boards.has(wanted)) {
@@ -833,8 +843,8 @@ export function createStadiumEnvironment({
 
   /**
    * `compile` (renderer.compile or compileAsync) on the board's meshes as board-scene.js draws them:
-   * in the environment's own pass, the camera on STADIUM_ENV_LAYER, where the table's light isn't
-   * seen, into the canvas. A program built with the light counted, or for a render target, has
+   * in the environment's own pass, the camera on STADIUM_ENV_LAYER (only lights on that layer
+   * count), into the canvas. A program built for another light count or for a render target has
    * another cache key, and three would build it again, on the main thread, the first time the pass
    * draws.
    */
@@ -851,15 +861,8 @@ export function createStadiumEnvironment({
     }
   };
 
-  /**
-   * Compiles a board's programs off the main thread (KHR_parallel_shader_compile, through
-   * compileAsync): its bake passes as they render into a target, and every mesh, hidden ones too
-   * (the lightning shows only when it strikes). The board stays hidden and the mat shows meanwhile;
-   * once ready, the next frame bakes and starts the reveal. A failed compile shows the board anyway:
-   * three then compiles on first draw, as it would without compileAsync.
-   */
-  const prepare = (board, camera) => {
-    if (board.preparing) return;
+  /** compileAsync on the bake passes, a render target bound as when they bake. */
+  const compileBakes = (board) => {
     const passes = new three.Scene();
     for (const material of new Set([board.bakePre, board.bakeField, board.bakeLight ?? bakeLight].filter(Boolean))) {
       const quad = new three.Mesh(bakeQuad.geometry, material);
@@ -868,18 +871,46 @@ export function createStadiumEnvironment({
     }
     const previous = renderer.getRenderTarget();
     renderer.setRenderTarget(compileTarget);
-    const bakes = renderer.compileAsync(passes, bakeCamera);
-    renderer.setRenderTarget(previous);
-    const meshes = compileMeshes(renderer.compileAsync.bind(renderer), board, camera);
-    board.preparing = Promise.all([bakes, meshes])
-      .catch((error) => console.warn('board3d: stadium environment compile failed', error?.message || error))
-      .then(() => {
-        board.preparing = null;
-        board.compiled = true;
-        if (disposed) return;
-        board.holder.visible = boards.get(key) === board;
-        onNeedsRender();
-      });
+    try {
+      return renderer.compileAsync(passes, bakeCamera);
+    } finally {
+      renderer.setRenderTarget(previous);
+    }
+  };
+
+  /**
+   * Compiles a board's programs with compileAsync, so the driver compiles and links them in
+   * parallel (KHR_parallel_shader_compile) while frames go on: its bake passes, and every mesh,
+   * hidden ones too (the lightning shows only when it strikes). The board stays hidden and the mat
+   * shows meanwhile; once ready (or after PREPARE_TIMEOUT_MS), the next frame bakes and starts the
+   * reveal. A compile that fails shows the board anyway: three then builds on first draw, as it
+   * would without compileAsync.
+   */
+  const prepare = (board, camera) => {
+    if (board.preparing) return;
+    let compiles = [];
+    try {
+      compiles = [compileBakes(board), compileMeshes(renderer.compileAsync.bind(renderer), board, camera)];
+    } catch (error) {
+      console.warn('board3d: stadium environment compile failed', error?.message || error);
+    }
+    const ready = Promise.all(compiles).catch((error) =>
+      console.warn('board3d: stadium environment compile failed', error?.message || error)
+    );
+    inFlight.add(ready);
+    ready.then(() => inFlight.delete(ready));
+    let timer = null;
+    const late = new Promise((resolve) => {
+      timer = setTimeout(resolve, PREPARE_TIMEOUT_MS);
+    });
+    board.preparing = Promise.race([ready, late]).then(() => {
+      clearTimeout(timer);
+      board.preparing = null;
+      board.compiled = true;
+      if (disposed) return;
+      board.holder.visible = boards.get(key) === board;
+      onNeedsRender();
+    });
   };
 
   const setKey = (next) => {
@@ -906,11 +937,12 @@ export function createStadiumEnvironment({
 
   const update = (now, camera) => {
     if (disposed || !key || !layout) return false;
+    if (camera) lastCamera = camera;
     const shown = boards.get(key);
     if (!showable(shown)) {
-      // The meshes first: a program's cache key depends on its geometry's attributes, so they
-      // compile with the geometry they will draw.
-      if (camera && applyLayout(false)) prepare(shown, camera);
+      // The meshes first: a program's cache key depends on its geometry's attributes (three r185:
+      // vertexNormals, hasPositionAttribute), so they compile with the geometry they will draw.
+      if (lastCamera && applyLayout(false)) prepare(shown, lastCamera);
       return false;
     }
     if (dirty) {
@@ -953,16 +985,22 @@ export function createStadiumEnvironment({
     key = null;
     cutout.uniforms.uCutoutOn.value = 0;
     parent.remove(group);
-    for (const board of boards.values()) {
-      for (const object of board.objects) object.geometry.dispose();
-      for (const material of board.materials) material.dispose();
-    }
+    const released = [...boards.values()];
     boards.clear();
-    bakeQuad.geometry.dispose();
-    bakeLight.dispose();
-    compileTarget.dispose();
-    disposeTargets();
-    targets = null;
+    const release = () => {
+      for (const board of released) {
+        for (const object of board.objects) object.geometry.dispose();
+        for (const material of board.materials) material.dispose();
+      }
+      bakeQuad.geometry.dispose();
+      bakeLight.dispose();
+      compileTarget.dispose();
+      disposeTargets();
+      targets = null;
+    };
+    // A compile still polling reads its materials' state: they go once it ends.
+    if (inFlight.size) Promise.all(inFlight).then(release);
+    else release();
   };
 
   return { setLayout, setKey, update, active: () => key !== null, cutout, dispose };
