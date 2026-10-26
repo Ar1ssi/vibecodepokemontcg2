@@ -20,6 +20,7 @@ import {
   OUTPUT,
   POKE_BALL,
   REVEAL,
+  STONES,
   TABLE_UNIFORMS,
   TERRAIN_GROUND,
   TERRAIN_UNIFORMS,
@@ -266,6 +267,7 @@ uniform vec3 uEmblem;
 varying vec2 vUv;
 ${NOISE}
 ${VORONOI}
+${STONES}
 ${POKE_BALL}
 float basinAt(vec2 p) {
   return texture2D(uPre, (p - uMin) / uSize).r;
@@ -318,12 +320,15 @@ void main() {
     }
   } else if (outerSD > 0.0) {
     kind = 0.0;
-    // Rough volcanic rock: broad faces broken by knobbly lumps and a fine grain, the art's walls.
+    // The art's walls: chunky rounded rocks heaped up the cliff, dark gaps between them, over
+    // broad faces; the falls run down smooth channels between the rocks.
     float onWall = smoothstep(4.0, 26.0, outerSD);
-    vec2 rock = faceted(p, h, onWall * 0.7);
-    float lumps = 7.0 * (fbm3(p / 26.0 + 3.0) - 0.5) + 3.0 * (gnoise(p / 9.0) - 0.5) + 1.2 * (gnoise(p / 3.5) - 0.5);
-    h = rock.x + lumps * onWall - 4.0 * (1.0 - smoothstep(-2.0, 4.0, fallSD));
-    tone = fract(rock.y + 0.35 * fbm3(p / 40.0));
+    vec2 rock = faceted(p, h, onWall * 0.6);
+    vec3 cobble = stones(p + 11.0, mix(26.0, 40.0, fbm3(p / 180.0)), 2.4);
+    float channel = smoothstep(0.0, 12.0, fallSD);
+    h = rock.x + (cobble.x * 13.0 + 1.2 * (gnoise(p / 3.5) - 0.5)) * onWall * channel
+      - 4.0 * (1.0 - smoothstep(-2.0, 4.0, fallSD));
+    tone = fract(cobble.y * 3.1 + 0.2 * rock.y);
   }
   gl_FragColor = vec4(h, tone, joint, kind);
 }
@@ -427,7 +432,7 @@ void main() {
   // The walls take less of it than the island: their faces lean away from the moat's middle.
   float moatGlow = exp(-fromMoat / mix(22.0, 38.0, onIsland)) * exp(-above / 60.0) * (0.25 + 0.75 * turned);
   col += mix(vec3(1.0, 0.12, 0.05), vec3(1.0, 0.2, 0.03), onIsland) * moatGlow * flicker * mix(0.3, 0.8, onIsland);
-  col += vec3(1.0, 0.26, 0.035) * exp(-max(fallSD, 0.0) / 11.0) * onWall * 0.7 * flicker;
+  col += vec3(1.0, 0.26, 0.035) * exp(-max(fallSD, 0.0) / 6.0) * onWall * 0.55 * flicker;
 
   // Some of the island's cracks still glow; sparks lie on the rock.
   col = mix(col, basinLava(0.26 + 0.1 * flicker), field.b * 0.85);
