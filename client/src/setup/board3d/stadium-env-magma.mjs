@@ -41,6 +41,8 @@ const ISLAND_SWELL = 7;
 export const ISLAND_MARGIN_PX = 28;
 /** Corner radius of the island's rounded outline. */
 export const ISLAND_CORNER_PX = 120;
+/** The emblem's button ring as a share of its radius: big, so its arcs show either side of the Actives. */
+const EMBLEM_BUTTON = '0.36';
 /**
  * How much further the island runs on toward the near end: the player's hand row lies over the
  * board's near edge, and its cards read poorly on bright lava, so the near moat lies past it.
@@ -312,7 +314,7 @@ void main() {
     if (uEmblem.z > 0.0) {
       vec2 rel = p - uEmblem.xy;
       float r = length(rel);
-      float buttonR = uEmblem.z * 0.24;
+      float buttonR = uEmblem.z * ${EMBLEM_BUTTON};
       float bandHalf = uEmblem.z * 0.075;
       float disc = 1.0 - smoothstep(uEmblem.z - 3.0, uEmblem.z, r);
       // Each half rises to a rounded crown between its edges: the rim, the band, the button's ring.
@@ -402,13 +404,13 @@ void main() {
   vec3 sun = normalize(uSun);
   float facing = dot(n, sun) * mix(0.5, 1.0, light.a);
 
-  // The island: dark grey-brown rock, warmer where lumps catch the light. The walls: dark crimson
-  // rock, the tops of its rounded rocks a brighter red to the light. Colours sampled from the art and
-  // inverted through Neutral tone mapping, as basinLava's: island (37,26,23), (70,47,34), (94,70,54);
+  // The island: charcoal basalt, warmer where lumps catch the light. The walls: dark crimson rock,
+  // the tops of its rounded rocks a brighter red to the light. Colours sampled from the art and
+  // inverted through Neutral tone mapping, as basinLava's: island (37,26,23), (59,43,37), (85,66,55);
   // walls (31,13,8), (70,21,18), (111,43,45), the first two lifted a third for the shade and
   // occlusion that darken them below.
-  vec3 islandRock = mix(vec3(0.047, 0.039, 0.037), vec3(0.096, 0.063, 0.051), smoothstep(0.35, 0.75, facing));
-  islandRock = mix(islandRock, vec3(0.152, 0.101, 0.077), smoothstep(0.85, 0.97, facing));
+  vec3 islandRock = mix(vec3(0.04, 0.033, 0.031), vec3(0.08, 0.06, 0.054), smoothstep(0.35, 0.75, facing));
+  islandRock = mix(islandRock, vec3(0.131, 0.094, 0.078), smoothstep(0.85, 0.97, facing));
   islandRock *= 0.86 + 0.28 * tone;
   vec3 wallRock = mix(vec3(0.042, 0.028, 0.027), vec3(0.116, 0.045, 0.042), smoothstep(0.4, 0.7, facing));
   wallRock = mix(wallRock, vec3(0.197, 0.062, 0.064), smoothstep(0.82, 0.95, facing));
@@ -453,14 +455,14 @@ void main() {
     vec2 rel = p - uEmblem.xy;
     float r = length(rel);
     float bandHalf = uEmblem.z * 0.075;
-    float buttonR = uEmblem.z * 0.24;
+    float buttonR = uEmblem.z * ${EMBLEM_BUTTON};
     float breathe = 0.93 + 0.07 * sin(uTime * 1.1);
     float inside = 1.0 - smoothstep(uEmblem.z - 1.5, uEmblem.z, r);
     float halves = inside * smoothstep(bandHalf, bandHalf + 1.5, abs(rel.y)) * smoothstep(buttonR + 3.0, buttonR + 5.0, r);
     float crown = clamp(min(min(uEmblem.z - r, abs(rel.y) - bandHalf), r - buttonR - 4.0) / 60.0, 0.0, 1.0);
-    // The art's (75,33,30) at the edges, (119,52,40) over the halves, (145,57,45) on their crowns,
-    // inverted through Neutral tone mapping.
-    vec3 stone = mix(vec3(0.075, 0.03, 0.027), vec3(0.2, 0.065, 0.053), sqrt(crown)) + vec3(0.1, 0.012, 0.01) * crown * crown;
+    // The art's (110,45,35) at the edges, (145,57,45) over the halves, a hotter (150,62,45) on their
+    // crowns, inverted through Neutral tone mapping.
+    vec3 stone = mix(vec3(0.191, 0.061, 0.052), vec3(0.322, 0.079, 0.065), sqrt(crown)) + vec3(0.06, 0.02, 0.006) * crown;
     stone *= (0.86 + 0.24 * smoothstep(-uEmblem.z, uEmblem.z, rel.y)) * breathe * (0.92 + 0.16 * fbm3(p / 22.0));
     stone += vec3(0.4, 0.14, 0.05) * smoothstep(0.84, 0.97, r / uEmblem.z) * smoothstep(0.1, 0.7, rel.y / uEmblem.z);
     float buttonRing = smoothstep(buttonR - 7.0, buttonR - 4.0, r) * (1.0 - smoothstep(buttonR + 3.0, buttonR + 5.0, r));
@@ -565,13 +567,13 @@ void main() {
   float middle = sin(across * 3.14159);
   // Pale gold flow lines down the middle; gold out to a thin red-orange lip at both shores, as the
   // art's moat (no bright rim along them).
-  float heat = 0.6 + 0.16 * middle + (flow.x - 0.5) * 0.4 + flow.y * 0.42 * middle;
+  float heat = 0.62 + 0.16 * middle + (flow.x - 0.5) * 0.22 + flow.y * 0.3 * middle;
   heat -= 0.36 * (1.0 - smoothstep(0.0, 14.0, shore));
   // A thin dark crust right against the rock.
   heat -= 0.4 * (1.0 - smoothstep(1.5, 5.0, shore));
   // Dark crust plates drifting where the flow runs cool.
-  float skin = smoothstep(0.6, 0.7, fbm3((p - velocity * uTime * 0.6) / 70.0 + 9.0)) * smoothstep(8.0, 30.0, shore);
-  heat -= skin * 0.3;
+  float skin = smoothstep(0.66, 0.74, fbm3((p - velocity * uTime * 0.6) / 70.0 + 9.0)) * smoothstep(8.0, 30.0, shore);
+  heat -= skin * 0.2;
 
   // Each fall's splash where its line meets the outer shore: a hot churning pool, rings running out
   // from it.
