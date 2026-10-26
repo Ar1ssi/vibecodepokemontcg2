@@ -15,7 +15,6 @@ import {
   FULLSCREEN_VERTEX,
   NOISE,
   OUTPUT,
-  POKE_BALL,
   REVEAL,
   STONES,
   TABLE_UNIFORMS,
@@ -293,7 +292,6 @@ varying vec2 vUv;
 ${NOISE}
 ${VORONOI}
 ${STONES}
-${POKE_BALL}
 ${RING}
 float ridged(vec2 q) {
   return 1.0 - abs(2.0 * gnoise(q) - 1.0);
@@ -388,7 +386,6 @@ export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
 ${REVEAL}
-${POKE_BALL}
 ${RING}
 ${OVERCAST}
 varying vec2 vPos;

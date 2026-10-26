@@ -17,7 +17,6 @@ import {
   FULLSCREEN_VERTEX,
   NOISE,
   OUTPUT,
-  POKE_BALL,
   REVEAL,
   TABLE_UNIFORMS,
   TERRAIN_GROUND,
@@ -632,7 +631,6 @@ ${TERRAIN_UNIFORMS}
 uniform vec3 uEmblem;
 ${NOISE}
 ${REVEAL}
-${POKE_BALL}
 ${DAIS}
 varying vec2 vPos;
 varying vec2 vUv;

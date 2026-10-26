@@ -18,7 +18,6 @@ import {
   FULLSCREEN_VERTEX,
   NOISE,
   OUTPUT,
-  POKE_BALL,
   REVEAL,
   STONES,
   TABLE_UNIFORMS,
@@ -77,13 +76,12 @@ const SIDE_DIRECTIONS = {
   left: { angle: Math.PI, axis: 'y', sign: -1 },
   right: { angle: 0, axis: 'y', sign: 1 },
   far: { angle: Math.PI / 2, axis: 'x', sign: 1 },
-  near: { angle: -Math.PI / 2, axis: 'x', sign: -1 },
 };
 
 /**
  * Magma Basin's landmarks: the island (a rounded rect round every card footprint, each corner of the
  * footprints ISLAND_MARGIN_PX inside its shore), the moat's width beside the cards and off their
- * ends (MOAT_PX), the lavafalls on its outer shore (FALL_RECIPES) and the Poké Ball etched in the
+ * ends (MOAT_PX), the lavafalls on its outer shore (FALL_RECIPES) and the Poké Ball set in the
  * island (craterEmblem, about the table's middle). Null without a table.
  * @param {ReturnType<typeof import('./board-layout.mjs').flatLayout>|null} layout
  * @returns {{ island: { x: number, y: number, hw: number, hh: number, r: number },
@@ -256,9 +254,9 @@ void main() {
 `;
 
 /**
- * Bake 1, second pass: the ground. The walls are cut into flat faces, the falls run in shallow
- * channels; the island's rock is lumpy, split into broad crust plates by shallow joints (a few of
- * them glow), the emblem cut into it.
+ * Bake 1, second pass: the ground. The walls are heaped with rounded rocks over broad faces, the
+ * falls running in smooth channels; the island's rock is lumpy, a few long cracks wander across it
+ * (some glow), and the Poké Ball is a smooth disc set in it.
  */
 export const BAKE_FIELD_FRAGMENT = /* glsl */ `
 ${TABLE_UNIFORMS}
@@ -268,7 +266,6 @@ varying vec2 vUv;
 ${NOISE}
 ${VORONOI}
 ${STONES}
-${POKE_BALL}
 float basinAt(vec2 p) {
   return texture2D(uPre, (p - uMin) / uSize).r;
 }
@@ -361,7 +358,6 @@ ${NOISE}
 ${REVEAL}
 ${BASIN_LAVA}
 ${FLOW_STREAKS}
-${POKE_BALL}
 ${FALLS}
 varying vec2 vPos;
 varying vec2 vUv;
@@ -398,8 +394,8 @@ void main() {
   vec3 sun = normalize(uSun);
   float facing = dot(n, sun) * mix(0.5, 1.0, light.a);
 
-  // The island: dark brown-black rock, a warm grey where lumps catch the light. The walls: black
-  // basalt with a red-brown cast, faces to the light a muted warm grey under the hazy sky.
+  // The island: dark brown rock, warmer where lumps catch the light. The walls: dark crimson rock,
+  // the tops of its rounded rocks a brighter red to the light.
   vec3 islandRock = mix(vec3(0.046, 0.028, 0.019), vec3(0.088, 0.053, 0.036), smoothstep(0.35, 0.75, facing));
   islandRock = mix(islandRock, vec3(0.15, 0.094, 0.052), smoothstep(0.85, 0.97, facing));
   islandRock *= 0.86 + 0.28 * tone;
@@ -439,7 +435,7 @@ void main() {
   float specks = speck(p, 12.0, 0.1, 1.0) + speck(p, 27.0, 0.16, 2.0) * 1.5;
   col += vec3(1.7, 0.42, 0.05) * specks * mix(0.35, 1.0, onIsland);
 
-  // The Poke Ball set in the island, as in the art: two smooth halves of glossy red-orange stone,
+  // The Poke Ball set in the island, as in the art: two smooth halves of brick-red stone,
   // brighter toward the rim and on the far side, a sheen along the far rim; the band, the button's
   // ring and the crevice round it dark; the button's core red. It glows faintly, breathing.
   if (uEmblem.z > 0.0 && onIsland > 0.5) {

@@ -15,7 +15,6 @@ import {
   FULLSCREEN_VERTEX,
   NOISE,
   OUTPUT,
-  POKE_BALL,
   REVEAL,
   TERRAIN_GROUND,
   TERRAIN_UNIFORMS,
@@ -188,7 +187,6 @@ ${NOISE}
 ${REVEAL}
 ${HEX}
 ${HALL}
-${POKE_BALL}
 varying vec2 vPos;
 
 // The ceiling's light panels at q: big hex lights in dark frames.
