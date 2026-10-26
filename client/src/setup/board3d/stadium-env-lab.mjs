@@ -85,6 +85,23 @@ const LID = [0.45, 0.48, 0.54, 0.25];
 /** The big pipes: turn round the dais (deg) each runs out from the ring before rising. */
 const BIG_PIPES = [100, 120, 238, 262, 292, 72, 200, 160];
 const BIG_PIPE = { radius: 20, run: 150, bend: 40, top: 320 };
+/** The deck's pipe bundles: candidates every `step` deg, at most `most`, pipes `spread` px apart. */
+const BUNDLE = { step: 20, most: 7, spread: 11, radius: 4.5 };
+/**
+ * The art's pipe arches: thick silver pipes arching up off the deck round the dais, each standing
+ * tangent to it. Turn round the dais (deg), gap from its edge to the arch, half span, height, pipe
+ * radius. Dropped when one would leave the scene or crowd the stair, a console or a tank.
+ */
+const ARCHES = [
+  [150, 120, 75, 150, 15],
+  [208, 140, 85, 170, 17],
+  [30, 130, 80, 160, 16],
+  [330, 115, 70, 140, 14],
+  [96, 150, 90, 175, 17],
+  [255, 110, 70, 140, 14],
+  [180, 210, 95, 190, 18],
+  [0, 220, 95, 185, 18],
+];
 const STEP_BLUE = [0.14, 0.24, 0.27, 0.35];
 const STEP_BLUE_LIGHT = [0.18, 0.29, 0.32, 0.35];
 const STEP_SIDE = [0.06, 0.1, 0.12, 0.35];
@@ -232,14 +249,99 @@ export function labSpots(layout) {
       tanks.every((t) => Math.hypot(x - t.x, y - t.y) > radius + t.radius + 14);
     if (clear) tanks.push({ x, y, radius, height, tint, angle });
   }
+  const arches = [];
+  for (const [deg, gap, half, height, radius] of ARCHES) {
+    const angle = (deg * Math.PI) / 180;
+    const edge = outlineAt(outline, angle);
+    const x = edge.x + Math.cos(angle) * gap;
+    const y = edge.y + Math.sin(angle) * gap;
+    const tangent = [-Math.sin(angle), Math.cos(angle)];
+    const feet = [-1, 1].map((side) => ({ x: x + tangent[0] * half * side, y: y + tangent[1] * half * side }));
+    const clear = feet.every(
+      (foot) =>
+        inScene(foot.x, foot.y, radius + 4) &&
+        daisDistance(foot.x, foot.y, dais) > radius + 30 &&
+        tanks.every((t) => Math.hypot(foot.x - t.x, foot.y - t.y) > t.radius + radius + 10) &&
+        consoles.every((c) => Math.hypot(foot.x - c.x, foot.y - c.y) > radius + 50) &&
+        Math.hypot(foot.x - stairEnd.x, foot.y - stairEnd.y) > radius + 80
+    ) && turnBetween(angle, STAIR.angle) > 0.4;
+    if (clear) arches.push({ x, y, angle, half, height, radius });
+  }
+  // Bundles of three low pipes run straight out across the deck from the ring pipe to the scene's
+  // edge, between the tanks, consoles, arches and the stair.
+  const bundles = [];
+  const rayHits = (angle, from, to, x, y, r) => {
+    const dx = Math.cos(angle);
+    const dy = Math.sin(angle);
+    const t = Math.max(from, Math.min(to, (x - dais.x) * dx + (y - dais.y) * dy));
+    return Math.hypot(dais.x + dx * t - x, dais.y + dy * t - y) < r;
+  };
+  for (let deg = 5; deg < 360 && bundles.length < BUNDLE.most; deg += BUNDLE.step) {
+    const angle = (deg * Math.PI) / 180;
+    const edge = outlineAt(outline, angle);
+    const from = edge.r + 30;
+    let to = from;
+    while (inScene(dais.x + Math.cos(angle) * to, dais.y + Math.sin(angle) * to, 0)) to += 10;
+    to += 10;
+    const room = BUNDLE.spread + BUNDLE.radius + 8;
+    const blocked =
+      to - from < 60 ||
+      turnBetween(angle, STAIR.angle) < 0.35 ||
+      tanks.some((t) => rayHits(angle, from, to, t.x, t.y, t.radius + room)) ||
+      consoles.some((c) => rayHits(angle, from, to, c.x, c.y, 40 + room)) ||
+      arches.some((a) => rayHits(angle, from, to, a.x, a.y, a.half + room)) ||
+      bundles.some((b) => turnBetween(b.angle, angle) < 0.25);
+    if (!blocked) bundles.push({ angle, from, to });
+  }
   const emblem = craterEmblem(layout, centre);
-  return { dais, outline, stair, consoles, tanks, emblem };
+  return { dais, outline, stair, consoles, tanks, arches, bundles, emblem };
 }
 
 /** The railing round the dais (open at the stair), its posts, the stair, consoles, tanks and pipes. */
 export function labProps(spots) {
   const props = createPropBuilder();
-  const { dais, outline, stair, consoles, tanks } = spots;
+  const { dais, outline, stair, consoles, tanks, arches = [], bundles = [] } = spots;
+  for (const bundle of bundles) {
+    const dir = [Math.cos(bundle.angle), Math.sin(bundle.angle)];
+    const side = [-dir[1], dir[0]];
+    for (const offset of [-1, 0, 1]) {
+      const at = (t) => [
+        dais.x + dir[0] * t + side[0] * offset * BUNDLE.spread,
+        dais.y + dir[1] * t + side[1] * offset * BUNDLE.spread,
+        -DROP_PX + BUNDLE.radius + 1,
+      ];
+      props.tube([at(bundle.from), at(bundle.to)], BUNDLE.radius, PIPE, { sides: 8 });
+    }
+    // A clamp across the bundle every so often.
+    for (let t = bundle.from + 40; t < bundle.to - 20; t += 90) {
+      props.box({
+        x: dais.x + dir[0] * t,
+        y: dais.y + dir[1] * t,
+        z0: -DROP_PX,
+        z1: -DROP_PX + BUNDLE.radius * 2 + 3,
+        hw: 3,
+        hh: BUNDLE.spread + BUNDLE.radius + 3,
+        yaw: bundle.angle,
+        color: DARK_STEEL,
+      });
+    }
+  }
+  // The pipe arches: a half-ellipse up off the deck and down again, a dark collar at each foot.
+  for (const arch of arches) {
+    const tangent = [-Math.sin(arch.angle), Math.cos(arch.angle)];
+    const points = [];
+    for (let k = 0; k <= 16; k += 1) {
+      const t = (k / 16) * Math.PI;
+      const along = -Math.cos(t) * arch.half;
+      points.push([arch.x + tangent[0] * along, arch.y + tangent[1] * along, -DROP_PX + Math.sin(t) * arch.height]);
+    }
+    props.tube(points, arch.radius, PIPE, { sides: 12 });
+    for (const side of [-1, 1]) {
+      const fx = arch.x + tangent[0] * arch.half * side;
+      const fy = arch.y + tangent[1] * arch.half * side;
+      props.cylinder({ x: fx, y: fy, z0: -DROP_PX, z1: -DROP_PX + 14, r: arch.radius + 4, color: DARK_STEEL, sides: 14 });
+    }
+  }
   const halfGap = (STAIR.width / 2 + 10) / outlineAt(outline, STAIR.angle).r;
   // The railing: from one side of the stair round to the other, inset from the edge.
   const rail = [];
@@ -625,7 +727,7 @@ vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
 
 export const PROP_FRAGMENT = propFragment({ light: PROP_LIGHT, reveal: LENS_BLUE });
 
-const NO_SPOTS = { dais: null, outline: [], stair: null, consoles: [], tanks: [], emblem: null };
+const NO_SPOTS = { dais: null, outline: [], stair: null, consoles: [], tanks: [], arches: [], bundles: [], emblem: null };
 
 /** Full Metal Lab's board (stadium-environment-mesh.js BOARDS): the dais and deck, and the props. */
 export function fullMetalLabBoard({ three, material, terrainGrid, replaceGeometry, bakeOptions }) {

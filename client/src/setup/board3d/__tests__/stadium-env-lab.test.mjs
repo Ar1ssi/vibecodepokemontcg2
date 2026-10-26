@@ -108,3 +108,29 @@ test('Full Metal Lab shaders declare no GLSL ES 3.00 reserved word and every one
     assert.doesNotMatch(shader, reserved);
   }
 });
+
+test('labSpots: pipe arches stand on the deck tangent to the dais; bundles run clear of every tank', () => {
+  for (const layout of layouts) {
+    const spots = labSpots(layout);
+    const scene = sceneBounds(layout, LAB_KEY);
+    for (const arch of spots.arches) {
+      const tangent = [-Math.sin(arch.angle), Math.cos(arch.angle)];
+      for (const side of [-1, 1]) {
+        const x = arch.x + tangent[0] * arch.half * side;
+        const y = arch.y + tangent[1] * arch.half * side;
+        assert.ok(daisDistance(x, y, spots.dais) > arch.radius, 'each foot off the dais');
+        assert.ok(x > scene.x && x < scene.x + scene.w && y > scene.y && y < scene.y + scene.h, 'each foot in the scene');
+        for (const tank of spots.tanks) assert.ok(Math.hypot(x - tank.x, y - tank.y) > tank.radius + arch.radius);
+      }
+    }
+    for (const bundle of spots.bundles) {
+      const dir = [Math.cos(bundle.angle), Math.sin(bundle.angle)];
+      for (let t = bundle.from; t <= bundle.to; t += 5) {
+        const x = spots.dais.x + dir[0] * t;
+        const y = spots.dais.y + dir[1] * t;
+        assert.ok(daisDistance(x, y, spots.dais) > 0, 'on the deck');
+        for (const tank of spots.tanks) assert.ok(Math.hypot(x - tank.x, y - tank.y) > tank.radius, 'clear of the tanks');
+      }
+    }
+  }
+});
