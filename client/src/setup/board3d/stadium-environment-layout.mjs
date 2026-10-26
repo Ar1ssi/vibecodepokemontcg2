@@ -11,6 +11,7 @@ import { tableBounds } from './table-uv.mjs';
 const ENVIRONMENT_BY_CARD = {
   'customhb-051': 'stormy-mountains',
   'customhb-162': 'steel-shelter',
+  'customhb-163': 'full-metal-lab',
   'customhb-253': 'perilous-jungle',
   'customhb-289': 'magma-basin',
   'customhb-299': 'scorched-earth',
@@ -27,6 +28,7 @@ export const ENVIRONMENT_OVERRIDE_KEY = 'ptcg-stadium-env';
  * table's own floor shows.
  */
 const SCENE_MARGINS = {
+  'full-metal-lab': { side: 0.17, near: 0.2, far: 0.34 },
   'magma-basin': { side: 0.17, near: 0.2, far: 0.34 },
   'stormy-mountains': { side: 0.17, near: 0.2, far: 0.34 },
   'perilous-jungle': { side: 0.17, near: 0.2, far: 0.34 },
@@ -112,6 +114,17 @@ const benchRectsOf = (layout, side) =>
   );
 
 const SIDES = ['self', 'opp'];
+
+/**
+ * Every Active and Bench card of both sides where the board's poses draw them: the arena a
+ * board's middle holds (Stormy Mountains' crater floor, Full Metal Lab's dais).
+ * @param {ReturnType<typeof import('./board-layout.mjs').flatLayout>|null} layout
+ * @returns {{ x: number, y: number, w: number, h: number }[]}
+ */
+export function arenaRects(layout) {
+  if (!layout?.self || !layout?.opp) return [];
+  return SIDES.flatMap((side) => [...activeRectsOf(layout, side), ...benchRectsOf(layout, side)]);
+}
 
 /**
  * The environment key for the Stadium in play: its card id (`customhb-299`), or the same card

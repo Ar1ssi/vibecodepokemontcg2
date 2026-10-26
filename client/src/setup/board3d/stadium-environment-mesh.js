@@ -7,6 +7,7 @@ import * as glsl from './stadium-environment-glsl.mjs';
 import * as forest from './stadium-env-forest.mjs';
 import { MAX_CARD_RECTS, STREAM_POINTS, jungleLeaves, jungleSpots } from './stadium-env-forest-layout.mjs';
 import * as highland from './stadium-env-highland.mjs';
+import { fullMetalLabBoard } from './stadium-env-lab.mjs';
 import { magmaBasinBoard } from './stadium-env-magma.mjs';
 import { steelShelterBoard } from './stadium-env-shelter.mjs';
 import * as volcanic from './stadium-env-volcanic.mjs';
@@ -510,6 +511,7 @@ function perilousJungleBoard({ three, material, seeded }) {
 }
 
 const BOARDS = {
+  'full-metal-lab': fullMetalLabBoard,
   'magma-basin': magmaBasinBoard,
   'perilous-jungle': perilousJungleBoard,
   'scorched-earth': scorchedEarthBoard,
