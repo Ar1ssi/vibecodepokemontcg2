@@ -59,11 +59,11 @@ const TANKS = [
 const TANK_DOME = 0.72;
 /** The consoles on the deck: turn round the dais (deg), gap from its edge. */
 const CONSOLES = [
-  [148, 26],
-  [136, 26],
+  [151, 26],
+  [133, 26],
 ];
 /** A console's half width along the dais, half depth, and its sloped top's low and high edges (z). */
-const CONSOLE = { hw: 40, hh: 22, low: -24, high: -8 };
+const CONSOLE = { hw: 58, hh: 30, low: -22, high: -2 };
 
 /** The art's safety yellow, bright in every light (glowing w: thin rails seen from above stayed olive when lit). */
 const YELLOW = [1.0, 0.76, 0.06, 1.78];
@@ -100,10 +100,15 @@ const BUNDLE = { step: 24, most: 6, spread: 22, radius: 8 };
 const STEP_BLUE = [0.14, 0.24, 0.27, 0.35];
 const STEP_BLUE_LIGHT = [0.18, 0.29, 0.32, 0.35];
 const STEP_SIDE = [0.06, 0.1, 0.12, 0.35];
-/** The art's consoles: pale grey bodies, dark teal screens with a faint glow. */
-const SCREEN = [0.3, 0.72, 1.0, 2.3];
-const CONSOLE_GREY = [0.5, 0.55, 0.6, 0.3];
-const BUTTON = [0.25, 0.3, 0.34, 0.3];
+/** The art's consoles: pale bodies, dark teal screens with a faint glow, rows of coloured buttons. */
+const SCREEN = [0.08, 0.26, 0.32, 1.6];
+const CONSOLE_GREY = [0.78, 0.81, 0.84, 0.3];
+const BUTTONS = [
+  [1.0, 0.22, 0.16, 1.8],
+  [1.0, 0.78, 0.12, 1.8],
+  [0.25, 0.9, 0.35, 1.8],
+  [0.3, 0.6, 1.0, 1.8],
+];
 
 const isRect = (rect) => rect && [rect.x, rect.y, rect.w, rect.h].every(Number.isFinite) && rect.w > 0 && rect.h > 0;
 const cornersOf = (rect) => [
@@ -421,7 +426,7 @@ export function labProps(spots) {
     }
     for (let k = 0; k < 7; k += 1) {
       const u = -hw + 8 + k * ((2 * hw - 16) / 6);
-      props.quad(at(u - 2.5, -hh + 4, 0.6), at(u + 2.5, -hh + 4, 0.6), at(u + 2.5, -hh + 9, 0.6), at(u - 2.5, -hh + 9, 0.6), BUTTON);
+      props.quad(at(u - 3, -hh + 4, 0.6), at(u + 3, -hh + 4, 0.6), at(u + 3, -hh + 10, 0.6), at(u - 3, -hh + 10, 0.6), BUTTONS[k % BUTTONS.length]);
     }
   }
 
@@ -700,12 +705,13 @@ void main() {
   float fromCentre = length(rel);
   vec3 col;
   if (d < 0.0) {
-    // The dais, as in the art: a blue disc lit from the lens overhead, the art's (0,118,184) round
-    // its middle darkening to (10,75,120) toward its edge (each inverted through Neutral tone
-    // mapping); round it a band of pale steel plates out to the edge, its own steel rim; the pads
-    // steel too.
-    float pool = exp(-fromCentre * fromCentre / (2.0 * 380.0 * 380.0));
-    col = mix(vec3(0.022, 0.089, 0.207), vec3(0.0, 0.181, 0.479), pool) * (0.92 + 0.16 * fbm3(p / 140.0));
+    // The dais, as in the art: a deep glossy navy disc, lit blue from the lens overhead toward its
+    // middle, a darker band of reflection across it; round it a band of pale steel plates out to the
+    // edge, its own steel rim; the pads steel too.
+    float pool = exp(-fromCentre * fromCentre / (2.0 * 360.0 * 360.0));
+    col = mix(vec3(0.008, 0.035, 0.1), vec3(0.0, 0.11, 0.3), pool) * (0.94 + 0.12 * fbm3(p / 140.0));
+    float reflection = 1.0 - smoothstep(30.0, 90.0, abs(dot(rel, vec2(0.8, 0.6)) - uDais.z * 0.45));
+    col *= 1.0 - 0.35 * reflection;
     float plates = smoothstep(uDais.z - 82.0, uDais.z - 79.0, fromCentre);
     float plateSeam = abs(mod(atan(rel.y, rel.x) * uDais.z + 1000.0, 58.0) - 29.0);
     vec3 paleSteel = mix(vec3(0.29, 0.34, 0.39), vec3(0.38, 0.44, 0.5), fbm3(p / 60.0));
@@ -721,13 +727,11 @@ void main() {
     float scanR = fract(uTime / 4.5) * (uDais.z - 80.0);
     float scan = exp(-abs(fromCentre - scanR) / 9.0) * (1.0 - fract(uTime / 4.5)) * (1.0 - plates);
     col += vec3(0.08, 0.2, 0.42) * scan * 0.5;
-    // The Poke Ball as in the art: the disc lit blue inside it, brightest toward the far side, in
-    // thick white lines (its outline, the band, the button's ring) with a cyan glow round them.
+    // The Poke Ball as in the art: crisp white lines (its outline, the band, the button's ring) with
+    // a cyan glow round them, over a soft radial glow of the lens's blue light.
     if (uEmblem.z > 0.0) {
       float R = uEmblem.z;
-      float inside = 1.0 - smoothstep(R - 1.0, R + 1.0, fromCentre);
-      vec3 lit = mix(vec3(0.046, 0.338, 0.691), vec3(0.1, 0.6, 1.05), smoothstep(-R, R, rel.y));
-      col = mix(col, lit * (0.9 + 0.1 * fbm3(p / 50.0)), inside * 0.9);
+      col += vec3(0.03, 0.22, 0.55) * exp(-fromCentre * fromCentre / (2.0 * R * R * 0.45));
       float ring = abs(fromCentre - R);
       float button = abs(fromCentre - R * 0.27);
       float bar = fromCentre > R * 0.27 && fromCentre < R ? abs(rel.y) : 100000.0;
@@ -737,13 +741,14 @@ void main() {
       col = mix(col, vec3(0.92, 1.0, 1.05) * pulse, 1.0 - smoothstep(2.2, 3.4, line));
     }
   } else {
-    // The deck: dark tread-plate steel in broad plates, shade gathering at the dais's foot.
+    // The deck: dark tread-plate steel in big plates, faint seams between them, shade gathering at
+    // the dais's foot.
     vec2 diamond = abs(fract(mat2(0.7071, 0.7071, -0.7071, 0.7071) * p / 7.0 * vec2(1.0, 2.6)) - 0.5);
     float tread = smoothstep(0.32, 0.46, max(diamond.x, diamond.y) - 0.0);
-    col = mix(vec3(0.36, 0.47, 0.53), vec3(0.45, 0.57, 0.64), tread * 0.6);
-    col *= 0.9 + 0.2 * fbm3(p / 90.0);
-    vec2 panel = abs(mod(p + 72.0, 144.0) - 72.0);
-    col = mix(col * 0.55, col, smoothstep(0.8, 2.0, min(panel.x, panel.y)));
+    col = mix(vec3(0.19, 0.25, 0.29), vec3(0.23, 0.3, 0.35), tread * 0.5);
+    col *= 0.9 + 0.2 * fbm3(p / 120.0);
+    vec2 panel = abs(mod(p + 150.0, 300.0) - 150.0);
+    col = mix(col * 0.72, col, smoothstep(0.8, 2.0, min(panel.x, panel.y)));
     col *= mix(0.55, 1.0, smoothstep(0.0, 70.0, d));
     col += vec3(0.008, 0.022, 0.03) * exp(-d / 160.0);
   }
@@ -764,13 +769,16 @@ vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
   vec3 sun = normalize(uSun);
   float key = max(dot(n, sun), 0.0);
   vec3 diffuse = albedo * (vec3(0.16, 0.18, 0.22) + vec3(0.72, 0.75, 0.8) * key + vec3(0.2, 0.26, 0.36) * (0.5 + 0.5 * n.z));
-  // Polished steel mirrors the lab: lamps overhead, bright panels round the walls, dark machinery
-  // low down, the deck beneath.
+  // Polished chrome mirrors the lab, as the art's pipes: dark machinery and the deck below a sharp
+  // horizon, pale walls just above it, bright panels round them, the lamps overhead a hard white
+  // stripe along the pipe's crown.
   vec3 view = normalize(uEye - world);
   vec3 r = reflect(-view, n);
-  vec3 env = mix(vec3(0.12, 0.18, 0.2), vec3(0.55, 0.68, 0.72), smoothstep(-0.35, 0.25, r.z));
-  env += vec3(0.55, 0.7, 0.76) * smoothstep(0.82, 1.0, sin(atan(r.y, r.x) * 5.0)) * smoothstep(-0.1, 0.3, r.z) * (1.0 - smoothstep(0.55, 0.85, r.z));
-  env = mix(env, vec3(1.25, 1.35, 1.38), smoothstep(0.78, 0.95, r.z));
+  vec3 env = mix(vec3(0.03, 0.045, 0.06), vec3(0.16, 0.22, 0.26), smoothstep(-0.7, -0.06, r.z));
+  env = mix(env, vec3(0.62, 0.72, 0.78), smoothstep(-0.06, 0.0, r.z));
+  env = mix(env, vec3(0.36, 0.45, 0.5), smoothstep(0.08, 0.5, r.z));
+  env += vec3(0.5, 0.62, 0.68) * smoothstep(0.85, 1.0, sin(atan(r.y, r.x) * 5.0)) * smoothstep(0.0, 0.2, r.z) * (1.0 - smoothstep(0.5, 0.8, r.z));
+  env = mix(env, vec3(1.45, 1.52, 1.56), smoothstep(0.9, 0.95, r.z));
   vec3 col = mix(diffuse, env * mix(vec3(1.0), albedo * 1.5, 0.45), metal * 0.85);
   col += vec3(0.9, 0.95, 1.0) * pow(max(dot(r, sun), 0.0), 30.0) * metal * 0.5;
   return col;
