@@ -67,10 +67,10 @@ const CONSOLES = [
 ];
 
 const YELLOW = [0.95, 0.68, 0.04, 0.35];
-const STEEL = [0.78, 0.82, 0.88, 0.85];
-const BLUE_STEEL = [0.58, 0.68, 0.82, 0.85];
+const STEEL = [0.72, 0.8, 0.84, 0.85];
+const BLUE_STEEL = [0.55, 0.68, 0.76, 0.85];
 const DARK_STEEL = [0.32, 0.35, 0.4, 0.7];
-const PIPE = [0.82, 0.86, 0.92, 0.85];
+const PIPE = [0.76, 0.85, 0.88, 0.85];
 const CABLE = [0.03, 0.03, 0.035, 0.3];
 const LAMP_BLACK = [0.035, 0.037, 0.045, 0.5];
 const LAMP_LIGHT = [1.2, 1.25, 1.3, 2.2];
@@ -85,9 +85,9 @@ const LID = [0.45, 0.48, 0.54, 0.25];
 /** The big pipes: turn round the dais (deg) each runs out from the ring before rising. */
 const BIG_PIPES = [100, 120, 238, 262, 292, 72, 200, 160];
 const BIG_PIPE = { radius: 20, run: 150, bend: 40, top: 320 };
-const STEP_BLUE = [0.1, 0.36, 0.8, 0.25];
-const STEP_BLUE_LIGHT = [0.13, 0.42, 0.88, 0.25];
-const STEP_SIDE = [0.05, 0.16, 0.38, 0.25];
+const STEP_BLUE = [0.14, 0.24, 0.27, 0.35];
+const STEP_BLUE_LIGHT = [0.18, 0.29, 0.32, 0.35];
+const STEP_SIDE = [0.06, 0.1, 0.12, 0.35];
 const SCREEN = [0.3, 0.85, 1.25, 2.4];
 const CONSOLE_GREY = [0.42, 0.45, 0.5, 0.4];
 
@@ -540,13 +540,13 @@ void main() {
   if (d < 0.0) {
     // The dais, as in the art: a dark navy disc in its middle, shallow grooves picked out in blue;
     // round it a band of pale steel plates out to the edge, its own steel rim; the pads steel too.
-    col = vec3(0.022, 0.04, 0.085) * (0.92 + 0.16 * fbm3(p / 140.0));
+    col = vec3(0.017, 0.036, 0.046) * (0.92 + 0.16 * fbm3(p / 140.0));
     float ringGroove = abs(mod(fromCentre + 32.0, 64.0) - 32.0);
     float spoke = abs(mod(atan(rel.y, rel.x) * fromCentre + 1000.0, max(fromCentre * 0.2618, 1.0)) - fromCentre * 0.1309);
-    col = mix(col, vec3(0.05, 0.1, 0.2), (1.0 - smoothstep(0.6, 1.8, min(ringGroove, spoke))) * step(d, -30.0) * 0.8);
+    col = mix(col, vec3(0.04, 0.09, 0.12), (1.0 - smoothstep(0.6, 1.8, min(ringGroove, spoke))) * step(d, -30.0) * 0.8);
     float plates = smoothstep(uDais.z - 82.0, uDais.z - 79.0, fromCentre);
     float plateSeam = abs(mod(atan(rel.y, rel.x) * uDais.z + 1000.0, 58.0) - 29.0);
-    vec3 paleSteel = mix(vec3(0.3, 0.33, 0.38), vec3(0.4, 0.43, 0.48), fbm3(p / 60.0));
+    vec3 paleSteel = mix(vec3(0.29, 0.34, 0.39), vec3(0.38, 0.44, 0.5), fbm3(p / 60.0));
     paleSteel = mix(vec3(0.12, 0.13, 0.16), paleSteel, smoothstep(0.6, 1.6, plateSeam));
     col = mix(col, paleSteel, plates);
     col = mix(col, vec3(0.02, 0.025, 0.035), (1.0 - smoothstep(0.8, 2.2, abs(fromCentre - uDais.z + 80.5))) * step(-60.0, d) * 0.9);
@@ -557,28 +557,35 @@ void main() {
     col = mix(col, vec3(0.02, 0.025, 0.035), (1.0 - smoothstep(0.6, 1.6, abs(d + 26.0))));
     // The lens overhead lights the middle of the dais blue; every few seconds its scan runs out
     // across the disc as a soft ring.
-    col += vec3(0.03, 0.07, 0.15) * exp(-fromCentre * fromCentre / (2.0 * 320.0 * 320.0));
+    col += vec3(0.015, 0.05, 0.07) * exp(-fromCentre * fromCentre / (2.0 * 320.0 * 320.0));
     float scanR = fract(uTime / 4.5) * (uDais.z - 80.0);
     float scan = exp(-abs(fromCentre - scanR) / 9.0) * (1.0 - fract(uTime / 4.5)) * (1.0 - plates);
     col += vec3(0.08, 0.2, 0.42) * scan * 0.5;
-    // The Poke Ball: a light-blue band round the Actives, its bar and button, glowing.
-    float e = emblemDistance(p, uEmblem);
-    float band = uEmblem.z > 0.0 ? abs(fromCentre - uEmblem.z * 0.93) - uEmblem.z * 0.07 : 100000.0;
-    float bar = uEmblem.z > 0.0 && fromCentre < uEmblem.z && fromCentre > uEmblem.z * 0.22 ? abs(rel.y) - 5.0 : 100000.0;
-    float fill = 1.0 - smoothstep(-0.5, 1.0, min(band, bar));
-    col = mix(col, vec3(0.12, 0.3, 0.62), fill * 0.85);
-    float pulse = 0.88 + 0.12 * sin(uTime * 1.4);
-    col += ${LENS_BLUE} * ((1.0 - smoothstep(0.8, 2.4, e)) * 0.9 + exp(-e / 12.0) * 0.25) * pulse * step(0.001, uEmblem.z);
+    // The Poke Ball as in the art: the disc lit blue inside it, brightest toward the far side, in
+    // thick white lines (its outline, the band, the button's ring) with a cyan glow round them.
+    if (uEmblem.z > 0.0) {
+      float R = uEmblem.z;
+      float inside = 1.0 - smoothstep(R - 1.0, R + 1.0, fromCentre);
+      vec3 lit = mix(vec3(0.0, 0.1, 0.22), vec3(0.01, 0.2, 0.4), smoothstep(-R, R, rel.y));
+      col = mix(col, lit * (0.9 + 0.1 * fbm3(p / 50.0)), inside * 0.9);
+      float ring = abs(fromCentre - R);
+      float button = abs(fromCentre - R * 0.27);
+      float bar = fromCentre > R * 0.27 && fromCentre < R ? abs(rel.y) : 100000.0;
+      float line = min(min(ring, button), bar);
+      float pulse = 0.9 + 0.1 * sin(uTime * 1.4);
+      col = mix(col, vec3(0.42, 0.85, 1.0), exp(-line / 12.0) * 0.4 * pulse);
+      col = mix(col, vec3(0.92, 1.0, 1.05) * pulse, 1.0 - smoothstep(3.0, 4.6, line));
+    }
   } else {
     // The deck: dark tread-plate steel in broad plates, shade gathering at the dais's foot.
     vec2 diamond = abs(fract(mat2(0.7071, 0.7071, -0.7071, 0.7071) * p / 7.0 * vec2(1.0, 2.6)) - 0.5);
     float tread = smoothstep(0.32, 0.46, max(diamond.x, diamond.y) - 0.0);
-    col = mix(vec3(0.26, 0.29, 0.34), vec3(0.34, 0.38, 0.44), tread * 0.6);
+    col = mix(vec3(0.17, 0.24, 0.27), vec3(0.23, 0.31, 0.35), tread * 0.6);
     col *= 0.9 + 0.2 * fbm3(p / 90.0);
     vec2 panel = abs(mod(p + 72.0, 144.0) - 72.0);
     col = mix(vec3(0.1, 0.11, 0.13), col, smoothstep(0.8, 2.0, min(panel.x, panel.y)));
     col *= mix(0.55, 1.0, smoothstep(0.0, 70.0, d));
-    col += vec3(0.01, 0.022, 0.04) * exp(-d / 160.0);
+    col += vec3(0.008, 0.022, 0.03) * exp(-d / 160.0);
   }
   col = mix(col * 0.55, col, smoothstep(0.3, 0.9, light.b));
   vec2 edgeUv = min(vUv, 1.0 - vUv);
@@ -601,9 +608,9 @@ vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
   // low down, the deck beneath.
   vec3 view = normalize(uEye - world);
   vec3 r = reflect(-view, n);
-  vec3 env = mix(vec3(0.16, 0.18, 0.22), vec3(0.62, 0.7, 0.8), smoothstep(-0.35, 0.25, r.z));
-  env += vec3(0.55, 0.65, 0.8) * smoothstep(0.82, 1.0, sin(atan(r.y, r.x) * 5.0)) * smoothstep(-0.1, 0.3, r.z) * (1.0 - smoothstep(0.55, 0.85, r.z));
-  env = mix(env, vec3(1.25, 1.32, 1.42), smoothstep(0.78, 0.95, r.z));
+  vec3 env = mix(vec3(0.12, 0.18, 0.2), vec3(0.55, 0.68, 0.72), smoothstep(-0.35, 0.25, r.z));
+  env += vec3(0.55, 0.7, 0.76) * smoothstep(0.82, 1.0, sin(atan(r.y, r.x) * 5.0)) * smoothstep(-0.1, 0.3, r.z) * (1.0 - smoothstep(0.55, 0.85, r.z));
+  env = mix(env, vec3(1.25, 1.35, 1.38), smoothstep(0.78, 0.95, r.z));
   vec3 col = mix(diffuse, env * mix(vec3(1.0), albedo * 1.5, 0.45), metal * 0.85);
   col += vec3(0.9, 0.95, 1.0) * pow(max(dot(r, sun), 0.0), 30.0) * metal * 0.5;
   return col;
