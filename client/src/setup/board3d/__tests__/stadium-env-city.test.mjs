@@ -17,7 +17,8 @@ import {
   citySpots,
 } from '../stadium-env-city.mjs';
 
-// Every mat profile: the no-mat default, the simulator's, one-player mats, full-size two-player mats.
+// Every mat profile (the no-mat default, the simulator's, one-player and full-size two-player mats)
+// at the board width board3d.js lays out beside the sidebox (0.755 of 1920) and at full width.
 const PROFILES = [NO_MAT_LAYOUT_ID, 'sim', 'one-player', 'two-player', 'edge-to-edge-two-player'];
 const HALVES = [
   { w: 1449.6, h: 540 },
