@@ -45,7 +45,7 @@ export const BOARD_PX = { height: 54, thick: 8, lean: 40 };
 export const TIER_PX = { run: 40, rise: 26 };
 /** The ring's corner posts and ropes: the posts' height and radius, the ropes' heights, radius, sag. */
 export const POST_PX = { height: 96, radius: 7 };
-export const ROPES = { heights: [30, 58, 86], radius: 4.2, sag: 5 };
+export const ROPES = { heights: [30, 58, 86], radius: 3.6, sag: 5, splay: 36 };
 /**
  * The lasers: how many (laser k shines from light k % 4: the far corners' sweep along their side
  * stands toward the near end, or for k >= 8 across the far stands; the near corners' along their side
@@ -62,8 +62,9 @@ export const RIG_PX = { out: 40, z: 300, depth: 16, cut: 110, lampEvery: 105 };
 /** Half the size of a rig lamp's glow and of a laser light's glare, px. */
 const GLINT_PX = { lamp: 22, light: 90 };
 
-const POST_STEEL = [0.0, 0.17, 0.38, 0.4];
-const PAD_BLUE = [0.0, 0.2, 0.44, 0.15];
+/** The art's dark navy corner posts and their pads. */
+const POST_STEEL = [0.02, 0.06, 0.2, 0.4];
+const PAD_BLUE = [0.03, 0.1, 0.3, 0.15];
 /** The art's white ropes: lit by the rig from every side, so drawn at their own brightness. */
 const ROPE_WHITE = [0.92, 0.95, 1.0, 1.9];
 const BOARD_FRAME = [0.05, 0.055, 0.065, 0.3];
@@ -214,17 +215,25 @@ export function arenaProps({ ring, boards }) {
     [1, 1],
     [-1, 1],
   ].map(([sx, sy]) => [ring.x + sx * ring.hw, ring.y + sy * ring.hh]);
-  for (const [x, y] of corners) {
-    props.cylinder({ x, y, z0: -APRON_PX.drop, z1: POST_PX.height, r: POST_PX.radius, color: POST_STEEL, sides: 14 });
+  // The posts splay out a little as they rise, so the three ropes a side, one over another, show
+  // apart from above as the art's three white lines.
+  const splayAt = ([x, y], z) => {
+    const out = (ROPES.splay * Math.max(z, 0)) / POST_PX.height;
+    return [x + Math.sign(x - ring.x) * out, y + Math.sign(y - ring.y) * out];
+  };
+  for (const corner of corners) {
+    const [tx, ty] = splayAt(corner, POST_PX.height);
+    props.tube([[corner[0], corner[1], -APRON_PX.drop], [tx, ty, POST_PX.height]], POST_PX.radius, POST_STEEL, { sides: 14 });
     // The turnbuckle pads on the ropes' side of the post.
     for (const z of ROPES.heights) {
-      props.cylinder({ x, y, z0: z - 7, z1: z + 7, r: POST_PX.radius + 3.5, color: PAD_BLUE, sides: 14 });
+      const [px, py] = splayAt(corner, z);
+      props.cylinder({ x: px, y: py, z0: z - 7, z1: z + 7, r: POST_PX.radius + 3.5, color: PAD_BLUE, sides: 14 });
     }
   }
   for (let k = 0; k < 4; k += 1) {
-    const [ax, ay] = corners[k];
-    const [bx, by] = corners[(k + 1) % 4];
     for (const z of ROPES.heights) {
+      const [ax, ay] = splayAt(corners[k], z);
+      const [bx, by] = splayAt(corners[(k + 1) % 4], z);
       const points = [];
       for (let i = 0; i <= 16; i += 1) {
         const t = i / 16;
@@ -453,7 +462,7 @@ void main() {
     // its edge; the Poke Ball painted on it in light grey lines.
     vec2 fromMiddle = (p - uRing.xy) / max(uRing.zw, vec2(1.0));
     float spot = exp(-dot(fromMiddle, fromMiddle) * 0.9);
-    col = mix(vec3(0.485, 0.605, 0.727), vec3(0.88, 1.02, 1.14), spot) * (0.97 + 0.04 * fbm3(p / 50.0));
+    col = mix(vec3(0.36, 0.62, 0.8), vec3(0.88, 1.02, 1.14), spot) * (0.97 + 0.04 * fbm3(p / 50.0));
     col = mix(col, vec3(0.022, 0.06, 0.16), smoothstep(-22.0, -16.0, d));
     float e = emblemDistance(p, uEmblem);
     col = mix(col, vec3(0.88, 0.93, 0.96), (1.0 - smoothstep(1.5, 3.0, e)) * 0.85 * step(0.001, uEmblem.z));
