@@ -59,11 +59,13 @@ const TANKS = [
 const TANK_DOME = 0.72;
 /** The consoles on the deck: turn round the dais (deg), gap from its edge. */
 const CONSOLES = [
-  [151, 26],
-  [133, 26],
+  [156, 26],
+  [143, 26],
+  [130, 26],
 ];
 /** A console's half width along the dais, half depth, and its sloped top's low and high edges (z). */
-const CONSOLE = { hw: 50, hh: 26, low: 10, high: 30 };
+/** A terminal: half width along the dais, half depth, its desk's height (z) and its monitor's. */
+const CONSOLE = { hw: 46, hh: 24, low: 6, monitor: 42 };
 
 /** The art's safety yellow, bright in every light (glowing w: thin rails seen from above stayed olive when lit). */
 const YELLOW = [1.0, 0.76, 0.06, 1.78];
@@ -73,6 +75,23 @@ const DARK_STEEL = [0.32, 0.35, 0.4, 0.7];
 const PIPE = [0.42, 0.54, 0.6, 0.85];
 const BIG_PIPE_STEEL = [0.24, 0.38, 0.45, 0.85];
 const CABLE = [0.03, 0.03, 0.035, 0.3];
+/**
+ * Clusters of thin upright pipes on the deck, as the art's lab packed with them: turn round the dais
+ * (deg), gap from its edge; each cluster three pipes in a row along the dais. Dropped when one would
+ * leave the scene or crowd the stair, a console or a tank.
+ */
+const PIPE_CLUSTERS = [
+  [168, 120],
+  [195, 160],
+  [12, 150],
+  [32, 120],
+  [62, 150],
+  [112, 140],
+];
+/** A cluster's pipes: radius, spacing, heights; brushed pale silver, as the art's (polished, seen
+ * from above, they mirrored only the dark machinery below and read as black sticks). */
+const CLUSTER_PIPE = { radius: 8, spacing: 24, heights: [210, 260, 180] };
+const PALE_PIPE = [0.72, 0.8, 0.85, 0.4];
 /** Cable runs on the dais's band: start turn (deg), span (deg), a wobble seed. */
 const CABLE_RUNS = [
   [96, 22, 0.4],
@@ -95,11 +114,12 @@ const PIPE_BAND = { every: 150, proud: 1.6, width: 2.4 };
 const BAND_WHITE = [0.92, 0.95, 0.97, 0.2];
 /** The deck's pipe runs: candidates every `step` deg, at most `most`, two pipes `spread` px apart. */
 const BUNDLE = { step: 24, most: 6, spread: 22, radius: 8 };
-const STEP_BLUE = [0.14, 0.24, 0.27, 0.35];
-const STEP_BLUE_LIGHT = [0.18, 0.29, 0.32, 0.35];
-const STEP_SIDE = [0.06, 0.1, 0.12, 0.35];
+/** The art's blue-teal stair. */
+const STEP_BLUE = [0.1, 0.32, 0.4, 0.35];
+const STEP_BLUE_LIGHT = [0.13, 0.38, 0.46, 0.35];
+const STEP_SIDE = [0.05, 0.14, 0.18, 0.35];
 /** The art's consoles: pale cabinets, sloped dark navy screens with a faint glow, a few grey buttons. */
-const SCREEN = [0.04, 0.1, 0.22, 1.5];
+const SCREEN = [0.08, 0.16, 0.3, 1.6];
 const CONSOLE_GREY = [0.78, 0.81, 0.84, 0.3];
 const BUTTON = [0.3, 0.33, 0.37, 0.3];
 
@@ -242,6 +262,23 @@ export function labSpots(layout) {
       tanks.every((t) => Math.hypot(x - t.x, y - t.y) > radius + t.radius + 14);
     if (clear) tanks.push({ x, y, radius, height, tint, angle });
   }
+  const clusters = [];
+  for (const [deg, gap] of PIPE_CLUSTERS) {
+    const angle = (deg * Math.PI) / 180;
+    const edge = outlineAt(outline, angle);
+    const x = edge.x + Math.cos(angle) * gap;
+    const y = edge.y + Math.sin(angle) * gap;
+    const reach = CLUSTER_PIPE.spacing + CLUSTER_PIPE.radius;
+    const clear =
+      inScene(x, y, reach) &&
+      daisDistance(x, y, dais) > reach + 30 &&
+      turnBetween(angle, STAIR.angle) > 0.3 &&
+      Math.hypot(x - stairEnd.x, y - stairEnd.y) > reach + 70 &&
+      consoles.every((c) => Math.hypot(x - c.x, y - c.y) > reach + 70) &&
+      tanks.every((t) => Math.hypot(x - t.x, y - t.y) > reach + t.radius + 16) &&
+      clusters.every((other) => Math.hypot(x - other.x, y - other.y) > 2 * reach + 20);
+    if (clear) clusters.push({ x, y, angle });
+  }
   // Pipe runs, as the art's pipes curving round the dais: each leaves the ring pipe along its
   // tangent and runs straight on to the scene's edge, two side by side, clear of the dais, the
   // tanks, consoles and the stair. Radial runs read as a wheel's spokes.
@@ -257,6 +294,7 @@ export function labSpots(layout) {
     !inScene(x, y, 0) ||
     daisDistance(x, y, dais) < room ||
     tanks.some((t) => Math.hypot(x - t.x, y - t.y) < t.radius + room) ||
+    clusters.some((c) => Math.hypot(x - c.x, y - c.y) < CLUSTER_PIPE.spacing + CLUSTER_PIPE.radius + room) ||
     consoles.some((c) => Math.hypot(x - c.x, y - c.y) < 40 + room) ||
     bundles.some((b) => nearSegment(x, y, [b.x, b.y], b.length, [b.dx, b.dy]) < room * 2);
   for (let deg = 10, k = 0; deg < 360 && bundles.length < BUNDLE.most; deg += BUNDLE.step, k += 1) {
@@ -274,7 +312,7 @@ export function labSpots(layout) {
     if (length >= 90) bundles.push({ x: start[0], y: start[1], dx: dir[0], dy: dir[1], length });
   }
   const emblem = craterEmblem(layout, centre);
-  return { dais, outline, stair, consoles, tanks, bundles, emblem };
+  return { dais, outline, stair, consoles, tanks, clusters, bundles, emblem };
 }
 
 /** Where the stair meets the deck. */
@@ -308,7 +346,7 @@ const pipeBands = (props, points, radius) => {
 /** The railing round the dais (open at the stair), its posts, the stair, consoles, tanks and pipes. */
 export function labProps(spots) {
   const props = createPropBuilder();
-  const { dais, outline, stair, consoles, tanks, bundles = [] } = spots;
+  const { dais, outline, stair, consoles, tanks, clusters = [], bundles = [] } = spots;
   for (const bundle of bundles) {
     const dir = [bundle.dx, bundle.dy];
     const side = [-dir[1], dir[0]];
@@ -394,33 +432,31 @@ export function labProps(spots) {
     for (const [x, y, z] of [top, foot]) props.cylinder({ x, y, z0: z - 37, z1: z, r: 2.8, color: YELLOW, sides: 8 });
   }
 
-  // The consoles, as the art's: upright pale cabinets on the deck, standing up past the dais's lip,
-  // their tops sloping up away from the dais, two dark screens and a few buttons on the slope.
+  // The consoles, as the art's row of terminals: a pale desk on the deck, its front half a keyboard
+  // sloping up with a strip of buttons, and an upright monitor at its back, its dark screen facing
+  // the dais (and so the cameras).
   for (const { x, y, angle } of consoles) {
     const yaw = angle + Math.PI / 2;
     const c = Math.cos(yaw);
     const s = Math.sin(yaw);
-    const { hw, hh, low, high } = CONSOLE;
-    // Its sloped top runs from `low` at the edge nearer the dais (v -hh) to `high` at the far edge.
-    const at = (u, v, lift = 0) => [x + u * c - v * s, y + u * s + v * c, low + ((v + hh) / (2 * hh)) * (high - low) + lift];
+    const { hw, hh, low, monitor } = CONSOLE;
+    // u runs along the desk, v out from the dais (-hh its front edge, hh its back).
+    const at = (u, v, z) => [x + u * c - v * s, y + u * s + v * c, z];
     props.box({ x, y, z0: -DROP_PX, z1: low, hw, hh, yaw, color: CONSOLE_GREY, topColor: CONSOLE_GREY });
-    const base = (u, v, z) => [x + u * c - v * s, y + u * s + v * c, z];
-    props.quad(base(-hw, -hh, low), base(hw, -hh, low), base(hw, hh, high), base(-hw, hh, high), CONSOLE_GREY);
-    for (const side of [-1, 1]) {
-      const u = side * hw;
-      props.quad(base(u, -hh, low), base(u, hh, low), base(u, hh, high), base(u, -hh, low), CONSOLE_GREY);
+    props.quad(at(-hw, -hh, low), at(hw, -hh, low), at(hw, 0, low + 7), at(-hw, 0, low + 7), CONSOLE_GREY);
+    for (const side of [-1, 1]) props.quad(at(side * hw, -hh, low), at(side * hw, 0, low), at(side * hw, 0, low + 7), at(side * hw, -hh, low), CONSOLE_GREY);
+    props.quad(at(-hw, 0, low), at(hw, 0, low), at(hw, 0, low + 7), at(-hw, 0, low + 7), CONSOLE_GREY);
+    for (let k = 0; k < 6; k += 1) {
+      const u = -hw + 10 + k * ((2 * hw - 20) / 5);
+      const v = -hh * 0.55;
+      const z = low + 0.6 + (7 * (v + hh)) / hh;
+      props.quad(at(u - 3, v - 2.5, z), at(u + 3, v - 2.5, z), at(u + 3, v + 2.5, z + 0.7), at(u - 3, v + 2.5, z + 0.7), BUTTON);
     }
-    props.quad(base(-hw, hh, low), base(hw, hh, low), base(hw, hh, high), base(-hw, hh, high), CONSOLE_GREY);
-    // Two screens side by side over a row of buttons, as the art's desks.
-    for (const side of [-1, 1]) {
-      const u0 = side < 0 ? -hw + 5 : 2;
-      const u1 = side < 0 ? -2 : hw - 5;
-      props.quad(at(u0, -2, 0.6), at(u1, -2, 0.6), at(u1, hh - 4, 0.6), at(u0, hh - 4, 0.6), SCREEN);
-    }
-    for (let k = 0; k < 4; k += 1) {
-      const u = -hw + 12 + k * ((2 * hw - 24) / 3);
-      props.quad(at(u - 3, -hh + 4, 0.6), at(u + 3, -hh + 4, 0.6), at(u + 3, -hh + 9, 0.6), at(u - 3, -hh + 9, 0.6), BUTTON);
-    }
+    const back = hh * 0.62;
+    const [mx, my] = at(0, back, 0);
+    props.box({ x: mx, y: my, z0: low, z1: low + monitor, hw: hw - 4, hh: 4, yaw, color: CONSOLE_GREY, topColor: CONSOLE_GREY });
+    const face = back - 4.6;
+    props.quad(at(-hw + 10, face, low + 6), at(hw - 10, face, low + 6), at(hw - 10, face, low + monitor - 6), at(-hw + 10, face, low + monitor - 6), SCREEN);
   }
 
   // The tanks, as in the art: big steel drums with darker bands and a bulbous domed top, a neck of
@@ -508,7 +544,7 @@ export function labProps(spots) {
     const dir = [next[0] - back[0], next[1] - back[1], 0];
     const length = Math.hypot(dir[0], dir[1]) || 1;
     const half = [(dir[0] / length) * 4, (dir[1] / length) * 4, 0];
-    props.tube([[point[0] - half[0], point[1] - half[1], point[2]], [point[0] + half[0], point[1] + half[1], point[2]]], 11.5, DARK_STEEL, { sides: 10 });
+    props.tube([[point[0] - half[0] * 0.3, point[1] - half[1] * 0.3, point[2]], [point[0] + half[0] * 0.3, point[1] + half[1] * 0.3, point[2]]], 10.6, BAND_WHITE, { sides: 10 });
   });
   for (const tank of tanks) {
     const edge = outlineAt(outline, tank.angle);
@@ -535,6 +571,7 @@ export function labProps(spots) {
     const corner = [from[0] + dir[0] * BIG_PIPE.run, from[1] + dir[1] * BIG_PIPE.run];
     const blocked =
       tanks.some((t) => pastSegment(t, from, corner) < t.radius + BIG_PIPE.radius + 8) ||
+      clusters.some((c) => pastSegment(c, from, corner) < CLUSTER_PIPE.spacing + CLUSTER_PIPE.radius + BIG_PIPE.radius + 6) ||
       consoles.some((c) => pastSegment(c, from, corner) < 50);
     if (blocked) continue;
     const z = -DROP_PX + BIG_PIPE.radius + 2;
@@ -564,18 +601,17 @@ export function labProps(spots) {
     props.tube(points, BIG_PIPE.radius, BIG_PIPE_STEEL, { sides: 14 });
     pipeBands(props, points, BIG_PIPE.radius);
     risers.push({ x: corner[0], y: corner[1], angle });
-    // Dark collars: where the low run meets its bend, half way up the riser, past the upper elbow.
-    const half = 5;
-    const level = (x, y, zz) => [[x - dir[0] * half, y - dir[1] * half, zz], [x + dir[0] * half, y + dir[1] * half, zz]];
-    const middle = (z + BIG_PIPE.bend + elbow) / 2;
-    const past = BIG_PIPE.bend + 40;
-    for (const collar of [
-      level(...points[6]),
-      [[corner[0], corner[1], middle - half], [corner[0], corner[1], middle + half]],
-      level(corner[0] + dir[0] * past, corner[1] + dir[1] * past, BIG_PIPE.top),
-    ]) {
-      props.tube(collar, BIG_PIPE.radius + 3, DARK_STEEL, { sides: 12 });
-    }
+  }
+  // The clusters of thin upright pipes, each with a white clamp ring near its top.
+  for (const cluster of clusters) {
+    const along = [-Math.sin(cluster.angle), Math.cos(cluster.angle)];
+    CLUSTER_PIPE.heights.forEach((height, k) => {
+      const offset = (k - 1) * CLUSTER_PIPE.spacing;
+      const x = cluster.x + along[0] * offset;
+      const y = cluster.y + along[1] * offset;
+      props.cylinder({ x, y, z0: -DROP_PX, z1: -DROP_PX + height, r: CLUSTER_PIPE.radius, color: PALE_PIPE, sides: 12 });
+      props.ring({ x, y, z0: -DROP_PX + height - 30, z1: -DROP_PX + height - 27, r: CLUSTER_PIPE.radius + 1.5, color: BAND_WHITE, sides: 12 });
+    });
   }
   // As in the art, black cables hang in loops between neighbouring risers and tank tops.
   const anchors = [
@@ -723,7 +759,7 @@ void main() {
     // the dais's foot.
     vec2 diamond = abs(fract(mat2(0.7071, 0.7071, -0.7071, 0.7071) * p / 7.0 * vec2(1.0, 2.6)) - 0.5);
     float tread = smoothstep(0.32, 0.46, max(diamond.x, diamond.y) - 0.0);
-    col = mix(vec3(0.3, 0.38, 0.43), vec3(0.35, 0.44, 0.5), tread * 0.5);
+    col = mix(vec3(0.4, 0.5, 0.56), vec3(0.46, 0.56, 0.62), tread * 0.5);
     col *= 0.9 + 0.2 * fbm3(p / 120.0);
     vec2 panel = abs(mod(p + 150.0, 300.0) - 150.0);
     col = mix(col * 0.72, col, smoothstep(0.8, 2.0, min(panel.x, panel.y)));
@@ -752,7 +788,7 @@ vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
   // stripe along the pipe's crown.
   vec3 view = normalize(uEye - world);
   vec3 r = reflect(-view, n);
-  vec3 env = mix(vec3(0.1, 0.13, 0.16), vec3(0.3, 0.37, 0.42), smoothstep(-0.7, -0.06, r.z));
+  vec3 env = mix(vec3(0.03, 0.06, 0.1), vec3(0.14, 0.22, 0.28), smoothstep(-0.7, -0.06, r.z));
   env = mix(env, vec3(0.62, 0.72, 0.78), smoothstep(-0.06, 0.0, r.z));
   env = mix(env, vec3(0.36, 0.45, 0.5), smoothstep(0.08, 0.5, r.z));
   env += vec3(0.5, 0.62, 0.68) * smoothstep(0.85, 1.0, sin(atan(r.y, r.x) * 5.0)) * smoothstep(0.0, 0.2, r.z) * (1.0 - smoothstep(0.5, 0.8, r.z));
@@ -765,7 +801,7 @@ vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
 
 export const PROP_FRAGMENT = propFragment({ light: PROP_LIGHT, reveal: LENS_BLUE });
 
-const NO_SPOTS = { dais: null, outline: [], stair: null, consoles: [], tanks: [], bundles: [], emblem: null };
+const NO_SPOTS = { dais: null, outline: [], stair: null, consoles: [], tanks: [], clusters: [], bundles: [], emblem: null };
 
 /** Full Metal Lab's board (stadium-environment-mesh.js BOARDS): the dais and deck, and the props. */
 export function fullMetalLabBoard({ three, material, terrainGrid, replaceGeometry, bakeOptions }) {

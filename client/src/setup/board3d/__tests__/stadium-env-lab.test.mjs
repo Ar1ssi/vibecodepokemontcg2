@@ -111,6 +111,20 @@ test('Full Metal Lab shaders declare no GLSL ES 3.00 reserved word and every one
   }
 });
 
+test('labSpots: the pipe clusters stand on the deck, inside the scene, clear of the tanks and consoles', () => {
+  for (const layout of layouts) {
+    const spots = labSpots(layout);
+    const scene = sceneBounds(layout, LAB_KEY);
+    assert.ok(spots.clusters.length >= 2, `${spots.clusters.length} clusters`);
+    for (const cluster of spots.clusters) {
+      assert.ok(daisDistance(cluster.x, cluster.y, spots.dais) > 30, 'off the dais');
+      assert.ok(cluster.x > scene.x && cluster.x < scene.x + scene.w && cluster.y > scene.y && cluster.y < scene.y + scene.h);
+      for (const tank of spots.tanks) assert.ok(Math.hypot(cluster.x - tank.x, cluster.y - tank.y) > tank.radius + 16);
+      for (const desk of spots.consoles) assert.ok(Math.hypot(cluster.x - desk.x, cluster.y - desk.y) > 70);
+    }
+  }
+});
+
 test('labSpots: pipe runs stay on the deck, clear of every tank', () => {
   for (const layout of layouts) {
     const spots = labSpots(layout);
