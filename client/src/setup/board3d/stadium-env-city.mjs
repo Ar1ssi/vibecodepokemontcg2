@@ -38,7 +38,7 @@ const PARAPET = { height: 22, thick: 12 };
  * The stairwell hut beside the cards' near-right corner, as the art's: low and long, its size,
  * height, and the roof kept clear in front of it for its lamp's pool.
  */
-const HUT = { w: 104, d: 170, h: 44, apron: 64 };
+const HUT = { w: 104, d: 120, h: 44, apron: 64 };
 /**
  * The towers round the roof, after the art: a tall block either side with a billboard on its face
  * to the roof, lesser blocks between, the round tower and its neighbours far off, low blocks near.
@@ -49,7 +49,7 @@ const HUT = { w: 104, d: 170, h: 44, apron: 64 };
  */
 const TOWERS = [
   { side: 'left', from: -1.0, to: -0.22, gap: 46, depth: 280, height: 70, board: 0 },
-  { side: 'left', from: -0.1, to: 0.42, gap: 38, depth: 250, height: 230, board: 2 },
+  { side: 'left', from: -0.1, to: 0.2, gap: 38, depth: 250, height: 230, board: 2 },
   { side: 'right', from: -1.0, to: -0.3, gap: 44, depth: 280, height: 40, board: 0 },
   { side: 'right', from: -0.18, to: 0.64, gap: 38, depth: 250, height: 270, board: 1 },
   { side: 'right', from: 0.76, to: 1.5, gap: 50, depth: 280, height: 160, board: 0 },
@@ -59,27 +59,28 @@ const TOWERS = [
 ];
 /**
  * The round tower: in the art it stands at the back, behind the roof's far edge, where the board's
- * far edge is covered by the opponent's hand; here it stands beside the roof's left side toward its
- * far end, near enough the roof and low enough that both camera presets see it whole. Its place
- * along that side (share of the roof's half height), street gap, radius, height.
+ * far edge is covered by the opponent's hand; here it stands beside the roof's left side halfway
+ * back, next to the purple billboard's tower, near enough the roof and low enough that both camera
+ * presets see it whole. Its place along that side (share of the roof's half height), street gap,
+ * radius, height to its roof (the lantern rises over it).
  */
-const ROUND_TOWER = { at: 0.8, gap: 34, r: 100, height: 270 };
+const ROUND_TOWER = { at: 0.55, gap: 34, r: 95, height: 200 };
 /**
  * The searchlights, as the art's shafts sweeping the night sky, never across the cards. Two stand on
  * the side towers' roofs (`tower`: its TOWERS index, `at` shares of its half size) and climb low
  * along the sides toward the far side: the top-down preset sees them. Two stand down in the streets
  * between the roof's building and the side towers (`at` shares of the roof's half size), two a side,
- * and climb steeply toward the far side, criss-crossing over the towers' faces as the art's cross the
- * sky, where the tilted preset sees them. Each its
+ * and climb toward the far side, away from the eye, rising past the towers' tops as the art's rise
+ * behind its buildings, where the tilted preset sees them. Each its
  * sweep's centre (rad), how steeply it climbs (rad) and phase.
  */
 const BEAMS = [
   { tower: 1, at: [0.0, -0.85], heading: 1.75, tip: 0.32, phase: 0 },
   { tower: 3, at: [0.0, -0.85], heading: 1.4, tip: 0.32, phase: 2.3 },
-  { at: [-1.03, 0.16], heading: 1.75, tip: 1.15, phase: 4.1 },
-  { at: [1.03, 0.22], heading: 1.4, tip: 1.15, phase: 1.2 },
-  { at: [-1.03, -0.42], heading: 1.95, tip: 1.05, phase: 3.3 },
-  { at: [1.03, -0.48], heading: 1.2, tip: 1.05, phase: 5.2 },
+  { at: [-1.03, 0.16], heading: 1.75, tip: 0.6, phase: 4.1 },
+  { at: [1.03, 0.22], heading: 1.4, tip: 0.6, phase: 1.2 },
+  { at: [-1.03, -0.42], heading: 1.95, tip: 0.5, phase: 3.3 },
+  { at: [1.03, -0.48], heading: 1.2, tip: 0.5, phase: 5.2 },
 ];
 /** A searchlight's shaft length, and its lamp's height over the tower's roof. */
 const BEAM_LENGTH_PX = 1250;
@@ -88,7 +89,7 @@ const BEAM_LAMP_PX = 22;
  * The billboards on the side towers' roofs: their extent along the table (most), the design's width
  * over its height, how far they lean back (rad above level), how high their foot stands on its posts.
  */
-const BILLBOARD_PX = { span: 150, aspect: 1.6, slope: 0.6, lift: 18 };
+const BILLBOARD_PX = { span: 130, aspect: 1.6, slope: 1.0, lift: 18 };
 const SIGN_POST = [0.12, 0.13, 0.15, 0.4];
 /**
  * The ads on the towers' faces: px up the face its foot stands, px up the face it runs (across the
@@ -108,12 +109,14 @@ const DOOR_RED = [0.3, 0.07, 0.08, 0.2];
 /** The hut's lamp: a cold white floodlight, as in the art. */
 const LAMP = [1.4, 1.45, 1.5, 2.8];
 const MACHINE = [0.3, 0.32, 0.35, 0.4];
-/** The round tower's lit crown and its dome. */
-const CROWN_LIGHT = [1.15, 1.02, 0.75, 1.9];
-const DOME = [0.24, 0.25, 0.29, 0.5];
-const HAZARD_YELLOW = [0.75, 0.6, 0.06, 1.7];
+/** The round tower's white-lit lantern glass, its dark dome, the pale ledges of its floors and their spacing. */
+const CROWN_LIGHT = [1.25, 1.32, 1.4, 2.0];
+const DOME = [0.16, 0.17, 0.2, 0.5];
+const LEDGE = [0.42, 0.45, 0.5, 0.15];
+const ROUND_FLOOR_PX = 30;
+/** The art's slanted panels along the far tower's top: glowing pale yellow-green. */
+const HAZARD_YELLOW = [0.78, 0.86, 0.42, 1.9];
 const TOWER_PARAPET = [0.3, 0.32, 0.37, 0.05];
-const HAZARD_BLACK = [0.03, 0.03, 0.03, 0.1];
 
 /**
  * Dark City's layout: the roof (round every card footprint, ROOF_GAP_PX clear), the hut, the towers
@@ -198,14 +201,15 @@ export function cityProps({ roof, hut, towers, round, beams = [] }) {
       }
     }
     if (tower.hazard) {
-      // The art's yellow and black hazard band along the roof edge facing the rooftop.
+      // The art's band along the roof edge facing the rooftop: glowing slanted panels, the dark wall
+      // showing in the gaps between them.
       const edgeY = tower.y - tower.d / 2 - 1.5;
-      const count = Math.max(2, Math.round(tower.w / 18));
+      const count = Math.max(2, Math.round(tower.w / 20));
       for (let k = 0; k < count; k += 1) {
         const x0 = tower.x - tower.w / 2 + (tower.w * k) / count;
-        const x1 = x0 + tower.w / count;
-        const z1 = tower.height - 2;
-        props.quad([x1, edgeY, z1 - 10], [x0, edgeY, z1 - 10], [x0 + 5, edgeY, z1], [x1 + 5, edgeY, z1], k % 2 ? HAZARD_BLACK : HAZARD_YELLOW);
+        const x1 = x0 + (tower.w / count) * 0.72;
+        const z1 = tower.height - 3;
+        props.quad([x1, edgeY, z1 - 11], [x0, edgeY, z1 - 11], [x0 + 6, edgeY, z1], [x1 + 6, edgeY, z1], HAZARD_YELLOW);
       }
     }
     // On top: a machine room, a water tank, an antenna with its red aircraft light (a billboard's
@@ -248,15 +252,20 @@ export function cityProps({ roof, hut, towers, round, beams = [] }) {
   for (const x0 of [hut.x + 2, hut.x + 28]) {
     props.quad([x0, faceY, 16], [x0 + 20, faceY, 16], [x0 + 20, faceY, 28], [x0, faceY, 28], HUT_WINDOW);
   }
-  // The round tower's crown, as the art's: a lit ring of glass on its top tier under a low dome.
+  // The round tower, as the art's: a pale ledge round every floor, and on its roof a lantern of
+  // white-lit glass under a dark dome.
   if (round) {
-    props.ring({ x: round.x, y: round.y, z0: round.height, z1: round.height + 16, r: round.r * 0.44, color: CROWN_LIGHT, sides: 36 });
-    props.cylinder({ x: round.x, y: round.y, z0: round.height + 16, z1: round.height + 20, r: round.r * 0.48, color: DOME, sides: 36, domeRise: round.r * 0.3 });
+    for (let z = round.height - 4; z > -STREET_PX + 40; z -= ROUND_FLOOR_PX) {
+      props.ring({ x: round.x, y: round.y, z0: z - 3, z1: z, r: round.r + 4, color: LEDGE, sides: 40 });
+    }
+    props.cylinder({ x: round.x, y: round.y, z0: round.height, z1: round.height + 6, r: round.r * 0.72, color: LEDGE, sides: 36 });
+    props.ring({ x: round.x, y: round.y, z0: round.height + 6, z1: round.height + 30, r: round.r * 0.6, color: CROWN_LIGHT, sides: 36 });
+    props.cylinder({ x: round.x, y: round.y, z0: round.height + 30, z1: round.height + 34, r: round.r * 0.66, color: LEDGE, sides: 36, capColor: DOME, domeRise: round.r * 0.38 });
   }
   return props;
 }
 
-/** The towers: boxes from the streets up, the round tower in three tiers with its crown. */
+/** The towers: boxes from the streets up, and the round tower's column of floors. */
 export function cityBuildings({ towers, round }) {
   const props = createPropBuilder();
   towers.forEach((tower, i) => {
@@ -270,14 +279,8 @@ export function cityBuildings({ towers, round }) {
       color: [0.2 + 0.03 * (i % 3), 0.25 + 0.03 * (i % 3), 0.32 + 0.03 * (i % 2), (i * 0.137) % 1],
     });
   });
-  const tiers = [
-    [-STREET_PX, round.height * 0.62, round.r],
-    [round.height * 0.62, round.height * 0.86, round.r * 0.82],
-    [round.height * 0.86, round.height, round.r * 0.6],
-  ];
-  for (const [z0, z1, r] of tiers) {
-    props.cylinder({ x: round.x, y: round.y, z0, z1, r, color: [0.22, 0.23, 0.27, 1.25], sides: 40, capColor: [0.2, 0.21, 0.25, 1.25] });
-  }
+  // The round tower, as the art's: one column of stacked floors (their ledges are props).
+  props.cylinder({ x: round.x, y: round.y, z0: -STREET_PX, z1: round.height, r: round.r, color: [0.22, 0.23, 0.27, 1.25], sides: 40, capColor: [0.2, 0.21, 0.25, 1.25] });
   return props;
 }
 
@@ -541,8 +544,6 @@ void main() {
       : (abs(n.x) > abs(n.y) ? vWorld.y : vWorld.x);
     vec3 wall = vColor.rgb * (0.3 + 0.32 * max(dot(n, normalize(vec3(-0.5, -0.5, 0.4))), 0.0));
     col = facadeColor(wall, along, vWorld.z + ${STREET_PX}.0, seed);
-    // The round tower's crown: a lit band under its top.
-    col = mix(col, vec3(1.2, 1.05, 0.8), isRound * step(uRound.w - 18.0, vWorld.z) * step(vWorld.z, uRound.w - 8.0));
   }
   // Down in the streets the night's haze swallows the towers' feet.
   col = mix(col, NIGHT, smoothstep(-40.0, -${STREET_PX}.0, vWorld.z) * 0.85);
@@ -606,31 +607,33 @@ void main() {
   vec3 paint;
   float sprayed;
   if (vBoard < 1.5) {
-    // The art's right board: a checked white ad with two lines of black print, Team Skull's skull
-    // sprayed over it in red, scribbled marks beside it.
-    vec2 check = floor(uv * vec2(9.0, 5.0));
-    col = mix(vec3(0.94, 0.95, 0.97), vec3(0.72, 0.75, 0.8), mod(check.x + check.y, 2.0));
-    col = mix(col, vec3(0.06), max(printed(uv, 0.48, 0.56, 0.18, 0.78, 1.0), printed(uv, 0.32, 0.39, 0.3, 0.62, 2.0)));
-    float head = length((q - vec2(0.0, 0.08)) * vec2(1.0, 1.15)) - 0.26;
-    float jaw = max(abs(q.x) - 0.15, abs(q.y + 0.2) - 0.07);
-    float skull = min(head, jaw);
-    float ring = abs(skull) - 0.025;
-    float eyes = min(min(stroke(q, vec2(-0.16, 0.13), vec2(-0.05, 0.02), 0.022), stroke(q, vec2(-0.16, 0.02), vec2(-0.05, 0.13), 0.022)),
-      min(stroke(q, vec2(0.05, 0.13), vec2(0.16, 0.02), 0.022), stroke(q, vec2(0.05, 0.02), vec2(0.16, 0.13), 0.022)));
-    float bones = min(stroke(q, vec2(-0.62, -0.38), vec2(0.62, 0.38), 0.03), stroke(q, vec2(-0.62, 0.38), vec2(0.62, -0.38), 0.03));
-    float scribble = min(stroke(q, vec2(0.42, -0.05), vec2(0.5, 0.18), 0.02), stroke(q, vec2(0.5, 0.18), vec2(0.58, -0.06), 0.02));
-    sprayed = 1.0 - smoothstep(-0.004, 0.006, min(min(min(ring, eyes), max(bones, -skull)), scribble));
+    // The art's right board: big white and grey checks, two lines of black print across its middle,
+    // Team Skull's angry face sprayed over it in red (horns, slanted eyes, a wide grin), a "w"
+    // scribbled beside it.
+    vec2 check = floor(uv * vec2(6.0, 4.0));
+    col = mix(vec3(0.95, 0.96, 0.97), vec3(0.58, 0.62, 0.68), mod(check.x + check.y, 2.0));
+    col = mix(col, vec3(0.05), max(printed(uv, 0.52, 0.6, 0.16, 0.78, 1.0), printed(uv, 0.36, 0.43, 0.3, 0.66, 2.0)));
+    float grin = abs(length((q - vec2(-0.05, 0.12)) * vec2(1.0, 1.25)) - 0.34) - 0.022;
+    grin = max(grin, q.y - 0.02);
+    float horns = min(stroke(q, vec2(-0.32, 0.05), vec2(-0.18, 0.42), 0.022), stroke(q, vec2(-0.18, 0.42), vec2(-0.08, 0.12), 0.022));
+    horns = min(horns, min(stroke(q, vec2(0.02, 0.12), vec2(0.12, 0.44), 0.022), stroke(q, vec2(0.12, 0.44), vec2(0.2, 0.05), 0.022)));
+    float eyes = min(stroke(q, vec2(-0.3, 0.02), vec2(-0.12, -0.06), 0.02), stroke(q, vec2(0.0, -0.06), vec2(0.17, 0.02), 0.02));
+    float scribble = min(min(stroke(q, vec2(0.36, -0.02), vec2(0.42, 0.16), 0.02), stroke(q, vec2(0.42, 0.16), vec2(0.48, 0.0), 0.02)),
+      min(stroke(q, vec2(0.48, 0.0), vec2(0.54, 0.16), 0.02), stroke(q, vec2(0.54, 0.16), vec2(0.6, -0.02), 0.02)));
+    sprayed = 1.0 - smoothstep(-0.004, 0.006, min(min(min(grin, horns), eyes), scribble));
     paint = vec3(0.82, 0.05, 0.06);
   } else {
-    // The art's left board: a dark navy ad, a pale wave along its top, a white logo and lettering;
-    // a pink X sprayed across it.
-    col = mix(vec3(0.06, 0.06, 0.2), vec3(0.2, 0.09, 0.36), uv.x);
-    float wave = abs(uv.y - 0.82 - 0.05 * sin(uv.x * 7.0)) - 0.025;
-    col = mix(col, vec3(0.85, 0.88, 0.95), 1.0 - smoothstep(0.0, 0.01, wave));
-    float logo = abs(length((uv - vec2(0.17, 0.42)) * vec2(1.6, 1.0)) - 0.12) - 0.02;
-    col = mix(col, vec3(0.9, 0.92, 0.98), 1.0 - smoothstep(0.0, 0.012, logo));
-    col = mix(col, vec3(0.92), printed(uv, 0.32, 0.5, 0.42, 0.9, 7.0));
-    float x = min(stroke(q, vec2(-0.45, -0.38), vec2(0.45, 0.38), 0.07), stroke(q, vec2(-0.45, 0.38), vec2(0.45, -0.38), 0.07));
+    // The art's left board: dark navy-violet, a pale blue sky band along its top under a white wave,
+    // a white crescent logo and big pale lettering below; a pink X sprayed across it.
+    col = mix(vec3(0.03, 0.03, 0.12), vec3(0.1, 0.05, 0.22), uv.x);
+    col = mix(col, vec3(0.45, 0.62, 0.8), step(0.8 + 0.05 * sin(uv.x * 7.0), uv.y));
+    float wave = abs(uv.y - 0.8 - 0.05 * sin(uv.x * 7.0)) - 0.022;
+    col = mix(col, vec3(0.9, 0.93, 0.98), 1.0 - smoothstep(0.0, 0.01, wave));
+    vec2 logoAt = (uv - vec2(0.17, 0.38)) * vec2(1.6, 1.0);
+    float crescent = max(length(logoAt) - 0.13, -(length(logoAt - vec2(0.06, 0.02)) - 0.09));
+    col = mix(col, vec3(0.92, 0.94, 0.99), 1.0 - smoothstep(0.0, 0.012, crescent));
+    col = mix(col, vec3(0.86, 0.88, 0.96), printed(uv, 0.24, 0.5, 0.38, 0.92, 7.0));
+    float x = min(stroke(q, vec2(-0.4, -0.34), vec2(0.4, 0.34), 0.045), stroke(q, vec2(-0.4, 0.34), vec2(0.4, -0.34), 0.045));
     sprayed = (1.0 - smoothstep(-0.004, 0.02, x)) * 0.85;
     paint = vec3(0.78, 0.32, 0.82);
   }
