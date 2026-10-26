@@ -1,6 +1,6 @@
 // Design 077 (prototype): Mountain Ring (customhb-240) after its card art (FFI 97, xy3-97 in
-// set.json; Ryo Ueda): a round arena high in the mountains, paved in patches of grey-brown brick
-// rows round the Poké Ball laid in pale stone at its middle; smooth standing stones ring it, thick ropes
+// set.json; Ryo Ueda): a round arena high in the mountains, paved in rows of grey-brown bricks
+// round the Poké Ball laid in pale stone at its middle; pale standing stones ring it, thick ropes
 // sagging between them, wound round each; a giant chain lies by it; rough rocky ground with boulders
 // runs on past them, tall dark rock spires standing on it, everything in the art's sepia under an
 // overcast sky. The art looks across the ring from its edge; the board looks down into it, so the
@@ -38,28 +38,34 @@ const STONE_FOOT_GAP_PX = 8;
 /** Spacing of the standing stones round the ring (px of arc). */
 const STONE_SPACING_PX = 225;
 /**
- * Paving: bricks in staggered rows, as in the art; their length (each row's own, up to `vary` px
- * either side) and height. The rows run their own way in each patch about `patch` px across (most
- * along the table, some on a diagonal or across it), as the art's paving does.
+ * Paving: bricks in straight staggered rows right up to the emblem, as the art's; their length (each
+ * row's own, up to `vary` px either side) and height.
  */
-const BRICK_PX = { long: 46, vary: 8, high: 23, patch: 230 };
-/** The two rope strands: height on the stones (share of each stone's height), sag, thickness, turns round each stone. */
+const BRICK_PX = { long: 46, vary: 8, high: 23 };
+/**
+ * The two rope strands, as the art's: height on the stones (share of each stone's height), sag, the
+ * coils' thickness and how many wind round each stone in a band, the strand's thickness between.
+ */
 const ROPES = [
-  { at: 0.5, sag: 30, radius: 5.2, wraps: 2 },
-  { at: 0.3, sag: 22, radius: 4.6, wraps: 1 },
+  { at: 0.5, sag: 30, radius: 3.4, wraps: 4, strand: 1.9 },
+  { at: 0.28, sag: 22, radius: 3.0, wraps: 2, strand: 1.7 },
 ];
 /**
- * The chain: which stone it hangs from (turn round the ring, rad), how many links, link size. As in
- * the art's foreground, massive links; they lie along the ground toward the near end, where both
- * camera presets see them.
+ * The chain, as the art's foreground: massive rusty links hanging from a stone on the left side (its
+ * turn round the ring, rad) and lying on along the paving's edge toward the far end, `inset` px in
+ * from it, where both camera presets see them; at most `links`, each `length` by `width` px, its
+ * metal `thick`. Links stop where the next would come within `clear` px of a card.
  */
-const CHAIN = { angle: Math.PI * 1.06, links: 12, length: 86, width: 48, thick: 10 };
+export const CHAIN = { angle: Math.PI * 1.14, links: 12, length: 92, width: 50, thick: 10, inset: 34, clear: 10 };
 /**
  * The art's rock spires standing on the ground past the stones: turn round the ring (deg), gap past
  * the stones' ring, base radius, height, how flattened. A spire with no room in the scene, or
  * crowding a stone or another spire, is left out.
  */
 const SPIRES = [
+  [100, 20, 70, 360, 0.75],
+  [78, 40, 58, 320, 0.8],
+  [120, 45, 54, 290, 0.85],
   [150, 20, 58, 300, 0.8],
   [180, 40, 66, 340, 0.7],
   [207, 20, 52, 260, 0.9],
@@ -72,12 +78,14 @@ const SPIRES = [
 /** The spires' dark rock, as the art's crags (83,73,62), darker than the menhirs. */
 const SPIRE_STONE = [0.24, 0.21, 0.18, 0.05];
 
-const GREY_STONE = [0.5, 0.46, 0.4, 0.05];
+/** The art's pale grey-tan stone, (118,110,101) in shade to (145,138,125) lit. */
+const GREY_STONE = [0.56, 0.54, 0.5, 0.05];
 // The art's ropes: dark sepia, the strands (69,57,49), the wraps (49,37,29) to (74,61,52).
 const ROPE_LIGHT = [0.2, 0.17, 0.155, 0.05];
 const ROPE_DARK = [0.13, 0.11, 0.1, 0.05];
-const RUST = [0.27, 0.19, 0.15, 0.35];
-const RUST_DARK = [0.19, 0.13, 0.1, 0.3];
+// The art's rusty chain, (98,80,72) to (58,42,38) in its shade.
+const RUST = [0.3, 0.2, 0.15, 0.35];
+const RUST_DARK = [0.2, 0.13, 0.1, 0.3];
 
 const turnBetween = (a, b) => Math.abs(((a - b + 3 * Math.PI) % (2 * Math.PI)) - Math.PI);
 
@@ -86,6 +94,38 @@ const hashOf = (n) => {
   const s = Math.sin(n * 127.1 + 311.7) * 43758.5453;
   return s - Math.floor(s);
 };
+
+/** px from (x, y) to the rect (0 inside it). */
+const distanceToRect = (x, y, r) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.y - y, 0, y - r.y - r.h));
+
+/**
+ * The chain's links, [x, y, z] centres in order: from the anchor stone's inner face, half way up it,
+ * down to the paving and on along its edge (CHAIN.inset in from it) toward the far end, while each
+ * link stays CHAIN.clear px clear of every card and inside the scene.
+ */
+function chainLinks(arena, anchor, rects, scene) {
+  const step = CHAIN.length - CHAIN.width * 0.45;
+  const start = Math.atan2(anchor.y - arena.y, anchor.x - arena.x);
+  const bed = arena.r - CHAIN.inset;
+  const startR = Math.hypot(anchor.x - arena.x, anchor.y - arena.y) - anchor.radius * 0.8;
+  const drop = anchor.height * 0.55;
+  const links = [];
+  for (let i = 0; i < CHAIN.links; i += 1) {
+    const s = i * step;
+    // Hanging: the first links come in and down off the stone; then the chain lies on the paving.
+    const hang = Math.min(1, s / (drop + startR - bed));
+    const radius = startR + (bed - startR) * Math.min(1, hang * 1.4);
+    const turn = start - Math.max(0, s - drop * 0.6) / bed;
+    const x = arena.x + Math.cos(turn) * radius;
+    const y = arena.y + Math.sin(turn) * radius;
+    const z = drop * (1 - hang) ** 1.6 + CHAIN.width / 2;
+    const clear = rects.every((r) => distanceToRect(x, y, r) > CHAIN.length / 2 + CHAIN.clear);
+    const inside = x > scene.x && x < scene.x + scene.w && y > scene.y && y < scene.y + scene.h;
+    if (!clear || !inside) break;
+    links.push([x, y, z]);
+  }
+  return links;
+}
 
 /**
  * Mountain Ring's layout: the arena (a circle round every card footprint, ARENA_MARGIN_PX clear),
@@ -118,24 +158,26 @@ export function ringSpots(layout) {
     const x = arena.x + Math.cos(angle) * out;
     const y = arena.y + Math.sin(angle) * out;
     const inside = x - radius > scene.x && x + radius < scene.x + scene.w && y - radius > scene.y && y + radius < scene.y + scene.h;
-    // As in the art, no two alike: flat-faced slabs of every height, some leaning; each turned about
-    // along the ring, so its broad face looks across the arena.
+    // As in the art, no two alike: rough columns of every height, a little flattened, some leaning;
+    // each turned about along the ring, so its broader face looks across the arena.
     stones.push({
       x,
       y,
       radius,
       height: 95 + 135 * hashOf(i + 200),
       lean: (hashOf(i + 300) - 0.5) * 0.14,
-      flat: 0.45 + 0.25 * hashOf(i + 500),
+      flat: 0.68 + 0.27 * hashOf(i + 500),
       yaw: angle + Math.PI / 2 + (hashOf(i + 600) - 0.5) * 0.9,
       seed: hashOf(i + 400),
       index: i,
       inside,
     });
   }
-  // The chain hangs off the stone nearest its turn and lies on out across the ground.
+  // The chain hangs off the stone nearest its turn and lies on along the paving's edge.
   const turnOf = (stone) => turnBetween(Math.atan2(stone.y - arena.y, stone.x - arena.x), CHAIN.angle);
   const anchor = stones.reduce((best, stone) => (turnOf(stone) < turnOf(best) ? stone : best));
+  const rects = [...slabs, ...flats];
+  const chain = anchor.inside ? chainLinks(arena, anchor, rects, scene) : [];
   const spires = [];
   SPIRES.forEach(([deg, gap, radius, height, flat], i) => {
     const angle = (deg * Math.PI) / 180;
@@ -160,44 +202,49 @@ export function ringSpots(layout) {
     });
   });
   const emblem = craterEmblem(layout, centre);
-  return { arena, ringR, stones: stones.filter((stone) => stone.inside), allStones: stones.length, anchor, spires, emblem };
+  return { arena, ringR, stones: stones.filter((stone) => stone.inside), allStones: stones.length, anchor, chain, spires, emblem };
 }
 
 /**
- * One standing stone, a menhir as in the art: a slab with broad flat faces (eight sides, flattened),
- * a little wider at its foot. As the art's, most rise to a point set off to one side (a tooth), some
- * end cut off at a slant, and the shortest round over; rough edges, no two alike.
+ * A standing stone's girth at `t` of its height, as a share of its radius: the art's menhirs keep
+ * their girth to half way, then taper into a blunt rounded top (the squat ones round over sooner).
+ */
+export const stoneGirth = (t, stone) => {
+  const shoulder = stone.height < 125 ? 0.6 : 0.5;
+  if (t <= shoulder) return 1.06 - 0.12 * t;
+  const base = 1.06 - 0.12 * shoulder;
+  const cap = Math.min(1, (t - shoulder) / (1 - shoulder));
+  return base * Math.max(0, 1 - cap ** 2.2) ** (1 / 2.2);
+};
+
+/**
+ * One standing stone, a menhir as in the art: a rough twelve-sided column, a little flattened and
+ * wider at its foot, tapering to a blunt rounded top (on the taller ones set a little to one side);
+ * chiselled faces, no two alike.
  */
 const standingStone = (props, stone) => {
-  const sides = 8;
-  const levels = [0, 0.3, 0.55, 0.72, 0.84, 0.93, 0.98, 1];
-  const shape = hashOf(stone.index * 13 + 5);
-  const kind = stone.height < 125 ? 'round' : shape < 0.55 ? 'tooth' : 'cut';
+  const sides = 12;
+  const levels = [0, 0.25, 0.5, 0.62, 0.72, 0.8, 0.87, 0.93, 0.97, 1];
   const side = hashOf(stone.index * 7 + 2) < 0.5 ? -1 : 1;
-  const slant = side * (0.35 + 0.35 * hashOf(stone.index * 7 + 3));
+  const tipShift = stone.height < 125 ? 0 : side * stone.radius * 0.35 * hashOf(stone.index * 7 + 3);
   const rings = levels.map((t, level) => {
-    // A tooth narrows to its point from half way up, the point drifting to one side.
-    const point = kind === 'tooth' ? Math.max(0.08, 1 - Math.max(0, (t - 0.45) / 0.55) ** 1.4 * 0.92) : 1;
-    const dome = kind === 'round' && t > 0.72 ? Math.sqrt(Math.max(0, 1 - ((t - 0.72) / 0.28) ** 2)) : 1;
-    const taper = (1.08 - 0.14 * t) * Math.max(Math.min(point, dome), level === levels.length - 1 ? 0.08 : 0);
+    const taper = Math.max(stoneGirth(t, stone), level === levels.length - 1 ? 0.04 : 0.1);
     const lean = stone.lean * t * stone.height;
-    const drift = kind === 'tooth' ? side * stone.radius * 0.45 * Math.max(0, t - 0.45) : 0;
+    const drift = tipShift * Math.max(0, (t - 0.5) / 0.5) ** 2;
     return Array.from({ length: sides }, (_, k) => {
       const angle = (k / sides) * 2 * Math.PI + stone.seed * 6;
-      const wobble = 0.86 + 0.24 * hashOf(stone.index * 31 + k * 7) + 0.06 * hashOf(stone.index * 17 + k * 3 + level * 5);
+      // Chiselled: each face column its own depth, nicked a little from level to level.
+      const wobble = 0.9 + 0.16 * hashOf(stone.index * 31 + k * 7) + 0.05 * hashOf(stone.index * 17 + k * 3 + level * 5);
       const r = stone.radius * taper * wobble;
-      // A flattened section turned by the stone's yaw: slabs, not columns.
+      // A flattened section turned by the stone's yaw.
       const u = Math.cos(angle) * r + drift;
       const v = Math.sin(angle) * r * stone.flat;
       const c = Math.cos(stone.yaw);
       const sn = Math.sin(stone.yaw);
-      // A cut stone stops at 0.86 of its height, its top ring tilted into a slanted face.
-      const rise = kind === 'cut' ? Math.min(t, 0.86) : t;
-      const tilt = kind === 'cut' && level === levels.length - 1 ? (u * slant * stone.height) / Math.max(stone.radius, 1) / 4 : 0;
-      return [stone.x + u * c - v * sn + lean, stone.y + u * sn + v * c, stone.height * rise + tilt];
+      return [stone.x + u * c - v * sn + lean, stone.y + u * sn + v * c, stone.height * t];
     });
   });
-  const tone = 0.7 + 0.45 * stone.seed;
+  const tone = 0.85 + 0.25 * stone.seed;
   const color = [GREY_STONE[0] * tone, GREY_STONE[1] * tone, GREY_STONE[2] * tone, GREY_STONE[3]];
   for (let level = 0; level < rings.length - 1; level += 1) {
     for (let k = 0; k < sides; k += 1) {
@@ -269,7 +316,7 @@ const chainLink = (props, centre, axis, up, { length, width, thick }, color) => 
 };
 
 /** The standing stones, the spires, the ropes between them, and the chain. */
-export function ringProps({ stones, allStones, anchor, spires = [] }) {
+export function ringProps({ stones, allStones, chain = [], spires = [] }) {
   const props = createPropBuilder();
   for (const stone of stones) standingStone(props, stone);
   for (const spire of spires) rockSpire(props, spire);
@@ -279,7 +326,7 @@ export function ringProps({ stones, allStones, anchor, spires = [] }) {
   const byIndex = new Map(stones.map((stone) => [stone.index, stone]));
   /** A point of the stone's surface, `share` of its height up, pushed out by `out` px at `angle`. */
   const onStone = (stone, share, angle, out) => {
-    const r = stone.radius * (1.08 - 0.14 * share) * 1.08 + out;
+    const r = stone.radius * stoneGirth(share, stone) * 1.1 + out;
     const u = Math.cos(angle) * r;
     const v = Math.sin(angle) * ((r - out) * stone.flat + out);
     const c = Math.cos(stone.yaw);
@@ -290,7 +337,7 @@ export function ringProps({ stones, allStones, anchor, spires = [] }) {
     const next = byIndex.get((stone.index + 1) % allStones);
     for (const rope of ROPES) {
       for (let wrap = 0; wrap < rope.wraps; wrap += 1) {
-        const z = stone.height * rope.at - wrap * rope.radius * 2.1;
+        const z = stone.height * rope.at - wrap * rope.radius * 1.9;
         const loop = [];
         for (let k = 0; k <= 18; k += 1) {
           const angle = (k / 18) * 2 * Math.PI;
@@ -306,42 +353,23 @@ export function ringProps({ stones, allStones, anchor, spires = [] }) {
         const t = k / 14;
         span.push([0, 1, 2].map((axis) => from[axis] + (to[axis] - from[axis]) * t - (axis === 2 ? rope.sag * 4 * t * (1 - t) : 0)));
       }
-      props.tube(span, rope.radius * 0.55, ROPE_LIGHT, { sides: 6, colorAt: ropeColor });
+      props.tube(span, rope.strand, ROPE_LIGHT, { sides: 6, colorAt: ropeColor });
     }
   }
-  // The chain: from the anchor stone's top it drops to the ground and lies on along the ring toward
-  // the near end, drifting out from it.
-  if (anchor && stones.includes(anchor)) {
-    const radial = [Math.cos(CHAIN.angle), Math.sin(CHAIN.angle)];
-    const along = [-radial[1], radial[0]];
-    const outLength = Math.hypot(radial[0] * 0.4 + along[0] * 0.9, radial[1] * 0.4 + along[1] * 0.9);
-    const out = [(radial[0] * 0.4 + along[0] * 0.9) / outLength, (radial[1] * 0.4 + along[1] * 0.9) / outLength];
-    const side = [-out[1], out[0]];
-    let previous = null;
-    for (let i = 0; i < CHAIN.links; i += 1) {
-      const s = i * (CHAIN.length - CHAIN.width * 0.45);
-      const drop = Math.max(0, anchor.height * 0.8 - s * 1.1);
-      const lying = Math.max(0, s - anchor.height * 0.8 / 1.1);
-      const centre = [
-        anchor.x + out[0] * (anchor.radius + 8 + lying * 0.9) + side[0] * Math.sin(lying / 70) * 30,
-        anchor.y + out[1] * (anchor.radius + 8 + lying * 0.9) + side[1] * Math.sin(lying / 70) * 30,
-        drop + CHAIN.width / 2,
-      ];
-      const axis = previous
-        ? (() => {
-            const d = [centre[0] - previous[0], centre[1] - previous[1], centre[2] - previous[2]];
-            const length = Math.hypot(...d) || 1;
-            return d.map((v) => v / length);
-          })()
-        : [out[0], out[1], -0.5];
-      const flat = [-axis[1], axis[0], 0];
-      const flatLength = Math.hypot(...flat) || 1;
-      const across = flat.map((v) => v / flatLength);
-      const up = [axis[1] * across[2] - axis[2] * across[1], axis[2] * across[0] - axis[0] * across[2], axis[0] * across[1] - axis[1] * across[0]];
-      chainLink(props, centre, axis, i % 2 ? up : across, CHAIN, i % 3 ? RUST : RUST_DARK);
-      previous = centre;
-    }
-  }
+  // The chain: each link along the line to the next (the last along the one before), alternate links
+  // lying flat and standing.
+  chain.forEach((centre, i) => {
+    const a = chain[Math.max(0, Math.min(i, chain.length - 2))];
+    const b = chain[Math.min(chain.length - 1, Math.max(i + 1, 1))];
+    const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    const dLength = Math.hypot(...d) || 1;
+    const axis = d.map((v) => v / dLength);
+    const flat = [-axis[1], axis[0], 0];
+    const flatLength = Math.hypot(...flat) || 1;
+    const across = flat.map((v) => v / flatLength);
+    const up = [axis[1] * across[2] - axis[2] * across[1], axis[2] * across[0] - axis[0] * across[2], axis[0] * across[1] - axis[1] * across[0]];
+    chainLink(props, centre, axis, i % 2 ? up : across, CHAIN, i % 3 ? RUST : RUST_DARK);
+  });
   return props;
 }
 
@@ -349,39 +377,15 @@ const RING = /* glsl */ `
 // The arena: centre x, y and its paving's radius (ringSpots).
 uniform vec3 uRing;
 uniform vec3 uEmblem;
-// The paving's patch at x (in patch units): x its hash, y about how far to its border (half the gap
-// between the nearest two cell points' distances; one pass, so cheap enough per pixel).
-vec2 pavingPatch(vec2 x) {
-  vec2 n = floor(x);
-  vec2 f = fract(x);
-  float best = 8.0;
-  float second = 8.0;
-  vec2 bestCell = vec2(0.0);
-  for (int j = -1; j <= 1; j++) {
-    for (int i = -1; i <= 1; i++) {
-      vec2 g = vec2(float(i), float(j));
-      float d = length(g + hash22(n + g) - f);
-      if (d < best) { second = best; best = d; bestCell = g; }
-      else if (d < second) { second = d; }
-    }
-  }
-  return vec2(hash12(n + bestCell), 0.5 * (second - best));
-}
-// The paving's brick at p: x, y its cell (unique across patches), z px to its nearest mortar line
-// (a patch's border is one), w its row's length px. In each patch the rows run their own way: half
-// the patches along the table, the rest on either diagonal or across it; each row is shifted along
-// by its own share of a brick and has its own brick length.
+// The paving's brick at p: x, y its cell, z px to its nearest mortar line, w its row's length px.
+// Straight rows, each shifted along by its own share of a brick and with its own brick length.
 vec4 brickAt(vec2 p) {
-  vec2 area = pavingPatch((p - uRing.xy) / ${BRICK_PX.patch}.0 + 5.0);
-  float pick = area.x;
-  float angle = pick < 0.5 ? 0.0 : pick < 0.7 ? 0.7854 : pick < 0.9 ? -0.7854 : 1.5708;
-  vec2 rel = p - uRing.xy + pick * 97.0;
-  rel = vec2(cos(angle) * rel.x + sin(angle) * rel.y, cos(angle) * rel.y - sin(angle) * rel.x);
+  vec2 rel = p - uRing.xy;
   float row = floor(rel.y / ${BRICK_PX.high}.0);
-  float brickLong = ${BRICK_PX.long}.0 + ${BRICK_PX.vary}.0 * (2.0 * hash12(vec2(row, 3.0 + pick)) - 1.0);
-  vec2 q = vec2(rel.x / brickLong + hash12(vec2(row, 7.0 + pick)), rel.y / ${BRICK_PX.high}.0);
+  float brickLong = ${BRICK_PX.long}.0 + ${BRICK_PX.vary}.0 * (2.0 * hash12(vec2(row, 3.0)) - 1.0);
+  vec2 q = vec2(rel.x / brickLong + hash12(vec2(row, 7.0)), rel.y / ${BRICK_PX.high}.0);
   vec2 edge = (0.5 - abs(fract(q) - 0.5)) * vec2(brickLong, ${BRICK_PX.high}.0);
-  return vec4(floor(q) + pick * 1000.0, min(min(edge.x, edge.y), area.y * ${BRICK_PX.patch}.0), brickLong);
+  return vec4(floor(q), min(edge.x, edge.y), brickLong);
 }
 // The emblem in the paving, as in the art: a broad disc of pale stone sunk in a dark groove, a dark
 // ring round its pale centre and a shallower band carved across it from that ring to the rim. x: 1 on
@@ -424,7 +428,7 @@ void main() {
   float id;
   float kind;
   if (d < 0.0) {
-    // Bricks in rows, their way turning patch by patch.
+    // Bricks in straight rows, each row shifted along by its own share of a brick.
     vec4 brick = brickAt(p);
     vec2 cell = brick.xy;
     float mortar = brick.z;
@@ -452,11 +456,15 @@ void main() {
     // cells' polygons, read as shards from above).
     vec4 rock = voronoiCell((p + 17.0) / 52.0);
     float radius = 11.0 + 9.0 * fract(rock.y * 3.3);
-    float inner = clamp(1.0 - length(rock.zw) * 52.0 / radius, 0.0, 1.0);
+    // An elongated, lumpy outline turned its own way, so no two read as marbles.
+    float turn = rock.y * 6.2831853;
+    vec2 o = rock.zw * 52.0;
+    vec2 e = vec2(cos(turn) * o.x + sin(turn) * o.y, cos(turn) * o.y - sin(turn) * o.x) * vec2(1.0, 1.5);
+    float inner = clamp(1.0 - length(e) * (1.0 + 0.3 * (gnoise(p / 6.0) - 0.5)) / radius, 0.0, 1.0);
     float dome = sqrt(inner * (2.0 - inner));
     float share = mix(0.92, 0.84, smoothstep(100.0, 400.0, beyond));
     float scatter = step(share, fract(rock.y * 13.1)) * smoothstep(10.0, 30.0, beyond);
-    h = land + dome * (8.0 + 8.0 * fract(rock.y * 5.7)) * scatter;
+    h = land + dome * (4.0 + 5.0 * fract(rock.y * 5.7)) * scatter;
     // B: a boulder's tone 0.6..1 on its dome, plain ground 0.3.
     id = scatter * inner > 0.0 ? 0.6 + 0.4 * rock.y : 0.3;
     kind = 1.0;

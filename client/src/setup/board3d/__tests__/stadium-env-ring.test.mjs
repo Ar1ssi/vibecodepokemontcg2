@@ -7,6 +7,7 @@ import { environmentFootprints, environmentKeyFor, sceneBounds } from '../stadiu
 import {
   ARENA_MARGIN_PX,
   BAKE_FIELD_FRAGMENT,
+  CHAIN,
   KERB_PX,
   PROP_FRAGMENT,
   RING_KEY,
@@ -47,6 +48,26 @@ test('ringSpots: the paving holds every card footprint; the stones stand outside
     }
   }
   assert.equal(ringSpots(null), null);
+});
+
+test('ringSpots: the chain hangs off a stone and lies along the paving, every link clear of every card', () => {
+  for (const layout of layouts) {
+    const { arena, anchor, chain } = ringSpots(layout);
+    const { slabs, flats } = environmentFootprints(layout);
+    const scene = sceneBounds(layout, RING_KEY);
+    for (const [x, y, z] of chain) {
+      for (const r of [...slabs, ...flats]) {
+        const d = Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.y - y, 0, y - r.y - r.h));
+        assert.ok(d > CHAIN.length / 2, 'clear of the card');
+      }
+      assert.ok(x > scene.x && x < scene.x + scene.w && y > scene.y && y < scene.y + scene.h, 'in the scene');
+      assert.ok(z >= CHAIN.width / 2 - 1e-6 && z <= anchor.height, 'between the ground and the stone\'s top');
+      assert.ok(Math.hypot(x - arena.x, y - arena.y) <= Math.hypot(anchor.x - arena.x, anchor.y - arena.y), 'no further out than its stone');
+    }
+  }
+  const { chain } = ringSpots(layouts[0]);
+  assert.ok(chain.length >= 6, `the default board's chain has ${chain.length} links`);
+  assert.ok(chain.at(-1)[2] < chain[0][2], 'it drops from the stone to the ground');
 });
 
 test('ringProps: stones, ropes and the chain build finite geometry', () => {
