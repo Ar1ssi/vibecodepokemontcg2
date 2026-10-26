@@ -37,11 +37,11 @@ export const STONE_RING_GAP_PX = 30;
 /** Least ground between the kerb and a standing stone's foot. */
 const STONE_FOOT_GAP_PX = 8;
 /** Spacing of the standing stones round the ring (px of arc). */
-const STONE_SPACING_PX = 124;
+const STONE_SPACING_PX = 175;
 /** Paving: bricks in straight staggered rows, as in the art; their length and height. */
 const BRICK_PX = { long: 46, high: 23 };
 /** Ropes: height on the stones (share of each stone's height), sag, thickness. */
-const ROPE = { at: 0.5, sag: 16, radius: 3.4 };
+const ROPE = { at: 0.45, sag: 30, radius: 4.2 };
 /** The chain: which stone it hangs from (turn round the ring, rad), how many links, link size. */
 const CHAIN = { angle: Math.PI * 1.19, links: 15, length: 50, width: 28, thick: 6 };
 /** The shelf the stones stand on, from the kerb to the cliff's lip, and the depths below it. */
@@ -62,7 +62,7 @@ const PEAKS = [
   [66, 90, 110, 190],
 ];
 
-const GREY_STONE = [0.52, 0.5, 0.46, 0.05];
+const GREY_STONE = [0.5, 0.46, 0.4, 0.05];
 const ROPE_LIGHT = [0.4, 0.27, 0.15, 0.05];
 const ROPE_DARK = [0.27, 0.17, 0.09, 0.05];
 const RUST = [0.44, 0.22, 0.1, 0.3];
@@ -101,13 +101,25 @@ export function ringSpots(layout) {
   const stones = [];
   for (let i = 0; i < count; i += 1) {
     const angle = ((i + (hashOf(i) - 0.5) * 0.3) / count) * 2 * Math.PI;
-    const radius = 21 + 11 * hashOf(i + 100);
+    const radius = 26 + 18 * hashOf(i + 100);
     // Each stone's foot clears the kerb by at least STONE_FOOT_GAP_PX.
     const out = arena.r + KERB_PX + STONE_FOOT_GAP_PX + radius + 12 * hashOf(i + 50);
     const x = arena.x + Math.cos(angle) * out;
     const y = arena.y + Math.sin(angle) * out;
     const inside = x - radius > scene.x && x + radius < scene.x + scene.w && y - radius > scene.y && y + radius < scene.y + scene.h;
-    stones.push({ x, y, radius, height: 100 + 80 * hashOf(i + 200), lean: (hashOf(i + 300) - 0.5) * 0.18, seed: hashOf(i + 400), index: i, inside });
+    // As in the art, no two alike: tall slabs and broad stumps, some flattened, some leaning.
+    stones.push({
+      x,
+      y,
+      radius,
+      height: 110 + 130 * hashOf(i + 200),
+      lean: (hashOf(i + 300) - 0.5) * 0.22,
+      flat: 0.55 + 0.45 * hashOf(i + 500),
+      yaw: hashOf(i + 600) * Math.PI,
+      seed: hashOf(i + 400),
+      index: i,
+      inside,
+    });
   }
   // The chain hangs off the stone nearest its turn and lies on out across the ground.
   const turnOf = (stone) => turnBetween(Math.atan2(stone.y - arena.y, stone.x - arena.x), CHAIN.angle);
@@ -137,7 +149,12 @@ const standingStone = (props, stone) => {
       const angle = (k / sides) * 2 * Math.PI + stone.seed * 6;
       const wobble = 0.82 + 0.3 * hashOf(stone.index * 31 + k * 7) + 0.1 * hashOf(stone.index * 17 + k * 3 + level * 5);
       const r = stone.radius * taper * wobble;
-      return [stone.x + Math.cos(angle) * r + lean, stone.y + Math.sin(angle) * r, stone.height * t];
+      // A flattened section turned by the stone's yaw: slabs, not only columns.
+      const u = Math.cos(angle) * r;
+      const v = Math.sin(angle) * r * stone.flat;
+      const c = Math.cos(stone.yaw);
+      const sn = Math.sin(stone.yaw);
+      return [stone.x + u * c - v * sn + lean, stone.y + u * sn + v * c, stone.height * t];
     });
   });
   const tone = 0.85 + 0.3 * stone.seed;
@@ -182,8 +199,12 @@ export function ringProps({ stones, allStones, anchor }) {
       const zWrap = z - wrap * ROPE.radius * 2.2;
       for (let k = 0; k <= 18; k += 1) {
         const angle = (k / 18) * 2 * Math.PI;
-        const r = stone.radius * (1.08 - 0.22 * ROPE.at) * 1.06 + ROPE.radius;
-        loop.push([stone.x + Math.cos(angle) * r + stone.lean * ROPE.at * stone.height, stone.y + Math.sin(angle) * r, zWrap]);
+        const r = stone.radius * (1.08 - 0.22 * ROPE.at) * 1.08 + ROPE.radius;
+        const u = Math.cos(angle) * r;
+        const v = Math.sin(angle) * (r - ROPE.radius) * stone.flat + Math.sin(angle) * ROPE.radius;
+        const c = Math.cos(stone.yaw);
+        const sn = Math.sin(stone.yaw);
+        loop.push([stone.x + u * c - v * sn + stone.lean * ROPE.at * stone.height, stone.y + u * sn + v * c, zWrap]);
       }
       props.tube(loop, ROPE.radius, ROPE_LIGHT, { sides: 6, colorAt: ropeColor });
     }
@@ -354,8 +375,8 @@ void main() {
 
 const OVERCAST = /* glsl */ `
 // The art's light: an overcast sky, soft and from everywhere above, a pale sun from the far left.
-const vec3 SKY = vec3(0.62, 0.58, 0.52);
-const vec3 HAZE = vec3(0.4, 0.37, 0.32);
+const vec3 SKY = vec3(0.64, 0.58, 0.49);
+const vec3 HAZE = vec3(0.42, 0.37, 0.3);
 `;
 
 export const TERRAIN_FRAGMENT = /* glsl */ `
@@ -386,7 +407,7 @@ void main() {
   if (kind < -0.5) {
     // Paving: grey-beige stones each a shade apart, darker mortar; the emblem's pale stone and its
     // dark grooves.
-    vec3 stone = mix(vec3(0.23, 0.21, 0.185), vec3(0.38, 0.35, 0.31), id);
+    vec3 stone = mix(vec3(0.24, 0.205, 0.17), vec3(0.4, 0.35, 0.29), id);
     stone *= 0.88 + 0.24 * fbm3(p / 23.0);
     vec2 inlay = emblemInlay(p);
     if (inlay.x > 1.5) stone = vec3(0.11, 0.1, 0.09) * (0.85 + 0.3 * gnoise(p / 6.0));
