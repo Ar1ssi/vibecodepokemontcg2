@@ -242,14 +242,22 @@ void main() {
   col *= mix(0.7, 1.0, smoothstep(0.0, 40.0, nearWall));
   col *= mix(0.86, 1.0, smoothstep(-200.0, 300.0, nearWall));
 
-  // The Poke Ball hologram: bright cyan lines, a soft halo, light running round it.
-  float d = emblemDistance(p, uEmblem);
-  float inner = uEmblem.z > 0.0 ? abs(length(p - uEmblem.xy) - uEmblem.z * 0.9) : 100000.0;
-  float lines = (1.0 - smoothstep(1.2, 3.0, d)) + (1.0 - smoothstep(0.7, 1.9, inner)) * 0.75;
-  float shimmer = 0.8 + 0.2 * sin(atan(p.y - uEmblem.y, p.x - uEmblem.x) * 6.0 - uTime * 1.5);
-  float halo = exp(-min(d, inner) / 16.0) * 0.45;
-  col = mix(col, col * 0.7, (1.0 - smoothstep(0.0, 34.0, min(d, inner))) * 0.35 * step(0.001, uEmblem.z));
-  col += vec3(0.28, 0.95, 1.4) * (lines * 1.2 + halo) * shimmer * step(0.001, uEmblem.z);
+  // The Poke Ball hologram as in the art: thin bright cyan lines (a doubled outline, the band
+  // across, the button's two rings), a tight glow round them, light running round it.
+  if (uEmblem.z > 0.0) {
+    vec2 rel = p - uEmblem.xy;
+    float r = length(rel);
+    float ring = min(abs(r - uEmblem.z), abs(r - uEmblem.z * 0.88));
+    float button = min(abs(r - uEmblem.z * 0.2), abs(r - uEmblem.z * 0.3));
+    float band = r > uEmblem.z * 0.3 && r < uEmblem.z * 0.88 ? abs(rel.y) : 100000.0;
+    float line = min(min(ring, button), band);
+    float lit = 1.0 - smoothstep(0.8, 2.2, line);
+    float shimmer = 0.85 + 0.15 * sin(atan(rel.y, rel.x) * 6.0 - uTime * 1.5);
+    // On the white floor an added glow would only wash out: the lines are painted a saturated
+    // cyan-blue, the glow a tint round them.
+    col = mix(col, vec3(0.42, 0.72, 0.95), exp(-line / 9.0) * 0.55);
+    col = mix(col, vec3(0.1, 0.62, 1.15) * shimmer, lit * 0.95);
+  }
 
   vec2 edgeUv = min((p - uMin) / uSize, 1.0 - (p - uMin) / uSize);
   col *= mix(0.4, 1.0, smoothstep(0.0, 0.05, min(edgeUv.x, edgeUv.y)));
