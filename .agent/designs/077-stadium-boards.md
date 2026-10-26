@@ -222,6 +222,33 @@ particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
   past the scene's right edge. Drooping bell flowers arch over the water, pink flower spikes stand
   on the island and banks; ripple rings, bubbles and spores move on the poison. Same scene margins
   as Stormy Mountains.
+- Six more, built on branch `feature/077-six-stadiums`, each in its own module with the Stormy
+  Mountains scene margins, each after its card art (set.json row, print named):
+  - Magma Basin (`stadium-env-magma.mjs`, BRS 144): every card on a dark lumpy rock island ringed
+    by a moat of molten gold (widest beside the cards); knobbly red-brown walls rise round it with
+    eight lavafalls (one forked) splashing into the moat; the Poke Ball set in the island, its two
+    halves glowing red; sparks off the moat and the splashes. Two-pass bake (smooth basin, then
+    facets and lumps).
+  - Steel Shelter (`stadium-env-shelter.mjs`, PHF 105): a white hall; polished hex floor that
+    mirrors the walls and the ceiling's hex lights per pixel, one big hatched hexagon in it, the
+    cyan Poke Ball hologram; white walls over dark louvred vents and cyan strips lean out a little
+    round the hall, a dark roof past them; the gate's chevron frame on the far wall.
+  - Full Metal Lab (`stadium-env-lab.mjs`, TEF 148): a two-tone dais (navy disc with the glowing
+    Poke Ball, a band of pale steel plates) holds the Actives, Benches, Stadium and Trainer rows,
+    docking pads the Prize cards and piles; yellow railings, a blue stair at the near right;
+    consoles, lidded tanks, ring pipes and bent pipes rising on the deck below.
+  - Dark City (`stadium-env-city.mjs`, UNM 193): a night rooftop with a parapet, the stairwell hut
+    and its lamp at the near right, AC units on the left; towers of lit windows across the streets,
+    the pink X and Team Skull's skull sprayed on two billboards, the round tower far off,
+    searchlights sweeping the night.
+  - Mountain Ring (`stadium-env-ring.mjs`, FFI 97): straight staggered brick rows breaking up at
+    the ring's edge, a pale stone Poke Ball set in dark grooves; menhirs round it, a thick rope wound
+    twice round each and sagging between, a giant rusty chain off one; past the shelf's lip a cliff
+    drops into sepia haze where snow-capped crags rise.
+  - Fighting Stadium (`stadium-env-arena.mjs`, FFI 90): a wrestling ring (pale canvas, corner posts
+    with blue pads, three white ropes a side) on a glowing white stage edged in lights; LED ad
+    boards round the floor, tiers of the crowd in a teal haze, lasers sweeping the stands from the
+    rig's corners, never across the ring.
 
 ### Mesh — `stadium-environment-mesh.js`
 `createStadiumEnvironment({ three, renderer, parent, clock, motionReduced, fxDisabled, onNeedsRender })`
@@ -358,6 +385,13 @@ boards" toggle. Revert: unset the toggle per user, or revert the feature commits
   materials, bakePre?, bakeField, bakeLight?, spots(layout), apply(spots, bounds), tick?(seconds) }`),
   not the § Recipes object: Stormy Mountains needs a cloud sheet, lightning meshes and a two-pass
   bake that object has no slots for. Revise § Recipes and slice 1 to this shape before approval.
+- Prototype (six more boards): boards made of shapes (railings, tanks, menhirs, ropes, towers, the
+  ring) build them with `stadium-env-props.mjs` (`createPropBuilder`: tubes, cylinders, boxes,
+  quads into one geometry, one draw call; `propFragment` lights them with the board's own light),
+  and the kit hands every builder `terrainGrid`, `replaceGeometry`, `bakeOptions`,
+  `instancedGeometry` and `latheIndex`. `POKE_BALL` and `FLOW_STREAKS` moved into the shared GLSL;
+  `arenaRects` (every Active and Bench card) into the layout module. Measured link times under
+  ANGLE D3D11: 0.45-0.8 s per board, Magma Basin 1.6 s; the compileAsync flag stands.
 
 ---
 Self-approval checklist (only when the user is unreachable):
