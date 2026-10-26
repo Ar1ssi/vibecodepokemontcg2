@@ -85,7 +85,11 @@ const CABLE_RUNS = [
 const LID = [0.45, 0.48, 0.54, 0.25];
 /** The big pipes: turn round the dais (deg) each runs out from the ring before rising. */
 const BIG_PIPES = [100, 120, 238, 262, 292, 72, 200, 160];
-const BIG_PIPE = { radius: 32, run: 150, bend: 50, top: 320 };
+/**
+ * The big pipes: radius, run out across the deck, bend radius, the height their upper elbow turns
+ * them out level at, and how far they run on out from there.
+ */
+const BIG_PIPE = { radius: 32, run: 150, bend: 50, top: 236, reach: 300 };
 /** Longest span a hanging cable crosses between two risers or tank tops. */
 const CABLE_SPAN_PX = 300;
 /** The art's thin white bands round its big pipes: spacing along the pipe, how far proud. */
@@ -529,7 +533,9 @@ export function labProps(spots) {
     const to = [tank.x - Math.cos(tank.angle) * (tank.radius - 2), tank.y - Math.sin(tank.angle) * (tank.radius - 2), -DROP_PX + 10];
     if (Math.hypot(to[0] - from[0], to[1] - from[1]) > 8) props.tube([from, to], 7, PIPE, { sides: 8 });
   }
-  // Big pipes run out across the deck from the ring and rise at its far side, bent like the art's.
+  // Big pipes run out across the deck from the ring, rise at its far side and elbow out level high
+  // over the deck, away from the dais, bent like the art's. (Rising out of view, from above they
+  // pointed at the eye like barrels.)
   const pastSegment = (point, a, b) => {
     const abx = b[0] - a[0];
     const aby = b[1] - a[1];
@@ -560,21 +566,32 @@ export function labProps(spots) {
       const t = bendFrom + BIG_PIPE.bend * Math.sin(phi);
       points.push([from[0] + dir[0] * t, from[1] + dir[1] * t, z + BIG_PIPE.bend * (1 - Math.cos(phi))]);
     }
-    for (let up = z + BIG_PIPE.bend + 40; up <= BIG_PIPE.top; up += 40) points.push([corner[0], corner[1], up]);
+    const elbow = BIG_PIPE.top - BIG_PIPE.bend;
+    for (let up = z + BIG_PIPE.bend + 40; up < elbow; up += 40) points.push([corner[0], corner[1], up]);
+    points.push([corner[0], corner[1], elbow]);
+    for (let k = 1; k <= 8; k += 1) {
+      const phi = (k / 8) * (Math.PI / 2);
+      const out = BIG_PIPE.bend * (1 - Math.cos(phi));
+      points.push([corner[0] + dir[0] * out, corner[1] + dir[1] * out, elbow + BIG_PIPE.bend * Math.sin(phi)]);
+    }
+    for (let k = 1; k <= 6; k += 1) {
+      const out = BIG_PIPE.bend + (BIG_PIPE.reach * k) / 6;
+      points.push([corner[0] + dir[0] * out, corner[1] + dir[1] * out, BIG_PIPE.top]);
+    }
     props.tube(points, BIG_PIPE.radius, BIG_PIPE_STEEL, { sides: 14 });
     pipeBands(props, points, BIG_PIPE.radius);
     risers.push({ x: corner[0], y: corner[1], angle });
-    for (const [x, y, zz] of [points[6], points[14], points[points.length - 2]]) {
-      const vertical = zz > z + 1;
-      const half = 5;
-      props.tube(
-        vertical
-          ? [[x, y, zz - half], [x, y, zz + half]]
-          : [[x - dir[0] * half, y - dir[1] * half, zz], [x + dir[0] * half, y + dir[1] * half, zz]],
-        BIG_PIPE.radius + 3,
-        DARK_STEEL,
-        { sides: 12 }
-      );
+    // Dark collars: where the low run meets its bend, half way up the riser, past the upper elbow.
+    const half = 5;
+    const level = (x, y, zz) => [[x - dir[0] * half, y - dir[1] * half, zz], [x + dir[0] * half, y + dir[1] * half, zz]];
+    const middle = (z + BIG_PIPE.bend + elbow) / 2;
+    const past = BIG_PIPE.bend + 40;
+    for (const collar of [
+      level(...points[6]),
+      [[corner[0], corner[1], middle - half], [corner[0], corner[1], middle + half]],
+      level(corner[0] + dir[0] * past, corner[1] + dir[1] * past, BIG_PIPE.top),
+    ]) {
+      props.tube(collar, BIG_PIPE.radius + 3, DARK_STEEL, { sides: 12 });
     }
   }
   // As in the art, black cables hang in loops between neighbouring risers and tank tops.
