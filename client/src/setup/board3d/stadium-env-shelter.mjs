@@ -1,15 +1,15 @@
 // Design 077 (prototype): Steel Shelter (customhb-162) after its card art (PHF 105, xy4-105 in
-// set.json; Ryo Ueda): a bright white hall. A glossy floor of big pale-grey hex tiles, one big
-// hexagon outlined in a dark hatched band round its middle, mirrors the hex light panels of the
-// ceiling and the walls round it; a cyan hologram of the Poké Ball glows in its middle. The walls are white panels over a band of dark
-// louvred vents, a cyan light strip near their top; the far wall holds the art's gate, a white
-// chevron frame with dark striped insets round a grey sliding door. The art looks along the hall at
-// the gate; the board looks down on its floor, so every card lies on the floor, the walls stand
-// round it leaning a little outward (so both camera presets see their faces) and the gate is
-// painted on the far wall's face, its pillars clear of the opponent's hand.
+// set.json; Ryo Ueda): a bright white hall. A mirror-gloss pale floor reflects the hex light
+// panels of the ceiling and the walls round it (the hexes on the art's floor are those
+// reflections); a cyan hologram of the Poké Ball glows in its middle. The walls are blocks of white
+// panelling with a louvred band, a cyan light strip near their top. The art looks along the hall at
+// its gate, a white chevron frame round a grey sliding door; the board looks down on the floor,
+// where the far wall's middle lies under the opponent's hand, so every card lies on the floor, the
+// walls stand round it leaning a little outward (so both camera presets see their faces) and the
+// gate stands in the middle of each side wall, facing the hall.
 //
-// No bake of its own: the floor is flat (its bake is empty) and FLOOR paints the tiles, their
-// mirror images and the hologram per frame; WALLS draws the four walls from one geometry built
+// No bake of its own: the floor is flat (its bake is empty) and FLOOR paints it, its mirror images
+// and the hologram per frame; WALLS draws the four walls from one geometry built
 // round the hall (shelterSpots), rising off the floor behind the reveal.
 import {
   FULLSCREEN_VERTEX,
@@ -26,12 +26,8 @@ import { tableBounds } from './table-uv.mjs';
 export const HALL_GAP_PX = { side: 150, end: 64 };
 /** The walls: how tall, how far their tops lean out past their feet, how deep their tops' cornice. */
 export const WALL_PX = { height: 245, lean: 105, cap: 60 };
-/** The gate on the far wall: half its width at its foot, its height. */
-export const GATE_PX = { half: 380, height: 228 };
-/** Floor tiles: px per hex unit (inradius half a unit, so 110 px). */
-const HEX_SCALE_PX = 220;
-/** The big hexagon outlined in the floor: its apothem as a share of the hall's half height. */
-const BIG_HEX_SHARE = 0.78;
+/** The gate on each side wall: half its width at its foot, its height. */
+export const GATE_PX = { half: 300, height: 205 };
 /** The ceiling the floor mirrors, px over the floor; its light panels' hex unit. */
 const CEILING_PX = 300;
 const CEILING_HEX_PX = 150;
@@ -40,11 +36,11 @@ const WALL_STEP_PX = 24;
 
 /**
  * Steel Shelter's hall: the floor's rect to the walls' feet (round every card footprint, HALL_GAP_PX
- * clear), the gate's place on the far wall and the Poké Ball hologram (craterEmblem, about the
- * table's middle). Null without a table.
+ * clear), the gate's place along the side walls (`u`: px along them, the hall's middle) and the
+ * Poké Ball hologram (craterEmblem, about the table's middle). Null without a table.
  * @param {ReturnType<typeof import('./board-layout.mjs').flatLayout>|null} layout
  * @returns {{ hall: { x: number, y: number, hw: number, hh: number },
- *   gate: { x: number, y: number, half: number, height: number },
+ *   gate: { u: number, half: number, height: number },
  *   emblem: { x: number, y: number, r: number }|null }|null}
  */
 export function shelterSpots(layout) {
@@ -62,9 +58,9 @@ export function shelterSpots(layout) {
     hw: (x1 - x0) / 2 + HALL_GAP_PX.side,
     hh: (y1 - y0) / 2 + HALL_GAP_PX.end,
   };
-  const gate = { x: hall.x, y: hall.y + hall.hh, half: GATE_PX.half, height: GATE_PX.height };
+  const gate = { u: hall.y, half: Math.min(GATE_PX.half, hall.hh * 0.62), height: GATE_PX.height };
   const emblem = craterEmblem(layout, { x: table.x + table.w / 2, y: layout.depth });
-  return { hall, gate, emblem, bigHex: Math.min(hall.hh, hall.hw * 0.866) * BIG_HEX_SHARE };
+  return { hall, gate, emblem };
 }
 
 const HEX = /* glsl */ `
@@ -85,28 +81,29 @@ vec4 hexTile(vec2 q) {
 `;
 
 const HALL = /* glsl */ `
-// The floor's rect to the walls' feet (centre x, y, half width, half height) and the gate on the
-// far wall (centre x, the wall's y, half width at its foot, height) (shelterSpots).
+// The floor's rect to the walls' feet (centre x, y, half width, half height) and the gate on each
+// side wall (its middle as px along the wall, half width at its foot, height) (shelterSpots).
 uniform vec4 uHall;
-uniform vec4 uGate;
+uniform vec3 uGate;
 const vec3 STRIP_CYAN = vec3(0.35, 1.0, 1.45);
 const float WALL_HEIGHT = ${WALL_PX.height}.0;
-// The art's gate on the far wall at u px along it (x) and h px up it: a white chevron frame, its
+// The art's gate on a side wall at u px along it (x) and h px up it: a white chevron frame, its
 // pillars leaning in to a flat lintel, round a grey sliding door filling the opening. x: 1 on the
 // gate, y: px inside its outer outline (under GATE_FRAME on the frame), z: px from its middle.
 const float GATE_FRAME = 64.0;
 vec3 gateAt(float u, float h) {
   float local = abs(u - uGate.x);
-  float outer = uGate.z - 0.55 * h;
-  if (h > uGate.w || local > outer) return vec3(0.0);
-  return vec3(1.0, min(outer - local, uGate.w - h), u - uGate.x);
+  float outer = uGate.y - 0.55 * h;
+  if (h > uGate.z || local > outer) return vec3(0.0);
+  return vec3(1.0, min(outer - local, uGate.z - h), u - uGate.x);
 }
-// The wall's colour at u px along it and h px up it (far: 1 on the far wall); its light strips'
+// The wall's colour at u px along it and h px up it (gated: 1 on a side wall, which holds the
+// gate); its light strips'
 // glow in glow. As in the art: blocks of white panelling one bay wide, dark seams between them,
 // each block a lower panel (a small access hatch in some), a band of dark louvres across its middle
 // and an upper panel; a dark baseboard with a cyan line at the foot, a cyan light strip near the
 // top under a pale cornice.
-vec3 wallPaint(float u, float h, float far, out vec3 glow) {
+vec3 wallPaint(float u, float h, float gated, out vec3 glow) {
   glow = vec3(0.0);
   float bay = mod(u, 170.0);
   float block = floor(u / 170.0);
@@ -138,7 +135,7 @@ vec3 wallPaint(float u, float h, float far, out vec3 glow) {
   } else if (h >= 222.0) {
     col = vec3(0.86, 0.88, 0.91);
   }
-  if (far > 0.5) {
+  if (gated > 0.5) {
     vec3 gate = gateAt(u, h);
     if (gate.x > 0.5) {
       glow = vec3(0.0);
@@ -154,7 +151,7 @@ vec3 wallPaint(float u, float h, float far, out vec3 glow) {
         // hexagon outlines at each leaf's foot by the frame.
         float inset = gate.y - GATE_FRAME;
         float fromSeam = abs(gate.z);
-        float top = uGate.w - GATE_FRAME;
+        float top = uGate.z - GATE_FRAME;
         col = mix(vec3(0.5, 0.52, 0.56), vec3(0.6, 0.62, 0.66), smoothstep(0.0, top, h));
         float vents = step(top - 34.0, h) * step(h, top - 16.0) * step(18.0, fromSeam) * step(fromSeam, 58.0)
           * (1.0 - smoothstep(0.4, 1.2, abs(fract((h - top + 34.0) / 6.0) - 0.5) * 6.0));
@@ -181,16 +178,13 @@ void main() {
 `;
 
 /**
- * The floor: big pale-grey hex tiles, each a shade apart, faint grey seams, one big hexagon outlined
- * in a dark hatched band; a gloss that mirrors the ceiling's hex light panels and, near the walls,
- * the walls themselves (their strips and vents) where the mirrored ray meets them below their top;
- * the cyan hologram of the Poké Ball; shade gathering at the walls' feet.
+ * The floor: pale and mirror-glossy, reflecting the ceiling's hex light panels and, near the walls,
+ * the walls themselves (their strips, louvres and gates) where the mirrored ray meets them below
+ * their top; the cyan hologram of the Poké Ball; shade gathering at the walls' feet.
  */
 export const FLOOR_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 uniform vec3 uEmblem;
-// The big hexagon outlined in the floor: its apothem px (shelterSpots).
-uniform float uBigHex;
 ${NOISE}
 ${REVEAL}
 ${HEX}
@@ -210,16 +204,16 @@ vec3 mirroredAt(vec2 p) {
   vec3 ray = vec3(p - uEye.xy, max(uEye.z, 1.0));
   float best = 100000.0;
   vec2 hit = vec2(0.0);
-  float far = 0.0;
+  float gated = 0.0;
   vec2 lo = uHall.xy - uHall.zw;
   vec2 hi = uHall.xy + uHall.zw;
-  if (ray.x < 0.0) { float t = (lo.x - p.x) / ray.x; if (t > 0.0 && t < best) { best = t; hit = vec2(p.y + t * ray.y, t * ray.z); far = 0.0; } }
-  if (ray.x > 0.0) { float t = (hi.x - p.x) / ray.x; if (t > 0.0 && t < best) { best = t; hit = vec2(p.y + t * ray.y, t * ray.z); far = 0.0; } }
-  if (ray.y > 0.0) { float t = (hi.y - p.y) / ray.y; if (t > 0.0 && t < best) { best = t; hit = vec2(p.x + t * ray.x, t * ray.z); far = 1.0; } }
-  if (ray.y < 0.0) { float t = (lo.y - p.y) / ray.y; if (t > 0.0 && t < best) { best = t; hit = vec2(p.x + t * ray.x, t * ray.z); far = 0.0; } }
+  if (ray.x < 0.0) { float t = (lo.x - p.x) / ray.x; if (t > 0.0 && t < best) { best = t; hit = vec2(p.y + t * ray.y, t * ray.z); gated = 1.0; } }
+  if (ray.x > 0.0) { float t = (hi.x - p.x) / ray.x; if (t > 0.0 && t < best) { best = t; hit = vec2(p.y + t * ray.y, t * ray.z); gated = 1.0; } }
+  if (ray.y > 0.0) { float t = (hi.y - p.y) / ray.y; if (t > 0.0 && t < best) { best = t; hit = vec2(p.x + t * ray.x, t * ray.z); gated = 0.0; } }
+  if (ray.y < 0.0) { float t = (lo.y - p.y) / ray.y; if (t > 0.0 && t < best) { best = t; hit = vec2(p.x + t * ray.x, t * ray.z); gated = 0.0; } }
   if (best < 100000.0 && hit.y < WALL_HEIGHT) {
     vec3 glow;
-    vec3 wall = wallPaint(hit.x, hit.y, far, glow);
+    vec3 wall = wallPaint(hit.x, hit.y, gated, glow);
     return wall * 0.9 + glow;
   }
   return ceilingAt(p + ray.xy * (${CEILING_PX}.0 / ray.z));
@@ -228,21 +222,10 @@ vec3 mirroredAt(vec2 p) {
 void main() {
   vec2 p = vPos;
   if (revealBurned(p) * exitKeep(p) < 0.5) discard;
-  // The art's floor: polished white hex tiles with faint seams, mirror-bright, and one big hexagon
-  // outlined in a dark hatched band round the hall's middle.
-  vec2 q = (p - uHall.xy) / ${HEX_SCALE_PX}.0;
-  vec4 tile = hexTile(q);
-  float edgePx = tile.x * ${HEX_SCALE_PX}.0;
-  vec3 col = mix(vec3(0.57, 0.59, 0.6), vec3(0.64, 0.66, 0.67), tile.y);
-  float seam = 1.0 - smoothstep(0.6, 1.5, edgePx);
-  vec2 rel = abs(p - uHall.xy);
-  float bigHex = max(rel.y, dot(rel, vec2(0.8660254, 0.5))) - uBigHex;
-  float band = 1.0 - smoothstep(-0.5, 0.8, abs(bigHex) - 7.0);
-  // The band, as the art's: black, crossed by thin dark-grey diagonal lines.
-  float hatch = step(0.8, fract(dot(p, vec2(0.7071, 0.7071)) / 9.0));
-  col = mix(col, mirroredAt(p) * 0.92, 0.55 * (1.0 - seam) * (1.0 - band));
-  col = mix(col, vec3(0.52, 0.55, 0.6), seam * 0.3 * (1.0 - band));
-  col = mix(col, mix(vec3(0.025, 0.027, 0.032), vec3(0.11, 0.115, 0.13), hatch), band);
+  // The art's floor: pale and polished to a mirror, the hexes on it only the ceiling lights'
+  // reflections (they shift as the eye moves).
+  vec3 col = vec3(0.6, 0.62, 0.64) * (0.97 + 0.04 * fbm3(p / 160.0));
+  col = mix(col, mirroredAt(p) * 0.94, 0.66);
 
   // Shade gathers at the walls' feet; the far reaches of the hall dim a little.
   vec2 fromWall = uHall.zw - abs(p - uHall.xy);
@@ -317,7 +300,7 @@ void main() {
   vec2 past = abs(vWall.xy - uHall.xy) - uHall.zw - ${WALL_PX.lean}.0 * clamp(vWall.z / WALL_HEIGHT, 0.0, 1.0);
   if (vPaint.w < 0.5 ? past.y > past.x + 0.5 : past.x > past.y + 0.5) discard;
   vec3 glow;
-  vec3 col = wallPaint(vPaint.x, vPaint.y, step(0.5, vPaint.w) * step(vPaint.w, 1.5), glow);
+  vec3 col = wallPaint(vPaint.x, vPaint.y, 1.0 - step(0.5, vPaint.w), glow);
   vec3 n = normalize(vNormal);
   // The hall's light comes from the ceiling: tops brightest, faces a little dimmer, the foot shaded.
   col *= 0.72 + 0.28 * n.z;
@@ -412,15 +395,14 @@ export function wallGeometry(three, hall, bounds) {
   return geometry;
 }
 
-const NO_SPOTS = { hall: null, gate: null, emblem: null, bigHex: 0 };
+const NO_SPOTS = { hall: null, gate: null, emblem: null };
 
 /** Steel Shelter's board (stadium-environment-mesh.js BOARDS): the floor and the walls. */
 export function steelShelterBoard({ three, material, replaceGeometry, bakeOptions }) {
   const own = {
     uHall: { value: new three.Vector4() },
-    uGate: { value: new three.Vector4() },
+    uGate: { value: new three.Vector3() },
     uEmblem: { value: new three.Vector3() },
-    uBigHex: { value: 0 },
   };
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
   const materials = {
@@ -436,10 +418,9 @@ export function steelShelterBoard({ three, material, replaceGeometry, bakeOption
     materials: Object.values(materials),
     bakeField: materials.bakeField,
     spots: (layout) => shelterSpots(layout) ?? NO_SPOTS,
-    apply({ hall, gate, emblem, bigHex }, bounds) {
-      own.uBigHex.value = bigHex ?? 0;
+    apply({ hall, gate, emblem }, bounds) {
       own.uHall.value.set(hall?.x ?? 0, hall?.y ?? 0, hall?.hw ?? 0, hall?.hh ?? 0);
-      own.uGate.value.set(gate?.x ?? 0, gate?.y ?? 0, gate?.half ?? 0, gate?.height ?? 0);
+      own.uGate.value.set(gate?.u ?? 0, gate?.half ?? 0, gate?.height ?? 0);
       own.uEmblem.value.set(emblem?.x ?? 0, emblem?.y ?? 0, emblem?.r ?? 0);
       replaceGeometry(
         floor,

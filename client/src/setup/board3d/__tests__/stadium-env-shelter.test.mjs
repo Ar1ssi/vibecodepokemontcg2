@@ -42,11 +42,11 @@ test('shelterSpots: every card footprint lies on the floor, the walls\' feet the
   }
 });
 
-test('shelterSpots: the gate stands on the far wall\'s middle; null without a table', () => {
+test('shelterSpots: the gate stands in the middle of the side walls, narrower than them; null without a table', () => {
   for (const layout of layouts) {
     const { hall, gate } = shelterSpots(layout);
-    assert.equal(gate.x, hall.x);
-    assert.equal(gate.y, hall.y + hall.hh);
+    assert.equal(gate.u, hall.y);
+    assert.ok(gate.half > 0 && gate.half < hall.hh, 'fits along the side wall');
   }
   assert.equal(shelterSpots(null), null);
 });
