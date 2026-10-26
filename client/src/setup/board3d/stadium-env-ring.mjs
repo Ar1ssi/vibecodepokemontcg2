@@ -302,9 +302,9 @@ void main() {
   float id;
   float kind;
   if (d < 0.0) {
-    // Bricks in straight rows, each row staggered half a brick, laid from the middle out.
+    // Bricks in straight rows, each row shifted along by its own share of a brick.
     vec2 q = (p - uRing.xy) / vec2(${BRICK_PX.long}.0, ${BRICK_PX.high}.0);
-    q.x += 0.5 * mod(floor(q.y), 2.0);
+    q.x += hash12(vec2(floor(q.y), 7.0));
     vec2 cell = floor(q);
     vec2 edge = (0.5 - abs(fract(q) - 0.5)) * vec2(${BRICK_PX.long}.0, ${BRICK_PX.high}.0);
     float mortar = min(edge.x, edge.y);
@@ -407,17 +407,23 @@ void main() {
   if (kind < -0.5) {
     // Paving: grey-beige stones each a shade apart, darker mortar; the emblem's pale stone and its
     // dark grooves.
-    vec3 stone = mix(vec3(0.24, 0.205, 0.17), vec3(0.4, 0.35, 0.29), id);
+    vec3 stone = mix(vec3(0.19, 0.165, 0.135), vec3(0.33, 0.29, 0.24), id);
+    // Dark gaps between the bricks, as wide as the art's.
+    vec2 q = (p - uRing.xy) / vec2(${BRICK_PX.long}.0, ${BRICK_PX.high}.0);
+    q.x += hash12(vec2(floor(q.y), 7.0));
+    vec2 edge = (0.5 - abs(fract(q) - 0.5)) * vec2(${BRICK_PX.long}.0, ${BRICK_PX.high}.0);
+    float gap = 1.0 - smoothstep(0.6, 1.8 + 1.4 * gnoise(p / 30.0), min(edge.x, edge.y));
     stone *= 0.88 + 0.24 * fbm3(p / 23.0);
+    stone = mix(stone, vec3(0.05, 0.042, 0.036), gap * 0.85);
     vec2 inlay = emblemInlay(p);
     if (inlay.x > 1.5) stone = vec3(0.11, 0.1, 0.09) * (0.85 + 0.3 * gnoise(p / 6.0));
-    else if (inlay.x > 0.5) stone = vec3(0.44, 0.42, 0.38) * (0.9 + 0.2 * fbm3(p / 18.0));
+    else if (inlay.x > 0.5) stone = vec3(0.4, 0.37, 0.34) * (0.9 + 0.2 * fbm3(p / 18.0));
     col = stone * (0.55 + 0.35 * facing + 0.25 * sky);
   } else {
     // Rock and dust, faces to the light pale; snow on the peaks' heads.
     vec3 rock = mix(vec3(0.17, 0.16, 0.145), vec3(0.37, 0.35, 0.32), smoothstep(0.35, 0.85, facing));
     rock *= 0.88 + 0.24 * id;
-    vec3 dust = vec3(0.3, 0.27, 0.23) * (0.9 + 0.2 * fbm3(p / 40.0));
+    vec3 dust = vec3(0.27, 0.245, 0.205) * (0.9 + 0.2 * fbm3(p / 40.0));
     rock = mix(dust, rock, smoothstep(0.92, 0.75, n.z));
     // The cliff's lip: bare dark rock where the shelf breaks off.
     rock *= mix(1.0, 0.62, smoothstep(-4.0, -40.0, ground) * (1.0 - smoothstep(-90.0, -150.0, ground)));
