@@ -337,7 +337,7 @@ void main() {
     col = mix(col, vec3(0.88, 0.93, 0.96), (1.0 - smoothstep(1.5, 3.0, e)) * 0.85 * step(0.001, uEmblem.z));
   } else if (kind < 0.5) {
     if (d < 3.0 || ground < -${APRON_PX.drop - 2}.0 && d < 5.0) {
-      // The apron: the ring's dark navy skirt, a white line along it.
+      // The apron: the ring's blue skirt.
       col = vec3(0.0, 0.16, 0.36);
     } else if (id >= 0.0) {
       // The ramp: the stage's glowing white running out to the left, lights along both edges.

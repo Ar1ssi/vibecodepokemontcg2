@@ -282,9 +282,10 @@ vec2 emblemInlay(vec2 p) {
 `;
 
 /**
- * Bake: the paving in curved rows round the middle, each stone a little domed between mortar
- * grooves, the emblem laid proud in lighter stone; a kerb of big blocks round it; then rough ground
- * strewn with boulders, climbing to crags past the standing stones.
+ * Bake: rows of bricks, each a little domed between mortar grooves and breaking up into dust toward
+ * the ring's edge, the Poke Ball's pale disc flush with them and its dark lines sunk; then the shelf
+ * the stones stand on, a few boulders, and past its lip the cliff down to the hazy depths where
+ * the crags rise.
  */
 export const BAKE_FIELD_FRAGMENT = /* glsl */ `
 ${TABLE_UNIFORMS}

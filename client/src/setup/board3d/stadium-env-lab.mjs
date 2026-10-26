@@ -600,9 +600,8 @@ void main() {
     float spoke = abs(mod(atan(rel.y, rel.x) * length(rel) + 1000.0, max(length(rel) * 0.2618, 1.0)) - length(rel) * 0.1309);
     h = -2.5 * smoothstep(-5.0, 0.0, d) - 0.7 * (1.0 - smoothstep(0.6, 1.6, min(ringGroove, spoke))) * step(d, -30.0);
   } else {
-    // The deck's grating, a hair proud along its bars.
-    vec2 bar = abs(fract(p / 9.0) - 0.5);
-    h = -uDais.w + 0.5 * smoothstep(0.3, 0.45, max(bar.x, bar.y));
+    // The deck: flat plate steel (its tread is painted).
+    h = -uDais.w;
   }
   gl_FragColor = vec4(h, d, 0.0, d < 0.0 ? -1.0 : 1.0);
 }
@@ -644,7 +643,7 @@ void main() {
   float fromCentre = length(rel);
   vec3 col;
   if (d < 0.0) {
-    // The dais, as in the art: a dark navy disc in its middle, shallow grooves picked out in blue;
+    // The dais, as in the art: a dark teal disc in its middle, shallow grooves picked out in blue;
     // round it a band of pale steel plates out to the edge, its own steel rim; the pads steel too.
     col = vec3(0.017, 0.036, 0.046) * (0.92 + 0.16 * fbm3(p / 140.0));
     float ringGroove = abs(mod(fromCentre + 32.0, 64.0) - 32.0);
