@@ -1,7 +1,7 @@
 // Design 077 (prototype): Full Metal Lab (customhb-163) after its card art (TEF 148, sv05-148 in
-// set.json; AYUMI ODASHIMA): a round steel lab. The cards lie on its raised dais, a dark teal disc
-// ringed in pale steel plates, the Poké Ball lit blue in white lines in its middle under the
-// machine's lens; yellow railings run round the dais's edge and a teal-grey stair with yellow
+// set.json; AYUMI ODASHIMA): a round steel lab. The cards lie on its raised dais, a blue disc lit
+// from the machine's lens overhead and ringed in pale steel plates, the Poké Ball lit brighter in
+// white lines in its middle; yellow railings run round the dais's edge and a teal-grey stair with yellow
 // handrails climbs to it from the near right, as in the art. Below the dais, on the lab's deck of
 // plate steel: control consoles with glowing screens, steel tanks and the pipes that ring the dais
 // and run to them. The art looks across the dais from below its stair; the board looks down on it, so the
@@ -728,12 +728,15 @@ void main() {
   float fromCentre = length(rel);
   vec3 col;
   if (d < 0.0) {
-    // The dais, as in the art: a dark teal disc in its middle, shallow grooves picked out in blue;
-    // round it a band of pale steel plates out to the edge, its own steel rim; the pads steel too.
-    col = vec3(0.017, 0.036, 0.046) * (0.92 + 0.16 * fbm3(p / 140.0));
+    // The dais, as in the art: a blue disc lit from the lens overhead, the art's (0,118,184) round
+    // its middle darkening to (10,75,120) toward its edge (each inverted through Neutral tone
+    // mapping), shallow grooves a darker blue; round it a band of pale steel plates out to the edge,
+    // its own steel rim; the pads steel too.
+    float pool = exp(-fromCentre * fromCentre / (2.0 * 380.0 * 380.0));
+    col = mix(vec3(0.022, 0.089, 0.207), vec3(0.0, 0.181, 0.479), pool) * (0.92 + 0.16 * fbm3(p / 140.0));
     float ringGroove = abs(mod(fromCentre + 32.0, 64.0) - 32.0);
     float spoke = abs(mod(atan(rel.y, rel.x) * fromCentre + 1000.0, max(fromCentre * 0.2618, 1.0)) - fromCentre * 0.1309);
-    col = mix(col, vec3(0.04, 0.09, 0.12), (1.0 - smoothstep(0.6, 1.8, min(ringGroove, spoke))) * step(d, -30.0) * 0.8);
+    col = mix(col, col * 0.62, (1.0 - smoothstep(0.6, 1.8, min(ringGroove, spoke))) * step(d, -30.0) * 0.8);
     float plates = smoothstep(uDais.z - 82.0, uDais.z - 79.0, fromCentre);
     float plateSeam = abs(mod(atan(rel.y, rel.x) * uDais.z + 1000.0, 58.0) - 29.0);
     vec3 paleSteel = mix(vec3(0.29, 0.34, 0.39), vec3(0.38, 0.44, 0.5), fbm3(p / 60.0));
@@ -745,9 +748,7 @@ void main() {
     steel = mix(steel, vec3(0.6, 0.64, 0.7), 1.0 - smoothstep(0.8, 2.6, abs(d + 4.0)));
     col = mix(col, steel, rim);
     col = mix(col, vec3(0.02, 0.025, 0.035), (1.0 - smoothstep(0.6, 1.6, abs(d + 26.0))));
-    // The lens overhead lights the middle of the dais blue; every few seconds its scan runs out
-    // across the disc as a soft ring.
-    col += vec3(0.015, 0.05, 0.07) * exp(-fromCentre * fromCentre / (2.0 * 320.0 * 320.0));
+    // Every few seconds the lens's scan runs out across the disc as a soft ring.
     float scanR = fract(uTime / 4.5) * (uDais.z - 80.0);
     float scan = exp(-abs(fromCentre - scanR) / 9.0) * (1.0 - fract(uTime / 4.5)) * (1.0 - plates);
     col += vec3(0.08, 0.2, 0.42) * scan * 0.5;
@@ -756,7 +757,7 @@ void main() {
     if (uEmblem.z > 0.0) {
       float R = uEmblem.z;
       float inside = 1.0 - smoothstep(R - 1.0, R + 1.0, fromCentre);
-      vec3 lit = mix(vec3(0.0, 0.1, 0.22), vec3(0.01, 0.2, 0.4), smoothstep(-R, R, rel.y));
+      vec3 lit = mix(vec3(0.046, 0.338, 0.691), vec3(0.1, 0.6, 1.05), smoothstep(-R, R, rel.y));
       col = mix(col, lit * (0.9 + 0.1 * fbm3(p / 50.0)), inside * 0.9);
       float ring = abs(fromCentre - R);
       float button = abs(fromCentre - R * 0.27);
