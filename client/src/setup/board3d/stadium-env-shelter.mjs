@@ -29,8 +29,10 @@ export const HALL_GAP_PX = { side: 150, end: 64 };
 export const WALL_PX = { height: 245, lean: 105, cap: 60 };
 /** The gate on the far wall: half its width at its foot, its height. */
 export const GATE_PX = { half: 330, height: 205 };
-/** Floor tiles: px per hex unit (inradius half a unit, so 50 px). */
-const HEX_SCALE_PX = 100;
+/** Floor tiles: px per hex unit (inradius half a unit, so 110 px). */
+const HEX_SCALE_PX = 220;
+/** The big hexagon outlined in the floor: its apothem as a share of the hall's half height. */
+const BIG_HEX_SHARE = 0.78;
 /** The ceiling the floor mirrors, px over the floor; its light panels' hex unit. */
 const CEILING_PX = 300;
 const CEILING_HEX_PX = 150;
@@ -63,7 +65,7 @@ export function shelterSpots(layout) {
   };
   const gate = { x: hall.x, y: hall.y + hall.hh, half: GATE_PX.half, height: GATE_PX.height };
   const emblem = craterEmblem(layout, { x: table.x + table.w / 2, y: layout.depth });
-  return { hall, gate, emblem };
+  return { hall, gate, emblem, bigHex: Math.min(hall.hh, hall.hw * 0.866) * BIG_HEX_SHARE };
 }
 
 const HALL = /* glsl */ `
@@ -179,6 +181,8 @@ void main() {
 export const FLOOR_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 uniform vec3 uEmblem;
+// The big hexagon outlined in the floor: its apothem px (shelterSpots).
+uniform float uBigHex;
 ${NOISE}
 ${REVEAL}
 ${HALL}
@@ -189,8 +193,9 @@ varying vec2 vPos;
 // The ceiling's light panels at q: big hex lights in dark frames.
 vec3 ceilingAt(vec2 q) {
   vec4 panel = hexTile(q / ${CEILING_HEX_PX}.0);
-  float lit = smoothstep(0.07, 0.13, panel.x);
-  return mix(vec3(0.03, 0.034, 0.042), vec3(1.25, 1.3, 1.38), lit);
+  // Seen in a polished floor the panels' frames soften to grey.
+  float lit = smoothstep(0.04, 0.1, panel.x);
+  return mix(vec3(0.45, 0.48, 0.53), vec3(1.15, 1.2, 1.27), lit);
 }
 // What the glossy floor mirrors at p: the nearest wall the mirrored ray meets below the wall's top,
 // else the ceiling over the hall.
@@ -216,20 +221,20 @@ vec3 mirroredAt(vec2 p) {
 void main() {
   vec2 p = vPos;
   if (revealBurned(p) * exitKeep(p) < 0.5) discard;
-  vec2 q = p / ${HEX_SCALE_PX}.0;
+  // The art's floor: polished white hex tiles with faint seams, mirror-bright, and one big hexagon
+  // outlined in a dark hatched band round the hall's middle.
+  vec2 q = (p - uHall.xy) / ${HEX_SCALE_PX}.0;
   vec4 tile = hexTile(q);
   float edgePx = tile.x * ${HEX_SCALE_PX}.0;
-  vec3 col = mix(vec3(0.64, 0.67, 0.71), vec3(0.74, 0.765, 0.8), tile.y);
-  col *= 0.93 + 0.07 * smoothstep(0.0, 14.0, edgePx);
-  // A scatter of tile edges inlaid in black, the same edge from both tiles.
-  vec2 middle = hexEdgeMiddle(q, tile.zw);
-  float inlaid = step(hash12(floor(middle * 8.0 + 0.5) + 3.0), 0.16);
-  float seam = 1.0 - smoothstep(0.7, 1.7, edgePx);
-  float inlay = (1.0 - smoothstep(2.2, 3.2, edgePx)) * inlaid;
-  float gloss = 0.4 * (1.0 - seam) * (1.0 - inlay);
-  col = mix(col, mirroredAt(p) * 0.9, gloss);
-  col = mix(col, vec3(0.3, 0.32, 0.35), seam * (1.0 - inlay));
-  col = mix(col, vec3(0.025, 0.027, 0.032), inlay);
+  vec3 col = mix(vec3(0.7, 0.725, 0.76), vec3(0.76, 0.785, 0.82), tile.y);
+  float seam = 1.0 - smoothstep(0.6, 1.5, edgePx);
+  vec2 rel = abs(p - uHall.xy);
+  float bigHex = max(rel.y, dot(rel, vec2(0.8660254, 0.5))) - uBigHex;
+  float band = 1.0 - smoothstep(-0.5, 0.8, abs(bigHex) - 7.0);
+  float hatch = step(0.5, fract(dot(p, vec2(0.7071, 0.7071)) / 7.0));
+  col = mix(col, mirroredAt(p) * 0.92, 0.5 * (1.0 - seam) * (1.0 - band));
+  col = mix(col, vec3(0.52, 0.55, 0.6), seam * 0.6 * (1.0 - band));
+  col = mix(col, mix(vec3(0.03, 0.032, 0.038), vec3(0.16, 0.17, 0.19), hatch), band);
 
   // Shade gathers at the walls' feet; the far reaches of the hall dim a little.
   vec2 fromWall = uHall.zw - abs(p - uHall.xy);
@@ -391,7 +396,7 @@ export function wallGeometry(three, hall, bounds) {
   return geometry;
 }
 
-const NO_SPOTS = { hall: null, gate: null, emblem: null };
+const NO_SPOTS = { hall: null, gate: null, emblem: null, bigHex: 0 };
 
 /** Steel Shelter's board (stadium-environment-mesh.js BOARDS): the floor and the walls. */
 export function steelShelterBoard({ three, material, replaceGeometry, bakeOptions }) {
@@ -399,6 +404,7 @@ export function steelShelterBoard({ three, material, replaceGeometry, bakeOption
     uHall: { value: new three.Vector4() },
     uGate: { value: new three.Vector4() },
     uEmblem: { value: new three.Vector3() },
+    uBigHex: { value: 0 },
   };
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
   const materials = {
@@ -414,7 +420,8 @@ export function steelShelterBoard({ three, material, replaceGeometry, bakeOption
     materials: Object.values(materials),
     bakeField: materials.bakeField,
     spots: (layout) => shelterSpots(layout) ?? NO_SPOTS,
-    apply({ hall, gate, emblem }, bounds) {
+    apply({ hall, gate, emblem, bigHex }, bounds) {
+      own.uBigHex.value = bigHex ?? 0;
       own.uHall.value.set(hall?.x ?? 0, hall?.y ?? 0, hall?.hw ?? 0, hall?.hh ?? 0);
       own.uGate.value.set(gate?.x ?? 0, gate?.y ?? 0, gate?.half ?? 0, gate?.height ?? 0);
       own.uEmblem.value.set(emblem?.x ?? 0, emblem?.y ?? 0, emblem?.r ?? 0);
