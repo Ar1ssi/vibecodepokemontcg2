@@ -29,7 +29,7 @@ export const WALL_PX = { height: 245, lean: 105, cap: 60 };
 /** The gate on each side wall: half its width at its foot, its height. */
 export const GATE_PX = { half: 300, height: 205 };
 /** The floor's big hex tiles: px per hex unit (inradius half a unit). */
-const FLOOR_HEX_PX = 230;
+const FLOOR_HEX_PX = 440;
 /** How far up the side walls (share of the hall's half height) the corner grooves meet them. */
 const CORNER_CUT = '0.5';
 /** The ceiling the floor mirrors, px over the floor; its light panels' hex unit. */
@@ -181,8 +181,8 @@ vec3 wallPaint(float u, float h, float gated, out vec3 glow) {
         // The frame: chunky and white, a grey bevel along its edges.
         col = mix(vec3(0.55, 0.57, 0.6), vec3(0.9, 0.92, 0.95), smoothstep(1.0, 6.0, gate.y));
       } else if (gate.x < 2.5) {
-        // An arm's end: black ribbed slats.
-        col = mix(vec3(0.05, 0.055, 0.065), vec3(0.26, 0.27, 0.3), step(0.6, fract(gate.y / 6.0)));
+        // An arm's end: dark ribbed slats.
+        col = mix(vec3(0.16, 0.17, 0.2), vec3(0.34, 0.36, 0.4), step(0.6, fract(gate.y / 6.0)));
       } else {
         // The door, as in the art: two grey leaves filling the opening, a dark seam between them
         // and a dark border round them; three vent slits near the top of each leaf, a cluster of
@@ -260,18 +260,17 @@ vec3 mirroredAt(vec2 p) {
 void main() {
   vec2 p = vPos;
   if (revealBurned(p) * exitKeep(p) < 0.5) discard;
-  // The art's floor: pale and polished to a mirror, the ceiling's hex lights reflected in it, its
-  // own big hex tiles' seams faint; black hatched grooves cut across the hall's four corners (the
-  // slanted sides of a great hexagon whose flat sides lie past the near and far walls).
-  vec3 col = vec3(0.64, 0.66, 0.68) * (0.97 + 0.04 * fbm3(p / 160.0));
-  col = mix(col, mirroredAt(p) * 0.96, 0.6);
+  // The art's floor: glossy near-white in big flat hex tiles parted by crisp hairline seams, a faint
+  // mirror of the walls and the ceiling's lights in it; thin grey trim cuts across the hall's four
+  // corners (the slanted sides of a great hexagon whose flat sides lie past the near and far walls).
+  vec3 col = vec3(0.7, 0.72, 0.74) * (0.98 + 0.03 * fbm3(p / 220.0));
+  col = mix(col, mirroredAt(p) * 0.98, 0.3);
   vec4 tile = hexTile((p - uHall.xy) / ${FLOOR_HEX_PX}.0);
-  col *= 1.0 - 0.08 * (1.0 - smoothstep(0.004, 0.012, tile.x));
+  col = mix(col, vec3(0.36, 0.38, 0.42), 1.0 - smoothstep(0.6, 1.4, tile.x * ${FLOOR_HEX_PX}.0));
   vec2 rel = abs(p - uHall.xy);
   float corner = dot(rel, vec2(0.8660254, 0.5)) - (0.8660254 * uHall.z + 0.5 * uHall.w * ${CORNER_CUT});
-  float groove = (1.0 - smoothstep(-0.5, 0.8, abs(corner) - 6.0)) * step(rel.y, uHall.w);
-  float hatch = step(0.8, fract(dot(p, vec2(0.7071, 0.7071)) / 9.0));
-  col = mix(col, mix(vec3(0.025, 0.027, 0.032), vec3(0.11, 0.115, 0.13), hatch), groove);
+  float groove = (1.0 - smoothstep(-0.5, 0.8, abs(corner) - 2.5)) * step(rel.y, uHall.w);
+  col = mix(col, vec3(0.34, 0.36, 0.4), groove * 0.85);
 
   // Shade gathers at the walls' feet; the far reaches of the hall dim a little.
   vec2 fromWall = uHall.zw - abs(p - uHall.xy);
@@ -284,16 +283,16 @@ void main() {
   if (uEmblem.z > 0.0) {
     vec2 rel = p - uEmblem.xy;
     float r = length(rel);
-    float ring = min(abs(r - uEmblem.z), abs(r - uEmblem.z * 0.88));
+    float ring = min(abs(r - uEmblem.z), abs(r - uEmblem.z * 0.95));
     float button = min(abs(r - uEmblem.z * 0.2), abs(r - uEmblem.z * 0.3));
-    float band = r > uEmblem.z * 0.3 && r < uEmblem.z * 0.88 ? abs(rel.y) : 100000.0;
+    float band = r > uEmblem.z * 0.3 && r < uEmblem.z * 0.95 ? abs(rel.y) : 100000.0;
     float line = min(min(ring, button), band);
-    float lit = 1.0 - smoothstep(0.6, 2.8, line);
+    float lit = 1.0 - smoothstep(0.5, 1.9, line);
     float shimmer = 0.85 + 0.15 * sin(atan(rel.y, rel.x) * 6.0 - uTime * 1.5);
     // On the white floor an added glow would only wash out: the lines are painted a saturated
     // cyan-blue, the glow a tint round them.
     // A soft glow round the lines, as the art's hologram blurs into the floor.
-    col = mix(col, vec3(0.38, 0.72, 0.98), exp(-line / 14.0) * 0.6);
+    col = mix(col, vec3(0.38, 0.72, 0.98), exp(-line / 10.0) * 0.3);
     col = mix(col, vec3(0.1, 0.62, 1.15) * shimmer, lit * 0.95);
   }
 
