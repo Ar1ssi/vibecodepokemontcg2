@@ -130,6 +130,8 @@ uniform float uCutoutOn;
 ${NOISE}
 ${REVEAL}
 float environmentShown(vec2 p) {
+  // The table's materials carry this from the start: no board, no noise to work out.
+  if (uCutoutOn < 0.5) return 0.0;
   // Inset a few px: along the edge the table's own floor stays under the terrain's skirt.
   vec2 inside = step(uMin + 4.0, p) * step(p, uMin + uSize - 4.0);
   return uCutoutOn * inside.x * inside.y * revealBurned(p) * exitKeep(p);

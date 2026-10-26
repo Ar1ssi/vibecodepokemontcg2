@@ -695,12 +695,15 @@ export function createStadiumEnvironment({
   const bakeScene = new three.Scene();
   bakeScene.add(bakeQuad);
   const bufferSize = new three.Vector2();
+  /** Bake programs are built for a render target (linear output): they compile with this one bound. */
+  const compileTarget = new three.WebGLRenderTarget(1, 1, { depthBuffer: false });
 
   /** Boards built so far, by key, each in a group of its own. */
   const boards = new Map();
   let key = null;
   let layout = null;
   let dirty = false;
+  let appliedFor = '';
   let bakedFor = '';
   let targets = null;
   let revealStartedAt = null;
@@ -794,8 +797,11 @@ export function createStadiumEnvironment({
     renderer.setRenderTarget(previous);
   };
 
-  /** The shown board's landmarks from the layout; rebakes only when they or the board changed. */
-  const applyLayout = () => {
+  /**
+   * The shown board's landmarks from the layout: its meshes and uniforms, then (unless `bakeToo` is
+   * false) its bake. Each runs again only when the landmarks or the board changed.
+   */
+  const applyLayout = (bakeToo = true) => {
     const bounds = sceneBounds(layout, key);
     if (!(bounds.w > 0 && bounds.h > 0)) return false;
     const board = boardOf(key);
@@ -805,11 +811,14 @@ export function createStadiumEnvironment({
       ? { x: stadium.x + stadium.w / 2, y: stadium.y + stadium.h / 2 }
       : { x: bounds.x + bounds.w / 2, y: layout.depth };
     const signature = JSON.stringify([key, bounds, spots, origin]);
-    if (signature === bakedFor) return true;
-    uniforms.uMin.value.set(bounds.x, bounds.y);
-    uniforms.uSize.value.set(bounds.w, bounds.h);
-    uniforms.uOrigin.value.set(origin.x, origin.y);
-    board.apply(spots, bounds);
+    if (signature !== appliedFor) {
+      uniforms.uMin.value.set(bounds.x, bounds.y);
+      uniforms.uSize.value.set(bounds.w, bounds.h);
+      uniforms.uOrigin.value.set(origin.x, origin.y);
+      board.apply(spots, bounds);
+      appliedFor = signature;
+    }
+    if (!bakeToo || signature === bakedFor) return true;
     bake(bounds, board);
     bakedFor = signature;
     return true;
@@ -819,6 +828,60 @@ export function createStadiumEnvironment({
     if (disposed || !next) return;
     layout = next;
     dirty = true;
+  };
+
+  /** A board shows once its programs are ready; without compileAsync, update compiles them itself. */
+  const showable = (board) => board.compiled || !renderer.compileAsync;
+
+  /**
+   * `compile` (renderer.compile or compileAsync) on the board's meshes as board-scene.js draws them:
+   * in the environment's own pass, the camera on STADIUM_ENV_LAYER, where the table's light isn't
+   * seen, into the canvas. A program built with the light counted, or for a render target, has
+   * another cache key, and three would build it again, on the main thread, the first time the pass
+   * draws.
+   */
+  const compileMeshes = (compile, board, camera) => {
+    const mask = camera.layers.mask;
+    const previous = renderer.getRenderTarget();
+    camera.layers.set(STADIUM_ENV_LAYER);
+    renderer.setRenderTarget(null);
+    try {
+      return compile(board.holder, camera, sceneOf(group));
+    } finally {
+      camera.layers.mask = mask;
+      renderer.setRenderTarget(previous);
+    }
+  };
+
+  /**
+   * Compiles a board's programs off the main thread (KHR_parallel_shader_compile, through
+   * compileAsync): its bake passes as they render into a target, and every mesh, hidden ones too
+   * (the lightning shows only when it strikes). The board stays hidden and the mat shows meanwhile;
+   * once ready, the next frame bakes and starts the reveal. A failed compile shows the board anyway:
+   * three then compiles on first draw, as it would without compileAsync.
+   */
+  const prepare = (board, camera) => {
+    if (board.preparing) return;
+    const passes = new three.Scene();
+    for (const material of new Set([board.bakePre, board.bakeField, board.bakeLight ?? bakeLight].filter(Boolean))) {
+      const quad = new three.Mesh(bakeQuad.geometry, material);
+      quad.frustumCulled = false;
+      passes.add(quad);
+    }
+    const previous = renderer.getRenderTarget();
+    renderer.setRenderTarget(compileTarget);
+    const bakes = renderer.compileAsync(passes, bakeCamera);
+    renderer.setRenderTarget(previous);
+    const meshes = compileMeshes(renderer.compileAsync.bind(renderer), board, camera);
+    board.preparing = Promise.all([bakes, meshes])
+      .catch((error) => console.warn('board3d: stadium environment compile failed', error?.message || error))
+      .then(() => {
+        board.preparing = null;
+        board.compiled = true;
+        if (disposed) return;
+        board.holder.visible = boards.get(key) === board;
+        onNeedsRender();
+      });
   };
 
   const setKey = (next) => {
@@ -831,8 +894,8 @@ export function createStadiumEnvironment({
     const shown = unsupported ? null : wanted;
     if (shown === key) return false;
     key = shown;
-    for (const [boardKey, board] of boards) board.holder.visible = boardKey === key;
-    if (key) boardOf(key).holder.visible = true;
+    if (key) boardOf(key);
+    for (const [boardKey, board] of boards) board.holder.visible = boardKey === key && showable(board);
     group.visible = Boolean(key);
     cutout.uniforms.uCutoutOn.value = key ? 1 : 0;
     uniforms.uReveal.value = 0;
@@ -845,16 +908,23 @@ export function createStadiumEnvironment({
 
   const update = (now, camera) => {
     if (disposed || !key || !layout) return false;
+    const shown = boards.get(key);
+    if (!showable(shown)) {
+      // The meshes first: a program's cache key depends on its geometry's attributes, so they
+      // compile with the geometry they will draw.
+      if (camera && applyLayout(false)) prepare(shown, camera);
+      return false;
+    }
     if (dirty) {
       if (!applyLayout()) return false;
       dirty = false;
     }
-    const board = boards.get(key);
+    const board = shown;
     if (camera && !board.compiled) {
-      // Every program now, hidden meshes too (the lightning shows only when it strikes), so the first
-      // strike doesn't stall a frame compiling its shader. This frame stalls instead: the reveal
-      // starts with the next one, or it would run its course while the compile holds the screen.
-      renderer.compile?.(board.holder, camera, sceneOf(group));
+      // No compileAsync: every program now, hidden meshes too, so the first strike doesn't stall a
+      // frame compiling its shader. This frame stalls instead: the reveal starts with the next one,
+      // or it would run its course while the compile holds the screen.
+      if (renderer.compile) compileMeshes(renderer.compile.bind(renderer), board, camera);
       board.compiled = true;
       revealStartedAt = null;
       uniforms.uReveal.value = 0;
@@ -892,6 +962,7 @@ export function createStadiumEnvironment({
     boards.clear();
     bakeQuad.geometry.dispose();
     bakeLight.dispose();
+    compileTarget.dispose();
     disposeTargets();
     targets = null;
   };

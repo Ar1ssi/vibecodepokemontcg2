@@ -205,6 +205,9 @@ export function createBoardScene({
     motionReduced,
     onNeedsRender: () => invalidate(),
   });
+  // The table's materials carry the cutout from the start, off (uCutoutOn 0) while no board shows,
+  // so showing one never recompiles them.
+  table.setCutout(environment.cutout);
 
   // Piles and count labels sit in the table frame, so they tilt with the cloth.
   const pilesGroup = new three.Group();
@@ -451,7 +454,6 @@ export function createBoardScene({
   /** Design 077 (prototype): shows the Stadium environment `key` under the board, or none (null). */
   const setStadiumEnvironment = (key) => {
     if (disposed || !environment.setKey(key)) return;
-    table.setCutout(environment.active() ? environment.cutout : null);
     invalidate();
   };
 

@@ -91,3 +91,69 @@ test('createStadiumEnvironment starts the reveal on the frame after the one that
   assert.equal(compiles, 1, 'compiled once');
   environment.dispose();
 });
+
+test('createStadiumEnvironment compiles off the main thread when it can: the mat shows until the programs are ready', async () => {
+  const three = await import('../../../vendor/three/three.module.min.js');
+  const asyncCompiles = [];
+  let syncCompiles = 0;
+  let renders = 0;
+  let boundTarget = null;
+  let needsRender = 0;
+  const renderer = {
+    extensions: { has: () => true },
+    compile: () => {
+      syncCompiles += 1;
+    },
+    compileAsync: (scene) => {
+      let resolve;
+      const promise = new Promise((done) => {
+        resolve = done;
+      });
+      asyncCompiles.push({ scene, target: boundTarget, resolve });
+      return promise;
+    },
+    getRenderTarget: () => boundTarget,
+    setRenderTarget: (target) => {
+      boundTarget = target;
+    },
+    render: () => {
+      renders += 1;
+    },
+    getDrawingBufferSize: (target) => target.set(1920, 1080),
+  };
+  const parent = new three.Group();
+  const environment = createStadiumEnvironment({
+    three,
+    renderer,
+    parent,
+    isHidden: () => true,
+    onNeedsRender: () => {
+      needsRender += 1;
+    },
+  });
+  const camera = new three.PerspectiveCamera();
+  const reveal = environment.cutout.uniforms.uReveal;
+  environment.setLayout(layout);
+  environment.setKey('magma-basin');
+  const holder = parent.getObjectByName('board3d-stadium-env-magma-basin');
+  assert.equal(holder.visible, false, 'hidden until its programs are ready');
+  assert.equal(environment.update(1000, camera), false, 'nothing animates while it compiles');
+  assert.equal(environment.update(1100, camera), false);
+  assert.equal(asyncCompiles.length, 2, 'the bake passes and the meshes, once');
+  assert.ok(asyncCompiles[0].target?.isWebGLRenderTarget, 'bake passes compile for a render target');
+  assert.equal(asyncCompiles[1].target, null, 'meshes compile for the canvas');
+  assert.equal(renders, 0, 'no bake before the programs are ready');
+  assert.equal(syncCompiles, 0);
+  assert.equal(reveal.value, 0);
+  const asked = needsRender;
+  for (const compile of asyncCompiles) compile.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(holder.visible, true, 'shown once ready');
+  assert.equal(needsRender, asked + 1, 'asks for the frame that bakes and starts the reveal');
+  assert.equal(environment.update(5000, camera), true, 'the reveal runs');
+  assert.ok(renders >= 3, 'baked its passes');
+  environment.update(5000 + INTRO_MS / 2, camera);
+  assert.ok(reveal.value > 0.5 && reveal.value < 1, `halfway through the reveal at ${reveal.value}`);
+  assert.equal(syncCompiles, 0, 'never compiled on the main thread');
+  environment.dispose();
+});
