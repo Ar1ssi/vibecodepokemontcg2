@@ -43,13 +43,20 @@ export const TIER_PX = { run: 40, rise: 26 };
 export const POST_PX = { height: 96, radius: 7 };
 export const ROPES = { heights: [36, 60, 84], radius: 2.6, sag: 5 };
 /** The lasers: how many, and where they shine from (z over the cloth). */
-export const LASER_COUNT = 8;
+export const LASER_COUNT = 24;
+/**
+ * The entrance ramp off the stage, as in the art (there to the right; here off the left side, which
+ * both camera presets see, where the sidebox covers the right): its middle's place as a share of
+ * the ring's half height (near side negative), its half width.
+ */
+export const RAMP = { at: -0.42, half: 52 };
 const LASER_FROM_Z = 520;
 
 const POST_STEEL = [0.55, 0.58, 0.62, 0.8];
 const PAD_BLUE = [0.12, 0.32, 0.75, 0.15];
 const ROPE_WHITE = [0.92, 0.93, 0.95, 0.1];
 const BOARD_FRAME = [0.05, 0.055, 0.065, 0.3];
+const TRUSS = [0.1, 0.14, 0.16, 0.5];
 
 /**
  * Fighting Stadium's layout: the ring (a rect round every card footprint, RING_GAP_PX clear), the
@@ -67,12 +74,14 @@ export function arenaSpots(layout) {
   const y1 = rects.length ? Math.max(...rects.map((r) => r.y + r.h)) : table.y + table.h;
   const ring = { x: (x0 + x1) / 2, y: (y0 + y1) / 2, hw: (x1 - x0) / 2 + RING_GAP_PX.side, hh: (y1 - y0) / 2 + RING_GAP_PX.end };
   const boards = { hw: ring.hw + STAGE_PX.width + FLOOR_PX, hh: ring.hh + STAGE_PX.width + FLOOR_PX };
+  const scene = sceneBounds(layout, ARENA_KEY);
+  const ramp = { y: ring.y + RAMP.at * ring.hh, half: RAMP.half, x0: ring.x - ring.hw - STAGE_PX.width + 2, x1: scene.x };
   const emblem = craterEmblem(layout, { x: table.x + table.w / 2, y: layout.depth });
-  return { ring, boards, scene: sceneBounds(layout, ARENA_KEY), emblem };
+  return { ring, boards, ramp, scene, emblem };
 }
 
 /** The ring's corner posts and ropes, and the ad boards' frames and backs. */
-export function arenaProps({ ring, boards }) {
+export function arenaProps({ ring, boards, ramp }) {
   const props = createPropBuilder();
   const corners = [
     [-1, -1],
@@ -109,7 +118,33 @@ export function arenaProps({ ring, boards }) {
     { x: ring.x - boards.hw - t, y: ring.y, hw: t, hh: boards.hh },
     { x: ring.x + boards.hw + t, y: ring.y, hw: t, hh: boards.hh },
   ];
-  for (const side of sides) props.box({ ...side, z0, z1: z1 + 3, color: BOARD_FRAME });
+  for (const [i, side] of sides.entries()) {
+    if (i !== 2 || !ramp) {
+      props.box({ ...side, z0, z1: z1 + 3, color: BOARD_FRAME });
+      continue;
+    }
+    // The left side's band opens where the ramp runs through it.
+    const lo = side.y - side.hh;
+    const hi = side.y + side.hh;
+    for (const [a, b] of [
+      [lo, ramp.y - ramp.half],
+      [ramp.y + ramp.half, hi],
+    ]) {
+      if (b - a > 1) props.box({ x: side.x, y: (a + b) / 2, hw: side.hw, hh: (b - a) / 2, z0, z1: z1 + 3, color: BOARD_FRAME });
+    }
+  }
+  // The ramp's truss: dark steel lattice under its edges, down to the floor, as in the art.
+  if (ramp) {
+    const zTop = -APRON_PX.drop - 2;
+    const zFoot = -APRON_PX.drop - STAGE_PX.drop;
+    for (const edge of [-1, 1]) {
+      const y = ramp.y + edge * (ramp.half - 2);
+      for (let x = ramp.x0 - 66; x > ramp.x1 + 10; x -= 36) {
+        props.tube([[x, y, zTop], [x + 36, y, zFoot]], 1.6, TRUSS, { sides: 4 });
+        props.tube([[x, y, zFoot], [x + 36, y, zTop]], 1.6, TRUSS, { sides: 4 });
+      }
+    }
+  }
   return props;
 }
 
@@ -117,7 +152,7 @@ export function arenaProps({ ring, boards }) {
  * The ad boards' glowing faces round the floor, facing the ring: one quad per board, `aAd` (u px
  * along the band, v 0..1 up the board, which board).
  */
-export function adBoardGeometry(three, { ring, boards }) {
+export function adBoardGeometry(three, { ring, boards, ramp }) {
   const positions = [];
   const ads = [];
   const index = [];
@@ -126,15 +161,18 @@ export function adBoardGeometry(three, { ring, boards }) {
   const lo = { x: ring.x - boards.hw, y: ring.y - boards.hh };
   const hi = { x: ring.x + boards.hw, y: ring.y + boards.hh };
   // Round the band counter-clockwise from the near-left corner, so u runs on round the corners.
-  const runs = [
-    [lo.x, lo.y, hi.x, lo.y],
-    [hi.x, lo.y, hi.x, hi.y],
-    [hi.x, hi.y, lo.x, hi.y],
-    [lo.x, hi.y, lo.x, lo.y],
-  ];
+  // The left run opens where the ramp runs through it.
+  const left = ramp
+    ? [
+        [lo.x, hi.y, lo.x, ramp.y + ramp.half],
+        [lo.x, ramp.y - ramp.half, lo.x, lo.y],
+      ]
+    : [[lo.x, hi.y, lo.x, lo.y]];
+  const runs = [[lo.x, lo.y, hi.x, lo.y], [hi.x, lo.y, hi.x, hi.y], [hi.x, hi.y, lo.x, hi.y], ...left];
   let u = 0;
   runs.forEach(([ax, ay, bx, by]) => {
     const length = Math.hypot(bx - ax, by - ay);
+    if (length < 1) return;
     const first = positions.length / 3;
     positions.push(ax, ay, z0, bx, by, z0, bx, by, z1, ax, ay, z1);
     ads.push(u, 0, 0, u + length, 0, 0, u + length, 1, 0, u, 1, 0);
@@ -180,7 +218,15 @@ const ARENA = /* glsl */ `
 uniform vec4 uRing;
 uniform vec2 uBoards;
 uniform vec3 uEmblem;
-const vec3 HAZE_TEAL = vec3(0.05, 0.22, 0.26);
+// The entrance ramp: its middle's y, half width, the x it leaves the stage at, out to the left
+// (arenaSpots).
+uniform vec3 uRamp;
+const vec3 HAZE_TEAL = vec3(0.07, 0.3, 0.34);
+// px inside the ramp's edges (negative off it).
+float rampInside(vec2 p) {
+  if (uRamp.y <= 0.0 || p.x > uRamp.z) return -100000.0;
+  return uRamp.y - abs(p.y - uRamp.x);
+}
 const vec3 STAGE_GLOW = vec3(0.55, 0.95, 1.05);
 // Signed px from the ring's edge, negative on the canvas.
 float ringDistance(vec2 p) {
@@ -225,6 +271,16 @@ void main() {
     kind = 2.0;
   }
   if (kind > -0.5 && kind < 0.5 && d > ${STAGE_PX.width - 3}.0) h = -${APRON_PX.drop + STAGE_PX.drop}.0;
+  // The entrance ramp runs off the stage at its level, out through the boards and the stands; B
+  // carries px inside its edges (-1 on the stage itself).
+  float ramp = rampInside(p);
+  if (ramp > 0.0 && d >= ${STAGE_PX.width - 3}.0) {
+    h = ramp < 3.0 ? mix(-${APRON_PX.drop + STAGE_PX.drop}.0, -${APRON_PX.drop}.0, ramp / 3.0) : -${APRON_PX.drop}.0;
+    kind = 0.0;
+    id = ramp;
+  } else if (kind > -0.5 && kind < 0.5) {
+    id = -1.0;
+  }
   gl_FragColor = vec4(h, d, id, kind);
 }
 `;
@@ -282,6 +338,12 @@ void main() {
     if (d < 3.0 || ground < -${APRON_PX.drop - 2}.0 && d < 5.0) {
       // The apron: the ring's dark navy skirt, a white line along it.
       col = vec3(0.03, 0.05, 0.1);
+    } else if (id >= 0.0) {
+      // The ramp: the stage's glowing white running out to the left, lights along both edges.
+      col = mix(vec3(0.6, 0.84, 0.9), vec3(0.78, 0.93, 0.98), smoothstep(0.0, 30.0, id));
+      float bulb = length(vec2(mod(p.x, 26.0) - 13.0, id - 9.0));
+      col += vec3(1.4, 1.5, 1.6) * (1.0 - smoothstep(2.0, 3.5, bulb));
+      col = mix(vec3(0.08, 0.14, 0.18), col, smoothstep(0.0, 3.0, id));
     } else {
       // The stage: glowing white, a row of white lights along its outer edge.
       col = mix(vec3(0.62, 0.86, 0.92), vec3(0.8, 0.95, 1.0), smoothstep(${STAGE_PX.width}.0, 10.0, d));
@@ -298,7 +360,7 @@ void main() {
     // The stands: tiers of seats in the dark, packed with the crowd: heads and shoulders in
     // silhouette, shirts a dim teal, a phone's light here and there.
     float tierTop = smoothstep(0.8, 0.95, n.z);
-    vec3 seat = mix(vec3(0.02, 0.05, 0.07), vec3(0.05, 0.11, 0.14), tierTop);
+    vec3 seat = mix(vec3(0.025, 0.07, 0.09), vec3(0.06, 0.15, 0.18), tierTop);
     float along = alongStands(p);
     float tierD = mod(length(max(abs(p - uRing.xy) - uBoards, 0.0)) - ${BOARD_PX.thick}.0, ${TIER_PX.run}.0);
     col = seat;
@@ -323,7 +385,7 @@ void main() {
   }
   col = mix(col * 0.55, col, smoothstep(0.3, 0.9, light.b));
   // The teal haze over the arena, thicker away from the ring.
-  col = mix(col, HAZE_TEAL, smoothstep(${STAGE_PX.width}.0, 600.0, d) * 0.35);
+  col = mix(col, HAZE_TEAL, smoothstep(${STAGE_PX.width}.0, 500.0, d) * 0.45);
   vec2 edgeUv = min(vUv, 1.0 - vUv);
   col *= mix(0.3, 1.0, smoothstep(0.0, 0.05, min(edgeUv.x, edgeUv.y)));
   float front = revealFront();
@@ -374,7 +436,7 @@ float lettering(vec2 q, float y0, float y1, float seed) {
 void main() {
   if (revealBurned(vPos) * exitKeep(vPos) < 0.5) discard;
   float panel = floor(vAd.x / PANEL);
-  float design = floor(hash12(vec2(panel, 4.0)) * 4.0);
+  float design = floor(hash12(vec2(panel, 4.0)) * 5.0);
   vec2 q = vec2(mod(vAd.x, PANEL), vAd.y * 38.0);
   vec3 col;
   if (design < 0.5) {
@@ -394,9 +456,12 @@ void main() {
     float button = 1.0 - smoothstep(0.8, 1.6, abs(r - 4.0));
     col = mix(col, vec3(1.0), max(max(outline, band), button));
     col = mix(col, vec3(0.95, 0.3, 0.3), step(r, 11.0) * step(1.2, ball.y) * step(5.0, r));
-  } else {
+  } else if (design < 3.5) {
     col = vec3(0.98, 0.78, 0.1);
     col = mix(col, vec3(0.08, 0.08, 0.1), lettering(q - vec2(20.0, 0.0), 12.0, 26.0, panel + 9.0));
+  } else {
+    col = vec3(0.1, 0.62, 0.3);
+    col = mix(col, vec3(0.95, 1.0, 0.9), lettering(q - vec2(26.0, 0.0), 14.0, 24.0, panel + 5.0));
   }
   // Seams between panels, a sheen running along the band.
   col *= 0.4 + 0.6 * smoothstep(0.0, 2.0, min(q.x, PANEL - q.x));
@@ -435,7 +500,7 @@ void main() {
   vec4 view = modelViewMatrix * vec4(here, 1.0);
   vec2 tangent = (modelViewMatrix * vec4(to - source, 0.0)).xy;
   vec2 across = length(tangent) > 0.0001 ? normalize(vec2(-tangent.y, tangent.x)) : vec2(1.0, 0.0);
-  view.xy += across * aBeam.y * 2.2;
+  view.xy += across * aBeam.y * 3.2;
   gl_Position = projectionMatrix * view;
   vBeam = aBeam.xy;
   vLaser = k;
@@ -449,13 +514,13 @@ varying vec2 vBeam;
 varying float vLaser;
 varying float vOutside;
 void main() {
-  float which = mod(vLaser, 4.0);
-  vec3 tint = which < 0.5 ? vec3(0.3, 1.4, 0.4) : which < 1.5 ? vec3(1.4, 0.3, 1.1) : which < 2.5 ? vec3(1.4, 1.2, 0.3) : vec3(1.2, 1.3, 1.4);
+  float which = mod(vLaser, 5.0);
+  vec3 tint = which < 0.5 ? vec3(0.3, 1.4, 0.4) : which < 1.5 ? vec3(1.4, 0.3, 1.1) : which < 2.5 ? vec3(1.4, 1.2, 0.3) : which < 3.5 ? vec3(1.3, 1.4, 1.5) : vec3(0.3, 0.6, 1.5);
   float core = exp(-vBeam.y * vBeam.y * 3.0);
   // Brightest where it reaches the arena, fading up into the haze toward the rig.
   float fade = smoothstep(0.05, 0.75, vBeam.x) * vOutside;
   float shown = smoothstep(0.6, 1.0, uReveal) * (1.0 - uExit);
-  gl_FragColor = vec4(tint * core * fade * 0.6 * shown, 1.0);
+  gl_FragColor = vec4(tint * core * fade * 0.75 * shown, 1.0);
 ${OUTPUT}
 }
 `;
@@ -472,7 +537,7 @@ vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
 
 export const PROP_FRAGMENT = propFragment({ light: PROP_LIGHT, uniforms: ARENA, reveal: 'STAGE_GLOW' });
 
-const NO_SPOTS = { ring: null, boards: null, scene: null, emblem: null };
+const NO_SPOTS = { ring: null, boards: null, ramp: null, scene: null, emblem: null };
 
 /** Fighting Stadium's board (stadium-environment-mesh.js BOARDS). */
 export function fightingStadiumBoard({ three, material, terrainGrid, replaceGeometry, bakeOptions }) {
@@ -480,6 +545,7 @@ export function fightingStadiumBoard({ three, material, terrainGrid, replaceGeom
     uRing: { value: new three.Vector4() },
     uBoards: { value: new three.Vector2() },
     uEmblem: { value: new three.Vector3() },
+    uRamp: { value: new three.Vector3() },
   };
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
   const materials = {
@@ -510,6 +576,7 @@ export function fightingStadiumBoard({ three, material, terrainGrid, replaceGeom
       const { ring, emblem } = spots;
       own.uRing.value.set(ring?.x ?? 0, ring?.y ?? 0, ring?.hw ?? 0, ring?.hh ?? 0);
       own.uBoards.value.set(spots.boards?.hw ?? 0, spots.boards?.hh ?? 0);
+      own.uRamp.value.set(spots.ramp?.y ?? 0, spots.ramp?.half ?? 0, spots.ramp?.x0 ?? 0);
       own.uEmblem.value.set(emblem?.x ?? 0, emblem?.y ?? 0, emblem?.r ?? 0);
       replaceGeometry(terrain, terrainGrid(bounds));
       for (const mesh of [props, boards, lasers]) mesh.visible = Boolean(ring);
