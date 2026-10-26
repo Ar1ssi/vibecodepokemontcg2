@@ -48,24 +48,18 @@ const SHORE_DRIFT_PX = 22;
 /** Run of the wall from the moat's outer shore up to its crest. */
 export const WALL_RUN_PX = 108;
 /** Most lavafalls a basin has (the uniform array's length). */
-export const MAX_FALLS = 10;
+export const MAX_FALLS = 4;
 /**
- * The lavafalls: the art's four down its back wall on the far wall (the middle pair beside the
- * opponent's hand, not behind it), three down each side wall. Where each pours, as the side of the
- * basin and a share along that side's straight run (-1 near/left end, 1 far/right end), and whether
- * it forks into three strands near its foot (the art's second fall from the right). None on the
- * near wall: the hand covers it.
+ * The lavafalls: only the art's four, down its back wall, so on the far wall (the middle pair
+ * beside the opponent's hand, not behind it). Falls on the side walls, seen from above, ran out
+ * from the moat like rays. Where each pours, as the side of the basin and a share along that
+ * side's straight run (-1 left end, 1 right end), and whether it forks into three strands near its
+ * foot (the art's second fall from the right).
  */
 const FALL_RECIPES = [
-  { side: 'left', at: -0.68, fork: false },
-  { side: 'left', at: 0.02, fork: false },
-  { side: 'left', at: 0.62, fork: false },
-  { side: 'right', at: 0.55, fork: false },
-  { side: 'right', at: -0.08, fork: true },
-  { side: 'right', at: -0.7, fork: false },
   { side: 'far', at: -0.9, fork: false },
   { side: 'far', at: -0.58, fork: false },
-  { side: 'far', at: 0.58, fork: false },
+  { side: 'far', at: 0.58, fork: true },
   { side: 'far', at: 0.9, fork: false },
 ];
 const FALL_DIP_PX = 14;
@@ -76,8 +70,6 @@ const FACET_PX = 44;
 export const EMBER_COUNT = 320;
 
 const SIDE_DIRECTIONS = {
-  left: { angle: Math.PI, axis: 'y', sign: -1 },
-  right: { angle: 0, axis: 'y', sign: 1 },
   far: { angle: Math.PI / 2, axis: 'x', sign: 1 },
 };
 
@@ -555,13 +547,12 @@ void main() {
   vec2 flow = mix(flowPhase(p - velocity * phaseB * period + vec2(53.0, 29.0)), flowPhase(p - velocity * phaseA * period), weightA);
 
   float middle = sin(across * 3.14159);
-  float heat = 0.56 + 0.2 * middle + (flow.x - 0.5) * 0.55 + flow.y * 0.3;
-  // Cooler toward the shores, a bright line right where it laps the rock.
-  heat -= 0.3 * (1.0 - smoothstep(0.0, 26.0, shore));
-  heat += 0.3 * (1.0 - smoothstep(0.0, 3.5, shore));
-  // Darker skins drifting where the flow runs cool.
-  float skin = smoothstep(0.58, 0.72, fbm3((p - velocity * uTime * 0.6) / 70.0 + 9.0)) * smoothstep(8.0, 30.0, shore);
-  heat -= skin * 0.32;
+  // White-hot flow lines down the middle, deep red toward both shores (no bright rim along them).
+  float heat = 0.54 + 0.22 * middle + (flow.x - 0.5) * 0.55 + flow.y * 0.42 * middle;
+  heat -= 0.4 * (1.0 - smoothstep(0.0, 34.0, shore));
+  // Dark crust plates drifting where the flow runs cool.
+  float skin = smoothstep(0.56, 0.68, fbm3((p - velocity * uTime * 0.6) / 70.0 + 9.0)) * smoothstep(8.0, 30.0, shore);
+  heat -= skin * 0.45;
 
   // Each fall's splash where its line meets the outer shore: a hot churning pool, rings running out
   // from it.

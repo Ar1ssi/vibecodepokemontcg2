@@ -59,7 +59,7 @@ test('basinSpots: the island holds every card footprint, its margin clear inside
   }
 });
 
-test('basinSpots: each fall stands on the moat\'s outer shore of its side, facing up the wall', () => {
+test('basinSpots: the falls stand on the far wall\'s outer shore, facing up it', () => {
   for (const layout of layouts) {
     const { island, falls } = basinSpots(layout);
     assert.ok(falls.length > 0 && falls.length <= MAX_FALLS);
