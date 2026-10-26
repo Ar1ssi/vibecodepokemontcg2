@@ -29,7 +29,7 @@ export const WALL_PX = { height: 245, lean: 105, cap: 60 };
 /** The gate on each side wall: half its width at its foot, its height. */
 export const GATE_PX = { half: 300, height: 205 };
 /** The floor's big hex tiles: px per hex unit (inradius half a unit). */
-const FLOOR_HEX_PX = 440;
+const FLOOR_HEX_PX = 260;
 /** How far out from each wall's foot its reflection streaks the floor. */
 const STREAK_PX = 150;
 /** How far up the side walls (share of the hall's half height) the corner grooves meet them. */
@@ -98,9 +98,9 @@ const float WALL_HEIGHT = ${WALL_PX.height}.0;
 // The art's gate on a side wall at u px along it and h px up it: a chunky white frame (GATE_BAND
 // thick) round a trapezoid opening that narrows upward, its legs leaning in to a flat lintel, each
 // corner flaring out into an arm, up and out at the top, out along the floor at the foot, the arm's
-// end ribbed with black slats; the grey double door filling the opening. x: 0 off it, 1 frame,
-// 2 slats, 3 door; y: on the frame px in from its edge, on the slats px along the arm, on the door px
-// in from the opening's edge; z: px from the gate's middle.
+// end a dark block ribbed with level slats; the grey double door filling the opening. x: 0 off it,
+// 1 frame, 2 slats, 3 door; y: on the frame px in from its edge, on the slats h, on the door px in
+// from the opening's edge; z: px from the gate's middle.
 const float GATE_BAND = 30.0;
 float segmentDistance(vec2 q, vec2 a, vec2 b) {
   vec2 ab = b - a;
@@ -130,8 +130,8 @@ vec3 gateAt(float u, float h) {
     float upperAt = segmentAlong(m, legTop, upperEnd);
     float lowerAt = segmentAlong(m, legFoot, lowerEnd);
     float armLength = length(upperEnd - legTop);
-    if (upper <= GATE_BAND * 0.5 && upperAt > 0.55) return vec3(2.0, upperAt * armLength, u - uGate.x);
-    if (lower <= GATE_BAND * 0.5 && lowerAt > 0.55) return vec3(2.0, lowerAt * armLength, u - uGate.x);
+    if (upper <= GATE_BAND * 0.5 && upperAt > 0.45) return vec3(2.0, h, u - uGate.x);
+    if (lower <= GATE_BAND * 0.5 && lowerAt > 0.45) return vec3(2.0, h, u - uGate.x);
     return vec3(1.0, -frame, u - uGate.x);
   }
   float legX = mix(bottomWide, topWide, clamp(h / top, 0.0, 1.0));
@@ -184,8 +184,8 @@ vec3 wallPaint(float u, float h, float gated, out vec3 glow) {
         // The frame: chunky and white, a grey bevel along its edges.
         col = mix(vec3(0.55, 0.57, 0.6), vec3(0.9, 0.92, 0.95), smoothstep(1.0, 6.0, gate.y));
       } else if (gate.x < 2.5) {
-        // An arm's end: dark ribbed slats.
-        col = mix(vec3(0.16, 0.17, 0.2), vec3(0.34, 0.36, 0.4), step(0.6, fract(gate.y / 6.0)));
+        // An arm's end: a chunky dark block, its vent slats running level (gate.y is h here).
+        col = mix(vec3(0.12, 0.13, 0.15), vec3(0.3, 0.32, 0.36), step(0.55, fract(gate.y / 7.0)));
       } else {
         // The door, as in the art: two grey leaves filling the opening, a dark seam between them
         // and a dark border round them; three vent slits near the top of each leaf, a cluster of
@@ -268,7 +268,7 @@ void main() {
   // flat sides lie past the near and far walls), as the art's.
   vec2 fromWalls = uHall.zw - abs(p - uHall.xy);
   float gloss = mix(0.62, 0.34, smoothstep(30.0, 260.0, min(fromWalls.x, fromWalls.y)));
-  vec3 col = vec3(0.68, 0.7, 0.72) * (0.98 + 0.03 * fbm3(p / 220.0));
+  vec3 col = vec3(0.63, 0.655, 0.68) * (0.98 + 0.03 * fbm3(p / 220.0));
   col = mix(col, mirroredAt(p) * 0.98, gloss);
   // The art's floor seen low along it: each wall unit and gate mirrored into a soft streak running
   // out from the wall's foot across the floor's margin, its white panels, dark louvres and gates
@@ -289,7 +289,7 @@ void main() {
   }
   col = mix(col, streak / max(streakWeight, 0.0001) * 1.02, min(streakWeight, 1.0) * 0.45);
   vec4 tile = hexTile((p - uHall.xy) / ${FLOOR_HEX_PX}.0);
-  col = mix(col, vec3(0.2, 0.22, 0.25), 1.0 - smoothstep(0.5, 1.2, tile.x * ${FLOOR_HEX_PX}.0));
+  col = mix(col, vec3(0.42, 0.44, 0.48), 1.0 - smoothstep(0.5, 1.2, tile.x * ${FLOOR_HEX_PX}.0));
   vec2 rel = abs(p - uHall.xy);
   float corner = dot(rel, vec2(0.8660254, 0.5)) - (0.8660254 * uHall.z + 0.5 * uHall.w * ${CORNER_CUT});
   float groove = (1.0 - smoothstep(-0.5, 0.8, abs(corner) - 5.0)) * step(rel.y, uHall.w)
