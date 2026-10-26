@@ -7,4 +7,7 @@ export const CARD_ART_PROXY_HOSTS = new Set([
   'limitlesstcg.nyc3.digitaloceanspaces.com',
   'limitlesstcg.nyc3.cdn.digitaloceanspaces.com',
   'ptcgsim.online',
+  // Card sleeves not replaced by a TCG Live scan (client/src/assets/catalogs/sleeves.json): the board's
+  // WebGL card backs need them same-origin.
+  'pokemon-sleeve-database.com',
 ]);
