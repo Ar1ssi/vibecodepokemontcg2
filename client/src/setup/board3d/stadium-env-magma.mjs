@@ -399,7 +399,7 @@ void main() {
 
   // The island: dark brown rock, warmer where lumps catch the light. The walls: dark crimson rock,
   // the tops of its rounded rocks a brighter red to the light.
-  vec3 islandRock = mix(vec3(0.046, 0.028, 0.019), vec3(0.088, 0.053, 0.036), smoothstep(0.35, 0.75, facing));
+  vec3 islandRock = mix(vec3(0.046, 0.028, 0.023), vec3(0.088, 0.053, 0.044), smoothstep(0.35, 0.75, facing));
   islandRock = mix(islandRock, vec3(0.15, 0.094, 0.052), smoothstep(0.85, 0.97, facing));
   islandRock *= 0.86 + 0.28 * tone;
   vec3 wallRock = mix(vec3(0.04, 0.008, 0.007), vec3(0.092, 0.017, 0.014), smoothstep(0.4, 0.7, facing));
@@ -450,7 +450,7 @@ void main() {
     float inside = 1.0 - smoothstep(uEmblem.z - 1.5, uEmblem.z, r);
     float halves = inside * smoothstep(bandHalf, bandHalf + 1.5, abs(rel.y)) * smoothstep(buttonR + 3.0, buttonR + 5.0, r);
     float rim = smoothstep(0.3, 1.0, r / uEmblem.z);
-    vec3 stone = mix(vec3(0.15, 0.032, 0.026), vec3(0.28, 0.052, 0.042), rim);
+    vec3 stone = mix(vec3(0.18, 0.06, 0.054), vec3(0.32, 0.092, 0.08), rim);
     stone *= (0.86 + 0.24 * smoothstep(-uEmblem.z, uEmblem.z, rel.y)) * breathe * (0.92 + 0.16 * fbm3(p / 22.0));
     stone += vec3(0.4, 0.14, 0.05) * smoothstep(0.84, 0.97, r / uEmblem.z) * smoothstep(0.1, 0.7, rel.y / uEmblem.z);
     float buttonRing = smoothstep(buttonR - 7.0, buttonR - 4.0, r) * (1.0 - smoothstep(buttonR + 3.0, buttonR + 5.0, r));
@@ -460,7 +460,7 @@ void main() {
     col = mix(col, stone, halves);
     col += vec3(1.7, 0.42, 0.05) * specks * halves;
     col = mix(col, vec3(0.035, 0.016, 0.014), max(dark * 0.85, outline * 0.85));
-    col = mix(col, vec3(0.5, 0.09, 0.03) * breathe, core);
+    col = mix(col, vec3(0.24, 0.07, 0.06) * breathe, core);
     col += vec3(0.5, 0.07, 0.01) * exp(-max(r - uEmblem.z, 0.0) / 14.0) * 0.12 * step(uEmblem.z, r);
   }
 
