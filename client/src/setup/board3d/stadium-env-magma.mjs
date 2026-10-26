@@ -307,9 +307,12 @@ void main() {
     h -= 2.2 * (1.0 - smoothstep(2.0, 4.5, emblemDistance(p, uEmblem))) * inland;
   } else if (outerSD > 0.0) {
     kind = 0.0;
-    vec2 rock = faceted(p, h, smoothstep(4.0, 26.0, outerSD));
-    h = rock.x - 4.0 * (1.0 - smoothstep(-2.0, 4.0, fallSD));
-    tone = rock.y;
+    // Rough volcanic rock: broad faces broken by knobbly lumps and a fine grain, the art's walls.
+    float onWall = smoothstep(4.0, 26.0, outerSD);
+    vec2 rock = faceted(p, h, onWall * 0.7);
+    float lumps = 7.0 * (fbm3(p / 26.0 + 3.0) - 0.5) + 3.0 * (gnoise(p / 9.0) - 0.5) + 1.2 * (gnoise(p / 3.5) - 0.5);
+    h = rock.x + lumps * onWall - 4.0 * (1.0 - smoothstep(-2.0, 4.0, fallSD));
+    tone = fract(rock.y + 0.35 * fbm3(p / 40.0));
   }
   gl_FragColor = vec4(h, tone, joint, kind);
 }
@@ -384,8 +387,8 @@ void main() {
   vec3 islandRock = mix(vec3(0.046, 0.037, 0.037), vec3(0.088, 0.071, 0.067), smoothstep(0.35, 0.75, facing));
   islandRock = mix(islandRock, vec3(0.15, 0.125, 0.115), smoothstep(0.85, 0.97, facing));
   islandRock *= 0.86 + 0.28 * tone;
-  vec3 wallRock = mix(vec3(0.042, 0.032, 0.034), vec3(0.085, 0.068, 0.07), smoothstep(0.4, 0.7, facing));
-  wallRock = mix(wallRock, vec3(0.16, 0.14, 0.15), smoothstep(0.82, 0.95, facing));
+  vec3 wallRock = mix(vec3(0.04, 0.021, 0.02), vec3(0.09, 0.047, 0.04), smoothstep(0.4, 0.7, facing));
+  wallRock = mix(wallRock, vec3(0.17, 0.1, 0.085), smoothstep(0.82, 0.95, facing));
   wallRock *= 0.8 + 0.4 * tone;
   vec3 col = mix(wallRock, islandRock, onIsland);
   // Painted rims: convex edges (lump tops, crags) catch a warm stroke of light.
@@ -410,23 +413,38 @@ void main() {
   float fromMoat = onIsland > 0.5 ? max(-islandSD, 0.0) : max(outerSD, 0.0);
   float above = max(ground - ${LAVA_LEVEL}.0, 0.0);
   float flicker = 0.85 + 0.15 * gnoise(vec2(uTime * 0.9, p.x / 90.0 + p.y / 130.0));
-  float moatGlow = exp(-fromMoat / 38.0) * exp(-above / 80.0) * (0.25 + 0.75 * turned);
-  col += vec3(1.0, 0.22, 0.03) * moatGlow * flicker * 0.8;
-  col += vec3(1.0, 0.28, 0.04) * exp(-max(fallSD, 0.0) / 14.0) * onWall * 0.85 * flicker;
+  // The walls take less of it than the island: their faces lean away from the moat's middle.
+  float moatGlow = exp(-fromMoat / mix(26.0, 38.0, onIsland)) * exp(-above / 70.0) * (0.25 + 0.75 * turned);
+  col += vec3(1.0, 0.22, 0.03) * moatGlow * flicker * mix(0.55, 0.8, onIsland);
+  col += vec3(1.0, 0.26, 0.035) * exp(-max(fallSD, 0.0) / 11.0) * onWall * 0.7 * flicker;
 
   // Some of the island's cracks still glow; sparks lie on the rock.
   col = mix(col, basinLava(0.26 + 0.1 * flicker), field.b * 0.85);
   float specks = speck(p, 12.0, 0.1, 1.0) + speck(p, 27.0, 0.16, 2.0) * 1.5;
   col += vec3(1.7, 0.42, 0.05) * specks * mix(0.35, 1.0, onIsland);
 
-  // The Poke Ball etched in the island: a broad groove of red-brown rock, a thin seam of cooling
-  // lava down its middle, breathing slowly.
-  float emblem = emblemDistance(p, uEmblem);
-  float groove = (1.0 - smoothstep(2.5, 4.5, emblem)) * onIsland;
-  col = mix(col, vec3(0.17, 0.035, 0.018) * (0.7 + 0.6 * facing), groove * 0.9);
-  float seamLine = (1.0 - smoothstep(0.5, 1.4, emblem)) * onIsland;
-  col = mix(col, basinLava(0.24 + 0.06 * sin(uTime * 1.1)), seamLine * 0.8);
-  col += vec3(0.6, 0.08, 0.01) * exp(-emblem / 12.0) * 0.12 * onIsland;
+  // The Poke Ball set in the island, as in the art: both halves of hot red rock glowing from
+  // within, brightest toward the rim, a dark band across its middle, the button a dark ring round
+  // a dull red core; it breathes slowly.
+  if (uEmblem.z > 0.0 && onIsland > 0.5) {
+    vec2 rel = p - uEmblem.xy;
+    float r = length(rel);
+    float bandHalf = uEmblem.z * 0.075;
+    float buttonR = uEmblem.z * 0.24;
+    float breathe = 0.85 + 0.15 * sin(uTime * 1.1);
+    float inside = 1.0 - smoothstep(uEmblem.z - 1.5, uEmblem.z, r);
+    float halves = inside * smoothstep(bandHalf, bandHalf + 1.5, abs(rel.y)) * smoothstep(buttonR + 3.0, buttonR + 5.0, r);
+    vec3 hot = mix(vec3(0.22, 0.028, 0.01), vec3(0.52, 0.1, 0.028), smoothstep(0.35, 1.0, r / uEmblem.z));
+    hot *= breathe * (0.82 + 0.18 * gnoise(p / 14.0));
+    float buttonRing = smoothstep(buttonR - 7.0, buttonR - 4.0, r) * (1.0 - smoothstep(buttonR + 3.0, buttonR + 5.0, r));
+    float dark = max(inside * (1.0 - halves) * step(buttonR - 4.0, r), buttonRing);
+    float core = 1.0 - smoothstep(buttonR - 8.0, buttonR - 6.0, r);
+    float outline = 1.0 - smoothstep(1.0, 2.5, abs(r - uEmblem.z));
+    col = mix(col, hot, halves * 0.92);
+    col = mix(col, vec3(0.03, 0.018, 0.016), max(dark * 0.65, outline * 0.8));
+    col = mix(col, vec3(0.22, 0.04, 0.015) * breathe, core);
+    col += vec3(0.5, 0.07, 0.01) * exp(-max(r - uEmblem.z, 0.0) / 14.0) * 0.12 * step(uEmblem.z, r);
+  }
 
   // The falls: lava streaming down the wall, a gold core, faster streaks racing down it.
   if (fallSD < 1.5 && onWall > 0.5) {
