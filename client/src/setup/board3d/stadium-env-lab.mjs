@@ -50,7 +50,7 @@ const OUTLINE_STEP_RAD = Math.PI / 90;
  */
 const TANKS = [
   [184, 44, 78, 104, 0],
-  [8, 50, 72, 100, 1],
+  [3, 60, 72, 100, 1],
   [214, 60, 56, 92, 1],
   [40, 56, 58, 96, 0],
   [118, 52, 50, 90, 0],
@@ -63,7 +63,7 @@ const CONSOLES = [
   [133, 26],
 ];
 /** A console's half width along the dais, half depth, and its sloped top's low and high edges (z). */
-const CONSOLE = { hw: 58, hh: 30, low: -22, high: -2 };
+const CONSOLE = { hw: 50, hh: 26, low: 10, high: 30 };
 
 /** The art's safety yellow, bright in every light (glowing w: thin rails seen from above stayed olive when lit). */
 const YELLOW = [1.0, 0.76, 0.06, 1.78];
@@ -73,8 +73,6 @@ const DARK_STEEL = [0.32, 0.35, 0.4, 0.7];
 const PIPE = [0.42, 0.54, 0.6, 0.85];
 const BIG_PIPE_STEEL = [0.24, 0.38, 0.45, 0.85];
 const CABLE = [0.03, 0.03, 0.035, 0.3];
-const LAMP_BLACK = [0.035, 0.037, 0.045, 0.5];
-const LAMP_LIGHT = [1.2, 1.25, 1.3, 2.2];
 /** Cable runs on the dais's band: start turn (deg), span (deg), a wobble seed. */
 const CABLE_RUNS = [
   [96, 22, 0.4],
@@ -84,7 +82,7 @@ const CABLE_RUNS = [
 /** Brushed lids: steel that doesn't mirror the lamps overhead as a white disc. */
 const LID = [0.45, 0.48, 0.54, 0.25];
 /** The big pipes: turn round the dais (deg) each runs out from the ring before rising. */
-const BIG_PIPES = [100, 120, 238, 262, 292, 72, 200, 160];
+const BIG_PIPES = [100, 120, 238, 262, 292, 72, 200, 160, 325, 345, 20, 60];
 /**
  * The big pipes: radius, run out across the deck, bend radius, the height their upper elbow turns
  * them out level at, and how far they run on out from there.
@@ -93,22 +91,17 @@ const BIG_PIPE = { radius: 32, run: 150, bend: 50, top: 236, reach: 300 };
 /** Longest span a hanging cable crosses between two risers or tank tops. */
 const CABLE_SPAN_PX = 300;
 /** The art's thin white bands round its big pipes: spacing along the pipe, how far proud. */
-const PIPE_BAND = { every: 70, proud: 1.6, width: 2.4 };
+const PIPE_BAND = { every: 150, proud: 1.6, width: 2.4 };
 const BAND_WHITE = [0.92, 0.95, 0.97, 0.2];
 /** The deck's pipe runs: candidates every `step` deg, at most `most`, two pipes `spread` px apart. */
 const BUNDLE = { step: 24, most: 6, spread: 22, radius: 8 };
 const STEP_BLUE = [0.14, 0.24, 0.27, 0.35];
 const STEP_BLUE_LIGHT = [0.18, 0.29, 0.32, 0.35];
 const STEP_SIDE = [0.06, 0.1, 0.12, 0.35];
-/** The art's consoles: pale bodies, dark teal screens with a faint glow, rows of coloured buttons. */
-const SCREEN = [0.08, 0.26, 0.32, 1.6];
+/** The art's consoles: pale cabinets, sloped dark navy screens with a faint glow, a few grey buttons. */
+const SCREEN = [0.04, 0.1, 0.22, 1.5];
 const CONSOLE_GREY = [0.78, 0.81, 0.84, 0.3];
-const BUTTONS = [
-  [1.0, 0.22, 0.16, 1.8],
-  [1.0, 0.78, 0.12, 1.8],
-  [0.25, 0.9, 0.35, 1.8],
-  [0.3, 0.6, 1.0, 1.8],
-];
+const BUTTON = [0.3, 0.33, 0.37, 0.3];
 
 const isRect = (rect) => rect && [rect.x, rect.y, rect.w, rect.h].every(Number.isFinite) && rect.w > 0 && rect.h > 0;
 const cornersOf = (rect) => [
@@ -401,8 +394,8 @@ export function labProps(spots) {
     for (const [x, y, z] of [top, foot]) props.cylinder({ x, y, z0: z - 37, z1: z, r: 2.8, color: YELLOW, sides: 8 });
   }
 
-  // The consoles: pale grey desks, their tops sloping up away from the dais, a lit screen and a
-  // row of buttons on the slope.
+  // The consoles, as the art's: upright pale cabinets on the deck, standing up past the dais's lip,
+  // their tops sloping up away from the dais, two dark screens and a few buttons on the slope.
   for (const { x, y, angle } of consoles) {
     const yaw = angle + Math.PI / 2;
     const c = Math.cos(yaw);
@@ -424,9 +417,9 @@ export function labProps(spots) {
       const u1 = side < 0 ? -2 : hw - 5;
       props.quad(at(u0, -2, 0.6), at(u1, -2, 0.6), at(u1, hh - 4, 0.6), at(u0, hh - 4, 0.6), SCREEN);
     }
-    for (let k = 0; k < 7; k += 1) {
-      const u = -hw + 8 + k * ((2 * hw - 16) / 6);
-      props.quad(at(u - 3, -hh + 4, 0.6), at(u + 3, -hh + 4, 0.6), at(u + 3, -hh + 10, 0.6), at(u - 3, -hh + 10, 0.6), BUTTONS[k % BUTTONS.length]);
+    for (let k = 0; k < 4; k += 1) {
+      const u = -hw + 12 + k * ((2 * hw - 24) / 3);
+      props.quad(at(u - 3, -hh + 4, 0.6), at(u + 3, -hh + 4, 0.6), at(u + 3, -hh + 9, 0.6), at(u - 3, -hh + 9, 0.6), BUTTON);
     }
   }
 
@@ -496,21 +489,6 @@ export function labProps(spots) {
     points.push(out(10, 2), out(15, -10), out(17, -30), out(22, -DROP_PX + 3), out(40, -DROP_PX + 3));
     props.tube(points, 2.6, CABLE, { sides: 6 });
   }
-  // The art's gooseneck lamp on the dais's rim by the stair, bent over the platform.
-  const lampFoot = outlineAt(outline, STAIR.angle + halfGap + 0.12);
-  const inward = Math.atan2(dais.y - lampFoot.y, dais.x - lampFoot.x);
-  const foot = [lampFoot.x + Math.cos(inward) * 8, lampFoot.y + Math.sin(inward) * 8];
-  const neck = [];
-  for (let k = 0; k <= 10; k += 1) {
-    const t = k / 10;
-    const reach = 46 * Math.sin((t * Math.PI) / 2) ** 2;
-    neck.push([foot[0] + Math.cos(inward) * reach, foot[1] + Math.sin(inward) * reach, 120 * Math.sin((t * Math.PI) / 1.6)]);
-  }
-  props.cylinder({ x: foot[0], y: foot[1], z0: 0, z1: 4, r: 9, color: LAMP_BLACK, sides: 12 });
-  props.tube(neck, 2.4, LAMP_BLACK, { sides: 6 });
-  const head = neck[neck.length - 1];
-  props.cylinder({ x: head[0], y: head[1], z0: head[2] - 10, z1: head[2] + 4, r: 7, color: LAMP_BLACK, sides: 12 });
-  props.cylinder({ x: head[0], y: head[1], z0: head[2] - 11, z1: head[2] - 10, r: 5.5, color: LAMP_LIGHT, sides: 12 });
   const ringPipe = [];
   for (let turn = 0; turn <= 2 * Math.PI - 2 * halfGap + 1e-9; turn += OUTLINE_STEP_RAD * 2) {
     const edge = outlineAt(outline, start + turn);
@@ -745,7 +723,7 @@ void main() {
     // the dais's foot.
     vec2 diamond = abs(fract(mat2(0.7071, 0.7071, -0.7071, 0.7071) * p / 7.0 * vec2(1.0, 2.6)) - 0.5);
     float tread = smoothstep(0.32, 0.46, max(diamond.x, diamond.y) - 0.0);
-    col = mix(vec3(0.19, 0.25, 0.29), vec3(0.23, 0.3, 0.35), tread * 0.5);
+    col = mix(vec3(0.3, 0.38, 0.43), vec3(0.35, 0.44, 0.5), tread * 0.5);
     col *= 0.9 + 0.2 * fbm3(p / 120.0);
     vec2 panel = abs(mod(p + 150.0, 300.0) - 150.0);
     col = mix(col * 0.72, col, smoothstep(0.8, 2.0, min(panel.x, panel.y)));
@@ -774,7 +752,7 @@ vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
   // stripe along the pipe's crown.
   vec3 view = normalize(uEye - world);
   vec3 r = reflect(-view, n);
-  vec3 env = mix(vec3(0.03, 0.045, 0.06), vec3(0.16, 0.22, 0.26), smoothstep(-0.7, -0.06, r.z));
+  vec3 env = mix(vec3(0.1, 0.13, 0.16), vec3(0.3, 0.37, 0.42), smoothstep(-0.7, -0.06, r.z));
   env = mix(env, vec3(0.62, 0.72, 0.78), smoothstep(-0.06, 0.0, r.z));
   env = mix(env, vec3(0.36, 0.45, 0.5), smoothstep(0.08, 0.5, r.z));
   env += vec3(0.5, 0.62, 0.68) * smoothstep(0.85, 1.0, sin(atan(r.y, r.x) * 5.0)) * smoothstep(0.0, 0.2, r.z) * (1.0 - smoothstep(0.5, 0.8, r.z));
