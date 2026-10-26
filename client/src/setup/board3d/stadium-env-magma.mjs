@@ -467,10 +467,8 @@ void main() {
   vec2 edgeUv = min(vUv, 1.0 - vUv);
   col *= mix(0.35, 1.0, smoothstep(0.0, 0.06, min(edgeUv.x, edgeUv.y)));
 
-  float front = revealFront();
-  col += basinLava(0.7) * smoothstep(front - 0.035, front - 0.004, revealReach(p)) * step(uReveal, 0.999);
-  float gone = uExit * 1.1;
-  col += basinLava(0.7) * (1.0 - smoothstep(gone, gone + 0.04, fbm3(p / 110.0 + 5.0))) * step(0.001, uExit);
+  col += basinLava(0.7) * revealGlow(p, 0.035);
+  col += basinLava(0.7) * exitGlow(p);
 
   gl_FragColor = vec4(col, 1.0);
 ${OUTPUT}
@@ -575,8 +573,7 @@ void main() {
   heat += (dome * 0.25 + ring * 0.2) * hasBubble;
 
   vec3 col = basinLava(heat);
-  float front = revealFront();
-  col += basinLava(0.7) * smoothstep(front - 0.035, front - 0.004, revealReach(p)) * step(uReveal, 0.999);
+  col += basinLava(0.7) * revealGlow(p, 0.035);
   gl_FragColor = vec4(col, 1.0);
 ${OUTPUT}
 }

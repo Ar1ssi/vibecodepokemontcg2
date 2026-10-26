@@ -408,10 +408,8 @@ void main() {
   }
   vec2 edgeUv = min(vUv, 1.0 - vUv);
   col *= mix(0.3, 1.0, smoothstep(0.0, 0.05, min(edgeUv.x, edgeUv.y)));
-  float front = revealFront();
-  col += NEON_PINK * smoothstep(front - 0.035, front - 0.004, revealReach(p)) * step(uReveal, 0.999);
-  float gone = uExit * 1.1;
-  col += NEON_PINK * (1.0 - smoothstep(gone, gone + 0.04, fbm3(p / 110.0 + 5.0))) * step(0.001, uExit);
+  col += NEON_PINK * revealGlow(p, 0.035);
+  col += NEON_PINK * exitGlow(p);
   gl_FragColor = vec4(col, 1.0);
 ${OUTPUT}
 }
@@ -448,8 +446,7 @@ void main() {
   }
   // Down in the streets the night's haze swallows the towers' feet.
   col = mix(col, NIGHT, smoothstep(-40.0, -${STREET_PX}.0, vWorld.z) * 0.85);
-  float front = revealFront();
-  col += NEON_PINK * smoothstep(front - 0.035, front - 0.004, revealReach(vWorld.xy)) * step(uReveal, 0.999);
+  col += NEON_PINK * revealGlow(vWorld.xy, 0.035);
   gl_FragColor = vec4(col, 1.0);
 ${OUTPUT}
 }

@@ -110,13 +110,29 @@ float revealReach(vec2 p) {
 float revealFront() {
   return uReveal * 1.25 - 0.05;
 }
-// 1 behind the front (the environment shows), 0 ahead of it (the mat shows).
+// 1 behind the front (the environment shows), 0 ahead of it (the mat shows). Once the reveal has
+// run (and before an exit starts) both are 1 everywhere: the uniform branches skip the noise, which
+// every vertex and pixel of a board would otherwise work out each frame.
 float revealBurned(vec2 p) {
+  if (uReveal >= 1.0) return 1.0;
   return 1.0 - smoothstep(revealFront() - 0.004, revealFront(), revealReach(p));
 }
 float exitKeep(vec2 p) {
+  if (uExit <= 0.0) return 1.0;
   float gone = uExit * 1.1;
   return smoothstep(gone - 0.04, gone, fbm3(p / 110.0 + 5.0));
+}
+// The reveal's front as a glow band of the given width behind it, 0 once it has run.
+float revealGlow(vec2 p, float width) {
+  if (uReveal >= 0.999) return 0.0;
+  float front = revealFront();
+  return smoothstep(front - width, front - 0.004, revealReach(p));
+}
+// The exit's edge as a glow, 0 while no exit runs.
+float exitGlow(vec2 p) {
+  if (uExit <= 0.001) return 0.0;
+  float gone = uExit * 1.1;
+  return 1.0 - smoothstep(gone, gone + 0.04, fbm3(p / 110.0 + 5.0));
 }
 `;
 
@@ -219,6 +235,7 @@ float groundAt(vec2 uv) {
 // How far the ground at p has risen behind the reveal front (0 flat on the cloth, 1 full height),
 // and sunk back as the exit passes.
 float terrainGrowth(vec2 p) {
+  if (uReveal >= 1.0) return exitKeep(p);
   float rise = 1.0 - smoothstep(revealFront() - 0.12, revealFront(), revealReach(p));
   return rise * rise * (3.0 - 2.0 * rise) * exitKeep(p);
 }

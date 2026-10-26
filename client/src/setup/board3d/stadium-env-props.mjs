@@ -184,8 +184,7 @@ void main() {
   vec3 col = vColor.w >= 1.5
     ? vColor.rgb * (vColor.w - 1.0)
     : lightProp(vColor.rgb, normalize(gl_FrontFacing ? vNormal : -vNormal), vWorld, vColor.w);
-  float front = revealFront();
-  col += (${reveal}) * smoothstep(front - 0.035, front - 0.004, revealReach(vWorld.xy)) * step(uReveal, 0.999);
+  col += (${reveal}) * revealGlow(vWorld.xy, 0.035);
   gl_FragColor = vec4(col, 1.0);
 ${OUTPUT}
 }

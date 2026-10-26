@@ -437,10 +437,8 @@ void main() {
   vec2 edgeUv = min(vUv, 1.0 - vUv);
   col *= mix(0.45, 1.0, smoothstep(0.0, 0.05, min(edgeUv.x, edgeUv.y)));
   vec3 dust = vec3(0.75, 0.68, 0.55);
-  float front = revealFront();
-  col += dust * smoothstep(front - 0.035, front - 0.004, revealReach(p)) * step(uReveal, 0.999) * 0.6;
-  float gone = uExit * 1.1;
-  col += dust * (1.0 - smoothstep(gone, gone + 0.04, fbm3(p / 110.0 + 5.0))) * step(0.001, uExit) * 0.6;
+  col += dust * revealGlow(p, 0.035) * 0.6;
+  col += dust * exitGlow(p) * 0.6;
   gl_FragColor = vec4(col, 1.0);
 ${OUTPUT}
 }

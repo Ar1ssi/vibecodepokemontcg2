@@ -584,10 +584,8 @@ void main() {
   vec2 edgeUv = min(vUv, 1.0 - vUv);
   col *= mix(0.35, 1.0, smoothstep(0.0, 0.05, min(edgeUv.x, edgeUv.y)));
 
-  float front = revealFront();
-  col += ${LENS_BLUE} * smoothstep(front - 0.035, front - 0.004, revealReach(p)) * step(uReveal, 0.999);
-  float gone = uExit * 1.1;
-  col += ${LENS_BLUE} * (1.0 - smoothstep(gone, gone + 0.04, fbm3(p / 110.0 + 5.0))) * step(0.001, uExit);
+  col += ${LENS_BLUE} * revealGlow(p, 0.035);
+  col += ${LENS_BLUE} * exitGlow(p);
   gl_FragColor = vec4(col, 1.0);
 ${OUTPUT}
 }

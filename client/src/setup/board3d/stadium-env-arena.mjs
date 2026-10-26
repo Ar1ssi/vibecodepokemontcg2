@@ -388,10 +388,8 @@ void main() {
   col = mix(col, HAZE_TEAL, smoothstep(${STAGE_PX.width}.0, 500.0, d) * 0.45);
   vec2 edgeUv = min(vUv, 1.0 - vUv);
   col *= mix(0.3, 1.0, smoothstep(0.0, 0.05, min(edgeUv.x, edgeUv.y)));
-  float front = revealFront();
-  col += STAGE_GLOW * smoothstep(front - 0.035, front - 0.004, revealReach(p)) * step(uReveal, 0.999);
-  float gone = uExit * 1.1;
-  col += STAGE_GLOW * (1.0 - smoothstep(gone, gone + 0.04, fbm3(p / 110.0 + 5.0))) * step(0.001, uExit);
+  col += STAGE_GLOW * revealGlow(p, 0.035);
+  col += STAGE_GLOW * exitGlow(p);
   gl_FragColor = vec4(col, 1.0);
 ${OUTPUT}
 }

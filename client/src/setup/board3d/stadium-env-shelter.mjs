@@ -264,10 +264,8 @@ void main() {
   vec2 edgeUv = min((p - uMin) / uSize, 1.0 - (p - uMin) / uSize);
   col *= mix(0.4, 1.0, smoothstep(0.0, 0.05, min(edgeUv.x, edgeUv.y)));
 
-  float front = revealFront();
-  col += STRIP_CYAN * smoothstep(front - 0.035, front - 0.004, revealReach(p)) * step(uReveal, 0.999);
-  float gone = uExit * 1.1;
-  col += STRIP_CYAN * (1.0 - smoothstep(gone, gone + 0.04, fbm3(p / 110.0 + 5.0))) * step(0.001, uExit);
+  col += STRIP_CYAN * revealGlow(p, 0.035);
+  col += STRIP_CYAN * exitGlow(p);
   gl_FragColor = vec4(col, 1.0);
 ${OUTPUT}
 }
@@ -327,8 +325,7 @@ void main() {
     col = mix(col, roof, smoothstep(${WALL_PX.cap - 20}.0, ${WALL_PX.cap}.0, beyond));
   }
   col += glow;
-  float front = revealFront();
-  col += STRIP_CYAN * smoothstep(front - 0.035, front - 0.004, revealReach(vPos)) * step(uReveal, 0.999);
+  col += STRIP_CYAN * revealGlow(vPos, 0.035);
   gl_FragColor = vec4(col, 1.0);
 ${OUTPUT}
 }
