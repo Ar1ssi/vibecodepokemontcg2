@@ -52,14 +52,14 @@ export const DEPTHS_PX = 260;
  * base radius, height of the summit over the depths.
  */
 const PEAKS = [
-  [176, 120, 150, 250],
-  [204, 70, 110, 200],
-  [150, 80, 120, 215],
-  [8, 100, 140, 245],
-  [338, 70, 105, 190],
-  [34, 70, 115, 205],
-  [96, 120, 150, 230],
-  [66, 90, 110, 190],
+  [176, 150, 150, 195],
+  [204, 90, 110, 160],
+  [150, 100, 120, 170],
+  [8, 120, 140, 190],
+  [338, 90, 105, 150],
+  [34, 90, 115, 165],
+  [96, 140, 150, 185],
+  [66, 110, 110, 150],
 ];
 
 const GREY_STONE = [0.5, 0.46, 0.4, 0.05];
@@ -421,8 +421,9 @@ void main() {
     rock = mix(dust, rock, smoothstep(0.92, 0.75, n.z));
     // The cliff's lip: bare dark rock where the shelf breaks off.
     rock *= mix(1.0, 0.62, smoothstep(-4.0, -40.0, ground) * (1.0 - smoothstep(-90.0, -150.0, ground)));
-    float snow = smoothstep(-${DEPTHS_PX - 150}.0, -${DEPTHS_PX - 175}.0, ground + (gnoise(p / 30.0) - 0.5) * 40.0) * step(ground, -10.0) * smoothstep(0.3, 0.6, n.z);
-    rock = mix(rock, mix(vec3(0.52, 0.51, 0.5), vec3(0.78, 0.77, 0.74), smoothstep(0.4, 0.8, facing)), snow);
+    // Snow dusts the peaks' heads, grey in the overcast light.
+    float snow = smoothstep(-${DEPTHS_PX - 130}.0, -${DEPTHS_PX - 155}.0, ground + (gnoise(p / 30.0) - 0.5) * 40.0) * step(ground, -10.0) * smoothstep(0.3, 0.6, n.z);
+    rock = mix(rock, mix(vec3(0.42, 0.41, 0.4), vec3(0.62, 0.61, 0.58), smoothstep(0.4, 0.8, facing)), snow * 0.8);
     col = rock * (0.75 + 0.3 * sky);
   }
   col = mix(col * 0.55, col, smoothstep(0.3, 0.9, light.b));
