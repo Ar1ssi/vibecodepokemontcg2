@@ -297,14 +297,16 @@ void main() {
   if (islandSD < 0.0) {
     kind = -1.0;
     float inland = smoothstep(0.0, -24.0, islandSD);
-    // Lumpy cooled lava: broad swells, knobbly lumps, a fine grain.
-    h += (4.5 * (fbm3(p / 46.0) - 0.5) + 2.2 * (gnoise(p / 15.0) - 0.5) + 0.8 * (gnoise(p / 5.0) - 0.5)) * inland;
+    // Lumpy cooled lava, as the art's: broad swells, faceted rocky lumps packed together, a fine
+    // grain.
+    vec3 lump = stones(p + 5.0, mix(26.0, 38.0, fbm3(p / 150.0)), 1.0);
+    h += (4.0 * (fbm3(p / 46.0) - 0.5) + 3.2 * lump.x + 0.8 * (gnoise(p / 5.0) - 0.5)) * inland;
     // A few long cracks wander across it in broken runs, some still glowing.
     vec2 warped = p + (vec2(fbm3(p / 80.0), fbm3(p / 80.0 + 5.3)) - 0.5) * 70.0;
     vec4 plate = voronoiCell(warped / 170.0 + 3.0);
     float seam = (1.0 - smoothstep(0.0, 0.016, plate.x)) * smoothstep(0.5, 0.62, gnoise(warped / 90.0 + 4.0));
     h -= 2.4 * seam * inland;
-    tone = fract(plate.y * 3.7 + fbm3(p / 70.0) * 0.8);
+    tone = fract(lump.y * 5.3 + fbm3(p / 70.0) * 0.5);
     joint = seam * step(0.45, fract(plate.y * 7.3));
     // The Poke Ball: a smooth disc a little proud of the rock, its band and button ring cut in, a
     // crevice round it.
