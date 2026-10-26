@@ -230,71 +230,86 @@ particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
   checked against pixel samples of the art:
   - Magma Basin (`stadium-env-magma.mjs`, BRS 144): every card on an island of charcoal basalt, a
     pebbly grain of small faceted lumps over broad swells, ember glints and no cracks (the art has
-    none), its shore wandering out in broad bulges so it reads as a blob; it runs on 140 px past the near cards (`NEAR_REACH_PX`), so the hand row lies over
-    rock, not lava. A moat of molten gold (a smooth glow, soft flow lines, a thin red-orange lip and
-    a dark crust at the shores, its width swelling and pinching) rings it; crimson cliffs heaped with
-    chunky rocks rise round it, the art's four thin lavafalls (a pale gold core in an orange halo, one
-    forked) pouring down the far wall only (falls on the side walls read as rays or spurs from
-    above); the Poke Ball set in the island as a relief of two domed brick-red cushions inside a
-    crisp deep carved outline, its band cut deep and its button ring wide enough to show either side
-    of the Actives; sparks off the moat and the
-    splashes. Two-pass bake. Every colour is the art's sample inverted through Neutral tone mapping
-    (its toe strips the smallest channel from dark colours, which over-saturated them).
+    none), its shore wandering out in broad bulges so it reads as a blob, its lip catching an orange
+    rim of the lava's light; it runs on 140 px past the near cards (`NEAR_REACH_PX`), so the hand
+    row lies over rock, not lava. A moat of molten lava (pale gold down its middle, orange to its
+    banks, a thin red-orange lip and a dark crust at the shores, its width swelling and pinching)
+    rings it; the art's chunky angular cliffs rise round it (big flat faces cut apart by dark seams,
+    maroon-brown faces, red-lit tops, glowing orange at their feet), the art's four thin lavafalls (a
+    pale gold core in an orange halo, one forked) pouring down the far wall only (falls on the side
+    walls, tried three times, run across the screen in both presets and read as rays); the Poke
+    Ball set in the island as a relief of two domed brick-red cushions inside a crisp deep carved
+    outline, its band cut deep and its button ring wide enough to show either side of the Actives;
+    sparks off the moat and the splashes. Two-pass bake. Every colour is the art's sample inverted
+    through Neutral tone mapping (its toe strips the smallest channel from dark colours, which
+    over-saturated them).
   - Steel Shelter (`stadium-env-shelter.mjs`, PHF 105): a white hall; the art's near-white floor in
     big hex tiles parted by crisp dark hairline seams, a per-pixel mirror of the walls and the
-    ceiling's big hex lights (hairline pale frames) strongest toward the walls, short black hatched
-    strips across the hall's four corners (the slanted sides of a great hexagon), the Poke Ball
-    hologram as the art's glowing doubled cyan outline, band and button rings with a tight glow; walls of white blocks with a louvred band across
-    their middle and hatches low, a dark baseboard, shimmering cyan strips near the top, leaning out
-    round the hall, the building's pale panelled roof past them, vent hoods on it; in the middle of each side wall (the far wall's
-    middle lies under the opponent's hand) the art's gate: a chunky white frame round a trapezoid
-    opening, each corner flaring into an arm ribbed with dark slats, a grey two-leaf door with vent
-    slits and hexagon clusters.
+    ceiling's big hex lights (hairline pale frames) strongest toward the walls, the walls'
+    reflections streaking the floor's margins as in the art's low view (the mirror shows the walls
+    but not their cyan strips), short black hatched strips across the hall's four corners (the
+    slanted sides of a great hexagon), the Poke Ball hologram as the art's glowing doubled cyan
+    outline, band and button rings, a near-white core in a soft blue bloom; walls of white blocks
+    with a louvred band across their middle and hatches low, a dark baseboard, shimmering cyan
+    strips near the top, leaning out round the hall, the building's pale panelled roof past them,
+    long skylights in it glowing with the hall's light; in the middle of each side wall (the far
+    wall's middle lies under the opponent's hand) the art's gate: a chunky white frame round a
+    trapezoid opening, each corner flaring into an arm ribbed with dark slats, a grey two-leaf door
+    with vent slits and hexagon clusters.
   - Full Metal Lab (`stadium-env-lab.mjs`, TEF 148): a two-tone dais (a deep glossy navy disc lit
     blue toward its middle under the lens, a darker band of reflection across it, a soft radial
     glow behind the Poke Ball's crisp white lines, the lens's scan pulse; a band of pale steel
-    plates) holds the Actives, Benches, Stadium and Trainer rows, docking pads the Prize cards and
-    piles, the joins wide enough that the railing runs round them smoothly; thick safety-yellow
-    railings, a blue-teal stair with steel nosings at the near right, black cables on the band; on
-    the pale ice-blue deck below the art's row of three terminals (a pale desk, a sloped keyboard
-    with a strip of buttons, an upright monitor whose dark screen faces the dais), its few big
-    bulbous tanks with collared necks and hanging cables between them, clusters of thin pale silver
-    pipes; every big pipe chrome (dark navy below a sharp horizon in its reflection, a hard white
-    stripe along its crown, thin white clamp rings): pipe runs round the dais along its tangent, ring
-    pipes, and thick elbow pipes on every side that rise at the deck's edge and turn out level high
-    over it, away from the dais (pipe arches read as horseshoes from above, pipes rising out of view
-    as barrels, the gooseneck lamp as a hook, dark collars as ribbed ducts).
+    plates) holds the Actives, Benches, Stadium and Trainer rows; docking pads of pale steel plate
+    (so the cards' blue backs keep their edges) hold the Prize cards and piles, the joins wide enough
+    that the railing runs round them smoothly, the margins wide enough that it stands clear of the
+    cards; thick safety-yellow railings, a blue-teal stair with steel nosings at the near right,
+    black cables on the band; on the pale ice-blue deck below, the art's row of three pale grey
+    cabinets (two desks with screens in pale bezels on their sloped tops, a taller upright one with
+    a big screen on its face to the dais; the row steps out past any docking pad), its big bulbous
+    tanks with collared necks and hanging cables between them; every big pipe chrome (dark navy
+    below a sharp horizon in its reflection, a hard white stripe along its crown, thin white clamp
+    rings): pipe runs round the dais along its tangent, ring pipes, and the art's cage, fifteen
+    thick (radius 40) elbow pipes on every side that start clear of the dais's rim, rise at the
+    deck's edge and turn out level high over it (pipe arches read as horseshoes from above, pipes
+    rising out of view as barrels, the gooseneck lamp as a hook, dark collars as ribbed ducts, thin
+    upright pipe clusters as rolling pins).
   - Dark City (`stadium-env-city.mjs`, UNM 193): a moonlit concrete rooftop in broad faint slabs with
-    a parapet, a dull red glow along its lower-left edge, the art's stairwell hut at the near right
-    (low and pale, its face lit by the lamp over its maroon door, the lamp's cold light spread on the
-    roof before it, a red light at its far end); slate towers with big windows, most of them dark (the
-    lit ones pale green-yellow, a few switching on and off), each roof plain tar with a parapet, tank
-    and red-lit mast; the art's two ads, each twice (on the tower's face to the roof, its width up
-    the face so the tilted preset reads it upright, and as a sign leaning back on the tower's roof
-    for the top-down preset): big white and grey checks with black print under Team Skull's red
-    angry face, and dark navy-violet with a pale sky band, a white crescent logo and big lettering
-    under a pink X; the far tower's band of glowing yellow-green slanted panels; the art's round
-    tower (one column of floors with pale ledges and lit window bands, a lantern of white-lit glass
-    under a dark dome) beside the roof's left side halfway back, low enough that both presets see it
-    whole; six searchlights, never across the cards: two on side tower roofs climb low along the
-    sides (the top-down preset), four in the streets beside the roof's building climb toward the far
-    side, rising past the side towers' tops (the tilted preset).
-  - Mountain Ring (`stadium-env-ring.mjs`, FFI 97): grey-brown brick paving in straight staggered rows
-    right up to the emblem, bricks a shade apart, thin joints, broad grime pools, breaking up at the
-    ring's edge; the art's emblem, a pale stone disc in a dark groove with a dark ring round its
-    centre and a shallower band carved across; the art's pale grey-tan menhirs round it, rough
-    chiselled columns tapering to blunt rounded tops (`stoneGirth`), a band of four rope coils above
-    and two below, thin strands sagging between; the art's massive rusty chain hanging off a stone on
-    the left and lying along the paving's edge toward the far end, every link clear of every card;
-    past them rough sandy ground with low irregular boulders, tall dark crags on the sides and past
-    the far edge, everything sinking into sepia haze with distance; cloud shadows and mist drift.
+    a parapet, its left low wall washed in the art's red-magenta and a dull red glow on the roof
+    beside it, the art's stairwell hut at the near right (low and pale; on its face to the cards,
+    the face both presets see, a maroon door under a bright lamp, two dark windows, a red light at
+    its far end; the lamp's cold light spread on the roof before it); slate towers with big
+    windows, most of them dark (one in five lit, pale yellow-green, a few switching on and off), each
+    roof plain tar with a parapet, tank and red-lit mast; the art's two ads, each twice (on the
+    tower's face to the roof, its width up the face so the tilted preset reads it upright, and as an
+    upright sign on the tower's roof for the top-down preset): big white and grey checks with black
+    print under Team Skull's red angry face, and dark navy-violet with a pale sky band, a white
+    crescent logo and big lettering under a pink X; the far tower's band of glowing yellow-green
+    slanted panels; the art's round tower (one column of floors with pale ledges and lit window
+    bands, a lantern of white-lit glass under a dark dome) beside the roof's left side halfway
+    back; between the buildings the art's near-black blue-violet night under a drifting
+    purple-grey haze; six searchlights on tower roofs, never across the cards: an X over each side
+    band from the tallest towers and a fan over the far skyline (the tilted preset sees almost no
+    sky, the towers' tops leaning out of its view, so they show in the top-down preset).
+  - Mountain Ring (`stadium-env-ring.mjs`, FFI 97): worn grey-brown cobbles in straight staggered rows
+    right up to the emblem, corners rounded, lengths and tones varied, thin joints, broad grime
+    pools, the edge wandering and fraying into the sand (no drawn circle); the art's emblem, a pale
+    stone disc in a dark groove with a dark ring round its centre and a shallower band carved
+    across; the art's pale grey menhirs round it (189,182,170, dark streaks down some faces), rough
+    chiselled columns tapering to blunt rounded tops (`stoneGirth`), squat in the side bands and tall
+    off the ends, a band of four rope coils above and two below, thick dark brown strands sagging
+    between; the art's massive rusty chain hanging off a stone on the left and lying along the
+    paving's edge toward the far end, every link clear of every card; past them rough sandy ground
+    with low pale boulders, tall dark crags on the sides and past the far edge, everything sinking
+    into sepia haze with distance; cloud shadows and mist drift.
   - Fighting Stadium (`stadium-env-arena.mjs`, FFI 90): a wrestling ring (canvas the art's pale
     cyan-white, a navy band at its edge, a deep blue skirt showing from above; blue corner posts,
     three white ropes a side) on a broad square glowing white stage edged in big round lamps; the lighting rig, a pale steel truss round over the ropes (its height
     carries it out past them in both presets) with round bulbs in small halos; the art's glowing
-    strip of LED ad boards round the floor, every panel one of its designs with its logo or print
-    (white with the red and white Poke Ball, white, blue, orange-red, teal-green); dark teal tiers of a quiet crowd broken by
+    strip of tall LED ad boards round the floor, every panel one bold logo (the big red and white
+    Poke Ball on white, a chunky wordmark on blue, orange-red or teal-green); dark teal tiers of a quiet crowd broken by
     aisles, the back rows fading into the dark, washed by the art's big yellow and pink spotlights;
+    over each side stand the art's lattice of white light, two X's of straight white shafts with a
+    flare at each crossing;
     lights flaring into starbursts high in the four corners, 16 long thin lasers in the art's
     yellow-green, magenta, cyan, green and white criss-crossing from them over the side and far
     stands, never over the ring. (The art's entrance ramp is left out: from above it read as a plank.)
