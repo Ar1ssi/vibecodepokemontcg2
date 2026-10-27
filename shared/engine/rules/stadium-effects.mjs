@@ -1877,6 +1877,31 @@ export function isStadiumStatusImmunity(card) {
   return /can'?t be (?:asleep|confused|paralyzed|poisoned|burned)/.test(t);
 }
 
+const ENERGY_TYPE_WORD = {
+  c: 'colorless', d: 'darkness', f: 'fighting', g: 'grass', l: 'lightning', m: 'metal',
+  n: 'dragon', p: 'psychic', r: 'fire', w: 'water', y: 'fairy',
+};
+const ENERGY_STATUS_IMMUNITY =
+  /each pok[eé]mon that has any {([a-z])} energy attached to it[^.]*is immune to special conditions/;
+
+/**
+ * "Each Pokémon that has any {Y} Energy attached to it (both yours and your opponent's) is immune
+ * to Special Conditions": true when `stadiumCard` prints that wording for a type some Energy
+ * attached to `pokemon` (a root card in `zoneCards`) carries. Pure; no rulesState.
+ */
+export function stadiumEnergyStatusImmunity(stadiumCard, pokemon, zoneCards = []) {
+  const m = ENERGY_STATUS_IMMUNITY.exec(textOf(stadiumCard).replace(/[‘’]/g, "'"));
+  const word = m && ENERGY_TYPE_WORD[m[1]];
+  if (!word || !pokemon) return false;
+  return (zoneCards || []).some((c) => {
+    if (!c || c.attachedTo !== pokemon.instanceId) return false;
+    const supertype = lower(c.supertype || c.type || '');
+    if (!supertype.includes('energy') && !/\benergy\b/.test(lower(c.name))) return false;
+    const types = [c.energyType, ...(Array.isArray(c.types) ? c.types : [])].map(lower);
+    return types.includes(word) || lower(c.name).includes(word);
+  });
+}
+
 /** Dizzying Valley: Confused Pokémon don't recover on evolve/devolve. */
 export function isStadiumConfusedPersist(card) {
   const t = textOf(card);

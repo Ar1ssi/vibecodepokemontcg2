@@ -321,3 +321,42 @@ test('evolve: a legacy Mega Evolution still runs Pokémon Checkup before the tur
     'Poison damage was applied at the between-turns checkup'
   );
 });
+
+// Gliscor PAR 092 Poison Heal (TCGdex sv04-092): no Poison damage, remove 1 damage counter at Checkup.
+const POISON_HEAL = {
+  name: 'Poison Heal',
+  type: 'Ability',
+  text: 'This Pokémon takes no damage from being Poisoned. During Pokémon Checkup, if this Pokémon is Poisoned, remove 1 damage counter from it.',
+};
+
+function poisonedGliscor(damage) {
+  const gligar = pokemon({ instanceId: 20, name: 'Gligar', hp: 70, damage, specialCondition: 'Poisoned' });
+  const gliscor = pokemon({
+    instanceId: 21, name: 'Gliscor', stage: 'Stage 1', hp: 120, attachedTo: 20, abilities: [POISON_HEAL],
+  });
+  return [gligar, gliscor];
+}
+
+test('checkup: Poison Heal removes a damage counter instead of dealing Poison damage', () => {
+  const state = game();
+  state.players.p1.zones.active.push(pokemon({ instanceId: 1, name: 'Pikachu', hp: 60 }));
+  state.players.p2.zones.active.push(...poisonedGliscor(50));
+
+  const res = applyCommand(state, { type: 'pass', payload: {}, playerId: 'p1' });
+  assert.equal(res.error, null);
+  const defender = res.state.players.p2.zones.active.find((c) => c.instanceId === 20);
+  assert.equal(defender.damage, 40);
+  assert.ok(res.events.some((e) => e.type === 'damageUpdated' && e.source === 'Poison Heal' && e.healed === 10));
+  assert.ok(!res.events.some((e) => e.type === 'checkupDamage'));
+});
+
+test('checkup: Poison Heal on an undamaged Pokémon changes nothing and stays Poisoned', () => {
+  const state = game();
+  state.players.p1.zones.active.push(pokemon({ instanceId: 1, name: 'Pikachu', hp: 60 }));
+  state.players.p2.zones.active.push(...poisonedGliscor(0));
+
+  const res = applyCommand(state, { type: 'pass', payload: {}, playerId: 'p1' });
+  const defender = res.state.players.p2.zones.active.find((c) => c.instanceId === 20);
+  assert.equal(defender.damage, 0);
+  assert.ok(!res.events.some((e) => e.type === 'checkupDamage'));
+});
