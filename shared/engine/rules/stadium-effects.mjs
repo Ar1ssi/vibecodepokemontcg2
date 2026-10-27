@@ -801,6 +801,21 @@ export function parseStadiumOncePerTurn(card) {
     }
   }
 
+  // Fairy Garden (customhb): "that player may discard a {Y} Energy card. If they do, …" — the
+  // hand is implied when the clause names no zone.
+  if (!base.cost) {
+    const bareEnergy = t.match(/discard (?:an? )?(basic )?(?:{([a-z])} )?energy card(?! (?:from|attached))/);
+    if (bareEnergy) {
+      const type = bareEnergy[2] ? HEAL_TYPE_SYMBOLS[bareEnergy[2]] : null;
+      base.cost = {
+        type: 'discard-energy',
+        n: 1,
+        ...(bareEnergy[1] ? { basicOnly: true } : {}),
+        ...(type ? { types: [type] } : {}),
+      };
+    }
+  }
+
   // "discard a card from their hand" (Giant Hearth, Viridian Forest) — an
   // untyped, one-card discard paid before a deck search.
   if (
@@ -1173,7 +1188,8 @@ export function parseStadiumOncePerTurn(card) {
   // printed, so this composes a discardCost + searchDeck rather than falling
   // through to a free search.
   if (
-    /discard (?:a|an) card from (?:their|his or her|your) hand/.test(t) &&
+    (/discard (?:a|an) card from (?:their|his or her|your) hand/.test(t) ||
+      base.cost?.type === 'discard-energy') &&
     /search(?:es)? (?:their|your|his or her) deck/.test(t)
   ) {
     const es = t.match(

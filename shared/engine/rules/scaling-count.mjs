@@ -231,6 +231,12 @@ function energyAcrossCount(unit, ctx) {
   if (/^energy attached to all of your active pokémon$/.test(unit) && num(ctx.energyCount) != null) {
     return { count: ctx.energyCount, label: 'Energy on your Active Pokémon' };
   }
+  const typedAll = /^{([a-z])} energy attached to all pokémon$/.exec(unit);
+  if (typedAll && Array.isArray(ctx.allEnergyUnits)) {
+    const type = LETTER_TYPES[typedAll[1]];
+    const units = ctx.allEnergyUnits.filter((u) => lower(u).split('|').some((part) => sameType(part, type)));
+    return { count: units.length, label: `${type} Energy on all Pokémon` };
+  }
   if (/^energy attached to all pokémon$/.test(unit)) {
     const own = num(ctx.ownEnergyCount);
     const opp = num(ctx.opponentAllEnergyCount);
