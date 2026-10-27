@@ -167,7 +167,23 @@ describe('attack-ui palette', () => {
     assert.deepEqual([b.top, b.right, b.bottom, b.left], [13, 16, 3, 16]);
     const decls = ruleFor('.tcgl-opt--passive .tcgl-opt__bar::before');
     assert.ok(decls, 'no passive ability header rule');
-    assert.match(decls, /mask-border: url\('\.\.\/assets\/attack-ui\/ability-bg\.png'\) 13 16 3 16 fill/);
+    // Sliced 1px in on the top and sides: the game borders fill the 32 x 16 sprite exactly.
+    assert.match(decls, /mask-border: url\('\.\.\/assets\/attack-ui\/ability-bg\.png'\) 12 15 3 15 fill/);
+  });
+
+  // Unity stretches a zero-size centre; CSS draws no edges or centre at all, so a sprite sliced
+  // through its whole width or height shows only its four corners.
+  it('every sliced sprite keeps a centre to stretch', () => {
+    const sliced = /url\('\.\.\/assets\/attack-ui\/([\w-]+\.png)'\) ((?:\d+ ?){1,4}) fill/g;
+    const uses = [...OPTIONS_CSS.matchAll(sliced)];
+    assert.ok(uses.length >= 5, 'expected the row, shadow, mask and bar slices');
+    for (const [, file, slices] of uses) {
+      const png = readFileSync(`${ASSET_DIR}${file}`);
+      const [width, height] = [png.readUInt32BE(16), png.readUInt32BE(20)];
+      const [top, right = top, bottom = top, left = right] = slices.trim().split(' ').map(Number);
+      assert.ok(left + right < width, `${file} ${slices.trim()} leaves no centre column`);
+      assert.ok(top + bottom < height, `${file} ${slices.trim()} leaves no centre row`);
+    }
   });
 
   it("an unusable attack bar is the registry's cantUse grey with black ink", () => {
