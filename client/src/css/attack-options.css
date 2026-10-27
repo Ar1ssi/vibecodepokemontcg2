@@ -101,7 +101,9 @@
   /* The chrome around the rows passes clicks through to the card; the rows take them back. */
   pointer-events: auto;
 }
-/* atkOv_Action_BG, 16px edges at 50 px per row unit. */
+/* atkOv_Action_BG: 16px edges at 50 px per row unit, but 16 + 16 is the whole 32px sprite, and CSS
+   draws no edges or centre for a zero-size middle where Unity stretches it. So
+   it is sliced 1px in, 15px edges = 0.30 row units, leaving a 2px centre to stretch. */
 .tcgl-opt::before {
   content: '';
   position: absolute;
@@ -109,7 +111,7 @@
   z-index: -1;
   pointer-events: none;
   border: 0 solid transparent;
-  border-image: url('../assets/attack-ui/row-bg.png') 16 fill / calc(var(--ru) * 0.32) stretch;
+  border-image: url('../assets/attack-ui/row-bg.png') 15 fill / calc(var(--ru) * 0.3) stretch;
 }
 .tcgl-opt--off::before { border-image-source: url('../assets/attack-ui/row-bg-off.png'); }
 /* atkOv_Action_Shadow tinted black at 50%, 0.23 x 0.15 row units larger than the row, which
@@ -218,13 +220,14 @@
 }
 
 /* Passive ability (GetAssetForAbilityEntry): atkOv_Ability_BG tinted with the type colour, its
-   16 / 13 / 3 px edges at 50 px per row unit. */
+   13 / 16 / 3 / 16 px edges at 50 px per row unit. Those fill the 32 x 16 sprite exactly, which
+   leaves CSS no centre to draw, so the mask is sliced 1px in on the top and sides. */
 .tcgl-opt--passive .tcgl-opt__bar::before {
-  border-width: calc(var(--ru) * 0.26) calc(var(--ru) * 0.32) calc(var(--ru) * 0.06);
+  border-width: calc(var(--ru) * 0.24) calc(var(--ru) * 0.3) calc(var(--ru) * 0.06);
   border-image: none;
   background: var(--atk-color);
-  -webkit-mask-box-image: url('../assets/attack-ui/ability-bg.png') 13 16 3 16 fill stretch;
-  mask-border: url('../assets/attack-ui/ability-bg.png') 13 16 3 16 fill stretch;
+  -webkit-mask-box-image: url('../assets/attack-ui/ability-bg.png') 12 15 3 15 fill stretch;
+  mask-border: url('../assets/attack-ui/ability-bg.png') 12 15 3 15 fill stretch;
 }
 .tcgl-opt--ability.tcgl-opt--off .tcgl-opt__bar { background: none; }
 
