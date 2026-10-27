@@ -14,24 +14,28 @@
 
   background-image:
     repeating-linear-gradient( 115deg,
-      hsl(0, 0%, 45%) 0%,
-      hsl(0, 0%, 45%) 9.33%,
+      hsl(0, 0%, 50%) 0%,
+      hsl(0, 0%, 50%) 9.33%,
       hsl(210, 15%, 80%) 15.33%,
       hsl(0, 0%, 100%) 16.67%,
       hsl(210, 15%, 80%) 18%,
-      hsl(0, 0%, 45%) 24%,
-      hsl(0, 0%, 45%) 33.33%
+      hsl(0, 0%, 50%) 24%,
+      hsl(0, 0%, 50%) 33.33%
     ),
-    url('../../assets/holo/grain.webp');
+    url('../../assets/holo/grain.webp'),
+    linear-gradient( hsl(0, 0%, 50%), hsl(0, 0%, 50%) );
 
-  background-size: 750% 750%, cover;
+  background-size: 750% 750%, cover, cover;
   background-repeat: no-repeat;
 
   background-position:
     calc( (var(--background-x) - 50%) * 1.15 + 50% ) calc( (var(--background-y) - 50%) * 1.15 + 50% ),
+    center center,
     center center;
 
-  background-blend-mode: hard-light;
+  /* The grain is near-black: on its own it would sink the whole card under
+     soft-light, so it screens onto a neutral grey base. */
+  background-blend-mode: hard-light, screen, normal;
   mix-blend-mode: soft-light;
   filter: contrast(1.5) saturate(.2);
   opacity: 1;

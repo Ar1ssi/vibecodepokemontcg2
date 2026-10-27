@@ -35,7 +35,7 @@
       transparent calc(50% - 6%), hsl(0, 0%, 80%) 50%, transparent calc(50% + 6%) ),
     linear-gradient( to bottom right,
       transparent calc(50% - 6%), hsl(0, 0%, 80%) 50%, transparent calc(50% + 6%) ),
-    linear-gradient( hsl(0, 0%, 28%), hsl(0, 0%, 28%) );
+    linear-gradient( hsl(0, 0%, 50%), hsl(0, 0%, 50%) );
 
   background-size: 600% 600%, 11% 8%, 11% 8%, 5.5% 4%, 5.5% 4%, cover;
   background-repeat: no-repeat, repeat, repeat, repeat, repeat, no-repeat;
@@ -87,7 +87,7 @@
     ),
     var(--glitter),
     var(--glitter),
-    linear-gradient( hsl(0, 0%, 40%), hsl(0, 0%, 40%) );
+    linear-gradient( hsl(0, 0%, 50%), hsl(0, 0%, 50%) );
 
   background-size: 600% 600%, 40% 3%, 28% 2%, cover;
   background-repeat: no-repeat, repeat, repeat, no-repeat;
