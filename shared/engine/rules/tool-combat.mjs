@@ -641,7 +641,7 @@ export function toolPrizeCountAdjust(
 export function parseToolOnDamageEffect(tool) {
   const t = cardAbilityText(tool);
   if (
-    !t.includes('damaged by an attack') &&
+    !/damaged by an? (?:opponent'?s? )?attack/.test(t) &&
     !t.includes('knocked out by damage') &&
     !/damage from an attack from your opponent/.test(t)
   ) {
@@ -655,7 +655,8 @@ export function parseToolOnDamageEffect(tool) {
     searchDeckOnKo: 0,
     moveDamage: 0,
     discardTool: false,
-    requiresActive: /active spot/.test(t),
+    // Poison Barb: "is your Active Pokémon and is damaged by an opponent's attack".
+    requiresActive: /active spot|is your active pok[eé]mon and is damaged/.test(t),
     // "the Pokémon this card is attached to is Knocked Out" vs "your Active Pokémon
     // is Knocked Out" (Exp. Share / Wishful Baton sit on a Benched Pokémon).
     trigger: /your active pok[eé]mon is knocked out/.test(t) ? 'activeKo' : 'selfKo',
@@ -703,7 +704,8 @@ export function parseToolOnDamageEffect(tool) {
     }
   }
   if (/discards any prize cards? they would take/.test(t)) out.discardPrizes = true;
-  if (/attacking pokémon is now asleep/.test(t)) out.statusAttacker = 'Asleep';
+  const attackerStatus = t.match(/attacking pok[eé]mon is now (asleep|poisoned|burned|confused|paralyzed)/)?.[1];
+  if (attackerStatus) out.statusAttacker = attackerStatus[0].toUpperCase() + attackerStatus.slice(1);
   if (/discard the top (\d+) cards? of your opponent'?s? deck/.test(t)) {
     const m = t.match(/discard the top (\d+) cards?/);
     out.millOpponent = { deck: parseInt(m[1], 10) || 1, handRandom: 0 };

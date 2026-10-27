@@ -6,8 +6,8 @@ import * as reduce from '../reduce.mjs';
 import { validateLegality } from '../reduce/legality.mjs';
 import { attackExtrasFor } from '../reduce/attack.mjs';
 
-test('reduce.mjs exports exactly applyCommand, validateLegality and attackExtrasFor', () => {
-  assert.deepEqual(Object.keys(reduce).sort(), ['applyCommand', 'attackExtrasFor', 'validateLegality']);
+test('reduce.mjs exports exactly applyCommand, costDiscountsFor, validateLegality and attackExtrasFor', () => {
+  assert.deepEqual(Object.keys(reduce).sort(), ['applyCommand', 'attackExtrasFor', 'costDiscountsFor', 'validateLegality']);
 });
 
 test('the re-exports are the domain modules’ own functions, with unchanged arity', () => {

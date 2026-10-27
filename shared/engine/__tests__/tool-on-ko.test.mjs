@@ -7,6 +7,7 @@ import { createCard } from '../cards.mjs';
 import { applyCommand } from '../reduce.mjs';
 import { evaluateToolKoPrevention, parseToolOnDamageEffect } from '../rules/tool-combat.mjs';
 import { createRng } from '../rng.mjs';
+import { hasCondition } from '../rules/special-conditions.mjs';
 
 let nextId = 900;
 const card = (props) => createCard({ instanceId: nextId++, ...props });
@@ -562,4 +563,37 @@ test('evaluateToolKoPrevention: Focus Band without a coin flipper neither flips 
   });
   assert.equal(res.prevented, false);
   assert.equal(res.coinFace, undefined);
+});
+
+// Poison Barb SUM 124 (pkmncards corpus, out/pkmn-trainer-cards.json).
+const POISON_BARB_TEXT =
+  'If the Pokémon this card is attached to is your Active Pokémon and is damaged by an opponent’s attack (even if this Pokémon is Knocked Out), the Attacking Pokémon is now Poisoned.';
+
+test('Poison Barb poisons the Attacking Pokémon when the holder is damaged', () => {
+  const victim = defender({ name: 'Tank', hp: 300 });
+  const state = game({ p1Active: attacker(), p2Active: victim });
+  attach(state, 'p2', tool('Poison Barb', POISON_BARB_TEXT), victim);
+  const res = attack(state);
+  assert.equal(res.error, null);
+  const striker = res.state.players.p1.zones.active[0];
+  assert.ok(hasCondition(striker, 'Poisoned'), 'the Attacking Pokémon is Poisoned');
+});
+
+test('Poison Barb still poisons when the holder is Knocked Out', () => {
+  const victim = defender({ name: 'Glass', hp: 10 });
+  const state = game({ p1Active: attacker(), p2Active: victim, p2Bench: [defender({ name: 'Spare' })] });
+  attach(state, 'p2', tool('Poison Barb', POISON_BARB_TEXT), victim);
+  const res = attack(state);
+  assert.equal(res.error, null);
+  assert.ok(res.events.some((e) => e.type === 'pokemonKnockedOut'));
+  assert.ok(hasCondition(res.state.players.p1.zones.active[0], 'Poisoned'));
+});
+
+test('Poison Barb does nothing while the holder is Benched', () => {
+  const victim = defender({ name: 'Front' });
+  const barbHolder = defender({ name: 'Back' });
+  const state = game({ p1Active: attacker(), p2Active: victim, p2Bench: [barbHolder] });
+  attach(state, 'p2', tool('Poison Barb', POISON_BARB_TEXT), barbHolder);
+  const res = attack(state);
+  assert.ok(!hasCondition(res.state.players.p1.zones.active[0], 'Poisoned'));
 });

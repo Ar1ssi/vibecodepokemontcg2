@@ -18,20 +18,24 @@ import { stadiumCheckupCoinModifiers } from '../rules/stadium-triggers.mjs';
 import {
   inPlayEntries, parseCheckupAbilities, parseBetweenTurnsAbilities, resolveBetweenTurnsTargets,
   parseEndOfTurnAbilities, parseSleepRecoveryLocks, sleepRecoveryBlocked,
-  parseOpponentTurnStartDraws, parseAttackedLastTurnBurns,
+  parseOpponentTurnStartDraws, parseAttackedLastTurnBurns, parseOpponentTurnStartBarriers,
 } from '../rules/ability-triggers.mjs';
 import { flipCoin } from '../rng.mjs';
+import { addAttackMarker, markerFromTurn, markerUntilTurn } from '../rules/attack-markers.mjs';
+import { topPokemonCard } from '../rules/evolved-pokemon.mjs';
 import { cardEffectShielded } from '../effects/trainer-steps.mjs';
 import {
   runEndOfTurnSpecialEnergies, applySpecialEnergyStatusImmunity, discardEndOfTurnSpecialEnergies,
 } from '../effects/special-energy.mjs';
-import { stadiumBetweenTurnsDamageFor, stadiumBlocksHealing } from '../rules/stadium-effects.mjs';
-import { healBlockedByAbility, abilitySleepLock, sideContextFor } from '../rules/ability-combat.mjs';
+import { stadiumBetweenTurnsDamageFor, stadiumBlocksHealing, stadiumEnergyStatusImmunity } from '../rules/stadium-effects.mjs';
 import {
-  removeCondition, hasCondition, hasAnyCondition, addCondition, listConditions,
+  healBlockedByAbility, abilitySleepLock, sideContextFor, abilityPoisonHeal,
+} from '../rules/ability-combat.mjs';
+import {
+  removeCondition, hasCondition, hasAnyCondition, addCondition, listConditions, poisonCheckupDamage,
 } from '../rules/special-conditions.mjs';
 import {
-  activeAttackMarkers, cardEffectiveHp, setGameEnded, isGameConcluded, abilitySideContext,
+  activeAttackMarkers, cardEffectiveHp, setGameEnded, isGameConcluded, abilitySideContext, inPlayView,
 } from './shared.mjs';
 import { settleKnockOutWins, handleKnockout } from './knockout.mjs';
 
@@ -47,6 +51,30 @@ export function applyAbilitySleepLocks(draft, { events }) {
     if (!abilitySleepLock(sideContextFor(draft, playerId))) continue;
     removeCondition(active, 'Asleep');
     events.push({ type: 'statusCleared', condition: 'Asleep', instanceId: active.instanceId, playerId, reason: 'ability' });
+  }
+}
+
+/**
+ * Fairy Garden-style Stadium: Pokémon holding the named Energy type are immune to Special
+ * Conditions, for both players. Conditions land through addCondition, which cannot see the board,
+ * so this sweep strips them after every command and before Pokémon Checkup.
+ */
+export function applyStadiumStatusImmunity(draft, { events }) {
+  const stadium = draft.stadium?.card || draft.stadium;
+  if (!stadium || typeof stadium !== 'object') return;
+  for (const playerId of Object.keys(draft.players || {})) {
+    const zones = draft.players[playerId]?.zones || {};
+    for (const zoneId of ['active', 'bench']) {
+      const zone = zones[zoneId] || [];
+      for (const root of zone) {
+        if (root.attachedTo || !hasAnyCondition(root)) continue;
+        if (!stadiumEnergyStatusImmunity(stadium, root, zone)) continue;
+        for (const condition of listConditions(root)) {
+          removeCondition(root, condition);
+          events.push({ type: 'statusCleared', condition, instanceId: root.instanceId, playerId, reason: 'stadium' });
+        }
+      }
+    }
   }
 }
 
@@ -392,6 +420,7 @@ export function resolveCheckup(
   // special Energy makes it immune never reaches Checkup.
   applySpecialEnergyStatusImmunity(draft, { events });
   applyAbilitySleepLocks(draft, { events });
+  applyStadiumStatusImmunity(draft, { events });
   const triggerCtx = abilitySideContext(draft, endingPlayerId);
   // "Between turns" abilities (I163): the pre-Checkup wording family.
   const betweenEffects = parseBetweenTurnsAbilities(inPlayEntries(draft), triggerCtx);
@@ -443,7 +472,20 @@ export function resolveCheckup(
 
     const checkupStadium = draft.stadium?.card || draft.stadium;
     if (hasCondition(active, 'Poisoned')) {
-      checkupDamage('Poisoned', 10);
+      const poisonHeal = abilityPoisonHeal(inPlayView(draft, active), sideContextFor(draft, pid));
+      if (!poisonHeal) {
+        checkupDamage('Poisoned', poisonCheckupDamage(active));
+      } else if (poisonHeal.heal > 0 && (active.damage || 0) > 0 && !healBlockedByAbility(draft, active)) {
+        const before = active.damage;
+        active.damage = Math.max(0, before - poisonHeal.heal);
+        events.push({
+          type: 'damageUpdated',
+          instanceId: active.instanceId,
+          damage: active.damage,
+          healed: before - active.damage,
+          source: 'Poison Heal',
+        });
+      }
     }
     if (hasCondition(active, 'Burned')) {
       checkupDamage('Burned', 20);
@@ -490,6 +532,8 @@ export function resolveCheckup(
   // between-turns Stadium damage (design 034 slice 4).
   applyCheckupAbilities(draft, { events, ctx: triggerCtx, betweenEffects, checkupEffects });
 
+  applyOpponentTurnStartBarriers(draft, { rng, events, ctx: triggerCtx, endingPlayerId });
+
   // Between-turns Stadium damage resolves after Pokémon Checkup.
   applyBetweenTurnsStadiumDamage(draft, { events });
 
@@ -505,6 +549,32 @@ export function resolveCheckup(
 
   // Mandatory end-of-turn ability effects (Great Tusk ex Quaking Demolition).
   applyEndOfTurnAbilities(draft, { events, ctx: triggerCtx, endingPlayerId });
+}
+
+/**
+ * Gardevoir Magic Barrier: at the start of the opponent's turn the holder's side flips a coin, and
+ * on heads its Active Pokémon takes no effects of the opponent's attacks that turn (damage still
+ * lands). That turn starts right after the ending player's Checkup, so the flip is taken here, for
+ * the ending player's holders, and the marker covers the turn that follows.
+ */
+function applyOpponentTurnStartBarriers(draft, { rng, events, ctx, endingPlayerId }) {
+  if (isGameConcluded(draft) || !endingPlayerId) return;
+  const entries = inPlayEntries(draft).filter((entry) => entry.playerId === endingPlayerId);
+  const zone = draft.players[endingPlayerId]?.zones?.active || [];
+  const root = zone.find((c) => !c.attachedTo);
+  for (const { playerId, source } of parseOpponentTurnStartBarriers(entries, ctx)) {
+    const face = (rng ? rng.next() : 0.5) < 0.5 ? 'heads' : 'tails';
+    events.push({ type: 'coinFlipped', playerId, face, source, instanceId: root?.instanceId });
+    if (face !== 'heads' || !root) continue;
+    const turn = draft.turn?.number || 1;
+    addAttackMarker(root, {
+      kind: 'effectPrevent',
+      filter: null,
+      fromTurn: markerFromTurn('opponentNextTurn', turn),
+      untilTurn: markerUntilTurn('opponentNextTurn', turn),
+      topId: topPokemonCard(zone, root).instanceId,
+    });
+  }
 }
 
 /**
