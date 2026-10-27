@@ -66,13 +66,14 @@ test('Pokémon rules: hp, types, stage, attacks, abilities, sides, retreat', () 
   const errorsOf = (patch) => validateCustomSet(withCard(patch)).errors.join('\n');
   assert.match(errorsOf({ hp: 185 }), /hp: a multiple of 10/);
   assert.match(errorsOf({ hp: '180' }), /hp/);
-  assert.match(errorsOf({ types: ['Fairy'] }), /unknown Energy type "Fairy"/);
+  assert.match(errorsOf({ types: ['Sound'] }), /unknown Energy type "Sound"/);
+  assert.doesNotMatch(errorsOf({ types: ['Fairy'] }), /types/);
   assert.match(errorsOf({ types: [] }), /at least one type/);
   assert.match(errorsOf({ stage: 'Mega' }), /stage: one of/);
   assert.match(errorsOf({ evolveFrom: '' }), /evolveFrom: required/);
   const five = Array.from({ length: 5 }, (_, i) => ({ cost: [], name: `A${i}`, damage: '', effect: '' }));
   assert.match(errorsOf({ attacks: five }), /at most 4 attacks/);
-  assert.match(errorsOf({ attacks: [{ cost: ['Fairy'], name: 'A', damage: '10' }] }), /cost: unknown Energy type/);
+  assert.match(errorsOf({ attacks: [{ cost: ['Sound'], name: 'A', damage: '10' }] }), /cost: unknown Energy type/);
   assert.match(errorsOf({ attacks: [{ cost: [], name: 'A', damage: 'ten' }] }), /damage/);
   assert.match(errorsOf({ attacks: [{ cost: [], name: '', damage: '10' }] }), /name: required/);
   const three = Array.from({ length: 3 }, (_, i) => ({ type: 'Ability', name: `B${i}`, effect: 'x' }));

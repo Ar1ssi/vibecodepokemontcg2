@@ -25,6 +25,7 @@ export const ENERGY_TYPES = Object.freeze([
   'Fighting',
   'Darkness',
   'Metal',
+  'Fairy',
   'Dragon',
   'Colorless',
 ]);
