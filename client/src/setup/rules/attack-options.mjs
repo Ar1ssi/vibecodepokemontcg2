@@ -162,6 +162,34 @@ export function buildAbilityOption(ability, cardType) {
   return row;
 }
 
+// A Stadium prints no type; its row wears Grass green, the colour its 013 banner used.
+const STADIUM_TYPE = 'grass';
+
+/**
+ * The in-play Stadium as an AbilityActionOption_L-style row (TCG Live has no Stadium prefab). An
+ * activatable effect gets the usable titlebar, or the bare tile once spent or blocked (`recede`); a
+ * continuous one the tinted header, as a passive ability does. A "Stadium" label stands in for the
+ * Ability tag. `stadium` is the inspector model's stadium entry.
+ */
+export function buildStadiumOption(stadium) {
+  const look = !stadium.actionable ? 'passive' : stadium.recede ? 'off' : 'on';
+  const classes = ['tcgl-opt--stadium', `tcgl-opt--${look}`];
+  if (stadium.text) classes.push('tcgl-opt--text');
+  const { row, content } = shell(classes, STADIUM_TYPE);
+  row.dataset.ptcgStadium = '1';
+
+  const bar = el('div', 'tcgl-opt__bar');
+  const info = el('div', 'tcgl-opt__info');
+  info.appendChild(el('span', 'tcgl-opt__name', stadium.name));
+  info.appendChild(el('span', 'tcgl-opt__label', 'Stadium'));
+  bar.appendChild(info);
+  if (stadium.text) bar.appendChild(el('span', 'tcgl-opt__divider'));
+  content.appendChild(bar);
+  if (stadium.text) content.appendChild(description(stadium.text));
+  if (stadium.reason) row.title = stadium.reason;
+  return row;
+}
+
 // WeakResistInfo: a label, up to three type icons and the amount, right-aligned in its half.
 const weakResistRow = (label, kind, typeValue) => {
   const row = el('div', `tcgl-wr__row tcgl-wr__row--${kind}`);

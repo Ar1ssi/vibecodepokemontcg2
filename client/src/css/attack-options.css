@@ -154,7 +154,8 @@
 }
 /* An attack with effect text, and every ability, wear the short titlebar and tab. */
 .tcgl-opt--text .tcgl-opt__bar::before,
-.tcgl-opt--ability .tcgl-opt__bar::before { border-image-source: var(--atk-bar-short); }
+.tcgl-opt--ability .tcgl-opt__bar::before,
+.tcgl-opt--stadium .tcgl-opt__bar::before { border-image-source: var(--atk-bar-short); }
 .tcgl-opt--text .tcgl-opt__bar { --atk-dmg: url('../assets/attack-ui/dmg-short.png'); --atk-dmg-l: 34; --atk-dmg-r: 24; }
 
 /* GX attacks: the wide titlebar, 480px of art before the stretch column. */
@@ -229,7 +230,8 @@
   -webkit-mask-box-image: url('../assets/attack-ui/ability-bg.png') 12 15 3 15 fill stretch;
   mask-border: url('../assets/attack-ui/ability-bg.png') 12 15 3 15 fill stretch;
 }
-.tcgl-opt--ability.tcgl-opt--off .tcgl-opt__bar { background: none; }
+.tcgl-opt--ability.tcgl-opt--off .tcgl-opt__bar,
+.tcgl-opt--stadium.tcgl-opt--off .tcgl-opt__bar { background: none; }
 
 /* AttackNameAlignment: 0.25 in from each side; the name fills the top half over the cost row, or
    the whole bar when there is no cost to show. */
@@ -284,6 +286,18 @@
   background: url('../assets/attack-ui/ability-tag-on.png') left center / contain no-repeat;
 }
 .tcgl-opt__tag--off { background-image: url('../assets/attack-ui/ability-tag-off.png'); }
+/* The Stadium row's stand-in for the Ability tag: a small-caps line in the bar's ink. */
+.tcgl-opt__label {
+  align-self: center;
+  margin-top: calc(var(--ru) * -0.04);
+  font-family: 'Akko Pro Condensed', 'Rodin Condensed', 'Barlow Semi Condensed', sans-serif;
+  font-size: calc(var(--ru) * 0.22);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--name-ink);
+  opacity: 0.85;
+}
 
 /* AttackDamageBG: 1.65 wide on the right, the bar's full height; hidden (alpha 0) without a number. */
 .tcgl-opt__tab {

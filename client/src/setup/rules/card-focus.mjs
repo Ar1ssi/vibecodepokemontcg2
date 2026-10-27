@@ -289,7 +289,7 @@ const watchForPickers = () => {
 };
 
 /**
- * Open the focus view for one of your own Active Pokémon. Returns false (and changes nothing)
+ * Open the focus view for one of your own Pokémon or the in-play Stadium. Returns false (and changes nothing)
  * when it is already open, the card has no element to fly from, or the build fails — the caller
  * then keeps its old behaviour.
  *
@@ -302,6 +302,9 @@ const watchForPickers = () => {
  * @param {() => void} [options.onAbility] defaults to the inspector's ability dispatch
  * @param {() => void} [options.onRetreat] caller closes the focus, then retreats
  * @param {() => void} [options.onOpenStack] opens the stack view; null hides the Stack button
+ * @param {() => object} [options.getContext] the inspector context; the in-play Stadium passes its
+ *   live rules flags
+ * @param {() => void} [options.onUse] caller closes the focus, then runs the Stadium's effect
  */
 export function openCardFocus({
   card,
@@ -311,6 +314,8 @@ export function openCardFocus({
   onAbility,
   onRetreat = null,
   onOpenStack = null,
+  getContext,
+  onUse = null,
 } = {}) {
   suppressHoverPreview('modal');
   if (focusState) return false;
@@ -343,7 +348,9 @@ export function openCardFocus({
       zone,
       onAttack,
       ...(onAbility ? { onAbility } : {}),
+      ...(getContext ? { getContext } : {}),
       onRetreat,
+      onUse,
     });
 
     state.root = el('div', 'card-focus');
