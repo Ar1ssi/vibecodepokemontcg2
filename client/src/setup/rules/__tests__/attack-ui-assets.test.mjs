@@ -115,6 +115,19 @@ describe('attack-ui palette', () => {
     }
   });
 
+  // The tab's seam backing draws the whole sprite at its slice density, so --atk-dmg-w must be the
+  // sprite's real width or the backing's art drifts off the sliced art above it.
+  it('every damage tab variant states its sprite width beside its source', () => {
+    const variants = [...OPTIONS_CSS.matchAll(/--atk-dmg: url\('\.\.\/assets\/attack-ui\/([\w-]+\.png)'\);\s*([^}]*)/g)];
+    assert.ok(variants.length >= 8, 'expected the eight damage tab sprites');
+    for (const [, file, rest] of variants) {
+      const stated = /--atk-dmg-w: (\d+);/.exec(rest);
+      assert.ok(stated, `${file} has no --atk-dmg-w`);
+      const width = readFileSync(`${ASSET_DIR}${file}`).readUInt32BE(16);
+      assert.equal(Number(stated[1]), width, file);
+    }
+  });
+
   it('GX bars use the wide titlebar borders', () => {
     const on = TABLE.borders.atkOv_TitlebarGX;
     const off = TABLE.borders.atkOv_TitlebarGX_Off;
