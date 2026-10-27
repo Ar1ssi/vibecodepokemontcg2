@@ -37,3 +37,6 @@ client/src/assets/tcgl-foil/tex/
 
 # Python bytecode from running scripts/*.py
 __pycache__/
+
+# Graphify output (knowledge graph + cache)
+graphify-out/
