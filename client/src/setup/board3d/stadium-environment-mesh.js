@@ -8,6 +8,7 @@ import * as forest from './stadium-env-forest.mjs';
 import { MAX_BOG_LOBES, MAX_BOGS, MAX_CARD_RECTS, MAX_TREES, jungleLeaves, jungleSpots } from './stadium-env-forest-layout.mjs';
 import * as highland from './stadium-env-highland.mjs';
 import { fightingStadiumBoard } from './stadium-env-arena.mjs';
+import { brookletHillBoard } from './stadium-env-brooklet.mjs';
 import { darkCityBoard } from './stadium-env-city.mjs';
 import { crystalCaveBoard } from './stadium-env-crystal.mjs';
 import { dimensionValleyBoard } from './stadium-env-dimension.mjs';
@@ -614,6 +615,7 @@ function perilousJungleBoard({ three, material, seeded }) {
 }
 
 const BOARDS = {
+  'brooklet-hill': brookletHillBoard,
   'crystal-cave': crystalCaveBoard,
   'dark-city': darkCityBoard,
   'dimension-valley': dimensionValleyBoard,

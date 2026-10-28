@@ -395,12 +395,17 @@ particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
     each wrapped in foam that swells with every wave and throwing up spray. The art's cliffs are left
     out: past the far edge they lean off the screen, and the near margin is where the cards are.
     There are no palms (the art has none).
-  - Brooklet Hill (`brooklet-hill`, GRI 120, 5ban Graphics). The art's sparkling blue lake, cards on
-    it, as the earlier prototype laid it out (`feature/077-brooklet-hill`, `stadium-env-brooklet.mjs` and
-    its `brookletSpots`; may be ported). A waterfall drops from layered rock cliffs at the far left
-    into the lake. A sandy shore curves along the far end, under a grassy rise with round trees. The
-    art's wooden pier runs out from the far-right shore. Dark rocks ringed in white water stand in
-    open water clear of every card. White sparkles glint on the lake.
+  - Brooklet Hill (`brooklet-hill`, GRI 120, 5ban Graphics; built fresh, `stadium-env-brooklet.mjs`). The
+    cards lie over the lake's sandy shallows, where the water is pale turquoise so every card keeps its
+    edges. The water deepens to the art's clear blue and then deeper blue away from them. Short bright
+    wavelets and flaring star glints drift with the breeze. A pale beach with a low dark rock bank and
+    grass with round trees runs along the far edge, and the opponent's hand lies over it. In the
+    far-left corner of the free table stands the art's olive-grey rock: a low ledge at the water,
+    then the main cliff with grass and rock patches on top and round trees. The waterfall leaves the
+    cliff's lip, falls over the ledge into the lake, and foams at its foot with spray rising. The
+    wooden pier reaches out from the far shore on the right. Two lumpy grey-brown boulders, ringed
+    in foam, stand in the near-left water, and dark rocks lie sunk in open water. Every piece keeps
+    clear of the cards, and a test projects them in both presets.
   - Levincia (`levincia`, JTG 150, Marina Chikazawa). A bright noon city on the water. Every Active
     and Bench card lies on the art's round raised stage: a pale blue-white floor ringed in a yellow
     and white band with the yellow Electric motif in its middle. Its rim wall drops to light-blue
