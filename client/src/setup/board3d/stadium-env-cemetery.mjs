@@ -13,7 +13,7 @@
 // on it), B the shadow the stones, the pines and the tree cast across the ground 0..1, A the kind
 // (0 grass, 1 path, 2 grave mound, 3 boulder); the shared light bake adds normals, occlusion and the
 // ground's own shadow. Per frame: TERRAIN paints the grass, the path, the mounds and the boulder in
-// moonlight; PROPS are the headstones, crosses, the post, the pines and the bare tree
+// moonlight; PROPS are the headstones, obelisks, the post, the pines and the bare tree
 // (stadium-env-props); MIST is a sheet of drifting fog low over the ground.
 import {
   FULLSCREEN_VERTEX,
@@ -38,11 +38,11 @@ export const PATH_HALF_PX = 30;
 export const PATH_CARD_GAP_PX = 22;
 export const MAX_PATH_POINTS = 48;
 export const MAX_GRAVES = 64;
-export const MAX_PINES = 16;
+export const MAX_PINES = 24;
 /** Least gap between any prop, seen from above, and a card or the opponent's hand. */
 export const PROP_CARD_GAP_PX = 14;
 /** Grave kinds. */
-export const GRAVE = Object.freeze({ headstone: 0, cross: 1 });
+export const GRAVE = Object.freeze({ round: 0, pointed: 1 });
 
 /** A small deterministic 0..1 from three numbers. */
 const hash = (x, y, salt) => {
@@ -163,8 +163,8 @@ export function cemeterySpots(layout) {
       const x = gx + (roll(1) - 0.5) * across * 0.5;
       const y = gy + (roll(2) - 0.5) * along * 0.3;
       const kindRoll = roll(3);
-      const kind = kindRoll < 0.82 ? GRAVE.headstone : GRAVE.cross;
-      const width = (kind === GRAVE.cross ? 30 : 30 + 22 * roll(4)) * u;
+      const kind = kindRoll < 0.7 ? GRAVE.round : GRAVE.pointed;
+      const width = (30 + 22 * roll(4)) * u;
       const height = (40 + 42 * roll(5) ** 1.4) * (y > far ? 1.2 : 1) * u;
       const reach = Math.max(width, 46 * u) * 0.75;
       // Toward the near end a tall stone leans up over the player's cards in the tilted view.
@@ -173,13 +173,13 @@ export function cemeterySpots(layout) {
         continue;
       }
       // Old stones lean back, away from the path's walkers, each its own way: from above the face shows.
-      const lean = kind === GRAVE.cross ? 0 : 0.2 + 0.3 * roll(8);
+      const lean = 0.2 + 0.3 * roll(8);
       graves.push({ x, y, yaw: (roll(7) - 0.5) * 0.7, lean, width, height, thick: (8 + 5 * roll(10)) * u, kind, seed: roll(9) });
     }
   }
   // Pines round the scene's outer edge, off the far end most.
   const pines = [];
-  const pineStep = 150 * u;
+  const pineStep = 118 * u;
   for (let gy = scene.y + pineStep / 2; gy < scene.y + scene.h; gy += pineStep) {
     for (let gx = scene.x + pineStep / 2; gx < scene.x + scene.w; gx += pineStep) {
       if (pines.length >= MAX_PINES) break;
@@ -188,9 +188,9 @@ export function cemeterySpots(layout) {
       const y = gy + (roll(2) - 0.5) * pineStep * 0.6;
       const r = (44 + 26 * roll(3)) * u;
       const outside = distanceToRect(x, y, core);
-      if (outside < 200 * u || roll(4) > 0.82 || !inScene(x, y, r * 0.3)) continue;
+      if (outside < 130 * u || roll(4) > 0.6 || !inScene(x, y, r * 0.3)) continue;
       // Tall only off the far end; elsewhere they lean over the cards in the tilted view.
-      const h = (y > far ? 240 + 90 * roll(5) : 150 + 50 * roll(5)) * u;
+      const h = (y > far ? 240 + 90 * roll(5) : 120 + 50 * roll(5)) * u;
       if (!clear(x, y, r + h * 0.25) || !pathClear(x, y, r) || !off(x, y, r)) continue;
       if (graves.some((g) => Math.hypot(x - g.x, y - g.y) < r + 30 * u)) continue;
       pines.push({ x, y, r, h, seed: roll(6) });
@@ -290,9 +290,9 @@ void main() {
     for (int k = 0; k <= 18; k++) {
       float z = size.x * float(k) / 18.0;
       vec2 q = graveFrame(p + drift * (z - h), grave) - vec2(0.0, size.w * z);
-      float halfW = grave.w * 0.5 * (size.z > 0.5 ? (z > size.x * 0.62 && z < size.x * 0.82 ? 1.0 : 0.22) : 1.0);
-      // A headstone's top is rounded: narrower near its crown.
-      if (size.z < 0.5) halfW *= sqrt(clamp((size.x - z) / (grave.w * 0.5), 0.0, 1.0));
+      // A headstone's top is rounded, or pointed (kind 1): narrower near its crown.
+      float crown = clamp((size.x - z) / (grave.w * (size.z > 0.5 ? 0.62 : 0.5)), 0.0, 1.0);
+      float halfW = grave.w * 0.5 * (size.z > 0.5 ? crown : sqrt(crown));
       if (abs(q.x) < halfW && abs(q.y) < size.y * 0.5) shadow = 1.0;
       if (shadow >= 1.0) break;
     }
@@ -363,6 +363,24 @@ ${NOISE}
 ${VORONOI}
 ${REVEAL}
 ${PALETTE}
+uniform vec4 uCore;
+// A fan of four tall blades out of a tuft's foot, as (stroke, 0..1 up the blade). v: px from the
+// foot, h: the tuft's hash. Each bends over as it rises, away from the moon.
+vec2 bladeFan(vec2 v, float h) {
+  float stroke = 0.0;
+  float tip = 0.0;
+  for (int k = 0; k < 4; k++) {
+    float a = 1.571 + (float(k) - 1.5) * 0.42 + (fract(h * (7.0 + float(k) * 3.1)) - 0.5) * 0.6;
+    vec2 d = vec2(cos(a), sin(a));
+    float len = 7.0 + 6.0 * fract(h * (11.0 + float(k)));
+    float s = clamp(dot(v, d), 0.0, len);
+    vec2 bent = d * s + vec2(-d.y, d.x) * (s * s / len) * 0.18;
+    float m = 1.0 - smoothstep(0.3, 0.95, length(v - bent) / mix(1.15, 0.4, s / len));
+    stroke = max(stroke, m);
+    tip = max(tip, m * s / len);
+  }
+  return vec2(stroke, tip);
+}
 varying vec2 vPos;
 varying vec2 vUv;
 varying float vGrowth;
@@ -381,27 +399,43 @@ void main() {
   // The grass: dark teal, paler in patches, tufts of blades fanning toward the moon, their tips lit
   // the art's pale yellow-green.
   vec3 col = mix(GROUND, GROUND_LIT, smoothstep(0.3, 0.8, fbm3(p / 140.0 + 1.0)));
-  vec4 tuft = voronoiCell(p / 16.0 + 4.0);
-  vec2 fromTuft = -tuft.zw * 16.0;
-  float bladeAngle = atan(fromTuft.x, fromTuft.y + 0.001);
-  float bladeRun = length(fromTuft) / 9.0;
-  float blades = smoothstep(0.45 + 0.4 * bladeRun, 0.6 + 0.35 * bladeRun, cos(bladeAngle * 8.0 + tuft.y * 30.0))
-    * (1.0 - smoothstep(0.8, 1.15, abs(bladeAngle))) * (1.0 - smoothstep(0.75, 1.05, bladeRun));
-  float hasTuft = step(fract(tuft.y * 31.7), 0.62) * smoothstep(0.3, 0.6, fbm3(p / 90.0 + 7.0));
-  col = mix(col, mix(GROUND_LIT * 1.4, TUFT * 1.1, smoothstep(0.3, 1.0, bladeRun)), blades * hasTuft);
+  col *= 0.9 + 0.2 * fbm3(p / 28.0 + 3.0);
+  vec4 tuft = voronoiCell(p / 15.0 + 4.0);
+  vec2 blades = bladeFan(-tuft.zw * 15.0, tuft.y);
+  float hasTuft = step(fract(tuft.y * 31.7), 0.5 + 0.35 * smoothstep(0.35, 0.65, fbm3(p / 90.0 + 7.0)));
+  col = mix(col, mix(GROUND * 0.7, mix(GROUND_LIT * 1.6, TUFT * 1.15, blades.y), 0.3 + 0.7 * blades.y), blades.x * hasTuft);
   // The path: worn earth, paler down its middle, ruts along it, its edge fraying into the grass.
   float pathEdge = smoothstep(2.0, -6.0, field.g + 6.0 * (gnoise(p / 11.0) - 0.5));
   vec3 earth = mix(EARTH_DARK, EARTH, smoothstep(-4.0, -20.0, field.g) * (0.7 + 0.3 * fbm3(p / 30.0)));
   // Grass creeps back over it in patches where few walk.
   float regrown = smoothstep(0.62, 0.75, fbm3(p / 45.0 + 9.0)) * 0.8;
-  col = mix(col, earth, pathEdge * (1.0 - regrown));
+  float onPath = pathEdge * (1.0 - regrown);
+  // Ruts down it, pebbles pressed in, and puddles holding the moon's pale light.
+  float rut = smoothstep(0.38, 0.62, gnoise(vec2(field.g / 5.5 + 3.0, dot(p, vec2(0.7, 0.7)) / 50.0)));
+  earth *= 1.0 - 0.28 * rut;
+  vec4 pebble = voronoiCell(p / 8.5 + 11.0);
+  float pebbleShape = (1.0 - smoothstep(0.12, 0.24, length(pebble.zw))) * step(fract(pebble.y * 9.3), 0.2);
+  earth = mix(earth, EARTH * (1.05 + 0.3 * fract(pebble.y * 3.7)), pebbleShape * 0.7);
+  float puddle = smoothstep(0.68, 0.73, fbm3(p / 36.0 + 5.0)) * smoothstep(-4.0, -14.0, field.g);
+  vec3 toEye = normalize(uEye - vec3(p, 0.0));
+  vec3 mirror = reflect(-normalize(uSun), vec3(0.0, 0.0, 1.0));
+  vec3 water = vec3(0.07, 0.15, 0.17) + MOONLIGHT * 0.3 * pow(max(dot(mirror, toEye), 0.0), 10.0);
+  earth = mix(earth, water, puddle * 0.9);
+  col = mix(col, earth, onPath);
   // A grave's mound: the grass on it a shade darker and finer.
   col = mix(col, GROUND_LIT * 0.9, step(1.5, kind) * step(kind, 2.5) * 0.35);
   // The boulder: mossy dark stone, its crown catching the moon.
   vec3 rock = mix(MOSS * 0.8, STONE * 0.9, smoothstep(0.4, 0.9, n.z) * fbm3(p / 25.0));
   col = mix(col, rock, step(2.5, kind));
 
-  col *= (0.35 + 0.5 * moonlit) * mix(0.55, 1.0, smoothstep(0.3, 0.9, light.b));
+  col *= (0.24 + 0.46 * moonlit) * mix(0.5, 1.0, smoothstep(0.3, 0.9, light.b));
+  // The blades' tips glow faintly pale yellow-green, as the art's, brighter against the darker grass.
+  col += TUFT * 0.07 * blades.x * blades.y * hasTuft * (1.0 - onPath);
+  // Night closes in round the graveyard: darker, bluer toward the scene's edge.
+  float outside = length(max(max(uCore.xy - p, p - uCore.zw), 0.0));
+  col = mix(col, col * vec3(0.5, 0.62, 0.8), smoothstep(80.0, 480.0, outside));
+  // Toward the far end, where the moon hangs, the night thins into pale teal haze.
+  col = mix(col, MIST * 0.34, 0.5 * smoothstep(uCore.w - 120.0, uCore.w + 460.0, p.y));
   col += MOONLIGHT * 0.1 * pow(clamp(dot(n, moon), 0.0, 1.0), 6.0) * step(2.5, kind);
   // Low mist pooled in the hollows, thicker out past the graves.
   float mist = smoothstep(0.45, 0.75, fbm3(p / 260.0 + vec2(uTime * 0.012, uTime * 0.004)));
@@ -416,8 +450,8 @@ ${OUTPUT}
 `;
 
 // Prop colours (aColor; w 0..1 how much a surface takes a sheen).
-const STONE_COLOR = [0.5, 0.68, 0.68, 0.1];
-const STONE_PALE = [0.64, 0.82, 0.8, 0.1];
+const STONE_COLOR = [0.5, 0.68, 0.7, 0.1];
+const STONE_PALE = [0.7, 0.88, 0.86, 0.1];
 const MOSS_COLOR = [0.12, 0.26, 0.2, 0];
 const PINE_COLOR = [0.045, 0.12, 0.13, 0];
 const DEAD_WOOD = [0.62, 0.78, 0.76, 0];
@@ -438,31 +472,27 @@ const headstone = (props, g) => {
   props.quad(at(halfW, half, 0), at(-halfW, half, 0), at(-halfW, half, shoulder), at(halfW, half, shoulder), STONE_COLOR);
   props.quad(at(halfW, -half, 0), at(halfW, half, 0), at(halfW, half, shoulder), at(halfW, -half, shoulder), STONE_PALE);
   props.quad(at(-halfW, half, 0), at(-halfW, -half, 0), at(-halfW, -half, shoulder), at(-halfW, half, shoulder), STONE_PALE);
-  // The rounded top: a half disc, front and back, joined by its curved rim.
-  const steps = 10;
+  // Moss creeping up its foot, front and back, a little proud of the face.
+  const moss = Math.min(shoulder * 0.32, 16);
+  const proud = 0.8;
+  props.quad(at(-halfW, -half - proud, 0), at(halfW, -half - proud, 0), at(halfW * 0.7, -half - proud, moss), at(-halfW * 0.8, -half - proud, moss * 0.8), MOSS_COLOR);
+  props.quad(at(halfW, half + proud, 0), at(-halfW, half + proud, 0), at(-halfW * 0.6, half + proud, moss * 0.9), at(halfW * 0.8, half + proud, moss * 0.7), MOSS_COLOR);
+  // The top, front and back, joined by its rim: a half disc, or a pointed arch (kind 1).
+  const arch = [[1, 0], [0.55, 0.78], [0, 1.25], [-0.55, 0.78], [-1, 0]];
+  const steps = g.kind === GRAVE.pointed ? arch.length - 1 : 10;
+  const topAt = (k) =>
+    g.kind === GRAVE.pointed
+      ? [arch[k][0] * halfW, shoulder + arch[k][1] * halfW]
+      : [Math.cos((Math.PI * k) / steps) * halfW, shoulder + Math.sin((Math.PI * k) / steps) * halfW];
   for (let k = 0; k < steps; k += 1) {
-    const a0 = (Math.PI * k) / steps;
-    const a1 = (Math.PI * (k + 1)) / steps;
-    const p0 = [Math.cos(a0) * halfW, shoulder + Math.sin(a0) * halfW];
-    const p1 = [Math.cos(a1) * halfW, shoulder + Math.sin(a1) * halfW];
+    const p0 = topAt(k);
+    const p1 = topAt(k + 1);
     // Each a triangle (the quad's last corner repeats its third, so its normal stays defined).
     props.quad(at(p0[0], -half, p0[1]), at(p1[0], -half, p1[1]), at(0, -half, shoulder), at(0, -half, shoulder), STONE_COLOR);
     props.quad(at(p1[0], half, p1[1]), at(p0[0], half, p0[1]), at(0, half, shoulder), at(0, half, shoulder), STONE_COLOR);
-    const mossy = Math.sin((a0 + a1) / 2) > 0.75 && g.seed > 0.4;
+    const mossy = (p0[1] + p1[1]) / 2 > shoulder + halfW * 0.75 && g.seed > 0.4;
     props.quad(at(p0[0], -half, p0[1]), at(p0[0], half, p0[1]), at(p1[0], half, p1[1]), at(p1[0], -half, p1[1]), mossy ? MOSS_COLOR : STONE_PALE);
   }
-};
-
-/** A stone cross on a low plinth. */
-const cross = (props, g) => {
-  const box = (dx, z0, z1, hw) => {
-    const x = g.x + dx * Math.cos(g.yaw);
-    const y = g.y + dx * Math.sin(g.yaw);
-    props.box({ x, y, z0, z1, hw, hh: g.thick / 2, yaw: g.yaw, color: STONE_COLOR, topColor: STONE_PALE });
-  };
-  props.box({ x: g.x, y: g.y, z0: 0, z1: 8, hw: g.width * 0.45, hh: g.thick, yaw: g.yaw, color: STONE_COLOR, topColor: STONE_PALE });
-  box(0, 8, g.height, g.width * 0.13);
-  box(0, g.height * 0.62, g.height * 0.82, g.width * 0.5);
 };
 
 /** A pine: three cones of dark boughs stacked up a trunk, each tier's skirt ragged. */
@@ -477,12 +507,14 @@ const pine = (props, p) => {
     { sides: 8 }
   );
   const tiers = [
-    [0.18, 0.62, 1],
-    [0.45, 0.84, 0.74],
-    [0.68, 1, 0.48],
+    [0.14, 0.5, 1],
+    [0.32, 0.66, 0.84],
+    [0.48, 0.8, 0.68],
+    [0.64, 0.92, 0.5],
+    [0.78, 1, 0.34],
   ];
   for (const [from, to, girth] of tiers) {
-    const sides = 14;
+    const sides = 16;
     const base = p.h * from;
     const top = p.h * to;
     const ring = Array.from({ length: sides }, (_, k) => {
@@ -519,8 +551,7 @@ const brokenPost = (props, p, u) => {
 export function cemeteryProps({ graves, pines, tree, post, u }) {
   const props = createPropBuilder();
   for (const g of graves) {
-    if (g.kind === GRAVE.headstone) headstone(props, g);
-    else cross(props, g);
+    headstone(props, g);
   }
   for (const p of pines) pine(props, p);
   bareTree(props, tree, u);
@@ -568,14 +599,14 @@ void main() {
   vec2 p = vPos;
   float shown = revealBurned(p) * exitKeep(p) * uReveal;
   vec2 drift = vec2(uTime * (6.0 + 4.0 * uLayer), uTime * 1.5);
-  float band = fbm3((p - drift) / vec2(420.0, 160.0) + uLayer * 7.0);
+  float band = fbm3((p - drift) / vec2(380.0, 150.0) + uLayer * 7.0);
   float wisps = fbm3((p - drift * 1.6) / 90.0 + uLayer * 3.0);
   float outside = length(max(max(uCore.xy - p, p - uCore.zw), 0.0));
-  float density = smoothstep(0.45, 0.8, band) * (0.55 + 0.45 * wisps) * mix(0.25, 1.0, smoothstep(20.0, 220.0, outside));
+  float density = smoothstep(0.4, 0.72, band) * (0.55 + 0.45 * wisps) * mix(0.25, 1.0, smoothstep(20.0, 220.0, outside));
   vec2 uv = (p - uMin) / uSize;
   vec2 edgeUv = min(uv, 1.0 - uv);
   density *= smoothstep(0.0, 0.05, min(edgeUv.x, edgeUv.y));
-  gl_FragColor = vec4(MIST * 0.6, density * 0.4 * shown);
+  gl_FragColor = vec4(MIST * 0.55, density * 0.55 * shown);
 ${OUTPUT}
 }
 `;
