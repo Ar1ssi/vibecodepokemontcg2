@@ -2,6 +2,9 @@ import {
       createDeckInLibrary,
       deckCardsKey,
       deleteDeckFromLibrary,
+      dismissStarter,
+      loadDismissedStarters,
+      setDeckStarterKey,
       getDeckFromLibrary,
       getDeckFormat,
       LIBRARY_STORAGE_KEY,
@@ -131,13 +134,23 @@ import {
       const seedStarterDecks = () => {
         const starters = getStarterDecks();
         const decksByName = new Map(listDecks(library).map((d) => [d.name, d.id]));
+        const decksByStarterKey = new Map(
+          Object.values(library.decks)
+            .filter((d) => d.starterKey)
+            .map((d) => [d.starterKey, d.id])
+        );
+        const dismissed = loadDismissedStarters(window.localStorage);
         let nextLibrary = library;
         let changed = false;
 
         for (const entry of getStarterDeckCatalog()) {
-          const existingId = decksByName.get(entry.name);
+          const existingId = decksByStarterKey.get(entry.key) ?? decksByName.get(entry.name);
           if (existingId) {
             const deck = nextLibrary.decks[existingId];
+            if (deck.starterKey !== entry.key) {
+              nextLibrary = setDeckStarterKey(nextLibrary, existingId, entry.key);
+              changed = true;
+            }
             if (entry.sleeveId && !deck.sleeveId) {
               nextLibrary = setDeckSleeve(nextLibrary, existingId, entry.sleeveId);
               changed = true;
@@ -157,6 +170,7 @@ import {
             continue;
           }
 
+          if (dismissed.has(entry.key)) continue;
           const cards = starters[entry.key];
           if (!cards?.length) continue;
 
@@ -183,6 +197,7 @@ import {
             }
           );
           nextLibrary = created.library;
+          nextLibrary = setDeckStarterKey(nextLibrary, created.deckId, entry.key);
           if (entry.sprites) {
             nextLibrary = setDeckSprites(nextLibrary, created.deckId, entry.sprites);
           }
@@ -278,6 +293,10 @@ import {
         const deck = library?.decks?.[deckId];
         if (!deck) return;
         if (!window.confirm(`Delete deck "${deck.name}"? This cannot be undone.`)) return;
+        // Starters not loaded yet: a name match is unknowable, so only a tagged deck is remembered.
+        const starterKey =
+          deck.starterKey ?? getStarterDeckCatalog().find((entry) => entry.name === deck.name)?.key;
+        if (starterKey) dismissStarter(window.localStorage, starterKey);
         const nextLibrary = deleteDeckFromLibrary(library, deckId);
         for (const key of ['self', 'opp']) {
           if (activeDeckIds[key] === deckId) {
