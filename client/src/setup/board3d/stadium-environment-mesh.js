@@ -13,6 +13,7 @@ import { darkCityBoard } from './stadium-env-city.mjs';
 import { crystalCaveBoard } from './stadium-env-crystal.mjs';
 import { dimensionValleyBoard } from './stadium-env-dimension.mjs';
 import { fullMetalLabBoard } from './stadium-env-lab.mjs';
+import { levinciaBoard } from './stadium-env-levincia.mjs';
 import { mysteryGardenBoard } from './stadium-env-garden.mjs';
 import { magmaBasinBoard } from './stadium-env-magma.mjs';
 import { mountainRingBoard } from './stadium-env-ring.mjs';
@@ -622,6 +623,7 @@ const BOARDS = {
   'fighting-stadium': fightingStadiumBoard,
   'forest-of-vitality': forestOfVitalityBoard,
   'full-metal-lab': fullMetalLabBoard,
+  levincia: levinciaBoard,
   'magma-basin': magmaBasinBoard,
   'mountain-ring': mountainRingBoard,
   'mystery-garden': mysteryGardenBoard,

@@ -406,14 +406,18 @@ particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
     wooden pier reaches out from the far shore on the right. Two lumpy grey-brown boulders, ringed
     in foam, stand in the near-left water, and dark rocks lie sunk in open water. Every piece keeps
     clear of the cards, and a test projects them in both presets.
-  - Levincia (`levincia`, JTG 150, Marina Chikazawa). A bright noon city on the water. Every Active
-    and Bench card lies on the art's round raised stage: a pale blue-white floor ringed in a yellow
-    and white band with the yellow Electric motif in its middle. Its rim wall drops to light-blue
-    water. Pale curved elevated walkways with railings and white arches circle the stage. The art's
-    row of bright yellow and red billboard screens runs along the far walkway. Glass skyscrapers
-    with angled crystal tops stand past the far edge, low enough to stay in view in both presets.
-    Any mast at the stage's rim ends in a lamp head. Glints run on the glass, and pulses run round
-    the yellow ring.
+  - Levincia (`levincia`, JTG 150, Marina Chikazawa; built, `stadium-env-levincia.mjs`). A noon city on
+    the water, with the sun high at the far right. A round stage holds every card. Its floor is pale
+    blue panels in rings and spokes, a shade darker than the art's, so white card borders keep their
+    edges. A band of yellow mosaic with a blue line inside it runs round the rim, and a two-armed
+    yellow mosaic swirl with a round eye lies at the middle. The rim wall drops to clear light-blue
+    water, which carries drifting ripples and glints. A walkway ring on its own wall circles the
+    water with white railings on both edges. Four bridges ramp up to it from the stage on the
+    diagonals, with railed sides. The art's billboards stand on the walkway's left, far and right arcs, never the
+    near arc. Each is a dark frame leaning back so both presets see its face, showing bright yellow
+    or blue screens with red, pale and yellow blocks. Glass towers with slanted crystal-cut tops
+    stand in the water past the walkway, lower out to the sides. The art's arches are left out (from
+    above they read as horseshoes), and so are its bare masts, which would lead to nothing.
 
 ### Board checklist — lessons from the first nine boards (every new board passes it)
 - Colours are the card art's pixel samples (`sample.py` region median and percentiles), inverted
