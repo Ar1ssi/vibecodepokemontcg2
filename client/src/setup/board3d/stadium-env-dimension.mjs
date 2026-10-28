@@ -187,6 +187,8 @@ uniform vec4 uIsland;
 uniform vec2 uIslandShape;
 uniform vec3 uEmblem;
 uniform vec4 uScene;
+// Every small slab (x, y, radius; 0 radius: none), for the shadows it throws on the void.
+uniform vec4 uSlabs[${MAX_ISLANDS}];
 float wander(vec2 p) {
   return 0.55 * sin(p.x * 0.013 + 1.1) * sin(p.y * 0.017 + 0.3) + 0.3 * sin((p.x + p.y) * 0.029 + 2.0) + 0.15 * sin(p.x * 0.051 - p.y * 0.043)
     + 0.22 * (1.0 - 2.0 * abs(sin(p.x * 0.021 + 1.7 * sin(p.y * 0.009))));
@@ -646,8 +648,13 @@ void main() {
     * (0.5 + 0.5 * sin(t * 4.0 + hash12(cell + 7.0) * 30.0));
   vec3 speckHue = mix(vec3(1.0), 0.55 + 0.45 * cos(6.2831853 * (hash12(cell + 3.0) + vec3(0.0, 0.33, 0.67))), step(0.45, hash12(cell + 11.0)));
   col += speckHue * speck * band * 1.1;
-  // The island's soft shadow on the mist far below it.
+  // The island's soft shadow on the mist far below it, and each small slab's, so they hang in front of it.
   col *= mix(0.3, 1.0, smoothstep(0.0, 260.0, islandDistance(p + vec2(30.0, 40.0))));
+  for (int i = 0; i < ${MAX_ISLANDS}; i++) {
+    vec4 slab = uSlabs[i];
+    if (slab.z <= 0.0) continue;
+    col *= mix(0.5, 1.0, smoothstep(0.0, slab.z * 1.1, distance(p + vec2(26.0, 34.0), slab.xy) - slab.z * 0.8));
+  }
   gl_FragColor = vec4(col, 1.0);
 ${OUTPUT}
 }
@@ -698,6 +705,7 @@ export function dimensionValleyBoard({ three, material, seeded, terrainGrid, rep
     uIslandShape: { value: new three.Vector2() },
     uEmblem: { value: new three.Vector3() },
     uScene: { value: new three.Vector4(0, 0, 1, 1) },
+    uSlabs: { value: Array.from({ length: MAX_ISLANDS }, () => new three.Vector4()) },
   };
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
   const materials = {
@@ -728,6 +736,10 @@ export function dimensionValleyBoard({ three, material, seeded, terrainGrid, rep
       own.uIslandShape.value.set(island?.corner ?? 0, island?.wander ?? 0);
       own.uEmblem.value.set(spots?.emblem?.x ?? 0, spots?.emblem?.y ?? 0, spots?.emblem?.r ?? 0);
       own.uScene.value.set(bounds.x, bounds.y, bounds.w, bounds.h);
+      own.uSlabs.value.forEach((slot, i) => {
+        const slab = spots?.islands[i];
+        return slab ? slot.set(slab.x, slab.y, slab.r, 0) : slot.set(0, 0, 0, 0);
+      });
       replaceGeometry(terrain, terrainGrid(bounds));
       // The void reaches well past the scene: lying deep, it shows round the scene's edges on screen.
       const depth = VOID_DEPTH * (spots?.u ?? 1);

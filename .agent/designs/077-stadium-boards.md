@@ -332,7 +332,9 @@ particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
     size, stretched along the sun's path. They stir as the pads sway, and the shadow grows in with the
     tree during the reveal. The cards lie on a soft meadow. A carpet of rounded bushes in the art's
     yellow-greens runs round it. Pools of the art's yellow glow well up between the bushes and at the
-    trunk's foot, and motes of light rise from them.
+    trunk's foot, and motes of light rise from them. A later critique pass: foliage is two scales of warped leaf lobes with
+    soft hollows between (no polygon creases), the lawn carries blade tufts and drifts of sun, the bark is furrowed
+    and mossy, and a skirt of lower pads closes the trunk's top under foliage.
   - Crystal Cave (`crystal-cave`, EVS 144, Toyste Beach; built, `stadium-env-crystal.mjs`). A warm
     brown floor of packed earth, stained and mottled, holds every card. Between the Actives the Poke
     Ball is the art's thin gold line, with a pale-blue glow at its heart. A soft pool of skylight lies
@@ -345,7 +347,9 @@ particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
     Clusters are tall off the far end, medium in the side bands and low toward the near end, because
     in the tilted preset tall things there lean up over the player's cards. A test projects every
     crystal clear of the cards in both presets. Each cluster lights the floor in its own colour, and
-    coloured sparkle dust twinkles in the air.
+    coloured sparkle dust twinkles in the air. A later critique pass: the floor is pebbled earth, the walls show
+    strata and lit lips, the crystals are glassy (a second low light gives each face its own tone, glints, veins) with
+    small shards at their feet, and the dust hangs low and warm round the skylight's pool.
   - Mystery Garden (`mystery-garden`, MEG 122, Ayumi Odashima; built, `stadium-env-garden.mjs`). A
     garden at night under a moon from the far left. A round plaza paved in rings of the art's lavender
     flagstones holds every card. The art's glowing basin is a pool on the emblem's circle: its pale
@@ -357,18 +361,22 @@ particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
     pale-blue vases, each with a lantern. Pale fluted pillars stand beyond the vases; the near pair is
     shorter, because tall props there lean up over the player's cards in the tilted preset. Teal
     hedges and broad leaves fill the garden. The pool lights the plaza cyan, the lanterns light their
-    pools pink, and fireflies drift.
+    pools pink, and fireflies drift. A later critique pass: each flagstone is its own slate, lavender or rose with moss in
+    the joints, the steps are slabs, the hedges are boxwood, and the lanterns wash their iron pink.
   - Old Cemetery (`old-cemetery`, CRE 147, Oswaldo Kato; built, `stadium-env-cemetery.mjs`). The cards
     lie on dark teal grass with tufts lit the art's pale yellow-green. A worn earth path with grass
     creeping back over it comes in past the near edge at the left. It runs up past the cards, rounds
     their far corner well outside it, and leaves past the right edge. Pale teal headstones with
-    rounded tops (and a few crosses) stand in loose rows either side of the path and off the far end.
+    rounded or pointed tops stand in loose rows either side of the path and off the far end.
     None stand toward the near end, where they would lean up over the player's cards in the tilted
     preset. Each stone leans back its own way, so its face shows from above. The art's mossy boulder
     lies in the right band, its broken wooden post stands by the path, and dark pines and the bare
     pale tree stand round the scene's edge. The moon is low beyond the far end, so every stone, pine
     and the tree cast baked shadows toward the player, and the stones' rims catch the moonlight. One
-    sheet of mist drifts low, thicker away from the cards.
+    sheet of mist drifts low, thicker away from the cards. A later critique pass: the night is darker and bluer toward
+    the scene's edge and thins to pale haze toward the moon, the grass has tall glowing blades, the path is rutted
+    with pebbles and puddles that hold the moon, and the stones carry moss at their feet. Crosses and obelisks read
+    as arrows from above, so the stones are all slabs.
   - Dimension Valley (`dimension-valley`, PHF 93, Ryo Ueda; built, `stadium-env-dimension.mjs`). Every
     card lies on one great floating island of grass, its edge wandering. Its brown earth cliffs fall
     sheer and then taper into the void, which lights them from below in its own colours. Past the edge
@@ -379,7 +387,9 @@ particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
     art's glowing discs (red, yellow, green, pink, blue) lie on the grass off every card and outside
     the mark. Up to ten small angular slabs of grass and earth float in the margins, each tipped its
     own way and bobbing slowly. They float low toward the near end, so they never lean over the
-    player's cards; a bare little tree stands on the farthest slab.
+    player's cards; a bare little tree stands on the farthest slab. A later critique pass: the island's edge is ragged, its grass
+    (tufts of tall blades, bare soil near the edge) is shared with the slabs, the earth shows strata and cracks, the
+    discs are flat painted lozenges, flakes tumble in the void, and each slab throws a shadow on it.
   - Surfing Beach (`surfing-beach`, MEG 129, Ayumi Odashima; built, `stadium-env-beach.mjs`, its bay in
     `stadium-env-beach-layout.mjs`, its palms in `stadium-env-palms.mjs`; the `feature/077-beach-board` version,
     which replaced a from-scratch one). A sunny bay seen from above: the sea fills the far-left corner,
@@ -413,7 +423,9 @@ particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
     near arc. Each is a dark frame leaning back so both presets see its face, showing bright yellow
     or blue screens with red, pale and yellow blocks. Glass towers with slanted crystal-cut tops
     stand in the water past the walkway, lower out to the sides. The art's arches are left out (from
-    above they read as horseshoes), and so are its bare masts, which would lead to nothing.
+    above they read as horseshoes), and so are its bare masts, which would lead to nothing. A later critique pass: the swirl's edges are crisp with
+    a blue outline, the walkway is paved, the water has foam at the walls and caustics, the billboards are painted
+    (golden, cream or sky blue, each with a creature) and the glass is lighter, as the art's.
 
 ### Board checklist — lessons from the first nine boards (every new board passes it)
 - Colours are the card art's pixel samples (`sample.py` region median and percentiles), inverted
