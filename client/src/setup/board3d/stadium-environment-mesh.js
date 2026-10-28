@@ -826,10 +826,11 @@ export function createStadiumEnvironment({
 
   const scheduleAmbient = () => {
     if (ambientTimer !== null || motionReduced() || isHidden()) return;
+    // A fifth short: the frame this asks for waits for the next vsync, so the pace holds at AMBIENT_FPS.
     ambientTimer = setTimeout(() => {
       ambientTimer = null;
       if (key && !disposed) onNeedsRender();
-    }, 1000 / AMBIENT_FPS);
+    }, (1000 / AMBIENT_FPS) * 0.8);
   };
 
   const renderBake = (target, material) => {

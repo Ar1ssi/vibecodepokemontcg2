@@ -13,7 +13,7 @@ export const BAKE_MAX_TEXELS = 4096;
 /** Most texels a bake may hold (~5 M: ~40 MB of half-float field plus its light). */
 export const BAKE_MAX_TEXEL_AREA = 5e6;
 /** Terrain grid spacing in table px. */
-export const TERRAIN_SPACING_PX = 2.5;
+export const TERRAIN_SPACING_PX = 6;
 /** Key light in the table frame: from the far left, ~48° up (table-mesh.js lights from there too). */
 export const SUN_DIRECTION = [-0.45, 0.5, 0.74];
 

@@ -545,7 +545,22 @@ maskUniforms, dispose() }`.
   not when `fxDisabled()` or `motionReduced()` (static frame, time frozen) or `document.hidden`.
 - `play()`: `fxDisabled()` or `motionReduced()` → `settle()` and return `0`; else `timeline.play(now)`
   and `onNeedsRender()`.
-- WebGL context restored → rebake.
+- WebGL context restored → rebake, and the plate is redrawn.
+- **Frame cost** (user, 2026-10-28: boards used ~70% of the GPU; target 60 fps). Three causes, three fixes,
+  measured with timer queries on a real GPU at 1920x1080 and DPR 2:
+  1. The environment drew at the canvas's full pixel count and on every frame the board drew; and the
+     board drew at the display's rate for ever, because rects() (read by the mirror's sync after each
+     moved frame) counted as the cards having moved (`card-frame-demand.mjs`). Now the environment
+     draws into a half-float **plate** of at most `PLATE_MAX_PIXELS` (1.6M, never above CSS-pixel size),
+     redrawn only on an ambient step (`AMBIENT_FPS`, the clock is quantised to it), a camera or table
+     move, a resize, the reveal, or a layout change; every other frame lays the plate on the canvas
+     (one textured quad, tone mapped there). Programs compile for the plate's target, as they draw.
+  2. The terrain grid was 2.5 px (435k vertices, triangles of about 3 px²: the GPU shades 2x2 quads, so
+     most of the pixel work was helper lanes). `TERRAIN_SPACING_PX` is 6; heights come from the bake, so
+     the look holds (checked on all 25 boards).
+  3. The frame cadence: the ambient timer waits a fifth short of its period so the next vsync lands on it.
+  Result at DPR 2 (GPU time per second, one board idle): 320-410 ms before, 50-70 ms after, the
+  no-Stadium board 170 ms before the loop fix and 13 ms after.
 
 ### Mat cutout — `table-mesh.js`
 `table.setCutout(cutout | null)`; `cutout = { uniforms, mask }` from the environment

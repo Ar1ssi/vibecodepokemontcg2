@@ -7,6 +7,7 @@ import { projectToScreen, tableToWorld } from './board-camera.mjs';
 import { diffModels, placementById } from './board-model.mjs';
 import { CARD_UNITS, cardScaleFor } from './card-geometry.mjs';
 import { createCardMeshPool } from './card-mesh.js';
+import { createCardFrameDemand } from './card-frame-demand.mjs';
 import { handGroupsOf, posesFor } from './card-poses.mjs';
 import { createCountLabels, createStackBadges } from './count-labels.js';
 import { createFxLayer } from './fx/fx-layer.js';
@@ -256,16 +257,14 @@ export function createBoardScene({
   let stopShake = null;
   let frameId = null;
   let disposed = false;
-  // rects()/hitTest advance the card tweens between frames. One of those calls can finish a
-  // tween, so the next frame sees nothing moving; with frames far apart a whole tween can even
-  // start and end between two frames. Either way that frame reports the cards moved, so
-  // `onRender` listeners (the mirror's rect sync) still see the final pose, and the frame after a
-  // running tween is still asked for (the scene clock advances with drawn frames).
-  let cardsAdvancedOffFrame = false;
+  // rects()/hitTest advance the card tweens between frames (card-frame-demand.mjs): a frame after a
+  // call that finished a tween still reports the cards moved, so `onRender` listeners (the mirror's
+  // rect sync) see the final pose; with frames far apart a whole tween can even start and end
+  // between two frames, which `posedSinceRender` covers.
+  const cardDemand = createCardFrameDemand();
   let posedSinceRender = false;
   const advanceCards = () => {
-    if (frameId !== null) cardsAdvancedOffFrame = true;
-    pool.update(clock.now());
+    cardDemand.advancedBetweenFrames(pool.update(clock.now()), frameId !== null);
   };
 
   const contextLost = () => {
@@ -286,8 +285,7 @@ export function createBoardScene({
   const render = () => {
     if (disposed || contextLost()) return;
     const now = clock.now();
-    const cardsMoving = pool.update(now) || cardsAdvancedOffFrame;
-    cardsAdvancedOffFrame = false;
+    const cardsMoving = cardDemand.drawn(pool.update(now));
     const pilesMoving = piles.update(now);
     const overlaysMoving = overlays.update(now);
     const environmentMoving = environment.update(now, camera);
