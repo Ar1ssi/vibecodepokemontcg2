@@ -46,6 +46,18 @@ export const INTRO_MS = 1600;
 export const STADIUM_ENV_LAYER = 3;
 export const AMBIENT_FPS = 30;
 /**
+ * The environment is drawn into a plate of its own (a half-float target) and the plate onto the
+ * canvas: the plate keeps its pixels while nothing under it changed (a card tween, a hover), and
+ * holds at most this many pixels however large the canvas, since the ground under the cards is
+ * smooth and a 4K canvas gains nothing from shading every one of its pixels.
+ */
+export const PLATE_MAX_PIXELS = 1_600_000;
+const PLATE_SAMPLES = 4;
+
+/** The plate's scale on the canvas's drawing buffer: never above the CSS-pixel size, never above PLATE_MAX_PIXELS. */
+export const plateScale = (width, height, pixelRatio = 1) =>
+  Math.min(1, 1 / Math.max(1, pixelRatio), Math.sqrt(PLATE_MAX_PIXELS / Math.max(1, width * height)));
+/**
  * Longest wait for a board's programs before it shows anyway (three then builds what is missing
  * on first draw): compileAsync polls each program until the driver reports it linked, which never
  * happens on a lost context.
@@ -745,11 +757,51 @@ export function createStadiumEnvironment({
   let revealStartedAt = null;
   let ambientTimer = null;
   let disposed = false;
+  // The plate (see PLATE_MAX_PIXELS): made when first needed; stale when what it shows is out of date.
+  let plateTarget = null;
+  let plateStale = true;
+  let lastStep = Number.NaN;
+  let plateMaterial = null;
+  let plateScene = null;
+  const watched = new Float64Array(3 + 4 + 16 + 16 + 2);
+  const onContextRestored = () => {
+    plateStale = true;
+    onNeedsRender();
+  };
+  renderer.domElement?.addEventListener?.('webglcontextrestored', onContextRestored);
   let unsupported = false;
   /** The last camera update was given: a board compiles for it even on a frame given none. */
   let lastCamera = null;
   /** Compiles still running: three polls their materials, so dispose waits for them. */
   const inFlight = new Set();
+
+  const plateTargetOf = () => {
+    plateTarget ??= new three.WebGLRenderTarget(1, 1, { type: three.HalfFloatType, samples: PLATE_SAMPLES });
+    return plateTarget;
+  };
+
+  /** True when the camera, the table or the canvas differ from the last time it was asked. */
+  const viewChanged = (camera) => {
+    let changed = false;
+    const mark = (index, value) => {
+      if (watched[index] === value) return;
+      watched[index] = value;
+      changed = true;
+    };
+    let index = 0;
+    for (const value of [
+      ...camera.position.toArray(),
+      ...camera.quaternion.toArray(),
+      ...camera.projectionMatrix.elements,
+      ...group.matrixWorld.elements,
+      bufferSize.x,
+      bufferSize.y,
+    ]) {
+      mark(index, value);
+      index += 1;
+    }
+    return changed;
+  };
 
   const boardOf = (wanted) => {
     if (!boards.has(wanted)) {
@@ -876,7 +928,7 @@ export function createStadiumEnvironment({
   /**
    * `compile` (renderer.compile or compileAsync) on the board's meshes as board-scene.js draws them:
    * in the environment's own pass, the camera on STADIUM_ENV_LAYER (only lights on that layer
-   * count), into the canvas. A program built for another light count or for a render target has
+   * count), into the plate. A program built for another light count or for a render target has
    * another cache key, and three would build it again, on the main thread, the first time the pass
    * draws.
    */
@@ -885,7 +937,7 @@ export function createStadiumEnvironment({
     const previous = renderer.getRenderTarget();
     try {
       camera.layers.set(STADIUM_ENV_LAYER);
-      renderer.setRenderTarget(null);
+      renderer.setRenderTarget(plateTargetOf());
       return compile(board.holder, camera, sceneOf(group));
     } finally {
       camera.layers.mask = mask;
@@ -952,6 +1004,7 @@ export function createStadiumEnvironment({
       board.lateTimer = null;
       board.preparing = null;
       board.compiled = true;
+      plateStale = true;
       if (disposed) return;
       board.holder.visible = boards.get(key) === board;
       onNeedsRender();
@@ -975,6 +1028,8 @@ export function createStadiumEnvironment({
     uniforms.uReveal.value = 0;
     revealStartedAt = null;
     dirty = true;
+    plateStale = true;
+    lastStep = Number.NaN;
     stopAmbient();
     onNeedsRender();
     return true;
@@ -993,6 +1048,8 @@ export function createStadiumEnvironment({
     if (dirty) {
       if (!applyLayout()) return false;
       dirty = false;
+      plateStale = true;
+      lastStep = Number.NaN;
     }
     const board = shown;
     if (camera && !board.compiled) {
@@ -1001,6 +1058,7 @@ export function createStadiumEnvironment({
       // or it would run its course while the compile holds the screen.
       if (renderer.compile) compileMeshes(renderer.compile.bind(renderer), board, camera);
       board.compiled = true;
+      plateStale = true;
       revealStartedAt = null;
       uniforms.uReveal.value = 0;
       return true;
@@ -1009,24 +1067,82 @@ export function createStadiumEnvironment({
     if (revealStartedAt === null) revealStartedAt = now;
     const progress = reduced ? 1 : Math.min(1, Math.max(0, (now - revealStartedAt) / INTRO_MS));
     uniforms.uReveal.value = easeOutCubic(progress);
-    uniforms.uTime.value = reduced ? 0 : now / 1000;
-    board.tick?.(reduced ? null : now / 1000);
-    if (camera) {
-      renderer.getDrawingBufferSize(bufferSize);
-      uniforms.uFocal.value = (camera.projectionMatrix.elements[5] * bufferSize.y) / 2;
+    // The ambient clock steps at AMBIENT_FPS: frames between steps (a card moving) leave the plate as it is.
+    const step = reduced ? 0 : Math.floor((now / 1000) * AMBIENT_FPS) / AMBIENT_FPS;
+    if (step !== lastStep) {
+      lastStep = step;
+      uniforms.uTime.value = step;
+      board.tick?.(reduced ? null : step);
+      plateStale = true;
     }
+    renderer.getDrawingBufferSize(bufferSize);
     group.updateWorldMatrix(true, false);
+    if (camera) {
+      const scale = plateScale(bufferSize.x, bufferSize.y, renderer.getPixelRatio?.());
+      uniforms.uFocal.value = (camera.projectionMatrix.elements[5] * bufferSize.y * scale) / 2;
+      if (viewChanged(camera)) plateStale = true;
+    }
     cutout.uniforms.uTableFromWorld.value.copy(group.matrixWorld).invert();
     if (camera) uniforms.uEye.value.copy(camera.position).applyMatrix4(cutout.uniforms.uTableFromWorld.value);
-    board.beforeRender?.(renderer);
     const revealing = progress < 1;
+    if (revealing) plateStale = true;
+    if (plateStale) board.beforeRender?.(renderer);
     if (!revealing) scheduleAmbient();
     return revealing;
+  };
+
+  /**
+   * Draws the environment under the board: redraws the plate when it is stale (a time step, a
+   * camera, a layout), then lays the plate on the canvas, clearing it first. `scene` and `camera`
+   * are the board's; the camera's layers are restored.
+   */
+  const drawPlate = (scene, camera) => {
+    const target = plateTargetOf();
+    renderer.getDrawingBufferSize(bufferSize);
+    const scale = plateScale(bufferSize.x, bufferSize.y, renderer.getPixelRatio?.());
+    const width = Math.max(2, Math.round(bufferSize.x * scale));
+    const height = Math.max(2, Math.round(bufferSize.y * scale));
+    if (target.width !== width || target.height !== height) {
+      target.setSize(width, height);
+      plateStale = true;
+    }
+    if (plateStale) {
+      const mask = camera.layers.mask;
+      const shadowsAuto = renderer.shadowMap.autoUpdate;
+      const previous = renderer.getRenderTarget();
+      camera.layers.set(STADIUM_ENV_LAYER);
+      renderer.shadowMap.autoUpdate = false;
+      renderer.setRenderTarget(target);
+      try {
+        renderer.render(scene, camera);
+      } finally {
+        renderer.setRenderTarget(previous);
+        renderer.shadowMap.autoUpdate = shadowsAuto;
+        camera.layers.mask = mask;
+      }
+      plateStale = false;
+    }
+    if (!plateScene) {
+      plateMaterial = new three.ShaderMaterial({
+        vertexShader: glsl.FULLSCREEN_VERTEX,
+        fragmentShader: `uniform sampler2D uPlate;\nvarying vec2 vUv;\nvoid main() {\n  gl_FragColor = texture2D(uPlate, vUv);\n${glsl.OUTPUT}\n}`,
+        uniforms: { uPlate: { value: target.texture } },
+        depthTest: false,
+        depthWrite: false,
+      });
+      const quad = new three.Mesh(bakeQuad.geometry, plateMaterial);
+      quad.frustumCulled = false;
+      plateScene = new three.Scene();
+      plateScene.add(quad);
+    }
+    plateMaterial.uniforms.uPlate.value = target.texture;
+    renderer.render(plateScene, bakeCamera);
   };
 
   const dispose = () => {
     if (disposed) return;
     disposed = true;
+    renderer.domElement?.removeEventListener?.('webglcontextrestored', onContextRestored);
     stopAmbient();
     key = null;
     cutout.uniforms.uCutoutOn.value = 0;
@@ -1043,6 +1159,8 @@ export function createStadiumEnvironment({
       bakeQuad.geometry.dispose();
       bakeLight.dispose();
       compileTarget.dispose();
+      plateTarget?.dispose();
+      plateMaterial?.dispose();
       disposeTargets();
       targets = null;
     };
@@ -1063,5 +1181,5 @@ export function createStadiumEnvironment({
     });
   };
 
-  return { setLayout, setKey, update, active: () => key !== null, cutout, dispose };
+  return { setLayout, setKey, update, drawPlate, active: () => key !== null, cutout, dispose };
 }

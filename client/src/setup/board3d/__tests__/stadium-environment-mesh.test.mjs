@@ -6,9 +6,12 @@ import { getMatLayout } from '../../sizing/mat-layouts.mjs';
 import { NO_MAT_LAYOUT_ID } from '../../sizing/mat-spec.mjs';
 import { craterBowl, mountainPeaks } from '../stadium-environment-layout.mjs';
 import {
+  AMBIENT_FPS,
   INTRO_MS,
+  PLATE_MAX_PIXELS,
   PREPARE_TIMEOUT_MS,
   createStadiumEnvironment,
+  plateScale,
   strikePath,
   strikePower,
 } from '../stadium-environment-mesh.js';
@@ -65,6 +68,61 @@ test('strikePath is null without a mountain, and arcs need the table', () => {
     const path = strikePath(index, 0, { bowl, peaks: { left: null, right: null } }, null);
     assert.equal(path, null);
   }
+});
+
+test('plateScale: CSS-pixel size at most, never more than PLATE_MAX_PIXELS', () => {
+  assert.equal(plateScale(1280, 720, 1), 1);
+  assert.equal(plateScale(2560, 1440, 2), 0.5 * 1 <= Math.sqrt(PLATE_MAX_PIXELS / (2560 * 1440)) ? 0.5 : Math.sqrt(PLATE_MAX_PIXELS / (2560 * 1440)));
+  for (const [width, height, ratio] of [[1920, 1080, 1], [3840, 2160, 2], [5120, 2880, 1.5]]) {
+    const scale = plateScale(width, height, ratio);
+    assert.ok(scale <= 1 / ratio + 1e-9 && width * height * scale * scale <= PLATE_MAX_PIXELS + 1);
+  }
+  assert.equal(plateScale(0, 0, 0), 1, 'a zero canvas does not divide by zero');
+});
+
+test('drawPlate redraws the plate only when it is stale: a time step, a camera, a canvas size', async () => {
+  const three = await import('../../../vendor/three/three.module.min.js');
+  const drawn = [];
+  let target = null;
+  let size = [1920, 1080];
+  const renderer = {
+    extensions: { has: () => true },
+    compile: () => {},
+    shadowMap: { autoUpdate: true },
+    getRenderTarget: () => target,
+    setRenderTarget: (next) => {
+      target = next;
+    },
+    render: () => drawn.push(target),
+    getPixelRatio: () => 1,
+    getDrawingBufferSize: (out) => out.set(...size),
+  };
+  const parent = new three.Group();
+  const environment = createStadiumEnvironment({ three, renderer, parent, isHidden: () => true });
+  const scene = new three.Scene();
+  const camera = new three.PerspectiveCamera();
+  environment.setLayout(layout);
+  environment.setKey('perilous-jungle');
+  environment.update(1000, camera);
+  environment.update(3000, camera);
+  const frame = (now) => {
+    drawn.length = 0;
+    environment.update(now, camera);
+    environment.drawPlate(scene, camera);
+    return drawn.map((drawnTarget) => (drawnTarget ? 'plate' : 'canvas')).join(',');
+  };
+  const step = 1000 / AMBIENT_FPS;
+  const later = 3000 + INTRO_MS + 10.2 * step;
+  assert.equal(frame(later), 'plate,canvas', 'the first frame draws the plate');
+  assert.equal(frame(later + step * 0.3), 'canvas', 'a frame inside the same time step lays the plate again');
+  assert.equal(frame(later + step * 1.2), 'plate,canvas', 'the next time step draws it');
+  camera.position.x += 5;
+  assert.equal(frame(later + step * 1.3), 'plate,canvas', 'a moved camera draws it');
+  size = [1000, 500];
+  assert.equal(frame(later + step * 1.4), 'plate,canvas', 'a resized canvas draws it');
+  assert.equal(target, null, 'the previous render target is restored');
+  assert.equal(renderer.shadowMap.autoUpdate, true, 'and the shadow flag');
+  environment.dispose();
 });
 
 test('createStadiumEnvironment starts the reveal on the frame after the one that compiles its shaders', async () => {
@@ -147,7 +205,7 @@ test('createStadiumEnvironment compiles with compileAsync when it can: the mat s
   assert.equal(environment.update(1100, camera), false);
   assert.equal(asyncCompiles.length, 2, 'the bake passes and the meshes, once');
   assert.ok(asyncCompiles[0].target?.isWebGLRenderTarget, 'bake passes compile for a render target');
-  assert.equal(asyncCompiles[1].target, null, 'meshes compile for the canvas');
+  assert.ok(asyncCompiles[1].target?.isWebGLRenderTarget, 'meshes compile for the plate, as they draw');
   assert.equal(renders, 0, 'no bake before the programs are ready');
   assert.equal(syncCompiles, 0);
   assert.equal(reveal.value, 0);
