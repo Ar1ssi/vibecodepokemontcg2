@@ -593,8 +593,9 @@ body.board3d-active #stadium {
   justify-content: center;
   gap: 6px;
   padding: 8px;
-  background: rgba(20, 22, 30, 0.35);
-  backdrop-filter: blur(6px);
+  /* Denser fill instead of backdrop-filter: the 3D board canvas under it redraws every animated
+     frame, and a backdrop blur is recomputed with each one. */
+  background: rgba(20, 22, 30, 0.62);
   border-radius: 10px;
   box-sizing: border-box;
   z-index: 1310;
@@ -5758,8 +5759,8 @@ img.drag-avatar {
   align-items: center;
   gap: 4px;
   padding: 5px 6px;
-  background: rgba(20, 22, 30, 0.55);
-  backdrop-filter: blur(6px);
+  /* No backdrop-filter over the 3D board canvas (see #boardButtonContainer). */
+  background: rgba(20, 22, 30, 0.72);
   border-radius: 10px;
   font-family: 'Rodin Condensed', 'Barlow Semi Condensed', sans-serif;
 }

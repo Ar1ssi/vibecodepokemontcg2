@@ -158,7 +158,8 @@ export function createGpuCanvasMesh({ three, renderOrder = 10 }) {
       const image = recording.images?.[i];
       const texture = image?.isTexture ? image : white;
       uniforms[`uImage${i}`].value = texture;
-      uniforms.uImageFlip.value[i] = texture.flipY ? 1 : 0;
+      // A bitmap flipped at decode (table-mesh.js createImageTextureLoader) lies as a flipY upload does.
+      uniforms.uImageFlip.value[i] = texture.flipY || texture.userData?.flippedAtDecode ? 1 : 0;
       uniforms.uImageSrgb.value[i] = texture.colorSpace === three.SRGBColorSpace ? 1 : 0;
     }
     uniforms.uTime.value = timeSeconds;

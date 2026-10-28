@@ -12,6 +12,15 @@ import { stageToWorldMatrix } from './fx-stage.mjs';
 // only the hot cores the styles push past 2.4 bloom (design 075 slice 9; awaits the user's look check).
 export const BLOOM = Object.freeze({ strength: 0.2, radius: 0.3, threshold: 2.4 });
 
+/**
+ * Share of the drawing buffer the FX target covers per side: CSS pixels, not device pixels. On a
+ * high-DPI screen the soft glows and particles lose nothing visible at 1/ratio, and the target,
+ * its depth prepass and the bloom chain cost 1/ratio² as much. Impact prefabs keep their own
+ * full-size targets (impact-stage.js resizeTargets) and only resolve into this one.
+ * @param {number} pixelRatio the renderer's pixel ratio
+ */
+export const fxTargetScale = (pixelRatio) => (Number.isFinite(pixelRatio) && pixelRatio > 1 ? 1 / pixelRatio : 1);
+
 const COMPOSITE_VERTEX = `
 precision highp float;
 in vec3 position;
@@ -104,11 +113,12 @@ export function createFxLayer({
   compositeScene.add(compositeQuad);
   const compositeCamera = new three.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
-  /** The FX target and bloom at the drawing-buffer size (re-made when it changes). */
+  /** The FX target and bloom at the drawing buffer's CSS-pixel size (re-made when it changes). */
   const ensureTarget = () => {
     renderer.getDrawingBufferSize(size);
-    const width = Math.max(1, size.x);
-    const height = Math.max(1, size.y);
+    const scale = fxTargetScale(renderer.getPixelRatio?.() ?? 1);
+    const width = Math.max(1, Math.round(size.x * scale));
+    const height = Math.max(1, Math.round(size.y * scale));
     if (!target) {
       target = new three.WebGLRenderTarget(width, height, {
         type: three.HalfFloatType,

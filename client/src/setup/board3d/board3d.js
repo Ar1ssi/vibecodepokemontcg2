@@ -4,6 +4,7 @@
 import { cameraFromCssTilt, cameraTcgLive } from './board-camera.mjs';
 import { boardWidthFrac, flatLayout, halfFromViewport } from './board-layout.mjs';
 import { CARD_ZONES } from './board-model.mjs';
+import { createPerfHud, perfHudWanted } from './perf-hud.js';
 import { environmentOverride } from './stadium-environment-layout.mjs';
 
 const ACTIVE_CLASS = 'board3d-active';
@@ -241,9 +242,12 @@ export async function initializeBoard3d({
     });
   };
   let cardsWereMoving = false;
-  const onSceneRendered = ({ cardsMoving }) => {
+  let perfHud = null;
+  const onSceneRendered = (frame) => {
+    const { cardsMoving } = frame;
     if (cardsMoving || cardsWereMoving) queueMirrorSync();
     cardsWereMoving = cardsMoving;
+    perfHud?.record(frame);
   };
 
   // Card foil for the scene's pool (card-mesh.js): lookups answer null until loadFoil resolves.
@@ -328,6 +332,7 @@ export async function initializeBoard3d({
     const textures = modules.createTextureCache({
       loader: modules.createMatTextureLoader?.(three),
       anisotropy: gl.renderer.capabilities?.getMaxAnisotropy?.() ?? 1,
+      renderer: gl.renderer,
     });
     const clock = modules.createSceneClock(canvas);
     const scene = modules.createBoardScene({
@@ -389,6 +394,13 @@ export async function initializeBoard3d({
   if (!buildGraphics(initialCanvas)) {
     session = null;
     return fail(deps, 'no-webgl2');
+  }
+  if (perfHudWanted(win)) {
+    perfHud = createPerfHud({ doc, renderer: () => session?.gl?.renderer ?? null });
+    session.cleanup.push(() => {
+      perfHud?.dispose();
+      perfHud = null;
+    });
   }
 
   session.mat = await readMat();
