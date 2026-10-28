@@ -9,13 +9,21 @@ import { tableBounds } from './table-uv.mjs';
 
 /** Homebrew Stadiums that have a board, by card id (customhb set.json). */
 const ENVIRONMENT_BY_CARD = {
+  'customhb-030': 'forest-of-vitality',
   'customhb-051': 'stormy-mountains',
+  'customhb-052': 'crystal-cave',
   'customhb-162': 'steel-shelter',
   'customhb-163': 'full-metal-lab',
+  'customhb-197': 'mystery-garden',
+  'customhb-198': 'old-cemetery',
+  'customhb-199': 'dimension-valley',
+  'customhb-209': 'surfing-beach',
+  'customhb-212': 'brooklet-hill',
   'customhb-239': 'fighting-stadium',
   'customhb-240': 'mountain-ring',
   'customhb-253': 'perilous-jungle',
   'customhb-254': 'dark-city',
+  'customhb-278': 'levincia',
   'customhb-289': 'magma-basin',
   'customhb-299': 'scorched-earth',
 };
@@ -31,6 +39,14 @@ export const ENVIRONMENT_OVERRIDE_KEY = 'ptcg-stadium-env';
  * table's own floor shows.
  */
 const SCENE_MARGINS = {
+  'brooklet-hill': { side: 0.17, near: 0.2, far: 0.34 },
+  'crystal-cave': { side: 0.17, near: 0.2, far: 0.34 },
+  'dimension-valley': { side: 0.17, near: 0.2, far: 0.34 },
+  'forest-of-vitality': { side: 0.17, near: 0.2, far: 0.34 },
+  levincia: { side: 0.17, near: 0.2, far: 0.34 },
+  'mystery-garden': { side: 0.17, near: 0.2, far: 0.34 },
+  'old-cemetery': { side: 0.17, near: 0.2, far: 0.34 },
+  'surfing-beach': { side: 0.17, near: 0.2, far: 0.34 },
   'fighting-stadium': { side: 0.17, near: 0.2, far: 0.34 },
   'mountain-ring': { side: 0.17, near: 0.2, far: 0.34 },
   'dark-city': { side: 0.17, near: 0.2, far: 0.34 },

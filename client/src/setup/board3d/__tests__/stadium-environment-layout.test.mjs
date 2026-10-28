@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { CARD_UNITS } from '../card-geometry.mjs';
 import { flatLayout } from '../board-layout.mjs';
 import { placementPose } from '../card-poses.mjs';
@@ -58,10 +59,23 @@ test('environmentKeyFor maps Scorched Earth by id, or by set and number when the
   assert.equal(environmentKeyFor({ id: 'customhb-299' }), 'scorched-earth');
   assert.equal(environmentKeyFor({ set: 'customhb', number: '299' }), 'scorched-earth');
   assert.equal(environmentKeyFor({ id: '', set: 'customhb', number: 299 }), 'scorched-earth');
-  assert.equal(environmentKeyFor({ id: 'customhb-209' }), null);
+  // customhb-001 is Weedle: not a Stadium.
+  assert.equal(environmentKeyFor({ id: 'customhb-001' }), null);
   assert.equal(environmentKeyFor({ set: 'customhb', number: 'abc' }), null);
   assert.equal(environmentKeyFor({ set: 'sv1', number: '299' }), null);
   assert.equal(environmentKeyFor(null), null);
+});
+
+test('environmentKeyFor gives every Homebrew Stadium in set.json a board of its own, and no other card one', () => {
+  const set = JSON.parse(readFileSync(new URL('../../../assets/custom-sets/customhb/set.json', import.meta.url), 'utf8'));
+  const stadiums = set.cards.filter((card) => card.trainerType === 'Stadium');
+  assert.equal(stadiums.length, 17);
+  const keys = stadiums.map((card) => environmentKeyFor({ id: card.id }));
+  assert.ok(keys.every(Boolean), `unmapped: ${stadiums.filter((_, i) => !keys[i]).map((card) => card.name)}`);
+  assert.equal(new Set(keys).size, stadiums.length);
+  for (const card of set.cards.filter((each) => each.trainerType !== 'Stadium')) {
+    assert.equal(environmentKeyFor({ id: card.id }), null, card.name);
+  }
 });
 
 test('environmentOverride reads the URL first, then storage, and ignores unknown or unreadable values', () => {

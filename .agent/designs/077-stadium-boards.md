@@ -315,6 +315,92 @@ particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
     lights flaring into starbursts high in the four corners, 16 long thin lasers in the art's
     yellow-green, magenta, cyan, green and white criss-crossing from them over the side and far
     stands, never over the ring. (The art's entrance ramp is left out: from above it read as a plank.)
+- Eight more (user, 2026-10-28: "every Stadium card in customhb", the card art as reference, a good
+  sense of perspective, no AI tells). Each is built on its own branch `feature/077-hb-<key>` in its own module
+  `stadium-env-<name>.mjs` with the standard scene margins, then merged into `feature/077-six-stadiums`:
+  - Forest of Vitality (`forest-of-vitality`, MEG 117, Ayumi Odashima). The user asked for one huge tree
+    standing at the top right of the mat, casting a shadow from there. Only one tree, with no smaller trees. It is
+    the art's broadleaf: a straight brown trunk forking into limbs, and a crown of layered, cloud-like
+    green clumps lit yellow-green on top. Its trunk stands past the table's far-right corner, buttress roots
+    running into the ground. The crown spreads over the far-right part of the scene and never hangs over a
+    card in either preset. The board's sun stands beyond the tree (high, from the far right), so the
+    crown's dappled shadow falls from the top right across the mat toward the near left. Sun flecks
+    show through gaps in the crown and drift as the crown sways. The ground is the art's soft, mossy,
+    sunlit meadow. Low rounded bushes in dense clumps (the art's foreground) fill the side bands.
+    The art's yellow-green "vitality" glow pools on the ground near the trunk, and light motes rise from it.
+  - Crystal Cave (`crystal-cave`, EVS 144, Toyste Beach). A warm umber-brown earthen cave floor
+    holds every card. Between the Actives, the Poke Ball is drawn on the floor as the art's thin gold
+    line ring, with a pale glowing button. A soft pool of the art's pale skylight lies on it (a pool, no
+    beam or whiteout). Clusters of tall hexagonal crystal prisms (the art's pink, aqua, teal-green,
+    lavender, mint and peach; translucent, with flat-cut tips) stand wherever no card lies. Tall
+    clusters go off the far end and in the side bands; low ones go near the near edge. Each cluster
+    casts a faint pool of its own colour on the floor. Rough dark rock walls close the cave past the
+    clusters. Coloured sparkle dust floats in the air.
+  - Mystery Garden (`mystery-garden`, MEG 122, Ayumi Odashima). A night garden plaza paved in the art's
+    lavender-grey flagstones laid in concentric rings round the table's middle. Round the Actives,
+    the art's glowing cyan basin becomes a flush inlay of glowing rings with a crackling energy
+    swirl; nothing stands over a card. At the plaza's edge, shallow stone steps lead down at the near
+    side. A low stone balustrade on the sides and far end holds pale urns of white flowers. Black iron
+    lanterns, each with a warm pink-white light, stand at the edge and light pools of paving. Pale
+    stone pillars stand at the far corners. Dark hedges and broad tropical leaves stand behind. Green-gold motes drift.
+  - Old Cemetery (`old-cemetery`, CRE 147, Oswaldo Kato). A misty graveyard under a crescent moon.
+    The grass is dark teal-green with tufts of pale yellow-green. A worn rust-brown dirt path enters
+    and leaves the scene at its edges and never stops in the middle of the ground. Pale teal-grey
+    round-topped headstones stand in the side bands and the far band, some leaning, some mossy. The
+    art's broken wooden grave post and big mossy boulder are included. Dark pines and one bare pale
+    tree stand past the far edge and the corners. Bands of ground mist drift. The moonlight is cool
+    cyan-white.
+  - Dimension Valley (`dimension-valley`, PHF 93, Ryo Ueda). Every card lies on one big floating
+    island. The island has a grass top and thick brown earth cliffs that taper down into the void
+    below it. The art's pink Psychic swirl is painted on the grass between the Actives. Round the island
+    is the art's void: a rainbow band (red, yellow and green on the left) turning violet, with streams of
+    white sparkle. Smaller grass-topped floating islands bob slowly in the margins, and a bare little
+    tree stands on one of them. The art's glowing coloured discs (red, yellow, green, pink, blue) lie
+    on the grass wherever no card lies.
+  - Surfing Beach (`surfing-beach`, MEG 129, Ayumi Odashima). Every card lies on golden-orange sand.
+    The sea fills the far-right side, and its surf rolls in in white lace foam lines toward the near
+    left. Swash runs up and drains, leaving the wet sand glossy. The water never covers a card
+    footprint. A big curling wave breaks out past the far edge. Sandstone cliffs stand at the far-left
+    corner, and brown rocks wrapped in white surf stand at the near right, as in the art. There are no
+    palms (the art has none). The old prototype `feature/077-beach-board` (`stadium-env-beach.mjs`:
+    water, waves, swash, foam) may be ported to the board-builder shape.
+  - Brooklet Hill (`brooklet-hill`, GRI 120, 5ban Graphics). The art's sparkling blue lake, cards on
+    it, as the earlier prototype laid it out (`feature/077-brooklet-hill`, `stadium-env-brooklet.mjs` and
+    its `brookletSpots`; may be ported). A waterfall drops from layered rock cliffs at the far left
+    into the lake. A sandy shore curves along the far end, under a grassy rise with round trees. The
+    art's wooden pier runs out from the far-right shore. Dark rocks ringed in white water stand in
+    open water clear of every card. White sparkles glint on the lake.
+  - Levincia (`levincia`, JTG 150, Marina Chikazawa). A bright noon city on the water. Every Active
+    and Bench card lies on the art's round raised stage: a pale blue-white floor ringed in a yellow
+    and white band with the yellow Electric motif in its middle. Its rim wall drops to light-blue
+    water. Pale curved elevated walkways with railings and white arches circle the stage. The art's
+    row of bright yellow and red billboard screens runs along the far walkway. Glass skyscrapers
+    with angled crystal tops stand past the far edge, low enough to stay in view in both presets.
+    Any mast at the stage's rim ends in a lamp head. Glints run on the glass, and pulses run round
+    the yellow ring.
+
+### Board checklist — lessons from the first nine boards (every new board passes it)
+- Colours are the card art's pixel samples (`sample.py` region median and percentiles), inverted
+  through Neutral tone mapping (`inv.py`) before they go in a shader.
+- Choose one world scale per board and state it in the module header (what a card's footprint is in
+  that place). Size every prop by that scale: no grass tuft as big as a bush, no lantern as big as a door.
+- Perspective: check both camera presets (`PRESET=tilt12` and `PRESET=tcgl`). Tall things beside
+  the cards lean out of the tilted view like missiles, so keep side-band props squat and put tall
+  ones off the far end. Every prop must also read from straight above: arches can read as
+  horseshoes, lamps as hooks, ray fans as glitter, faceted boulders as shards, window grids as scatter.
+- Cards: flat ground under every footprint (`environmentFootprints`, `arenaRects`). On screen, no
+  prop, liquid or glow covers a card in either preset. Each card's border needs contrast: white
+  borders on a pale floor and blue backs on a blue floor lose their edges.
+- No AI tells. Avoid noise speckle, moiré, shimmer on fine detail, z-fighting, and bake seams. Avoid
+  stretched texture on steep displaced faces and repeated tiling that the eye can spot. Nothing
+  leads to nothing: paths, rivers, pipes, ropes and stairs start and end somewhere real (a scene
+  edge, a building, a source). Every shadow has a caster and every glow has a source, and both
+  agree with the board's light.
+- No whiteouts and no spinning sunburst rays. One palette through the reveal. Ambient motion is
+  slow and subtle, at 30 fps.
+- First show: the board's programs compile async. Keep each shader small enough (split the bake
+  into `bakePre` + `bakeField` when needed), and measure with `stall.mjs`.
+- The art wins: when a critique asks for something the art doesn't have, leave it out.
 
 ### Mesh — `stadium-environment-mesh.js`
 `createStadiumEnvironment({ three, renderer, parent, clock, motionReduced, fxDisabled, onNeedsRender })`
