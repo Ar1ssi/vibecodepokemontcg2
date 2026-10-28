@@ -16,8 +16,8 @@ const unit = (a) => {
 
 /**
  * A builder of lit solids in the table frame (x right, y far, z up, px).
- * @returns {{ tube: Function, cylinder: Function, box: Function, quad: Function, ring: Function,
- *   sphere: Function, cone: Function,
+ * @returns {{ tube: Function, cylinder: Function, box: Function, quad: Function, triangle: Function,
+ *   ring: Function, sphere: Function, cone: Function,
  *   vertexCount: () => number, build: (three: typeof import('three')) => import('three').BufferGeometry }}
  */
 export function createPropBuilder() {
@@ -40,6 +40,15 @@ export function createPropBuilder() {
     vertex(c, n, color);
     vertex(d, n, color);
     index.push(first, first + 1, first + 2, first, first + 2, first + 3);
+  };
+
+  /** A flat triangle a-b-c (counter-clockwise seen from its front), one normal. */
+  const triangle = (a, b, c, color) => {
+    const n = unit(cross(sub(b, a), sub(c, a)));
+    const first = vertex(a, n, color);
+    vertex(b, n, color);
+    vertex(c, n, color);
+    index.push(first, first + 1, first + 2);
   };
 
   /**
@@ -177,7 +186,7 @@ export function createPropBuilder() {
     return geometry;
   };
 
-  return { tube, cylinder, ring, box, quad, sphere, cone, vertexCount: () => positions.length / 3, build };
+  return { tube, cylinder, ring, box, quad, triangle, sphere, cone, vertexCount: () => positions.length / 3, build };
 }
 
 export const PROP_VERTEX = /* glsl */ `

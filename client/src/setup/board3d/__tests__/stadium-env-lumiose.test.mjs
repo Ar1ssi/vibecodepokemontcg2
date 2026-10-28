@@ -10,13 +10,16 @@ import {
   BAKE_LIGHT_FRAGMENT,
   LUMIOSE_KEY,
   MAX_BUILDINGS,
+  MAX_CAFES,
   MAX_LAMPS,
   MAX_TREES,
   PROP_FRAGMENT,
   TERRAIN_FRAGMENT,
   TERRAIN_VERTEX,
+  TOWER_HEIGHT_PX,
   lumioseProps,
   lumioseSpots,
+  towerRadius,
 } from '../stadium-env-lumiose.mjs';
 import { SCREEN_VIEWS, pointOnCard, screenView } from './stadium-screen.mjs';
 
@@ -52,25 +55,44 @@ test('lumioseSpots: the square holds every card; buildings stand outside it, nev
   }
 });
 
-test('lumioseSpots: trees, lamps and benches stand clear of every card', () => {
+test('lumioseSpots: trees, lamps, benches and cafes stand clear of every card, the tower on its own in the left strip', () => {
   for (const layout of layouts) {
-    const { trees, lamps, benches, clear, u } = lumioseSpots(layout);
-    assert.ok(trees.length <= MAX_TREES && lamps.length <= MAX_LAMPS);
+    const { trees, pits, lamps, benches, cafes, tower, square, clear, u } = lumioseSpots(layout);
+    assert.ok(trees.length <= MAX_TREES && lamps.length <= MAX_LAMPS && cafes.length <= MAX_CAFES);
+    assert.equal(pits.length, trees.length, 'a grate for every tree');
     for (const t of trees) assert.ok(clear(t.x, t.y, t.r, 10 * u), 'tree');
     for (const l of lamps) assert.ok(clear(l.x, l.y, 8 * u, 10 * u), 'lamp');
     for (const b of benches) assert.ok(clear(b.x, b.y, 26 * u, 10 * u), 'bench');
+    for (const c of cafes) assert.ok(clear(c.x, c.y, c.r, 10 * u), 'cafe');
+    assert.ok(clear(tower.x, tower.y, tower.r, 10 * u), 'tower foot');
+    assert.ok(tower.x - tower.r > square.x0 && tower.h === TOWER_HEIGHT_PX * u, 'the tower stands inside the plaza, in the left strip');
+    for (const l of lamps) assert.ok(Math.hypot(l.x - tower.x, l.y - tower.y) > tower.r + 8 * u, 'lamp off the tower');
+    for (const t of trees) assert.ok(Math.hypot(t.x - tower.x, t.y - tower.y) > tower.r + t.r * 0.6, 'tree off the tower');
   }
 });
 
-test('no building, tree, lamp or the tower covers a card on screen, in either camera preset', () => {
+test('towerRadius: legs flare at the foot, a slim waist, a swollen crown, closing at the spire', () => {
+  const h = 540;
+  assert.ok(Math.abs(towerRadius(0, h) - h * 0.118) < 0.01 * h, 'foot');
+  assert.ok(towerRadius(0.5, h) < towerRadius(0.05, h) * 0.5, 'waist narrower than the foot');
+  assert.ok(towerRadius(0.83, h) > towerRadius(0.55, h) * 1.4, 'the crown swells over the waist');
+  assert.ok(towerRadius(1, h) < 0.002 * h, 'the spire closes');
+});
+
+test('no building, tree, lamp, parasol or the tower covers a card on screen, in either camera preset', () => {
   for (const view of SCREEN_VIEWS) {
     const { layout, projectors } = screenView(view);
-    const { buildings, trees, lamps, tower } = lumioseSpots(layout);
+    const { buildings, trees, lamps, cafes, tower, u } = lumioseSpots(layout);
+    const shaft = Array.from({ length: 12 }, (_, i) => i / 11).flatMap((s) => {
+      const r = towerRadius(s, tower.h);
+      return [[tower.x, tower.y, s * tower.h], [tower.x - r, tower.y - r, s * tower.h], [tower.x + r, tower.y + r, s * tower.h], [tower.x - r, tower.y + r, s * tower.h], [tower.x + r, tower.y - r, s * tower.h]];
+    });
     const points = [
-      ...buildings.flatMap((b) => [b.x0, b.x1].flatMap((x) => [b.y0, b.y1].flatMap((y) => [[x, y, b.height], [x, y, b.height + 38]]))),
+      ...buildings.flatMap((b) => [b.x0, b.x1].flatMap((x) => [b.y0, b.y1].flatMap((y) => [[x, y, b.height], [x, y, b.height + 58 * u]]))),
       ...trees.flatMap((t) => [[t.x, t.y, t.h + t.r], [t.x - t.r, t.y, t.h], [t.x + t.r, t.y, t.h], [t.x, t.y - t.r, t.h], [t.x, t.y + t.r, t.h]]),
-      ...lamps.flatMap((l) => [[l.x, l.y, l.h], [l.x, l.y + 17, l.h + 18], [l.x, l.y - 17, l.h + 18]]),
-      [tower.x, tower.y, tower.h],
+      ...lamps.flatMap((l) => [[l.x, l.y, l.h], [l.x, l.y + 17 * u, l.h + 18 * u], [l.x, l.y - 17 * u, l.h + 18 * u]]),
+      ...cafes.flatMap((c) => [[c.x - c.r, c.y, 62 * u], [c.x + c.r, c.y, 62 * u], [c.x, c.y - c.r, 62 * u], [c.x, c.y + c.r, 62 * u], [c.x, c.y, 83 * u]]),
+      ...shaft,
     ];
     for (const { preset, project } of projectors) {
       const hit = pointOnCard(points, layout, project);

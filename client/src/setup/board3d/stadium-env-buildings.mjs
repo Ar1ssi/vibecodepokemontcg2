@@ -40,3 +40,19 @@ export function wallBand(props, { a, b, depth, z0, z1, over = 0, color, topColor
   const mid = [(a[0] + b[0]) / 2 + out[0] * (over - depth) / 2, (a[1] + b[1]) / 2 + out[1] * (over - depth) / 2];
   props.box({ x: mid[0], y: mid[1], z0, z1, hw: length / 2, hh: (depth + over) / 2, yaw: Math.atan2(along[1], along[0]), color, topColor, frontColor: color });
 }
+
+/**
+ * A disc standing on a wall or hung from one, its plane through `out` (a unit [x, y] direction) and
+ * up: a fan of triangles from `centre` ([x, y, z]) over the arc `from` to `to` (rad; 0 along `out`,
+ * a quarter turn straight up). Seen from either side the same.
+ * @param {ReturnType<typeof import('./stadium-env-props.mjs').createPropBuilder>} props
+ * @param {{ centre: number[], out: number[], r: number, color: number[], from?: number, to?: number, sides?: number }} spec
+ */
+export function disc(props, { centre, out, r, color, from = 0, to = 2 * Math.PI, sides = 20 }) {
+  const at = (angle) => [centre[0] + out[0] * Math.cos(angle) * r, centre[1] + out[1] * Math.cos(angle) * r, centre[2] + Math.sin(angle) * r];
+  for (let k = 0; k < sides; k += 1) {
+    const a0 = from + ((to - from) * k) / sides;
+    const a1 = from + ((to - from) * (k + 1)) / sides;
+    props.triangle(centre, at(a0), at(a1), color);
+  }
+}
