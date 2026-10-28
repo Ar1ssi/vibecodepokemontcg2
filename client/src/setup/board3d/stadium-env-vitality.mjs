@@ -49,7 +49,7 @@ export const MAX_POOLS = 20;
 /** Buttress fins round the trunk's foot, each running on into a root. */
 export const TRUNK_FINS = 5;
 /** Rings and segments of the instanced sphere every pad and bush is drawn with. */
-export const PUFF_SEGMENTS = { rings: 10, around: 16 };
+export const PUFF_SEGMENTS = { rings: 16, around: 28 };
 const MOTE_COUNT = 140;
 /** How far a pad reaches past its radius once its lumps are on (the vertex shader's 0.1). */
 const PUFF_REACH = 1.12;
@@ -121,6 +121,17 @@ function growTree(table, scene, core, obstacles, u) {
       if (!inScene || !clear(px, py, r)) continue;
       pads.push({ x: px, y: py, z: (345 - 170 * out * out + 22 * (roll(5) - 0.5)) * u, r, tier: out, seed: roll(6) });
     }
+  }
+  // A skirt of lower pads round the fork, so the trunk's top ends under foliage, not in a cut face.
+  for (let k = 0; k < 11; k += 1) {
+    const roll = (salt) => hash(k + 0.5, x, salt + 60);
+    const angle = (k / 11) * 2 * Math.PI + roll(1) * 0.5;
+    const out = (62 + 70 * roll(2)) * u;
+    const px = fork[0] + 24 * u + Math.cos(angle) * out;
+    const py = fork[1] + 34 * u + Math.sin(angle) * out;
+    const r = (52 + 22 * roll(3)) * u;
+    if (!clear(px, py, r)) continue;
+    pads.push({ x: px, y: py, z: (214 + 34 * roll(4)) * u, r, tier: 0.45 + 0.1 * roll(5), seed: roll(6) });
   }
   pads.sort((a, b) => a.tier - b.tier);
   const shown = pads.slice(0, MAX_PADS);
@@ -425,6 +436,23 @@ ${VORONOI}
 ${REVEAL}
 ${PALETTE}
 ${VITALITY}
+// A fan of three blades from a tuft's foot, as (stroke, 0..1 up its length). v: px from the foot,
+// h: the tuft's hash. Each bends over a little as it rises, as long grass does.
+vec2 grassBlades(vec2 v, float h) {
+  float stroke = 0.0;
+  float tip = 0.0;
+  for (int k = 0; k < 3; k++) {
+    float a = 1.571 + (float(k) - 1.0) * 0.55 + (fract(h * (7.0 + float(k) * 3.1)) - 0.5) * 0.8;
+    vec2 d = vec2(cos(a), sin(a));
+    float len = 4.0 + 3.5 * fract(h * (11.0 + float(k)));
+    float s = clamp(dot(v, d), 0.0, len);
+    vec2 bent = d * s + vec2(-d.y, d.x) * (s * s / len) * 0.14;
+    float m = 1.0 - smoothstep(0.35, 0.95, length(v - bent) / mix(1.0, 0.45, s / len));
+    stroke = max(stroke, m);
+    tip = max(tip, m * s / len);
+  }
+  return vec2(stroke, tip);
+}
 varying vec2 vPos;
 varying vec2 vUv;
 varying float vGrowth;
@@ -449,6 +477,12 @@ void main() {
   float tuftShape = 1.0 - smoothstep(0.18, 0.42, length(tuft.zw * vec2(1.0, 0.6)));
   float hasTuft = step(fract(tuft.y * 41.7), 0.22) * smoothstep(0.3, 0.7, fbm3(p / 120.0 + 1.0));
   col = mix(col, GRASS_LIT, tuftShape * hasTuft * 0.3);
+  // Blades: a small fan out of most cells' points, dark at the foot and lit at the tip, thick
+  // where the grass is long. Broad soft patches of sun break the lawn's green between them.
+  vec2 blades = grassBlades(-tuft.zw * 13.0, tuft.y);
+  float lawn = step(fract(tuft.y * 23.1), 0.55 + 0.35 * smoothstep(0.35, 0.65, fbm3(p / 95.0 + 8.0)));
+  col = mix(col, mix(GRASS_DARK * 0.8, GRASS_LIT * 1.25, blades.y), blades.x * lawn * 0.85);
+  col *= 1.0 + 0.16 * smoothstep(0.5, 0.78, fbm3(p / 52.0 + 3.0));
 
   // Past the meadow's edge, the undergrowth under the bushes: deep green, lighter on the swells.
   vec3 under = mix(BUSH_DARK * 0.55, BUSH_DARK, smoothstep(4.0, 14.0, field.r));
@@ -575,23 +609,34 @@ void main() {
   vec3 n = normalize(vNormal);
   vec3 sun = normalize(uSun);
   float bush = vInfo.z;
-  vec2 q = vSphere.xy / (1.3 + vSphere.z) * mix(3.2, 2.2, bush) + vInfo.w * 17.0;
+  float seed = vInfo.w;
+  // Two scales of leaf clumps, as the art paints foliage: broad lobes, each carrying smaller leaf
+  // clusters. Each bulges the normal, so it takes the light on its own sunward side.
+  vec2 q = vSphere.xy / (1.3 + vSphere.z) * mix(3.2, 2.2, bush) + seed * 17.0;
+  // Warped, so the lobes' borders wander like brush strokes rather than run straight.
+  q += 0.32 * (vec2(gnoise(q * 1.6), gnoise(q * 1.6 + 9.1)) - 0.5);
   vec4 cluster = voronoiCell(q);
-  float fromCentre = length(cluster.zw);
   float size = 0.5 + 0.2 * fract(cluster.y * 13.0);
-  float inCluster = 1.0 - smoothstep(size - 0.1, size, fromCentre);
-  vec3 bulged = normalize(n - vec3(cluster.zw / size, 0.0) * 0.6 * inCluster);
+  float inCluster = 1.0 - smoothstep(size - 0.14, size, length(cluster.zw));
+  vec2 ql = q * 3.4 + 5.3;
+  ql += 0.3 * (vec2(gnoise(ql * 1.3), gnoise(ql * 1.3 + 4.7)) - 0.5);
+  vec4 leaf = voronoiCell(ql);
+  float leafSize = 0.46 + 0.18 * fract(leaf.y * 9.0);
+  float inLeaf = 1.0 - smoothstep(leafSize - 0.16, leafSize, length(leaf.zw));
+  vec3 bulged = normalize(n - vec3(cluster.zw / size, 0.0) * 0.55 * inCluster - vec3(leaf.zw / leafSize, 0.0) * 0.3 * inLeaf);
   float light = dot(bulged, sun);
-  float body = smoothstep(0.0, 0.3, light);
-  float top = smoothstep(0.62, 0.8, light);
+  // Painted tone bands with soft, short edges: shadow, body, lit, and a sun-struck crest.
+  float body = smoothstep(-0.02, 0.22, light);
+  float top = smoothstep(0.55, 0.7, light);
+  float crest = smoothstep(0.8, 0.92, light) * inLeaf;
   // The rim: the band round each pad's middle and under it, scalloped by its clusters.
   float rim = smoothstep(0.2, -0.15, vSphere.z + 0.2 * (fract(cluster.y * 5.1) - 0.5)) * inCluster;
   float glow = vInfo.x;
-  float seed = vInfo.w;
   vec3 col;
   if (bush < 0.5) {
     col = mix(CROWN_DARK, CROWN_BODY, body);
     col = mix(col, CROWN_TOP, top);
+    col = mix(col, CROWN_TOP * vec3(1.5, 1.45, 1.1) + 0.05, crest * 0.55);
     col = mix(col, FRINGE, rim * (0.7 + 0.3 * vInfo.y));
     col *= mix(1.0, 0.7, vInfo.y);
   } else {
@@ -599,9 +644,12 @@ void main() {
     vec3 mid = mix(BUSH_MID, CROWN_BODY * 1.15, fract(seed * 7.13) * 0.22);
     col = mix(BUSH_DARK, mid, body);
     col = mix(col, mix(BUSH_LIT, mid * 1.5, 0.25), top);
+    col = mix(col, BUSH_LIT * vec3(1.35, 1.3, 0.9), crest * 0.5);
     col = mix(col, BUSH_YELLOW, rim * smoothstep(0.05, 0.6, glow) * 0.85);
   }
-  col *= mix(0.72, 1.0, inCluster);
+  // Shade tucked between lobes, soft and wide so it reads as a hollow, not a drawn line.
+  col *= mix(0.68, 1.0, smoothstep(0.0, 0.22, cluster.x)) * mix(0.9, 1.0, smoothstep(0.0, 0.12, leaf.x));
+  col *= mix(0.86, 1.0, inCluster);
   // A bush in the crown's shade (a pad's own depth in the crown darkens it above).
   vec4 ground = texture2D(uField, vShadeUv);
   float shade = max(ground.b, ground.a) * bush * vTreeUp;
@@ -624,8 +672,12 @@ uniform vec4 uRoot;
 vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
   vec3 sun = normalize(uSun);
   float around = atan(world.y - uRoot.y, world.x - uRoot.x);
-  float ridge = gnoise(vec2(around * 7.0, world.z / 40.0 + around * 0.3));
-  vec3 bark = albedo * (0.7 + 0.5 * smoothstep(0.25, 0.75, ridge));
+  // Long furrows in two scales, a little slanted, with moss on the up-facing swells and the roots.
+  float ridge = gnoise(vec2(around * 7.0, world.z / 55.0 + around * 0.35));
+  float fine = gnoise(vec2(around * 23.0, world.z / 12.0 + around));
+  vec3 bark = albedo * (0.5 + 0.7 * smoothstep(0.3, 0.7, ridge)) * (0.8 + 0.4 * fine);
+  float moss = smoothstep(0.5, 0.85, n.z) * smoothstep(0.38, 0.62, gnoise(world.xy / 9.0 + 3.0));
+  bark = mix(bark, vec3(0.07, 0.17, 0.045) * (0.7 + 0.6 * fine), moss * 0.75);
   float underCrown = smoothstep(130.0, 220.0, world.z);
   vec3 sky = vec3(0.5, 0.56, 0.6) * (0.75 + 0.25 * n.z);
   vec3 sunLight = vec3(1.25, 1.15, 0.9) * max(dot(n, sun), 0.0) * (1.0 - 0.8 * underCrown);
