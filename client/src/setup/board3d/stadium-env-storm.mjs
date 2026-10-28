@@ -9,9 +9,11 @@
 // The storm is magnetic and the board shows it: a tall coil pylon stands at each side's pole, the iron
 // dust of the marsh lies along the flux between them in fine dashes while pulses of pink and cyan
 // energy run the field lines from the north pole to the south, bright arcs of the same field loop
-// overhead from pole to pole, a dome of hexagonal force field closes the whole arena (its cells
-// flicker, its rim glows where it is seen edge-on) and each strike of lightning from a pad lands on it
-// and sends a ripple of lit cells out across it, while a vortex of dark mist turns over the ground.
+// overhead from pole to pole, a dome of force field closes the whole arena (a faint sheen, its rim
+// glowing where it is seen edge-on) and each strike of lightning from a pad lands on it and sends
+// a ring of light out across it. The field is not always there: it swells into view and fades out
+// again on a slow beat, each part of it on its own, so it never sits over the cards for long. A
+// vortex of dark mist turns over the ground.
 // World scale: a card's footprint is a trampled patch of mud; a reed stands a hand high.
 //
 // Bake, once per layout: BAKE_FIELD is the flat marsh (R height px) with the clearing's distance in
@@ -223,6 +225,14 @@ float clearingDistance(vec2 p) {
   float box = length(max(max(uCore.xy - p, p - uCore.zw), 0.0));
   return box - ${CLEARING_PX.toFixed(1)} * uUnit - ${CLEARING_WOBBLE_PX.toFixed(1)} * uUnit * wobble(p);
 }
+// How much of the force field shows at p, 0..1: it fades out of view altogether for a while, and
+// while it is there a swell runs round it, so each part comes and goes on its own beat.
+float fieldPresence(vec2 p) {
+  vec2 rel = (p - uDome.xy) / max(uDome.zw, vec2(1.0));
+  float gate = smoothstep(-0.25, 0.55, sin(uTime * 0.23 + 1.0));
+  float swell = smoothstep(0.1, 0.95, 0.5 + 0.5 * sin(uTime * 0.55 - atan(rel.y, rel.x) + length(rel) * 2.0));
+  return gate * (0.2 + 0.8 * swell);
+}
 // The strike's flash 0..1: a quick flicker up, then a slow fade, once every period, offset by phase.
 float strike(float period, float phase) {
   float t = fract(uTime / period + phase);
@@ -355,7 +365,7 @@ void main() {
     float pulse = smoothstep(0.55, 1.0, fract(run * 1.15 - t * 0.38 + hash12(vec2(lineId, 3.0))));
     vec3 lineCol = mix(PINK, FIELD_CYAN, smoothstep(-1.4, 1.4, -run));
     float energy = (0.16 + 0.95 * pulse) * core + 0.12 * halo * (0.4 + 0.6 * pulse);
-    col += lineCol * energy * (0.35 + 0.65 * inside) * 0.9;
+    col += lineCol * energy * (0.35 + 0.65 * inside) * (0.3 + 0.7 * fieldPresence(p)) * 0.9;
     // The iron dust: fine dashes along a hundred and twenty lines, thinning out where the lines crowd.
     float fine = psi * 120.0;
     float spacing = 1.0 / (120.0 * slope);
@@ -589,9 +599,9 @@ void main() {
 `;
 
 /**
- * The force field: a net of hexagonal cells (a stereographic map of the hemisphere, so they shrink
- * toward the rim), a few of them flickering, the rim glowing where the dome is seen edge-on, and where
- * a strike lands a flash and a ring of lit cells running out across it.
+ * The force field: a faint sheen drifting over the dome, its rim glowing where it is seen edge-on,
+ * all of it swelling into view and fading out again; where a strike lands a flash and a ring of
+ * light running out across it, measured on the dome itself so that it is round, not stretched.
  */
 export const DOME_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
@@ -600,18 +610,6 @@ ${REVEAL}
 ${STORM}
 varying vec3 vDir;
 varying vec3 vWorld;
-float hexDist(vec2 p) {
-  p = abs(p);
-  return max(dot(p, normalize(vec2(1.0, 1.7320508))), p.x);
-}
-vec4 hexCoords(vec2 uv) {
-  vec2 r = vec2(1.0, 1.7320508);
-  vec2 h = r * 0.5;
-  vec2 a = mod(uv, r) - h;
-  vec2 b = mod(uv - h, r) - h;
-  vec2 gv = dot(a, a) < dot(b, b) ? a : b;
-  return vec4(gv, uv - gv);
-}
 void main() {
   if (revealBurned(vWorld.xy) * exitKeep(vWorld.xy) < 0.5) discard;
   vec3 dir = normalize(vDir);
@@ -619,23 +617,21 @@ void main() {
   vec3 view = normalize(uEye - vWorld);
   float rim = pow(1.0 - abs(dot(n, view)), 2.2);
   float up = clamp(dir.z, 0.0, 1.0);
-  vec4 hex = hexCoords(dir.xy / (1.0 + up) * 15.0);
-  float edge = 0.5 - hexDist(hex.xy);
-  float cell = hash12(hex.zw);
-  float fade = smoothstep(0.03, 0.2, up);
-  float line = (1.0 - smoothstep(0.0, 0.05 + 0.04 * (1.0 - up), edge)) * fade;
-  float flicker = pow(0.5 + 0.5 * sin(uTime * (0.5 + 2.2 * cell) + cell * 61.0), 6.0) * step(0.72, cell) * fade;
+  float present = fieldPresence(vWorld.xy);
+  vec2 q = (vWorld.xy + vec2(vWorld.z, -0.6 * vWorld.z)) / (190.0 * uUnit);
+  float sheen = smoothstep(0.35, 0.8, fbm3(q + vec2(uTime * 0.03, -uTime * 0.02)));
   float charge = 0.0;
   float flash = 0.0;
   for (int i = 0; i < ${MAX_IMPACTS}; i++) {
     vec4 hit = uImpacts[i];
     if (hit.w < 0.0) continue;
-    float arc = acos(clamp(dot(dir, hit.xyz), -1.0, 1.0));
-    float ahead = (arc - hit.w * 0.8) / 0.075;
-    charge += exp(-ahead * ahead) * exp(-hit.w * 1.4);
-    flash += exp(-arc * arc / 0.025) * exp(-hit.w * 4.5);
+    vec3 landing = vec3(uDome.x + hit.x * uDome.z, uDome.y + hit.y * uDome.w, hit.z * uDomeHeight);
+    float away = distance(vWorld, landing) / uUnit;
+    float ahead = (away - hit.w * 190.0) / 38.0;
+    charge += exp(-ahead * ahead) * exp(-hit.w * 1.1);
+    flash += exp(-away * away / 7200.0) * exp(-hit.w * 4.5);
   }
-  float intensity = line * (0.07 + 0.75 * rim + charge * 2.6 + flash * 3.0) + flicker * 0.1 * (0.4 + rim) + rim * 0.2 + charge * 0.22 + flash * 0.6;
+  float intensity = present * (0.4 * rim + 0.1 * sheen * (0.4 + rim)) + charge * 0.45 + flash * 0.9 + (charge + flash) * rim * 0.6;
   vec3 tint = mix(vec3(0.12, 0.55, 1.0), vec3(0.65, 0.28, 1.0), smoothstep(0.2, 1.0, 1.0 - up));
   tint = mix(tint, vec3(1.0, 0.55, 0.95), clamp(charge + flash, 0.0, 1.0) * 0.5);
   gl_FragColor = vec4(tint * intensity * 0.8, 1.0);
@@ -643,11 +639,12 @@ ${OUTPUT}
 }
 `;
 
-/** The field arcs' ribbons: as the bolts', but steady and thin, a pink to cyan gradient, pulses running along them. */
+/** The field arcs' ribbons: as the bolts', but thin, a pink to cyan gradient, pulses running along them, fading in and out with the field. */
 export const FIELD_VERTEX = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
 ${REVEAL}
+${STORM}
 attribute vec3 aTan;
 attribute vec4 aInfo;
 varying float vSide;
@@ -663,7 +660,7 @@ void main() {
   vSide = aInfo.x;
   vAlong = aInfo.y;
   vId = aInfo.z;
-  vShown = revealBurned(position.xy) * exitKeep(position.xy);
+  vShown = revealBurned(position.xy) * exitKeep(position.xy) * fieldPresence(position.xy);
 }
 `;
 
