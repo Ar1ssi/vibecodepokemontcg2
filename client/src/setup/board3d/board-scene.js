@@ -7,6 +7,7 @@ import { projectToScreen, tableToWorld } from './board-camera.mjs';
 import { diffModels, placementById } from './board-model.mjs';
 import { CARD_UNITS, cardScaleFor } from './card-geometry.mjs';
 import { createCardMeshPool } from './card-mesh.js';
+import { createCardFrameDemand } from './card-frame-demand.mjs';
 import { handGroupsOf, posesFor } from './card-poses.mjs';
 import { createCountLabels, createStackBadges } from './count-labels.js';
 import { createFramePacer } from './frame-pacer.mjs';
@@ -16,6 +17,7 @@ import { createPileMeshes } from './pile-mesh.js';
 import { PILE_ZONES, pilePose, pileThicknessPx } from './pile-poses.mjs';
 import { pileVisualCount } from './pile-stack.mjs';
 import { createTable } from './table-mesh.js';
+import { createStadiumEnvironment } from './stadium-environment-mesh.js';
 import { easeOutCubic } from './tween.mjs';
 import { DRAG_TILT, DRAG_TILT_STILL, createDragTilt, stepDragTilt } from '../image-logic/drag-tilt.mjs';
 import { matTiltAngles } from '../deck-constructor/mat-tilt.mjs';
@@ -204,6 +206,17 @@ export function createBoardScene({
 
   const table = createTable({ scene, textures, three, renderer, RoomEnvironment });
   tableFrame.add(table.group);
+  // Design 077 (prototype): a Stadium's place under the board; off until setStadiumEnvironment.
+  const environment = createStadiumEnvironment({
+    three,
+    renderer,
+    parent: tableFrame,
+    motionReduced,
+    onNeedsRender: () => invalidate(),
+  });
+  // The table's materials carry the cutout from the start, off (uCutoutOn 0) while no board shows,
+  // so showing one never recompiles them.
+  table.setCutout(environment.cutout);
 
   // Piles and count labels sit in the table frame, so they tilt with the cloth.
   const pilesGroup = new three.Group();
@@ -250,16 +263,15 @@ export function createBoardScene({
   let shakeOffset = { x: 0, y: 0 };
   let stopShake = null;
   let disposed = false;
-  // rects()/hitTest advance the card tweens between frames. One of those calls can finish a
-  // tween, so the next frame sees nothing moving; with frames far apart a whole tween can even
-  // start and end between two frames. Either way that frame reports the cards moved, so
-  // `onRender` listeners (the mirror's rect sync) still see the final pose, and the frame after a
-  // running tween is still asked for (the scene clock advances with drawn frames).
-  let cardsAdvancedOffFrame = false;
+  // rects()/hitTest advance the card tweens between frames (card-frame-demand.mjs): a frame after a
+  // call that finished a tween still reports the cards moved, so `onRender` listeners (the mirror's
+  // rect sync) see the final pose; with frames far apart a whole tween can even start and end
+  // between two frames, which `posedSinceRender` covers.
+  const cardDemand = createCardFrameDemand();
   let posedSinceRender = false;
   const advanceCards = () => {
-    if (pacer.pending()) cardsAdvancedOffFrame = true;
     pool.update(clock.now());
+    cardDemand.advancedBetweenFrames(pool.moving(), pacer.pending());
   };
 
   const contextLost = () => {
@@ -286,19 +298,20 @@ export function createBoardScene({
     const startedAt = globalThis.performance?.now?.() ?? Date.now();
     const now = clock.now();
     const cardsAnimating = pool.update(now);
-    const cardsMoving = pool.moving() || cardsAdvancedOffFrame;
-    cardsAdvancedOffFrame = false;
+    const cardsMoving = cardDemand.drawn(pool.moving());
     const pilesMoving = piles.update(now);
     const overlaysAnimating = overlays.update(now);
+    const environmentAnimating = environment.update(now, camera);
     const shadowPass = kind === 'change' || cardsMoving || pilesMoving;
     renderer.shadowMap.needsUpdate = shadowPass;
-    renderer.render(scene, camera);
+    if (environment.active()) renderUnderEnvironment();
+    else renderer.render(scene, camera);
     // The board pass's counts: the FX passes below reset renderer.info as they draw.
     const calls = renderer.info?.render?.calls ?? 0;
     const triangles = renderer.info?.render?.triangles ?? 0;
     const fxRunning = fxLayer.active() && fxLayer.render();
     if (cardsMoving || pilesMoving || fxRunning) invalidate();
-    else if (cardsAnimating || overlaysAnimating) pacer.invalidateAmbient();
+    else if (cardsAnimating || overlaysAnimating || environmentAnimating) pacer.invalidateAmbient();
     onRender?.({
       cardsMoving: cardsMoving || posedSinceRender,
       kind: cardsMoving || pilesMoving || fxRunning ? 'motion' : kind,
@@ -308,6 +321,19 @@ export function createBoardScene({
       triangles,
     });
     posedSinceRender = false;
+  };
+
+  /**
+   * Design 077: the environment's plate laid on the canvas, then the board over it with the depth
+   * cleared, so cards, piles and labels always lie on top and the ground under them can rise freely.
+   */
+  const renderUnderEnvironment = () => {
+    const autoClear = renderer.autoClear;
+    environment.drawPlate(scene, camera);
+    renderer.clearDepth();
+    renderer.autoClear = false;
+    renderer.render(scene, camera);
+    renderer.autoClear = autoClear;
   };
 
   const pacer = createFramePacer({ onFrame: render, requestFrame, cancelFrame });
@@ -428,6 +454,7 @@ export function createBoardScene({
     if (disposed || !next) return;
     layout = next;
     table.setLayout(next);
+    environment.setLayout(next);
     syncZonePlanes();
     syncCards(model, model, { relayout: true });
     syncPiles(model);
@@ -437,6 +464,12 @@ export function createBoardScene({
   const setMat = (spec) => {
     if (disposed) return;
     table.setMat(spec);
+    invalidate();
+  };
+
+  /** Design 077 (prototype): shows the Stadium environment `key` under the board, or none (null). */
+  const setStadiumEnvironment = (key) => {
+    if (disposed || !environment.setKey(key)) return;
     invalidate();
   };
 
@@ -1178,6 +1211,7 @@ export function createBoardScene({
     }
     appliedPoses.clear();
     pileTops.clear();
+    environment.dispose();
     table.dispose();
     scene.remove(tableFrame);
     uiState.clear();
@@ -1213,6 +1247,7 @@ export function createBoardScene({
     fx,
     setUiState,
     setMat,
+    setStadiumEnvironment,
     setHover,
     setPointerTilt,
     setHandPose,
