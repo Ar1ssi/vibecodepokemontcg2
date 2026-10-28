@@ -7,21 +7,18 @@
 // on a coil post with a lightning arc leaping to the next, bare trees stand off the far end and in
 // the far corners, and the aurora lights the ground in slow drifting colour.
 // The storm is magnetic and the board shows it: a tall coil pylon stands at each side's pole, the iron
-// dust of the marsh lies along the flux between them in fine dashes while pulses of pink and cyan
-// energy run the field lines from the north pole to the south, bright arcs of the same field loop
-// overhead from pole to pole, a dome of force field closes the whole arena (a faint sheen, its rim
-// glowing where it is seen edge-on) and each strike of lightning from a pad lands on it and sends
-// a ring of light out across it. The field is not always there: it swells into view and fades out
-// again on a slow beat, each part of it on its own, so it never sits over the cards for long. A
-// vortex of dark mist turns over the ground.
+// dust of the marsh lies along the flux between them in fine dashes, a dome of force field closes the
+// whole arena (a faint blue sheen, its rim glowing where it is seen edge-on) and each strike of
+// lightning from a pad lands on it, now and then sending a ring of light out across it. The field is
+// not always there: it swells into view and fades out again on a slow beat, each part of it on its
+// own, so it never sits over the cards for long. A vortex of dark mist turns over the ground.
 // World scale: a card's footprint is a trampled patch of mud; a reed stands a hand high.
 //
 // Bake, once per layout: BAKE_FIELD is the flat marsh (R height px) with the clearing's distance in
 // G; the shared light bake adds nothing. Per frame: TERRAIN paints the mud, puddles, reeds, the ring,
-// the pads, the field lines and their dust, the mist, the aurora's wash and the lightning's flashes;
-// PROPS the trees, boulders, reeds and pylons; BOLTS the lightning's ribbons and FIELD the field
-// arcs' (additive); DOME the force field (additive, one hemisphere of unit directions the shader
-// scales to the arena).
+// the pads, the iron dust along the field, the mist, the aurora's wash and the lightning's flashes;
+// PROPS the trees, boulders, reeds and pylons; BOLTS the lightning's ribbons (additive); DOME the
+// force field (additive, one hemisphere of unit directions the shader scales to the arena).
 import {
   FULLSCREEN_VERTEX,
   NOISE,
@@ -48,7 +45,10 @@ export const CLEARING_WOBBLE_PX = 70;
 export const MAX_PADS = 4;
 /** Two links between the pads, then one strike from each pad up to the force field. */
 export const MAX_ARCS = 6;
-export const MAX_FIELD_ARCS = 12;
+/** Only every sixth strike from a pad sends a ring out across the field. */
+export const RIPPLE_EVERY = 6;
+/** Seconds a ring runs for. */
+export const RIPPLE_SECONDS = 4;
 export const MAX_IMPACTS = 4;
 export const MAX_TREES = 6;
 export const MAX_CLUMPS = 170;
@@ -137,18 +137,6 @@ export function stormSpots(layout) {
       dir,
     });
   });
-  // The field's own arcs: loops of energy from the north pole's top to the south's, flat to upright round their axis.
-  const fieldArcs = Array.from({ length: MAX_FIELD_ARCS }, (_, k) => {
-    const phi = (((k % 6) + 0.5) / 6) * Math.PI;
-    const rho = (k < 6 ? 150 + 130 * hash(k, 2, 1) : 330 + 220 * hash(k, 2, 2)) * u;
-    const rise = dome.h * 0.86 - poles[0].h;
-    const points = Array.from({ length: 27 }, (_, j) => {
-      const s = j / 26;
-      const bulge = Math.sin(Math.PI * s) ** 0.8;
-      return [poles[0].x + (poles[1].x - poles[0].x) * s, centre.y + rho * bulge * Math.cos(phi), poles[0].h + Math.min(rho * bulge * Math.sin(phi), rise)];
-    });
-    return { points, seed: hash(k, 5, 3) };
-  });
   const nearPylon = (x, y, gap) => [...poles, ...pads].every((p) => Math.hypot(x - p.x, y - p.y) > p.r + gap);
   const treeSlots = [
     [-0.82, 0.3],
@@ -185,7 +173,7 @@ export function stormSpots(layout) {
       clumps.push({ x, y, h: (24 + 24 * roll(4)) * u, lean: roll(5) * 6.28, seed: roll(6), blades: 7 + Math.floor(roll(7) * 4) });
     }
   }
-  return { ...ctx, handEnd, pads, poles, dome, arcs, fieldArcs, trees, boulders, clumps, ring: craterEmblem(layout, centre) };
+  return { ...ctx, handEnd, pads, poles, dome, arcs, trees, boulders, clumps, ring: craterEmblem(layout, centre) };
 }
 
 const distanceOut = (rect, x, y) => Math.hypot(Math.max(rect.x - x, 0, x - rect.x - rect.w), Math.max(rect.y - y, 0, y - rect.y - rect.h));
@@ -266,7 +254,6 @@ const vec3 RING_WHITE = vec3(1.866, 1.596, 1.866);
 const vec3 AURORA_BLUE = vec3(0.085, 0.442, 0.618);
 const vec3 AURORA_VIOLET = vec3(0.196, 0.085, 0.496);
 const vec3 BOLT = vec3(1.2, 1.45, 1.7);
-const vec3 FIELD_CYAN = vec3(0.3, 0.85, 1.3);
 const vec3 DUST = vec3(0.2, 0.25, 0.34);
 const vec3 MIST = vec3(0.07, 0.05, 0.13);
 `;
@@ -344,8 +331,8 @@ void main() {
   float mist = smoothstep(0.5, 0.82, fbm3(swirled / 230.0 + 3.0 + vec2(t * 0.01, 0.0)));
   col = mix(col, MIST * (1.0 + lightning * 6.0), mist * 0.38);
 
-  // The magnetic field: the marsh's iron dust lies along the poles' flux, and the lines themselves
-  // glow as pulses of energy run along them from the north pole (pink) to the south (cyan).
+  // The magnetic field: the marsh's iron dust lies along the poles' flux, dashes brightening as a
+  // pulse runs along their line from the north pole to the south.
   if (uPoleA.z > 0.0) {
     vec2 wob = (vec2(gnoise(p / 150.0 + vec2(t * 0.06, 0.0)), gnoise(p / 150.0 + vec2(9.0, t * 0.05))) - 0.5) * 40.0 * u;
     vec2 q = p + wob;
@@ -356,16 +343,12 @@ void main() {
     float volts = potential(q);
     float run = sign(volts) * log(1.0 + abs(volts) * 3.0);
     float inside = 1.0 - smoothstep(0.9, 1.2, cr);
-    // Twelve level lines of the flux between the poles, a glow round each, a pulse running along it.
+    // Twelve level lines of the flux between the poles, a pulse running along each.
     float levels = psi * 6.0;
     float gap = abs(fract(levels + 0.5) - 0.5) / (6.0 * slope);
     float lineId = floor(levels + 0.5);
     float core = exp(-gap * gap / (2.0 * 1.4 * 1.4 * u * u));
-    float halo = exp(-gap * gap / (2.0 * 7.0 * 7.0 * u * u));
     float pulse = smoothstep(0.55, 1.0, fract(run * 1.15 - t * 0.38 + hash12(vec2(lineId, 3.0))));
-    vec3 lineCol = mix(PINK, FIELD_CYAN, smoothstep(-1.4, 1.4, -run));
-    float energy = (0.16 + 0.95 * pulse) * core + 0.12 * halo * (0.4 + 0.6 * pulse);
-    col += lineCol * energy * (0.35 + 0.65 * inside) * (0.3 + 0.7 * fieldPresence(p)) * 0.9;
     // The iron dust: fine dashes along a hundred and twenty lines, thinning out where the lines crowd.
     float fine = psi * 120.0;
     float spacing = 1.0 / (120.0 * slope);
@@ -599,8 +582,8 @@ void main() {
 `;
 
 /**
- * The force field: a faint sheen drifting over the dome, its rim glowing where it is seen edge-on,
- * all of it swelling into view and fading out again; where a strike lands a flash and a ring of
+ * The force field: a faint blue sheen drifting over the dome, its rim glowing where it is seen
+ * edge-on, all of it swelling into view and fading out again; where a strike lands a flash and a ring of
  * light running out across it, measured on the dome itself so that it is round, not stretched.
  */
 export const DOME_FRAGMENT = /* glsl */ `
@@ -615,8 +598,7 @@ void main() {
   vec3 dir = normalize(vDir);
   vec3 n = normalize(vec3(dir.x / uDome.z, dir.y / uDome.w, dir.z / uDomeHeight));
   vec3 view = normalize(uEye - vWorld);
-  float rim = pow(1.0 - abs(dot(n, view)), 2.2);
-  float up = clamp(dir.z, 0.0, 1.0);
+  float rim = pow(1.0 - abs(dot(n, view)), 2.8);
   float present = fieldPresence(vWorld.xy);
   vec2 q = (vWorld.xy + vec2(vWorld.z, -0.6 * vWorld.z)) / (190.0 * uUnit);
   float sheen = smoothstep(0.35, 0.8, fbm3(q + vec2(uTime * 0.03, -uTime * 0.02)));
@@ -631,57 +613,25 @@ void main() {
     charge += exp(-ahead * ahead) * exp(-hit.w * 1.1);
     flash += exp(-away * away / 7200.0) * exp(-hit.w * 4.5);
   }
-  float intensity = present * (0.4 * rim + 0.1 * sheen * (0.4 + rim)) + charge * 0.45 + flash * 0.9 + (charge + flash) * rim * 0.6;
-  vec3 tint = mix(vec3(0.12, 0.55, 1.0), vec3(0.65, 0.28, 1.0), smoothstep(0.2, 1.0, 1.0 - up));
-  tint = mix(tint, vec3(1.0, 0.55, 0.95), clamp(charge + flash, 0.0, 1.0) * 0.5);
-  gl_FragColor = vec4(tint * intensity * 0.8, 1.0);
+  float intensity = present * (0.2 * rim + 0.05 * sheen * (0.4 + rim)) + charge * 0.22 + flash * 0.5 + (charge + flash) * rim * 0.3;
+  vec3 tint = mix(vec3(0.12, 0.55, 1.0), vec3(0.7, 0.9, 1.0), clamp(charge + flash, 0.0, 1.0) * 0.5);
+  gl_FragColor = vec4(tint * intensity * 0.7, 1.0);
 ${OUTPUT}
 }
 `;
 
-/** The field arcs' ribbons: as the bolts', but thin, a pink to cyan gradient, pulses running along them, fading in and out with the field. */
-export const FIELD_VERTEX = /* glsl */ `
-${TERRAIN_UNIFORMS}
-${NOISE}
-${REVEAL}
-${STORM}
-attribute vec3 aTan;
-attribute vec4 aInfo;
-varying float vSide;
-varying float vAlong;
-varying float vId;
-varying float vShown;
-void main() {
-  vec4 mv = modelViewMatrix * vec4(position, 1.0);
-  vec4 ahead = modelViewMatrix * vec4(position + normalize(aTan) * 4.0, 1.0);
-  vec2 dir = normalize(ahead.xy - mv.xy + 1e-5);
-  mv.xy += vec2(-dir.y, dir.x) * aInfo.x * aInfo.w * 0.7;
-  gl_Position = projectionMatrix * mv;
-  vSide = aInfo.x;
-  vAlong = aInfo.y;
-  vId = aInfo.z;
-  vShown = revealBurned(position.xy) * exitKeep(position.xy) * fieldPresence(position.xy);
+/**
+ * Seconds since the strike of this arc that rings the field, or -1: a strike rings it only one time
+ * in RIPPLE_EVERY (each pad on its own count, so the rings do not come together), and only for
+ * RIPPLE_SECONDS after it.
+ */
+export function rippleAge(arc, slot, now) {
+  const count = now / arc.period + arc.phase;
+  const strike = Math.floor(count);
+  if ((((strike + slot) % RIPPLE_EVERY) + RIPPLE_EVERY) % RIPPLE_EVERY !== 0) return -1;
+  const age = (count - strike) * arc.period;
+  return age < RIPPLE_SECONDS ? age : -1;
 }
-`;
-
-export const FIELD_FRAGMENT = /* glsl */ `
-${TERRAIN_UNIFORMS}
-varying float vSide;
-varying float vAlong;
-varying float vId;
-varying float vShown;
-void main() {
-  float across = abs(vSide);
-  float core = exp(-across * across * 6.0);
-  float glow = exp(-across * across * 1.3) * 0.65;
-  float envelope = pow(sin(3.14159265 * clamp(vAlong, 0.0, 1.0)), 0.55);
-  float pulse = smoothstep(0.55, 1.0, fract(vAlong * 2.4 - uTime * 0.32 + vId * 0.37));
-  vec3 tint = mix(vec3(1.2, 0.2, 0.75), vec3(0.3, 0.85, 1.3), vAlong);
-  vec3 col = tint * glow + mix(tint, vec3(1.2, 1.3, 1.5), 0.45) * core * 0.5;
-  gl_FragColor = vec4(col * envelope * (0.22 + 0.95 * pulse) * vShown, 1.0);
-${OUTPUT}
-}
-`;
 
 /** Magnetic Storm's board (stadium-environment-mesh.js BOARDS). */
 export function magneticStormBoard({ three, material, terrainGrid, replaceGeometry, bakeOptions }) {
@@ -705,7 +655,6 @@ export function magneticStormBoard({ three, material, terrainGrid, replaceGeomet
     terrain: make(TERRAIN_VERTEX, TERRAIN_FRAGMENT),
     props: make(PROP_VERTEX, PROP_FRAGMENT, { side: three.DoubleSide }),
     bolts: make(BOLT_VERTEX, BOLT_FRAGMENT, additive),
-    field: make(FIELD_VERTEX, FIELD_FRAGMENT, additive),
     dome: make(DOME_VERTEX, DOME_FRAGMENT, additive),
     bakeField: make(FULLSCREEN_VERTEX, BAKE_FIELD_FRAGMENT, bakeOptions),
     bakeLight: make(FULLSCREEN_VERTEX, bakeLightFragment(), bakeOptions),
@@ -713,10 +662,8 @@ export function magneticStormBoard({ three, material, terrainGrid, replaceGeomet
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
   const props = new three.Mesh(new three.BufferGeometry(), materials.props);
   const bolts = new three.Mesh(new three.BufferGeometry(), materials.bolts);
-  const field = new three.Mesh(new three.BufferGeometry(), materials.field);
   const dome = new three.Mesh(domeGeometry(three), materials.dome);
   bolts.renderOrder = 2;
-  field.renderOrder = 2;
   dome.renderOrder = 3;
   // The strike's clock: where in its period it is, 0..1.
   const clockAt = (period, phase, now) => (((now / period + phase) % 1) + 1) % 1;
@@ -729,7 +676,7 @@ export function magneticStormBoard({ three, material, terrainGrid, replaceGeomet
     return flash * flicker + tail;
   };
   return {
-    objects: [terrain, props, bolts, field, dome],
+    objects: [terrain, props, bolts, dome],
     materials: Object.values(materials),
     bakeField: materials.bakeField,
     bakeLight: materials.bakeLight,
@@ -752,8 +699,7 @@ export function magneticStormBoard({ three, material, terrainGrid, replaceGeomet
       own.uImpacts.value.forEach((slot, i) => {
         const arc = landings[i];
         if (!arc || seconds === null) return slot.set(0, 0, 1, -1);
-        const age = clockAt(arc.period, arc.phase, seconds) * arc.period;
-        return slot.set(arc.dir[0], arc.dir[1], arc.dir[2], age < 4 ? age : -1);
+        return slot.set(arc.dir[0], arc.dir[1], arc.dir[2], rippleAge(arc, i, seconds));
       });
     },
     apply(spots, bounds) {
@@ -776,12 +722,10 @@ export function magneticStormBoard({ three, material, terrainGrid, replaceGeomet
       replaceGeometry(terrain, terrainGrid(bounds));
       props.visible = Boolean(spots);
       bolts.visible = Boolean(spots);
-      field.visible = Boolean(spots);
       dome.visible = Boolean(spots);
       if (spots) {
         replaceGeometry(props, stormProps(spots).build(three));
         replaceGeometry(bolts, boltGeometry(three, spots.arcs, u));
-        replaceGeometry(field, boltGeometry(three, spots.fieldArcs, u * 0.7));
       }
     },
   };

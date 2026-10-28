@@ -483,12 +483,13 @@ particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
     sky, the glowing pink Poke Ball round the Actives, bare trees. Reworked (user, 2026-10-28: "make
     Magnetic Storm more of an actual magnetic storm, emphasize the force field") around the field: a coil
     pylon at each side's pole (pink north, cyan south) and a coil post at each of the four pads; the iron
-    dust of the marsh lies along the poles' flux in fine dashes and the field lines glow, pulses running
-    along them pole to pole; twelve arcs of the field loop overhead between the poles; a dome of force
-    field closes the arena (a faint sheen, the rim glowing where seen edge-on; no cells), and each pad's
-    strike of lightning lands on it, flashes it and sends a ring of light out across it, round on the dome
-    itself. The field swells into view and fades out on a slow beat, each part on its own, and the field
-    arcs and ground lines swell with it; a vortex of dark mist turns over the ground. The dome is a hemisphere of unit
+    dust of the marsh lies along the poles' flux in fine dashes (no glowing field lines or overhead arcs:
+    user, 2026-10-28, "remove the purple lines"); a dome of force field closes the arena (a faint blue
+    sheen, the rim glowing where seen edge-on, very transparent; no cells), and each pad's strike of
+    lightning lands on it and flashes it, one strike in six also sending a ring of light out across it
+    (`rippleAge`; user: the big blue circles "significantly less often"), round on the dome itself. The
+    field swells into view and fades out on a slow beat, each part on its own; a vortex of dark mist
+    turns over the ground. The dome is a hemisphere of unit
     directions the vertex shader scales to the arena (grown where the pads and poles would stand outside).
   - Grand Tree (`grand-tree`, SCR 136, `stadium-env-grandtree.mjs`). A bright jungle clearing on
     moss and clover under one vast tree at the top left: a trunk of six twisting strands veined with

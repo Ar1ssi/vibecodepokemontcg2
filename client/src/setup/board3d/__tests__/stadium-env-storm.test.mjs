@@ -11,20 +11,20 @@ import {
   BOLT_VERTEX,
   DOME_FRAGMENT,
   DOME_VERTEX,
-  FIELD_FRAGMENT,
-  FIELD_VERTEX,
   MAX_ARCS,
   MAX_CLUMPS,
-  MAX_FIELD_ARCS,
   MAX_PADS,
   MAX_TREES,
   PROP_FRAGMENT,
+  RIPPLE_EVERY,
+  RIPPLE_SECONDS,
   STORM_KEY,
   TERRAIN_FRAGMENT,
   TERRAIN_VERTEX,
   boltGeometry,
   boltPath,
   domeGeometry,
+  rippleAge,
   stormProps,
   stormSpots,
 } from '../stadium-env-storm.mjs';
@@ -90,27 +90,8 @@ test('stormSpots: a pole in the middle of each side band, the force field over t
   }
 });
 
-test('stormSpots: the field arcs leave the north pole and reach the south, under the dome', () => {
-  for (const layout of layouts) {
-    const { fieldArcs, poles, dome } = stormSpots(layout);
-    assert.equal(fieldArcs.length, MAX_FIELD_ARCS);
-    for (const arc of fieldArcs) {
-      assert.deepEqual(arc.points[0].map(Math.round), [poles[0].x, poles[0].y, poles[0].h].map(Math.round));
-      assert.deepEqual(arc.points.at(-1).map(Math.round), [poles[1].x, poles[1].y, poles[1].h].map(Math.round));
-      for (const [x, y, z] of arc.points) {
-        assert.ok(z >= poles[0].h - 1e-6 && z < dome.h, 'under the dome');
-        assert.ok(((x - dome.x) / dome.a) ** 2 + ((y - dome.y) / dome.b) ** 2 < 1, 'inside its footprint');
-      }
-    }
-    // Some lie flat on their axis, some stand upright over it, and they fan to both sides of it.
-    assert.ok(fieldArcs.some((arc) => Math.max(...arc.points.map((p) => p[2])) < poles[0].h * 1.8));
-    assert.ok(fieldArcs.some((arc) => Math.max(...arc.points.map((p) => p[2])) > poles[0].h * 2.4));
-    assert.ok(fieldArcs.some((arc) => arc.points.some((p) => p[1] > poles[0].y + 40)) && fieldArcs.some((arc) => arc.points.some((p) => p[1] < poles[0].y - 40)));
-  }
-});
-
 // The links between the pads, the trees, the reeds and the pylons stay off the cards; the strikes up to the
-// dome and the field's arcs fly over the arena and pass behind them (the board draws over the environment).
+// dome fly over the arena and pass behind the cards (the board draws over the environment).
 test('no pad link, tree, pylon or reed covers a card on screen, in either camera preset', () => {
   for (const view of SCREEN_VIEWS) {
     const { layout, projectors } = screenView(view);
@@ -128,7 +109,7 @@ test('no pad link, tree, pylon or reed covers a card on screen, in either camera
   }
 });
 
-test('stormSpots is null without a layout; the props, bolts and field arcs build', () => {
+test('stormSpots is null without a layout; the props and bolts build', () => {
   assert.equal(stormSpots(null), null);
   const spots = stormSpots(layouts[0]);
   const props = stormProps(spots);
@@ -136,8 +117,31 @@ test('stormSpots is null without a layout; the props, bolts and field arcs build
   assert.equal(props.build(three).getAttribute('position').count, props.vertexCount());
   const bolts = boltGeometry(three, spots.arcs, spots.u);
   assert.equal(bolts.getAttribute('position').count, spots.arcs.reduce((sum, arc) => sum + arc.points.length * 2, 0));
-  const field = boltGeometry(three, spots.fieldArcs, spots.u);
-  assert.equal(field.getAttribute('position').count, spots.fieldArcs.reduce((sum, arc) => sum + arc.points.length * 2, 0));
+});
+
+test('rippleAge: one strike in RIPPLE_EVERY rings the field, for RIPPLE_SECONDS, each pad on its own count', () => {
+  const { arcs } = stormSpots(layouts[0]);
+  const landings = arcs.filter((arc) => arc.dir);
+  const horizon = 600;
+  landings.forEach((arc, slot) => {
+    let strikes = 0;
+    let rings = 0;
+    let lastCount = null;
+    for (let now = 0; now < horizon; now += 0.05) {
+      const count = Math.floor(now / arc.period + arc.phase);
+      if (count !== lastCount) strikes += 1;
+      lastCount = count;
+      const age = rippleAge(arc, slot, now);
+      if (age >= 0) {
+        assert.ok(age < RIPPLE_SECONDS);
+        rings += 1;
+      }
+    }
+    assert.ok(rings * 0.05 < (horizon * RIPPLE_SECONDS) / (arc.period * RIPPLE_EVERY) * 1.2 + RIPPLE_SECONDS, `pad ${slot} rings seldom`);
+    assert.ok(rings > 0 && strikes >= horizon / arc.period - 1, 'it does ring now and then, and strikes as often as before');
+  });
+  const first = landings.map((arc, slot) => [...Array(1200).keys()].find((k) => rippleAge(arc, slot, k * 0.05) >= 0));
+  assert.ok(new Set(first).size > 1, 'the pads do not ring together');
 });
 
 test('domeGeometry: a hemisphere of unit directions, the apex straight up, the rim on the ground', () => {
@@ -157,7 +161,7 @@ test('domeGeometry: a hemisphere of unit directions, the apex straight up, the r
 
 test('Magnetic Storm shaders declare no GLSL ES 3.00 reserved word and every one has a main', () => {
   const reserved = /\b(?:float|vec[234]|int|bool)\s+(?:flat|half|smooth|noperspective|sample|patch|input|output|filter|active|common|fixed|long|short|out|in|inout|round)\b/;
-  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_VERTEX, TERRAIN_FRAGMENT, PROP_FRAGMENT, BOLT_VERTEX, BOLT_FRAGMENT, DOME_VERTEX, DOME_FRAGMENT, FIELD_VERTEX, FIELD_FRAGMENT]) {
+  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_VERTEX, TERRAIN_FRAGMENT, PROP_FRAGMENT, BOLT_VERTEX, BOLT_FRAGMENT, DOME_VERTEX, DOME_FRAGMENT]) {
     assert.doesNotMatch(shader, reserved);
     assert.match(shader, /void main\(\)/);
   }
