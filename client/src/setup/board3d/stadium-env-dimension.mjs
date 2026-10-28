@@ -23,6 +23,7 @@ import {
   TABLE_UNIFORMS,
   TERRAIN_GROUND,
   TERRAIN_UNIFORMS,
+  VORONOI,
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
 import { craterEmblem, environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
@@ -31,7 +32,7 @@ import { tableBounds } from './table-uv.mjs';
 
 export const VALLEY_KEY = 'dimension-valley';
 /** The island runs this far past the cards' box, its corners this round, its edge wandering this much. */
-export const ISLAND = Object.freeze({ margin: 64, corner: 110, wander: 30 });
+export const ISLAND = Object.freeze({ margin: 78, corner: 120, wander: 36 });
 /** How deep the void lies under the island, px. */
 export const VOID_DEPTH = 380;
 export const MAX_DISCS = 44;
@@ -64,7 +65,10 @@ const union = (rects) => {
 
 /** The island edge's wander at (x, y), -1..1 (the shader's `wander`). */
 export const edgeWander = (x, y) =>
-  0.55 * Math.sin(x * 0.013 + 1.1) * Math.sin(y * 0.017 + 0.3) + 0.3 * Math.sin((x + y) * 0.029 + 2.0) + 0.15 * Math.sin(x * 0.051 - y * 0.043);
+  0.55 * Math.sin(x * 0.013 + 1.1) * Math.sin(y * 0.017 + 0.3) +
+  0.3 * Math.sin((x + y) * 0.029 + 2.0) +
+  0.15 * Math.sin(x * 0.051 - y * 0.043) +
+  0.22 * (1 - 2 * Math.abs(Math.sin(x * 0.021 + 1.7 * Math.sin(y * 0.009))));
 
 /** Signed px from the island's edge at (x, y), negative on it (the shader's `islandDistance`). */
 export function islandDistance(island, x, y) {
@@ -134,9 +138,9 @@ export function valleySpots(layout) {
       const roll = (salt) => hash(gx, gy, salt);
       const x = gx + (roll(1) - 0.5) * discStep * 0.8;
       const y = gy + (roll(2) - 0.5) * discStep * 0.8;
-      const r = (10 + 9 * roll(3)) * u;
+      const r = (9 + 16 * roll(3) ** 1.6) * u;
       const sd = islandDistance(island, x, y);
-      if (sd > -14 * u || roll(4) > 0.5) continue;
+      if (sd > -14 * u || roll(4) > 0.42) continue;
       if (cards.some((card) => distanceToRect(x, y, card) < r + 8 * u)) continue;
       // The ground round the Actives stays calm: no disc inside the painted mark.
       if (emblem && Math.hypot(x - emblem.x, y - emblem.y) < emblem.r + 24 * u) continue;
@@ -184,7 +188,8 @@ uniform vec2 uIslandShape;
 uniform vec3 uEmblem;
 uniform vec4 uScene;
 float wander(vec2 p) {
-  return 0.55 * sin(p.x * 0.013 + 1.1) * sin(p.y * 0.017 + 0.3) + 0.3 * sin((p.x + p.y) * 0.029 + 2.0) + 0.15 * sin(p.x * 0.051 - p.y * 0.043);
+  return 0.55 * sin(p.x * 0.013 + 1.1) * sin(p.y * 0.017 + 0.3) + 0.3 * sin((p.x + p.y) * 0.029 + 2.0) + 0.15 * sin(p.x * 0.051 - p.y * 0.043)
+    + 0.22 * (1.0 - 2.0 * abs(sin(p.x * 0.021 + 1.7 * sin(p.y * 0.009))));
 }
 float islandDistance(vec2 p) {
   vec2 q = abs(p - uIsland.xy) - (uIsland.zw - uIslandShape.x);
@@ -256,12 +261,43 @@ const vec3 EARTH_DARK = vec3(0.096, 0.067, 0.052);
 const vec3 MARK = vec3(0.9, 0.232, 0.572);
 `;
 
+// The art's grass, shared by the great island and the small slabs: tall dark blades fanned out of
+// tufts on a voronoi grid, their tips lit, in soft clumps and broad patches of sun.
+const GRASS_SURFACE = /* glsl */ `
+vec2 bladeFan(vec2 v, float h) {
+  float stroke = 0.0;
+  float tip = 0.0;
+  for (int k = 0; k < 3; k++) {
+    float a = 1.571 + (float(k) - 1.0) * 0.6 + (fract(h * (7.0 + float(k) * 3.1)) - 0.5) * 0.9;
+    vec2 d = vec2(cos(a), sin(a));
+    float len = 5.0 + 5.0 * fract(h * (11.0 + float(k)));
+    float s = clamp(dot(v, d), 0.0, len);
+    vec2 bent = d * s + vec2(-d.y, d.x) * (s * s / len) * 0.16;
+    float m = 1.0 - smoothstep(0.3, 0.95, length(v - bent) / mix(1.1, 0.4, s / len));
+    stroke = max(stroke, m);
+    tip = max(tip, m * s / len);
+  }
+  return vec2(stroke, tip);
+}
+vec3 grassSurface(vec2 p, float clump) {
+  vec3 col = mix(GRASS_DARK, GRASS, 0.35 + 0.65 * clump);
+  col *= 0.86 + 0.26 * fbm3(p / 34.0 + 5.0);
+  vec4 tuft = voronoiCell(p / 13.0 + 2.3);
+  vec2 blades = bladeFan(-tuft.zw * 13.0, tuft.y);
+  float has = step(fract(tuft.y * 23.7), 0.66);
+  col = mix(col, mix(GRASS_DARK * 0.7, GRASS_LIT * 1.2, blades.y), blades.x * has * 0.85);
+  return col * (1.0 + 0.16 * smoothstep(0.5, 0.78, fbm3(p / 64.0 + 9.0)));
+}
+`;
+
 export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
+${VORONOI}
 ${REVEAL}
 ${POKE_BALL}
 ${PALETTE}
+${GRASS_SURFACE}
 ${VALLEY}
 varying vec2 vPos;
 varying vec2 vUv;
@@ -277,10 +313,12 @@ void main() {
   vec3 n = normalize(vec3(nxy / nz * vGrowth, 1.0));
   float lit = clamp(dot(n, normalize(uSun)), 0.0, 1.0);
 
-  // The grass: soft clumps, lighter where they catch the sun, short blades brushed in streaks.
-  vec3 col = mix(GRASS_DARK, GRASS, 0.5 + 0.5 * field.b);
-  float blades = gnoise(vec2(p.x * 0.35 + 3.0 * fbm3(p / 40.0), p.y * 0.08));
-  col = mix(col, GRASS_LIT, smoothstep(0.55, 0.85, blades) * 0.45);
+  // The grass: soft clumps, tufts of tall blades, lighter where they catch the sun.
+  vec3 col = grassSurface(p, field.b);
+  // Broad drifts of sun-yellow and shaded blue-green, and bare soil showing through toward the edge.
+  col *= mix(vec3(0.9, 1.0, 0.9), vec3(1.08, 1.03, 0.88), fbm3(p / 230.0 + 2.0));
+  float soil = smoothstep(0.6, 0.7, fbm3(p / 52.0 + 3.0)) * smoothstep(-76.0, -16.0, field.g);
+  col = mix(col, EARTH * (0.75 + 0.5 * gnoise(p / 5.0)), soil * 0.85);
   col *= 0.65 + 0.45 * lit;
   col *= mix(0.6, 1.0, smoothstep(0.3, 0.9, light.b));
   // Toward the edge the grass thins over the earth, then its lip catches the light where it turns
@@ -477,7 +515,10 @@ void main() {
 export const ROCK_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
+${VORONOI}
 ${REVEAL}
+${PALETTE}
+${GRASS_SURFACE}
 ${VALLEY}
 varying vec4 vColor;
 varying vec3 vNormal;
@@ -487,9 +528,14 @@ void main() {
   vec3 n = normalize(gl_FrontFacing ? vNormal : -vNormal);
   float lit = max(dot(n, normalize(uSun)), 0.0);
   vec3 albedo = vColor.rgb * (0.85 + 0.3 * gnoise(vWorld.xy / 9.0 + vWorld.z / 13.0));
-  // A slab's grass: soft clumps and brushed blades, as on the great island.
-  float blades = gnoise(vec2(vWorld.x * 0.35 + 3.0 * fbm3(vWorld.xy / 40.0), vWorld.y * 0.08));
-  albedo = mix(albedo, albedo * (0.8 + 0.4 * fbm3(vWorld.xy / 50.0)) + vec3(0.06, 0.1, 0.02) * smoothstep(0.55, 0.85, blades), vColor.a);
+  // The earth's strata (layers that wave a little), cracks between its blocks, and roots' dark runs.
+  float layer = sin(vWorld.z * 0.32 + 3.0 * gnoise(vWorld.xy / 36.0));
+  vec4 block = voronoiCell(vec2(vWorld.x + vWorld.y * 0.7, vWorld.z * 1.7) / 26.0);
+  vec3 earth = albedo * (0.82 + 0.2 * smoothstep(-0.4, 0.6, layer)) * mix(0.7, 1.0, smoothstep(0.0, 0.06, block.x));
+  earth = mix(earth, vec3(0.14, 0.095, 0.065), 0.5 * smoothstep(0.78, 0.9, gnoise(vec2(vWorld.x * 0.4 + vWorld.y * 0.3, vWorld.z * 0.05))));
+  // A slab's grass: the same tufts and clumps as on the great island.
+  vec3 grass = grassSurface(vWorld.xy, 0.55 + 0.45 * fbm3(vWorld.xy / 70.0));
+  albedo = mix(earth, grass, vColor.a);
   vec3 col = albedo * (0.42 + 0.75 * lit);
   // The void's light from below, in its own colour where the rock hangs over it.
   col += albedo * voidColour(vWorld.xy, uTime) * 0.9 * max(-n.z + 0.25, 0.0);
@@ -528,7 +574,7 @@ varying float vShown;
 void main() {
   // A little bigger than the disc, room for its glow.
   vec2 local = position.xy * 1.6;
-  vec3 pos = vec3(aDisc.xy + local * aDisc.w, aDisc.z + 0.6);
+  vec3 pos = vec3(aDisc.xy + local * vec2(1.0, 0.66) * aDisc.w, aDisc.z + 0.6);
   pos.z += sin(uTime * 0.6 + aHue.w) * aBob;
   float growth = terrainGrowth(aDisc.xy);
   pos.z *= growth;
@@ -551,7 +597,11 @@ void main() {
   float core = 1.0 - smoothstep(0.0, 0.85, r);
   float glow = exp(-(r - 1.0) * (r - 1.0) * 6.0) * step(1.0, r);
   float breath = 0.85 + 0.15 * sin(uTime * 1.3 + vHue.r * 9.0 + vHue.b * 5.0);
-  vec3 col = vHue * (0.9 + 0.6 * core) * breath + vec3(0.35) * core * core;
+  // A painted glowing lozenge, as the art's, lying flat: a brighter rim, a paler heart, swirled a little.
+  float rim = smoothstep(0.7, 0.95, r) * (1.0 - smoothstep(0.95, 1.0, r));
+  float swirl = 0.5 + 0.5 * sin(atan(vLocal.y, vLocal.x) * 3.0 + r * 5.0 + vHue.g * 8.0);
+  vec3 col = vHue * (0.85 + 0.5 * core) * breath * (0.9 + 0.2 * swirl) + vec3(0.3) * core * core * core;
+  col += vHue * rim * 0.45;
   float alpha = max(body, glow * 0.35 * breath);
   gl_FragColor = vec4(mix(vHue * 1.4, col, body), alpha);
 ${OUTPUT}
@@ -589,7 +639,11 @@ void main() {
   vec2 moving = (flow + vec2(t * 40.0, 0.0)) / 11.0;
   vec2 cell = floor(moving);
   vec2 inCell = fract(moving) - 0.5 - (hash22(cell) - 0.5) * 0.5;
-  float speck = step(0.9, hash12(cell)) * (1.0 - smoothstep(0.06, 0.16, length(inCell))) * (0.5 + 0.5 * sin(t * 4.0 + hash12(cell + 7.0) * 30.0));
+  // Each speck a small flake, turned its own way, tumbling as it twinkles.
+  float turn = hash12(cell + 5.0) * 6.2831853 + t * (0.6 + hash12(cell + 9.0));
+  vec2 flake = vec2(cos(turn) * inCell.x + sin(turn) * inCell.y, -sin(turn) * inCell.x + cos(turn) * inCell.y);
+  float speck = step(0.8, hash12(cell)) * (1.0 - smoothstep(0.06, 0.12, abs(flake.x))) * (1.0 - smoothstep(0.14, 0.26, abs(flake.y)))
+    * (0.5 + 0.5 * sin(t * 4.0 + hash12(cell + 7.0) * 30.0));
   vec3 speckHue = mix(vec3(1.0), 0.55 + 0.45 * cos(6.2831853 * (hash12(cell + 3.0) + vec3(0.0, 0.33, 0.67))), step(0.45, hash12(cell + 11.0)));
   col += speckHue * speck * band * 1.1;
   // The island's soft shadow on the mist far below it.
