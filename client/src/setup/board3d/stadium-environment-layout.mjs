@@ -26,6 +26,7 @@ const ENVIRONMENT_BY_CARD = {
   'customhb-278': 'levincia',
   'customhb-289': 'magma-basin',
   'customhb-299': 'scorched-earth',
+  'customhb-361': 'community-center',
   'customhb-362': 'pokemon-center',
 };
 export const ENVIRONMENT_KEYS = Object.freeze([...new Set(Object.values(ENVIRONMENT_BY_CARD))]);
@@ -41,6 +42,7 @@ export const ENVIRONMENT_OVERRIDE_KEY = 'ptcg-stadium-env';
  */
 const SCENE_MARGINS = {
   'brooklet-hill': { side: 0.17, near: 0.2, far: 0.34 },
+  'community-center': { side: 0.17, near: 0.2, far: 0.34 },
   'crystal-cave': { side: 0.17, near: 0.2, far: 0.34 },
   'dimension-valley': { side: 0.17, near: 0.2, far: 0.34 },
   'forest-of-vitality': { side: 0.17, near: 0.2, far: 0.34 },

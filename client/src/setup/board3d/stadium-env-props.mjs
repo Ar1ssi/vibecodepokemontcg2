@@ -155,12 +155,12 @@ export function createPropBuilder() {
     }
   };
 
-  /** A cone from radius r at z0 up to its apex at z1; its base is left open. */
-  const cone = ({ x, y, z0, z1, r, color, sides = 16 }) => {
+  /** A cone (a pyramid with few `sides`, turned by `turn` rad) from radius r at z0 up to its apex at z1; its base is left open. */
+  const cone = ({ x, y, z0, z1, r, color, sides = 16, turn = 0 }) => {
     const first = positions.length / 3;
     const rise = z1 - z0;
     for (let k = 0; k <= sides; k += 1) {
-      const angle = (k / sides) * 2 * Math.PI;
+      const angle = (k / sides) * 2 * Math.PI + turn;
       const n = unit([Math.cos(angle) * rise, Math.sin(angle) * rise, r]);
       vertex([x + Math.cos(angle) * r, y + Math.sin(angle) * r, z0], n, color);
       vertex([x, y, z1], n, color);

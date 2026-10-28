@@ -31,7 +31,7 @@ import { craterEmblem } from './stadium-environment-layout.mjs';
 import { PROP_VERTEX, createPropBuilder, propFragment } from './stadium-env-props.mjs';
 import { wallBand, windowRun } from './stadium-env-buildings.mjs';
 import { boardContext, hash } from './stadium-env-spots.mjs';
-import { EDGE_HAZE, PAVING, STANDARD_TERRAIN_VERTEX } from './stadium-env-surfaces.mjs';
+import { BOX_SHADOW, EDGE_HAZE, PAVING, STANDARD_TERRAIN_VERTEX } from './stadium-env-surfaces.mjs';
 
 export const CENTER_KEY = 'pokemon-center';
 /** The bright day's sun (toward it, table frame): high, from the far left, so the Center's shadow falls toward the road. */
@@ -129,23 +129,6 @@ float centerWalk(vec2 p) {
 float walkDistance(vec2 p) {
   return min(centerWalk(p), uWalk.y - p.x);
 }
-// 1 where the building's shadow falls on a ground point o (a ray toward the sun hits its box), a few
-// taps over the sun's disc so the edge is soft.
-float boxShadow(vec3 o, vec3 sun, vec4 box, float top) {
-  float shade = 0.0;
-  for (int k = 0; k < 4; k++) {
-    vec3 s = normalize(sun + vec3(float(k) - 1.5, mod(float(k) * 1.7, 2.0) - 1.0, 0.0) * 0.045);
-    vec3 inv = 1.0 / s;
-    vec3 t0 = (vec3(box.xy, 0.0) - o) * inv;
-    vec3 t1 = (vec3(box.zw, top) - o) * inv;
-    vec3 tmin = min(t0, t1);
-    vec3 tmax = max(t0, t1);
-    float a = max(max(tmin.x, tmin.y), tmin.z);
-    float b = min(min(tmax.x, tmax.y), tmax.z);
-    shade += step(max(a, 0.0), b) * step(0.0, b);
-  }
-  return shade * 0.25;
-}
 `;
 
 /**
@@ -200,6 +183,7 @@ ${REVEAL}
 ${POKE_BALL}
 ${PAVING}
 ${EDGE_HAZE}
+${BOX_SHADOW}
 ${PALETTE}
 ${CENTER}
 varying vec2 vPos;
