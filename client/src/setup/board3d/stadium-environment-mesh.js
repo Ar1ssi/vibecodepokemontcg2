@@ -17,6 +17,7 @@ import { magmaBasinBoard } from './stadium-env-magma.mjs';
 import { mountainRingBoard } from './stadium-env-ring.mjs';
 import { oldCemeteryBoard } from './stadium-env-cemetery.mjs';
 import { steelShelterBoard } from './stadium-env-shelter.mjs';
+import { surfingBeachBoard } from './stadium-env-beach.mjs';
 import { forestOfVitalityBoard } from './stadium-env-vitality.mjs';
 import * as volcanic from './stadium-env-volcanic.mjs';
 import {
@@ -627,6 +628,7 @@ const BOARDS = {
   'scorched-earth': scorchedEarthBoard,
   'steel-shelter': steelShelterBoard,
   'stormy-mountains': stormyMountainsBoard,
+  'surfing-beach': surfingBeachBoard,
 };
 
 /**

@@ -380,13 +380,21 @@ particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
     the mark. Up to ten small angular slabs of grass and earth float in the margins, each tipped its
     own way and bobbing slowly. They float low toward the near end, so they never lean over the
     player's cards; a bare little tree stands on the farthest slab.
-  - Surfing Beach (`surfing-beach`, MEG 129, Ayumi Odashima). Every card lies on golden-orange sand.
-    The sea fills the far-right side, and its surf rolls in in white lace foam lines toward the near
-    left. Swash runs up and drains, leaving the wet sand glossy. The water never covers a card
-    footprint. A big curling wave breaks out past the far edge. Sandstone cliffs stand at the far-left
-    corner, and brown rocks wrapped in white surf stand at the near right, as in the art. There are no
-    palms (the art has none). The old prototype `feature/077-beach-board` (`stadium-env-beach.mjs`:
-    water, waves, swash, foam) may be ported to the board-builder shape.
+  - Surfing Beach (`surfing-beach`, MEG 129, Ayumi Odashima; built, `stadium-env-beach.mjs`, its surf
+    model ported from `feature/077-beach-board`). Every card lies on the art's golden-orange sand, with
+    wind ripples in patches and low dunes away from the cards. The sea lies in the far-left corner and
+    down the left margin, the one stretch both presets see: in the tilted preset the right margin lies
+    under the sidebox. The art's sea is on the right, so its layout is mirrored. The shore is a
+    straight line square to the sea, 300 px nearer the cards than a line clearing them all; it is
+    smoothly turned aside round each card, so every card keeps dry sand past the highest run-up. Swell
+    shoals and bunches toward the shore. Big waves break on a sandbar cut by rip channels, every wave
+    breaks at the shore, and a big swell's crest spills into short whitecaps. Foam is patchy lace
+    whose holes open as it thins, never a net. Each bore runs up as a thin sheet with a foam front and
+    drains, leaving glassy sand. The water is clear in the shallows, with soft caustic threads on the
+    sand, then turquoise, teal and deep blue. Up to four chunky faceted brown rocks stand in the surf,
+    each wrapped in foam that swells with every wave and throwing up spray. The art's cliffs are left
+    out: past the far edge they lean off the screen, and the near margin is where the cards are.
+    There are no palms (the art has none).
   - Brooklet Hill (`brooklet-hill`, GRI 120, 5ban Graphics). The art's sparkling blue lake, cards on
     it, as the earlier prototype laid it out (`feature/077-brooklet-hill`, `stadium-env-brooklet.mjs` and
     its `brookletSpots`; may be ported). A waterfall drops from layered rock cliffs at the far left
