@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as three from 'three';
 
 import { FX_LAYER, OCCLUDER_LAYER } from '../fx-layers.mjs';
-import { createFxLayer } from '../fx-layer.js';
+import { createFxLayer, fxTargetScale } from '../fx-layer.js';
 
 /** A WebGLRenderer stand-in that records what each pass rendered with. */
 function fakeRenderer({ width = 800, height = 600 } = {}) {
@@ -184,4 +184,21 @@ test('resize follows the drawing buffer; dispose drops entries and frees the blo
   assert.equal(bloom.disposed, true);
   assert.equal(detached, true);
   assert.equal(layer.render(), false);
+});
+
+test('on a high-DPI screen the FX target and bloom run at CSS-pixel size', () => {
+  const { layer, renderer } = makeLayer({ width: 2000, height: 1200 });
+  renderer.getPixelRatio = () => 2;
+  layer.add({ frame: () => true });
+  layer.render();
+  const bloom = FakeBloom.instances.at(-1);
+  assert.deepEqual([bloom.resolution.x, bloom.resolution.y], [1000, 600]);
+});
+
+test('fxTargetScale: 1 at or below ratio 1 and for nonsense, 1/ratio above', () => {
+  assert.equal(fxTargetScale(1), 1);
+  assert.equal(fxTargetScale(0.5), 1);
+  assert.equal(fxTargetScale(Number.NaN), 1);
+  assert.equal(fxTargetScale(2), 0.5);
+  assert.equal(fxTargetScale(1.5), 1 / 1.5);
 });

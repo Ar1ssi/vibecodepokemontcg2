@@ -133,11 +133,12 @@ function buildCardGeometry(three, widthPx, uv) {
  *   has: (id: number) => boolean, placed: (id: number) => boolean, meshOf: (id: number) => import('three').Mesh|null,
  *   idAt: (object3d: import('three').Object3D|null) => number|null, ids: () => number[],
  *   cornersOf: (id: number, o?: { rest?: boolean }) => number[][]|null, update: (nowMs: number) => boolean,
- *   dispose: () => void }}
+ *   moving: () => boolean, dispose: () => void }}
  *   A card whose image fails shows its back on both faces and the image is tried once more
  *   after 5 s (edge case 12); its name label is a text plane of slice C5. `update(now)` places
  *   every moving card and answers whether another frame is needed (a tween is running, or a
- *   visible foil animates while motion is allowed).
+ *   visible foil animates while motion is allowed); `moving()` answers the same for the last
+ *   `update` without the foil (a foil-only frame is ambient: board-scene paces it, frame-pacer.mjs).
  *   `tween` (design 074 H1) flies a card: for `ms` of scene time `poseFn(t)` (t eased 0 → 1) gives
  *   `{ rect, rotateZDeg, tiltXDeg, lift, flipDeg }` in viewport px (flight-pose.mjs) and the mesh
  *   sits there; the card's own pose is suspended and the mesh is shown, hidden or not. It resolves
@@ -977,7 +978,9 @@ export function createCardMeshPool({
     onNeedsRender();
   };
 
+  let lastMoving = false;
   const update = (nowMs) => {
+    lastMoving = false;
     if (disposed) return false;
     const now = Number.isFinite(nowMs) ? nowMs : clock.now();
     let moving = false;
@@ -1025,6 +1028,7 @@ export function createCardMeshPool({
       if (card.foilLive && card.mesh.visible && card.face === 'front')
         foilShown = true;
     }
+    lastMoving = moving;
     return moving || (foilShown && !motionReduced());
   };
 
@@ -1106,6 +1110,7 @@ export function createCardMeshPool({
     ids,
     cornersOf,
     update,
+    moving: () => lastMoving,
     dispose,
   };
 }

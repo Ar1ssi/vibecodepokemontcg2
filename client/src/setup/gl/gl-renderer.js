@@ -2,8 +2,18 @@
 import { NeutralToneMapping, SRGBColorSpace, WebGLRenderer } from 'three';
 
 const MAX_PIXEL_RATIO = 2;
+/** From this pixel ratio up the drawing buffer is dense enough that 4x MSAA on top buys little. */
+const MSAA_MAX_PIXEL_RATIO = 2;
 
 const pixelRatio = () => Math.min(globalThis.devicePixelRatio || 1, MAX_PIXEL_RATIO);
+
+/**
+ * Whether to ask for MSAA. Context attributes are fixed at creation, so this follows the pixel
+ * ratio at boot; a later move to another screen keeps it.
+ * @param {boolean} wanted the caller's `antialias`
+ * @param {number} ratio the device pixel ratio
+ */
+export const msaaFor = (wanted, ratio) => Boolean(wanted) && !(ratio >= MSAA_MAX_PIXEL_RATIO);
 
 const contextAttributes = ({ alpha, antialias }) => ({
   alpha,
@@ -26,9 +36,10 @@ export function createRenderer({ canvas, onLost = () => {}, alpha = true, antial
   if (!canvas || typeof canvas.getContext !== 'function') return null;
   let renderer;
   try {
-    const context = canvas.getContext('webgl2', contextAttributes({ alpha, antialias }));
+    const msaa = msaaFor(antialias, globalThis.devicePixelRatio || 1);
+    const context = canvas.getContext('webgl2', contextAttributes({ alpha, antialias: msaa }));
     if (!context) return null;
-    renderer = new WebGLRenderer({ canvas, context, alpha, antialias });
+    renderer = new WebGLRenderer({ canvas, context, alpha, antialias: msaa });
   } catch {
     return null;
   }
