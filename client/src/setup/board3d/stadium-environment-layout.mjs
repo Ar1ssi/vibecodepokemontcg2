@@ -26,6 +26,7 @@ const ENVIRONMENT_BY_CARD = {
   'customhb-278': 'levincia',
   'customhb-289': 'magma-basin',
   'customhb-299': 'scorched-earth',
+  'customhb-360': 'shopping-center',
   'customhb-361': 'community-center',
   'customhb-362': 'pokemon-center',
 };
@@ -57,6 +58,7 @@ const SCENE_MARGINS = {
   'magma-basin': { side: 0.17, near: 0.2, far: 0.34 },
   'stormy-mountains': { side: 0.17, near: 0.2, far: 0.34 },
   'perilous-jungle': { side: 0.17, near: 0.2, far: 0.34 },
+  'shopping-center': { side: 0.17, near: 0.2, far: 0.34 },
   'pokemon-center': { side: 0.17, near: 0.2, far: 0.34 },
   'steel-shelter': { side: 0.17, near: 0.2, far: 0.34 },
 };

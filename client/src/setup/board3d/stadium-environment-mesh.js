@@ -20,6 +20,7 @@ import { mysteryGardenBoard } from './stadium-env-garden.mjs';
 import { magmaBasinBoard } from './stadium-env-magma.mjs';
 import { mountainRingBoard } from './stadium-env-ring.mjs';
 import { oldCemeteryBoard } from './stadium-env-cemetery.mjs';
+import { shoppingCenterBoard } from './stadium-env-shopping.mjs';
 import { steelShelterBoard } from './stadium-env-shelter.mjs';
 import { surfingBeachBoard } from './stadium-env-beach.mjs';
 import { forestOfVitalityBoard } from './stadium-env-vitality.mjs';
@@ -634,6 +635,7 @@ const BOARDS = {
   'perilous-jungle': perilousJungleBoard,
   'pokemon-center': pokemonCenterBoard,
   'scorched-earth': scorchedEarthBoard,
+  'shopping-center': shoppingCenterBoard,
   'steel-shelter': steelShelterBoard,
   'stormy-mountains': stormyMountainsBoard,
   'surfing-beach': surfingBeachBoard,
