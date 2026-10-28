@@ -13,6 +13,7 @@ import { fullMetalLabBoard } from './stadium-env-lab.mjs';
 import { magmaBasinBoard } from './stadium-env-magma.mjs';
 import { mountainRingBoard } from './stadium-env-ring.mjs';
 import { steelShelterBoard } from './stadium-env-shelter.mjs';
+import { forestOfVitalityBoard } from './stadium-env-vitality.mjs';
 import * as volcanic from './stadium-env-volcanic.mjs';
 import {
   ENVIRONMENT_KEYS,
@@ -610,6 +611,7 @@ function perilousJungleBoard({ three, material, seeded }) {
 const BOARDS = {
   'dark-city': darkCityBoard,
   'fighting-stadium': fightingStadiumBoard,
+  'forest-of-vitality': forestOfVitalityBoard,
   'full-metal-lab': fullMetalLabBoard,
   'magma-basin': magmaBasinBoard,
   'mountain-ring': mountainRingBoard,

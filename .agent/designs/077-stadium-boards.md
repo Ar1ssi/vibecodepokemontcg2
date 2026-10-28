@@ -318,16 +318,21 @@ particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
 - Eight more (user, 2026-10-28: "every Stadium card in customhb", the card art as reference, a good
   sense of perspective, no AI tells). Each is built on its own branch `feature/077-hb-<key>` in its own module
   `stadium-env-<name>.mjs` with the standard scene margins, then merged into `feature/077-six-stadiums`:
-  - Forest of Vitality (`forest-of-vitality`, MEG 117, Ayumi Odashima). The user asked for one huge tree
-    standing at the top right of the mat, casting a shadow from there. Only one tree, with no smaller trees. It is
-    the art's broadleaf: a straight brown trunk forking into limbs, and a crown of layered, cloud-like
-    green clumps lit yellow-green on top. Its trunk stands past the table's far-right corner, buttress roots
-    running into the ground. The crown spreads over the far-right part of the scene and never hangs over a
-    card in either preset. The board's sun stands beyond the tree (high, from the far right), so the
-    crown's dappled shadow falls from the top right across the mat toward the near left. Sun flecks
-    show through gaps in the crown and drift as the crown sways. The ground is the art's soft, mossy,
-    sunlit meadow. Low rounded bushes in dense clumps (the art's foreground) fill the side bands.
-    The art's yellow-green "vitality" glow pools on the ground near the trunk, and light motes rise from it.
+  - Forest of Vitality (`forest-of-vitality`, MEG 117, Ayumi Odashima; built, `stadium-env-vitality.mjs`).
+    The user asked for one huge tree at the top right of the mat, casting its shadow from there. There
+    is only that one tree. Its olive-brown trunk stands in the band right of the cards, toward the far
+    end. The trunk is a smooth lathe whose five buttress fins run on into root ridges carved in the
+    ground. Its crown is a dome of about 70 overlapping teal pads, lit jade on top, with scalloped
+    yellow-green rims as in the art. The pads spread over the top-right corner, and each one stays clear
+    of the cards and the opponent's hand seen from above. The cameras stand over the table's middle, so
+    on screen a pad only moves further out; a test projects the crown in both presets. In the
+    top-down preset the corner lies under the sidebox, so the shadow carries the tree there. The board
+    has its own sun, low (~27°) from the right and the far end. The crown's long shadow therefore falls
+    across the mat toward the near left. Flecks gather where the crown is thin: soft ellipses of every
+    size, stretched along the sun's path. They stir as the pads sway, and the shadow grows in with the
+    tree during the reveal. The cards lie on a soft meadow. A carpet of rounded bushes in the art's
+    yellow-greens runs round it. Pools of the art's yellow glow well up between the bushes and at the
+    trunk's foot, and motes of light rise from them.
   - Crystal Cave (`crystal-cave`, EVS 144, Toyste Beach). A warm umber-brown earthen cave floor
     holds every card. Between the Actives, the Poke Ball is drawn on the floor as the art's thin gold
     line ring, with a pale glowing button. A soft pool of the art's pale skylight lies on it (a pool, no
