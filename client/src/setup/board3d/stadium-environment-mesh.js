@@ -11,6 +11,7 @@ import { fightingStadiumBoard } from './stadium-env-arena.mjs';
 import { darkCityBoard } from './stadium-env-city.mjs';
 import { crystalCaveBoard } from './stadium-env-crystal.mjs';
 import { fullMetalLabBoard } from './stadium-env-lab.mjs';
+import { mysteryGardenBoard } from './stadium-env-garden.mjs';
 import { magmaBasinBoard } from './stadium-env-magma.mjs';
 import { mountainRingBoard } from './stadium-env-ring.mjs';
 import { steelShelterBoard } from './stadium-env-shelter.mjs';
@@ -617,6 +618,7 @@ const BOARDS = {
   'full-metal-lab': fullMetalLabBoard,
   'magma-basin': magmaBasinBoard,
   'mountain-ring': mountainRingBoard,
+  'mystery-garden': mysteryGardenBoard,
   'perilous-jungle': perilousJungleBoard,
   'scorched-earth': scorchedEarthBoard,
   'steel-shelter': steelShelterBoard,

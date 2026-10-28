@@ -346,13 +346,18 @@ particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
     in the tilted preset tall things there lean up over the player's cards. A test projects every
     crystal clear of the cards in both presets. Each cluster lights the floor in its own colour, and
     coloured sparkle dust twinkles in the air.
-  - Mystery Garden (`mystery-garden`, MEG 122, Ayumi Odashima). A night garden plaza paved in the art's
-    lavender-grey flagstones laid in concentric rings round the table's middle. Round the Actives,
-    the art's glowing cyan basin becomes a flush inlay of glowing rings with a crackling energy
-    swirl; nothing stands over a card. At the plaza's edge, shallow stone steps lead down at the near
-    side. A low stone balustrade on the sides and far end holds pale urns of white flowers. Black iron
-    lanterns, each with a warm pink-white light, stand at the edge and light pools of paving. Pale
-    stone pillars stand at the far corners. Dark hedges and broad tropical leaves stand behind. Green-gold motes drift.
+  - Mystery Garden (`mystery-garden`, MEG 122, Ayumi Odashima; built, `stadium-env-garden.mjs`). A
+    garden at night under a moon from the far left. A round plaza paved in rings of the art's lavender
+    flagstones holds every card. The art's glowing basin is a pool on the emblem's circle: its pale
+    curb runs between the Actives and the Bench. The water glows cyan, swirls in rainbow rings and
+    crackles with threads of light that flicker in and out. The glowing column at the art's middle
+    would stand on the Actives, so the column is left out. Two steps lead up from the plaza to a
+    stone balustrade. On every fourth post stands a black iron lantern with glowing panes and a soft
+    pink halo; the second post after each holds an urn of white flowers. On the diagonals stand big
+    pale-blue vases, each with a lantern. Pale fluted pillars stand beyond the vases; the near pair is
+    shorter, because tall props there lean up over the player's cards in the tilted preset. Teal
+    hedges and broad leaves fill the garden. The pool lights the plaza cyan, the lanterns light their
+    pools pink, and fireflies drift.
   - Old Cemetery (`old-cemetery`, CRE 147, Oswaldo Kato). A misty graveyard under a crescent moon.
     The grass is dark teal-green with tufts of pale yellow-green. A worn rust-brown dirt path enters
     and leaves the scene at its edges and never stops in the middle of the ground. Pale teal-grey
