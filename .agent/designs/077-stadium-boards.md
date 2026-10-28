@@ -358,13 +358,17 @@ particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
     shorter, because tall props there lean up over the player's cards in the tilted preset. Teal
     hedges and broad leaves fill the garden. The pool lights the plaza cyan, the lanterns light their
     pools pink, and fireflies drift.
-  - Old Cemetery (`old-cemetery`, CRE 147, Oswaldo Kato). A misty graveyard under a crescent moon.
-    The grass is dark teal-green with tufts of pale yellow-green. A worn rust-brown dirt path enters
-    and leaves the scene at its edges and never stops in the middle of the ground. Pale teal-grey
-    round-topped headstones stand in the side bands and the far band, some leaning, some mossy. The
-    art's broken wooden grave post and big mossy boulder are included. Dark pines and one bare pale
-    tree stand past the far edge and the corners. Bands of ground mist drift. The moonlight is cool
-    cyan-white.
+  - Old Cemetery (`old-cemetery`, CRE 147, Oswaldo Kato; built, `stadium-env-cemetery.mjs`). The cards
+    lie on dark teal grass with tufts lit the art's pale yellow-green. A worn earth path with grass
+    creeping back over it comes in past the near edge at the left. It runs up past the cards, rounds
+    their far corner well outside it, and leaves past the right edge. Pale teal headstones with
+    rounded tops (and a few crosses) stand in loose rows either side of the path and off the far end.
+    None stand toward the near end, where they would lean up over the player's cards in the tilted
+    preset. Each stone leans back its own way, so its face shows from above. The art's mossy boulder
+    lies in the right band, its broken wooden post stands by the path, and dark pines and the bare
+    pale tree stand round the scene's edge. The moon is low beyond the far end, so every stone, pine
+    and the tree cast baked shadows toward the player, and the stones' rims catch the moonlight. One
+    sheet of mist drifts low, thicker away from the cards.
   - Dimension Valley (`dimension-valley`, PHF 93, Ryo Ueda). Every card lies on one big floating
     island. The island has a grass top and thick brown earth cliffs that taper down into the void
     below it. The art's pink Psychic swirl is painted on the grass between the Actives. Round the island

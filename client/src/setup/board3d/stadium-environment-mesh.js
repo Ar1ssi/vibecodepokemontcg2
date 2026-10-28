@@ -14,6 +14,7 @@ import { fullMetalLabBoard } from './stadium-env-lab.mjs';
 import { mysteryGardenBoard } from './stadium-env-garden.mjs';
 import { magmaBasinBoard } from './stadium-env-magma.mjs';
 import { mountainRingBoard } from './stadium-env-ring.mjs';
+import { oldCemeteryBoard } from './stadium-env-cemetery.mjs';
 import { steelShelterBoard } from './stadium-env-shelter.mjs';
 import { forestOfVitalityBoard } from './stadium-env-vitality.mjs';
 import * as volcanic from './stadium-env-volcanic.mjs';
@@ -619,6 +620,7 @@ const BOARDS = {
   'magma-basin': magmaBasinBoard,
   'mountain-ring': mountainRingBoard,
   'mystery-garden': mysteryGardenBoard,
+  'old-cemetery': oldCemeteryBoard,
   'perilous-jungle': perilousJungleBoard,
   'scorched-earth': scorchedEarthBoard,
   'steel-shelter': steelShelterBoard,
