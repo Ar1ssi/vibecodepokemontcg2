@@ -45,7 +45,7 @@ export const MAX_LANTERNS = 24;
 /** Least gap between any prop, seen from above, and a card or the opponent's hand. */
 export const PROP_CARD_GAP_PX = 14;
 /** Rings and segments of the instanced sphere every hedge, leaf and flower is drawn with. */
-export const BLOB_SEGMENTS = { rings: 9, around: 14 };
+export const BLOB_SEGMENTS = { rings: 12, around: 22 };
 const FIREFLY_COUNT = 90;
 
 /** A small deterministic 0..1 from three numbers. */
@@ -124,13 +124,13 @@ export function gardenSpots(layout) {
   // each vase and pillar.
   const furniture = [...vases.map((v) => ({ ...v, keep: v.r + 18 * u })), ...pillars.map((p) => ({ ...p, keep: p.r + 26 * u }))];
   const hedges = [];
-  const step = 56 * u;
+  const step = 46 * u;
   for (let gy = scene.y + step / 2; gy < scene.y + scene.h; gy += step) {
     for (let gx = scene.x + step / 2; gx < scene.x + scene.w; gx += step) {
       const roll = (salt) => hash(gx, gy, salt);
       const x = gx + (roll(1) - 0.5) * step * 0.7;
       const y = gy + (roll(2) - 0.5) * step * 0.7;
-      const r = (22 + 18 * roll(3)) * u;
+      const r = (24 + 20 * roll(3)) * u;
       const out = Math.hypot(x - centre.x, y - centre.y);
       if (out < ringR + 26 * u + r * 0.6 || !inScene(x, y, r * 0.4) || roll(4) > 0.85) continue;
       if (furniture.some((f) => Math.hypot(x - f.x, y - f.y) < f.keep + r * 0.7)) continue;
@@ -201,7 +201,7 @@ void main() {
   vec2 p = uMin + vUv * uSize;
   float r = distance(p, uPlaza.xy);
   vec2 stone = flagstone(p);
-  float h = 1.4 * smoothstep(0.0, 2.5, stone.x) - 0.4 * stone.y;
+  float h = 2.4 * smoothstep(0.0, 4.5, stone.x) - 0.7 * stone.y;
   float kind = 0.0;
   float tone = stone.y;
   if (uPlaza.w > 0.0 && abs(r - uPlaza.w) < ${(CURB.width / 2).toFixed(1)}) {
@@ -289,10 +289,27 @@ void main() {
 
   // The paving: lavender flagstones a shade apart, their joints dark, worn paler at their middles.
   vec2 stone = flagstone(p);
-  vec3 col = mix(PAVING_DARK * 1.3, PAVING, 0.55 + 0.45 * field.b) * (0.92 + 0.12 * fbm3(p / 26.0));
-  col = mix(col, PAVING_DARK * 0.7, 1.0 - smoothstep(0.4, 1.6, stone.x));
+  // Each flagstone its own tone, from slate-blue through lavender to the dusty rose of the art's
+  // older paving, grained and veined, its edge chipped paler where it meets a joint, moss and
+  // damp dark in the joints.
+  vec3 slate = vec3(0.24, 0.235, 0.4);
+  vec3 rose = vec3(0.4, 0.25, 0.33);
+  vec3 col = mix(mix(slate, PAVING, smoothstep(0.0, 0.5, field.b)), rose, smoothstep(0.62, 1.0, field.b) * 0.85);
+  col *= 0.86 + 0.2 * fbm3(p / 26.0) + 0.1 * (gnoise(p / 2.6) - 0.5);
+  col *= 1.0 + 0.16 * smoothstep(0.55, 0.8, gnoise(vec2(dot(p, vec2(0.8, 0.6)) / 38.0, dot(p, vec2(-0.6, 0.8)) / 9.0)));
+  col = mix(col, col * 1.28, (1.0 - smoothstep(1.2, 3.6, stone.x)) * smoothstep(0.5, 1.8, stone.x));
+  float joint = 1.0 - smoothstep(0.4, 1.7, stone.x);
+  vec3 moss = vec3(0.05, 0.19, 0.14) * (0.8 + 0.5 * gnoise(p / 5.0));
+  col = mix(col, PAVING_DARK * 0.55, joint);
+  col = mix(col, moss, joint * smoothstep(0.42, 0.68, fbm3(p / 34.0 + 7.0)) * 0.8);
   // The steps and the curb: the paler wall stone of the art's terrace.
   vec3 pale = STONE_PALE * (0.85 + 0.25 * field.b);
+  // The steps are slabs: radial joints between them, the slabs of the lower step set half a slab off.
+  float onStep = step(0.5, kind) * step(kind, 1.5);
+  float arc = atan(p.y - uPlaza.y, p.x - uPlaza.x) * r / 64.0 + floor((r - uPlaza.z) / uStep.x) * 0.5;
+  float slabJoint = (1.0 - smoothstep(0.0, 0.035, fract(arc))) + smoothstep(0.965, 1.0, fract(arc));
+  pale *= 1.0 - 0.38 * clamp(slabJoint, 0.0, 1.0) * onStep;
+  pale *= 1.0 + 0.1 * (gnoise(p / 3.2) - 0.5);
   col = mix(col, pale, step(0.5, kind) * step(kind, 1.5));
   col = mix(col, pale, step(-1.5, kind) * step(kind, -0.5));
   // The garden ground: dark grass.
@@ -338,8 +355,8 @@ ${OUTPUT}
 const STONE = [0.6, 0.6, 0.78, 0.15];
 const PILLAR = [0.78, 0.62, 0.8, 0.15];
 const VASE = [0.28, 0.46, 0.78, 0.45];
-const IRON = [0.07, 0.065, 0.085, 0.6];
-const GLASS = [1.25, 0.82, 1.0, 2.6];
+const IRON = [0.13, 0.125, 0.17, 0.7];
+const GLASS = [1.45, 0.9, 1.05, 2.6];
 const SOIL = [0.06, 0.05, 0.05, 0];
 
 /** A lathe up a vertical axis at (x, y): `profile` is [[z, radius], ...] from foot to top. */
@@ -353,7 +370,7 @@ const lathe = (props, x, y, profile, color) =>
 
 /** One iron lantern standing at (x, y) from z: a little hipped roof over four glowing panes. */
 const lantern = (props, x, y, z, u) => {
-  const s = 1.5 * u;
+  const s = 1.3 * u;
   props.box({ x, y, z0: z, z1: z + 4 * s, hw: 7 * s, hh: 7 * s, color: IRON });
   props.box({ x, y, z0: z + 4 * s, z1: z + 22 * s, hw: 5.5 * s, hh: 5.5 * s, color: GLASS });
   for (const [dx, dy] of [
@@ -579,12 +596,18 @@ void main() {
   float kind = vKind.x;
   vec3 col;
   if (kind < 0.5) {
-    vec4 cluster = voronoiCell(vSphere.xy / (1.3 + vSphere.z) * 2.6 + vKind.y * 17.0);
-    float inCluster = 1.0 - smoothstep(0.42, 0.62, length(cluster.zw));
-    vec3 bulged = normalize(n - vec3(cluster.zw, 0.0) * 0.6 * inCluster);
+    // Clipped boxwood: leaf clumps in two sizes, their borders wandering, each bulging toward the moon.
+    vec2 q = vSphere.xy / (1.3 + vSphere.z) * 2.6 + vKind.y * 17.0;
+    q += 0.3 * (vec2(gnoise(q * 1.7), gnoise(q * 1.7 + 6.3)) - 0.5);
+    vec4 cluster = voronoiCell(q);
+    float inCluster = 1.0 - smoothstep(0.34, 0.6, length(cluster.zw));
+    vec4 leaf = voronoiCell(q * 3.3 + 2.1);
+    float inLeaf = 1.0 - smoothstep(0.3, 0.55, length(leaf.zw));
+    vec3 bulged = normalize(n - vec3(cluster.zw, 0.0) * 0.55 * inCluster - vec3(leaf.zw, 0.0) * 0.3 * inLeaf);
     float lit = max(dot(bulged, normalize(uSun)), 0.0);
-    col = mix(HEDGE_DARK * 1.4, HEDGE * 1.25, smoothstep(0.1, 0.7, lit)) * mix(0.6, 1.0, inCluster);
-    col = mix(col, HEDGE * 1.7, smoothstep(0.75, 0.9, lit) * inCluster * 0.6);
+    col = mix(HEDGE_DARK * 1.2, HEDGE * 1.2, smoothstep(0.05, 0.5, lit)) * mix(0.62, 1.0, inCluster);
+    col = mix(col, HEDGE * 2.0, smoothstep(0.6, 0.85, lit) * inLeaf * 0.7);
+    col *= mix(0.7, 1.0, smoothstep(0.0, 0.2, cluster.x));
   } else if (kind < 1.5) {
     // A broad leaf: its midrib pale, darker toward its edges.
     float rib = 1.0 - smoothstep(0.0, 0.18, abs(vSphere.y));
@@ -622,7 +645,8 @@ vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
   vec2 toPool = uPlaza.xy - world.xy;
   float fromPool = max(length(toPool) - uPlaza.w, 0.0);
   col += albedo * POOL_CYAN * 0.35 * exp(-fromPool / 380.0) * max(dot(n, normalize(vec3(toPool, 40.0))), 0.0);
-  col += albedo * LANTERN_GLOW * 0.7 * lanternFall(world);
+  // The lantern's own light washes the iron nearest it pink, not only the paint on it.
+  col += albedo * LANTERN_GLOW * 0.7 * lanternFall(world) + LANTERN_GLOW * 0.16 * lanternFall(world) * (0.4 + 0.6 * max(n.z, 0.0));
   return col;
 }
 `;
