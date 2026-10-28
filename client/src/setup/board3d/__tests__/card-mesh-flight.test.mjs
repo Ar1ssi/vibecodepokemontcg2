@@ -396,3 +396,17 @@ test('lift: a lifted card ignores tween; cornersOf rest reports the slot, not th
   assertBox(boxOf(pool, 7), FOCUS.rect);
   assertBox(boxOf(pool, 7, { rest: true }), slot, 0.01);
 });
+
+test('moving(): true for the update that placed a flying card, false once it rests', () => {
+  const { pool, clock } = makePool();
+  assert.equal(pool.moving(), false, 'nothing updated yet');
+  pool.tween(7, () => ({ rect: RECT }), 100);
+  clock.t = 50;
+  pool.update(clock.now());
+  assert.equal(pool.moving(), true);
+  clock.t = 400;
+  pool.update(clock.now());
+  clock.t = 1000;
+  pool.update(clock.now());
+  assert.equal(pool.moving(), false);
+});

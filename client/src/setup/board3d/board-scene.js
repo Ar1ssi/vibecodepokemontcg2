@@ -9,6 +9,7 @@ import { CARD_UNITS, cardScaleFor } from './card-geometry.mjs';
 import { createCardMeshPool } from './card-mesh.js';
 import { handGroupsOf, posesFor } from './card-poses.mjs';
 import { createCountLabels, createStackBadges } from './count-labels.js';
+import { createFramePacer } from './frame-pacer.mjs';
 import { createFxLayer } from './fx/fx-layer.js';
 import { createOverlayMeshes } from './overlay-meshes.js';
 import { createPileMeshes } from './pile-mesh.js';
@@ -128,11 +129,13 @@ function offsetAt(keys, elapsed) {
  *   foil?: { recordFor: (placement: object) => object|null, createMaterial: Function,
  *     uv?: Function|object }|null, motionReduced?: () => boolean, pointerTiltEnabled?: () => boolean,
  *   requestFrame?: (fn: FrameRequestCallback) => number, cancelFrame?: (id: number) => void,
- *   onRender?: ((frame: { cardsMoving: boolean }) => void)|null, UnrealBloomPass?: Function|null }} deps
+ *   onRender?: ((frame: { cardsMoving: boolean, kind: 'change'|'ambient'|'motion', shadowPass: boolean,
+ *     ms: number, calls: number, triangles: number }) => void)|null, UnrealBloomPass?: Function|null }} deps
  *   The scene does not own `renderer`, `textures` or `clock`; its `dispose()` leaves them to the caller.
  *   `foil` (card-mesh.js) dresses the visible card of a stack in its TCG Live foil; null = none.
  *   `onRender` hears every drawn frame and whether a card was still tweening in it (the board
- *   mirror re-syncs its rects from it, board3d.js).
+ *   mirror re-syncs its rects from it, board3d.js), plus the frame's kind, whether it redrew the
+ *   shadow map, its CPU ms and the board pass's draw calls (the `?perf=1` readout, perf-hud.js).
  *   `UnrealBloomPass` (the vendored addon) blooms attack FX (design 075); null = no bloom.
  * @returns {{ applyModel: (model: object) => void, setLayout: (layout: object) => void,
  *   setCamera: (desc: ReturnType<typeof import('./board-camera.mjs').cameraFromCssTilt>) => void,
@@ -189,6 +192,10 @@ export function createBoardScene({
   scene.name = 'board3d';
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = three.PCFSoftShadowMap;
+  // Shadows are redrawn only on frames that follow a change (render below): an ambient frame
+  // (foil, Tera, status loop, glow) moves no caster, so it reuses the last shadow map.
+  renderer.shadowMap.autoUpdate = false;
+  renderer.shadowMap.needsUpdate = true;
 
   // The table frame of board-layout.mjs, turned by the tilt about the pivot (board-camera.mjs).
   const tableFrame = new three.Group();
@@ -242,7 +249,6 @@ export function createBoardScene({
   const uiState = new Map();
   let shakeOffset = { x: 0, y: 0 };
   let stopShake = null;
-  let frameId = null;
   let disposed = false;
   // rects()/hitTest advance the card tweens between frames. One of those calls can finish a
   // tween, so the next frame sees nothing moving; with frames far apart a whole tween can even
@@ -252,7 +258,7 @@ export function createBoardScene({
   let cardsAdvancedOffFrame = false;
   let posedSinceRender = false;
   const advanceCards = () => {
-    if (frameId !== null) cardsAdvancedOffFrame = true;
+    if (pacer.pending()) cardsAdvancedOffFrame = true;
     pool.update(clock.now());
   };
 
@@ -270,28 +276,44 @@ export function createBoardScene({
   scene.add(cardsGroup);
   const raycaster = new three.Raycaster();
 
-  /** Renders one frame; keeps rendering on the next frame while a card tween or foil runs. */
-  const render = () => {
+  /**
+   * Renders one frame. Motion (a card, pile or attack FX moving) asks for the next frame at once;
+   * a frame wanted only by an ambient loop (foil, overlays) comes at the pacer's ambient rate.
+   * `kind` 'change' = something changed since the last frame (the shadow map is redrawn).
+   */
+  const render = (kind = 'change') => {
     if (disposed || contextLost()) return;
+    const startedAt = globalThis.performance?.now?.() ?? Date.now();
     const now = clock.now();
-    const cardsMoving = pool.update(now) || cardsAdvancedOffFrame;
+    const cardsAnimating = pool.update(now);
+    const cardsMoving = pool.moving() || cardsAdvancedOffFrame;
     cardsAdvancedOffFrame = false;
     const pilesMoving = piles.update(now);
-    const overlaysMoving = overlays.update(now);
-    const animating = cardsMoving || pilesMoving || overlaysMoving;
+    const overlaysAnimating = overlays.update(now);
+    const shadowPass = kind === 'change' || cardsMoving || pilesMoving;
+    renderer.shadowMap.needsUpdate = shadowPass;
     renderer.render(scene, camera);
+    // The board pass's counts: the FX passes below reset renderer.info as they draw.
+    const calls = renderer.info?.render?.calls ?? 0;
+    const triangles = renderer.info?.render?.triangles ?? 0;
     const fxRunning = fxLayer.active() && fxLayer.render();
-    if (animating || fxRunning) invalidate();
-    onRender?.({ cardsMoving: cardsMoving || posedSinceRender });
+    if (cardsMoving || pilesMoving || fxRunning) invalidate();
+    else if (cardsAnimating || overlaysAnimating) pacer.invalidateAmbient();
+    onRender?.({
+      cardsMoving: cardsMoving || posedSinceRender,
+      kind: cardsMoving || pilesMoving || fxRunning ? 'motion' : kind,
+      shadowPass,
+      ms: (globalThis.performance?.now?.() ?? Date.now()) - startedAt,
+      calls,
+      triangles,
+    });
     posedSinceRender = false;
   };
 
+  const pacer = createFramePacer({ onFrame: render, requestFrame, cancelFrame });
   const invalidate = () => {
-    if (disposed || frameId !== null) return;
-    frameId = requestFrame(() => {
-      frameId = null;
-      render();
-    });
+    if (disposed) return;
+    pacer.invalidate();
   };
 
   const pool = createCardMeshPool({
@@ -1132,8 +1154,7 @@ export function createBoardScene({
     endLift();
     endHold();
     disposed = true;
-    if (frameId !== null) cancelFrame(frameId);
-    frameId = null;
+    pacer.dispose();
     overlays.dispose();
     pool.dispose();
     scene.remove(cardsGroup);
