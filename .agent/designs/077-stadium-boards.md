@@ -369,13 +369,17 @@ particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
     pale tree stand round the scene's edge. The moon is low beyond the far end, so every stone, pine
     and the tree cast baked shadows toward the player, and the stones' rims catch the moonlight. One
     sheet of mist drifts low, thicker away from the cards.
-  - Dimension Valley (`dimension-valley`, PHF 93, Ryo Ueda). Every card lies on one big floating
-    island. The island has a grass top and thick brown earth cliffs that taper down into the void
-    below it. The art's pink Psychic swirl is painted on the grass between the Actives. Round the island
-    is the art's void: a rainbow band (red, yellow and green on the left) turning violet, with streams of
-    white sparkle. Smaller grass-topped floating islands bob slowly in the margins, and a bare little
-    tree stands on one of them. The art's glowing coloured discs (red, yellow, green, pink, blue) lie
-    on the grass wherever no card lies.
+  - Dimension Valley (`dimension-valley`, PHF 93, Ryo Ueda; built, `stadium-env-dimension.mjs`). Every
+    card lies on one great floating island of grass, its edge wandering. Its brown earth cliffs fall
+    sheer and then taper into the void, which lights them from below in its own colours. Past the edge
+    the terrain draws nothing: the void plane lies 380 px below. The void is the art's rainbow
+    (red, orange, yellow, green on the left) through pink and blue to deep violet on the right. Its
+    bands swirl slowly, and streams of white and coloured sparkle cross it. The island casts a soft
+    shadow on the void. The art's pink Poke Ball mark is painted on the grass round the Actives. The
+    art's glowing discs (red, yellow, green, pink, blue) lie on the grass off every card and outside
+    the mark. Up to ten small angular slabs of grass and earth float in the margins, each tipped its
+    own way and bobbing slowly. They float low toward the near end, so they never lean over the
+    player's cards; a bare little tree stands on the farthest slab.
   - Surfing Beach (`surfing-beach`, MEG 129, Ayumi Odashima). Every card lies on golden-orange sand.
     The sea fills the far-right side, and its surf rolls in in white lace foam lines toward the near
     left. Swash runs up and drains, leaving the wet sand glossy. The water never covers a card

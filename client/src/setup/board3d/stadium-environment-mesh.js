@@ -10,6 +10,7 @@ import * as highland from './stadium-env-highland.mjs';
 import { fightingStadiumBoard } from './stadium-env-arena.mjs';
 import { darkCityBoard } from './stadium-env-city.mjs';
 import { crystalCaveBoard } from './stadium-env-crystal.mjs';
+import { dimensionValleyBoard } from './stadium-env-dimension.mjs';
 import { fullMetalLabBoard } from './stadium-env-lab.mjs';
 import { mysteryGardenBoard } from './stadium-env-garden.mjs';
 import { magmaBasinBoard } from './stadium-env-magma.mjs';
@@ -614,6 +615,7 @@ function perilousJungleBoard({ three, material, seeded }) {
 const BOARDS = {
   'crystal-cave': crystalCaveBoard,
   'dark-city': darkCityBoard,
+  'dimension-valley': dimensionValleyBoard,
   'fighting-stadium': fightingStadiumBoard,
   'forest-of-vitality': forestOfVitalityBoard,
   'full-metal-lab': fullMetalLabBoard,
