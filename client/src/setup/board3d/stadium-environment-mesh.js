@@ -16,6 +16,7 @@ import { dimensionValleyBoard } from './stadium-env-dimension.mjs';
 import { fairyGardenBoard } from './stadium-env-fairy.mjs';
 import { fullMetalLabBoard } from './stadium-env-lab.mjs';
 import { levinciaBoard } from './stadium-env-levincia.mjs';
+import { lumioseCityBoard } from './stadium-env-lumiose.mjs';
 import { pokemonCenterBoard } from './stadium-env-pokecenter.mjs';
 import { mysteryGardenBoard } from './stadium-env-garden.mjs';
 import { magmaBasinBoard } from './stadium-env-magma.mjs';
@@ -630,6 +631,7 @@ const BOARDS = {
   'forest-of-vitality': forestOfVitalityBoard,
   'full-metal-lab': fullMetalLabBoard,
   levincia: levinciaBoard,
+  'lumiose-city': lumioseCityBoard,
   'magma-basin': magmaBasinBoard,
   'mountain-ring': mountainRingBoard,
   'mystery-garden': mysteryGardenBoard,

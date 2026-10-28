@@ -65,14 +65,15 @@ vec2 bladeFan(vec2 v, float h, float len) {
 
 /**
  * `boxShadow(o, sun, box, top)`: how much of a box is in the way of the sun from the ground point o
- * (0..1, four taps over the sun's disc so its edge is soft): the box covers `box` = (x0, y0, x1, y1)
+ * (0..1, twelve taps over the sun's disc so its edge is soft): the box covers `box` = (x0, y0, x1, y1)
  * from the ground up to `top`.
  */
 export const BOX_SHADOW = /* glsl */ `
 float boxShadow(vec3 o, vec3 sun, vec4 box, float top) {
   float shade = 0.0;
-  for (int k = 0; k < 4; k++) {
-    vec3 s = normalize(sun + vec3(float(k) - 1.5, mod(float(k) * 1.7, 2.0) - 1.0, 0.0) * 0.045);
+  for (int k = 0; k < 12; k++) {
+    float turn = float(k) * 2.399963;
+    vec3 s = normalize(sun + vec3(cos(turn), sin(turn), 0.0) * 0.045 * sqrt((float(k) + 0.5) / 12.0));
     vec3 inv = 1.0 / s;
     vec3 t0 = (vec3(box.xy, 0.0) - o) * inv;
     vec3 t1 = (vec3(box.zw, top) - o) * inv;
@@ -82,7 +83,7 @@ float boxShadow(vec3 o, vec3 sun, vec4 box, float top) {
     float b = min(min(tmax.x, tmax.y), tmax.z);
     shade += step(max(a, 0.0), b) * step(0.0, b);
   }
-  return shade * 0.25;
+  return shade / 12.0;
 }
 `;
 
