@@ -1,8 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as three from 'three';
-import { cameraFromCssTilt, cameraTcgLive, projectToScreen, tableToWorld } from '../board-camera.mjs';
-import { flatLayout, halfFromViewport } from '../board-layout.mjs';
+import { flatLayout } from '../board-layout.mjs';
 import { getMatLayout } from '../../sizing/mat-layouts.mjs';
 import { NO_MAT_LAYOUT_ID } from '../../sizing/mat-spec.mjs';
 import { environmentFootprints, environmentKeyFor } from '../stadium-environment-layout.mjs';
@@ -27,6 +26,7 @@ import {
   trunkGeometry,
   vitalitySpots,
 } from '../stadium-env-vitality.mjs';
+import { SCREEN_VIEWS, pointOnCard, screenView } from './stadium-screen.mjs';
 
 // Every mat profile at the board width board3d.js lays out beside the sidebox (0.755 of 1920) and at
 // full width.
@@ -88,30 +88,6 @@ test('vitalitySpots: bushes stand off the meadow and off every card, clear of th
   }
 });
 
-// The board as both camera presets draw it, at three window sizes: no part of the crown or trunk
-// lands on a card's screen box.
-const VIEWS = [
-  ...[
-    { w: 1920, h: 1080 },
-    { w: 1366, h: 768 },
-    { w: 2560, h: 1440 },
-  ].map((viewport) => ({ viewport, profile: NO_MAT_LAYOUT_ID })),
-  ...PROFILES.slice(1).map((profile) => ({ viewport: { w: 1920, h: 1080 }, profile })),
-];
-const screenBox = (project, rect) => {
-  const corners = [
-    [rect.x, rect.y],
-    [rect.x + rect.w, rect.y],
-    [rect.x, rect.y + rect.h],
-    [rect.x + rect.w, rect.y + rect.h],
-  ].map(([x, y]) => project(x, y, 0));
-  return {
-    x0: Math.min(...corners.map((p) => p.x)),
-    x1: Math.max(...corners.map((p) => p.x)),
-    y0: Math.min(...corners.map((p) => p.y)),
-    y1: Math.max(...corners.map((p) => p.y)),
-  };
-};
 const spherePoints = ({ x, y, z, r }) => {
   const points = [];
   for (let i = 0; i <= 6; i += 1) {
@@ -126,30 +102,19 @@ const spherePoints = ({ x, y, z, r }) => {
 };
 
 test('the crown and the trunk never cover a card on screen, in either camera preset', () => {
-  for (const { viewport, profile } of VIEWS) {
-    const half = halfFromViewport(viewport);
-    const layout = flatLayout(getMatLayout(profile), half, { viewport });
-    const params = { viewportW: viewport.w, viewportH: viewport.h, nearHalf: half };
-    const cameras = [cameraFromCssTilt(params), cameraTcgLive({ ...params, cardHeightPx: layout.self.cardBox.active.h })];
+  for (const view of SCREEN_VIEWS) {
+    const { layout, projectors } = screenView(view);
     const { tree } = vitalitySpots(layout);
-    const parts = [
-      ...tree.pads.flatMap(spherePoints),
-      ...Array.from({ length: 9 }, (_, i) => {
-        const t = i / 8;
-        const { from, via, to, r0 } = tree.trunk;
-        const at = [0, 1, 2].map((k) => (1 - t) ** 2 * from[k] + 2 * (1 - t) * t * via[k] + t ** 2 * to[k]);
-        return [-1, 1].flatMap((sx) => [-1, 1].map((sy) => [at[0] + sx * r0 * 1.75, at[1] + sy * r0 * 1.75, Math.max(at[2], 0)]));
-      }).flat(),
-    ];
-    for (const camera of cameras) {
-      const project = (x, y, z) => projectToScreen(camera, tableToWorld({ x, y, z }, camera));
-      const boxes = cardsOf(layout).map((rect) => screenBox(project, rect));
-      for (const [x, y, z] of parts) {
-        const p = project(x, y, z);
-        if (!p) continue;
-        const hit = boxes.find((b) => p.x > b.x0 && p.x < b.x1 && p.y > b.y0 && p.y < b.y1);
-        assert.equal(hit, undefined, `${profile} ${viewport.w}x${viewport.h}: (${x | 0}, ${y | 0}, ${z | 0}) on a card`);
-      }
+    const { from, via, to, r0 } = tree.trunk;
+    const trunk = Array.from({ length: 9 }, (_, i) => {
+      const t = i / 8;
+      const at = [0, 1, 2].map((k) => (1 - t) ** 2 * from[k] + 2 * (1 - t) * t * via[k] + t ** 2 * to[k]);
+      return [-1, 1].flatMap((sx) => [-1, 1].map((sy) => [at[0] + sx * r0 * 1.75, at[1] + sy * r0 * 1.75, Math.max(at[2], 0)]));
+    }).flat();
+    const points = [...tree.pads.flatMap(spherePoints), ...trunk];
+    for (const { preset, project } of projectors) {
+      const hit = pointOnCard(points, layout, project);
+      assert.equal(hit, null, `${view.profile} ${view.viewport.w}x${view.viewport.h} ${preset}: ${hit}`);
     }
   }
 });

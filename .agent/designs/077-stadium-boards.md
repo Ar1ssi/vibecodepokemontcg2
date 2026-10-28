@@ -333,14 +333,19 @@ particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
     tree during the reveal. The cards lie on a soft meadow. A carpet of rounded bushes in the art's
     yellow-greens runs round it. Pools of the art's yellow glow well up between the bushes and at the
     trunk's foot, and motes of light rise from them.
-  - Crystal Cave (`crystal-cave`, EVS 144, Toyste Beach). A warm umber-brown earthen cave floor
-    holds every card. Between the Actives, the Poke Ball is drawn on the floor as the art's thin gold
-    line ring, with a pale glowing button. A soft pool of the art's pale skylight lies on it (a pool, no
-    beam or whiteout). Clusters of tall hexagonal crystal prisms (the art's pink, aqua, teal-green,
-    lavender, mint and peach; translucent, with flat-cut tips) stand wherever no card lies. Tall
-    clusters go off the far end and in the side bands; low ones go near the near edge. Each cluster
-    casts a faint pool of its own colour on the floor. Rough dark rock walls close the cave past the
-    clusters. Coloured sparkle dust floats in the air.
+  - Crystal Cave (`crystal-cave`, EVS 144, Toyste Beach; built, `stadium-env-crystal.mjs`). A warm
+    brown floor of packed earth, stained and mottled, holds every card. Between the Actives the Poke
+    Ball is the art's thin gold line, with a pale-blue glow at its heart. A soft pool of skylight lies
+    round it, and the cave dims toward its walls. The walls are heaps of the shared sculpted stones,
+    climbing past the floor and sinking into darkness. Up to 36 clusters of slim hexagonal prisms with
+    pointed tips stand where no card lies, on the floor's edge and up the walls. Their colours are the
+    art's pink, aqua, teal, lavender, mint, peach and yellow-green. Their faces are frosted: each face has
+    its own tone, a pale streak and bright edges, and the crystals grow paler toward their points. On
+    the walls a crystal's foot sinks into the rock and the crystal grows taller by the same amount.
+    Clusters are tall off the far end, medium in the side bands and low toward the near end, because
+    in the tilted preset tall things there lean up over the player's cards. A test projects every
+    crystal clear of the cards in both presets. Each cluster lights the floor in its own colour, and
+    coloured sparkle dust twinkles in the air.
   - Mystery Garden (`mystery-garden`, MEG 122, Ayumi Odashima). A night garden plaza paved in the art's
     lavender-grey flagstones laid in concentric rings round the table's middle. Round the Actives,
     the art's glowing cyan basin becomes a flush inlay of glowing rings with a crackling energy
