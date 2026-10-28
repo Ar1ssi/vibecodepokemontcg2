@@ -435,15 +435,21 @@ particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
   `palette.py` and inverted through Neutral tone mapping with `inv.py`), laid out with the shared
   `stadium-env-spots.mjs` (`boardContext`: table, cards, core box, scale `u`, `clear`, `inScene`),
   `stadium-env-surfaces.mjs` (terrain vertex, edge haze, blade tufts, box shadow, staggered paving) and
-  `stadium-env-buildings.mjs` (`windowRun`, `wallBand`); the prop builder gained `sphere` and `cone`:
-  - Pokemon Center (`pokemon-center`, NXD 90, `stadium-env-pokecenter.mjs`). A harbour street at noon:
-    mended, cracked, oil-stained asphalt holds every card with the Poke Ball painted on it in worn white
-    lines and white edge lines at each kerb. The Center stands in the left band on a cream sidewalk edged in
-    tan kerb stones (red and yellow bands over glazed floors, a cream cornice, a red-domed glass drum
-    for an entrance, a roof of stair hut, skylights, units and a tank); a dark glass tower stands off
-    the far end; a quay with a coping, rail and two globe lamps runs down the right band over a
-    sea of rolling swells with glitter, crests and foam. Its sun is from the far left so the Center's
-    blue shadow falls on the road.
+  `stadium-env-buildings.mjs` (`windowRun`, `wallBand`); the prop builder gained `sphere`, `cone` and `triangle` (and `stadium-env-buildings.mjs` a `disc`):
+  - Pokemon Center (`pokemon-center`, NXD 90, `stadium-env-pokecenter.mjs`). Rebuilt (user, 2026-10-28:
+    "make the pokemon center the interior of a pokemon center") as the inside of the games' lobby, after the
+    orange and cream ones of Let's Go, Brilliant Diamond and Omega Ruby (references: Bulbapedia's interior
+    shots and concept art, palettes sampled). Cream and peach floor tiles in a gentle checker with an orange
+    border and a pale line along the walls, the big Poke Ball laid in tiles between the Actives (orange
+    over white, a dark band, a button); orange walls over a panelled wainscot under a red rail and crown,
+    bays of daylight, a red-topped rim round the room; the long half-ring reception counter against the
+    left wall (white body, red stripe and rim, pale work surface, a glowing ball lamp at each end, the
+    healing machine with its six balls on a lit tray, a Poke Ball on its face) under the wall's glowing
+    screen; the lounge beside it (blue sofa, glass table, two cushion stools on a red rug), a bookshelf, PCs
+    on white desks, a cushioned bench, plants, glass columns lit from within in the near corners. Outside the
+    walls a sidewalk and asphalt. Lit by ceiling lamps from nearly overhead (short baked box shadows, round
+    pieces shadowed in the terrain shader, the lamps' panels mirrored in the tiles). Environment only: no
+    characters (user: "dont put any characters in the stadiums, only environments").
   - Community Center (`community-center`, TWM 146, `stadium-env-community.mjs`). A pale square in big
     staggered slabs holds every card; the white hall with its red-brown roof band, green banner, awning
     and roof flag stands down its left side, the rock cliff and waterfall (into a pool with spray) behind
@@ -459,16 +465,30 @@ particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
     where the Actives lie, great dark trees in the side bands, big leaves, green orbs of light drifting
     in the margins (kept far enough from the cards that raised, they never lean over one) and
     four-pointed sparkles.
-  - Lumiose City (`lumiose-city`, POR 77, `stadium-env-lumiose.mjs`). A Parisian avenue square in
-    cream slabs with two red-curbed beds, trees and iron lamps in its side strips, rows of cream, ochre
-    and purple stone buildings down both sides (piered windows, awnings, balconies, slate mansards
-    with dormers), the white Prism Tower past the far right corner. The buildings' shadows come from an
-    exact baked light pass (12 taps over the sun's disc against every block).
+  - Lumiose City (`lumiose-city`, POR 77, `stadium-env-lumiose.mjs`). Rebuilt (user, 2026-10-28: "look at
+    actual references of lumiose city in the game and rebuild it") after the games' city (Bulbapedia's X and
+    Y plaza and boulevard models, the Z-A map and artwork): pale stone slabs inlaid with the plaza's compass
+    of rings and spokes, a band of blue-grey setts along the building fronts, long lawn beds with flowers in
+    salmon-tan curbs, street trees in iron grates, iron lamps with banners and flower baskets, cafe tables
+    under striped parasols; limestone, taupe, pale stone and sand blocks five to seven floors high with
+    balconies, shopfronts and steep mansard roofs (a slate slope with dormers, a zinc top with seams,
+    trimmed hips, chimneys, patina green and terracotta variants), a dark purple one with a big screen and
+    the Pokemon Center's red awning under a Poke Ball blade sign; and the white lattice Prism Tower (flared
+    legs, slim waist, swollen crown with four fins and a mast, glass in the shaft) standing in the left
+    strip with a ring of inlay round its foot, its crown leaning up toward the view's corner in the tilted
+    preset and its lattice shadow laid across the paving. The buildings' shadows come from an exact baked
+    light pass (12 taps over the sun's disc against every block).
   - Magnetic Storm (`magnetic-storm`, FLF 91, `stadium-env-storm.mjs`). A marsh at night under a
     drifting aurora: wet mud in a trampled clearing, dry olive grass and reeds outside, puddles holding the
-    sky, the glowing pink Poke Ball round the Actives, four pink pads in the side bands with two
-    lightning arcs between them and two tall bolts up into the dark (flashing on their own periods,
-    lighting the ground, the trees and the pads), bare trees.
+    sky, the glowing pink Poke Ball round the Actives, bare trees. Reworked (user, 2026-10-28: "make
+    Magnetic Storm more of an actual magnetic storm, emphasize the force field") around the field: a coil
+    pylon at each side's pole (pink north, cyan south) and a coil post at each of the four pads; the iron
+    dust of the marsh lies along the poles' flux in fine dashes and the field lines glow, pulses running
+    along them pole to pole; twelve arcs of the field loop overhead between the poles; a dome of hexagonal
+    force field closes the arena (cells shrink toward the rim, which glows where seen edge-on, a few cells
+    flicker), and each pad's strike of lightning lands on it, flashes it and sends a ring of lit cells
+    out across it; a vortex of dark mist turns over the ground. The dome is a hemisphere of unit
+    directions the vertex shader scales to the arena (grown where the pads and poles would stand outside).
   - Grand Tree (`grand-tree`, SCR 136, `stadium-env-grandtree.mjs`). A bright jungle clearing on
     moss and clover under one vast tree at the top left: a trunk of six twisting strands veined with
     glowing gold, fat roots over the ground, a crown of foliage balls casting dappled shade, a smaller

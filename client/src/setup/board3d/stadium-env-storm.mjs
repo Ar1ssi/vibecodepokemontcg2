@@ -4,14 +4,22 @@
 // pools of light round it, and white-blue lightning arcing between them. The art looks across the
 // marsh at the hills; the board looks down on it, so the trampled mud holds every card with the ring
 // round the Actives, the reeds stand thick in the margins, a pad of pink light lies in each side band
-// with a lightning arc leaping to the next, bare trees stand off the far end and in the far corners,
-// and the aurora lights the ground in slow drifting colour.
+// on a coil post with a lightning arc leaping to the next, bare trees stand off the far end and in
+// the far corners, and the aurora lights the ground in slow drifting colour.
+// The storm is magnetic and the board shows it: a tall coil pylon stands at each side's pole, the iron
+// dust of the marsh lies along the flux between them in fine dashes while pulses of pink and cyan
+// energy run the field lines from the north pole to the south, bright arcs of the same field loop
+// overhead from pole to pole, a dome of hexagonal force field closes the whole arena (its cells
+// flicker, its rim glows where it is seen edge-on) and each strike of lightning from a pad lands on it
+// and sends a ripple of lit cells out across it, while a vortex of dark mist turns over the ground.
 // World scale: a card's footprint is a trampled patch of mud; a reed stands a hand high.
 //
 // Bake, once per layout: BAKE_FIELD is the flat marsh (R height px) with the clearing's distance in
 // G; the shared light bake adds nothing. Per frame: TERRAIN paints the mud, puddles, reeds, the ring,
-// the pads, the aurora's wash and the lightning's flashes; PROPS the trees and boulders; REEDS the
-// standing reed clumps; BOLTS the lightning's ribbons (additive).
+// the pads, the field lines and their dust, the mist, the aurora's wash and the lightning's flashes;
+// PROPS the trees, boulders, reeds and pylons; BOLTS the lightning's ribbons and FIELD the field
+// arcs' (additive); DOME the force field (additive, one hemisphere of unit directions the shader
+// scales to the arena).
 import {
   FULLSCREEN_VERTEX,
   NOISE,
@@ -36,10 +44,16 @@ export const STORM_LIGHT = Object.freeze([-0.3, 0.5, 0.6]);
 export const CLEARING_PX = 36;
 export const CLEARING_WOBBLE_PX = 70;
 export const MAX_PADS = 4;
-export const MAX_ARCS = 4;
+/** Two links between the pads, then one strike from each pad up to the force field. */
+export const MAX_ARCS = 6;
+export const MAX_FIELD_ARCS = 12;
+export const MAX_IMPACTS = 4;
 export const MAX_TREES = 6;
 export const MAX_CLUMPS = 170;
 const BOLT_POINTS = 16;
+/** Heights of the coil posts (card-scale px): a pad's, a pole's. */
+const PAD_POST_PX = 46;
+const POLE_PX = 150;
 
 /** A signed distance in px from the clearing's edge at (x, y), negative on it (the shader's `clearingDistance`). */
 export const clearingWobble = (x, y) =>
@@ -87,28 +101,53 @@ export function stormSpots(layout) {
       pads.push({ x: centre.x + side * sideX, y: core.y + core.h * share, r: 34 * u, side });
     }
   }
+  // The poles: a tall coil pylon in the middle of each side band, the north one pink on the left, the south one cyan on the right.
+  const poleX = sideX + 56 * u;
+  const poles = [-1, 1].map((side) => ({ x: centre.x + side * poleX, y: centre.y, r: 30 * u, h: POLE_PX * u, side }));
+  // The force field: a dome over the whole arena, its rim at the scene's edges, grown where the pads and poles would stand outside it.
+  const spread = [...poles, ...pads].reduce((worst, p) => Math.max(worst, ((p.x - centre.x) / (scene.w * 0.46)) ** 2 + ((p.y - centre.y) / (scene.h * 0.44)) ** 2), 0);
+  const grow = Math.max(1, Math.sqrt(spread / 0.85));
+  const dome = { x: centre.x, y: centre.y, a: scene.w * 0.46 * grow, b: scene.h * 0.44 * grow };
+  dome.h = Math.min(dome.a, dome.b) * 0.92;
+  const postTop = PAD_POST_PX * u;
   const arcs = [];
   for (let side = 0; side < 2; side += 1) {
     const a = pads[side * 2];
     const b = pads[side * 2 + 1];
     arcs.push({
       pads: [side * 2, side * 2 + 1],
-      points: boltPath([a.x, a.y, 14 * u], [b.x, b.y, 14 * u], 96 * u, 34 * u, side * 7 + 1),
+      points: boltPath([a.x, a.y, postTop], [b.x, b.y, postTop], 96 * u, 34 * u, side * 7 + 1),
       period: 3.4 + 1.1 * side,
       phase: 0.35 + 0.4 * side,
     });
   }
-  // A tall bolt from each far pad's glow straight up into the dark.
-  for (let side = 0; side < 2; side += 1) {
-    const a = pads[side * 2 + 1];
-    const out = a.side * 40 * u;
+  // A strike from each pad's post up to the force field: where it lands the field's cells light and a ripple runs out.
+  pads.forEach((pad, i) => {
+    const azimuth = Math.atan2((pad.y - dome.y) / dome.b, (pad.x - dome.x) / dome.a);
+    const elevation = 0.7 + 0.35 * hash(i, 2, 1);
+    const dir = [Math.cos(elevation) * Math.cos(azimuth), Math.cos(elevation) * Math.sin(azimuth), Math.sin(elevation)];
+    const landing = [dome.x + dome.a * dir[0], dome.y + dome.b * dir[1], dome.h * dir[2]];
     arcs.push({
-      pads: [side * 2 + 1, side * 2 + 1],
-      points: boltPath([a.x, a.y, 14 * u], [a.x + out, a.y + 60 * u, 300 * u], 10 * u, 26 * u, side * 11 + 5),
-      period: 5.2 + 1.7 * side,
-      phase: 0.7 - 0.3 * side,
+      pads: [i, i],
+      points: boltPath([pad.x, pad.y, postTop], landing, 30 * u, 30 * u, i * 13 + 3),
+      period: 4.6 + 0.9 * i,
+      phase: 0.1 + 0.23 * i,
+      dir,
     });
-  }
+  });
+  // The field's own arcs: loops of energy from the north pole's top to the south's, flat to upright round their axis.
+  const fieldArcs = Array.from({ length: MAX_FIELD_ARCS }, (_, k) => {
+    const phi = (((k % 6) + 0.5) / 6) * Math.PI;
+    const rho = (k < 6 ? 150 + 130 * hash(k, 2, 1) : 330 + 220 * hash(k, 2, 2)) * u;
+    const rise = dome.h * 0.86 - poles[0].h;
+    const points = Array.from({ length: 27 }, (_, j) => {
+      const s = j / 26;
+      const bulge = Math.sin(Math.PI * s) ** 0.8;
+      return [poles[0].x + (poles[1].x - poles[0].x) * s, centre.y + rho * bulge * Math.cos(phi), poles[0].h + Math.min(rho * bulge * Math.sin(phi), rise)];
+    });
+    return { points, seed: hash(k, 5, 3) };
+  });
+  const nearPylon = (x, y, gap) => [...poles, ...pads].every((p) => Math.hypot(x - p.x, y - p.y) > p.r + gap);
   const treeSlots = [
     [-0.82, 0.3],
     [0.8, 0.46],
@@ -119,14 +158,14 @@ export function stormSpots(layout) {
   ];
   const trees = treeSlots
     .map(([sx, sy], k) => ({ x: centre.x + sx * Math.max(sideX + 80 * u, table.w * 0.5), y: core.y + sy * core.h, h: (150 + 50 * hash(sx, sy, 1)) * u, seed: hash(sx, sy, 2), k }))
-    .filter((tree) => ctx.inScene(tree.x, tree.y, 40 * u) && ctx.clear(tree.x, tree.y, 50 * u + tree.h * 0.5, 14 * u))
+    .filter((tree) => ctx.inScene(tree.x, tree.y, 40 * u) && ctx.clear(tree.x, tree.y, 50 * u + tree.h * 0.5, 14 * u) && nearPylon(tree.x, tree.y, 70 * u))
     .slice(0, MAX_TREES);
   const boulders = [];
   for (let k = 0; k < 9; k += 1) {
     const x = scene.x + 60 * u + hash(k, 4, 1) * (scene.w - 120 * u);
     const y = core.y + (0.05 + 1.1 * hash(k, 4, 2)) * core.h;
     const r = (14 + 20 * hash(k, 4, 3)) * u;
-    if (ctx.clear(x, y, r + 18 * u, 8 * u) && pads.every((p) => Math.hypot(x - p.x, y - p.y) > p.r + r + 24 * u)) boulders.push({ x, y, r });
+    if (ctx.clear(x, y, r + 18 * u, 8 * u) && nearPylon(x, y, r + 24 * u)) boulders.push({ x, y, r });
   }
   // Reed clumps over the scene outside the clearing, clear of the pads and the trees' feet.
   const clumps = [];
@@ -139,12 +178,12 @@ export function stormSpots(layout) {
       if (roll(3) > 0.78 || !ctx.inScene(x, y, 10 * u)) continue;
       const out = distanceOut(ctx.core, x, y);
       if (out < (CLEARING_PX + CLEARING_WOBBLE_PX * 0.7) * u + 22 * u) continue;
-      if (pads.some((p) => Math.hypot(x - p.x, y - p.y) < p.r + 22 * u)) continue;
+      if (!nearPylon(x, y, 22 * u)) continue;
       if (!ctx.clear(x, y, 10 * u, 18 * u)) continue;
       clumps.push({ x, y, h: (24 + 24 * roll(4)) * u, lean: roll(5) * 6.28, seed: roll(6), blades: 7 + Math.floor(roll(7) * 4) });
     }
   }
-  return { ...ctx, handEnd, pads, arcs, trees, boulders, clumps, ring: craterEmblem(layout, centre) };
+  return { ...ctx, handEnd, pads, poles, dome, arcs, fieldArcs, trees, boulders, clumps, ring: craterEmblem(layout, centre) };
 }
 
 const distanceOut = (rect, x, y) => Math.hypot(Math.max(rect.x - x, 0, x - rect.x - rect.w), Math.max(rect.y - y, 0, y - rect.y - rect.h));
@@ -156,6 +195,26 @@ uniform vec4 uCore;
 uniform vec3 uRing;
 uniform float uUnit;
 uniform vec4 uPads[${MAX_PADS}];
+// The poles (x, y, radius; 0: none), north then south; the force field's centre and half sizes (x, y,
+// a, b) and its height; the strikes' landings on it (unit direction, seconds since the strike; below
+// 0: none).
+uniform vec3 uPoleA;
+uniform vec3 uPoleB;
+uniform vec4 uDome;
+uniform float uDomeHeight;
+uniform vec4 uImpacts[${MAX_IMPACTS}];
+// The flux of two opposite point poles at p (cos of the angle each makes with the axis, one from the
+// other): its level lines are the field lines, 0 far out round them up to 2 on the axis between.
+float flux(vec2 p) {
+  vec2 a = p - uPoleA.xy;
+  vec2 b = p - uPoleB.xy;
+  vec2 axis = normalize(uPoleB.xy - uPoleA.xy);
+  return dot(a, axis) / (length(a) + 1.0) - dot(b, axis) / (length(b) + 1.0);
+}
+// The poles' potential at p: falling along every field line from the north pole to the south.
+float potential(vec2 p) {
+  return uUnit * 260.0 * (1.0 / (length(p - uPoleA.xy) + 40.0 * uUnit) - 1.0 / (length(p - uPoleB.xy) + 40.0 * uUnit));
+}
 float wobble(vec2 p) {
   return 0.5 + 0.3 * sin(p.x * 0.021 + 1.3) * sin(p.y * 0.017 + 0.4) + 0.2 * sin((p.x + p.y) * 0.013 + 2.2) + 0.16 * sin(p.x * 0.047 - p.y * 0.039 + 0.7);
 }
@@ -197,6 +256,9 @@ const vec3 RING_WHITE = vec3(1.866, 1.596, 1.866);
 const vec3 AURORA_BLUE = vec3(0.085, 0.442, 0.618);
 const vec3 AURORA_VIOLET = vec3(0.196, 0.085, 0.496);
 const vec3 BOLT = vec3(1.2, 1.45, 1.7);
+const vec3 FIELD_CYAN = vec3(0.3, 0.85, 1.3);
+const vec3 DUST = vec3(0.2, 0.25, 0.34);
+const vec3 MIST = vec3(0.07, 0.05, 0.13);
 `;
 
 export const TERRAIN_FRAGMENT = /* glsl */ `
@@ -264,6 +326,45 @@ void main() {
     col += PINK_SOFT * 0.8 * pool * (0.8 + 0.2 * sin(t * 1.4 + float(i) * 2.0)) + mix(PINK, RING_WHITE, 0.45) * 0.55 * heart;
     lightning += vec3(0.55, 0.7, 1.0) * pad.w * exp(-dist * dist * 0.35) * 0.8;
   }
+  // The storm: a vortex of dark mist turning about the force field's centre, thicker toward the middle.
+  vec2 rel = p - uDome.xy;
+  float cr = length(rel / max(uDome.zw, vec2(1.0)));
+  float turn = 2.4 * exp(-cr * 1.3) + t * 0.025;
+  vec2 swirled = vec2(cos(turn) * rel.x - sin(turn) * rel.y, sin(turn) * rel.x + cos(turn) * rel.y);
+  float mist = smoothstep(0.5, 0.82, fbm3(swirled / 230.0 + 3.0 + vec2(t * 0.01, 0.0)));
+  col = mix(col, MIST * (1.0 + lightning * 6.0), mist * 0.38);
+
+  // The magnetic field: the marsh's iron dust lies along the poles' flux, and the lines themselves
+  // glow as pulses of energy run along them from the north pole (pink) to the south (cyan).
+  if (uPoleA.z > 0.0) {
+    vec2 wob = (vec2(gnoise(p / 150.0 + vec2(t * 0.06, 0.0)), gnoise(p / 150.0 + vec2(9.0, t * 0.05))) - 0.5) * 40.0 * u;
+    vec2 q = p + wob;
+    float psi = flux(q);
+    float eps = 2.0;
+    vec2 grad = vec2(flux(q + vec2(eps, 0.0)) - psi, flux(q + vec2(0.0, eps)) - psi) / eps;
+    float slope = max(length(grad), 1e-5);
+    float volts = potential(q);
+    float run = sign(volts) * log(1.0 + abs(volts) * 3.0);
+    float inside = 1.0 - smoothstep(0.9, 1.2, cr);
+    // Twelve level lines of the flux between the poles, a glow round each, a pulse running along it.
+    float levels = psi * 6.0;
+    float gap = abs(fract(levels + 0.5) - 0.5) / (6.0 * slope);
+    float lineId = floor(levels + 0.5);
+    float core = exp(-gap * gap / (2.0 * 1.4 * 1.4 * u * u));
+    float halo = exp(-gap * gap / (2.0 * 7.0 * 7.0 * u * u));
+    float pulse = smoothstep(0.55, 1.0, fract(run * 1.15 - t * 0.38 + hash12(vec2(lineId, 3.0))));
+    vec3 lineCol = mix(PINK, FIELD_CYAN, smoothstep(-1.4, 1.4, -run));
+    float energy = (0.16 + 0.95 * pulse) * core + 0.12 * halo * (0.4 + 0.6 * pulse);
+    col += lineCol * energy * (0.35 + 0.65 * inside) * 0.9;
+    // The iron dust: fine dashes along a hundred and twenty lines, thinning out where the lines crowd.
+    float fine = psi * 120.0;
+    float spacing = 1.0 / (120.0 * slope);
+    float gap2 = abs(fract(fine + 0.5) - 0.5) / (120.0 * slope);
+    float dashes = smoothstep(0.5, 0.72, gnoise(vec2(run * 36.0, floor(fine + 0.5) * 3.7)));
+    float dust = (1.0 - smoothstep(0.4 * u, 1.2 * u, gap2)) * dashes * smoothstep(3.0, 7.0, spacing) * (1.0 - puddleMask);
+    col = mix(col, DUST * (0.7 + 0.8 * pulse + 0.5 * core), dust * 0.55 * (0.3 + 0.7 * inside));
+  }
+
   // The aurora's wash over the whole marsh, drifting, strongest toward the far end.
   float far = smoothstep(0.0, 1.0, (p.y - uMin.y) / uSize.y);
   col += aurora * 0.05 * (0.5 + 0.8 * far) * (0.5 + 0.5 * fbm3(p / 260.0 + t * 0.02));
@@ -282,6 +383,22 @@ ${OUTPUT}
 const BARK = [0.07, 0.06, 0.05, 0.12];
 const ROCK = [0.11, 0.105, 0.105, 0.2];
 const REED_COLOR = [0.2, 0.16, 0.065, 0.16];
+const IRON = [0.07, 0.075, 0.09, 0.3];
+const COPPER = [0.5, 0.2, 0.09, 0.3];
+const ORB_PINK = [1.4, 0.18, 0.8, 2.4];
+const ORB_CYAN = [0.35, 1.0, 1.5, 2.4];
+
+/** A coil pylon: an iron plinth, a tapering iron column wound with copper rings, a glowing orb on top. */
+function pylon(props, p, u) {
+  props.cylinder({ x: p.x, y: p.y, z0: -3, z1: 8 * u, r: p.r * 1.5, color: IRON, sides: 18 });
+  props.tube([[p.x, p.y, 6 * u], [p.x, p.y, p.h * 0.5], [p.x, p.y, p.h]], [p.r * 0.7, p.r * 0.52, p.r * 0.4], IRON, { sides: 14 });
+  const coils = Math.max(4, Math.round(p.h / (22 * u)));
+  for (let k = 0; k < coils; k += 1) {
+    const z = p.h * (0.16 + (0.72 * k) / (coils - 1));
+    props.ring({ x: p.x, y: p.y, z0: z - 3 * u, z1: z + 3 * u, r: p.r * (0.95 - 0.35 * (z / p.h)), color: COPPER, sides: 18 });
+  }
+  props.sphere({ x: p.x, y: p.y, z: p.h + p.r * 0.45, r: p.r * 0.5, color: p.orb, sides: 16, rings: 10 });
+}
 
 /** A bare tree: a forking trunk of tapering boughs reaching up and out, twisted. */
 function bareTree(props, tree, u) {
@@ -330,6 +447,8 @@ export function stormProps(spots) {
   for (const tree of spots.trees) bareTree(props, tree, spots.u);
   for (const rock of spots.boulders) props.sphere({ x: rock.x, y: rock.y, z: -2, r: rock.r, color: ROCK, sides: 10, rings: 7, squash: 0.62 });
   reedClumps(props, spots.clumps, spots.u);
+  for (const pole of spots.poles) pylon(props, { ...pole, orb: pole.side < 0 ? ORB_PINK : ORB_CYAN }, spots.u);
+  for (const pad of spots.pads) pylon(props, { x: pad.x, y: pad.y, r: 11 * spots.u, h: PAD_POST_PX * spots.u, orb: ORB_PINK }, spots.u);
   return props;
 }
 
@@ -433,6 +552,140 @@ ${OUTPUT}
 }
 `;
 
+/** The force field's mesh: a hemisphere of unit directions the vertex shader scales to the arena's ellipsoid, apex at +z. */
+export function domeGeometry(three, rings = 32, segments = 96) {
+  const positions = [];
+  const index = [];
+  for (let i = 0; i <= rings; i += 1) {
+    const polar = (i / rings) * (Math.PI / 2);
+    for (let k = 0; k <= segments; k += 1) {
+      const azimuth = (k / segments) * 2 * Math.PI;
+      positions.push(Math.sin(polar) * Math.cos(azimuth), Math.sin(polar) * Math.sin(azimuth), Math.cos(polar));
+    }
+  }
+  for (let i = 0; i < rings; i += 1) {
+    for (let k = 0; k < segments; k += 1) {
+      const a = i * (segments + 1) + k;
+      const b = a + segments + 1;
+      index.push(a, b, a + 1, a + 1, b, b + 1);
+    }
+  }
+  const geometry = new three.BufferGeometry();
+  geometry.setAttribute('position', new three.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(index);
+  return geometry;
+}
+
+export const DOME_VERTEX = /* glsl */ `
+${TERRAIN_UNIFORMS}
+${STORM}
+varying vec3 vDir;
+varying vec3 vWorld;
+void main() {
+  vDir = position;
+  vWorld = vec3(uDome.x + position.x * uDome.z, uDome.y + position.y * uDome.w, position.z * uDomeHeight);
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(vWorld, 1.0);
+}
+`;
+
+/**
+ * The force field: a net of hexagonal cells (a stereographic map of the hemisphere, so they shrink
+ * toward the rim), a few of them flickering, the rim glowing where the dome is seen edge-on, and where
+ * a strike lands a flash and a ring of lit cells running out across it.
+ */
+export const DOME_FRAGMENT = /* glsl */ `
+${TERRAIN_UNIFORMS}
+${NOISE}
+${REVEAL}
+${STORM}
+varying vec3 vDir;
+varying vec3 vWorld;
+float hexDist(vec2 p) {
+  p = abs(p);
+  return max(dot(p, normalize(vec2(1.0, 1.7320508))), p.x);
+}
+vec4 hexCoords(vec2 uv) {
+  vec2 r = vec2(1.0, 1.7320508);
+  vec2 h = r * 0.5;
+  vec2 a = mod(uv, r) - h;
+  vec2 b = mod(uv - h, r) - h;
+  vec2 gv = dot(a, a) < dot(b, b) ? a : b;
+  return vec4(gv, uv - gv);
+}
+void main() {
+  if (revealBurned(vWorld.xy) * exitKeep(vWorld.xy) < 0.5) discard;
+  vec3 dir = normalize(vDir);
+  vec3 n = normalize(vec3(dir.x / uDome.z, dir.y / uDome.w, dir.z / uDomeHeight));
+  vec3 view = normalize(uEye - vWorld);
+  float rim = pow(1.0 - abs(dot(n, view)), 2.2);
+  float up = clamp(dir.z, 0.0, 1.0);
+  vec4 hex = hexCoords(dir.xy / (1.0 + up) * 15.0);
+  float edge = 0.5 - hexDist(hex.xy);
+  float cell = hash12(hex.zw);
+  float fade = smoothstep(0.03, 0.2, up);
+  float line = (1.0 - smoothstep(0.0, 0.05 + 0.04 * (1.0 - up), edge)) * fade;
+  float flicker = pow(0.5 + 0.5 * sin(uTime * (0.5 + 2.2 * cell) + cell * 61.0), 6.0) * step(0.72, cell) * fade;
+  float charge = 0.0;
+  float flash = 0.0;
+  for (int i = 0; i < ${MAX_IMPACTS}; i++) {
+    vec4 hit = uImpacts[i];
+    if (hit.w < 0.0) continue;
+    float arc = acos(clamp(dot(dir, hit.xyz), -1.0, 1.0));
+    float ahead = (arc - hit.w * 0.8) / 0.075;
+    charge += exp(-ahead * ahead) * exp(-hit.w * 1.4);
+    flash += exp(-arc * arc / 0.025) * exp(-hit.w * 4.5);
+  }
+  float intensity = line * (0.07 + 0.75 * rim + charge * 2.6 + flash * 3.0) + flicker * 0.1 * (0.4 + rim) + rim * 0.2 + charge * 0.22 + flash * 0.6;
+  vec3 tint = mix(vec3(0.12, 0.55, 1.0), vec3(0.65, 0.28, 1.0), smoothstep(0.2, 1.0, 1.0 - up));
+  tint = mix(tint, vec3(1.0, 0.55, 0.95), clamp(charge + flash, 0.0, 1.0) * 0.5);
+  gl_FragColor = vec4(tint * intensity * 0.8, 1.0);
+${OUTPUT}
+}
+`;
+
+/** The field arcs' ribbons: as the bolts', but steady and thin, a pink to cyan gradient, pulses running along them. */
+export const FIELD_VERTEX = /* glsl */ `
+${TERRAIN_UNIFORMS}
+${NOISE}
+${REVEAL}
+attribute vec3 aTan;
+attribute vec4 aInfo;
+varying float vSide;
+varying float vAlong;
+varying float vId;
+varying float vShown;
+void main() {
+  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  vec4 ahead = modelViewMatrix * vec4(position + normalize(aTan) * 4.0, 1.0);
+  vec2 dir = normalize(ahead.xy - mv.xy + 1e-5);
+  mv.xy += vec2(-dir.y, dir.x) * aInfo.x * aInfo.w * 0.7;
+  gl_Position = projectionMatrix * mv;
+  vSide = aInfo.x;
+  vAlong = aInfo.y;
+  vId = aInfo.z;
+  vShown = revealBurned(position.xy) * exitKeep(position.xy);
+}
+`;
+
+export const FIELD_FRAGMENT = /* glsl */ `
+${TERRAIN_UNIFORMS}
+varying float vSide;
+varying float vAlong;
+varying float vId;
+varying float vShown;
+void main() {
+  float across = abs(vSide);
+  float core = exp(-across * across * 6.0);
+  float glow = exp(-across * across * 1.3) * 0.65;
+  float envelope = pow(sin(3.14159265 * clamp(vAlong, 0.0, 1.0)), 0.55);
+  float pulse = smoothstep(0.55, 1.0, fract(vAlong * 2.4 - uTime * 0.32 + vId * 0.37));
+  vec3 tint = mix(vec3(1.2, 0.2, 0.75), vec3(0.3, 0.85, 1.3), vAlong);
+  vec3 col = tint * glow + mix(tint, vec3(1.2, 1.3, 1.5), 0.45) * core * 0.5;
+  gl_FragColor = vec4(col * envelope * (0.22 + 0.95 * pulse) * vShown, 1.0);
+${OUTPUT}
+}
+`;
+
 /** Magnetic Storm's board (stadium-environment-mesh.js BOARDS). */
 export function magneticStormBoard({ three, material, terrainGrid, replaceGeometry, bakeOptions }) {
   const own = {
@@ -442,30 +695,44 @@ export function magneticStormBoard({ three, material, terrainGrid, replaceGeomet
     uUnit: { value: 1 },
     uPads: { value: Array.from({ length: MAX_PADS }, () => new three.Vector4()) },
     uStrikes: { value: Array.from({ length: MAX_ARCS }, () => new three.Vector4()) },
+    uPoleA: { value: new three.Vector3() },
+    uPoleB: { value: new three.Vector3() },
+    uDome: { value: new three.Vector4() },
+    uDomeHeight: { value: 1 },
+    uImpacts: { value: Array.from({ length: MAX_IMPACTS }, () => new three.Vector4(0, 0, 1, -1)) },
   };
   let arcsNow = [];
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
+  const additive = { transparent: true, depthWrite: false, blending: three.AdditiveBlending, side: three.DoubleSide };
   const materials = {
     terrain: make(TERRAIN_VERTEX, TERRAIN_FRAGMENT),
     props: make(PROP_VERTEX, PROP_FRAGMENT, { side: three.DoubleSide }),
-    bolts: make(BOLT_VERTEX, BOLT_FRAGMENT, { transparent: true, depthWrite: false, blending: three.AdditiveBlending, side: three.DoubleSide }),
+    bolts: make(BOLT_VERTEX, BOLT_FRAGMENT, additive),
+    field: make(FIELD_VERTEX, FIELD_FRAGMENT, additive),
+    dome: make(DOME_VERTEX, DOME_FRAGMENT, additive),
     bakeField: make(FULLSCREEN_VERTEX, BAKE_FIELD_FRAGMENT, bakeOptions),
     bakeLight: make(FULLSCREEN_VERTEX, bakeLightFragment(), bakeOptions),
   };
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
   const props = new three.Mesh(new three.BufferGeometry(), materials.props);
   const bolts = new three.Mesh(new three.BufferGeometry(), materials.bolts);
+  const field = new three.Mesh(new three.BufferGeometry(), materials.field);
+  const dome = new three.Mesh(domeGeometry(three), materials.dome);
   bolts.renderOrder = 2;
-  // Each frame the strikes' flashes and the pads' brightness follow the clock, on the CPU: a handful of numbers.
+  field.renderOrder = 2;
+  dome.renderOrder = 3;
+  // The strike's clock: where in its period it is, 0..1.
+  const clockAt = (period, phase, now) => (((now / period + phase) % 1) + 1) % 1;
+  // Each frame the strikes' flashes, the pads' brightness and the landings' ripples follow the clock, on the CPU: a handful of numbers.
   const strikeAt = (period, phase, now) => {
-    const t = (((now / period + phase) % 1) + 1) % 1;
+    const t = clockAt(period, phase, now);
     const flash = Math.min(1, t / 0.012) * (1 - Math.min(1, Math.max(0, (t - 0.03) / 0.17)));
     const flicker = 0.65 + 0.35 * (((t * 61) % 1) >= 0.5 ? 1 : 0);
     const tail = 0.18 * Math.min(1, t / 0.03) * (1 - Math.min(1, Math.max(0, (t - 0.2) / 0.3)));
     return flash * flicker + tail;
   };
   return {
-    objects: [terrain, props, bolts],
+    objects: [terrain, props, bolts, field, dome],
     materials: Object.values(materials),
     bakeField: materials.bakeField,
     bakeLight: materials.bakeLight,
@@ -483,6 +750,14 @@ export function magneticStormBoard({ three, material, terrainGrid, replaceGeomet
         });
         slot.w = strength;
       });
+      // A strike's ripple runs from the moment it lands for a few seconds.
+      const landings = arcsNow.filter((arc) => arc.dir);
+      own.uImpacts.value.forEach((slot, i) => {
+        const arc = landings[i];
+        if (!arc || seconds === null) return slot.set(0, 0, 1, -1);
+        const age = clockAt(arc.period, arc.phase, seconds) * arc.period;
+        return slot.set(arc.dir[0], arc.dir[1], arc.dir[2], age < 4 ? age : -1);
+      });
     },
     apply(spots, bounds) {
       const u = spots?.u ?? 1;
@@ -494,14 +769,22 @@ export function magneticStormBoard({ three, material, terrainGrid, replaceGeomet
         const pad = spots?.pads[i];
         return pad ? slot.set(pad.x, pad.y, pad.r, 0) : slot.set(0, 0, 0, 0);
       });
+      const [north, south] = spots?.poles ?? [];
+      own.uPoleA.value.set(north?.x ?? 0, north?.y ?? 0, north?.r ?? 0);
+      own.uPoleB.value.set(south?.x ?? 0, south?.y ?? 0, south?.r ?? 0);
+      own.uDome.value.set(spots?.dome.x ?? 0, spots?.dome.y ?? 0, spots?.dome.a ?? 1, spots?.dome.b ?? 1);
+      own.uDomeHeight.value = spots?.dome.h ?? 1;
       arcsNow = spots?.arcs ?? [];
       own.uStrikes.value.forEach((slot) => slot.set(0, 0, 0, 0));
       replaceGeometry(terrain, terrainGrid(bounds));
       props.visible = Boolean(spots);
       bolts.visible = Boolean(spots);
+      field.visible = Boolean(spots);
+      dome.visible = Boolean(spots);
       if (spots) {
         replaceGeometry(props, stormProps(spots).build(three));
         replaceGeometry(bolts, boltGeometry(three, spots.arcs, u));
+        replaceGeometry(field, boltGeometry(three, spots.fieldArcs, u * 0.7));
       }
     },
   };
