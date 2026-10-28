@@ -1550,6 +1550,15 @@ function atkDraw(ctx) {
     ctx.events.push({ type: 'cardsDrawn', count: drawn.length, playerId: opponent.playerId, cards: drawn.map((c) => ({ instanceId: c.instanceId })) });
     return null;
   }
+  if (step.side === 'each') {
+    for (const drawer of [ctx.player, ctx.opponent]) {
+      if (!drawer) continue;
+      const drawn = drawer.zones.deck.splice(0, Math.min(step.count || 0, drawer.zones.deck.length));
+      drawer.zones.hand.push(...drawn);
+      ctx.events.push({ type: 'cardsDrawn', count: drawn.length, playerId: drawer.playerId, cards: drawn.map((c) => ({ instanceId: c.instanceId })) });
+    }
+    return null;
+  }
   const { player } = ctx;
   const deck = player.zones.deck;
   if (step.upTo && !ctx.selection) {

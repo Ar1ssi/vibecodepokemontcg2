@@ -7,6 +7,7 @@ import { JSDOM } from 'jsdom';
 import {
   buildAbilityOption,
   buildAttackOption,
+  buildStadiumOption,
   buildWeakResistBar,
   typeIcon,
   typeKeyFor,
@@ -135,6 +136,49 @@ describe('074 — buildAbilityOption (GetAssetForAbilityEntry)', () => {
   });
 });
 
+// The in-play Stadium's row, fed the inspector model's stadium entry (card-inspector-model).
+const stadium = (overrides = {}) => ({
+  kind: 'stadium',
+  name: 'Safari Zone',
+  text: 'Once during each player\'s turn, that player may put a Basic Pokémon onto their Bench.',
+  actionable: true,
+  usable: true,
+  recede: false,
+  reason: null,
+  ...overrides,
+});
+
+describe('018 — buildStadiumOption (the Stadium in the focus overlay)', () => {
+  it('an activatable Stadium: the usable titlebar in Stadium green, routed as the Stadium', () => {
+    const row = buildStadiumOption(stadium());
+    assert.deepEqual(classesOf(row), ['tcgl-opt', 'tcgl-opt--stadium', 'tcgl-opt--on', 'tcgl-opt--text']);
+    assert.equal(row.dataset.ptcgStadium, '1');
+    assert.equal(row.dataset.ptcgType, 'grass');
+    assert.equal(row.querySelector('.tcgl-opt__name').textContent, 'Safari Zone');
+    assert.equal(row.querySelector('.tcgl-opt__label').textContent, 'Stadium');
+    assert.match(row.querySelector('.tcgl-opt__text').textContent, /Basic Pokémon onto their Bench/);
+  });
+
+  it('used this turn or off-turn: the bare tile, with the reason on the tooltip', () => {
+    const row = buildStadiumOption(stadium({ usable: false, recede: true, reason: 'Already used this turn' }));
+    assert.ok(row.classList.contains('tcgl-opt--off'));
+    assert.equal(row.title, 'Already used this turn');
+  });
+
+  it('a continuous Stadium (nothing to activate) wears the tinted header', () => {
+    const row = buildStadiumOption(stadium({ actionable: false, usable: false }));
+    assert.ok(row.classList.contains('tcgl-opt--passive'));
+    assert.ok(!row.classList.contains('tcgl-opt--on'));
+  });
+
+  it('no effect text: no divider or description', () => {
+    const row = buildStadiumOption(stadium({ text: '' }));
+    assert.ok(!row.classList.contains('tcgl-opt--text'));
+    assert.equal(row.querySelector('.tcgl-opt__divider'), null);
+    assert.equal(row.querySelector('.tcgl-opt__text'), null);
+  });
+});
+
 describe('074 — buildWeakResistBar (WeakResistRetreatBar)', () => {
   const model = (overrides = {}) => ({
     type: 'Fire',
@@ -207,6 +251,7 @@ describe('074 — attack-options.css covers every class the builders emit', () =
       buildAttackOption(attack({ gx: true, recede: true, readout: { text: '10', tone: 'resistance', mod: 'debuff', showTab: true } }), 'Fire'),
       buildAbilityOption({ name: 'a', text: 'b', passive: true }, 'Fire'),
       buildAbilityOption({ name: 'a', text: 'b', recede: true }, 'Fire'),
+      buildStadiumOption(stadium({ recede: true })),
       buildWeakResistBar({ type: 'Fire', weakness: { type: 'Water', value: 2 }, resistance: null, retreatRecede: true, retreatIcons: null, retreatCount: { attached: 0, needed: 5 } }),
       buildWeakResistBar({ type: 'Fire', weakness: null, resistance: null, retreatIcons: [{ type: 'colorless', filled: true }] }),
     ];

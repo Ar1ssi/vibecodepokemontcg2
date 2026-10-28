@@ -268,3 +268,14 @@ export function statusesFromBranches(
 
   return { defenderConditions: [...defender], attackerConditions: [...attacker] };
 }
+
+/**
+ * Toxic Sting (Gliscor PAR 092): "During Pokémon Checkup, put 2 damage counters on that Pokémon
+ * instead of 1." Returns the counter count the Poison it just applied deals each Checkup, or null.
+ */
+export function poisonCheckupCounters(text) {
+  const m = /during pok[eé]mon checkup, put (\d+) damage counters? on that pok[eé]mon instead of 1/i.exec(
+    String(text || '')
+  );
+  return m ? Number(m[1]) : null;
+}

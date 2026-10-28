@@ -3,8 +3,8 @@
  *
  * Decorates a card slide with its TCG Live readout and keeps it live: a Pokémon gets the
  * AttackOverlay chrome (HP pill, the option rows from attack-options.mjs, the Weakness / Resistance /
- * Retreat bar) that the card-focus view mounts; the in-play Stadium gets its effect panel over the
- * printed box, in the carousel. The 013 print-band panels for Pokémon are retired (design 074 A11).
+ * Retreat bar) that the card-focus view mounts; the in-play Stadium gets the same list window holding
+ * one Stadium row. The 013 print-band panels are retired (design 074 A11).
  *
  * The card scan is the background and stays visible, and dimming uses `filter` rather than
  * `opacity` so a panel never becomes translucent enough for the print underneath to ghost back
@@ -14,7 +14,6 @@
 
 import { uiCue } from '../netcode/mat-fx/ui-cue.mjs';
 import { getEnergyTokenSrcForType } from '../../actions/move-card-bundle/energy-token-assets.mjs';
-import { ENERGY_SYMBOL_TO_TYPE } from '../../../../shared/engine/rules/energy-effects.mjs';
 import {
   isStadiumCard,
   stadiumExtraAttacksFromZone,
@@ -52,14 +51,9 @@ import { liveZoneArray } from '../zones/live-zone-array.js';
 import {
   buildAbilityOption,
   buildAttackOption,
+  buildStadiumOption,
   buildWeakResistBar,
 } from './attack-options.mjs';
-import {
-  openCarouselViewer,
-  closeCarouselViewer,
-} from '../image-logic/card-picker.js';
-import { orderAttachedForCarousel } from '../image-logic/carousel-order.mjs';
-import { suppressHoverPreview } from '../image-logic/hover-preview-bus.mjs';
 
 // Events that can change what the inspector reports while it is open. Owned here because this
 // module outlives attack-preview.js — slice 3 deletes that file and its copy of this list.
@@ -96,17 +90,6 @@ const el = (tag, className, text) => {
   return node;
 };
 
-// Short effect text is set larger so a one-line block fills its panel instead of leaving a
-// band of empty white; long text keeps the base size so it still fits the printed box.
-const SHORT_TEXT_MAX_CHARS = 90;
-const textBody = (text) =>
-  el(
-    'p',
-    String(text).length <= SHORT_TEXT_MAX_CHARS
-      ? 'ptcg-atk__text ptcg-atk__text--short'
-      : 'ptcg-atk__text'
-  );
-
 const orb = (type, className) => {
   const src = getEnergyTokenSrcForType(type);
   if (src) {
@@ -125,81 +108,19 @@ const orb = (type, className) => {
 };
 
 /**
- * Printed card text carries energy as curly glyphs ("Discard 2 {R} Energy"), resolved through
- * the exported ENERGY_SYMBOL_TO_TYPE rather than a copy of it (013 C7). That map is lowercase
- * and carries no dragon/fairy, so an unmatched glyph falls back to the letter rather than
- * rendering an empty circle.
+ * The overlay pieces: the TCG Live overlay chrome (design 074) for a Pokémon, or for the in-play
+ * Stadium the same list window holding its one row, with no HP pill or Weakness / Resistance bar.
  */
-const textWithOrbs = (target, text, className) => {
-  for (const part of String(text ?? '').split(/(\{[a-z]\})/gi)) {
-    const match = /^\{([a-z])\}$/i.exec(part);
-    if (!match) {
-      if (part) target.appendChild(document.createTextNode(part));
-      continue;
-    }
-    const named = ENERGY_SYMBOL_TO_TYPE[match[1].toLowerCase()];
-    const type = named
-      ? named[0].toUpperCase() + named.slice(1)
-      : match[1].toUpperCase();
-    target.appendChild(
-      orb(TYPE_GLYPHS[type] ? type : match[1].toUpperCase(), className)
-    );
-  }
-};
+const buildChrome = (model) =>
+  model.kind === 'stadium' ? buildStadiumChrome(model) : buildFocusChrome(model);
 
-// A Stadium prints no type, so its panel uses one fixed green banner regardless of card.
-const STADIUM_BANNER = '#2e8b57';
-
-const stadiumEl = (model) => {
-  const section = el(
-    'section',
-    `ptcg-stadium${model.recede ? ' ptcg-stadium--recede' : ''}`
-  );
-  section.dataset.ptcgStadium = '1';
-  section.style.setProperty('--ptcg-banner', STADIUM_BANNER);
-
-  const head = el('div', 'ptcg-atk__head');
-  head.appendChild(el('span', 'ptcg-atk__badge', 'Stadium'));
-  head.appendChild(el('span', 'ptcg-atk__name', model.name));
-  if (model.actionable) {
-    head.appendChild(
-      el('span', 'ptcg-atk__use', model.usable ? 'Use' : 'Unusable')
-    );
-  }
-  section.appendChild(head);
-
-  if (model.text) {
-    const body = textBody(model.text);
-    textWithOrbs(body, model.text, 'ptcg-orb ptcg-orb--inline');
-    section.appendChild(body);
-  }
-  // `reason` explains a receded panel; `applyAffordances` gates the click off `usable` alone,
-  // so the tooltip is the only place the "why not" surfaces.
-  if (model.reason) section.title = model.reason;
-  return section;
-};
-
-/**
- * The overlay pieces. A Pokémon gets the TCG Live overlay chrome (`buildFocusChrome`, design 074 —
- * the 013 print-band panels are retired). A Stadium keeps its own panel: its effect text laid out
- * as a content-sized panel anchored over the printed effect box.
- */
-const buildChrome = (model) => {
-  if (model.kind !== 'stadium') return buildFocusChrome(model);
-  const chrome = el('div', 'ptcg-chrome');
-  chrome.dataset.finish = model.finish ?? 'plain';
-  chrome.style.setProperty('--ptcg-inset-left', `${model.sideInsetLeftPct ?? 0}%`);
-  chrome.style.setProperty('--ptcg-inset-right', `${model.sideInsetRightPct ?? 0}%`);
-  const stack = el('div', 'ptcg-stack');
-  stack.style.top = `${model.blockTopPct}%`;
-  const panel = stadiumEl(model);
-  if (model.blockHeightPct != null) {
-    // min-height, not height: text longer than the printed box grows the panel, never clips.
-    stack.style.minHeight = `${model.blockHeightPct}%`;
-    panel.style.flexGrow = '1';
-  }
-  stack.appendChild(panel);
-  chrome.appendChild(stack);
+const buildStadiumChrome = (model) => {
+  const chrome = el('div', 'ptcg-chrome ptcg-chrome--focus ptcg-chrome--stadium');
+  const frame = el('div', 'ptcg-frame ptcg-frame--focus');
+  const stack = el('div', 'ptcg-stack ptcg-stack--focus');
+  stack.appendChild(buildStadiumOption(model));
+  frame.appendChild(stack);
+  chrome.appendChild(frame);
   return chrome;
 };
 
@@ -211,7 +132,6 @@ const buildChrome = (model) => {
  */
 const buildFocusChrome = (model) => {
   const chrome = el('div', 'ptcg-chrome ptcg-chrome--focus');
-  chrome.dataset.finish = model.finish ?? 'plain';
 
   const hp = el('div', 'ptcg-hp');
   hp.appendChild(el('span', 'ptcg-hp__num', model.hp));
@@ -336,7 +256,7 @@ const rerender = (state) => {
 };
 
 /**
- * The `decorate` implementation for the carousel (see card-picker.js). Wraps the built slide
+ * Hang the inspector chrome off a built slide (see buildInspectorCard). Wraps the built slide
  * node in a positioned container and hangs the chrome off it, keeping `holoWrapper` inside the
  * returned node so slideWrapper() and the holo hover sync still resolve.
  */
@@ -386,7 +306,7 @@ export const decorateInspectorSlide = (built, card, getContext, actions = null) 
   return wrap;
 };
 
-// Each panel's own "usable" modifier: its block class with `--usable` (ptcg-atk, tcgl-opt, …).
+// Each panel's own "usable" modifier: its block class with `--usable` (tcgl-opt, tcgl-retreat).
 const usableClass = (panel) => `${panel.classList[0]}--usable`;
 
 /**
@@ -397,12 +317,11 @@ const usableClass = (panel) => `${panel.classList[0]}--usable`;
 const applyAffordances = (state, model) => {
   const handlers = state.actions;
 
-  state.wrap
-    .querySelector('.ptcg-stadium')
-    ?.classList.toggle(
-      'ptcg-stadium--usable',
-      Boolean(handlers?.onUse) && Boolean(model.usable)
-    );
+  const stadiumPanel = state.wrap.querySelector('[data-ptcg-stadium]');
+  stadiumPanel?.classList.toggle(
+    usableClass(stadiumPanel),
+    Boolean(handlers?.onUse) && Boolean(model.usable)
+  );
 
   const abilityPanel = state.wrap.querySelector('[data-ptcg-ability]');
   abilityPanel?.classList.toggle(
@@ -675,62 +594,6 @@ const hydrateContext = (state) => {
 };
 
 /**
- * Open the carousel inspector — today only the in-play Stadium routes here (design 018); a
- * Pokémon opens the card-focus overlay instead (design 074).
- *
- * @param {object} options
- * @param {object} options.card a preview card — a server stamp or a legacy zone card
- * @param {object[]} [options.attachedSlides] further carousel slides, prepared by the caller.
- *   The caller owns this because turning a board token back into full card art is a playmat
- *   concern (attach-card.js swaps the img src and stashes the real art in a dataset key).
- *   Everything attached rides along — Energy and Tools — as it does today.
- * @param {() => object} [options.getContext] overrides the first-paint context; the authoritative
- *   one always arrives via `hydrateContext`, so this only changes what shows before then.
- * @param {(attackIndex: number) => void} [options.onAttack] fires a payable attack
- * @param {() => void} [options.onAbility] uses the card's ability
- * @param {() => void} [options.onRetreat] retreats the Active Spot Pokémon (clicking the
- *   retreat tile); the caller closes the inspector before dispatching, as the attack path does
- * @param {'active'|'bench'} [options.zone] where the card sits, for the ability dispatch
- */
-export function openCardInspector({
-  card,
-  attachedSlides = [],
-  zone = 'active',
-  getContext = () => stampContextFor(card, zone),
-  onAttack = null,
-  onAbility = () => useAbility(card, zone),
-  onRetreat = null,
-  onUse = null,
-} = {}) {
-  suppressHoverPreview('modal');
-  if (!card?.image) return false;
-
-  // Carousel slide N sits to the right of slide N+1, so the attached cards go BEFORE the main
-  // card and initialIndex points at the main card's slot.
-  const slides = [...orderAttachedForCarousel(attachedSlides), card];
-  const mainIndex = slides.length - 1;
-
-  const decorate = (built, slideCard, index) =>
-    index === mainIndex
-      ? decorateInspectorSlide(built, slideCard, getContext, {
-          onAttack,
-          onAbility,
-          onRetreat,
-          onUse,
-        })
-      : built.node;
-
-  openCarouselViewer({
-    title: card.name || 'Card',
-    candidates: slides,
-    initialIndex: mainIndex,
-    decorate,
-  });
-  uiCue('big-card-in');
-  return true;
-}
-
-/**
  * Use the card's ability — the dispatch design 008's ability zone used, unchanged. Under server
  * authority the SERVER runs it (and asks for any picks through a pendingChoice); the local step
  * runner would mutate legacy zone arrays the server never sees.
@@ -763,10 +626,11 @@ const useAbility = (card, zone) => {
 };
 
 /**
- * Decorate a built slide for the card-focus view (design 067): the same chrome, affordances and
- * live-context hydration the carousel inspector uses, without opening the carousel.
+ * Decorate a built slide for the card-focus view (design 067): the chrome, its affordances and
+ * live-context hydration.
  *
  * @param {{ node: Node, holoWrapper: Node|null }} options.built result of buildSlideContent
+ * @param {() => void} [options.onUse] runs the in-play Stadium's effect (its row's click)
  */
 export const buildInspectorCard = ({
   built,
@@ -776,17 +640,18 @@ export const buildInspectorCard = ({
   onAttack = null,
   onAbility = () => useAbility(card, zone),
   onRetreat = null,
+  onUse = null,
 }) =>
   decorateInspectorSlide(
     built,
     card,
     getContext,
-    { onAttack, onAbility, onRetreat, onUse: null }
+    { onAttack, onAbility, onRetreat, onUse }
   );
 
 /**
  * Drop the refresh listener and resize observer of ONE card built by buildInspectorCard, leaving
- * any other mounted inspector (a carousel's) alone. A no-op for a card with no state.
+ * any other mounted inspector alone. A no-op for a card with no state.
  */
 export const releaseInspectorCard = (wrap) => {
   for (const state of states) {
@@ -797,12 +662,4 @@ export const releaseInspectorCard = (wrap) => {
   unwireBoundaryIfIdle();
 };
 
-export const closeCardInspector = () => {
-  if (states.size > 0) uiCue('big-card-out');
-  teardownAll();
-  // Tearing down the state alone leaves the carousel open, and a modal over the board is exactly
-  // how a dispatched attack looks like it never happened. The attack path closes before it fires;
-  // the ability path does not close at all, since using an ability does not end the turn.
-  closeCarouselViewer(null, true);
-};
 export const isCardInspectorOpen = () => states.size > 0;

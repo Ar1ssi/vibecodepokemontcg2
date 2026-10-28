@@ -520,7 +520,10 @@ export function abilityDamageBonus(attacker, defender, ctx = {}) {
     // "for each Prize card your opponent has taken" (Kingambit) scales the bonus; any other
     // "for each" is not read.
     const perOpponentPrize = /for each prize card your opponent has taken/.test(t);
-    if (/for each/.test(t) && !perOpponentPrize) continue;
+    // Huge Power: each differently named Energy card (a special Energy counts apart
+    // from the basic of its type) attached to the attacker adds the printed bonus.
+    const perUniqueEnergy = /for each unique type of energy attached to it/.test(t);
+    if (/for each/.test(t) && !perOpponentPrize && !perUniqueEnergy) continue;
     // An activated power's "during your next turn … more damage" is its effect, not a passive.
     if (/^(?:once during your turn|as often as you like)/.test(t)) continue;
     if (!attackerQualifies(t, attacker, holder, ctx)) continue;
@@ -531,6 +534,12 @@ export function abilityDamageBonus(attacker, defender, ctx = {}) {
       onceTexts.add(t);
     }
     const bonus = parseDamageBonus(holder).bonus;
+    if (perUniqueEnergy) {
+      const unique = new Set(attachedEnergy(attacker, ctx.sideCards).map(energyIdentity));
+      unique.delete('');
+      total += bonus * unique.size;
+      continue;
+    }
     if (!perOpponentPrize) {
       total += bonus;
       continue;
@@ -2000,6 +2009,23 @@ export function abilityStatusImmune(card, condition) {
   return new RegExp(
     `(?:can't|cannot|can not) be (?:affected by (?:any )?)?${word}\\b`
   ).test(t);
+}
+
+// Basic Energy reads the same with or without "Basic" in its printed name.
+const energyIdentity = (card) => lower(card?.name).replace(/^basic /, '').trim();
+
+/**
+ * Gliscor Poison Heal: "This Pokémon takes no damage from being Poisoned. During Pokémon Checkup,
+ * if this Pokémon is Poisoned, remove 1 damage counter from it." Returns `{ heal }` (damage to
+ * remove each Checkup, 0 when the wording only waives the damage), or null when not printed/live.
+ */
+export function abilityPoisonHeal(card, ctx = {}) {
+  if (!card) return null;
+  const t = cardAbilityText(card);
+  if (!/takes no damage from being poisoned/.test(t)) return null;
+  if (isAbilitySuppressed(card, ctx)) return null;
+  const heal = t.match(/remove (\d+) damage counters? from it/);
+  return { heal: heal ? Number(heal[1]) * 10 : 0 };
 }
 
 /**

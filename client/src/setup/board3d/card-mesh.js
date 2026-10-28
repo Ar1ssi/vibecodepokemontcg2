@@ -15,7 +15,7 @@ import {
   cardScaleFor,
   roundedRectShapePoints,
 } from './card-geometry.mjs';
-import { flightPlacement } from './flight-pose.mjs';
+import { flightPlacement, restingFlightPlacement } from './flight-pose.mjs';
 import { OCCLUDER_LAYER } from './fx/fx-layers.mjs';
 import { createTween, easeOutCubic } from './tween.mjs';
 
@@ -120,6 +120,7 @@ function buildCardGeometry(three, widthPx, uv) {
  *   drive: (id: number, offsetAt: (elapsedMs: number) => object|null, ms: number) => Promise<void>,
  *   tablePoseOf: (id: number) => { x: number, y: number, z: number, yawDeg: number, widthPx: number,
  *     heightPx: number }|null,
+ *   holdTablePose: (id: number) => void, releaseTablePose: (id: number) => void,
  *   frontMapOf: (id: number) => import('three').Texture|null,
  *   lift: (id: number, pose: object, o?: { ms?: number, ease?: (t: number) => number }) => Promise<void>,
  *   unlift: (id: number, o?: { ms?: number, ease?: (t: number) => number }) => Promise<void>,
@@ -497,10 +498,7 @@ export function createCardMeshPool({
     });
   };
 
-  /** The card's own pose now, in flat table px, with its drawn size; null when it has none. */
-  const tablePoseOf = (id) => {
-    const card = cards.get(id);
-    if (!card?.pose) return null;
+  const ownTablePose = (card) => {
     const pose = card.pose.at(clock.now());
     return {
       x: pose.x,
@@ -510,6 +508,28 @@ export function createCardMeshPool({
       widthPx: card.geometry.w * pose.s,
       heightPx: card.geometry.h * pose.s,
     };
+  };
+
+  /**
+   * The card's own pose now, in flat table px, with its drawn size; null when it has none. A held
+   * card answers the pose it was held at: its mesh is pinned there while its own pose already
+   * points at its new zone (a knocked-out defender sits in its slot until its knockout scene).
+   */
+  const tablePoseOf = (id) => {
+    const card = cards.get(id);
+    if (!card?.pose) return null;
+    return card.heldTablePose ?? ownTablePose(card);
+  };
+
+  /** Freezes what `tablePoseOf` answers for card `id` at its pose now, until `releaseTablePose`. */
+  const holdTablePose = (id) => {
+    const card = cards.get(id);
+    if (card?.pose) card.heldTablePose = ownTablePose(card);
+  };
+
+  const releaseTablePose = (id) => {
+    const card = cards.get(id);
+    if (card) card.heldTablePose = null;
   };
 
   /** The card's front art texture once loaded, else null. */
@@ -561,11 +581,12 @@ export function createCardMeshPool({
       return true;
     }
     const flipDeg = Number.isFinite(pose?.flipDeg) ? pose.flipDeg : card.flip ? card.flip.at(now) : 0;
-    const placement = flightPlacement(
+    const placement = restingFlightPlacement(
       camera,
       { ...pose, flipDeg },
-      { widthPx: card.geometry.w, heightPx: card.geometry.h },
-      viewOrigin()
+      { widthPx: card.geometry.w, heightPx: card.geometry.h, thicknessPx: card.geometry.t },
+      viewOrigin(),
+      CARD_LIFT_PX
     );
     if (placement) {
       card.mesh.position.set(...placement.position);
@@ -788,6 +809,7 @@ export function createCardMeshPool({
       face: 'front',
       hidden: false,
       pose: null,
+      heldTablePose: null,
       flip: null,
       tilt: null,
       hoverTilt: null,
@@ -1065,6 +1087,8 @@ export function createCardMeshPool({
     tween,
     drive,
     tablePoseOf,
+    holdTablePose,
+    releaseTablePose,
     frontMapOf,
     lift,
     unlift,

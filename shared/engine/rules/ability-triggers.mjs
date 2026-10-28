@@ -680,3 +680,22 @@ export function parseOpponentSwitchDamage(entries = [], ctx = {}, switchedPlayer
   }
   return out;
 }
+
+// Gardevoir SIT 069 Magic Barrier: "At the start of your opponent's turn (before they attack), flip
+// a coin. If heads, your Active Pokémon is protected from the effects of attacks used by your
+// opponent's Active Pokémon." Read at the holder's own Checkup, the step right before that turn.
+const MAGIC_BARRIER_CLAUSE =
+  /at the start of your opponent(?:'s|s)? turn(?: \(before they attack\))?, flip a coin\. if heads, your active pok[eé]mon is protected from the effects of attacks used by your opponent(?:'s|s)? active pok[eé]mon/;
+
+/** `{ holder, playerId, source }` for each live holder whose Ability prints the Magic Barrier coin. */
+export function parseOpponentTurnStartBarriers(entries = [], ctx = {}) {
+  const out = [];
+  for (const entry of entries) {
+    const printed = printedOf(entry);
+    if (!holderCanTrigger(printed, ctx)) continue;
+    const text = cardAbilityText(printed);
+    if (!text || !MAGIC_BARRIER_CLAUSE.test(text)) continue;
+    out.push({ holder: entry.card, playerId: entry.playerId, source: printed.name });
+  }
+  return out;
+}

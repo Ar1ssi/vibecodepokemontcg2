@@ -2326,6 +2326,17 @@ function parseTrainerStepsInner(lower) {
   // Blowtorch — discard a Tool/Special Energy from an opponent's Pokémon,
   // or a Stadium in play (opponent-facing, choice-based)
   if (lower.includes('discard a pokémon tool or special energy')) {
+    // Dangerous Drill: "You can play this card only if you discard a {D} Pokémon from your hand."
+    const pokemonCost = lower.match(/only if you discard an? (?:\{([a-z])\} )?pokémon from your hand/);
+    if (pokemonCost) {
+      const type = SYMBOL_ENERGY_WORDS[pokemonCost[1]];
+      steps.push({
+        type: 'discardCost',
+        count: 1,
+        what: 'Pokémon',
+        ...(type ? { pokemonTypes: [type] } : {}),
+      });
+    }
     steps.push({ type: 'discardFromOpponent', target: "a Pokémon Tool or Special Energy from 1 of your opponent's Pokémon, or a Stadium in play" });
     return { steps, recognizable: true };
   }
@@ -2402,7 +2413,7 @@ function parseTrainerStepsInner(lower) {
   // {R} Energy cards") used to miss this branch entirely (audit S&M, §2).
   {
     const at = lower.match(
-      /attach (?:up to )?(\d+|a|an)?\s*(?:\{([a-z])\}\s*)?(basic\s*)?(?:\{([a-z])\}\s*)?energy cards? from your hand/
+      /attach (?:up to )?(\d+|a|an)?\s*(?:\{([a-z])\}\s*)?(basic\s*)?(?:\{([a-z])\}\s*|(grass|fire|water|lightning|psychic|fighting|darkness|metal|dragon|fairy)\s+)?energy cards? from your hand/
     );
     if (at) {
       const raw = at[1] || '1';
@@ -2411,7 +2422,7 @@ function parseTrainerStepsInner(lower) {
       if (lower.includes('benched')) target = '1 of your Benched Pokémon';
       else if (lower.includes('stage 2')) target = '1 of your Stage 2 Pokémon';
       const symbol = at[2] || at[4];
-      const typeWord = symbol ? SYMBOL_ENERGY_WORDS[symbol] : null;
+      const typeWord = symbol ? SYMBOL_ENERGY_WORDS[symbol] : at[5] || null;
       const basic = Boolean(at[3] || typeWord);
       // Gardenia's Vigor prints "Draw 2 cards. If you drew any cards in this
       // way, attach …": the draw leads and the attach follows it (review 5).

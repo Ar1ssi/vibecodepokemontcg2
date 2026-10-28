@@ -39,9 +39,9 @@ import { hasSpecialEnergyEffectShield } from '../rules/special-energy-parse.mjs'
 import { resolveAttachedEnergyType } from '../rules/energy-effects.mjs';
 import { runSpecialEnergyTriggers, resolveAttackEnergyDiscard } from '../effects/special-energy.mjs';
 import { stadiumBlocksHealing } from '../rules/stadium-effects.mjs';
-import { addCondition, hasCondition } from '../rules/special-conditions.mjs';
+import { addCondition, hasCondition, setPoisonCounters } from '../rules/special-conditions.mjs';
 import { parseNextTurnLock, parseAttackEnergyDiscard } from '../rules/attack-effects.mjs';
-import { parseAttackStatusBranches, statusesFromBranches } from '../rules/attack-status.mjs';
+import { parseAttackStatusBranches, statusesFromBranches, poisonCheckupCounters } from '../rules/attack-status.mjs';
 import {
   benchTargets, discardCardFromPlayerZone, activeAttackMarkers, inPlayView, cardEffectiveHp,
   conditionsUpdatedEvent, isGameConcluded, abilitySideContext, shuffleDeckWithRng, rootsIn,
@@ -631,7 +631,8 @@ export function resolveAttackEffectPhase(draft, ctx) {
               immunity.ignoreDefenderEffects ||
               abilityReads.ignoreDefenderEffects ||
               trainerIgnoresDefenderEffects(draft, playerId, abilityReads.attacker),
-            ignoreResistance: abilityReads.ignoreResistance,
+            // The attack's own "isn't affected by Resistance" (Mist Slash) must survive the Ability read.
+            ignoreResistance: Boolean(immunity.ignoreResistance) || abilityReads.ignoreResistance,
             ignoreAttackerBoosts: abilityReads.ignoresAttackerBoosts,
             // Gyarados Dragon DNA: a borrowed Basic attack does 30 more to the Defending Pokémon
             // (design 049). computeAttackDamage drops every bonus when the attack does no damage.
@@ -1209,6 +1210,7 @@ export function resolveAttackEffectPhase(draft, ctx) {
           for (const cond of defenderConditions) {
             if (markersBlockCondition(defMarkers, cond)) continue;
             addCondition(defRef.card, cond);
+            if (cond === 'Poisoned') setPoisonCounters(defRef.card, poisonCheckupCounters(attack.text));
             events.push(conditionsUpdatedEvent(defRef.card, cond));
           }
         }

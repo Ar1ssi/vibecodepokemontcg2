@@ -115,6 +115,19 @@ describe('attack-ui palette', () => {
     }
   });
 
+  // The tab's seam backing draws the whole sprite at its slice density, so --atk-dmg-w must be the
+  // sprite's real width or the backing's art drifts off the sliced art above it.
+  it('every damage tab variant states its sprite width beside its source', () => {
+    const variants = [...OPTIONS_CSS.matchAll(/--atk-dmg: url\('\.\.\/assets\/attack-ui\/([\w-]+\.png)'\);\s*([^}]*)/g)];
+    assert.ok(variants.length >= 8, 'expected the eight damage tab sprites');
+    for (const [, file, rest] of variants) {
+      const stated = /--atk-dmg-w: (\d+);/.exec(rest);
+      assert.ok(stated, `${file} has no --atk-dmg-w`);
+      const width = readFileSync(`${ASSET_DIR}${file}`).readUInt32BE(16);
+      assert.equal(Number(stated[1]), width, file);
+    }
+  });
+
   it('GX bars use the wide titlebar borders', () => {
     const on = TABLE.borders.atkOv_TitlebarGX;
     const off = TABLE.borders.atkOv_TitlebarGX_Off;
@@ -167,7 +180,23 @@ describe('attack-ui palette', () => {
     assert.deepEqual([b.top, b.right, b.bottom, b.left], [13, 16, 3, 16]);
     const decls = ruleFor('.tcgl-opt--passive .tcgl-opt__bar::before');
     assert.ok(decls, 'no passive ability header rule');
-    assert.match(decls, /mask-border: url\('\.\.\/assets\/attack-ui\/ability-bg\.png'\) 13 16 3 16 fill/);
+    // Sliced 1px in on the top and sides: the game borders fill the 32 x 16 sprite exactly.
+    assert.match(decls, /mask-border: url\('\.\.\/assets\/attack-ui\/ability-bg\.png'\) 12 15 3 15 fill/);
+  });
+
+  // Unity stretches a zero-size centre; CSS draws no edges or centre at all, so a sprite sliced
+  // through its whole width or height shows only its four corners.
+  it('every sliced sprite keeps a centre to stretch', () => {
+    const sliced = /url\('\.\.\/assets\/attack-ui\/([\w-]+\.png)'\) ((?:\d+ ?){1,4}) fill/g;
+    const uses = [...OPTIONS_CSS.matchAll(sliced)];
+    assert.ok(uses.length >= 5, 'expected the row, shadow, mask and bar slices');
+    for (const [, file, slices] of uses) {
+      const png = readFileSync(`${ASSET_DIR}${file}`);
+      const [width, height] = [png.readUInt32BE(16), png.readUInt32BE(20)];
+      const [top, right = top, bottom = top, left = right] = slices.trim().split(' ').map(Number);
+      assert.ok(left + right < width, `${file} ${slices.trim()} leaves no centre column`);
+      assert.ok(top + bottom < height, `${file} ${slices.trim()} leaves no centre row`);
+    }
   });
 
   it("an unusable attack bar is the registry's cantUse grey with black ink", () => {

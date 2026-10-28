@@ -66,13 +66,14 @@ test('Pokémon rules: hp, types, stage, attacks, abilities, sides, retreat', () 
   const errorsOf = (patch) => validateCustomSet(withCard(patch)).errors.join('\n');
   assert.match(errorsOf({ hp: 185 }), /hp: a multiple of 10/);
   assert.match(errorsOf({ hp: '180' }), /hp/);
-  assert.match(errorsOf({ types: ['Fairy'] }), /unknown Energy type "Fairy"/);
+  assert.match(errorsOf({ types: ['Sound'] }), /unknown Energy type "Sound"/);
+  assert.doesNotMatch(errorsOf({ types: ['Fairy'] }), /types/);
   assert.match(errorsOf({ types: [] }), /at least one type/);
   assert.match(errorsOf({ stage: 'Mega' }), /stage: one of/);
   assert.match(errorsOf({ evolveFrom: '' }), /evolveFrom: required/);
   const five = Array.from({ length: 5 }, (_, i) => ({ cost: [], name: `A${i}`, damage: '', effect: '' }));
   assert.match(errorsOf({ attacks: five }), /at most 4 attacks/);
-  assert.match(errorsOf({ attacks: [{ cost: ['Fairy'], name: 'A', damage: '10' }] }), /cost: unknown Energy type/);
+  assert.match(errorsOf({ attacks: [{ cost: ['Sound'], name: 'A', damage: '10' }] }), /cost: unknown Energy type/);
   assert.match(errorsOf({ attacks: [{ cost: [], name: 'A', damage: 'ten' }] }), /damage/);
   assert.match(errorsOf({ attacks: [{ cost: [], name: '', damage: '10' }] }), /name: required/);
   const three = Array.from({ length: 3 }, (_, i) => ({ type: 'Ability', name: `B${i}`, effect: 'x' }));
@@ -112,8 +113,19 @@ test('array- or null-typed fields are errors, not coerced strings (review of des
   assert.match(validateCustomSet(twins).errors.join(), /001 is used twice/);
 });
 
-test('Energy cards, too many cards and printed decklist codes are refused', () => {
-  assert.match(validateCustomSet(withCard({ category: 'Energy' })).errors.join(), /category: one of Pokemon, Trainer/);
+test("Energy rules: kind, a Special Energy's effect; a Basic Energy needs none", () => {
+  const energy = { category: 'Energy', energyType: 'Special', effect: 'Provides {C}{C} Energy.', rarity: 'Uncommon' };
+  assert.equal(validateCustomSet(withCard(energy, 1)).ok, true);
+  const errorsOf = (patch) => validateCustomSet(withCard({ ...energy, ...patch }, 1)).errors.join();
+  assert.match(errorsOf({ energyType: 'Basic' }), /energyType: one of Special, Normal/);
+  assert.match(errorsOf({ energyType: undefined }), /energyType/);
+  assert.match(errorsOf({ effect: ' ' }), /effect: required/);
+  const basic = { category: 'Energy', energyType: 'Normal', rarity: 'Hyper rare' };
+  assert.equal(validateCustomSet(withCard(basic, 1)).ok, true);
+  assert.match(validateCustomSet(withCard({ ...basic, effect: 5 }, 1)).errors.join(), /effect: expected text/);
+});
+
+test('too many cards and printed decklist codes are refused', () => {
   const big = sampleSet();
   big.cards = Array.from({ length: 1000 }, () => big.cards[0]);
   assert.match(validateCustomSet(big).errors.join(), /cards: at most 999/);

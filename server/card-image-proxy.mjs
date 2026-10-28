@@ -94,8 +94,8 @@ export function createCardImageHandler({
   fetchImpl = globalThis.fetch,
   allowedHosts,
   now = Date.now,
-  maxEntries = 200,
-  maxBodyBytes = 2 * 1024 * 1024,
+  maxEntries = 100,
+  maxBodyBytes = 6 * 1024 * 1024,
   timeoutMs = 10_000,
 } = {}) {
   if (!(allowedHosts instanceof Set)) throw new TypeError('createCardImageHandler needs an allowedHosts Set');

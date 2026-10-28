@@ -24,8 +24,6 @@ import { rulesState, stadiumUsed } from '/shared/engine/rules/rules-state.mjs';
 import { isHandActivatedAbility } from '/shared/engine/rules/ability-executors.mjs';
 import {
   benchHasUsableAction,
-  openCardInspector,
-  closeCardInspector,
   stadiumContextFor,
 } from '../rules/card-inspector.mjs';
 import {
@@ -406,16 +404,16 @@ export const doubleClick = (event) => {
     // main card in the array to land on its right, with initialIndex on the main card's slot.
     const attachedSlides = attachedSlidesOf(card);
 
-    // Design 018: the shared in-play Stadium opens the same module — the effect text as a
-    // content-sized panel, clicked to run the Stadium effect. It has no cardUser (`#stadium`
-    // is neutral), so route on the zone alone; the actor is the local player, exactly the user
-    // the sidebox Stadium button passes. `getContext` reads live flags so the panel's Use
-    // affordance tracks turn/once-per-turn state.
+    // Design 018: the shared in-play Stadium opens the focus overlay with one Stadium row, clicked
+    // to run its effect. It has no cardUser (`#stadium` is neutral), so route on the zone alone;
+    // the actor is the local player, exactly the user the sidebox Stadium button passes.
+    // `getContext` reads live flags so the row's usable look tracks turn/once-per-turn state.
     if (mouseClick.zoneId === 'stadium') {
       const user = systemState.initiator;
-      openCardInspector({
+      if (isCardFocusOpen()) return;
+      // A Stadium the focus view cannot fly (no element to lift) still zooms.
+      const opened = openCardFocus({
         card,
-        attachedSlides,
         zone: 'stadium',
         getContext: () =>
           stadiumContextFor({
@@ -425,10 +423,11 @@ export const doubleClick = (event) => {
             flags: rulesState.flags?.[user] || {},
           }),
         onUse: () => {
-          closeCardInspector();
+          closeCardFocus({ immediate: true });
           stadiumEffect(user);
         },
       });
+      if (!opened) openCardPreview(targetImage, card);
       return;
     }
 

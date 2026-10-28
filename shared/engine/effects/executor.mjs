@@ -1036,17 +1036,21 @@ export function executeSteps(draft, {
           break;
         }
         const count = step.count || 1;
-        const deck = player.zones.deck || [];
-        const hand = player.zones.hand || [];
-        const actualCount = Math.min(count, deck.length);
-        const drawn = deck.splice(0, actualCount);
-        hand.push(...drawn);
-        events.push({
-          type: 'cardsDrawn',
-          count: actualCount,
-          playerId,
-          cards: drawn.map((c) => ({ instanceId: c.instanceId })),
-        });
+        // "Each player draws N cards" (Togetic Shared Peace): the user first, then the opponent.
+        for (const drawer of step.eachPlayer ? [player, opponent] : [player]) {
+          if (!drawer) continue;
+          const deck = drawer.zones.deck || [];
+          const hand = drawer.zones.hand || [];
+          const actualCount = Math.min(count, deck.length);
+          const drawn = deck.splice(0, actualCount);
+          hand.push(...drawn);
+          events.push({
+            type: 'cardsDrawn',
+            count: actualCount,
+            playerId: drawer.playerId,
+            cards: drawn.map((c) => ({ instanceId: c.instanceId })),
+          });
+        }
         break;
       }
 
@@ -1665,7 +1669,10 @@ export function executeSteps(draft, {
             !c.attachedTo &&
             ((c.damage || 0) > 0 || (step.cure && hasAnyCondition(c))) &&
             (!typeFilter ||
-              (c.types || []).some((ty) => typeFilter.includes(String(ty).toLowerCase()))) &&
+              // An evolved Pokémon has the type of its top card (Colorless Basic → Metal Stage 1).
+              ((topPokemonCard([...(player.zones.active || []), ...(player.zones.bench || [])], c) || c).types || []).some(
+                (ty) => typeFilter.includes(String(ty).toLowerCase())
+              )) &&
             (step.target === 'attached Pokémon'
               ? c.instanceId === context.attachedTargetId
               : step.target === 'costHost'

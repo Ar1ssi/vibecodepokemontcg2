@@ -701,12 +701,13 @@ export function parseAbility(text = '') {
       guidance: `Once during your turn: draw cards until you have ${until[1]} in your hand.`,
     });
   } else if (lower.includes('each player draws') || lower.includes('each player must draw')) {
-    // "Each player draws a card" — both players draw 1
+    // "Each player draws a card" / "Each player draws 3 cards" — both players draw N
+    const eachCount = Number(lower.match(/each player (?:draws|must draw)\s+(\d+)\s+cards?/)?.[1] || 1);
     steps.push({
       type: 'drawAbility',
-      count: 1,
+      count: eachCount,
       eachPlayer: true,
-      guidance: 'Once during your turn: each player draws 1 card.',
+      guidance: `Once during your turn: each player draws ${eachCount} card${eachCount === 1 ? '' : 's'}.`,
     });
   } else if (lower.includes('your opponent draws')) {
     // "Your opponent draws N cards" — opponent-facing draw
@@ -2293,6 +2294,19 @@ export function parseAbility(text = '') {
   }
   if (steps.some((step) => step.type === 'selfAttachEnergyAbility')) {
     steps = steps.filter((step) => step.type !== 'attachAbility');
+  }
+
+  // Gardevoir Shining Arcana: one look-then-attach step, not a hand attach plus a bare look.
+  const lookAttach = lower.match(
+    /look at the top (\d+) cards? of your deck and attach any number of basic energy cards you find there to your pok[eé]mon in any way you like/
+  );
+  if (lookAttach) {
+    steps = steps.filter((step) => step.type !== 'attachAbility' && step.type !== 'lookAtTopAbility');
+    steps.unshift({
+      type: 'lookAttachEnergyAbility',
+      count: Number(lookAttach[1]),
+      guidance: `Once during your turn: look at the top ${lookAttach[1]} cards of your deck, attach any number of basic Energy cards to your Pokémon in any way you like, and put the rest into your hand.`,
+    });
   }
 
   steps = withIfYouDoHalves(lower, steps);

@@ -495,6 +495,12 @@ export function buildServerAttackContext(
       (sum, { card }) => sum + energyOn(opponent, card, { stadiumCard, opponent: own }).length,
       0
     );
+    // Energy units on every Pokémon of both sides, for "{R} Energy attached to all Pokémon"
+    // (Delphox Energized Storm): typed counts read the units' provided types.
+    ctx.allEnergyUnits = [
+      ...ownInPlay.flatMap(({ card }) => energyOn(own, card, { stadiumCard, opponent })),
+      ...inPlayPokemon(opponent).flatMap(({ card }) => energyOn(opponent, card, { stadiumCard, opponent: own })),
+    ];
     // Jumping Balloon: "for each of your opponent's Pokémon-GX and Pokémon-EX in play".
     ctx.opponentGxExCount = inPlayPokemon(opponent).filter(
       ({ view }) => isGxCard(view) || isExCard(view)

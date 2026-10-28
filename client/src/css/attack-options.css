@@ -101,7 +101,9 @@
   /* The chrome around the rows passes clicks through to the card; the rows take them back. */
   pointer-events: auto;
 }
-/* atkOv_Action_BG, 16px edges at 50 px per row unit. */
+/* atkOv_Action_BG: 16px edges at 50 px per row unit, but 16 + 16 is the whole 32px sprite, and CSS
+   draws no edges or centre for a zero-size middle where Unity stretches it. So
+   it is sliced 1px in, 15px edges = 0.30 row units, leaving a 2px centre to stretch. */
 .tcgl-opt::before {
   content: '';
   position: absolute;
@@ -109,7 +111,15 @@
   z-index: -1;
   pointer-events: none;
   border: 0 solid transparent;
-  border-image: url('../assets/attack-ui/row-bg.png') 16 fill / calc(var(--ru) * 0.32) stretch;
+  border-image: url('../assets/attack-ui/row-bg.png') 15 fill / calc(var(--ru) * 0.3) stretch;
+  /* Chromium antialiases each slice's edges on its own, so at a fractional device-pixel position
+     (125% / 150% display scaling, the stack view's centring) a hairline of what lies beneath (the
+     shadow) shows where two slices meet. A backing in the tile's own white sits under those seams: a
+     full-height and a full-width band, each stopping 0.22 row units (11px) short of the chamfered
+     corners, where the sprite is opaque to its edge. */
+  background:
+    linear-gradient(#ffffff, #ffffff) center / calc(100% - var(--ru) * 0.44) 100% no-repeat,
+    linear-gradient(#ffffff, #ffffff) center / 100% calc(100% - var(--ru) * 0.44) no-repeat;
 }
 .tcgl-opt--off::before { border-image-source: url('../assets/attack-ui/row-bg-off.png'); }
 /* atkOv_Action_Shadow tinted black at 50%, 0.23 x 0.15 row units larger than the row, which
@@ -133,6 +143,7 @@
   --atk-dmg: url('../assets/attack-ui/dmg.png');
   --atk-dmg-l: 33;
   --atk-dmg-r: 24;
+  --atk-dmg-w: 59;
   --name-ink: var(--atk-ink, #ffffff);
   position: relative;
   isolation: isolate;
@@ -149,11 +160,25 @@
   border-color: transparent;
   border-width: 0 calc(var(--ru) * 0.21) 0 calc(var(--ru) * 2.78);
   border-image: var(--atk-bar) 0 21 0 278 fill / 0 calc(var(--ru) * 0.21) 0 calc(var(--ru) * 2.78) stretch;
+  /* Slice seams (see .tcgl-opt::before): the whole sprite at its slice density, once under each end,
+     puts the stretch column's own colours under the left and right joins. */
+  background:
+    var(--atk-bar) left / calc(var(--ru) * 3) 100% no-repeat border-box,
+    var(--atk-bar) right / calc(var(--ru) * 3) 100% no-repeat border-box;
 }
 /* An attack with effect text, and every ability, wear the short titlebar and tab. */
 .tcgl-opt--text .tcgl-opt__bar::before,
-.tcgl-opt--ability .tcgl-opt__bar::before { border-image-source: var(--atk-bar-short); }
-.tcgl-opt--text .tcgl-opt__bar { --atk-dmg: url('../assets/attack-ui/dmg-short.png'); --atk-dmg-l: 34; --atk-dmg-r: 24; }
+.tcgl-opt--ability .tcgl-opt__bar::before,
+.tcgl-opt--stadium .tcgl-opt__bar::before {
+  border-image-source: var(--atk-bar-short);
+  background-image: var(--atk-bar-short), var(--atk-bar-short);
+}
+.tcgl-opt--text .tcgl-opt__bar {
+  --atk-dmg: url('../assets/attack-ui/dmg-short.png');
+  --atk-dmg-l: 34;
+  --atk-dmg-r: 24;
+  --atk-dmg-w: 67;
+}
 
 /* GX attacks: the wide titlebar, 480px of art before the stretch column. */
 .tcgl-opt--gx .tcgl-opt__bar { --name-ink: #ffffff; }
@@ -161,6 +186,8 @@
   border-width: 0 calc(var(--ru) * 0.19) 0 calc(var(--ru) * 4.8);
   border-image: url('../assets/attack-ui/bar-gx.png') 0 19 0 480 fill / 0 calc(var(--ru) * 0.19) 0
     calc(var(--ru) * 4.8) stretch;
+  background-image: url('../assets/attack-ui/bar-gx.png'), url('../assets/attack-ui/bar-gx.png');
+  background-size: calc(var(--ru) * 5) 100%;
 }
 
 /* VSTAR Power: atkOV_Titlebar_VStar is 908 x 173 with its art in an 878px right border, wider than
@@ -169,11 +196,13 @@
 .tcgl-opt--vstar .tcgl-opt__bar {
   --name-ink: #ffffff;
   --atk-dmg: url('../assets/attack-ui/dmg-vstar.png');
+  --atk-dmg-w: 64;
   --atk-dmg-l: 41;
   --atk-dmg-r: 22;
 }
 .tcgl-opt--vstar.tcgl-opt--text .tcgl-opt__bar {
   --atk-dmg: url('../assets/attack-ui/dmg-vstar-short.png');
+  --atk-dmg-w: 68;
   --atk-dmg-l: 44;
   --atk-dmg-r: 22;
 }
@@ -181,22 +210,27 @@
   border-width: 0 calc(var(--bar-h) * 878 / 173) 0 calc(var(--bar-h) * 28 / 173);
   border-image: url('../assets/attack-ui/bar-vstar.png') 0 878 0 28 fill / 0 calc(var(--bar-h) * 878 / 173) 0
     calc(var(--bar-h) * 28 / 173) stretch;
+  background-image: url('../assets/attack-ui/bar-vstar.png'), url('../assets/attack-ui/bar-vstar.png');
+  background-size: calc(var(--bar-h) * 908 / 173) 100%;
 }
 .tcgl-opt--vstar.tcgl-opt--text .tcgl-opt__bar::before,
 .tcgl-opt--vstar.tcgl-opt--ability .tcgl-opt__bar::before {
   border-image-source: url('../assets/attack-ui/bar-vstar-short.png');
+  background-image: url('../assets/attack-ui/bar-vstar-short.png'), url('../assets/attack-ui/bar-vstar-short.png');
 }
 
 /* canUse false: the registry's cantUse bar (#d4d4d4, black ink) with the empty damage tab. */
 .tcgl-opt--off .tcgl-opt__bar {
   --name-ink: #000000;
   --atk-dmg: url('../assets/attack-ui/dmg-empty.png');
+  --atk-dmg-w: 59;
   --atk-dmg-l: 37;
   --atk-dmg-r: 20;
   background: #d4d4d4;
 }
 .tcgl-opt--off.tcgl-opt--text .tcgl-opt__bar {
   --atk-dmg: url('../assets/attack-ui/dmg-empty-short.png');
+  --atk-dmg-w: 65;
   --atk-dmg-r: 27;
 }
 .tcgl-opt--off .tcgl-opt__bar::before { display: none; }
@@ -206,27 +240,39 @@
   border-width: 0 calc(var(--ru) * 0.18) 0 calc(var(--ru) * 4.8);
   border-image: url('../assets/attack-ui/bar-gx-off.png') 0 18 0 480 fill / 0 calc(var(--ru) * 0.18) 0
     calc(var(--ru) * 4.8) stretch;
+  background-image: url('../assets/attack-ui/bar-gx-off.png'), url('../assets/attack-ui/bar-gx-off.png');
 }
 .tcgl-opt--vstar.tcgl-opt--off .tcgl-opt__bar {
   --atk-dmg: url('../assets/attack-ui/dmg-vstar-empty.png');
+  --atk-dmg-w: 59;
   --atk-dmg-l: 32;
   --atk-dmg-r: 26;
 }
 .tcgl-opt--vstar.tcgl-opt--text.tcgl-opt--off .tcgl-opt__bar {
   --atk-dmg: url('../assets/attack-ui/dmg-vstar-empty-short.png');
+  --atk-dmg-w: 65;
   --atk-dmg-r: 32;
 }
 
 /* Passive ability (GetAssetForAbilityEntry): atkOv_Ability_BG tinted with the type colour, its
-   16 / 13 / 3 px edges at 50 px per row unit. */
+   13 / 16 / 3 / 16 px edges at 50 px per row unit. Those fill the 32 x 16 sprite exactly, which
+   leaves CSS no centre to draw, so the mask is sliced 1px in on the top and sides. */
+/* The mask's slices seam like the tiles' do; the header colour behind it fills them, in the same
+   two bands clear of the sprite's chamfered top corners (11px = 0.22 row units). */
+.tcgl-opt--passive .tcgl-opt__bar {
+  background:
+    linear-gradient(var(--atk-color), var(--atk-color)) center / calc(100% - var(--ru) * 0.44) 100% no-repeat,
+    linear-gradient(var(--atk-color), var(--atk-color)) bottom / 100% calc(100% - var(--ru) * 0.22) no-repeat;
+}
 .tcgl-opt--passive .tcgl-opt__bar::before {
-  border-width: calc(var(--ru) * 0.26) calc(var(--ru) * 0.32) calc(var(--ru) * 0.06);
+  border-width: calc(var(--ru) * 0.24) calc(var(--ru) * 0.3) calc(var(--ru) * 0.06);
   border-image: none;
   background: var(--atk-color);
-  -webkit-mask-box-image: url('../assets/attack-ui/ability-bg.png') 13 16 3 16 fill stretch;
-  mask-border: url('../assets/attack-ui/ability-bg.png') 13 16 3 16 fill stretch;
+  -webkit-mask-box-image: url('../assets/attack-ui/ability-bg.png') 12 15 3 15 fill stretch;
+  mask-border: url('../assets/attack-ui/ability-bg.png') 12 15 3 15 fill stretch;
 }
-.tcgl-opt--ability.tcgl-opt--off .tcgl-opt__bar { background: none; }
+.tcgl-opt--ability.tcgl-opt--off .tcgl-opt__bar,
+.tcgl-opt--stadium.tcgl-opt--off .tcgl-opt__bar { background: none; }
 
 /* AttackNameAlignment: 0.25 in from each side; the name fills the top half over the cost row, or
    the whole bar when there is no cost to show. */
@@ -281,6 +327,18 @@
   background: url('../assets/attack-ui/ability-tag-on.png') left center / contain no-repeat;
 }
 .tcgl-opt__tag--off { background-image: url('../assets/attack-ui/ability-tag-off.png'); }
+/* The Stadium row's stand-in for the Ability tag: a small-caps line in the bar's ink. */
+.tcgl-opt__label {
+  align-self: center;
+  margin-top: calc(var(--ru) * -0.04);
+  font-family: 'Akko Pro Condensed', 'Rodin Condensed', 'Barlow Semi Condensed', sans-serif;
+  font-size: calc(var(--ru) * 0.22);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--name-ink);
+  opacity: 0.85;
+}
 
 /* AttackDamageBG: 1.65 wide on the right, the bar's full height; hidden (alpha 0) without a number. */
 .tcgl-opt__tab {
@@ -295,12 +353,17 @@
   border-width: 0 calc(var(--ru) * var(--atk-dmg-r) / 100) 0 calc(var(--ru) * var(--atk-dmg-l) / 100);
   border-image: var(--atk-dmg) 0 var(--atk-dmg-r) 0 var(--atk-dmg-l) fill / 0
     calc(var(--ru) * var(--atk-dmg-r) / 100) 0 calc(var(--ru) * var(--atk-dmg-l) / 100) stretch;
+  /* Slice seams, as under the titlebar: the whole sprite (--atk-dmg-w px) under each join. */
+  background:
+    var(--atk-dmg) left / calc(var(--ru) * var(--atk-dmg-w) / 100) 100% no-repeat border-box,
+    var(--atk-dmg) right / calc(var(--ru) * var(--atk-dmg-w) / 100) 100% no-repeat border-box;
 }
 .tcgl-opt--vstar .tcgl-opt__tab {
   border-width: 0 calc(var(--bar-h) * var(--atk-dmg-r) / 173) 0 calc(var(--bar-h) * var(--atk-dmg-l) / 173);
   border-image-width: 0 calc(var(--bar-h) * var(--atk-dmg-r) / 173) 0 calc(var(--bar-h) * var(--atk-dmg-l) / 173);
+  background-size: calc(var(--bar-h) * var(--atk-dmg-w) / 173) 100%;
 }
-.tcgl-opt:not(.tcgl-opt--damage) .tcgl-opt__tab { border-image: none; }
+.tcgl-opt:not(.tcgl-opt--damage) .tcgl-opt__tab { border-image: none; background: none; }
 /* AttackDamage: 1.14 wide, 0.15 in from the right, 0.15 clear of top and bottom; Display_Bd,
    auto-sized 0.30–0.50, black — or weaknessColor / resistanceColor once the outcome hit one. */
 .tcgl-opt__dmg {

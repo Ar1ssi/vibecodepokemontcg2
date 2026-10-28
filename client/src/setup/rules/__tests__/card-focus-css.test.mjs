@@ -189,9 +189,10 @@ describe('067 — card-focus.css', () => {
       const b = borders[sprite];
       assert.deepEqual([b.top, b.right, b.bottom, b.left], [16, 16, 16, 16], sprite);
     }
-    // 16px edges at 50 px per row unit = 0.32 row units (0.24tu at the row's 0.75 scale).
+    // 16px edges at 50 px per row unit = 0.32 row units. The 32px tile is sliced 1px in (15px =
+    // 0.30 row units): 16 + 16 leaves CSS a zero-size centre, and it then draws only the corners.
     const tile = option('.tcgl-opt::before');
-    assert.ok(tile.includes("row-bg.png') 16 fill / calc(var(--ru) * 0.32) stretch;"));
+    assert.ok(tile.includes("row-bg.png') 15 fill / calc(var(--ru) * 0.3) stretch;"));
     assert.ok(tile.includes('z-index: -1;'));
     const shadow = option('.tcgl-opt::after');
     assert.ok(shadow.includes("row-shadow.png') 16 fill / calc(var(--ru) * 0.32) stretch;"));

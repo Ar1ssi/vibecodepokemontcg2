@@ -51,11 +51,11 @@
 
   background-image:
     repeating-linear-gradient( 115deg,
-      hsl(0, 0%, 30%) 0%,
-      hsl(0, 0%, 30%) 10.67%,
+      hsl(0, 0%, 50%) 0%,
+      hsl(0, 0%, 50%) 10.67%,
       hsl(0, 0%, 100%) 16.67%,
-      hsl(0, 0%, 30%) 22.67%,
-      hsl(0, 0%, 30%) 33.33%
+      hsl(0, 0%, 50%) 22.67%,
+      hsl(0, 0%, 50%) 33.33%
     ),
     repeating-linear-gradient( 125deg,
       hsl(285, 100%, 55%) 0%,
@@ -66,9 +66,10 @@
       hsl(0, 100%, 58%) 10%,
       hsl(285, 100%, 55%) 12%
     ),
-    url('../../assets/holo/grain.webp');
+    url('../../assets/holo/grain.webp'),
+    linear-gradient( hsl(0, 0%, 50%), hsl(0, 0%, 50%) );
 
-  background-size: 750% 750%, 900% 900%, cover;
+  background-size: 750% 750%, 900% 900%, cover, cover;
   /* Gradients are never tiled: a diagonal gradient tile edge draws a hard
      box. Tiles are 3x their old size and repeat their bands inside, and the
      pan stays inside 0-100% (--background-x/y stay within 26-74%), so the tile
@@ -78,9 +79,12 @@
   background-position:
     calc( (var(--background-x) - 50%) * 1.15 + 50% ) calc( (var(--background-y) - 50%) * 1.15 + 50% ),
     calc( (var(--background-x) - 50%) * -1 + 50% ) calc( (var(--background-y) - 50%) * -1 + 50% ),
+    center center,
     center center;
 
-  background-blend-mode: hard-light, hard-light;
+  /* The grain is near-black and soft-light darkens below 50% grey: the grain
+     screens onto a neutral grey base so the foil never dims the card. */
+  background-blend-mode: hard-light, hard-light, screen, normal;
   mix-blend-mode: soft-light;
   filter: saturate(2) contrast(1.6);
 

@@ -61,6 +61,7 @@ test('the proxy host set covers every CORS-verified card art host', () => {
     'limitlesstcg.nyc3.digitaloceanspaces.com',
     'limitlesstcg.nyc3.cdn.digitaloceanspaces.com',
     'ptcgsim.online',
+    'pokemon-sleeve-database.com',
   ]) {
     assert.ok(CARD_ART_PROXY_HOSTS.has(host), host);
   }
