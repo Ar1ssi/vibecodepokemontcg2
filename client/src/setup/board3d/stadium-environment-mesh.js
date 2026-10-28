@@ -13,6 +13,7 @@ import { darkCityBoard } from './stadium-env-city.mjs';
 import { communityCenterBoard } from './stadium-env-community.mjs';
 import { crystalCaveBoard } from './stadium-env-crystal.mjs';
 import { dimensionValleyBoard } from './stadium-env-dimension.mjs';
+import { fairyGardenBoard } from './stadium-env-fairy.mjs';
 import { fullMetalLabBoard } from './stadium-env-lab.mjs';
 import { levinciaBoard } from './stadium-env-levincia.mjs';
 import { pokemonCenterBoard } from './stadium-env-pokecenter.mjs';
@@ -624,6 +625,7 @@ const BOARDS = {
   'crystal-cave': crystalCaveBoard,
   'dark-city': darkCityBoard,
   'dimension-valley': dimensionValleyBoard,
+  'fairy-garden': fairyGardenBoard,
   'fighting-stadium': fightingStadiumBoard,
   'forest-of-vitality': forestOfVitalityBoard,
   'full-metal-lab': fullMetalLabBoard,

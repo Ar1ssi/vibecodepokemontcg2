@@ -29,6 +29,7 @@ const ENVIRONMENT_BY_CARD = {
   'customhb-360': 'shopping-center',
   'customhb-361': 'community-center',
   'customhb-362': 'pokemon-center',
+  'customhb-428': 'fairy-garden',
 };
 export const ENVIRONMENT_KEYS = Object.freeze([...new Set(Object.values(ENVIRONMENT_BY_CARD))]);
 /** Dev check on the real board: `?stadiumEnv=` or `localStorage[ENVIRONMENT_OVERRIDE_KEY]` forces one on. */
@@ -46,6 +47,7 @@ const SCENE_MARGINS = {
   'community-center': { side: 0.17, near: 0.2, far: 0.34 },
   'crystal-cave': { side: 0.17, near: 0.2, far: 0.34 },
   'dimension-valley': { side: 0.17, near: 0.2, far: 0.34 },
+  'fairy-garden': { side: 0.17, near: 0.2, far: 0.34 },
   'forest-of-vitality': { side: 0.17, near: 0.2, far: 0.34 },
   levincia: { side: 0.17, near: 0.2, far: 0.34 },
   'mystery-garden': { side: 0.17, near: 0.2, far: 0.34 },
