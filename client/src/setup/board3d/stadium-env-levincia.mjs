@@ -238,21 +238,38 @@ void main() {
   col = mix(col, BLUE_BAND, blueLine);
   // The swirl at the middle: a yellow spiral of mosaic, as the art's.
   // Two arms winding out from a round yellow eye, a turn and a half each.
+  // Its edges are measured in px (about), so they stay crisp at every radius, a blue line outside them.
   float spiral = fract((angle / 6.2831853) * 2.0 - log(max(r, 1.0) / 30.0) * 1.6);
-  float arms = (1.0 - smoothstep(0.1, 0.17, abs(spiral - 0.5))) * smoothstep(34.0, 56.0, r) * (1.0 - smoothstep(uStage.z * 0.34, uStage.z * 0.42, r));
-  float eye = 1.0 - smoothstep(26.0, 30.0, r);
-  float swirl = max(arms, eye);
-  col = mix(col, tessera, swirl * 0.9);
+  float armEdge = (0.15 - abs(spiral - 0.5)) * 1.9 * r;
+  float armEnds = min(r - 40.0, uStage.z * 0.4 - r);
+  float arms = smoothstep(-0.8, 0.8, min(armEdge, armEnds));
+  float eyeEdge = 30.0 - r;
+  float eyeShape = smoothstep(-0.8, 0.8, eyeEdge);
+  float swirl = max(arms, eyeShape);
+  float swirlEdge = max(min(armEdge, armEnds), eyeEdge);
+  col = mix(col, BLUE_BAND, (1.0 - swirl) * smoothstep(-6.0, -4.5, swirlEdge) * (1.0 - smoothstep(-2.0, -0.8, swirlEdge)) * 0.9);
+  col = mix(col, tessera, swirl * 0.95);
 
   // The rim wall: blue panels, dark joints.
   vec3 rim = mix(RIM_DARK, RIM, 0.5 + 0.5 * step(0.5, fract(angle * 40.0)));
+  // Its top lip catches the sun; a darker band runs along it lower down, and the wall darkens to the water.
+  float wallDepth = clamp((r - uStage.z) / 6.0, 0.0, 1.0);
+  rim = mix(rim * 1.35, rim * 0.78, smoothstep(0.1, 0.9, wallDepth));
   col = mix(col, rim, step(0.5, kind) * step(kind, 1.5));
   // The water's bed: deep blue (the water sheet paints over it).
   col = mix(col, WATER_DEEP * 0.7, step(1.5, kind) * step(kind, 2.5));
   // The walkway: pale deck planks across it, blue on its sides.
   float deckTop = smoothstep(0.85, 0.97, n.z);
   float plank = 1.0 - smoothstep(0.4, 1.0, abs(fract(angle * r / 14.0) - 0.5) * 14.0);
-  vec3 walk = mix(WALK_SIDE, WALK * (0.95 - 0.1 * plank), deckTop);
+  // Pavers: long slabs along the walkway in two courses, a darker joint between, a curb line at each edge.
+  float across = (r - uStage.w) / max(uWalkOut - uStage.w, 1.0);
+  float course = floor(across * 3.0);
+  float slab = abs(fract(angle * r / 46.0 + course * 0.5) - 0.5) * 46.0;
+  float joint = 1.0 - smoothstep(0.4, 1.2, slab);
+  float courseJoint = 1.0 - smoothstep(0.4, 1.2, (0.5 - abs(fract(across * 3.0) - 0.5)) * (uWalkOut - uStage.w) / 3.0);
+  float curb = 1.0 - smoothstep(0.05, 0.09, min(across, 1.0 - across));
+  vec3 walk = mix(WALK_SIDE, WALK * (0.97 - 0.07 * plank - 0.12 * max(joint, courseJoint) + 0.04 * (hash12(vec2(floor(angle * r / 46.0), course)) - 0.5)), deckTop);
+  walk = mix(walk, WALK * 1.12, curb * deckTop * 0.6);
   col = mix(col, walk, step(2.5, kind) * step(kind, 3.5));
   // A bridge: the deck's pale planks.
   vec3 bridgeDeck = mix(WALK_SIDE, WALK * 0.95, deckTop);
@@ -260,6 +277,11 @@ void main() {
 
   col *= 0.7 + 0.35 * min(lit, 1.2);
   col *= mix(0.6, 1.0, smoothstep(0.3, 0.9, light.b));
+  // The stage's polished floor takes the sky: a broad soft sheen toward the sun, panel by panel.
+  float onStage = 1.0 - step(0.5, kind);
+  vec3 toEye = normalize(uEye - vec3(p, 0.0));
+  float sheen = pow(max(dot(reflect(-sun, vec3(0.0, 0.0, 1.0)), toEye), 0.0), 6.0);
+  col += vec3(0.5, 0.55, 0.6) * sheen * 0.22 * onStage * (0.7 + 0.5 * hash12(vec2(floor(r / ringW), floor(angle / 6.2831853 * spokes))));
   col = edgeHaze(col, vUv);
   vec3 spark = vec3(1.1, 0.95, 0.4);
   col += spark * revealGlow(p, 0.035) * 0.6;
@@ -301,14 +323,22 @@ void main() {
   float t = uTime;
   float r = field.g;
   vec3 col = mix(WATER, WATER_DEEP, smoothstep(uWalkOut, uWalkOut + 300.0, r));
-  // Shade under the rim and the walkway's edges.
+  // Shade under the rim and the walkway's edges, and a white line of foam where the water meets them.
   col *= mix(0.75, 1.0, smoothstep(uStage.z, uStage.z + 24.0, r));
+  float wallDist = r < uStage.w ? min(r - uStage.z, uStage.w - r) : r - uWalkOut;
+  float lap = 0.5 + 0.5 * sin(t * 0.9 + r * 0.05 + 4.0 * gnoise(p / 40.0));
+  float foam = (1.0 - smoothstep(1.0, 3.0 + 3.0 * lap, wallDist)) * (0.55 + 0.45 * gnoise(p / 5.0));
+  // Caustics: bright net of light on the bed, drifting.
+  vec4 net = voronoiCell(p / 34.0 + vec2(t * 0.03, -t * 0.02));
+  float caustic = (1.0 - smoothstep(0.0, 0.12, net.x)) * (1.0 - smoothstep(0.0, 2.4, wallDist / 26.0));
+  col += vec3(0.12, 0.16, 0.14) * caustic;
   // Ripples drifting, and short bright glints.
   float swell = fbm3((p - vec2(t * 6.0, t * 2.0)) / vec2(80.0, 36.0));
   col *= 0.9 + 0.2 * swell;
   vec4 cell = voronoiCell((p - vec2(t * 9.0, t * 4.0)) / vec2(20.0, 8.0));
   float glint = (1.0 - smoothstep(0.1, 0.26, length(cell.zw * vec2(0.6, 1.6)))) * step(0.62, fract(cell.y * 7.0));
   col = mix(col, vec3(0.95, 1.0, 1.05), glint * (0.5 + 0.5 * sin(t * 2.0 + cell.y * 30.0)) * 0.7);
+  col = mix(col, vec3(0.97, 1.0, 1.03), foam * 0.8);
   col = edgeHaze(col, vUv);
   vec3 spark = vec3(1.1, 0.95, 0.4);
   col += spark * revealGlow(p, 0.035) * 0.6;
@@ -326,8 +356,12 @@ const SCREEN_YELLOW = [1.0, 0.82, 0.25, 2.25];
 const SCREEN_RED = [1.0, 0.36, 0.28, 2.25];
 const SCREEN_BLUE = [0.36, 0.58, 1.0, 2.25];
 const SCREEN_PALE = [1.0, 0.97, 0.75, 2.25];
-const GLASS = [0.05, 0.09, 0.42, 0.9];
-const GLASS_LIT = [0.18, 0.3, 0.78, 0.9];
+const SCREEN_CREAM = [1.0, 0.93, 0.62, 2.25];
+const SCREEN_ORANGE = [1.0, 0.55, 0.16, 2.25];
+const SCREEN_GREEN = [0.5, 0.82, 0.36, 2.25];
+const SCREEN_SKY = [0.55, 0.8, 1.0, 2.25];
+const GLASS = [0.1, 0.2, 0.58, 0.9];
+const GLASS_LIT = [0.34, 0.54, 0.9, 0.9];
 const BASE = [0.55, 0.62, 0.74, 0.3];
 
 /**
@@ -349,16 +383,34 @@ const billboard = (props, board, centre, deck, u) => {
   for (const s of [-halfW * 0.6, halfW * 0.6]) props.tube([[foot[0] + along[0] * s, foot[1] + along[1] * s, deck - 1], at(s, board.height * 0.3)], 2.6 * u, FRAME, { sides: 6 });
   // The frame's back and face.
   props.quad(at(halfW, 0), at(-halfW, 0), at(-halfW, board.height), at(halfW, board.height), FRAME);
-  const field = board.index % 3 === 0 ? SCREEN_BLUE : SCREEN_YELLOW;
+  // The art's screens, each a painted field with a creature on it: golden with an orange splash and
+  // a red figure, cream with a green one, or sky blue with pale paper shapes.
+  const variant = board.index % 3;
+  const field = [SCREEN_YELLOW, SCREEN_CREAM, SCREEN_SKY][variant];
   const inset = 5 * u;
   props.quad(frontAt(-halfW + inset, inset, 1.5), frontAt(halfW - inset, inset, 1.5), frontAt(halfW - inset, board.height - inset, 1.5), frontAt(-halfW + inset, board.height - inset, 1.5), field);
   // The art's bright Pokémon art on it, abstracted: a big red-orange figure, a pale highlight and a
   // small dark accent, each a slanted block placed by the board's seed.
   const blocks = [
-    [0.12 + 0.3 * board.seed, 0.16, 0.36, 0.62, SCREEN_RED],
-    [0.2 + 0.3 * board.seed, 0.5, 0.16, 0.3, SCREEN_PALE],
-    [0.62 - 0.2 * board.seed, 0.2, 0.22, 0.4, field === SCREEN_BLUE ? SCREEN_YELLOW : SCREEN_RED],
-  ];
+    [
+      [0.03, 0.4, 0.34, 0.55, SCREEN_ORANGE],
+      [0.12 + 0.12 * board.seed, 0.12, 0.28, 0.5, SCREEN_RED],
+      [0.6, 0.55, 0.12, 0.3, SCREEN_PALE],
+      [0.78, 0.15, 0.14, 0.25, SCREEN_ORANGE],
+    ],
+    [
+      [0.04, 0.5, 0.3, 0.45, SCREEN_YELLOW],
+      [0.38 + 0.08 * board.seed, 0.14, 0.26, 0.62, SCREEN_GREEN],
+      [0.74, 0.3, 0.2, 0.5, SCREEN_PALE],
+      [0.46 + 0.08 * board.seed, 0.62, 0.1, 0.16, SCREEN_RED],
+    ],
+    [
+      [0.06, 0.2, 0.3, 0.6, SCREEN_PALE],
+      [0.5, 0.3, 0.2, 0.55, SCREEN_BLUE],
+      [0.74, 0.18, 0.18, 0.4, SCREEN_YELLOW],
+      [0.28 + 0.1 * board.seed, 0.68, 0.14, 0.2, SCREEN_RED],
+    ],
+  ][variant];
   for (const [left, bottom, width, height, color] of blocks) {
     const s0 = -halfW + inset + (board.width - 2 * inset) * left;
     const s1 = Math.min(halfW - inset, s0 + (board.width - 2 * inset) * width);
