@@ -38,10 +38,13 @@ Facts read this session.
   painted 2048×1024 texture with a normal map: rounded slate stones, thin light crack lines,
   saturated red lava glowing in the gaps. Contact sheet: `.agent/scratch/stadium-env/tcgl-boards.png`.
 - **Homebrew Stadiums** — `client/src/assets/custom-sets/customhb/set.json`, `trainerType === 'Stadium'`,
-  17 cards: 030 Forest of Vitality, 051 Stormy Mountains, 052 Crystal Cave, 162 Steel Shelter,
-  163 Full Metal Lab, 197 Mystery Garden, 198 Old Cemetery, 199 Dimension Valley, 209 Surfing Beach,
-  212 Brooklet Hill, 239 Fighting Stadium, 240 Mountain Ring, 253 Perilous Jungle, 254 Dark City,
-  278 Levincia, 289 Magma Basin, 299 Scorched Earth. Each card's art is
+  17 cards in this worktree's copy (25 in the primary folder's newer set: the eight added later are
+  351 Lumiose City, 358 Magnetic Storm, 360 Shopping Center, 361 Community Center, 362 Pokemon Center,
+  376 Grand Tree, 378 Neutralization Zone, 428 Fairy Garden): 030 Forest of Vitality, 051 Stormy
+  Mountains, 052 Crystal Cave, 162 Steel Shelter, 163 Full Metal Lab, 197 Mystery Garden, 198 Old
+  Cemetery, 199 Dimension Valley, 209 Surfing Beach, 212 Brooklet Hill, 239 Fighting Stadium, 240
+  Mountain Ring, 253 Perilous Jungle, 254 Dark City, 278 Levincia, 289 Magma Basin, 299 Scorched
+  Earth. Each card's art is
   `client/src/assets/custom-sets/customhb/<nnn>/high.webp`.
 - **Stadium state**: one `state.stadium` card or null (`shared/engine/state.mjs:112`), sent as
   `view.stadium` (`shared/engine/view.mjs:203`). Engine cards carry `id`, `set`, `number`, `name`,
@@ -426,6 +429,55 @@ particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
     above they read as horseshoes), and so are its bare masts, which would lead to nothing. A later critique pass: the swirl's edges are crisp with
     a blue outline, the walkway is paved, the water has foam at the walls and caustics, the billboards are painted
     (golden, cream or sky blue, each with a creature) and the glass is lighter, as the art's.
+
+- Eight more (user, 2026-10-28: "the rest of the stadiums from the customhb set that haven't been made"),
+  each in its own module on this branch, each after its card art (read as a PNG, palette sampled with
+  `palette.py` and inverted through Neutral tone mapping with `inv.py`), laid out with the shared
+  `stadium-env-spots.mjs` (`boardContext`: table, cards, core box, scale `u`, `clear`, `inScene`),
+  `stadium-env-surfaces.mjs` (terrain vertex, edge haze, blade tufts, box shadow, staggered paving) and
+  `stadium-env-buildings.mjs` (`windowRun`, `wallBand`); the prop builder gained `sphere` and `cone`:
+  - Pokemon Center (`pokemon-center`, NXD 90, `stadium-env-pokecenter.mjs`). A harbour street at noon:
+    mended, cracked, oil-stained asphalt holds every card with the Poke Ball painted on it in worn white
+    lines and white edge lines at each kerb. The Center stands in the left band on a cream sidewalk edged in
+    tan kerb stones (red and yellow bands over glazed floors, a cream cornice, a red-domed glass drum
+    for an entrance, a roof of stair hut, skylights, units and a tank); a dark glass tower stands off
+    the far end; a quay with a coping, rail and two globe lamps runs down the right band over a
+    sea of rolling swells with glitter, crests and foam. Its sun is from the far left so the Center's
+    blue shadow falls on the road.
+  - Community Center (`community-center`, TWM 146, `stadium-env-community.mjs`). A pale square in big
+    staggered slabs holds every card; the white hall with its red-brown roof band, green banner, awning
+    and roof flag stands down its left side, the rock cliff and waterfall (into a pool with spray) behind
+    it, scree at its foot; a white tent and a green and a red kiosk, and round trees, stand in the
+    right band. Clouds' shadows drift over it.
+  - Shopping Center (`shopping-center`, EVS 157, `stadium-env-shopping.mjs`). A checkered coral and
+    pale-pink mall floor with a thick gold ring round the Actives; tables of folded clothes, shirt racks,
+    mannequins in yellow and pink and bunches of balloons in the side bands; pink walls with lights at the
+    table's edges, a glass-railed mezzanine across the far end climbed by two escalators whose
+    steps slide.
+  - Fairy Garden (`fairy-garden`, FCO 100, `stadium-env-fairy.mjs`). Night in a forest: a carpet of
+    five-petalled lilac blossoms in two sizes over dark moss, a thread of pale light round short grass
+    where the Actives lie, great dark trees in the side bands, big leaves, green orbs of light drifting
+    in the margins (kept far enough from the cards that raised, they never lean over one) and
+    four-pointed sparkles.
+  - Lumiose City (`lumiose-city`, POR 77, `stadium-env-lumiose.mjs`). A Parisian avenue square in
+    cream slabs with two red-curbed beds, trees and iron lamps in its side strips, rows of cream, ochre
+    and purple stone buildings down both sides (piered windows, awnings, balconies, slate mansards
+    with dormers), the white Prism Tower past the far right corner. The buildings' shadows come from an
+    exact baked light pass (12 taps over the sun's disc against every block).
+  - Magnetic Storm (`magnetic-storm`, FLF 91, `stadium-env-storm.mjs`). A marsh at night under a
+    drifting aurora: wet mud in a trampled clearing, dry olive grass and reeds outside, puddles holding the
+    sky, the glowing pink Poke Ball round the Actives, four pink pads in the side bands with two
+    lightning arcs between them and two tall bolts up into the dark (flashing on their own periods,
+    lighting the ground, the trees and the pads), bare trees.
+  - Grand Tree (`grand-tree`, SCR 136, `stadium-env-grandtree.mjs`). A bright jungle clearing on
+    moss and clover under one vast tree at the top left: a trunk of six twisting strands veined with
+    glowing gold, fat roots over the ground, a crown of foliage balls casting dappled shade, a smaller
+    tree, broad leaves, golden motes rising off the roots.
+  - Neutralization Zone (`neutralization-zone`, SFA 60, `stadium-env-neutral.mjs`). A round blue
+    platform with five rings of white-cyan light and a pulse of light travelling out along them, panels
+    between, polish; a dark panelled floor round it with yellow guide lines, blue panelled walls with a
+    grate band and a light strip, columns of light on the floor, three green-lit screens floating
+    over the far side.
 
 ### Board checklist — lessons from the first nine boards (every new board passes it)
 - Colours are the card art's pixel samples (`sample.py` region median and percentiles), inverted
