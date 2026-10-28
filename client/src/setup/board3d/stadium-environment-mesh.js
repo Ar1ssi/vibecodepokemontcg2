@@ -22,6 +22,7 @@ import { pokemonCenterBoard } from './stadium-env-pokecenter.mjs';
 import { mysteryGardenBoard } from './stadium-env-garden.mjs';
 import { magmaBasinBoard } from './stadium-env-magma.mjs';
 import { magneticStormBoard } from './stadium-env-storm.mjs';
+import { neutralizationZoneBoard } from './stadium-env-neutral.mjs';
 import { mountainRingBoard } from './stadium-env-ring.mjs';
 import { oldCemeteryBoard } from './stadium-env-cemetery.mjs';
 import { shoppingCenterBoard } from './stadium-env-shopping.mjs';
@@ -638,6 +639,7 @@ const BOARDS = {
   'magma-basin': magmaBasinBoard,
   'magnetic-storm': magneticStormBoard,
   'mountain-ring': mountainRingBoard,
+  'neutralization-zone': neutralizationZoneBoard,
   'mystery-garden': mysteryGardenBoard,
   'old-cemetery': oldCemeteryBoard,
   'perilous-jungle': perilousJungleBoard,

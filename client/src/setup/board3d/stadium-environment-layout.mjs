@@ -32,6 +32,7 @@ const ENVIRONMENT_BY_CARD = {
   'customhb-361': 'community-center',
   'customhb-362': 'pokemon-center',
   'customhb-376': 'grand-tree',
+  'customhb-378': 'neutralization-zone',
   'customhb-428': 'fairy-garden',
 };
 export const ENVIRONMENT_KEYS = Object.freeze([...new Set(Object.values(ENVIRONMENT_BY_CARD))]);
@@ -60,6 +61,7 @@ const SCENE_MARGINS = {
   'lumiose-city': { side: 0.17, near: 0.2, far: 0.34 },
   'magnetic-storm': { side: 0.17, near: 0.2, far: 0.34 },
   'mountain-ring': { side: 0.17, near: 0.2, far: 0.34 },
+  'neutralization-zone': { side: 0.17, near: 0.2, far: 0.34 },
   'dark-city': { side: 0.17, near: 0.2, far: 0.34 },
   'full-metal-lab': { side: 0.17, near: 0.2, far: 0.34 },
   'grand-tree': { side: 0.17, near: 0.2, far: 0.34 },
