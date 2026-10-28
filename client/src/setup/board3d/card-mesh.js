@@ -15,7 +15,7 @@ import {
   cardScaleFor,
   roundedRectShapePoints,
 } from './card-geometry.mjs';
-import { flightPlacement } from './flight-pose.mjs';
+import { flightPlacement, restingFlightPlacement } from './flight-pose.mjs';
 import { OCCLUDER_LAYER } from './fx/fx-layers.mjs';
 import { createTween, easeOutCubic } from './tween.mjs';
 
@@ -581,11 +581,12 @@ export function createCardMeshPool({
       return true;
     }
     const flipDeg = Number.isFinite(pose?.flipDeg) ? pose.flipDeg : card.flip ? card.flip.at(now) : 0;
-    const placement = flightPlacement(
+    const placement = restingFlightPlacement(
       camera,
       { ...pose, flipDeg },
-      { widthPx: card.geometry.w, heightPx: card.geometry.h },
-      viewOrigin()
+      { widthPx: card.geometry.w, heightPx: card.geometry.h, thicknessPx: card.geometry.t },
+      viewOrigin(),
+      CARD_LIFT_PX
     );
     if (placement) {
       card.mesh.position.set(...placement.position);
