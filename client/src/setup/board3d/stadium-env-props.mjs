@@ -17,6 +17,7 @@ const unit = (a) => {
 /**
  * A builder of lit solids in the table frame (x right, y far, z up, px).
  * @returns {{ tube: Function, cylinder: Function, box: Function, quad: Function, ring: Function,
+ *   sphere: Function, cone: Function,
  *   vertexCount: () => number, build: (three: typeof import('three')) => import('three').BufferGeometry }}
  */
 export function createPropBuilder() {
@@ -134,6 +135,39 @@ export function createPropBuilder() {
     }
   };
 
+  /** A smooth-shaded sphere at (x, y, z), `squash` flattening z (a balloon's, a dome's). */
+  const sphere = ({ x, y, z, r, color, sides = 16, rings = 10, squash = 1 }) => {
+    const first = positions.length / 3;
+    for (let i = 0; i <= rings; i += 1) {
+      const theta = (i / rings) * Math.PI;
+      for (let k = 0; k <= sides; k += 1) {
+        const phi = (k / sides) * 2 * Math.PI;
+        const n = [Math.sin(theta) * Math.cos(phi), Math.sin(theta) * Math.sin(phi), Math.cos(theta)];
+        vertex([x + n[0] * r, y + n[1] * r, z + n[2] * r * squash], unit([n[0], n[1], n[2] / squash]), color);
+      }
+    }
+    for (let i = 0; i < rings; i += 1) {
+      for (let k = 0; k < sides; k += 1) {
+        const a = first + i * (sides + 1) + k;
+        const b = a + sides + 1;
+        index.push(a, b, a + 1, a + 1, b, b + 1);
+      }
+    }
+  };
+
+  /** A cone from radius r at z0 up to its apex at z1; its base is left open. */
+  const cone = ({ x, y, z0, z1, r, color, sides = 16 }) => {
+    const first = positions.length / 3;
+    const rise = z1 - z0;
+    for (let k = 0; k <= sides; k += 1) {
+      const angle = (k / sides) * 2 * Math.PI;
+      const n = unit([Math.cos(angle) * rise, Math.sin(angle) * rise, r]);
+      vertex([x + Math.cos(angle) * r, y + Math.sin(angle) * r, z0], n, color);
+      vertex([x, y, z1], n, color);
+    }
+    for (let k = 0; k < sides; k += 1) index.push(first + k * 2, first + k * 2 + 2, first + k * 2 + 1);
+  };
+
   const build = (three) => {
     const geometry = new three.BufferGeometry();
     geometry.setAttribute('position', new three.Float32BufferAttribute(positions, 3));
@@ -143,7 +177,7 @@ export function createPropBuilder() {
     return geometry;
   };
 
-  return { tube, cylinder, ring, box, quad, vertexCount: () => positions.length / 3, build };
+  return { tube, cylinder, ring, box, quad, sphere, cone, vertexCount: () => positions.length / 3, build };
 }
 
 export const PROP_VERTEX = /* glsl */ `

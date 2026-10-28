@@ -69,7 +69,8 @@ test('environmentKeyFor maps Scorched Earth by id, or by set and number when the
 test('environmentKeyFor gives every Homebrew Stadium in set.json a board of its own, and no other card one', () => {
   const set = JSON.parse(readFileSync(new URL('../../../assets/custom-sets/customhb/set.json', import.meta.url), 'utf8'));
   const stadiums = set.cards.filter((card) => card.trainerType === 'Stadium');
-  assert.equal(stadiums.length, 17);
+  // The worktree's set.json holds 17 Stadiums; the full set (primary folder) holds 25, each with a board here.
+  assert.ok(stadiums.length >= 17);
   const keys = stadiums.map((card) => environmentKeyFor({ id: card.id }));
   assert.ok(keys.every(Boolean), `unmapped: ${stadiums.filter((_, i) => !keys[i]).map((card) => card.name)}`);
   assert.equal(new Set(keys).size, stadiums.length);

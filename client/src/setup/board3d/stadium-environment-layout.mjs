@@ -26,6 +26,7 @@ const ENVIRONMENT_BY_CARD = {
   'customhb-278': 'levincia',
   'customhb-289': 'magma-basin',
   'customhb-299': 'scorched-earth',
+  'customhb-362': 'pokemon-center',
 };
 export const ENVIRONMENT_KEYS = Object.freeze([...new Set(Object.values(ENVIRONMENT_BY_CARD))]);
 /** Dev check on the real board: `?stadiumEnv=` or `localStorage[ENVIRONMENT_OVERRIDE_KEY]` forces one on. */
@@ -54,6 +55,7 @@ const SCENE_MARGINS = {
   'magma-basin': { side: 0.17, near: 0.2, far: 0.34 },
   'stormy-mountains': { side: 0.17, near: 0.2, far: 0.34 },
   'perilous-jungle': { side: 0.17, near: 0.2, far: 0.34 },
+  'pokemon-center': { side: 0.17, near: 0.2, far: 0.34 },
   'steel-shelter': { side: 0.17, near: 0.2, far: 0.34 },
 };
 

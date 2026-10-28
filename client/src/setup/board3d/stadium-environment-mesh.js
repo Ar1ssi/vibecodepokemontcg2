@@ -14,6 +14,7 @@ import { crystalCaveBoard } from './stadium-env-crystal.mjs';
 import { dimensionValleyBoard } from './stadium-env-dimension.mjs';
 import { fullMetalLabBoard } from './stadium-env-lab.mjs';
 import { levinciaBoard } from './stadium-env-levincia.mjs';
+import { pokemonCenterBoard } from './stadium-env-pokecenter.mjs';
 import { mysteryGardenBoard } from './stadium-env-garden.mjs';
 import { magmaBasinBoard } from './stadium-env-magma.mjs';
 import { mountainRingBoard } from './stadium-env-ring.mjs';
@@ -629,6 +630,7 @@ const BOARDS = {
   'mystery-garden': mysteryGardenBoard,
   'old-cemetery': oldCemeteryBoard,
   'perilous-jungle': perilousJungleBoard,
+  'pokemon-center': pokemonCenterBoard,
   'scorched-earth': scorchedEarthBoard,
   'steel-shelter': steelShelterBoard,
   'stormy-mountains': stormyMountainsBoard,
