@@ -380,32 +380,28 @@ particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
     the mark. Up to ten small angular slabs of grass and earth float in the margins, each tipped its
     own way and bobbing slowly. They float low toward the near end, so they never lean over the
     player's cards; a bare little tree stands on the farthest slab.
-  - Surfing Beach (`surfing-beach`, MEG 129, Ayumi Odashima; built, `stadium-env-beach.mjs`, its surf
-    model ported from `feature/077-beach-board`). Every card lies on the art's golden-orange sand, with
-    wind ripples in patches and low dunes away from the cards. The sea lies in the far-left corner and
-    down the left margin, the one stretch both presets see: in the tilted preset the right margin lies
-    under the sidebox. The art's sea is on the right, so its layout is mirrored. The shore is a
-    straight line square to the sea, 300 px nearer the cards than a line clearing them all; it is
-    smoothly turned aside round each card, so every card keeps dry sand past the highest run-up. Swell
-    shoals and bunches toward the shore. Big waves break on a sandbar cut by rip channels, every wave
-    breaks at the shore, and a big swell's crest spills into short whitecaps. Foam is patchy lace
-    whose holes open as it thins, never a net. Each bore runs up as a thin sheet with a foam front and
-    drains, leaving glassy sand. The water is clear in the shallows, with soft caustic threads on the
-    sand, then turquoise, teal and deep blue. Up to four chunky faceted brown rocks stand in the surf,
-    each wrapped in foam that swells with every wave and throwing up spray. The art's cliffs are left
-    out: past the far edge they lean off the screen, and the near margin is where the cards are.
-    There are no palms (the art has none).
-  - Brooklet Hill (`brooklet-hill`, GRI 120, 5ban Graphics; built fresh, `stadium-env-brooklet.mjs`). The
-    cards lie over the lake's sandy shallows, where the water is pale turquoise so every card keeps its
-    edges. The water deepens to the art's clear blue and then deeper blue away from them. Short bright
-    wavelets and flaring star glints drift with the breeze. A pale beach with a low dark rock bank and
-    grass with round trees runs along the far edge, and the opponent's hand lies over it. In the
-    far-left corner of the free table stands the art's olive-grey rock: a low ledge at the water,
-    then the main cliff with grass and rock patches on top and round trees. The waterfall leaves the
-    cliff's lip, falls over the ledge into the lake, and foams at its foot with spray rising. The
-    wooden pier reaches out from the far shore on the right. Two lumpy grey-brown boulders, ringed
-    in foam, stand in the near-left water, and dark rocks lie sunk in open water. Every piece keeps
-    clear of the cards, and a test projects them in both presets.
+  - Surfing Beach (`surfing-beach`, MEG 129, Ayumi Odashima; built, `stadium-env-beach.mjs`, its bay in
+    `stadium-env-beach-layout.mjs`, its palms in `stadium-env-palms.mjs`; the `feature/077-beach-board` version,
+    which replaced a from-scratch one). A sunny bay seen from above: the sea fills the far-left corner,
+    the waterline running from the far edge to the left edge with a slight bend into the land, golden
+    sand beyond it. Swell slows and bunches in the shallows, big waves break on a sandbar cut by rip
+    channels, and every wave breaks at the shore, rolling in as white lace. Each bore runs up the beach
+    as a thin sheet with a fingered foam front, drains, and leaves glassy then dull wet sand, with a
+    wrack line of seaweed above the highest run-up. The shallows are clear (ripple marks and caustics
+    show through), turquoise over the bar, deep blue past it. Up to three rock clusters stand along the
+    waterline, one out in the surf. Up to six palms stand on the dry sand near the table edges, clear
+    of every card, leaning over open sand, and cast swaying shadows the sand and sea read (drawn each
+    frame into a table-space target by the board's `beforeRender`).
+  - Brooklet Hill (`brooklet-hill`, GRI 120, 5ban Graphics; the `feature/077-brooklet-map` version, laid out
+    as the 3DS map draws it; `stadium-env-brooklet.mjs`, pieces placed by `stadium-env-brooklet-layout.mjs`).
+    A teal lake lies under every card. Stone towers hold round pools past its far-left corner, with
+    their falls and a cave. The left bank is a sand-topped ledge on a stone wall straight out of the
+    water, with a walled pool spilling off it; short of the ledge the lake spills into a walled basin a
+    step down. Boulders stand in the shallows. A beach under dark earth cliffs, and grass with round
+    bushes, line the far and right banks. A plank pier reaches out, and a fenced sand path runs along
+    the near shore. The water has a mottled ripple texture drifting in two layers, one crisp white line
+    at every waterline, foam rings round the boulders and churn where the falls land. The stone is
+    courses of rounded olive-tan stones with moss in their joints.
   - Levincia (`levincia`, JTG 150, Marina Chikazawa; built, `stadium-env-levincia.mjs`). A noon city on
     the water, with the sun high at the far right. A round stage holds every card. Its floor is pale
     blue panels in rings and spokes, a shade darker than the art's, so white card borders keep their

@@ -1002,6 +1002,7 @@ export function createStadiumEnvironment({
     group.updateWorldMatrix(true, false);
     cutout.uniforms.uTableFromWorld.value.copy(group.matrixWorld).invert();
     if (camera) uniforms.uEye.value.copy(camera.position).applyMatrix4(cutout.uniforms.uTableFromWorld.value);
+    board.beforeRender?.(renderer);
     const revealing = progress < 1;
     if (!revealing) scheduleAmbient();
     return revealing;
@@ -1021,6 +1022,7 @@ export function createStadiumEnvironment({
       for (const board of released) {
         for (const object of board.objects) object.geometry.dispose();
         for (const material of board.materials) material.dispose();
+        board.dispose?.();
       }
       bakeQuad.geometry.dispose();
       bakeLight.dispose();

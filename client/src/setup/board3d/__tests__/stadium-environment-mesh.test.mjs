@@ -164,6 +164,43 @@ test('createStadiumEnvironment compiles with compileAsync when it can: the mat s
   environment.dispose();
 });
 
+// A board's own beforeRender draws its palms' shadows each frame; its dispose frees the target (Surfing Beach).
+test('a board with a beforeRender hook draws it each frame and disposes what it owns', async () => {
+  const three = await import('../../../vendor/three/three.module.min.js');
+  const drawn = [];
+  let target = null;
+  const renderer = {
+    extensions: { has: () => true },
+    compile: () => {},
+    getRenderTarget: () => target,
+    setRenderTarget: (next) => {
+      target = next;
+    },
+    getClearColor: (colour) => colour,
+    getClearAlpha: () => 1,
+    setClearColor: () => {},
+    clear: () => {},
+    render: () => drawn.push(target),
+    getDrawingBufferSize: (size) => size.set(1920, 1080),
+  };
+  const environment = createStadiumEnvironment({ three, renderer, parent: new three.Group(), isHidden: () => true });
+  const camera = new three.PerspectiveCamera();
+  environment.setLayout(layout);
+  environment.setKey('surfing-beach');
+  environment.update(1000, camera);
+  const before = drawn.length;
+  environment.update(3000, camera);
+  const shadowPasses = drawn.slice(before).filter((drawnTarget) => drawnTarget?.texture);
+  assert.equal(shadowPasses.length, 1, 'the palm shadows are drawn once a frame');
+  assert.equal(target, null, 'the previous render target is restored');
+  let disposed = 0;
+  shadowPasses[0].addEventListener('dispose', () => {
+    disposed += 1;
+  });
+  environment.dispose();
+  assert.equal(disposed, 1, 'the shadow target is freed with the environment');
+});
+
 /**
  * A renderer whose compileAsync calls wait until the test settles them, and an environment on it
  * (magma-basin and steel-shelter boards), for the races round a pending compile.
