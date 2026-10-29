@@ -1,5 +1,10 @@
 import { cardSpriteFor } from '../../../setup/deck-builder/core/card-sprites.mjs';
 import { ownedTileLabel } from '../../../setup/deck-builder/core/elite-trainer-box/etb-view.mjs';
+import {
+  createTapGesture,
+  isPhoneLayout,
+  previewTile,
+} from '../../../setup/deck-builder/core/card-tap-gesture.mjs';
 
 const escapeHtml = (value = '') => String(value)
       .replaceAll('&', '&amp;')
@@ -66,12 +71,32 @@ const escapeHtml = (value = '') => String(value)
           `;
     };
 
+    const selectTile = (grid, button) => {
+      const state = renderedSearchGrids.get(grid);
+      if (state) state.onSelect(state.results[Number(button.dataset.resultIndex)]);
+    };
+
+    // Phone layout: tap previews, double tap adds.
+    const gridTaps = new WeakMap(); // grid element -> tap resolver
+    const phoneTap = (grid, button) => {
+      if (!gridTaps.has(grid)) {
+        gridTaps.set(
+          grid,
+          createTapGesture({
+            onSingle: previewTile,
+            onDouble: (tile) => selectTile(grid, tile),
+          })
+        );
+      }
+      gridTaps.get(grid)(button);
+    };
+
     const handleSearchGridClick = (event) => {
       const grid = event.currentTarget;
       const button = event.target.closest('[data-result-index]');
-      const state = renderedSearchGrids.get(grid);
-      if (!button || !state || !grid.contains(button)) return;
-      state.onSelect(state.results[Number(button.dataset.resultIndex)]);
+      if (!button || !renderedSearchGrids.has(grid) || !grid.contains(button)) return;
+      if (isPhoneLayout()) phoneTap(grid, button);
+      else selectTile(grid, button);
     };
 
     // Swaps the nodes between the image and the caption for freshly parsed badge markup.

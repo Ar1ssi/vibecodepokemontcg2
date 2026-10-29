@@ -121,4 +121,5 @@ scripts/e2e/playtest-bot.mjs — design 004 slice 6: the playtest runner. Two Pl
   bot, either netcode (`node server/server.js` on :4000, then `node scripts/e2e/playtest-bot.mjs
   --games=N --seed=S`); dumps a replayable trace to out/playtest/ on any failure. Found a real bug
   on first live run (I30, ISSUES.md) — see design 004 slice 6's Acceptance note.
-
+client/src/css/deck-builder-phone.css — phone layout (<760px) for the builder tab: one pane at a time, bottom Cards/Deck nav; sidebox/native-deck-builder-phone-view.js sets `data-phone-view`
+client/src/setup/deck-builder/core/card-tap-gesture.mjs — phone tap = preview, double tap = add for result tiles (renderers + set-browser); `isPhoneLayout`, `createTapGesture`

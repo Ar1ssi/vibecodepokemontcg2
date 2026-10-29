@@ -368,6 +368,12 @@
                             <button type="button" data-wallpaper-step="1" aria-label="Next box wallpaper" title="Next box wallpaper">&#9654;</button>
                         </div>
                     </div></div>
+            <% if (isBuilderWindow) { %>
+            <nav id="nativeDeckBuilderPhoneNav" class="native-deck-builder-phone-nav" aria-label="Deck builder view">
+                <button type="button" data-phone-view="cards" aria-pressed="true">Cards</button>
+                <button type="button" data-phone-view="deck" aria-pressed="false">Deck <span id="nativeDeckBuilderPhoneCount"></span></button>
+            </nav>
+            <% } %>
             </div>
             <div id="nativeDeckBuilderImportListModal" class="native-deck-builder-modal" role="dialog" aria-modal="true" aria-label="Import card list" hidden>
                 <div class="native-deck-builder-modal-box native-deck-builder-import-box">

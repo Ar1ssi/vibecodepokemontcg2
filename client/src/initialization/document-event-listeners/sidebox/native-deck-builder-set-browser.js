@@ -1,4 +1,9 @@
 import {
+  createTapGesture,
+  isPhoneLayout,
+  previewTile,
+} from '../../../setup/deck-builder/core/card-tap-gesture.mjs';
+import {
       fetchLegalStandardSets,
       fetchGenerationSets,
       fetchHomebrewSets,
@@ -412,15 +417,21 @@ import {
           });
         });
 
+        const addTile = (button) => {
+          for (const cards of cardsBySet.values()) {
+            const card = cards.find((c) => c.id === button.dataset.cardId);
+            if (card) {
+              onAddCard?.(card);
+              return;
+            }
+          }
+        };
+        // Phone layout: tap previews, double tap adds.
+        const tapTile = createTapGesture({ onSingle: previewTile, onDouble: addTile });
         resultsEl.querySelectorAll('[data-card-id]').forEach((button) => {
           button.addEventListener('click', () => {
-            for (const cards of cardsBySet.values()) {
-              const card = cards.find((c) => c.id === button.dataset.cardId);
-              if (card) {
-                onAddCard?.(card);
-                return;
-              }
-            }
+            if (isPhoneLayout()) tapTile(button);
+            else addTile(button);
           });
         });
       };

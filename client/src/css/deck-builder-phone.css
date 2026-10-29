@@ -1,0 +1,190 @@
+/* Phone layout for the deck builder tab (/deck-builder, /build-and-battle).
+ * Under 760px the card pane and the deck pane take turns filling the window; the bottom nav
+ * (#nativeDeckBuilderPhoneNav, native-deck-builder-phone-view.js) sets data-phone-view on the
+ * workspace. The desktop sizes are vh/vw based, which turns tiny on a phone, so this block
+ * re-sizes in px. Id selectors keep it independent of @import order. */
+
+.native-deck-builder-phone-nav {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  body.deck-builder-window #nativeDeckBuilderWorkspace {
+    height: 100dvh;
+  }
+
+  /* Header: stacked rows that scroll sideways rather than wrapping into the content. */
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-header {
+    flex: 0 0 auto;
+    min-width: 0;
+    max-width: 100%;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: stretch;
+    height: auto;
+    gap: 6px;
+    padding: 6px 8px;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-targetbar,
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-actions {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 6px;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-targetbar > *,
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-actions > * {
+    flex: 0 0 auto;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-targetbar,
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-actions {
+    flex: 0 0 auto;
+    min-width: 0;
+    max-width: 100%;
+    align-items: center;
+    height: auto;
+    min-height: 0;
+    margin: 0;
+    padding-top: 0;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-target-label,
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-header > div:first-child {
+    display: none;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-header button,
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-actions label {
+    min-height: 36px;
+    padding: 6px 10px;
+    font-size: 14px;
+    white-space: nowrap;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-link-banner {
+    flex: 0 0 auto;
+    min-width: 0;
+    white-space: normal;
+    font-size: 13px;
+    padding: 6px 8px;
+  }
+
+  /* One pane at a time. */
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-body {
+    flex-direction: column;
+    gap: 0;
+    padding: 6px;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-pane {
+    flex: 1 1 0;
+    max-width: none;
+    padding: 0;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-pane-side {
+    padding: 8px;
+    gap: 8px;
+    overflow-y: auto;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace[data-phone-view='deck'] .native-deck-builder-pane-main,
+  body.deck-builder-window #nativeDeckBuilderWorkspace:not([data-phone-view='deck']) .native-deck-builder-pane-side {
+    display: none;
+  }
+
+  /* Bottom switch, in thumb reach. */
+  body.deck-builder-window #nativeDeckBuilderPhoneNav {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 6px;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+    background: var(--db-panel, rgb(207, 211, 218));
+    border-top: 1px solid var(--db-border, rgba(0, 0, 0, 0.12));
+  }
+  body.deck-builder-window #nativeDeckBuilderPhoneNav button {
+    flex: 1 1 0;
+    min-height: 44px;
+    font-size: 16px;
+    font-weight: 700;
+    border: 1px solid var(--db-border-strong, rgba(0, 0, 0, 0.2));
+    border-radius: 999px;
+    background: transparent;
+    color: var(--db-text-dim, inherit);
+    cursor: pointer;
+  }
+  body.deck-builder-window #nativeDeckBuilderPhoneNav button[aria-pressed='true'] {
+    background: var(--db-gold, #e8b84a);
+    border-color: transparent;
+    color: #23190a;
+  }
+
+  /* Card pane: tabs scroll sideways, search wraps onto two lines, results are a 2-3 up grid. */
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-mode-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-mode-tab {
+    flex: 0 0 auto;
+    min-height: 40px;
+    padding: 0 14px;
+    font-size: 14px;
+    white-space: nowrap;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-pane-main-header {
+    padding: 8px;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-section-title {
+    font-size: 16px;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-section-button {
+    font-size: 13px;
+    padding: 6px 10px;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-search-row {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-search-input {
+    flex: 1 1 100%;
+    min-height: 40px;
+    padding: 8px 10px;
+    /* 16px stops iOS zooming the page when the field is focused. */
+    font-size: 16px;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-search-select {
+    flex: 1 1 0;
+    min-height: 36px;
+    padding: 6px;
+    font-size: 14px;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace #nativeDeckBuilderSearchButton,
+  body.deck-builder-window #nativeDeckBuilderWorkspace #nativeDeckBuilderFiltersButton {
+    flex: 1 1 0;
+    min-height: 36px;
+    padding: 6px 10px;
+    font-size: 14px;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-search-status {
+    font-size: 13px;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-search-results {
+    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+    gap: 8px;
+    padding: 4px 8px;
+  }
+
+  /* Double tap adds a card; without this the browser zooms the page instead. */
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-result {
+    touch-action: manipulation;
+  }
+
+  /* Filter drawer covers the card pane. */
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-fdrawer {
+    width: 100%;
+  }
+
+  /* Modals fit the screen. */
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-modal-box {
+    width: calc(100vw - 24px);
+    max-width: none;
+    max-height: calc(100dvh - 24px);
+    overflow-y: auto;
+  }
+}
