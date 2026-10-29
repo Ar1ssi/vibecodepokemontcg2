@@ -5,7 +5,7 @@ import { cameraFromCssTilt, cameraTcgLive } from './board-camera.mjs';
 import { boardWidthFrac, flatLayout, halfFromViewport } from './board-layout.mjs';
 import { CARD_ZONES } from './board-model.mjs';
 import { createPerfHud, perfHudWanted } from './perf-hud.js';
-import { environmentOverride } from './stadium-environment-layout.mjs';
+import { environmentKeyFor, environmentOverride } from './stadium-environment-layout.mjs';
 
 const ACTIVE_CLASS = 'board3d-active';
 // Past the scene's longest tween (board-scene.js CARD_POSE_MS 180, card-mesh.js FLIP_MS 300).
@@ -17,7 +17,7 @@ const unavailableNotice = (reason) => `3D board unavailable: ${reason}; this bro
 const defaultDeps = {
   importThree: () => import('three'),
   loadModules: async () => {
-    const [renderer, textures, scene, clock, table, room, bloom, impacts, model, applyView, hydrateHolo, matFx, containers, input, hover, dragActions, fxApply, fxModel, handSort] =
+    const [renderer, textures, scene, clock, table, room, bloom, impacts, model, applyView, hydrateHolo, matFx, containers, input, hover, dragActions, fxApply, fxModel, handSort, advisory] =
       await Promise.all([
         import('../gl/gl-renderer.js'),
         import('../gl/gl-textures.js'),
@@ -38,6 +38,7 @@ const defaultDeps = {
         import('../image-logic/fx-settings.js'),
         import('../image-logic/fx-settings.mjs'),
         import('../netcode/hand-sort-context.js'),
+        import('../netcode/advisory-animations.js'),
       ]);
     return {
       createRenderer: renderer.createRenderer,
@@ -62,6 +63,11 @@ const defaultDeps = {
         current: () => fxModel.readSettings(globalThis.localStorage).cameraPreset,
         subscribe: (listener) => fxApply.onFxSettingsChanged((settings) => listener(settings.cameraPreset)),
       },
+      stadiumBoards: {
+        off: () => fxModel.readSettings(globalThis.localStorage).stadiumBoardsOff,
+        subscribe: (listener) => fxApply.onFxSettingsChanged((settings) => listener(settings.stadiumBoardsOff)),
+      },
+      queueBoardEnvironment: advisory.queueBoardEnvironment,
       loadFoil,
     };
   },
@@ -214,6 +220,38 @@ export async function initializeBoard3d({
   const current = { lost: 0, model: null, cards: new Map(), foil: null, warnedInvalid: false };
   const mirror = modules.boardMirror ?? null;
 
+  /**
+   * Design 077: the Stadium board the model's Stadium in play wants, or null (the mat): none while
+   * the "Stadium boards" setting is off; the dev override (`?stadiumEnv=<key>`) wins otherwise.
+   */
+  const stadiumEnvironmentKey = (model) => {
+    if (modules.stadiumBoards?.off?.()) return null;
+    let override = null;
+    try {
+      override = environmentOverride(win?.localStorage, win?.location?.search ?? '');
+    } catch (error) {
+      console.warn('board3d: stadium environment override unreadable', error?.message || error);
+    }
+    if (override) return override;
+    const stadium = model?.stadium;
+    return stadium ? environmentKeyFor({ id: stadium.cardId, set: stadium.set, number: stadium.number }) : null;
+  };
+
+  /**
+   * Points the scene's Stadium board at the model's. A change animates through the FX queue (after
+   * the Stadium card's own play) when `animate`, else it snaps: the first view of a board, a
+   * rebuilt scene, a settings toggle.
+   */
+  const syncStadiumEnvironment = (scene, { animate }) => {
+    if (!scene?.setStadiumEnvironment?.(stadiumEnvironmentKey(current.model))) return;
+    if (animate && typeof modules.queueBoardEnvironment === 'function') {
+      modules.queueBoardEnvironment({ play: scene.playStadiumEnvironment, settle: scene.settleStadiumEnvironment });
+      return;
+    }
+    scene.settleStadiumEnvironment();
+  };
+  let environmentShown = false;
+
   // The mirror's rects follow the scene: after each model, each relayout and every frame in which
   // a card moved (plus the frame it settled on), coalesced to one write per task.
   // A trailing sync once every tween has settled covers a page that draws no frames (a hidden or
@@ -359,12 +397,7 @@ export async function initializeBoard3d({
       resetState: () => gl.renderer.resetState(),
     });
     if (impactHost) scene.fx.setImpacts(impactHost);
-    // Design 077 (prototype): `?stadiumEnv=scorched-earth` (or local storage) shows a Stadium board.
-    try {
-      scene.setStadiumEnvironment?.(environmentOverride(win?.localStorage, win?.location?.search ?? ''));
-    } catch (error) {
-      console.warn('board3d: stadium environment override unreadable', error?.message || error);
-    }
+    syncStadiumEnvironment(scene, { animate: false });
     Object.assign(session, { canvas, gl, textures, clock, scene, input: createInput(canvas, scene) });
     if (doc.visibilityState !== 'hidden') clock.start();
     return true;
@@ -420,6 +453,12 @@ export async function initializeBoard3d({
     session.cleanup.push(unsubscribe);
   }
 
+  // Turning Stadium boards off removes the board at once; turning them on snaps it in.
+  if (typeof modules.stadiumBoards?.subscribe === 'function') {
+    const unsubscribe = modules.stadiumBoards.subscribe(() => syncStadiumEnvironment(session?.scene, { animate: false }));
+    session.cleanup.push(unsubscribe);
+  }
+
   const onMatApplied = async () => {
     const spec = await readMat();
     if (!session) return;
@@ -456,6 +495,9 @@ export async function initializeBoard3d({
       },
     });
     session.scene.applyModel(current.model);
+    // The first view this board shows snaps to its Stadium (a join or reconnect mid-game).
+    syncStadiumEnvironment(session.scene, { animate: environmentShown });
+    environmentShown = true;
     queueMirrorSync();
   };
   if (mirror) {

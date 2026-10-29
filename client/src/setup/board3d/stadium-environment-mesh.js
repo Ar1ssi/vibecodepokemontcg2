@@ -39,9 +39,10 @@ import {
   sceneBounds,
   volcanoSpot,
 } from './stadium-environment-layout.mjs';
+import { createEnvironmentTimeline } from './stadium-environment-timeline.mjs';
 import { tableBounds } from './table-uv.mjs';
 
-export const INTRO_MS = 1600;
+export { EXIT_MS, INTRO_MS } from './stadium-environment-timeline.mjs';
 /** Render layer of the environment: board-scene.js draws it in a pass of its own, under the board. */
 export const STADIUM_ENV_LAYER = 3;
 export const AMBIENT_FPS = 30;
@@ -81,9 +82,25 @@ const STORM_PX = { from: 100, span: 60, inset: 24, z: 96 };
 const STORM_MIN_TURN = 0.08;
 const STORM_ATTEMPTS = 6;
 
-const BAKE_OPTIONS = { depthTest: false, depthWrite: false, toneMapped: false };
+/**
+ * Lays the plate on the canvas. During a swap the incoming board's plate (premultiplied: it cleared
+ * to transparent) goes over the outgoing board's last plate.
+ */
+const PLATE_FRAGMENT = `uniform sampler2D uPlate;
+uniform sampler2D uUnder;
+uniform float uUnderOn;
+varying vec2 vUv;
+void main() {
+  vec4 top = texture2D(uPlate, vUv);
+  if (uUnderOn > 0.5) {
+    vec4 under = texture2D(uUnder, vUv);
+    top = vec4(top.rgb + under.rgb * (1.0 - top.a), max(top.a, under.a));
+  }
+  gl_FragColor = top;
+${glsl.OUTPUT}
+}`;
 
-const easeOutCubic = (t) => 1 - (1 - t) ** 3;
+const BAKE_OPTIONS = { depthTest: false, depthWrite: false, toneMapped: false };
 
 /** The scene an object is in (its root). */
 const sceneOf = (object) => {
@@ -669,11 +686,15 @@ const BOARDS = {
  *   isHidden?: () => boolean, random?: () => number }} deps
  *   `parent` is the table frame (board-scene.js `tableFrame`); `onNeedsRender` asks the scene for a
  *   frame (ambient animation, 30 fps while shown).
- * @returns {{ setLayout: (layout: object) => void, setKey: (key: string|null) => boolean,
+ * @returns {{ setLayout: (layout: object) => void, setTarget: (key: string|null) => boolean,
+ *   play: () => number, settle: () => void, setKey: (key: string|null) => boolean,
  *   update: (now: number, camera?: import('three').PerspectiveCamera) => boolean, active: () => boolean,
  *   cutout: { glsl: string, uniforms: object }, dispose: () => void }}
- *   `setKey` returns true when the shown environment changed; `update` (each frame, before the
- *   scene renders) bakes when needed and returns true while the reveal still runs.
+ *   `setTarget` records the board the view wants (true when that changed); `play` animates from the
+ *   shown board to it and returns the hold (stadium-environment-timeline.mjs): a reveal over the mat,
+ *   a reveal over the outgoing board's last plate (a swap), or a dissolve; `settle` snaps to it.
+ *   `setKey` is `setTarget` then `play`. `update` (each frame, before the scene renders) bakes when
+ *   needed and returns true while a transition runs.
  */
 export function createStadiumEnvironment({
   three,
@@ -713,6 +734,9 @@ export function createStadiumEnvironment({
       uReveal: uniforms.uReveal,
       uExit: uniforms.uExit,
       uCutoutOn: { value: 0 },
+      uUnderOn: { value: 0 },
+      uUnderMin: { value: new three.Vector2() },
+      uUnderSize: { value: new three.Vector2() },
       uTableFromWorld: { value: new three.Matrix4() },
     },
   };
@@ -754,7 +778,11 @@ export function createStadiumEnvironment({
   let appliedFor = '';
   let bakedFor = '';
   let targets = null;
-  let revealStartedAt = null;
+  const timeline = createEnvironmentTimeline();
+  /** The outgoing board's last plate while the incoming one reveals over it (a swap). */
+  let underTarget = null;
+  /** The plate shows the shown board fully revealed: a swap can lay the next board over it. */
+  let plateSettled = false;
   let ambientTimer = null;
   let disposed = false;
   // The plate (see PLATE_MAX_PIXELS): made when first needed; stale when what it shows is out of date.
@@ -763,6 +791,7 @@ export function createStadiumEnvironment({
   let lastStep = Number.NaN;
   let plateMaterial = null;
   let plateScene = null;
+  const clearColour = new three.Color();
   const watched = new Float64Array(3 + 4 + 16 + 16 + 2);
   const onContextRestored = () => {
     plateStale = true;
@@ -1012,33 +1041,98 @@ export function createStadiumEnvironment({
     });
   };
 
-  const setKey = (next) => {
+  /** The board the shown frame draws (a transition's incoming board), or none. */
+  const showKey = (next) => {
+    if (next === key) return;
+    key = next;
+    if (key) boardOf(key);
+    for (const [boardKey, board] of boards) board.holder.visible = boardKey === key && showable(board);
+    group.visible = Boolean(key);
+    cutout.uniforms.uCutoutOn.value = key ? 1 : 0;
+    uniforms.uReveal.value = 0;
+    uniforms.uExit.value = 0;
+    dirty = true;
+    plateStale = true;
+    plateSettled = false;
+    lastStep = Number.NaN;
+    stopAmbient();
+  };
+
+  const dropUnder = () => {
+    underTarget?.dispose();
+    underTarget = null;
+    cutout.uniforms.uUnderOn.value = 0;
+  };
+
+  /** Puts the timeline's frame on the board: its key, and the swap's under plate once that ends. */
+  const showFrame = (frame) => {
+    showKey(frame.key);
+    if (!frame.under && underTarget) {
+      dropUnder();
+      plateStale = true;
+    }
+    uniforms.uReveal.value = frame.reveal;
+    uniforms.uExit.value = frame.exit;
+    return frame;
+  };
+
+  const setTarget = (next) => {
     if (disposed) return false;
     const wanted = ENVIRONMENT_KEYS.includes(next) && BOARDS[next] ? next : null;
     if (wanted && !unsupported && renderer.extensions?.has?.('EXT_color_buffer_float') === false) {
       console.warn('board3d: stadium environment needs EXT_color_buffer_float; the mat stays');
       unsupported = true;
     }
-    const shown = unsupported ? null : wanted;
-    if (shown === key) return false;
-    key = shown;
-    if (key) boardOf(key);
-    for (const [boardKey, board] of boards) board.holder.visible = boardKey === key && showable(board);
-    group.visible = Boolean(key);
-    cutout.uniforms.uCutoutOn.value = key ? 1 : 0;
-    uniforms.uReveal.value = 0;
-    revealStartedAt = null;
-    dirty = true;
-    plateStale = true;
-    lastStep = Number.NaN;
-    stopAmbient();
+    return timeline.setTarget(unsupported ? null : wanted);
+  };
+
+  const settle = () => {
+    if (disposed) return;
+    timeline.settle();
+    dropUnder();
+    showFrame(timeline.frame(0));
     onNeedsRender();
+  };
+
+  const play = () => {
+    if (disposed) return 0;
+    if (motionReduced()) {
+      settle();
+      return 0;
+    }
+    const swapReady = Boolean(key) && plateSettled && Boolean(plateTarget) && !timeline.frame(0).animating;
+    const outgoing = key;
+    const hold = timeline.play({ swapReady });
+    const { phase } = timeline.current();
+    // A board leaving before it ever showed has nothing to dissolve.
+    if (phase === 'exit' && !showable(boards.get(outgoing))) {
+      settle();
+      return 0;
+    }
+    if (phase === 'swap') {
+      dropUnder();
+      underTarget = plateTarget;
+      plateTarget = null;
+      cutout.uniforms.uUnderOn.value = 1;
+      cutout.uniforms.uUnderMin.value.copy(uniforms.uMin.value);
+      cutout.uniforms.uUnderSize.value.copy(uniforms.uSize.value);
+    }
+    showFrame(timeline.frame(0));
+    if (hold > 0) onNeedsRender();
+    return hold;
+  };
+
+  const setKey = (next) => {
+    if (!setTarget(next)) return false;
+    play();
     return true;
   };
 
   const update = (now, camera) => {
-    if (disposed || !key || !layout) return false;
+    if (disposed) return false;
     if (camera) lastCamera = camera;
+    showFrame(timeline.frame(now));
+    if (!key || !layout) return false;
     const shown = boards.get(key);
     if (!showable(shown)) {
       // The meshes first: a program's cache key depends on its geometry's attributes (three r185:
@@ -1060,14 +1154,13 @@ export function createStadiumEnvironment({
       if (renderer.compile) compileMeshes(renderer.compile.bind(renderer), board, camera);
       board.compiled = true;
       plateStale = true;
-      revealStartedAt = null;
-      uniforms.uReveal.value = 0;
+      uniforms.uReveal.value = timeline.frame(now).reveal;
       return true;
     }
     const reduced = motionReduced();
-    if (revealStartedAt === null) revealStartedAt = now;
-    const progress = reduced ? 1 : Math.min(1, Math.max(0, (now - revealStartedAt) / INTRO_MS));
-    uniforms.uReveal.value = easeOutCubic(progress);
+    timeline.start(now);
+    const frame = showFrame(timeline.frame(now));
+    if (!key) return false;
     // The ambient clock steps at AMBIENT_FPS: frames between steps (a card moving) leave the plate as it is.
     const step = reduced ? 0 : Math.floor((now / 1000) * AMBIENT_FPS) / AMBIENT_FPS;
     if (step !== lastStep) {
@@ -1085,11 +1178,11 @@ export function createStadiumEnvironment({
     }
     cutout.uniforms.uTableFromWorld.value.copy(group.matrixWorld).invert();
     if (camera) uniforms.uEye.value.copy(camera.position).applyMatrix4(cutout.uniforms.uTableFromWorld.value);
-    const revealing = progress < 1;
-    if (revealing) plateStale = true;
+    const changing = frame.animating;
+    if (changing) plateStale = true;
     if (plateStale) board.beforeRender?.(renderer);
-    if (!revealing) scheduleAmbient();
-    return revealing;
+    if (!changing) scheduleAmbient();
+    return changing;
   };
 
   /**
@@ -1111,6 +1204,13 @@ export function createStadiumEnvironment({
       const mask = camera.layers.mask;
       const shadowsAuto = renderer.shadowMap.autoUpdate;
       const previous = renderer.getRenderTarget();
+      // Over an outgoing board the plate clears to transparent: where the incoming one hasn't
+      // revealed yet, the under plate shows through it.
+      const clearAlpha = underTarget ? renderer.getClearAlpha() : null;
+      if (underTarget) {
+        renderer.getClearColor(clearColour);
+        renderer.setClearColor(0x000000, 0);
+      }
       camera.layers.set(STADIUM_ENV_LAYER);
       renderer.shadowMap.autoUpdate = false;
       renderer.setRenderTarget(target);
@@ -1120,14 +1220,17 @@ export function createStadiumEnvironment({
         renderer.setRenderTarget(previous);
         renderer.shadowMap.autoUpdate = shadowsAuto;
         camera.layers.mask = mask;
+        if (clearAlpha !== null) renderer.setClearColor(clearColour, clearAlpha);
       }
       plateStale = false;
+      plateSettled =
+        !underTarget && showable(boards.get(key)) && uniforms.uReveal.value >= 1 && uniforms.uExit.value <= 0;
     }
     if (!plateScene) {
       plateMaterial = new three.ShaderMaterial({
         vertexShader: glsl.FULLSCREEN_VERTEX,
-        fragmentShader: `uniform sampler2D uPlate;\nvarying vec2 vUv;\nvoid main() {\n  gl_FragColor = texture2D(uPlate, vUv);\n${glsl.OUTPUT}\n}`,
-        uniforms: { uPlate: { value: target.texture } },
+        fragmentShader: PLATE_FRAGMENT,
+        uniforms: { uPlate: { value: target.texture }, uUnder: { value: null }, uUnderOn: { value: 0 } },
         depthTest: false,
         depthWrite: false,
       });
@@ -1137,6 +1240,8 @@ export function createStadiumEnvironment({
       plateScene.add(quad);
     }
     plateMaterial.uniforms.uPlate.value = target.texture;
+    plateMaterial.uniforms.uUnder.value = underTarget?.texture ?? null;
+    plateMaterial.uniforms.uUnderOn.value = underTarget ? 1 : 0;
     renderer.render(plateScene, bakeCamera);
   };
 
@@ -1161,6 +1266,7 @@ export function createStadiumEnvironment({
       bakeLight.dispose();
       compileTarget.dispose();
       plateTarget?.dispose();
+      underTarget?.dispose();
       plateMaterial?.dispose();
       disposeTargets();
       targets = null;
@@ -1182,5 +1288,5 @@ export function createStadiumEnvironment({
     });
   };
 
-  return { setLayout, setKey, update, drawPlate, active: () => key !== null, cutout, dispose };
+  return { setLayout, setTarget, play, settle, setKey, update, drawPlate, active: () => key !== null, cutout, dispose };
 }

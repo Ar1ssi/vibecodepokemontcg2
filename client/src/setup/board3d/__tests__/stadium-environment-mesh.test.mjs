@@ -7,6 +7,7 @@ import { NO_MAT_LAYOUT_ID } from '../../sizing/mat-spec.mjs';
 import { craterBowl, mountainPeaks } from '../stadium-environment-layout.mjs';
 import {
   AMBIENT_FPS,
+  EXIT_MS,
   INTRO_MS,
   PLATE_MAX_PIXELS,
   PREPARE_TIMEOUT_MS,
@@ -433,5 +434,129 @@ test('a board compiles for the last camera when a frame comes without one', asyn
   environment.setKey('magma-basin');
   environment.update(1200);
   assert.equal(compiles.length, 4, 'the second board compiled for the camera seen before');
+  environment.dispose();
+});
+
+/** An environment on a stub renderer that compiles at once, and a frame helper that draws the plate. */
+const transitions = async ({ motionReduced = () => false } = {}) => {
+  const three = await import('../../../vendor/three/three.module.min.js');
+  const clears = [];
+  let target = null;
+  const renderer = {
+    extensions: { has: () => true },
+    compile: () => {},
+    shadowMap: { autoUpdate: true },
+    getRenderTarget: () => target,
+    setRenderTarget: (next) => {
+      target = next;
+    },
+    getClearColor: (colour) => colour,
+    getClearAlpha: () => 1,
+    setClearColor: (colour, alpha) => clears.push(alpha),
+    clear: () => {},
+    render: () => {},
+    getPixelRatio: () => 1,
+    getDrawingBufferSize: (size) => size.set(1920, 1080),
+  };
+  const environment = createStadiumEnvironment({
+    three,
+    renderer,
+    parent: new three.Group(),
+    isHidden: () => true,
+    motionReduced,
+  });
+  const scene = new three.Scene();
+  const camera = new three.PerspectiveCamera();
+  environment.setLayout(layout);
+  const frame = (now) => {
+    const animating = environment.update(now, camera);
+    if (environment.active()) environment.drawPlate(scene, camera);
+    return animating;
+  };
+  /** Shows `key` fully revealed, its plate drawn: compile frame, reveal start, reveal end. */
+  const show = (key, at) => {
+    environment.setKey(key);
+    frame(at);
+    frame(at + 100);
+    frame(at + 100 + INTRO_MS);
+  };
+  return { environment, frame, show, clears, uniforms: environment.cutout.uniforms };
+};
+
+test('exit: a shown board dissolves for EXIT_MS, then the mat returns', async () => {
+  const { environment, frame, show, uniforms } = await transitions();
+  show('scorched-earth', 1000);
+  assert.equal(environment.setTarget(null), true);
+  assert.equal(environment.play(), EXIT_MS);
+  assert.equal(environment.active(), true, 'still drawn while it dissolves');
+  assert.equal(frame(5000), true);
+  assert.equal(uniforms.uExit.value, 0, 'the dissolve starts with this frame');
+  frame(5000 + EXIT_MS / 2);
+  assert.ok(uniforms.uExit.value > 0 && uniforms.uExit.value < 1, `dissolving at ${uniforms.uExit.value}`);
+  assert.equal(uniforms.uCutoutOn.value, 1);
+  assert.equal(frame(5000 + EXIT_MS), false, 'dissolved');
+  assert.equal(environment.active(), false);
+  assert.equal(uniforms.uCutoutOn.value, 0, 'the mat shows again');
+  environment.dispose();
+});
+
+test('swap: the incoming board reveals over the outgoing plate, whose scene stays cut out of the mat', async () => {
+  const { environment, frame, show, clears, uniforms } = await transitions();
+  show('scorched-earth', 1000);
+  const outgoingMin = uniforms.uMin.value.clone();
+  const outgoingSize = uniforms.uSize.value.clone();
+  environment.setTarget('stormy-mountains');
+  assert.equal(environment.play(), INTRO_MS);
+  assert.equal(uniforms.uUnderOn.value, 1, 'the outgoing scene keeps the mat cut');
+  assert.deepEqual(uniforms.uUnderMin.value.toArray(), outgoingMin.toArray());
+  assert.deepEqual(uniforms.uUnderSize.value.toArray(), outgoingSize.toArray());
+  clears.length = 0;
+  frame(9000);
+  frame(9100);
+  assert.ok(clears.includes(0), 'the incoming plate clears to transparent over the outgoing one');
+  frame(9100 + INTRO_MS / 2);
+  assert.ok(uniforms.uReveal.value > 0.5 && uniforms.uReveal.value < 1);
+  assert.equal(uniforms.uUnderOn.value, 1);
+  assert.equal(frame(9100 + INTRO_MS), false, 'revealed');
+  assert.equal(uniforms.uUnderOn.value, 0, 'the outgoing plate is dropped');
+  assert.equal(environment.active(), true);
+  environment.dispose();
+});
+
+test('a swap before the outgoing board has drawn a settled plate reveals over the mat', async () => {
+  const { environment, frame, uniforms } = await transitions();
+  environment.setKey('scorched-earth');
+  frame(1000);
+  frame(1100);
+  environment.setTarget('stormy-mountains');
+  assert.equal(environment.play(), INTRO_MS);
+  assert.equal(uniforms.uUnderOn.value, 0);
+  environment.dispose();
+});
+
+test('settle mid-swap: the incoming board fully shown, no under plate, nothing animating', async () => {
+  const { environment, frame, show, uniforms } = await transitions();
+  show('scorched-earth', 1000);
+  environment.setTarget('stormy-mountains');
+  environment.play();
+  frame(9000);
+  environment.settle();
+  assert.equal(uniforms.uUnderOn.value, 0);
+  frame(9050);
+  assert.equal(frame(9100), false);
+  assert.equal(uniforms.uReveal.value, 1);
+  environment.dispose();
+});
+
+test('reduced motion: play settles at once and holds nothing', async () => {
+  const { environment, frame, uniforms } = await transitions({ motionReduced: () => true });
+  environment.setTarget('scorched-earth');
+  assert.equal(environment.play(), 0);
+  frame(1000);
+  assert.equal(frame(1100), false, 'no reveal runs');
+  assert.equal(uniforms.uReveal.value, 1);
+  environment.setTarget(null);
+  assert.equal(environment.play(), 0);
+  assert.equal(environment.active(), false);
   environment.dispose();
 });

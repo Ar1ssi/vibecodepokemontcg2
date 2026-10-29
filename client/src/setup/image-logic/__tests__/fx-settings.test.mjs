@@ -9,6 +9,7 @@ import {
   AMBIENCE_OFF_KEY,
   CROWD_OFF_KEY,
   HOVER_PREVIEW_OFF_KEY,
+  STADIUM_BOARDS_OFF_KEY,
   HOLO_SHAPES_OFF_KEY,
   CAMERA_PRESET_KEY,
   normalizeCameraPreset,
@@ -44,6 +45,7 @@ test('fx-settings: defaults when nothing is stored', () => {
     ambienceOff: false,
     crowdOff: true,
     hoverPreviewOff: false,
+    stadiumBoardsOff: false,
     holoShapesOff: false,
     cameraPreset: 'tilt12',
   });
@@ -62,6 +64,7 @@ test('fx-settings: reads each stored flag', () => {
     ambienceOff: false,
     crowdOff: true,
     hoverPreviewOff: false,
+    stadiumBoardsOff: false,
     holoShapesOff: false,
     cameraPreset: 'tilt12',
   });
@@ -86,6 +89,7 @@ test('fx-settings: a missing or throwing storage yields defaults, not a throw', 
     ambienceOff: false,
     crowdOff: true,
     hoverPreviewOff: false,
+    stadiumBoardsOff: false,
     holoShapesOff: false,
     cameraPreset: 'tilt12',
   });
@@ -97,6 +101,7 @@ test('fx-settings: a missing or throwing storage yields defaults, not a throw', 
     ambienceOff: false,
     crowdOff: true,
     hoverPreviewOff: false,
+    stadiumBoardsOff: false,
     holoShapesOff: false,
     cameraPreset: 'tilt12',
   });
@@ -127,7 +132,7 @@ test('fx-settings: writeSetting stores flags as 1/0 and volume as a number', () 
   assert.equal(storage.data[FX_OFF_KEY], '0');
   writeSetting(storage, VOLUME_KEY, 3);
   assert.equal(storage.data[VOLUME_KEY], '1');
-  assert.deepEqual(readSettings(storage), { fxOff: false, sfxOff: false, ambienceOff: false, crowdOff: true, hoverPreviewOff: false, holoShapesOff: false, cameraPreset: 'tilt12', volume: 1 });
+  assert.deepEqual(readSettings(storage), { fxOff: false, sfxOff: false, ambienceOff: false, crowdOff: true, hoverPreviewOff: false, stadiumBoardsOff: false, holoShapesOff: false, cameraPreset: 'tilt12', volume: 1 });
 });
 
 test('fx-settings: writeSetting reports failure instead of throwing', () => {
@@ -197,4 +202,15 @@ test('fx-settings: the camera preset round-trips through writeSetting and reject
   assert.equal(readSettings(storage).cameraPreset, 'tilt12');
   writeSetting(storage, CAMERA_PRESET_KEY, true);
   assert.equal(storage.data[CAMERA_PRESET_KEY], 'tilt12');
+});
+
+test('fx-settings: Stadium boards are on by default and off only for the stored "1" (design 077)', () => {
+  assert.equal(STADIUM_BOARDS_OFF_KEY, 'ptcg-stadium-boards-off');
+  assert.equal(readSettings(fakeStorage()).stadiumBoardsOff, false);
+  assert.equal(readSettings({ getItem: (key) => (key === 'ptcg-stadium-boards-off' ? '1' : null) }).stadiumBoardsOff, true);
+  assert.equal(readSettings(fakeStorage({ [STADIUM_BOARDS_OFF_KEY]: '0' })).stadiumBoardsOff, false);
+  assert.equal(readSettings(throwingStorage).stadiumBoardsOff, false);
+  const storage = fakeStorage();
+  writeSetting(storage, STADIUM_BOARDS_OFF_KEY, true);
+  assert.equal(readSettings(storage).stadiumBoardsOff, true);
 });

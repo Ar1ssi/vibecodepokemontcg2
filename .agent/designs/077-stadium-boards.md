@@ -696,6 +696,15 @@ boards" toggle. Revert: unset the toggle per user, or revert the feature commits
   rooftop window grids as scattered windows). Critique rounds were checked against the card art
   before acting: where a critic asked for something the art doesn't have, the art won.
 
+- Slice 4 (wiring) built on the shipped mesh, not the § Mesh/Timeline API: the timeline is
+  `stadium-environment-timeline.mjs` (`setTarget`/`play({swapReady})`/`settle`/`start`/`frame`), whose
+  clock starts once the board's programs are ready. The mesh drives the shaders' existing `uExit` for
+  the dissolve. A swap keeps the outgoing board's last plate (`underTarget`) under the incoming
+  board, which renders to a plate cleared transparent; the table cutout also covers the outgoing
+  scene's rect (`uUnderOn`). A swap before the outgoing plate has settled reveals over the mat
+  instead. The queue lives in `netcode/mat-fx/board-environment-queue.mjs`. The first view a board
+  shows, a rebuilt scene and the settings toggle snap; later view changes queue (user, 2026-10-29:
+  exit and swap in scope).
 ---
 Self-approval checklist (only when the user is unreachable):
 - [ ] Every constraint traceable into the Design section

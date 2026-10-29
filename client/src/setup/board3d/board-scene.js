@@ -467,9 +467,21 @@ export function createBoardScene({
     invalidate();
   };
 
-  /** Design 077 (prototype): shows the Stadium environment `key` under the board, or none (null). */
-  const setStadiumEnvironment = (key) => {
-    if (disposed || !environment.setKey(key)) return;
+  /**
+   * Design 077: the Stadium board the view wants (`key`, or null for the mat). True when that
+   * changed: the caller then queues `playStadiumEnvironment` (the reveal, swap or dissolve; returns
+   * its hold) or calls `settleStadiumEnvironment` (snap) when no animation may play.
+   */
+  const setStadiumEnvironment = (key) => !disposed && environment.setTarget(key);
+  const playStadiumEnvironment = () => {
+    if (disposed) return 0;
+    const hold = environment.play();
+    invalidate();
+    return hold;
+  };
+  const settleStadiumEnvironment = () => {
+    if (disposed) return;
+    environment.settle();
     invalidate();
   };
 
@@ -1248,6 +1260,8 @@ export function createBoardScene({
     setUiState,
     setMat,
     setStadiumEnvironment,
+    playStadiumEnvironment,
+    settleStadiumEnvironment,
     setHover,
     setPointerTilt,
     setHandPose,

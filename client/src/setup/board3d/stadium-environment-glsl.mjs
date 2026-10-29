@@ -143,6 +143,9 @@ float exitGlow(vec2 p) {
 export const CUTOUT_GLSL = /* glsl */ `
 ${TABLE_UNIFORMS}
 uniform float uCutoutOn;
+uniform float uUnderOn;
+uniform vec2 uUnderMin;
+uniform vec2 uUnderSize;
 ${NOISE}
 ${REVEAL}
 float environmentShown(vec2 p) {
@@ -150,7 +153,13 @@ float environmentShown(vec2 p) {
   if (uCutoutOn < 0.5) return 0.0;
   // Inset a few px: along the edge the table's own floor stays under the terrain's skirt.
   vec2 inside = step(uMin + 4.0, p) * step(p, uMin + uSize - 4.0);
-  return uCutoutOn * inside.x * inside.y * revealBurned(p) * exitKeep(p);
+  float shown = inside.x * inside.y * revealBurned(p) * exitKeep(p);
+  // A swap: the outgoing board's plate still covers its whole scene under the incoming reveal.
+  if (uUnderOn > 0.5) {
+    vec2 under = step(uUnderMin + 4.0, p) * step(p, uUnderMin + uUnderSize - 4.0);
+    shown = max(shown, under.x * under.y);
+  }
+  return shown;
 }
 `;
 
