@@ -125,7 +125,7 @@ test('the grain pass is a no-op where no noise tile can be made, and with zero s
 
 test('water uses the recipe palette, a navy shade, mist for smoke and droplet particles', () => {
   const water = MATERIALS.water;
-  assert.equal(materialFor('water'), water);
+  assert.equal(materialFor('water').palette, water.palette, 'the registry serves this kit (design 077 wraps it with its elements)');
   assert.deepEqual(water.palette.deep, [46, 124, 230]);
   assert.deepEqual(water.palette.body, [82, 180, 255]);
   assert.deepEqual(water.palette.hot, [185, 232, 255]);
@@ -197,7 +197,7 @@ const blurProbe = (rec) => {
 
 test('grass uses the recipe palette, a dark-green shade, no smoke and leaf particles', () => {
   const grass = MATERIALS.grass;
-  assert.equal(materialFor('grass'), grass);
+  assert.equal(materialFor('grass').palette, grass.palette, 'the registry serves this kit (design 077 wraps it with its elements)');
   assert.deepEqual(grass.palette.deep, [63, 163, 77]);
   assert.deepEqual(grass.palette.body, [126, 217, 87]);
   assert.deepEqual(grass.palette.hot, [201, 242, 122]);
@@ -307,7 +307,7 @@ test('fire keeps the accepted look-test palette, shade and smoke colours', () =>
 
 test('electric uses the recipe palette with its blue edge, a storm shade, no smoke and spark streaks', () => {
   const electric = MATERIALS.electric;
-  assert.equal(materialFor('electric'), electric);
+  assert.equal(materialFor('electric').palette, electric.palette, 'the registry serves this kit (design 077 wraps it with its elements)');
   assert.deepEqual(electric.palette.body, [247, 210, 30]);
   assert.deepEqual(electric.palette.hot, [255, 242, 122]);
   assert.deepEqual(electric.palette.white, [255, 255, 255]);
@@ -394,7 +394,7 @@ test('electric jagStroke draws lightning in five strokes with one blur, and noth
 
 test('fighting uses the recipe palette, an umber shade, dust for smoke and white streaks', () => {
   const fighting = MATERIALS.fighting;
-  assert.equal(materialFor('fighting'), fighting);
+  assert.equal(materialFor('fighting').palette, fighting.palette, 'the registry serves this kit (design 077 wraps it with its elements)');
   assert.deepEqual(fighting.palette.body, [217, 100, 58]);
   assert.deepEqual(fighting.palette.hot, [242, 166, 107]);
   assert.deepEqual(fighting.palette.core, [255, 230, 194]);
@@ -407,7 +407,7 @@ test('fighting uses the recipe palette, an umber shade, dust for smoke and white
 
 test('aura is the recipe blue-white for the ki specials: a navy shade, no smoke, blue streaks', () => {
   const aura = MATERIALS.aura;
-  assert.equal(materialFor('aura'), aura);
+  assert.equal(materialFor('aura').palette, aura.palette, 'the registry serves this kit (design 077 wraps it with its elements)');
   assert.deepEqual(aura.palette.body, [127, 183, 255]);
   assert.deepEqual(aura.palette.core, [230, 242, 255]);
   assert.equal(aura.smoke, null);
@@ -519,7 +519,7 @@ test('the fighting sigil draws the barrage as impact discs; nothing before the f
 
 test('psychic uses the recipe palette, a violet shade, no smoke and lilac motes', () => {
   const psychic = MATERIALS.psychic;
-  assert.equal(materialFor('psychic'), psychic);
+  assert.equal(materialFor('psychic').palette, psychic.palette, 'the registry serves this kit (design 077 wraps it with its elements)');
   assert.deepEqual(psychic.palette.body, [200, 92, 219]);
   assert.deepEqual(psychic.palette.hot, [240, 165, 255]);
   assert.deepEqual(psychic.palette.core, [255, 225, 255]);
@@ -637,7 +637,7 @@ const compositeProbe = (rec) => {
 
 test('dark uses the recipe palette with the crimson accent as hot, a violet-black shade, dark smoke and crimson streaks', () => {
   const dark = MATERIALS.dark;
-  assert.equal(materialFor('dark'), dark);
+  assert.equal(materialFor('dark').palette, dark.palette, 'the registry serves this kit (design 077 wraps it with its elements)');
   assert.deepEqual(dark.palette.deep, [16, 16, 24]);
   assert.deepEqual(dark.palette.shadow, [59, 59, 79]);
   assert.deepEqual(dark.palette.body, [110, 110, 140]);
@@ -739,7 +739,7 @@ test('a dark projectile is a bare pulse in a haze at 0 tongues and wreathes `ton
 
 test('steel uses the recipe palette with a cool blue edge, a blue-black shade, no smoke and white sparks', () => {
   const steel = MATERIALS.steel;
-  assert.equal(materialFor('steel'), steel);
+  assert.equal(materialFor('steel').palette, steel.palette, 'the registry serves this kit (design 077 wraps it with its elements)');
   assert.deepEqual(steel.palette.body, [154, 167, 184]);
   assert.deepEqual(steel.palette.hot, [213, 222, 234]);
   assert.deepEqual(steel.palette.white, [255, 255, 255]);
@@ -835,7 +835,7 @@ test('the steel sigil is a glow and a filled four-point glint, no stroked reticl
 
 test('dragon uses the recipe palette with the ember accent, a violet-black shade, violet smoke and ember particles', () => {
   const dragon = MATERIALS.dragon;
-  assert.equal(materialFor('dragon'), dragon);
+  assert.equal(materialFor('dragon').palette, dragon.palette, 'the registry serves this kit (design 077 wraps it with its elements)');
   // Design 075 parity: Scarlet/Violet's violet-to-magenta dragon colours.
   assert.deepEqual(dragon.palette.deep, [52, 22, 110]);
   assert.deepEqual(dragon.palette.body, [128, 52, 206]);
@@ -910,7 +910,7 @@ test('a dragon projectile is the orb in its glow trailing `tongues` flame tongue
 
 test('fairy uses the recipe palette with the gold accent, a plum shade, no smoke and pink twinkle particles', () => {
   const fairy = MATERIALS.fairy;
-  assert.equal(materialFor('fairy'), fairy);
+  assert.equal(materialFor('fairy').palette, fairy.palette, 'the registry serves this kit (design 077 wraps it with its elements)');
   assert.deepEqual(fairy.palette.body, [244, 143, 177]);
   assert.deepEqual(fairy.palette.hot, [255, 194, 218]);
   assert.deepEqual(fairy.palette.core, [255, 240, 247]);
@@ -1022,7 +1022,7 @@ test('the fairy sigil is a soft bloom with twinkles at the star\'s points: no st
 
 test('ghost uses the recipe palette, a violet-black shade, violet smoke and violet motes', () => {
   const ghost = MATERIALS.ghost;
-  assert.equal(materialFor('ghost'), ghost);
+  assert.equal(materialFor('ghost').palette, ghost.palette, 'the registry serves this kit (design 077 wraps it with its elements)');
   assert.deepEqual(ghost.palette.body, [107, 79, 168]);
   assert.deepEqual(ghost.palette.hot, [157, 124, 242]);
   assert.deepEqual(ghost.palette.core, [217, 204, 255]);
@@ -1169,7 +1169,7 @@ test('the ghost sigil: a shadow puff, the eye whites in one fill with one violet
 
 test('poison uses the recipe palette, a violet-black shade, fume smoke and lilac glob particles', () => {
   const poison = MATERIALS.poison;
-  assert.equal(materialFor('poison'), poison);
+  assert.equal(materialFor('poison').palette, poison.palette, 'the registry serves this kit (design 077 wraps it with its elements)');
   assert.deepEqual(poison.palette.deep, [75, 30, 107]);
   assert.deepEqual(poison.palette.body, [155, 77, 202]);
   assert.deepEqual(poison.palette.hot, [199, 125, 255]);
@@ -1342,7 +1342,7 @@ test('the poison sigil: a pool fill (no stroked rim, design 075 parity), then ea
 
 test('ground uses the recipe palette, an umber shade, dust for smoke and sand-coloured shard particles', () => {
   const ground = MATERIALS.ground;
-  assert.equal(materialFor('ground'), ground);
+  assert.equal(materialFor('ground').palette, ground.palette, 'the registry serves this kit (design 077 wraps it with its elements)');
   assert.deepEqual(ground.palette.deep, [92, 58, 23]);
   assert.deepEqual(ground.palette.body, [181, 121, 60]);
   assert.deepEqual(ground.palette.hot, [217, 160, 102]);
@@ -1356,7 +1356,7 @@ test('ground uses the recipe palette, an umber shade, dust for smoke and sand-co
 
 test('mud is the ground browns one step darker: its hot and core are ground body and hot, glob particles, no sigil', () => {
   const { ground, mud } = MATERIALS;
-  assert.equal(materialFor('mud'), mud);
+  assert.equal(materialFor('mud').palette, mud.palette, 'the registry serves this kit (design 077 wraps it with its elements)');
   assert.deepEqual(mud.palette.hot, ground.palette.body);
   assert.deepEqual(mud.palette.core, ground.palette.hot);
   for (const key of ['deep', 'body']) {
@@ -1540,7 +1540,7 @@ test('a mud glob is a glossy sphere with a sheen dot; a mud projectile trails `t
 
 test('rock uses the recipe palette, a slate shade, grey stone dust for smoke and pale shard particles', () => {
   const rock = MATERIALS.rock;
-  assert.equal(materialFor('rock'), rock);
+  assert.equal(materialFor('rock').palette, rock.palette, 'the registry serves this kit (design 077 wraps it with its elements)');
   assert.deepEqual(rock.palette.deep, [62, 67, 76]);
   assert.deepEqual(rock.palette.body, [138, 143, 153]);
   assert.deepEqual(rock.palette.hot, [184, 190, 201]);
@@ -1553,7 +1553,7 @@ test('rock uses the recipe palette, a slate shade, grey stone dust for smoke and
 
 test('ancient is the rock stone in a violet aura: rock face, deep and lit facet, violet hot and shard particles', () => {
   const { rock, ancient } = MATERIALS;
-  assert.equal(materialFor('ancient'), ancient);
+  assert.equal(materialFor('ancient').palette, ancient.palette, 'the registry serves this kit (design 077 wraps it with its elements)');
   assert.deepEqual(ancient.palette.body, rock.palette.body);
   assert.deepEqual(ancient.palette.deep, rock.palette.deep);
   assert.deepEqual(ancient.palette.lit, rock.palette.hot, 'the stone stays stone');
@@ -1564,7 +1564,7 @@ test('ancient is the rock stone in a violet aura: rock face, deep and lit facet,
 
 test('gem is light: a lilac-white palette, no smoke, twinkle particles, never touching the composite', () => {
   const gem = MATERIALS.gem;
-  assert.equal(materialFor('gem'), gem);
+  assert.equal(materialFor('gem').palette, gem.palette, 'the registry serves this kit (design 077 wraps it with its elements)');
   assert.equal(gem.smoke, null);
   assert.equal(gem.particle.className, 'fx-particle--twinkle');
   assert.deepEqual(rgbOf(gem.particle.color), gem.palette.hot);
@@ -1776,7 +1776,7 @@ test('a gem projectile: a halo, `tongues` crystal streaks behind its heading, a 
 
 test('flying uses the recipe palette, a navy shade, no smoke, no grain and pale feather particles', () => {
   const flying = MATERIALS.flying;
-  assert.equal(materialFor('flying'), flying);
+  assert.equal(materialFor('flying').palette, flying.palette, 'the registry serves this kit (design 077 wraps it with its elements)');
   assert.deepEqual(flying.palette.deep, [143, 179, 217]);
   assert.deepEqual(flying.palette.body, [207, 227, 247]);
   assert.deepEqual(flying.palette.hot, [234, 243, 255]);
@@ -1884,7 +1884,7 @@ test('a flying projectile is a bare orb in its halo at 0 tongues, else a pinwhee
 
 test('ice uses the recipe palette, a navy shade, cold mist for smoke and pale shard particles', () => {
   const ice = MATERIALS.ice;
-  assert.equal(materialFor('ice'), ice);
+  assert.equal(materialFor('ice').palette, ice.palette, 'the registry serves this kit (design 077 wraps it with its elements)');
   assert.deepEqual(ice.palette.deep, [62, 143, 209]);
   assert.deepEqual(ice.palette.body, [143, 211, 255]);
   assert.deepEqual(ice.palette.hot, [214, 243, 255]);
@@ -1986,7 +1986,7 @@ test('an ice projectile is a snowflake in mist at 0 tongues, else a crystal head
 
 test('aurora: ice crystals with a pastel aurora palette; its ring is three hues breathing out of phase', () => {
   const aurora = MATERIALS.aurora;
-  assert.equal(materialFor('aurora'), aurora);
+  assert.equal(materialFor('aurora').palette, aurora.palette, 'the registry serves this kit (design 077 wraps it with its elements)');
   assert.deepEqual(aurora.palette.body, MATERIALS.ice.palette.body);
   assert.deepEqual(aurora.palette.mint, [168, 240, 214]);
   assert.deepEqual(aurora.palette.lilac, [200, 180, 255]);
@@ -2010,7 +2010,7 @@ test('aurora: ice crystals with a pastel aurora palette; its ring is three hues 
 
 test('bug uses the recipe palette, a forest-black shade, no smoke and yellow-green shard particles', () => {
   const bug = MATERIALS.bug;
-  assert.equal(materialFor('bug'), bug);
+  assert.equal(materialFor('bug').palette, bug.palette, 'the registry serves this kit (design 077 wraps it with its elements)');
   assert.deepEqual(bug.palette.deep, [74, 107, 16]);
   assert.deepEqual(bug.palette.body, [140, 191, 38]);
   assert.deepEqual(bug.palette.hot, [191, 227, 77]);
@@ -2124,7 +2124,7 @@ test('a bug projectile is a wing disc beating on the clock at 0 tongues, else a 
 
 test('buzz: the bug needle, but its round unit is three sound rings breathing out of phase', () => {
   const buzz = MATERIALS.buzz;
-  assert.equal(materialFor('buzz'), buzz);
+  assert.equal(materialFor('buzz').palette, buzz.palette, 'the registry serves this kit (design 077 wraps it with its elements)');
   assert.equal(buzz.palette, MATERIALS.bug.palette);
   const drawn = (material) => {
     const rec = recordingContext();
@@ -2151,7 +2151,7 @@ test('buzz: the bug needle, but its round unit is three sound rings breathing ou
 
 test('silver: a silver-white palette, a slate shade, no smoke, powder motes; a scale is a sphere and a glint, a streak one fill and a line', () => {
   const silver = MATERIALS.silver;
-  assert.equal(materialFor('silver'), silver);
+  assert.equal(materialFor('silver').palette, silver.palette, 'the registry serves this kit (design 077 wraps it with its elements)');
   assert.deepEqual(silver.palette.deep, [124, 138, 150]);
   assert.deepEqual(silver.palette.body, [200, 210, 218]);
   assert.deepEqual(silver.palette.hot, [232, 238, 242]);
