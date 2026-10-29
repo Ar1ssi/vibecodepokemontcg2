@@ -1255,6 +1255,11 @@ const BLOCKS = [
     /move all attached energy and pokémon tools from this pokémon to 1 of your benched pokémon\. then, discard this pokémon\./g,
     () => ({ type: 'atkMoveAttachedToBench' }),
   ],
+  // Active-only doubling that stops at 10 HP remaining (effects/attack-steps.mjs atkDoubleCountersActive).
+  [
+    /double the number of damage counters on your opponent's active pokémon\. this attack can't leave it with less than 10 hp remaining\./g,
+    () => ({ type: 'atkDoubleCountersActive', hpFloor: 10 }),
+  ],
   // Weavile Ransack: on at least one heads the opponent's hand is revealed, then the attacker
   // puts one revealed card per heads on the bottom of their deck.
   [

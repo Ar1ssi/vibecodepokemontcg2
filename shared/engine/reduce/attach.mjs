@@ -18,6 +18,7 @@ import {
 import { createPendingChoice, attachToRoot } from '../effects/executor.mjs';
 import { isSpecialEnergyCard } from '../rules/special-energy-parse.mjs';
 import { runSpecialEnergyTriggers } from '../effects/special-energy.mjs';
+import { applyAutomaticEvolveAbility } from '../effects/ability.mjs';
 import {
   isStadiumEnergyAttachHeal, isStadiumStatusPersistsOnEvolve,
 } from '../rules/stadium-effects.mjs';
@@ -426,6 +427,9 @@ export function attachCardCommand({ draft, payload, playerId, activeRng, events 
         hostZoneId: hostRef.zoneId,
         events,
       });
+
+      // Evolve-played Ability with no "you may" (e.g. a turn damage boost) runs as the evolve lands.
+      applyAutomaticEvolveAbility(draft, { evolvedCard: cardRef.card, playerId, events });
 
       // Stadium on-evolve triggers (Po Town, Galactic HQ, Wyndon, Battle Tower).
       const evolveStadium = draft.stadium?.card || draft.stadium;

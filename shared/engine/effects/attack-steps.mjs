@@ -2012,6 +2012,22 @@ function atkDoubleCountersEach(ctx) {
   return null;
 }
 
+// Active-only doubling: adds the Active's current counters, but never so many that it is left
+// with less than step.hpFloor remaining HP. Counters land in 10s, so the headroom rounds down.
+function atkDoubleCountersActive(ctx) {
+  const { opponent, step } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const active = activeOf(opponent);
+  if (!active) return skip(ctx, 'no_opponent_active');
+  const hp = Number(topPokemonCard(opponent, active)?.hp) || 0;
+  const damage = active.damage || 0;
+  const headroom = Math.floor(Math.max(0, hp - damage - step.hpFloor) / 10) * 10;
+  const amount = Math.min(damage, headroom);
+  if (amount === 0) return skip(ctx, 'no_target');
+  placeCounters(ctx, active, opponent.playerId, amount);
+  return null;
+}
+
 // Yveltal ex Soul Destroyer: every opponent's Pokémon at or below the remaining-HP line.
 function atkKnockOutAll(ctx) {
   const { opponent, step } = ctx;
@@ -4020,6 +4036,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkCountersEach,
   atkCountersEachFiltered,
   atkDoubleCountersEach,
+  atkDoubleCountersActive,
   atkHpCap,
   atkMoveAllCounters: optional(atkMoveAllCounters, () => 'Move damage counters'),
   atkMoveCounterBetween,

@@ -1407,6 +1407,58 @@ test("ability: Enthusiastic Dance boosts the team's Basic attackers, not the hol
   assert.equal(turnDamageBonusTotal(bonuses, ludicolo, { name: 'Defender' }), 0);
 });
 
+test('ability: evolve-played "your Active Pokémon\'s attacks do 50 more damage for the rest of your turn"', async () => {
+  const { executeSteps } = await import('../effects/executor.mjs');
+  const { turnDamageBonusTotal } = await import('../rules/turn-damage-bonus.mjs');
+  const { state } = setupGame();
+  const ludicolo = createCard({ instanceId: 70, name: 'Ludicolo', supertype: 'Pokémon', subtypes: ['Stage 2'] });
+  const parsed = parseAbility(
+    "When you play this Pokémon from your hand to evolve 1 of your Pokémon during your turn, your Active Pokémon's attacks do 50 more damage for the rest of your turn."
+  );
+  assert.equal(parsed.find((step) => step.type === 'whenPlayedAbility')?.evolve, true);
+  const steps = parsed.filter((step) => step.type === 'turnDamageBonusAbility');
+  assert.equal(steps.length, 1);
+  assert.equal(steps[0].amount, 50);
+  executeSteps(state, {
+    steps,
+    playerId: 'p1',
+    effectType: 'ability',
+    sourceCard: ludicolo,
+    activeRng: createRng(1),
+    events: [],
+  });
+  const bonuses = state.players.p1.flags.turnDamageBonuses;
+  const active = { instanceId: 71, name: 'Stage 1 Attacker', subtypes: ['Stage 1'] };
+  assert.equal(turnDamageBonusTotal(bonuses, active, { name: 'Defender' }), 50);
+  assert.equal(turnDamageBonusTotal(bonuses, ludicolo, { name: 'Defender' }), 50, 'team scope: the Active attacks, whatever its stage');
+});
+
+test('ability: evolve-played boost without "you may" runs on the evolve and cannot be activated', async () => {
+  const { abilityActivationBlockReason } = await import('../rules/ability-combat.mjs');
+  const { state } = setupGame();
+  state.turn = { player: 'p1', number: 3, phase: 'main' };
+  const text =
+    "When you play this Pokémon from your hand to evolve 1 of your Pokémon during your turn, your Active Pokémon's attacks do 50 more damage for the rest of your turn.";
+  const lombre = createCard({
+    instanceId: 80,
+    name: 'Lombre',
+    supertype: 'Pokémon',
+    stage: 'Stage 1',
+    evolvesFrom: 'Lotad',
+    hp: 80,
+    abilities: [{ name: 'Boost', text }],
+  });
+  state.players.p1.zones.active.push(createCard({ instanceId: 79, name: 'Lotad', supertype: 'Pokémon', stage: 'Basic', hp: 50 }));
+  state.players.p1.zones.hand.push(lombre);
+
+  const res = applyCommand(state, { type: 'attachCard', payload: { instanceId: 80, targetInstanceId: 79 }, playerId: 'p1' }, createRng(1));
+  assert.equal(res.error, null);
+  const bonuses = res.state.players.p1.flags.turnDamageBonuses;
+  assert.equal(bonuses?.length, 1, 'one automatic bonus on the evolve');
+  assert.equal(bonuses[0].amount, 50);
+  assert.match(abilityActivationBlockReason(lombre, { rulesEnabled: true, zone: 'active' }) || '', /automatically/);
+});
+
 test('ability: Swelling Flash puts a hand copy onto the Bench only with more Prizes', async () => {
   const { executeSteps } = await import('../effects/executor.mjs');
   const { state } = setupGame();

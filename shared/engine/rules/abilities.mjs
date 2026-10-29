@@ -10,6 +10,16 @@
 // Backward-compat: the bridge auto-draws by finding `type === 'drawAbility'`
 // and reading `.count`. That step type + property are preserved.
 import { energySearchWhat } from './search-match.mjs';
+
+// "When you play this Pokémon from your hand to evolve 1 of your Pokémon during your turn, …" with
+// no "you may": the effect is mandatory and runs on the evolve itself (effects/ability.mjs
+// applyAutomaticEvolveAbility), not as an activation. Returns the steps it runs, or [].
+const AUTOMATIC_EVOLVE = /when you play this pok[eé]mon from your hand to evolve 1 of your pok[eé]mon during your turn, (?!you may)/;
+export function automaticEvolveSteps(abilityText) {
+  const lowered = String(abilityText || '').toLowerCase().replace(/[‘’]/g, "'");
+  if (!AUTOMATIC_EVOLVE.test(lowered)) return [];
+  return parseAbility(lowered).filter((step) => step.type === 'turnDamageBonusAbility');
+}
 import { symbolizeTypeWords } from './attack-text.mjs';
 import { textRevealsPicks } from './reveal-picks.mjs';
 import { rewriteLegacyPowerWording } from './legacy-power-wording.mjs';
@@ -1126,6 +1136,18 @@ export function parseAbility(text = '') {
       guidance: amount
         ? `During this turn, this Pokémon's attacks do ${amount} more damage to your opponent's Active Pokémon.`
         : 'During this turn, this Pokémon\'s attacks do more damage (as described).',
+    });
+  }
+
+  // ── 8c. Evolve-played turn boost: "… your Active Pokémon's attacks do N more damage for the rest
+  // of your turn." Team scope: only the Active attacks, so every attack this turn is covered.
+  const restOfTurnBoost = lower.match(/your active pok[eé]mon['’]s attacks do (\d+) more damage for the rest of your turn/);
+  if (restOfTurnBoost) {
+    steps.push({
+      type: 'turnDamageBonusAbility',
+      amount: Number(restOfTurnBoost[1]),
+      team: true,
+      guidance: `For the rest of this turn, your Active Pokémon's attacks do ${restOfTurnBoost[1]} more damage.`,
     });
   }
 
