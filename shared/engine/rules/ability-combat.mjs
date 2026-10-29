@@ -66,7 +66,7 @@ import {
 } from './card-classify.mjs';
 import { isAttachedAsEnergy, isAttachedAsTool, isBasicPokemon, isPokemon } from '../cards.mjs';
 import { stadiumBlocksToolEffects } from './stadium-effects.mjs';
-import { parseAbility, isAncientTraitAbility } from './abilities.mjs';
+import { parseAbility, isAncientTraitAbility, automaticEvolveSteps } from './abilities.mjs';
 import { isAbilityCard } from './ability-effects.mjs';
 import { evolvedView, topPokemonCard } from './evolved-pokemon.mjs';
 import { isAncientCard, isFutureCard } from './paradox-tags.mjs';
@@ -651,6 +651,18 @@ function legacyModifierApplies(spec, holder, defender, attacker, ctx) {
   return true;
 }
 
+// Multiscale: "If this Pokémon has full HP, damage done to it by attacks is halved." Full HP is the
+// holder condition sourceConditionMet already reads, so the halve shares that check.
+const MULTISCALE_HALVE = /if this pok[eé]mon has full hp, damage done to (?:it|this pok[eé]mon) by attacks is halved/;
+
+/** `{ kind: 'halve', round: 'down' }` when the defending holder's Multiscale condition is met, else null. */
+function multiscaleHalveSpec(defender, attacker, ctx) {
+  const text = cardAbilityText(defender);
+  if (!MULTISCALE_HALVE.test(text) || isAbilitySuppressed(defender, ctx)) return null;
+  if (!sourceConditionMet(text, defender, defender, attacker, ctx)) return null;
+  return { kind: 'halve', round: 'down' };
+}
+
 /**
  * WotC Powers that change an attack's damage after Weakness and Resistance (Invisible Wall,
  * Kabuto Armor, Hard Shell, Strange Barrier, Relaxing Scent, Unown D/M/N): the parsed modifiers
@@ -660,6 +672,8 @@ function legacyModifierApplies(spec, holder, defender, attacker, ctx) {
 export function abilityLegacyDamageModifiers(defender, attacker, ctx = {}) {
   if (!defender) return [];
   const out = [];
+  const multiscale = multiscaleHalveSpec(defender, attacker, ctx);
+  if (multiscale) out.push(multiscale);
   for (const holder of dedupe([defender, ...sideInPlay(ctx), ...opponentInPlay(ctx)])) {
     const spec = parseLegacyDamageModifier(cardAbilityText(holder));
     if (!spec || isAbilitySuppressed(holder, ctx)) continue;
@@ -1536,6 +1550,9 @@ export function abilityActivationBlockReason(card, ctx = {}) {
     return 'This card is attached to a Pokémon; its Ability is not in play.';
   }
   if (rulesEnabled && used) return 'Ability already used this turn.';
+  if (automaticEvolveSteps(cardAbilityText(card)).length > 0) {
+    return 'This Ability happens automatically when you evolve this Pokémon.';
+  }
   if (!isActivatedAbility(card, abilityIndex)) {
     return "This Ability can't be activated; it works on its own.";
   }

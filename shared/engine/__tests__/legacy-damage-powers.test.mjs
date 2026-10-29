@@ -235,6 +235,15 @@ const FEINT_ATTACK =
 const DEFENDER =
   "Attach Defender to 1 of your Pokémon. At the end of your opponent's next turn, discard Defender. Damage done to that Pokémon by attacks is reduced by 20 (after applying Weakness and Resistance).";
 
+// Multiscale wording: halved only at full HP, checked before the hit lands.
+const MULTISCALE = 'If this Pokémon has full HP, damage done to it by attacks is halved.';
+
+test('Multiscale halve: full HP takes half (rounded down), a damaged holder takes full', () => {
+  const holder = (damage) => pokemon({ instanceId: 10, name: 'Halver', hp: 100, damage, abilities: [power('Multiscale', MULTISCALE)] });
+  assert.equal(hit(holder(0), { damage: '50' }).defender, 20);
+  assert.equal(hit(holder(10), { damage: '50' }).defender, 60);
+});
+
 const kabutoAt = (instanceId) => pokemon({ instanceId, name: 'Kabuto', abilities: [power('Kabuto Armor', KABUTO_ARMOR)] });
 
 test('legacy damage: Zzzap on an Active Kabuto is halved once (20 → 10)', () => {

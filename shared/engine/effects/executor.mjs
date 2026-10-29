@@ -68,6 +68,7 @@ const OPPONENT_ACTIVE_STEPS = new Set([
   'atkGust',
   'atkMoveAllCounters',
   'atkCureOppConditions',
+  'atkDoubleCountersActive',
 ]);
 const OPPONENT_ACTIVE_SCOPED_STEPS = new Set(['atkDiscardOppEnergy', 'atkDiscardOppTools', 'atkDevolve']);
 const OPPONENT_ACTIVE_TARGETED_STEPS = new Set(['atkAddMarker', 'atkHpCap', 'atkChangeType']);
@@ -1709,6 +1710,36 @@ export function executeSteps(draft, {
         if (inPlay.length === 0) {
           events.push({ type: 'effectStepSkipped', reason: 'no_damaged_pokemon' });
           break;
+        }
+
+        // "Choose up to 2 of your {C} Pokémon and heal each of them" (Moomoo Milk).
+        if (step.count > 1) {
+          if (stepSelection) {
+            const picked = new Set(stepSelection);
+            inPlay.filter((c) => picked.has(c.instanceId)).slice(0, step.count).forEach(healOne);
+            break;
+          }
+          const choice = createPendingChoice({
+            player: playerId,
+            prompt: `${sourceCard?.name || 'Heal'}: Choose up to ${step.count} Pokémon to heal (${healAmt} HP each)`,
+            source: sourceCard?.name || '',
+            options: inPlay,
+            min: 0,
+            max: Math.min(step.count, inPlay.length),
+            cancellable: false,
+            stateVersion: draft.stateVersion,
+            stepIndex: idx,
+            resumeToken: {
+              effectType,
+              sourceInstanceId: sourceCard?.instanceId,
+              initiatorPlayerId: playerId,
+              stepIndex: idx,
+              steps,
+              context,
+              budgetCount: budget.count,
+            },
+          });
+          return { pendingChoice: choice, completed: false };
         }
 
         let targetId = null;

@@ -34,6 +34,10 @@ test('parser: filtered and both-sides counter wordings', () => {
   assert.deepEqual(steps("Double the number of damage counters on each of your opponent's Pokémon."), [
     { type: 'atkDoubleCountersEach' },
   ]);
+  assert.deepEqual(
+    steps("Double the number of damage counters on your opponent's Active Pokémon. This attack can't leave it with less than 10 HP remaining."),
+    [{ type: 'atkDoubleCountersActive', hpFloor: 10 }]
+  );
   assert.deepEqual(steps("Knock Out each of your opponent's Pokémon that has 50 HP or less remaining."), [
     { type: 'atkKnockOutAll', maxRemainingHp: 50 },
   ]);
@@ -145,6 +149,34 @@ test('Snow Coating doubles the counters on each of the opponent\'s Pokémon', ()
   );
   assert.equal(damageOf(state, 'p2', 20), 60);
   assert.equal(damageOf(state, 'p2', 21), 0);
+});
+
+const DOUBLE_ACTIVE_FLOOR =
+  "Double the number of damage counters on your opponent's Active Pokémon. This attack can't leave it with less than 10 HP remaining.";
+
+test('Active doubling: adds the counters already there, Bench untouched', () => {
+  const state = attack(
+    board({
+      text: DOUBLE_ACTIVE_FLOOR,
+      opponent: [
+        { instanceId: 20, name: 'Active', hp: 200, damage: 30 },
+        { instanceId: 21, name: 'Bench', hp: 200, damage: 30 },
+      ],
+    })
+  );
+  assert.equal(damageOf(state, 'p2', 20), 60);
+  assert.equal(damageOf(state, 'p2', 21), 30);
+});
+
+test('Active doubling: stops at 10 HP remaining', () => {
+  const state = attack(
+    board({
+      text: DOUBLE_ACTIVE_FLOOR,
+      opponent: [{ instanceId: 20, name: 'Active', hp: 100, damage: 60 }],
+    })
+  );
+  assert.equal(damageOf(state, 'p2', 20), 90, 'only 30 of the 60 counters fit above the 10 HP floor');
+  assert.equal(state.pendingChoice, null);
 });
 
 test('Soul Destroyer knocks out each Pokémon at 50 HP or less, and only those', () => {
