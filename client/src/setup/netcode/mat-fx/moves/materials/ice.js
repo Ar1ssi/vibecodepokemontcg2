@@ -24,8 +24,14 @@
 // ice fill takes a fine, barely drifting second noise layer (detail) as frost, never a warp; only
 // the cold mist drifts and wavers (distort + detail). A drawer's dissolve burns at a thin pale-cyan
 // frost edge.
+//
+// Design 076 § Depth: a crystal is a lit glassy tube round its axis (`volume`: a sharp white glint,
+// a strong rim) standing off the cloth with its facet and edge on it; a snowflake floats higher,
+// its heart a lit bead and its spokes lit rods; aurora rings are lit tubes stacked outer-lowest.
+// Heights (lane units) add to the drawer's lift (`withLiftZ`); the cast pass shades the cloth.
 import { rgbCss } from '../../fx-colors.mjs';
-import { withFxMod } from './_mods.js';
+import { moddedKit } from './_kit-mod.js';
+import { withFxMod, withLiftZ } from './_mods.js';
 import { grainPass, inShadow, shardOutline, sphere, traceOutline } from './_shared.js';
 
 const TAU = Math.PI * 2;
@@ -63,17 +69,22 @@ const rad = (deg) => (deg * Math.PI) / 180;
 const CRYSTAL_BODY = Object.freeze({ id: 'crystal', facets: 6, sheen: 0.55, speed: 1.4 });
 const CRYSTAL_EDGE = Object.freeze({ id: 'crystal', facets: 6, sheen: 0.7, speed: 1.2 });
 const AURORA_SHIMMER = Object.freeze({ id: 'crystal', facets: 6, sheen: 0.45, speed: 0.6 });
-// Modifier params (gpu-canvas FX_MODS), strengths in lane heights.
-const FROST_MOD = Object.freeze({ detail: Object.freeze({ amount: 0.2, speed: 0.15, scale: 6, angle: -90 }) });
-const MIST_MOD = Object.freeze({
-  distort: Object.freeze({ strength: 0.04, speed: 0.4, scale: 2.5, angle: -90 }),
-  detail: Object.freeze({ amount: 0.2, speed: 0.3, scale: 3, angle: -90 }),
+// Modifier params (gpu-canvas FX_MODS), strengths in lane heights; light from up-left (120°).
+const FROST_MOD = Object.freeze({
+  detail: Object.freeze({ amount: 0.22, speed: 0.15, scale: 6, angle: -90 }),
+  volume: Object.freeze({ amount: 0.7, spec: 0.9, rim: 0.7, light: 120, bump: 0, radius: 0.1, ambient: 0.5 }),
 });
+const MIST_MOD = Object.freeze({
+  distort: Object.freeze({ strength: 0.06, speed: 0.4, scale: 2.5, angle: -90 }),
+  detail: Object.freeze({ amount: 0.22, speed: 0.3, scale: 3, angle: -90 }),
+});
+const BEAD_MOD = Object.freeze({ volume: Object.freeze({ amount: 0.8, spec: 0.8, rim: 0.6, light: 120, bump: 0, ambient: 0.45 }) });
+const ROD_MOD = Object.freeze({ volume: Object.freeze({ amount: 0.6, spec: 0.6, rim: 0.3, light: 120, bump: 0, ambient: 0.45 }) });
+// Heights (lane units) over the drawer's lift: mist on the cloth, crystals above it, a snowflake
+// higher, aurora rings from `ring` (outer) up by `ringStep` per ring inward.
+const LIFT = Object.freeze({ crystal: 0.06, flake: 0.1, ring: 0.05, ringStep: 0.03 });
 /** A thin frost rim in `pal`'s pale cyan: a drawer's dissolve burns it. */
 const frostEdge = (pal) => Object.freeze({ dissolve: Object.freeze({ edge: pal.hot, width: 0.08, gain: 1.1 }) });
-/** A kit method run under the kit's own modifiers (its dissolve edge); a non-context passes through. */
-const modded = (draw, mod) => (ctx, ...args) =>
-  ctx && typeof ctx === 'object' ? withFxMod(ctx, mod, () => draw(ctx, ...args)) : draw(ctx, ...args);
 
 const ICE_PALETTE = Object.freeze({
   deep: Object.freeze([62, 143, 209]),
@@ -188,8 +199,13 @@ const restingPhase = (x, y, r) => x * 0.02 + y * 0.03 + r * 0.15;
 
 /** A snowflake: a bright centre, a wide ice-blue pass of every stroke, a thin white pass. */
 function snowflake(ctx, pal, x, y, r, alpha, hot, phase) {
+  withLiftZ(ctx, LIFT.flake, () => litFlake(ctx, pal, x, y, r, alpha, hot, phase));
+}
+
+/** The snowflake's bead and rods at the current lift. */
+function litFlake(ctx, pal, x, y, r, alpha, hot, phase) {
   ctx.fxStyle = CRYSTAL_EDGE;
-  sphere(
+  withFxMod(ctx, BEAD_MOD, () => sphere(
     ctx,
     x,
     y,
@@ -200,7 +216,7 @@ function snowflake(ctx, pal, x, y, r, alpha, hot, phase) {
       [1, pal.body, 0],
     ],
     0
-  );
+  ));
   const segments = snowflakeSegments(x, y, r, phase);
   ctx.lineCap = 'round';
   const passes = [
@@ -215,7 +231,7 @@ function snowflake(ctx, pal, x, y, r, alpha, hot, phase) {
       ctx.moveTo(x0, y0);
       ctx.lineTo(x1, y1);
     }
-    ctx.stroke();
+    withFxMod(ctx, ROD_MOD, () => ctx.stroke());
   }
   ctx.fxStyle = null;
 }
@@ -224,8 +240,13 @@ function snowflake(ctx, pal, x, y, r, alpha, hot, phase) {
  * One crystal (or with `jag`, a splinter): the translucent ice fill, the lit facet down its left
  * side, then a 1 px white edge. `hot` scales the facet.
  */
-function crystal(ctx, pal, spec, { alpha = 1, hot = 1, jag = 0 } = {}) {
-  if (!(spec.length > 0) || !(spec.width > 0) || !(alpha > 0)) return;
+function crystal(ctx, pal, spec, options = {}) {
+  if (!(spec.length > 0) || !(spec.width > 0) || !((options.alpha ?? 1) > 0)) return;
+  withLiftZ(ctx, LIFT.crystal, () => litCrystal(ctx, pal, spec, options));
+}
+
+/** The crystal's ice fill, facet and edge at the current lift. */
+function litCrystal(ctx, pal, spec, { alpha = 1, hot = 1, jag = 0 } = {}) {
   const outline = jag ? shardOutline(spec) : icicleOutline(spec);
   inShadow(ctx, () => {
     ctx.fxStyle = CRYSTAL_BODY;
@@ -245,7 +266,7 @@ function crystal(ctx, pal, spec, { alpha = 1, hot = 1, jag = 0 } = {}) {
   ctx.lineJoin = 'miter';
   ctx.fxStyle = CRYSTAL_EDGE;
   traceOutline(ctx, outline);
-  ctx.stroke();
+  withFxMod(ctx, ROD_MOD, () => ctx.stroke());
   ctx.fxStyle = null;
 }
 
@@ -297,21 +318,24 @@ function iceKit(palette) {
     crystalVolley(ctx, palette, { x, y, r, headingDeg, seed, alpha, tongues, hot });
   }
 
-  return Object.freeze({
-    key: 'ice',
-    palette,
-    // A deep winter navy, kept local to a card, so pale ice reads against it.
-    shade: Object.freeze([6, 24, 50]),
-    // Cold mist (the recipe's smoke).
-    smoke: Object.freeze([200, 230, 245]),
-    particle: Object.freeze({ className: 'fx-particle--shard', color: rgbCss(palette.hot), aspect: 0.6 }),
-    glow: modded(iceGlow, edge),
-    body: modded(iceBody, edge),
-    tongue: modded(iceTongue, edge),
-    projectile: modded(iceProjectile, edge),
-    grain: grainPass,
-    withPalette: (p) => iceKit(p),
-  });
+  return moddedKit(
+    {
+      key: 'ice',
+      palette,
+      // A deep winter navy, kept local to a card, so pale ice reads against it.
+      shade: Object.freeze([6, 24, 50]),
+      // Cold mist (the recipe's smoke).
+      smoke: Object.freeze([200, 230, 245]),
+      particle: Object.freeze({ className: 'fx-particle--shard', color: rgbCss(palette.hot), aspect: 0.6 }),
+      glow: iceGlow,
+      body: iceBody,
+      tongue: iceTongue,
+      projectile: iceProjectile,
+      grain: grainPass,
+      withPalette: (p) => iceKit(p),
+    },
+    edge
+  );
 }
 
 export const ice = iceKit(ICE_PALETTE);
@@ -336,7 +360,7 @@ function auroraKit(palette) {
         ctx.strokeStyle = rgbCss(palette[key], RING_ALPHA * alpha * alphas[k] * (0.6 + 0.4 * clamp01(hot)));
         ctx.beginPath();
         ctx.arc(x, y, r * scale, 0, TAU);
-        ctx.stroke();
+        withLiftZ(ctx, LIFT.ring + k * LIFT.ringStep, () => withFxMod(ctx, ROD_MOD, () => ctx.stroke()));
       });
       ctx.fxStyle = null;
     });
@@ -362,19 +386,22 @@ function auroraKit(palette) {
     auroraRing(ctx, x, y, r, alpha, hot, time * 4 + seed);
   }
 
-  return Object.freeze({
-    key: 'aurora',
-    palette,
-    shade: Object.freeze([10, 18, 46]),
-    smoke: null,
-    particle: Object.freeze({ className: 'fx-particle--twinkle', color: rgbCss(palette.lilac), aspect: 1 }),
-    glow: modded(auroraGlow, edge),
-    body: modded(auroraBody, edge),
-    tongue: modded(auroraTongue, edge),
-    projectile: modded(auroraProjectile, edge),
-    grain: grainPass,
-    withPalette: (p) => auroraKit(p),
-  });
+  return moddedKit(
+    {
+      key: 'aurora',
+      palette,
+      shade: Object.freeze([10, 18, 46]),
+      smoke: null,
+      particle: Object.freeze({ className: 'fx-particle--twinkle', color: rgbCss(palette.lilac), aspect: 1 }),
+      glow: auroraGlow,
+      body: auroraBody,
+      tongue: auroraTongue,
+      projectile: auroraProjectile,
+      grain: grainPass,
+      withPalette: (p) => auroraKit(p),
+    },
+    edge
+  );
 }
 
 export const aurora = auroraKit(AURORA_PALETTE);

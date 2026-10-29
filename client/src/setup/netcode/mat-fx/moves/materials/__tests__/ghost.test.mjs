@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { ghost } from '../ghost.js';
-import { assertEdged, detailed, distorted, drawMods } from './fx-mod-rows.mjs';
+import { assertEdged, assertLift, detailed, distorted, drawMods, lit } from './fx-mod-rows.mjs';
 
 test('ghost wisp: outer and inner passes waver as vapour; the dark core line holds', () => {
   const rows = drawMods((ctx) => ghost.tongue(ctx, { x: 50, y: 50, angleDeg: -90, length: 80, width: 30, time: 0.4, seed: 3 }));
@@ -25,4 +25,15 @@ test('ghost shadow puff and ball: puff fills and rim glow waver; the dark sphere
   assert.ok(distorted(ball[0]), 'the rim glow');
   assert.ok(!distorted(ball[1]) && !distorted(ball[2]));
   assertEdged([...puff, ...ball], ghost.palette.hot);
+});
+
+test('ghost depth: the ball is a glossy lit sphere floating over its rim glow, its edge on top', () => {
+  const [rim, ball, edge] = drawMods((ctx) => ghost.body(ctx, 50, 50, 30, 1, 0));
+  assert.ok(lit(ball) && ball.volume.spec > 0 && lit(edge));
+  assert.ok(!lit(rim));
+  assert.ok(rim.lift > 0 && ball.lift > rim.lift && edge.lift > ball.lift);
+  const [outer, inner, core] = drawMods((ctx) => ghost.tongue(ctx, { x: 50, y: 50, angleDeg: -90, length: 80, width: 30, time: 0.4, seed: 3 }));
+  assert.ok(lit(outer) && lit(inner) && outer.lift > 0 && core.lift > outer.lift, 'wisps are lit vapour, the core line over them');
+  const haze = drawMods((ctx) => ghost.projectile(ctx, { x: 60, y: 60, r: 20, headingDeg: 0, time: 0.5, seed: 2, tongues: 0 }))[0];
+  assertLift(haze, 0, 'haze on the cloth');
 });

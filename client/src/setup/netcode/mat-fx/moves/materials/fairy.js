@@ -17,8 +17,14 @@
 // warp, distort, and a faint second noise layer, detail), a trail's ribbon wavers along it, and
 // the moon's dim disc takes a slow-turning surface (detail). Sparkles stay crisp. A drawer's
 // dissolve burns at a gold edge, the kit's own accent.
+//
+// Design 076 § Depth: the moon is a lit sphere (`volume`: a glint and a strong rim) floating high
+// with its crescent and sparkle on it; a twinkle's soft orb is a lit bead under its sparkle; trails
+// are lit ribbons just off the cloth. Heights (lane units) add to the drawer's lift (`withLiftZ`);
+// the cast pass lays their light on the cloth under them.
 import { rgbCss } from '../../fx-colors.mjs';
-import { withFxMod } from './_mods.js';
+import { moddedKit } from './_kit-mod.js';
+import { withFxMod, withLiftZ } from './_mods.js';
 import { rootFaded } from './_root-fade.js';
 import { grainPass, sphere, tongueOutline, traceOutline } from './_shared.js';
 
@@ -40,16 +46,26 @@ const TRAIL_SPREAD = 40;
 const SHIMMER = Object.freeze({ id: 'energy', streak: 0.35, speed: 1.5, gain: 0.5 });
 const SHIMMER_SOFT = Object.freeze({ id: 'energy', streak: 0.25, speed: 1, gain: 0 });
 // Modifier params (gpu-canvas FX_MODS), strengths in lane heights.
+// Light from up-left (120°).
 const LIGHT_MOD = Object.freeze({
-  distort: Object.freeze({ strength: 0.03, speed: 0.6, scale: 3, angle: -90 }),
-  detail: Object.freeze({ amount: 0.15, speed: 0.5, scale: 4, angle: -90 }),
+  distort: Object.freeze({ strength: 0.05, speed: 0.6, scale: 3, angle: -90 }),
+  detail: Object.freeze({ amount: 0.2, speed: 0.5, scale: 4, angle: -90 }),
 });
-const MOON_MOD = Object.freeze({ detail: Object.freeze({ amount: 0.2, speed: 0.2, scale: 4, angle: 0 }) });
-/** A trail's ribbon wavering along it. */
-const trailMod = (angleDeg) => ({ distort: { strength: 0.03, speed: 1, scale: 3, angle: angleDeg } });
-/** A kit method run under the kit's own modifiers (its dissolve edge); a non-context passes through. */
-const modded = (draw, mod) => (ctx, ...args) =>
-  ctx && typeof ctx === 'object' ? withFxMod(ctx, mod, () => draw(ctx, ...args)) : draw(ctx, ...args);
+// The moon's glint and rim stay low: the disc is additive light, already near-white on the board
+// where it sums with its haze, trails and crescent, so the volume adds no bloom of its own.
+const MOON_MOD = Object.freeze({
+  detail: Object.freeze({ amount: 0.22, speed: 0.2, scale: 4, angle: 0 }),
+  volume: Object.freeze({ amount: 0.85, spec: 0.25, rim: 0.45, light: 120, bump: 0.3, bumpScale: 3, ambient: 0.4 }),
+});
+const BEAD_MOD = Object.freeze({ volume: Object.freeze({ amount: 0.6, spec: 0.4, rim: 0.6, light: 120, bump: 0, ambient: 0.45 }) });
+/** A trail's ribbon wavering along it, lit as a tube round its axis. */
+const trailMod = (angleDeg) => ({
+  distort: { strength: 0.05, speed: 1, scale: 3, angle: angleDeg },
+  volume: { amount: 0.6, spec: 0.3, rim: 0.6, light: 120, bump: 0.2, radius: 0.09, ambient: 0.45 },
+});
+// Heights (lane units) over the drawer's lift: soft light on the cloth, trails and shards just off
+// it, a twinkle above them, the star's sparkles and the moon highest.
+const LIFT = Object.freeze({ trail: 0.05, twinkle: 0.08, star: 0.1, moon: 0.12 });
 
 const PALETTE = Object.freeze({
   deep: Object.freeze([184, 58, 114]),
@@ -133,18 +149,25 @@ function fairyKit(palette) {
    */
   function body(ctx, x, y, r, alpha, hot = 1, time = 0) {
     if (!(r > 0) || !(alpha > 0)) return;
+    withLiftZ(ctx, LIFT.twinkle, () => twinkle(ctx, x, y, r, alpha, hot, time));
+  }
+
+  /** The twinkle's bead and sparkle at the current lift. */
+  function twinkle(ctx, x, y, r, alpha, hot, time) {
     ctx.fxStyle = SHIMMER_SOFT;
-    sphere(
-      ctx,
-      x,
-      y,
-      r * 0.7,
-      [
-        [0, palette.core, alpha * 0.45],
-        [0.5, palette.hot, alpha * 0.35],
-        [1, palette.body, 0],
-      ],
-      0
+    withFxMod(ctx, BEAD_MOD, () =>
+      sphere(
+        ctx,
+        x,
+        y,
+        r * 0.7,
+        [
+          [0, palette.core, alpha * 0.45],
+          [0.5, palette.hot, alpha * 0.35],
+          [1, palette.body, 0],
+        ],
+        0
+      )
     );
     const size = r * twinklePulse(time, x * 0.013 + y * 0.017 + r * 0.05);
     const g = ctx.createRadialGradient(x, y, 0, x, y, size);
@@ -196,8 +219,13 @@ function fairyKit(palette) {
    * root, so trails fanned out of a moon never stack into a white disc), and gold twinkles
    * strung along its centre that pulse with the clock (`hot` 0 drops the twinkles).
    */
-  function tongue(ctx, spec, { alpha = 1, hot = 1, jag = 0 } = {}) {
-    if (!(spec.length > 0) || !(spec.width > 0) || !(alpha > 0)) return;
+  function tongue(ctx, spec, options = {}) {
+    if (!(spec.length > 0) || !(spec.width > 0) || !((options.alpha ?? 1) > 0)) return;
+    withLiftZ(ctx, LIFT.trail, () => trail(ctx, spec, options));
+  }
+
+  /** The trail (or with `jag`, a sparkle shard) at the current lift. */
+  function trail(ctx, spec, { alpha = 1, hot = 1, jag = 0 } = {}) {
     if (jag) {
       sparkleShard(ctx, spec, alpha, hot);
       return;
@@ -254,6 +282,11 @@ function fairyKit(palette) {
         { alpha: alpha * 0.6, hot }
       );
     }
+    withLiftZ(ctx, LIFT.moon, () => moon(ctx, x, y, r, alpha, hot, time, seed));
+  }
+
+  /** The moon's lit disc, crescent and sparkle at the current lift. */
+  function moon(ctx, x, y, r, alpha, hot, time, seed) {
     ctx.fxStyle = SHIMMER_SOFT;
     withFxMod(ctx, MOON_MOD, () =>
       sphere(ctx, x, y, r, [
@@ -301,28 +334,31 @@ function fairyKit(palette) {
     ctx.beginPath();
     addSparkle(ctx, x, y, r * 0.3 * pulse);
     for (let k = 0; k < outline.length; k += 2) addPolygon(ctx, twinkleOutline(outline[k][0], outline[k][1], r * 0.12 * pulse));
-    ctx.fill();
+    withLiftZ(ctx, LIFT.star, () => ctx.fill());
     ctx.fxStyle = null;
   }
 
   // Gold, the kit's accent (its trail twinkles), with a little bloom: the moon goes out in sparkle.
   const kitMod = Object.freeze({ dissolve: Object.freeze({ edge: palette.gold, width: 0.1, gain: 1.2 }) });
 
-  return Object.freeze({
-    key: 'fairy',
-    palette,
-    // A plum dusk, kept local to a card (the references' night sky and violet tints).
-    shade: Object.freeze([58, 14, 40]),
-    smoke: null,
-    particle: Object.freeze({ className: 'fx-particle--twinkle', color: rgbCss(palette.hot), aspect: 1 }),
-    glow: modded(glow, kitMod),
-    body: modded(body, kitMod),
-    tongue: modded(tongue, kitMod),
-    projectile: modded(projectile, kitMod),
-    sigil: modded(sigil, kitMod),
-    grain: grainPass,
-    withPalette: (p) => fairyKit(p),
-  });
+  return moddedKit(
+    {
+      key: 'fairy',
+      palette,
+      // A plum dusk, kept local to a card (the references' night sky and violet tints).
+      shade: Object.freeze([58, 14, 40]),
+      smoke: null,
+      particle: Object.freeze({ className: 'fx-particle--twinkle', color: rgbCss(palette.hot), aspect: 1 }),
+      glow,
+      body,
+      tongue,
+      projectile,
+      sigil,
+      grain: grainPass,
+      withPalette: (p) => fairyKit(p),
+    },
+    kitMod
+  );
 }
 
 export const fairy = fairyKit(PALETTE);

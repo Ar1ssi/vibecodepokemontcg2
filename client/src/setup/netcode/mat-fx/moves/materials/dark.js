@@ -13,8 +13,14 @@
 // shadow waver: a slash's crimson halo smoulders (distort + a second noise layer, detail, flowing
 // along the blade), the haze and the pulse's ripples read through a slow warp. The black blade and
 // core stay crisp. A drawer's dissolve burns at a crimson edge that blooms.
+//
+// Design 076 § Depth: the pulse's core is a glossy black sphere (`volume`: a glint, a rim) floating
+// over its ripples; the slash's blade is a bumped black sheet catching a glint, standing above its
+// halo, its crimson edge a lit tube on top. Heights (lane units) add to the drawer's lift
+// (`withLiftZ`); the cast pass shades the cloth under them.
 import { rgbCss } from '../../fx-colors.mjs';
-import { withFxMod } from './_mods.js';
+import { moddedKit } from './_kit-mod.js';
+import { withFxMod, withLiftZ } from './_mods.js';
 import { grainPass, inShadow, shardOutline, sphere, styledKit, tongueOutline, traceOutline } from './_shared.js';
 
 // Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
@@ -37,18 +43,26 @@ const PULSE_HZ = 1.6;
 const TAIL_SPREAD = 24;
 // Modifier params (gpu-canvas FX_MODS), strengths in lane heights.
 const HAZE_MOD = Object.freeze({
-  distort: Object.freeze({ strength: 0.05, speed: 0.5, scale: 2.5, angle: -90 }),
-  detail: Object.freeze({ amount: 0.2, speed: 0.5, scale: 3, angle: -90 }),
+  distort: Object.freeze({ strength: 0.07, speed: 0.5, scale: 2.5, angle: -90 }),
+  detail: Object.freeze({ amount: 0.22, speed: 0.5, scale: 3, angle: -90 }),
 });
-const RIPPLE_MOD = Object.freeze({ distort: Object.freeze({ strength: 0.03, speed: 0.6, scale: 3, angle: 0 }) });
+const RIPPLE_MOD = Object.freeze({ distort: Object.freeze({ strength: 0.05, speed: 0.6, scale: 3, angle: 0 }) });
+// Light from up-left (120°). Black solids: a strong glint and rim, little ambient.
+const CORE_MOD = Object.freeze({
+  volume: Object.freeze({ amount: 1, spec: 0.6, rim: 0.7, light: 120, bump: 0.4, bumpScale: 4, ambient: 0.2 }),
+});
+const BLADE_MOD = Object.freeze({
+  volume: Object.freeze({ amount: 0.8, spec: 0.6, rim: 0, light: 120, bump: 0.5, bumpScale: 5, ambient: 0.3 }),
+});
+const EDGE_MOD = Object.freeze({ volume: Object.freeze({ amount: 0.7, spec: 0.4, rim: 0.4, light: 120, bump: 0, ambient: 0.4 }) });
 /** A slash's halo smouldering along the blade. */
 const haloMod = (angleDeg) => ({
-  distort: { strength: 0.04, speed: 0.8, scale: 3, angle: angleDeg },
+  distort: { strength: 0.06, speed: 0.8, scale: 3, angle: angleDeg },
   detail: { amount: 0.3, speed: 0.8, scale: 3, angle: angleDeg },
 });
-/** A kit method run under the kit's own modifiers (its dissolve edge); a non-context passes through. */
-const modded = (draw, mod) => (ctx, ...args) =>
-  ctx && typeof ctx === 'object' ? withFxMod(ctx, mod, () => draw(ctx, ...args)) : draw(ctx, ...args);
+// Heights (lane units) over the drawer's lift: haze on the cloth, the pulse's ripples above it and
+// its core over them; a slash's halo low, the blade above it, its edge on top.
+const LIFT = Object.freeze({ ripples: 0.06, core: 0.1, spark: 0.11, halo: 0.02, blade: 0.05, edge: 0.055 });
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 const fract = (v) => v - Math.floor(v);
@@ -110,35 +124,39 @@ function darkKit(palette) {
 
   /** A dark pulse turned to `phase`: shadow core, dark rings rippling out with crimson between. */
   function pulse(ctx, x, y, r, alpha, hot, phase) {
-    inShadow(ctx, () => {
-      sphere(
-        ctx,
-        x,
-        y,
-        r,
-        [
-          [0, palette.deep, alpha * 0.92],
-          [0.6, palette.shadow, alpha * 0.75],
-          [1, palette.shadow, 0],
-        ],
-        0
-      );
-    });
+    withLiftZ(ctx, LIFT.core, () =>
+      inShadow(ctx, () =>
+        withFxMod(ctx, CORE_MOD, () =>
+          sphere(
+            ctx,
+            x,
+            y,
+            r,
+            [
+              [0, palette.deep, alpha * 0.92],
+              [0.6, palette.shadow, alpha * 0.75],
+              [1, palette.shadow, 0],
+            ],
+            0
+          )
+        )
+      )
+    );
     // Ripples as soft bands (a radial gradient peaking at the ring), not stroked circles: hard
     // concentric lines read as a target reticle (design 075 parity).
     const rings = pulseRings(phase, r);
-    withFxMod(ctx, RIPPLE_MOD, () => {
+    withLiftZ(ctx, LIFT.ripples, () => withFxMod(ctx, RIPPLE_MOD, () => {
       inShadow(ctx, () => {
         for (const ring of rings) band(ctx, x, y, ring.radius, r * 0.12, palette.deep, 0.8 * alpha * ring.alpha);
       });
       for (const ring of rings) band(ctx, x, y, ring.radius + r * 0.1, r * 0.06, palette.hot, 0.75 * alpha * ring.alpha);
-    });
+    }));
     const spark = alpha * clamp01(hot);
     if (!(spark > 0)) return;
     ctx.fillStyle = rgbCss(palette.core, 0.55 * spark);
     ctx.beginPath();
     ctx.arc(x, y, r * 0.16, 0, TAU);
-    ctx.fill();
+    withLiftZ(ctx, LIFT.spark, () => ctx.fill());
   }
 
   // The interface's `body` carries no clock, so a pulse ripples with where it is and how big it
@@ -165,12 +183,12 @@ function darkKit(palette) {
     ctx.filter = `blur(${Math.max(1, spec.width * HALO_BLUR).toFixed(2)}px)`;
     ctx.fillStyle = rgbCss(palette.hot, HALO_ALPHA * alpha * (0.4 + 0.6 * clamp01(hot)));
     traceOutline(ctx, halo);
-    withFxMod(ctx, haloMod(spec.angleDeg), () => ctx.fill());
+    withLiftZ(ctx, LIFT.halo, () => withFxMod(ctx, haloMod(spec.angleDeg), () => ctx.fill()));
     ctx.filter = 'none';
     inShadow(ctx, () => {
       ctx.fillStyle = rgbCss(palette.deep, BLADE_ALPHA * alpha);
       traceOutline(ctx, blade);
-      ctx.fill();
+      withLiftZ(ctx, LIFT.blade, () => withFxMod(ctx, BLADE_MOD, () => ctx.fill()));
     });
     ctx.strokeStyle = rgbCss(palette.hot, 0.9 * alpha);
     ctx.lineWidth = Math.max(1, spec.width * EDGE_WIDTH);
@@ -178,7 +196,7 @@ function darkKit(palette) {
     ctx.lineJoin = 'round';
     ctx.beginPath();
     blade.left.forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
-    ctx.stroke();
+    withLiftZ(ctx, LIFT.edge, () => withFxMod(ctx, EDGE_MOD, () => ctx.stroke()));
   }
 
   /**
@@ -215,20 +233,23 @@ function darkKit(palette) {
   // Crimson that blooms: the one bright note dark has, burning the shadow away.
   const kitMod = Object.freeze({ dissolve: Object.freeze({ edge: palette.hot, width: 0.1, gain: 1.6 }) });
 
-  return Object.freeze({
-    key: 'dark',
-    palette,
-    // The sprite games' night: a violet-black, kept local to a card.
-    shade: Object.freeze([10, 6, 18]),
-    smoke: Object.freeze([40, 40, 60]),
-    particle: Object.freeze({ className: 'fx-particle--streak', color: rgbCss(palette.hot), aspect: 0.3 }),
-    glow: modded(glow, kitMod),
-    body: modded(body, kitMod),
-    tongue: modded(tongue, kitMod),
-    projectile: modded(projectile, kitMod),
-    grain: grainPass,
-    withPalette: (p) => darkKit(p),
-  });
+  return moddedKit(
+    {
+      key: 'dark',
+      palette,
+      // The sprite games' night: a violet-black, kept local to a card.
+      shade: Object.freeze([10, 6, 18]),
+      smoke: Object.freeze([40, 40, 60]),
+      particle: Object.freeze({ className: 'fx-particle--streak', color: rgbCss(palette.hot), aspect: 0.3 }),
+      glow,
+      body,
+      tongue,
+      projectile,
+      grain: grainPass,
+      withPalette: (p) => darkKit(p),
+    },
+    kitMod
+  );
 }
 
 export const dark = styledKit(darkKit(PALETTE), INK);
