@@ -4,6 +4,7 @@
 // colours come from the kit palette, so a tinted beat's fire takes its tint.
 import { elementKit } from './_kit.js';
 import { alphaOf, dissolveOf, emit, rgb01, stageAngle, stageLen, stageOf } from './_emit.js';
+import { sootBeats } from './shadow.js';
 
 /** How much larger than the canvas kit each piece draws. */
 export const FIRE_SCALE = Object.freeze({ body: 1.7, projectile: 1.9, tongueWidth: 1.6, tongueLength: 1.45, glow: 1.5 });
@@ -115,4 +116,4 @@ function projectile(ctx, { x, y, r, headingDeg = 0, time = 0, seed = 0, alpha = 
   }
 }
 
-export const fireElements = elementKit({ glow, body, tongue, projectile });
+export const fireElements = elementKit({ glow, body, tongue, projectile, beats: { smoke: sootBeats.smoke } });

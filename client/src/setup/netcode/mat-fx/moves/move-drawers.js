@@ -57,9 +57,9 @@ import {
 const TAU = Math.PI * 2;
 const HELIX_SAMPLES = 12;
 
-const centreOf = (lane, target) => (target === 'attacker' ? { x: lane.ax, y: lane.ay } : { x: lane.bx, y: lane.by });
+export const centreOf = (lane, target) => (target === 'attacker' ? { x: lane.ax, y: lane.ay } : { x: lane.bx, y: lane.by });
 /** An anchored beat's point: its target (kind anchor) moved by its dx / dy. */
-const anchorOf = (lane, p) => anchorPoint(lane, p.target, p.dx, p.dy);
+export const anchorOf = (lane, p) => anchorPoint(lane, p.target, p.dx, p.dy);
 /** Item i's material: the hued one when the beat has hues, else the beat material. */
 const itemMaterial = (info, i) => (typeof info.materialAt === 'function' ? info.materialAt(i) : info.material);
 const isSky = (target) => target === 'sky' || target === 'sky-attacker';
