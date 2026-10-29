@@ -822,8 +822,21 @@ export function parseAbility(text = '') {
     }
   }
 
+  // Mysterious Potion: one coin flip picks heal OR counters, so neither generic step below applies.
+  const coinHealOrCounters = lower.match(
+    /choose 1 of your pok[eé]mon and flip a coin\. if heads, heal (\d+) damage from that pok[eé]mon\. if tails, (?:put|place) (\d+) damage counters? on that pok[eé]mon/
+  );
+  if (coinHealOrCounters) {
+    steps.push({
+      type: 'coinHealOrCountersAbility',
+      heal: Number(coinHealOrCounters[1]),
+      counters: Number(coinHealOrCounters[2]),
+      guidance: `Once during your turn: choose 1 of your Pokémon and flip a coin. Heads: heal ${coinHealOrCounters[1]} damage. Tails: put ${coinHealOrCounters[2]} damage counters on it.`,
+    });
+  }
+
   // ── 4. Heal / remove damage counters ────────────────────────────────────
-  if (lower.includes('heal') || (lower.includes('remove') && lower.includes('damage counter'))) {
+  if (!coinHealOrCounters && (lower.includes('heal') || (lower.includes('remove') && lower.includes('damage counter')))) {
     const amount = lower.match(/heal\s+(\d+)\s+damage/)?.[1] || lower.match(/remove\s+(?:up to\s+)?(\d+)\s+damage/)?.[1] || null;
     const all = lower.includes('all damage');
     const cure = lower.includes('special condition') || lower.includes('recover');
@@ -1035,6 +1048,7 @@ export function parseAbility(text = '') {
     lower.includes('evolve') &&
     !/when you play this pok[eé]mon from your hand to evolve/.test(lower);
   if (
+    !coinHealOrCounters &&
     !hasPromotionTrigger &&
     !/in this way, place \d+ damage counters? on that pok/.test(lower) &&
     !lower.includes('checkup') &&

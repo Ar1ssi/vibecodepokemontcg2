@@ -2053,3 +2053,29 @@ test('ability: Tachyon Bits is refused outside the promotion turn', () => {
   assert.match(res.error, /moved to the Active Spot/);
   assert.equal(res.state.players.p2.zones.active[0].damage || 0, 0);
 });
+
+test('ability: Mysterious Potion flips once — heads heals 50, tails puts 2 counters, never both', () => {
+  const text =
+    'Once during your turn, you may choose 1 of your Pokémon and flip a coin. If heads, heal 50 damage from that Pokémon. If tails, put 2 damage counters on that Pokémon.';
+  assert.deepEqual(
+    parseAbility(text).map((s) => s.type),
+    ['coinHealOrCountersAbility']
+  );
+  const results = new Set();
+  for (let seed = 1; seed <= 40; seed++) {
+    const { state } = setupGame();
+    const { holder } = holderWithAbility(state, text);
+    holder.damage = 100;
+    const rng = createRng(seed);
+    const res1 = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
+    assert.ok(res1.pendingChoice);
+    const res2 = applyCommand(
+      res1.state,
+      { type: 'resolveChoice', payload: { choiceId: res1.pendingChoice.choiceId, selection: [70] }, playerId: 'p1' },
+      rng
+    );
+    assert.equal(res2.error, null);
+    results.add(res2.state.players.p1.zones.active[0].damage);
+  }
+  assert.deepEqual([...results].sort((a, b) => a - b), [50, 120]);
+});

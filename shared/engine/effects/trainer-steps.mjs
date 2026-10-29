@@ -3539,6 +3539,43 @@ function selfDamageAbility(ctx) {
 }
 
 /**
+ * Mysterious Potion: "choose 1 of your Pokémon and flip a coin. If heads, heal 50 damage from
+ * that Pokémon. If tails, put 2 damage counters on that Pokémon." One flip decides one outcome.
+ */
+function coinHealOrCountersAbility(ctx) {
+  const { player, step } = ctx;
+  const roots = rootsOf(player);
+  if (!ctx.selection) {
+    if (roots.length === 0) return skip(ctx, 'no_target');
+    return ctx.ask({
+      prompt: `${sourceName(ctx, 'Ability')}: Choose 1 of your Pokémon, then flip a coin (heads: heal ${step.heal}, tails: put ${step.counters} damage counters)`,
+      options: roots,
+      min: 1,
+      max: 1,
+    });
+  }
+  const target = roots.find((c) => c.instanceId === ctx.selection[0]);
+  if (!target) return skip(ctx, 'target_not_found');
+  const face = flipFace(ctx);
+  ctx.events.push({ type: 'coinFlipped', playerId: player.playerId, face });
+  if (face === 'heads') {
+    if (stadiumBlocksHealing(ctx.draft.stadium)) return skip(ctx, 'healing_blocked');
+    healCard(ctx, target, step.heal);
+    return null;
+  }
+  target.damage = (target.damage || 0) + step.counters * 10;
+  ctx.events.push({ type: 'damageUpdated', instanceId: target.instanceId, damage: target.damage });
+  ctx.events.push({
+    type: 'damageCountersPlaced',
+    instanceId: target.instanceId,
+    victimPlayerId: player.playerId,
+    attackerPlayerId: null,
+    damage: target.damage,
+  });
+  return null;
+}
+
+/**
  * Luxray Swelling Flash / Klinklang Emergency Rotation: "if this Pokémon is in
  * your hand …, you may put this Pokémon onto your Bench." `step.condition`
  * carries the parsed gate; an unmet condition skips without consuming a Bench
@@ -6073,6 +6110,7 @@ export const EXTRA_STEP_HANDLERS = {
   moveDamageBetweenAbility: moveDamageBetweenOwn,
   recoverStatusAbility,
   selfDamageAbility,
+  coinHealOrCountersAbility,
   selfBenchPlacementAbility,
   turnDamageBonusAbility,
   chooseMode,
