@@ -37,11 +37,13 @@ test('normalizeSprite fills defaults and refuses what cannot draw', () => {
   assert.deepEqual(odd.colour, [1, 1, 1], 'a non-numeric channel drops the colour');
 });
 
-test('packSprite writes the three attribute vec4s in order; the bucket key splits texture, blend, channel', () => {
+test('packSprite writes the four attribute vec4s in order; the bucket key splits texture, blend, channel', () => {
   const sprite = normalizeSprite({ texture: 't', at: { x: 1, y: 2, z: 3 }, size: 4, aspect: 2, rotation: 90, colour: [0.5, 2, 1], alpha: 0.5, frame: 3.7, dissolve: 0.25, blend: 'over', channel: 'rgba' });
   const out = new Float32Array(SPRITE_FLOATS * 2);
   packSprite(sprite, out, 1);
   const row = [...out.subarray(SPRITE_FLOATS)].map((v) => Math.round(v * 1000) / 1000);
-  assert.deepEqual(row, [1, 2, 3, 4, 8, 1.571, 3, 0.25, 0.5, 2, 1, 0.5]);
+  assert.deepEqual(row, [1, 2, 3, 4, 8, 1.571, 3, 0.25, 0.5, 2, 1, 0.5, 0, 0, 0, 0], 'not aligned');
+  packSprite(normalizeSprite({ texture: 't', at: { x: 0, y: 0 }, size: 1, alignDeg: 90 }), out, 0);
+  assert.deepEqual([...out.subarray(12, 16)].map((v) => Math.round(v * 1000) / 1000), [0, 1, 1, 0], 'aligned down the stage');
   assert.equal(spriteBucketKey(sprite), 't|over|rgba');
 });

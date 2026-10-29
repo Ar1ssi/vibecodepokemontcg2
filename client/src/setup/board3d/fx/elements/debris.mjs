@@ -1,19 +1,22 @@
 // Design 077 § Kinds: the debris element's pure half — solid rock and earth: a jagged stone mesh
 // per instance, tumbling, optionally stretched along a heading into a shard or spike.
 //
-// Row (DEBRIS_FLOATS), four vec4: x y z size · colour alpha · light seed · stretch heading spin dissolve.
+// Row (DEBRIS_FLOATS), five vec4: x y z size · colour alpha · light seed · stretch heading spin
+// dissolve · gloss smooth 0 0. `gloss` turns stone to metal or ice (a specular glint and a sky
+// reflection); `smooth` rounds the jagged stone toward a sphere (a steel ball, an ice orb).
 // The rock mesh itself (rockMesh) is built once: an icosahedron's faces with each corner pushed
 // in or out by a hash of its position, so shared corners move together and the stone stays closed.
 import { finite, positive, rgb, stagePoint, unit } from './element-params.mjs';
 
-export const DEBRIS_FLOATS = 16;
-export const DEBRIS_ATTRIBUTES = Object.freeze(['iA', 'iB', 'iC', 'iD']);
+export const DEBRIS_FLOATS = 20;
+export const DEBRIS_ATTRIBUTES = Object.freeze(['iA', 'iB', 'iC', 'iD', 'iE']);
 const STONE = Object.freeze([0.55, 0.5, 0.45]);
 const DEG = Math.PI / 180;
 
 /**
  * @param {{ at: object, size: number, alpha?: number, seed?: number, colour?: number[], light?: number[],
- *   stretch?: number, headingDeg?: number, spin?: number, dissolve?: number }} params `size` stage px
+ *   stretch?: number, headingDeg?: number, spin?: number, dissolve?: number, gloss?: number,
+ *   smooth?: number }} params `size` stage px
  *   (the stone's radius); `stretch` ≥ 1 its length over its width along `headingDeg`; `spin`
  *   radians it has tumbled; `light` its lit edge colour.
  * @returns {object|null}
@@ -35,12 +38,17 @@ export function normalizeDebris(params) {
     heading: finite(params.headingDeg) ? params.headingDeg * DEG : 0,
     spin: finite(params.spin) ? params.spin : 0,
     dissolve: unit(params.dissolve, 0),
+    gloss: unit(params.gloss, 0),
+    smooth: unit(params.smooth, 0),
   };
 }
 
 export function packDebris(row, out, index) {
   const o = index * DEBRIS_FLOATS;
-  out.set([row.at.x, row.at.y, row.at.z, row.size, ...row.colour, row.alpha, ...row.light, row.seed, row.stretch, row.heading, row.spin, row.dissolve], o);
+  out.set(
+    [row.at.x, row.at.y, row.at.z, row.size, ...row.colour, row.alpha, ...row.light, row.seed, row.stretch, row.heading, row.spin, row.dissolve, row.gloss, row.smooth, 0, 0],
+    o
+  );
 }
 
 /** The 12 corners and 20 faces of a unit icosahedron. */
@@ -105,4 +113,6 @@ export const debrisSamples = () => [
   { at: { x: -80, y: 0, z: 40 }, size: 36, seed: 1, spin: 0.7 },
   { at: { x: 0, y: 10, z: 50 }, size: 22, seed: 2, stretch: 2.6, headingDeg: -60, spin: 1.3, colour: [0.62, 0.45, 0.3] },
   { at: { x: 80, y: 0, z: 40 }, size: 30, seed: 3, spin: 2.2, dissolve: 0.4 },
+  { at: { x: -40, y: 90, z: 40 }, size: 28, seed: 4, gloss: 1, smooth: 1, colour: [0.7, 0.72, 0.78] },
+  { at: { x: 50, y: 90, z: 40 }, size: 18, seed: 5, gloss: 0.8, stretch: 3, headingDeg: 30, colour: [0.7, 0.9, 1] },
 ];

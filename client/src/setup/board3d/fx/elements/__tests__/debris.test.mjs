@@ -11,7 +11,9 @@ test('debris: defaults, a stretch never below 1, refusals, packed row', () => {
   assert.equal(normalizeDebris({ size: 3 }), null);
   const out = new Float32Array(DEBRIS_FLOATS);
   packDebris(normalizeDebris({ at: { x: 1, y: 2, z: 3 }, size: 4, alpha: 0.5, seed: 6, colour: [0, 0, 0], light: [1, 1, 1], stretch: 2, headingDeg: 0, spin: 7, dissolve: 0.25 }), out, 0);
-  assert.deepEqual([...out], [1, 2, 3, 4, 0, 0, 0, 0.5, 1, 1, 1, 6, 2, 0, 7, 0.25]);
+  assert.deepEqual([...out], [1, 2, 3, 4, 0, 0, 0, 0.5, 1, 1, 1, 6, 2, 0, 7, 0.25, 0, 0, 0, 0]);
+  packDebris(normalizeDebris({ at: { x: 0, y: 0 }, size: 1, gloss: 2, smooth: 0.5 }), out, 0);
+  assert.deepEqual([...out.subarray(16)], [1, 0.5, 0, 0], 'gloss clamps; smooth rides beside it');
 });
 
 test('rockMesh: 80 closed, jagged faces; shared corners move together', () => {

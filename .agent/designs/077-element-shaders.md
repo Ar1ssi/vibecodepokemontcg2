@@ -177,5 +177,12 @@ entries (or the whole wrap in `materialFor`) — the canvas path is untouched.
   (INVALID_VALUE, found by the check script's per-step GL error attribution).
 - Slice 5: ghost and dark share one smoke-made kit (`shadow.js`); fire's smoke beat is soot from the same helper.
 - Slice 6: grass is leaves only (sprite kind); rock/ground share a stone kit (`earth.js`). Debris writes depth.
-- Not yet on elements (slice 7): dragon, fighting/aura, steel, fairy, ice/aurora, poison, bug/buzz/silver, flying,
-  normal, stellar, petal/solar/mud/ancient/gem. They draw with their 076 canvas kits; burst particles are sprites.
+- Slice 7 (user: "do slice 7"): every material has an element kit. Shared beats for all types (`_shared-beats.js`):
+  impact flash (glow, TCG Live impact ring, spikes, flash lines), slash (the type's tongue + a Slash_1x4 streak aligned
+  on screen), aura (inner glow + energy ring). Kits reused by palette: dragon/solar → fire; poison/mud → water + gas;
+  fairy/stellar → psychic lens; ancient → rock. New small kits: energy (fighting, aura, normal, buzz: force spheres +
+  flame streaks), crystal (ice/aurora drops + glossy shards, gem/steel light spheres + shards, bug needles), air
+  (flying, silver: Slash02 swipes + white air), petal leaves. Sprites gained `alignDeg` (a stage heading projected on
+  screen); debris gained `gloss` / `smooth`. Steel and gem orbs are light spheres, not metal balls: Flash Cannon's beam
+  motes are bodies and read black as polished metal. Checked: Dragon Pulse, Aura Sphere, Close Combat, Iron Tail,
+  Flash Cannon, Moonblast, Ice Beam, Avalanche, Sludge Bomb, X-Scissor, Pin Missile, Hurricane, Petal Dance.

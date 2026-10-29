@@ -11,6 +11,7 @@ export const EARTH_SCALE = Object.freeze({ body: 1.25, projectile: 1.35, shard: 
 const MAX_STRETCH = 4;
 const DUST_PUFFS = 3;
 const LEAF_TEXTURE = 'T_VFX_Leaves_2x2.webp';
+const PETAL_TEXTURE = 'T_VFX_Fairy_Petal_Soft_2x2.webp';
 const DEG = Math.PI / 180;
 
 /** A stone kit in a palette role: `look(palette)` → `{ colour, light, dust }` (0–1 rgb). */
@@ -105,26 +106,33 @@ export const groundElements = stoneKit((palette, smoke) => ({
   dust: rgb01(smoke ?? palette.body, 0.85),
 }));
 
-/** A leaf from (spec.x, spec.y) along spec.angleDeg: a TCG Live leaf sprite along it. */
-function leaf(ctx, spec, { alpha = 1 } = {}) {
-  if (!(spec?.length > 0) || !(alpha > 0)) return;
-  const mid = 0.5 * spec.length;
-  const cx = spec.x + Math.cos(spec.angleDeg * DEG) * mid;
-  const cy = spec.y + Math.sin(spec.angleDeg * DEG) * mid;
-  const seed = Math.abs(Math.round((spec.seed ?? 0) * 7));
-  emit(ctx, 'sprite', {
-    texture: LEAF_TEXTURE,
-    channel: 'rgba',
-    blend: 'over',
-    at: stageOf(ctx, cx, cy),
-    size: stageLen(ctx, spec.length) * EARTH_SCALE.leaf,
-    // The sheet's leaves point up; stage angles run clockwise from +x with y down the screen.
-    rotation: -stageAngle(ctx, spec.angleDeg) - 90,
-    frame: seed % 4,
-    colour: [1, 1, 1],
-    alpha: alphaOf(ctx, alpha),
-    dissolve: dissolveOf(ctx),
-  });
+/**
+ * Leaves from (spec.x, spec.y) along spec.angleDeg: a TCG Live leaf sprite laid along it on
+ * screen. `texture` / `channel` pick the sheet (green leaves keep their own colour; petals are a
+ * mask tinted by `tint(palette)`).
+ */
+function leafKit({ texture, channel, blend, tint }) {
+  function leaf(ctx, spec, { alpha = 1 } = {}) {
+    if (!(spec?.length > 0) || !(alpha > 0)) return;
+    const mid = 0.5 * spec.length;
+    const seed = Math.abs(Math.round((spec.seed ?? 0) * 7));
+    emit(ctx, 'sprite', {
+      texture,
+      channel,
+      blend,
+      at: stageOf(ctx, spec.x + Math.cos(spec.angleDeg * DEG) * mid, spec.y + Math.sin(spec.angleDeg * DEG) * mid),
+      size: stageLen(ctx, spec.length) * EARTH_SCALE.leaf,
+      // The sheet's leaves point up the texture; laid along the leaf, that is a quarter turn.
+      alignDeg: stageAngle(ctx, spec.angleDeg),
+      rotation: -90,
+      frame: seed % 4,
+      colour: tint(this.base.palette),
+      alpha: alphaOf(ctx, alpha),
+      dissolve: dissolveOf(ctx),
+    });
+  }
+  return elementKit({ tongue: leaf });
 }
 
-export const grassElements = elementKit({ tongue: leaf });
+export const grassElements = leafKit({ texture: LEAF_TEXTURE, channel: 'rgba', blend: 'over', tint: () => [1, 1, 1] });
+export const petalElements = leafKit({ texture: PETAL_TEXTURE, channel: 'a', blend: 'over', tint: (palette) => rgb01(palette.body, 1.1) });

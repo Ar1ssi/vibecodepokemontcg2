@@ -1,12 +1,13 @@
 // Design 077 § Kinds: the sprite element's pure half — params → one instance row, and the
 // flipbook grid a texture's name declares. DOM- and GL-free so it runs under `node --test`.
 //
-// Instance row (SPRITE_FLOATS), three vec4 attributes: x y z width · height rotation (rad) frame
-// dissolve · r g b a.
+// Instance row (SPRITE_FLOATS), four vec4 attributes: x y z width · height rotation (rad) frame
+// dissolve · r g b a · alignX alignY aligned 0. An aligned sprite turns its width along a stage
+// heading as the camera sees it (a slash, a leaf, a gust); `rotation` then adds to that.
 // Positions are stage px (y down the screen) with z px above the cloth; the vertex shader takes
 // them to the world through uStageToWorld and faces the quad to the camera.
 
-export const SPRITE_FLOATS = 12;
+export const SPRITE_FLOATS = 16;
 export const SPRITE_BLENDS = Object.freeze(['add', 'over']);
 /**
  * How a texture carries its shape: most TCG Live particle textures are greyscale masks in RGB
@@ -46,7 +47,8 @@ export function flipbookGrid(name, width = 0, height = 0) {
  *   dissolve?: number }} params `size` = width in stage px, `aspect` = height / width,
  *   `rotation` in degrees, `colour` rgb 0–1 (may exceed 1: HDR, it blooms), `frame` the flipbook
  *   frame (fractions floor), `blend` 'add' (light) or 'over' (premultiplied cover), `channel` one
- *   of SPRITE_CHANNELS (default 'r').
+ *   of SPRITE_CHANNELS (default 'r'), `alignDeg` a stage heading (degrees, y down) the sprite's
+ *   width lies along on screen.
  */
 export function normalizeSprite(params) {
   if (!params || typeof params.texture !== 'string' || params.texture === '') return null;
@@ -74,6 +76,7 @@ export function normalizeSprite(params) {
     alpha,
     frame: finite(params.frame) && params.frame > 0 ? Math.floor(params.frame) : 0,
     dissolve: finite(params.dissolve) ? clamp01(params.dissolve) : 0,
+    align: finite(params.alignDeg) ? { x: Math.cos(params.alignDeg * DEG), y: Math.sin(params.alignDeg * DEG) } : null,
   };
 }
 
@@ -92,6 +95,10 @@ export function packSprite(sprite, out, index) {
   out[o + 9] = sprite.colour[1];
   out[o + 10] = sprite.colour[2];
   out[o + 11] = sprite.alpha;
+  out[o + 12] = sprite.align ? sprite.align.x : 0;
+  out[o + 13] = sprite.align ? sprite.align.y : 0;
+  out[o + 14] = sprite.align ? 1 : 0;
+  out[o + 15] = 0;
 }
 
 /** The bucket a sprite draws in: one texture, blend and channel per draw call. */

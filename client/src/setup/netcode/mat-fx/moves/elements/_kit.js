@@ -18,6 +18,18 @@ export function elementKit(definition) {
   return Object.freeze({ methods: Object.freeze(methods), beats: Object.freeze({ ...beats }) });
 }
 
+/** Element kits merged left to right: a later kit's methods and beats win. Nulls are skipped. */
+export function combineKits(...kits) {
+  const methods = {};
+  const beats = {};
+  for (const kit of kits) {
+    if (!kit) continue;
+    Object.assign(methods, kit.methods);
+    Object.assign(beats, kit.beats);
+  }
+  return elementKit({ ...methods, beats });
+}
+
 /** The canvas `kit` with `elements` merged over it (the kit itself when there is none). */
 export function withElements(kit, elements) {
   if (!elements) return kit;

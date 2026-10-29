@@ -13,6 +13,7 @@ uniform vec2 uGrid;
 in vec4 iPosSize;   // x y z, width
 in vec4 iShape;     // height, rotation, frame, dissolve
 in vec4 iColour;
+in vec4 iAlign;     // stage heading x y, aligned flag
 out vec2 vUv;
 out vec2 vLocal;
 out vec4 vColour;
@@ -21,8 +22,16 @@ out float vSeed;
 ${BILLBOARD_GLSL}
 void main() {
   vec2 size = vec2(iPosSize.w, iShape.x);
-  float c = cos(iShape.y);
-  float s = sin(iShape.y);
+  float angle = iShape.y;
+  if (iAlign.z > 0.5) {
+    // The heading as the camera sees it: project a step along it and take its on-screen angle.
+    vec4 from = viewMatrix * (uStageToWorld * vec4(iPosSize.xyz, 1.0));
+    vec4 to = viewMatrix * (uStageToWorld * vec4(iPosSize.xyz + vec3(iAlign.xy, 0.0) * iPosSize.w, 1.0));
+    vec2 seen = to.xy - from.xy;
+    if (dot(seen, seen) > 1e-6) angle += atan(seen.y, seen.x);
+  }
+  float c = cos(angle);
+  float s = sin(angle);
   vec2 corner = position.xy * size;
   corner = vec2(c * corner.x - s * corner.y, s * corner.x + c * corner.y);
   gl_Position = elBillboard(iPosSize.xyz, corner, 0.5 * max(size.x, size.y));
@@ -104,6 +113,7 @@ export function defineSprite({ three, textures, uniforms, layer, debug = (...arg
     geometry.setAttribute('iPosSize', new three.InterleavedBufferAttribute(buffer, 4, 0));
     geometry.setAttribute('iShape', new three.InterleavedBufferAttribute(buffer, 4, 4));
     geometry.setAttribute('iColour', new three.InterleavedBufferAttribute(buffer, 4, 8));
+    geometry.setAttribute('iAlign', new three.InterleavedBufferAttribute(buffer, 4, 12));
     geometry.instanceCount = 0;
     const material = new three.ShaderMaterial({
       glslVersion: three.GLSL3,
