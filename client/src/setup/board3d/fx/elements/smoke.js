@@ -1,4 +1,4 @@
-// Design 077 § Kinds: smoke — a billowing puff on a camera-facing quad. TCG Live's cloud tile,
+// Design 079 § Kinds: smoke — a billowing puff on a camera-facing quad. TCG Live's cloud tile,
 // sampled twice and slid along its RG flow map (two-phase, so it never jumps), rolls inside a
 // soft round mass; the density's own slope lights it from above, so a puff has a lit top and a
 // shaded underside instead of a flat gradient. `glow` lights its heart in the light colour.

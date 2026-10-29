@@ -23,13 +23,13 @@ import { streamGlobs } from './poison.js';
 const DUST = Object.freeze({ byKind: { linear: { id: 'smoke', churn: 0.55, drift: 0.8, folds: 0.65 }, radial: { id: 'smoke', churn: 0.6, drift: 0.8, folds: 0.65 } } });
 const SLUDGE = Object.freeze({ byKind: { linear: { id: 'liquid', gloss: 0.3, flow: 0.5, clarity: 0 }, radial: { id: 'liquid', gloss: 0.35, flow: 0.4, clarity: 0 } } });
 
-// Design 076 modifiers (GPU canvas only; Canvas2D ignores them). Earth (clods, spikes, chips)
+// Design 078 modifiers (GPU canvas only; Canvas2D ignores them). Earth (clods, spikes, chips)
 // takes a grit layer that never scrolls, so the masses stop reading as flat brown; lit edges and
 // chips stay clean. Dust shimmers and rises: halos, the fissure's pool and trail puffs (a fixed
 // flow: one turned with a bowed heading would sweep the shader's clock-long scroll offset and
 // boil). Mud globs wobble wet. Dissolving earth crumbles at a sandy rim, mud at its wet brown,
 // both dull (low gain, no bloom).
-// Depth (076 § Depth): earth is a lit, bumped, matte solid. A clod's face is a radial paint, lit
+// Depth (078 § Depth): earth is a lit, bumped, matte solid. A clod's face is a radial paint, lit
 // as a sphere on the GPU (a strong Lambert side away from the up-left light); spikes and chips
 // are bumped sheets; the lit edge is a stroke lit as a tube (a rounded bevel). A mud glob is the
 // same sphere, wet: a tight glint, less bump. Canvas2D ignores it and keeps the baked tones.

@@ -1,4 +1,4 @@
-// Design 076: the psychic kit's GPU modifiers. The haze and the lens read through a slow warp
+// Design 078: the psychic kit's GPU modifiers. The haze and the lens read through a slow warp
 // (distort) so their light ripples, the haze adds a detail layer, a ribbon wavers along itself,
 // and every fill burns a drawer's dissolve at the kit's pink-violet edge.
 import test from 'node:test';

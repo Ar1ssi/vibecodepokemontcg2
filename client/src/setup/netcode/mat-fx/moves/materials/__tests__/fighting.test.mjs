@@ -1,4 +1,4 @@
-// Design 076: the fighting and aura kits' modifiers. A shock streak is rigid (grain only, no
+// Design 078: the fighting and aura kits' modifiers. A shock streak is rigid (grain only, no
 // warp), the impact disc and the ki sphere ripple and churn, the rings and swirls stay clean, and
 // every fill names the kit's dissolve edge.
 import test from 'node:test';

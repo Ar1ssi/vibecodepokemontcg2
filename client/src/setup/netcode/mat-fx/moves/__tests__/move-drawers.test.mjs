@@ -327,7 +327,7 @@ test('design 065: a non-body unit draws in the material palette instead of the m
   assert.equal(projectiles, 0);
 });
 
-// ---- design 076: dissolve exits ---------------------------------------------------
+// ---- design 078: dissolve exits ---------------------------------------------------
 
 /** The beats that burn away in their tail, with params that exercise the burning path. */
 const BURNING = [
@@ -364,7 +364,7 @@ const paintMods = (drawer, s, params = {}, over = {}) => {
 const amountsOf = (mods) => mods.map((mod) => mod?.dissolve?.amount ?? 0);
 const peakAmount = (drawer, s, params) => Math.max(0, ...amountsOf(paintMods(drawer, s, params).mods));
 
-test('design 076: a travelling or burst beat paints whole early and burns away in its tail', () => {
+test('design 078: a travelling or burst beat paints whole early and burns away in its tail', () => {
   for (const [drawer, params] of BURNING) {
     const label = `${drawer} ${JSON.stringify(params)}`;
     const early = paintMods(drawer, 0.2, params);
@@ -380,7 +380,7 @@ test('design 076: a travelling or burst beat paints whole early and burns away i
   }
 });
 
-test('design 076: the dissolve rises through the tail and is nearly complete at its end', () => {
+test('design 078: the dissolve rises through the tail and is nearly complete at its end', () => {
   for (const drawer of ['projectile', 'beam', 'starFlare', 'shockRings', 'slashArc', 'bolt', 'fan']) {
     const mid = peakAmount(drawer, 0.9, {});
     const late = peakAmount(drawer, 0.99, {});
@@ -389,20 +389,20 @@ test('design 076: the dissolve rises through the tail and is nearly complete at 
   }
 });
 
-test('design 076: a starFlare starts burning where it breaks up, a beam just before it retracts', () => {
+test('design 078: a starFlare starts burning where it breaks up, a beam just before it retracts', () => {
   assert.equal(peakAmount('starFlare', 0.69, { breakAt: 0.7 }), 0);
   assert.ok(peakAmount('starFlare', 0.75, { breakAt: 0.7 }) > 0);
   assert.equal(peakAmount('beam', 0.6, { retract: 0.3 }), 0);
   assert.ok(peakAmount('beam', 0.72, { retract: 0.3 }) > 0);
 });
 
-test('design 076: a flare projectile lands whole for the starFlare that takes over at contact', () => {
+test('design 078: a flare projectile lands whole for the starFlare that takes over at contact', () => {
   const tail = paintMods('projectile', 0.99, { flare: 'dai', size: 0.8 });
   assert.ok(tail.mods.length > 0);
   assert.ok(amountsOf(tail.mods).every((amount) => amount === 0));
 });
 
-test('design 076: anchored, held and charging beats never touch the dissolve', () => {
+test('design 078: anchored, held and charging beats never touch the dissolve', () => {
   const burning = new Set(BURNING.map(([drawer]) => drawer));
   for (const drawer of Object.keys(DRAWERS)) {
     if (burning.has(drawer)) continue;
@@ -419,7 +419,7 @@ test('design 076: anchored, held and charging beats never touch the dissolve', (
   assert.ok(amountsOf(cluster.mods).every((amount) => amount === 0), 'a held shard cluster stays whole');
 });
 
-test("design 076: a drawer that throws mid-dissolve still restores the caller's fxMod", () => {
+test("design 078: a drawer that throws mid-dissolve still restores the caller's fxMod", () => {
   const rec = recordingContext();
   rec.target.fxMod = OUTER;
   const exploding = { ...MATERIALS.fire, tongue: () => { throw new Error('boom'); } };
@@ -427,7 +427,7 @@ test("design 076: a drawer that throws mid-dissolve still restores the caller's 
   assert.equal(rec.target.fxMod, OUTER);
 });
 
-test('design 076: glows fade whole while the bodies round them burn', () => {
+test('design 078: glows fade whole while the bodies round them burn', () => {
   const glowMods = [];
   const material = {
     ...MATERIALS.fire,
@@ -446,7 +446,7 @@ test('design 076: glows fade whole while the bodies round them burn', () => {
   assert.ok(amountsOf(paintMods('impactFlash', 0.95).mods).every((amount) => amount === 0), 'an impact flash is a glow');
 });
 
-// ---- design 076 § Depth: beats lifted off the cloth ------------------------------------
+// ---- design 078 § Depth: beats lifted off the cloth ------------------------------------
 
 /** Draws one frame recording `ctx.fxLift` at every fill and stroke; the caller's lift is `outer`. */
 const paintLifts = (drawer, s, params = {}, over = {}, outer = null) => {
@@ -459,11 +459,11 @@ const paintLifts = (drawer, s, params = {}, over = {}, outer = null) => {
   return { lifts, after: rec.target.fxLift };
 };
 const near = (a, b) => Math.abs(a - b) < 1e-9;
-/** Kits stack their passes up to this far over a drawer's lift (withLiftZ, design 076 § Depth). */
+/** Kits stack their passes up to this far over a drawer's lift (withLiftZ, design 078 § Depth). */
 const KIT_LAYERS = 0.15;
 const drawerZ = (z, base) => z >= base - 1e-9 && z <= base + KIT_LAYERS;
 
-test('design 076 depth: a bolt from the sky rises off the defender; a lane bolt arcs', () => {
+test('design 078 depth: a bolt from the sky rises off the defender; a lane bolt arcs', () => {
   const sky = paintLifts('bolt', 0.5, { from: 'sky' });
   assert.ok(sky.lifts.length > 0);
   for (const lift of sky.lifts) {
@@ -479,7 +479,7 @@ test('design 076 depth: a bolt from the sky rises off the defender; a lane bolt 
   }
 });
 
-test('design 076 depth: travelling beats arc along the lane at chest height', () => {
+test('design 078 depth: travelling beats arc along the lane at chest height', () => {
   for (const [drawer, params, arc] of [
     ['projectile', {}, LIFT.travelArc],
     ['projectile', { flare: 'dai', size: 0.8 }, LIFT.travelArc],
@@ -500,7 +500,7 @@ test('design 076 depth: travelling beats arc along the lane at chest height', ()
   assert.deepEqual([meteor.stand, meteor.at], [LIFT.upright, [lane.bx, lane.by]], 'a sky drop falls onto the defender');
 });
 
-test('design 076 depth: bursts, flares, splashes and face rings stand up over their anchor; pillars stand most', () => {
+test('design 078 depth: bursts, flares, splashes and face rings stand up over their anchor; pillars stand most', () => {
   for (const [drawer, params, stand] of [
     ['starFlare', {}, LIFT.burstStand],
     ['impactFlash', {}, LIFT.burstStand],
@@ -524,7 +524,7 @@ test('design 076 depth: bursts, flares, splashes and face rings stand up over th
   assert.ok(glyph.length > 0 && glyph.every((lift) => near(lift.stand, LIFT.faceStand)), 'a sigil stands nearly upright');
 });
 
-test('design 076 depth: the charge hangs where the shot leaves, at chest height', () => {
+test('design 078 depth: the charge hangs where the shot leaves, at chest height', () => {
   const { lifts } = paintLifts('coreCharge', 0.9);
   assert.ok(lifts.length > 0);
   for (const lift of lifts) {
@@ -533,7 +533,7 @@ test('design 076 depth: the charge hangs where the shot leaves, at chest height'
   }
 });
 
-test('design 076 depth: ground waves, cracks and card glows stay on the cloth', () => {
+test('design 078 depth: ground waves, cracks and card glows stay on the cloth', () => {
   for (const [drawer, params, s] of [
     ['shockRings', {}, 0.3],
     ['ring', {}, 0.3],
@@ -551,7 +551,7 @@ test('design 076 depth: ground waves, cracks and card glows stay on the cloth', 
   }
 });
 
-test("design 076 depth: every drawer leaves the caller's fxLift as it found it, even when it throws", () => {
+test("design 078 depth: every drawer leaves the caller's fxLift as it found it, even when it throws", () => {
   const outer = Object.freeze({ z: 0.01 });
   for (const drawer of Object.keys(DRAWERS)) {
     for (const s of [0.2, 0.6, 0.95]) assert.equal(paintLifts(drawer, s, {}, {}, outer).after, outer, `${drawer} at ${s}`);

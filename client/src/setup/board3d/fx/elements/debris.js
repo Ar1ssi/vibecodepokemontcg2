@@ -1,4 +1,4 @@
-// Design 077 § Kinds: debris — real 3-D stones. Each instance is the jagged rock mesh tumbled
+// Design 079 § Kinds: debris — real 3-D stones. Each instance is the jagged rock mesh tumbled
 // about an axis of its own (from its seed), stretched along its heading for a shard or a spike,
 // scaled and placed in the stage. The fragment takes the face normal from screen-space slopes
 // (flat facets), lights it from up-left with a rim toward the camera, and grains its surface.

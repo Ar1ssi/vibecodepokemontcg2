@@ -1,4 +1,4 @@
-// Design 077 § Kinds: the lens element's pure half — a psychic field: a disc of bent space that
+// Design 079 § Kinds: the lens element's pure half — a psychic field: a disc of bent space that
 // swirls the board behind it with a chromatic split, ringed by glowing psychic rings.
 //
 // Row (LENS_FLOATS), four vec4: x y z radius · body alpha · hot seed · spin strength dissolve rings.

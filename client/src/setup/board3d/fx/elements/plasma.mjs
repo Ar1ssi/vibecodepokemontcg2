@@ -1,4 +1,4 @@
-// Design 077 § Kinds: the plasma element's pure half — a ball of electricity: a glowing sphere
+// Design 079 § Kinds: the plasma element's pure half — a ball of electricity: a glowing sphere
 // with arcs crawling over it, a bright shell at its rim and a white heart.
 //
 // Row (PLASMA_FLOATS), four vec4: x y z radius · hot rgb alpha · glow rgb seed · heat arcs

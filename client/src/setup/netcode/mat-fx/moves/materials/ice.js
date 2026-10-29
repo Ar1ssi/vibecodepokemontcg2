@@ -20,12 +20,12 @@
 // sweeps a glint down it; edges, spokes and rings carry short running glints; a flake's heart
 // twinkles. The lit facet and the mist stay flat.
 //
-// Design 076: the GPU modifiers (`ctx.fxMod`, ignored by Canvas2D). Ice holds still: a crystal's
+// Design 078: the GPU modifiers (`ctx.fxMod`, ignored by Canvas2D). Ice holds still: a crystal's
 // ice fill takes a fine, barely drifting second noise layer (detail) as frost, never a warp; only
 // the cold mist drifts and wavers (distort + detail). A drawer's dissolve burns at a thin pale-cyan
 // frost edge.
 //
-// Design 076 § Depth: a crystal is a lit glassy tube round its axis (`volume`: a sharp white glint,
+// Design 078 § Depth: a crystal is a lit glassy tube round its axis (`volume`: a sharp white glint,
 // a strong rim) standing off the cloth with its facet and edge on it; a snowflake floats higher,
 // its heart a lit bead and its spokes lit rods; aurora rings are lit tubes stacked outer-lowest.
 // Heights (lane units) add to the drawer's lift (`withLiftZ`); the cast pass shades the cloth.

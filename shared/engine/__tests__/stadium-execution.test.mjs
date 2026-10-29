@@ -2152,3 +2152,57 @@ test('stadium: Blizzard Town blocks attacks at 40 HP or less remaining, not by l
   );
   assert.equal(evolvedAllowed.error, null, '100 HP remaining on the Stage 1 must be allowed');
 });
+
+// Fairy Garden (customhb set.json — the user's custom Stadium, not the printed FCO 100 card).
+const FAIRY_GARDEN_SEARCH =
+  "Once during each player's turn, that player may discard a {Y} Energy card. If they do, they may search their deck for an Energy card. Then, that player shuffles their deck.";
+
+function fairyGardenGame() {
+  const { state, rng } = setupGame();
+  state.stadium = createCard({
+    instanceId: 75,
+    name: 'Fairy Garden',
+    supertype: 'Trainer',
+    subtypes: ['Stadium'],
+    text: FAIRY_GARDEN_SEARCH,
+  });
+  return { state, rng };
+}
+
+test('stadium: Fairy Garden discards a {Y} Energy, then searches for any Energy', () => {
+  const { state, rng } = fairyGardenGame();
+  state.players.p1.zones.hand.push(
+    energyCard(90, 'Fairy Energy', ['Fairy']),
+    energyCard(91, 'Water Energy', ['Water']),
+    trainerStub(92, 'Ultra Ball')
+  );
+  state.players.p1.zones.deck.push(
+    energyCard(110, 'Fire Energy', ['Fire']),
+    trainerStub(111, 'Item')
+  );
+
+  const res1 = activate(state, rng);
+  assert.ok(res1.pendingChoice);
+  assert.deepEqual(optionIds(res1), [90], 'only the {Y} Energy can pay the cost');
+
+  const res2 = resolveChoice(res1, [90], rng);
+  assert.ok(res2.pendingChoice);
+  assert.deepEqual(optionIds(res2), [110], 'any Energy card is a legal search pick');
+
+  const res3 = resolveChoice(res2, [110], rng);
+  assert.equal(res3.pendingChoice, null);
+  const p1 = res3.state.players.p1;
+  assert.ok(p1.zones.discard.some((c) => c.instanceId === 90));
+  assert.ok(p1.zones.hand.some((c) => c.instanceId === 110));
+});
+
+test('stadium: Fairy Garden is a no-op (and not consumed) without a {Y} Energy in hand', () => {
+  const { state, rng } = fairyGardenGame();
+  state.players.p1.zones.hand.push(energyCard(91, 'Water Energy', ['Water']));
+  state.players.p1.zones.deck.push(energyCard(110, 'Fire Energy', ['Fire']));
+
+  const res = activate(state, rng);
+  assert.equal(res.pendingChoice, null);
+  assert.equal(res.state.players.p1.zones.deck.length, 1);
+  assert.ok(!res.state.players.p1.flags.stadiumUsedThisTurn);
+});

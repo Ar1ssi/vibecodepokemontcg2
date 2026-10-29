@@ -502,6 +502,12 @@ const TEMPLATES = [
     /^discard (an?|\d+|all|up to \d+) (special )?energy(?: cards?)? (?:from|attached to) your opponent's active pokémon(?:, if any)?$/,
     (m) => ({ type: 'atkDiscardOppEnergy', scope: 'active', ...discardCount(m[1]), ...(m[2] ? { special: true } : {}) }),
   ],
+  // Araquanid Drowning Ball (customhb): "… is now Paralyzed, and discard an Energy from that
+  // Pokémon" — the status is read by attack-status.mjs; this clause is the discard.
+  [
+    /^your opponent's active pokémon is now (?:asleep|burned|confused|paralyzed|poisoned), and discard (an?|\d+) (special )?energy(?: cards?)? from (?:it|that pokémon)$/,
+    (m) => ({ type: 'atkDiscardOppEnergy', scope: 'active', ...discardCount(m[1]), ...(m[2] ? { special: true } : {}) }),
+  ],
   // Articuno-GX Cold Crush-GX: both Active Pokémon shed all their Energy.
   [
     /^discard all (special )?energy(?: cards?)? (?:from|attached to) both active pokémon$/,
@@ -857,7 +863,9 @@ const TEMPLATES = [
   ],
   // Comfey Sweet Kiss / Light Togetic Sweet Kiss.
   [/^your opponent (may )?draws? a card$/, (m) => ({ type: 'atkDraw', side: 'opponent', count: 1, ...(m[1] ? { opponentMay: true } : {}) })],
-  [/^draw up to (\d+) cards$/, (m) => ({ type: 'atkDraw', count: Number(m[1]), upTo: true })],
+  // Togetic Shared Peace: both players draw.
+  [/^each player draws (a|an|\d+) cards?$/, (m) => ({ type: 'atkDraw', side: 'each', count: countOf(m[1]) })],
+  [/^draw up to (\d+) cards$/,(m) => ({ type: 'atkDraw', count: Number(m[1]), upTo: true })],
   [/^draw (a|an|\d+) cards?$/, (m) => ({ type: 'atkDraw', count: countOf(m[1]) })],
   [/^draw a number of cards equal to the number of cards in your opponent's hand$/, () => ({ type: 'atkDraw', countFrom: 'opponentHand' })],
   [
@@ -1246,6 +1254,11 @@ const BLOCKS = [
   [
     /move all attached energy and pokémon tools from this pokémon to 1 of your benched pokémon\. then, discard this pokémon\./g,
     () => ({ type: 'atkMoveAttachedToBench' }),
+  ],
+  // Active-only doubling that stops at 10 HP remaining (effects/attack-steps.mjs atkDoubleCountersActive).
+  [
+    /double the number of damage counters on your opponent's active pokémon\. this attack can't leave it with less than 10 hp remaining\./g,
+    () => ({ type: 'atkDoubleCountersActive', hpFloor: 10 }),
   ],
   // Weavile Ransack: on at least one heads the opponent's hand is revealed, then the attacker
   // puts one revealed card per heads on the bottom of their deck.

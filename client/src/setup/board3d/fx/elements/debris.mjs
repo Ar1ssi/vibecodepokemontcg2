@@ -1,4 +1,4 @@
-// Design 077 § Kinds: the debris element's pure half — solid rock and earth: a jagged stone mesh
+// Design 079 § Kinds: the debris element's pure half — solid rock and earth: a jagged stone mesh
 // per instance, tumbling, optionally stretched along a heading into a shard or spike.
 //
 // Row (DEBRIS_FLOATS), five vec4: x y z size · colour alpha · light seed · stretch heading spin

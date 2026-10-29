@@ -1,4 +1,4 @@
-// Design 077 § Kinds: plasma — a ball of electricity on a camera-facing quad. Thin ridged-noise
+// Design 079 § Kinds: plasma — a ball of electricity on a camera-facing quad. Thin ridged-noise
 // arcs crawl over a sphere's surface (3-D noise on it, re-rolled in steps like a discharge), a
 // Fresnel shell brightens the rim, the glow colour falls off outside, and the heart is white.
 // The TCG Live electric-crack flipbook adds forked filaments when it has loaded.

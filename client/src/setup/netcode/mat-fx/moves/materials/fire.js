@@ -8,11 +8,11 @@
 // Tongues paint a single-colour gradient laid along their axis — identical on Canvas2D — so
 // the flame style knows base from tip and flows its noise that way.
 //
-// Design 076: modifiers (`ctx.fxMod`, ignored by Canvas2D). Heat haze warps the flame body and
+// Design 078: modifiers (`ctx.fxMod`, ignored by Canvas2D). Heat haze warps the flame body and
 // its halo, a grain streams base to tip through the outer passes so a big tongue never reads
 // flat, the white-hot filament stays clean, and every fill names the orange dissolve edge.
 //
-// Design 076 § Depth: the flame is lit as a billowing solid (gpu-canvas `volume`): a tongue's
+// Design 078 § Depth: the flame is lit as a billowing solid (gpu-canvas `volume`): a tongue's
 // outer passes are tubes round their axis with a lumpy bump, so the edges fall to deep red and
 // the crest catches the light; the hot sphere is a lumpy lit ball. The core stays emissive. The
 // passes stand at rising heights over the drawer's lift, so the white-hot core rides above the

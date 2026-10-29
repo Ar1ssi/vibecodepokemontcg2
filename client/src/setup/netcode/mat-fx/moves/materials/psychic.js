@@ -11,12 +11,12 @@
 // ignored by Canvas2D): the ribbons and rings carry soft pulses round and along them, the haze
 // and lens ripple with slow veins. No gain on the haze, a little on the lens and centre line.
 //
-// Design 076: the GPU modifiers (`ctx.fxMod`, ignored by Canvas2D) bend space round the move:
+// Design 078: the GPU modifiers (`ctx.fxMod`, ignored by Canvas2D) bend space round the move:
 // the haze and the lens read their colour through slow flowing warps (distort), so their rings
 // of light ripple, and the haze carries a faint second noise layer (detail); a ribbon wavers
 // along its length. A drawer's dissolve burns at a pink-violet edge.
 //
-// Design 076 § Depth: the shapes are solids standing off the cloth. The lens is a lit sphere
+// Design 078 § Depth: the shapes are solids standing off the cloth. The lens is a lit sphere
 // (`volume`: Lambert, a glint and a Fresnel rim) floating above its haze, its rings lit tubes
 // stacked inner-highest so the turning rings separate in depth; ribbons are lit tubes and the
 // wave rings thick lit tubes riding above the card (the cast pass lays their light on the cloth

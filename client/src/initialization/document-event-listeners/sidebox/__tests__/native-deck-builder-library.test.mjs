@@ -5,6 +5,9 @@ import { JSDOM } from 'jsdom';
 import {
   createDeckInLibrary,
   createEmptyLibrary,
+  dismissStarter,
+  loadDismissedStarters,
+  setDeckStarterKey,
   getDeckFromLibrary,
   LIBRARY_STORAGE_KEY,
   parseLibrary,
@@ -149,4 +152,28 @@ test('a new deck that storage refuses is not created or left bound', () => {
   assert.deepEqual(result, { saved: false, created: false, name: null, reason: 'storage' });
   assert.equal(controller.getActiveDeckId('self'), null);
   assert.equal(controller.getLibrary().order.length, decksBefore);
+});
+
+test('deleting a seeded starter deck remembers it, so reseeding skips it', () => {
+  const { library, deckId } = createDeckInLibrary(createEmptyLibrary(), 'Mega Gengar ex Battle Deck', pikachu(4), 1);
+  const tagged = setDeckStarterKey(library, deckId, 'gengar');
+  const { storage, otherTabWrites } = boot();
+  otherTabWrites(tagged);
+  window.confirm = () => true;
+  window.document
+    .querySelector(`[data-deck-id="${deckId}"] [data-action="delete"]`)
+    ?.click();
+
+  assert.deepEqual([...loadDismissedStarters(storage)], ['gengar']);
+});
+
+test('dismissStarter ignores empty keys and unwritable storage', () => {
+  const storage = makeStorage('');
+  assert.equal(dismissStarter(storage, ''), false);
+  storage.full = true;
+  assert.equal(dismissStarter(storage, 'gengar'), false);
+  storage.full = false;
+  assert.equal(dismissStarter(storage, 'gengar'), true);
+  assert.equal(dismissStarter(storage, 'gengar'), true);
+  assert.deepEqual([...loadDismissedStarters(storage)], ['gengar']);
 });

@@ -1,4 +1,4 @@
-// Design 077: the element kinds the layer builds, by the name element kits emit. Each entry is
+// Design 079: the element kinds the layer builds, by the name element kits emit. Each entry is
 // `define({ three, textures, uniforms, layer, debug })` → { kind, object3d, needsBoard(), begin(),
 // push(params) → boolean, finish(uniforms), counts?(), dispose() }.
 import { defineBolt } from './bolt.js';

@@ -1,4 +1,4 @@
-// Design 077 § Kinds: the water drop's pure half — a ball of water that bends the board behind
+// Design 079 § Kinds: the water drop's pure half — a ball of water that bends the board behind
 // it, glossy at its rim with a white glint.
 //
 // Row (WATER_DROP_FLOATS), four vec4: x y z radius · body alpha · hot seed · deep dissolve.

@@ -2,7 +2,7 @@
 // before the DOM diff removed the card: the gold stars, then the card and its attachments knocked back, fanned and flown to the
 // discard pile. Every layer runs on WAAPI (D103) and removes itself. Design 074 H1: a card the 3D
 // board still draws flies on its own mesh; one it no longer does (the view already buried it in
-// the discard pile) keeps the cloned image. Design 076: the knocked-out card's mesh burns away
+// the discard pile) keeps the cloned image. Design 078: the knocked-out card's mesh burns away
 // (card-mesh.js cardFx) and re-forms in the pile; with motion reduced it burns where it stood.
 import { getBoardScene } from '../../board3d/board3d.js';
 import { flightPoseFromTrack } from '../../board3d/flight-pose.mjs';
@@ -47,13 +47,13 @@ function playStars(rect) {
   removeWhen(host, spawnParticles(host, stars, { className: 'fx-particle--star', duration: STAR_MS }), STAR_MS + BACKSTOP_PAD_MS);
 }
 
-/** Burns the knocked-out card's mesh by `dissolveAt(elapsedMs)` over `ms` (design 076). */
+/** Burns the knocked-out card's mesh by `dissolveAt(elapsedMs)` over `ms` (design 078). */
 function burnCard(instanceId, dissolveAt, ms) {
   getBoardScene()?.cardFx?.(instanceId, { at: (elapsed) => ({ dissolve: dissolveAt(elapsed) }), ms, cut: true });
 }
 
 /**
- * Reduced motion (design 076): no knock, no flight, no stars; the card's mesh holds still where
+ * Reduced motion (design 078): no knock, no flight, no stars; the card's mesh holds still where
  * it stood and burns away, then the board shows it in the pile. False when the board has no mesh.
  */
 function playReducedBurn(ghost) {

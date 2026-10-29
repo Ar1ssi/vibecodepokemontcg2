@@ -14,7 +14,7 @@ import {
   expandEnergyEntries,
 } from '../../../../shared/engine/rules/attack-engine.mjs';
 import { topPokemonCard } from '../../../../shared/engine/rules/evolved-pokemon.mjs';
-import { liveAttackMarkers } from '../../../../shared/engine/rules/attack-markers.mjs';
+import { liveAttackMarkers, parseDamageImmunity } from '../../../../shared/engine/rules/attack-markers.mjs';
 import { listConditions } from '../../../../shared/engine/rules/special-conditions.mjs';
 import { isPokemonToolCard } from '../../../../shared/engine/rules/ability-executors.mjs';
 
@@ -189,6 +189,7 @@ export function damagePreviewAgainst({
         stadium,
         defenderMarkers,
         attackerMarkers,
+        ...parseDamageImmunity(attack?.text ?? attack?.effect),
       });
     } catch {
       // A card shape the engine cannot read: the tab falls back to the printed label.

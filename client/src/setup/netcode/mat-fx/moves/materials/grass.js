@@ -19,7 +19,7 @@ const LEAF = Object.freeze({ byKind: { linear: { id: 'crystal', facets: 2, sheen
 const PETAL = Object.freeze({ byKind: { linear: { id: 'liquid', gloss: 0.35, flow: 0.6, clarity: 0.2 }, radial: { id: 'orb', boil: 0.25, limb: 0.25, gain: 0 } } });
 const SUNLIGHT = Object.freeze({ byKind: { linear: { id: 'energy', streak: 0.3, speed: 1, gain: 0.5 }, radial: { id: 'orb', boil: 0.35, limb: 0.3, gain: 0.8 }, stroke: { id: 'energy', streak: 0.3, speed: 1, gain: 0.5 } } });
 
-// Design 076 modifiers (GPU canvas only; Canvas2D ignores them). A leaf's body and lit half take
+// Design 078 modifiers (GPU canvas only; Canvas2D ignores them). A leaf's body and lit half take
 // a still fibre layer with a faint wobble through it, so a blade reads as leaf, not flat card;
 // its veins stay crisp. Seeds and halos wobble like sap. Dissolving leaves burn at a leaf-green
 // rim (petals at their pink); solar's light at its pale yellow, blooming as light does.
@@ -28,7 +28,7 @@ const FIBRE = Object.freeze({
   distort: Object.freeze({ strength: 0.015, speed: 0.6, scale: 4 }),
 });
 const SAP = Object.freeze({ distort: Object.freeze({ strength: 0.03, speed: 0.5, scale: 2.5, angle: -90 }) });
-// Depth (076 § Depth): a leaf is matter, not light. It fills opaque (source-over, so it covers
+// Depth (078 § Depth): a leaf is matter, not light. It fills opaque (source-over, so it covers
 // the card art instead of washing it white, and the cast pass gives it a shadow), lit on the GPU
 // as a bumped sheet with a waxy glint; its two halves keep their light and dark side. Each leaf
 // floats at its own height (a lone leaf by its stable seed, a pinwheel's by order, the seed core

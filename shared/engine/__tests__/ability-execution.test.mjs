@@ -1407,6 +1407,58 @@ test("ability: Enthusiastic Dance boosts the team's Basic attackers, not the hol
   assert.equal(turnDamageBonusTotal(bonuses, ludicolo, { name: 'Defender' }), 0);
 });
 
+test('ability: evolve-played "your Active Pokémon\'s attacks do 50 more damage for the rest of your turn"', async () => {
+  const { executeSteps } = await import('../effects/executor.mjs');
+  const { turnDamageBonusTotal } = await import('../rules/turn-damage-bonus.mjs');
+  const { state } = setupGame();
+  const ludicolo = createCard({ instanceId: 70, name: 'Ludicolo', supertype: 'Pokémon', subtypes: ['Stage 2'] });
+  const parsed = parseAbility(
+    "When you play this Pokémon from your hand to evolve 1 of your Pokémon during your turn, your Active Pokémon's attacks do 50 more damage for the rest of your turn."
+  );
+  assert.equal(parsed.find((step) => step.type === 'whenPlayedAbility')?.evolve, true);
+  const steps = parsed.filter((step) => step.type === 'turnDamageBonusAbility');
+  assert.equal(steps.length, 1);
+  assert.equal(steps[0].amount, 50);
+  executeSteps(state, {
+    steps,
+    playerId: 'p1',
+    effectType: 'ability',
+    sourceCard: ludicolo,
+    activeRng: createRng(1),
+    events: [],
+  });
+  const bonuses = state.players.p1.flags.turnDamageBonuses;
+  const active = { instanceId: 71, name: 'Stage 1 Attacker', subtypes: ['Stage 1'] };
+  assert.equal(turnDamageBonusTotal(bonuses, active, { name: 'Defender' }), 50);
+  assert.equal(turnDamageBonusTotal(bonuses, ludicolo, { name: 'Defender' }), 50, 'team scope: the Active attacks, whatever its stage');
+});
+
+test('ability: evolve-played boost without "you may" runs on the evolve and cannot be activated', async () => {
+  const { abilityActivationBlockReason } = await import('../rules/ability-combat.mjs');
+  const { state } = setupGame();
+  state.turn = { player: 'p1', number: 3, phase: 'main' };
+  const text =
+    "When you play this Pokémon from your hand to evolve 1 of your Pokémon during your turn, your Active Pokémon's attacks do 50 more damage for the rest of your turn.";
+  const lombre = createCard({
+    instanceId: 80,
+    name: 'Lombre',
+    supertype: 'Pokémon',
+    stage: 'Stage 1',
+    evolvesFrom: 'Lotad',
+    hp: 80,
+    abilities: [{ name: 'Boost', text }],
+  });
+  state.players.p1.zones.active.push(createCard({ instanceId: 79, name: 'Lotad', supertype: 'Pokémon', stage: 'Basic', hp: 50 }));
+  state.players.p1.zones.hand.push(lombre);
+
+  const res = applyCommand(state, { type: 'attachCard', payload: { instanceId: 80, targetInstanceId: 79 }, playerId: 'p1' }, createRng(1));
+  assert.equal(res.error, null);
+  const bonuses = res.state.players.p1.flags.turnDamageBonuses;
+  assert.equal(bonuses?.length, 1, 'one automatic bonus on the evolve');
+  assert.equal(bonuses[0].amount, 50);
+  assert.match(abilityActivationBlockReason(lombre, { rulesEnabled: true, zone: 'active' }) || '', /automatically/);
+});
+
 test('ability: Swelling Flash puts a hand copy onto the Bench only with more Prizes', async () => {
   const { executeSteps } = await import('../effects/executor.mjs');
   const { state } = setupGame();
@@ -2000,4 +2052,30 @@ test('ability: Tachyon Bits is refused outside the promotion turn', () => {
   const res = use70(state, rng);
   assert.match(res.error, /moved to the Active Spot/);
   assert.equal(res.state.players.p2.zones.active[0].damage || 0, 0);
+});
+
+test('ability: Mysterious Potion flips once — heads heals 50, tails puts 2 counters, never both', () => {
+  const text =
+    'Once during your turn, you may choose 1 of your Pokémon and flip a coin. If heads, heal 50 damage from that Pokémon. If tails, put 2 damage counters on that Pokémon.';
+  assert.deepEqual(
+    parseAbility(text).map((s) => s.type),
+    ['coinHealOrCountersAbility']
+  );
+  const results = new Set();
+  for (let seed = 1; seed <= 40; seed++) {
+    const { state } = setupGame();
+    const { holder } = holderWithAbility(state, text);
+    holder.damage = 100;
+    const rng = createRng(seed);
+    const res1 = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
+    assert.ok(res1.pendingChoice);
+    const res2 = applyCommand(
+      res1.state,
+      { type: 'resolveChoice', payload: { choiceId: res1.pendingChoice.choiceId, selection: [70] }, playerId: 'p1' },
+      rng
+    );
+    assert.equal(res2.error, null);
+    results.add(res2.state.players.p1.zones.active[0].damage);
+  }
+  assert.deepEqual([...results].sort((a, b) => a - b), [50, 120]);
 });

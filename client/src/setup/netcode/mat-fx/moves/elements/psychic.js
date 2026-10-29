@@ -1,4 +1,4 @@
-// Design 077 slice 5: the psychic element kit. Sigils (the glyph drawer) and orbs become lens
+// Design 079 slice 5: the psychic element kit. Sigils (the glyph drawer) and orbs become lens
 // fields that bend and colour-split the board behind them inside turning psychic rings; the
 // halo is a pink light, a travelling orb trails motes. Ribbons keep the canvas kit's tongue.
 import { elementKit } from './_kit.js';

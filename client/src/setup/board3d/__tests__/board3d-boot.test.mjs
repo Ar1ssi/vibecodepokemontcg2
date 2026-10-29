@@ -314,3 +314,93 @@ describe('camera preset (design 074 H3)', () => {
     assert.equal(preset.state.listeners.size, 0, 'the subscription is released with the board');
   });
 });
+
+describe('Stadium boards (design 077)', () => {
+  const scorched = { cardId: 'customhb-299', set: 'customhb', number: '299' };
+  const withStadiums = (deps) => {
+    const state = { view: { stadium: null }, off: false, listeners: new Set(), queued: [], log: [] };
+    const loadModules = deps.loadModules;
+    deps.loadModules = async () => {
+      const modules = await loadModules();
+      return {
+        ...modules,
+        createBoardScene: (args) => {
+          const scene = modules.createBoardScene(args);
+          let target = null;
+          return Object.assign(scene, {
+            setStadiumEnvironment: (key) => {
+              if (key === target) return false;
+              target = key;
+              state.log.push(`target:${key}`);
+              return true;
+            },
+            playStadiumEnvironment: () => {
+              state.log.push('play');
+              return 1600;
+            },
+            settleStadiumEnvironment: () => state.log.push('settle'),
+          });
+        },
+        getLastAppliedView: () => state.view,
+        boardModelFrom: (view) => ({ stadium: view.stadium }),
+        stadiumBoards: {
+          off: () => state.off,
+          subscribe: (listener) => {
+            state.listeners.add(listener);
+            return () => state.listeners.delete(listener);
+          },
+        },
+        queueBoardEnvironment: (transition) => {
+          state.queued.push(transition);
+          state.log.push('queued');
+        },
+      };
+    };
+    const toggle = (off) => {
+      state.off = off;
+      for (const listener of state.listeners) listener(off);
+    };
+    return { state, toggle };
+  };
+
+  it('a Stadium already in play when the board starts snaps in; later changes queue their animation', async () => {
+    const { host, deps, doc } = setup();
+    const { state } = withStadiums(deps);
+    state.view = { stadium: scorched };
+    await initializeBoard3d({ host, deps });
+    assert.deepEqual(state.log, ['target:scorched-earth', 'settle']);
+
+    state.log.length = 0;
+    state.view = { stadium: null };
+    doc.dispatchEvent(new doc.defaultView.Event('board-view-applied'));
+    assert.deepEqual(state.log, ['target:null', 'queued']);
+    assert.equal(state.queued[0].play(), 1600, 'the queued plan plays the scene transition');
+
+    state.log.length = 0;
+    state.view = { stadium: { cardId: 'sv2-191', set: 'sv2', number: '191' } };
+    doc.dispatchEvent(new doc.defaultView.Event('board-view-applied'));
+    assert.deepEqual(state.log, [], 'a Stadium with no board changes nothing');
+  });
+
+  it('turning Stadium boards off removes the board at once; on again snaps it back', async () => {
+    const { host, deps } = setup();
+    const { state, toggle } = withStadiums(deps);
+    state.view = { stadium: scorched };
+    await initializeBoard3d({ host, deps });
+    state.log.length = 0;
+    toggle(true);
+    assert.deepEqual(state.log, ['target:null', 'settle']);
+    toggle(false);
+    assert.deepEqual(state.log, ['target:null', 'settle', 'target:scorched-earth', 'settle']);
+    disposeBoard3d();
+    assert.equal(state.listeners.size, 0, 'the subscription is released with the board');
+  });
+
+  it('the dev override shows its board whatever the Stadium in play', async () => {
+    const { host, deps } = setup({ url: 'http://localhost/?stadiumEnv=surfing-beach' });
+    const { state } = withStadiums(deps);
+    state.view = { stadium: scorched };
+    await initializeBoard3d({ host, deps });
+    assert.deepEqual(state.log, ['target:surfing-beach', 'settle']);
+  });
+});

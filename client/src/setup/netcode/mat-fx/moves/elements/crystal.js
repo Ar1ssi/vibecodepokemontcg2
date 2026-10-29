@@ -1,4 +1,4 @@
-// Design 077 slice 7: the crystal element kits (ice, aurora, gem, steel, bug needles). Spires,
+// Design 079 slice 7: the crystal element kits (ice, aurora, gem, steel, bug needles). Spires,
 // shards, blades and needles are stretched glossy stones (debris with gloss); bodies are a
 // glassy drop (ice) or a sphere of light (steel, gem: Flash Cannon and Power Gem are light, and
 // their beams' motes are bodies, so a polished metal ball read black inside them); a thrown one

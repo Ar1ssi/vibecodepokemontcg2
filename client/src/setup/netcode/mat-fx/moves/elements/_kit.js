@@ -1,4 +1,4 @@
-// Design 077 § Element kits: an element kit overrides some of a canvas kit's methods (body,
+// Design 079 § Element kits: an element kit overrides some of a canvas kit's methods (body,
 // tongue, projectile, glow, jagStroke, sigil) and may replace whole drawers (`beats`). The
 // merged kit routes each overridden call to the element kit only while the GPU canvas records a
 // lit pass; in the cast pass, on a 2D context and in node tests the canvas kit draws as before.

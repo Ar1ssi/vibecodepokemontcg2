@@ -1,4 +1,4 @@
-// Design 076: the steel kit's modifiers. Metal stays rigid: no warp on the blade, a slow brushed
+// Design 078: the steel kit's modifiers. Metal stays rigid: no warp on the blade, a slow brushed
 // grain on its body, a faint cool shimmer in the halo, a clean specular line, and every fill
 // names the cool-blue dissolve edge.
 import test from 'node:test';

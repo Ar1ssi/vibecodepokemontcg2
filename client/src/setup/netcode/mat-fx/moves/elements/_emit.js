@@ -1,5 +1,5 @@
-// Design 077 § Element kits: what an element kit needs from the context it is handed. The
-// recorder knows the current transform and the 076 lift; these helpers turn a kit's local
+// Design 079 § Element kits: what an element kit needs from the context it is handed. The
+// recorder knows the current transform and the 078 lift; these helpers turn a kit's local
 // numbers into the stage px (and height) element params take, and send them to the layer.
 
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
@@ -31,7 +31,7 @@ export const alphaOf = (ctx, alpha) => {
   return clamp01((Number(alpha) || 0) * (Number.isFinite(global) ? global : 1));
 };
 
-/** The drawer's dissolve amount on this draw (design 076), 0 when none. */
+/** The drawer's dissolve amount on this draw (design 078), 0 when none. */
 export const dissolveOf = (ctx) => clamp01(Number(ctx.fxMod?.dissolve?.amount) || 0);
 
 /** Queues one element; false when the layer refused it (not live, unknown kind, bad params, full). */

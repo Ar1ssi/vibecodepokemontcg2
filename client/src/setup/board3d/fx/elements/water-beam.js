@@ -1,4 +1,4 @@
-// Design 077 § Kinds: the water beam — a column of running water. A ribbon faces the camera along
+// Design 079 § Kinds: the water beam — a column of running water. A ribbon faces the camera along
 // the beam's on-screen axis; across it the shader rebuilds a round tube's normal, bends the board
 // behind through it (refraction), runs TCG Live's water-beam caustics and white foam streaks from
 // root to head, and lights a Fresnel rim and a glossy stripe. Water covers what is under it

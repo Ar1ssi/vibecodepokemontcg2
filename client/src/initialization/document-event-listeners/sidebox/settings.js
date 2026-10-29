@@ -22,6 +22,7 @@ import {
   setHoloShapesOff,
   setHoverPreviewOff,
   setSfxOff,
+  setStadiumBoardsOff,
 } from '../../../setup/image-logic/fx-settings.js';
 
 export const initializeSettings = () => {
@@ -101,6 +102,15 @@ export const initializeSettings = () => {
     hoverPreviewCheckbox.checked = !fx.hoverPreviewOff;
     hoverPreviewCheckbox.addEventListener('change', () => {
       setHoverPreviewOff(!hoverPreviewCheckbox.checked);
+    });
+  }
+
+  // Design 077: on by default; board3d.js hears the change through onFxSettingsChanged.
+  const stadiumBoardsCheckbox = document.getElementById('stadiumBoardsCheckbox');
+  if (stadiumBoardsCheckbox) {
+    stadiumBoardsCheckbox.checked = !fx.stadiumBoardsOff;
+    stadiumBoardsCheckbox.addEventListener('change', () => {
+      setStadiumBoardsOff(!stadiumBoardsCheckbox.checked);
     });
   }
 

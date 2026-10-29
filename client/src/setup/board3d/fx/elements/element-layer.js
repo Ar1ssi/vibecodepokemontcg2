@@ -1,4 +1,4 @@
-// Design 077 § Element layer: per-type shader meshes drawn in the FX pass beside the gpu-canvas
+// Design 079 § Element layer: per-type shader meshes drawn in the FX pass beside the gpu-canvas
 // mesh. Each kind (ELEMENT_KINDS) owns its three objects and instance buffers; element kits emit
 // into them through `emitter` while an FX frame records, and `finish` uploads what was emitted.
 // Kinds that refract or lens the board ask for it (`needsBoard`), and only then is the board's
@@ -93,6 +93,14 @@ export function createElementLayer({
         }
       }
     },
+    /**
+     * The size of the target the elements render into, in its pixels: refracting kinds map
+     * gl_FragCoord through it onto the board copy. fx-layer renders at CSS-pixel size on high-DPI
+     * screens (fxTargetScale), so this is not the drawing buffer's size there.
+     */
+    setViewport(width, height) {
+      uniforms.uViewport.value.set(Math.max(1, Number(width) || 1), Math.max(1, Number(height) || 1));
+    },
     /** Whether any kind drawing this frame reads the board behind it. */
     needsBoard() {
       for (const kind of defined.values()) if (kind.needsBoard()) return true;
@@ -100,7 +108,7 @@ export function createElementLayer({
     },
     /**
      * Copies the framebuffer bound now (the canvas, after the board's render) into `uBoard` when a
-     * kind needs it; otherwise binds the 1×1 black stand-in (design 077 edge 9).
+     * kind needs it; otherwise binds the 1×1 black stand-in (design 079 edge 9).
      */
     captureBoard() {
       if (!this.needsBoard()) {

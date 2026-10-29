@@ -404,6 +404,10 @@
   pointer-events: auto;
 }
 
+/* The in-play Stadium has no Weakness / Resistance bar, so its list window drops to where the bar's
+   bottom edge would sit. */
+.card-focus__card .ptcg-chrome--stadium .ptcg-frame--focus { bottom: calc(var(--tu) * 0.43); }
+
 /* The HP pill and the damage counter are drawn about 1.5x and 2x the print's size and spill past the
    card's right edge. */
 .card-focus__card .ptcg-chrome--focus .ptcg-hp {

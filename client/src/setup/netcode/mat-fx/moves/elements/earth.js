@@ -1,4 +1,4 @@
-// Design 077 slice 6: the rock, ground and grass element kits. Rock and ground are solid: their
+// Design 079 slice 6: the rock, ground and grass element kits. Rock and ground are solid: their
 // boulders and clods become real tumbling 3-D stones (debris), their spires, shards and spikes
 // stretched stones along the tongue, a thrown rock a stone trailing dust, and their smoke beats
 // dust. Grass leaves become TCG Live leaf sprites turned along the leaf. Larger than the canvas

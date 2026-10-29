@@ -35,6 +35,7 @@
     "fx:check-elements": "node scripts/fx/check-element-shaders.mjs",
     "foil:import": "node scripts/tcgl-foil/import-foil.mjs",
     "foil:upload": "node scripts/tcgl-foil/upload-foil.mjs",
+    "custom-sets:publish": "node scripts/custom-sets/publish.mjs",
     "audit:oracle": "node scripts/audit-oracle.mjs",
     "audit:abilities": "node scripts/audit-ability-behaviour.mjs",
     "audit:trainers": "node scripts/audit-trainer-behaviour.mjs",

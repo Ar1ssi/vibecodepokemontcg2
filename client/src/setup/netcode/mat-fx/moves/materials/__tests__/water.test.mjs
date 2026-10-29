@@ -1,4 +1,4 @@
-// Design 076: the water kit's GPU modifiers. A sheet wavers along its axis (distort), a drop and
+// Design 078: the water kit's GPU modifiers. A sheet wavers along its axis (distort), a drop and
 // the spray carry a second noise layer (detail), and every fill burns a drawer's dissolve at the
 // kit's pale-cyan foam edge; the caller's fxMod comes back untouched.
 import test from 'node:test';

@@ -120,6 +120,22 @@ export function flightPlacement(camera, pose, card, origin = { left: 0, top: 0 }
   return { position, quaternion, scale };
 }
 
+/**
+ * `flightPlacement` for a card mesh `card.thicknessPx` thick that rests `clearancePx` over the
+ * cloth: `pose.lift` is how far its underside rides over that resting clearance, as the card's own
+ * pose places it, not where its centre goes. A flight at lift 0 (a pin, a takeoff, a landing) then
+ * lies where the resting card does, instead of half sunk into the cloth under the mat's art.
+ */
+export function restingFlightPlacement(camera, pose, card, origin, clearancePx = 0) {
+  const half = finite(card?.thicknessPx) / 2;
+  const base = finite(pose?.lift) + finite(clearancePx);
+  const flat = { widthPx: card?.widthPx, heightPx: card?.heightPx };
+  const first = flightPlacement(camera, { ...pose, lift: base + half }, flat, origin);
+  if (!first || half === 0) return first;
+  // The slab's half thickness scales with the mesh; the scale is known once the card is placed.
+  return flightPlacement(camera, { ...pose, lift: base + half * first.scale }, flat, origin) ?? first;
+}
+
 /** A card in flight rides this share of its height above the cloth (design 074 H1). */
 export const FLIGHT_LIFT_FRAC = 0.3;
 /** Share of a track over which the flight rises off the cloth at its start and settles at its end. */

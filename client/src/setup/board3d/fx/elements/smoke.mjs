@@ -1,4 +1,4 @@
-// Design 077 § Kinds: the smoke element's pure half — a billowing puff (soot, ghost wisps, dark
+// Design 079 § Kinds: the smoke element's pure half — a billowing puff (soot, ghost wisps, dark
 // ink) lit from above, with an optional glow inside it.
 //
 // Row (SMOKE_FLOATS), four vec4: x y z radius · tint alpha · light seed · density rise glow dissolve.

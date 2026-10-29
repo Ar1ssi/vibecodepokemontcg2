@@ -1,4 +1,4 @@
-// Design 077 slice 5: the ghost and dark element kits — both are made of smoke. Ghost is violet
+// Design 079 slice 5: the ghost and dark element kits — both are made of smoke. Ghost is violet
 // wisps that glow from inside; dark is near-black ink with a crimson edge. Their smoke and cloud
 // beats become lit billowing smoke; their orbs (Shadow Ball, Dark Pulse) are dense smoke balls
 // with a lit heart; the halo is a dim light; a travelling orb sheds smoke behind it.

@@ -63,3 +63,32 @@ test('a pin that ran out on its own is forgotten', async () => {
   pins.releaseAll();
   assert.equal(calls.length, 1);
 });
+
+const fakeHolds = () => {
+  const log = [];
+  return { log, hold: (id) => log.push(['hold', id]), release: (id) => log.push(['release', id]) };
+};
+
+test('a pin holds the card\'s table pose until its scene takes it over', () => {
+  const { tween } = fakeTween();
+  const holds = fakeHolds();
+  const pins = createSlidePins(tween, holds);
+  pins.pin(7, POSE);
+  pins.pin(7, POSE);
+  assert.deepEqual(holds.log, [['hold', 7]]);
+  pins.take(7);
+  pins.take(7);
+  assert.deepEqual(holds.log, [['hold', 7], ['release', 7]]);
+});
+
+test('releaseAll and the backstop let go of held table poses', async () => {
+  const { calls, tween } = fakeTween();
+  const holds = fakeHolds();
+  const pins = createSlidePins(tween, holds);
+  pins.pin(7, POSE);
+  pins.pin(8, POSE);
+  calls[0].resolve();
+  await Promise.resolve();
+  pins.releaseAll();
+  assert.deepEqual(holds.log, [['hold', 7], ['hold', 8], ['release', 7], ['release', 8]]);
+});

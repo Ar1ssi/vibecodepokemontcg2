@@ -13,11 +13,11 @@
 // bright card face tints it blue instead of adding up to white; only the gloss (rim, edge glint,
 // specular dot) stays additive.
 //
-// Design 076: the GPU modifiers (`ctx.fxMod`, ignored by Canvas2D). A sheet's caustics waver
+// Design 078: the GPU modifiers (`ctx.fxMod`, ignored by Canvas2D). A sheet's caustics waver
 // (distort flowing toward its tip); a drop and the spray carry a slow second noise layer (detail)
 // so they stop reading as flat discs. A drawer's dissolve burns at a soft pale-cyan foam edge.
 //
-// Design 076 § Depth: water is glossy solid. A drop is a lit sphere (`volume`: Lambert, a white
+// Design 078 § Depth: water is glossy solid. A drop is a lit sphere (`volume`: Lambert, a white
 // glint that blooms, a Fresnel rim) floating off the cloth; a sheet is a lit tube round its axis
 // with a bumped, wavering surface, just above the cloth, its glint and shed drops above it. Heights
 // (lane units) add to the drawer's lift (`withLiftZ`); the cast pass shades the cloth under them.

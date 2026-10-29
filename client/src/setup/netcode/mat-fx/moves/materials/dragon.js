@@ -7,11 +7,11 @@
 // falls from the sky). Palette #8034CE #E25CD6 #FFB8F0, deep #34166E (design 075 parity; was #5A47C9 #8F7CF5 #D2C8FF), accent #FF9B3D; grain
 // 0.25. Every call draws on the context it is handed and is otherwise pure.
 //
-// Design 076: modifiers (`ctx.fxMod`, ignored by Canvas2D). The violet flame and the orb waver
+// Design 078: modifiers (`ctx.fxMod`, ignored by Canvas2D). The violet flame and the orb waver
 // like plasma and carry a streaming energy grain; the ember core and the helix stay crisp, and
 // every fill names the magenta dissolve edge.
 //
-// Design 076 § Depth: the violet flame is lit as lumpy plasma (gpu-canvas `volume` on its solid
+// Design 078 § Depth: the violet flame is lit as lumpy plasma (gpu-canvas `volume` on its solid
 // fills: a bumped sheet), the orb is a glossy lit sphere and its helix strands are lit tubes
 // riding above it; every pass stands at its own height over the drawer's lift, so the ember core
 // sits on top of the flame and the cast pass pools violet light on the cloth.
@@ -120,7 +120,7 @@ function dragonKit(palette) {
   function body(ctx, x, y, r, alpha, hot = 1, time = 0) {
     if (!(r > 0) || !(alpha > 0)) return;
     // A dimmer white heart than the flat orb had: lit, the sphere models itself, and a full white
-    // heart bloomed it into a white disc (design 076 § Depth capture).
+    // heart bloomed it into a white disc (design 078 § Depth capture).
     layered(ctx, Z_ORB, mergeFxMods(ORB_CHURN, GLOSSY_ORB), () =>
       sphere(ctx, x, y, r, [
         [0, palette.white, alpha * hot * 0.5],

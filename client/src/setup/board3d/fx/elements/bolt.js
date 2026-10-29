@@ -1,4 +1,4 @@
-// Design 077 § Kinds: the bolt — lightning segments as camera-facing capsules. The fragment
+// Design 079 § Kinds: the bolt — lightning segments as camera-facing capsules. The fragment
 // measures its distance to the segment on screen (in core widths), shakes it with fast noise
 // along the line so the bolt crackles without moving, and lights it: white-hot core past 1.0
 // (it blooms), the hot colour inside, the glow colour falling off outside. Blending takes the

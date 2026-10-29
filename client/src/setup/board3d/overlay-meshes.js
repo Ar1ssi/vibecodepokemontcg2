@@ -54,9 +54,10 @@ const GLOW = { blurPx: 10, spreadPx: 2, alpha: 0.6, rimPx: 3, periods: [3200, 49
 const MAT_PICK = { idle: '#ffd23f', picked: '#38d66b', widthPx: 4, offsetPx: 2 };
 /** The card corner radius of the board's images (`border-radius: 4.55% / 3.5%`). */
 const CORNER = { x: 0.0455, y: 0.035 };
-/** The idle loop's canvases cover this many card widths square, at this many canvas px. */
-const LOOP_SPAN = 3.2;
-const LOOP_CANVAS_PX = 512;
+/** Each idle-loop part's draw order within its layer, after the layer's own order. */
+const LOOP_PART_ORDER_STEP = 1e-4;
+/** The radial-glow part's texture: a white-to-clear disc, tinted per part. */
+const LOOP_RADIAL_PX = 128;
 const MAX_PIXEL_RATIO = 2;
 /** Heights above the card face (px) and draw order, bottom first. */
 const LAYER = {
@@ -161,6 +162,8 @@ export function createOverlayMeshes({
   const shared = new Map();
   const sheets = new Map();
   const sheetImages = new Map();
+  /** The idle loop's GPU textures: processed sheets and radial discs, by sheets' key. Parts wear clones. */
+  const loopTextures = new Map();
   // When each card's Tera skin went on, so a re-dress (damage, a ring) does not fade it in again.
   const teraSince = new Map();
   const plane = new three.PlaneGeometry(1, 1);
@@ -301,19 +304,32 @@ export function createOverlayMeshes({
     });
   };
 
-  /** The glow halo and rim; the rim's hotspots are repainted as the clock turns them. */
-  const paintGlow = (entry, now) => {
-    const { ctx, w, h, margin, rgb, size } = entry;
-    if (!ctx) return;
-    ctx.clearRect(0, 0, size[0], size[1]);
-    ctx.save();
+  /** The glow's blurred halo, which never changes: painted once, then copied under each rim frame. */
+  const bakeGlowHalo = ({ w, h, margin, rgb, size }) => {
+    const { canvas, ctx } = makeCanvas(size[0], size[1]);
+    if (!ctx) return null;
     ctx.shadowColor = `rgba(${rgb}, ${GLOW.alpha})`;
     ctx.shadowBlur = GLOW.blurPx;
     cardPath(ctx, margin, margin, w, h, GLOW.spreadPx);
     ctx.lineWidth = 1.5;
     ctx.strokeStyle = `rgba(${rgb}, ${GLOW.alpha})`;
     ctx.stroke();
-    ctx.restore();
+    return canvas;
+  };
+
+  /** The glow halo and rim; the rim's hotspots are repainted as the clock turns them. */
+  const paintGlow = (entry, now) => {
+    const { ctx, w, h, margin, rgb, size } = entry;
+    if (!ctx) return;
+    entry.halo ??= bakeGlowHalo(entry);
+    ctx.clearRect(0, 0, size[0], size[1]);
+    if (entry.halo) {
+      // Both canvases are at the device pixel ratio: copy pixel for pixel.
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(entry.halo, 0, 0);
+      ctx.restore();
+    }
     const cx = margin + w / 2;
     const cy = margin + h / 2;
     const rim = ctx.createConicGradient ? [0, 1] : [];
@@ -417,47 +433,82 @@ export function createOverlayMeshes({
     return sheet;
   };
 
-  const drawPart = (ctx, part, t, { pxPerW, sky, sideways }) => {
-    const frame = loopPartFrame(part, t);
-    if (!frame) return;
-    const offset = loopBoxOffset(frame, part, { sky, sideways });
-    const wPx = frame.w * pxPerW;
-    const hPx = frame.h * pxPerW;
-    ctx.save();
-    ctx.translate(LOOP_CANVAS_PX / 2 + offset.x * pxPerW, LOOP_CANVAS_PX / 2 + offset.y * pxPerW);
-    ctx.rotate(frame.rotateDeg * DEG);
-    ctx.scale(frame.scale, frame.scale);
-    ctx.globalAlpha = Math.max(0, Math.min(1, frame.alpha));
-    if (STATUS_LOOP_PAINT[part.sprite]?.paint === 'radial') {
-      ctx.scale(wPx / 2, hPx / 2);
-      const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+  /** A texture the loop's parts share (one upload), made once per key; null until it can be. */
+  const loopTextureFor = (part) => {
+    const radial = STATUS_LOOP_PAINT[part.sprite]?.paint === 'radial';
+    const key = radial ? `radial|${part.tint ?? ''}` : `${part.sprite}|${part.tint ?? ''}`;
+    if (loopTextures.has(key)) return loopTextures.get(key);
+    let canvas = null;
+    if (radial) {
+      canvas = document.createElement('canvas');
+      canvas.width = LOOP_RADIAL_PX;
+      canvas.height = LOOP_RADIAL_PX;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+      const r = LOOP_RADIAL_PX / 2;
+      const gradient = ctx.createRadialGradient(r, r, 0, r, r, r);
       gradient.addColorStop(0, `rgba(${part.tint ?? '255, 255, 255'}, 1)`);
       gradient.addColorStop(1, `rgba(${part.tint ?? '255, 255, 255'}, 0)`);
       ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.arc(0, 0, 1, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.fillRect(0, 0, LOOP_RADIAL_PX, LOOP_RADIAL_PX);
     } else {
-      const sheet = sheetFor(part);
-      if (sheet) {
-        const cw = sheet.width / frame.cols;
-        const ch = sheet.height / frame.rows;
-        ctx.drawImage(sheet, frame.col * cw, frame.row * ch, cw, ch, -wPx / 2, -hPx / 2, wPx, hPx);
-      }
+      canvas = sheetFor(part);
     }
-    ctx.restore();
+    if (!canvas) return null;
+    const texture = canvasTexture(canvas);
+    // Sampled like the canvas drawImage it replaces: no mips, so a frame never bleeds its neighbours.
+    texture.generateMipmaps = false;
+    texture.minFilter = three.LinearFilter;
+    loopTextures.set(key, texture);
+    return texture;
   };
 
-  const paintLoop = (loop, now) => {
-    const t = now - loop.start;
-    for (const layer of loop.layers) {
-      const { ctx } = layer;
-      if (!ctx) continue;
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.clearRect(0, 0, LOOP_CANVAS_PX, LOOP_CANVAS_PX);
-      for (const part of layer.parts) drawPart(ctx, part, t, layer);
-      layer.texture.needsUpdate = true;
+  /** Gives a part its own clone of the shared texture (its own frame offset, one GPU upload). */
+  const dressLoopPiece = (piece) => {
+    if (piece.material.map) return true;
+    const texture = loopTextureFor(piece.part);
+    if (!texture) return false;
+    piece.material.map = texture.clone();
+    piece.material.needsUpdate = true;
+    return true;
+  };
+
+  /**
+   * One part at `t` ms of the loop: its plane's place, turn, size, opacity and sprite frame, as
+   * the stylesheet's keyframes put them (status-loop-frame.mjs). Card widths → px by `cardW`.
+   */
+  const poseLoopPiece = (piece, t, { cardW, sky, sideways }) => {
+    const { mesh, material, part } = piece;
+    const frame = loopPartFrame(part, t);
+    if (!frame || !dressLoopPiece(piece)) {
+      mesh.visible = false;
+      return;
     }
+    const offset = loopBoxOffset(frame, part, { sky, sideways });
+    mesh.visible = true;
+    mesh.position.x = offset.x * cardW;
+    mesh.position.y = -offset.y * cardW;
+    mesh.rotation.z = -frame.rotateDeg * DEG;
+    mesh.scale.set(frame.w * cardW * frame.scale, frame.h * cardW * frame.scale, 1);
+    material.opacity = Math.max(0, Math.min(1, frame.alpha));
+    if (STATUS_LOOP_PAINT[part.sprite]?.paint !== 'radial') {
+      material.map.repeat.set(1 / frame.cols, 1 / frame.rows);
+      material.map.offset.set(frame.col / frame.cols, 1 - (frame.row + 1) / frame.rows);
+    }
+  };
+
+  /** Poses every part of a card's loop; answers whether a part still waits for its sheet. */
+  const poseLoop = (loop, now) => {
+    const t = now - loop.start;
+    let waiting = false;
+    for (const layer of loop.layers) {
+      for (const piece of layer.pieces) {
+        poseLoopPiece(piece, t, layer);
+        if (!piece.material.map && loopPartFrame(piece.part, t)) waiting = true;
+      }
+    }
+    loop.waiting = waiting;
+    return waiting;
   };
 
   // ── per card
@@ -641,28 +692,28 @@ export function createOverlayMeshes({
     }
   };
 
+  // Each part is its own sprite plane posed per frame (no canvas repainted and re-uploaded per
+  // frame), drawn in the stylesheet's order inside its layer.
   const buildLoop = (entry, root, sky, keys, card, sideways, now) => {
     const layers = statusLoopLayers(keys);
-    const span = LOOP_SPAN * card.w;
-    const pxPerW = LOOP_CANVAS_PX / LOOP_SPAN;
     const loopLayers = [];
     const addLayer = (parts, parent, z, order, isSky) => {
       if (parts.length === 0) return;
-      const canvas = document.createElement('canvas');
-      canvas.width = LOOP_CANVAS_PX;
-      canvas.height = LOOP_CANVAS_PX;
-      const texture = canvasTexture(canvas);
-      const material = basicMaterial(texture);
-      entry.owned.push(material);
-      addMesh(entry, parent, plane, material, { z, w: span, h: span, order });
-      loopLayers.push({ parts, ctx: canvas.getContext('2d'), texture, pxPerW, sky: isSky, sideways });
+      const pieces = parts.map((part, index) => {
+        const material = basicMaterial();
+        entry.owned.push(material);
+        const mesh = addMesh(entry, parent, plane, material, { z, order: order + (index + 1) * LOOP_PART_ORDER_STEP });
+        mesh.visible = false;
+        return { part, mesh, material };
+      });
+      loopLayers.push({ pieces, cardW: card.w, sky: isSky, sideways });
     };
     addLayer(layers.under, entry.cardRoot, LAYER.loopUnder.z - card.t, LAYER.loopUnder.order, false);
     addLayer(layers.card, entry.cardRoot, LAYER.loop.z, LAYER.loop.order, false);
     addLayer(layers.sky, sky, LAYER.loopSky.z, LAYER.loopSky.order, true);
     if (loopLayers.length === 0) return;
-    entry.loop = { start: now, layers: loopLayers };
-    paintLoop(entry.loop, frozenAt ?? now);
+    entry.loop = { start: now, layers: loopLayers, waiting: false };
+    poseLoop(entry.loop, frozenAt ?? now);
   };
 
   // ── the Tera crystal skin, on the card's face (css/mat-ambient.css `.fx-tera-crystal__*`).
@@ -1018,7 +1069,8 @@ export function createOverlayMeshes({
         animating = true;
       }
       if (!entry.loop) continue;
-      if (!still) paintLoop(entry.loop, t);
+      // Held still, a part whose sheet loaded since is still posed once.
+      if (!still || entry.loop.waiting) poseLoop(entry.loop, t);
       animating = true;
     }
     for (const entry of shared.values()) {
@@ -1044,6 +1096,8 @@ export function createOverlayMeshes({
     disposed = true;
     plane.dispose();
     disc.dispose();
+    for (const texture of loopTextures.values()) texture.dispose();
+    loopTextures.clear();
     sheets.clear();
     sheetImages.clear();
     teraSince.clear();

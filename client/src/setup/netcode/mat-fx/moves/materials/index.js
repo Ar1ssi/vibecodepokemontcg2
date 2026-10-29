@@ -54,7 +54,7 @@ export const MATERIALS = Object.freeze({
   default: fire,
 });
 
-// Design 077: each kit with its element kit (if any) merged over it; drawing routes per call.
+// Design 079: each kit with its element kit (if any) merged over it; drawing routes per call.
 const DRAWN = Object.freeze(Object.fromEntries(Object.entries(MATERIALS).map(([key, kit]) => [key, withElements(kit, elementsFor(key))])));
 
 /** The material for `key`, else the default. */

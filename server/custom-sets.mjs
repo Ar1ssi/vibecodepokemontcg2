@@ -12,6 +12,7 @@ import { promisify } from 'node:util';
 
 import {
   DEFAULT_CUSTOM_SET_GROUP,
+  MAX_SET_JSON_BYTES,
   isCustomCardId,
   isCustomSetId,
   validateCustomSet,
@@ -22,8 +23,7 @@ import { LEGACY_SET_CODE_TO_TCGDEX_ID } from '../shared/engine/rules/legacy-set-
 export const CUSTOM_SERIES = Object.freeze({ id: 'custom', name: 'Custom Sets' });
 // A custom code must not shadow a printed set's decklist code ("4 Pikachu ex SVI 57"): printed wins in resolveEntry.
 export const RESERVED_SET_CODES = Object.freeze([...Object.keys(PTCGL_SET_IDS), ...Object.keys(LEGACY_SET_CODE_TO_TCGDEX_ID)]);
-// A set.json is a few hundred KB at most; anything bigger is a mistake, not a set, and is skipped at boot.
-export const MAX_SET_JSON_BYTES = 4 << 20;
+export { MAX_SET_JSON_BYTES };
 
 const gzipAsync = promisify(gzip);
 const noStore = (status, body) => ({ status, body, cacheControl: 'no-store', gzip: null });
@@ -81,53 +81,67 @@ function cardBriefOf(card) {
   return { id: card.id, localId: card.localId, name: card.name, image: card.image };
 }
 
-/**
- * Reads every `<rootDir>/<setId>/set.json`. A set that fails validation is skipped and reported through
- * `log` (one line); a missing root is an empty store. With `previous`, a set that fails now but loaded
- * before keeps its earlier copy: a half-written or mistyped save must not pull it out of open decks.
- * @param {string} rootDir
- * @param {{ log?: (line: string) => void, previous?: ReturnType<typeof createCustomSetStore> }} [options]
- */
-export function loadCustomSets(rootDir, { log = () => {}, previous = null } = {}) {
-  const sets = new Map();
-  const cards = new Map();
-  let dirs = [];
+const rootList = (rootDirs) => (Array.isArray(rootDirs) ? rootDirs : [rootDirs]);
+
+function setDirsOf(rootDir) {
   try {
-    dirs = fs
+    return fs
       .readdirSync(rootDir, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
       .map((entry) => entry.name)
       .sort();
   } catch {
-    dirs = [];
+    return [];
   }
-  const add = (entry) => {
+}
+
+/** One set folder's set.json, validated: `{entry}` or `{why}`; null when the folder holds no set.json. */
+function readSetDir(rootDir, dir) {
+  const file = path.join(rootDir, dir, 'set.json');
+  if (!fs.existsSync(file)) return null;
+  let parsed;
+  try {
+    const size = fs.statSync(file).size;
+    if (size > MAX_SET_JSON_BYTES) throw new Error(`set.json is ${size} bytes, over ${MAX_SET_JSON_BYTES}`);
+    parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch (error) {
+    return { why: error instanceof SyntaxError ? `set.json is not valid JSON (${error.message})` : error.message };
+  }
+  const result = validateCustomSet(parsed, { setDirName: dir, reservedCodes: RESERVED_SET_CODES });
+  if (!result.ok) return { why: result.errors.join('; ') };
+  return { entry: { set: result.set, record: setRecordOf(result.set) } };
+}
+
+/**
+ * Reads every `<root>/<setId>/set.json` of each root, in order: a later root's set replaces an earlier one's of
+ * the same folder name (the site's bucket mirror over the repo's sets, design 076). A set that fails validation is
+ * skipped and reported through `log` (one line); a missing root adds nothing. A set that fails keeps the copy in
+ * `previous` (it loaded before: a half-written or mistyped save must not pull it out of open decks), else an
+ * earlier root's copy.
+ * @param {string|string[]} rootDirs
+ * @param {{ log?: (line: string) => void, previous?: ReturnType<typeof createCustomSetStore> }} [options]
+ */
+export function loadCustomSets(rootDirs, { log = () => {}, previous = null } = {}) {
+  const chosen = new Map();
+  for (const rootDir of rootList(rootDirs)) {
+    for (const dir of setDirsOf(rootDir)) {
+      const read = readSetDir(rootDir, dir);
+      if (!read) continue;
+      if (read.entry) {
+        chosen.set(dir, read.entry);
+        continue;
+      }
+      const kept = previous?.sets.get(dir) ?? chosen.get(dir);
+      log(`custom set ${dir} skipped: ${read.why}${kept ? '; kept the copy loaded before' : ''}`);
+      if (kept) chosen.set(dir, kept);
+    }
+  }
+  const sets = new Map();
+  const cards = new Map();
+  for (const dir of [...chosen.keys()].sort()) {
+    const entry = chosen.get(dir);
     sets.set(entry.set.id, entry);
     for (const card of entry.set.cards) cards.set(card.id, cardRecordOf(card, entry.set));
-  };
-  const skip = (dir, why) => {
-    const kept = previous?.sets.get(dir);
-    log(`custom set ${dir} skipped: ${why}${kept ? '; kept the copy loaded before' : ''}`);
-    if (kept) add(kept);
-  };
-  for (const dir of dirs) {
-    const file = path.join(rootDir, dir, 'set.json');
-    if (!fs.existsSync(file)) continue;
-    let parsed;
-    try {
-      const size = fs.statSync(file).size;
-      if (size > MAX_SET_JSON_BYTES) throw new Error(`set.json is ${size} bytes, over ${MAX_SET_JSON_BYTES}`);
-      parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
-    } catch (error) {
-      skip(dir, error instanceof SyntaxError ? `set.json is not valid JSON (${error.message})` : error.message);
-      continue;
-    }
-    const result = validateCustomSet(parsed, { setDirName: dir, reservedCodes: RESERVED_SET_CODES });
-    if (!result.ok) {
-      skip(dir, result.errors.join('; '));
-      continue;
-    }
-    add({ set: result.set, record: setRecordOf(result.set) });
   }
   return createCustomSetStore({ sets, cards });
 }
@@ -166,19 +180,22 @@ function setFolderSignature(dir) {
   return parts.join('\n');
 }
 
-/** `{ <setDir>: signature }` for every folder under the root that holds a set.json. */
-export function customSetSignatures(rootDir) {
+/**
+ * `{ <setDir>: signature }` for every folder holding a set.json, over the roots in order; the signature names the
+ * root, so a set that moves between roots counts as changed.
+ * @param {string|string[]} rootDirs
+ */
+export function customSetSignatures(rootDirs) {
   const signatures = new Map();
-  let dirs = [];
-  try {
-    dirs = fs.readdirSync(rootDir, { withFileTypes: true }).filter((entry) => entry.isDirectory());
-  } catch {
-    return signatures;
-  }
-  for (const { name } of dirs) {
-    const dir = path.join(rootDir, name);
-    if (fs.existsSync(path.join(dir, 'set.json'))) signatures.set(name, setFolderSignature(dir));
-  }
+  rootList(rootDirs).forEach((rootDir, rootIndex) => {
+    for (const name of setDirsOf(rootDir)) {
+      const dir = path.join(rootDir, name);
+      if (!fs.existsSync(path.join(dir, 'set.json'))) continue;
+      const earlier = signatures.get(name);
+      // both copies count: the later one wins only while valid, so either changing can change what is served
+      signatures.set(name, `${earlier ? `${earlier}\n` : ''}${rootIndex}|${setFolderSignature(dir)}`);
+    }
+  });
   return signatures;
 }
 
@@ -188,25 +205,26 @@ function changedSetDirs(before, after) {
 }
 
 /**
- * Custom sets that follow their folder while the server runs: the card editor writes a set into
- * `rootDir` and the next lookups answer the new cards, no restart. A change to a set's files (fs.watch backed
+ * Custom sets that follow their folders while the server runs: the card editor writes a set into a root
+ * and the next lookups answer the new cards, no restart. A change to a set's files (fs.watch on each root backed
  * by a poll every `safetyPollMs`, else a poll every `pollMs`; settled for `debounceMs` so a many-file write
  * reloads once) reloads every set, keeping a set's last good copy when its set.json is broken (loadCustomSets `previous`), and calls
  * `onChange({ version, sets })` with the changed set folders. Same read interface as createCustomSetStore.
- * @param {string} rootDir
+ * @param {string|string[]} rootDirs later roots win, as in loadCustomSets
  * @param {{ log?: (line: string) => void, onChange?: (change: { version: number, sets: string[] }) => void,
  *   watch?: boolean, debounceMs?: number, pollMs?: number, safetyPollMs?: number }} [options]
  */
 export function createLiveCustomSets(
-  rootDir,
+  rootDirs,
   { log = () => {}, onChange = () => {}, watch = true, debounceMs = 300, pollMs = 2000, safetyPollMs = 15000 } = {}
 ) {
   // signatures before the load: a write landing in between is then seen as a change by the next pass
-  let signatures = customSetSignatures(rootDir);
-  let store = loadCustomSets(rootDir, { log });
+  let signatures = customSetSignatures(rootDirs);
+  let store = loadCustomSets(rootDirs, { log });
   let version = 0;
-  let watcher = null;
+  const watchers = new Set();
   let poller = null;
+  let pollEveryMs = null;
   let settleTimer = null;
 
   // Runs from timers: a throw here would take the whole game server down, so it is logged and retried next pass.
@@ -220,10 +238,10 @@ export function createLiveCustomSets(
   }
 
   function reloadChanged() {
-    const next = customSetSignatures(rootDir);
+    const next = customSetSignatures(rootDirs);
     const changed = changedSetDirs(signatures, next);
     if (!changed.length) return null;
-    store = loadCustomSets(rootDir, { log, previous: store });
+    store = loadCustomSets(rootDirs, { log, previous: store });
     signatures = next;
     version += 1;
     const change = { version, sets: changed };
@@ -241,19 +259,23 @@ export function createLiveCustomSets(
     settleTimer.unref?.();
   }
 
+  // One poll for every root: the fastest any root needs wins.
   function startPolling(everyMs = pollMs) {
+    if (pollEveryMs !== null && pollEveryMs <= everyMs) return;
     clearInterval(poller);
+    pollEveryMs = everyMs;
     poller = setInterval(reload, everyMs);
     poller.unref?.();
   }
 
-  if (watch) {
+  function watchRoot(rootDir) {
     try {
-      watcher = fs.watch(rootDir, { recursive: true, persistent: false }, scheduleReload);
+      const watcher = fs.watch(rootDir, { recursive: true, persistent: false }, scheduleReload);
+      watchers.add(watcher);
       watcher.on('error', (error) => {
         log(`custom sets: watching ${rootDir} failed (${error.message}); checking every ${pollMs} ms instead`);
         watcher.close();
-        watcher = null;
+        watchers.delete(watcher);
         startPolling();
       });
       // a watcher can go quiet without an error (the folder deleted and made again): a slow poll backs it up
@@ -263,6 +285,8 @@ export function createLiveCustomSets(
       startPolling();
     }
   }
+
+  if (watch) rootList(rootDirs).forEach(watchRoot);
 
   return {
     live: true,
@@ -284,8 +308,9 @@ export function createLiveCustomSets(
       clearTimeout(settleTimer);
       clearInterval(poller);
       poller = null;
-      watcher?.close();
-      watcher = null;
+      pollEveryMs = null;
+      for (const watcher of watchers) watcher.close();
+      watchers.clear();
     },
   };
 }

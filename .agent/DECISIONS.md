@@ -6,8 +6,12 @@
 # Pruned or shortened lines, verbatim: .agent/archive/DECISIONS-pruned-2026-10-15.md (grep the D-number).
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
-#   Next id = highest D number in this file and the archives + 1 (next: D228).
+#   Next id = highest D number in this file and the archives + 1 (next: D232).
 
+- D231 2026-10-29 [mat-fx] Attack FX are per-type element shaders: instanced three.js meshes in the FX pass, emitted by element kits over canvas-kit methods/beats; canvas kits stay the 2D + cast fallback. (design 079)
+- D230 2026-10-29 [mat-fx] Element looks are hybrid: own GLSL for structure + committed TCG Live attack textures for detail; refraction reads one board copy per frame, only while a kind needs it. (design 079)
+- D229 2026-10-25 [mat-fx] GPU-canvas paints take stackable modifiers (fxMod), lift (fxLift arc/stand) and a cast pass; drawers own dissolve and lift, kits texture. Designs 078/079 renumbered from 076/077 at landing.
+- D228 2026-10-25 [server] Custom sets reach Render via R2: publish.mjs uploads blobs by sha256 + swaps index.json (rclone); the site polls it every 10 s, mirrors set.json, art lazily; R2 overlays git. (design 076)
 - D227 2026-10-25 [server] Custom sets reload live: server watches custom-sets/ (fs.watch, poll fallback), keeps a broken set's last good copy, emits `customSetsChanged`; cardback "Send to ptcg-sim" writes there. Design 075 addendum.
 - D226 2026-10-25 [deck-builder] A custom set's /sets record carries each card's `category`, and fetchSetCards trusts it over the /cards?category= supertype index: those lists sit in IndexedDB for a day, so a set added since marked every custom Trainer as Pokémon.
 - D225 2026-10-25 [deck-builder] Custom-set foil (I271): each set folder may hold foil.json + foil/<nnn>-<kind>.webp (cardback's TCG Live foil export, converted by scripts/custom-sets/import-foil.py); /api/tcgl-foil/config lists those sets and the client merges them into the foil manifest as base-printing records with a `dir`, so card textures load from the repo while shaders and shared material textures still need the texture host. Alternative rejected: upload to R2 keyed by TCGdex id (needs a deploy step per set, collides with the source card's own foil).
@@ -25,6 +29,7 @@
 - D215 2026-10-15 [board-ui] Custom playmats ship as WebP in `thumbs/` and `board/`; PNG originals in `custom/` are untracked. Don't rerun `generate-mat-thumbs.mjs` blindly: manifest.json lacks custom entries. (052f8ac)
 - D214 2026-10-15 [harness] Playwright/jsdom e2e harnesses live in `scripts/e2e/`; the repo root holds config and entry docs only, no probe scripts, logs, `.bak` files or notes. (052f8ac, design 073)
 - D213 2026-10-16 [deck-builder] Sleeves are TCG Live's 415 (scripts/import-tcgl-sleeves.py: face crop 73-439 px, webp, ids `cs_*`), not the sleeve database; old stored ETB sleeve id remaps.
+- D214 2026-10-27 [deck-builder] D213 narrowed: catalog is the sleeve database dump (451) with TCG Live art swapped in only where TCG Live has the same sleeve (106 `cs_*`, incl. 3 the starter decks use); other TCG Live sleeves and their webp are gone, database ids live on as `aliases`. Re-running import-tcgl-sleeves.py re-extracts all 415 into assets/sleeves/tcgl and a scratch catalog; merge by hand.
 - D212 2026-10-15 [netcode] Opening coin follows TCG Live: caller calls, server flips, the winner picks first or second; a silent or dropped winner goes first. Extends D51. (design 072)
 - D211 2026-10-15 [board-ui] Special Energy tokens are cut from the card's orb art, one per name, never drawn (user); finish = the art printing's; 2-Energy cards: two orbs; Basic-named Metal/Darkness need a Special tag.
 - D209 2026-10-11 [board-ui] Card focus ignores card/backdrop clicks for 500 ms after opening: a double-click's second click would land on an attack panel. (design 067)

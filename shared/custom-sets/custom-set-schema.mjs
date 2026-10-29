@@ -25,13 +25,19 @@ export const ENERGY_TYPES = Object.freeze([
   'Fighting',
   'Darkness',
   'Metal',
+  'Fairy',
   'Dragon',
   'Colorless',
 ]);
-export const POKEMON_STAGES = Object.freeze(['Basic', 'Stage1', 'Stage2']);
+// MEGAHB: the homebrew MEGA stage (a Stage 3 evolving from its named Pokémon of any stage; evolution.mjs).
+export const POKEMON_STAGES = Object.freeze(['Basic', 'Stage1', 'Stage2', 'MEGAHB']);
+// cardback's editor stage for MEGA; its export writes the TCGdex slot below the Mega instead (Stage1/Stage2).
+const EDITOR_MEGA_STAGE = 3;
 export const TRAINER_TYPES = Object.freeze(['Item', 'Supporter', 'Stadium', 'Tool']);
-// Energy is out of scope (design 075): decks use official Energy, the editor exports none.
-export const CARD_CATEGORIES = Object.freeze(['Pokemon', 'Trainer']);
+// Energy cards the editor exports: a Special Energy (a restyled Double Colorless Energy, say) or a Basic Energy (a
+// holofoil Basic Energy print). energyType is TCGdex's: "Normal" is Basic, "Special" has text of its own.
+export const CARD_CATEGORIES = Object.freeze(['Pokemon', 'Trainer', 'Energy']);
+export const ENERGY_KINDS = Object.freeze(['Special', 'Normal']);
 // Which deck-builder pill lists the set: "custom" (the Custom pill, the default when absent) or
 // "homebrew" (the Homebrew sets pill).
 export const CUSTOM_SET_GROUPS = Object.freeze(['custom', 'homebrew']);
@@ -42,6 +48,9 @@ const MAX_ATTACKS = 4;
 const MAX_ABILITIES = 2;
 const MAX_COST = 5;
 export const MAX_CARDS = 999;
+// A set.json is a few hundred KB at most; anything bigger is a mistake, not a set (the server skips it, the bucket
+// index refuses it).
+export const MAX_SET_JSON_BYTES = 4 << 20;
 // Socket.IO broadcast when the server reloads changed set folders: `{ version, sets: [setId] }`.
 export const CUSTOM_SETS_CHANGED_EVENT = 'customSetsChanged';
 
@@ -157,6 +166,13 @@ function checkTrainer(card, where, errors) {
   checkAbilities(card.abilities, `${where}.abilities`, errors);
 }
 
+function checkEnergy(card, where, errors) {
+  if (!ENERGY_KINDS.includes(card.energyType)) errors.push(`${where}.energyType: one of ${ENERGY_KINDS.join(', ')}`);
+  if (card.energyType === 'Special') {
+    if (typeof card.effect !== 'string' || card.effect.trim().length === 0) errors.push(`${where}.effect: required`);
+  } else if (card.effect !== undefined && typeof card.effect !== 'string') errors.push(`${where}.effect: expected text`);
+}
+
 function checkCard(card, setId, where, errors, seenLocalIds) {
   if (!card || typeof card !== 'object') {
     errors.push(`${where}: expected an object`);
@@ -175,6 +191,7 @@ function checkCard(card, setId, where, errors, seenLocalIds) {
   if (card.image !== image) errors.push(`${where}.image: expected "${image}"`);
   if (card.category === 'Pokemon') checkPokemon(card, where, errors);
   if (card.category === 'Trainer') checkTrainer(card, where, errors);
+  if (card.category === 'Energy') checkEnergy(card, where, errors);
 }
 
 /**
@@ -212,5 +229,15 @@ export function validateCustomSet(json, { setDirName, reservedCodes = [] } = {})
     const seen = new Set();
     json.cards.forEach((card, i) => checkCard(card, json.id, `cards[${i}]`, errors, seen));
   }
-  return { ok: errors.length === 0, errors, set: errors.length === 0 ? json : null };
+  return { ok: errors.length === 0, errors, set: errors.length === 0 ? withMegaStages(json) : null };
+}
+
+/** A Pokémon cardback edited as MEGA (custom.edits.stage 3) plays at the MEGAHB stage, whatever the export wrote. */
+export function isEditorMegaCard(card) {
+  return card?.category === 'Pokemon' && Number(card.custom?.edits?.stage) === EDITOR_MEGA_STAGE;
+}
+
+function withMegaStages(set) {
+  if (!set.cards.some(isEditorMegaCard)) return set;
+  return { ...set, cards: set.cards.map((card) => (isEditorMegaCard(card) ? { ...card, stage: 'MEGAHB' } : card)) };
 }

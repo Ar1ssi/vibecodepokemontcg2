@@ -1,4 +1,4 @@
-// Design 076: the stellar kit's modifiers. The cyan mist drifts like a nebula (warp and a fine
+// Design 078: the stellar kit's modifiers. The cyan mist drifts like a nebula (warp and a fine
 // grain), the faceted head only glints, the prismatic fringe stays a clean line, and every fill
 // names the cyan dissolve edge.
 import test from 'node:test';

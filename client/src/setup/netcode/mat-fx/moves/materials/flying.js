@@ -18,7 +18,7 @@ import { grainPass, sphere, styledKit, traceOutline } from './_shared.js';
 // Gusts fray and churn like moving air; their streak lines stay crisp.
 const GUST = Object.freeze({ byKind: { linear: { id: 'smoke', churn: 0.55, drift: 1.6, folds: 0.25 }, radial: { id: 'smoke', churn: 0.5, drift: 1.2, folds: 0.3 } } });
 
-// Design 076 modifiers (GPU canvas only; Canvas2D ignores them). Wind shear: a blade's fill and
+// Design 078 modifiers (GPU canvas only; Canvas2D ignores them). Wind shear: a blade's fill and
 // the air of halos and orbs warp, and blades stream wisps, so the air reads as moving, not as
 // flat translucent shapes; the blade's bright edge stays crisp. Feather vanes take a still fibre
 // layer. Dissolving air thins at a pale sky rim (a soft bloom).
@@ -33,7 +33,7 @@ const WISPS = Object.freeze({
 });
 const FIBRE = Object.freeze({ detail: Object.freeze({ amount: 0.25, speed: 0, scale: 18 }) });
 const edgeOf = (rgb) => Object.freeze({ dissolve: Object.freeze({ edge: rgb, gain: 0.6, width: 0.14 }) });
-// Depth (076 § Depth): a gust is a stack of translucent sheets, not one decal. Each blade sits at
+// Depth (078 § Depth): a gust is a stack of translucent sheets, not one decal. Each blade sits at
 // its own height above whatever lift the drawer gives the beat (a whirl's blades by their stable
 // seed, a projectile's pinwheel by blade order, its orb on top), so the camera sees the layers
 // part and the cast pass pools each one's light on the cloth at its own offset. Inside a blade, a

@@ -1,4 +1,4 @@
-// Design 076: the dark kit's GPU modifiers. A slash's crimson halo smoulders (distort and detail
+// Design 078: the dark kit's GPU modifiers. A slash's crimson halo smoulders (distort and detail
 // along the blade) while the black blade stays crisp; the haze and the pulse ripples waver;
 // every fill burns a drawer's dissolve at the kit's crimson edge.
 import test from 'node:test';

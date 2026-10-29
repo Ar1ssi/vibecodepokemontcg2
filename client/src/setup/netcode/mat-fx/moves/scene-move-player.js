@@ -37,7 +37,7 @@ const isSourceOver = (beat) =>
 const centreOf = (rect) => ({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
 
 /**
- * Design 076 § Depth: a burst's particles are thrown up and out of the struck card's centre, not
+ * Design 078 § Depth: a burst's particles are thrown up and out of the struck card's centre, not
  * slid across the cloth; lifted, the cast pass gives them shadows and light pools too.
  */
 export const particleLift = (centre) => burstLift(centre, { stand: LIFT.particleStand, z: LIFT.particleZ });
@@ -254,7 +254,7 @@ export function playMoveInScene({
 
   scene.drive(attackerId, (ms) => offsetWith(attackerAt(ms), ms), durationMs);
   scene.drive(defenderId, (ms) => offsetWith(defenderAt(ms), ms), durationMs);
-  // Design 076: the attacker's own edge glows in the move's colour as it charges and lunges.
+  // Design 078: the attacker's own edge glows in the move's colour as it charges and lunges.
   if (!motionReduced()) {
     const rimRgb = (glowColours ?? tintedGlow(material.key)).hot;
     scene.cardFx?.(attackerId, { at: (ms) => ({ rim: attackerAt(ms).glow }), ms: durationMs, rimRgb });
@@ -276,7 +276,7 @@ export function playMoveInScene({
       const aOffset = a ? offsetWith(a, elapsed) : null;
       const dOffset = d ? offsetWith(d, elapsed) : null;
 
-      // Cast (design 076): the front and top beats and the burst particles replayed flat on the
+      // Cast (design 078): the front and top beats and the burst particles replayed flat on the
       // cloth, where solid paint shadows it and light pools its colour, pushed off by how high
       // each piece is lifted.
       canvas.begin({ layer: 'back', z: LAYER_Z.back, depthTest: true, unit: lane.h, seed, cast: CAST });

@@ -23,13 +23,13 @@ const STONE = Object.freeze({ byKind: { linear: { id: 'crystal', facets: 3, shee
 const RELIC = Object.freeze({ byKind: { linear: { id: 'crystal', facets: 3, sheen: 0.4, speed: 0.8 }, radial: { id: 'smoke', churn: 0.45, drift: 0.6, folds: 0.5 } } });
 const FACETED = Object.freeze({ byKind: { linear: { id: 'crystal', facets: 6, sheen: 0.8, speed: 1.2 }, radial: { id: 'crystal', facets: 6, sheen: 0.7, speed: 1.2 }, stroke: { id: 'crystal', sheen: 0.7, speed: 1.2 } } });
 
-// Design 076 modifiers (GPU canvas only; Canvas2D ignores them). Stone faces take a grit layer
+// Design 078 modifiers (GPU canvas only; Canvas2D ignores them). Stone faces take a grit layer
 // that never scrolls (stone is inert; a tumbling boulder rolls through it); its outline stays
 // clean. Dust puffs shimmer and rise (a fixed flow: one turned with a bowed heading would sweep
 // the shader's clock-long scroll offset and boil). Dissolving stone crumbles at a pale, dull rim
 // (low gain, no bloom); the ancient aura burns violet; gem light rims and blooms.
 const GRIT = Object.freeze({ detail: Object.freeze({ amount: 0.45, speed: 0, scale: 24 }) });
-// Depth (076 § Depth): stone is a lit, bumped, matte solid. The face is a radial paint, which the
+// Depth (078 § Depth): stone is a lit, bumped, matte solid. The face is a radial paint, which the
 // GPU lights as a sphere, so a boulder gets a strong Lambert side away from the up-left light;
 // facets and spires are bumped sheets. Low spec, faint rim: rock does not shine. The lit edge is
 // a stroke, lit as a tube (a rounded bevel). Canvas2D ignores all of it and keeps the baked tones.

@@ -68,3 +68,65 @@ test('colour spaces are cached apart and an empty url rejects', async () => {
   assert.equal(loads.length, 2);
   await assert.rejects(cache.acquire(''), TypeError);
 });
+
+function graceHarness() {
+  const timers = [];
+  const disposed = [];
+  let loads = 0;
+  const cache = createTextureCacheCore({
+    load: async (url) => {
+      loads += 1;
+      return { url, n: loads };
+    },
+    dispose: (texture) => disposed.push(texture),
+    graceMs: 15000,
+    setTimer: (fn, ms) => {
+      timers.push({ fn, ms, cleared: false });
+      return timers.length - 1;
+    },
+    clearTimer: (id) => {
+      timers[id].cleared = true;
+    },
+  });
+  const fire = () => timers.filter((t) => !t.cleared).forEach((t) => ((t.cleared = true), t.fn()));
+  return { cache, timers, disposed, fire, loads: () => loads };
+}
+
+test('with a grace, the last release keeps the texture until the grace ends', async () => {
+  const { cache, timers, disposed, fire } = graceHarness();
+  const texture = await cache.acquire('/a.png');
+  cache.release('/a.png');
+  assert.deepEqual(disposed, []);
+  assert.equal(timers.length, 1);
+  assert.equal(timers[0].ms, 15000);
+  assert.equal(cache.size(), 1);
+  fire();
+  assert.deepEqual(disposed, [texture]);
+  assert.equal(cache.size(), 0);
+});
+
+test('acquiring during the grace reuses the texture with no new load and cancels the disposal', async () => {
+  const { cache, timers, disposed, fire, loads } = graceHarness();
+  const first = await cache.acquire('/a.png');
+  cache.release('/a.png');
+  const again = await cache.acquire('/a.png');
+  assert.equal(again, first);
+  assert.equal(loads(), 1);
+  assert.equal(timers[0].cleared, true);
+  fire();
+  assert.deepEqual(disposed, []);
+  cache.release('/a.png');
+  fire();
+  assert.deepEqual(disposed, [first]);
+});
+
+test('an extra release during the grace changes nothing', async () => {
+  const { cache, disposed, fire } = graceHarness();
+  const texture = await cache.acquire('/a.png');
+  cache.release('/a.png');
+  cache.release('/a.png');
+  await cache.acquire('/a.png');
+  cache.release('/a.png');
+  fire();
+  assert.deepEqual(disposed, [texture], 'one hold, one release: disposed once the grace ends');
+});

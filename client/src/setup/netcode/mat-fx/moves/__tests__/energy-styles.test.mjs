@@ -54,7 +54,7 @@ test('electric: jags, the crackling ball, its halo and the bolt strokes all run 
 
 test('electric: the bolt core gains, its halo only shimmers', () => {
   const { rows } = record((ctx) => electric.jagStroke(ctx, [[[0, 0], [30, 12], [60, 0]]], { width: 6, alpha: 1 }));
-  // Halo, the wrapping filament's back run, body, centre, its front run (design 076 § Depth).
+  // Halo, the wrapping filament's back run, body, centre, its front run (design 078 § Depth).
   assert.equal(rows.length, 5);
   const gain = (row) => row[22];
   assert.equal(gain(rows[0]), 0, 'halo: no gain');

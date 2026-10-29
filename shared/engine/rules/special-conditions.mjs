@@ -72,6 +72,7 @@ export function removeCondition(card, condition) {
   normalizeLegacyMarker(card);
   if (isMarker(condition)) {
     delete card[MARKER_KEYS[condition]];
+    if (condition === 'Poisoned') delete card.poisonCounters;
     return true;
   }
   if (!ROTATION_CONDITIONS.includes(condition)) return false;
@@ -79,11 +80,24 @@ export function removeCondition(card, condition) {
   return true;
 }
 
+/** Toxic Sting: the Poison deals `counters` damage counters each Checkup instead of 1. */
+export function setPoisonCounters(card, counters) {
+  if (!card || !hasCondition(card, 'Poisoned') || !(counters > 1)) return false;
+  card.poisonCounters = counters;
+  return true;
+}
+
+/** Damage the card's Poison deals at Pokémon Checkup. */
+export function poisonCheckupDamage(card) {
+  return (card?.poisonCounters > 1 ? card.poisonCounters : 1) * 10;
+}
+
 /** Removes every condition and marker (Bench, Knockout, evolution, full cure). */
 export function clearConditions(card) {
   if (!card) return;
   card.specialCondition = null;
   for (const key of Object.values(MARKER_KEYS)) delete card[key];
+  delete card.poisonCounters;
 }
 
 /** Makes `to` carry exactly the conditions `from` has. */
@@ -91,4 +105,5 @@ export function copyConditions(from, to) {
   if (!to) return;
   clearConditions(to);
   for (const condition of listConditions(from)) addCondition(to, condition);
+  setPoisonCounters(to, from.poisonCounters);
 }

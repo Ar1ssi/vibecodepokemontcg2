@@ -1,4 +1,4 @@
-// Design 076: the fairy kit's GPU modifiers. The soft light shimmers (distort + detail), a trail's
+// Design 078: the fairy kit's GPU modifiers. The soft light shimmers (distort + detail), a trail's
 // ribbon wavers, the moon's disc takes a surface layer, sparkles stay crisp; every fill burns a
 // drawer's dissolve at the kit's gold edge.
 import test from 'node:test';

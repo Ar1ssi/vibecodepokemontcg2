@@ -147,7 +147,7 @@ SHAPES.ember = SHAPES.streak;
 export const PARTICLE_SHAPES = Object.freeze(Object.fromEntries(PARTICLE_KINDS.map((kind) => [kind, kind in SHAPES ? kind : 'dot'])));
 
 /**
- * Design 077: the TCG Live texture each particle kind draws as when element sprites are live
+ * Design 079: the TCG Live texture each particle kind draws as when element sprites are live
  * (`channel` per sprite.mjs SPRITE_CHANNELS; `gain` > 1 blooms). Kinds left out keep their shape.
  */
 export const PARTICLE_SPRITES = Object.freeze({
@@ -207,7 +207,7 @@ export function parseCssColour(text) {
 /**
  * Draw one particle: `state` from fx-stage.mjs `particleState` (null draws nothing), at
  * `(originX + x, originY + y)`; `size` and `aspect` are the burst row's, `colour` a CSS colour.
- * Design 077: while element sprites are live the kind draws as its TCG Live sprite instead
+ * Design 079: while element sprites are live the kind draws as its TCG Live sprite instead
  * (`frame` picks a flipbook frame, e.g. the row index).
  */
 export function drawParticle(ctx, kind, state, { originX = 0, originY = 0, size, aspect = 1, colour = '#fff', frame = 0 }) {

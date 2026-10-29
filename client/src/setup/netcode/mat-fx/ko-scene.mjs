@@ -110,7 +110,7 @@ export function koTrack({ index = 0, dir = -1, turn = 0, pileTurn = turn, cardRe
   };
 }
 
-// Design 076 row 5: the knocked-out card burns away on its own mesh (card-mesh.js cardFx) as it
+// Design 078 row 5: the knocked-out card burns away on its own mesh (card-mesh.js cardFx) as it
 // swings back to face the camera and sets off (thrown back it is edge-on, where a burn cannot be
 // seen); it is gone well before the pile, its light streak flies on, and the card re-forms out of
 // the burn in the pile as the pile catches it.

@@ -1550,6 +1550,15 @@ function atkDraw(ctx) {
     ctx.events.push({ type: 'cardsDrawn', count: drawn.length, playerId: opponent.playerId, cards: drawn.map((c) => ({ instanceId: c.instanceId })) });
     return null;
   }
+  if (step.side === 'each') {
+    for (const drawer of [ctx.player, ctx.opponent]) {
+      if (!drawer) continue;
+      const drawn = drawer.zones.deck.splice(0, Math.min(step.count || 0, drawer.zones.deck.length));
+      drawer.zones.hand.push(...drawn);
+      ctx.events.push({ type: 'cardsDrawn', count: drawn.length, playerId: drawer.playerId, cards: drawn.map((c) => ({ instanceId: c.instanceId })) });
+    }
+    return null;
+  }
   const { player } = ctx;
   const deck = player.zones.deck;
   if (step.upTo && !ctx.selection) {
@@ -2000,6 +2009,22 @@ function atkDoubleCountersEach(ctx) {
   const damaged = rootsOf(opponent).filter((root) => (root.damage || 0) > 0);
   if (damaged.length === 0) return skip(ctx, 'no_target');
   for (const root of damaged) placeCounters(ctx, root, opponent.playerId, root.damage);
+  return null;
+}
+
+// Active-only doubling: adds the Active's current counters, but never so many that it is left
+// with less than step.hpFloor remaining HP. Counters land in 10s, so the headroom rounds down.
+function atkDoubleCountersActive(ctx) {
+  const { opponent, step } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const active = activeOf(opponent);
+  if (!active) return skip(ctx, 'no_opponent_active');
+  const hp = Number(topPokemonCard(opponent, active)?.hp) || 0;
+  const damage = active.damage || 0;
+  const headroom = Math.floor(Math.max(0, hp - damage - step.hpFloor) / 10) * 10;
+  const amount = Math.min(damage, headroom);
+  if (amount === 0) return skip(ctx, 'no_target');
+  placeCounters(ctx, active, opponent.playerId, amount);
   return null;
 }
 
@@ -4011,6 +4036,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkCountersEach,
   atkCountersEachFiltered,
   atkDoubleCountersEach,
+  atkDoubleCountersActive,
   atkHpCap,
   atkMoveAllCounters: optional(atkMoveAllCounters, () => 'Move damage counters'),
   atkMoveCounterBetween,

@@ -1,4 +1,4 @@
-// Design 076 row 5: per-card shader effects on the 3D board's card meshes, after VFX Essential's
+// Design 078 row 5: per-card shader effects on the 3D board's card meshes, after VFX Essential's
 // dissolve (noise eats the card, the hole rims burn) and rim (an edge glow). DOM-free and
 // three-free: the effect values over time, the shared GLSL, and the shader maths mirrored in JS
 // so the tests can pin what the GPU does. card-mesh-fx.js builds the materials from these.

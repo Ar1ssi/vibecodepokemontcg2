@@ -87,7 +87,7 @@ test('a frame just after contact records back, front and top runs; the entry end
   assert.equal(frameAt(scene, 1900 + 760 + 1001).keep, false);
 });
 
-test('design 076: a cast pass lays the move on the cloth first, as shadow and light pools', () => {
+test('design 078: a cast pass lays the move on the cloth first, as shadow and light pools', () => {
   const scene = fakeScene();
   playMoveInScene({ scene, spec: fireBlast, attackerId: 1, defenderId: 2, seed: 7 });
   const { recording } = frameAt(scene, 1060);
@@ -119,7 +119,7 @@ const heightsOf = (recording, runs, passZ) => {
 };
 const CARD_H = 126;
 
-test('design 076 depth: burst particles fly up off the struck card and cast onto the cloth', () => {
+test('design 078 depth: burst particles fly up off the struck card and cast onto the cloth', () => {
   const scene = fakeScene();
   const particlesOnly = { ...SPECS['zap-cannon'], beats: [] };
   playMoveInScene({ scene, spec: particlesOnly, attackerId: 1, defenderId: 2, seed: 7 });
@@ -134,7 +134,7 @@ test('design 076 depth: burst particles fly up off the struck card and cast onto
   assert.ok(heightsOf(recording, [cast], LAYER_Z.back).every((h) => Math.abs(h) < 1e-6), 'the cast lies on the cloth');
 });
 
-test('design 076 depth: Thunder\'s bolt stands as a column over the defender, not a decal up the table', () => {
+test('design 078 depth: Thunder\'s bolt stands as a column over the defender, not a decal up the table', () => {
   const scene = fakeScene();
   playMoveInScene({ scene, spec: SPECS.thunder, attackerId: 1, defenderId: 2, seed: 7 });
   const { recording } = frameAt(scene, 760);

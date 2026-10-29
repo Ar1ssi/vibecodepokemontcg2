@@ -13,6 +13,8 @@ const LIGHT_INTENSITY = 1.4;
 const SHADOW_MAP_PX = 2048;
 /** Heights off the cloth: layers 0.5 px apart, well inside depth-buffer precision at ~1400 px. */
 const Z = { floor: -2, backing: 0, ambient: 0.25, art: 0.5, overlay: 1 };
+/** Program cache key of a material carrying a Stadium environment cutout (design 077). */
+const CUTOUT_PROGRAM_KEY = 'stadium-env-cutout';
 /**
  * `img.mat-ambient-image` (index.css): the art, cover-fitted to a box 124% of the half, scaled
  * 1.08, blurred 32px, darkened and saturated, at 0.75 opacity behind the letterboxed art.
@@ -64,22 +66,59 @@ async function rasterizeSvg(three, url, fetchImpl) {
 }
 
 /**
- * A `createTextureCache` loader for mat textures: SVGs (the zone overlay) are rasterized at
- * 2048 px wide from their viewBox; everything else goes through three's TextureLoader (CORS).
+ * Raster images decoded off the main thread (createImageBitmap through three's
+ * ImageBitmapLoader), flipped at decode so the texture samples as an <img> one with flipY would;
+ * an <img> through TextureLoader where createImageBitmap is missing. Both CORS 'anonymous'.
  * @param {typeof import('three')} three
- * @param {{ fetchImpl?: typeof fetch }} [options]
+ * @param {{ createImageBitmapImpl?: Function|undefined }} [options]
  * @returns {{ loadAsync: (url: string) => Promise<import('three').Texture> }}
  */
-export function createMatTextureLoader(three, { fetchImpl = globalThis.fetch?.bind(globalThis) } = {}) {
-  const images = new three.TextureLoader();
-  images.setCrossOrigin('anonymous');
+export function createImageTextureLoader(three, { createImageBitmapImpl = globalThis.createImageBitmap } = {}) {
+  if (typeof createImageBitmapImpl !== 'function' || typeof three.ImageBitmapLoader !== 'function') {
+    const images = new three.TextureLoader();
+    images.setCrossOrigin('anonymous');
+    return images;
+  }
+  const bitmaps = new three.ImageBitmapLoader();
+  bitmaps.setCrossOrigin('anonymous');
+  bitmaps.setOptions({ imageOrientation: 'flipY', premultiplyAlpha: 'none' });
+  return {
+    loadAsync: async (url) => {
+      const bitmap = await bitmaps.loadAsync(url);
+      const texture = new three.Texture(bitmap);
+      // An ImageBitmap ignores UNPACK_FLIP_Y; the decode above already flipped it. Code that
+      // reads flipY to orient its own sampling (gpu-canvas-mesh.js) also reads this mark.
+      texture.flipY = false;
+      texture.userData.flippedAtDecode = true;
+      texture.needsUpdate = true;
+      return texture;
+    },
+  };
+}
+
+/**
+ * A `createTextureCache` loader for mat textures: SVGs (the zone overlay) are rasterized at
+ * 2048 px wide from their viewBox; everything else goes through createImageTextureLoader.
+ * @param {typeof import('three')} three
+ * @param {{ fetchImpl?: typeof fetch, createImageBitmapImpl?: Function|undefined }} [options]
+ * @returns {{ loadAsync: (url: string) => Promise<import('three').Texture> }}
+ */
+export function createMatTextureLoader(
+  three,
+  { fetchImpl = globalThis.fetch?.bind(globalThis), createImageBitmapImpl = globalThis.createImageBitmap } = {}
+) {
+  const images = createImageTextureLoader(three, { createImageBitmapImpl });
   return {
     loadAsync: (url) => (isSvgUrl(url) && fetchImpl ? rasterizeSvg(three, url, fetchImpl) : images.loadAsync(url)),
   };
 }
 
-/** The ambient backdrop of a mat image, pre-blurred on a small canvas; null if it cannot be drawn. */
-function ambientTexture(three, image) {
+/**
+ * The ambient backdrop of a mat image, pre-blurred on a small canvas; null if it cannot be drawn.
+ * `flipY` is the source texture's: an ImageBitmap arrives already flipped (createImageTextureLoader),
+ * and the canvas copy keeps that orientation.
+ */
+function ambientTexture(three, image, { flipY = true } = {}) {
   const w = image?.naturalWidth || image?.width;
   const h = image?.naturalHeight || image?.height;
   if (!positive(w) || !positive(h)) return null;
@@ -96,6 +135,7 @@ function ambientTexture(three, image) {
   }
   const texture = new three.CanvasTexture(canvas);
   texture.colorSpace = three.SRGBColorSpace;
+  texture.flipY = flipY;
   return texture;
 }
 
@@ -166,6 +206,7 @@ function halvesFromSpec(spec) {
  *   lit by the directional light only.
  * @returns {{ group: import('three').Group, light: import('three').DirectionalLight,
  *   setLayout: (layout: object) => void, setMat: (spec: object|null) => void,
+ *   setCutout: (cutout: { glsl: string, uniforms: object }|null) => void,
  *   onChange: (fn: () => void) => void, dispose: () => void }}
  *   `setMat({ src, farSrc, mode: 'one-player'|'two-player', fit, imageAspect, boxAspect,
  *   overlaySrc, farOverlaySrc, far: { fit, imageAspect, boxAspect }, flip, scale })`: `src` is the near
@@ -369,7 +410,7 @@ export function createTable({ scene, textures, three, renderer = null, RoomEnvir
   /** Rebuilds a half's ambient backdrop from its art (or clears it). */
   const setAmbient = (parts, texture) => {
     parts.ambientTexture?.dispose();
-    parts.ambientTexture = texture ? ambientTexture(three, texture.image) : null;
+    parts.ambientTexture = texture ? ambientTexture(three, texture.image, { flipY: texture.flipY }) : null;
     parts.ambient.material.map = parts.ambientTexture;
     parts.ambient.material.needsUpdate = true;
   };
@@ -433,6 +474,49 @@ export function createTable({ scene, textures, three, renderer = null, RoomEnvir
     placeGeometry();
   };
 
+  /** The materials a Stadium environment covers: the cloth, its art, backdrop and zone outlines, the floor. */
+  const coveredMaterials = () => [
+    floor.material,
+    ...HALVES.flatMap((key) => [
+      halves[key].backing.material,
+      halves[key].ambient.material,
+      halves[key].art.material,
+      halves[key].overlay.material,
+    ]),
+  ];
+
+  /**
+   * Design 077: with a cutout, the covered materials discard their fragments wherever the Stadium
+   * environment shows (`cutout.glsl` defines `environmentShown(tablePoint)`; `cutout.uniforms`
+   * carries `uTableFromWorld`, world → table frame), the zone outlines and labels too (user,
+   * 2026-10-25: the place shows alone). Null removes it.
+   * @param {{ glsl: string, uniforms: object }|null} cutout
+   */
+  const setCutout = (cutout) => {
+    if (disposed) return;
+    for (const material of coveredMaterials()) {
+      if (cutout) {
+        material.onBeforeCompile = (shader) => {
+          Object.assign(shader.uniforms, cutout.uniforms);
+          shader.vertexShader = shader.vertexShader
+            .replace('#include <common>', '#include <common>\nuniform mat4 uTableFromWorld;\nvarying vec2 vTablePos;')
+            .replace(
+              '#include <project_vertex>',
+              '#include <project_vertex>\n\tvTablePos = (uTableFromWorld * modelMatrix * vec4(transformed, 1.0)).xy;'
+            );
+          shader.fragmentShader = shader.fragmentShader
+            .replace('#include <common>', `#include <common>\nvarying vec2 vTablePos;\n${cutout.glsl}`)
+            .replace('void main() {', 'void main() {\n\tif (environmentShown(vTablePos) >= 0.5) discard;');
+        };
+        material.customProgramCacheKey = () => CUTOUT_PROGRAM_KEY;
+      } else {
+        delete material.onBeforeCompile;
+        delete material.customProgramCacheKey;
+      }
+      material.needsUpdate = true;
+    }
+  };
+
   const onChange = (fn) => {
     if (typeof fn === 'function') listeners.add(fn);
   };
@@ -452,5 +536,5 @@ export function createTable({ scene, textures, three, renderer = null, RoomEnvir
     }
   };
 
-  return { group, light, setLayout, setMat, onChange, dispose };
+  return { group, light, setLayout, setMat, setCutout, onChange, dispose };
 }

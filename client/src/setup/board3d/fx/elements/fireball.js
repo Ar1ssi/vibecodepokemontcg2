@@ -1,4 +1,4 @@
-// Design 077 § Kinds: the fireball — a boiling ball of flame. A camera-facing quad shades a
+// Design 079 § Kinds: the fireball — a boiling ball of flame. A camera-facing quad shades a
 // unit sphere's surface noise: domain-warped fbm boils the body, flame licks stream off its
 // rim, temperature falls from a white-hot heart through the kit palette to soot at the edge.
 // Moving, the quad's back half stretches along the heading into a comet. Additive light with

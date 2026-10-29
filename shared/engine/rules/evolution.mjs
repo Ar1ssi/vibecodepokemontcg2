@@ -282,10 +282,7 @@ export async function canEvolve(
       };
     }
 
-    const order = ['Basic', 'Stage 1', 'Stage 2'];
-    const baseIdx = order.indexOf(baseStage);
-    const evoIdx = order.indexOf(evoStage);
-    if (evoIdx !== baseIdx + 1 && !rareCandyJump) {
+    if (!isNextStage(baseStage, evoStage) && !rareCandyJump) {
       return {
         allowed: false,
         reason: `${evoStage} can't evolve from ${baseStage} directly (needs Rare Candy for a skip).`,
@@ -329,11 +326,29 @@ export function normalizeStage(stage) {
   if (s === 'basic' || s.startsWith('basic')) return 'Basic';
   if (s === 'stage1' || s.startsWith('stage1')) return 'Stage 1';
   if (s === 'stage2' || s.startsWith('stage2')) return 'Stage 2';
+  if (s === MEGAHB.toLowerCase()) return MEGAHB;
   if (s === 'mega' || s.startsWith('mega')) return 'Stage 1';
   // BREAK Evolution is an Evolution (not Basic); it keeps the previous
   // Evolution's stats and attacks (see evolved-pokemon.mjs).
   if (s === 'break' || s.startsWith('break')) return 'BREAK';
   return null;
+}
+
+// The homebrew set's MEGA stage (cardback stage 3; custom-set-schema.mjs
+// stamps it on load): a Stage 3 that evolves from its named Pokémon whatever
+// that one's stage. Its own token so TCGdex's legacy "MEGA" ("M <Name>-EX",
+// read as Stage 1 above) keeps its behaviour.
+export const MEGAHB = 'MEGAHB';
+
+const NUMBERED_STAGES = ['Basic', 'Stage 1', 'Stage 2'];
+
+// Whether `evoStage` is one evolution step onto a Pokémon of `baseStage`
+// (both normalized). The evolvesFrom name check is the caller's.
+export function isNextStage(baseStage, evoStage) {
+  const baseIdx = NUMBERED_STAGES.indexOf(baseStage);
+  if (evoStage === MEGAHB) return baseIdx >= 0;
+  const evoIdx = NUMBERED_STAGES.indexOf(evoStage);
+  return evoIdx >= 0 && evoIdx === baseIdx + 1;
 }
 
 // Rare Candy: Basic -> Stage 2 directly (item, so it also needs the item
@@ -423,6 +438,7 @@ export function requiresTurnEndOnEvolve(evolvingCard, baseCardInPlay) {
       const notPlayableFromHand =
         stage === 'Stage 1' ||
         stage === 'Stage 2' ||
+        stage === MEGAHB ||
         stage === 'BREAK' ||
         collapsed === 'restored' ||
         collapsed === 'vunion';

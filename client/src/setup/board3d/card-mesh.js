@@ -15,7 +15,7 @@ import {
   cardScaleFor,
   roundedRectShapePoints,
 } from './card-geometry.mjs';
-import { flightPlacement } from './flight-pose.mjs';
+import { flightPlacement, restingFlightPlacement } from './flight-pose.mjs';
 import { cardFxValuesAt } from './card-mesh-fx.mjs';
 import {
   burningCopyOf,
@@ -131,6 +131,7 @@ function buildCardGeometry(three, widthPx, uv) {
  *   cardFxOf: (id: number) => { dissolve: number, rim: number }|null,
  *   tablePoseOf: (id: number) => { x: number, y: number, z: number, yawDeg: number, widthPx: number,
  *     heightPx: number }|null,
+ *   holdTablePose: (id: number) => void, releaseTablePose: (id: number) => void,
  *   frontMapOf: (id: number) => import('three').Texture|null,
  *   lift: (id: number, pose: object, o?: { ms?: number, ease?: (t: number) => number }) => Promise<void>,
  *   unlift: (id: number, o?: { ms?: number, ease?: (t: number) => number }) => Promise<void>,
@@ -143,11 +144,12 @@ function buildCardGeometry(three, widthPx, uv) {
  *   has: (id: number) => boolean, placed: (id: number) => boolean, meshOf: (id: number) => import('three').Mesh|null,
  *   idAt: (object3d: import('three').Object3D|null) => number|null, ids: () => number[],
  *   cornersOf: (id: number, o?: { rest?: boolean }) => number[][]|null, update: (nowMs: number) => boolean,
- *   dispose: () => void }}
+ *   moving: () => boolean, dispose: () => void }}
  *   A card whose image fails shows its back on both faces and the image is tried once more
  *   after 5 s (edge case 12); its name label is a text plane of slice C5. `update(now)` places
  *   every moving card and answers whether another frame is needed (a tween is running, or a
- *   visible foil animates while motion is allowed).
+ *   visible foil animates while motion is allowed); `moving()` answers the same for the last
+ *   `update` without the foil (a foil-only frame is ambient: board-scene paces it, frame-pacer.mjs).
  *   `tween` (design 074 H1) flies a card: for `ms` of scene time `poseFn(t)` (t eased 0 → 1) gives
  *   `{ rect, rotateZDeg, tiltXDeg, lift, flipDeg }` in viewport px (flight-pose.mjs) and the mesh
  *   sits there; the card's own pose is suspended and the mesh is shown, hidden or not. It resolves
@@ -170,7 +172,7 @@ function buildCardGeometry(three, widthPx, uv) {
  *   the card's release ends it (resolving); a lifted or flying card is not driven.
  *   `tween(..., { still: true })` is a hold, not a motion: its pose must not move, and it keeps
  *   its full `ms` with motion reduced (a reduced-motion knockout burns its card where it stood).
- *   `cardFx` (design 076) runs a shader effect on the card for `ms` of scene time, whatever its
+ *   `cardFx` (design 078) runs a shader effect on the card for `ms` of scene time, whatever its
  *   motion and with motion reduced too: `at(elapsedMs)` gives `dissolve` (0 whole – 1 burnt away,
  *   the hole rims burn in `edgeRgb`) and `rim` (0–1, an edge glow in `rimRgb`). `cut: true` (needed
  *   for any dissolve) gives the card its own burning copies of its materials for the whole run (a
@@ -426,7 +428,7 @@ export function createCardMeshPool({
     card.foilLive = wearsFoil;
   }
 
-  // ── card effects (design 076): dissolve and rim through the card's own uniforms.
+  // ── card effects (design 078): dissolve and rim through the card's own uniforms.
   /** The card's burning copy of `base`, made once per base for the effect's run. */
   const burningCopy = (card, base) => {
     const { copies } = card.fx;
@@ -618,10 +620,7 @@ export function createCardMeshPool({
     });
   };
 
-  /** The card's own pose now, in flat table px, with its drawn size; null when it has none. */
-  const tablePoseOf = (id) => {
-    const card = cards.get(id);
-    if (!card?.pose) return null;
+  const ownTablePose = (card) => {
     const pose = card.pose.at(clock.now());
     return {
       x: pose.x,
@@ -631,6 +630,28 @@ export function createCardMeshPool({
       widthPx: card.geometry.w * pose.s,
       heightPx: card.geometry.h * pose.s,
     };
+  };
+
+  /**
+   * The card's own pose now, in flat table px, with its drawn size; null when it has none. A held
+   * card answers the pose it was held at: its mesh is pinned there while its own pose already
+   * points at its new zone (a knocked-out defender sits in its slot until its knockout scene).
+   */
+  const tablePoseOf = (id) => {
+    const card = cards.get(id);
+    if (!card?.pose) return null;
+    return card.heldTablePose ?? ownTablePose(card);
+  };
+
+  /** Freezes what `tablePoseOf` answers for card `id` at its pose now, until `releaseTablePose`. */
+  const holdTablePose = (id) => {
+    const card = cards.get(id);
+    if (card?.pose) card.heldTablePose = ownTablePose(card);
+  };
+
+  const releaseTablePose = (id) => {
+    const card = cards.get(id);
+    if (card) card.heldTablePose = null;
   };
 
   /** The card's front art texture once loaded, else null. */
@@ -682,11 +703,12 @@ export function createCardMeshPool({
       return true;
     }
     const flipDeg = Number.isFinite(pose?.flipDeg) ? pose.flipDeg : card.flip ? card.flip.at(now) : 0;
-    const placement = flightPlacement(
+    const placement = restingFlightPlacement(
       camera,
       { ...pose, flipDeg },
-      { widthPx: card.geometry.w, heightPx: card.geometry.h },
-      viewOrigin()
+      { widthPx: card.geometry.w, heightPx: card.geometry.h, thicknessPx: card.geometry.t },
+      viewOrigin(),
+      CARD_LIFT_PX
     );
     if (placement) {
       card.mesh.position.set(...placement.position);
@@ -909,6 +931,7 @@ export function createCardMeshPool({
       face: 'front',
       hidden: false,
       pose: null,
+      heldTablePose: null,
       flip: null,
       tilt: null,
       hoverTilt: null,
@@ -1078,7 +1101,9 @@ export function createCardMeshPool({
     onNeedsRender();
   };
 
+  let lastMoving = false;
   const update = (nowMs) => {
+    lastMoving = false;
     if (disposed) return false;
     const now = Number.isFinite(nowMs) ? nowMs : clock.now();
     let moving = false;
@@ -1130,6 +1155,7 @@ export function createCardMeshPool({
       if (card.foilLive && card.mesh.visible && card.face === 'front')
         foilShown = true;
     }
+    lastMoving = moving;
     return moving || (foilShown && !motionReduced());
   };
 
@@ -1194,6 +1220,8 @@ export function createCardMeshPool({
     cardFx,
     cardFxOf,
     tablePoseOf,
+    holdTablePose,
+    releaseTablePose,
     frontMapOf,
     lift,
     unlift,
@@ -1211,6 +1239,7 @@ export function createCardMeshPool({
     ids,
     cornersOf,
     update,
+    moving: () => lastMoving,
     dispose,
   };
 }

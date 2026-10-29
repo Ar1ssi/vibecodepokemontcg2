@@ -1,4 +1,4 @@
-// Design 077 § Kinds: the lens — a psychic field on a camera-facing quad. Inside the disc the
+// Design 079 § Kinds: the lens — a psychic field on a camera-facing quad. Inside the disc the
 // board behind is swirled (stronger toward the heart) and split into red / green / blue at
 // slightly different bends; TCG Live's psychic ring turns at three sizes over it, the spectrum
 // ring shimmers, and the rim glows. Covers the disc with the bent board; the rings add light.

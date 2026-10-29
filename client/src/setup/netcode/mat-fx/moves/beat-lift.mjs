@@ -1,4 +1,4 @@
-// Design 076 § Depth: where a beat sits in height. Each builder returns a `ctx.fxLift` hint
+// Design 078 § Depth: where a beat sits in height. Each builder returns a `ctx.fxLift` hint
 // (gpu-canvas resolveLift; heights in lane units = card heights, points in the stage px the
 // drawer draws in). Without a lift every beat lay 0.25–4 px above the cloth and the tilted
 // camera read it as a decal. Heights follow the Scarlet/Violet clips (063-move-refs.json

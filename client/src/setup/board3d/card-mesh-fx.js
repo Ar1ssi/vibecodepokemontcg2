@@ -1,4 +1,4 @@
-// Design 076 row 5: the materials of a card mesh's shader effect (card-mesh.js `cardFx`). A card
+// Design 078 row 5: the materials of a card mesh's shader effect (card-mesh.js `cardFx`). A card
 // with a running effect gets its own uniforms; a burning one also its own cut copies of its front,
 // back, edge walls and shadow depth (the shared materials stay untouched, so a card at rest looks
 // exactly as before), and every effect gets a glow twin: the card's geometry again, drawing the

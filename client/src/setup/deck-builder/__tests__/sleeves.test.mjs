@@ -33,27 +33,43 @@ const webpSize = (url) => {
   return [bytes.readUIntLE(24, 3) + 1, bytes.readUIntLE(27, 3) + 1];
 };
 
-test('sleeve catalog: all 415 TCG Live sleeves, each with art on disk', () => {
+test('sleeve catalog: the database dump, with TCG Live scans where TCG Live has the same sleeve', () => {
   const sleeves = getSleeves();
-  assert.equal(sleeves.length, 415);
+  assert.equal(sleeves.length, 451);
 
   const ids = new Set();
   for (const sleeve of sleeves) {
-    assert.match(sleeve.id, /^cs_[a-z0-9_-]+$/, `bad id: ${sleeve.id}`);
     assert.ok(!ids.has(sleeve.id), `duplicate id: ${sleeve.id}`);
     ids.add(sleeve.id);
     assert.ok(sleeve.name && !/[<>�]/.test(sleeve.name), `bad name: ${sleeve.id}`);
     assert.ok(sleeve.category, `missing category: ${sleeve.id}`);
+    if (!sleeve.id.startsWith('cs_')) continue;
     assert.equal(sleeve.image, `/src/assets/sleeves/tcgl/full/${sleeve.id}.webp`);
     assert.equal(sleeve.thumb, `/src/assets/sleeves/tcgl/thumb/${sleeve.id}.webp`);
     for (const url of [sleeve.image, sleeve.thumb]) {
       assert.ok(fs.existsSync(path.join(CLIENT_ROOT, url)), `missing file: ${url}`);
     }
   }
+  assert.equal(sleeves.filter((sleeve) => sleeve.id.startsWith('cs_')).length, 106);
+});
+
+test('every TCG Live sleeve on disk is in the catalog', () => {
+  const inCatalog = new Set(getSleeves().map((sleeve) => sleeve.id));
+  for (const dir of ['full', 'thumb']) {
+    const dirPath = path.join(CLIENT_ROOT, 'src', 'assets', 'sleeves', 'tcgl', dir);
+    for (const file of fs.readdirSync(dirPath)) {
+      assert.ok(inCatalog.has(file.replace(/\.webp$/, '')), `orphan file: ${dir}/${file}`);
+    }
+  }
+});
+
+test('a database id resolves to the TCG Live sleeve that replaced it', () => {
+  assert.equal(getSleeveById('08266b9d-1d37-4ddb-a458-9adc302edb62')?.id, 'cs_charizardxmega_me2_etb');
+  assert.equal(getSleeveById('legacy-sleeve')?.id, 'legacy-sleeve');
 });
 
 test('sleeve art is the card mesh face: 366x512 full, 183x256 thumb', () => {
-  for (const { image, thumb } of getSleeves().slice(0, 3)) {
+  for (const { image, thumb } of getSleeves().filter((sleeve) => sleeve.id.startsWith('cs_')).slice(0, 3)) {
     assert.deepEqual(webpSize(image), [366, 512]);
     assert.deepEqual(webpSize(thumb), [183, 256]);
   }

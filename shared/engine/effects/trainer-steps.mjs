@@ -789,6 +789,78 @@ function lookAtDeckEnd(ctx, fromBottom) {
   });
 }
 
+/**
+ * Gardevoir Shining Arcana: "look at the top N cards of your deck and attach any number of basic
+ * Energy cards you find there to your Pokémon in any way you like. Put the other cards into your
+ * hand." Phases (memo): pick the Energy to attach → choose a Pokémon for each in turn → the rest
+ * of the looked-at cards go to the hand.
+ */
+function lookAttachEnergy(ctx) {
+  const { player, step, memo, selection, events } = ctx;
+  const deck = player.zones.deck;
+  const viewedIds = memo?.viewedIds || deck.slice(0, Math.min(step.count || 2, deck.length)).map((c) => c.instanceId);
+  const viewed = viewedIds.map((id) => deck.find((c) => c.instanceId === id)).filter(Boolean);
+  if (!memo) {
+    if (viewed.length === 0) return skip(ctx, 'empty_deck');
+    events.push({
+      type: 'cardsRevealed',
+      playerId: player.playerId,
+      revealedTo: player.playerId,
+      cards: viewed.map((c) => ({ instanceId: c.instanceId, name: c.name })),
+    });
+  }
+
+  let queue = memo?.queue;
+  if (memo?.phase === 'target') {
+    const root = rootsOf(player).find((c) => c.instanceId === selection?.[0]);
+    const energy = viewed.find((c) => c.instanceId === queue[0]);
+    if (energy && root) attachTo(player, energy, root, events);
+    queue = queue.slice(1);
+  } else if (memo?.phase === 'pick') {
+    queue = pickById(viewed, selection || []).map((c) => c.instanceId);
+  } else {
+    const energies = viewed.filter(isBasicEnergy);
+    if (energies.length > 0) {
+      return ctx.ask({
+        prompt: `${sourceName(ctx, 'Ability')}: Choose any number of basic Energy cards to attach`,
+        options: energies,
+        min: 0,
+        max: energies.length,
+        memo: { phase: 'pick', viewedIds },
+      });
+    }
+    queue = [];
+  }
+
+  const roots = rootsOf(player);
+  while (queue.length > 0) {
+    const energy = viewed.find((c) => c.instanceId === queue[0]);
+    if (!energy || roots.length === 0) {
+      queue = queue.slice(1);
+      continue;
+    }
+    if (roots.length === 1) {
+      attachTo(player, energy, roots[0], events);
+      queue = queue.slice(1);
+      continue;
+    }
+    return ctx.ask({
+      prompt: `${sourceName(ctx, 'Ability')}: Choose a Pokémon to attach ${energy.name} to`,
+      options: roots,
+      min: 1,
+      max: 1,
+      memo: { phase: 'target', viewedIds, queue },
+    });
+  }
+
+  for (const card of viewed.filter((c) => deck.includes(c))) {
+    removeFromZones(player, card);
+    player.zones.hand.push(card);
+    events.push({ type: 'cardMoved', instanceId: card.instanceId, from: 'deck', to: 'hand', playerId: player.playerId });
+  }
+  return null;
+}
+
 // First chosen card for each category, in category order; a card fills one slot only.
 export function oneOfEach(cards, categories) {
   const taken = [];
@@ -3467,6 +3539,43 @@ function selfDamageAbility(ctx) {
 }
 
 /**
+ * Mysterious Potion: "choose 1 of your Pokémon and flip a coin. If heads, heal 50 damage from
+ * that Pokémon. If tails, put 2 damage counters on that Pokémon." One flip decides one outcome.
+ */
+function coinHealOrCountersAbility(ctx) {
+  const { player, step } = ctx;
+  const roots = rootsOf(player);
+  if (!ctx.selection) {
+    if (roots.length === 0) return skip(ctx, 'no_target');
+    return ctx.ask({
+      prompt: `${sourceName(ctx, 'Ability')}: Choose 1 of your Pokémon, then flip a coin (heads: heal ${step.heal}, tails: put ${step.counters} damage counters)`,
+      options: roots,
+      min: 1,
+      max: 1,
+    });
+  }
+  const target = roots.find((c) => c.instanceId === ctx.selection[0]);
+  if (!target) return skip(ctx, 'target_not_found');
+  const face = flipFace(ctx);
+  ctx.events.push({ type: 'coinFlipped', playerId: player.playerId, face });
+  if (face === 'heads') {
+    if (stadiumBlocksHealing(ctx.draft.stadium)) return skip(ctx, 'healing_blocked');
+    healCard(ctx, target, step.heal);
+    return null;
+  }
+  target.damage = (target.damage || 0) + step.counters * 10;
+  ctx.events.push({ type: 'damageUpdated', instanceId: target.instanceId, damage: target.damage });
+  ctx.events.push({
+    type: 'damageCountersPlaced',
+    instanceId: target.instanceId,
+    victimPlayerId: player.playerId,
+    attackerPlayerId: null,
+    damage: target.damage,
+  });
+  return null;
+}
+
+/**
  * Luxray Swelling Flash / Klinklang Emergency Rotation: "if this Pokémon is in
  * your hand …, you may put this Pokémon onto your Bench." `step.condition`
  * carries the parsed gate; an unmet condition skips without consuming a Bench
@@ -5943,6 +6052,7 @@ export const EXTRA_STEP_HANDLERS = {
   variableDraw,
   lookAtTop: (ctx) => lookAtDeckEnd(ctx, false),
   lookAtTopAbility: (ctx) => lookAtDeckEnd(ctx, false),
+  lookAttachEnergyAbility: lookAttachEnergy,
   lookAtBottom: (ctx) => lookAtDeckEnd(ctx, true),
   searchDeckSequence,
   evolveStage2,
@@ -6000,6 +6110,7 @@ export const EXTRA_STEP_HANDLERS = {
   moveDamageBetweenAbility: moveDamageBetweenOwn,
   recoverStatusAbility,
   selfDamageAbility,
+  coinHealOrCountersAbility,
   selfBenchPlacementAbility,
   turnDamageBonusAbility,
   chooseMode,

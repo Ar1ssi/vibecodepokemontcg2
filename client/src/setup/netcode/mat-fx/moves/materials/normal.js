@@ -9,11 +9,11 @@
 // ignored by Canvas2D): pressure light breathes with slow veins and the rings carry pulses round
 // them. Gain stays off the body so its white core never blooms into a slab.
 //
-// Design 076: modifiers (`ctx.fxMod`, ignored by Canvas2D). Pressure light breathes: a slow warp
+// Design 078: modifiers (`ctx.fxMod`, ignored by Canvas2D). Pressure light breathes: a slow warp
 // and grain through the body and the tongue's hot pass, a slow waver in the glow; the white core
 // pass and the rings stay clean, and every fill names the gold dissolve edge.
 //
-// Design 076 § Depth: the body is a softly lit sphere of light (gpu-canvas `volume`, high ambient
+// Design 078 § Depth: the body is a softly lit sphere of light (gpu-canvas `volume`, high ambient
 // so it stays light, not stone), the tongue's hot pass a soft tube, the rings lit tubes orbiting
 // above the body; every pass stands at its own height over the drawer's lift.
 import { rgbCss } from '../../fx-colors.mjs';

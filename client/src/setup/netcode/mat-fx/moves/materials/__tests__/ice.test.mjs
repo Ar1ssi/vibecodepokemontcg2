@@ -1,4 +1,4 @@
-// Design 076: the ice kit's GPU modifiers. A crystal's ice fill takes a frost detail layer and is
+// Design 078: the ice kit's GPU modifiers. A crystal's ice fill takes a frost detail layer and is
 // never warped; only the mist drifts (distort + detail); ice and aurora burn a drawer's dissolve
 // at a thin pale-cyan edge.
 import test from 'node:test';

@@ -11,12 +11,12 @@
 // lays over a defender (Close Combat). Every call draws on the context it is handed and is
 // otherwise pure.
 //
-// Design 076: modifiers (`ctx.fxMod`, ignored by Canvas2D). A shock streak is rigid: a grain
+// Design 078: modifiers (`ctx.fxMod`, ignored by Canvas2D). A shock streak is rigid: a grain
 // streams along its body pass, never a warp. The impact disc and the ki sphere ripple and
 // churn, their halos waver, the rings and swirls stay clean, and every fill names the kit's
 // dissolve edge (its hot tone).
 //
-// Design 076 § Depth: the impact disc and the ki sphere are lit spheres (gpu-canvas `volume`) and
+// Design 078 § Depth: the impact disc and the ki sphere are lit spheres (gpu-canvas `volume`) and
 // their rings and swirls lit tubes riding above them; a streak's passes stand at rising heights
 // over the drawer's lift, so the white centre sits on the body and the cast pass pools light.
 import { rgbCss } from '../../fx-colors.mjs';

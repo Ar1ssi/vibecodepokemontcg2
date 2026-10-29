@@ -12,11 +12,11 @@
 // by Canvas2D): bolts carry bright packets running down them over a stepped flicker, fills
 // crackle with thin filaments. The gain stays low so only the packets' centres bloom.
 //
-// Design 076: modifiers (`ctx.fxMod`, ignored by Canvas2D). A fast, fine crackle jitter runs
+// Design 078: modifiers (`ctx.fxMod`, ignored by Canvas2D). A fast, fine crackle jitter runs
 // through the glow and the yellow core of every jag and bolt (the white centre stays a clean
 // line), the ball carries a charge grain, and every fill names the cyan-white dissolve edge.
 //
-// Design 076 § Depth: a bolt is a lit tube (gpu-canvas `volume`: a stroke shades round its
+// Design 078 § Depth: a bolt is a lit tube (gpu-canvas `volume`: a stroke shades round its
 // width), a gold body with a white-hot centre riding above it and a soft halo below; the ball is
 // a lit sphere inside a thin fresnel shell of charge. Each pass stands at its own height over the
 // drawer's lift (halo lowest, centre highest), so the camera sees the layers part and the cast
@@ -338,7 +338,7 @@ function electricKit(palette) {
    * x 3.2, the lit gold tube at `width` x 1.8, a white centre at `width` x 0.3, and a filament
    * wrapping the tube (its back under, its front over). Under the additive pass these sum toward
    * white, so the glow stays faint (0.25), the tube is the deep yellow at 0.75 with a soft glint,
-   * and the centre 0.6, or the bolt reads as a white ribbon and its shading is lost (design 076
+   * and the centre 0.6, or the bolt reads as a white ribbon and its shading is lost (design 078
    * § Depth: the first depth capture did exactly that).
    */
   function jagStroke(ctx, lines, { width, alpha = 1 }) {

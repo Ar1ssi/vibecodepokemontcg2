@@ -2576,6 +2576,16 @@ describe('Audit S&M compound clauses (S6)', () => {
     assert.deepEqual(molayne.steps[0].energyTypes, ['metal']);
   });
 
+  test('Dangerous Drill (customhb-261 / sm9-138): {D} Pokémon hand-discard cost precedes the discard', () => {
+    const r = parseTrainerEffect(
+      "You can play this card only if you discard a {D} Pokémon from your hand.\n\nDiscard a Pokémon Tool or Special Energy card from 1 of your opponent's Pokémon, or discard any Stadium card in play."
+    );
+    assert.equal(r.steps[0].type, 'discardCost');
+    assert.equal(r.steps[0].what, 'Pokémon');
+    assert.deepEqual(r.steps[0].pokemonTypes, ['darkness']);
+    assert.equal(r.steps[1].type, 'discardFromOpponent');
+  });
+
   test('Max Potion: heal-all now carries the discard-all-Energy follow-up', () => {
     const r = parseTrainerEffect(
       'Heal all damage from 1 of your Pok\u00e9mon. If you do, discard all Energy from that Pok\u00e9mon.'

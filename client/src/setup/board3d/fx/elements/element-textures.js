@@ -1,7 +1,7 @@
-// Design 077: the TCG Live attack textures (design 068's import, client/src/assets/fx/attack/
+// Design 079: the TCG Live attack textures (design 068's import, client/src/assets/fx/attack/
 // textures) as three.js textures for the element kinds, by file name. A texture starts loading on
 // first ask and is "not ready" until its bitmap arrives; a kind draws its procedural fallback
-// meanwhile. A failed load is forgotten so a later ask tries again (design 077 edge 5).
+// meanwhile. A failed load is forgotten so a later ask tries again (design 079 edge 5).
 import { flipbookGrid } from './sprite.mjs';
 
 export const ELEMENT_TEXTURE_URL = '/src/assets/fx/attack/textures/';

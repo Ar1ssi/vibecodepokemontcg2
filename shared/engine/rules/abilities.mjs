@@ -10,6 +10,16 @@
 // Backward-compat: the bridge auto-draws by finding `type === 'drawAbility'`
 // and reading `.count`. That step type + property are preserved.
 import { energySearchWhat } from './search-match.mjs';
+
+// "When you play this Pokémon from your hand to evolve 1 of your Pokémon during your turn, …" with
+// no "you may": the effect is mandatory and runs on the evolve itself (effects/ability.mjs
+// applyAutomaticEvolveAbility), not as an activation. Returns the steps it runs, or [].
+const AUTOMATIC_EVOLVE = /when you play this pok[eé]mon from your hand to evolve 1 of your pok[eé]mon during your turn, (?!you may)/;
+export function automaticEvolveSteps(abilityText) {
+  const lowered = String(abilityText || '').toLowerCase().replace(/[‘’]/g, "'");
+  if (!AUTOMATIC_EVOLVE.test(lowered)) return [];
+  return parseAbility(lowered).filter((step) => step.type === 'turnDamageBonusAbility');
+}
 import { symbolizeTypeWords } from './attack-text.mjs';
 import { textRevealsPicks } from './reveal-picks.mjs';
 import { rewriteLegacyPowerWording } from './legacy-power-wording.mjs';
@@ -701,12 +711,13 @@ export function parseAbility(text = '') {
       guidance: `Once during your turn: draw cards until you have ${until[1]} in your hand.`,
     });
   } else if (lower.includes('each player draws') || lower.includes('each player must draw')) {
-    // "Each player draws a card" — both players draw 1
+    // "Each player draws a card" / "Each player draws 3 cards" — both players draw N
+    const eachCount = Number(lower.match(/each player (?:draws|must draw)\s+(\d+)\s+cards?/)?.[1] || 1);
     steps.push({
       type: 'drawAbility',
-      count: 1,
+      count: eachCount,
       eachPlayer: true,
-      guidance: 'Once during your turn: each player draws 1 card.',
+      guidance: `Once during your turn: each player draws ${eachCount} card${eachCount === 1 ? '' : 's'}.`,
     });
   } else if (lower.includes('your opponent draws')) {
     // "Your opponent draws N cards" — opponent-facing draw
@@ -811,8 +822,21 @@ export function parseAbility(text = '') {
     }
   }
 
+  // Mysterious Potion: one coin flip picks heal OR counters, so neither generic step below applies.
+  const coinHealOrCounters = lower.match(
+    /choose 1 of your pok[eé]mon and flip a coin\. if heads, heal (\d+) damage from that pok[eé]mon\. if tails, (?:put|place) (\d+) damage counters? on that pok[eé]mon/
+  );
+  if (coinHealOrCounters) {
+    steps.push({
+      type: 'coinHealOrCountersAbility',
+      heal: Number(coinHealOrCounters[1]),
+      counters: Number(coinHealOrCounters[2]),
+      guidance: `Once during your turn: choose 1 of your Pokémon and flip a coin. Heads: heal ${coinHealOrCounters[1]} damage. Tails: put ${coinHealOrCounters[2]} damage counters on it.`,
+    });
+  }
+
   // ── 4. Heal / remove damage counters ────────────────────────────────────
-  if (lower.includes('heal') || (lower.includes('remove') && lower.includes('damage counter'))) {
+  if (!coinHealOrCounters && (lower.includes('heal') || (lower.includes('remove') && lower.includes('damage counter')))) {
     const amount = lower.match(/heal\s+(\d+)\s+damage/)?.[1] || lower.match(/remove\s+(?:up to\s+)?(\d+)\s+damage/)?.[1] || null;
     const all = lower.includes('all damage');
     const cure = lower.includes('special condition') || lower.includes('recover');
@@ -1024,6 +1048,7 @@ export function parseAbility(text = '') {
     lower.includes('evolve') &&
     !/when you play this pok[eé]mon from your hand to evolve/.test(lower);
   if (
+    !coinHealOrCounters &&
     !hasPromotionTrigger &&
     !/in this way, place \d+ damage counters? on that pok/.test(lower) &&
     !lower.includes('checkup') &&
@@ -1125,6 +1150,18 @@ export function parseAbility(text = '') {
       guidance: amount
         ? `During this turn, this Pokémon's attacks do ${amount} more damage to your opponent's Active Pokémon.`
         : 'During this turn, this Pokémon\'s attacks do more damage (as described).',
+    });
+  }
+
+  // ── 8c. Evolve-played turn boost: "… your Active Pokémon's attacks do N more damage for the rest
+  // of your turn." Team scope: only the Active attacks, so every attack this turn is covered.
+  const restOfTurnBoost = lower.match(/your active pok[eé]mon['’]s attacks do (\d+) more damage for the rest of your turn/);
+  if (restOfTurnBoost) {
+    steps.push({
+      type: 'turnDamageBonusAbility',
+      amount: Number(restOfTurnBoost[1]),
+      team: true,
+      guidance: `For the rest of this turn, your Active Pokémon's attacks do ${restOfTurnBoost[1]} more damage.`,
     });
   }
 
@@ -2293,6 +2330,19 @@ export function parseAbility(text = '') {
   }
   if (steps.some((step) => step.type === 'selfAttachEnergyAbility')) {
     steps = steps.filter((step) => step.type !== 'attachAbility');
+  }
+
+  // Gardevoir Shining Arcana: one look-then-attach step, not a hand attach plus a bare look.
+  const lookAttach = lower.match(
+    /look at the top (\d+) cards? of your deck and attach any number of basic energy cards you find there to your pok[eé]mon in any way you like/
+  );
+  if (lookAttach) {
+    steps = steps.filter((step) => step.type !== 'attachAbility' && step.type !== 'lookAtTopAbility');
+    steps.unshift({
+      type: 'lookAttachEnergyAbility',
+      count: Number(lookAttach[1]),
+      guidance: `Once during your turn: look at the top ${lookAttach[1]} cards of your deck, attach any number of basic Energy cards to your Pokémon in any way you like, and put the rest into your hand.`,
+    });
   }
 
   steps = withIfYouDoHalves(lower, steps);

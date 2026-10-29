@@ -1,4 +1,4 @@
-// Design 077 § Kinds: the sprite element — instanced camera-facing quads textured from the TCG
+// Design 079 § Kinds: the sprite element — instanced camera-facing quads textured from the TCG
 // Live attack textures (flipbook frames, rotation, HDR tint, add or over, dissolve). The particle
 // base: bursts, sparks, embers, smoke puffs and splashes all draw through it. One bucket (draw
 // call) per texture × blend × channel, made on first use and kept for the session.

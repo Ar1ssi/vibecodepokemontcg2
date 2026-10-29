@@ -1,4 +1,4 @@
-// Design 077 slice 7: element beats every type shares, built from TCG Live's own impact
+// Design 079 slice 7: element beats every type shares, built from TCG Live's own impact
 // textures in the type's palette. The impact flash (the most used drawer) becomes a glow, a
 // spiked star, an expanding shock ring and flash lines; a slash keeps the type's tongue for its
 // body and gains a bright slash streak along it; an aura is a soft energy ring pulsing round the

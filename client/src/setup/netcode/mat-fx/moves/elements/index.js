@@ -1,4 +1,4 @@
-// Design 077: element kits by material key (materials/index.js). Every material gets the shared
+// Design 079: element kits by material key (materials/index.js). Every material gets the shared
 // beats (impact flash, slash, aura) under its own kit; a material with no kit of its own draws
 // everything else with its canvas kit. `default` serves a spec whose type has no kit: fire's.
 import { combineKits } from './_kit.js';

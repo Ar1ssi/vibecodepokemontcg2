@@ -101,7 +101,7 @@ const compiled = (material, libName) => {
   return shader;
 };
 
-test('the plain card art material is untouched (same program as before design 076)', () => {
+test('the plain card art material is untouched (same program as before design 078)', () => {
   const material = createCardArtMaterial(three);
   assert.equal(material.customProgramCacheKey(), 'card-art-lod-bias');
   const shader = compiled(material, 'basic');

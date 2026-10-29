@@ -169,3 +169,24 @@ test('two scenes in one frame (a move and a multi-hit impact) queue into the sam
   layer.finish();
   assert.equal(layer.counts().sprite['a.webp|add|r'], 2);
 });
+
+test('setViewport overrides the drawing-buffer size the refracting kinds map through', () => {
+  let seen = null;
+  const capture = ({ uniforms }) => ({
+    object3d: new three.Group(),
+    needsBoard: () => false,
+    begin() {},
+    push: () => true,
+    finish: (u) => {
+      seen = u;
+    },
+    dispose() {},
+  });
+  const { layer } = make({ capture });
+  layer.begin();
+  layer.finish();
+  layer.setViewport(320, 180);
+  assert.deepEqual([seen.uViewport.value.x, seen.uViewport.value.y], [320, 180]);
+  layer.setViewport(NaN, 0);
+  assert.deepEqual([seen.uViewport.value.x, seen.uViewport.value.y], [1, 1]);
+});

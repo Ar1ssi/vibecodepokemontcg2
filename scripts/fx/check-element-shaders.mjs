@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Design 077 § Test plan: compile and draw every element kind in a real browser (Chromium on
+// Design 079 § Test plan: compile and draw every element kind in a real browser (Chromium on
 // SwiftShader, as the fx-preview captures run). Serves client/ on a free port, renders each
 // kind's ELEMENT_SAMPLES once its textures load, and fails on a shader or GL error, a console
 // error, or a kind that draws no pixel. Usage: node scripts/fx/check-element-shaders.mjs [kind…]

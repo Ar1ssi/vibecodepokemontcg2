@@ -17,12 +17,12 @@
 // their own save/restore), so a glob over a bright card face stays violet instead of adding up
 // to white; glints, barbs, bubbles and the haze stay additive.
 //
-// Design 076: the GPU modifiers (`ctx.fxMod`, ignored by Canvas2D) make the venom bubble: globs,
+// Design 078: the GPU modifiers (`ctx.fxMod`, ignored by Canvas2D) make the venom bubble: globs,
 // drips and the pool read their colour through a slow rising warp (distort) under a second noise
 // layer (detail), so the goo churns instead of sitting as a flat gradient; a stream's ooze wavers
 // along it. A drawer's dissolve eats the goo with a thick lilac rim.
 //
-// Design 076 § Depth: venom is wet solid. A glob and its drips are lit spheres (`volume`: a white
+// Design 078 § Depth: venom is wet solid. A glob and its drips are lit spheres (`volume`: a white
 // glint, a rim) floating off the cloth; a stream's ooze is a lit tube with its globs riding just
 // above; the pool lies on the card as a bumped wet bulge with its bubbles rising off it. Heights
 // (lane units) add to the drawer's lift (`withLiftZ`); the cast pass shades the cloth under them.

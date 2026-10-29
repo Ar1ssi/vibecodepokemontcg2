@@ -1,5 +1,5 @@
 // A 2D-context stand-in that snapshots, at every fill and stroke, the GPU hints a kit draws under
-// (design 076): `fxMod`, `fxStyle`, the lift height `fxLift.z` and the composite operation, so a
+// (design 078): `fxMod`, `fxStyle`, the lift height `fxLift.z` and the composite operation, so a
 // kit test can say what a fill ran under and that the kit left them as it found them. It starts
 // on the move player's additive pass (`lighter`); save/restore keep the composite.
 export const fxModSpy = (initial = null) => {

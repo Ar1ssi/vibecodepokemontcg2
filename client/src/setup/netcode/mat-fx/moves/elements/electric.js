@@ -1,4 +1,4 @@
-// Design 077 slice 3: the electric element kit. The drawers' lightning polylines become bolt
+// Design 079 slice 3: the electric element kit. The drawers' lightning polylines become bolt
 // capsules (white core, gold glow, crackle and strobe in the shader), jags become short bolts,
 // bodies become plasma balls, a travelling spark a plasma ball dragging forked bolts, and the
 // halo a light sprite. Thicker than the canvas strokes (user: bigger effects, 2026-10-29).

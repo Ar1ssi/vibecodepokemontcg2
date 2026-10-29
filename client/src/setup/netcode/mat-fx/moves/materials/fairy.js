@@ -13,12 +13,12 @@
 // ignored by Canvas2D): the sparkles and the star shimmer, the trails and the moon ripple with
 // slow veins. Only the sparkles keep a little gain, so the moon never blooms into a white disc.
 //
-// Design 076: the GPU modifiers (`ctx.fxMod`, ignored by Canvas2D). The soft light shimmers (a slow
+// Design 078: the GPU modifiers (`ctx.fxMod`, ignored by Canvas2D). The soft light shimmers (a slow
 // warp, distort, and a faint second noise layer, detail), a trail's ribbon wavers along it, and
 // the moon's dim disc takes a slow-turning surface (detail). Sparkles stay crisp. A drawer's
 // dissolve burns at a gold edge, the kit's own accent.
 //
-// Design 076 § Depth: the moon is a lit sphere (`volume`: a glint and a strong rim) floating high
+// Design 078 § Depth: the moon is a lit sphere (`volume`: a glint and a strong rim) floating high
 // with its crescent and sparkle on it; a twinkle's soft orb is a lit bead under its sparkle; trails
 // are lit ribbons just off the cloth. Heights (lane units) add to the drawer's lift (`withLiftZ`);
 // the cast pass lays their light on the cloth under them.

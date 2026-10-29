@@ -11,12 +11,12 @@
 // shadow and close again. Palette #6B4FA8 #9D7CF2 #D9CCFF, deep #1E1238; grain 0.2. Every
 // call draws on the context it is handed and is otherwise pure.
 //
-// Design 076: the GPU modifiers (`ctx.fxMod`, ignored by Canvas2D) make it waver: the wisps, the
+// Design 078: the GPU modifiers (`ctx.fxMod`, ignored by Canvas2D) make it waver: the wisps, the
 // shadow puffs, the haze and the ball's rim glow read their colour through a slow rising warp
 // (distort), and the wisps and haze carry a drifting second noise layer (detail) so their flat
 // violet breaks into vapour. A drawer's dissolve burns at a violet edge.
 //
-// Design 076 § Depth: the shadow ball is a glossy black sphere (`volume`: a white glint and a
+// Design 078 § Depth: the shadow ball is a glossy black sphere (`volume`: a white glint and a
 // rim) floating above its violet rim glow and haze, its ragged edge a lit tube just above it;
 // wisps are bumped vapour sheets a little off the cloth, their dark core line on top. Heights
 // (lane units) add to the drawer's lift (`withLiftZ`); the cast pass shades the cloth under them.

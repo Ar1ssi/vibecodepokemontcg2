@@ -50,7 +50,8 @@ export const UNDER_POKEMON_SHIFT = 1 / 15;
  * @typedef {{ count:number, top:Placement|null }} OpenPile
  * @typedef {{ deck:DeckPile, discard:OpenPile, lostZone:OpenPile,
  *   prizes:{ count:number, faceUp:number[] } }} SidePiles
- * @typedef {{ instanceId:number, src:string|null, name:string, facing:'self'|'opp' }} StadiumPlacement
+ * @typedef {{ instanceId:number, src:string|null, name:string, facing:'self'|'opp', cardId:string, set:string,
+ *   number:string }} StadiumPlacement
  * @typedef {{ version:number, nearSeat:string, placements:Placement[],
  *   piles:{ self:SidePiles, opp:SidePiles }, stadium:StadiumPlacement|null,
  *   handStacks:{ self:number[][], opp:number[][] } }} BoardModel
@@ -384,6 +385,10 @@ function stadiumOf(stadium, localPlayerId) {
     src: stadium.src || null,
     name: stadium.name || '',
     facing: ownerId && localPlayerId && ownerId !== localPlayerId ? 'opp' : 'self',
+    // Design 077: which Stadium board shows (stadium-environment-layout.mjs environmentKeyFor).
+    cardId: stadium.id || '',
+    set: stadium.set || '',
+    number: stadium.number != null ? String(stadium.number) : '',
   };
 }
 

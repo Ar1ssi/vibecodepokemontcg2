@@ -137,6 +137,7 @@ import {
   saveLastSession,
 } from '../../../setup/deck-builder/core/last-session.mjs';
 import { changePlaymat } from '../../../setup/sizing/apply-mat-layout.js';
+import { initPhoneView } from './native-deck-builder-phone-view.js';
 import {
   getSleeves,
   loadSleeveCatalog,
@@ -376,6 +377,7 @@ export const initializeNativeDeckBuilder = ({
   // only covers the game surface.
   const workspaceEl = document.getElementById('nativeDeckBuilderWorkspace');
   const themeToggle = document.getElementById('nativeDeckBuilderThemeToggle');
+  initPhoneView(workspaceEl);
   let builderTheme = applyBuilderTheme(
     workspaceEl,
     loadBuilderTheme(window.localStorage),

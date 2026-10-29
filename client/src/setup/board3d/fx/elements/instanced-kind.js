@@ -1,4 +1,4 @@
-// Design 077: the plumbing every instanced element kind shares — one quad (or strip) geometry,
+// Design 079: the plumbing every instanced element kind shares — one quad (or strip) geometry,
 // an interleaved instance buffer of `floats` per instance read as vec4 attributes, one
 // ShaderMaterial on the layer's shared uniforms plus named TCG Live textures, a capacity with a
 // one-line warning, and begin / push / finish / dispose. A kind supplies its GLSL, its pure

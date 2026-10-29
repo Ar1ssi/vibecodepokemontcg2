@@ -310,6 +310,46 @@ test('healPerHeads: a single damaged Pokémon is healed without a choice', () =>
   assert.equal(cardIn(res, active.instanceId).damage, 10);
 });
 
+// customhb-486 Moomoo Milk (sm8-185 base text, {C} edit).
+const MOOMOO_MILK_C = 'Choose up to 2 of your {C} Pokémon and heal each of them for 30 HP.';
+
+test('Moomoo Milk: heals up to 2 chosen {C} Pokémon for 30 HP each, ignoring other types', () => {
+  const game = setup();
+  const colorless = (name, damage) => pokemon(name, { types: ['Colorless'], damage });
+  const a = game.p1.zones.active[0];
+  a.types = ['Colorless'];
+  a.damage = 50;
+  const b = colorless('Bench B', 40);
+  const c = colorless('Bench C', 40);
+  const fire = pokemon('Bench Fire', { types: ['Fire'], damage: 40 });
+  game.p1.zones.bench.push(b, c, fire);
+
+  const { res } = play(game, MOOMOO_MILK_C, { name: 'Moomoo Milk' });
+  assert.equal(res.error, null);
+  assert.equal(res.pendingChoice.max, 2);
+  assert.deepEqual(
+    res.pendingChoice.options.map((o) => o.name).sort(),
+    ['Bench B', 'Bench C', a.name].sort(),
+    'the Fire Pokémon is not offered'
+  );
+
+  const done = resolve(game, res, [a.instanceId, b.instanceId]);
+  assert.equal(done.error, null);
+  assert.equal(cardIn(done, a.instanceId).damage, 20);
+  assert.equal(cardIn(done, b.instanceId).damage, 10);
+  assert.equal(cardIn(done, c.instanceId).damage, 40, 'third pick is not healed');
+  assert.equal(cardIn(done, fire.instanceId).damage, 40);
+});
+
+test('Moomoo Milk: no damaged {C} Pokémon is a no-op', () => {
+  const game = setup();
+  game.p1.zones.bench.push(pokemon('Bench Fire', { types: ['Fire'], damage: 40 }));
+  const res = play(game, MOOMOO_MILK_C, { name: 'Moomoo Milk' }).res;
+  assert.equal(res.error, null);
+  assert.equal(res.pendingChoice, null);
+  assert.ok(res.events.some((e) => e.type === 'effectStepSkipped' && e.reason === 'no_damaged_pokemon'));
+});
+
 test('rearrangeTop: Pokédex reorders the top 5 cards in selection order', () => {
   const game = setup();
   const top = [

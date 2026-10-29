@@ -1,4 +1,4 @@
-// Design 077 § Kinds: the flame-jet element's pure half. A tongue of flame from a base point
+// Design 079 § Kinds: the flame-jet element's pure half. A tongue of flame from a base point
 // to a tip point (both stage px with height), drawn as a ribbon facing the camera that flows
 // from base to tip, widest just past its root and licking out toward its tip.
 //

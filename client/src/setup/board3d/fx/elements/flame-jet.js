@@ -1,4 +1,4 @@
-// Design 077 § Kinds: the flame jet — a tongue of fire from base to tip. A ribbon faces the
+// Design 079 § Kinds: the flame jet — a tongue of fire from base to tip. A ribbon faces the
 // camera along the jet's on-screen axis; noise streams from base to tip, the outline narrows
 // and licks harder toward the tip, the TCG Live pointy-flame texture adds its tear, and the
 // shared fire ramp colours it from a white-hot root to deep red licks.

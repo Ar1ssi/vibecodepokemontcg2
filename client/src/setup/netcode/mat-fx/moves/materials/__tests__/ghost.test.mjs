@@ -1,4 +1,4 @@
-// Design 076: the ghost kit's GPU modifiers. Wisps, shadow puffs, the haze and the ball's rim
+// Design 078: the ghost kit's GPU modifiers. Wisps, shadow puffs, the haze and the ball's rim
 // glow waver (distort, drifting up); wisps and haze add a vapour detail layer; every fill burns
 // a drawer's dissolve at the kit's violet edge.
 import test from 'node:test';

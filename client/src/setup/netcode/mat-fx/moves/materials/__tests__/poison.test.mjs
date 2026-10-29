@@ -1,4 +1,4 @@
-// Design 076: the poison kit's GPU modifiers. Globs, drips and the pool bubble (a rising distort
+// Design 078: the poison kit's GPU modifiers. Globs, drips and the pool bubble (a rising distort
 // under a detail layer), a stream's ooze wavers along it, and every fill burns a drawer's
 // dissolve at the kit's thick lilac edge.
 import test from 'node:test';

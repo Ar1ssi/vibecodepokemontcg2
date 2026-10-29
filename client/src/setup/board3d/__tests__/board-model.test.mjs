@@ -304,7 +304,7 @@ test('piles: counts, layers, top cards and face-up prizes', () => {
 
 test('stadium faces whoever played it', () => {
   const mine = boardModelFrom(ownerView({ stadium: card(9, 'Artazon', { ownerId: 'p1' }) }), opts());
-  assert.deepEqual(mine.stadium, { instanceId: 9, src: '/Artazon.png', name: 'Artazon', facing: 'self' });
+  assert.deepEqual(mine.stadium, { instanceId: 9, src: '/Artazon.png', name: 'Artazon', facing: 'self', cardId: '', set: '', number: '' });
   const theirs = boardModelFrom(ownerView({ stadium: card(9, 'Artazon', { ownerId: 'p2' }) }), opts());
   assert.equal(theirs.stadium.facing, 'opp');
   const unknown = boardModelFrom(ownerView({ stadium: card(9, 'Artazon') }), opts());
@@ -413,4 +413,14 @@ test('sortHand: the hand fans in the page\'s render order (deck-list sort); a ba
   assert.deepEqual(handIds(boardModelFrom(view, opts({ sortHand: throwing })), 'self'), [1, 2, 3]);
   assert.deepEqual(handIds(boardModelFrom(view, opts({ sortHand: () => [] })), 'self'), [1, 2, 3]);
   assert.deepEqual(handIds(boardModelFrom(view, opts()), 'self'), [1, 2, 3]);
+});
+
+test('design 077: the Stadium placement carries the card id, set and number its board is keyed by', () => {
+  const view = ownerView({ stadium: card(90, 'Scorched Earth', { ownerId: 'p1', id: 'customhb-299', set: 'customhb', number: '299' }) });
+  const { stadium } = boardModelFrom(view, opts());
+  assert.equal(stadium.cardId, 'customhb-299');
+  assert.equal(stadium.set, 'customhb');
+  assert.equal(stadium.number, '299');
+  const bare = boardModelFrom(ownerView({ stadium: card(91, 'Path to the Peak', { ownerId: 'p1' }) }), opts());
+  assert.deepEqual([bare.stadium.cardId, bare.stadium.set, bare.stadium.number], ['', '', '']);
 });

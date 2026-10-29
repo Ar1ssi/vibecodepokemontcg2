@@ -1,4 +1,4 @@
-// Design 077 slice 7: the energy element kit (fighting, aura, normal). A ki orb or an impact
+// Design 079 slice 7: the energy element kit (fighting, aura, normal). A ki orb or an impact
 // body is a plasma ball with almost no arcs and a strong shell — a sphere of force; streaks are
 // flame jets in the type's palette; a thrown orb drags streaks; the halo is a light sprite.
 import { elementKit } from './_kit.js';

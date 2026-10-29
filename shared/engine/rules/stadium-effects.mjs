@@ -316,7 +316,7 @@ export function mergeAttacks(printed = [], extra = []) {
   return merged;
 }
 
-const STACK_STAGE_RANK = { Basic: 0, 'Stage 1': 1, 'Stage 2': 2, BREAK: 3 };
+const STACK_STAGE_RANK = { Basic: 0, 'Stage 1': 1, 'Stage 2': 2, MEGAHB: 3, BREAK: 3 };
 const stackStageRank = (card) =>
   STACK_STAGE_RANK[normalizeStage(card?.stage) || 'Basic'] ?? 0;
 
@@ -486,7 +486,9 @@ export function isStadiumTriggered(card) {
     (/plays a pokémon from their hand to evolve/.test(t) && /damage counter/.test(t)) ||
     (/burned between turns/.test(t) && /isn't removed/.test(t)) ||
     (/switches their poisoned active pokémon/.test(t) && /special condition/.test(t)) ||
-    (/is asleep, its owner flips 2 coins/.test(t) && /still asleep/.test(t))
+    (/is asleep, its owner flips 2 coins/.test(t) && /still asleep/.test(t)) ||
+    // Forest of Vitality (homebrew): evolve -> search deck for Basic Energy and attach.
+    (/evolves an? {w} pokémon/.test(t) && /search their deck for a basic {w} energy card/.test(t))
   );
 }
 
@@ -796,6 +798,21 @@ export function parseStadiumOncePerTurn(card) {
     }
     if (types.length) {
       base.cost = { type: 'discard-energy', n: 1, types };
+    }
+  }
+
+  // Fairy Garden (customhb): "that player may discard a {Y} Energy card. If they do, …" — the
+  // hand is implied when the clause names no zone.
+  if (!base.cost) {
+    const bareEnergy = t.match(/discard (?:an? )?(basic )?(?:{([a-z])} )?energy card(?! (?:from|attached))/);
+    if (bareEnergy) {
+      const type = bareEnergy[2] ? HEAL_TYPE_SYMBOLS[bareEnergy[2]] : null;
+      base.cost = {
+        type: 'discard-energy',
+        n: 1,
+        ...(bareEnergy[1] ? { basicOnly: true } : {}),
+        ...(type ? { types: [type] } : {}),
+      };
     }
   }
 
@@ -1171,7 +1188,8 @@ export function parseStadiumOncePerTurn(card) {
   // printed, so this composes a discardCost + searchDeck rather than falling
   // through to a free search.
   if (
-    /discard (?:a|an) card from (?:their|his or her|your) hand/.test(t) &&
+    (/discard (?:a|an) card from (?:their|his or her|your) hand/.test(t) ||
+      base.cost?.type === 'discard-energy') &&
     /search(?:es)? (?:their|your|his or her) deck/.test(t)
   ) {
     const es = t.match(
@@ -1873,6 +1891,31 @@ export function isStadiumStatusImmunity(card) {
   // named-condition immunity (Sidney's Stadium).
   if (/can'?t be affected by (?:any )?special condition/.test(t)) return true;
   return /can'?t be (?:asleep|confused|paralyzed|poisoned|burned)/.test(t);
+}
+
+const ENERGY_TYPE_WORD = {
+  c: 'colorless', d: 'darkness', f: 'fighting', g: 'grass', l: 'lightning', m: 'metal',
+  n: 'dragon', p: 'psychic', r: 'fire', w: 'water', y: 'fairy',
+};
+const ENERGY_STATUS_IMMUNITY =
+  /each pok[eé]mon that has any {([a-z])} energy attached to it[^.]*is immune to special conditions/;
+
+/**
+ * "Each Pokémon that has any {Y} Energy attached to it (both yours and your opponent's) is immune
+ * to Special Conditions": true when `stadiumCard` prints that wording for a type some Energy
+ * attached to `pokemon` (a root card in `zoneCards`) carries. Pure; no rulesState.
+ */
+export function stadiumEnergyStatusImmunity(stadiumCard, pokemon, zoneCards = []) {
+  const m = ENERGY_STATUS_IMMUNITY.exec(textOf(stadiumCard).replace(/[‘’]/g, "'"));
+  const word = m && ENERGY_TYPE_WORD[m[1]];
+  if (!word || !pokemon) return false;
+  return (zoneCards || []).some((c) => {
+    if (!c || c.attachedTo !== pokemon.instanceId) return false;
+    const supertype = lower(c.supertype || c.type || '');
+    if (!supertype.includes('energy') && !/\benergy\b/.test(lower(c.name))) return false;
+    const types = [c.energyType, ...(Array.isArray(c.types) ? c.types : [])].map(lower);
+    return types.includes(word) || lower(c.name).includes(word);
+  });
 }
 
 /** Dizzying Valley: Confused Pokémon don't recover on evolve/devolve. */

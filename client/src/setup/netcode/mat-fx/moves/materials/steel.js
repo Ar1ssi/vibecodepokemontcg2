@@ -8,12 +8,12 @@
 // Strike). Palette #9AA7B8 #D5DEEA #FFFFFF, deep #4A5563, cool edge #9FC5F0. No grain. Every
 // call draws on the context it is handed and is otherwise pure.
 //
-// Design 076: modifiers (`ctx.fxMod`, ignored by Canvas2D). Metal is rigid, so nothing on a
+// Design 078: modifiers (`ctx.fxMod`, ignored by Canvas2D). Metal is rigid, so nothing on a
 // blade or sphere warps: a slow brushed grain runs along the blade body and over the sphere, a
 // faint cool shimmer moves in the halos, the specular line and rim stay clean, and every fill
 // names the cool-blue dissolve edge (a thin, cold sliver).
 //
-// Design 076 § Depth: the metal sphere is lit as polished metal (gpu-canvas `volume`: hard glint,
+// Design 078 § Depth: the metal sphere is lit as polished metal (gpu-canvas `volume`: hard glint,
 // cool rim, little bump) with its rim a lit tube; a blade's halo, body and specular line stand at
 // rising heights over the drawer's lift. The blade body keeps its own brushed gradient lighting:
 // its gradient runs across the blade, so the volume tube would wrap the wrong axis.

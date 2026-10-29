@@ -1,4 +1,4 @@
-// Design 077 slice 7: the air element kit (flying, silver). A gust, an air blade or a wing
+// Design 079 slice 7: the air element kit (flying, silver). A gust, an air blade or a wing
 // stroke is a TCG Live swipe laid along it on screen; a gust ball is a pale puff of smoke with a
 // light heart; a thrown blade trails swipes; the clouds and smoke are white air.
 import { elementKit } from './_kit.js';

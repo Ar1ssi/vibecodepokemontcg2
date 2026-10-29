@@ -35,6 +35,7 @@ import { afterHit, attackSceneEndsAt, knockoutHoldFor } from './mat-fx/combat.js
 import { seedDamageBaselines } from './mat-fx/damage-hit.mjs';
 import { playDeckReveal } from './mat-fx/deck-reveal.js';
 import { playFxSound } from './mat-fx/fx-audio.js';
+import { createBoardEnvironmentQueue } from './mat-fx/board-environment-queue.mjs';
 import { createFxQueue } from './mat-fx/fx-queue.mjs';
 import { holdFor, turnBannerLead } from './mat-fx/fx-holds.mjs';
 import { drawSceneHold } from './mat-fx/draw-scene.mjs';
@@ -288,6 +289,7 @@ function runPlan(plan) {
   }
   if (plan.kind === 'fx') return playFx(plan);
   if (plan.kind === 'wait') return plan.ms;
+  if (plan.kind === 'board-environment') return boardEnvironments.run(plan);
   return 0;
 }
 
@@ -301,16 +303,42 @@ const fxQueue = createFxQueue({
   leadIn: (plan) => turnBannerLead(plan, attackSceneEndsAt(), performance.now()),
 });
 
+/** False during catch-up replay or in a hidden tab (edge cases 5, 6): plans are dropped, not queued. */
+const mirrorMayAnimate = () =>
+  shouldAnimateMirror({
+    syncReplaying: !!systemState.syncReplaying,
+    isCatchingUp: !!systemState.isCatchingUp,
+    hidden: typeof document !== 'undefined' && !!document.hidden,
+  });
+
+// Design 077: Stadium board changes wait in the queue; every clear settles the ones it drops.
+const boardEnvironments = createBoardEnvironmentQueue({
+  push: (plan) => fxQueue.push(plan),
+  clear: () => fxQueue.clear(),
+  mayAnimate: () => !fxDisabled() && mirrorMayAnimate(),
+});
+const clearFxQueue = () => boardEnvironments.clear();
+
+/**
+ * Design 077: queues a Stadium board's change (board3d.js, after the view set its target) so it
+ * plays after the Stadium card's own play; settles at once when it may not animate.
+ *
+ * @param {{ play: () => number, settle: () => void }} transition
+ */
+export function queueBoardEnvironment(transition) {
+  boardEnvironments.queue(transition);
+}
+
 // Two ways choreography must stop mid-chain (edge 11):
 // turning effects off — the dispatcher would skip each remaining plan anyway,
 // but the queue would keep ticking timers to do it — and a restart or a player
 // leaving, where the plans describe a board that no longer exists.
 onFxSettingsChanged((settings) => {
-  if (settings.fxOff) fxQueue.clear();
+  if (settings.fxOff) clearFxQueue();
 });
 
 if (typeof document !== 'undefined') {
-  document.addEventListener('game-restarted', () => fxQueue.clear());
+  document.addEventListener('game-restarted', () => clearFxQueue());
 }
 
 /**
@@ -375,19 +403,13 @@ function queueEvent(event, selfPlayerId) {
   const plans = Array.isArray(planned) ? planned : [planned];
   if (plans.length === 0) return;
 
-  if (
-    !shouldAnimateMirror({
-      syncReplaying: !!systemState.syncReplaying,
-      isCatchingUp: !!systemState.isCatchingUp,
-      hidden: typeof document !== 'undefined' && !!document.hidden,
-    })
-  ) {
+  if (!mirrorMayAnimate()) {
     for (const plan of plans) {
       if (plan.kind === 'knockout') pendingKnockoutGhosts.delete(plan.instanceId);
     }
     // Once per EVENT: a fanned-out event's plans all share the same origins.
     if (plans.some((plan) => plan.kind === 'fx')) discardOrigins(event);
-    fxQueue.clear();
+    clearFxQueue();
     return;
   }
 

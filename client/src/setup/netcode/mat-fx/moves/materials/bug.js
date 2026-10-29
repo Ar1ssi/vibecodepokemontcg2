@@ -23,7 +23,7 @@ const CHITIN = Object.freeze({ byKind: { linear: { id: 'crystal', facets: 3, she
 const BUZZ = Object.freeze({ byKind: { linear: { id: 'energy', streak: 0.45, speed: 4, gain: 0.3 }, radial: { id: 'orb', boil: 0.2, limb: 0.4, gain: 0 }, stroke: { id: 'energy', streak: 0.45, speed: 4, gain: 0.3 } } });
 const POWDER = Object.freeze({ byKind: { linear: { id: 'crystal', facets: 4, sheen: 0.7, speed: 1.4 }, radial: { id: 'crystal', facets: 4, sheen: 0.6, speed: 1.4 }, stroke: { id: 'crystal', sheen: 0.6, speed: 1.4 } } });
 
-// Design 076 modifiers (GPU canvas only; Canvas2D ignores them). Wing membranes take a still,
+// Design 078 modifiers (GPU canvas only; Canvas2D ignores them). Wing membranes take a still,
 // fine detail layer (a film, not a flat tint); halos buzz with a fast, fine shimmer; a silver
 // streak streams powder grain on a fixed flow (one turned with the heading would sweep the
 // shader's clock-long scroll offset and boil). Needles stay clean: they are too thin to read it.

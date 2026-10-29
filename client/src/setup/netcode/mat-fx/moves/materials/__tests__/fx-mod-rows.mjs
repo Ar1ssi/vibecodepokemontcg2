@@ -1,4 +1,4 @@
-// Design 076 test helper: a kit drawn on the GPU canvas recorder, read back as the modifiers each
+// Design 078 test helper: a kit drawn on the GPU canvas recorder, read back as the modifiers each
 // paint row carries (FX_MODS texels) and how high its geometry stands (vertex z, in lane units),
 // with a drawer's dissolve already set by the caller.
 import assert from 'node:assert/strict';

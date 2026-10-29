@@ -1,4 +1,4 @@
-// Design 077 slice 4: the water element kit. Sheets and splash tongues become tapering water
+// Design 079 slice 4: the water element kit. Sheets and splash tongues become tapering water
 // streams that refract the board, bodies become refracting water drops, a travelling shot a drop
 // dragging streams and throwing droplets, the halo a soft light, and a straight beam (Hydro Pump,
 // Water Gun) one even column of running water from the attacker to the defender with a breaking

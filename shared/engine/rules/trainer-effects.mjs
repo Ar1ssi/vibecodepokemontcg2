@@ -537,6 +537,11 @@ function matchesSwitchOpponentIn(lower) {
   );
 }
 
+const POKEMON_TYPE_BY_SYMBOL = {
+  g: 'grass', r: 'fire', w: 'water', l: 'lightning', p: 'psychic', f: 'fighting',
+  d: 'darkness', m: 'metal', y: 'fairy', n: 'dragon', c: 'colorless',
+};
+
 const PARADOX_TAG_WORD = { ancient: 'Ancient', future: 'Future' };
 
 // Design 058. Professor Sada's Vitality: "Choose up to 2 of your Ancient Pokémon and attach a Basic
@@ -2115,6 +2120,23 @@ function parseTrainerStepsInner(lower) {
     return { steps, recognizable: true };
   }
 
+  // Moomoo Milk (custom, from LOT 185): "Choose up to 2 of your {C} Pokémon and heal each of
+  // them for 30 HP." Typed by the top card, so an evolved Pokémon counts by its own type.
+  const healChosen = lower.match(
+    /^choose up to (\d+) of your (?:\{([a-z])\} )?pok[ée]mon and heal each of them for (\d+) hp/
+  );
+  if (healChosen) {
+    const type = healChosen[2] ? POKEMON_TYPE_BY_SYMBOL[healChosen[2]] : null;
+    steps.push({
+      type: 'healAmount',
+      amount: Number(healChosen[3]),
+      target: `up to ${healChosen[1]} of your ${healChosen[2] ? `{${healChosen[2].toUpperCase()}} ` : ''}Pokémon`,
+      count: Number(healChosen[1]),
+      ...(type ? { types: [type] } : {}),
+    });
+    return { steps, recognizable: true };
+  }
+
   // heal a fixed amount (Pokémon Center Lady, Jumbo Ice Cream)
   if (/heal\s+(\d+)\s+damage/.test(lower)) {
     const m = lower.match(/heal\s+(\d+)\s+damage/);
@@ -2326,6 +2348,17 @@ function parseTrainerStepsInner(lower) {
   // Blowtorch — discard a Tool/Special Energy from an opponent's Pokémon,
   // or a Stadium in play (opponent-facing, choice-based)
   if (lower.includes('discard a pokémon tool or special energy')) {
+    // Dangerous Drill: "You can play this card only if you discard a {D} Pokémon from your hand."
+    const pokemonCost = lower.match(/only if you discard an? (?:\{([a-z])\} )?pokémon from your hand/);
+    if (pokemonCost) {
+      const type = SYMBOL_ENERGY_WORDS[pokemonCost[1]];
+      steps.push({
+        type: 'discardCost',
+        count: 1,
+        what: 'Pokémon',
+        ...(type ? { pokemonTypes: [type] } : {}),
+      });
+    }
     steps.push({ type: 'discardFromOpponent', target: "a Pokémon Tool or Special Energy from 1 of your opponent's Pokémon, or a Stadium in play" });
     return { steps, recognizable: true };
   }
@@ -2402,7 +2435,7 @@ function parseTrainerStepsInner(lower) {
   // {R} Energy cards") used to miss this branch entirely (audit S&M, §2).
   {
     const at = lower.match(
-      /attach (?:up to )?(\d+|a|an)?\s*(?:\{([a-z])\}\s*)?(basic\s*)?(?:\{([a-z])\}\s*)?energy cards? from your hand/
+      /attach (?:up to )?(\d+|a|an)?\s*(?:\{([a-z])\}\s*)?(basic\s*)?(?:\{([a-z])\}\s*|(grass|fire|water|lightning|psychic|fighting|darkness|metal|dragon|fairy)\s+)?energy cards? from your hand/
     );
     if (at) {
       const raw = at[1] || '1';
@@ -2411,7 +2444,7 @@ function parseTrainerStepsInner(lower) {
       if (lower.includes('benched')) target = '1 of your Benched Pokémon';
       else if (lower.includes('stage 2')) target = '1 of your Stage 2 Pokémon';
       const symbol = at[2] || at[4];
-      const typeWord = symbol ? SYMBOL_ENERGY_WORDS[symbol] : null;
+      const typeWord = symbol ? SYMBOL_ENERGY_WORDS[symbol] : at[5] || null;
       const basic = Boolean(at[3] || typeWord);
       // Gardenia's Vigor prints "Draw 2 cards. If you drew any cards in this
       // way, attach …": the draw leads and the attach follows it (review 5).

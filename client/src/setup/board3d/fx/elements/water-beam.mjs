@@ -1,4 +1,4 @@
-// Design 077 § Kinds: the water beam's pure half — a column of water from a root point to a head
+// Design 079 § Kinds: the water beam's pure half — a column of water from a root point to a head
 // point, round at the head, either even (a Hydro Pump beam, taper 0) or a tapering stream (a
 // jet or splash tongue, taper 1). The shader refracts the board behind it.
 //

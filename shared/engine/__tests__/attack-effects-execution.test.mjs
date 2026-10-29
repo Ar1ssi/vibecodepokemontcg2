@@ -529,6 +529,50 @@ describe('Phase 3: Secondary Attack Effects & Costs', () => {
       assert.equal(res2.state.turn.number, 3);
     });
 
+    it('Beldum Magnetic Lift: the searched card goes on top of the deck after the shuffle, not into hand', () => {
+      const state = createTestGame();
+      const beldum = createCard({
+        instanceId: 1,
+        id: 'beldum',
+        name: 'Beldum',
+        supertype: 'Pokémon',
+        hp: 60,
+        attacks: [
+          {
+            name: 'Magnetic Lift',
+            cost: ['Colorless'],
+            damage: '',
+            // customhb set.json, Beldum
+            text: 'Search your deck for a card. Shuffle your deck, then put that card on top of it.',
+          },
+        ],
+      });
+      const energy = createCard({
+        instanceId: 11,
+        id: 'ce-1',
+        name: 'Colorless Energy',
+        supertype: 'Energy',
+        energyType: 'Colorless',
+        attachedTo: 1,
+      });
+      state.players.p1.zones.active = [beldum, energy];
+      state.players.p2.zones.active = [createCard({ instanceId: 2, id: 'def', name: 'Defender', supertype: 'Pokémon', hp: 100 })];
+      const handBefore = state.players.p1.zones.hand.length;
+
+      const res1 = applyCommand(state, { type: 'attack', playerId: 'p1', payload: { attackIndex: 0 } });
+      assert.equal(res1.error, null);
+      assert.ok(res1.state.pendingChoice, 'search prompt expected');
+
+      const res2 = applyCommand(res1.state, {
+        type: 'resolveChoice',
+        playerId: 'p1',
+        payload: { choiceId: res1.state.pendingChoice.choiceId, selection: [102] },
+      });
+      assert.equal(res2.error, null);
+      assert.equal(res2.state.players.p1.zones.deck[0].instanceId, 102);
+      assert.equal(res2.state.players.p1.zones.hand.length, handBefore);
+    });
+
     it("Thundurus' Charge: offers only the typed Energy (with art) and attaches it to the attacker", () => {
       const state = createTestGame();
       const thundurus = createCard({

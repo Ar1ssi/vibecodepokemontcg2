@@ -1,4 +1,4 @@
-// Design 077 § Kinds: the sprite element's pure half — params → one instance row, and the
+// Design 079 § Kinds: the sprite element's pure half — params → one instance row, and the
 // flipbook grid a texture's name declares. DOM- and GL-free so it runs under `node --test`.
 //
 // Instance row (SPRITE_FLOATS), four vec4 attributes: x y z width · height rotation (rad) frame
@@ -104,7 +104,7 @@ export function packSprite(sprite, out, index) {
 /** The bucket a sprite draws in: one texture, blend and channel per draw call. */
 export const spriteBucketKey = (sprite) => `${sprite.texture}|${sprite.blend}|${sprite.channel}`;
 
-/** Design 077 § Test plan: emits that exercise every sprite path (check-element-shaders.mjs). */
+/** Design 079 § Test plan: emits that exercise every sprite path (check-element-shaders.mjs). */
 export const spriteSamples = () => [
   { texture: 'TEX_VFX_Dot_Glow.webp', at: { x: -60, y: 0, z: 20 }, size: 80, colour: [2, 1.2, 0.4] },
   { texture: 'T_VFX_Leaves_2x2.webp', channel: 'rgba', blend: 'over', at: { x: 0, y: 0, z: 20 }, size: 80, frame: 2, rotation: 30 },

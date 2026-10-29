@@ -13,6 +13,15 @@ import { createElementLayer } from './elements/element-layer.js';
 // only the hot cores the styles push past 2.4 bloom (design 075 slice 9; awaits the user's look check).
 export const BLOOM = Object.freeze({ strength: 0.2, radius: 0.3, threshold: 2.4 });
 
+/**
+ * Share of the drawing buffer the FX target covers per side: CSS pixels, not device pixels. On a
+ * high-DPI screen the soft glows and particles lose nothing visible at 1/ratio, and the target,
+ * its depth prepass and the bloom chain cost 1/ratio² as much. Impact prefabs keep their own
+ * full-size targets (impact-stage.js resizeTargets) and only resolve into this one.
+ * @param {number} pixelRatio the renderer's pixel ratio
+ */
+export const fxTargetScale = (pixelRatio) => (Number.isFinite(pixelRatio) && pixelRatio > 1 ? 1 / pixelRatio : 1);
+
 const COMPOSITE_VERTEX = `
 precision highp float;
 in vec3 position;
@@ -38,7 +47,7 @@ void main() {
  *   scene: import('three').Scene, camera: import('three').Camera, clock: { now: () => number },
  *   tiltDeg?: () => number, UnrealBloomPass?: Function|null, motionReduced?: () => boolean,
  *   triangulate?: Function, elementKinds?: Record<string, Function>, debug?: (...args: unknown[]) => void }} options
- *   `elementKinds` overrides the design 077 element registry (tests).
+ *   `elementKinds` overrides the design 079 element registry (tests).
  * @returns {{ add: (entry: { frame: (nowMs: number, ctx: object) => boolean }) => () => void,
  *   active: () => boolean, render: () => boolean, setImpacts: (host: object|null) => void,
  *   impactsActive: () => boolean,
@@ -72,7 +81,7 @@ export function createFxLayer({
   const recorder = createGpuCanvas({ triangulate, debug });
   const mesh = createGpuCanvasMesh({ three });
   group.add(mesh.object3d);
-  // Design 077: per-type shader meshes; element kits emit into them through the recorder's ctx.
+  // Design 079: per-type shader meshes; element kits emit into them through the recorder's ctx.
   const elements = createElementLayer({ three, renderer, group, layer: FX_LAYER, kinds: elementKinds, debug });
   recorder.ctx.fxElements = elements.emitter;
 
@@ -110,11 +119,12 @@ export function createFxLayer({
   compositeScene.add(compositeQuad);
   const compositeCamera = new three.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
-  /** The FX target and bloom at the drawing-buffer size (re-made when it changes). */
+  /** The FX target and bloom at the drawing buffer's CSS-pixel size (re-made when it changes). */
   const ensureTarget = () => {
     renderer.getDrawingBufferSize(size);
-    const width = Math.max(1, size.x);
-    const height = Math.max(1, size.y);
+    const scale = fxTargetScale(renderer.getPixelRatio?.() ?? 1);
+    const width = Math.max(1, Math.round(size.x * scale));
+    const height = Math.max(1, Math.round(size.y * scale));
     if (!target) {
       target = new three.WebGLRenderTarget(width, height, {
         type: three.HalfFloatType,
@@ -190,7 +200,9 @@ export function createFxLayer({
     try {
       // Refracting kinds read the board as drawn this frame, copied before the FX target binds.
       elements.captureBoard();
-      renderer.setRenderTarget(ensureTarget());
+      const fxTarget = ensureTarget();
+      elements.setViewport(fxTarget.width, fxTarget.height);
+      renderer.setRenderTarget(fxTarget);
       renderer.setClearColor(0x000000, 0);
       renderer.clear(true, true, true);
       renderer.autoClear = false;
@@ -256,7 +268,7 @@ export function createFxLayer({
     impactsActive: () => !disposed && Boolean(impacts?.active?.()),
     group,
     canvas: recorder,
-    /** Design 077: the element layer (fx-preview scripts read `counts()`). */
+    /** Design 079: the element layer (fx-preview scripts read `counts()`). */
     elements,
     dispose,
   };

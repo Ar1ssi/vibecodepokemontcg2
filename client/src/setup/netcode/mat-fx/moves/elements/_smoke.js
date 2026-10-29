@@ -1,4 +1,4 @@
-// Design 077 slice 5: the smoke and cloud drawers as element beats. Each puff the drawers'
+// Design 079 slice 5: the smoke and cloud drawers as element beats. Each puff the drawers'
 // poses place (smokePuffs, cloudPose) becomes a lit, billowing smoke element in a type's own
 // look — soot, ghost wisps, dark ink — at the same place, size and timing.
 import { anchorOf, centreOf } from '../move-drawers.js';

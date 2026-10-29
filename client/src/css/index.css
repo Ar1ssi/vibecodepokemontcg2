@@ -26,6 +26,7 @@
 @import url('./coin/coin.css');
 @import url('./deck-builder-live.css');
 @import url('./deck-builder-pc-box.css');
+@import url('./deck-builder-phone.css');
 @import url('./deck-builder-build-battle.css');
 @import url('./deck-builder-bnb-run.css');
 @import url('./deck-builder-unboxing.css');
@@ -593,8 +594,9 @@ body.board3d-active #stadium {
   justify-content: center;
   gap: 6px;
   padding: 8px;
-  background: rgba(20, 22, 30, 0.35);
-  backdrop-filter: blur(6px);
+  /* Denser fill instead of backdrop-filter: the 3D board canvas under it redraws every animated
+     frame, and a backdrop blur is recomputed with each one. */
+  background: rgba(20, 22, 30, 0.62);
   border-radius: 10px;
   box-sizing: border-box;
   z-index: 1310;
@@ -5301,7 +5303,6 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
   vertical-align: middle;
 }
 
-.ptcg-orb--inline { width: calc(var(--u) * 2.9); height: calc(var(--u) * 2.9); vertical-align: -0.4em; }
 .ptcg-orb--missing {
   display: grid;
   place-items: center;
@@ -5349,187 +5350,6 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
   border-radius: calc(var(--u) * 2.1);
   overflow: hidden;
   box-shadow: 0 calc(var(--u) * 1.2) calc(var(--u) * 3.4) rgba(0, 0, 0, 0.4);
-}
-
-/* Frosted panels: a top-lit fill at ~90% over a heavy backdrop blur lets the card's colour bleed
-   through while the printed text beneath stays an illegible smear, never a readable ghost.
-   Keep the fill at 85%+ — lower and the blurred print starts to read as shapes again. */
-.ptcg-stadium {
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--ptcg-panel-bg, #fff) 92%, transparent) 0%,
-    color-mix(in srgb, color-mix(in srgb, var(--ptcg-panel-bg, #fff) 94%, #1c2530) 88%, transparent) 100%
-  );
-  backdrop-filter: blur(calc(var(--u) * 2.4)) saturate(1.25);
-}
-.ptcg-stadium {
-  display: flex;
-  flex-direction: column;
-  border-top: 1px solid #d9d2c5;
-  pointer-events: auto;
-}
-.ptcg-stack > .ptcg-stadium:first-child { border-top: 0; }
-.ptcg-atk__head {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: calc(var(--u) * 1.4);
-  background-color: var(--ptcg-banner, #8e8e93);
-  /* Depth: a lit top edge and shaded bottom edge make the banner read as a raised strip,
-     and the drop shadow lifts it off the print the way the TCG Live attack bar does. The
-     gloss gradient rides over the type colour instead of replacing it, so every cost type
-     keeps its hue. */
-  background-image: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.32) 0%,
-    rgba(255, 255, 255, 0.08) 42%,
-    rgba(0, 0, 0, 0.18) 100%
-  );
-  box-shadow:
-    inset 0 calc(var(--u) * 0.2) 0 rgba(255, 255, 255, 0.4),
-    inset 0 calc(var(--u) * -0.2) 0 rgba(0, 0, 0, 0.28),
-    0 calc(var(--u) * 0.5) calc(var(--u) * 1.4) rgba(0, 0, 0, 0.38);
-  padding: calc(var(--u) * 1.4) calc(var(--u) * 2.3);
-  overflow: hidden;
-}
-/* A slow highlight sweeping across the banner — the "flowing" energy the attack bar carries
-   in TCG Live. Scoped to attack panels so ability/stadium text bands stay calm. */
-.ptcg-stadium > .ptcg-atk__head::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    100deg,
-    transparent 32%,
-    rgba(255, 255, 255, 0.5) 50%,
-    transparent 68%
-  );
-  transform: translateX(-130%);
-  animation: ptcg-atk-flow 3.6s ease-in-out infinite;
-  pointer-events: none;
-}
-@keyframes ptcg-atk-flow {
-  0% { transform: translateX(-130%); }
-  55%, 100% { transform: translateX(130%); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .ptcg-stadium > .ptcg-atk__head::after,
-  .ptcg-atk__text::after { animation: none; opacity: 0; }
-}
-/* The printed card carries a red "Ability" badge before the name; without it an ability panel
-   is indistinguishable from an attack that happens to have no damage. */
-.ptcg-atk__badge {
-  flex: 0 0 auto;
-  font-size: calc(var(--u) * 2.2);
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #fff;
-  background: rgba(0, 0, 0, 0.28);
-  border-radius: calc(var(--u) * 2);
-  padding: calc(var(--u) * 0.4) calc(var(--u) * 1.6);
-  white-space: nowrap;
-}
-/* The Stadium panel's action chip. Present only when the card has an activatable effect; the
-   head banner it sits in is the same as an ability/attack head. */
-.ptcg-atk__use {
-  flex: 0 0 auto;
-  font-size: calc(var(--u) * 2.2);
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.16);
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  border-radius: calc(var(--u) * 2);
-  padding: calc(var(--u) * 0.4) calc(var(--u) * 1.6);
-  white-space: nowrap;
-}
-.ptcg-atk__name {
-  flex: 1;
-  font-size: calc(var(--u) * 3.2);
-  font-weight: 800;
-  color: #fff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Natural height — the panel is as tall as its text, so the card shows in whatever is left
-   below the stack rather than being covered by an opaque void. */
-.ptcg-atk__text {
-  margin: 0;
-  padding: calc(var(--u) * 1.4) calc(var(--u) * 2.3);
-  font-size: calc(var(--u) * 2.7);
-  line-height: 1.45;
-  color: #1c2530;
-  /* Shadow cast down from the raised head band, so the text sits in a recess below it. */
-  box-shadow: inset 0 calc(var(--u) * 0.8) calc(var(--u) * 1.2) rgba(0, 0, 0, 0.09);
-}
-/* The white text areas carry a faint cool sheen sweep of their own. */
-.ptcg-atk__text {
-  position: relative;
-  overflow: hidden;
-}
-.ptcg-atk__text::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    100deg,
-    transparent 34%,
-    rgba(110, 140, 185, 0.2) 50%,
-    transparent 66%
-  );
-  transform: translateX(-130%);
-  animation: ptcg-atk-flow 5.2s ease-in-out infinite;
-  pointer-events: none;
-}
-/* Finish tiers (set from the card's rarity as `data-finish`): shinier cards get a tinted panel and a
-   flowing sheen that matches the print. Plain keeps the cool sweep above. */
-.ptcg-chrome[data-finish='holo'] { --ptcg-panel-bg: #f1f6ff; }
-.ptcg-chrome[data-finish='ultra'] { --ptcg-panel-bg: #faf2ff; }
-.ptcg-chrome[data-finish='secret'] { --ptcg-panel-bg: #fff7e2; }
-.ptcg-chrome[data-finish='holo'] .ptcg-atk__text::after {
-  background: linear-gradient(100deg, transparent 20%, rgba(110, 165, 255, 0.6) 50%, transparent 80%);
-  animation-duration: 4s;
-}
-.ptcg-chrome[data-finish='ultra'] .ptcg-atk__text::after {
-  /* Two faint colour bands with clear gaps between them: a solid 0.5 rainbow painted the whole
-     panel mint/pink at all times and made it the loudest thing on the card. */
-  background: linear-gradient(
-    115deg,
-    transparent 0%,
-    rgba(255, 90, 190, 0.2) 12%,
-    rgba(90, 190, 255, 0.2) 22%,
-    transparent 34%,
-    transparent 50%,
-    rgba(255, 225, 90, 0.18) 62%,
-    rgba(90, 240, 170, 0.2) 72%,
-    transparent 84%,
-    transparent 100%
-  );
-  background-size: 300% 100%;
-  transform: none;
-  animation: ptcg-prism 7s linear infinite;
-}
-.ptcg-chrome[data-finish='secret'] .ptcg-atk__text::after {
-  background: linear-gradient(100deg, transparent 20%, rgba(255, 190, 60, 0.7) 50%, transparent 80%);
-  animation-duration: 3.4s;
-}
-@keyframes ptcg-prism {
-  from { background-position: 0% 0; }
-  to { background-position: 300% 0; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .ptcg-chrome[data-finish] .ptcg-atk__text::after { animation: none; opacity: 0; }
-}
-
-.ptcg-atk__text--short { font-size: calc(var(--u) * 3.4); }
-.ptcg-stadium--recede { filter: saturate(0.25) brightness(0.84) contrast(0.94); }
-.ptcg-stadium--usable { cursor: pointer; }
-.ptcg-stadium--usable:hover {
-  box-shadow: inset 0 0 0 calc(var(--u) * 0.5) rgba(255, 255, 255, 0.85);
 }
 
 .ptcg-dmg {
@@ -5940,8 +5760,8 @@ img.drag-avatar {
   align-items: center;
   gap: 4px;
   padding: 5px 6px;
-  background: rgba(20, 22, 30, 0.55);
-  backdrop-filter: blur(6px);
+  /* No backdrop-filter over the 3D board canvas (see #boardButtonContainer). */
+  background: rgba(20, 22, 30, 0.72);
   border-radius: 10px;
   font-family: 'Rodin Condensed', 'Barlow Semi Condensed', sans-serif;
 }

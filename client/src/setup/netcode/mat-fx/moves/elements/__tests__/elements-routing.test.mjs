@@ -35,7 +35,7 @@ test('begin turns elements live for a lit pass and off for a cast pass', () => {
   assert.equal(bare.ctx.fxElements, null, 'no emitter attached: nothing to toggle');
 });
 
-test('stagePoint follows the transform and the 076 lift; stageScale and stageAngle follow the transform', () => {
+test('stagePoint follows the transform and the 078 lift; stageScale and stageAngle follow the transform', () => {
   const { canvas, ctx } = recorderWithEmitter();
   canvas.begin({ layer: 'front', z: 3, unit: 100 });
   ctx.translate(10, 20);

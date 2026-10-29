@@ -9,12 +9,12 @@
 // style (`ctx.fxStyle`, ignored by Canvas2D): the fringe carries light running round each
 // crystal, the head shimmers with fine veins. The crystal tongue itself is ice's, styled there.
 //
-// Design 076: modifiers (`ctx.fxMod`, ignored by Canvas2D). The cyan mist drifts like a nebula
+// Design 078: modifiers (`ctx.fxMod`, ignored by Canvas2D). The cyan mist drifts like a nebula
 // (a slow warp and a fine grain), the faceted head only glints (a faint grain, never a warp: a
 // crystal is rigid), the prismatic fringe stays a clean line, and every fill names the cyan
 // dissolve edge. The crystal tongue's own modifiers are ice's.
 //
-// Design 076 § Depth: the mist lies lowest, the faceted head above it, and the prismatic fringe is
+// Design 078 § Depth: the mist lies lowest, the faceted head above it, and the prismatic fringe is
 // a lit tube riding just over its crystal (gpu-canvas `volume` on the stroke), so the fringe reads
 // as an edge of light standing off the crystal rather than an outline printed on it.
 import { rgbCss } from '../../fx-colors.mjs';

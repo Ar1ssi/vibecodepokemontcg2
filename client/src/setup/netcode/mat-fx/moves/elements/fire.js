@@ -1,4 +1,4 @@
-// Design 077 slice 2: the fire element kit. The drawers' fire bodies become boiling fireballs,
+// Design 079 slice 2: the fire element kit. The drawers' fire bodies become boiling fireballs,
 // their tongues flame jets, a travelling projectile a comet that sheds flame and embers, and the
 // halo a light sprite. Sizes run larger than the canvas kit's (user: bigger effects, 2026-10-29);
 // colours come from the kit palette, so a tinted beat's fire takes its tint.

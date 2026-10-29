@@ -1,4 +1,4 @@
-// Design 076: the dragon kit's modifiers. Wavering plasma and a streaming energy grain ride the
+// Design 078: the dragon kit's modifiers. Wavering plasma and a streaming energy grain ride the
 // violet flame and the orb, the ember core stays crisp, the helix strands stay clean, and every
 // fill names the magenta dissolve edge.
 import test from 'node:test';

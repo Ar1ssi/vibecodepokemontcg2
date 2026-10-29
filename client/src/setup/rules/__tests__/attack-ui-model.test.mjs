@@ -213,6 +213,26 @@ describe('damagePreviewAgainst → damageOutcome → damageReadout', () => {
     assert.deepEqual(readout, { text: '0', tone: 'resistance', mod: null, showTab: true });
   });
 
+  // Greninja XY 41 Mist Slash (out/pkmn-pokemon-cards.json): the engine skips Weakness and Resistance,
+  // so the tab must not tint or scale the number either.
+  const MIST_SLASH_TEXT =
+    "This attack's damage isn't affected by Weakness, Resistance, or any other effects on your opponent's Active Pokémon.";
+  const readoutOf = (attack, defender) => {
+    const preview = damagePreviewAgainst({ attacker, attackerZone: [attacker], defenderZone: [defender] });
+    return damageReadout(attack.damage, damageOutcome(preview(attack, 50), { unmodifiedBase: 50 }));
+  };
+
+  it('an attack not affected by Weakness or Resistance reads its plain number', () => {
+    const plain = { text: '50', tone: 'plain', mod: null, showTab: true };
+    const weak = { instanceId: 23, types: ['Grass'], weakness: { type: 'Fire', value: 2 } };
+    const resists = { instanceId: 24, types: ['Water'], resistance: { type: 'Fire', value: -30 } };
+    for (const field of ['text', 'effect']) {
+      const mistSlash = { name: 'Mist Slash', damage: '50', cost: ['Water'], [field]: MIST_SLASH_TEXT };
+      assert.deepEqual(readoutOf(mistSlash, weak), plain, `${field}: Weakness`);
+      assert.deepEqual(readoutOf(mistSlash, resists), plain, `${field}: Resistance`);
+    }
+  });
+
   it('a defender damage reduction marker shows the debuff arrow', () => {
     const defender = {
       instanceId: 22,

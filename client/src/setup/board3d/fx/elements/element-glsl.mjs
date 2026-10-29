@@ -1,4 +1,4 @@
-// Design 077: GLSL every element kind shares — value noise, fbm, the blend states, and the
+// Design 079: GLSL every element kind shares — value noise, fbm, the blend states, and the
 // billboard maths that faces a stage-space point's quad to the board camera. Strings only, so
 // kinds compose them and node tests can import the module.
 
@@ -47,7 +47,7 @@ vec4 elBillboard(vec3 stagePoint, vec2 corner, float lean) {
 `;
 
 /**
- * Fragment-side dissolve shared by every kind (design 076's look): noise eats the element from
+ * Fragment-side dissolve shared by every kind (design 078's look): noise eats the element from
  * amount 0 (whole) to 1 (gone), the surviving rim burns brighter. Returns alpha scale; `edge` out.
  */
 export const DISSOLVE_GLSL = `
@@ -80,7 +80,7 @@ vec3 elFireRamp(float t, vec3 deep, vec3 body, vec3 hot, vec3 core, float heat) 
 `;
 
 /**
- * Refraction (design 077 option 4): the board as drawn this frame, `offsetPx` drawing-buffer px
+ * Refraction (design 079 option 4): the board as drawn this frame, `offsetPx` drawing-buffer px
  * from this fragment. Without a copy (`uHasBoard` 0) it returns `fallback`, so a refracting kind
  * degrades to a tint. Needs SHARED_UNIFORMS_GLSL.
  */

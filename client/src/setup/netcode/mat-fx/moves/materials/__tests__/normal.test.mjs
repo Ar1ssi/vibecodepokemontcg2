@@ -1,4 +1,4 @@
-// Design 076: the normal kit's modifiers. Pressure light breathes: a slow warp and grain in the
+// Design 078: the normal kit's modifiers. Pressure light breathes: a slow warp and grain in the
 // body and the tongue's hot pass, the white core pass and the rings clean, and every fill names
 // the gold dissolve edge.
 import test from 'node:test';

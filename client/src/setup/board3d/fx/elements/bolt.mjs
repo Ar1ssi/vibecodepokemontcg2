@@ -1,4 +1,4 @@
-// Design 077 § Kinds: the bolt element's pure half. A lightning bolt is a polyline (the drawer's
+// Design 079 § Kinds: the bolt element's pure half. A lightning bolt is a polyline (the drawer's
 // jagged points, branches included); each segment is one instance, a capsule the shader lights
 // with a white core, a hot inner glow and a soft outer glow. `along` (px from the line's start)
 // keeps the shader's crackle continuous across segments.

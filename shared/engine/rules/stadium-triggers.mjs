@@ -81,9 +81,36 @@ export function stadiumOnEvolveTriggers(stadiumCard, { evolvedCard, hostTop } = 
       ? [{ kind: 'heal', amount: 20, source }]
       : [];
   }
-  if (/put 3 damage counters/.test(t)) return [{ kind: 'damage', amount: 30, source }];
-  if (/put 2 damage counters/.test(t)) return [{ kind: 'damage', amount: 20, source }];
+  // Anchored on "to evolve": Old Cemetery, Gapejaw Bog, Spikemuth etc. also print "put 2 damage
+  // counters" but trigger on attach / Bench / switch, not evolution.
+  const evolveCounters = /to evolve[^.]*?put (\d+) damage counters/.exec(t);
+  if (evolveCounters) return [{ kind: 'damage', amount: Number(evolveCounters[1]) * 10, source }];
   return [];
+}
+
+const SEARCH_ENERGY_TYPES = {
+  g: 'grass', r: 'fire', w: 'water', l: 'lightning', p: 'psychic',
+  f: 'fighting', d: 'darkness', m: 'metal',
+};
+
+/**
+ * "If a player evolves a {G} Pokémon, that player may search their deck for a Basic {G} Energy
+ * card and attach it to that Pokémon" (Forest of Vitality, customhb-117). Returns the lowercase
+ * Energy type the evolving player may fetch, or null when the Stadium has no such text or the
+ * evolved Pokémon is not of the named type.
+ *
+ * @param {object} stadiumCard
+ * @param {{ hostTop?: object }} ctx
+ * @returns {string|null}
+ */
+export function stadiumEvolveSearchEnergy(stadiumCard, { hostTop } = {}) {
+  const m = /evolves an? \{(\w)\} pok[ée]mon[^.]*?search their deck for a basic \{(\w)\} energy card and attach it/.exec(
+    textOf(stadiumCard)
+  );
+  if (!m || !hostTop) return null;
+  const pokemonType = SEARCH_ENERGY_TYPES[m[1]];
+  const energyType = SEARCH_ENERGY_TYPES[m[2]];
+  return pokemonType && energyType && hasType(hostTop, pokemonType) ? energyType : null;
 }
 
 /**

@@ -9,12 +9,12 @@
 // Palette #3B3B4F #6E6E8C #B9B9D6, deep #101018, accent #FF3D6E (crimson) as `hot`. Every
 // call draws on the context it is handed and is otherwise pure.
 //
-// Design 076: the GPU modifiers (`ctx.fxMod`, ignored by Canvas2D) make the light round the
+// Design 078: the GPU modifiers (`ctx.fxMod`, ignored by Canvas2D) make the light round the
 // shadow waver: a slash's crimson halo smoulders (distort + a second noise layer, detail, flowing
 // along the blade), the haze and the pulse's ripples read through a slow warp. The black blade and
 // core stay crisp. A drawer's dissolve burns at a crimson edge that blooms.
 //
-// Design 076 § Depth: the pulse's core is a glossy black sphere (`volume`: a glint, a rim) floating
+// Design 078 § Depth: the pulse's core is a glossy black sphere (`volume`: a glint, a rim) floating
 // over its ripples; the slash's blade is a bumped black sheet catching a glint, standing above its
 // halo, its crimson edge a lit tube on top. Heights (lane units) add to the drawer's lift
 // (`withLiftZ`); the cast pass shades the cloth under them.

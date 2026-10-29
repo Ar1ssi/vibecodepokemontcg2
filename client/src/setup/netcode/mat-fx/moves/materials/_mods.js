@@ -1,4 +1,4 @@
-// Design 076: the GPU canvas modifiers (gpu-canvas.mjs FX_MODS: dissolve, distort, detail) as
+// Design 078: the GPU canvas modifiers (gpu-canvas.mjs FX_MODS: dissolve, distort, detail) as
 // kits and drawers use them. A drawer owns a beat's dissolve (its exit timing); a kit owns its
 // distort and detail (its texture) and may name the dissolve edge colour. Both layer through
 // `withFxMod`, which merges into whatever the caller already set and restores it after, so
@@ -39,7 +39,7 @@ export function dissolveTail(progress, from = 0.7) {
 }
 
 /**
- * Runs `draw` with `extraZ` lane units added to the current lift (`ctx.fxLift`, design 076 §
+ * Runs `draw` with `extraZ` lane units added to the current lift (`ctx.fxLift`, design 078 §
  * Depth), keeping the drawer's arc and stand, so a kit can stack its passes at different heights.
  * The previous lift is back afterwards. A real 2D context keeps `fxLift` as an inert property.
  */

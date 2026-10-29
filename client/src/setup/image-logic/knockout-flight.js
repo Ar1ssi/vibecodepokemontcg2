@@ -4,7 +4,7 @@
 // move; authoritative: apply-view.js's `onBeforeApply` hook), so removing the
 // real card mid-animation never matters — the ghost is a detached copy.
 // Design 042: with effects on, the ghost hands over to the TCG Live knockout
-// scene (mat-fx/ko-scene.js; with motion reduced, its still burn, design 076); the drift below
+// scene (mat-fx/ko-scene.js; with motion reduced, its still burn, design 078); the drift below
 // is the fallback when that scene cannot play.
 import {
   oppContainerDocument,
@@ -74,7 +74,7 @@ export const playKnockoutGhost = (ghost, { deferStart } = {}) => {
   const start = () => {
     if (started) return;
     started = true;
-    // Design 076: with motion reduced the scene only burns the card's mesh where it stood.
+    // Design 078: with motion reduced the scene only burns the card's mesh where it stood.
     if (!fxDisabled() && playKnockoutScene(ghost, { reduced: motionReduced() })) {
       host.remove();
       return;

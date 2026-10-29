@@ -4,6 +4,7 @@ import * as three from 'three';
 
 import { cameraFromCssTilt, projectToScreen, tableToWorld } from '../board-camera.mjs';
 import { createCardMeshPool } from '../card-mesh.js';
+import { CARD_UNITS, cardScaleFor } from '../card-geometry.mjs';
 
 const camera = cameraFromCssTilt({ viewportW: 1920, viewportH: 1080 });
 const RECT = { left: 800, top: 300, width: 120, height: 168 };
@@ -112,6 +113,33 @@ test('tween: setPose during a flight does not move the mesh; releasing the card 
   await flush();
   assert.equal(done(), true);
   assert.equal(pool.has(7), false);
+});
+
+// The height over the cloth (table z) of a world point, and the card slab's half thickness.
+const tableHeightOf = (mesh) => {
+  const tilt = (camera.tiltDeg * Math.PI) / 180;
+  return mesh.position.y * Math.sin(tilt) + mesh.position.z * Math.cos(tilt);
+};
+const halfThicknessOf = (mesh) => (CARD_UNITS.t * cardScaleFor(90) * mesh.scale.x) / 2;
+
+test('tween: a card flown at lift 0 rests on the cloth like its own pose, above the mat art', () => {
+  // A slide or knockout pin holds the card at lift 0 for seconds. Its centre used to sit on the
+  // cloth, its face under the mat's art plane (table-mesh Z.art 0.5), so the pinned card vanished.
+  const { pool, clock } = makePool();
+  pool.update(clock.now());
+  const mesh = pool.meshOf(7);
+  const restUnderside = tableHeightOf(mesh) - halfThicknessOf(mesh);
+  pool.tween(7, () => ({ rect: RECT, lift: 0 }), 500);
+  clock.t = 100;
+  pool.update(clock.now());
+  const underside = tableHeightOf(mesh) - halfThicknessOf(mesh);
+  assert.ok(Math.abs(underside - restUnderside) < 1e-3, `underside ${underside} vs rest ${restUnderside}`);
+  assert.ok(underside > 1, `underside ${underside} clears the mat overlay`);
+
+  pool.tween(7, () => ({ rect: RECT, lift: 30 }), 500);
+  pool.update(clock.now());
+  const lifted = tableHeightOf(mesh) - halfThicknessOf(mesh);
+  assert.ok(Math.abs(lifted - (restUnderside + 30)) < 1e-3, `lift rides over the resting height: ${lifted}`);
 });
 
 test('tween: motion reduced resolves after one frame at poseFn(1)', async () => {
@@ -367,4 +395,18 @@ test('lift: a lifted card ignores tween; cornersOf rest reports the slot, not th
   await pool.tween(7, () => ({ rect: RECT }), 100);
   assertBox(boxOf(pool, 7), FOCUS.rect);
   assertBox(boxOf(pool, 7, { rest: true }), slot, 0.01);
+});
+
+test('moving(): true for the update that placed a flying card, false once it rests', () => {
+  const { pool, clock } = makePool();
+  assert.equal(pool.moving(), false, 'nothing updated yet');
+  pool.tween(7, () => ({ rect: RECT }), 100);
+  clock.t = 50;
+  pool.update(clock.now());
+  assert.equal(pool.moving(), true);
+  clock.t = 400;
+  pool.update(clock.now());
+  clock.t = 1000;
+  pool.update(clock.now());
+  assert.equal(pool.moving(), false);
 });

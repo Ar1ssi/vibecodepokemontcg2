@@ -1,4 +1,4 @@
-// Design 076: the fire kit's modifiers. Heat haze and a rising grain ride the flame body, the
+// Design 078: the fire kit's modifiers. Heat haze and a rising grain ride the flame body, the
 // white-hot core stays crisp, every fill names the orange dissolve edge, and the caller's
 // `fxMod` (a drawer's dissolve) survives the draw untouched.
 import test from 'node:test';

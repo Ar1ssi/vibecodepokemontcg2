@@ -1,4 +1,9 @@
 import {
+  createTapGesture,
+  isPhoneLayout,
+  previewTile,
+} from '../../../setup/deck-builder/core/card-tap-gesture.mjs';
+import {
       fetchLegalStandardSets,
       fetchGenerationSets,
       fetchHomebrewSets,
@@ -333,8 +338,11 @@ import {
                 if (expanded) {
                   const cardsHtml = filtered.length
                     ? renderCardsGrid(
-                        // These Other-tab sets arrive in their own order; number order would undo it.
-                        KEEP_FETCH_ORDER_SET_IDS.has(set.setId) ? filtered : sortCardsWithinGroup(filtered, { sortBy: 'number', sortDirection: 'asc' }),
+                        // These Other-tab sets arrive in their own order; number order would undo it. So does a custom
+                        // set: its set.json lists the cards in the order its editor wants them shown (ids stay).
+                        KEEP_FETCH_ORDER_SET_IDS.has(set.setId) || isCustomSetId(set.setId)
+                          ? filtered
+                          : sortCardsWithinGroup(filtered, { sortBy: 'number', sortDirection: 'asc' }),
                         quantities,
                         owned
                       )
@@ -409,15 +417,21 @@ import {
           });
         });
 
+        const addTile = (button) => {
+          for (const cards of cardsBySet.values()) {
+            const card = cards.find((c) => c.id === button.dataset.cardId);
+            if (card) {
+              onAddCard?.(card);
+              return;
+            }
+          }
+        };
+        // Phone layout: tap previews, double tap adds.
+        const tapTile = createTapGesture({ onSingle: previewTile, onDouble: addTile });
         resultsEl.querySelectorAll('[data-card-id]').forEach((button) => {
           button.addEventListener('click', () => {
-            for (const cards of cardsBySet.values()) {
-              const card = cards.find((c) => c.id === button.dataset.cardId);
-              if (card) {
-                onAddCard?.(card);
-                return;
-              }
-            }
+            if (isPhoneLayout()) tapTile(button);
+            else addTile(button);
           });
         });
       };

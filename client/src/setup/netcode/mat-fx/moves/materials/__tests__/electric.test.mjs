@@ -1,4 +1,4 @@
-// Design 076: the electric kit's modifiers and depth. A fast crackle jitter runs through the glow
+// Design 078: the electric kit's modifiers and depth. A fast crackle jitter runs through the glow
 // and the gold body; a bolt is a lit tube with its white centre riding above it and its halo
 // below; the ball is a lit sphere in a fresnel shell; every fill names the cyan-white dissolve
 // edge, and the caller's `fxMod` and `fxLift` come back untouched.

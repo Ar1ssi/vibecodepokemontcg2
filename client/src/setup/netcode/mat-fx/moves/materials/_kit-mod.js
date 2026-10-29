@@ -1,4 +1,4 @@
-// Design 076: what holds for a whole kit (its dissolve edge colour) laid round every drawing
+// Design 078: what holds for a whole kit (its dissolve edge colour) laid round every drawing
 // method, as `styledKit` (_shared.js) lays its GPU style; per-fill texture (distort, detail)
 // stays inside the kit's own fills. Merges through `withFxMod`, so a drawer's dissolve amount
 // set round the call survives and gains the kit's edge. A real 2D context ignores `fxMod`.

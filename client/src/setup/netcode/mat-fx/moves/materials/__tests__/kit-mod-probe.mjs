@@ -1,4 +1,4 @@
-// Design 076: reads the modifiers (gpu-canvas FX_MODS) each fill of a kit draw recorded into its
+// Design 078: reads the modifiers (gpu-canvas FX_MODS) each fill of a kit draw recorded into its
 // paint row, so a kit test can prove which modules a fill carried and that `ctx.fxMod` came back.
 import { ShapeUtils, Vector2 } from 'three';
 

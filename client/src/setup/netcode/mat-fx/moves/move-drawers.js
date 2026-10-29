@@ -8,7 +8,7 @@
 // Design 065: `info.materialAt(i)` is item i's material on the multi-item drawers (beat `hues`),
 // anchored drawers place themselves with `anchorPoint`, and travelling / orbiting drawers draw
 // their `unit` (materials/_units.js; 'body' is the material's own body / projectile).
-// Design 076: travelling and burst drawers own their exit as a GPU dissolve (`burnOut`), and
+// Design 078: travelling and burst drawers own their exit as a GPU dissolve (`burnOut`), and
 // every drawer owns its place in height (`ctx.fxLift`, beat-lift.mjs): no beat lies on the cloth.
 import { rgbCss } from '../fx-colors.mjs';
 import { LIFT, anchorLift, bodyLift, burstLift, standOn, travelLift } from './beat-lift.mjs';
@@ -64,7 +64,7 @@ export const anchorOf = (lane, p) => anchorPoint(lane, p.target, p.dx, p.dy);
 const itemMaterial = (info, i) => (typeof info.materialAt === 'function' ? info.materialAt(i) : info.material);
 const isSky = (target) => target === 'sky' || target === 'sky-attacker';
 
-// Design 076: where each travelling / burst beat starts burning away, as a fraction of its
+// Design 078: where each travelling / burst beat starts burning away, as a fraction of its
 // progress. Each starts at or a little before its pose's own alpha fade, so on the GPU canvas
 // the noise eats the shape (rims blooming) while it is still bright; Canvas2D ignores `fxMod`,
 // so there the pose's fade is the exit. Held, anchored and charging beats keep their fades, and
@@ -86,7 +86,7 @@ const BURN_FROM = Object.freeze({
 /** A beam starts burning a quarter of its retract before the retract does. */
 const BEAM_BURN_LEAD = 1.25;
 
-/** Runs `draw` with the dissolve at `amount`, merged over whatever the caller set (076 contract). */
+/** Runs `draw` with the dissolve at `amount`, merged over whatever the caller set (078 contract). */
 const burnOut = (ctx, amount, draw) => withFxMod(ctx, { dissolve: { amount } }, draw);
 
 const WHOLE = Object.freeze({ dissolve: Object.freeze({ amount: 0 }) });
@@ -891,7 +891,7 @@ const grip = (ctx, lane, s, info) => {
 const burning = (draw, fromOf) => (ctx, lane, s, info) =>
   burnOut(ctx, dissolveTail(s, fromOf(info.params)), () => draw(ctx, lane, s, info));
 
-// Design 076 § Depth: the whole-beat lifts (beat-lift.mjs). Unlisted drawers lift per item
+// Design 078 § Depth: the whole-beat lifts (beat-lift.mjs). Unlisted drawers lift per item
 // (projectile, volley, pillar, shards, ring, the charges) or stay on the cloth: ground waves and
 // cracks (shockRings, terrain, ring 'floor'), the card-hugging aura and vignette, shade and chain.
 const atAnchor = (lane, p) => anchorLift(lane, p.target, anchorOf(lane, p));
@@ -903,7 +903,7 @@ const boltLift = (lane, p) =>
 const beamLift = (lane) => travelLift(beamPoint(lane, 0), beamPoint(lane, 1), { arc: LIFT.beamArc });
 
 /**
- * Design 077: a material's element kit may draw a beat as shader meshes. The hook sits on the raw
+ * Design 079: a material's element kit may draw a beat as shader meshes. The hook sits on the raw
  * drawer, inside its lift and burn wrappers, so an element beat rises and dissolves like the
  * canvas one; the element drawer may return false to leave this beat to the canvas drawer.
  */

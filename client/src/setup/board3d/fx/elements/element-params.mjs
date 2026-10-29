@@ -1,4 +1,4 @@
-// Design 077: the param checks every element kind's packer shares. Pure.
+// Design 079: the param checks every element kind's packer shares. Pure.
 
 export const finite = (v) => typeof v === 'number' && Number.isFinite(v);
 export const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);

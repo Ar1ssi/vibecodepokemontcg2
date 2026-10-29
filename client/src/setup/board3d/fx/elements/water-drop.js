@@ -1,4 +1,4 @@
-// Design 077 § Kinds: the water drop — a ball of water on a camera-facing quad. The sphere's
+// Design 079 § Kinds: the water drop — a ball of water on a camera-facing quad. The sphere's
 // normal bends the board behind it (more at the rim, as a lens), tints it, and lights a Fresnel
 // rim, a soft caustic shimmer inside and a white glint up-left. Covers what is under it.
 import { BILLBOARD_GLSL, BOARD_GLSL, DISSOLVE_GLSL, NOISE_GLSL, SHARED_UNIFORMS_GLSL } from './element-glsl.mjs';

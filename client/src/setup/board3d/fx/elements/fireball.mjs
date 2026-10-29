@@ -1,4 +1,4 @@
-// Design 077 § Kinds: the fireball element's pure half. A boiling ball of flame on a
+// Design 079 § Kinds: the fireball element's pure half. A boiling ball of flame on a
 // camera-facing quad; moving, it stretches into a comet behind its heading.
 //
 // Row (FIREBALL_FLOATS), six vec4: x y z radius · deep heat · body seed · hot dissolve ·

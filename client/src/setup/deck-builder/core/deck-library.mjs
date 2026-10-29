@@ -285,6 +285,38 @@ import { DECK_FORMAT_TCG, isDeckFormat } from '../../../../../shared/engine/form
       }
     }
     
+    // Starter decks the user deleted. Seeding skips them, so a delete sticks across reloads.
+    export const DISMISSED_STARTERS_KEY = 'ptcg-sim.deck-library.dismissed-starters.v1';
+
+    export function loadDismissedStarters(storage) {
+      try {
+        const parsed = JSON.parse(storage?.getItem?.(DISMISSED_STARTERS_KEY) || '[]');
+        return new Set(Array.isArray(parsed) ? parsed.filter((key) => typeof key === 'string') : []);
+      } catch {
+        return new Set();
+      }
+    }
+
+    export function dismissStarter(storage, starterKey) {
+      if (!starterKey) return false;
+      try {
+        if (!storage || typeof storage.setItem !== 'function') return false;
+        const dismissed = loadDismissedStarters(storage).add(starterKey);
+        storage.setItem(DISMISSED_STARTERS_KEY, JSON.stringify([...dismissed]));
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    /** Remembers which starter-catalog deck a library deck was seeded from, so a rename keeps the link. */
+    export function setDeckStarterKey(library = {}, deckId, starterKey = null) {
+      if (!library?.decks?.[deckId]) return structuredClone(library);
+      const nextLibrary = structuredClone(library);
+      nextLibrary.decks[deckId].starterKey = starterKey || null;
+      return nextLibrary;
+    }
+
     export function saveLibraryToStorage(storage, library = {}) {
       try {
         if (!storage || typeof storage.setItem !== 'function') return false;

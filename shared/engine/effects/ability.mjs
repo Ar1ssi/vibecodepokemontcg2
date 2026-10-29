@@ -4,7 +4,8 @@
  */
 
 import { findCard } from '../state.mjs';
-import { parseAbility, rewriteLegacyPowerWording } from '../rules/abilities.mjs';
+import { parseAbility, rewriteLegacyPowerWording, automaticEvolveSteps } from '../rules/abilities.mjs';
+import { cardAbilityText } from '../rules/ability-executors.mjs';
 import { planAbilitySteps } from '../rules/ability-step-plan.mjs';
 import { parseAbilityEffectSteps, resolveCoinGates } from '../rules/attack-steps.mjs';
 import { executeSteps, isExecutableStepType } from './executor.mjs';
@@ -177,6 +178,16 @@ export function executeAbility(draft, {
 
   draft.pendingChoice = null;
   return { pendingChoice: null, completed: true, turnEnds: endsTurn && !skippedOnly };
+}
+
+/**
+ * Runs an evolve-played Ability that has no "you may" (automaticEvolveSteps) as the evolve lands.
+ * Activation is blocked for these (ability-combat abilityActivationBlockReason), so it runs once.
+ */
+export function applyAutomaticEvolveAbility(draft, { evolvedCard, playerId, events }) {
+  const steps = automaticEvolveSteps(cardAbilityText(evolvedCard));
+  if (steps.length === 0) return;
+  executeSteps(draft, { steps, effectType: 'ability', sourceCard: evolvedCard, playerId, events, context: {} });
 }
 
 // Steps that attach the Ability's own card to a Pokémon the player names.
