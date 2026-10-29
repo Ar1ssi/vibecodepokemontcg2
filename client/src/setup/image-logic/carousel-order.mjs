@@ -13,7 +13,7 @@ import { isPokemon } from '../../../../shared/engine/cards.mjs';
 import { normalizeStage } from '../../../../shared/engine/rules/evolution.mjs';
 import { isEnergyCard } from '../../actions/move-card-bundle/energy-token-assets.mjs';
 
-const STAGE_RANK = { Basic: 0, 'Stage 1': 1, 'Stage 2': 2 };
+const STAGE_RANK = { Basic: 0, 'Stage 1': 1, 'Stage 2': 2, MEGAHB: 3 };
 
 const stageRank = (card) => STAGE_RANK[normalizeStage(card?.stage)] ?? 0;
 

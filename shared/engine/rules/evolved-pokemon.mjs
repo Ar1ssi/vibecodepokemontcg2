@@ -6,7 +6,7 @@
 import { isPokemon } from '../cards.mjs';
 import { normalizeStage } from './evolution.mjs';
 
-const STAGE_RANK = { Basic: 0, 'Stage 1': 1, 'Stage 2': 2, BREAK: 3 };
+const STAGE_RANK = { Basic: 0, 'Stage 1': 1, 'Stage 2': 2, MEGAHB: 3, BREAK: 3 };
 
 const PRINTED_FIELDS = [
   'name',

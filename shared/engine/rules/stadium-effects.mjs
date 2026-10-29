@@ -316,7 +316,7 @@ export function mergeAttacks(printed = [], extra = []) {
   return merged;
 }
 
-const STACK_STAGE_RANK = { Basic: 0, 'Stage 1': 1, 'Stage 2': 2, BREAK: 3 };
+const STACK_STAGE_RANK = { Basic: 0, 'Stage 1': 1, 'Stage 2': 2, MEGAHB: 3, BREAK: 3 };
 const stackStageRank = (card) =>
   STACK_STAGE_RANK[normalizeStage(card?.stage) || 'Basic'] ?? 0;
 

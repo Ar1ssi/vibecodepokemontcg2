@@ -29,7 +29,10 @@ export const ENERGY_TYPES = Object.freeze([
   'Dragon',
   'Colorless',
 ]);
-export const POKEMON_STAGES = Object.freeze(['Basic', 'Stage1', 'Stage2']);
+// MEGAHB: the homebrew MEGA stage (a Stage 3 evolving from its named Pokémon of any stage; evolution.mjs).
+export const POKEMON_STAGES = Object.freeze(['Basic', 'Stage1', 'Stage2', 'MEGAHB']);
+// cardback's editor stage for MEGA; its export writes the TCGdex slot below the Mega instead (Stage1/Stage2).
+const EDITOR_MEGA_STAGE = 3;
 export const TRAINER_TYPES = Object.freeze(['Item', 'Supporter', 'Stadium', 'Tool']);
 // Energy cards the editor exports: a Special Energy (a restyled Double Colorless Energy, say) or a Basic Energy (a
 // holofoil Basic Energy print). energyType is TCGdex's: "Normal" is Basic, "Special" has text of its own.
@@ -226,5 +229,15 @@ export function validateCustomSet(json, { setDirName, reservedCodes = [] } = {})
     const seen = new Set();
     json.cards.forEach((card, i) => checkCard(card, json.id, `cards[${i}]`, errors, seen));
   }
-  return { ok: errors.length === 0, errors, set: errors.length === 0 ? json : null };
+  return { ok: errors.length === 0, errors, set: errors.length === 0 ? withMegaStages(json) : null };
+}
+
+/** A Pokémon cardback edited as MEGA (custom.edits.stage 3) plays at the MEGAHB stage, whatever the export wrote. */
+export function isEditorMegaCard(card) {
+  return card?.category === 'Pokemon' && Number(card.custom?.edits?.stage) === EDITOR_MEGA_STAGE;
+}
+
+function withMegaStages(set) {
+  if (!set.cards.some(isEditorMegaCard)) return set;
+  return { ...set, cards: set.cards.map((card) => (isEditorMegaCard(card) ? { ...card, stage: 'MEGAHB' } : card)) };
 }

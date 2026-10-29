@@ -90,12 +90,12 @@ export function speciesFor(card) {
   return { atk, spa, types };
 }
 
-/** Evolution tier: 3 for rule-box / Mega / Stage 2 / BREAK, 2 for Stage 1, else 1. */
+/** Evolution tier: 3 for rule-box / Mega / Stage 2 / homebrew MEGA / BREAK, 2 for Stage 1, else 1. */
 export function tierFor(card) {
   if (!card || typeof card !== 'object') return 1;
   if (RULE_BOX_TESTS.some((isRuleBox) => isRuleBox(card))) return 3;
   const stage = collapseStage(card.stage || card.subtypes?.[0] || 'Basic');
-  if (stage === 'stage2' || stage === 'break') return 3;
+  if (stage === 'stage2' || stage === 'megahb' || stage === 'break') return 3;
   if (stage === 'stage1') return 2;
   return 1;
 }

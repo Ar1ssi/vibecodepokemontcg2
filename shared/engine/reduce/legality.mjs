@@ -43,7 +43,7 @@ import {
 } from '../rules/trainer-play-conditions.mjs';
 import { serverEnergyDescriptor } from '../rules/server-energy.mjs';
 import { trainerTargetCounts, ownedCards, topPokemonCard } from '../rules/evolved-pokemon.mjs';
-import { normalizeStage, pokemonNamesMatch } from '../rules/evolution.mjs';
+import { MEGAHB, normalizeStage, pokemonNamesMatch } from '../rules/evolution.mjs';
 import { isBabyEvolution } from '../rules/baby-rule.mjs';
 import { listConditions } from '../rules/special-conditions.mjs';
 import {
@@ -1079,7 +1079,7 @@ export function validateLegality(state, command) {
         }
         const baseIdx = order.indexOf(baseStage);
         const evoIdx = order.indexOf(evoStage);
-        if (evoIdx !== baseIdx + 1) {
+        if (evoIdx !== baseIdx + 1 && !(evoStage === MEGAHB && baseIdx >= 0)) {
           return {
             allowed: false,
             reason: `${evoStage} can't evolve from ${baseStage} directly.`,
