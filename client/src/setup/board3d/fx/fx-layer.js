@@ -6,6 +6,7 @@ import { FX_LAYER, OCCLUDER_LAYER } from './fx-layers.mjs';
 import { createGpuCanvas } from './gpu-canvas.mjs';
 import { createGpuCanvasMesh } from './gpu-canvas-mesh.js';
 import { stageToWorldMatrix } from './fx-stage.mjs';
+import { createElementLayer } from './elements/element-layer.js';
 
 // UnrealBloomPass passes a texel's whole colour once its luma clears the threshold and sums five
 // mips, so its glow is ~3 × strength × the source: ordinary additive overlaps (luma 1–2) stay out,
@@ -36,7 +37,8 @@ void main() {
  * @param {{ three: typeof import('three'), renderer: import('three').WebGLRenderer,
  *   scene: import('three').Scene, camera: import('three').Camera, clock: { now: () => number },
  *   tiltDeg?: () => number, UnrealBloomPass?: Function|null, motionReduced?: () => boolean,
- *   triangulate?: Function, debug?: (...args: unknown[]) => void }} options
+ *   triangulate?: Function, elementKinds?: Record<string, Function>, debug?: (...args: unknown[]) => void }} options
+ *   `elementKinds` overrides the design 077 element registry (tests).
  * @returns {{ add: (entry: { frame: (nowMs: number, ctx: object) => boolean }) => () => void,
  *   active: () => boolean, render: () => boolean, setImpacts: (host: object|null) => void,
  *   impactsActive: () => boolean,
@@ -59,6 +61,7 @@ export function createFxLayer({
       contour.map((p) => new three.Vector2(p.x, p.y)),
       holes.map((hole) => hole.map((p) => new three.Vector2(p.x, p.y)))
     ),
+  elementKinds = undefined,
   debug = (...args) => console.debug(...args),
 }) {
   const group = new three.Group();
@@ -69,6 +72,9 @@ export function createFxLayer({
   const recorder = createGpuCanvas({ triangulate, debug });
   const mesh = createGpuCanvasMesh({ three });
   group.add(mesh.object3d);
+  // Design 077: per-type shader meshes; element kits emit into them through the recorder's ctx.
+  const elements = createElementLayer({ three, renderer, group, layer: FX_LAYER, kinds: elementKinds, debug });
+  recorder.ctx.fxElements = elements.emitter;
 
   const entries = new Set();
   const failed = new Set();
@@ -164,8 +170,11 @@ export function createFxLayer({
   const render = () => {
     if (!active()) return false;
     const now = clock.now();
+    const stageToWorld = stageToWorldMatrix(tiltDeg());
+    elements.begin();
     recordEntries(now);
-    mesh.upload(recorder.recording(), { timeSeconds: now / 1000, stageToWorld: stageToWorldMatrix(tiltDeg()) });
+    mesh.upload(recorder.recording(), { timeSeconds: now / 1000, stageToWorld });
+    elements.finish({ timeSeconds: now / 1000, stageToWorld });
 
     const previousTarget = renderer.getRenderTarget();
     const previousAutoClear = renderer.autoClear;
@@ -179,6 +188,8 @@ export function createFxLayer({
     const previousShadowUpdate = shadowMap?.autoUpdate;
     if (shadowMap) shadowMap.autoUpdate = false;
     try {
+      // Refracting kinds read the board as drawn this frame, copied before the FX target binds.
+      elements.captureBoard();
       renderer.setRenderTarget(ensureTarget());
       renderer.setClearColor(0x000000, 0);
       renderer.clear(true, true, true);
@@ -224,6 +235,7 @@ export function createFxLayer({
     impacts?.detach?.();
     impacts = null;
     mesh.dispose();
+    elements.dispose();
     scene.remove(group);
     depthOnly.dispose();
     compositeMaterial.dispose();
@@ -244,6 +256,8 @@ export function createFxLayer({
     impactsActive: () => !disposed && Boolean(impacts?.active?.()),
     group,
     canvas: recorder,
+    /** Design 077: the element layer (fx-preview scripts read `counts()`). */
+    elements,
     dispose,
   };
 }

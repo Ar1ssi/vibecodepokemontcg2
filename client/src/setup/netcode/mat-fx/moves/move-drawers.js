@@ -127,7 +127,9 @@ const guarded = (name, draw) =>
       const lift = ctx.fxLift ?? null;
       ctx.save();
       try {
-        draw(ctx, lane, s, info);
+        // Design 077: a material's element kit may draw this whole beat as shader meshes.
+        const elementDraw = info?.material?.drawBeat?.(name, ctx);
+        (elementDraw ?? draw)(ctx, lane, s, info);
       } finally {
         ctx.filter = 'none';
         ctx.restore();

@@ -19,6 +19,8 @@ import { normal } from './normal.js';
 import { stellar } from './stellar.js';
 import { steel } from './steel.js';
 import { water } from './water.js';
+import { ELEMENT_KITS } from '../elements/index.js';
+import { withElements } from '../elements/_kit.js';
 
 export const MATERIALS = Object.freeze({
   fire,
@@ -52,5 +54,8 @@ export const MATERIALS = Object.freeze({
   default: fire,
 });
 
+// Design 077: each kit with its element kit (if any) merged over it; drawing routes per call.
+const DRAWN = Object.freeze(Object.fromEntries(Object.entries(MATERIALS).map(([key, kit]) => [key, withElements(kit, ELEMENT_KITS[key])])));
+
 /** The material for `key`, else the default. */
-export const materialFor = (key) => (Object.hasOwn(MATERIALS, key) ? MATERIALS[key] : MATERIALS.default);
+export const materialFor = (key) => (Object.hasOwn(DRAWN, key) ? DRAWN[key] : DRAWN.default);

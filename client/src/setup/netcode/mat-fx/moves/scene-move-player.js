@@ -47,15 +47,16 @@ const drawBursts = (ctx, bursts, elapsed, colour) => {
   for (const { burst, anchor, rows } of bursts) {
     ctx.save();
     ctx.fxLift = particleLift(anchor.centre);
-    for (const row of rows) {
+    rows.forEach((row, index) => {
       drawParticle(ctx, burst.kind, particleState(row, elapsed, { durationMs: burst.durationMs, delayMs: burst.at }), {
         originX: anchor.centre.x,
         originY: anchor.centre.y,
         size: row.size,
         aspect: row.aspect,
         colour,
+        frame: index,
       });
-    }
+    });
     ctx.fxLift = null;
     ctx.restore();
   }

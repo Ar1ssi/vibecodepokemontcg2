@@ -643,6 +643,25 @@ export function createGpuCanvas({ triangulate, size = 4096, maxVertices = MAX_VE
       const [a, b, c, d, e, f] = state.transform;
       return { a, b, c, d, e, f };
     },
+    /**
+     * Design 077: where (x, y) in the current transform lands in the stage, lifted as the fills
+     * that follow would be: `{ x, y }` in stage px and `z` px above the cloth.
+     */
+    stagePoint(x, y) {
+      const p = applyTo(state.transform, Number(x) || 0, Number(y) || 0);
+      const lifted = liftPoint(state.lift, p.x, p.y, pass.unit);
+      return { x: lifted.x, y: lifted.y, z: pass.z + lifted.h };
+    },
+    /** Design 077: how many stage px one unit of the current transform spans (its mean scale). */
+    stageScale() {
+      return scaleOf(state.transform);
+    },
+    /** Design 077: the lane height of the current pass, in stage px. */
+    stageUnit() {
+      return pass.unit;
+    },
+    /** Design 077: the element emitter (element-layer.js) while one is attached, else null. */
+    fxElements: null,
 
     beginPath() {
       subpaths = [];
@@ -1040,6 +1059,8 @@ export function createGpuCanvas({ triangulate, size = 4096, maxVertices = MAX_VE
         seed: Number(seed) || 0,
         cast: resolveCast(cast),
       };
+      // Element kits draw only in a lit pass; the cast pass replays the canvas kits as shadows.
+      if (ctx.fxElements) ctx.fxElements.live = !pass.cast;
       state = defaultState();
       stack.length = 0;
       subpaths = [];

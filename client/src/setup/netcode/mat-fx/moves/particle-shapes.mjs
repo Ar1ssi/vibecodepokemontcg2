@@ -147,11 +147,72 @@ SHAPES.ember = SHAPES.streak;
 export const PARTICLE_SHAPES = Object.freeze(Object.fromEntries(PARTICLE_KINDS.map((kind) => [kind, kind in SHAPES ? kind : 'dot'])));
 
 /**
+ * Design 077: the TCG Live texture each particle kind draws as when element sprites are live
+ * (`channel` per sprite.mjs SPRITE_CHANNELS; `gain` > 1 blooms). Kinds left out keep their shape.
+ */
+export const PARTICLE_SPRITES = Object.freeze({
+  ember: { texture: 'TEX_VFX_Dot_Glow.webp', channel: 'r', gain: 2.2, grow: 1.6 },
+  droplet: { texture: 'T_VFX_Water_Drop_Blurred.webp', channel: 'r', gain: 1.3, grow: 1.6 },
+  leaf: { texture: 'T_VFX_Leaves_2x2.webp', channel: 'rgba', gain: 1, grow: 1.8, blend: 'over' },
+  shard: { texture: 'TEX_VFX_Diamond_Shard.webp', channel: 'r', gain: 1.4, grow: 1.6 },
+  glob: { texture: 'TEX_VFX_Circle_Bokeh_2x2.webp', channel: 'r', gain: 1.2, grow: 1.6 },
+  feather: { texture: 'T_VFX_Fairy_Petal_Soft_2x2.webp', channel: 'a', gain: 1.1, grow: 1.8 },
+  flake: { texture: 'TEX_VFX_Flake_Sharp.webp', channel: 'r', gain: 1.6, grow: 1.6 },
+  streak: { texture: 'TEX_VFX_Trail_Soft.webp', channel: 'r', gain: 1.8, grow: 1.6 },
+  mote: { texture: 'TEX_VFX_Dot_Glow.webp', channel: 'r', gain: 1.6, grow: 1.6 },
+  star: { texture: 'TEX_VFX_Star_FourPoint_Light.webp', channel: 'a', gain: 2.4, grow: 1.8 },
+  twinkle: { texture: 'TEX_VFX_Sparkle_2x2.webp', channel: 'r', gain: 2.4, grow: 1.8 },
+});
+
+/** Emits the particle as a sprite element; false when sprites are not live or it was refused. */
+function emitSprite(ctx, kind, state, { originX, originY, size, aspect, colour, frame }) {
+  const sprite = PARTICLE_SPRITES[kind];
+  if (!sprite || !ctx.fxElements?.live) return false;
+  const [r, g, b, a] = parseCssColour(colour);
+  const at = ctx.stagePoint(originX + state.x, originY + state.y);
+  const scale = ctx.stageScale();
+  return ctx.fxElements.emit('sprite', {
+    texture: sprite.texture,
+    channel: sprite.channel,
+    blend: sprite.blend ?? 'add',
+    at,
+    size: size * state.scale * scale * sprite.grow,
+    aspect: aspect ?? 1,
+    rotation: state.rotateDeg,
+    colour: [r * sprite.gain, g * sprite.gain, b * sprite.gain],
+    alpha: state.opacity * a * (Number.isFinite(ctx.globalAlpha) ? ctx.globalAlpha : 1),
+    frame,
+  });
+}
+
+/** A CSS colour as 0–1 rgba (`#rgb`, `#rrggbb`, `rgb()`, `rgba()`); anything else is white. */
+export function parseCssColour(text) {
+  const s = String(text ?? '').trim().toLowerCase();
+  const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/.exec(s);
+  if (hex) {
+    const h = hex[1].length === 3 ? [...hex[1]].map((c) => c + c).join('') : hex[1];
+    return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).concat(1);
+  }
+  const fn = /^rgba?\(([^)]*)\)$/.exec(s);
+  if (fn) {
+    const parts = fn[1].split(/[\s,/]+/).filter(Boolean).map(Number);
+    if (parts.length >= 3 && parts.slice(0, 3).every(Number.isFinite)) {
+      const alpha = Number.isFinite(parts[3]) ? Math.min(1, Math.max(0, parts[3])) : 1;
+      return [parts[0] / 255, parts[1] / 255, parts[2] / 255, alpha];
+    }
+  }
+  return [1, 1, 1, 1];
+}
+
+/**
  * Draw one particle: `state` from fx-stage.mjs `particleState` (null draws nothing), at
  * `(originX + x, originY + y)`; `size` and `aspect` are the burst row's, `colour` a CSS colour.
+ * Design 077: while element sprites are live the kind draws as its TCG Live sprite instead
+ * (`frame` picks a flipbook frame, e.g. the row index).
  */
-export function drawParticle(ctx, kind, state, { originX = 0, originY = 0, size, aspect = 1, colour = '#fff' }) {
+export function drawParticle(ctx, kind, state, { originX = 0, originY = 0, size, aspect = 1, colour = '#fff', frame = 0 }) {
   if (!state || !(state.opacity > 0) || !(state.scale > 0) || !(size > 0)) return;
+  if (emitSprite(ctx, kind, state, { originX, originY, size, aspect, colour, frame })) return;
   const shape = SHAPES[PARTICLE_SHAPES[kind] ?? 'dot'];
   ctx.save();
   ctx.globalAlpha *= state.opacity;
