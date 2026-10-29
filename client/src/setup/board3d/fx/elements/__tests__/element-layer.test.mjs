@@ -9,7 +9,11 @@ const LAYER = 1;
 
 const fakeRenderer = () => ({
   copies: 0,
+  resets: 0,
   getDrawingBufferSize: (v) => v.set(640, 360),
+  resetState() {
+    this.resets += 1;
+  },
   copyFramebufferToTexture() {
     this.copies += 1;
   },
@@ -89,6 +93,7 @@ test('the board is copied only when a kind drawing this frame needs it (edge 1, 
   layer.emitter.emit('probe', {});
   assert.equal(layer.captureBoard(), true);
   assert.equal(renderer.copies, 1);
+  assert.equal(renderer.resets, 1, 'three state is reset first, so the copy binds the real texture');
 });
 
 test('a kind that throws on push or finish is contained and logged once', () => {

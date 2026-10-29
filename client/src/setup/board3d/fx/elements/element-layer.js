@@ -116,6 +116,9 @@ export function createElementLayer({
         board = new three.FramebufferTexture(width, height);
         board.name = 'board3d-fx-board-copy';
       }
+      // three's texture-binding cache can disagree with GL here (the copy then lands in whatever
+      // texture is really bound, a 1×1 stand-in → INVALID_VALUE); a reset makes it bind for real.
+      renderer.resetState();
       renderer.copyFramebufferToTexture(board);
       uniforms.uBoard.value = board;
       uniforms.uHasBoard.value = 1;

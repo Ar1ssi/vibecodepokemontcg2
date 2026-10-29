@@ -7,7 +7,8 @@ import { elementsLive } from './_emit.js';
 /**
  * @param {Record<string, Function> & { beats?: Record<string, Function> }} definition methods with
  *   the canvas kit's signatures `(ctx, ...args)`; `this.base` is the canvas kit inside them.
- *   `beats[drawer](ctx, lane, s, info)` draws instead of that drawer for this material.
+ *   `beats[drawer](ctx, lane, s, info)` draws instead of that drawer for this material (inside the
+ *   drawer's lift and burn wrappers); returning false leaves that beat to the canvas drawer.
  */
 export function elementKit(definition) {
   const { beats = {}, ...methods } = definition ?? {};

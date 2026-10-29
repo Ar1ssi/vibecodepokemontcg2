@@ -10,6 +10,10 @@ import { flameJetSamples } from './flame-jet.mjs';
 import { definePlasma } from './plasma.js';
 import { plasmaSamples } from './plasma.mjs';
 import { defineSprite } from './sprite.js';
+import { defineWaterBeam } from './water-beam.js';
+import { waterBeamSamples } from './water-beam.mjs';
+import { defineWaterDrop } from './water-drop.js';
+import { waterDropSamples } from './water-drop.mjs';
 import { spriteSamples } from './sprite.mjs';
 
 export const ELEMENT_KINDS = Object.freeze({
@@ -18,6 +22,8 @@ export const ELEMENT_KINDS = Object.freeze({
   flameJet: defineFlameJet,
   bolt: defineBolt,
   plasma: definePlasma,
+  waterBeam: defineWaterBeam,
+  waterDrop: defineWaterDrop,
 });
 
 /** Per kind, emits that exercise its shader paths (scripts/fx/check-element-shaders.mjs). */
@@ -27,4 +33,6 @@ export const ELEMENT_SAMPLES = Object.freeze({
   flameJet: flameJetSamples,
   bolt: boltSamples,
   plasma: plasmaSamples,
+  waterBeam: waterBeamSamples,
+  waterDrop: waterDropSamples,
 });

@@ -45,3 +45,18 @@ export function firePalette(palette) {
     core: rgb(palette?.core, FIRE_PALETTE.core),
   };
 }
+
+/** Water's palette (materials/water.js PALETTE / 255): deep → body → hot. */
+export const WATER_PALETTE = Object.freeze({
+  deep: Object.freeze([46 / 255, 124 / 255, 230 / 255]),
+  body: Object.freeze([82 / 255, 180 / 255, 1]),
+  hot: Object.freeze([185 / 255, 232 / 255, 1]),
+});
+
+export function waterPalette(palette) {
+  return {
+    deep: rgb(palette?.deep, WATER_PALETTE.deep),
+    body: rgb(palette?.body, WATER_PALETTE.body),
+    hot: rgb(palette?.hot, WATER_PALETTE.hot),
+  };
+}

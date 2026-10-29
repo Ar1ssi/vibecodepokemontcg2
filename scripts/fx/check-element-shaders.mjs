@@ -40,6 +40,16 @@ window.runKind = async (name) => {
   const layer = createElementLayer({ three, renderer, group, layer: FX_LAYER, kinds: { [name]: ELEMENT_KINDS[name] }, debug: (...a) => errors.push('debug: ' + a.join(' ')) });
   const board = new three.Mesh(new three.PlaneGeometry(900, 900), new three.MeshBasicMaterial({ color: 0x335577 }));
   board.layers.set(0);
+  const gl = renderer.getContext();
+  // Names the step a GL error came from (each error is reported once per kind).
+  const seen = new Set();
+  const check = (step) => {
+    const code = gl.getError();
+    if (code !== gl.NO_ERROR && !seen.has(step + code)) {
+      seen.add(step + code);
+      errors.push('gl error ' + code + ' after ' + step);
+    }
+  };
   const frame = (t) => {
     layer.begin();
     layer.emitter.live = true;
@@ -51,10 +61,13 @@ window.runKind = async (name) => {
     scene.add(board);
     renderer.render(scene, camera);
     scene.remove(board);
+    check('board render');
     layer.captureBoard();
+    check('captureBoard');
     renderer.autoClear = false;
     camera.layers.set(FX_LAYER);
     renderer.render(scene, camera);
+    check('element render');
     renderer.autoClear = true;
   };
   // Let textures arrive (fetch + decode), then draw for real.
@@ -63,9 +76,6 @@ window.runKind = async (name) => {
     await new Promise((r) => setTimeout(r, 100));
   }
   frame(3.3);
-  const gl = renderer.getContext();
-  const glError = gl.getError();
-  if (glError !== gl.NO_ERROR) errors.push('gl error ' + glError);
   const pixels = new Uint8Array(512 * 512 * 4);
   gl.readPixels(0, 0, 512, 512, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
   // The board alone is (51, 85, 119): count pixels the element changed.

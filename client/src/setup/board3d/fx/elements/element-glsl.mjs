@@ -79,6 +79,19 @@ vec3 elFireRamp(float t, vec3 deep, vec3 body, vec3 hot, vec3 core, float heat) 
 }
 `;
 
+/**
+ * Refraction (design 077 option 4): the board as drawn this frame, `offsetPx` drawing-buffer px
+ * from this fragment. Without a copy (`uHasBoard` 0) it returns `fallback`, so a refracting kind
+ * degrades to a tint. Needs SHARED_UNIFORMS_GLSL.
+ */
+export const BOARD_GLSL = `
+vec3 elBoardAt(vec2 offsetPx, vec3 fallback) {
+  if (uHasBoard < 0.5) return fallback;
+  vec2 uv = (gl_FragCoord.xy + offsetPx) / uViewport;
+  return texture(uBoard, clamp(uv, vec2(0.001), vec2(0.999))).rgb;
+}
+`;
+
 /** The shared uniforms' GLSL declarations (element-layer.js owns their values). */
 export const SHARED_UNIFORMS_GLSL = `
 uniform float uTime;

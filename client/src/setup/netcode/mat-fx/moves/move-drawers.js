@@ -127,9 +127,7 @@ const guarded = (name, draw) =>
       const lift = ctx.fxLift ?? null;
       ctx.save();
       try {
-        // Design 077: a material's element kit may draw this whole beat as shader meshes.
-        const elementDraw = info?.material?.drawBeat?.(name, ctx);
-        (elementDraw ?? draw)(ctx, lane, s, info);
+        draw(ctx, lane, s, info);
       } finally {
         ctx.filter = 'none';
         ctx.restore();
@@ -354,7 +352,7 @@ const BEAM_PASSES = [
 ];
 
 /** The lane point `f` along a beam that starts BEAM_ORIGIN_H back inside the attacker. */
-const beamPoint = (lane, f, side = 0) => {
+export const beamPoint = (lane, f, side = 0) => {
   const run = Math.max(lane.length - lane.h * LEAD_H, 1);
   const back = (lane.h * BEAM_ORIGIN_H) / run;
   return lanePoint(lane, -back + (1 + back) * f, side);
@@ -904,38 +902,48 @@ const boltLift = (lane, p) =>
   p.from === 'sky' ? fromSky(lane) : travelLift({ x: lane.ax, y: lane.ay }, { x: lane.bx, y: lane.by }, { arc: LIFT.boltArc });
 const beamLift = (lane) => travelLift(beamPoint(lane, 0), beamPoint(lane, 1), { arc: LIFT.beamArc });
 
+/**
+ * Design 077: a material's element kit may draw a beat as shader meshes. The hook sits on the raw
+ * drawer, inside its lift and burn wrappers, so an element beat rises and dissolves like the
+ * canvas one; the element drawer may return false to leave this beat to the canvas drawer.
+ */
+const elementable = (name, draw) => (ctx, lane, s, info) => {
+  const elementDraw = info?.material?.drawBeat?.(name, ctx);
+  if (!elementDraw || elementDraw(ctx, lane, s, info) === false) draw(ctx, lane, s, info);
+};
+
 const IMPLEMENTATIONS = {
-  orbitCharge,
-  coreCharge,
-  shockRings: burning(shockRings, () => BURN_FROM.shockRings),
-  projectile,
-  vignette,
-  speedRays: lifted(speedRays, atAnchor),
+  orbitCharge: elementable('orbitCharge', orbitCharge),
+  coreCharge: elementable('coreCharge', coreCharge),
+  shockRings: burning(elementable('shockRings', shockRings), () => BURN_FROM.shockRings),
+  projectile: elementable('projectile', projectile),
+  vignette: elementable('vignette', vignette),
+  speedRays: lifted(elementable('speedRays', speedRays), atAnchor),
   // Burns as it breaks up: the arms' alpha only starts to drop there (easeInCubic).
-  starFlare: lifted(burning(starFlare, (p) => p.breakAt), atAnchor),
-  impactFlash: lifted(impactFlash, atCentre),
+  starFlare: lifted(burning(elementable('starFlare', starFlare), (p) => p.breakAt), atAnchor),
+  impactFlash: lifted(elementable('impactFlash', impactFlash), atCentre),
   // Soot rises off the struck card.
-  smoke: lifted(smoke, (lane, p) => burstLift(centreOf(lane, p.target), { z: 0.05 })),
-  beam: lifted(burning(beam, (p) => 1 - p.retract * BEAM_BURN_LEAD), beamLift),
-  splash: lifted(burning(splash, () => BURN_FROM.splash), atCentre),
-  pillar,
-  slashArc: lifted(burning(slashArc, () => BURN_FROM.slashArc), atCentre),
-  terrain,
-  cloud: lifted(cloud, (lane, p) => anchorLift(lane, p.target, anchorOf(lane, p), { stand: 0, z: LIFT.travelZ })),
-  spiral: lifted(spiral, atCentre),
-  volley,
-  aura,
+  smoke: lifted(elementable('smoke', smoke), (lane, p) => burstLift(centreOf(lane, p.target), { z: 0.05 })),
+  beam: lifted(burning(elementable('beam', beam), (p) => 1 - p.retract * BEAM_BURN_LEAD), beamLift),
+  splash: lifted(burning(elementable('splash', splash), () => BURN_FROM.splash), atCentre),
+  pillar: elementable('pillar', pillar),
+  slashArc: lifted(burning(elementable('slashArc', slashArc), () => BURN_FROM.slashArc), atCentre),
+  terrain: elementable('terrain', terrain),
+  cloud: lifted(elementable('cloud', cloud), (lane, p) => anchorLift(lane, p.target, anchorOf(lane, p), { stand: 0, z: LIFT.travelZ })),
+  spiral: lifted(elementable('spiral', spiral), atCentre),
+  volley: elementable('volley', volley),
+  aura: elementable('aura', aura),
   // Rain falls out of the air onto the card.
-  rain: lifted(rain, (lane, p) => standOn(centreOf(lane, p.target))),
-  shards,
-  bolt: lifted(burning(bolt, () => BURN_FROM.bolt), boltLift),
-  ring,
-  glyph: lifted(glyph, (lane, p) => anchorLift(lane, p.target, anchorOf(lane, p), { stand: LIFT.faceStand })),
-  fan: lifted(burning(fan, () => BURN_FROM.fan), atAnchor),
-  shade,
-  chain,
+  rain: lifted(elementable('rain', rain), (lane, p) => standOn(centreOf(lane, p.target))),
+  shards: elementable('shards', shards),
+  bolt: lifted(burning(elementable('bolt', bolt), () => BURN_FROM.bolt), boltLift),
+  ring: elementable('ring', ring),
+  glyph: lifted(elementable('glyph', glyph), (lane, p) => anchorLift(lane, p.target, anchorOf(lane, p), { stand: LIFT.faceStand })),
+  fan: lifted(burning(elementable('fan', fan), () => BURN_FROM.fan), atAnchor),
+  shade: elementable('shade', shade),
+  chain: elementable('chain', chain),
   // The glove comes down out of the air.
-  grip: lifted(grip, fromSky),
+  grip: lifted(elementable('grip', grip), fromSky),
 };
 
 /** The drawer registry: `{ draw, check, tonguesAt }` per drawer name. */
