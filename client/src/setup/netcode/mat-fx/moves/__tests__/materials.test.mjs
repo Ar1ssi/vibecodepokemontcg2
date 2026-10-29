@@ -1394,14 +1394,16 @@ test('clodOutline: seven corners between 0.8 r and 1.2 r, stable per seed, turne
   assert.ok(Math.abs(delta - Math.PI / 2) < 1e-9, 'spin turns it');
 });
 
-test('a ground clod: one flat-shaded fill (body above, deep below a hard terminator), a lit chip only when hot', () => {
+test('a ground clod: one fill lit up-left (hot through body to deep, a sphere round its centre), a lit chip only when hot', () => {
   const rec = recordingContext();
   MATERIALS.ground.body(rec.ctx, 100, 100, 40, 1, 1);
-  const { body, deep, core } = MATERIALS.ground.palette;
+  const { body, hot, deep, core } = MATERIALS.ground.palette;
   assert.equal(rec.fills.count, 2);
-  assert.deepEqual(rec.colours.map(rgbOf), [body, body, deep, deep, core]);
-  const gradient = rec.calls.find(([name]) => name === 'createLinearGradient')[1];
-  assert.deepEqual(gradient, [100, 60, 100, 140], 'lit from straight above');
+  assert.deepEqual(rec.colours.map(rgbOf), [hot, body, deep, core]);
+  const [x0, y0, , x1, y1, r1] = rec.calls.find(([name]) => name === 'createRadialGradient')[1];
+  assert.ok(x0 < 100 && y0 < 100, 'highlight up-left');
+  assert.deepEqual([x1, y1], [100, 100], 'the sphere sits on the clod centre');
+  assert.ok(r1 >= 40, 'and covers it');
   const cold = recordingContext();
   MATERIALS.ground.body(cold.ctx, 100, 100, 40, 1, 0);
   assert.equal(cold.fills.count, 1);
@@ -1425,7 +1427,7 @@ test('spikeOutline: a base `width` wide on the origin, straight to the shoulders
   assert.ok(up.left.at(-1)[1] < -99, 'follows its heading');
 });
 
-test('a ground spike never blurs: a solid fill, a shaded facet and one lit edge; hot 0 drops the edge; a chip is two fills', () => {
+test('a ground spike never blurs: a body fill (one colour along its axis), a shaded facet and one lit edge; hot 0 drops the edge; a chip is two fills', () => {
   const rec = recordingContext();
   const probe = blurProbe(rec);
   MATERIALS.ground.tongue(probe.ctx, TONGUE, { alpha: 1, hot: 1 });
@@ -1433,7 +1435,7 @@ test('a ground spike never blurs: a solid fill, a shaded facet and one lit edge;
   assert.deepEqual(probe.filters, []);
   assert.equal(rec.fills.count, 2);
   assert.equal(strokes(rec), 1);
-  assert.deepEqual(rec.colours.map(rgbOf), [body, deep, hot]);
+  assert.deepEqual(rec.colours.map(rgbOf), [body, body, deep, hot]);
   const cold = recordingContext();
   MATERIALS.ground.tongue(cold.ctx, TONGUE, { alpha: 1, hot: 0 });
   assert.equal(strokes(cold), 0);
@@ -1667,14 +1669,15 @@ test('a rock stone: a face, a lit facet and a shadow sliver (source-over), a dar
   const { body, hot, deep, core } = MATERIALS.rock.palette;
   assert.equal(rec.fills.count, 3);
   assert.equal(strokes(rec), 2);
-  assert.deepEqual(rec.colours.map(rgbOf), [body, hot, deep, deep, core]);
+  // The face is a radial lit up-left (hot to body), then the lit facet, the shadow, outline, rim.
+  assert.deepEqual(rec.colours.map(rgbOf), [hot, body, body, hot, deep, deep, core]);
   const cold = recordingContext();
   MATERIALS.rock.body(cold.ctx, 100, 100, 40, 1, 0);
   assert.equal(strokes(cold), 1, 'no rim when cold');
   assert.equal(cold.fills.count, 3, 'the facet tones stay');
 });
 
-test('a rock spire never blurs: a solid fill, a shaded half and one lit edge; hot 0 drops the edge; a chip is two fills', () => {
+test('a rock spire never blurs: a body fill (one colour along its axis), a shaded half and one lit edge; hot 0 drops the edge; a chip is two fills', () => {
   const rec = recordingContext();
   const probe = blurProbe(rec);
   MATERIALS.rock.tongue(probe.ctx, TONGUE, { alpha: 1, hot: 1 });
@@ -1682,7 +1685,7 @@ test('a rock spire never blurs: a solid fill, a shaded half and one lit edge; ho
   assert.deepEqual(probe.filters, []);
   assert.equal(rec.fills.count, 2);
   assert.equal(strokes(rec), 1);
-  assert.deepEqual(rec.colours.map(rgbOf), [body, deep, core]);
+  assert.deepEqual(rec.colours.map(rgbOf), [body, body, deep, core]);
   const cold = recordingContext();
   MATERIALS.rock.tongue(cold.ctx, TONGUE, { alpha: 1, hot: 0 });
   assert.equal(strokes(cold), 0);
@@ -1820,19 +1823,19 @@ test('featherOutline: a bare quill, a vane at most `width` wide rounding to one 
   assert.ok(widest > 0 && widest < widths.length - 1, 'widest inside the vane, tapering to the tip');
 });
 
-test('a wind blade never blurs: one translucent fill and one white outer-edge stroke; hot 0 drops the edge', () => {
+test('a wind blade never blurs: one translucent fill, a pale centre ribbon and one white outer-edge stroke; hot 0 drops the edge', () => {
   const rec = recordingContext();
   const probe = blurProbe(rec);
   MATERIALS.flying.tongue(probe.ctx, TONGUE, { alpha: 1, hot: 1 });
-  const { body, white } = MATERIALS.flying.palette;
+  const { body, hot, white } = MATERIALS.flying.palette;
   assert.deepEqual(probe.filters, []);
   assert.equal(rec.fills.count, 1);
-  assert.equal(strokes(rec), 1);
-  assert.deepEqual(rec.colours.map(rgbOf), [body, white]);
+  assert.equal(strokes(rec), 2);
+  assert.deepEqual(rec.colours.map(rgbOf), [body, hot, white]);
   assert.match(rec.colours[0], /, 0\.45\)$/, 'the blade is translucent (alpha 0.45)');
   const cold = recordingContext();
   MATERIALS.flying.tongue(cold.ctx, TONGUE, { alpha: 1, hot: 0 });
-  assert.equal(strokes(cold), 0);
+  assert.equal(strokes(cold), 1, 'the ribbon stays');
 });
 
 test('a feather (jag) is one vane fill and one vein stroke in deep', () => {
@@ -1866,7 +1869,7 @@ test('a flying projectile is a bare orb in its halo at 0 tongues, else a pinwhee
   assert.equal(draw({ tongues: 0 }).fills.count, 2, 'halo + orb');
   const wheel = draw({ tongues: 3 });
   assert.equal(wheel.fills.count, 1 + 3 + 1, 'halo, three blades, the core orb');
-  assert.equal(strokes(wheel), 3 + 2, 'three blade edges, two swirl arcs');
+  assert.equal(strokes(wheel), 3 * 2 + 2, 'three blades (ribbon + edge each), two swirl arcs');
   const bladeStart = (time) => draw({ tongues: 3, time }).calls.find(([name]) => name === 'moveTo')[1];
   assert.notDeepEqual(bladeStart(1), bladeStart(1.2), 'the pinwheel turns');
 });

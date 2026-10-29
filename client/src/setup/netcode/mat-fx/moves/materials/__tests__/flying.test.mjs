@@ -45,3 +45,27 @@ test('flying air dissolves with a pale sky rim from its palette, the drawer amou
   assert.equal(dissolve.amount, 0.6);
   assert.equal(spy.ctx.fxMod, outer);
 });
+
+test('depth: blades are translucent sheets at their own heights; the ribbon and edge are lit tubes; the halo stays down', () => {
+  const lone = fxModSpy();
+  flying.tongue(lone.ctx, BLADE, { alpha: 1, hot: 1 });
+  const [sheet] = lone.fills();
+  assert.ok(sheet.z >= 0.04 && sheet.z <= 0.3, `sheet height ${sheet.z}`);
+  const [ribbon, edge] = lone.strokes();
+  assert.equal(ribbon.z, sheet.z);
+  assert.ok(ribbon.fxMod.volume.spec > 0.5 && edge.fxMod.volume.spec > 0.5, 'glossy tubes');
+  assert.equal(lone.ctx.fxLift, null, 'lift restored');
+  const again = fxModSpy();
+  flying.tongue(again.ctx, { ...BLADE, time: 0.9 }, { alpha: 1, hot: 1 });
+  assert.equal(again.fills()[0].z, sheet.z, 'a blade holds its height as the clock runs');
+  const other = fxModSpy();
+  flying.tongue(other.ctx, { ...BLADE, seed: 5 }, { alpha: 1, hot: 1 });
+  assert.notEqual(other.fills()[0].z, sheet.z, 'blades of a whirl sit at different heights');
+  const gust = fxModSpy();
+  flying.projectile(gust.ctx, { x: 100, y: 100, r: 20, headingDeg: 0, time: 0, seed: 0, tongues: 3 });
+  const fills = gust.fills();
+  assert.equal(fills[0].z, 0, 'the halo stays on the cloth');
+  const heights = fills.slice(1).map((f) => f.z);
+  assert.ok(heights.every((z, i) => i === 0 || z > heights[i - 1]), `stacked: ${heights}`);
+  assert.equal(gust.ctx.fxLift, null);
+});

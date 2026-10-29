@@ -13,8 +13,8 @@
 //     centre and a sheen, a glob trailing drips.
 // Every call draws on the context it is handed and is otherwise pure.
 import { rgbCss } from '../../fx-colors.mjs';
-import { moddedKit } from './_kit-mod.js';
-import { withFxMod } from './_mods.js';
+import { litSideLight, moddedKit, unstyled } from './_kit-mod.js';
+import { mergeFxMods, withFxMod } from './_mods.js';
 import { grainPass, inShadow, shardOutline, styledKit, tongueOutline, traceOutline } from './_shared.js';
 import { streamGlobs } from './poison.js';
 
@@ -29,9 +29,25 @@ const SLUDGE = Object.freeze({ byKind: { linear: { id: 'liquid', gloss: 0.3, flo
 // flow: one turned with a bowed heading would sweep the shader's clock-long scroll offset and
 // boil). Mud globs wobble wet. Dissolving earth crumbles at a sandy rim, mud at its wet brown,
 // both dull (low gain, no bloom).
-const GRIT = Object.freeze({ detail: Object.freeze({ amount: 0.45, speed: 0, scale: 20 }) });
+// Depth (076 § Depth): earth is a lit, bumped, matte solid. A clod's face is a radial paint, lit
+// as a sphere on the GPU (a strong Lambert side away from the up-left light); spikes and chips
+// are bumped sheets; the lit edge is a stroke lit as a tube (a rounded bevel). A mud glob is the
+// same sphere, wet: a tight glint, less bump. Canvas2D ignores it and keeps the baked tones.
+const SOLID_EARTH = Object.freeze({
+  detail: Object.freeze({ amount: 0.45, speed: 0, scale: 20 }),
+  volume: Object.freeze({ amount: 1, spec: 0.1, rim: 0.2, bump: 0.9, bumpScale: 7, ambient: 0.28 }),
+});
+const BEVEL = Object.freeze({ volume: Object.freeze({ amount: 1, spec: 0.4, rim: 0, bump: 0, ambient: 0.45 }) });
+// A spike's body is filled along its axis, which the GPU lights as a tube of `radius` lane units
+// round it (a rounded column falling to a dark flank), lit from its lit edge as rock's spires are
+// (`litSideLight`). The radius is a fixed guess under a pillar's half-width: kits draw in px and
+// cannot read the lane unit.
+const SPIKE_RADIUS = 0.12;
 const SHIMMER = Object.freeze({ distort: Object.freeze({ strength: 0.03, speed: 0.5, scale: 2.5, angle: -90 }) });
-const WET = Object.freeze({ distort: Object.freeze({ strength: 0.02, speed: 0.4, scale: 2 }) });
+const WET = Object.freeze({
+  distort: Object.freeze({ strength: 0.02, speed: 0.4, scale: 2 }),
+  volume: Object.freeze({ amount: 1, spec: 0.75, rim: 0.3, bump: 0.25, bumpScale: 5, ambient: 0.35 }),
+});
 const DUST_DRIFT = Object.freeze({
   distort: Object.freeze({ strength: 0.04, speed: 0.7, scale: 2.5, angle: -90 }),
   detail: Object.freeze({ amount: 0.3, speed: 0.5, scale: 7, angle: -90 }),
@@ -197,19 +213,18 @@ const dustTrail = (ctx, pal, { x, y, r, headingDeg, time, seed, alpha, count }) 
 function groundKit(palette) {
 
   /**
-   * One clod: the lump flat-shaded (body above, deep below, a hard terminator through the
-   * centre, so the light stays overhead however it tumbles), then a lit chip up-left when hot.
+   * One clod: the lump lit up-left (hot through body to deep, the light fixed on screen however
+   * it tumbles; on the GPU a bumped sphere), then a lit chip up-left when hot.
    */
   function clod(ctx, x, y, r, alpha, hot, seed, spin) {
     inShadow(ctx, () => {
-      const g = ctx.createLinearGradient(x, y - r, x, y + r);
-      g.addColorStop(0, rgbCss(palette.body, alpha));
+      const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.35, r * 0.05, x, y, r * 1.2);
+      g.addColorStop(0, rgbCss(palette.hot, alpha));
       g.addColorStop(0.5, rgbCss(palette.body, alpha));
-      g.addColorStop(0.5, rgbCss(palette.deep, alpha));
       g.addColorStop(1, rgbCss(palette.deep, alpha));
       ctx.fillStyle = g;
       tracePoints(ctx, clodOutline(x, y, r, seed, spin));
-      withFxMod(ctx, GRIT, () => ctx.fill());
+      withFxMod(ctx, SOLID_EARTH, () => unstyled(ctx, () => ctx.fill()));
     });
     const lit = alpha * clamp01(hot);
     if (!(lit > 0)) return;
@@ -235,11 +250,16 @@ function groundKit(palette) {
     if (!(spec.length > 0) || !(spec.width > 0) || !(alpha > 0)) return;
     const outline = jag ? shardOutline(spec) : spikeOutline(spec);
     const tip = outline.left.at(-1);
+    const litFrom = { volume: { light: litSideLight(spec.angleDeg) } };
     inShadow(ctx, () =>
-      withFxMod(ctx, GRIT, () => {
-        ctx.fillStyle = rgbCss(palette.body, 0.95 * alpha);
+      withFxMod(ctx, mergeFxMods(SOLID_EARTH, litFrom), () => {
+        const a = rad(spec.angleDeg);
+        const g = ctx.createLinearGradient(spec.x, spec.y, spec.x + Math.cos(a) * spec.length, spec.y + Math.sin(a) * spec.length);
+        g.addColorStop(0, rgbCss(palette.body, 0.95 * alpha));
+        g.addColorStop(1, rgbCss(palette.body, 0.95 * alpha));
+        ctx.fillStyle = g;
         traceOutline(ctx, outline);
-        ctx.fill();
+        withFxMod(ctx, { volume: { radius: SPIKE_RADIUS } }, () => unstyled(ctx, () => ctx.fill()));
         ctx.fillStyle = rgbCss(palette.deep, FACET_ALPHA * alpha);
         traceOutline(ctx, { left: [[spec.x, spec.y], tip], right: outline.right });
         ctx.fill();
@@ -250,7 +270,7 @@ function groundKit(palette) {
     ctx.strokeStyle = rgbCss(palette.hot, EDGE_ALPHA * lit);
     ctx.lineWidth = Math.max(1, spec.width * 0.06);
     ctx.lineJoin = 'round';
-    strokeLine(ctx, outline.left);
+    withFxMod(ctx, mergeFxMods(BEVEL, litFrom), () => strokeLine(ctx, outline.left));
   }
 
   /** A clod tumbling along `headingDeg` with the scene clock, trailing `tongues` dust puffs. */

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { moddedKit } from '../_kit-mod.js';
+import { litSideLight, moddedKit, unstyled } from '../_kit-mod.js';
 
 test('moddedKit runs each drawing method under its mod, merged over the caller, and restores it', () => {
   const seen = [];
@@ -23,4 +23,24 @@ test('moddedKit runs each drawing method under its mod, merged over the caller, 
 test('moddedKit passes a missing context straight through', () => {
   const kit = moddedKit({ body: (ctx, x) => [ctx, x] }, { detail: { amount: 1 } });
   assert.deepEqual(kit.body(null, 4), [null, 4]);
+});
+
+test('unstyled clears the GPU style for its draw and restores it, even when draw throws', () => {
+  const hint = { byKind: { radial: { id: 'smoke' } } };
+  const ctx = { fxStyle: hint };
+  assert.equal(unstyled(ctx, () => ctx.fxStyle), null);
+  assert.equal(ctx.fxStyle, hint);
+  assert.throws(() =>
+    unstyled(ctx, () => {
+      throw new Error('boom');
+    })
+  );
+  assert.equal(ctx.fxStyle, hint);
+});
+
+test('litSideLight lights a shape from its left normal: an upright spire (stage -90) from stage +x (light 0)', () => {
+  assert.equal(litSideLight(-90), 0);
+  // Pointing right (0): its left normal is stage +y, down the screen: light angle -90.
+  assert.equal(litSideLight(0), -90);
+  assert.equal(litSideLight(undefined), -90);
 });
