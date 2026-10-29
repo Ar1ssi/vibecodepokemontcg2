@@ -62,6 +62,23 @@ float elDissolve(vec2 p, float amount, float seed, out float edge) {
 }
 `;
 
+/**
+ * Fire's colour by temperature t (0 cold … 1 white-hot) in a kit palette: soot below the deep
+ * red, then deep → body → hot → core, and past 0.9 a white core boosted by `heat` past 1.0 so it
+ * alone blooms. Shared by fireball and flame jet so a jet and its ball burn alike.
+ */
+export const FIRE_RAMP_GLSL = `
+vec3 elFireRamp(float t, vec3 deep, vec3 body, vec3 hot, vec3 core, float heat) {
+  vec3 soot = deep * 0.18;
+  vec3 c = mix(soot, deep, smoothstep(0.0, 0.22, t));
+  c = mix(c, body, smoothstep(0.22, 0.48, t));
+  c = mix(c, hot, smoothstep(0.48, 0.7, t));
+  c = mix(c, core, smoothstep(0.74, 0.94, t));
+  // Only the last few percent pass 1.0: a small white filament blooms, not a white disc.
+  return c * (1.0 + 1.4 * heat * smoothstep(0.94, 1.0, t));
+}
+`;
+
 /** The shared uniforms' GLSL declarations (element-layer.js owns their values). */
 export const SHARED_UNIFORMS_GLSL = `
 uniform float uTime;

@@ -151,7 +151,7 @@ export const PARTICLE_SHAPES = Object.freeze(Object.fromEntries(PARTICLE_KINDS.m
  * (`channel` per sprite.mjs SPRITE_CHANNELS; `gain` > 1 blooms). Kinds left out keep their shape.
  */
 export const PARTICLE_SPRITES = Object.freeze({
-  ember: { texture: 'TEX_VFX_Dot_Glow.webp', channel: 'r', gain: 2.2, grow: 1.6 },
+  ember: { texture: 'TEX_VFX_Gradient_Radial_Small.webp', channel: 'r', gain: 2.2, grow: 2.4 },
   droplet: { texture: 'T_VFX_Water_Drop_Blurred.webp', channel: 'r', gain: 1.3, grow: 1.6 },
   leaf: { texture: 'T_VFX_Leaves_2x2.webp', channel: 'rgba', gain: 1, grow: 1.8, blend: 'over' },
   shard: { texture: 'TEX_VFX_Diamond_Shard.webp', channel: 'r', gain: 1.4, grow: 1.6 },
@@ -159,7 +159,7 @@ export const PARTICLE_SPRITES = Object.freeze({
   feather: { texture: 'T_VFX_Fairy_Petal_Soft_2x2.webp', channel: 'a', gain: 1.1, grow: 1.8 },
   flake: { texture: 'TEX_VFX_Flake_Sharp.webp', channel: 'r', gain: 1.6, grow: 1.6 },
   streak: { texture: 'TEX_VFX_Trail_Soft.webp', channel: 'r', gain: 1.8, grow: 1.6 },
-  mote: { texture: 'TEX_VFX_Dot_Glow.webp', channel: 'r', gain: 1.6, grow: 1.6 },
+  mote: { texture: 'TEX_VFX_Gradient_Radial_Small.webp', channel: 'r', gain: 1.6, grow: 2.4 },
   star: { texture: 'TEX_VFX_Star_FourPoint_Light.webp', channel: 'a', gain: 2.4, grow: 1.8 },
   twinkle: { texture: 'TEX_VFX_Sparkle_2x2.webp', channel: 'r', gain: 2.4, grow: 1.8 },
 });

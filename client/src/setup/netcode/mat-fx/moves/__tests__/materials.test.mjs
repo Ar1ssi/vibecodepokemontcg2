@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MATERIALS, materialFor } from '../materials/index.js';
+import { ELEMENT_KITS } from '../elements/index.js';
 import { jagOutline } from '../materials/electric.js';
 import { barrageStamps, streakOutline } from '../materials/fighting.js';
 import { leafOutline } from '../materials/grass.js';
@@ -35,9 +36,16 @@ test('the registry covers every spec material key and has a default', () => {
   for (const key of MATERIAL_KEYS) assert.ok(Object.hasOwn(MATERIALS, key), key);
   assert.ok(MATERIALS.default);
   assert.ok(Object.isFrozen(MATERIALS));
-  assert.equal(materialFor('fire'), MATERIALS.fire);
-  assert.equal(materialFor('no-such-material'), MATERIALS.default);
-  assert.equal(materialFor(undefined), MATERIALS.default);
+  // Design 077: materialFor serves each kit with its element kit merged over it.
+  assert.equal(materialFor('fire').key, 'fire');
+  assert.equal(materialFor('fire').palette, MATERIALS.fire.palette);
+  assert.equal(typeof materialFor('fire').drawBeat, 'function');
+  for (const key of Object.keys(MATERIALS).filter((k) => !Object.hasOwn(ELEMENT_KITS, k))) {
+    assert.equal(materialFor(key), MATERIALS[key], `${key}: a kit with no element kit is served as is`);
+  }
+  assert.equal(materialFor('no-such-material'), materialFor('default'));
+  assert.equal(materialFor(undefined), materialFor('default'));
+  assert.equal(materialFor('default').palette, MATERIALS.default.palette);
 });
 
 test('every material has the full interface and frozen palette colours', () => {

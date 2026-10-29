@@ -119,6 +119,7 @@ export function defineSprite({ three, textures, uniforms, layer, debug = (...arg
       transparent: true,
       depthTest: true,
       depthWrite: false,
+      side: three.DoubleSide,
       ...blendSettings(three, sprite.blend),
     });
     const mesh = new three.Mesh(geometry, material);
