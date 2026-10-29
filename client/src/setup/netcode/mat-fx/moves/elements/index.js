@@ -1,5 +1,6 @@
 // Design 077: element kits by material key (materials/index.js). A material without one draws
 // with its canvas kit everywhere. `default` serves a spec whose type has no kit: it is fire's.
+import { grassElements, groundElements, rockElements } from './earth.js';
 import { electricElements } from './electric.js';
 import { fireElements } from './fire.js';
 import { psychicElements } from './psychic.js';
@@ -13,5 +14,8 @@ export const ELEMENT_KITS = Object.freeze({
   psychic: psychicElements,
   ghost: ghostElements,
   dark: darkElements,
+  rock: rockElements,
+  ground: groundElements,
+  grass: grassElements,
   default: fireElements,
 });

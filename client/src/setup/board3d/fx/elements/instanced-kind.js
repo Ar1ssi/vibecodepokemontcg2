@@ -16,10 +16,13 @@ export const QUAD = Object.freeze({
  *   uniforms: object, layer: number, debug?: (...args: unknown[]) => void, kind: string, floats: number,
  *   attributes: string[], capacity: number, vertexShader: string, fragmentShader: string,
  *   blend?: 'add'|'over', renderOrder?: number, maps?: Record<string, string>, needsBoard?: boolean,
- *   geometry?: { positions: number[], index: number[] }, normalize: (params: object) => object|null,
+ *   depthWrite?: boolean, geometry?: { positions: number[], index?: number[] },
+ *   normalize: (params: object) => object|null,
  *   pack: (row: object, out: Float32Array, index: number) => void }} options
  *   `attributes` names the vec4 attributes in row order (floats = 4 × attributes.length);
- *   `maps` binds uniform names to texture file names — each gets `<name>Ready` (0 / 1) beside it.
+ *   `maps` binds uniform names to texture file names — each gets `<name>Ready` (0 / 1) beside it;
+ *   `depthWrite` for solid geometry (debris) that must hide its own far side; `geometry` without
+ *   an index draws its positions as plain triangles.
  */
 export function defineInstancedKind({
   three,
@@ -37,6 +40,7 @@ export function defineInstancedKind({
   renderOrder = 30,
   maps = {},
   needsBoard = false,
+  depthWrite = false,
   geometry: shape = QUAD,
   normalize,
   pack,
@@ -47,7 +51,7 @@ export function defineInstancedKind({
   buffer.setUsage(three.DynamicDrawUsage);
   const geometry = new three.InstancedBufferGeometry();
   geometry.setAttribute('position', new three.Float32BufferAttribute([...shape.positions], 3));
-  geometry.setIndex([...shape.index]);
+  if (shape.index) geometry.setIndex([...shape.index]);
   attributes.forEach((name, i) => geometry.setAttribute(name, new three.InterleavedBufferAttribute(buffer, 4, i * 4)));
   geometry.instanceCount = 0;
 
@@ -63,7 +67,7 @@ export function defineInstancedKind({
     uniforms: { ...uniforms, ...own },
     transparent: true,
     depthTest: true,
-    depthWrite: false,
+    depthWrite,
     // A ribbon's winding follows its direction on screen; neither face may be culled.
     side: three.DoubleSide,
     ...blendSettings(three, blend),

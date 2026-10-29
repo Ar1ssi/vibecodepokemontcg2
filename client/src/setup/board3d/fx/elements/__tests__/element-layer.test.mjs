@@ -157,3 +157,15 @@ test('sprite: a texture not loaded yet draws its fallback dot (edge 5); capacity
   assert.equal(debug.filter((line) => line.includes('capacity')).length, 1);
   assert.equal(layer.counts().sprite['a.webp|add|r'], SPRITE_CAPACITY);
 });
+
+test('two scenes in one frame (a move and a multi-hit impact) queue into the same buckets (edge 4)', () => {
+  const { layer } = make({ sprite: defineSprite });
+  layer.begin();
+  layer.emitter.live = true;
+  const sceneA = () => layer.emitter.emit('sprite', { texture: 'a.webp', at: { x: 0, y: 0 }, size: 4 });
+  const sceneB = () => layer.emitter.emit('sprite', { texture: 'a.webp', at: { x: 9, y: 9 }, size: 4 });
+  sceneA();
+  sceneB();
+  layer.finish();
+  assert.equal(layer.counts().sprite['a.webp|add|r'], 2);
+});

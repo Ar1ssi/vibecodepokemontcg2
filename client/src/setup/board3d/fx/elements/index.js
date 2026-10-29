@@ -3,6 +3,8 @@
 // push(params) → boolean, finish(uniforms), counts?(), dispose() }.
 import { defineBolt } from './bolt.js';
 import { boltSamples } from './bolt.mjs';
+import { defineDebris } from './debris.js';
+import { debrisSamples } from './debris.mjs';
 import { defineFireball } from './fireball.js';
 import { fireballSamples } from './fireball.mjs';
 import { defineFlameJet } from './flame-jet.js';
@@ -30,6 +32,7 @@ export const ELEMENT_KINDS = Object.freeze({
   waterDrop: defineWaterDrop,
   lens: defineLens,
   smoke: defineSmoke,
+  debris: defineDebris,
 });
 
 /** Per kind, emits that exercise its shader paths (scripts/fx/check-element-shaders.mjs). */
@@ -43,4 +46,5 @@ export const ELEMENT_SAMPLES = Object.freeze({
   waterDrop: waterDropSamples,
   lens: lensSamples,
   smoke: smokeSamples,
+  debris: debrisSamples,
 });

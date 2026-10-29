@@ -127,15 +127,15 @@ Element kits scale up from the canvas sizes they receive (bigger effects, user p
 | 1 | no emits in a frame | every kind's instance count 0; nothing draws; `needsBoard` false (no copy) | [x] covered: element-layer.test 'sprite: buckets…' (empty frame), 'the board is copied only when…' |
 | 2 | invalid params (NaN, negative size, unknown kind) | instance dropped / emit ignored, one debug line per kind | [x] covered: sprite.test 'normalizeSprite…', element-layer.test 'emits reach a kind only while live…' |
 | 3 | capacity reached | further pushes dropped this frame, one debug line per kind per session | [x] covered: element-layer.test 'sprite: a texture not loaded yet…' |
-| 4 | two scenes overlap (multi-hit impacts + move) | both emit into the same frame; instances accumulate | [ ] |
+| 4 | two scenes overlap (multi-hit impacts + move) | both emit into the same frame; instances accumulate | [x] covered: element-layer.test 'two scenes in one frame…' |
 | 5 | texture fails to load / not yet loaded | kind draws with its procedural fallback (`uHasTex` 0); retried next attack | [x] covered: element-layer.test (uHasTex 0 path) + check-element-shaders sample 'missing-texture.webp' |
 | 6 | shader fails to compile | the shader check script fails in CI before landing; at runtime three logs once and that kind draws nothing (the move still plays; other kinds and canvas parts draw) | [x] covered: scripts/fx/check-element-shaders.mjs (caught gl_FragColor under GLSL3); element-layer.test 'a kind that throws…' |
 | 7 | cast pass | element kits not called; canvas kit draws shadows/light pools | [x] covered: elements-routing.test 'begin turns elements live…', 'withElements routes…', 'a drawer hands its whole beat…' |
 | 8 | Canvas2D context / node tests | no `fxElements`; all kits draw as before | [x] covered: elements-routing.test 'withElements routes…' (no emitter), full mat-fx suite unchanged |
 | 9 | board render target not the canvas (future offscreen) | `uBoard` copy skipped, 1×1 black bound; refraction degrades to tint | [x] covered: element-layer.test 'the board is copied only when…' (black stand-in) |
 | 10 | context lost / fx-layer disposed | element layer disposes geometry, materials, textures it created | [x] covered: element-layer.test 'finish wraps time… dispose frees every kind' |
-| 11 | reduced motion | bloom off (fx-layer); elements unchanged | [ ] |
-| 12 | dissolve amount 1 | instance fully transparent (shader discard), not dropped (keeps noise stable) | [ ] |
+| 11 | reduced motion | bloom off (fx-layer); elements unchanged | [x] reasoning: fx-layer skips only bloom under motionReduced(); the element layer has no motion branch |
+| 12 | dissolve amount 1 | instance fully transparent (shader discard), not dropped (keeps noise stable) | [x] reasoning: elDissolve(amount 1) → k = n − 1 ≤ 0 → alpha 0 → discard; the instance stays queued (sprite/fire/water/lens/smoke/debris shaders) |
 
 ## Test plan
 - Node: every pure packer/path module (`*.mjs`) — params → instance arrays, clamps, drops, caps; bolt path
@@ -167,3 +167,15 @@ entries (or the whole wrap in `materialFor`) — the canvas path is untouched.
   through the cards/cloth behind it with a hard line (seen in the first check render).
 - Slice 1: GLSL3 ShaderMaterial in three r185 has no `gl_FragColor`; kinds declare `out vec4 fragColor`.
 - Build is sequential, no agents (user, 2026-10-29); the work-plan rows' "(agent)" read "(lead)".
+- Slice 2: TEX_VFX_Dot_Glow is a hard-edged disc; glows and embers use TEX_VFX_Gradient_Radial(_Small). Flame-jet roots
+  fade (a fan of jets stacks white at its hub otherwise); the fire ramp's HDR boost covers only t > 0.94.
+- Slice 3: bolt segments blend with MaxEquation (summing knots every joint). Bolts take the drawer's polylines; no
+  CPU fractal path module was needed (`boltPath` in the slice row is the drawers' existing boltPoses).
+- Slice 4: the beat hook moved from guarded() onto the raw drawer (`elementable`), inside lift and burn wrappers, so an
+  element beat rises and dissolves like the canvas one; an element beat may return false to defer to canvas. The board
+  copy calls renderer.resetState() first: three's binding cache drifted and the copy landed in the 1×1 stand-in
+  (INVALID_VALUE, found by the check script's per-step GL error attribution).
+- Slice 5: ghost and dark share one smoke-made kit (`shadow.js`); fire's smoke beat is soot from the same helper.
+- Slice 6: grass is leaves only (sprite kind); rock/ground share a stone kit (`earth.js`). Debris writes depth.
+- Not yet on elements (slice 7): dragon, fighting/aura, steel, fairy, ice/aurora, poison, bug/buzz/silver, flying,
+  normal, stellar, petal/solar/mud/ancient/gem. They draw with their 076 canvas kits; burst particles are sprites.
