@@ -537,6 +537,11 @@ function matchesSwitchOpponentIn(lower) {
   );
 }
 
+const POKEMON_TYPE_BY_SYMBOL = {
+  g: 'grass', r: 'fire', w: 'water', l: 'lightning', p: 'psychic', f: 'fighting',
+  d: 'darkness', m: 'metal', y: 'fairy', n: 'dragon', c: 'colorless',
+};
+
 const PARADOX_TAG_WORD = { ancient: 'Ancient', future: 'Future' };
 
 // Design 058. Professor Sada's Vitality: "Choose up to 2 of your Ancient Pokémon and attach a Basic
@@ -2112,6 +2117,23 @@ function parseTrainerStepsInner(lower) {
     }
     steps.push({ type: 'recursion', what, from: 'discard' });
     appendTrailingDraw(steps, lower);
+    return { steps, recognizable: true };
+  }
+
+  // Moomoo Milk (custom, from LOT 185): "Choose up to 2 of your {C} Pokémon and heal each of
+  // them for 30 HP." Typed by the top card, so an evolved Pokémon counts by its own type.
+  const healChosen = lower.match(
+    /^choose up to (\d+) of your (?:\{([a-z])\} )?pok[ée]mon and heal each of them for (\d+) hp/
+  );
+  if (healChosen) {
+    const type = healChosen[2] ? POKEMON_TYPE_BY_SYMBOL[healChosen[2]] : null;
+    steps.push({
+      type: 'healAmount',
+      amount: Number(healChosen[3]),
+      target: `up to ${healChosen[1]} of your ${healChosen[2] ? `{${healChosen[2].toUpperCase()}} ` : ''}Pokémon`,
+      count: Number(healChosen[1]),
+      ...(type ? { types: [type] } : {}),
+    });
     return { steps, recognizable: true };
   }
 

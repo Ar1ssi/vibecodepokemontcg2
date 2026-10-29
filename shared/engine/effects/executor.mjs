@@ -1712,6 +1712,36 @@ export function executeSteps(draft, {
           break;
         }
 
+        // "Choose up to 2 of your {C} Pokémon and heal each of them" (Moomoo Milk).
+        if (step.count > 1) {
+          if (stepSelection) {
+            const picked = new Set(stepSelection);
+            inPlay.filter((c) => picked.has(c.instanceId)).slice(0, step.count).forEach(healOne);
+            break;
+          }
+          const choice = createPendingChoice({
+            player: playerId,
+            prompt: `${sourceCard?.name || 'Heal'}: Choose up to ${step.count} Pokémon to heal (${healAmt} HP each)`,
+            source: sourceCard?.name || '',
+            options: inPlay,
+            min: 0,
+            max: Math.min(step.count, inPlay.length),
+            cancellable: false,
+            stateVersion: draft.stateVersion,
+            stepIndex: idx,
+            resumeToken: {
+              effectType,
+              sourceInstanceId: sourceCard?.instanceId,
+              initiatorPlayerId: playerId,
+              stepIndex: idx,
+              steps,
+              context,
+              budgetCount: budget.count,
+            },
+          });
+          return { pendingChoice: choice, completed: false };
+        }
+
         let targetId = null;
         if (stepSelection && stepSelection.length > 0) {
           targetId = stepSelection[0];
