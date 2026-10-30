@@ -118,6 +118,12 @@ a drip tail; Scald adds a hiss.
   bounded by the rule against whiteouts over the struck card; Water Gun's narrow stream carries one
   continuous highlight line that edges toward a glass rod — break the stripe harder when the beam
   is under ~0.2 card heights.
+- **"Beam still seems too flat"** (pass 3, 2026-10-30, three rounds). Clear water with one
+  highlight line was a band: nothing across the tube said "round". Fix: Lambert shading across the
+  fake normal with the light well to the side (terminator past the axis, shadow half to the deep
+  stop, ambient 0.35), the refracted board darkened in the tube's shadow, a rim light on the
+  shadow edge, a broad lit-side sheen with the glint cut into lengths by the streak noise
+  (techniques § What makes a tube a tube). The round-8 frames read as a cylinder at ~40 px wide.
 - Hydro Pump as a chain of stacked rings → one solid widening beam that churns.
 - Aqua Tail's contact blades reading as ice → a water crescent (a curved tube) and a splash, no
   shards.

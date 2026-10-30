@@ -65,6 +65,14 @@ colour = body * diff + rimColour * fresnel * rimStrength + vec3(1.0) * spec * sp
 Trap: `specStrength` above ~1.2 on a large sphere makes a white blob; the glint is small because
 `shininess` is high, not because it is bright.
 
+**What makes a tube a tube** — an outline with one highlight line is a flat band, however good
+the refraction. Light the fake normal with the one scene light placed well to the side
+(`L ≈ (−0.75, 0, 0.66)`, ambient 0.35) so the terminator falls past the axis and the shadow half
+drops to the deep stop; add a *rim light* on the shadow side's edge (`fresnel × smoothstep(0.2, 0.8, nv)`),
+a broad sheen plus a glint string on the lit side, and let the refracted scene behind sit in the
+tube's shadow too (`behind × (0.55 + 0.45 × shade)`). Shadow half, bright far edge: that pair is the
+cylinder read, and it survives at ~40 px wide.
+
 **Bumped sheet** — a flat quad that reads as a surface: perturb `N.xy` by the gradient of a noise
 field (`N.xy += bump * (vec2(fbm(p + dx) - fbm(p - dx), fbm(p + dy) - fbm(p - dy)))`), renormalise.
 
