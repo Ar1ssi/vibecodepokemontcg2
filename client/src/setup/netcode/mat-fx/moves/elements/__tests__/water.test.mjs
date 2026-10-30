@@ -54,6 +54,20 @@ test('the beam drawer draws a solid water beam as an even column with a breaking
   assert.ok(tail && tail.params.dissolve > 0, 'the drawer burn reaches the element beam');
 });
 
+test('a thin solid beam (Hydro Pump\'s inner core, w ≤ 0.12) is a half-covering white-streak core without its own head splash', () => {
+  const { ctx, emits } = live();
+  DRAWERS.beam.draw(ctx, lane, 0.5, info({ kind: 'solid', w: 0.1 }));
+  const beams = emits.filter((e) => e.kind === 'waterBeam');
+  assert.equal(beams.length, 1);
+  assert.equal(beams[0].params.foam, 1);
+  assert.ok(beams[0].params.alpha <= 0.5, `core alpha ${beams[0].params.alpha}`);
+  assert.equal(emits.filter((e) => e.kind === 'sprite').length, 0, 'the wide beam owns the crown');
+  assert.equal(emits.filter((e) => e.kind === 'waterDrop').length, 0, 'and the droplets');
+  const wide = live();
+  DRAWERS.beam.draw(wide.ctx, lane, 0.5, info({ kind: 'widening', w: 0.32 }));
+  assert.ok(wide.emits.some((e) => e.kind === 'waterDrop'), 'the wide beam throws droplets');
+});
+
 test('helix and pulse-train beams fall back to the canvas drawer, whose bodies are drops', () => {
   const { ctx, emits } = live();
   DRAWERS.beam.draw(ctx, lane, 0.5, info({ kind: 'pulse-train' }));

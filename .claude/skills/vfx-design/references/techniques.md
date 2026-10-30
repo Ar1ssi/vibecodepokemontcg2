@@ -156,6 +156,9 @@ colour = mix(behind * tint, bodyColour, opacity);
 - Hiding what is behind (a solid drop) needs the covered pass to also write coverage, or the card
   shows through the bent copy of itself.
 - Without a copy, degrade to a tint, never to black.
+- Clear matter over a dark background goes black and reads as glass or ice. Add an **in-scatter**
+  term (`+ body × 0.3`) so the refracted middle keeps the element's colour, and make opacity a
+  Fresnel: clearest down the middle (~0.55), covering at the grazing sides (~0.9).
 
 ## Depth and ordering
 

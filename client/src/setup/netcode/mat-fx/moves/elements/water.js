@@ -8,8 +8,9 @@ import { beamPoint } from '../move-drawers.js';
 import { elementKit } from './_kit.js';
 import { alphaOf, dissolveOf, emit, rgb01, stageAngle, stageLen, stageOf } from './_emit.js';
 
-// beam 1.7: the SV Hydro Pump column is ~0.4 card heights wide at contact (Hydrocanon_EV.mp4, 2.5 s).
-export const WATER_SCALE = Object.freeze({ stream: 1.4, streamLength: 1.25, drop: 1.6, projectile: 1.8, beam: 1.7, glow: 1.4 });
+// beam 1.45: the SV Hydro Pump column is ~0.35 card heights wide at contact (Hydrocanon_EV.mp4, 2.5 s);
+// 1.7 read as a thick pipe next to the card.
+export const WATER_SCALE = Object.freeze({ stream: 1.4, streamLength: 1.25, drop: 1.6, projectile: 1.8, beam: 1.45, glow: 1.4 });
 const DROPLETS = 8;
 /** Droplets the breaking head throws while a beam holds: thrown out and up, falling under gravity. */
 const HEAD_DROPLETS = 6;
@@ -23,6 +24,8 @@ const GLOW_TEXTURE = 'TEX_VFX_Gradient_Radial.webp';
 const SPLASH_TEXTURE = 'TEX_VFX_Splash_Water_1x4.webp';
 const SPLATTER_TEXTURE = 'T_VFX_Water_Splash_2x2.webp';
 const SPLASH_FRAME_MS = 90;
+/** A solid beam this narrow (card heights) inside a wider one is the stream's bright core. */
+const CORE_MAX_W = 0.12;
 const DEG = Math.PI / 180;
 
 const paletteOf = (kit) => ({ deep: rgb01(kit.palette.deep), body: rgb01(kit.palette.body), hot: rgb01(kit.palette.hot) });
@@ -126,6 +129,11 @@ function beam(ctx, lane, s, info) {
   if (!(pose.to > pose.from)) return;
   const kind = info.params?.kind ?? 'solid';
   if (kind === 'helix' || kind === 'pulse-train') return false;
+  // A spec that stacks a thin solid beam inside a wide one (Hydro Pump) means "a bright core in
+  // one stream", not two tubes: the thin one is drawn as a fast white-streak core, half covering,
+  // and leaves the head's crown and droplets to the wide beam, or both the water and the splash
+  // doubled up into an opaque pipe.
+  const isCore = kind === 'solid' && (info.params?.w ?? CORE_MAX_W + 1) <= CORE_MAX_W;
   const palette = paletteOf(info.material);
   const width = stageLen(ctx, pose.width) * WATER_SCALE.beam;
   const dissolve = dissolveOf(ctx);
@@ -136,33 +144,36 @@ function beam(ctx, lane, s, info) {
       from: stageOf(ctx, a.x, a.y),
       to: stageOf(ctx, b.x, b.y),
       width: kind === 'segmented' ? width * 0.8 : width,
-      alpha: alphaOf(ctx, segment.alpha),
+      alpha: alphaOf(ctx, segment.alpha * (isCore ? 0.5 : 1)),
       seed: info.seed + index * 1.3,
       taper: 0,
-      flow: 2.4,
-      foam: 0.75,
+      flow: isCore ? 3.6 : 2.4,
+      foam: isCore ? 1 : 0.75,
       dissolve,
       palette,
     });
   }
+  if (isCore) return;
   // The head breaks into spray: the splash crown flipbook, upright over the landing point, three
   // copies a frame apart so the crown churns while the beam holds; fine splatter dots over it.
-  // Tinted (hot, no gain) and under full alpha: a white splash at 1.4 bloomed into a frost puff.
   const head = beamPoint(lane, pose.to, 0);
   const at = stageOf(ctx, head.x, head.y);
   const elapsed = info.elapsedMs ?? 0;
   const seed = info.seed ?? 0;
   const frame = Math.floor(elapsed / SPLASH_FRAME_MS);
-  const { hot } = info.material.palette;
-  for (let k = 0; k < 3; k += 1) {
+  // Foam is matter: the crown covers (over) in a tinted white instead of adding light, so two
+  // copies over the beam's own head foam stay a crown and do not sum into a white sheet.
+  const foam = rgb01(info.material.palette.hot, 1).map((c) => c * 0.4 + 0.6);
+  for (let k = 0; k < 2; k += 1) {
     emit(ctx, 'sprite', {
       texture: SPLASH_TEXTURE,
       at: { ...at, z: at.z + width * 0.45 },
-      size: width * (2.6 + 0.5 * k),
-      rotation: (k - 1) * 14 + seed * 3,
+      size: width * (3.0 + 0.6 * k),
+      rotation: (k - 0.5) * 18 + seed * 3,
       frame: frame + k,
-      colour: rgb01(hot, 1),
-      alpha: alphaOf(ctx, 0.75),
+      colour: foam,
+      alpha: alphaOf(ctx, 0.85),
+      blend: 'over',
       dissolve,
     });
   }
@@ -172,8 +183,9 @@ function beam(ctx, lane, s, info) {
     size: width * 3.2,
     rotation: seed * 40,
     frame,
-    colour: rgb01(hot, 1),
-    alpha: alphaOf(ctx, 0.5),
+    colour: foam,
+    alpha: alphaOf(ctx, 0.55),
+    blend: 'over',
     dissolve,
   });
   // Large droplets thrown off the head, rising then falling (SV: "large droplets hang and fall"):
@@ -186,7 +198,7 @@ function beam(ctx, lane, s, info) {
     const rise = width * 2.3 * (phase - phase * phase);
     emit(ctx, 'waterDrop', {
       at: { x: at.x + Math.cos(angle) * distance, y: at.y + Math.sin(angle) * distance * 0.6, z: at.z + width * 0.3 + rise },
-      radius: width * (0.17 - 0.06 * phase),
+      radius: width * (0.22 - 0.07 * phase),
       alpha: alphaOf(ctx, 0.9 * (1 - phase * phase)),
       seed: seed + k * 1.7,
       dissolve,

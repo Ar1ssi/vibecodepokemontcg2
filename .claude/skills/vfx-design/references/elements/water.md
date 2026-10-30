@@ -102,6 +102,22 @@ a drip tail; Scald adds a hiss.
   `waterDrop` spheres rising and falling; flank streak-drops aligned to their flight. Still open
   after round 3: the attacker's charge is the shared card-wide rim (design 078), a pale box that
   reads frosty next to SV's small orb at the mouth.
+- **"Too thick, no foam, wants clarity/shine"** (pass 2, 2026-10-30, three rounds). The frames
+  showed an opaque pipe: Hydro Pump stacks a thin `solid` beam inside its `widening` one and both
+  drew as full tubes at ~0.98 alpha, the refracted board was only 45 % of the colour, the stripe was
+  a soft band and the foam a faint tint. Fix: output alpha 0.55 down the middle rising to 0.9 at the
+  grazing sides (Fresnel opacity), foam covering fully; refraction 16 px with a body-colour
+  in-scatter term so the clear middle stays blue over the dark cloth (pale glass over black is ice);
+  the thin inner beam drawn as a half-alpha white-streak core (`CORE_MAX_W`) that leaves the head
+  to the wide beam; foam as three kinds — the beam texture's white cell web, flow-stretched streaks
+  warped by the ripple and broken into lengths, and a wide blobby froth band on the outer ~30 % of
+  each side; shine as a narrow stripe broken by the streaks, a far-side reflection stripe, a
+  pow-4 rim and sparkle points, all added as light after coverage; crown and splatter sprites
+  `blend: 'over'` in tinted white (three additive copies summed to a white sheet). Beam scale
+  1.7 → 1.45. Still open: the attacker rim box (078); the head splash is far smaller than SV's,
+  bounded by the rule against whiteouts over the struck card; Water Gun's narrow stream carries one
+  continuous highlight line that edges toward a glass rod — break the stripe harder when the beam
+  is under ~0.2 card heights.
 - Hydro Pump as a chain of stacked rings → one solid widening beam that churns.
 - Aqua Tail's contact blades reading as ice → a water crescent (a curved tube) and a splash, no
   shards.
