@@ -110,6 +110,17 @@ real hand card, writes frames, a video and frozen-time strips (`strip-self.png`,
 `.agent/scratch/deck-reveal/`. In the cloud container: `CHROMIUM=/opt/pw-browsers/chromium` and
 `SIO_JS=<node_modules/.pnpm/socket.io@*/node_modules/socket.io/client-dist/socket.io.min.js>`.
 
+## The seven rubric frames (vfx-design skill)
+
+`rec/seven-frames.mjs` renders one move spec at the vfx-design skill's seven beats (rest ·
+anticipation · travel · contact · contact + 120 ms · dissipation · settle) on a frozen scene clock,
+cropped to the two cards at 2× density, to `.agent/scratch/vfx-frames/<move>/`; `SIDE=opp` is the
+far seat, `IMPACT=1` adds the TCG Live impact, `CARD_IMG=<png|webp>` puts art on the cards when
+images.pokemontcg.io is blocked (a `client/src/assets/custom-sets/*/NNN/high.webp` works).
+`rec/seven-sheet.sh <dir> ours <reference-row.png>` labels, tiles and stacks them under a reference
+row for scoring. Use this, not `rec-move`, to judge a beat: SwiftShader records about one frame a
+second, so a real-time video of a 1.6 s scene holds two states.
+
 ## Attack impact prefabs (design 068, WebGL)
 
 TCG Live's impact prefabs draw on a WebGL2 canvas, so both recorders launch Chromium on

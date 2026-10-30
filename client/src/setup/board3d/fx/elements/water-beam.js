@@ -93,24 +93,33 @@ void main() {
   vec2 bend = vec2(nv * 10.0 + ripple * 8.0, ripple * 8.0);
   vec3 behind = elBoardAt(bend, vC.rgb * 0.35);
   vec3 tinted = behind * mix(vec3(1.0), vD.rgb * 1.15, 0.6);
-  vec3 caustic = vD.rgb;
+  // The caustic texture is a mask, not a colour: it runs the water between its deep and its body,
+  // so the column stays saturated. (Mixing the caustic toward white made the beam a pale slab.)
+  float causticMask = 0.5;
   if (uBeamReady > 0.5) {
-    caustic = texture(uBeam, vec2(0.5 + nv * 0.45, along * 0.22 - flow * 1.3)).rgb;
+    causticMask = texture(uBeam, vec2(0.5 + nv * 0.45, along * 0.22 - flow * 1.3)).r;
   }
-  // Thin streams show less of the (often dark) board through them and more of the water's own light.
-  vec3 colour = mix(tinted, caustic * mix(vD.rgb, vec3(1.0), 0.35), mix(0.5, 0.75, taper));
-  colour = mix(colour, vC.rgb, (1.0 - nz) * 0.35 * (1.0 - taper));
-  // Splash and spray read pale: a thin stream is mostly lit water and air, not deep blue.
-  colour = mix(colour, vE.rgb, 0.5 * taper);
-  // White water: streaks stretched along the flow, running fast toward the head.
+  vec3 water = mix(vC.rgb, vD.rgb, 0.35 + 0.65 * causticMask);
+  // Thin streams show less of the (often dark) board through them and more of the water's own colour.
+  vec3 colour = mix(tinted, water, mix(0.55, 0.8, taper));
+  // Darker toward the tube's sides: that gradient is the volume.
+  colour = mix(colour, vC.rgb, (1.0 - nz) * 0.45);
+  // A thin stream carries light at its crest only; its sides stay water-coloured, or it reads as ice.
+  colour = mix(colour, vE.rgb, 0.3 * taper * nz);
+  // White water: streaks stretched along the flow, running fast toward the head — the top ~15 %
+  // of the noise on a beam, not half of it. Foam is tinted white; pure white over blue reads as
+  // frost. A splash tongue (taper 1) is mostly torn water and air, so it froths far more than the
+  // column that feeds it: that contrast is what reads as "splash" next to "jet".
   float streak = elFbm(vec3(nv * 2.2, along * 0.45 - flow * 3.2, seed + 9.0));
+  float streakCut = 0.78 - 0.16 * taper;
   // Froth at the edges where the water tears, and at the head where it breaks.
-  float froth = 1.0 - smoothstep(0.0, 0.28, shape);
-  float foam = clamp(smoothstep(0.5, 0.68, streak) * (0.5 + 0.7 * (1.0 - nz)) + froth * (0.7 + 0.5 * taper) + smoothstep(0.85, 1.05, t) * 0.5, 0.0, 1.0) * vF.y;
-  colour = mix(colour, vec3(1.0), foam);
+  float froth = 1.0 - smoothstep(0.0, 0.18 + 0.1 * taper, shape);
+  float foam = clamp(smoothstep(streakCut, streakCut + 0.12, streak) * (0.4 + 0.6 * (1.0 - nz)) + froth * (0.45 + 0.55 * taper) + smoothstep(0.9, 1.05, t) * (0.45 + 0.3 * taper), 0.0, 1.0) * vF.y;
+  vec3 foamColour = mix(vE.rgb, vec3(1.0), 0.55);
+  colour = mix(colour, foamColour, foam);
   float fresnel = pow(1.0 - nz, 3.0);
   float stripe = exp(-pow((nv + 0.42) * 7.0, 2.0)) * (0.7 + 0.3 * ripple);
-  colour += vE.rgb * fresnel * 0.6 + vec3(1.0) * stripe * 0.7;
+  colour += vE.rgb * fresnel * 0.45 + mix(vE.rgb, vec3(1.0), 0.6) * stripe * 0.4;
   float edge;
   float alpha = coverage * vB.w * elDissolve(vec2(along * 0.4, v), vF.x, seed, edge);
   if (alpha <= 0.002) discard;

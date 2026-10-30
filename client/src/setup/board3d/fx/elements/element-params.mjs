@@ -47,10 +47,11 @@ export function firePalette(palette) {
 }
 
 /** Water's palette (materials/water.js PALETTE / 255): deep → body → hot. */
+// The water kit's palette (materials/water.js), SV-sampled: saturated turquoise, a pale hot stop only.
 export const WATER_PALETTE = Object.freeze({
-  deep: Object.freeze([46 / 255, 124 / 255, 230 / 255]),
-  body: Object.freeze([82 / 255, 180 / 255, 1]),
-  hot: Object.freeze([185 / 255, 232 / 255, 1]),
+  deep: Object.freeze([24 / 255, 120 / 255, 208 / 255]),
+  body: Object.freeze([46 / 255, 196 / 255, 240 / 255]),
+  hot: Object.freeze([136 / 255, 216 / 255, 248 / 255]),
 });
 
 export function waterPalette(palette) {
