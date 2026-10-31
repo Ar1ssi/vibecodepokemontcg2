@@ -381,17 +381,17 @@ const lathe = (props, x, y, profile, color) =>
 /** One iron lantern standing at (x, y) from z: a little hipped roof over four glowing panes. */
 const lantern = (props, x, y, z, u) => {
   const s = 1.3 * u;
-  props.box({ x, y, z0: z, z1: z + 4 * s, hw: 7 * s, hh: 7 * s, color: IRON });
-  props.box({ x, y, z0: z + 4 * s, z1: z + 22 * s, hw: 5.5 * s, hh: 5.5 * s, color: GLASS });
+  props.roundBox({ x, y, z0: z, z1: z + 4 * s, hw: 7 * s, hh: 7 * s, color: IRON });
+  props.roundBox({ x, y, z0: z + 4 * s, z1: z + 22 * s, hw: 5.5 * s, hh: 5.5 * s, color: GLASS });
   for (const [dx, dy] of [
     [-1, -1],
     [1, -1],
     [1, 1],
     [-1, 1],
   ]) {
-    props.box({ x: x + dx * 5.8 * s, y: y + dy * 5.8 * s, z0: z + 4 * s, z1: z + 22 * s, hw: 1.2 * s, hh: 1.2 * s, color: IRON });
+    props.roundBox({ x: x + dx * 5.8 * s, y: y + dy * 5.8 * s, z0: z + 4 * s, z1: z + 22 * s, hw: 1.2 * s, hh: 1.2 * s, color: IRON });
   }
-  props.box({ x, y, z0: z + 22 * s, z1: z + 25 * s, hw: 8.5 * s, hh: 8.5 * s, color: IRON });
+  props.roundBox({ x, y, z0: z + 22 * s, z1: z + 25 * s, hw: 8.5 * s, hh: 8.5 * s, color: IRON });
   const apex = [x, y, z + 34 * s];
   const c = [
     [x - 8.5 * s, y - 8.5 * s, z + 25 * s],
@@ -431,8 +431,8 @@ const GARDEN_FERN = Object.freeze({ leaf: [0.07, 0.3, 0.28, 0], leafLight: [0.12
 function gardenFurniture(props, { posts, vases, pillars, ground, ringR, centre, u }) {
   const height = BALUSTRADE.height * u;
   for (const post of posts) {
-    props.box({ x: post.x, y: post.y, z0: ground - 2, z1: ground + height + 4 * u, hw: 7 * u, hh: 7 * u, yaw: post.angle, color: STONE });
-    props.box({ x: post.x, y: post.y, z0: ground + height + 4 * u, z1: ground + height + 7 * u, hw: 9 * u, hh: 9 * u, yaw: post.angle, color: STONE });
+    props.roundBox({ x: post.x, y: post.y, z0: ground - 2, z1: ground + height + 4 * u, hw: 7 * u, hh: 7 * u, yaw: post.angle, color: STONE });
+    props.roundBox({ x: post.x, y: post.y, z0: ground + height + 4 * u, z1: ground + height + 7 * u, hw: 9 * u, hh: 9 * u, yaw: post.angle, color: STONE });
     if (post.lantern) lantern(props, post.x, post.y, ground + height + 7 * u, u);
     if (post.planter) {
       lathe(props, post.x, post.y, [
@@ -453,8 +453,8 @@ function gardenFurniture(props, { posts, vases, pillars, ground, ringR, centre, 
     const mid = { x: (post.x + next.x) / 2, y: (post.y + next.y) / 2 };
     const span = Math.hypot(next.x - post.x, next.y - post.y);
     const yaw = Math.atan2(next.y - post.y, next.x - post.x);
-    props.box({ x: mid.x, y: mid.y, z0: ground + height - 3 * u, z1: ground + height + 2 * u, hw: span / 2, hh: 5 * u, yaw, color: STONE });
-    props.box({ x: mid.x, y: mid.y, z0: ground - 2, z1: ground + 5 * u, hw: span / 2, hh: 5.5 * u, yaw, color: STONE });
+    props.roundBox({ x: mid.x, y: mid.y, z0: ground + height - 3 * u, z1: ground + height + 2 * u, hw: span / 2, hh: 5 * u, yaw, color: STONE });
+    props.roundBox({ x: mid.x, y: mid.y, z0: ground - 2, z1: ground + 5 * u, hw: span / 2, hh: 5.5 * u, yaw, color: STONE });
     const balusters = Math.max(2, Math.round(span / (13 * u)) - 1);
     for (let k = 1; k <= balusters; k += 1) {
       const f = k / (balusters + 1);
@@ -491,14 +491,14 @@ function gardenFurniture(props, { posts, vases, pillars, ground, ringR, centre, 
   for (const pillar of pillars) {
     const { x, y, r, h } = pillar;
     const turn = Math.atan2(y - centre.y, x - centre.x);
-    props.box({ x, y, z0: ground - 2, z1: ground + 14 * u, hw: r * 1.35, hh: r * 1.35, yaw: turn, color: PILLAR });
+    props.roundBox({ x, y, z0: ground - 2, z1: ground + 14 * u, hw: r * 1.35, hh: r * 1.35, yaw: turn, color: PILLAR });
     props.tube(
       Array.from({ length: 6 }, (_, k) => [x, y, ground + 14 * u + ((h - 30 * u) * k) / 5]),
       Array.from({ length: 6 }, (_, k) => r * (1 - 0.06 * (k / 5))),
       PILLAR,
       { sides: 16 }
     );
-    props.box({ x, y, z0: ground + h - 16 * u, z1: ground + h, hw: r * 1.25, hh: r * 1.25, yaw: turn, color: PILLAR });
+    props.roundBox({ x, y, z0: ground + h - 16 * u, z1: ground + h, hw: r * 1.25, hh: r * 1.25, yaw: turn, color: PILLAR });
   }
 }
 

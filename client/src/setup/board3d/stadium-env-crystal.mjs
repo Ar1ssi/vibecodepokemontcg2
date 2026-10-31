@@ -335,14 +335,14 @@ void main() {
   // 080) and broad soft stains across it.
   float calm = fieldCalm(p, 110.0);
   float stain = smoothstep(0.35, 0.7, fbm3(p / 180.0 + 6.0));
-  vec3 packed = mix(FLOOR_LIT, FLOOR_DARK, 0.2 + 0.45 * stain);
+  vec3 worn = mix(FLOOR_LIT, FLOOR_DARK, 0.2 + 0.45 * stain);
   vec3 stone = cobbles(p, 26.0, sunDir);
   vec3 cobble = mix(FLOOR_DARK * 1.2, FLOOR_LIT * 1.15, 0.35 + 0.5 * stone.y) * (0.88 + 0.32 * stone.z);
-  vec3 col = mix(mix(packed * 0.72, cobble, stone.x), packed, calm);
+  vec3 col = mix(mix(worn * 0.72, cobble, stone.x), worn, calm);
   // The walls: rough brown rock laid in strata, each course its own tone, its top faces catching the
   // skylight, sinking into the dark the further it climbs from the floor.
   vec2 course = strata(field.r, p, 18.0);
-  vec3 rock = mix(FLOOR_DARK * 0.8, FLOOR_LIT * 0.95, 0.25 + 0.5 * course.y) * (0.45 + 0.8 * lit) * course.x;
+  vec3 rock = mix(FLOOR_DARK * 0.8, FLOOR_LIT * 0.95, 0.25 + 0.5 * course.y) * (0.45 + 0.8 * lit) * mix(0.6, 1.0, course.x);
   rock += FLOOR_LIT * 1.2 * smoothstep(0.88, 0.5, n.z) * (0.3 + 0.7 * lit);
   col = mix(col, rock, wall);
   col *= mix(1.0, 0.3, smoothstep(40.0, uCave.y + 60.0, d));

@@ -354,7 +354,7 @@ function labSolids(props, spots) {
     }
     // A clamp across the pair every so often.
     for (let t = 40; t < bundle.length - 20; t += 110) {
-      props.box({
+      props.roundBox({
         x: bundle.x + dir[0] * t,
         y: bundle.y + dir[1] * t,
         z0: -DROP_PX,
@@ -391,7 +391,7 @@ function labSolids(props, spots) {
   const rise = DROP_PX / (STAIR.steps + 1);
   for (let i = 0; i < STAIR.steps; i += 1) {
     const centreRun = STAIR.tread * (i + 0.5) - 1;
-    props.box({
+    props.roundBox({
       x: stair.x + along[0] * centreRun,
       y: stair.y + along[1] * centreRun,
       z0: -DROP_PX,
@@ -404,7 +404,7 @@ function labSolids(props, spots) {
     });
     // A steel nosing along each tread's outer edge, so the steps read one by one from above.
     const edgeRun = STAIR.tread * (i + 1) - 2.5;
-    props.box({
+    props.roundBox({
       x: stair.x + along[0] * edgeRun,
       y: stair.y + along[1] * edgeRun,
       z0: -rise * (i + 1),
@@ -433,9 +433,9 @@ function labSolids(props, spots) {
     const s = Math.sin(yaw);
     // u runs along the row, v out from the dais (-hh the face to the dais, hh the back).
     const at = (u, v, z) => [x + u * c - v * s, y + u * s + v * c, z];
-    props.box({ x, y, z0: -DROP_PX, z1: CONSOLE.kick, hw: hw - 1, hh: hh - 1, yaw, color: KICK, topColor: KICK });
+    props.roundBox({ x, y, z0: -DROP_PX, z1: CONSOLE.kick, hw: hw - 1, hh: hh - 1, yaw, color: KICK, topColor: KICK });
     if (kind === 'upright') {
-      props.box({ x, y, z0: CONSOLE.kick, z1: CONSOLE.upright, hw, hh, yaw, color: CONSOLE_GREY, topColor: CONSOLE_GREY });
+      props.roundBox({ x, y, z0: CONSOLE.kick, z1: CONSOLE.upright, hw, hh, yaw, color: CONSOLE_GREY, topColor: CONSOLE_GREY });
       const face = -hh - 0.6;
       props.quad(at(-hw + 4, face, 0), at(hw - 14, face, 0), at(hw - 14, face, CONSOLE.upright - 6), at(-hw + 4, face, CONSOLE.upright - 6), BEZEL);
       props.quad(at(-hw + 7, face - 0.3, 3), at(hw - 17, face - 0.3, 3), at(hw - 17, face - 0.3, CONSOLE.upright - 9), at(-hw + 7, face - 0.3, CONSOLE.upright - 9), SCREEN);
@@ -447,7 +447,7 @@ function labSolids(props, spots) {
     }
     // A desk: its top slopes from `front` at the face to the dais (v -hh) up to `back` at the back.
     const topAt = (v) => CONSOLE.front + ((v + hh) / (2 * hh)) * (CONSOLE.back - CONSOLE.front);
-    props.box({ x, y, z0: CONSOLE.kick, z1: CONSOLE.front, hw, hh, yaw, color: CONSOLE_GREY, topColor: CONSOLE_GREY });
+    props.roundBox({ x, y, z0: CONSOLE.kick, z1: CONSOLE.front, hw, hh, yaw, color: CONSOLE_GREY, topColor: CONSOLE_GREY });
     props.quad(at(-hw, -hh, CONSOLE.front), at(hw, -hh, CONSOLE.front), at(hw, hh, CONSOLE.back), at(-hw, hh, CONSOLE.back), CONSOLE_GREY);
     for (const side of [-1, 1]) props.quad(at(side * hw, -hh, CONSOLE.front), at(side * hw, hh, CONSOLE.front), at(side * hw, hh, CONSOLE.back), at(side * hw, -hh, CONSOLE.front), CONSOLE_GREY);
     props.quad(at(-hw, hh, CONSOLE.front), at(hw, hh, CONSOLE.front), at(hw, hh, CONSOLE.back), at(-hw, hh, CONSOLE.back), CONSOLE_GREY);

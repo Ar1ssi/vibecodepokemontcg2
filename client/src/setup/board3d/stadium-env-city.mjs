@@ -185,8 +185,8 @@ function citySolids(props, { roof, hut, towers, round, beams = [] }) {
     if (!tower.board) continue;
     const { foot, top, y0, y1 } = billboardOf(roof, tower);
     for (const y of [y0 + 12, y1 - 12]) {
-      props.box({ x: foot.x, y, z0: tower.height, z1: foot.z, hw: 2.5, hh: 2.5, color: SIGN_POST });
-      props.box({ x: top.x, y, z0: tower.height, z1: top.z, hw: 2.5, hh: 2.5, color: SIGN_POST });
+      props.roundBox({ x: foot.x, y, z0: tower.height, z1: foot.z, hw: 2.5, hh: 2.5, color: SIGN_POST });
+      props.roundBox({ x: top.x, y, z0: tower.height, z1: top.z, hw: 2.5, hh: 2.5, color: SIGN_POST });
     }
   }
   // Each searchlight: a dark drum on a stand, its lens lit.
@@ -205,7 +205,7 @@ function citySolids(props, { roof, hut, towers, round, beams = [] }) {
         { x: tower.x - tower.w / 2 + t, y: tower.y, hw: t, hh: tower.d / 2 - 2 * t },
         { x: tower.x + tower.w / 2 - t, y: tower.y, hw: t, hh: tower.d / 2 - 2 * t },
       ]) {
-        props.box({ ...edge, z0: tower.height, z1: top, color: TOWER_PARAPET, topColor: COPING });
+        props.roundBox({ ...edge, z0: tower.height, z1: top, color: TOWER_PARAPET, topColor: COPING });
       }
     }
     if (tower.hazard) {
@@ -223,7 +223,7 @@ function citySolids(props, { roof, hut, towers, round, beams = [] }) {
     // On top: a machine room, a water tank, an antenna with its red aircraft light (a billboard's
     // tower carries the billboard instead).
     if (tower.height < 60 || tower.board) continue;
-    props.box({
+    props.roundBox({
       x: tower.x + tower.w * 0.18,
       y: tower.y - tower.d * 0.2,
       z0: tower.height,
@@ -235,7 +235,7 @@ function citySolids(props, { roof, hut, towers, round, beams = [] }) {
     props.cylinder({ x: tower.x - tower.w * 0.22, y: tower.y + tower.d * 0.24, z0: tower.height, z1: tower.height + 30, r: 16, color: [0.24, 0.22, 0.22, 0.3], sides: 14 });
     const mast = { x: tower.x - tower.w * 0.1, y: tower.y - tower.d * 0.3 };
     props.cylinder({ x: mast.x, y: mast.y, z0: tower.height, z1: tower.height + 58, r: 1.6, color: [0.3, 0.3, 0.34, 0.6], sides: 6 });
-    props.box({ x: mast.x, y: mast.y, z0: tower.height + 58, z1: tower.height + 63, hw: 2.8, hh: 2.8, color: [1.5, 0.12, 0.08, 2.0] });
+    props.roundBox({ x: mast.x, y: mast.y, z0: tower.height + 58, z1: tower.height + 63, hw: 2.8, hh: 2.8, color: [1.5, 0.12, 0.08, 2.0] });
   }
   const lo = { x: roof.x - roof.hw, y: roof.y - roof.hh };
   const hi = { x: roof.x + roof.hw, y: roof.y + roof.hh };
@@ -248,21 +248,21 @@ function citySolids(props, { roof, hut, towers, round, beams = [] }) {
   ];
   walls.forEach((wall, i) => {
     if (i !== 2) {
-      props.box({ ...wall, z0: 0, z1: PARAPET.height, color: CONCRETE, topColor: COPING });
+      props.roundBox({ ...wall, z0: 0, z1: PARAPET.height, color: CONCRETE, topColor: COPING });
       return;
     }
     // The left parapet, turned so its face to the roof takes the art's red-magenta wash.
-    props.box({ x: wall.x, y: wall.y, z0: 0, z1: PARAPET.height, hw: wall.hh, hh: wall.hw, yaw: Math.PI / 2, color: CONCRETE, topColor: COPING, frontColor: PARAPET_RED });
+    props.roundBox({ x: wall.x, y: wall.y, z0: 0, z1: PARAPET.height, hw: wall.hh, hh: wall.hw, yaw: Math.PI / 2, color: CONCRETE, topColor: COPING, frontColor: PARAPET_RED });
   });
   // The hut, as the art's: low concrete walls, a flat roof with a vent; on its face to the cards (the
   // face both presets see) a maroon door at its near end under a bright lamp, two dark windows
   // along the rest. The box is turned so that face takes the lamp's light.
-  props.box({ x: hut.x, y: hut.y, z0: 0, z1: hut.h, hw: hut.d / 2, hh: hut.w / 2, yaw: -Math.PI / 2, color: HUT_WALL, topColor: HUT_ROOF, frontColor: HUT_FACE_LIT });
-  props.box({ x: hut.x + 14, y: hut.y + hut.d * 0.2, z0: hut.h, z1: hut.h + 12, hw: 12, hh: 14, color: MACHINE });
+  props.roundBox({ x: hut.x, y: hut.y, z0: 0, z1: hut.h, hw: hut.d / 2, hh: hut.w / 2, yaw: -Math.PI / 2, color: HUT_WALL, topColor: HUT_ROOF, frontColor: HUT_FACE_LIT });
+  props.roundBox({ x: hut.x + 14, y: hut.y + hut.d * 0.2, z0: hut.h, z1: hut.h + 12, hw: 12, hh: 14, color: MACHINE });
   const faceX = hut.x - hut.w / 2 - 0.6;
   const doorY = hut.y - hut.d / 2 + 10;
   props.quad([faceX, doorY + 30, 0], [faceX, doorY, 0], [faceX, doorY, 34], [faceX, doorY + 30, 34], DOOR_RED);
-  props.box({ x: faceX - 3, y: doorY + 15, z0: 37, z1: 41, hw: 3, hh: 8, color: LAMP });
+  props.roundBox({ x: faceX - 3, y: doorY + 15, z0: 37, z1: 41, hw: 3, hh: 8, color: LAMP });
   for (const y0 of [hut.y - 4, hut.y + 24]) {
     props.quad([faceX, y0 + 20, 16], [faceX, y0, 16], [faceX, y0, 28], [faceX, y0 + 20, 28], HUT_WINDOW);
   }
@@ -282,7 +282,7 @@ function citySolids(props, { roof, hut, towers, round, beams = [] }) {
 export function cityBuildings({ towers, round }) {
   const props = createPropBuilder();
   towers.forEach((tower, i) => {
-    props.box({
+    props.roundBox({
       x: tower.x,
       y: tower.y,
       z0: -STREET_PX,

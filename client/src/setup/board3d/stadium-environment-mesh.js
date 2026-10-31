@@ -116,7 +116,8 @@ varying vec2 vUv;
 vec4 tiltShift(sampler2D plate, vec2 uv) {
   float away = smoothstep(uTiltShift.y, 0.5, abs(uv.y - uTiltShift.x));
   float radius = uTiltShift.z * away * away;
-  if (radius < 0.35) return texture2D(plate, uv);
+  // An explicit level: the radius varies down the screen, so implicit derivatives are not to be trusted here.
+  if (radius < 0.35) return textureLod(plate, uv, 0.0);
   vec2 texel = 1.0 / vec2(textureSize(plate, 0));
   float lod = max(log2(radius) - 0.5, 0.0);
   vec4 sum = textureLod(plate, uv, lod) * 0.2;
@@ -628,19 +629,20 @@ export function jungleTreeProps(trees) {
       props.tube(points, radii, JUNGLE_BARK, { sides: 12 });
     }
   }
-  // Each crown a cluster of leafy lumps (design 082), dark in the creases between them.
+  // Each crown a cluster of leafy lumps (design 082), dark in the creases between them, built about
+  // the crown's centre so the leaves on its flat tops lie outward from it.
   for (const tree of trees) {
     const palette = JUNGLE_CROWNS[tree.palette] ?? JUNGLE_CROWNS[0];
     const lumps = tree.puffs.map((puff) => ({
-      x: puff.x,
-      y: puff.y,
+      x: puff.x - tree.cx,
+      y: puff.y - tree.cy,
       z: puff.z,
       rx: puff.r,
       rz: puff.r * 0.82,
       color: palette.body.map((v, k) => (k < 3 ? v + (palette.light[k] - v) * puff.shade : 0)),
     }));
     const leaf = Math.max(6, (tree.puffs.reduce((sum, puff) => sum + puff.r, 0) / Math.max(1, tree.puffs.length)) * 0.2);
-    props.look({ kind: LOOK.foliage, leaf }, () => props.lumps(lumps, { crease: 0.5 }));
+    props.at({ x: tree.cx, y: tree.cy, ground: false }, () => props.look({ kind: LOOK.foliage, leaf }, () => props.lumps(lumps, { crease: 0.5 })));
   }
   props.look({ kind: LOOK.foliage, sway: 0.8 }, () => {
     for (const tree of trees) {

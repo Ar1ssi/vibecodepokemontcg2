@@ -35,6 +35,9 @@ export const LOOK = Object.freeze({ plain: 0, foliage: 1, gloss: 2, crystal: 3, 
  */
 export const DEFAULT_LOOK = Object.freeze({ kind: LOOK.plain, sway: 0, shade: 1, leaf: 0 });
 
+/** The most a roundBox's edges round without an `r` of their own, px. */
+export const ROUND_EDGE_MAX = 8;
+
 const IDENTITY = Object.freeze({ m: Object.freeze([1, 0, 0, 0, 1, 0, 0, 0, 1]), t: Object.freeze([0, 0, 0]), k: 1 });
 
 const multiply = (a, b) => {
@@ -375,11 +378,15 @@ export function createPropBuilder() {
   /**
    * A box from z0 to z1, half sizes hw (along its yaw) and hh, its every edge rounded at radius r
    * (an inner box swept by a ball: smooth normals round each edge), turned by yaw; its five faces
-   * but the floor. Vertices facing up (n.z > 0.5) take `topColor`.
+   * but the floor. Without `r` its edges round at a third of its smallest half size, at most
+   * ROUND_EDGE_MAX px: the art bible's soft toy edge, which on a building would read as a cushion
+   * (design 082). Vertices facing up (n.z > 0.5) take `topColor`, the rest of its front (the -hh
+   * side, as `box` paints it) `frontColor`.
    */
-  const roundBox = ({ x, y, z0, z1, hw, hh, r, yaw = 0, color, topColor = color }) => {
+  const roundBox = ({ x, y, z0, z1, hw, hh, r, yaw = 0, color, topColor = color, frontColor = color }) => {
     const half = [hw, hh, (z1 - z0) / 2];
-    const radius = Math.max(0, Math.min(r, 0.999 * Math.min(...half)));
+    const edge = Number.isFinite(r) ? r : Math.min(Math.min(...half) / 3, ROUND_EDGE_MAX);
+    const radius = Math.max(0, Math.min(edge, 0.999 * Math.min(...half)));
     // The inner box the ball sweeps: inset by the radius but at its floor, which stands square on
     // the ground (its bottom edges are not rounded).
     const low = [radius - hw, radius - hh, -half[2]];
@@ -417,7 +424,7 @@ export function createPropBuilder() {
           const local = core.map((value, k) => value + n[k] * radius);
           const world = [centre[0] + local[0] * c - local[1] * s, centre[1] + local[0] * s + local[1] * c, centre[2] + local[2]];
           const facing = [n[0] * c - n[1] * s, n[0] * s + n[1] * c, n[2]];
-          vertex(world, facing, facing[2] > 0.5 ? topColor : color);
+          vertex(world, facing, facing[2] > 0.5 ? topColor : n[1] < -0.5 ? frontColor : color);
         }
       }
       const width = us.length;

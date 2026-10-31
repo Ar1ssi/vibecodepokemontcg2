@@ -297,13 +297,19 @@ function crown(props, spots, u) {
     props.tube([fork, mid, [ball.x, ball.y, ball.z - ball.r * 0.4]], [tree.top * 0.4, tree.top * 0.28, tree.top * 0.14], BARK, { sides: 9 });
   }
   // Each ball a leafy lump, a lighter one on its sunward top (the art's yellow light), the crown
-  // dark in the creases between them.
+  // dark in the creases between them; built about the trunk so the leaves on its flat tops lie
+  // outward from it.
   const [sx, sy] = GRAND_SUN;
-  const lumps = balls.flatMap((ball) => [
-    { x: ball.x, y: ball.y, z: ball.z, rx: ball.r, rz: ball.r * 0.82, color: FOLIAGE },
-    { x: ball.x + sx * ball.r * 0.3, y: ball.y + sy * ball.r * 0.3, z: ball.z + ball.r * 0.4, rx: ball.r * 0.62, rz: ball.r * 0.5, color: FOLIAGE_LIT },
-  ]);
-  props.look({ kind: LOOK.foliage, leaf: 12 * u }, () => props.lumps(lumps, { crease: 0.5 }));
+  const lumps = balls.flatMap((ball) => {
+    const [x, y] = [ball.x - tree.x, ball.y - tree.y];
+    return [
+      { x, y, z: ball.z, rx: ball.r, rz: ball.r * 0.82, color: FOLIAGE },
+      { x: x + sx * ball.r * 0.3, y: y + sy * ball.r * 0.3, z: ball.z + ball.r * 0.4, rx: ball.r * 0.62, rz: ball.r * 0.5, color: FOLIAGE_LIT },
+    ];
+  });
+  props.at({ x: tree.x, y: tree.y, ground: false }, () =>
+    props.look({ kind: LOOK.foliage, leaf: 12 * u }, () => props.lumps(lumps, { crease: 0.5 }))
+  );
 }
 
 /** Everything solid, as one kit builder (design 081). */

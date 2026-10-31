@@ -64,6 +64,7 @@
 - I1 2026-09-07 P2 [rules] Legacy ISSUES.txt items unverified: turn-start auto-draw both players (I1), +Turn/End Turn rework (I2), Garland Ray discard parse on multipliers (I3) (merged I1–I3)
 
 ## Closed (newest first; older history in the archive)
+- I273 2026-10-31 P3 [mat-fx] Brooklet Hill, Steel Shelter, Scorched Earth, Magma Basin off the Stadium kit: GLSL-only or own-shader solids (refs: D233, design 081) → closed 2026-10-31: design 082; Brooklet's rocks and bushes are kit props, Shelter kit-lit, Scorched/Magma stay baked (082 Deviations)
 - I242 2026-10-11 P3 [board-ui] Card focus gaps (merged I242, I243): own Active only, no buff/debuff HUD, no damage split for W/R tint and arrows (refs: D208, design 067) → closed 2026-10-16: design 074, D219; action drawer wontfix (not in landscape)
 - I250 2026-10-15 P2 [engine] reduce.mjs was 10,976 lines, 186 commits in 2 months; applyCommand 2,322 lines, 123 cases behind 3 exports (073 B) → closed 2026-10-16: split into reduce/<domain>.mjs (14 modules, largest 1,910) behind the same exports; token-identical, oracle unchanged (D218)
 - I252 2026-10-15 P3 [deck-builder] Data as code: coins.mjs 9,647 lines at boot, set-browser.mjs 720 JSON lines, 160 lines twice across the B&B flows (073 D) → closed 2026-10-16: JSON in assets/catalogs/ via catalog-loader.mjs on first use; flows share bb-shared.js; boot weight → I260

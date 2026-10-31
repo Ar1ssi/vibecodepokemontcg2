@@ -203,7 +203,7 @@ const GRATE = [0.04, 0.045, 0.08, 0];
 /** A wall: panelled blue boards, a dark grate band, a glowing cyan strip near the top, vertical ribs. */
 function wall(props, box, height, face, u) {
   const mid = [(box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2];
-  props.box({ x: mid[0], y: mid[1], z0: -2, z1: height, hw: (box.x1 - box.x0) / 2, hh: (box.y1 - box.y0) / 2, color: WALL, topColor: WALL_LIGHT });
+  props.roundBox({ x: mid[0], y: mid[1], z0: -2, z1: height, hw: (box.x1 - box.x0) / 2, hh: (box.y1 - box.y0) / 2, color: WALL, topColor: WALL_LIGHT });
   const a = face === 'right' ? [box.x1, box.y0] : face === 'left' ? [box.x0, box.y1] : [box.x0, box.y0];
   const b = face === 'right' ? [box.x1, box.y1] : face === 'left' ? [box.x0, box.y0] : [box.x1, box.y0];
   wallBand(props, { a, b, depth: 8 * u, z0: -2, z1: 18 * u, over: 4 * u, color: WALL_DARK });
@@ -218,7 +218,7 @@ function wall(props, box, height, face, u) {
   const count = Math.max(3, Math.round(length / (120 * u)));
   for (let k = 0; k <= count; k += 1) {
     const s = (length * k) / count;
-    props.box({ x: a[0] + along[0] * s + out[0] * 4 * u, y: a[1] + along[1] * s + out[1] * 4 * u, z0: 24 * u, z1: height - 24 * u, hw: 4 * u, hh: 4 * u, yaw: Math.atan2(along[1], along[0]), color: FRAME });
+    props.roundBox({ x: a[0] + along[0] * s + out[0] * 4 * u, y: a[1] + along[1] * s + out[1] * 4 * u, z0: 24 * u, z1: height - 24 * u, hw: 4 * u, hh: 4 * u, yaw: Math.atan2(along[1], along[0]), color: FRAME });
   }
 }
 

@@ -5,14 +5,10 @@ import * as brooklet from '../stadium-env-brooklet.mjs';
 import {
   BANK_CEILING_PX,
   BAY_MAX,
-  BEACH_RISE_PX,
-  CLIFF_RISE_PX,
   FALL_MAX,
-  LEDGE_TOP_PX,
   ROCK_MAX,
   STONEWORK_PARTS,
   SUNKEN_MAX,
-  TERRACE_RISE_PX,
   TOWER_MAX,
   brookletSpots,
 } from '../stadium-env-brooklet-layout.mjs';
@@ -81,14 +77,40 @@ test('the stonework shader reads the parts as the layout numbers them', () => {
   assert.match(brooklet.STONEWORK_FRAGMENT, /bool top = \(part > 0\.5 && part < 1\.5\) \|\| \(part > 3\.5 && part < 4\.5\);/);
 });
 
-test('the land ceiling the screen test bounds is still the bake\'s highest ground (design 082)', () => {
-  // The banks rise highest: beach, cliff and terrace, each with its swell of ±2 px; the hill's
-  // ledge and the near path stay under them.
-  assert.equal(BANK_CEILING_PX, BEACH_RISE_PX + CLIFF_RISE_PX + TERRACE_RISE_PX + 4);
-  assert.ok(LEDGE_TOP_PX < BANK_CEILING_PX);
-  assert.match(brooklet.FIELD_FRAGMENT, /h \+= 40\.000 \* riser\(\(land - beach\) \/ 14\.000\);/);
-  assert.match(brooklet.FIELD_FRAGMENT, /h \+= 32\.000 \* riser\(/);
-  assert.match(brooklet.FIELD_FRAGMENT, /return h \+ 4\.0 \* \(fbm3\(p \/ 140\.0\) - 0\.5\)/);
+test('the land ceiling the screen test bounds is above the bake\'s highest ground (design 082)', () => {
+  // Read the bake's own height functions: each rise's height and each swell's amplitude (fbm3 - 0.5
+  // lies within ±0.5), so a rise raised in the shader without the ceiling fails here. groundHeight
+  // blends the zones with shares where the bank takes what the hill and the near shore leave, so the
+  // land stays under the bank's top, or the hill's and the near shore's together where both overlap.
+  const source = brooklet.FIELD_FRAGMENT;
+  const body = (name) => {
+    const match = new RegExp(`float ${name}\\(vec2 p, float land\\) \\{([\\s\\S]*?)\\n\\}`).exec(source);
+    assert.ok(match, `${name} is in the bake`);
+    return match[1];
+  };
+  const numbers = (text, pattern) => [...text.matchAll(pattern)].map((match) => Number(match[1]));
+  const constant = (name) => numbers(source, new RegExp(`const float ${name} = (\\d+\\.\\d+);`, 'g'))[0];
+
+  const bank = body('bankHeight');
+  const rises = numbers(bank, /h \+?= (\d+\.\d+) \* (?:smoothstep|riser)\(/g);
+  const [bankSwell] = numbers(bank, /return h \+ (\d+\.\d+) \* \(fbm3\(/g);
+  assert.equal(rises.length, 3, 'the beach, the cliff and the terrace');
+  const bankTop = rises.reduce((sum, rise) => sum + rise, 0) + bankSwell / 2;
+
+  const hill = body('hillHeight');
+  const [flats] = numbers(hill, /float flats = (\d+\.\d+) \* smoothstep\(/g);
+  const [ledgeSwell] = numbers(hill, /LEDGE_TOP - DROP \+ (\d+\.\d+) \* \(fbm3\(/g);
+  const hillTop = Math.max(flats, constant('LEDGE_TOP') - constant('DROP') + ledgeSwell / 2);
+
+  const near = body('nearHeight');
+  const [path] = numbers(near, /float h = (\d+\.\d+) \* smoothstep\(/g);
+  const [nearSwell] = numbers(near, /\+ (\d+\.\d+) \* \(fbm3\(/g);
+  const nearTop = path + nearSwell / 2;
+
+  for (const value of [bankTop, hillTop, nearTop]) assert.ok(Number.isFinite(value), 'every height read from the bake');
+  const highest = Math.max(bankTop, hillTop + nearTop);
+  assert.ok(highest <= BANK_CEILING_PX, `the land rises to ${highest} px, the ceiling is ${BANK_CEILING_PX}`);
+  assert.ok(BANK_CEILING_PX - bankTop <= 4, 'the ceiling hugs the banks, so the bushes are not held needlessly far from the cards');
 });
 
 test('no boulder or bush covers a card on screen, in either camera preset, the bushes risen on the land (design 082)', () => {

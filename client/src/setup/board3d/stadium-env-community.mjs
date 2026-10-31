@@ -410,7 +410,7 @@ function communityHall(props, spots) {
   const { hall, canopy, banner, flag, benches, u } = spots;
   const H = hall.height;
   const mid = [(hall.x0 + hall.x1) / 2, (hall.y0 + hall.y1) / 2];
-  props.box({ x: mid[0], y: mid[1], z0: -2, z1: H, hw: (hall.x1 - hall.x0) / 2, hh: (hall.y1 - hall.y0) / 2, color: WALL, topColor: ROOF_TOP });
+  props.roundBox({ x: mid[0], y: mid[1], z0: -2, z1: H, hw: (hall.x1 - hall.x0) / 2, hh: (hall.y1 - hall.y0) / 2, color: WALL, topColor: ROOF_TOP });
   const faces = [
     { a: [hall.x1, hall.y0], b: [hall.x1, hall.y1], length: hall.y1 - hall.y0 },
     { a: [hall.x0, hall.y0], b: [hall.x1, hall.y0], length: hall.x1 - hall.x0 },
@@ -434,18 +434,18 @@ function communityHall(props, spots) {
   }
   // The roof's units: a stair hut at the near end, three air handlers with fans, a row of skylights.
   const length = hall.y1 - hall.y0;
-  props.box({ x: hall.x1 - 52 * u, y: hall.y0 + 44 * u, z0: H, z1: H + 30 * u, hw: 30 * u, hh: 24 * u, color: WALL, topColor: UNIT_TOP });
-  props.box({ x: hall.x1 - 22 * u, y: hall.y0 + 44 * u, z0: H, z1: H + 22 * u, hw: 1, hh: 9 * u, color: GLASS });
+  props.roundBox({ x: hall.x1 - 52 * u, y: hall.y0 + 44 * u, z0: H, z1: H + 30 * u, hw: 30 * u, hh: 24 * u, color: WALL, topColor: UNIT_TOP });
+  props.roundBox({ x: hall.x1 - 22 * u, y: hall.y0 + 44 * u, z0: H, z1: H + 22 * u, hw: 1, hh: 9 * u, color: GLASS });
   for (const [share, side] of [[0.3, 0.3], [0.62, 0.42], [0.86, 0.3]]) {
     const x = hall.x0 + (hall.x1 - hall.x0) * side;
     const y = hall.y0 + length * share;
-    props.box({ x, y, z0: H, z1: H + 16 * u, hw: 24 * u, hh: 18 * u, color: UNIT, topColor: UNIT_TOP });
+    props.roundBox({ x, y, z0: H, z1: H + 16 * u, hw: 24 * u, hh: 18 * u, color: UNIT, topColor: UNIT_TOP });
     props.cylinder({ x, y, z0: H + 16 * u, z1: H + 17.4 * u, r: 13 * u, color: [0.1, 0.11, 0.13, 0.3], sides: 14 });
   }
   for (let k = 0; k < 4; k += 1) {
     const x = (hall.x0 + hall.x1) / 2 + 24 * u;
     const y = hall.y0 + length * (0.18 + 0.19 * k) + 20 * u;
-    props.box({ x, y, z0: H, z1: H + 6 * u, hw: 34 * u, hh: 20 * u, color: UNIT, topColor: GLASS });
+    props.roundBox({ x, y, z0: H, z1: H + 6 * u, hw: 34 * u, hh: 20 * u, color: UNIT, topColor: GLASS });
   }
   // The banner down the face, pale glyphs on it.
   const face = hall.x1 + 1.6 * u;
@@ -455,7 +455,7 @@ function communityHall(props, spots) {
     props.quad([face + 0.4 * u, banner.y + banner.w - 5 * u, z], [face + 0.4 * u, banner.y + 5 * u, z], [face + 0.4 * u, banner.y + 5 * u, z + 14 * u], [face + 0.4 * u, banner.y + banner.w - 5 * u, z + 14 * u], GLYPH);
   }
   // The awning over the door: a red-brown slab on two white posts.
-  props.box({ x: (canopy.x0 + canopy.x1) / 2, y: (canopy.y0 + canopy.y1) / 2, z0: canopy.z0, z1: canopy.z1, hw: (canopy.x1 - canopy.x0) / 2, hh: (canopy.y1 - canopy.y0) / 2, color: ROOF_BAND, topColor: ROOF_BAND_DARK });
+  props.roundBox({ x: (canopy.x0 + canopy.x1) / 2, y: (canopy.y0 + canopy.y1) / 2, z0: canopy.z0, z1: canopy.z1, hw: (canopy.x1 - canopy.x0) / 2, hh: (canopy.y1 - canopy.y0) / 2, color: ROOF_BAND, topColor: ROOF_BAND_DARK });
   for (const y of [canopy.y0 + 8 * u, canopy.y1 - 8 * u]) props.cylinder({ x: canopy.x1 - 6 * u, y, z0: -2, z1: canopy.z0, r: 2.6 * u, color: POLE, sides: 8 });
   // The flag: a green banner with a white diamond on a pole standing on the roof, flying toward the far end.
   const top = flag.base + flag.h;
@@ -471,7 +471,7 @@ function communityHall(props, spots) {
   props.quad([cx, cy, cz - 13 * u], [cx + 0.5 * u, cy + 13 * u, cz], [cx, cy, cz + 13 * u], [cx + 0.5 * u, cy - 13 * u, cz], FLAG_WHITE);
   // Two concrete benches along the face.
   for (const bench of benches) {
-    props.box({ x: bench.x, y: bench.y, z0: -2, z1: bench.h, hw: bench.w / 2, hh: bench.d / 2, color: CONCRETE, topColor: [0.62, 0.66, 0.72, 0] });
+    props.roundBox({ x: bench.x, y: bench.y, z0: -2, z1: bench.h, hw: bench.w / 2, hh: bench.d / 2, color: CONCRETE, topColor: [0.62, 0.66, 0.72, 0] });
   }
 }
 
@@ -490,12 +490,12 @@ function communityTent(props, spots) {
     props.quad([x0, y0, tent.post - 9 * u], [x1, y1, tent.post - 9 * u], [x1, y1, tent.post], [x0, y0, tent.post], TENT_EDGE);
   }
   // A counter under it.
-  props.box({ x: tent.x, y: tent.y + half * 0.45, z0: -2, z1: 24 * u, hw: half * 0.7, hh: 9 * u, color: KIOSK_TOP });
+  props.roundBox({ x: tent.x, y: tent.y + half * 0.45, z0: -2, z1: 24 * u, hw: half * 0.7, hh: 9 * u, color: KIOSK_TOP });
   for (const kiosk of kiosks) {
     const body = kiosk.green ? KIOSK_G : KIOSK_R;
-    props.box({ x: kiosk.x, y: kiosk.y, z0: -2, z1: kiosk.h, hw: kiosk.w / 2, hh: kiosk.d / 2, color: body, topColor: KIOSK_TOP });
-    props.box({ x: kiosk.x - kiosk.w / 2 + 1 * u, y: kiosk.y, z0: kiosk.h * 0.38, z1: kiosk.h * 0.7, hw: 1.5 * u, hh: kiosk.d * 0.36, color: GLASS });
-    props.box({ x: kiosk.x - kiosk.w / 2 - 4 * u, y: kiosk.y, z0: kiosk.h * 0.72, z1: kiosk.h * 0.76, hw: 7 * u, hh: kiosk.d * 0.44, color: kiosk.green ? [0.9, 0.95, 0.9, 0.2] : [0.95, 0.95, 0.95, 0.2] });
+    props.roundBox({ x: kiosk.x, y: kiosk.y, z0: -2, z1: kiosk.h, hw: kiosk.w / 2, hh: kiosk.d / 2, color: body, topColor: KIOSK_TOP });
+    props.roundBox({ x: kiosk.x - kiosk.w / 2 + 1 * u, y: kiosk.y, z0: kiosk.h * 0.38, z1: kiosk.h * 0.7, hw: 1.5 * u, hh: kiosk.d * 0.36, color: GLASS });
+    props.roundBox({ x: kiosk.x - kiosk.w / 2 - 4 * u, y: kiosk.y, z0: kiosk.h * 0.72, z1: kiosk.h * 0.76, hw: 7 * u, hh: kiosk.d * 0.44, color: kiosk.green ? [0.9, 0.95, 0.9, 0.2] : [0.95, 0.95, 0.95, 0.2] });
   }
 }
 

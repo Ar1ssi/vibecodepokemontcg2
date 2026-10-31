@@ -448,7 +448,7 @@ function roomWalls(props, spots) {
   const faces = innerFaces(room);
   const H = wallHeight;
   for (const wall of walls) {
-    props.box({ x: (wall.x0 + wall.x1) / 2, y: (wall.y0 + wall.y1) / 2, z0: -2, z1: H, hw: (wall.x1 - wall.x0) / 2, hh: (wall.y1 - wall.y0) / 2, color: WALL_ORANGE, topColor: RAIL_RED });
+    props.roundBox({ x: (wall.x0 + wall.x1) / 2, y: (wall.y0 + wall.y1) / 2, z0: -2, z1: H, hw: (wall.x1 - wall.x0) / 2, hh: (wall.y1 - wall.y0) / 2, color: WALL_ORANGE, topColor: RAIL_RED });
     const face = faces[wall.name];
     const length = Math.hypot(face.b[0] - face.a[0], face.b[1] - face.a[1]);
     const depth = 8 * u;
@@ -542,7 +542,7 @@ function receptionCounter(props, counter, u) {
   }
   // The healing machine: a white body, a silver tray with six balls on a lit pad, a monitor behind.
   const [mx, my] = point(0, r - 18 * u, 0);
-  props.box({ x: mx, y: my, z0: zt, z1: zt + 14 * u, hw: 15 * u, hh: 34 * u, color: COUNTER_BODY, topColor: SILVER });
+  props.roundBox({ x: mx, y: my, z0: zt, z1: zt + 14 * u, hw: 15 * u, hh: 34 * u, color: COUNTER_BODY, topColor: SILVER });
   props.quad([mx - 12 * u, my - 29 * u, zt + 14.4 * u], [mx + 12 * u, my - 29 * u, zt + 14.4 * u], [mx + 12 * u, my + 29 * u, zt + 14.4 * u], [mx - 12 * u, my + 29 * u, zt + 14.4 * u], GLOW_PAD);
   for (const dy of [-19, 0, 19]) {
     for (const dx of [-6.5, 6.5]) {
@@ -550,7 +550,7 @@ function receptionCounter(props, counter, u) {
       props.cylinder({ x: mx + dx * u, y: my + dy * u, z0: zt + 22.6 * u, z1: zt + 23.4 * u, r: 1.7 * u, color: BALL_WHITE, sides: 8 });
     }
   }
-  props.box({ x: mx - dir * 12 * u, y: my, z0: zt + 14 * u, z1: zt + 52 * u, hw: 2.2 * u, hh: 30 * u, color: MONITOR });
+  props.roundBox({ x: mx - dir * 12 * u, y: my, z0: zt + 14 * u, z1: zt + 52 * u, hw: 2.2 * u, hh: 30 * u, color: MONITOR });
   props.quad([mx - dir * 9.6 * u, my - 27 * u, zt + 20 * u], [mx - dir * 9.6 * u, my + 27 * u, zt + 20 * u], [mx - dir * 9.6 * u, my + 27 * u, zt + 48 * u], [mx - dir * 9.6 * u, my - 27 * u, zt + 48 * u], SCREEN);
 }
 
@@ -558,7 +558,7 @@ function receptionCounter(props, counter, u) {
 function sofa(props, s, u) {
   const at = (dx) => s.x + s.dir * dx;
   const length = s.y1 - s.y0;
-  const part = (dx0, dx1, y0, y1, z0, z1, color) => props.box({ x: at((dx0 + dx1) / 2), y: (y0 + y1) / 2, z0, z1, hw: Math.abs(dx1 - dx0) / 2, hh: (y1 - y0) / 2, color });
+  const part = (dx0, dx1, y0, y1, z0, z1, color) => props.roundBox({ x: at((dx0 + dx1) / 2), y: (y0 + y1) / 2, z0, z1, hw: Math.abs(dx1 - dx0) / 2, hh: (y1 - y0) / 2, color });
   const D = s.depth;
   part(0, D, s.y0, s.y1, 3 * u, 20 * u, SOFA);
   part(0, 0.3 * D, s.y0, s.y1, 20 * u, 58 * u, SOFA);
@@ -576,15 +576,15 @@ function sofa(props, s, u) {
 
 /** A cushion stool: a square pad on four chrome legs. */
 function stool(props, s, u) {
-  props.box({ x: s.x, y: s.y, z0: 8 * u, z1: 16 * u, hw: 10 * u, hh: 10 * u, color: STOOLS[s.color % STOOLS.length] });
-  for (const [dx, dy] of [[-7, -7], [7, -7], [7, 7], [-7, 7]]) props.box({ x: s.x + dx * u, y: s.y + dy * u, z0: -1, z1: 8 * u, hw: 0.9 * u, hh: 0.9 * u, color: CHROME });
+  props.roundBox({ x: s.x, y: s.y, z0: 8 * u, z1: 16 * u, hw: 10 * u, hh: 10 * u, color: STOOLS[s.color % STOOLS.length] });
+  for (const [dx, dy] of [[-7, -7], [7, -7], [7, 7], [-7, 7]]) props.roundBox({ x: s.x + dx * u, y: s.y + dy * u, z0: -1, z1: 8 * u, hw: 0.9 * u, hh: 0.9 * u, color: CHROME });
 }
 
 /** A low glass table on a chrome frame. */
 function coffeeTable(props, t, u) {
-  props.box({ x: t.x, y: t.y, z0: 18 * u, z1: 20.5 * u, hw: t.w / 2, hh: t.d / 2, color: TABLE_GLASS });
-  props.box({ x: t.x, y: t.y, z0: 14 * u, z1: 17 * u, hw: t.w / 2 - 2 * u, hh: t.d / 2 - 2 * u, color: CHROME });
-  for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) props.box({ x: t.x + sx * (t.w / 2 - 3 * u), y: t.y + sy * (t.d / 2 - 3 * u), z0: -1, z1: 18 * u, hw: 1.1 * u, hh: 1.1 * u, color: CHROME });
+  props.roundBox({ x: t.x, y: t.y, z0: 18 * u, z1: 20.5 * u, hw: t.w / 2, hh: t.d / 2, color: TABLE_GLASS });
+  props.roundBox({ x: t.x, y: t.y, z0: 14 * u, z1: 17 * u, hw: t.w / 2 - 2 * u, hh: t.d / 2 - 2 * u, color: CHROME });
+  for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) props.roundBox({ x: t.x + sx * (t.w / 2 - 3 * u), y: t.y + sy * (t.d / 2 - 3 * u), z0: -1, z1: 18 * u, hw: 1.1 * u, hh: 1.1 * u, color: CHROME });
 }
 
 /** A potted plant (the kit's clipped ball of foliage in a pot), terracotta or white by turns. */
@@ -604,7 +604,7 @@ function plant(props, p) {
 function bookshelf(props, s, u) {
   const at = (dx) => s.x + s.dir * dx;
   const mid = (s.y0 + s.y1) / 2;
-  props.box({ x: at(s.depth / 2), y: mid, z0: -1, z1: s.h, hw: s.depth / 2, hh: (s.y1 - s.y0) / 2, color: SHELF_WHITE });
+  props.roundBox({ x: at(s.depth / 2), y: mid, z0: -1, z1: s.h, hw: s.depth / 2, hh: (s.y1 - s.y0) / 2, color: SHELF_WHITE });
   const length = s.y1 - s.y0;
   for (let row = 0; row < 3; row += 1) {
     const z0 = (6 + row * 26) * u;
@@ -624,20 +624,20 @@ function bookshelf(props, s, u) {
 /** A PC on its desk: a white desk with a silver top, a monitor with a lit blue screen, a keyboard. */
 function pcDesk(props, d, u) {
   const at = (dx) => d.x + d.dir * dx;
-  props.box({ x: at(d.d / 2), y: d.y, z0: -1, z1: d.h, hw: d.d / 2, hh: d.w / 2, color: SHELF_WHITE, topColor: SILVER });
-  props.box({ x: at(d.d * 0.7), y: d.y, z0: d.h, z1: d.h + 4 * u, hw: 6 * u, hh: 5 * u, color: MONITOR });
-  props.box({ x: at(d.d * 0.7), y: d.y, z0: d.h + 4 * u, z1: d.h + 28 * u, hw: 2.4 * u, hh: 17 * u, color: MONITOR });
+  props.roundBox({ x: at(d.d / 2), y: d.y, z0: -1, z1: d.h, hw: d.d / 2, hh: d.w / 2, color: SHELF_WHITE, topColor: SILVER });
+  props.roundBox({ x: at(d.d * 0.7), y: d.y, z0: d.h, z1: d.h + 4 * u, hw: 6 * u, hh: 5 * u, color: MONITOR });
+  props.roundBox({ x: at(d.d * 0.7), y: d.y, z0: d.h + 4 * u, z1: d.h + 28 * u, hw: 2.4 * u, hh: 17 * u, color: MONITOR });
   props.quad([at(d.d * 0.7 + 2.6 * u), d.y - 15 * u, d.h + 7 * u], [at(d.d * 0.7 + 2.6 * u), d.y + 15 * u, d.h + 7 * u], [at(d.d * 0.7 + 2.6 * u), d.y + 15 * u, d.h + 26 * u], [at(d.d * 0.7 + 2.6 * u), d.y - 15 * u, d.h + 26 * u], SCREEN);
-  props.box({ x: at(d.d * 0.28), y: d.y, z0: d.h, z1: d.h + 2 * u, hw: 6 * u, hh: 14 * u, color: COUNTER_BODY });
+  props.roundBox({ x: at(d.d * 0.28), y: d.y, z0: d.h, z1: d.h + 2 * u, hw: 6 * u, hh: 14 * u, color: COUNTER_BODY });
 }
 
 /** A long cushioned bench along a wall: a pale base, a blue cushion, a low back. */
 function bench(props, b, u) {
   const at = (dx) => b.x + b.dir * dx;
   const mid = (b.y0 + b.y1) / 2;
-  props.box({ x: at(b.depth / 2), y: mid, z0: 3 * u, z1: 14 * u, hw: b.depth / 2, hh: (b.y1 - b.y0) / 2, color: BENCH_BASE });
-  props.box({ x: at(b.depth * 0.54), y: mid, z0: 14 * u, z1: 23 * u, hw: b.depth * 0.46, hh: (b.y1 - b.y0) / 2 - 1.5 * u, color: BENCH_CUSHION });
-  props.box({ x: at(b.depth * 0.12), y: mid, z0: 14 * u, z1: 42 * u, hw: b.depth * 0.12, hh: (b.y1 - b.y0) / 2, color: BENCH_CUSHION });
+  props.roundBox({ x: at(b.depth / 2), y: mid, z0: 3 * u, z1: 14 * u, hw: b.depth / 2, hh: (b.y1 - b.y0) / 2, color: BENCH_BASE });
+  props.roundBox({ x: at(b.depth * 0.54), y: mid, z0: 14 * u, z1: 23 * u, hw: b.depth * 0.46, hh: (b.y1 - b.y0) / 2 - 1.5 * u, color: BENCH_CUSHION });
+  props.roundBox({ x: at(b.depth * 0.12), y: mid, z0: 14 * u, z1: 42 * u, hw: b.depth * 0.12, hh: (b.y1 - b.y0) / 2, color: BENCH_CUSHION });
 }
 
 /** A glass column lit from within: a pale glass drum between white rings, a glowing cap. */

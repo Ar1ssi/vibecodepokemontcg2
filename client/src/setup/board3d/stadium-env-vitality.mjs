@@ -580,7 +580,7 @@ export function trunkGrid(tree) {
 
 /**
  * Everything solid on the board in the kit's one look (design 081): the trunk and its boughs, the
- * crown's pads as soft foliage balls (teal, the highest jade, the rim yellow-green as the art's),
+ * crown's pads as leafy lumps (teal, the highest jade, the rim yellow-green as the art's),
  * the bushes, tall grass on the meadow's edge, beds of flowers and the toadstools by the trunk.
  */
 export function vitalityProps(spots) {
@@ -594,17 +594,20 @@ export function vitalityProps(spots) {
       props.tube(points, points.map((_, i) => bough.r0 + ((bough.r1 - bough.r0) * i) / 10), BARK, { sides: 12 });
     }
   }
-  // The crown: every pad a leafy lump, dark where it tucks in under its neighbours.
+  // The crown: every pad a leafy lump, dark where it tucks in under its neighbours, built about the
+  // trunk so the leaves on its flat tops lie outward from it.
   const zTop = Math.max(...tree.pads.map((pad) => pad.z), 1);
   const lumps = tree.pads.map((pad) => ({
-    x: pad.x,
-    y: pad.y,
+    x: pad.x - tree.x,
+    y: pad.y - tree.y,
     z: pad.z,
     rx: pad.r,
     rz: pad.r * 0.78,
     color: pad.tier > 0.84 ? CROWN.fringe : pad.z > zTop * 0.84 ? CROWN.top : CROWN.body,
   }));
-  props.look({ kind: LOOK.foliage, leaf: 11 * spots.u }, () => props.lumps(lumps, { crease: 0.5 }));
+  props.at({ x: tree.x, y: tree.y, ground: false }, () =>
+    props.look({ kind: LOOK.foliage, leaf: 11 * spots.u }, () => props.lumps(lumps, { crease: 0.5 }))
+  );
   for (const bush of spots.bushes) placeAsset(props, 'bush', { ...kit, x: bush.x, y: bush.y, size: bush.size, seed: bush.seed * 997, colors: BUSH_COLOURS });
   for (const patch of spots.grass) placeAsset(props, 'tallGrass', { ...kit, x: patch.x, y: patch.y, size: patch.size, blade: patch.blade, seed: patch.seed * 991, colors: TALL_GRASS });
   for (const clump of spots.flowers) {

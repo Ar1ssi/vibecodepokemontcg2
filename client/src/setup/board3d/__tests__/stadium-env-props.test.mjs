@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as three from 'three';
-import { LOOK, composeFrames, createPropBuilder, frameOf } from '../stadium-env-props.mjs';
+import { LOOK, ROUND_EDGE_MAX, composeFrames, createPropBuilder, frameOf } from '../stadium-env-props.mjs';
 import { disc } from '../stadium-env-buildings.mjs';
 
 const close = (a, b, eps = 1e-6) => Math.abs(a - b) <= eps;
@@ -160,6 +160,38 @@ test('builder roundBox(): inside its box, square on the floor, rounded on top, e
     const local = [dx * c + dy * s, -dx * s + dy * c];
     assert.ok(!(Math.abs(local[0]) > 14.9 && position.getZ(i) > 19.9), 'no sharp top edge');
   }
+});
+
+test('builder roundBox(): its front takes frontColor as box paints it, and without r it rounds at a third of its smallest half (design 082)', () => {
+  const props = createPropBuilder();
+  // Turned a quarter: its front (the -hh side) faces +x in the table.
+  props.roundBox({ x: 0, y: 0, z0: 0, z1: 30, hw: 12, hh: 6, yaw: Math.PI / 2, color: [1, 0, 0, 0], topColor: [0, 1, 0, 0], frontColor: [0, 0, 1, 0] });
+  const geometry = props.build(three);
+  const position = geometry.getAttribute('position');
+  const normal = geometry.getAttribute('normal');
+  const color = geometry.getAttribute('aColor');
+  let fronts = 0;
+  let highestOnFront = -Infinity;
+  for (let i = 0; i < position.count; i += 1) {
+    const n = [normal.getX(i), normal.getY(i), normal.getZ(i)];
+    const expected = n[2] > 0.5 ? [0, 1, 0] : n[0] > 0.5 ? [0, 0, 1] : [1, 0, 0];
+    assert.deepEqual([color.getX(i), color.getY(i), color.getZ(i)], expected, `vertex ${i} facing ${n.map((v) => v.toFixed(2))}`);
+    if (expected[2] === 1) fronts += 1;
+    // The front's plane (x 6) stops where its top edge starts rounding: the default radius, 6 / 3 = 2 px down.
+    if (position.getX(i) > 6 - 1e-6) highestOnFront = Math.max(highestOnFront, position.getZ(i));
+  }
+  assert.ok(fronts > 0, 'the front is painted');
+  assert.ok(close(highestOnFront, 28, 1e-6), `the top edge rounds from 2 px down (${highestOnFront})`);
+  // A building-sized box rounds at most ROUND_EDGE_MAX, not a third of its 60 px half depth.
+  const big = createPropBuilder();
+  big.roundBox({ x: 0, y: 0, z0: 0, z1: 200, hw: 100, hh: 60, color: [1, 1, 1, 0] });
+  const bigGeometry = big.build(three);
+  const bigPosition = bigGeometry.getAttribute('position');
+  let highestOnBigFront = -Infinity;
+  for (let i = 0; i < bigPosition.count; i += 1) {
+    if (bigPosition.getY(i) < -60 + 1e-6) highestOnBigFront = Math.max(highestOnBigFront, bigPosition.getZ(i));
+  }
+  assert.ok(close(highestOnBigFront, 200 - ROUND_EDGE_MAX, 1e-6), `a building's edge rounds ${ROUND_EDGE_MAX} px (${highestOnBigFront})`);
 });
 
 test('builder: shadows are quads round their centres, scaled with the frame, none inside withoutShadows', () => {

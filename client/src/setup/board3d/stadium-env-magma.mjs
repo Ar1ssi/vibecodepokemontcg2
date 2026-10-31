@@ -16,6 +16,7 @@
 // Design 082 (Brilliant Diamond / Shining Pearl): the rock on a smooth ramp in BDSP's soft light, the
 // walls laid in strata (stadium-env-ground.mjs).
 import {
+  FILTERING,
   FLOW_STREAKS,
   FOOTPRINTS,
   FULLSCREEN_VERTEX,
@@ -380,6 +381,7 @@ ${REVEAL}
 ${BASIN_LAVA}
 ${FLOW_STREAKS}
 ${FALLS}
+${FILTERING}
 ${STRATA}
 varying vec2 vPos;
 varying vec2 vUv;
@@ -398,6 +400,7 @@ float speck(vec2 p, float cell, float share, float seed) {
 
 void main() {
   vec2 p = vPos;
+  filterPixel = pixelSize(p);
   if (revealBurned(p) * exitKeep(p) < 0.5) discard;
   vec4 field = texture2D(uField, vUv);
   vec4 pre = texture2D(uPre, vUv);

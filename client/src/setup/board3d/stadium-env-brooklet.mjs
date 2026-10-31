@@ -371,15 +371,13 @@ const vec3 SAND_WET = vec3(0.3, 0.19, 0.07);
 const vec3 EARTH_DARK = vec3(0.1, 0.05, 0.03);
 const vec3 EARTH = vec3(0.22, 0.11, 0.06);
 const vec3 EARTH_LIGHT = vec3(0.38, 0.2, 0.11);
-// Grass, the game's deep green swept in darker strokes; its tall grass lighter.
-const vec3 GRASS_DARK = vec3(0.02, 0.15, 0.03);
+// Grass (design 082): BDSP's clover grass in two greens.
 const vec3 GRASS = vec3(0.07, 0.34, 0.06);
 const vec3 GRASS_LIGHT = vec3(0.13, 0.44, 0.08);
-// Boulders, warm grey-brown.
 // The pier's and the fence's weathered wood.
 const vec3 WOOD_DARK = vec3(0.07, 0.06, 0.045);
 const vec3 WOOD_LIGHT = vec3(0.45, 0.41, 0.32);
-// The water, the game's teal: deep, base, light; the art's white strokes.
+// The water (design 082): a clear BDSP blue, deep, base, light; the art's white strokes.
 const vec3 WATER_DEEP = vec3(0.01, 0.12, 0.42);
 const vec3 WATER = vec3(0.03, 0.27, 0.66);
 const vec3 WATER_LIGHT = vec3(0.16, 0.52, 0.84);
@@ -394,23 +392,28 @@ vec3 skyColor(vec3 dir) {
 }
 `;
 
-// The ground's materials, the game's: grass, earth cliffs, sand, laid stone. After NOISE, VORONOI and PALETTE.
-const MATERIALS = /* glsl */ `
+// The land's grass and sand (design 082): the ground kit's clover grass and rippled sand, so only the
+// land includes them, after GRASS_KIT and SAND_KIT.
+const LAND_COLOURS = /* glsl */ `
 // Grass (design 082): BDSP's clover grass, lighter in broad patches.
 vec3 grassColour(vec2 p) {
   return cloverGrass(p, mix(GRASS, GRASS_LIGHT, smoothstep(0.58, 0.8, fbm3(p / 120.0 + 1.7)) * 0.55), 0.0);
 }
+// Sand (design 082): BDSP's warm sand with soft ripples, lighter in drifts, damp and dark at the water.
+vec3 sandColour(vec2 p, float land) {
+  vec3 c = bdspSand(p, mix(SAND_DRY, SAND_LIGHT, smoothstep(0.4, 0.8, fbm3(p / 60.0 + 5.0)) * 0.7), 0.0);
+  return mix(SAND_WET, c, smoothstep(0.5, 7.0, land));
+}
+`;
+
+// The ground's materials, the game's: earth cliffs and laid stone. After NOISE, VORONOI and PALETTE.
+const MATERIALS = /* glsl */ `
 // The earth cliffs: dark red-brown, mottled, lighter strata running along their faces (by height,
 // wavering), seen from above as bands along each cliff.
 vec3 earthColour(vec2 p, float height) {
   vec3 c = mix(EARTH_DARK, EARTH, smoothstep(0.25, 0.75, gnoise(p / 6.0)));
   float strata = sin(height / 4.5 + gnoise(p / 30.0) * 5.0);
   return mix(c, EARTH_LIGHT, smoothstep(0.7, 0.95, strata) * 0.55);
-}
-// Sand (design 082): BDSP's warm sand with soft ripples, lighter in drifts, damp and dark at the water.
-vec3 sandColour(vec2 p, float land) {
-  vec3 c = bdspSand(p, mix(SAND_DRY, SAND_LIGHT, smoothstep(0.4, 0.8, fbm3(p / 60.0 + 5.0)) * 0.7), 0.0);
-  return mix(SAND_WET, c, smoothstep(0.5, 7.0, land));
 }
 // A wall's courses as the game lays them: rows of big rough stones 17 px high and 24..44 px long,
 // well rounded, each row's joints set off from the last, each stone's outline a little lumpy. x 0 in
@@ -616,6 +619,7 @@ ${THINGS}
 ${PALETTE}
 ${SHADING}
 ${MATERIALS}
+${LAND_COLOURS}
 ${CELLS}
 ${WATER_LOOK}
 varying vec2 vPos;
@@ -1329,11 +1333,6 @@ const stoneworkGeometry = (three, spots) => {
 const setEach = (vectors, items, toValues) =>
   vectors.forEach((vector, i) => (items[i] ? vector.set(...toValues(items[i])) : vector.set(0, 0, 0, 0)));
 
-/**
- * Brooklet Hill: the land (banks, ledge, pools, basin, boulders, bushes, pier), the stonework of the
- * towers, the basin's kerb and the ledge's walls, the lake's sheet, the falls' sheets, the mist where
- * they land and the path's fence.
- */
 // The kit's colours: the art's warm brown boulders, the map's round bushes in BDSP's greens.
 const BOULDER = Object.freeze({ body: '#8d6a52', light: '#b48f72', dark: '#5f4636' });
 const BUSH = Object.freeze({ leaf: '#3f9a3a', leafLight: '#7cc44a' });
@@ -1351,6 +1350,11 @@ export function brookletProps({ rocks = [], trees = [] } = {}) {
   return props;
 }
 
+/**
+ * Brooklet Hill: the land (banks, ledge, pools, basin, pier), the stonework of the towers, the basin's
+ * kerb and the ledge's walls, the kit's boulders and bushes (design 082), the lake's sheet, the falls'
+ * sheets, the mist where they land and the path's fence.
+ */
 export function brookletHillBoard({ three, material, seeded, terrainGrid, replaceGeometry, bakeOptions }) {
   const vectors = (count) => Array.from({ length: count }, () => new three.Vector4());
   const own = {

@@ -277,8 +277,8 @@ const stockColours = (seed) => {
 
 /** A table of folded clothes: a wood top on four legs, rows of piles in two colours on it. */
 function displayTable(props, table, u) {
-  props.box({ x: table.x, y: table.y, z0: table.h - 4 * u, z1: table.h, hw: table.w / 2, hh: table.d / 2, color: WOOD, topColor: [0.62, 0.36, 0.2, 0] });
-  for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) props.box({ x: table.x + sx * (table.w / 2 - 4 * u), y: table.y + sy * (table.d / 2 - 4 * u), z0: -1, z1: table.h - 4 * u, hw: 2.2 * u, hh: 2.2 * u, color: WOOD });
+  props.roundBox({ x: table.x, y: table.y, z0: table.h - 4 * u, z1: table.h, hw: table.w / 2, hh: table.d / 2, color: WOOD, topColor: [0.62, 0.36, 0.2, 0] });
+  for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) props.roundBox({ x: table.x + sx * (table.w / 2 - 4 * u), y: table.y + sy * (table.d / 2 - 4 * u), z0: -1, z1: table.h - 4 * u, hw: 2.2 * u, hh: 2.2 * u, color: WOOD });
   const rows = 3;
   const cols = 5;
   const stock = stockColours(hash(table.x, table.y, 7));
@@ -287,7 +287,7 @@ function displayTable(props, table, u) {
       const tone = 0.94 + 0.12 * hash(table.x + r, table.y + c, 9);
       const colour = stock[r % 2].map((v) => v * tone);
       const height = (4 + 5 * hash(r, c, table.seed * 10)) * u;
-      props.box({
+      props.roundBox({
         x: table.x + (r - 1) * (table.w / 3.2),
         y: table.y + (c - 2) * (table.d / 5.4),
         z0: table.h,
@@ -308,7 +308,7 @@ function mannequin(props, m, u) {
   props.tube([[m.x, m.y, 3 * u], [m.x, m.y, m.h * 0.5]], [5 * u, 7 * u], MAN_LEG, { sides: 10 });
   props.tube([[m.x, m.y, m.h * 0.46], [m.x, m.y, m.h * 0.62], [m.x, m.y, m.h * 0.8]], [11 * u, 14 * u, 12 * u], top, { sides: 16 });
   // Shoulders: a broad flat bar across the chest.
-  props.box({ x: m.x, y: m.y, z0: m.h * 0.74, z1: m.h * 0.82, hw: 7 * u, hh: 19 * u, color: top, topColor: top });
+  props.roundBox({ x: m.x, y: m.y, z0: m.h * 0.74, z1: m.h * 0.82, hw: 7 * u, hh: 19 * u, color: top, topColor: top });
   props.tube([[m.x, m.y, m.h * 0.82], [m.x, m.y, m.h * 0.9]], 4.2 * u, SKIN, { sides: 8 });
   props.sphere({ x: m.x, y: m.y, z: m.h * 0.97, r: 9.5 * u, color: SKIN, sides: 14, rings: 9, squash: 1.15 });
   for (const s of [-1, 1]) props.tube([[m.x, m.y + s * 18 * u, m.h * 0.78], [m.x, m.y + s * 21 * u, m.h * 0.5]], [4 * u, 3.2 * u], top, { sides: 8 });
@@ -326,7 +326,7 @@ function shirtRack(props, rack, u) {
     const [from, to] = stockColours(rack.seed);
     const colour = from.map((v, i) => v + (to[i] - v) * (k / Math.max(1, count - 1)));
     const y = rack.y - rack.len / 2 + (k + 0.5) * step;
-    props.box({ x: rack.x, y, z0: 28 * u, z1: 58 * u, hw: 14 * u, hh: 2.6 * u, color: [colour[0], colour[1], colour[2], 0.2], topColor: [colour[0] * 1.1, colour[1] * 1.1, colour[2] * 1.1, 0.2] });
+    props.roundBox({ x: rack.x, y, z0: 28 * u, z1: 58 * u, hw: 14 * u, hh: 2.6 * u, color: [colour[0], colour[1], colour[2], 0.2], topColor: [colour[0] * 1.1, colour[1] * 1.1, colour[2] * 1.1, 0.2] });
   }
 }
 
@@ -342,8 +342,8 @@ function balloon(props, b, u) {
 function mezzanine(props, spots) {
   const { mezzanine: m, escalators, columns, u } = spots;
   const mid = [(m.x0 + m.x1) / 2, (m.y0 + m.y1) / 2];
-  props.box({ x: mid[0], y: mid[1], z0: -2, z1: m.height, hw: (m.x1 - m.x0) / 2, hh: (m.y1 - m.y0) / 2, color: WALL, topColor: FLOOR_TOP, frontColor: WALL_LIGHT });
-  props.box({ x: mid[0], y: m.y0 + 1.5 * u, z0: m.height - 8 * u, z1: m.height - 2 * u, hw: (m.x1 - m.x0) / 2, hh: 3 * u, color: SKIRT });
+  props.roundBox({ x: mid[0], y: mid[1], z0: -2, z1: m.height, hw: (m.x1 - m.x0) / 2, hh: (m.y1 - m.y0) / 2, color: WALL, topColor: FLOOR_TOP, frontColor: WALL_LIGHT });
+  props.roundBox({ x: mid[0], y: m.y0 + 1.5 * u, z0: m.height - 8 * u, z1: m.height - 2 * u, hw: (m.x1 - m.x0) / 2, hh: 3 * u, color: SKIRT });
   // The balustrade: glass panels between posts along the front edge, a rail on top; gaps where the escalators land.
   const posts = Math.round((m.x1 - m.x0) / (70 * u));
   for (let k = 0; k <= posts; k += 1) {
@@ -378,9 +378,9 @@ function walls(props, spots) {
   for (const [x, side] of [[wall.left, -1], [wall.right, 1]]) {
     const cx = x + side * 30 * u;
     const cy = scene.y - 80 * u + length / 2;
-    props.box({ x: cx, y: cy, z0: -2, z1: 150 * u, hw: 30 * u, hh: length / 2, color: WALL, topColor: WALL_LIGHT });
-    props.box({ x: x + side * 1.5 * u, y: cy, z0: -2, z1: 10 * u, hw: 3 * u, hh: length / 2, color: SKIRT });
-    props.box({ x: x + side * 1.5 * u, y: cy, z0: 108 * u, z1: 118 * u, hw: 3 * u, hh: length / 2, color: WALL_LIGHT });
+    props.roundBox({ x: cx, y: cy, z0: -2, z1: 150 * u, hw: 30 * u, hh: length / 2, color: WALL, topColor: WALL_LIGHT });
+    props.roundBox({ x: x + side * 1.5 * u, y: cy, z0: -2, z1: 10 * u, hw: 3 * u, hh: length / 2, color: SKIRT });
+    props.roundBox({ x: x + side * 1.5 * u, y: cy, z0: 108 * u, z1: 118 * u, hw: 3 * u, hh: length / 2, color: WALL_LIGHT });
     for (let y = scene.y; y < scene.y + scene.h; y += 120 * u) {
       props.sphere({ x: x - side * 2 * u, y, z: 128 * u, r: 7 * u, color: LIGHT_GLOBE, sides: 10, rings: 7, squash: 0.45 });
     }

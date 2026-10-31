@@ -17,6 +17,7 @@
 // sea, domes turning round the mountain on a grid of their own; BOLT draws one lightning stroke and
 // its fork as a camera-facing ribbon (the mesh schedules the strikes).
 import {
+  FILTERING,
   FOOTPRINTS,
   NOISE,
   OUTPUT,
@@ -406,6 +407,7 @@ export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
 ${REVEAL}
+${FILTERING}
 ${STRATA}
 ${BOWL}
 ${EMBLEM}
@@ -416,6 +418,7 @@ varying float vGrowth;
 
 void main() {
   vec2 p = vPos;
+  filterPixel = pixelSize(p);
   if (revealBurned(p) * exitKeep(p) < 0.5) discard;
   vec4 field = texture2D(uField, vUv);
   vec4 light = texture2D(uLight, vUv);

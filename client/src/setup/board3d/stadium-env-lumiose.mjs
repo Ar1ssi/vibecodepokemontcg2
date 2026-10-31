@@ -547,11 +547,11 @@ function roof(props, b, face, u) {
   for (const share of [0.28, 0.74]) {
     const cx = (b.x0 + b.x1) / 2 + (hash(b.seed, share, 4) - 0.5) * w;
     const cy = b.y0 + iy + d * share;
-    props.box({ x: cx, y: cy, z0: z2 - 2, z1: z2 + 26 * u, hw: 8 * u, hh: 6 * u, color: BRICK, topColor: [0.12, 0.1, 0.1, 0] });
+    props.roundBox({ x: cx, y: cy, z0: z2 - 2, z1: z2 + 26 * u, hw: 8 * u, hh: 6 * u, color: BRICK, topColor: [0.12, 0.1, 0.1, 0] });
     for (const dx of [-3.2, 3.2]) props.cylinder({ x: cx + dx * u, y: cy, z0: z2 + 26 * u, z1: z2 + 33 * u, r: 2.2 * u, color: BRICK, capColor: [0.1, 0.09, 0.09, 0], sides: 8 });
   }
   const sky = { x: (b.x0 + b.x1) / 2, y: b.y0 + iy + d * 0.5 };
-  props.box({ x: sky.x, y: sky.y, z0: z2, z1: z2 + 4 * u, hw: Math.min(10 * u, w / 2 - 1), hh: 8 * u, color: TRIM, topColor: GLASS });
+  props.roundBox({ x: sky.x, y: sky.y, z0: z2, z1: z2 + 4 * u, hw: Math.min(10 * u, w / 2 - 1), hh: 8 * u, color: TRIM, topColor: GLASS });
 }
 
 /** The Pokemon Center's blade sign: a Poke Ball on a bracket, standing out from the wall. */
@@ -586,7 +586,7 @@ function pokeSign(props, b, face, u) {
 function building(props, b, u) {
   const wall = WALLS[b.palette];
   const mid = [(b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2];
-  props.box({ x: mid[0], y: mid[1], z0: -2, z1: b.height, hw: (b.x1 - b.x0) / 2, hh: (b.y1 - b.y0) / 2, color: [...wall, 0], topColor: [...ROOFS[b.roof].steep, SLATE] });
+  props.roundBox({ x: mid[0], y: mid[1], z0: -2, z1: b.height, hw: (b.x1 - b.x0) / 2, hh: (b.y1 - b.y0) / 2, color: [...wall, 0], topColor: [...ROOFS[b.roof].steep, SLATE] });
   // The face to the plaza: a to b runs so its outer side is on the right.
   let a;
   let c;
@@ -722,7 +722,7 @@ function prismTower(props, t, u) {
   }
   // The foot: a white pavilion between the legs, arched windows on its faces.
   const pavilion = radius(0.02) * 0.62;
-  props.box({ x: t.x, y: t.y, z0: -2, z1: 0.075 * t.h, hw: pavilion, hh: pavilion, yaw: Math.PI / 4, color: TOWER_WHITE, topColor: [0.5, 0.58, 0.68, 0.3] });
+  props.roundBox({ x: t.x, y: t.y, z0: -2, z1: 0.075 * t.h, hw: pavilion, hh: pavilion, yaw: Math.PI / 4, color: TOWER_WHITE, topColor: [0.5, 0.58, 0.68, 0.3] });
   for (let k = 0; k < 4; k += 1) {
     const angle = (k / 4) * 2 * Math.PI;
     const px = t.x + Math.cos(angle) * (pavilion * 1.0 + 0.3);

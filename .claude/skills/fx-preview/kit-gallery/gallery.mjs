@@ -111,8 +111,10 @@ void main(){
   float d = length(p - vec2(430.0, -210.0)) - 90.0;
   col = mix(col, mix(bdspSand(p, sand, 0.0), bdspSand(p, sand, 0.0) * 0.82, smoothstep(14.0, 0.0, d)), 1.0 - grassFringe(16.0 - d, p, 6.0));
   float depth = clamp(-d / 70.0, 0.0, 1.0);
-  vec3 wet = bdspWater(p, depth, water, shallow, 0.0);
-  wet = mix(wet, vec3(1.0), waterEdge(depth) * 0.75);
+  vec3 wet = mix(shallow, water, smoothstep(0.0, 0.7, depth));
+  wet += vec3(0.8, 0.9, 1.0) * lightStreaks(p, uTime) * 0.28 * smoothstep(0.05, 0.25, depth);
+  wet += vec3(1.2) * sparkles(p, uTime) * 0.8 * smoothstep(0.1, 0.3, depth);
+  wet = mix(wet, vec3(1.0), (1.0 - smoothstep(0.0, 0.06, depth)) * 0.75);
   col = mix(col, wet, step(d, 0.0));
   gl_FragColor = vec4(col * 1.12, 1.0);
 }`,

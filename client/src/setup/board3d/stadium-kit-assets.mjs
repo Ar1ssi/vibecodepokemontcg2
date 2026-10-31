@@ -8,7 +8,7 @@
 // scales them by its world unit (a card's width / 100). Pure: no three.js.
 import { SUN_DIRECTION } from './stadium-environment-glsl.mjs';
 import { LOOK } from './stadium-env-props.mjs';
-import { paint } from './stadium-kit.mjs';
+import { KEY_GAIN, paint } from './stadium-kit.mjs';
 
 /** How far a shadow slides from under its caster per px of the caster's height, along the sun. */
 export const SHADOW_SLIDE = 0.3;
@@ -810,7 +810,9 @@ const ASSETS = {
     dims: ({ height = 70, style = 'globe' }) => ({ reach: height * 0.12, height: height * (style === 'lantern' ? 1.03 : 1) }),
     draw(props, { height: H = 70, style = 'globe', glow = 2.2, colors }, dims, { shift }) {
       const c = coloursOf({ post: 'iron', light: style === 'lantern' ? 'glass' : 'glow' }, colors);
-      const light = [...c.light.slice(0, 3).map((v) => v * KEY_LIGHT), 1 + glow];
+      // A lamp's glass is a light (w 2 and up), drawn at its own colour: paint divided out the kit's
+      // key gain, so it is multiplied back and a lit lamp reads lit in daylight too.
+      const light = [...c.light.slice(0, 3).map((v) => v * KEY_GAIN), 1 + glow];
       props.look({ kind: LOOK.gloss }, () =>
         props.lathe(
           [
@@ -1098,9 +1100,6 @@ function planterPlant(W, plant, colors = {}) {
   if (plant === 'topiary') return { name: 'topiary', options: { size: 0.85 * W, colors, pot: false }, salt: 3 };
   return { name: 'bush', options: { size: 0.95 * W, colors }, salt: 4 };
 }
-
-/** The kit's light on a lamp's glass, so a lit lamp reads lit in daylight too. */
-const KEY_LIGHT = 1.12;
 
 /** Every asset's name. */
 export const ASSET_NAMES = Object.freeze(Object.keys(ASSETS));

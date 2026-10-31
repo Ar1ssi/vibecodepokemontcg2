@@ -93,7 +93,7 @@ export function glslColour(hex) {
  * How much brighter than its albedo an up-facing part in full sun shows under the day mood (the
  * wrapped key at the default sun's height, plus the sky's fill): paint divides it out.
  */
-const KEY_GAIN = 1.25;
+export const KEY_GAIN = 1.25;
 
 /**
  * A colour authored as it shows on screen ('#rrggbb', an up-facing part in full sun) as the linear
@@ -281,10 +281,11 @@ ${KIT_LIGHT}
 ${KIT_LEAVES}
 ${glow}
 void main() {
+  // Derivatives first: after the discard below, control flow is no longer uniform.
+  float footprint = length(fwidth(vWorld));
   if (revealBurned(vWorld.xy) * exitKeep(vWorld.xy) < 0.5) discard;
   vec3 n = normalize(gl_FrontFacing ? vNormal : -vNormal);
   vec3 albedo = vColor.rgb;
-  float footprint = length(fwidth(vWorld));
   if (vLook.x > 0.5 && vLook.x < 1.5 && vLook.w > 0.0) {
     vec2 leaf = kitLeaves(vWorld, n, normalize(vWorld.xy - vFoot + 1e-3), vLook.w);
     float shade = leaf.x < 0.0 ? 0.4 : mix(0.5, 1.1, smoothstep(0.12, 0.8, leaf.x)) * (0.9 + 0.2 * leaf.y);

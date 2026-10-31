@@ -187,15 +187,16 @@ Every board and asset needs a pass, including the four that 081 left off the kit
     - `flowerBed`: a patch of BDSP flowers;
     - `ledgeRock`: a stacked slab outcrop, for caves and shores;
     - `bollard`: a rounded post;
-    - `lantern`: the BDSP street lamp, glass head on an iron post (lamp `style: 'bdsp'`).
-- **`stadium-env-ground.mjs`** (new, after NOISE, VORONOI, FILTERING): GLSL
-  - `cloverGrass(p, base, calm)`;
-  - `grassFringe(d, p)`;
-  - `flagstones(p, size, gap)`;
-  - `cobbles(p, size)`;
-  - `sandRipples(p)`;
-  - `bdspWater(p, depth, t)` → colour;
-  - `strata(z, p)`.
+    - `lantern`: the BDSP street lamp, glass head on an iron post (lamp `style: 'lantern'`).
+- **`stadium-env-ground.mjs`** (new, after NOISE and FILTERING; STONEWORK after VORONOI too): GLSL
+  - GRASS: `cloverGrass(p, base, calm)` → colour; `grassFringe(d, p, size)` (d < 0 inside the grass)
+    and `fringeShade(d, size)`;
+  - STONEWORK: `flagstones(p, size, gap, sun)` and `cobbles(p, size, sun)` → (into the stone, its
+    tone, its bevel's light);
+  - SAND: `bdspSand(p, base, calm)` → colour;
+  - WATER: `lightStreaks(p, t)` and `sparkles(p, t)`, 0..1, over each board's own blues;
+  - STRATA: `strata(z, p, band)` → (light across the course, its tone).
+  - Every motif fades by patternFade (`filterPixel`) where it falls under a few screen px.
 - **`stadium-environment-mesh.js`**
   - The plate target takes mipmaps (LinearMipmapLinear).
   - PLATE_FRAGMENT runs `tiltShift(tex, uv)` over the plate and the under plate: 8 taps on a disc
@@ -236,19 +237,19 @@ Every board and asset needs a pass, including the four that 081 left off the kit
 ## Edge cases & failure modes
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | no layout / no spots | `kit.set(null)`: both meshes hide | [ ] stadium-kit.test: createKitProps set(null) |
-| 2 | bad colour | `paint` throws on anything but #rrggbb | [ ] stadium-kit.test: paint |
-| 3 | an asset's parts past its stated reach | every asset's vertices inside measureAsset's reach and height | [ ] stadium-kit-assets.test: option-grid sweep (new assets included) |
-| 4 | a prop over a card on screen | every built vertex above the cloth off every card's projected outline, both presets, every board with props (ground-follow boards along the ground's whole rise) | [ ] each board's screen test (`geometryOnCard`) |
-| 5 | leaves under ~3 px on screen (far camera, small asset) | the pattern fades to its mean by fwidth: no shimmer | [ ] by construction (kitFragment fade); stills at game zoom |
-| 6 | a flat top's middle (outward undefined) | `outward` falls back to its epsilon; leaves still form | [ ] by construction (kitLeaves normalize + 1e-4) |
-| 7 | a foliage part with no `leaf` | soft foliage light, no leaves | [ ] stadium-env-props.test: look leaf 0 → aLook.w 0 |
-| 8 | lumps that do not touch | no crease darkening | [ ] stadium-env-props.test: lumps apart keep their colour |
-| 9 | tilt-shift on a 2×2 plate / the under plate in a swap | radius in plate px clamps to the mip chain; both plates blurred alike | [ ] stadium-environment-mesh.test: TILT_SHIFT, PLATE_FRAGMENT taps both |
-| 10 | reveal and exit | kit solids and shadows rise/discard with terrainGrowth/revealBurned/exitKeep as before | [ ] manual: localhost reveal |
-| 11 | reduced motion | sway reads uTime, frozen by the mesh | [ ] by construction |
-| 12 | GL compile | every board's programs compile on SwiftShader with no shader error | [ ] captures of all 25 boards |
-| 13 | a board on its own shaders moved to the kit (I273) | its old solids' shader paths go; screen tests cover its new props | [ ] that board's test |
+| 1 | no layout / no spots | `kit.set(null)`: both meshes hide | [x] stadium-kit.test: createKitProps set(null) |
+| 2 | bad colour | `paint` throws on anything but #rrggbb | [x] stadium-kit.test: paint |
+| 3 | an asset's parts past its stated reach | every asset's vertices inside measureAsset's reach and height | [x] stadium-kit-assets.test: option-grid sweep (flowerBed, ledgeRock, bollard included) |
+| 4 | a prop over a card on screen | every built vertex above the cloth off every card's projected outline, both presets, every board with props (ground-follow boards along the ground's whole rise) | [x] each board's screen test (`geometryOnCard`; Brooklet's new) |
+| 5 | leaves under ~3 px on screen (far camera, small asset) | the pattern fades to its mean by fwidth: no shimmer | [x] by construction (kitFragment fade, its fwidth before the discard); stills of all 25 boards |
+| 6 | a flat top's middle (outward undefined) | `outward` falls back to its epsilon; leaves still form | [x] by construction (normalize(world - foot + 1e-3)) |
+| 7 | a foliage part with no `leaf` | soft foliage light, no leaves | [x] stadium-env-props.test: look leaf 0 → aLook.w 0 |
+| 8 | lumps that do not touch | no crease darkening | [x] stadium-env-props.test: lumps apart keep their colour |
+| 9 | tilt-shift on a 2×2 plate / the under plate in a swap | radius in plate px clamps to the mip chain; both plates blurred alike | [x] stadium-environment-mesh.test: TILT_SHIFT, PLATE_FRAGMENT taps both |
+| 10 | reveal and exit | kit solids and shadows rise/discard with terrainGrowth/revealBurned/exitKeep as before | [ ] manual: localhost reveal (the captures show every board's props standing after it; exit unchecked) |
+| 11 | reduced motion | sway reads uTime, frozen by the mesh | [x] by construction |
+| 12 | GL compile | every board's programs compile on SwiftShader with no shader error | [x] captures of all 25 boards, both presets: no shader log lines; stadium-glsl-idents.test: every program declares every name |
+| 13 | a board on its own shaders moved to the kit (I273) | its old solids' shader paths go; screen tests cover its new props | [x] stadium-env-brooklet.test: no bake of boulders or bushes, screen test, ceiling read from the bake |
 
 ## Test plan
 - **Unit (pure):**
@@ -301,6 +302,24 @@ n/a: visual only, no data. Revert: revert the commit; the boards fall back to 08
 - New assets in use: Forest of Vitality's flowers are `flowerBed`s, since a clump of five read as
   specks among the bushes; Crystal Cave's rubble is a `ledgeRock` of two slabs, as the Grand
   Underground stacks them. `bollard` is placed by no board yet: it stays in the gallery.
+- Built things: every box the boards build is a roundBox at its default radius (a third of its
+  smallest half size, at most 8 px, ROUND_EDGE_MAX: past that a building reads as a cushion):
+  Dark City, Pokémon Center, Shopping Center, Full Metal Lab, Neutralization Zone, Community
+  Center, Mystery Garden, Lumiose City and the shared wall bands. Fighting Stadium's posts and
+  Levincia's towers were already cylinders. roundBox takes `frontColor` as `box` does.
+- Per-board rows kept to each Stadium's own ground where the row would have replaced the card art's:
+  - Mountain Ring keeps its brick court with the emblem inlay, and its twelve-sided menhirs.
+  - Old Cemetery keeps the art's worn earth path; only its grass takes clover and fringes.
+  - Community Center has no paths: its paved square holds every card (the row misread the board).
+  - Levincia keeps its plank walkway; its water takes the kit's light streaks and sparkles.
+  - Lumiose City keeps its setts and the art's lampposts (three globes, a green banner), not the
+    kit's lantern.
+  - Magnetic Storm's puddles and Mystery Garden's pool keep their own night water (the aurora's
+    and the pool light's); WATER's streaks are sky light, which neither board has.
+- The ground kit trims to what the boards use: no `wetSand`, `bdspWater` or `waterEdge` (each water
+  board keeps its own blues and adds `lightStreaks`/`sparkles`).
+- Crowns built outside an asset (Forest of Vitality, Grand Tree, Perilous Jungle) are built in a
+  frame at their trunk or crown centre, so the leaves on their flat tops lie outward from it.
 
 ---
 Self-approval checklist (only when the user is unreachable):
