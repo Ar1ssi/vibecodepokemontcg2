@@ -8,15 +8,18 @@ import {
   isEvolutionCard,
   isSingleStrikeCard,
   isRepeatableStadiumAction,
+  stadiumOnceConditionMet,
 } from '../rules/stadium-effects.mjs';
-import { executeSteps, matchesEnergyTypeFilter } from './executor.mjs';
+import { executeSteps, matchesEnergyTypeFilter, attachToRoot, createPendingChoice } from './executor.mjs';
+import { topPokemonCard } from '../rules/evolved-pokemon.mjs';
+import { isEnergy as isEnergyCard } from '../cards.mjs';
 import { hasCondition } from '../rules/special-conditions.mjs';
 import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
 
 /**
  * Whether a parsed once-per-turn condition holds for the acting player on the
- * server. Conditions the parser can't verify statically (supporter-played) are
- * left to the client affordance and treated as satisfied here.
+ * server. The Supporter conditions read the flags playTrainer sets (Community
+ * Center: "if they played a Supporter card from their hand this turn").
  */
 function stadiumServerConditionMet(condition, player, opponent = null) {
   if (!condition) return true;
@@ -42,6 +45,9 @@ function stadiumServerConditionMet(condition, player, opponent = null) {
         classifyEnergyEffect(c) !== 'basic'
     );
   }
+  if (condition.type === 'supporter-played' || condition.type === 'named-supporter') {
+    return stadiumOnceConditionMet(condition, player.flags || {});
+  }
   if (condition.type === 'no-supporter-played') {
     return !player.flags?.supporterPlayed;
   }
@@ -53,6 +59,107 @@ function stadiumServerConditionMet(condition, player, opponent = null) {
     return lost.length >= (condition.n || 6);
   }
   return true;
+}
+
+// ── Sky Field (customhb-485): move 1 Energy card from 1 of your {C} Pokémon to another ──
+
+const TYPED_MOVE_EFFECT = 'typedEnergyMove';
+
+function typedRoots(player, type) {
+  return ['active', 'bench'].flatMap((zoneId) => {
+    const zone = player.zones?.[zoneId] || [];
+    return zone.filter((root) => {
+      if (root.attachedTo) return false;
+      const top = topPokemonCard(zone, root) || root;
+      return (top.types || []).some((t) => String(t).toLowerCase() === type);
+    });
+  });
+}
+
+function energiesOn(player, root) {
+  return ['active', 'bench']
+    .flatMap((zoneId) => player.zones?.[zoneId] || [])
+    .filter((c) => c.attachedTo === root.instanceId && isEnergyCard(c));
+}
+
+/** Whether the move has a legal source and destination; checked before the activation is spent. */
+function typedEnergyMovePossible(player, opt) {
+  const targets = typedRoots(player, opt.toType);
+  return typedRoots(player, opt.fromType).some(
+    (source) => energiesOn(player, source).length > 0 && targets.some((t) => t.instanceId !== source.instanceId)
+  );
+}
+
+function askTypedMove(draft, { playerId, stadium, prompt, options, memo }) {
+  draft.pendingChoice = createPendingChoice({
+    player: playerId,
+    source: stadium.name,
+    prompt: `${stadium.name}: ${prompt}`,
+    options,
+    min: 1,
+    max: 1,
+    stateVersion: draft.stateVersion || 0,
+    resumeToken: { effectType: 'stadium', initiatorPlayerId: playerId, typedMove: memo },
+  });
+  return { pendingChoice: draft.pendingChoice, completed: false, turnEnds: false };
+}
+
+function finishTypedMove(draft) {
+  draft.pendingChoice = null;
+  return { pendingChoice: null, completed: true, turnEnds: false };
+}
+
+/** One phase of the move: source Pokémon → (Energy, when it holds several) → destination. */
+function runTypedEnergyMove(draft, { playerId, player, stadium, opt, memo = { phase: 'start' }, selection, events }) {
+  const sources = typedRoots(player, opt.fromType).filter((root) => energiesOn(player, root).length > 0);
+  const targetsFor = (sourceId) => typedRoots(player, opt.toType).filter((t) => t.instanceId !== sourceId);
+  const askTarget = (energy) =>
+    askTypedMove(draft, {
+      playerId,
+      stadium,
+      prompt: `Choose a Pokémon to move ${energy.name} to`,
+      options: targetsFor(energy.attachedTo),
+      memo: { ...opt, phase: 'target', energyId: energy.instanceId },
+    });
+
+  if (memo.phase === 'target') {
+    const target = targetsFor(null).find((c) => c.instanceId === selection?.[0]);
+    const energy = ['active', 'bench']
+      .flatMap((zoneId) => player.zones?.[zoneId] || [])
+      .find((c) => c.instanceId === memo.energyId);
+    if (!target || !energy || target.instanceId === energy.attachedTo) return finishTypedMove(draft);
+    for (const zoneId of ['active', 'bench']) {
+      const zone = player.zones[zoneId] || [];
+      const i = zone.indexOf(energy);
+      if (i >= 0) zone.splice(i, 1);
+    }
+    attachToRoot(player, energy, target, events);
+    return finishTypedMove(draft);
+  }
+  if (memo.phase === 'energy') {
+    const energy = sources.flatMap((root) => energiesOn(player, root)).find((c) => c.instanceId === selection?.[0]);
+    return energy ? askTarget(energy) : finishTypedMove(draft);
+  }
+  if (memo.phase === 'source') {
+    const source = sources.find((c) => c.instanceId === selection?.[0]);
+    const energies = source ? energiesOn(player, source) : [];
+    if (energies.length === 0) return finishTypedMove(draft);
+    if (energies.length === 1) return askTarget(energies[0]);
+    return askTypedMove(draft, {
+      playerId,
+      stadium,
+      prompt: `Choose an Energy on ${source.name} to move`,
+      options: energies,
+      memo: { ...opt, phase: 'energy' },
+    });
+  }
+  return askTypedMove(draft, {
+    playerId,
+    stadium,
+    prompt: 'Choose a Pokémon to move an Energy card from',
+    options: sources,
+    memo: { ...opt, phase: 'source' },
+  });
 }
 
 /**
@@ -90,6 +197,18 @@ export function executeStadium(draft, {
   const turnEndsOnResolve = !!preview?.turnEnds;
   const isEnergy = (c) =>
     /energy/i.test(String(c?.type || '') + String(c?.name || ''));
+
+  if (resumeToken?.typedMove) {
+    return runTypedEnergyMove(draft, {
+      playerId: actingPlayerId,
+      player,
+      stadium,
+      opt: resumeToken.typedMove,
+      memo: resumeToken.typedMove,
+      selection,
+      events,
+    });
+  }
 
   if (resumeToken) {
     // Resuming suspended stadium step
@@ -174,6 +293,15 @@ export function executeStadium(draft, {
   const steps = [];
 
   const opt = parseStadiumOncePerTurn(stadium);
+
+  if (opt?.kind === 'move-energy-typed') {
+    // Nothing to move: the optional activation does nothing and is not spent.
+    if (!typedEnergyMovePossible(player, opt)) return finishTypedMove(draft);
+    if (!player.flags) player.flags = {};
+    player.flags.stadiumUsedThisTurn = true;
+    events.push({ type: 'stadiumEffectUsed', instanceId: stadium.instanceId, name: stadium.name, playerId });
+    return runTypedEnergyMove(draft, { playerId, player, stadium, opt, selection: null, events });
+  }
 
   // Lost World: winning is a terminal game state, not a step — signal it to the
   // reducer, which owns `setGameEnded`.

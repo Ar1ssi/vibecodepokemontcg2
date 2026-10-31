@@ -221,11 +221,13 @@ export function reductionForCard(card, defender, attacker, { skipSymbolFilter = 
     return 0;
   }
 
-  // Attacker requirements
-  const sym = t.match(/opponent's \{([a-z])\}/i);
-  if (sym) {
-    const need = TYPE_LETTER[sym[1].toLowerCase()];
-    if (need && !attackerTypes(attacker).includes(need)) return 0;
+  // Attacker requirements: "your opponent's {G}, {R}, {W}, or {L} Pokémon" is any-of (Thick Scale).
+  const symList = t.match(/opponent's ((?:\{[a-z]\}(?:,?\s+(?:or|and)\s+|,\s*)?)+)/i);
+  if (symList) {
+    const needs = [...symList[1].matchAll(/\{([a-z])\}/gi)]
+      .map((m) => TYPE_LETTER[m[1].toLowerCase()])
+      .filter(Boolean);
+    if (needs.length && !needs.some((need) => attackerTypes(attacker).includes(need))) return 0;
   }
   if (/non-\{d\}/i.test(t)) {
     if (attackerTypes(attacker).includes('darkness')) return 0;
@@ -665,6 +667,8 @@ export function parseToolOnDamageEffect(tool) {
     statusAttacker: null,
     millOpponent: null,
     returnSelfToHand: false,
+    // Spell Tag: "put 4 damage counters on your opponent's Pokémon in any way you like".
+    countersOnOpponent: 0,
   };
   const dm = t.match(/draw (\d+) cards?/);
   if (dm) out.draw = parseInt(dm[1], 10) || 2;
@@ -714,6 +718,8 @@ export function parseToolOnDamageEffect(tool) {
     out.millOpponent = { deck: 0, handRandom: 1 };
   }
   if (/put that pokémon into your hand/.test(t)) out.returnSelfToHand = true;
+  const spread = t.match(/put (\d+) damage counters on your opponent'?s pok[eé]mon in any way you like/);
+  if (spread) out.countersOnOpponent = parseInt(spread[1], 10) || 0;
 
   const th = parseThorns(tool);
   if (th.count && !out.damageAttacker) out.damageAttacker = th.count;
@@ -732,7 +738,8 @@ function hasToolOnDamageEffect(out) {
       out.discardPrizes ||
       out.statusAttacker ||
       out.millOpponent ||
-      out.returnSelfToHand
+      out.returnSelfToHand ||
+      out.countersOnOpponent
   );
 }
 

@@ -23,7 +23,9 @@ import {
   abilityEnergyAttackerShield, healBlockedByAbility,
 } from '../rules/ability-combat.mjs';
 import { serverEnergyDescriptor } from '../rules/server-energy.mjs';
-import { stadiumBlocksHealing } from '../rules/stadium-effects.mjs';
+import {
+  stadiumBlocksHealing, stadiumPreventsAttackDamage, stadiumAttackDamageReductionFor,
+} from '../rules/stadium-effects.mjs';
 import { isEnergy } from '../cards.mjs';
 import { flipCoin } from '../rng.mjs';
 import { parseOnDamageAbilities } from '../rules/ability-triggers.mjs';
@@ -71,6 +73,33 @@ export function damageBenchedPokemon(
   if (!countersPlaced && wallsUntil >= (draft.turn?.number || 1)) {
     events.push({ type: 'damagePrevented', instanceId: victim.instanceId, attackName, reason: 'trainer-bench-shield' });
     return;
+  }
+
+  // Mountain Ring / Sky Pillar / Neutralization Zone: a Stadium that prevents attack damage to
+  // Benched Pokémon; "take N less damage" Stadiums (Full Metal Lab) reduce it. Counters are not damage.
+  const benchStadium = draft.stadium?.card || draft.stadium || null;
+  if (benchStadium && !countersPlaced) {
+    const benchView = inPlayView(draft, victim) || victim;
+    const striker = (draft.players[attackerPlayerId]?.zones?.active || []).find((c) => !c.attachedTo);
+    if (
+      stadiumPreventsAttackDamage(benchStadium, {
+        defender: benchView,
+        attacker: striker ? inPlayView(draft, striker) : null,
+        zoneId: 'bench',
+        ownAttack,
+      })
+    ) {
+      events.push({ type: 'damagePrevented', instanceId: victim.instanceId, attackName, reason: 'stadium' });
+      return;
+    }
+    const stadiumCut = ownAttack ? 0 : stadiumAttackDamageReductionFor(benchStadium, benchView);
+    if (stadiumCut > 0) {
+      dealt = Math.max(0, dealt - stadiumCut);
+      if (dealt === 0) {
+        events.push({ type: 'damagePrevented', instanceId: victim.instanceId, attackName, reason: 'stadium' });
+        return;
+      }
+    }
   }
 
   // Check Tera bench damage immunity ("Tera: As long as this Pokémon is on your Bench, prevent all damage done to this Pokémon by attacks")

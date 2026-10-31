@@ -9,6 +9,9 @@ import {
   isStadiumWeaknessTimesTwo,
   stadiumIgnoresResistance,
   getStadiumTypeDamageReduction,
+  stadiumAttackDamageReductionFor,
+  stadiumAttackDamageBonusFor,
+  stadiumPreventsAttackDamage,
 } from './stadium-effects.mjs';
 import {
   stadiumWeaknessOverrides,
@@ -149,6 +152,13 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
         defenderDeckFormat,
       });
 
+  // Step 2c': continuous Stadium bonus before W/R (Fighting Stadium, Postwick, Practice Studio).
+  const stadiumForBonus = stadium?.card || stadium || null;
+  const stadiumBonus =
+    stadiumForBonus && !ignoreAttackerBoosts
+      ? stadiumAttackDamageBonusFor(stadiumForBonus, attacker, defender, { defenderIsActive })
+      : 0;
+
   // Step 2d: Attack markers placed on earlier turns. A next-turn bonus needs damage to add to.
   const markerBonus =
     base > 0 && defenderIsActive && !ignoreAttackerBoosts
@@ -175,7 +185,7 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
 
   const damageBeforeWR = Math.max(
     0,
-    base + attackerBonus + specialEnergyBonus + turnBonus + markerBonus + incomingBonusBeforeWR +
+    base + attackerBonus + specialEnergyBonus + turnBonus + stadiumBonus + markerBonus + incomingBonusBeforeWR +
       (ignoreAttackerBoosts ? 0 : abilityBonusBeforeWR) - specialEnergyPenalty - markerReductionBeforeWR -
       specialEnergyReductionBeforeWR -
       (ignoreDefenderEffects ? 0 : abilityReductionBeforeWR || 0)
@@ -255,8 +265,10 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     resistance = Math.max(0, resistance - resistanceOverride.reduce);
   }
 
+  // "Reduced by N" (Drake's Stadium) and "take N less damage" (Full Metal Lab) are separate wordings.
   const stadiumReduction = stadiumCard
-    ? getStadiumTypeDamageReduction(stadiumCard, defender, { defenderIsActive })
+    ? getStadiumTypeDamageReduction(stadiumCard, defender, { defenderIsActive }) +
+      stadiumAttackDamageReductionFor(stadiumCard, defender)
     : 0;
 
   let damageAfterWR = damageBeforeWR * multiplier + flat - resistance - stadiumReduction;
@@ -336,7 +348,14 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
 
   let prevented = false;
   let finalDamage = damageAfterReduction;
-  if (prevention?.preventAll) {
+  const stadiumPrevents =
+    !!stadiumCard &&
+    stadiumPreventsAttackDamage(stadiumCard, {
+      defender,
+      attacker,
+      zoneId: defenderIsActive ? 'active' : 'bench',
+    });
+  if (prevention?.preventAll || stadiumPrevents) {
     prevented = true;
     finalDamage = 0;
   } else if (prevention?.reduce > 0 || prevention?.reduceHp > 0) {
@@ -371,7 +390,7 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
   return {
     total: finalDamage,
     base,
-    attackerBonus: attackerBonus + outgoingBonusAfterWR,
+    attackerBonus: attackerBonus + stadiumBonus + outgoingBonusAfterWR,
     specialEnergyBonus: specialEnergyBonus + specialEnergyBonusAfterWR,
     specialEnergyPenalty: specialEnergyPenalty + specialEnergyPenaltyAfterWR,
     abilityBonus: ignoreAttackerBoosts ? 0 : abilityBonusBeforeWR || 0,

@@ -136,6 +136,28 @@ export function toolDiscardsAtEndOfTurn(card) {
 }
 
 /**
+ * "At the end of your turn, if the Pokémon this card is attached to is in the Active Spot, heal
+ * 20 damage from it." (Leftovers MEW 163). The amount healed, or 0 for any other Tool.
+ */
+export function toolEndOfTurnActiveHeal(card) {
+  if (!card || isPokemon(card) || isEnergy(card)) return 0;
+  const m = normalizeText(cardTextOf(card)).match(
+    /at the end of your turn, if the pok[eé]mon this card is attached to is (?:in the active spot|your active pok[eé]mon), heal (\d+) damage from it/
+  );
+  return m ? Number(m[1]) : 0;
+}
+
+/**
+ * True when a Pokémon Tool discards itself at the end of its owner's opponent's turn:
+ * "If this card is attached to 1 of your Pokémon, discard it at the end of your opponent's turn"
+ * (Metal Core Barrier sm10-180, customhb-165).
+ */
+export function toolDiscardsAtEndOfOpponentTurn(card) {
+  if (!card || isPokemon(card) || isEnergy(card)) return false;
+  return /discard it at the end of your opponent's turn/.test(normalizeText(cardTextOf(card)));
+}
+
+/**
  * The Pokémon a Technical Machine may be attached to, read from "Attach this card to 1 of
  * your <X> in play" (ex5-84, ex4 Team Magma/Aqua TM 01, pl2-95). Null when unrestricted
  * or when the card prints no such clause (SV TMs attach like any Tool).

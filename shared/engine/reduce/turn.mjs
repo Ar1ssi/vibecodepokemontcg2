@@ -13,7 +13,9 @@ import { legacyTrainerType } from '../rules/legacy-trainer-type.mjs';
 import {
   legacyAttachedTrainer, attachedTrainerTurnEnd,
 } from '../rules/legacy-attached-trainer.mjs';
-import { toolDiscardsAtEndOfTurn } from '../rules/tool-attacks.mjs';
+import {
+  toolDiscardsAtEndOfTurn, toolDiscardsAtEndOfOpponentTurn, toolEndOfTurnActiveHeal,
+} from '../rules/tool-attacks.mjs';
 import { stadiumCheckupCoinModifiers } from '../rules/stadium-triggers.mjs';
 import {
   inPlayEntries, parseCheckupAbilities, parseBetweenTurnsAbilities, resolveBetweenTurnsTargets,
@@ -27,7 +29,10 @@ import { cardEffectShielded } from '../effects/trainer-steps.mjs';
 import {
   runEndOfTurnSpecialEnergies, applySpecialEnergyStatusImmunity, discardEndOfTurnSpecialEnergies,
 } from '../effects/special-energy.mjs';
-import { stadiumBetweenTurnsDamageFor, stadiumBlocksHealing, stadiumEnergyStatusImmunity } from '../rules/stadium-effects.mjs';
+import {
+  stadiumBetweenTurnsDamageFor, stadiumBlocksHealing, stadiumEnergyStatusImmunity, stadiumTypeStatusImmunity,
+  stadiumCheckupPoisonBonusFor, stadiumBlocksToolEffects,
+} from '../rules/stadium-effects.mjs';
 import {
   healBlockedByAbility, abilitySleepLock, sideContextFor, abilityPoisonHeal,
 } from '../rules/ability-combat.mjs';
@@ -56,7 +61,7 @@ export function applyAbilitySleepLocks(draft, { events }) {
 
 /**
  * Fairy Garden-style Stadium: Pokémon holding the named Energy type are immune to Special
- * Conditions, for both players. Conditions land through addCondition, which cannot see the board,
+ * Conditions, for both players; Steel Shelter does the same by type ("Each {M} Pokémon …"). Conditions land through addCondition, which cannot see the board,
  * so this sweep strips them after every command and before Pokémon Checkup.
  */
 export function applyStadiumStatusImmunity(draft, { events }) {
@@ -68,7 +73,10 @@ export function applyStadiumStatusImmunity(draft, { events }) {
       const zone = zones[zoneId] || [];
       for (const root of zone) {
         if (root.attachedTo || !hasAnyCondition(root)) continue;
-        if (!stadiumEnergyStatusImmunity(stadium, root, zone)) continue;
+        if (
+          !stadiumEnergyStatusImmunity(stadium, root, zone) &&
+          !stadiumTypeStatusImmunity(stadium, inPlayView(draft, root))
+        ) continue;
         for (const condition of listConditions(root)) {
           removeCondition(root, condition);
           events.push({ type: 'statusCleared', condition, instanceId: root.instanceId, playerId, reason: 'stadium' });
@@ -191,17 +199,50 @@ function resolveDeferredKnockouts(draft, { events }) {
   }
 }
 
+// Leftovers: "At the end of your turn, if the Pokémon this card is attached to is in the Active
+// Spot, heal 20 damage from it." Resolves as the turn ends, before Pokémon Checkup.
+function applyEndOfTurnToolHeals(draft, { endingPlayerId, events }) {
+  const player = draft.players?.[endingPlayerId];
+  const zone = player?.zones?.active || [];
+  const active = zone.find((c) => !c.attachedTo);
+  if (!active || !(active.damage > 0)) return;
+  const stadium = draft.stadium?.card || draft.stadium || null;
+  if (stadiumBlocksToolEffects(stadium) || stadiumBlocksHealing(stadium) || healBlockedByAbility(draft, active)) return;
+  for (const tool of zone.filter((c) => c.attachedTo === active.instanceId)) {
+    const amount = toolEndOfTurnActiveHeal(tool);
+    if (!amount || !(active.damage > 0)) continue;
+    const before = active.damage;
+    active.damage = Math.max(0, before - amount);
+    events.push({
+      type: 'damageUpdated',
+      instanceId: active.instanceId,
+      damage: active.damage,
+      healed: before - active.damage,
+      source: tool.name,
+    });
+  }
+}
+
 // TM/Cube Items (design 035 slice 7): "At the end of your turn, discard <tool>." SV TMs
 // attach as ordinary Tools, so the printed clause is read here, not only the attach-time flag.
-// The sweep runs for the player whose turn is ending, after Pokémon Checkup.
+// The sweep runs for the player whose turn is ending, after Pokémon Checkup. Metal Core Barrier
+// ("discard it at the end of your opponent's turn") leaves the other side's Pokémon here too.
 function discardEndOfTurnTools(draft, { endingPlayerId, events }) {
-  const player = draft.players?.[endingPlayerId];
-  if (!player) return;
+  if (!draft.players?.[endingPlayerId]) return;
+  for (const player of Object.values(draft.players)) {
+    discardSideEndOfTurnTools(player, { ownTurn: player.playerId === endingPlayerId, events });
+  }
+}
+
+function discardSideEndOfTurnTools(player, { ownTurn, events }) {
   for (const zoneId of ['active', 'bench']) {
     const zone = player.zones?.[zoneId] || [];
     for (const card of [...zone]) {
       if (!card.attachedTo) continue;
-      if (!card.discardAtEndOfTurn && !toolDiscardsAtEndOfTurn(card)) continue;
+      const expires = ownTurn
+        ? card.discardAtEndOfTurn || toolDiscardsAtEndOfTurn(card)
+        : toolDiscardsAtEndOfOpponentTurn(card);
+      if (!expires) continue;
       zone.splice(zone.indexOf(card), 1);
       card.attachedTo = null;
       delete card.discardAtEndOfTurn;
@@ -416,6 +457,7 @@ export function resolveCheckup(
   { rng, events, endingPlayerId = draft.turn?.player }
 ) {
   resolveDeferredKnockouts(draft, { events });
+  applyEndOfTurnToolHeals(draft, { endingPlayerId, events });
   // A condition landed this command (the attack that ended the turn) on a Pokémon whose
   // special Energy makes it immune never reaches Checkup.
   applySpecialEnergyStatusImmunity(draft, { events });
@@ -474,7 +516,11 @@ export function resolveCheckup(
     if (hasCondition(active, 'Poisoned')) {
       const poisonHeal = abilityPoisonHeal(inPlayView(draft, active), sideContextFor(draft, pid));
       if (!poisonHeal) {
-        checkupDamage('Poisoned', poisonCheckupDamage(active));
+        // Perilous Jungle / Virbank City Gym: more counters on each Poisoned Pokémon at Checkup.
+        const stadiumExtra = checkupStadium
+          ? stadiumCheckupPoisonBonusFor(checkupStadium, inPlayView(draft, active))
+          : 0;
+        checkupDamage('Poisoned', poisonCheckupDamage(active) + stadiumExtra);
       } else if (poisonHeal.heal > 0 && (active.damage || 0) > 0 && !healBlockedByAbility(draft, active)) {
         const before = active.damage;
         active.damage = Math.max(0, before - poisonHeal.heal);

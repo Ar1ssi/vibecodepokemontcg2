@@ -14,7 +14,7 @@ import { priorEvolutionCards, topPokemonCard } from './evolved-pokemon.mjs';
 import { isPokemon } from '../cards.mjs';
 import { getAttachedSpecialEnergies, parseSpecialEnergyEffects } from './special-energy-parse.mjs';
 import { isAncientTraitAbility } from './abilities.mjs';
-import { isRuleBoxPokemon, isTeraCard, isExCard, isGxCard } from './card-classify.mjs';
+import { isRuleBoxPokemon, isTeraCard, isExCard, isGxCard, isVCard } from './card-classify.mjs';
 import { isDeltaSpecies } from './energy-effects.mjs';
 import { getSpecialEnergyHpBonus } from './special-energy-parse.mjs';
 import { matchesSearch } from './search-match.mjs';
@@ -917,6 +917,19 @@ export function parseStadiumOncePerTurn(card) {
   ) {
     return { ...base, kind: 'return-tool', n: 1 };
   }
+  // Sky Field (customhb-485): "move 1 Energy card from 1 of your {C} Pokémon to another of your {C} Pokémon".
+  const typedMove = t.match(
+    /move (?:1|an?) energy card from 1 of (?:your|their|his or her) \{([a-z])\} pok[eé]mon to another of (?:your|their|his or her) \{([a-z])\} pok[eé]mon/
+  );
+  if (typedMove && HEAL_TYPE_SYMBOLS[typedMove[1]] && HEAL_TYPE_SYMBOLS[typedMove[2]]) {
+    return {
+      ...base,
+      kind: 'move-energy-typed',
+      n: 1,
+      fromType: HEAL_TYPE_SYMBOLS[typedMove[1]],
+      toType: HEAL_TYPE_SYMBOLS[typedMove[2]],
+    };
+  }
   // Stark Mountain: move a {R}/{F} Energy between your own Pokémon.
   if (
     /choose a \{r\} or \{f\} energy attached to 1 of (?:his or her|their|your) pok[eé]mon and move/.test(
@@ -1063,7 +1076,8 @@ export function parseStadiumOncePerTurn(card) {
       target: 'bench',
     };
   }
-  const healEach = t.match(/heal (\d+) damage from each(?: of their)? ([^.]+)/);
+  // "from each of their …" (Crystal Cave) and "from all their {W} Pokémon" (Surfing Beach, customhb-209).
+  const healEach = t.match(/heal (\d+) damage from (?:each(?: of their)?|all(?: of)? their) ([^.]+)/);
   if (healEach) {
     const types = parseStadiumHealTypes(healEach[2]);
     return {
@@ -1985,6 +1999,146 @@ export function getStadiumDamageReduction(defender, targetPlayer) {
   if (scope === 'opponent' && targetPlayer === stadium.user) return 0;
   if (scope === 'owner' && targetPlayer !== stadium.user) return 0;
   return amount;
+}
+
+// ── Server-pure continuous Stadium modifiers (caller passes the Stadium card) ──
+// The rulesState readers above serve the manual-play client. These read the
+// printed subject ("{M} Pokémon", "Benched {F} Pokémon", "Steven's Pokémon") and
+// only apply to "(both yours and your opponent's)" Stadiums; a subject they cannot
+// read (a named Pokémon, "that have any … Energy attached") applies nothing.
+
+const SUBJECT_TYPE_WORDS = {
+  g: 'grass', r: 'fire', w: 'water', l: 'lightning', p: 'psychic', f: 'fighting',
+  d: 'darkness', m: 'metal', y: 'fairy', n: 'dragon', c: 'colorless',
+};
+
+function pokemonHasTypeWord(card, word) {
+  return (card?.types || []).some((type) => {
+    const t = lower(type);
+    return t === word || (word === 'darkness' && t === 'dark');
+  });
+}
+
+function stagePredicate(stageWord) {
+  const wanted = { basic: 'basic', 'stage 1': 'stage1', 'stage 2': 'stage2' }[stageWord];
+  return (card) => lower(card?.stage || 'basic').replace(/[^a-z0-9]/g, '') === wanted;
+}
+
+/** Predicate for a printed Stadium subject, or null when the wording is not one this reads. */
+function stadiumSubjectPredicate(segment) {
+  const subject = lower(segment)
+    .trim()
+    .replace(/^(?:the attacks of|attacks used by)\s+/, '')
+    .replace(/^(?:all|each)\s+/, '')
+    .replace(/\s+in play$/, '');
+  if (!subject) return null;
+  const parts = subject.split(/,?\s+(?:and|or)\s+|,\s+/).map((p) => (/pok[eé]mon/.test(p) ? p : `${p} pokémon`));
+  const preds = parts.map((part) => {
+    const m = part.match(
+      /^(?:benched\s+)?(?:(basic|stage 1|stage 2)\s+)?(?:(non-)?\{([a-z])\}\s+)?pok[eé]mon(\s+that (?:don'?t|do not) have a rule box)?$/
+    );
+    if (m) {
+      const stageOk = m[1] ? stagePredicate(m[1]) : () => true;
+      const type = m[3] ? SUBJECT_TYPE_WORDS[m[3]] : null;
+      if (m[3] && !type) return null;
+      return (card) =>
+        stageOk(card) &&
+        (!type || pokemonHasTypeWord(card, type) !== Boolean(m[2])) &&
+        (!m[4] || !isRuleBoxPokemon(card));
+    }
+    const owner = part.match(/^([a-z]+)'s pok[eé]mon$/);
+    if (owner) return (card) => lower(card?.name).includes(`${owner[1]}'s`);
+    return null;
+  });
+  if (!preds.length || preds.some((p) => !p)) return null;
+  return (card) => Boolean(card) && preds.some((p) => p(card));
+}
+
+const BOTH_SIDES_RE = /\s*\(both yours and your opponent'?s\)/;
+
+/**
+ * "{M} Pokémon (both yours and your opponent's) take N less damage from attacks from the
+ * opponent's Pokémon (after applying Weakness and Resistance)" (Full Metal Lab, Granite Cave,
+ * Circhester Bath). Damage to `defender` is reduced by N; 0 when it does not apply.
+ */
+export function stadiumAttackDamageReductionFor(stadiumCard, defender) {
+  const amount = parseStadiumDamageReduction(stadiumCard);
+  if (amount <= 0 || !defender) return 0;
+  const t = textOf(stadiumCard);
+  const m = t.match(/(?:^|\.\s+)([^.]*?)\s*\(both yours and your opponent'?s\)\s+takes?\s+\d+\s+less damage/);
+  const matches = m ? stadiumSubjectPredicate(m[1]) : null;
+  return matches && matches(defender) ? amount : 0;
+}
+
+/**
+ * "The attacks of each {F} Pokémon in play (both yours and your opponent's) do 20 more damage to
+ * the Defending Pokémon-EX" / "… to the opponent's Active Pokémon (before applying Weakness and
+ * Resistance)" (Fighting Stadium, Postwick, Practice Studio). The bonus before W/R, or 0.
+ */
+export function stadiumAttackDamageBonusFor(stadiumCard, attacker, defender, { defenderIsActive = true } = {}) {
+  const bonus = parseStadiumAttackDamageBonus(stadiumCard);
+  if (bonus <= 0 || !attacker) return 0;
+  const t = textOf(stadiumCard);
+  const m = t.match(/(?:^|\.\s+)([^.]*?)\s*\(both yours and your opponent'?s\)\s+do\s+\d+\s+more damage to the ([^(.]*)/);
+  if (!m) return 0;
+  const matches = stadiumSubjectPredicate(m[1]);
+  if (!matches || !matches(attacker)) return 0;
+  const target = m[2].trim();
+  if (!defenderIsActive) return 0;
+  if (/pok[eé]mon-ex$/.test(target)) {
+    const name = String(defender?.name || '');
+    const subtypes = Array.isArray(defender?.subtypes) ? defender.subtypes.map(String) : [];
+    return /-EX$/.test(name) || subtypes.includes('EX') ? bonus : 0;
+  }
+  return /^(?:opponent'?s active pok[eé]mon|defending pok[eé]mon)$/.test(target) ? bonus : 0;
+}
+
+/**
+ * "Prevent all damage done to Benched Pokémon by attacks (both yours and your opponent's)"
+ * (Mountain Ring), "… done to Pokémon that don't have a Rule Box … by attacks from the
+ * opponent's Pokémon ex and Pokémon V" (Neutralization Zone), "Prevent all effects of the
+ * opponent's attacks, including damage, done to Benched Pokémon" (Sky Pillar).
+ * Damage counters placed by effects are not covered (Battle Cage prints that apart).
+ */
+export function stadiumPreventsAttackDamage(stadiumCard, { defender, attacker = null, zoneId = 'active', ownAttack = false } = {}) {
+  const t = textOf(stadiumCard);
+  if (!t || !defender || !stadiumAffectsBothPlayers(stadiumCard)) return false;
+  const m = t.match(
+    /prevent all (?:damage|effects of (?:the opponent'?s )?attacks, including damage,) done to ([^.]*?)(?:\s+by attacks([^.]*))?\./
+  );
+  if (!m) return false;
+  const subjectText = m[1].replace(BOTH_SIDES_RE, '').trim();
+  const matches = stadiumSubjectPredicate(subjectText);
+  if (!matches || !matches(defender)) return false;
+  const benchedOnly = /^(?:all\s+|each\s+)?benched\b/.test(subjectText);
+  if (benchedOnly && zoneId !== 'bench') return false;
+  const attackerClause = lower(m[2] || '').replace(BOTH_SIDES_RE, '');
+  if ((/opponent'?s attacks/.test(m[0]) || /from the opponent'?s/.test(attackerClause)) && ownAttack) return false;
+  const kinds = [...attackerClause.matchAll(/pok[eé]mon[-\s](ex|gx|v)\b/g)].map((k) => k[1]);
+  if (kinds.length) {
+    const ok = kinds.some((k) => (k === 'ex' ? isExCard(attacker) : k === 'gx' ? isGxCard(attacker) : isVCard(attacker)));
+    if (!attacker || !ok) return false;
+  }
+  return true;
+}
+
+/** "Each {M} Pokémon (both yours and your opponent's) can't be affected by any Special Conditions" (Steel Shelter). */
+export function stadiumTypeStatusImmunity(stadiumCard, pokemon) {
+  const t = textOf(stadiumCard);
+  if (!t || !pokemon || !/can'?t be affected by (?:any )?special conditions/.test(t)) return false;
+  if (/energy attached/.test(t)) return false;
+  const m = t.match(/(?:^|\.\s+)([^.]*?)\s*\(both yours and your opponent'?s\)\s+can'?t be affected by/);
+  const matches = m ? stadiumSubjectPredicate(m[1]) : null;
+  return Boolean(matches && matches(pokemon));
+}
+
+/** "During Pokémon Checkup, put 2 more damage counters on each Poisoned non-{D} Pokémon (both …)" (Perilous Jungle). Extra damage (HP). */
+export function stadiumCheckupPoisonBonusFor(stadiumCard, pokemon) {
+  const counters = parseStadiumCheckupPoisonBonus(stadiumCard);
+  if (counters <= 0 || !pokemon || !stadiumAffectsBothPlayers(stadiumCard)) return 0;
+  const t = textOf(stadiumCard);
+  if (/non-\{d\}/.test(t) && pokemonHasTypeWord(pokemon, 'darkness')) return 0;
+  return counters * 10;
 }
 
 export function stadiumBlocksToolEffects(stadiumOverride = null) {

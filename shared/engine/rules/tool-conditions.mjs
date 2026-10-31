@@ -221,6 +221,11 @@ export function parseToolCondition(card) {
   const out = {};
 
   parseHolderPhrase(t, out);
+  // Dark Claw (DEX 92): "If this card is attached to a {D} Pokémon, each of the attacks of that Pokémon…"
+  const attachedToType = t.match(/if this card is attached to an? \{([a-z])\} pok[eé]mon/);
+  if (attachedToType && !out.holderType && TYPE_WORDS[attachedToType[1]]) {
+    out.holderType = TYPE_WORDS[attachedToType[1]];
+  }
 
   if (/doesn'?t have a rule box|does not have a rule box/.test(t)) {
     out.holderNoRuleBox = true;

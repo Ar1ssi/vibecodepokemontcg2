@@ -27,7 +27,7 @@ import {
 } from './attack-effect.mjs';
 import {
   promoteBenchToActive, koEnergyTargets, moveKoEnergy, PRIZE_CHOICE_EFFECT, resolvePrizeChoice,
-  KO_HAND_DISCARD_EFFECT, resolveKoHandDiscard,
+  KO_HAND_DISCARD_EFFECT, resolveKoHandDiscard, KO_TOOL_COUNTERS_EFFECT, resolveKoToolCounter,
   PRIZE_BENCH_EFFECT, PRIZE_ATTACH_EFFECT, resumePrizeAttach, resumePrizeToBench,
   PRIZE_TRAINER_EFFECT, resumePrizeTrainer,
 } from './knockout.mjs';
@@ -459,6 +459,14 @@ export function resolveChoiceCommand({ draft, playerId, activeRng, events, paylo
       events,
     });
     draft.pendingChoice = null;
+  } else if (token.effectType === KO_TOOL_COUNTERS_EFFECT) {
+    draft.pendingChoice = null;
+    resolveKoToolCounter(draft, {
+      playerId: initiatorPlayerId,
+      targetPlayerId: token.targetPlayerId,
+      selection: payload.selection || [],
+      events,
+    });
   } else if (token.effectType === KO_HAND_DISCARD_EFFECT) {
     draft.pendingChoice = null;
     resolveKoHandDiscard(draft, {

@@ -72,6 +72,18 @@ function applyToolOnKoEffects(
   for (const eff of effects) {
     if (eff.returnSelfToHand) outcome.returnToHand = true;
     if (eff.discardPrizes) outcome.discardPrizes = true;
+    // Spell Tag: the holder's owner places the counters once no other choice is pending.
+    if (eff.countersOnOpponent > 0 && attacker && attackerPlayerId !== victimPlayerId) {
+      draft.__koToolCounters = [
+        ...(draft.__koToolCounters || []),
+        {
+          playerId: victimPlayerId,
+          targetPlayerId: attackerPlayerId,
+          remaining: eff.countersOnOpponent,
+          source: eff.tool?.name || 'Pokémon Tool',
+        },
+      ];
+    }
 
     if (eff.moveEnergyOnKo) {
       const spec = eff.moveEnergyOnKo;
@@ -1317,6 +1329,71 @@ export function settleKoHandDiscards(draft, { events }) {
   }
   if (queue.length > 0) draft.__koHandDiscards = queue;
   else delete draft.__koHandDiscards;
+}
+
+export const KO_TOOL_COUNTERS_EFFECT = 'koToolCounters';
+
+/**
+ * Runs the queued on-Knock-Out counter placements (Spell Tag: "put 4 damage counters on your
+ * opponent's Pokémon in any way you like") once no other choice is pending: one counter per
+ * pick, so the owner splits them freely across the opponent's Pokémon in play.
+ */
+export function settleKoToolCounters(draft) {
+  if (isGameConcluded(draft)) {
+    delete draft.__koToolCounters;
+    return;
+  }
+  if (draft.pendingChoice) return;
+  const queue = [...(draft.__koToolCounters || [])];
+  while (queue.length > 0) {
+    const entry = queue[0];
+    const target = draft.players?.[entry.targetPlayerId];
+    const options = rootsIn([...(target?.zones?.active || []), ...(target?.zones?.bench || [])]);
+    if (!draft.players?.[entry.playerId] || options.length === 0 || !(entry.remaining > 0)) {
+      queue.shift();
+      continue;
+    }
+    draft.pendingChoice = createPendingChoice({
+      player: entry.playerId,
+      source: entry.source,
+      prompt: `${entry.source}: put a damage counter on 1 of your opponent's Pokémon (${entry.remaining} left)`,
+      options,
+      min: 1,
+      max: 1,
+      stateVersion: draft.stateVersion || 0,
+      resumeToken: {
+        effectType: KO_TOOL_COUNTERS_EFFECT,
+        initiatorPlayerId: entry.playerId,
+        targetPlayerId: entry.targetPlayerId,
+      },
+    });
+    break;
+  }
+  if (queue.length > 0) draft.__koToolCounters = queue;
+  else delete draft.__koToolCounters;
+}
+
+/** Places one queued counter on the picked Pokémon; the Knock Out sweep reads the event. */
+export function resolveKoToolCounter(draft, { playerId, targetPlayerId, selection, events }) {
+  const queue = draft.__koToolCounters || [];
+  const entry = queue[0];
+  if (!entry) return;
+  const ref = findCard(draft, (selection || [])[0]);
+  if (ref && ref.playerId === targetPlayerId && (ref.zoneId === 'active' || ref.zoneId === 'bench') && !ref.card.attachedTo) {
+    ref.card.damage = (ref.card.damage || 0) + 10;
+    events.push({
+      type: 'damageCountersPlaced',
+      instanceId: ref.card.instanceId,
+      victimPlayerId: targetPlayerId,
+      attackerPlayerId: playerId,
+      damage: ref.card.damage,
+      source: entry.source,
+    });
+    entry.remaining -= 1;
+  }
+  if (!(entry.remaining > 0)) queue.shift();
+  if (queue.length > 0) draft.__koToolCounters = queue;
+  else delete draft.__koToolCounters;
 }
 
 /** Discards the chosen cards from the chooser's hand (the Amoonguss Disarming Spore choice). */

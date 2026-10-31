@@ -17,6 +17,7 @@ import { attackCommand } from './reduce/attack.mjs';
 import {
   settlePromotionChoices, stampHealedPokemon, stampActivePromotions, settleKoEnergyMoves,
   settleKoHandDiscards,
+  settleKoToolCounters,
   settlePrizeEntitlements, resolveDamageCounterKnockouts, takePrizesCommand,
   takePrizesByIndexCommand, promoteCommand,
 } from './reduce/knockout.mjs';
@@ -448,6 +449,7 @@ export function applyCommand(state, command, rng = null) {
   settlePromotionChoices(draft, { events });
   settleKoEnergyMoves(draft, { events });
   settleKoHandDiscards(draft, { events });
+  settleKoToolCounters(draft);
   settlePrizeEntitlements(draft, { events });
   stampActivePromotions(state, draft);
   stampHealedPokemon(state, draft);
