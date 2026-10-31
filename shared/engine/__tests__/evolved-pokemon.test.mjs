@@ -303,16 +303,21 @@ test('evolve: a homebrew Mega ends the turn like a Gen 6 Mega Evolution', () => 
   assert.equal(res.state.turn.player, 'p2');
 });
 
-test('evolve: the homebrew Mega Signal is a universal Spirit Link; a lookalike is not', () => {
-  const signal = (id) =>
-    createCard({ instanceId: 3, name: 'Mega Signal', id, supertype: 'Trainer', trainerType: 'Tool', attachedTo: 1 });
-  for (const [id, keepsTurn] of [['customhb-500', true], ['me01-122', false]]) {
+test('evolve: the homebrew Mega Signal (a Tool, or any custom-set card) is a universal Spirit Link; the printed Item is not', () => {
+  const signal = (id, trainerType) =>
+    createCard({ instanceId: 3, name: 'Mega Signal', id, supertype: 'Trainer', trainerType, attachedTo: 1 });
+  for (const [id, trainerType, keepsTurn] of [
+    ['customhb-500', 'Tool', true],
+    ['customhb-500', 'Item', true],
+    ['', 'Tool', true],
+    ['asc-193', 'Item', false],
+  ]) {
     const state = megaGame('Absol');
-    state.players.p1.zones.active.push(signal(id));
+    state.players.p1.zones.active.push(signal(id, trainerType));
     state.players.p1.zones.hand.push(homebrewMega());
     const res = evolve(state, 2, 1);
     assert.equal(res.error, null);
-    assert.equal(res.state.turn.player, keepsTurn ? 'p1' : 'p2', id);
+    assert.equal(res.state.turn.player, keepsTurn ? 'p1' : 'p2', `${id} ${trainerType}`);
   }
 });
 

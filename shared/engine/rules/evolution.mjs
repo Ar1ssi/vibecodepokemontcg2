@@ -401,8 +401,7 @@ export { isModernMegaCard, isLegacyMegaOrPrimalCard };
 // Spirit Link cards are named "<Species> Spirit Link" and attach to the
 // Basic/EX Pokémon they cover. Match on the evolving card's base species
 // name (its "M "/"Primal "/"Mega " prefix and EX suffix stripped) against every
-// attached card's name. The homebrew "Mega Signal" (a custom-set card; the
-// printed Mega Signal Item is unrelated) is a universal link: it covers any Mega.
+// attached card's name. The homebrew "Mega Signal" Tool is a universal link: it covers any Mega.
 export function hasMatchingSpiritLink(baseCardInPlay, evolvingCardName) {
   const attached = Array.isArray(baseCardInPlay?.attachedCards)
     ? baseCardInPlay.attachedCards
@@ -419,11 +418,11 @@ export function hasMatchingSpiritLink(baseCardInPlay, evolvingCardName) {
   });
 }
 
+// The printed Mega Signal (ASC 193 / MEG 121, 171) is an Item that searches the deck; the homebrew one is a
+// Pokémon Tool (or any custom-set card) of the same name.
 function isHomebrewMegaSignal(card) {
-  return (
-    isCustomCardId(card?.id) &&
-    String(card?.name || '').trim().toLowerCase() === 'mega signal'
-  );
+  if (String(card?.name || '').trim().toLowerCase() !== 'mega signal') return false;
+  return isCustomCardId(card?.id) || /tool/i.test(String(card?.trainerType || ''));
 }
 
 // True when evolving `evolvingCard` onto `baseCardInPlay` must end the
