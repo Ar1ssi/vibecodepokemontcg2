@@ -14,8 +14,10 @@ import { getStadiumEvolutionSpeed } from './stadium-effects.mjs';
 import {
   isModernMegaCard,
   isLegacyMegaCard as isLegacyMegaOrPrimalCard,
+  isHomebrewMegaCard,
 } from './card-classify.mjs';
 import { isBabyEvolution } from './baby-rule.mjs';
+import { isCustomCardId } from '../../custom-sets/custom-set-schema.mjs';
 
 export const STAGE1_EVOLVES_FROM = new Map([
   ['piloswine', 'swinub'],
@@ -398,14 +400,16 @@ export { isModernMegaCard, isLegacyMegaOrPrimalCard };
 
 // Spirit Link cards are named "<Species> Spirit Link" and attach to the
 // Basic/EX Pokémon they cover. Match on the evolving card's base species
-// name (its "M "/"Primal " prefix and EX suffix stripped) against every
-// attached card's name.
+// name (its "M "/"Primal "/"Mega " prefix and EX suffix stripped) against every
+// attached card's name. The homebrew "Mega Signal" (a custom-set card; the
+// printed Mega Signal Item is unrelated) is a universal link: it covers any Mega.
 export function hasMatchingSpiritLink(baseCardInPlay, evolvingCardName) {
   const attached = Array.isArray(baseCardInPlay?.attachedCards)
     ? baseCardInPlay.attachedCards
     : [];
+  if (attached.some(isHomebrewMegaSignal)) return true;
   const baseSpecies = cleanPokemonName(
-    String(evolvingCardName || '').replace(/^(?:m|primal)\s+/i, '')
+    String(evolvingCardName || '').replace(/^(?:m|primal|mega)\s+/i, '')
   );
   if (!baseSpecies) return false;
   return attached.some((c) => {
@@ -415,10 +419,18 @@ export function hasMatchingSpiritLink(baseCardInPlay, evolvingCardName) {
   });
 }
 
+function isHomebrewMegaSignal(card) {
+  return (
+    isCustomCardId(card?.id) &&
+    String(card?.name || '').trim().toLowerCase() === 'mega signal'
+  );
+}
+
 // True when evolving `evolvingCard` onto `baseCardInPlay` must end the
-// turn immediately per the Gen 6 Mega Evolution / Primal Reversion rule.
+// turn immediately per the Gen 6 Mega Evolution / Primal Reversion rule
+// (legacy "M <Name>-EX" / "Primal" cards and homebrew Megas).
 export function requiresTurnEndOnEvolve(evolvingCard, baseCardInPlay) {
-  if (!isLegacyMegaOrPrimalCard(evolvingCard)) return false;
+  if (!isLegacyMegaOrPrimalCard(evolvingCard) && !isHomebrewMegaCard(evolvingCard)) return false;
   if (hasMatchingSpiritLink(baseCardInPlay, evolvingCard?.name)) return false;
   return true;
 }
