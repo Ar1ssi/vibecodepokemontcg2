@@ -298,5 +298,9 @@ function playConditionBlockReason(condition, ctx) {
   if (condition === 'secondPlayerFirstTurn') {
     return ctx.turnNumber !== 2 ? 'You can use this card only if you go second, during your first turn.' : null;
   }
+  // Greedy Dice (Steam Siege): played only from the Prize-taking prompt (knockout.mjs offerPrizeTrainer).
+  if (condition === 'fromPrizeOnly') {
+    return 'You can play this card only when you take it as a face-down Prize card.';
+  }
   return null;
 }

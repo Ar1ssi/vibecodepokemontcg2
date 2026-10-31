@@ -37,6 +37,8 @@ import {
   abilitySideContext, tiebreakActive, rootsIn,
 } from './shared.mjs';
 import { trainerEffectText } from './trainer.mjs';
+import { parseTrainerEffect } from '../rules/trainer-effects.mjs';
+import { executeTrainer } from '../effects/trainer.mjs';
 
 // On-Knock-Out Tool effects (design 035 slice 9): return-to-hand, Prize denial,
 // Energy moves, opponent mill, KO search and draw-to-N. Runs before the victim's
@@ -876,6 +878,7 @@ function collectPrizeEntitlement(draft, { playerId, events }) {
   if (prizes.length > 0) {
     offerPrizeToBench(draft, { playerId, taken });
     offerPrizeAttach(draft, { playerId, taken });
+    offerPrizeTrainer(draft, { playerId, taken });
   }
 }
 
@@ -1034,6 +1037,44 @@ export function resolvePrizeChoice(draft, { playerId, selection, events }) {
   }
   offerPrizeToBench(draft, { playerId, taken });
   offerPrizeAttach(draft, { playerId, taken });
+  offerPrizeTrainer(draft, { playerId, taken });
+}
+
+export const PRIZE_TRAINER_EFFECT = 'prizeTrainer';
+
+// Greedy Dice (Steam Siege): "You can play this card only if you took it as a face-down Prize
+// card, before you put it into your hand." The taker is asked once, for the first such card.
+function offerPrizeTrainer(draft, { playerId, taken }) {
+  if (draft.pendingChoice || isGameConcluded(draft)) return;
+  const player = draft.players[playerId];
+  const card = taken.find(
+    (c) =>
+      player.zones.hand.includes(c) &&
+      !isPokemon(c) &&
+      parseTrainerEffect(trainerEffectText(c)).playCondition === 'fromPrizeOnly'
+  );
+  if (!card) return;
+  draft.pendingChoice = createPendingChoice({
+    player: playerId,
+    source: card.name || 'Trainer',
+    prompt: `${card.name}: play it now? (you took it as a Prize card)`,
+    options: [
+      { instanceId: 1, name: `Play ${card.name}`, type: 'option' },
+      { instanceId: 2, name: 'Keep it in your hand', type: 'option' },
+    ],
+    min: 1,
+    max: 1,
+    resumeToken: { effectType: PRIZE_TRAINER_EFFECT, initiatorPlayerId: playerId, cardId: card.instanceId },
+  });
+}
+
+export function resumePrizeTrainer(draft, { token, selection, activeRng, events }) {
+  draft.pendingChoice = null;
+  if (Number((selection || [])[0]) !== 1) return;
+  const player = draft.players[token.initiatorPlayerId];
+  const card = player?.zones?.hand?.find((c) => c.instanceId === token.cardId);
+  if (!card) return;
+  executeTrainer(draft, { card, playerId: token.initiatorPlayerId, activeRng, events });
 }
 
 export const PRIZE_BENCH_EFFECT = 'prizeBench';

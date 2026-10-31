@@ -18,7 +18,8 @@ import { topPokemonCard } from '../rules/evolved-pokemon.mjs';
 import { becomeFossilPokemon, isFossilItem } from '../rules/fossil.mjs';
 import { addCondition, clearConditions, hasAnyCondition } from '../rules/special-conditions.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
-import { isVCard } from '../rules/card-classify.mjs';
+import { isGxCard, isVCard } from '../rules/card-classify.mjs';
+import { cardEffectiveHp } from '../reduce/shared.mjs';
 import { effectTextFor, stepRevealsPicks } from '../rules/reveal-picks.mjs';
 import {
   healLocked, addAttackMarker, markerFromTurn, markerUntilTurn,
@@ -109,6 +110,31 @@ function opponentActiveAbilityShielded(draft, opponent) {
     specialEnergyShielded(opponent, active, 'ability') ||
     cardEffectShielded(draft, { owner: opponent, root: active, source: 'Ability' })
   );
+}
+
+/**
+ * The printed limits a healAmount step carries (trainer-effects healTargetConditions): a
+ * Pokémon-GX, at least N Energy attached, any Energy of a type attached, or N HP or less left.
+ */
+function healTargetAllowed(draft, player, root, step) {
+  const sideCards = [...(player.zones.active || []), ...(player.zones.bench || [])];
+  const top = topPokemonCard(sideCards, root) || root;
+  if (step.subtypes?.includes('gx') && !isGxCard(top)) return false;
+  const energies = (step.minEnergy || step.energyType)
+    ? sideCards.filter((c) => c.attachedTo === root.instanceId && isEnergy(c))
+    : [];
+  if (step.minEnergy && energies.length < step.minEnergy) return false;
+  if (
+    step.energyType &&
+    !energies.some((e) => String(resolveAttachedEnergyType(e) || '').toLowerCase() === step.energyType)
+  ) {
+    return false;
+  }
+  if (step.maxRemainingHp != null) {
+    const remaining = cardEffectiveHp(draft, root, player.playerId) - (root.damage || 0);
+    if (remaining > step.maxRemainingHp) return false;
+  }
+  return true;
 }
 
 /** Whether executeSteps has a handler for a step kind (switch case or handler table). */
@@ -314,6 +340,21 @@ function inPlayTypes(player) {
     for (const t of (topPokemonCard(zone, root) || root).types || []) types.add(String(t).toLowerCase());
   }
   return types;
+}
+
+/** Lowercase names of a player's Pokémon in play, by top card (Love Ball). */
+function inPlayNames(player) {
+  const zone = [...(player?.zones?.active || []), ...(player?.zones?.bench || [])];
+  return new Set(
+    zone.filter((c) => !c.attachedTo).map((root) => String((topPokemonCard(zone, root) || root).name || '').toLowerCase())
+  );
+}
+
+/** Printed Retreat Cost as a count: an array of symbols or a number (Feather Ball). */
+function retreatCostCount(card) {
+  const cost = card?.retreatCost;
+  if (Array.isArray(cost)) return cost.length;
+  return Number(cost) || 0;
 }
 
 export function attachToRoot(player, card, root, events) {
@@ -670,8 +711,11 @@ export function executeSteps(draft, {
           : null;
         const evolvesFrom = step.evolvesFrom ? String(step.evolvesFrom).toLowerCase() : null;
         const opponentTypes = step.sameTypeAsOpponent ? inPlayTypes(opponent) : null;
+        const opponentNames = step.sameNameAsOpponent ? inPlayNames(opponent) : null;
         const cardMatches = (c) =>
           matchesKind(c, { what, exclude: step.exclude }) &&
+          (!step.noRetreatCost || retreatCostCount(c) === 0) &&
+          (!opponentNames || opponentNames.has(String(c?.name || '').toLowerCase())) &&
           (!nameFilter || String(c?.name || '').toLowerCase().includes(nameFilter)) &&
           (!evolvesFrom || String(c?.evolvesFrom || '').toLowerCase() === evolvesFrom) &&
           (!opponentTypes || (c?.types || []).some((t) => opponentTypes.has(String(t).toLowerCase())));
@@ -1674,6 +1718,7 @@ export function executeSteps(draft, {
               ((topPokemonCard([...(player.zones.active || []), ...(player.zones.bench || [])], c) || c).types || []).some(
                 (ty) => typeFilter.includes(String(ty).toLowerCase())
               )) &&
+            healTargetAllowed(draft, player, c, step) &&
             (step.target === 'attached Pokémon'
               ? c.instanceId === context.attachedTargetId
               : step.target === 'costHost'

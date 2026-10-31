@@ -542,6 +542,37 @@ const POKEMON_TYPE_BY_SYMBOL = {
   d: 'darkness', m: 'metal', y: 'fairy', n: 'dragon', c: 'colorless',
 };
 
+// The Pokémon a "Heal N damage from …" Trainer may pick, kept with its printed zone and type so
+// rootMatchesTarget filters it: "your Active {N} Pokémon" (Dragon Elixir, Surging Sparks),
+// "1 of your {P} Pokémon" (Jacinthe, Perfect Order), "your Active Pokémon-GX" (Great Potion).
+const HEAL_TARGET_RE = /heal \d+ damage from (1 of )?your (active )?(?:\{([a-z])\} )?pok[ée]mon/;
+
+function healAmountTarget(lower) {
+  if (lower.includes('each of your pokémon')) return 'each of your Pokémon';
+  const m = lower.match(HEAL_TARGET_RE);
+  if (!m) return lower.includes('active pokémon') ? 'Active Pokémon' : '1 of your Pokémon';
+  const typed = m[3] ? `{${m[3].toUpperCase()}} ` : '';
+  if (m[2]) return typed ? `Active ${typed}Pokémon` : 'Active Pokémon';
+  return `1 of your ${typed}Pokémon`;
+}
+
+// Printed limits on which Pokémon a heal may pick (each read by the healAmount executor):
+// Pokémon-GX (Great Potion), "that has at least 2 Energy attached" (Hyper Potion, Sword &
+// Shield), "that has any {Y} Energy attached to it" (Fairy Drop, Fates Collide), "that has 30 HP
+// or less remaining" (Last Chance Potion, Celestial Storm).
+function healTargetConditions(lower) {
+  const target = lower.match(/heal \d+ damage from ([^.]*)/)?.[1] || '';
+  const conditions = {};
+  if (/pok[ée]mon-gx\b/.test(target)) conditions.subtypes = ['gx'];
+  const minEnergy = target.match(/that has at least (\d+) energy attached/);
+  if (minEnergy) conditions.minEnergy = Number(minEnergy[1]);
+  const energyType = target.match(/that has any \{([a-z])\} energy attached/);
+  if (energyType) conditions.energyType = POKEMON_TYPE_BY_SYMBOL[energyType[1]];
+  const maxHp = target.match(/that has (\d+) hp or less remaining/);
+  if (maxHp) conditions.maxRemainingHp = Number(maxHp[1]);
+  return conditions;
+}
+
 const PARADOX_TAG_WORD = { ancient: 'Ancient', future: 'Future' };
 
 // Design 058. Professor Sada's Vitality: "Choose up to 2 of your Ancient Pokémon and attach a Basic
@@ -713,6 +744,27 @@ function parseSpecialKindSearch(lower, destination, reveal) {
   return null;
 }
 
+// "a Basic {F} Energy card or a Basic {F} Pokémon" (Fighting Gong, Mega Evolution), "a {P}
+// Energy card or a Basic {P} Pokémon" (Fog Crystal), "a Basic {G} Pokémon or a {G} Energy card"
+// (Net Ball): both kinds keep their printed type. Untyped wordings return null.
+const ENERGY_OR_POKEMON_PART = '((?:basic )?(?:\\{[a-z]\\} )?(?:energy card|pokémon))';
+const ENERGY_OR_POKEMON_RE = new RegExp(
+  `search your deck for an? ${ENERGY_OR_POKEMON_PART} or an? ${ENERGY_OR_POKEMON_PART}`
+);
+
+function typedEnergyOrPokemonWhat(lower) {
+  const m = lower.match(ENERGY_OR_POKEMON_RE);
+  if (!m || !/\{[a-z]\}/.test(m[1] + m[2])) return null;
+  const label = (part) =>
+    part
+      .replace(/ card$/, '')
+      .replace(/\{([a-z])\}/, (_, sym) => `{${sym.toUpperCase()}}`)
+      .replace(/\bbasic\b/, 'Basic')
+      .replace(/\benergy\b/, 'Energy')
+      .replace(/\bpokémon\b/, 'Pokémon');
+  return `${label(m[1])} or ${label(m[2])}`;
+}
+
 // Shared search-deck target parsing — used by the main search branch, coin-flip
 // sub-clauses, and attack search (parseAttackSearchClause in damage-parser.mjs).
 export function parseSearchDeckParams(lower) {
@@ -815,6 +867,20 @@ function parseSearchDeckKind(lower) {
   }
   if (/search your deck for a basic energy card/.test(lower) && lower.includes('into your hand')) {
     return { what: 'Basic Energy', count: 1, destination: 'hand' };
+  }
+  // Energy Search Pro (Surging Sparks): "any number of Basic Energy cards of different types";
+  // 9 is every Basic Energy type, and distinctTypes keeps one of each.
+  if (/search your deck for any number of basic energy cards of different types/.test(lower)) {
+    return { what: 'Basic Energy', count: 9, destination: 'hand', upTo: true, reveal: true, distinctTypes: true };
+  }
+  // Feather Ball (Astral Radiance): "a Pokémon that has no Retreat Cost".
+  if (/search your deck for a pokémon that has no retreat cost/.test(lower)) {
+    return { what: 'Pokémon', count: 1, destination: 'hand', reveal: true, noRetreatCost: true };
+  }
+  // Love Ball (Twilight Masquerade): "a Pokémon with the same name as 1 of your opponent's
+  // Pokémon in play".
+  if (/search your deck for a pokémon with the same name as 1 of your opponent's pokémon in play/.test(lower)) {
+    return { what: 'Pokémon', count: 1, destination: 'hand', reveal: true, sameNameAsOpponent: true };
   }
   // Crispin (Prismatic Evolutions 171): 1 pick goes to the hand, the other onto a Pokémon.
   const splitEnergy = lower.match(
@@ -1011,7 +1077,7 @@ function parseSearchDeckKind(lower) {
     what = 'Pokémon';
     count = Number(lower.match(/search your deck for up to\s+(\d+)/)[1]);
   } else if (lower.includes('energy') && /\bor\b/.test(lower) && lower.includes('pokémon')) {
-    what = 'Basic Energy or Basic Pokémon';
+    what = typedEnergyOrPokemonWhat(lower) || 'Basic Energy or Basic Pokémon';
   } else if (lower.includes('pokémon')) what = 'Pokémon';
 
   // The printed count and kind of a plain search ("up to 2 Basic Pokémon", "3 Pokémon Tool
@@ -1128,6 +1194,29 @@ function parseCoinFlipStep(lower) {
         })),
       };
     }
+  }
+
+  // Energy Coin (Black Bolt): "Flip 2 coins. If both of them are heads, search your deck …".
+  const bothHeadsSearch = lower.match(/^flip 2 coins\. if both of them are heads, (search your deck .+)$/);
+  if (bothHeadsSearch) {
+    return {
+      type: 'coinFlip',
+      count: 2,
+      headsAtLeast: 2,
+      heads: [{ type: 'searchDeck', ...parseSearchDeckParams(bothHeadsSearch[1]) }],
+      tails: [],
+    };
+  }
+
+  // Energy Sticker (151): "If heads, attach a Basic Energy card from your discard pile to 1 of
+  // your Benched Pokémon."
+  const headsAttach = lower.match(
+    /if heads, attach an? basic (\{[a-z]\} )?energy card from your discard pile to (1 of your (?:benched )?(?:\{[a-z]\} )?pokémon)/
+  );
+  if (headsAttach) {
+    const energy = headsAttach[1] ? `Basic ${headsAttach[1].trim().toUpperCase()} Energy` : 'Basic Energy';
+    const target = headsAttach[2].replace('benched', 'Benched').replace('pokémon', 'Pokémon');
+    return { type: 'coinFlip', heads: [{ type: 'attachFromDiscard', energy, target }], tails: [] };
   }
 
   if (lower.includes('search your deck')) {
@@ -1257,7 +1346,12 @@ const PLAY_STAGE_WORDS = { basic: 'Basic', 'stage 1': 'Stage 1', 'stage 2': 'Sta
 
 // Card-printed "only if …" / "you can't play this card if …" restrictions, as one condition
 // string evaluated by trainer-play-conditions.mjs. Hand counts include the Trainer itself.
+// "You can play this card only if you took it as a face-down Prize card, before you put it into
+// your hand." (Greedy Dice, Steam Siege; Dream Ball, Evolving Skies)
+export const FROM_PRIZE_PLAY_RE = /you can play this card only if you took it as a face-down prize card, before you put it into your hand\.\s*/;
+
 function parsePlayCondition(lower) {
+  if (FROM_PRIZE_PLAY_RE.test(lower)) return 'fromPrizeOnly';
   const oppPrizes = lower.match(/only if your opponent has\s+(\d+)\s+or fewer prize cards remaining/);
   if (oppPrizes) return `opponentPrizes<=${oppPrizes[1]}`;
   const exactPrizes = lower.match(/only if your opponent has exactly\s+(\d+)(?:\s+or\s+(\d+))?\s+prize cards remaining/);
@@ -1709,6 +1803,24 @@ function parseTrainerStepsInner(lower) {
   }
 
   // discard-hand-then-draw (Professor's Research); Ingo & Emmet draws from the bottom
+  // The Prize-only play condition is parsePlayCondition's; the effect is the rest of the text.
+  if (FROM_PRIZE_PLAY_RE.test(lower)) {
+    const rest = lower.replace(FROM_PRIZE_PLAY_RE, '').trim();
+    // Greedy Dice: "Flip a coin. If heads, take 1 more Prize card."
+    const extraPrize = rest.match(/^flip a coin\. if heads, take (\d+) more prize cards?\.?$/);
+    if (extraPrize) {
+      steps.push({ type: 'coinFlip', heads: [{ type: 'takeExtraPrize', count: Number(extraPrize[1]) }], tails: [] });
+      return { steps, recognizable: true };
+    }
+    return parseTrainerStepsInner(rest);
+  }
+
+  // Full Heal (Rebel Clash): a one-shot cure, not a lasting immunity.
+  if (/^your active pok[ée]mon recovers from all special conditions\.?$/.test(lower.trim())) {
+    steps.push({ type: 'clearStatus', target: 'yourActive' });
+    return { steps, recognizable: true };
+  }
+
   if (lower.includes('discard your hand and draw')) {
     const m = lower.match(/draw\s+(\d+)\s+cards?/);
     steps.push({
@@ -1893,8 +2005,26 @@ function parseTrainerStepsInner(lower) {
       return { steps, recognizable: true };
     }
 
+    // Electric Generator (Scarlet & Violet): the found Energy is attached, not taken.
+    const generator = lower.match(
+      /attach up to (\d+) (basic \{([a-z])\} energy) cards you find there to your (benched (?:\{[a-z]\} )?pokémon) in any way you like\. shuffle the other cards back into your deck/
+    );
+    if (generator) {
+      steps.push({
+        type: 'lookAttachEnergy',
+        count: m ? Number(m[1]) : 5,
+        max: Number(generator[1]),
+        energyWhat: `Basic {${generator[3].toUpperCase()}} Energy`,
+        target: `your ${generator[4]}`,
+        restTo: 'shuffle',
+      });
+      return { steps, recognizable: true };
+    }
+
     let pick = 'any';
     if (lower.includes('discard any number of them')) pick = 'discard';
+    // Energy Loto (Guardians Rising): "You may reveal an Energy card you find there".
+    else if (/reveal an energy card you find there/.test(lower)) pick = 'Energy';
     else if (lower.includes('supporter card')) pick = 'Supporter';
     else if (lower.includes('attach a basic energy')) pick = 'Basic Energy (attach)';
     else if (lower.includes('onto your bench')) pick = benchLookPick(lower);
@@ -1950,8 +2080,13 @@ function parseTrainerStepsInner(lower) {
 
   // switches (with optional trailing draw)
   if (matchesSwitchOpponentIn(lower)) {
-    // Giovanni: switch your own Team Rocket's Pokémon, then the opponent's.
-    if (lower.includes('switch your active') && lower.includes('switch in 1 of your opponent')) {
+    // Giovanni: switch your own Team Rocket's Pokémon, then the opponent's. Prime Catcher
+    // (Temporal Forces) prints the opponent's switch first and gates yours on it ("If you do").
+    if (
+      lower.includes('switch your active') &&
+      lower.includes('switch in 1 of your opponent') &&
+      lower.indexOf('switch your active') < lower.indexOf('switch in 1 of your opponent')
+    ) {
       steps.push({ type: 'switchOwn' });
       steps.push({ type: 'switchOpponent' });
     } else {
@@ -2000,6 +2135,10 @@ function parseTrainerStepsInner(lower) {
       lower.includes('switch 1 of your benched pokémon with your active pokémon')) &&
       !lower.includes('opponent switches') && !lower.includes("opponent's")) {
     steps.push({ type: 'switchOwn' });
+    // Scramble Switch (Surging Sparks): the Energy may follow to the new Active Pokémon.
+    if (/if you do, you may move any amount of energy from the pokémon you moved to your bench to the new active pokémon/.test(lower)) {
+      steps.push({ type: 'moveEnergyToNewActive' });
+    }
     appendTrailingDraw(steps, lower);
     return { steps, recognizable: true };
   }
@@ -2021,16 +2160,16 @@ function parseTrainerStepsInner(lower) {
     return { steps, recognizable: true };
   }
 
-  // Escape Rope: each player switches their own Active with a Benched Pokémon, and
-  // the player who played the card switches first. Modelled as two sequential switch
-  // steps so each seat gets its own click-the-card choice (server authority) / picker.
+  // Escape Rope: each player switches their own Active with a Benched Pokémon. Modelled as two
+  // sequential switch steps so each seat gets its own choice; "Your opponent switches first"
+  // (Battle Styles) puts the opponent's step first.
   if (
     /each player switches (?:their|his or her) active pok[ée]mon with 1 of (?:their|his or her) benched pok[ée]mon/.test(
       lower
     )
   ) {
-    steps.push({ type: 'switchOwn' });
-    steps.push({ type: 'switchOpponentOut' });
+    if (lower.includes('your opponent switches first')) steps.push({ type: 'switchOpponentOut' }, { type: 'switchOwn' });
+    else steps.push({ type: 'switchOwn' }, { type: 'switchOpponentOut' });
     appendTrailingDraw(steps, lower);
     return { steps, recognizable: true };
   }
@@ -2143,11 +2282,18 @@ function parseTrainerStepsInner(lower) {
     steps.push({
       type: 'healAmount',
       amount: Number(m[1]),
-      target: lower.includes('each of your pokémon')
-        ? 'each of your Pokémon'
-        : lower.includes('active pokémon') ? 'Active Pokémon' : '1 of your Pokémon',
+      target: healAmountTarget(lower),
       cure: lower.includes('special condition'),
+      ...healTargetConditions(lower),
     });
+    // "If you healed any damage in this way, discard an Energy from that Pokémon" (Super
+    // Potion, Journey Together; Hyper Potion, Sword & Shield): paid only when damage was healed.
+    const discard = lower.match(
+      /if you healed any damage in this way, discard (an|\d+) energy from (?:it|that pokémon)/
+    );
+    if (discard) {
+      steps.push({ type: 'discardEnergyFromHealed', count: discard[1] === 'an' ? 1 : Number(discard[1]) });
+    }
     appendTrailingDraw(steps, lower);
     return { steps, recognizable: true };
   }
@@ -2441,7 +2587,10 @@ function parseTrainerStepsInner(lower) {
       const raw = at[1] || '1';
       const count = raw === 'a' || raw === 'an' ? 1 : Number(raw);
       let target = '1 of your Pokémon';
-      if (lower.includes('benched')) target = '1 of your Benched Pokémon';
+      // The printed type of the receiving Pokémon: "to 1 of your {N} Pokémon" (Zinnia, Dragon Majesty).
+      const typedTarget = lower.match(/from your hand to 1 of your (benched )?\{([a-z])\} pokémon/);
+      if (typedTarget) target = `1 of your ${typedTarget[1] ? 'Benched ' : ''}{${typedTarget[2].toUpperCase()}} Pokémon`;
+      else if (lower.includes('benched')) target = '1 of your Benched Pokémon';
       else if (lower.includes('stage 2')) target = '1 of your Stage 2 Pokémon';
       const symbol = at[2] || at[4];
       const typeWord = symbol ? SYMBOL_ENERGY_WORDS[symbol] : at[5] || null;
@@ -2725,6 +2874,25 @@ function parseTrainerStepsInner(lower) {
   // shuffle from discard into deck (Energy Recycler, Sacred Ash, Great Haul
   // Net, Super Rod — "from your discard pile back into your deck")
   if (lower.includes('from your discard pile') && /(?:back )?into your deck/.test(lower)) {
+    // Electrocharger (Team Up): "Flip 2 coins. For each heads, shuffle an Electropower card …".
+    const perHeads = lower.match(
+      /^flip (\d+) coins\. for each heads, shuffle an? ([^.]+?) card from your discard pile into your deck/
+    );
+    if (perHeads) {
+      steps.push({ type: 'shuffleFromDiscard', what: 'card', nameFilter: perHeads[2], coins: Number(perHeads[1]), perHeads: 1 });
+      return { steps, recognizable: true };
+    }
+    // Lana's Fishing Rod (Cosmic Eclipse): one Pokémon and one Pokémon Tool card.
+    if (/shuffle a pokémon and a pokémon tool card from your discard pile into your deck/.test(lower)) {
+      steps.push({ type: 'shuffleFromDiscard', choices: [{ what: 'Pokémon', count: 1 }, { what: 'Pokémon Tool', count: 1 }] });
+      return { steps, recognizable: true };
+    }
+    // Special Charge (Steam Siege): "Shuffle 2 Special Energy cards …".
+    const special = lower.match(/shuffle (?:up to )?(\d+) special energy cards? from your discard pile/);
+    if (special) {
+      steps.push({ type: 'shuffleFromDiscard', what: 'Special Energy', count: Number(special[1]) });
+      return { steps, recognizable: true };
+    }
     const countMatch = lower.match(/shuffle\s+(?:up to\s+)?(\d+)/);
     const count = countMatch ? Number(countMatch[1]) : 5;
     // "up to 3 {W} Pokémon" / "up to 3 Basic {W} Energy cards" (Great Haul Net's modes).
@@ -3019,7 +3187,14 @@ function parseTrainerStepsInner(lower) {
   // Hole-Digging Shovel — mill top N of your deck
   if (lower.includes('discard the top') && lower.includes('cards of your deck')) {
     const m = lower.match(/discard the top\s+(\d+)\s+cards? of your deck/);
-    steps.push({ type: 'millSelf', count: m ? Number(m[1]) : 2 });
+    const attach = lower.match(
+      /if any of those cards are basic energy cards, attach them to (1 of your (?:benched )?(?:\{[a-z]\} )?pokémon)/
+    );
+    steps.push({
+      type: 'millSelf',
+      count: m ? Number(m[1]) : 2,
+      ...(attach ? { attachEnergyTo: attach[1] } : {}),
+    });
     return { steps, recognizable: true };
   }
 
@@ -3547,6 +3722,10 @@ function describeStepBody(step) {
     case 'eachPlayerDiscardBenchUntil': return `Each player discards Benched Pokémon until they have ${step.count}${step.opponentFirst ? ' (opponent first)' : ''}.`;
     case 'gxReuseTurn': return `During this turn, your ${step.pokemonType} Pokémon can use their GX attacks even if you have used your GX attack.`;
     case 'discardOwnAttachedEnergy': return step.cost ? 'Discard an Energy attached to 1 of your Pokémon (cost).' : 'Discard an Energy attached to 1 of your Pokémon.';
+    case 'discardEnergyFromHealed': return `If damage was healed, discard ${step.count} Energy from that Pokémon.`;
+    case 'lookAttachEnergy': return `Look at the top ${step.count} cards; attach up to ${step.max} ${step.energyWhat} to ${step.target}, then shuffle.`;
+    case 'moveEnergyToNewActive': return 'You may move any amount of Energy from the Pokémon you moved to your Bench to the new Active Pokémon.';
+    case 'takeExtraPrize': return `Take ${step.count} more Prize card${step.count > 1 ? 's' : ''}.`;
     case 'healAmount': return `Heal ${step.amount} damage from ${step.target === 'switchedOut' ? 'the Pokémon you moved to your Bench' : step.target === 'costHost' ? 'that Pokémon' : step.target}${step.cure ? ', and it recovers from Special Conditions' : ''}.`;
     case 'attachFromDiscard': return `Attach a ${step.energy} from your discard pile to ${step.target}.`;
     case 'attachMultipleFromDiscard': return `Attach up to ${step.count} ${step.energy} cards from your discard pile to ${step.target}.`;

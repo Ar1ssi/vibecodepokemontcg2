@@ -29,6 +29,7 @@ import {
   promoteBenchToActive, koEnergyTargets, moveKoEnergy, PRIZE_CHOICE_EFFECT, resolvePrizeChoice,
   KO_HAND_DISCARD_EFFECT, resolveKoHandDiscard,
   PRIZE_BENCH_EFFECT, PRIZE_ATTACH_EFFECT, resumePrizeAttach, resumePrizeToBench,
+  PRIZE_TRAINER_EFFECT, resumePrizeTrainer,
 } from './knockout.mjs';
 import { resolveCheckup, advanceTurn, endTurnFromEffect } from './turn.mjs';
 import { continueRetreat, isExactRetreatPayment, applyRetreatSwap } from './retreat.mjs';
@@ -82,6 +83,8 @@ export function resolveChoiceCommand({ draft, playerId, activeRng, events, paylo
     resumePrizeAttach(draft, { token, selection: payload.selection, events });
   } else if (token.effectType === PRIZE_BENCH_EFFECT) {
     resumePrizeToBench(draft, { token, selection: payload.selection, activeRng, events });
+  } else if (token.effectType === PRIZE_TRAINER_EFFECT) {
+    resumePrizeTrainer(draft, { token, selection: payload.selection, activeRng, events });
   } else if (token.effectType === PRIZE_CHOICE_EFFECT) {
     resolvePrizeChoice(draft, {
       playerId: initiatorPlayerId,

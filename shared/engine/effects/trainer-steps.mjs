@@ -587,6 +587,7 @@ function countShuffleDrawPlus(ctx) {
 
 function millSelf(ctx) {
   const { player, step } = ctx;
+  if (ctx.memo?.energyIds) return attachMilledEnergy(ctx, ctx.memo.energyIds);
   const milled = player.zones.deck.splice(0, step.count || 1);
   for (const card of milled) discardCardToPlayerZone(player, card);
   ctx.events.push({
@@ -594,6 +595,32 @@ function millSelf(ctx) {
     playerId: player.playerId,
     cards: milled.map((c) => ({ instanceId: c.instanceId, name: c.name })),
   });
+  if (!step.attachEnergyTo) return null;
+  return attachMilledEnergy(ctx, milled.filter(isBasicEnergy).map((c) => c.instanceId));
+}
+
+// N's Resolve (Cosmic Eclipse): "If any of those cards are Basic Energy cards, attach them to 1
+// of your Benched {N} Pokémon." Every milled Basic Energy goes onto the one chosen Pokémon.
+function attachMilledEnergy(ctx, energyIds) {
+  const { player, step } = ctx;
+  const energies = energyIds
+    .map((id) => player.zones.discard.find((c) => c.instanceId === id))
+    .filter(Boolean);
+  if (energies.length === 0) return null;
+  const targets = rootsOf(player).filter((root) => rootMatchesTarget(player, root, step.attachEnergyTo));
+  if (targets.length === 0) return skip(ctx, 'no_target');
+  const target =
+    targets.length === 1 ? targets[0] : targets.find((root) => root.instanceId === ctx.selection?.[0]);
+  if (!target) {
+    return ctx.ask({
+      prompt: `${sourceName(ctx, 'Trainer')}: Choose a Pokémon to attach ${energies.length} Basic Energy to`,
+      options: targets,
+      min: 1,
+      max: 1,
+      memo: { energyIds },
+    });
+  }
+  for (const energy of energies) attachTo(player, energy, target, ctx.events);
   return null;
 }
 
@@ -795,6 +822,11 @@ function lookAtDeckEnd(ctx, fromBottom) {
  * hand." Phases (memo): pick the Energy to attach → choose a Pokémon for each in turn → the rest
  * of the looked-at cards go to the hand.
  */
+/** The Pokémon a looked-at Energy may go onto: `step.target` is printed wording ("your Benched {L} Pokémon"). */
+function attachRoots(player, step) {
+  return rootsOf(player).filter((root) => !step.target || rootMatchesTarget(player, root, step.target));
+}
+
 function lookAttachEnergy(ctx) {
   const { player, step, memo, selection, events } = ctx;
   const deck = player.zones.deck;
@@ -819,20 +851,22 @@ function lookAttachEnergy(ctx) {
   } else if (memo?.phase === 'pick') {
     queue = pickById(viewed, selection || []).map((c) => c.instanceId);
   } else {
-    const energies = viewed.filter(isBasicEnergy);
-    if (energies.length > 0) {
+    // Electric Generator (Scarlet & Violet): "up to 2 Basic {L} Energy cards … to your Benched
+    // {L} Pokémon"; Shining Arcana takes any number of basic Energy for any of your Pokémon.
+    const energies = viewed.filter((c) => isBasicEnergy(c) && (!step.energyWhat || matchesSearch(c, step.energyWhat)));
+    if (energies.length > 0 && attachRoots(player, step).length > 0) {
       return ctx.ask({
-        prompt: `${sourceName(ctx, 'Ability')}: Choose any number of basic Energy cards to attach`,
+        prompt: `${sourceName(ctx, 'Ability')}: Choose ${step.max ? `up to ${step.max}` : 'any number of'} ${step.energyWhat || 'basic Energy'} cards to attach`,
         options: energies,
         min: 0,
-        max: energies.length,
+        max: Math.min(step.max || energies.length, energies.length),
         memo: { phase: 'pick', viewedIds },
       });
     }
     queue = [];
   }
 
-  const roots = rootsOf(player);
+  const roots = attachRoots(player, step);
   while (queue.length > 0) {
     const energy = viewed.find((c) => c.instanceId === queue[0]);
     if (!energy || roots.length === 0) {
@@ -853,6 +887,10 @@ function lookAttachEnergy(ctx) {
     });
   }
 
+  if (step.restTo === 'shuffle') {
+    shuffleDeck(player, ctx);
+    return null;
+  }
   for (const card of viewed.filter((c) => deck.includes(c))) {
     removeFromZones(player, card);
     player.zones.hand.push(card);
@@ -1413,6 +1451,73 @@ function discardOwnAttachedEnergy(ctx) {
     min: 1,
     max: 1,
   });
+}
+
+// Super Potion (Journey Together), Hyper Potion (Sword & Shield): "If you healed any damage in
+// this way, discard N Energy from that Pokémon." The heal step's damageUpdated names the host.
+function discardEnergyFromHealed(ctx) {
+  const { player, step } = ctx;
+  const hostId =
+    ctx.memo?.hostId ??
+    ctx.events.findLast((e) => e.type === 'damageUpdated' && e.healed > 0)?.instanceId;
+  if (hostId == null) return skip(ctx, 'nothing_healed');
+  const count = step.count || 1;
+  const energies = attachedCards(player, hostId).filter(isEnergy);
+  const discardAll = (cards) => {
+    for (const energy of cards) discardCard(ctx.draft, energy, ctx.events);
+    return null;
+  };
+  if (ctx.selection) {
+    return discardAll(energies.filter((c) => ctx.selection.includes(c.instanceId)).slice(0, count));
+  }
+  if (energies.length <= count) return discardAll(energies);
+  const host = rootsOf(player).find((root) => root.instanceId === hostId);
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Trainer')}: Choose ${count} Energy to discard from ${topPokemonCard(player, host)?.name || 'that Pokémon'}`,
+    options: energies,
+    min: count,
+    max: count,
+    memo: { hostId },
+  });
+}
+
+// Scramble Switch (Surging Sparks): "If you do, you may move any amount of Energy from the
+// Pokémon you moved to your Bench to the new Active Pokémon." The switch's cardSwitched event
+// names both Pokémon (activeId went to the Bench, benchId is the new Active).
+function moveEnergyToNewActive(ctx) {
+  const { player } = ctx;
+  const swap =
+    ctx.memo?.swap ??
+    ctx.events.findLast((e) => e.type === 'cardSwitched' && e.playerId === player.playerId);
+  if (!swap) return skip(ctx, 'not_switched');
+  const roots = rootsOf(player);
+  const newActive = roots.find((root) => root.instanceId === swap.benchId);
+  if (!newActive) return skip(ctx, 'target_not_found');
+  const energies = attachedCards(player, swap.activeId).filter(isEnergy);
+  if (ctx.selection) {
+    for (const energy of energies.filter((c) => ctx.selection.includes(c.instanceId))) {
+      attachTo(player, energy, newActive, ctx.events);
+    }
+    return null;
+  }
+  if (energies.length === 0) return null;
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Trainer')}: Move any amount of Energy to ${topPokemonCard(player, newActive)?.name || 'the new Active Pokémon'}`,
+    options: energies,
+    min: 0,
+    max: energies.length,
+    memo: { swap: { activeId: swap.activeId, benchId: swap.benchId } },
+  });
+}
+
+// Greedy Dice (Steam Siege): "If heads, take 1 more Prize card." Owed like a Knock Out's Prizes.
+function takeExtraPrize(ctx) {
+  const { player, step } = ctx;
+  const count = Math.min(step.count || 1, player.zones.prizes.length);
+  if (count === 0) return skip(ctx, 'no_prizes');
+  if (!player.flags) player.flags = {};
+  player.flags.prizesOwed = (player.flags.prizesOwed || 0) + count;
+  return null;
 }
 
 function damageCounters(ctx) {
@@ -5999,6 +6104,9 @@ function opponentHandSetAside(ctx) {
 }
 
 export const EXTRA_STEP_HANDLERS = {
+  takeExtraPrize,
+  moveEnergyToNewActive,
+  discardEnergyFromHealed,
   optionalDiscardCost,
   playCopies,
   playCopiesChoice,
@@ -6053,6 +6161,7 @@ export const EXTRA_STEP_HANDLERS = {
   lookAtTop: (ctx) => lookAtDeckEnd(ctx, false),
   lookAtTopAbility: (ctx) => lookAtDeckEnd(ctx, false),
   lookAttachEnergyAbility: lookAttachEnergy,
+  lookAttachEnergy,
   lookAtBottom: (ctx) => lookAtDeckEnd(ctx, true),
   searchDeckSequence,
   evolveStage2,

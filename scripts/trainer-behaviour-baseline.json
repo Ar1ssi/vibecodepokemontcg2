@@ -984,11 +984,8 @@
    ]
   },
   "Brock’s Protection#hde4lb": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
-    "passive"
+    "attachLegacyTrainer"
    ]
   },
   "Brock’s Scouting#ewe069": {
@@ -1343,11 +1340,8 @@
    ]
   },
   "Charity#1w3zd3n": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
-    "passive"
+    "attachLegacyTrainer"
    ]
   },
   "Charizard Spirit Link#14ffyle": {
@@ -1913,6 +1907,7 @@
   },
   "Dangerous Drill#9hb1ev": {
    "steps": [
+    "discardCost",
     "discardFromOpponent"
    ]
   },
@@ -1979,11 +1974,8 @@
    ]
   },
   "Defender#q6gsrx": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
-    "passive"
+    "attachLegacyTrainer"
    ]
   },
   "Defender#r46149": {
@@ -2018,6 +2010,7 @@
   },
   "Delivery Drone#1bc7njk": {
    "steps": [
+    "coinFlip",
     "searchDeck"
    ]
   },
@@ -2200,6 +2193,7 @@
    ]
   },
   "Dream Ball#10pzmrl": {
+   "playCondition": "fromPrizeOnly",
    "steps": [
     "searchDeck"
    ]
@@ -2305,7 +2299,7 @@
   },
   "Electric Generator#o3a9k0": {
    "steps": [
-    "lookAtTop"
+    "lookAttachEnergy"
    ]
   },
   "Electric Memory#x9vclc": {
@@ -2404,6 +2398,7 @@
   },
   "Energy Coin#1ixqqel": {
    "steps": [
+    "coinFlip",
     "searchDeck"
    ]
   },
@@ -2576,7 +2571,8 @@
   },
   "Energy Sticker#1q59eam": {
    "steps": [
-    "attachFromDiscard"
+    "attachFromDiscard",
+    "coinFlip"
    ]
   },
   "Energy Swatter#12afhrt": {
@@ -2606,6 +2602,7 @@
   },
   "Engineer’s Adjustments#y9y5fl": {
    "steps": [
+    "discardCost",
     "draw"
    ]
   },
@@ -2944,6 +2941,7 @@
   },
   "Fiery Torch#z4eei9": {
    "steps": [
+    "discardCost",
     "draw"
    ]
   },
@@ -3233,11 +3231,8 @@
    ]
   },
   "Full Heal#16wqr0t": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
-    "passive"
+    "clearStatus"
    ]
   },
   "Full Heal#hgv6xo": {
@@ -3607,11 +3602,10 @@
    ]
   },
   "Greedy Dice#b6niy4": {
-   "gaps": [
-    "passive-only"
-   ],
+   "playCondition": "fromPrizeOnly",
    "steps": [
-    "passive"
+    "coinFlip",
+    "takeExtraPrize"
    ]
   },
   "Green’s Exploration#1oh9r62": {
@@ -4034,6 +4028,7 @@
   },
   "Hyper Potion#tj3sl4": {
    "steps": [
+    "discardEnergyFromHealed",
     "healAmount"
    ]
   },
@@ -4344,11 +4339,8 @@
    ]
   },
   "Koga’s Ninja Trick#qtp720": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
-    "passive"
+    "attachLegacyTrainer"
    ]
   },
   "Koga’s Trap#1a1sexc": {
@@ -4928,11 +4920,8 @@
    ]
   },
   "Magnifier#lvogy8": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
-    "passive"
+    "attachLegacyTrainer"
    ]
   },
   "Mail from Bill#3o244v": {
@@ -6066,11 +6055,8 @@
    ]
   },
   "PlusPower#b0f68p": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
-    "passive"
+    "attachLegacyTrainer"
    ]
   },
   "Po Town#dvwezb": {
@@ -7404,11 +7390,8 @@
    ]
   },
   "Sabrina’s ESP#df7o5q": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
-    "passive"
+    "attachLegacyTrainer"
    ]
   },
   "Sabrina’s Gaze#p2a8t3": {
@@ -7557,6 +7540,7 @@
   },
   "Scramble Switch#djxw4b": {
    "steps": [
+    "moveEnergyToNewActive",
     "switchOwn"
    ]
   },
@@ -8134,6 +8118,7 @@
   },
   "Super Potion#r4d80o": {
    "steps": [
+    "discardEnergyFromHealed",
     "healAmount"
    ]
   },
@@ -8492,6 +8477,7 @@
   },
   "Team Plasma Grunt#k6temf": {
    "steps": [
+    "discardCost",
     "draw"
    ]
   },
