@@ -35,7 +35,7 @@ import {
 import {
   markersBlockCondition, markersPreventEffects, parseDamageImmunity,
 } from '../rules/attack-markers.mjs';
-import { hasSpecialEnergyEffectShield } from '../rules/special-energy-parse.mjs';
+import { hasSpecialEnergyEffectShield, isSpecialEnergyCard } from '../rules/special-energy-parse.mjs';
 import { resolveAttachedEnergyType } from '../rules/energy-effects.mjs';
 import { runSpecialEnergyTriggers, resolveAttackEnergyDiscard } from '../effects/special-energy.mjs';
 import { stadiumBlocksHealing } from '../rules/stadium-effects.mjs';
@@ -1490,6 +1490,7 @@ export function resolveAttackEffectPhase(draft, ctx) {
             const picked = attachedEnergies
               .filter((c) => !toDiscard.includes(c))
               .filter(ofType(part.energyType))
+              .filter((c) => !part.special || isSpecialEnergyCard(c))
               .slice(0, part.count);
             toDiscard.push(...picked);
           }

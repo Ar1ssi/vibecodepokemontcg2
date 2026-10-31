@@ -983,6 +983,7 @@ const discardCount = (raw) =>
  * - all: discard all energy from this Pokémon
  * - count: number of energy cards to discard (Infinity = all of energyType)
  * - energyType: specific type if required (e.g. 'Fire')
+ * - special: only Special Energy cards count (Infinity count = all of them)
  * - parts: several typed requirements ("a {W} and a {L} Energy"), each { count, energyType }
  *
  * Printed text uses symbols ("Discard 2 {R} Energy"); they are read as type words. Costs that
@@ -1029,6 +1030,11 @@ export function parseAttackEnergyDiscard(attack) {
     if (parts.length > 1 && parts.every(Boolean)) {
       return { all: false, count: parts.reduce((sum, part) => sum + part.count, 0), energyType: null, parts };
     }
+  }
+
+  // "Discard all Special Energy from this Pokémon" (Magearna ex Fleur Cannon)
+  if (/discard all special energy (?:attached to|from) this pok[ée]mon/.test(sentence)) {
+    return { all: false, count: Infinity, energyType: null, special: true };
   }
 
   // "Discard all {M} Energy from this Pokémon"

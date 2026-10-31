@@ -13,7 +13,10 @@ const mk = (props) => createCard({ instanceId: nextId++, ...props });
 const energy = (type, attachedTo) =>
   mk({ name: `Basic ${type} Energy`, supertype: 'Energy', subtypes: ['Basic'], energyType: type, type: 'Energy', attachedTo });
 
-function attackWith(text, energyTypes) {
+const special = (name, attachedTo) =>
+  mk({ name, supertype: 'Energy', subtypes: ['Special'], energyType: 'Colorless', type: 'Energy', attachedTo });
+
+function attackWith(text, energyTypes, specialNames = []) {
   nextId = 1;
   const state = createGameState({ gameId: 'discard', seed: 3, rulesEnabled: false });
   for (const id of ['p1', 'p2']) {
@@ -26,7 +29,8 @@ function attackWith(text, energyTypes) {
     hp: 200,
     attacks: [{ name: 'Blast', cost: [], damage: '10', text }],
   });
-  state.players.p1.zones.active.push(attacker, ...energyTypes.map((t) => energy(t, attacker.instanceId)));
+  state.players.p1.zones.active.push(attacker, ...energyTypes.map((t) => energy(t, attacker.instanceId)),
+    ...specialNames.map((name) => special(name, attacker.instanceId)));
   state.players.p2.zones.active.push(mk({ name: 'Defender', supertype: 'Pokémon', hp: 300 }));
   const res = applyCommand(state, { type: 'attack', playerId: 'p1', payload: { attackIndex: 0 } }, createRng(3));
   assert.equal(res.error, null);
@@ -34,6 +38,8 @@ function attackWith(text, energyTypes) {
   return {
     attached: p1.zones.active.filter((c) => c.attachedTo === attacker.instanceId).map((c) => c.energyType).sort(),
     discarded: p1.zones.discard.map((c) => c.energyType).sort(),
+    attachedNames: p1.zones.active.filter((c) => c.attachedTo === attacker.instanceId).map((c) => c.name).sort(),
+    discardedNames: p1.zones.discard.map((c) => c.name).sort(),
   };
 }
 
@@ -69,4 +75,21 @@ test('parseAttackEnergyDiscard: player-choice and coin-gated costs stay unparsed
   ]) {
     assert.equal(parseAttackEnergyDiscard({ text }), null, text);
   }
+});
+
+// Magearna ex (Silver Tempest 128) Fleur Cannon: out/pkmn-pokemon-cards.json text of Magearna V's twin move.
+test('attack: "discard all Special Energy from this Pokémon" keeps basic Energy attached', () => {
+  const text = 'If this Pokémon has any Special Energy attached, this attack does 60 more damage. Then, discard all Special Energy from this Pokémon.';
+  const out = attackWith(text, ['Metal', 'Psychic'], ['Double Turbo Energy', 'Jet Energy']);
+  assert.deepEqual(out.discardedNames, ['Double Turbo Energy', 'Jet Energy']);
+  assert.deepEqual(out.attached, ['Metal', 'Psychic']);
+});
+
+test('parseAttackEnergyDiscard: "discard all Special Energy" is a special-only discard', () => {
+  assert.deepEqual(parseAttackEnergyDiscard({ text: 'Then, discard all Special Energy from this Pokémon.' }), {
+    all: false,
+    count: Infinity,
+    energyType: null,
+    special: true,
+  });
 });
