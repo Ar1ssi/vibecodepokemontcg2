@@ -210,6 +210,11 @@ import test from 'node:test';
     });
 
     // ── prize table ────────────────────────────────────────────────────────
+    test('prizesForKO: a homebrew Mega (MEGAHB) is 2, not the modern Mega 3', () => {
+      assert.equal(prizesForKO(card({ name: 'Mega Absol ex', stage: 'MEGAHB' })), 2);
+      assert.equal(prizesForKO(card({ name: 'Mega Absol ex' })), 3);
+    });
+
     test('prizesForKO: 3 for VMAX / TAG TEAM / V-UNION / modern Mega', () => {
       assert.equal(prizesForKO(card({ subtypes: ['VMAX'] })), 3);
       assert.equal(prizesForKO(card({ name: 'Lapras VMAX' })), 3);

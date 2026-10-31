@@ -290,6 +290,32 @@ test('evolve: a matching Spirit Link keeps the turn after a legacy Mega Evolutio
   assert.equal(res.state.turn.player, 'p1', 'the Spirit Link suppresses the turn-end');
 });
 
+const homebrewMega = (extra = {}) =>
+  pokemon({ instanceId: 2, name: 'Mega Absol ex', stage: 'MEGAHB', hp: 330, evolvesFrom: 'Absol', ...extra });
+
+test('evolve: a homebrew Mega ends the turn like a Gen 6 Mega Evolution', () => {
+  const state = megaGame('Absol');
+  state.players.p1.zones.hand.push(homebrewMega());
+
+  const res = evolve(state, 2, 1);
+  assert.equal(res.error, null);
+  assert.ok(res.events.some((e) => e.type === 'turnEndedByMegaEvolve'));
+  assert.equal(res.state.turn.player, 'p2');
+});
+
+test('evolve: the homebrew Mega Signal is a universal Spirit Link; a lookalike is not', () => {
+  const signal = (id) =>
+    createCard({ instanceId: 3, name: 'Mega Signal', id, supertype: 'Trainer', trainerType: 'Tool', attachedTo: 1 });
+  for (const [id, keepsTurn] of [['customhb-500', true], ['me01-122', false]]) {
+    const state = megaGame('Absol');
+    state.players.p1.zones.active.push(signal(id));
+    state.players.p1.zones.hand.push(homebrewMega());
+    const res = evolve(state, 2, 1);
+    assert.equal(res.error, null);
+    assert.equal(res.state.turn.player, keepsTurn ? 'p1' : 'p2', id);
+  }
+});
+
 test('evolve: a modern Mega Venusaur ex does not end the turn', () => {
   const state = megaGame('Venusaur ex');
   state.players.p1.zones.hand.push(

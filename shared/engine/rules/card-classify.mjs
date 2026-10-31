@@ -131,6 +131,12 @@ export function isLegacyMegaCard(card = {}) {
   return !isModernMegaCard(card);
 }
 
+// Homebrew Mega (customhb "MEGAHB" stage, evolution.mjs): plays by the Gen 6 turn-end rule and
+// takes 2 Prizes, though its "Mega <Name> ex" name reads as a modern Mega.
+export function isHomebrewMegaCard(card = {}) {
+  return collapse(card?.stage) === 'megahb';
+}
+
 export function isMegaCard(card = {}) {
   return isModernMegaCard(card) || isLegacyMegaCard(card);
 }
@@ -217,14 +223,14 @@ export function isRuleBoxPokemon(card = {}) {
 
 // ── prizes ─────────────────────────────────────────────────────────────────
 // 3: VMAX / TAG TEAM / V-UNION / modern Mega Evolution Pokémon ex.  2: ex /
-// GX / V / VSTAR / legacy Mega (Gen 6 "M …-EX") / LEGEND / Double Rare.
+// GX / V / VSTAR / legacy Mega (Gen 6 "M …-EX") / homebrew Mega / LEGEND / Double Rare.
 // 1: everything else. (App. 1, 10, 14, 16, 19, 26.)
 export function prizesForKO(card = {}) {
   if (
     isVmaxCard(card) ||
     isTagTeamCard(card) ||
     isVUnionCard(card) ||
-    isModernMegaCard(card)
+    (isModernMegaCard(card) && !isHomebrewMegaCard(card))
   ) {
     return 3;
   }
@@ -234,6 +240,7 @@ export function prizesForKO(card = {}) {
     isVCard(card) ||
     isVstarCard(card) ||
     isLegacyMegaCard(card) ||
+    isHomebrewMegaCard(card) ||
     isLegendCard(card) ||
     lower(card?.rarity).includes('double rare')
   ) {
