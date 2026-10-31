@@ -621,10 +621,10 @@ import test, { describe } from 'node:test';
       assert.equal(search.upTo, true);
     });
 
-    test('Fighting Gong: or-clause "Basic Energy or Basic Pokémon" (not plain Pokémon)', () => {
+    test('Fighting Gong: or-clause keeps the printed {F} type on both kinds', () => {
       const r = parseTrainerEffect("Search your deck for a Basic { F } Energy card or a Basic { F } Pokémon, reveal it, and put it into your hand. Then, shuffle your deck.");
       assert.equal(r.recognizable, true);
-      assert.ok(r.steps.some((s) => s.type === 'searchDeck' && s.what === 'Basic Energy or Basic Pokémon'));
+      assert.ok(r.steps.some((s) => s.type === 'searchDeck' && s.what === 'Basic {F} Energy or Basic {F} Pokémon'));
     });
 
     test("Team Rocket's Proton: search up to 3 Basic Pokémon", () => {
