@@ -52,7 +52,8 @@ export const ROPES = { heights: [30, 58, 86], radius: 3.6, sag: 5, splay: 36 };
  * stands toward the far end, so the two sets criss-cross), and the lights they shine from, high in
  * the four corners: px out past the ad boards' corner along x and along y, and z over the cloth.
  */
-export const LASER_COUNT = 16;
+// Design 080: half the art's sixteen; the stands stay lit without a web of beams.
+export const LASER_COUNT = 8;
 export const LASER_LIGHT_PX = { out: 150, end: 110, z: 240 };
 /**
  * The lighting rig over the ring, as the art's: a truss round it `out` px outside the ropes, `z` px
@@ -460,12 +461,14 @@ void main() {
     // The canvas, as the art's: a pale cyan-white (214,230,242) under the rig's spotlight, (178,198,216)
     // toward the ropes, both inverted through Neutral tone mapping; faint scuffs; a navy band round
     // its edge; the Poke Ball painted on it in light grey lines.
+    // Design 080: the spotlit middle stays a clear step under the cards' white borders (the art's
+    // near-white canvas swallowed them), the cyan toward the ropes a little deeper.
     vec2 fromMiddle = (p - uRing.xy) / max(uRing.zw, vec2(1.0));
     float spot = exp(-dot(fromMiddle, fromMiddle) * 0.9);
-    col = mix(vec3(0.36, 0.62, 0.8), vec3(0.88, 1.02, 1.14), spot) * (0.97 + 0.04 * fbm3(p / 50.0));
+    col = mix(vec3(0.28, 0.48, 0.64), vec3(0.45, 0.57, 0.69), spot) * (0.97 + 0.04 * fbm3(p / 50.0));
     col = mix(col, vec3(0.022, 0.06, 0.16), smoothstep(-22.0, -16.0, d));
     float e = emblemDistance(p, uEmblem);
-    col = mix(col, vec3(0.88, 0.93, 0.96), (1.0 - smoothstep(1.5, 3.0, e)) * 0.85 * step(0.001, uEmblem.z));
+    col = mix(col, vec3(0.8, 0.86, 0.9), (1.0 - smoothstep(1.5, 3.0, e)) * 0.7 * step(0.001, uEmblem.z));
   } else if (kind < 0.5) {
     if (d < ${APRON_PX.slope}.0 || ground < -${APRON_PX.drop - 2}.0 && d < ${APRON_PX.slope + 2}.0) {
       // The apron: the ring's deep blue skirt, the art's (0,123,175) where the rig lights it,
@@ -514,8 +517,8 @@ void main() {
       col = mix(col, shirt * (0.75 + 0.25 * smoothstep(-6.0, 2.0, local.y)), body);
       // The head, as the art's crowd speckle: dark hair, the face toward the ring catching the light.
       col = mix(col, mix(vec3(0.015, 0.04, 0.045), vec3(0.09, 0.2, 0.2), smoothstep(-1.5, 2.5, local.y - 2.0)), head);
-      // A raised phone's light here and there, twinkling.
-      float phone = step(0.985, hash12(vec2(slot * 3.1, id * 13.0))) * (0.35 + 0.25 * sin(uTime * 2.5 + seed * 40.0));
+      // A raised phone's light here and there, steady (design 080: no twinkle at the edge of the eye).
+      float phone = step(0.985, hash12(vec2(slot * 3.1, id * 13.0))) * 0.4;
       col += vec3(0.9, 1.0, 1.1) * phone * (1.0 - smoothstep(0.8, 1.8, length(local - vec2(3.0, 4.0))));
     }
   }
@@ -562,9 +565,9 @@ void main() {
 
 /**
  * The LED ad boards, as the art's glowing strip: an unbroken run of panels round the band, each one
- * of the art's designs with its logo or print (white with a red and white Poke Ball and dark print,
- * white with dark print, blue with a white wordmark, orange-red with yellow print, teal-green with
- * yellow print); a slow sheen runs along them.
+ * bold icon on a field of the art's colours (white with a red and white Poke Ball, blue with a white
+ * star, orange-red with a yellow lightning bolt, teal-green with a yellow star); a slow sheen runs
+ * along them.
  */
 export const BOARD_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
@@ -573,25 +576,33 @@ ${REVEAL}
 varying vec3 vAd;
 varying vec2 vPos;
 const float PANEL = 150.0;
-// Lettering: bold words as solid rounded blocks of different lengths along a line at height y0..y1;
-// seen from the stands' side they read as print, where letter detail smeared into a barcode.
-float lettering(vec2 q, float y0, float y1, float seed) {
-  if (q.x < 0.0) return 0.0;
-  float word = floor(q.x / 36.0);
-  float wordLength = 14.0 + 16.0 * hash12(vec2(word, seed));
-  vec2 inWord = vec2(mod(q.x, 36.0), q.y);
-  float radius = (y1 - y0) * 0.5;
-  vec2 rel = vec2(max(abs(inWord.x - wordLength * 0.5) - (wordLength * 0.5 - radius), 0.0), inWord.y - (y0 + radius));
-  return 1.0 - smoothstep(radius - 0.8, radius + 0.4, length(rel));
+// Design 080: each panel shows one icon you can name (a Poke Ball, a star, a lightning bolt); blocks
+// standing in for lettering read as fake text.
+float segment(vec2 p, vec2 a, vec2 b) {
+  vec2 pa = p - a;
+  vec2 ba = b - a;
+  return length(pa - ba * clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0));
+}
+// Signed distance to a five-pointed star of outer radius r (Quilez's sdStar5), point up.
+float starDistance(vec2 p, float r, float inner) {
+  const vec2 k1 = vec2(0.809016994, -0.587785252);
+  const vec2 k2 = vec2(-0.809016994, -0.587785252);
+  p.x = abs(p.x);
+  p -= 2.0 * max(dot(k1, p), 0.0) * k1;
+  p -= 2.0 * max(dot(k2, p), 0.0) * k2;
+  p.x = abs(p.x);
+  p.y -= r;
+  vec2 ba = inner * vec2(-k1.y, k1.x) - vec2(0.0, 1.0);
+  float h = clamp(dot(p, ba) / dot(ba, ba), 0.0, r);
+  return length(p - ba * h) * sign(p.y * ba.x - p.x * ba.y);
 }
 void main() {
   if (revealBurned(vPos) * exitKeep(vPos) < 0.5) discard;
   float panel = floor(vAd.x / PANEL);
   float pick = hash12(vec2(panel, 4.0));
   vec2 q = vec2(mod(vAd.x, PANEL), vAd.y * 38.0);
-  // One bold logo on each panel, as the art's: a big wordmark of two or three chunky word blocks
-  // across its middle.
-  float print = lettering(q - vec2(16.0, 0.0), 10.0, 28.0, panel) * step(q.x, 136.0);
+  // One bold icon in the middle of each panel.
+  vec2 mid = q - vec2(PANEL * 0.5, 19.0);
   vec3 col;
   if (pick < 0.4) {
     // White with the big red and white Poke Ball in its middle.
@@ -602,20 +613,26 @@ void main() {
     col = mix(col, vec3(0.08), max(1.0 - smoothstep(1.0, 2.2, abs(r - 15.0)), (1.0 - smoothstep(0.8, 2.0, abs(ball.y))) * step(r, 15.0)));
     col = mix(col, vec3(0.08), 1.0 - smoothstep(0.8, 1.8, abs(r - 5.0)));
   } else if (pick < 0.65) {
+    // Blue with a white star.
     col = vec3(0.1, 0.3, 0.85);
-    col = mix(col, vec3(0.97, 0.98, 1.0), print);
+    col = mix(col, vec3(0.97, 0.98, 1.0), 1.0 - smoothstep(-0.6, 0.6, starDistance(mid + vec2(0.0, 1.5), 15.0, 0.42)));
   } else if (pick < 0.85) {
+    // Red-orange with a yellow lightning bolt.
     col = vec3(0.9, 0.22, 0.08);
-    col = mix(col, vec3(1.0, 0.86, 0.2), print);
+    float bolt = min(min(segment(mid, vec2(6.0, 15.0), vec2(-4.0, 1.5)), segment(mid, vec2(-4.0, 1.5), vec2(4.0, -1.5))),
+      segment(mid, vec2(4.0, -1.5), vec2(-6.0, -15.0)));
+    col = mix(col, vec3(1.0, 0.86, 0.2), 1.0 - smoothstep(2.6, 3.6, bolt));
   } else {
+    // Teal with a yellow star.
     col = vec3(0.04, 0.5, 0.42);
-    col = mix(col, vec3(1.0, 0.9, 0.3), print);
+    col = mix(col, vec3(1.0, 0.9, 0.3), 1.0 - smoothstep(-0.6, 0.6, starDistance(mid + vec2(0.0, 1.5), 15.0, 0.42)));
   }
   // Seams between panels, a dark frame along the top and foot, a sheen running along the band.
   col *= 0.4 + 0.6 * smoothstep(0.0, 2.0, min(q.x, PANEL - q.x));
   col *= 0.25 + 0.75 * smoothstep(0.0, 0.06, min(vAd.y, 1.0 - vAd.y));
-  col *= 1.0 + 0.25 * smoothstep(0.9, 1.0, sin(vAd.x / 180.0 - uTime * 1.2));
-  gl_FragColor = vec4(col * 1.25, 1.0);
+  col *= 1.0 + 0.12 * smoothstep(0.9, 1.0, sin(vAd.x / 180.0 - uTime * 0.5));
+  // A glowing band, a step quieter than the ring's lights (design 080: it runs right round the cards).
+  gl_FragColor = vec4(col * 0.9, 1.0);
 ${OUTPUT}
 }
 `;
@@ -636,7 +653,7 @@ void main() {
   // lights' sweep across the far stands to the other side instead. Each stays out past the ad
   // boards, so none crosses the ring or the stage.
   float k = aBeam.z;
-  float sweep = sin(uTime * (0.1 + 0.07 * hash12(vec2(k, 2.0))) + hash12(vec2(k, 3.0)) * 6.28);
+  float sweep = sin(uTime * (0.06 + 0.04 * hash12(vec2(k, 2.0))) + hash12(vec2(k, 3.0)) * 6.28);
   float light = mod(k, 4.0);
   float side = mod(light, 2.0) < 0.5 ? -1.0 : 1.0;
   float end = light < 1.5 ? 1.0 : -1.0;
@@ -701,7 +718,7 @@ void main() {
   // Out of the light's glare, on along its length to the crowd, gone at its very end.
   float fade = smoothstep(0.02, 0.12, vBeam.x) * (1.0 - smoothstep(0.88, 1.0, vBeam.x)) * vOutside;
   float shown = smoothstep(0.6, 1.0, uReveal) * (1.0 - uExit);
-  gl_FragColor = vec4(tint * core * fade * 0.7 * shown, 1.0);
+  gl_FragColor = vec4(tint * core * fade * 0.5 * shown, 1.0);
 ${OUTPUT}
 }
 `;
@@ -719,7 +736,7 @@ void main() {
   vCorner = aGlint.xy;
   vFlare = step(${GLINT_PX.lamp + 1}.0, aGlint.w);
   float seed = hash12(vec2(aGlint.z, 4.0));
-  vTwinkle = 0.85 + 0.15 * sin(uTime * (1.1 + 1.4 * seed) + seed * 40.0);
+  vTwinkle = 0.94 + 0.06 * sin(uTime * (0.5 + 0.6 * seed) + seed * 40.0);
   gl_Position = projectionMatrix * view;
 }
 `;
@@ -745,7 +762,8 @@ void main() {
       + exp(-abs(diagonal.x) * 40.0) * (1.0 - smoothstep(0.0, 1.0, abs(diagonal.y)));
     rays += 0.5 * (exp(-abs(q.y) * 46.0) * (1.0 - smoothstep(0.0, 0.5, abs(q.x)))
       + exp(-abs(q.x) * 46.0) * (1.0 - smoothstep(0.0, 0.5, abs(q.y))));
-    glow += rays * 0.9;
+    // Short, faint rays: a lamp's glare, not a starburst.
+    glow += rays * 0.35;
   }
   glow *= 1.0 - smoothstep(0.85, 1.0, r);
   float shown = smoothstep(0.6, 1.0, uReveal) * (1.0 - uExit);

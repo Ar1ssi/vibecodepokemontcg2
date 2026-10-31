@@ -1,8 +1,8 @@
 // Design 077 (prototype): Crystal Cave (customhb-052) after its card art (EVS 144, Toyste Beach): a
 // warm brown cave floor under a shaft of pale skylight, the Poké Ball drawn on it in a thin gold line
-// with a glowing pale-blue heart, clusters of tall hexagonal crystals (pink, aqua, teal, mint,
-// lavender, peach, a yellow-green) splaying out of the floor round it, coloured sparkle dust in the
-// air, rough dark rock closing the cave behind. The art looks across the floor at the crystals; the
+// with a glowing pale-blue heart, clusters of tall hexagonal crystals (the art's pink, sky blue,
+// lavender and teal) splaying out of the floor round it, coloured sparkle dust in the air among
+// them, rough dark rock closing the cave behind. The art looks across the floor at the crystals; the
 // board looks down into the cave, so the floor holds every card, the clusters stand where no card
 // lies (the tall ones off the far end and in the far corners, low ones toward the near end, where a
 // tall crystal would lean over the player's cards in the tilted view) and the walls rise past them.
@@ -15,6 +15,7 @@
 // the emblem, the skylight's pool and the crystals' coloured light; CRYSTALS draws every crystal, a
 // faceted prism with a pointed tip; SPARKLES the dust drifting and twinkling in the air.
 import {
+  FOOTPRINTS,
   FULLSCREEN_VERTEX,
   NOISE,
   OUTPUT,
@@ -39,22 +40,22 @@ export const WALL_HEIGHT_PX = 170;
 /** Least gap between any crystal, seen from above, and a card or the opponent's hand. */
 export const CRYSTAL_CARD_GAP_PX = 14;
 export const MAX_CLUSTERS = 36;
-/** The art's crystal colours (sRGB, linearised in the shader), one per cluster in turn. */
+/**
+ * The art's crystal colours (sRGB, linearised in the shader), one per cluster in turn. Design 080:
+ * its four main ones (pink, sky blue, lavender, teal); seven read as a rainbow assortment.
+ */
 export const CRYSTAL_HUES = Object.freeze([
   [236, 158, 192],
   [120, 178, 228],
-  [88, 204, 166],
   [186, 168, 232],
-  [64, 186, 126],
-  [238, 152, 132],
-  [176, 206, 104],
+  [88, 204, 166],
 ]);
 /**
  * How tall a cluster's crystals grow, by where it stands: off the far end, in the side bands, toward
  * the near end (a tall crystal there leans up over the player's cards in the tilted view).
  */
-const CLUSTER_HEIGHT = { far: [150, 270], side: [100, 180], near: [40, 70] };
-const SPARKLE_COUNT = 190;
+const CLUSTER_HEIGHT = { far: [120, 210], side: [70, 125], near: [30, 55] };
+const SPARKLE_COUNT = 70;
 
 /** A small deterministic 0..1 from three numbers. */
 const hash = (x, y, salt) => {
@@ -294,6 +295,7 @@ vec3 edgeHaze(vec3 col, vec2 uv) {
 export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
+${FOOTPRINTS}
 ${VORONOI}
 ${REVEAL}
 ${PALETTE}
@@ -328,14 +330,15 @@ void main() {
   float lit = clamp(dot(n, sunDir), 0.0, 1.0) * mix(0.5, 1.0, light.a);
   float wall = step(0.5, field.a);
 
-  // The floor: packed earth, warm brown, darker in broad stains and smaller mottles, small and
-  // larger pebbles pressed into it, each a little dome with a dark seat, and a grit of fine flecks.
+  // The floor: packed earth, warm brown, darker in broad stains and smaller mottles; small and
+  // larger pebbles pressed into it, each a little dome with a dark seat, gathered at the walls' feet
+  // (design 080: the open floor where the cards lie is worn smooth).
+  float calm = max(fieldCalm(p, 110.0), 1.0 - smoothstep(-150.0, -60.0, d));
   float stain = smoothstep(0.3, 0.75, fbm3(p / 150.0 + 6.0));
   vec3 col = mix(FLOOR_LIT, FLOOR_DARK, 0.25 + 0.55 * stain);
-  col *= 0.88 + 0.2 * fbm3(p / 34.0 + 2.0);
-  col *= 0.94 + 0.1 * gnoise(p / 4.0);
-  vec4 small = pebbles(p, 15.0, 0.62, sunDir);
-  vec4 large = pebbles(p + 13.0, 44.0, 0.4, sunDir);
+  col *= 0.9 + 0.14 * fbm3(p / 34.0 + 2.0);
+  vec4 small = pebbles(p, 15.0, 0.62 * (1.0 - calm), sunDir);
+  vec4 large = pebbles(p + 13.0, 44.0, 0.4 * (1.0 - calm), sunDir);
   vec3 pebbleBase = mix(vec3(0.06, 0.042, 0.032), vec3(0.15, 0.1, 0.07), small.w);
   vec3 stoneBase = mix(vec3(0.085, 0.06, 0.045), vec3(0.2, 0.14, 0.095), large.w);
   col *= 1.0 - 0.3 * max(small.z, large.z);
@@ -356,7 +359,7 @@ void main() {
   vec2 fromHeart = p - uEmblem.xy;
   float pool = exp(-dot(fromHeart / vec2(430.0, 330.0), fromHeart / vec2(430.0, 330.0)));
   col *= 0.62 + 0.55 * pool;
-  col += SKYLIGHT * 0.05 * pool * (0.9 + 0.1 * sin(uTime * 0.6 + p.x * 0.01));
+  col += SKYLIGHT * 0.05 * pool;
 
   // Each cluster lights the floor and the rock round it in its own colour, breathing slowly.
   vec3 glow = vec3(0.0);
@@ -365,7 +368,7 @@ void main() {
     vec4 cluster = uClusters[i];
     if (cluster.z <= 0.0) continue;
     vec2 q = (p - cluster.xy) / cluster.z;
-    float breath = 0.85 + 0.15 * sin(uTime * 0.8 + cluster.x * 0.02 + cluster.y * 0.013);
+    float breath = 0.93 + 0.07 * sin(uTime * 0.5 + cluster.x * 0.02 + cluster.y * 0.013);
     float q2 = dot(q, q);
     glow += uHues[int(cluster.w)] * exp(-q2 * 4.2) * breath;
     // The crystals' feet shut the light out of the rock they grow from.
@@ -382,9 +385,10 @@ void main() {
     float line = min(abs(r - uEmblem.z), abs(r - button));
     if (r > button && r < uEmblem.z) line = min(line, abs(fromHeart.y));
     float stroke = 1.0 - smoothstep(1.6, 3.2, line);
-    col = mix(col, GOLD * (0.85 + 0.25 * gnoise(p / 6.0)), stroke * 0.95);
+    col = mix(col, GOLD * (0.9 + 0.12 * fbm3(p / 18.0)), stroke * 0.9);
+    // A soft heart, steady: a bright pool between the Actives pulls the eye off them.
     float heart = exp(-pow(r / (button * 1.25), 2.0));
-    col += HEART * heart * (0.32 + 0.05 * sin(uTime * 1.3));
+    col += HEART * heart * 0.12;
   }
 
   col = edgeHaze(col, vUv);
@@ -512,16 +516,16 @@ void main() {
   // A pale streak down each face, as frost, flawed by veins that run along the crystal.
   float streak = 1.0 - smoothstep(0.06, 0.34, abs(vFacet.x - 0.5));
   float vein = smoothstep(0.58, 0.82, gnoise(vec2(vFacet.x * 4.0 + vFacet.y * 23.0, along * 8.0)));
-  col = mix(col, mix(hue, vec3(1.0), 0.4), streak * 0.22 + vein * 0.2);
+  col = mix(col, mix(hue, vec3(1.0), 0.4), streak * 0.18 + vein * 0.1);
   // Bright edges between the faces, and a sharp glint where a face catches the skylight.
   float edge = 1.0 - smoothstep(0.0, 0.05, min(vFacet.x, 1.0 - vFacet.x));
-  col = mix(col, vec3(1.0, 0.97, 1.0), edge * 0.6);
+  col = mix(col, vec3(1.0, 0.97, 1.0), edge * 0.35);
   vec3 half_ = normalize(sun + toEye);
   col += vec3(1.0, 0.98, 0.94) * pow(max(dot(n, half_), 0.0), 56.0) * 1.1;
   float rim = pow(1.0 - abs(dot(n, toEye)), 3.0);
-  col += (hue * 0.5 + 0.15) * rim;
-  // Its own glow, breathing slowly; darker where it meets the floor.
-  col += hue * (0.1 + 0.04 * sin(uTime * 0.9 + vWorld.x * 0.03));
+  col += (hue * 0.35 + 0.06) * rim;
+  // Its own steady glow; darker where it meets the floor.
+  col += hue * 0.1;
   col *= mix(0.4, 1.0, smoothstep(0.0, 0.14, along));
   col += vec3(0.75, 0.82, 1.0) * revealGlow(vWorld.xy, 0.035);
   gl_FragColor = vec4(col, 1.0);
@@ -529,13 +533,14 @@ ${OUTPUT}
 }
 `;
 
-/** Coloured sparkle dust: drifting slowly up through the cave, each mote twinkling. */
+/** Coloured sparkle dust: drifting slowly up among the crystals, each mote twinkling gently. */
 export const SPARKLE_VERTEX = /* glsl */ `
 ${TABLE_UNIFORMS}
 uniform float uTime;
 uniform float uFocal;
 uniform vec3 uHues[${CRYSTAL_HUES.length}];
 ${NOISE}
+${FOOTPRINTS}
 ${REVEAL}
 attribute vec4 aSeed;
 varying vec3 vHue;
@@ -545,16 +550,16 @@ void main() {
   float clock = uTime + aSeed.z * period;
   float life = fract(clock / period);
   float cycle = floor(clock / period);
-  // Dust hangs low over the floor, thickest in the skylight's pool at the table's middle, as the art's.
-  vec2 start = mix(uMin + hash22(aSeed.xy * 53.0 + cycle) * uSize, uMin + uSize * 0.5, 0.4);
+  // Dust drifts out among the crystals; design 080: none over the cards.
+  vec2 start = uMin + hash22(aSeed.xy * 53.0 + cycle) * uSize;
   vec3 pos = vec3(start, 6.0 + 70.0 * aSeed.y * aSeed.y);
   pos.xy += vec2(sin(life * 3.0 + aSeed.x * 20.0), cos(life * 2.0 + aSeed.y * 20.0)) * 14.0;
   pos.z += life * 26.0;
-  float shown = revealBurned(start) * exitKeep(start);
+  float shown = revealBurned(start) * exitKeep(start) * step(fieldCalm(start, 90.0), 0.001);
   vec4 mv = modelViewMatrix * vec4(pos, 1.0);
   gl_Position = projectionMatrix * mv;
   float fade = smoothstep(0.0, 0.2, life) * (1.0 - smoothstep(0.75, 1.0, life));
-  vTwinkle = fade * (0.35 + 0.65 * pow(0.5 + 0.5 * sin(uTime * (2.0 + 3.0 * aSeed.z) + aSeed.x * 40.0), 3.0));
+  vTwinkle = fade * (0.55 + 0.45 * pow(0.5 + 0.5 * sin(uTime * (1.0 + 1.5 * aSeed.z) + aSeed.x * 40.0), 2.0));
   vHue = aSeed.w < 0.45 ? vec3(1.0, 0.9, 0.45) : uHues[int(floor(fract(aSeed.x * 7.0) * ${CRYSTAL_HUES.length}.0))];
   gl_PointSize = max((0.9 + 1.2 * aSeed.z) * uFocal / -mv.z, 1.4) * 1.9 * shown;
 }

@@ -142,7 +142,7 @@ void main() {
   float fromRim = r - uPlatform.z;
   float guide = (1.0 - smoothstep(1.0 * u, 2.4 * u, abs(fromRim - 22.0 * u))) + (1.0 - smoothstep(1.0 * u, 2.4 * u, abs(fromRim - 30.0 * u)));
   float guideOn = smoothstep(0.1, 0.3, fract(angle * 3.0 / 6.2831853 + 0.2)) * (1.0 - smoothstep(0.7, 0.9, fract(angle * 3.0 / 6.2831853 + 0.2)));
-  outer = mix(outer, YELLOW * (0.8 + 0.2 * gnoise(p / 6.0)), clamp(guide, 0.0, 1.0) * guideOn * 0.85);
+  outer = mix(outer, YELLOW * (0.84 + 0.16 * fbm3(p / 14.0)), clamp(guide, 0.0, 1.0) * guideOn * 0.85);
 
   // The platform: panels in two blues between the rings, polished; radial seams; each panel its own tone.
   // Each band between two rings is its own ring of panels, the same number all the way round it, so
@@ -164,16 +164,19 @@ void main() {
     ringLight = max(ringLight, 1.0 - smoothstep(0.8 * u, 2.4 * u, d));
     ringBloom = max(ringBloom, exp(-pow(d / (8.0 * u), 2.0)) * (0.55 + 0.1 * float(i)));
   }
-  // The pulse: a front of light travelling out along the rings, lighting each as it passes.
-  float front = fract(t / 4.2) * 1.18;
-  float pulse = exp(-pow((share - front) / 0.07, 2.0));
-  plat += RING * 0.2 * ringBloom * (0.7 + 0.5 * pulse);
-  plat = mix(plat, mix(RING, RING_WHITE, 0.4 + 0.6 * pulse), ringLight * (0.75 + 0.25 * pulse));
-  plat += RING * 0.16 * pulse * (1.0 - ringLight) * smoothstep(0.0, 0.2, share);
+  // The pulse: a front of light travelling out along the rings, lighting each as it passes. Design
+  // 080: the cards lie on these rings, so the pulse is a slow, faint brightening of the rings
+  // themselves, no wash of light across the floor between them.
+  float front = fract(t / 7.0) * 1.18;
+  float pulse = exp(-pow((share - front) / 0.07, 2.0)) * 0.35;
+  // The rings are thin lines of light, not bands: little bloom, a cyan core that goes white only
+  // as the pulse passes.
+  plat += RING * 0.07 * ringBloom * (0.75 + 0.5 * pulse);
+  plat = mix(plat, mix(RING * 0.75, RING_WHITE, 0.15 + 0.6 * pulse), ringLight * (0.62 + 0.25 * pulse));
   // Polish: the floor mirrors the lit ceiling, a broad soft sheen toward the middle that drifts.
   vec3 view = normalize(uEye - vec3(p, 0.0));
   float sheen = pow(max(dot(reflect(-normalize(uSun), vec3(0.0, 0.0, 1.0)), view), 0.0), 5.0);
-  plat += vec3(0.16, 0.22, 0.3) * sheen * (0.6 + 0.4 * fbm3(p / 200.0 + t * 0.02));
+  plat += vec3(0.08, 0.11, 0.15) * sheen * (0.6 + 0.4 * fbm3(p / 200.0 + t * 0.02));
   // The rim: a bright edge line where the platform ends.
   float rim = 1.0 - smoothstep(0.5 * u, 2.0 * u, abs(fromRim));
   plat = mix(plat, RING * (0.9 + 0.4 * pulse), rim * 0.9);
@@ -222,7 +225,10 @@ function wall(props, box, height, face, u) {
   }
 }
 
-/** A floating screen: a dark-green rim round a bright green pane with a pale block on it, tilted toward the platform. */
+/**
+ * A floating screen: a dark-green rim round a bright green pane, tilted toward the platform, showing
+ * the Poke Ball in pale lines (design 080: anonymous pale blocks on a screen read as fake content).
+ */
 function screenPanel(props, s, u) {
   const c = Math.cos(s.yaw);
   const sn = Math.sin(s.yaw);
@@ -235,8 +241,22 @@ function screenPanel(props, s, u) {
   const hw = s.w / 2;
   props.quad(at(-hw, 0, 0), at(hw, 0, 0), at(hw, s.h, 0), at(-hw, s.h, 0), SCREEN_RIM);
   props.quad(at(-hw + 4 * u, 4 * u, 0.8), at(hw - 4 * u, 4 * u, 0.8), at(hw - 4 * u, s.h - 4 * u, 0.8), at(-hw + 4 * u, s.h - 4 * u, 0.8), SCREEN);
-  props.quad(at(-hw * 0.5, s.h * 0.3, 1.4), at(hw * 0.5, s.h * 0.3, 1.4), at(hw * 0.5, s.h * 0.62, 1.4), at(-hw * 0.5, s.h * 0.62, 1.4), SCREEN_WHITE);
-  props.quad(at(-hw * 0.82, s.h * 0.74, 1.4), at(hw * 0.2, s.h * 0.74, 1.4), at(hw * 0.2, s.h * 0.84, 1.4), at(-hw * 0.82, s.h * 0.84, 1.4), SCREEN_WHITE);
+  // A ring of quads in the pane's plane round (0, cy), from radius r0 out to r1.
+  const ring = (cy, r0, r1, push, steps = 28) => {
+    for (let k = 0; k < steps; k += 1) {
+      const a0 = (k / steps) * 2 * Math.PI;
+      const a1 = ((k + 1) / steps) * 2 * Math.PI;
+      const on = (r, a) => at(Math.cos(a) * r, cy + Math.sin(a) * r, push);
+      props.quad(on(r0, a0), on(r1, a0), on(r1, a1), on(r0, a1), SCREEN_WHITE);
+    }
+  };
+  const cy = s.h / 2;
+  const r = Math.min(hw, s.h / 2) * 0.62;
+  const line = Math.max(1.6 * u, r * 0.1);
+  ring(cy, r - line, r, 1.4);
+  ring(cy, r * 0.22, r * 0.22 + line, 1.4, 16);
+  props.quad(at(-r + line * 0.5, cy - line / 2, 1.4), at(-r * 0.22, cy - line / 2, 1.4), at(-r * 0.22, cy + line / 2, 1.4), at(-r + line * 0.5, cy + line / 2, 1.4), SCREEN_WHITE);
+  props.quad(at(r * 0.22, cy - line / 2, 1.4), at(r - line * 0.5, cy - line / 2, 1.4), at(r - line * 0.5, cy + line / 2, 1.4), at(r * 0.22, cy + line / 2, 1.4), SCREEN_WHITE);
 }
 
 /** Everything solid, as one prop geometry. */
@@ -333,7 +353,7 @@ void main() {
   float up = vInfo.x;
   vec3 toEye = normalize(uEye - vWorld);
   float edge = pow(1.0 - abs(dot(normalize(vNormal), toEye)), 1.6);
-  float shimmer = 0.75 + 0.25 * sin(vWorld.z * 0.06 - uTime * 2.4 + vInfo.z);
+  float shimmer = 0.88 + 0.12 * sin(vWorld.z * 0.06 - uTime * 1.0 + vInfo.z);
   float fade = pow(1.0 - up, 1.25);
   vec3 col = mix(vec3(0.3, 0.75, 1.5), vec3(1.2, 1.6, 1.9), edge);
   gl_FragColor = vec4(col * (0.08 + 0.34 * edge) * fade * shimmer, 1.0);

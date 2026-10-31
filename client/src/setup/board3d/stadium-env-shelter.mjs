@@ -262,14 +262,16 @@ vec3 mirroredAt(vec2 p) {
 void main() {
   vec2 p = vPos;
   if (revealBurned(p) * exitKeep(p) < 0.5) discard;
-  // The art's floor: near-white (222,224,226), polished to a mirror (strongest toward the walls, whose gates,
-  // louvres and strips it reflects), big hex tiles parted by crisp dark hairline seams; short black
-  // hatched strips cut across the hall's four corners (the slanted sides of a great hexagon whose
-  // flat sides lie past the near and far walls), as the art's.
+  // The art's floor (near-white in the art, a cool grey here so the cards keep their edges), polished
+  // to a mirror (strongest toward the walls, whose gates, louvres and strips it reflects), big hex
+  // tiles parted by dark hairline seams; short hatched strips cut across the hall's four corners
+  // (the slanted sides of a great hexagon whose flat sides lie past the near and far walls).
+  // Design 080: the floor sits a clear step below the cards' white borders (a cool mid-light grey,
+  // the walls stay white), and its mirror quietens toward the cards.
   vec2 fromWalls = uHall.zw - abs(p - uHall.xy);
-  float gloss = mix(0.62, 0.34, smoothstep(30.0, 260.0, min(fromWalls.x, fromWalls.y)));
-  vec3 col = vec3(0.63, 0.655, 0.68) * (0.98 + 0.03 * fbm3(p / 220.0));
-  col = mix(col, mirroredAt(p) * 0.98, gloss);
+  float gloss = mix(0.5, 0.22, smoothstep(30.0, 260.0, min(fromWalls.x, fromWalls.y)));
+  vec3 col = vec3(0.34, 0.36, 0.39) * (0.98 + 0.03 * fbm3(p / 220.0));
+  col = mix(col, mirroredAt(p) * 0.62, gloss);
   // The art's floor seen low along it: each wall unit and gate mirrored into a soft streak running
   // out from the wall's foot across the floor's margin, its white panels, dark louvres and gates
   // stretched and blurred, fading out toward the cards.
@@ -287,15 +289,16 @@ void main() {
     streak += seen * w;
     streakWeight += w;
   }
-  col = mix(col, streak / max(streakWeight, 0.0001) * 1.02, min(streakWeight, 1.0) * 0.45);
+  col = mix(col, streak / max(streakWeight, 0.0001) * 0.66, min(streakWeight, 1.0) * 0.4);
   vec4 tile = hexTile((p - uHall.xy) / ${FLOOR_HEX_PX}.0);
-  col = mix(col, vec3(0.42, 0.44, 0.48), 1.0 - smoothstep(0.5, 1.2, tile.x * ${FLOOR_HEX_PX}.0));
+  col = mix(col, vec3(0.24, 0.255, 0.28), (1.0 - smoothstep(0.5, 1.2, tile.x * ${FLOOR_HEX_PX}.0)) * 0.8);
   vec2 rel = abs(p - uHall.xy);
   float corner = dot(rel, vec2(0.8660254, 0.5)) - (0.8660254 * uHall.z + 0.5 * uHall.w * ${CORNER_CUT});
   float groove = (1.0 - smoothstep(-0.5, 0.8, abs(corner) - 5.0)) * step(rel.y, uHall.w)
     * smoothstep(uHall.z - ${CORNER_STRIP_PX}.0, uHall.z - ${CORNER_STRIP_PX - 20}.0, rel.x);
   float hatch = step(0.75, fract(dot(p, vec2(0.7071, 0.7071)) / 8.0));
-  col = mix(col, mix(vec3(0.025, 0.027, 0.032), vec3(0.16, 0.17, 0.19), hatch), groove);
+  // Grey on grey: black and white stripes aimed at the cards were the loudest lines on the board.
+  col = mix(col, mix(vec3(0.17, 0.18, 0.2), vec3(0.27, 0.285, 0.31), hatch), groove);
 
   // Shade gathers at the walls' feet; the far reaches of the hall dim a little.
   vec2 fromWall = uHall.zw - abs(p - uHall.xy);
@@ -314,12 +317,12 @@ void main() {
     float line = min(min(ring, button), band);
     float lit = 1.0 - smoothstep(1.0, 2.6, line);
     float core = 1.0 - smoothstep(0.2, 0.9, line);
-    float shimmer = 0.85 + 0.15 * sin(atan(rel.y, rel.x) * 6.0 - uTime * 1.5);
-    // On the pale floor an added glow would only wash out: the bloom is a blue tint round the lines,
-    // the lines a saturated cyan with a near-white core.
-    col = mix(col, vec3(0.36, 0.7, 1.02), exp(-line / 9.0) * 0.5);
-    col = mix(col, vec3(0.2, 0.78, 1.25) * shimmer, lit);
-    col = mix(col, vec3(0.85, 1.05, 1.15), core * 0.85);
+    // Light runs round it slowly and faintly (design 080: no busy motion under the Actives).
+    float shimmer = 0.95 + 0.05 * sin(atan(rel.y, rel.x) * 6.0 - uTime * 0.6);
+    // The bloom is a blue tint round the lines, the lines a saturated cyan with a pale core.
+    col = mix(col, vec3(0.3, 0.6, 0.9), exp(-line / 9.0) * 0.35);
+    col = mix(col, vec3(0.2, 0.74, 1.15) * shimmer, lit);
+    col = mix(col, vec3(0.7, 0.95, 1.08), core * 0.5);
   }
 
   vec2 edgeUv = min((p - uMin) / uSize, 1.0 - (p - uMin) / uSize);

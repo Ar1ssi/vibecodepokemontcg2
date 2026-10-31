@@ -256,6 +256,60 @@ float edgeSkirt(vec2 uv) {
 }
 `;
 
+/** Most card footprints `uFootprints` holds (environmentFootprints gives ~23 on a full two-player board). */
+export const MAX_FOOTPRINTS = 24;
+
+/**
+ * Design 080: the field, the calm ground every board keeps round the cards. `uFootprints` holds
+ * each card footprint as (x0, y0, x1, y1) table px, the first `uFootprintCount` in use, and
+ * `uFootprintBox` the box round all of them (the mesh fills them from environmentFootprints).
+ * `footprintDistance(p)`: px from p to the nearest card; `fieldCalm(p, reach)`: 1 on a card, easing
+ * to 0 `reach` px out. A board scales its small detail, local contrast, glow and motion by it, so the
+ * cards keep the play area.
+ */
+export const FOOTPRINTS = /* glsl */ `
+uniform vec4 uFootprints[${MAX_FOOTPRINTS}];
+uniform int uFootprintCount;
+uniform vec4 uFootprintBox;
+float footprintDistance(vec2 p) {
+  float best = 100000.0;
+  for (int i = 0; i < ${MAX_FOOTPRINTS}; i++) {
+    if (i >= uFootprintCount) break;
+    vec4 r = uFootprints[i];
+    best = min(best, length(max(max(r.xy - p, p - r.zw), 0.0)));
+  }
+  return best;
+}
+float fieldCalm(vec2 p, float reach) {
+  // The box round every card is never farther than the nearest card: past reach from it, no card
+  // is in reach either, so most of the world skips the loop.
+  if (length(max(max(uFootprintBox.xy - p, p - uFootprintBox.zw), 0.0)) >= reach) return 0.0;
+  return 1.0 - smoothstep(0.0, reach, footprintDistance(p));
+}
+`;
+
+/**
+ * Design 080: frequency clamping (Quilez), after NOISE. `pixelSize(p)`: table px per screen px at
+ * this fragment. Derivatives are undefined inside a branch neighbouring pixels take differently
+ * (ANGLE's HLSL rejects them there), so main sets `filterPixel = pixelSize(p)` first thing and
+ * helpers read that. `patternFade(pixel, period)` is 1 while a pattern repeating every `period` px
+ * spans at least ~4 screen px, 0 once it spans ~1.5 or less: scale a fine pattern's contrast by it,
+ * so under the tilted camera it fades to its mean instead of shimmering. `grain(p, scale)` is
+ * gnoise(p / scale) faded so (a main that never sets filterPixel keeps the grain unfaded).
+ */
+export const FILTERING = /* glsl */ `
+float filterPixel = 1.0;
+float pixelSize(vec2 p) {
+  return max(length(fwidth(p)), 0.0001);
+}
+float patternFade(float pixel, float period) {
+  return smoothstep(1.5, 4.0, period / pixel);
+}
+float grain(vec2 p, float scale) {
+  return mix(0.5, gnoise(p / scale), patternFade(filterPixel, scale * 2.0));
+}
+`;
+
 /** A Poke Ball emblem's lines, after NOISE: its outline, the band across its middle, the button's ring. */
 export const POKE_BALL = /* glsl */ `
 // px from the nearest line of the emblem at emblem.xy with outline radius emblem.z (0: none).

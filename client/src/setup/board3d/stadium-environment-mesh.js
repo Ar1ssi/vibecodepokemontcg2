@@ -64,11 +64,14 @@ export const plateScale = (width, height, pixelRatio = 1) =>
  * happens on a lost context.
  */
 export const PREPARE_TIMEOUT_MS = 8000;
-const EMBER_COUNT = 220;
+const EMBER_COUNT = 110;
 const SMOKE_COUNT = 14;
-const SPORE_COUNT = 150;
-/** Lightning slots: each strikes about once per cycle (s), at a random moment, some cycles not at all. */
-const BOLT_CYCLES_S = [4.6, 6.9];
+const SPORE_COUNT = 90;
+/**
+ * Lightning slots: each strikes about once per cycle (s), at a random moment, some cycles not at all.
+ * Design 080: a strike every few seconds round the rim, not every other second.
+ */
+const BOLT_CYCLES_S = [7.8, 11.3];
 const STRIKE_S = 0.6;
 const STRIKE_CHANCE = 0.8;
 /**
@@ -108,6 +111,38 @@ const sceneOf = (object) => {
   while (root.parent) root = root.parent;
   return root;
 };
+
+let warnedFootprints = false;
+
+/**
+ * Design 080: card footprints (environmentFootprints) into the shared `uFootprints` /
+ * `uFootprintCount` (the FOOTPRINTS chunk). Past MAX_FOOTPRINTS they are dropped with one warning:
+ * those cards still lie on the board, only the ground round them is not kept calm.
+ */
+export function setFootprints(uniforms, { slabs = [], flats = [] } = {}) {
+  const rects = [...slabs, ...flats];
+  if (rects.length > glsl.MAX_FOOTPRINTS && !warnedFootprints) {
+    warnedFootprints = true;
+    console.warn(`board3d: ${rects.length} card footprints, the Stadium board keeps ${glsl.MAX_FOOTPRINTS} calm`);
+  }
+  const kept = rects.slice(0, glsl.MAX_FOOTPRINTS);
+  uniforms.uFootprints.value.forEach((vector, i) => {
+    const rect = kept[i];
+    if (rect) vector.set(rect.x, rect.y, rect.x + rect.w, rect.y + rect.h);
+    else vector.set(-1e5, -1e5, -1e5, -1e5);
+  });
+  uniforms.uFootprintCount.value = kept.length;
+  if (!kept.length) {
+    uniforms.uFootprintBox.value.set(-1e5, -1e5, -1e5, -1e5);
+    return;
+  }
+  uniforms.uFootprintBox.value.set(
+    Math.min(...kept.map((r) => r.x)),
+    Math.min(...kept.map((r) => r.y)),
+    Math.max(...kept.map((r) => r.x + r.w)),
+    Math.max(...kept.map((r) => r.y + r.h))
+  );
+}
 
 /** A deterministic 0..1 from two integers, so a strike looks the same in every frame it spans. */
 const unitHash = (a, b) => {
@@ -724,6 +759,10 @@ export function createStadiumEnvironment({
     uTexel: { value: new three.Vector2() },
     uFocal: { value: 1000 },
     uEye: { value: new three.Vector3() },
+    // Design 080: every card footprint, for the shared FOOTPRINTS chunk (fieldCalm).
+    uFootprints: { value: Array.from({ length: glsl.MAX_FOOTPRINTS }, () => new three.Vector4()) },
+    uFootprintCount: { value: 0 },
+    uFootprintBox: { value: new three.Vector4(-1e5, -1e5, -1e5, -1e5) },
   };
   const cutout = {
     glsl: glsl.CUTOUT_GLSL,
@@ -932,11 +971,14 @@ export function createStadiumEnvironment({
     const origin = stadium
       ? { x: stadium.x + stadium.w / 2, y: stadium.y + stadium.h / 2 }
       : { x: bounds.x + bounds.w / 2, y: layout.depth };
-    const signature = JSON.stringify([key, bounds, spots, origin]);
+    // The footprints too: a board's bake may keep its ground calm round them (design 080).
+    const footprints = environmentFootprints(layout);
+    const signature = JSON.stringify([key, bounds, spots, origin, footprints]);
     if (signature !== appliedFor) {
       uniforms.uMin.value.set(bounds.x, bounds.y);
       uniforms.uSize.value.set(bounds.w, bounds.h);
       uniforms.uOrigin.value.set(origin.x, origin.y);
+      setFootprints(uniforms, footprints);
       board.apply(spots, bounds);
       appliedFor = signature;
     }

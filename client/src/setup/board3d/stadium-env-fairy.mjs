@@ -13,6 +13,7 @@
 // it, the orbs' light and the trees' shade; PROPS the trees, roots and leaves (stadium-env-props);
 // ORBS the glowing orbs and their halos; SPARKLES the trails of four-pointed twinkles.
 import {
+  FOOTPRINTS,
   FULLSCREEN_VERTEX,
   NOISE,
   OUTPUT,
@@ -34,7 +35,7 @@ export const FAIRY_MOON = Object.freeze([-0.3, 0.3, 0.9]);
 export const MAX_TREES = 12;
 export const MAX_ORBS = 6;
 export const MAX_LEAVES = 8;
-const SPARKLE_COUNT = 190;
+const SPARKLE_COUNT = 90;
 const FLOWER_PX = 27;
 
 /**
@@ -144,6 +145,7 @@ const vec3 ORB = vec3(0.55, 1.4, 0.95);
 export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
+${FOOTPRINTS}
 ${VORONOI}
 ${REVEAL}
 ${BLADES}
@@ -180,10 +182,15 @@ void main() {
   vec3 col = mix(FLOOR_DARK, FLOOR_DARK * 2.2 + vec3(0.0, 0.016, 0.01), smoothstep(0.35, 0.7, fbm3(p / 90.0 + 4.0)));
   // Two layers of blossoms: small ones among the big, the carpet thinning in patches where the moss
   // shows, and heaping into drifts.
+  // Design 080: round the cards the carpet thins to moss with a blossom here and there, so a field of
+  // small flowers never runs under them; it is full out under the trees.
+  float calm = fieldCalm(p, 120.0);
   float size = ${FLOWER_PX}.0 * uUnit;
-  float drift = smoothstep(0.3, 0.7, fbm3(p / 210.0 + 11.0));
-  vec3 small = blossoms(p + 7.0, size * 0.7, 0.7 + 0.28 * drift);
-  vec3 big = blossoms(p, size, 0.78 + 0.22 * drift);
+  // The blossoms lie in drifts: broad patches, thick in their hearts, with bare moss between them (a
+  // carpet of the same small flower everywhere read as speckle).
+  float drift = smoothstep(0.42, 0.68, fbm3(p / 230.0 + 11.0) + 0.08 * (fbm3(p / 70.0 + 3.0) - 0.5));
+  vec3 small = blossoms(p + 7.0, size * 0.7, 0.85 * drift * (1.0 - 0.9 * calm));
+  vec3 big = blossoms(p, size, 0.9 * smoothstep(0.15, 0.6, drift) * (1.0 - 0.8 * calm));
   vec3 smallCol = mix(PETAL_SHADE, PETAL * 0.9, small.y) * (0.82 + 0.28 * fract(small.z * 9.0));
   vec3 bigCol = mix(PETAL_SHADE * 1.3, mix(PETAL, PETAL_HI, small.y * 0.7), big.y) * (0.88 + 0.22 * fract(big.z * 11.0));
   col = mix(col, smallCol, small.x);
@@ -211,7 +218,7 @@ void main() {
     float angle = atan(p.y - uRing.y, p.x - uRing.x);
     float glints = pow(0.5 + 0.5 * sin(angle * 38.0 - t * 0.7 + 4.0 * gnoise(vec2(angle * 3.0, t * 0.1))), 6.0);
     float bloom = exp(-pow((toRing - uRing.z) / (14.0 * uUnit), 2.0));
-    col += RING * 0.32 * bloom * (0.85 + 0.15 * sin(t * 1.4));
+    col += RING * 0.28 * bloom;
     col = mix(col, RING * (0.85 + 0.35 * glints), line);
     t0 = bloom;
   }
@@ -343,7 +350,7 @@ void main() {
   vec3 pos = vec3(orb.xy + vec2(sin(uTime * 0.4 + orb.x * 0.02), cos(uTime * 0.33 + orb.y * 0.02)) * 6.0, orb.z + sin(uTime * 0.6 + orb.x) * 5.0);
   vec4 mv = modelViewMatrix * vec4(pos, 1.0);
   gl_Position = projectionMatrix * mv;
-  vPulse = 0.85 + 0.15 * sin(uTime * 1.3 + orb.y * 0.02);
+  vPulse = 0.94 + 0.06 * sin(uTime * 0.6 + orb.y * 0.02);
   gl_PointSize = orb.w * 5.2 * uFocal / -mv.z * step(0.5, orb.w) * revealBurned(orb.xy) * exitKeep(orb.xy);
 }
 `;
@@ -365,6 +372,7 @@ ${TABLE_UNIFORMS}
 uniform float uTime;
 uniform float uFocal;
 ${NOISE}
+${FOOTPRINTS}
 ${REVEAL}
 uniform vec4 uOrbs[${MAX_ORBS}];
 attribute vec4 aSeed;
@@ -382,10 +390,12 @@ void main() {
   // Each drifts along a slow curve, as the art's trails do.
   pos.xy += vec2(cos(life * 6.28 + aSeed.x * 9.0), sin(life * 5.0 + aSeed.y * 9.0)) * 46.0;
   pos.z += life * 30.0;
-  float shown = step(0.5, orb.w) * revealBurned(pos.xy) * exitKeep(pos.xy);
+  // Design 080: sparkles trail round their orbs out in the forest, none over or beside a card, and
+  // they shimmer slowly rather than blink.
+  float shown = step(0.5, orb.w) * revealBurned(pos.xy) * exitKeep(pos.xy) * (1.0 - fieldCalm(pos.xy, 70.0));
   vec4 mv = modelViewMatrix * vec4(pos, 1.0);
   gl_Position = projectionMatrix * mv;
-  vTwinkle = smoothstep(0.0, 0.15, life) * (1.0 - smoothstep(0.7, 1.0, life)) * (0.3 + 0.7 * pow(0.5 + 0.5 * sin(uTime * (2.0 + 4.0 * aSeed.z) + aSeed.x * 50.0), 3.0));
+  vTwinkle = smoothstep(0.0, 0.15, life) * (1.0 - smoothstep(0.7, 1.0, life)) * (0.55 + 0.45 * pow(0.5 + 0.5 * sin(uTime * (0.8 + 1.4 * aSeed.z) + aSeed.x * 50.0), 2.0));
   vTint = step(0.78, aSeed.w);
   gl_PointSize = max((1.6 + 2.4 * aSeed.z) * uFocal / -mv.z, 2.0) * 3.2 * shown;
 }

@@ -15,6 +15,7 @@
 // sheet, flowing round the island; EMBERS rise off the moat and spray off the falls' splashes.
 import {
   FLOW_STREAKS,
+  FOOTPRINTS,
   FULLSCREEN_VERTEX,
   NOISE,
   OUTPUT,
@@ -76,7 +77,7 @@ const FORK_AT_PX = 58;
 /** Width of the walls' flat faces, and how deep the seams between them are cut. */
 const FACET_PX = 110;
 const SEAM_PX = 7;
-export const EMBER_COUNT = 320;
+export const EMBER_COUNT = 160;
 
 const SIDE_DIRECTIONS = {
   far: { angle: Math.PI / 2, axis: 'x', sign: 1 },
@@ -270,6 +271,7 @@ uniform sampler2D uPre;
 uniform vec3 uEmblem;
 varying vec2 vUv;
 ${NOISE}
+${FOOTPRINTS}
 ${VORONOI}
 ${STONES}
 float basinAt(vec2 p) {
@@ -302,8 +304,10 @@ void main() {
     float inland = smoothstep(0.0, -24.0, islandSD);
     // Cooled basalt, as the art's: broad swells under a pebbly grain of small faceted lumps packed
     // together.
+    // Design 080: round the cards the grain is worn low (the lumps flatter, the fine roughness gone).
+    float calm = fieldCalm(p, 90.0);
     vec3 lump = stones(p + 5.0, mix(16.0, 24.0, fbm3(p / 150.0)), 0.3);
-    h += (4.0 * (fbm3(p / 46.0) - 0.5) + 1.6 * lump.x + 0.6 * (gnoise(p / 4.0) - 0.5)) * inland;
+    h += (4.0 * (fbm3(p / 46.0) - 0.5) + 1.6 * lump.x * (1.0 - 0.6 * calm) + 0.6 * (gnoise(p / 4.0) - 0.5) * (1.0 - calm)) * inland;
     // A few long cracks wander across it in broken runs, some still glowing.
     vec2 warped = p + (vec2(fbm3(p / 80.0), fbm3(p / 80.0 + 5.3)) - 0.5) * 70.0;
     vec4 plate = voronoiCell(warped / 170.0 + 3.0);
@@ -368,6 +372,7 @@ ${TERRAIN_UNIFORMS}
 uniform sampler2D uPre;
 uniform vec3 uEmblem;
 ${NOISE}
+${FOOTPRINTS}
 ${REVEAL}
 ${BASIN_LAVA}
 ${FLOW_STREAKS}
@@ -423,7 +428,7 @@ void main() {
   float laplace = texture2D(uField, vUv + vec2(t2.x, 0.0)).r + texture2D(uField, vUv - vec2(t2.x, 0.0)).r
     + texture2D(uField, vUv + vec2(0.0, t2.y)).r + texture2D(uField, vUv - vec2(0.0, t2.y)).r - 4.0 * ground;
   float convex = smoothstep(0.4, 2.2, -laplace) * vGrowth;
-  col = mix(col, col * 1.7 + vec3(0.028, 0.016, 0.01), convex * mix(0.55, 0.25, onIsland));
+  col = mix(col, col * 1.7 + vec3(0.028, 0.016, 0.01), convex * mix(0.55, 0.25 * (1.0 - 0.7 * fieldCalm(p, 90.0)), onIsland));
   col = mix(vec3(0.026, 0.018, 0.02), col, smoothstep(0.25, 0.9, light.b));
 
   // The lava lights the rock: the moat the island's shore and the wall's foot, faces turned to it
@@ -439,7 +444,7 @@ void main() {
   float turned = clamp(dot(n, normalize(vec3(toMoat, 0.3))), 0.0, 1.0);
   float fromMoat = onIsland > 0.5 ? max(-islandSD, 0.0) : max(outerSD, 0.0);
   float above = max(ground - ${LAVA_LEVEL}.0, 0.0);
-  float flicker = 0.85 + 0.15 * gnoise(vec2(uTime * 0.9, p.x / 90.0 + p.y / 130.0));
+  float flicker = 0.95 + 0.05 * gnoise(vec2(uTime * 0.4, p.x / 160.0 + p.y / 230.0));
   // The walls take less of it than the island: their faces lean away from the moat's middle.
   float moatGlow = exp(-fromMoat / mix(34.0, 38.0, onIsland)) * exp(-above / 70.0) * (0.25 + 0.75 * turned);
   col += mix(vec3(1.0, 0.24, 0.08), vec3(1.0, 0.35, 0.1), onIsland) * moatGlow * flicker * mix(0.55, 0.55, onIsland);
@@ -447,10 +452,11 @@ void main() {
   col += vec3(1.0, 0.36, 0.06) * exp(-fromMoat / 7.0) * onIsland * 0.5 * flicker;
   col += vec3(1.0, 0.3, 0.12) * exp(-max(fallSD, 0.0) / 6.0) * onWall * 0.55 * flicker;
 
-  // Some of the island's cracks still glow; sparks lie on the rock.
+  // Some of the island's cracks still glow; sparks lie on the rock out toward the moat (design 080:
+  // none round the cards, where glowing dots read as speckle on the field).
   col = mix(col, basinLava(0.26 + 0.1 * flicker), field.b * 0.85);
   float specks = speck(p, 12.0, 0.1, 1.0) + speck(p, 27.0, 0.16, 2.0) * 1.5;
-  col += vec3(1.7, 0.42, 0.05) * specks * mix(0.35, 1.0, onIsland);
+  col += vec3(1.7, 0.42, 0.05) * specks * mix(0.35, 0.7, onIsland) * (1.0 - fieldCalm(p, 90.0));
 
   // The Poke Ball set in the island, as in the art: two domed halves of red stone, brightest along
   // their crowns, warm as if lit from within, a sheen along the far rim; the band, the button's ring
@@ -460,7 +466,7 @@ void main() {
     float r = length(rel);
     float bandHalf = uEmblem.z * 0.075;
     float buttonR = uEmblem.z * ${EMBLEM_BUTTON};
-    float breathe = 0.93 + 0.07 * sin(uTime * 1.1);
+    float breathe = 0.97 + 0.03 * sin(uTime * 0.6);
     float inside = 1.0 - smoothstep(uEmblem.z - 1.5, uEmblem.z, r);
     float halves = inside * smoothstep(bandHalf, bandHalf + 1.5, abs(rel.y)) * smoothstep(buttonR + 3.0, buttonR + 5.0, r);
     float crown = clamp(min(min(uEmblem.z - r, abs(rel.y) - bandHalf), r - buttonR - 4.0) / 60.0, 0.0, 1.0);
@@ -570,9 +576,10 @@ void main() {
   vec2 flow = mix(flowPhase(p - velocity * phaseB * period + vec2(53.0, 29.0)), flowPhase(p - velocity * phaseA * period), weightA);
 
   float middle = sin(across * 3.14159);
-  // Pale gold flow lines down the middle; gold out to a thin red-orange lip at both shores, as the
-  // art's moat (no bright rim along them).
-  float heat = 0.5 + 0.42 * middle + (flow.x - 0.5) * 0.14 + flow.y * 0.18 * middle;
+  // Gold flow lines down the middle; orange out to a thin red-orange lip at both shores, as the art's
+  // moat (no bright rim along them). Design 080: a step cooler than the art's pale gold, so the ring of
+  // lava hugging the cards glows without glaring.
+  float heat = 0.42 + 0.34 * middle + (flow.x - 0.5) * 0.12 + flow.y * 0.16 * middle;
   heat -= 0.36 * (1.0 - smoothstep(0.0, 14.0, shore));
   // A thin dark crust right against the rock.
   heat -= 0.4 * (1.0 - smoothstep(1.5, 5.0, shore));
@@ -591,15 +598,15 @@ void main() {
     if (abs(dot(rel, dir)) > 160.0) continue;
     float d = length(vec2(across, outerSD + 10.0));
     float pool = exp(-d / 24.0);
-    float rings = smoothstep(0.6, 1.0, sin(d / 5.0 - uTime * 5.0)) * exp(-d / 40.0) * smoothstep(6.0, 14.0, d);
+    float rings = smoothstep(0.6, 1.0, sin(d / 5.0 - uTime * 2.2)) * exp(-d / 40.0) * smoothstep(6.0, 14.0, d);
     heat += pool * 0.38 + rings * 0.2;
   }
 
-  // Bubbles swell for most of their life, then pop as a widening ring.
+  // Bubbles swell for most of their life, then pop as a widening ring: slowly, and few.
   vec2 cell = floor(p / 46.0);
-  float bubblePeriod = 2.4 + 2.6 * hash12(cell + 3.0);
+  float bubblePeriod = 4.5 + 3.5 * hash12(cell + 3.0);
   float life = fract(uTime / bubblePeriod + hash12(cell));
-  float hasBubble = step(0.62, hash12(cell + 11.0)) * smoothstep(10.0, 24.0, shore);
+  float hasBubble = step(0.8, hash12(cell + 11.0)) * smoothstep(10.0, 24.0, shore);
   vec2 centre = (cell + 0.2 + 0.6 * hash22(cell + 7.0)) * 46.0;
   float r = distance(p, centre);
   float swell = smoothstep(0.0, 0.8, life) * 6.0;
@@ -624,6 +631,7 @@ ${TABLE_UNIFORMS}
 uniform float uTime;
 uniform float uFocal;
 ${NOISE}
+${FOOTPRINTS}
 ${REVEAL}
 uniform vec4 uIsland;
 uniform vec4 uMoat;
@@ -657,13 +665,11 @@ void main() {
       drift = vec3(-dir * 40.0 * jitter.y + side * (jitter.x - 0.5) * 60.0, 70.0 + 110.0 * jitter.y);
       kind = 1.0;
     }
-  } else if (aSeed.w > 0.92) {
-    start = vec3(uIsland.xy + (aSeed.xy * 2.0 - 1.0) * uIsland.zw, 30.0 + 60.0 * jitter.x);
-    drift = vec3((jitter - 0.5) * 80.0, 60.0);
   }
   vec3 pos = start + drift * life;
   pos.xy += vec2(sin(life * 5.0 + aSeed.z * 20.0), cos(life * 4.0 + aSeed.x * 20.0)) * 8.0 * life;
-  float shown = revealBurned(pos.xy) * exitKeep(pos.xy);
+  // Design 080: sparks keep to the moat and the falls; none drift over or beside a card.
+  float shown = revealBurned(pos.xy) * exitKeep(pos.xy) * (1.0 - fieldCalm(pos.xy, 50.0));
   vec4 mv = modelViewMatrix * vec4(pos, 1.0);
   gl_Position = projectionMatrix * mv;
   float sizePx = (1.4 + aSeed.z * 2.2) * (1.0 - life * 0.5);

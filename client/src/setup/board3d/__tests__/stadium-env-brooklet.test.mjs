@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as brooklet from '../stadium-env-brooklet.mjs';
 import { BAY_MAX, FALL_MAX, ROCK_MAX, STONEWORK_PARTS, SUNKEN_MAX, TOWER_MAX, TREE_MAX } from '../stadium-env-brooklet-layout.mjs';
+import { MAX_FOOTPRINTS } from '../stadium-environment-glsl.mjs';
 
 const shaders = Object.entries(brooklet).filter(([, value]) => typeof value === 'string' && value.includes('void main'));
 
@@ -47,7 +48,7 @@ test('no Brooklet Hill shader names a variable with a word GLSL ES 3.00 keeps', 
 
 test("the shaders' uniform arrays hold every piece the layout can place", () => {
   const sizes = { uBays: BAY_MAX, uTowers: TOWER_MAX, uNotches: TOWER_MAX, uFalls: FALL_MAX, uFallShapes: FALL_MAX, uFallKind: FALL_MAX };
-  Object.assign(sizes, { uRocks: ROCK_MAX, uSunken: SUNKEN_MAX, uTrees: TREE_MAX });
+  Object.assign(sizes, { uRocks: ROCK_MAX, uSunken: SUNKEN_MAX, uTrees: TREE_MAX, uFootprints: MAX_FOOTPRINTS });
   const seen = new Set();
   for (const [name, source] of shaders) {
     for (const [, uniform, size] of source.matchAll(/uniform\s+\w+\s+(\w+)\[(\d+)\]/g)) {

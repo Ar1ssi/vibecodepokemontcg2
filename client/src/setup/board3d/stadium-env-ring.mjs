@@ -13,6 +13,7 @@
 // dust, the emblem and the haze; PROPS are the standing stones, the spires, the ropes and the chain
 // (stadium-env-props).
 import {
+  FOOTPRINTS,
   FULLSCREEN_VERTEX,
   NOISE,
   OUTPUT,
@@ -514,6 +515,7 @@ const vec3 HAZE = vec3(0.42, 0.37, 0.3);
 export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
+${FOOTPRINTS}
 ${REVEAL}
 ${RING}
 ${OVERCAST}
@@ -539,12 +541,15 @@ void main() {
     // Paving: grey-beige stones a shade apart, a few worn darker, thin joints only a few shades darker
     // than the stone, as the art's (85,76,70) between (128,120,112) bricks, grime in broad pools; the
     // emblem's pale stone, its dark grooves and its carved band.
+    // Design 080: round the cards the stones keep closer to one tone and their joints are shallower,
+    // so the paving reads as one floor under the cards, its pattern fuller out toward the menhirs.
+    float calm = fieldCalm(p, 100.0);
     vec4 brick = brickAt(p);
     float wear = hash12(brick.xy + 21.0);
-    vec3 stone = mix(vec3(0.215, 0.196, 0.17), vec3(0.32, 0.292, 0.252), id) * (wear < 0.15 ? 0.84 : 1.0);
+    vec3 stone = mix(vec3(0.215, 0.196, 0.17), vec3(0.32, 0.292, 0.252), mix(id, 0.55, 0.6 * calm)) * (wear < 0.15 ? mix(0.84, 0.94, calm) : 1.0);
     float gap = 1.0 - smoothstep(0.3, 0.9 + 0.5 * gnoise(p / 30.0), brick.z);
-    stone *= 0.92 + 0.16 * fbm3(p / 23.0);
-    stone = mix(stone, stone * 0.6, gap * 0.85);
+    stone *= 0.93 + 0.14 * fbm3(p / 23.0);
+    stone = mix(stone, stone * mix(0.6, 0.8, calm), gap * 0.85);
     // Dark grime gathers in broad pools, as on the art's paving.
     stone *= mix(1.0, 0.74, smoothstep(0.58, 0.78, fbm3(p / 210.0 + 3.0)));
     vec2 inlay = emblemInlay(p);
@@ -565,7 +570,7 @@ void main() {
   col = mix(col * 0.55, col, smoothstep(0.3, 0.9, light.b));
   // The overcast sky's thicker clouds drift over, their soft shadows crossing the ring.
   float clouds = fbm3((p - vec2(uTime * 9.0, uTime * 4.0)) / 520.0 + 3.7);
-  col *= 1.0 - 0.16 * smoothstep(0.48, 0.72, clouds);
+  col *= 1.0 - 0.16 * smoothstep(0.48, 0.72, clouds) * (1.0 - 0.7 * fieldCalm(p, 120.0));
   // The art's sepia haze, thicker with distance from the ring, its mist drifting.
   float far = smoothstep(140.0, 560.0, d);
   float mist = fbm3((p + vec2(uTime * 14.0, -uTime * 6.0)) / 160.0);

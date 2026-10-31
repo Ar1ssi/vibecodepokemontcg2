@@ -20,6 +20,8 @@
 // PROPS the trees, boulders, reeds and pylons; BOLTS the lightning's ribbons (additive); DOME the
 // force field (additive, one hemisphere of unit directions the shader scales to the arena).
 import {
+  FILTERING,
+  FOOTPRINTS,
   FULLSCREEN_VERTEX,
   NOISE,
   OUTPUT,
@@ -119,7 +121,8 @@ export function stormSpots(layout) {
     arcs.push({
       pads: [side * 2, side * 2 + 1],
       points: boltPath([a.x, a.y, postTop], [b.x, b.y, postTop], 96 * u, 34 * u, side * 7 + 1),
-      period: 3.4 + 1.1 * side,
+      // Design 080: the storm keeps its strikes, about half as often (one every 3-4 s over the board).
+      period: 7.5 + 2.2 * side,
       phase: 0.35 + 0.4 * side,
     });
   }
@@ -132,7 +135,7 @@ export function stormSpots(layout) {
     arcs.push({
       pads: [i, i],
       points: boltPath([pad.x, pad.y, postTop], landing, 30 * u, 30 * u, i * 13 + 3),
-      period: 4.6 + 0.9 * i,
+      period: 9.5 + 1.9 * i,
       phase: 0.1 + 0.23 * i,
       dir,
     });
@@ -225,7 +228,7 @@ float fieldPresence(vec2 p) {
 float strike(float period, float phase) {
   float t = fract(uTime / period + phase);
   float flash = smoothstep(0.0, 0.012, t) * (1.0 - smoothstep(0.03, 0.2, t));
-  return flash * (0.65 + 0.35 * step(0.5, fract(t * 61.0))) + 0.18 * smoothstep(0.0, 0.03, t) * (1.0 - smoothstep(0.2, 0.5, t));
+  return flash * 0.85 + 0.18 * smoothstep(0.0, 0.03, t) * (1.0 - smoothstep(0.2, 0.5, t));
 }
 `;
 
@@ -261,6 +264,8 @@ const vec3 MIST = vec3(0.07, 0.05, 0.13);
 export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
+${FOOTPRINTS}
+${FILTERING}
 ${VORONOI}
 ${REVEAL}
 ${POKE_BALL}
@@ -273,6 +278,7 @@ varying vec2 vUv;
 varying float vGrowth;
 void main() {
   vec2 p = vPos;
+  filterPixel = pixelSize(p);
   if (revealBurned(p) * exitKeep(p) < 0.5) discard;
   vec4 field = texture2D(uField, vUv);
   float t = uTime;
@@ -308,8 +314,8 @@ void main() {
   float rd = emblemDistance(p, uRing);
   float line = 1.0 - smoothstep(0.8 * u, 2.6 * u, rd);
   float bloom = exp(-pow(rd / (13.0 * u), 2.0));
-  float breath = 0.88 + 0.12 * sin(t * 1.6);
-  col += PINK_SOFT * 0.45 * bloom * breath;
+  // Steady: nothing under the Actives pulses (design 080).
+  col += PINK_SOFT * 0.28 * bloom;
   col = mix(col, mix(PINK * 0.9, RING_WHITE, smoothstep(0.0, 1.0, 1.0 - rd / (2.2 * u))), line);
 
   // The pads: a pink pool of light on the ground, a hot white-pink heart, pulsing; flashing with its bolt.
@@ -320,8 +326,8 @@ void main() {
     float dist = distance(p, pad.xy) / pad.z;
     float pool = exp(-dist * dist * 1.6);
     float heart = exp(-dist * dist * 9.0);
-    col += PINK_SOFT * 0.8 * pool * (0.8 + 0.2 * sin(t * 1.4 + float(i) * 2.0)) + mix(PINK, RING_WHITE, 0.45) * 0.55 * heart;
-    lightning += vec3(0.55, 0.7, 1.0) * pad.w * exp(-dist * dist * 0.35) * 0.8;
+    col += PINK_SOFT * 0.8 * pool * (0.94 + 0.06 * sin(t * 0.7 + float(i) * 2.0)) + mix(PINK, RING_WHITE, 0.45) * 0.55 * heart;
+    lightning += vec3(0.55, 0.7, 1.0) * pad.w * exp(-dist * dist * 0.35) * 0.45;
   }
   // The storm: a vortex of dark mist turning about the force field's centre, thicker toward the middle.
   vec2 rel = p - uDome.xy;
@@ -354,8 +360,12 @@ void main() {
     float spacing = 1.0 / (120.0 * slope);
     float gap2 = abs(fract(fine + 0.5) - 0.5) / (120.0 * slope);
     float dashes = smoothstep(0.5, 0.72, gnoise(vec2(run * 36.0, floor(fine + 0.5) * 3.7)));
-    float dust = (1.0 - smoothstep(0.4 * u, 1.2 * u, gap2)) * dashes * smoothstep(3.0, 7.0, spacing) * (1.0 - puddleMask);
-    col = mix(col, DUST * (0.7 + 0.8 * pulse + 0.5 * core), dust * 0.55 * (0.3 + 0.7 * inside));
+    // Design 080: the dust lies faint round the cards (the field shows out toward the pylons), and
+    // its pulse runs there only; lines too fine for the screen fade rather than alias.
+    float calm = fieldCalm(p, 110.0);
+    float dust = (1.0 - smoothstep(0.4 * u, 1.2 * u, gap2)) * dashes * smoothstep(3.0, 7.0, spacing) * (1.0 - puddleMask)
+      * (1.0 - 0.75 * calm) * smoothstep(1.0, 2.5, spacing / filterPixel);
+    col = mix(col, DUST * (0.7 + 0.8 * pulse * (1.0 - calm) + 0.5 * core), dust * 0.55 * (0.3 + 0.7 * inside));
   }
 
   // The aurora's wash over the whole marsh, drifting, strongest toward the far end.
@@ -613,7 +623,7 @@ void main() {
     charge += exp(-ahead * ahead) * exp(-hit.w * 1.1);
     flash += exp(-away * away / 7200.0) * exp(-hit.w * 4.5);
   }
-  float intensity = present * (0.2 * rim + 0.05 * sheen * (0.4 + rim)) + charge * 0.22 + flash * 0.5 + (charge + flash) * rim * 0.3;
+  float intensity = present * (0.2 * rim + 0.05 * sheen * (0.4 + rim)) + charge * 0.2 + flash * 0.3 + (charge + flash) * rim * 0.25;
   vec3 tint = mix(vec3(0.12, 0.55, 1.0), vec3(0.7, 0.9, 1.0), clamp(charge + flash, 0.0, 1.0) * 0.5);
   gl_FragColor = vec4(tint * intensity * 0.7, 1.0);
 ${OUTPUT}
@@ -671,9 +681,9 @@ export function magneticStormBoard({ three, material, terrainGrid, replaceGeomet
   const strikeAt = (period, phase, now) => {
     const t = clockAt(period, phase, now);
     const flash = Math.min(1, t / 0.012) * (1 - Math.min(1, Math.max(0, (t - 0.03) / 0.17)));
-    const flicker = 0.65 + 0.35 * (((t * 61) % 1) >= 0.5 ? 1 : 0);
+    // No strobe (design 080): one soft flash and its tail.
     const tail = 0.18 * Math.min(1, t / 0.03) * (1 - Math.min(1, Math.max(0, (t - 0.2) / 0.3)));
-    return flash * flicker + tail;
+    return flash * 0.85 + tail;
   };
   return {
     objects: [terrain, props, bolts, dome],

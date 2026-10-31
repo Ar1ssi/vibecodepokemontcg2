@@ -16,6 +16,8 @@
 // the mosaic band, the swirl), the rim wall, the walkway and the bridges; WATER one sheet at
 // WATER_LEVEL; PROPS the railings, the billboards and the towers (stadium-env-props).
 import {
+  FILTERING,
+  FOOTPRINTS,
   FULLSCREEN_VERTEX,
   NOISE,
   OUTPUT,
@@ -177,8 +179,8 @@ void main() {
 
 // The card art's colours (pixel samples, inverted through Neutral tone mapping).
 const PALETTE = /* glsl */ `
-const vec3 FLOOR = vec3(0.47, 0.57, 0.7);
-const vec3 FLOOR_PALE = vec3(0.555, 0.65, 0.756);
+const vec3 FLOOR = vec3(0.4, 0.49, 0.62);
+const vec3 FLOOR_PALE = vec3(0.47, 0.56, 0.68);
 const vec3 YELLOW = vec3(1.0, 0.677, 0.077);
 const vec3 YELLOW_PALE = vec3(1.1, 0.9, 0.24);
 const vec3 BLUE_BAND = vec3(0.142, 0.302, 0.618);
@@ -197,6 +199,8 @@ vec3 edgeHaze(vec3 col, vec2 uv) {
 export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
+${FOOTPRINTS}
+${FILTERING}
 ${VORONOI}
 ${REVEAL}
 ${PALETTE}
@@ -230,10 +234,15 @@ void main() {
   col = mix(col, FLOOR * 0.82, seam * 0.6);
   // The mosaic band round the rim: yellow tesserae, a few pale, pale grout between; a blue line in.
   float band = smoothstep(uStage.z - 48.0, uStage.z - 46.0, r) * (1.0 - smoothstep(uStage.z - 8.0, uStage.z - 6.0, r));
+  // Design 080: the tesserae show only where the screen can draw them and not round the cards; they
+  // fade to the mosaic's own even yellow, so the band and the swirl stay crisp shapes, not speckle.
+  float tiles = patternFade(pixelSize(p), 9.0) * (1.0 - 0.75 * fieldCalm(p, 60.0));
   vec4 tile = voronoiCell(p / 9.0);
+  vec3 mosaic = mix(YELLOW, YELLOW_PALE, 0.25);
   vec3 tessera = mix(YELLOW, YELLOW_PALE, step(0.7, tile.y)) * (0.9 + 0.2 * fract(tile.y * 9.0));
   tessera = mix(tessera, FLOOR_PALE * 1.1, (1.0 - smoothstep(0.05, 0.12, tile.x)) * 0.7);
-  col = mix(col, tessera, band);
+  tessera = mix(mosaic, tessera, tiles);
+  col = mix(col, tessera, band * 0.9);
   float blueLine = smoothstep(uStage.z - 58.0, uStage.z - 56.0, r) * (1.0 - smoothstep(uStage.z - 50.0, uStage.z - 48.0, r));
   col = mix(col, BLUE_BAND, blueLine);
   // The swirl at the middle: a yellow spiral of mosaic, as the art's.
@@ -247,8 +256,10 @@ void main() {
   float eyeShape = smoothstep(-0.8, 0.8, eyeEdge);
   float swirl = max(arms, eyeShape);
   float swirlEdge = max(min(armEdge, armEnds), eyeEdge);
-  col = mix(col, BLUE_BAND, (1.0 - swirl) * smoothstep(-6.0, -4.5, swirlEdge) * (1.0 - smoothstep(-2.0, -0.8, swirlEdge)) * 0.9);
-  col = mix(col, tessera, swirl * 0.95);
+  // Design 080: the swirl under the Actives is an inlay a few steps quieter than the rim's band, a
+  // pale yellow on the pale blue with a thin blue edge, so the eye keeps the cards over it.
+  col = mix(col, BLUE_BAND, (1.0 - swirl) * smoothstep(-6.0, -4.5, swirlEdge) * (1.0 - smoothstep(-2.0, -0.8, swirlEdge)) * 0.5);
+  col = mix(col, mix(tessera, FLOOR_PALE, 0.35), swirl * 0.6);
 
   // The rim wall: blue panels, dark joints.
   vec3 rim = mix(RIM_DARK, RIM, 0.5 + 0.5 * step(0.5, fract(angle * 40.0)));
@@ -327,7 +338,7 @@ void main() {
   col *= mix(0.75, 1.0, smoothstep(uStage.z, uStage.z + 24.0, r));
   float wallDist = r < uStage.w ? min(r - uStage.z, uStage.w - r) : r - uWalkOut;
   float lap = 0.5 + 0.5 * sin(t * 0.9 + r * 0.05 + 4.0 * gnoise(p / 40.0));
-  float foam = (1.0 - smoothstep(1.0, 3.0 + 3.0 * lap, wallDist)) * (0.55 + 0.45 * gnoise(p / 5.0));
+  float foam = (1.0 - smoothstep(1.0, 3.0 + 3.0 * lap, wallDist)) * (0.65 + 0.35 * gnoise(p / 9.0));
   // Caustics: bright net of light on the bed, drifting.
   vec4 net = voronoiCell(p / 34.0 + vec2(t * 0.03, -t * 0.02));
   float caustic = (1.0 - smoothstep(0.0, 0.12, net.x)) * (1.0 - smoothstep(0.0, 2.4, wallDist / 26.0));
@@ -337,7 +348,7 @@ void main() {
   col *= 0.9 + 0.2 * swell;
   vec4 cell = voronoiCell((p - vec2(t * 9.0, t * 4.0)) / vec2(20.0, 8.0));
   float glint = (1.0 - smoothstep(0.1, 0.26, length(cell.zw * vec2(0.6, 1.6)))) * step(0.62, fract(cell.y * 7.0));
-  col = mix(col, vec3(0.95, 1.0, 1.05), glint * (0.5 + 0.5 * sin(t * 2.0 + cell.y * 30.0)) * 0.7);
+  col = mix(col, vec3(0.95, 1.0, 1.05), glint * (0.6 + 0.4 * sin(t * 0.9 + cell.y * 30.0)) * 0.35);
   col = mix(col, vec3(0.97, 1.0, 1.03), foam * 0.8);
   col = edgeHaze(col, vUv);
   vec3 spark = vec3(1.1, 0.95, 0.4);
@@ -354,19 +365,30 @@ const POST = [0.6, 0.66, 0.76, 0.4];
 const FRAME = [0.16, 0.22, 0.36, 0.5];
 const SCREEN_YELLOW = [1.0, 0.82, 0.25, 2.25];
 const SCREEN_RED = [1.0, 0.36, 0.28, 2.25];
-const SCREEN_BLUE = [0.36, 0.58, 1.0, 2.25];
-const SCREEN_PALE = [1.0, 0.97, 0.75, 2.25];
-const SCREEN_CREAM = [1.0, 0.93, 0.62, 2.25];
-const SCREEN_ORANGE = [1.0, 0.55, 0.16, 2.25];
-const SCREEN_GREEN = [0.5, 0.82, 0.36, 2.25];
 const SCREEN_SKY = [0.55, 0.8, 1.0, 2.25];
+const SCREEN_NAVY = [0.14, 0.2, 0.42, 2.15];
+const SCREEN_PINK = [1.0, 0.56, 0.72, 2.2];
+const SCREEN_WHITE = [0.98, 0.98, 0.96, 2.3];
+const SCREEN_INK = [0.1, 0.11, 0.16, 2.05];
 const GLASS = [0.1, 0.2, 0.58, 0.9];
 const GLASS_LIT = [0.34, 0.54, 0.9, 0.9];
 const BASE = [0.55, 0.62, 0.74, 0.3];
 
+/** A disc (or the arc a0..a1 of one) laid on a billboard's screen at (s, h), `push` px proud of it. */
+const screenDisc = (props, frontAt, [s, h], r, color, push, a0 = 0, a1 = 2 * Math.PI) => {
+  const steps = Math.max(6, Math.round(((a1 - a0) / (2 * Math.PI)) * 32));
+  const centre = frontAt(s, h, push);
+  const rimAt = (a) => frontAt(s + Math.cos(a) * r, h + Math.sin(a) * r, push);
+  for (let k = 0; k < steps; k += 1) {
+    props.triangle(centre, rimAt(a0 + ((a1 - a0) * k) / steps), rimAt(a0 + ((a1 - a0) * (k + 1)) / steps), color);
+  }
+};
+
 /**
  * A billboard: a dark frame on two legs at the walkway's outer edge, leaning back away from the stage,
- * its screen a bright panel of the art's yellow, red and blue blocks (a big shape on a field).
+ * its screen a bright field with one bold icon you can name from across the water (design 080: the
+ * art's screens show Pokémon; colour blocks standing in for them read as noise): a Poké Ball on sky
+ * blue, a lightning bolt on navy (the electric city), a play button on pink (a stream).
  */
 const billboard = (props, board, centre, deck, u) => {
   const out = [Math.cos(board.angle), Math.sin(board.angle)];
@@ -383,42 +405,34 @@ const billboard = (props, board, centre, deck, u) => {
   for (const s of [-halfW * 0.6, halfW * 0.6]) props.tube([[foot[0] + along[0] * s, foot[1] + along[1] * s, deck - 1], at(s, board.height * 0.3)], 2.6 * u, FRAME, { sides: 6 });
   // The frame's back and face.
   props.quad(at(halfW, 0), at(-halfW, 0), at(-halfW, board.height), at(halfW, board.height), FRAME);
-  // The art's screens, each a painted field with a creature on it: golden with an orange splash and
-  // a red figure, cream with a green one, or sky blue with pale paper shapes.
   const variant = board.index % 3;
-  const field = [SCREEN_YELLOW, SCREEN_CREAM, SCREEN_SKY][variant];
+  const field = [SCREEN_SKY, SCREEN_NAVY, SCREEN_PINK][variant];
   const inset = 5 * u;
   props.quad(frontAt(-halfW + inset, inset, 1.5), frontAt(halfW - inset, inset, 1.5), frontAt(halfW - inset, board.height - inset, 1.5), frontAt(-halfW + inset, board.height - inset, 1.5), field);
-  // The art's bright Pokémon art on it, abstracted: a big red-orange figure, a pale highlight and a
-  // small dark accent, each a slanted block placed by the board's seed.
-  const blocks = [
-    [
-      [0.03, 0.4, 0.34, 0.55, SCREEN_ORANGE],
-      [0.12 + 0.12 * board.seed, 0.12, 0.28, 0.5, SCREEN_RED],
-      [0.6, 0.55, 0.12, 0.3, SCREEN_PALE],
-      [0.78, 0.15, 0.14, 0.25, SCREEN_ORANGE],
-    ],
-    [
-      [0.04, 0.5, 0.3, 0.45, SCREEN_YELLOW],
-      [0.38 + 0.08 * board.seed, 0.14, 0.26, 0.62, SCREEN_GREEN],
-      [0.74, 0.3, 0.2, 0.5, SCREEN_PALE],
-      [0.46 + 0.08 * board.seed, 0.62, 0.1, 0.16, SCREEN_RED],
-    ],
-    [
-      [0.06, 0.2, 0.3, 0.6, SCREEN_PALE],
-      [0.5, 0.3, 0.2, 0.55, SCREEN_BLUE],
-      [0.74, 0.18, 0.18, 0.4, SCREEN_YELLOW],
-      [0.28 + 0.1 * board.seed, 0.68, 0.14, 0.2, SCREEN_RED],
-    ],
-  ][variant];
-  for (const [left, bottom, width, height, color] of blocks) {
-    const s0 = -halfW + inset + (board.width - 2 * inset) * left;
-    const s1 = Math.min(halfW - inset, s0 + (board.width - 2 * inset) * width);
-    const h0 = inset + (board.height - 2 * inset) * bottom;
-    const h1 = Math.min(board.height - inset, h0 + (board.height - 2 * inset) * height);
-    const slant = (s1 - s0) * 0.15;
-    props.quad(frontAt(s0, h0, 2), frontAt(s1, h0 + slant * 0.4, 2), frontAt(s1 - slant, h1, 2), frontAt(s0 + slant * 0.3, h1, 2), color);
+  const mid = [0, board.height / 2];
+  const size = (board.height - 2 * inset) * 0.8;
+  if (variant === 0) {
+    // A Poké Ball: red over white, a dark band, a white button in a dark ring.
+    const r = size / 2;
+    screenDisc(props, frontAt, mid, r, SCREEN_RED, 2.1, 0, Math.PI);
+    screenDisc(props, frontAt, mid, r, SCREEN_WHITE, 2.1, Math.PI, 2 * Math.PI);
+    props.quad(frontAt(-r, mid[1] - r * 0.09, 2.7), frontAt(r, mid[1] - r * 0.09, 2.7), frontAt(r, mid[1] + r * 0.09, 2.7), frontAt(-r, mid[1] + r * 0.09, 2.7), SCREEN_INK);
+    screenDisc(props, frontAt, mid, r * 0.32, SCREEN_INK, 3.3);
+    screenDisc(props, frontAt, mid, r * 0.2, SCREEN_WHITE, 3.9);
+    return;
   }
+  // The icon's own frame: x across the screen, y up it, both 0..1 over a square `size` wide.
+  const icon = (x, y) => [(x - 0.5) * size, mid[1] + (y - 0.5) * size];
+  const on = ([x, y], push = 2.1) => frontAt(...icon(x, y), push);
+  if (variant === 1) {
+    // A lightning bolt in the electric city's yellow: a slanted bar, then a point striking down.
+    props.quad(on([0.3, 0.5]), on([0.56, 0.5]), on([0.78, 1.0]), on([0.52, 1.0]), SCREEN_YELLOW);
+    props.triangle(on([0.3, 0.0]), on([0.74, 0.56]), on([0.34, 0.56]), SCREEN_YELLOW);
+    return;
+  }
+  // A play button: a white triangle in a dark disc.
+  screenDisc(props, frontAt, mid, size * 0.42, SCREEN_INK, 2.1);
+  props.triangle(on([0.37, 0.27], 2.7), on([0.71, 0.5], 2.7), on([0.37, 0.73], 2.7), SCREEN_WHITE);
 };
 
 /**

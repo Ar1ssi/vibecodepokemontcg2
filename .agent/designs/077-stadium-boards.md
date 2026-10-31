@@ -501,6 +501,9 @@ particles: { count, vertex, fragment } | null, accent: [r, g, b] }`.
     grate band and a light strip, columns of light on the floor, three green-lit screens floating
     over the far side.
 
+Design 080 (2026-10-31) revised all 25 boards for playability (calm field round the cards, no fake text,
+speckle or busy motion); where its § Per-board critique differs from the descriptions above, 080 is current.
+
 ### Board checklist — lessons from the first nine boards (every new board passes it)
 - Colours are the card art's pixel samples (`sample.py` region median and percentiles), inverted
   through Neutral tone mapping (`inv.py`) before they go in a shader.

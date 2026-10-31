@@ -16,6 +16,8 @@
 // paints the tiles, the border, the emblem, the rug, the lamps' pools, the ceiling panels' reflections
 // and the round pieces' shadows; PROPS the walls, the counter and the furniture (stadium-env-props).
 import {
+  FILTERING,
+  FOOTPRINTS,
   FULLSCREEN_VERTEX,
   NOISE,
   OUTPUT,
@@ -232,13 +234,16 @@ void main() {
 // The games' lobby colours (pixel samples of Let's Go's and Brilliant Diamond's, inverted through Neutral
 // tone mapping), the tiles a shade under the games' so a card's white border keeps its edge.
 const PALETTE = /* glsl */ `
-const vec3 FLOOR_A = vec3(0.957, 0.855, 0.657);
-const vec3 FLOOR_B = vec3(0.871, 0.697, 0.482);
+// Design 080: the cream tile a step deeper still (the brightest floor colour sat at card white).
+const vec3 FLOOR_A = vec3(0.86, 0.765, 0.585);
+const vec3 FLOOR_B = vec3(0.82, 0.655, 0.452);
 const vec3 JOINT = vec3(0.644, 0.474, 0.302);
 const vec3 BORDER_ORANGE = vec3(0.858, 0.348, 0.142);
 const vec3 BORDER_LINE = vec3(1.164, 1.08, 0.922);
-const vec3 EMBLEM_ORANGE = vec3(1.008, 0.321, 0.107);
-const vec3 EMBLEM_WHITE = vec3(1.295, 1.27, 1.199);
+// Design 080: the floor's Poke Ball lies under both Actives: a soft coral over a cream a step under
+// card white, so the cards' borders keep their edges over it.
+const vec3 EMBLEM_ORANGE = vec3(0.86, 0.36, 0.17);
+const vec3 EMBLEM_WHITE = vec3(0.98, 0.93, 0.83);
 const vec3 EMBLEM_BAND = vec3(0.3, 0.1, 0.07);
 const vec3 RUG_RED = vec3(0.473, 0.076, 0.066);
 const vec3 RUG_DARK = vec3(0.223, 0.053, 0.053);
@@ -252,6 +257,8 @@ const vec3 SHADE_TINT = vec3(0.7, 0.62, 0.66);
 export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
+${FOOTPRINTS}
+${FILTERING}
 ${REVEAL}
 ${EDGE_HAZE}
 ${PALETTE}
@@ -280,6 +287,7 @@ vec4 floorBall(vec2 rel, float R) {
 }
 void main() {
   vec2 p = vPos;
+  filterPixel = pixelSize(p);
   if (revealBurned(p) * exitKeep(p) < 0.5) discard;
   vec4 field = texture2D(uField, vUv);
   vec4 light = texture2D(uLight, vUv);
@@ -288,10 +296,10 @@ void main() {
   vec3 sun = normalize(uSun);
   // Outside the walls: a cream sidewalk edged in a tan kerb, then dark asphalt.
   float past = sd - 16.0 * u;
-  vec3 col = ASPHALT * (0.9 + 0.2 * fbm3(p / 90.0)) * (0.95 + 0.1 * gnoise(p / 3.0));
+  vec3 col = ASPHALT * (0.9 + 0.2 * fbm3(p / 90.0)) * (0.95 + 0.1 * grain(p, 3.0));
   if (past > 0.0 && past < 44.0 * u) {
     vec2 slab = floor(p / (36.0 * u));
-    vec3 walk = WALK * (0.92 + 0.14 * hash12(slab)) * (0.96 + 0.08 * gnoise(p / 3.0));
+    vec3 walk = WALK * (0.92 + 0.14 * hash12(slab)) * (0.96 + 0.08 * grain(p, 3.0));
     col = mix(walk, KERB, 1.0 - smoothstep(0.5, 1.5, abs(past - 42.0 * u) - 2.0 * u));
   }
 
@@ -300,7 +308,9 @@ void main() {
     float tile = TILE_SIZE_PLACEHOLDER * u;
     vec2 cell = floor(p / tile);
     float checker = mod(cell.x + cell.y, 2.0);
-    vec3 floorCol = mix(FLOOR_A, FLOOR_B, checker * 0.72) * (0.96 + 0.07 * hash12(cell + 3.0));
+    // Design 080: round the cards the checker and its joints soften, so the squares never run under them.
+    float calm = fieldCalm(p, 110.0);
+    vec3 floorCol = mix(FLOOR_A, FLOOR_B, checker * mix(0.72, 0.35, calm)) * (0.96 + 0.07 * hash12(cell + 3.0));
     vec2 inCell = abs(fract(p / tile) - 0.5);
     float jointD = (0.5 - max(inCell.x, inCell.y)) * tile;
     // An orange border along the walls, a pale line inside it.
@@ -323,12 +333,12 @@ void main() {
         vec3 rug = mix(RUG_RED, RUG_DARK, smoothstep(0.35, 0.65, diamond));
         rug = mix(rug, RUG_CREAM, step(0.86, m) * step(m, 0.915));
         rug = mix(rug, RUG_DARK, step(0.94, m));
-        floorCol = rug * (0.94 + 0.12 * gnoise(p / 2.0));
+        floorCol = rug * (0.94 + 0.12 * grain(p, 2.0));
         jointD = 99.0;
       }
     }
-    floorCol = mix(floorCol, JOINT, (1.0 - smoothstep(0.4, 1.3, jointD)) * 0.75);
-    floorCol *= 0.97 + 0.06 * gnoise(p / 5.0);
+    floorCol = mix(floorCol, JOINT, (1.0 - smoothstep(0.4, 1.3, jointD)) * mix(0.75, 0.42, calm));
+    floorCol *= 0.97 + 0.06 * grain(p, 5.0);
     col = floorCol;
 
     // The ceiling lamps' soft pools and the lamps' panels mirrored in the polished tiles.

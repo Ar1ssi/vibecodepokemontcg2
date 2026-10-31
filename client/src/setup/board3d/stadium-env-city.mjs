@@ -14,6 +14,7 @@
 // windows; PROPS is the parapet, the hut and the roof's machinery; BOARDS the two billboards;
 // BEAMS the searchlights.
 import {
+  FILTERING,
   FULLSCREEN_VERTEX,
   NOISE,
   OUTPUT,
@@ -456,18 +457,28 @@ vec3 windowAt(float along, float up, float seed) {
   roll = mix(roll, hash12(cell + seed * 131.0 + hour * 7.13), restless);
   return vec3(pane, step(roll, 0.2) * (0.6 + 0.5 * hash12(cell * 1.7 + seed)), step(0.78, hash12(cell * 3.1 + seed)));
 }
+// Design 080: 1 where a window spans enough screen px to draw, easing to 0 where it would alias into
+// speckle (a facade seen edge-on); main sets it from the facade's own derivatives, first thing.
+float windowFade = 1.0;
+float windowFadeFor(vec3 world) {
+  return smoothstep(1.5, 4.0, 30.0 / max(length(fwidth(world)), 0.0001));
+}
 vec3 facadeColor(vec3 wall, float along, float up, float seed) {
   vec3 w = windowAt(along, up, seed);
   vec3 lamp = mix(vec3(0.82, 1.02, 0.5), vec3(0.95, 1.05, 0.62), w.z);
   // Dark glass only a little darker than the wall, as the art's, so the facade doesn't read as a checkerboard.
-  vec3 glass = mix(wall * 0.55 + vec3(0.004, 0.006, 0.012), lamp, w.y);
-  return mix(wall, glass, w.x);
+  vec3 darkGlass = wall * 0.55 + vec3(0.004, 0.006, 0.012);
+  vec3 glass = mix(darkGlass, lamp, w.y);
+  // Too small to draw: the facade's mean (about a third of it glass, a fifth of that lit).
+  vec3 mean = mix(wall, mix(darkGlass, vec3(0.85, 1.03, 0.53), 0.17), 0.35);
+  return mix(mean, mix(wall, glass, w.x), windowFade);
 }
 `;
 
 export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
+${FILTERING}
 ${REVEAL}
 ${ROOF}
 ${WINDOWS}
@@ -476,6 +487,8 @@ varying vec2 vUv;
 varying float vHeight;
 void main() {
   vec2 p = vPos;
+  filterPixel = pixelSize(p);
+  windowFade = windowFadeFor(vec3(p, vHeight));
   if (revealBurned(p) * exitKeep(p) < 0.5) discard;
   vec4 field = texture2D(uField, vUv);
   vec4 light = texture2D(uLight, vUv);
@@ -493,7 +506,7 @@ void main() {
     vec2 slab = abs(mod(p + 150.0, 300.0) - 150.0);
     float slabTone = 0.95 + 0.1 * hash12(floor((p + 150.0) / 300.0));
     col = vec3(0.11, 0.125, 0.15) * (0.94 + 0.12 * fbm3(p / 90.0)) * slabTone;
-    col *= 0.96 + 0.06 * gnoise(p / 4.0);
+    col *= 0.96 + 0.06 * grain(p, 4.0);
     col *= mix(0.85, 1.12, smoothstep(-1.0, 1.0, (p.y - uRoof.y) / uRoof.w));
     col = mix(col, vec3(0.04, 0.042, 0.05), (1.0 - smoothstep(0.8, 2.0, min(slab.x, slab.y))) * 0.15);
     col = mix(col, col * 0.78, smoothstep(0.74, 0.8, fbm3(p / 70.0 + 9.0)) * 0.7);
@@ -534,6 +547,7 @@ varying vec4 vColor;
 varying vec3 vNormal;
 varying vec3 vWorld;
 void main() {
+  windowFade = windowFadeFor(vWorld);
   if (revealBurned(vWorld.xy) * exitKeep(vWorld.xy) < 0.5) discard;
   vec3 n = normalize(gl_FrontFacing ? vNormal : -vNormal);
   float isRound = step(1.0, vColor.w);
@@ -592,18 +606,6 @@ float stroke(vec2 uv, vec2 a, vec2 b, float width) {
   float t = clamp(dot(uv - a, ab) / dot(ab, ab), 0.0, 1.0);
   return length(uv - a - ab * t) - width * (0.85 + 0.3 * gnoise(uv * 40.0));
 }
-// A line of printed words at heights y0..y1 from x0 to x1 (board uv): bold words as solid rounded
-// blocks of different lengths (letter detail smears into a barcode at a board's size on screen).
-float printed(vec2 uv, float y0, float y1, float x0, float x1, float seed) {
-  if (uv.y < y0 || uv.y > y1 || uv.x < x0 || uv.x > x1) return 0.0;
-  float pitch = (y1 - y0) * 4.0;
-  float word = floor((uv.x - x0) / pitch);
-  float wordLength = pitch * (0.45 + 0.4 * hash12(vec2(word, seed)));
-  float inWord = mod(uv.x - x0, pitch);
-  float radius = (y1 - y0) * 0.5;
-  vec2 rel = vec2(max(abs(inWord - wordLength * 0.5) - (wordLength * 0.5 - radius), 0.0), uv.y - (y0 + radius));
-  return 1.0 - smoothstep(radius * 0.85, radius, length(rel));
-}
 void main() {
   if (revealBurned(vPos) * exitKeep(vPos) < 0.5) discard;
   vec2 uv = vBoardUv;
@@ -612,12 +614,11 @@ void main() {
   vec3 paint;
   float sprayed;
   if (vBoard < 1.5) {
-    // The art's right board: big white and grey checks, two lines of black print across its middle,
-    // Team Skull's angry face sprayed over it in red (horns, slanted eyes, a wide grin), a "w"
-    // scribbled beside it.
+    // The art's right board: big white and grey checks, Team Skull's angry face sprayed over it in
+    // red (horns, slanted eyes, a wide grin), a "w" scribbled beside it. (Design 080: no blocks
+    // standing in for print; they read as fake text.)
     vec2 check = floor(uv * vec2(6.0, 4.0));
     col = mix(vec3(0.95, 0.96, 0.97), vec3(0.58, 0.62, 0.68), mod(check.x + check.y, 2.0));
-    col = mix(col, vec3(0.05), max(printed(uv, 0.52, 0.6, 0.16, 0.78, 1.0), printed(uv, 0.36, 0.43, 0.3, 0.66, 2.0)));
     float grin = abs(length((q - vec2(-0.05, 0.12)) * vec2(1.0, 1.25)) - 0.34) - 0.022;
     grin = max(grin, q.y - 0.02);
     float horns = min(stroke(q, vec2(-0.32, 0.05), vec2(-0.18, 0.42), 0.022), stroke(q, vec2(-0.18, 0.42), vec2(-0.08, 0.12), 0.022));
@@ -629,15 +630,14 @@ void main() {
     paint = vec3(0.82, 0.05, 0.06);
   } else {
     // The art's left board: dark navy-violet, a pale blue sky band along its top under a white wave,
-    // a white crescent logo and big pale lettering below; a pink X sprayed across it.
+    // a big white crescent logo; a pink X sprayed across it.
     col = mix(vec3(0.03, 0.03, 0.12), vec3(0.1, 0.05, 0.22), uv.x);
     col = mix(col, vec3(0.45, 0.62, 0.8), step(0.8 + 0.05 * sin(uv.x * 7.0), uv.y));
     float wave = abs(uv.y - 0.8 - 0.05 * sin(uv.x * 7.0)) - 0.022;
     col = mix(col, vec3(0.9, 0.93, 0.98), 1.0 - smoothstep(0.0, 0.01, wave));
-    vec2 logoAt = (uv - vec2(0.17, 0.38)) * vec2(1.6, 1.0);
-    float crescent = max(length(logoAt) - 0.13, -(length(logoAt - vec2(0.06, 0.02)) - 0.09));
+    vec2 logoAt = (uv - vec2(0.5, 0.4)) * vec2(1.6, 1.0);
+    float crescent = max(length(logoAt) - 0.26, -(length(logoAt - vec2(0.11, 0.04)) - 0.19));
     col = mix(col, vec3(0.92, 0.94, 0.99), 1.0 - smoothstep(0.0, 0.012, crescent));
-    col = mix(col, vec3(0.86, 0.88, 0.96), printed(uv, 0.24, 0.5, 0.38, 0.92, 7.0));
     float x = min(stroke(q, vec2(-0.4, -0.34), vec2(0.4, 0.34), 0.045), stroke(q, vec2(-0.4, 0.34), vec2(0.4, -0.34), 0.045));
     sprayed = (1.0 - smoothstep(-0.004, 0.02, x)) * 0.85;
     paint = vec3(0.78, 0.32, 0.82);
@@ -686,7 +686,8 @@ void main() {
   float shaft = across * across * 0.45 + core;
   float fade = smoothstep(0.0, 0.04, vBeam.x) * (1.0 - smoothstep(0.55, 1.0, vBeam.x));
   float shown = smoothstep(0.6, 1.0, uReveal) * (1.0 - uExit);
-  gl_FragColor = vec4(vec3(0.62, 0.74, 1.0) * shaft * fade * 0.6 * shown, 1.0);
+  // Design 080: a haze-thin shaft (at 0.6 the beams' X was the brightest thing in the top-down view).
+  gl_FragColor = vec4(vec3(0.62, 0.74, 1.0) * shaft * fade * 0.32 * shown, 1.0);
 ${OUTPUT}
 }
 `;

@@ -15,6 +15,8 @@
 // dappled shadow and the glow round the roots; PROPS the trunk, roots, crown, small tree, ferns
 // (stadium-env-props); MOTES the golden specks rising.
 import {
+  FILTERING,
+  FOOTPRINTS,
   FULLSCREEN_VERTEX,
   NOISE,
   OUTPUT,
@@ -35,7 +37,7 @@ export const GRAND_SUN = Object.freeze([-0.42, 0.28, 0.86]);
 export const MAX_BALLS = 16;
 export const MAX_ROOTS = 8;
 export const MAX_LEAVES = 22;
-const MOTE_COUNT = 90;
+const MOTE_COUNT = 60;
 /** The trunk's radius at its foot and at its fork, the fork's height, the crown's height (card-scale px). */
 export const TRUNK = Object.freeze({ foot: 70, top: 46, fork: 210, crown: 290 });
 
@@ -78,15 +80,24 @@ export function grandSpots(layout) {
   }
   // A smaller tree off the far right, ferns and broad leaves clear of everything.
   const small = { x: Math.min(scene.x + scene.w - 90 * u, centre.x + table.w * 0.44), y: Math.min(handEnd + 10 * u, scene.y + scene.h - 120 * u), r: 62 * u, h: 150 * u };
+  // Design 080: the broad leaves grow in clumps, four or five fanning out from one root, as ferns do;
+  // single leaves strewn at random read as litter thrown on the lawn.
   const leaves = [];
   for (let k = 0; k < 90 && leaves.length < MAX_LEAVES; k += 1) {
     const roll = (salt) => hash(k, 8, salt);
-    const lx = scene.x + 40 * u + roll(1) * (scene.w - 80 * u);
-    const ly = scene.y + 40 * u + roll(2) * (scene.h - 80 * u);
-    const len = (78 + 50 * roll(3)) * u;
-    if (!ctx.clear(lx, ly, len * 0.7, 12 * u)) continue;
-    if (Math.hypot(lx - x, ly - y) < tree.foot + 40 * u) continue;
-    leaves.push({ x: lx, y: ly, yaw: roll(4) * 6.28, len, wid: len * 0.42, seed: roll(5) });
+    const cx = scene.x + 40 * u + roll(1) * (scene.w - 80 * u);
+    const cy = scene.y + 40 * u + roll(2) * (scene.h - 80 * u);
+    const len = (66 + 36 * roll(3)) * u;
+    if (!ctx.clear(cx, cy, len * 1.15, 12 * u)) continue;
+    if (Math.hypot(cx - x, cy - y) < tree.foot + 40 * u + len) continue;
+    if (leaves.some((leaf) => Math.hypot(cx - leaf.x, cy - leaf.y) < len * 2.4)) continue;
+    const fronds = 4 + Math.floor(roll(6) * 2);
+    const turn = roll(4) * 6.28;
+    for (let f = 0; f < fronds && leaves.length < MAX_LEAVES; f += 1) {
+      const flen = len * (0.75 + 0.35 * hash(k, f, 10));
+      const yaw = turn + (f / fronds) * 6.28 + (hash(k, f, 9) - 0.5) * 0.5;
+      leaves.push({ x: cx, y: cy, yaw, len: flen, wid: flen * 0.42, seed: hash(k, f, 11) });
+    }
   }
   return { ...ctx, handEnd, tree, roots, balls, small, leaves };
 }
@@ -145,6 +156,8 @@ const vec3 SHADE_TINT = vec3(0.5, 0.66, 0.82);
 export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
+${FOOTPRINTS}
+${FILTERING}
 ${VORONOI}
 ${REVEAL}
 ${BLADES}
@@ -156,6 +169,7 @@ varying vec2 vUv;
 varying float vGrowth;
 void main() {
   vec2 p = vPos;
+  filterPixel = pixelSize(p);
   if (revealBurned(p) * exitKeep(p) < 0.5) discard;
   vec4 field = texture2D(uField, vUv);
   float t = uTime;
@@ -167,20 +181,27 @@ void main() {
   vec3 col = mix(MOSS_DARK * 1.1, MOSS, 0.4 + 0.6 * cushion);
   col = mix(col, EARTH_DARK * 1.4, (1.0 - cushion) * smoothstep(0.62, 0.78, fbm3(p / 70.0 + 8.0)) * 0.55);
   col *= 0.88 + 0.24 * fbm3(p / 24.0 + 5.0);
-  // Leaf litter: small brown flakes lying flat among it, each a shade of its own.
+  // Leaf litter: small brown flakes lying flat among it, each a shade of its own. Design 080: litter,
+  // tufts and clover thin out round the cards (moss cushions stay), and none draws finer than the
+  // screen can show.
+  float calm = fieldCalm(p, 110.0);
   vec4 litter = voronoiCell(p / (6.0 * u) + 9.1);
-  col = mix(col, EARTH * (0.7 + 0.7 * fract(litter.y * 11.0)), (1.0 - smoothstep(0.1, 0.2, length(litter.zw * vec2(1.0, 1.7)))) * step(fract(litter.y * 7.7), 0.1));
+  col = mix(col, EARTH * (0.7 + 0.7 * fract(litter.y * 11.0)), (1.0 - smoothstep(0.1, 0.2, length(litter.zw * vec2(1.0, 1.7))))
+    * step(fract(litter.y * 7.7), 0.1) * (1.0 - calm) * patternFade(filterPixel, 6.0 * u));
   vec4 tuft = voronoiCell(p / (11.0 * u) + 1.1);
   vec2 blades = bladeFan(-tuft.zw * 11.0 * u, tuft.y, 10.0 * u);
-  col = mix(col, mix(MOSS_DARK, GRASS, blades.y), blades.x * step(fract(tuft.y * 23.1), 0.5 + 0.3 * cushion) * 0.9);
+  col = mix(col, mix(MOSS_DARK, GRASS, blades.y), blades.x * step(fract(tuft.y * 23.1), 0.5 + 0.3 * cushion) * 0.9
+    * (1.0 - 0.6 * calm) * patternFade(filterPixel, 11.0 * u));
   // Clover: small round leaf triples, paler.
   vec4 clover = voronoiCell(p / (7.5 * u) + 4.4);
-  col = mix(col, GRASS * 1.15, (1.0 - smoothstep(0.1, 0.22, length(clover.zw))) * step(fract(clover.y * 13.7), 0.14) * 0.8);
+  col = mix(col, GRASS * 1.15, (1.0 - smoothstep(0.1, 0.22, length(clover.zw))) * step(fract(clover.y * 13.7), 0.14) * 0.8
+    * (1.0 - 0.7 * calm) * patternFade(filterPixel, 7.5 * u));
 
   // The light: the sun's patches through the crown, dappled where it thins; the shade is cool and deep.
   float shade = crownShade(p, sun);
-  float dapple = smoothstep(0.35, 0.65, fbm3((p - vec2(t * 3.0, 0.0)) / 20.0 + 2.0));
-  shade *= mix(1.0, 0.55 + 0.45 * dapple, 0.85) * vGrowth;
+  // The dapple drifts slowly in broad flecks; over the cards it is faint.
+  float dapple = smoothstep(0.35, 0.65, fbm3((p - vec2(t * 1.2, 0.0)) / 34.0 + 2.0));
+  shade *= mix(1.0, 0.55 + 0.45 * dapple, 0.85 * (1.0 - 0.6 * calm)) * vGrowth;
   col = mix(col * 1.12, col * SHADE_TINT * 0.82, shade * 0.85);
 
   // The glow of the roots and the trunk's foot, golden on the ground near them.
@@ -195,7 +216,7 @@ void main() {
     glow = max(glow, exp(-pow(d / (18.0 * u + 12.0 * u * (1.0 - s)), 2.0)) * (1.0 - 0.6 * s));
   }
   glow = max(glow, exp(-pow(distance(p, uTree.xy) / (uTree.z * 2.0), 2.0)) * 0.9);
-  col += GLOW * 0.2 * glow * (0.85 + 0.15 * sin(t * 0.9 + p.x * 0.02));
+  col += GLOW * 0.2 * glow * (0.95 + 0.05 * sin(t * 0.6 + p.x * 0.02));
 
   col = edgeHaze(col, vUv, 0.55);
   vec3 spark = vec3(0.9, 1.0, 0.6);
@@ -362,6 +383,7 @@ export const PROP_FRAGMENT = propFragment({ light: PROP_LIGHT, reveal: 'vec3(0.9
 export const MOTE_VERTEX = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
+${FOOTPRINTS}
 ${REVEAL}
 ${GRAND}
 uniform float uFocal;
@@ -379,7 +401,9 @@ void main() {
   vec4 mv = modelViewMatrix * vec4(pos, 1.0);
   gl_Position = projectionMatrix * mv;
   vLife = life;
-  gl_PointSize = max((1.4 + 1.5 * aSeed.z) * uFocal / -mv.z, 2.0) * 2.4 * revealBurned(pos.xy) * exitKeep(pos.xy);
+  // Design 080: the motes rise round the roots, none beside a card.
+  float shown = revealBurned(pos.xy) * exitKeep(pos.xy) * (1.0 - fieldCalm(pos.xy, 60.0));
+  gl_PointSize = max((1.4 + 1.5 * aSeed.z) * uFocal / -mv.z, 2.0) * 2.4 * shown;
 }
 `;
 

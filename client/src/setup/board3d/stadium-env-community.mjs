@@ -16,7 +16,9 @@
 // sheet of water; PROPS the hall, tent, kiosks, flag, benches, trees and boulders
 // (stadium-env-props); MIST drifts off the pool.
 import {
+  FILTERING,
   FLOW_STREAKS,
+  FOOTPRINTS,
   FULLSCREEN_VERTEX,
   NOISE,
   OUTPUT,
@@ -183,7 +185,8 @@ const PALETTE = /* glsl */ `
 const vec3 GRASS = vec3(0.075, 0.25, 0.095);
 const vec3 GRASS_DARK = vec3(0.04, 0.14, 0.07);
 const vec3 GRASS_LIT = vec3(0.15, 0.38, 0.12);
-const vec3 PLAZA = vec3(0.592, 0.618, 0.684);
+// Design 080: a step under the art's pale square, so white card borders keep their edge.
+const vec3 PLAZA = vec3(0.462, 0.482, 0.534);
 const vec3 PLAZA_SHADE = vec3(0.345, 0.411, 0.531);
 const vec3 ROCK_LIT = vec3(0.644, 0.474, 0.432);
 const vec3 ROCK_MID = vec3(0.345, 0.294, 0.392);
@@ -198,6 +201,8 @@ const vec3 SHADE_TINT = vec3(0.6, 0.7, 0.98);
 export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
+${FOOTPRINTS}
+${FILTERING}
 ${VORONOI}
 ${REVEAL}
 ${PAVING}
@@ -212,6 +217,7 @@ varying vec2 vUv;
 varying float vGrowth;
 void main() {
   vec2 p = vPos;
+  filterPixel = pixelSize(p);
   if (revealBurned(p) * exitKeep(p) < 0.5) discard;
   vec4 field = texture2D(uField, vUv);
   vec4 light = texture2D(uLight, vUv);
@@ -236,7 +242,7 @@ void main() {
     vec3 slab = paving(p, vec2(132.0, 100.0) * uUnit, 0.5);
     vec3 stone = mix(PLAZA * 0.9, PLAZA * 1.05, slab.y);
     stone *= 0.94 + 0.12 * fbm3(p / 26.0 + slab.y * 9.0);
-    stone *= 0.97 + 0.06 * gnoise(p / 3.4);
+    stone *= 0.97 + 0.06 * grain(p, 3.4);
     // Wide, faint joints; a darker, finer line down the middle of some, as a cut control joint.
     stone = mix(stone, stone * 0.8, 1.0 - smoothstep(0.4, 1.4, slab.x));
     stone *= 1.0 - 0.07 * step(0.6, slab.y) * (1.0 - smoothstep(0.0, 1.1, abs(slab.z - 0.5) * 132.0 * uUnit));
@@ -295,7 +301,8 @@ void main() {
   col = mix(col, col * SHADE_TINT, shadow * 0.78);
   // Clouds' shadows drifting over everything, slowly.
   float cloud = smoothstep(0.55, 0.72, fbm3((p - vec2(uTime * 7.0, uTime * 2.5)) / 420.0 + 6.0)) * step(kind, 2.5);
-  col = mix(col, col * vec3(0.78, 0.86, 1.0), cloud * 0.5);
+  // Design 080: the clouds' shadows cross the town, faintly over the square's cards.
+  col = mix(col, col * vec3(0.78, 0.86, 1.0), cloud * 0.5 * (1.0 - 0.7 * fieldCalm(p, 120.0)));
 
   col = edgeHaze(col, vUv, 0.55);
   vec3 spark = vec3(0.85, 1.0, 1.05);
@@ -322,12 +329,14 @@ void main() {
 export const POOL_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
+${FILTERING}
 ${REVEAL}
 ${PALETTE}
 ${COMMUNITY}
 varying vec2 vPos;
 void main() {
   vec2 p = vPos;
+  filterPixel = pixelSize(p);
   float fromCentre = distance(p, uFall.zw);
   if (fromCentre > uPool.x * 1.04 || revealBurned(p) * exitKeep(p) < 0.5) discard;
   float t = uTime;
@@ -344,7 +353,7 @@ void main() {
   col += vec3(1.0, 0.98, 0.9) * pow(max(dot(reflect(-sun, n), view), 0.0), 70.0) * 0.3;
   // Foam where the fall lands, and a rim of it round the stones.
   float foam = exp(-pow(distance(p, landing) / (uPool.x * 0.34), 2.0)) * (0.5 + 0.5 * gnoise(p / 6.0 + t)) * 0.8;
-  foam += (1.0 - smoothstep(uPool.x * 0.9, uPool.x * 1.03, fromCentre)) * smoothstep(uPool.x * 0.82, uPool.x * 0.9, fromCentre) * 0.5 * gnoise(p / 5.0);
+  foam += (1.0 - smoothstep(uPool.x * 0.9, uPool.x * 1.03, fromCentre)) * smoothstep(uPool.x * 0.82, uPool.x * 0.9, fromCentre) * 0.5 * grain(p, 5.0);
   col = mix(col, vec3(0.78, 0.87, 0.93), clamp(foam, 0.0, 1.0) * 0.5);
   col += vec3(0.9, 1.0, 1.05) * revealGlow(p, 0.035) * 0.6;
   gl_FragColor = vec4(col, 1.0);

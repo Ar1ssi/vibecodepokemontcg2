@@ -16,6 +16,8 @@
 // moonlight; PROPS are the headstones, obelisks, the post, the pines and the bare tree
 // (stadium-env-props); MIST is a sheet of drifting fog low over the ground.
 import {
+  FILTERING,
+  FOOTPRINTS,
   FULLSCREEN_VERTEX,
   NOISE,
   OUTPUT,
@@ -167,8 +169,9 @@ export function cemeterySpots(layout) {
       const width = (30 + 22 * roll(4)) * u;
       const height = (40 + 42 * roll(5) ** 1.4) * (y > far ? 1.2 : 1) * u;
       const reach = Math.max(width, 46 * u) * 0.75;
-      // Toward the near end a tall stone leans up over the player's cards in the tilted view.
-      if (y < core.y) continue;
+      // Toward the near end a tall stone leans up over the player's cards in the tilted view; and
+      // none stands among the cards (design 080: the graves ring the field, they don't sit in it).
+      if (y < core.y || distanceToRect(x, y, core) < reach + 24 * u) continue;
       if (roll(6) > 0.7 || !inScene(x, y, 30 * u) || !clear(x, y, reach + height * 0.35) || !pathClear(x, y, reach) || !off(x, y, reach)) {
         continue;
       }
@@ -360,6 +363,8 @@ vec3 edgeHaze(vec3 col, vec2 uv) {
 export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
+${FOOTPRINTS}
+${FILTERING}
 ${VORONOI}
 ${REVEAL}
 ${PALETTE}
@@ -397,12 +402,16 @@ void main() {
   float moonlit = clamp(dot(n, moon) / moon.z, 0.0, 1.6) * mix(0.55, 1.0, light.a) * (1.0 - 0.55 * field.b * vGrowth);
 
   // The grass: dark teal, paler in patches, tufts of blades fanning toward the moon, their tips lit
-  // the art's pale yellow-green.
+  // the art's pale yellow-green. Design 080: round the cards the grass is short (few, faint tufts),
+  // so its speckle doesn't run under the cards; the long glowing tufts grow out among the graves.
+  float calm = fieldCalm(p, 110.0);
+  float pixel = pixelSize(p);
   vec3 col = mix(GROUND, GROUND_LIT, smoothstep(0.3, 0.8, fbm3(p / 140.0 + 1.0)));
-  col *= 0.9 + 0.2 * fbm3(p / 28.0 + 3.0);
+  col *= 0.92 + 0.16 * fbm3(p / 28.0 + 3.0);
   vec4 tuft = voronoiCell(p / 15.0 + 4.0);
   vec2 blades = bladeFan(-tuft.zw * 15.0, tuft.y);
-  float hasTuft = step(fract(tuft.y * 31.7), 0.5 + 0.35 * smoothstep(0.35, 0.65, fbm3(p / 90.0 + 7.0)));
+  float hasTuft = step(fract(tuft.y * 31.7), (0.5 + 0.35 * smoothstep(0.35, 0.65, fbm3(p / 90.0 + 7.0))) * (1.0 - 0.75 * calm))
+    * patternFade(pixel, 15.0);
   col = mix(col, mix(GROUND * 0.7, mix(GROUND_LIT * 1.6, TUFT * 1.15, blades.y), 0.3 + 0.7 * blades.y), blades.x * hasTuft);
   // The path: worn earth, paler down its middle, ruts along it, its edge fraying into the grass.
   float pathEdge = smoothstep(2.0, -6.0, field.g + 6.0 * (gnoise(p / 11.0) - 0.5));
@@ -430,7 +439,7 @@ void main() {
 
   col *= (0.24 + 0.46 * moonlit) * mix(0.5, 1.0, smoothstep(0.3, 0.9, light.b));
   // The blades' tips glow faintly pale yellow-green, as the art's, brighter against the darker grass.
-  col += TUFT * 0.07 * blades.x * blades.y * hasTuft * (1.0 - onPath);
+  col += TUFT * 0.05 * blades.x * blades.y * hasTuft * (1.0 - onPath);
   // Night closes in round the graveyard: darker, bluer toward the scene's edge.
   float outside = length(max(max(uCore.xy - p, p - uCore.zw), 0.0));
   col = mix(col, col * vec3(0.5, 0.62, 0.8), smoothstep(80.0, 480.0, outside));

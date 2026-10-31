@@ -20,6 +20,8 @@
 // the tree grates, the street, the baked shadows and the tower's; PROPS the buildings, trees, lamps,
 // benches, cafes and the tower (stadium-env-props).
 import {
+  FILTERING,
+  FOOTPRINTS,
   FULLSCREEN_VERTEX,
   NOISE,
   OUTPUT,
@@ -284,9 +286,10 @@ void main() {
 // The card art's colours (pixel samples, inverted through Neutral tone mapping), the paving a shade
 // darker than the art's so white card borders keep their edges.
 const PALETTE = /* glsl */ `
-const vec3 SLAB = vec3(0.555, 0.519, 0.453);
-const vec3 SLAB_LO = vec3(0.345, 0.327, 0.294);
-const vec3 SLAB_HI = vec3(0.72, 0.684, 0.618);
+// Design 080: the plaza a step darker than the art's pale stone, so white card borders keep their edge.
+const vec3 SLAB = vec3(0.42, 0.392, 0.344);
+const vec3 SLAB_LO = vec3(0.3, 0.284, 0.256);
+const vec3 SLAB_HI = vec3(0.6, 0.57, 0.515);
 const vec3 INLAY = vec3(0.33, 0.345, 0.4);
 const vec3 SETT = vec3(0.345, 0.372, 0.442);
 const vec3 CURB = vec3(0.698, 0.485, 0.382);
@@ -362,6 +365,8 @@ float medallion(vec2 p) {
 export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
+${FOOTPRINTS}
+${FILTERING}
 ${VORONOI}
 ${REVEAL}
 ${PAVING}
@@ -375,6 +380,7 @@ varying vec2 vUv;
 varying float vGrowth;
 void main() {
   vec2 p = vPos;
+  filterPixel = pixelSize(p);
   if (revealBurned(p) * exitKeep(p) < 0.5) discard;
   vec4 field = texture2D(uField, vUv);
   vec4 light = texture2D(uLight, vUv);
@@ -385,25 +391,26 @@ void main() {
 
   // The street past the plaza: dark asphalt with a worn crown.
   vec3 col = mix(ASPHALT, ASPHALT * 1.25, smoothstep(0.3, 0.7, fbm3(p / 140.0 + 3.0)));
-  col *= 0.93 + 0.14 * gnoise(p / 3.0);
+  col *= 0.93 + 0.14 * grain(p, 3.0);
   // The plaza: big pale slabs in staggered rows, each its own tone, hairline joints, wear and stain.
   if (kind > 0.5) {
     vec3 slab = paving(p, vec2(108.0, 72.0) * u, 0.5);
     vec3 stone = mix(SLAB * 0.92, SLAB * 1.08, slab.y);
     stone *= 0.94 + 0.12 * fbm3(p / 28.0 + slab.y * 7.0);
-    stone *= 0.97 + 0.06 * gnoise(p / 3.2);
-    stone = mix(stone, stone * 0.7, 1.0 - smoothstep(0.4, 1.4, slab.x));
+    stone *= 0.97 + 0.06 * grain(p, 3.2);
+    // Design 080: the joints are shallower round the cards, so the slabs read as one floor under them.
+    stone = mix(stone, stone * mix(0.7, 0.84, fieldCalm(p, 100.0)), 1.0 - smoothstep(0.4, 1.4, slab.x));
     // A paler diagonal polish across some slabs.
     stone *= 1.0 + 0.06 * step(0.6, slab.y) * smoothstep(0.35, 0.65, gnoise(vec2(dot(p, vec2(0.7, 0.7)) / 60.0, slab.y * 9.0)));
     stone = mix(stone, SLAB_LO, 0.35 * smoothstep(0.62, 0.78, fbm3(p / 52.0 + 8.0)));
     // The compass inlaid in blue-grey stone, worn a little.
-    stone = mix(stone, INLAY * (0.9 + 0.2 * gnoise(p / 5.0)), max(medallion(p), towerFoot(p)) * 0.85);
+    stone = mix(stone, INLAY * (0.9 + 0.2 * grain(p, 5.0)), max(medallion(p), towerFoot(p)) * 0.85);
     col = stone;
     // Along the building fronts a band of setts, small blue-grey stones in running bond, a pale kerb line at its edge.
     float band = 1.0 - smoothstep(30.0 * u, 31.5 * u, -sd);
     vec3 sett = paving(p, vec2(9.0, 6.0) * u, 0.5);
-    vec3 setts = mix(SETT * 0.82, SETT * 1.12, sett.y) * (0.94 + 0.1 * gnoise(p / 2.2));
-    setts *= 1.0 - 0.4 * (1.0 - smoothstep(0.25, 0.8, sett.x));
+    vec3 setts = mix(SETT * 0.82, SETT * 1.12, sett.y) * (0.94 + 0.1 * grain(p, 2.2));
+    setts *= 1.0 - 0.4 * (1.0 - smoothstep(0.25, 0.8, sett.x)) * patternFade(filterPixel, 6.0 * u);
     col = mix(col, setts, band);
     col = mix(col, SLAB_HI, 0.6 * (1.0 - smoothstep(0.5, 1.6 * u, abs(-sd - 31.5 * u))));
     col *= 1.0 - 0.14 * (1.0 - smoothstep(0.0, 14.0 * u, -sd));
@@ -424,7 +431,7 @@ void main() {
   float inCurb = step(-9.0 * u, field.b) * step(field.b, 0.0);
   float jointAt = (0.5 - abs(fract(p.y / (26.0 * u)) - 0.5)) * 26.0 * u;
   float joint = 1.0 - smoothstep(0.3, 0.9, jointAt);
-  vec3 curb = mix(CURB, CURB_CAP, smoothstep(-3.2 * u, -1.6 * u, field.b)) * (0.94 + 0.1 * gnoise(p / 3.0)) * (1.0 - 0.2 * joint);
+  vec3 curb = mix(CURB, CURB_CAP, smoothstep(-3.2 * u, -1.6 * u, field.b)) * (0.94 + 0.1 * grain(p, 3.0)) * (1.0 - 0.2 * joint);
   col = mix(col, curb, inCurb);
   // The street trees' iron grates, set in the paving.
   for (int i = 0; i < ${MAX_TREES}; i++) {
@@ -433,7 +440,7 @@ void main() {
     vec2 q = abs(p - pit.xy) - pit.z;
     float edge = max(q.x, q.y);
     float slits = step(0.45, fract((p.x - pit.x) / (3.6 * u))) * step(0.3, fract((p.y - pit.y) / (11.0 * u)));
-    vec3 grate = GRATE * (0.8 + 0.7 * slits) + vec3(0.06, 0.05, 0.045) * smoothstep(0.0, 0.7, gnoise(p / 2.0));
+    vec3 grate = GRATE * (0.8 + 0.7 * slits) + vec3(0.06, 0.05, 0.045) * smoothstep(0.0, 0.7, grain(p, 2.0));
     col = mix(col, CURB_CAP * 0.9, (1.0 - smoothstep(-0.3, 0.8, abs(edge - 2.2 * u) - 2.2 * u)) * step(0.0, edge));
     col = mix(col, grate, 1.0 - smoothstep(-0.6, 0.4, edge));
   }
@@ -445,7 +452,7 @@ void main() {
   col = mix(col, col * SHADE_TINT, shade * 0.8);
   // Clouds' shadows drifting over it all, slowly.
   float cloud = smoothstep(0.58, 0.74, fbm3((p - vec2(uTime * 6.0, uTime * 2.0)) / 380.0 + 4.0));
-  col = mix(col, col * vec3(0.8, 0.88, 1.0), cloud * 0.4);
+  col = mix(col, col * vec3(0.8, 0.88, 1.0), cloud * 0.4 * (1.0 - 0.7 * fieldCalm(p, 120.0)));
 
   col = edgeHaze(col, vUv, 0.55);
   vec3 spark = vec3(0.9, 1.0, 1.1);

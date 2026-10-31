@@ -6,8 +6,9 @@
 # Pruned or shortened lines, verbatim: .agent/archive/DECISIONS-pruned-2026-10-15.md (grep the D-number).
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
-#   Next id = highest D number in this file and the archives + 1 (next: D232).
+#   Next id = highest D number in this file and the archives + 1 (next: D233).
 
+- D232 2026-10-31 [mat-fx] Stadium boards keep the field calm: shaders read card footprints (fieldCalm) to fade detail, glow, particles and motion round cards; fine patterns fade by fwidth. (design 080)
 - D231 2026-10-29 [mat-fx] Attack FX are per-type element shaders: instanced three.js meshes in the FX pass, emitted by element kits over canvas-kit methods/beats; canvas kits stay the 2D + cast fallback. (design 079)
 - D230 2026-10-29 [mat-fx] Element looks are hybrid: own GLSL for structure + committed TCG Live attack textures for detail; refraction reads one board copy per frame, only while a kind needs it. (design 079)
 - D229 2026-10-25 [mat-fx] GPU-canvas paints take stackable modifiers (fxMod), lift (fxLift arc/stand) and a cast pass; drawers own dissolve and lift, kits texture. Designs 078/079 renumbered from 076/077 at landing.

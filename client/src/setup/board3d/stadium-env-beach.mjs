@@ -18,6 +18,8 @@
 // beach, rocks and swash; SEA one displaced sheet at sea level; PALM the trees, and PALM_SHADOW their
 // shadows into a table-space target the sand reads.
 import {
+  FILTERING,
+  FOOTPRINTS,
   FULLSCREEN_VERTEX,
   NOISE,
   OUTPUT,
@@ -473,7 +475,8 @@ vec4 beachFinds(vec2 p, float top, out float shadow) {
     if (up > top * 0.75 && up < top * 2.2) {
       mat2 spin = rotation(hash12(starCell + 3.0) * 6.2831853);
       float radius = 6.0 + 3.0 * hash12(starCell + 5.0);
-      float d = starDistance(spin * (p - centre), radius, 0.42) - 1.3;
+      // Design 080: none washed up beside a card.
+      float d = starDistance(spin * (p - centre), radius, 0.42) - 1.3 + 100.0 * step(0.001, fieldCalm(centre, 50.0));
       vec3 colour = mix(vec3(0.95, 0.36, 0.12), vec3(0.88, 0.22, 0.32), hash12(starCell + 9.0));
       colour = mix(colour * 0.72, colour * 1.12, smoothstep(0.0, radius * 0.5, -d));
       colour = mix(colour, vec3(1.0, 0.85, 0.6), step(0.9, hash12(floor(p * 0.9))) * step(d, -1.0) * 0.6);
@@ -491,7 +494,7 @@ vec4 beachFinds(vec2 p, float top, out float shadow) {
       vec2 q = spin * (p - centre);
       vec2 qs = spin * (p + away * 0.7 - centre);
       // A scallop: a ribbed fan on its hinge.
-      float d = max(length(q * vec2(1.0, 1.15)) - radius, -q.y - radius * 0.35);
+      float d = max(length(q * vec2(1.0, 1.15)) - radius, -q.y - radius * 0.35) + 100.0 * step(0.001, fieldCalm(centre, 50.0));
       float ds = max(length(qs * vec2(1.0, 1.15)) - radius, -qs.y - radius * 0.35);
       float ribs = 0.86 + 0.14 * cos(atan(q.x, q.y + radius * 0.35) * 18.0);
       vec3 colour = mix(vec3(0.96, 0.9, 0.82), vec3(0.95, 0.66, 0.6), hash12(shellCell + 43.0)) * ribs;
@@ -568,6 +571,8 @@ vec3 rockShading(float id, vec3 n, float shade, float occlusion, float wetBand) 
 export const SAND_FRAGMENT = /* glsl */ `
 ${BEACH_UNIFORMS}
 ${NOISE}
+${FOOTPRINTS}
+${FILTERING}
 ${REVEAL}
 ${SHORE}
 ${SURF}
@@ -581,6 +586,7 @@ varying float vHeight;
 varying float vGrowth;
 void main() {
   vec2 p = vPos;
+  filterPixel = pixelSize(p);
   if (revealBurned(p) * exitKeep(p) < 0.5) discard;
   vec4 field = texture2D(uField, vUv);
   vec4 light = texture2D(uLight, vUv);
@@ -600,16 +606,18 @@ void main() {
   float wet = max(damp * 0.72, max(swash.gloss, step(0.02, swash.film)));
   float dry = smoothstep(top, top + 50.0, upBeach);
 
+  // Design 080: the wind ripples lie out on the open beach; round the cards the sand is smooth, and
+  // no ripple finer than the screen can draw shimmers. (Per-pixel grain and quartz glints, a hash of
+  // each pixel, read as speckle and are gone.)
+  float calm = fieldCalm(p, 110.0);
   vec3 n = bakedNormal(light, vGrowth);
-  n = normalize(vec3(n.xy - sandRipples(p, seaward) * dry * (1.0 - isRock), n.z));
+  float rippleShow = dry * (1.0 - isRock) * (1.0 - 0.75 * calm) * patternFade(filterPixel, 10.0);
+  n = normalize(vec3(n.xy - sandRipples(p, seaward) * rippleShow, n.z));
 
   vec3 sand = mix(SAND_DRY, SAND_DRY * vec3(1.05, 0.96, 0.86), smoothstep(0.3, 0.7, fbm3(p / 420.0 + 2.0)));
-  sand *= (0.93 + 0.12 * fbm3(p / 210.0)) * (0.97 + 0.06 * hash12(floor(p * 1.5)));
+  sand *= 0.93 + 0.12 * fbm3(p / 210.0);
   vec3 albedo = mix(sand, SAND_WET * (0.94 + 0.1 * gnoise(p / 50.0)), wet);
   vec3 col = lit(albedo, n, shade, light.b);
-  // Grains of quartz glint in the sun on the dry sand.
-  float grain = step(0.985, hash12(floor(p * 1.1))) * dry * shade;
-  col += vec3(0.35, 0.32, 0.26) * grain;
   // Starfish, shells and beach grass, out of the swash's reach.
   float findShadow;
   vec4 find = beachFinds(p, top, findShadow);
@@ -784,7 +792,8 @@ void main() {
   // Only along the sun's path (where the swell itself mirrors the sun within ~20 degrees), and only
   // a few ripples at a time twinkle.
   float sunPath = smoothstep(0.92, 0.985, dot(mirror, sun));
-  float twinkle = step(0.7, hash12(floor(p / 5.0) + floor(uTime * 4.0) * 7.31));
+  // Design 080: a slow glitter in broad cells, not a 4 Hz fizz of single pixels.
+  float twinkle = step(0.72, hash12(floor(p / 9.0) + floor(uTime * 1.2) * 7.31));
   float glint = pow(sunAlign, 2000.0) * 10.0 * sunPath * twinkle + pow(max(dot(mirror, sun), 0.0), 200.0) * 0.25;
 
   // Foam: rollers on broken crests, the lace they trail, the lip's burst; whitecaps out past the bar;

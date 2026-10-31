@@ -16,6 +16,8 @@
 // urns, vases and pillars (stadium-env-props); BLOBS the hedges, broad leaves and flowers, one
 // instanced sphere each; FIREFLIES the motes drifting over the garden.
 import {
+  FILTERING,
+  FOOTPRINTS,
   FULLSCREEN_VERTEX,
   NOISE,
   OUTPUT,
@@ -46,7 +48,7 @@ export const MAX_LANTERNS = 24;
 export const PROP_CARD_GAP_PX = 14;
 /** Rings and segments of the instanced sphere every hedge, leaf and flower is drawn with. */
 export const BLOB_SEGMENTS = { rings: 12, around: 22 };
-const FIREFLY_COUNT = 90;
+const FIREFLY_COUNT = 45;
 
 /** A small deterministic 0..1 from three numbers. */
 const hash = (x, y, salt) => {
@@ -268,6 +270,8 @@ vec3 edgeHaze(vec3 col, vec2 uv) {
 export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
+${FOOTPRINTS}
+${FILTERING}
 ${REVEAL}
 ${PALETTE}
 ${GARDEN}
@@ -292,16 +296,21 @@ void main() {
   // Each flagstone its own tone, from slate-blue through lavender to the dusty rose of the art's
   // older paving, grained and veined, its edge chipped paler where it meets a joint, moss and
   // damp dark in the joints.
+  // Design 080: round the cards the stones keep close to one lavender, their joints shallow and
+  // their grain faint, so the paving reads as one floor under the cards, richer out by the steps.
+  float calm = fieldCalm(p, 110.0);
   vec3 slate = vec3(0.24, 0.235, 0.4);
   vec3 rose = vec3(0.4, 0.25, 0.33);
   vec3 col = mix(mix(slate, PAVING, smoothstep(0.0, 0.5, field.b)), rose, smoothstep(0.62, 1.0, field.b) * 0.85);
-  col *= 0.86 + 0.2 * fbm3(p / 26.0) + 0.1 * (gnoise(p / 2.6) - 0.5);
-  col *= 1.0 + 0.16 * smoothstep(0.55, 0.8, gnoise(vec2(dot(p, vec2(0.8, 0.6)) / 38.0, dot(p, vec2(-0.6, 0.8)) / 9.0)));
-  col = mix(col, col * 1.28, (1.0 - smoothstep(1.2, 3.6, stone.x)) * smoothstep(0.5, 1.8, stone.x));
-  float joint = 1.0 - smoothstep(0.4, 1.7, stone.x);
-  vec3 moss = vec3(0.05, 0.19, 0.14) * (0.8 + 0.5 * gnoise(p / 5.0));
+  col = mix(col, mix(slate, PAVING, 0.6), calm * 0.6);
+  col *= 0.9 + 0.14 * fbm3(p / 26.0);
+  col *= 1.0 + 0.12 * (1.0 - calm) * patternFade(pixelSize(p), 9.0)
+    * smoothstep(0.55, 0.8, gnoise(vec2(dot(p, vec2(0.8, 0.6)) / 38.0, dot(p, vec2(-0.6, 0.8)) / 9.0)));
+  col = mix(col, col * 1.2, (1.0 - smoothstep(1.2, 3.6, stone.x)) * smoothstep(0.5, 1.8, stone.x) * (1.0 - 0.7 * calm));
+  float joint = (1.0 - smoothstep(0.4, 1.7, stone.x)) * mix(1.0, 0.45, calm);
+  vec3 moss = vec3(0.05, 0.19, 0.14) * (0.85 + 0.3 * fbm3(p / 12.0));
   col = mix(col, PAVING_DARK * 0.55, joint);
-  col = mix(col, moss, joint * smoothstep(0.42, 0.68, fbm3(p / 34.0 + 7.0)) * 0.8);
+  col = mix(col, moss, joint * smoothstep(0.42, 0.68, fbm3(p / 34.0 + 7.0)) * 0.8 * (1.0 - calm));
   // The steps and the curb: the paler wall stone of the art's terrace.
   vec3 pale = STONE_PALE * (0.85 + 0.25 * field.b);
   // The steps are slabs: radial joints between them, the slabs of the lower step set half a slab off.
@@ -309,7 +318,7 @@ void main() {
   float arc = atan(p.y - uPlaza.y, p.x - uPlaza.x) * r / 64.0 + floor((r - uPlaza.z) / uStep.x) * 0.5;
   float slabJoint = (1.0 - smoothstep(0.0, 0.035, fract(arc))) + smoothstep(0.965, 1.0, fract(arc));
   pale *= 1.0 - 0.38 * clamp(slabJoint, 0.0, 1.0) * onStep;
-  pale *= 1.0 + 0.1 * (gnoise(p / 3.2) - 0.5);
+  pale *= 0.96 + 0.08 * fbm3(p / 14.0);
   col = mix(col, pale, step(0.5, kind) * step(kind, 1.5));
   col = mix(col, pale, step(-1.5, kind) * step(kind, -0.5));
   // The garden ground: dark grass.
@@ -317,28 +326,26 @@ void main() {
   col = mix(col, grass, step(1.5, kind));
   col = nightLight(col, moonlit) * mix(0.55, 1.0, smoothstep(0.3, 0.9, light.b));
 
-  // The pool: its water glowing cyan from below, rings of rainbow swirling out from the middle,
-  // threads of light crackling across it.
+  // The pool: its water glowing cyan from below, slow rings of light swirling out from the middle,
+  // faint threads of light wandering across it. Design 080: the Actives lie on this water, so it is
+  // a deep teal lit from its heart, not a bright disc, and nothing on it flashes.
   if (kind < -1.5) {
     float fromMiddle = r / max(uPlaza.w, 1.0);
-    float swirl = sin((r - t * 14.0) / 7.0 + 4.0 * fbm3(p / 70.0 + t * 0.05));
-    vec3 water = mix(vec3(0.06, 0.32, 0.5), POOL_CYAN * 0.55, 0.55 + 0.45 * (1.0 - fromMiddle));
-    vec3 rainbow = 0.5 + 0.5 * cos(6.2831853 * (fromMiddle * 1.7 + vec3(0.0, 0.33, 0.67) + t * 0.03));
-    water += mix(vec3(0.6, 0.95, 1.1), rainbow, 0.55) * smoothstep(0.82, 0.98, swirl) * 0.45;
+    float swirl = sin((r - t * 6.0) / 9.0 + 4.0 * fbm3(p / 70.0 + t * 0.03));
+    vec3 water = mix(vec3(0.03, 0.17, 0.27), POOL_CYAN * 0.3, 0.45 + 0.55 * (1.0 - fromMiddle));
+    water += vec3(0.4, 0.75, 0.9) * smoothstep(0.85, 0.99, swirl) * 0.1;
     float angle = atan(p.y - uPlaza.y, p.x - uPlaza.x);
-    // Threads of light: the noise's middle line, running out from the centre and wandering, each
-    // stretch flickering in and out.
-    float thread = abs(gnoise(vec2(angle * 4.0, r / 60.0 - t * 0.35)) - 0.5);
-    float flicker = smoothstep(0.55, 0.72, gnoise(vec2(angle * 2.0 + t * 0.8, r / 90.0 + t * 0.25)));
-    water += vec3(0.75, 1.0, 1.15) * (1.0 - smoothstep(0.004, 0.022, thread)) * flicker * 0.8;
-    water += POOL_CYAN * 0.35 * exp(-fromMiddle * fromMiddle * 3.0);
+    float thread = abs(gnoise(vec2(angle * 4.0, r / 60.0 - t * 0.12)) - 0.5);
+    float glimmer = smoothstep(0.55, 0.72, gnoise(vec2(angle * 2.0 + t * 0.25, r / 90.0 + t * 0.08)));
+    water += vec3(0.6, 0.9, 1.05) * (1.0 - smoothstep(0.004, 0.022, thread)) * glimmer * 0.16;
+    water += POOL_CYAN * 0.12 * exp(-fromMiddle * fromMiddle * 3.0);
     col = water;
   }
 
   // The pool's light over the plaza, and each lantern's warm pool of light.
   if (uPlaza.w > 0.0) {
     float spill = exp(-pow(max(r - uPlaza.w, 0.0) / (uPlaza.w * 0.9), 1.4));
-    col += POOL_CYAN * 0.16 * spill * step(-1.5, kind) * (0.92 + 0.08 * sin(t * 1.4));
+    col += POOL_CYAN * 0.12 * spill * step(-1.5, kind);
   }
   col += LANTERN_GLOW * 0.3 * lanternLight(vec3(p, field.r)) * step(-1.5, kind);
 
@@ -596,18 +603,19 @@ void main() {
   float kind = vKind.x;
   vec3 col;
   if (kind < 0.5) {
-    // Clipped boxwood: leaf clumps in two sizes, their borders wandering, each bulging toward the moon.
-    vec2 q = vSphere.xy / (1.3 + vSphere.z) * 2.6 + vKind.y * 17.0;
+    // Clipped boxwood: a few broad clumps, their borders wandering, each bulging toward the moon
+    // (design 080: the small leaf scale read as speckle from above, so it only tints the lit tops).
+    vec2 q = vSphere.xy / (1.3 + vSphere.z) * 1.9 + vKind.y * 17.0;
     q += 0.3 * (vec2(gnoise(q * 1.7), gnoise(q * 1.7 + 6.3)) - 0.5);
     vec4 cluster = voronoiCell(q);
     float inCluster = 1.0 - smoothstep(0.34, 0.6, length(cluster.zw));
     vec4 leaf = voronoiCell(q * 3.3 + 2.1);
     float inLeaf = 1.0 - smoothstep(0.3, 0.55, length(leaf.zw));
-    vec3 bulged = normalize(n - vec3(cluster.zw, 0.0) * 0.55 * inCluster - vec3(leaf.zw, 0.0) * 0.3 * inLeaf);
+    vec3 bulged = normalize(n - vec3(cluster.zw, 0.0) * 0.55 * inCluster - vec3(leaf.zw, 0.0) * 0.08 * inLeaf);
     float lit = max(dot(bulged, normalize(uSun)), 0.0);
-    col = mix(HEDGE_DARK * 1.2, HEDGE * 1.2, smoothstep(0.05, 0.5, lit)) * mix(0.62, 1.0, inCluster);
-    col = mix(col, HEDGE * 2.0, smoothstep(0.6, 0.85, lit) * inLeaf * 0.7);
-    col *= mix(0.7, 1.0, smoothstep(0.0, 0.2, cluster.x));
+    col = mix(HEDGE_DARK * 1.2, HEDGE * 1.2, smoothstep(0.05, 0.5, lit)) * mix(0.72, 1.0, inCluster);
+    col = mix(col, HEDGE * 1.7, smoothstep(0.6, 0.85, lit) * mix(0.6, 1.0, inLeaf) * 0.45);
+    col *= mix(0.78, 1.0, smoothstep(0.0, 0.2, cluster.x));
   } else if (kind < 1.5) {
     // A broad leaf: its midrib pale, darker toward its edges.
     float rib = 1.0 - smoothstep(0.0, 0.18, abs(vSphere.y));
@@ -664,6 +672,7 @@ uniform float uTime;
 uniform float uFocal;
 uniform vec4 uPlaza;
 ${NOISE}
+${FOOTPRINTS}
 ${REVEAL}
 attribute vec4 aSeed;
 varying vec3 vHue;
@@ -677,10 +686,11 @@ void main() {
   vec3 pos = vec3(start, 14.0 + 70.0 * aSeed.y);
   pos.xy += vec2(sin(clock * 0.7 + aSeed.x * 30.0), cos(clock * 0.6 + aSeed.y * 30.0)) * 26.0;
   pos.z += sin(clock * 0.9 + aSeed.w * 10.0) * 10.0;
-  float shown = revealBurned(start) * exitKeep(start);
+  // Design 080: fireflies keep to the garden, none over the plaza's cards.
+  float shown = revealBurned(start) * exitKeep(start) * step(fieldCalm(start, 110.0), 0.001);
   vec4 mv = modelViewMatrix * vec4(pos, 1.0);
   gl_Position = projectionMatrix * mv;
-  vGlow = smoothstep(0.0, 0.2, life) * (1.0 - smoothstep(0.7, 1.0, life)) * (0.45 + 0.55 * pow(0.5 + 0.5 * sin(clock * 2.3 + aSeed.x * 20.0), 2.0));
+  vGlow = smoothstep(0.0, 0.2, life) * (1.0 - smoothstep(0.7, 1.0, life)) * (0.6 + 0.4 * pow(0.5 + 0.5 * sin(clock * 1.2 + aSeed.x * 20.0), 2.0));
   vHue = aSeed.x < 0.5 ? vec3(0.75, 1.05, 0.45) : aSeed.x < 0.8 ? vec3(1.1, 0.6, 0.95) : vec3(0.95, 0.95, 1.0);
   gl_PointSize = max((1.4 + 1.4 * aSeed.z) * uFocal / -mv.z, 1.5) * 2.3 * shown;
 }
@@ -709,7 +719,8 @@ varying float vFlicker;
 void main() {
   vec4 mv = modelViewMatrix * vec4(position, 1.0);
   gl_Position = projectionMatrix * mv;
-  vFlicker = 0.85 + 0.1 * sin(uTime * 7.0 + position.x * 0.3) + 0.05 * sin(uTime * 13.0 + position.y);
+  // A lantern's glass breathes faintly (design 080: no flicker at the edge of the eye).
+  vFlicker = 0.95 + 0.03 * sin(uTime * 2.3 + position.x * 0.3) + 0.02 * sin(uTime * 3.7 + position.y);
   gl_PointSize = 74.0 * uFocal / -mv.z * revealBurned(position.xy) * exitKeep(position.xy);
 }
 `;

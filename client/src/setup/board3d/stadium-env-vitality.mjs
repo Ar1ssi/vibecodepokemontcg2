@@ -16,6 +16,8 @@
 // lathe whose buttress fins run on into the roots' ridges in the ground; BOUGHS its boughs
 // (stadium-env-props); MOTES the motes of light rising off the glow.
 import {
+  FILTERING,
+  FOOTPRINTS,
   FULLSCREEN_VERTEX,
   NOISE,
   OUTPUT,
@@ -50,7 +52,7 @@ export const MAX_POOLS = 20;
 export const TRUNK_FINS = 5;
 /** Rings and segments of the instanced sphere every pad and bush is drawn with. */
 export const PUFF_SEGMENTS = { rings: 16, around: 28 };
-const MOTE_COUNT = 140;
+const MOTE_COUNT = 70;
 /** How far a pad reaches past its radius once its lumps are on (the vertex shader's 0.1). */
 const PUFF_REACH = 1.12;
 
@@ -234,13 +236,14 @@ export function vitalitySpots(layout) {
   // The carpet of bushes: a jittered grid over the scene, every bush outside the meadow, clear of
   // the tree's roots and of the pools' bright cores.
   const bushes = [];
-  const step = 70 * u;
+  // Design 080: fewer, bigger bushes; a carpet of small lumps read as noise from above.
+  const step = 96 * u;
   for (let gy = scene.y + step / 2; gy < scene.y + scene.h; gy += step) {
     for (let gx = scene.x + step / 2; gx < scene.x + scene.w; gx += step) {
       const roll = (salt) => hash(gx, gy, salt + 100);
       const x = gx + (roll(1) - 0.5) * step * 0.7;
       const y = gy + (roll(2) - 0.5) * step * 0.7;
-      const r = (22 + 36 * roll(3) ** 1.5) * u;
+      const r = (32 + 44 * roll(3) ** 1.5) * u;
       if (!inScene(x, y, r * 0.5)) continue;
       if (clearingDistance(core, x, y) < -r * 0.3 || distanceToRect(x, y, core) < r + BUSH_CARD_GAP_PX) continue;
       if (Math.hypot(x - tree.x, y - tree.y) < tree.reach + r * 0.4) continue;
@@ -283,7 +286,7 @@ float poolGlow(vec2 p, float t) {
   for (int i = 0; i < ${MAX_POOLS}; i++) {
     vec4 pool = uPools[i];
     if (pool.z <= 0.0) continue;
-    float breath = 0.85 + 0.15 * sin(t * 0.9 + pool.x * 0.031 + pool.y * 0.017);
+    float breath = 0.94 + 0.06 * sin(t * 0.5 + pool.x * 0.031 + pool.y * 0.017);
     vec2 q = (p - pool.xy) / pool.z;
     glow += pool.w * breath * exp(-dot(q, q) * 1.6);
   }
@@ -432,6 +435,8 @@ vec3 edgeHaze(vec3 col, vec2 uv) {
 export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
+${FOOTPRINTS}
+${FILTERING}
 ${VORONOI}
 ${REVEAL}
 ${PALETTE}
@@ -479,9 +484,13 @@ void main() {
   col = mix(col, GRASS_LIT, tuftShape * hasTuft * 0.3);
   // Blades: a small fan out of most cells' points, dark at the foot and lit at the tip, thick
   // where the grass is long. Broad soft patches of sun break the lawn's green between them.
+  // Design 080: round the cards the lawn is short and even (the blades fade), and no blade finer
+  // than the screen can draw shimmers.
+  float calm = fieldCalm(p, 120.0);
   vec2 blades = grassBlades(-tuft.zw * 13.0, tuft.y);
   float lawn = step(fract(tuft.y * 23.1), 0.55 + 0.35 * smoothstep(0.35, 0.65, fbm3(p / 95.0 + 8.0)));
-  col = mix(col, mix(GRASS_DARK * 0.8, GRASS_LIT * 1.25, blades.y), blades.x * lawn * 0.85);
+  float bladeShow = (1.0 - 0.7 * calm) * patternFade(pixelSize(p), 13.0);
+  col = mix(col, mix(GRASS_DARK * 0.8, GRASS_LIT * 1.25, blades.y), blades.x * lawn * 0.85 * bladeShow);
   col *= 1.0 + 0.16 * smoothstep(0.5, 0.78, fbm3(p / 52.0 + 3.0));
 
   // Past the meadow's edge, the undergrowth under the bushes: deep green, lighter on the swells.
@@ -515,15 +524,18 @@ void main() {
   // The shadow comes and goes with the tree, as the reveal grows it from its root and the exit sinks it.
   float treeUp = uReveal >= 1.0 ? 1.0 : 1.0 - smoothstep(revealFront() - 0.12, revealFront(), revealReach(uRoot.xy));
   treeUp = treeUp * treeUp * (3.0 - 2.0 * treeUp) * exitKeep(uRoot.xy);
-  float shade = max(crownShade * (1.0 - 0.9 * max(fleck, gap * 0.85)), field.a) * vGrowth * treeUp;
+  // Over the cards the shade is lighter and its flecks fainter (design 080), so the field keeps one
+  // value band under its cards; out in the bushes it is as deep as the crown makes it.
+  float flecks = max(fleck, gap * 0.85) * (1.0 - 0.6 * calm);
+  float shade = max(crownShade * (1.0 - 0.9 * flecks), field.a) * vGrowth * treeUp * mix(1.0, 0.6, calm);
   col = mix(col, col * SHADE_TINT, shade);
 
   // The glow welling up between the bushes and round the trunk's foot: it lights the ground yellow,
   // brightest at each pool's heart.
   // A faint glow wells up through all the undergrowth too, as the art's light between every bush.
-  float glow = (poolGlow(p, t) + 0.1 * wild * smoothstep(0.35, 0.7, fbm3(p / 90.0 + 13.0))) * vGrowth;
-  col += GLOW * glow * 0.8 * (1.0 - 0.6 * rootMask);
-  col = mix(col, GLOW_CORE, smoothstep(0.7, 1.15, glow) * 0.55);
+  float glow = (poolGlow(p, t) + 0.05 * wild * smoothstep(0.35, 0.7, fbm3(p / 90.0 + 13.0))) * vGrowth;
+  col += GLOW * glow * 0.5 * (1.0 - 0.6 * rootMask);
+  col = mix(col, GLOW_CORE, smoothstep(0.75, 1.2, glow) * 0.3);
 
   col = edgeHaze(col, vUv);
   vec3 dawn = vec3(0.85, 0.95, 0.35);
@@ -612,7 +624,7 @@ void main() {
   float seed = vInfo.w;
   // Two scales of leaf clumps, as the art paints foliage: broad lobes, each carrying smaller leaf
   // clusters. Each bulges the normal, so it takes the light on its own sunward side.
-  vec2 q = vSphere.xy / (1.3 + vSphere.z) * mix(3.2, 2.2, bush) + seed * 17.0;
+  vec2 q = vSphere.xy / (1.3 + vSphere.z) * mix(2.5, 1.7, bush) + seed * 17.0;
   // Warped, so the lobes' borders wander like brush strokes rather than run straight.
   q += 0.32 * (vec2(gnoise(q * 1.6), gnoise(q * 1.6 + 9.1)) - 0.5);
   vec4 cluster = voronoiCell(q);
@@ -623,7 +635,10 @@ void main() {
   vec4 leaf = voronoiCell(ql);
   float leafSize = 0.46 + 0.18 * fract(leaf.y * 9.0);
   float inLeaf = 1.0 - smoothstep(leafSize - 0.16, leafSize, length(leaf.zw));
-  vec3 bulged = normalize(n - vec3(cluster.zw / size, 0.0) * 0.55 * inCluster - vec3(leaf.zw / leafSize, 0.0) * 0.3 * inLeaf);
+  // Design 080: a bush is a few broad lobes; the small leaf clusters are the crown's alone (on every
+  // bush they read as speckle from above).
+  float leafBulge = mix(0.16, 0.07, bush);
+  vec3 bulged = normalize(n - vec3(cluster.zw / size, 0.0) * 0.55 * inCluster - vec3(leaf.zw / leafSize, 0.0) * leafBulge * inLeaf);
   float light = dot(bulged, sun);
   // Painted tone bands with soft, short edges: shadow, body, lit, and a sun-struck crest.
   float body = smoothstep(-0.02, 0.22, light);
@@ -644,11 +659,11 @@ void main() {
     vec3 mid = mix(BUSH_MID, CROWN_BODY * 1.15, fract(seed * 7.13) * 0.22);
     col = mix(BUSH_DARK, mid, body);
     col = mix(col, mix(BUSH_LIT, mid * 1.5, 0.25), top);
-    col = mix(col, BUSH_LIT * vec3(1.35, 1.3, 0.9), crest * 0.5);
-    col = mix(col, BUSH_YELLOW, rim * smoothstep(0.05, 0.6, glow) * 0.85);
+    col = mix(col, BUSH_LIT * vec3(1.3, 1.25, 0.9), crest * 0.3);
+    col = mix(col, BUSH_YELLOW, rim * smoothstep(0.05, 0.6, glow) * 0.6);
   }
   // Shade tucked between lobes, soft and wide so it reads as a hollow, not a drawn line.
-  col *= mix(0.68, 1.0, smoothstep(0.0, 0.22, cluster.x)) * mix(0.9, 1.0, smoothstep(0.0, 0.12, leaf.x));
+  col *= mix(0.68, 1.0, smoothstep(0.0, 0.22, cluster.x)) * mix(mix(0.9, 0.97, bush), 1.0, smoothstep(0.0, 0.12, leaf.x));
   col *= mix(0.86, 1.0, inCluster);
   // A bush in the crown's shade (a pad's own depth in the crown darkens it above).
   vec4 ground = texture2D(uField, vShadeUv);
@@ -819,6 +834,7 @@ ${TABLE_UNIFORMS}
 uniform float uTime;
 uniform float uFocal;
 ${NOISE}
+${FOOTPRINTS}
 ${REVEAL}
 uniform vec4 uPools[${MAX_POOLS}];
 attribute vec4 aSeed;
@@ -844,7 +860,8 @@ void main() {
   vec3 pos = vec3(start, 2.0);
   pos.xy += vec2(sin(life * 4.0 + aSeed.x * 30.0), cos(life * 3.0 + aSeed.y * 30.0)) * 10.0 * life;
   pos.z += life * (50.0 + 70.0 * aSeed.y);
-  float shown = revealBurned(start) * exitKeep(start) * step(0.001, pool.z);
+  // Design 080: none rise beside a card.
+  float shown = revealBurned(start) * exitKeep(start) * step(0.001, pool.z) * step(fieldCalm(start, 60.0), 0.001);
   vec4 mv = modelViewMatrix * vec4(pos, 1.0);
   gl_Position = projectionMatrix * mv;
   float sizePx = (1.3 + aSeed.z * 1.8) * (1.0 - life * 0.4);

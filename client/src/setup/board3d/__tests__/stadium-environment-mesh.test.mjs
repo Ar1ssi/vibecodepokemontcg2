@@ -4,7 +4,8 @@ import { flatLayout } from '../board-layout.mjs';
 import { tableBounds } from '../table-uv.mjs';
 import { getMatLayout } from '../../sizing/mat-layouts.mjs';
 import { NO_MAT_LAYOUT_ID } from '../../sizing/mat-spec.mjs';
-import { craterBowl, mountainPeaks } from '../stadium-environment-layout.mjs';
+import { craterBowl, environmentFootprints, mountainPeaks } from '../stadium-environment-layout.mjs';
+import { MAX_FOOTPRINTS } from '../stadium-environment-glsl.mjs';
 import {
   AMBIENT_FPS,
   EXIT_MS,
@@ -13,6 +14,7 @@ import {
   PREPARE_TIMEOUT_MS,
   createStadiumEnvironment,
   plateScale,
+  setFootprints,
   strikePath,
   strikePower,
 } from '../stadium-environment-mesh.js';
@@ -69,6 +71,54 @@ test('strikePath is null without a mountain, and arcs need the table', () => {
     const path = strikePath(index, 0, { bowl, peaks: { left: null, right: null } }, null);
     assert.equal(path, null);
   }
+});
+
+/** The shared uniforms setFootprints writes, with plain vectors standing in for three's. */
+const footprintUniforms = () => ({
+  uFootprints: {
+    value: Array.from({ length: MAX_FOOTPRINTS }, () => ({
+      set(x, y, z, w) {
+        Object.assign(this, { x, y, z, w });
+      },
+    })),
+  },
+  uFootprintCount: { value: 0 },
+  uFootprintBox: {
+    value: {
+      set(x, y, z, w) {
+        Object.assign(this, { x, y, z, w });
+      },
+    },
+  },
+});
+
+test('setFootprints: every card footprint as (x0, y0, x1, y1), the rest far off the table', () => {
+  const uniforms = footprintUniforms();
+  const { slabs, flats } = environmentFootprints(layout);
+  setFootprints(uniforms, { slabs, flats });
+  const rects = [...slabs, ...flats];
+  assert.ok(rects.length > 10 && rects.length <= MAX_FOOTPRINTS, `${rects.length} footprints on a full board`);
+  assert.equal(uniforms.uFootprintCount.value, rects.length);
+  rects.forEach((rect, i) => {
+    assert.deepEqual({ ...uniforms.uFootprints.value[i], set: undefined }, { x: rect.x, y: rect.y, z: rect.x + rect.w, w: rect.y + rect.h, set: undefined });
+  });
+  const unused = uniforms.uFootprints.value[MAX_FOOTPRINTS - 1];
+  if (rects.length < MAX_FOOTPRINTS) assert.ok(unused.x < -1e4 && unused.z < -1e4, 'an unused slot lies far off the table');
+  const box = uniforms.uFootprintBox.value;
+  assert.deepEqual([box.x, box.y, box.z, box.w], [
+    Math.min(...rects.map((r) => r.x)),
+    Math.min(...rects.map((r) => r.y)),
+    Math.max(...rects.map((r) => r.x + r.w)),
+    Math.max(...rects.map((r) => r.y + r.h)),
+  ], 'the box round every footprint');
+});
+
+test('setFootprints: no layout gives no footprints', () => {
+  const uniforms = footprintUniforms();
+  setFootprints(uniforms, environmentFootprints(null));
+  assert.equal(uniforms.uFootprintCount.value, 0);
+  assert.ok(uniforms.uFootprintBox.value.z < -1e4, 'no box: every point is far from it');
+  assert.ok(uniforms.uFootprints.value.every((vector) => vector.x < -1e4));
 });
 
 test('plateScale: CSS-pixel size at most, never more than PLATE_MAX_PIXELS', () => {

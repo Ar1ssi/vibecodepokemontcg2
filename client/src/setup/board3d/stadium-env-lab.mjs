@@ -14,6 +14,7 @@
 // PROPS is every railing, post, stair step, console, tank and pipe, one geometry
 // (stadium-env-props.mjs).
 import {
+  FILTERING,
   FULLSCREEN_VERTEX,
   NOISE,
   OUTPUT,
@@ -79,24 +80,17 @@ const BLUE_STEEL = [0.55, 0.68, 0.76, 0.85];
 const DARK_STEEL = [0.32, 0.35, 0.4, 0.7];
 const PIPE = [0.42, 0.54, 0.6, 0.85];
 const BIG_PIPE_STEEL = [0.36, 0.46, 0.54, 0.85];
-const CABLE = [0.03, 0.03, 0.035, 0.3];
-/** Cable runs on the dais's band: start turn (deg), span (deg), a wobble seed. */
-const CABLE_RUNS = [
-  [96, 22, 0.4],
-  [108, 16, 2.1],
-  [128, 14, 4.0],
-];
 /** Brushed lids: steel that doesn't mirror the lamps overhead as a white disc. */
 const LID = [0.45, 0.48, 0.54, 0.25];
 /** The big pipes: turn round the dais (deg) each runs out from the ring before rising. */
-const BIG_PIPES = [16, 28, 58, 72, 86, 100, 114, 168, 204, 218, 236, 254, 272, 290, 306];
+// Design 080: half the art's cage. Fifteen read as a tangle of hoses round the board; seven still
+// close the room.
+const BIG_PIPES = [16, 58, 100, 168, 218, 254, 306];
 /**
  * The big pipes: radius, run out across the deck, bend radius, the height their upper elbow turns
  * them out level at, and how far they run on out from there.
  */
 const BIG_PIPE = { radius: 40, run: 160, bend: 70, top: 250, reach: 300 };
-/** Longest span a hanging cable crosses between two risers or tank tops. */
-const CABLE_SPAN_PX = 300;
 /** The art's thin white bands round its big pipes: spacing along the pipe, how far proud. */
 const PIPE_BAND = { every: 150, proud: 1.6, width: 2.4 };
 const BAND_WHITE = [0.92, 0.95, 0.97, 0.2];
@@ -492,42 +486,8 @@ export function labProps(spots) {
       sides: 10,
     });
   }
-  // Black cables snake over the deck from the dais's foot to the consoles.
-  [consoles[0], consoles[consoles.length - 1]].forEach(({ x, y, angle }, i) => {
-    const edge = outlineAt(outline, angle + 0.06 * (i ? 1 : -1));
-    const bend = [-Math.sin(angle) * 26 * (i ? 1 : -1), Math.cos(angle) * 26 * (i ? 1 : -1)];
-    const points = [];
-    for (let k = 0; k <= 12; k += 1) {
-      const t = k / 12;
-      const sway = Math.sin(t * Math.PI);
-      points.push([
-        edge.x + (x - edge.x) * t + bend[0] * sway,
-        edge.y + (y - edge.y) * t + bend[1] * sway,
-        -DROP_PX + 3,
-      ]);
-    }
-    props.tube(points, 3, CABLE, { sides: 6 });
-  });
-  // As in the art, black cables lie in loose loops on the dais's steel band inside the railing,
-  // where the far Bench leaves it free, and hang over its edge to the deck.
-  for (const [deg, span, seed] of CABLE_RUNS) {
-    const from = (deg * Math.PI) / 180;
-    const points = [];
-    for (let k = 0; k <= 16; k += 1) {
-      const t = k / 16;
-      const angle = from + ((span * Math.PI) / 180) * t;
-      const edge = outlineAt(outline, angle);
-      const inset = RAIL.inset + 14 + 9 * Math.sin(t * Math.PI * 3 + seed);
-      const radial = Math.atan2(edge.y - dais.y, edge.x - dais.x);
-      points.push([edge.x - Math.cos(radial) * inset, edge.y - Math.sin(radial) * inset, 2.5]);
-    }
-    // Over the lip and down the dais's side to the deck.
-    const last = points[points.length - 1];
-    const radial = Math.atan2(last[1] - dais.y, last[0] - dais.x);
-    const out = (r, z) => [last[0] + Math.cos(radial) * r, last[1] + Math.sin(radial) * r, z];
-    points.push(out(10, 2), out(15, -10), out(17, -30), out(22, -DROP_PX + 3), out(40, -DROP_PX + 3));
-    props.tube(points, 2.6, CABLE, { sides: 6 });
-  }
+  // Design 080: no loose cables. From above, the ones snaking to the consoles and hanging between the
+  // risers read as black hooks, and the loops on the dais's band as scribbles beside the far Bench.
   const ringPipe = [];
   for (let turn = 0; turn <= 2 * Math.PI - 2 * halfGap + 1e-9; turn += OUTLINE_STEP_RAD * 2) {
     const edge = outlineAt(outline, start + turn);
@@ -564,7 +524,6 @@ export function labProps(spots) {
     const t = Math.max(0, Math.min(1, ((point.x - a[0]) * abx + (point.y - a[1]) * aby) / (abx * abx + aby * aby || 1)));
     return Math.hypot(point.x - a[0] - abx * t, point.y - a[1] - aby * t);
   };
-  const risers = [];
   for (const deg of BIG_PIPES) {
     const angle = (deg * Math.PI) / 180;
     if (turnBetween(angle, STAIR.angle) < 0.3) continue;
@@ -602,30 +561,7 @@ export function labProps(spots) {
     }
     props.tube(points, BIG_PIPE.radius, BIG_PIPE_STEEL, { sides: 14 });
     pipeBands(props, points, BIG_PIPE.radius);
-    risers.push({ x: corner[0], y: corner[1], angle });
   }
-  // As in the art, black cables hang in loops between neighbouring risers and tank tops.
-  const anchors = [
-    ...risers.map((riser) => ({ x: riser.x, y: riser.y, z: 210, angle: riser.angle })),
-    ...tanks.map((tank) => ({ x: tank.x, y: tank.y, z: -DROP_PX + tank.height + tank.radius * TANK_DOME, angle: tank.angle })),
-  ].sort((a, b) => a.angle - b.angle);
-  anchors.forEach((a, i) => {
-    const b = anchors[(i + 1) % anchors.length];
-    const span = Math.hypot(a.x - b.x, a.y - b.y);
-    if (a === b || span > CABLE_SPAN_PX) return;
-    for (const [lift, sag] of [
-      [0, 0.3],
-      [12, 0.2],
-    ]) {
-      const points = [];
-      for (let k = 0; k <= 16; k += 1) {
-        const t = k / 16;
-        const z = a.z + (b.z - a.z) * t + lift - span * sag * 4 * t * (1 - t);
-        points.push([a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, z]);
-      }
-      props.tube(points, 2.4, CABLE, { sides: 6 });
-    }
-  });
   return props;
 }
 
@@ -696,6 +632,7 @@ export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 uniform vec3 uEmblem;
 ${NOISE}
+${FILTERING}
 ${REVEAL}
 ${DAIS}
 varying vec2 vPos;
@@ -708,13 +645,14 @@ void main() {
   float d = field.g;
   vec2 rel = p - uDais.xy;
   float fromCentre = length(rel);
+  float pixel = pixelSize(p);
   vec3 col;
   if (d < 0.0) {
     // The dais, as in the art: a deep glossy navy disc, lit blue from the lens overhead toward its
     // middle, a darker band of reflection across it; round it a band of pale steel plates out to the
     // edge, its own steel rim; the pads steel too.
     float pool = exp(-fromCentre * fromCentre / (2.0 * 360.0 * 360.0));
-    col = mix(vec3(0.008, 0.035, 0.1), vec3(0.0, 0.11, 0.3), pool) * (0.94 + 0.12 * fbm3(p / 140.0));
+    col = mix(vec3(0.01, 0.035, 0.095), vec3(0.0, 0.085, 0.23), pool) * (0.96 + 0.08 * fbm3(p / 140.0));
     float reflection = 1.0 - smoothstep(30.0, 90.0, abs(dot(rel, vec2(0.8, 0.6)) - uDais.z * 0.45));
     col *= 1.0 - 0.35 * reflection;
     float onPad = 100000.0;
@@ -733,28 +671,25 @@ void main() {
     steel = mix(steel, vec3(0.6, 0.64, 0.7), 1.0 - smoothstep(0.8, 2.6, abs(d + 4.0)));
     col = mix(col, steel, rim);
     col = mix(col, vec3(0.02, 0.025, 0.035), (1.0 - smoothstep(0.6, 1.6, abs(d + 26.0))));
-    // Every few seconds the lens's scan runs out across the disc as a soft ring.
-    float scanR = fract(uTime / 4.5) * (uDais.z - 80.0);
-    float scan = exp(-abs(fromCentre - scanR) / 9.0) * (1.0 - fract(uTime / 4.5)) * (1.0 - plates);
-    col += vec3(0.08, 0.2, 0.42) * scan * 0.5;
     // The Poke Ball as in the art: crisp white lines (its outline, the band, the button's ring) with
-    // a cyan glow round them, over a soft radial glow of the lens's blue light.
+    // a cyan glow round them, over a soft radial glow of the lens's blue light. Design 080: steady,
+    // and the glow under the Actives a breath, not a spotlight (the lens's sweeping scan ring is gone).
     if (uEmblem.z > 0.0) {
       float R = uEmblem.z;
-      col += vec3(0.03, 0.22, 0.55) * exp(-fromCentre * fromCentre / (2.0 * R * R * 0.45));
+      col += vec3(0.012, 0.09, 0.22) * exp(-fromCentre * fromCentre / (2.0 * R * R * 0.45));
       float ring = abs(fromCentre - R);
       float button = abs(fromCentre - R * 0.27);
       float bar = fromCentre > R * 0.27 && fromCentre < R ? abs(rel.y) : 100000.0;
       float line = min(min(ring, button), bar);
-      float pulse = 0.9 + 0.1 * sin(uTime * 1.4);
-      col = mix(col, vec3(0.42, 0.85, 1.0), exp(-line / 8.0) * 0.45 * pulse);
-      col = mix(col, vec3(0.92, 1.0, 1.05) * pulse, 1.0 - smoothstep(2.2, 3.4, line));
+      col = mix(col, vec3(0.42, 0.85, 1.0), exp(-line / 8.0) * 0.32);
+      col = mix(col, vec3(0.86, 0.95, 1.0), 1.0 - smoothstep(2.2, 3.4, line));
     }
   } else {
     // The deck: dark tread-plate steel in big plates, faint seams between them, shade gathering at
     // the dais's foot.
     vec2 diamond = abs(fract(mat2(0.7071, 0.7071, -0.7071, 0.7071) * p / 7.0 * vec2(1.0, 2.6)) - 0.5);
-    float tread = smoothstep(0.32, 0.46, max(diamond.x, diamond.y) - 0.0);
+    // The tread fades where it would draw finer than the screen (shimmer under the tilted camera).
+    float tread = smoothstep(0.32, 0.46, max(diamond.x, diamond.y)) * patternFade(pixel, 7.0);
     col = mix(vec3(0.4, 0.5, 0.56), vec3(0.46, 0.56, 0.62), tread * 0.5);
     col *= 0.9 + 0.2 * fbm3(p / 120.0);
     vec2 panel = abs(mod(p + 150.0, 300.0) - 150.0);

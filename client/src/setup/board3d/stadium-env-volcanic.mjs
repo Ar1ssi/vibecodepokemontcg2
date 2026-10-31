@@ -18,6 +18,7 @@
 //    side streams run at the land's own level, the stones standing only a little proud of them.
 //    LAVA is one sheet at LAVA_LEVEL for the river, which sits lower; EMBERS and SMOKE rise off it.
 import {
+  FOOTPRINTS,
   NOISE,
   OUTPUT,
   REVEAL,
@@ -103,7 +104,7 @@ float riverCenter(float x) {
   return mix(uVolcano.y, seam, smoothstep(uVolcano.x, uVolcano.x + 420.0, x));
 }
 float riverHalfWidth(float x) {
-  return 70.0 + 22.0 * (fbm3(vec2(x / 380.0, 7.7)) - 0.5);
+  return 56.0 + 18.0 * (fbm3(vec2(x / 380.0, 7.7)) - 0.5);
 }
 `;
 
@@ -119,6 +120,7 @@ export const BAKE_FIELD_FRAGMENT = /* glsl */ `
 ${TABLE_UNIFORMS}
 varying vec2 vUv;
 ${NOISE}
+${FOOTPRINTS}
 ${VORONOI}
 ${STONES}
 ${VOLCANO}
@@ -199,7 +201,9 @@ void main() {
   float dip = 2.0 * smoothstep(0.0, -1.5, gap) * crackOn;
   float nearHeat = max(1.0 - smoothstep(0.0, 220.0, lavaSD),
     step(0.001, uVolcano.z) * (1.0 - smoothstep(uVolcano.z, uVolcano.z * 2.2, vd)));
-  float crackLava = crackOn * smoothstep(0.6, 0.68, fbm3(p / 230.0 + 13.0) + 0.3 * nearHeat);
+  // Design 080: the cracks round the cards run dry (dark ash), so no glowing line lies beside a card.
+  float crackLava = crackOn * smoothstep(0.6, 0.68, fbm3(p / 230.0 + 13.0) + 0.3 * nearHeat)
+    * (1.0 - fieldCalm(p, 70.0));
 
   // Past the cone's foot the streams run on in beds cleared of stones.
   float pastFoot = step(uVolcano.z * 0.9, vd) * step(0.001, uVolcano.z);
@@ -249,6 +253,7 @@ void main() {
 export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
+${FOOTPRINTS}
 ${VORONOI}
 ${LAVA_RAMP}
 ${REVEAL}
@@ -316,11 +321,13 @@ void main() {
   float convex = smoothstep(0.8, 3.5, -laplace) * vGrowth;
   col = mix(col, vec3(0.2, 0.21, 0.24), convex * 0.55 * smoothstep(0.35, 0.85, n.z));
 
-  // Painted cracks: thin light lines across the tops of some stones.
+  // Painted cracks: thin light lines across the tops of some stones, out in the world only
+  // (design 080: no fine lines round the cards).
+  float calm = fieldCalm(p, 80.0);
   vec4 crack = voronoiCell(p / 22.0 + id * 17.0);
   float crackLine = (1.0 - smoothstep(0.015, 0.04, crack.x)) * smoothstep(0.82, 0.95, n.z)
     * smoothstep(0.55, 0.7, gnoise(p / 26.0 + id * 5.0)) * isStone * step(0.4, tone);
-  col = mix(col, col * 1.45 + 0.01, crackLine * 0.6);
+  col = mix(col, col * 1.45 + 0.01, crackLine * 0.4 * (1.0 - calm));
 
   // Occlusion: crevices and the feet of stones go deep blue-grey.
   col = mix(vec3(0.036, 0.034, 0.046), col, smoothstep(0.3, 0.9, light.b));
@@ -333,11 +340,12 @@ void main() {
   float hasVolcano = step(0.001, uVolcano.z);
   float hot = max(1.0 - smoothstep(-20.0, 170.0, riverSD), hasVolcano * (1.0 - smoothstep(uVolcano.z, uVolcano.z * 2.4, vd)));
   float aboveLava = max(ground - max(lavaTable, ${LAVA_LEVEL.toFixed(1)}), 0.0);
-  float flicker = 0.88 + 0.12 * gnoise(vec2(uTime * 0.8, p.x / 80.0 + p.y / 120.0));
+  // A slow breath, not a flicker: light pulsing beside the cards pulls the eye off them.
+  float flicker = 0.95 + 0.05 * gnoise(vec2(uTime * 0.35, p.x / 160.0 + p.y / 240.0));
   float sideFacing = 1.0 - smoothstep(0.55, 0.95, n.z);
-  float underglow = exp(-aboveLava / 3.0) * mix(0.2, 1.0, sideFacing) * mix(0.3, 0.6, hot);
+  float underglow = exp(-aboveLava / 3.0) * mix(0.2, 1.0, sideFacing) * mix(0.18, 0.36, hot);
   float bounce = exp(-max(riverSD, 0.0) / 45.0) * exp(-max(ground - ${LAVA_LEVEL.toFixed(1)}, 0.0) / 24.0) * mix(0.15, 1.0, sideFacing);
-  col += vec3(1.0, 0.16, 0.02) * (underglow + bounce * 0.28) * flicker;
+  col += vec3(1.0, 0.16, 0.02) * (underglow + bounce * 0.1) * flicker;
 
   // The volcano: its streams warm the rock right beside them; the crater lights its rim and inner
   // walls.
@@ -398,8 +406,8 @@ void main() {
 
 /**
  * The lava sheet. Shallow lava (the gaps, the banks, the stream channels) is deep red; the open
- * river runs orange with a gold core. Banded colour, soft wavy flow lines streaming downstream
- * (+x, bending along the banks), round rafts of crust with glowing rims, bubbles that swell and pop.
+ * river runs deep red, its heat in thin threads: orange flow lines streaming downstream (+x,
+ * bending along the banks), a gold thread down its middle, dark crust drifting in long streaks.
  */
 export const LAVA_FRAGMENT = /* glsl */ `
 ${TABLE_UNIFORMS}
@@ -410,6 +418,8 @@ uniform vec3 uSun;
 ${NOISE}
 ${LAVA_RAMP}
 ${REVEAL}
+${VOLCANO}
+${RIVER}
 varying vec2 vPos;
 
 // One flow phase: x heat noise 0..1, y flow-line strength 0..1.
@@ -454,46 +464,20 @@ void main() {
   vec2 flow = mix(flowPhase(p - velocity * phaseB * period + vec2(53.0, 29.0)), flowPhase(p - velocity * phaseA * period), weightA);
 
   float pools = smoothstep(0.35, 0.75, fbm3((p - vec2(uTime * 6.0, 0.0)) / 180.0));
-  float core = smoothstep(-24.0, -58.0, riverSD);
-  float heat = smoothstep(1.0, 16.0, smoothDepth) * 0.36 + openRiver * 0.06 + core * 0.16 + (flow.x - 0.5) * 0.6
-    + pools * 0.16 + flow.y * 0.38;
-  // Shallow lava and the river's edge stay red like the cracks' lava, never a dark smudge.
-  heat = max(heat, 0.25);
-  heat += 0.06 * sin(uTime * 1.1 + p.x / 90.0);
+  // Design 080: a deep red river with its heat in thin threads (orange flow lines, a gold thread
+  // down its middle) and dark crust drifting in long streaks along the flow: it reads as lava at a
+  // glance without a broad bright band between the Actives.
+  // The thread follows the river's own centre line (the banks wobble round it).
+  float thread = (1.0 - smoothstep(4.0, 11.0, abs(p.y - riverCenter(p.x)))) * openRiver;
+  // The ramp's red already renders a bright orange-red: the body sits in its deep crimson band.
+  float heat = 0.135 + smoothstep(1.0, 16.0, smoothDepth) * 0.03 + (flow.x - 0.5) * 0.08 + pools * 0.04
+    + flow.y * 0.36 + thread * (0.3 + 0.2 * flow.x);
+  // Shallow lava and the river's edge stay crimson like the cracks' lava, never a dark smudge.
+  heat = max(heat, 0.135);
   vec3 col = lavaColor(heat);
-
-  // Crust: round cartoon rafts of cooled rock, domed, with a glowing rim, drifting downstream as
-  // one rigid sheet so they never stretch or ghost.
-  vec2 raft = p - vec2(uTime * 7.0, 0.0);
-  vec2 raftCell = floor(raft / 40.0);
-  vec2 raftCentre = (raftCell + 0.3 + 0.4 * hash22(raftCell + 5.0)) * 40.0;
-  float raftRadius = mix(8.0, 16.0, hash12(raftCell + 9.0));
-  vec2 fromCentre = (raft - raftCentre) / vec2(1.35, 1.0);
-  float raftDistance = length(fromCentre) + (gnoise(raft / 9.0) - 0.5) * 4.0 - raftRadius;
-  float coverage = mix(0.3, 0.16, openRiver) + (fbm3(raft / 220.0) - 0.5) * 0.4;
-  float hasRaft = step(hash12(raftCell + 2.0), coverage) * smoothstep(3.0, 9.0, smoothDepth);
-  float body = (1.0 - smoothstep(-1.0, 0.0, raftDistance)) * hasRaft;
-  float raftRim = (1.0 - smoothstep(0.0, 3.0, raftDistance)) * hasRaft;
-  vec3 raftNormal = normalize(vec3(fromCentre / raftRadius * 0.9, 1.0));
-  float raftKey = smoothstep(0.55, 0.95, dot(raftNormal, normalize(uSun)));
-  vec3 crust = mix(vec3(0.06, 0.06, 0.07), vec3(0.12, 0.12, 0.135), raftKey);
-  crust += vec3(0.45, 0.05, 0.0) * smoothstep(-3.5, -0.5, raftDistance);
-  col = mix(col, lavaColor(0.88), raftRim * (1.0 - body));
-  col = mix(col, crust, body);
-
-  // Bubbles: swell for most of their life, then pop as a widening ring.
-  vec2 cell = floor(raft / 42.0);
-  float bubblePeriod = 2.6 + 2.4 * hash12(cell + 3.0);
-  float life = fract(uTime / bubblePeriod + hash12(cell));
-  float hasBubble = step(0.55, hash12(cell + 11.0)) * smoothstep(6.0, 12.0, smoothDepth) * (1.0 - body);
-  vec2 centre = (cell + 0.2 + 0.6 * hash22(cell + 7.0)) * 42.0;
-  float r = distance(raft, centre);
-  float swell = smoothstep(0.0, 0.8, life) * 7.0;
-  float dome = (1.0 - smoothstep(swell - 1.2, swell, r)) * step(life, 0.82);
-  float pop = smoothstep(0.82, 1.0, life);
-  float ring = (1.0 - smoothstep(0.6, 1.6, abs(r - (7.0 + pop * 9.0)))) * step(0.82, life) * (1.0 - pop);
-  col = mix(col, lavaColor(0.95) * (1.0 + 0.25 * (1.0 - r / max(swell, 0.001))), dome * hasBubble * 0.85);
-  col += lavaColor(0.9) * ring * hasBubble * 0.8;
+  float crust = smoothstep(0.5, 0.72, fbm3((p - vec2(uTime * 6.0, 0.0)) / vec2(130.0, 24.0) + 3.0))
+    * smoothstep(3.0, 9.0, smoothDepth) * (1.0 - thread);
+  col = mix(col, vec3(0.05, 0.028, 0.026), crust * 0.75 * (1.0 - flow.y));
 
   float front = revealFront();
   col += lavaColor(0.7) * smoothstep(front - 0.035, front - 0.004, revealReach(p)) * step(uReveal, 0.999);
@@ -511,6 +495,7 @@ ${TABLE_UNIFORMS}
 uniform float uTime;
 uniform float uFocal;
 ${NOISE}
+${FOOTPRINTS}
 ${REVEAL}
 ${VOLCANO}
 ${RIVER}
@@ -533,7 +518,8 @@ void main() {
   vec3 crater = vec3(uVolcano.xy + spread + jitter * life * 170.0, craterRimHeight() - 4.0 + life * (130.0 + 90.0 * aSeed.y));
   pos = mix(pos, crater, fromCrater);
   float onTable = smoothstep(uMin.x + 20.0, uMin.x + 90.0, pos.x) * (1.0 - smoothstep(uMin.x + uSize.x - 90.0, uMin.x + uSize.x - 20.0, pos.x));
-  float shown = revealBurned(pos.xy) * exitKeep(pos.xy) * max(onTable, fromCrater);
+  // Design 080: none rise beside a card (motion there pulls the eye off it).
+  float shown = revealBurned(pos.xy) * exitKeep(pos.xy) * max(onTable, fromCrater) * (1.0 - fieldCalm(pos.xy, 60.0));
   vec4 mv = modelViewMatrix * vec4(pos, 1.0);
   gl_Position = projectionMatrix * mv;
   float sizePx = (1.6 + aSeed.z * 2.4) * (1.0 - life * 0.5);
@@ -551,7 +537,7 @@ void main() {
   float core = 1.0 - smoothstep(0.35, 0.5, d);
   float glow = exp(-d * d * 3.0) * 0.5;
   float fade = smoothstep(0.0, 0.1, vLife) * (1.0 - smoothstep(0.55, 1.0, vLife));
-  vec3 hot = mix(vec3(2.0, 0.55, 0.05), vec3(1.8, 0.8, 0.14), vKind);
+  vec3 hot = mix(vec3(1.5, 0.42, 0.04), vec3(1.4, 0.62, 0.11), vKind);
   vec3 col = mix(hot, vec3(0.7, 0.05, 0.0), smoothstep(0.3, 1.0, vLife));
   gl_FragColor = vec4(col * (core + glow) * fade, 1.0);
 ${OUTPUT}

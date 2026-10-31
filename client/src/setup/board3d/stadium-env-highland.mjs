@@ -17,6 +17,7 @@
 // sea, domes turning round the mountain on a grid of their own; BOLT draws one lightning stroke and
 // its fork as a camera-facing ribbon (the mesh schedules the strikes).
 import {
+  FOOTPRINTS,
   NOISE,
   OUTPUT,
   REVEAL,
@@ -129,8 +130,8 @@ vec3 flashLight(vec3 at, vec3 n) {
 }
 `;
 
-/** Width of the rock's flat faces in table px. */
-const FACET_PX = 92;
+/** Width of the rock's flat faces in table px: broad, so the rim reads as chunky sculpted planes, not crumpled foil. */
+const FACET_PX = 124;
 
 /**
  * Bake 1, first pass (into uPre; stadium-environment-mesh.js renders it before the field): the
@@ -198,14 +199,15 @@ void main() {
 
 /**
  * Bake 1, second pass: the ground. The crater floor is level dust with faint swells and the emblem's
- * groove; the mountain (uPre) is cut into flat faces; round scree heaps lie at the wall's foot and a
- * few pebbles out on the floor.
+ * groove; the mountain (uPre) is cut into flat faces; round scree heaps lie at the wall's foot, clear
+ * of the cards.
  */
 export const BAKE_FIELD_FRAGMENT = /* glsl */ `
 ${TABLE_UNIFORMS}
 uniform sampler2D uPre;
 varying vec2 vUv;
 ${NOISE}
+${FOOTPRINTS}
 ${VORONOI}
 ${BOWL}
 ${EMBLEM}
@@ -231,8 +233,10 @@ vec2 faceted(vec2 p, float h, float amount) {
 // d its px from the floor's edge, so no stone is cut where the zone ends. x: height px, y: its id.
 vec2 pebbles(vec2 p, float seed, float size, float share, vec4 zone) {
   vec4 cell = voronoiCell(p / size + seed);
-  float d = floorDistance(p + cell.zw * size);
-  float weight = smoothstep(zone.x, zone.y, d) - smoothstep(zone.z, zone.w, d);
+  vec2 centre = p + cell.zw * size;
+  float d = floorDistance(centre);
+  // Design 080: no stone lies beside a card; the scree keeps to the wall's foot between them.
+  float weight = (smoothstep(zone.x, zone.y, d) - smoothstep(zone.z, zone.w, d)) * (1.0 - fieldCalm(centre, 40.0));
   if (fract(cell.y * 37.3) >= share * weight) return vec2(0.0, cell.y);
   float radius = size * (0.14 + 0.12 * fract(cell.y * 13.7));
   float angle = cell.y * 40.0;
@@ -256,13 +260,13 @@ void main() {
   amount *= 1.0 - cloudPresence(p) * (1.0 - smoothstep(${CLOUD_LEVEL.toFixed(1)}, ${(CLOUD_LEVEL + 40).toFixed(1)}, mountain));
   vec2 rock = amount > 0.0 ? faceted(p, mountain, amount) : vec2(mountain, 0.0);
 
+  // Scree heaps at the wall's foot only: stones dotted over the floor read as specks among the cards.
   vec2 scree = pebbles(p, 5.3, 26.0, 0.35, vec4(-46.0, -6.0, 10.0, 34.0));
-  vec2 pebble = pebbles(p, 11.7, 52.0, 0.05, vec4(-100001.0, -100000.0, -40.0, 0.0));
-  float debris = max(scree.x, pebble.x);
+  float debris = scree.x;
 
   float onRock = step(debris, rock.x) * step(1.0, rock.x);
   float kind = onRock > 0.5 ? 0.0 : (debris > 0.4 ? 1.0 : -1.0);
-  float tone = onRock > 0.5 ? rock.y : (scree.x >= pebble.x ? scree.y : pebble.y);
+  float tone = onRock > 0.5 ? rock.y : scree.y;
   gl_FragColor = vec4(ground + max(rock.x, debris), floorSD, tone, kind);
 }
 `;
@@ -324,7 +328,8 @@ void main() {
   rock += vec3(0.01, 0.03, 0.045) * smoothstep(0.1, 0.45, away);
   // Summits and high crags catch the light; the low slopes sink into the storm's gloom.
   rock *= mix(0.72, 1.12, smoothstep(30.0, 200.0, ground));
-  float snow = smoothstep(150.0, 172.0, ground + (gnoise(p / 26.0) - 0.5) * 44.0) * smoothstep(0.25, 0.5, n.z);
+  // Broad snow fields, not flecks: a fine noise edge reads as crumpled foil from above.
+  float snow = smoothstep(148.0, 168.0, ground + (fbm3(p / 90.0) - 0.5) * 40.0) * smoothstep(0.3, 0.55, n.z);
   vec3 snowColor = mix(vec3(0.34, 0.45, 0.58), vec3(0.86, 0.93, 1.0), smoothstep(0.5, 0.85, facing));
   rock = mix(rock, snowColor, snow * 0.92);
 
@@ -341,11 +346,11 @@ void main() {
   float laplace = texture2D(uField, vUv + vec2(t2.x, 0.0)).r + texture2D(uField, vUv - vec2(t2.x, 0.0)).r
     + texture2D(uField, vUv + vec2(0.0, t2.y)).r + texture2D(uField, vUv - vec2(0.0, t2.y)).r - 4.0 * ground;
   float convex = smoothstep(0.8, 3.5, -laplace) * vGrowth;
-  col = mix(col, vec3(0.3, 0.5, 0.6), convex * 0.45 * (1.0 - onFloor));
+  col = mix(col, vec3(0.3, 0.5, 0.6), convex * 0.2 * (1.0 - onFloor));
   // The storm's glow round the silhouettes: steep rock seen edge-on from the camera rims cyan,
   // so the crags and peaks stand out against the cloud.
   float edgeOn = 1.0 - clamp(dot(n, normalize(uEye - vec3(p, ground))), 0.0, 1.0);
-  col += vec3(0.16, 0.42, 0.52) * pow(edgeOn, 3.0) * smoothstep(0.2, 0.6, 1.0 - n.z) * (1.0 - onFloor);
+  col += vec3(0.1, 0.27, 0.34) * pow(edgeOn, 3.0) * smoothstep(0.2, 0.6, 1.0 - n.z) * (1.0 - onFloor);
 
   // Occlusion into deep navy; a cold sky fill on faces turned up; cyan haze where the outer slope
   // sinks toward the cloud sea.
@@ -357,12 +362,12 @@ void main() {
   float distant = smoothstep(uFoot - 20.0, uFoot + 160.0, length(p - uBowl.xy));
   col = mix(col, vec3(0.22, 0.45, 0.54), distant * 0.45 * (1.0 - onFloor));
 
-  // The emblem glows in its groove, pulsing slowly and flaring with each strike.
+  // The emblem glows steadily in its groove (design 080: nothing pulses under the Actives).
   float emblem = emblemDistance(p);
-  float pulse = 0.85 + 0.15 * sin(uTime * 1.3) + uFlash.w * 0.5;
-  col += vec3(1.0, 0.8, 0.42) * ((1.0 - smoothstep(0.6, 2.2, emblem)) * 0.9 + exp(-emblem / 10.0) * 0.22) * pulse * onFloor;
+  col += vec3(1.0, 0.8, 0.42) * ((1.0 - smoothstep(0.6, 2.2, emblem)) * 0.62 + exp(-emblem / 10.0) * 0.12) * onFloor;
 
-  col += flashLight(vec3(p, ground), n);
+  // A strike lights the rock; on the floor among the cards only faintly.
+  col += flashLight(vec3(p, ground), n) * mix(1.0, 0.25, onFloor);
 
   vec2 edgeUv = min(vUv, 1.0 - vUv);
   col *= mix(0.6, 1.0, smoothstep(0.0, 0.03, min(edgeUv.x, edgeUv.y)));

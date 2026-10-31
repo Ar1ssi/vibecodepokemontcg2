@@ -6,9 +6,9 @@
 Focus: attack FX are per-type element shaders (079-element-shaders, D229–D231): every material has an element kit (fireballs, flame jets,
   bolts, plasma, refracting water, psychic lens, smoke, 3-D debris, TCG Live sprites); 078 modifiers/lift/cast under them. Custom sets
   reach Render (076-remote-custom-sets, D228) via cardback "Publish to site".
-Active: user localhost checks — attack FX on all types (known: water spray reads icy, psychic rings large, Pin Missile needles small,
-  impact centres can blow out, leaf orientation unconfirmed); first custom-set publish + Render check;
-  older: 3D board H1-H3 (I266), TCG Live attack UI (074). No review pass yet on 078/079 (visual-only; offered).
+Active: user localhost checks — Stadium board polish (080, all 25 boards, branch claude/elegant-volta-r2cv6e); attack FX on all
+  types (known: water spray reads icy, psychic rings large, Pin Missile needles small, impact centres can blow out, leaf orientation
+  unconfirmed); first custom-set publish + Render check; older: 3D board H1-H3 (I266), TCG Live attack UI (074). No review on 078/079.
 Next: maintenance is due (`pnpm harness:check`: caps over, 250+ commits since the last maintain) → maintain.md. Then tune 079 from the
   user's verdict; I264, I259, 072 coin prompts, B&B run flow, I242, I239, I227; prune merged branches; ETB (057) slice 6 unstarted.
 Blocked: I85/I86 need design approval (028/029); I87 needs the user's description; I235 needs a face-down-card design.

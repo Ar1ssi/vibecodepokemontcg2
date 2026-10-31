@@ -18,6 +18,8 @@
 // and branches, CROWN the clumps of their foliage, VINE the vines hanging from them; SPORE the
 // glowing motes rising off the water and drifting through the jungle.
 import {
+  FILTERING,
+  FOOTPRINTS,
   NOISE,
   OUTPUT,
   REVEAL,
@@ -294,6 +296,8 @@ vec3 edgeHaze(vec3 col, vec2 uv) {
 export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
+${FOOTPRINTS}
+${FILTERING}
 ${VORONOI}
 ${REVEAL}
 ${PALETTE}
@@ -304,6 +308,7 @@ varying float vGrowth;
 
 void main() {
   vec2 p = vPos;
+  filterPixel = pixelSize(p);
   if (revealBurned(p) * exitKeep(p) < 0.5) discard;
   vec4 field = texture2D(uField, vUv);
   vec4 light = texture2D(uLight, vUv);
@@ -327,8 +332,8 @@ void main() {
   vec3 mossCol = mix(vec3(0.022, 0.048, 0.066), vec3(0.04, 0.098, 0.105), lit);
   mossCol = mix(mossCol, vec3(0.07, 0.19, 0.17), bright * 0.6);
   vec3 col = mix(earth, mossCol, moss);
-  float grain = gnoise(p / 3.5);
-  col *= 0.92 + 0.16 * grain;
+  float speck = grain(p, 3.5);
+  col *= 0.92 + 0.16 * speck;
   vec4 tuft = voronoiCell(p / 15.0 + 1.7);
   vec2 fromTuft = -tuft.zw * 15.0;
   // Each tuft fans its blades up the table, as standing grass leans to a camera looking up it;
@@ -338,14 +343,16 @@ void main() {
   float fan = 1.0 - smoothstep(0.8, 1.15, abs(bladeAngle));
   float blades = smoothstep(0.4 + 0.5 * bladeRun, 0.55 + 0.42 * bladeRun, cos(bladeAngle * 9.0 + tuft.y * 30.0))
     * fan * (1.0 - smoothstep(0.75, 1.05, bladeRun));
-  float hasTuft = step(fract(tuft.y * 41.7), 0.55) * smoothstep(0.25, 0.7, moss);
+  // Design 080: round the cards the moss is short (few tufts) and bare of flowers.
+  float calm = fieldCalm(p, 110.0);
+  float hasTuft = step(fract(tuft.y * 41.7), 0.55 * (1.0 - 0.65 * calm)) * smoothstep(0.25, 0.7, moss) * patternFade(filterPixel, 15.0);
   vec3 blade = mix(vec3(0.03, 0.09, 0.08), vec3(0.08, 0.24, 0.19), smoothstep(1.0, 6.0, length(fromTuft)));
   col = mix(col, blade * mix(0.7, 1.15, lit), blades * hasTuft);
   // Light falling through the canopy in soft flecks, drifting as the leaves stir.
   float fleck = smoothstep(0.6, 0.72, fbm3(p / 70.0 + vec2(uTime * 0.02, 0.0) + 11.0));
   col = mix(col, col * 1.5 + vec3(0.01, 0.02, 0.03), fleck * 0.3);
   vec4 bloom = voronoiCell(p / 26.0 + 5.0);
-  float flower = (1.0 - smoothstep(1.4, 2.2, length(bloom.zw) * 26.0)) * step(fract(bloom.y * 23.1), 0.16) * moss;
+  float flower = (1.0 - smoothstep(1.4, 2.2, length(bloom.zw) * 26.0)) * step(fract(bloom.y * 23.1), 0.16) * moss * (1.0 - calm);
   vec3 petal = fract(bloom.y * 7.7) < 0.6 ? vec3(1.0, 0.32, 0.68) : vec3(0.78, 0.74, 1.0);
   col = mix(col, petal * mix(0.6, 1.0, lit), flower);
 
@@ -366,7 +373,7 @@ void main() {
   vec3 jungleFloor = mix(under, grassBlade, grass);
   col = mix(col, jungleFloor, step(0.5, kind) * step(kind, 1.5));
   // Roots: violet bark, ridged along their length, moss on their backs.
-  vec3 bark = mix(vec3(0.04, 0.02, 0.075), vec3(0.13, 0.07, 0.21), lit) * (0.85 + 0.3 * gnoise(p / 5.0));
+  vec3 bark = mix(vec3(0.04, 0.02, 0.075), vec3(0.13, 0.07, 0.21), lit) * (0.85 + 0.3 * grain(p, 5.0));
   bark = mix(bark, vec3(0.04, 0.14, 0.12), smoothstep(0.86, 0.97, n.z) * smoothstep(0.5, 0.65, gnoise(p / 11.0)));
   col = mix(col, bark, step(1.5, kind) * step(kind, 2.5));
   // Stones: blue-violet, moss on their tops.
@@ -375,7 +382,7 @@ void main() {
   col = mix(col, rock, step(2.5, kind) * step(kind, 3.5));
   // The island: lush teal-green grass, thick with pink and white flowers, as in the card art.
   vec3 islandGrass = mix(vec3(0.03, 0.12, 0.06), vec3(0.08, 0.32, 0.15), lit);
-  islandGrass = mix(islandGrass, vec3(0.18, 0.5, 0.24), bright * 0.7) * (0.85 + 0.3 * grain);
+  islandGrass = mix(islandGrass, vec3(0.18, 0.5, 0.24), bright * 0.7) * (0.85 + 0.3 * speck);
   vec4 blossom = voronoiCell(p / 9.0 + 2.0);
   float bud = (1.0 - smoothstep(1.2, 2.0, length(blossom.zw) * 9.0)) * step(fract(blossom.y * 17.3), 0.3);
   islandGrass = mix(islandGrass, fract(blossom.y * 5.3) < 0.55 ? vec3(1.0, 0.3, 0.62) : vec3(0.85, 0.82, 1.0), bud);
@@ -438,12 +445,14 @@ ${JUNGLE}
 ${CANOPY}
 varying vec2 vPos;
 
+// Design 080: the art's poison pink, a few steps deeper and less fluorescent, so the bogs read as the
+// jungle's danger without being the brightest thing beside the cards.
 vec3 poisonColor(float t) {
   t = clamp(t, 0.0, 1.0);
-  vec3 deep = vec3(0.32, 0.025, 0.22);
-  vec3 body = vec3(0.86, 0.15, 0.56);
-  vec3 lighter = vec3(1.0, 0.4, 0.78);
-  vec3 pale = vec3(1.04, 0.7, 0.95);
+  vec3 deep = vec3(0.24, 0.02, 0.17);
+  vec3 body = vec3(0.6, 0.11, 0.4);
+  vec3 lighter = vec3(0.78, 0.3, 0.6);
+  vec3 pale = vec3(0.86, 0.58, 0.8);
   vec3 c = mix(deep, body, smoothstep(0.2, 0.28, t));
   c = mix(c, lighter, smoothstep(0.58, 0.64, t));
   return mix(c, pale, smoothstep(0.84, 0.9, t));
@@ -688,6 +697,7 @@ ${TABLE_UNIFORMS}
 uniform float uTime;
 uniform float uFocal;
 ${NOISE}
+${FOOTPRINTS}
 ${REVEAL}
 ${JUNGLE}
 attribute vec4 aSeed;
@@ -722,7 +732,8 @@ void main() {
   pos.xy += vec2(sin(life * 5.0 + aSeed.x * 30.0), cos(life * 4.0 + aSeed.y * 30.0)) * 12.0 * life;
   pos.z += life * (46.0 + 64.0 * aSeed.y);
   vec2 inside = step(uMin + 30.0, start) * step(start, uMin + uSize - 30.0);
-  float shown = revealBurned(start) * exitKeep(start) * inside.x * inside.y * inJungle;
+  // Design 080: spores drift over the bogs and the undergrowth, none beside a card.
+  float shown = revealBurned(start) * exitKeep(start) * inside.x * inside.y * inJungle * (1.0 - fieldCalm(pos.xy, 60.0));
   vec4 mv = modelViewMatrix * vec4(pos, 1.0);
   gl_Position = projectionMatrix * mv;
   float sizePx = (1.4 + aSeed.z * 2.2) * (1.0 - life * 0.4);

@@ -24,6 +24,8 @@
 // smaller, for their shadows); LAKE is one flat sheet at lake level, its waves all in the shading;
 // FALLS the sheets of water; MIST the spray where they land; FENCE the path's posts and rails.
 import {
+  FILTERING,
+  FOOTPRINTS,
   FULLSCREEN_VERTEX,
   NOISE,
   OUTPUT,
@@ -437,14 +439,17 @@ const MATERIALS = /* glsl */ `
 // lighter in broad patches; tall grass in patches, lighter, in upright tufts.
 vec3 grassColour(vec2 p) {
   vec2 q = vec2(0.8 * p.x + 0.6 * p.y, 0.8 * p.y - 0.6 * p.x);
+  // Design 080: the strokes are 2-3 px across; where the screen can't draw that they fade to their
+  // mean tone instead of breaking into speckle.
+  float fine = patternFade(filterPixel, 4.5);
   float strokes = gnoise(q / vec2(12.0, 2.4)) * 0.65 + gnoise(q / vec2(5.0, 1.6) + 4.0) * 0.35;
-  vec3 c = mix(GRASS, GRASS_DARK, smoothstep(0.54, 0.64, strokes));
+  vec3 c = mix(GRASS, GRASS_DARK, mix(0.3, smoothstep(0.54, 0.64, strokes), fine));
   c = mix(c, GRASS_LIGHT, smoothstep(0.58, 0.8, fbm3(p / 120.0 + 1.7)) * 0.55);
   float tall = smoothstep(0.64, 0.68, fbm3(p / 70.0 + 12.0));
   if (tall > 0.0) {
     vec2 cell = floor(p / vec2(5.0, 7.0));
-    float tuft = gnoise(p / vec2(2.0, 6.0) + hash12(cell) * 3.0);
-    vec3 tallColour = mix(GRASS, TALL_GRASS, smoothstep(0.3, 0.75, tuft)) * (0.85 + 0.25 * hash12(cell + 3.0));
+    float tuft = mix(0.52, gnoise(p / vec2(2.0, 6.0) + hash12(cell) * 3.0), fine);
+    vec3 tallColour = mix(GRASS, TALL_GRASS, smoothstep(0.3, 0.75, tuft)) * (0.975 + (0.25 * hash12(cell + 3.0) - 0.125) * fine);
     c = mix(c, tallColour, tall);
   }
   return c;
@@ -459,7 +464,7 @@ vec3 earthColour(vec2 p, float height) {
 // Sand: the game's orange tan, grained, lighter in drifts, damp and dark at the water.
 vec3 sandColour(vec2 p, float land) {
   vec3 c = mix(SAND_DRY, SAND_LIGHT, smoothstep(0.4, 0.8, fbm3(p / 60.0 + 5.0)) * 0.7);
-  c *= 0.92 + 0.12 * gnoise(p / 2.5);
+  c *= 0.93 + 0.1 * grain(p, 2.5);
   return mix(SAND_WET, c, smoothstep(0.5, 7.0, land));
 }
 // A wall's courses as the game lays them: rows of big rough stones 17 px high and 24..44 px long,
@@ -671,6 +676,7 @@ void main() {
 export const LAND_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
+${FILTERING}
 ${VORONOI}
 ${REVEAL}
 ${PLACE}
@@ -700,6 +706,7 @@ float landingChurn(vec2 p) {
 }
 void main() {
   vec2 p = vPos;
+  filterPixel = pixelSize(p);
   if (revealBurned(p) * exitKeep(p) < 0.5) discard;
   vec4 field = texture2D(uField, vUv);
   float land = field.g;
@@ -876,6 +883,7 @@ void main() {
 export const STONEWORK_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
+${FILTERING}
 ${VORONOI}
 ${REVEAL}
 ${STRUCTURES}
@@ -890,6 +898,7 @@ varying float vGround;
 varying float vGrowth;
 void main() {
   vec2 p = vPos.xy;
+  filterPixel = pixelSize(p);
   if (revealBurned(p) * exitKeep(p) < 0.5) discard;
   float part = floor(vPart.x + 0.5);
   float along = vPart.y;
@@ -1098,6 +1107,7 @@ float sparkles(vec2 p, float time, float swell, float path) {
 export const LAKE_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
+${FOOTPRINTS}
 ${REVEAL}
 ${TERRAIN_GROUND}
 ${PLACE}
@@ -1124,33 +1134,38 @@ void main() {
 
   // The surface: the swell, rings off the plunges, round the boulders and where a fish rose; still at
   // the very edge.
+  // Design 080: every card lies on this lake, so round the cards the water lies quiet: a gentle swell,
+  // faint ripples, no fish rising, no crest strokes or sun sparkles; the lively water is out by the
+  // falls, the boulders and the shores.
+  float calm = fieldCalm(p, 90.0);
   vec3 wave = waves(p, uTime);
-  vec3 rings = plungeRings(p, uTime) + rockRings(p, uTime) + fishRings(p, uTime);
+  vec3 rings = plungeRings(p, uTime) + rockRings(p, uTime) + fishRings(p, uTime) * (1.0 - calm);
   float still = growth * smoothstep(0.0, 6.0, offshore);
-  vec2 gradient = (wave.yz * 1.1 + rings.yz * 1.2) * still;
+  vec2 gradient = (wave.yz * 1.1 * (1.0 - 0.6 * calm) + rings.yz * 1.2) * still;
   vec3 n = normalize(vec3(-gradient, 1.0));
 
   // The water: the game's teal and ripples; the sand shows through only in the first px of the
   // shallows. Darker in the walls' shade and close under them.
   vec3 col = gameWater(p + gradient * 6.0, uTime);
+  col = mix(col, mix(WATER_DEEP, WATER, 0.62) * (0.92 + 0.16 * fbm3(p / 220.0 + uTime * 0.01)), calm * 0.65);
   vec3 bed = BED_SAND * (0.9 + 0.15 * gnoise(p / 30.0)) + caustics(p * 0.7, uTime) * 0.25;
   col = mix(col, bed * vec3(0.72, 0.93, 1.0), exp(-max(offshore, 0.0) / 4.0) * growth * 0.8);
   col *= mix(0.6, 1.0, light.a) * mix(0.72, 1.0, light.b);
   // Rocks under the surface: dark, lighter on their tops, wavering with the water.
-  vec2 sunken = sunkenRock(p + gradient * 8.0) * still;
+  vec2 sunken = sunkenRock(p + gradient * 8.0) * still * (1.0 - calm);
   col = mix(col, col * vec3(0.34, 0.44, 0.48), sunken.x * 0.85);
   col = mix(col, WATER_LIGHT * 0.8, sunken.y * 0.45);
   // The art's swell: troughs a little deeper, its white crescent strokes on the crests.
   float swell = (wave.x + rings.x) / 1.2;
   col *= 1.0 - 0.18 * smoothstep(0.1, 0.9, -swell) * still;
-  col = mix(col, WATER_STREAK, crestStrokes(p, swell, uTime) * 0.7 * still);
+  col = mix(col, WATER_STREAK, crestStrokes(p, swell, uTime) * 0.7 * still * (1.0 - calm));
   col = mix(col, FALL_LIGHT, spillRush(p, uTime) * 0.6);
   // The sky off the surface, by Fresnel; the sun's sparkles.
   vec3 mirror = reflect(-eye, n);
   float fresnel = 0.02 + 0.98 * pow(1.0 - max(dot(n, eye), 0.0), 5.0);
   col = mix(col, skyColor(mirror), clamp(fresnel * 2.0, 0.0, 0.5));
   float path = smoothstep(0.86, 0.98, dot(reflect(-eye, vec3(0.0, 0.0, 1.0)), sun));
-  float glint = sparkles(p, uTime, swell, path) * light.a * still;
+  float glint = sparkles(p, uTime, swell, path) * light.a * still * (1.0 - calm);
 
   // Foam: the plunges' churn and the lace they send off, white water round the boulders, and the
   // game's crisp white line at every waterline, the water a little darker just inside it.

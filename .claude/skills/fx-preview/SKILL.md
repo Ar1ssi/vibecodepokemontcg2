@@ -124,6 +124,25 @@ SwiftShader. Worktree server on :4100 first.
   `WEBGL=0` checks the fallback to the DOM hit dressing. Frames to `.agent/scratch/attack-hit/`.
 - By hand: open `/src/dev/attack-fx-lab.html`, pick a type and size, scrub the time slider.
 
+## Stadium boards (design 077/080, `rec/rec-stadium-boards.mjs`)
+
+Stills of every Stadium board as a game shows it: both players' zones filled with Homebrew card art,
+the board's Stadium in play (the view picks the board, as in a game), each camera preset, 1920x1080.
+One page per board; the first preset is set before the page loads, later presets switch in place (the
+board's programs stay compiled, which is most of a still's time on SwiftShader: ~2-4 min a board).
+
+```bash
+PORT=4100 pnpm start &
+SIO_JS=<node_modules/.pnpm/socket.io@*/node_modules/socket.io/client-dist/socket.io.min.js> \
+  BOARDS=scorched-earth,levincia PRESETS=tilt12,tcgl OUT=.agent/scratch/stadium-boards \
+  node .claude/skills/fx-preview/rec/rec-stadium-boards.mjs
+```
+
+- `<OUT>/<board>-<preset>.png`, plus `sheet-<preset>.png` (ImageMagick `montage`) when there are several.
+- `EMPTY=1` shows the bare board. Shader errors and stadium warnings print as they happen.
+- Judge playability on the stills: the cards' borders against the ground, nothing bright or busy beside a
+  card, nothing over one (design 080 § Rules).
+
 ## Builder tab: the Build & Battle unboxing (`rec/rec-unboxing.mjs`)
 
 The unboxing scene (design 052) lives in the builder tab, not on the board, so its recorder drives

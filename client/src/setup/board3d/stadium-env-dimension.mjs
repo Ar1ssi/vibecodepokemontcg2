@@ -15,6 +15,8 @@
 // where the void shows); ROCK draws the island's cliffs, every small island and the bare tree, bobbing;
 // DISCS the glowing coloured discs; VOID the rainbow void far below; SPARKLES the white sparkle.
 import {
+  FILTERING,
+  FOOTPRINTS,
   FULLSCREEN_VERTEX,
   NOISE,
   OUTPUT,
@@ -47,7 +49,7 @@ export const DISC_HUES = Object.freeze([
   [238, 120, 196],
   [76, 118, 232],
 ]);
-const SPARKLE_COUNT = 320;
+const SPARKLE_COUNT = 150;
 
 /** A small deterministic 0..1 from three numbers. */
 const hash = (x, y, salt) => {
@@ -140,8 +142,9 @@ export function valleySpots(layout) {
       const y = gy + (roll(2) - 0.5) * discStep * 0.8;
       const r = (9 + 16 * roll(3) ** 1.6) * u;
       const sd = islandDistance(island, x, y);
-      if (sd > -14 * u || roll(4) > 0.42) continue;
-      if (cards.some((card) => distanceToRect(x, y, card) < r + 8 * u)) continue;
+      // Design 080: fewer, and a clear step off every card, so no bright blot sits at a card's edge.
+      if (sd > -14 * u || roll(4) > 0.3) continue;
+      if (cards.some((card) => distanceToRect(x, y, card) < r + 30 * u)) continue;
       // The ground round the Actives stays calm: no disc inside the painted mark.
       if (emblem && Math.hypot(x - emblem.x, y - emblem.y) < emblem.r + 24 * u) continue;
       if (discs.length < MAX_DISCS) discs.push({ x, y, z: 1, r, hue: Math.floor(roll(5) * DISC_HUES.length), bob: 0, phase: 0 });
@@ -255,8 +258,8 @@ void main() {
 
 // The card art's colours (pixel samples, inverted through Neutral tone mapping).
 const PALETTE = /* glsl */ `
-const vec3 GRASS = vec3(0.154, 0.416, 0.078);
-const vec3 GRASS_LIT = vec3(0.345, 0.65, 0.12);
+const vec3 GRASS = vec3(0.13, 0.34, 0.08);
+const vec3 GRASS_LIT = vec3(0.29, 0.54, 0.12);
 const vec3 GRASS_DARK = vec3(0.063, 0.193, 0.058);
 const vec3 EARTH = vec3(0.245, 0.142, 0.085);
 const vec3 EARTH_DARK = vec3(0.096, 0.067, 0.052);
@@ -295,6 +298,7 @@ vec3 grassSurface(vec2 p, float clump) {
 export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
+${FILTERING}
 ${VORONOI}
 ${REVEAL}
 ${POKE_BALL}
@@ -306,6 +310,7 @@ varying vec2 vUv;
 varying float vGrowth;
 void main() {
   vec2 p = vPos;
+  filterPixel = pixelSize(p);
   vec4 field = texture2D(uField, vUv);
   // Past the island's edge there is only the void below.
   if (field.g > 0.0 || revealBurned(p) * exitKeep(p) < 0.5) discard;
@@ -320,7 +325,7 @@ void main() {
   // Broad drifts of sun-yellow and shaded blue-green, and bare soil showing through toward the edge.
   col *= mix(vec3(0.9, 1.0, 0.9), vec3(1.08, 1.03, 0.88), fbm3(p / 230.0 + 2.0));
   float soil = smoothstep(0.6, 0.7, fbm3(p / 52.0 + 3.0)) * smoothstep(-76.0, -16.0, field.g);
-  col = mix(col, EARTH * (0.75 + 0.5 * gnoise(p / 5.0)), soil * 0.85);
+  col = mix(col, EARTH * (0.75 + 0.5 * grain(p, 5.0)), soil * 0.85);
   col *= 0.65 + 0.45 * lit;
   col *= mix(0.6, 1.0, smoothstep(0.3, 0.9, light.b));
   // Toward the edge the grass thins over the earth, then its lip catches the light where it turns
@@ -598,14 +603,14 @@ void main() {
   float body = 1.0 - smoothstep(0.92, 1.0, r);
   float core = 1.0 - smoothstep(0.0, 0.85, r);
   float glow = exp(-(r - 1.0) * (r - 1.0) * 6.0) * step(1.0, r);
-  float breath = 0.85 + 0.15 * sin(uTime * 1.3 + vHue.r * 9.0 + vHue.b * 5.0);
+  float breath = 0.94 + 0.06 * sin(uTime * 0.6 + vHue.r * 9.0 + vHue.b * 5.0);
   // A painted glowing lozenge, as the art's, lying flat: a brighter rim, a paler heart, swirled a little.
   float rim = smoothstep(0.7, 0.95, r) * (1.0 - smoothstep(0.95, 1.0, r));
   float swirl = 0.5 + 0.5 * sin(atan(vLocal.y, vLocal.x) * 3.0 + r * 5.0 + vHue.g * 8.0);
-  vec3 col = vHue * (0.85 + 0.5 * core) * breath * (0.9 + 0.2 * swirl) + vec3(0.3) * core * core * core;
-  col += vHue * rim * 0.45;
-  float alpha = max(body, glow * 0.35 * breath);
-  gl_FragColor = vec4(mix(vHue * 1.4, col, body), alpha);
+  vec3 col = vHue * (0.7 + 0.35 * core) * breath * (0.92 + 0.16 * swirl) + vec3(0.18) * core * core * core;
+  col += vHue * rim * 0.3;
+  float alpha = max(body, glow * 0.22 * breath);
+  gl_FragColor = vec4(mix(vHue * 1.1, col, body), alpha);
 ${OUTPUT}
 }
 `;
@@ -635,6 +640,10 @@ void main() {
   float nebula = fbm3(p / 300.0 + vec2(t * 0.02, -t * 0.01));
   vec3 col = voidColour(p, t) * (0.5 + 0.6 * nebula) * 0.85;
   col += voidColour(p + vec2(260.0, 0.0), t) * 0.25 * smoothstep(0.6, 0.85, fbm3(p / 120.0 - t * 0.03));
+  // Design 080: the art's rainbow kept rich but deep, about half its light, leaning to violet, so the
+  // void reads as far below the island instead of glaring round the cards (taking its saturation out
+  // instead turned the yellow and green to mud).
+  col *= mix(vec3(0.5), vec3(0.46, 0.44, 0.6), 0.5);
   // Streams of white sparkle running up across it, as the art's: specks along drifting bands.
   vec2 flow = vec2(dot(p, vec2(0.6, 0.8)), dot(p, vec2(-0.8, 0.6)));
   float band = smoothstep(0.5, 0.75, gnoise(vec2(flow.y / 140.0, flow.x / 900.0 - t * 0.05)));
@@ -645,9 +654,9 @@ void main() {
   float turn = hash12(cell + 5.0) * 6.2831853 + t * (0.6 + hash12(cell + 9.0));
   vec2 flake = vec2(cos(turn) * inCell.x + sin(turn) * inCell.y, -sin(turn) * inCell.x + cos(turn) * inCell.y);
   float speck = step(0.8, hash12(cell)) * (1.0 - smoothstep(0.06, 0.12, abs(flake.x))) * (1.0 - smoothstep(0.14, 0.26, abs(flake.y)))
-    * (0.5 + 0.5 * sin(t * 4.0 + hash12(cell + 7.0) * 30.0));
+    * (0.6 + 0.4 * sin(t * 1.5 + hash12(cell + 7.0) * 30.0));
   vec3 speckHue = mix(vec3(1.0), 0.55 + 0.45 * cos(6.2831853 * (hash12(cell + 3.0) + vec3(0.0, 0.33, 0.67))), step(0.45, hash12(cell + 11.0)));
-  col += speckHue * speck * band * 1.1;
+  col += speckHue * speck * band * 0.6;
   // The island's soft shadow on the mist far below it, and each small slab's, so they hang in front of it.
   col *= mix(0.3, 1.0, smoothstep(0.0, 260.0, islandDistance(p + vec2(30.0, 40.0))));
   for (int i = 0; i < ${MAX_ISLANDS}; i++) {
@@ -666,6 +675,7 @@ ${TABLE_UNIFORMS}
 uniform float uTime;
 uniform float uFocal;
 ${NOISE}
+${FOOTPRINTS}
 ${REVEAL}
 attribute vec4 aSeed;
 varying vec3 vHue;
@@ -677,10 +687,11 @@ void main() {
   float cycle = floor(clock / period);
   vec2 start = uMin + hash22(aSeed.xy * 61.0 + cycle) * uSize;
   vec3 pos = vec3(start + vec2(-40.0, 60.0) * life, -${VOID_DEPTH}.0 * (0.25 + 0.6 * aSeed.y) + 220.0 * life);
-  float shown = revealBurned(start) * exitKeep(start);
+  // Design 080: the streams of sparkle keep to the void; none rise past the island's cards.
+  float shown = revealBurned(start) * exitKeep(start) * step(fieldCalm(start, 140.0), 0.001);
   vec4 mv = modelViewMatrix * vec4(pos, 1.0);
   gl_Position = projectionMatrix * mv;
-  vGlow = smoothstep(0.0, 0.15, life) * (1.0 - smoothstep(0.7, 1.0, life)) * (0.5 + 0.5 * sin(clock * 5.0 + aSeed.x * 40.0));
+  vGlow = smoothstep(0.0, 0.15, life) * (1.0 - smoothstep(0.7, 1.0, life)) * (0.65 + 0.35 * sin(clock * 1.6 + aSeed.x * 40.0));
   vHue = aSeed.x < 0.7 ? vec3(1.0) : 0.6 + 0.4 * cos(6.2831853 * (aSeed.w + vec3(0.0, 0.33, 0.67)));
   gl_PointSize = max((1.2 + 1.6 * aSeed.z) * uFocal / -mv.z, 1.5) * 2.2 * shown;
 }

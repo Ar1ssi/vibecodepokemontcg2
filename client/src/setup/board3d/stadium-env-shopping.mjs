@@ -14,6 +14,7 @@
 // polish and every prop's soft shadow on it; PROPS the walls, mezzanine, escalators, tables, mannequins
 // and balloons (stadium-env-props).
 import {
+  FOOTPRINTS,
   FULLSCREEN_VERTEX,
   NOISE,
   OUTPUT,
@@ -159,15 +160,16 @@ export const TERRAIN_VERTEX = STANDARD_TERRAIN_VERTEX;
 // The card art's colours (pixel samples), kept a shade under the art's lightest so white card borders keep their edge.
 const PALETTE = /* glsl */ `
 const vec3 TILE_PINK = vec3(0.93, 0.34, 0.42);
-const vec3 TILE_PALE = vec3(1.22, 0.95, 1.04);
-const vec3 GROUT = vec3(1.3, 1.12, 1.18);
-const vec3 RING_GOLD = vec3(1.75, 0.92, 0.08);
+const vec3 TILE_PALE = vec3(1.0, 0.78, 0.86);
+const vec3 GROUT = vec3(1.1, 0.94, 1.0);
+const vec3 RING_GOLD = vec3(1.3, 0.7, 0.07);
 const vec3 RING_DARK = vec3(0.84, 0.35, 0.07);
 `;
 
 export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
+${FOOTPRINTS}
 ${REVEAL}
 ${EDGE_HAZE}
 ${PALETTE}
@@ -192,11 +194,15 @@ void main() {
   vec2 cell = floor(p / tile);
   float checker = mod(cell.x + cell.y, 2.0);
   // The checkered floor: coral pink and pale pink, each tile a shade of its own, a bright grout line.
-  vec3 col = mix(TILE_PINK, TILE_PALE, checker);
-  col *= 0.95 + 0.1 * hash12(cell + 3.0);
+  // Design 080: round the cards the two pinks draw close together (a blush floor with a faint
+  // checker), so the hard high-contrast squares never run under the cards; full contrast out by the
+  // shops. The pale tile stays a step under the cards' white borders.
+  float calm = fieldCalm(p, 120.0);
+  vec3 col = mix(TILE_PINK, TILE_PALE, mix(checker, 0.55, 0.7 * calm));
+  col *= 0.96 + 0.08 * hash12(cell + 3.0);
   vec2 inTile = abs(fract(p / tile) - 0.5) * tile;
   float grout = 1.0 - smoothstep(0.3, 1.3, tile * 0.5 - max(inTile.x, inTile.y));
-  col = mix(col, GROUT, grout * 0.55);
+  col = mix(col, GROUT, grout * mix(0.55, 0.25, calm));
   // Polish: broad soft lamp reflections drifting across it, a wash of sheen toward the middle.
   vec3 view = normalize(uEye - vec3(p, 0.0));
   float sheen = pow(max(dot(reflect(-sun, vec3(0.0, 0.0, 1.0)), view), 0.0), 6.0);
@@ -250,15 +256,26 @@ const MAN_LEG = [0.9, 0.85, 0.85, 0];
 const MAN_TOPS = [[0.92, 0.55, 0.08, 0], [1.0, 0.36, 0.5, 0]];
 const LIGHT_GLOBE = [1.8, 1.7, 1.5, 2.6];
 
-/** A table of folded clothes: a wood top on four legs, rows of colourful piles on it. */
+/**
+ * Two neighbouring colours of the shirt palette for a table or rack: stock is set out sorted by
+ * colour (design 080: piles in random colours read as a rainbow quilt of colour blocks).
+ */
+const stockColours = (seed) => {
+  const first = Math.floor(seed * SHIRTS.length) % SHIRTS.length;
+  return [SHIRTS[first], SHIRTS[(first + 1 + Math.floor(seed * 7) % 2) % SHIRTS.length]];
+};
+
+/** A table of folded clothes: a wood top on four legs, rows of piles in two colours on it. */
 function displayTable(props, table, u) {
   props.box({ x: table.x, y: table.y, z0: table.h - 4 * u, z1: table.h, hw: table.w / 2, hh: table.d / 2, color: WOOD, topColor: [0.62, 0.36, 0.2, 0] });
   for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) props.box({ x: table.x + sx * (table.w / 2 - 4 * u), y: table.y + sy * (table.d / 2 - 4 * u), z0: -1, z1: table.h - 4 * u, hw: 2.2 * u, hh: 2.2 * u, color: WOOD });
   const rows = 3;
   const cols = 5;
+  const stock = stockColours(hash(table.x, table.y, 7));
   for (let r = 0; r < rows; r += 1) {
     for (let c = 0; c < cols; c += 1) {
-      const colour = SHIRTS[Math.floor(hash(table.x + r, table.y + c, 7) * SHIRTS.length)];
+      const tone = 0.94 + 0.12 * hash(table.x + r, table.y + c, 9);
+      const colour = stock[r % 2].map((v) => v * tone);
       const height = (4 + 5 * hash(r, c, table.seed * 10)) * u;
       props.box({
         x: table.x + (r - 1) * (table.w / 3.2),
@@ -295,7 +312,9 @@ function shirtRack(props, rack, u) {
   props.cylinder({ x: rack.x, y: rack.y + rack.len / 2, z0: -1, z1: 60 * u, r: 2 * u, color: RAIL, sides: 8 });
   props.tube([[rack.x, rack.y - rack.len / 2, 60 * u], [rack.x, rack.y + rack.len / 2, 60 * u]], 1.6 * u, RAIL, { sides: 8 });
   for (let k = 0; k < count; k += 1) {
-    const colour = SHIRTS[Math.floor(hash(rack.seed * 10, k, 5) * SHIRTS.length)];
+    // A rack runs from one colour into its neighbour along its length.
+    const [from, to] = stockColours(rack.seed);
+    const colour = from.map((v, i) => v + (to[i] - v) * (k / Math.max(1, count - 1)));
     const y = rack.y - rack.len / 2 + (k + 0.5) * step;
     props.box({ x: rack.x, y, z0: 28 * u, z1: 58 * u, hw: 14 * u, hh: 2.6 * u, color: [colour[0], colour[1], colour[2], 0.2], topColor: [colour[0] * 1.1, colour[1] * 1.1, colour[2] * 1.1, 0.2] });
   }
