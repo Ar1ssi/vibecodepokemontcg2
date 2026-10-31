@@ -310,6 +310,8 @@ export function buildServerAttackContext(
       (total, { card }) => total + energyOn(own, card, { stadiumCard, opponent }).length,
       0
     ),
+    // Energy units on each of this player's Pokémon (provided types) for "{R} Energy attached to all your Pokémon".
+    ownEnergyUnits: ownInPlay.flatMap(({ card }) => energyOn(own, card, { stadiumCard, opponent })),
     // Types of the Energy attached across this player's board, one entry per card, for
     // "times the amount of {X} Energy attached to your Pokémon" scaling. Card-level descriptor
     // types: Stadium type rewrites and multi-provision Special Energy are not reflected here.

@@ -231,6 +231,13 @@ function energyAcrossCount(unit, ctx) {
   if (/^energy attached to all of your active pokémon$/.test(unit) && num(ctx.energyCount) != null) {
     return { count: ctx.energyCount, label: 'Energy on your Active Pokémon' };
   }
+  // Blacephalon Fireball Circus: "{R} Energy attached to all your Pokémon".
+  const typedOwn = /^{([a-z])} energy attached to all (?:of )?your pokémon$/.exec(unit);
+  if (typedOwn && Array.isArray(ctx.ownEnergyUnits)) {
+    const type = LETTER_TYPES[typedOwn[1]];
+    const units = ctx.ownEnergyUnits.filter((u) => lower(u).split('|').some((part) => sameType(part, type)));
+    return { count: units.length, label: `${type} Energy on all your Pokémon` };
+  }
   const typedAll = /^{([a-z])} energy attached to all pokémon$/.exec(unit);
   if (typedAll && Array.isArray(ctx.allEnergyUnits)) {
     const type = LETTER_TYPES[typedAll[1]];
