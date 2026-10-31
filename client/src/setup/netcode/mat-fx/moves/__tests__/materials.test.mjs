@@ -126,15 +126,16 @@ test('the grain pass is a no-op where no noise tile can be made, and with zero s
 test('water uses the recipe palette, a navy shade, mist for smoke and droplet particles', () => {
   const water = MATERIALS.water;
   assert.equal(materialFor('water').palette, water.palette, 'the registry serves this kit (design 079 wraps it with its elements)');
-  assert.deepEqual(water.palette.deep, [46, 124, 230]);
-  assert.deepEqual(water.palette.body, [82, 180, 255]);
-  assert.deepEqual(water.palette.hot, [185, 232, 255]);
+  // SV Hydro Pump (Poképédia Hydrocanon_EV.mp4, 2.0–2.5 s): saturated turquoise body, pale hot stop only.
+  assert.deepEqual(water.palette.deep, [24, 120, 208]);
+  assert.deepEqual(water.palette.body, [46, 196, 240]);
+  assert.deepEqual(water.palette.hot, [136, 216, 248]);
   assert.deepEqual(water.palette.white, [255, 255, 255]);
   assert.deepEqual(water.smoke, [190, 215, 235]);
   assert.ok(water.shade.every((v, i) => v <= water.palette.deep[i]), 'shade darker than deep');
   assert.equal(water.particle.className, 'fx-particle--droplet');
   assert.equal(water.particle.aspect, 1);
-  assert.deepEqual(rgbOf(water.particle.color), [185, 232, 255]);
+  assert.deepEqual(rgbOf(water.particle.color), [136, 216, 248]);
 });
 
 test('a water sheet never blurs: one fill, a 1.5 px pale leading-edge glint, drops shed in one fill', () => {

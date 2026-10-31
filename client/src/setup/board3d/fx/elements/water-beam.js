@@ -90,32 +90,71 @@ void main() {
   float nv = clamp(v / max(half_, 1e-3), -1.0, 1.0);
   float nz = sqrt(max(1.0 - nv * nv, 0.0));
   float ripple = elFbm(vec3(along * 0.7 - flow * 2.2, nv * 1.5, seed + 4.0)) - 0.5;
-  vec2 bend = vec2(nv * 10.0 + ripple * 8.0, ripple * 8.0);
-  vec3 behind = elBoardAt(bend, vC.rgb * 0.35);
-  vec3 tinted = behind * mix(vec3(1.0), vD.rgb * 1.15, 0.6);
-  vec3 caustic = vD.rgb;
+  // Lit from up-left across the tube (the scene's one light): a Lambert lit side, a shadow side
+  // and the terminator between them. Light across the form is what makes a cylinder a cylinder;
+  // an outline with a highlight line is a flat band.
+  float lambert = max(dot(vec3(nv, 0.0, nz), normalize(vec3(-0.75, 0.0, 0.66))), 0.0);
+  float shade = 0.35 + 0.65 * lambert;
+  // Refraction: a lens, so the board bends little down the middle and hard toward the sides, and
+  // ripples along the flow. The scene behind is in the water's shadow too.
+  vec2 bend = vec2(nv * abs(nv) * 30.0 + ripple * 10.0, ripple * 10.0);
+  vec3 behind = elBoardAt(bend, vC.rgb * 0.35) * (0.55 + 0.45 * shade);
+  // Clear water: the scene shows through, tinted. In-scattered body colour keeps the column
+  // saturated blue over the dark cloth (pale glass over black reads as ice, not water).
+  vec3 tinted = behind * mix(vec3(1.0), vD.rgb * 1.2, 0.65) + vD.rgb * 0.3 * shade;
+  // The beam texture is a mask, not a colour: its cells run the water between deep and body so
+  // the column stays saturated (mixing it toward white made the beam a pale slab); its white cell
+  // web, sharpened, is the foam skin of running water.
+  float cells = 0.5;
   if (uBeamReady > 0.5) {
-    caustic = texture(uBeam, vec2(0.5 + nv * 0.45, along * 0.22 - flow * 1.3)).rgb;
+    cells = texture(uBeam, vec2(0.5 + nv * 0.45, along * 0.22 - flow * 1.3)).r;
   }
-  // Thin streams show less of the (often dark) board through them and more of the water's own light.
-  vec3 colour = mix(tinted, caustic * mix(vD.rgb, vec3(1.0), 0.35), mix(0.5, 0.75, taper));
-  colour = mix(colour, vC.rgb, (1.0 - nz) * 0.35 * (1.0 - taper));
-  // Splash and spray read pale: a thin stream is mostly lit water and air, not deep blue.
-  colour = mix(colour, vE.rgb, 0.5 * taper);
-  // White water: streaks stretched along the flow, running fast toward the head.
-  float streak = elFbm(vec3(nv * 2.2, along * 0.45 - flow * 3.2, seed + 9.0));
-  // Froth at the edges where the water tears, and at the head where it breaks.
-  float froth = 1.0 - smoothstep(0.0, 0.28, shape);
-  float foam = clamp(smoothstep(0.5, 0.68, streak) * (0.5 + 0.7 * (1.0 - nz)) + froth * (0.7 + 0.5 * taper) + smoothstep(0.85, 1.05, t) * 0.5, 0.0, 1.0) * vF.y;
-  colour = mix(colour, vec3(1.0), foam);
-  float fresnel = pow(1.0 - nz, 3.0);
-  float stripe = exp(-pow((nv + 0.42) * 7.0, 2.0)) * (0.7 + 0.3 * ripple);
-  colour += vE.rgb * fresnel * 0.6 + vec3(1.0) * stripe * 0.7;
+  vec3 water = mix(vC.rgb, vD.rgb, 0.35 + 0.65 * cells) * shade;
+  // A beam is mostly refracted scene (that is its clarity); a thin tongue is mostly its own colour.
+  vec3 colour = mix(tinted, water, mix(0.45, 0.72, taper));
+  // The shadow side falls to the deep stop and both grazing sides darken: that gradient is the
+  // volume. The thickest water down the middle glows a little with the light passing through it.
+  colour = mix(colour, vC.rgb * 0.7, (1.0 - shade) * 0.75);
+  colour = mix(colour, vC.rgb, (1.0 - nz) * 0.3);
+  colour += vD.rgb * 0.15 * pow(nz, 3.0);
+  // A thin stream carries light at its crest only; its sides stay water-coloured, or it reads as ice.
+  colour = mix(colour, vE.rgb, 0.3 * taper * nz);
+  // Foam, tinted white (pure white over blue reads as frost), three kinds: the cell web; long
+  // streaks stretched along the flow (SV's white lines: the top ~12 % of a noise squashed along the
+  // axis); froth where the water tears, at the edges and the breaking head. A splash tongue
+  // (taper 1) froths far more than the column that feeds it: that contrast reads as "splash".
+  float web = smoothstep(0.58, 0.85, cells) * (0.35 + 0.65 * nz);
+  // The streaks wander with the ripple and break into lengths, or they are ruler-straight speed lines.
+  float streak = elFbm(vec3(nv * 2.6 + ripple * 1.6, along * 0.12 - flow * 4.0, seed + 9.0));
+  float streakCut = 0.74 - 0.14 * taper;
+  float lines = smoothstep(streakCut, streakCut + 0.08, streak) * (0.45 + 0.55 * smoothstep(0.35, 0.65, elFbm(vec3(nv * 4.0, along * 0.5 - flow * 3.0, seed + 5.0))));
+  // Froth is a wide, blobby band (coarse noise over the outer ~30 % of each side), not a hairline.
+  float froth = (1.0 - smoothstep(0.0, 0.3 + 0.1 * taper, shape)) * smoothstep(0.3, 0.75, elFbm(vec3(nv * 2.0, along * 0.6 - flow * 3.5, seed + 21.0))) * 1.4;
+  float head = smoothstep(0.88, 1.05, t);
+  float foam = clamp(web + lines * 0.9 + froth * (1.0 + 0.3 * taper) + head * (0.5 + 0.3 * taper), 0.0, 1.0) * vF.y;
+  vec3 foamColour = mix(vE.rgb, vec3(1.0), 0.8);
+  colour = mix(colour, foamColour, foam);
+  // Shine is light, added after coverage: a thin hot Fresnel rim, a broad sheen on the lit side
+  // with a glossy stripe inside it broken into glints by the streaks, a thinner reflection stripe
+  // on the shadow side's edge, and sparkle points.
+  float fresnel = pow(1.0 - nz, 4.0);
+  float sheen = exp(-pow((nv + 0.35) * 3.0, 2.0)) * 0.3;
+  // The glint is a string of glints: the streak noise cuts it into lengths that run with the flow.
+  float stripe = exp(-pow((nv + 0.42) * 11.0, 2.0)) * (0.2 + 0.8 * smoothstep(0.35, 0.65, streak));
+  // The shadow side's edge catches a rim light: the bright line against the dark half is what
+  // separates a round tube from a shaded band.
+  float stripe2 = exp(-pow((nv - 0.74) * 12.0, 2.0)) * 0.9;
+  float rimLight = fresnel * smoothstep(0.2, 0.8, nv) * 0.9;
+  float sparkle = smoothstep(0.78, 0.86, elFbm(vec3(nv * 7.0, along * 1.6 - flow * 5.0, seed + 33.0))) * nz;
+  vec3 light = vE.rgb * (fresnel * 0.5 + sheen + rimLight) + mix(vE.rgb, vec3(1.0), 0.8) * (stripe * 0.9 + stripe2 * 0.6) + vec3(1.0) * sparkle * 0.7;
   float edge;
   float alpha = coverage * vB.w * elDissolve(vec2(along * 0.4, v), vF.x, seed, edge);
   if (alpha <= 0.002) discard;
   colour = mix(colour, vE.rgb * 1.6, edge);
-  fragColor = vec4(colour * alpha, alpha * (0.78 + 0.2 * nz));
+  // Water is clearest down its middle and opaque at its grazing sides; foam covers fully.
+  float opacity = max(mix(0.62, 0.92, 1.0 - nz), foam * 0.95);
+  float a = alpha * opacity;
+  fragColor = vec4(colour * a + light * alpha, a);
 }
 `;
 

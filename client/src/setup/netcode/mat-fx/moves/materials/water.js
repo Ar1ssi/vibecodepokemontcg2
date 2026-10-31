@@ -55,10 +55,13 @@ const sheetMod = (angleDeg) => ({
 // glint and thrown drops over them, a drop (the projectile's head, a beam's beads) highest.
 const LIFT = Object.freeze({ sheet: 0.04, edge: 0.045, drops: 0.05, drop: 0.1 });
 
+// Palette sampled from the Scarlet/Violet Hydro Pump clip (Poképédia Hydrocanon_EV.mp4, 2.0–2.5 s):
+// the beam body is a saturated turquoise, not the B2W2 sprite's pale sky blue. The pale ramp read as
+// ice on the 3D board (user, 2026-10-29: "water spray reads icy"); saturation is the water read.
 const PALETTE = Object.freeze({
-  deep: Object.freeze([46, 124, 230]),
-  body: Object.freeze([82, 180, 255]),
-  hot: Object.freeze([185, 232, 255]),
+  deep: Object.freeze([24, 120, 208]),
+  body: Object.freeze([46, 196, 240]),
+  hot: Object.freeze([136, 216, 248]),
   core: Object.freeze([228, 247, 255]),
   white: Object.freeze([255, 255, 255]),
 });

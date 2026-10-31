@@ -8,11 +8,24 @@ import { beamPoint } from '../move-drawers.js';
 import { elementKit } from './_kit.js';
 import { alphaOf, dissolveOf, emit, rgb01, stageAngle, stageLen, stageOf } from './_emit.js';
 
-export const WATER_SCALE = Object.freeze({ stream: 1.4, streamLength: 1.25, drop: 1.6, projectile: 1.8, beam: 1.5, glow: 1.4 });
+// beam 1.45: the SV Hydro Pump column is ~0.35 card heights wide at contact (Hydrocanon_EV.mp4, 2.5 s);
+// 1.7 read as a thick pipe next to the card.
+export const WATER_SCALE = Object.freeze({ stream: 1.4, streamLength: 1.25, drop: 1.6, projectile: 1.8, beam: 1.45, glow: 1.4 });
 const DROPLETS = 8;
+/** Droplets the breaking head throws while a beam holds: thrown out and up, falling under gravity. */
+const HEAD_DROPLETS = 6;
+const HEAD_DROPLET_MS = 700;
+// A streak-drop: a tall capsule with a bright head and a dim tail (probed 2026-10-30), so it is
+// aligned along its flight; drawn square and upright its tail read as a grey dot.
 const DROPLET_TEXTURE = 'T_VFX_Water_Drop_Blurred.webp';
 const GLOW_TEXTURE = 'TEX_VFX_Gradient_Radial.webp';
-const SPLASH_TEXTURE = 'T_VFX_Water_Splash_2x2.webp';
+// Splash_Water_1x4 is the crown flipbook (a chunky splash breaking into drops over four frames);
+// Water_Splash_2x2 is only sparse splatter dots, which alone left the head with no visible splash.
+const SPLASH_TEXTURE = 'TEX_VFX_Splash_Water_1x4.webp';
+const SPLATTER_TEXTURE = 'T_VFX_Water_Splash_2x2.webp';
+const SPLASH_FRAME_MS = 90;
+/** A solid beam this narrow (card heights) inside a wider one is the stream's bright core. */
+const CORE_MAX_W = 0.12;
 const DEG = Math.PI / 180;
 
 const paletteOf = (kit) => ({ deep: rgb01(kit.palette.deep), body: rgb01(kit.palette.body), hot: rgb01(kit.palette.hot) });
@@ -97,7 +110,10 @@ function projectile(ctx, { x, y, r, headingDeg = 0, time = 0, seed = 0, alpha = 
       texture: DROPLET_TEXTURE,
       at: { x: at.x + Math.cos(side) * distance, y: at.y + Math.sin(side) * distance, z: at.z + radius * 0.6 * Math.sin(Math.PI * phase) },
       size: radius * (0.35 - 0.15 * phase),
-      colour: rgb01(this.base.palette.hot, 1.3),
+      // The streak lies along the droplet's flight (its width is across it).
+      alignDeg: (side * 180) / Math.PI - 90,
+      // Droplets are water, not light: body colour, no HDR gain, or they bloom white and read as frost.
+      colour: rgb01(this.base.palette.body, 1),
       alpha: a * (1 - phase),
     });
   }
@@ -113,6 +129,11 @@ function beam(ctx, lane, s, info) {
   if (!(pose.to > pose.from)) return;
   const kind = info.params?.kind ?? 'solid';
   if (kind === 'helix' || kind === 'pulse-train') return false;
+  // A spec that stacks a thin solid beam inside a wide one (Hydro Pump) means "a bright core in
+  // one stream", not two tubes: the thin one is drawn as a fast white-streak core, half covering,
+  // and leaves the head's crown and droplets to the wide beam, or both the water and the splash
+  // doubled up into an opaque pipe.
+  const isCore = kind === 'solid' && (info.params?.w ?? CORE_MAX_W + 1) <= CORE_MAX_W;
   const palette = paletteOf(info.material);
   const width = stageLen(ctx, pose.width) * WATER_SCALE.beam;
   const dissolve = dissolveOf(ctx);
@@ -123,29 +144,65 @@ function beam(ctx, lane, s, info) {
       from: stageOf(ctx, a.x, a.y),
       to: stageOf(ctx, b.x, b.y),
       width: kind === 'segmented' ? width * 0.8 : width,
-      alpha: alphaOf(ctx, segment.alpha),
+      alpha: alphaOf(ctx, segment.alpha * (isCore ? 0.5 : 1)),
       seed: info.seed + index * 1.3,
       taper: 0,
-      flow: 2.4,
-      foam: 0.75,
+      flow: isCore ? 3.6 : 2.4,
+      foam: isCore ? 1 : 0.75,
       dissolve,
       palette,
     });
   }
-  // The head breaks into spray: the splash flipbook, standing up where the water lands.
+  if (isCore) return;
+  // The head breaks into spray: the splash crown flipbook, upright over the landing point, three
+  // copies a frame apart so the crown churns while the beam holds; fine splatter dots over it.
   const head = beamPoint(lane, pose.to, 0);
   const at = stageOf(ctx, head.x, head.y);
-  const frame = Math.floor((info.elapsedMs ?? 0) / 70);
-  for (let k = 0; k < 3; k += 1) {
+  const elapsed = info.elapsedMs ?? 0;
+  const seed = info.seed ?? 0;
+  const frame = Math.floor(elapsed / SPLASH_FRAME_MS);
+  // Foam is matter: the crown covers (over) in a tinted white instead of adding light, so two
+  // copies over the beam's own head foam stay a crown and do not sum into a white sheet.
+  const foam = rgb01(info.material.palette.hot, 1).map((c) => c * 0.4 + 0.6);
+  for (let k = 0; k < 2; k += 1) {
     emit(ctx, 'sprite', {
       texture: SPLASH_TEXTURE,
-      at: { ...at, z: at.z + width * 0.3 },
-      size: width * (2.4 + 0.6 * k),
-      rotation: 120 * k + (info.seed ?? 0) * 40,
+      at: { ...at, z: at.z + width * 0.45 },
+      size: width * (3.0 + 0.6 * k),
+      rotation: (k - 0.5) * 18 + seed * 3,
       frame: frame + k,
-      colour: rgb01(info.material.palette.hot, 1.4),
-      alpha: alphaOf(ctx, 0.75),
+      colour: foam,
+      alpha: alphaOf(ctx, 0.85),
+      blend: 'over',
       dissolve,
+    });
+  }
+  emit(ctx, 'sprite', {
+    texture: SPLATTER_TEXTURE,
+    at: { ...at, z: at.z + width * 0.5 },
+    size: width * 3.2,
+    rotation: seed * 40,
+    frame,
+    colour: foam,
+    alpha: alphaOf(ctx, 0.55),
+    blend: 'over',
+    dissolve,
+  });
+  // Large droplets thrown off the head, rising then falling (SV: "large droplets hang and fall"):
+  // real refracting drops, so each is a lit sphere, not a dot. Placed by elapsed time and seed
+  // alone, so a frozen preview stands still.
+  for (let k = 0; k < HEAD_DROPLETS; k += 1) {
+    const phase = (((elapsed / HEAD_DROPLET_MS + k * 0.17 + seed * 0.11) % 1) + 1) % 1;
+    const angle = seed * 0.7 + k * ((Math.PI * 2) / HEAD_DROPLETS) + 0.4 * Math.sin(k * 3.3 + seed);
+    const distance = width * (0.5 + 1.8 * phase);
+    const rise = width * 2.3 * (phase - phase * phase);
+    emit(ctx, 'waterDrop', {
+      at: { x: at.x + Math.cos(angle) * distance, y: at.y + Math.sin(angle) * distance * 0.6, z: at.z + width * 0.3 + rise },
+      radius: width * (0.22 - 0.07 * phase),
+      alpha: alphaOf(ctx, 0.9 * (1 - phase * phase)),
+      seed: seed + k * 1.7,
+      dissolve,
+      palette,
     });
   }
 }
