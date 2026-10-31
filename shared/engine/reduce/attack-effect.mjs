@@ -1061,7 +1061,8 @@ export function resolveAttackEffectPhase(draft, ctx) {
           // Thorns via the trigger reader: a suppressed holder contributes
           // nothing, and an Active-Spot-only wording is inert off the Active
           // (the defender here is the opponent's Active, so isActive: true).
-          const thorns = parseOnDamageAbilities(defender, {
+          const defenderView = inPlayView(draft, defender);
+          const thorns = parseOnDamageAbilities(defenderView, {
             ...abilitySideContext(draft, defenderPlayerId),
             isActive: true,
           });
@@ -1093,7 +1094,7 @@ export function resolveAttackEffectPhase(draft, ctx) {
 
           // "… the Attacking Pokémon is now Poisoned" (Qwilfish, Numel, …): after thorns, so
           // an Attacker the thorns Knocked Out is no longer in the Active Spot to receive it.
-          const onDamageStatus = parseOnDamageStatus(defender, {
+          const onDamageStatus = parseOnDamageStatus(defenderView, {
             ...abilitySideContext(draft, defenderPlayerId),
             isActive: true,
           });

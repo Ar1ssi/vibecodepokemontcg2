@@ -440,6 +440,53 @@ describe('Phase 1: Combat Passives & Modifier Pipeline', () => {
       assert.equal(res.error, null);
       assert.equal(res.state.players.p1.zones.active[0].damage, 20);
     });
+
+    test('Rough Skin on an evolved Active stacks with Rocky Helmet on the Basic beneath it', () => {
+      const state = createTestGame();
+      state.players.p1.zones.active.push(
+        createCard({
+          instanceId: 1,
+          name: 'Delphox',
+          subtypes: ['Stage 2'],
+          types: ['Fire'],
+          hp: 150,
+          attacks: [{ name: 'Energized Storm', cost: [], damage: 90 }],
+        })
+      );
+      state.players.p2.zones.active.push(
+        createCard({ instanceId: 2, name: 'Gible', stage: 'Basic', subtypes: ['Basic'], types: ['Dragon'], hp: 70, attacks: [] }),
+        createCard({
+          instanceId: 4,
+          name: 'Garchomp ex',
+          stage: 'Stage2',
+          subtypes: ['Stage 2', 'ex'],
+          types: ['Dragon'],
+          hp: 330,
+          attachedTo: 2,
+          attacks: [],
+          abilities: [
+            {
+              name: 'Rough Skin',
+              type: 'Ability',
+              text: "If this Pokémon is in the Active Spot and is damaged by an attack from your opponent's Pokémon (even if this Pokémon is Knocked Out), put 3 damage counters on the Attacking Pokémon.",
+            },
+          ],
+        }),
+        createCard({
+          instanceId: 3,
+          name: 'Rocky Helmet',
+          type: 'Trainer',
+          trainerType: 'Tool',
+          subtypes: ['Pokémon Tool'],
+          attachedTo: 2,
+          text: 'If the Pokémon this card is attached to is in the Active Spot and is damaged by an attack from your opponent’s Pokémon (even if it is Knocked Out), put 2 damage counters on the Attacking Pokémon.',
+        })
+      );
+      const res = applyCommand(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' });
+      assert.equal(res.error, null);
+      // 3 counters (Rough Skin on the Garchomp ex, not the Gible root) + 2 (Rocky Helmet)
+      assert.equal(res.state.players.p1.zones.active[0].damage, 50);
+    });
   });
 
   describe('Knocked-Out-only counters (Maractus JTG 160, out/pkmn-pokemon-cards.json)', () => {
