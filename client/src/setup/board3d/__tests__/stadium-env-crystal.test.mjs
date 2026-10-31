@@ -18,7 +18,7 @@ import {
   crystalSpots,
   wallFloorAt,
 } from '../stadium-env-crystal.mjs';
-import { SCREEN_VIEWS, geometryPoints, pointOnCard, screenView } from './stadium-screen.mjs';
+import { SCREEN_VIEWS, geometryOnCard, screenView } from './stadium-screen.mjs';
 
 const PROFILES = [NO_MAT_LAYOUT_ID, 'sim', 'one-player', 'two-player', 'edge-to-edge-two-player'];
 const HALVES = [
@@ -66,9 +66,9 @@ test('crystals grow out of the floor or the rock, never above it', () => {
 test('no crystal or rubble covers a card on screen, in either camera preset', () => {
   for (const view of SCREEN_VIEWS) {
     const { layout, projectors } = screenView(view);
-    const points = geometryPoints(crystalProps(crystalSpots(layout).clusters).build(three), 3);
+    const geometry = crystalProps(crystalSpots(layout).clusters).build(three);
     for (const { preset, project } of projectors) {
-      const hit = pointOnCard(points, layout, project);
+      const hit = geometryOnCard(geometry, layout, project);
       assert.equal(hit, null, `${view.profile} ${view.viewport.w}x${view.viewport.h} ${preset}: ${hit}`);
     }
   }

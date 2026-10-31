@@ -22,8 +22,12 @@ const unit = (a) => {
 /** A face's unit normal, straight up when the face has no area (a lit part never gets a zero normal). */
 const faceNormal = (n) => (Math.hypot(n[0], n[1], n[2]) > 1e-9 ? unit(n) : [0, 0, 1]);
 
-/** Toon kinds a part is shaded as (aLook.x; stadium-kit.mjs KIT_LIGHT). */
-export const LOOK = Object.freeze({ plain: 0, foliage: 1, gloss: 2, crystal: 3, cloud: 4, chrome: 5 });
+/**
+ * Toon kinds a part is shaded as (aLook.x; stadium-kit.mjs KIT_LIGHT). `matte`: a thin dry stalk or
+ * blade, lit by the key alone, no rim or glint (seen from above it is all edge, and a rim would
+ * swamp its own colour).
+ */
+export const LOOK = Object.freeze({ plain: 0, foliage: 1, gloss: 2, crystal: 3, cloud: 4, chrome: 5, matte: 6 });
 
 /**
  * A part's look unless it says otherwise: plain, still, unshaded, no outline. Loose quads and

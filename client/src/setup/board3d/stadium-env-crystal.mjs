@@ -301,7 +301,6 @@ export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
 ${FOOTPRINTS}
-${VORONOI}
 ${REVEAL}
 ${PALETTE}
 ${CAVE}
@@ -511,7 +510,7 @@ export function crystalCaveBoard({ three, material, seeded, terrainGrid, replace
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
   const kit = createKitProps({ three, material, own, mood: 'cave', reveal: 'vec3(0.8, 0.9, 1.2)' });
   const sparkles = new three.Points(seeded(SPARKLE_COUNT), materials.sparkles);
-  sparkles.renderOrder = 3;
+  sparkles.renderOrder = 2;
   return {
     objects: [terrain, ...kit.objects, sparkles],
     materials: [...Object.values(materials), ...kit.materials],

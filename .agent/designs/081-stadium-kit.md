@@ -68,7 +68,8 @@ for assets that unify the style and look like the Pokémon games.
 3. Light: one toon ramp, crisp on hard surfaces, soft on foliage and cloud; the shade cool and
    saturated (the mood's `shade`); a little sky from above; a rim on the lit side of a silhouette; a
    hard glint on glossy parts; toon chrome (floor dark under a bright horizon line) on metal;
-   crystals keep their colour in shade.
+   crystals keep their colour in shade; thin dry stalks (`LOOK.matte`) take no rim or glint, since
+   seen from above they are all edge and a rim would whiten them.
 4. Outline: a thin dark shade of the part's own colour, ~1.1 plate px, on solids only (loose quads
    opt in with `sheets: true`).
 5. Contact shadow: a soft ellipse under every solid, slid away from the board's sun.
@@ -99,24 +100,24 @@ for assets that unify the style and look like the Pokémon games.
 |---|---|
 | Forest of Vitality | trunk (surface), boughs, crown pads as foliage balls, kit bushes, tall grass on the meadow edge, flowers, toadstools; meadow painted |
 | Grand Tree | strands/roots/limbs outlined, crown balls with sunward tops, kit small tree, fern clumps, toadstools; floor painted |
-| Surfing Beach | kit palms (fitted clear of cards), boulders (sea rocks at sea level), starfish, shells, parasol + towel sets, beach ball, surfboard, dune grass; sea in flat bands + crisp foam; clean sand; palm shadow target removed |
+| Surfing Beach | kit palms (fitted clear of cards, allowing for the sand's rise: `sandCeiling`), boulders (sea rocks at sea level), starfish, shells, parasol + towel sets, beach ball, surfboard, dune grass; sea in flat bands + crisp foam; clean sand; palm shadow target removed |
 | Lumiose City | kit trees, benches, café parasols, flower clumps on the beds; buildings/lamps/tower kit-lit, outlined; paving without grain/stains |
 | Community Center | kit trees (terrain shades under them), boulders, bushes, flowers; hall/tent/kiosks outlined; grass and paving painted |
 | Pokémon Center | lobby mood; furniture outlined; kit topiary plants; tile grain gone |
 | Shopping Center | mall mood; balloons gloss; fixtures outlined |
 | Levincia | towers/billboards outlined; mosaic one even yellow; water flat with a crisp foam line |
 | Old Cemetery | moonlit mood; headstones outlined; kit pines; kit tall grass tufts; grass and path painted |
-| Mystery Garden | garden night mood + pool/lantern glow; kit hedges, ferns, urn flowers |
+| Mystery Garden | garden night mood + pool/lantern glow; hedges of kit bushes, kit ferns, urn flowers |
 | Fairy Garden | night mood + orb glow; kit trees, ferns |
 | Mountain Ring | stones, spires, ropes, chain outlined; paving speckle gone |
-| Magnetic Storm | storm mood + pad/strike glow; kit boulders; pylons/trees outlined |
+| Magnetic Storm | storm mood + pad/strike glow; kit boulders; pylons/trees outlined; ground painted (no painted reed tufts, grain or rippling puddles: the reeds are its clumps) |
 | Full Metal Lab | everything toon chrome, outlined |
-| Fighting Stadium | arena lights mood; ring toon chrome, outlined |
+| Fighting Stadium | arena lights mood; ring toon chrome, outlined; the rig runs RIG_OUT_PX outside the ropes so it never leans over a card |
 | Neutralization Zone | zone mood; walls/screens toon chrome, outlined |
 | Dark City | rooftop props kit-lit with the hut's lamp glow; towers keep their window shader |
 | Crystal Cave | crystals as kit facets (crystal kind, outlined), rubble at each cluster; floor without pebble speckle |
 | Dimension Valley | island rock in KIT_LIGHT, earth in clean strata bands; grass painted |
-| Stormy Mountains | kit boulders on the crater wall's foot, snow pines on the outer slopes (ground-follow) |
+| Stormy Mountains | kit boulders on the crater wall's foot, snow pines on the outer slopes (ground-follow; clear of the cards by their top's height on `craterCeiling`) |
 | Perilous Jungle | trees (violet trunks, teal/violet foliage-ball crowns, beaded vines) as kit solids in a jungle mood; its cel-shaded leaves, bells and spikes kept |
 | Mountain Ring | (also) a hazy mountain mood so the menhirs stay grey |
 | Brooklet Hill, Steel Shelter, Scorched Earth, Magma Basin | unchanged here: their solids are baked terrain or bespoke shaders (Brooklet copies Sun and Moon's own 3DS map; Scorched Earth's slate is sculpted stones); see Deviations |
@@ -127,7 +128,7 @@ for assets that unify the style and look like the Pokémon games.
 | 1 | no layout / no spots | `kit.set(null)`: the three meshes hide | [x] stadium-kit.test: createKitProps set(null) |
 | 2 | bad colour | `paint` throws on anything but #rrggbb | [x] stadium-kit.test: paint |
 | 3 | an asset's parts past its stated reach | every asset's vertices inside measureAsset's reach and height | [x] stadium-kit-assets.test: every kit asset … |
-| 4 | a prop over a card on screen | every built vertex off every card's projected outline, both presets, 7 views, every board with props | [x] each board's "covers a card on screen" test (geometryPoints) |
+| 4 | a prop over a card on screen | every built vertex above the cloth off every card's projected outline, both presets, 7 views, every board with props; on a ground-follow board along the ground's whole possible rise (`sandCeiling`, `craterCeiling`); clearances add RISE_LEAN of a prop's top height | [x] each board's "covers a card on screen" test (`geometryOnCard`) |
 | 5 | a loose sheet with an outline | its hull would show as a slab: sheets never outline unless `sheets: true` | [x] stadium-env-props.test: loose quad |
 | 6 | a degenerate face (a frond's tip) | the face normal falls back to +z, never 0 | [x] stadium-env-props.test (degenerate triangle) |
 | 7 | reveal and exit | kit solids, outlines and shadows rise/discard with terrainGrowth/revealBurned/exitKeep like the terrain | [ ] manual: localhost reveal |
@@ -137,10 +138,12 @@ for assets that unify the style and look like the Pokémon games.
 
 ## Test plan
 - Unit (pure): `__tests__/stadium-env-props.test.mjs` (frames, looks, sheets, hull normals, shadows,
-  feet), `stadium-kit.test.mjs` (paint/neutral inverse, kitUniforms, createKitProps),
-  `stadium-kit-assets.test.mjs` (every asset's measure, determinism, palette); each board's
-  test checks every built vertex against the cards on screen (`stadium-screen.mjs` `geometryPoints`,
-  `pointOnCard` now tests the card's projected outline, not its box).
+  feet, degenerate faces), `stadium-kit.test.mjs` (paint/neutral inverse, kitUniforms, createKitProps:
+  pass settings, geometry released; every kit shader a full program), `stadium-kit-assets.test.mjs`
+  (every asset inside its measure over an option grid and the boards' seeds, determinism, palette);
+  each board's test checks every built vertex above the cloth against the cards' projected outlines
+  (`stadium-screen.mjs` `geometryOnCard`, with the ground's rise on the beach and Stormy Mountains,
+  whose bounds are pinned to their bake shaders' text).
 - Visual: stills of all 25 boards in both presets (`rec-stadium-boards.mjs`), no GL errors.
 - Manual (user, localhost): each board via `?stadiumEnv=<key>` for ~10 s, both cameras.
 
@@ -159,3 +162,7 @@ n/a: visual only, no data. Revert: revert the commit; boards fall back to their 
 - Perilous Jungle's limb, crown and vine shaders (stadium-env-forest.mjs) went with the kit trees.
 - The board hooks `beforeRender` and `dispose` went with their only user (the beach's palm shadow
   target).
+- 14 of the 32 assets are placed by no board yet (hedge, spire, crystals, stump, deadTree, cloud,
+  pokeBall, lamp, planter, fence, signpost, gravestone, reeds, lilyPad): the boards that have these
+  things keep their own shapes, drawn in the kit's light and outline. They stay as the kit's library,
+  measured, tested and in the gallery, for I273's boards and the next ones.

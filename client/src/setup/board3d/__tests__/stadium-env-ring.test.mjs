@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import * as three from 'three';
 import { flatLayout } from '../board-layout.mjs';
 import { getMatLayout } from '../../sizing/mat-layouts.mjs';
 import { NO_MAT_LAYOUT_ID } from '../../sizing/mat-spec.mjs';
@@ -14,6 +15,7 @@ import {
   ringProps,
   ringSpots,
 } from '../stadium-env-ring.mjs';
+import { SCREEN_VIEWS, geometryOnCard, screenView } from './stadium-screen.mjs';
 
 // Every mat profile (the no-mat default, the simulator's, one-player and full-size two-player mats)
 // at the board width board3d.js lays out beside the sidebox (0.755 of 1920) and at full width.
@@ -94,5 +96,18 @@ test('ringSpots: the spires stand past the stones, inside the scene, apart from 
       for (const stone of stones) assert.ok(Math.hypot(spire.x - stone.x, spire.y - stone.y) > spire.radius + stone.radius);
       for (const other of spires.slice(i + 1)) assert.ok(Math.hypot(spire.x - other.x, spire.y - other.y) > spire.radius + other.radius);
     });
+  }
+});
+
+test('no stone, rope, spire or the chain covers a card on screen, in either camera preset', () => {
+  for (const view of SCREEN_VIEWS) {
+    const { layout, projectors } = screenView(view);
+    const geometries = [ringProps(ringSpots(layout))].map((props) => props.build(three));
+    for (const { preset, project } of projectors) {
+      for (const geometry of geometries) {
+        const hit = geometryOnCard(geometry, layout, project);
+        assert.equal(hit, null, `${view.profile} ${view.viewport.w}x${view.viewport.h} ${preset}: ${hit}`);
+      }
+    }
   }
 });

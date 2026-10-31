@@ -253,9 +253,7 @@ const vec3 PAVING = vec3(0.345, 0.263, 0.469);
 const vec3 PAVING_DARK = vec3(0.154, 0.12, 0.245);
 const vec3 STONE_PALE = vec3(0.469, 0.525, 0.72);
 const vec3 GRASS = vec3(0.058, 0.225, 0.139);
-const vec3 HEDGE = vec3(0.058, 0.26, 0.26);
 const vec3 HEDGE_DARK = vec3(0.028, 0.061, 0.093);
-const vec3 NIGHT = vec3(0.033, 0.053, 0.088);
 const vec3 POOL_CYAN = vec3(0.32, 1.15, 1.45);
 const vec3 LANTERN_GLOW = vec3(1.25, 0.82, 1.0);
 // The moonlit night: everything not lit by the pool or a lantern sinks toward its blue.
@@ -626,9 +624,9 @@ export function mysteryGardenBoard({ three, material, seeded, terrainGrid, repla
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
   const kit = createKitProps({ three, material, own, mood: GARDEN_NIGHT, reveal: 'vec3(0.55, 0.95, 1.1)', glow: GARDEN_GLOW });
   const fireflies = new three.Points(seeded(FIREFLY_COUNT), materials.fireflies);
-  fireflies.renderOrder = 3;
+  fireflies.renderOrder = 2;
   const halos = new three.Points(new three.BufferGeometry(), materials.halos);
-  halos.renderOrder = 3;
+  halos.renderOrder = 2;
   return {
     objects: [terrain, ...kit.objects, fireflies, halos],
     materials: [...Object.values(materials), ...kit.materials],

@@ -42,7 +42,6 @@ import {
 import { createEnvironmentTimeline } from './stadium-environment-timeline.mjs';
 import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
 import { createKitProps } from './stadium-kit.mjs';
-import { placeAsset } from './stadium-kit-assets.mjs';
 import { tableBounds } from './table-uv.mjs';
 
 export { EXIT_MS, INTRO_MS } from './stadium-environment-timeline.mjs';
@@ -317,10 +316,6 @@ export function strikePath(index, slot, { bowl, peaks }, bounds) {
   return null;
 }
 
-/**
- * Stormy Mountains: the mountain and its crater, the cloud sea round it, and two lightning ribbons
- * whose strikes the board schedules itself, lighting the ground and clouds as they fall.
- */
 /** The storm's light on the crater's kit solids: cold blue-white, deep slate shade, a cyan rim. */
 const STORMY_MOOD = Object.freeze({
   key: [0.8, 0.88, 1.0],
@@ -330,20 +325,12 @@ const STORMY_MOOD = Object.freeze({
   outline: [0.22, 0.26, 0.34, 1.1],
   shadow: [0.34, 0.4, 0.55, 0.55],
 });
-const CRATER_ROCK = Object.freeze({ body: '#7f8aa0', light: '#aeb9cc', dark: '#545d72' });
-const SNOW_PINE = Object.freeze({ pine: '#2e6b62', pineLight: '#3f8576', pineDark: '#1d4a45', bark: '#5a4436', snow: '#eef6ff' });
 
-/** The crater's dressing (highland.craterDressing) as one kit builder. */
-const crater = (pieces) => {
-  const props = createPropBuilder();
-  for (const piece of pieces) {
-    const common = { x: piece.x, y: piece.y, size: piece.size, seed: piece.seed * 997, yaw: piece.seed * 6.28 };
-    if (piece.asset === 'pine') placeAsset(props, 'pine', { ...common, height: piece.height, snow: true, tiers: 3, colors: SNOW_PINE });
-    else placeAsset(props, 'boulder', { ...common, colors: CRATER_ROCK });
-  }
-  return props;
-};
-
+/**
+ * Stormy Mountains: the mountain and its crater, the cloud sea round it, and two lightning ribbons
+ * whose strikes the board schedules itself, lighting the ground and clouds as they fall; the crater's
+ * dressing is the kit's (highland.craterDressing, craterProps).
+ */
 function stormyMountainsBoard({ three, material }) {
   const own = {
     uBowl: { value: new three.Vector4() },
@@ -366,7 +353,7 @@ function stormyMountainsBoard({ three, material }) {
   };
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
   const clouds = new three.Mesh(new three.BufferGeometry(), materials.clouds);
-  clouds.renderOrder = 3;
+  clouds.renderOrder = 1;
   // Design 081: the crater's boulders and pines are the kit's, standing on the baked mountain.
   const kit = createKitProps({ three, material, own, mood: STORMY_MOOD, reveal: 'vec3(0.7, 0.95, 1.1)', ground: true });
   const bolts = BOLT_CYCLES_S.map(() => {
@@ -405,12 +392,13 @@ function stormyMountainsBoard({ three, material }) {
     bakeLight: materials.bakeLight,
     spots(layout) {
       const bowl = craterBowl(layout);
+      const peaks = mountainPeaks(layout, bowl);
       return {
         bowl,
-        peaks: mountainPeaks(layout, bowl),
+        peaks,
         emblem: craterEmblem(layout, bowl),
         table: tableBounds(layout),
-        dressing: highland.craterDressing(layout, bowl),
+        dressing: highland.craterDressing(layout, bowl, peaks),
       };
     },
     apply(next, nextBounds) {
@@ -427,7 +415,7 @@ function stormyMountainsBoard({ three, material }) {
         own[`uRidge${side}`].value.set(peak?.ridge.x ?? 0, peak?.ridge.y ?? 0);
       }
       own.uEmblem.value.set(emblem?.x ?? 0, emblem?.y ?? 0, emblem?.r ?? 0);
-      kit.set(next.dressing?.length ? crater(next.dressing) : null);
+      kit.set(next.dressing?.length ? highland.craterProps(next.dressing) : null);
       replaceGeometry(terrain, terrainGrid(three, bounds));
       clouds.visible = Boolean(bowl);
       replaceGeometry(
@@ -659,7 +647,7 @@ function perilousJungleBoard({ three, material, seeded }) {
   const spikes = new three.Mesh(new three.BufferGeometry(), materials.spikes);
   const kit = createKitProps({ three, material, own, mood: JUNGLE_MOOD, reveal: 'vec3(1.0, 0.45, 0.85)' });
   const spores = new three.Points(seeded(SPORE_COUNT), materials.spores);
-  spores.renderOrder = 3;
+  spores.renderOrder = 2;
   return {
     objects: [terrain, poison, leaves, bells, spikes, ...kit.objects, spores],
     materials: [...Object.values(materials), ...kit.materials],

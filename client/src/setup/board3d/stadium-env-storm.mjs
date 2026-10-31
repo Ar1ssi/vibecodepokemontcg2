@@ -15,7 +15,7 @@
 // World scale: a card's footprint is a trampled patch of mud; a reed stands a hand high.
 //
 // Bake, once per layout: BAKE_FIELD is the flat marsh (R height px) with the clearing's distance in
-// G; the shared light bake adds nothing. Per frame: TERRAIN paints the mud, puddles, reeds, the ring,
+// G; the shared light bake adds nothing. Per frame: TERRAIN paints the mud, grass, puddles, the ring,
 // the pads, the iron dust along the field, the mist, the aurora's wash and the lightning's flashes;
 // PROPS the trees, boulders, reeds and pylons; BOLTS the lightning's ribbons (additive); DOME the
 // force field (additive, one hemisphere of unit directions the shader scales to the arena).
@@ -28,17 +28,15 @@ import {
   POKE_BALL,
   REVEAL,
   TABLE_UNIFORMS,
-  TERRAIN_GROUND,
   TERRAIN_UNIFORMS,
-  VORONOI,
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
 import { craterEmblem } from './stadium-environment-layout.mjs';
-import { createPropBuilder } from './stadium-env-props.mjs';
+import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
 import { createKitProps } from './stadium-kit.mjs';
 import { placeAsset } from './stadium-kit-assets.mjs';
 import { boardContext, hash } from './stadium-env-spots.mjs';
-import { BLADES, EDGE_HAZE, STANDARD_TERRAIN_VERTEX } from './stadium-env-surfaces.mjs';
+import { EDGE_HAZE, STANDARD_TERRAIN_VERTEX } from './stadium-env-surfaces.mjs';
 
 export const STORM_KEY = 'magnetic-storm';
 /** The moonless night's light (toward it): the aurora's, low and wide, from the far left. */
@@ -258,7 +256,6 @@ const vec3 PINK_SOFT = vec3(0.617, 0.071, 0.345);
 const vec3 RING_WHITE = vec3(1.866, 1.596, 1.866);
 const vec3 AURORA_BLUE = vec3(0.085, 0.442, 0.618);
 const vec3 AURORA_VIOLET = vec3(0.196, 0.085, 0.496);
-const vec3 BOLT = vec3(1.2, 1.45, 1.7);
 const vec3 DUST = vec3(0.2, 0.25, 0.34);
 const vec3 MIST = vec3(0.07, 0.05, 0.13);
 `;
@@ -268,10 +265,8 @@ ${TERRAIN_UNIFORMS}
 ${NOISE}
 ${FOOTPRINTS}
 ${FILTERING}
-${VORONOI}
 ${REVEAL}
 ${POKE_BALL}
-${BLADES}
 ${EDGE_HAZE}
 ${PALETTE}
 ${STORM}
@@ -287,30 +282,20 @@ void main() {
   float d = clearingDistance(p);
   float u = uUnit;
 
-  // The ground: wet black-brown mud in the trampled clearing; outside it dry olive-brown grass lying
-  // in swathes over the mud, broad drifts of dark and pale. Puddles in the low places hold the sky
-  // as dark glass, the aurora's colour only a gleam on it.
+  // The ground, painted (design 081): wet black-brown mud in the trampled clearing; outside it dry
+  // olive-brown grass lying in broad swathes over the mud. The reeds are the kit's clumps standing in
+  // the margins. Puddles in the low places hold the sky as still dark glass, the aurora's colour only a
+  // gleam on it.
   float wild = smoothstep(-10.0 * u, 100.0 * u, d + 8.0 * u * (gnoise(p / 24.0) - 0.5));
   vec3 mud = mix(MUD * 0.8, MUD * 1.5, smoothstep(0.3, 0.7, fbm3(p / 110.0 + 2.0)));
-  mud *= 0.88 + 0.24 * fbm3(p / 26.0 + 5.0);
   vec3 turf = mix(REED_DARK * 1.5, REED * 0.8, smoothstep(0.3, 0.75, fbm3(p / 150.0 + 6.0)));
-  turf *= 0.86 + 0.28 * fbm3(p / 19.0 + 2.0);
   vec3 col = mix(mud, turf, wild * 0.85);
   float puddleMask = smoothstep(0.66, 0.74, fbm3(p / 70.0 + 9.0)) * (0.35 + 0.65 * smoothstep(0.0, 40.0 * u, d + 20.0 * u));
   vec3 view = normalize(uEye - vec3(p, 0.0));
-  vec3 ripple = normalize(vec3((gnoise(p / 7.0 + t * 0.2) - 0.5) * 0.6, (gnoise(p / 7.0 + 5.0 - t * 0.17) - 0.5) * 0.6, 1.0));
-  float sky = pow(clamp(reflect(-view, ripple).z, 0.0, 1.0), 3.0);
+  float sky = pow(clamp(view.z, 0.0, 1.0), 3.0);
   float auroraBand = 0.5 + 0.5 * sin(p.x * 0.007 + p.y * 0.004 + t * 0.12 + 2.0 * fbm3(p / 300.0));
   vec3 aurora = mix(AURORA_VIOLET, AURORA_BLUE, auroraBand);
   col = mix(col, WATER * 0.55 + aurora * 0.22 * sky, puddleMask * 0.92);
-
-  // Reeds: tufts of long blades in the dry grass, thick toward the edge of the scene.
-  vec4 tuft = voronoiCell(p / (12.0 * u) + 1.7);
-  vec2 blades = bladeFan(-tuft.zw * 12.0 * u, tuft.y, 17.0 * u);
-  float reeds = blades.x * step(fract(tuft.y * 19.7), 0.5 + 0.45 * wild) * wild * (1.0 - puddleMask);
-  col = mix(col, mix(REED_DARK, REED * 1.15, blades.y), reeds * 0.95);
-  // Inside the clearing a few short tufts, trampled.
-  col = mix(col, REED_DARK * 1.3, blades.x * step(fract(tuft.y * 19.7), 0.2) * (1.0 - wild) * 0.5);
 
   // The Poke Ball: the glowing pink and white line the art shows, with a soft bloom.
   float rd = emblemDistance(p, uRing);
@@ -387,7 +372,8 @@ ${OUTPUT}
 // Prop colours (aColor; w: 0 matte, 0.12 bark, 0.16 reed, 0.2 rock).
 const BARK = [0.07, 0.06, 0.05, 0];
 const ROCK = Object.freeze({ body: [0.11, 0.105, 0.105, 0], light: [0.18, 0.18, 0.2, 0], dark: [0.06, 0.06, 0.065, 0] });
-const REED_COLOR = [0.2, 0.16, 0.065, 0];
+// Dry straw, lit by the key alone (LOOK.matte): the night's cyan rim would whiten every thin blade.
+const REED_COLOR = [0.3, 0.24, 0.09, 0];
 const IRON = [0.07, 0.075, 0.09, 0.3];
 const COPPER = [0.5, 0.2, 0.09, 0.3];
 const ORB_PINK = [1.4, 0.18, 0.8, 2.4];
@@ -455,7 +441,7 @@ export function stormProps(spots) {
     for (const pad of spots.pads) pylon(props, { x: pad.x, y: pad.y, r: 11 * spots.u, h: PAD_POST_PX * spots.u, orb: ORB_PINK }, spots.u);
   });
   spots.boulders.forEach((rock, k) => placeAsset(props, 'boulder', { x: rock.x, y: rock.y, z: -2, size: rock.r * 1.05, seed: k * 11 + 3, yaw: k, sun: STORM_LIGHT, colors: ROCK }));
-  reedClumps(props, spots.clumps, spots.u);
+  props.look({ kind: LOOK.matte }, () => reedClumps(props, spots.clumps, spots.u));
   return props;
 }
 

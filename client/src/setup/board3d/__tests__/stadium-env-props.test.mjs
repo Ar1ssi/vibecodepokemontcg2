@@ -27,11 +27,13 @@ test('triangle: three vertices with one unit normal, facing where the winding fa
   }
 });
 
-test('triangle: a degenerate one does not poison the geometry with NaN normals', () => {
+test('triangle and quad: a degenerate face (a frond\'s tip) faces straight up, never a zero or NaN normal', () => {
   const props = createPropBuilder();
   props.triangle([1, 1, 1], [1, 1, 1], [1, 1, 1], [1, 1, 1, 0]);
+  props.quad([2, 2, 0], [2, 2, 0], [2, 2, 0], [2, 2, 0], [1, 1, 1, 0]);
   const { normal } = read(props);
-  for (let i = 0; i < 3; i += 1) assert.ok(Number.isFinite(normal.getX(i)) && Number.isFinite(normal.getY(i)) && Number.isFinite(normal.getZ(i)));
+  assert.equal(normal.count, 7);
+  for (let i = 0; i < normal.count; i += 1) assert.deepEqual([normal.getX(i), normal.getY(i), normal.getZ(i)], [0, 0, 1]);
 });
 
 test('disc: a fan of triangles on the circle in the plane through `out` and up, a half disc covering half the arc', () => {

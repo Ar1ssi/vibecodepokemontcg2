@@ -26,7 +26,6 @@ import {
   OUTPUT,
   REVEAL,
   TABLE_UNIFORMS,
-  TERRAIN_GROUND,
   TERRAIN_UNIFORMS,
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
@@ -158,8 +157,6 @@ export const TERRAIN_VERTEX = STANDARD_TERRAIN_VERTEX;
 const PALETTE = /* glsl */ `
 const vec3 MOSS = vec3(0.12, 0.263, 0.071);
 const vec3 MOSS_DARK = vec3(0.046, 0.113, 0.054);
-const vec3 GRASS = vec3(0.142, 0.345, 0.085);
-const vec3 EARTH = vec3(0.16, 0.094, 0.046);
 const vec3 EARTH_DARK = vec3(0.077, 0.055, 0.043);
 const vec3 GLOW = vec3(1.0, 0.68, 0.08);
 const vec3 SHADE_TINT = vec3(0.5, 0.66, 0.82);
@@ -385,7 +382,7 @@ export function grandTreeBoard({ three, material, seeded, terrainGrid, replaceGe
   const kit = createKitProps({ three, material, own, mood: 'day', reveal: 'vec3(0.9, 1.0, 0.6)' });
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
   const motes = new three.Points(seeded(MOTE_COUNT), materials.motes);
-  motes.renderOrder = 3;
+  motes.renderOrder = 2;
   return {
     objects: [terrain, ...kit.objects, motes],
     materials: [...Object.values(materials), ...kit.materials],

@@ -18,7 +18,7 @@ import {
   grandProps,
   grandSpots,
 } from '../stadium-env-grandtree.mjs';
-import { SCREEN_VIEWS, geometryPoints, pointOnCard, screenView } from './stadium-screen.mjs';
+import { SCREEN_VIEWS, geometryOnCard, screenView } from './stadium-screen.mjs';
 
 const PROFILES = [NO_MAT_LAYOUT_ID, 'sim', 'one-player', 'two-player', 'edge-to-edge-two-player'];
 const HALVES = [
@@ -53,9 +53,9 @@ test('grandSpots: the trunk beside the cards, roots, crown balls and ferns clear
 test('no solid (trunk, crown, small tree, ferns, toadstools) covers a card on screen, in either camera preset', () => {
   for (const view of SCREEN_VIEWS) {
     const { layout, projectors } = screenView(view);
-    const points = geometryPoints(grandProps(grandSpots(layout)).build(three), 4);
+    const geometry = grandProps(grandSpots(layout)).build(three);
     for (const { preset, project } of projectors) {
-      const hit = pointOnCard(points, layout, project);
+      const hit = geometryOnCard(geometry, layout, project);
       assert.equal(hit, null, `${view.profile} ${view.viewport.w}x${view.viewport.h} ${preset}: ${hit}`);
     }
   }

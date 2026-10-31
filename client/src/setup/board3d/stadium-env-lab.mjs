@@ -715,8 +715,6 @@ ${OUTPUT}
 }
 `;
 
-
-
 const NO_SPOTS = { dais: null, outline: [], stair: null, consoles: [], tanks: [], bundles: [], emblem: null };
 
 /** Full Metal Lab's board (stadium-environment-mesh.js BOARDS): the dais and deck, and the props. */
@@ -729,7 +727,6 @@ export function fullMetalLabBoard({ three, material, terrainGrid, replaceGeometr
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
   const materials = {
     terrain: make(TERRAIN_VERTEX, TERRAIN_FRAGMENT),
-    // Both sides: a tube's winding turns with its frame.
     bakeField: make(FULLSCREEN_VERTEX, BAKE_FIELD_FRAGMENT, bakeOptions),
     bakeLight: make(FULLSCREEN_VERTEX, bakeLightFragment(), bakeOptions),
   };

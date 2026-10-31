@@ -1,8 +1,23 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as three from 'three';
-import { createPropBuilder } from '../stadium-env-props.mjs';
-import { MOODS, createKitProps, glslColour, kitUniforms, neutralInverse, neutralToneMap, paint } from '../stadium-kit.mjs';
+import { LOOK, createPropBuilder } from '../stadium-env-props.mjs';
+import {
+  KIT_LIGHT,
+  KIT_OUTLINE_FRAGMENT,
+  KIT_OUTLINE_VERTEX,
+  KIT_SHADOW_FRAGMENT,
+  KIT_SHADOW_VERTEX,
+  KIT_VERTEX,
+  MOODS,
+  createKitProps,
+  glslColour,
+  kitFragment,
+  kitUniforms,
+  neutralInverse,
+  neutralToneMap,
+  paint,
+} from '../stadium-kit.mjs';
 import { placeAsset } from '../stadium-kit-assets.mjs';
 
 const close = (a, b, eps = 1e-6) => Math.abs(a - b) <= eps;
@@ -52,11 +67,66 @@ test('createKitProps: shadows, solid and outline over one geometry; set(null) hi
   assert.match(made[0].fragmentShader, /kitGlow/);
   const [shadows, props, outline] = kit.objects;
   assert.ok(shadows.renderOrder < props.renderOrder, 'shadows go down before any prop');
+  // The shadows multiply the ground under them (colour × shade, alpha kept), over everything drawn so far.
+  const shade = shadows.material;
+  assert.equal(shade.depthTest, false);
+  assert.equal(shade.depthWrite, false);
+  assert.equal(shade.blending, three.CustomBlending);
+  assert.deepEqual([shade.blendSrc, shade.blendDst, shade.blendSrcAlpha, shade.blendDstAlpha], [three.DstColorFactor, three.ZeroFactor, three.ZeroFactor, three.OneFactor]);
+  assert.ok(!shade.transparent && !props.material.transparent && !outline.material.transparent, 'all three draw before any transparent layer');
+  assert.equal(outline.material.side, three.BackSide, 'the outline is the hull\'s back faces');
+  assert.equal(props.material.side, three.DoubleSide);
   const builder = createPropBuilder();
   placeAsset(builder, 'bush', { size: 20 });
+  const disposed = [];
+  for (const mesh of [props, shadows]) mesh.geometry.addEventListener('dispose', () => disposed.push(mesh.name));
   kit.set(builder);
+  assert.deepEqual(disposed.sort(), ['stadium-kit-props', 'stadium-kit-shadows'], 'the geometry it replaces is released');
   assert.equal(props.geometry, outline.geometry, 'the outline draws the props geometry');
   assert.ok(props.visible && shadows.visible);
+  const built = props.geometry;
+  let released = false;
+  built.addEventListener('dispose', () => {
+    released = true;
+  });
   kit.set(null);
+  assert.ok(released, 'set(null) releases the builder\'s geometry');
   assert.ok(!props.visible && !outline.visible && !shadows.visible);
+  kit.set(createPropBuilder());
+  assert.ok(!props.visible && !shadows.visible, 'an empty builder shows nothing');
+});
+
+test('every kit shader is a full program: one main, balanced brackets, no unfilled template, no reserved word as a name', () => {
+  const reserved = /\b(?:float|int|bool|vec[234]|mat[234])\s+(?:flat|smooth|half|sample|patch|noperspective|input|output|active|filter|common|partition|fixed|long|short|in|out|inout|buffer|shared|texture|round|step)\b/;
+  const glow = 'vec3 kitGlow(vec3 a, vec3 n, vec3 w) { return vec3(0.0); }';
+  const shaders = {
+    KIT_VERTEX,
+    kitFragment: kitFragment(),
+    kitFragmentGlow: kitFragment('vec3(1.0)', glow),
+    KIT_OUTLINE_VERTEX,
+    KIT_OUTLINE_FRAGMENT,
+    KIT_SHADOW_VERTEX,
+    KIT_SHADOW_FRAGMENT,
+  };
+  for (const [name, source] of Object.entries(shaders)) {
+    assert.equal(source.match(/void main\(\)/g)?.length, 1, name);
+    for (const [open, close] of [['{', '}'], ['(', ')'], ['[', ']']]) {
+      assert.equal(source.split(open).length, source.split(close).length, `${name} ${open}${close}`);
+    }
+    assert.ok(!source.includes('${'), `${name} has no unfilled template`);
+    assert.doesNotMatch(source, reserved, name);
+  }
+  assert.match(shaders.kitFragmentGlow, /col \+= kitGlow\(/);
+  assert.doesNotMatch(shaders.kitFragment, /kitGlow/);
+});
+
+test('kitLight: the kinds by their LOOK numbers; a matte part takes no rim or glint, only chrome the mirror', () => {
+  assert.deepEqual(LOOK, { plain: 0, foliage: 1, gloss: 2, crystal: 3, cloud: 4, chrome: 5, matte: 6 });
+  assert.match(KIT_LIGHT, /bool kitCloud = kind > 3\.5 && kind < 4\.5;/);
+  assert.match(KIT_LIGHT, /bool kitChrome = kind > 4\.5 && kind < 5\.5;/);
+  assert.match(KIT_LIGHT, /bool kitMatte = kind > 5\.5;/);
+  const guarded = KIT_LIGHT.slice(KIT_LIGHT.indexOf('if (!kitMatte) {'), KIT_LIGHT.indexOf('if (kitChrome) {'));
+  assert.match(guarded, /uKitRim/, 'the rim sits inside the matte guard');
+  assert.match(guarded, /glint/, 'and the glint');
+  assert.equal(KIT_LIGHT.split('\n').filter((line) => line.includes('uKitRim')).length, 1, 'no rim anywhere else');
 });

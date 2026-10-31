@@ -19,7 +19,7 @@ import {
   communityProps,
   communitySpots,
 } from '../stadium-env-community.mjs';
-import { SCREEN_VIEWS, geometryPoints, pointOnCard, screenView } from './stadium-screen.mjs';
+import { SCREEN_VIEWS, geometryOnCard, screenView } from './stadium-screen.mjs';
 
 const PROFILES = [NO_MAT_LAYOUT_ID, 'sim', 'one-player', 'two-player', 'edge-to-edge-two-player'];
 const HALVES = [
@@ -67,9 +67,9 @@ test('communitySpots: trees stand off the square, clear of the tent and kiosks',
 test('nothing of the hall, tent, kiosks, flag or trees covers a card on screen, in either camera preset', () => {
   for (const view of SCREEN_VIEWS) {
     const { layout, projectors } = screenView(view);
-    const points = geometryPoints(communityProps(communitySpots(layout)).build(three), 4);
+    const geometry = communityProps(communitySpots(layout)).build(three);
     for (const { preset, project } of projectors) {
-      const hit = pointOnCard(points, layout, project);
+      const hit = geometryOnCard(geometry, layout, project);
       assert.equal(hit, null, `${view.profile} ${view.viewport.w}x${view.viewport.h} ${preset}: ${hit}`);
     }
   }

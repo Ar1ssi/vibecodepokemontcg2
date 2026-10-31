@@ -24,7 +24,7 @@ import {
   vitalityProps,
   vitalitySpots,
 } from '../stadium-env-vitality.mjs';
-import { SCREEN_VIEWS, pointOnCard, screenView } from './stadium-screen.mjs';
+import { SCREEN_VIEWS, geometryOnCard, pointOnCard, screenView } from './stadium-screen.mjs';
 
 // Every mat profile at the board width board3d.js lays out beside the sidebox (0.755 of 1920) and at
 // full width.
@@ -158,13 +158,10 @@ test('vitalitySpots is null without a layout', () => {
 test('every kit solid builds, and none lands on a card on screen in either camera preset', () => {
   for (const view of SCREEN_VIEWS) {
     const { layout, projectors } = screenView(view);
-    const props = vitalityProps(vitalitySpots(layout));
-    const position = props.build(three).getAttribute('position');
-    assert.ok(position.count > 20000);
-    const points = [];
-    for (let i = 0; i < position.count; i += 7) points.push([position.getX(i), position.getY(i), position.getZ(i)]);
+    const geometry = vitalityProps(vitalitySpots(layout)).build(three);
+    assert.ok(geometry.getAttribute('position').count > 20000);
     for (const { preset, project } of projectors) {
-      const hit = pointOnCard(points, layout, project);
+      const hit = geometryOnCard(geometry, layout, project);
       assert.equal(hit, null, `${view.profile} ${view.viewport.w}x${view.viewport.h} ${preset}: ${hit}`);
     }
   }

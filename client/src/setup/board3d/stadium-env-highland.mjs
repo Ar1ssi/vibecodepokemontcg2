@@ -23,36 +23,92 @@ import {
   REVEAL,
   TABLE_UNIFORMS,
   TERRAIN_GROUND,
+  TERRAIN_SPACING_PX,
   TERRAIN_UNIFORMS,
   VORONOI,
 } from './stadium-environment-glsl.mjs';
 import { RIDGE_HALF_WIDTH } from './stadium-environment-layout.mjs';
-import { boardContext, hash } from './stadium-env-spots.mjs';
-import { measureAsset } from './stadium-kit-assets.mjs';
+import { createPropBuilder } from './stadium-env-props.mjs';
+import { RISE_LEAN, boardContext, hash } from './stadium-env-spots.mjs';
+import { measureAsset, placeAsset } from './stadium-kit-assets.mjs';
 
-/** Base of the cloud sea round the mountain, px off the cloth. */
+/** The crest's tallest round the mountain (BAKE_MOUNTAIN crestHeight: a swell to 130 px, crags of 34 and 14). */
+const CREST_MAX_PX = 130 + 34 + 14;
+/** How far in and out round the mountain the rim wanders from its mean (BOWL rimAt: 34 × -0.35..0.65). */
+const RIM_IN_PX = 34 * 0.35;
+const RIM_OUT_PX = 34 * 0.65;
+
+/** A peak's height with its ridge at its tallest within `near` px of (x, y) (PEAKS ridgedPeak). */
+const peakCeiling = (peak, x, y, near) => {
+  const fromSummit = Math.max(0, Math.hypot(x - peak.x, y - peak.y) - near);
+  const cone = fromSummit < peak.r ? peak.h * (1 - fromSummit / peak.r) ** 1.15 : 0;
+  const along = { x: peak.ridge.x - peak.x, y: peak.ridge.y - peak.y };
+  const span = along.x ** 2 + along.y ** 2;
+  if (span < 1) return cone;
+  const s = Math.min(1, Math.max(0, ((x - peak.x) * along.x + (y - peak.y) * along.y) / span));
+  const across = Math.max(0, Math.hypot(x - peak.x - along.x * s, y - peak.y - along.y * s) - near) / (peak.r * RIDGE_HALF_WIDTH);
+  const nearest = Math.max(0, s - near / Math.sqrt(span));
+  const crest = peak.h * (0.72 - 0.5 * nearest) * 1.15;
+  return Math.max(cone, crest * Math.max(1 - across, 0) ** 1.2);
+};
+
+/**
+ * The highest the mountain's ground can stand at (x, y), px: the field bake's height with every noise
+ * at its tallest. BAKE_MOUNTAIN's wall (from the floor's edge, never nearer than the floor's radius,
+ * up to the crest) or outer slope (down from the crest to the cloud sea's floor, CLOUD_LEVEL - 40)
+ * or a peak and its ridge, blended (smaxUp, +6.5); then BAKE_FIELD's faces (+20) and dust (+6);
+ * anywhere within groundAt's neighbour samples and a bake texel of (x, y). The crater's dressing
+ * stands on this ground, so it keeps off the cards by this rise too.
+ * @param {{ x: number, y: number, floor: number, rim: number, foot: number }} bowl craterBowl
+ * @param {{ left: object|null, right: object|null }|null} peaks mountainPeaks
+ */
+export function craterCeiling(bowl, peaks, x, y) {
+  const near = TERRAIN_SPACING_PX / 2 + 2;
+  const d = Math.hypot(x - bowl.x, y - bowl.y);
+  const rimNear = bowl.rim - RIM_IN_PX;
+  const rimFar = bowl.rim + RIM_OUT_PX;
+  let mountain = 0;
+  // The wall climbs with distance out: at its steepest from the floor's radius to the rim's nearest.
+  if (d - near <= rimFar && d + near > bowl.floor) {
+    const s = Math.min(1, Math.max(0, (Math.min(d + near, rimFar) - bowl.floor) / Math.max(rimNear - bowl.floor, 1)));
+    mountain = CREST_MAX_PX * (1 - (1 - s) ** 1.8) + 8;
+  }
+  // The outer slope falls with distance out: at its slowest from the rim's farthest to the foot.
+  if (d + near > rimNear) {
+    const fall = Math.min(1, Math.max(0, (Math.max(d - near, rimNear) - rimFar) / Math.max(bowl.foot - rimFar, 1)));
+    const base = CLOUD_LEVEL - 40;
+    mountain = Math.max(mountain, CREST_MAX_PX - (CREST_MAX_PX - base) * (1 - (1 - fall) ** 1.5) + 10 * (1 - fall));
+  }
+  for (const peak of [peaks?.left, peaks?.right]) if (peak) mountain = Math.max(mountain, peakCeiling(peak, x, y, near));
+  return mountain + 6.5 + 20 + 6;
+}
+
 /**
  * Design 081: the crater's dressing in the Stadium kit's assets: boulders fallen against the crater
  * wall's foot, snow-dusted pines up the outer slopes (each standing on the baked mountain), every one
- * clear of the cards and the opponent's hand by its reach. Pure; [] without a crater.
+ * clear of the cards and the opponent's hand by its reach and by RISE_LEAN of its top's height on the
+ * mountain (craterCeiling). Pure; [] without a crater.
  * @param {ReturnType<typeof import('./board-layout.mjs').flatLayout>|null} layout
  * @param {{ x: number, y: number, floor: number, rim: number, foot: number }|null} bowl
+ * @param {{ left: object|null, right: object|null }|null} peaks mountainPeaks
  */
-export function craterDressing(layout, bowl) {
+export function craterDressing(layout, bowl, peaks) {
   const ctx = boardContext(layout, 'stormy-mountains');
   if (!ctx || !bowl) return [];
   const { u } = ctx;
   const pieces = [];
-  const fits = (x, y, reach) =>
-    ctx.inScene(x, y, reach) && ctx.clear(x, y, reach, 16 * u) && pieces.every((p) => Math.hypot(p.x - x, p.y - y) >= (p.reach + reach) * 1.1);
+  const fits = (x, y, reach, height) =>
+    ctx.inScene(x, y, reach) &&
+    ctx.clear(x, y, reach + RISE_LEAN * (craterCeiling(bowl, peaks, x, y) + height), 16 * u) &&
+    pieces.every((p) => Math.hypot(p.x - x, p.y - y) >= (p.reach + reach) * 1.1);
   for (let k = 0; k < 28 && pieces.length < 12; k += 1) {
     const angle = (k / 28) * 2 * Math.PI + (hash(k, 1, 3) - 0.5) * 0.3;
     const out = bowl.floor + (bowl.rim - bowl.floor) * (0.15 + 0.25 * hash(k, 2, 3));
     const x = bowl.x + Math.cos(angle) * out;
     const y = bowl.y + Math.sin(angle) * out;
     const size = (16 + 14 * hash(k, 3, 3)) * u;
-    const { reach } = measureAsset('boulder', { size });
-    if (hash(k, 4, 3) > 0.6 || !fits(x, y, reach)) continue;
+    const { reach, height } = measureAsset('boulder', { size });
+    if (hash(k, 4, 3) > 0.6 || !fits(x, y, reach, height)) continue;
     pieces.push({ asset: 'boulder', x, y, size, reach, seed: hash(k, 5, 3) });
   }
   for (let k = 0; k < 40 && pieces.filter((p) => p.asset === 'pine').length < 10; k += 1) {
@@ -63,13 +119,27 @@ export function craterDressing(layout, bowl) {
     const size = (22 + 10 * hash(k, 8, 3)) * u;
     const height = size * 3;
     const { reach } = measureAsset('pine', { size, height });
-    // A tall tree leans up the screen in the tilted view: it keeps off the cards by its height too.
-    if (hash(k, 9, 3) > 0.5 || !fits(x, y, reach + height * 0.3)) continue;
+    if (hash(k, 9, 3) > 0.5 || !fits(x, y, reach, height)) continue;
     pieces.push({ asset: 'pine', x, y, size, height, reach, seed: hash(k, 10, 3) });
   }
   return pieces;
 }
 
+const CRATER_ROCK = Object.freeze({ body: '#7f8aa0', light: '#aeb9cc', dark: '#545d72' });
+const SNOW_PINE = Object.freeze({ pine: '#2e6b62', pineLight: '#3f8576', pineDark: '#1d4a45', bark: '#5a4436', snow: '#eef6ff' });
+
+/** The crater's dressing (craterDressing) as one kit builder: slate boulders, snow-dusted pines. */
+export function craterProps(pieces) {
+  const props = createPropBuilder();
+  for (const piece of pieces) {
+    const common = { x: piece.x, y: piece.y, size: piece.size, seed: piece.seed * 997, yaw: piece.seed * 6.28 };
+    if (piece.asset === 'pine') placeAsset(props, 'pine', { ...common, height: piece.height, snow: true, tiers: 3, colors: SNOW_PINE });
+    else placeAsset(props, 'boulder', { ...common, colors: CRATER_ROCK });
+  }
+  return props;
+}
+
+/** Base of the cloud sea round the mountain, px off the cloth. */
 export const CLOUD_LEVEL = 60;
 /** Cloud grid spacing in table px: the domes are broad and smooth. */
 export const CLOUD_SPACING_PX = 6;

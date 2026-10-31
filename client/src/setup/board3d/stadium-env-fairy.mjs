@@ -19,7 +19,6 @@ import {
   OUTPUT,
   REVEAL,
   TABLE_UNIFORMS,
-  TERRAIN_GROUND,
   TERRAIN_UNIFORMS,
   VORONOI,
   bakeLightFragment,
@@ -48,7 +47,7 @@ const FLOWER_PX = 27;
 export function fairySpots(layout) {
   const ctx = boardContext(layout, FAIRY_KEY);
   if (!ctx) return null;
-  const { scene, table, core, u, hand, centre } = ctx;
+  const { scene, core, u, hand, centre } = ctx;
   const handEnd = hand ? hand.y + hand.h : core.y + core.h;
   const reach = Math.max(Math.abs(core.x), core.x + core.w);
   // Trees: a jittered grid over the scene, kept to the side bands and the far end, crowns clear of the cards.
@@ -386,9 +385,9 @@ export function fairyGardenBoard({ three, material, seeded, terrainGrid, replace
   const orbGeometry = new three.BufferGeometry();
   orbGeometry.setAttribute('position', new three.BufferAttribute(new Float32Array(MAX_ORBS * 3), 3));
   const orbs = new three.Points(orbGeometry, materials.orbs);
-  orbs.renderOrder = 3;
+  orbs.renderOrder = 2;
   const sparkles = new three.Points(seeded(SPARKLE_COUNT), materials.sparkles);
-  sparkles.renderOrder = 4;
+  sparkles.renderOrder = 3;
   return {
     objects: [terrain, ...kit.objects, orbs, sparkles],
     materials: [...Object.values(materials), ...kit.materials],

@@ -408,7 +408,6 @@ const vec3 NEON_PINK = vec3(1.5, 0.16, 0.62);
 const vec3 HUT_LAMP = vec3(1.1, 1.15, 1.25);
 // The red light at the far end of the hut's face to the cards, as the art's.
 const vec3 HUT_RED = vec3(1.3, 0.08, 0.1);
-const vec3 STREET_LAMP = vec3(1.3, 0.95, 0.55);
 const vec3 NIGHT = vec3(0.03, 0.036, 0.07);
 // Signed px from the roof's edge, negative on it.
 float roofDistance(vec2 p) {
@@ -747,7 +746,7 @@ export function darkCityBoard({ three, material, terrainGrid, replaceGeometry, b
   const buildings = new three.Mesh(new three.BufferGeometry(), materials.buildings);
   const billboards = new three.Mesh(new three.BufferGeometry(), materials.billboards);
   const beams = new three.Mesh(new three.BufferGeometry(), materials.beams);
-  beams.renderOrder = 3;
+  beams.renderOrder = 2;
   return {
     objects: [terrain, buildings, ...kit.objects, billboards, beams],
     materials: [...Object.values(materials), ...kit.materials],

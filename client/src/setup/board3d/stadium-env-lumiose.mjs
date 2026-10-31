@@ -479,7 +479,6 @@ const PARASOLS = [
   [[0.101, 0.345, 0.167, 0.02], [1.1, 1.08, 1.0, 0.02]],
 ];
 const TABLE_TOP = [0.9, 0.88, 0.84, 0.3];
-const POT = [0.38, 0.17, 0.12, 0];
 const FLOWER_PINK = [0.836, 0.168, 0.264, 0.02];
 
 /** The point `t` px inside a building's face from `s` px along it, at height z. */

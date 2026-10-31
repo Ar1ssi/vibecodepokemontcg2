@@ -208,10 +208,8 @@ export const TERRAIN_VERTEX = STANDARD_TERRAIN_VERTEX;
 const PALETTE = /* glsl */ `
 const vec3 GRASS = vec3(0.075, 0.25, 0.095);
 const vec3 GRASS_DARK = vec3(0.04, 0.14, 0.07);
-const vec3 GRASS_LIT = vec3(0.15, 0.38, 0.12);
 // Design 080: a step under the art's pale square, so white card borders keep their edge.
 const vec3 PLAZA = vec3(0.462, 0.482, 0.534);
-const vec3 PLAZA_SHADE = vec3(0.345, 0.411, 0.531);
 const vec3 ROCK_LIT = vec3(0.644, 0.474, 0.432);
 const vec3 ROCK_MID = vec3(0.345, 0.294, 0.392);
 const vec3 ROCK_SHADE = vec3(0.167, 0.196, 0.345);
@@ -582,7 +580,7 @@ export function communityCenterBoard({ three, material, seeded, terrainGrid, rep
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
   const pool = new three.Mesh(new three.BufferGeometry(), materials.pool);
   const mist = new three.Points(seeded(MIST_COUNT), materials.mist);
-  mist.renderOrder = 3;
+  mist.renderOrder = 2;
   return {
     objects: [terrain, pool, ...kit.objects, mist],
     materials: [...Object.values(materials), ...kit.materials],

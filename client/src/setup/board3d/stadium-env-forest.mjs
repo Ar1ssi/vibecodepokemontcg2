@@ -279,7 +279,6 @@ void main() {
 const PALETTE = /* glsl */ `
 // The card art's palette in linear RGB, a little above the art (Neutral tone mapping darkens).
 const vec3 INDIGO = vec3(0.016, 0.014, 0.05);
-const vec3 LAVENDER = vec3(0.2, 0.16, 0.46);
 const vec3 POISON_GLOW = vec3(1.0, 0.2, 0.66);
 // Haze toward the scene's edges, past which the table's own floor shows.
 vec3 edgeHaze(vec3 col, vec2 uv) {

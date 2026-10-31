@@ -4,9 +4,9 @@ import * as beach from '../stadium-env-beach.mjs';
 import * as volcanic from '../stadium-environment-glsl.mjs';
 import { environmentFootprints } from '../stadium-environment-layout.mjs';
 import * as three from 'three';
-import { DRESSING_CARD_GAP_PX, beachSpots } from '../stadium-env-beach-layout.mjs';
+import { DRESSING_CARD_GAP_PX, beachSpots, shoreFrame } from '../stadium-env-beach-layout.mjs';
 import { measureAsset } from '../stadium-kit-assets.mjs';
-import { SCREEN_VIEWS, geometryPoints, pointOnCard, screenView } from './stadium-screen.mjs';
+import { SCREEN_VIEWS, geometryOnCard, screenView } from './stadium-screen.mjs';
 import { flatLayout } from '../board-layout.mjs';
 import { getMatLayout } from '../../sizing/mat-layouts.mjs';
 
@@ -72,13 +72,40 @@ test('the beach dressing stands clear of every card: finds by the water, parasol
   }
 });
 
-test('no palm, rock or piece of dressing covers a card on screen, in either camera preset', () => {
+/**
+ * The sand's height under a foot, bounded: BEACH_FIELD_FRAGMENT's beachHeight with its dunes and
+ * hummocks at their extremes, the waterline wandering its most toward the sea (shoreWobble, 16 px),
+ * and as far up the beach as groundAt's neighbour samples and a bake texel reach.
+ */
+const SHORE_WANDER_PX = 16;
+const smooth = (a, b, v) => {
+  const t = Math.min(1, Math.max(0, (v - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+};
+const sandHeight = (shore) => (x, y) => {
+  const up = Math.max(0, -shoreFrame(shore, x, y).offshore + SHORE_WANDER_PX + volcanic.TERRAIN_SPACING_PX / 2 + 2);
+  const face = 15 * (1 - Math.exp(-up / 70)) + 0.035 * up;
+  return [-12, face + 0.55 * 22 * smooth(110, 260, up) + 2 * smooth(60, 140, up)];
+};
+
+test('the sand height the screen test bounds is still the field bake\'s', () => {
+  for (const piece of [
+    'float face = 15.0 * (1.0 - exp(-upBeach / 70.0)) + 0.035 * upBeach;',
+    '(fbm3(p / 230.0 + 3.3) - 0.45) * 22.0 * smoothstep(110.0, 260.0, upBeach)',
+    '(gnoise(p / 60.0 + 1.1) - 0.5) * 4.0 * smoothstep(60.0, 140.0, upBeach)',
+    '24.0 * (fbm3(vec2(along / 320.0, 4.2)) - 0.5) + 4.0 * sin(along * 0.0748)',
+  ]) {
+    assert.ok(beach.BEACH_FIELD_FRAGMENT.includes(piece), piece);
+  }
+});
+
+test('no palm, rock or piece of dressing covers a card on screen, in either camera preset, risen on the sand', () => {
   for (const view of SCREEN_VIEWS) {
     const { layout, projectors } = screenView(view);
     const spots = beachSpots(layout, environmentFootprints(layout));
-    const points = geometryPoints(beach.beachProps(spots).build(three), 4);
+    const geometry = beach.beachProps(spots).build(three);
     for (const { preset, project } of projectors) {
-      const hit = pointOnCard(points, layout, project);
+      const hit = geometryOnCard(geometry, layout, project, { ground: sandHeight(spots.shore) });
       assert.equal(hit, null, `${view.profile} ${view.viewport.w}x${view.viewport.h} ${preset}: ${hit}`);
     }
   }

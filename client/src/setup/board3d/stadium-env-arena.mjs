@@ -30,6 +30,7 @@ import {
 } from './stadium-environment-glsl.mjs';
 import { craterEmblem, environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
 import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
+import { PROP_CARD_GAP_PX, RISE_LEAN } from './stadium-env-spots.mjs';
 import { createKitProps } from './stadium-kit.mjs';
 import { tableBounds } from './table-uv.mjs';
 
@@ -57,10 +58,18 @@ export const ROPES = { heights: [30, 58, 86], radius: 3.6, sag: 5, splay: 36 };
 export const LASER_COUNT = 8;
 export const LASER_LIGHT_PX = { out: 150, end: 110, z: 240 };
 /**
- * The lighting rig over the ring, as the art's: a truss round it `out` px outside the ropes, `z` px
- * over the canvas and `depth` px deep, its corners cut `cut` px; a lamp about every `lampEvery` px.
+ * The lighting rig over the ring, as the art's: a truss round it `z` px over the canvas and `depth`
+ * px deep, its corners cut `cut` px; a lamp about every `lampEvery` px.
  */
-export const RIG_PX = { out: 40, z: 300, depth: 16, cut: 110, lampEvery: 105 };
+export const RIG_PX = { z: 300, depth: 16, cut: 110, lampEvery: 105 };
+/**
+ * How far outside the ropes the rig runs along the ring's sides and its ends, px: so far past the
+ * cards (the ring's own gap and this) that, high as it hangs, the tilted view never leans it over one.
+ */
+export const RIG_OUT_PX = {
+  side: RISE_LEAN * RIG_PX.z + PROP_CARD_GAP_PX - RING_GAP_PX.side,
+  end: RISE_LEAN * RIG_PX.z + PROP_CARD_GAP_PX - RING_GAP_PX.end,
+};
 /** Half the size of a rig lamp's glow and of a laser light's glare, px. */
 const GLINT_PX = { lamp: 22, light: 90 };
 
@@ -97,10 +106,10 @@ export function arenaSpots(layout) {
   return { ring, boards, scene, emblem };
 }
 
-/** The rig's outline round the ring: its eight corners (RIG_PX.out outside the ropes, corners cut), counter-clockwise. */
+/** The rig's outline round the ring: its eight corners (RIG_OUT_PX outside the ropes, corners cut), counter-clockwise. */
 export function rigOutline(ring) {
-  const hw = ring.hw + RIG_PX.out;
-  const hh = ring.hh + RIG_PX.out;
+  const hw = ring.hw + RIG_OUT_PX.side;
+  const hh = ring.hh + RIG_OUT_PX.end;
   const cut = Math.min(RIG_PX.cut, hw * 0.4, hh * 0.4);
   return [
     [hw - cut, -hh],
@@ -208,7 +217,6 @@ function adRuns({ ring, boards }) {
     .map((run) => ({ ...run, out: [(run.by - run.ay) / run.length, -(run.bx - run.ax) / run.length] }));
 }
 
-/** The ring's corner posts and ropes, the rig's truss and lamps, and the ad boards' rails. */
 /**
  * The arena under its rig for the kit (design 081): a cool white key from the lamps overhead, a deep
  * teal shade from the dark hall, a bright cyan rim off the screens.
@@ -222,6 +230,7 @@ export const ARENA_LIGHTS = Object.freeze({
   shadow: [0.3, 0.38, 0.45, 0.55],
 });
 
+/** The ring's corner posts and ropes, the rig's truss and lamps, and the ad boards' rails. */
 export function arenaProps(spots) {
   const props = createPropBuilder();
   props.look({ kind: LOOK.chrome, outline: 1 }, () => arenaSolids(props, spots));
@@ -790,8 +799,6 @@ void main() {
 ${OUTPUT}
 }
 `;
-
-
 
 const NO_SPOTS = { ring: null, boards: null, scene: null, emblem: null };
 

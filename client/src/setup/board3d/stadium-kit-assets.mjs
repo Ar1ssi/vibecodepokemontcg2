@@ -276,7 +276,9 @@ const ASSETS = {
 
   /** A palm: a ringed, curving trunk leaning `lean` rad toward `leanYaw`, a crown of arched fronds, coconuts. */
   palm: {
-    dims: ({ height = 150, lean = 0.22 }) => ({ reach: Math.sin(lean) * height + height * 0.62, height }),
+    // The crown stands cos(lean) of the height up; the trunk's top ring, tipped with the trunk, and a
+    // frond rising before it droops stand at most 0.045 of the height over it.
+    dims: ({ height = 150, lean = 0.22 }) => ({ reach: Math.sin(lean) * height + height * 0.62, height: height * (Math.cos(lean) + 0.045) }),
     draw(props, { height: H = 150, lean = 0.22, leanYaw = 0, fronds = 7, colors }, dims, { rand, shift }) {
       const c = coloursOf({ frond: 'frond', frondLight: 'frondLight', trunk: 'palmTrunk', trunkDark: 'palmTrunkDark', coconut: 'coconut' }, colors);
       const head = [Math.cos(leanYaw) * Math.sin(lean) * H, Math.sin(leanYaw) * Math.sin(lean) * H, Math.cos(lean) * H];
@@ -414,7 +416,8 @@ const ASSETS = {
 
   /** A patch of tall grass, Pokémon's own: tufts of bent blades, darker at the foot, swaying. */
   tallGrass: {
-    dims: ({ size = 30, blade = 16 }) => ({ reach: size + blade * 0.6, height: blade * 1.15 }),
+    // Tufts reach 1.05 of the size out; a blade leans out up to 0.55 of its height (1.15 × blade), its foot ~3 px wide.
+    dims: ({ size = 30, blade = 16 }) => ({ reach: size * 1.05 + blade * 0.64 + 3, height: blade * 1.15 }),
     draw(props, { size: R = 30, blade = 16, colors }, dims, { rand }) {
       const c = coloursOf({ grass: 'grass', tip: 'grassTip' }, colors);
       const step = 5.5;
@@ -502,7 +505,8 @@ const ASSETS = {
 
   /** A handful of small stones round one another. */
   pebbles: {
-    dims: ({ size = 14 }) => ({ reach: size * 1.25, height: size * 0.45 }),
+    // Stones lie out to 0.9 of the size, each a boulder of up to 0.44 of it (reach 1.12 × its own).
+    dims: ({ size = 14 }) => ({ reach: size * 1.4, height: size * 0.45 }),
     draw(props, { size: R = 14, count = 4, colors }, dims, { rand }) {
       for (let k = 0; k < count; k += 1) {
         const angle = (k / count) * 6.28 + rand();
@@ -530,7 +534,8 @@ const ASSETS = {
 
   /** A cluster of crystals: one tall hexagonal shaft and smaller ones leaning out round it, bright at the tips. */
   crystals: {
-    dims: ({ size = 40 }) => ({ reach: size * 0.85, height: size * 1.4 }),
+    // A side shaft stands out to 0.38 of the size and leans out up to 0.7 rad over its ~0.96 of it.
+    dims: ({ size = 40 }) => ({ reach: size * 1.02, height: size * 1.4 }),
     draw(props, { size: S = 40, count = 5, colors }, dims, { rand, shift }) {
       const c = coloursOf({ base: 'crystal', tip: 'crystalTip' }, colors);
       const mix = (t) => c.base.map((v, k) => (k < 3 ? v + (c.tip[k] - v) * t : v));
@@ -778,8 +783,8 @@ const ASSETS = {
 
   /** A street lamp: a moulded foot, a slim post, a glowing globe (`style` 'globe') or a lantern ('lantern'). */
   lamp: {
-    dims: ({ height = 70 }) => ({ reach: height * 0.12, height }),
-    draw(props, { height: H = 70, style = 'globe', glow = 2.2, colors }, dims) {
+    dims: ({ height = 70, style = 'globe' }) => ({ reach: height * 0.12, height: height * (style === 'lantern' ? 1.03 : 1) }),
+    draw(props, { height: H = 70, style = 'globe', glow = 2.2, colors }) {
       const c = coloursOf({ post: 'iron', light: 'glow' }, colors);
       const light = [...c.light.slice(0, 3).map((v) => v * KEY_LIGHT), 1 + glow];
       props.look({ outline: 1 }, () => {
@@ -876,10 +881,12 @@ const ASSETS = {
 
   /** A planter box (`size` its half width) with a `plant`: 'bush', 'tree', 'flowers' or 'topiary'. */
   planter: {
-    dims: ({ size = 18, plant = 'bush' }) => ({
-      reach: size * (plant === 'tree' ? 2.2 : 1.6),
-      height: size * (plant === 'tree' ? 4.2 : 2.1),
-    }),
+    // The rim's corner (1.08 W out each way), or the plant standing on the soil, whichever reaches further.
+    dims: ({ size: W = 18, plant = 'bush' }) => {
+      const grown = planterPlant(W, plant);
+      const dims = ASSETS[grown.name].dims(grown.options);
+      return { reach: Math.max(W * 1.08 * Math.SQRT2, dims.reach), height: PLANTER_SOIL * W + dims.height };
+    },
     draw(props, { size: W = 18, plant = 'bush', seed = 0, colors }, dims, ctx) {
       const c = coloursOf({ box: 'planter', rim: 'white', soil: 'soil' }, colors);
       const top = 0.7 * W;
@@ -888,13 +895,9 @@ const ASSETS = {
         props.box({ x: 0, y: 0, z0: top - 0.12 * W, z1: top + 0.06 * W, hw: W * 1.08, hh: W * 1.08, color: c.rim });
       });
       props.box({ x: 0, y: 0, z0: top, z1: top + 0.08 * W, hw: W * 0.9, hh: W * 0.9, color: c.soil });
-      const plantColors = colors?.plant ?? {};
-      props.at({ z: top + 0.05 * W }, () => {
-        if (plant === 'tree') ASSETS.treeRound.draw(props, { size: 1.6 * W, height: 3.6 * W, colors: plantColors }, {}, { ...ctx, rand: seededRandom(seed + 1) });
-        else if (plant === 'flowers') ASSETS.flowers.draw(props, { size: 0.75 * W, count: 6, head: 0.3 * W, petals: plantColors.petals }, {}, { ...ctx, rand: seededRandom(seed + 2) });
-        else if (plant === 'topiary') ASSETS.topiary.draw(props, { size: 0.85 * W, colors: plantColors, pot: false }, {}, { ...ctx, rand: seededRandom(seed + 3) });
-        else ASSETS.bush.draw(props, { size: 0.95 * W, colors: plantColors }, {}, { ...ctx, rand: seededRandom(seed + 4) });
-      });
+      const grown = planterPlant(W, plant, colors?.plant);
+      const asset = ASSETS[grown.name];
+      props.at({ z: PLANTER_SOIL * W }, () => asset.draw(props, grown.options, asset.dims(grown.options), { ...ctx, rand: seededRandom(seed + grown.salt) }));
       props.shadow({ rx: W * 1.45, strength: 0.6 });
     },
   },
@@ -992,7 +995,8 @@ const ASSETS = {
 
   /** Reeds: thin stems, some with a brown cattail, leaning a little each its own way. */
   reeds: {
-    dims: ({ size = 10, height = 28 }) => ({ reach: size + height * 0.15, height }),
+    // A stem leans out 0.12 of its height, its cattail 1.5 px round; its leaning end ring sits a hair over it.
+    dims: ({ size = 10, height = 28 }) => ({ reach: size + height * 0.12 + 1.5, height: height + 0.5 }),
     draw(props, { size: R = 10, height: H = 28, count = 7, colors }, dims, { rand }) {
       const c = coloursOf({ reed: 'reed', cattail: 'cattail' }, colors);
       for (let k = 0; k < count; k += 1) {
@@ -1012,7 +1016,7 @@ const ASSETS = {
 
   /** A lily pad, notched, a pink bloom on some (`bloom`). */
   lilyPad: {
-    dims: ({ size = 12 }) => ({ reach: size, height: size * 0.4 }),
+    dims: ({ size = 12, bloom = false }) => ({ reach: size, height: bloom ? size * 0.42 : Math.max(size * 0.4, 0.9) }),
     draw(props, { size: R = 12, bloom = false, colors }, dims, { rand }) {
       const c = coloursOf({ pad: 'lily', rim: 'lilyLight', petal: 'petal', eye: '#ffd84a' }, colors);
       const notch = rand() * 6.28;
@@ -1040,6 +1044,20 @@ const ASSETS = {
     },
   },
 };
+
+/** How high in a planter (× its half width) the plant stands: on the soil, a little under the rim's top. */
+const PLANTER_SOIL = 0.75;
+
+/**
+ * What a planter of half width W grows (`plant`: 'tree', 'flowers', 'topiary', else a bush): the
+ * asset, its options, and the salt its own random stream takes from the planter's seed.
+ */
+function planterPlant(W, plant, colors = {}) {
+  if (plant === 'tree') return { name: 'treeRound', options: { size: 1.6 * W, height: 3.6 * W, colors }, salt: 1 };
+  if (plant === 'flowers') return { name: 'flowers', options: { size: 0.75 * W, count: 6, head: 0.3 * W, petals: colors.petals }, salt: 2 };
+  if (plant === 'topiary') return { name: 'topiary', options: { size: 0.85 * W, colors, pot: false }, salt: 3 };
+  return { name: 'bush', options: { size: 0.95 * W, colors }, salt: 4 };
+}
 
 /** The kit's light on a lamp's glass, so a lit lamp reads lit in daylight too. */
 const KEY_LIGHT = 1.12;

@@ -1,5 +1,5 @@
 // Test helper (not a test): where a Stadium board's props land on screen in both camera presets,
-// against the screen boxes of every card footprint, for the boards' "never covers a card" tests.
+// against the projected outline of every card footprint, for the boards' "never covers a card" tests.
 import { cameraFromCssTilt, cameraTcgLive, projectToScreen, tableToWorld } from '../board-camera.mjs';
 import { flatLayout, halfFromViewport } from '../board-layout.mjs';
 import { getMatLayout } from '../../sizing/mat-layouts.mjs';
@@ -29,35 +29,6 @@ export function screenView({ viewport, profile }) {
     project: (x, y, z) => projectToScreen(camera, tableToWorld({ x, y, z }, camera)),
   }));
   return { layout, projectors };
-}
-
-/** Every card footprint's box on screen through `project`. */
-export function cardScreenBoxes(layout, project) {
-  const { slabs, flats } = environmentFootprints(layout);
-  return [...slabs, ...flats].map((rect) => {
-    const corners = [
-      [rect.x, rect.y],
-      [rect.x + rect.w, rect.y],
-      [rect.x, rect.y + rect.h],
-      [rect.x + rect.w, rect.y + rect.h],
-    ].map(([x, y]) => project(x, y, 0));
-    return {
-      x0: Math.min(...corners.map((p) => p.x)),
-      x1: Math.max(...corners.map((p) => p.x)),
-      y0: Math.min(...corners.map((p) => p.y)),
-      y1: Math.max(...corners.map((p) => p.y)),
-    };
-  });
-}
-
-/** The first of `points` ([x, y, z] table px) that lands on a card's screen box, or null. */
-export function pointOnCard(points, layout, project) {
-  const quads = cardScreenQuads(layout, project);
-  for (const point of points) {
-    const p = project(...point);
-    if (p && quads.some((quad) => insideQuad(p, quad))) return point;
-  }
-  return null;
 }
 
 /**
@@ -91,10 +62,52 @@ const insideQuad = (p, quad) => {
   return true;
 };
 
-/** Every `every`-th vertex of a built geometry as [x, y, z] table px (a board's solids, for pointOnCard). */
-export function geometryPoints(geometry, every = 5) {
+const side = (p, q, r) => (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
+/** True when screen segments ab and cd cross (each one's ends strictly either side of the other). */
+const crosses = (a, b, c, d) => side(c, d, a) * side(c, d, b) < 0 && side(a, b, c) * side(a, b, d) < 0;
+/** True when screen segment ab has any point inside the quad. */
+const segmentMeetsQuad = (a, b, quad) =>
+  quad.every(Boolean) && (insideQuad(a, quad) || insideQuad(b, quad) || quad.some((c, k) => crosses(a, b, c, quad[(k + 1) % 4])));
+
+/** The first of `points` ([x, y, z] table px) that lands on a card's outline on screen, or null. */
+export function pointOnCard(points, layout, project) {
+  const quads = cardScreenQuads(layout, project);
+  for (const point of points) {
+    const p = project(...point);
+    if (p && quads.some((quad) => insideQuad(p, quad))) return point;
+  }
+  return null;
+}
+
+/**
+ * The first vertex of a built geometry ([x, y, z] table px) that lands on a card's outline on screen
+ * while standing above the cloth, or null; every vertex is tested. (One below the cloth that shows
+ * inside a card's outline lies behind that card along the eye's ray, so the card rightly hides it.)
+ * `ground(x, y)` → [lowest, highest] px, for a board whose kit stands on its baked ground
+ * (stadium-kit.mjs kitGround): a vertex whose foot stands on the ground (aFoot.z 1) rises by the
+ * ground's height at its foot, somewhere in that range, so it is tested along the whole rise (a
+ * straight segment on screen).
+ */
+export function geometryOnCard(geometry, layout, project, { ground = null } = {}) {
+  const quads = cardScreenQuads(layout, project);
   const position = geometry.getAttribute('position');
-  const points = [];
-  for (let i = 0; i < position.count; i += every) points.push([position.getX(i), position.getY(i), position.getZ(i)]);
-  return points;
+  const foot = ground ? geometry.getAttribute('aFoot') : null;
+  const rises = new Map();
+  for (let i = 0; i < position.count; i += 1) {
+    const at = [position.getX(i), position.getY(i), position.getZ(i)];
+    if (!foot || foot.getZ(i) < 0.5) {
+      if (at[2] <= 0) continue;
+      const p = project(...at);
+      if (p && quads.some((quad) => insideQuad(p, quad))) return at;
+      continue;
+    }
+    const key = `${foot.getX(i)},${foot.getY(i)}`;
+    if (!rises.has(key)) rises.set(key, ground(foot.getX(i), foot.getY(i)));
+    const [low, high] = rises.get(key);
+    if (at[2] + high <= 0) continue;
+    const a = project(at[0], at[1], Math.max(at[2] + low, 0));
+    const b = project(at[0], at[1], at[2] + high);
+    if (a && b && quads.some((quad) => segmentMeetsQuad(a, b, quad))) return at;
+  }
+  return null;
 }

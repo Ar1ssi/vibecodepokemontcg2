@@ -446,15 +446,7 @@ void main() {
 const PALETTE = /* glsl */ `
 const vec3 GRASS = vec3(0.137, 0.255, 0.069);
 const vec3 GRASS_DARK = vec3(0.071, 0.154, 0.058);
-const vec3 GRASS_LIT = vec3(0.25, 0.37, 0.07);
 const vec3 BUSH_DARK = vec3(0.033, 0.162, 0.063);
-const vec3 BUSH_MID = vec3(0.154, 0.294, 0.071);
-const vec3 BUSH_LIT = vec3(0.31, 0.416, 0.07);
-const vec3 BUSH_YELLOW = vec3(0.66, 0.614, 0.039);
-const vec3 CROWN_DARK = vec3(0.02, 0.159, 0.108);
-const vec3 CROWN_BODY = vec3(0.0, 0.27, 0.205);
-const vec3 CROWN_TOP = vec3(0.04, 0.46, 0.33);
-const vec3 FRINGE = vec3(0.345, 0.469, 0.131);
 const vec3 GLOW = vec3(0.836, 0.828, 0.131);
 const vec3 GLOW_CORE = vec3(0.95, 0.94, 0.45);
 // Shade under the crown is lit by the blue sky: cooler, not just darker.
@@ -694,7 +686,7 @@ export function forestOfVitalityBoard({ three, material, seeded, terrainGrid, re
   const kit = createKitProps({ three, material, own, mood: 'day', reveal: 'vec3(0.85, 0.95, 0.35)' });
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
   const motes = new three.Points(seeded(MOTE_COUNT), materials.motes);
-  motes.renderOrder = 3;
+  motes.renderOrder = 2;
   return {
     objects: [terrain, ...kit.objects, motes],
     materials: [...Object.values(materials), ...kit.materials],

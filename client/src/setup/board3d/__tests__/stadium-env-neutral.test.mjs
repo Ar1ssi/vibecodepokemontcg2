@@ -19,7 +19,7 @@ import {
   neutralProps,
   neutralSpots,
 } from '../stadium-env-neutral.mjs';
-import { SCREEN_VIEWS, geometryPoints, pointOnCard, screenView } from './stadium-screen.mjs';
+import { SCREEN_VIEWS, geometryOnCard, screenView } from './stadium-screen.mjs';
 
 const PROFILES = [NO_MAT_LAYOUT_ID, 'sim', 'one-player', 'two-player', 'edge-to-edge-two-player'];
 const HALVES = [
@@ -59,9 +59,9 @@ test('neutralSpots: the platform holds every card; columns stand outside it, nev
 test('no wall, column or screen covers a card on screen, in either camera preset', () => {
   for (const view of SCREEN_VIEWS) {
     const { layout, projectors } = screenView(view);
-    const points = geometryPoints(neutralProps(neutralSpots(layout)).build(three), 4);
+    const geometry = neutralProps(neutralSpots(layout)).build(three);
     for (const { preset, project } of projectors) {
-      const hit = pointOnCard(points, layout, project);
+      const hit = geometryOnCard(geometry, layout, project);
       assert.equal(hit, null, `${view.profile} ${view.viewport.w}x${view.viewport.h} ${preset}: ${hit}`);
     }
   }

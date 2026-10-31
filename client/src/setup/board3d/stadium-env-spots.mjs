@@ -7,6 +7,12 @@ import { tableBounds } from './table-uv.mjs';
 /** Least gap between any prop, seen from above, and a card or the opponent's hand. */
 export const PROP_CARD_GAP_PX = 14;
 
+/**
+ * The share of a prop's top height (px above the cloth, its ground's rise included) a board adds to
+ * its card clearance: the tilted view shows a raised point further across the table than its foot.
+ */
+export const RISE_LEAN = 0.3;
+
 /** A small deterministic 0..1 from three numbers. */
 export const hash = (x, y, salt) => {
   const s = Math.sin(x * 127.1 + y * 311.7 + salt * 74.7) * 43758.5453;

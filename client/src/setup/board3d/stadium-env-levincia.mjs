@@ -16,8 +16,6 @@
 // the mosaic band, the swirl), the rim wall, the walkway and the bridges; WATER one sheet at
 // WATER_LEVEL; PROPS the railings, the billboards and the towers (stadium-env-props).
 import {
-  FILTERING,
-  FOOTPRINTS,
   FULLSCREEN_VERTEX,
   NOISE,
   OUTPUT,
@@ -25,7 +23,6 @@ import {
   TABLE_UNIFORMS,
   TERRAIN_GROUND,
   TERRAIN_UNIFORMS,
-  VORONOI,
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
 import { environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
@@ -200,9 +197,6 @@ vec3 edgeHaze(vec3 col, vec2 uv) {
 export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
-${FOOTPRINTS}
-${FILTERING}
-${VORONOI}
 ${REVEAL}
 ${PALETTE}
 ${CITY}
@@ -316,7 +310,6 @@ void main() {
 export const WATER_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
-${VORONOI}
 ${REVEAL}
 ${PALETTE}
 ${CITY}

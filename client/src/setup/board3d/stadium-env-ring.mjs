@@ -523,8 +523,7 @@ void main() {
 `;
 
 const OVERCAST = /* glsl */ `
-// The art's light: an overcast sky, soft and from everywhere above, a pale sun from the far left.
-const vec3 SKY = vec3(0.64, 0.58, 0.49);
+// The art's overcast air: the haze the far ground fades into.
 const vec3 HAZE = vec3(0.42, 0.37, 0.3);
 `;
 

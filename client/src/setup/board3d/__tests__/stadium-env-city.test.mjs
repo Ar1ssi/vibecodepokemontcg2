@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import * as three from 'three';
 import { flatLayout } from '../board-layout.mjs';
 import { getMatLayout } from '../../sizing/mat-layouts.mjs';
 import { NO_MAT_LAYOUT_ID } from '../../sizing/mat-spec.mjs';
@@ -15,6 +16,7 @@ import {
   cityProps,
   citySpots,
 } from '../stadium-env-city.mjs';
+import { SCREEN_VIEWS, geometryOnCard, screenView } from './stadium-screen.mjs';
 
 // Every mat profile (the no-mat default, the simulator's, one-player and full-size two-player mats)
 // at the board width board3d.js lays out beside the sidebox (0.755 of 1920) and at full width.
@@ -88,5 +90,18 @@ test('Dark City shaders declare no GLSL ES 3.00 reserved word and every one has 
   for (const shader of [TERRAIN_FRAGMENT, BUILDING_FRAGMENT, BILLBOARD_FRAGMENT, BEAM_VERTEX]) {
     assert.match(shader, /void main\(\)/);
     assert.doesNotMatch(shader, reserved);
+  }
+});
+
+test('no tower, the hut or a searchlight covers a card on screen, in either camera preset', () => {
+  for (const view of SCREEN_VIEWS) {
+    const { layout, projectors } = screenView(view);
+    const geometries = [cityProps(citySpots(layout)), cityBuildings(citySpots(layout))].map((props) => props.build(three));
+    for (const { preset, project } of projectors) {
+      for (const geometry of geometries) {
+        const hit = geometryOnCard(geometry, layout, project);
+        assert.equal(hit, null, `${view.profile} ${view.viewport.w}x${view.viewport.h} ${preset}: ${hit}`);
+      }
+    }
   }
 });

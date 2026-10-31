@@ -151,54 +151,61 @@ varying vec4 vColor;
 varying vec4 vLook;
 varying vec3 vNormal;
 varying vec3 vWorld;
+varying float vRise;
 void main() {
   vec3 p = kitPosition(position, aLook);
   vColor = aColor;
   vLook = aLook;
   vNormal = normal;
   vWorld = p;
+  // Height over the ground the part stands on (its foot's, before the ground's own rise).
+  vRise = position.z;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
 }
 `;
 
 /**
- * The kit's light (LOOK kinds: 0 plain, 1 foliage, 2 gloss, 3 crystal, 4 cloud, 5 chrome). `metal`
+ * The kit's light (LOOK kinds: 0 plain, 1 foliage, 2 gloss, 3 crystal, 4 cloud, 5 chrome, 6 matte). `metal`
  * (aColor.w, 0..1) adds the glint to a plain part; on a chrome part it is how much of the toon
  * mirror shows (the floor's dark under a sharp bright horizon, the room's pale above, a white
- * highlight overhead), so a matte part of a chrome prop stays matte.
+ * highlight overhead), so a part of a chrome prop with no metal shows no mirror. A matte part takes
+ * no rim or glint.
  */
 export const KIT_LIGHT = /* glsl */ `
 vec3 kitLight(vec3 albedo, vec3 n, vec3 world, vec4 look, float metal) {
   vec3 sun = normalize(uSun);
   vec3 view = normalize(uEye - world);
   float kind = look.x;
-  bool soft = (kind > 0.5 && kind < 1.5) || kind > 3.5;
+  bool kitCloud = kind > 3.5 && kind < 4.5;
+  bool kitChrome = kind > 4.5 && kind < 5.5;
+  bool kitMatte = kind > 5.5;
+  bool soft = (kind > 0.5 && kind < 1.5) || kitCloud;
   float width = soft ? 0.3 : 0.07;
   float ndl = dot(n, sun);
   float lit = smoothstep(-width, width, ndl - 0.04);
   vec3 shade = albedo * uKitShade;
   float grey = dot(shade, vec3(0.299, 0.587, 0.114));
   shade = max(mix(vec3(grey), shade, 1.25), 0.0);
-  if (kind > 3.5) shade = mix(shade, albedo, 0.35);
+  if (kitCloud) shade = mix(shade, albedo, 0.35);
   // Light passes into a crystal: its shaded faces stay bright with its own colour.
   if (kind > 2.5 && kind < 3.5) shade = mix(shade, albedo * 0.95, 0.45);
   vec3 col = mix(shade, albedo * uKitKey, lit);
   col += albedo * uKitSky * (0.06 + 0.06 * n.z);
-  float edge = 1.0 - max(dot(n, view), 0.0);
-  col += uKitRim.rgb * uKitRim.w * smoothstep(0.55, 0.9, edge) * mix(0.25, 1.0, lit);
-  float glint = smoothstep(0.88, 0.93, dot(reflect(-sun, n), view));
-  float shine = kind > 1.5 && kind < 3.5 ? 0.55 : metal * 0.6;
-  col += uKitKey * glint * shine;
-  if (kind > 4.5) {
+  if (!kitMatte) {
+    float edge = 1.0 - max(dot(n, view), 0.0);
+    col += uKitRim.rgb * uKitRim.w * smoothstep(0.55, 0.9, edge) * mix(0.25, 1.0, lit);
+    float glint = smoothstep(0.88, 0.93, dot(reflect(-sun, n), view));
+    float shine = kind > 1.5 && kind < 3.5 ? 0.55 : metal * 0.6;
+    col += uKitKey * glint * shine;
+  }
+  if (kitChrome) {
     vec3 r = reflect(-view, n);
     vec3 mirror = mix(uKitShade * 0.3, uKitSky * 0.95, smoothstep(-0.14, -0.03, r.z));
     mirror = mix(mirror, vec3(1.3), smoothstep(-0.03, -0.01, r.z) * (1.0 - smoothstep(0.05, 0.09, r.z)));
     mirror = mix(mirror, vec3(1.35), smoothstep(0.86, 0.9, r.z));
     col = mix(col, mirror * mix(vec3(1.0), albedo * 1.4, 0.5), clamp(metal, 0.0, 1.0) * 0.85);
   }
-  // A part standing on the ground darkens a little at its foot (its contact shadow does the rest).
-  col *= look.z * mix(0.8, 1.0, smoothstep(0.0, 10.0, world.z));
-  return col;
+  return col * look.z;
 }
 `;
 
@@ -216,12 +223,16 @@ varying vec4 vColor;
 varying vec4 vLook;
 varying vec3 vNormal;
 varying vec3 vWorld;
+varying float vRise;
 ${KIT_LIGHT}
 ${glow}
 void main() {
   if (revealBurned(vWorld.xy) * exitKeep(vWorld.xy) < 0.5) discard;
   vec3 n = normalize(gl_FrontFacing ? vNormal : -vNormal);
-  vec3 col = vColor.w >= 1.5 ? vColor.rgb * (vColor.w - 1.0) : kitLight(vColor.rgb, n, vWorld, vLook, vColor.w);
+  // A lit part darkens a little at its foot, where it meets the ground (its contact shadow does the rest).
+  vec3 col = vColor.w >= 1.5
+    ? vColor.rgb * (vColor.w - 1.0)
+    : kitLight(vColor.rgb, n, vWorld, vLook, vColor.w) * mix(0.8, 1.0, smoothstep(0.0, 10.0, vRise));
   ${glow ? 'if (vColor.w < 1.5) col += kitGlow(vColor.rgb, n, vWorld);' : ''}
   col += (${reveal}) * revealGlow(vWorld.xy, 0.035);
   gl_FragColor = vec4(col, 1.0);
@@ -355,7 +366,8 @@ export function createKitProps({ three, material, own = {}, mood = 'day', reveal
   props.name = 'stadium-kit-props';
   outline.name = 'stadium-kit-outline';
   shadows.name = 'stadium-kit-shadows';
-  // The shadows go down on the ground before any prop stands on it (they test no depth).
+  // The shadows go down on the ground before any prop stands on it (they test no depth). None of
+  // the three is transparent, so all draw before a board's transparent layers, whatever their order.
   shadows.renderOrder = 1;
   props.renderOrder = 2;
   outline.renderOrder = 2;

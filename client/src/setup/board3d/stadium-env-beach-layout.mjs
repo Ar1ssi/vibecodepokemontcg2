@@ -1,6 +1,9 @@
 // Design 077 (prototype): where Surfing Beach's pieces go, from the board layout: the bay (the mean
 // waterline from the far edge to the left edge, the sea filling the far-left corner), rock clusters
 // along the waterline and palms on the dry sand, all clear of the card footprints. Pure: no three.js.
+import { TERRAIN_SPACING_PX } from './stadium-environment-glsl.mjs';
+import { RISE_LEAN } from './stadium-env-spots.mjs';
+import { measureAsset } from './stadium-kit-assets.mjs';
 import { tableBounds } from './table-uv.mjs';
 
 const isRect = (rect) => rect && [rect.x, rect.y, rect.w, rect.h].every(Number.isFinite) && rect.w > 0 && rect.h > 0;
@@ -71,6 +74,25 @@ export function shoreFrame(shore, x, y) {
   const t = Math.min(1, Math.max(0, along / span));
   const offshore = (x - shore.a.x) * seaward.x + (y - shore.a.y) * seaward.y + shore.bend * 4 * t * (1 - t);
   return { along, offshore };
+}
+
+/** px the waterline wanders toward the sea at most (stadium-env-beach.mjs shoreWobble: 24 × 0.5 + 4). */
+const SHORE_WANDER_PX = 16;
+const smoothstep = (a, b, v) => {
+  const t = Math.min(1, Math.max(0, (v - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+};
+
+/**
+ * The highest the sand can stand at (x, y), px: the field bake's beachHeight (stadium-env-beach.mjs
+ * BEACH_FIELD_FRAGMENT) with its dunes and hummocks at their tallest, the waterline wandered its
+ * furthest out, and a little further up the beach for the ground's smoothing (groundAt) and a bake
+ * texel. The kit's pieces stand on the sand, so they keep off the cards by this rise too.
+ */
+export function sandCeiling(shore, x, y) {
+  const up = Math.max(0, -shoreFrame(shore, x, y).offshore + SHORE_WANDER_PX + TERRAIN_SPACING_PX / 2 + 2);
+  const face = 15 * (1 - Math.exp(-up / 70)) + 0.035 * up;
+  return face + 0.55 * 22 * smoothstep(110, 260, up) + 2 * smoothstep(60, 140, up);
 }
 
 /** The table point at `t` (share of the waterline's length from `a`) and `offshore` px. */
@@ -176,17 +198,18 @@ export const PALM_FROND_REACH = 0.64;
 
 /**
  * Every palm's crown clear of the cards seen from above: the fronds' circle round the crown (the
- * trunk's top, leant over) keeps PALM_CLEARANCE_PX off every card; a palm too close shrinks, to
- * 0.6 of its height at most, or goes.
+ * trunk's top, leant over) keeps PALM_CLEARANCE_PX off every card, and more by RISE_LEAN of the
+ * sand's rise under the palm; a palm too close shrinks, to 0.6 of its height at most, or goes.
  */
-const fitPalms = (palms, rects) =>
+const fitPalms = (palms, rects, shore) =>
   palms
     .map((palm) => {
+      const rise = RISE_LEAN * sandCeiling(shore, palm.x, palm.y);
       for (let scale = 1; scale >= 0.6 - 1e-9; scale -= 0.05) {
         const height = palm.height * scale;
         const out = Math.sin(palm.lean) * height;
         const crown = { x: palm.x + Math.cos(palm.leanAngle) * out, y: palm.y + Math.sin(palm.leanAngle) * out };
-        if (nearestFootprint(rects, crown.x, crown.y).distance >= height * PALM_FROND_REACH + PALM_CLEARANCE_PX) return { ...palm, height };
+        if (nearestFootprint(rects, crown.x, crown.y).distance >= height * PALM_FROND_REACH + PALM_CLEARANCE_PX + rise) return { ...palm, height };
       }
       return null;
     })
@@ -212,9 +235,10 @@ const pickDressing = (shore, bounds, rects, rocks, palms, u) => {
       ];
     }),
   ];
-  const fits = (x, y, r) =>
+  // A piece `top` px tall keeps off the cards by RISE_LEAN of its top's height, on the sand's rise.
+  const fits = (x, y, r, top = 0) =>
     insideBounds(bounds, x, y, r + 8) &&
-    nearestFootprint(rects, x, y).distance >= r + DRESSING_CARD_GAP_PX &&
+    nearestFootprint(rects, x, y).distance >= r + DRESSING_CARD_GAP_PX + RISE_LEAN * (sandCeiling(shore, x, y) + top) &&
     taken.every((spot) => Math.hypot(spot.x - x, spot.y - y) >= spot.r + r);
   const claim = (x, y, r) => taken.push({ x, y, r });
   const finds = [];
@@ -224,32 +248,36 @@ const pickDressing = (shore, bounds, rects, rocks, palms, u) => {
     if (spotHash(t, 2, 12) > 0.55) continue;
     const star = spotHash(t, 3, 13) < 0.4;
     const size = (star ? 7 + 2 * spotHash(t, 4, 14) : 5 + 1.5 * spotHash(t, 4, 14)) * u;
-    if (!fits(x, y, size + 6)) continue;
-    finds.push({ kind: star ? 'starfish' : 'shell', x, y, size, seed: spotHash(t, 5, 15), warm: spotHash(t, 6, 16) < 0.5 });
+    const kind = star ? 'starfish' : 'shell';
+    if (!fits(x, y, size + 6, measureAsset(kind, { size }).height)) continue;
+    finds.push({ kind, x, y, size, seed: spotHash(t, 5, 15), warm: spotHash(t, 6, 16) < 0.5 });
     claim(x, y, size + 22);
   }
   // Parasol sets on the dry sand: the freest spots first, far apart.
   const sets = [];
   const setReach = 64 * u;
+  const parasol = { size: 34 * u, height: 34 * u * 1.55, table: false };
+  const setTop = measureAsset('parasol', parasol).height;
   const candidates = [];
   for (let x = bounds.x + setReach; x <= bounds.x + bounds.w - setReach; x += 18) {
     for (let y = bounds.y + setReach; y <= bounds.y + bounds.h - setReach; y += 18) {
       const { offshore } = shoreFrame(shore, x, y);
-      if (offshore > -170 || !fits(x, y, setReach)) continue;
+      if (offshore > -170 || !fits(x, y, setReach, setTop)) continue;
       candidates.push({ x, y, score: Math.min(nearestFootprint(rects, x, y).distance, 160) + 10 * spotHash(x, y, 21) });
     }
   }
   candidates.sort((a, b) => b.score - a.score);
   for (const spot of candidates) {
     if (sets.length >= 2) break;
-    if (!fits(spot.x, spot.y, setReach) || sets.some((set) => Math.hypot(set.x - spot.x, set.y - spot.y) < 320)) continue;
+    if (!fits(spot.x, spot.y, setReach, setTop) || sets.some((set) => Math.hypot(set.x - spot.x, set.y - spot.y) < 320)) continue;
     const k = sets.length;
     const away = nearestFootprint(rects, spot.x, spot.y).away;
     const yaw = Math.atan2(away.y, away.x) + Math.PI / 2;
     sets.push({
       x: spot.x,
       y: spot.y,
-      size: 34 * u,
+      size: parasol.size,
+      height: parasol.height,
       stripes: k === 0 ? ['#ff6b6b', '#fff6ea'] : ['#3fa2ff', '#fff6ea'],
       towel: { x: spot.x + away.x * 8 * u, y: spot.y + away.y * 8 * u, size: 46 * u, yaw, stripes: k === 0 ? ['#ffd84a', '#fff6ea', '#ffd84a'] : ['#57c785', '#fff6ea', '#57c785'] },
       extra:
@@ -266,9 +294,10 @@ const pickDressing = (shore, bounds, rects, rocks, palms, u) => {
       if (grass.length >= 10) break;
       const toEdge = Math.min(x - bounds.x, bounds.x + bounds.w - x, y - bounds.y, bounds.y + bounds.h - y);
       const size = (18 + 6 * spotHash(x, y, 31)) * u;
+      const blade = 17 * u;
       if (toEdge > 120 || spotHash(x, y, 32) > 0.12) continue;
-      if (shoreFrame(shore, x, y).offshore > -260 || !fits(x, y, size + 10)) continue;
-      grass.push({ x, y, size, seed: spotHash(x, y, 33) });
+      if (shoreFrame(shore, x, y).offshore > -260 || !fits(x, y, size + 10, measureAsset('tallGrass', { size, blade }).height)) continue;
+      grass.push({ x, y, size, blade, seed: spotHash(x, y, 33) });
       claim(x, y, size * 2.2);
     }
   }
@@ -294,7 +323,7 @@ export function beachSpots(layout, { slabs = [], flats = [] } = {}) {
   const corner = shoreFrame(shore, bounds.x, bounds.y + bounds.h).offshore;
   const barAt = Math.min(220, Math.max(110, corner * 0.4));
   const rocks = pickRocks(shore, bounds, rects);
-  const palms = fitPalms(pickPalms(shore, bounds, rects, rocks), rects);
+  const palms = fitPalms(pickPalms(shore, bounds, rects, rocks), rects, shore);
   const u = (layout?.self?.cardBox?.active?.w ?? 100) / 100;
   return { shore, barAt, rocks, palms, u, dressing: pickDressing(shore, bounds, rects, rocks, palms, u) };
 }

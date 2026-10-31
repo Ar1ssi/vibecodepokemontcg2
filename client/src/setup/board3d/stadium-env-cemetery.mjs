@@ -16,7 +16,6 @@
 // moonlight; PROPS are the headstones, obelisks, the post, the pines and the bare tree
 // (stadium-env-props); MIST is a sheet of drifting fog low over the ground.
 import {
-  FILTERING,
   FOOTPRINTS,
   FULLSCREEN_VERTEX,
   NOISE,
@@ -25,7 +24,6 @@ import {
   TABLE_UNIFORMS,
   TERRAIN_GROUND,
   TERRAIN_UNIFORMS,
-  VORONOI,
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
 import { environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
@@ -380,7 +378,6 @@ const vec3 GROUND_LIT = vec3(0.078, 0.228, 0.181);
 const vec3 EARTH = vec3(0.228, 0.142, 0.101);
 const vec3 EARTH_DARK = vec3(0.12, 0.101, 0.085);
 const vec3 STONE = vec3(0.181, 0.302, 0.302);
-const vec3 STONE_LIT = vec3(0.392, 0.618, 0.586);
 const vec3 MOSS = vec3(0.058, 0.139, 0.128);
 const vec3 MIST = vec3(0.345, 0.618, 0.586);
 const vec3 MOONLIGHT = vec3(0.677, 1.0, 0.962);
@@ -394,8 +391,6 @@ export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
 ${FOOTPRINTS}
-${FILTERING}
-${VORONOI}
 ${REVEAL}
 ${PALETTE}
 uniform vec4 uCore;

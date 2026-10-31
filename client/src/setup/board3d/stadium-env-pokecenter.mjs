@@ -25,7 +25,6 @@ import {
   TABLE_UNIFORMS,
   TERRAIN_GROUND,
   TERRAIN_UNIFORMS,
-  VORONOI,
 } from './stadium-environment-glsl.mjs';
 import { craterEmblem } from './stadium-environment-layout.mjs';
 import { createPropBuilder } from './stadium-env-props.mjs';
@@ -412,7 +411,6 @@ const POT_WHITE = [1.05, 1.05, 1.0, 0.1];
 const POT_TERRA = [0.7, 0.24, 0.14, 0];
 const FOLIAGE = [0.1, 0.3, 0.12, 0];
 const FOLIAGE_LIT = [0.22, 0.5, 0.2, 0];
-const SOIL = [0.13, 0.08, 0.06, 0];
 const SHELF_WHITE = [1.1, 1.08, 1.0, 0.1];
 const BOOKS = [[0.8, 0.12, 0.1, 0], [0.12, 0.34, 0.7, 0], [0.96, 0.72, 0.15, 0], [0.15, 0.5, 0.25, 0], [0.9, 0.9, 0.85, 0], [0.55, 0.2, 0.55, 0], [0.9, 0.4, 0.1, 0]];
 const MONITOR = [0.12, 0.13, 0.16, 0.3];

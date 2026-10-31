@@ -27,7 +27,6 @@ import {
   TABLE_UNIFORMS,
   TERRAIN_GROUND,
   TERRAIN_UNIFORMS,
-  VORONOI,
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
 import { craterEmblem, environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
@@ -265,7 +264,6 @@ const vec3 GRASS = vec3(0.13, 0.34, 0.08);
 const vec3 GRASS_LIT = vec3(0.29, 0.54, 0.12);
 const vec3 GRASS_DARK = vec3(0.063, 0.193, 0.058);
 const vec3 EARTH = vec3(0.245, 0.142, 0.085);
-const vec3 EARTH_DARK = vec3(0.096, 0.067, 0.052);
 const vec3 MARK = vec3(0.9, 0.232, 0.572);
 `;
 
@@ -281,7 +279,6 @@ export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
 ${FILTERING}
-${VORONOI}
 ${REVEAL}
 ${POKE_BALL}
 ${PALETTE}

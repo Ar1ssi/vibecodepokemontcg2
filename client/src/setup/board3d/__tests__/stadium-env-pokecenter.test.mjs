@@ -17,7 +17,7 @@ import {
   centerProps,
   centerSpots,
 } from '../stadium-env-pokecenter.mjs';
-import { SCREEN_VIEWS, geometryPoints, pointOnCard, screenView } from './stadium-screen.mjs';
+import { SCREEN_VIEWS, geometryOnCard, screenView } from './stadium-screen.mjs';
 
 const PROFILES = [NO_MAT_LAYOUT_ID, 'sim', 'one-player', 'two-player', 'edge-to-edge-two-player'];
 const HALVES = [
@@ -79,9 +79,9 @@ test('centerSpots: the boxes and round pieces the light is cast from fit the sha
 test('no wall, counter, shelf, column or plant covers a card on screen, in either camera preset', () => {
   for (const view of SCREEN_VIEWS) {
     const { layout, projectors } = screenView(view);
-    const points = geometryPoints(centerProps(centerSpots(layout)).build(three), 4);
+    const geometry = centerProps(centerSpots(layout)).build(three);
     for (const { preset, project } of projectors) {
-      const hit = pointOnCard(points, layout, project);
+      const hit = geometryOnCard(geometry, layout, project);
       assert.equal(hit, null, `${view.profile} ${view.viewport.w}x${view.viewport.h} ${preset}: ${hit}`);
     }
   }

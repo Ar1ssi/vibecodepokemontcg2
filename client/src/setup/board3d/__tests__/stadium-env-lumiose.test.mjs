@@ -20,7 +20,7 @@ import {
   lumioseSpots,
   towerRadius,
 } from '../stadium-env-lumiose.mjs';
-import { SCREEN_VIEWS, geometryPoints, pointOnCard, screenView } from './stadium-screen.mjs';
+import { SCREEN_VIEWS, geometryOnCard, screenView } from './stadium-screen.mjs';
 
 const PROFILES = [NO_MAT_LAYOUT_ID, 'sim', 'one-player', 'two-player', 'edge-to-edge-two-player'];
 const HALVES = [
@@ -81,9 +81,9 @@ test('towerRadius: legs flare at the foot, a slim waist, a swollen crown, closin
 test('no building, tree, lamp, parasol, flower or the tower covers a card on screen, in either camera preset', () => {
   for (const view of SCREEN_VIEWS) {
     const { layout, projectors } = screenView(view);
-    const points = geometryPoints(lumioseProps(lumioseSpots(layout)).build(three), 4);
+    const geometry = lumioseProps(lumioseSpots(layout)).build(three);
     for (const { preset, project } of projectors) {
-      const hit = pointOnCard(points, layout, project);
+      const hit = geometryOnCard(geometry, layout, project);
       assert.equal(hit, null, `${view.profile} ${view.viewport.w}x${view.viewport.h} ${preset}: ${hit}`);
     }
   }

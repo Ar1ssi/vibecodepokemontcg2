@@ -134,7 +134,7 @@ float steepness(float n, float crest, float along) {
 struct Sea {
   float height;  // px above sea level
   float slope;   // d height / d offshore
-  float foam;    // roller and trail, 0..1, before the lace
+  float foam;    // roller and trail, 0..1
   float fresh;   // a crest breaking right here
   float glow;    // a steep crest's thin face, lit through
   float cap;     // a whitecap on a big swell's crest, out past the bar
@@ -186,7 +186,7 @@ float runupMax(float along) {
 }
 struct Swash {
   float film;   // the sheet's depth, 0..1
-  float foam;   // its foam front, the line it leaves at the top, 0..1 before the lace
+  float foam;   // its foam front, the line it leaves at the top, 0..1
   float gloss;  // glassy sand just drained, 0..1
   float reach;  // px the sheet has run up the beach
 };
@@ -482,10 +482,10 @@ const DUNE_GRASS = Object.freeze({ grass: '#6f9a3d', tip: '#c3c56b' });
 
 /**
  * The beach's solids, the kit's (design 081): palms where the layout stands them, each rock cluster
- * a boulder with a smaller one or two at its side (out in the sea they stand on the sea floor's
- * level of the water, so they break the surface), the dressing on the sand.
+ * a boulder with a smaller one or two at its side (out in the sea they stand at sea level, sunk a
+ * little, so they break the surface), the dressing on the sand.
  */
-export function beachProps({ shore, rocks, palms, dressing, u = 1 }) {
+export function beachProps({ shore, rocks, palms, dressing }) {
   const props = createPropBuilder();
   for (const palm of palms) {
     placeAsset(props, 'palm', { x: palm.x, y: palm.y, height: palm.height, lean: palm.lean, leanYaw: palm.leanAngle, fronds: 8, seed: palm.seed * 1013, colors: PALM });
@@ -512,13 +512,13 @@ export function beachProps({ shore, rocks, palms, dressing, u = 1 }) {
   }
   for (const set of dressing?.sets ?? []) {
     placeAsset(props, 'towel', { x: set.towel.x, y: set.towel.y, size: set.towel.size, yaw: set.towel.yaw, stripes: set.towel.stripes });
-    placeAsset(props, 'parasol', { x: set.x, y: set.y, size: set.size, height: set.size * 1.55, table: false, stripes: set.stripes, colors: { pole: '#f6f4ee' } });
+    placeAsset(props, 'parasol', { x: set.x, y: set.y, size: set.size, height: set.height, table: false, stripes: set.stripes, colors: { pole: '#f6f4ee' } });
     const extra = set.extra;
     if (extra.kind === 'beachBall') placeAsset(props, 'beachBall', { x: extra.x, y: extra.y, size: extra.size });
     else placeAsset(props, 'surfboard', { x: extra.x, y: extra.y, size: extra.size, yaw: extra.yaw });
   }
   for (const clump of dressing?.grass ?? []) {
-    placeAsset(props, 'tallGrass', { x: clump.x, y: clump.y, size: clump.size, blade: 17 * u, seed: clump.seed * 991, colors: DUNE_GRASS });
+    placeAsset(props, 'tallGrass', { x: clump.x, y: clump.y, size: clump.size, blade: clump.blade, seed: clump.seed * 991, colors: DUNE_GRASS });
   }
   return props;
 }

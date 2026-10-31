@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import * as three from 'three';
 import { flatLayout } from '../board-layout.mjs';
 import { tableBounds } from '../table-uv.mjs';
 import { getMatLayout } from '../../sizing/mat-layouts.mjs';
@@ -13,11 +14,14 @@ import {
   PLATE_MAX_PIXELS,
   PREPARE_TIMEOUT_MS,
   createStadiumEnvironment,
+  jungleTreeProps,
   plateScale,
   setFootprints,
   strikePath,
   strikePower,
 } from '../stadium-environment-mesh.js';
+import { jungleSpots } from '../stadium-env-forest-layout.mjs';
+import { SCREEN_VIEWS, geometryOnCard, screenView } from './stadium-screen.mjs';
 
 // The no-mat profile the board draws by default, at the board width board3d.js lays out beside the
 // sidebox (0.755 of 1920).
@@ -273,7 +277,6 @@ test('createStadiumEnvironment compiles with compileAsync when it can: the mat s
   environment.dispose();
 });
 
-// A board's own beforeRender draws its palms' shadows each frame; its dispose frees the target (Surfing Beach).
 /**
  * A renderer whose compileAsync calls wait until the test settles them, and an environment on it
  * (magma-basin and steel-shelter boards), for the races round a pending compile.
@@ -573,4 +576,17 @@ test('reduced motion: play settles at once and holds nothing', async () => {
   assert.equal(environment.play(), 0);
   assert.equal(environment.active(), false);
   environment.dispose();
+});
+
+test('no Perilous Jungle tree covers a card on screen, in either camera preset', () => {
+  for (const view of SCREEN_VIEWS) {
+    const { layout, projectors } = screenView(view);
+    const geometries = [jungleTreeProps(jungleSpots(layout).trees)].map((props) => props.build(three));
+    for (const { preset, project } of projectors) {
+      for (const geometry of geometries) {
+        const hit = geometryOnCard(geometry, layout, project);
+        assert.equal(hit, null, `${view.profile} ${view.viewport.w}x${view.viewport.h} ${preset}: ${hit}`);
+      }
+    }
+  }
 });

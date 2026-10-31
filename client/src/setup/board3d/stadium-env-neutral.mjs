@@ -18,9 +18,7 @@ import {
   OUTPUT,
   REVEAL,
   TABLE_UNIFORMS,
-  TERRAIN_GROUND,
   TERRAIN_UNIFORMS,
-  VORONOI,
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
 import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
@@ -47,7 +45,7 @@ const BEAM_SIDES = 14;
 export function neutralSpots(layout) {
   const ctx = boardContext(layout, NEUTRAL_KEY);
   if (!ctx) return null;
-  const { scene, table, cards, core, u, hand, centre } = ctx;
+  const { scene, cards, core, u, hand, centre } = ctx;
   const corners = cards.flatMap((r) => [[r.x, r.y], [r.x + r.w, r.y], [r.x, r.y + r.h], [r.x + r.w, r.y + r.h]]);
   const platform = Math.max(...corners.map(([x, y]) => Math.hypot(x - centre.x, y - centre.y))) + PLATFORM_MARGIN_PX * u;
   const handEnd = hand ? hand.y + hand.h : core.y + core.h;
@@ -107,7 +105,6 @@ export const TERRAIN_VERTEX = STANDARD_TERRAIN_VERTEX;
 const PALETTE = /* glsl */ `
 const vec3 FLOOR = vec3(0.17, 0.26, 0.46);
 const vec3 FLOOR_PALE = vec3(0.24, 0.35, 0.6);
-const vec3 FLOOR_DARK = vec3(0.1, 0.12, 0.23);
 const vec3 OUTER = vec3(0.075, 0.09, 0.18);
 const vec3 RING = vec3(0.6, 1.5, 2.3);
 const vec3 RING_WHITE = vec3(2.2, 3.0, 3.4);
@@ -117,7 +114,6 @@ const vec3 YELLOW = vec3(0.79, 0.79, 0.085);
 export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
-${VORONOI}
 ${REVEAL}
 ${EDGE_HAZE}
 ${PALETTE}
