@@ -40,6 +40,9 @@ import {
   volcanoSpot,
 } from './stadium-environment-layout.mjs';
 import { createEnvironmentTimeline } from './stadium-environment-timeline.mjs';
+import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
+import { createKitProps } from './stadium-kit.mjs';
+import { placeAsset } from './stadium-kit-assets.mjs';
 import { tableBounds } from './table-uv.mjs';
 
 export { EXIT_MS, INTRO_MS } from './stadium-environment-timeline.mjs';
@@ -318,6 +321,29 @@ export function strikePath(index, slot, { bowl, peaks }, bounds) {
  * Stormy Mountains: the mountain and its crater, the cloud sea round it, and two lightning ribbons
  * whose strikes the board schedules itself, lighting the ground and clouds as they fall.
  */
+/** The storm's light on the crater's kit solids: cold blue-white, deep slate shade, a cyan rim. */
+const STORMY_MOOD = Object.freeze({
+  key: [0.8, 0.88, 1.0],
+  shade: [0.3, 0.36, 0.55],
+  sky: [0.45, 0.55, 0.75],
+  rim: [0.55, 0.85, 1.0, 0.35],
+  outline: [0.22, 0.26, 0.34, 1.1],
+  shadow: [0.34, 0.4, 0.55, 0.55],
+});
+const CRATER_ROCK = Object.freeze({ body: '#7f8aa0', light: '#aeb9cc', dark: '#545d72' });
+const SNOW_PINE = Object.freeze({ pine: '#2e6b62', pineLight: '#3f8576', pineDark: '#1d4a45', bark: '#5a4436', snow: '#eef6ff' });
+
+/** The crater's dressing (highland.craterDressing) as one kit builder. */
+const crater = (pieces) => {
+  const props = createPropBuilder();
+  for (const piece of pieces) {
+    const common = { x: piece.x, y: piece.y, size: piece.size, seed: piece.seed * 997, yaw: piece.seed * 6.28 };
+    if (piece.asset === 'pine') placeAsset(props, 'pine', { ...common, height: piece.height, snow: true, tiers: 3, colors: SNOW_PINE });
+    else placeAsset(props, 'boulder', { ...common, colors: CRATER_ROCK });
+  }
+  return props;
+};
+
 function stormyMountainsBoard({ three, material }) {
   const own = {
     uBowl: { value: new three.Vector4() },
@@ -340,7 +366,9 @@ function stormyMountainsBoard({ three, material }) {
   };
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
   const clouds = new three.Mesh(new three.BufferGeometry(), materials.clouds);
-  clouds.renderOrder = 1;
+  clouds.renderOrder = 3;
+  // Design 081: the crater's boulders and pines are the kit's, standing on the baked mountain.
+  const kit = createKitProps({ three, material, own, mood: STORMY_MOOD, reveal: 'vec3(0.7, 0.95, 1.1)', ground: true });
   const bolts = BOLT_CYCLES_S.map(() => {
     const uniforms = {
       uBoltFrom: { value: new three.Vector3() },
@@ -370,8 +398,8 @@ function stormyMountainsBoard({ three, material }) {
   };
 
   return {
-    objects: [terrain, clouds, ...bolts.map((bolt) => bolt.mesh)],
-    materials: [...Object.values(materials), ...bolts.map((bolt) => bolt.material)],
+    objects: [terrain, ...kit.objects, clouds, ...bolts.map((bolt) => bolt.mesh)],
+    materials: [...Object.values(materials), ...kit.materials, ...bolts.map((bolt) => bolt.material)],
     bakePre: materials.bakePre,
     bakeField: materials.bakeField,
     bakeLight: materials.bakeLight,
@@ -382,6 +410,7 @@ function stormyMountainsBoard({ three, material }) {
         peaks: mountainPeaks(layout, bowl),
         emblem: craterEmblem(layout, bowl),
         table: tableBounds(layout),
+        dressing: highland.craterDressing(layout, bowl),
       };
     },
     apply(next, nextBounds) {
@@ -398,6 +427,7 @@ function stormyMountainsBoard({ three, material }) {
         own[`uRidge${side}`].value.set(peak?.ridge.x ?? 0, peak?.ridge.y ?? 0);
       }
       own.uEmblem.value.set(emblem?.x ?? 0, emblem?.y ?? 0, emblem?.r ?? 0);
+      kit.set(next.dressing?.length ? crater(next.dressing) : null);
       replaceGeometry(terrain, terrainGrid(three, bounds));
       clouds.visible = Boolean(bowl);
       replaceGeometry(
@@ -528,71 +558,65 @@ const spikeGeometry = (three, spikes) => {
   ]);
 };
 
-/** Every limb of the trees: per vertex aLathe (along, round), its rings bunched toward the foot. */
-const limbGeometry = (three, trees) => {
-  const { rings, around } = forest.LIMB_SEGMENTS;
-  const parts = [];
-  const index = [];
-  for (let ring = 0; ring <= rings; ring += 1) {
-    // The trunk's buttress roots flare at its foot: more rings there.
-    const s = (ring / rings) ** 1.6;
-    for (let k = 0; k <= around; k += 1) parts.push(s, (k / around) * 2 * Math.PI);
-  }
-  for (let ring = 0; ring < rings; ring += 1) {
-    for (let k = 0; k < around; k += 1) {
-      const a = ring * (around + 1) + k;
-      const b = a + around + 1;
-      index.push(a, b, a + 1, a + 1, b, b + 1);
-    }
-  }
-  const limbs = trees.flatMap((tree) => tree.limbs.map((limb) => ({ tree, limb })));
-  return instancedGeometry(three, { name: 'aLathe', size: 2, parts, index }, [
-    ['aRoot', 4, limbs.flatMap(({ tree, limb }) => [tree.x, tree.y, tree.seed, limb.flare])],
-    ['aFrom', 4, limbs.flatMap(({ limb }) => [...limb.from, limb.r0])],
-    ['aVia', 4, limbs.flatMap(({ limb }) => [...limb.via, 0])],
-    ['aTo', 4, limbs.flatMap(({ limb }) => [...limb.to, limb.r1])],
-  ]);
-};
+/** The jungle's trees in the kit's light (design 081): violet bark, crowns of teal or violet foliage balls, dark vines. */
+const JUNGLE_MOOD = Object.freeze({
+  key: [0.86, 0.9, 1.0],
+  shade: [0.3, 0.26, 0.55],
+  sky: [0.4, 0.4, 0.7],
+  rim: [0.95, 0.55, 0.9, 0.3],
+  outline: [0.2, 0.16, 0.3, 1.1],
+  shadow: [0.32, 0.26, 0.5, 0.55],
+});
+const JUNGLE_BARK = [0.13, 0.07, 0.22, 0];
+const JUNGLE_CROWNS = [
+  { body: [0.03, 0.16, 0.15, 0], light: [0.06, 0.28, 0.24, 0] },
+  { body: [0.065, 0.06, 0.22, 0], light: [0.12, 0.1, 0.36, 0] },
+];
+const JUNGLE_VINE = [0.05, 0.015, 0.08, 0];
+const JUNGLE_BEAD = [0.95, 0.36, 0.75, 0];
 
-/** Every clump of the crowns' foliage: per vertex the unit sphere, per instance the clump. */
-const crownGeometry = (three, trees) => {
-  const { rings, around } = forest.PUFF_SEGMENTS;
-  const parts = [];
-  const index = [];
-  for (let ring = 0; ring <= rings; ring += 1) {
-    const latitude = -Math.PI / 2 + (Math.PI * ring) / rings;
-    for (let k = 0; k < around; k += 1) {
-      const longitude = (k / around) * 2 * Math.PI;
-      parts.push(Math.cos(latitude) * Math.cos(longitude), Math.cos(latitude) * Math.sin(longitude), Math.sin(latitude));
-    }
-  }
-  for (let ring = 0; ring < rings; ring += 1) {
-    for (let k = 0; k < around; k += 1) {
-      const a0 = ring * around + k;
-      const a1 = ring * around + ((k + 1) % around);
-      index.push(a0, a1, a0 + around, a1, a1 + around, a0 + around);
-    }
-  }
-  const puffs = trees.flatMap((tree) => tree.puffs.map((puff) => ({ tree, puff })));
-  return instancedGeometry(three, { name: 'aSphere', size: 3, parts, index }, [
-    ['aRoot', 4, puffs.flatMap(({ tree, puff }) => [tree.x, tree.y, tree.seed + puff.r * 0.013, tree.palette])],
-    ['aPuff', 4, puffs.flatMap(({ puff }) => [puff.x, puff.y, puff.z, puff.r])],
-    ['aShade', 1, puffs.map(({ puff }) => puff.shade)],
-  ]);
-};
+/** A point on the quadratic curve from `from` via `via` to `to` at t. */
+const onLimb = ({ from, via, to }, t) => [0, 1, 2].map((k) => (1 - t) ** 2 * from[k] + 2 * (1 - t) * t * via[k] + t ** 2 * to[k]);
 
-/** Every vine: per vertex aStrip (across, down), per instance its anchor and size. */
-const vineGeometry = (three, trees) => {
-  const parts = [];
-  const index = [];
-  for (let i = 0; i <= forest.VINE_SEGMENTS; i += 1) parts.push(-1, i / forest.VINE_SEGMENTS, 1, i / forest.VINE_SEGMENTS);
-  for (let i = 0; i < forest.VINE_SEGMENTS; i += 1) index.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 1, i * 2 + 3, i * 2 + 2);
-  const vines = trees.flatMap((tree) => tree.vines.map((vine) => ({ tree, vine })));
-  return instancedGeometry(three, { name: 'aStrip', size: 2, parts, index }, [
-    ['aRoot', 4, vines.flatMap(({ tree, vine }) => [tree.x, tree.y, vine.seed, vine.width])],
-    ['aVine', 4, vines.flatMap(({ vine }) => [vine.x, vine.y, vine.z, vine.length])],
-  ]);
-};
+/**
+ * Every tree as the kit's solids: each limb a tube up its curve (the trunk flaring at its foot), each
+ * clump of the crown a foliage ball (its shade from the layout as how lit it sits), each vine a thin
+ * dark strand hanging from the crown with pink beads down it.
+ */
+export function jungleTreeProps(trees) {
+  const props = createPropBuilder();
+  props.look({ outline: 1 }, () => {
+    for (const tree of trees) {
+      for (const limb of tree.limbs) {
+        const points = Array.from({ length: 9 }, (_, i) => onLimb(limb, i / 8));
+        const radii = points.map((_, i) => {
+          const t = i / 8;
+          return (limb.r0 + (limb.r1 - limb.r0) * t) * (1 + limb.flare * 0.6 * Math.exp(-t * 9));
+        });
+        props.tube(points, radii, JUNGLE_BARK, { sides: 12 });
+      }
+    }
+  });
+  props.look({ kind: LOOK.foliage, outline: 1 }, () => {
+    for (const tree of trees) {
+      const palette = JUNGLE_CROWNS[tree.palette] ?? JUNGLE_CROWNS[0];
+      for (const puff of tree.puffs) {
+        const tone = palette.body.map((v, k) => (k < 3 ? v + (palette.light[k] - v) * puff.shade : 0));
+        props.blob({ x: puff.x, y: puff.y, z: puff.z, rx: puff.r, rz: puff.r * 0.82, color: tone });
+      }
+    }
+  });
+  props.look({ kind: LOOK.foliage, sway: 0.8, outline: 1 }, () => {
+    for (const tree of trees) {
+      for (const vine of tree.vines) {
+        const strand = Array.from({ length: 7 }, (_, i) => [vine.x + Math.sin(i * 0.9 + vine.seed * 6) * 2, vine.y, vine.z - (vine.length * i) / 6]);
+        props.tube(strand, vine.width * 0.12, JUNGLE_VINE, { sides: 5 });
+        for (let i = 1; i < 6; i += 2) props.blob({ x: strand[i][0], y: strand[i][1], z: strand[i][2], rx: vine.width * 0.2, color: JUNGLE_BEAD, sides: 8, rings: 6 });
+      }
+    }
+  });
+  return props;
+}
 
 /**
  * Perilous Jungle: the ground, the poison's sheet, every leaf, the bell flowers and flower spikes,
@@ -621,10 +645,6 @@ function perilousJungleBoard({ three, material, seeded }) {
     leaves: make(forest.LEAF_VERTEX, forest.LEAF_FRAGMENT, { side: three.DoubleSide, alphaToCoverage: true }),
     bells: make(forest.BELL_VERTEX, forest.BELL_FRAGMENT, { side: three.DoubleSide }),
     spikes: make(forest.SPIKE_VERTEX, forest.SPIKE_FRAGMENT),
-    limbs: make(forest.LIMB_VERTEX, forest.LIMB_FRAGMENT),
-    crowns: make(forest.CROWN_VERTEX, forest.CROWN_FRAGMENT),
-    // Both sides: a vine turns to face the eye, but its ribbon may still wind either way on screen.
-    vines: make(forest.VINE_VERTEX, forest.VINE_FRAGMENT, { side: three.DoubleSide, alphaToCoverage: true }),
     spores: make(forest.SPORE_VERTEX, forest.SPORE_FRAGMENT, {
       transparent: true,
       depthWrite: false,
@@ -637,14 +657,12 @@ function perilousJungleBoard({ three, material, seeded }) {
   const leaves = new three.Mesh(new three.BufferGeometry(), materials.leaves);
   const bells = new three.Mesh(new three.BufferGeometry(), materials.bells);
   const spikes = new three.Mesh(new three.BufferGeometry(), materials.spikes);
-  const limbs = new three.Mesh(new three.BufferGeometry(), materials.limbs);
-  const crowns = new three.Mesh(new three.BufferGeometry(), materials.crowns);
-  const vines = new three.Mesh(new three.BufferGeometry(), materials.vines);
+  const kit = createKitProps({ three, material, own, mood: JUNGLE_MOOD, reveal: 'vec3(1.0, 0.45, 0.85)' });
   const spores = new three.Points(seeded(SPORE_COUNT), materials.spores);
-  spores.renderOrder = 2;
+  spores.renderOrder = 3;
   return {
-    objects: [terrain, poison, leaves, bells, spikes, limbs, crowns, vines, spores],
-    materials: Object.values(materials),
+    objects: [terrain, poison, leaves, bells, spikes, ...kit.objects, spores],
+    materials: [...Object.values(materials), ...kit.materials],
     bakeField: materials.bakeField,
     spots: (layout) => jungleSpots(layout),
     apply(spots, bounds) {
@@ -680,9 +698,7 @@ function perilousJungleBoard({ three, material, seeded }) {
       replaceGeometry(leaves, leafGeometry(three, jungleLeaves(spots)));
       replaceGeometry(bells, bellGeometry(three, spots.bells));
       replaceGeometry(spikes, spikeGeometry(three, spots.spikes));
-      replaceGeometry(limbs, limbGeometry(three, trees));
-      replaceGeometry(crowns, crownGeometry(three, trees));
-      replaceGeometry(vines, vineGeometry(three, trees));
+      kit.set(trees.length ? jungleTreeProps(trees) : null);
     },
   };
 }
@@ -1222,7 +1238,6 @@ export function createStadiumEnvironment({
     if (camera) uniforms.uEye.value.copy(camera.position).applyMatrix4(cutout.uniforms.uTableFromWorld.value);
     const changing = frame.animating;
     if (changing) plateStale = true;
-    if (plateStale) board.beforeRender?.(renderer);
     if (!changing) scheduleAmbient();
     return changing;
   };
@@ -1302,7 +1317,6 @@ export function createStadiumEnvironment({
       for (const board of released) {
         for (const object of board.objects) object.geometry.dispose();
         for (const material of board.materials) material.dispose();
-        board.dispose?.();
       }
       bakeQuad.geometry.dispose();
       bakeLight.dispose();

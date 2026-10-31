@@ -171,6 +171,110 @@ const pickPalms = (shore, bounds, rects, rocks) => {
   return palms;
 };
 
+/** How far a palm's fronds reach from its crown (the kit's palm: up to 0.62 of its height). */
+export const PALM_FROND_REACH = 0.64;
+
+/**
+ * Every palm's crown clear of the cards seen from above: the fronds' circle round the crown (the
+ * trunk's top, leant over) keeps PALM_CLEARANCE_PX off every card; a palm too close shrinks, to
+ * 0.6 of its height at most, or goes.
+ */
+const fitPalms = (palms, rects) =>
+  palms
+    .map((palm) => {
+      for (let scale = 1; scale >= 0.6 - 1e-9; scale -= 0.05) {
+        const height = palm.height * scale;
+        const out = Math.sin(palm.lean) * height;
+        const crown = { x: palm.x + Math.cos(palm.leanAngle) * out, y: palm.y + Math.sin(palm.leanAngle) * out };
+        if (nearestFootprint(rects, crown.x, crown.y).distance >= height * PALM_FROND_REACH + PALM_CLEARANCE_PX) return { ...palm, height };
+      }
+      return null;
+    })
+    .filter(Boolean);
+
+/** Least gap between a piece of the beach's dressing, seen from above, and a card footprint. */
+export const DRESSING_CARD_GAP_PX = 14;
+
+/**
+ * The beach's kit dressing (design 081), all clear of every card footprint, the rocks, the palms and
+ * one another: starfish and shells washed up just above the swash, parasols each with a towel (one
+ * with a beach ball, one with a surfboard) on the dry sand, clumps of dune grass at the back of the
+ * beach by the table's edges. Sizes in table px, `u` a card's width over 100.
+ */
+const pickDressing = (shore, bounds, rects, rocks, palms, u) => {
+  const taken = [
+    ...rocks.map((rock) => ({ x: rock.x, y: rock.y, r: rock.r * 2 })),
+    ...palms.flatMap((palm) => {
+      const out = Math.sin(palm.lean) * palm.height;
+      return [
+        { x: palm.x, y: palm.y, r: 26 },
+        { x: palm.x + Math.cos(palm.leanAngle) * out, y: palm.y + Math.sin(palm.leanAngle) * out, r: palm.height * 0.5 },
+      ];
+    }),
+  ];
+  const fits = (x, y, r) =>
+    insideBounds(bounds, x, y, r + 8) &&
+    nearestFootprint(rects, x, y).distance >= r + DRESSING_CARD_GAP_PX &&
+    taken.every((spot) => Math.hypot(spot.x - x, spot.y - y) >= spot.r + r);
+  const claim = (x, y, r) => taken.push({ x, y, r });
+  const finds = [];
+  for (let t = 0.04; t <= 0.96; t += 0.035) {
+    const up = 50 + 55 * spotHash(t, 1, 11);
+    const { x, y } = shorePoint(shore, t, -up);
+    if (spotHash(t, 2, 12) > 0.55) continue;
+    const star = spotHash(t, 3, 13) < 0.4;
+    const size = (star ? 7 + 2 * spotHash(t, 4, 14) : 5 + 1.5 * spotHash(t, 4, 14)) * u;
+    if (!fits(x, y, size + 6)) continue;
+    finds.push({ kind: star ? 'starfish' : 'shell', x, y, size, seed: spotHash(t, 5, 15), warm: spotHash(t, 6, 16) < 0.5 });
+    claim(x, y, size + 22);
+  }
+  // Parasol sets on the dry sand: the freest spots first, far apart.
+  const sets = [];
+  const setReach = 64 * u;
+  const candidates = [];
+  for (let x = bounds.x + setReach; x <= bounds.x + bounds.w - setReach; x += 18) {
+    for (let y = bounds.y + setReach; y <= bounds.y + bounds.h - setReach; y += 18) {
+      const { offshore } = shoreFrame(shore, x, y);
+      if (offshore > -170 || !fits(x, y, setReach)) continue;
+      candidates.push({ x, y, score: Math.min(nearestFootprint(rects, x, y).distance, 160) + 10 * spotHash(x, y, 21) });
+    }
+  }
+  candidates.sort((a, b) => b.score - a.score);
+  for (const spot of candidates) {
+    if (sets.length >= 2) break;
+    if (!fits(spot.x, spot.y, setReach) || sets.some((set) => Math.hypot(set.x - spot.x, set.y - spot.y) < 320)) continue;
+    const k = sets.length;
+    const away = nearestFootprint(rects, spot.x, spot.y).away;
+    const yaw = Math.atan2(away.y, away.x) + Math.PI / 2;
+    sets.push({
+      x: spot.x,
+      y: spot.y,
+      size: 34 * u,
+      stripes: k === 0 ? ['#ff6b6b', '#fff6ea'] : ['#3fa2ff', '#fff6ea'],
+      towel: { x: spot.x + away.x * 8 * u, y: spot.y + away.y * 8 * u, size: 46 * u, yaw, stripes: k === 0 ? ['#ffd84a', '#fff6ea', '#ffd84a'] : ['#57c785', '#fff6ea', '#57c785'] },
+      extra:
+        k === 0
+          ? { kind: 'beachBall', x: spot.x + away.x * 40 * u - away.y * 26 * u, y: spot.y + away.y * 40 * u + away.x * 26 * u, size: 8 * u }
+          : { kind: 'surfboard', x: spot.x - away.y * 44 * u, y: spot.y + away.x * 44 * u, size: 62 * u, yaw: yaw + 0.4 },
+    });
+    claim(spot.x, spot.y, setReach);
+  }
+  // Dune grass at the back of the beach, in clumps by the table's edges.
+  const grass = [];
+  for (let x = bounds.x + 30; x <= bounds.x + bounds.w - 30; x += 22) {
+    for (let y = bounds.y + 30; y <= bounds.y + bounds.h - 30; y += 22) {
+      if (grass.length >= 10) break;
+      const toEdge = Math.min(x - bounds.x, bounds.x + bounds.w - x, y - bounds.y, bounds.y + bounds.h - y);
+      const size = (18 + 6 * spotHash(x, y, 31)) * u;
+      if (toEdge > 120 || spotHash(x, y, 32) > 0.12) continue;
+      if (shoreFrame(shore, x, y).offshore > -260 || !fits(x, y, size + 10)) continue;
+      grass.push({ x, y, size, seed: spotHash(x, y, 33) });
+      claim(x, y, size * 2.2);
+    }
+  }
+  return { finds, sets, grass };
+};
+
 /**
  * Where the Surfing Beach's pieces go: the bay (`beachShore`), the sandbar's distance offshore,
  * rock clusters along the waterline and palms on the dry sand, all clear of the card footprints.
@@ -178,7 +282,8 @@ const pickPalms = (shore, bounds, rects, rocks) => {
  * @param {{ slabs: object[], flats: object[] }} footprints `environmentFootprints(layout)`
  * @returns {{ shore: ReturnType<typeof beachShore>, barAt: number,
  *   rocks: { x: number, y: number, r: number, seed: number }[],
- *   palms: { x: number, y: number, height: number, lean: number, leanAngle: number, seed: number }[] }|null}
+ *   palms: { x: number, y: number, height: number, lean: number, leanAngle: number, seed: number }[],
+ *   u: number, dressing: ReturnType<typeof pickDressing> }|null}
  *   Null without a table.
  */
 export function beachSpots(layout, { slabs = [], flats = [] } = {}) {
@@ -189,5 +294,7 @@ export function beachSpots(layout, { slabs = [], flats = [] } = {}) {
   const corner = shoreFrame(shore, bounds.x, bounds.y + bounds.h).offshore;
   const barAt = Math.min(220, Math.max(110, corner * 0.4));
   const rocks = pickRocks(shore, bounds, rects);
-  return { shore, barAt, rocks, palms: pickPalms(shore, bounds, rects, rocks) };
+  const palms = fitPalms(pickPalms(shore, bounds, rects, rocks), rects);
+  const u = (layout?.self?.cardBox?.active?.w ?? 100) / 100;
+  return { shore, barAt, rocks, palms, u, dressing: pickDressing(shore, bounds, rects, rocks, palms, u) };
 }

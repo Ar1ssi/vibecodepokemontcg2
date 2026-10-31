@@ -13,7 +13,6 @@ import {
   MAX_TREES,
   ORB_FRAGMENT,
   ORB_VERTEX,
-  PROP_FRAGMENT,
   SPARKLE_FRAGMENT,
   SPARKLE_VERTEX,
   TERRAIN_FRAGMENT,
@@ -21,7 +20,7 @@ import {
   fairyProps,
   fairySpots,
 } from '../stadium-env-fairy.mjs';
-import { SCREEN_VIEWS, pointOnCard, screenView } from './stadium-screen.mjs';
+import { SCREEN_VIEWS, geometryPoints, pointOnCard, screenView } from './stadium-screen.mjs';
 
 const PROFILES = [NO_MAT_LAYOUT_ID, 'sim', 'one-player', 'two-player', 'edge-to-edge-two-player'];
 const HALVES = [
@@ -51,18 +50,7 @@ test('fairySpots: the ring between the Actives, trees, orbs and leaves clear of 
 test('no tree crown, orb or leaf covers a card on screen, in either camera preset', () => {
   for (const view of SCREEN_VIEWS) {
     const { layout, projectors } = screenView(view);
-    const { trees, orbs, leaves } = fairySpots(layout);
-    const points = [
-      ...trees.flatMap((t) => [
-        [t.x, t.y, t.h + t.r],
-        [t.x - t.r, t.y, t.h],
-        [t.x + t.r, t.y, t.h],
-        [t.x, t.y - t.r, t.h],
-        [t.x, t.y + t.r, t.h],
-      ]),
-      ...orbs.flatMap((o) => [[o.x, o.y, o.z], [o.x - o.r * 4, o.y, o.z], [o.x + o.r * 4, o.y, o.z]]),
-      ...leaves.flatMap((l) => [[l.x, l.y, 12], [l.x + Math.cos(l.yaw) * l.len, l.y + Math.sin(l.yaw) * l.len, 8]]),
-    ];
+    const points = geometryPoints(fairyProps(fairySpots(layout)).build(three), 4);
     for (const { preset, project } of projectors) {
       const hit = pointOnCard(points, layout, project);
       assert.equal(hit, null, `${view.profile} ${view.viewport.w}x${view.viewport.h} ${preset}: ${hit}`);
@@ -79,7 +67,7 @@ test('fairySpots is null without a layout; the props build', () => {
 
 test('Fairy Garden shaders declare no GLSL ES 3.00 reserved word and every one has a main', () => {
   const reserved = /\b(?:float|vec[234]|int|bool)\s+(?:flat|half|smooth|noperspective|sample|patch|input|output|filter|active|common|fixed|long|short|out|in|inout|round)\b/;
-  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_VERTEX, TERRAIN_FRAGMENT, PROP_FRAGMENT, ORB_VERTEX, ORB_FRAGMENT, SPARKLE_VERTEX, SPARKLE_FRAGMENT]) {
+  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_VERTEX, TERRAIN_FRAGMENT, ORB_VERTEX, ORB_FRAGMENT, SPARKLE_VERTEX, SPARKLE_FRAGMENT]) {
     assert.doesNotMatch(shader, reserved);
     assert.match(shader, /void main\(\)/);
   }

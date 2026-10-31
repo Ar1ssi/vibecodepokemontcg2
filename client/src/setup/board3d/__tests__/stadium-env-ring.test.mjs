@@ -9,7 +9,6 @@ import {
   BAKE_FIELD_FRAGMENT,
   CHAIN,
   KERB_PX,
-  PROP_FRAGMENT,
   RING_KEY,
   TERRAIN_FRAGMENT,
   ringProps,
@@ -77,7 +76,7 @@ test('ringProps: stones, ropes and the chain build finite geometry', () => {
 
 test('Mountain Ring shaders declare no GLSL ES 3.00 reserved word and every one has a main', () => {
   const reserved = /\b(?:float|vec[234]|int|bool)\s+(?:flat|half|smooth|noperspective|sample|patch|input|output|filter|active|common|fixed|long|short|out|in|inout|round)\b/;
-  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_FRAGMENT, PROP_FRAGMENT]) {
+  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_FRAGMENT]) {
     assert.match(shader, /void main\(\)/);
     assert.doesNotMatch(shader, reserved);
   }

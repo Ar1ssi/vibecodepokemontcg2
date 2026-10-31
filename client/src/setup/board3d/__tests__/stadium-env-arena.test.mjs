@@ -14,7 +14,6 @@ import {
   LASER_COUNT,
   LASER_VERTEX,
   POST_PX,
-  PROP_FRAGMENT,
   RIG_PX,
   RING_GAP_PX,
   TERRAIN_FRAGMENT,
@@ -144,7 +143,7 @@ test('laserLights: one high in each corner, out past the ad boards', () => {
 
 test('Fighting Stadium shaders declare no GLSL ES 3.00 reserved word and every one has a main', () => {
   const reserved = /\b(?:float|vec[234]|int|bool)\s+(?:flat|half|smooth|noperspective|sample|patch|input|output|filter|active|common|fixed|long|short|out|in|inout|round|step)\b/;
-  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_FRAGMENT, BOARD_FRAGMENT, LASER_VERTEX, PROP_FRAGMENT, GLINT_VERTEX, GLINT_FRAGMENT, LATTICE_VERTEX]) {
+  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_FRAGMENT, BOARD_FRAGMENT, LASER_VERTEX, GLINT_VERTEX, GLINT_FRAGMENT, LATTICE_VERTEX]) {
     assert.match(shader, /void main\(\)/);
     assert.doesNotMatch(shader, reserved);
   }

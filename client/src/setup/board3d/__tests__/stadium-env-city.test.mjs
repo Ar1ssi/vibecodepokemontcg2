@@ -9,7 +9,6 @@ import {
   BILLBOARD_FRAGMENT,
   BUILDING_FRAGMENT,
   CITY_KEY,
-  PROP_FRAGMENT,
   ROOF_GAP_PX,
   TERRAIN_FRAGMENT,
   cityBuildings,
@@ -86,7 +85,7 @@ test('cityProps and cityBuildings: geometry with every attribute finite', () => 
 
 test('Dark City shaders declare no GLSL ES 3.00 reserved word and every one has a main', () => {
   const reserved = /\b(?:float|vec[234]|int|bool)\s+(?:flat|half|smooth|noperspective|sample|patch|input|output|filter|active|common|fixed|long|short|out|in|inout|round)\b/;
-  for (const shader of [TERRAIN_FRAGMENT, BUILDING_FRAGMENT, BILLBOARD_FRAGMENT, BEAM_VERTEX, PROP_FRAGMENT]) {
+  for (const shader of [TERRAIN_FRAGMENT, BUILDING_FRAGMENT, BILLBOARD_FRAGMENT, BEAM_VERTEX]) {
     assert.match(shader, /void main\(\)/);
     assert.doesNotMatch(shader, reserved);
   }

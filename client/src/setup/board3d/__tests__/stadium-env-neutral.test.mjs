@@ -13,14 +13,13 @@ import {
   MAX_SCREENS,
   NEUTRAL_KEY,
   PLATFORM_MARGIN_PX,
-  PROP_FRAGMENT,
   TERRAIN_FRAGMENT,
   TERRAIN_VERTEX,
   beamGeometry,
   neutralProps,
   neutralSpots,
 } from '../stadium-env-neutral.mjs';
-import { SCREEN_VIEWS, pointOnCard, screenView } from './stadium-screen.mjs';
+import { SCREEN_VIEWS, geometryPoints, pointOnCard, screenView } from './stadium-screen.mjs';
 
 const PROFILES = [NO_MAT_LAYOUT_ID, 'sim', 'one-player', 'two-player', 'edge-to-edge-two-player'];
 const HALVES = [
@@ -60,13 +59,7 @@ test('neutralSpots: the platform holds every card; columns stand outside it, nev
 test('no wall, column or screen covers a card on screen, in either camera preset', () => {
   for (const view of SCREEN_VIEWS) {
     const { layout, projectors } = screenView(view);
-    const { beams, screens, walls } = neutralSpots(layout);
-    const points = [
-      ...beams.flatMap((b) => [[b.x, b.y, b.h], [b.x - b.r, b.y, b.h], [b.x + b.r, b.y, b.h]]),
-      ...screens.flatMap((s) => [[s.x - s.w / 2, s.y, s.z + s.h / 2], [s.x + s.w / 2, s.y, s.z + s.h / 2], [s.x, s.y, s.z - s.h / 2]]),
-      ...[walls.left, walls.right].flatMap((w) => [[w.x0, w.y0, walls.height], [w.x1, w.y0, walls.height], [w.x0, w.y1, walls.height], [w.x1, w.y1, walls.height]]),
-      ...[walls.far.x0, walls.far.x1].flatMap((x) => [[x, walls.far.y0, walls.height], [x, walls.far.y1, walls.height]]),
-    ];
+    const points = geometryPoints(neutralProps(neutralSpots(layout)).build(three), 4);
     for (const { preset, project } of projectors) {
       const hit = pointOnCard(points, layout, project);
       assert.equal(hit, null, `${view.profile} ${view.viewport.w}x${view.viewport.h} ${preset}: ${hit}`);
@@ -85,7 +78,7 @@ test('neutralSpots is null without a layout; the props and columns build', () =>
 
 test('Neutralization Zone shaders declare no GLSL ES 3.00 reserved word and every one has a main', () => {
   const reserved = /\b(?:float|vec[234]|int|bool)\s+(?:flat|half|smooth|noperspective|sample|patch|input|output|filter|active|common|fixed|long|short|out|in|inout|round)\b/;
-  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_VERTEX, TERRAIN_FRAGMENT, PROP_FRAGMENT, BEAM_VERTEX, BEAM_FRAGMENT]) {
+  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_VERTEX, TERRAIN_FRAGMENT, BEAM_VERTEX, BEAM_FRAGMENT]) {
     assert.doesNotMatch(shader, reserved);
     assert.match(shader, /void main\(\)/);
   }

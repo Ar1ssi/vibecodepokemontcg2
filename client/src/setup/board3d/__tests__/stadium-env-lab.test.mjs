@@ -10,7 +10,6 @@ import {
   LAB_KEY,
   MAX_PADS,
   PAD_MARGIN_PX,
-  PROP_FRAGMENT,
   TERRAIN_FRAGMENT,
   daisDistance,
   labProps,
@@ -105,7 +104,7 @@ test('labProps: one geometry with every attribute filled', () => {
 
 test('Full Metal Lab shaders declare no GLSL ES 3.00 reserved word and every one has a main', () => {
   const reserved = /\b(?:float|vec[234]|int|bool)\s+(?:flat|half|smooth|noperspective|sample|patch|input|output|filter|active|common|fixed|long|short|out|in|inout)\b/;
-  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_FRAGMENT, PROP_FRAGMENT]) {
+  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_FRAGMENT]) {
     assert.match(shader, /void main\(\)/);
     assert.doesNotMatch(shader, reserved);
   }

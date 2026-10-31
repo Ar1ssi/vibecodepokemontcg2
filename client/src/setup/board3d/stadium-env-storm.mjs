@@ -34,7 +34,9 @@ import {
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
 import { craterEmblem } from './stadium-environment-layout.mjs';
-import { PROP_VERTEX, createPropBuilder, propFragment } from './stadium-env-props.mjs';
+import { createPropBuilder } from './stadium-env-props.mjs';
+import { createKitProps } from './stadium-kit.mjs';
+import { placeAsset } from './stadium-kit-assets.mjs';
 import { boardContext, hash } from './stadium-env-spots.mjs';
 import { BLADES, EDGE_HAZE, STANDARD_TERRAIN_VERTEX } from './stadium-env-surfaces.mjs';
 
@@ -383,9 +385,9 @@ ${OUTPUT}
 `;
 
 // Prop colours (aColor; w: 0 matte, 0.12 bark, 0.16 reed, 0.2 rock).
-const BARK = [0.07, 0.06, 0.05, 0.12];
-const ROCK = [0.11, 0.105, 0.105, 0.2];
-const REED_COLOR = [0.2, 0.16, 0.065, 0.16];
+const BARK = [0.07, 0.06, 0.05, 0];
+const ROCK = Object.freeze({ body: [0.11, 0.105, 0.105, 0], light: [0.18, 0.18, 0.2, 0], dark: [0.06, 0.06, 0.065, 0] });
+const REED_COLOR = [0.2, 0.16, 0.065, 0];
 const IRON = [0.07, 0.075, 0.09, 0.3];
 const COPPER = [0.5, 0.2, 0.09, 0.3];
 const ORB_PINK = [1.4, 0.18, 0.8, 2.4];
@@ -447,25 +449,21 @@ function reedClumps(props, clumps, u) {
 /** The props, as one geometry. */
 export function stormProps(spots) {
   const props = createPropBuilder();
-  for (const tree of spots.trees) bareTree(props, tree, spots.u);
-  for (const rock of spots.boulders) props.sphere({ x: rock.x, y: rock.y, z: -2, r: rock.r, color: ROCK, sides: 10, rings: 7, squash: 0.62 });
+  props.look({ outline: 1 }, () => {
+    for (const tree of spots.trees) bareTree(props, tree, spots.u);
+    for (const pole of spots.poles) pylon(props, { ...pole, orb: pole.side < 0 ? ORB_PINK : ORB_CYAN }, spots.u);
+    for (const pad of spots.pads) pylon(props, { x: pad.x, y: pad.y, r: 11 * spots.u, h: PAD_POST_PX * spots.u, orb: ORB_PINK }, spots.u);
+  });
+  spots.boulders.forEach((rock, k) => placeAsset(props, 'boulder', { x: rock.x, y: rock.y, z: -2, size: rock.r * 1.05, seed: k * 11 + 3, yaw: k, sun: STORM_LIGHT, colors: ROCK }));
   reedClumps(props, spots.clumps, spots.u);
-  for (const pole of spots.poles) pylon(props, { ...pole, orb: pole.side < 0 ? ORB_PINK : ORB_CYAN }, spots.u);
-  for (const pad of spots.pads) pylon(props, { x: pad.x, y: pad.y, r: 11 * spots.u, h: PAD_POST_PX * spots.u, orb: ORB_PINK }, spots.u);
   return props;
 }
 
-/** The props by the aurora's light: dark and cool, a rim of blue where a surface turns edge-on, the pads' pink on what faces them. */
-const PROP_LIGHT = /* glsl */ `
+/** The pads' pink and the strikes' flash on the kit's solids (design 081). */
+const STORM_GLOW = /* glsl */ `
 uniform vec4 uPads[${MAX_PADS}];
-vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
-  vec3 view = normalize(uEye - world);
-  vec3 l = normalize(uSun);
-  float lit = max(dot(n, l), 0.0);
-  vec3 col = albedo * (vec3(0.32, 0.4, 0.55) * (0.6 + 0.4 * n.z) + vec3(0.35, 0.55, 0.7) * lit);
-  float rim = pow(1.0 - abs(dot(n, view)), 3.0);
-  col += vec3(0.1, 0.32, 0.4) * rim * 0.5;
-  if (metal > 0.19 && metal < 0.21) col *= 0.75 + 0.5 * fbm3(world.xy / 9.0 + world.z / 7.0);
+vec3 kitGlow(vec3 albedo, vec3 n, vec3 world) {
+  vec3 col = vec3(0.0);
   for (int i = 0; i < ${MAX_PADS}; i++) {
     vec4 pad = uPads[i];
     if (pad.z <= 0.0) continue;
@@ -478,7 +476,15 @@ vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
 }
 `;
 
-export const PROP_FRAGMENT = propFragment({ light: PROP_LIGHT, reveal: 'vec3(0.7, 0.9, 1.1)' });
+/** The storm's night for the kit: a cold blue-teal light from the aurora, deep blue shade, a cyan rim. */
+export const STORM_NIGHT = Object.freeze({
+  key: [0.4, 0.58, 0.75],
+  shade: [0.2, 0.25, 0.4],
+  sky: [0.32, 0.4, 0.55],
+  rim: [0.3, 0.65, 0.8, 0.4],
+  outline: [0.2, 0.22, 0.3, 1.1],
+  shadow: [0.3, 0.32, 0.45, 0.5],
+});
 
 /**
  * The lightning ribbons: each bolt a strip of quads along its path, widened toward the camera in the
@@ -663,14 +669,13 @@ export function magneticStormBoard({ three, material, terrainGrid, replaceGeomet
   const additive = { transparent: true, depthWrite: false, blending: three.AdditiveBlending, side: three.DoubleSide };
   const materials = {
     terrain: make(TERRAIN_VERTEX, TERRAIN_FRAGMENT),
-    props: make(PROP_VERTEX, PROP_FRAGMENT, { side: three.DoubleSide }),
     bolts: make(BOLT_VERTEX, BOLT_FRAGMENT, additive),
     dome: make(DOME_VERTEX, DOME_FRAGMENT, additive),
     bakeField: make(FULLSCREEN_VERTEX, BAKE_FIELD_FRAGMENT, bakeOptions),
     bakeLight: make(FULLSCREEN_VERTEX, bakeLightFragment(), bakeOptions),
   };
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
-  const props = new three.Mesh(new three.BufferGeometry(), materials.props);
+  const kit = createKitProps({ three, material, own, mood: STORM_NIGHT, reveal: 'vec3(0.7, 0.9, 1.1)', glow: STORM_GLOW });
   const bolts = new three.Mesh(new three.BufferGeometry(), materials.bolts);
   const dome = new three.Mesh(domeGeometry(three), materials.dome);
   bolts.renderOrder = 2;
@@ -686,8 +691,8 @@ export function magneticStormBoard({ three, material, terrainGrid, replaceGeomet
     return flash * 0.85 + tail;
   };
   return {
-    objects: [terrain, props, bolts, dome],
-    materials: Object.values(materials),
+    objects: [terrain, ...kit.objects, bolts, dome],
+    materials: [...Object.values(materials), ...kit.materials],
     bakeField: materials.bakeField,
     bakeLight: materials.bakeLight,
     spots: (layout) => stormSpots(layout),
@@ -730,11 +735,10 @@ export function magneticStormBoard({ three, material, terrainGrid, replaceGeomet
       arcsNow = spots?.arcs ?? [];
       own.uStrikes.value.forEach((slot) => slot.set(0, 0, 0, 0));
       replaceGeometry(terrain, terrainGrid(bounds));
-      props.visible = Boolean(spots);
+      kit.set(spots ? stormProps(spots) : null);
       bolts.visible = Boolean(spots);
       dome.visible = Boolean(spots);
       if (spots) {
-        replaceGeometry(props, stormProps(spots).build(three));
         replaceGeometry(bolts, boltGeometry(three, spots.arcs, u));
       }
     },

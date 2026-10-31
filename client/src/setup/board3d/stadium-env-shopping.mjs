@@ -24,7 +24,18 @@ import {
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
 import { craterEmblem } from './stadium-environment-layout.mjs';
-import { PROP_VERTEX, createPropBuilder, propFragment } from './stadium-env-props.mjs';
+import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
+import { createKitProps } from './stadium-kit.mjs';
+
+/** The mall's light for the kit (design 081): bright and soft from the skylights, the shade a pale rosy grey. */
+export const MALL_MOOD = Object.freeze({
+  key: [1.0, 0.98, 0.96],
+  shade: [0.8, 0.74, 0.8],
+  sky: [0.86, 0.84, 0.9],
+  rim: [1.0, 1.0, 1.0, 0.14],
+  outline: [0.44, 0.34, 0.4, 1.05],
+  shadow: [0.7, 0.6, 0.66, 0.45],
+});
 import { boardContext, hash } from './stadium-env-spots.mjs';
 import { EDGE_HAZE, STANDARD_TERRAIN_VERTEX } from './stadium-env-surfaces.mjs';
 
@@ -381,44 +392,20 @@ function walls(props, spots) {
 export function shoppingProps(spots) {
   const { tables, mannequins, balloons, racks, u } = spots;
   const props = createPropBuilder();
-  walls(props, spots);
-  mezzanine(props, spots);
-  for (const rack of racks) shirtRack(props, rack, u);
-  for (const table of tables) displayTable(props, table, u);
-  for (const m of mannequins) mannequin(props, m, u);
-  for (const b of balloons) balloon(props, b, u);
+  props.look({ outline: 1 }, () => {
+    walls(props, spots);
+    mezzanine(props, spots);
+    for (const rack of racks) shirtRack(props, rack, u);
+    for (const table of tables) displayTable(props, table, u);
+    for (const m of mannequins) mannequin(props, m, u);
+  });
+  props.look({ kind: LOOK.gloss, outline: 1 }, () => {
+    for (const b of balloons) balloon(props, b, u);
+  });
   return props;
 }
 
-/** The props under the hall's light: bright and soft, glass pale and bright-edged, balloons glossy with a window's highlight. */
-const PROP_LIGHT = /* glsl */ `
-vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
-  vec3 sun = normalize(uSun);
-  vec3 view = normalize(uEye - world);
-  float lit = max(dot(n, sun), 0.0);
-  vec3 col = albedo * (0.66 + 0.2 * n.z + 0.3 * lit);
-  if (metal > 0.6) {
-    float fres = pow(1.0 - abs(dot(n, view)), 2.0);
-    col = mix(albedo * 0.9, vec3(1.7, 1.9, 2.1), 0.1 + 0.55 * fres);
-  } else if (metal > 0.14 && metal < 0.18) {
-    // A balloon: translucent colour, a bright rim, a soft window's highlight.
-    float rim = pow(1.0 - abs(dot(n, view)), 2.2);
-    col = albedo * (0.7 + 0.5 * lit) + albedo * rim * 0.5;
-    col += vec3(1.0) * pow(max(dot(reflect(-normalize(vec3(-0.4, 0.5, 0.8)), n), view), 0.0), 26.0) * 0.8;
-  } else if (metal > 0.1 && metal < 0.14) {
-    // Escalator steps: ridged treads sliding up.
-    float tread = abs(fract((world.y - uTime * 22.0) / (9.0)) - 0.5);
-    col = albedo * (0.8 + 0.4 * smoothstep(0.1, 0.4, tread)) * (0.7 + 0.3 * lit);
-  } else if (metal > 0.19 && metal < 0.24) {
-    // Folded cloth: soft stripes across the pile.
-    col *= 0.9 + 0.12 * sin(world.y * 1.1 + world.x * 0.3);
-  }
-  col *= mix(0.82, 1.0, smoothstep(0.0, 14.0, world.z));
-  return col;
-}
-`;
 
-export const PROP_FRAGMENT = propFragment({ light: PROP_LIGHT, reveal: 'vec3(1.0, 0.9, 0.9)' });
 
 /** Shopping Center's board (stadium-environment-mesh.js BOARDS). */
 export function shoppingCenterBoard({ three, material, terrainGrid, replaceGeometry, bakeOptions }) {
@@ -434,15 +421,14 @@ export function shoppingCenterBoard({ three, material, terrainGrid, replaceGeome
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
   const materials = {
     terrain: make(TERRAIN_VERTEX, TERRAIN_FRAGMENT),
-    props: make(PROP_VERTEX, PROP_FRAGMENT, { side: three.DoubleSide }),
     bakeField: make(FULLSCREEN_VERTEX, BAKE_FIELD_FRAGMENT, bakeOptions),
     bakeLight: make(FULLSCREEN_VERTEX, bakeLightFragment(), bakeOptions),
   };
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
-  const props = new three.Mesh(new three.BufferGeometry(), materials.props);
+  const kit = createKitProps({ three, material, own, mood: MALL_MOOD, reveal: 'vec3(1.0, 0.85, 0.9)' });
   return {
-    objects: [terrain, props],
-    materials: Object.values(materials),
+    objects: [terrain, ...kit.objects],
+    materials: [...Object.values(materials), ...kit.materials],
     bakeField: materials.bakeField,
     bakeLight: materials.bakeLight,
     spots: (layout) => shoppingSpots(layout),
@@ -464,8 +450,7 @@ export function shoppingCenterBoard({ three, material, terrainGrid, replaceGeome
         return b ? slot.set(b.x, b.y, b.r, b.hue) : slot.set(0, 0, 0, 0);
       });
       replaceGeometry(terrain, terrainGrid(bounds));
-      props.visible = Boolean(spots);
-      if (spots) replaceGeometry(props, shoppingProps(spots).build(three));
+      kit.set(spots ? shoppingProps(spots) : null);
     },
   };
 }

@@ -27,8 +27,49 @@ import {
   VORONOI,
 } from './stadium-environment-glsl.mjs';
 import { RIDGE_HALF_WIDTH } from './stadium-environment-layout.mjs';
+import { boardContext, hash } from './stadium-env-spots.mjs';
+import { measureAsset } from './stadium-kit-assets.mjs';
 
 /** Base of the cloud sea round the mountain, px off the cloth. */
+/**
+ * Design 081: the crater's dressing in the Stadium kit's assets: boulders fallen against the crater
+ * wall's foot, snow-dusted pines up the outer slopes (each standing on the baked mountain), every one
+ * clear of the cards and the opponent's hand by its reach. Pure; [] without a crater.
+ * @param {ReturnType<typeof import('./board-layout.mjs').flatLayout>|null} layout
+ * @param {{ x: number, y: number, floor: number, rim: number, foot: number }|null} bowl
+ */
+export function craterDressing(layout, bowl) {
+  const ctx = boardContext(layout, 'stormy-mountains');
+  if (!ctx || !bowl) return [];
+  const { u } = ctx;
+  const pieces = [];
+  const fits = (x, y, reach) =>
+    ctx.inScene(x, y, reach) && ctx.clear(x, y, reach, 16 * u) && pieces.every((p) => Math.hypot(p.x - x, p.y - y) >= (p.reach + reach) * 1.1);
+  for (let k = 0; k < 28 && pieces.length < 12; k += 1) {
+    const angle = (k / 28) * 2 * Math.PI + (hash(k, 1, 3) - 0.5) * 0.3;
+    const out = bowl.floor + (bowl.rim - bowl.floor) * (0.15 + 0.25 * hash(k, 2, 3));
+    const x = bowl.x + Math.cos(angle) * out;
+    const y = bowl.y + Math.sin(angle) * out;
+    const size = (16 + 14 * hash(k, 3, 3)) * u;
+    const { reach } = measureAsset('boulder', { size });
+    if (hash(k, 4, 3) > 0.6 || !fits(x, y, reach)) continue;
+    pieces.push({ asset: 'boulder', x, y, size, reach, seed: hash(k, 5, 3) });
+  }
+  for (let k = 0; k < 40 && pieces.filter((p) => p.asset === 'pine').length < 10; k += 1) {
+    const angle = (k / 40) * 2 * Math.PI + (hash(k, 6, 3) - 0.5) * 0.2;
+    const out = bowl.rim + (bowl.foot - bowl.rim) * (0.25 + 0.6 * hash(k, 7, 3));
+    const x = bowl.x + Math.cos(angle) * out;
+    const y = bowl.y + Math.sin(angle) * out;
+    const size = (22 + 10 * hash(k, 8, 3)) * u;
+    const height = size * 3;
+    const { reach } = measureAsset('pine', { size, height });
+    // A tall tree leans up the screen in the tilted view: it keeps off the cards by its height too.
+    if (hash(k, 9, 3) > 0.5 || !fits(x, y, reach + height * 0.3)) continue;
+    pieces.push({ asset: 'pine', x, y, size, height, reach, seed: hash(k, 10, 3) });
+  }
+  return pieces;
+}
+
 export const CLOUD_LEVEL = 60;
 /** Cloud grid spacing in table px: the domes are broad and smooth. */
 export const CLOUD_SPACING_PX = 6;

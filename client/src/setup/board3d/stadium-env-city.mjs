@@ -25,7 +25,8 @@ import {
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
 import { environmentFootprints } from './stadium-environment-layout.mjs';
-import { PROP_VERTEX, createPropBuilder, propFragment } from './stadium-env-props.mjs';
+import { PROP_VERTEX, createPropBuilder } from './stadium-env-props.mjs';
+import { createKitProps } from './stadium-kit.mjs';
 import { tableBounds } from './table-uv.mjs';
 
 export const CITY_KEY = 'dark-city';
@@ -171,8 +172,14 @@ export function citySpots(layout) {
 }
 
 /** The parapet round the roof, the hut with its door and lamp, the towers' rooftops, billboards' posts and searchlights, the round tower's crown. */
-export function cityProps({ roof, hut, towers, round, beams = [] }) {
+export function cityProps(spots) {
   const props = createPropBuilder();
+  props.look({ outline: 1 }, () => citySolids(props, spots));
+  return props;
+}
+
+/** The billboards' posts, the searchlights, the parapets and everything on the roofs. */
+function citySolids(props, { roof, hut, towers, round, beams = [] }) {
   // Each billboard's posts: two at its foot, two longer ones up to its top edge.
   for (const tower of towers) {
     if (!tower.board) continue;
@@ -269,7 +276,6 @@ export function cityProps({ roof, hut, towers, round, beams = [] }) {
     props.ring({ x: round.x, y: round.y, z0: round.height + 6, z1: round.height + 30, r: round.r * 0.6, color: CROWN_LIGHT, sides: 36 });
     props.cylinder({ x: round.x, y: round.y, z0: round.height + 30, z1: round.height + 34, r: round.r * 0.66, color: LEDGE, sides: 36, capColor: DOME, domeRise: round.r * 0.38 });
   }
-  return props;
 }
 
 /** The towers: boxes from the streets up, and the round tower's column of floors. */
@@ -692,22 +698,26 @@ ${OUTPUT}
 }
 `;
 
-/** The props' light: the night's cold fill, the city glow from below, the hut lamp and the neon. */
-const PROP_LIGHT = /* glsl */ `
-vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
-  vec3 col = albedo * (vec3(0.11, 0.125, 0.155) + vec3(0.18, 0.2, 0.25) * (0.5 + 0.5 * n.z));
+/** The hut's lamp and its red warning light on the kit's solids (design 081). */
+const HUT_GLOW = /* glsl */ `
+${ROOF}
+vec3 kitGlow(vec3 albedo, vec3 n, vec3 world) {
   vec3 toLamp = vec3(uHut.x - uHut.z - 12.0, uHut.y - uHut.w + 25.0, 39.0) - world;
-  col += albedo * HUT_LAMP * max(dot(n, normalize(toLamp)), 0.0) * exp(-length(toLamp) / 90.0) * 1.4;
+  vec3 col = albedo * HUT_LAMP * max(dot(n, normalize(toLamp)), 0.0) * exp(-length(toLamp) / 90.0) * 1.4;
   vec3 toRed = vec3(uHut.x - uHut.z - 22.0, uHut.y + uHut.w - 10.0, 24.0) - world;
-  col += albedo * HUT_RED * max(dot(n, normalize(toRed)), 0.0) * exp(-length(toRed) / 60.0) * 1.6;
-
-  vec3 view = normalize(uEye - world);
-  col += vec3(0.4, 0.45, 0.7) * pow(max(dot(reflect(-view, n), vec3(0.0, 0.0, 1.0)), 0.0), 16.0) * metal * 0.3;
-  return col;
+  return col + albedo * HUT_RED * max(dot(n, normalize(toRed)), 0.0) * exp(-length(toRed) / 60.0) * 1.6;
 }
 `;
 
-export const PROP_FRAGMENT = propFragment({ light: PROP_LIGHT, uniforms: ROOF, reveal: 'NEON_PINK' });
+/** The rooftop at night for the kit: the city's cool glow from above, deep blue shade, a violet rim off the neon. */
+export const CITY_NIGHT = Object.freeze({
+  key: [0.32, 0.36, 0.5],
+  shade: [0.16, 0.17, 0.3],
+  sky: [0.22, 0.24, 0.4],
+  rim: [0.7, 0.45, 1.0, 0.3],
+  outline: [0.12, 0.12, 0.2, 1.1],
+  shadow: [0.3, 0.3, 0.45, 0.55],
+});
 
 const NO_SPOTS = { roof: null, hut: null, towers: [], round: null, beams: [] };
 
@@ -721,7 +731,6 @@ export function darkCityBoard({ three, material, terrainGrid, replaceGeometry, b
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
   const materials = {
     terrain: make(TERRAIN_VERTEX, TERRAIN_FRAGMENT),
-    props: make(PROP_VERTEX, PROP_FRAGMENT, { side: three.DoubleSide }),
     buildings: make(PROP_VERTEX, BUILDING_FRAGMENT, { side: three.DoubleSide }),
     billboards: make(BILLBOARD_VERTEX, BILLBOARD_FRAGMENT, { side: three.DoubleSide }),
     beams: make(BEAM_VERTEX, BEAM_FRAGMENT, {
@@ -734,14 +743,14 @@ export function darkCityBoard({ three, material, terrainGrid, replaceGeometry, b
     bakeLight: make(FULLSCREEN_VERTEX, bakeLightFragment(), bakeOptions),
   };
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
-  const props = new three.Mesh(new three.BufferGeometry(), materials.props);
+  const kit = createKitProps({ three, material, own, mood: CITY_NIGHT, reveal: 'vec3(1.0, 0.3, 0.8)', glow: HUT_GLOW });
   const buildings = new three.Mesh(new three.BufferGeometry(), materials.buildings);
   const billboards = new three.Mesh(new three.BufferGeometry(), materials.billboards);
   const beams = new three.Mesh(new three.BufferGeometry(), materials.beams);
-  beams.renderOrder = 2;
+  beams.renderOrder = 3;
   return {
-    objects: [terrain, buildings, props, billboards, beams],
-    materials: Object.values(materials),
+    objects: [terrain, buildings, ...kit.objects, billboards, beams],
+    materials: [...Object.values(materials), ...kit.materials],
     bakeField: materials.bakeField,
     bakeLight: materials.bakeLight,
     spots: (layout) => citySpots(layout) ?? NO_SPOTS,
@@ -751,9 +760,9 @@ export function darkCityBoard({ three, material, terrainGrid, replaceGeometry, b
       own.uHut.value.set(hut?.x ?? 0, hut?.y ?? 0, (hut?.w ?? 0) / 2, (hut?.d ?? 0) / 2);
       own.uRound.value.set(round?.x ?? 0, round?.y ?? 0, round?.r ?? 0, round?.height ?? 0);
       replaceGeometry(terrain, terrainGrid(bounds));
-      for (const mesh of [props, buildings, billboards, beams]) mesh.visible = Boolean(roof);
+      for (const mesh of [buildings, billboards, beams]) mesh.visible = Boolean(roof);
+      kit.set(roof ? cityProps(spots) : null);
       if (!roof) return;
-      replaceGeometry(props, cityProps(spots).build(three));
       replaceGeometry(buildings, cityBuildings(spots).build(three));
       replaceGeometry(billboards, billboardGeometry(three, spots));
       replaceGeometry(beams, beamGeometry(three, spots.beams));

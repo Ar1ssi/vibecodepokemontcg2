@@ -29,7 +29,8 @@ import {
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
 import { craterEmblem, environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
-import { PROP_VERTEX, createPropBuilder, propFragment } from './stadium-env-props.mjs';
+import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
+import { createKitProps } from './stadium-kit.mjs';
 import { tableBounds } from './table-uv.mjs';
 
 export const ARENA_KEY = 'fighting-stadium';
@@ -208,8 +209,27 @@ function adRuns({ ring, boards }) {
 }
 
 /** The ring's corner posts and ropes, the rig's truss and lamps, and the ad boards' rails. */
-export function arenaProps({ ring, boards }) {
+/**
+ * The arena under its rig for the kit (design 081): a cool white key from the lamps overhead, a deep
+ * teal shade from the dark hall, a bright cyan rim off the screens.
+ */
+export const ARENA_LIGHTS = Object.freeze({
+  key: [0.9, 0.96, 1.0],
+  shade: [0.24, 0.36, 0.42],
+  sky: [0.35, 0.5, 0.56],
+  rim: [0.6, 0.9, 1.0, 0.3],
+  outline: [0.2, 0.24, 0.3, 1.1],
+  shadow: [0.3, 0.38, 0.45, 0.55],
+});
+
+export function arenaProps(spots) {
   const props = createPropBuilder();
+  props.look({ kind: LOOK.chrome, outline: 1 }, () => arenaSolids(props, spots));
+  return props;
+}
+
+/** The ring's posts, pads, ropes and apron; the stands' rails. */
+function arenaSolids(props, { ring, boards }) {
   const corners = [
     [-1, -1],
     [1, -1],
@@ -271,7 +291,6 @@ export function arenaProps({ ring, boards }) {
     props.cylinder({ x, y, z0: z - 34, z1: z - 10, r: 3, color: TRUSS, sides: 6 });
     props.cylinder({ x, y, z0: z - 10, z1: z + 6, r: 12, color: LAMP_CASE, sides: 14 });
   }
-  return props;
 }
 
 /**
@@ -772,17 +791,7 @@ ${OUTPUT}
 }
 `;
 
-/** The props' light: the rig's white from above, the teal haze round them. */
-const PROP_LIGHT = /* glsl */ `
-vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
-  vec3 col = albedo * (vec3(0.14, 0.24, 0.27) + vec3(0.75, 0.82, 0.85) * max(n.z, 0.0) * 0.8 + 0.25 * max(dot(n, normalize(uSun)), 0.0));
-  vec3 view = normalize(uEye - world);
-  col += vec3(0.7, 0.9, 1.0) * pow(max(dot(reflect(-view, n), vec3(0.0, 0.0, 1.0)), 0.0), 24.0) * metal * 0.5;
-  return col;
-}
-`;
 
-export const PROP_FRAGMENT = propFragment({ light: PROP_LIGHT, uniforms: ARENA, reveal: 'STAGE_GLOW' });
 
 const NO_SPOTS = { ring: null, boards: null, scene: null, emblem: null };
 
@@ -796,7 +805,6 @@ export function fightingStadiumBoard({ three, material, terrainGrid, replaceGeom
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
   const materials = {
     terrain: make(TERRAIN_VERTEX, TERRAIN_FRAGMENT),
-    props: make(PROP_VERTEX, PROP_FRAGMENT, { side: three.DoubleSide }),
     boards: make(BOARD_VERTEX, BOARD_FRAGMENT, { side: three.DoubleSide }),
     lasers: make(LASER_VERTEX, LASER_FRAGMENT, {
       transparent: true,
@@ -822,7 +830,7 @@ export function fightingStadiumBoard({ three, material, terrainGrid, replaceGeom
     bakeLight: make(FULLSCREEN_VERTEX, bakeLightFragment(), bakeOptions),
   };
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
-  const props = new three.Mesh(new three.BufferGeometry(), materials.props);
+  const kit = createKitProps({ three, material, own, mood: ARENA_LIGHTS, reveal: 'vec3(0.6, 0.9, 1.1)' });
   const boards = new three.Mesh(new three.BufferGeometry(), materials.boards);
   const lasers = new three.Mesh(laserGeometry(three), materials.lasers);
   lasers.renderOrder = 2;
@@ -831,8 +839,8 @@ export function fightingStadiumBoard({ three, material, terrainGrid, replaceGeom
   const glints = new three.Mesh(new three.BufferGeometry(), materials.glints);
   glints.renderOrder = 2;
   return {
-    objects: [terrain, props, boards, lasers, lattice, glints],
-    materials: Object.values(materials),
+    objects: [terrain, ...kit.objects, boards, lasers, lattice, glints],
+    materials: [...Object.values(materials), ...kit.materials],
     bakeField: materials.bakeField,
     bakeLight: materials.bakeLight,
     spots: (layout) => arenaSpots(layout) ?? NO_SPOTS,
@@ -842,9 +850,9 @@ export function fightingStadiumBoard({ three, material, terrainGrid, replaceGeom
       own.uBoards.value.set(spots.boards?.hw ?? 0, spots.boards?.hh ?? 0);
       own.uEmblem.value.set(emblem?.x ?? 0, emblem?.y ?? 0, emblem?.r ?? 0);
       replaceGeometry(terrain, terrainGrid(bounds));
-      for (const mesh of [props, boards, lasers, lattice, glints]) mesh.visible = Boolean(ring);
+      for (const mesh of [boards, lasers, lattice, glints]) mesh.visible = Boolean(ring);
+      kit.set(ring ? arenaProps(spots) : null);
       if (!ring) return;
-      replaceGeometry(props, arenaProps(spots).build(three));
       replaceGeometry(boards, adBoardGeometry(three, spots));
       replaceGeometry(lattice, latticeGeometry(three, spots));
       replaceGeometry(glints, glintGeometry(three, rigLamps(ring), [...laserLights(spots), ...latticeCrossings(spots)]));

@@ -12,8 +12,10 @@
 // Bake, once per layout: BAKE_FIELD writes R height px, G signed px from the floor's edge (negative
 // on it), B a stone's tone 0..1 on the walls, A the kind (-1 floor, 1 wall); the shared light bake
 // adds normals, occlusion and the skylight's shadow. Per frame: TERRAIN paints the floor, the walls,
-// the emblem, the skylight's pool and the crystals' coloured light; CRYSTALS draws every crystal, a
-// faceted prism with a pointed tip; SPARKLES the dust drifting and twinkling in the air.
+// the emblem, the skylight's pool and the crystals' coloured light; the kit's meshes (design 081:
+// one toon light, outlines, contact shadows) every crystal, a faceted prism with a pointed tip paling
+// toward it, and the rubble of broken rock at each cluster's outer foot; SPARKLES the dust drifting
+// and twinkling in the air. The floor is clean packed earth: no pebble speckle.
 import {
   FOOTPRINTS,
   FULLSCREEN_VERTEX,
@@ -27,6 +29,9 @@ import {
   VORONOI,
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
+import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
+import { createKitProps } from './stadium-kit.mjs';
+import { placeAsset } from './stadium-kit-assets.mjs';
 import { craterEmblem, environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
 import { tableBounds } from './table-uv.mjs';
 
@@ -300,20 +305,6 @@ ${VORONOI}
 ${REVEAL}
 ${PALETTE}
 ${CAVE}
-// A pebble pressed into the earth on a voronoi grid of cellPx: (shape 0..1, shade, its dark seat, tone).
-vec4 pebbles(vec2 p, float cellPx, float chance, vec3 sun) {
-  vec4 c = voronoiCell(p / cellPx);
-  float has = step(fract(c.y * 17.3), chance);
-  float rad = 0.2 + 0.2 * fract(c.y * 5.7);
-  vec2 off = -c.zw / rad;
-  off.x /= 0.75 + 0.5 * fract(c.y * 3.1);
-  float r = length(off);
-  float dome = sqrt(max(1.0 - r * r, 0.0));
-  vec3 n = normalize(vec3(off, 0.35 + dome));
-  float shade = clamp(dot(n, sun) * 1.1 + 0.15, 0.0, 1.3);
-  float seat = smoothstep(0.95, 1.12, r) * (1.0 - smoothstep(1.12, 1.55, r));
-  return vec4((1.0 - smoothstep(0.86, 1.0, r)) * has, shade, seat * has, fract(c.y * 29.0));
-}
 varying vec2 vPos;
 varying vec2 vUv;
 varying float vGrowth;
@@ -334,16 +325,8 @@ void main() {
   // larger pebbles pressed into it, each a little dome with a dark seat, gathered at the walls' feet
   // (design 080: the open floor where the cards lie is worn smooth).
   float calm = max(fieldCalm(p, 110.0), 1.0 - smoothstep(-150.0, -60.0, d));
-  float stain = smoothstep(0.3, 0.75, fbm3(p / 150.0 + 6.0));
+  float stain = smoothstep(0.35, 0.7, fbm3(p / 180.0 + 6.0));
   vec3 col = mix(FLOOR_LIT, FLOOR_DARK, 0.25 + 0.55 * stain);
-  col *= 0.9 + 0.14 * fbm3(p / 34.0 + 2.0);
-  vec4 small = pebbles(p, 15.0, 0.62 * (1.0 - calm), sunDir);
-  vec4 large = pebbles(p + 13.0, 44.0, 0.4 * (1.0 - calm), sunDir);
-  vec3 pebbleBase = mix(vec3(0.06, 0.042, 0.032), vec3(0.15, 0.1, 0.07), small.w);
-  vec3 stoneBase = mix(vec3(0.085, 0.06, 0.045), vec3(0.2, 0.14, 0.095), large.w);
-  col *= 1.0 - 0.3 * max(small.z, large.z);
-  col = mix(col, pebbleBase * (0.5 + 0.8 * small.y), small.x * 0.75);
-  col = mix(col, stoneBase * (0.5 + 0.8 * large.y), large.x * 0.85);
   // The walls: rough brown rock, each stone its own tone, its top faces catching the skylight,
   // sinking into the dark the further it climbs from the floor.
   vec3 rock = mix(FLOOR_DARK * 0.8, FLOOR_LIT * 0.9, 0.25 + 0.5 * field.b) * (0.45 + 0.8 * lit);
@@ -401,137 +384,63 @@ ${OUTPUT}
 `;
 
 /**
- * Every crystal as flat-faced triangles: a hexagonal prism up its axis, capped by a six-sided point.
- * Per vertex: position, normal (each face its own), aColor (the hue's sRGB / 255, then how far up the
- * crystal 0..1), aFacet (across the face 0..1, the face's own tone 0..1).
+ * Every crystal as the kit's faceted solid (design 081): six flat sides from its foot to its shoulder,
+ * six faces up to its point, its hue paling toward the tip; a shard of broken rock or two at each
+ * cluster's outer foot (the side away from the cards); one soft shadow under each cluster.
  */
-export function crystalGeometry(three, clusters) {
-  const positions = [];
-  const normals = [];
-  const colors = [];
-  const facets = [];
-  const index = [];
-  const push = (p, n, color, along, across, tone) => {
-    positions.push(...p);
-    normals.push(...n);
-    colors.push(color[0] / 255, color[1] / 255, color[2] / 255, along);
-    facets.push(across, tone);
-  };
-  const face = (corners, color, alongs, acrosses, tone) => {
-    const [a, b, c] = corners;
-    const e1 = b.map((v, k) => v - a[k]);
-    const e2 = c.map((v, k) => v - a[k]);
-    const n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
-    const length = Math.hypot(...n) || 1;
-    const first = positions.length / 3;
-    corners.forEach((corner, k) => push(corner, n.map((v) => v / length), color, alongs[k], acrosses[k], tone));
-    if (corners.length === 4) index.push(first, first + 1, first + 2, first, first + 2, first + 3);
-    else index.push(first, first + 1, first + 2);
-  };
-  for (const cluster of clusters) {
-    for (const crystal of cluster.crystals) {
-      const color = CRYSTAL_HUES[crystal.hue];
-      const axis = crystal.axis;
-      // A frame square to the axis.
-      const helper = Math.abs(axis[2]) > 0.9 ? [1, 0, 0] : [0, 0, 1];
-      let side = [axis[1] * helper[2] - axis[2] * helper[1], axis[2] * helper[0] - axis[0] * helper[2], axis[0] * helper[1] - axis[1] * helper[0]];
-      const sl = Math.hypot(...side);
-      side = side.map((v) => v / sl);
-      const lift = [axis[1] * side[2] - axis[2] * side[1], axis[2] * side[0] - axis[0] * side[2], axis[0] * side[1] - axis[1] * side[0]];
-      const foot = [crystal.x, crystal.y, crystal.z];
-      const at = (height, k, radius) => {
-        const angle = crystal.spin + (k / 6) * 2 * Math.PI;
-        return [0, 1, 2].map((v) => foot[v] + axis[v] * height + (side[v] * Math.cos(angle) + lift[v] * Math.sin(angle)) * radius);
-      };
-      const shoulder = crystal.height;
-      const tip = [0, 1, 2].map((v) => foot[v] + axis[v] * (shoulder + crystal.radius * 1.7));
-      const shoulderAlong = shoulder / (shoulder + crystal.radius * 1.7);
-      for (let k = 0; k < 6; k += 1) {
-        const tone = hash(crystal.seed * 100, k, 3);
-        face([at(0, k, crystal.radius), at(0, k + 1, crystal.radius), at(shoulder, k + 1, crystal.radius), at(shoulder, k, crystal.radius)], color, [0, 0, shoulderAlong, shoulderAlong], [0, 1, 1, 0], tone);
-        face([at(shoulder, k, crystal.radius), at(shoulder, k + 1, crystal.radius), tip], color, [shoulderAlong, shoulderAlong, 1], [0, 1, 0.5], tone * 0.8 + 0.2);
+export function crystalProps(clusters) {
+  const props = createPropBuilder();
+  props.look({ kind: LOOK.crystal, outline: 1 }, () => {
+    for (const cluster of clusters) {
+      const hue = CRYSTAL_HUES[cluster.hue].map((v) => toLinear(v));
+      const tipHue = hue.map((v) => v + (1 - v) * 0.55);
+      const tint = (t) => [...hue.map((v, k) => v + (tipHue[k] - v) * Math.min(1, Math.max(0, t))), 0];
+      for (const crystal of cluster.crystals) {
+        const axis = crystal.axis;
+        const helper = Math.abs(axis[2]) > 0.9 ? [1, 0, 0] : [0, 0, 1];
+        let side = [axis[1] * helper[2] - axis[2] * helper[1], axis[2] * helper[0] - axis[0] * helper[2], axis[0] * helper[1] - axis[1] * helper[0]];
+        const sl = Math.hypot(...side);
+        side = side.map((v) => v / sl);
+        const lift = [axis[1] * side[2] - axis[2] * side[1], axis[2] * side[0] - axis[0] * side[2], axis[0] * side[1] - axis[1] * side[0]];
+        const foot = [crystal.x, crystal.y, crystal.z];
+        const at = (height, k, radius) => {
+          const angle = crystal.spin + (k / 6) * 2 * Math.PI;
+          return [0, 1, 2].map((v) => foot[v] + axis[v] * height + (side[v] * Math.cos(angle) + lift[v] * Math.sin(angle)) * radius);
+        };
+        const shoulder = crystal.height;
+        const top = shoulder + crystal.radius * 1.7;
+        const points = [];
+        for (let k = 0; k < 6; k += 1) points.push(at(0, k, crystal.radius * 0.86));
+        for (let k = 0; k < 6; k += 1) points.push(at(shoulder, k, crystal.radius));
+        points.push([0, 1, 2].map((v) => foot[v] + axis[v] * top));
+        const faces = [];
+        for (let k = 0; k < 6; k += 1) {
+          const n = (k + 1) % 6;
+          faces.push([k, n, 6 + n], [k, 6 + n, 6 + k], [6 + k, 6 + n, 12]);
+        }
+        const along = (centre) => [0, 1, 2].reduce((sum, v) => sum + (centre[v] - foot[v]) * axis[v], 0) / top;
+        props.facets(points, faces, (centre) => tint(along(centre) ** 1.3 + (along(centre) > shoulder / top ? 0.15 : 0)));
       }
+      props.shadow({ x: cluster.x, y: cluster.y, z: cluster.z, rx: cluster.r * 1.1, strength: 0.5 });
     }
+  });
+  for (const cluster of clusters) {
+    const out = [Math.cos(cluster.outward), Math.sin(cluster.outward)];
+    placeAsset(props, 'pebbles', {
+      x: cluster.x + out[0] * cluster.r * 1.15,
+      y: cluster.y + out[1] * cluster.r * 1.15,
+      z: cluster.z,
+      size: cluster.r * 0.42,
+      count: 3,
+      seed: cluster.x * 0.37 + cluster.y,
+      sun: CAVE_LIGHT,
+      colors: CAVE_ROCK,
+    });
   }
-  const geometry = new three.BufferGeometry();
-  geometry.setAttribute('position', new three.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute('normal', new three.Float32BufferAttribute(normals, 3));
-  geometry.setAttribute('aColor', new three.Float32BufferAttribute(colors, 4));
-  geometry.setAttribute('aFacet', new three.Float32BufferAttribute(facets, 2));
-  geometry.setIndex(index);
-  return geometry;
+  return props;
 }
 
-export const CRYSTAL_VERTEX = /* glsl */ `
-${TERRAIN_UNIFORMS}
-${NOISE}
-${REVEAL}
-${TERRAIN_GROUND}
-attribute vec4 aColor;
-attribute vec2 aFacet;
-varying vec4 vColor;
-varying vec2 vFacet;
-varying vec3 vNormal;
-varying vec3 vWorld;
-void main() {
-  float growth = terrainGrowth(position.xy);
-  vColor = aColor;
-  vFacet = aFacet;
-  vNormal = normal;
-  vWorld = vec3(position.xy, position.z * growth);
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(vWorld, 1.0);
-}
-`;
-
-/**
- * A crystal, painted as the art's: frosted, translucent-looking faces, each its own tone, deeper and
- * more saturated at the foot, paler toward the point where the light passes through; a pale streak
- * down each face's middle, bright edges between faces, a rim of light where a face turns edge-on, and
- * a soft glow of its own.
- */
-export const CRYSTAL_FRAGMENT = /* glsl */ `
-${TERRAIN_UNIFORMS}
-${NOISE}
-${REVEAL}
-varying vec4 vColor;
-varying vec2 vFacet;
-varying vec3 vNormal;
-varying vec3 vWorld;
-void main() {
-  if (revealBurned(vWorld.xy) * exitKeep(vWorld.xy) < 0.5) discard;
-  vec3 n = normalize(gl_FrontFacing ? vNormal : -vNormal);
-  vec3 toEye = normalize(uEye - vWorld);
-  vec3 sun = normalize(uSun);
-  vec3 hue = pow(vColor.rgb, vec3(2.2));
-  float along = vColor.w;
-  float facing = dot(n, sun);
-  // Each face its own tone; deep and saturated at the foot, lighter where the light carried up the
-  // crystal comes out toward the point.
-  vec3 body = mix(pow(hue, vec3(1.35)) * 0.8, hue * 1.1, smoothstep(0.0, 0.75, along));
-  // A second, low light from the far left gives the faces round the prism their own tones.
-  float side = dot(n, normalize(vec3(-0.6, 0.5, 0.35)));
-  float faceLight = 0.2 + 0.45 * max(side, 0.0) + 0.35 * max(facing, 0.0);
-  vec3 col = body * faceLight * (0.5 + 0.9 * vFacet.y);
-  col += hue * (0.06 + 0.24 * smoothstep(0.2, 1.0, along));
-  // A pale streak down each face, as frost, flawed by veins that run along the crystal.
-  float streak = 1.0 - smoothstep(0.06, 0.34, abs(vFacet.x - 0.5));
-  float vein = smoothstep(0.58, 0.82, gnoise(vec2(vFacet.x * 4.0 + vFacet.y * 23.0, along * 8.0)));
-  col = mix(col, mix(hue, vec3(1.0), 0.4), streak * 0.18 + vein * 0.1);
-  // Bright edges between the faces, and a sharp glint where a face catches the skylight.
-  float edge = 1.0 - smoothstep(0.0, 0.05, min(vFacet.x, 1.0 - vFacet.x));
-  col = mix(col, vec3(1.0, 0.97, 1.0), edge * 0.35);
-  vec3 half_ = normalize(sun + toEye);
-  col += vec3(1.0, 0.98, 0.94) * pow(max(dot(n, half_), 0.0), 56.0) * 1.1;
-  float rim = pow(1.0 - abs(dot(n, toEye)), 3.0);
-  col += (hue * 0.35 + 0.06) * rim;
-  // Its own steady glow; darker where it meets the floor.
-  col += hue * 0.1;
-  col *= mix(0.4, 1.0, smoothstep(0.0, 0.14, along));
-  col += vec3(0.75, 0.82, 1.0) * revealGlow(vWorld.xy, 0.035);
-  gl_FragColor = vec4(col, 1.0);
-${OUTPUT}
-}
-`;
+const CAVE_ROCK = Object.freeze({ body: [0.16, 0.11, 0.08, 0], light: [0.27, 0.19, 0.13, 0], dark: [0.08, 0.055, 0.045, 0] });
 
 /** Coloured sparkle dust: drifting slowly up among the crystals, each mote twinkling gently. */
 export const SPARKLE_VERTEX = /* glsl */ `
@@ -595,18 +504,17 @@ export function crystalCaveBoard({ three, material, seeded, terrainGrid, replace
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
   const materials = {
     terrain: make(TERRAIN_VERTEX, TERRAIN_FRAGMENT),
-    crystals: make(CRYSTAL_VERTEX, CRYSTAL_FRAGMENT, { side: three.DoubleSide }),
     sparkles: make(SPARKLE_VERTEX, SPARKLE_FRAGMENT, { transparent: true, depthWrite: false, blending: three.AdditiveBlending }),
     bakeField: make(FULLSCREEN_VERTEX, BAKE_FIELD_FRAGMENT, bakeOptions),
     bakeLight: make(FULLSCREEN_VERTEX, bakeLightFragment({ aoFollowsSlope: true }), bakeOptions),
   };
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
-  const crystals = new three.Mesh(new three.BufferGeometry(), materials.crystals);
+  const kit = createKitProps({ three, material, own, mood: 'cave', reveal: 'vec3(0.8, 0.9, 1.2)' });
   const sparkles = new three.Points(seeded(SPARKLE_COUNT), materials.sparkles);
-  sparkles.renderOrder = 2;
+  sparkles.renderOrder = 3;
   return {
-    objects: [terrain, crystals, sparkles],
-    materials: Object.values(materials),
+    objects: [terrain, ...kit.objects, sparkles],
+    materials: [...Object.values(materials), ...kit.materials],
     bakeField: materials.bakeField,
     bakeLight: materials.bakeLight,
     spots: (layout) => crystalSpots(layout),
@@ -623,8 +531,7 @@ export function crystalCaveBoard({ three, material, seeded, terrainGrid, replace
         return cluster ? slot.set(cluster.x, cluster.y, cluster.r * 1.3 + cluster.height * 0.2, cluster.hue) : slot.set(0, 0, 0, 0);
       });
       replaceGeometry(terrain, terrainGrid(bounds));
-      crystals.visible = clusters.length > 0;
-      if (clusters.length) replaceGeometry(crystals, crystalGeometry(three, clusters));
+      kit.set(clusters.length ? crystalProps(clusters) : null);
     },
   };
 }

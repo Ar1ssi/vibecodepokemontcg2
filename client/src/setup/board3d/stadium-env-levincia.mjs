@@ -29,7 +29,8 @@ import {
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
 import { environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
-import { PROP_VERTEX, createPropBuilder, propFragment } from './stadium-env-props.mjs';
+import { createPropBuilder } from './stadium-env-props.mjs';
+import { createKitProps } from './stadium-kit.mjs';
 import { tableBounds } from './table-uv.mjs';
 
 export const LEVINCIA_KEY = 'levincia';
@@ -232,17 +233,11 @@ void main() {
   float seam = 1.0 - smoothstep(0.5, 1.5, min(ringW * 0.5 - seamRing, seamSpoke));
   vec3 col = mix(FLOOR, FLOOR_PALE, 0.35 + 0.2 * hash12(vec2(floor(r / ringW), floor(angle / 6.2831853 * spokes))));
   col = mix(col, FLOOR * 0.82, seam * 0.6);
-  // The mosaic band round the rim: yellow tesserae, a few pale, pale grout between; a blue line in.
+  // The mosaic band round the rim; a blue line in.
   float band = smoothstep(uStage.z - 48.0, uStage.z - 46.0, r) * (1.0 - smoothstep(uStage.z - 8.0, uStage.z - 6.0, r));
-  // Design 080: the tesserae show only where the screen can draw them and not round the cards; they
-  // fade to the mosaic's own even yellow, so the band and the swirl stay crisp shapes, not speckle.
-  float tiles = patternFade(pixelSize(p), 9.0) * (1.0 - 0.75 * fieldCalm(p, 60.0));
-  vec4 tile = voronoiCell(p / 9.0);
+  // Design 081: the band is one even mosaic yellow, a crisp painted shape (no per-tile speckle).
   vec3 mosaic = mix(YELLOW, YELLOW_PALE, 0.25);
-  vec3 tessera = mix(YELLOW, YELLOW_PALE, step(0.7, tile.y)) * (0.9 + 0.2 * fract(tile.y * 9.0));
-  tessera = mix(tessera, FLOOR_PALE * 1.1, (1.0 - smoothstep(0.05, 0.12, tile.x)) * 0.7);
-  tessera = mix(mosaic, tessera, tiles);
-  col = mix(col, tessera, band * 0.9);
+  col = mix(col, mosaic, band * 0.9);
   float blueLine = smoothstep(uStage.z - 58.0, uStage.z - 56.0, r) * (1.0 - smoothstep(uStage.z - 50.0, uStage.z - 48.0, r));
   col = mix(col, BLUE_BAND, blueLine);
   // The swirl at the middle: a yellow spiral of mosaic, as the art's.
@@ -259,7 +254,7 @@ void main() {
   // Design 080: the swirl under the Actives is an inlay a few steps quieter than the rim's band, a
   // pale yellow on the pale blue with a thin blue edge, so the eye keeps the cards over it.
   col = mix(col, BLUE_BAND, (1.0 - swirl) * smoothstep(-6.0, -4.5, swirlEdge) * (1.0 - smoothstep(-2.0, -0.8, swirlEdge)) * 0.5);
-  col = mix(col, mix(tessera, FLOOR_PALE, 0.35), swirl * 0.6);
+  col = mix(col, mix(mosaic, FLOOR_PALE, 0.35), swirl * 0.6);
 
   // The rim wall: blue panels, dark joints.
   vec3 rim = mix(RIM_DARK, RIM, 0.5 + 0.5 * step(0.5, fract(angle * 40.0)));
@@ -337,19 +332,13 @@ void main() {
   // Shade under the rim and the walkway's edges, and a white line of foam where the water meets them.
   col *= mix(0.75, 1.0, smoothstep(uStage.z, uStage.z + 24.0, r));
   float wallDist = r < uStage.w ? min(r - uStage.z, uStage.w - r) : r - uWalkOut;
-  float lap = 0.5 + 0.5 * sin(t * 0.9 + r * 0.05 + 4.0 * gnoise(p / 40.0));
-  float foam = (1.0 - smoothstep(1.0, 3.0 + 3.0 * lap, wallDist)) * (0.65 + 0.35 * gnoise(p / 9.0));
-  // Caustics: bright net of light on the bed, drifting.
-  vec4 net = voronoiCell(p / 34.0 + vec2(t * 0.03, -t * 0.02));
-  float caustic = (1.0 - smoothstep(0.0, 0.12, net.x)) * (1.0 - smoothstep(0.0, 2.4, wallDist / 26.0));
-  col += vec3(0.12, 0.16, 0.14) * caustic;
-  // Ripples drifting, and short bright glints.
-  float swell = fbm3((p - vec2(t * 6.0, t * 2.0)) / vec2(80.0, 36.0));
-  col *= 0.9 + 0.2 * swell;
-  vec4 cell = voronoiCell((p - vec2(t * 9.0, t * 4.0)) / vec2(20.0, 8.0));
-  float glint = (1.0 - smoothstep(0.1, 0.26, length(cell.zw * vec2(0.6, 1.6)))) * step(0.62, fract(cell.y * 7.0));
-  col = mix(col, vec3(0.95, 1.0, 1.05), glint * (0.6 + 0.4 * sin(t * 0.9 + cell.y * 30.0)) * 0.35);
-  col = mix(col, vec3(0.97, 1.0, 1.03), foam * 0.8);
+  // Design 081: flat water as the games paint it: a broad slow swell, a crisp white line of foam
+  // lapping where it meets the walls (no caustics or glints).
+  float lap = 0.5 + 0.5 * sin(t * 0.9 + r * 0.05);
+  float foam = 1.0 - smoothstep(1.5, 2.5 + 3.0 * lap, wallDist);
+  float swell = fbm3((p - vec2(t * 6.0, t * 2.0)) / vec2(160.0, 90.0));
+  col *= 0.95 + 0.1 * swell;
+  col = mix(col, vec3(0.97, 1.0, 1.03), foam * 0.85);
   col = edgeHaze(col, vUv);
   vec3 spark = vec3(1.1, 0.95, 0.4);
   col += spark * revealGlow(p, 0.035) * 0.6;
@@ -518,29 +507,14 @@ export function levinciaProps({ centre, stage, walkIn, walkOut, billboards, towe
       if (points.length > 1) props.tube(points, 1.6 * u, RAIL, { sides: 6 });
     }
   }
-  for (const board of billboards) billboard(props, board, centre, deck, u);
-  for (const t of towers) tower(props, t, u);
+  props.look({ outline: 1 }, () => {
+    for (const board of billboards) billboard(props, board, centre, deck, u);
+    for (const t of towers) tower(props, t, u);
+  });
   return props;
 }
 
-/** The props in the noon sun: a sheen on the glass that shows the sky, the screens their own light. */
-const PROP_LIGHT = /* glsl */ `
-vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
-  vec3 sun = normalize(uSun);
-  vec3 view = normalize(uEye - world);
-  vec3 col = albedo * (vec3(0.55, 0.62, 0.75) * (0.7 + 0.3 * n.z) + vec3(1.05, 1.0, 0.92) * max(dot(n, sun), 0.0));
-  // Glass shows the sky above it, paler toward the top, a hot glint of the sun.
-  vec3 sky = mix(vec3(0.35, 0.55, 0.95), vec3(0.75, 0.85, 1.0), clamp(reflect(-view, n).z, 0.0, 1.0));
-  col = mix(col, sky * 0.75, metal * 0.25 * (1.0 - abs(n.z)));
-  col += vec3(1.0) * pow(max(dot(reflect(-sun, n), view), 0.0), 40.0) * metal * 0.6;
-  // Mullion lines up the glass.
-  col *= 1.0 - 0.3 * metal * step(0.82, fract((world.x + world.y) / 11.0)) * (1.0 - abs(n.z));
-  col *= 1.0 - 0.15 * metal * step(0.88, fract(world.z / 14.0)) * (1.0 - abs(n.z));
-  return col;
-}
-`;
 
-export const PROP_FRAGMENT = propFragment({ light: PROP_LIGHT, reveal: 'vec3(1.1, 0.95, 0.4)' });
 
 /** Levincia's board (stadium-environment-mesh.js BOARDS). */
 export function levinciaBoard({ three, material, terrainGrid, replaceGeometry, bakeOptions }) {
@@ -554,16 +528,15 @@ export function levinciaBoard({ three, material, terrainGrid, replaceGeometry, b
     terrain: make(TERRAIN_VERTEX, TERRAIN_FRAGMENT),
     // Pushed back a hair so the walls right at the water's level win the depth test, not flicker.
     water: make(WATER_VERTEX, WATER_FRAGMENT, { polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 2 }),
-    props: make(PROP_VERTEX, PROP_FRAGMENT, { side: three.DoubleSide }),
     bakeField: make(FULLSCREEN_VERTEX, BAKE_FIELD_FRAGMENT, bakeOptions),
     bakeLight: make(FULLSCREEN_VERTEX, bakeLightFragment(), bakeOptions),
   };
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
   const water = new three.Mesh(new three.BufferGeometry(), materials.water);
-  const props = new three.Mesh(new three.BufferGeometry(), materials.props);
+  const kit = createKitProps({ three, material, own, mood: 'day', reveal: 'vec3(1.1, 0.95, 0.4)' });
   return {
-    objects: [terrain, water, props],
-    materials: Object.values(materials),
+    objects: [terrain, water, ...kit.objects],
+    materials: [...Object.values(materials), ...kit.materials],
     bakeField: materials.bakeField,
     bakeLight: materials.bakeLight,
     spots: (layout) => levinciaSpots(layout),
@@ -572,8 +545,7 @@ export function levinciaBoard({ three, material, terrainGrid, replaceGeometry, b
       own.uWalkOut.value = spots?.walkOut ?? 1e5;
       replaceGeometry(terrain, terrainGrid(bounds));
       replaceGeometry(water, new three.PlaneGeometry(bounds.w, bounds.h).translate(bounds.x + bounds.w / 2, bounds.y + bounds.h / 2, 0));
-      props.visible = Boolean(spots);
-      if (spots) replaceGeometry(props, levinciaProps(spots).build(three));
+      kit.set(spots ? levinciaProps(spots) : null);
     },
   };
 }

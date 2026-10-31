@@ -25,9 +25,11 @@ import {
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
 import { craterEmblem } from './stadium-environment-layout.mjs';
-import { PROP_VERTEX, createPropBuilder, propFragment } from './stadium-env-props.mjs';
+import { createPropBuilder } from './stadium-env-props.mjs';
+import { createKitProps } from './stadium-kit.mjs';
+import { measureAsset, placeAsset } from './stadium-kit-assets.mjs';
 import { boardContext, hash } from './stadium-env-spots.mjs';
-import { BLADES, EDGE_HAZE, STANDARD_TERRAIN_VERTEX } from './stadium-env-surfaces.mjs';
+import { EDGE_HAZE, STANDARD_TERRAIN_VERTEX } from './stadium-env-surfaces.mjs';
 
 export const FAIRY_KEY = 'fairy-garden';
 /** The moon (toward it, table frame): high, a little from the far left; the forest keeps most of it out. */
@@ -91,8 +93,10 @@ export function fairySpots(layout) {
     const y = core.y + ((k + 0.5) / MAX_LEAVES) * (handEnd - core.y) + (hash(k, 3, 2) - 0.5) * 80 * u;
     const yaw = (side > 0 ? Math.PI : 0) + (hash(k, 3, 3) - 0.5) * 1.1;
     const len = (96 + 34 * hash(k, 3, 4)) * u;
-    if (!ctx.clear(x + Math.cos(yaw) * len * 0.5, y + Math.sin(yaw) * len * 0.5, len * 0.5, 10 * u) || !ctx.clear(x, y, 20 * u, 10 * u)) continue;
-    leaves.push({ x, y, yaw, len, wid: len * 0.38, seed: hash(k, 3, 5) });
+    // Design 081: each a clump of the kit's broad fern, clear of the cards by its whole reach.
+    const size = len * 0.6;
+    if (!ctx.clear(x, y, measureAsset('fern', { size }).reach, 10 * u)) continue;
+    leaves.push({ x, y, yaw, len, size, seed: hash(k, 3, 5) });
   }
   return { ...ctx, reach, handEnd, trees, orbs, leaves, ring: craterEmblem(layout, centre) };
 }
@@ -148,7 +152,6 @@ ${NOISE}
 ${FOOTPRINTS}
 ${VORONOI}
 ${REVEAL}
-${BLADES}
 ${EDGE_HAZE}
 ${PALETTE}
 ${FAIRY}
@@ -208,10 +211,7 @@ void main() {
   if (uRing.z > 0.0) {
     float toRing = distance(p, uRing.xy);
     float inside = 1.0 - smoothstep(uRing.z - 8.0 * uUnit, uRing.z - 1.0 * uUnit, toRing);
-    vec4 tuft = voronoiCell(p / (10.0 * uUnit) + 1.3);
-    vec2 blades = bladeFan(-tuft.zw * 10.0 * uUnit, tuft.y, 9.0 * uUnit);
-    vec3 grass = mix(GRASS * 0.7, GRASS, 0.5 + 0.5 * fbm3(p / 40.0 + 2.0));
-    grass = mix(grass, mix(GRASS, GRASS_LIT, blades.y), blades.x * 0.9);
+    vec3 grass = mix(GRASS * 0.75, GRASS, 0.5 + 0.5 * smoothstep(0.35, 0.65, fbm3(p / 90.0 + 2.0)));
     grass += GRASS_LIT * 0.35 * (1.0 - smoothstep(0.0, uRing.z, toRing));
     col = mix(col, grass, inside);
     float line = 1.0 - smoothstep(0.0, 1.6 * uUnit, abs(toRing - uRing.z) - 1.6 * uUnit);
@@ -245,96 +245,46 @@ ${OUTPUT}
 `;
 
 // Prop colours (aColor; w: 0 matte, 0.05 foliage, 0.1 big leaf, 0.12 root bark, 2 and up a light at w - 1).
-const FOLIAGE = [0.02, 0.075, 0.05, 0.05];
-const FOLIAGE_LIT = [0.032, 0.12, 0.075, 0.05];
-const BARK = [0.1, 0.075, 0.06, 0.12];
-const LEAF = [0.025, 0.1, 0.06, 0.1];
-const RIB = [0.16, 0.3, 0.22, 0.1];
+const FOLIAGE = [0.03, 0.1, 0.07, 0];
+const FOLIAGE_LIT = [0.05, 0.16, 0.1, 0];
+const BARK = [0.1, 0.075, 0.06, 0];
+const LEAF = [0.03, 0.12, 0.07, 0];
 const ORB_CORE = [0.9, 1.5, 1.1, 2.9];
 
 /** One broad leaf: a pointed outline arching over a midrib, lying low. */
-function broadLeaf(props, leaf, u) {
-  const segments = 8;
-  const along = [Math.cos(leaf.yaw), Math.sin(leaf.yaw)];
-  const side = [-along[1], along[0]];
-  const at = (s, across, z) => [leaf.x + along[0] * s * leaf.len + side[0] * across, leaf.y + along[1] * s * leaf.len + side[1] * across, z];
-  for (let k = 0; k < segments; k += 1) {
-    const s0 = k / segments;
-    const s1 = (k + 1) / segments;
-    const w0 = leaf.wid * Math.sin(Math.PI * s0) ** 0.75;
-    const w1 = leaf.wid * Math.sin(Math.PI * s1) ** 0.75;
-    const z0 = (7 + 12 * Math.sin(Math.PI * s0 ** 0.9)) * u;
-    const z1 = (7 + 12 * Math.sin(Math.PI * s1 ** 0.9)) * u;
-    props.quad(at(s0, -w0 / 2, z0 - 3 * u), at(s1, -w1 / 2, z1 - 3 * u), at(s1, 0, z1), at(s0, 0, z0), LEAF);
-    props.quad(at(s0, 0, z0), at(s1, 0, z1), at(s1, w1 / 2, z1 - 3 * u), at(s0, w0 / 2, z0 - 3 * u), LEAF);
-    props.quad(at(s0, -1.1 * u, z0 + 0.5), at(s1, -1.1 * u, z1 + 0.5), at(s1, 1.1 * u, z1 + 0.5), at(s0, 1.1 * u, z0 + 0.5), RIB);
-  }
-}
-
-/** A great tree: a flared trunk on spreading roots, a crown of overlapping dark balls. */
-function fairyTree(props, tree, u) {
-  const trunkR = tree.r * 0.2;
-  props.tube([[tree.x, tree.y, -3], [tree.x, tree.y, tree.h * 0.55]], [trunkR * 1.7, trunkR], BARK, { sides: 12 });
-  for (let k = 0; k < 5; k += 1) {
-    const angle = tree.seed * 6.28 + (k / 5) * 6.28;
-    const reach = trunkR * (2.4 + 1.6 * hash(tree.seed, k, 2));
-    props.tube(
-      [
-        [tree.x + Math.cos(angle) * trunkR * 0.5, tree.y + Math.sin(angle) * trunkR * 0.5, tree.h * 0.12],
-        [tree.x + Math.cos(angle) * reach * 0.6, tree.y + Math.sin(angle) * reach * 0.6, 4 * u],
-        [tree.x + Math.cos(angle) * reach, tree.y + Math.sin(angle) * reach, -2],
-      ],
-      [trunkR * 0.55, trunkR * 0.4, trunkR * 0.2],
-      BARK,
-      { sides: 8 }
-    );
-  }
-  const balls = [[0, 0, 0.1, 1], [-0.62, 0.22, -0.15, 0.74], [0.58, -0.32, -0.1, 0.78], [0.12, 0.62, 0.0, 0.68], [-0.2, -0.62, 0.05, 0.7], [0.0, 0.0, 0.5, 0.62], [0.7, 0.4, 0.1, 0.56], [-0.7, -0.4, 0.0, 0.58]];
-  balls.forEach(([dx, dy, dz, scale], k) => {
-    props.sphere({ x: tree.x + dx * tree.r, y: tree.y + dy * tree.r, z: tree.h + dz * tree.r, r: tree.r * scale, color: k % 2 ? FOLIAGE_LIT : FOLIAGE, sides: 14, rings: 9, squash: 0.85 });
-  });
-}
+const NIGHT_TREE = Object.freeze({ leaf: FOLIAGE, leafLight: FOLIAGE_LIT, bark: BARK, barkDark: [0.07, 0.05, 0.045, 0] });
+const NIGHT_FERN = Object.freeze({ leaf: LEAF, leafLight: [0.05, 0.16, 0.1, 0], heart: [0.012, 0.04, 0.03, 0] });
 
 /** Everything solid, as one prop geometry. */
 export function fairyProps(spots) {
   const props = createPropBuilder();
-  for (const tree of spots.trees) fairyTree(props, tree, spots.u);
-  for (const leaf of spots.leaves) broadLeaf(props, leaf, spots.u);
+  const kit = { sun: FAIRY_MOON };
+  // The terrain shades under the crowns itself (uTrees), so the kit's trees cast no shadow of their own.
+  for (const tree of spots.trees) {
+    placeAsset(props, 'treeRound', { ...kit, x: tree.x, y: tree.y, size: tree.r, height: tree.h + tree.r * 0.6, seed: tree.seed * 997, colors: NIGHT_TREE, shadows: false });
+  }
+  for (const leaf of spots.leaves) placeAsset(props, 'fern', { ...kit, x: leaf.x, y: leaf.y, size: leaf.size, fronds: 5, yaw: leaf.yaw, seed: leaf.seed * 991, colors: NIGHT_FERN });
   for (const orb of spots.orbs) props.sphere({ x: orb.x, y: orb.y, z: orb.z, r: orb.r * 0.5, color: ORB_CORE, sides: 12, rings: 8 });
   return props;
 }
 
-/** The props by night: teal-blue ambient, the orbs' green light on what faces them, foliage in dark lobes, leaves with a pale midrib. */
-const PROP_LIGHT = /* glsl */ `
-${VORONOI}
+/** The orbs' green light on the kit's solids (design 081), each pulsing on its own beat. */
+const FAIRY_GLOW = /* glsl */ `
 ${FAIRY}
-vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
-  vec3 moon = normalize(uSun);
-  float lit = max(dot(n, moon), 0.0);
-  vec3 col = albedo * (vec3(0.5, 0.78, 0.78) * (0.55 + 0.45 * n.z) + vec3(0.7, 0.8, 1.0) * lit * 0.55);
-  if (metal > 0.04 && metal < 0.06) {
-    vec2 q = world.xy / 13.0 + world.z / 11.0;
-    q += 0.35 * (vec2(gnoise(q * 1.7), gnoise(q * 1.7 + 9.1)) - 0.5);
-    vec4 lobe = voronoiCell(q);
-    float inLobe = 1.0 - smoothstep(0.34, 0.62, length(lobe.zw));
-    float bulge = dot(normalize(n + vec3(-lobe.zw, 0.0) * 0.6 * inLobe), moon);
-    col = albedo * (0.45 + 1.3 * smoothstep(-0.1, 0.8, bulge)) * mix(0.45, 1.0, smoothstep(0.0, 0.2, lobe.x)) * mix(0.45, 1.15, smoothstep(-0.3, 0.7, n.z));
-    col += vec3(0.01, 0.035, 0.03) * smoothstep(0.6, 0.95, bulge);
-  } else if (metal > 0.09 && metal < 0.11) {
-    col = albedo * (0.6 + 0.8 * smoothstep(0.0, 1.0, lit + 0.3 * n.z));
-    col += vec3(0.04, 0.1, 0.07) * pow(1.0 - n.z, 2.0);
-  } else if (metal > 0.11 && metal < 0.13) {
-    col = albedo * (0.6 + 0.8 * lit) * (0.8 + 0.4 * gnoise(vec2(atan(world.y, world.x) * 6.0, world.z / 30.0)));
-  }
-  // The orbs' green light on whatever faces them.
-  col += ORB_GLOW * orbLight(world, uTime) * albedo * 2.2 * (0.5 + 0.5 * n.z);
-  return col;
+const vec3 ORB_GLOW = vec3(0.45, 1.0, 0.8);
+vec3 kitGlow(vec3 albedo, vec3 n, vec3 world) {
+  return ORB_GLOW * orbLight(world, uTime) * albedo * 2.2 * (0.5 + 0.5 * n.z);
 }
 `;
 
-export const PROP_FRAGMENT = propFragment({
-  light: `const vec3 ORB_GLOW = vec3(0.45, 1.0, 0.8);\n${PROP_LIGHT}`,
-  reveal: 'vec3(0.7, 1.0, 0.9)',
+/** The night forest for the kit: a cool teal moon, deep teal shade, a pale green rim. */
+export const FAIRY_NIGHT = Object.freeze({
+  key: [0.55, 0.78, 0.9],
+  shade: [0.22, 0.34, 0.4],
+  sky: [0.35, 0.55, 0.6],
+  rim: [0.5, 0.9, 0.8, 0.35],
+  outline: [0.2, 0.26, 0.26, 1.1],
+  shadow: [0.3, 0.4, 0.42, 0.55],
 });
 
 /** The orbs: a soft round glow of green-white light, each breathing, drifting a little. */
@@ -426,23 +376,22 @@ export function fairyGardenBoard({ three, material, seeded, terrainGrid, replace
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
   const materials = {
     terrain: make(TERRAIN_VERTEX, TERRAIN_FRAGMENT),
-    props: make(PROP_VERTEX, PROP_FRAGMENT, { side: three.DoubleSide }),
     orbs: make(ORB_VERTEX, ORB_FRAGMENT, { transparent: true, depthWrite: false, blending: three.AdditiveBlending }),
     sparkles: make(SPARKLE_VERTEX, SPARKLE_FRAGMENT, { transparent: true, depthWrite: false, blending: three.AdditiveBlending }),
     bakeField: make(FULLSCREEN_VERTEX, BAKE_FIELD_FRAGMENT, bakeOptions),
     bakeLight: make(FULLSCREEN_VERTEX, bakeLightFragment(), bakeOptions),
   };
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
-  const props = new three.Mesh(new three.BufferGeometry(), materials.props);
+  const kit = createKitProps({ three, material, own, mood: FAIRY_NIGHT, reveal: 'vec3(0.7, 1.0, 0.9)', glow: FAIRY_GLOW });
   const orbGeometry = new three.BufferGeometry();
   orbGeometry.setAttribute('position', new three.BufferAttribute(new Float32Array(MAX_ORBS * 3), 3));
   const orbs = new three.Points(orbGeometry, materials.orbs);
-  orbs.renderOrder = 2;
+  orbs.renderOrder = 3;
   const sparkles = new three.Points(seeded(SPARKLE_COUNT), materials.sparkles);
-  sparkles.renderOrder = 3;
+  sparkles.renderOrder = 4;
   return {
-    objects: [terrain, props, orbs, sparkles],
-    materials: Object.values(materials),
+    objects: [terrain, ...kit.objects, orbs, sparkles],
+    materials: [...Object.values(materials), ...kit.materials],
     bakeField: materials.bakeField,
     bakeLight: materials.bakeLight,
     spots: (layout) => fairySpots(layout),
@@ -458,8 +407,7 @@ export function fairyGardenBoard({ three, material, seeded, terrainGrid, replace
         return tree ? slot.set(tree.x, tree.y, tree.r, tree.h) : slot.set(0, 0, 0, 0);
       });
       replaceGeometry(terrain, terrainGrid(bounds));
-      props.visible = Boolean(spots);
-      if (spots) replaceGeometry(props, fairyProps(spots).build(three));
+      kit.set(spots ? fairyProps(spots) : null);
     },
   };
 }

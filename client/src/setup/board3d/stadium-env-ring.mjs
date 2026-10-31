@@ -25,7 +25,8 @@ import {
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
 import { craterEmblem, environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
-import { PROP_VERTEX, createPropBuilder, propFragment } from './stadium-env-props.mjs';
+import { createPropBuilder } from './stadium-env-props.mjs';
+import { createKitProps } from './stadium-kit.mjs';
 import { tableBounds } from './table-uv.mjs';
 
 export const RING_KEY = 'mountain-ring';
@@ -326,8 +327,24 @@ const chainLink = (props, centre, axis, up, { length, width, thick }, color) => 
 };
 
 /** The standing stones, the spires, the ropes between them, and the chain. */
-export function ringProps({ stones, allStones, chain = [], spires = [] }) {
+/** The ring's hazy mountain light for the kit (design 081): a soft warm key, a dusty violet-grey shade. */
+export const RING_MOOD = Object.freeze({
+  key: [0.8, 0.77, 0.72],
+  shade: [0.42, 0.4, 0.5],
+  sky: [0.55, 0.52, 0.5],
+  rim: [1.0, 0.92, 0.8, 0.18],
+  outline: [0.3, 0.27, 0.3, 1.1],
+  shadow: [0.45, 0.42, 0.48, 0.55],
+});
+
+export function ringProps(spots) {
   const props = createPropBuilder();
+  props.look({ outline: 1 }, () => ringSolids(props, spots));
+  return props;
+}
+
+/** The standing stones and spires, the ropes wound round them and sagging between, the chain. */
+function ringSolids(props, { stones, allStones, chain = [], spires = [] }) {
   for (const stone of stones) standingStone(props, stone);
   for (const spire of spires) rockSpire(props, spire);
   // Ropes, as in the art: two strands, each wound round every stone in a band of turns and sagging
@@ -380,7 +397,6 @@ export function ringProps({ stones, allStones, chain = [], spires = [] }) {
     const up = [axis[1] * across[2] - axis[2] * across[1], axis[2] * across[0] - axis[0] * across[2], axis[0] * across[1] - axis[1] * across[0]];
     chainLink(props, centre, axis, i % 2 ? up : across, CHAIN, i % 3 ? RUST : RUST_DARK);
   });
-  return props;
 }
 
 const RING = /* glsl */ `
@@ -548,14 +564,13 @@ void main() {
     float wear = hash12(brick.xy + 21.0);
     vec3 stone = mix(vec3(0.215, 0.196, 0.17), vec3(0.32, 0.292, 0.252), mix(id, 0.55, 0.6 * calm)) * (wear < 0.15 ? mix(0.84, 0.94, calm) : 1.0);
     float gap = 1.0 - smoothstep(0.3, 0.9 + 0.5 * gnoise(p / 30.0), brick.z);
-    stone *= 0.93 + 0.14 * fbm3(p / 23.0);
     stone = mix(stone, stone * mix(0.6, 0.8, calm), gap * 0.85);
     // Dark grime gathers in broad pools, as on the art's paving.
     stone *= mix(1.0, 0.74, smoothstep(0.58, 0.78, fbm3(p / 210.0 + 3.0)));
     vec2 inlay = emblemInlay(p);
-    if (inlay.x > 2.5) stone = vec3(0.24, 0.22, 0.2) * (0.9 + 0.2 * fbm3(p / 18.0));
-    else if (inlay.x > 1.5) stone = vec3(0.11, 0.1, 0.09) * (0.85 + 0.3 * gnoise(p / 6.0));
-    else if (inlay.x > 0.5) stone = vec3(0.4, 0.37, 0.34) * (0.9 + 0.2 * fbm3(p / 18.0));
+    if (inlay.x > 2.5) stone = vec3(0.24, 0.22, 0.2);
+    else if (inlay.x > 1.5) stone = vec3(0.11, 0.1, 0.09);
+    else if (inlay.x > 0.5) stone = vec3(0.4, 0.37, 0.34);
     col = stone * (0.55 + 0.35 * facing + 0.25 * sky);
   } else {
     // Rock and dust, faces to the light pale; the boulders a darker grey-brown.
@@ -563,7 +578,7 @@ void main() {
     float boulder = step(0.55, id);
     vec3 boulderRock = mix(vec3(0.24, 0.225, 0.2), vec3(0.42, 0.4, 0.36), smoothstep(0.2, 0.9, facing)) * (0.9 + 0.25 * (id - 0.6));
     rock = mix(rock, boulderRock, boulder);
-    vec3 dust = vec3(0.27, 0.245, 0.205) * (0.9 + 0.2 * fbm3(p / 40.0));
+    vec3 dust = vec3(0.27, 0.245, 0.205) * (0.94 + 0.12 * smoothstep(0.35, 0.65, fbm3(p / 120.0)));
     rock = mix(dust, rock, max(smoothstep(0.92, 0.75, n.z), boulder));
     col = rock * (0.75 + 0.3 * sky);
   }
@@ -585,24 +600,7 @@ ${OUTPUT}
 }
 `;
 
-/**
- * The props' light: the overcast sky from above, a pale sun from the far left, rust's dull sheen;
- * the stones and spires sink into the art's sepia haze with distance from the ring, as the ground
- * does.
- */
-const PROP_LIGHT = /* glsl */ `
-uniform vec3 uRing;
-vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
-  vec3 sun = normalize(uSun);
-  vec3 col = albedo * (SKY * (0.42 + 0.3 * n.z) + vec3(0.55, 0.52, 0.47) * max(dot(n, sun), 0.0));
-  vec3 view = normalize(uEye - world);
-  col += vec3(0.5, 0.45, 0.38) * pow(max(dot(reflect(-sun, n), view), 0.0), 12.0) * metal * 0.4;
-  float far = smoothstep(140.0, 560.0, distance(world.xy, uRing.xy) - uRing.z);
-  return mix(col, HAZE, far * 0.6);
-}
-`;
 
-export const PROP_FRAGMENT = propFragment({ light: PROP_LIGHT, uniforms: OVERCAST, reveal: 'vec3(0.45, 0.4, 0.33)' });
 
 const NO_SPOTS = { arena: null, ringR: 0, stones: [], anchor: null, spires: [], emblem: null };
 
@@ -615,15 +613,14 @@ export function mountainRingBoard({ three, material, terrainGrid, replaceGeometr
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
   const materials = {
     terrain: make(TERRAIN_VERTEX, TERRAIN_FRAGMENT),
-    props: make(PROP_VERTEX, PROP_FRAGMENT, { side: three.DoubleSide }),
     bakeField: make(FULLSCREEN_VERTEX, BAKE_FIELD_FRAGMENT, bakeOptions),
     bakeLight: make(FULLSCREEN_VERTEX, bakeLightFragment({ aoFollowsSlope: true }), bakeOptions),
   };
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
-  const props = new three.Mesh(new three.BufferGeometry(), materials.props);
+  const kit = createKitProps({ three, material, own, mood: RING_MOOD, reveal: 'vec3(1.0, 0.9, 0.7)' });
   return {
-    objects: [terrain, props],
-    materials: Object.values(materials),
+    objects: [terrain, ...kit.objects],
+    materials: [...Object.values(materials), ...kit.materials],
     bakeField: materials.bakeField,
     bakeLight: materials.bakeLight,
     spots: (layout) => ringSpots(layout) ?? NO_SPOTS,
@@ -632,8 +629,7 @@ export function mountainRingBoard({ three, material, terrainGrid, replaceGeometr
       own.uRing.value.set(arena?.x ?? 0, arena?.y ?? 0, arena?.r ?? 0);
       own.uEmblem.value.set(emblem?.x ?? 0, emblem?.y ?? 0, emblem?.r ?? 0);
       replaceGeometry(terrain, terrainGrid(bounds));
-      props.visible = Boolean(arena);
-      if (arena) replaceGeometry(props, ringProps(spots).build(three));
+      kit.set(arena ? ringProps(spots) : null);
     },
   };
 }

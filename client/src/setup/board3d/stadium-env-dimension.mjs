@@ -12,7 +12,9 @@
 // Bake, once per layout: BAKE_FIELD writes R height px, G signed px from the island's edge (negative
 // on it), B a tone 0..1, A unused; the shared light bake adds normals and occlusion. Per frame:
 // TERRAIN paints the island's grass, the painted mark and the edge's lip (and nothing past the edge,
-// where the void shows); ROCK draws the island's cliffs, every small island and the bare tree, bobbing;
+// where the void shows); ROCK draws the island's cliffs, every small island and the bare tree, bobbing,
+// in the Stadium kit's light (design 081: a two-tone toon ramp; the earth in clean bands of strata, no
+// noise or cracks), lit from below in the void's colours;
 // DISCS the glowing coloured discs; VOID the rainbow void far below; SPARKLES the white sparkle.
 import {
   FILTERING,
@@ -30,6 +32,7 @@ import {
 } from './stadium-environment-glsl.mjs';
 import { craterEmblem, environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
 import { createPropBuilder } from './stadium-env-props.mjs';
+import { KIT_LIGHT, KIT_UNIFORMS, kitUniforms } from './stadium-kit.mjs';
 import { tableBounds } from './table-uv.mjs';
 
 export const VALLEY_KEY = 'dimension-valley';
@@ -266,35 +269,14 @@ const vec3 EARTH_DARK = vec3(0.096, 0.067, 0.052);
 const vec3 MARK = vec3(0.9, 0.232, 0.572);
 `;
 
-// The art's grass, shared by the great island and the small slabs: tall dark blades fanned out of
-// tufts on a voronoi grid, their tips lit, in soft clumps and broad patches of sun.
+// The art's grass on the great island (design 081: painted, not textured): two greens in its broad
+// clumps and soft patches of sun.
 const GRASS_SURFACE = /* glsl */ `
-vec2 bladeFan(vec2 v, float h) {
-  float stroke = 0.0;
-  float tip = 0.0;
-  for (int k = 0; k < 3; k++) {
-    float a = 1.571 + (float(k) - 1.0) * 0.6 + (fract(h * (7.0 + float(k) * 3.1)) - 0.5) * 0.9;
-    vec2 d = vec2(cos(a), sin(a));
-    float len = 5.0 + 5.0 * fract(h * (11.0 + float(k)));
-    float s = clamp(dot(v, d), 0.0, len);
-    vec2 bent = d * s + vec2(-d.y, d.x) * (s * s / len) * 0.16;
-    float m = 1.0 - smoothstep(0.3, 0.95, length(v - bent) / mix(1.1, 0.4, s / len));
-    stroke = max(stroke, m);
-    tip = max(tip, m * s / len);
-  }
-  return vec2(stroke, tip);
-}
 vec3 grassSurface(vec2 p, float clump) {
-  vec3 col = mix(GRASS_DARK, GRASS, 0.35 + 0.65 * clump);
-  col *= 0.86 + 0.26 * fbm3(p / 34.0 + 5.0);
-  vec4 tuft = voronoiCell(p / 13.0 + 2.3);
-  vec2 blades = bladeFan(-tuft.zw * 13.0, tuft.y);
-  float has = step(fract(tuft.y * 23.7), 0.66);
-  col = mix(col, mix(GRASS_DARK * 0.7, GRASS_LIT * 1.2, blades.y), blades.x * has * 0.85);
-  return col * (1.0 + 0.16 * smoothstep(0.5, 0.78, fbm3(p / 64.0 + 9.0)));
+  vec3 col = mix(GRASS_DARK, GRASS, 0.4 + 0.6 * smoothstep(0.3, 0.7, clump));
+  return col * (1.0 + 0.12 * smoothstep(0.45, 0.7, fbm3(p / 120.0 + 9.0)));
 }
 `;
-
 export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
@@ -518,32 +500,29 @@ void main() {
 }
 `;
 
-/** Earth and grass in the sun from above, the cliffs lit from below in the void's colours. */
+/**
+ * Earth and grass in the kit's light (design 081), the cliffs lit from below in the void's colours.
+ * The earth steps down in clean bands of strata, darker as it tapers into the void.
+ */
 export const ROCK_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
+${KIT_UNIFORMS}
 ${NOISE}
-${VORONOI}
 ${REVEAL}
 ${PALETTE}
-${GRASS_SURFACE}
 ${VALLEY}
 varying vec4 vColor;
 varying vec3 vNormal;
 varying vec3 vWorld;
+${KIT_LIGHT}
 void main() {
   if (revealBurned(vWorld.xy) * exitKeep(vWorld.xy) < 0.5) discard;
   vec3 n = normalize(gl_FrontFacing ? vNormal : -vNormal);
-  float lit = max(dot(n, normalize(uSun)), 0.0);
-  vec3 albedo = vColor.rgb * (0.85 + 0.3 * gnoise(vWorld.xy / 9.0 + vWorld.z / 13.0));
-  // The earth's strata (layers that wave a little), cracks between its blocks, and roots' dark runs.
-  float layer = sin(vWorld.z * 0.32 + 3.0 * gnoise(vWorld.xy / 36.0));
-  vec4 block = voronoiCell(vec2(vWorld.x + vWorld.y * 0.7, vWorld.z * 1.7) / 26.0);
-  vec3 earth = albedo * (0.82 + 0.2 * smoothstep(-0.4, 0.6, layer)) * mix(0.7, 1.0, smoothstep(0.0, 0.06, block.x));
-  earth = mix(earth, vec3(0.14, 0.095, 0.065), 0.5 * smoothstep(0.78, 0.9, gnoise(vec2(vWorld.x * 0.4 + vWorld.y * 0.3, vWorld.z * 0.05))));
-  // A slab's grass: the same tufts and clumps as on the great island.
-  vec3 grass = grassSurface(vWorld.xy, 0.55 + 0.45 * fbm3(vWorld.xy / 70.0));
-  albedo = mix(earth, grass, vColor.a);
-  vec3 col = albedo * (0.42 + 0.75 * lit);
+  float band = step(0.5, fract(vWorld.z / 26.0));
+  vec3 earth = vColor.rgb * mix(0.9, 1.06, band);
+  vec3 grass = vec3(0.36, 0.62, 0.2) * mix(0.9, 1.05, smoothstep(0.4, 0.6, fbm3(vWorld.xy / 90.0)));
+  vec3 albedo = mix(earth, grass, vColor.a);
+  vec3 col = kitLight(albedo, n, vWorld, vec4(vColor.a > 0.5 ? 1.0 : 0.0, 0.0, 1.0, 0.0), 0.0);
   // The void's light from below, in its own colour where the rock hangs over it.
   col += albedo * voidColour(vWorld.xy, uTime) * 0.9 * max(-n.z + 0.25, 0.0);
   col += vec3(1.0, 0.75, 1.0) * revealGlow(vWorld.xy, 0.035) * 0.6;
@@ -551,6 +530,14 @@ void main() {
 ${OUTPUT}
 }
 `;
+
+/** The valley's light for the kit: a bright warm sun over the slabs, the shade a violet of the void. */
+export const VALLEY_MOOD = Object.freeze({
+  key: [1.0, 0.96, 0.9],
+  shade: [0.46, 0.4, 0.66],
+  sky: [0.7, 0.6, 0.9],
+  rim: [1.0, 0.8, 1.0, 0.25],
+});
 
 /** Every glowing disc: a flat instanced quad on the grass, bobbing with its island. */
 export function discGeometry(three, discs) {
@@ -717,6 +704,7 @@ export function dimensionValleyBoard({ three, material, seeded, terrainGrid, rep
     uEmblem: { value: new three.Vector3() },
     uScene: { value: new three.Vector4(0, 0, 1, 1) },
     uSlabs: { value: Array.from({ length: MAX_ISLANDS }, () => new three.Vector4()) },
+    ...kitUniforms(three, VALLEY_MOOD),
   };
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
   const materials = {

@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import * as three from 'three';
 import { flatLayout } from '../board-layout.mjs';
 import { getMatLayout } from '../../sizing/mat-layouts.mjs';
 import { NO_MAT_LAYOUT_ID } from '../../sizing/mat-spec.mjs';
@@ -14,13 +15,12 @@ import {
   MIST_VERTEX,
   MOON,
   PATH_CARD_GAP_PX,
-  PROP_FRAGMENT,
   TERRAIN_FRAGMENT,
   TERRAIN_VERTEX,
   cemeteryProps,
   cemeterySpots,
 } from '../stadium-env-cemetery.mjs';
-import { SCREEN_VIEWS, pointOnCard, screenView } from './stadium-screen.mjs';
+import { SCREEN_VIEWS, geometryPoints, pointOnCard, screenView } from './stadium-screen.mjs';
 
 const PROFILES = [NO_MAT_LAYOUT_ID, 'sim', 'one-player', 'two-player', 'edge-to-edge-two-player'];
 const HALVES = [
@@ -76,13 +76,7 @@ test('cemeterySpots: graves off the path and every card, in the side bands and o
 test('no grave, pine or the bare tree covers a card on screen, in either camera preset', () => {
   for (const view of SCREEN_VIEWS) {
     const { layout, projectors } = screenView(view);
-    const spots = cemeterySpots(layout);
-    const points = [
-      ...spots.graves.flatMap((g) => [[g.x, g.y, 0], [g.x, g.y + g.lean * g.height, g.height]]),
-      ...spots.pines.flatMap((p) => [[p.x - p.r, p.y, p.h * 0.2], [p.x + p.r, p.y, p.h * 0.2], [p.x, p.y - p.r, p.h * 0.2], [p.x, p.y, p.h]]),
-      [spots.tree.x, spots.tree.y, spots.tree.h],
-      [spots.post.x, spots.post.y, spots.post.h],
-    ];
+    const points = geometryPoints(cemeteryProps(cemeterySpots(layout)).build(three), 4);
     for (const { preset, project } of projectors) {
       const hit = pointOnCard(points, layout, project);
       assert.equal(hit, null, `${view.profile} ${view.viewport.w}x${view.viewport.h} ${preset}: ${hit}`);
@@ -97,7 +91,7 @@ test('cemeterySpots is null without a layout; the props build', () => {
 
 test('Old Cemetery shaders declare no GLSL ES 3.00 reserved word and every one has a main', () => {
   const reserved = /\b(?:float|vec[234]|int|bool)\s+(?:flat|half|smooth|noperspective|sample|patch|input|output|filter|active|common|fixed|long|short|out|in|inout|round)\b/;
-  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_VERTEX, TERRAIN_FRAGMENT, PROP_FRAGMENT, MIST_VERTEX, MIST_FRAGMENT]) {
+  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_VERTEX, TERRAIN_FRAGMENT, MIST_VERTEX, MIST_FRAGMENT]) {
     assert.doesNotMatch(shader, reserved);
     assert.match(shader, /void main\(\)/);
   }

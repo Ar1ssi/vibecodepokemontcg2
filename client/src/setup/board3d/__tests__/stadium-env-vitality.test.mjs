@@ -8,22 +8,20 @@ import { environmentFootprints, environmentKeyFor } from '../stadium-environment
 import { tableBounds } from '../table-uv.mjs';
 import {
   BAKE_FIELD_FRAGMENT,
+  BUSH_CARD_GAP_PX,
   MAX_LIMBS,
   MAX_PADS,
   MOTE_FRAGMENT,
   MOTE_VERTEX,
-  PROP_FRAGMENT,
-  PUFF_FRAGMENT,
-  PUFF_VERTEX,
+  PLANT_CARD_GAP_PX,
   TERRAIN_FRAGMENT,
   TERRAIN_VERTEX,
   TREE_CARD_GAP_PX,
   VITALITY_KEY,
   VITALITY_SUN,
-  boughProps,
   clearingDistance,
-  puffGeometry,
-  trunkGeometry,
+  trunkGrid,
+  vitalityProps,
   vitalitySpots,
 } from '../stadium-env-vitality.mjs';
 import { SCREEN_VIEWS, pointOnCard, screenView } from './stadium-screen.mjs';
@@ -74,17 +72,29 @@ test('vitalitySpots: the crown is broad, every pad clear of every card seen from
   }
 });
 
-test('vitalitySpots: bushes stand off the meadow and off every card, clear of the tree', () => {
+test('vitalitySpots: bushes stand off the meadow and off every card and the hand, clear of the tree', () => {
   for (const layout of layouts) {
-    const { bushes, core, tree } = vitalitySpots(layout);
-    assert.ok(bushes.length > 50);
+    const { bushes, core, tree, hand } = vitalitySpots(layout);
+    assert.ok(bushes.length > 40);
+    const obstacles = hand ? [...cardsOf(layout), hand] : cardsOf(layout);
     for (const bush of bushes) {
       assert.ok(clearingDistance(core, bush.x, bush.y) >= -bush.r * 0.3 - 1e-9);
       assert.ok(Math.hypot(bush.x - tree.x, bush.y - tree.y) >= tree.reach);
-      for (const puff of bush.puffs) {
-        for (const card of cardsOf(layout)) assert.ok(distanceToRect(puff.x, puff.y, card) >= puff.r);
-      }
+      for (const rect of obstacles) assert.ok(distanceToRect(bush.x, bush.y, rect) >= bush.reach + BUSH_CARD_GAP_PX - 1e-6);
     }
+  }
+});
+
+test('vitalitySpots: tall grass on the meadow edge, flowers and toadstools, each clear of every card and the hand', () => {
+  for (const layout of layouts) {
+    const { grass, flowers, mushrooms, core, hand } = vitalitySpots(layout);
+    assert.ok(grass.length > 6, `${grass.length} tall grass patches`);
+    assert.ok(flowers.length > 3, `${flowers.length} flower clumps`);
+    const obstacles = hand ? [...cardsOf(layout), hand] : cardsOf(layout);
+    for (const plant of [...grass, ...flowers, ...mushrooms]) {
+      for (const rect of obstacles) assert.ok(distanceToRect(plant.x, plant.y, rect) >= plant.reach + PLANT_CARD_GAP_PX - 1e-6);
+    }
+    for (const patch of grass) assert.ok(clearingDistance(core, patch.x, patch.y) > 0, 'tall grass grows outside the meadow');
   }
 });
 
@@ -145,19 +155,34 @@ test('vitalitySpots is null without a layout', () => {
   assert.equal(vitalitySpots({}), null);
 });
 
-test('the tree, its boughs and every puff build into geometry', () => {
-  const spots = vitalitySpots(layouts[0]);
-  const trunk = trunkGeometry(three, spots.tree);
-  assert.ok(trunk.getAttribute('position').count > 500);
-  assert.equal(trunk.getAttribute('aColor').itemSize, 4);
-  assert.ok(boughProps(spots.tree).vertexCount() > 0);
-  const puffs = puffGeometry(three, spots);
-  assert.equal(puffs.instanceCount, spots.tree.pads.length + spots.bushes.reduce((sum, bush) => sum + bush.puffs.length, 0));
+test('every kit solid builds, and none lands on a card on screen in either camera preset', () => {
+  for (const view of SCREEN_VIEWS) {
+    const { layout, projectors } = screenView(view);
+    const props = vitalityProps(vitalitySpots(layout));
+    const position = props.build(three).getAttribute('position');
+    assert.ok(position.count > 20000);
+    const points = [];
+    for (let i = 0; i < position.count; i += 7) points.push([position.getX(i), position.getY(i), position.getZ(i)]);
+    for (const { preset, project } of projectors) {
+      const hit = pointOnCard(points, layout, project);
+      assert.equal(hit, null, `${view.profile} ${view.viewport.w}x${view.viewport.h} ${preset}: ${hit}`);
+    }
+  }
+});
+
+test('trunkGrid: rings round the spine from the foot to the fork, each closed round itself', () => {
+  const { tree } = vitalitySpots(layouts[0]);
+  const grid = trunkGrid(tree);
+  assert.equal(grid.length, 31);
+  assert.ok(grid.every((row) => row.length === 40 && row.every((p) => p.every(Number.isFinite))));
+  const foot = grid[0].reduce((sum, p) => sum + p[2], 0) / 40;
+  const top = grid[30].reduce((sum, p) => sum + p[2], 0) / 40;
+  assert.ok(foot < 0 && Math.abs(top - tree.fork[2]) < 1e-6);
 });
 
 test('Forest of Vitality shaders declare no GLSL ES 3.00 reserved word and every one has a main', () => {
   const reserved = /\b(?:float|vec[234]|int|bool)\s+(?:flat|half|smooth|noperspective|sample|patch|input|output|filter|active|common|fixed|long|short|out|in|inout|round)\b/;
-  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_VERTEX, TERRAIN_FRAGMENT, PUFF_VERTEX, PUFF_FRAGMENT, PROP_FRAGMENT, MOTE_VERTEX, MOTE_FRAGMENT]) {
+  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_VERTEX, TERRAIN_FRAGMENT, MOTE_VERTEX, MOTE_FRAGMENT]) {
     assert.doesNotMatch(shader, reserved);
     assert.match(shader, /void main\(\)/);
   }

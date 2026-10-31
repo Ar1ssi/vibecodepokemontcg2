@@ -25,7 +25,8 @@ import {
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
 import { arenaRects, craterEmblem, environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
-import { PROP_VERTEX, createPropBuilder, propFragment } from './stadium-env-props.mjs';
+import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
+import { createKitProps } from './stadium-kit.mjs';
 import { tableBounds } from './table-uv.mjs';
 
 export const LAB_KEY = 'full-metal-lab';
@@ -330,6 +331,13 @@ const pipeBands = (props, points, radius) => {
 /** The railing round the dais (open at the stair), its posts, the stair, consoles, tanks and pipes. */
 export function labProps(spots) {
   const props = createPropBuilder();
+  // Design 081: every part in the kit's toon chrome (its metal says how much mirror shows), outlined.
+  props.look({ kind: LOOK.chrome, outline: 1 }, () => labSolids(props, spots));
+  return props;
+}
+
+/** The pipe bundles, the dais's rim and stair, the consoles and the tanks. */
+function labSolids(props, spots) {
   const { dais, outline, stair, consoles, tanks, bundles = [] } = spots;
   for (const bundle of bundles) {
     const dir = [bundle.dx, bundle.dy];
@@ -562,7 +570,6 @@ export function labProps(spots) {
     props.tube(points, BIG_PIPE.radius, BIG_PIPE_STEEL, { sides: 14 });
     pipeBands(props, points, BIG_PIPE.radius);
   }
-  return props;
 }
 
 const DAIS = /* glsl */ `
@@ -708,29 +715,7 @@ ${OUTPUT}
 }
 `;
 
-/** The props' light: the lab's cold key from the far left, a blue-white fill from the lamps above, steel highlights. */
-const PROP_LIGHT = /* glsl */ `
-vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
-  vec3 sun = normalize(uSun);
-  float key = max(dot(n, sun), 0.0);
-  vec3 diffuse = albedo * (vec3(0.16, 0.18, 0.22) + vec3(0.72, 0.75, 0.8) * key + vec3(0.2, 0.26, 0.36) * (0.5 + 0.5 * n.z));
-  // Polished chrome mirrors the lab, as the art's pipes: dark machinery and the deck below a sharp
-  // horizon, pale walls just above it, bright panels round them, the lamps overhead a hard white
-  // stripe along the pipe's crown.
-  vec3 view = normalize(uEye - world);
-  vec3 r = reflect(-view, n);
-  vec3 env = mix(vec3(0.07, 0.11, 0.16), vec3(0.22, 0.3, 0.38), smoothstep(-0.7, -0.06, r.z));
-  env = mix(env, vec3(0.62, 0.72, 0.78), smoothstep(-0.06, 0.0, r.z));
-  env = mix(env, vec3(0.36, 0.45, 0.5), smoothstep(0.08, 0.5, r.z));
-  env += vec3(0.5, 0.62, 0.68) * smoothstep(0.85, 1.0, sin(atan(r.y, r.x) * 5.0)) * smoothstep(0.0, 0.2, r.z) * (1.0 - smoothstep(0.5, 0.8, r.z));
-  env = mix(env, vec3(1.45, 1.52, 1.56), smoothstep(0.9, 0.95, r.z));
-  vec3 col = mix(diffuse, env * mix(vec3(1.0), albedo * 1.5, 0.45), metal * 0.85);
-  col += vec3(0.9, 0.95, 1.0) * pow(max(dot(r, sun), 0.0), 30.0) * metal * 0.5;
-  return col;
-}
-`;
 
-export const PROP_FRAGMENT = propFragment({ light: PROP_LIGHT, reveal: LENS_BLUE });
 
 const NO_SPOTS = { dais: null, outline: [], stair: null, consoles: [], tanks: [], bundles: [], emblem: null };
 
@@ -745,15 +730,14 @@ export function fullMetalLabBoard({ three, material, terrainGrid, replaceGeometr
   const materials = {
     terrain: make(TERRAIN_VERTEX, TERRAIN_FRAGMENT),
     // Both sides: a tube's winding turns with its frame.
-    props: make(PROP_VERTEX, PROP_FRAGMENT, { side: three.DoubleSide }),
     bakeField: make(FULLSCREEN_VERTEX, BAKE_FIELD_FRAGMENT, bakeOptions),
     bakeLight: make(FULLSCREEN_VERTEX, bakeLightFragment(), bakeOptions),
   };
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
-  const props = new three.Mesh(new three.BufferGeometry(), materials.props);
+  const kit = createKitProps({ three, material, own, mood: 'indoor', reveal: 'vec3(0.6, 0.85, 1.0)' });
   return {
-    objects: [terrain, props],
-    materials: Object.values(materials),
+    objects: [terrain, ...kit.objects],
+    materials: [...Object.values(materials), ...kit.materials],
     bakeField: materials.bakeField,
     bakeLight: materials.bakeLight,
     spots: (layout) => labSpots(layout) ?? NO_SPOTS,
@@ -767,8 +751,7 @@ export function fullMetalLabBoard({ three, material, terrainGrid, replaceGeometr
       });
       own.uEmblem.value.set(emblem?.x ?? 0, emblem?.y ?? 0, emblem?.r ?? 0);
       replaceGeometry(terrain, terrainGrid(bounds));
-      props.visible = Boolean(dais);
-      if (dais) replaceGeometry(props, labProps(spots).build(three));
+      kit.set(dais ? labProps(spots) : null);
     },
   };
 }

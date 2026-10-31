@@ -13,8 +13,9 @@
 // on it), B a rock's tone 0..1, A the kind (0 grass, 1 square, 2 cliff, 3 pool); the shared light
 // bake adds normals, occlusion and the sun's shadow. Per frame: TERRAIN paints the grass, the
 // square, the cliff and its waterfall, and the shadows of the hall, tent, kiosks and trees; POOL one
-// sheet of water; PROPS the hall, tent, kiosks, flag, benches, trees and boulders
-// (stadium-env-props); MIST drifts off the pool.
+// sheet of water; the kit's meshes (design 081: one toon light, outlines, contact shadows) the hall,
+// tent, kiosks, flag and benches, and the kit's own trees, boulders, bushes and flowers; MIST drifts
+// off the pool. The grass and paving are painted clean: no tufts, grain or stains.
 import {
   FILTERING,
   FLOW_STREAKS,
@@ -30,10 +31,12 @@ import {
   VORONOI,
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
-import { PROP_VERTEX, createPropBuilder, propFragment } from './stadium-env-props.mjs';
+import { createPropBuilder } from './stadium-env-props.mjs';
+import { createKitProps } from './stadium-kit.mjs';
+import { measureAsset, placeAsset } from './stadium-kit-assets.mjs';
 import { wallBand, windowRun } from './stadium-env-buildings.mjs';
 import { boardContext, hash } from './stadium-env-spots.mjs';
-import { BLADES, BOX_SHADOW, EDGE_HAZE, PAVING, STANDARD_TERRAIN_VERTEX } from './stadium-env-surfaces.mjs';
+import { BOX_SHADOW, EDGE_HAZE, PAVING, STANDARD_TERRAIN_VERTEX } from './stadium-env-surfaces.mjs';
 
 export const COMMUNITY_KEY = 'community-center';
 /** The day's sun (toward it, table frame): high, from the far left, so the hall's blue shade falls across the square, as the art's. */
@@ -107,7 +110,28 @@ export function communitySpots(layout) {
     if (Math.hypot(x - pool.x, y - pool.y) < pool.r * 1.3 || x > hall.x0 - 4 * u && y > hall.y0 - 20 * u && y < hall.y1 + 20 * u) continue;
     boulders.push({ x, y, r: (9 + 16 * hash(k, 9, 2) ** 1.5) * u });
   }
-  return { ...ctx, plaza, front, hall, canopy, banner, flag, tent, kiosks, cliffFoot, cliffStart, fall, pool, trees, benches, boulders };
+  // Design 081: bushes and flower clumps (the kit's) on the grass among the trees and kiosks, clear
+  // of the cards, the square and everything standing there.
+  const taken = [
+    { x: tent.x, y: tent.y, r: tent.half * 1.45 },
+    ...kiosks.map((k) => ({ x: k.x, y: k.y, r: Math.hypot(k.w, k.d) / 2 })),
+    ...trees.map((t) => ({ x: t.x, y: t.y, r: t.r * 1.1 })),
+  ];
+  const plants = [];
+  for (let k = 0; k < 160 && plants.length < 12; k += 1) {
+    const roll = (salt) => hash(k, 21, salt);
+    const x = scene.x + roll(1) * scene.w;
+    const y = scene.y + roll(2) * scene.h;
+    const kind = roll(3) < 0.45 ? 'bush' : 'flowers';
+    const size = (kind === 'bush' ? 18 + 8 * roll(4) : 12 + 4 * roll(4)) * u;
+    const { reach } = measureAsset(kind, { size });
+    const onGrass = x > plaza.x1 + reach + 8 * u || (y > plaza.y1 + reach + 8 * u && x > cliffFoot + 60 * u);
+    if (!onGrass || !ctx.inScene(x, y, reach) || !ctx.clear(x, y, reach, 14 * u)) continue;
+    if (taken.some((t) => Math.hypot(t.x - x, t.y - y) < t.r + reach)) continue;
+    plants.push({ kind, x, y, size, reach, seed: roll(5) });
+    taken.push({ x, y, r: reach * 1.2 });
+  }
+  return { ...ctx, plaza, front, hall, canopy, banner, flag, tent, kiosks, cliffFoot, cliffStart, fall, pool, trees, benches, boulders, plants };
 }
 
 const COMMUNITY = /* glsl */ `
@@ -203,10 +227,8 @@ ${TERRAIN_UNIFORMS}
 ${NOISE}
 ${FOOTPRINTS}
 ${FILTERING}
-${VORONOI}
 ${REVEAL}
 ${PAVING}
-${BLADES}
 ${EDGE_HAZE}
 ${BOX_SHADOW}
 ${FLOW_STREAKS}
@@ -229,20 +251,13 @@ void main() {
   vec3 sun = normalize(uSun);
   float lit = clamp(dot(n, sun) / sun.z, 0.0, 1.4) * mix(0.62, 1.0, light.a);
 
-  // The grass: soft green in broad drifts under tufts of blades, clover paler among them.
-  vec3 col = mix(GRASS_DARK * 1.2, GRASS, 0.3 + 0.7 * smoothstep(0.3, 0.7, fbm3(p / 120.0 + 1.0)));
-  col *= 0.88 + 0.24 * fbm3(p / 30.0 + 4.0);
-  vec4 tuft = voronoiCell(p / 12.0 + 2.3);
-  vec2 blades = bladeFan(-tuft.zw * 12.0, tuft.y, 9.0 * uUnit);
-  col = mix(col, mix(GRASS_DARK, GRASS_LIT, blades.y), blades.x * step(fract(tuft.y * 23.1), 0.62) * 0.85);
-  col = mix(col, GRASS_LIT * 1.1, 0.25 * smoothstep(0.62, 0.7, fbm3(p / 19.0 + 8.0)));
+  // The grass (design 081: painted, not textured): two greens in broad soft drifts.
+  vec3 col = mix(GRASS_DARK * 1.2, GRASS, 0.35 + 0.65 * smoothstep(0.35, 0.65, fbm3(p / 160.0 + 1.0)));
 
   // The square: big pale slabs a shade apart, joints darker and blue in the shade, a kerb of lighter stone.
   if (kind > 0.5 && kind < 1.5) {
     vec3 slab = paving(p, vec2(132.0, 100.0) * uUnit, 0.5);
-    vec3 stone = mix(PLAZA * 0.9, PLAZA * 1.05, slab.y);
-    stone *= 0.94 + 0.12 * fbm3(p / 26.0 + slab.y * 9.0);
-    stone *= 0.97 + 0.06 * grain(p, 3.4);
+    vec3 stone = mix(PLAZA * 0.92, PLAZA * 1.05, slab.y);
     // Wide, faint joints; a darker, finer line down the middle of some, as a cut control joint.
     stone = mix(stone, stone * 0.8, 1.0 - smoothstep(0.4, 1.4, slab.x));
     stone *= 1.0 - 0.07 * step(0.6, slab.y) * (1.0 - smoothstep(0.0, 1.1, abs(slab.z - 0.5) * 132.0 * uUnit));
@@ -262,12 +277,9 @@ void main() {
     float facing = clamp(dot(n, sun), 0.0, 1.0);
     vec3 rock = mix(ROCK_SHADE, ROCK_MID, smoothstep(0.1, 0.5, facing));
     rock = mix(rock, ROCK_LIT, smoothstep(0.5, 0.9, facing));
-    rock *= 0.82 + 0.4 * field.b;
-    rock *= 0.9 + 0.2 * fbm3(p / 17.0);
-    float strata = smoothstep(0.45, 0.62, gnoise(vec2(p.y / 9.0 + 3.0 * gnoise(p / 44.0), p.x / 80.0)));
-    rock *= 1.0 - 0.07 * strata;
+    rock *= 0.86 + 0.3 * field.b;
     float low = 1.0 - smoothstep(0.0, 36.0, field.r);
-    rock = mix(rock, ROCK_MOSS * (0.8 + 0.4 * gnoise(p / 7.0)), 0.55 * low * smoothstep(0.3, 0.7, fbm3(p / 40.0 + 3.0)));
+    rock = mix(rock, ROCK_MOSS, 0.5 * low * smoothstep(0.35, 0.65, fbm3(p / 60.0 + 3.0)));
     col = mix(base, rock, smoothstep(2.0, 10.0, field.r));
     // The waterfall: pale blue-white water sliding down the chute, in streaks that run downhill.
     float across = abs(p.y - uFall.x);
@@ -353,7 +365,7 @@ void main() {
   col += vec3(1.0, 0.98, 0.9) * pow(max(dot(reflect(-sun, n), view), 0.0), 70.0) * 0.3;
   // Foam where the fall lands, and a rim of it round the stones.
   float foam = exp(-pow(distance(p, landing) / (uPool.x * 0.34), 2.0)) * (0.5 + 0.5 * gnoise(p / 6.0 + t)) * 0.8;
-  foam += (1.0 - smoothstep(uPool.x * 0.9, uPool.x * 1.03, fromCentre)) * smoothstep(uPool.x * 0.82, uPool.x * 0.9, fromCentre) * 0.5 * grain(p, 5.0);
+  foam += (1.0 - smoothstep(uPool.x * 0.9, uPool.x * 1.03, fromCentre)) * smoothstep(uPool.x * 0.82, uPool.x * 0.9, fromCentre) * 0.5;
   col = mix(col, vec3(0.78, 0.87, 0.93), clamp(foam, 0.0, 1.0) * 0.5);
   col += vec3(0.9, 1.0, 1.05) * revealGlow(p, 0.035) * 0.6;
   gl_FragColor = vec4(col, 1.0);
@@ -381,10 +393,8 @@ const KIOSK_G = [0.0, 0.305, 0.089, 0.3];
 const KIOSK_R = [0.934, 0.062, 0.093, 0.3];
 const KIOSK_TOP = [0.88, 0.9, 0.92, 0.2];
 const CONCRETE = [0.5, 0.55, 0.62, 0];
-const TRUNK = [0.28, 0.2, 0.16, 0];
-const FOLIAGE = [0.087, 0.274, 0.077, 0.05];
-const FOLIAGE_LIGHT = [0.16, 0.44, 0.1, 0.05];
-const BOULDER = [0.45, 0.4, 0.45, 0.07];
+const TREE = Object.freeze({ leaf: [0.087, 0.274, 0.077, 0], leafLight: [0.16, 0.44, 0.1, 0], bark: [0.28, 0.2, 0.16, 0], barkDark: [0.2, 0.14, 0.11, 0] });
+const BOULDER = Object.freeze({ body: [0.45, 0.4, 0.45, 0], light: [0.62, 0.57, 0.6, 0], dark: [0.3, 0.27, 0.32, 0] });
 
 /**
  * The hall: a white block with a ground floor of glazing, a ribbon of upper windows, the red-brown
@@ -487,71 +497,29 @@ function communityTent(props, spots) {
 
 /** Round trees: a trunk and a crown of a few overlapping balls, the boulders by the pool. */
 function communityTrees(props, spots) {
-  const { trees, boulders, u } = spots;
+  const { trees, boulders, plants, u } = spots;
+  const kit = { sun: COMMUNITY_SUN };
+  // The terrain shades under the trees itself (uTrees), so they cast no contact shadow of their own.
   for (const tree of trees) {
-    props.tube([[tree.x, tree.y, -2], [tree.x, tree.y, tree.z * 0.7]], [4.6 * u, 3 * u], TRUNK, { sides: 8 });
-    const balls = [[0, 0, 0, 1], [-0.52, 0.2, -0.16, 0.74], [0.5, -0.24, -0.1, 0.76], [0.08, 0.46, 0.2, 0.62], [-0.1, -0.5, 0.14, 0.66]];
-    balls.forEach(([dx, dy, dz, scale], k) => {
-      props.sphere({ x: tree.x + dx * tree.r, y: tree.y + dy * tree.r, z: tree.z + dz * tree.r, r: tree.r * scale, color: k % 2 ? FOLIAGE_LIGHT : FOLIAGE, sides: 14, rings: 9, squash: 0.88 });
-    });
+    placeAsset(props, 'treeRound', { ...kit, x: tree.x, y: tree.y, size: tree.r, height: tree.z + tree.r * 0.62, seed: tree.seed * 997, colors: TREE, shadows: false });
   }
-  for (const rock of boulders) props.sphere({ x: rock.x, y: rock.y, z: -3, r: rock.r, color: BOULDER, sides: 12, rings: 8, squash: 0.72 });
+  boulders.forEach((rock, k) => placeAsset(props, 'boulder', { ...kit, x: rock.x, y: rock.y, z: -2 * u, size: rock.r * 1.1, seed: k * 13 + 5, yaw: k, colors: BOULDER }));
+  for (const plant of plants) {
+    const colors = plant.kind === 'bush' ? { leaf: TREE.leaf, leafLight: TREE.leafLight } : undefined;
+    placeAsset(props, plant.kind, { ...kit, x: plant.x, y: plant.y, size: plant.size, seed: plant.seed * 991, colors, petals: ['#fff7ec', '#ffd84a', '#f6a6c8'] });
+  }
 }
 
 /** Everything solid, as one prop geometry. */
 export function communityProps(spots) {
   const props = createPropBuilder();
-  communityHall(props, spots);
-  communityTent(props, spots);
+  props.look({ outline: 1 }, () => {
+    communityHall(props, spots);
+    communityTent(props, spots);
+  });
   communityTrees(props, spots);
   return props;
 }
-
-/** The props in the day: sun and blue sky, white walls shading blue, glass that shows the sky, foliage in leafy lumps. */
-const PROP_LIGHT = /* glsl */ `
-// The hall's roof height (uHeights.x): the membrane laid in sheets, stained by rain.
-uniform vec4 uHeights;
-vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
-  vec3 sun = normalize(uSun);
-  vec3 view = normalize(uEye - world);
-  float lit = max(dot(n, sun), 0.0);
-  vec3 sky = vec3(0.5, 0.6, 0.86) * (0.62 + 0.38 * n.z);
-  if (n.z > 0.97 && metal < 0.02 && abs(world.z - uHeights.x) < 1.5) {
-    float sheet = world.y / 44.0;
-    float toSeam = min(fract(sheet), 1.0 - fract(sheet)) * 44.0;
-    albedo *= (0.92 + 0.16 * hash12(vec2(floor(sheet), 6.0))) * (0.9 + 0.2 * fbm3(world.xy / 50.0)) * (1.0 - 0.3 * (1.0 - smoothstep(0.4, 1.5, toSeam)));
-  }
-  vec3 col = albedo * (sky + vec3(1.0, 0.97, 0.9) * lit * 0.78);
-  if (metal > 0.6) {
-    vec3 r = reflect(-view, n);
-    vec3 refl = mix(vec3(0.45, 0.62, 0.85), vec3(0.88, 0.95, 1.02), clamp(r.z + 0.2, 0.0, 1.0));
-    float fres = pow(1.0 - abs(dot(n, view)), 2.0);
-    col = mix(albedo * (0.7 + 0.5 * lit), refl * 0.85, 0.2 + 0.5 * fres);
-    col += vec3(1.0) * pow(max(dot(reflect(-sun, n), view), 0.0), 50.0) * 0.6;
-  } else if (metal > 0.04 && metal < 0.06) {
-    // Foliage: leaf clumps, each lit on its own sunward side, dark hollows between.
-    vec2 q = world.xy / 13.0 + world.z / 11.0;
-    q += 0.35 * (vec2(gnoise(q * 1.7), gnoise(q * 1.7 + 9.1)) - 0.5);
-    vec4 lobe = voronoiCell(q);
-    float inLobe = 1.0 - smoothstep(0.34, 0.62, length(lobe.zw));
-    float bulge = dot(normalize(n + vec3(-lobe.zw, 0.0) * 0.6 * inLobe), sun);
-    float crown = smoothstep(-0.3, 0.7, n.z);
-    col = albedo * (0.4 + 0.9 * smoothstep(-0.1, 0.8, bulge)) * mix(0.64, 1.0, smoothstep(0.0, 0.2, lobe.x)) * (sky * 0.5 + 0.55) * mix(0.55, 1.05, crown);
-    col += vec3(0.07, 0.12, 0.02) * smoothstep(0.65, 0.95, bulge) * crown;
-  } else if (metal > 0.06 && metal < 0.08) {
-    // A boulder: rough, mossy where it faces up.
-    float rough = fbm3(world.xy / 6.0 + world.z / 5.0);
-    col = albedo * (0.7 + 0.5 * rough) * (sky * 0.6 + lit * 0.8);
-    col = mix(col, vec3(0.1, 0.22, 0.1) * (sky * 0.5 + 0.5), smoothstep(0.55, 0.9, n.z) * smoothstep(0.4, 0.6, rough) * 0.7);
-  }
-  // Grime at a wall's foot.
-  col *= mix(0.84, 1.0, smoothstep(0.0, 12.0, world.z));
-  return col;
-}
-`;
-
-export const PROP_FRAGMENT = propFragment({ light: `${VORONOI}
-${PROP_LIGHT}`, reveal: 'vec3(0.85, 1.0, 1.05)' });
 
 /** Mist rising off the pool where the fall lands: pale soft puffs drifting up and out. */
 export const MIST_VERTEX = /* glsl */ `
@@ -606,19 +574,18 @@ export function communityCenterBoard({ three, material, seeded, terrainGrid, rep
   const materials = {
     terrain: make(TERRAIN_VERTEX, TERRAIN_FRAGMENT),
     pool: make(POOL_VERTEX, POOL_FRAGMENT, { polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 2 }),
-    props: make(PROP_VERTEX, PROP_FRAGMENT, { side: three.DoubleSide }),
     mist: make(MIST_VERTEX, MIST_FRAGMENT, { transparent: true, depthWrite: false, blending: three.AdditiveBlending }),
     bakeField: make(FULLSCREEN_VERTEX, BAKE_FIELD_FRAGMENT, bakeOptions),
     bakeLight: make(FULLSCREEN_VERTEX, bakeLightFragment(), bakeOptions),
   };
+  const kit = createKitProps({ three, material, own, mood: 'day', reveal: 'vec3(0.85, 1.0, 1.05)' });
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
   const pool = new three.Mesh(new three.BufferGeometry(), materials.pool);
-  const props = new three.Mesh(new three.BufferGeometry(), materials.props);
   const mist = new three.Points(seeded(MIST_COUNT), materials.mist);
-  mist.renderOrder = 2;
+  mist.renderOrder = 3;
   return {
-    objects: [terrain, pool, props, mist],
-    materials: Object.values(materials),
+    objects: [terrain, pool, ...kit.objects, mist],
+    materials: [...Object.values(materials), ...kit.materials],
     bakeField: materials.bakeField,
     bakeLight: materials.bakeLight,
     spots: (layout) => communitySpots(layout),
@@ -660,8 +627,7 @@ export function communityCenterBoard({ three, material, seeded, terrainGrid, rep
       if (basin) {
         replaceGeometry(pool, new three.PlaneGeometry(basin.r * 2.2, basin.r * 2.2).translate(basin.x, basin.y, 0));
       }
-      props.visible = Boolean(spots);
-      if (spots) replaceGeometry(props, communityProps(spots).build(three));
+      kit.set(spots ? communityProps(spots) : null);
     },
   };
 }
