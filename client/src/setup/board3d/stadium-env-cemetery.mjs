@@ -16,6 +16,7 @@
 // moonlight; PROPS are the headstones, obelisks, the post, the pines and the bare tree
 // (stadium-env-props); MIST is a sheet of drifting fog low over the ground.
 import {
+  FILTERING,
   FOOTPRINTS,
   FULLSCREEN_VERTEX,
   NOISE,
@@ -27,20 +28,20 @@ import {
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
 import { environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
+import { GRASS as GRASS_KIT } from './stadium-env-ground.mjs';
 import { createPropBuilder } from './stadium-env-props.mjs';
 import { createKitProps } from './stadium-kit.mjs';
 import { measureAsset, placeAsset } from './stadium-kit-assets.mjs';
 
 /**
- * Moonlight for the kit (design 081): the art's pale teal moon, a deep teal night in the shade, a
- * bright teal rim where an edge turns from the moon, as the art's stones glow.
+ * Moonlight for the kit (designs 081, 082): the art's pale teal moon, a deep teal night filling the
+ * shade, the stones' sheen catching the moon.
  */
 export const MOONLIT = Object.freeze({
-  key: [0.7, 0.95, 0.9],
-  shade: [0.28, 0.4, 0.46],
-  sky: [0.3, 0.45, 0.5],
-  rim: [0.5, 0.85, 0.8, 0.45],
-  outline: [0.24, 0.3, 0.32, 1.1],
+  key: [0.72, 0.96, 0.92],
+  sky: [0.17, 0.25, 0.28],
+  bounce: [0.06, 0.09, 0.1],
+  sheen: [0.4, 0.6],
   shadow: [0.38, 0.46, 0.5, 0.55],
 });
 import { tableBounds } from './table-uv.mjs';
@@ -390,8 +391,10 @@ vec3 edgeHaze(vec3 col, vec2 uv) {
 export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
+${FILTERING}
 ${FOOTPRINTS}
 ${REVEAL}
+${GRASS_KIT}
 ${PALETTE}
 uniform vec4 uCore;
 varying vec2 vPos;
@@ -399,6 +402,7 @@ varying vec2 vUv;
 varying float vGrowth;
 void main() {
   vec2 p = vPos;
+  filterPixel = pixelSize(p);
   if (revealBurned(p) * exitKeep(p) < 0.5) discard;
   vec4 field = texture2D(uField, vUv);
   vec4 light = texture2D(uLight, vUv);
@@ -413,12 +417,12 @@ void main() {
   // the art's pale yellow-green. Design 080: round the cards the grass is short (few, faint tufts),
   // so its speckle doesn't run under the cards; the long glowing tufts grow out among the graves.
   float calm = fieldCalm(p, 110.0);
-  // Design 081: the grass painted in two teals in broad soft patches; the lit tufts are the kit's
-  // tall grass, standing among the graves.
-  vec3 col = mix(GROUND, GROUND_LIT, smoothstep(0.35, 0.75, fbm3(p / 160.0 + 1.0)));
-  // The path: worn earth, paler down its middle, ruts along it, its edge fraying into the grass.
-  float pathEdge = smoothstep(2.0, -4.0, field.g);
-  vec3 earth = mix(EARTH_DARK, EARTH, smoothstep(-4.0, -20.0, field.g));
+  // Design 082: BDSP's clover grass in the night's two teals; the lit tufts are the kit's tall grass,
+  // standing among the graves.
+  vec3 col = cloverGrass(p, mix(GROUND, GROUND_LIT, smoothstep(0.35, 0.75, fbm3(p / 160.0 + 1.0))), calm);
+  // The path: worn earth, paler down its middle, the grass fringing over its edge.
+  float pathEdge = 1.0 - grassFringe(-field.g, p, 6.0);
+  vec3 earth = mix(EARTH_DARK, EARTH, smoothstep(-4.0, -20.0, field.g)) * (1.0 - 0.25 * fringeShade(-field.g, 6.0));
   // Grass creeps back over it in patches where few walk.
   float regrown = smoothstep(0.62, 0.75, fbm3(p / 45.0 + 9.0)) * 0.8;
   float onPath = pathEdge * (1.0 - regrown);
@@ -458,48 +462,28 @@ ${OUTPUT}
 const STONE_COLOR = [0.5, 0.68, 0.7, 0.1];
 const STONE_PALE = [0.7, 0.88, 0.86, 0.1];
 const MOSS_COLOR = [0.12, 0.26, 0.2, 0];
-const PINE_COLOR = [0.045, 0.12, 0.13, 0];
+const PINE_COLOR = [0.05, 0.14, 0.14, 0];
 const DEAD_WOOD = [0.62, 0.78, 0.76, 0];
 const WOOD = [0.2, 0.17, 0.16, 0];
 
-/** A headstone: a slab with a rounded top, leaning a little, moss on its crown. */
+/**
+ * A headstone, BDSP's: a slab with every edge rounded, leaning back a little (higher up, further from
+ * the player), a rounded or pointed top; moss on the crown of some.
+ */
 const headstone = (props, g) => {
-  const c = Math.cos(g.yaw);
-  const s = Math.sin(g.yaw);
-  // Leaning back: higher up, further from the player.
-  const tip = (z) => g.lean * z;
-  const at = (x, y, z) => [g.x + x * c - (y + tip(z)) * s, g.y + x * s + (y + tip(z)) * c, z];
   const halfW = g.width / 2;
   const shoulder = g.height - halfW;
   const half = g.thick / 2;
-  // The body: front, back and sides up to the shoulder (outlined: its quads close a solid).
-  props.look({ outline: 1, sheets: true }, () => {
-    props.quad(at(-halfW, -half, 0), at(halfW, -half, 0), at(halfW, -half, shoulder), at(-halfW, -half, shoulder), STONE_COLOR);
-    props.quad(at(halfW, half, 0), at(-halfW, half, 0), at(-halfW, half, shoulder), at(halfW, half, shoulder), STONE_COLOR);
-    props.quad(at(halfW, -half, 0), at(halfW, half, 0), at(halfW, half, shoulder), at(halfW, -half, shoulder), STONE_PALE);
-    props.quad(at(-halfW, half, 0), at(-halfW, -half, 0), at(-halfW, -half, shoulder), at(-halfW, half, shoulder), STONE_PALE);
-  });
-  // Moss creeping up its foot, front and back, a little proud of the face.
-  const moss = Math.min(shoulder * 0.32, 16);
-  const proud = 0.8;
-  props.quad(at(-halfW, -half - proud, 0), at(halfW, -half - proud, 0), at(halfW * 0.7, -half - proud, moss), at(-halfW * 0.8, -half - proud, moss * 0.8), MOSS_COLOR);
-  props.quad(at(halfW, half + proud, 0), at(-halfW, half + proud, 0), at(-halfW * 0.6, half + proud, moss * 0.9), at(halfW * 0.8, half + proud, moss * 0.7), MOSS_COLOR);
-  // The top, front and back, joined by its rim: a half disc, or a pointed arch (kind 1).
-  const arch = [[1, 0], [0.55, 0.78], [0, 1.25], [-0.55, 0.78], [-1, 0]];
-  const steps = g.kind === GRAVE.pointed ? arch.length - 1 : 10;
-  const topAt = (k) =>
-    g.kind === GRAVE.pointed
-      ? [arch[k][0] * halfW, shoulder + arch[k][1] * halfW]
-      : [Math.cos((Math.PI * k) / steps) * halfW, shoulder + Math.sin((Math.PI * k) / steps) * halfW];
-  props.look({ outline: 1, sheets: true }, () => {
-    for (let k = 0; k < steps; k += 1) {
-      const p0 = topAt(k);
-      const p1 = topAt(k + 1);
-      // Each a triangle (the quad's last corner repeats its third, so its normal stays defined).
-      props.quad(at(p0[0], -half, p0[1]), at(p1[0], -half, p1[1]), at(0, -half, shoulder), at(0, -half, shoulder), STONE_COLOR);
-      props.quad(at(p1[0], half, p1[1]), at(p0[0], half, p0[1]), at(0, half, shoulder), at(0, half, shoulder), STONE_COLOR);
-      const mossy = (p0[1] + p1[1]) / 2 > shoulder + halfW * 0.75 && g.seed > 0.4;
-      props.quad(at(p0[0], -half, p0[1]), at(p0[0], half, p0[1]), at(p1[0], half, p1[1]), at(p1[0], -half, p1[1]), mossy ? MOSS_COLOR : STONE_PALE);
+  const crown = g.seed > 0.4 ? MOSS_COLOR : STONE_PALE;
+  props.at({ x: g.x, y: g.y, yaw: g.yaw, lean: [-Math.atan(g.lean), 0] }, () => {
+    props.roundBox({ x: 0, y: 0, z0: 0, z1: shoulder + half, hw: halfW, hh: half, r: half * 0.5, color: STONE_COLOR, topColor: STONE_PALE });
+    if (g.kind === GRAVE.pointed) {
+      // A pointed arch: a low four-sided cap over the slab's shoulder.
+      const points = [[-halfW, -half, shoulder], [halfW, -half, shoulder], [halfW, half, shoulder], [-halfW, half, shoulder], [0, 0, shoulder + halfW * 1.2]];
+      props.facets(points, [[0, 1, 4], [1, 2, 4], [2, 3, 4], [3, 0, 4]], (centre, n) => (n[2] > 0.6 ? crown : STONE_COLOR));
+    } else {
+      // A half disc: a cylinder lying through the slab at its shoulder, its round side the crown.
+      props.at({ z: shoulder, lean: [Math.PI / 2, 0] }, () => props.cylinder({ x: 0, y: 0, z0: -half, z1: half, r: halfW, color: crown, capColor: STONE_COLOR, sides: 20 }));
     }
   });
 };
@@ -515,7 +499,7 @@ const pine = (props, p) => {
     seed: p.seed * 977,
     sun: MOON,
     shadows: false,
-    colors: { pine: PINE_COLOR, pineLight: [0.08, 0.2, 0.2, 0], pineDark: [0.03, 0.08, 0.09, 0], bark: WOOD },
+    colors: { pine: PINE_COLOR, pineLight: [0.08, 0.2, 0.2, 0], pineDark: [0.03, 0.08, 0.09, 0], tip: [0.16, 0.34, 0.27, 0], bark: WOOD },
   });
 };
 
@@ -535,8 +519,8 @@ const bareTree = (props, t, u) => {
 
 /** A broken wooden grave post: a leaning upright, its crossbar snapped short. */
 const brokenPost = (props, p, u) => {
-  props.box({ x: p.x, y: p.y, z0: -2, z1: p.h, hw: 5 * u, hh: 5 * u, yaw: 0.3, color: WOOD });
-  props.box({ x: p.x + 9 * u, y: p.y + 3 * u, z0: p.h * 0.66, z1: p.h * 0.66 + 9 * u, hw: 13 * u, hh: 4 * u, yaw: 0.3, color: WOOD });
+  props.roundBox({ x: p.x, y: p.y, z0: -2, z1: p.h, hw: 5 * u, hh: 5 * u, r: 1.6 * u, yaw: 0.3, color: WOOD });
+  props.roundBox({ x: p.x + 9 * u, y: p.y + 3 * u, z0: p.h * 0.66, z1: p.h * 0.66 + 9 * u, hw: 13 * u, hh: 4 * u, r: 1.6 * u, yaw: 0.3, color: WOOD });
 };
 
 /** Every grave, the pines, the bare tree and the post: one prop geometry. */
@@ -546,10 +530,8 @@ export function cemeteryProps({ graves, pines, tree, post, tufts = [], u }) {
     headstone(props, g);
   }
   for (const p of pines) pine(props, p);
-  props.look({ outline: 1 }, () => {
-    bareTree(props, tree, u);
-    brokenPost(props, post, u);
-  });
+  bareTree(props, tree, u);
+  brokenPost(props, post, u);
   for (const t of tufts) {
     placeAsset(props, 'tallGrass', { x: t.x, y: t.y, size: t.size, blade: 16 * u, seed: t.seed * 991, sun: MOON, colors: { grass: [0.05, 0.16, 0.15, 0], tip: [0.62, 0.78, 0.36, 0] } });
   }

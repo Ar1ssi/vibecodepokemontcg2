@@ -28,6 +28,7 @@ import {
   VORONOI,
 } from './stadium-environment-glsl.mjs';
 import { RIDGE_HALF_WIDTH } from './stadium-environment-layout.mjs';
+import { STRATA } from './stadium-env-ground.mjs';
 import { createPropBuilder } from './stadium-env-props.mjs';
 import { RISE_LEAN, boardContext, hash } from './stadium-env-spots.mjs';
 import { measureAsset, placeAsset } from './stadium-kit-assets.mjs';
@@ -405,6 +406,7 @@ export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
 ${REVEAL}
+${STRATA}
 ${BOWL}
 ${EMBLEM}
 ${FLASH}
@@ -435,6 +437,10 @@ void main() {
   vec3 rock = mix(vec3(0.04, 0.046, 0.066), vec3(0.15, 0.165, 0.2), smoothstep(0.4, 0.52, facing));
   rock = mix(rock, vec3(0.37, 0.4, 0.46), smoothstep(0.8, 0.92, facing));
   rock *= 0.84 + 0.32 * tone;
+  // Design 082: Mt. Coronet's rock, laid in BDSP's strata: courses each its own tone, a dark groove
+  // under each, on the walls and the slopes (the floor and the summits' snow cover them).
+  vec2 course = strata(ground, p, 22.0);
+  rock *= mix(0.62, 1.0, course.x) * (0.9 + 0.2 * course.y);
   float away = clamp(-dot(n.xy, normalize(sun.xy)), 0.0, 1.0);
   rock += vec3(0.01, 0.03, 0.045) * smoothstep(0.1, 0.45, away);
   // Summits and high crags catch the light; the low slopes sink into the storm's gloom.

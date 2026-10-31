@@ -218,22 +218,21 @@ function adRuns({ ring, boards }) {
 }
 
 /**
- * The arena under its rig for the kit (design 081): a cool white key from the lamps overhead, a deep
- * teal shade from the dark hall, a bright cyan rim off the screens.
+ * The arena under its rig for the kit (designs 081, 082): a cool white key from the lamps overhead,
+ * a deep teal fill from the dark hall.
  */
 export const ARENA_LIGHTS = Object.freeze({
   key: [0.9, 0.96, 1.0],
-  shade: [0.24, 0.36, 0.42],
-  sky: [0.35, 0.5, 0.56],
-  rim: [0.6, 0.9, 1.0, 0.3],
-  outline: [0.2, 0.24, 0.3, 1.1],
+  sky: [0.24, 0.32, 0.36],
+  bounce: [0.12, 0.16, 0.18],
+  sheen: [0.4, 0.7],
   shadow: [0.3, 0.38, 0.45, 0.55],
 });
 
 /** The ring's corner posts and ropes, the rig's truss and lamps, and the ad boards' rails. */
 export function arenaProps(spots) {
   const props = createPropBuilder();
-  props.look({ kind: LOOK.chrome, outline: 1 }, () => arenaSolids(props, spots));
+  props.look({ kind: LOOK.chrome }, () => arenaSolids(props, spots));
   return props;
 }
 

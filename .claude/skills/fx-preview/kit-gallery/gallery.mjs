@@ -1,13 +1,14 @@
-// The Stadium kit's asset gallery (design 081): every asset through the real kit shaders and the
-// board's plate path (a HalfFloat target, then Neutral tone mapping on the blit), seen by a camera
-// like the 12° tilt preset, on a meadow, a sand strip, a plaza and a pond. Captured by
-// rec/rec-stadium-kit.mjs. Query: mood (MOODS key), outline (px), zoom, cx / cy (where the camera
-// looks), tilt (deg), dist, w / h, t (the clock, for sway), grass (#hex).
+// The Stadium kit's asset gallery (designs 081, 082): every asset through the real kit shaders and
+// the board's plate path (a HalfFloat target, then Neutral tone mapping on the blit), seen by a
+// camera like the 12° tilt preset, on a meadow, a sand strip, a plaza and a pond. Captured by
+// rec/rec-stadium-kit.mjs. Query: mood (MOODS key), zoom, cx / cy (where the camera looks), tilt
+// (deg), dist, w / h, t (the clock, for sway), grass (#hex).
 import * as three from 'three';
 import { createPropBuilder } from '/client/src/setup/board3d/stadium-env-props.mjs';
 import { createKitProps, paint } from '/client/src/setup/board3d/stadium-kit.mjs';
 import { placeAsset } from '/client/src/setup/board3d/stadium-kit-assets.mjs';
-import { SUN_DIRECTION, MAX_FOOTPRINTS } from '/client/src/setup/board3d/stadium-environment-glsl.mjs';
+import { FILTERING, MAX_FOOTPRINTS, NOISE, SUN_DIRECTION, VORONOI } from '/client/src/setup/board3d/stadium-environment-glsl.mjs';
+import * as GROUND from '/client/src/setup/board3d/stadium-env-ground.mjs';
 
 const params = new URLSearchParams(location.search);
 const W = Number(params.get('w') || 1600);
@@ -55,38 +56,64 @@ const material = (vertexShader, fragmentShader, extra = {}, own = {}) =>
 
 const scene = new three.Scene();
 
-// The ground: a flat painted meadow, a sand strip and a pond, so each asset is seen on a ground like its own.
+// The ground, painted with the BDSP ground kit (stadium-env-ground.mjs): a clover meadow, a dirt path
+// fringed with grass, a flagstone plaza, a sand strip running wet into a pond.
 const groundColours = {
-  grass: paint(params.get('grass') || '#79bf5c'),
-  grassDark: paint('#68b154'),
-  sand: paint('#ecd6a4'),
-  water: paint('#4fb6e3'),
-  waterDeep: paint('#3a96cf'),
-  foam: paint('#effaff'),
-  plaza: paint('#d9d4cc'),
+  grass: paint(params.get('grass') || '#79bf55'),
+  dirt: paint('#d9b27a'),
+  sand: paint('#e8c58a'),
+  water: paint('#3f86e8'),
+  shallow: paint('#6cc6f0'),
+  plaza: paint('#e3d7b5'),
+  grout: paint('#b9a57e'),
 };
 const groundMaterial = new three.ShaderMaterial({
-  uniforms: Object.fromEntries(Object.entries(groundColours).map(([k, v]) => [k, { value: new three.Vector3(...v) }])),
+  uniforms: {
+    ...Object.fromEntries(Object.entries(groundColours).map(([k, v]) => [k, { value: new three.Vector3(...v) }])),
+    uTime: uniforms.uTime,
+    uSun: uniforms.uSun,
+  },
   vertexShader: `varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
-uniform vec3 grass; uniform vec3 grassDark; uniform vec3 sand; uniform vec3 water; uniform vec3 waterDeep; uniform vec3 foam; uniform vec3 plaza;
+uniform vec3 grass; uniform vec3 dirt; uniform vec3 sand; uniform vec3 water; uniform vec3 shallow; uniform vec3 plaza; uniform vec3 grout;
+uniform float uTime;
+uniform vec3 uSun;
 varying vec2 vP;
-float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f); return mix(mix(h(i), h(i+vec2(1,0)), f.x), mix(h(i+vec2(0,1)), h(i+vec2(1,1)), f.x), f.y); }
+${NOISE}
+${VORONOI}
+${FILTERING}
+${GROUND.GRASS}
+${GROUND.STONEWORK}
+${GROUND.SAND}
+${GROUND.WATER}
+float box(vec2 p, vec4 b) { vec2 d = abs(p - 0.5 * (b.xy + b.zw)) - 0.5 * (b.zw - b.xy); return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0); }
 void main(){
   vec2 p = vP;
-  float blot = smoothstep(0.48, 0.56, n(p / 180.0) * 0.7 + n(p / 70.0) * 0.3);
-  vec3 col = mix(grass, grassDark, blot * 0.6);
-  // the sand strip under the beach row
-  float sandArea = step(-120.0, p.y) * step(p.y, 150.0) * step(-200.0, p.x) * step(p.x, 330.0);
-  col = mix(col, sand, sandArea);
-  // the plaza under the town row
-  float plazaArea = step(-330.0, p.y) * step(p.y, -110.0) * step(-720.0, p.x) * step(p.x, 270.0);
-  col = mix(col, plaza, plazaArea);
-  // the pond
+  filterPixel = pixelSize(p);
+  vec3 col = cloverGrass(p, grass, 0.0);
+  // a dirt path across the meadow, fringed with grass
+  float path = abs(p.y - 160.0 - 30.0 * sin(p.x / 140.0)) - 26.0;
+  float lawn = grassFringe(-path, p, 7.0);
+  vec3 ground = dirt * (1.0 - 0.18 * fringeShade(-path, 7.0));
+  col = mix(ground, col, lawn);
+  // the sand strip
+  float sandD = box(p, vec4(-200.0, -120.0, 330.0, 150.0));
+  float sandy = 1.0 - grassFringe(-sandD, p, 6.0);
+  col = mix(col, bdspSand(p, sand, 0.0) * (1.0 - 0.15 * fringeShade(-sandD, 6.0)), sandy);
+  // the plaza of flagstones
+  float plazaD = box(p, vec4(-720.0, -330.0, 270.0, -110.0));
+  vec3 stone = flagstones(p, 36.0, 0.9, uSun);
+  vec3 slab = plaza * (0.9 + 0.16 * stone.y) * (1.0 + 0.18 * stone.z);
+  vec3 paved = mix(grout, slab, stone.x);
+  float paving = 1.0 - grassFringe(-plazaD, p, 6.0);
+  col = mix(col, paved, paving);
+  // the pond, its sand bank running wet into the water
   float d = length(p - vec2(430.0, -210.0)) - 90.0;
-  col = mix(col, mix(water, waterDeep, smoothstep(-10.0, -70.0, d)), step(d, 0.0));
-  col = mix(col, foam, (1.0 - smoothstep(0.0, 3.0, abs(d + 4.0))) * 0.9);
+  col = mix(col, mix(bdspSand(p, sand, 0.0), bdspSand(p, sand, 0.0) * 0.82, smoothstep(14.0, 0.0, d)), 1.0 - grassFringe(16.0 - d, p, 6.0));
+  float depth = clamp(-d / 70.0, 0.0, 1.0);
+  vec3 wet = bdspWater(p, depth, water, shallow, 0.0);
+  wet = mix(wet, vec3(1.0), waterEdge(depth) * 0.75);
+  col = mix(col, wet, step(d, 0.0));
   gl_FragColor = vec4(col * 1.12, 1.0);
 }`,
 });
@@ -104,8 +131,7 @@ for (const x of [560, 680]) {
 
 const mood = params.get('mood') || 'day';
 const kit = createKitProps({ three, material, mood });
-const outline = params.get('outline');
-if (outline !== null) kit.uniforms.uKitOutline.value.w = Number(outline);
+
 for (const object of kit.objects) scene.add(object);
 
 const props = createPropBuilder();
@@ -122,7 +148,8 @@ const scenes = {
       ['hedge', 0, { size: 16, length: 90 }],
       ['fern', 70, { size: 28 }],
       ['tallGrass', 130, { size: 32 }],
-      ['flowers', 230, { size: 16 }],
+      ['flowers', 210, { size: 16 }],
+      ['flowerBed', 250, { size: 24, depth: 0.5, y: 220 }],
       ['mushroom', 300, { size: 9 }],
       ['mushroom', 318, { size: 6, seed: 4 }],
       ['stump', 380, { size: 14 }],
@@ -132,6 +159,7 @@ const scenes = {
       ['boulder', -660, { size: 26 }],
       ['pebbles', -580, { size: 14 }],
       ['spire', -480, { size: 24 }],
+      ['ledgeRock', -420, { size: 26, y: -10 }],
       ['crystals', -360, { size: 42 }],
       ['crystals', -280, { size: 30, colors: { base: '#e58fd8', tip: '#ffe6fb' } }],
       ['cloud', -140, { size: 46, z: 50 }],
@@ -155,6 +183,7 @@ const scenes = {
       ['gravestone', 90, { size: 16 }],
       ['gravestone', 130, { size: 14, style: 'slab' }],
       ['reeds', 200, { size: 10 }],
+      ['bollard', 240, { size: 6 }],
       ['lilyPad', 400, { size: 12, y: -230 }],
       ['lilyPad', 440, { size: 10, y: -190, bloom: true }],
     ]);

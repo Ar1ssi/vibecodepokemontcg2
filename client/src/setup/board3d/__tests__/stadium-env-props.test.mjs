@@ -76,51 +76,89 @@ test('builder at(): a part modelled about its foot lands where the placement put
   assert.ok(close(normal.getZ(0), 1), 'a flat triangle seen from +z still faces +z after a turn about z');
 });
 
-test('builder look(): kind, sway, shade and outline ride on every vertex; looks nest and restore', () => {
+test('builder look(): kind, sway, shade and leaf size ride on every vertex; looks nest and restore', () => {
   const props = createPropBuilder();
-  props.look({ kind: LOOK.foliage, sway: 1.5, outline: 1 }, () => {
+  props.look({ kind: LOOK.foliage, sway: 1.5, leaf: 4 }, () => {
     props.box({ x: 0, y: 0, z0: 0, z1: 10, hw: 5, hh: 5, color: [1, 0, 0, 0] });
     props.look({ kind: LOOK.gloss }, () => props.box({ x: 20, y: 0, z0: 0, z1: 10, hw: 5, hh: 5, color: [0, 1, 0, 0] }));
   });
   props.box({ x: 40, y: 0, z0: 0, z1: 10, hw: 5, hh: 5, color: [0, 0, 1, 0] });
   const look = props.build(three).getAttribute('aLook');
   const at = (i) => [look.getX(i), look.getY(i), look.getZ(i), look.getW(i)];
-  assert.deepEqual(at(0), [LOOK.foliage, 1.5, 1, 1]);
-  assert.deepEqual(at(20), [LOOK.gloss, 1.5, 1, 1], 'the inner look keeps the outer sway and outline');
+  assert.deepEqual(at(0), [LOOK.foliage, 1.5, 1, 4]);
+  assert.deepEqual(at(20), [LOOK.gloss, 1.5, 1, 4], 'the inner look keeps the outer sway and leaf');
   assert.deepEqual(at(40), [LOOK.plain, 0, 1, 0], 'back to the default after');
 });
 
-test('builder: a loose quad never takes the outline unless its look says it closes a solid; a box always does', () => {
+test('builder look(): a leaf size is px of the part\'s own frame, so it scales with its placement', () => {
   const props = createPropBuilder();
-  props.look({ outline: 1 }, () => {
-    props.quad([0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0], [1, 1, 1, 0]);
-    props.look({ sheets: true }, () => props.quad([0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1], [1, 1, 1, 0]));
-    props.box({ x: 0, y: 0, z0: 0, z1: 1, hw: 1, hh: 1, color: [1, 1, 1, 0] });
-  });
-  const look = props.build(three).getAttribute('aLook');
-  assert.equal(look.getW(0), 0, 'a banner: no outline');
-  assert.equal(look.getW(4), 1, 'a roof slope that closes a solid: outlined');
-  assert.equal(look.getW(8), 1, "a box's faces: outlined");
+  props.at({ x: 0, y: 0, scale: 2 }, () => props.look({ kind: LOOK.foliage, leaf: 4 }, () => props.blob({ rx: 5, color: [0, 1, 0, 0] })));
+  props.look({ kind: LOOK.foliage, leaf: 0 }, () => props.blob({ x: 30, rx: 5, color: [0, 1, 0, 0] }));
+  const geometry = props.build(three);
+  const look = geometry.getAttribute('aLook');
+  const position = geometry.getAttribute('position');
+  for (let i = 0; i < look.count; i += 1) assert.equal(look.getW(i), position.getX(i) > 20 ? 0 : 8);
+  assert.equal(geometry.getAttribute('aHull'), undefined, 'no outline hull any more (design 082)');
 });
 
-test("builder: the hull normal is averaged over the outlined vertices at a place, so a box's corner swells out along its diagonal", () => {
+test('builder lumps(): a lump keeps its colour where no other lump is near, darkens in the crease against one', () => {
+  const read = (list) => {
+    const props = createPropBuilder();
+    props.lumps(list, { crease: 0.5 });
+    const geometry = props.build(three);
+    const color = geometry.getAttribute('aColor');
+    const position = geometry.getAttribute('position');
+    return { color, position };
+  };
+  const apart = read([
+    { x: 0, rx: 5, color: [0.5, 0.6, 0.2, 0] },
+    { x: 40, rx: 5, color: [0.5, 0.6, 0.2, 0] },
+  ]);
+  for (let i = 0; i < apart.color.count; i += 1) assert.ok(close(apart.color.getY(i), 0.6), 'lumps apart: no crease');
+  const together = read([
+    { x: 0, rx: 5, color: [0.5, 0.6, 0.2, 0] },
+    { x: 7, rx: 5, color: [0.5, 0.6, 0.2, 0] },
+  ]);
+  let darkest = 1;
+  let farSide = 0;
+  for (let i = 0; i < together.color.count; i += 1) {
+    const g = together.color.getY(i);
+    darkest = Math.min(darkest, g);
+    // The first lump's far side (x ≤ -4) is more than 1.5 radii from the second's surface: untouched.
+    if (together.position.getX(i) <= -4) farSide = Math.max(farSide, Math.abs(g - 0.6));
+  }
+  assert.ok(darkest < 0.6 * 0.6, `the crease darkens (${darkest})`);
+  assert.ok(farSide < 1e-6, 'the far side keeps its colour');
+});
+
+test('builder roundBox(): inside its box, square on the floor, rounded on top, every normal outward, top colour up', () => {
   const props = createPropBuilder();
-  props.look({ outline: 1 }, () => props.box({ x: 0, y: 0, z0: 0, z1: 2, hw: 1, hh: 1, color: [1, 1, 1, 0] }));
+  props.roundBox({ x: 10, y: 0, z0: 0, z1: 20, hw: 15, hh: 8, r: 4, yaw: 0.3, color: [1, 0, 0, 0], topColor: [0, 1, 0, 0] });
   const geometry = props.build(three);
   const position = geometry.getAttribute('position');
-  const hull = geometry.getAttribute('aHull');
+  const normal = geometry.getAttribute('normal');
+  const color = geometry.getAttribute('aColor');
+  const [c, s] = [Math.cos(0.3), Math.sin(0.3)];
+  let lowest = Infinity;
   for (let i = 0; i < position.count; i += 1) {
-    const length = Math.hypot(hull.getX(i), hull.getY(i), hull.getZ(i));
-    assert.ok(close(length, 1, 1e-5), 'unit length');
-    // Every hull normal points away from the box's middle.
-    const out = [position.getX(i), position.getY(i), position.getZ(i) - 1];
-    assert.ok(out[0] * hull.getX(i) + out[1] * hull.getY(i) + out[2] * hull.getZ(i) > 0);
+    const dx = position.getX(i) - 10;
+    const dy = position.getY(i);
+    const local = [dx * c + dy * s, -dx * s + dy * c, position.getZ(i)];
+    assert.ok(Math.abs(local[0]) <= 15 + 1e-6 && Math.abs(local[1]) <= 8 + 1e-6 && local[2] <= 20 + 1e-6 && local[2] >= -1e-6, 'inside its box');
+    lowest = Math.min(lowest, local[2]);
+    const n = [normal.getX(i), normal.getY(i), normal.getZ(i)];
+    assert.ok(close(Math.hypot(...n), 1, 1e-6), 'unit normals');
+    const out = [position.getX(i) - 10, position.getY(i), position.getZ(i) - 10];
+    assert.ok(out[0] * n[0] + out[1] * n[1] + out[2] * n[2] > 0, 'outward');
+    assert.equal(color.getY(i), n[2] > 0.5 ? 1 : 0, 'the top colour on parts facing up');
   }
-  // The top corner (1, 1, 2): its three faces' normals average to the diagonal.
+  assert.equal(lowest, 0, 'its walls run down to the floor');
+  // The top is rounded: no vertex at the box's top corner.
   for (let i = 0; i < position.count; i += 1) {
-    if (close(position.getX(i), 1) && close(position.getY(i), 1) && close(position.getZ(i), 2)) {
-      assert.ok(close(hull.getX(i), hull.getY(i), 1e-5) && hull.getX(i) > 0.5 && hull.getZ(i) > 0.5);
-    }
+    const dx = position.getX(i) - 10;
+    const dy = position.getY(i);
+    const local = [dx * c + dy * s, -dx * s + dy * c];
+    assert.ok(!(Math.abs(local[0]) > 14.9 && position.getZ(i) > 19.9), 'no sharp top edge');
   }
 });
 

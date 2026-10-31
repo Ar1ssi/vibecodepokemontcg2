@@ -16,6 +16,8 @@
 // the mosaic band, the swirl), the rim wall, the walkway and the bridges; WATER one sheet at
 // WATER_LEVEL; PROPS the railings, the billboards and the towers (stadium-env-props).
 import {
+  FILTERING,
+  FOOTPRINTS,
   FULLSCREEN_VERTEX,
   NOISE,
   OUTPUT,
@@ -26,6 +28,7 @@ import {
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
 import { environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
+import { WATER as WATER_KIT } from './stadium-env-ground.mjs';
 import { createPropBuilder } from './stadium-env-props.mjs';
 import { createKitProps } from './stadium-kit.mjs';
 import { tableBounds } from './table-uv.mjs';
@@ -310,13 +313,17 @@ void main() {
 export const WATER_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
+${FILTERING}
+${FOOTPRINTS}
 ${REVEAL}
+${WATER_KIT}
 ${PALETTE}
 ${CITY}
 varying vec2 vPos;
 varying vec2 vUv;
 void main() {
   vec2 p = vPos;
+  filterPixel = pixelSize(p);
   vec4 field = texture2D(uField, vUv);
   if (field.r > ${WATER_LEVEL.toFixed(1)} + 0.5 || revealBurned(p) * exitKeep(p) < 0.5) discard;
   float t = uTime;
@@ -325,12 +332,15 @@ void main() {
   // Shade under the rim and the walkway's edges, and a white line of foam where the water meets them.
   col *= mix(0.75, 1.0, smoothstep(uStage.z, uStage.z + 24.0, r));
   float wallDist = r < uStage.w ? min(r - uStage.z, uStage.w - r) : r - uWalkOut;
-  // Design 081: flat water as the games paint it: a broad slow swell, a crisp white line of foam
-  // lapping where it meets the walls (no caustics or glints).
+  // Design 081: a broad slow swell, a crisp white line of foam lapping where it meets the walls.
+  // Design 082: BDSP's ribbons of sky light and a few slow sparkles across it, quiet near the cards.
   float lap = 0.5 + 0.5 * sin(t * 0.9 + r * 0.05);
   float foam = 1.0 - smoothstep(1.5, 2.5 + 3.0 * lap, wallDist);
   float swell = fbm3((p - vec2(t * 6.0, t * 2.0)) / vec2(160.0, 90.0));
   col *= 0.95 + 0.1 * swell;
+  float quiet = 1.0 - 0.8 * fieldCalm(p, 110.0);
+  col += vec3(0.8, 0.9, 1.0) * lightStreaks(p, t) * 0.24 * quiet;
+  col += vec3(1.2) * sparkles(p, t) * 0.7 * quiet;
   col = mix(col, vec3(0.97, 1.0, 1.03), foam * 0.85);
   col = edgeHaze(col, vUv);
   vec3 spark = vec3(1.1, 0.95, 0.4);
@@ -500,14 +510,10 @@ export function levinciaProps({ centre, stage, walkIn, walkOut, billboards, towe
       if (points.length > 1) props.tube(points, 1.6 * u, RAIL, { sides: 6 });
     }
   }
-  props.look({ outline: 1 }, () => {
-    for (const board of billboards) billboard(props, board, centre, deck, u);
-    for (const t of towers) tower(props, t, u);
-  });
+  for (const board of billboards) billboard(props, board, centre, deck, u);
+  for (const t of towers) tower(props, t, u);
   return props;
 }
-
-
 
 /** Levincia's board (stadium-environment-mesh.js BOARDS). */
 export function levinciaBoard({ three, material, terrainGrid, replaceGeometry, bakeOptions }) {

@@ -10,16 +10,17 @@
 // World scale: a card's footprint is a mossy flagstone of the clearing; the trunk is a card and a
 // half through at its foot.
 //
-// Design 081: every solid is the Stadium kit's (stadium-kit.mjs, stadium-kit-assets.mjs), one toon
-// light with outlines and contact shadows: the strands, roots and limbs plain bark, the crown soft
-// foliage balls, the small tree, the fern clumps and a few toadstools the kit's own; the floor is
-// painted moss in broad patches, no litter, tufts or clover of noise.
+// Design 081: every solid is the Stadium kit's (stadium-kit.mjs, stadium-kit-assets.mjs): the strands,
+// roots and limbs plain bark, the crown's balls, the small tree, the fern clumps and a few toadstools.
+// Design 082 (Brilliant Diamond / Shining Pearl): the crown is leafy lumps, dark in their creases;
+// the floor is the ground kit's clover grass, a deep jungle green.
 //
 // Bake, once per layout: BAKE_FIELD is the flat floor (R height px; the roots' ridges are props);
 // the shared light bake adds nothing. Per frame: TERRAIN paints the moss, earth, the crown's
 // shadow and the glow round the roots; the kit's meshes the trunk, roots, crown, small tree, ferns
 // and toadstools; MOTES the golden specks rising.
 import {
+  FILTERING,
   FOOTPRINTS,
   FULLSCREEN_VERTEX,
   NOISE,
@@ -32,7 +33,8 @@ import {
 import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
 import { boardContext, hash } from './stadium-env-spots.mjs';
 import { EDGE_HAZE, STANDARD_TERRAIN_VERTEX } from './stadium-env-surfaces.mjs';
-import { createKitProps } from './stadium-kit.mjs';
+import { GRASS } from './stadium-env-ground.mjs';
+import { createKitProps, glslColour, paint } from './stadium-kit.mjs';
 import { measureAsset, placeAsset } from './stadium-kit-assets.mjs';
 
 export const GRAND_KEY = 'grand-tree';
@@ -153,11 +155,9 @@ void main() {
 
 export const TERRAIN_VERTEX = STANDARD_TERRAIN_VERTEX;
 
-// The card art's colours (pixel samples, inverted through Neutral tone mapping).
+// The floor in BDSP's jungle greens (authored as shown), the glow the card art's gold.
 const PALETTE = /* glsl */ `
-const vec3 MOSS = vec3(0.12, 0.263, 0.071);
-const vec3 MOSS_DARK = vec3(0.046, 0.113, 0.054);
-const vec3 EARTH_DARK = vec3(0.077, 0.055, 0.043);
+const vec3 MOSS = ${glslColour('#5a9e3e')};
 const vec3 GLOW = vec3(1.0, 0.68, 0.08);
 const vec3 SHADE_TINT = vec3(0.5, 0.66, 0.82);
 `;
@@ -165,9 +165,11 @@ const vec3 SHADE_TINT = vec3(0.5, 0.66, 0.82);
 export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
+${FILTERING}
 ${FOOTPRINTS}
 ${REVEAL}
 ${EDGE_HAZE}
+${GRASS}
 ${PALETTE}
 ${GRAND}
 varying vec2 vPos;
@@ -175,18 +177,17 @@ varying vec2 vUv;
 varying float vGrowth;
 void main() {
   vec2 p = vPos;
+  filterPixel = pixelSize(p);
   if (revealBurned(p) * exitKeep(p) < 0.5) discard;
   vec4 field = texture2D(uField, vUv);
   float t = uTime;
   vec3 sun = normalize(uSun);
   float u = uUnit;
 
-  // The floor (design 081: painted, not textured): moss in broad soft cushions, earth showing
-  // between; tufts, ferns and toadstools are the kit's solids.
-  float cushion = smoothstep(0.35, 0.6, fbm3(p / 150.0 + 3.0));
-  vec3 col = mix(MOSS_DARK * 1.1, MOSS, 0.4 + 0.6 * cushion);
-  col = mix(col, EARTH_DARK * 1.4, (1.0 - cushion) * smoothstep(0.6, 0.76, fbm3(p / 110.0 + 8.0)) * 0.5);
+  // The floor (design 082): BDSP's clover grass, a deeper green in broad patches; ferns and
+  // toadstools are the kit's solids.
   float calm = fieldCalm(p, 110.0);
+  vec3 col = cloverGrass(p, mix(MOSS * 0.82, MOSS, smoothstep(0.3, 0.7, fbm3(p / 210.0 + 8.0))), calm);
 
   // The light: the sun's patches through the crown, dappled where it thins; the shade is cool and deep.
   float shade = crownShade(p, sun);
@@ -218,15 +219,15 @@ ${OUTPUT}
 }
 `;
 
-// Prop colours (aColor, linear; w 2 and up a light at w - 1).
-const BARK = [0.16, 0.094, 0.046, 0];
-const BARK_DARK = [0.11, 0.07, 0.045, 0];
-const ROOT = [0.263, 0.142, 0.071, 0];
+// Prop colours, BDSP's (aColor, linear; w 2 and up a light at w - 1): the veins the card art's gold.
+const BARK = paint('#6e4a2c');
+const BARK_DARK = paint('#57391f');
+const ROOT = paint('#86592f');
 const VEIN = [1.0, 0.68, 0.08, 2.6];
-const FOLIAGE = [0.068, 0.226, 0.063, 0];
-const FOLIAGE_LIT = [0.14, 0.34, 0.07, 0];
-const FERN = Object.freeze({ leaf: [0.085, 0.345, 0.101, 0], leafLight: [0.17, 0.46, 0.12, 0], heart: [0.05, 0.2, 0.06, 0] });
-const SMALL_TREE = Object.freeze({ leaf: [0.057, 0.2, 0.06, 0], leafLight: [0.12, 0.31, 0.08, 0], bark: BARK, barkDark: BARK_DARK });
+const FOLIAGE = paint('#3a9a3c');
+const FOLIAGE_LIT = paint('#79c446');
+const FERN = Object.freeze({ leaf: '#3fa03a', leafLight: '#7fcb4c', heart: '#2a6e2c' });
+const SMALL_TREE = Object.freeze({ leaf: '#3a9640', leafLight: '#6fc244', bark: BARK, barkDark: BARK_DARK });
 
 /** The trunk at height s (0 foot, 1 fork): its radius, tapering and flaring at the foot. */
 const trunkRadius = (tree, s) => tree.top + (tree.foot - tree.top) * (1 - s) ** 1.6 + tree.foot * 0.22 * Math.exp(-s * 9);
@@ -248,7 +249,7 @@ function trunk(props, tree, u) {
       points.push([tree.x + Math.cos(angle) * around, tree.y + Math.sin(angle) * around, -4 + s * tree.fork]);
       radii.push(R * (0.58 - 0.1 * s));
     }
-    props.look({ outline: 1 }, () => props.tube(points, radii, k % 2 ? BARK : BARK_DARK, { sides: 12 }));
+    props.tube(points, radii, k % 2 ? BARK : BARK_DARK, { sides: 12 });
     // A gold vein lying along every other strand's flank.
     if (k % 2 === 0) {
       const vein = points.map((p, i) => {
@@ -260,9 +261,7 @@ function trunk(props, tree, u) {
       props.tube(vein.slice(2), 4.2 * u, VEIN, { sides: 6 });
     }
   }
-  props.look({ outline: 1 }, () =>
-    props.cylinder({ x: tree.x, y: tree.y, z0: tree.fork - 6 * u, z1: tree.fork + 4 * u, r: tree.top * 1.05, color: BARK, capColor: BARK_DARK, sides: 16 })
-  );
+  props.cylinder({ x: tree.x, y: tree.y, z0: tree.fork - 6 * u, z1: tree.fork + 4 * u, r: tree.top * 1.05, color: BARK, capColor: BARK_DARK, sides: 16 });
 }
 
 /** Roots: thick tubes arching out of the trunk's foot over the ground and diving into it, a vein along some. */
@@ -284,7 +283,7 @@ function roots(props, spots, u) {
       ]);
       radii.push(root.radius * (1 - 0.78 * s ** 0.8));
     }
-    props.look({ outline: 1 }, () => props.tube(points, radii, ROOT, { sides: 9 }));
+    props.tube(points, radii, ROOT, { sides: 9 });
     if (root.seed > 0.3) props.tube(points.slice(1, 7).map((p, i) => [p[0], p[1], p[2] + radii[i + 1] * 0.9]), 3.6 * u, VEIN, { sides: 6 });
   }
 }
@@ -293,20 +292,18 @@ function roots(props, spots, u) {
 function crown(props, spots, u) {
   const { tree, balls } = spots;
   const fork = [tree.x, tree.y, tree.fork];
-  props.look({ outline: 1 }, () => {
-    for (const ball of balls) {
-      const mid = [(fork[0] + ball.x) / 2, (fork[1] + ball.y) / 2, (fork[2] + ball.z) / 2 + 20 * u];
-      props.tube([fork, mid, [ball.x, ball.y, ball.z - ball.r * 0.4]], [tree.top * 0.4, tree.top * 0.28, tree.top * 0.14], BARK, { sides: 9 });
-    }
-  });
-  // Each ball a soft mound of foliage, a lighter one on its sunward top (the art's yellow light).
+  for (const ball of balls) {
+    const mid = [(fork[0] + ball.x) / 2, (fork[1] + ball.y) / 2, (fork[2] + ball.z) / 2 + 20 * u];
+    props.tube([fork, mid, [ball.x, ball.y, ball.z - ball.r * 0.4]], [tree.top * 0.4, tree.top * 0.28, tree.top * 0.14], BARK, { sides: 9 });
+  }
+  // Each ball a leafy lump, a lighter one on its sunward top (the art's yellow light), the crown
+  // dark in the creases between them.
   const [sx, sy] = GRAND_SUN;
-  props.look({ kind: LOOK.foliage, outline: 1 }, () => {
-    for (const ball of balls) {
-      props.blob({ x: ball.x, y: ball.y, z: ball.z, rx: ball.r, rz: ball.r * 0.82, color: FOLIAGE });
-      props.blob({ x: ball.x + sx * ball.r * 0.3, y: ball.y + sy * ball.r * 0.3, z: ball.z + ball.r * 0.4, rx: ball.r * 0.62, rz: ball.r * 0.5, color: FOLIAGE_LIT });
-    }
-  });
+  const lumps = balls.flatMap((ball) => [
+    { x: ball.x, y: ball.y, z: ball.z, rx: ball.r, rz: ball.r * 0.82, color: FOLIAGE },
+    { x: ball.x + sx * ball.r * 0.3, y: ball.y + sy * ball.r * 0.3, z: ball.z + ball.r * 0.4, rx: ball.r * 0.62, rz: ball.r * 0.5, color: FOLIAGE_LIT },
+  ]);
+  props.look({ kind: LOOK.foliage, leaf: 12 * u }, () => props.lumps(lumps, { crease: 0.5 }));
 }
 
 /** Everything solid, as one kit builder (design 081). */

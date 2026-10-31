@@ -12,11 +12,15 @@
 // Bake, once per layout: BAKE_FIELD writes R height px, G signed px from the floor's edge (negative
 // on it), B a stone's tone 0..1 on the walls, A the kind (-1 floor, 1 wall); the shared light bake
 // adds normals, occlusion and the skylight's shadow. Per frame: TERRAIN paints the floor, the walls,
-// the emblem, the skylight's pool and the crystals' coloured light; the kit's meshes (design 081:
-// one toon light, outlines, contact shadows) every crystal, a faceted prism with a pointed tip paling
-// toward it, and the rubble of broken rock at each cluster's outer foot; SPARKLES the dust drifting
-// and twinkling in the air. The floor is clean packed earth: no pebble speckle.
+// the emblem, the skylight's pool and the crystals' coloured light; the kit's meshes (designs 081,
+// 082: the kit's soft light, contact shadows) every crystal, a faceted prism with a pointed tip paling
+// toward it, and a ledge of stacked slabs at each cluster's outer foot; SPARKLES the dust drifting
+// and twinkling in the air.
+// Design 082 (Brilliant Diamond / Shining Pearl): the Grand Underground's caves. The floor is rounded
+// cobbles of warm sandstone lit from the skylight's side, worn to smooth packed sand round the cards;
+// the walls rough rock laid in strata (stadium-env-ground.mjs); no ink outlines.
 import {
+  FILTERING,
   FOOTPRINTS,
   FULLSCREEN_VERTEX,
   NOISE,
@@ -29,6 +33,7 @@ import {
   VORONOI,
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
+import { STONEWORK, STRATA } from './stadium-env-ground.mjs';
 import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
 import { createKitProps } from './stadium-kit.mjs';
 import { placeAsset } from './stadium-kit-assets.mjs';
@@ -286,8 +291,8 @@ void main() {
 
 // The card art's colours (pixel samples, inverted through Neutral tone mapping).
 const PALETTE = /* glsl */ `
-const vec3 FLOOR_LIT = vec3(0.221, 0.138, 0.078);
-const vec3 FLOOR_DARK = vec3(0.096, 0.069, 0.051);
+const vec3 FLOOR_LIT = vec3(0.3, 0.19, 0.1);
+const vec3 FLOOR_DARK = vec3(0.12, 0.08, 0.055);
 const vec3 GOLD = vec3(0.77, 0.442, 0.101);
 const vec3 HEART = vec3(0.77, 1.04, 1.22);
 const vec3 SKYLIGHT = vec3(0.62, 0.74, 0.86);
@@ -300,8 +305,12 @@ vec3 edgeHaze(vec3 col, vec2 uv) {
 export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
+${FILTERING}
+${VORONOI}
 ${FOOTPRINTS}
 ${REVEAL}
+${STONEWORK}
+${STRATA}
 ${PALETTE}
 ${CAVE}
 varying vec2 vPos;
@@ -309,6 +318,7 @@ varying vec2 vUv;
 varying float vGrowth;
 void main() {
   vec2 p = vPos;
+  filterPixel = pixelSize(p);
   if (revealBurned(p) * exitKeep(p) < 0.5) discard;
   vec4 field = texture2D(uField, vUv);
   vec4 light = texture2D(uLight, vUv);
@@ -320,18 +330,20 @@ void main() {
   float lit = clamp(dot(n, sunDir), 0.0, 1.0) * mix(0.5, 1.0, light.a);
   float wall = step(0.5, field.a);
 
-  // The floor: packed earth, warm brown, darker in broad stains and smaller mottles; small and
-  // larger pebbles pressed into it, each a little dome with a dark seat, gathered at the walls' feet
-  // (design 080: the open floor where the cards lie is worn smooth).
-  float calm = max(fieldCalm(p, 110.0), 1.0 - smoothstep(-150.0, -60.0, d));
+  // The floor (design 082): BDSP's cave cobbles, rounded sandstone each its own tone, lit on the
+  // skylight's side, sand packed in the gaps; worn to smooth packed sand where the cards lie (design
+  // 080) and broad soft stains across it.
+  float calm = fieldCalm(p, 110.0);
   float stain = smoothstep(0.35, 0.7, fbm3(p / 180.0 + 6.0));
-  vec3 col = mix(FLOOR_LIT, FLOOR_DARK, 0.25 + 0.55 * stain);
-  // The walls: rough brown rock, each stone its own tone, its top faces catching the skylight,
-  // sinking into the dark the further it climbs from the floor.
-  vec3 rock = mix(FLOOR_DARK * 0.8, FLOOR_LIT * 0.9, 0.25 + 0.5 * field.b) * (0.45 + 0.8 * lit);
-  float strata = smoothstep(0.35, 0.65, gnoise(vec2(p.x / 140.0 + gnoise(p / 50.0) * 2.0, p.y / 9.0)));
-  rock *= 0.82 + 0.3 * strata;
-  rock += FLOOR_LIT * 1.5 * smoothstep(0.88, 0.5, n.z) * (0.3 + 0.7 * lit);
+  vec3 packed = mix(FLOOR_LIT, FLOOR_DARK, 0.2 + 0.45 * stain);
+  vec3 stone = cobbles(p, 26.0, sunDir);
+  vec3 cobble = mix(FLOOR_DARK * 1.2, FLOOR_LIT * 1.15, 0.35 + 0.5 * stone.y) * (0.88 + 0.32 * stone.z);
+  vec3 col = mix(mix(packed * 0.72, cobble, stone.x), packed, calm);
+  // The walls: rough brown rock laid in strata, each course its own tone, its top faces catching the
+  // skylight, sinking into the dark the further it climbs from the floor.
+  vec2 course = strata(field.r, p, 18.0);
+  vec3 rock = mix(FLOOR_DARK * 0.8, FLOOR_LIT * 0.95, 0.25 + 0.5 * course.y) * (0.45 + 0.8 * lit) * course.x;
+  rock += FLOOR_LIT * 1.2 * smoothstep(0.88, 0.5, n.z) * (0.3 + 0.7 * lit);
   col = mix(col, rock, wall);
   col *= mix(1.0, 0.3, smoothstep(40.0, uCave.y + 60.0, d));
   col *= (0.55 + 0.5 * lit) * mix(0.5, 1.0, smoothstep(0.3, 0.9, light.b));
@@ -384,12 +396,12 @@ ${OUTPUT}
 
 /**
  * Every crystal as the kit's faceted solid (design 081): six flat sides from its foot to its shoulder,
- * six faces up to its point, its hue paling toward the tip; a shard of broken rock or two at each
- * cluster's outer foot (the side away from the cards); one soft shadow under each cluster.
+ * six faces up to its point, its hue paling toward the tip; a ledge of stacked slabs at each
+ * cluster's outer foot (the side away from the cards, design 082); one soft shadow under each cluster.
  */
 export function crystalProps(clusters) {
   const props = createPropBuilder();
-  props.look({ kind: LOOK.crystal, outline: 1 }, () => {
+  props.look({ kind: LOOK.crystal }, () => {
     for (const cluster of clusters) {
       const hue = CRYSTAL_HUES[cluster.hue].map((v) => toLinear(v));
       const tipHue = hue.map((v) => v + (1 - v) * 0.55);
@@ -423,14 +435,16 @@ export function crystalProps(clusters) {
       props.shadow({ x: cluster.x, y: cluster.y, z: cluster.z, rx: cluster.r * 1.1, strength: 0.5 });
     }
   });
+  // At each cluster's outer foot, a ledge of stacked sandstone slabs (BDSP's Grand Underground).
   for (const cluster of clusters) {
     const out = [Math.cos(cluster.outward), Math.sin(cluster.outward)];
-    placeAsset(props, 'pebbles', {
+    placeAsset(props, 'ledgeRock', {
       x: cluster.x + out[0] * cluster.r * 1.15,
       y: cluster.y + out[1] * cluster.r * 1.15,
       z: cluster.z,
       size: cluster.r * 0.42,
-      count: 3,
+      slabs: 2,
+      yaw: cluster.outward,
       seed: cluster.x * 0.37 + cluster.y,
       sun: CAVE_LIGHT,
       colors: CAVE_ROCK,
@@ -439,7 +453,7 @@ export function crystalProps(clusters) {
   return props;
 }
 
-const CAVE_ROCK = Object.freeze({ body: [0.16, 0.11, 0.08, 0], light: [0.27, 0.19, 0.13, 0], dark: [0.08, 0.055, 0.045, 0] });
+const CAVE_ROCK = Object.freeze({ body: '#a0714a', top: '#c9976a' });
 
 /** Coloured sparkle dust: drifting slowly up among the crystals, each mote twinkling gently. */
 export const SPARKLE_VERTEX = /* glsl */ `

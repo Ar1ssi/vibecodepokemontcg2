@@ -32,15 +32,14 @@ import { createKitProps } from './stadium-kit.mjs';
 import { placeAsset } from './stadium-kit-assets.mjs';
 
 /**
- * The lobby's light for the kit (design 081): warm lamps from nearly overhead, the shade a warm
- * peach-grey (light bounced off the cream floor and orange walls), soft contact shadows.
+ * The lobby's light for the kit (designs 081, 082): warm lamps from nearly overhead, a warm
+ * peach fill bounced off the cream floor and orange walls, soft contact shadows.
  */
 export const LOBBY_MOOD = Object.freeze({
-  key: [1.0, 0.97, 0.92],
-  shade: [0.78, 0.71, 0.72],
-  sky: [0.82, 0.76, 0.72],
-  rim: [1.0, 0.98, 0.94, 0.12],
-  outline: [0.42, 0.34, 0.34, 1.05],
+  key: [0.9, 0.87, 0.82],
+  sky: [0.46, 0.42, 0.4],
+  bounce: [0.36, 0.3, 0.28],
+  sheen: [0.4, 0.65],
   shadow: [0.66, 0.56, 0.54, 0.5],
 });
 import { disc, wallBand, windowRun } from './stadium-env-buildings.mjs';
@@ -674,18 +673,16 @@ function posters(props, spots) {
 export function centerProps(spots) {
   const { counter, sofa: sofaSpot, table, stools, shelves, desks, deskStools, bench: benchSpot, plants, columns, u } = spots;
   const props = createPropBuilder();
-  props.look({ outline: 1 }, () => {
-    roomWalls(props, spots);
-    wallScreen(props, spots);
-    receptionCounter(props, counter, u);
-    sofa(props, sofaSpot, u);
-    coffeeTable(props, table, u);
-    for (const s of [...stools, ...deskStools]) stool(props, s, u);
-    for (const s of shelves) bookshelf(props, s, u);
-    for (const d of desks) pcDesk(props, d, u);
-    bench(props, benchSpot, u);
-    for (const c of columns) glassColumn(props, c, u);
-  });
+  roomWalls(props, spots);
+  wallScreen(props, spots);
+  receptionCounter(props, counter, u);
+  sofa(props, sofaSpot, u);
+  coffeeTable(props, table, u);
+  for (const s of [...stools, ...deskStools]) stool(props, s, u);
+  for (const s of shelves) bookshelf(props, s, u);
+  for (const d of desks) pcDesk(props, d, u);
+  bench(props, benchSpot, u);
+  for (const c of columns) glassColumn(props, c, u);
   for (const p of plants) plant(props, p);
   posters(props, spots);
   return props;

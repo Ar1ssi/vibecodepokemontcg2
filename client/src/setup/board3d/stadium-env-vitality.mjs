@@ -7,10 +7,10 @@
 // over the top-right corner and never over a card. The board's sun stands beyond the tree, high at
 // the far right, so the crown's shadow falls from the top right across the mat.
 // World scale: a card's footprint is about a picnic blanket; the trunk is over a card wide.
-// Design 081: every solid is the Stadium kit's (stadium-kit.mjs, stadium-kit-assets.mjs): one toon
-// light, outlines and contact shadows; the crown's pads soft foliage balls, the kit's bushes, tall
-// grass along the meadow's edge, clumps of flowers, toadstools by the trunk; the meadow is painted
-// in broad patches, no tufts or flecks of noise.
+// Design 081: every solid is the Stadium kit's (stadium-kit.mjs, stadium-kit-assets.mjs): the crown's
+// pads, the kit's bushes, tall grass along the meadow's edge, beds of flowers, toadstools by the
+// trunk. Design 082 (Brilliant Diamond / Shining Pearl): the crown is a canopy of leafy lumps, dark in
+// its creases; the meadow and the undergrowth are the ground kit's clover grass (stadium-env-ground).
 //
 // Bake, once per layout: BAKE_FIELD writes R height px, G signed px from the meadow's edge (negative
 // on it), B the crown's shade 0..1, A the trunk's and boughs' shade 0..1; the shared light bake (with
@@ -19,6 +19,7 @@
 // up its curved spine whose buttress fins run on into the roots' ridges in the ground), boughs,
 // crown, bushes and plants; MOTES the motes of light rising off the glow.
 import {
+  FILTERING,
   FOOTPRINTS,
   FULLSCREEN_VERTEX,
   NOISE,
@@ -31,7 +32,8 @@ import {
 } from './stadium-environment-glsl.mjs';
 import { environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
 import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
-import { createKitProps } from './stadium-kit.mjs';
+import { GRASS } from './stadium-env-ground.mjs';
+import { createKitProps, glslColour, paint } from './stadium-kit.mjs';
 import { measureAsset, placeAsset } from './stadium-kit-assets.mjs';
 import { tableBounds } from './table-uv.mjs';
 
@@ -48,7 +50,7 @@ export const CLEARING_WOBBLE_PX = 26;
 export const TREE_CARD_GAP_PX = 16;
 /** Least gap between a bush, seen from above, and a card or the opponent's hand. */
 export const BUSH_CARD_GAP_PX = 10;
-/** Least gap between tall grass, a flower clump or a toadstool, seen from above, and a card or the hand. */
+/** Least gap between tall grass, a flower bed or a toadstool, seen from above, and a card or the hand. */
 export const PLANT_CARD_GAP_PX = 12;
 export const MAX_PADS = 72;
 export const MAX_LIMBS = 10;
@@ -56,8 +58,10 @@ export const MAX_POOLS = 20;
 /** Buttress fins round the trunk's foot, each running on into a root. */
 export const TRUNK_FINS = 5;
 const MOTE_COUNT = 70;
-/** How far a pad reaches past its radius, seen from above (the kit's outline and a margin). */
+/** How far a pad reaches past its radius, seen from above (a margin). */
 const PUFF_REACH = 1.06;
+/** A flower's width in the beds out among the bushes (px at world unit 1): BDSP's chunky blooms. */
+export const FLOWER_HEAD_PX = 7;
 
 /** A small deterministic 0..1 from three numbers. */
 const hash = (x, y, salt) => {
@@ -279,8 +283,8 @@ export function vitalitySpots(layout) {
         grass.push({ x, y, size, blade, reach, seed: roll(5) });
         taken.push({ x, y, r: reach * 0.7 });
       } else if (edge >= 70 * u && roll(6) < 0.3) {
-        const size = (12 + 6 * roll(7)) * u;
-        const { reach } = measureAsset('flowers', { size, head: 5.5 * u });
+        const size = (20 + 10 * roll(7)) * u;
+        const { reach } = measureAsset('flowerBed', { size, head: FLOWER_HEAD_PX * u });
         if (!inScene(x, y, reach) || !clear(x, y, reach + PLANT_CARD_GAP_PX) || !free(x, y, reach)) continue;
         flowers.push({ x, y, size, reach, seed: roll(8), warm: roll(9) < 0.5 });
         taken.push({ x, y, r: reach });
@@ -442,11 +446,11 @@ void main() {
 }
 `;
 
-// The card art's colours (pixel samples, inverted through Neutral tone mapping).
+// The meadow and the undergrowth as BDSP paints them (authored as shown, inverted through Neutral
+// tone mapping), the glow the card art's.
 const PALETTE = /* glsl */ `
-const vec3 GRASS = vec3(0.137, 0.255, 0.069);
-const vec3 GRASS_DARK = vec3(0.071, 0.154, 0.058);
-const vec3 BUSH_DARK = vec3(0.033, 0.162, 0.063);
+const vec3 MEADOW = ${glslColour('#78b84e')};
+const vec3 UNDERGROWTH = ${glslColour('#3f8a3a')};
 const vec3 GLOW = vec3(0.836, 0.828, 0.131);
 const vec3 GLOW_CORE = vec3(0.95, 0.94, 0.45);
 // Shade under the crown is lit by the blue sky: cooler, not just darker.
@@ -460,8 +464,10 @@ vec3 edgeHaze(vec3 col, vec2 uv) {
 export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
+${FILTERING}
 ${FOOTPRINTS}
 ${REVEAL}
+${GRASS}
 ${PALETTE}
 ${VITALITY}
 varying vec2 vPos;
@@ -469,6 +475,7 @@ varying vec2 vUv;
 varying float vGrowth;
 void main() {
   vec2 p = vPos;
+  filterPixel = pixelSize(p);
   if (revealBurned(p) * exitKeep(p) < 0.5) discard;
   vec4 field = texture2D(uField, vUv);
   vec4 light = texture2D(uLight, vUv);
@@ -481,14 +488,12 @@ void main() {
   float sunlit = clamp(dot(n, sun) / sun.z, 0.0, 1.3) * mix(0.55, 1.0, light.a);
   float calm = fieldCalm(p, 120.0);
 
-  // Design 081: the meadow is painted, not textured: two greens in broad soft patches and a few
-  // broad sunny swells. Tufts, flowers and toadstools are the kit's solids, not noise in the grass.
-  float patchTone = smoothstep(0.38, 0.62, fbm3(p / 220.0 + 2.0));
-  vec3 col = mix(GRASS_DARK, GRASS, 0.5 + 0.5 * patchTone);
-  col *= 1.0 + 0.1 * smoothstep(0.45, 0.7, fbm3(p / 320.0 + 3.0));
+  // Design 082: the meadow is BDSP's clover grass (broad soft patches, little clover marks, quieter
+  // round the cards); tufts, flowers and toadstools are the kit's solids.
+  vec3 col = cloverGrass(p, MEADOW, calm);
 
-  // Past the meadow's edge, the undergrowth under the bushes: deep green, lighter on the swells.
-  vec3 under = mix(BUSH_DARK * 0.62, BUSH_DARK * 1.05, smoothstep(4.0, 14.0, field.r));
+  // Past the meadow's edge, the undergrowth under the bushes: a deeper green, lighter on the swells.
+  vec3 under = cloverGrass(p + 31.0, UNDERGROWTH, 0.0) * mix(0.8, 1.05, smoothstep(4.0, 14.0, field.r));
   vec2 ridge = rootRidge(p);
   float wild = smoothstep(16.0, 44.0, d) * smoothstep(uRoot.w * 0.75, uRoot.w + 40.0, distance(p, uRoot.xy));
   col = mix(col, under, wild);
@@ -508,7 +513,7 @@ void main() {
   treeUp = treeUp * treeUp * (3.0 - 2.0 * treeUp) * exitKeep(uRoot.xy);
   // Over the cards the shade is lighter (design 080), so the field keeps one value band under its
   // cards; out in the bushes it is as deep as the crown makes it.
-  float shade = max(crownShade * (1.0 - gap), field.a) * vGrowth * treeUp * mix(1.0, 0.6, calm);
+  float shade = max(crownShade * (1.0 - gap), field.a) * vGrowth * treeUp * mix(1.0, 0.45, calm);
   col = mix(col, col * SHADE_TINT, shade);
 
   // The glow welling up between the bushes and round the trunk's foot: it lights the ground yellow,
@@ -527,12 +532,12 @@ ${OUTPUT}
 }
 `;
 
-// The card art's colours for the kit's solids (aColor, linear like the GLSL PALETTE).
-const BARK = [0.22, 0.155, 0.07, 0];
-const CROWN = Object.freeze({ body: [0.0, 0.27, 0.205, 0], top: [0.04, 0.46, 0.33, 0], fringe: [0.345, 0.469, 0.131, 0] });
-const BUSH_COLOURS = Object.freeze({ leaf: [0.154, 0.294, 0.071, 0], leafLight: [0.31, 0.416, 0.07, 0] });
-const TALL_GRASS = Object.freeze({ grass: [0.06, 0.19, 0.05, 0], tip: [0.25, 0.38, 0.07, 0] });
-const BLOOMS = Object.freeze({ warm: ['#fff6d8', '#ffe066'], cool: ['#ffffff', '#f6f0a0'] });
+// The kit's solids in BDSP's greens, the crown keeping the card art's jade with its yellow-green rim.
+const BARK = paint('#7d5232');
+const CROWN = Object.freeze({ body: paint('#2f9460'), top: paint('#4fba6c'), fringe: paint('#93d04c') });
+const BUSH_COLOURS = Object.freeze({ leaf: '#3f9a3a', leafLight: '#7cc44a' });
+const TALL_GRASS = Object.freeze({ grass: '#2f7f34', tip: '#86c94e' });
+const BLOOMS = Object.freeze({ warm: ['#fff4d6', '#ffd94a'], cool: ['#ffffff', '#f7a1c4'] });
 
 /** A point on the quadratic curve from `from` via `via` to `to` at t. */
 const onCurve = ({ from, via, to }, t) => [0, 1, 2].map((k) => (1 - t) ** 2 * from[k] + 2 * (1 - t) * t * via[k] + t ** 2 * to[k]);
@@ -576,32 +581,34 @@ export function trunkGrid(tree) {
 /**
  * Everything solid on the board in the kit's one look (design 081): the trunk and its boughs, the
  * crown's pads as soft foliage balls (teal, the highest jade, the rim yellow-green as the art's),
- * the bushes, tall grass on the meadow's edge, clumps of flowers and the toadstools by the trunk.
+ * the bushes, tall grass on the meadow's edge, beds of flowers and the toadstools by the trunk.
  */
 export function vitalityProps(spots) {
   const props = createPropBuilder();
   const { tree } = spots;
   const kit = { sun: VITALITY_SUN };
   if (tree.trunk) {
-    props.look({ outline: 1 }, () => {
-      props.surface(trunkGrid(tree), { color: BARK, wrap: true });
-      for (const bough of tree.boughs) {
-        const points = Array.from({ length: 11 }, (_, i) => onCurve(bough, i / 10));
-        props.tube(points, points.map((_, i) => bough.r0 + ((bough.r1 - bough.r0) * i) / 10), BARK, { sides: 12 });
-      }
-    });
-  }
-  const zTop = Math.max(...tree.pads.map((pad) => pad.z), 1);
-  props.look({ kind: LOOK.foliage, outline: 1 }, () => {
-    for (const pad of tree.pads) {
-      const colour = pad.tier > 0.84 ? CROWN.fringe : pad.z > zTop * 0.84 ? CROWN.top : CROWN.body;
-      props.blob({ x: pad.x, y: pad.y, z: pad.z, rx: pad.r, rz: pad.r * 0.78, color: colour });
+    props.surface(trunkGrid(tree), { color: BARK, wrap: true });
+    for (const bough of tree.boughs) {
+      const points = Array.from({ length: 11 }, (_, i) => onCurve(bough, i / 10));
+      props.tube(points, points.map((_, i) => bough.r0 + ((bough.r1 - bough.r0) * i) / 10), BARK, { sides: 12 });
     }
-  });
+  }
+  // The crown: every pad a leafy lump, dark where it tucks in under its neighbours.
+  const zTop = Math.max(...tree.pads.map((pad) => pad.z), 1);
+  const lumps = tree.pads.map((pad) => ({
+    x: pad.x,
+    y: pad.y,
+    z: pad.z,
+    rx: pad.r,
+    rz: pad.r * 0.78,
+    color: pad.tier > 0.84 ? CROWN.fringe : pad.z > zTop * 0.84 ? CROWN.top : CROWN.body,
+  }));
+  props.look({ kind: LOOK.foliage, leaf: 11 * spots.u }, () => props.lumps(lumps, { crease: 0.5 }));
   for (const bush of spots.bushes) placeAsset(props, 'bush', { ...kit, x: bush.x, y: bush.y, size: bush.size, seed: bush.seed * 997, colors: BUSH_COLOURS });
   for (const patch of spots.grass) placeAsset(props, 'tallGrass', { ...kit, x: patch.x, y: patch.y, size: patch.size, blade: patch.blade, seed: patch.seed * 991, colors: TALL_GRASS });
   for (const clump of spots.flowers) {
-    placeAsset(props, 'flowers', { ...kit, x: clump.x, y: clump.y, size: clump.size, head: 5.5 * spots.u, count: 6, seed: clump.seed * 983, petals: clump.warm ? BLOOMS.warm : BLOOMS.cool });
+    placeAsset(props, 'flowerBed', { ...kit, x: clump.x, y: clump.y, size: clump.size, depth: 0.7, head: FLOWER_HEAD_PX * spots.u, seed: clump.seed * 983, petals: clump.warm ? BLOOMS.warm : BLOOMS.cool, yaw: clump.seed * 6.28 });
   }
   for (const toadstool of spots.mushrooms) placeAsset(props, 'mushroom', { ...kit, x: toadstool.x, y: toadstool.y, size: toadstool.size, seed: toadstool.seed * 977 });
   return props;

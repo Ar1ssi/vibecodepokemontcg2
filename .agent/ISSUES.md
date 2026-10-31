@@ -6,7 +6,7 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I274). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I275). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Umbrella lines name every member as `(merged I<a>, I<b>…)`: grep any id to find its line.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (`pnpm harness:check`); maintain.md moves older Closed lines to .agent/archive/ISSUES-closed.md.
@@ -14,7 +14,7 @@
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
-- I273 2026-10-31 P3 [mat-fx] Brooklet Hill, Steel Shelter, Scorched Earth and Magma Basin are not on the Stadium kit: their solids are GLSL-only or own-shader, so no kit toon light, outlines or contact shadows; move them onto createKitProps (refs: D233, design 081 Deviations)
+- I274 2026-10-31 P3 [mat-fx] KIT_LEAVES loops 27 cells per foliage pixel each plate redraw (30 fps while a board sways): measure on a low-end GPU; past budget, fade leaves to plain foliage (refs: D234, design 082)
 - I272 2026-10-24 P3 [rules] Homebrew set customhb: every attack/ability runs; only Gloom Drowziness is inert (Asleep cannot retreat). Limits in client/src/assets/custom-sets/customhb/ENGINE-CHECK.md; recheck: node scripts/custom-sets/engine-check.mjs
 - I270 2026-10-19 P3 [rules] Delinquent (PR #222) adds a third "If you do" gate: opponentDiscardFromHand rescans events for a Stadium cardMoved (trainer-steps.mjs:4536) though the executor has `cost` steps and `requiresStadiumDiscard` (executor.mjs:400, :483) — fold into one
 - I269 2026-10-19 P3 [client] trainer-execution.js `_stadiumDiscardedByStep` (:82, PR #222) is module state never reset per runTrainerSteps; a later requiresStadium step with no discardStadium before it reads the last Trainer's value — reset it at run start

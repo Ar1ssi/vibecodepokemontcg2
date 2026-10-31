@@ -12,7 +12,10 @@
 // nothing but the leaves' contact. Per frame: TERRAIN paints the carpet, the ring and the grass in
 // it, the orbs' light and the trees' shade; PROPS the trees, roots and leaves (stadium-env-props);
 // ORBS the glowing orbs and their halos; SPARKLES the trails of four-pointed twinkles.
+// Design 082 (Brilliant Diamond / Shining Pearl): the moss under the blossoms and the grass inside the
+// ring are the ground kit's clover grass (stadium-env-ground.mjs); the trees the kit's leafy ones.
 import {
+  FILTERING,
   FOOTPRINTS,
   FULLSCREEN_VERTEX,
   NOISE,
@@ -23,6 +26,7 @@ import {
   VORONOI,
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
+import { GRASS as GRASS_KIT } from './stadium-env-ground.mjs';
 import { craterEmblem } from './stadium-environment-layout.mjs';
 import { createPropBuilder } from './stadium-env-props.mjs';
 import { createKitProps } from './stadium-kit.mjs';
@@ -148,10 +152,12 @@ const vec3 ORB = vec3(0.55, 1.4, 0.95);
 export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
+${FILTERING}
 ${FOOTPRINTS}
 ${VORONOI}
 ${REVEAL}
 ${EDGE_HAZE}
+${GRASS_KIT}
 ${PALETTE}
 ${FAIRY}
 varying vec2 vPos;
@@ -175,13 +181,14 @@ vec3 blossoms(vec2 p, float size, float chance) {
 }
 void main() {
   vec2 p = vPos;
+  filterPixel = pixelSize(p);
   if (revealBurned(p) * exitKeep(p) < 0.5) discard;
   vec4 field = texture2D(uField, vUv);
   float t = uTime;
   vec3 moon = normalize(uSun);
 
-  // The floor under the blossoms: dark moss, paler where the moon reaches it.
-  vec3 col = mix(FLOOR_DARK, FLOOR_DARK * 2.2 + vec3(0.0, 0.016, 0.01), smoothstep(0.35, 0.7, fbm3(p / 90.0 + 4.0)));
+  // The floor under the blossoms: BDSP's clover grass at night, paler where the moon reaches it.
+  vec3 col = cloverGrass(p, mix(FLOOR_DARK * 1.4, FLOOR_DARK * 2.6 + vec3(0.0, 0.016, 0.01), smoothstep(0.35, 0.7, fbm3(p / 90.0 + 4.0))), fieldCalm(p, 120.0));
   // Two layers of blossoms: small ones among the big, the carpet thinning in patches where the moss
   // shows, and heaping into drifts.
   // Design 080: round the cards the carpet thins to moss with a blossom here and there, so a field of
@@ -210,7 +217,7 @@ void main() {
   if (uRing.z > 0.0) {
     float toRing = distance(p, uRing.xy);
     float inside = 1.0 - smoothstep(uRing.z - 8.0 * uUnit, uRing.z - 1.0 * uUnit, toRing);
-    vec3 grass = mix(GRASS * 0.75, GRASS, 0.5 + 0.5 * smoothstep(0.35, 0.65, fbm3(p / 90.0 + 2.0)));
+    vec3 grass = cloverGrass(p + 13.0, GRASS, 0.5);
     grass += GRASS_LIT * 0.35 * (1.0 - smoothstep(0.0, uRing.z, toRing));
     col = mix(col, grass, inside);
     float line = 1.0 - smoothstep(0.0, 1.6 * uUnit, abs(toRing - uRing.z) - 1.6 * uUnit);
@@ -244,8 +251,8 @@ ${OUTPUT}
 `;
 
 // Prop colours (aColor; w: 0 matte, 0.05 foliage, 0.1 big leaf, 0.12 root bark, 2 and up a light at w - 1).
-const FOLIAGE = [0.03, 0.1, 0.07, 0];
-const FOLIAGE_LIT = [0.05, 0.16, 0.1, 0];
+const FOLIAGE = [0.04, 0.14, 0.09, 0];
+const FOLIAGE_LIT = [0.07, 0.22, 0.13, 0];
 const BARK = [0.1, 0.075, 0.06, 0];
 const LEAF = [0.03, 0.12, 0.07, 0];
 const ORB_CORE = [0.9, 1.5, 1.1, 2.9];
@@ -276,13 +283,12 @@ vec3 kitGlow(vec3 albedo, vec3 n, vec3 world) {
 }
 `;
 
-/** The night forest for the kit: a cool teal moon, deep teal shade, a pale green rim. */
+/** The night forest for the kit: a cool teal moon, a deep teal fill from the night sky. */
 export const FAIRY_NIGHT = Object.freeze({
-  key: [0.55, 0.78, 0.9],
-  shade: [0.22, 0.34, 0.4],
-  sky: [0.35, 0.55, 0.6],
-  rim: [0.5, 0.9, 0.8, 0.35],
-  outline: [0.2, 0.26, 0.26, 1.1],
+  key: [0.6, 0.82, 0.92],
+  sky: [0.17, 0.25, 0.3],
+  bounce: [0.06, 0.1, 0.1],
+  sheen: [0.3, 0.5],
   shadow: [0.3, 0.4, 0.42, 0.55],
 });
 

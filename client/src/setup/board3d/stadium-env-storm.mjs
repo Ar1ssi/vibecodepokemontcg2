@@ -435,11 +435,9 @@ function reedClumps(props, clumps, u) {
 /** The props, as one geometry. */
 export function stormProps(spots) {
   const props = createPropBuilder();
-  props.look({ outline: 1 }, () => {
-    for (const tree of spots.trees) bareTree(props, tree, spots.u);
-    for (const pole of spots.poles) pylon(props, { ...pole, orb: pole.side < 0 ? ORB_PINK : ORB_CYAN }, spots.u);
-    for (const pad of spots.pads) pylon(props, { x: pad.x, y: pad.y, r: 11 * spots.u, h: PAD_POST_PX * spots.u, orb: ORB_PINK }, spots.u);
-  });
+  for (const tree of spots.trees) bareTree(props, tree, spots.u);
+  for (const pole of spots.poles) pylon(props, { ...pole, orb: pole.side < 0 ? ORB_PINK : ORB_CYAN }, spots.u);
+  for (const pad of spots.pads) pylon(props, { x: pad.x, y: pad.y, r: 11 * spots.u, h: PAD_POST_PX * spots.u, orb: ORB_PINK }, spots.u);
   spots.boulders.forEach((rock, k) => placeAsset(props, 'boulder', { x: rock.x, y: rock.y, z: -2, size: rock.r * 1.05, seed: k * 11 + 3, yaw: k, sun: STORM_LIGHT, colors: ROCK }));
   props.look({ kind: LOOK.matte }, () => reedClumps(props, spots.clumps, spots.u));
   return props;
@@ -462,13 +460,12 @@ vec3 kitGlow(vec3 albedo, vec3 n, vec3 world) {
 }
 `;
 
-/** The storm's night for the kit: a cold blue-teal light from the aurora, deep blue shade, a cyan rim. */
+/** The storm's night for the kit (designs 081, 082): a cold blue-teal light from the aurora, a deep blue fill. */
 export const STORM_NIGHT = Object.freeze({
-  key: [0.4, 0.58, 0.75],
-  shade: [0.2, 0.25, 0.4],
-  sky: [0.32, 0.4, 0.55],
-  rim: [0.3, 0.65, 0.8, 0.4],
-  outline: [0.2, 0.22, 0.3, 1.1],
+  key: [0.45, 0.62, 0.8],
+  sky: [0.14, 0.17, 0.26],
+  bounce: [0.06, 0.07, 0.1],
+  sheen: [0.35, 0.6],
   shadow: [0.3, 0.32, 0.45, 0.5],
 });
 

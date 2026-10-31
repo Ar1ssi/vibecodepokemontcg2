@@ -331,8 +331,8 @@ const pipeBands = (props, points, radius) => {
 /** The railing round the dais (open at the stair), its posts, the stair, consoles, tanks and pipes. */
 export function labProps(spots) {
   const props = createPropBuilder();
-  // Design 081: every part in the kit's toon chrome (its metal says how much mirror shows), outlined.
-  props.look({ kind: LOOK.chrome, outline: 1 }, () => labSolids(props, spots));
+  // Design 081: every part in the kit's chrome (its metal says how much mirror shows).
+  props.look({ kind: LOOK.chrome }, () => labSolids(props, spots));
   return props;
 }
 

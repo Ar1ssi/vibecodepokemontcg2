@@ -30,6 +30,7 @@ import {
   TERRAIN_UNIFORMS,
   VORONOI,
 } from './stadium-environment-glsl.mjs';
+import { GRASS } from './stadium-env-ground.mjs';
 import {
   BOG_BLEND_PX,
   CLEARING_BLEND_PX,
@@ -294,6 +295,7 @@ ${FOOTPRINTS}
 ${FILTERING}
 ${VORONOI}
 ${REVEAL}
+${GRASS}
 ${PALETTE}
 ${CANOPY}
 varying vec2 vPos;
@@ -319,36 +321,17 @@ void main() {
   float lit = smoothstep(0.35, 0.5, facing);
   float bright = smoothstep(0.82, 0.94, facing);
 
-  // The clearing's floor: violet earth under teal moss, tufts catching the light, tiny pink and
-  // white flowers in the moss.
-  float moss = smoothstep(0.3, 0.75, fbm3(p / 160.0 + 3.3) + 0.15 * (gnoise(p / 30.0) - 0.5));
-  vec3 earth = mix(vec3(0.03, 0.027, 0.072), vec3(0.058, 0.05, 0.125), lit);
-  vec3 mossCol = mix(vec3(0.022, 0.048, 0.066), vec3(0.04, 0.098, 0.105), lit);
-  mossCol = mix(mossCol, vec3(0.07, 0.19, 0.17), bright * 0.6);
-  vec3 col = mix(earth, mossCol, moss);
-  float speck = grain(p, 3.5);
-  col *= 0.92 + 0.16 * speck;
-  vec4 tuft = voronoiCell(p / 15.0 + 1.7);
-  vec2 fromTuft = -tuft.zw * 15.0;
-  // Each tuft fans its blades up the table, as standing grass leans to a camera looking up it;
-  // the blades taper to their tips.
-  float bladeAngle = atan(fromTuft.x, fromTuft.y + 0.001);
-  float bladeRun = length(fromTuft) / 8.0;
-  float fan = 1.0 - smoothstep(0.8, 1.15, abs(bladeAngle));
-  float blades = smoothstep(0.4 + 0.5 * bladeRun, 0.55 + 0.42 * bladeRun, cos(bladeAngle * 9.0 + tuft.y * 30.0))
-    * fan * (1.0 - smoothstep(0.75, 1.05, bladeRun));
-  // Design 080: round the cards the moss is short (few tufts) and bare of flowers.
+  // The clearing's floor (design 082): BDSP's clover grass in the art's teal, violet earth showing
+  // through in patches fringed by it; quiet round the cards (design 080). The flecks of light
+  // through the canopy drift over it.
   float calm = fieldCalm(p, 110.0);
-  float hasTuft = step(fract(tuft.y * 41.7), 0.55 * (1.0 - 0.65 * calm)) * smoothstep(0.25, 0.7, moss) * patternFade(filterPixel, 15.0);
-  vec3 blade = mix(vec3(0.03, 0.09, 0.08), vec3(0.08, 0.24, 0.19), smoothstep(1.0, 6.0, length(fromTuft)));
-  col = mix(col, blade * mix(0.7, 1.15, lit), blades * hasTuft);
-  // Light falling through the canopy in soft flecks, drifting as the leaves stir.
+  vec3 col = cloverGrass(p, mix(vec3(0.03, 0.1, 0.1), vec3(0.06, 0.2, 0.17), lit), calm);
+  col = mix(col, vec3(0.1, 0.3, 0.22), bright * 0.35);
+  float earthD = (fbm3(p / 160.0 + 3.3) - 0.62) * 300.0;
+  vec3 earth = mix(vec3(0.045, 0.036, 0.1), vec3(0.085, 0.07, 0.17), lit) * (1.0 - 0.25 * fringeShade(earthD, 5.0));
+  col = mix(col, earth, (1.0 - grassFringe(earthD, p, 5.0)) * (1.0 - calm));
   float fleck = smoothstep(0.6, 0.72, fbm3(p / 70.0 + vec2(uTime * 0.02, 0.0) + 11.0));
   col = mix(col, col * 1.5 + vec3(0.01, 0.02, 0.03), fleck * 0.3);
-  vec4 bloom = voronoiCell(p / 26.0 + 5.0);
-  float flower = (1.0 - smoothstep(1.4, 2.2, length(bloom.zw) * 26.0)) * step(fract(bloom.y * 23.1), 0.16) * moss * (1.0 - calm);
-  vec3 petal = fract(bloom.y * 7.7) < 0.6 ? vec3(1.0, 0.32, 0.68) : vec3(0.78, 0.74, 1.0);
-  col = mix(col, petal * mix(0.6, 1.0, lit), flower);
 
   // Bank mud: dark and wet, the poison's light on it.
   vec3 mud = mix(vec3(0.03, 0.016, 0.04), vec3(0.075, 0.04, 0.09), lit);
@@ -374,9 +357,9 @@ void main() {
   vec3 rock = mix(vec3(0.035, 0.034, 0.08), vec3(0.13, 0.12, 0.25), lit) * (0.85 + 0.3 * fract(tone * 9.0));
   rock = mix(rock, vec3(0.05, 0.16, 0.14), smoothstep(0.82, 0.95, n.z) * smoothstep(0.45, 0.6, gnoise(p / 9.0)));
   col = mix(col, rock, step(2.5, kind) * step(kind, 3.5));
-  // The island: lush teal-green grass, thick with pink and white flowers, as in the card art.
-  vec3 islandGrass = mix(vec3(0.03, 0.12, 0.06), vec3(0.08, 0.32, 0.15), lit);
-  islandGrass = mix(islandGrass, vec3(0.18, 0.5, 0.24), bright * 0.7) * (0.85 + 0.3 * speck);
+  // The island: lush teal-green clover grass, thick with pink and white flowers, as in the card art.
+  vec3 islandGrass = cloverGrass(p, mix(vec3(0.04, 0.15, 0.075), vec3(0.1, 0.38, 0.18), lit), 0.0);
+  islandGrass = mix(islandGrass, vec3(0.18, 0.5, 0.24), bright * 0.6);
   vec4 blossom = voronoiCell(p / 9.0 + 2.0);
   float bud = (1.0 - smoothstep(1.2, 2.0, length(blossom.zw) * 9.0)) * step(fract(blossom.y * 17.3), 0.3);
   islandGrass = mix(islandGrass, fract(blossom.y * 5.3) < 0.55 ? vec3(1.0, 0.3, 0.62) : vec3(0.85, 0.82, 1.0), bud);

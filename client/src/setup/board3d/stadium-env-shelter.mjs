@@ -11,6 +11,8 @@
 // No bake of its own: the floor is flat (its bake is empty) and FLOOR paints it, its mirror images
 // and the hologram per frame; WALLS draws the four walls from one geometry built
 // round the hall (shelterSpots), rising off the floor behind the reveal.
+// Design 082 (Brilliant Diamond / Shining Pearl; I273): the walls are lit by the Stadium kit's soft
+// light (stadium-kit.mjs KIT_LIGHT, the hall's own indoor mood), their panelling their own paint.
 import {
   FULLSCREEN_VERTEX,
   NOISE,
@@ -20,6 +22,7 @@ import {
   TERRAIN_UNIFORMS,
 } from './stadium-environment-glsl.mjs';
 import { craterEmblem, environmentFootprints } from './stadium-environment-layout.mjs';
+import { KIT_LIGHT, KIT_UNIFORMS, kitUniforms } from './stadium-kit.mjs';
 import { tableBounds } from './table-uv.mjs';
 
 /** Free floor kept between the cards and the side walls' feet, and the far and near walls'. */
@@ -360,6 +363,7 @@ void main() {
 
 export const WALL_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
+${KIT_UNIFORMS}
 ${NOISE}
 ${REVEAL}
 ${HEX}
@@ -367,6 +371,7 @@ ${HALL}
 varying vec4 vPaint;
 varying vec3 vNormal;
 varying vec3 vWall;
+${KIT_LIGHT}
 void main() {
   vec2 vPos = vWall.xy;
   if (revealBurned(vPos) * exitKeep(vPos) < 0.5) discard;
@@ -375,10 +380,7 @@ void main() {
   if (vPaint.w < 0.5 ? past.y > past.x + 0.5 : past.x > past.y + 0.5) discard;
   vec3 glow;
   vec3 col = wallPaint(vPaint.x, vPaint.y, 1.0 - step(0.5, vPaint.w), glow);
-  vec3 n = normalize(vNormal);
-  // The hall's light comes from the ceiling: tops brightest, faces a little dimmer, the foot shaded.
-  col *= 0.72 + 0.28 * n.z;
-  col *= mix(0.78, 1.0, smoothstep(0.0, 26.0, vPaint.y));
+  vec3 n = normalize(gl_FrontFacing ? vNormal : -vNormal);
   if (vPaint.z > 0.5) {
     // The wall's top: a pale cornice, a cyan line along its inner edge, then the dark roof over
     // the rooms beyond the hall, panelled, out to the scene's edge.
@@ -399,6 +401,9 @@ void main() {
     roof = mix(roof, STRIP_CYAN * 0.6, (1.0 - smoothstep(0.6, 1.6, abs(lane - 14.5))) * step(16.0, panel.x) * smoothstep(40.0, 60.0, beyond - ${WALL_PX.cap}.0));
     col = mix(col, roof, smoothstep(${WALL_PX.cap - 20}.0, ${WALL_PX.cap}.0, beyond));
   }
+  // The kit's light (design 082): the panelling's paint as its albedo, a faint sheen on the enamel,
+  // the wall's foot a little darker where it meets the floor.
+  col = kitLight(col * 0.78, n, vWall, vec4(0.0, 0.0, 1.0, 0.0), 0.25) * mix(0.8, 1.0, smoothstep(0.0, 26.0, vPaint.y));
   col += glow;
   col += STRIP_CYAN * revealGlow(vPos, 0.035);
   gl_FragColor = vec4(col, 1.0);
@@ -480,12 +485,22 @@ export function wallGeometry(three, hall, bounds) {
 
 const NO_SPOTS = { hall: null, gate: null, emblem: null };
 
+/** The hall's light for the kit (design 082): white from the ceiling's panels, a pale cool fill off the white walls and floor. */
+export const SHELTER_MOOD = Object.freeze({
+  key: [0.95, 0.97, 1.0],
+  sky: [0.46, 0.48, 0.52],
+  bounce: [0.38, 0.4, 0.44],
+  sheen: [0.4, 0.7],
+  shadow: [0.55, 0.58, 0.66, 0.5],
+});
+
 /** Steel Shelter's board (stadium-environment-mesh.js BOARDS): the floor and the walls. */
 export function steelShelterBoard({ three, material, replaceGeometry, bakeOptions }) {
   const own = {
     uHall: { value: new three.Vector4() },
     uGate: { value: new three.Vector3() },
     uEmblem: { value: new three.Vector3() },
+    ...kitUniforms(three, SHELTER_MOOD),
   };
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
   const materials = {

@@ -12,7 +12,9 @@ import {
   EXIT_MS,
   INTRO_MS,
   PLATE_MAX_PIXELS,
+  BLOOM,
   PREPARE_TIMEOUT_MS,
+  TILT_SHIFT,
   createStadiumEnvironment,
   jungleTreeProps,
   plateScale,
@@ -133,6 +135,49 @@ test('plateScale: CSS-pixel size at most, never more than PLATE_MAX_PIXELS', () 
     assert.ok(scale <= 1 / ratio + 1e-9 && width * height * scale * scale <= PLATE_MAX_PIXELS + 1);
   }
   assert.equal(plateScale(0, 0, 0), 1, 'a zero canvas does not divide by zero');
+});
+
+test('the plate is mipmapped and laid through the tilt-shift, the under plate of a swap alike (design 082)', async () => {
+  const three = await import('../../../vendor/three/three.module.min.js');
+  let target = null;
+  const scenes = [];
+  const renderer = {
+    extensions: { has: () => true },
+    compile: () => {},
+    shadowMap: { autoUpdate: true },
+    getRenderTarget: () => target,
+    setRenderTarget: (next) => {
+      target = next;
+    },
+    render: (scene) => scenes.push({ scene, target }),
+    getPixelRatio: () => 1,
+    getDrawingBufferSize: (out) => out.set(1920, 1080),
+  };
+  const environment = createStadiumEnvironment({ three, renderer, parent: new three.Group(), isHidden: () => true });
+  const camera = new three.PerspectiveCamera();
+  environment.setLayout(layout);
+  environment.setKey('perilous-jungle');
+  environment.update(1000, camera);
+  environment.update(3000 + INTRO_MS + 400, camera);
+  const world = new three.Scene();
+  environment.drawPlate(world, camera);
+  const plate = scenes.find((drawn) => drawn.scene === world)?.target;
+  assert.ok(plate, 'the plate is drawn into a target');
+  assert.equal(plate.texture.generateMipmaps, true);
+  assert.equal(plate.texture.minFilter, three.LinearMipmapLinearFilter, 'its taps read the mip chain');
+  const laid = scenes.at(-1).scene.children[0].material;
+  assert.equal(scenes.at(-1).target, null, 'laid on the canvas');
+  assert.match(laid.fragmentShader, /vec4 top = tiltShift\(uPlate, vUv\);/);
+  assert.match(laid.fragmentShader, /vec4 under = tiltShift\(uUnder, vUv\);/);
+  assert.match(laid.fragmentShader, /textureLod\(plate, uv \+ offset \* texel, lod\)/);
+  assert.deepEqual(laid.uniforms.uTiltShift.value.toArray(), [TILT_SHIFT.centre, TILT_SHIFT.band, TILT_SHIFT.edge]);
+  assert.ok(TILT_SHIFT.band > 0 && TILT_SHIFT.band < 0.5 && TILT_SHIFT.edge > 0, 'a sharp band through the middle, soft past it');
+  // The glow reads the plate's coarse mip, only past its threshold, and only where the plate is.
+  assert.match(laid.fragmentShader, /top\.rgb \+= bloom\(uPlate, vUv\) \* top\.a;/);
+  assert.match(laid.fragmentShader, /under\.rgb \+= bloom\(uUnder, vUv\) \* under\.a;/);
+  assert.deepEqual(laid.uniforms.uBloom.value.toArray(), [BLOOM.threshold, BLOOM.strength, BLOOM.level]);
+  assert.ok(BLOOM.threshold > 0.5 && BLOOM.strength < 0.5, 'a soft glow on the brightest parts only');
+  environment.dispose();
 });
 
 test('drawPlate redraws the plate only when it is stale: a time step, a camera, a canvas size', async () => {

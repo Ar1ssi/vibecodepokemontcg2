@@ -174,7 +174,7 @@ export function citySpots(layout) {
 /** The parapet round the roof, the hut with its door and lamp, the towers' rooftops, billboards' posts and searchlights, the round tower's crown. */
 export function cityProps(spots) {
   const props = createPropBuilder();
-  props.look({ outline: 1 }, () => citySolids(props, spots));
+  citySolids(props, spots);
   return props;
 }
 
@@ -708,13 +708,12 @@ vec3 kitGlow(vec3 albedo, vec3 n, vec3 world) {
 }
 `;
 
-/** The rooftop at night for the kit: the city's cool glow from above, deep blue shade, a violet rim off the neon. */
+/** The rooftop at night for the kit (designs 081, 082): the city's cool glow from above, a deep blue fill. */
 export const CITY_NIGHT = Object.freeze({
-  key: [0.32, 0.36, 0.5],
-  shade: [0.16, 0.17, 0.3],
-  sky: [0.22, 0.24, 0.4],
-  rim: [0.7, 0.45, 1.0, 0.3],
-  outline: [0.12, 0.12, 0.2, 1.1],
+  key: [0.36, 0.4, 0.55],
+  sky: [0.14, 0.15, 0.25],
+  bounce: [0.06, 0.06, 0.1],
+  sheen: [0.35, 0.6],
   shadow: [0.3, 0.3, 0.45, 0.55],
 });
 

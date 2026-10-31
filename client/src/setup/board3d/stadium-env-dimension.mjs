@@ -13,9 +13,12 @@
 // on it), B a tone 0..1, A unused; the shared light bake adds normals and occlusion. Per frame:
 // TERRAIN paints the island's grass, the painted mark and the edge's lip (and nothing past the edge,
 // where the void shows); ROCK draws the island's cliffs, every small island and the bare tree, bobbing,
-// in the Stadium kit's light (design 081: a two-tone toon ramp; the earth in clean bands of strata, no
+// in the Stadium kit's light (designs 081, 082: its soft wrapped key; the earth in clean bands of strata, no
 // noise or cracks), lit from below in the void's colours;
 // DISCS the glowing coloured discs; VOID the rainbow void far below; SPARKLES the white sparkle.
+// Design 082 (Brilliant Diamond / Shining Pearl, the Distortion World's floating isles): the grass is
+// the ground kit's clover grass (stadium-env-ground.mjs), bare soil fringed by it; the rock is lit
+// by the kit's soft light, its strata bands kept.
 import {
   FILTERING,
   FOOTPRINTS,
@@ -30,6 +33,7 @@ import {
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
 import { craterEmblem, environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
+import { GRASS as GRASS_KIT } from './stadium-env-ground.mjs';
 import { createPropBuilder } from './stadium-env-props.mjs';
 import { KIT_LIGHT, KIT_UNIFORMS, kitUniforms } from './stadium-kit.mjs';
 import { tableBounds } from './table-uv.mjs';
@@ -263,24 +267,24 @@ const PALETTE = /* glsl */ `
 const vec3 GRASS = vec3(0.13, 0.34, 0.08);
 const vec3 GRASS_LIT = vec3(0.29, 0.54, 0.12);
 const vec3 GRASS_DARK = vec3(0.063, 0.193, 0.058);
-const vec3 EARTH = vec3(0.245, 0.142, 0.085);
 const vec3 MARK = vec3(0.9, 0.232, 0.572);
 `;
 
-// The art's grass on the great island (design 081: painted, not textured): two greens in its broad
-// clumps and soft patches of sun.
+// The art's grass on the great island (design 082): BDSP's clover grass in two greens by its broad
+// clumps, quieter round the cards.
 const GRASS_SURFACE = /* glsl */ `
-vec3 grassSurface(vec2 p, float clump) {
-  vec3 col = mix(GRASS_DARK, GRASS, 0.4 + 0.6 * smoothstep(0.3, 0.7, clump));
-  return col * (1.0 + 0.12 * smoothstep(0.45, 0.7, fbm3(p / 120.0 + 9.0)));
+vec3 grassSurface(vec2 p, float clump, float calm) {
+  return cloverGrass(p, mix(GRASS_DARK, GRASS, 0.45 + 0.55 * smoothstep(0.3, 0.7, clump)), calm);
 }
 `;
 export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
 ${FILTERING}
+${FOOTPRINTS}
 ${REVEAL}
 ${POKE_BALL}
+${GRASS_KIT}
 ${PALETTE}
 ${GRASS_SURFACE}
 ${VALLEY}
@@ -299,12 +303,11 @@ void main() {
   vec3 n = normalize(vec3(nxy / nz * vGrowth, 1.0));
   float lit = clamp(dot(n, normalize(uSun)), 0.0, 1.0);
 
-  // The grass: soft clumps, tufts of tall blades, lighter where they catch the sun.
-  vec3 col = grassSurface(p, field.b);
-  // Broad drifts of sun-yellow and shaded blue-green, and bare soil showing through toward the edge.
+  // The grass: BDSP's clover grass in soft clumps, lighter where they catch the sun.
+  vec3 col = grassSurface(p, field.b, fieldCalm(p, 110.0));
+  // Broad drifts of sun-yellow and shaded blue-green (design 082: no bare soil in patches, which
+  // read as stains from above; the earth shows at the cliff's lip).
   col *= mix(vec3(0.9, 1.0, 0.9), vec3(1.08, 1.03, 0.88), fbm3(p / 230.0 + 2.0));
-  float soil = smoothstep(0.6, 0.7, fbm3(p / 52.0 + 3.0)) * smoothstep(-76.0, -16.0, field.g);
-  col = mix(col, EARTH * (0.75 + 0.5 * grain(p, 5.0)), soil * 0.85);
   col *= 0.65 + 0.45 * lit;
   col *= mix(0.6, 1.0, smoothstep(0.3, 0.9, light.b));
   // Toward the edge the grass thins over the earth, then its lip catches the light where it turns
@@ -517,7 +520,7 @@ void main() {
   vec3 n = normalize(gl_FrontFacing ? vNormal : -vNormal);
   float band = step(0.5, fract(vWorld.z / 26.0));
   vec3 earth = vColor.rgb * mix(0.9, 1.06, band);
-  vec3 grass = vec3(0.36, 0.62, 0.2) * mix(0.9, 1.05, smoothstep(0.4, 0.6, fbm3(vWorld.xy / 90.0)));
+  vec3 grass = vec3(0.2, 0.42, 0.11) * mix(0.9, 1.05, smoothstep(0.4, 0.6, fbm3(vWorld.xy / 90.0)));
   vec3 albedo = mix(earth, grass, vColor.a);
   vec3 col = kitLight(albedo, n, vWorld, vec4(vColor.a > 0.5 ? 1.0 : 0.0, 0.0, 1.0, 0.0), 0.0);
   // The void's light from below, in its own colour where the rock hangs over it.
@@ -528,12 +531,13 @@ ${OUTPUT}
 }
 `;
 
-/** The valley's light for the kit: a bright warm sun over the slabs, the shade a violet of the void. */
+/** The valley's light for the kit: a bright warm sun over the slabs, the fill a violet of the void. */
 export const VALLEY_MOOD = Object.freeze({
   key: [1.0, 0.96, 0.9],
-  shade: [0.46, 0.4, 0.66],
-  sky: [0.7, 0.6, 0.9],
-  rim: [1.0, 0.8, 1.0, 0.25],
+  sky: [0.34, 0.3, 0.46],
+  bounce: [0.2, 0.14, 0.26],
+  sheen: [0.3, 0.55],
+  shadow: [0.4, 0.36, 0.56, 0.6],
 });
 
 /** Every glowing disc: a flat instanced quad on the grass, bobbing with its island. */

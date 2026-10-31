@@ -8,9 +8,10 @@
 //
 // Design 081 (the Stadium kit) adds to the builder what the kit's assets (stadium-kit-assets.mjs)
 // are modelled with: placement frames (an asset is built about its own foot, then moved, turned,
-// leant and scaled into the table frame), a look per part (aLook: the toon kind, the sway in px, a
-// shade, the outline's weight), contact shadows (soft ellipses on the ground, built apart by
-// buildShadows) and, at build, aHull: the smoothed normal the outline pass pushes the hull along.
+// leant and scaled into the table frame), a look per part (aLook: the light's kind, the sway in px, a
+// shade, and since design 082 the size of its leaves in px) and contact shadows (soft ellipses on the
+// ground, built apart by buildShadows). Design 082 adds the BDSP shapes: `lumps` (leafy or rocky
+// clusters, dark in their creases) and `roundBox` (a box with rounded edges).
 import { NOISE, REVEAL, TERRAIN_GROUND, TERRAIN_UNIFORMS } from './stadium-environment-glsl.mjs';
 
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -23,18 +24,16 @@ const unit = (a) => {
 const faceNormal = (n) => (Math.hypot(n[0], n[1], n[2]) > 1e-9 ? unit(n) : [0, 0, 1]);
 
 /**
- * Toon kinds a part is shaded as (aLook.x; stadium-kit.mjs KIT_LIGHT). `matte`: a thin dry stalk or
- * blade, lit by the key alone, no rim or glint (seen from above it is all edge, and a rim would
- * swamp its own colour).
+ * Kinds a part is lit as (aLook.x; stadium-kit.mjs KIT_LIGHT). `matte`: a thin dry stalk or blade,
+ * lit without sheen (seen from above it is all edge).
  */
 export const LOOK = Object.freeze({ plain: 0, foliage: 1, gloss: 2, crystal: 3, cloud: 4, chrome: 5, matte: 6 });
 
 /**
- * A part's look unless it says otherwise: plain, still, unshaded, no outline. Loose quads and
- * triangles (a banner, a flag, a leaf: sheets with nothing behind them) never take the outline
- * unless `sheets` says they close a solid (a roof, a parasol); a box's faces always do.
+ * A part's look unless it says otherwise: plain, still, unshaded, no leaves. `leaf` (px, in the
+ * part's own frame) covers a foliage part with shingled leaves that size (stadium-kit.mjs KIT_LEAVES).
  */
-export const DEFAULT_LOOK = Object.freeze({ kind: LOOK.plain, sway: 0, shade: 1, outline: 0, sheets: false });
+export const DEFAULT_LOOK = Object.freeze({ kind: LOOK.plain, sway: 0, shade: 1, leaf: 0 });
 
 const IDENTITY = Object.freeze({ m: Object.freeze([1, 0, 0, 0, 1, 0, 0, 0, 1]), t: Object.freeze([0, 0, 0]), k: 1 });
 
@@ -78,8 +77,8 @@ export const composeFrames = (parent, child) => ({
 
 /**
  * A builder of lit solids in the table frame (x right, y far, z up, px).
- * @returns {{ tube: Function, cylinder: Function, box: Function, quad: Function, triangle: Function,
- *   ring: Function, sphere: Function, cone: Function, blob: Function, lathe: Function, facets: Function, surface: Function,
+ * @returns {{ tube: Function, cylinder: Function, box: Function, roundBox: Function, quad: Function, triangle: Function,
+ *   ring: Function, sphere: Function, cone: Function, blob: Function, lumps: Function, lathe: Function, facets: Function, surface: Function,
  *   at: Function, look: Function, withoutShadows: Function, shadow: Function, frame: () => object,
  *   vertexCount: () => number, shadowCount: () => number,
  *   build: (three: typeof import('three')) => import('three').BufferGeometry,
@@ -106,7 +105,7 @@ export function createPropBuilder() {
     positions.push(at[0], at[1], at[2]);
     normals.push(facing[0], facing[1], facing[2]);
     colors.push(color[0], color[1], color[2], color[3] ?? 0);
-    looks.push(look.kind, look.sway, look.shade, look.outline);
+    looks.push(look.kind, look.sway, look.shade, look.leaf > 0 ? look.leaf * frame.k : 0);
     if (foot) feet.push(foot[0], foot[1], foot[2]);
     else feet.push(at[0], at[1], 0);
     return positions.length / 3 - 1;
@@ -163,9 +162,6 @@ export function createPropBuilder() {
     shadows.push([centre[0], centre[1], centre[2], rx * frame.k, ry * frame.k, heading, Math.min(1, strength), foot ? foot[2] : 0]);
   };
 
-  /** Builds `draw`'s loose quads and triangles without an outline unless the look's `sheets` says so. */
-  const asSheet = (draw) => (look.sheets || !(look.outline > 0) ? draw() : withLook({ outline: 0 }, draw));
-
   /** A flat quad a-b-c-d (counter-clockwise seen from its front), one normal. */
   const face = (a, b, c, d, color) => {
     // Across the diagonals: a quad with one corner pinched to a point (a frond's tip) still has a normal.
@@ -176,11 +172,10 @@ export function createPropBuilder() {
     vertex(d, n, color);
     index.push(first, first + 1, first + 2, first, first + 2, first + 3);
   };
-  const quad = (a, b, c, d, color) => asSheet(() => face(a, b, c, d, color));
+  const quad = (a, b, c, d, color) => face(a, b, c, d, color);
 
   /** A flat triangle a-b-c (counter-clockwise seen from its front), one normal. */
-  const triangle = (a, b, c, color) => asSheet(() => sheetTriangle(a, b, c, color));
-  const sheetTriangle = (a, b, c, color) => {
+  const triangle = (a, b, c, color) => {
     const n = faceNormal(cross(sub(b, a), sub(c, a)));
     const first = vertex(a, n, color);
     vertex(b, n, color);
@@ -288,7 +283,7 @@ export function createPropBuilder() {
    * `rings` its tessellation grows with its size.
    */
   const blob = ({ x = 0, y = 0, z = 0, rx, ry = rx, rz = rx, color, sides: around, rings: down, from = 0, to = 1 }) => {
-    // Rounder the bigger it is on screen: a toon terminator shows every facet of a coarse sphere.
+    // Rounder the bigger it is on screen: a light's terminator shows every facet of a coarse sphere.
     const sides = around ?? Math.round(Math.min(34, Math.max(12, Math.sqrt(Math.max(rx, ry) * frame.k) * 3.4)));
     const rings = down ?? Math.round(sides * 0.66);
     const first = positions.length / 3;
@@ -378,6 +373,89 @@ export function createPropBuilder() {
   };
 
   /**
+   * A box from z0 to z1, half sizes hw (along its yaw) and hh, its every edge rounded at radius r
+   * (an inner box swept by a ball: smooth normals round each edge), turned by yaw; its five faces
+   * but the floor. Vertices facing up (n.z > 0.5) take `topColor`.
+   */
+  const roundBox = ({ x, y, z0, z1, hw, hh, r, yaw = 0, color, topColor = color }) => {
+    const half = [hw, hh, (z1 - z0) / 2];
+    const radius = Math.max(0, Math.min(r, 0.999 * Math.min(...half)));
+    // The inner box the ball sweeps: inset by the radius but at its floor, which stands square on
+    // the ground (its bottom edges are not rounded).
+    const low = [radius - hw, radius - hh, -half[2]];
+    const high = half.map((h) => h - radius);
+    const centre = [x, y, (z0 + z1) / 2];
+    const c = Math.cos(yaw);
+    const s = Math.sin(yaw);
+    // Samples along one axis of a face: through the flat middle, then a quarter of each bevel (the
+    // neighbouring face draws the other quarter): tan spacing puts them evenly round the bevel.
+    const steps = 3;
+    const along = (axis) => {
+      const bevel = (edge, sign) => Array.from({ length: steps }, (_, k) => edge + sign * radius * Math.tan((((k + 1) / steps) * Math.PI) / 4));
+      const below = axis === 2 ? [] : bevel(low[axis], -1).reverse();
+      return [...below, low[axis], high[axis], ...bevel(high[axis], 1)];
+    };
+    const faces = [
+      { axis: 2, sign: 1, u: 0, v: 1 },
+      { axis: 0, sign: 1, u: 1, v: 2 },
+      { axis: 0, sign: -1, u: 2, v: 1 },
+      { axis: 1, sign: 1, u: 2, v: 0 },
+      { axis: 1, sign: -1, u: 0, v: 2 },
+    ];
+    for (const { axis, sign, u, v } of faces) {
+      const us = along(u);
+      const vs = along(v);
+      const first = positions.length / 3;
+      for (const b of vs) {
+        for (const a of us) {
+          const q = [0, 0, 0];
+          q[axis] = sign * half[axis];
+          q[u] = a;
+          q[v] = b;
+          const core = q.map((value, k) => Math.max(low[k], Math.min(high[k], value)));
+          const n = unit(q.map((value, k) => value - core[k] + (k === axis ? sign * 1e-6 : 0)));
+          const local = core.map((value, k) => value + n[k] * radius);
+          const world = [centre[0] + local[0] * c - local[1] * s, centre[1] + local[0] * s + local[1] * c, centre[2] + local[2]];
+          const facing = [n[0] * c - n[1] * s, n[0] * s + n[1] * c, n[2]];
+          vertex(world, facing, facing[2] > 0.5 ? topColor : color);
+        }
+      }
+      const width = us.length;
+      for (let j = 0; j < vs.length - 1; j += 1) {
+        for (let i = 0; i < width - 1; i += 1) {
+          const a = first + j * width + i;
+          index.push(a, a + 1, a + width + 1, a, a + width + 1, a + width);
+        }
+      }
+    }
+  };
+
+  /**
+   * A cluster of soft lumps (a canopy's, a bush's, a boulder's): each an ellipsoid as `blob` builds
+   * it ({ x, y, z, rx, ry, rz, color }), its colour darkened where it tucks in against another lump,
+   * so the creases between lumps read deep. `crease` 0..1 is how dark a crease gets.
+   */
+  const lumps = (list, { crease = 0.45 } = {}) => {
+    list.forEach((lump, i) => {
+      const { x = 0, y = 0, z = 0, rx, ry = rx, rz = rx, color } = lump;
+      const tint = (d) => {
+        const base = typeof color === 'function' ? color(d) : color;
+        const p = [x + d[0] * rx, y + d[1] * ry, z + d[2] * rz];
+        let open = 1;
+        list.forEach((other, j) => {
+          if (j === i) return;
+          const q = [(p[0] - (other.x ?? 0)) / other.rx, (p[1] - (other.y ?? 0)) / (other.ry ?? other.rx), (p[2] - (other.z ?? 0)) / (other.rz ?? other.rx)];
+          const reach = Math.hypot(q[0], q[1], q[2]);
+          const near = 1 - Math.min(1, Math.max(0, (reach - 1) / 0.5));
+          open *= 1 - crease * near * near;
+        });
+        return [base[0] * open, base[1] * open, base[2] * open, base[3] ?? 0];
+      };
+      blob({ ...lump, color: tint });
+    });
+  };
+
+  /**
    * Faceted solid: `points` [x, y, z] and `faces` (index triples, counter-clockwise seen from
    * outside), every face flat shaded. `color` is one colour or a function of the face's centre and
    * normal (a lighter top, a darker foot).
@@ -425,34 +503,6 @@ export function createPropBuilder() {
     }
   };
 
-  /**
-   * The hull normal of every vertex: its normal averaged over every outlined vertex at the same
-   * place, so a box's hull swells out round its corners instead of parting along its edges.
-   */
-  const hullNormals = () => {
-    const sums = new Map();
-    const keyOf = (i) => `${Math.round(positions[i * 3] * 32)},${Math.round(positions[i * 3 + 1] * 32)},${Math.round(positions[i * 3 + 2] * 32)}`;
-    const count = positions.length / 3;
-    const keys = new Array(count);
-    for (let i = 0; i < count; i += 1) {
-      if (!(looks[i * 4 + 3] > 0)) continue;
-      keys[i] = keyOf(i);
-      const sum = sums.get(keys[i]) ?? [0, 0, 0];
-      sum[0] += normals[i * 3];
-      sum[1] += normals[i * 3 + 1];
-      sum[2] += normals[i * 3 + 2];
-      sums.set(keys[i], sum);
-    }
-    const hull = new Float32Array(count * 3);
-    for (let i = 0; i < count; i += 1) {
-      const own = [normals[i * 3], normals[i * 3 + 1], normals[i * 3 + 2]];
-      const sum = keys[i] ? sums.get(keys[i]) : null;
-      const n = sum && Math.hypot(...sum) > 1e-3 ? unit(sum) : own;
-      hull.set(n, i * 3);
-    }
-    return hull;
-  };
-
   const build = (three) => {
     const geometry = new three.BufferGeometry();
     geometry.setAttribute('position', new three.Float32BufferAttribute(positions, 3));
@@ -460,7 +510,6 @@ export function createPropBuilder() {
     geometry.setAttribute('aColor', new three.Float32BufferAttribute(colors, 4));
     geometry.setAttribute('aLook', new three.Float32BufferAttribute(looks, 4));
     geometry.setAttribute('aFoot', new three.Float32BufferAttribute(feet, 3));
-    geometry.setAttribute('aHull', new three.Float32BufferAttribute(hullNormals(), 3));
     geometry.setIndex(index);
     return geometry;
   };
@@ -499,11 +548,13 @@ export function createPropBuilder() {
     cylinder,
     ring,
     box,
+    roundBox,
     quad,
     triangle,
     sphere,
     cone,
     blob,
+    lumps,
     lathe,
     facets,
     surface,

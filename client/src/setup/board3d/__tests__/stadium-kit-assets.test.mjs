@@ -17,6 +17,9 @@ const OPTION_GRID = {
   fern: { size: [10, 30, 50], fronds: [4, 5, 6, 7, 8] },
   tallGrass: { size: [10, 18, 24, 30, 40], blade: [10, 15, 16, 17, 22] },
   flowers: { size: [7, 16, 24], head: [3, 4.5, 6, 8], count: [3, 5, 6, 8, 10] },
+  flowerBed: { size: [12, 30, 50], depth: [0.3, 0.6, 1, 1.4], head: [4, 6, 8] },
+  ledgeRock: { size: [14, 30, 50], slabs: [1, 2, 3, 4] },
+  bollard: { size: [4, 6, 9], height: [10, 16, 24] },
   boulder: { size: [10, 24, 40], height: [undefined, 10, 30], depth: [0.6, 0.8, 0.86, 1] },
   pebbles: { size: [8, 14, 24], count: [2, 4, 7] },
   spire: { size: [12, 26, 40], height: [undefined, 50, 120] },
@@ -97,7 +100,8 @@ test('placeAsset: shadows: false casts none; the palette takes a #hex or a linea
   let sawGreen = false;
   for (let i = 0; i < colour.count; i += 1) {
     if (colour.getX(i) > 0.5 && colour.getY(i) < 0.1) sawRed = true;
-    if (colour.getY(i) === 1 && colour.getX(i) === 0) sawGreen = true;
+    // The linear green as given, only ever darkened in a crease between lumps.
+    if (colour.getX(i) === 0 && colour.getZ(i) === 0 && colour.getY(i) > 0.3) sawGreen = true;
   }
   assert.ok(sawRed && sawGreen);
 });

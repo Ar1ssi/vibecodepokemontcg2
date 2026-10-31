@@ -257,19 +257,18 @@ function screenPanel(props, s, u) {
 }
 
 /** Everything solid, as one prop geometry. */
-/** The zone's light for the kit (design 081): a cool blue-white from the beams, deep blue shade. */
+/** The zone's light for the kit (designs 081, 082): a cool blue-white from the beams, a deep blue fill. */
 export const NEUTRAL_MOOD = Object.freeze({
-  key: [0.85, 0.92, 1.08],
-  shade: [0.4, 0.46, 0.7],
-  sky: [0.5, 0.6, 0.85],
-  rim: [0.6, 0.8, 1.0, 0.22],
-  outline: [0.24, 0.28, 0.4, 1.1],
+  key: [0.85, 0.92, 1.05],
+  sky: [0.3, 0.36, 0.5],
+  bounce: [0.16, 0.18, 0.26],
+  sheen: [0.35, 0.65],
   shadow: [0.42, 0.46, 0.66, 0.5],
 });
 
 export function neutralProps(spots) {
   const props = createPropBuilder();
-  props.look({ kind: LOOK.chrome, outline: 1 }, () => neutralSolids(props, spots));
+  props.look({ kind: LOOK.chrome }, () => neutralSolids(props, spots));
   return props;
 }
 

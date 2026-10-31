@@ -12,10 +12,12 @@
 // Bake, once per layout: BAKE_FIELD writes R height px, G px from the plaza's centre, B the stone's
 // tone 0..1, A the kind (-2 water, -1 pool curb, 0 plaza, 1 steps, 2 garden ground); the shared light
 // bake adds normals, occlusion and the moon's shadow. Per frame: TERRAIN paints the stone, the water,
-// the grass and every light (the pool's, the lanterns'); the kit's meshes (design 081: one toon light
-// with the pool's cyan and the lanterns' pink over it, outlines, contact shadows) the balustrade,
+// the grass and every light (the pool's, the lanterns'); the kit's meshes (design 081: the kit's light
+// with the pool's cyan and the lanterns' pink over it, contact shadows) the balustrade,
 // lanterns, urns, vases and pillars, and the kit's own hedges, ferns by the vases and pillars and
 // white flowers in the urns; FIREFLIES the motes drifting over the garden.
+// Design 082 (Brilliant Diamond / Shining Pearl): the flagstones crisp with a moonlit bevel and no
+// grain; the garden ground the ground kit's clover grass; no ink outlines.
 import {
   FILTERING,
   FOOTPRINTS,
@@ -29,6 +31,7 @@ import {
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
 import { craterEmblem, environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
+import { GRASS as GRASS_KIT } from './stadium-env-ground.mjs';
 import { createPropBuilder } from './stadium-env-props.mjs';
 import { createKitProps } from './stadium-kit.mjs';
 import { placeAsset } from './stadium-kit-assets.mjs';
@@ -272,6 +275,7 @@ ${NOISE}
 ${FOOTPRINTS}
 ${FILTERING}
 ${REVEAL}
+${GRASS_KIT}
 ${PALETTE}
 ${GARDEN}
 varying vec2 vPos;
@@ -279,6 +283,7 @@ varying vec2 vUv;
 varying float vGrowth;
 void main() {
   vec2 p = vPos;
+  filterPixel = pixelSize(p);
   if (revealBurned(p) * exitKeep(p) < 0.5) discard;
   vec4 field = texture2D(uField, vUv);
   vec4 light = texture2D(uLight, vUv);
@@ -302,12 +307,11 @@ void main() {
   vec3 rose = vec3(0.4, 0.25, 0.33);
   vec3 col = mix(mix(slate, PAVING, smoothstep(0.0, 0.5, field.b)), rose, smoothstep(0.62, 1.0, field.b) * 0.85);
   col = mix(col, mix(slate, PAVING, 0.6), calm * 0.6);
-  col *= 0.9 + 0.14 * fbm3(p / 26.0);
-  col *= 1.0 + 0.12 * (1.0 - calm) * patternFade(pixelSize(p), 9.0)
-    * smoothstep(0.55, 0.8, gnoise(vec2(dot(p, vec2(0.8, 0.6)) / 38.0, dot(p, vec2(-0.6, 0.8)) / 9.0)));
-  col = mix(col, col * 1.2, (1.0 - smoothstep(1.2, 3.6, stone.x)) * smoothstep(0.5, 1.8, stone.x) * (1.0 - 0.7 * calm));
-  float joint = (1.0 - smoothstep(0.4, 1.7, stone.x)) * mix(1.0, 0.45, calm);
-  vec3 moss = vec3(0.05, 0.19, 0.14) * (0.85 + 0.3 * fbm3(p / 12.0));
+  // Design 082: each slab clean, its rounded shoulder catching the moon pale (BDSP's flagstones), its
+  // joint a crisp dark line, moss in the joints out past the cards.
+  col = mix(col, col * 1.2, (1.0 - smoothstep(1.0, 3.2, stone.x)) * smoothstep(0.4, 1.4, stone.x) * (1.0 - 0.6 * calm));
+  float joint = (1.0 - smoothstep(0.5, 1.3, stone.x)) * mix(1.0, 0.5, calm);
+  vec3 moss = vec3(0.05, 0.19, 0.14);
   col = mix(col, PAVING_DARK * 0.55, joint);
   col = mix(col, moss, joint * smoothstep(0.42, 0.68, fbm3(p / 34.0 + 7.0)) * 0.8 * (1.0 - calm));
   // The steps and the curb: the paler wall stone of the art's terrace.
@@ -320,8 +324,8 @@ void main() {
   pale *= 0.96 + 0.08 * fbm3(p / 14.0);
   col = mix(col, pale, step(0.5, kind) * step(kind, 1.5));
   col = mix(col, pale, step(-1.5, kind) * step(kind, -0.5));
-  // The garden ground: dark grass.
-  vec3 grass = mix(HEDGE_DARK, GRASS * 0.8, smoothstep(0.3, 0.7, fbm3(p / 55.0 + 4.0)));
+  // The garden ground: BDSP's clover grass, dark by night.
+  vec3 grass = cloverGrass(p, mix(HEDGE_DARK * 1.4, GRASS * 0.85, smoothstep(0.3, 0.7, fbm3(p / 55.0 + 4.0))), 0.0);
   col = mix(col, grass, step(1.5, kind));
   col = nightLight(col, moonlit) * mix(0.55, 1.0, smoothstep(0.3, 0.9, light.b));
 
@@ -405,7 +409,7 @@ const lantern = (props, x, y, z, u) => {
 /** The balustrade, its lanterns and flower urns, the vases and pillars: one prop geometry. */
 export function gardenProps(spots) {
   const props = createPropBuilder();
-  props.look({ outline: 1 }, () => gardenFurniture(props, spots));
+  gardenFurniture(props, spots);
   const { hedges, ferns, posts, ground, u } = spots;
   const kit = { sun: MOON };
   for (const hedge of hedges) {
@@ -525,13 +529,12 @@ vec3 kitGlow(vec3 albedo, vec3 n, vec3 world) {
 }
 `;
 
-/** The garden by night for the kit: a cool violet moon, deep blue-violet shade, a pale rim. */
+/** The garden by night for the kit: a cool violet moon, a blue-violet fill from the night sky. */
 export const GARDEN_NIGHT = Object.freeze({
-  key: [0.55, 0.6, 0.85],
-  shade: [0.22, 0.24, 0.42],
-  sky: [0.3, 0.32, 0.55],
-  rim: [0.6, 0.72, 1.0, 0.3],
-  outline: [0.22, 0.2, 0.3, 1.1],
+  key: [0.6, 0.64, 0.9],
+  sky: [0.17, 0.18, 0.32],
+  bounce: [0.07, 0.07, 0.12],
+  sheen: [0.35, 0.6],
   shadow: [0.32, 0.32, 0.5, 0.55],
 });
 

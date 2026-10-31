@@ -27,13 +27,12 @@ import { craterEmblem } from './stadium-environment-layout.mjs';
 import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
 import { createKitProps } from './stadium-kit.mjs';
 
-/** The mall's light for the kit (design 081): bright and soft from the skylights, the shade a pale rosy grey. */
+/** The mall's light for the kit (designs 081, 082): bright and soft from the skylights, a pale rosy fill. */
 export const MALL_MOOD = Object.freeze({
-  key: [1.0, 0.98, 0.96],
-  shade: [0.8, 0.74, 0.8],
-  sky: [0.86, 0.84, 0.9],
-  rim: [1.0, 1.0, 1.0, 0.14],
-  outline: [0.44, 0.34, 0.4, 1.05],
+  key: [0.88, 0.86, 0.84],
+  sky: [0.5, 0.49, 0.53],
+  bounce: [0.38, 0.34, 0.37],
+  sheen: [0.4, 0.7],
   shadow: [0.7, 0.6, 0.66, 0.45],
 });
 import { boardContext, hash } from './stadium-env-spots.mjs';
@@ -392,14 +391,12 @@ function walls(props, spots) {
 export function shoppingProps(spots) {
   const { tables, mannequins, balloons, racks, u } = spots;
   const props = createPropBuilder();
-  props.look({ outline: 1 }, () => {
-    walls(props, spots);
-    mezzanine(props, spots);
-    for (const rack of racks) shirtRack(props, rack, u);
-    for (const table of tables) displayTable(props, table, u);
-    for (const m of mannequins) mannequin(props, m, u);
-  });
-  props.look({ kind: LOOK.gloss, outline: 1 }, () => {
+  walls(props, spots);
+  mezzanine(props, spots);
+  for (const rack of racks) shirtRack(props, rack, u);
+  for (const table of tables) displayTable(props, table, u);
+  for (const m of mannequins) mannequin(props, m, u);
+  props.look({ kind: LOOK.gloss }, () => {
     for (const b of balloons) balloon(props, b, u);
   });
   return props;

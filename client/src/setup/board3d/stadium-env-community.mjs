@@ -13,7 +13,7 @@
 // on it), B a rock's tone 0..1, A the kind (0 grass, 1 square, 2 cliff, 3 pool); the shared light
 // bake adds normals, occlusion and the sun's shadow. Per frame: TERRAIN paints the grass, the
 // square, the cliff and its waterfall, and the shadows of the hall, tent, kiosks and trees; POOL one
-// sheet of water; the kit's meshes (design 081: one toon light, outlines, contact shadows) the hall,
+// sheet of water; the kit's meshes (designs 081, 082: the kit's soft light, contact shadows) the hall,
 // tent, kiosks, flag and benches, and the kit's own trees, boulders, bushes and flowers; MIST drifts
 // off the pool. The grass and paving are painted clean: no tufts, grain or stains.
 import {
@@ -31,6 +31,7 @@ import {
   VORONOI,
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
+import { GRASS as GRASS_KIT } from './stadium-env-ground.mjs';
 import { createPropBuilder } from './stadium-env-props.mjs';
 import { createKitProps } from './stadium-kit.mjs';
 import { measureAsset, placeAsset } from './stadium-kit-assets.mjs';
@@ -226,6 +227,7 @@ ${NOISE}
 ${FOOTPRINTS}
 ${FILTERING}
 ${REVEAL}
+${GRASS_KIT}
 ${PAVING}
 ${EDGE_HAZE}
 ${BOX_SHADOW}
@@ -249,8 +251,10 @@ void main() {
   vec3 sun = normalize(uSun);
   float lit = clamp(dot(n, sun) / sun.z, 0.0, 1.4) * mix(0.62, 1.0, light.a);
 
-  // The grass (design 081: painted, not textured): two greens in broad soft drifts.
-  vec3 col = mix(GRASS_DARK * 1.2, GRASS, 0.35 + 0.65 * smoothstep(0.35, 0.65, fbm3(p / 160.0 + 1.0)));
+  // The grass (design 082): BDSP's clover grass, two greens in broad soft drifts, the square's
+  // kerb fringed by it.
+  vec3 col = cloverGrass(p, mix(GRASS_DARK * 1.2, GRASS, 0.35 + 0.65 * smoothstep(0.35, 0.65, fbm3(p / 160.0 + 1.0))), fieldCalm(p, 110.0));
+  vec3 lawn = col;
 
   // The square: big pale slabs a shade apart, joints darker and blue in the shade, a kerb of lighter stone.
   if (kind > 0.5 && kind < 1.5) {
@@ -267,6 +271,8 @@ void main() {
     col = mix(col, PLAZA * 1.18, kerb);
     // A gutter of darker stone round the square's edge, a few slabs wide.
     col *= 1.0 - 0.1 * (1.0 - smoothstep(10.0, 30.0 * uUnit, -sd));
+    // The lawn's tufts lie over the kerb's outer edge.
+    col = mix(col, lawn, grassFringe(-sd, p, 5.0));
   }
 
   // The cliff: sculpted rock, sunlit faces warm beige, the shaded ones blue-violet, moss in the low creases.
@@ -511,10 +517,8 @@ function communityTrees(props, spots) {
 /** Everything solid, as one prop geometry. */
 export function communityProps(spots) {
   const props = createPropBuilder();
-  props.look({ outline: 1 }, () => {
-    communityHall(props, spots);
-    communityTent(props, spots);
-  });
+  communityHall(props, spots);
+  communityTent(props, spots);
   communityTrees(props, spots);
   return props;
 }

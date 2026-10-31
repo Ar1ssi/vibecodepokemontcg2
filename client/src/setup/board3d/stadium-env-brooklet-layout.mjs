@@ -19,6 +19,8 @@
 // room inside the view (the sim mat's cards run to the table's side edges), its pieces move round to
 // the near shore. stadium-env-brooklet.mjs draws all of it. Pure: no three.js, no DOM.
 import { environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
+import { RISE_LEAN } from './stadium-env-spots.mjs';
+import { measureAsset } from './stadium-kit-assets.mjs';
 import { tableBounds } from './table-uv.mjs';
 
 export const BROOKLET_KEY = 'brooklet-hill';
@@ -80,6 +82,12 @@ export const CLIFF_RISE_PX = 40;
 export const CLIFF_RUN_PX = 14;
 export const TERRACE_PX = 150;
 export const TERRACE_RISE_PX = 32;
+/**
+ * The highest the land rises (design 082, for the kit's bushes standing on it): the banks' beach,
+ * cliff and terrace (above the hill's ledge, LEDGE_TOP_PX, and the near path) plus their swell
+ * (±2 px of noise) and a texel of the bake's grid each way.
+ */
+export const BANK_CEILING_PX = BEACH_RISE_PX + CLIFF_RISE_PX + TERRACE_RISE_PX + 4;
 /** The near shore: a path PATH_PX wide (wandering PATH_WANDER_PX) PATH_RISE_PX up, then a cliff dropping DROP_PX over DROP_RUN_PX. */
 export const PATH_PX = 56;
 export const PATH_WANDER_PX = 10;
@@ -157,7 +165,10 @@ export const FALL_KINDS = Object.freeze({ lake: 0, pool: 1, basin: 2 });
 
 /** Boulders: the main fall's row, the spill's, one in the shallows at the path's end, a pair on the right shore. */
 export const ROCK_MAX = 16;
-/** Boulder middle to card footprint, at least its radius plus this. */
+/**
+ * Least gap between a boulder, seen from above, and a card footprint: past its reach (the kit's
+ * boulder of size r, standing at the lake's level) and its lean on screen (RISE_LEAN of its top).
+ */
 export const ROCK_CARD_GAP_PX = 10;
 /** The map's row at the main fall's foot: px across its line and out along it from where it lands. */
 const FALL_ROW = Object.freeze([
@@ -192,11 +203,15 @@ export const SUNKEN_CARD_GAP_PX = 12;
 export const SUNKEN_SPACING_PX = 240;
 const SUNKEN_STEP_PX = 12;
 
-/** Round bushes on the banks' grass. */
+/** Round bushes on the banks' grass (the kit's bush, size BUSH_SIZE × r). */
 export const TREE_MAX = 10;
-/** A bush stands on grass at least this far past its cliff's top, and this far from every card. */
+export const BUSH_SIZE = 0.95;
+/**
+ * A bush stands on grass at least this far past its cliff's top, and this far from every card past
+ * its reach and its lean on screen (RISE_LEAN of its top over the highest the land rises, BANK_CEILING_PX).
+ */
 export const TREE_GRASS_PX = 8;
-export const TREE_CARD_GAP_PX = 30;
+export const TREE_CARD_GAP_PX = 12;
 /**
  * The map's bushes, at offsets (px) from the lake's far-right corner: a cluster of small ones past
  * the corner, big ones down the right bank, a few on the far bank. Each takes the nearest spot on
@@ -621,7 +636,8 @@ const pickDock = (core, room, rects) => {
 
 /** A boulder `{ x, y, r, seed }` if it keeps clear of the cards and the `avoid` circles, else null. */
 const clearRock = (rects, avoid, rock) => {
-  if (cardGap(rects, rock.x, rock.y) < rock.r + ROCK_CARD_GAP_PX) return null;
+  const { reach, height } = measureAsset('boulder', { size: rock.r });
+  if (cardGap(rects, rock.x, rock.y) < reach + RISE_LEAN * height + ROCK_CARD_GAP_PX) return null;
   if (avoid.some((spot) => Math.hypot(spot.x - rock.x, spot.y - rock.y) < spot.r + rock.r)) return null;
   return rock;
 };
@@ -678,7 +694,8 @@ const onBankGrass = (spots, rects, view, x, y, r) => {
   const { zones } = spots;
   if (hillShare(zones, x, y) > 0.05 || nearShare(zones, x, y) > 0.05) return false;
   if (!insideBox(view, x, y, r + 4)) return false;
-  if (cardGap(rects, x, y) < r + TREE_CARD_GAP_PX) return false;
+  const { reach, height } = measureAsset('bush', { size: r * BUSH_SIZE });
+  if (cardGap(rects, x, y) < reach + RISE_LEAN * (BANK_CEILING_PX + height) + TREE_CARD_GAP_PX) return false;
   const land = lakeDistance(spots, x, y);
   const grass = beachWidth(x, y) + CLIFF_RUN_PX + TREE_GRASS_PX;
   if (land - r < grass) return false;

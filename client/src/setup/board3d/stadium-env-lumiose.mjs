@@ -32,6 +32,7 @@ import {
   TERRAIN_GROUND,
   TERRAIN_UNIFORMS,
 } from './stadium-environment-glsl.mjs';
+import { GRASS as GRASS_KIT } from './stadium-env-ground.mjs';
 import { createPropBuilder } from './stadium-env-props.mjs';
 import { createKitProps } from './stadium-kit.mjs';
 import { placeAsset } from './stadium-kit-assets.mjs';
@@ -367,6 +368,7 @@ ${NOISE}
 ${FOOTPRINTS}
 ${FILTERING}
 ${REVEAL}
+${GRASS_KIT}
 ${PAVING}
 ${EDGE_HAZE}
 ${PALETTE}
@@ -409,7 +411,8 @@ void main() {
   }
   // The beds: short grass in two greens (the kit's flower clumps stand on it), under a curb of
   // salmon-tan stone with a pale cap.
-  if (kind > 1.5) col = mix(BED_GRASS_DARK, BED_GRASS, 0.6 + 0.3 * smoothstep(0.35, 0.65, fbm3(p / 70.0 + 2.0)));
+  // Design 082: BDSP's clover grass.
+  if (kind > 1.5) col = cloverGrass(p, mix(BED_GRASS_DARK, BED_GRASS, 0.6 + 0.3 * smoothstep(0.35, 0.65, fbm3(p / 70.0 + 2.0))), 0.0);
   // The curb: the bed's outer 9 px, laid in blocks with a pale lip along its outer edge.
   float inCurb = step(-9.0 * u, field.b) * step(field.b, 0.0);
   float jointAt = (0.5 - abs(fract(p.y / (26.0 * u)) - 0.5)) * 26.0 * u;
@@ -503,14 +506,12 @@ function roof(props, b, face, u) {
   const rim = [[b.x0, b.y0], [b.x1, b.y0], [b.x1, b.y1], [b.x0, b.y1]];
   const mid = [[b.x0 + i1, b.y0 + i1], [b.x1 - i1, b.y0 + i1], [b.x1 - i1, b.y1 - i1], [b.x0 + i1, b.y1 - i1]];
   const ridge = [[b.x0 + ix, b.y0 + iy], [b.x1 - ix, b.y0 + iy], [b.x1 - ix, b.y1 - iy], [b.x0 + ix, b.y1 - iy]];
-  props.look({ outline: 1, sheets: true }, () => {
-    for (let k = 0; k < 4; k += 1) {
-      const n = (k + 1) % 4;
-      props.quad([...rim[k], H], [...rim[n], H], [...mid[n], z1], [...mid[k], z1], steep);
-      props.quad([...mid[k], z1], [...mid[n], z1], [...ridge[n], z2], [...ridge[k], z2], top);
-    }
-    props.quad([...ridge[0], z2], [...ridge[1], z2], [...ridge[2], z2], [...ridge[3], z2], top);
-  });
+  for (let k = 0; k < 4; k += 1) {
+    const n = (k + 1) % 4;
+    props.quad([...rim[k], H], [...rim[n], H], [...mid[n], z1], [...mid[k], z1], steep);
+    props.quad([...mid[k], z1], [...mid[n], z1], [...ridge[n], z2], [...ridge[k], z2], top);
+  }
+  props.quad([...ridge[0], z2], [...ridge[1], z2], [...ridge[2], z2], [...ridge[3], z2], top);
   // Metal trims: the four hips, the break between the slopes, the edge of the flat top.
   for (let k = 0; k < 4; k += 1) props.tube([[...rim[k], H + 1], [...mid[k], z1], [...ridge[k], z2]], 1 * u, ROOF_TRIM, { sides: 4 });
   props.tube([...mid, mid[0]].map((p) => [...p, z1 + 0.4]), 0.9 * u, ROOF_TRIM, { sides: 4 });
@@ -585,9 +586,7 @@ function pokeSign(props, b, face, u) {
 function building(props, b, u) {
   const wall = WALLS[b.palette];
   const mid = [(b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2];
-  props.look({ outline: 1 }, () =>
-    props.box({ x: mid[0], y: mid[1], z0: -2, z1: b.height, hw: (b.x1 - b.x0) / 2, hh: (b.y1 - b.y0) / 2, color: [...wall, 0], topColor: [...ROOFS[b.roof].steep, SLATE] })
-  );
+  props.box({ x: mid[0], y: mid[1], z0: -2, z1: b.height, hw: (b.x1 - b.x0) / 2, hh: (b.y1 - b.y0) / 2, color: [...wall, 0], topColor: [...ROOFS[b.roof].steep, SLATE] });
   // The face to the plaza: a to b runs so its outer side is on the right.
   let a;
   let c;
@@ -647,7 +646,7 @@ function tree(props, t) {
 
 /** A lamppost: a fluted iron post, a bracket with three globes, a green banner hung from it. */
 function lamp(props, l, u) {
-  props.look({ outline: 1 }, () => lampPost(props, l, u));
+  lampPost(props, l, u);
   props.quad([l.x + l.side * -0.6 * u, l.y - 5 * u, l.h * 0.46], [l.x + l.side * -0.6 * u, l.y + 5 * u, l.h * 0.46], [l.x + l.side * -0.6 * u, l.y + 5 * u, l.h * 0.78], [l.x + l.side * -0.6 * u, l.y - 5 * u, l.h * 0.78], BANNER);
 }
 

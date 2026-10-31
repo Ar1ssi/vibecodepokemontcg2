@@ -16,11 +16,16 @@
 // lace. The sand is clean and warm, darker where wet. Palms, rocks, starfish, shells, parasols,
 // towels, a beach ball, a surfboard and dune grass are the kit's solids (stadium-kit-assets.mjs),
 // standing on the baked ground.
+// Design 082 (Brilliant Diamond / Shining Pearl): the sea in BDSP's saturated blues, paler only in a
+// band of shallows, slow ribbons of sky light and a few slow sparkles crossing it (stadium-env-ground
+// WATER), quiet near the cards; the sand BDSP's warm gold with soft ripples (SAND).
 // Two stages, as Scorched Earth: BEACH_FIELD bakes the ground once per layout (R height px, sea
 // level 0; G signed px from the mean waterline, + seaward) and the shared BAKE_LIGHT turns it into
 // normals, occlusion and sun shadow. Per frame SAND draws the beach and the swash; SEA one displaced
 // sheet at sea level; the kit's meshes the solids.
 import {
+  FILTERING,
+  FOOTPRINTS,
   FULLSCREEN_VERTEX,
   NOISE,
   OUTPUT,
@@ -29,6 +34,7 @@ import {
 } from './stadium-environment-glsl.mjs';
 import { environmentFootprints } from './stadium-environment-layout.mjs';
 import { beachSpots, shoreFrame } from './stadium-env-beach-layout.mjs';
+import { SAND, WATER } from './stadium-env-ground.mjs';
 import { createPropBuilder } from './stadium-env-props.mjs';
 import { createKitProps, glslColour } from './stadium-kit.mjs';
 import { placeAsset } from './stadium-kit-assets.mjs';
@@ -237,15 +243,15 @@ Swash swashAt(float upBeach, float along, float time) {
 
 const PALETTE = /* glsl */ `
 // Linear colours before tone mapping (Neutral compresses above ~0.76 and takes ~0.04 off dark ones).
-const vec3 SAND_DRY = vec3(0.86, 0.64, 0.38);
-const vec3 SAND_WET = vec3(0.6, 0.38, 0.18);
+const vec3 SAND_DRY = vec3(0.86, 0.6, 0.31);
+const vec3 SAND_WET = vec3(0.58, 0.36, 0.16);
 const vec3 SKY_LIGHT = vec3(0.36, 0.4, 0.5);
 const vec3 SUN_LIGHT = vec3(0.86, 0.78, 0.64);
 // The sea's bands, authored as they show on screen (Pokémon's clear turquoise shallows, deep blue out).
-const vec3 SEA_SHALLOW = ${glslColour('#8fe6dc')};
-const vec3 SEA_TURQUOISE = ${glslColour('#3ccad3')};
-const vec3 SEA_TEAL = ${glslColour('#2196cf')};
-const vec3 SEA_DEEP = ${glslColour('#1b62b3')};
+const vec3 SEA_SHALLOW = ${glslColour('#86dbe6')};
+const vec3 SEA_TURQUOISE = ${glslColour('#45b7ea')};
+const vec3 SEA_TEAL = ${glslColour('#3388e6')};
+const vec3 SEA_DEEP = ${glslColour('#2a63d2')};
 const vec3 FOAM_LIT = vec3(0.95, 0.97, 0.98);
 `;
 
@@ -351,7 +357,10 @@ float revealRim(vec2 p) {
 export const SAND_FRAGMENT = /* glsl */ `
 ${BEACH_UNIFORMS}
 ${NOISE}
+${FILTERING}
+${FOOTPRINTS}
 ${REVEAL}
+${SAND}
 ${SHORE}
 ${SURF}
 ${PALETTE}
@@ -362,6 +371,7 @@ varying float vHeight;
 varying float vGrowth;
 void main() {
   vec2 p = vPos;
+  filterPixel = pixelSize(p);
   if (revealBurned(p) * exitKeep(p) < 0.5) discard;
   vec4 field = texture2D(uField, vUv);
   vec4 light = texture2D(uLight, vUv);
@@ -372,7 +382,7 @@ void main() {
   // Wet up to the highest run-up, the sheet itself wetter; broad soft dunes of paler sand behind.
   float damp = 1.0 - smoothstep(0.86, 1.0, upBeach / top);
   float wet = max(damp * 0.7, step(0.02, swash.film) * 0.85);
-  vec3 sand = mix(SAND_DRY, SAND_DRY * vec3(1.05, 0.96, 0.86), smoothstep(0.35, 0.65, fbm3(p / 420.0 + 2.0)));
+  vec3 sand = bdspSand(p, mix(SAND_DRY, SAND_DRY * vec3(1.05, 0.96, 0.86), smoothstep(0.35, 0.65, fbm3(p / 420.0 + 2.0))), fieldCalm(p, 110.0));
   vec3 col = lit(mix(sand, SAND_WET, wet), bakedNormal(light, vGrowth), light.a, light.b);
   // The sheet: a thin clear tint of the shallows; its front a crisp white line of foam.
   col = mix(col, mix(col, SEA_SHALLOW, 0.45), smoothstep(0.0, 0.3, swash.film));
@@ -415,11 +425,17 @@ void main() {
 }
 `;
 
-/** The sea: flat bands of colour by depth, the swells' backs a shade darker, crisp white foam. */
+/**
+ * The sea: bands of colour by depth, the swells' backs a shade darker, BDSP's ribbons of sky light
+ * and slow sparkles over it, crisp white foam.
+ */
 export const SEA_FRAGMENT = /* glsl */ `
 ${BEACH_UNIFORMS}
 ${NOISE}
+${FILTERING}
+${FOOTPRINTS}
 ${REVEAL}
+${WATER}
 ${SHORE}
 ${SURF}
 ${PALETTE}
@@ -448,6 +464,7 @@ vec3 waterBands(float depth) {
 }
 void main() {
   vec2 p = vPos;
+  filterPixel = pixelSize(p);
   if (revealBurned(p) * exitKeep(p) < 0.5) discard;
   vec4 field = texture2D(uField, vUv);
   float ground = field.r * vGrowth;
@@ -462,6 +479,9 @@ void main() {
   // A swell's face toward the shore a shade lighter, its back a shade darker; a steep crest glows.
   col *= 1.0 + 0.18 * clamp(sea.slope * 2.5, -1.0, 1.0) * calm;
   col += vec3(0.04, 0.24, 0.22) * sea.glow * 0.6;
+  float quiet = (1.0 - 0.8 * fieldCalm(p, 110.0)) * calm;
+  col += vec3(0.8, 0.9, 1.0) * lightStreaks(p, uTime) * 0.28 * quiet * smoothstep(3.0, 12.0, depth);
+  col += vec3(1.2) * sparkles(p, uTime) * 0.8 * quiet * smoothstep(6.0, 14.0, depth);
   // Foam: the rollers and fresh breaks as crisp white bands, a collar round each rock, and a thin
   // white line where the water meets the sand.
   float amount = max(max(sea.foam, sea.fresh), sea.cap * 0.55) * calm;

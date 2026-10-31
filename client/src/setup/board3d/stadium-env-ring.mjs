@@ -326,20 +326,19 @@ const chainLink = (props, centre, axis, up, { length, width, thick }, color) => 
   props.tube(points, thick, color, { sides: 7 });
 };
 
-/** The standing stones, the spires, the ropes between them, and the chain. */
-/** The ring's hazy mountain light for the kit (design 081): a soft warm key, a dusty violet-grey shade. */
+/** The ring's hazy mountain light for the kit (designs 081, 082): a soft warm key, a dusty violet-grey fill. */
 export const RING_MOOD = Object.freeze({
-  key: [0.8, 0.77, 0.72],
-  shade: [0.42, 0.4, 0.5],
-  sky: [0.55, 0.52, 0.5],
-  rim: [1.0, 0.92, 0.8, 0.18],
-  outline: [0.3, 0.27, 0.3, 1.1],
+  key: [0.84, 0.8, 0.74],
+  sky: [0.3, 0.29, 0.3],
+  bounce: [0.2, 0.19, 0.2],
+  sheen: [0.3, 0.55],
   shadow: [0.45, 0.42, 0.48, 0.55],
 });
 
+/** The standing stones, the spires, the ropes between them, and the chain. */
 export function ringProps(spots) {
   const props = createPropBuilder();
-  props.look({ outline: 1 }, () => ringSolids(props, spots));
+  ringSolids(props, spots);
   return props;
 }
 

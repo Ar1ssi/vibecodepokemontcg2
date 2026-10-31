@@ -88,17 +88,61 @@ const STORM_MIN_TURN = 0.08;
 const STORM_ATTEMPTS = 6;
 
 /**
- * Lays the plate on the canvas. During a swap the incoming board's plate (premultiplied: it cleared
- * to transparent) goes over the outgoing board's last plate.
+ * Design 082: the diorama focus, BDSP's tilt-shift. A band through the middle of the screen
+ * (`centre` ± `band`, fractions of its height) stays sharp; past it the plate softens toward the top
+ * and bottom edges, to `edge` plate px of blur there. The cards are drawn over the plate, so they
+ * stay sharp whatever lies under them.
+ */
+export const TILT_SHIFT = Object.freeze({ centre: 0.5, band: 0.2, edge: 5 });
+/**
+ * Design 082: BDSP's soft glow. What the plate holds brighter than `threshold` (linear, before tone
+ * mapping) spills `strength` of its excess round itself, read off a coarse mip of the plate, so
+ * lamps, crystals, lava and sunlit snow glow a little into what lies round them.
+ */
+export const BLOOM = Object.freeze({ threshold: 0.9, strength: 0.22, level: 4 });
+
+/**
+ * Lays the plate on the canvas, through the tilt-shift: eight taps on a disc of the blur's radius
+ * round the pixel, from the plate's mip level of that size, so a wide blur costs no more than a
+ * narrow one. During a swap the incoming board's plate (premultiplied: it cleared to transparent)
+ * goes over the outgoing board's last plate, blurred alike.
  */
 const PLATE_FRAGMENT = `uniform sampler2D uPlate;
 uniform sampler2D uUnder;
 uniform float uUnderOn;
+uniform vec3 uTiltShift;
+uniform vec3 uBloom;
 varying vec2 vUv;
+vec4 tiltShift(sampler2D plate, vec2 uv) {
+  float away = smoothstep(uTiltShift.y, 0.5, abs(uv.y - uTiltShift.x));
+  float radius = uTiltShift.z * away * away;
+  if (radius < 0.35) return texture2D(plate, uv);
+  vec2 texel = 1.0 / vec2(textureSize(plate, 0));
+  float lod = max(log2(radius) - 0.5, 0.0);
+  vec4 sum = textureLod(plate, uv, lod) * 0.2;
+  for (int k = 0; k < 8; k++) {
+    float turn = float(k) * 2.39996;
+    vec2 offset = vec2(cos(turn), sin(turn)) * sqrt((float(k) + 0.5) / 8.0) * radius;
+    sum += textureLod(plate, uv + offset * texel, lod) * 0.1;
+  }
+  return sum;
+}
+// The glow round the plate's brightest parts: four taps on a coarse mip, past the threshold.
+vec3 bloom(sampler2D plate, vec2 uv) {
+  vec2 reach = 2.5 * exp2(uBloom.z) / vec2(textureSize(plate, 0));
+  vec3 sum = vec3(0.0);
+  for (int k = 0; k < 4; k++) {
+    float turn = float(k) * 1.5708 + 0.4;
+    sum += textureLod(plate, uv + vec2(cos(turn), sin(turn)) * reach, uBloom.z).rgb;
+  }
+  return max(sum * 0.25 - uBloom.x, 0.0) * uBloom.y;
+}
 void main() {
-  vec4 top = texture2D(uPlate, vUv);
+  vec4 top = tiltShift(uPlate, vUv);
+  top.rgb += bloom(uPlate, vUv) * top.a;
   if (uUnderOn > 0.5) {
-    vec4 under = texture2D(uUnder, vUv);
+    vec4 under = tiltShift(uUnder, vUv);
+    under.rgb += bloom(uUnder, vUv) * under.a;
     top = vec4(top.rgb + under.rgb * (1.0 - top.a), max(top.a, under.a));
   }
   gl_FragColor = top;
@@ -316,13 +360,12 @@ export function strikePath(index, slot, { bowl, peaks }, bounds) {
   return null;
 }
 
-/** The storm's light on the crater's kit solids: cold blue-white, deep slate shade, a cyan rim. */
+/** The storm's light on the crater's kit solids: cold blue-white, a deep slate fill (designs 081, 082). */
 const STORMY_MOOD = Object.freeze({
-  key: [0.8, 0.88, 1.0],
-  shade: [0.3, 0.36, 0.55],
-  sky: [0.45, 0.55, 0.75],
-  rim: [0.55, 0.85, 1.0, 0.35],
-  outline: [0.22, 0.26, 0.34, 1.1],
+  key: [0.82, 0.9, 1.0],
+  sky: [0.2, 0.25, 0.36],
+  bounce: [0.08, 0.1, 0.14],
+  sheen: [0.3, 0.55],
   shadow: [0.34, 0.4, 0.55, 0.55],
 });
 
@@ -546,19 +589,21 @@ const spikeGeometry = (three, spikes) => {
   ]);
 };
 
-/** The jungle's trees in the kit's light (design 081): violet bark, crowns of teal or violet foliage balls, dark vines. */
+/**
+ * The jungle's trees in the kit's light (designs 081, 082): violet bark, crowns of teal or violet
+ * leafy lumps, dark vines; a cool key, the shade violet from the jungle round it.
+ */
 const JUNGLE_MOOD = Object.freeze({
   key: [0.86, 0.9, 1.0],
-  shade: [0.3, 0.26, 0.55],
-  sky: [0.4, 0.4, 0.7],
-  rim: [0.95, 0.55, 0.9, 0.3],
-  outline: [0.2, 0.16, 0.3, 1.1],
+  sky: [0.24, 0.22, 0.44],
+  bounce: [0.12, 0.07, 0.18],
+  sheen: [0.3, 0.55],
   shadow: [0.32, 0.26, 0.5, 0.55],
 });
 const JUNGLE_BARK = [0.13, 0.07, 0.22, 0];
 const JUNGLE_CROWNS = [
-  { body: [0.03, 0.16, 0.15, 0], light: [0.06, 0.28, 0.24, 0] },
-  { body: [0.065, 0.06, 0.22, 0], light: [0.12, 0.1, 0.36, 0] },
+  { body: [0.04, 0.2, 0.18, 0], light: [0.09, 0.36, 0.3, 0] },
+  { body: [0.08, 0.075, 0.27, 0], light: [0.15, 0.13, 0.44, 0] },
 ];
 const JUNGLE_VINE = [0.05, 0.015, 0.08, 0];
 const JUNGLE_BEAD = [0.95, 0.36, 0.75, 0];
@@ -573,28 +618,31 @@ const onLimb = ({ from, via, to }, t) => [0, 1, 2].map((k) => (1 - t) ** 2 * fro
  */
 export function jungleTreeProps(trees) {
   const props = createPropBuilder();
-  props.look({ outline: 1 }, () => {
-    for (const tree of trees) {
-      for (const limb of tree.limbs) {
-        const points = Array.from({ length: 9 }, (_, i) => onLimb(limb, i / 8));
-        const radii = points.map((_, i) => {
-          const t = i / 8;
-          return (limb.r0 + (limb.r1 - limb.r0) * t) * (1 + limb.flare * 0.6 * Math.exp(-t * 9));
-        });
-        props.tube(points, radii, JUNGLE_BARK, { sides: 12 });
-      }
+  for (const tree of trees) {
+    for (const limb of tree.limbs) {
+      const points = Array.from({ length: 9 }, (_, i) => onLimb(limb, i / 8));
+      const radii = points.map((_, i) => {
+        const t = i / 8;
+        return (limb.r0 + (limb.r1 - limb.r0) * t) * (1 + limb.flare * 0.6 * Math.exp(-t * 9));
+      });
+      props.tube(points, radii, JUNGLE_BARK, { sides: 12 });
     }
-  });
-  props.look({ kind: LOOK.foliage, outline: 1 }, () => {
-    for (const tree of trees) {
-      const palette = JUNGLE_CROWNS[tree.palette] ?? JUNGLE_CROWNS[0];
-      for (const puff of tree.puffs) {
-        const tone = palette.body.map((v, k) => (k < 3 ? v + (palette.light[k] - v) * puff.shade : 0));
-        props.blob({ x: puff.x, y: puff.y, z: puff.z, rx: puff.r, rz: puff.r * 0.82, color: tone });
-      }
-    }
-  });
-  props.look({ kind: LOOK.foliage, sway: 0.8, outline: 1 }, () => {
+  }
+  // Each crown a cluster of leafy lumps (design 082), dark in the creases between them.
+  for (const tree of trees) {
+    const palette = JUNGLE_CROWNS[tree.palette] ?? JUNGLE_CROWNS[0];
+    const lumps = tree.puffs.map((puff) => ({
+      x: puff.x,
+      y: puff.y,
+      z: puff.z,
+      rx: puff.r,
+      rz: puff.r * 0.82,
+      color: palette.body.map((v, k) => (k < 3 ? v + (palette.light[k] - v) * puff.shade : 0)),
+    }));
+    const leaf = Math.max(6, (tree.puffs.reduce((sum, puff) => sum + puff.r, 0) / Math.max(1, tree.puffs.length)) * 0.2);
+    props.look({ kind: LOOK.foliage, leaf }, () => props.lumps(lumps, { crease: 0.5 }));
+  }
+  props.look({ kind: LOOK.foliage, sway: 0.8 }, () => {
     for (const tree of trees) {
       for (const vine of tree.vines) {
         const strand = Array.from({ length: 7 }, (_, i) => [vine.x + Math.sin(i * 0.9 + vine.seed * 6) * 2, vine.y, vine.z - (vine.length * i) / 6]);
@@ -848,7 +896,13 @@ export function createStadiumEnvironment({
   const inFlight = new Set();
 
   const plateTargetOf = () => {
-    plateTarget ??= new three.WebGLRenderTarget(1, 1, { type: three.HalfFloatType, samples: PLATE_SAMPLES });
+    // Mipmapped for the tilt-shift's taps (three resolves the samples, then builds the chain).
+    plateTarget ??= new three.WebGLRenderTarget(1, 1, {
+      type: three.HalfFloatType,
+      samples: PLATE_SAMPLES,
+      generateMipmaps: true,
+      minFilter: three.LinearMipmapLinearFilter,
+    });
     return plateTarget;
   };
 
@@ -1275,7 +1329,13 @@ export function createStadiumEnvironment({
       plateMaterial = new three.ShaderMaterial({
         vertexShader: glsl.FULLSCREEN_VERTEX,
         fragmentShader: PLATE_FRAGMENT,
-        uniforms: { uPlate: { value: target.texture }, uUnder: { value: null }, uUnderOn: { value: 0 } },
+        uniforms: {
+          uPlate: { value: target.texture },
+          uUnder: { value: null },
+          uUnderOn: { value: 0 },
+          uTiltShift: { value: new three.Vector3(TILT_SHIFT.centre, TILT_SHIFT.band, TILT_SHIFT.edge) },
+          uBloom: { value: new three.Vector3(BLOOM.threshold, BLOOM.strength, BLOOM.level) },
+        },
         depthTest: false,
         depthWrite: false,
       });
