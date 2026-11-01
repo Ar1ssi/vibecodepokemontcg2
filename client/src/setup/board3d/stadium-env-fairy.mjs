@@ -31,7 +31,8 @@ import { craterEmblem } from './stadium-environment-layout.mjs';
 import { createPropBuilder } from './stadium-env-props.mjs';
 import { createKitProps } from './stadium-kit.mjs';
 import { measureAsset, placeAsset } from './stadium-kit-assets.mjs';
-import { boardContext, hash } from './stadium-env-spots.mjs';
+import { RISE_LEAN, boardContext, hash, patchy, visibleArea } from './stadium-env-spots.mjs';
+import { clumpPieces, scaledKinds } from './stadium-env-clumps.mjs';
 import { EDGE_HAZE, STANDARD_TERRAIN_VERTEX } from './stadium-env-surfaces.mjs';
 
 export const FAIRY_KEY = 'fairy-garden';
@@ -40,6 +41,8 @@ export const FAIRY_MOON = Object.freeze([-0.3, 0.3, 0.9]);
 export const MAX_TREES = 12;
 export const MAX_ORBS = 6;
 export const MAX_LEAVES = 8;
+/** Design 083: the highest the floor swells under a prop (2 + 9 px past the cards, plus the ripple). */
+export const FAIRY_GROUND_CEILING_PX = 12;
 const SPARKLE_COUNT = 90;
 const FLOWER_PX = 27;
 
@@ -65,10 +68,11 @@ export function fairySpots(layout) {
       const r = (62 + 34 * roll(3)) * u;
       const side = Math.abs(x - centre.x) > reach + 80 * u + r * 0.5;
       const far = y > handEnd + 60 * u + r * 0.4;
-      if (!(side || far) || roll(4) > 0.78 || !ctx.inScene(x, y, r * 0.5) || y < core.y + 60 * u) continue;
+      // Design 083: the trees gather into groves (patchy) with glades between.
+      if (!(side || far) || roll(4) > 0.7 * patchy(x, y, { scale: 340 * u, salt: 83 }) || !ctx.inScene(x, y, r * 0.5) || y < core.y + 60 * u) continue;
       if (!ctx.clear(x, y, r * 0.8, 22 * u)) continue;
       if (trees.some((t) => Math.hypot(x - t.x, y - t.y) < (r + t.r) * 0.85)) continue;
-      trees.push({ x, y, r, h: (130 + 50 * roll(5)) * u, seed: roll(6) });
+      trees.push({ x, y, r, h: (110 + 90 * roll(5)) * u, seed: roll(6) });
     }
   }
   // Orbs of light over the margins, between the trees: on a grid over the scene, each far enough
@@ -88,12 +92,13 @@ export function fairySpots(layout) {
       orbs.push({ x, y, z, r: (13 + 5 * roll(5)) * u, phase: roll(6) * 6.28 });
     }
   }
-  // Big leaves framing the margins, lying low, pointing in toward the clearing.
+  // Big leaves framing the margins, lying low, pointing in toward the clearing (design 083: on
+  // either side by hash, at uneven steps, never a strict left-right alternation).
   const leaves = [];
   for (let k = 0; k < MAX_LEAVES; k += 1) {
-    const side = k % 2 ? 1 : -1;
+    const side = hash(k, 3, 7) < 0.5 ? -1 : 1;
     const x = centre.x + side * (reach + (50 + 90 * hash(k, 3, 1)) * u);
-    const y = core.y + ((k + 0.5) / MAX_LEAVES) * (handEnd - core.y) + (hash(k, 3, 2) - 0.5) * 80 * u;
+    const y = core.y + ((k + 0.2 + 0.6 * hash(k, 3, 8)) / MAX_LEAVES) * (handEnd - core.y) + (hash(k, 3, 2) - 0.5) * 80 * u;
     const yaw = (side > 0 ? Math.PI : 0) + (hash(k, 3, 3) - 0.5) * 1.1;
     const len = (96 + 34 * hash(k, 3, 4)) * u;
     // Design 081: each a clump of the kit's broad fern, clear of the cards by its whole reach.
@@ -101,7 +106,22 @@ export function fairySpots(layout) {
     if (!ctx.clear(x, y, measureAsset('fern', { size }).reach, 10 * u)) continue;
     leaves.push({ x, y, yaw, len, size, seed: hash(k, 3, 5) });
   }
-  return { ...ctx, reach, handEnd, trees, orbs, leaves, ring: craterEmblem(layout, centre) };
+  // Design 083: the undergrowth in clumps (bushes, blossom beds, ferns, toadstools) round the groves,
+  // in the side bands and off the far end, clear of the cards with its lean, of the trunks and the leaves.
+  const pieces = clumpPieces(visibleArea(ctx.table, scene, 0.15) ?? scene, {
+    step: 160 * u,
+    mix: scaledKinds(UNDERGROWTH, u),
+    thick: 0.9,
+    cap: 30,
+    salt: 87,
+    taken: [...trees.map((t) => ({ x: t.x, y: t.y, r: t.r * 0.45 })), ...leaves.map((l) => ({ x: l.x, y: l.y, r: l.size }))],
+    fits: (x, y, r, height) => {
+      const side = Math.abs(x - centre.x) > reach + 60 * u + r;
+      const far = y > handEnd + 40 * u + r;
+      return (side || far) && y > core.y + 40 * u && ctx.inScene(x, y, r * 0.5) && ctx.clear(x, y, r + RISE_LEAN * (height + FAIRY_GROUND_CEILING_PX), 14 * u);
+    },
+  });
+  return { ...ctx, reach, handEnd, trees, orbs, leaves, pieces, ring: craterEmblem(layout, centre) };
 }
 
 const FAIRY = /* glsl */ `
@@ -124,14 +144,17 @@ float orbLight(vec3 p, float t) {
 }
 `;
 
-/** Bake: the floor, flat. */
+/** Bake: the floor, flat round the cards; design 083: past them, low soft swells (2 + 9 px) under the groves. */
 export const BAKE_FIELD_FRAGMENT = /* glsl */ `
 ${TABLE_UNIFORMS}
 varying vec2 vUv;
 ${NOISE}
+${FOOTPRINTS}
 void main() {
   vec2 p = uMin + vUv * uSize;
-  gl_FragColor = vec4(0.4 * (fbm3(p / 70.0) - 0.5), 0.0, 0.0, 0.0);
+  float away = smoothstep(80.0, 230.0, footprintDistance(p));
+  float h = 0.4 * (fbm3(p / 70.0) - 0.5) + away * (2.0 + 9.0 * fbm3(p / 190.0 + 5.0));
+  gl_FragColor = vec4(h, 0.0, 0.0, 0.0);
 }
 `;
 
@@ -260,6 +283,13 @@ const ORB_CORE = [0.9, 1.5, 1.1, 2.9];
 /** One broad leaf: a pointed outline arching over a midrib, lying low. */
 const NIGHT_TREE = Object.freeze({ leaf: FOLIAGE, leafLight: FOLIAGE_LIT, bark: BARK, barkDark: [0.07, 0.05, 0.045, 0] });
 const NIGHT_FERN = Object.freeze({ leaf: LEAF, leafLight: [0.05, 0.16, 0.1, 0], heart: [0.012, 0.04, 0.03, 0] });
+// Design 083: the undergrowth's clumps (sizes card-scale px).
+const UNDERGROWTH = Object.freeze([
+  { asset: 'bush', weight: 2.4, size: [22, 38], options: { colors: { leaf: FOLIAGE, leafLight: FOLIAGE_LIT } } },
+  { asset: 'flowerBed', weight: 1.8, size: [18, 30], options: { depth: 0.7, head: 7, petals: ['#ffffff', '#ffd0e6', '#f6a8cf'] } },
+  { asset: 'fern', weight: 1.2, size: [40, 62], options: { fronds: 5, colors: NIGHT_FERN } },
+  { asset: 'mushroom', weight: 0.9, size: [6, 10], options: { colors: { cap: '#f6c8e8', spot: '#ffffff' } } },
+]);
 
 /** Everything solid, as one prop geometry. */
 export function fairyProps(spots) {
@@ -270,6 +300,7 @@ export function fairyProps(spots) {
     placeAsset(props, 'treeRound', { ...kit, x: tree.x, y: tree.y, size: tree.r, height: tree.h + tree.r * 0.6, seed: tree.seed * 997, colors: NIGHT_TREE, shadows: false });
   }
   for (const leaf of spots.leaves) placeAsset(props, 'fern', { ...kit, x: leaf.x, y: leaf.y, size: leaf.size, fronds: 5, yaw: leaf.yaw, seed: leaf.seed * 991, colors: NIGHT_FERN });
+  for (const piece of spots.pieces) placeAsset(props, piece.asset, { ...kit, ...piece.options, x: piece.x, y: piece.y, size: piece.size, seed: piece.seed * 997, yaw: piece.yaw });
   for (const orb of spots.orbs) props.sphere({ x: orb.x, y: orb.y, z: orb.z, r: orb.r * 0.5, color: ORB_CORE, sides: 12, rings: 8 });
   return props;
 }
@@ -387,7 +418,7 @@ export function fairyGardenBoard({ three, material, seeded, terrainGrid, replace
     bakeLight: make(FULLSCREEN_VERTEX, bakeLightFragment(), bakeOptions),
   };
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
-  const kit = createKitProps({ three, material, own, mood: FAIRY_NIGHT, reveal: 'vec3(0.7, 1.0, 0.9)', glow: FAIRY_GLOW });
+  const kit = createKitProps({ three, material, own, mood: FAIRY_NIGHT, reveal: 'vec3(0.7, 1.0, 0.9)', glow: FAIRY_GLOW, ground: true });
   const orbGeometry = new three.BufferGeometry();
   orbGeometry.setAttribute('position', new three.BufferAttribute(new Float32Array(MAX_ORBS * 3), 3));
   const orbs = new three.Points(orbGeometry, materials.orbs);

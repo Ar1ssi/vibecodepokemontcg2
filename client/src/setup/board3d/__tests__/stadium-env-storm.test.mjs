@@ -159,3 +159,11 @@ test('Magnetic Storm shaders declare no GLSL ES 3.00 reserved word and every one
     assert.match(shader, /void main\(\)/);
   }
 });
+
+test('the reed beds spread over the near, side and far margins: shuffled before the cap (design 083)', () => {
+  for (const layout of layouts) {
+    const { clumps, core } = stormSpots(layout);
+    const far = clumps.filter((clump) => clump.y > core.y + core.h).length;
+    assert.ok(far >= clumps.length * 0.15, `${far} of ${clumps.length} reed clumps past the far end`);
+  }
+});

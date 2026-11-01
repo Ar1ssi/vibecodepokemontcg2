@@ -99,15 +99,16 @@ export function shoppingSpots(layout) {
   const tables = [];
   for (const side of [-1, 1]) {
     for (let k = 0; k < 3; k += 1) {
-      const y = core.y + (0.12 + 0.27 * k) * core.h + 34 * u;
-      const table = { x: side * (reach + 96 * u), y, w: 62 * u, d: 150 * u, h: 22 * u, seed: hash(side, k, 1) };
+      // Design 083: the two bands no longer mirror each other: each table its own offset, length and turn.
+      const y = core.y + (0.12 + 0.27 * k + (hash(side, k, 6) - 0.5) * 0.08) * core.h + 34 * u;
+      const table = { x: side * (reach + (84 + 24 * hash(side, k, 7)) * u), y, w: 62 * u, d: (130 + 36 * hash(side, k, 8)) * u, h: 22 * u, seed: hash(side, k, 1), turn: (hash(side, k, 9) - 0.5) * 0.18 };
       if (ctx.clear(table.x, table.y, table.d / 2 + 4 * u, 6 * u)) tables.push(table);
     }
   }
   const mannequins = [];
   for (const side of [-1, 1]) {
     for (let k = 0; k < 3; k += 1) {
-      const y = core.y + (0.12 + 0.27 * k) * core.h + 34 * u + 124 * u;
+      const y = core.y + (0.12 + 0.27 * k + (hash(side, k, 10) - 0.5) * 0.1) * core.h + 34 * u + 124 * u;
       const m = { x: side * (reach + 150 * u + hash(side, k, 3) * 14 * u), y, h: (100 + 12 * hash(side, k, 4)) * u, top: (k + (side > 0 ? 1 : 0)) % 2, seed: hash(side, k, 5) };
       if (ctx.clear(m.x, m.y, 22 * u, 8 * u)) mannequins.push(m);
     }
@@ -281,10 +282,11 @@ function displayTable(props, table, u) {
   for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) props.roundBox({ x: table.x + sx * (table.w / 2 - 4 * u), y: table.y + sy * (table.d / 2 - 4 * u), z0: -1, z1: table.h - 4 * u, hw: 2.2 * u, hh: 2.2 * u, color: WOOD });
   const rows = 3;
   const cols = 5;
-  const stock = stockColours(hash(table.x, table.y, 7));
+  const [sx0, sy0] = table.stockAt ?? [table.x, table.y];
+  const stock = stockColours(hash(sx0, sy0, 7));
   for (let r = 0; r < rows; r += 1) {
     for (let c = 0; c < cols; c += 1) {
-      const tone = 0.94 + 0.12 * hash(table.x + r, table.y + c, 9);
+      const tone = 0.94 + 0.12 * hash(sx0 + r, sy0 + c, 9);
       const colour = stock[r % 2].map((v) => v * tone);
       const height = (4 + 5 * hash(r, c, table.seed * 10)) * u;
       props.roundBox({
@@ -394,10 +396,13 @@ export function shoppingProps(spots) {
   walls(props, spots);
   mezzanine(props, spots);
   for (const rack of racks) shirtRack(props, rack, u);
-  for (const table of tables) displayTable(props, table, u);
+  // Design 083: each table turned a little its own way (built about its middle, its stock keeping
+  // the same colours as at its place).
+  for (const table of tables) props.at({ x: table.x, y: table.y, yaw: table.turn ?? 0 }, () => displayTable(props, { ...table, x: 0, y: 0, stockAt: [table.x, table.y] }, u));
   for (const m of mannequins) mannequin(props, m, u);
-  props.look({ kind: LOOK.gloss }, () => {
-    for (const b of balloons) balloon(props, b, u);
+  // Design 083: the balloons bob and drift on their strings, each one whole (built about its own middle).
+  props.look({ kind: LOOK.gloss, sway: 3.5 }, () => {
+    for (const b of balloons) props.at({ x: b.x, y: b.y, ground: false }, () => balloon(props, { ...b, x: 0, y: 0, anchor: { x: b.anchor.x - b.x, y: b.anchor.y - b.y } }, u));
   });
   return props;
 }

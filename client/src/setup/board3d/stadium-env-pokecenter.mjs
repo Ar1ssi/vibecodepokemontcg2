@@ -27,7 +27,7 @@ import {
   TERRAIN_UNIFORMS,
 } from './stadium-environment-glsl.mjs';
 import { craterEmblem } from './stadium-environment-layout.mjs';
-import { createPropBuilder } from './stadium-env-props.mjs';
+import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
 import { createKitProps } from './stadium-kit.mjs';
 import { placeAsset } from './stadium-kit-assets.mjs';
 
@@ -98,12 +98,15 @@ export function centerSpots(layout) {
   const desks = [0.14, 0.27, 0.4].map((share) => ({ x: room.x1, y: at(share), w: 52 * u, d: 34 * u, h: 34 * u, dir: -1 }));
   const deskStools = desks.map((d) => ({ x: d.x - (d.d + 24 * u), y: d.y, color: 2 }));
   const bench = { x: room.x1, y0: at(0.68), y1: at(0.68) + 150 * u, depth: 34 * u, dir: -1 };
+  // Design 083: plants of more sizes, a pair by the bench, a big one by the entrance's end.
   const plants = [
     { x: room.x0 + 28 * u, y: at(0.35), r: 11 * u, seed: 1 },
-    { x: room.x0 + 28 * u, y: at(0.93), r: 12 * u, seed: 2 },
+    { x: room.x0 + 30 * u, y: at(0.93), r: 15 * u, seed: 2 },
+    { x: room.x0 + 24 * u, y: at(0.98), r: 9 * u, seed: 7 },
     { x: room.x1 - 28 * u, y: at(0.47), r: 11 * u, seed: 3 },
-    { x: room.x1 - 28 * u, y: at(0.62), r: 12 * u, seed: 4 },
-    { x: room.x1 - 28 * u, y: at(0.93), r: 12 * u, seed: 5 },
+    { x: room.x1 - 26 * u, y: at(0.61), r: 13 * u, seed: 4 },
+    { x: room.x1 - 30 * u, y: at(0.93), r: 16 * u, seed: 5 },
+    { x: room.x1 - 24 * u, y: at(0.88), r: 9 * u, seed: 8 },
   ];
   const columns = [-1, 1].map((side) => ({ x: side < 0 ? room.x0 + 36 * u : room.x1 - 36 * u, y: room.y0 + 48 * u, r: 24 * u, h: 190 * u }));
   const footprint = (s) => ({ x0: Math.min(s.x, s.x + s.dir * s.depth), x1: Math.max(s.x, s.x + s.dir * s.depth), y0: s.y0, y1: s.y1 });
@@ -538,7 +541,8 @@ function receptionCounter(props, counter, u) {
   for (const end of [-1, 1]) {
     const [lx, ly] = point(end * 1.2, r - 18 * u, 0);
     props.cylinder({ x: lx, y: ly, z0: zt, z1: zt + 8 * u, r: 8 * u, color: SILVER, capColor: SILVER, sides: 14 });
-    props.sphere({ x: lx, y: ly, z: zt + 20 * u, r: 11 * u, color: LAMP_BALL, sides: 16, rings: 10 });
+    // Design 083: the counter's lamps pulse softly, out of step.
+    props.look({ kind: LOOK.blink, rate: 0.35, phase: end > 0 ? 0.5 : 0 }, () => props.sphere({ x: lx, y: ly, z: zt + 20 * u, r: 11 * u, color: LAMP_BALL, sides: 16, rings: 10 }));
   }
   // The healing machine: a white body, a silver tray with six balls on a lit pad, a monitor behind.
   const [mx, my] = point(0, r - 18 * u, 0);

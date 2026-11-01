@@ -33,7 +33,7 @@ import {
   TERRAIN_UNIFORMS,
 } from './stadium-environment-glsl.mjs';
 import { GRASS as GRASS_KIT } from './stadium-env-ground.mjs';
-import { createPropBuilder } from './stadium-env-props.mjs';
+import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
 import { createKitProps } from './stadium-kit.mjs';
 import { placeAsset } from './stadium-kit-assets.mjs';
 import { disc, wallBand, windowRun } from './stadium-env-buildings.mjs';
@@ -150,11 +150,14 @@ export function lumioseSpots(layout) {
   for (const side of [-1, 1]) {
     const outer = side < 0 ? square.x0 + 36 * u : square.x1 - 36 * u;
     const inner = side < 0 ? square.x0 + strip * 0.88 : square.x1 - strip * 0.88;
+    // Design 083: the trees off a strict line (some a little further in from the edge), each its own
+    // size; the lamps at uneven steps, never one regular row.
     treeShares[side].forEach((share, k) => {
-      trees.push({ x: outer, y: core.y + core.h * share, r: (42 + 10 * hash(side, k, 1)) * u, h: (78 + 20 * hash(side, k, 2)) * u, seed: hash(side, k, 3) });
+      const wander = (hash(side, k, 4) - 0.5) * 34 * u;
+      trees.push({ x: outer - side * Math.max(0, wander), y: core.y + core.h * share + (hash(side, k, 5) - 0.5) * 30 * u, r: (36 + 20 * hash(side, k, 1)) * u, h: (70 + 34 * hash(side, k, 2)) * u, seed: hash(side, k, 3) });
     });
     for (let k = 0; k < 4; k += 1) {
-      lamps.push({ x: inner, y: core.y + core.h * (0.05 + 0.3 * k), h: 118 * u, side });
+      lamps.push({ x: inner, y: core.y + core.h * (0.05 + 0.3 * k + (hash(side, k, 6) - 0.5) * 0.09), h: (112 + 12 * hash(side, k, 7)) * u, side });
     }
     for (const share of benchShares[side]) {
       benches.push({ x: inner, y: core.y + core.h * share, side, w: 14 * u, d: 50 * u });
@@ -179,6 +182,8 @@ export function lumioseSpots(layout) {
     benches: keep(benches, 26 * u),
     cafes: keep(cafes, (c) => c.r).slice(0, MAX_CAFES),
     tower,
+    // Design 083: leaves fall from the plaza's trees.
+    driftEmitters: keptTrees.slice(0, 12).map((t) => ({ x: t.x, y: t.y, r: t.r * 0.8, z: t.h })),
     medal: { x: centre.x, y: centre.y, r: core.w * 0.4 },
     strip,
     centre,
@@ -647,7 +652,10 @@ function tree(props, t) {
 /** A lamppost: a fluted iron post, a bracket with three globes, a green banner hung from it. */
 function lamp(props, l, u) {
   lampPost(props, l, u);
-  props.quad([l.x + l.side * -0.6 * u, l.y - 5 * u, l.h * 0.46], [l.x + l.side * -0.6 * u, l.y + 5 * u, l.h * 0.46], [l.x + l.side * -0.6 * u, l.y + 5 * u, l.h * 0.78], [l.x + l.side * -0.6 * u, l.y - 5 * u, l.h * 0.78], BANNER);
+  // Design 083: the banner stirs in the breeze (a little: it hangs from the post).
+  props.look({ kind: LOOK.plain, sway: 0.6 }, () =>
+    props.quad([l.x + l.side * -0.6 * u, l.y - 5 * u, l.h * 0.46], [l.x + l.side * -0.6 * u, l.y + 5 * u, l.h * 0.46], [l.x + l.side * -0.6 * u, l.y + 5 * u, l.h * 0.78], [l.x + l.side * -0.6 * u, l.y - 5 * u, l.h * 0.78], BANNER)
+  );
 }
 
 function lampPost(props, l, u) {

@@ -77,7 +77,7 @@ import {
   brookletSpots,
   stonework,
 } from './stadium-env-brooklet-layout.mjs';
-import { GRASS as GRASS_KIT, SAND as SAND_KIT } from './stadium-env-ground.mjs';
+import { GRASS as GRASS_KIT, LIGHT_MOTION, SAND as SAND_KIT } from './stadium-env-ground.mjs';
 import { createPropBuilder } from './stadium-env-props.mjs';
 import { createKitProps } from './stadium-kit.mjs';
 import { placeAsset } from './stadium-kit-assets.mjs';
@@ -612,6 +612,7 @@ ${VORONOI}
 ${REVEAL}
 ${GRASS_KIT}
 ${SAND_KIT}
+${LIGHT_MOTION}
 ${PLACE}
 ${STRUCTURES}
 ${FALL_UNIFORMS}
@@ -757,6 +758,9 @@ void main() {
     col = lit(wood, n, shade, occlusion);
   }
 
+  // Design 083: the soft shadows of slow clouds drifting over the banks (the land lies clear of every
+  // card: the lake is under them all).
+  col *= 1.0 - 0.14 * cloudShade(p, uTime, 380.0);
   col = edgeHaze(col, vUv);
   col = mix(col, FOAM_LIT, revealRim(p) * 0.85);
   gl_FragColor = vec4(col, 1.0);
@@ -1341,12 +1345,17 @@ const BUSH = Object.freeze({ leaf: '#3f9a3a', leafLight: '#7cc44a' });
  * The boulders and the round bushes as the Stadium kit's solids (design 082, I273): each boulder at
  * the lake's level, half in the water; each bush standing on the land under it (the kit's ground).
  */
-export function brookletProps({ rocks = [], trees = [] } = {}) {
+export function brookletProps({ rocks = [], trees = [], clumps = [] } = {}) {
   const props = createPropBuilder();
   rocks.forEach((rock, k) => {
     placeAsset(props, 'boulder', { x: rock.x, y: rock.y, z: 0, ground: false, size: rock.r, depth: 0.82, yaw: rock.seed * 6.28, seed: k * 13 + 5, colors: BOULDER });
   });
   trees.forEach((tree, k) => placeAsset(props, 'bush', { x: tree.x, y: tree.y, size: tree.r * BUSH_SIZE, seed: k * 17 + 3, colors: BUSH }));
+  // Design 083: the banks' clumps, standing on the land.
+  for (const piece of clumps) {
+    const colors = piece.asset === 'bush' || piece.asset === 'treeRound' ? BUSH : piece.options.colors;
+    placeAsset(props, piece.asset, { ...piece.options, x: piece.x, y: piece.y, size: piece.size, seed: piece.seed * 997, yaw: piece.yaw, colors });
+  }
   return props;
 }
 

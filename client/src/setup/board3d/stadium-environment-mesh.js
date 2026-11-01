@@ -42,6 +42,8 @@ import {
 import { createEnvironmentTimeline } from './stadium-environment-timeline.mjs';
 import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
 import { createKitProps } from './stadium-kit.mjs';
+import { BOARD_DRIFT, createDrift, driftArea } from './stadium-env-drift.mjs';
+import { oppHandRect, union } from './stadium-env-spots.mjs';
 import { tableBounds } from './table-uv.mjs';
 
 export { EXIT_MS, INTRO_MS } from './stadium-environment-timeline.mjs';
@@ -642,7 +644,7 @@ export function jungleTreeProps(trees) {
       color: palette.body.map((v, k) => (k < 3 ? v + (palette.light[k] - v) * puff.shade : 0)),
     }));
     const leaf = Math.max(6, (tree.puffs.reduce((sum, puff) => sum + puff.r, 0) / Math.max(1, tree.puffs.length)) * 0.2);
-    props.at({ x: tree.cx, y: tree.cy, ground: false }, () => props.look({ kind: LOOK.foliage, leaf }, () => props.lumps(lumps, { crease: 0.5 })));
+    props.at({ x: tree.cx, y: tree.cy, ground: false }, () => props.look({ kind: LOOK.foliage, leaf, sway: 0.9 }, () => props.lumps(lumps, { crease: 0.5 })));
   }
   props.look({ kind: LOOK.foliage, sway: 0.8 }, () => {
     for (const tree of trees) {
@@ -934,6 +936,10 @@ export function createStadiumEnvironment({
   const boardOf = (wanted) => {
     if (!boards.has(wanted)) {
       const board = BOARDS[wanted](kit);
+      // Design 083: the board's ambient drift (stadium-env-drift.mjs BOARD_DRIFT), drawn with it.
+      board.drift = createDrift(kit, BOARD_DRIFT[wanted] ?? []);
+      board.objects = [...board.objects, ...board.drift.objects];
+      board.materials = [...board.materials, ...board.drift.materials];
       board.holder = new three.Group();
       board.holder.name = `board3d-stadium-env-${wanted}`;
       for (const object of board.objects) {
@@ -1040,6 +1046,10 @@ export function createStadiumEnvironment({
       uniforms.uOrigin.value.set(origin.x, origin.y);
       setFootprints(uniforms, footprints);
       board.apply(spots, bounds);
+      board.drift.setEmitters(spots?.driftEmitters ?? []);
+      board.drift.setArea(driftArea(tableBounds(layout), bounds));
+      const cards = [...footprints.slabs, ...footprints.flats];
+      board.drift.setAvoid(cards.length ? oppHandRect(layout, union(cards)) : null);
       appliedFor = signature;
     }
     if (!bakeToo || signature === bakedFor) return true;

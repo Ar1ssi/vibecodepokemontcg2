@@ -194,6 +194,48 @@ test('builder roundBox(): its front takes frontColor as box paints it, and witho
   assert.ok(close(highestOnBigFront, 200 - ROUND_EDGE_MAX, 1e-6), `a building's edge rounds ${ROUND_EDGE_MAX} px (${highestOnBigFront})`);
 });
 
+test('builder tint(): lit colours take the factor, nested tints multiply, glowing colours keep theirs (design 083)', () => {
+  const props = createPropBuilder();
+  props.tint([0.5, 1, 2], () => {
+    props.box({ x: 0, y: 0, z0: 0, z1: 4, hw: 2, hh: 2, color: [0.4, 0.4, 0.4, 0] });
+    props.tint([2, 1, 0.5], () => props.box({ x: 10, y: 0, z0: 0, z1: 4, hw: 2, hh: 2, color: [0.4, 0.4, 0.4, 0] }));
+    props.box({ x: 20, y: 0, z0: 0, z1: 4, hw: 2, hh: 2, color: [0.4, 0.4, 0.4, 2.5] });
+  });
+  props.tint([NaN, 1, 1], () => props.box({ x: 30, y: 0, z0: 0, z1: 4, hw: 2, hh: 2, color: [0.4, 0.4, 0.4, 0] }));
+  const color = props.build(three).getAttribute('aColor');
+  const position = props.build(three).getAttribute('position');
+  const seen = { tinted: false, nested: false, glow: false, invalid: false };
+  for (let i = 0; i < color.count; i += 1) {
+    const rgb = [color.getX(i), color.getY(i), color.getZ(i)];
+    const x = position.getX(i);
+    if (x < 5) {
+      assert.ok(close(rgb[0], 0.2) && close(rgb[1], 0.4) && close(rgb[2], 0.8), 'tinted');
+      seen.tinted = true;
+    } else if (x < 15) {
+      assert.ok(close(rgb[0], 0.4) && close(rgb[1], 0.4) && close(rgb[2], 0.4), 'nested tints multiply back to 1');
+      seen.nested = true;
+    } else if (x < 25) {
+      assert.ok(close(rgb[0], 0.4) && close(rgb[2], 0.4) && close(color.getW(i), 2.5), 'glow keeps its colour');
+      seen.glow = true;
+    } else {
+      assert.ok(close(rgb[0], 0.4) && close(rgb[2], 0.4), 'an invalid factor tints nothing');
+      seen.invalid = true;
+    }
+  }
+  assert.deepEqual(seen, { tinted: true, nested: true, glow: true, invalid: true });
+});
+
+test('builder look(): a blink look writes its phase and rate, unscaled by the frame, and no sway (design 083)', () => {
+  const props = createPropBuilder();
+  props.at({ x: 0, y: 0, scale: 3 }, () =>
+    props.look({ kind: LOOK.blink, rate: 1.5, phase: 0.25, sway: 2 }, () => props.box({ x: 0, y: 0, z0: 0, z1: 2, hw: 1, hh: 1, color: [1, 0, 0, 2.2] }))
+  );
+  const look = props.build(three).getAttribute('aLook');
+  for (let i = 0; i < look.count; i += 1) {
+    assert.deepEqual([look.getX(i), look.getY(i), look.getZ(i), look.getW(i)], [7, 0, 0.25, 1.5]);
+  }
+});
+
 test('builder: shadows are quads round their centres, scaled with the frame, none inside withoutShadows', () => {
   const props = createPropBuilder();
   props.at({ x: 10, y: 0, scale: 2 }, () => props.shadow({ rx: 3, strength: 0.5 }));

@@ -2,7 +2,7 @@
 // waterline from the far edge to the left edge, the sea filling the far-left corner), rock clusters
 // along the waterline and palms on the dry sand, all clear of the card footprints. Pure: no three.js.
 import { TERRAIN_SPACING_PX } from './stadium-environment-glsl.mjs';
-import { RISE_LEAN } from './stadium-env-spots.mjs';
+import { RISE_LEAN, clumpAround, patchy } from './stadium-env-spots.mjs';
 import { measureAsset } from './stadium-kit-assets.mjs';
 import { tableBounds } from './table-uv.mjs';
 
@@ -245,7 +245,8 @@ const pickDressing = (shore, bounds, rects, rocks, palms, u) => {
   for (let t = 0.04; t <= 0.96; t += 0.035) {
     const up = 50 + 55 * spotHash(t, 1, 11);
     const { x, y } = shorePoint(shore, t, -up);
-    if (spotHash(t, 2, 12) > 0.55) continue;
+    // Design 083: the tide leaves its finds in drifts along the shore, not one every few steps.
+    if (spotHash(t, 2, 12) > 0.55 * patchy(x, y, { scale: 220, salt: 19 })) continue;
     const star = spotHash(t, 3, 13) < 0.4;
     const size = (star ? 7 + 2 * spotHash(t, 4, 14) : 5 + 1.5 * spotHash(t, 4, 14)) * u;
     const kind = star ? 'starfish' : 'shell';
@@ -287,21 +288,45 @@ const pickDressing = (shore, bounds, rects, rocks, palms, u) => {
     });
     claim(spot.x, spot.y, setReach);
   }
-  // Dune grass at the back of the beach, in clumps by the table's edges.
+  // Dune grass at the back of the beach, in clumps by the table's edges (design 083: more of it,
+  // gathered in tussocks by patchy(), every size its own).
   const grass = [];
   for (let x = bounds.x + 30; x <= bounds.x + bounds.w - 30; x += 22) {
     for (let y = bounds.y + 30; y <= bounds.y + bounds.h - 30; y += 22) {
-      if (grass.length >= 10) break;
+      if (grass.length >= 18) break;
       const toEdge = Math.min(x - bounds.x, bounds.x + bounds.w - x, y - bounds.y, bounds.y + bounds.h - y);
-      const size = (18 + 6 * spotHash(x, y, 31)) * u;
-      const blade = 17 * u;
-      if (toEdge > 120 || spotHash(x, y, 32) > 0.12) continue;
+      const size = (14 + 12 * spotHash(x, y, 31)) * u;
+      const blade = (14 + 6 * spotHash(x, y, 34)) * u;
+      if (toEdge > 140 || spotHash(x, y, 32) > 0.12 * patchy(x, y, { scale: 180, salt: 23 })) continue;
       if (shoreFrame(shore, x, y).offshore > -260 || !fits(x, y, size + 10, measureAsset('tallGrass', { size, blade }).height)) continue;
       grass.push({ x, y, size, blade, seed: spotHash(x, y, 33) });
       claim(x, y, size * 2.2);
     }
   }
-  return { finds, sets, grass };
+  // Design 083: little scatters of rounded pebbles on the dry sand, a few stones each, out past the
+  // cards' block (the open sand between the rows stays clear: D232).
+  const block = rects.length ? { x0: Math.min(...rects.map((r) => r.x)), y0: Math.min(...rects.map((r) => r.y)), x1: Math.max(...rects.map((r) => r.x + r.w)), y1: Math.max(...rects.map((r) => r.y + r.h)) } : null;
+  const pastBlock = (x, y, gap) => !block || Math.hypot(Math.max(block.x0 - x, 0, x - block.x1), Math.max(block.y0 - y, 0, y - block.y1)) >= gap;
+  const pebbles = [];
+  for (let k = 0; k < 120 && pebbles.length < 18; k += 1) {
+    const x = bounds.x + 40 + spotHash(k, 7, 41) * (bounds.w - 80);
+    const y = bounds.y + 40 + spotHash(k, 8, 42) * (bounds.h - 80);
+    if (shoreFrame(shore, x, y).offshore > -110 || !pastBlock(x, y, 40)) continue;
+    const heart = (6 + 3 * spotHash(k, 9, 43)) * u;
+    if (!fits(x, y, heart + 4, heart * 0.8)) continue;
+    pebbles.push({ x, y, size: heart, seed: spotHash(k, 10, 44) });
+    // Its own stone only (its reach): the satellites gather close round it, a scatter of three to five.
+    claim(x, y, heart);
+    for (const spot of clumpAround({ x, y }, { count: 2 + Math.floor(spotHash(k, 11, 45) * 3), reach: [heart * 2.2, heart * 3.6], salt: k })) {
+      const size = heart * spot.share;
+      if (!fits(spot.x, spot.y, size + 2, size * 0.8) || !pastBlock(spot.x, spot.y, 30)) continue;
+      pebbles.push({ x: spot.x, y: spot.y, size, seed: spot.seed });
+      claim(spot.x, spot.y, size + 2);
+    }
+    // The scatter as a whole keeps the next one off it.
+    claim(x, y, heart * 4.2);
+  }
+  return { finds, sets, grass, pebbles };
 };
 
 /**

@@ -29,7 +29,7 @@ import {
 } from './stadium-environment-glsl.mjs';
 import { environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
 import { WATER as WATER_KIT } from './stadium-env-ground.mjs';
-import { createPropBuilder } from './stadium-env-props.mjs';
+import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
 import { createKitProps } from './stadium-kit.mjs';
 import { tableBounds } from './table-uv.mjs';
 
@@ -80,14 +80,24 @@ export function levinciaSpots(layout) {
   // Billboards along the walkway's outer edge, facing the stage, from the left arc round over the far
   // end to the right, between the bridges; none on the near arc (they would lean over the player's
   // cards in the tilted view).
+  // Design 083: billboards of three sizes (wide, standard, narrow and tall), at uneven gaps, their
+  // screens cycling icons in no fixed order.
   const billboards = [];
-  const boardWidth = 150 * u;
-  const step = (boardWidth + 26 * u) / walkOut;
-  for (let angle = Math.PI * 1.1; angle > -0.1 && billboards.length < MAX_BILLBOARDS; angle -= step) {
-    if (BRIDGE_TURNS.some((turn) => Math.abs(((angle - turn + 3 * Math.PI) % (2 * Math.PI)) - Math.PI) < step * 0.75)) continue;
-    const spot = at(angle, walkOut - 10 * u);
+  const SIZES = [
+    [190, 92],
+    [150, 84],
+    [104, 104],
+  ];
+  for (let angle = Math.PI * 1.1, k = 0; angle > -0.1 && billboards.length < MAX_BILLBOARDS; k += 1) {
+    const [w, h] = SIZES[Math.floor(hash(k, 3, 1) * SIZES.length) % SIZES.length];
+    const boardWidth = w * u;
+    const step = (boardWidth + (18 + 30 * hash(k, 3, 2)) * u) / walkOut;
+    const centreAngle = angle - step / 2;
+    angle -= step;
+    if (BRIDGE_TURNS.some((turn) => Math.abs(((centreAngle - turn + 3 * Math.PI) % (2 * Math.PI)) - Math.PI) < step * 0.75)) continue;
+    const spot = at(centreAngle, walkOut - 10 * u);
     if (!inScene(spot.x, spot.y, boardWidth * 0.5)) continue;
-    billboards.push({ ...spot, angle, width: boardWidth, height: 84 * u, seed: hash(angle, 1, 1), index: billboards.length });
+    billboards.push({ ...spot, angle: centreAngle, width: boardWidth, height: h * u, seed: hash(centreAngle, 1, 1), variant: Math.floor(hash(k, 3, 4) * 3) });
   }
   // Towers: in the water past the walkway, on the far end and in the corners.
   const towers = [];
@@ -397,10 +407,12 @@ const billboard = (props, board, centre, deck, u) => {
   for (const s of [-halfW * 0.6, halfW * 0.6]) props.tube([[foot[0] + along[0] * s, foot[1] + along[1] * s, deck - 1], at(s, board.height * 0.3)], 2.6 * u, FRAME, { sides: 6 });
   // The frame's back and face.
   props.quad(at(halfW, 0), at(-halfW, 0), at(-halfW, board.height), at(halfW, board.height), FRAME);
-  const variant = board.index % 3;
+  const variant = (board.variant ?? 0) % 3;
   const field = [SCREEN_SKY, SCREEN_NAVY, SCREEN_PINK][variant];
   const inset = 5 * u;
   props.quad(frontAt(-halfW + inset, inset, 1.5), frontAt(halfW - inset, inset, 1.5), frontAt(halfW - inset, board.height - inset, 1.5), frontAt(-halfW + inset, board.height - inset, 1.5), field);
+  // Design 083: a little light in the frame's corner blinks, each board on its own beat.
+  props.look({ kind: LOOK.blink, rate: 0.7 + 0.6 * board.seed, phase: board.seed }, () => screenDisc(props, frontAt, [halfW - inset * 1.6, board.height - inset * 1.6], 2.6 * u, SCREEN_RED, 2.4));
   const mid = [0, board.height / 2];
   const size = (board.height - 2 * inset) * 0.8;
   if (variant === 0) {

@@ -31,7 +31,7 @@ import { environmentFootprints, sceneBounds } from './stadium-environment-layout
 import { GRASS as GRASS_KIT } from './stadium-env-ground.mjs';
 import { createPropBuilder } from './stadium-env-props.mjs';
 import { createKitProps } from './stadium-kit.mjs';
-import { measureAsset, placeAsset } from './stadium-kit-assets.mjs';
+import { instanceTint, measureAsset, placeAsset } from './stadium-kit-assets.mjs';
 
 /**
  * Moonlight for the kit (designs 081, 082): the art's pale teal moon, a deep teal night filling the
@@ -45,6 +45,7 @@ export const MOONLIT = Object.freeze({
   shadow: [0.38, 0.46, 0.5, 0.55],
 });
 import { tableBounds } from './table-uv.mjs';
+import { patchy, shuffled } from './stadium-env-spots.mjs';
 
 export const CEMETERY_KEY = 'old-cemetery';
 /** The moon (toward it, table frame): low beyond the far end, a little to the right. */
@@ -168,13 +169,14 @@ export function cemeterySpots(layout) {
   ];
   const off = (x, y, r) => keepOff.every((k) => Math.hypot(x - k.x, y - k.y) >= k.keep + r);
 
-  // Graves in rows facing the player, either side of the path and off the far end.
-  const graves = [];
+  // Graves in rows facing the player, either side of the path and off the far end. Design 083: the
+  // rows past the far end thinned, every candidate shuffled before the cap, so the stones spread over
+  // the sides and the far end instead of filling one far row.
+  const graveSpots = [];
   const across = 82 * u;
   const along = 104 * u;
   for (let gy = scene.y + along / 2, row = 0; gy < scene.y + scene.h; gy += along, row += 1) {
     for (let gx = scene.x + across / 2 + (row % 2) * across * 0.4; gx < scene.x + scene.w; gx += across) {
-      if (graves.length >= MAX_GRAVES) break;
       const roll = (salt) => hash(gx, gy, salt);
       const x = gx + (roll(1) - 0.5) * across * 0.5;
       const y = gy + (roll(2) - 0.5) * along * 0.3;
@@ -186,32 +188,40 @@ export function cemeterySpots(layout) {
       // Toward the near end a tall stone leans up over the player's cards in the tilted view; and
       // none stands among the cards (design 080: the graves ring the field, they don't sit in it).
       if (y < core.y || distanceToRect(x, y, core) < reach + 24 * u) continue;
-      if (roll(6) > 0.7 || !inScene(x, y, 30 * u) || !clear(x, y, reach + height * 0.35) || !pathClear(x, y, reach) || !off(x, y, reach)) {
+      const share = y > far ? 0.38 : 0.7;
+      if (roll(6) > share || !inScene(x, y, 30 * u) || !clear(x, y, reach + height * 0.35) || !pathClear(x, y, reach) || !off(x, y, reach)) {
         continue;
       }
       // Old stones lean back, away from the path's walkers, each its own way: from above the face shows.
       const lean = 0.2 + 0.3 * roll(8);
-      graves.push({ x, y, yaw: (roll(7) - 0.5) * 0.7, lean, width, height, thick: (8 + 5 * roll(10)) * u, kind, seed: roll(9) });
+      graveSpots.push({ x, y, yaw: (roll(7) - 0.5) * 0.7, lean, width, height, thick: (8 + 5 * roll(10)) * u, kind, seed: roll(9) });
     }
   }
-  // Pines round the scene's outer edge, off the far end most.
-  const pines = [];
+  const graves = shuffled(graveSpots, 13).slice(0, MAX_GRAVES);
+  // Pines round the scene's outer edge, off the far end most. Design 083: shuffled before the cap
+  // (a near-to-far scan filled it from the near strip) and gathered in stands (patchy).
+  const pineSpots = [];
   const pineStep = 118 * u;
   for (let gy = scene.y + pineStep / 2; gy < scene.y + scene.h; gy += pineStep) {
     for (let gx = scene.x + pineStep / 2; gx < scene.x + scene.w; gx += pineStep) {
-      if (pines.length >= MAX_PINES) break;
       const roll = (salt) => hash(gx, gy, salt + 50);
       const x = gx + (roll(1) - 0.5) * pineStep * 0.6;
       const y = gy + (roll(2) - 0.5) * pineStep * 0.6;
       const r = (44 + 26 * roll(3)) * u;
       const outside = distanceToRect(x, y, core);
-      if (outside < 130 * u || roll(4) > 0.6 || !inScene(x, y, r * 0.3)) continue;
+      if (outside < 130 * u || roll(4) > 0.6 * patchy(x, y, { scale: 300 * u, salt: 57 }) || !inScene(x, y, r * 0.3)) continue;
       // Tall only off the far end; elsewhere they lean over the cards in the tilted view.
-      const h = (y > far ? 240 + 90 * roll(5) : 120 + 50 * roll(5)) * u;
+      const h = (y > far ? 190 + 110 * roll(5) : 120 + 50 * roll(5)) * u;
       if (!clear(x, y, r + h * 0.25) || !pathClear(x, y, r) || !off(x, y, r)) continue;
       if (graves.some((g) => Math.hypot(x - g.x, y - g.y) < r + 30 * u)) continue;
-      pines.push({ x, y, r, h, seed: roll(6) });
+      pineSpots.push({ x, y, r, h, seed: roll(6) });
     }
+  }
+  const pines = [];
+  for (const pine of shuffled(pineSpots, 17)) {
+    if (pines.length >= MAX_PINES) break;
+    if (pines.some((other) => Math.hypot(pine.x - other.x, pine.y - other.y) < (pine.r + other.r) * 0.8)) continue;
+    pines.push(pine);
   }
   // The broken grave post by the path on the left, two thirds of the way up.
   const at = path[Math.floor(path.length * 0.3)];
@@ -527,7 +537,8 @@ const brokenPost = (props, p, u) => {
 export function cemeteryProps({ graves, pines, tree, post, tufts = [], u }) {
   const props = createPropBuilder();
   for (const g of graves) {
-    headstone(props, g);
+    // Design 083: each stone its own shade of the grey, weathered lighter or darker.
+    props.tint(instanceTint(g.seed * 991, 1.4), () => headstone(props, g));
   }
   for (const p of pines) pine(props, p);
   bareTree(props, tree, u);

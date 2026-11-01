@@ -93,3 +93,12 @@ test('Crystal Cave shaders declare no GLSL ES 3.00 reserved word and every one h
     assert.match(shader, /void main\(\)/);
   }
 });
+
+test('the clusters reach the far end too: shuffled before the cap, not spent on the near rows (design 083)', () => {
+  for (const layout of layouts) {
+    const { clusters, core } = crystalSpots(layout);
+    const far = clusters.filter((cluster) => cluster.y > core.y + core.h).length;
+    assert.ok(far >= 3, `${far} of ${clusters.length} clusters past the far end`);
+    assert.ok(new Set(clusters.map((cluster) => cluster.hue)).size >= 4, 'many hues');
+  }
+});

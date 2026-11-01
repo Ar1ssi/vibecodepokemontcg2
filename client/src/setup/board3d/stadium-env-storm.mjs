@@ -35,7 +35,7 @@ import { craterEmblem } from './stadium-environment-layout.mjs';
 import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
 import { createKitProps } from './stadium-kit.mjs';
 import { placeAsset } from './stadium-kit-assets.mjs';
-import { boardContext, hash } from './stadium-env-spots.mjs';
+import { boardContext, hash, patchy, shuffled } from './stadium-env-spots.mjs';
 import { EDGE_HAZE, STANDARD_TERRAIN_VERTEX } from './stadium-env-surfaces.mjs';
 
 export const STORM_KEY = 'magnetic-storm';
@@ -160,22 +160,25 @@ export function stormSpots(layout) {
     const r = (14 + 20 * hash(k, 4, 3)) * u;
     if (ctx.clear(x, y, r + 18 * u, 8 * u) && nearPylon(x, y, r + 24 * u)) boulders.push({ x, y, r });
   }
-  // Reed clumps over the scene outside the clearing, clear of the pads and the trees' feet.
-  const clumps = [];
+  // Reed clumps over the scene outside the clearing, clear of the pads and the trees' feet. Design
+  // 083: gathered in beds (patchy) with open marsh between, every candidate shuffled before the cap
+  // (a near-to-far scan spent it all on the near rows).
+  const reedSpots = [];
   const step = 62 * u;
-  for (let gy = scene.y + step / 2; gy < scene.y + scene.h && clumps.length < MAX_CLUMPS; gy += step) {
-    for (let gx = scene.x + step / 2; gx < scene.x + scene.w && clumps.length < MAX_CLUMPS; gx += step) {
+  for (let gy = scene.y + step / 2; gy < scene.y + scene.h; gy += step) {
+    for (let gx = scene.x + step / 2; gx < scene.x + scene.w; gx += step) {
       const roll = (salt) => hash(gx, gy, salt + 60);
       const x = gx + (roll(1) - 0.5) * step * 0.9;
       const y = gy + (roll(2) - 0.5) * step * 0.9;
-      if (roll(3) > 0.78 || !ctx.inScene(x, y, 10 * u)) continue;
+      if (roll(3) > 0.78 * patchy(x, y, { scale: 260 * u, salt: 131 }) || !ctx.inScene(x, y, 10 * u)) continue;
       const out = distanceOut(ctx.core, x, y);
       if (out < (CLEARING_PX + CLEARING_WOBBLE_PX * 0.7) * u + 22 * u) continue;
       if (!nearPylon(x, y, 22 * u)) continue;
       if (!ctx.clear(x, y, 10 * u, 18 * u)) continue;
-      clumps.push({ x, y, h: (24 + 24 * roll(4)) * u, lean: roll(5) * 6.28, seed: roll(6), blades: 7 + Math.floor(roll(7) * 4) });
+      reedSpots.push({ x, y, h: (20 + 30 * roll(4)) * u, lean: roll(5) * 6.28, seed: roll(6), blades: 6 + Math.floor(roll(7) * 6) });
     }
   }
+  const clumps = shuffled(reedSpots, 11).slice(0, MAX_CLUMPS);
   return { ...ctx, handEnd, pads, poles, dome, arcs, trees, boulders, clumps, ring: craterEmblem(layout, centre) };
 }
 
@@ -439,7 +442,8 @@ export function stormProps(spots) {
   for (const pole of spots.poles) pylon(props, { ...pole, orb: pole.side < 0 ? ORB_PINK : ORB_CYAN }, spots.u);
   for (const pad of spots.pads) pylon(props, { x: pad.x, y: pad.y, r: 11 * spots.u, h: PAD_POST_PX * spots.u, orb: ORB_PINK }, spots.u);
   spots.boulders.forEach((rock, k) => placeAsset(props, 'boulder', { x: rock.x, y: rock.y, z: -2, size: rock.r * 1.05, seed: k * 11 + 3, yaw: k, sun: STORM_LIGHT, colors: ROCK }));
-  props.look({ kind: LOOK.matte }, () => reedClumps(props, spots.clumps, spots.u));
+  // Design 083: the reeds sway in the storm's wind.
+  props.look({ kind: LOOK.matte, sway: 1.1 }, () => reedClumps(props, spots.clumps, spots.u));
   return props;
 }
 

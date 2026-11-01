@@ -143,3 +143,24 @@ vec2 strata(float z, vec2 p, float band) {
   return vec2(mix(0.8, groove, fine), mix(0.5, hash12(vec2(course, 4.1)), fine));
 }
 `;
+
+/**
+ * Design 083: light that moves over the land, after NOISE and FILTERING. `cloudShade(p, t, scale)`:
+ * 0..1, the soft shadow of slow clouds drifting over (`scale` about a cloud's size, px).
+ * `dapple(p, t, size)`: -0.3..1, sun flecks about `size` px across under a canopy, slowly shifting as
+ * its leaves move (faded where they fall under a few screen px). A board fades both out near the
+ * cards, (1 - smoothstep(0, 0.4, fieldCalm(p, ~120))), so no moving light crosses them (D232).
+ */
+export const LIGHT_MOTION = /* glsl */ `
+float cloudShade(vec2 p, float t, float scale) {
+  float cover = fbm3((p - vec2(t * 7.0, t * 2.6)) / scale + 6.1);
+  return smoothstep(0.54, 0.72, cover);
+}
+float dapple(vec2 p, float t, float size) {
+  vec2 q = p / size;
+  float a = gnoise(q + vec2(t * 0.11, t * 0.07));
+  float b = gnoise(q * 1.7 - vec2(t * 0.09, -t * 0.05) + 3.7);
+  float light = smoothstep(0.6, 0.76, a * 0.6 + b * 0.4);
+  return mix(-0.3, 1.0, light) * patternFade(filterPixel, size);
+}
+`;

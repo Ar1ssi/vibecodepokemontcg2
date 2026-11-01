@@ -36,6 +36,7 @@ import { createPropBuilder } from './stadium-env-props.mjs';
 import { createKitProps } from './stadium-kit.mjs';
 import { placeAsset } from './stadium-kit-assets.mjs';
 import { tableBounds } from './table-uv.mjs';
+import { patchy } from './stadium-env-spots.mjs';
 
 export const GARDEN_KEY = 'mystery-garden';
 /** The moon (toward it, table frame): high, from the far left. */
@@ -136,11 +137,15 @@ export function gardenSpots(layout) {
       const roll = (salt) => hash(gx, gy, salt);
       const x = gx + (roll(1) - 0.5) * step * 0.7;
       const y = gy + (roll(2) - 0.5) * step * 0.7;
-      const r = (24 + 20 * roll(3)) * u;
+      // Design 083: the hedges gather into thickets (patchy), bigger in their hearts, in three teals,
+      // some of the thickest in bloom.
+      const thick = patchy(x, y, { scale: 280 * u, salt: 91 });
+      const r = (24 + 20 * roll(3)) * u * (0.85 + 0.12 * Math.min(thick, 1.6));
       const out = Math.hypot(x - centre.x, y - centre.y);
-      if (out < ringR + 26 * u + r * 0.6 || !inScene(x, y, r * 0.4) || roll(4) > 0.85) continue;
+      if (out < ringR + 26 * u + r * 0.6 || !inScene(x, y, r * 0.4) || roll(4) > 0.72 * thick) continue;
       if (furniture.some((f) => Math.hypot(x - f.x, y - f.y) < f.keep + r * 0.7)) continue;
-      hedges.push({ x, y, z: ground + r * 0.5, r, seed: roll(5) });
+      const palette = Math.min(2, Math.floor(patchy(x, y, { scale: 420 * u, contrast: 0.6, salt: 93 }) * 1.66));
+      hedges.push({ x, y, z: ground + r * 0.5, r, seed: roll(5), palette, bloom: thick > 1.2 && roll(6) < 0.4 });
     }
   }
   // A clump of broad leaves (the kit's fern) at the outer foot of each vase and pillar.
@@ -413,7 +418,7 @@ export function gardenProps(spots) {
   const { hedges, ferns, posts, ground, u } = spots;
   const kit = { sun: MOON };
   for (const hedge of hedges) {
-    placeAsset(props, 'bush', { ...kit, x: hedge.x, y: hedge.y, z: ground, size: hedge.r * 0.9, seed: hedge.seed * 997, colors: GARDEN_HEDGE });
+    placeAsset(props, 'bush', { ...kit, x: hedge.x, y: hedge.y, z: ground, size: hedge.r * 0.9, seed: hedge.seed * 997, colors: GARDEN_HEDGES[hedge.palette] ?? GARDEN_HEDGE, berries: hedge.bloom ? BLOSSOM : null });
   }
   for (const fern of ferns) placeAsset(props, 'fern', { ...kit, x: fern.x, y: fern.y, z: ground, size: fern.size, seed: fern.seed * 991, colors: GARDEN_FERN });
   // White flowers heaped in each urn on the balustrade.
@@ -425,6 +430,13 @@ export function gardenProps(spots) {
 }
 
 const GARDEN_HEDGE = Object.freeze({ leaf: [0.058, 0.26, 0.26, 0], leafLight: [0.1, 0.4, 0.38, 0] });
+// Design 083: the thickets in three teals (the second deeper, the third bluer) and their pale blossom.
+const GARDEN_HEDGES = Object.freeze([
+  GARDEN_HEDGE,
+  Object.freeze({ leaf: [0.04, 0.2, 0.21, 0], leafLight: [0.08, 0.32, 0.32, 0] }),
+  Object.freeze({ leaf: [0.07, 0.24, 0.32, 0], leafLight: [0.13, 0.38, 0.46, 0] }),
+]);
+const BLOSSOM = '#f2e6ff';
 const GARDEN_FERN = Object.freeze({ leaf: [0.07, 0.3, 0.28, 0], leafLight: [0.12, 0.42, 0.36, 0], heart: [0.03, 0.12, 0.13, 0] });
 
 /** The balustrade with its lanterns and urns, the vases and the pillars. */

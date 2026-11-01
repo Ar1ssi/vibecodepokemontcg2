@@ -183,7 +183,7 @@ const ASSETS = {
           color: top,
         });
       }
-      props.look({ kind: LOOK.foliage, leaf: 0.17 * R }, () => props.lumps(lumps));
+      props.look({ kind: LOOK.foliage, leaf: 0.17 * R, sway: 1.0 }, () => props.lumps(lumps));
       props.shadow({ x: shift[0] * crown, y: shift[1] * crown, rx: 1.02 * R, strength: 0.75 });
       props.shadow({ rx: 0.4 * R, strength: 0.6 });
     },
@@ -224,7 +224,7 @@ const ASSETS = {
         const { z0, z1 } = shape[i];
         return Math.min(1, Math.max(0, (z0 + (z1 - z0) * t ** 1.25 - next.z0) / (0.08 * H)));
       };
-      props.look({ kind: LOOK.foliage, leaf: 0.24 * R }, () => {
+      props.look({ kind: LOOK.foliage, leaf: 0.24 * R, sway: 0.7 }, () => {
         shape.forEach(({ r, z0, z1, turn }, i) => {
           const grid = [];
           for (let j = 0; j <= rows; j += 1) {
@@ -339,9 +339,9 @@ const ASSETS = {
         lumps.push({ x: Math.cos(angle) * 0.55 * R, y: Math.sin(angle) * 0.55 * R, z: 0.4 * R, rx: r, rz: r * 0.84, color: c.leaf });
       }
       lumps.push({ x: sunward[0] * 0.2 * R, y: sunward[1] * 0.2 * R, z: 0.84 * R, rx: 0.4 * R, rz: 0.32 * R, color: blend(c.leaf, c.leafLight, 0.6) });
-      props.look({ kind: LOOK.foliage, leaf: 0.3 * R }, () => props.lumps(lumps));
+      props.look({ kind: LOOK.foliage, leaf: 0.3 * R, sway: 0.6 }, () => props.lumps(lumps));
       if (berries) {
-        props.look({ kind: LOOK.gloss }, () => {
+        props.look({ kind: LOOK.gloss, sway: 0.6 }, () => {
           const count = 5 + Math.floor(rand() * 4);
           for (let k = 0; k < count; k += 1) {
             const angle = rand() * 6.28;
@@ -359,7 +359,7 @@ const ASSETS = {
     dims: ({ size = 18, length = 80 }) => ({ reach: length / 2 + size, height: size * 1.5 }),
     draw(props, { size: R = 18, length: L = 80, colors }, dims, { shift }) {
       const c = coloursOf({ leaf: 'leaf', leafLight: 'leafLight' }, colors);
-      props.look({ kind: LOOK.foliage, leaf: 0.36 * R }, () =>
+      props.look({ kind: LOOK.foliage, leaf: 0.36 * R, sway: 0.3 }, () =>
         props.roundBox({ x: 0, y: 0, z0: 0, z1: 1.3 * R, hw: L / 2, hh: 0.6 * R, r: 0.32 * R, color: c.leaf, topColor: blend(c.leaf, c.leafLight, 0.5) })
       );
       props.shadow({ x: shift[0] * R * 0.6, y: shift[1] * R * 0.6, rx: L / 2 + R * 0.6, ry: R * 1.15, strength: 0.6 });
@@ -954,7 +954,7 @@ const ASSETS = {
         ],
         { color: c.stem, sides: 8 }
       );
-      props.look({ kind: LOOK.gloss }, () => props.blob({ z: base + 1.75 * R, rx: R, rz: 0.92 * R, color: (d) => (d[2] > 0.55 ? c.leafLight : c.leaf), sides: 22, rings: 14 }));
+      props.look({ kind: LOOK.gloss, sway: 0.4 }, () => props.blob({ z: base + 1.75 * R, rx: R, rz: 0.92 * R, color: (d) => (d[2] > 0.55 ? c.leafLight : c.leaf), sides: 22, rings: 14 }));
       props.shadow({ x: shift[0] * (base + 1.7 * R), y: shift[1] * (base + 1.7 * R), rx: R, strength: 0.6 });
     },
   },
@@ -1101,6 +1101,19 @@ function planterPlant(W, plant, colors = {}) {
   return { name: 'bush', options: { size: 0.95 * W, colors }, salt: 4 };
 }
 
+/**
+ * Design 083: an instance's own shade of its palette, so a row of one asset never repeats: from its
+ * seed, lighter or darker by up to 7% and warmer or cooler by up to 4%, times `vary` (0: none).
+ * @returns {number[]} [r, g, b] factors
+ */
+export function instanceTint(seed = 0, vary = 1) {
+  const amount = Number.isFinite(vary) ? Math.max(0, vary) : 1;
+  const rand = seededRandom(seed * 3.7 + 11);
+  const value = (rand() - 0.5) * 0.14 * amount;
+  const warmth = (rand() - 0.5) * 0.08 * amount;
+  return [1 + value + warmth, 1 + value, 1 + value - warmth];
+}
+
 /** Every asset's name. */
 export const ASSET_NAMES = Object.freeze(Object.keys(ASSETS));
 
@@ -1115,8 +1128,9 @@ export function measureAsset(name, options = {}) {
  * Builds asset `name` into `props` (createPropBuilder) standing at (x, y, z) turned by `yaw`, with
  * its own options (`size`, `height`, `colors`, `seed`, ...). `sun` (toward it, the board's own)
  * lays its shadows (`shadows: false`: none, the board's ground shades under it); on a board whose
- * kit stands on its ground, `ground: false` keeps the asset at z (a rock out in the sea). Returns
- * measureAsset's dims.
+ * kit stands on its ground, `ground: false` keeps the asset at z (a rock out in the sea). A seed
+ * also tints its colours (instanceTint; `vary` 0..1, default 1, how far); without one it keeps its
+ * palette. Returns measureAsset's dims.
  */
 export function placeAsset(props, name, options = {}) {
   const dims = measureAsset(name, options);
@@ -1131,7 +1145,9 @@ export function placeAsset(props, name, options = {}) {
     shift: [world[0] * c - world[1] * s, world[0] * s + world[1] * c],
     sunward: [sun[0] * c - sun[1] * s, sun[0] * s + sun[1] * c],
   };
-  const draw = () => ASSETS[name].draw(props, options, dims, ctx);
+  const build = () => ASSETS[name].draw(props, options, dims, ctx);
+  // An asset placed without a seed keeps its palette (a towel, a bench): only seeded ones vary.
+  const draw = () => (options.seed === undefined ? build() : props.tint(instanceTint(seed, options.vary ?? 1), build));
   props.at({ x, y, z, yaw, ground: options.ground !== false }, () => (options.shadows === false ? props.withoutShadows(draw) : draw()));
   return dims;
 }

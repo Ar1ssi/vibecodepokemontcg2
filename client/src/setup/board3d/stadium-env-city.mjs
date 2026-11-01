@@ -25,8 +25,10 @@ import {
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
 import { environmentFootprints } from './stadium-environment-layout.mjs';
-import { PROP_VERTEX, createPropBuilder } from './stadium-env-props.mjs';
+import { LOOK, PROP_VERTEX, createPropBuilder } from './stadium-env-props.mjs';
+import { RISE_LEAN, distanceToRect, hash } from './stadium-env-spots.mjs';
 import { createKitProps } from './stadium-kit.mjs';
+import { instanceTint } from './stadium-kit-assets.mjs';
 import { tableBounds } from './table-uv.mjs';
 
 export const CITY_KEY = 'dark-city';
@@ -114,6 +116,8 @@ const DOOR_RED = [0.3, 0.07, 0.08, 0.2];
 /** The hut's lamp: a cold white floodlight, as in the art. */
 const LAMP = [1.4, 1.45, 1.5, 2.8];
 const MACHINE = [0.3, 0.32, 0.35, 0.4];
+const CRATE = [0.36, 0.27, 0.18, 0.05];
+const CRATE_TOP = [0.46, 0.35, 0.24, 0.05];
 /** The round tower's white-lit lantern glass, its dark dome, the pale ledges of its floors and their spacing. */
 const CROWN_LIGHT = [1.25, 1.32, 1.4, 2.0];
 const DOME = [0.16, 0.17, 0.2, 0.5];
@@ -168,7 +172,46 @@ export function citySpots(layout) {
     const tower = towers[index];
     return { x: tower.x + (u * tower.w) / 2, y: tower.y + (v * tower.d) / 2, z: tower.height + BEAM_LAMP_PX, heading, tip, phase };
   });
-  return { roof, hut, towers, round, beams };
+  // Design 083: rooftop clutter in the roof's side bands — air-conditioning units, vents breathing
+  // steam, stacked crates, a few pipes — at uneven steps, each clear of the cards with its lean and
+  // of the hut and the parapet.
+  const clutter = [];
+  const clearOf = (x, y, reach, height) =>
+    rects.every((rect) => distanceToRect(x, y, rect) >= reach + RISE_LEAN * height + 14) &&
+    Math.abs(x - roof.x) + reach < roof.hw - PARAPET.thick - 4 &&
+    Math.abs(y - roof.y) + reach < roof.hh - PARAPET.thick - 4 &&
+    Math.hypot(x - hut.x, y - hut.y) > Math.max(hut.w, hut.d) * 0.75 + reach + 10 &&
+    clutter.every((c) => Math.hypot(x - c.x, y - c.y) > c.reach + reach + 8);
+  for (const side of [-1, 1]) {
+    let y = roof.y - roof.hh + PARAPET.thick + 30 + 40 * hash(side, 1, 3);
+    for (let k = 0; y < roof.y + roof.hh - PARAPET.thick - 30 && k < 12; k += 1) {
+      const roll = (salt) => hash(side * 7 + k, y, salt);
+      const pick = hash(k * 3.7 + side, 11, 41);
+      const kind = pick < 0.38 ? 'unit' : pick < 0.66 ? 'vent' : 'crates';
+      const size = kind === 'unit' ? 16 + 6 * roll(2) : kind === 'vent' ? 7 + 3 * roll(2) : 11 + 4 * roll(2);
+      const height = kind === 'unit' ? 18 + 6 * roll(3) : kind === 'vent' ? 16 + 8 * roll(3) : 12 + 12 * roll(3);
+      const x = roof.x + side * (roof.hw - PARAPET.thick - size - 8 - 30 * roll(4));
+      if (clearOf(x, y, size * 1.2, height)) clutter.push({ kind, x, y, reach: size * 1.2, size, height, seed: roll(5) });
+      y += 46 + 70 * roll(6);
+    }
+  }
+  const driftEmitters = clutter.filter((c) => c.kind === 'vent').map((c) => ({ x: c.x, y: c.y, r: c.size * 0.6, z: c.height + 4 }));
+  return { roof, hut, towers, round, beams, clutter, driftEmitters };
+}
+
+/** Design 083: one piece of rooftop clutter: an air-conditioning unit, a vent with a cowl, or stacked crates. */
+function clutterPiece(props, { kind, x, y, size, height, seed }) {
+  const yaw = (seed - 0.5) * 0.6;
+  if (kind === 'unit') {
+    props.roundBox({ x, y, z0: 0, z1: height, hw: size, hh: size * 0.7, yaw, color: MACHINE, topColor: [0.36, 0.38, 0.42, 0.4] });
+    props.cylinder({ x: x + Math.cos(yaw) * size * 0.35, y: y + Math.sin(yaw) * size * 0.35, z0: height, z1: height + 1.5, r: size * 0.42, color: [0.16, 0.17, 0.2, 0.3], sides: 16 });
+  } else if (kind === 'vent') {
+    props.cylinder({ x, y, z0: 0, z1: height, r: size * 0.55, color: [0.34, 0.35, 0.39, 0.6], sides: 12 });
+    props.cylinder({ x, y, z0: height, z1: height + 3, r: size * 0.85, color: [0.28, 0.29, 0.33, 0.6], sides: 12 });
+  } else {
+    props.roundBox({ x, y, z0: 0, z1: height * 0.55, hw: size, hh: size * 0.8, yaw, color: CRATE, topColor: CRATE_TOP });
+    props.roundBox({ x: x + size * 0.2, y: y - size * 0.15, z0: height * 0.55, z1: height, hw: size * 0.7, hh: size * 0.6, yaw: yaw + 0.4, color: CRATE, topColor: CRATE_TOP });
+  }
 }
 
 /** The parapet round the roof, the hut with its door and lamp, the towers' rooftops, billboards' posts and searchlights, the round tower's crown. */
@@ -179,7 +222,7 @@ export function cityProps(spots) {
 }
 
 /** The billboards' posts, the searchlights, the parapets and everything on the roofs. */
-function citySolids(props, { roof, hut, towers, round, beams = [] }) {
+function citySolids(props, { roof, hut, towers, round, beams = [], clutter = [] }) {
   // Each billboard's posts: two at its foot, two longer ones up to its top edge.
   for (const tower of towers) {
     if (!tower.board) continue;
@@ -235,7 +278,10 @@ function citySolids(props, { roof, hut, towers, round, beams = [] }) {
     props.cylinder({ x: tower.x - tower.w * 0.22, y: tower.y + tower.d * 0.24, z0: tower.height, z1: tower.height + 30, r: 16, color: [0.24, 0.22, 0.22, 0.3], sides: 14 });
     const mast = { x: tower.x - tower.w * 0.1, y: tower.y - tower.d * 0.3 };
     props.cylinder({ x: mast.x, y: mast.y, z0: tower.height, z1: tower.height + 58, r: 1.6, color: [0.3, 0.3, 0.34, 0.6], sides: 6 });
-    props.roundBox({ x: mast.x, y: mast.y, z0: tower.height + 58, z1: tower.height + 63, hw: 2.8, hh: 2.8, color: [1.5, 0.12, 0.08, 2.0] });
+    // Design 083: the aircraft light blinks, each on its own beat.
+    props.look({ kind: LOOK.blink, rate: 0.45 + 0.3 * hash(tower.x, tower.y, 5), phase: hash(tower.x, tower.y, 6) }, () =>
+      props.roundBox({ x: mast.x, y: mast.y, z0: tower.height + 58, z1: tower.height + 63, hw: 2.8, hh: 2.8, color: [1.5, 0.12, 0.08, 2.0] })
+    );
   }
   const lo = { x: roof.x - roof.hw, y: roof.y - roof.hh };
   const hi = { x: roof.x + roof.hw, y: roof.y + roof.hh };
@@ -265,6 +311,10 @@ function citySolids(props, { roof, hut, towers, round, beams = [] }) {
   props.roundBox({ x: faceX - 3, y: doorY + 15, z0: 37, z1: 41, hw: 3, hh: 8, color: LAMP });
   for (const y0 of [hut.y - 4, hut.y + 24]) {
     props.quad([faceX, y0 + 20, 16], [faceX, y0, 16], [faceX, y0, 28], [faceX, y0 + 20, 28], HUT_WINDOW);
+  }
+  // Design 083: the rooftop clutter, each piece its own shade.
+  for (const piece of clutter) {
+    props.tint(instanceTint(piece.seed * 991, 1.3), () => clutterPiece(props, piece));
   }
   // The round tower, as the art's: a pale ledge round every floor, and on its roof a lantern of
   // white-lit glass under a dark dome.

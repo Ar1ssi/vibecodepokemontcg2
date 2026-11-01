@@ -67,7 +67,8 @@ export function neutralSpots(layout) {
     const x = centre.x + Math.cos(angle) * reach;
     const y = centre.y + Math.sin(angle) * reach;
     if (!ctx.inScene(x, y, 20 * u) || !ctx.clear(x, y, 14 * u, 14 * u)) continue;
-    beams.push({ x, y, r: 13 * u, h: 230 * u, phase: hash(k, 5, 1) * 6.28 });
+    // Design 083: each column its own height and girth.
+    beams.push({ x, y, r: (10 + 6 * hash(k, 5, 2)) * u, h: (170 + 110 * hash(k, 5, 3)) * u, phase: hash(k, 5, 1) * 6.28 });
   }
   // Screens floating over the far side, each a tilted green-lit panel facing the platform.
   const screens = [-0.52, 0.04, 0.5].map((share, k) => ({
@@ -252,6 +253,12 @@ function screenPanel(props, s, u) {
   const line = Math.max(1.6 * u, r * 0.1);
   ring(cy, r - line, r, 1.4);
   ring(cy, r * 0.22, r * 0.22 + line, 1.4, 16);
+  // Design 083: a status light in the pane's corner blinks, each screen on its own beat.
+  props.look({ kind: LOOK.blink, rate: 0.6 + 0.4 * ((s.x * 0.01) % 1 + 1) % 1, phase: ((s.x * 0.0071) % 1 + 1) % 1 }, () => {
+    const lx = hw - 9 * u;
+    const ly = s.h - 9 * u;
+    props.quad(at(lx - 2.6 * u, ly - 2.6 * u, 1.6), at(lx + 2.6 * u, ly - 2.6 * u, 1.6), at(lx + 2.6 * u, ly + 2.6 * u, 1.6), at(lx - 2.6 * u, ly + 2.6 * u, 1.6), SCREEN_WHITE);
+  });
   props.quad(at(-r + line * 0.5, cy - line / 2, 1.4), at(-r * 0.22, cy - line / 2, 1.4), at(-r * 0.22, cy + line / 2, 1.4), at(-r + line * 0.5, cy + line / 2, 1.4), SCREEN_WHITE);
   props.quad(at(r * 0.22, cy - line / 2, 1.4), at(r - line * 0.5, cy - line / 2, 1.4), at(r - line * 0.5, cy + line / 2, 1.4), at(r * 0.22, cy + line / 2, 1.4), SCREEN_WHITE);
 }

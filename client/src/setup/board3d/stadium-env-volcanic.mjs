@@ -314,6 +314,14 @@ void main() {
   col = mix(col, vec3(0.24, 0.18, 0.155), smoothstep(0.6, 1.0, facing));
   col *= 0.9 + 0.2 * tone;
   col *= 0.88 + 0.16 * smoothstep(-6.0, 50.0, ground);
+  // Design 083: not one basalt: some stones cool slate, some rusty, and broad soft patches of ash
+  // lighter and darker across the field, all quieter by the cards.
+  float family = fract(id * 7.31);
+  float calm = fieldCalm(p, 80.0);
+  float quietStone = 1.0 - 0.7 * calm;
+  col = mix(col, col * vec3(0.84, 0.9, 1.1), step(0.64, family) * isStone * quietStone);
+  col = mix(col, col * vec3(1.18, 0.92, 0.78), step(family, 0.16) * isStone * quietStone);
+  col *= 1.0 + 0.16 * (fbm3(p / 320.0 + 2.0) - 0.5) * quietStone;
   // Bare ground between stones is darker ash; the volcano is darker basalt.
   col *= mix(0.72, 1.0, isStone) * mix(1.0, 0.85, onVolcano);
 
@@ -326,7 +334,6 @@ void main() {
 
   // Painted cracks: thin light lines across the tops of some stones, out in the world only
   // (design 080: no fine lines round the cards).
-  float calm = fieldCalm(p, 80.0);
   vec4 crack = voronoiCell(p / 22.0 + id * 17.0);
   float crackLine = (1.0 - smoothstep(0.015, 0.04, crack.x)) * smoothstep(0.82, 0.95, n.z)
     * smoothstep(0.55, 0.7, gnoise(p / 26.0 + id * 5.0)) * isStone * step(0.4, tone);

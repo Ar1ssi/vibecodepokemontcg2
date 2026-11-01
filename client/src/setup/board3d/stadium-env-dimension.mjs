@@ -37,6 +37,7 @@ import { GRASS as GRASS_KIT } from './stadium-env-ground.mjs';
 import { createPropBuilder } from './stadium-env-props.mjs';
 import { KIT_LIGHT, KIT_UNIFORMS, kitUniforms } from './stadium-kit.mjs';
 import { tableBounds } from './table-uv.mjs';
+import { patchy } from './stadium-env-spots.mjs';
 
 export const VALLEY_KEY = 'dimension-valley';
 /** The island runs this far past the cards' box, its corners this round, its edge wandering this much. */
@@ -149,7 +150,8 @@ export function valleySpots(layout) {
       const r = (9 + 16 * roll(3) ** 1.6) * u;
       const sd = islandDistance(island, x, y);
       // Design 080: fewer, and a clear step off every card, so no bright blot sits at a card's edge.
-      if (sd > -14 * u || roll(4) > 0.3) continue;
+      // Design 083: in drifts (patchy), not an even dotting.
+      if (sd > -14 * u || roll(4) > 0.3 * patchy(x, y, { scale: 240 * u, salt: 101 })) continue;
       if (cards.some((card) => distanceToRect(x, y, card) < r + 30 * u)) continue;
       // The ground round the Actives stays calm: no disc inside the painted mark.
       if (emblem && Math.hypot(x - emblem.x, y - emblem.y) < emblem.r + 24 * u) continue;
@@ -492,7 +494,8 @@ varying vec3 vWorld;
 void main() {
   float growth = terrainGrowth(position.xy);
   vec3 pos = position;
-  pos.z = (pos.z + sin(uTime * 0.6 + aBob.x) * aBob.y) * growth;
+  // Design 083: each island bobs at its own pace (from its phase), not all on one beat.
+  pos.z = (pos.z + sin(uTime * (0.42 + 0.36 * fract(aBob.x * 0.159)) + aBob.x) * aBob.y) * growth;
   vColor = aColor;
   vNormal = normal;
   vWorld = pos;
@@ -570,7 +573,7 @@ void main() {
   // A little bigger than the disc, room for its glow.
   vec2 local = position.xy * 1.6;
   vec3 pos = vec3(aDisc.xy + local * vec2(1.0, 0.66) * aDisc.w, aDisc.z + 0.6);
-  pos.z += sin(uTime * 0.6 + aHue.w) * aBob;
+  pos.z += sin(uTime * (0.42 + 0.36 * fract(aHue.w * 0.159)) + aHue.w) * aBob;
   float growth = terrainGrowth(aDisc.xy);
   pos.z *= growth;
   vLocal = local;

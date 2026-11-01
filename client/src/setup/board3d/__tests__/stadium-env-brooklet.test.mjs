@@ -139,3 +139,9 @@ test('the land no longer bakes boulders or bushes: the kit draws them (design 08
   for (let i = 0; i < foot.count; i += 1) (foot.getZ(i) > 0.5 ? (grounded += 1) : (level += 1));
   assert.ok(grounded > 0 && level > 0, 'the bush stands on the land, the boulder at the lake\'s level');
 });
+
+test('the banks carry clumps of bushes, flowers and grass round the map\'s bushes in the usual views (design 083)', () => {
+  const counts = SCREEN_VIEWS.map((view) => brookletSpots(screenView(view).layout)?.clumps.length ?? 0);
+  assert.ok(counts[0] >= 5, `the first view's banks are dressed (${counts[0]})`);
+  assert.ok(counts.filter((n) => n >= 5).length >= SCREEN_VIEWS.length - 2, `most views are dressed (${counts})`);
+});

@@ -432,6 +432,8 @@ void main() {
   wallRock = mix(wallRock, vec3(0.31, 0.088, 0.058), smoothstep(0.62, 1.0, facing));
   vec2 course = strata(ground, p, 20.0);
   wallRock *= (0.85 + 0.3 * tone) * mix(0.62, 1.0, course.x) * (0.92 + 0.16 * course.y);
+  // Design 083: the walls in broad warmer and darker stretches, not one crimson.
+  wallRock *= 1.0 + 0.26 * (fbm3(p / 260.0 + 4.0) - 0.5);
   vec3 col = mix(wallRock, islandRock, onIsland);
   // Painted rims: convex edges (lump tops, crags) catch a warm stroke of light.
   vec2 t2 = uTexel * 2.5;
@@ -461,6 +463,9 @@ void main() {
   // The island's lip catches a bright orange rim of the lava's light.
   col += vec3(1.0, 0.36, 0.06) * exp(-fromMoat / 7.0) * onIsland * 0.5 * flicker;
   col += vec3(1.0, 0.3, 0.12) * exp(-max(fallSD, 0.0) / 6.0) * onWall * 0.55 * flicker;
+  // Design 083: thin veins of lava threading the walls, each breathing slowly on its own beat.
+  float vein = (1.0 - smoothstep(0.0, 0.035, abs(fbm3(p / 95.0 + 7.0) - 0.5))) * step(0.58, gnoise(p / 150.0 + 3.0));
+  col += vec3(1.0, 0.32, 0.08) * vein * onWall * smoothstep(20.0, 60.0, ground) * (0.22 + 0.14 * sin(uTime * 0.7 + p.x * 0.013 + p.y * 0.007));
 
   // Some of the island's cracks still glow; sparks lie on the rock out toward the moat (design 080:
   // none round the cards, where glowing dots read as speckle on the field).

@@ -361,6 +361,7 @@ export function laserGeometry(three, count = LASER_COUNT) {
 export function glintGeometry(three, lamps, lights = []) {
   const positions = [];
   const glints = [];
+  const chases = [];
   const index = [];
   const z = RIG_PX.z - RIG_PX.depth - 18;
   const points = [...lamps.map(([x, y]) => [x, y, z, GLINT_PX.lamp]), ...lights.map(([x, y, lz]) => [x, y, lz, GLINT_PX.light])];
@@ -374,12 +375,15 @@ export function glintGeometry(three, lamps, lights = []) {
     ]) {
       positions.push(x, y, pz);
       glints.push(cx, cy, k, size);
+      // Design 083: a lamp's place round the rig, 0..1 (the chase sweeps it); -1 a laser light.
+      chases.push(k < lamps.length ? k / Math.max(lamps.length, 1) : -1);
     }
     index.push(first, first + 1, first + 2, first, first + 2, first + 3);
   });
   const geometry = new three.BufferGeometry();
   geometry.setAttribute('position', new three.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('aGlint', new three.Float32BufferAttribute(glints, 4));
+  geometry.setAttribute('aChase', new three.Float32BufferAttribute(chases, 1));
   geometry.setIndex(index);
   return geometry;
 }
@@ -754,6 +758,7 @@ export const GLINT_VERTEX = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
 attribute vec4 aGlint;
+attribute float aChase;
 varying vec2 vCorner;
 varying float vTwinkle;
 varying float vFlare;
@@ -764,6 +769,10 @@ void main() {
   vFlare = step(${GLINT_PX.lamp + 1}.0, aGlint.w);
   float seed = hash12(vec2(aGlint.z, 4.0));
   vTwinkle = 0.94 + 0.06 * sin(uTime * (0.5 + 0.6 * seed) + seed * 40.0);
+  // Design 083: every 9 s a flash runs once round all the rig's lamps, one after another (the laser
+  // lights, aChase -1, keep their steady breath); at uTime 0 (reduced motion) none is lit.
+  float sweep = fract(uTime / 9.0) * 1.4 - 0.2 - aChase;
+  vTwinkle += step(0.0, aChase) * 0.55 * exp(-sweep * sweep * 900.0);
   gl_Position = projectionMatrix * view;
 }
 `;

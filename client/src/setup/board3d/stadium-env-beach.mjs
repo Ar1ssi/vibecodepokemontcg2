@@ -34,7 +34,7 @@ import {
 } from './stadium-environment-glsl.mjs';
 import { environmentFootprints } from './stadium-environment-layout.mjs';
 import { beachSpots, shoreFrame } from './stadium-env-beach-layout.mjs';
-import { SAND, WATER } from './stadium-env-ground.mjs';
+import { LIGHT_MOTION, SAND, WATER } from './stadium-env-ground.mjs';
 import { createPropBuilder } from './stadium-env-props.mjs';
 import { createKitProps, glslColour } from './stadium-kit.mjs';
 import { placeAsset } from './stadium-kit-assets.mjs';
@@ -361,6 +361,7 @@ ${FILTERING}
 ${FOOTPRINTS}
 ${REVEAL}
 ${SAND}
+${LIGHT_MOTION}
 ${SHORE}
 ${SURF}
 ${PALETTE}
@@ -387,6 +388,8 @@ void main() {
   // The sheet: a thin clear tint of the shallows; its front a crisp white line of foam.
   col = mix(col, mix(col, SEA_SHALLOW, 0.45), smoothstep(0.0, 0.3, swash.film));
   col = mix(col, FOAM_LIT, smoothstep(0.45, 0.6, swash.foam));
+  // Design 083: the soft shadows of slow clouds drifting over the sand, none near the cards.
+  col *= 1.0 - 0.16 * cloudShade(p, uTime, 420.0) * (1.0 - smoothstep(0.0, 0.4, fieldCalm(p, 120.0)));
   vec2 edgeUv = min(vUv, 1.0 - vUv);
   col *= mix(0.72, 1.0, smoothstep(0.0, 0.04, min(edgeUv.x, edgeUv.y)));
   col = mix(col, FOAM_LIT, revealRim(p) * 0.85);
@@ -499,6 +502,7 @@ ${OUTPUT}
 const ROCK = Object.freeze({ body: '#a68a6c', light: '#cdb391', dark: '#77624f' });
 const PALM = Object.freeze({ frond: '#4caf4f', frondLight: '#7ccb5c', trunk: '#c29a63', trunkDark: '#97723f', coconut: '#7a5232' });
 const DUNE_GRASS = Object.freeze({ grass: '#6f9a3d', tip: '#c3c56b' });
+const PEBBLE = Object.freeze({ body: '#b8a48c', light: '#e2d4bc', dark: '#86735e' });
 
 /**
  * The beach's solids, the kit's (design 081): palms where the layout stands them, each rock cluster
@@ -539,6 +543,9 @@ export function beachProps({ shore, rocks, palms, dressing }) {
   }
   for (const clump of dressing?.grass ?? []) {
     placeAsset(props, 'tallGrass', { x: clump.x, y: clump.y, size: clump.size, blade: clump.blade, seed: clump.seed * 991, colors: DUNE_GRASS });
+  }
+  for (const pebble of dressing?.pebbles ?? []) {
+    placeAsset(props, 'boulder', { x: pebble.x, y: pebble.y, size: pebble.size, depth: 0.7, seed: pebble.seed * 977, yaw: pebble.seed * 6.28, colors: PEBBLE });
   }
   return props;
 }

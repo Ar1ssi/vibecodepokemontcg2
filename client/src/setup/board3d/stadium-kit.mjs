@@ -129,11 +129,12 @@ float kitGround(vec3 foot) {
 }
 // The vertex as the board draws it: stood on the ground under its foot, risen behind the reveal, and
 // swaying (aLook.y px) when its part sways, the more the higher it stands, so a blade's or a frond's
-// foot stays put.
+// foot stays put. Design 083: the phase follows the asset's foot, so a crown sways as one piece and
+// its neighbours out of step with it; a little of it follows the vertex, so its parts stay alive.
 vec3 kitPosition(vec3 p, vec4 look) {
   vec3 q = vec3(p.xy, (p.z + kitGround(aFoot)) * terrainGrowth(p.xy));
   if (look.y > 0.0) {
-    float phase = dot(p.xy, vec2(0.043, 0.029));
+    float phase = dot(aFoot.xy, vec2(0.043, 0.029)) + dot(p.xy, vec2(0.006, 0.004));
     vec2 sway = vec2(sin(uTime * 1.6 + phase), sin(uTime * 1.25 + phase * 1.6 + 1.7));
     q.xy += sway * look.y * clamp(p.z / 16.0, 0.0, 1.0);
   }
@@ -168,7 +169,7 @@ void main() {
 `;
 
 /**
- * The kit's light (LOOK kinds: 0 plain, 1 foliage, 2 gloss, 3 crystal, 4 cloud, 5 chrome, 6 matte):
+ * The kit's light (LOOK kinds: 0 plain, 1 foliage, 2 gloss, 3 crystal, 4 cloud, 5 chrome, 6 matte; 7 blink, a glowing part only):
  * a soft key wrapping round the form, the sky's fill from above and the ground's bounce from below,
  * a broad sheen (`metal`, aColor.w 0..1, strengthens it) and on gloss and crystal a tighter gloss.
  * Foliage lit by the sun goes warmer and yellower; a crystal and a cloud fill with their own light;
@@ -295,6 +296,10 @@ void main() {
   vec3 col = vColor.w >= 1.5
     ? vColor.rgb * (vColor.w - 1.0)
     : kitLight(albedo, n, vWorld, vLook, vColor.w) * mix(0.75, 1.0, smoothstep(0.0, 12.0, vRise));
+  // Design 083: a blinking light (LOOK.blink: aLook.z its phase, aLook.w its rate per second).
+  if (vColor.w >= 1.5 && vLook.x > 6.5 && vLook.x < 7.5) {
+    col *= mix(0.18, 1.0, smoothstep(-0.2, 0.2, sin(6.2831853 * (uTime * vLook.w + vLook.z))));
+  }
   ${glow ? 'if (vColor.w < 1.5) col += kitGlow(vColor.rgb, n, vWorld);' : ''}
   col += (${reveal}) * revealGlow(vWorld.xy, 0.035);
   gl_FragColor = vec4(col, 1.0);

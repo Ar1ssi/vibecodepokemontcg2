@@ -6,8 +6,9 @@
 # Pruned or shortened lines, verbatim: .agent/archive/DECISIONS-pruned-2026-10-15.md (grep the D-number).
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
-#   Next id = highest D number in this file and the archives + 1 (next: D235).
+#   Next id = highest D number in this file and the archives + 1 (next: D236).
 
+- D235 2026-11-01 [mat-fx] Stadium boards live: drift on every board (one point shader, never over cards or the opp hand), foot-phased sway, LOOK.blink, per-instance tints, clumped scatters. (design 083)
 - D234 2026-10-31 [mat-fx] Stadium boards look like BDSP: kit solids in one soft light per mood, no outlines, leaf splats; grounds from one ground kit; plate tilt-shift. (design 082; supersedes D233)
 - D232 2026-10-31 [mat-fx] Stadium boards keep the field calm: shaders read card footprints (fieldCalm) to fade detail, glow, particles and motion round cards; fine patterns fade by fwidth. (design 080)
 - D231 2026-10-29 [mat-fx] Attack FX are per-type element shaders: instanced three.js meshes in the FX pass, emitted by element kits over canvas-kit methods/beats; canvas kits stay the 2D + cast fallback. (design 079)

@@ -7,6 +7,7 @@ import { NO_MAT_LAYOUT_ID } from '../../sizing/mat-spec.mjs';
 import { environmentKeyFor } from '../stadium-environment-layout.mjs';
 import {
   BAKE_FIELD_FRAGMENT,
+  FAIRY_GROUND_CEILING_PX,
   FAIRY_KEY,
   MAX_LEAVES,
   MAX_ORBS,
@@ -47,12 +48,12 @@ test('fairySpots: the ring between the Actives, trees, orbs and leaves clear of 
   }
 });
 
-test('no tree crown, orb or leaf covers a card on screen, in either camera preset', () => {
+test('no tree crown, orb, leaf or clump covers a card on screen, in either camera preset, risen on the swells', () => {
   for (const view of SCREEN_VIEWS) {
     const { layout, projectors } = screenView(view);
     const geometry = fairyProps(fairySpots(layout)).build(three);
     for (const { preset, project } of projectors) {
-      const hit = geometryOnCard(geometry, layout, project);
+      const hit = geometryOnCard(geometry, layout, project, { ground: () => [0, FAIRY_GROUND_CEILING_PX] });
       assert.equal(hit, null, `${view.profile} ${view.viewport.w}x${view.viewport.h} ${preset}: ${hit}`);
     }
   }
@@ -71,4 +72,12 @@ test('Fairy Garden shaders declare no GLSL ES 3.00 reserved word and every one h
     assert.doesNotMatch(shader, reserved);
     assert.match(shader, /void main\(\)/);
   }
+});
+
+test('the undergrowth gathers in clumps of mixed kinds; the swells stay under the ceiling (design 083)', () => {
+  const spots = fairySpots(flatLayout(getMatLayout(NO_MAT_LAYOUT_ID), { w: 1449.6, h: 540 }));
+  assert.ok(spots.pieces.length >= 6 && spots.pieces.length <= 30, `${spots.pieces.length} pieces`);
+  assert.ok(new Set(spots.pieces.map((piece) => piece.asset)).size >= 2);
+  assert.match(BAKE_FIELD_FRAGMENT, /away \* \(2\.0 \+ 9\.0 \* fbm3\(p \/ 190\.0 \+ 5\.0\)\)/);
+  assert.ok(0.2 + 2 + 9 <= FAIRY_GROUND_CEILING_PX);
 });

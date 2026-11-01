@@ -31,7 +31,7 @@ import {
 import { RIDGE_HALF_WIDTH } from './stadium-environment-layout.mjs';
 import { STRATA } from './stadium-env-ground.mjs';
 import { createPropBuilder } from './stadium-env-props.mjs';
-import { RISE_LEAN, boardContext, hash } from './stadium-env-spots.mjs';
+import { RISE_LEAN, boardContext, clumpAround, hash, patchy } from './stadium-env-spots.mjs';
 import { measureAsset, placeAsset } from './stadium-kit-assets.mjs';
 
 /** The crest's tallest round the mountain (BAKE_MOUNTAIN crestHeight: a swell to 130 px, crags of 34 and 14). */
@@ -103,26 +103,43 @@ export function craterDressing(layout, bowl, peaks) {
     ctx.inScene(x, y, reach) &&
     ctx.clear(x, y, reach + RISE_LEAN * (craterCeiling(bowl, peaks, x, y) + height), 16 * u) &&
     pieces.every((p) => Math.hypot(p.x - x, p.y - y) >= (p.reach + reach) * 1.1);
-  for (let k = 0; k < 28 && pieces.length < 12; k += 1) {
-    const angle = (k / 28) * 2 * Math.PI + (hash(k, 1, 3) - 0.5) * 0.3;
+  // Design 083: boulders fall in heaps against the wall's foot and pines stand in groves up the
+  // outer slopes (patchy round the crater, each hero with smaller ones beside it), not one per slot.
+  const heap = (asset, x, y, size, seed, extra = {}) => {
+    const height = asset === 'pine' ? size * 3 : measureAsset(asset, { size }).height;
+    const { reach } = measureAsset(asset, { size, height });
+    if (!fits(x, y, reach, height)) return null;
+    const piece = { asset, x, y, size, reach, seed, ...(asset === 'pine' ? { height } : {}), ...extra };
+    pieces.push(piece);
+    return piece;
+  };
+  for (let k = 0; k < 64 && pieces.length < 18; k += 1) {
+    const angle = ((k + (hash(k, 1, 3) - 0.5) * 0.7) / 64) * 2 * Math.PI;
     const out = bowl.floor + (bowl.rim - bowl.floor) * (0.15 + 0.25 * hash(k, 2, 3));
     const x = bowl.x + Math.cos(angle) * out;
     const y = bowl.y + Math.sin(angle) * out;
-    const size = (16 + 14 * hash(k, 3, 3)) * u;
-    const { reach, height } = measureAsset('boulder', { size });
-    if (hash(k, 4, 3) > 0.6 || !fits(x, y, reach, height)) continue;
-    pieces.push({ asset: 'boulder', x, y, size, reach, seed: hash(k, 5, 3) });
+    if (hash(k, 4, 3) > 0.65 * patchy(x, y, { scale: 260 * u, salt: 111 })) continue;
+    const hero = heap('boulder', x, y, (20 + 14 * hash(k, 3, 3)) * u, hash(k, 5, 3));
+    if (!hero) continue;
+    for (const spot of clumpAround(hero, { count: 1 + Math.floor(hash(k, 11, 3) * 3), reach: [hero.reach * 1.1, hero.reach * 1.9], salt: k })) {
+      if (pieces.length >= 18) break;
+      heap('boulder', spot.x, spot.y, hero.size * spot.share, spot.seed);
+    }
   }
-  for (let k = 0; k < 40 && pieces.filter((p) => p.asset === 'pine').length < 10; k += 1) {
-    const angle = (k / 40) * 2 * Math.PI + (hash(k, 6, 3) - 0.5) * 0.2;
+  let pines = 0;
+  for (let k = 0; k < 80 && pines < 16; k += 1) {
+    const angle = ((k + (hash(k, 6, 3) - 0.5) * 0.8) / 80) * 2 * Math.PI;
     const out = bowl.rim + (bowl.foot - bowl.rim) * (0.25 + 0.6 * hash(k, 7, 3));
     const x = bowl.x + Math.cos(angle) * out;
     const y = bowl.y + Math.sin(angle) * out;
-    const size = (22 + 10 * hash(k, 8, 3)) * u;
-    const height = size * 3;
-    const { reach } = measureAsset('pine', { size, height });
-    if (hash(k, 9, 3) > 0.5 || !fits(x, y, reach, height)) continue;
-    pieces.push({ asset: 'pine', x, y, size, height, reach, seed: hash(k, 10, 3) });
+    if (hash(k, 9, 3) > 0.6 * patchy(x, y, { scale: 300 * u, salt: 113 })) continue;
+    const hero = heap('pine', x, y, (24 + 12 * hash(k, 8, 3)) * u, hash(k, 10, 3));
+    if (!hero) continue;
+    pines += 1;
+    for (const spot of clumpAround(hero, { count: 1 + Math.floor(hash(k, 12, 3) * 2), reach: [hero.reach * 1.2, hero.reach * 2], salt: k + 70 })) {
+      if (pines >= 16) break;
+      if (heap('pine', spot.x, spot.y, hero.size * (0.55 + 0.35 * spot.share), spot.seed)) pines += 1;
+    }
   }
   return pieces;
 }

@@ -17,6 +17,7 @@ import {
   TERRAIN_FRAGMENT,
   TERRAIN_VERTEX,
   TREE_CARD_GAP_PX,
+  VITALITY_GROUND_CEILING_PX,
   VITALITY_KEY,
   VITALITY_SUN,
   clearingDistance,
@@ -155,13 +156,13 @@ test('vitalitySpots is null without a layout', () => {
   assert.equal(vitalitySpots({}), null);
 });
 
-test('every kit solid builds, and none lands on a card on screen in either camera preset', () => {
+test('every kit solid builds, and none lands on a card on screen in either camera preset, risen on the swells (design 083)', () => {
   for (const view of SCREEN_VIEWS) {
     const { layout, projectors } = screenView(view);
     const geometry = vitalityProps(vitalitySpots(layout)).build(three);
     assert.ok(geometry.getAttribute('position').count > 20000);
     for (const { preset, project } of projectors) {
-      const hit = geometryOnCard(geometry, layout, project);
+      const hit = geometryOnCard(geometry, layout, project, { ground: () => [0, VITALITY_GROUND_CEILING_PX] });
       assert.equal(hit, null, `${view.profile} ${view.viewport.w}x${view.viewport.h} ${preset}: ${hit}`);
     }
   }
@@ -183,4 +184,19 @@ test('Forest of Vitality shaders declare no GLSL ES 3.00 reserved word and every
     assert.doesNotMatch(shader, reserved);
     assert.match(shader, /void main\(\)/);
   }
+});
+
+test('the ground ceiling the screen test bounds stays above the bake\'s swells (design 083)', () => {
+  // The bake's height past the meadow: a ±0.4 px ripple plus 4 + 12 px of fbm swell.
+  assert.match(BAKE_FIELD_FRAGMENT, /float h = 0\.8 \* \(fbm3\(p \/ 90\.0\) - 0\.5\) \+ outside \* \(4\.0 \+ 12\.0 \* fbm3\(p \/ 200\.0 \+ 7\.0\)\);/);
+  assert.ok(0.4 + 4 + 12 <= VITALITY_GROUND_CEILING_PX);
+});
+
+test('the thickets gather (some cells bare, some thick), in three greens, with broadleaves over the thickest (design 083)', () => {
+  const spots = vitalitySpots(layouts[0]);
+  const palettes = new Set(spots.bushes.map((bush) => bush.palette));
+  assert.ok(palettes.size >= 2, `bush greens ${[...palettes]}`);
+  assert.ok(spots.bushes.some((bush) => bush.tree), 'a broadleaf stands over a thicket');
+  assert.ok(spots.driftEmitters.length > 0 && spots.driftEmitters.length <= 12, 'leaves fall from the crown and the broadleaves');
+  for (const e of spots.driftEmitters) assert.ok([e.x, e.y, e.r, e.z].every(Number.isFinite) && e.z > 0);
 });

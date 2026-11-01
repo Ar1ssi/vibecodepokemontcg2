@@ -28,6 +28,9 @@ import { craterEmblem, environmentFootprints, sceneBounds } from './stadium-envi
 import { createPropBuilder } from './stadium-env-props.mjs';
 import { createKitProps } from './stadium-kit.mjs';
 import { tableBounds } from './table-uv.mjs';
+import { RISE_LEAN, visibleArea } from './stadium-env-spots.mjs';
+import { clumpPieces } from './stadium-env-clumps.mjs';
+import { instanceTint, placeAsset } from './stadium-kit-assets.mjs';
 
 export const RING_KEY = 'mountain-ring';
 /** Free paving kept round every card footprint inside the arena's edge. */
@@ -153,14 +156,15 @@ export function ringSpots(layout) {
   const count = Math.max(7, Math.round((2 * Math.PI * ringR) / STONE_SPACING_PX));
   const stones = [];
   for (let i = 0; i < count; i += 1) {
-    const angle = ((i + (hashOf(i) - 0.5) * 0.3) / count) * 2 * Math.PI;
+    // Design 083: unevenly spaced round the ring, as stones set by hand long ago.
+    const angle = ((i + (hashOf(i) - 0.5) * 0.55) / count) * 2 * Math.PI;
     // Squat stones in the side bands (tall ones there lean out of the tilted view like missiles), tall
     // ones off the ends.
     const sideways = Math.abs(Math.cos(angle));
     const squat = sideways > 0.6;
     const radius = squat ? 34 + 14 * hashOf(i + 100) : 26 + 14 * hashOf(i + 100);
     // Each stone's foot clears the kerb by at least STONE_FOOT_GAP_PX.
-    const out = arena.r + KERB_PX + STONE_FOOT_GAP_PX + radius + 12 * hashOf(i + 50);
+    const out = arena.r + KERB_PX + STONE_FOOT_GAP_PX + radius + 26 * hashOf(i + 50);
     const x = arena.x + Math.cos(angle) * out;
     const y = arena.y + Math.sin(angle) * out;
     const inside = x - radius > scene.x && x + radius < scene.x + scene.w && y - radius > scene.y && y + radius < scene.y + scene.h;
@@ -208,7 +212,25 @@ export function ringSpots(layout) {
     });
   });
   const emblem = craterEmblem(layout, centre);
-  return { arena, ringR, stones: stones.filter((stone) => stone.inside), allStones: stones.length, anchor, chain, spires, emblem };
+  // Design 083: rubble and dry grass in clumps just outside the stones, where the ground is still low,
+  // clear of the stones, the spires and (with their lean) the cards.
+  const standing = stones.filter((stone) => stone.inside);
+  const rubble = clumpPieces(visibleArea(table, scene, 0.15) ?? scene, {
+    step: 110,
+    mix: RUBBLE,
+    thick: 0.8,
+    cap: 26,
+    salt: 121,
+    taken: [...standing.map((stone) => ({ x: stone.x, y: stone.y, r: stone.radius + 8 })), ...spires.map((spire) => ({ x: spire.x, y: spire.y, r: spire.radius + 8 }))],
+    fits: (x, y, reach, height) => {
+      const out = Math.hypot(x - arena.x, y - arena.y);
+      if (out < ringR + 34 + reach || out > ringR + 150) return false;
+      if (x - reach < scene.x || x + reach > scene.x + scene.w || y - reach < scene.y || y + reach > scene.y + scene.h) return false;
+      const near = rects.length ? Math.min(...rects.map((r) => distanceToRect(x, y, r))) : Infinity;
+      return near >= reach + RISE_LEAN * (height + 8) + 14;
+    },
+  });
+  return { arena, ringR, stones: standing, allStones: stones.length, anchor, chain, spires, emblem, rubble };
 }
 
 /**
@@ -339,12 +361,21 @@ export const RING_MOOD = Object.freeze({
 export function ringProps(spots) {
   const props = createPropBuilder();
   ringSolids(props, spots);
+  for (const piece of spots.rubble ?? []) placeAsset(props, piece.asset, { ...piece.options, x: piece.x, y: piece.y, size: piece.size, seed: piece.seed * 997, yaw: piece.yaw });
   return props;
 }
 
+/** Design 083: the rubble's clumps (px): fallen stone in the stones' greys, dry grass, a few low stones. */
+const RUBBLE = Object.freeze([
+  { asset: 'boulder', weight: 2, size: [12, 22], options: { colors: { body: '#8c8478', light: '#b8b0a2', dark: '#5c564e' } } },
+  { asset: 'tallGrass', weight: 1.6, size: [12, 18], options: { blade: 14, colors: { grass: '#8a8a52', tip: '#cfc88a' } } },
+  { asset: 'ledgeRock', weight: 0.8, size: [14, 22], options: { colors: { body: '#837c70', top: '#aea697' } } },
+]);
+
 /** The standing stones and spires, the ropes wound round them and sagging between, the chain. */
 function ringSolids(props, { stones, allStones, chain = [], spires = [] }) {
-  for (const stone of stones) standingStone(props, stone);
+  // Design 083: each stone its own shade of grey.
+  for (const stone of stones) props.tint(instanceTint(stone.seed * 991, 1.3), () => standingStone(props, stone));
   for (const spire of spires) rockSpire(props, spire);
   // Ropes, as in the art: two strands, each wound round every stone in a band of turns and sagging
   // to the next stone where both stand in the scene.

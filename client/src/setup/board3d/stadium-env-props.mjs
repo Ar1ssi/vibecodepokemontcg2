@@ -25,9 +25,10 @@ const faceNormal = (n) => (Math.hypot(n[0], n[1], n[2]) > 1e-9 ? unit(n) : [0, 0
 
 /**
  * Kinds a part is lit as (aLook.x; stadium-kit.mjs KIT_LIGHT). `matte`: a thin dry stalk or blade,
- * lit without sheen (seen from above it is all edge).
+ * lit without sheen (seen from above it is all edge). `blink` (design 083): a glowing part (aColor.w
+ * ≥ 1.5) that blinks `rate` times a second from `phase` (0..1): aLook = (blink, 0, phase, rate).
  */
-export const LOOK = Object.freeze({ plain: 0, foliage: 1, gloss: 2, crystal: 3, cloud: 4, chrome: 5, matte: 6 });
+export const LOOK = Object.freeze({ plain: 0, foliage: 1, gloss: 2, crystal: 3, cloud: 4, chrome: 5, matte: 6, blink: 7 });
 
 /**
  * A part's look unless it says otherwise: plain, still, unshaded, no leaves. `leaf` (px, in the
@@ -82,7 +83,7 @@ export const composeFrames = (parent, child) => ({
  * A builder of lit solids in the table frame (x right, y far, z up, px).
  * @returns {{ tube: Function, cylinder: Function, box: Function, roundBox: Function, quad: Function, triangle: Function,
  *   ring: Function, sphere: Function, cone: Function, blob: Function, lumps: Function, lathe: Function, facets: Function, surface: Function,
- *   at: Function, look: Function, withoutShadows: Function, shadow: Function, frame: () => object,
+ *   at: Function, look: Function, tint: Function, withoutShadows: Function, shadow: Function, frame: () => object,
  *   vertexCount: () => number, shadowCount: () => number,
  *   build: (three: typeof import('three')) => import('three').BufferGeometry,
  *   buildShadows: (three: typeof import('three')) => import('three').BufferGeometry }}
@@ -97,6 +98,8 @@ export function createPropBuilder() {
   const shadows = [];
   let frame = IDENTITY;
   let look = DEFAULT_LOOK;
+  // Design 083: a colour factor every lit vertex built takes (an instance's own tint); glow keeps its colour.
+  let tinting = null;
   // The foot of the asset being built (its outermost placement's x, y) and whether it stands on the
   // board's baked ground there (aFoot.z 1) or keeps its own height (0). Outside any placement a
   // vertex is its own foot and keeps its height.
@@ -107,8 +110,11 @@ export function createPropBuilder() {
     const facing = frame === IDENTITY ? n : unit(apply(frame.m, n));
     positions.push(at[0], at[1], at[2]);
     normals.push(facing[0], facing[1], facing[2]);
-    colors.push(color[0], color[1], color[2], color[3] ?? 0);
-    looks.push(look.kind, look.sway, look.shade, look.leaf > 0 ? look.leaf * frame.k : 0);
+    const glow = (color[3] ?? 0) >= 1.5;
+    const factor = tinting && !glow ? tinting : null;
+    colors.push(factor ? color[0] * factor[0] : color[0], factor ? color[1] * factor[1] : color[1], factor ? color[2] * factor[2] : color[2], color[3] ?? 0);
+    if (look.kind === LOOK.blink) looks.push(LOOK.blink, 0, look.phase ?? 0, look.rate ?? 1);
+    else looks.push(look.kind, look.sway, look.shade, look.leaf > 0 ? look.leaf * frame.k : 0);
     if (foot) feet.push(foot[0], foot[1], foot[2]);
     else feet.push(at[0], at[1], 0);
     return positions.length / 3 - 1;
@@ -140,6 +146,21 @@ export function createPropBuilder() {
       draw();
     } finally {
       look = outer;
+    }
+  };
+
+  /**
+   * Design 083: builds `draw` with every lit colour times `factor` ([r, g, b]; tints nest by
+   * multiplying), an instance's own shade of its palette. Glowing colours (w ≥ 1.5) keep theirs.
+   */
+  const withTint = (factor, draw) => {
+    const outer = tinting;
+    const valid = Array.isArray(factor) && factor.length >= 3 && factor.slice(0, 3).every((v) => Number.isFinite(v) && v >= 0);
+    tinting = !valid ? outer : outer ? outer.map((v, k) => v * factor[k]) : factor.slice(0, 3);
+    try {
+      draw();
+    } finally {
+      tinting = outer;
     }
   };
 
@@ -567,6 +588,7 @@ export function createPropBuilder() {
     surface,
     at,
     look: withLook,
+    tint: withTint,
     withoutShadows,
     shadow,
     frame: () => frame,

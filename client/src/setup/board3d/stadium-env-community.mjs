@@ -32,11 +32,12 @@ import {
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
 import { GRASS as GRASS_KIT } from './stadium-env-ground.mjs';
-import { createPropBuilder } from './stadium-env-props.mjs';
+import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
 import { createKitProps } from './stadium-kit.mjs';
-import { measureAsset, placeAsset } from './stadium-kit-assets.mjs';
+import { placeAsset } from './stadium-kit-assets.mjs';
 import { wallBand, windowRun } from './stadium-env-buildings.mjs';
-import { boardContext, hash } from './stadium-env-spots.mjs';
+import { boardContext, hash, patchy } from './stadium-env-spots.mjs';
+import { clumpPieces, scaledKinds } from './stadium-env-clumps.mjs';
 import { BOX_SHADOW, EDGE_HAZE, PAVING, STANDARD_TERRAIN_VERTEX } from './stadium-env-surfaces.mjs';
 
 export const COMMUNITY_KEY = 'community-center';
@@ -92,7 +93,8 @@ export function communitySpots(layout) {
     const r = (34 + 18 * roll(3)) * u;
     const onRight = x > plaza.x1 + 60 * u + r;
     const onFar = y > plaza.y1 + 30 * u + r && x > cliffFoot + 120 * u;
-    if (!(onRight || onFar) || roll(4) > 0.74 || trees.length >= MAX_TREES) continue;
+    // Design 083: the trees gather into small groves (patchy) with open lawn between.
+    if (!(onRight || onFar) || roll(4) > 0.7 * patchy(x, y, { scale: 300 * u, salt: 141 }) || trees.length >= MAX_TREES) continue;
     if (!ctx.inScene(x, y, r * 0.5) || y < core.y - 30 * u) continue;
     if (Math.hypot(x - tent.x, y - tent.y) < tent.half + r + 30 * u) continue;
     if (kiosks.some((k) => Math.hypot(x - k.x, y - k.y) < r + 50 * u)) continue;
@@ -118,20 +120,21 @@ export function communitySpots(layout) {
     ...kiosks.map((k) => ({ x: k.x, y: k.y, r: Math.hypot(k.w, k.d) / 2 })),
     ...trees.map((t) => ({ x: t.x, y: t.y, r: t.r * 1.1 })),
   ];
-  const plants = [];
-  for (let k = 0; k < 160 && plants.length < 12; k += 1) {
-    const roll = (salt) => hash(k, 21, salt);
-    const x = scene.x + roll(1) * scene.w;
-    const y = scene.y + roll(2) * scene.h;
-    const kind = roll(3) < 0.45 ? 'bush' : 'flowers';
-    const size = (kind === 'bush' ? 18 + 8 * roll(4) : 12 + 4 * roll(4)) * u;
-    const { reach } = measureAsset(kind, { size });
-    const onGrass = x > plaza.x1 + reach + 8 * u || (y > plaza.y1 + reach + 8 * u && x > cliffFoot + 60 * u);
-    if (!onGrass || !ctx.inScene(x, y, reach) || !ctx.clear(x, y, reach, 14 * u)) continue;
-    if (taken.some((t) => Math.hypot(t.x - x, t.y - y) < t.r + reach)) continue;
-    plants.push({ kind, x, y, size, reach, seed: roll(5) });
-    taken.push({ x, y, r: reach * 1.2 });
-  }
+  // Design 083: the plants in clumps of mixed kinds (bushes, flower beds, flowers, tall grass) round
+  // the groves, on the grass and clear of everything standing there.
+  const plants = clumpPieces(scene, {
+    step: 140 * u,
+    mix: scaledKinds(LAWN_CLUMPS, u),
+    satellites: scaledKinds(LAWN_SATELLITES, u),
+    thick: 0.85,
+    cap: 26,
+    salt: 143,
+    taken,
+    fits: (x, y, reach) => {
+      const onGrass = x > plaza.x1 + reach + 8 * u || (y > plaza.y1 + reach + 8 * u && x > cliffFoot + 60 * u);
+      return onGrass && ctx.inScene(x, y, reach) && ctx.clear(x, y, reach, 14 * u);
+    },
+  }).map((piece) => ({ ...piece, kind: piece.asset }));
   return { ...ctx, plaza, front, hall, canopy, banner, flag, tent, kiosks, cliffFoot, cliffStart, fall, pool, trees, benches, boulders, plants };
 }
 
@@ -389,6 +392,16 @@ const GLASS_FRAME = [0.8, 0.84, 0.88, 0.2];
 const BANNER = [0.101, 0.592, 0.442, 0.2];
 const GLYPH = [0.9, 1.1, 0.55, 2.2];
 const FLAG_GREEN = [0.101, 0.496, 0.228, 0.1];
+// Design 083: the lawn's clumps (sizes card-scale px), and their satellites.
+const LAWN_CLUMPS = Object.freeze([
+  { asset: 'bush', weight: 2, size: [18, 28] },
+  { asset: 'flowerBed', weight: 1.2, size: [16, 24], options: { depth: 0.7, head: 6, petals: ['#fff4d6', '#ffd94a', '#f7a1c4'] } },
+]);
+const LAWN_SATELLITES = Object.freeze([
+  { asset: 'bush', weight: 1, size: [14, 22] },
+  { asset: 'flowers', weight: 1.6, size: [10, 15] },
+  { asset: 'tallGrass', weight: 0.8, size: [12, 18], options: { blade: 14 } },
+]);
 const FLAG_WHITE = [0.95, 0.98, 0.95, 0.1];
 const POLE = [0.82, 0.86, 0.9, 0.5];
 const TENT = [0.97, 0.98, 1.0, 0.1];
@@ -464,11 +477,14 @@ function communityHall(props, spots) {
   const fw = 78 * u;
   const fh = 48 * u;
   const fz = top - 8 * u;
-  props.quad([flag.x, flag.y, fz - fh], [flag.x + 6 * u, flag.y + fw, fz - fh], [flag.x + 6 * u, flag.y + fw, fz], [flag.x, flag.y, fz], FLAG_GREEN);
-  const cx = flag.x + 3 * u + 0.4 * u;
-  const cy = flag.y + fw * 0.5;
-  const cz = fz - fh / 2;
-  props.quad([cx, cy, cz - 13 * u], [cx + 0.5 * u, cy + 13 * u, cz], [cx, cy, cz + 13 * u], [cx + 0.5 * u, cy - 13 * u, cz], FLAG_WHITE);
+  // Design 083: the flag stirs in the wind (no further than the pole's girth, so it stays on it).
+  props.look({ kind: LOOK.plain, sway: 0.9 }, () => {
+    props.quad([flag.x, flag.y, fz - fh], [flag.x + 6 * u, flag.y + fw, fz - fh], [flag.x + 6 * u, flag.y + fw, fz], [flag.x, flag.y, fz], FLAG_GREEN);
+    const cx = flag.x + 3 * u + 0.4 * u;
+    const cy = flag.y + fw * 0.5;
+    const cz = fz - fh / 2;
+    props.quad([cx, cy, cz - 13 * u], [cx + 0.5 * u, cy + 13 * u, cz], [cx, cy, cz + 13 * u], [cx + 0.5 * u, cy - 13 * u, cz], FLAG_WHITE);
+  });
   // Two concrete benches along the face.
   for (const bench of benches) {
     props.roundBox({ x: bench.x, y: bench.y, z0: -2, z1: bench.h, hw: bench.w / 2, hh: bench.d / 2, color: CONCRETE, topColor: [0.62, 0.66, 0.72, 0] });
@@ -509,8 +525,8 @@ function communityTrees(props, spots) {
   }
   boulders.forEach((rock, k) => placeAsset(props, 'boulder', { ...kit, x: rock.x, y: rock.y, z: -2 * u, size: rock.r * 1.1, seed: k * 13 + 5, yaw: k, colors: BOULDER }));
   for (const plant of plants) {
-    const colors = plant.kind === 'bush' ? { leaf: TREE.leaf, leafLight: TREE.leafLight } : undefined;
-    placeAsset(props, plant.kind, { ...kit, x: plant.x, y: plant.y, size: plant.size, seed: plant.seed * 991, colors, petals: ['#fff7ec', '#ffd84a', '#f6a6c8'] });
+    const colors = plant.kind === 'bush' ? { leaf: TREE.leaf, leafLight: TREE.leafLight } : plant.options?.colors;
+    placeAsset(props, plant.kind, { ...kit, petals: ['#fff7ec', '#ffd84a', '#f6a6c8'], ...plant.options, x: plant.x, y: plant.y, size: plant.size, seed: plant.seed * 991, yaw: plant.yaw, colors });
   }
 }
 

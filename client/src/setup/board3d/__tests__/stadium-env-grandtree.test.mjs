@@ -9,7 +9,8 @@ import {
   BAKE_FIELD_FRAGMENT,
   GRAND_KEY,
   MAX_BALLS,
-  MAX_FERNS,
+  GRAND_CLUMP_CAP,
+  GRAND_GROUND_CEILING_PX,
   MAX_ROOTS,
   MOTE_FRAGMENT,
   MOTE_VERTEX,
@@ -35,11 +36,12 @@ test('environmentKeyFor: Grand Tree by id, and by set and number', () => {
 
 test('grandSpots: the trunk beside the cards, roots, crown balls and ferns clear of them seen from above', () => {
   for (const layout of layouts) {
-    const { tree, roots, balls, ferns, toadstools, clear, core, u } = grandSpots(layout);
+    const { tree, roots, balls, pieces, toadstools, clear, core, u } = grandSpots(layout);
+    const ferns = pieces.filter((piece) => piece.asset === 'fern');
     assert.ok(tree.x < core.x, 'the trunk stands left of the cards');
     assert.equal(roots.length, MAX_ROOTS);
     assert.ok(balls.length >= 5 && balls.length <= MAX_BALLS, `${balls.length} balls`);
-    assert.ok(ferns.length >= 2 && ferns.length <= MAX_FERNS, `${ferns.length} ferns`);
+    assert.ok(ferns.length >= 2, `${ferns.length} ferns`);
     for (const root of roots) {
       const out = tree.foot + root.length;
       assert.ok(clear(tree.x + Math.cos(root.angle) * out, tree.y + Math.sin(root.angle) * out, 14 * u, 18 * u) || root.length <= 40 * u, 'root end');
@@ -50,12 +52,12 @@ test('grandSpots: the trunk beside the cards, roots, crown balls and ferns clear
   }
 });
 
-test('no solid (trunk, crown, small tree, ferns, toadstools) covers a card on screen, in either camera preset', () => {
+test('no solid (trunk, crown, small tree, clumps, toadstools) covers a card on screen, in either camera preset, risen on the swells', () => {
   for (const view of SCREEN_VIEWS) {
     const { layout, projectors } = screenView(view);
     const geometry = grandProps(grandSpots(layout)).build(three);
     for (const { preset, project } of projectors) {
-      const hit = geometryOnCard(geometry, layout, project);
+      const hit = geometryOnCard(geometry, layout, project, { ground: () => [0, GRAND_GROUND_CEILING_PX] });
       assert.equal(hit, null, `${view.profile} ${view.viewport.w}x${view.viewport.h} ${preset}: ${hit}`);
     }
   }
@@ -74,4 +76,13 @@ test('Grand Tree shaders declare no GLSL ES 3.00 reserved word and every one has
     assert.doesNotMatch(shader, reserved);
     assert.match(shader, /void main\(\)/);
   }
+});
+
+test('the floor\'s clumps: mixed kinds over the clover, at most GRAND_CLUMP_CAP, the swells under the ceiling (design 083)', () => {
+  const spots = grandSpots(layouts[0]);
+  assert.ok(spots.pieces.length >= 8 && spots.pieces.length <= GRAND_CLUMP_CAP, `${spots.pieces.length} pieces`);
+  assert.ok(new Set(spots.pieces.map((piece) => piece.asset)).size >= 3, 'ferns, bushes and more');
+  assert.match(BAKE_FIELD_FRAGMENT, /away \* \(3\.0 \+ 11\.0 \* fbm3\(p \/ 210\.0 \+ 3\.0\)\)/);
+  assert.ok(0.25 + 3 + 11 <= GRAND_GROUND_CEILING_PX);
+  assert.ok(spots.driftEmitters.length >= 2 && spots.driftEmitters.length <= 12);
 });

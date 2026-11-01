@@ -31,9 +31,10 @@ import {
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
 import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
-import { boardContext, hash } from './stadium-env-spots.mjs';
+import { RISE_LEAN, boardContext, distanceToRect, hash, shuffled, visibleArea } from './stadium-env-spots.mjs';
+import { clumpPieces, scaledKinds } from './stadium-env-clumps.mjs';
 import { EDGE_HAZE, STANDARD_TERRAIN_VERTEX } from './stadium-env-surfaces.mjs';
-import { GRASS } from './stadium-env-ground.mjs';
+import { GRASS, LIGHT_MOTION } from './stadium-env-ground.mjs';
 import { createKitProps, glslColour, paint } from './stadium-kit.mjs';
 import { measureAsset, placeAsset } from './stadium-kit-assets.mjs';
 
@@ -42,7 +43,10 @@ export const GRAND_KEY = 'grand-tree';
 export const GRAND_SUN = Object.freeze([-0.42, 0.28, 0.86]);
 export const MAX_BALLS = 16;
 export const MAX_ROOTS = 8;
-export const MAX_FERNS = 8;
+/** Design 083: the most clump pieces (ferns, bushes, flowers, rocks, toadstools) over the floor. */
+export const GRAND_CLUMP_CAP = 36;
+/** Design 083: the highest the floor swells under a prop (3 + 11 px past the cards and roots, plus the ripple). */
+export const GRAND_GROUND_CEILING_PX = 15;
 const MOTE_COUNT = 60;
 /** The trunk's radius at its foot and at its fork, the fork's height, the crown's height (card-scale px). */
 export const TRUNK = Object.freeze({ foot: 70, top: 46, fork: 210, crown: 290 });
@@ -86,21 +90,23 @@ export function grandSpots(layout) {
   }
   // A smaller tree off the far right, ferns and broad leaves clear of everything.
   const small = { x: Math.min(scene.x + scene.w - 90 * u, centre.x + table.w * 0.44), y: Math.min(handEnd + 10 * u, scene.y + scene.h - 120 * u), r: 62 * u, h: 150 * u };
-  // Ferns and big-leaved plants in clumps (the kit's fern, design 081), clear of the cards, the
-  // trunk and one another; a few toadstools at the trunk's foot.
-  const ferns = [];
-  for (let k = 0; k < 140 && ferns.length < MAX_FERNS; k += 1) {
-    const roll = (salt) => hash(k, 8, salt);
-    const cx = scene.x + 40 * u + roll(1) * (scene.w - 80 * u);
-    const cy = scene.y + 40 * u + roll(2) * (scene.h - 80 * u);
-    const size = (66 + 36 * roll(3)) * u;
-    const { reach } = measureAsset('fern', { size });
-    if (!ctx.inScene(cx, cy, reach * 0.5) || !ctx.clear(cx, cy, reach, 12 * u)) continue;
-    if (Math.hypot(cx - x, cy - y) < tree.foot + 40 * u + reach) continue;
-    if (Math.hypot(cx - small.x, cy - small.y) < small.r + reach) continue;
-    if (ferns.some((fern) => Math.hypot(cx - fern.x, cy - fern.y) < (fern.reach + reach) * 1.1)) continue;
-    ferns.push({ x: cx, y: cy, size, reach, seed: roll(6) });
-  }
+  // Design 083: ferns, bushes, flowers, rocks and toadstools in clumps over the bare clover (a hero
+  // piece and its satellites, gathered where patchy() runs thick), clear of the cards and the hand
+  // with their lean on screen, of the trunk and its roots, and of the small tree.
+  const pieces = clumpPieces(visibleArea(table, scene, 0.15) ?? scene, {
+    step: 170 * u,
+    mix: scaledKinds(CLUMP_MIX, u),
+    satellites: scaledKinds(CLUMP_SATELLITES, u),
+    thick: 0.95,
+    cap: GRAND_CLUMP_CAP,
+    salt: 61,
+    fits: (cx, cy, reach, height) =>
+      ctx.inScene(cx, cy, reach * 0.5) &&
+      distanceToRect(cx, cy, core) >= reach + 24 * u &&
+      ctx.clear(cx, cy, reach + RISE_LEAN * (height + GRAND_GROUND_CEILING_PX), 12 * u) &&
+      Math.hypot(cx - x, cy - y) >= tree.foot + 230 * u + reach &&
+      Math.hypot(cx - small.x, cy - small.y) >= small.r + reach,
+  });
   const toadstools = [];
   for (let k = 0; k < 9 && toadstools.length < 4; k += 1) {
     const angle = hash(k, x, 81) * 2 * Math.PI;
@@ -112,7 +118,9 @@ export function grandSpots(layout) {
     if (toadstools.some((t) => Math.hypot(t.x - tx, t.y - ty) < 30 * u)) continue;
     toadstools.push({ x: tx, y: ty, size, seed: hash(k, 4, 84) });
   }
-  return { ...ctx, handEnd, tree, roots, balls, small, ferns, toadstools };
+  // Design 083: leaves fall from the crown's balls and the small tree.
+  const driftEmitters = [...shuffled(balls, 3).slice(0, 9).map((ball) => ({ x: ball.x, y: ball.y, r: ball.r, z: ball.z })), { x: small.x, y: small.y, r: small.r, z: small.h }];
+  return { ...ctx, handEnd, tree, roots, balls, small, pieces, toadstools, driftEmitters };
 }
 
 const GRAND = /* glsl */ `
@@ -142,14 +150,22 @@ float crownShade(vec2 p, vec3 sun) {
 }
 `;
 
-/** Bake: the floor, flat. */
+/**
+ * Bake: the floor, flat round the cards and the tree; design 083: past them it rises in low soft
+ * swells (3 + 11 px of noise), so the clumps stand on hummocks of the forest floor.
+ */
 export const BAKE_FIELD_FRAGMENT = /* glsl */ `
 ${TABLE_UNIFORMS}
+uniform vec4 uTree;
+uniform float uUnit;
 varying vec2 vUv;
 ${NOISE}
+${FOOTPRINTS}
 void main() {
   vec2 p = uMin + vUv * uSize;
-  gl_FragColor = vec4(0.5 * (fbm3(p / 70.0) - 0.5), 0.0, 0.0, 0.0);
+  float away = smoothstep(90.0, 240.0, footprintDistance(p)) * smoothstep(uTree.z + 200.0 * uUnit, uTree.z + 330.0 * uUnit, distance(p, uTree.xy));
+  float h = 0.5 * (fbm3(p / 70.0) - 0.5) + away * (3.0 + 11.0 * fbm3(p / 210.0 + 3.0));
+  gl_FragColor = vec4(h, 0.0, 0.0, 0.0);
 }
 `;
 
@@ -160,6 +176,7 @@ const PALETTE = /* glsl */ `
 const vec3 MOSS = ${glslColour('#5a9e3e')};
 const vec3 GLOW = vec3(1.0, 0.68, 0.08);
 const vec3 SHADE_TINT = vec3(0.5, 0.66, 0.82);
+const vec3 FALLEN_LEAF = ${glslColour('#c99a3a')};
 `;
 
 export const TERRAIN_FRAGMENT = /* glsl */ `
@@ -170,6 +187,7 @@ ${FOOTPRINTS}
 ${REVEAL}
 ${EDGE_HAZE}
 ${GRASS}
+${LIGHT_MOTION}
 ${PALETTE}
 ${GRAND}
 varying vec2 vPos;
@@ -195,6 +213,17 @@ void main() {
   float gap = smoothstep(0.6, 0.72, fbm3(p / 120.0 + 2.0));
   shade *= mix(1.0, 1.0 - 0.6 * gap, 1.0 - 0.6 * calm) * vGrowth;
   col = mix(col * 1.12, col * SHADE_TINT * 0.82, shade * 0.85);
+  float open = 1.0 - smoothstep(0.0, 0.4, calm);
+  // Design 083: sun flecks through the crown, shifting as its leaves move; none near the cards.
+  col *= 1.0 + 0.3 * dapple(p, t, 22.0) * shade * open;
+  // A few fallen leaves on the floor, more under the crown; none near the cards.
+  vec2 cell = floor(p / 26.0);
+  vec2 jitter = hash22(cell + 41.0);
+  vec2 local = p - (cell + 0.2 + 0.6 * jitter) * 26.0;
+  float turn = jitter.x * 6.2832;
+  vec2 along = vec2(cos(turn) * local.x + sin(turn) * local.y, -sin(turn) * local.x + cos(turn) * local.y);
+  float fallen = (1.0 - smoothstep(0.75, 1.0, length(along / vec2(4.6, 2.2)))) * step(0.82 - 0.12 * shade, hash12(cell + 7.0));
+  col = mix(col, FALLEN_LEAF * (0.8 + 0.4 * jitter.y), fallen * 0.55 * open * patternFade(filterPixel, 26.0));
 
   // The glow of the roots and the trunk's foot, golden on the ground near them.
   float glow = 0.0;
@@ -227,6 +256,18 @@ const VEIN = [1.0, 0.68, 0.08, 2.6];
 const FOLIAGE = paint('#3a9a3c');
 const FOLIAGE_LIT = paint('#79c446');
 const FERN = Object.freeze({ leaf: '#3fa03a', leafLight: '#7fcb4c', heart: '#2a6e2c' });
+// Design 083: what the floor's clumps are made of (sizes card-scale px), and their satellites.
+const CLUMP_MIX = Object.freeze([
+  { asset: 'fern', weight: 3, size: [62, 96], options: { fronds: 6, colors: FERN } },
+  { asset: 'bush', weight: 2, size: [26, 42], options: { colors: { leaf: '#3c9a3c', leafLight: '#78c64a' } } },
+  { asset: 'boulder', weight: 0.7, size: [14, 24], options: { colors: { body: '#9a8f78', light: '#c4b898', dark: '#5e5646' } } },
+]);
+const CLUMP_SATELLITES = Object.freeze([
+  { asset: 'fern', weight: 2, size: [40, 64], options: { fronds: 5, colors: FERN } },
+  { asset: 'bush', weight: 1.4, size: [18, 30], options: { colors: { leaf: '#46a23e', leafLight: '#8acd4e' } } },
+  { asset: 'flowers', weight: 1.6, size: [10, 15], options: { petals: ['#ffd84a', '#fff7ec', '#f7a1c4'] } },
+  { asset: 'mushroom', weight: 1, size: [6, 10], options: { colors: { cap: '#f2b33d', spot: '#fff6e0' } } },
+]);
 const SMALL_TREE = Object.freeze({ leaf: '#3a9640', leafLight: '#6fc244', bark: BARK, barkDark: BARK_DARK });
 
 /** The trunk at height s (0 foot, 1 fork): its radius, tapering and flaring at the foot. */
@@ -314,14 +355,14 @@ function crown(props, spots, u) {
 
 /** Everything solid, as one kit builder (design 081). */
 export function grandProps(spots) {
-  const { tree, small, ferns, toadstools, u } = spots;
+  const { tree, small, toadstools, u } = spots;
   const props = createPropBuilder();
   const kit = { sun: GRAND_SUN };
   trunk(props, tree, u);
   roots(props, spots, u);
   crown(props, spots, u);
   placeAsset(props, 'treeRound', { ...kit, x: small.x, y: small.y, size: small.r * 0.95, height: small.h + small.r * 0.5, seed: 7, colors: SMALL_TREE });
-  for (const fern of ferns) placeAsset(props, 'fern', { ...kit, x: fern.x, y: fern.y, size: fern.size, fronds: 6, seed: fern.seed * 997, colors: FERN });
+  for (const piece of spots.pieces) placeAsset(props, piece.asset, { ...kit, ...piece.options, x: piece.x, y: piece.y, size: piece.size, seed: piece.seed * 997, yaw: piece.yaw });
   for (const t of toadstools) placeAsset(props, 'mushroom', { ...kit, x: t.x, y: t.y, size: t.size, seed: t.seed * 991, colors: { cap: '#f2b33d', spot: '#fff6e0' } });
   return props;
 }
@@ -382,7 +423,7 @@ export function grandTreeBoard({ three, material, seeded, terrainGrid, replaceGe
     bakeField: make(FULLSCREEN_VERTEX, BAKE_FIELD_FRAGMENT, bakeOptions),
     bakeLight: make(FULLSCREEN_VERTEX, bakeLightFragment(), bakeOptions),
   };
-  const kit = createKitProps({ three, material, own, mood: 'day', reveal: 'vec3(0.9, 1.0, 0.6)' });
+  const kit = createKitProps({ three, material, own, mood: 'day', reveal: 'vec3(0.9, 1.0, 0.6)', ground: true });
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
   const motes = new three.Points(seeded(MOTE_COUNT), materials.motes);
   motes.renderOrder = 2;

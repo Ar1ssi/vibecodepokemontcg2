@@ -121,7 +121,7 @@ test('every kit shader is a full program: one main, balanced brackets, no unfill
 });
 
 test('kitLight: the kinds by their LOOK numbers; a matte part takes no sheen, only chrome the mirror', () => {
-  assert.deepEqual(LOOK, { plain: 0, foliage: 1, gloss: 2, crystal: 3, cloud: 4, chrome: 5, matte: 6 });
+  assert.deepEqual(LOOK, { plain: 0, foliage: 1, gloss: 2, crystal: 3, cloud: 4, chrome: 5, matte: 6, blink: 7 });
   assert.match(KIT_LIGHT, /bool leafy = kind > 0\.5 && kind < 1\.5;/);
   assert.match(KIT_LIGHT, /bool cloud = kind > 3\.5 && kind < 4\.5;/);
   assert.match(KIT_LIGHT, /bool chrome = kind > 4\.5 && kind < 5\.5;/);
@@ -130,6 +130,17 @@ test('kitLight: the kinds by their LOOK numbers; a matte part takes no sheen, on
   assert.match(guarded, /uKitSheen/, 'the sheen sits inside the matte guard');
   assert.equal(KIT_LIGHT.split('\n').filter((line) => line.includes('uKitSheen')).length, 2, 'and nowhere else');
   assert.doesNotMatch(KIT_LIGHT, /uKitRim|uKitShade|uKitOutline/, 'no toon rim, shade or outline (design 082)');
+});
+
+test('kitFragment: a glowing part with the blink look dims and brightens at its own rate and phase; lit parts do not (design 083)', () => {
+  const shader = kitFragment();
+  assert.match(shader, /if \(vColor\.w >= 1\.5 && vLook\.x > 6\.5 && vLook\.x < 7\.5\) \{/);
+  assert.match(shader, /col \*= mix\(0\.18, 1\.0, smoothstep\(-0\.2, 0\.2, sin\(6\.2831853 \* \(uTime \* vLook\.w \+ vLook\.z\)\)\)\);/);
+  assert.equal((shader.match(/uniform float uTime;/g) ?? []).length, 1, 'uTime declared once');
+});
+
+test('kitPosition: a swaying part takes its phase from its asset\'s foot, so a crown sways as one piece (design 083)', () => {
+  assert.match(KIT_VERTEX, /float phase = dot\(aFoot\.xy, vec2\(0\.043, 0\.029\)\) \+ dot\(p\.xy, vec2\(0\.006, 0\.004\)\);/);
 });
 
 test('kitFragment: foliage with a leaf size is covered in leaves, faded where they fall under a few px; nothing else is', () => {

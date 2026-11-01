@@ -109,6 +109,9 @@ const CONSOLE_GREY = [0.64, 0.68, 0.72, 0.3];
 const BEZEL = [0.82, 0.85, 0.88, 0.3];
 const KICK = [0.3, 0.36, 0.42, 0.3];
 const BUTTON = [0.22, 0.25, 0.3, 0.3];
+// Design 083: status lights, glowing (w ≥ 1.5) so they blink.
+const STATUS_GREEN = [0.2, 1.1, 0.45, 2.0];
+const STATUS_AMBER = [1.2, 0.7, 0.12, 2.0];
 
 const isRect = (rect) => rect && [rect.x, rect.y, rect.w, rect.h].every(Number.isFinite) && rect.w > 0 && rect.h > 0;
 const cornersOf = (rect) => [
@@ -297,7 +300,9 @@ export function labSpots(layout) {
     if (length >= 90) bundles.push({ x: start[0], y: start[1], dx: dir[0], dy: dir[1], length });
   }
   const emblem = craterEmblem(layout, centre);
-  return { dais, outline, stair, consoles, tanks, bundles, emblem };
+  // Design 083: steam breathes from the tanks' crowns.
+  const driftEmitters = tanks.map((tank) => ({ x: tank.x, y: tank.y, r: tank.radius * 0.25, z: tank.height + tank.radius * 0.6 }));
+  return { dais, outline, stair, consoles, tanks, bundles, emblem, driftEmitters };
 }
 
 /** Where the stair meets the deck. */
@@ -440,8 +445,11 @@ function labSolids(props, spots) {
       props.quad(at(-hw + 4, face, 0), at(hw - 14, face, 0), at(hw - 14, face, CONSOLE.upright - 6), at(-hw + 4, face, CONSOLE.upright - 6), BEZEL);
       props.quad(at(-hw + 7, face - 0.3, 3), at(hw - 17, face - 0.3, 3), at(hw - 17, face - 0.3, CONSOLE.upright - 9), at(-hw + 7, face - 0.3, CONSOLE.upright - 9), SCREEN);
       props.quad(at(-hw + 7, face - 0.6, CONSOLE.upright - 17), at(hw - 17, face - 0.6, CONSOLE.upright - 17), at(hw - 17, face - 0.6, CONSOLE.upright - 13), at(-hw + 7, face - 0.6, CONSOLE.upright - 13), SCREEN_GLARE);
-      for (const z of [CONSOLE.upright - 16, CONSOLE.upright - 28]) {
-        props.quad(at(hw - 10, face - 0.3, z - 3), at(hw - 4, face - 0.3, z - 3), at(hw - 4, face - 0.3, z + 3), at(hw - 10, face - 0.3, z + 3), BUTTON);
+      for (const [k, z] of [CONSOLE.upright - 16, CONSOLE.upright - 28].entries()) {
+        // Design 083: the status lights blink, green and amber, each on its own beat.
+        props.look({ kind: LOOK.blink, rate: 0.6 + 0.5 * k, phase: (((x * 0.013 + k * 0.37) % 1) + 1) % 1 }, () =>
+          props.quad(at(hw - 10, face - 0.3, z - 3), at(hw - 4, face - 0.3, z - 3), at(hw - 4, face - 0.3, z + 3), at(hw - 10, face - 0.3, z + 3), k ? STATUS_AMBER : STATUS_GREEN)
+        );
       }
       continue;
     }
@@ -460,7 +468,10 @@ function labSolids(props, spots) {
     for (let k = 0; k < 5; k += 1) {
       const u = -hw + 8 + k * ((2 * hw - 16) / 4);
       const v = -hh + 5;
-      props.quad(on(u - 2.5, v - 2, 0.6), on(u + 2.5, v - 2, 0.6), on(u + 2.5, v + 2, 0.6), on(u - 2.5, v + 2, 0.6), BUTTON);
+      const button = () => props.quad(on(u - 2.5, v - 2, 0.6), on(u + 2.5, v - 2, 0.6), on(u + 2.5, v + 2, 0.6), on(u - 2.5, v + 2, 0.6), k % 2 ? STATUS_GREEN : BUTTON);
+      // Design 083: every other button is a status light, blinking on its own beat.
+      if (k % 2) props.look({ kind: LOOK.blink, rate: 0.8 + 0.4 * ((((k * 7 + Math.round(x)) % 3) + 3) % 3), phase: ((((y + k * 31) * 0.017) % 1) + 1) % 1 }, button);
+      else button();
     }
   }
 

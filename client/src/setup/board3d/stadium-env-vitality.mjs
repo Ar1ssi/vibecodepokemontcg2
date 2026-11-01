@@ -32,7 +32,8 @@ import {
 } from './stadium-environment-glsl.mjs';
 import { environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
 import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
-import { GRASS } from './stadium-env-ground.mjs';
+import { GRASS, LIGHT_MOTION } from './stadium-env-ground.mjs';
+import { RISE_LEAN, patchy, shuffled } from './stadium-env-spots.mjs';
 import { createKitProps, glslColour, paint } from './stadium-kit.mjs';
 import { measureAsset, placeAsset } from './stadium-kit-assets.mjs';
 import { tableBounds } from './table-uv.mjs';
@@ -52,6 +53,11 @@ export const TREE_CARD_GAP_PX = 16;
 export const BUSH_CARD_GAP_PX = 10;
 /** Least gap between tall grass, a flower bed or a toadstool, seen from above, and a card or the hand. */
 export const PLANT_CARD_GAP_PX = 12;
+/**
+ * Design 083: the highest the ground rises under a prop (the swells past the meadow, 4 + 12 px of
+ * noise, plus its ±0.4 px ripple): the kit stands on it, the screen test bounds it.
+ */
+export const VITALITY_GROUND_CEILING_PX = 17;
 export const MAX_PADS = 72;
 export const MAX_LIMBS = 10;
 export const MAX_POOLS = 20;
@@ -242,7 +248,9 @@ export function vitalitySpots(layout) {
 
   // The carpet of bushes (the kit's bush, design 081): a jittered grid over the scene, every bush
   // outside the meadow and clear of every card and the opponent's hand, the tree's roots and the
-  // pools' bright cores.
+  // pools' bright cores. Design 083: they gather into thickets with clearings between (patchy),
+  // bigger in a thicket's heart, in three greens; where a thicket is thickest, well out from the
+  // meadow, a broadleaf stands over it.
   const clear = (x, y, r) => obstacles.every((rect) => distanceToRect(x, y, rect) >= r);
   const bushes = [];
   // Design 080: fewer, bigger bushes; a carpet of small lumps read as noise from above.
@@ -252,14 +260,24 @@ export function vitalitySpots(layout) {
       const roll = (salt) => hash(gx, gy, salt + 100);
       const x = gx + (roll(1) - 0.5) * step * 0.7;
       const y = gy + (roll(2) - 0.5) * step * 0.7;
-      const r = (32 + 44 * roll(3) ** 1.5) * u;
+      const thick = patchy(x, y, { scale: 300 * u, salt: 41 });
+      if (roll(7) > 0.75 * thick) continue;
+      const r = (32 + 44 * roll(3) ** 1.5) * u * (0.8 + 0.2 * Math.min(thick, 1.5));
       const size = r * 0.9;
       const { reach } = measureAsset('bush', { size });
       if (!inScene(x, y, reach * 0.5)) continue;
       if (clearingDistance(core, x, y) < -r * 0.3 || !clear(x, y, reach + BUSH_CARD_GAP_PX)) continue;
       if (Math.hypot(x - tree.x, y - tree.y) < tree.reach + r * 0.4) continue;
       if (pools.some((pool) => Math.hypot(x - pool.x, y - pool.y) < pool.r * 0.55 + r * 0.5)) continue;
-      bushes.push({ x, y, r, size, reach, seed: roll(6), glow: glowAt(x, y) });
+      const palette = Math.floor(patchy(x, y, { scale: 420 * u, contrast: 0.6, salt: 47 }) * 1.66);
+      const crown = { size: r * 1.1, height: r * 2.5 };
+      const dims = measureAsset('treeRound', crown);
+      const hero =
+        thick > 1.3 &&
+        roll(8) < 0.35 &&
+        clearingDistance(core, x, y) > 120 * u &&
+        clear(x, y, dims.reach + RISE_LEAN * (dims.height + VITALITY_GROUND_CEILING_PX) + TREE_CARD_GAP_PX);
+      bushes.push({ x, y, r, size, reach: hero ? dims.reach : reach, seed: roll(6), glow: glowAt(x, y), palette: Math.min(2, palette), tree: hero ? crown : null });
     }
   }
   // Tall grass along the meadow's edge, flowers out among the bushes, a few toadstools round the
@@ -282,7 +300,7 @@ export function vitalitySpots(layout) {
         if (!inScene(x, y, reach) || !clear(x, y, reach + PLANT_CARD_GAP_PX) || !free(x, y, reach * 0.7)) continue;
         grass.push({ x, y, size, blade, reach, seed: roll(5) });
         taken.push({ x, y, r: reach * 0.7 });
-      } else if (edge >= 70 * u && roll(6) < 0.3) {
+      } else if (edge >= 70 * u && roll(6) < 0.3 * patchy(x, y, { scale: 220 * u, salt: 43 })) {
         const size = (20 + 10 * roll(7)) * u;
         const { reach } = measureAsset('flowerBed', { size, head: FLOWER_HEAD_PX * u });
         if (!inScene(x, y, reach) || !clear(x, y, reach + PLANT_CARD_GAP_PX) || !free(x, y, reach)) continue;
@@ -303,7 +321,14 @@ export function vitalitySpots(layout) {
     if (mushrooms.some((m) => Math.hypot(m.x - x, m.y - y) < (m.reach + reach) * 1.6)) continue;
     mushrooms.push({ x, y, size, reach, seed: hash(k, 2, 74) });
   }
-  return { table, scene, core, u, hand, tree, pools, bushes, grass, flowers, mushrooms };
+  // Design 083: leaves fall from the crown's outer pads and from the broadleaves over the thickets.
+  const crownPads = shuffled(tree.pads.filter((pad) => pad.tier > 0.5), 5).slice(0, 8);
+  const heroes = shuffled(bushes.filter((bush) => bush.tree), 9).slice(0, 4);
+  const driftEmitters = [
+    ...crownPads.map((pad) => ({ x: pad.x, y: pad.y, r: pad.r, z: pad.z })),
+    ...heroes.map((bush) => ({ x: bush.x, y: bush.y, r: bush.tree.size, z: bush.tree.height * 0.75 })),
+  ];
+  return { table, scene, core, u, hand, tree, pools, bushes, grass, flowers, mushrooms, driftEmitters };
 }
 
 const VITALITY = /* glsl */ `
@@ -468,6 +493,7 @@ ${FILTERING}
 ${FOOTPRINTS}
 ${REVEAL}
 ${GRASS}
+${LIGHT_MOTION}
 ${PALETTE}
 ${VITALITY}
 varying vec2 vPos;
@@ -515,6 +541,8 @@ void main() {
   // cards; out in the bushes it is as deep as the crown makes it.
   float shade = max(crownShade * (1.0 - gap), field.a) * vGrowth * treeUp * mix(1.0, 0.45, calm);
   col = mix(col, col * SHADE_TINT, shade);
+  // Design 083: sun flecks through the crown, shifting as its leaves move; none near the cards.
+  col *= 1.0 + 0.3 * dapple(p, t, 22.0) * crownShade * treeUp * (1.0 - smoothstep(0.0, 0.4, calm));
 
   // The glow welling up between the bushes and round the trunk's foot: it lights the ground yellow,
   // brightest at each pool's heart. A faint glow wells up through all the undergrowth too, as the
@@ -536,6 +564,9 @@ ${OUTPUT}
 const BARK = paint('#7d5232');
 const CROWN = Object.freeze({ body: paint('#2f9460'), top: paint('#4fba6c'), fringe: paint('#93d04c') });
 const BUSH_COLOURS = Object.freeze({ leaf: '#3f9a3a', leafLight: '#7cc44a' });
+// Design 083: the thickets in three greens, and the broadleaves standing over them.
+const BUSH_PALETTES = Object.freeze([BUSH_COLOURS, Object.freeze({ leaf: '#327f34', leafLight: '#5fae46' }), Object.freeze({ leaf: '#5aa63a', leafLight: '#a4d24e' })]);
+const BROADLEAF = Object.freeze({ leaf: '#3a9442', leafLight: '#82c84c' });
 const TALL_GRASS = Object.freeze({ grass: '#2f7f34', tip: '#86c94e' });
 const BLOOMS = Object.freeze({ warm: ['#fff4d6', '#ffd94a'], cool: ['#ffffff', '#f7a1c4'] });
 
@@ -608,7 +639,10 @@ export function vitalityProps(spots) {
   props.at({ x: tree.x, y: tree.y, ground: false }, () =>
     props.look({ kind: LOOK.foliage, leaf: 11 * spots.u }, () => props.lumps(lumps, { crease: 0.5 }))
   );
-  for (const bush of spots.bushes) placeAsset(props, 'bush', { ...kit, x: bush.x, y: bush.y, size: bush.size, seed: bush.seed * 997, colors: BUSH_COLOURS });
+  for (const bush of spots.bushes) {
+    if (bush.tree) placeAsset(props, 'treeRound', { ...kit, x: bush.x, y: bush.y, size: bush.tree.size, height: bush.tree.height, seed: bush.seed * 997, colors: BROADLEAF });
+    else placeAsset(props, 'bush', { ...kit, x: bush.x, y: bush.y, size: bush.size, seed: bush.seed * 997, colors: BUSH_PALETTES[bush.palette] ?? BUSH_COLOURS });
+  }
   for (const patch of spots.grass) placeAsset(props, 'tallGrass', { ...kit, x: patch.x, y: patch.y, size: patch.size, blade: patch.blade, seed: patch.seed * 991, colors: TALL_GRASS });
   for (const clump of spots.flowers) {
     placeAsset(props, 'flowerBed', { ...kit, x: clump.x, y: clump.y, size: clump.size, depth: 0.7, head: FLOWER_HEAD_PX * spots.u, seed: clump.seed * 983, petals: clump.warm ? BLOOMS.warm : BLOOMS.cool, yaw: clump.seed * 6.28 });
@@ -693,7 +727,7 @@ export function forestOfVitalityBoard({ three, material, seeded, terrainGrid, re
     bakeField: make(FULLSCREEN_VERTEX, BAKE_FIELD_FRAGMENT, bakeOptions),
     bakeLight: make(FULLSCREEN_VERTEX, bakeLightFragment(), bakeOptions),
   };
-  const kit = createKitProps({ three, material, own, mood: 'day', reveal: 'vec3(0.85, 0.95, 0.35)' });
+  const kit = createKitProps({ three, material, own, mood: 'day', reveal: 'vec3(0.85, 0.95, 0.35)', ground: true });
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
   const motes = new three.Points(seeded(MOTE_COUNT), materials.motes);
   motes.renderOrder = 2;

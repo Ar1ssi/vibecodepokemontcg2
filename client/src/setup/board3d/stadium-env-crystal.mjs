@@ -39,6 +39,7 @@ import { createKitProps } from './stadium-kit.mjs';
 import { placeAsset } from './stadium-kit-assets.mjs';
 import { craterEmblem, environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
 import { tableBounds } from './table-uv.mjs';
+import { shuffled } from './stadium-env-spots.mjs';
 
 export const CRYSTAL_KEY = 'crystal-cave';
 /** The skylight (toward it, table frame): from high above, a little toward the far left. */
@@ -51,14 +52,17 @@ export const WALL_HEIGHT_PX = 170;
 export const CRYSTAL_CARD_GAP_PX = 14;
 export const MAX_CLUSTERS = 36;
 /**
- * The art's crystal colours (sRGB, linearised in the shader), one per cluster in turn. Design 080:
- * its four main ones (pink, sky blue, lavender, teal); seven read as a rainbow assortment.
+ * The art's crystal colours (sRGB, linearised in the shader). Design 080: its four main ones (pink,
+ * sky blue, lavender, teal); seven read as a rainbow assortment. Design 083: two softer ones join
+ * them (peach, mint), each cluster drawing one by hash rather than in turn.
  */
 export const CRYSTAL_HUES = Object.freeze([
   [236, 158, 192],
   [120, 178, 228],
   [186, 168, 232],
   [88, 204, 166],
+  [244, 192, 150],
+  [164, 228, 204],
 ]);
 /**
  * How tall a cluster's crystals grow, by where it stands: off the far end, in the side bands, toward
@@ -183,10 +187,10 @@ export function crystalSpots(layout) {
     );
   const inScene = (x, y, inset) => x > scene.x + inset && x < scene.x + scene.w - inset && y > scene.y + inset && y < scene.y + scene.h - inset;
 
-  // Clusters on a jittered grid over the ring between the cards and the walls' middle.
-  const clusters = [];
+  // Clusters on a jittered grid over the ring between the cards and the walls' middle. Design 083:
+  // every candidate first, then shuffled before the cap (a near-to-far scan left the far end bare).
+  const candidates = [];
   const step = 150 * u;
-  let hueTurn = 0;
   for (let gy = scene.y + step / 2; gy < scene.y + scene.h; gy += step) {
     for (let gx = scene.x + step / 2; gx < scene.x + scene.w; gx += step) {
       const roll = (salt) => hash(gx, gy, salt);
@@ -199,23 +203,25 @@ export function crystalSpots(layout) {
       const [low, high] = CLUSTER_HEIGHT[zone];
       // Leaning out, away from the cards' box.
       const outward = Math.atan2(y - Math.min(Math.max(y, core.y), core.y + core.h), x - Math.min(Math.max(x, core.x), core.x + core.w));
-      const cluster = {
+      candidates.push({
         x,
         y,
-        r: (34 + 30 * roll(4)) * u,
-        count: zone === 'near' ? 3 + Math.floor(roll(5) * 3) : 6 + Math.floor(roll(5) * 5),
+        r: (28 + 44 * roll(4) ** 1.3) * u,
+        count: zone === 'near' ? 3 + Math.floor(roll(5) * 3) : 5 + Math.floor(roll(5) * 7),
         height: (low + (high - low) * roll(6)) * u,
-        hue: hueTurn % CRYSTAL_HUES.length,
+        hue: Math.floor(roll(7) * CRYSTAL_HUES.length) % CRYSTAL_HUES.length,
         outward,
-      };
-      // Crystals that would reach a card are left out; a cluster left with fewer than two goes.
-      const crystals = growCluster({ ...cluster, z: wallFloorAt(fromCards, u) }, u).filter(clear);
-      if (crystals.length < 2) continue;
-      hueTurn += 3;
-      clusters.push({ ...cluster, crystals });
-      if (clusters.length >= MAX_CLUSTERS) break;
+        fromCards,
+      });
     }
+  }
+  const clusters = [];
+  for (const { fromCards, ...cluster } of shuffled(candidates, 7)) {
     if (clusters.length >= MAX_CLUSTERS) break;
+    // Crystals that would reach a card are left out; a cluster left with fewer than two goes.
+    const crystals = growCluster({ ...cluster, z: wallFloorAt(fromCards, u) }, u).filter(clear);
+    if (crystals.length < 2) continue;
+    clusters.push({ ...cluster, crystals });
   }
   return { table, scene, core, u, hand, centre, emblem, clusters };
 }
