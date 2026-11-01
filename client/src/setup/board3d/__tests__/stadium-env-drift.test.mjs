@@ -70,7 +70,8 @@ test('setEmitters: only emitting drifts take them, valid discs only, at most MAX
 
 test('the shaders hide a particle over a card or the opponent\'s hand by the ground point it covers on screen', () => {
   assert.match(DRIFT_VERTEX, /covered = uEye\.xy \+ \(world\.xy - uEye\.xy\) \* \(uEye\.z \/ max\(uEye\.z - world\.z, 1\.0\)\);/);
-  assert.match(DRIFT_VERTEX, /float clear = \(1\.0 - smoothstep\(0\.02, 0\.3, fieldCalm\(covered, 110\.0\)\)\) \* smoothstep\(20\.0, 70\.0, avoidGap\(covered\)\);/);
+  assert.match(DRIFT_VERTEX, /float clear = smoothstep\(30\.0, 90\.0, blockGap\(covered\)\) \* smoothstep\(20\.0, 70\.0, avoidGap\(covered\)\);/);
+  assert.match(DRIFT_VERTEX, /return length\(max\(max\(uFootprintBox\.xy - p, p - uFootprintBox\.zw\), 0\.0\)\);/);
   assert.match(DRIFT_VERTEX, /revealBurned\(pos\) \* exitKeep\(pos\)/);
   assert.match(DRIFT_FRAGMENT, /gl_FragColor = vec4\(tone, alpha\);/);
 });

@@ -389,7 +389,7 @@ void main() {
   col = mix(col, mix(col, SEA_SHALLOW, 0.45), smoothstep(0.0, 0.3, swash.film));
   col = mix(col, FOAM_LIT, smoothstep(0.45, 0.6, swash.foam));
   // Design 083: the soft shadows of slow clouds drifting over the sand, none near the cards.
-  col *= 1.0 - 0.16 * cloudShade(p, uTime, 420.0) * (1.0 - smoothstep(0.0, 0.4, fieldCalm(p, 120.0)));
+  col *= 1.0 - 0.16 * cloudShade(p, uTime, 420.0) * smoothstep(40.0, 160.0, length(max(max(uFootprintBox.xy - p, p - uFootprintBox.zw), 0.0)));
   vec2 edgeUv = min(vUv, 1.0 - vUv);
   col *= mix(0.72, 1.0, smoothstep(0.0, 0.04, min(edgeUv.x, edgeUv.y)));
   col = mix(col, FOAM_LIT, revealRim(p) * 0.85);

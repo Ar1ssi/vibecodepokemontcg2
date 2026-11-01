@@ -542,7 +542,8 @@ void main() {
   float shade = max(crownShade * (1.0 - gap), field.a) * vGrowth * treeUp * mix(1.0, 0.45, calm);
   col = mix(col, col * SHADE_TINT, shade);
   // Design 083: sun flecks through the crown, shifting as its leaves move; none near the cards.
-  col *= 1.0 + 0.3 * dapple(p, t, 22.0) * crownShade * treeUp * (1.0 - smoothstep(0.0, 0.4, calm));
+  float offBlock = smoothstep(40.0, 140.0, length(max(max(uFootprintBox.xy - p, p - uFootprintBox.zw), 0.0)));
+  col *= 1.0 + 0.3 * dapple(p, t, 22.0) * crownShade * treeUp * offBlock;
 
   // The glow welling up between the bushes and round the trunk's foot: it lights the ground yellow,
   // brightest at each pool's heart. A faint glow wells up through all the undergrowth too, as the

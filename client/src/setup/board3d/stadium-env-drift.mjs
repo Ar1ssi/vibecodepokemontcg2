@@ -5,7 +5,7 @@
 // from a board's emitters (a crown's leaves, a vent's steam). Every frame is a function of uTime, so
 // reduced motion freezes it. It never shows over a card: it fades as the ground point it covers on
 // screen (the eye's ray through it, met with the cloth) nears a card (D232, the user's "never over
-// cards").
+// cards"). The whole block of cards counts, the field between their rows included.
 import { FOOTPRINTS, NOISE, OUTPUT, REVEAL, TABLE_UNIFORMS } from './stadium-environment-glsl.mjs';
 import { paint } from './stadium-kit.mjs';
 import { visibleArea } from './stadium-env-spots.mjs';
@@ -128,6 +128,10 @@ float avoidGap(vec2 p) {
   if (uDriftAvoid.z <= uDriftAvoid.x) return 100000.0;
   return length(max(max(uDriftAvoid.xy - p, p - uDriftAvoid.zw), 0.0));
 }
+// px from the box round every card (FOOTPRINTS' uFootprintBox): the field and the rows between.
+float blockGap(vec2 p) {
+  return length(max(max(uFootprintBox.xy - p, p - uFootprintBox.zw), 0.0));
+}
 void main() {
   float life = mix(uDriftB.z, uDriftB.w, aSeed.w);
   float clock = uTime + aSeed.z * life * 7.0;
@@ -139,7 +143,7 @@ void main() {
   vec2 start = areaMin + h * areaSize;
   // Born off the cards: the first of a few tries that clears them, so the life is in the margins.
   for (int k = 1; k < 6; k++) {
-    if (fieldCalm(start, 140.0) < 0.01 && avoidGap(start) > 80.0) break;
+    if (blockGap(start) > 110.0 && avoidGap(start) > 80.0) break;
     start = areaMin + hash22(aSeed.xy * 91.0 + cycle * 1.7 + float(k) * 17.3) * areaSize;
   }
   float z0 = mix(uDriftC.x, uDriftC.y, fract(h.x * 5.3 + h.y * 2.1));
@@ -164,7 +168,8 @@ void main() {
   // The ground point it covers on screen: the eye's ray through it, met with the cloth.
   vec2 covered = world.xy;
   if (uEye.z > 1.0) covered = uEye.xy + (world.xy - uEye.xy) * (uEye.z / max(uEye.z - world.z, 1.0));
-  float clear = (1.0 - smoothstep(0.02, 0.3, fieldCalm(covered, 110.0))) * smoothstep(20.0, 70.0, avoidGap(covered));
+  // Never over the cards' block (the cards and the field between their rows) nor the opponent's hand.
+  float clear = smoothstep(30.0, 90.0, blockGap(covered)) * smoothstep(20.0, 70.0, avoidGap(covered));
   vec2 inner = min(pos - uMin, uMin + uSize - pos);
   float inside = smoothstep(0.0, 30.0, min(inner.x, inner.y));
   float fade = smoothstep(0.0, 0.12, t) * (1.0 - smoothstep(0.82, 1.0, t));

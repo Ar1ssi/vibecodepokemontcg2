@@ -151,7 +151,7 @@ less repetitive." Surveys of all 25 boards (2026-11-01) found:
 | 2 | unknown kind / bad colour | createDrift throws (kind) / paint throws (colour) | [x] stadium-env-drift.test: unknown kind or bad colour throws |
 | 3 | emitters empty | particles spawn over the visible area (driftArea) | [x] stadium-env-drift.test: setEmitters none → 0; driftArea/setArea |
 | 4 | more emitters than MAX_EMITTERS | setEmitters keeps the first MAX_EMITTERS | [x] stadium-env-drift.test: setEmitters cap |
-| 5 | particle over a card (or the opponent's hand) on screen | hidden by the eye-ray ground test (fieldCalm, avoidGap) | [x] stadium-env-drift.test: shader hides by covered point; setAvoid; stills |
+| 5 | particle over a card, the field between the rows, or the opponent's hand, on screen | hidden by the eye-ray ground test (blockGap from uFootprintBox, avoidGap) | [x] stadium-env-drift.test: shader hides by covered point; setAvoid; stills |
 | 6 | reduced motion | uTime frozen: particles, sway, blink and clouds still | [x] by construction: every new term is a function of uTime and attributes only |
 | 7 | reveal / exit | particles gated by revealBurned/exitKeep | [x] stadium-env-drift.test: revealBurned(pos) * exitKeep(pos) |
 | 8 | tint on emissive | glow colours unchanged | [x] stadium-env-props.test: tint() glow keeps its colour |
@@ -185,8 +185,10 @@ n/a: client visuals only; revert = revert the commit.
 
 ## Deviations (Builder appends here during build)
 - Drift is born over the part of the scene the camera sees (visibleArea: the table grown 12%), not
-  the whole scene: over the scene most particles were off screen. It also fades before the
-  opponent's fanned hand (setAvoid), which is not a card footprint.
+  the whole scene: over the scene most particles were off screen. It fades before the whole block of
+  cards (uFootprintBox: per-card fieldCalm let leaves show in the field between the rows) and before
+  the opponent's fanned hand (setAvoid), which is not a card footprint. The sun flecks and the cloud
+  shadows fade the same way.
 - A shared clump placer (stadium-env-clumps.mjs: clumpPieces, scaledKinds) does the boards' new
   clumps; it was not in § Shared modules.
 - Rows built only in part, or not at all, each board keeping its own look where the row asked for

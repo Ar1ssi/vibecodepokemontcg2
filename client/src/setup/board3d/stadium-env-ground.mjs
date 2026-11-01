@@ -148,8 +148,9 @@ vec2 strata(float z, vec2 p, float band) {
  * Design 083: light that moves over the land, after NOISE and FILTERING. `cloudShade(p, t, scale)`:
  * 0..1, the soft shadow of slow clouds drifting over (`scale` about a cloud's size, px).
  * `dapple(p, t, size)`: -0.3..1, sun flecks about `size` px across under a canopy, slowly shifting as
- * its leaves move (faded where they fall under a few screen px). A board fades both out near the
- * cards, (1 - smoothstep(0, 0.4, fieldCalm(p, ~120))), so no moving light crosses them (D232).
+ * its leaves move (faded where they fall under a few screen px). A board fades both out over the
+ * whole block of cards (by distance from FOOTPRINTS' uFootprintBox), so no moving light crosses the
+ * cards or the field between their rows (D232).
  */
 export const LIGHT_MOTION = /* glsl */ `
 float cloudShade(vec2 p, float t, float scale) {

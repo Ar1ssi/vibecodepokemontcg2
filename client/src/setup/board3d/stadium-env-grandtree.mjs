@@ -213,7 +213,8 @@ void main() {
   float gap = smoothstep(0.6, 0.72, fbm3(p / 120.0 + 2.0));
   shade *= mix(1.0, 1.0 - 0.6 * gap, 1.0 - 0.6 * calm) * vGrowth;
   col = mix(col * 1.12, col * SHADE_TINT * 0.82, shade * 0.85);
-  float open = 1.0 - smoothstep(0.0, 0.4, calm);
+  // Off the whole block of cards (the field between their rows too), not only off each card.
+  float open = smoothstep(40.0, 140.0, length(max(max(uFootprintBox.xy - p, p - uFootprintBox.zw), 0.0)));
   // Design 083: sun flecks through the crown, shifting as its leaves move; none near the cards.
   col *= 1.0 + 0.3 * dapple(p, t, 22.0) * shade * open;
   // A few fallen leaves on the floor, more under the crown; none near the cards.
