@@ -144,6 +144,7 @@ function buildCardGeometry(three, widthPx, uv) {
  *   has: (id: number) => boolean, placed: (id: number) => boolean, meshOf: (id: number) => import('three').Mesh|null,
  *   idAt: (object3d: import('three').Object3D|null) => number|null, ids: () => number[],
  *   cornersOf: (id: number, o?: { rest?: boolean }) => number[][]|null, update: (nowMs: number) => boolean,
+ *   restingPoses: () => { id: number, x: number, y: number, z: number, yawDeg: number, widthPx: number, heightPx: number }[],
  *   moving: () => boolean, dispose: () => void }}
  *   A card whose image fails shows its back on both faces and the image is tried once more
  *   after 5 s (edge case 12); its name label is a text plane of slice C5. `update(now)` places
@@ -652,6 +653,21 @@ export function createCardMeshPool({
   const releaseTablePose = (id) => {
     const card = cards.get(id);
     if (card) card.heldTablePose = null;
+  };
+
+  /**
+   * Where every card that rests on the table stands now (flat table px, its drawn size): placed,
+   * shown, not hidden, not lifted, flying, driven or dimmed by a burn. What casts a contact shadow on a
+   * Stadium (board-scene.js): a moving card is left out until it lands.
+   * @returns {{ id: number, x: number, y: number, z: number, yawDeg: number, widthPx: number, heightPx: number }[]}
+   */
+  const restingPoses = () => {
+    const out = [];
+    for (const card of cards.values()) {
+      if (!card.pose || card.hidden || card.lift || card.flight || card.drive || card.fx || !card.mesh.visible) continue;
+      out.push({ id: card.id, ...ownTablePose(card) });
+    }
+    return out;
   };
 
   /** The card's front art texture once loaded, else null. */
@@ -1220,6 +1236,7 @@ export function createCardMeshPool({
     cardFx,
     cardFxOf,
     tablePoseOf,
+    restingPoses,
     holdTablePose,
     releaseTablePose,
     frontMapOf,

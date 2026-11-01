@@ -255,6 +255,18 @@ export function createPileMeshes({
 
   const objects = () => [...piles.values()].map((pile) => pile.stack);
 
+  /** Where every shown pile stands (flat table px, its card's size): what casts a contact shadow on a Stadium. */
+  const footprints = () =>
+    [...piles.values()]
+      .filter((pile) => pile.stack.visible !== false)
+      .map((pile) => ({
+        x: pile.stack.position.x,
+        y: pile.stack.position.y,
+        yawDeg: -pile.stack.rotation.z / DEG,
+        widthPx: pile.geometry.key,
+        heightPx: (pile.geometry.key * CARD_UNITS.h) / CARD_UNITS.w,
+      }));
+
   const pileAt = (object3d) => {
     for (let node = object3d; node; node = node.parent) {
       const key = node.userData?.boardPile;
@@ -276,5 +288,5 @@ export function createPileMeshes({
     rim.dispose();
   };
 
-  return { setPile, clear, update, objects, pileAt, meshCount, dispose };
+  return { setPile, clear, update, objects, footprints, pileAt, meshCount, dispose };
 }

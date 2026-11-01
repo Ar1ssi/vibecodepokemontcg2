@@ -1404,5 +1404,43 @@ export function createStadiumEnvironment({
     });
   };
 
-  return { setLayout, setTarget, play, settle, setKey, update, drawPlate, active: () => key !== null, cutout, dispose };
+  /**
+   * The shown board's light for what stands on it (the cards' shadows): `sun`, toward its sun or
+   * moon (table frame, unit), and `shadow`, its kit's shadow tint and strength [r, g, b, s] (linear).
+   * Read off the board's own materials (its uSun, its kit's uKitShadow), the shared defaults where
+   * it has none; null while no board shows.
+   */
+  const lighting = () => {
+    if (!key) return null;
+    const board = boards.get(key);
+    if (!board) return null;
+    if (!board.lighting) board.lighting = boardLighting(board.materials, uniforms.uSun.value);
+    return board.lighting;
+  };
+
+  return { setLayout, setTarget, play, settle, setKey, update, drawPlate, active: () => key !== null, lighting, cutout, dispose };
+}
+
+/** A daylight shadow's tint and strength where a board's kit gives none (stadium-kit.mjs MOODS.day). */
+export const DEFAULT_GROUND_SHADOW = Object.freeze([0.42, 0.47, 0.62, 0.62]);
+
+/**
+ * A board's light from its materials: the first own `uSun` that differs from the shared one (else
+ * the shared sun), the first `uKitShadow` (else DEFAULT_GROUND_SHADOW).
+ * @param {import('three').ShaderMaterial[]} materials
+ * @param {import('three').Vector3} sharedSun
+ * @returns {{ sun: number[], shadow: number[] }}
+ */
+export function boardLighting(materials, sharedSun) {
+  let sun = null;
+  let shadow = null;
+  for (const material of materials ?? []) {
+    const own = material?.uniforms?.uSun?.value;
+    if (!sun && own && own !== sharedSun && [own.x, own.y, own.z].every(Number.isFinite)) sun = [own.x, own.y, own.z];
+    const tint = material?.uniforms?.uKitShadow?.value;
+    if (!shadow && tint && [tint.x, tint.y, tint.z, tint.w].every(Number.isFinite)) shadow = [tint.x, tint.y, tint.z, tint.w];
+  }
+  const s = sun ?? [sharedSun.x, sharedSun.y, sharedSun.z];
+  const length = Math.hypot(s[0], s[1], s[2]) || 1;
+  return { sun: s.map((v) => v / length), shadow: shadow ?? [...DEFAULT_GROUND_SHADOW] };
 }

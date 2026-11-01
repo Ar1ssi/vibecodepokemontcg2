@@ -15,6 +15,8 @@ import {
   BLOOM,
   PREPARE_TIMEOUT_MS,
   TILT_SHIFT,
+  DEFAULT_GROUND_SHADOW,
+  boardLighting,
   createStadiumEnvironment,
   jungleTreeProps,
   plateScale,
@@ -634,4 +636,51 @@ test('no Perilous Jungle tree covers a card on screen, in either camera preset',
       }
     }
   }
+});
+
+test('boardLighting: a board\'s own sun (unit) and its kit\'s shadow; the shared sun and a day shadow without them', () => {
+  const shared = new three.Vector3(0, 0, 1);
+  const own = { uniforms: { uSun: { value: new three.Vector3(0, 3, 4) } } };
+  const kit = { uniforms: { uSun: { value: shared }, uKitShadow: { value: new three.Vector4(0.3, 0.4, 0.5, 0.6) } } };
+  const lit = boardLighting([{ uniforms: {} }, kit, own], shared);
+  assert.deepEqual(lit.sun.map((v) => +v.toFixed(6)), [0, 0.6, 0.8]);
+  assert.deepEqual(lit.shadow.map((v) => +v.toFixed(6)), [0.3, 0.4, 0.5, 0.6]);
+  const bare = boardLighting([{ uniforms: { uSun: { value: shared } } }], shared);
+  assert.deepEqual(bare.sun, [0, 0, 1]);
+  assert.deepEqual(bare.shadow, [...DEFAULT_GROUND_SHADOW]);
+  assert.deepEqual(boardLighting(null, shared).sun, [0, 0, 1]);
+});
+
+test('lighting(): the shown board\'s sun and kit shadow, null while none shows (the cards\' ground shadows)', async () => {
+  const three = await import('../../../vendor/three/three.module.min.js');
+  const { VITALITY_SUN } = await import('../stadium-env-vitality.mjs');
+  const { MOODS } = await import('../stadium-kit.mjs');
+  let target = null;
+  const renderer = {
+    extensions: { has: () => true },
+    compile: () => {},
+    shadowMap: { autoUpdate: true },
+    getRenderTarget: () => target,
+    setRenderTarget: (next) => {
+      target = next;
+    },
+    render: () => {},
+    getPixelRatio: () => 1,
+    getDrawingBufferSize: (out) => out.set(1920, 1080),
+  };
+  const environment = createStadiumEnvironment({ three, renderer, parent: new three.Group(), isHidden: () => true });
+  assert.equal(environment.lighting(), null, 'no board yet');
+  environment.setLayout(layout);
+  environment.setKey('forest-of-vitality');
+  environment.update(1000, new three.PerspectiveCamera());
+  const lit = environment.lighting();
+  const length = Math.hypot(...VITALITY_SUN);
+  assert.deepEqual(lit.sun.map((v) => +v.toFixed(5)), VITALITY_SUN.map((v) => +(v / length).toFixed(5)));
+  assert.deepEqual(lit.shadow.map((v) => +v.toFixed(5)), MOODS.day.shadow.map((v) => +v.toFixed(5)));
+  environment.setKey(null);
+  environment.update(9000, new three.PerspectiveCamera());
+  assert.ok(environment.lighting(), 'the board still shows as it sinks away');
+  environment.update(9000 + EXIT_MS + 500, new three.PerspectiveCamera());
+  assert.equal(environment.lighting(), null, 'gone once its exit ends');
+  environment.dispose();
 });

@@ -18,6 +18,8 @@ import { PILE_ZONES, pilePose, pileThicknessPx } from './pile-poses.mjs';
 import { pileVisualCount } from './pile-stack.mjs';
 import { createTable } from './table-mesh.js';
 import { createStadiumEnvironment } from './stadium-environment-mesh.js';
+import { createStadiumCardShadows } from './stadium-card-shadows.js';
+import { tableBounds } from './table-uv.mjs';
 import { easeOutCubic } from './tween.mjs';
 import { DRAG_TILT, DRAG_TILT_STILL, createDragTilt, stepDragTilt } from '../image-logic/drag-tilt.mjs';
 import { matTiltAngles } from '../deck-constructor/mat-tilt.mjs';
@@ -219,6 +221,11 @@ export function createBoardScene({
   // The table's materials carry the cutout from the start, off (uCutoutOn 0) while no board shows,
   // so showing one never recompiles them.
   table.setCutout(environment.cutout);
+  // Where a Stadium shows, the cards' and piles' shadows on its ground (the cloth that took them is
+  // cut away there), in its light.
+  const groundShadows = createStadiumCardShadows({ three, parent: tableFrame, cutout: environment.cutout });
+  /** The sun the key light follows (a Stadium's), or null: the table's own light. */
+  let groundSun = null;
 
   // Piles and count labels sit in the table frame, so they tilt with the cloth.
   const pilesGroup = new three.Group();
@@ -304,7 +311,8 @@ export function createBoardScene({
     const pilesMoving = piles.update(now);
     const overlaysAnimating = overlays.update(now);
     const environmentAnimating = environment.update(now, camera);
-    const shadowPass = kind === 'change' || cardsMoving || pilesMoving;
+    const sunMoved = syncGroundShadows(environment.active() ? environment.lighting() : null);
+    const shadowPass = kind === 'change' || cardsMoving || pilesMoving || sunMoved;
     renderer.shadowMap.needsUpdate = shadowPass;
     if (environment.active()) renderUnderEnvironment();
     else renderer.render(scene, camera);
@@ -323,6 +331,28 @@ export function createBoardScene({
       triangles,
     });
     posedSinceRender = false;
+  };
+
+  /**
+   * With a Stadium showing: the key light along its sun, and the shadows of every card and pile
+   * resting on the table (the hands' cards fan over the edges, not on the ground) laid on its
+   * ground; without one, the table's own light and no ground shadows. True when the sun moved
+   * (the shadow map is redrawn).
+   */
+  const syncGroundShadows = (lighting) => {
+    const sun = lighting?.sun ?? null;
+    const moved = sun?.join(',') !== groundSun?.join(',');
+    if (moved) {
+      table.setSun(sun);
+      groundSun = sun;
+    }
+    let footprints = [];
+    if (lighting) {
+      const hand = new Set((model?.placements ?? []).filter((p) => p.zone === 'hand').map((p) => p.instanceId));
+      footprints = [...pool.restingPoses().filter((pose) => !hand.has(pose.id)), ...piles.footprints()];
+    }
+    groundShadows.update({ lighting, footprints });
+    return moved;
   };
 
   /**
@@ -472,6 +502,7 @@ export function createBoardScene({
     layout = next;
     table.setLayout(next);
     environment.setLayout(next);
+    groundShadows.setBounds(tableBounds(next));
     syncZonePlanes();
     syncCards(model, model, { relayout: true });
     syncPiles(model);
@@ -1240,6 +1271,7 @@ export function createBoardScene({
     }
     appliedPoses.clear();
     pileTops.clear();
+    groundShadows.dispose();
     environment.dispose();
     table.dispose();
     scene.remove(tableFrame);

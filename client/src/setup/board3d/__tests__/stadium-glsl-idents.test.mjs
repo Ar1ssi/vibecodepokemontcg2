@@ -14,6 +14,7 @@ import { getMatLayout } from '../../sizing/mat-layouts.mjs';
 import { NO_MAT_LAYOUT_ID } from '../../sizing/mat-spec.mjs';
 import { ENVIRONMENT_KEYS } from '../stadium-environment-layout.mjs';
 import { INTRO_MS, createStadiumEnvironment } from '../stadium-environment-mesh.js';
+import { createStadiumCardShadows } from '../stadium-card-shadows.js';
 
 const TYPES = new Set(
   'void float int uint bool vec2 vec3 vec4 ivec2 ivec3 ivec4 uvec2 uvec3 uvec4 bvec2 bvec3 bvec4 mat2 mat3 mat4 sampler2D sampler3D samplerCube'.split(' ')
@@ -170,4 +171,27 @@ test('every Stadium board shader declares every name it uses before it uses it',
   }
   assert.ok(seen.size > 100, `every board's programs were collected (${seen.size})`);
   assert.deepEqual(problems, []);
+});
+
+test('the cards\' contact shadow on a Stadium declares every name it uses (with the cutout it carries)', () => {
+  let target = null;
+  const renderer = {
+    extensions: { has: () => true },
+    compile: () => {},
+    shadowMap: { autoUpdate: true },
+    getRenderTarget: () => target,
+    setRenderTarget: (next) => {
+      target = next;
+    },
+    render: () => {},
+    getPixelRatio: () => 1,
+    getDrawingBufferSize: (out) => out.set(1920, 1080),
+  };
+  const environment = createStadiumEnvironment({ three: realThree, renderer, parent: new realThree.Group(), isHidden: () => true });
+  const shadows = createStadiumCardShadows({ three: realThree, parent: new realThree.Group(), cutout: environment.cutout });
+  const [, contacts] = shadows.meshes();
+  assert.deepEqual(undeclaredNames(contacts.material.vertexShader), []);
+  assert.deepEqual(undeclaredNames(contacts.material.fragmentShader), []);
+  shadows.dispose();
+  environment.dispose();
 });
