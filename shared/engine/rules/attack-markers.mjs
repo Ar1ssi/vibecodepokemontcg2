@@ -384,7 +384,7 @@ const MARKER_BODIES = [
   // Design 036 A7/A8a. "Takes N more damage" / "is increased by N": computeAttackDamage adds
   // it when the attack does damage (after Weakness and Resistance unless printed before).
   [
-    /^(?:this pokémon takes (\d+) more damage from attacks|any damage done to this pokémon by attacks is increased by (\d+))$/,
+    /^(?:this pokémon takes (\d+) more damage from (?:attacks|your opponent's active pokémon)|any damage done to this pokémon by attacks is increased by (\d+))$/,
     'self',
     null,
     (m, { wrOrder }) => incomingBonus(m[1] || m[2], wrOrder),

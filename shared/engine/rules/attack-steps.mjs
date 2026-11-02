@@ -476,6 +476,12 @@ const TEMPLATES = [
       ...(m[4] ? { energyType: m[4].toUpperCase() } : {}),
     }),
   ],
+  // Technical Machine: Spite (customhb-523): the offer exists only while the Defending Pokémon
+  // has a Special Condition.
+  [
+    /^if your opponent's active pokémon has a special condition, you may discard (an?) energy(?: cards?)? attached to that pokémon$/,
+    () => ({ type: 'atkDiscardOppEnergy', scope: 'active', count: 1, optional: true, requiresOppCondition: true }),
+  ],
   // Scizor V Hack Off.
   [
     /^discard a pokémon tool and a special energy from your opponent's active pokémon$/,
@@ -1506,6 +1512,15 @@ const BLOCKS = [
     /search your deck for a card that evolves from 1 of your pokémon and put it onto that pokémon\. shuffle your deck afterward\./g,
     () => ({ type: 'searchEvolve' }),
   ],
+  // Technical Machine: Fluorite (customhb-521): the search for the primary kind falls back to a
+  // Supporter and an Energy, paid for by the Technical Machine itself.
+  [
+    /discard all energy from this pokémon, and search your deck for an ace spec card\. if you do not find one, discard this card from your active pokémon and instead search your deck for a supporter card and an energy card\./g,
+    () => [
+      { type: 'atkDiscardSelfEnergy', all: true },
+      { type: 'atkSearchDeckFallback', primary: 'aceSpec', fallback: ['supporter', 'energy'], discardGrantingTool: true },
+    ],
+  ],
   // Technical Machine TS-2 Devoluter (Legends Awakened 137).
   [
     /choose 1 of your opponent's evolved pokémon( but not pokémon lv\.x)?\. remove the highest stage evolution card from that pokémon and put that card back into your opponent's hand\./g,
@@ -1852,7 +1867,9 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
       const placeholders = [];
       for (const step of [].concat(built)) {
         blockSteps.push(step);
-        if (step.type === 'searchAbility' || step.type === 'searchEvolve') result.handlesSearch = true;
+        if (step.type === 'searchAbility' || step.type === 'searchEvolve' || step.type === 'atkSearchDeckFallback') {
+          result.handlesSearch = true;
+        }
         placeholders.push(`@block${blockSteps.length - 1}.`);
       }
       return ` ${placeholders.join(' ')} `;

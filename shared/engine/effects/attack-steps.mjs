@@ -25,6 +25,7 @@ import {
 } from '../rules/special-conditions.mjs';
 import { effectiveHp, stadiumBlocksHealing } from '../rules/stadium-effects.mjs';
 import {
+  isAceSpecCard,
   isExCard,
   isGxCard,
   isMegaCard,
@@ -33,6 +34,7 @@ import {
   isUltraBeastCard,
 } from '../rules/card-classify.mjs';
 import { shuffleInPlace } from '../rng.mjs';
+import { parseGrantedAttacks } from '../rules/tool-attacks.mjs';
 import {
   addAttackMarker,
   clearAttackMarkers,
@@ -294,6 +296,11 @@ function moveToZone(player, card, zone, from, events) {
  */
 function optional(handler, question) {
   return (ctx) => {
+    // The offer exists only while the condition holds (Technical Machine: Spite).
+    if (ctx.step.requiresOppCondition && !ctx.memo?.confirmed && !ctx.memo?.confirming) {
+      const defender = ctx.opponent ? activeOf(ctx.opponent) : null;
+      if (!defender || !hasAnyCondition(defender)) return skip(ctx, 'no_special_condition');
+    }
     if (!ctx.step.optional || ctx.memo?.confirmed) {
       const memo = ctx.memo ? { ...ctx.memo } : undefined;
       if (memo) delete memo.confirmed;
@@ -778,6 +785,70 @@ function atkDiscardOppEnergy(ctx) {
     toOwnerDeck: step.toDeck ? opponent : null,
     chooser: step.chooser === 'opponent' ? opponent : null,
   });
+}
+
+// Technical Machine: Fluorite — search the deck for the primary kind; when none is found (or
+// none is taken), the Technical Machine that granted the attack is discarded and the fallback
+// kinds are searched one by one. Stages resume through the memo.
+const SEARCH_KIND_TESTS = {
+  aceSpec: { label: 'an ACE SPEC card', test: isAceSpecCard },
+  supporter: { label: 'a Supporter card', test: (card) => matchesSearch(card, 'supporter') },
+  energy: { label: 'an Energy card', test: (card) => isEnergy(card) },
+};
+
+function grantingTool(ctx) {
+  const ref = attackerRef(ctx);
+  if (!ref) return null;
+  const name = attackName(ctx);
+  return (
+    attachedCards(ctx.player, ref.card.instanceId).find(
+      (c) => !isPokemon(c) && !isEnergy(c) && parseGrantedAttacks(c).some((a) => a.name === name)
+    ) || null
+  );
+}
+
+function atkSearchDeckFallback(ctx) {
+  const { player, step } = ctx;
+  const deck = player.zones.deck;
+  const kinds = [step.primary, ...(step.fallback || [])];
+  const take = (card) => moveToZone(player, card, 'hand', 'deck', ctx.events);
+  const finish = () => {
+    shuffleOwnDeck(player, ctx);
+    return null;
+  };
+  const askKind = (index, memo) => {
+    const kind = SEARCH_KIND_TESTS[kinds[index]];
+    const options = deck.filter(kind.test);
+    if (options.length === 0) return null;
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: Search your deck for ${kind.label}`,
+      options,
+      min: 0,
+      max: 1,
+      memo: { ...memo, index },
+    });
+  };
+  // Advances to the first later kind that has cards to offer; null when none is left.
+  const askFrom = (index, memo) => {
+    for (let i = index; i < kinds.length; i++) {
+      const asked = askKind(i, memo);
+      if (asked) return asked;
+    }
+    return finish();
+  };
+  const fallBack = () => {
+    const tool = step.discardGrantingTool ? grantingTool(ctx) : null;
+    if (tool) discardCard(ctx.draft, tool, ctx.events);
+    return askFrom(1, { fellBack: true });
+  };
+
+  if (!ctx.memo) return askKind(0, {}) || fallBack();
+  // A cancelled optional choice resumes with no selection: nothing was taken from that kind.
+  const { index, fellBack } = ctx.memo;
+  const picked = deck.find((c) => c.instanceId === ctx.selection?.[0] && SEARCH_KIND_TESTS[kinds[index]].test(c));
+  if (picked) take(picked);
+  if (!fellBack) return picked ? finish() : fallBack();
+  return askFrom(index + 1, { fellBack: true });
 }
 
 // Articuno-GX Cold Crush-GX: every matching Energy leaves both Active Pokémon. An effect-shield
@@ -3960,6 +4031,7 @@ function atkJokeNoOp() {
 
 export const ATTACK_STEP_HANDLERS = {
   atkJokeNoOp,
+  atkSearchDeckFallback,
   atkSwitchSelf: optional(atkSwitchSelf, () => 'Switch this Pokémon with 1 of your Benched Pokémon'),
   atkGust: optional(atkGust, () => "Switch out your opponent's Active Pokémon"),
   atkMoveEnergy: optional(atkMoveEnergy, (step) => `Move ${whatOf(step)}`),
