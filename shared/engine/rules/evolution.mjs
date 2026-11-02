@@ -223,12 +223,13 @@ export async function canEvolve(
   const stadiumRelaxes =
     evoSpeed.relaxTurnGate &&
     (!evoSpeed.typeFilter || !evolutionTypes.length || evolutionTypes.includes(evoSpeed.typeFilter));
-  if (wasPlayedThisTurn && !stadiumRelaxes && !bypassJustEvolvedGate) {
-    return { allowed: false, reason: "That Pokémon was just played this turn — it can't evolve yet." };
-  }
-
   await ensureCardData(baseCardInPlay);
   await ensureCardData(evolutionCardInHand);
+
+  const sameTurnEvolution = evolvesSameTurn(evolutionCardInHand);
+  if (wasPlayedThisTurn && !stadiumRelaxes && !bypassJustEvolvedGate && !sameTurnEvolution) {
+    return { allowed: false, reason: "That Pokémon was just played this turn — it can't evolve yet." };
+  }
 
   // stage chain check: evolution must be exactly the next stage (or a
   // legal Rare Candy jump from Basic to Stage 2)
@@ -294,7 +295,7 @@ export async function canEvolve(
 
   // once per turn per card instance — Grand Tree's chained Stage 2 step is
   // the one printed exception (see bypassJustEvolvedGate above).
-  if (!bypassJustEvolvedGate && !stadiumRelaxes) {
+  if (!bypassJustEvolvedGate && !stadiumRelaxes && !sameTurnEvolution) {
     const instanceId = getCardInstanceId(baseCardInPlay);
     if (instanceId && rulesState.flags[player]?.evolved?.[instanceId]) {
       return { allowed: false, reason: 'Already evolved that Pokémon this turn.' };
@@ -329,6 +330,7 @@ export function normalizeStage(stage) {
   if (s === 'stage1' || s.startsWith('stage1')) return 'Stage 1';
   if (s === 'stage2' || s.startsWith('stage2')) return 'Stage 2';
   if (s === MEGAHB.toLowerCase()) return MEGAHB;
+  if (s === TERAHB.toLowerCase()) return TERAHB;
   if (s === 'mega' || s.startsWith('mega')) return 'Stage 1';
   // BREAK Evolution is an Evolution (not Basic); it keeps the previous
   // Evolution's stats and attacks (see evolved-pokemon.mjs).
@@ -342,13 +344,22 @@ export function normalizeStage(stage) {
 // read as Stage 1 above) keeps its behaviour.
 export const MEGAHB = 'MEGAHB';
 
+// The homebrew set's Tera stage (cardback stage 4; stamped the same way): a
+// MEGAHB's placement, and it may go on the turn its previous stage was played
+// or evolved (evolvesSameTurn). The first-turn gate still holds.
+export const TERAHB = 'TERAHB';
+
 const NUMBERED_STAGES = ['Basic', 'Stage 1', 'Stage 2'];
+
+export function evolvesSameTurn(evolutionCard) {
+  return normalizeStage(evolutionCard?.stage) === TERAHB;
+}
 
 // Whether `evoStage` is one evolution step onto a Pokémon of `baseStage`
 // (both normalized). The evolvesFrom name check is the caller's.
 export function isNextStage(baseStage, evoStage) {
   const baseIdx = NUMBERED_STAGES.indexOf(baseStage);
-  if (evoStage === MEGAHB) return baseIdx >= 0;
+  if (evoStage === MEGAHB || evoStage === TERAHB) return baseIdx >= 0;
   const evoIdx = NUMBERED_STAGES.indexOf(evoStage);
   return evoIdx >= 0 && evoIdx === baseIdx + 1;
 }
@@ -450,6 +461,7 @@ export function requiresTurnEndOnEvolve(evolvingCard, baseCardInPlay) {
         stage === 'Stage 1' ||
         stage === 'Stage 2' ||
         stage === MEGAHB ||
+        stage === TERAHB ||
         stage === 'BREAK' ||
         collapsed === 'restored' ||
         collapsed === 'vunion';

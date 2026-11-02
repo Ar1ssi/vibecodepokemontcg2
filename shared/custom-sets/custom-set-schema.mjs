@@ -29,10 +29,11 @@ export const ENERGY_TYPES = Object.freeze([
   'Dragon',
   'Colorless',
 ]);
-// MEGAHB: the homebrew MEGA stage (a Stage 3 evolving from its named Pokémon of any stage; evolution.mjs).
-export const POKEMON_STAGES = Object.freeze(['Basic', 'Stage1', 'Stage2', 'MEGAHB']);
+// MEGAHB / TERAHB: the homebrew MEGA and Tera stages (evolve from their named Pokémon of any stage; evolution.mjs).
+export const POKEMON_STAGES = Object.freeze(['Basic', 'Stage1', 'Stage2', 'MEGAHB', 'TERAHB']);
 // cardback's editor stage for MEGA; its export writes the TCGdex slot below the Mega instead (Stage1/Stage2).
 const EDITOR_MEGA_STAGE = 3;
+const EDITOR_TERA_STAGE = 4;
 export const TRAINER_TYPES = Object.freeze(['Item', 'Supporter', 'Stadium', 'Tool']);
 // Energy cards the editor exports: a Special Energy (a restyled Double Colorless Energy, say) or a Basic Energy (a
 // holofoil Basic Energy print). energyType is TCGdex's: "Normal" is Basic, "Special" has text of its own.
@@ -229,7 +230,7 @@ export function validateCustomSet(json, { setDirName, reservedCodes = [] } = {})
     const seen = new Set();
     json.cards.forEach((card, i) => checkCard(card, json.id, `cards[${i}]`, errors, seen));
   }
-  return { ok: errors.length === 0, errors, set: errors.length === 0 ? withMegaStages(json) : null };
+  return { ok: errors.length === 0, errors, set: errors.length === 0 ? withHomebrewStages(json) : null };
 }
 
 /** A Pokémon cardback edited as MEGA (custom.edits.stage 3) plays at the MEGAHB stage, whatever the export wrote. */
@@ -237,7 +238,18 @@ export function isEditorMegaCard(card) {
   return card?.category === 'Pokemon' && Number(card.custom?.edits?.stage) === EDITOR_MEGA_STAGE;
 }
 
-function withMegaStages(set) {
-  if (!set.cards.some(isEditorMegaCard)) return set;
-  return { ...set, cards: set.cards.map((card) => (isEditorMegaCard(card) ? { ...card, stage: 'MEGAHB' } : card)) };
+/** A Pokémon cardback edited as Tera (custom.edits.stage 4) plays at the TERAHB stage. */
+export function isEditorTeraCard(card) {
+  return card?.category === 'Pokemon' && Number(card.custom?.edits?.stage) === EDITOR_TERA_STAGE;
+}
+
+function editorStageOf(card) {
+  if (isEditorMegaCard(card)) return 'MEGAHB';
+  if (isEditorTeraCard(card)) return 'TERAHB';
+  return null;
+}
+
+function withHomebrewStages(set) {
+  if (!set.cards.some(editorStageOf)) return set;
+  return { ...set, cards: set.cards.map((card) => (editorStageOf(card) ? { ...card, stage: editorStageOf(card) } : card)) };
 }

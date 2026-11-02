@@ -5,11 +5,12 @@ import {
   isMegaCard,
   isTeraCard,
 } from '../../../../../shared/engine/rules/card-classify.mjs';
+import { normalizeStage, TERAHB } from '../../../../../shared/engine/rules/evolution.mjs';
 
 /** @returns {'tera' | 'mega' | null} */
 export function signatureEntryKind(card) {
   if (!card || typeof card !== 'object' || !isPokemon(card)) return null;
-  if (isTeraCard(card)) return 'tera';
+  if (isTeraCard(card) || normalizeStage(card.stage) === TERAHB) return 'tera';
   if (isMegaCard(card)) return 'mega';
   return null;
 }
