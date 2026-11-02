@@ -11,6 +11,8 @@
 // No bake of its own: the floor is flat (its bake is empty) and FLOOR paints it, its mirror images
 // and the hologram per frame; WALLS draws the four walls from one geometry built
 // round the hall (shelterSpots), rising off the floor behind the reveal.
+// Design 082 (Brilliant Diamond / Shining Pearl; I273): the walls are lit by the Stadium kit's soft
+// light (stadium-kit.mjs KIT_LIGHT, the hall's own indoor mood), their panelling their own paint.
 import {
   FULLSCREEN_VERTEX,
   NOISE,
@@ -20,6 +22,10 @@ import {
   TERRAIN_UNIFORMS,
 } from './stadium-environment-glsl.mjs';
 import { craterEmblem, environmentFootprints } from './stadium-environment-layout.mjs';
+import { KIT_LIGHT, KIT_UNIFORMS, createKitProps, kitUniforms } from './stadium-kit.mjs';
+import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
+import { instanceTint } from './stadium-kit-assets.mjs';
+import { RISE_LEAN, distanceToRect, hash } from './stadium-env-spots.mjs';
 import { tableBounds } from './table-uv.mjs';
 
 /** Free floor kept between the cards and the side walls' feet, and the far and near walls'. */
@@ -68,7 +74,59 @@ export function shelterSpots(layout) {
   };
   const gate = { u: hall.y, half: Math.min(GATE_PX.half, hall.hh * 0.62), height: GATE_PX.height };
   const emblem = craterEmblem(layout, { x: table.x + table.w / 2, y: layout.depth });
-  return { hall, gate, emblem };
+  // Design 083: supplies along the side walls' feet, off the gates: stacked crates, barrels, a warning
+  // lamp on a post, at uneven steps, each clear of the cards with its lean.
+  const supplies = [];
+  for (const side of [-1, 1]) {
+    let y = hall.y - hall.hh + 40 + 30 * hash(side, 2, 1);
+    for (let k = 0; y < hall.y + hall.hh - 40 && k < 10; k += 1) {
+      const roll = (salt) => hash(side * 5 + k, y, salt);
+      const pick = hash(k * 2.3 + side, 4, 7);
+      const kind = pick < 0.45 ? 'crates' : pick < 0.8 ? 'barrels' : 'lamp';
+      const size = kind === 'crates' ? 15 + 6 * roll(2) : kind === 'barrels' ? 9 + 3 * roll(2) : 5;
+      const height = kind === 'crates' ? 18 + 16 * roll(3) : kind === 'barrels' ? 20 + 6 * roll(3) : 44;
+      const x = hall.x + side * (hall.hw - size - 10 - 18 * roll(4));
+      const offGate = Math.abs(y - gate.u) > gate.half + size + 20;
+      const clear = rects.every((rect) => distanceToRect(x, y, rect) >= size * 1.4 + RISE_LEAN * height + 14);
+      if (offGate && clear && supplies.every((s) => Math.hypot(s.x - x, s.y - y) > s.size + size + 10)) supplies.push({ kind, x, y, size, height, side, seed: roll(5) });
+      y += 60 + 90 * roll(6);
+    }
+  }
+  return { hall, gate, emblem, supplies };
+}
+
+const CRATE = [0.58, 0.44, 0.28, 0.05];
+const CRATE_TOP = [0.68, 0.53, 0.35, 0.05];
+const BARREL = [[0.2, 0.42, 0.62, 0.35], [0.66, 0.2, 0.16, 0.35], [0.42, 0.44, 0.48, 0.5]];
+const BAND = [0.8, 0.8, 0.82, 0.6];
+const LAMP_AMBER = [1.4, 0.72, 0.1, 2.2];
+
+/** Design 083: the supplies along the walls, one kit builder. */
+export function shelterProps({ supplies = [] } = {}) {
+  const props = createPropBuilder();
+  for (const s of supplies) {
+    const yaw = (s.seed - 0.5) * 0.5;
+    props.tint(instanceTint(s.seed * 991, 1.2), () => {
+      if (s.kind === 'crates') {
+        props.roundBox({ x: s.x, y: s.y, z0: 0, z1: s.height * 0.55, hw: s.size, hh: s.size * 0.85, yaw, color: CRATE, topColor: CRATE_TOP });
+        props.roundBox({ x: s.x - s.side * s.size * 0.15, y: s.y + s.size * 0.2, z0: s.height * 0.55, z1: s.height, hw: s.size * 0.7, hh: s.size * 0.65, yaw: yaw + 0.5, color: CRATE, topColor: CRATE_TOP });
+      } else if (s.kind === 'barrels') {
+        const count = 2 + Math.floor(s.seed * 2);
+        for (let k = 0; k < count; k += 1) {
+          const angle = s.seed * 6.28 + (k / count) * 6.28;
+          const bx = s.x + Math.cos(angle) * s.size * 0.9;
+          const by = s.y + Math.sin(angle) * s.size * 0.9;
+          const colour = BARREL[(k + Math.floor(s.seed * 3)) % BARREL.length];
+          props.cylinder({ x: bx, y: by, z0: 0, z1: s.height, r: s.size * 0.8, color: colour, capColor: [colour[0] * 1.15, colour[1] * 1.15, colour[2] * 1.15, colour[3]], sides: 16 });
+          for (const z of [s.height * 0.25, s.height * 0.75]) props.ring({ x: bx, y: by, z0: z - 1, z1: z + 1, r: s.size * 0.82, color: BAND, sides: 16 });
+        }
+      } else {
+        props.cylinder({ x: s.x, y: s.y, z0: 0, z1: s.height, r: 1.8, color: BAND, sides: 8 });
+        props.look({ kind: LOOK.blink, rate: 0.9 + 0.5 * s.seed, phase: s.seed }, () => props.sphere({ x: s.x, y: s.y, z: s.height + 3, r: 4, color: LAMP_AMBER, sides: 12, rings: 8 }));
+      }
+    });
+  }
+  return props;
 }
 
 const HEX = /* glsl */ `
@@ -360,6 +418,7 @@ void main() {
 
 export const WALL_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
+${KIT_UNIFORMS}
 ${NOISE}
 ${REVEAL}
 ${HEX}
@@ -367,6 +426,7 @@ ${HALL}
 varying vec4 vPaint;
 varying vec3 vNormal;
 varying vec3 vWall;
+${KIT_LIGHT}
 void main() {
   vec2 vPos = vWall.xy;
   if (revealBurned(vPos) * exitKeep(vPos) < 0.5) discard;
@@ -375,10 +435,7 @@ void main() {
   if (vPaint.w < 0.5 ? past.y > past.x + 0.5 : past.x > past.y + 0.5) discard;
   vec3 glow;
   vec3 col = wallPaint(vPaint.x, vPaint.y, 1.0 - step(0.5, vPaint.w), glow);
-  vec3 n = normalize(vNormal);
-  // The hall's light comes from the ceiling: tops brightest, faces a little dimmer, the foot shaded.
-  col *= 0.72 + 0.28 * n.z;
-  col *= mix(0.78, 1.0, smoothstep(0.0, 26.0, vPaint.y));
+  vec3 n = normalize(gl_FrontFacing ? vNormal : -vNormal);
   if (vPaint.z > 0.5) {
     // The wall's top: a pale cornice, a cyan line along its inner edge, then the dark roof over
     // the rooms beyond the hall, panelled, out to the scene's edge.
@@ -399,6 +456,9 @@ void main() {
     roof = mix(roof, STRIP_CYAN * 0.6, (1.0 - smoothstep(0.6, 1.6, abs(lane - 14.5))) * step(16.0, panel.x) * smoothstep(40.0, 60.0, beyond - ${WALL_PX.cap}.0));
     col = mix(col, roof, smoothstep(${WALL_PX.cap - 20}.0, ${WALL_PX.cap}.0, beyond));
   }
+  // The kit's light (design 082): the panelling's paint as its albedo, a faint sheen on the enamel,
+  // the wall's foot a little darker where it meets the floor.
+  col = kitLight(col * 0.78, n, vWall, vec4(0.0, 0.0, 1.0, 0.0), 0.25) * mix(0.8, 1.0, smoothstep(0.0, 26.0, vPaint.y));
   col += glow;
   col += STRIP_CYAN * revealGlow(vPos, 0.035);
   gl_FragColor = vec4(col, 1.0);
@@ -478,7 +538,16 @@ export function wallGeometry(three, hall, bounds) {
   return geometry;
 }
 
-const NO_SPOTS = { hall: null, gate: null, emblem: null };
+const NO_SPOTS = { hall: null, gate: null, emblem: null, supplies: [] };
+
+/** The hall's light for the kit (design 082): white from the ceiling's panels, a pale cool fill off the white walls and floor. */
+export const SHELTER_MOOD = Object.freeze({
+  key: [0.95, 0.97, 1.0],
+  sky: [0.46, 0.48, 0.52],
+  bounce: [0.38, 0.4, 0.44],
+  sheen: [0.4, 0.7],
+  shadow: [0.55, 0.58, 0.66, 0.5],
+});
 
 /** Steel Shelter's board (stadium-environment-mesh.js BOARDS): the floor and the walls. */
 export function steelShelterBoard({ three, material, replaceGeometry, bakeOptions }) {
@@ -486,6 +555,7 @@ export function steelShelterBoard({ three, material, replaceGeometry, bakeOption
     uHall: { value: new three.Vector4() },
     uGate: { value: new three.Vector3() },
     uEmblem: { value: new three.Vector3() },
+    ...kitUniforms(three, SHELTER_MOOD),
   };
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
   const materials = {
@@ -496,12 +566,14 @@ export function steelShelterBoard({ three, material, replaceGeometry, bakeOption
   };
   const floor = new three.Mesh(new three.BufferGeometry(), materials.floor);
   const walls = new three.Mesh(new three.BufferGeometry(), materials.walls);
+  const kit = createKitProps({ three, material, own, mood: SHELTER_MOOD, reveal: 'vec3(0.6, 0.9, 1.1)' });
   return {
-    objects: [floor, walls],
-    materials: Object.values(materials),
+    objects: [floor, walls, ...kit.objects],
+    materials: [...Object.values(materials), ...kit.materials],
     bakeField: materials.bakeField,
     spots: (layout) => shelterSpots(layout) ?? NO_SPOTS,
-    apply({ hall, gate, emblem }, bounds) {
+    apply({ hall, gate, emblem, supplies }, bounds) {
+      kit.set(hall ? shelterProps({ supplies }) : null);
       own.uHall.value.set(hall?.x ?? 0, hall?.y ?? 0, hall?.hw ?? 0, hall?.hh ?? 0);
       own.uGate.value.set(gate?.u ?? 0, gate?.half ?? 0, gate?.height ?? 0);
       own.uEmblem.value.set(emblem?.x ?? 0, emblem?.y ?? 0, emblem?.r ?? 0);

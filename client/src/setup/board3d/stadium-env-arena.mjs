@@ -29,7 +29,9 @@ import {
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
 import { craterEmblem, environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
-import { PROP_VERTEX, createPropBuilder, propFragment } from './stadium-env-props.mjs';
+import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
+import { PROP_CARD_GAP_PX, RISE_LEAN } from './stadium-env-spots.mjs';
+import { createKitProps } from './stadium-kit.mjs';
 import { tableBounds } from './table-uv.mjs';
 
 export const ARENA_KEY = 'fighting-stadium';
@@ -56,10 +58,18 @@ export const ROPES = { heights: [30, 58, 86], radius: 3.6, sag: 5, splay: 36 };
 export const LASER_COUNT = 8;
 export const LASER_LIGHT_PX = { out: 150, end: 110, z: 240 };
 /**
- * The lighting rig over the ring, as the art's: a truss round it `out` px outside the ropes, `z` px
- * over the canvas and `depth` px deep, its corners cut `cut` px; a lamp about every `lampEvery` px.
+ * The lighting rig over the ring, as the art's: a truss round it `z` px over the canvas and `depth`
+ * px deep, its corners cut `cut` px; a lamp about every `lampEvery` px.
  */
-export const RIG_PX = { out: 40, z: 300, depth: 16, cut: 110, lampEvery: 105 };
+export const RIG_PX = { z: 300, depth: 16, cut: 110, lampEvery: 105 };
+/**
+ * How far outside the ropes the rig runs along the ring's sides and its ends, px: so far past the
+ * cards (the ring's own gap and this) that, high as it hangs, the tilted view never leans it over one.
+ */
+export const RIG_OUT_PX = {
+  side: RISE_LEAN * RIG_PX.z + PROP_CARD_GAP_PX - RING_GAP_PX.side,
+  end: RISE_LEAN * RIG_PX.z + PROP_CARD_GAP_PX - RING_GAP_PX.end,
+};
 /** Half the size of a rig lamp's glow and of a laser light's glare, px. */
 const GLINT_PX = { lamp: 22, light: 90 };
 
@@ -96,10 +106,10 @@ export function arenaSpots(layout) {
   return { ring, boards, scene, emblem };
 }
 
-/** The rig's outline round the ring: its eight corners (RIG_PX.out outside the ropes, corners cut), counter-clockwise. */
+/** The rig's outline round the ring: its eight corners (RIG_OUT_PX outside the ropes, corners cut), counter-clockwise. */
 export function rigOutline(ring) {
-  const hw = ring.hw + RIG_PX.out;
-  const hh = ring.hh + RIG_PX.out;
+  const hw = ring.hw + RIG_OUT_PX.side;
+  const hh = ring.hh + RIG_OUT_PX.end;
   const cut = Math.min(RIG_PX.cut, hw * 0.4, hh * 0.4);
   return [
     [hw - cut, -hh],
@@ -207,9 +217,27 @@ function adRuns({ ring, boards }) {
     .map((run) => ({ ...run, out: [(run.by - run.ay) / run.length, -(run.bx - run.ax) / run.length] }));
 }
 
+/**
+ * The arena under its rig for the kit (designs 081, 082): a cool white key from the lamps overhead,
+ * a deep teal fill from the dark hall.
+ */
+export const ARENA_LIGHTS = Object.freeze({
+  key: [0.9, 0.96, 1.0],
+  sky: [0.24, 0.32, 0.36],
+  bounce: [0.12, 0.16, 0.18],
+  sheen: [0.4, 0.7],
+  shadow: [0.3, 0.38, 0.45, 0.55],
+});
+
 /** The ring's corner posts and ropes, the rig's truss and lamps, and the ad boards' rails. */
-export function arenaProps({ ring, boards }) {
+export function arenaProps(spots) {
   const props = createPropBuilder();
+  props.look({ kind: LOOK.chrome }, () => arenaSolids(props, spots));
+  return props;
+}
+
+/** The ring's posts, pads, ropes and apron; the stands' rails. */
+function arenaSolids(props, { ring, boards }) {
   const corners = [
     [-1, -1],
     [1, -1],
@@ -271,7 +299,6 @@ export function arenaProps({ ring, boards }) {
     props.cylinder({ x, y, z0: z - 34, z1: z - 10, r: 3, color: TRUSS, sides: 6 });
     props.cylinder({ x, y, z0: z - 10, z1: z + 6, r: 12, color: LAMP_CASE, sides: 14 });
   }
-  return props;
 }
 
 /**
@@ -334,6 +361,7 @@ export function laserGeometry(three, count = LASER_COUNT) {
 export function glintGeometry(three, lamps, lights = []) {
   const positions = [];
   const glints = [];
+  const chases = [];
   const index = [];
   const z = RIG_PX.z - RIG_PX.depth - 18;
   const points = [...lamps.map(([x, y]) => [x, y, z, GLINT_PX.lamp]), ...lights.map(([x, y, lz]) => [x, y, lz, GLINT_PX.light])];
@@ -347,12 +375,15 @@ export function glintGeometry(three, lamps, lights = []) {
     ]) {
       positions.push(x, y, pz);
       glints.push(cx, cy, k, size);
+      // Design 083: a lamp's place round the rig, 0..1 (the chase sweeps it); -1 a laser light.
+      chases.push(k < lamps.length ? k / Math.max(lamps.length, 1) : -1);
     }
     index.push(first, first + 1, first + 2, first, first + 2, first + 3);
   });
   const geometry = new three.BufferGeometry();
   geometry.setAttribute('position', new three.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('aGlint', new three.Float32BufferAttribute(glints, 4));
+  geometry.setAttribute('aChase', new three.Float32BufferAttribute(chases, 1));
   geometry.setIndex(index);
   return geometry;
 }
@@ -727,6 +758,7 @@ export const GLINT_VERTEX = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
 attribute vec4 aGlint;
+attribute float aChase;
 varying vec2 vCorner;
 varying float vTwinkle;
 varying float vFlare;
@@ -737,6 +769,10 @@ void main() {
   vFlare = step(${GLINT_PX.lamp + 1}.0, aGlint.w);
   float seed = hash12(vec2(aGlint.z, 4.0));
   vTwinkle = 0.94 + 0.06 * sin(uTime * (0.5 + 0.6 * seed) + seed * 40.0);
+  // Design 083: every 9 s a flash runs once round all the rig's lamps, one after another (the laser
+  // lights, aChase -1, keep their steady breath); at uTime 0 (reduced motion) none is lit.
+  float sweep = fract(uTime / 9.0) * 1.4 - 0.2 - aChase;
+  vTwinkle += step(0.0, aChase) * 0.55 * exp(-sweep * sweep * 900.0);
   gl_Position = projectionMatrix * view;
 }
 `;
@@ -772,18 +808,6 @@ ${OUTPUT}
 }
 `;
 
-/** The props' light: the rig's white from above, the teal haze round them. */
-const PROP_LIGHT = /* glsl */ `
-vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
-  vec3 col = albedo * (vec3(0.14, 0.24, 0.27) + vec3(0.75, 0.82, 0.85) * max(n.z, 0.0) * 0.8 + 0.25 * max(dot(n, normalize(uSun)), 0.0));
-  vec3 view = normalize(uEye - world);
-  col += vec3(0.7, 0.9, 1.0) * pow(max(dot(reflect(-view, n), vec3(0.0, 0.0, 1.0)), 0.0), 24.0) * metal * 0.5;
-  return col;
-}
-`;
-
-export const PROP_FRAGMENT = propFragment({ light: PROP_LIGHT, uniforms: ARENA, reveal: 'STAGE_GLOW' });
-
 const NO_SPOTS = { ring: null, boards: null, scene: null, emblem: null };
 
 /** Fighting Stadium's board (stadium-environment-mesh.js BOARDS). */
@@ -796,7 +820,6 @@ export function fightingStadiumBoard({ three, material, terrainGrid, replaceGeom
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
   const materials = {
     terrain: make(TERRAIN_VERTEX, TERRAIN_FRAGMENT),
-    props: make(PROP_VERTEX, PROP_FRAGMENT, { side: three.DoubleSide }),
     boards: make(BOARD_VERTEX, BOARD_FRAGMENT, { side: three.DoubleSide }),
     lasers: make(LASER_VERTEX, LASER_FRAGMENT, {
       transparent: true,
@@ -822,7 +845,7 @@ export function fightingStadiumBoard({ three, material, terrainGrid, replaceGeom
     bakeLight: make(FULLSCREEN_VERTEX, bakeLightFragment(), bakeOptions),
   };
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
-  const props = new three.Mesh(new three.BufferGeometry(), materials.props);
+  const kit = createKitProps({ three, material, own, mood: ARENA_LIGHTS, reveal: 'vec3(0.6, 0.9, 1.1)' });
   const boards = new three.Mesh(new three.BufferGeometry(), materials.boards);
   const lasers = new three.Mesh(laserGeometry(three), materials.lasers);
   lasers.renderOrder = 2;
@@ -831,8 +854,8 @@ export function fightingStadiumBoard({ three, material, terrainGrid, replaceGeom
   const glints = new three.Mesh(new three.BufferGeometry(), materials.glints);
   glints.renderOrder = 2;
   return {
-    objects: [terrain, props, boards, lasers, lattice, glints],
-    materials: Object.values(materials),
+    objects: [terrain, ...kit.objects, boards, lasers, lattice, glints],
+    materials: [...Object.values(materials), ...kit.materials],
     bakeField: materials.bakeField,
     bakeLight: materials.bakeLight,
     spots: (layout) => arenaSpots(layout) ?? NO_SPOTS,
@@ -842,9 +865,9 @@ export function fightingStadiumBoard({ three, material, terrainGrid, replaceGeom
       own.uBoards.value.set(spots.boards?.hw ?? 0, spots.boards?.hh ?? 0);
       own.uEmblem.value.set(emblem?.x ?? 0, emblem?.y ?? 0, emblem?.r ?? 0);
       replaceGeometry(terrain, terrainGrid(bounds));
-      for (const mesh of [props, boards, lasers, lattice, glints]) mesh.visible = Boolean(ring);
+      for (const mesh of [boards, lasers, lattice, glints]) mesh.visible = Boolean(ring);
+      kit.set(ring ? arenaProps(spots) : null);
       if (!ring) return;
-      replaceGeometry(props, arenaProps(spots).build(three));
       replaceGeometry(boards, adBoardGeometry(three, spots));
       replaceGeometry(lattice, latticeGeometry(three, spots));
       replaceGeometry(glints, glintGeometry(three, rigLamps(ring), [...laserLights(spots), ...latticeCrossings(spots)]));

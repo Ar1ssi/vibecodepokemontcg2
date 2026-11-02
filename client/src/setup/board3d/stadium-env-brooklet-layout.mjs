@@ -19,6 +19,10 @@
 // room inside the view (the sim mat's cards run to the table's side edges), its pieces move round to
 // the near shore. stadium-env-brooklet.mjs draws all of it. Pure: no three.js, no DOM.
 import { environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
+import { RISE_LEAN } from './stadium-env-spots.mjs';
+import { measureAsset } from './stadium-kit-assets.mjs';
+import { clumpPieces } from './stadium-env-clumps.mjs';
+import { clumpAround } from './stadium-env-spots.mjs';
 import { tableBounds } from './table-uv.mjs';
 
 export const BROOKLET_KEY = 'brooklet-hill';
@@ -80,6 +84,12 @@ export const CLIFF_RISE_PX = 40;
 export const CLIFF_RUN_PX = 14;
 export const TERRACE_PX = 150;
 export const TERRACE_RISE_PX = 32;
+/**
+ * The highest the land rises (design 082, for the kit's bushes standing on it): the banks' beach,
+ * cliff and terrace (above the hill's ledge, LEDGE_TOP_PX, and the near path) plus their swell
+ * (±2 px of noise) and a texel of the bake's grid each way.
+ */
+export const BANK_CEILING_PX = BEACH_RISE_PX + CLIFF_RISE_PX + TERRACE_RISE_PX + 4;
 /** The near shore: a path PATH_PX wide (wandering PATH_WANDER_PX) PATH_RISE_PX up, then a cliff dropping DROP_PX over DROP_RUN_PX. */
 export const PATH_PX = 56;
 export const PATH_WANDER_PX = 10;
@@ -157,7 +167,10 @@ export const FALL_KINDS = Object.freeze({ lake: 0, pool: 1, basin: 2 });
 
 /** Boulders: the main fall's row, the spill's, one in the shallows at the path's end, a pair on the right shore. */
 export const ROCK_MAX = 16;
-/** Boulder middle to card footprint, at least its radius plus this. */
+/**
+ * Least gap between a boulder, seen from above, and a card footprint: past its reach (the kit's
+ * boulder of size r, standing at the lake's level) and its lean on screen (RISE_LEAN of its top).
+ */
 export const ROCK_CARD_GAP_PX = 10;
 /** The map's row at the main fall's foot: px across its line and out along it from where it lands. */
 const FALL_ROW = Object.freeze([
@@ -192,11 +205,26 @@ export const SUNKEN_CARD_GAP_PX = 12;
 export const SUNKEN_SPACING_PX = 240;
 const SUNKEN_STEP_PX = 12;
 
-/** Round bushes on the banks' grass. */
+/** Round bushes on the banks' grass (the kit's bush, size BUSH_SIZE × r). */
 export const TREE_MAX = 10;
-/** A bush stands on grass at least this far past its cliff's top, and this far from every card. */
+export const BUSH_SIZE = 0.95;
+/**
+ * A bush stands on grass at least this far past its cliff's top, and this far from every card past
+ * its reach and its lean on screen (RISE_LEAN of its top over the highest the land rises, BANK_CEILING_PX).
+ */
 export const TREE_GRASS_PX = 8;
-export const TREE_CARD_GAP_PX = 30;
+export const TREE_CARD_GAP_PX = 12;
+/** Design 083: what the banks' clumps are made of (px), and their satellites. */
+const BANK_CLUMPS = Object.freeze([
+  { asset: 'bush', weight: 2, size: [20, 34] },
+  { asset: 'treeRound', weight: 0.5, size: [30, 40] },
+  { asset: 'flowerBed', weight: 1, size: [16, 26], options: { depth: 0.7, head: 7, petals: ['#fff4d6', '#ffd94a', '#f7a1c4'] } },
+]);
+const BANK_SATELLITES = Object.freeze([
+  { asset: 'bush', weight: 1.2, size: [16, 26] },
+  { asset: 'flowers', weight: 1.4, size: [9, 14], options: { petals: ['#fff7ec', '#ffd84a', '#f05a4e'] } },
+  { asset: 'tallGrass', weight: 1.2, size: [14, 20], options: { blade: 16 } },
+]);
 /**
  * The map's bushes, at offsets (px) from the lake's far-right corner: a cluster of small ones past
  * the corner, big ones down the right bank, a few on the far bank. Each takes the nearest spot on
@@ -621,7 +649,8 @@ const pickDock = (core, room, rects) => {
 
 /** A boulder `{ x, y, r, seed }` if it keeps clear of the cards and the `avoid` circles, else null. */
 const clearRock = (rects, avoid, rock) => {
-  if (cardGap(rects, rock.x, rock.y) < rock.r + ROCK_CARD_GAP_PX) return null;
+  const { reach, height } = measureAsset('boulder', { size: rock.r });
+  if (cardGap(rects, rock.x, rock.y) < reach + RISE_LEAN * height + ROCK_CARD_GAP_PX) return null;
   if (avoid.some((spot) => Math.hypot(spot.x - rock.x, spot.y - rock.y) < spot.r + rock.r)) return null;
   return rock;
 };
@@ -675,10 +704,16 @@ const pickSunken = (spots, rects, avoid) => {
 
 /** True when a crown of radius r at (x, y) stands on a bank's grass, clear of its cliffs, in view and clear of every card. */
 const onBankGrass = (spots, rects, view, x, y, r) => {
+  const { reach, height } = measureAsset('bush', { size: r * BUSH_SIZE });
+  return onBankGround(spots, rects, view, x, y, r, reach, height);
+};
+
+/** onBankGrass for any piece: its footprint radius r, its reach and height (measureAsset). */
+const onBankGround = (spots, rects, view, x, y, r, reach, height) => {
   const { zones } = spots;
   if (hillShare(zones, x, y) > 0.05 || nearShare(zones, x, y) > 0.05) return false;
   if (!insideBox(view, x, y, r + 4)) return false;
-  if (cardGap(rects, x, y) < r + TREE_CARD_GAP_PX) return false;
+  if (cardGap(rects, x, y) < reach + RISE_LEAN * (BANK_CEILING_PX + height) + TREE_CARD_GAP_PX) return false;
   const land = lakeDistance(spots, x, y);
   const grass = beachWidth(x, y) + CLIFF_RUN_PX + TREE_GRASS_PX;
   if (land - r < grass) return false;
@@ -982,6 +1017,33 @@ export function brookletSpots(layout) {
   const sunken = pickSunken(spots, rects, [...avoid, ...fallSpots, ...rocks.map((rock) => ({ ...rock, r: rock.r * 1.6 }))]);
   const structures = [...towers, basin].filter(Boolean).map((ring) => ({ x: ring.x, y: ring.y, r: ring.r + 6 }));
   const trees = placeBushes(spots, rects, view, [...avoid, ...structures, ...rocks]);
+  // Design 083: the banks dressed in clumps (bushes, flowers, tall grass, a broadleaf here and
+  // there) round the map's bushes, on the grass and clear of the cliffs, the cards and each other.
+  const clumps = [];
+  const bankTaken = [...avoid, ...structures, ...rocks.map((rock) => ({ x: rock.x, y: rock.y, r: rock.r * 1.2 })), ...trees.map((tree) => ({ x: tree.x, y: tree.y, r: tree.r }))];
+  // First round the map's own bushes: two or three small pieces at each one's foot.
+  trees.forEach((tree, index) => {
+    for (const spot of clumpAround(tree, { count: 3 + (index % 2), reach: [tree.r * 1.4, tree.r * 2.6], salt: 151 + index })) {
+      const kind = BANK_SATELLITES[Math.floor(spot.seed * BANK_SATELLITES.length) % BANK_SATELLITES.length];
+      const size = kind.size[0] + (kind.size[1] - kind.size[0]) * spot.share;
+      const { reach, height } = measureAsset(kind.asset, { ...(kind.options ?? {}), size });
+      if (!onBankGround(spots, rects, view, spot.x, spot.y, reach * 0.9, reach, height)) continue;
+      if (bankTaken.some((t) => Math.hypot(t.x - spot.x, t.y - spot.y) < (t.r + reach) * 0.75)) continue;
+      clumps.push({ asset: kind.asset, x: spot.x, y: spot.y, size, seed: spot.seed, yaw: spot.seed * 2 * Math.PI, reach, height, hero: false, options: kind.options ?? {} });
+      bankTaken.push({ x: spot.x, y: spot.y, r: reach });
+    }
+  });
+  // Then clumps of their own over the rest of the banks' grass.
+  clumps.push(...clumpPieces({ x: view.x0, y: view.y0, w: view.x1 - view.x0, h: view.y1 - view.y0 }, {
+    step: 120,
+    mix: BANK_CLUMPS,
+    satellites: BANK_SATELLITES,
+    thick: 0.55,
+    cap: 28,
+    salt: 97,
+    taken: bankTaken,
+    fits: (x, y, reach, height) => onBankGround(spots, rects, view, x, y, reach * 0.9, reach, height),
+  }));
 
   return {
     table,
@@ -996,6 +1058,7 @@ export function brookletSpots(layout) {
     rocks,
     sunken,
     trees,
+    clumps,
     dock: docked?.dock ?? null,
     fence,
   };

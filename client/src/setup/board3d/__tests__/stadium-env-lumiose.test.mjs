@@ -13,7 +13,6 @@ import {
   MAX_CAFES,
   MAX_LAMPS,
   MAX_TREES,
-  PROP_FRAGMENT,
   TERRAIN_FRAGMENT,
   TERRAIN_VERTEX,
   TOWER_HEIGHT_PX,
@@ -21,7 +20,7 @@ import {
   lumioseSpots,
   towerRadius,
 } from '../stadium-env-lumiose.mjs';
-import { SCREEN_VIEWS, pointOnCard, screenView } from './stadium-screen.mjs';
+import { SCREEN_VIEWS, geometryOnCard, screenView } from './stadium-screen.mjs';
 
 const PROFILES = [NO_MAT_LAYOUT_ID, 'sim', 'one-player', 'two-player', 'edge-to-edge-two-player'];
 const HALVES = [
@@ -79,23 +78,12 @@ test('towerRadius: legs flare at the foot, a slim waist, a swollen crown, closin
   assert.ok(towerRadius(1, h) < 0.002 * h, 'the spire closes');
 });
 
-test('no building, tree, lamp, parasol or the tower covers a card on screen, in either camera preset', () => {
+test('no building, tree, lamp, parasol, flower or the tower covers a card on screen, in either camera preset', () => {
   for (const view of SCREEN_VIEWS) {
     const { layout, projectors } = screenView(view);
-    const { buildings, trees, lamps, cafes, tower, u } = lumioseSpots(layout);
-    const shaft = Array.from({ length: 12 }, (_, i) => i / 11).flatMap((s) => {
-      const r = towerRadius(s, tower.h);
-      return [[tower.x, tower.y, s * tower.h], [tower.x - r, tower.y - r, s * tower.h], [tower.x + r, tower.y + r, s * tower.h], [tower.x - r, tower.y + r, s * tower.h], [tower.x + r, tower.y - r, s * tower.h]];
-    });
-    const points = [
-      ...buildings.flatMap((b) => [b.x0, b.x1].flatMap((x) => [b.y0, b.y1].flatMap((y) => [[x, y, b.height], [x, y, b.height + 58 * u]]))),
-      ...trees.flatMap((t) => [[t.x, t.y, t.h + t.r], [t.x - t.r, t.y, t.h], [t.x + t.r, t.y, t.h], [t.x, t.y - t.r, t.h], [t.x, t.y + t.r, t.h]]),
-      ...lamps.flatMap((l) => [[l.x, l.y, l.h], [l.x, l.y + 17 * u, l.h + 18 * u], [l.x, l.y - 17 * u, l.h + 18 * u]]),
-      ...cafes.flatMap((c) => [[c.x - c.r, c.y, 62 * u], [c.x + c.r, c.y, 62 * u], [c.x, c.y - c.r, 62 * u], [c.x, c.y + c.r, 62 * u], [c.x, c.y, 83 * u]]),
-      ...shaft,
-    ];
+    const geometry = lumioseProps(lumioseSpots(layout)).build(three);
     for (const { preset, project } of projectors) {
-      const hit = pointOnCard(points, layout, project);
+      const hit = geometryOnCard(geometry, layout, project);
       assert.equal(hit, null, `${view.profile} ${view.viewport.w}x${view.viewport.h} ${preset}: ${hit}`);
     }
   }
@@ -110,7 +98,7 @@ test('lumioseSpots is null without a layout; the props build into a good deal of
 
 test('Lumiose City shaders declare no GLSL ES 3.00 reserved word and every one has a main', () => {
   const reserved = /\b(?:float|vec[234]|int|bool)\s+(?:flat|half|smooth|noperspective|sample|patch|input|output|filter|active|common|fixed|long|short|out|in|inout|round)\b/;
-  for (const shader of [BAKE_FIELD_FRAGMENT, BAKE_LIGHT_FRAGMENT, TERRAIN_VERTEX, TERRAIN_FRAGMENT, PROP_FRAGMENT]) {
+  for (const shader of [BAKE_FIELD_FRAGMENT, BAKE_LIGHT_FRAGMENT, TERRAIN_VERTEX, TERRAIN_FRAGMENT]) {
     assert.doesNotMatch(shader, reserved);
     assert.match(shader, /void main\(\)/);
   }

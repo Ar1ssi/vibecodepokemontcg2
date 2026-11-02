@@ -17,6 +17,8 @@
 //    the ground dips under it, and paints that lava itself: the cracks between the stones and the
 //    side streams run at the land's own level, the stones standing only a little proud of them.
 //    LAVA is one sheet at LAVA_LEVEL for the river, which sits lower; EMBERS and SMOKE rise off it.
+// Design 082 (Brilliant Diamond / Shining Pearl, Stark Mountain): the stones warm basalt on a smooth
+// ramp in BDSP's soft light.
 import {
   FOOTPRINTS,
   NOISE,
@@ -303,14 +305,23 @@ void main() {
   vec3 n = normalize(vec3(nxy / nz * vGrowth, 1.0));
   vec3 sun = normalize(uSun);
 
-  // Painted three-tone ramp: cool shadow on faces turned away, mid slate on flat tops, light grey
-  // on faces turned to the sun; the baked sun shadow pushes faces toward the shadow tone.
+  // Design 082 (Brilliant Diamond / Shining Pearl, Stark Mountain): warm basalt in BDSP's soft light,
+  // a smooth ramp from its shade on faces turned away to warm grey-brown on faces to the sun; the
+  // baked sun shadow pushes faces toward the shade.
   float tone = fract(id * 13.7) * isStone;
   float facing = dot(n, sun) * mix(0.45, 1.0, light.a);
-  vec3 col = mix(vec3(0.058, 0.06, 0.074), vec3(0.088, 0.092, 0.108), smoothstep(0.3, 0.5, facing));
-  col = mix(col, vec3(0.138, 0.143, 0.16), smoothstep(0.8, 0.92, facing));
+  vec3 col = mix(vec3(0.07, 0.055, 0.06), vec3(0.13, 0.1, 0.095), smoothstep(0.15, 0.6, facing));
+  col = mix(col, vec3(0.24, 0.18, 0.155), smoothstep(0.6, 1.0, facing));
   col *= 0.9 + 0.2 * tone;
   col *= 0.88 + 0.16 * smoothstep(-6.0, 50.0, ground);
+  // Design 083: not one basalt: some stones cool slate, some rusty, and broad soft patches of ash
+  // lighter and darker across the field, all quieter by the cards.
+  float family = fract(id * 7.31);
+  float calm = fieldCalm(p, 80.0);
+  float quietStone = 1.0 - 0.7 * calm;
+  col = mix(col, col * vec3(0.84, 0.9, 1.1), step(0.64, family) * isStone * quietStone);
+  col = mix(col, col * vec3(1.18, 0.92, 0.78), step(family, 0.16) * isStone * quietStone);
+  col *= 1.0 + 0.16 * (fbm3(p / 320.0 + 2.0) - 0.5) * quietStone;
   // Bare ground between stones is darker ash; the volcano is darker basalt.
   col *= mix(0.72, 1.0, isStone) * mix(1.0, 0.85, onVolcano);
 
@@ -319,18 +330,17 @@ void main() {
   float laplace = texture2D(uField, vUv + vec2(t2.x, 0.0)).r + texture2D(uField, vUv - vec2(t2.x, 0.0)).r
     + texture2D(uField, vUv + vec2(0.0, t2.y)).r + texture2D(uField, vUv - vec2(0.0, t2.y)).r - 4.0 * ground;
   float convex = smoothstep(0.8, 3.5, -laplace) * vGrowth;
-  col = mix(col, vec3(0.2, 0.21, 0.24), convex * 0.55 * smoothstep(0.35, 0.85, n.z));
+  col = mix(col, vec3(0.3, 0.23, 0.2), convex * 0.5 * smoothstep(0.35, 0.85, n.z));
 
   // Painted cracks: thin light lines across the tops of some stones, out in the world only
   // (design 080: no fine lines round the cards).
-  float calm = fieldCalm(p, 80.0);
   vec4 crack = voronoiCell(p / 22.0 + id * 17.0);
   float crackLine = (1.0 - smoothstep(0.015, 0.04, crack.x)) * smoothstep(0.82, 0.95, n.z)
     * smoothstep(0.55, 0.7, gnoise(p / 26.0 + id * 5.0)) * isStone * step(0.4, tone);
   col = mix(col, col * 1.45 + 0.01, crackLine * 0.4 * (1.0 - calm));
 
   // Occlusion: crevices and the feet of stones go deep blue-grey.
-  col = mix(vec3(0.036, 0.034, 0.046), col, smoothstep(0.3, 0.9, light.b));
+  col = mix(vec3(0.045, 0.034, 0.038), col, smoothstep(0.3, 0.9, light.b));
 
   // Lava light. Lava near the river and the volcano runs hotter than out in the cracks. Rock just
   // above the lava beside it (the river's sheet, or the lava in its own cracks) glows red, side

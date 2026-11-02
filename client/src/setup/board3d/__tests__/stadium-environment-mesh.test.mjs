@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import * as three from 'three';
 import { flatLayout } from '../board-layout.mjs';
 import { tableBounds } from '../table-uv.mjs';
 import { getMatLayout } from '../../sizing/mat-layouts.mjs';
@@ -11,13 +12,20 @@ import {
   EXIT_MS,
   INTRO_MS,
   PLATE_MAX_PIXELS,
+  BLOOM,
   PREPARE_TIMEOUT_MS,
+  TILT_SHIFT,
+  DEFAULT_GROUND_SHADOW,
+  boardLighting,
   createStadiumEnvironment,
+  jungleTreeProps,
   plateScale,
   setFootprints,
   strikePath,
   strikePower,
 } from '../stadium-environment-mesh.js';
+import { jungleSpots } from '../stadium-env-forest-layout.mjs';
+import { SCREEN_VIEWS, geometryOnCard, screenView } from './stadium-screen.mjs';
 
 // The no-mat profile the board draws by default, at the board width board3d.js lays out beside the
 // sidebox (0.755 of 1920).
@@ -129,6 +137,49 @@ test('plateScale: CSS-pixel size at most, never more than PLATE_MAX_PIXELS', () 
     assert.ok(scale <= 1 / ratio + 1e-9 && width * height * scale * scale <= PLATE_MAX_PIXELS + 1);
   }
   assert.equal(plateScale(0, 0, 0), 1, 'a zero canvas does not divide by zero');
+});
+
+test('the plate is mipmapped and laid through the tilt-shift, the under plate of a swap alike (design 082)', async () => {
+  const three = await import('../../../vendor/three/three.module.min.js');
+  let target = null;
+  const scenes = [];
+  const renderer = {
+    extensions: { has: () => true },
+    compile: () => {},
+    shadowMap: { autoUpdate: true },
+    getRenderTarget: () => target,
+    setRenderTarget: (next) => {
+      target = next;
+    },
+    render: (scene) => scenes.push({ scene, target }),
+    getPixelRatio: () => 1,
+    getDrawingBufferSize: (out) => out.set(1920, 1080),
+  };
+  const environment = createStadiumEnvironment({ three, renderer, parent: new three.Group(), isHidden: () => true });
+  const camera = new three.PerspectiveCamera();
+  environment.setLayout(layout);
+  environment.setKey('perilous-jungle');
+  environment.update(1000, camera);
+  environment.update(3000 + INTRO_MS + 400, camera);
+  const world = new three.Scene();
+  environment.drawPlate(world, camera);
+  const plate = scenes.find((drawn) => drawn.scene === world)?.target;
+  assert.ok(plate, 'the plate is drawn into a target');
+  assert.equal(plate.texture.generateMipmaps, true);
+  assert.equal(plate.texture.minFilter, three.LinearMipmapLinearFilter, 'its taps read the mip chain');
+  const laid = scenes.at(-1).scene.children[0].material;
+  assert.equal(scenes.at(-1).target, null, 'laid on the canvas');
+  assert.match(laid.fragmentShader, /vec4 top = tiltShift\(uPlate, vUv\);/);
+  assert.match(laid.fragmentShader, /vec4 under = tiltShift\(uUnder, vUv\);/);
+  assert.match(laid.fragmentShader, /textureLod\(plate, uv \+ offset \* texel, lod\)/);
+  assert.deepEqual(laid.uniforms.uTiltShift.value.toArray(), [TILT_SHIFT.centre, TILT_SHIFT.band, TILT_SHIFT.edge]);
+  assert.ok(TILT_SHIFT.band > 0 && TILT_SHIFT.band < 0.5 && TILT_SHIFT.edge > 0, 'a sharp band through the middle, soft past it');
+  // The glow reads the plate's coarse mip, only past its threshold, and only where the plate is.
+  assert.match(laid.fragmentShader, /top\.rgb \+= bloom\(uPlate, vUv\) \* top\.a;/);
+  assert.match(laid.fragmentShader, /under\.rgb \+= bloom\(uUnder, vUv\) \* under\.a;/);
+  assert.deepEqual(laid.uniforms.uBloom.value.toArray(), [BLOOM.threshold, BLOOM.strength, BLOOM.level]);
+  assert.ok(BLOOM.threshold > 0.5 && BLOOM.strength < 0.5, 'a soft glow on the brightest parts only');
+  environment.dispose();
 });
 
 test('drawPlate redraws the plate only when it is stale: a time step, a camera, a canvas size', async () => {
@@ -271,43 +322,6 @@ test('createStadiumEnvironment compiles with compileAsync when it can: the mat s
   assert.ok(reveal.value > 0.5 && reveal.value < 1, `halfway through the reveal at ${reveal.value}`);
   assert.equal(syncCompiles, 0, 'never compiled on the main thread');
   environment.dispose();
-});
-
-// A board's own beforeRender draws its palms' shadows each frame; its dispose frees the target (Surfing Beach).
-test('a board with a beforeRender hook draws it each frame and disposes what it owns', async () => {
-  const three = await import('../../../vendor/three/three.module.min.js');
-  const drawn = [];
-  let target = null;
-  const renderer = {
-    extensions: { has: () => true },
-    compile: () => {},
-    getRenderTarget: () => target,
-    setRenderTarget: (next) => {
-      target = next;
-    },
-    getClearColor: (colour) => colour,
-    getClearAlpha: () => 1,
-    setClearColor: () => {},
-    clear: () => {},
-    render: () => drawn.push(target),
-    getDrawingBufferSize: (size) => size.set(1920, 1080),
-  };
-  const environment = createStadiumEnvironment({ three, renderer, parent: new three.Group(), isHidden: () => true });
-  const camera = new three.PerspectiveCamera();
-  environment.setLayout(layout);
-  environment.setKey('surfing-beach');
-  environment.update(1000, camera);
-  const before = drawn.length;
-  environment.update(3000, camera);
-  const shadowPasses = drawn.slice(before).filter((drawnTarget) => drawnTarget?.texture);
-  assert.equal(shadowPasses.length, 1, 'the palm shadows are drawn once a frame');
-  assert.equal(target, null, 'the previous render target is restored');
-  let disposed = 0;
-  shadowPasses[0].addEventListener('dispose', () => {
-    disposed += 1;
-  });
-  environment.dispose();
-  assert.equal(disposed, 1, 'the shadow target is freed with the environment');
 });
 
 /**
@@ -608,5 +622,65 @@ test('reduced motion: play settles at once and holds nothing', async () => {
   environment.setTarget(null);
   assert.equal(environment.play(), 0);
   assert.equal(environment.active(), false);
+  environment.dispose();
+});
+
+test('no Perilous Jungle tree covers a card on screen, in either camera preset', () => {
+  for (const view of SCREEN_VIEWS) {
+    const { layout, projectors } = screenView(view);
+    const geometries = [jungleTreeProps(jungleSpots(layout).trees)].map((props) => props.build(three));
+    for (const { preset, project } of projectors) {
+      for (const geometry of geometries) {
+        const hit = geometryOnCard(geometry, layout, project);
+        assert.equal(hit, null, `${view.profile} ${view.viewport.w}x${view.viewport.h} ${preset}: ${hit}`);
+      }
+    }
+  }
+});
+
+test('boardLighting: a board\'s own sun (unit) and its kit\'s shadow; the shared sun and a day shadow without them', () => {
+  const shared = new three.Vector3(0, 0, 1);
+  const own = { uniforms: { uSun: { value: new three.Vector3(0, 3, 4) } } };
+  const kit = { uniforms: { uSun: { value: shared }, uKitShadow: { value: new three.Vector4(0.3, 0.4, 0.5, 0.6) } } };
+  const lit = boardLighting([{ uniforms: {} }, kit, own], shared);
+  assert.deepEqual(lit.sun.map((v) => +v.toFixed(6)), [0, 0.6, 0.8]);
+  assert.deepEqual(lit.shadow.map((v) => +v.toFixed(6)), [0.3, 0.4, 0.5, 0.6]);
+  const bare = boardLighting([{ uniforms: { uSun: { value: shared } } }], shared);
+  assert.deepEqual(bare.sun, [0, 0, 1]);
+  assert.deepEqual(bare.shadow, [...DEFAULT_GROUND_SHADOW]);
+  assert.deepEqual(boardLighting(null, shared).sun, [0, 0, 1]);
+});
+
+test('lighting(): the shown board\'s sun and kit shadow, null while none shows (the cards\' ground shadows)', async () => {
+  const three = await import('../../../vendor/three/three.module.min.js');
+  const { VITALITY_SUN } = await import('../stadium-env-vitality.mjs');
+  const { MOODS } = await import('../stadium-kit.mjs');
+  let target = null;
+  const renderer = {
+    extensions: { has: () => true },
+    compile: () => {},
+    shadowMap: { autoUpdate: true },
+    getRenderTarget: () => target,
+    setRenderTarget: (next) => {
+      target = next;
+    },
+    render: () => {},
+    getPixelRatio: () => 1,
+    getDrawingBufferSize: (out) => out.set(1920, 1080),
+  };
+  const environment = createStadiumEnvironment({ three, renderer, parent: new three.Group(), isHidden: () => true });
+  assert.equal(environment.lighting(), null, 'no board yet');
+  environment.setLayout(layout);
+  environment.setKey('forest-of-vitality');
+  environment.update(1000, new three.PerspectiveCamera());
+  const lit = environment.lighting();
+  const length = Math.hypot(...VITALITY_SUN);
+  assert.deepEqual(lit.sun.map((v) => +v.toFixed(5)), VITALITY_SUN.map((v) => +(v / length).toFixed(5)));
+  assert.deepEqual(lit.shadow.map((v) => +v.toFixed(5)), MOODS.day.shadow.map((v) => +v.toFixed(5)));
+  environment.setKey(null);
+  environment.update(9000, new three.PerspectiveCamera());
+  assert.ok(environment.lighting(), 'the board still shows as it sinks away');
+  environment.update(9000 + EXIT_MS + 500, new three.PerspectiveCamera());
+  assert.equal(environment.lighting(), null, 'gone once its exit ends');
   environment.dispose();
 });

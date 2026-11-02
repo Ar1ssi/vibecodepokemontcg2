@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import * as three from 'three';
 import { flatLayout } from '../board-layout.mjs';
 import { getMatLayout } from '../../sizing/mat-layouts.mjs';
 import { NO_MAT_LAYOUT_ID } from '../../sizing/mat-spec.mjs';
@@ -9,7 +10,6 @@ import {
   LEVINCIA_KEY,
   MAX_BILLBOARDS,
   MAX_TOWERS,
-  PROP_FRAGMENT,
   STAGE_MARGIN_PX,
   TERRAIN_FRAGMENT,
   TERRAIN_VERTEX,
@@ -19,7 +19,7 @@ import {
   levinciaProps,
   levinciaSpots,
 } from '../stadium-env-levincia.mjs';
-import { SCREEN_VIEWS, pointOnCard, screenView } from './stadium-screen.mjs';
+import { SCREEN_VIEWS, geometryOnCard, screenView } from './stadium-screen.mjs';
 
 const PROFILES = [NO_MAT_LAYOUT_ID, 'sim', 'one-player', 'two-player', 'edge-to-edge-two-player'];
 const HALVES = [
@@ -62,21 +62,9 @@ test('levinciaSpots: billboards only off the near arc, towers past the walkway',
 test('no billboard or tower covers a card on screen, in either camera preset', () => {
   for (const view of SCREEN_VIEWS) {
     const { layout, projectors } = screenView(view);
-    const { billboards, towers } = levinciaSpots(layout);
-    const points = [
-      ...billboards.flatMap((board) => {
-        const out = [Math.cos(board.angle), Math.sin(board.angle)];
-        const along = [-out[1], out[0]];
-        const top = [board.x + out[0] * Math.sin(0.7) * board.height, board.y + out[1] * Math.sin(0.7) * board.height, WALKWAY.height + board.height];
-        return [-1, 1].flatMap((s) => [
-          [board.x + along[0] * s * board.width * 0.5, board.y + along[1] * s * board.width * 0.5, WALKWAY.height],
-          [top[0] + along[0] * s * board.width * 0.5, top[1] + along[1] * s * board.width * 0.5, top[2]],
-        ]);
-      }),
-      ...towers.flatMap((t) => [[t.x - t.r, t.y, t.h], [t.x + t.r, t.y, t.h], [t.x, t.y - t.r, t.h], [t.x, t.y + t.r, t.h]]),
-    ];
+    const geometry = levinciaProps(levinciaSpots(layout)).build(three);
     for (const { preset, project } of projectors) {
-      const hit = pointOnCard(points, layout, project);
+      const hit = geometryOnCard(geometry, layout, project);
       assert.equal(hit, null, `${view.profile} ${view.viewport.w}x${view.viewport.h} ${preset}: ${hit}`);
     }
   }
@@ -89,7 +77,7 @@ test('levinciaSpots is null without a layout; the props build', () => {
 
 test('Levincia shaders declare no GLSL ES 3.00 reserved word and every one has a main', () => {
   const reserved = /\b(?:float|vec[234]|int|bool)\s+(?:flat|half|smooth|noperspective|sample|patch|input|output|filter|active|common|fixed|long|short|out|in|inout|round)\b/;
-  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_VERTEX, TERRAIN_FRAGMENT, WATER_VERTEX, WATER_FRAGMENT, PROP_FRAGMENT]) {
+  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_VERTEX, TERRAIN_FRAGMENT, WATER_VERTEX, WATER_FRAGMENT]) {
     assert.doesNotMatch(shader, reserved);
     assert.match(shader, /void main\(\)/);
   }

@@ -7,13 +7,13 @@ import { NO_MAT_LAYOUT_ID } from '../../sizing/mat-spec.mjs';
 import { environmentKeyFor } from '../stadium-environment-layout.mjs';
 import {
   BAKE_FIELD_FRAGMENT,
+  FAIRY_GROUND_CEILING_PX,
   FAIRY_KEY,
   MAX_LEAVES,
   MAX_ORBS,
   MAX_TREES,
   ORB_FRAGMENT,
   ORB_VERTEX,
-  PROP_FRAGMENT,
   SPARKLE_FRAGMENT,
   SPARKLE_VERTEX,
   TERRAIN_FRAGMENT,
@@ -21,7 +21,7 @@ import {
   fairyProps,
   fairySpots,
 } from '../stadium-env-fairy.mjs';
-import { SCREEN_VIEWS, pointOnCard, screenView } from './stadium-screen.mjs';
+import { SCREEN_VIEWS, geometryOnCard, screenView } from './stadium-screen.mjs';
 
 const PROFILES = [NO_MAT_LAYOUT_ID, 'sim', 'one-player', 'two-player', 'edge-to-edge-two-player'];
 const HALVES = [
@@ -48,23 +48,12 @@ test('fairySpots: the ring between the Actives, trees, orbs and leaves clear of 
   }
 });
 
-test('no tree crown, orb or leaf covers a card on screen, in either camera preset', () => {
+test('no tree crown, orb, leaf or clump covers a card on screen, in either camera preset, risen on the swells', () => {
   for (const view of SCREEN_VIEWS) {
     const { layout, projectors } = screenView(view);
-    const { trees, orbs, leaves } = fairySpots(layout);
-    const points = [
-      ...trees.flatMap((t) => [
-        [t.x, t.y, t.h + t.r],
-        [t.x - t.r, t.y, t.h],
-        [t.x + t.r, t.y, t.h],
-        [t.x, t.y - t.r, t.h],
-        [t.x, t.y + t.r, t.h],
-      ]),
-      ...orbs.flatMap((o) => [[o.x, o.y, o.z], [o.x - o.r * 4, o.y, o.z], [o.x + o.r * 4, o.y, o.z]]),
-      ...leaves.flatMap((l) => [[l.x, l.y, 12], [l.x + Math.cos(l.yaw) * l.len, l.y + Math.sin(l.yaw) * l.len, 8]]),
-    ];
+    const geometry = fairyProps(fairySpots(layout)).build(three);
     for (const { preset, project } of projectors) {
-      const hit = pointOnCard(points, layout, project);
+      const hit = geometryOnCard(geometry, layout, project, { ground: () => [0, FAIRY_GROUND_CEILING_PX] });
       assert.equal(hit, null, `${view.profile} ${view.viewport.w}x${view.viewport.h} ${preset}: ${hit}`);
     }
   }
@@ -79,8 +68,16 @@ test('fairySpots is null without a layout; the props build', () => {
 
 test('Fairy Garden shaders declare no GLSL ES 3.00 reserved word and every one has a main', () => {
   const reserved = /\b(?:float|vec[234]|int|bool)\s+(?:flat|half|smooth|noperspective|sample|patch|input|output|filter|active|common|fixed|long|short|out|in|inout|round)\b/;
-  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_VERTEX, TERRAIN_FRAGMENT, PROP_FRAGMENT, ORB_VERTEX, ORB_FRAGMENT, SPARKLE_VERTEX, SPARKLE_FRAGMENT]) {
+  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_VERTEX, TERRAIN_FRAGMENT, ORB_VERTEX, ORB_FRAGMENT, SPARKLE_VERTEX, SPARKLE_FRAGMENT]) {
     assert.doesNotMatch(shader, reserved);
     assert.match(shader, /void main\(\)/);
   }
+});
+
+test('the undergrowth gathers in clumps of mixed kinds; the swells stay under the ceiling (design 083)', () => {
+  const spots = fairySpots(flatLayout(getMatLayout(NO_MAT_LAYOUT_ID), { w: 1449.6, h: 540 }));
+  assert.ok(spots.pieces.length >= 6 && spots.pieces.length <= 30, `${spots.pieces.length} pieces`);
+  assert.ok(new Set(spots.pieces.map((piece) => piece.asset)).size >= 2);
+  assert.match(BAKE_FIELD_FRAGMENT, /away \* \(2\.0 \+ 9\.0 \* fbm3\(p \/ 190\.0 \+ 5\.0\)\)/);
+  assert.ok(0.2 + 2 + 9 <= FAIRY_GROUND_CEILING_PX);
 });

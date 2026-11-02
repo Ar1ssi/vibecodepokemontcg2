@@ -8,25 +8,24 @@ import { environmentFootprints, environmentKeyFor } from '../stadium-environment
 import { tableBounds } from '../table-uv.mjs';
 import {
   BAKE_FIELD_FRAGMENT,
+  BUSH_CARD_GAP_PX,
   MAX_LIMBS,
   MAX_PADS,
   MOTE_FRAGMENT,
   MOTE_VERTEX,
-  PROP_FRAGMENT,
-  PUFF_FRAGMENT,
-  PUFF_VERTEX,
+  PLANT_CARD_GAP_PX,
   TERRAIN_FRAGMENT,
   TERRAIN_VERTEX,
   TREE_CARD_GAP_PX,
+  VITALITY_GROUND_CEILING_PX,
   VITALITY_KEY,
   VITALITY_SUN,
-  boughProps,
   clearingDistance,
-  puffGeometry,
-  trunkGeometry,
+  trunkGrid,
+  vitalityProps,
   vitalitySpots,
 } from '../stadium-env-vitality.mjs';
-import { SCREEN_VIEWS, pointOnCard, screenView } from './stadium-screen.mjs';
+import { SCREEN_VIEWS, geometryOnCard, pointOnCard, screenView } from './stadium-screen.mjs';
 
 // Every mat profile at the board width board3d.js lays out beside the sidebox (0.755 of 1920) and at
 // full width.
@@ -74,17 +73,29 @@ test('vitalitySpots: the crown is broad, every pad clear of every card seen from
   }
 });
 
-test('vitalitySpots: bushes stand off the meadow and off every card, clear of the tree', () => {
+test('vitalitySpots: bushes stand off the meadow and off every card and the hand, clear of the tree', () => {
   for (const layout of layouts) {
-    const { bushes, core, tree } = vitalitySpots(layout);
-    assert.ok(bushes.length > 50);
+    const { bushes, core, tree, hand } = vitalitySpots(layout);
+    assert.ok(bushes.length > 40);
+    const obstacles = hand ? [...cardsOf(layout), hand] : cardsOf(layout);
     for (const bush of bushes) {
       assert.ok(clearingDistance(core, bush.x, bush.y) >= -bush.r * 0.3 - 1e-9);
       assert.ok(Math.hypot(bush.x - tree.x, bush.y - tree.y) >= tree.reach);
-      for (const puff of bush.puffs) {
-        for (const card of cardsOf(layout)) assert.ok(distanceToRect(puff.x, puff.y, card) >= puff.r);
-      }
+      for (const rect of obstacles) assert.ok(distanceToRect(bush.x, bush.y, rect) >= bush.reach + BUSH_CARD_GAP_PX - 1e-6);
     }
+  }
+});
+
+test('vitalitySpots: tall grass on the meadow edge, flowers and toadstools, each clear of every card and the hand', () => {
+  for (const layout of layouts) {
+    const { grass, flowers, mushrooms, core, hand } = vitalitySpots(layout);
+    assert.ok(grass.length > 6, `${grass.length} tall grass patches`);
+    assert.ok(flowers.length > 3, `${flowers.length} flower clumps`);
+    const obstacles = hand ? [...cardsOf(layout), hand] : cardsOf(layout);
+    for (const plant of [...grass, ...flowers, ...mushrooms]) {
+      for (const rect of obstacles) assert.ok(distanceToRect(plant.x, plant.y, rect) >= plant.reach + PLANT_CARD_GAP_PX - 1e-6);
+    }
+    for (const patch of grass) assert.ok(clearingDistance(core, patch.x, patch.y) > 0, 'tall grass grows outside the meadow');
   }
 });
 
@@ -145,20 +156,47 @@ test('vitalitySpots is null without a layout', () => {
   assert.equal(vitalitySpots({}), null);
 });
 
-test('the tree, its boughs and every puff build into geometry', () => {
-  const spots = vitalitySpots(layouts[0]);
-  const trunk = trunkGeometry(three, spots.tree);
-  assert.ok(trunk.getAttribute('position').count > 500);
-  assert.equal(trunk.getAttribute('aColor').itemSize, 4);
-  assert.ok(boughProps(spots.tree).vertexCount() > 0);
-  const puffs = puffGeometry(three, spots);
-  assert.equal(puffs.instanceCount, spots.tree.pads.length + spots.bushes.reduce((sum, bush) => sum + bush.puffs.length, 0));
+test('every kit solid builds, and none lands on a card on screen in either camera preset, risen on the swells (design 083)', () => {
+  for (const view of SCREEN_VIEWS) {
+    const { layout, projectors } = screenView(view);
+    const geometry = vitalityProps(vitalitySpots(layout)).build(three);
+    assert.ok(geometry.getAttribute('position').count > 20000);
+    for (const { preset, project } of projectors) {
+      const hit = geometryOnCard(geometry, layout, project, { ground: () => [0, VITALITY_GROUND_CEILING_PX] });
+      assert.equal(hit, null, `${view.profile} ${view.viewport.w}x${view.viewport.h} ${preset}: ${hit}`);
+    }
+  }
+});
+
+test('trunkGrid: rings round the spine from the foot to the fork, each closed round itself', () => {
+  const { tree } = vitalitySpots(layouts[0]);
+  const grid = trunkGrid(tree);
+  assert.equal(grid.length, 31);
+  assert.ok(grid.every((row) => row.length === 40 && row.every((p) => p.every(Number.isFinite))));
+  const foot = grid[0].reduce((sum, p) => sum + p[2], 0) / 40;
+  const top = grid[30].reduce((sum, p) => sum + p[2], 0) / 40;
+  assert.ok(foot < 0 && Math.abs(top - tree.fork[2]) < 1e-6);
 });
 
 test('Forest of Vitality shaders declare no GLSL ES 3.00 reserved word and every one has a main', () => {
   const reserved = /\b(?:float|vec[234]|int|bool)\s+(?:flat|half|smooth|noperspective|sample|patch|input|output|filter|active|common|fixed|long|short|out|in|inout|round)\b/;
-  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_VERTEX, TERRAIN_FRAGMENT, PUFF_VERTEX, PUFF_FRAGMENT, PROP_FRAGMENT, MOTE_VERTEX, MOTE_FRAGMENT]) {
+  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_VERTEX, TERRAIN_FRAGMENT, MOTE_VERTEX, MOTE_FRAGMENT]) {
     assert.doesNotMatch(shader, reserved);
     assert.match(shader, /void main\(\)/);
   }
+});
+
+test('the ground ceiling the screen test bounds stays above the bake\'s swells (design 083)', () => {
+  // The bake's height past the meadow: a ±0.4 px ripple plus 4 + 12 px of fbm swell.
+  assert.match(BAKE_FIELD_FRAGMENT, /float h = 0\.8 \* \(fbm3\(p \/ 90\.0\) - 0\.5\) \+ outside \* \(4\.0 \+ 12\.0 \* fbm3\(p \/ 200\.0 \+ 7\.0\)\);/);
+  assert.ok(0.4 + 4 + 12 <= VITALITY_GROUND_CEILING_PX);
+});
+
+test('the thickets gather (some cells bare, some thick), in three greens, with broadleaves over the thickest (design 083)', () => {
+  const spots = vitalitySpots(layouts[0]);
+  const palettes = new Set(spots.bushes.map((bush) => bush.palette));
+  assert.ok(palettes.size >= 2, `bush greens ${[...palettes]}`);
+  assert.ok(spots.bushes.some((bush) => bush.tree), 'a broadleaf stands over a thicket');
+  assert.ok(spots.driftEmitters.length > 0 && spots.driftEmitters.length <= 12, 'leaves fall from the crown and the broadleaves');
+  for (const e of spots.driftEmitters) assert.ok([e.x, e.y, e.r, e.z].every(Number.isFinite) && e.z > 0);
 });

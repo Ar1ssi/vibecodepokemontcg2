@@ -25,10 +25,23 @@ import {
   TABLE_UNIFORMS,
   TERRAIN_GROUND,
   TERRAIN_UNIFORMS,
-  VORONOI,
 } from './stadium-environment-glsl.mjs';
 import { craterEmblem } from './stadium-environment-layout.mjs';
-import { PROP_VERTEX, createPropBuilder, propFragment } from './stadium-env-props.mjs';
+import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
+import { createKitProps } from './stadium-kit.mjs';
+import { placeAsset } from './stadium-kit-assets.mjs';
+
+/**
+ * The lobby's light for the kit (designs 081, 082): warm lamps from nearly overhead, a warm
+ * peach fill bounced off the cream floor and orange walls, soft contact shadows.
+ */
+export const LOBBY_MOOD = Object.freeze({
+  key: [0.9, 0.87, 0.82],
+  sky: [0.46, 0.42, 0.4],
+  bounce: [0.36, 0.3, 0.28],
+  sheen: [0.4, 0.65],
+  shadow: [0.66, 0.56, 0.54, 0.5],
+});
 import { disc, wallBand, windowRun } from './stadium-env-buildings.mjs';
 import { boardContext, hash } from './stadium-env-spots.mjs';
 import { BOX_SHADOW, EDGE_HAZE } from './stadium-env-surfaces.mjs';
@@ -85,12 +98,15 @@ export function centerSpots(layout) {
   const desks = [0.14, 0.27, 0.4].map((share) => ({ x: room.x1, y: at(share), w: 52 * u, d: 34 * u, h: 34 * u, dir: -1 }));
   const deskStools = desks.map((d) => ({ x: d.x - (d.d + 24 * u), y: d.y, color: 2 }));
   const bench = { x: room.x1, y0: at(0.68), y1: at(0.68) + 150 * u, depth: 34 * u, dir: -1 };
+  // Design 083: plants of more sizes, a pair by the bench, a big one by the entrance's end.
   const plants = [
     { x: room.x0 + 28 * u, y: at(0.35), r: 11 * u, seed: 1 },
-    { x: room.x0 + 28 * u, y: at(0.93), r: 12 * u, seed: 2 },
+    { x: room.x0 + 30 * u, y: at(0.93), r: 15 * u, seed: 2 },
+    { x: room.x0 + 24 * u, y: at(0.98), r: 9 * u, seed: 7 },
     { x: room.x1 - 28 * u, y: at(0.47), r: 11 * u, seed: 3 },
-    { x: room.x1 - 28 * u, y: at(0.62), r: 12 * u, seed: 4 },
-    { x: room.x1 - 28 * u, y: at(0.93), r: 12 * u, seed: 5 },
+    { x: room.x1 - 26 * u, y: at(0.61), r: 13 * u, seed: 4 },
+    { x: room.x1 - 30 * u, y: at(0.93), r: 16 * u, seed: 5 },
+    { x: room.x1 - 24 * u, y: at(0.88), r: 9 * u, seed: 8 },
   ];
   const columns = [-1, 1].map((side) => ({ x: side < 0 ? room.x0 + 36 * u : room.x1 - 36 * u, y: room.y0 + 48 * u, r: 24 * u, h: 190 * u }));
   const footprint = (s) => ({ x0: Math.min(s.x, s.x + s.dir * s.depth), x1: Math.max(s.x, s.x + s.dir * s.depth), y0: s.y0, y1: s.y1 });
@@ -296,10 +312,10 @@ void main() {
   vec3 sun = normalize(uSun);
   // Outside the walls: a cream sidewalk edged in a tan kerb, then dark asphalt.
   float past = sd - 16.0 * u;
-  vec3 col = ASPHALT * (0.9 + 0.2 * fbm3(p / 90.0)) * (0.95 + 0.1 * grain(p, 3.0));
+  vec3 col = ASPHALT * (0.9 + 0.2 * fbm3(p / 90.0));
   if (past > 0.0 && past < 44.0 * u) {
     vec2 slab = floor(p / (36.0 * u));
-    vec3 walk = WALK * (0.92 + 0.14 * hash12(slab)) * (0.96 + 0.08 * grain(p, 3.0));
+    vec3 walk = WALK * (0.92 + 0.14 * hash12(slab));
     col = mix(walk, KERB, 1.0 - smoothstep(0.5, 1.5, abs(past - 42.0 * u) - 2.0 * u));
   }
 
@@ -333,12 +349,11 @@ void main() {
         vec3 rug = mix(RUG_RED, RUG_DARK, smoothstep(0.35, 0.65, diamond));
         rug = mix(rug, RUG_CREAM, step(0.86, m) * step(m, 0.915));
         rug = mix(rug, RUG_DARK, step(0.94, m));
-        floorCol = rug * (0.94 + 0.12 * grain(p, 2.0));
+        floorCol = rug;
         jointD = 99.0;
       }
     }
     floorCol = mix(floorCol, JOINT, (1.0 - smoothstep(0.4, 1.3, jointD)) * mix(0.75, 0.42, calm));
-    floorCol *= 0.97 + 0.06 * grain(p, 5.0);
     col = floorCol;
 
     // The ceiling lamps' soft pools and the lamps' panels mirrored in the polished tiles.
@@ -396,9 +411,8 @@ const CHROME = [0.7, 0.74, 0.8, 0.3];
 const TABLE_GLASS = [0.55, 0.78, 0.86, 0.9];
 const POT_WHITE = [1.05, 1.05, 1.0, 0.1];
 const POT_TERRA = [0.7, 0.24, 0.14, 0];
-const FOLIAGE = [0.1, 0.3, 0.12, 0.05];
-const FOLIAGE_LIT = [0.22, 0.5, 0.2, 0.05];
-const SOIL = [0.13, 0.08, 0.06, 0];
+const FOLIAGE = [0.1, 0.3, 0.12, 0];
+const FOLIAGE_LIT = [0.22, 0.5, 0.2, 0];
 const SHELF_WHITE = [1.1, 1.08, 1.0, 0.1];
 const BOOKS = [[0.8, 0.12, 0.1, 0], [0.12, 0.34, 0.7, 0], [0.96, 0.72, 0.15, 0], [0.15, 0.5, 0.25, 0], [0.9, 0.9, 0.85, 0], [0.55, 0.2, 0.55, 0], [0.9, 0.4, 0.1, 0]];
 const MONITOR = [0.12, 0.13, 0.16, 0.3];
@@ -437,7 +451,7 @@ function roomWalls(props, spots) {
   const faces = innerFaces(room);
   const H = wallHeight;
   for (const wall of walls) {
-    props.box({ x: (wall.x0 + wall.x1) / 2, y: (wall.y0 + wall.y1) / 2, z0: -2, z1: H, hw: (wall.x1 - wall.x0) / 2, hh: (wall.y1 - wall.y0) / 2, color: WALL_ORANGE, topColor: RAIL_RED });
+    props.roundBox({ x: (wall.x0 + wall.x1) / 2, y: (wall.y0 + wall.y1) / 2, z0: -2, z1: H, hw: (wall.x1 - wall.x0) / 2, hh: (wall.y1 - wall.y0) / 2, color: WALL_ORANGE, topColor: RAIL_RED });
     const face = faces[wall.name];
     const length = Math.hypot(face.b[0] - face.a[0], face.b[1] - face.a[1]);
     const depth = 8 * u;
@@ -527,11 +541,12 @@ function receptionCounter(props, counter, u) {
   for (const end of [-1, 1]) {
     const [lx, ly] = point(end * 1.2, r - 18 * u, 0);
     props.cylinder({ x: lx, y: ly, z0: zt, z1: zt + 8 * u, r: 8 * u, color: SILVER, capColor: SILVER, sides: 14 });
-    props.sphere({ x: lx, y: ly, z: zt + 20 * u, r: 11 * u, color: LAMP_BALL, sides: 16, rings: 10 });
+    // Design 083: the counter's lamps pulse softly, out of step.
+    props.look({ kind: LOOK.blink, rate: 0.35, phase: end > 0 ? 0.5 : 0 }, () => props.sphere({ x: lx, y: ly, z: zt + 20 * u, r: 11 * u, color: LAMP_BALL, sides: 16, rings: 10 }));
   }
   // The healing machine: a white body, a silver tray with six balls on a lit pad, a monitor behind.
   const [mx, my] = point(0, r - 18 * u, 0);
-  props.box({ x: mx, y: my, z0: zt, z1: zt + 14 * u, hw: 15 * u, hh: 34 * u, color: COUNTER_BODY, topColor: SILVER });
+  props.roundBox({ x: mx, y: my, z0: zt, z1: zt + 14 * u, hw: 15 * u, hh: 34 * u, color: COUNTER_BODY, topColor: SILVER });
   props.quad([mx - 12 * u, my - 29 * u, zt + 14.4 * u], [mx + 12 * u, my - 29 * u, zt + 14.4 * u], [mx + 12 * u, my + 29 * u, zt + 14.4 * u], [mx - 12 * u, my + 29 * u, zt + 14.4 * u], GLOW_PAD);
   for (const dy of [-19, 0, 19]) {
     for (const dx of [-6.5, 6.5]) {
@@ -539,7 +554,7 @@ function receptionCounter(props, counter, u) {
       props.cylinder({ x: mx + dx * u, y: my + dy * u, z0: zt + 22.6 * u, z1: zt + 23.4 * u, r: 1.7 * u, color: BALL_WHITE, sides: 8 });
     }
   }
-  props.box({ x: mx - dir * 12 * u, y: my, z0: zt + 14 * u, z1: zt + 52 * u, hw: 2.2 * u, hh: 30 * u, color: MONITOR });
+  props.roundBox({ x: mx - dir * 12 * u, y: my, z0: zt + 14 * u, z1: zt + 52 * u, hw: 2.2 * u, hh: 30 * u, color: MONITOR });
   props.quad([mx - dir * 9.6 * u, my - 27 * u, zt + 20 * u], [mx - dir * 9.6 * u, my + 27 * u, zt + 20 * u], [mx - dir * 9.6 * u, my + 27 * u, zt + 48 * u], [mx - dir * 9.6 * u, my - 27 * u, zt + 48 * u], SCREEN);
 }
 
@@ -547,7 +562,7 @@ function receptionCounter(props, counter, u) {
 function sofa(props, s, u) {
   const at = (dx) => s.x + s.dir * dx;
   const length = s.y1 - s.y0;
-  const part = (dx0, dx1, y0, y1, z0, z1, color) => props.box({ x: at((dx0 + dx1) / 2), y: (y0 + y1) / 2, z0, z1, hw: Math.abs(dx1 - dx0) / 2, hh: (y1 - y0) / 2, color });
+  const part = (dx0, dx1, y0, y1, z0, z1, color) => props.roundBox({ x: at((dx0 + dx1) / 2), y: (y0 + y1) / 2, z0, z1, hw: Math.abs(dx1 - dx0) / 2, hh: (y1 - y0) / 2, color });
   const D = s.depth;
   part(0, D, s.y0, s.y1, 3 * u, 20 * u, SOFA);
   part(0, 0.3 * D, s.y0, s.y1, 20 * u, 58 * u, SOFA);
@@ -565,26 +580,27 @@ function sofa(props, s, u) {
 
 /** A cushion stool: a square pad on four chrome legs. */
 function stool(props, s, u) {
-  props.box({ x: s.x, y: s.y, z0: 8 * u, z1: 16 * u, hw: 10 * u, hh: 10 * u, color: STOOLS[s.color % STOOLS.length] });
-  for (const [dx, dy] of [[-7, -7], [7, -7], [7, 7], [-7, 7]]) props.box({ x: s.x + dx * u, y: s.y + dy * u, z0: -1, z1: 8 * u, hw: 0.9 * u, hh: 0.9 * u, color: CHROME });
+  props.roundBox({ x: s.x, y: s.y, z0: 8 * u, z1: 16 * u, hw: 10 * u, hh: 10 * u, color: STOOLS[s.color % STOOLS.length] });
+  for (const [dx, dy] of [[-7, -7], [7, -7], [7, 7], [-7, 7]]) props.roundBox({ x: s.x + dx * u, y: s.y + dy * u, z0: -1, z1: 8 * u, hw: 0.9 * u, hh: 0.9 * u, color: CHROME });
 }
 
 /** A low glass table on a chrome frame. */
 function coffeeTable(props, t, u) {
-  props.box({ x: t.x, y: t.y, z0: 18 * u, z1: 20.5 * u, hw: t.w / 2, hh: t.d / 2, color: TABLE_GLASS });
-  props.box({ x: t.x, y: t.y, z0: 14 * u, z1: 17 * u, hw: t.w / 2 - 2 * u, hh: t.d / 2 - 2 * u, color: CHROME });
-  for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) props.box({ x: t.x + sx * (t.w / 2 - 3 * u), y: t.y + sy * (t.d / 2 - 3 * u), z0: -1, z1: 18 * u, hw: 1.1 * u, hh: 1.1 * u, color: CHROME });
+  props.roundBox({ x: t.x, y: t.y, z0: 18 * u, z1: 20.5 * u, hw: t.w / 2, hh: t.d / 2, color: TABLE_GLASS });
+  props.roundBox({ x: t.x, y: t.y, z0: 14 * u, z1: 17 * u, hw: t.w / 2 - 2 * u, hh: t.d / 2 - 2 * u, color: CHROME });
+  for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) props.roundBox({ x: t.x + sx * (t.w / 2 - 3 * u), y: t.y + sy * (t.d / 2 - 3 * u), z0: -1, z1: 18 * u, hw: 1.1 * u, hh: 1.1 * u, color: CHROME });
 }
 
-/** A potted plant: a pot, dark soil, a clump of leafy lobes. */
-function plant(props, p, u) {
+/** A potted plant (the kit's clipped ball of foliage in a pot), terracotta or white by turns. */
+function plant(props, p) {
   const terracotta = p.seed % 2 === 0;
-  props.cylinder({ x: p.x, y: p.y, z0: -2, z1: 20 * u, r: p.r, color: terracotta ? POT_TERRA : POT_WHITE, sides: 16, capColor: SOIL });
-  props.cylinder({ x: p.x, y: p.y, z0: 17 * u, z1: 22 * u, r: p.r * 1.12, color: terracotta ? POT_TERRA : POT_WHITE, sides: 16, capColor: SOIL });
-  props.tube([[p.x, p.y, 20 * u], [p.x, p.y, 38 * u]], 1.8 * u, [0.2, 0.12, 0.08, 0], { sides: 6 });
-  const lobes = [[0, 0, 44, 1], [-0.7, 0.3, 34, 0.75], [0.6, -0.4, 36, 0.75], [0.1, 0.7, 40, 0.65], [-0.2, -0.7, 38, 0.65], [0.3, 0.1, 56, 0.6]];
-  lobes.forEach(([dx, dy, z, s], k) => {
-    props.sphere({ x: p.x + dx * 15 * u, y: p.y + dy * 15 * u, z: z * u, r: 14 * u * s, color: k % 2 ? FOLIAGE_LIT : FOLIAGE, sides: 12, rings: 8, squash: 0.85 });
+  placeAsset(props, 'topiary', {
+    x: p.x,
+    y: p.y,
+    size: p.r * 1.25,
+    seed: p.seed * 13 + 1,
+    sun: CENTER_LIGHT,
+    colors: { leaf: FOLIAGE, leafLight: FOLIAGE_LIT, pot: terracotta ? POT_TERRA : POT_WHITE, stem: [0.2, 0.12, 0.08, 0] },
   });
 }
 
@@ -592,7 +608,7 @@ function plant(props, p, u) {
 function bookshelf(props, s, u) {
   const at = (dx) => s.x + s.dir * dx;
   const mid = (s.y0 + s.y1) / 2;
-  props.box({ x: at(s.depth / 2), y: mid, z0: -1, z1: s.h, hw: s.depth / 2, hh: (s.y1 - s.y0) / 2, color: SHELF_WHITE });
+  props.roundBox({ x: at(s.depth / 2), y: mid, z0: -1, z1: s.h, hw: s.depth / 2, hh: (s.y1 - s.y0) / 2, color: SHELF_WHITE });
   const length = s.y1 - s.y0;
   for (let row = 0; row < 3; row += 1) {
     const z0 = (6 + row * 26) * u;
@@ -612,20 +628,20 @@ function bookshelf(props, s, u) {
 /** A PC on its desk: a white desk with a silver top, a monitor with a lit blue screen, a keyboard. */
 function pcDesk(props, d, u) {
   const at = (dx) => d.x + d.dir * dx;
-  props.box({ x: at(d.d / 2), y: d.y, z0: -1, z1: d.h, hw: d.d / 2, hh: d.w / 2, color: SHELF_WHITE, topColor: SILVER });
-  props.box({ x: at(d.d * 0.7), y: d.y, z0: d.h, z1: d.h + 4 * u, hw: 6 * u, hh: 5 * u, color: MONITOR });
-  props.box({ x: at(d.d * 0.7), y: d.y, z0: d.h + 4 * u, z1: d.h + 28 * u, hw: 2.4 * u, hh: 17 * u, color: MONITOR });
+  props.roundBox({ x: at(d.d / 2), y: d.y, z0: -1, z1: d.h, hw: d.d / 2, hh: d.w / 2, color: SHELF_WHITE, topColor: SILVER });
+  props.roundBox({ x: at(d.d * 0.7), y: d.y, z0: d.h, z1: d.h + 4 * u, hw: 6 * u, hh: 5 * u, color: MONITOR });
+  props.roundBox({ x: at(d.d * 0.7), y: d.y, z0: d.h + 4 * u, z1: d.h + 28 * u, hw: 2.4 * u, hh: 17 * u, color: MONITOR });
   props.quad([at(d.d * 0.7 + 2.6 * u), d.y - 15 * u, d.h + 7 * u], [at(d.d * 0.7 + 2.6 * u), d.y + 15 * u, d.h + 7 * u], [at(d.d * 0.7 + 2.6 * u), d.y + 15 * u, d.h + 26 * u], [at(d.d * 0.7 + 2.6 * u), d.y - 15 * u, d.h + 26 * u], SCREEN);
-  props.box({ x: at(d.d * 0.28), y: d.y, z0: d.h, z1: d.h + 2 * u, hw: 6 * u, hh: 14 * u, color: COUNTER_BODY });
+  props.roundBox({ x: at(d.d * 0.28), y: d.y, z0: d.h, z1: d.h + 2 * u, hw: 6 * u, hh: 14 * u, color: COUNTER_BODY });
 }
 
 /** A long cushioned bench along a wall: a pale base, a blue cushion, a low back. */
 function bench(props, b, u) {
   const at = (dx) => b.x + b.dir * dx;
   const mid = (b.y0 + b.y1) / 2;
-  props.box({ x: at(b.depth / 2), y: mid, z0: 3 * u, z1: 14 * u, hw: b.depth / 2, hh: (b.y1 - b.y0) / 2, color: BENCH_BASE });
-  props.box({ x: at(b.depth * 0.54), y: mid, z0: 14 * u, z1: 23 * u, hw: b.depth * 0.46, hh: (b.y1 - b.y0) / 2 - 1.5 * u, color: BENCH_CUSHION });
-  props.box({ x: at(b.depth * 0.12), y: mid, z0: 14 * u, z1: 42 * u, hw: b.depth * 0.12, hh: (b.y1 - b.y0) / 2, color: BENCH_CUSHION });
+  props.roundBox({ x: at(b.depth / 2), y: mid, z0: 3 * u, z1: 14 * u, hw: b.depth / 2, hh: (b.y1 - b.y0) / 2, color: BENCH_BASE });
+  props.roundBox({ x: at(b.depth * 0.54), y: mid, z0: 14 * u, z1: 23 * u, hw: b.depth * 0.46, hh: (b.y1 - b.y0) / 2 - 1.5 * u, color: BENCH_CUSHION });
+  props.roundBox({ x: at(b.depth * 0.12), y: mid, z0: 14 * u, z1: 42 * u, hw: b.depth * 0.12, hh: (b.y1 - b.y0) / 2, color: BENCH_CUSHION });
 }
 
 /** A glass column lit from within: a pale glass drum between white rings, a glowing cap. */
@@ -670,48 +686,13 @@ export function centerProps(spots) {
   for (const s of shelves) bookshelf(props, s, u);
   for (const d of desks) pcDesk(props, d, u);
   bench(props, benchSpot, u);
-  for (const p of plants) plant(props, p, u);
   for (const c of columns) glassColumn(props, c, u);
+  for (const p of plants) plant(props, p);
   posters(props, spots);
   return props;
 }
 
-/** The props by the lobby's lamps: warm bounce from the floor and ceiling, a little key from above, glass mirroring the daylight, polished metal. */
-const PROP_LIGHT = /* glsl */ `
-${VORONOI}
-uniform float uUnit;
-vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
-  vec3 key = normalize(uSun);
-  vec3 view = normalize(uEye - world);
-  float lit = max(dot(n, key), 0.0);
-  vec3 bounce = vec3(0.82, 0.76, 0.7) * (0.85 + 0.15 * n.z);
-  vec3 col = albedo * (bounce + vec3(1.0, 0.95, 0.86) * lit * 0.26);
-  if (metal > 0.6) {
-    // Glass: the room's warm light and the bays' daylight, mirrored at a slant, the lamps' glint.
-    vec3 r = reflect(-view, n);
-    vec3 refl = mix(vec3(0.9, 0.8, 0.68), vec3(0.62, 0.8, 1.0), clamp(abs(r.x) * 0.9 + 0.1, 0.0, 1.0));
-    float fres = pow(1.0 - abs(dot(n, view)), 2.0);
-    col = mix(albedo * (0.7 + 0.5 * lit), refl * 0.85, 0.2 + 0.5 * fres);
-    col += vec3(1.0) * pow(max(dot(reflect(-key, n), view), 0.0), 60.0) * 0.5;
-  } else if (metal > 0.04 && metal < 0.06) {
-    vec2 q = world.xy / 12.0 + world.z / 10.0;
-    q += 0.35 * (vec2(gnoise(q * 1.7), gnoise(q * 1.7 + 9.1)) - 0.5);
-    vec4 lobe = voronoiCell(q);
-    float inLobe = 1.0 - smoothstep(0.34, 0.62, length(lobe.zw));
-    float bulge = dot(normalize(n + vec3(-lobe.zw, 0.0) * 0.6 * inLobe), key);
-    col = albedo * (0.5 + 0.8 * smoothstep(-0.1, 0.8, bulge)) * mix(0.82, 1.0, smoothstep(0.0, 0.2, lobe.x)) * (0.7 + 0.5 * n.z);
-    col *= 0.88 + 0.24 * gnoise(world.xy / 2.4 + world.z / 2.0);
-  } else if (metal > 0.25 && metal < 0.35) {
-    col += vec3(1.0, 0.97, 0.9) * pow(max(dot(reflect(-key, n), view), 0.0), 26.0) * 0.4;
-  } else if (metal > 0.15 && metal < 0.25) {
-    col += vec3(1.0, 0.97, 0.9) * pow(max(dot(reflect(-key, n), view), 0.0), 12.0) * 0.1;
-  }
-  col *= mix(0.76, 1.0, smoothstep(0.0, 14.0 * uUnit, world.z));
-  return col;
-}
-`;
 
-export const PROP_FRAGMENT = propFragment({ light: PROP_LIGHT, reveal: 'vec3(1.0, 0.95, 0.85)' });
 
 /** Pokemon Center's board (stadium-environment-mesh.js BOARDS). */
 export function pokemonCenterBoard({ three, material, terrainGrid, replaceGeometry, bakeOptions }) {
@@ -728,15 +709,14 @@ export function pokemonCenterBoard({ three, material, terrainGrid, replaceGeomet
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
   const materials = {
     terrain: make(TERRAIN_VERTEX, TERRAIN_FRAGMENT),
-    props: make(PROP_VERTEX, PROP_FRAGMENT, { side: three.DoubleSide }),
     bakeField: make(FULLSCREEN_VERTEX, BAKE_FIELD_FRAGMENT, bakeOptions),
     bakeLight: make(FULLSCREEN_VERTEX, BAKE_LIGHT_FRAGMENT, bakeOptions),
   };
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
-  const props = new three.Mesh(new three.BufferGeometry(), materials.props);
+  const kit = createKitProps({ three, material, own, mood: LOBBY_MOOD, reveal: 'vec3(1.0, 0.9, 0.75)' });
   return {
-    objects: [terrain, props],
-    materials: Object.values(materials),
+    objects: [terrain, ...kit.objects],
+    materials: [...Object.values(materials), ...kit.materials],
     bakeField: materials.bakeField,
     bakeLight: materials.bakeLight,
     spots: (layout) => centerSpots(layout),
@@ -756,8 +736,7 @@ export function pokemonCenterBoard({ three, material, terrainGrid, replaceGeomet
         return round ? slot.set(round.x, round.y, round.r, round.h) : slot.set(0, 0, 0, 0);
       });
       replaceGeometry(terrain, terrainGrid(bounds));
-      props.visible = Boolean(spots);
-      if (spots) replaceGeometry(props, centerProps(spots).build(three));
+      kit.set(spots ? centerProps(spots) : null);
     },
   };
 }

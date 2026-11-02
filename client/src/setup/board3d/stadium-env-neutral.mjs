@@ -18,12 +18,11 @@ import {
   OUTPUT,
   REVEAL,
   TABLE_UNIFORMS,
-  TERRAIN_GROUND,
   TERRAIN_UNIFORMS,
-  VORONOI,
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
-import { PROP_VERTEX, createPropBuilder, propFragment } from './stadium-env-props.mjs';
+import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
+import { createKitProps } from './stadium-kit.mjs';
 import { wallBand } from './stadium-env-buildings.mjs';
 import { boardContext, hash } from './stadium-env-spots.mjs';
 import { EDGE_HAZE, STANDARD_TERRAIN_VERTEX } from './stadium-env-surfaces.mjs';
@@ -46,7 +45,7 @@ const BEAM_SIDES = 14;
 export function neutralSpots(layout) {
   const ctx = boardContext(layout, NEUTRAL_KEY);
   if (!ctx) return null;
-  const { scene, table, cards, core, u, hand, centre } = ctx;
+  const { scene, cards, core, u, hand, centre } = ctx;
   const corners = cards.flatMap((r) => [[r.x, r.y], [r.x + r.w, r.y], [r.x, r.y + r.h], [r.x + r.w, r.y + r.h]]);
   const platform = Math.max(...corners.map(([x, y]) => Math.hypot(x - centre.x, y - centre.y))) + PLATFORM_MARGIN_PX * u;
   const handEnd = hand ? hand.y + hand.h : core.y + core.h;
@@ -68,7 +67,8 @@ export function neutralSpots(layout) {
     const x = centre.x + Math.cos(angle) * reach;
     const y = centre.y + Math.sin(angle) * reach;
     if (!ctx.inScene(x, y, 20 * u) || !ctx.clear(x, y, 14 * u, 14 * u)) continue;
-    beams.push({ x, y, r: 13 * u, h: 230 * u, phase: hash(k, 5, 1) * 6.28 });
+    // Design 083: each column its own height and girth.
+    beams.push({ x, y, r: (10 + 6 * hash(k, 5, 2)) * u, h: (170 + 110 * hash(k, 5, 3)) * u, phase: hash(k, 5, 1) * 6.28 });
   }
   // Screens floating over the far side, each a tilted green-lit panel facing the platform.
   const screens = [-0.52, 0.04, 0.5].map((share, k) => ({
@@ -106,7 +106,6 @@ export const TERRAIN_VERTEX = STANDARD_TERRAIN_VERTEX;
 const PALETTE = /* glsl */ `
 const vec3 FLOOR = vec3(0.17, 0.26, 0.46);
 const vec3 FLOOR_PALE = vec3(0.24, 0.35, 0.6);
-const vec3 FLOOR_DARK = vec3(0.1, 0.12, 0.23);
 const vec3 OUTER = vec3(0.075, 0.09, 0.18);
 const vec3 RING = vec3(0.6, 1.5, 2.3);
 const vec3 RING_WHITE = vec3(2.2, 3.0, 3.4);
@@ -116,7 +115,6 @@ const vec3 YELLOW = vec3(0.79, 0.79, 0.085);
 export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
-${VORONOI}
 ${REVEAL}
 ${EDGE_HAZE}
 ${PALETTE}
@@ -206,7 +204,7 @@ const GRATE = [0.04, 0.045, 0.08, 0];
 /** A wall: panelled blue boards, a dark grate band, a glowing cyan strip near the top, vertical ribs. */
 function wall(props, box, height, face, u) {
   const mid = [(box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2];
-  props.box({ x: mid[0], y: mid[1], z0: -2, z1: height, hw: (box.x1 - box.x0) / 2, hh: (box.y1 - box.y0) / 2, color: WALL, topColor: WALL_LIGHT });
+  props.roundBox({ x: mid[0], y: mid[1], z0: -2, z1: height, hw: (box.x1 - box.x0) / 2, hh: (box.y1 - box.y0) / 2, color: WALL, topColor: WALL_LIGHT });
   const a = face === 'right' ? [box.x1, box.y0] : face === 'left' ? [box.x0, box.y1] : [box.x0, box.y0];
   const b = face === 'right' ? [box.x1, box.y1] : face === 'left' ? [box.x0, box.y0] : [box.x1, box.y0];
   wallBand(props, { a, b, depth: 8 * u, z0: -2, z1: 18 * u, over: 4 * u, color: WALL_DARK });
@@ -221,7 +219,7 @@ function wall(props, box, height, face, u) {
   const count = Math.max(3, Math.round(length / (120 * u)));
   for (let k = 0; k <= count; k += 1) {
     const s = (length * k) / count;
-    props.box({ x: a[0] + along[0] * s + out[0] * 4 * u, y: a[1] + along[1] * s + out[1] * 4 * u, z0: 24 * u, z1: height - 24 * u, hw: 4 * u, hh: 4 * u, yaw: Math.atan2(along[1], along[0]), color: FRAME });
+    props.roundBox({ x: a[0] + along[0] * s + out[0] * 4 * u, y: a[1] + along[1] * s + out[1] * 4 * u, z0: 24 * u, z1: height - 24 * u, hw: 4 * u, hh: 4 * u, yaw: Math.atan2(along[1], along[0]), color: FRAME });
   }
 }
 
@@ -255,14 +253,35 @@ function screenPanel(props, s, u) {
   const line = Math.max(1.6 * u, r * 0.1);
   ring(cy, r - line, r, 1.4);
   ring(cy, r * 0.22, r * 0.22 + line, 1.4, 16);
+  // Design 083: a status light in the pane's corner blinks, each screen on its own beat.
+  props.look({ kind: LOOK.blink, rate: 0.6 + 0.4 * ((s.x * 0.01) % 1 + 1) % 1, phase: ((s.x * 0.0071) % 1 + 1) % 1 }, () => {
+    const lx = hw - 9 * u;
+    const ly = s.h - 9 * u;
+    props.quad(at(lx - 2.6 * u, ly - 2.6 * u, 1.6), at(lx + 2.6 * u, ly - 2.6 * u, 1.6), at(lx + 2.6 * u, ly + 2.6 * u, 1.6), at(lx - 2.6 * u, ly + 2.6 * u, 1.6), SCREEN_WHITE);
+  });
   props.quad(at(-r + line * 0.5, cy - line / 2, 1.4), at(-r * 0.22, cy - line / 2, 1.4), at(-r * 0.22, cy + line / 2, 1.4), at(-r + line * 0.5, cy + line / 2, 1.4), SCREEN_WHITE);
   props.quad(at(r * 0.22, cy - line / 2, 1.4), at(r - line * 0.5, cy - line / 2, 1.4), at(r - line * 0.5, cy + line / 2, 1.4), at(r * 0.22, cy + line / 2, 1.4), SCREEN_WHITE);
 }
 
 /** Everything solid, as one prop geometry. */
+/** The zone's light for the kit (designs 081, 082): a cool blue-white from the beams, a deep blue fill. */
+export const NEUTRAL_MOOD = Object.freeze({
+  key: [0.85, 0.92, 1.05],
+  sky: [0.3, 0.36, 0.5],
+  bounce: [0.16, 0.18, 0.26],
+  sheen: [0.35, 0.65],
+  shadow: [0.42, 0.46, 0.66, 0.5],
+});
+
 export function neutralProps(spots) {
-  const { walls, screens, beams, u } = spots;
   const props = createPropBuilder();
+  props.look({ kind: LOOK.chrome }, () => neutralSolids(props, spots));
+  return props;
+}
+
+/** The walls, the screens and the columns' glowing bases. */
+function neutralSolids(props, spots) {
+  const { walls, screens, beams, u } = spots;
   wall(props, walls.left, walls.height, 'right', u);
   wall(props, walls.right, walls.height, 'left', u);
   wall(props, walls.far, walls.height, 'near', u);
@@ -272,33 +291,9 @@ export function neutralProps(spots) {
     props.cylinder({ x: beam.x, y: beam.y, z0: -2, z1: 9 * u, r: beam.r * 1.35, color: FRAME, capColor: WALL_LIGHT, sides: 18 });
     props.cylinder({ x: beam.x, y: beam.y, z0: 9 * u, z1: 11 * u, r: beam.r * 1.05, color: STRIP, sides: 18 });
   }
-  return props;
 }
 
-/** The props under the hall's light: cool and even, a sheen on the panels, the strips and screens lit by themselves. */
-const PROP_LIGHT = /* glsl */ `
-vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
-  vec3 l = normalize(uSun);
-  vec3 view = normalize(uEye - world);
-  float lit = max(dot(n, l), 0.0);
-  vec3 col = albedo * (vec3(0.5, 0.6, 0.85) * (0.6 + 0.4 * n.z) + vec3(0.8, 0.9, 1.1) * lit * 0.6);
-  if (metal > 0.2 && metal < 0.4) {
-    col += vec3(0.5, 0.65, 0.9) * pow(max(dot(reflect(-l, n), view), 0.0), 18.0) * 0.4;
-    col *= 0.92 + 0.12 * gnoise(vec2((world.x + world.y) * 0.05, world.z / 14.0));
-  }
-  // A flat top: panels laid in rows, a seam between, a pale rail along the middle.
-  if (n.z > 0.97 && metal > 0.2 && metal < 0.4) {
-    float seam = min(fract(world.y / 70.0), 1.0 - fract(world.y / 70.0)) * 70.0;
-    col *= 1.0 - 0.3 * (1.0 - smoothstep(0.4, 1.4, seam));
-  }
-  // The grate's slats: dark bars across it.
-  col *= 1.0 - 0.35 * step(0.5, fract(world.z / 6.0)) * step(60.0, world.z) * step(world.z, 112.0) * step(albedo.b, 0.06);
-  col *= mix(0.8, 1.0, smoothstep(0.0, 30.0, world.z));
-  return col;
-}
-`;
 
-export const PROP_FRAGMENT = propFragment({ light: PROP_LIGHT, reveal: 'vec3(0.7, 0.95, 1.2)' });
 
 /** The columns of light: open cylinders, bright at their foot, fading up, a shimmer running up them. */
 export function beamGeometry(three, beams) {
@@ -371,18 +366,17 @@ export function neutralizationZoneBoard({ three, material, terrainGrid, replaceG
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
   const materials = {
     terrain: make(TERRAIN_VERTEX, TERRAIN_FRAGMENT),
-    props: make(PROP_VERTEX, PROP_FRAGMENT, { side: three.DoubleSide }),
     beams: make(BEAM_VERTEX, BEAM_FRAGMENT, { transparent: true, depthWrite: false, blending: three.AdditiveBlending, side: three.DoubleSide }),
     bakeField: make(FULLSCREEN_VERTEX, BAKE_FIELD_FRAGMENT, bakeOptions),
     bakeLight: make(FULLSCREEN_VERTEX, bakeLightFragment(), bakeOptions),
   };
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
-  const props = new three.Mesh(new three.BufferGeometry(), materials.props);
+  const kit = createKitProps({ three, material, own, mood: NEUTRAL_MOOD, reveal: 'vec3(0.7, 0.9, 1.1)' });
   const beams = new three.Mesh(new three.BufferGeometry(), materials.beams);
   beams.renderOrder = 2;
   return {
-    objects: [terrain, props, beams],
-    materials: Object.values(materials),
+    objects: [terrain, ...kit.objects, beams],
+    materials: [...Object.values(materials), ...kit.materials],
     bakeField: materials.bakeField,
     bakeLight: materials.bakeLight,
     spots: (layout) => neutralSpots(layout),
@@ -390,12 +384,9 @@ export function neutralizationZoneBoard({ three, material, terrainGrid, replaceG
       own.uUnit.value = spots?.u ?? 1;
       own.uPlatform.value.set(spots?.centre.x ?? 0, spots?.centre.y ?? 0, spots?.platform ?? 1e5);
       replaceGeometry(terrain, terrainGrid(bounds));
-      props.visible = Boolean(spots);
+      kit.set(spots ? neutralProps(spots) : null);
       beams.visible = Boolean(spots);
-      if (spots) {
-        replaceGeometry(props, neutralProps(spots).build(three));
-        replaceGeometry(beams, beamGeometry(three, spots.beams));
-      }
+      if (spots) replaceGeometry(beams, beamGeometry(three, spots.beams));
     },
   };
 }

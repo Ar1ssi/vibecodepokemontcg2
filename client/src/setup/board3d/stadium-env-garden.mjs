@@ -12,9 +12,12 @@
 // Bake, once per layout: BAKE_FIELD writes R height px, G px from the plaza's centre, B the stone's
 // tone 0..1, A the kind (-2 water, -1 pool curb, 0 plaza, 1 steps, 2 garden ground); the shared light
 // bake adds normals, occlusion and the moon's shadow. Per frame: TERRAIN paints the stone, the water,
-// the grass and every light (the pool's, the lanterns'); PROPS are the balustrade, the lanterns, the
-// urns, vases and pillars (stadium-env-props); BLOBS the hedges, broad leaves and flowers, one
-// instanced sphere each; FIREFLIES the motes drifting over the garden.
+// the grass and every light (the pool's, the lanterns'); the kit's meshes (design 081: the kit's light
+// with the pool's cyan and the lanterns' pink over it, contact shadows) the balustrade,
+// lanterns, urns, vases and pillars, and the kit's own hedges, ferns by the vases and pillars and
+// white flowers in the urns; FIREFLIES the motes drifting over the garden.
+// Design 082 (Brilliant Diamond / Shining Pearl): the flagstones crisp with a moonlit bevel and no
+// grain; the garden ground the ground kit's clover grass; no ink outlines.
 import {
   FILTERING,
   FOOTPRINTS,
@@ -25,12 +28,15 @@ import {
   TABLE_UNIFORMS,
   TERRAIN_GROUND,
   TERRAIN_UNIFORMS,
-  VORONOI,
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
 import { craterEmblem, environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
-import { PROP_VERTEX, createPropBuilder, propFragment } from './stadium-env-props.mjs';
+import { GRASS as GRASS_KIT } from './stadium-env-ground.mjs';
+import { createPropBuilder } from './stadium-env-props.mjs';
+import { createKitProps } from './stadium-kit.mjs';
+import { placeAsset } from './stadium-kit-assets.mjs';
 import { tableBounds } from './table-uv.mjs';
+import { patchy } from './stadium-env-spots.mjs';
 
 export const GARDEN_KEY = 'mystery-garden';
 /** The moon (toward it, table frame): high, from the far left. */
@@ -47,7 +53,6 @@ export const MAX_LANTERNS = 24;
 /** Least gap between any prop, seen from above, and a card or the opponent's hand. */
 export const PROP_CARD_GAP_PX = 14;
 /** Rings and segments of the instanced sphere every hedge, leaf and flower is drawn with. */
-export const BLOB_SEGMENTS = { rings: 12, around: 22 };
 const FIREFLY_COUNT = 45;
 
 /** A small deterministic 0..1 from three numbers. */
@@ -132,28 +137,32 @@ export function gardenSpots(layout) {
       const roll = (salt) => hash(gx, gy, salt);
       const x = gx + (roll(1) - 0.5) * step * 0.7;
       const y = gy + (roll(2) - 0.5) * step * 0.7;
-      const r = (24 + 20 * roll(3)) * u;
+      // Design 083: the hedges gather into thickets (patchy), bigger in their hearts, in three teals,
+      // some of the thickest in bloom.
+      const thick = patchy(x, y, { scale: 280 * u, salt: 91 });
+      const r = (24 + 20 * roll(3)) * u * (0.85 + 0.12 * Math.min(thick, 1.6));
       const out = Math.hypot(x - centre.x, y - centre.y);
-      if (out < ringR + 26 * u + r * 0.6 || !inScene(x, y, r * 0.4) || roll(4) > 0.85) continue;
+      if (out < ringR + 26 * u + r * 0.6 || !inScene(x, y, r * 0.4) || roll(4) > 0.72 * thick) continue;
       if (furniture.some((f) => Math.hypot(x - f.x, y - f.y) < f.keep + r * 0.7)) continue;
-      hedges.push({ x, y, z: ground + r * 0.5, r, seed: roll(5) });
+      const palette = Math.min(2, Math.floor(patchy(x, y, { scale: 420 * u, contrast: 0.6, salt: 93 }) * 1.66));
+      hedges.push({ x, y, z: ground + r * 0.5, r, seed: roll(5), palette, bloom: thick > 1.2 && roll(6) < 0.4 });
     }
   }
-  const leaves = [];
-  for (const spot of furniture) {
+  // A clump of broad leaves (the kit's fern) at the outer foot of each vase and pillar.
+  const ferns = furniture.map((spot, k) => {
     const turn = Math.atan2(spot.y - centre.y, spot.x - centre.x);
-    for (let k = 0; k < 7; k += 1) {
-      const yaw = turn + (k / 7 - 0.5) * 2.4 + (hash(spot.x, k, 9) - 0.5) * 0.3;
-      const length = (34 + 16 * hash(spot.y, k, 10)) * u;
-      const base = { x: spot.x + Math.cos(turn) * (spot.keep - 6 * u), y: spot.y + Math.sin(turn) * (spot.keep - 6 * u) };
-      leaves.push({ x: base.x + Math.cos(yaw) * length * 0.6, y: base.y + Math.sin(yaw) * length * 0.6, z: ground + 10 * u, length, yaw, seed: hash(spot.x, k, 11) });
-    }
-  }
+    return {
+      x: spot.x + Math.cos(turn) * (spot.keep - 6 * u),
+      y: spot.y + Math.sin(turn) * (spot.keep - 6 * u),
+      size: (38 + 12 * hash(spot.y, k, 10)) * u,
+      seed: hash(spot.x, k, 11),
+    };
+  });
   const lanterns = [
     ...posts.filter((post) => post.lantern).map((post) => ({ x: post.x, y: post.y, z: ground + (BALUSTRADE.height + 7 + 20) * u })),
     ...vases.map((vase) => ({ x: vase.x, y: vase.y, z: ground + vase.h + 26 * u + 20 * u })),
   ].slice(0, MAX_LANTERNS);
-  return { table, scene, u, centre, plaza, emblem, ground, ringR, posts, vases, pillars, hedges, leaves, lanterns, hand };
+  return { table, scene, u, centre, plaza, emblem, ground, ringR, posts, vases, pillars, hedges, ferns, lanterns, hand };
 }
 
 const GARDEN = /* glsl */ `
@@ -252,9 +261,7 @@ const vec3 PAVING = vec3(0.345, 0.263, 0.469);
 const vec3 PAVING_DARK = vec3(0.154, 0.12, 0.245);
 const vec3 STONE_PALE = vec3(0.469, 0.525, 0.72);
 const vec3 GRASS = vec3(0.058, 0.225, 0.139);
-const vec3 HEDGE = vec3(0.058, 0.26, 0.26);
 const vec3 HEDGE_DARK = vec3(0.028, 0.061, 0.093);
-const vec3 NIGHT = vec3(0.033, 0.053, 0.088);
 const vec3 POOL_CYAN = vec3(0.32, 1.15, 1.45);
 const vec3 LANTERN_GLOW = vec3(1.25, 0.82, 1.0);
 // The moonlit night: everything not lit by the pool or a lantern sinks toward its blue.
@@ -273,6 +280,7 @@ ${NOISE}
 ${FOOTPRINTS}
 ${FILTERING}
 ${REVEAL}
+${GRASS_KIT}
 ${PALETTE}
 ${GARDEN}
 varying vec2 vPos;
@@ -280,6 +288,7 @@ varying vec2 vUv;
 varying float vGrowth;
 void main() {
   vec2 p = vPos;
+  filterPixel = pixelSize(p);
   if (revealBurned(p) * exitKeep(p) < 0.5) discard;
   vec4 field = texture2D(uField, vUv);
   vec4 light = texture2D(uLight, vUv);
@@ -303,12 +312,11 @@ void main() {
   vec3 rose = vec3(0.4, 0.25, 0.33);
   vec3 col = mix(mix(slate, PAVING, smoothstep(0.0, 0.5, field.b)), rose, smoothstep(0.62, 1.0, field.b) * 0.85);
   col = mix(col, mix(slate, PAVING, 0.6), calm * 0.6);
-  col *= 0.9 + 0.14 * fbm3(p / 26.0);
-  col *= 1.0 + 0.12 * (1.0 - calm) * patternFade(pixelSize(p), 9.0)
-    * smoothstep(0.55, 0.8, gnoise(vec2(dot(p, vec2(0.8, 0.6)) / 38.0, dot(p, vec2(-0.6, 0.8)) / 9.0)));
-  col = mix(col, col * 1.2, (1.0 - smoothstep(1.2, 3.6, stone.x)) * smoothstep(0.5, 1.8, stone.x) * (1.0 - 0.7 * calm));
-  float joint = (1.0 - smoothstep(0.4, 1.7, stone.x)) * mix(1.0, 0.45, calm);
-  vec3 moss = vec3(0.05, 0.19, 0.14) * (0.85 + 0.3 * fbm3(p / 12.0));
+  // Design 082: each slab clean, its rounded shoulder catching the moon pale (BDSP's flagstones), its
+  // joint a crisp dark line, moss in the joints out past the cards.
+  col = mix(col, col * 1.2, (1.0 - smoothstep(1.0, 3.2, stone.x)) * smoothstep(0.4, 1.4, stone.x) * (1.0 - 0.6 * calm));
+  float joint = (1.0 - smoothstep(0.5, 1.3, stone.x)) * mix(1.0, 0.5, calm);
+  vec3 moss = vec3(0.05, 0.19, 0.14);
   col = mix(col, PAVING_DARK * 0.55, joint);
   col = mix(col, moss, joint * smoothstep(0.42, 0.68, fbm3(p / 34.0 + 7.0)) * 0.8 * (1.0 - calm));
   // The steps and the curb: the paler wall stone of the art's terrace.
@@ -321,8 +329,8 @@ void main() {
   pale *= 0.96 + 0.08 * fbm3(p / 14.0);
   col = mix(col, pale, step(0.5, kind) * step(kind, 1.5));
   col = mix(col, pale, step(-1.5, kind) * step(kind, -0.5));
-  // The garden ground: dark grass.
-  vec3 grass = mix(HEDGE_DARK, GRASS * 0.8, smoothstep(0.3, 0.7, fbm3(p / 55.0 + 4.0)));
+  // The garden ground: BDSP's clover grass, dark by night.
+  vec3 grass = cloverGrass(p, mix(HEDGE_DARK * 1.4, GRASS * 0.85, smoothstep(0.3, 0.7, fbm3(p / 55.0 + 4.0))), 0.0);
   col = mix(col, grass, step(1.5, kind));
   col = nightLight(col, moonlit) * mix(0.55, 1.0, smoothstep(0.3, 0.9, light.b));
 
@@ -378,17 +386,17 @@ const lathe = (props, x, y, profile, color) =>
 /** One iron lantern standing at (x, y) from z: a little hipped roof over four glowing panes. */
 const lantern = (props, x, y, z, u) => {
   const s = 1.3 * u;
-  props.box({ x, y, z0: z, z1: z + 4 * s, hw: 7 * s, hh: 7 * s, color: IRON });
-  props.box({ x, y, z0: z + 4 * s, z1: z + 22 * s, hw: 5.5 * s, hh: 5.5 * s, color: GLASS });
+  props.roundBox({ x, y, z0: z, z1: z + 4 * s, hw: 7 * s, hh: 7 * s, color: IRON });
+  props.roundBox({ x, y, z0: z + 4 * s, z1: z + 22 * s, hw: 5.5 * s, hh: 5.5 * s, color: GLASS });
   for (const [dx, dy] of [
     [-1, -1],
     [1, -1],
     [1, 1],
     [-1, 1],
   ]) {
-    props.box({ x: x + dx * 5.8 * s, y: y + dy * 5.8 * s, z0: z + 4 * s, z1: z + 22 * s, hw: 1.2 * s, hh: 1.2 * s, color: IRON });
+    props.roundBox({ x: x + dx * 5.8 * s, y: y + dy * 5.8 * s, z0: z + 4 * s, z1: z + 22 * s, hw: 1.2 * s, hh: 1.2 * s, color: IRON });
   }
-  props.box({ x, y, z0: z + 22 * s, z1: z + 25 * s, hw: 8.5 * s, hh: 8.5 * s, color: IRON });
+  props.roundBox({ x, y, z0: z + 22 * s, z1: z + 25 * s, hw: 8.5 * s, hh: 8.5 * s, color: IRON });
   const apex = [x, y, z + 34 * s];
   const c = [
     [x - 8.5 * s, y - 8.5 * s, z + 25 * s],
@@ -404,12 +412,39 @@ const lantern = (props, x, y, z, u) => {
 };
 
 /** The balustrade, its lanterns and flower urns, the vases and pillars: one prop geometry. */
-export function gardenProps({ posts, vases, pillars, ground, ringR, centre, u }) {
+export function gardenProps(spots) {
   const props = createPropBuilder();
+  gardenFurniture(props, spots);
+  const { hedges, ferns, posts, ground, u } = spots;
+  const kit = { sun: MOON };
+  for (const hedge of hedges) {
+    placeAsset(props, 'bush', { ...kit, x: hedge.x, y: hedge.y, z: ground, size: hedge.r * 0.9, seed: hedge.seed * 997, colors: GARDEN_HEDGES[hedge.palette] ?? GARDEN_HEDGE, berries: hedge.bloom ? BLOSSOM : null });
+  }
+  for (const fern of ferns) placeAsset(props, 'fern', { ...kit, x: fern.x, y: fern.y, z: ground, size: fern.size, seed: fern.seed * 991, colors: GARDEN_FERN });
+  // White flowers heaped in each urn on the balustrade.
+  const top = ground + (BALUSTRADE.height + 20) * u;
+  for (const post of posts.filter((each) => each.planter)) {
+    placeAsset(props, 'flowers', { ...kit, x: post.x, y: post.y, z: top, size: 7 * u, head: 4.5 * u, count: 5, seed: post.x, petals: ['#f4f2ff', '#ffffff'], shadows: false });
+  }
+  return props;
+}
+
+const GARDEN_HEDGE = Object.freeze({ leaf: [0.058, 0.26, 0.26, 0], leafLight: [0.1, 0.4, 0.38, 0] });
+// Design 083: the thickets in three teals (the second deeper, the third bluer) and their pale blossom.
+const GARDEN_HEDGES = Object.freeze([
+  GARDEN_HEDGE,
+  Object.freeze({ leaf: [0.04, 0.2, 0.21, 0], leafLight: [0.08, 0.32, 0.32, 0] }),
+  Object.freeze({ leaf: [0.07, 0.24, 0.32, 0], leafLight: [0.13, 0.38, 0.46, 0] }),
+]);
+const BLOSSOM = '#f2e6ff';
+const GARDEN_FERN = Object.freeze({ leaf: [0.07, 0.3, 0.28, 0], leafLight: [0.12, 0.42, 0.36, 0], heart: [0.03, 0.12, 0.13, 0] });
+
+/** The balustrade with its lanterns and urns, the vases and the pillars. */
+function gardenFurniture(props, { posts, vases, pillars, ground, ringR, centre, u }) {
   const height = BALUSTRADE.height * u;
   for (const post of posts) {
-    props.box({ x: post.x, y: post.y, z0: ground - 2, z1: ground + height + 4 * u, hw: 7 * u, hh: 7 * u, yaw: post.angle, color: STONE });
-    props.box({ x: post.x, y: post.y, z0: ground + height + 4 * u, z1: ground + height + 7 * u, hw: 9 * u, hh: 9 * u, yaw: post.angle, color: STONE });
+    props.roundBox({ x: post.x, y: post.y, z0: ground - 2, z1: ground + height + 4 * u, hw: 7 * u, hh: 7 * u, yaw: post.angle, color: STONE });
+    props.roundBox({ x: post.x, y: post.y, z0: ground + height + 4 * u, z1: ground + height + 7 * u, hw: 9 * u, hh: 9 * u, yaw: post.angle, color: STONE });
     if (post.lantern) lantern(props, post.x, post.y, ground + height + 7 * u, u);
     if (post.planter) {
       lathe(props, post.x, post.y, [
@@ -430,8 +465,8 @@ export function gardenProps({ posts, vases, pillars, ground, ringR, centre, u })
     const mid = { x: (post.x + next.x) / 2, y: (post.y + next.y) / 2 };
     const span = Math.hypot(next.x - post.x, next.y - post.y);
     const yaw = Math.atan2(next.y - post.y, next.x - post.x);
-    props.box({ x: mid.x, y: mid.y, z0: ground + height - 3 * u, z1: ground + height + 2 * u, hw: span / 2, hh: 5 * u, yaw, color: STONE });
-    props.box({ x: mid.x, y: mid.y, z0: ground - 2, z1: ground + 5 * u, hw: span / 2, hh: 5.5 * u, yaw, color: STONE });
+    props.roundBox({ x: mid.x, y: mid.y, z0: ground + height - 3 * u, z1: ground + height + 2 * u, hw: span / 2, hh: 5 * u, yaw, color: STONE });
+    props.roundBox({ x: mid.x, y: mid.y, z0: ground - 2, z1: ground + 5 * u, hw: span / 2, hh: 5.5 * u, yaw, color: STONE });
     const balusters = Math.max(2, Math.round(span / (13 * u)) - 1);
     for (let k = 1; k <= balusters; k += 1) {
       const f = k / (balusters + 1);
@@ -468,173 +503,25 @@ export function gardenProps({ posts, vases, pillars, ground, ringR, centre, u })
   for (const pillar of pillars) {
     const { x, y, r, h } = pillar;
     const turn = Math.atan2(y - centre.y, x - centre.x);
-    props.box({ x, y, z0: ground - 2, z1: ground + 14 * u, hw: r * 1.35, hh: r * 1.35, yaw: turn, color: PILLAR });
+    props.roundBox({ x, y, z0: ground - 2, z1: ground + 14 * u, hw: r * 1.35, hh: r * 1.35, yaw: turn, color: PILLAR });
     props.tube(
       Array.from({ length: 6 }, (_, k) => [x, y, ground + 14 * u + ((h - 30 * u) * k) / 5]),
       Array.from({ length: 6 }, (_, k) => r * (1 - 0.06 * (k / 5))),
       PILLAR,
       { sides: 16 }
     );
-    props.box({ x, y, z0: ground + h - 16 * u, z1: ground + h, hw: r * 1.25, hh: r * 1.25, yaw: turn, color: PILLAR });
+    props.roundBox({ x, y, z0: ground + h - 16 * u, z1: ground + h, hw: r * 1.25, hh: r * 1.25, yaw: turn, color: PILLAR });
   }
-  return props;
 }
 
-/** Every hedge, leaf and flower: per vertex the unit sphere, per instance centre, size, yaw and kind. */
-export function blobGeometry(three, { hedges, leaves, posts, ground, u }) {
-  const { rings, around } = BLOB_SEGMENTS;
-  const positions = [];
-  const index = [];
-  for (let ring = 0; ring <= rings; ring += 1) {
-    const latitude = -Math.PI / 2 + (Math.PI * ring) / rings;
-    for (let k = 0; k < around; k += 1) {
-      const longitude = (k / around) * 2 * Math.PI;
-      positions.push(Math.cos(latitude) * Math.cos(longitude), Math.cos(latitude) * Math.sin(longitude), Math.sin(latitude));
-    }
-  }
-  for (let ring = 0; ring < rings; ring += 1) {
-    for (let k = 0; k < around; k += 1) {
-      const a0 = ring * around + k;
-      const a1 = ring * around + ((k + 1) % around);
-      index.push(a0, a1, a0 + around, a1, a1 + around, a0 + around);
-    }
-  }
-  const blobs = [];
-  for (const hedge of hedges) blobs.push({ centre: [hedge.x, hedge.y, hedge.z], size: [hedge.r, hedge.r, hedge.r * 0.75], yaw: 0, kind: 0, seed: hedge.seed });
-  for (const leaf of leaves) {
-    blobs.push({ centre: [leaf.x, leaf.y, leaf.z], size: [leaf.length * 0.55, leaf.length * 0.16, leaf.length * 0.07], yaw: leaf.yaw, kind: 1, seed: leaf.seed });
-  }
-  // White flowers heaped in each urn on the balustrade.
-  const top = ground + (BALUSTRADE.height + 24) * u;
-  for (const post of posts.filter((each) => each.planter)) {
-    for (let k = 0; k < 6; k += 1) {
-      const angle = (k / 6) * 2 * Math.PI + hash(post.x, k, 3);
-      const out = k === 0 ? 0 : 6 * u;
-      blobs.push({
-        centre: [post.x + Math.cos(angle) * out, post.y + Math.sin(angle) * out, top + (k === 0 ? 3 * u : 0)],
-        size: [5 * u, 5 * u, 3.5 * u],
-        yaw: 0,
-        kind: 2,
-        seed: hash(post.y, k, 4),
-      });
-      blobs.push({
-        centre: [post.x + Math.cos(angle + 0.5) * 9 * u, post.y + Math.sin(angle + 0.5) * 9 * u, top - 3 * u],
-        size: [5 * u, 3 * u, 2 * u],
-        yaw: angle + 0.5,
-        kind: 1,
-        seed: hash(post.x, k, 5),
-      });
-    }
-  }
-  const geometry = new three.InstancedBufferGeometry();
-  geometry.setAttribute('position', new three.Float32BufferAttribute(positions, 3));
-  geometry.setIndex(index);
-  geometry.setAttribute('aCentre', new three.InstancedBufferAttribute(Float32Array.from(blobs.flatMap((b) => b.centre)), 3));
-  geometry.setAttribute('aSize', new three.InstancedBufferAttribute(Float32Array.from(blobs.flatMap((b) => b.size)), 3));
-  geometry.setAttribute('aShape', new three.InstancedBufferAttribute(Float32Array.from(blobs.flatMap((b) => [b.yaw, b.kind, b.seed])), 3));
-  geometry.instanceCount = blobs.length;
-  return geometry;
-}
-
-export const BLOB_VERTEX = /* glsl */ `
-${TERRAIN_UNIFORMS}
-${NOISE}
-${REVEAL}
-${TERRAIN_GROUND}
-attribute vec3 aCentre;
-attribute vec3 aSize;
-// yaw, kind (0 hedge, 1 leaf, 2 flower), seed.
-attribute vec3 aShape;
-varying vec3 vNormal;
-varying vec3 vPos;
-varying vec3 vSphere;
-varying vec2 vKind;
-void main() {
-  vec3 dir = position;
-  float seed = aShape.z;
-  float kind = aShape.y;
-  float lumps = kind < 0.5 ? sin(dir.x * 4.1 + seed * 20.0) * sin(dir.y * 3.7 + seed * 11.0) * sin(dir.z * 3.3 + 1.0) : 0.0;
-  vec3 local = dir * aSize * (1.0 + 0.12 * lumps);
-  // A leaf arches: its tip lower than its middle.
-  if (kind > 0.5 && kind < 1.5) local.z -= aSize.x * 0.25 * dir.x * dir.x;
-  float c = cos(aShape.x);
-  float s = sin(aShape.x);
-  local.xy = vec2(local.x * c - local.y * s, local.x * s + local.y * c);
-  local.xy += vec2(sin(uTime * 0.8 + seed * 20.0), cos(uTime * 0.7 + seed * 13.0)) * 0.5 * step(0.5, kind) * (dir.x + 1.0);
-  float growth = terrainGrowth(aCentre.xy);
-  vec3 pos = vec3(aCentre.xy, 0.0) + vec3(local.xy, local.z + aCentre.z) * vec3(1.0, 1.0, growth);
-  vec3 scaled = dir / max(aSize, vec3(0.5));
-  vNormal = normalize(vec3(scaled.x * c - scaled.y * s, scaled.x * s + scaled.y * c, scaled.z));
-  vPos = pos;
-  vSphere = dir;
-  vKind = vec2(kind, seed);
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-}
-`;
-
-/** Hedges and leaves in the art's night teals, lit cyan by the pool and pink by the lanterns; flowers white. */
-export const BLOB_FRAGMENT = /* glsl */ `
-${TERRAIN_UNIFORMS}
+/**
+ * The garden's own light on the kit's solids (design 081): the pool's cyan on what faces it, the
+ * lanterns' pink washing what stands near them.
+ */
+const GARDEN_GLOW = /* glsl */ `
 uniform vec4 uPlaza;
 uniform vec3 uLanterns[${MAX_LANTERNS}];
-${NOISE}
-${VORONOI}
-${REVEAL}
 ${PALETTE}
-float lanternNear(vec3 p) {
-  float light = 0.0;
-  for (int i = 0; i < ${MAX_LANTERNS}; i++) {
-    vec3 lantern = uLanterns[i];
-    if (lantern.z <= 0.0) continue;
-    vec3 d = (p - lantern) / 130.0;
-    light += exp(-dot(d, d) * 1.6);
-  }
-  return light;
-}
-varying vec3 vNormal;
-varying vec3 vPos;
-varying vec3 vSphere;
-varying vec2 vKind;
-void main() {
-  if (revealBurned(vPos.xy) * exitKeep(vPos.xy) < 0.5) discard;
-  vec3 n = normalize(gl_FrontFacing ? vNormal : -vNormal);
-  vec3 toEye = normalize(uEye - vPos);
-  float moonlit = max(dot(n, normalize(uSun)), 0.0);
-  float kind = vKind.x;
-  vec3 col;
-  if (kind < 0.5) {
-    // Clipped boxwood: a few broad clumps, their borders wandering, each bulging toward the moon
-    // (design 080: the small leaf scale read as speckle from above, so it only tints the lit tops).
-    vec2 q = vSphere.xy / (1.3 + vSphere.z) * 1.9 + vKind.y * 17.0;
-    q += 0.3 * (vec2(gnoise(q * 1.7), gnoise(q * 1.7 + 6.3)) - 0.5);
-    vec4 cluster = voronoiCell(q);
-    float inCluster = 1.0 - smoothstep(0.34, 0.6, length(cluster.zw));
-    vec4 leaf = voronoiCell(q * 3.3 + 2.1);
-    float inLeaf = 1.0 - smoothstep(0.3, 0.55, length(leaf.zw));
-    vec3 bulged = normalize(n - vec3(cluster.zw, 0.0) * 0.55 * inCluster - vec3(leaf.zw, 0.0) * 0.08 * inLeaf);
-    float lit = max(dot(bulged, normalize(uSun)), 0.0);
-    col = mix(HEDGE_DARK * 1.2, HEDGE * 1.2, smoothstep(0.05, 0.5, lit)) * mix(0.72, 1.0, inCluster);
-    col = mix(col, HEDGE * 1.7, smoothstep(0.6, 0.85, lit) * mix(0.6, 1.0, inLeaf) * 0.45);
-    col *= mix(0.78, 1.0, smoothstep(0.0, 0.2, cluster.x));
-  } else if (kind < 1.5) {
-    // A broad leaf: its midrib pale, darker toward its edges.
-    float rib = 1.0 - smoothstep(0.0, 0.18, abs(vSphere.y));
-    col = nightLight(mix(HEDGE * 0.9, HEDGE * 1.6, rib * 0.6), moonlit);
-  } else {
-    col = nightLight(vec3(0.9, 0.9, 0.96), moonlit) * 1.25;
-  }
-  float fromPool = max(distance(vPos.xy, uPlaza.xy) - uPlaza.w, 0.0);
-  col += POOL_CYAN * 0.1 * exp(-fromPool / 420.0) * (0.5 + 0.5 * max(dot(n, normalize(vec3(uPlaza.xy - vPos.xy, 60.0))), 0.0));
-  col += LANTERN_GLOW * 0.2 * lanternNear(vPos) * (0.5 + 0.5 * n.z);
-  float edgeOn = 1.0 - abs(dot(n, toEye));
-  col = mix(col, col * 0.5, smoothstep(0.7, 0.92, edgeOn));
-  gl_FragColor = vec4(col, 1.0);
-${OUTPUT}
-}
-`;
-
-/** The props' light: the moon and the night sky, a gloss on the vases and iron, the pool's cyan and the lanterns' pink. */
-const PROP_LIGHT = /* glsl */ `
 float lanternFall(vec3 p) {
   float light = 0.0;
   for (int i = 0; i < ${MAX_LANTERNS}; i++) {
@@ -645,24 +532,22 @@ float lanternFall(vec3 p) {
   }
   return light;
 }
-vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
-  vec3 moon = normalize(uSun);
-  vec3 col = nightLight(albedo, max(dot(n, moon), 0.0));
-  vec3 view = normalize(uEye - world);
-  col += vec3(0.5, 0.55, 0.75) * pow(max(dot(reflect(-moon, n), view), 0.0), 18.0) * metal * 0.5;
+vec3 kitGlow(vec3 albedo, vec3 n, vec3 world) {
   vec2 toPool = uPlaza.xy - world.xy;
   float fromPool = max(length(toPool) - uPlaza.w, 0.0);
-  col += albedo * POOL_CYAN * 0.35 * exp(-fromPool / 380.0) * max(dot(n, normalize(vec3(toPool, 40.0))), 0.0);
-  // The lantern's own light washes the iron nearest it pink, not only the paint on it.
-  col += albedo * LANTERN_GLOW * 0.7 * lanternFall(world) + LANTERN_GLOW * 0.16 * lanternFall(world) * (0.4 + 0.6 * max(n.z, 0.0));
-  return col;
+  vec3 col = albedo * POOL_CYAN * 0.35 * exp(-fromPool / 380.0) * max(dot(n, normalize(vec3(toPool, 40.0))), 0.0);
+  float near = lanternFall(world);
+  return col + albedo * LANTERN_GLOW * 0.7 * near + LANTERN_GLOW * 0.16 * near * (0.4 + 0.6 * max(n.z, 0.0));
 }
 `;
 
-export const PROP_FRAGMENT = propFragment({
-  light: PROP_LIGHT,
-  uniforms: `uniform vec4 uPlaza;\nuniform vec3 uLanterns[${MAX_LANTERNS}];\n${PALETTE}`,
-  reveal: 'vec3(0.55, 0.95, 1.1)',
+/** The garden by night for the kit: a cool violet moon, a blue-violet fill from the night sky. */
+export const GARDEN_NIGHT = Object.freeze({
+  key: [0.6, 0.64, 0.9],
+  sky: [0.17, 0.18, 0.32],
+  bounce: [0.07, 0.07, 0.12],
+  sheen: [0.35, 0.6],
+  shadow: [0.32, 0.32, 0.5, 0.55],
 });
 
 /** Fireflies: green-gold, pink and white motes drifting over the garden, glowing on and off. */
@@ -746,23 +631,20 @@ export function mysteryGardenBoard({ three, material, seeded, terrainGrid, repla
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
   const materials = {
     terrain: make(TERRAIN_VERTEX, TERRAIN_FRAGMENT),
-    props: make(PROP_VERTEX, PROP_FRAGMENT, { side: three.DoubleSide }),
-    blobs: make(BLOB_VERTEX, BLOB_FRAGMENT, { side: three.DoubleSide }),
     fireflies: make(FIREFLY_VERTEX, FIREFLY_FRAGMENT, { transparent: true, depthWrite: false, blending: three.AdditiveBlending }),
     halos: make(HALO_VERTEX, HALO_FRAGMENT, { transparent: true, depthWrite: false, blending: three.AdditiveBlending }),
     bakeField: make(FULLSCREEN_VERTEX, BAKE_FIELD_FRAGMENT, bakeOptions),
     bakeLight: make(FULLSCREEN_VERTEX, bakeLightFragment(), bakeOptions),
   };
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
-  const props = new three.Mesh(new three.BufferGeometry(), materials.props);
-  const blobs = new three.Mesh(new three.BufferGeometry(), materials.blobs);
+  const kit = createKitProps({ three, material, own, mood: GARDEN_NIGHT, reveal: 'vec3(0.55, 0.95, 1.1)', glow: GARDEN_GLOW });
   const fireflies = new three.Points(seeded(FIREFLY_COUNT), materials.fireflies);
   fireflies.renderOrder = 2;
   const halos = new three.Points(new three.BufferGeometry(), materials.halos);
   halos.renderOrder = 2;
   return {
-    objects: [terrain, props, blobs, fireflies, halos],
-    materials: Object.values(materials),
+    objects: [terrain, ...kit.objects, fireflies, halos],
+    materials: [...Object.values(materials), ...kit.materials],
     bakeField: materials.bakeField,
     bakeLight: materials.bakeLight,
     spots: (layout) => gardenSpots(layout),
@@ -775,13 +657,12 @@ export function mysteryGardenBoard({ three, material, seeded, terrainGrid, repla
         return light ? slot.set(light.x, light.y, light.z) : slot.set(0, 0, 0);
       });
       replaceGeometry(terrain, terrainGrid(bounds));
-      for (const mesh of [props, blobs, halos]) mesh.visible = Boolean(spots);
+      halos.visible = Boolean(spots);
+      kit.set(spots ? gardenProps(spots) : null);
       if (!spots) return;
       const halo = new three.BufferGeometry();
       halo.setAttribute('position', new three.Float32BufferAttribute(spots.lanterns.flatMap((light) => [light.x, light.y, light.z]), 3));
       replaceGeometry(halos, halo);
-      replaceGeometry(props, gardenProps(spots).build(three));
-      replaceGeometry(blobs, blobGeometry(three, spots));
     },
   };
 }

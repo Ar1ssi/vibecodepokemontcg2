@@ -7,8 +7,6 @@ import { NO_MAT_LAYOUT_ID } from '../../sizing/mat-spec.mjs';
 import { environmentFootprints, environmentKeyFor } from '../stadium-environment-layout.mjs';
 import {
   BAKE_FIELD_FRAGMENT,
-  BLOB_FRAGMENT,
-  BLOB_VERTEX,
   FIREFLY_FRAGMENT,
   FIREFLY_VERTEX,
   GARDEN_KEY,
@@ -16,14 +14,12 @@ import {
   HALO_VERTEX,
   MAX_LANTERNS,
   PLAZA_MARGIN_PX,
-  PROP_FRAGMENT,
   TERRAIN_FRAGMENT,
   TERRAIN_VERTEX,
-  blobGeometry,
   gardenProps,
   gardenSpots,
 } from '../stadium-env-garden.mjs';
-import { SCREEN_VIEWS, pointOnCard, screenView } from './stadium-screen.mjs';
+import { SCREEN_VIEWS, geometryOnCard, screenView } from './stadium-screen.mjs';
 
 const PROFILES = [NO_MAT_LAYOUT_ID, 'sim', 'one-player', 'two-player', 'edge-to-edge-two-player'];
 const HALVES = [
@@ -67,32 +63,24 @@ test('gardenSpots: lanterns light the balustrade and the vases, no more than the
 test('no prop of the garden covers a card on screen, in either camera preset', () => {
   for (const view of SCREEN_VIEWS) {
     const { layout, projectors } = screenView(view);
-    const spots = gardenSpots(layout);
-    const top = spots.ground + 70;
-    const points = [
-      ...spots.posts.flatMap((post) => [[post.x, post.y, spots.ground], [post.x, post.y, top]]),
-      ...spots.vases.flatMap((vase) => [[vase.x, vase.y, spots.ground], [vase.x, vase.y, spots.ground + vase.h + 70]]),
-      ...spots.pillars.flatMap((pillar) => [0, 0.5, 1].map((f) => [pillar.x, pillar.y, spots.ground + pillar.h * f])),
-      ...spots.hedges.map((hedge) => [hedge.x, hedge.y, hedge.z + hedge.r]),
-    ];
+    const geometry = gardenProps(gardenSpots(layout)).build(three);
     for (const { preset, project } of projectors) {
-      const hit = pointOnCard(points, layout, project);
+      const hit = geometryOnCard(geometry, layout, project);
       assert.equal(hit, null, `${view.profile} ${view.viewport.w}x${view.viewport.h} ${preset}: ${hit}`);
     }
   }
 });
 
-test('gardenSpots is null without a layout; the props and blobs build into geometry', () => {
+test('gardenSpots is null without a layout; the props, hedges, ferns and flowers build into geometry', () => {
   assert.equal(gardenSpots(null), null);
   const spots = gardenSpots(layouts[0]);
   assert.ok(gardenProps(spots).vertexCount() > 1000);
-  const blobs = blobGeometry(three, spots);
-  assert.ok(blobs.instanceCount >= spots.hedges.length + spots.leaves.length);
+  assert.ok(spots.ferns.length > 0 && spots.hedges.length > 0);
 });
 
 test('Mystery Garden shaders declare no GLSL ES 3.00 reserved word and every one has a main', () => {
   const reserved = /\b(?:float|vec[234]|int|bool)\s+(?:flat|half|smooth|noperspective|sample|patch|input|output|filter|active|common|fixed|long|short|out|in|inout|round)\b/;
-  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_VERTEX, TERRAIN_FRAGMENT, BLOB_VERTEX, BLOB_FRAGMENT, PROP_FRAGMENT, FIREFLY_VERTEX, FIREFLY_FRAGMENT, HALO_VERTEX, HALO_FRAGMENT]) {
+  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_VERTEX, TERRAIN_FRAGMENT, FIREFLY_VERTEX, FIREFLY_FRAGMENT, HALO_VERTEX, HALO_FRAGMENT]) {
     assert.doesNotMatch(shader, reserved);
     assert.match(shader, /void main\(\)/);
   }

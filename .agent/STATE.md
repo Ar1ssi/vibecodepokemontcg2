@@ -6,7 +6,7 @@
 Focus: attack FX are per-type element shaders (079-element-shaders, D229–D231): every material has an element kit (fireballs, flame jets,
   bolts, plasma, refracting water, psychic lens, smoke, 3-D debris, TCG Live sprites); 078 modifiers/lift/cast under them. Custom sets
   reach Render (076-remote-custom-sets, D228) via cardback "Publish to site".
-Active: user localhost checks — Stadium board polish (080, all 25 boards, branch claude/elegant-volta-r2cv6e); attack FX on all
+Active: user localhost checks — lively pass on all 25 Stadium boards (083: drift, sway, blink, clumps, over 082's BDSP restyle on 081's kit; branch claude/elegant-volta-r2cv6e); attack FX on all
   types (known: water spray reads icy, psychic rings large, Pin Missile needles small, impact centres can blow out, leaf orientation
   unconfirmed); first custom-set publish + Render check; older: 3D board H1-H3 (I266), TCG Live attack UI (074). No review on 078/079.
 Next: maintenance is due (`pnpm harness:check`: caps over, 250+ commits since the last maintain) → maintain.md. Then tune 079 from the

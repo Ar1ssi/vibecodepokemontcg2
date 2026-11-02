@@ -8,6 +8,7 @@
 // Pure: no three.js, no DOM.
 import { environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
 import { tableBounds } from './table-uv.mjs';
+import { patchy } from './stadium-env-spots.mjs';
 
 export const JUNGLE_KEY = 'perilous-jungle';
 /**
@@ -494,7 +495,8 @@ export function jungleTrees(layout, spots) {
 /**
  * The jungle floor's plants: a jittered grid over the `scene`, a plant in PLANT_SHARE of its cells,
  * each PLANT_CLEARING_GAP_PX or more past the clearing's edge, on dry ground and clear of the
- * trunks; bigger deeper in the jungle.
+ * trunks; bigger deeper in the jungle. Design 083: the share follows patchy(), so the plants gather
+ * into thickets (bigger in their hearts) with open floor between.
  * @param {{ bogs: Bog[], cards: object[], core?: object|null, table: object, trees: Tree[] }} spots
  * @param {{ x: number, y: number, w: number, h: number }} scene
  * @returns {Plant[]}
@@ -503,7 +505,8 @@ export function junglePlants(spots, scene) {
   const plants = [];
   for (let gy = scene.y; gy < scene.y + scene.h; gy += PLANT_SPACING_PX) {
     for (let gx = scene.x; gx < scene.x + scene.w; gx += PLANT_SPACING_PX) {
-      if (hash(gx, gy, 30) > PLANT_SHARE) continue;
+      const thick = patchy(gx, gy, { scale: 280, salt: 71 });
+      if (hash(gx, gy, 30) > PLANT_SHARE * thick) continue;
       const x = gx + (0.15 + 0.7 * hash(gx, gy, 31)) * PLANT_SPACING_PX;
       const y = gy + (0.15 + 0.7 * hash(gx, gy, 32)) * PLANT_SPACING_PX;
       const outside = clearingDistance(spots, x, y) - PLANT_CLEARING_GAP_PX;
@@ -514,7 +517,7 @@ export function junglePlants(spots, scene) {
       plants.push({
         x,
         y,
-        size: (PLANT_LEAF_PX.edge + PLANT_LEAF_PX.deep * smoothstep(0, 240, outside)) * (0.8 + 0.4 * roll(1)),
+        size: (PLANT_LEAF_PX.edge + PLANT_LEAF_PX.deep * smoothstep(0, 240, outside)) * (0.8 + 0.4 * roll(1)) * (0.85 + 0.12 * Math.min(thick, 1.6)),
         kind: kindRoll < 0.45 ? LEAF_KINDS.pointed : kindRoll < 0.75 ? LEAF_KINDS.broad : LEAF_KINDS.frond,
         tint: Math.floor(roll(3) * 4),
         count: 5 + Math.floor(roll(4) * 4),

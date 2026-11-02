@@ -16,13 +16,17 @@
 // Bake, once per layout: FIELD writes R height px (lake level 0, the pools and the basin flat at their
 // own levels), G signed px from the lake's shore (+ on land), B what the ground is built of (-1 the
 // zones' own, 1 tower stone, 3 a tower's pool, 4 the basin, 5 the basin's kerb, 6 the notch the lake
-// pours through into the basin; the fraction the tower's index / 4), A what stands there (boulder id
-// 0..1, bush 2..3, pier 4, -1 nothing); the shared BAKE_LIGHT (stadium-environment-glsl.mjs) adds
+// pours through into the basin; the fraction the tower's index / 4), A what stands there (pier 4,
+// -1 nothing); the shared BAKE_LIGHT (stadium-environment-glsl.mjs) adds
 // normals, occlusion and the sun shadow.
 // Per frame: LAND draws the ground on the terrain grid; STONEWORK the towers, the basin's kerb and the
 // ledge's walls, meshes of their own so their walls stand straight (the field holds them a little
 // smaller, for their shadows); LAKE is one flat sheet at lake level, its waves all in the shading;
 // FALLS the sheets of water; MIST the spray where they land; FENCE the path's posts and rails.
+// Design 082 (Brilliant Diamond / Shining Pearl; I273): the boulders and round bushes are the Stadium
+// kit's (stadium-kit-assets.mjs), the bushes standing on the land (the kit's ground-follow), the
+// boulders at the lake's level, half in the water; the grass and sand are the ground kit's
+// (stadium-env-ground.mjs); the water a clear BDSP blue under the map's ripples.
 import {
   FILTERING,
   FOOTPRINTS,
@@ -42,6 +46,7 @@ import {
   BEACH_PX,
   BEACH_RISE_PX,
   BEACH_WANDER_PX,
+  BUSH_SIZE,
   CLIFF_RISE_PX,
   CLIFF_RUN_PX,
   DOCK_LANDING_PX,
@@ -68,11 +73,14 @@ import {
   TERRACE_RISE_PX,
   TOWER_MAX,
   TOWER_WALL_PX,
-  TREE_MAX,
   ZONE_BLEND_PX,
   brookletSpots,
   stonework,
 } from './stadium-env-brooklet-layout.mjs';
+import { GRASS as GRASS_KIT, LIGHT_MOTION, SAND as SAND_KIT } from './stadium-env-ground.mjs';
+import { createPropBuilder } from './stadium-env-props.mjs';
+import { createKitProps } from './stadium-kit.mjs';
+import { placeAsset } from './stadium-kit-assets.mjs';
 
 export const MIST_COUNT = 40;
 /** Height of the pier's deck above the lake, px. */
@@ -262,54 +270,14 @@ vec2 sunkenRock(vec2 p) {
 
 const THINGS = /* glsl */ `
 ${ROCK_UNIFORMS}
-uniform vec4 uTrees[${TREE_MAX}];
 // The pier: where it leaves the shore and the way out over the water (unit); length, width.
 uniform vec4 uDock;
 uniform vec2 uDockSize;
 const float DOCK_DECK = ${f(DOCK_DECK_PX)};
 const float DOCK_LANDING = ${f(DOCK_LANDING_PX)};
-// A thing's id reaches this far past its edge, so the land's grid colours its steep side all the way
+// The pier's id reaches this far past its edge, so the land's grid colours its steep side all the way
 // down (the land takes ids off the nearest texel).
 const float STAND_MARGIN = 2.5;
-// A boulder (centre, radius, seed) as the art and the game draw them: a smooth dome a little
-// flattened and squashed, with broad soft facets. x its height px over its base, y its id (the
-// seed), z 1 out to STAND_MARGIN past its edge. lift stands one out in the lake on its bed.
-vec3 boulder(vec2 p, vec4 rock, float lift) {
-  float angle = rock.w * 6.2831853;
-  mat2 turn = mat2(cos(angle), sin(angle), -sin(angle), cos(angle));
-  vec2 q = turn * (p - rock.xy) / (rock.z * vec2(1.0, 0.8));
-  float near = step(length(q), 1.0 + STAND_MARGIN / (rock.z * 0.8));
-  float dome = 1.0 - dot(q, q);
-  if (dome <= 0.0) return vec3(0.0, rock.w, near);
-  float top = sqrt(dome);
-  for (int i = 0; i < 5; i++) {
-    float a = float(i) * 1.2566 + (hash12(vec2(rock.w, float(i))) - 0.5) * 0.8;
-    top = smin(top, 1.0 - 0.7 * dot(q, vec2(cos(a), sin(a))), 0.25);
-  }
-  float h = max(top, 0.0) * rock.z * 0.75 + lift * smoothstep(0.0, 0.25, top);
-  return vec3(h, rock.w, 1.0);
-}
-// A round bush from above: a crown of leafy lobes. x its height px over the ground, y its id (2..3),
-// z 1 out to STAND_MARGIN past its edge.
-vec3 treeCrown(vec2 p, vec4 tree) {
-  vec2 d = p - tree.xy;
-  float r = tree.z;
-  float id = 2.0 + tree.w * 0.9;
-  if (length(d) > r * 1.25 + STAND_MARGIN) return vec3(0.0, id, 0.0);
-  float top = 0.0;
-  float reach = -STAND_MARGIN - 1.0;
-  for (int i = 0; i < 6; i++) {
-    float fi = float(i);
-    float turn = fi * 1.2566 + tree.w * 6.2831853;
-    vec2 centre = i == 0 ? vec2(0.0) : vec2(cos(turn), sin(turn)) * r * (0.4 + 0.12 * hash12(vec2(tree.w, fi)));
-    float lobe = r * (i == 0 ? 0.7 : 0.46 + 0.14 * hash12(vec2(fi, tree.w * 7.0)));
-    reach = max(reach, lobe - length(d - centre));
-    vec2 q = (d - centre) / lobe;
-    float dome = sqrt(max(1.0 - dot(q, q), 0.0));
-    top = max(top, (r * (i == 0 ? 0.8 : 0.6) + dome * lobe * 0.75) * smoothstep(0.0, 0.3, dome));
-  }
-  return vec3(top, id, step(-STAND_MARGIN, reach));
-}
 // The pier's frame: x px out from its shore point over the water, y px across it.
 vec2 dockFrame(vec2 p) {
   vec2 d = p - uDock.xy;
@@ -400,28 +368,19 @@ const vec3 SAND_DRY = vec3(0.6, 0.36, 0.1);
 const vec3 SAND_LIGHT = vec3(0.72, 0.47, 0.16);
 const vec3 SAND_WET = vec3(0.3, 0.19, 0.07);
 // The earth cliffs under the grass, the game's dark red-brown.
-const vec3 EARTH_DARK = vec3(0.03, 0.017, 0.016);
-const vec3 EARTH = vec3(0.085, 0.05, 0.045);
-const vec3 EARTH_LIGHT = vec3(0.16, 0.1, 0.08);
-// Grass, the game's deep green swept in darker strokes; its tall grass lighter.
-const vec3 GRASS_DARK = vec3(0.007, 0.085, 0.022);
-const vec3 GRASS = vec3(0.03, 0.235, 0.05);
-const vec3 GRASS_LIGHT = vec3(0.075, 0.33, 0.075);
-const vec3 TALL_GRASS = vec3(0.1, 0.33, 0.1);
-const vec3 TREE_DARK = vec3(0.004, 0.06, 0.025);
-const vec3 TREE_MID = vec3(0.02, 0.21, 0.07);
-const vec3 TREE_LIGHT = vec3(0.15, 0.48, 0.18);
-// Boulders, warm grey-brown.
-const vec3 BOULDER_DARK = vec3(0.09, 0.068, 0.055);
-const vec3 BOULDER_MID = vec3(0.19, 0.135, 0.105);
-const vec3 BOULDER_LIGHT = vec3(0.38, 0.3, 0.24);
+const vec3 EARTH_DARK = vec3(0.1, 0.05, 0.03);
+const vec3 EARTH = vec3(0.22, 0.11, 0.06);
+const vec3 EARTH_LIGHT = vec3(0.38, 0.2, 0.11);
+// Grass (design 082): BDSP's clover grass in two greens.
+const vec3 GRASS = vec3(0.07, 0.34, 0.06);
+const vec3 GRASS_LIGHT = vec3(0.13, 0.44, 0.08);
 // The pier's and the fence's weathered wood.
 const vec3 WOOD_DARK = vec3(0.07, 0.06, 0.045);
 const vec3 WOOD_LIGHT = vec3(0.45, 0.41, 0.32);
-// The water, the game's teal: deep, base, light; the art's white strokes.
-const vec3 WATER_DEEP = vec3(0.006, 0.115, 0.11);
-const vec3 WATER = vec3(0.025, 0.27, 0.25);
-const vec3 WATER_LIGHT = vec3(0.13, 0.5, 0.45);
+// The water (design 082): a clear BDSP blue, deep, base, light; the art's white strokes.
+const vec3 WATER_DEEP = vec3(0.01, 0.12, 0.42);
+const vec3 WATER = vec3(0.03, 0.27, 0.66);
+const vec3 WATER_LIGHT = vec3(0.16, 0.52, 0.84);
 const vec3 WATER_STREAK = vec3(0.8, 0.95, 0.95);
 const vec3 FALL_TEAL = vec3(0.05, 0.32, 0.32);
 const vec3 FALL_LIGHT = vec3(0.4, 0.66, 0.64);
@@ -433,39 +392,28 @@ vec3 skyColor(vec3 dir) {
 }
 `;
 
-// The ground's materials, the game's: grass, earth cliffs, sand, laid stone. After NOISE, VORONOI and PALETTE.
-const MATERIALS = /* glsl */ `
-// Grass as the game paints it: green brushed with short dark strokes at a slant, crisp-edged,
-// lighter in broad patches; tall grass in patches, lighter, in upright tufts.
+// The land's grass and sand (design 082): the ground kit's clover grass and rippled sand, so only the
+// land includes them, after GRASS_KIT and SAND_KIT.
+const LAND_COLOURS = /* glsl */ `
+// Grass (design 082): BDSP's clover grass, lighter in broad patches.
 vec3 grassColour(vec2 p) {
-  vec2 q = vec2(0.8 * p.x + 0.6 * p.y, 0.8 * p.y - 0.6 * p.x);
-  // Design 080: the strokes are 2-3 px across; where the screen can't draw that they fade to their
-  // mean tone instead of breaking into speckle.
-  float fine = patternFade(filterPixel, 4.5);
-  float strokes = gnoise(q / vec2(12.0, 2.4)) * 0.65 + gnoise(q / vec2(5.0, 1.6) + 4.0) * 0.35;
-  vec3 c = mix(GRASS, GRASS_DARK, mix(0.3, smoothstep(0.54, 0.64, strokes), fine));
-  c = mix(c, GRASS_LIGHT, smoothstep(0.58, 0.8, fbm3(p / 120.0 + 1.7)) * 0.55);
-  float tall = smoothstep(0.64, 0.68, fbm3(p / 70.0 + 12.0));
-  if (tall > 0.0) {
-    vec2 cell = floor(p / vec2(5.0, 7.0));
-    float tuft = mix(0.52, gnoise(p / vec2(2.0, 6.0) + hash12(cell) * 3.0), fine);
-    vec3 tallColour = mix(GRASS, TALL_GRASS, smoothstep(0.3, 0.75, tuft)) * (0.975 + (0.25 * hash12(cell + 3.0) - 0.125) * fine);
-    c = mix(c, tallColour, tall);
-  }
-  return c;
+  return cloverGrass(p, mix(GRASS, GRASS_LIGHT, smoothstep(0.58, 0.8, fbm3(p / 120.0 + 1.7)) * 0.55), 0.0);
 }
+// Sand (design 082): BDSP's warm sand with soft ripples, lighter in drifts, damp and dark at the water.
+vec3 sandColour(vec2 p, float land) {
+  vec3 c = bdspSand(p, mix(SAND_DRY, SAND_LIGHT, smoothstep(0.4, 0.8, fbm3(p / 60.0 + 5.0)) * 0.7), 0.0);
+  return mix(SAND_WET, c, smoothstep(0.5, 7.0, land));
+}
+`;
+
+// The ground's materials, the game's: earth cliffs and laid stone. After NOISE, VORONOI and PALETTE.
+const MATERIALS = /* glsl */ `
 // The earth cliffs: dark red-brown, mottled, lighter strata running along their faces (by height,
 // wavering), seen from above as bands along each cliff.
 vec3 earthColour(vec2 p, float height) {
   vec3 c = mix(EARTH_DARK, EARTH, smoothstep(0.25, 0.75, gnoise(p / 6.0)));
   float strata = sin(height / 4.5 + gnoise(p / 30.0) * 5.0);
   return mix(c, EARTH_LIGHT, smoothstep(0.7, 0.95, strata) * 0.55);
-}
-// Sand: the game's orange tan, grained, lighter in drifts, damp and dark at the water.
-vec3 sandColour(vec2 p, float land) {
-  vec3 c = mix(SAND_DRY, SAND_LIGHT, smoothstep(0.4, 0.8, fbm3(p / 60.0 + 5.0)) * 0.7);
-  c *= 0.93 + 0.1 * grain(p, 2.5);
-  return mix(SAND_WET, c, smoothstep(0.5, 7.0, land));
 }
 // A wall's courses as the game lays them: rows of big rough stones 17 px high and 24..44 px long,
 // well rounded, each row's joints set off from the last, each stone's outline a little lumpy. x 0 in
@@ -624,26 +572,9 @@ void main() {
     ground = built.x;
     kind = built.y;
   }
-  // What stands on the ground: the highest thing here, else any whose edge is within STAND_MARGIN.
+  // What stands on the ground: the pier (the boulders and bushes are the kit's, design 082).
   vec2 thing = vec2(0.0, -1.0);
   float near = -1.0;
-  for (int i = 0; i < ${ROCK_MAX}; i++) {
-    vec4 stoneAt = uRocks[i];
-    if (stoneAt.z <= 0.0) continue;
-    // A boulder stands on the ground at its middle, so where the ledge rises behind it the ledge
-    // wins; one out on the lake stands on its bed and breaks the surface.
-    float base = groundHeight(stoneAt.xy, landDistance(stoneAt.xy));
-    vec3 stone = boulder(p, stoneAt, max(-base, 0.0));
-    float over = base + stone.x - ground;
-    if (stone.x > 0.0 && over > thing.x) thing = vec2(over, stone.y);
-    if (stone.z > 0.5) near = stone.y;
-  }
-  for (int i = 0; i < ${TREE_MAX}; i++) {
-    if (uTrees[i].z <= 0.0) continue;
-    vec3 crown = treeCrown(p, uTrees[i]);
-    if (crown.x > thing.x) thing = crown.xy;
-    if (crown.z > 0.5) near = crown.y;
-  }
   if (onDock(p, 0.0) > 0.5) thing = vec2(max(DOCK_DECK + 3.0 * onPost(p) - ground, 0.7), 4.0);
   if (onDock(p, STAND_MARGIN) > 0.5) near = 4.0;
   gl_FragColor = vec4(ground + thing.x, land, kind, thing.x > 0.6 ? thing.y : near);
@@ -679,6 +610,9 @@ ${NOISE}
 ${FILTERING}
 ${VORONOI}
 ${REVEAL}
+${GRASS_KIT}
+${SAND_KIT}
+${LIGHT_MOTION}
 ${PLACE}
 ${STRUCTURES}
 ${FALL_UNIFORMS}
@@ -686,6 +620,7 @@ ${THINGS}
 ${PALETTE}
 ${SHADING}
 ${MATERIALS}
+${LAND_COLOURS}
 ${CELLS}
 ${WATER_LOOK}
 varying vec2 vPos;
@@ -800,25 +735,8 @@ void main() {
     col = pool;
   }
 
-  // What stands on the ground: boulders, round bushes, the pier.
-  if (id > -0.5 && id < 1.5) {
-    float facing = dot(n, sun) * mix(0.65, 1.0, shade);
-    vec3 boulderColour = mix(BOULDER_DARK, BOULDER_MID, smoothstep(0.1, 0.45, facing));
-    boulderColour = mix(boulderColour, BOULDER_LIGHT, smoothstep(0.6, 0.85, facing));
-    boulderColour *= (0.9 + 0.2 * fract(id * 13.7)) * (0.82 + 0.34 * fbm3(p / 7.0 + id * 9.0));
-    // Wet and darker just above the water.
-    boulderColour = mix(boulderColour * vec3(0.6, 0.66, 0.66), boulderColour, smoothstep(0.5, 5.0, vHeight));
-    col = mix(boulderColour * 0.75, boulderColour, smoothstep(0.25, 0.8, occlusion));
-  } else if (id > 1.5 && id < 3.5) {
-    // Leaf clumps on the crown's own shape, lit in soft steps like the game's bushes.
-    float seed = fract(id);
-    vec2 leaf = vec2(gnoise(p / 5.0 + seed * 40.0), gnoise(p / 5.0 + 3.1 + seed * 40.0)) - 0.5;
-    vec3 leafNormal = normalize(n + vec3(leaf * 1.1, 0.0));
-    float key = max(dot(leafNormal, sun), 0.0) * mix(0.35, 1.0, shade);
-    vec3 leaves = mix(TREE_DARK, TREE_MID, smoothstep(0.12, 0.42, key));
-    leaves = mix(leaves, TREE_LIGHT, smoothstep(0.62, 0.84, key));
-    col = leaves * mix(0.7, 1.0, occlusion) * (0.94 + 0.12 * seed) * 1.15;
-  } else if (id > 3.5) {
+  // What stands on the ground: the pier.
+  if (id > 3.5) {
     // The game's pier: two sections of boards running out along it, a cross board at each end of
     // each, a gap between them; posts at their corners.
     vec2 q = dockFrame(p);
@@ -840,6 +758,9 @@ void main() {
     col = lit(wood, n, shade, occlusion);
   }
 
+  // Design 083: the soft shadows of slow clouds drifting over the banks (the land lies clear of every
+  // card: the lake is under them all).
+  col *= 1.0 - 0.14 * cloudShade(p, uTime, 380.0);
   col = edgeHaze(col, vUv);
   col = mix(col, FOAM_LIT, revealRim(p) * 0.85);
   gl_FragColor = vec4(col, 1.0);
@@ -1416,10 +1337,32 @@ const stoneworkGeometry = (three, spots) => {
 const setEach = (vectors, items, toValues) =>
   vectors.forEach((vector, i) => (items[i] ? vector.set(...toValues(items[i])) : vector.set(0, 0, 0, 0)));
 
+// The kit's colours: the art's warm brown boulders, the map's round bushes in BDSP's greens.
+const BOULDER = Object.freeze({ body: '#8d6a52', light: '#b48f72', dark: '#5f4636' });
+const BUSH = Object.freeze({ leaf: '#3f9a3a', leafLight: '#7cc44a' });
+
 /**
- * Brooklet Hill: the land (banks, ledge, pools, basin, boulders, bushes, pier), the stonework of the
- * towers, the basin's kerb and the ledge's walls, the lake's sheet, the falls' sheets, the mist where
- * they land and the path's fence.
+ * The boulders and the round bushes as the Stadium kit's solids (design 082, I273): each boulder at
+ * the lake's level, half in the water; each bush standing on the land under it (the kit's ground).
+ */
+export function brookletProps({ rocks = [], trees = [], clumps = [] } = {}) {
+  const props = createPropBuilder();
+  rocks.forEach((rock, k) => {
+    placeAsset(props, 'boulder', { x: rock.x, y: rock.y, z: 0, ground: false, size: rock.r, depth: 0.82, yaw: rock.seed * 6.28, seed: k * 13 + 5, colors: BOULDER });
+  });
+  trees.forEach((tree, k) => placeAsset(props, 'bush', { x: tree.x, y: tree.y, size: tree.r * BUSH_SIZE, seed: k * 17 + 3, colors: BUSH }));
+  // Design 083: the banks' clumps, standing on the land.
+  for (const piece of clumps) {
+    const colors = piece.asset === 'bush' || piece.asset === 'treeRound' ? BUSH : piece.options.colors;
+    placeAsset(props, piece.asset, { ...piece.options, x: piece.x, y: piece.y, size: piece.size, seed: piece.seed * 997, yaw: piece.yaw, colors });
+  }
+  return props;
+}
+
+/**
+ * Brooklet Hill: the land (banks, ledge, pools, basin, pier), the stonework of the towers, the basin's
+ * kerb and the ledge's walls, the kit's boulders and bushes (design 082), the lake's sheet, the falls'
+ * sheets, the mist where they land and the path's fence.
  */
 export function brookletHillBoard({ three, material, seeded, terrainGrid, replaceGeometry, bakeOptions }) {
   const vectors = (count) => Array.from({ length: count }, () => new three.Vector4());
@@ -1439,7 +1382,6 @@ export function brookletHillBoard({ three, material, seeded, terrainGrid, replac
     uFallKind: { value: new Array(FALL_MAX).fill(-1) },
     uRocks: { value: vectors(ROCK_MAX) },
     uSunken: { value: vectors(SUNKEN_MAX) },
-    uTrees: { value: vectors(TREE_MAX) },
     uDock: { value: new three.Vector4() },
     uDockSize: { value: new three.Vector2() },
   };
@@ -1463,6 +1405,7 @@ export function brookletHillBoard({ three, material, seeded, terrainGrid, replac
     stonework: make(STONEWORK_VERTEX, STONEWORK_FRAGMENT, { side: three.DoubleSide }),
     bakeField: make(FULLSCREEN_VERTEX, FIELD_FRAGMENT, bakeOptions),
   };
+  const kit = createKitProps({ three, material, own, mood: 'day', reveal: 'vec3(0.95, 0.97, 0.98)', ground: true });
   const land = new three.Mesh(new three.BufferGeometry(), materials.land);
   const lake = new three.Mesh(new three.BufferGeometry(), materials.lake);
   const falls = new three.Mesh(fallsGeometry(three), materials.falls);
@@ -1473,13 +1416,13 @@ export function brookletHillBoard({ three, material, seeded, terrainGrid, replac
   falls.renderOrder = 2;
   mist.renderOrder = 3;
   return {
-    objects: [land, stone, lake, falls, mist, fence],
-    materials: Object.values(materials),
+    objects: [land, stone, ...kit.objects, lake, falls, mist, fence],
+    materials: [...Object.values(materials), ...kit.materials],
     bakeField: materials.bakeField,
     spots: (layout) => brookletSpots(layout),
     apply(spots, bounds) {
       if (!spots) return;
-      const { core, bays, zones, towers, ledge, cave, basin, rocks, sunken, trees, dock, fence: posts } = spots;
+      const { core, bays, zones, towers, ledge, cave, basin, rocks, sunken, dock, fence: posts } = spots;
       own.uCore.value.set(core.x0, core.y0, core.x1, core.y1);
       own.uCoreRadius.value = core.r;
       setEach(own.uBays.value, bays, (bay) => [bay.x, bay.y, bay.rx, bay.ry]);
@@ -1496,7 +1439,6 @@ export function brookletHillBoard({ three, material, seeded, terrainGrid, replac
       for (const [uniform, list] of [
         [own.uRocks, rocks],
         [own.uSunken, sunken],
-        [own.uTrees, trees],
       ]) {
         setEach(uniform.value, list, (item) => [item.x, item.y, item.r, item.seed]);
       }
@@ -1510,6 +1452,7 @@ export function brookletHillBoard({ three, material, seeded, terrainGrid, replac
       replaceGeometry(fence, fenceGeometry(three, posts));
       fence.visible = posts.length > 0;
       replaceGeometry(stone, stoneworkGeometry(three, spots));
+      kit.set(brookletProps(spots));
     },
   };
 }

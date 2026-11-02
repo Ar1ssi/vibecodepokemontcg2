@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import * as THREE from 'three';
 import { flatLayout } from '../board-layout.mjs';
 import { getMatLayout } from '../../sizing/mat-layouts.mjs';
 import { NO_MAT_LAYOUT_ID } from '../../sizing/mat-spec.mjs';
@@ -10,12 +11,12 @@ import {
   LAB_KEY,
   MAX_PADS,
   PAD_MARGIN_PX,
-  PROP_FRAGMENT,
   TERRAIN_FRAGMENT,
   daisDistance,
   labProps,
   labSpots,
 } from '../stadium-env-lab.mjs';
+import { SCREEN_VIEWS, geometryOnCard, screenView } from './stadium-screen.mjs';
 
 // Every mat profile (the no-mat default, the simulator's, one-player and full-size two-player mats)
 // at the board width board3d.js lays out beside the sidebox (0.755 of 1920) and at full width.
@@ -105,7 +106,7 @@ test('labProps: one geometry with every attribute filled', () => {
 
 test('Full Metal Lab shaders declare no GLSL ES 3.00 reserved word and every one has a main', () => {
   const reserved = /\b(?:float|vec[234]|int|bool)\s+(?:flat|half|smooth|noperspective|sample|patch|input|output|filter|active|common|fixed|long|short|out|in|inout)\b/;
-  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_FRAGMENT, PROP_FRAGMENT]) {
+  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_FRAGMENT]) {
     assert.match(shader, /void main\(\)/);
     assert.doesNotMatch(shader, reserved);
   }
@@ -134,6 +135,19 @@ test('labSpots: pipe runs stay on the deck, clear of every tank', () => {
         const y = bundle.y + bundle.dy * t;
         assert.ok(daisDistance(x, y, spots.dais) > 0, 'on the deck');
         for (const tank of spots.tanks) assert.ok(Math.hypot(x - tank.x, y - tank.y) > tank.radius, 'clear of the tanks');
+      }
+    }
+  }
+});
+
+test('no console, tank, pipe, rail or the stair covers a card on screen, in either camera preset', () => {
+  for (const view of SCREEN_VIEWS) {
+    const { layout, projectors } = screenView(view);
+    const geometries = [labProps(labSpots(layout))].map((props) => props.build(THREE));
+    for (const { preset, project } of projectors) {
+      for (const geometry of geometries) {
+        const hit = geometryOnCard(geometry, layout, project);
+        assert.equal(hit, null, `${view.profile} ${view.viewport.w}x${view.viewport.h} ${preset}: ${hit}`);
       }
     }
   }

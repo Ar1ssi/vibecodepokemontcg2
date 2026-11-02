@@ -1,5 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import * as three from 'three';
+import { SCREEN_VIEWS, geometryOnCard, screenView } from './stadium-screen.mjs';
 import { flatLayout } from '../board-layout.mjs';
 import { getMatLayout } from '../../sizing/mat-layouts.mjs';
 import { NO_MAT_LAYOUT_ID } from '../../sizing/mat-spec.mjs';
@@ -11,6 +13,7 @@ import {
   WALL_FRAGMENT,
   WALL_PX,
   WALL_VERTEX,
+  shelterProps,
   shelterSpots,
   wallGeometry,
 } from '../stadium-env-shelter.mjs';
@@ -98,4 +101,19 @@ test('Steel Shelter shaders declare no GLSL ES 3.00 reserved word and every one 
     assert.match(shader, /void main\(\)/);
     assert.doesNotMatch(shader, reserved);
   }
+});
+
+test('the supplies along the walls (crates, barrels, warning lamps) never cover a card on screen, in either camera preset (design 083)', () => {
+  let pieces = 0;
+  for (const view of SCREEN_VIEWS) {
+    const { layout, projectors } = screenView(view);
+    const spots = shelterSpots(layout);
+    pieces += spots.supplies.length;
+    const geometry = shelterProps(spots).build(three);
+    for (const { preset, project } of projectors) {
+      const hit = geometryOnCard(geometry, layout, project);
+      assert.equal(hit, null, `${view.profile} ${view.viewport.w}x${view.viewport.h} ${preset}: ${hit}`);
+    }
+  }
+  assert.ok(pieces > 0, 'the walls have supplies');
 });

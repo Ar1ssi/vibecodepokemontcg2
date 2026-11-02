@@ -25,7 +25,10 @@ import {
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
 import { environmentFootprints } from './stadium-environment-layout.mjs';
-import { PROP_VERTEX, createPropBuilder, propFragment } from './stadium-env-props.mjs';
+import { LOOK, PROP_VERTEX, createPropBuilder } from './stadium-env-props.mjs';
+import { RISE_LEAN, distanceToRect, hash } from './stadium-env-spots.mjs';
+import { createKitProps } from './stadium-kit.mjs';
+import { instanceTint } from './stadium-kit-assets.mjs';
 import { tableBounds } from './table-uv.mjs';
 
 export const CITY_KEY = 'dark-city';
@@ -113,6 +116,8 @@ const DOOR_RED = [0.3, 0.07, 0.08, 0.2];
 /** The hut's lamp: a cold white floodlight, as in the art. */
 const LAMP = [1.4, 1.45, 1.5, 2.8];
 const MACHINE = [0.3, 0.32, 0.35, 0.4];
+const CRATE = [0.36, 0.27, 0.18, 0.05];
+const CRATE_TOP = [0.46, 0.35, 0.24, 0.05];
 /** The round tower's white-lit lantern glass, its dark dome, the pale ledges of its floors and their spacing. */
 const CROWN_LIGHT = [1.25, 1.32, 1.4, 2.0];
 const DOME = [0.16, 0.17, 0.2, 0.5];
@@ -167,19 +172,64 @@ export function citySpots(layout) {
     const tower = towers[index];
     return { x: tower.x + (u * tower.w) / 2, y: tower.y + (v * tower.d) / 2, z: tower.height + BEAM_LAMP_PX, heading, tip, phase };
   });
-  return { roof, hut, towers, round, beams };
+  // Design 083: rooftop clutter in the roof's side bands — air-conditioning units, vents breathing
+  // steam, stacked crates, a few pipes — at uneven steps, each clear of the cards with its lean and
+  // of the hut and the parapet.
+  const clutter = [];
+  const clearOf = (x, y, reach, height) =>
+    rects.every((rect) => distanceToRect(x, y, rect) >= reach + RISE_LEAN * height + 14) &&
+    Math.abs(x - roof.x) + reach < roof.hw - PARAPET.thick - 4 &&
+    Math.abs(y - roof.y) + reach < roof.hh - PARAPET.thick - 4 &&
+    Math.hypot(x - hut.x, y - hut.y) > Math.max(hut.w, hut.d) * 0.75 + reach + 10 &&
+    clutter.every((c) => Math.hypot(x - c.x, y - c.y) > c.reach + reach + 8);
+  for (const side of [-1, 1]) {
+    let y = roof.y - roof.hh + PARAPET.thick + 30 + 40 * hash(side, 1, 3);
+    for (let k = 0; y < roof.y + roof.hh - PARAPET.thick - 30 && k < 12; k += 1) {
+      const roll = (salt) => hash(side * 7 + k, y, salt);
+      const pick = hash(k * 3.7 + side, 11, 41);
+      const kind = pick < 0.38 ? 'unit' : pick < 0.66 ? 'vent' : 'crates';
+      const size = kind === 'unit' ? 16 + 6 * roll(2) : kind === 'vent' ? 7 + 3 * roll(2) : 11 + 4 * roll(2);
+      const height = kind === 'unit' ? 18 + 6 * roll(3) : kind === 'vent' ? 16 + 8 * roll(3) : 12 + 12 * roll(3);
+      const x = roof.x + side * (roof.hw - PARAPET.thick - size - 8 - 30 * roll(4));
+      if (clearOf(x, y, size * 1.2, height)) clutter.push({ kind, x, y, reach: size * 1.2, size, height, seed: roll(5) });
+      y += 46 + 70 * roll(6);
+    }
+  }
+  const driftEmitters = clutter.filter((c) => c.kind === 'vent').map((c) => ({ x: c.x, y: c.y, r: c.size * 0.6, z: c.height + 4 }));
+  return { roof, hut, towers, round, beams, clutter, driftEmitters };
+}
+
+/** Design 083: one piece of rooftop clutter: an air-conditioning unit, a vent with a cowl, or stacked crates. */
+function clutterPiece(props, { kind, x, y, size, height, seed }) {
+  const yaw = (seed - 0.5) * 0.6;
+  if (kind === 'unit') {
+    props.roundBox({ x, y, z0: 0, z1: height, hw: size, hh: size * 0.7, yaw, color: MACHINE, topColor: [0.36, 0.38, 0.42, 0.4] });
+    props.cylinder({ x: x + Math.cos(yaw) * size * 0.35, y: y + Math.sin(yaw) * size * 0.35, z0: height, z1: height + 1.5, r: size * 0.42, color: [0.16, 0.17, 0.2, 0.3], sides: 16 });
+  } else if (kind === 'vent') {
+    props.cylinder({ x, y, z0: 0, z1: height, r: size * 0.55, color: [0.34, 0.35, 0.39, 0.6], sides: 12 });
+    props.cylinder({ x, y, z0: height, z1: height + 3, r: size * 0.85, color: [0.28, 0.29, 0.33, 0.6], sides: 12 });
+  } else {
+    props.roundBox({ x, y, z0: 0, z1: height * 0.55, hw: size, hh: size * 0.8, yaw, color: CRATE, topColor: CRATE_TOP });
+    props.roundBox({ x: x + size * 0.2, y: y - size * 0.15, z0: height * 0.55, z1: height, hw: size * 0.7, hh: size * 0.6, yaw: yaw + 0.4, color: CRATE, topColor: CRATE_TOP });
+  }
 }
 
 /** The parapet round the roof, the hut with its door and lamp, the towers' rooftops, billboards' posts and searchlights, the round tower's crown. */
-export function cityProps({ roof, hut, towers, round, beams = [] }) {
+export function cityProps(spots) {
   const props = createPropBuilder();
+  citySolids(props, spots);
+  return props;
+}
+
+/** The billboards' posts, the searchlights, the parapets and everything on the roofs. */
+function citySolids(props, { roof, hut, towers, round, beams = [], clutter = [] }) {
   // Each billboard's posts: two at its foot, two longer ones up to its top edge.
   for (const tower of towers) {
     if (!tower.board) continue;
     const { foot, top, y0, y1 } = billboardOf(roof, tower);
     for (const y of [y0 + 12, y1 - 12]) {
-      props.box({ x: foot.x, y, z0: tower.height, z1: foot.z, hw: 2.5, hh: 2.5, color: SIGN_POST });
-      props.box({ x: top.x, y, z0: tower.height, z1: top.z, hw: 2.5, hh: 2.5, color: SIGN_POST });
+      props.roundBox({ x: foot.x, y, z0: tower.height, z1: foot.z, hw: 2.5, hh: 2.5, color: SIGN_POST });
+      props.roundBox({ x: top.x, y, z0: tower.height, z1: top.z, hw: 2.5, hh: 2.5, color: SIGN_POST });
     }
   }
   // Each searchlight: a dark drum on a stand, its lens lit.
@@ -198,7 +248,7 @@ export function cityProps({ roof, hut, towers, round, beams = [] }) {
         { x: tower.x - tower.w / 2 + t, y: tower.y, hw: t, hh: tower.d / 2 - 2 * t },
         { x: tower.x + tower.w / 2 - t, y: tower.y, hw: t, hh: tower.d / 2 - 2 * t },
       ]) {
-        props.box({ ...edge, z0: tower.height, z1: top, color: TOWER_PARAPET, topColor: COPING });
+        props.roundBox({ ...edge, z0: tower.height, z1: top, color: TOWER_PARAPET, topColor: COPING });
       }
     }
     if (tower.hazard) {
@@ -216,7 +266,7 @@ export function cityProps({ roof, hut, towers, round, beams = [] }) {
     // On top: a machine room, a water tank, an antenna with its red aircraft light (a billboard's
     // tower carries the billboard instead).
     if (tower.height < 60 || tower.board) continue;
-    props.box({
+    props.roundBox({
       x: tower.x + tower.w * 0.18,
       y: tower.y - tower.d * 0.2,
       z0: tower.height,
@@ -228,7 +278,10 @@ export function cityProps({ roof, hut, towers, round, beams = [] }) {
     props.cylinder({ x: tower.x - tower.w * 0.22, y: tower.y + tower.d * 0.24, z0: tower.height, z1: tower.height + 30, r: 16, color: [0.24, 0.22, 0.22, 0.3], sides: 14 });
     const mast = { x: tower.x - tower.w * 0.1, y: tower.y - tower.d * 0.3 };
     props.cylinder({ x: mast.x, y: mast.y, z0: tower.height, z1: tower.height + 58, r: 1.6, color: [0.3, 0.3, 0.34, 0.6], sides: 6 });
-    props.box({ x: mast.x, y: mast.y, z0: tower.height + 58, z1: tower.height + 63, hw: 2.8, hh: 2.8, color: [1.5, 0.12, 0.08, 2.0] });
+    // Design 083: the aircraft light blinks, each on its own beat.
+    props.look({ kind: LOOK.blink, rate: 0.45 + 0.3 * hash(tower.x, tower.y, 5), phase: hash(tower.x, tower.y, 6) }, () =>
+      props.roundBox({ x: mast.x, y: mast.y, z0: tower.height + 58, z1: tower.height + 63, hw: 2.8, hh: 2.8, color: [1.5, 0.12, 0.08, 2.0] })
+    );
   }
   const lo = { x: roof.x - roof.hw, y: roof.y - roof.hh };
   const hi = { x: roof.x + roof.hw, y: roof.y + roof.hh };
@@ -241,23 +294,27 @@ export function cityProps({ roof, hut, towers, round, beams = [] }) {
   ];
   walls.forEach((wall, i) => {
     if (i !== 2) {
-      props.box({ ...wall, z0: 0, z1: PARAPET.height, color: CONCRETE, topColor: COPING });
+      props.roundBox({ ...wall, z0: 0, z1: PARAPET.height, color: CONCRETE, topColor: COPING });
       return;
     }
     // The left parapet, turned so its face to the roof takes the art's red-magenta wash.
-    props.box({ x: wall.x, y: wall.y, z0: 0, z1: PARAPET.height, hw: wall.hh, hh: wall.hw, yaw: Math.PI / 2, color: CONCRETE, topColor: COPING, frontColor: PARAPET_RED });
+    props.roundBox({ x: wall.x, y: wall.y, z0: 0, z1: PARAPET.height, hw: wall.hh, hh: wall.hw, yaw: Math.PI / 2, color: CONCRETE, topColor: COPING, frontColor: PARAPET_RED });
   });
   // The hut, as the art's: low concrete walls, a flat roof with a vent; on its face to the cards (the
   // face both presets see) a maroon door at its near end under a bright lamp, two dark windows
   // along the rest. The box is turned so that face takes the lamp's light.
-  props.box({ x: hut.x, y: hut.y, z0: 0, z1: hut.h, hw: hut.d / 2, hh: hut.w / 2, yaw: -Math.PI / 2, color: HUT_WALL, topColor: HUT_ROOF, frontColor: HUT_FACE_LIT });
-  props.box({ x: hut.x + 14, y: hut.y + hut.d * 0.2, z0: hut.h, z1: hut.h + 12, hw: 12, hh: 14, color: MACHINE });
+  props.roundBox({ x: hut.x, y: hut.y, z0: 0, z1: hut.h, hw: hut.d / 2, hh: hut.w / 2, yaw: -Math.PI / 2, color: HUT_WALL, topColor: HUT_ROOF, frontColor: HUT_FACE_LIT });
+  props.roundBox({ x: hut.x + 14, y: hut.y + hut.d * 0.2, z0: hut.h, z1: hut.h + 12, hw: 12, hh: 14, color: MACHINE });
   const faceX = hut.x - hut.w / 2 - 0.6;
   const doorY = hut.y - hut.d / 2 + 10;
   props.quad([faceX, doorY + 30, 0], [faceX, doorY, 0], [faceX, doorY, 34], [faceX, doorY + 30, 34], DOOR_RED);
-  props.box({ x: faceX - 3, y: doorY + 15, z0: 37, z1: 41, hw: 3, hh: 8, color: LAMP });
+  props.roundBox({ x: faceX - 3, y: doorY + 15, z0: 37, z1: 41, hw: 3, hh: 8, color: LAMP });
   for (const y0 of [hut.y - 4, hut.y + 24]) {
     props.quad([faceX, y0 + 20, 16], [faceX, y0, 16], [faceX, y0, 28], [faceX, y0 + 20, 28], HUT_WINDOW);
+  }
+  // Design 083: the rooftop clutter, each piece its own shade.
+  for (const piece of clutter) {
+    props.tint(instanceTint(piece.seed * 991, 1.3), () => clutterPiece(props, piece));
   }
   // The round tower, as the art's: a pale ledge round every floor, and on its roof a lantern of
   // white-lit glass under a dark dome.
@@ -269,14 +326,13 @@ export function cityProps({ roof, hut, towers, round, beams = [] }) {
     props.ring({ x: round.x, y: round.y, z0: round.height + 6, z1: round.height + 30, r: round.r * 0.6, color: CROWN_LIGHT, sides: 36 });
     props.cylinder({ x: round.x, y: round.y, z0: round.height + 30, z1: round.height + 34, r: round.r * 0.66, color: LEDGE, sides: 36, capColor: DOME, domeRise: round.r * 0.38 });
   }
-  return props;
 }
 
 /** The towers: boxes from the streets up, and the round tower's column of floors. */
 export function cityBuildings({ towers, round }) {
   const props = createPropBuilder();
   towers.forEach((tower, i) => {
-    props.box({
+    props.roundBox({
       x: tower.x,
       y: tower.y,
       z0: -STREET_PX,
@@ -402,7 +458,6 @@ const vec3 NEON_PINK = vec3(1.5, 0.16, 0.62);
 const vec3 HUT_LAMP = vec3(1.1, 1.15, 1.25);
 // The red light at the far end of the hut's face to the cards, as the art's.
 const vec3 HUT_RED = vec3(1.3, 0.08, 0.1);
-const vec3 STREET_LAMP = vec3(1.3, 0.95, 0.55);
 const vec3 NIGHT = vec3(0.03, 0.036, 0.07);
 // Signed px from the roof's edge, negative on it.
 float roofDistance(vec2 p) {
@@ -692,22 +747,25 @@ ${OUTPUT}
 }
 `;
 
-/** The props' light: the night's cold fill, the city glow from below, the hut lamp and the neon. */
-const PROP_LIGHT = /* glsl */ `
-vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
-  vec3 col = albedo * (vec3(0.11, 0.125, 0.155) + vec3(0.18, 0.2, 0.25) * (0.5 + 0.5 * n.z));
+/** The hut's lamp and its red warning light on the kit's solids (design 081). */
+const HUT_GLOW = /* glsl */ `
+${ROOF}
+vec3 kitGlow(vec3 albedo, vec3 n, vec3 world) {
   vec3 toLamp = vec3(uHut.x - uHut.z - 12.0, uHut.y - uHut.w + 25.0, 39.0) - world;
-  col += albedo * HUT_LAMP * max(dot(n, normalize(toLamp)), 0.0) * exp(-length(toLamp) / 90.0) * 1.4;
+  vec3 col = albedo * HUT_LAMP * max(dot(n, normalize(toLamp)), 0.0) * exp(-length(toLamp) / 90.0) * 1.4;
   vec3 toRed = vec3(uHut.x - uHut.z - 22.0, uHut.y + uHut.w - 10.0, 24.0) - world;
-  col += albedo * HUT_RED * max(dot(n, normalize(toRed)), 0.0) * exp(-length(toRed) / 60.0) * 1.6;
-
-  vec3 view = normalize(uEye - world);
-  col += vec3(0.4, 0.45, 0.7) * pow(max(dot(reflect(-view, n), vec3(0.0, 0.0, 1.0)), 0.0), 16.0) * metal * 0.3;
-  return col;
+  return col + albedo * HUT_RED * max(dot(n, normalize(toRed)), 0.0) * exp(-length(toRed) / 60.0) * 1.6;
 }
 `;
 
-export const PROP_FRAGMENT = propFragment({ light: PROP_LIGHT, uniforms: ROOF, reveal: 'NEON_PINK' });
+/** The rooftop at night for the kit (designs 081, 082): the city's cool glow from above, a deep blue fill. */
+export const CITY_NIGHT = Object.freeze({
+  key: [0.36, 0.4, 0.55],
+  sky: [0.14, 0.15, 0.25],
+  bounce: [0.06, 0.06, 0.1],
+  sheen: [0.35, 0.6],
+  shadow: [0.3, 0.3, 0.45, 0.55],
+});
 
 const NO_SPOTS = { roof: null, hut: null, towers: [], round: null, beams: [] };
 
@@ -721,7 +779,6 @@ export function darkCityBoard({ three, material, terrainGrid, replaceGeometry, b
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
   const materials = {
     terrain: make(TERRAIN_VERTEX, TERRAIN_FRAGMENT),
-    props: make(PROP_VERTEX, PROP_FRAGMENT, { side: three.DoubleSide }),
     buildings: make(PROP_VERTEX, BUILDING_FRAGMENT, { side: three.DoubleSide }),
     billboards: make(BILLBOARD_VERTEX, BILLBOARD_FRAGMENT, { side: three.DoubleSide }),
     beams: make(BEAM_VERTEX, BEAM_FRAGMENT, {
@@ -734,14 +791,14 @@ export function darkCityBoard({ three, material, terrainGrid, replaceGeometry, b
     bakeLight: make(FULLSCREEN_VERTEX, bakeLightFragment(), bakeOptions),
   };
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
-  const props = new three.Mesh(new three.BufferGeometry(), materials.props);
+  const kit = createKitProps({ three, material, own, mood: CITY_NIGHT, reveal: 'vec3(1.0, 0.3, 0.8)', glow: HUT_GLOW });
   const buildings = new three.Mesh(new three.BufferGeometry(), materials.buildings);
   const billboards = new three.Mesh(new three.BufferGeometry(), materials.billboards);
   const beams = new three.Mesh(new three.BufferGeometry(), materials.beams);
   beams.renderOrder = 2;
   return {
-    objects: [terrain, buildings, props, billboards, beams],
-    materials: Object.values(materials),
+    objects: [terrain, buildings, ...kit.objects, billboards, beams],
+    materials: [...Object.values(materials), ...kit.materials],
     bakeField: materials.bakeField,
     bakeLight: materials.bakeLight,
     spots: (layout) => citySpots(layout) ?? NO_SPOTS,
@@ -751,9 +808,9 @@ export function darkCityBoard({ three, material, terrainGrid, replaceGeometry, b
       own.uHut.value.set(hut?.x ?? 0, hut?.y ?? 0, (hut?.w ?? 0) / 2, (hut?.d ?? 0) / 2);
       own.uRound.value.set(round?.x ?? 0, round?.y ?? 0, round?.r ?? 0, round?.height ?? 0);
       replaceGeometry(terrain, terrainGrid(bounds));
-      for (const mesh of [props, buildings, billboards, beams]) mesh.visible = Boolean(roof);
+      for (const mesh of [buildings, billboards, beams]) mesh.visible = Boolean(roof);
+      kit.set(roof ? cityProps(spots) : null);
       if (!roof) return;
-      replaceGeometry(props, cityProps(spots).build(three));
       replaceGeometry(buildings, cityBuildings(spots).build(three));
       replaceGeometry(billboards, billboardGeometry(three, spots));
       replaceGeometry(beams, beamGeometry(three, spots.beams));

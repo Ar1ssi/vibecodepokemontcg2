@@ -13,7 +13,10 @@
 // 1 moat bed); the shared light bake adds normals, occlusion and the sun shadow.
 // Per frame: TERRAIN paints the rock lit by the lava, the falls and the emblem; LAVA is the moat's
 // sheet, flowing round the island; EMBERS rise off the moat and spray off the falls' splashes.
+// Design 082 (Brilliant Diamond / Shining Pearl): the rock on a smooth ramp in BDSP's soft light, the
+// walls laid in strata (stadium-env-ground.mjs).
 import {
+  FILTERING,
   FLOW_STREAKS,
   FOOTPRINTS,
   FULLSCREEN_VERTEX,
@@ -28,6 +31,7 @@ import {
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
 import { craterEmblem, environmentFootprints } from './stadium-environment-layout.mjs';
+import { STRATA } from './stadium-env-ground.mjs';
 import { EMBER_FRAGMENT } from './stadium-env-volcanic.mjs';
 import { tableBounds } from './table-uv.mjs';
 
@@ -377,6 +381,8 @@ ${REVEAL}
 ${BASIN_LAVA}
 ${FLOW_STREAKS}
 ${FALLS}
+${FILTERING}
+${STRATA}
 varying vec2 vPos;
 varying vec2 vUv;
 varying float vGrowth;
@@ -394,6 +400,7 @@ float speck(vec2 p, float cell, float share, float seed) {
 
 void main() {
   vec2 p = vPos;
+  filterPixel = pixelSize(p);
   if (revealBurned(p) * exitKeep(p) < 0.5) discard;
   vec4 field = texture2D(uField, vUv);
   vec4 pre = texture2D(uPre, vUv);
@@ -416,12 +423,17 @@ void main() {
   // the tops of its rounded rocks a brighter red to the light. Colours sampled from the art and
   // inverted through Neutral tone mapping, as basinLava's: island (37,26,23), (59,43,37), (85,66,55);
   // walls (52,22,16) in shade, (90,36,24) on their faces, (138,58,36) on tops turned to the light.
-  vec3 islandRock = mix(vec3(0.04, 0.033, 0.031), vec3(0.08, 0.06, 0.054), smoothstep(0.35, 0.75, facing));
-  islandRock = mix(islandRock, vec3(0.131, 0.094, 0.078), smoothstep(0.85, 0.97, facing));
+  // Design 082 (Brilliant Diamond / Shining Pearl, Stark Mountain): the same colours on a smooth ramp
+  // (BDSP's soft light, no hard steps), the walls laid in strata.
+  vec3 islandRock = mix(vec3(0.045, 0.036, 0.034), vec3(0.09, 0.068, 0.06), smoothstep(0.15, 0.65, facing));
+  islandRock = mix(islandRock, vec3(0.15, 0.108, 0.09), smoothstep(0.65, 1.0, facing));
   islandRock *= 0.86 + 0.28 * tone;
-  vec3 wallRock = mix(vec3(0.058, 0.032, 0.029), vec3(0.131, 0.047, 0.038), smoothstep(0.4, 0.7, facing));
-  wallRock = mix(wallRock, vec3(0.29, 0.078, 0.053), smoothstep(0.82, 0.95, facing));
-  wallRock *= 0.85 + 0.3 * tone;
+  vec3 wallRock = mix(vec3(0.065, 0.035, 0.032), vec3(0.15, 0.055, 0.042), smoothstep(0.2, 0.62, facing));
+  wallRock = mix(wallRock, vec3(0.31, 0.088, 0.058), smoothstep(0.62, 1.0, facing));
+  vec2 course = strata(ground, p, 20.0);
+  wallRock *= (0.85 + 0.3 * tone) * mix(0.62, 1.0, course.x) * (0.92 + 0.16 * course.y);
+  // Design 083: the walls in broad warmer and darker stretches, not one crimson.
+  wallRock *= 1.0 + 0.26 * (fbm3(p / 260.0 + 4.0) - 0.5);
   vec3 col = mix(wallRock, islandRock, onIsland);
   // Painted rims: convex edges (lump tops, crags) catch a warm stroke of light.
   vec2 t2 = uTexel * 2.5;
@@ -451,6 +463,9 @@ void main() {
   // The island's lip catches a bright orange rim of the lava's light.
   col += vec3(1.0, 0.36, 0.06) * exp(-fromMoat / 7.0) * onIsland * 0.5 * flicker;
   col += vec3(1.0, 0.3, 0.12) * exp(-max(fallSD, 0.0) / 6.0) * onWall * 0.55 * flicker;
+  // Design 083: thin veins of lava threading the walls, each breathing slowly on its own beat.
+  float vein = (1.0 - smoothstep(0.0, 0.035, abs(fbm3(p / 95.0 + 7.0) - 0.5))) * step(0.58, gnoise(p / 150.0 + 3.0));
+  col += vec3(1.0, 0.32, 0.08) * vein * onWall * smoothstep(20.0, 60.0, ground) * (0.22 + 0.14 * sin(uTime * 0.7 + p.x * 0.013 + p.y * 0.007));
 
   // Some of the island's cracks still glow; sparks lie on the rock out toward the moat (design 080:
   // none round the cards, where glowing dots read as speckle on the field).
