@@ -306,6 +306,15 @@ const CASES = [
     { ownPrizes: 4 },
   ],
   [
+    // Printed damage is a bare "40" in the custom set; the per-Prize catch-all once added 90 × 6.
+    'customhb Kartana Divine Paper (customhb set.json)',
+    'Kartana',
+    '40',
+    'If your opponent has exactly 6 Prize cards remaining, this attack does 90 more damage.',
+    { opponentPrizes: 6 },
+    { opponentPrizes: 5 },
+  ],
+  [
     'customhb Pinsir Reckless Throw (customhb-005 set.json)',
     'Pinsir',
     '90+',
@@ -379,6 +388,16 @@ for (const [source, name, damage, text, yes, no] of CASES) {
     assert.equal(dealt(attack, no, { name }), base, 'no bonus when it does not');
   });
 }
+
+test('Kartana Divine Paper (customhb): exactly 6 opponent Prizes adds 90 once, not 90 per Prize', () => {
+  const attack = {
+    name: 'Divine Paper',
+    damage: '40',
+    text: 'If your opponent has exactly 6 Prize cards remaining, this attack does 90 more damage.',
+  };
+  assert.equal(dealt(attack, { opponentPrizes: 6 }, { name: 'Kartana' }), 130);
+  assert.equal(dealt(attack, { opponentPrizes: 5 }, { name: 'Kartana' }), 40);
+});
 
 test('a gated "more damage for each" bonus scales only when the gate holds (Deoxys-EX Helix Force)', () => {
   const attack = {
