@@ -2830,7 +2830,7 @@
    "name": "Wo-Chien ex",
    "attack": "Covetous Ivy",
    "family": "bench-damage",
-   "verdict": "ok"
+   "verdict": "ran-no-effect"
   },
   "cracking stomp#1j6itjw": {
    "name": "Tyranitar",
@@ -12124,7 +12124,7 @@
    "name": "Mesprit",
    "attack": "Mind Splash",
    "family": "conditional-damage",
-   "verdict": "partial"
+   "verdict": "ok"
   },
   "mineral pump#9wjh45": {
    "name": "Manaphy-EX",
