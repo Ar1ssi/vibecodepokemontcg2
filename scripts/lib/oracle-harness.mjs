@@ -172,7 +172,9 @@ export function buildState(holder, holderZone) {
             );
       benched.damage = 20;
       z.bench.push(benched);
-      z.bench.push(energy('Grass', benched.instanceId));
+      // One own Psychic off the Active: "{P} Energy attached to all of your Pokémon" counts 2,
+      // not the 1 that makes correct damage equal the printed base (Mega Symphonia, Wonder Storm).
+      z.bench.push(energy(own && b === 1 ? 'Psychic' : 'Grass', benched.instanceId));
     }
     z.deck.push(...deckFor(pid));
     z.hand.push(
