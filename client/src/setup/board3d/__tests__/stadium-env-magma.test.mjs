@@ -6,7 +6,6 @@ import { NO_MAT_LAYOUT_ID } from '../../sizing/mat-spec.mjs';
 import { environmentFootprints, environmentKeyFor } from '../stadium-environment-layout.mjs';
 import { tableBounds } from '../table-uv.mjs';
 import { SCREEN_VIEWS, screenView } from './stadium-screen.mjs';
-import { oppHandRect } from '../stadium-env-spots.mjs';
 import {
   BAKE_BASIN_FRAGMENT,
   BAKE_FIELD_FRAGMENT,
@@ -77,13 +76,16 @@ test('basinSpots: the island holds every card footprint, its margin clear inside
 });
 
 // Design 084: the falls pour down the far wall's corners, where both cameras see them past the
-// opponent's hand row, each straight up the screen.
-test('basinSpots: the falls stand round the far corners past the moat, pouring straight up the screen', () => {
+// opponent's hand row, each straight down the wall's face (the corner's outward normal; I277).
+test('basinSpots: the falls stand round the far corners past the moat, each pouring down the wall\'s face', () => {
   for (const layout of layouts) {
     const { island, falls } = basinSpots(layout);
     assert.equal(falls.length, MAX_FALLS);
     for (const fall of falls) {
-      close(fall.angle, Math.PI / 2, 'straight up the screen');
+      const corner = Math.sign(fall.x - island.x);
+      const centre = [island.x + corner * (island.hw - island.r), island.y + (island.hh - island.r)];
+      const out = Math.atan2(fall.y - centre[1], fall.x - centre[0]);
+      close(Math.cos(fall.angle - out), 1, 'its line runs along the corner\'s outward normal');
       assert.ok(fall.y > island.y + island.hh - island.r, 'past the far corners\' centres');
       assert.ok(Math.abs(fall.x - island.x) > island.hw - island.r, 'round a corner, off the far run');
       assert.ok(roundedRect(fall.x, fall.y, island) >= MOAT_PX.end, 'past the moat');
@@ -95,29 +97,30 @@ test('basinSpots: the falls stand round the far corners past the moat, pouring s
 
 // Design 084 (I277): the falls are the card's identity, so both camera presets show them: on the
 // default board at least two falls' feet lie in each preset's frame (left of the chat panel, clear of
-// the opponent's hand row), each fall a near-vertical streak on screen.
-test('the falls show in both camera presets, as near-vertical streaks', () => {
-  const { layout, projectors } = screenView(SCREEN_VIEWS[0]);
-  const { viewport } = SCREEN_VIEWS[0];
-  const { falls } = basinSpots(layout);
-  const { slabs, flats } = environmentFootprints(layout);
-  const rects = [...slabs, ...flats];
-  const core = { x: Math.min(...rects.map((r) => r.x)), y: 0, w: 0, h: 0 };
-  core.w = Math.max(...rects.map((r) => r.x + r.w)) - core.x;
-  const hand = oppHandRect(layout, core);
-  for (const { preset, project } of projectors) {
-    const handTop = Math.max(...[hand.x, hand.x + hand.w].map((x) => project(x, hand.y, 0).y));
-    const seen = falls.filter((fall) => {
-      const foot = project(fall.x, fall.y, -8);
-      if (!foot || foot.x < 0 || foot.x > viewport.w * 0.755 || foot.y < 0 || foot.y > viewport.h) return false;
-      const handX = [hand.x, hand.x + hand.w].map((x) => project(x, hand.y, 0).x);
-      if (foot.x > Math.min(...handX) && foot.x < Math.max(...handX) && foot.y < handTop) return false;
-      const up = project(fall.x + Math.cos(fall.angle) * 120, fall.y + Math.sin(fall.angle) * 120, 100);
-      const lean = Math.atan2(Math.abs(up.x - foot.x), Math.abs(up.y - foot.y));
-      assert.ok(lean < (15 * Math.PI) / 180, `${preset}: a fall leans ${((lean * 180) / Math.PI).toFixed(1)} deg on screen`);
-      return true;
-    });
-    assert.ok(seen.length >= 2, `${preset} shows ${seen.length} falls`);
+// the opponent's hand row), and on screen each runs across the moat beside it, never along it (a fall
+// laid parallel to the moat read as a second moat).
+test('the falls show in both camera presets, each crossing the moat beside it on screen', () => {
+  for (const view of [SCREEN_VIEWS[0], SCREEN_VIEWS[2]]) {
+    const { layout, projectors } = screenView(view);
+    const { viewport } = view;
+    const { falls } = basinSpots(layout);
+    for (const { preset, project } of projectors) {
+      const seen = falls.filter((fall) => {
+        const foot = project(fall.x, fall.y, -8);
+        if (!foot || foot.x < 0 || foot.x > viewport.w * 0.755 || foot.y < 0 || foot.y > viewport.h) return false;
+        const way = [Math.cos(fall.angle), Math.sin(fall.angle)];
+        const crest = project(fall.x + way[0] * 108, fall.y + way[1] * 108, 120);
+        const shoreA = project(fall.x + way[1] * 40, fall.y - way[0] * 40, -8);
+        const shoreB = project(fall.x - way[1] * 40, fall.y + way[0] * 40, -8);
+        const fallTurn = Math.atan2(crest.y - foot.y, crest.x - foot.x);
+        const moatTurn = Math.atan2(shoreB.y - shoreA.y, shoreB.x - shoreA.x);
+        let apart = Math.abs(fallTurn - moatTurn) % Math.PI;
+        if (apart > Math.PI / 2) apart = Math.PI - apart;
+        assert.ok(apart > Math.PI / 3, `${viewport.w} ${preset}: a fall only ${((apart * 180) / Math.PI).toFixed(0)} deg off its moat`);
+        return true;
+      });
+      assert.ok(seen.length >= 2, `${viewport.w} ${preset} shows ${seen.length} falls`);
+    }
   }
 });
 

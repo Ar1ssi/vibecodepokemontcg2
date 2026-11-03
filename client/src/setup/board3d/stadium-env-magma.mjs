@@ -74,16 +74,17 @@ export const MAX_FALLS = 4;
  * The lavafalls: the art's four, down its back wall. Falls on the side walls (tried three times) run
  * across the screen in both presets, from the screen's edge to the moat, and read as rays; on the far
  * wall's straight run they hide behind the opponent's hand row. Design 084: so they pour down the far
- * wall's corners, each straight up the screen (angle +y): which corner (-1 left, 1 right), how far
- * round its arc from the far run (0) toward the side run (1), and whether it forks into three strands
- * near its foot (the art's second fall from the right). tcgl's frame shows the far-left corner only
- * from about 0.6 round (its right corner lies under the chat panel), so three pour there, two of them
- * past 0.6, and one on the right for the top-down preset (I277).
+ * wall's corners: which corner (-1 left, 1 right), how far round its arc from the far run (0) toward
+ * the side run (1), and whether it forks into three strands near its foot (the art's second fall from
+ * the right). Each pours straight down the wall's face (its outward normal): a fall laid along the
+ * screen's up ran beside the side moat, parallel to it, and read as a second moat (I277). tcgl's frame
+ * shows the far-left corner only from about 0.6 round (its right corner lies under the chat panel), so
+ * three pour there, between 0.6 and 0.9, and one on the right for the top-down preset.
  */
 const FALL_RECIPES = [
-  { corner: -1, turn: 0.5, fork: false },
-  { corner: -1, turn: 0.68, fork: false },
-  { corner: -1, turn: 0.82, fork: false },
+  { corner: -1, turn: 0.62, fork: false },
+  { corner: -1, turn: 0.74, fork: false },
+  { corner: -1, turn: 0.86, fork: false },
   { corner: 1, turn: 0.55, fork: true },
 ];
 /** A distance past every fall that still fits the bake's half-float target. */
@@ -132,14 +133,14 @@ export function basinSpots(layout) {
   };
   const moat = { side: MOAT_PX.side, end: MOAT_PX.end };
   // Each fall meets the moat about where its outer shore runs round the far corner's arc (the
-  // shader's shores wander a little further out; it finds the wall band itself), pouring straight up
-  // the screen.
+  // shader's shores wander a little further out; it finds the wall band itself), pouring straight down
+  // the wall's face: its line runs along the corner's outward normal (angle a, up the wall).
   const falls = FALL_RECIPES.map(({ corner, turn, fork }) => {
     const a = Math.PI / 2 - corner * turn * (Math.PI / 2);
     const reach = r + MOAT_PX.end + (MOAT_PX.side - MOAT_PX.end) * turn + SHORE_DRIFT_PX;
     const x = island.x + corner * (island.hw - r) + Math.cos(a) * reach;
     const y = island.y + (island.hh - r) + Math.sin(a) * reach;
-    return { x, y, angle: Math.PI / 2, fork };
+    return { x, y, angle: a, fork };
   });
   const emblem = craterEmblem(layout, { x: table.x + table.w / 2, y: layout.depth });
   return { island, moat, falls, emblem };
@@ -208,7 +209,7 @@ vec3 fallAt(vec2 p, vec4 fall, float up) {
   vec2 rel = p - fall.xy;
   float along = dot(rel, dir);
   float across = dot(rel, vec2(-dir.y, dir.x));
-  if (along < -260.0 || along > 360.0) return vec3(100000.0, along, across);
+  if (along < -60.0 || along > ${WALL_RUN_PX + 80}.0) return vec3(100000.0, along, across);
   float t = clamp(up / ${WALL_RUN_PX}.0, 0.0, 1.0);
   float line = across - (gnoise(vec2(along / 46.0, fall.x * 0.013 + fall.z * 3.0)) - 0.5) * 9.0 * t;
   // Wider where it spills out over the moat at its foot.
@@ -628,7 +629,7 @@ void main() {
     vec2 dir = vec2(cos(fall.z), sin(fall.z));
     vec2 rel = p - fall.xy;
     float across = dot(rel, vec2(-dir.y, dir.x));
-    if (abs(dot(rel, dir)) > 260.0) continue;
+    if (abs(dot(rel, dir)) > 160.0) continue;
     float d = length(vec2(across, outerSD + 10.0));
     float pool = exp(-d / 24.0);
     float rings = smoothstep(0.6, 1.0, sin(d / 5.0 - uTime * 2.2)) * exp(-d / 40.0) * smoothstep(6.0, 14.0, d);
