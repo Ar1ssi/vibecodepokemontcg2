@@ -111,3 +111,9 @@ test('no stone, rope, spire or the chain covers a card on screen, in either came
     }
   }
 });
+
+test('design 084: the chain at link scale, each link under a tenth of a card, its metal fine', () => {
+  assert.ok(CHAIN.length <= 10 && CHAIN.width <= 6 && CHAIN.thick <= 2, `links ${CHAIN.length} x ${CHAIN.width}`);
+  const { chain } = ringSpots(flatLayout(getMatLayout(NO_MAT_LAYOUT_ID), { w: 1449.6, h: 540 }));
+  assert.ok(chain.length >= 40, `a long run of small links (${chain.length})`);
+});

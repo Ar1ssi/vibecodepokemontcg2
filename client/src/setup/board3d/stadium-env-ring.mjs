@@ -7,6 +7,11 @@
 // paving grows round every card on the table, the stones stand just outside it where the table is
 // free of cards, and the spires rise past them on the sides and the far side, in the haze.
 //
+// Design 084 (the visual audit): the ropes thin sagging catenaries (about a twentieth of a card
+// across) with one knot round each stone, the chain at link scale (each link under a tenth of a card);
+// the menhirs tall irregular slabs (five to seven faces, laid in strata, lighter on top), each leaning
+// a little; a real Poké Ball inlaid at the middle in two stone tones; the arena warmer at its middle and
+// cooler toward its edge, the bricks quieter under the cards, low mountains painted on the far margin.
 // Bake, once per layout: BAKE_FIELD writes R height px, G signed px from the arena's edge, B the
 // stone's id (brick or boulder) 0..1, A the kind (-1 paving, 1 ground); the shared light
 // bake adds normals, occlusion and the sun's soft shadow. Per frame: TERRAIN paints stone, rock,
@@ -52,8 +57,8 @@ const BRICK_PX = { long: 46, vary: 14, high: 23, corner: 6 };
  * coils' thickness and how many wind round each stone in a band, the strand's thickness between.
  */
 const ROPES = [
-  { at: 0.5, sag: 30, radius: 3.6, wraps: 4, strand: 3.0 },
-  { at: 0.28, sag: 22, radius: 3.2, wraps: 2, strand: 2.7 },
+  { at: 0.52, sag: 40, radius: 2.6, wraps: 1, strand: 2.4 },
+  { at: 0.3, sag: 30, radius: 2.4, wraps: 1, strand: 2.2 },
 ];
 /**
  * The chain, as the art's foreground: massive rusty links hanging from a stone on the left side (its
@@ -61,7 +66,7 @@ const ROPES = [
  * from it, where both camera presets see them; at most `links`, each `length` by `width` px, its
  * metal `thick`. Links stop where the next would come within `clear` px of a card.
  */
-export const CHAIN = { angle: Math.PI * 1.14, links: 12, length: 92, width: 50, thick: 10, inset: 34, clear: 10 };
+export const CHAIN = { angle: Math.PI * 1.14, links: 110, length: 9, width: 5.5, thick: 1.3, inset: 34, clear: 10 };
 /**
  * The art's rock spires standing on the ground past the stones: turn round the ring (deg), gap past
  * the stones' ring, base radius, height, how flattened. A spire with no room in the scene, or
@@ -238,11 +243,13 @@ export function ringSpots(layout) {
  * their girth to half way, then taper into a blunt rounded top (the squat ones round over sooner).
  */
 export const stoneGirth = (t, stone) => {
-  const shoulder = stone.height < 125 ? 0.6 : 0.5;
-  if (t <= shoulder) return 1.06 - 0.12 * t;
-  const base = 1.06 - 0.12 * shoulder;
+  // Design 084: a slab, not an egg: a gentle taper most of the way up, then a short rounded shoulder
+  // into a broad top (the squat ones shoulder a little sooner).
+  const shoulder = stone.height < 125 ? 0.78 : 0.86;
+  if (t <= shoulder) return 1.06 - 0.22 * t;
+  const base = 1.06 - 0.22 * shoulder;
   const cap = Math.min(1, (t - shoulder) / (1 - shoulder));
-  return base * Math.max(0, 1 - cap ** 2.2) ** (1 / 2.2);
+  return base * (1 - 0.45 * cap ** 1.6);
 };
 
 /**
@@ -251,8 +258,9 @@ export const stoneGirth = (t, stone) => {
  * chiselled faces, no two alike.
  */
 const standingStone = (props, stone) => {
-  const sides = 12;
-  const levels = [0, 0.25, 0.5, 0.62, 0.72, 0.8, 0.87, 0.93, 0.97, 1];
+  // Design 084: a slab of five to seven faces, flatter than a column, laid in strata.
+  const sides = 5 + Math.floor(hashOf(stone.index * 7 + 9) * 3);
+  const levels = [0, 0.14, 0.28, 0.42, 0.56, 0.68, 0.78, 0.86, 0.93, 0.97, 1];
   const side = hashOf(stone.index * 7 + 2) < 0.5 ? -1 : 1;
   const tipShift = stone.height < 125 ? 0 : side * stone.radius * 0.35 * hashOf(stone.index * 7 + 3);
   const rings = levels.map((t, level) => {
@@ -266,29 +274,38 @@ const standingStone = (props, stone) => {
       const r = stone.radius * taper * wobble;
       // A flattened section turned by the stone's yaw.
       const u = Math.cos(angle) * r + drift;
-      const v = Math.sin(angle) * r * stone.flat;
+      const v = Math.sin(angle) * r * stone.flat * 0.62;
       const c = Math.cos(stone.yaw);
       const sn = Math.sin(stone.yaw);
       return [stone.x + u * c - v * sn + lean, stone.y + u * sn + v * c, stone.height * t];
     });
   });
   const tone = 0.88 + 0.2 * stone.seed;
-  // Dark streaks run down some of its faces, as weathering down the art's stones.
-  const colorOf = (k) => {
-    const streak = hashOf(stone.index * 19 + k * 5) < 0.3 ? 0.74 : 1.0;
-    return [GREY_STONE[0] * tone * streak, GREY_STONE[1] * tone * streak, GREY_STONE[2] * tone * streak, GREY_STONE[3]];
+  // Dark streaks run down some of its faces, as weathering down the art's stones; each course of the
+  // strata its own shade; the top courses lighter (design 084).
+  const colorOf = (k, level) => {
+    const streak = hashOf(stone.index * 19 + k * 5) < 0.3 ? 0.78 : 1.0;
+    const course = 0.9 + 0.16 * hashOf(stone.index * 13 + level * 3);
+    const t = levels[Math.min(level, levels.length - 1)];
+    const lift = 1 + 0.2 * Math.max(0, (t - 0.7) / 0.3);
+    const shade = tone * streak * course * lift;
+    return [GREY_STONE[0] * shade, GREY_STONE[1] * shade, GREY_STONE[2] * shade, GREY_STONE[3]];
   };
-  const color = colorOf(-1);
+  // A broad top broken off at a slant (design 084), lighter as weathered stone's tops are: the top
+  // ring tipped about its middle before the faces are built, so they meet it.
+  const last = rings.length - 1;
+  const middle = rings[last].reduce((sum, p) => [sum[0] + p[0] / sides, sum[1] + p[1] / sides, sum[2] + p[2] / sides], [0, 0, 0]);
+  const slant = [Math.cos(stone.seed * 9), Math.sin(stone.seed * 9)];
+  rings[last] = rings[last].map((p) => [p[0], p[1], p[2] + ((p[0] - middle[0]) * slant[0] + (p[1] - middle[1]) * slant[1]) * 0.25]);
   for (let level = 0; level < rings.length - 1; level += 1) {
     for (let k = 0; k < sides; k += 1) {
       const a = rings[level][k];
       const b = rings[level][(k + 1) % sides];
-      props.quad(a, b, rings[level + 1][(k + 1) % sides], rings[level + 1][k], colorOf(k));
+      props.quad(a, b, rings[level + 1][(k + 1) % sides], rings[level + 1][k], colorOf(k, level));
     }
   }
-  const top = rings[rings.length - 1];
-  const apex = top.reduce((sum, p) => [sum[0] + p[0] / sides, sum[1] + p[1] / sides, Math.max(sum[2], p[2])], [0, 0, 0]);
-  for (let k = 0; k < sides; k += 1) props.quad(top[k], top[(k + 1) % sides], apex, apex, color);
+  const color = colorOf(-1, levels.length - 1).map((v, k) => (k < 3 ? v * 1.08 : v));
+  for (let k = 0; k < sides; k += 1) props.quad(rings[last][k], rings[last][(k + 1) % sides], middle, middle, color);
 };
 
 /**
@@ -402,6 +419,11 @@ function ringSolids(props, { stones, allStones, chain = [], spires = [] }) {
         }
         props.tube(loop, rope.radius, ROPE_LIGHT, { sides: 6, colorAt: ropeColor });
       }
+      // Design 084: one knot where the rope is tied round the stone, on its side toward the next.
+      if (next) {
+        const knot = onStone(stone, rope.at, Math.atan2(next.y - stone.y, next.x - stone.x), rope.radius * 1.6);
+        props.blob({ x: knot[0], y: knot[1], z: stone.height * rope.at, rx: rope.radius * 2.2, ry: rope.radius * 1.8, rz: rope.radius * 1.9, color: ROPE_DARK, sides: 10, rings: 7 });
+      }
       if (!next) continue;
       const from = [...onStone(stone, rope.at, Math.atan2(next.y - stone.y, next.x - stone.x), 0), stone.height * rope.at];
       const to = [...onStone(next, rope.at, Math.atan2(stone.y - next.y, stone.x - next.x), 0), next.height * rope.at];
@@ -448,6 +470,8 @@ vec4 brickAt(vec2 p) {
 // The emblem in the paving, as in the art: a broad disc of pale stone sunk in a dark groove, a dark
 // ring round its pale centre and a shallower band carved across it from that ring to the rim. x: 1 on
 // pale stone, 2 on dark stone, 3 on the band, 0 off it; y px from its outline (negative inside).
+// Design 084: a real Poké Ball in two stone tones: its upper half (toward the far end) the darker,
+// warmer stone (x 4), its lower half and its button the pale.
 vec2 emblemInlay(vec2 p) {
   if (uEmblem.z <= 0.0) return vec2(0.0, 100000.0);
   vec2 rel = p - uEmblem.xy;
@@ -459,7 +483,8 @@ vec2 emblemInlay(vec2 p) {
   bool buttonRing = r > buttonR * 0.55 && r < buttonR;
   if (groove || buttonRing) return vec2(2.0, outline);
   bool band = abs(rel.y) < uEmblem.z * 0.045 && r > buttonR;
-  return vec2(band ? 3.0 : 1.0, outline);
+  if (band) return vec2(3.0, outline);
+  return vec2(rel.y > 0.0 && r > buttonR ? 4.0 : 1.0, outline);
 }
 `;
 
@@ -501,7 +526,7 @@ void main() {
     // The emblem's pale stone lies flush, smooth; its dark lines a little sunk.
     vec2 inlay = emblemInlay(p);
     if (inlay.x > 0.5) {
-      h = inlay.x > 2.5 ? 0.1 : inlay.x > 1.5 ? -0.6 : 0.6 + 0.3 * (gnoise(p / 12.0) - 0.5);
+      h = inlay.x > 3.5 ? 0.6 + 0.3 * (gnoise(p / 12.0) - 0.5) : inlay.x > 2.5 ? 0.1 : inlay.x > 1.5 ? -0.6 : 0.6 + 0.3 * (gnoise(p / 12.0) - 0.5);
       missing = 0.0;
       id = 0.5;
     }
@@ -591,13 +616,15 @@ void main() {
     float calm = fieldCalm(p, 100.0);
     vec4 brick = brickAt(p);
     float wear = hash12(brick.xy + 21.0);
-    vec3 stone = mix(vec3(0.215, 0.196, 0.17), vec3(0.32, 0.292, 0.252), mix(id, 0.55, 0.6 * calm)) * (wear < 0.15 ? mix(0.84, 0.94, calm) : 1.0);
+    // Design 084: under the cards the bricks quieter still (closer tones, shallower joints).
+    vec3 stone = mix(vec3(0.215, 0.196, 0.17), vec3(0.32, 0.292, 0.252), mix(id, 0.55, 0.85 * calm)) * (wear < 0.15 ? mix(0.84, 0.97, calm) : 1.0);
     float gap = 1.0 - smoothstep(0.3, 0.9 + 0.5 * gnoise(p / 30.0), brick.z);
-    stone = mix(stone, stone * mix(0.6, 0.8, calm), gap * 0.85);
+    stone = mix(stone, stone * mix(0.6, 0.9, calm), gap * 0.85);
     // Dark grime gathers in broad pools, as on the art's paving.
     stone *= mix(1.0, 0.74, smoothstep(0.58, 0.78, fbm3(p / 210.0 + 3.0)));
     vec2 inlay = emblemInlay(p);
-    if (inlay.x > 2.5) stone = vec3(0.24, 0.22, 0.2);
+    if (inlay.x > 3.5) stone = vec3(0.3, 0.2, 0.15);
+    else if (inlay.x > 2.5) stone = vec3(0.24, 0.22, 0.2);
     else if (inlay.x > 1.5) stone = vec3(0.11, 0.1, 0.09);
     else if (inlay.x > 0.5) stone = vec3(0.4, 0.37, 0.34);
     col = stone * (0.55 + 0.35 * facing + 0.25 * sky);
@@ -612,6 +639,9 @@ void main() {
     col = rock * (0.75 + 0.3 * sky);
   }
   col = mix(col * 0.55, col, smoothstep(0.3, 0.9, light.b));
+  // Design 084: warmer at the arena's middle, cooler toward its edge and the land past it.
+  float fromMiddle = length(p - uRing.xy) / max(uRing.z, 1.0);
+  col *= mix(vec3(1.1, 1.03, 0.92), vec3(0.86, 0.9, 0.98), smoothstep(0.15, 1.3, fromMiddle));
   // The overcast sky's thicker clouds drift over, their soft shadows crossing the ring.
   float clouds = fbm3((p - vec2(uTime * 9.0, uTime * 4.0)) / 520.0 + 3.7);
   col *= 1.0 - 0.16 * smoothstep(0.48, 0.72, clouds) * (1.0 - 0.7 * fieldCalm(p, 120.0));
@@ -619,6 +649,14 @@ void main() {
   float far = smoothstep(140.0, 560.0, d);
   float mist = fbm3((p + vec2(uTime * 14.0, -uTime * 6.0)) / 160.0);
   col = mix(col, HAZE * (0.92 + 0.22 * mist), far * (0.6 + 0.2 * mist));
+  // Design 084: low mountains painted along the far margin, past the spires: a ridge of hazy slate
+  // shapes, paler toward their crests, snow on the highest, under the haze.
+  float skyline = uRing.y + uRing.z + 360.0 + 70.0 * fbm3(vec2(p.x / 260.0, 2.3)) + 50.0 * fbm3(vec2(p.x / 90.0, 7.1));
+  float range = smoothstep(skyline + 8.0, skyline - 4.0, p.y) * smoothstep(skyline - 230.0, skyline - 120.0, p.y);
+  float crest = smoothstep(skyline - 60.0, skyline - 6.0, p.y);
+  vec3 hills = mix(vec3(0.24, 0.23, 0.24), vec3(0.36, 0.35, 0.34), crest);
+  hills = mix(hills, vec3(0.62, 0.62, 0.62), crest * smoothstep(0.62, 0.8, fbm3(vec2(p.x / 140.0, 1.7))));
+  col = mix(col, hills, range * 0.7 * smoothstep(80.0, 260.0, d));
   vec2 edgeUv = min(vUv, 1.0 - vUv);
   col *= mix(0.45, 1.0, smoothstep(0.0, 0.05, min(edgeUv.x, edgeUv.y)));
   vec3 dust = vec3(0.75, 0.68, 0.55);
