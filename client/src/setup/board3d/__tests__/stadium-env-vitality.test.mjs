@@ -9,6 +9,8 @@ import { tableBounds } from '../table-uv.mjs';
 import {
   BAKE_FIELD_FRAGMENT,
   BUSH_CARD_GAP_PX,
+  HERO_SIDE,
+  LIGHT_POOL,
   MAX_LIMBS,
   MAX_PADS,
   MOTE_FRAGMENT,
@@ -48,12 +50,13 @@ test('environmentKeyFor: Forest of Vitality by id, and by set and number', () =>
   assert.equal(environmentKeyFor({ set: 'customhb', number: '30' }), VITALITY_KEY);
 });
 
-test('vitalitySpots: one tree, its trunk right of every card in the far half, clear of them', () => {
+test('vitalitySpots: one tree, its trunk beside every card on HERO_SIDE in the far half, clear of them (design 084: left)', () => {
+  assert.equal(HERO_SIDE, -1, 'the audit moved the tree to the top-left margin');
   for (const layout of layouts) {
     const { tree } = vitalitySpots(layout);
     const table = tableBounds(layout);
     const cards = cardsOf(layout);
-    assert.ok(cards.every((card) => tree.x - tree.flare > card.x + card.w), 'trunk right of the cards');
+    assert.ok(cards.every((card) => tree.x + tree.flare < card.x), 'trunk left of the cards');
     assert.ok(tree.y > table.y + table.h / 2, 'trunk in the far half');
     for (const card of cards) assert.ok(distanceToRect(tree.x, tree.y, card) >= tree.flare + TREE_CARD_GAP_PX);
     for (const root of tree.roots) {
@@ -76,26 +79,45 @@ test('vitalitySpots: the crown is broad, every pad clear of every card seen from
 test('vitalitySpots: bushes stand off the meadow and off every card and the hand, clear of the tree', () => {
   for (const layout of layouts) {
     const { bushes, core, tree, hand } = vitalitySpots(layout);
-    assert.ok(bushes.length > 40);
+    assert.ok(bushes.length > 30, `${bushes.length} bushes`);
     const obstacles = hand ? [...cardsOf(layout), hand] : cardsOf(layout);
     for (const bush of bushes) {
-      assert.ok(clearingDistance(core, bush.x, bush.y) >= -bush.r * 0.3 - 1e-9);
+      assert.ok(clearingDistance(core, bush.x, bush.y) >= -bush.reach * 0.25 - 1e-9);
       assert.ok(Math.hypot(bush.x - tree.x, bush.y - tree.y) >= tree.reach);
       for (const rect of obstacles) assert.ok(distanceToRect(bush.x, bush.y, rect) >= bush.reach + BUSH_CARD_GAP_PX - 1e-6);
     }
   }
 });
 
-test('vitalitySpots: tall grass on the meadow edge, flowers and toadstools, each clear of every card and the hand', () => {
+test('vitalitySpots: tall grass on the meadow edge, flower beds round the light pool, no toadstools (design 084)', () => {
   for (const layout of layouts) {
-    const { grass, flowers, mushrooms, core, hand } = vitalitySpots(layout);
+    const spots = vitalitySpots(layout);
+    const { grass, flowers, core, hand, tree, glows } = spots;
     assert.ok(grass.length > 6, `${grass.length} tall grass patches`);
-    assert.ok(flowers.length > 3, `${flowers.length} flower clumps`);
+    assert.ok(flowers.length >= 5, `${flowers.length} flower beds`);
+    assert.equal(spots.mushrooms, undefined, 'the card has no toadstools');
+    const pool = glows[0];
+    for (const bed of flowers) {
+      const out = Math.hypot(bed.x - tree.x, bed.y - tree.y);
+      assert.ok(out >= pool.r * 0.74 - 1e-6 && out <= pool.r + 1e-6, `a bed on the pool's rim (${out.toFixed(0)} of ${pool.r.toFixed(0)})`);
+    }
     const obstacles = hand ? [...cardsOf(layout), hand] : cardsOf(layout);
-    for (const plant of [...grass, ...flowers, ...mushrooms]) {
+    for (const plant of [...grass, ...flowers]) {
       for (const rect of obstacles) assert.ok(distanceToRect(plant.x, plant.y, rect) >= plant.reach + PLANT_CARD_GAP_PX - 1e-6);
     }
     for (const patch of grass) assert.ok(clearingDistance(core, patch.x, patch.y) > 0, 'tall grass grows outside the meadow');
+  }
+});
+
+test('vitalitySpots: a warm light pools under the tree, about two card widths past its flare (design 084)', () => {
+  for (const layout of layouts) {
+    const { tree, glows, u } = vitalitySpots(layout);
+    assert.equal(glows.length, 1);
+    const [pool] = glows;
+    assert.deepEqual([pool.x, pool.y], [tree.x, tree.y]);
+    assert.equal(pool.colour, LIGHT_POOL.colour);
+    assert.ok(pool.r >= tree.flare + 180 * u && pool.r <= tree.flare + 260 * u);
+    assert.ok(pool.strength > 0.2 && pool.strength <= 0.8, 'a pool of light, not a flare');
   }
 });
 
@@ -130,9 +152,9 @@ test('the crown and the trunk never cover a card on screen, in either camera pre
   }
 });
 
-test("the sun stands at the far right, so the crown's shadow falls from the top right across the mat", () => {
+test("the sun stands beyond the tree, so the crown's shadow falls from its corner across the mat", () => {
   const [sx, sy, sz] = VITALITY_SUN;
-  assert.ok(sx > 0 && sy > 0 && sz > 0);
+  assert.ok(Math.sign(sx) === HERO_SIDE && sy > 0 && sz > 0);
   for (const layout of layouts) {
     const { tree } = vitalitySpots(layout);
     const table = tableBounds(layout);
@@ -145,7 +167,7 @@ test("the sun stands at the far right, so the crown's shadow falls from the top 
       shadow.x += (pad.x - (sx / sz) * pad.z) / tree.pads.length;
       shadow.y += (pad.y - (sy / sz) * pad.z) / tree.pads.length;
     }
-    assert.ok(crown.x > middle.x && crown.y > middle.y, 'crown at the top right');
+    assert.ok(Math.sign(crown.x - middle.x) === HERO_SIDE && crown.y > middle.y, 'crown at the top corner on its side');
     assert.ok(shadow.x > table.x && shadow.x < table.x + table.w && shadow.y > table.y && shadow.y < table.y + table.h, 'shadow on the mat');
     assert.ok(Math.hypot(shadow.x - middle.x, shadow.y - middle.y) < Math.hypot(crown.x - middle.x, crown.y - middle.y) * 0.75);
   }
@@ -192,11 +214,18 @@ test('the ground ceiling the screen test bounds stays above the bake\'s swells (
   assert.ok(0.4 + 4 + 12 <= VITALITY_GROUND_CEILING_PX);
 });
 
-test('the thickets gather (some cells bare, some thick), in three greens, with broadleaves over the thickest (design 083)', () => {
-  const spots = vitalitySpots(layouts[0]);
-  const palettes = new Set(spots.bushes.map((bush) => bush.palette));
-  assert.ok(palettes.size >= 2, `bush greens ${[...palettes]}`);
-  assert.ok(spots.bushes.some((bush) => bush.tree), 'a broadleaf stands over a thicket');
-  assert.ok(spots.driftEmitters.length > 0 && spots.driftEmitters.length <= 12, 'leaves fall from the crown and the broadleaves');
-  for (const e of spots.driftEmitters) assert.ok([e.x, e.y, e.r, e.z].every(Number.isFinite) && e.z > 0);
+test("the thickets gather in three greens; the card's flat-topped broadleaves stand in groves of three to five (design 084)", () => {
+  for (const layout of layouts) {
+    const spots = vitalitySpots(layout);
+    const palettes = new Set(spots.bushes.map((bush) => bush.palette));
+    assert.ok(palettes.size >= 2, `bush greens ${[...palettes]}`);
+    const trees = spots.groves.filter((piece) => piece.asset === 'treeRound');
+    assert.ok(trees.length >= 3, `${trees.length} broadleaves`);
+    assert.ok(trees.every((piece) => piece.options.crown === 'umbrella'), "the card's umbrella crown");
+    assert.ok(new Set(trees.map((piece) => Math.round(piece.size))).size >= 2, 'at least two sizes');
+    const heroes = spots.groves.filter((piece) => piece.hero);
+    assert.ok(heroes.length >= 1 && heroes.length < spots.groves.length, 'groves, not single trees in a row');
+    assert.ok(spots.driftEmitters.length > 0 && spots.driftEmitters.length <= 12, 'leaves fall from the crown and the broadleaves');
+    for (const e of spots.driftEmitters) assert.ok([e.x, e.y, e.r, e.z].every(Number.isFinite) && e.z > 0);
+  }
 });
