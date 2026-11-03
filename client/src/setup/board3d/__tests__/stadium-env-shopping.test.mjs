@@ -52,6 +52,18 @@ test('shoppingSpots: tables, racks and mannequins stand clear of every card, ins
   }
 });
 
+// Design 084: the balloons bunch at the hall's corners: on the end tables of each band.
+test('shoppingSpots: the balloons bunch on the end tables of each band, five to a bunch, four hues', () => {
+  for (const layout of layouts) {
+    const { tables, balloons } = shoppingSpots(layout);
+    const ends = tables.filter((table) => table.end);
+    for (const b of balloons) {
+      assert.ok(ends.some((table) => table.x === b.anchor.x && table.y === b.anchor.y), 'tied to an end table');
+      assert.ok(b.hue >= 0 && b.hue < 4, `hue ${b.hue}`);
+    }
+  }
+});
+
 test('the escalators climb to the mezzanine behind the opponent hand', () => {
   for (const layout of layouts) {
     const { escalators, mezzanine, hand } = shoppingSpots(layout);
