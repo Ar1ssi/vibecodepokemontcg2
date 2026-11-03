@@ -354,15 +354,37 @@ export function holdFxQueue(ms) {
 }
 
 /**
+ * Holds the FX queue until `promise` settles: the opening coin ceremony, whose real end depends on
+ * its renderer loading, so the deal queued behind it never plays under the coin.
+ *
+ * @param {Promise<unknown>} promise
+ */
+export function holdFxQueueUntil(promise) {
+  if (typeof promise?.then !== 'function') return;
+  fxQueue.push({ kind: 'gate', until: promise, blocking: true });
+}
+
+/**
  * Resolves once every queued effect has played out its hold (the opening deal, so the
  * Starting Active picker opens after it instead of over it). The backstop keeps a caller
- * that gates input on this from waiting forever.
+ * that gates input on this from waiting forever: it fires only after HELD_DRAW_BACKSTOP_MS
+ * in which no plan started, so a long chain that is still moving is waited out.
  *
  * @returns {Promise<void>}
  */
 export function whenFxQueueIdle() {
   return new Promise((resolve) => {
-    const backstop = setTimeout(resolve, HELD_DRAW_BACKSTOP_MS);
+    let seen = fxQueue.startedCount();
+    let backstop = null;
+    const arm = () => {
+      backstop = setTimeout(() => {
+        const now = fxQueue.startedCount();
+        if (now === seen) return resolve();
+        seen = now;
+        arm();
+      }, HELD_DRAW_BACKSTOP_MS);
+    };
+    arm();
     fxQueue.whenIdle().then(() => {
       clearTimeout(backstop);
       resolve();

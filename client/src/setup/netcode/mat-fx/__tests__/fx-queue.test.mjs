@@ -315,3 +315,49 @@ test('fx-queue: whenIdle resolves when the queue is cleared', async () => {
   await idle;
   assert.equal(queue.pending(), 0);
 });
+
+test('fx-queue: a gate plan holds later plans until its promise settles, never running it', async () => {
+  const ran = [];
+  const { queue, clock } = make((p) => {
+    ran.push(p.id);
+    return 0;
+  });
+  let open;
+  queue.push({ id: 'gate', until: new Promise((resolve) => (open = resolve)) });
+  queue.push({ id: 'deal' });
+  assert.equal(clock.drain(), 0);
+  assert.deepEqual(ran, []);
+  let idle = false;
+  queue.whenIdle().then(() => (idle = true));
+  await Promise.resolve();
+  assert.equal(idle, false);
+  open();
+  await new Promise((r) => setImmediate(r));
+  clock.drain();
+  assert.deepEqual(ran, ['deal']);
+  assert.equal(queue.startedCount(), 2);
+});
+
+test('fx-queue: a rejected gate releases the chain; clear() drops a waiting gate', async () => {
+  const ran = [];
+  const { queue, clock } = make((p) => {
+    ran.push(p.id);
+    return 0;
+  });
+  queue.push({ id: 'gate', until: Promise.reject(new Error('stage lost')) });
+  queue.push({ id: 'after' });
+  await new Promise((r) => setImmediate(r));
+  clock.drain();
+  assert.deepEqual(ran, ['after']);
+
+  let open;
+  queue.push({ id: 'gate2', until: new Promise((resolve) => (open = resolve)) });
+  queue.push({ id: 'dropped' });
+  queue.clear();
+  open();
+  await new Promise((r) => setImmediate(r));
+  clock.drain();
+  assert.deepEqual(ran, ['after']);
+  queue.push({ id: 'fresh' });
+  assert.deepEqual(ran, ['after', 'fresh']);
+});
