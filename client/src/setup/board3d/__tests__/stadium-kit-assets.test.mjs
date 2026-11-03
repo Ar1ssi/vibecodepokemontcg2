@@ -9,7 +9,7 @@ import { ASSET_NAMES, measureAsset, placeAsset, seededRandom } from '../stadium-
  * (undefined: the asset's default).
  */
 const OPTION_GRID = {
-  treeRound: { size: [20, 40, 60, 90], height: [undefined, 50, 120, 200], crown: [undefined, 'umbrella'] },
+  treeRound: { size: [20, 40, 60, 90], height: [undefined, 50, 120, 200], crown: [undefined, 'umbrella'], tiers: [undefined, 2] },
   pine: { size: [20, 34, 50], height: [undefined, 60, 120], tiers: [2, 3, 4], snow: [false, true] },
   palm: { height: [80, 150, 220], lean: [0, 0.22, 0.45], fronds: [6, 8, 10] },
   bush: { size: [10, 26, 40], berries: [null, ['#ff0000']] },

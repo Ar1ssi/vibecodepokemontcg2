@@ -23,6 +23,12 @@
 // meadow, the undergrowth, the glow and the crown's shade; the kit's meshes draw the trunk (a lathe
 // up its curved spine whose buttress fins run on into the roots' ridges in the ground), boughs,
 // crown, bushes and plants; MOTES the motes of light rising off the glow.
+// Design 085 (a hostile review: "procedural and empty"): the crown is the card's three stacked shelves
+// of flattened lumps, each lit from below by the vitality glow (the kit's underlight); the trunk's foot
+// flares less and glows; the glow is a lit volume where both cameras look: its pool on the table side
+// of the trunk, a low drifting mist in the undergrowth and soft columns of light at the trunks; the
+// bushes gather in thickets, taller further out; the broadleaves are real trees with two shelves; the
+// meadow is a glade (a deeper green, soft canopy shadows, a cool far edge); no flower ring.
 import {
   FILTERING,
   FOOTPRINTS,
@@ -57,6 +63,8 @@ export const HERO_SIDE = -1;
 export const VITALITY_SUN = Object.freeze([0.7128 * HERO_SIDE, 0.5346, 0.454]);
 /** Design 084: the light pool under the tree (the shared contact glow): its colour, reach past the trunk's flare, strength. */
 export const LIGHT_POOL = Object.freeze({ colour: '#d9e86a', reachPx: 230, strength: 0.75, breath: 0.07 });
+/** Design 085: the pool's centre off the trunk, toward the table and the near side, where both cameras see it. */
+export const POOL_OFFSET_PX = Object.freeze({ across: 110, near: 150 });
 /** Meadow kept round the cards' box before the bushes begin, and how far its edge wanders out. */
 export const CLEARING_PX = 30;
 export const CLEARING_WOBBLE_PX = 26;
@@ -77,6 +85,22 @@ export const MAX_POOLS = 20;
 /** Buttress fins round the trunk's foot, each running on into a root. */
 export const TRUNK_FINS = 5;
 const MOTE_COUNT = 70;
+/** Design 085: the most mist banks and light columns the board draws (the uniform arrays' lengths). */
+export const MAX_MISTS = 10;
+export const MAX_COLUMNS = 5;
+/**
+ * Design 085: the crown's shelves, bottom first: height and reach from the crown's centre (card-scale
+ * px), lumps in its scalloped rim; each shelf leans a little further toward the sun.
+ */
+export const SHELVES = Object.freeze([
+  Object.freeze({ z: 150, reach: 330, ring: 11 }),
+  Object.freeze({ z: 240, reach: 240, ring: 9 }),
+  Object.freeze({ z: 320, reach: 140, ring: 7 }),
+]);
+/** Design 085: a light column's width and height (card-scale px). */
+export const COLUMN_PX = Object.freeze({ width: 30, height: 120 });
+/** Design 085: the least gap between a mist bank's edge and any card or the opponent's hand. */
+export const MIST_CARD_GAP_PX = 40;
 /** How far a pad reaches past its radius, seen from above (a margin). */
 const PUFF_REACH = 1.06;
 /** A flower's width in the beds out among the bushes (px at world unit 1): BDSP's chunky blooms. */
@@ -133,39 +157,37 @@ function growTree(table, scene, core, obstacles, u) {
   const x = side < 0 ? Math.max(wanted, scene.x + flare * 1.2) : Math.min(wanted, scene.x + scene.w - flare * 1.2);
   const y = table.y + table.h * 0.7;
   const fork = [x + side * 30 * u, y + 48 * u, 190 * u];
-  // The crown: a dome of overlapping pads over an ellipse out past the trunk (longer up the table
-  // than across it), highest in its middle; pads on a jittered grid, so no two rings line up.
+  // Design 085: the crown as the card draws it: three stacked shelves of flattened lumps over the
+  // trunk, widest at the bottom, each leaning a little further toward the sun (a dome of round pads read
+  // as a cauliflower). Every lump is clear of every card and the hand seen from above.
   const centre = { x: x + side * 50 * u, y: y + 130 * u };
-  const reach = { x: 330 * u, y: 400 * u };
-  const step = 60 * u;
-  const clear = (px, py, r) => obstacles.every((rect) => distanceToRect(px, py, rect) >= r * PUFF_REACH + TREE_CARD_GAP_PX);
+  const toSun = [VITALITY_SUN[0], VITALITY_SUN[1]];
+  const sunLength = Math.hypot(toSun[0], toSun[1]) || 1;
+  // The largest a lump at (px, py) may grow and stay clear of every card and the hand seen from above:
+  // a shelf's big lumps shrink by the cards instead of dropping out (so each shelf stays one mass).
+  const fitRadius = (px, py) => (Math.min(...obstacles.map((rect) => distanceToRect(px, py, rect))) - TREE_CARD_GAP_PX) / PUFF_REACH;
   const pads = [];
-  for (let gy = -reach.y; gy <= reach.y; gy += step * 0.87) {
-    const row = Math.round(gy / (step * 0.87));
-    for (let gx = -reach.x + (row % 2 ? step / 2 : 0); gx <= reach.x; gx += step) {
-      const roll = (salt) => hash(gx + 0.5, gy + 0.5, salt + x);
-      const px = centre.x + gx + (roll(1) - 0.5) * step * 0.5;
-      const py = centre.y + gy + (roll(2) - 0.5) * step * 0.5;
-      const out = Math.hypot((px - centre.x) / reach.x, (py - centre.y) / reach.y);
-      if (out > 1 - 0.12 * roll(3)) continue;
-      const r = (50 + 30 * roll(4)) * u * (1.15 - 0.3 * out);
-      const inScene = px > scene.x - r && px < scene.x + scene.w + r * 2 && py > scene.y - r && py < scene.y + scene.h + r * 2;
-      if (!inScene || !clear(px, py, r)) continue;
-      pads.push({ x: px, y: py, z: (300 - 140 * out * out + 22 * (roll(5) - 0.5)) * u, r, tier: out, seed: roll(6) });
-    }
-  }
-  // A skirt of lower pads round the fork, so the trunk's top ends under foliage, not in a cut face.
-  for (let k = 0; k < 11; k += 1) {
-    const roll = (salt) => hash(k + 0.5, x, salt + 60);
-    const angle = (k / 11) * 2 * Math.PI + roll(1) * 0.5;
-    const out = (62 + 70 * roll(2)) * u;
-    const px = fork[0] + side * 24 * u + Math.cos(angle) * out;
-    const py = fork[1] + 34 * u + Math.sin(angle) * out;
-    const r = (52 + 22 * roll(3)) * u;
-    if (!clear(px, py, r)) continue;
-    pads.push({ x: px, y: py, z: (190 + 30 * roll(4)) * u, r, tier: 0.45 + 0.1 * roll(5), seed: roll(6) });
-  }
-  pads.sort((a, b) => a.tier - b.tier);
+  SHELVES.forEach((shelf, level) => {
+    const lean = level * 28 * u;
+    const middle = { x: centre.x + (toSun[0] / sunLength) * lean, y: centre.y + (toSun[1] / sunLength) * lean };
+    const reach = shelf.reach * u;
+    // One broad plate in the middle, three lumps round it, a scalloped ring at the rim (many small
+    // round pads read as a cauliflower; a few big flat ones as the card's shelves).
+    const spots = [{ angle: 0, out: 0, share: 0.62 }];
+    for (let k = 0; k < 3; k += 1) spots.push({ angle: (k / 3) * 2 * Math.PI + 0.9 + level, out: 0.32, share: 0.42 });
+    for (let k = 0; k < shelf.ring; k += 1) spots.push({ angle: (k / shelf.ring) * 2 * Math.PI + hash(level, k, 7) * 0.5, out: 0.68, share: 0.36 });
+    spots.forEach(({ angle, out, share }, k) => {
+      const roll = (salt) => hash(level + 0.5, k + 0.5, salt + x);
+      const spread = out * (0.9 + 0.2 * roll(1));
+      const px = middle.x + Math.cos(angle) * reach * spread;
+      const py = middle.y + Math.sin(angle) * reach * spread * 1.12;
+      const wanted = reach * share * (0.9 + 0.2 * roll(2));
+      const r = Math.min(wanted, fitRadius(px, py));
+      if (r < wanted * 0.45) return;
+      const sunSide = ((px - middle.x) * toSun[0] + (py - middle.y) * toSun[1]) / (sunLength * Math.max(reach, 1));
+      pads.push({ x: px, y: py, z: (shelf.z + 14 * (roll(3) - 0.5)) * u, r, shelf: level, tier: out, sunSide, seed: roll(4) });
+    });
+  });
   const shown = pads.slice(0, MAX_PADS);
   const trunk = {
     from: [x, y, -10],
@@ -174,16 +196,16 @@ function growTree(table, scene, core, obstacles, u) {
     r0: radius,
     r1: radius * 0.7,
   };
-  // Boughs from the fork up into pads part way out, spread round it.
+  // Boughs from the fork up into the shelves' lumps part way out, spread round it.
   const boughs = shown
-    .filter((pad) => pad.tier > 0.2 && pad.tier < 0.6)
+    .filter((pad) => pad.shelf < 2 && pad.tier > 0.2 && pad.tier < 0.7)
     .sort((a, b) => Math.atan2(a.y - fork[1], a.x - fork[0]) - Math.atan2(b.y - fork[1], b.x - fork[0]))
     .filter((_, i, all) => i % Math.max(1, Math.floor(all.length / (MAX_LIMBS - 1))) === 0)
     .slice(0, MAX_LIMBS - 1)
     .map((pad) => ({
       from: fork,
       via: [(fork[0] + pad.x) / 2, (fork[1] + pad.y) / 2, fork[2] + (pad.z - pad.r * 0.5 - fork[2]) * 0.3],
-      to: [pad.x, pad.y, pad.z - pad.r * 0.45],
+      to: [pad.x, pad.y, pad.z - pad.r * 0.2],
       r0: radius * 0.42,
       r1: radius * 0.14,
     }));
@@ -196,7 +218,8 @@ function growTree(table, scene, core, obstacles, u) {
     const angle = (2 * Math.PI * i - finTurn) / TRUNK_FINS;
     const dir = [Math.cos(angle), Math.sin(angle)];
     const away = Math.max(0, side * Math.cos(angle));
-    let length = radius + (45 + 55 * hash(i, x, 41) + 50 * away) * u;
+    // Design 085: shorter (from above the fins and roots read as a brown star).
+    let length = radius + 0.35 * (45 + 55 * hash(i, x, 41) + 50 * away) * u;
     while (length > radius * 1.3 && distanceToRect(x + dir[0] * length, y + dir[1] * length, core) < TREE_CARD_GAP_PX + 6 * u) {
       length -= 6 * u;
     }
@@ -226,6 +249,9 @@ export function shadowBox(tree) {
   return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) };
 }
 
+/** Design 085: how near p lies to a pool of glow, 1 in its heart, 0 past twice its radius. */
+const poolNear = (pools, x, y) => Math.max(0, ...pools.map((pool) => 1 - Math.hypot(x - pool.x, y - pool.y) / (2 * pool.r)));
+
 /**
  * Forest of Vitality's layout: the meadow (the cards' box, CLEARING_PX and its wander round it), the
  * tree, the pools of glow and the bushes. Null without a table.
@@ -245,8 +271,10 @@ export function vitalitySpots(layout) {
   const tree = growTree(table, scene, core, obstacles, u);
   const inScene = (x, y, inset) => x > scene.x + inset && x < scene.x + scene.w - inset && y > scene.y + inset && y < scene.y + scene.h - inset;
   // Design 084: the warm light pooling under the tree, as the card's vitality glow (the shared GLOW).
+  // Design 085: centred off the trunk toward the table and the near side, where both cameras see it.
   const poolReach = tree.flare + LIGHT_POOL.reachPx * u;
-  const glows = [{ x: tree.x, y: tree.y, r: poolReach, colour: LIGHT_POOL.colour, strength: LIGHT_POOL.strength, breath: LIGHT_POOL.breath }];
+  const poolCentre = { x: tree.x - HERO_SIDE * POOL_OFFSET_PX.across * u, y: tree.y - POOL_OFFSET_PX.near * u };
+  const glows = [{ ...poolCentre, r: poolReach, colour: LIGHT_POOL.colour, strength: LIGHT_POOL.strength, breath: LIGHT_POOL.breath }];
 
   // Pools of glow: one at the trunk's foot, the rest on a coarse jittered grid out in the bushes.
   const pools = [{ x: tree.x, y: tree.y, r: tree.radius * 2.4, strength: 1 }];
@@ -279,60 +307,76 @@ export function vitalitySpots(layout) {
     Math.hypot(x - tree.x, y - tree.y) >= tree.reach + reach * 0.4 &&
     offPools(x, y, reach);
   const groveFits = reachOff(TREE_CARD_GAP_PX);
-  const groves = clumpPieces(area, {
+  // Design 085: real secondary trees: the card's broadleaves big (85-120 px crowns) with two shelves,
+  // overlapping in groves, most where the frame shows them (the left and top-left).
+  const groveOptions = {
     step: 300 * u,
     mix: scaledKinds(
       [
-        { asset: 'treeRound', weight: 1, size: [50, 62], options: { crown: 'umbrella' }, lean: 0.05, spread: 0.08 },
-        { asset: 'treeRound', weight: 1, size: [34, 44], options: { crown: 'umbrella' }, lean: 0.06, spread: 0.1 },
+        { asset: 'treeRound', weight: 1, size: [76, 100], options: { crown: 'umbrella', tiers: 2 }, lean: 0.04, spread: 0.08 },
+        { asset: 'treeRound', weight: 1, size: [56, 72], options: { crown: 'umbrella', tiers: 2 }, lean: 0.05, spread: 0.1 },
       ],
       u
     ),
     satellites: scaledKinds(
       [
-        { asset: 'treeRound', weight: 2, size: [32, 42], options: { crown: 'umbrella' }, lean: 0.07, spread: 0.12 },
-        { asset: 'bush', weight: 1, size: [30, 42], lean: 0.05, spread: 0.2 },
+        { asset: 'treeRound', weight: 2, size: [44, 58], options: { crown: 'umbrella' }, lean: 0.06, spread: 0.12 },
+        { asset: 'bush', weight: 1, size: [34, 48], lean: 0.05, spread: 0.2 },
       ],
       u
     ),
     fits: (x, y, reach, height) => clearingDistance(core, x, y) > 70 * u && groveFits(x, y, reach, height),
-    thick: 0.72,
+    thick: 0.5,
     count: [2, 4],
-    cap: 16,
-    spacing: 0.72,
+    cap: 12,
+    spacing: 0.62,
     salt: 61,
     taken: [{ x: tree.x, y: tree.y, r: tree.reach }],
-    weight: (x) => 0.5 + 0.5 * wanted(x),
-  }).map((piece) => ({ ...piece, palette: Math.floor(hash(piece.x, piece.y, 67) * 2) }));
-  // Design 084: the flower beds round the light pool's rim, as the card's blossoms gather where the
-  // glow spreads; then tall grass along the meadow's edge. Each clear of every card, the hand, the
-  // tree, the groves and one another.
+    weight: (x) => 0.4 + 0.6 * wanted(x),
+  };
+  let planted = clumpPieces(area, groveOptions);
+  // Where the margins are narrow (a mat whose cards run near the table's edges) the big trees find no
+  // room: the groves fall back to design 084's smaller broadleaves there.
+  if (planted.filter((piece) => piece.asset === 'treeRound').length < 3) {
+    planted = clumpPieces(area, {
+      ...groveOptions,
+      mix: scaledKinds(
+        [
+          { asset: 'treeRound', weight: 1, size: [50, 62], options: { crown: 'umbrella', tiers: 2 }, lean: 0.05, spread: 0.08 },
+          { asset: 'treeRound', weight: 1, size: [34, 44], options: { crown: 'umbrella' }, lean: 0.06, spread: 0.1 },
+        ],
+        u
+      ),
+      thick: 0.6,
+      cap: 16,
+    });
+  }
+  const groves = planted.map((piece) => ({ ...piece, palette: Math.floor(hash(piece.x, piece.y, 67) * 2) }));
+  // Tall grass along the meadow's edge, clear of every card, the hand, the tree, the groves and one
+  // another (design 085: no flower ring; the card has none).
   const taken = [{ x: tree.x, y: tree.y, r: tree.reach }, ...groves.map((piece) => ({ x: piece.x, y: piece.y, r: piece.reach * 0.85 }))];
   const free = (x, y, r) => taken.every((spot) => Math.hypot(x - spot.x, y - spot.y) >= spot.r + r);
-  const flowers = [];
-  for (let k = 0; k < 60 && flowers.length < 8; k += 1) {
-    const angle = hash(k, tree.x, 81) * 2 * Math.PI;
-    const out = poolReach * (0.74 + 0.26 * hash(k, tree.y, 82));
-    const x = tree.x + Math.cos(angle) * out;
-    const y = tree.y + Math.sin(angle) * out;
-    const size = (18 + 12 * hash(k, 3, 83)) * u;
-    const { reach } = measureAsset('flowerBed', { size, head: FLOWER_HEAD_PX * u });
-    if (!inScene(x, y, reach) || !clear(x, y, reach + PLANT_CARD_GAP_PX) || !free(x, y, reach)) continue;
-    flowers.push({ x, y, size, reach, seed: hash(k, 4, 84), warm: hash(k, 5, 85) < 0.6 });
-    taken.push({ x, y, r: reach });
-  }
+  // Design 085: thickets, not dots: bushes in dense continuous masses, the big ones only well out from
+  // the meadow.
   const bushFits = reachOff(BUSH_CARD_GAP_PX);
   const bushes = clumpPieces(area, {
-    step: 104 * u,
-    mix: scaledKinds([{ asset: 'bush', weight: 1, size: [30, 46], lean: 0.06, spread: 0.22 }], u),
-    fits: (x, y, reach, height) => clearingDistance(core, x, y) >= -reach * 0.25 && bushFits(x, y, reach, height),
-    thick: 0.62,
-    count: [2, 4],
-    cap: 110,
-    spacing: 0.8,
+    step: 120 * u,
+    mix: scaledKinds(
+      [
+        { asset: 'bush', weight: 1, size: [30, 46], lean: 0.06, spread: 0.22 },
+        { asset: 'bush', weight: 1.2, size: [50, 75], lean: 0.05, spread: 0.18 },
+      ],
+      u
+    ),
+    fits: (x, y, reach, height) =>
+      clearingDistance(core, x, y) >= -reach * 0.25 && (reach < 56 * u || clearingDistance(core, x, y) > 140 * u) && bushFits(x, y, reach, height),
+    thick: 0.5,
+    count: [6, 12],
+    cap: 140,
+    spacing: 0.5,
     salt: 71,
     taken: taken.map((spot) => ({ ...spot })),
-    weight: (x) => 0.55 + 0.45 * wanted(x),
+    weight: (x) => 0.45 + 0.55 * wanted(x),
   }).map((piece) => ({
     ...piece,
     palette: Math.min(2, Math.floor(patchy(piece.x, piece.y, { scale: 420 * u, contrast: 0.6, salt: 47 }) * 1.66)),
@@ -362,7 +406,37 @@ export function vitalitySpots(layout) {
     ...crownPads.map((pad) => ({ x: pad.x, y: pad.y, r: pad.r, z: pad.z })),
     ...heroes.map((grove) => ({ x: grove.x, y: grove.y, r: grove.reach, z: grove.height * 0.75 })),
   ];
-  return { table, scene, core, u, hand, tree, pools, groves, bushes, grass, flowers, driftEmitters, glows };
+  // Design 085: the glow as a lit volume. Low banks of mist drifting in the undergrowth, near the
+  // pools and where the frame shows them, each clear of every card and the hand by its own reach and
+  // MIST_CARD_GAP_PX; soft columns of light standing at the trunks.
+  const mists = [];
+  const mistStep = 150 * u;
+  const candidates = [{ ...poolCentre, r: 90 * u, phase: 0.1 }];
+  for (let gy = area.y + mistStep / 2; gy < area.y + area.h; gy += mistStep) {
+    for (let gx = area.x + mistStep / 2; gx < area.x + area.w; gx += mistStep) {
+      const roll = (salt) => hash(gx, gy, salt + 900);
+      const x = gx + (roll(1) - 0.5) * mistStep * 0.6;
+      const y = gy + (roll(2) - 0.5) * mistStep * 0.6;
+      if (roll(3) > 0.45 * (0.4 + 0.6 * wanted(x)) + 0.25 * Math.min(1, poolNear(pools, x, y))) continue;
+      candidates.push({ x, y, r: (60 + 50 * roll(4)) * u, phase: roll(5) });
+    }
+  }
+  for (const spot of candidates) {
+    if (mists.length >= MAX_MISTS) break;
+    if (clearingDistance(core, spot.x, spot.y) < 40 * u || !inScene(spot.x, spot.y, spot.r * 0.5)) continue;
+    if (!clear(spot.x, spot.y, spot.r + MIST_CARD_GAP_PX * u)) continue;
+    if (mists.some((m) => Math.hypot(m.x - spot.x, m.y - spot.y) < (m.r + spot.r) * 0.7)) continue;
+    mists.push(spot);
+  }
+  // Each column wider than its trunk, so the light shows round it.
+  const columns = [
+    { x: tree.x, y: tree.y, w: tree.radius * 2.6, h: COLUMN_PX.height * u * 1.25 },
+    ...groves
+      .filter((piece) => piece.asset === 'treeRound' && piece.size > 40 * u)
+      .slice(0, MAX_COLUMNS - 1)
+      .map((piece) => ({ x: piece.x, y: piece.y, w: Math.max(COLUMN_PX.width * u, piece.size * 0.7), h: COLUMN_PX.height * u })),
+  ];
+  return { table, scene, core, u, hand, tree, pools, groves, bushes, grass, driftEmitters, glows, mists, columns };
 }
 
 const VITALITY = /* glsl */ `
@@ -406,7 +480,8 @@ vec2 rootRidge(vec2 p) {
     float s = clamp((along - uRoot.z * 0.8) / max(run - uRoot.z * 0.8, 1.0), 0.0, 1.0);
     float across = abs(dot(p - uRoot.xy, vec2(-way.y, way.x)));
     float width = mix(uRoot.z * 0.36, 3.0, pow(s, 0.8)) * (1.0 + 0.15 * sin(along * 0.11 + float(i)));
-    float height = pow(1.0 - s, 1.3) * uRoot.z * 0.4 * sqrt(max(1.0 - (across * across) / (width * width), 0.0));
+    // Design 085: low soft swellings (tall short ridges read as spikes round the trunk).
+    float height = pow(1.0 - s, 1.3) * uRoot.z * 0.2 * sqrt(max(1.0 - (across * across) / (width * width), 0.0));
     if (along > 0.0 && height > best.x) best = vec2(height, s);
   }
   return best;
@@ -511,8 +586,10 @@ void main() {
 const PALETTE = /* glsl */ `
 // Design 084: the meadow grades from a warm green by the tree to a cooler one far from it, the depth
 // the card has (warm gold foreground, cool blue-green distance); the undergrowth likewise.
-const vec3 MEADOW_WARM = ${glslColour('#86c45a')};
-const vec3 MEADOW_COOL = ${glslColour('#5fa36a')};
+// Design 085: a glade's deeper greens (one flat lime lawn filled the view), a cool blue-green distance.
+const vec3 MEADOW_WARM = ${glslColour('#6aa857')};
+const vec3 MEADOW_COOL = ${glslColour('#4f8f6e')};
+const vec3 FAR_HAZE = ${glslColour('#84bdbe')};
 const vec3 UNDERGROWTH_WARM = ${glslColour('#4a9238')};
 const vec3 UNDERGROWTH_COOL = ${glslColour('#2f7c4a')};
 const vec3 GLOW = vec3(0.836, 0.828, 0.131);
@@ -572,6 +649,9 @@ void main() {
   col = mix(col, rootBark, rootMask);
 
   col *= (0.6 + 0.4 * min(sunlit, 1.15)) * mix(0.45, 1.0, smoothstep(0.3, 0.9, light.b));
+  // Design 085: the glade's light: broad still patches of canopy shade over it all (about 12% either
+  // way, low-frequency, so it is fine under the cards).
+  col *= 0.88 + 0.24 * smoothstep(0.25, 0.75, fbm3(p / 430.0 + 3.0));
 
   // The crown's shade, cool and deep, opened by a few broad soft gaps where the crown is thin.
   float t = uTime;
@@ -599,6 +679,8 @@ void main() {
   // Design 084: the warm light pooling under the tree (the shared contact glow), grown in with it.
   col = mix(col, glowOn(col, p), treeUp);
 
+  // Design 085: the far margin cools into the card's blue-green distance.
+  col = mix(col, FAR_HAZE * 0.8, smoothstep(0.74, 1.0, vUv.y) * 0.45);
   col = edgeHaze(col, vUv);
   vec3 dawn = vec3(0.85, 0.95, 0.35);
   col += dawn * revealGlow(p, 0.035) * 0.7;
@@ -611,14 +693,14 @@ ${OUTPUT}
 // The kit's solids in BDSP's greens, the crown keeping the card art's teal jade (pixel samples:
 // #038577, #1da095) with its yellow-green rim.
 const BARK = paint('#7d5232');
-const CROWN = Object.freeze({ body: paint('#1f8a6c'), top: paint('#34a88a'), fringe: paint('#9cc447') });
+// Design 085: the card's shelves: dark teal bodies, the top shelf lighter, a jade highlight on the sun side.
+const CROWN = Object.freeze({ low: paint('#175f47'), body: paint('#1d7657'), top: paint('#2f9a7a'), lit: paint('#5cb39a') });
 const BUSH_COLOURS = Object.freeze({ leaf: '#3f9a3a', leafLight: '#7cc44a' });
 // Design 083: the thickets in three greens, and the broadleaves standing over them.
 const BUSH_PALETTES = Object.freeze([BUSH_COLOURS, Object.freeze({ leaf: '#327f34', leafLight: '#5fae46' }), Object.freeze({ leaf: '#5aa63a', leafLight: '#a4d24e' })]);
 // Design 084: the groves' broadleaves in the card's teal greens, two of them so a grove is not one stamp.
 const BROADLEAVES = Object.freeze([Object.freeze({ leaf: '#22896b', leafLight: '#8fc24a' }), Object.freeze({ leaf: '#2f8f55', leafLight: '#a6c843' })]);
 const TALL_GRASS = Object.freeze({ grass: '#2f7f34', tip: '#86c94e' });
-const BLOOMS = Object.freeze({ warm: ['#fff4d6', '#ffd94a'], cool: ['#ffffff', '#f7a1c4'] });
 
 /** A point on the quadratic curve from `from` via `via` to `to` at t. */
 const onCurve = ({ from, via, to }, t) => [0, 1, 2].map((k) => (1 - t) ** 2 * from[k] + 2 * (1 - t) * t * via[k] + t ** 2 * to[k]);
@@ -642,12 +724,13 @@ export function trunkGrid(tree) {
     const tangent = ahead.map((v, k) => v - behind[k]);
     const tLength = Math.hypot(...tangent) || 1;
     const unitTangent = tangent.map((v) => v / tLength);
-    const flare = 0.75 * Math.exp(-t * 10);
+    // Design 085: a smaller flare and shallower fins (from above they read as a brown star).
+    const flare = 0.35 * Math.exp(-t * 10);
     const row = [];
     for (let k = 0; k < around; k += 1) {
       const angle = (k / around) * 2 * Math.PI;
       const fin = 0.5 + 0.5 * Math.cos(TRUNK_FINS * angle + tree.finTurn);
-      const r = (r0 + (r1 - r0) * t) * (1 + flare * (0.25 + 0.75 * fin ** 1.6));
+      const r = (r0 + (r1 - r0) * t) * (1 + flare * (0.85 + 0.15 * fin ** 1.6));
       const radial = [Math.cos(angle), Math.sin(angle), 0];
       const along = radial[0] * unitTangent[0] + radial[1] * unitTangent[1];
       const square = radial.map((v, axis) => v - unitTangent[axis] * along);
@@ -678,17 +761,19 @@ export function vitalityProps(spots) {
   }
   // The crown: every pad a leafy lump, dark where it tucks in under its neighbours, built about the
   // trunk so the leaves on its flat tops lie outward from it.
-  const zTop = Math.max(...tree.pads.map((pad) => pad.z), 1);
+  // Design 085: every lump flattened into a shelf (rz 0.38 of its width), the sun side of each shelf
+  // jade, the top shelf lighter; the kit's underlight (kitGlow) gives each its yellow-green lower lip.
   const lumps = tree.pads.map((pad) => ({
     x: pad.x - tree.x,
     y: pad.y - tree.y,
     z: pad.z,
     rx: pad.r,
-    rz: pad.r * 0.78,
-    color: pad.tier > 0.84 ? CROWN.fringe : pad.z > zTop * 0.84 ? CROWN.top : CROWN.body,
+    rz: pad.r * 0.38,
+    color: pad.sunSide > 0.42 ? CROWN.lit : [CROWN.low, CROWN.body, CROWN.top][Math.min(pad.shelf, 2)],
   }));
+  // Soft creases: each shelf reads as one mass, the shelves apart by their steps and lit lower lips.
   props.at({ x: tree.x, y: tree.y, ground: false }, () =>
-    props.look({ kind: LOOK.foliage, leaf: 11 * spots.u }, () => props.lumps(lumps, { crease: 0.5 }))
+    props.look({ kind: LOOK.foliage, leaf: 11 * spots.u }, () => props.lumps(lumps, { crease: 0.2 }))
   );
   const piece = (p, colors) => ({ ...kit, ...p.options, x: p.x, y: p.y, size: p.size, yaw: p.yaw, lean: p.lean ?? undefined, seed: p.seed * 997, colors });
   for (const grove of spots.groves) {
@@ -697,9 +782,6 @@ export function vitalityProps(spots) {
   }
   for (const bush of spots.bushes) placeAsset(props, 'bush', piece(bush, BUSH_PALETTES[bush.palette] ?? BUSH_COLOURS));
   for (const patch of spots.grass) placeAsset(props, 'tallGrass', { ...kit, x: patch.x, y: patch.y, size: patch.size, blade: patch.blade, seed: patch.seed * 991, colors: TALL_GRASS });
-  for (const clump of spots.flowers) {
-    placeAsset(props, 'flowerBed', { ...kit, x: clump.x, y: clump.y, size: clump.size, depth: 0.7, head: FLOWER_HEAD_PX * spots.u, seed: clump.seed * 983, petals: clump.warm ? BLOOMS.warm : BLOOMS.cool, yaw: clump.seed * 6.28 });
-  }
   return props;
 }
 
@@ -757,6 +839,121 @@ ${OUTPUT}
 }
 `;
 
+/**
+ * Design 085: the kit's underlight: the vitality glow lights the forest from below, so the undersides
+ * and lower flanks of every lit part take its yellow-green (the card's lit lower lips of every crown),
+ * most near the ground.
+ */
+const UNDERLIGHT = /* glsl */ `
+vec3 kitGlow(vec3 albedo, vec3 n, vec3 world) {
+  float under = smoothstep(0.35, -0.45, n.z);
+  float low = exp(-max(world.z, 0.0) / 230.0);
+  return ${glslColour('#c8cf3c')} * under * (0.3 + 0.7 * low) * 0.42;
+}
+`;
+
+/**
+ * Design 085: mist banks: soft low sprites, a yellow-green haze lit from within (#d6d84a core to
+ * #9fbf3a edge), drifting a little and breathing; two sprites a bank, each its own size and drift.
+ */
+export const MIST_VERTEX = /* glsl */ `
+${TABLE_UNIFORMS}
+uniform float uTime;
+uniform float uFocal;
+${NOISE}
+${REVEAL}
+uniform vec4 uMists[${MAX_MISTS}];
+attribute float aMist;
+varying float vBreath;
+void main() {
+  vec4 mist = uMists[int(min(aMist * 0.5, ${MAX_MISTS - 1}.0))];
+  float second = mod(aMist, 2.0);
+  vec2 drift = vec2(sin(uTime * 0.05 + mist.w * 6.3 + second * 2.1), cos(uTime * 0.04 + mist.w * 4.1 + second)) * mist.z * 0.12;
+  vec2 at = mist.xy + drift + (second - 0.5) * vec2(0.4, -0.25) * mist.z;
+  vec3 pos = vec3(at, 10.0 + 18.0 * second);
+  float shown = step(0.001, mist.z) * revealBurned(at) * exitKeep(at);
+  vec4 mv = modelViewMatrix * vec4(pos, 1.0);
+  gl_Position = projectionMatrix * mv;
+  gl_PointSize = 2.0 * mist.z * mix(1.0, 0.75, second) * uFocal / -mv.z * shown;
+  vBreath = 0.85 + 0.15 * sin(uTime * 0.3 + mist.w * 9.0 + second * 1.7);
+}
+`;
+
+export const MIST_FRAGMENT = /* glsl */ `
+varying float vBreath;
+void main() {
+  float d = length(gl_PointCoord - 0.5) * 2.0;
+  float soft = exp(-d * d * 3.2) * (1.0 - smoothstep(0.8, 1.0, d));
+  vec3 col = mix(${glslColour('#9fbf3a')}, ${glslColour('#d6d84a')}, exp(-d * d * 6.0));
+  gl_FragColor = vec4(col, soft * 0.3 * vBreath);
+${OUTPUT}
+}
+`;
+
+/**
+ * Design 085: the light columns at the trunks: soft parallel shafts of the glow rising from the ground,
+ * a camera-facing strip each, bright at its foot and fading upward (no rays, no fan).
+ */
+export const COLUMN_VERTEX = /* glsl */ `
+${TABLE_UNIFORMS}
+uniform float uTime;
+${NOISE}
+${REVEAL}
+uniform vec4 uColumns[${MAX_COLUMNS}];
+attribute vec3 aColumn;
+varying vec2 vAcross;
+varying float vShow;
+void main() {
+  vec4 column = uColumns[int(aColumn.z)];
+  vec3 foot = vec3(column.xy, 0.0);
+  vec4 mv = modelViewMatrix * vec4(foot + vec3(0.0, 0.0, aColumn.y * column.w), 1.0);
+  vec4 footView = modelViewMatrix * vec4(foot, 1.0);
+  vec4 topView = modelViewMatrix * vec4(foot + vec3(0.0, 0.0, column.w), 1.0);
+  vec2 up = topView.xy - footView.xy;
+  vec2 side = length(up) > 0.001 ? normalize(vec2(-up.y, up.x)) : vec2(1.0, 0.0);
+  mv.xy += side * aColumn.x * column.z * 0.5;
+  gl_Position = projectionMatrix * mv;
+  vAcross = aColumn.xy;
+  vShow = step(0.001, column.w) * revealBurned(column.xy) * exitKeep(column.xy) * (0.9 + 0.1 * sin(uTime * 0.4 + column.x * 0.01));
+}
+`;
+
+export const COLUMN_FRAGMENT = /* glsl */ `
+varying vec2 vAcross;
+varying float vShow;
+void main() {
+  float across = 1.0 - vAcross.x * vAcross.x;
+  float rise = 1.0 - smoothstep(0.0, 1.0, vAcross.y);
+  float foot = smoothstep(0.0, 0.08, vAcross.y);
+  gl_FragColor = vec4(${glslColour('#e3e86a')} * across * rise * rise * foot * 0.45 * vShow, 1.0);
+${OUTPUT}
+}
+`;
+
+/** The light columns' strips: four corners each (across -1/1, up 0/1, the column's index). */
+const columnGeometry = (three) => {
+  const corners = [];
+  const index = [];
+  for (let i = 0; i < MAX_COLUMNS; i += 1) {
+    const first = corners.length / 3;
+    corners.push(-1, 0, i, 1, 0, i, 1, 1, i, -1, 1, i);
+    index.push(first, first + 1, first + 2, first, first + 2, first + 3);
+  }
+  const geometry = new three.BufferGeometry();
+  geometry.setAttribute('position', new three.Float32BufferAttribute(new Array(corners.length).fill(0), 3));
+  geometry.setAttribute('aColumn', new three.Float32BufferAttribute(corners, 3));
+  geometry.setIndex(index);
+  return geometry;
+};
+
+/** The mist sprites: two a bank, each its bank's index times two (plus one for the second). */
+const mistGeometry = (three) => {
+  const geometry = new three.BufferGeometry();
+  geometry.setAttribute('position', new three.Float32BufferAttribute(new Array(MAX_MISTS * 2 * 3).fill(0), 3));
+  geometry.setAttribute('aMist', new three.Float32BufferAttribute(Array.from({ length: MAX_MISTS * 2 }, (_, i) => i), 1));
+  return geometry;
+};
+
 const NO_TREE = { x: 0, y: 0, radius: 0, reach: 0, finTurn: 0, pads: [], boughs: [], roots: [], trunk: null };
 
 /** Forest of Vitality's board (stadium-environment-mesh.js BOARDS). */
@@ -771,20 +968,30 @@ export function forestOfVitalityBoard({ three, material, seeded, terrainGrid, re
     uLimbFrom: { value: Array.from({ length: MAX_LIMBS }, () => new three.Vector4()) },
     uLimbTo: { value: Array.from({ length: MAX_LIMBS }, () => new three.Vector4()) },
     uShadowBox: { value: new three.Vector4() },
+    uMists: { value: Array.from({ length: MAX_MISTS }, () => new three.Vector4()) },
+    uColumns: { value: Array.from({ length: MAX_COLUMNS }, () => new three.Vector4()) },
   };
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
   const materials = {
     terrain: make(TERRAIN_VERTEX, TERRAIN_FRAGMENT),
     motes: make(MOTE_VERTEX, MOTE_FRAGMENT, { transparent: true, depthWrite: false, blending: three.AdditiveBlending }),
+    mist: make(MIST_VERTEX, MIST_FRAGMENT, { transparent: true, depthWrite: false }),
+    columns: make(COLUMN_VERTEX, COLUMN_FRAGMENT, { transparent: true, depthWrite: false, blending: three.AdditiveBlending, side: three.DoubleSide }),
     bakeField: make(FULLSCREEN_VERTEX, BAKE_FIELD_FRAGMENT, bakeOptions),
     bakeLight: make(FULLSCREEN_VERTEX, bakeLightFragment(), bakeOptions),
   };
-  const kit = createKitProps({ three, material, own, mood: 'day', reveal: 'vec3(0.85, 0.95, 0.35)', ground: true });
+  const kit = createKitProps({ three, material, own, mood: 'day', reveal: 'vec3(0.85, 0.95, 0.35)', ground: true, glow: UNDERLIGHT });
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
   const motes = new three.Points(seeded(MOTE_COUNT), materials.motes);
   motes.renderOrder = 2;
+  const mist = new three.Points(mistGeometry(three), materials.mist);
+  mist.renderOrder = 1;
+  const columns = new three.Mesh(columnGeometry(three), materials.columns);
+  columns.renderOrder = 2;
+  columns.frustumCulled = false;
+  mist.frustumCulled = false;
   return {
-    objects: [terrain, ...kit.objects, motes],
+    objects: [terrain, ...kit.objects, mist, columns, motes],
     materials: [...Object.values(materials), ...kit.materials],
     bakeField: materials.bakeField,
     bakeLight: materials.bakeLight,
@@ -809,6 +1016,14 @@ export function forestOfVitalityBoard({ three, material, seeded, terrainGrid, re
       const limbs = tree.trunk ? [tree.trunk, ...tree.boughs] : [];
       own.uLimbFrom.value.forEach((slot, i) => (limbs[i] ? slot.set(...limbs[i].from, limbs[i].r0) : slot.set(0, 0, 0, 0)));
       own.uLimbTo.value.forEach((slot, i) => (limbs[i] ? slot.set(...limbs[i].to, limbs[i].r1) : slot.set(0, 0, 0, 0)));
+      own.uMists.value.forEach((slot, i) => {
+        const m = spots?.mists?.[i];
+        return m ? slot.set(m.x, m.y, m.r, m.phase) : slot.set(0, 0, 0, 0);
+      });
+      own.uColumns.value.forEach((slot, i) => {
+        const c = spots?.columns?.[i];
+        return c ? slot.set(c.x, c.y, c.w, c.h) : slot.set(0, 0, 0, 0);
+      });
       const box = shadowBox(tree);
       own.uShadowBox.value.set(box.x0, box.y0, box.x1, box.y1);
       replaceGeometry(terrain, terrainGrid(bounds));

@@ -10,11 +10,20 @@ import {
   BAKE_FIELD_FRAGMENT,
   BUSH_CARD_GAP_PX,
   HERO_SIDE,
+  COLUMN_FRAGMENT,
+  COLUMN_VERTEX,
   LIGHT_POOL,
+  MAX_COLUMNS,
   MAX_LIMBS,
+  MAX_MISTS,
   MAX_PADS,
+  MIST_CARD_GAP_PX,
+  MIST_FRAGMENT,
+  MIST_VERTEX,
   MOTE_FRAGMENT,
   MOTE_VERTEX,
+  POOL_OFFSET_PX,
+  SHELVES,
   PLANT_CARD_GAP_PX,
   TERRAIN_FRAGMENT,
   TERRAIN_VERTEX,
@@ -65,6 +74,19 @@ test('vitalitySpots: one tree, its trunk beside every card on HERO_SIDE in the f
   }
 });
 
+// Design 085: the card's crown: three stacked shelves of flattened lumps, widest at the bottom.
+test('vitalitySpots: the crown stands in three shelves, each higher one narrower', () => {
+  const layout = layouts[0];
+  const { tree, u } = vitalitySpots(layout);
+  const shelves = [0, 1, 2].map((level) => tree.pads.filter((pad) => pad.shelf === level));
+  shelves.forEach((pads, level) => {
+    assert.ok(pads.length >= 3, `shelf ${level}: ${pads.length} lumps`);
+    for (const pad of pads) assert.ok(Math.abs(pad.z - SHELVES[level].z * u) <= 8 * u, `shelf ${level} lump at ${pad.z}`);
+  });
+  const spreadOf = (pads) => Math.max(...pads.map((p) => Math.hypot(p.x - pads[0].x, p.y - pads[0].y)));
+  assert.ok(spreadOf(shelves[0]) > spreadOf(shelves[2]), 'the bottom shelf is the widest');
+});
+
 test('vitalitySpots: the crown is broad, every pad clear of every card seen from above', () => {
   for (const layout of layouts) {
     const { tree } = vitalitySpots(layout);
@@ -89,32 +111,28 @@ test('vitalitySpots: bushes stand off the meadow and off every card and the hand
   }
 });
 
-test('vitalitySpots: tall grass on the meadow edge, flower beds round the light pool, no toadstools (design 084)', () => {
+test('vitalitySpots: tall grass on the meadow edge, no flower ring and no toadstools (design 085)', () => {
   for (const layout of layouts) {
     const spots = vitalitySpots(layout);
-    const { grass, flowers, core, hand, tree, glows } = spots;
+    const { grass, core, hand } = spots;
     assert.ok(grass.length > 6, `${grass.length} tall grass patches`);
-    assert.ok(flowers.length >= 5, `${flowers.length} flower beds`);
+    assert.equal(spots.flowers, undefined, 'the card has no flower ring');
     assert.equal(spots.mushrooms, undefined, 'the card has no toadstools');
-    const pool = glows[0];
-    for (const bed of flowers) {
-      const out = Math.hypot(bed.x - tree.x, bed.y - tree.y);
-      assert.ok(out >= pool.r * 0.74 - 1e-6 && out <= pool.r + 1e-6, `a bed on the pool's rim (${out.toFixed(0)} of ${pool.r.toFixed(0)})`);
-    }
     const obstacles = hand ? [...cardsOf(layout), hand] : cardsOf(layout);
-    for (const plant of [...grass, ...flowers]) {
+    for (const plant of grass) {
       for (const rect of obstacles) assert.ok(distanceToRect(plant.x, plant.y, rect) >= plant.reach + PLANT_CARD_GAP_PX - 1e-6);
     }
     for (const patch of grass) assert.ok(clearingDistance(core, patch.x, patch.y) > 0, 'tall grass grows outside the meadow');
   }
 });
 
-test('vitalitySpots: a warm light pools under the tree, about two card widths past its flare (design 084)', () => {
+test('vitalitySpots: a warm light pools by the tree, on its table side, about two card widths past its flare (designs 084, 085)', () => {
   for (const layout of layouts) {
     const { tree, glows, u } = vitalitySpots(layout);
     assert.equal(glows.length, 1);
     const [pool] = glows;
-    assert.deepEqual([pool.x, pool.y], [tree.x, tree.y]);
+    assert.ok(Math.abs(pool.x - (tree.x - HERO_SIDE * POOL_OFFSET_PX.across * u)) < 1e-9, 'toward the table');
+    assert.ok(Math.abs(pool.y - (tree.y - POOL_OFFSET_PX.near * u)) < 1e-9, 'toward the near side');
     assert.equal(pool.colour, LIGHT_POOL.colour);
     assert.ok(pool.r >= tree.flare + 180 * u && pool.r <= tree.flare + 260 * u);
     assert.ok(pool.strength > 0.2 && pool.strength <= 0.8, 'a pool of light, not a flare');
@@ -173,6 +191,36 @@ test("the sun stands beyond the tree, so the crown's shadow falls from its corne
   }
 });
 
+// Design 085: the glow as a lit volume: mist banks off the meadow and clear of every card and the hand;
+// light columns at the trunks, never over a card on screen.
+test('vitalitySpots: mist banks drift clear of every card and the hand, off the meadow', () => {
+  for (const layout of layouts) {
+    const { mists, hand, core, u } = vitalitySpots(layout);
+    assert.ok(mists.length >= 2 && mists.length <= MAX_MISTS, `${mists.length} mist banks`);
+    const obstacles = hand ? [...cardsOf(layout), hand] : cardsOf(layout);
+    for (const m of mists) {
+      assert.ok(clearingDistance(core, m.x, m.y) >= 40 * u - 1e-9, 'off the meadow');
+      for (const rect of obstacles) assert.ok(distanceToRect(m.x, m.y, rect) >= m.r + MIST_CARD_GAP_PX * u - 1e-6, 'clear of a card');
+    }
+  }
+});
+
+test('the light columns stand at the trunks and never cover a card on screen, in either camera preset', () => {
+  for (const view of SCREEN_VIEWS) {
+    const { layout, projectors } = screenView(view);
+    const { columns, tree } = vitalitySpots(layout);
+    assert.ok(columns.length >= 1 && columns.length <= MAX_COLUMNS);
+    assert.deepEqual([columns[0].x, columns[0].y], [tree.x, tree.y], 'the first at the great trunk');
+    for (const { preset, project } of projectors) {
+      for (const c of columns) {
+        const points = [];
+        for (const s of [-0.5, 0, 0.5]) for (const z of [0, c.h * 0.5, c.h]) points.push([c.x + s * c.w, c.y, z], [c.x, c.y + s * c.w, z]);
+        assert.equal(pointOnCard(points, layout, project), null, `${view.profile} ${view.viewport.w} ${preset}: a column over a card`);
+      }
+    }
+  }
+});
+
 test('vitalitySpots is null without a layout', () => {
   assert.equal(vitalitySpots(null), null);
   assert.equal(vitalitySpots({}), null);
@@ -202,7 +250,7 @@ test('trunkGrid: rings round the spine from the foot to the fork, each closed ro
 
 test('Forest of Vitality shaders declare no GLSL ES 3.00 reserved word and every one has a main', () => {
   const reserved = /\b(?:float|vec[234]|int|bool)\s+(?:flat|half|smooth|noperspective|sample|patch|input|output|filter|active|common|fixed|long|short|out|in|inout|round)\b/;
-  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_VERTEX, TERRAIN_FRAGMENT, MOTE_VERTEX, MOTE_FRAGMENT]) {
+  for (const shader of [MIST_VERTEX, MIST_FRAGMENT, COLUMN_VERTEX, COLUMN_FRAGMENT, BAKE_FIELD_FRAGMENT, TERRAIN_VERTEX, TERRAIN_FRAGMENT, MOTE_VERTEX, MOTE_FRAGMENT]) {
     assert.doesNotMatch(shader, reserved);
     assert.match(shader, /void main\(\)/);
   }

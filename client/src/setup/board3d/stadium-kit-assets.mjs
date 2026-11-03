@@ -143,9 +143,10 @@ function flowerHead(props, { x, y, head, h, tint, eye, leaf, turn }) {
  * on a trunk of height H, and how high its lighter top lumps reach. The crown never sinks below a
  * third of the trunk, so a short tall-crowned tree still shows its trunk.
  */
-const umbrellaShape = (R, H) => {
+const umbrellaShape = (R, H, tiers = 1) => {
   const base = Math.max(H - 0.55 * R, 0.35 * H);
-  return { base, top: base + 0.52 * R };
+  // Design 085: a second, smaller shelf over the first (the card's stacked crowns).
+  return { base, top: base + (tiers > 1 ? 0.74 : 0.52) * R };
 };
 
 /** Each asset: dims(options) → { reach (px from its foot, seen from above), height }, draw(props, options, dims, ctx). */
@@ -157,10 +158,10 @@ const ASSETS = {
    * trunk forking into limbs under a wide flat crown, its lit top a band of lighter lumps.
    */
   treeRound: {
-    dims: ({ size = 60, height, crown }) => {
+    dims: ({ size = 60, height, crown, tiers }) => {
       if (crown === 'umbrella') {
         const H = height ?? size * 2.3;
-        return { reach: size * 1.18, height: Math.max(H, umbrellaShape(size, H).top) };
+        return { reach: size * 1.18, height: Math.max(H, umbrellaShape(size, H, tiers).top) };
       }
       return { reach: size * 1.12, height: (height ?? size * 2.1) + size * 0.06 };
     },
@@ -1114,9 +1115,9 @@ const ASSETS = {
  * round its rim) with a band of lighter lumps on top leaning sunward. Every lump lies within 1.14 R
  * of the trunk and under umbrellaShape's top.
  */
-function drawUmbrella(props, { size: R = 60, height, colors }, { rand, shift, sunward }) {
+function drawUmbrella(props, { size: R = 60, height, colors, tiers = 1 }, { rand, shift, sunward }) {
   const H = height ?? R * 2.3;
-  const { base } = umbrellaShape(R, H);
+  const { base } = umbrellaShape(R, H, tiers);
   const c = coloursOf({ leaf: 'leaf', leafLight: 'leafLight', bark: 'bark', barkDark: 'barkDark' }, colors);
   props.lathe(
     [
@@ -1146,14 +1147,28 @@ function drawUmbrella(props, { size: R = 60, height, colors }, { rand, shift, su
     const r = (0.38 + 0.08 * rand()) * R;
     lumps.push({ x: Math.cos(angle) * 0.68 * R, y: Math.sin(angle) * 0.68 * R, z: base + 0.04 * R + rand() * 0.04 * R, rx: r, rz: r * 0.6, color: c.leaf });
   }
+  // Design 085 (tiers 2): a second, smaller shelf over the first, leaning sunward, the lighter band
+  // on it instead.
+  const upper = tiers > 1;
+  if (upper) {
+    const mid = blend(c.leaf, c.leafLight, 0.3);
+    lumps.push({ x: sunward[0] * 0.1 * R, y: sunward[1] * 0.1 * R, z: base + 0.36 * R, rx: 0.58 * R, rz: 0.2 * R, color: mid });
+    const ring = 5 + Math.floor(rand() * 2);
+    for (let k = 0; k < ring; k += 1) {
+      const angle = turn + 0.3 + (k / ring) * 2 * Math.PI + (rand() - 0.5) * 0.3;
+      const r = (0.24 + 0.05 * rand()) * R;
+      lumps.push({ x: Math.cos(angle) * 0.4 * R + sunward[0] * 0.1 * R, y: Math.sin(angle) * 0.4 * R + sunward[1] * 0.1 * R, z: base + 0.32 * R, rx: r, rz: r * 0.55, color: mid });
+    }
+  }
   const tops = 3 + Math.floor(rand() * 2);
   for (let k = 0; k < tops; k += 1) {
     const angle = turn + 0.6 + (k / tops) * 2 * Math.PI;
-    const r = (0.34 + 0.05 * rand()) * R;
+    const r = (upper ? 0.22 + 0.04 * rand() : 0.34 + 0.05 * rand()) * R;
+    const out = upper ? 0.22 : 0.34;
     lumps.push({
-      x: Math.cos(angle) * 0.34 * R + sunward[0] * 0.14 * R,
-      y: Math.sin(angle) * 0.34 * R + sunward[1] * 0.14 * R,
-      z: base + 0.3 * R,
+      x: Math.cos(angle) * out * R + sunward[0] * 0.14 * R,
+      y: Math.sin(angle) * out * R + sunward[1] * 0.14 * R,
+      z: base + (upper ? 0.54 : 0.3) * R,
       rx: r,
       rz: r * 0.55,
       color: top,

@@ -62,8 +62,30 @@ the right ~24%).
 ## Acceptance
 | # | Criterion | Evidence |
 |---|---|---|
-| A1 | S1–S6 built, Scorched Earth reads dark basalt + bright lava in both presets | |
-| A2 | V1–V6 built, Vitality reads shelf crown + vitality glow + thickets in both presets | |
-| A3 | Every board test green; new layout logic tested (river path, mist off cards) | |
+| A1 | S1–S6 built, Scorched Earth reads dark basalt + bright lava in both presets | 0a7eff1c; stills `.agent/scratch/085a/` (rock ~#33231a, lava flow down the left in both presets) |
+| A2 | V1–V6 built, Vitality reads shelf crown + vitality glow + thickets in both presets | this branch; stills `.agent/scratch/085b/` |
+| A3 | Every board test green; new layout logic tested (river path, mist off cards) | stadium tests 380/380; `lavaPath`, shelves, mist, light-column screen tests |
 
 ## Deviations
+- S2: the river's course comes from the layout (`lavaPath`): from the volcano's foot down the strip
+  left of the cards to the near margin, each point as far toward the cards as their footprints allow
+  (bank 34 px off every card), bowing a little toward the margin; it never runs under the card block.
+- S5: the volcano is bigger (up to 320 px) but lower (height 0.7 r); its crater keeps in both frames
+  through `VOLCANO_CRATER_INSET` (measured with the board cameras). Its channels: two braided, each
+  forking at a narrow angle (wide forks read as spider legs).
+- S4/S1 found a second cause of the "vein net": a dry crack's lava table sat 4 px under its floor, so
+  every crack in the field glowed red; dry cracks' table now lies 12 px under.
+- V1: each shelf is one broad plate, three lumps round it and a scalloped rim, every lump shrunk to
+  stay clear of the cards rather than dropped (small round pads read as a cauliflower).
+- V3: the light columns are wider than their trunks (a narrow one hid inside the great trunk).
+- V5: where a mat's cards run near the table's edges the big broadleaves find no room; the groves
+  fall back to design 084's smaller ones there (tested: three or more on every profile).
+- Not done: V4's per-bush crease (the kit's bush asset has no crease option; the underlight carries
+  the thickets' depth instead).
+
+## Landing edits (for the commit that lands this branch on main)
+- DECISIONS: `[mat-fx]` design 085 (Scorched Earth's river is a layout path off the cards; Vitality's
+  crown is three shelves, the kit's underlight, mist and light columns).
+- ISSUES: reopen I277: Magma Basin's corner falls run beside the moat in tcgl and do not read as falls
+  (the 084 follow-up's test only checks they are in frame and near-vertical).
+- STATE: Active line names 085 for the user's localhost check.
