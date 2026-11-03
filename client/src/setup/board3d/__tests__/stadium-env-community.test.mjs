@@ -52,6 +52,14 @@ test('communitySpots: the square holds every card, the hall stands on its left e
   }
 });
 
+// Design 084: the mountains rise past the square's far end, never on it.
+test("communitySpots: the mountains start past the square's far end", () => {
+  for (const layout of layouts) {
+    const { farEdge, plaza } = communitySpots(layout);
+    assert.ok(farEdge > plaza.y1, `far edge ${farEdge} past the square ${plaza.y1}`);
+  }
+});
+
 test('communitySpots: trees stand off the square, clear of the tent and kiosks', () => {
   for (const layout of layouts) {
     const { trees, plaza, tent, kiosks } = communitySpots(layout);

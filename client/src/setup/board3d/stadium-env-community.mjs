@@ -16,6 +16,11 @@
 // sheet of water; the kit's meshes (designs 081, 082: the kit's soft light, contact shadows) the hall,
 // tent, kiosks, flag and benches, and the kit's own trees, boulders, bushes and flowers; MIST drifts
 // off the pool. The grass and paving are painted clean: no tufts, grain or stains.
+// Design 084 (the visual audit): the hall reads from above: a terracotta roof inside a white parapet,
+// the green banner down its near end and draped over the parapet, a bigger red awning at the door;
+// warmer, smaller paving slabs, more flower beds in the clover, one lower sun with deeper soft
+// shadows; the tent bigger, its roof in white and green gores that face up; mountains along the far
+// margin.
 import {
   FILTERING,
   FLOW_STREAKS,
@@ -41,8 +46,11 @@ import { clumpPieces, scaledKinds } from './stadium-env-clumps.mjs';
 import { BOX_SHADOW, EDGE_HAZE, PAVING, STANDARD_TERRAIN_VERTEX } from './stadium-env-surfaces.mjs';
 
 export const COMMUNITY_KEY = 'community-center';
-/** The day's sun (toward it, table frame): high, from the far left, so the hall's blue shade falls across the square, as the art's. */
-export const COMMUNITY_SUN = Object.freeze([-0.5, 0.35, 0.8]);
+/**
+ * The day's sun (toward it, table frame): from the far left, so the hall's blue shade falls across
+ * the square, as the art's. Design 084: a little lower, the shadows longer and crisper.
+ */
+export const COMMUNITY_SUN = Object.freeze([-0.58, 0.42, 0.7]);
 /** The square runs this far past the cards' box; its kerb rises this high. */
 export const PLAZA_MARGIN_PX = 64;
 export const PLAZA_RISE_PX = 5;
@@ -69,13 +77,15 @@ export function communitySpots(layout) {
   // The hall stands on the square's left edge, its face on it, long down the table.
   const hall = { x0: plaza.x0 - 190 * u, x1: plaza.x0, y0: core.y + 70 * u, y1: core.y + core.h * 0.8, height: HALL_HEIGHT_PX * u };
   const hallLength = hall.y1 - hall.y0;
-  const canopy = { x0: hall.x1, x1: hall.x1 + 36 * u, y0: hall.y0 + hallLength * 0.5 - 76 * u, y1: hall.y0 + hallLength * 0.5 + 76 * u, z0: 56 * u, z1: 64 * u };
+  // Design 084: the door's red awning bigger, so it reads from above.
+  const canopy = { x0: hall.x1, x1: hall.x1 + 46 * u, y0: hall.y0 + hallLength * 0.5 - 86 * u, y1: hall.y0 + hallLength * 0.5 + 86 * u, z0: 56 * u, z1: 65 * u };
   const banner = { y: hall.y0 + hallLength * 0.2, w: 28 * u, z0: 22 * u, z1: 128 * u };
   const flag = { x: hall.x1 - 30 * u, y: hall.y1 - 34 * u, base: hall.height, h: 130 * u };
-  const tent = { x: plaza.x1 + 130 * u, y: core.y + core.h * 0.56, half: 66 * u, post: 58 * u, apex: 90 * u };
+  // Design 084: the tent bigger, so its roof reads from above.
+  const tent = { x: plaza.x1 + 140 * u, y: core.y + core.h * 0.56, half: 86 * u, post: 64 * u, apex: 110 * u };
   const kiosks = [
-    { x: tent.x + 112 * u, y: tent.y - 62 * u, w: 52 * u, d: 40 * u, h: 56 * u, green: true },
-    { x: tent.x + 112 * u, y: tent.y + 40 * u, w: 52 * u, d: 40 * u, h: 52 * u, green: false },
+    { x: tent.x + 140 * u, y: tent.y - 62 * u, w: 52 * u, d: 40 * u, h: 56 * u, green: true },
+    { x: tent.x + 140 * u, y: tent.y + 40 * u, w: 52 * u, d: 40 * u, h: 52 * u, green: false },
   ];
   const cliffFoot = hall.x0 - 22 * u;
   const cliffStart = hall.y0 - 50 * u;
@@ -127,7 +137,7 @@ export function communitySpots(layout) {
     mix: scaledKinds(LAWN_CLUMPS, u),
     satellites: scaledKinds(LAWN_SATELLITES, u),
     thick: 0.85,
-    cap: 26,
+    cap: 32,
     salt: 143,
     taken,
     fits: (x, y, reach) => {
@@ -135,7 +145,9 @@ export function communitySpots(layout) {
       return onGrass && ctx.inScene(x, y, reach) && ctx.clear(x, y, reach, 14 * u);
     },
   }).map((piece) => ({ ...piece, kind: piece.asset }));
-  return { ...ctx, plaza, front, hall, canopy, banner, flag, tent, kiosks, cliffFoot, cliffStart, fall, pool, trees, benches, boulders, plants };
+  // Design 084: the mountains rise along the far margin, past the square's far end.
+  const farEdge = front + 20 * u;
+  return { ...ctx, plaza, front, farEdge, hall, canopy, banner, flag, tent, kiosks, cliffFoot, cliffStart, fall, pool, trees, benches, boulders, plants };
 }
 
 const COMMUNITY = /* glsl */ `
@@ -152,6 +164,8 @@ uniform float uUnit;
 uniform vec4 uBoxes[4];
 uniform vec4 uHeights;
 uniform vec4 uTrees[${MAX_TREES}];
+// Design 084: where the mountains start rising along the far margin (y).
+uniform float uFarEdge;
 float plazaDistance(vec2 p) {
   vec2 centre = (uPlaza.xy + uPlaza.zw) * 0.5;
   vec2 q = abs(p - centre) - ((uPlaza.zw - uPlaza.xy) * 0.5 - uShape.x);
@@ -197,6 +211,18 @@ void main() {
       tone = big.x > mid.x * 0.55 ? big.y : mid.y;
     }
   }
+  // Design 084: mountains along the far margin, ridged, rising out of the grass past the square.
+  float range = smoothstep(uFarEdge, uFarEdge + 200.0, p.y + 70.0 * (fbm3(vec2(p.x / 280.0, 4.0)) - 0.5));
+  if (range > 0.0) {
+    float ridge = 1.0 - abs(2.0 * fbm3(p / 240.0 + 9.0) - 1.0);
+    vec3 crag = stones(p + 71.0, 90.0, 4.0);
+    float mountain = range * range * (100.0 + 130.0 * ridge) + 22.0 * crag.x * range;
+    if (mountain > h) {
+      h = mountain;
+      kind = 2.0;
+      tone = crag.y;
+    }
+  }
   float pd = distance(p, uFall.zw);
   if (pd < uPool.x + 14.0) {
     h = mix(h, -24.0, smoothstep(uPool.x + 14.0, uPool.x * 0.72, pd));
@@ -212,8 +238,9 @@ export const TERRAIN_VERTEX = STANDARD_TERRAIN_VERTEX;
 const PALETTE = /* glsl */ `
 const vec3 GRASS = vec3(0.075, 0.25, 0.095);
 const vec3 GRASS_DARK = vec3(0.04, 0.14, 0.07);
-// Design 080: a step under the art's pale square, so white card borders keep their edge.
-const vec3 PLAZA = vec3(0.462, 0.482, 0.534);
+// Design 080: a step under the art's pale square, so white card borders keep their edge. Design 084:
+// warm stone, not the cool grey of a car park.
+const vec3 PLAZA = vec3(0.53, 0.49, 0.42);
 const vec3 ROCK_LIT = vec3(0.644, 0.474, 0.432);
 const vec3 ROCK_MID = vec3(0.345, 0.294, 0.392);
 const vec3 ROCK_SHADE = vec3(0.167, 0.196, 0.345);
@@ -221,7 +248,8 @@ const vec3 ROCK_MOSS = vec3(0.147, 0.228, 0.142);
 const vec3 FALL = vec3(0.625, 0.722, 0.858);
 const vec3 POOL = vec3(0.101, 0.442, 0.555);
 const vec3 POOL_DEEP = vec3(0.046, 0.16, 0.295);
-const vec3 SHADE_TINT = vec3(0.6, 0.7, 0.98);
+// Design 084: deeper, so one sun's soft shadows read.
+const vec3 SHADE_TINT = vec3(0.52, 0.6, 0.8);
 `;
 
 export const TERRAIN_FRAGMENT = /* glsl */ `
@@ -261,13 +289,14 @@ void main() {
 
   // The square: big pale slabs a shade apart, joints darker and blue in the shade, a kerb of lighter stone.
   if (kind > 0.5 && kind < 1.5) {
-    vec3 slab = paving(p, vec2(132.0, 100.0) * uUnit, 0.5);
+    // Design 084: smaller slabs (a big slab per card read as a car park).
+    vec3 slab = paving(p, vec2(76.0, 58.0) * uUnit, 0.5);
     vec3 stone = mix(PLAZA * 0.92, PLAZA * 1.05, slab.y);
     // Wide, faint joints; a darker, finer line down the middle of some, as a cut control joint.
     stone = mix(stone, stone * 0.8, 1.0 - smoothstep(0.4, 1.4, slab.x));
-    stone *= 1.0 - 0.07 * step(0.6, slab.y) * (1.0 - smoothstep(0.0, 1.1, abs(slab.z - 0.5) * 132.0 * uUnit));
+    stone *= 1.0 - 0.07 * step(0.6, slab.y) * (1.0 - smoothstep(0.0, 1.1, abs(slab.z - 0.5) * 76.0 * uUnit));
     // Each slab dished a little at its middle: its centre catches the sky.
-    stone *= 1.0 + 0.05 * (1.0 - smoothstep(0.0, 0.5, length(vec2(slab.z - 0.5, fract(p.y / (100.0 * uUnit)) - 0.5))));
+    stone *= 1.0 + 0.05 * (1.0 - smoothstep(0.0, 0.5, length(vec2(slab.z - 0.5, fract(p.y / (58.0 * uUnit)) - 0.5))));
     stone *= 1.0 - 0.14 * (1.0 - smoothstep(0.0, 18.0, -sd));
     col = stone;
     float kerb = (1.0 - smoothstep(0.5, 1.5, abs(sd + 3.0))) * 0.5;
@@ -382,7 +411,9 @@ ${OUTPUT}
 
 // Prop colours (aColor; w 0..1 how glossy, 0.05 foliage, 0.9 glass, 2 and up a light at w - 1).
 const WALL = [0.94, 0.957, 0.957, 0];
-const ROOF_TOP = [0.2, 0.23, 0.3, 0];
+// Design 084: terracotta, so the hall reads from above (a grey roof read as a warehouse).
+const ROOF_TOP = [0.46, 0.14, 0.09, 0];
+const AWNING = [0.62, 0.1, 0.08, 0.2];
 const UNIT = [0.5, 0.54, 0.6, 0.3];
 const UNIT_TOP = [0.72, 0.76, 0.8, 0.3];
 const ROOF_BAND = [0.592, 0.228, 0.215, 0.2];
@@ -393,9 +424,10 @@ const BANNER = [0.101, 0.592, 0.442, 0.2];
 const GLYPH = [0.9, 1.1, 0.55, 2.2];
 const FLAG_GREEN = [0.101, 0.496, 0.228, 0.1];
 // Design 083: the lawn's clumps (sizes card-scale px), and their satellites.
+// Design 084: more flower beds in the clover.
 const LAWN_CLUMPS = Object.freeze([
   { asset: 'bush', weight: 2, size: [18, 28] },
-  { asset: 'flowerBed', weight: 1.2, size: [16, 24], options: { depth: 0.7, head: 6, petals: ['#fff4d6', '#ffd94a', '#f7a1c4'] } },
+  { asset: 'flowerBed', weight: 2.6, size: [16, 26], options: { depth: 0.7, head: 6, petals: ['#fff4d6', '#ffd94a', '#f7a1c4'] } },
 ]);
 const LAWN_SATELLITES = Object.freeze([
   { asset: 'bush', weight: 1, size: [14, 22] },
@@ -406,6 +438,7 @@ const FLAG_WHITE = [0.95, 0.98, 0.95, 0.1];
 const POLE = [0.82, 0.86, 0.9, 0.5];
 const TENT = [0.97, 0.98, 1.0, 0.1];
 const TENT_EDGE = [0.5, 0.6, 0.78, 0.1];
+const TENT_GREEN = [0.16, 0.56, 0.34, 0.1];
 const KIOSK_G = [0.0, 0.305, 0.089, 0.3];
 const KIOSK_R = [0.934, 0.062, 0.093, 0.3];
 const KIOSK_TOP = [0.88, 0.9, 0.92, 0.2];
@@ -436,39 +469,55 @@ function communityHall(props, spots) {
     wallBand(props, { a, b, depth: 10 * u, z0: 116 * u, z1: H - 6 * u, over: 5 * u, color: ROOF_BAND, topColor: ROOF_BAND_DARK });
     wallBand(props, { a, b, depth: 6 * u, z0: H - 6 * u, z1: H, over: 8 * u, color: ROOF_BAND_DARK, topColor: ROOF_BAND });
   }
+  // Design 084: a white parapet round the terracotta roof (its edges, outer side on the right).
+  const edges = [
+    [[hall.x0, hall.y1], [hall.x0, hall.y0]],
+    [[hall.x0, hall.y0], [hall.x1, hall.y0]],
+    [[hall.x1, hall.y0], [hall.x1, hall.y1]],
+    [[hall.x1, hall.y1], [hall.x0, hall.y1]],
+  ];
+  for (const [a, b] of edges) wallBand(props, { a, b, depth: 9 * u, z0: H - 1, z1: H + 9 * u, over: 2 * u, color: WALL, topColor: WALL });
   // The roof's rail: posts and two rails round it.
   const rail = [[hall.x0, hall.y0], [hall.x1, hall.y0], [hall.x1, hall.y1], [hall.x0, hall.y1], [hall.x0, hall.y0]];
-  for (const z of [H + 10 * u, H + 20 * u]) props.tube(rail.map(([x, y]) => [x, y, z]), 1.4 * u, POLE, { sides: 6 });
+  for (const z of [H + 14 * u, H + 22 * u]) props.tube(rail.map(([x, y]) => [x, y, z]), 1.4 * u, POLE, { sides: 6 });
   for (let k = 0; k < 4; k += 1) {
     const [x0, y0] = rail[k];
     const [x1, y1] = rail[k + 1];
     const count = Math.max(2, Math.round(Math.hypot(x1 - x0, y1 - y0) / (34 * u)));
     for (let i = 0; i < count; i += 1) props.cylinder({ x: x0 + ((x1 - x0) * i) / count, y: y0 + ((y1 - y0) * i) / count, z0: H, z1: H + 21 * u, r: 1.4 * u, color: POLE, sides: 6 });
   }
-  // The roof's units: a stair hut at the near end, three air handlers with fans, a row of skylights.
+  // The roof's units (design 084: fewer, so the terracotta reads): a stair hut at the near end, two
+  // air handlers with fans.
   const length = hall.y1 - hall.y0;
   props.roundBox({ x: hall.x1 - 52 * u, y: hall.y0 + 44 * u, z0: H, z1: H + 30 * u, hw: 30 * u, hh: 24 * u, color: WALL, topColor: UNIT_TOP });
   props.roundBox({ x: hall.x1 - 22 * u, y: hall.y0 + 44 * u, z0: H, z1: H + 22 * u, hw: 1, hh: 9 * u, color: GLASS });
-  for (const [share, side] of [[0.3, 0.3], [0.62, 0.42], [0.86, 0.3]]) {
+  for (const [share, side] of [[0.55, 0.36], [0.8, 0.36]]) {
     const x = hall.x0 + (hall.x1 - hall.x0) * side;
     const y = hall.y0 + length * share;
-    props.roundBox({ x, y, z0: H, z1: H + 16 * u, hw: 24 * u, hh: 18 * u, color: UNIT, topColor: UNIT_TOP });
-    props.cylinder({ x, y, z0: H + 16 * u, z1: H + 17.4 * u, r: 13 * u, color: [0.1, 0.11, 0.13, 0.3], sides: 14 });
+    props.roundBox({ x, y, z0: H, z1: H + 16 * u, hw: 22 * u, hh: 17 * u, color: UNIT, topColor: UNIT_TOP });
+    props.cylinder({ x, y, z0: H + 16 * u, z1: H + 17.4 * u, r: 12 * u, color: [0.1, 0.11, 0.13, 0.3], sides: 14 });
   }
-  for (let k = 0; k < 4; k += 1) {
-    const x = (hall.x0 + hall.x1) / 2 + 24 * u;
-    const y = hall.y0 + length * (0.18 + 0.19 * k) + 20 * u;
-    props.roundBox({ x, y, z0: H, z1: H + 6 * u, hw: 34 * u, hh: 20 * u, color: UNIT, topColor: GLASS });
-  }
-  // The banner down the face, pale glyphs on it.
+  // The banner down the face to the cards, pale glyphs on it.
   const face = hall.x1 + 1.6 * u;
   props.quad([face, banner.y + banner.w, banner.z0], [face, banner.y, banner.z0], [face, banner.y, banner.z1], [face, banner.y + banner.w, banner.z1], BANNER);
   for (let k = 0; k < 4; k += 1) {
     const z = banner.z0 + 12 * u + k * 22 * u;
     props.quad([face + 0.4 * u, banner.y + banner.w - 5 * u, z], [face + 0.4 * u, banner.y + 5 * u, z], [face + 0.4 * u, banner.y + 5 * u, z + 14 * u], [face + 0.4 * u, banner.y + banner.w - 5 * u, z + 14 * u], GLYPH);
   }
-  // The awning over the door: a red-brown slab on two white posts.
-  props.roundBox({ x: (canopy.x0 + canopy.x1) / 2, y: (canopy.y0 + canopy.y1) / 2, z0: canopy.z0, z1: canopy.z1, hw: (canopy.x1 - canopy.x0) / 2, hh: (canopy.y1 - canopy.y0) / 2, color: ROOF_BAND, topColor: ROOF_BAND_DARK });
+  // Design 084: a second, wide banner down the near end, the face the cameras look at, draped over
+  // the parapet onto the roof, so it shows from above.
+  const near = hall.y0 - 1.6 * u;
+  const bx0 = hall.x1 - 34 * u - 38 * u;
+  const bx1 = hall.x1 - 34 * u;
+  props.quad([bx0, near, banner.z0], [bx1, near, banner.z0], [bx1, near, H + 9.6 * u], [bx0, near, H + 9.6 * u], BANNER);
+  props.quad([bx0, near, H + 9.6 * u], [bx1, near, H + 9.6 * u], [bx1, hall.y0 + 9 * u, H + 9.6 * u], [bx0, hall.y0 + 9 * u, H + 9.6 * u], BANNER);
+  props.quad([bx0, hall.y0 + 9 * u, H + 0.8 * u], [bx1, hall.y0 + 9 * u, H + 0.8 * u], [bx1, hall.y0 + 40 * u, H + 0.8 * u], [bx0, hall.y0 + 40 * u, H + 0.8 * u], BANNER);
+  for (let k = 0; k < 4; k += 1) {
+    const z = banner.z0 + 12 * u + k * 24 * u;
+    props.quad([bx0 + 7 * u, near - 0.4 * u, z], [bx1 - 7 * u, near - 0.4 * u, z], [bx1 - 7 * u, near - 0.4 * u, z + 15 * u], [bx0 + 7 * u, near - 0.4 * u, z + 15 * u], GLYPH);
+  }
+  // The awning over the door: a red slab on two white posts (design 084: the art's red, bigger).
+  props.roundBox({ x: (canopy.x0 + canopy.x1) / 2, y: (canopy.y0 + canopy.y1) / 2, z0: canopy.z0, z1: canopy.z1, hw: (canopy.x1 - canopy.x0) / 2, hh: (canopy.y1 - canopy.y0) / 2, color: ROOF_BAND, topColor: AWNING });
   for (const y of [canopy.y0 + 8 * u, canopy.y1 - 8 * u]) props.cylinder({ x: canopy.x1 - 6 * u, y, z0: -2, z1: canopy.z0, r: 2.6 * u, color: POLE, sides: 8 });
   // The flag: a green banner with a white diamond on a pole standing on the roof, flying toward the far end.
   const top = flag.base + flag.h;
@@ -498,8 +547,16 @@ function communityTent(props, spots) {
   for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
     props.tube([[tent.x + sx * (half - 4 * u), tent.y + sy * (half - 4 * u), -2], [tent.x + sx * (half - 4 * u), tent.y + sy * (half - 4 * u), tent.post]], 2.2 * u, POLE, { sides: 8 });
   }
-  props.cone({ x: tent.x, y: tent.y, z0: tent.post, z1: tent.apex, r: half * 1.414, color: TENT, sides: 4, turn: Math.PI / 4 });
   const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sy]) => [tent.x + sx * half, tent.y + sy * half]);
+  // Design 084: the roof in eight gores, white and green by turns, facing up.
+  const apex = [tent.x, tent.y, tent.apex];
+  for (let k = 0; k < 4; k += 1) {
+    const [x0, y0] = corners[k];
+    const [x1, y1] = corners[(k + 1) % 4];
+    const mid = [(x0 + x1) / 2, (y0 + y1) / 2, tent.post];
+    props.triangle(apex, [x0, y0, tent.post], mid, TENT);
+    props.triangle(apex, mid, [x1, y1, tent.post], TENT_GREEN);
+  }
   for (let k = 0; k < 4; k += 1) {
     const [x0, y0] = corners[k];
     const [x1, y1] = corners[(k + 1) % 4];
@@ -587,6 +644,7 @@ export function communityCenterBoard({ three, material, seeded, terrainGrid, rep
     uBoxes: { value: Array.from({ length: 4 }, () => new three.Vector4()) },
     uHeights: { value: new three.Vector4() },
     uTrees: { value: Array.from({ length: MAX_TREES }, () => new three.Vector4()) },
+    uFarEdge: { value: 1e4 },
   };
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
   const materials = {
@@ -610,6 +668,7 @@ export function communityCenterBoard({ three, material, seeded, terrainGrid, rep
     apply(spots, bounds) {
       const u = spots?.u ?? 1;
       own.uUnit.value = u;
+      own.uFarEdge.value = spots?.farEdge ?? 1e4;
       if (spots) {
         const { plaza, hall, tent, kiosks, cliffFoot, cliffStart, fall, pool: basin } = spots;
         own.uPlaza.value.set(plaza.x0, plaza.y0, plaza.x1, plaza.y1);
