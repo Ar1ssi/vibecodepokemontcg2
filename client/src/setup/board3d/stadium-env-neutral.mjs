@@ -110,7 +110,8 @@ varying vec2 vUv;
 ${NEUTRAL}
 void main() {
   vec2 p = uMin + vUv * uSize;
-  gl_FragColor = vec4(0.0, distance(p, uPlatform.xy) - uPlatform.z, 0.0, 0.0);
+  // Design 084: clamped under the half-float target's 65504 (no platform leaves its radius at 1e5).
+  gl_FragColor = vec4(0.0, clamp(distance(p, uPlatform.xy) - uPlatform.z, -9000.0, 9000.0), 0.0, 0.0);
 }
 `;
 

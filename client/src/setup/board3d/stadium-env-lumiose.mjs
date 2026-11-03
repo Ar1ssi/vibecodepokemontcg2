@@ -257,7 +257,8 @@ void main() {
   float bed = 1e5;
   for (int i = 0; i < ${MAX_BEDS}; i++) bed = min(bed, bedDistance(p, uBeds[i]));
   float kind = bed < 0.0 ? 2.0 : (sd < 0.0 ? 1.0 : 0.0);
-  gl_FragColor = vec4(h, sd, bed, kind);
+  // Design 084: clamped under the half-float target's 65504 (no beds leaves bed at 1e5, stored as Inf).
+  gl_FragColor = vec4(h, sd, min(bed, 9000.0), kind);
 }
 `;
 

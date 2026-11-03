@@ -728,7 +728,9 @@ n/a: client visuals only, no data. Revert: revert the branch's commits; boards f
   row) to its two corners, each pouring straight up the screen; tcgl still shows only their feet.
 - Magma Basin bug found and fixed in passing: the falls' "no fall" distance (100000) overflowed the
   half-float bake to Inf/NaN, lighting every wall pale orange (the audit read it as "a wide moat").
-  Other boards' sentinels are an ISSUES line (not audited here).
+  The same audit over every board's bake found three more that could write such a value: Perilous
+  Jungle's water distance when no bog fits, Lumiose's bed distance with no beds, Neutralization
+  Zone's platform distance with no platform. All clamped; `stadium-bake-range.test.mjs` guards all four.
 - Scorched Earth's volcano keeps its crater in view (`craterInView`, VOLCANO_RISE): the tilted
   cameras push a tall cone's crater toward the far edge, off screen at the table's corner.
 - Lumiose's Prism Tower stands at the far end of the left strip (both cameras draw it upright),
@@ -742,7 +744,6 @@ n/a: client visuals only, no data. Revert: revert the branch's commits; boards f
   barely show (ISSUES line).
 
 ## Landing edits (for the commit that lands this branch on main)
-- ISSUES: `[board3d]` half-float bake sentinels (100000/1e5) audit across boards (Magma fixed).
 - ISSUES: `[board3d]` Magma Basin falls show only their feet in tcgl (its frame stops below the far wall).
 - ISSUES: `[board3d]` Community Center far mountains barely in frame (past the opponent's hand row).
 - ISSUES: close I276 (this audit) as shipped by 084.

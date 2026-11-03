@@ -254,7 +254,9 @@ void main() {
   if (onIsland > 0.5) kind = 4.0;
   if (waterSD < mix(16.0, 5.0, onIsland)) kind = 0.0;
   if (shoreStone > 0.6 || wetStone > 0.6) kind = 3.0;
-  gl_FragColor = vec4(height, waterSD, kind > 2.5 && kind < 3.5 ? stone.y : mound.y, kind);
+  // Design 084: clamped: the bake's target is half float (largest 65504), and with no bog fitting a
+  // layout waterDistance is 100000, which stores as Inf and filters to NaN.
+  gl_FragColor = vec4(height, clamp(waterSD, -9000.0, 9000.0), kind > 2.5 && kind < 3.5 ? stone.y : mound.y, kind);
 }
 `;
 
