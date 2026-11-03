@@ -244,6 +244,20 @@ export function resolveChoiceCommand({ draft, playerId, activeRng, events, paylo
       });
       resolveAttackEffectPhase(draft, { ...resumeCtx, energyDiscarded });
     }
+  } else if (token.effectType === 'attackSelfEnergyDiscard') {
+    // "Discard 2 Energy from this Pokémon": record the player's picks for this part, then resume;
+    // the discard itself happens after damage.
+    draft.pendingChoice = null;
+    const resumeCtx = attackResumeContext(draft, token, { activeRng, events });
+    if (resumeCtx) {
+      const allowed = new Set(token.allowedIds || []);
+      const picked = [...new Set((payload.selection || []).map(Number))]
+        .filter((id) => allowed.has(id))
+        .slice(0, token.count);
+      const selfDiscardPicks = [...(token.selfDiscardPicks || [])];
+      selfDiscardPicks[token.partIndex] = picked;
+      resolveAttackEffectPhase(draft, { ...resumeCtx, selfDiscardPicks });
+    }
   } else if (token.effectType === 'attackReturnEnergyBonus') {
     // Ninja Spinner: move the chosen Energy to hand (yes) or keep it (no),
     // then resume the attack with the bonus decision settled.
@@ -483,7 +497,11 @@ export function resolveChoiceCommand({ draft, playerId, activeRng, events, paylo
       ? [...token.obligations]
       : [];
     const obligation = pending.shift();
-    if (player && obligation) {
+    if (token.stage === 'energy' && obligation) {
+      // The player picked which Energy move; the target (if any) is settled next.
+      const picked = (payload.selection || []).filter((id) => obligation.energyIds.includes(id));
+      pending.unshift({ ...obligation, energyIds: picked.slice(0, obligation.upTo), energyPicked: true });
+    } else if (player && obligation) {
       const target = koEnergyTargets(player, obligation).find(
         (c) => c.instanceId === (payload.selection || [])[0]
       );

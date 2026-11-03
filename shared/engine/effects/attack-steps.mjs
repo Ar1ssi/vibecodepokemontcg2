@@ -648,9 +648,21 @@ function atkDiscardSelfEnergyEither(ctx) {
     for (const card of cards) discardCard(ctx.draft, card, ctx.events);
     return null;
   };
-  if (ctx.selection) {
-    return discard(ctx.selection[0] === ATTACK_YES ? typed.slice(0, step.count) : named.slice(0, 1));
-  }
+  // More typed Energy than the count, not all the same card: the player picks which go.
+  const discardTyped = () => {
+    if (typed.length <= step.count || new Set(typed.map((c) => c.name)).size === 1) {
+      return discard(typed.slice(0, step.count));
+    }
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: Choose ${step.count} {${step.energyType}} Energy to discard`,
+      options: typed,
+      min: step.count,
+      max: step.count,
+      memo: { pickTyped: true },
+    });
+  };
+  if (ctx.selection && ctx.memo?.pickTyped) return discard(pickById(typed, ctx.selection).slice(0, step.count));
+  if (ctx.selection) return ctx.selection[0] === ATTACK_YES ? discardTyped() : discard(named.slice(0, 1));
   if (typedOk && named.length > 0) {
     return ctx.ask({
       prompt: `${attackName(ctx)}: Which Energy do you discard?`,
@@ -662,7 +674,7 @@ function atkDiscardSelfEnergyEither(ctx) {
       max: 1,
     });
   }
-  if (typedOk) return discard(typed.slice(0, step.count));
+  if (typedOk) return discardTyped();
   if (named.length > 0) return discard(named.slice(0, 1));
   return discard(typed);
 }

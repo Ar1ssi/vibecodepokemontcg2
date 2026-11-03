@@ -161,6 +161,98 @@ function stampAttackEnergyCount(draft, attacker, attackerView) {
   if (attackerView && attackerView !== attacker) attackerView.attackEnergyCount = count;
 }
 
+// A typed special Energy ("Nitro {R} Energy") counts as the type it provides.
+const energyOfType = (energyType) => (card) => {
+  if (!energyType) return true;
+  const provided = resolveAttachedEnergyType(card).toLowerCase();
+  const wanted = energyType.toLowerCase();
+  if (provided === wanted || (provided === 'darkness' && wanted === 'dark')) return true;
+  const ty = card.energyType || card.name?.replace(/\s*Energy.*/i, '');
+  return Boolean(ty && ty.toLowerCase().includes(wanted));
+};
+
+const attachedEnergiesOf = (draft, playerId, attacker) =>
+  (draft.players[playerId]?.zones?.active || []).filter((c) => c.attachedTo === attacker.instanceId && isEnergy(c));
+
+const selfDiscardParts = (spec) => (spec.parts || [spec]);
+
+/** Energy one part of a printed self-discard may take, leaving out cards earlier parts took. */
+function selfDiscardPartCandidates(energies, part, taken) {
+  return energies
+    .filter((c) => !taken.has(c.instanceId))
+    .filter(energyOfType(part.energyType))
+    .filter((c) => !part.special || isSpecialEnergyCard(c));
+}
+
+// Interchangeable cards (three Basic {M} Energy) leave nothing to choose.
+const energyIdentity = (card) => `${card.name}|${resolveAttachedEnergyType(card)}|${isSpecialEnergyCard(card)}`;
+
+/**
+ * "Discard 2 Energy from this Pokémon" (Kartana Paper Cut): which Energy goes is the attacking
+ * player's choice. Asks, before damage, for the first part that has a real choice and no answer
+ * yet; returns true while that prompt is open. Picks travel on resumeBase so later prompts keep
+ * them; the Phase 3 discard reads them. A part with no choice is filled at discard time.
+ */
+function askSelfDiscardPicks(draft, { spec, playerId, attacker, attack, resumeBase, picks }) {
+  if (!spec || spec.all || !attacker) return false;
+  const energies = attachedEnergiesOf(draft, playerId, attacker);
+  const parts = selfDiscardParts(spec);
+  const taken = new Set();
+  for (let index = 0; index < parts.length; index += 1) {
+    const part = parts[index];
+    const candidates = selfDiscardPartCandidates(energies, part, taken);
+    if (Array.isArray(picks[index])) {
+      for (const id of picks[index]) taken.add(id);
+      continue;
+    }
+    const count = Math.min(part.count, candidates.length);
+    const choice = Number.isFinite(part.count) && candidates.length > count &&
+      new Set(candidates.map(energyIdentity)).size > 1;
+    if (!choice) {
+      for (const card of candidates.slice(0, count)) taken.add(card.instanceId);
+      continue;
+    }
+    const typeLabel = part.special ? 'Special Energy' : `${part.energyType ? `${part.energyType} ` : ''}Energy`;
+    draft.pendingChoice = createPendingChoice({
+      player: playerId,
+      source: 'attack',
+      prompt: `${attack.name}: choose ${count} ${typeLabel} to discard from this Pokémon.`,
+      options: candidates.map((c) => ({ instanceId: c.instanceId, name: c.name, src: c.src || '', type: c.type || 'Energy' })),
+      min: count,
+      max: count,
+      resumeToken: {
+        ...resumeBase,
+        effectType: 'attackSelfEnergyDiscard',
+        selfDiscardPicks: picks,
+        partIndex: index,
+        count,
+        allowedIds: candidates.map((c) => c.instanceId),
+      },
+    });
+    return true;
+  }
+  return false;
+}
+
+/** The attacker's Energy a printed self-discard removes: the player's picks, else the first matches. */
+function selfDiscardCards(draft, { spec, playerId, attacker, picks = [] }) {
+  const energies = attachedEnergiesOf(draft, playerId, attacker);
+  if (spec.all) return energies;
+  const taken = new Set();
+  const out = [];
+  selfDiscardParts(spec).forEach((part, index) => {
+    const candidates = selfDiscardPartCandidates(energies, part, taken);
+    const chosen = Array.isArray(picks[index])
+      ? candidates.filter((c) => picks[index].includes(c.instanceId))
+      : [];
+    const fill = candidates.filter((c) => !chosen.includes(c));
+    const cards = [...chosen, ...fill].slice(0, part.count);
+    for (const card of cards) taken.add(card.instanceId);
+    out.push(...cards);
+  });
+  return out;
+}
+
 /**
  * Resolves the part of an attack that runs after its coins are flipped:
  * printed-text damage, recoil, status, bench/spread damage, searches, and the
@@ -335,6 +427,21 @@ export function resolveAttackEffectPhase(draft, ctx) {
   // Discard-to-scale: the player picks which Energy to discard before damage.
   let energyDiscarded = ctx.energyDiscarded;
   const discardScaling = discardEnergyScaling(attack?.text);
+
+  // A printed self-discard ("Discard 2 Energy from this Pokémon"): the player picks before
+  // damage; the discard itself still happens after damage (Phase 3).
+  const selfDiscardSpec = discardScaling
+    ? null
+    : parseAttackEnergyDiscard({
+        ...attack,
+        // Older prints name themselves ("Discard an Energy card attached to Tyranitar").
+        text: normalizeAttackText(attack?.text, attackerView?.name || attacker?.name),
+      });
+  const selfDiscardPicks = [...(ctx.selfDiscardPicks || [])];
+  if (askSelfDiscardPicks(draft, { spec: selfDiscardSpec, playerId, attacker, attack, resumeBase, picks: selfDiscardPicks })) {
+    return;
+  }
+  if (selfDiscardPicks.length > 0) resumeBase.selfDiscardPicks = selfDiscardPicks;
   if (discardScaling?.coinGate && energyDiscarded === undefined && coin !== discardScaling.coinGate) {
     energyDiscarded = 0;
   }
@@ -1460,42 +1567,10 @@ export function resolveAttackEffectPhase(draft, ctx) {
       }
 
       // Attack effects: discard energy from attacker (Phase 3)
-      // A discard-to-scale attack already discarded the player's picks before damage.
-      const energyDiscardSpec = discardScaling
-        ? null
-        : parseAttackEnergyDiscard({
-            ...effectiveAttack,
-            // Older prints name themselves ("Discard an Energy card attached to Tyranitar").
-            text: normalizeAttackText(effectiveAttack?.text, attackerView?.name || attacker?.name),
-          });
-      if (energyDiscardSpec && attacker) {
-        const attackerZone = draft.players[playerId]?.zones?.active || [];
-        const attachedEnergies = attackerZone.filter(
-          (c) => c.attachedTo === attacker.instanceId && isEnergy(c)
-        );
-
-        const ofType = (energyType) => (c) => {
-          if (!energyType) return true;
-          // A typed special Energy ("Nitro {R} Energy") counts as the type it provides.
-          const provided = resolveAttachedEnergyType(c).toLowerCase();
-          const wanted = energyType.toLowerCase();
-          if (provided === wanted || (provided === 'darkness' && wanted === 'dark')) return true;
-          const ty = c.energyType || c.name?.replace(/\s*Energy.*/i, '');
-          return ty && ty.toLowerCase().includes(wanted);
-        };
-        let toDiscard = [];
-        if (energyDiscardSpec.all) {
-          toDiscard = attachedEnergies;
-        } else {
-          for (const part of energyDiscardSpec.parts || [energyDiscardSpec]) {
-            const picked = attachedEnergies
-              .filter((c) => !toDiscard.includes(c))
-              .filter(ofType(part.energyType))
-              .filter((c) => !part.special || isSpecialEnergyCard(c))
-              .slice(0, part.count);
-            toDiscard.push(...picked);
-          }
-        }
+      // A discard-to-scale attack already discarded the player's picks before damage; a printed
+      // self-discard takes the Energy the player picked before damage (askSelfDiscardPicks).
+      if (selfDiscardSpec && attacker) {
+        const toDiscard = selfDiscardCards(draft, { spec: selfDiscardSpec, playerId, attacker, picks: selfDiscardPicks });
 
         for (const card of toDiscard) {
           const idx = draft.players[playerId].zones.active.findIndex(

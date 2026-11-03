@@ -1697,6 +1697,31 @@ test('Arcanine ex Flame Swirl (Legend Maker 83): 2 {R} Energy or 1 React Energy,
   assert.deepEqual(attachedTypes(res.state, attacker), ['Fire', 'Fire']);
 });
 
+test('Arcanine ex Flame Swirl (Legend Maker 83): with 3 mixed {R} Energy the player picks which 2 go', () => {
+  const text = 'Discard 2 {R} Energy or 1 React Energy card attached to Arcanine ex.';
+  let heatId;
+  const { state, attacker } = board('Arcanine ex', text, {
+    damage: '100',
+    setup: (s) => {
+      const host = s.players.p1.zones.active[0];
+      attachTo(s, host, ['Fire', 'Fire']);
+      heatId = nextId++;
+      s.players.p1.zones.active.push(
+        createCard({ instanceId: heatId, name: 'Heat {R} Energy', supertype: 'Energy', subtypes: ['Special'], energyType: 'Fire', attachedTo: host.instanceId }),
+        createCard({ instanceId: nextId++, name: 'React Energy', supertype: 'Energy', subtypes: ['Special'], attachedTo: host.instanceId })
+      );
+    },
+  });
+  let res = choose(attack(state), [-11]);
+  const picker = res.state.pendingChoice;
+  assert.ok(picker, 'expected a picker for which {R} Energy to discard');
+  assert.equal(picker.options.length, 3);
+  const basics = picker.options.filter((o) => o.instanceId !== heatId).map((o) => o.instanceId);
+  res = choose(res, basics);
+  const left = res.state.players.p1.zones.active.filter((c) => c.attachedTo === attacker.instanceId).map((c) => c.name).sort();
+  assert.deepEqual(left, ['Heat {R} Energy', 'React Energy']);
+});
+
 test('Crobat BREAK Silent Bite (XY Promos XY181): Paralysis, then Crobat shuffles itself away', () => {
   const text =
     "You may leave your opponent's Active Pokémon Paralyzed. If you do, shuffle this Pokémon and all cards attached to into your deck.";

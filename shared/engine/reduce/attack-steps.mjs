@@ -665,6 +665,7 @@ export function attackResumeContext(draft, token, { activeRng, events }) {
     flips,
     milledMatches: token.milledMatches,
     revealedMatches: token.revealedMatches,
+    selfDiscardPicks: token.selfDiscardPicks,
     copiedAttack: token.copiedAttack || null,
     conditionChecked: token.conditionChecked === true,
     statusConditionsMet: token.statusConditionsMet,

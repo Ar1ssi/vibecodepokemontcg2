@@ -597,3 +597,71 @@ test('Poison Barb does nothing while the holder is Benched', () => {
   const res = attack(state);
   assert.ok(!hasCondition(res.state.players.p1.zones.active[0], 'Poisoned'));
 });
+
+const resolveAs = (res, selection) =>
+  applyCommand(res.state, {
+    type: 'resolveChoice',
+    playerId: res.state.pendingChoice.player,
+    payload: { choiceId: res.state.pendingChoice.choiceId, selection },
+  });
+const holderOf = (state, instanceId) =>
+  [...state.players.p2.zones.active, ...state.players.p2.zones.bench].find((c) => c.instanceId === instanceId)?.attachedTo;
+
+test('Exp. Share (Scarlet & Violet 174) asks which Basic Energy to move when the KO\'d Pokémon had different ones', () => {
+  const benchMon = defender({ name: 'Bench Holder' });
+  const state = game({ p1Active: attacker(), p2Active: defender(), p2Bench: [benchMon] });
+  const share = tool(
+    'Exp. Share',
+    'When your Active Pokémon is Knocked Out by damage from an attack from your opponent’s Pokémon, you may move a Basic Energy from that Pokémon to the Pokémon this card is attached to.'
+  );
+  const fire = energy();
+  const water = energy('Basic Water Energy', { types: ['Water'] });
+  attachBench(state, 'p2', share, benchMon);
+  attach(state, 'p2', fire, state.players.p2.zones.active[0]);
+  attach(state, 'p2', water, state.players.p2.zones.active[0]);
+  let res = attack(state);
+  assert.equal(res.error, null);
+  // Promotion of the only Benched Pokémon may come first; then the Energy pick.
+  for (let i = 0; i < 4 && res.state.pendingChoice?.resumeToken?.effectType !== 'koEnergy'; i++) {
+    if (!res.state.pendingChoice) break;
+    res = resolveAs(res, [res.state.pendingChoice.options[0].instanceId]);
+  }
+  const choice = res.state.pendingChoice;
+  assert.equal(choice?.resumeToken?.effectType, 'koEnergy', 'expected an Energy picker');
+  assert.deepEqual(choice.options.map((o) => o.instanceId).sort((a, b) => a - b), [fire.instanceId, water.instanceId].sort((a, b) => a - b));
+  res = resolveAs(res, [water.instanceId]);
+  assert.equal(res.error, null);
+  assert.equal(holderOf(res.state, water.instanceId), benchMon.instanceId);
+  assert.ok(res.state.players.p2.zones.discard.some((c) => c.instanceId === fire.instanceId));
+});
+
+test('Wishful Baton (Crimson Invasion 121) asks which Benched Pokémon gets the Energy when there are several', () => {
+  const benchA = defender({ name: 'Bench A' });
+  const benchB = defender({ name: 'Bench B' });
+  const victim = defender();
+  const state = game({ p1Active: attacker(), p2Active: victim, p2Bench: [benchA, benchB] });
+  const baton = tool(
+    'Wishful Baton',
+    'If the Pokémon this card is attached to is your Active Pokémon and is Knocked Out by damage from an opponent’s attack, move up to 3 basic Energy cards from that Pokémon to 1 of your Benched Pokémon.'
+  );
+  const e1 = energy();
+  const e2 = energy();
+  attach(state, 'p2', baton, victim);
+  attach(state, 'p2', e1, victim);
+  attach(state, 'p2', e2, victim);
+  let res = attack(state);
+  assert.equal(res.error, null);
+  for (let i = 0; i < 4 && res.state.pendingChoice?.resumeToken?.effectType !== 'koEnergy'; i++) {
+    if (!res.state.pendingChoice) break;
+    // Promote Bench A; the Energy then goes to the chosen remaining Benched Pokémon.
+    const promote = res.state.pendingChoice.options.find((o) => o.instanceId === benchA.instanceId) || res.state.pendingChoice.options[0];
+    res = resolveAs(res, [promote.instanceId]);
+  }
+  const choice = res.state.pendingChoice;
+  if (choice?.resumeToken?.effectType === 'koEnergy') {
+    res = resolveAs(res, [benchB.instanceId]);
+    assert.equal(res.error, null);
+  }
+  assert.equal(holderOf(res.state, e1.instanceId), benchB.instanceId);
+  assert.equal(holderOf(res.state, e2.instanceId), benchB.instanceId);
+});

@@ -40,6 +40,40 @@ import { trainerEffectText } from './trainer.mjs';
 import { parseTrainerEffect } from '../rules/trainer-effects.mjs';
 import { executeTrainer } from '../effects/trainer.mjs';
 
+const TOOL_KO_TARGET_KINDS = { holder: 'holder', bench: 'bench', hand: 'hand' };
+
+/**
+ * A victim-side Tool Energy move with a real choice (Exp. Share, Wishful Baton): which Energy
+ * when the pool holds different cards beyond the count, or which Benched Pokémon when there
+ * are several. Queued as a koEnergy obligation (settleKoEnergyMoves asks once the victim's
+ * cards are in the discard pile). Returns true when queued; false leaves the immediate move.
+ */
+function queueToolKoEnergyChoice(draft, { spec, eff, victim, victimPlayerId, pool, count }) {
+  const targetKind = TOOL_KO_TARGET_KINDS[spec.to];
+  if (spec.from !== 'victim' || !targetKind || count === 0) return false;
+  // A Lost Zone Knock Out never puts the Energy in the discard pile to move it from.
+  if (draft.__attackLostZoneKnockouts === victimPlayerId) return false;
+  if (targetKind === 'holder' && (!eff.holder || eff.holder.instanceId === victim.instanceId)) return false;
+  const energyChoice = pool.length > count && new Set(pool.map((c) => c.name)).size > 1;
+  const player = draft.players[victimPlayerId];
+  const benchTargets = (player?.zones?.bench || []).filter((c) => !c.attachedTo && c.instanceId !== victim.instanceId);
+  const benchChoice = targetKind === 'bench' && benchTargets.length > 1;
+  if (!energyChoice && !benchChoice) return false;
+  draft.__koEnergyMoves = [
+    ...(draft.__koEnergyMoves || []),
+    {
+      playerId: victimPlayerId,
+      holderInstanceId: targetKind === 'holder' ? eff.holder.instanceId : victim.instanceId,
+      targetKind,
+      energyIds: pool.map((c) => c.instanceId),
+      upTo: count,
+      exact: spec.count !== 'all' && !/up to/i.test(eff.tool?.text || ''),
+      source: eff.tool?.name || 'Pokémon Tool',
+    },
+  ];
+  return true;
+}
+
 // On-Knock-Out Tool effects (design 035 slice 9): return-to-hand, Prize denial,
 // Energy moves, opponent mill, KO search and draw-to-N. Runs before the victim's
 // discard sweep so Energy still attached can be moved.
@@ -100,7 +134,8 @@ function applyToolOnKoEffects(
           (!spec.basicOnly || classifyEnergyEffect(c) === 'basic')
       );
       const count = spec.count === 'all' ? pool.length : Math.min(spec.count, pool.length);
-      for (const energy of pool.slice(0, count)) {
+      const queued = queueToolKoEnergyChoice(draft, { spec, eff, victim, victimPlayerId, pool, count });
+      for (const energy of queued ? [] : pool.slice(0, count)) {
         if (spec.to === 'hand') {
           moveCard(victimPlayer, energy, sourceZone, victimPlayer.zones.hand, 'hand');
         } else if (spec.to === 'holder') {
@@ -821,6 +856,37 @@ export function settleKoEnergyMoves(draft, { events }) {
       obligation.energyIds.includes(c.instanceId)
     );
     if (!player || !energyLeft) {
+      remaining.shift();
+      continue;
+    }
+    // Which Energy moves is the player's pick when the cards differ and not all of them go.
+    const available = (player.zones?.discard || []).filter((c) => obligation.energyIds.includes(c.instanceId));
+    if (!obligation.energyPicked && available.length > obligation.upTo && new Set(available.map((c) => c.name)).size > 1) {
+      delete draft.__koEnergyMoves;
+      draft.pendingChoice = createPendingChoice({
+        player: obligation.playerId,
+        source: obligation.source,
+        prompt: `${obligation.source}: choose ${obligation.exact ? '' : 'up to '}${obligation.upTo} Energy to move`,
+        options: available,
+        min: obligation.exact ? obligation.upTo : 1,
+        max: obligation.upTo,
+        cancellable: false,
+        stateVersion: draft.stateVersion,
+        resumeToken: {
+          effectType: 'koEnergy',
+          stage: 'energy',
+          initiatorPlayerId: obligation.playerId,
+          obligations: remaining,
+        },
+      });
+      return;
+    }
+    if (obligation.targetKind === 'hand') {
+      for (const card of available.slice(0, obligation.upTo)) {
+        player.zones.discard.splice(player.zones.discard.indexOf(card), 1);
+        player.zones.hand.push(card);
+        events.push({ type: 'cardMoved', instanceId: card.instanceId, from: 'discard', to: 'hand', playerId: obligation.playerId });
+      }
       remaining.shift();
       continue;
     }

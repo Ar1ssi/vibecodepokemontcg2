@@ -1254,24 +1254,37 @@ function discardToolAndSpecialEnergy(ctx) {
     attachedCards(opponent, root.instanceId).some((c) => isToolCard(c) || removableSpecial(c))
   );
 
-  const discardFrom = (root) => {
-    const attached = attachedCards(opponent, root.instanceId);
-    const tool = attached.find(isToolCard);
-    const energy = attached.find(removableSpecial);
+  const discardBoth = (root, energy) => {
+    const tool = attachedCards(opponent, root.instanceId).find(isToolCard);
     if (tool) discardCard(ctx.draft, tool, ctx.events);
     if (energy) discardCard(ctx.draft, energy, ctx.events);
+    return null;
+  };
+  // Which Special Energy goes is the player's pick when the Pokémon has different ones.
+  const discardFrom = (root) => {
+    const specials = attachedCards(opponent, root.instanceId).filter(removableSpecial);
+    if (new Set(specials.map((c) => c.name)).size <= 1) return discardBoth(root, specials[0]);
+    return ctx.ask({
+      prompt: `${sourceName(ctx, 'Trainer')}: Choose a Special Energy attached to ${topPokemonCard(opponent, root)?.name || 'that Pokémon'} to discard`,
+      options: specials,
+      min: 1,
+      max: 1,
+      memo: { stage: 'energy', hostId: root.instanceId },
+    });
   };
 
+  if (ctx.memo?.stage === 'energy') {
+    const root = candidates.find((c) => c.instanceId === ctx.memo.hostId);
+    if (!root) return skip(ctx, 'target_not_found');
+    const energy = attachedCards(opponent, root.instanceId).filter(removableSpecial).find((c) => c.instanceId === ctx.selection?.[0]);
+    return discardBoth(root, energy);
+  }
   if (ctx.selection) {
     const root = candidates.find((c) => c.instanceId === ctx.selection[0]);
-    if (root) discardFrom(root);
-    return null;
+    return root ? discardFrom(root) : null;
   }
   if (candidates.length === 0) return skip(ctx, 'nothing_to_discard');
-  if (candidates.length === 1) {
-    discardFrom(candidates[0]);
-    return null;
-  }
+  if (candidates.length === 1) return discardFrom(candidates[0]);
   return ctx.ask({
     prompt: `${sourceName(ctx, 'Trainer')}: Choose 1 of your opponent's Pokémon`,
     options: candidates,
@@ -1286,13 +1299,7 @@ function discardEnergyFromOpponent(ctx) {
   const kindMatches = step.energy === 'Special Energy' ? isSpecialEnergy : isEnergy;
   const matchesEnergy = (c) => kindMatches(c) && energyRemovable(ctx, opponent, c);
 
-  if (step.scope === 'each Pokémon') {
-    for (const root of targetableRoots(ctx, opponent)) {
-      const energy = attachedCards(opponent, root.instanceId).find(matchesEnergy);
-      if (energy) discardCard(ctx.draft, energy, ctx.events);
-    }
-    return null;
-  }
+  if (step.scope === 'each Pokémon') return discardEnergyFromEach(ctx, matchesEnergy);
 
   // scope 'Active': only the opponent's Active Pokémon (Crawdaunt Unruly Claw).
   const active = step.scope === 'Active' ? targetableRoots(ctx, opponent).find((r) => r === activeOf(opponent)) : null;
@@ -1321,6 +1328,34 @@ function discardEnergyFromOpponent(ctx) {
     min: 1,
     max: 1,
   });
+}
+
+// "Discard an Energy from each of your opponent's Pokémon": one per Pokémon, the player picking
+// wherever a Pokémon has different Energy attached.
+function discardEnergyFromEach(ctx, matchesEnergy) {
+  const { opponent } = ctx;
+  const energyOn = (rootId) => attachedCards(opponent, rootId).filter(matchesEnergy);
+  let pending = ctx.memo?.rootIds || targetableRoots(ctx, opponent).map((root) => root.instanceId);
+  if (ctx.memo?.rootIds && ctx.selection) {
+    const [current, ...rest] = pending;
+    const energy = energyOn(current).find((c) => c.instanceId === ctx.selection[0]);
+    if (energy) discardCard(ctx.draft, energy, ctx.events);
+    pending = rest;
+  }
+  for (let index = 0; index < pending.length; index += 1) {
+    const energies = energyOn(pending[index]);
+    if (new Set(energies.map((c) => c.name)).size > 1) {
+      return ctx.ask({
+        prompt: `${sourceName(ctx, 'Trainer')}: Choose an Energy to discard from ${topPokemonCard(opponent, findCard(ctx.draft, pending[index])?.card)?.name || 'that Pokémon'}`,
+        options: energies,
+        min: 1,
+        max: 1,
+        memo: { rootIds: pending.slice(index) },
+      });
+    }
+    if (energies.length > 0) discardCard(ctx.draft, energies[0], ctx.events);
+  }
+  return null;
 }
 
 // Super Energy Removal: choose 1 opponent Pokémon, then up to `count` Energy attached to it.
