@@ -631,9 +631,9 @@ per board, its numbered suggestions in § Per-board detail (and its scorecard "o
 | B12 | Dimension Valley suggestions 1–4 | a9fb363d |
 | B13 | Magnetic Storm suggestions 1–4 | d33bf5f8 |
 | B14 | Scorched Earth suggestions 1–4 | 99d50781 |
-| B15 | Magma Basin suggestions 1–4 | 16534a6a (falls show in tilt12; tcgl's frame shows only their feet — ISSUES line) |
+| B15 | Magma Basin suggestions 1–4 | 16534a6a; falls placed for both cameras in the follow-up (I277, test: the falls show in both camera presets) |
 | B16 | Lumiose City suggestions 1–4 | 7d5b8516 |
-| B17 | Community Center suggestions 1–3 | 26671d5a (far mountains barely in frame — ISSUES line) |
+| B17 | Community Center suggestions 1–3 | 26671d5a; mountain in frame in the follow-up (I278, test: the cliff's mountain lies in both frames) |
 | B18 | Levincia suggestions 1–3 | c80fb5a1 + close slice (shared water) |
 | B19 | Dark City suggestions 1–4 | c3061f95 |
 | B20 | Pokémon Center suggestions 1–4 | aac56579 |
@@ -725,7 +725,10 @@ n/a: client visuals only, no data. Revert: revert the branch's commits; boards f
 
 ## Deviations (Builder appends here during build)
 - Magma Basin's falls moved from the far wall's straight run (hidden behind the opponent's hand
-  row) to its two corners, each pouring straight up the screen; tcgl still shows only their feet.
+  row) to its corners, each pouring straight up the screen. Follow-up (I277): tcgl frames the
+  far-left corner only from about 0.6 round its arc and its right corner lies under the chat panel,
+  so three falls pour round the left corner (0.5, 0.68, 0.82) and one on the right; a projection
+  test checks both presets show two or more, each near-vertical.
 - Magma Basin bug found and fixed in passing: the falls' "no fall" distance (100000) overflowed the
   half-float bake to Inf/NaN, lighting every wall pale orange (the audit read it as "a wide moat").
   The same audit over every board's bake found three more that could write such a value: Perilous
@@ -740,11 +743,13 @@ n/a: client visuals only, no data. Revert: revert the branch's commits; boards f
   scratches/sunbursts); four wedges replace eight lasers.
 - Full Metal Lab: the railing runs on the round dais's edge only, so it breaks at the docking pads
   (a rail round the pads crossed their cards' edges or wandered); short arcs left and right remain.
-- Community Center's mountains sit in the ~80 px of scene past the opponent's hand row, so they
-  barely show (ISSUES line).
+- Community Center: the far margin lies past the opponent's hand row, out of both frames. Follow-up
+  (I278): the cliff behind the hall rises into the card's mountain toward its far end, ridged over
+  the waterfall, its foot stepping in past the pool to fill the corner both cameras show; a
+  projection test checks its slopes stand in both frames.
 
 ## Landing edits (for the commit that lands this branch on main)
-- ISSUES: I277 (Magma falls in tcgl), I278 (Community Center far mountains); I276 closed.
+- ISSUES: I276 closed; I277 (Magma falls in tcgl) and I278 (Community Center mountains) filed, then fixed and closed in the follow-up.
 - DECISIONS: `[board3d]` shared contact glow (`GLOW`, `setGlows`, MAX_GLOWS 16) is the one emissive
   hook boards light their surroundings with; `LOOK.pulse` joins `LOOK.blink` for glowing parts.
 - DECISIONS (assumed): Vitality's tree moved top-left per the audit (077 had top right; `HERO_SIDE` flips it).
