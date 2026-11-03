@@ -21,6 +21,12 @@
 // stadium-kit.mjs) draw the buildings, lamps and tower in the kit's one light, and the kit's own
 // street trees, benches, cafe parasols and flower clumps on the beds. The paving is clean stone:
 // each slab its own tone, no grain or stains.
+// Design 084 (the visual audit): the warmth back: cream stone (#e8dcc3) fronts, warm light grey paving
+// with a darker band of setts along the fronts, the compass inlaid at about a fifth's contrast so it
+// reads; one sun low from the top-left, every tree and lamp casting a long soft shadow; the Prism
+// Tower stands at the far end of the left strip (the top-left), where both cameras show it upright,
+// its long shadow across the plaza; blue-grey mansards with bigger dormers, the Pokemon Center's red
+// roof and big blade sign a second landmark, a striped cafe awning at one corner.
 import {
   FILTERING,
   FOOTPRINTS,
@@ -41,8 +47,12 @@ import { boardContext, hash } from './stadium-env-spots.mjs';
 import { BOX_SHADOW, EDGE_HAZE, PAVING } from './stadium-env-surfaces.mjs';
 
 export const LUMIOSE_KEY = 'lumiose-city';
-/** The bright day's sun (toward it, table frame): high from the far left, so the buildings' shadows fall across the plaza. */
-export const LUMIOSE_SUN = Object.freeze([-0.55, 0.32, 0.77]);
+/**
+ * The bright day's sun (toward it, table frame): from the far left (the top-left on screen), so the
+ * buildings' shadows fall across the plaza. Design 084: lower, so trees, lamps and the tower cast long
+ * shadows (about 1.1 times their height).
+ */
+export const LUMIOSE_SUN = Object.freeze([-0.6, 0.42, 0.68]);
 /** The strips of plaza either side of the cards, and the least gap kept between a prop's foot and a card. */
 export const STRIP_PX = 250;
 export const MAX_BUILDINGS = 20;
@@ -50,6 +60,8 @@ export const MAX_TREES = 8;
 export const MAX_LAMPS = 10;
 export const MAX_BEDS = 2;
 export const MAX_CAFES = 3;
+/** Design 084: the trees' and lamps' shadows (the terrain casts them: the kit's props cast none). */
+export const MAX_CASTERS = MAX_TREES + MAX_LAMPS;
 const BUILDING_GAP_PX = 14;
 /** The Prism Tower's height in card-scale px. */
 export const TOWER_HEIGHT_PX = 460;
@@ -67,7 +79,8 @@ export const towerRadius = (s, h) => h * (0.036 + 0.082 * Math.exp(-s * 9) + 0.0
 
 /** The wall palettes (aColor, linear): cream, taupe, pale stone, sand, purple-grey brick, rose, dark purple (the screen's building). */
 const WALLS = [
-  [0.77, 0.657, 0.519],
+  // Design 084: the art's cream (#e8dcc3).
+  [0.807, 0.716, 0.546],
   [0.62, 0.5, 0.4],
   [0.7, 0.66, 0.62],
   [0.68, 0.53, 0.3],
@@ -76,15 +89,20 @@ const WALLS = [
   [0.142, 0.105, 0.221],
 ];
 const DARK_PURPLE = 6;
-/** The palettes the plain blocks draw from: limestone, taupe, pale stone, sand, limestone, taupe. */
-const FACADES = [0, 1, 2, 3, 0, 1];
+/** The palettes the plain blocks draw from (design 084: cream most of all, as the art's boulevard). */
+const FACADES = [0, 0, 3, 0, 1, 2];
 /** The roofs: a steep slope in slate, a shallow top in zinc; blue-grey, patina green, dark violet, terracotta. */
 const ROOFS = [
-  { steep: [0.116, 0.133, 0.184], top: [0.235, 0.286, 0.372] },
+  // Design 084: the blue-grey slate a step lighter, so the mansard reads from above.
+  { steep: [0.16, 0.19, 0.26], top: [0.27, 0.32, 0.4] },
   { steep: [0.24, 0.42, 0.33], top: [0.345, 0.519, 0.392] },
   { steep: [0.15, 0.13, 0.2], top: [0.28, 0.27, 0.36] },
-  { steep: [0.36, 0.13, 0.09], top: [0.442, 0.18, 0.12] },
+  // The Pokemon Center's red roof.
+  { steep: [0.5, 0.055, 0.05], top: [0.62, 0.09, 0.07] },
 ];
+const CENTER_ROOF = 3;
+/** The roofs the plain blocks draw from: blue-grey slate most of all, some patina, some violet. */
+const ROOF_PICKS = [0, 0, 1, 0, 2, 0];
 /** aColor w of a roof's slates (courses across the slope) and of its zinc (seams down it). */
 const SLATE = 0.07;
 const ZINC = 0.08;
@@ -115,7 +133,7 @@ export function lumioseSpots(layout) {
     }
   };
   const depth = 250 * u;
-  const base = (roll) => ({ palette: FACADES[Math.floor(roll(3) * FACADES.length)], roof: Math.floor(roll(5) * ROOFS.length), seed: roll(4), role: null });
+  const base = (roll) => ({ palette: FACADES[Math.floor(roll(3) * FACADES.length)], roof: ROOF_PICKS[Math.floor(roll(5) * ROOF_PICKS.length)], seed: roll(4), role: null });
   for (const side of [-1, 1]) {
     const edge = side < 0 ? square.x0 : square.x1;
     along(scene.y + 20 * u, scene.y + scene.h - 10 * u, (y, len, roll) => {
@@ -127,7 +145,7 @@ export function lumioseSpots(layout) {
   // The Pokemon Center in the left row and the screen's dark purple corner in the right.
   const left = buildings.filter((b) => b.side < 0);
   const right = buildings.filter((b) => b.side > 0);
-  if (left.length) Object.assign(left[Math.min(2, left.length - 1)], { role: 'center', palette: 0, roof: 0 });
+  if (left.length) Object.assign(left[Math.min(2, left.length - 1)], { role: 'center', palette: 0, roof: CENTER_ROOF });
   if (right.length) Object.assign(right[Math.min(1, right.length - 1)], { role: 'screen', palette: DARK_PURPLE, roof: 2 });
   // Across the far end, lower, beyond the opponent's hand, between the two rows.
   const farY = square.y1 + 20 * u;
@@ -163,13 +181,19 @@ export function lumioseSpots(layout) {
       benches.push({ x: inner, y: core.y + core.h * share, side, w: 14 * u, d: 50 * u });
     }
   }
-  // Cafe tables under parasols in the right strip's far half.
+  // Cafe tables under parasols in the right strip's far half; design 084: the block behind them a cafe,
+  // its awning striped.
   const cafes = [0.68, 0.9].map((share, k) => ({ x: square.x1 - strip * 0.5, y: core.y + core.h * share, r: 36 * u, seed: hash(share, k, 7), k }));
+  const cafeAt = core.y + core.h * 0.79;
+  const cafeBlock = right.filter((b) => b.role === null).sort((a, b) => Math.abs((a.y0 + a.y1) / 2 - cafeAt) - Math.abs((b.y0 + b.y1) / 2 - cafeAt))[0];
+  if (cafeBlock) cafeBlock.role = 'cafe';
   const keep = (list, r) => list.filter((item) => ctx.clear(item.x, item.y, typeof r === 'function' ? r(item) : r, 10 * u));
   const keptTrees = keep(trees, (t) => t.r).slice(0, MAX_TREES);
-  // The tower: in the left strip a little past its middle, its foot clear of the cards, its crown leaning up toward the view's corner.
+  // The tower: design 084: at the far end of the left strip (the view's top-left), past the far cards,
+  // where both cameras draw it upright (in the strip's middle tcgl laid it across the plaza).
   const h = TOWER_HEIGHT_PX * u;
-  const tower = { x: core.x - strip * 0.5, y: core.y + core.h * 0.62, h, r: towerRadius(0, h) };
+  const tower = { x: core.x - strip * 0.5, y: core.y + core.h + 60 * u, h, r: towerRadius(0, h) };
+  const keptLamps = keep(lamps, 8 * u).slice(0, MAX_LAMPS);
   return {
     ...ctx,
     handEnd,
@@ -178,7 +202,9 @@ export function lumioseSpots(layout) {
     beds,
     trees: keptTrees,
     pits: keptTrees.map((t) => ({ x: t.x, y: t.y, half: 11 * u })),
-    lamps: keep(lamps, 8 * u).slice(0, MAX_LAMPS),
+    lamps: keptLamps,
+    // Design 084: each tree's crown and each lamp's post and head cast a long soft shadow (r 0: a lamp).
+    casters: [...keptTrees.map((t) => ({ x: t.x, y: t.y, r: t.r, h: t.h })), ...keptLamps.map((l) => ({ x: l.x, y: l.y, r: 0, h: l.h }))],
     benches: keep(benches, 26 * u),
     cafes: keep(cafes, (c) => c.r).slice(0, MAX_CAFES),
     tower,
@@ -296,17 +322,19 @@ void main() {
 // darker than the art's so white card borders keep their edges.
 const PALETTE = /* glsl */ `
 // Design 080: the plaza a step darker than the art's pale stone, so white card borders keep their edge.
-const vec3 SLAB = vec3(0.42, 0.392, 0.344);
-const vec3 SLAB_HI = vec3(0.6, 0.57, 0.515);
-const vec3 INLAY = vec3(0.33, 0.345, 0.4);
-const vec3 SETT = vec3(0.345, 0.372, 0.442);
+// Design 084: warm light grey paving, a darker warm band of setts, the inlay a fifth darker.
+const vec3 SLAB = vec3(0.5, 0.45, 0.36);
+const vec3 SLAB_HI = vec3(0.7, 0.64, 0.53);
+const vec3 INLAY = vec3(0.31, 0.28, 0.245);
+const vec3 SETT = vec3(0.25, 0.22, 0.19);
 const vec3 CURB = vec3(0.698, 0.485, 0.382);
 const vec3 CURB_CAP = vec3(0.817, 0.74, 0.66);
 const vec3 BED_GRASS = vec3(0.196, 0.416, 0.101);
 const vec3 BED_GRASS_DARK = vec3(0.09, 0.22, 0.07);
 const vec3 GRATE = vec3(0.05, 0.05, 0.058);
 const vec3 ASPHALT = vec3(0.129, 0.133, 0.157);
-const vec3 SHADE_TINT = vec3(0.58, 0.68, 0.98);
+// Design 084: deeper, so the long shadows of one low sun read (cool, as BDSP's).
+const vec3 SHADE_TINT = vec3(0.5, 0.56, 0.74);
 `;
 
 /** The Prism Tower's and the plaza's inlay: the tower (x, y, height, foot radius) and the compass (x, y, radius). */
@@ -343,6 +371,31 @@ float towerShadow(vec2 p, vec3 sun) {
   float glass = smoothstep(0.3, 0.34, s) * (1.0 - smoothstep(0.66, 0.7, s)) * 0.5;
   return body * max(lattice, glass) * (1.0 - 0.25 * smoothstep(0.5, 1.0, s));
 }
+// Design 084: the trees' and lamps' long soft shadows: (x, y, crown radius, height); radius 0 is a lamp
+// (its post a thin line out to its head's blob). A crown's shadow is the sphere's: an ellipse its
+// radius across, stretched along the sun's way by 1/sun.z.
+uniform vec4 uCasters[${MAX_CASTERS}];
+float casterShadow(vec2 p, vec3 sun) {
+  vec2 dir = -sun.xy / sun.z;
+  vec2 way = normalize(dir);
+  float shade = 0.0;
+  for (int i = 0; i < ${MAX_CASTERS}; i++) {
+    vec4 c = uCasters[i];
+    if (c.w <= 0.0) continue;
+    vec2 rel = p - c.xy;
+    vec2 tip = dir * c.w;
+    if (dot(rel, rel) > dot(tip, tip) * 1.6 + 4.0 * c.z * c.z + 900.0) continue;
+    float t = clamp(dot(rel, tip) / dot(tip, tip), 0.0, 1.0);
+    float post = 1.0 - smoothstep(1.2 * uUnit, 3.6 * uUnit, length(rel - tip * t));
+    shade = max(shade, post * (c.z > 0.0 ? 0.55 : 0.45));
+    float headR = c.z > 0.0 ? c.z : 13.0 * uUnit;
+    vec2 at = rel - dir * (c.z > 0.0 ? c.w * 0.9 : c.w * 1.05);
+    vec2 local = vec2(dot(at, way) * sun.z, dot(at, vec2(-way.y, way.x)));
+    float d = length(local) - headR;
+    shade = max(shade, (1.0 - smoothstep(-headR * 0.45, headR * 0.35, d)) * (c.z > 0.0 ? 0.85 : 0.5));
+  }
+  return shade;
+}
 // Two rings of inlay round the tower's foot.
 float towerFoot(vec2 p) {
   if (uTower.w <= 0.0) return 0.0;
@@ -356,8 +409,9 @@ float medallion(vec2 p) {
   if (uMedal.z <= 0.0) return 0.0;
   vec2 rel = p - uMedal.xy;
   float r = length(rel);
-  float w0 = 0.8 * uUnit;
-  float w1 = 2.2 * uUnit;
+  // Design 084: a little wider, so it reads.
+  float w0 = 1.5 * uUnit;
+  float w1 = 3.2 * uUnit;
   float rings = max(1.0 - smoothstep(w0, w1, abs(r - uMedal.z)), 1.0 - smoothstep(w0, w1, abs(r - uMedal.z * 0.78)));
   float sector = 0.7853982;
   float toSpoke = abs(fract(atan(rel.y, rel.x) / sector + 0.5) - 0.5) * sector * r;
@@ -439,7 +493,11 @@ void main() {
   // The baked sun: the buildings' shadows (alpha), their feet's occlusion (blue); the tower's lattice shadow.
   float lit = light.a;
   col *= mix(0.78, 1.0, light.b);
-  float shade = max((1.0 - lit) * step(field.r, 1.0), towerShadow(p, sun));
+  // Design 084: by the cards the tower's lattice and the lamps' thin posts soften to a plain soft shade.
+  float nearCard = fieldCalm(p, 70.0);
+  float tower = towerShadow(p, sun);
+  float props = casterShadow(p, sun);
+  float shade = max((1.0 - lit) * step(field.r, 1.0), max(mix(tower, 0.45 * step(0.01, tower), nearCard), props * (1.0 - 0.45 * nearCard)));
   col = mix(col, col * SHADE_TINT, shade * 0.8);
   // Clouds' shadows drifting over it all, slowly.
   float cloud = smoothstep(0.58, 0.74, fbm3((p - vec2(uTime * 6.0, uTime * 2.0)) / 380.0 + 4.0));
@@ -465,6 +523,7 @@ const AWNINGS = [
   [0.101, 0.196, 0.442, 0.02],
 ];
 const AWNING_RED = [0.684, 0.071, 0.071, 0.02];
+const AWNING_CREAM = [0.95, 0.88, 0.74, 0.02];
 const BANNER = [0.142, 0.555, 0.196, 0.02];
 const FOLIAGE_MID = [0.16, 0.36, 0.2, 0.05];
 const TRUNK = [0.142, 0.1, 0.09, 0];
@@ -522,11 +581,12 @@ function roof(props, b, face, u) {
   props.tube([...mid, mid[0]].map((p) => [...p, z1 + 0.4]), 0.9 * u, ROOF_TRIM, { sides: 4 });
   props.tube([...ridge, ridge[0]].map((p) => [...p, z2 + 0.4]), 0.9 * u, ROOF_TRIM, { sides: 4 });
   // Dormers in the steep slope on the face to the plaza: a front wall with a window, a gable roof back into the slope.
-  const count = Math.max(2, Math.round(face.length / (62 * u)));
+  // Design 084: bigger and closer, so the mansard reads from above.
+  const count = Math.max(2, Math.round(face.length / (52 * u)));
   const slope = rise1 / i1;
   for (let k = 0; k < count; k += 1) {
     const s = (face.length * (k + 0.5)) / count;
-    const half = 8.5 * u;
+    const half = 11 * u;
     const front = 3 * u;
     const zFront = H + slope * front;
     const eave = H + 26 * u;
@@ -561,9 +621,10 @@ function roof(props, b, face, u) {
 
 /** The Pokemon Center's blade sign: a Poke Ball on a bracket, standing out from the wall. */
 function pokeSign(props, b, face, u) {
-  const r = 17 * u;
+  // Design 084: bigger, a landmark (the art's sign over the street).
+  const r = 25 * u;
   const s = face.length * 0.5;
-  const z = 128 * u;
+  const z = 140 * u;
   const wall = onFace(face, s, 0, z);
   const centre = [wall[0] + face.out[0] * (r + 8 * u), wall[1] + face.out[1] * (r + 8 * u), z];
   props.tube([wall, [wall[0] + face.out[0] * 8 * u, wall[1] + face.out[1] * 8 * u, z]], 1.3 * u, IRON, { sides: 6 });
@@ -618,7 +679,18 @@ function building(props, b, u) {
   wallBand(props, { a, b: c, depth: 10 * u, z0: -2, z1: 7 * u, over: 2 * u, color: trim });
   windowRun(props, { a, b: c, z0: 8 * u, z1: 34 * u, panes: Math.max(2, Math.round(length / (isCenter ? 70 : 52) / u)), rows: 1, glass: isCenter ? GLASS : GLASS_DARK, frame: IRON, frameW: 9 * u });
   const awning = isCenter ? AWNING_RED : AWNINGS[Math.floor(b.seed * AWNINGS.length) % AWNINGS.length];
-  wallBand(props, { a, b: c, depth: 4 * u, z0: 36 * u, z1: 44 * u, over: 15 * u, color: awning, topColor: awning });
+  if (b.role === 'cafe') {
+    // Design 084: the cafe's awning in red and cream stripes.
+    const stripes = Math.max(6, Math.round(length / (14 * u)));
+    for (let k = 0; k < stripes; k += 1) {
+      const from = [a[0] + along[0] * ((length * k) / stripes), a[1] + along[1] * ((length * k) / stripes)];
+      const to = [a[0] + along[0] * ((length * (k + 1)) / stripes), a[1] + along[1] * ((length * (k + 1)) / stripes)];
+      const stripe = k % 2 ? AWNING_CREAM : AWNING_RED;
+      wallBand(props, { a: from, b: to, depth: 4 * u, z0: 36 * u, z1: 44 * u, over: 18 * u, color: stripe, topColor: stripe });
+    }
+  } else {
+    wallBand(props, { a, b: c, depth: 4 * u, z0: 36 * u, z1: 44 * u, over: 15 * u, color: awning, topColor: awning });
+  }
   wallBand(props, { a, b: c, depth: 8 * u, z0: 44 * u, z1: 50 * u, over: 4 * u, color: isCenter ? [1.1, 1.08, 1.0, 0.02] : trim });
   // Upper floors: long windows in stone piers, a trim band every floor, a balcony slab and rail on some.
   for (let floor = 0; floor < b.floors - 1; floor += 1) {
@@ -791,6 +863,7 @@ export function lumioseCityBoard({ three, material, terrainGrid, replaceGeometry
     uUnit: { value: 1 },
     uBlocks: { value: Array.from({ length: MAX_BUILDINGS }, () => new three.Vector4()) },
     uBlockHeights: { value: Array.from({ length: MAX_BUILDINGS }, () => 0) },
+    uCasters: { value: Array.from({ length: MAX_CASTERS }, () => new three.Vector4()) },
   };
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
   const materials = {
@@ -826,6 +899,10 @@ export function lumioseCityBoard({ three, material, terrainGrid, replaceGeometry
         // The roof's mass counts too: the shadow's block reaches a little above the cornice.
         own.uBlockHeights.value[i] = b ? b.height + 26 * u : 0;
         return b ? slot.set(b.x0, b.y0, b.x1, b.y1) : slot.set(0, 0, 0, 0);
+      });
+      own.uCasters.value.forEach((slot, i) => {
+        const c = spots?.casters[i];
+        return c ? slot.set(c.x, c.y, c.r, c.h) : slot.set(0, 0, 0, 0);
       });
       replaceGeometry(terrain, terrainGrid(bounds));
       kit.set(spots ? lumioseProps(spots) : null);

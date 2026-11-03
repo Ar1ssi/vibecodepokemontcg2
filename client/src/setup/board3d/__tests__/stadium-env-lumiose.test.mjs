@@ -19,6 +19,7 @@ import {
   lumioseProps,
   lumioseSpots,
   towerRadius,
+  MAX_CASTERS,
 } from '../stadium-env-lumiose.mjs';
 import { SCREEN_VIEWS, geometryOnCard, screenView } from './stadium-screen.mjs';
 
@@ -67,6 +68,20 @@ test('lumioseSpots: trees, lamps, benches and cafes stand clear of every card, t
     assert.ok(tower.x - tower.r > square.x0 && tower.h === TOWER_HEIGHT_PX * u, 'the tower stands inside the plaza, in the left strip');
     for (const l of lamps) assert.ok(Math.hypot(l.x - tower.x, l.y - tower.y) > tower.r + 8 * u, 'lamp off the tower');
     for (const t of trees) assert.ok(Math.hypot(t.x - tower.x, t.y - tower.y) > tower.r + t.r * 0.6, 'tree off the tower');
+  }
+});
+
+// Design 084: the tower at the view's top-left, where both cameras draw it upright; every tree and lamp
+// casts a shadow (the terrain draws them).
+test('lumioseSpots: the tower stands past the far cards in the left strip; a shadow caster per tree and lamp', () => {
+  for (const layout of layouts) {
+    const { tower, core, square, trees, lamps, casters } = lumioseSpots(layout);
+    assert.ok(tower.y > core.y + core.h && tower.y < square.y1, 'past the far cards, inside the plaza');
+    assert.ok(tower.x < core.x, 'left of the cards');
+    assert.equal(casters.length, trees.length + lamps.length);
+    assert.ok(casters.length <= MAX_CASTERS);
+    assert.equal(casters.filter((c) => c.r > 0).length, trees.length, 'trees have crowns, lamps none');
+    assert.ok(casters.every((c) => c.h > 0), 'each has a height');
   }
 });
 
