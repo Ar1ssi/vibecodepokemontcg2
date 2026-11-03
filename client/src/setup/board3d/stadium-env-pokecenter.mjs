@@ -109,6 +109,8 @@ export function centerSpots(layout) {
     { x: room.x1 - 24 * u, y: at(0.88), r: 9 * u, seed: 8 },
   ];
   const columns = [-1, 1].map((side) => ({ x: side < 0 ? room.x0 + 36 * u : room.x1 - 36 * u, y: room.y0 + 48 * u, r: 24 * u, h: 190 * u }));
+  // Design 084: a doormat inside the entrance, between the glass columns.
+  const doormat = { x0: centre.x - 96 * u, x1: centre.x + 96 * u, y0: room.y0 + 6 * u, y1: room.y0 + 58 * u };
   const footprint = (s) => ({ x0: Math.min(s.x, s.x + s.dir * s.depth), x1: Math.max(s.x, s.x + s.dir * s.depth), y0: s.y0, y1: s.y1 });
   const deskBox = (d) => ({ x0: Math.min(d.x, d.x + d.dir * d.d), x1: Math.max(d.x, d.x + d.dir * d.d), y0: d.y - d.w / 2, y1: d.y + d.w / 2 });
   const blocks = [
@@ -142,6 +144,7 @@ export function centerSpots(layout) {
     bench,
     plants,
     columns,
+    doormat,
     blocks,
     discs,
     emblem: craterEmblem(layout, centre),
@@ -256,11 +259,13 @@ const vec3 FLOOR_B = vec3(0.82, 0.655, 0.452);
 const vec3 JOINT = vec3(0.644, 0.474, 0.302);
 const vec3 BORDER_ORANGE = vec3(0.858, 0.348, 0.142);
 const vec3 BORDER_LINE = vec3(1.164, 1.08, 0.922);
-// Design 080: the floor's Poke Ball lies under both Actives: a soft coral over a cream a step under
-// card white, so the cards' borders keep their edges over it.
-const vec3 EMBLEM_ORANGE = vec3(0.86, 0.36, 0.17);
-const vec3 EMBLEM_WHITE = vec3(0.98, 0.93, 0.83);
-const vec3 EMBLEM_BAND = vec3(0.3, 0.1, 0.07);
+// Design 080: the floor's Poke Ball lies under both Actives, a cream a step under card white, so the
+// cards' borders keep their edges over it. Design 084: a two-tone tile inlay, cream and peach, its
+// band a deeper tan, orange only as a thin ring (a saturated disc under the hero cards).
+const vec3 EMBLEM_ORANGE = vec3(0.86, 0.6, 0.4);
+const vec3 EMBLEM_WHITE = vec3(0.9, 0.81, 0.64);
+const vec3 EMBLEM_BAND = vec3(0.72, 0.5, 0.32);
+const vec3 EMBLEM_RING = vec3(0.86, 0.36, 0.15);
 const vec3 RUG_RED = vec3(0.473, 0.076, 0.066);
 const vec3 RUG_DARK = vec3(0.223, 0.053, 0.053);
 const vec3 RUG_CREAM = vec3(0.801, 0.644, 0.411);
@@ -290,14 +295,14 @@ vec4 floorBall(vec2 rel, float R) {
   float band = 1.0 - smoothstep(R * 0.055, R * 0.068, abs(rel.y));
   ball = mix(ball, EMBLEM_BAND, band);
   float ringLine = 1.0 - smoothstep(R * 0.008, R * 0.02, abs(r - R * 0.97));
-  ball = mix(ball, EMBLEM_BAND, ringLine * 0.8);
+  ball = mix(ball, EMBLEM_RING, ringLine * 0.9);
   float button = 1.0 - smoothstep(R * 0.255, R * 0.262, r);
   ball = mix(ball, EMBLEM_WHITE, button);
-  ball = mix(ball, EMBLEM_BAND, 1.0 - smoothstep(R * 0.008, R * 0.018, abs(r - R * 0.255)));
+  ball = mix(ball, EMBLEM_RING, 1.0 - smoothstep(R * 0.008, R * 0.018, abs(r - R * 0.255)));
   float centre = 1.0 - smoothstep(R * 0.1, R * 0.108, r);
-  ball = mix(ball, EMBLEM_ORANGE * 0.9, centre);
-  // A pale ring just outside, as the games lay it, and a thin one further out.
-  float outer = max(1.0 - smoothstep(R * 0.025, R * 0.04, abs(r - R * 1.08)), 0.7 * (1.0 - smoothstep(R * 0.008, R * 0.02, abs(r - R * 1.16))));
+  ball = mix(ball, EMBLEM_ORANGE, centre);
+  // A thin pale ring just outside, as the games lay it.
+  float outer = 0.7 * (1.0 - smoothstep(R * 0.008, R * 0.02, abs(r - R * 1.08)));
   vec3 colour = mix(ball, EMBLEM_WHITE, outer * (1.0 - inside));
   return vec4(colour, max(inside, outer));
 }
@@ -326,7 +331,8 @@ void main() {
     float checker = mod(cell.x + cell.y, 2.0);
     // Design 080: round the cards the checker and its joints soften, so the squares never run under them.
     float calm = fieldCalm(p, 110.0);
-    vec3 floorCol = mix(FLOOR_A, FLOOR_B, checker * mix(0.72, 0.35, calm)) * (0.96 + 0.07 * hash12(cell + 3.0));
+    // Design 084: a little quieter still by the cards (the checker ran under everything).
+    vec3 floorCol = mix(FLOOR_A, FLOOR_B, checker * mix(0.72, 0.22, calm)) * (0.96 + 0.07 * hash12(cell + 3.0) * (1.0 - 0.6 * calm));
     vec2 inCell = abs(fract(p / tile) - 0.5);
     float jointD = (0.5 - max(inCell.x, inCell.y)) * tile;
     // An orange border along the walls, a pale line inside it.
@@ -353,8 +359,10 @@ void main() {
         jointD = 99.0;
       }
     }
-    floorCol = mix(floorCol, JOINT, (1.0 - smoothstep(0.4, 1.3, jointD)) * mix(0.75, 0.42, calm));
+    floorCol = mix(floorCol, JOINT, (1.0 - smoothstep(0.4, 1.3, jointD)) * mix(0.75, 0.28, calm));
     col = floorCol;
+    // Design 084: the lobby's warm key, brightest in the room's middle, falling off softly toward the walls.
+    col *= vec3(1.03, 1.0, 0.95) * mix(0.8, 1.05, smoothstep(0.0, 380.0 * u, -sd));
 
     // The ceiling lamps' soft pools and the lamps' panels mirrored in the polished tiles.
     col *= 0.94 + 0.09 * (0.5 + 0.5 * cos(p.x / 230.0) * cos(p.y / 190.0));
@@ -425,6 +433,9 @@ const SCREEN_BALL_ORANGE = [1.5, 0.5, 0.12, 2.2];
 const POSTER_MAP = [0.2, 0.5, 0.75, 0];
 const POSTER_LAND = [0.3, 0.6, 0.3, 0];
 const BENCH_BASE = [0.7, 0.72, 0.78, 0.2];
+// Design 084: the doormat's coir and its edge.
+const MAT = [0.36, 0.2, 0.12, 0];
+const MAT_EDGE = [0.2, 0.11, 0.07, 0];
 const BENCH_CUSHION = [0.2, 0.5, 0.85, 0.2];
 
 /** The point `s` px along a wall's inner face (a to b) at height z, `push` px into the room. */
@@ -562,7 +573,12 @@ function receptionCounter(props, counter, u) {
 function sofa(props, s, u) {
   const at = (dx) => s.x + s.dir * dx;
   const length = s.y1 - s.y0;
-  const part = (dx0, dx1, y0, y1, z0, z1, color) => props.roundBox({ x: at((dx0 + dx1) / 2), y: (y0 + y1) / 2, z0, z1, hw: Math.abs(dx1 - dx0) / 2, hh: (y1 - y0) / 2, color });
+  // Design 084: soft rounded solids (sharp boxes read as flat coloured rectangles from above).
+  const part = (dx0, dx1, y0, y1, z0, z1, color) => {
+    const hw = Math.abs(dx1 - dx0) / 2;
+    const hh = (y1 - y0) / 2;
+    props.roundBox({ x: at((dx0 + dx1) / 2), y: (y0 + y1) / 2, z0, z1, hw, hh, r: 0.7 * Math.min(hw, hh, (z1 - z0) / 2), color });
+  };
   const D = s.depth;
   part(0, D, s.y0, s.y1, 3 * u, 20 * u, SOFA);
   part(0, 0.3 * D, s.y0, s.y1, 20 * u, 58 * u, SOFA);
@@ -580,7 +596,7 @@ function sofa(props, s, u) {
 
 /** A cushion stool: a square pad on four chrome legs. */
 function stool(props, s, u) {
-  props.roundBox({ x: s.x, y: s.y, z0: 8 * u, z1: 16 * u, hw: 10 * u, hh: 10 * u, color: STOOLS[s.color % STOOLS.length] });
+  props.roundBox({ x: s.x, y: s.y, z0: 8 * u, z1: 16 * u, hw: 10 * u, hh: 10 * u, r: 3.5 * u, color: STOOLS[s.color % STOOLS.length] });
   for (const [dx, dy] of [[-7, -7], [7, -7], [7, 7], [-7, 7]]) props.roundBox({ x: s.x + dx * u, y: s.y + dy * u, z0: -1, z1: 8 * u, hw: 0.9 * u, hh: 0.9 * u, color: CHROME });
 }
 
@@ -640,8 +656,8 @@ function bench(props, b, u) {
   const at = (dx) => b.x + b.dir * dx;
   const mid = (b.y0 + b.y1) / 2;
   props.roundBox({ x: at(b.depth / 2), y: mid, z0: 3 * u, z1: 14 * u, hw: b.depth / 2, hh: (b.y1 - b.y0) / 2, color: BENCH_BASE });
-  props.roundBox({ x: at(b.depth * 0.54), y: mid, z0: 14 * u, z1: 23 * u, hw: b.depth * 0.46, hh: (b.y1 - b.y0) / 2 - 1.5 * u, color: BENCH_CUSHION });
-  props.roundBox({ x: at(b.depth * 0.12), y: mid, z0: 14 * u, z1: 42 * u, hw: b.depth * 0.12, hh: (b.y1 - b.y0) / 2, color: BENCH_CUSHION });
+  props.roundBox({ x: at(b.depth * 0.54), y: mid, z0: 14 * u, z1: 23 * u, hw: b.depth * 0.46, hh: (b.y1 - b.y0) / 2 - 1.5 * u, r: 3.5 * u, color: BENCH_CUSHION });
+  props.roundBox({ x: at(b.depth * 0.12), y: mid, z0: 14 * u, z1: 42 * u, hw: b.depth * 0.12, hh: (b.y1 - b.y0) / 2, r: 2.8 * u, color: BENCH_CUSHION });
 }
 
 /** A glass column lit from within: a pale glass drum between white rings, a glowing cap. */
@@ -682,6 +698,10 @@ export function centerProps(spots) {
   receptionCounter(props, counter, u);
   sofa(props, sofaSpot, u);
   coffeeTable(props, table, u);
+  // Design 084: a little plant on the table, and a doormat inside the entrance (the near wall's middle).
+  placeAsset(props, 'topiary', { x: table.x, y: table.y, z: 20.5 * u, size: 9 * u, seed: 41, sun: CENTER_LIGHT, colors: { leaf: FOLIAGE, leafLight: FOLIAGE_LIT, pot: POT_WHITE, stem: [0.2, 0.12, 0.08, 0] } });
+  const mat = spots.doormat;
+  props.roundBox({ x: (mat.x0 + mat.x1) / 2, y: (mat.y0 + mat.y1) / 2, z0: -1, z1: 1.6 * u, hw: (mat.x1 - mat.x0) / 2, hh: (mat.y1 - mat.y0) / 2, r: 1.2 * u, color: MAT_EDGE, topColor: MAT });
   for (const s of [...stools, ...deskStools]) stool(props, s, u);
   for (const s of shelves) bookshelf(props, s, u);
   for (const d of desks) pcDesk(props, d, u);

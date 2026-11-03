@@ -64,6 +64,20 @@ test('centerSpots: the counter, the lounge, the shelves, the PCs, the bench, the
   }
 });
 
+// Design 084: a doormat inside the entrance, by the near wall, off every card.
+test('centerSpots: the doormat lies inside the room by the near wall, clear of every card', () => {
+  for (const layout of layouts) {
+    const { doormat, room } = centerSpots(layout);
+    assert.ok(doormat.x0 > room.x0 && doormat.x1 < room.x1 && doormat.y0 > room.y0 && doormat.y1 < room.y1, 'inside the room');
+    assert.ok(doormat.y0 - room.y0 < 20, 'by the near wall');
+    const { slabs, flats } = environmentFootprints(layout);
+    for (const rect of [...slabs, ...flats]) {
+      const apart = rect.y >= doormat.y1 || rect.y + rect.h <= doormat.y0 || rect.x >= doormat.x1 || rect.x + rect.w <= doormat.x0;
+      assert.ok(apart, 'off every card');
+    }
+  }
+});
+
 test('centerSpots: the boxes and round pieces the light is cast from fit the shader arrays, none of them over a card', () => {
   for (const layout of layouts) {
     const { blocks, discs, walls } = centerSpots(layout);
