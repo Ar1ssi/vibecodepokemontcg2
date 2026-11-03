@@ -132,6 +132,26 @@ export function clumpAround({ x, y }, { count = 3, reach = [30, 60], salt = 0 } 
 }
 
 /**
+ * Design 084: about this share of the table's width, at its right, lies under the chat panel at a
+ * 1920 px window (the sidebox covers the viewport's right ~24 %).
+ */
+export const PANEL_SHARE = 0.24;
+
+/**
+ * Design 084: how much a board wants a prop or a landmark at x, by how much of it the chat panel
+ * hides: 1 over the table's left 0.52, easing to 0.4 where the panel begins (its right PANEL_SHARE)
+ * and past the table's right edge. 1 without a table.
+ */
+export function frameWeight(x, table) {
+  if (!table || !(table.w > 0) || !Number.isFinite(x)) return 1;
+  const across = (x - table.x) / table.w;
+  const from = 1 - 2 * PANEL_SHARE;
+  const to = 1 - PANEL_SHARE;
+  const t = Math.min(1, Math.max(0, (across - from) / (to - from)));
+  return 1 - 0.6 * t * t * (3 - 2 * t);
+}
+
+/**
  * Design 083: the part of a board's scene the camera presets see past the cards: the table grown by
  * `grow` of its size each way, clipped to the scene. Drift is born there and clumps stand there, so
  * neither is spent off screen. Null without a table or a scene.

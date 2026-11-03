@@ -37,29 +37,48 @@ const pick = (mix, roll) => {
 };
 
 /**
+ * Design 084: a piece's lean, up to `most` rad toward a hashed heading, as frameOf's [about x, about
+ * y]; null when it stands upright.
+ */
+export function pieceLean(x, y, most, salt = 0) {
+  if (!(most > 0)) return null;
+  const tilt = most * hash(x, y, salt + 35);
+  if (!(tilt > 0)) return null;
+  const heading = hash(y, x, salt + 37) * 2 * Math.PI;
+  return [-Math.sin(heading) * tilt, Math.cos(heading) * tilt];
+}
+
+/**
  * Clumps over `area` ({ x, y, w, h } table px).
  * - `step`: px between anchors (a clump's spacing).
- * - `mix`: [{ asset, weight, size: [min, max] px, options? }] — `options` ride into placeAsset;
- *   satellites draw from `satellites ?? mix`.
- * - `fits(x, y, reach, height)`: the board's clearance (cards, hand, its own features).
+ * - `mix`: [{ asset, weight, size: [min, max] px, options?, lean?, spread? }] — `options` ride into
+ *   placeAsset; satellites draw from `satellites ?? mix`. Design 084: `lean` (rad) tips each piece
+ *   by a hashed amount up to it, `spread` (0..0.6) scales its size by a hashed factor in
+ *   [1 − spread, 1 + spread], so no two pieces of a kind stand alike.
+ * - `fits(x, y, reach, height)`: the board's clearance (cards, hand, its own features); a leaning
+ *   piece's reach grows by its height × sin(lean).
  * - `thick`: least patchy() weight an anchor needs (1: about half the ground holds clumps).
+ * - `weight(x, y)`: design 084, a factor on that weight (frameWeight: fewer clumps under the panel).
  * - `count`: [min, max] satellites per clump. `cap`: most pieces. `spacing`: least gap between two
  *   pieces as a share of their reaches. `taken`: [{ x, y, r }] already there.
- * @returns {{ asset: string, x: number, y: number, size: number, seed: number, yaw: number, reach: number, height: number, hero: boolean, options: object }[]}
+ * @returns {{ asset: string, x: number, y: number, size: number, seed: number, yaw: number, lean: number[]|null, reach: number, height: number, hero: boolean, options: object }[]}
  */
-export function clumpPieces(area, { step, mix, satellites = null, fits, thick = 1, count = [2, 4], cap = 40, spacing = 0.85, salt = 0, taken = [] }) {
+export function clumpPieces(area, { step, mix, satellites = null, fits, thick = 1, count = [2, 4], cap = 40, spacing = 0.85, salt = 0, taken = [], weight = null }) {
   if (!area || !(area.w > 0 && area.h > 0) || !(step > 0) || !mix?.length || typeof fits !== 'function') return [];
   const pieces = [];
   const others = taken.map((spot) => ({ ...spot }));
   const room = (x, y, reach) => others.every((spot) => Math.hypot(x - spot.x, y - spot.y) >= (spot.r + reach) * spacing);
   const tryPlace = (kind, x, y, share, seed, hero) => {
     const [low, high] = kind.size;
-    const size = (low + (high - low) * hash(x, y, salt + 31)) * share;
+    const spread = Math.min(0.6, Math.max(0, kind.spread ?? 0));
+    const size = (low + (high - low) * hash(x, y, salt + 31)) * share * (1 + spread * (2 * hash(y, x, salt + 33) - 1));
     const dims = measureAsset(kind.asset, { ...(kind.options ?? {}), size });
-    if (!fits(x, y, dims.reach, dims.height) || !room(x, y, dims.reach)) return null;
-    const piece = { asset: kind.asset, x, y, size, seed, yaw: seed * 2 * Math.PI, reach: dims.reach, height: dims.height, hero, options: kind.options ?? {} };
+    const lean = pieceLean(x, y, Math.min(0.5, kind.lean ?? 0), salt);
+    const reach = dims.reach + (lean ? dims.height * Math.sin(Math.hypot(lean[0], lean[1])) : 0);
+    if (!fits(x, y, reach, dims.height) || !room(x, y, reach)) return null;
+    const piece = { asset: kind.asset, x, y, size, seed, yaw: seed * 2 * Math.PI, lean, reach, height: dims.height, hero, options: kind.options ?? {} };
     pieces.push(piece);
-    others.push({ x, y, r: dims.reach });
+    others.push({ x, y, r: reach });
     return piece;
   };
   const anchors = [];
@@ -67,7 +86,8 @@ export function clumpPieces(area, { step, mix, satellites = null, fits, thick = 
     for (let gx = area.x + step / 2; gx < area.x + area.w; gx += step) {
       const x = gx + (hash(gx, gy, salt + 1) - 0.5) * step * 0.8;
       const y = gy + (hash(gx, gy, salt + 2) - 0.5) * step * 0.8;
-      if (patchy(x, y, { scale: step * 2.2, salt: salt + 3 }) >= thick) anchors.push({ x, y });
+      const welcome = patchy(x, y, { scale: step * 2.2, salt: salt + 3 }) * (typeof weight === 'function' ? weight(x, y) : 1);
+      if (welcome >= thick) anchors.push({ x, y });
     }
   }
   for (const anchor of shuffled(anchors, salt + 4)) {

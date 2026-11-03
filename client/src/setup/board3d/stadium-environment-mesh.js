@@ -41,7 +41,8 @@ import {
 } from './stadium-environment-layout.mjs';
 import { createEnvironmentTimeline } from './stadium-environment-timeline.mjs';
 import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
-import { createKitProps } from './stadium-kit.mjs';
+import { createKitProps, paint } from './stadium-kit.mjs';
+import { MAX_GLOWS } from './stadium-env-ground.mjs';
 import { BOARD_DRIFT, createDrift, driftArea } from './stadium-env-drift.mjs';
 import { oppHandRect, union } from './stadium-env-spots.mjs';
 import { tableBounds } from './table-uv.mjs';
@@ -191,6 +192,38 @@ export function setFootprints(uniforms, { slabs = [], flats = [] } = {}) {
     Math.max(...kept.map((r) => r.x + r.w)),
     Math.max(...kept.map((r) => r.y + r.h))
   );
+}
+
+let warnedGlows = false;
+
+/**
+ * Design 084: a board's contact glows (its spots' `glows`) into the shared `uGlows`, `uGlowTints` and
+ * `uGlowCount` (stadium-env-ground.mjs GLOW). Each glow is `{ x, y, r, colour: '#rrggbb', strength = 1,
+ * breath = 0 }` (table px; breath in Hz, 0 steady); its colour is a light's (paint(hex, 2): shown at
+ * its own colour). A glow with no finite place, no radius or no strength is skipped; past MAX_GLOWS
+ * the rest are dropped with one warning.
+ */
+export function setGlows(uniforms, glows = []) {
+  const valid = (Array.isArray(glows) ? glows : []).filter(
+    (glow) => glow && [glow.x, glow.y, glow.r].every(Number.isFinite) && glow.r > 0 && (glow.strength ?? 1) > 0
+  );
+  if (valid.length > MAX_GLOWS && !warnedGlows) {
+    warnedGlows = true;
+    console.warn(`board3d: ${valid.length} Stadium glows, the board lights ${MAX_GLOWS}`);
+  }
+  const kept = valid.slice(0, MAX_GLOWS);
+  const tints = kept.map((glow) => paint(glow.colour, 2));
+  uniforms.uGlows.value.forEach((vector, i) => {
+    const glow = kept[i];
+    if (glow) vector.set(glow.x, glow.y, glow.r, glow.strength ?? 1);
+    else vector.set(0, 0, 0, 0);
+  });
+  uniforms.uGlowTints.value.forEach((vector, i) => {
+    const tint = tints[i];
+    if (tint) vector.set(tint[0], tint[1], tint[2], Math.max(0, kept[i].breath ?? 0));
+    else vector.set(0, 0, 0, 0);
+  });
+  uniforms.uGlowCount.value = kept.length;
 }
 
 /** A deterministic 0..1 from two integers, so a strike looks the same in every frame it spans. */
@@ -819,6 +852,10 @@ export function createStadiumEnvironment({
     uFootprints: { value: Array.from({ length: glsl.MAX_FOOTPRINTS }, () => new three.Vector4()) },
     uFootprintCount: { value: 0 },
     uFootprintBox: { value: new three.Vector4(-1e5, -1e5, -1e5, -1e5) },
+    // Design 084: the shown board's contact glows, for the shared GLOW chunk (setGlows).
+    uGlows: { value: Array.from({ length: MAX_GLOWS }, () => new three.Vector4()) },
+    uGlowTints: { value: Array.from({ length: MAX_GLOWS }, () => new three.Vector4()) },
+    uGlowCount: { value: 0 },
   };
   const cutout = {
     glsl: glsl.CUTOUT_GLSL,
@@ -1045,6 +1082,7 @@ export function createStadiumEnvironment({
       uniforms.uSize.value.set(bounds.w, bounds.h);
       uniforms.uOrigin.value.set(origin.x, origin.y);
       setFootprints(uniforms, footprints);
+      setGlows(uniforms, spots?.glows ?? []);
       board.apply(spots, bounds);
       board.drift.setEmitters(spots?.driftEmitters ?? []);
       board.drift.setArea(driftArea(tableBounds(layout), bounds));

@@ -21,9 +21,12 @@ import {
   jungleTreeProps,
   plateScale,
   setFootprints,
+  setGlows,
   strikePath,
   strikePower,
 } from '../stadium-environment-mesh.js';
+import { MAX_GLOWS } from '../stadium-env-ground.mjs';
+import { paint } from '../stadium-kit.mjs';
 import { jungleSpots } from '../stadium-env-forest-layout.mjs';
 import { SCREEN_VIEWS, geometryOnCard, screenView } from './stadium-screen.mjs';
 
@@ -127,6 +130,51 @@ test('setFootprints: no layout gives no footprints', () => {
   assert.equal(uniforms.uFootprintCount.value, 0);
   assert.ok(uniforms.uFootprintBox.value.z < -1e4, 'no box: every point is far from it');
   assert.ok(uniforms.uFootprints.value.every((vector) => vector.x < -1e4));
+});
+
+/** The glow uniforms setGlows writes, with plain vectors standing in for three's. */
+const glowUniforms = () => {
+  const vectors = () =>
+    Array.from({ length: MAX_GLOWS }, () => ({
+      set(x, y, z, w) {
+        Object.assign(this, { x, y, z, w });
+      },
+    }));
+  return { uGlows: { value: vectors() }, uGlowTints: { value: vectors() }, uGlowCount: { value: 0 } };
+};
+
+test('setGlows: each glow as (x, y, r, strength) with its light colour and breath; bad ones skipped (design 084)', () => {
+  const uniforms = glowUniforms();
+  setGlows(uniforms, [
+    { x: 10, y: 20, r: 80, colour: '#ffcf5a', strength: 0.5, breath: 0.2 },
+    { x: Number.NaN, y: 0, r: 40, colour: '#ffffff' },
+    { x: 0, y: 0, r: 0, colour: '#ffffff' },
+    { x: 1, y: 2, r: 30, colour: '#5ff0ff', strength: 0 },
+    null,
+    { x: -5, y: 7, r: 60, colour: '#5ff0ff' },
+  ]);
+  assert.equal(uniforms.uGlowCount.value, 2, 'NaN place, no radius, no strength and null are skipped');
+  const [first, second] = uniforms.uGlows.value;
+  assert.deepEqual([first.x, first.y, first.z, first.w], [10, 20, 80, 0.5]);
+  assert.deepEqual([second.x, second.y, second.z, second.w], [-5, 7, 60, 1], 'strength defaults to 1');
+  const [tint, tint2] = uniforms.uGlowTints.value;
+  const light = paint('#ffcf5a', 2);
+  assert.deepEqual([tint.x, tint.y, tint.z, tint.w], [light[0], light[1], light[2], 0.2], 'a light at its own colour, its breath in w');
+  assert.equal(tint2.w, 0, 'steady unless it breathes');
+  assert.ok(uniforms.uGlows.value.slice(2).every((v) => v.z === 0), 'unused slots have no radius');
+});
+
+test('setGlows: none clears the count; past MAX_GLOWS the rest are dropped', () => {
+  const uniforms = glowUniforms();
+  setGlows(uniforms, [{ x: 0, y: 0, r: 10, colour: '#ffffff' }]);
+  setGlows(uniforms, undefined);
+  assert.equal(uniforms.uGlowCount.value, 0);
+  assert.ok(uniforms.uGlows.value.every((v) => v.z === 0));
+  const many = Array.from({ length: MAX_GLOWS + 5 }, (_, i) => ({ x: i, y: 0, r: 10, colour: '#ffffff' }));
+  setGlows(uniforms, many);
+  assert.equal(uniforms.uGlowCount.value, MAX_GLOWS);
+  assert.equal(uniforms.uGlows.value[MAX_GLOWS - 1].x, MAX_GLOWS - 1, 'the first MAX_GLOWS kept');
+  assert.throws(() => setGlows(glowUniforms(), [{ x: 0, y: 0, r: 10, colour: 'gold' }]), /not a #rrggbb colour/);
 });
 
 test('plateScale: CSS-pixel size at most, never more than PLATE_MAX_PIXELS', () => {

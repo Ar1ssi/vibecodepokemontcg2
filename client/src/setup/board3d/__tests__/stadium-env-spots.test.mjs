@@ -2,7 +2,25 @@
 // hand clumps round a hero piece.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { clumpAround, patch, patchy, shuffled } from '../stadium-env-spots.mjs';
+import { PANEL_SHARE, clumpAround, frameWeight, patch, patchy, shuffled } from '../stadium-env-spots.mjs';
+
+test('frameWeight: 1 over the table\'s left half, easing to 0.4 under the chat panel and past the right edge (design 084)', () => {
+  const table = { x: -700, y: 0, w: 1400, h: 900 };
+  const at = (share) => frameWeight(table.x + table.w * share, table);
+  assert.equal(at(0), 1);
+  assert.equal(at(1 - 2 * PANEL_SHARE), 1);
+  assert.ok(Math.abs(at(1 - PANEL_SHARE) - 0.4) < 1e-9);
+  assert.ok(Math.abs(at(1.2) - 0.4) < 1e-9, 'past the right edge');
+  assert.equal(at(-0.15), 1, 'the left margin is wanted');
+  let last = 1;
+  for (let share = 0; share <= 1.1; share += 0.02) {
+    const weight = at(share);
+    assert.ok(weight <= last + 1e-12, 'never rises to the right');
+    last = weight;
+  }
+  assert.equal(frameWeight(0, null), 1, 'no table: no bias');
+  assert.equal(frameWeight(Number.NaN, table), 1);
+});
 
 test('patch: a smooth 0..1 field, the same for the same inputs, its lattice points the hash', () => {
   for (let k = 0; k < 400; k += 1) {

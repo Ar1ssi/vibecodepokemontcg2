@@ -144,6 +144,40 @@ vec2 strata(float z, vec2 p, float band) {
 }
 `;
 
+/** Most contact glows a board lights its ground and kit props with (GLOW). */
+export const MAX_GLOWS = 16;
+
+/**
+ * Design 084: contact glow, the light an emissive thing (a lamp, crystals, a pool, lava) throws on
+ * what lies round it, after TERRAIN_UNIFORMS (uTime). `uGlows[i]` = (x, y, radius px, strength),
+ * `uGlowTints[i]` = (linear r, g, b, breath rate Hz: 0 steady), the first `uGlowCount` in use (the
+ * mesh's setGlows fills them from a board's spots.glows). `glowLight(p)`: the light at p, smooth at
+ * its middle and fading to nothing at its radius ((1 − d²/r²)³). `glowOn(col, p)`: a surface of
+ * colour col under it, tinted and brightened by it.
+ */
+export const GLOW = /* glsl */ `
+uniform vec4 uGlows[${MAX_GLOWS}];
+uniform vec4 uGlowTints[${MAX_GLOWS}];
+uniform int uGlowCount;
+vec3 glowLight(vec2 p) {
+  vec3 light = vec3(0.0);
+  for (int i = 0; i < ${MAX_GLOWS}; i++) {
+    if (i >= uGlowCount) break;
+    vec4 spot = uGlows[i];
+    vec2 q = (p - spot.xy) / spot.z;
+    float reach = 1.0 - dot(q, q);
+    if (reach <= 0.0) continue;
+    vec4 tint = uGlowTints[i];
+    float breath = tint.w > 0.0 ? 1.0 + 0.12 * sin(6.2831853 * tint.w * uTime + float(i) * 1.7) : 1.0;
+    light += tint.rgb * spot.w * reach * reach * reach * breath;
+  }
+  return light;
+}
+vec3 glowOn(vec3 col, vec2 p) {
+  return col + (col * 1.6 + 0.03) * glowLight(p);
+}
+`;
+
 /**
  * Design 083: light that moves over the land, after NOISE and FILTERING. `cloudShade(p, t, scale)`:
  * 0..1, the soft shadow of slow clouds drifting over (`scale` about a cloud's size, px).

@@ -9,6 +9,7 @@
 // Colours are authored as they show on screen: paint('#hex') inverts sRGB and Neutral tone mapping.
 // Pure: three comes in through createKitProps' arguments.
 import { NOISE, OUTPUT, REVEAL, TERRAIN_GROUND, TERRAIN_UNIFORMS } from './stadium-environment-glsl.mjs';
+import { GLOW } from './stadium-env-ground.mjs';
 
 /**
  * The light's colours per mood: the key (the sun's colour and strength), the fill from the sky
@@ -265,13 +266,15 @@ vec2 kitLeaves(vec3 p, vec3 n, vec2 outward, float size) {
  * (uniforms and functions) defining `vec3 kitGlow(vec3 albedo, vec3 n, vec3 world)`: a board's own
  * local light (lanterns, a glowing pool) added over the kit's light on every lit part. A foliage part
  * with a leaf size (aLook.w px) is covered in leaves, faded to their mean where they fall under ~3 px
- * on screen so they never shimmer.
+ * on screen so they never shimmer. Design 084: every lit part also takes the board's contact glows
+ * (GLOW, the shared uGlows), most on its upper faces, so a prop beside a lamp or a crystal is lit by it.
  */
 export const kitFragment = (reveal = 'vec3(1.0, 0.95, 0.8)', glow = '') => /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${KIT_UNIFORMS}
 ${NOISE}
 ${REVEAL}
+${GLOW}
 varying vec4 vColor;
 varying vec4 vLook;
 varying vec3 vNormal;
@@ -301,6 +304,7 @@ void main() {
     col *= mix(0.18, 1.0, smoothstep(-0.2, 0.2, sin(6.2831853 * (uTime * vLook.w + vLook.z))));
   }
   ${glow ? 'if (vColor.w < 1.5) col += kitGlow(vColor.rgb, n, vWorld);' : ''}
+  if (vColor.w < 1.5 && uGlowCount > 0) col += albedo * glowLight(vWorld.xy) * (0.55 + 0.45 * max(n.z, 0.0));
   col += (${reveal}) * revealGlow(vWorld.xy, 0.035);
   gl_FragColor = vec4(col, 1.0);
 ${OUTPUT}

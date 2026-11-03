@@ -138,15 +138,36 @@ function flowerHead(props, { x, y, head, h, tint, eye, leaf, turn }) {
   props.look({ kind: LOOK.gloss, sway: 0.5 }, () => props.blob({ x, y, z: h + head * 0.05, rx: head * 0.19, rz: head * 0.12, color: eye, sides: 10, rings: 6 }));
 }
 
+/**
+ * Design 084: the umbrella broadleaf's crown (Forest of Vitality's card): where its flat crown sits
+ * on a trunk of height H, and how high its lighter top lumps reach. The crown never sinks below a
+ * third of the trunk, so a short tall-crowned tree still shows its trunk.
+ */
+const umbrellaShape = (R, H) => {
+  const base = Math.max(H - 0.55 * R, 0.35 * H);
+  return { base, top: base + 0.52 * R };
+};
+
 /** Each asset: dims(options) → { reach (px from its foot, seen from above), height }, draw(props, options, dims, ctx). */
 const ASSETS = {
   /**
    * A broadleaf, BDSP's: a stout trunk flaring into its roots under a crown of leafy lumps (a broad
    * middle, a ring round it, a few lighter ones on top leaning sunward), dark in the creases between.
+   * Design 084: `crown: 'umbrella'` is the Forest of Vitality card's broadleaf instead: a tall visible
+   * trunk forking into limbs under a wide flat crown, its lit top a band of lighter lumps.
    */
   treeRound: {
-    dims: ({ size = 60, height }) => ({ reach: size * 1.12, height: (height ?? size * 2.1) + size * 0.06 }),
-    draw(props, { size: R = 60, height, colors }, dims, { rand, shift, sunward }) {
+    dims: ({ size = 60, height, crown }) => {
+      if (crown === 'umbrella') {
+        const H = height ?? size * 2.3;
+        return { reach: size * 1.18, height: Math.max(H, umbrellaShape(size, H).top) };
+      }
+      return { reach: size * 1.12, height: (height ?? size * 2.1) + size * 0.06 };
+    },
+    draw(props, options, dims, ctx) {
+      if (options.crown === 'umbrella') return drawUmbrella(props, options, ctx);
+      const { size: R = 60, height, colors } = options;
+      const { rand, shift, sunward } = ctx;
       const H = height ?? R * 2.1;
       const c = coloursOf({ leaf: 'leaf', leafLight: 'leafLight', bark: 'bark', barkDark: 'barkDark' }, colors);
       const crown = H - 0.6 * R;
@@ -1087,6 +1108,62 @@ const ASSETS = {
   },
 };
 
+/**
+ * The umbrella broadleaf (treeRound `crown: 'umbrella'`): a trunk flaring at its foot, three limbs
+ * forking out under the crown, a wide flat crown of leafy lumps (a broad flat middle, a ring of lumps
+ * round its rim) with a band of lighter lumps on top leaning sunward. Every lump lies within 1.14 R
+ * of the trunk and under umbrellaShape's top.
+ */
+function drawUmbrella(props, { size: R = 60, height, colors }, { rand, shift, sunward }) {
+  const H = height ?? R * 2.3;
+  const { base } = umbrellaShape(R, H);
+  const c = coloursOf({ leaf: 'leaf', leafLight: 'leafLight', bark: 'bark', barkDark: 'barkDark' }, colors);
+  props.lathe(
+    [
+      [0.3 * R, 0],
+      [0.2 * R, 0.04 * H],
+      [0.13 * R, 0.12 * H],
+      [0.11 * R, 0.5 * base],
+      [0.09 * R, base - 0.04 * R],
+      [0, base + 0.02 * R],
+    ],
+    { color: (i) => (i < 1 ? c.barkDark : c.bark), sides: 14 }
+  );
+  const turn = rand() * 6.28;
+  for (let k = 0; k < 3; k += 1) {
+    const angle = turn + (k / 3) * 2 * Math.PI + (rand() - 0.5) * 0.5;
+    const out = (0.38 + 0.1 * rand()) * R;
+    const from = [0, 0, 0.55 * base];
+    const to = [Math.cos(angle) * out, Math.sin(angle) * out, base + 0.02 * R];
+    const via = [to[0] * 0.35, to[1] * 0.35, (from[2] + to[2]) / 2 + 0.06 * R];
+    props.tube([from, via, to], [0.075 * R, 0.055 * R, 0.035 * R], c.bark, { sides: 8 });
+  }
+  const top = blend(c.leaf, c.leafLight, 0.65);
+  const lumps = [{ z: base + 0.12 * R, rx: 0.95 * R, rz: 0.3 * R, color: c.leaf }];
+  const rim = 7 + Math.floor(rand() * 2);
+  for (let k = 0; k < rim; k += 1) {
+    const angle = turn + (k / rim) * 2 * Math.PI + (rand() - 0.5) * 0.35;
+    const r = (0.38 + 0.08 * rand()) * R;
+    lumps.push({ x: Math.cos(angle) * 0.68 * R, y: Math.sin(angle) * 0.68 * R, z: base + 0.04 * R + rand() * 0.04 * R, rx: r, rz: r * 0.6, color: c.leaf });
+  }
+  const tops = 3 + Math.floor(rand() * 2);
+  for (let k = 0; k < tops; k += 1) {
+    const angle = turn + 0.6 + (k / tops) * 2 * Math.PI;
+    const r = (0.34 + 0.05 * rand()) * R;
+    lumps.push({
+      x: Math.cos(angle) * 0.34 * R + sunward[0] * 0.14 * R,
+      y: Math.sin(angle) * 0.34 * R + sunward[1] * 0.14 * R,
+      z: base + 0.3 * R,
+      rx: r,
+      rz: r * 0.55,
+      color: top,
+    });
+  }
+  props.look({ kind: LOOK.foliage, leaf: 0.15 * R, sway: 0.9 }, () => props.lumps(lumps));
+  props.shadow({ x: shift[0] * base, y: shift[1] * base, rx: 1.08 * R, strength: 0.6 });
+  props.shadow({ rx: 0.36 * R, strength: 0.55 });
+}
+
 /** How high in a planter (× its half width) the plant stands: on the soil, a little under the rim's top. */
 const PLANTER_SOIL = 0.75;
 
@@ -1148,6 +1225,8 @@ export function placeAsset(props, name, options = {}) {
   const build = () => ASSETS[name].draw(props, options, dims, ctx);
   // An asset placed without a seed keeps its palette (a towel, a bench): only seeded ones vary.
   const draw = () => (options.seed === undefined ? build() : props.tint(instanceTint(seed, options.vary ?? 1), build));
-  props.at({ x, y, z, yaw, ground: options.ground !== false }, () => (options.shadows === false ? props.withoutShadows(draw) : draw()));
+  // Design 084: `lean` ([about x, about y], frameOf's) tips the whole asset about its foot.
+  const lean = Array.isArray(options.lean) ? options.lean : [0, 0];
+  props.at({ x, y, z, yaw, lean, ground: options.ground !== false }, () => (options.shadows === false ? props.withoutShadows(draw) : draw()));
   return dims;
 }

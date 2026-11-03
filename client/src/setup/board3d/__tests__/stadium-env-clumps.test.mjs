@@ -56,6 +56,36 @@ test('clumpPieces: the cap, the taken spots and bad input', () => {
   assert.deepEqual(clumpPieces(area, { step: 100, mix }), []);
 });
 
+test('clumpPieces: lean and spread vary each piece; a leaning piece keeps its height × sin(lean) further off the cards (design 084)', () => {
+  const varied = mix.map((kind) => ({ ...kind, lean: 0.3, spread: 0.3 }));
+  const pieces = clumpPieces(area, { step: 180, mix: varied, fits, cap: 60, salt: 3 });
+  assert.ok(pieces.length >= 10, `${pieces.length} pieces`);
+  const leaning = pieces.filter((p) => p.lean);
+  assert.ok(leaning.length >= pieces.length * 0.8, 'most pieces lean');
+  for (const piece of pieces) {
+    const kind = varied.find((k) => k.asset === piece.asset);
+    const dims = measureAsset(piece.asset, { ...kind.options, size: piece.size });
+    const tilt = piece.lean ? Math.hypot(...piece.lean) : 0;
+    assert.ok(tilt <= 0.3 + 1e-9, `lean within its kind's most (${tilt})`);
+    assert.ok(Math.abs(piece.reach - (dims.reach + dims.height * Math.sin(tilt))) < 1e-9, 'reach grows by the lean');
+    assert.ok(fits(piece.x, piece.y, piece.reach), 'the leaning piece clears the card');
+    assert.ok(piece.size <= kind.size[1] * 1.3 + 1e-9 && piece.size >= kind.size[0] * 0.45 * 0.7 - 1e-9, `${piece.asset} size ${piece.size} within its spread`);
+  }
+  const sizes = new Set(pieces.filter((p) => p.asset === 'bush').map((p) => p.size.toFixed(3)));
+  assert.ok(sizes.size >= Math.min(3, pieces.filter((p) => p.asset === 'bush').length), 'no two bushes alike');
+  assert.deepEqual(clumpPieces(area, { step: 180, mix: varied, fits, cap: 60, salt: 3 }), pieces, 'deterministic');
+  assert.ok(clumpPieces(area, { step: 180, mix, fits, cap: 60, salt: 3 }).every((p) => p.lean === null), 'no lean unless asked');
+});
+
+test('clumpPieces: weight thins the anchors where it is low (the chat panel side, design 084)', () => {
+  const all = clumpPieces(area, { step: 140, mix, fits, cap: 200, salt: 9 });
+  const right = (list) => list.filter((p) => p.x > 300).length;
+  const weighted = clumpPieces(area, { step: 140, mix, fits, cap: 200, salt: 9, weight: (x) => (x > 300 ? 0.2 : 1) });
+  assert.ok(right(weighted) < right(all), `fewer pieces on the right (${right(weighted)} < ${right(all)})`);
+  const none = clumpPieces(area, { step: 140, mix, fits, cap: 200, salt: 9, weight: () => 0 });
+  assert.deepEqual(none, [], 'no welcome, no clumps');
+});
+
 test('scaledKinds: sizes, flower heads and grass blades (given or the asset\'s default) at the card scale', () => {
   const [fern, flowers, grass, bed] = scaledKinds(
     [

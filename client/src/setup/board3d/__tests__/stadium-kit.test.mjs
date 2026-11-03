@@ -139,6 +139,14 @@ test('kitFragment: a glowing part with the blink look dims and brightens at its 
   assert.equal((shader.match(/uniform float uTime;/g) ?? []).length, 1, 'uTime declared once');
 });
 
+test('kitFragment: every lit part takes the board\'s contact glows, a glowing part does not (design 084)', () => {
+  const shader = kitFragment();
+  assert.match(shader, /uniform vec4 uGlows\[\d+\];/);
+  assert.match(shader, /vec3 glowLight\(vec2 p\)/);
+  assert.match(shader, /if \(vColor\.w < 1\.5 && uGlowCount > 0\) col \+= albedo \* glowLight\(vWorld\.xy\) \* \(0\.55 \+ 0\.45 \* max\(n\.z, 0\.0\)\);/);
+  assert.equal((shader.match(/uniform float uTime;/g) ?? []).length, 1, 'uTime declared once');
+});
+
 test('kitPosition: a swaying part takes its phase from its asset\'s foot, so a crown sways as one piece (design 083)', () => {
   assert.match(KIT_VERTEX, /float phase = dot\(aFoot\.xy, vec2\(0\.043, 0\.029\)\) \+ dot\(p\.xy, vec2\(0\.006, 0\.004\)\);/);
 });
