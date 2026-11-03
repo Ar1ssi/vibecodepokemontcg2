@@ -75,6 +75,7 @@ export function deckFormatMismatch(state, roomFormat = null) {
  * 3. Evaluates mulligans, redrawing hands without Basic Pokémon and awarding opponent bonus draws.
  * 4. Resolves turn order via rng (or options.firstPlayerId).
  * 5. Sets turn to { player: starter, number: 1, phase: 'main' } and initializes player flags.
+ * 6. Owes the starter's turn-1 draw (`state.openingDrawPending`) until both Actives are placed.
  *
  * @param {object} state GameState (or cloned draft)
  * @param {object} [options]
@@ -229,20 +230,10 @@ export function setupGame(state, { firstPlayerId = null, rng = null, maxMulligan
     };
   }
 
-  if (starter) {
-    const starterDeck = state.players[starter].zones.deck;
-    const starterHand = state.players[starter].zones.hand;
-    if (starterDeck.length > 0) {
-      const [card] = starterDeck.splice(0, 1);
-      starterHand.push(card);
-      events.push({
-        type: 'cardsDrawn',
-        playerId: starter,
-        count: 1,
-        cards: [{ instanceId: card.instanceId }],
-      });
-    }
-  }
+  // The starter's turn-1 draw comes after setup: it is owed until both Actives are down
+  // (rules/opening-draw.mjs settles it), so the drawn card can never be the Starting Active.
+  if (starter) state.openingDrawPending = starter;
+  else delete state.openingDrawPending;
 
   events.push({
     type: 'gameSetupCompleted',

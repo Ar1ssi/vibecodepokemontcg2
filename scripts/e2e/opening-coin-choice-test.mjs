@@ -145,7 +145,7 @@ try {
   const otherHand = await (expectedStarter === a ? b : a).page.evaluate(
     () => window.__ptcg.zone('self', 'hand').count
   );
-  T('the starter drew for turn 1 (8 vs 7)', starterHand === 8 && otherHand === 7, `${starterHand}/${otherHand}`);
+  T('the turn-1 draw waits for the Starting Actives (7 vs 7)', starterHand === 7 && otherHand === 7, `${starterHand}/${otherHand}`);
   console.log('turnPlayer A/B:', await turnOf(a.page), await turnOf(b.page));
   console.log('--- winner chat ---\n' + winnerChat.split('\n').slice(-12).join('\n'));
 } catch (err) {
