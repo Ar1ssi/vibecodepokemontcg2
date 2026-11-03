@@ -126,6 +126,36 @@ float sparkles(vec2 p, float t) {
   float spot = 1.0 - smoothstep(0.0, 0.07, length(o));
   return spot * wink * step(0.72, h.y) * patternFade(filterPixel, 22.0);
 }
+// Design 084: a body of water as BDSP paints it from above. depth 0 at the shore .. 1 out deep: the
+// bed shows through the shallows, the shallow colour deepens to the deep one, a broad soft band of
+// sky light drifts across it (its highlight), the light streaks lie on the open water and sparkles
+// only out in the deep. The caller adds its foam and keeps it calm round the cards.
+vec3 waterBody(vec3 deep, vec3 shallow, vec3 bed, float depth, vec2 p, float t) {
+  float d = clamp(depth, 0.0, 1.0);
+  vec3 col = mix(shallow, deep, smoothstep(0.05, 0.9, d));
+  col = mix(bed, col, 0.35 + 0.65 * smoothstep(0.0, 0.3, d));
+  float band = smoothstep(0.42, 0.62, gnoise(p / vec2(520.0, 190.0) + vec2(t * 0.01, -t * 0.004)));
+  col += (shallow * 0.3 + 0.03) * band * smoothstep(0.08, 0.45, d);
+  col += vec3(0.85, 0.95, 1.0) * lightStreaks(p, t) * 0.12 * smoothstep(0.12, 0.5, d);
+  col += vec3(1.0) * sparkles(p, t) * 0.55 * smoothstep(0.5, 0.85, d);
+  return col;
+}
+// Design 084: foam bands parallel to a shore, 0..1. offshore is px out from the waterline (0 on it);
+// count bands (at most 4) spacing px apart roll in toward it, each thinning and fading as it nears,
+// its line broken a little along the shore (by p).
+float foamBands(float offshore, vec2 p, float t, float count, float spacing) {
+  float foam = 0.0;
+  for (int k = 0; k < 4; k++) {
+    if (float(k) >= count) break;
+    float phase = fract(t * 0.03 + float(k) / count);
+    float at = (1.0 - phase) * spacing * count;
+    float wobble = 6.0 * (gnoise(p / 90.0 + float(k) * 3.1) - 0.5);
+    float width = mix(2.0, 5.0, 1.0 - phase);
+    float line = 1.0 - smoothstep(width * 0.4, width, abs(offshore - at - wobble));
+    foam = max(foam, line * smoothstep(0.0, 0.15, phase) * mix(0.55, 1.0, phase) * (1.0 - 0.6 * smoothstep(0.85, 1.0, phase)));
+  }
+  return foam * patternFade(filterPixel, 6.0);
+}
 `;
 
 /**

@@ -18,6 +18,12 @@
 // white flowers in the urns; FIREFLIES the motes drifting over the garden.
 // Design 082 (Brilliant Diamond / Shining Pearl): the flagstones crisp with a moonlit bevel and no
 // grain; the garden ground the ground kit's clover grass; no ink outlines.
+// Design 084 (the visual audit): the pool is the picture, so it glows: a cyan core, slow rainbow
+// rings running outward, soft streaks of light, its light tinting the inner rings of paving (the
+// shared contact glow); the plaza bright in the middle and dark at its rim, the paving quieter under
+// the Bench rows; lanterns at prop scale, each in a warm pink pool of light; urns on pedestals on the
+// four axes; the two steps two pale rings; tall dark trees round the garden; a few soft pink clumps
+// of blossom.
 import {
   FILTERING,
   FOOTPRINTS,
@@ -31,12 +37,12 @@ import {
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
 import { craterEmblem, environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
-import { GRASS as GRASS_KIT } from './stadium-env-ground.mjs';
+import { GLOW, GRASS as GRASS_KIT, WATER } from './stadium-env-ground.mjs';
 import { createPropBuilder } from './stadium-env-props.mjs';
 import { createKitProps } from './stadium-kit.mjs';
-import { placeAsset } from './stadium-kit-assets.mjs';
+import { measureAsset, placeAsset } from './stadium-kit-assets.mjs';
 import { tableBounds } from './table-uv.mjs';
-import { patchy } from './stadium-env-spots.mjs';
+import { RISE_LEAN, frameWeight, patchy } from './stadium-env-spots.mjs';
 
 export const GARDEN_KEY = 'mystery-garden';
 /** The moon (toward it, table frame): high, from the far left. */
@@ -52,6 +58,13 @@ export const CURB = Object.freeze({ width: 10, rise: 4 });
 export const MAX_LANTERNS = 24;
 /** Least gap between any prop, seen from above, and a card or the opponent's hand. */
 export const PROP_CARD_GAP_PX = 14;
+/** Design 084: a lantern's size (× the world unit): at prop scale, a lantern reads as one on the posts. */
+export const LANTERN_SCALE = 2;
+/** Design 084: the pool's light (cyan, the art's), out over the inner two rings of paving, and each lantern's warm pink pool. */
+export const POOL_GLOW = Object.freeze({ colour: '#5ff0ff', reachPx: 84, strength: 0.6, breath: 0.05 });
+export const LANTERN_POOL = Object.freeze({ colour: '#ffa8d8', reachPx: 110, strength: 0.5, breath: 0.12 });
+/** Design 084: the urns on pedestals on the four axes, just past the balustrade: pedestal half width and height, urn radius. */
+export const AXIS_URN = Object.freeze({ out: 44, half: 15, height: 34, urn: 13 });
 /** Rings and segments of the instanced sphere every hedge, leaf and flower is drawn with. */
 const FIREFLY_COUNT = 45;
 
@@ -127,9 +140,38 @@ export function gardenSpots(layout) {
       pillars.push({ ...pillar, r: 30 * u, h: (far ? 230 : 120) * u, angle });
     }
   }
+  // Design 084: an urn of white flowers on a pedestal on each of the four axes, just past the
+  // balustrade, as the art's urns stand on the terrace (where the scene holds it and no card is near).
+  const urns = [];
+  for (const angle of [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]) {
+    const spot = at(angle, ringR + AXIS_URN.out * u);
+    const top = (AXIS_URN.height + 2.2 * AXIS_URN.urn + 16) * u;
+    if (!inScene(spot.x, spot.y, 30 * u) || !clear(spot.x, spot.y, AXIS_URN.half * 1.5 * u + RISE_LEAN * (ground + top))) continue;
+    urns.push({ ...spot, angle });
+  }
+  // Design 084: tall dark trees round the garden, silhouettes against the night, out past the vases
+  // and pillars (each clear of the cards by its lean over the tilted view).
+  const trees = [];
+  for (let k = 0; k < 28 && trees.length < 9; k += 1) {
+    const angle = (k / 28) * 2 * Math.PI + hash(k, ringR, 21) * 0.2;
+    const size = (40 + 16 * hash(k, 1, 22)) * u;
+    const height = size * (2.9 + 0.6 * hash(k, 2, 23));
+    const spot = at(angle, ringR + (215 + 70 * hash(k, 3, 24)) * u);
+    const dims = measureAsset('treeRound', { size, height });
+    if (!inScene(spot.x, spot.y, dims.reach * 0.4)) continue;
+    if (!clear(spot.x, spot.y, dims.reach + RISE_LEAN * (ground + dims.height))) continue;
+    if (trees.some((tree) => Math.hypot(tree.x - spot.x, tree.y - spot.y) < (tree.reach + dims.reach) * 1.1)) continue;
+    if ([...vases, ...pillars].some((f) => Math.hypot(f.x - spot.x, f.y - spot.y) < f.r + dims.reach + 10 * u)) continue;
+    trees.push({ ...spot, size, height, reach: dims.reach, seed: hash(k, 4, 25) });
+  }
   // Hedges on the garden ground past the balustrade, clear of the furniture; broad-leaved plants by
   // each vase and pillar.
-  const furniture = [...vases.map((v) => ({ ...v, keep: v.r + 18 * u })), ...pillars.map((p) => ({ ...p, keep: p.r + 26 * u }))];
+  const furniture = [
+    ...vases.map((v) => ({ ...v, keep: v.r + 18 * u })),
+    ...pillars.map((p) => ({ ...p, keep: p.r + 26 * u })),
+    ...urns.map((urn) => ({ ...urn, keep: AXIS_URN.half * 1.6 * u })),
+    ...trees.map((tree) => ({ ...tree, keep: tree.reach * 0.85 })),
+  ];
   const hedges = [];
   const step = 46 * u;
   for (let gy = scene.y + step / 2; gy < scene.y + scene.h; gy += step) {
@@ -137,17 +179,27 @@ export function gardenSpots(layout) {
       const roll = (salt) => hash(gx, gy, salt);
       const x = gx + (roll(1) - 0.5) * step * 0.7;
       const y = gy + (roll(2) - 0.5) * step * 0.7;
-      // Design 083: the hedges gather into thickets (patchy), bigger in their hearts, in three teals,
-      // some of the thickest in bloom.
+      // Design 083: the hedges gather into thickets (patchy), bigger in their hearts, in three teals.
       const thick = patchy(x, y, { scale: 280 * u, salt: 91 });
       const r = (24 + 20 * roll(3)) * u * (0.85 + 0.12 * Math.min(thick, 1.6));
       const out = Math.hypot(x - centre.x, y - centre.y);
       if (out < ringR + 26 * u + r * 0.6 || !inScene(x, y, r * 0.4) || roll(4) > 0.72 * thick) continue;
       if (furniture.some((f) => Math.hypot(x - f.x, y - f.y) < f.keep + r * 0.7)) continue;
       const palette = Math.min(2, Math.floor(patchy(x, y, { scale: 420 * u, contrast: 0.6, salt: 93 }) * 1.66));
-      hedges.push({ x, y, z: ground + r * 0.5, r, seed: roll(5), palette, bloom: thick > 1.2 && roll(6) < 0.4 });
+      hedges.push({ x, y, z: ground + r * 0.5, r, seed: roll(5), palette });
     }
   }
+  // Design 084: a few soft pink clumps of blossom at the plaza-side foot of the thickets nearest the
+  // balustrade, not specks over every hedge.
+  const blossoms = hedges
+    .filter((hedge) => Math.hypot(hedge.x - centre.x, hedge.y - centre.y) < ringR + 120 * u)
+    .filter((hedge, i) => hash(hedge.x, hedge.y, 31) < 0.3 && i % 2 === 0)
+    .slice(0, 8)
+    .map((hedge) => {
+      const turn = Math.atan2(centre.y - hedge.y, centre.x - hedge.x);
+      return { x: hedge.x + Math.cos(turn) * hedge.r * 0.8, y: hedge.y + Math.sin(turn) * hedge.r * 0.8, size: (12 + 6 * hash(hedge.x, 1, 32)) * u, seed: hedge.seed };
+    })
+    .filter((clump) => clear(clump.x, clump.y, clump.size * 1.2 + RISE_LEAN * (ground + 16 * u)));
   // A clump of broad leaves (the kit's fern) at the outer foot of each vase and pillar.
   const ferns = furniture.map((spot, k) => {
     const turn = Math.atan2(spot.y - centre.y, spot.x - centre.x);
@@ -158,11 +210,21 @@ export function gardenSpots(layout) {
       seed: hash(spot.x, k, 11),
     };
   });
+  // A lantern's panes are lit 4..22 of its own units up (LANTERN_SCALE × the world unit each).
+  const panes = 13 * LANTERN_SCALE * u;
   const lanterns = [
-    ...posts.filter((post) => post.lantern).map((post) => ({ x: post.x, y: post.y, z: ground + (BALUSTRADE.height + 7 + 20) * u })),
-    ...vases.map((vase) => ({ x: vase.x, y: vase.y, z: ground + vase.h + 26 * u + 20 * u })),
+    ...posts.filter((post) => post.lantern).map((post) => ({ x: post.x, y: post.y, z: ground + (BALUSTRADE.height + 7) * u + panes })),
+    ...vases.map((vase) => ({ x: vase.x, y: vase.y, z: ground + vase.h + 26 * u + panes })),
   ].slice(0, MAX_LANTERNS);
-  return { table, scene, u, centre, plaza, emblem, ground, ringR, posts, vases, pillars, hedges, ferns, lanterns, hand };
+  // Design 084: the pool's cyan over the inner rings of paving, and a warm pink pool round each
+  // lantern the frame shows best (the shared contact glow holds sixteen).
+  const glows = [];
+  if (emblem?.r > 0) glows.push({ x: centre.x, y: centre.y, r: emblem.r + POOL_GLOW.reachPx * u, colour: POOL_GLOW.colour, strength: POOL_GLOW.strength, breath: POOL_GLOW.breath });
+  const shown = [...lanterns].sort((a, b) => frameWeight(b.x, table) - frameWeight(a.x, table) || a.x - b.x);
+  for (const light of shown.slice(0, 16 - glows.length)) {
+    glows.push({ x: light.x, y: light.y, r: LANTERN_POOL.reachPx * u, colour: LANTERN_POOL.colour, strength: LANTERN_POOL.strength, breath: LANTERN_POOL.breath });
+  }
+  return { table, scene, u, centre, plaza, emblem, ground, ringR, posts, vases, pillars, urns, trees, hedges, blossoms, ferns, lanterns, hand, glows };
 }
 
 const GARDEN = /* glsl */ `
@@ -281,11 +343,17 @@ ${FOOTPRINTS}
 ${FILTERING}
 ${REVEAL}
 ${GRASS_KIT}
+${WATER}
+${GLOW}
 ${PALETTE}
 ${GARDEN}
 varying vec2 vPos;
 varying vec2 vUv;
 varying float vGrowth;
+// Design 084: a soft rainbow, the pool's swirling rings (a cosine palette, low in saturation).
+vec3 softRainbow(float h) {
+  return 0.62 + 0.38 * cos(6.2831853 * (h + vec3(0.0, 0.33, 0.67)));
+}
 void main() {
   vec2 p = vPos;
   filterPixel = pixelSize(p);
@@ -307,55 +375,63 @@ void main() {
   // damp dark in the joints.
   // Design 080: round the cards the stones keep close to one lavender, their joints shallow and
   // their grain faint, so the paving reads as one floor under the cards, richer out by the steps.
+  // Design 084: under the Bench rows the paving's contrast drops by half again.
   float calm = fieldCalm(p, 110.0);
   vec3 slate = vec3(0.24, 0.235, 0.4);
   vec3 rose = vec3(0.4, 0.25, 0.33);
   vec3 col = mix(mix(slate, PAVING, smoothstep(0.0, 0.5, field.b)), rose, smoothstep(0.62, 1.0, field.b) * 0.85);
-  col = mix(col, mix(slate, PAVING, 0.6), calm * 0.6);
+  col = mix(col, mix(slate, PAVING, 0.6), calm * 0.8);
   // Design 082: each slab clean, its rounded shoulder catching the moon pale (BDSP's flagstones), its
   // joint a crisp dark line, moss in the joints out past the cards.
-  col = mix(col, col * 1.2, (1.0 - smoothstep(1.0, 3.2, stone.x)) * smoothstep(0.4, 1.4, stone.x) * (1.0 - 0.6 * calm));
-  float joint = (1.0 - smoothstep(0.5, 1.3, stone.x)) * mix(1.0, 0.5, calm);
+  col = mix(col, col * 1.2, (1.0 - smoothstep(1.0, 3.2, stone.x)) * smoothstep(0.4, 1.4, stone.x) * (1.0 - 0.8 * calm));
+  float joint = (1.0 - smoothstep(0.5, 1.3, stone.x)) * mix(1.0, 0.25, calm);
   vec3 moss = vec3(0.05, 0.19, 0.14);
   col = mix(col, PAVING_DARK * 0.55, joint);
   col = mix(col, moss, joint * smoothstep(0.42, 0.68, fbm3(p / 34.0 + 7.0)) * 0.8 * (1.0 - calm));
-  // The steps and the curb: the paler wall stone of the art's terrace.
+  // The steps and the curb: the paler wall stone of the art's terrace. Design 084: the two steps read
+  // as two pale rings, each lighter at its nose, where the moon and the pool's light catch it.
   vec3 pale = STONE_PALE * (0.85 + 0.25 * field.b);
   // The steps are slabs: radial joints between them, the slabs of the lower step set half a slab off.
   float onStep = step(0.5, kind) * step(kind, 1.5);
-  float arc = atan(p.y - uPlaza.y, p.x - uPlaza.x) * r / 64.0 + floor((r - uPlaza.z) / uStep.x) * 0.5;
+  float up = (r - uPlaza.z) / uStep.x;
+  float arc = atan(p.y - uPlaza.y, p.x - uPlaza.x) * r / 64.0 + floor(up) * 0.5;
   float slabJoint = (1.0 - smoothstep(0.0, 0.035, fract(arc))) + smoothstep(0.965, 1.0, fract(arc));
   pale *= 1.0 - 0.38 * clamp(slabJoint, 0.0, 1.0) * onStep;
   pale *= 0.96 + 0.08 * fbm3(p / 14.0);
-  col = mix(col, pale, step(0.5, kind) * step(kind, 1.5));
+  vec3 stepStone = pale * (1.3 + 0.25 * (1.0 - smoothstep(0.0, 0.3, fract(up))));
+  col = mix(col, stepStone, onStep);
   col = mix(col, pale, step(-1.5, kind) * step(kind, -0.5));
   // The garden ground: BDSP's clover grass, dark by night.
   vec3 grass = cloverGrass(p, mix(HEDGE_DARK * 1.4, GRASS * 0.85, smoothstep(0.3, 0.7, fbm3(p / 55.0 + 4.0))), 0.0);
   col = mix(col, grass, step(1.5, kind));
   col = nightLight(col, moonlit) * mix(0.55, 1.0, smoothstep(0.3, 0.9, light.b));
+  // Design 084: the plaza bright toward its middle and dark at its rim and in the garden past it, so
+  // the eye goes to the pool and the cards round it.
+  col *= mix(1.12, 0.55, smoothstep(uPlaza.z * 0.35, uPlaza.z * 1.25, r));
 
-  // The pool: its water glowing cyan from below, slow rings of light swirling out from the middle,
-  // faint threads of light wandering across it. Design 080: the Actives lie on this water, so it is
-  // a deep teal lit from its heart, not a bright disc, and nothing on it flashes.
+  // The pool, the picture (design 084): water on the shared kit (the curb's pale stone through its
+  // shallow rim, a deep teal, a drifting band of sky), lit from below with a cyan core, slow rainbow
+  // rings running outward and a few soft streaks of light. The Actives lie on it, so under them its
+  // rings and streaks stay faint (design 080) and nothing on it flashes.
   if (kind < -1.5) {
     float fromMiddle = r / max(uPlaza.w, 1.0);
-    float swirl = sin((r - t * 6.0) / 9.0 + 4.0 * fbm3(p / 70.0 + t * 0.03));
-    vec3 water = mix(vec3(0.03, 0.17, 0.27), POOL_CYAN * 0.3, 0.45 + 0.55 * (1.0 - fromMiddle));
-    water += vec3(0.4, 0.75, 0.9) * smoothstep(0.85, 0.99, swirl) * 0.1;
+    vec3 water = waterBody(vec3(0.02, 0.12, 0.2), vec3(0.05, 0.36, 0.48), STONE_PALE * 0.5, smoothstep(0.98, 0.7, fromMiddle), p, t);
+    water += POOL_CYAN * 0.32 * exp(-fromMiddle * fromMiddle * 2.6);
+    float ripple = 0.5 + 0.5 * sin((r - t * 7.0) / 11.0 + 3.0 * fbm3(p / 80.0 + t * 0.02));
+    float rings = smoothstep(0.55, 0.95, ripple) * smoothstep(0.08, 0.3, fromMiddle) * (1.0 - 0.6 * smoothstep(0.85, 1.0, fromMiddle));
+    vec3 rainbow = softRainbow(r / 140.0 - t * 0.02 + 0.15 * fbm3(p / 60.0));
+    water += rainbow * POOL_CYAN * 0.24 * rings * (1.0 - 0.55 * calm);
     float angle = atan(p.y - uPlaza.y, p.x - uPlaza.x);
     float thread = abs(gnoise(vec2(angle * 4.0, r / 60.0 - t * 0.12)) - 0.5);
-    float glimmer = smoothstep(0.55, 0.72, gnoise(vec2(angle * 2.0 + t * 0.25, r / 90.0 + t * 0.08)));
-    water += vec3(0.6, 0.9, 1.05) * (1.0 - smoothstep(0.004, 0.022, thread)) * glimmer * 0.16;
-    water += POOL_CYAN * 0.12 * exp(-fromMiddle * fromMiddle * 3.0);
+    float glimmer = smoothstep(0.58, 0.75, gnoise(vec2(angle * 2.0 + t * 0.2, r / 90.0 + t * 0.06)));
+    water += vec3(0.6, 0.95, 1.1) * (1.0 - smoothstep(0.004, 0.03, thread)) * glimmer * 0.2 * (1.0 - 0.6 * calm);
     col = water;
   }
 
-  // The pool's light over the plaza, and each lantern's warm pool of light.
-  if (uPlaza.w > 0.0) {
-    float spill = exp(-pow(max(r - uPlaza.w, 0.0) / (uPlaza.w * 0.9), 1.4));
-    col += POOL_CYAN * 0.12 * spill * step(-1.5, kind);
-  }
-  col += LANTERN_GLOW * 0.3 * lanternLight(vec3(p, field.r)) * step(-1.5, kind);
+  // The pool's light over the inner rings of paving and each lantern's warm pink pool (the shared
+  // contact glow, design 084), with a faint wash from every lantern round the ring.
+  col = mix(col, glowOn(col, p), step(-1.5, kind));
+  col += LANTERN_GLOW * 0.14 * lanternLight(vec3(p, field.r)) * step(-1.5, kind);
 
   col = edgeHaze(col, vUv);
   vec3 shimmer = vec3(0.55, 0.95, 1.1);
@@ -383,9 +459,9 @@ const lathe = (props, x, y, profile, color) =>
     { sides: 18 }
   );
 
-/** One iron lantern standing at (x, y) from z: a little hipped roof over four glowing panes. */
+/** One iron lantern standing at (x, y) from z: a little hipped roof over four glowing panes (design 084: at prop scale). */
 const lantern = (props, x, y, z, u) => {
-  const s = 1.3 * u;
+  const s = LANTERN_SCALE * u;
   props.roundBox({ x, y, z0: z, z1: z + 4 * s, hw: 7 * s, hh: 7 * s, color: IRON });
   props.roundBox({ x, y, z0: z + 4 * s, z1: z + 22 * s, hw: 5.5 * s, hh: 5.5 * s, color: GLASS });
   for (const [dx, dy] of [
@@ -418,29 +494,60 @@ export function gardenProps(spots) {
   const { hedges, ferns, posts, ground, u } = spots;
   const kit = { sun: MOON };
   for (const hedge of hedges) {
-    placeAsset(props, 'bush', { ...kit, x: hedge.x, y: hedge.y, z: ground, size: hedge.r * 0.9, seed: hedge.seed * 997, colors: GARDEN_HEDGES[hedge.palette] ?? GARDEN_HEDGE, berries: hedge.bloom ? BLOSSOM : null });
+    placeAsset(props, 'bush', { ...kit, x: hedge.x, y: hedge.y, z: ground, size: hedge.r * 0.9, seed: hedge.seed * 997, colors: GARDEN_HEDGES[hedge.palette] ?? GARDEN_HEDGE });
+  }
+  // Design 084: tall dark trees, silhouettes with a thin cool rim from the moon.
+  for (const tree of spots.trees ?? []) {
+    placeAsset(props, 'treeRound', { ...kit, x: tree.x, y: tree.y, z: ground, size: tree.size, height: tree.height, seed: tree.seed * 983, colors: GARDEN_TREE });
+  }
+  for (const clump of spots.blossoms ?? []) {
+    placeAsset(props, 'flowers', { ...kit, x: clump.x, y: clump.y, z: ground, size: clump.size, head: 6 * u, count: 6, seed: clump.seed * 977, petals: BLOSSOMS });
   }
   for (const fern of ferns) placeAsset(props, 'fern', { ...kit, x: fern.x, y: fern.y, z: ground, size: fern.size, seed: fern.seed * 991, colors: GARDEN_FERN });
-  // White flowers heaped in each urn on the balustrade.
+  // White flowers heaped in each urn on the balustrade and on the axis pedestals.
   const top = ground + (BALUSTRADE.height + 20) * u;
   for (const post of posts.filter((each) => each.planter)) {
     placeAsset(props, 'flowers', { ...kit, x: post.x, y: post.y, z: top, size: 7 * u, head: 4.5 * u, count: 5, seed: post.x, petals: ['#f4f2ff', '#ffffff'], shadows: false });
+  }
+  for (const urn of spots.urns ?? []) {
+    const rim = ground + (AXIS_URN.height + 1.9 * AXIS_URN.urn) * u;
+    placeAsset(props, 'flowers', { ...kit, x: urn.x, y: urn.y, z: rim, size: AXIS_URN.urn * 0.7 * u, head: 5 * u, count: 6, seed: urn.x, petals: ['#f4f2ff', '#ffffff'], shadows: false });
   }
   return props;
 }
 
 const GARDEN_HEDGE = Object.freeze({ leaf: [0.058, 0.26, 0.26, 0], leafLight: [0.1, 0.4, 0.38, 0] });
-// Design 083: the thickets in three teals (the second deeper, the third bluer) and their pale blossom.
+// Design 083: the thickets in three teals (the second deeper, the third bluer).
 const GARDEN_HEDGES = Object.freeze([
   GARDEN_HEDGE,
   Object.freeze({ leaf: [0.04, 0.2, 0.21, 0], leafLight: [0.08, 0.32, 0.32, 0] }),
   Object.freeze({ leaf: [0.07, 0.24, 0.32, 0], leafLight: [0.13, 0.38, 0.46, 0] }),
 ]);
-const BLOSSOM = '#f2e6ff';
+// Design 084: the dark trees ringing the art's garden, near-black teal; the blossom soft pinks.
+const GARDEN_TREE = Object.freeze({ leaf: [0.02, 0.085, 0.1, 0], leafLight: [0.05, 0.16, 0.18, 0], bark: [0.04, 0.035, 0.05, 0], barkDark: [0.02, 0.02, 0.03, 0] });
+const BLOSSOMS = Object.freeze(['#f7b3d9', '#f29ccc', '#fbd0e8']);
 const GARDEN_FERN = Object.freeze({ leaf: [0.07, 0.3, 0.28, 0], leafLight: [0.12, 0.42, 0.36, 0], heart: [0.03, 0.12, 0.13, 0] });
 
-/** The balustrade with its lanterns and urns, the vases and the pillars. */
-function gardenFurniture(props, { posts, vases, pillars, ground, ringR, centre, u }) {
+/** The balustrade with its lanterns and urns, the vases, the pillars and the axis urns on their pedestals. */
+function gardenFurniture(props, { posts, vases, pillars, urns = [], ground, ringR, centre, u }) {
+  // Design 084: an urn on a pedestal on each axis: a square plinth, a moulded shaft, a pale stone urn.
+  for (const urn of urns) {
+    const { x, y, angle } = urn;
+    const half = AXIS_URN.half * u;
+    const rise = AXIS_URN.height * u;
+    const bowl = AXIS_URN.urn * u;
+    props.roundBox({ x, y, z0: ground - 2, z1: ground + rise * 0.18, hw: half * 1.15, hh: half * 1.15, yaw: angle, color: STONE });
+    props.roundBox({ x, y, z0: ground + rise * 0.18, z1: ground + rise * 0.86, hw: half * 0.8, hh: half * 0.8, yaw: angle, color: STONE });
+    props.roundBox({ x, y, z0: ground + rise * 0.86, z1: ground + rise, hw: half, hh: half, yaw: angle, color: STONE });
+    lathe(props, x, y, [
+      [ground + rise, bowl * 0.45],
+      [ground + rise + bowl * 0.35, bowl * 0.35],
+      [ground + rise + bowl * 0.8, bowl * 0.95],
+      [ground + rise + bowl * 1.6, bowl],
+      [ground + rise + bowl * 2.0, bowl * 1.1],
+    ], STONE);
+    props.cylinder({ x, y, z0: ground + rise + bowl * 1.85, z1: ground + rise + bowl * 1.9, r: bowl * 0.95, color: SOIL });
+  }
   const height = BALUSTRADE.height * u;
   for (const post of posts) {
     props.roundBox({ x: post.x, y: post.y, z0: ground - 2, z1: ground + height + 4 * u, hw: 7 * u, hh: 7 * u, yaw: post.angle, color: STONE });
@@ -606,7 +713,7 @@ void main() {
   gl_Position = projectionMatrix * mv;
   // A lantern's glass breathes faintly (design 080: no flicker at the edge of the eye).
   vFlicker = 0.95 + 0.03 * sin(uTime * 2.3 + position.x * 0.3) + 0.02 * sin(uTime * 3.7 + position.y);
-  gl_PointSize = 74.0 * uFocal / -mv.z * revealBurned(position.xy) * exitKeep(position.xy);
+  gl_PointSize = ${(74 * (LANTERN_SCALE / 1.3)).toFixed(1)} * uFocal / -mv.z * revealBurned(position.xy) * exitKeep(position.xy);
 }
 `;
 
