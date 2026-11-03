@@ -15,6 +15,13 @@
 // Design 082 (Brilliant Diamond / Shining Pearl): the crown is leafy lumps, dark in their creases;
 // the floor is the ground kit's clover grass, a deep jungle green.
 //
+// Design 084 (the visual audit): a jungle clearing, not a lawn: big-leaf plants, ferns and bushes in
+// two or three sizes crowd a band round the table's edge, the floor darker there, so the open middle
+// reads as the clearing; the floor a warmer, more contrasty mossy soil and grass (set apart from Forest
+// of Vitality's meadow); the gold veins glow (emissive, with contact glow on the floor beside each
+// root and round the trunk's foot, the shared GLOW); the trunk a tighter knot of six twisting strands;
+// the crown bigger, overhanging the table (kept off each card only); one warm low sun from the top
+// left, so the roots throw long soft shadows.
 // Bake, once per layout: BAKE_FIELD is the flat floor (R height px; the roots' ridges are props);
 // the shared light bake adds nothing. Per frame: TERRAIN paints the moss, earth, the crown's
 // shadow and the glow round the roots; the kit's meshes the trunk, roots, crown, small tree, ferns
@@ -31,20 +38,29 @@ import {
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
 import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
-import { RISE_LEAN, boardContext, distanceToRect, hash, shuffled, visibleArea } from './stadium-env-spots.mjs';
+import { RISE_LEAN, boardContext, distanceToRect, frameWeight, hash, shuffled, visibleArea } from './stadium-env-spots.mjs';
 import { clumpPieces, scaledKinds } from './stadium-env-clumps.mjs';
 import { EDGE_HAZE, STANDARD_TERRAIN_VERTEX } from './stadium-env-surfaces.mjs';
-import { GRASS, LIGHT_MOTION } from './stadium-env-ground.mjs';
-import { createKitProps, glslColour, paint } from './stadium-kit.mjs';
-import { measureAsset, placeAsset } from './stadium-kit-assets.mjs';
+import { GLOW, GRASS, LIGHT_MOTION } from './stadium-env-ground.mjs';
+import { KEY_GAIN, createKitProps, glslColour, paint } from './stadium-kit.mjs';
+import { SHADOW_SLIDE, measureAsset, placeAsset } from './stadium-kit-assets.mjs';
 
 export const GRAND_KEY = 'grand-tree';
-/** The sun (toward it, table frame): high and a little from the far left, so the crown's shadow falls toward the cards, short and soft. */
-export const GRAND_SUN = Object.freeze([-0.42, 0.28, 0.86]);
-export const MAX_BALLS = 16;
+/**
+ * The sun (toward it, table frame): design 084, one warm low sun from the top left (~40° up), so the
+ * roots and the crown throw long soft shadows across the floor toward the cards.
+ */
+export const GRAND_SUN = Object.freeze([-0.58, 0.46, 0.67]);
+/** Design 084: the veins' gold, emissive (the art's, the audit's #ffcf5a), and its contact glow on the floor round the trunk. */
+export const VEIN_GOLD = '#ffcf5a';
+export const TRUNK_GLOW = Object.freeze({ reach: 2.6, strength: 0.7, breath: 0.12 });
+/** Design 084: the jungle band round the table's edge starts this far past the cards' box (card-scale px). */
+export const JUNGLE_FROM_PX = 120;
+export const MAX_BALLS = 24;
 export const MAX_ROOTS = 8;
-/** Design 083: the most clump pieces (ferns, bushes, flowers, rocks, toadstools) over the floor. */
+/** Design 083: the most clump pieces (ferns, bushes, flowers, rocks, toadstools) over the floor; design 084: the jungle band's. */
 export const GRAND_CLUMP_CAP = 36;
+export const JUNGLE_CAP = 70;
 /** Design 083: the highest the floor swells under a prop (3 + 11 px past the cards and roots, plus the ripple). */
 export const GRAND_GROUND_CEILING_PX = 15;
 const MOTE_COUNT = 60;
@@ -77,8 +93,8 @@ export function grandSpots(layout) {
   }
   // The crown: balls on a dome over the top-left, kept clear of the cards (and the hand) seen from above.
   const balls = [];
-  const spread = 220 * u;
-  for (let k = 0; k < 40 && balls.length < MAX_BALLS; k += 1) {
+  const spread = 285 * u;
+  for (let k = 0; k < 80 && balls.length < MAX_BALLS; k += 1) {
     const roll = (salt) => hash(k, 6, salt);
     const bx = x + (roll(1) - 0.5) * 2 * spread;
     const by = y + (roll(2) - 0.4) * 1.5 * spread;
@@ -107,6 +123,30 @@ export function grandSpots(layout) {
       Math.hypot(cx - x, cy - y) >= tree.foot + 230 * u + reach &&
       Math.hypot(cx - small.x, cy - small.y) >= small.r + reach,
   });
+  // Design 084: the jungle closing round the clearing: a band of big-leaf plants (the kit's fern at its
+  // biggest), smaller ferns and bushes in two or three sizes, out past the cards' box by JUNGLE_FROM_PX,
+  // thickest where the frame shows it, clear of the trunk, the roots, the small tree and the clumps.
+  const taken = pieces.map((piece) => ({ x: piece.x, y: piece.y, r: piece.reach }));
+  const jungle = clumpPieces(visibleArea(table, scene, 0.15) ?? scene, {
+    step: 118 * u,
+    mix: scaledKinds(JUNGLE_MIX, u),
+    satellites: scaledKinds(JUNGLE_SATELLITES, u),
+    thick: 0.5,
+    count: [2, 4],
+    cap: JUNGLE_CAP,
+    spacing: 0.7,
+    salt: 131,
+    taken,
+    weight: (cx) => 0.65 + 0.35 * frameWeight(cx, table),
+    fits: (cx, cy, reach, height) =>
+      ctx.inScene(cx, cy, reach * 0.4) &&
+      distanceToRect(cx, cy, core) >= JUNGLE_FROM_PX * u + reach &&
+      ctx.clear(cx, cy, reach + RISE_LEAN * (height + GRAND_GROUND_CEILING_PX), 12 * u) &&
+      Math.hypot(cx - x, cy - y) >= tree.foot + 200 * u + reach &&
+      Math.hypot(cx - small.x, cy - small.y) >= small.r + reach,
+  });
+  // Design 084: the trunk's gold lights the floor round its foot (the shared contact glow).
+  const glows = [{ x, y, r: tree.foot * TRUNK_GLOW.reach + 90 * u, colour: VEIN_GOLD, strength: TRUNK_GLOW.strength, breath: TRUNK_GLOW.breath }];
   const toadstools = [];
   for (let k = 0; k < 9 && toadstools.length < 4; k += 1) {
     const angle = hash(k, x, 81) * 2 * Math.PI;
@@ -120,7 +160,7 @@ export function grandSpots(layout) {
   }
   // Design 083: leaves fall from the crown's balls and the small tree.
   const driftEmitters = [...shuffled(balls, 3).slice(0, 9).map((ball) => ({ x: ball.x, y: ball.y, r: ball.r, z: ball.z })), { x: small.x, y: small.y, r: small.r, z: small.h }];
-  return { ...ctx, handEnd, tree, roots, balls, small, pieces, toadstools, driftEmitters };
+  return { ...ctx, handEnd, tree, roots, balls, small, pieces, jungle, toadstools, driftEmitters, glows };
 }
 
 const GRAND = /* glsl */ `
@@ -173,7 +213,11 @@ export const TERRAIN_VERTEX = STANDARD_TERRAIN_VERTEX;
 
 // The floor in BDSP's jungle greens (authored as shown), the glow the card art's gold.
 const PALETTE = /* glsl */ `
-const vec3 MOSS = ${glslColour('#5a9e3e')};
+// Design 084: warmer, more contrasty yellow-green moss over dark soil (set apart from Vitality's lawn).
+const vec3 MOSS = ${glslColour('#6fae36')};
+const vec3 MOSS_LIT = ${glslColour('#a3c840')};
+const vec3 SOIL = ${glslColour('#5e4a2c')};
+const vec3 UNDERGROWTH = ${glslColour('#2f5a2a')};
 const vec3 GLOW = vec3(1.0, 0.68, 0.08);
 const vec3 SHADE_TINT = vec3(0.5, 0.66, 0.82);
 const vec3 FALLEN_LEAF = ${glslColour('#c99a3a')};
@@ -188,8 +232,10 @@ ${REVEAL}
 ${EDGE_HAZE}
 ${GRASS}
 ${LIGHT_MOTION}
+${GLOW}
 ${PALETTE}
 ${GRAND}
+uniform float uJungle;
 varying vec2 vPos;
 varying vec2 vUv;
 varying float vGrowth;
@@ -202,10 +248,15 @@ void main() {
   vec3 sun = normalize(uSun);
   float u = uUnit;
 
-  // The floor (design 082): BDSP's clover grass, a deeper green in broad patches; ferns and
-  // toadstools are the kit's solids.
+  // The floor (design 082): BDSP's clover grass; ferns and toadstools are the kit's solids. Design 084:
+  // a mossy forest floor, warm yellow-green moss in broad patches with dark soil showing between them
+  // out past the cards; darker toward the jungle round the clearing's edge.
   float calm = fieldCalm(p, 110.0);
-  vec3 col = cloverGrass(p, mix(MOSS * 0.82, MOSS, smoothstep(0.3, 0.7, fbm3(p / 210.0 + 8.0))), calm);
+  vec3 col = cloverGrass(p, mix(MOSS * 0.85, MOSS_LIT, smoothstep(0.35, 0.72, fbm3(p / 210.0 + 8.0))), calm);
+  float soil = smoothstep(0.56, 0.72, fbm3(p / 95.0 + 4.0)) * (1.0 - calm);
+  col = mix(col, SOIL * (0.85 + 0.3 * gnoise(p / 30.0)), soil * 0.7);
+  float edge = smoothstep(uJungle * 0.6, uJungle * 1.5, length(max(max(uFootprintBox.xy - p, p - uFootprintBox.zw), 0.0)));
+  col = mix(col, UNDERGROWTH * (0.9 + 0.2 * fbm3(p / 60.0)), edge * 0.55);
 
   // The light: the sun's patches through the crown, dappled where it thins; the shade is cool and deep.
   float shade = crownShade(p, sun);
@@ -226,7 +277,9 @@ void main() {
   float fallen = (1.0 - smoothstep(0.75, 1.0, length(along / vec2(4.6, 2.2)))) * step(0.82 - 0.12 * shade, hash12(cell + 7.0));
   col = mix(col, FALLEN_LEAF * (0.8 + 0.4 * jitter.y), fallen * 0.55 * open * patternFade(filterPixel, 26.0));
 
-  // The glow of the roots and the trunk's foot, golden on the ground near them.
+  // The glow of the roots and the trunk's foot, golden on the ground near them. Design 084: the veins
+  // are lights, so the floor beside each root is lit gold (tinting what it falls on), and the trunk's
+  // foot pools in it (the shared contact glow).
   float glow = 0.0;
   for (int i = 0; i < ${MAX_ROOTS}; i++) {
     vec4 end = uRootEnds[i];
@@ -235,10 +288,11 @@ void main() {
     vec2 ab = end.xy - a;
     float s = clamp(dot(p - a, ab) / max(dot(ab, ab), 1.0), 0.0, 1.0);
     float d = distance(p, a + ab * s);
-    glow = max(glow, exp(-pow(d / (18.0 * u + 12.0 * u * (1.0 - s)), 2.0)) * (1.0 - 0.6 * s));
+    glow = max(glow, exp(-pow(d / (24.0 * u + 14.0 * u * (1.0 - s)), 2.0)) * (1.0 - 0.55 * s));
   }
-  glow = max(glow, exp(-pow(distance(p, uTree.xy) / (uTree.z * 2.0), 2.0)) * 0.9);
-  col += GLOW * 0.2 * glow * (0.95 + 0.05 * sin(t * 0.6 + p.x * 0.02));
+  float pulse = 0.94 + 0.06 * sin(t * 0.6 + p.x * 0.02);
+  col += (col * 1.4 + 0.04) * GLOW * 0.38 * glow * pulse * vGrowth;
+  col = glowOn(col, p);
 
   col = edgeHaze(col, vUv, 0.55);
   vec3 spark = vec3(0.9, 1.0, 0.6);
@@ -253,7 +307,8 @@ ${OUTPUT}
 const BARK = paint('#6e4a2c');
 const BARK_DARK = paint('#57391f');
 const ROOT = paint('#86592f');
-const VEIN = [1.0, 0.68, 0.08, 2.6];
+// Design 084: the veins a light (w 2 and up) in the art's gold, bright enough to bloom.
+const VEIN = [...paint(VEIN_GOLD, 2).slice(0, 3).map((v) => v * KEY_GAIN), 3.4];
 const FOLIAGE = paint('#3a9a3c');
 const FOLIAGE_LIT = paint('#79c446');
 const FERN = Object.freeze({ leaf: '#3fa03a', leafLight: '#7fcb4c', heart: '#2a6e2c' });
@@ -270,26 +325,42 @@ const CLUMP_SATELLITES = Object.freeze([
   { asset: 'mushroom', weight: 1, size: [6, 10], options: { colors: { cap: '#f2b33d', spot: '#fff6e0' } } },
 ]);
 const SMALL_TREE = Object.freeze({ leaf: '#3a9640', leafLight: '#6fc244', bark: BARK, barkDark: BARK_DARK });
+// Design 084: the jungle round the clearing: big-leaf plants (the kit's fern at its biggest), ferns and
+// bushes in the art's deep and fresh greens, two or three sizes each.
+const JUNGLE_FERN = Object.freeze({ leaf: '#2f8a36', leafLight: '#6fbf45', heart: '#1f5a26' });
+const JUNGLE_MIX = Object.freeze([
+  { asset: 'fern', weight: 2.5, size: [96, 132], options: { fronds: 7, colors: JUNGLE_FERN }, spread: 0.12, lean: 0.06 },
+  { asset: 'bush', weight: 2, size: [34, 52], options: { colors: { leaf: '#2e7f34', leafLight: '#68b847' } }, spread: 0.18, lean: 0.05 },
+  { asset: 'fern', weight: 1.5, size: [60, 84], options: { fronds: 6, colors: FERN }, spread: 0.15, lean: 0.08 },
+]);
+const JUNGLE_SATELLITES = Object.freeze([
+  { asset: 'fern', weight: 2, size: [44, 66], options: { fronds: 5, colors: FERN }, spread: 0.15, lean: 0.08 },
+  { asset: 'bush', weight: 1.6, size: [22, 34], options: { colors: { leaf: '#3a8f38', leafLight: '#7cc44a' } }, spread: 0.2, lean: 0.05 },
+]);
 
 /** The trunk at height s (0 foot, 1 fork): its radius, tapering and flaring at the foot. */
 const trunkRadius = (tree, s) => tree.top + (tree.foot - tree.top) * (1 - s) ** 1.6 + tree.foot * 0.22 * Math.exp(-s * 9);
 
-/** The trunk: strands twisting round each other up from the foot, gold veins creeping along some. */
+/**
+ * The trunk: strands twisting round each other up from the foot, gold veins creeping along some.
+ * Design 084: a tighter knot, as the card's: six strands set apart (a dark groove between each),
+ * turning most of a full turn on the way up, each swelling and thinning along its run.
+ */
 function trunk(props, tree, u) {
   const strands = 6;
-  const levels = 16;
+  const levels = 20;
   for (let k = 0; k < strands; k += 1) {
     const phase = (k / strands) * 2 * Math.PI + 0.3;
-    const twist = 1.7 + 0.25 * hash(k, 2, 1);
+    const twist = 2.6 + 0.4 * hash(k, 2, 1);
     const points = [];
     const radii = [];
     for (let i = 0; i <= levels; i += 1) {
       const s = i / levels;
       const R = trunkRadius(tree, s);
       const angle = phase + twist * s * 2 * Math.PI * 0.5;
-      const around = R * (0.52 - 0.12 * s);
+      const around = R * (0.6 - 0.14 * s);
       points.push([tree.x + Math.cos(angle) * around, tree.y + Math.sin(angle) * around, -4 + s * tree.fork]);
-      radii.push(R * (0.58 - 0.1 * s));
+      radii.push(R * (0.5 - 0.08 * s) * (1 + 0.12 * Math.sin(s * 9 + k * 1.7)));
     }
     props.tube(points, radii, k % 2 ? BARK : BARK_DARK, { sides: 12 });
     // A gold vein lying along every other strand's flank.
@@ -327,6 +398,13 @@ function roots(props, spots, u) {
     }
     props.tube(points, radii, ROOT, { sides: 9 });
     if (root.seed > 0.3) props.tube(points.slice(1, 7).map((p, i) => [p[0], p[1], p[2] + radii[i + 1] * 0.9]), 3.6 * u, VEIN, { sides: 6 });
+    // Design 084: the root's long soft shadow along the floor, thrown away from the low sun.
+    const lift = Math.max(GRAND_SUN[2], 0.25);
+    const slide = [(-GRAND_SUN[0] / lift) * SHADOW_SLIDE * 2.2, (-GRAND_SUN[1] / lift) * SHADOW_SLIDE * 2.2];
+    for (let i = 1; i < steps; i += 2) {
+      const [px, py, pz] = points[i];
+      props.shadow({ x: px + slide[0] * pz, y: py + slide[1] * pz, rx: radii[i] * 1.5 + pz * 0.25, ry: radii[i] * 1.1, yaw: root.angle, strength: 0.5 });
+    }
   }
 }
 
@@ -364,6 +442,9 @@ export function grandProps(spots) {
   crown(props, spots, u);
   placeAsset(props, 'treeRound', { ...kit, x: small.x, y: small.y, size: small.r * 0.95, height: small.h + small.r * 0.5, seed: 7, colors: SMALL_TREE });
   for (const piece of spots.pieces) placeAsset(props, piece.asset, { ...kit, ...piece.options, x: piece.x, y: piece.y, size: piece.size, seed: piece.seed * 997, yaw: piece.yaw });
+  for (const piece of spots.jungle ?? []) {
+    placeAsset(props, piece.asset, { ...kit, ...piece.options, x: piece.x, y: piece.y, size: piece.size, seed: piece.seed * 983, yaw: piece.yaw, lean: piece.lean ?? undefined });
+  }
   for (const t of toadstools) placeAsset(props, 'mushroom', { ...kit, x: t.x, y: t.y, size: t.size, seed: t.seed * 991, colors: { cap: '#f2b33d', spot: '#fff6e0' } });
   return props;
 }
@@ -416,6 +497,7 @@ export function grandTreeBoard({ three, material, seeded, terrainGrid, replaceGe
     uBalls: { value: Array.from({ length: MAX_BALLS }, () => new three.Vector4()) },
     uRootEnds: { value: Array.from({ length: MAX_ROOTS }, () => new three.Vector4()) },
     uUnit: { value: 1 },
+    uJungle: { value: JUNGLE_FROM_PX },
   };
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
   const materials = {
@@ -436,6 +518,7 @@ export function grandTreeBoard({ three, material, seeded, terrainGrid, replaceGe
     spots: (layout) => grandSpots(layout),
     apply(spots, bounds) {
       own.uUnit.value = spots?.u ?? 1;
+      own.uJungle.value = JUNGLE_FROM_PX * (spots?.u ?? 1);
       const tree = spots?.tree;
       own.uTree.value.set(tree?.x ?? 0, tree?.y ?? 0, tree?.foot ?? 0, tree?.crownZ ?? 0);
       own.uBalls.value.forEach((slot, i) => {

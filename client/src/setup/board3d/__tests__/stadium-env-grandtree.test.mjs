@@ -8,7 +8,11 @@ import { environmentKeyFor } from '../stadium-environment-layout.mjs';
 import {
   BAKE_FIELD_FRAGMENT,
   GRAND_KEY,
+  GRAND_SUN,
+  JUNGLE_CAP,
+  JUNGLE_FROM_PX,
   MAX_BALLS,
+  VEIN_GOLD,
   GRAND_CLUMP_CAP,
   GRAND_GROUND_CEILING_PX,
   MAX_ROOTS,
@@ -85,4 +89,21 @@ test('the floor\'s clumps: mixed kinds over the clover, at most GRAND_CLUMP_CAP,
   assert.match(BAKE_FIELD_FRAGMENT, /away \* \(3\.0 \+ 11\.0 \* fbm3\(p \/ 210\.0 \+ 3\.0\)\)/);
   assert.ok(0.25 + 3 + 11 <= GRAND_GROUND_CEILING_PX);
   assert.ok(spots.driftEmitters.length >= 2 && spots.driftEmitters.length <= 12);
+});
+
+test('design 084: a jungle band closes round the clearing, the veins light the floor, the sun is low from the top left', () => {
+  const [sx, sy, sz] = GRAND_SUN;
+  assert.ok(sx < 0 && sy > 0 && sz < 0.8, 'a low sun from the top left: long shadows');
+  for (const layout of layouts) {
+    const spots = grandSpots(layout);
+    assert.ok(spots.jungle.length >= 12 && spots.jungle.length <= JUNGLE_CAP, `${spots.jungle.length} jungle pieces`);
+    for (const piece of spots.jungle) {
+      const off = Math.hypot(Math.max(spots.core.x - piece.x, 0, piece.x - spots.core.x - spots.core.w), Math.max(spots.core.y - piece.y, 0, piece.y - spots.core.y - spots.core.h));
+      assert.ok(off >= JUNGLE_FROM_PX * spots.u + piece.reach - 1e-6, 'out in the band round the clearing');
+    }
+    assert.ok(new Set(spots.jungle.map((piece) => piece.asset)).size >= 2, 'big-leaf plants, ferns and bushes');
+    assert.equal(spots.glows.length, 1);
+    assert.equal(spots.glows[0].colour, VEIN_GOLD);
+    assert.deepEqual([spots.glows[0].x, spots.glows[0].y], [spots.tree.x, spots.tree.y]);
+  }
 });

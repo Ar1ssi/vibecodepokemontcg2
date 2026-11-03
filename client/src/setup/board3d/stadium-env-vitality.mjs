@@ -132,7 +132,7 @@ function growTree(table, scene, core, obstacles, u) {
   const wanted = edge + side * (TREE_CARD_GAP_PX + flare + 70 * u);
   const x = side < 0 ? Math.max(wanted, scene.x + flare * 1.2) : Math.min(wanted, scene.x + scene.w - flare * 1.2);
   const y = table.y + table.h * 0.7;
-  const fork = [x + side * 30 * u, y + 48 * u, 215 * u];
+  const fork = [x + side * 30 * u, y + 48 * u, 190 * u];
   // The crown: a dome of overlapping pads over an ellipse out past the trunk (longer up the table
   // than across it), highest in its middle; pads on a jittered grid, so no two rings line up.
   const centre = { x: x + side * 50 * u, y: y + 130 * u };
@@ -151,7 +151,7 @@ function growTree(table, scene, core, obstacles, u) {
       const r = (50 + 30 * roll(4)) * u * (1.15 - 0.3 * out);
       const inScene = px > scene.x - r && px < scene.x + scene.w + r * 2 && py > scene.y - r && py < scene.y + scene.h + r * 2;
       if (!inScene || !clear(px, py, r)) continue;
-      pads.push({ x: px, y: py, z: (345 - 170 * out * out + 22 * (roll(5) - 0.5)) * u, r, tier: out, seed: roll(6) });
+      pads.push({ x: px, y: py, z: (300 - 140 * out * out + 22 * (roll(5) - 0.5)) * u, r, tier: out, seed: roll(6) });
     }
   }
   // A skirt of lower pads round the fork, so the trunk's top ends under foliage, not in a cut face.
@@ -163,7 +163,7 @@ function growTree(table, scene, core, obstacles, u) {
     const py = fork[1] + 34 * u + Math.sin(angle) * out;
     const r = (52 + 22 * roll(3)) * u;
     if (!clear(px, py, r)) continue;
-    pads.push({ x: px, y: py, z: (214 + 34 * roll(4)) * u, r, tier: 0.45 + 0.1 * roll(5), seed: roll(6) });
+    pads.push({ x: px, y: py, z: (190 + 30 * roll(4)) * u, r, tier: 0.45 + 0.1 * roll(5), seed: roll(6) });
   }
   pads.sort((a, b) => a.tier - b.tier);
   const shown = pads.slice(0, MAX_PADS);
