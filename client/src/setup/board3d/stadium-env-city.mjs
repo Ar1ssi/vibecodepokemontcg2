@@ -13,6 +13,12 @@
 // lamp's and the neon's light) and the streets; BUILDINGS paints every tower's
 // windows; PROPS is the parapet, the hut and the roof's machinery; BOARDS the two billboards;
 // BEAMS the searchlights.
+// Design 084 (the visual audit): re-keyed to the card's night: the roof #2a3040, the towers
+// near-black, their windows warm yellow, about three in ten lit, whole floors dark; the round tower's
+// crown a warm lit ring, its light on the roofs and streets round it (the shared contact glow), the
+// board's landmark; the searchlights soft wide wedges sweeping slowly, a faint purple glow over the
+// streets toward the horizon; the sprayed marks cleaner, pink and purple; the roof's machinery in
+// irregular huddles.
 import {
   FILTERING,
   FULLSCREEN_VERTEX,
@@ -25,6 +31,7 @@ import {
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
 import { environmentFootprints } from './stadium-environment-layout.mjs';
+import { GLOW } from './stadium-env-ground.mjs';
 import { LOOK, PROP_VERTEX, createPropBuilder } from './stadium-env-props.mjs';
 import { RISE_LEAN, distanceToRect, hash } from './stadium-env-spots.mjs';
 import { createKitProps } from './stadium-kit.mjs';
@@ -118,8 +125,12 @@ const LAMP = [1.4, 1.45, 1.5, 2.8];
 const MACHINE = [0.3, 0.32, 0.35, 0.4];
 const CRATE = [0.36, 0.27, 0.18, 0.05];
 const CRATE_TOP = [0.46, 0.35, 0.24, 0.05];
-/** The round tower's white-lit lantern glass, its dark dome, the pale ledges of its floors and their spacing. */
-const CROWN_LIGHT = [1.25, 1.32, 1.4, 2.0];
+/**
+ * The round tower's lantern glass, its dark dome, the pale ledges of its floors and their spacing.
+ * Design 084: the crown a warm lit ring, the board's landmark; its light falls round it.
+ */
+const CROWN_LIGHT = [1.5, 1.05, 0.5, 2.3];
+export const CROWN_GLOW = Object.freeze({ colour: '#ffb060', reach: 1.9, strength: 0.9, breath: 0.08 });
 const DOME = [0.16, 0.17, 0.2, 0.5];
 const LEDGE = [0.42, 0.45, 0.5, 0.15];
 const ROUND_FLOOR_PX = 30;
@@ -182,21 +193,32 @@ export function citySpots(layout) {
     Math.abs(y - roof.y) + reach < roof.hh - PARAPET.thick - 4 &&
     Math.hypot(x - hut.x, y - hut.y) > Math.max(hut.w, hut.d) * 0.75 + reach + 10 &&
     clutter.every((c) => Math.hypot(x - c.x, y - c.y) > c.reach + reach + 8);
+  // Design 084: in irregular huddles (a row read as a parade): a few anchors down each band at
+  // uneven steps, each with one to three pieces gathered close round it.
   for (const side of [-1, 1]) {
-    let y = roof.y - roof.hh + PARAPET.thick + 30 + 40 * hash(side, 1, 3);
-    for (let k = 0; y < roof.y + roof.hh - PARAPET.thick - 30 && k < 12; k += 1) {
-      const roll = (salt) => hash(side * 7 + k, y, salt);
-      const pick = hash(k * 3.7 + side, 11, 41);
-      const kind = pick < 0.38 ? 'unit' : pick < 0.66 ? 'vent' : 'crates';
-      const size = kind === 'unit' ? 16 + 6 * roll(2) : kind === 'vent' ? 7 + 3 * roll(2) : 11 + 4 * roll(2);
-      const height = kind === 'unit' ? 18 + 6 * roll(3) : kind === 'vent' ? 16 + 8 * roll(3) : 12 + 12 * roll(3);
-      const x = roof.x + side * (roof.hw - PARAPET.thick - size - 8 - 30 * roll(4));
-      if (clearOf(x, y, size * 1.2, height)) clutter.push({ kind, x, y, reach: size * 1.2, size, height, seed: roll(5) });
-      y += 46 + 70 * roll(6);
+    let y = roof.y - roof.hh + PARAPET.thick + 40 + 60 * hash(side, 1, 3);
+    for (let k = 0; y < roof.y + roof.hh - PARAPET.thick - 30 && k < 8; k += 1) {
+      const huddle = 1 + Math.floor(hash(side, k, 17) * 3);
+      const anchorX = roof.x + side * (roof.hw - PARAPET.thick - 30 - 40 * hash(side, k, 19));
+      for (let j = 0; j < huddle; j += 1) {
+        const roll = (salt) => hash(side * 7 + k * 5 + j, y, salt);
+        const pick = hash(k * 3.7 + side + j * 1.3, 11, 41);
+        const kind = pick < 0.42 ? 'unit' : pick < 0.68 ? 'vent' : 'crates';
+        const size = kind === 'unit' ? 14 + 8 * roll(2) : kind === 'vent' ? 7 + 3 * roll(2) : 11 + 4 * roll(2);
+        const height = kind === 'unit' ? 16 + 8 * roll(3) : kind === 'vent' ? 16 + 8 * roll(3) : 12 + 12 * roll(3);
+        const angle = roll(7) * Math.PI * 2;
+        const out = j === 0 ? 0 : 26 + 14 * roll(8);
+        const x = anchorX + Math.cos(angle) * out;
+        const at = y + Math.sin(angle) * out;
+        if (clearOf(x, at, size * 1.2, height)) clutter.push({ kind, x, y: at, reach: size * 1.2, size, height, seed: roll(5) });
+      }
+      y += 90 + 120 * hash(side, k, 23);
     }
   }
   const driftEmitters = clutter.filter((c) => c.kind === 'vent').map((c) => ({ x: c.x, y: c.y, r: c.size * 0.6, z: c.height + 4 }));
-  return { roof, hut, towers, round, beams, clutter, driftEmitters };
+  // Design 084: the round tower's crown lights the roofs and streets round it.
+  const glows = [{ x: round.x, y: round.y, r: round.r * CROWN_GLOW.reach, colour: CROWN_GLOW.colour, strength: CROWN_GLOW.strength, breath: CROWN_GLOW.breath }];
+  return { roof, hut, towers, round, beams, clutter, driftEmitters, glows };
 }
 
 /** Design 083: one piece of rooftop clutter: an air-conditioning unit, a vent with a cowl, or stacked crates. */
@@ -339,7 +361,8 @@ export function cityBuildings({ towers, round }) {
       z1: tower.height,
       hw: tower.w / 2,
       hh: tower.d / 2,
-      color: [0.2 + 0.03 * (i % 3), 0.25 + 0.03 * (i % 3), 0.32 + 0.03 * (i % 2), (i * 0.137) % 1],
+      // Design 084: near-black towers (their walls darken further in the shader).
+      color: [0.12 + 0.02 * (i % 3), 0.14 + 0.02 * (i % 3), 0.2 + 0.02 * (i % 2), (i * 0.137) % 1],
     });
   });
   // The round tower, as the art's: one column of stacked floors (their ledges are props).
@@ -510,7 +533,9 @@ vec3 windowAt(float along, float up, float seed) {
   float restless = step(0.89, hash12(cell * 2.3 + seed));
   float hour = floor(uTime / 9.0 + hash12(cell * 5.1 + seed) * 9.0);
   roll = mix(roll, hash12(cell + seed * 131.0 + hour * 7.13), restless);
-  return vec3(pane, step(roll, 0.2) * (0.6 + 0.5 * hash12(cell * 1.7 + seed)), step(0.78, hash12(cell * 3.1 + seed)));
+  // Design 084: about three windows in ten lit, whole floors dark between (the art's).
+  float floorOn = step(0.3, hash12(vec2(cell.y, seed * 17.0 + 3.0)));
+  return vec3(pane, step(roll, 0.43) * floorOn * (0.6 + 0.5 * hash12(cell * 1.7 + seed)), step(0.78, hash12(cell * 3.1 + seed)));
 }
 // Design 080: 1 where a window spans enough screen px to draw, easing to 0 where it would alias into
 // speckle (a facade seen edge-on); main sets it from the facade's own derivatives, first thing.
@@ -520,12 +545,13 @@ float windowFadeFor(vec3 world) {
 }
 vec3 facadeColor(vec3 wall, float along, float up, float seed) {
   vec3 w = windowAt(along, up, seed);
-  vec3 lamp = mix(vec3(0.82, 1.02, 0.5), vec3(0.95, 1.05, 0.62), w.z);
+  // Design 084: warm yellow (lime read sickly), now and then a paler warm white.
+  vec3 lamp = mix(vec3(1.0, 0.7, 0.3), vec3(1.05, 0.88, 0.58), w.z);
   // Dark glass only a little darker than the wall, as the art's, so the facade doesn't read as a checkerboard.
   vec3 darkGlass = wall * 0.55 + vec3(0.004, 0.006, 0.012);
   vec3 glass = mix(darkGlass, lamp, w.y);
   // Too small to draw: the facade's mean (about a third of it glass, a fifth of that lit).
-  vec3 mean = mix(wall, mix(darkGlass, vec3(0.85, 1.03, 0.53), 0.17), 0.35);
+  vec3 mean = mix(wall, mix(darkGlass, vec3(1.0, 0.74, 0.36), 0.3), 0.35);
   return mix(mean, mix(wall, glass, w.x), windowFade);
 }
 `;
@@ -535,6 +561,7 @@ ${TERRAIN_UNIFORMS}
 ${NOISE}
 ${FILTERING}
 ${REVEAL}
+${GLOW}
 ${ROOF}
 ${WINDOWS}
 varying vec2 vPos;
@@ -553,14 +580,15 @@ void main() {
     // The roof building's own face where it drops to the street: windows, darker going down.
     vec2 rel = p - uRoof.xy;
     float along = abs(rel.x) / uRoof.z > abs(rel.y) / uRoof.w ? p.y : p.x;
-    col = facadeColor(vec3(0.07, 0.075, 0.095), along, vHeight + ${STREET_PX}.0, 7.0);
+    col = facadeColor(vec3(0.03, 0.032, 0.045), along, vHeight + ${STREET_PX}.0, 7.0);
     col *= mix(0.35, 1.0, smoothstep(-${STREET_PX}.0, 0.0, vHeight));
   } else if (d < 0.0) {
     // The roof, as in the art: smooth pale grey concrete under the moon in broad slabs with dark
     // seams, a soft stain here and there; the moonlight falls brighter toward the far side.
     vec2 slab = abs(mod(p + 150.0, 300.0) - 150.0);
     float slabTone = 0.95 + 0.1 * hash12(floor((p + 150.0) / 300.0));
-    col = vec3(0.11, 0.125, 0.15) * (0.94 + 0.12 * fbm3(p / 90.0)) * slabTone;
+    // Design 084: the card's night roof, #2a3040.
+    col = vec3(0.023, 0.029, 0.052) * (0.94 + 0.12 * fbm3(p / 90.0)) * slabTone;
     col *= 0.96 + 0.06 * grain(p, 4.0);
     col *= mix(0.85, 1.12, smoothstep(-1.0, 1.0, (p.y - uRoof.y) / uRoof.w));
     col = mix(col, vec3(0.04, 0.042, 0.05), (1.0 - smoothstep(0.8, 2.0, min(slab.x, slab.y))) * 0.15);
@@ -580,7 +608,12 @@ void main() {
     // haze drifting through (street lamps from above read as stars).
     float haze = fbm3((p + vec2(uTime * 6.0, uTime * 2.0)) / 260.0);
     col = mix(vec3(0.016, 0.015, 0.034), vec3(0.06, 0.054, 0.085), smoothstep(0.35, 0.8, haze));
+    // Design 084: a faint purple glow over the streets toward the horizon (the far end and the sides).
+    vec2 away = abs(p - uRoof.xy) / max(uRoof.zw, vec2(1.0));
+    col += vec3(0.07, 0.025, 0.1) * smoothstep(1.2, 2.4, max(away.x, away.y) + 0.4 * smoothstep(0.0, 1.0, (p.y - uRoof.y) / uRoof.w));
   }
+  // Design 084: the round tower's warm crown light on the roof and the streets round it.
+  col = glowOn(col, p);
   vec2 edgeUv = min(vUv, 1.0 - vUv);
   col *= mix(0.3, 1.0, smoothstep(0.0, 0.05, min(edgeUv.x, edgeUv.y)));
   col += NEON_PINK * revealGlow(p, 0.035);
@@ -595,6 +628,7 @@ export const BUILDING_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
 ${REVEAL}
+${GLOW}
 ${ROOF}
 ${WINDOWS}
 uniform vec4 uRound;
@@ -610,13 +644,14 @@ void main() {
   vec3 col;
   if (n.z > 0.5) {
     // A roof: dark tar, its gravel mottled, the city's glow faint on it.
-    col = vColor.rgb * 0.24 * (0.8 + 0.4 * gnoise(vWorld.xy / 14.0)) + vec3(0.006, 0.006, 0.014);
+    col = vColor.rgb * 0.16 * (0.8 + 0.4 * gnoise(vWorld.xy / 14.0)) + vec3(0.004, 0.004, 0.01);
+    col = glowOn(col, vWorld.xy);
 
   } else {
     float along = isRound > 0.5
       ? atan(vWorld.y - uRound.y, vWorld.x - uRound.x) * uRound.z
       : (abs(n.x) > abs(n.y) ? vWorld.y : vWorld.x);
-    vec3 wall = vColor.rgb * (0.3 + 0.32 * max(dot(n, normalize(vec3(-0.5, -0.5, 0.4))), 0.0));
+    vec3 wall = vColor.rgb * (0.16 + 0.18 * max(dot(n, normalize(vec3(-0.5, -0.5, 0.4))), 0.0));
     col = facadeColor(wall, along, vWorld.z + ${STREET_PX}.0, seed);
   }
   // Down in the streets the night's haze swallows the towers' feet.
@@ -659,7 +694,8 @@ varying vec2 vPos;
 float stroke(vec2 uv, vec2 a, vec2 b, float width) {
   vec2 ab = b - a;
   float t = clamp(dot(uv - a, ab) / dot(ab, ab), 0.0, 1.0);
-  return length(uv - a - ab * t) - width * (0.85 + 0.3 * gnoise(uv * 40.0));
+  // Design 084: cleaner strokes (a little drip of spray at the edge, no ragged roughness).
+  return length(uv - a - ab * t) - width * (0.95 + 0.1 * gnoise(uv * 40.0));
 }
 void main() {
   if (revealBurned(vPos) * exitKeep(vPos) < 0.5) discard;
@@ -682,7 +718,8 @@ void main() {
     float scribble = min(min(stroke(q, vec2(0.36, -0.02), vec2(0.42, 0.16), 0.02), stroke(q, vec2(0.42, 0.16), vec2(0.48, 0.0), 0.02)),
       min(stroke(q, vec2(0.48, 0.0), vec2(0.54, 0.16), 0.02), stroke(q, vec2(0.54, 0.16), vec2(0.6, -0.02), 0.02)));
     sprayed = 1.0 - smoothstep(-0.004, 0.006, min(min(min(grin, horns), eyes), scribble));
-    paint = vec3(0.82, 0.05, 0.06);
+    // Design 084: the card's pink-red spray.
+    paint = vec3(0.95, 0.1, 0.35);
   } else {
     // The art's left board: dark navy-violet, a pale blue sky band along its top under a white wave,
     // a big white crescent logo; a pink X sprayed across it.
@@ -694,8 +731,8 @@ void main() {
     float crescent = max(length(logoAt) - 0.26, -(length(logoAt - vec2(0.11, 0.04)) - 0.19));
     col = mix(col, vec3(0.92, 0.94, 0.99), 1.0 - smoothstep(0.0, 0.012, crescent));
     float x = min(stroke(q, vec2(-0.4, -0.34), vec2(0.4, 0.34), 0.045), stroke(q, vec2(-0.4, 0.34), vec2(0.4, -0.34), 0.045));
-    sprayed = (1.0 - smoothstep(-0.004, 0.02, x)) * 0.85;
-    paint = vec3(0.78, 0.32, 0.82);
+    sprayed = (1.0 - smoothstep(-0.004, 0.012, x)) * 0.9;
+    paint = vec3(0.86, 0.3, 0.9);
   }
   col = mix(col, paint, sprayed);
   // Lit from below by a spotlight, fading up the board.
@@ -715,15 +752,17 @@ varying vec2 vBeam;
 void main() {
   // Each light sweeps slowly to and fro out over the city, tipped up, so its shaft climbs away into
   // the sky as the art's.
-  float sweep = aSource.z + 0.12 * sin(uTime * 0.21 + aSource.w);
-  float tip = aBeam.w + 0.06 * sin(uTime * 0.17 + aSource.w * 1.7);
+  // Design 084: slower and wider sweeps.
+  float sweep = aSource.z + 0.22 * sin(uTime * 0.11 + aSource.w);
+  float tip = aBeam.w + 0.05 * sin(uTime * 0.09 + aSource.w * 1.7);
   vec3 axis = normalize(vec3(cos(sweep) * cos(tip), sin(sweep) * cos(tip), sin(tip)));
   vec3 source = vec3(aSource.xy, aBeam.z);
   vec3 here = source + axis * aBeam.x * ${BEAM_LENGTH_PX}.0;
   vec4 view = modelViewMatrix * vec4(here, 1.0);
   vec2 tangent = (modelViewMatrix * vec4(axis, 0.0)).xy;
   vec2 across = length(tangent) > 0.0001 ? normalize(vec2(-tangent.y, tangent.x)) : vec2(1.0, 0.0);
-  view.xy += across * aBeam.y * mix(5.0, 34.0, aBeam.x);
+  // Design 084: a soft wedge widening from the lamp (a line read as a wire).
+  view.xy += across * aBeam.y * mix(8.0, 110.0, aBeam.x);
   gl_Position = projectionMatrix * view;
   vBeam = aBeam.xy;
 }
@@ -737,12 +776,13 @@ void main() {
   // A soft shaft with a brighter core, both falling to nothing at the ribbon's edges, brightest by
   // its lamp and fading out along its length: the art's pale blue-white.
   float across = 1.0 - vBeam.y * vBeam.y;
-  float core = exp(-vBeam.y * vBeam.y * 6.0) * across;
-  float shaft = across * across * 0.45 + core;
+  // Design 084: volumetric: mostly the soft body, a faint core.
+  float core = exp(-vBeam.y * vBeam.y * 6.0) * across * 0.45;
+  float shaft = across * across * 0.7 + core;
   float fade = smoothstep(0.0, 0.04, vBeam.x) * (1.0 - smoothstep(0.55, 1.0, vBeam.x));
   float shown = smoothstep(0.6, 1.0, uReveal) * (1.0 - uExit);
   // Design 080: a haze-thin shaft (at 0.6 the beams' X was the brightest thing in the top-down view).
-  gl_FragColor = vec4(vec3(0.62, 0.74, 1.0) * shaft * fade * 0.32 * shown, 1.0);
+  gl_FragColor = vec4(vec3(0.62, 0.74, 1.0) * shaft * fade * 0.2 * shown, 1.0);
 ${OUTPUT}
 }
 `;

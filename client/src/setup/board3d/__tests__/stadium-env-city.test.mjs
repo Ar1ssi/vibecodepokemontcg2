@@ -78,6 +78,24 @@ test('citySpots: the towers stand off the roof, apart from each other and the ro
   }
 });
 
+// Design 084: the round tower's crown is the board's one warm light, falling on what lies round it.
+test('citySpots: the round tower’s crown lights round it (one glow on the tower), the clutter in huddles off the cards', () => {
+  for (const layout of layouts) {
+    const { round, glows, clutter } = citySpots(layout);
+    assert.equal(glows.length, 1);
+    assert.deepEqual([glows[0].x, glows[0].y], [round.x, round.y]);
+    assert.ok(glows[0].r > round.r && glows[0].strength > 0, 'reaches past the tower');
+    const { slabs, flats } = environmentFootprints(layout);
+    for (const piece of clutter) {
+      for (const rect of [...slabs, ...flats]) {
+        const dx = Math.max(rect.x - piece.x, 0, piece.x - rect.x - rect.w);
+        const dy = Math.max(rect.y - piece.y, 0, piece.y - rect.y - rect.h);
+        assert.ok(Math.hypot(dx, dy) >= piece.reach, 'clutter off every card');
+      }
+    }
+  }
+});
+
 test('cityProps and cityBuildings: geometry with every attribute finite', () => {
   const spots = citySpots(layouts[0]);
   for (const builder of [cityProps(spots), cityBuildings(spots)]) {
