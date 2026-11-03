@@ -1,5 +1,8 @@
 # 084: Stadium boards — visual audit against the card art and general design principles
 Date: 2026-11-02 · Build: main @ 1d7bb60 (designs 077–083 merged) · Read-only; nothing changed.
+Status: building (one-shot, self-approved) — 2026-11-03, branch `feature/084-stadium-visual-fixes`.
+User request (2026-11-03, verbatim): "@.agent/designs/084-stadium-visual-audit.md Implementing all fixes."
+The audit below is the spec; the build sections (Acceptance, Assumptions, Design, Work plan) follow it.
 
 ## What was looked at
 - All 25 boards rendered as a game shows them (every zone filled, both camera presets, 1920×1080,
@@ -597,3 +600,127 @@ Stormy Mountains and Magnetic Storm read brighter here than their paintings are.
    cap density (Cemetery, Fairy Garden).
 7. **Frame-aware layout**: bias landmarks and props to the visible three quarters.
 8. Scorched Earth: margins + BDSP shading; move the river off the hero cards.
+
+---
+# Build (one-shot, 2026-11-03)
+
+## Acceptance
+Every row is the audit's own words: the eight cross-cutting items of "Suggested order of work" and,
+per board, its numbered suggestions in § Per-board detail (and its scorecard "one fix").
+| # | Criterion (the brief's words) | Evidence |
+|---|---|---|
+| X1 | Hero light pass: the one emissive cue per board actually emits; one shader hook (`uGlowSpots` or similar) serves most boards | |
+| X2 | Re-key the night boards (Stormy Mountains, Dark City, Old Cemetery, Magnetic Storm): darker ground values, warm/cool split, the hero cue as the only bright thing | |
+| X3 | Tree crowns overhang, don't clip (Vitality, Grand Tree); a lighter, soft-edged shadow | |
+| X4 | Replace the four off-family props: Mountain Ring rope, Neutralization pillars, Lab railing, Dimension Valley islands/void | |
+| X5 | Water material shared by Beach, Brooklet, Levincia, Mystery Garden: depth gradient, highlight band, shore translucency; Brooklet to teal so card backs separate | |
+| X6 | Scatter variety: per-kind scale/rotation jitter and species mix in `stadium-env-clumps.mjs`; cap density (Cemetery, Fairy Garden) | |
+| X7 | Frame-aware layout: bias landmarks and props to the visible three quarters | |
+| X8 | Scorched Earth: margins + BDSP shading; move the river off the hero cards | |
+| B1 | Forest of Vitality suggestions 1–5 | |
+| B2 | Grand Tree suggestions 1–5 | |
+| B3 | Perilous Jungle suggestions 1–4 | |
+| B4 | Fairy Garden suggestions 1–4 | |
+| B5 | Mystery Garden suggestions 1–4 | |
+| B6 | Old Cemetery suggestions 1–4 | |
+| B7 | Surfing Beach suggestions 1–3 | |
+| B8 | Brooklet Hill suggestions 1–4 | |
+| B9 | Stormy Mountains suggestions 1–4 | |
+| B10 | Mountain Ring suggestions 1–4 | |
+| B11 | Crystal Cave suggestions 1–4 | |
+| B12 | Dimension Valley suggestions 1–4 | |
+| B13 | Magnetic Storm suggestions 1–4 | |
+| B14 | Scorched Earth suggestions 1–4 | |
+| B15 | Magma Basin suggestions 1–4 | |
+| B16 | Lumiose City suggestions 1–4 | |
+| B17 | Community Center suggestions 1–3 | |
+| B18 | Levincia suggestions 1–3 | |
+| B19 | Dark City suggestions 1–4 | |
+| B20 | Pokémon Center suggestions 1–4 | |
+| B21 | Shopping Center suggestions 1–4 | |
+| B22 | Full Metal Lab suggestions 1–3 | |
+| B23 | Fighting Stadium suggestions 1–3 | |
+| B24 | Neutralization Zone suggestions 1–4 | |
+| B25 | Steel Shelter suggestions 1–3 | |
+
+## Assumptions
+- (assumed) Forest of Vitality's tree moves to the top-left margin as suggestion 1 says, although
+  077 records the user's 2026-10-28 ask for "one huge tree at the top right". The newer request
+  ("implementing all fixes") names this fix; the side is one constant (`HERO_SIDE`) so it flips back.
+- (assumed) The audit's colour values are lookdev starting points (its own words), checked against
+  pixel samples of the card art; where a sample disagrees, the art wins.
+- (assumed) "Off under reduced motion" (Stormy Mountains' lightning) is the repo's own rule: the app's
+  reduce-motion setting freezes uTime and stops the ambient clock (D105); the OS flag is not read.
+- (assumed) Shopping Center's mannequins stay as faceless dress forms on stands (fixtures, not
+  characters: 077's no-characters rule holds).
+- (assumed) The chat panel covers about the right 24 % of the viewport (the audit's measure at
+  1920×1080); boards bias toward the left of the table, never place anything only the panel would show.
+- (assumed) Board-wide light pools under the cards (Crystal Cave's shaft, the Lab's dais core, the
+  arena's canvas, Steel Shelter's floor) are broad soft value changes, not detail: D232's calm field
+  limits detail, glints and motion round cards, not a low-frequency light gradient.
+- (assumed) Lightning and the aurora are slow, local and dim enough to keep D232 (never over a card);
+  no board-wide white flash (the user's FX taste: no whiteouts).
+
+## Design (build)
+### Shared modules
+- **Contact glow (X1).** `stadium-env-ground.mjs` gains `MAX_GLOWS = 16` and the GLSL chunk `GLOW`
+  (after TERRAIN_UNIFORMS): uniforms `uGlows[16]` (x, y, radius px, strength), `uGlowTints[16]`
+  (linear r, g, b, breath rate Hz), `uGlowCount`; `vec3 glowLight(vec2 p)` = Σ tint × strength ×
+  (1 − d/r)²₊ × (1 + 0.12 sin(2π rate t + i)); `vec3 glowOn(vec3 col, vec2 p)` = col + (col × 1.6 +
+  0.03) × glowLight(p) — light tints and brightens what it falls on. The mesh's shared uniforms hold
+  them; `setGlows(uniforms, glows)` (exported, pure on the uniform objects) fills them from a
+  board's `spots.glows` (`[{ x, y, r, colour: '#hex', strength = 1, breath = 0 }]`) in applyLayout:
+  non-finite or r ≤ 0 entries skipped, past MAX_GLOWS dropped with one warning, colours through
+  `paint(hex, 2)` (a light's own colour). `kitFragment` adds `albedo × glowLight(world.xy) × (0.55 +
+  0.45 n.z)` to every lit kit part, so props beside a lamp or a crystal pick its light up.
+- **Water (X5).** `stadium-env-ground.mjs` `WATER` gains `waterBody(deep, shallow, bed, depth, p, t)`
+  (depth 0 at the shore .. 1 deep: the bed shows through the shallows, shallow → deep by depth, a
+  broad soft highlight band of sky drifting across, sparkles only past depth 0.55) and
+  `foamBands(shore, t, count, spacing)` (parallel bands moving shoreward, 0..1).
+- **Scatter (X6).** `clumpPieces` gains per-kind `lean` (rad, max) and `spread` (size spread, default
+  0): each piece leans by a hashed amount up to `lean` toward a hashed heading, and its size takes a
+  hashed factor in [1 − spread, 1 + spread]; the clearance passed to `fits` grows by height ×
+  sin(lean). `placeAsset` takes `lean` ([about x, about y], frameOf's). New asset variant:
+  `treeRound` `crown: 'umbrella'` (the card's flat-topped broadleaf: a wide flat crown on a tall
+  visible trunk); its measure is a true bound (asset sweep).
+- **Frame (X7).** `stadium-env-spots.mjs` `PANEL_SHARE = 0.24`, `frameWeight(x, table)` 1 left of
+  the table's 0.6 mark easing to 0.4 at its right edge; clumpPieces takes `weight(x, y)` multiplying
+  its patchy acceptance. Landmarks named by a board's suggestions go top-left/left.
+
+### Per board
+Each board takes its numbered suggestions in § Per-board detail, in that order, plus the
+cross-cutting rows that name it. Colour values are lookdev starting points checked against the art.
+
+## Edge cases & failure modes
+| # | Case | Expected behavior | Covered by |
+|---|---|---|---|
+| 1 | no glows / spots null | uGlowCount 0: glowLight is 0, no loop work | [ ] stadium-environment-mesh.test: setGlows none |
+| 2 | bad glow entry (NaN, r ≤ 0, bad colour) | skipped; a bad colour throws in paint as every kit colour does | [ ] setGlows test |
+| 3 | more glows than MAX_GLOWS | the first 16 kept, one warning | [ ] setGlows test |
+| 4 | reduced motion | uTime frozen: glows steady, lightning and aurora still | [ ] by construction (functions of uTime / tick(null)) |
+| 5 | glow, lightning, aurora near a card | glows are broad light, no detail; lightning and particles keep off cards on screen | [ ] stills; bolt-path tests |
+| 6 | leaned clump piece near a card | clearance grows by height × sin(lean) | [ ] stadium-env-clumps.test |
+| 7 | new/changed props | every built vertex off every card on screen, both presets | [ ] each board's screen test |
+| 8 | GLSL | every changed program declares every name it uses | [ ] stadium-glsl-idents.test |
+| 9 | reveal / exit | new meshes gated by revealBurned/exitKeep like the rest | [ ] by construction; stills after reveal |
+| 10 | no table / no cards | boards' spots null: kit set(null), glows cleared | [ ] each board's null-layout test |
+
+## Test plan
+- Unit: setGlows (none, invalid, cap, colours); GLOW/WATER chunks compile in full programs
+  (stadium-glsl-idents); clumps lean/spread/weight determinism and clearance; asset sweep with the
+  umbrella crown; each board's tests (screen tests for every new prop) stay green, new tests where a
+  board's pure layout logic changes (tree side, headstone groups, river route, rope radius...).
+- Visual: before/after stills of all 25 boards in both presets (`rec-stadium-boards.mjs`, scratch).
+- Manual (user, localhost): each board via `?stadiumEnv=<key>`, both cameras, ~10 s.
+
+## Migration / rollout
+n/a: client visuals only, no data. Revert: revert the branch's commits; boards fall back to 083.
+
+## Work plan — slices, each green on its own
+| Slice | Files | Contract | Tests | Green when |
+|---|---|---|---|---|
+| 1 Shared kit | stadium-env-ground.mjs, stadium-environment-mesh.js, stadium-kit.mjs, stadium-env-clumps.mjs, stadium-env-spots.mjs, stadium-kit-assets.mjs + tests | § Shared modules | edge rows 1–3, 6, 8 | board3d stadium tests green |
+| 2–26 One board each, in § Per-board detail order | stadium-env-<board>.mjs (+ layout module, mesh for Scorched/Stormy/Jungle, stadium-environment-layout.mjs for Scorched's margins) + its test | its suggestions + named cross-cutting rows | its tests; edge rows 4, 5, 7, 9, 10 | its tests green; stills reviewed |
+| 27 Close | design, harness, captures | — | full `pnpm test`, lint, gates | Done checklist |
+
+## Deviations (Builder appends here during build)
