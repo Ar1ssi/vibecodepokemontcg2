@@ -19,13 +19,18 @@
 // Design 082 (Brilliant Diamond / Shining Pearl, the Distortion World's floating isles): the grass is
 // the ground kit's clover grass (stadium-env-ground.mjs), bare soil fringed by it; the rock is lit
 // by the kit's soft light, its strata bands kept.
+// Design 084 (the visual audit): the void at about half its saturation, soft bands of nebula over a
+// dark base (warm on the left, cool on the right, as the card); the small slabs irregular rounded
+// shapes in three sizes, their sides the ground kit's strata; the great island's edge a lip of earth
+// fringed by its grass; a subtle lighter-grass ring for the mark (no pink ring and cross); the
+// flowers small pastel clumps (the kit's flower beds on the great island, painted clumps on the slabs)
+// in place of glowing discs; the sparkle streams slow soft bands.
 import {
   FILTERING,
   FOOTPRINTS,
   FULLSCREEN_VERTEX,
   NOISE,
   OUTPUT,
-  POKE_BALL,
   REVEAL,
   TABLE_UNIFORMS,
   TERRAIN_GROUND,
@@ -33,9 +38,10 @@ import {
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
 import { craterEmblem, environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
-import { GRASS as GRASS_KIT } from './stadium-env-ground.mjs';
+import { GRASS as GRASS_KIT, STRATA } from './stadium-env-ground.mjs';
 import { createPropBuilder } from './stadium-env-props.mjs';
-import { KIT_LIGHT, KIT_UNIFORMS, kitUniforms } from './stadium-kit.mjs';
+import { KIT_LIGHT, KIT_UNIFORMS, createKitProps, kitUniforms } from './stadium-kit.mjs';
+import { placeAsset } from './stadium-kit-assets.mjs';
 import { tableBounds } from './table-uv.mjs';
 import { patchy } from './stadium-env-spots.mjs';
 
@@ -45,6 +51,8 @@ export const ISLAND = Object.freeze({ margin: 78, corner: 120, wander: 36 });
 /** How deep the void lies under the island, px. */
 export const VOID_DEPTH = 380;
 export const MAX_DISCS = 44;
+/** Design 084: the most flower clumps on the great island (the kit's flower beds). */
+export const MAX_ISLAND_FLOWERS = 16;
 export const MAX_ISLANDS = 10;
 /** Least gap between any small island, seen from above, and a card or the opponent's hand. */
 export const ISLAND_CARD_GAP_PX = 16;
@@ -155,7 +163,8 @@ export function valleySpots(layout) {
       if (cards.some((card) => distanceToRect(x, y, card) < r + 30 * u)) continue;
       // The ground round the Actives stays calm: no disc inside the painted mark.
       if (emblem && Math.hypot(x - emblem.x, y - emblem.y) < emblem.r + 24 * u) continue;
-      if (discs.length < MAX_DISCS) discs.push({ x, y, z: 1, r, hue: Math.floor(roll(5) * DISC_HUES.length), bob: 0, phase: 0 });
+      // Design 084: a few clumps on the great island (MAX_ISLAND_FLOWERS), room left for the slabs'.
+      if (discs.length < MAX_ISLAND_FLOWERS) discs.push({ x, y, z: 1, r, hue: Math.floor(roll(5) * DISC_HUES.length), bob: 0, phase: 0 });
     }
   }
   // Small islands round it, out in the margins.
@@ -167,7 +176,9 @@ export function valleySpots(layout) {
       const roll = (salt) => hash(gx, gy, salt + 40);
       const x = gx + (roll(1) - 0.5) * step * 0.6;
       const y = gy + (roll(2) - 0.5) * step * 0.6;
-      const r = (46 + 60 * roll(3)) * u;
+      // Design 084: three sizes of slab, not one spread.
+      const tier = roll(3) < 0.4 ? 0 : roll(3) < 0.8 ? 1 : 2;
+      const r = [34 + 12 * roll(11), 58 + 16 * roll(11), 88 + 22 * roll(11)][tier] * u;
       if (roll(4) > 0.72 || islandDistance(island, x, y) < r + 60 * u) continue;
       if (x - r < scene.x || x + r > scene.x + scene.w || y - r < scene.y || y + r > scene.y + scene.h) continue;
       if (islands.some((other) => Math.hypot(x - other.x, y - other.y) < r + other.r + 30 * u)) continue;
@@ -189,7 +200,10 @@ export function valleySpots(layout) {
       discs.push({ x: each.x + Math.cos(angle) * out, y: each.y + Math.sin(angle) * out, z: each.z + 1, r: (8 + 6 * hash(each.x, k, 5)) * u, hue: Math.floor(hash(each.y, k, 6) * DISC_HUES.length), bob: each.bob, phase: each.phase });
     }
   }
-  return { table, scene, core, u, hand, centre, island, outline, emblem, discs, islands, tree };
+  // Design 084: on the great island the flowers are the kit's flower beds (it stands still); on the
+  // bobbing slabs they stay painted clumps, moving with their slab.
+  const flowers = discs.filter((disc) => disc.bob === 0);
+  return { table, scene, core, u, hand, centre, island, outline, emblem, discs: discs.filter((disc) => disc.bob !== 0), flowers, islands, tree };
 }
 
 const VALLEY = /* glsl */ `
@@ -269,7 +283,7 @@ const PALETTE = /* glsl */ `
 const vec3 GRASS = vec3(0.13, 0.34, 0.08);
 const vec3 GRASS_LIT = vec3(0.29, 0.54, 0.12);
 const vec3 GRASS_DARK = vec3(0.063, 0.193, 0.058);
-const vec3 MARK = vec3(0.9, 0.232, 0.572);
+const vec3 EARTH_LIP = vec3(0.3, 0.2, 0.12);
 `;
 
 // The art's grass on the great island (design 082): BDSP's clover grass in two greens by its broad
@@ -285,7 +299,6 @@ ${NOISE}
 ${FILTERING}
 ${FOOTPRINTS}
 ${REVEAL}
-${POKE_BALL}
 ${GRASS_KIT}
 ${PALETTE}
 ${GRASS_SURFACE}
@@ -312,13 +325,17 @@ void main() {
   col *= mix(vec3(0.9, 1.0, 0.9), vec3(1.08, 1.03, 0.88), fbm3(p / 230.0 + 2.0));
   col *= 0.65 + 0.45 * lit;
   col *= mix(0.6, 1.0, smoothstep(0.3, 0.9, light.b));
-  // Toward the edge the grass thins over the earth, then its lip catches the light where it turns
-  // over the cliff.
-  col = mix(col, col * 0.7, smoothstep(-34.0, -10.0, field.g));
-  col = mix(col, GRASS_LIT * 1.05, smoothstep(-6.0, -1.0, field.g) * 0.6);
-  // The art's mark: a faded pink Poke Ball painted on the grass round the Actives.
-  float mark = 1.0 - smoothstep(4.0, 7.0, emblemDistance(p, uEmblem));
-  col = mix(col, MARK * (0.9 + 0.25 * fbm3(p / 18.0)), mark * 0.85 * (0.8 + 0.2 * gnoise(p / 30.0)));
+  // Toward the edge the grass thins; design 084: past it a lip of earth shows, the grass fringing
+  // over it in little tufts, so the island has an edge and a side.
+  col = mix(col, col * 0.78, smoothstep(-34.0, -12.0, field.g));
+  float grassy = grassFringe(field.g + 11.0, p, 7.0);
+  vec3 lip = EARTH_LIP * (0.8 + 0.4 * lit) * (0.9 + 0.2 * gnoise(p / 14.0)) * (1.0 - 0.25 * fringeShade(field.g + 11.0, 7.0));
+  col = mix(lip, col, grassy);
+  // Design 084: the mark a subtle ring of lighter grass round the Actives (no pink ring or cross).
+  if (uEmblem.z > 0.0) {
+    float ring = 1.0 - smoothstep(4.0, 11.0, abs(length(p - uEmblem.xy) - uEmblem.z));
+    col = mix(col, col * 1.2 + GRASS_LIT * 0.06, ring * 0.55);
+  }
 
   vec3 shimmer = vec3(1.0, 0.75, 1.0);
   col += shimmer * revealGlow(p, 0.035) * 0.6;
@@ -428,24 +445,15 @@ export function rockGeometry(three, { outline, island, islands, tree, u }) {
   };
   skirt(outline, [island.x, island.y], 2.5, 260 * u, [0, 0], 0, 320 * u);
   for (const each of islands) {
-    // An angular slab, as the art's: a few straight edges, its corners at uneven turns and reaches.
-    const corners = 5 + Math.floor(each.seed * 4);
-    const turn = each.seed * 6.28;
+    // Design 084: an irregular rounded slab (no straight-edged prism): its outline a smooth wander of
+    // two or three slow waves round a circle, each its own phase, never past 1.05 of its radius.
     const loop = [];
-    for (let c = 0; c < corners; c += 1) {
-      const a0 = turn + ((c + 0.3 * (hash(each.x, c, 2) - 0.5)) / corners) * 2 * Math.PI;
-      const a1 = turn + ((c + 1 + 0.3 * (hash(each.x, c + 1, 2) - 0.5)) / corners) * 2 * Math.PI;
-      const r0 = each.r * (0.8 + 0.3 * hash(each.y, c, 3));
-      const r1 = each.r * (0.8 + 0.3 * hash(each.y, (c + 1) % corners, 3));
-      // Each edge in a few straight steps, so the skirt's rings follow it.
-      for (let k = 0; k < 4; k += 1) {
-        const f = k / 4;
-        const x0 = each.x + Math.cos(a0) * r0;
-        const y0 = each.y + Math.sin(a0) * r0;
-        const x1 = each.x + Math.cos(a1) * r1;
-        const y1 = each.y + Math.sin(a1) * r1;
-        loop.push([x0 + (x1 - x0) * f, y0 + (y1 - y0) * f]);
-      }
+    const waves = [2, 3, 5].map((k, i) => ({ k, phase: hash(each.x, i, 2) * 6.28, size: [0.1, 0.07, 0.04][i] * (0.6 + 0.8 * hash(each.y, i, 3)) }));
+    for (let c = 0; c < 36; c += 1) {
+      const angle = (c / 36) * 2 * Math.PI;
+      const wander = waves.reduce((sum, w) => sum + w.size * Math.sin(w.k * angle + w.phase), 0);
+      const r = each.r * Math.min(1.05, 0.86 + wander);
+      loop.push([each.x + Math.cos(angle) * r, each.y + Math.sin(angle) * r]);
     }
     const bob = [each.phase, each.bob];
     const from = positions.length / 3;
@@ -511,6 +519,8 @@ export const ROCK_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${KIT_UNIFORMS}
 ${NOISE}
+${FILTERING}
+${STRATA}
 ${REVEAL}
 ${PALETTE}
 ${VALLEY}
@@ -519,10 +529,12 @@ varying vec3 vNormal;
 varying vec3 vWorld;
 ${KIT_LIGHT}
 void main() {
+  filterPixel = pixelSize(vWorld.xy);
   if (revealBurned(vWorld.xy) * exitKeep(vWorld.xy) < 0.5) discard;
   vec3 n = normalize(gl_FrontFacing ? vNormal : -vNormal);
-  float band = step(0.5, fract(vWorld.z / 26.0));
-  vec3 earth = vColor.rgb * mix(0.9, 1.06, band);
+  // Design 084: the earth laid in the ground kit's strata, each course its own tone, a dark groove under it.
+  vec2 course = strata(vWorld.z, vWorld.xy, 15.0);
+  vec3 earth = vColor.rgb * mix(0.68, 1.04, course.x) * (0.88 + 0.24 * course.y);
   vec3 grass = vec3(0.2, 0.42, 0.11) * mix(0.9, 1.05, smoothstep(0.4, 0.6, fbm3(vWorld.xy / 90.0)));
   vec3 albedo = mix(earth, grass, vColor.a);
   vec3 col = kitLight(albedo, n, vWorld, vec4(vColor.a > 0.5 ? 1.0 : 0.0, 0.0, 1.0, 0.0), 0.0);
@@ -591,17 +603,22 @@ varying float vShown;
 void main() {
   float r = length(vLocal);
   if (vShown < 0.5 || r > 1.6) discard;
-  float body = 1.0 - smoothstep(0.92, 1.0, r);
-  float core = 1.0 - smoothstep(0.0, 0.85, r);
-  float glow = exp(-(r - 1.0) * (r - 1.0) * 6.0) * step(1.0, r);
-  float breath = 0.94 + 0.06 * sin(uTime * 0.6 + vHue.r * 9.0 + vHue.b * 5.0);
-  // A painted glowing lozenge, as the art's, lying flat: a brighter rim, a paler heart, swirled a little.
-  float rim = smoothstep(0.7, 0.95, r) * (1.0 - smoothstep(0.95, 1.0, r));
-  float swirl = 0.5 + 0.5 * sin(atan(vLocal.y, vLocal.x) * 3.0 + r * 5.0 + vHue.g * 8.0);
-  vec3 col = vHue * (0.7 + 0.35 * core) * breath * (0.92 + 0.16 * swirl) + vec3(0.18) * core * core * core;
-  col += vHue * rim * 0.3;
-  float alpha = max(body, glow * 0.22 * breath);
-  gl_FragColor = vec4(mix(vHue * 1.1, col, body), alpha);
+  // Design 084: a small pastel clump of flowers painted on the slab's grass (no glowing disc): six
+  // round blossoms in a loose ring and one in the middle, each with a gold eye, on a few dark leaves.
+  vec3 pastel = mix(vHue, vec3(1.0), 0.45);
+  float bloom = 0.0;
+  float eye = 0.0;
+  for (int k = 0; k < 7; k++) {
+    float fk = float(k);
+    vec2 at = k == 0 ? vec2(0.0) : vec2(cos(fk * 1.047 + vHue.g * 6.0), sin(fk * 1.047 + vHue.g * 6.0)) * 0.62;
+    float d = length(vLocal - at);
+    bloom = max(bloom, 1.0 - smoothstep(0.26, 0.32, d));
+    eye = max(eye, 1.0 - smoothstep(0.07, 0.1, d));
+  }
+  float leaves = 1.0 - smoothstep(0.95, 1.15, r);
+  vec3 col = mix(vec3(0.06, 0.2, 0.06), pastel, bloom);
+  col = mix(col, vec3(1.0, 0.8, 0.25), eye * bloom);
+  gl_FragColor = vec4(col, max(bloom, leaves * 0.7));
 ${OUTPUT}
 }
 `;
@@ -629,16 +646,16 @@ void main() {
   if (revealBurned(p) * exitKeep(p) < 0.5) discard;
   float t = uTime;
   float nebula = fbm3(p / 300.0 + vec2(t * 0.02, -t * 0.01));
-  vec3 col = voidColour(p, t) * (0.5 + 0.6 * nebula) * 0.85;
-  col += voidColour(p + vec2(260.0, 0.0), t) * 0.25 * smoothstep(0.6, 0.85, fbm3(p / 120.0 - t * 0.03));
-  // Design 080: the art's rainbow kept rich but deep, about half its light, leaning to violet, so the
-  // void reads as far below the island instead of glaring round the cards (taking its saturation out
-  // instead turned the yellow and green to mud).
-  col *= mix(vec3(0.5), vec3(0.46, 0.44, 0.6), 0.5);
+  // Design 084: the rainbow at about half its saturation, laid in soft bands of nebula over a dark
+  // base, warm on the left, cool on the right, so nothing in it fights the cards' own colours.
+  vec3 hue = voidColour(p, t);
+  hue = mix(vec3(dot(hue, vec3(0.3, 0.55, 0.15))), hue, 0.5);
+  float bands = smoothstep(0.32, 0.78, fbm3(vec2(p.x / 520.0, p.y / 230.0) + vec2(t * 0.012, 0.0)));
+  vec3 col = mix(vec3(0.03, 0.022, 0.055), hue * 0.62, 0.25 + 0.75 * bands * (0.65 + 0.35 * nebula));
   // Streams of white sparkle running up across it, as the art's: specks along drifting bands.
   vec2 flow = vec2(dot(p, vec2(0.6, 0.8)), dot(p, vec2(-0.8, 0.6)));
   float band = smoothstep(0.5, 0.75, gnoise(vec2(flow.y / 140.0, flow.x / 900.0 - t * 0.05)));
-  vec2 moving = (flow + vec2(t * 40.0, 0.0)) / 11.0;
+  vec2 moving = (flow + vec2(t * 14.0, 0.0)) / 11.0;
   vec2 cell = floor(moving);
   vec2 inCell = fract(moving) - 0.5 - (hash22(cell) - 0.5) * 0.5;
   // Each speck a small flake, turned its own way, tumbling as it twinkles.
@@ -647,7 +664,8 @@ void main() {
   float speck = step(0.8, hash12(cell)) * (1.0 - smoothstep(0.06, 0.12, abs(flake.x))) * (1.0 - smoothstep(0.14, 0.26, abs(flake.y)))
     * (0.6 + 0.4 * sin(t * 1.5 + hash12(cell + 7.0) * 30.0));
   vec3 speckHue = mix(vec3(1.0), 0.55 + 0.45 * cos(6.2831853 * (hash12(cell + 3.0) + vec3(0.0, 0.33, 0.67))), step(0.45, hash12(cell + 11.0)));
-  col += speckHue * speck * band * 0.6;
+  // Design 084: the streams as slow soft bands of light, their specks faint.
+  col += vec3(0.85, 0.82, 1.0) * band * 0.035 + speckHue * speck * band * 0.3;
   // The island's soft shadow on the mist far below it, and each small slab's, so they hang in front of it.
   col *= mix(0.3, 1.0, smoothstep(0.0, 260.0, islandDistance(p + vec2(30.0, 40.0))));
   for (int i = 0; i < ${MAX_ISLANDS}; i++) {
@@ -700,6 +718,17 @@ ${OUTPUT}
 }
 `;
 
+/** Design 084: the great island's flower beds, small pastel clumps of the kit's flowers. */
+export function valleyFlowers({ flowers, u }) {
+  const props = createPropBuilder();
+  for (const [i, flower] of flowers.entries()) {
+    const hue = DISC_HUES[flower.hue].map((c) => Math.round(c + (255 - c) * 0.45));
+    const hex = `#${hue.map((c) => c.toString(16).padStart(2, '0')).join('')}`;
+    placeAsset(props, 'flowerBed', { x: flower.x, y: flower.y, size: flower.r * 1.1, depth: 0.75, head: 6 * u, petals: [hex, '#fff6fb'], seed: i * 13 + 7, yaw: i * 1.7 });
+  }
+  return props;
+}
+
 /** Dimension Valley's board (stadium-environment-mesh.js BOARDS). */
 export function dimensionValleyBoard({ three, material, seeded, terrainGrid, replaceGeometry, bakeOptions }) {
   const own = {
@@ -727,9 +756,11 @@ export function dimensionValleyBoard({ three, material, seeded, terrainGrid, rep
   const voidPlane = new three.Mesh(new three.BufferGeometry(), materials.void);
   const sparkles = new three.Points(seeded(SPARKLE_COUNT), materials.sparkles);
   sparkles.renderOrder = 2;
+  // Design 084: the great island's flowers are the kit's flower beds, in the valley's light.
+  const kit = createKitProps({ three, material, own, mood: VALLEY_MOOD, reveal: 'vec3(1.0, 0.75, 1.0)' });
   return {
-    objects: [voidPlane, terrain, rock, discs, sparkles],
-    materials: Object.values(materials),
+    objects: [voidPlane, terrain, rock, discs, ...kit.objects, sparkles],
+    materials: [...Object.values(materials), ...kit.materials],
     bakeField: materials.bakeField,
     bakeLight: materials.bakeLight,
     spots: (layout) => valleySpots(layout),
@@ -751,6 +782,7 @@ export function dimensionValleyBoard({ three, material, seeded, terrainGrid, rep
       if (!spots) return;
       replaceGeometry(rock, rockGeometry(three, spots));
       replaceGeometry(discs, discGeometry(three, spots.discs));
+      kit.set(spots.flowers.length ? valleyFlowers(spots) : null);
     },
   };
 }

@@ -23,9 +23,10 @@ import {
   discGeometry,
   islandDistance,
   rockGeometry,
+  valleyFlowers,
   valleySpots,
 } from '../stadium-env-dimension.mjs';
-import { SCREEN_VIEWS, pointOnCard, screenView } from './stadium-screen.mjs';
+import { SCREEN_VIEWS, geometryOnCard, pointOnCard, screenView } from './stadium-screen.mjs';
 
 const PROFILES = [NO_MAT_LAYOUT_ID, 'sim', 'one-player', 'two-player', 'edge-to-edge-two-player'];
 const HALVES = [
@@ -59,10 +60,12 @@ test('valleySpots: every card lies well inside the island; its outline traces th
 
 test('valleySpots: discs on the grass off every card; small islands off the great one', () => {
   for (const layout of layouts) {
-    const { island, discs, islands, u } = valleySpots(layout);
-    assert.ok(discs.length > 0 && discs.length <= MAX_DISCS);
+    const { island, discs, flowers, islands, u } = valleySpots(layout);
+    assert.ok(discs.length > 0 && discs.length + flowers.length <= MAX_DISCS);
     assert.ok(islands.length >= 3 && islands.length <= MAX_ISLANDS);
-    for (const disc of discs.filter((d) => d.bob === 0)) {
+    assert.ok(discs.every((d) => d.bob > 0), 'the painted clumps ride the bobbing slabs');
+    assert.ok(flowers.length > 0 && flowers.length <= 16, `${flowers.length} flower beds on the great island (design 084)`);
+    for (const disc of flowers) {
       assert.ok(islandDistance(island, disc.x, disc.y) < 0);
       for (const card of cardsOf(layout)) assert.ok(distanceToRect(disc.x, disc.y, card) >= disc.r);
     }
@@ -103,5 +106,17 @@ test('Dimension Valley shaders declare no GLSL ES 3.00 reserved word and every o
   for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_VERTEX, TERRAIN_FRAGMENT, ROCK_VERTEX, ROCK_FRAGMENT, DISC_VERTEX, DISC_FRAGMENT, VOID_VERTEX, VOID_FRAGMENT, SPARKLE_VERTEX, SPARKLE_FRAGMENT]) {
     assert.doesNotMatch(shader, reserved);
     assert.match(shader, /void main\(\)/);
+  }
+});
+
+test("design 084: the great island's flower beds (the kit's) never cover a card on screen, in either camera preset", () => {
+  for (const view of SCREEN_VIEWS) {
+    const { layout, projectors } = screenView(view);
+    const geometry = valleyFlowers(valleySpots(layout)).build(three);
+    assert.ok(geometry.getAttribute('position').count > 0);
+    for (const { preset, project } of projectors) {
+      const hit = geometryOnCard(geometry, layout, project);
+      assert.equal(hit, null, `${view.profile} ${view.viewport.w}x${view.viewport.h} ${preset}: ${hit}`);
+    }
   }
 });
