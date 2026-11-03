@@ -617,7 +617,7 @@ per board, its numbered suggestions in § Per-board detail (and its scorecard "o
 | X6 | Scatter variety: per-kind scale/rotation jitter and species mix in `stadium-env-clumps.mjs`; cap density (Cemetery, Fairy Garden) | `clumpPieces` lean/spread/weight (32daabed; stadium-env-clumps.test); density caps Cemetery 41516243, Fairy Garden 579cd88a |
 | X7 | Frame-aware layout: bias landmarks and props to the visible three quarters | `PANEL_SHARE`/`frameWeight` (32daabed; stadium-env-spots.test) used by Beach, Fairy Garden, Mystery Garden, Grand Tree, Vitality; landmarks moved left/top-left (Vitality tree, Scorched volcano, Lumiose tower) |
 | X8 | Scorched Earth: margins + BDSP shading; move the river off the hero cards | 99d50781: margins (`sceneBounds` test), river crusted under the cards, wrapped-key stones; volcano tests in stadium-environment-layout.test |
-| B1 | Forest of Vitality suggestions 1–5 | 81ce61ea |
+| B1 | Forest of Vitality suggestions 1–5 | 81ce61ea; reworked by design 085 after the user's review |
 | B2 | Grand Tree suggestions 1–5 | e511ef64 |
 | B3 | Perilous Jungle suggestions 1–4 | b022dee6 |
 | B4 | Fairy Garden suggestions 1–4 | 579cd88a |
@@ -630,8 +630,8 @@ per board, its numbered suggestions in § Per-board detail (and its scorecard "o
 | B11 | Crystal Cave suggestions 1–4 | 253e94fa |
 | B12 | Dimension Valley suggestions 1–4 | a9fb363d |
 | B13 | Magnetic Storm suggestions 1–4 | d33bf5f8 |
-| B14 | Scorched Earth suggestions 1–4 | 99d50781 |
-| B15 | Magma Basin suggestions 1–4 | 16534a6a; falls placed for both cameras in the follow-up (I277, test: the falls show in both camera presets) |
+| B14 | Scorched Earth suggestions 1–4 | 99d50781; reworked by design 085 after the user's review |
+| B15 | Magma Basin suggestions 1–4 | 16534a6a; falls down the corner's wall face, crossing the moat on screen in both cameras (I277; test: the falls show in both camera presets, each crossing the moat beside it) |
 | B16 | Lumiose City suggestions 1–4 | 7d5b8516 |
 | B17 | Community Center suggestions 1–3 | 26671d5a; mountain in frame in the follow-up (I278, test: the cliff's mountain lies in both frames) |
 | B18 | Levincia suggestions 1–3 | c80fb5a1 + close slice (shared water) |

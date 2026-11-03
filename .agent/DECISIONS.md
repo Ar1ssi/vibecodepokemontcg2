@@ -6,8 +6,9 @@
 # Pruned or shortened lines, verbatim: .agent/archive/DECISIONS-pruned-2026-10-15.md (grep the D-number).
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
-#   Next id = highest D number in this file and the archives + 1 (next: D238).
+#   Next id = highest D number in this file and the archives + 1 (next: D239).
 
+- D238 2026-11-03 [mat-fx] Scorched Earth's river is a layout path (lavaPath) off every card; Vitality's crown is three underlit shelves (kitGlow) with mist and light columns. (design 085)
 - D237 2026-11-03 [mat-fx] (assumed) Forest of Vitality's tree stands top-left as the 084 audit asks, not 077's top right; HERO_SIDE flips it. (design 084)
 - D236 2026-11-03 [mat-fx] Stadium lights reach their ground through one shared contact glow (setGlows, MAX_GLOWS 16); LOOK.pulse for soft LED; bake outputs fit half float (<65504). (design 084)
 - D235 2026-11-01 [mat-fx] Stadium boards live: drift on every board (one point shader, never over cards or the opp hand), foot-phased sway, LOOK.blink, per-instance tints, clumped scatters. (design 083)

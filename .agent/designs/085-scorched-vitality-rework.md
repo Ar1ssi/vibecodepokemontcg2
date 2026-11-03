@@ -1,6 +1,6 @@
 # 085 — Scorched Earth and Forest of Vitality rework
 
-Status: building — 2026-11-03, branch `feature/085-scorched-vitality`.
+Status: shipped — 2026-11-03 (branch `feature/085-scorched-vitality` landed on main).
 
 ## Brief (the user, verbatim)
 "Scorched earth looks terrible. Just very procedural and empty. Same with forest of vitality. Have a
@@ -86,6 +86,7 @@ the right ~24%).
 ## Landing edits (for the commit that lands this branch on main)
 - DECISIONS: `[mat-fx]` design 085 (Scorched Earth's river is a layout path off the cards; Vitality's
   crown is three shelves, the kit's underlight, mist and light columns).
-- ISSUES: reopen I277: Magma Basin's corner falls run beside the moat in tcgl and do not read as falls
-  (the 084 follow-up's test only checks they are in frame and near-vertical).
+- ISSUES: I277's closed line amended: the 084 follow-up's falls ran beside the side moat in tcgl
+  (its test only checked frame and verticality); this branch's fix pours them down the wall's face,
+  each crossing its moat on screen (tested).
 - STATE: Active line names 085 for the user's localhost check.
