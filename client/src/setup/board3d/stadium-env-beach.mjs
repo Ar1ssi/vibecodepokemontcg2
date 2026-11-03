@@ -19,6 +19,11 @@
 // Design 082 (Brilliant Diamond / Shining Pearl): the sea in BDSP's saturated blues, paler only in a
 // band of shallows, slow ribbons of sky light and a few slow sparkles crossing it (stadium-env-ground
 // WATER), quiet near the cards; the sand BDSP's warm gold with soft ripples (SAND).
+// Design 084 (the visual audit): the surf is the card's subject. The water is three zones on the
+// shared water body (stadium-env-ground waterBody): a reflective band of wet sand, turquoise shallows
+// the sand shows through, deep blue out past them, sparkles only out in the deep; three foam bands roll
+// in parallel to the shore; the sand lighter where dry, darker where wet, with a soft tide line; the
+// rocks bigger lumpy clusters.
 // Two stages, as Scorched Earth: BEACH_FIELD bakes the ground once per layout (R height px, sea
 // level 0; G signed px from the mean waterline, + seaward) and the shared BAKE_LIGHT turns it into
 // normals, occlusion and sun shadow. Per frame SAND draws the beach and the swash; SEA one displaced
@@ -243,15 +248,16 @@ Swash swashAt(float upBeach, float along, float time) {
 
 const PALETTE = /* glsl */ `
 // Linear colours before tone mapping (Neutral compresses above ~0.76 and takes ~0.04 off dark ones).
-const vec3 SAND_DRY = vec3(0.86, 0.6, 0.31);
-const vec3 SAND_WET = vec3(0.58, 0.36, 0.16);
+const vec3 SAND_DRY = vec3(0.96, 0.7, 0.4);
+const vec3 SAND_WET = vec3(0.5, 0.31, 0.14);
+// Design 084: the three zones' blues (the audit's, checked against the card: #1fa8ce, #59bedd).
+const vec3 ZONE_SHALLOW = ${glslColour('#6cd3e8')};
+const vec3 ZONE_DEEP = ${glslColour('#2a6fd6')};
+const vec3 SKY_REFLECT = ${glslColour('#cfeaf6')};
 const vec3 SKY_LIGHT = vec3(0.36, 0.4, 0.5);
 const vec3 SUN_LIGHT = vec3(0.86, 0.78, 0.64);
 // The sea's bands, authored as they show on screen (Pokémon's clear turquoise shallows, deep blue out).
 const vec3 SEA_SHALLOW = ${glslColour('#86dbe6')};
-const vec3 SEA_TURQUOISE = ${glslColour('#45b7ea')};
-const vec3 SEA_TEAL = ${glslColour('#3388e6')};
-const vec3 SEA_DEEP = ${glslColour('#2a63d2')};
 const vec3 FOAM_LIT = vec3(0.95, 0.97, 0.98);
 `;
 
@@ -385,6 +391,12 @@ void main() {
   float wet = max(damp * 0.7, step(0.02, swash.film) * 0.85);
   vec3 sand = bdspSand(p, mix(SAND_DRY, SAND_DRY * vec3(1.05, 0.96, 0.86), smoothstep(0.35, 0.65, fbm3(p / 420.0 + 2.0))), fieldCalm(p, 110.0));
   vec3 col = lit(mix(sand, SAND_WET, wet), bakedNormal(light, vGrowth), light.a, light.b);
+  // Design 084: the wet band along the water mirrors the sky, glassiest just above the waterline;
+  // a soft tide line of darker sand and dried foam marks the highest run-up.
+  float mirrorBand = (1.0 - smoothstep(0.0, top * 0.75, upBeach)) * damp;
+  col = mix(col, col * 0.75 + SKY_REFLECT * 0.4, mirrorBand * 0.55 + swash.gloss * 0.3);
+  float tide = exp(-pow((upBeach - top * 1.02) / 5.0, 2.0)) * patternFade(filterPixel, 10.0);
+  col = mix(col, col * 0.82 + FOAM_LIT * 0.06, tide * 0.7);
   // The sheet: a thin clear tint of the shallows; its front a crisp white line of foam.
   col = mix(col, mix(col, SEA_SHALLOW, 0.45), smoothstep(0.0, 0.3, swash.film));
   col = mix(col, FOAM_LIT, smoothstep(0.45, 0.6, swash.foam));
@@ -459,12 +471,6 @@ float rockWash(vec2 p, float surge) {
   }
   return ring * (0.55 + 0.45 * surge);
 }
-// Each band one flat colour, its border soft over a few px of depth.
-vec3 waterBands(float depth) {
-  vec3 c = mix(SEA_SHALLOW, SEA_TURQUOISE, smoothstep(5.0, 9.0, depth));
-  c = mix(c, SEA_TEAL, smoothstep(19.0, 24.0, depth));
-  return mix(c, SEA_DEEP, smoothstep(40.0, 47.0, depth));
-}
 void main() {
   vec2 p = vPos;
   filterPixel = pixelSize(p);
@@ -478,16 +484,20 @@ void main() {
   vec2 edgeUv = min(vUv, 1.0 - vUv);
   float calm = smoothstep(0.0, 24.0, offshore) * smoothstep(0.0, 0.02, min(edgeUv.x, edgeUv.y));
   float depth = max(vHeight - ground, 0.0);
-  vec3 col = waterBands(depth);
+  float quiet = (1.0 - 0.8 * fieldCalm(p, 110.0)) * calm;
+  // Design 084: three zones on the shared water body: the sand shows through the turquoise shallows
+  // (a broad band, the card's), deep blue past them; its sky band and streaks over the open water,
+  // sparkles only out in the deep.
+  float zone = 0.5 * smoothstep(0.0, 14.0, depth) + 0.5 * smoothstep(18.0, 34.0, depth);
+  vec3 col = waterBody(ZONE_DEEP, ZONE_SHALLOW, SAND_WET * 1.25, zone, p, uTime * mix(0.4, 1.0, quiet));
   // A swell's face toward the shore a shade lighter, its back a shade darker; a steep crest glows.
   col *= 1.0 + 0.18 * clamp(sea.slope * 2.5, -1.0, 1.0) * calm;
   col += vec3(0.04, 0.24, 0.22) * sea.glow * 0.6;
-  float quiet = (1.0 - 0.8 * fieldCalm(p, 110.0)) * calm;
-  col += vec3(0.8, 0.9, 1.0) * lightStreaks(p, uTime) * 0.28 * quiet * smoothstep(3.0, 12.0, depth);
-  col += vec3(1.2) * sparkles(p, uTime) * 0.8 * quiet * smoothstep(6.0, 14.0, depth);
-  // Foam: the rollers and fresh breaks as crisp white bands, a collar round each rock, and a thin
-  // white line where the water meets the sand.
-  float amount = max(max(sea.foam, sea.fresh), sea.cap * 0.55) * calm;
+  // Foam: three bands rolling in parallel to the shore over the shallows (design 084), the rollers
+  // and fresh breaks as crisp white bands, a collar round each rock, and a thin white line where the
+  // water meets the sand.
+  float bands = foamBands(offshore, p, uTime, 3.0, 38.0) * smoothstep(150.0, 70.0, offshore) * quiet;
+  float amount = max(max(max(sea.foam, sea.fresh), sea.cap * 0.55) * calm, bands);
   amount = max(amount, rockWash(p, smoothstep(0.5, 3.0, sea.height)));
   float foam = smoothstep(0.42, 0.56, amount);
   foam = max(foam, (1.0 - smoothstep(0.6, 2.4, depth)) * 0.9);
@@ -506,8 +516,9 @@ const PEBBLE = Object.freeze({ body: '#b8a48c', light: '#e2d4bc', dark: '#86735e
 
 /**
  * The beach's solids, the kit's (design 081): palms where the layout stands them, each rock cluster
- * a boulder with a smaller one or two at its side (out in the sea they stand at sea level, sunk a
- * little, so they break the surface), the dressing on the sand.
+ * a big boulder with three or four smaller ones heaped round it (design 084: a lumpy cluster, as the
+ * card's; out in the sea they stand at sea level, sunk a little, so they break the surface), the
+ * dressing on the sand.
  */
 export function beachProps({ shore, rocks, palms, dressing }) {
   const props = createPropBuilder();
@@ -518,8 +529,10 @@ export function beachProps({ shore, rocks, palms, dressing }) {
     const turn = rock.seed * 6.28;
     const parts = [
       [0, 0, rock.r * 1.05],
-      [Math.cos(turn) * rock.r * 1.25, Math.sin(turn) * rock.r * 1.25, rock.r * 0.55],
-      [Math.cos(turn + 2.2) * rock.r * 1.15, Math.sin(turn + 2.2) * rock.r * 1.15, rock.r * 0.42],
+      [Math.cos(turn) * rock.r * 1.1, Math.sin(turn) * rock.r * 1.1, rock.r * 0.66],
+      [Math.cos(turn + 1.3) * rock.r * 0.95, Math.sin(turn + 1.3) * rock.r * 0.95, rock.r * 0.5],
+      [Math.cos(turn + 2.6) * rock.r * 1.2, Math.sin(turn + 2.6) * rock.r * 1.2, rock.r * 0.42],
+      [Math.cos(turn + 4.1) * rock.r * 1.05, Math.sin(turn + 4.1) * rock.r * 1.05, rock.r * 0.34],
     ];
     parts.forEach(([dx, dy, size], k) => {
       const x = rock.x + dx;

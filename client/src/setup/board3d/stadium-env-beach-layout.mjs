@@ -1,8 +1,10 @@
 // Design 077 (prototype): where Surfing Beach's pieces go, from the board layout: the bay (the mean
 // waterline from the far edge to the left edge, the sea filling the far-left corner), rock clusters
 // along the waterline and palms on the dry sand, all clear of the card footprints. Pure: no three.js.
+// Design 084 (the visual audit): three or four palms in two sizes, kept out from under the chat panel
+// (frameWeight); the rocks larger lumpy clusters, as the card's; at most one parasol.
 import { TERRAIN_SPACING_PX } from './stadium-environment-glsl.mjs';
-import { RISE_LEAN, clumpAround, patchy } from './stadium-env-spots.mjs';
+import { RISE_LEAN, clumpAround, frameWeight, patchy } from './stadium-env-spots.mjs';
 import { measureAsset } from './stadium-kit-assets.mjs';
 import { tableBounds } from './table-uv.mjs';
 
@@ -14,7 +16,7 @@ export const SHORE_FAR_EDGE_SHARE = 0.42;
 export const SHORE_LEFT_EDGE_SHARE = 0.3;
 /** How far the bay bends into the land at its middle, as a share of the waterline's length. */
 export const SHORE_BEND_SHARE = 0.07;
-export const PALM_MAX = 6;
+export const PALM_MAX = 4;
 /** Palms stand at least this far up the beach from the mean waterline (dry sand, past the swash). */
 export const PALM_DRY_PX = 150;
 /** Free sand kept between a palm's trunk and any card footprint. */
@@ -34,10 +36,12 @@ const PALM_OPEN_PX = 150;
  * The last stands out in the surf; the field shader raises it off the sea floor to break the surface.
  */
 const ROCK_BANDS = [
-  { from: 0.78, to: 0.95, offshore: [-6, 14], r: 30, seed: 0.13 },
-  { from: 0.3, to: 0.6, offshore: [-20, 8], r: 20, seed: 0.57 },
-  { from: 0.35, to: 0.75, offshore: [110, 170], r: 17, seed: 0.91 },
+  { from: 0.78, to: 0.95, offshore: [-6, 14], r: 40, seed: 0.13 },
+  { from: 0.3, to: 0.6, offshore: [-20, 8], r: 28, seed: 0.57 },
+  { from: 0.35, to: 0.75, offshore: [110, 170], r: 22, seed: 0.91 },
 ];
+/** Design 084: the palms in two sizes (px tall), the first and every other one tall. */
+export const PALM_HEIGHTS = Object.freeze({ tall: [180, 205], short: [118, 140] });
 const ROCK_STEP = 0.01;
 const ROCK_OFFSHORE_STEP_PX = 6;
 /** Rock edge to card footprint, at least. */
@@ -164,7 +168,9 @@ const pickPalms = (shore, bounds, rects, rocks) => {
       if (nearest.distance < PALM_CLEARANCE_PX) continue;
       if (rocks.some((rock) => Math.hypot(rock.x - x, rock.y - y) < rock.r + PALM_ROCK_GAP_PX)) continue;
       const nearBeach = 20 * Math.exp(-(((offshore + 230) / 140) ** 2));
-      const score = Math.min(nearest.distance, 120) + nearBeach + 8 * spotHash(x, y);
+      // Design 084: out from under the chat panel (a palm there is mostly hidden).
+      const framed = 90 * (frameWeight(x, bounds) - 1);
+      const score = Math.min(nearest.distance, 120) + nearBeach + framed + 8 * spotHash(x, y);
       candidates.push({ x, y, score, nearest });
     }
   }
@@ -181,10 +187,11 @@ const pickPalms = (shore, bounds, rects, rocks) => {
     }
     if (!spot) break;
     const away = spot.nearest.distance < PALM_OPEN_PX ? spot.nearest.away : seaward;
+    const [low, high] = palms.length % 2 === 0 ? PALM_HEIGHTS.tall : PALM_HEIGHTS.short;
     palms.push({
       x: spot.x,
       y: spot.y,
-      height: 150 + 50 * spotHash(spot.x, spot.y, 1),
+      height: low + (high - low) * spotHash(spot.x, spot.y, 1),
       lean: 0.25 + 0.3 * spotHash(spot.x, spot.y, 2),
       leanAngle: Math.atan2(away.y, away.x) + (spotHash(spot.x, spot.y, 3) - 0.5) * 0.8,
       seed: spotHash(spot.x, spot.y, 4),
@@ -268,8 +275,9 @@ const pickDressing = (shore, bounds, rects, rocks, palms, u) => {
     }
   }
   candidates.sort((a, b) => b.score - a.score);
+  // Design 084: at most one parasol set: the beach is the sea's, not a resort's.
   for (const spot of candidates) {
-    if (sets.length >= 2) break;
+    if (sets.length >= 1) break;
     if (!fits(spot.x, spot.y, setReach, setTop) || sets.some((set) => Math.hypot(set.x - spot.x, set.y - spot.y) < 320)) continue;
     const k = sets.length;
     const away = nearestFootprint(rects, spot.x, spot.y).away;
