@@ -23,10 +23,9 @@ import {
   VOLCANO_MAX_RADIUS,
   VOLCANO_MIN_RADIUS,
   VOLCANO_PAST_EDGE,
-  VOLCANO_RIVER_GAP_PX,
   VOLCANO_SEAM_GAP_PX,
   VOLCANO_RISE,
-  VOLCANO_STREAM_CLEAR_PX,
+  LAVA_PATH,
   craterBowl,
   craterInView,
   craterEmblem,
@@ -35,8 +34,8 @@ import {
   environmentOverride,
   mountainPeaks,
   sceneBounds,
+  lavaPath,
   volcanoSpot,
-  volcanoStream,
 } from '../stadium-environment-layout.mjs';
 
 // The no-mat profile the board draws by default, and the simulator's own, at the board width
@@ -126,8 +125,8 @@ test('environmentFootprints of a missing layout is empty', () => {
 
 for (const profile of PROFILES) {
   for (const half of HALVES) {
-    // Design 084: the volcano is the board's top-left landmark, its main stream clear of every card.
-    test(`volcanoSpot (${profile}, ${half.w} px half) stands far and left of the Stadium, clear of every footprint, its stream clear of every card`, () => {
+    // Design 084: the volcano is the board's top-left landmark; design 085: a bigger, lower mountain.
+    test(`volcanoSpot (${profile}, ${half.w} px half) stands far and left of the Stadium, clear of every footprint`, () => {
       const layout = layoutOf(profile, half);
       const footprints = environmentFootprints(layout);
       const rects = [...footprints.slabs, ...footprints.flats];
@@ -138,30 +137,61 @@ for (const profile of PROFILES) {
       for (const rect of rects) {
         assert.ok(distanceToRect(spot.x, spot.y, rect) >= spot.r + VOLCANO_MARGIN_PX - 1e-9, `clear of ${JSON.stringify(rect)}`);
       }
-      const seam = layout.depth;
-      assert.ok(spot.y >= seam + VOLCANO_SEAM_GAP_PX - 1e-9, 'in the far half');
-      assert.ok(spot.y - spot.r >= seam + VOLCANO_RIVER_GAP_PX - 1e-9, 'its cone off the river');
+      assert.ok(spot.y >= layout.depth + VOLCANO_SEAM_GAP_PX - 1e-9, 'in the far half');
       const table = tableBounds(layout);
       const scene = sceneBounds(layout, 'scorched-earth');
       assert.ok(spot.y <= table.y + table.h + 1e-9, 'centre on the table along');
       assert.ok(spot.x >= table.x - VOLCANO_PAST_EDGE * (table.x - scene.x) - 1e-9, 'centre little past the left edge');
       const inner = spot.r * (1 - VOLCANO_EDGE_OVERHANG);
       assert.ok(spot.x - inner >= scene.x - 1e-9 && spot.y + inner <= scene.y + scene.h + 1e-9, 'inside the scene');
-      const stream = volcanoStream(spot, seam);
-      assert.ok(stream.dy < 0 && Math.abs(stream.dy) > stream.dx, 'the stream runs down toward the seam');
-      assert.ok(spot.y + stream.dy * stream.to <= seam + 1e-9, 'the stream reaches the river');
-      // The default board keeps its table's left edge free: the crater stands in view there.
-      if (profile === NO_MAT_LAYOUT_ID) assert.ok(craterInView(spot, table), 'crater in view');
-      for (let s = stream.from; s <= stream.to; s += 4) {
-        const x = spot.x + stream.dx * s;
-        const y = spot.y + stream.dy * s;
-        for (const rect of rects) {
-          assert.ok(distanceToRect(x, y, rect) >= VOLCANO_STREAM_CLEAR_PX - 6, `stream clear of ${JSON.stringify(rect)} at ${s}`);
+      // The default board keeps its table's left edge free: the crater stands in view there, and the
+      // mountain is a landmark, not a stamp (design 085).
+      if (profile === NO_MAT_LAYOUT_ID) {
+        assert.ok(craterInView(spot, table), 'crater in view');
+        assert.ok(spot.r >= table.w * 0.13, `radius ${spot.r.toFixed(0)} at least 0.13 of the table's width`);
+      }
+    });
+
+    // Design 085: the river is the card's wide flow, from the volcano's foot down the free strip left
+    // of the cards, never under them.
+    test(`lavaPath (${profile}, ${half.w} px half) runs from the volcano's foot to the near margin, its banks clear of every card`, () => {
+      const layout = layoutOf(profile, half);
+      const footprints = environmentFootprints(layout);
+      const rects = [...footprints.slabs, ...footprints.flats];
+      const volcano = volcanoSpot(layout, footprints);
+      const path = lavaPath(layout, volcano, footprints);
+      assert.equal(path.length, LAVA_PATH.points);
+      const table = tableBounds(layout);
+      const scene = sceneBounds(layout, 'scorched-earth');
+      assert.ok(path.at(-1).y < table.y, 'its mouth in the near margin');
+      for (let k = 1; k < path.length; k += 1) {
+        assert.ok(path[k].y < path[k - 1].y, 'it runs down toward the near side');
+        assert.ok(path[k].w > path[k - 1].w, 'it widens downstream');
+      }
+      for (const point of path) assert.ok(point.x - point.w >= scene.x - 1e-9, 'inside the scene');
+      if (profile === NO_MAT_LAYOUT_ID) {
+        assert.ok(Math.hypot(path[0].x - volcano.x, path[0].y - volcano.y) <= volcano.r, "its source at the volcano's foot");
+      }
+      for (let k = 1; k < path.length; k += 1) {
+        const [a, b] = [path[k - 1], path[k]];
+        for (let s = 0; s <= 1.0001; s += 0.05) {
+          const x = a.x + (b.x - a.x) * s;
+          const y = a.y + (b.y - a.y) * s;
+          const w = a.w + (b.w - a.w) * s;
+          for (const rect of rects) {
+            assert.ok(distanceToRect(x, y, rect) >= w + LAVA_PATH.clear * 0.5, `bank ${(distanceToRect(x, y, rect) - w).toFixed(1)} px off ${JSON.stringify(rect)}`);
+          }
         }
       }
     });
   }
 }
+
+test('lavaPath is empty without a volcano or a table', () => {
+  const layout = layoutOf(NO_MAT_LAYOUT_ID, HALVES[0]);
+  assert.deepEqual(lavaPath(layout, null, environmentFootprints(layout)), []);
+  assert.deepEqual(lavaPath(null, { x: 0, y: 0, r: 100 }), []);
+});
 
 test('VOLCANO_RISE is the crater rim height VOLCANO_SHAPE builds, as a share of the radius', () => {
   const rim = VOLCANO_SHAPE.height * Math.pow(1 - VOLCANO_SHAPE.crater, 1.25);

@@ -75,7 +75,8 @@ const SCENE_MARGINS = {
   'steel-shelter': { side: 0.17, near: 0.2, far: 0.34 },
 };
 
-export const VOLCANO_MAX_RADIUS = 210;
+// Design 085: a mountain, not a stamp: up to about a fifth of the table's width.
+export const VOLCANO_MAX_RADIUS = 320;
 export const VOLCANO_MIN_RADIUS = 48;
 /** Free ground kept between the volcano's foot and any card footprint. */
 export const VOLCANO_MARGIN_PX = 18;
@@ -84,25 +85,29 @@ export const VOLCANO_EDGE_OVERHANG = 0.2;
 const VOLCANO_STEP_PX = 6;
 /** Design 084: the volcano stands in the far half, its centre at least this far past the seam. */
 export const VOLCANO_SEAM_GAP_PX = 120;
-/** Its cone's foot stays at least this far off the seam, where the river runs. */
-export const VOLCANO_RIVER_GAP_PX = 70;
 /**
  * Share of the scene's side margin the volcano's centre may stand past the table's left edge: the
  * cameras show about that much of it (both presets).
  */
 export const VOLCANO_PAST_EDGE = 0.4;
-/** Free ground kept between the volcano's main stream, down to the river, and any card footprint. */
-export const VOLCANO_STREAM_CLEAR_PX = 36;
-const VOLCANO_STREAM_STEP_PX = 12;
 /**
  * The crater's rim height as a share of the volcano's radius (stadium-env-volcanic.mjs VOLCANO_SHAPE).
  * The tilted cameras show a point that high about that far toward the far edge, and SHIFT of that to
  * the left at the board's far-left corner (tilt12, the steeper of the two).
  */
-export const VOLCANO_RISE = 0.85;
+export const VOLCANO_RISE = 0.58;
 export const VOLCANO_RISE_SHIFT = 0.35;
-/** The crater, seen where the cameras show it, stays this far inside the table's far and left edges. */
-export const VOLCANO_CRATER_INSET_PX = 40;
+/**
+ * How far inside the table's left edge, and past its far edge, the crater may be seen and still sit in
+ * both camera frames (design 085: measured with the board cameras, 1366 to 2560 px wide windows).
+ */
+export const VOLCANO_CRATER_INSET = Object.freeze({ left: 35, far: -50 });
+/**
+ * Design 085: the lava river, as the card's wide flow: from the volcano's near foot down the free
+ * strip left of the cards to the near margin, points along it, its half width at its source and at its
+ * mouth (it widens downstream), and the ground kept between its bank and any card.
+ */
+export const LAVA_PATH = Object.freeze({ points: 6, halfWidth: [42, 100], clear: 34 });
 
 /** Free floor kept round the Actives and Benches inside the crater's wall. */
 export const CRATER_FLOOR_MARGIN_PX = 14;
@@ -272,38 +277,14 @@ const distanceToRect = (x, y, rect) => {
 };
 
 /**
- * The volcano's main stream: from the foot of its cone down to the river on the seam, heading a
- * little downstream (the terrain shader's streamHeading), running on 30 px into the river.
- * @param {{ x: number, y: number, r: number }} spot
- * @param {number} seam the river's line (layout.depth)
- * @returns {{ dx: number, dy: number, from: number, to: number }} unit heading and run in px
- */
-export function volcanoStream(spot, seam) {
-  const across = 0.35 * spot.r;
-  const along = seam - spot.y;
-  const length = Math.hypot(across, along) || 1;
-  return { dx: across / length, dy: along / length, from: spot.r, to: Math.max(Math.abs(along), spot.r) + 30 };
-}
-
-const streamClear = (spot, seam, rects) => {
-  const { dx, dy, from, to } = volcanoStream(spot, seam);
-  for (let s = from; s <= to; s += VOLCANO_STREAM_STEP_PX) {
-    const x = spot.x + dx * s;
-    const y = spot.y + dy * s;
-    if (rects.some((rect) => distanceToRect(x, y, rect) < VOLCANO_STREAM_CLEAR_PX)) return false;
-  }
-  return true;
-};
-
-/**
  * Where the volcano stands. Design 084: the board's top-left landmark: in the far half, left of the
  * Stadium, the largest circle with no footprint within its radius plus VOLCANO_MARGIN_PX, its centre
  * at least VOLCANO_SEAM_GAP_PX past the seam and on the table or a little past its left edge
- * (VOLCANO_PAST_EDGE of the margin), its cone off the river (VOLCANO_RIVER_GAP_PX) and at most
- * VOLCANO_EDGE_OVERHANG of its radius past the scene's edge, its main stream down to the river clear
- * of every card. First with its crater in view (craterInView: the radius shrinks to keep it there),
- * else wherever it fits (a layout whose cards run to the table's left edge). Prefers the largest
- * circle, far up and to the left. Null without a Stadium or when no circle of VOLCANO_MIN_RADIUS fits.
+ * (VOLCANO_PAST_EDGE of the margin), at most VOLCANO_EDGE_OVERHANG of its radius past the scene's
+ * edge. First with its crater in view (craterInView: the radius shrinks to keep it there), else
+ * wherever it fits (a layout whose cards run to the table's left edge). Prefers the largest circle,
+ * far up and to the left. Null without a Stadium or when no circle of VOLCANO_MIN_RADIUS fits.
+ * Design 085: bigger and lower (the river leaves from its foot: lavaPath).
  * @param {ReturnType<typeof import('./board-layout.mjs').flatLayout>|null} layout
  * @param {{ slabs: object[], flats: object[] }} footprints `environmentFootprints(layout)`
  * @returns {{ x: number, y: number, r: number }|null}
@@ -317,11 +298,11 @@ export function volcanoSpot(layout, { slabs = [], flats = [] } = {}) {
   const rects = [...slabs, ...flats];
   const left = table.x - VOLCANO_PAST_EDGE * (table.x - scene.x);
   const sides = (x, y) => Math.min(x - scene.x, scene.x + scene.w - x, y - scene.y, scene.y + scene.h - y);
-  // The largest radius whose crater the cameras show inside the table's far and left edges.
+  // The largest radius whose crater the cameras show inside the frame (VOLCANO_CRATER_INSET).
   const inView = (x, y) =>
     Math.min(
-      (table.y + table.h - VOLCANO_CRATER_INSET_PX - y) / VOLCANO_RISE,
-      (x - table.x - VOLCANO_CRATER_INSET_PX) / (VOLCANO_RISE * VOLCANO_RISE_SHIFT)
+      (table.y + table.h - VOLCANO_CRATER_INSET.far - y) / VOLCANO_RISE,
+      (x - table.x - VOLCANO_CRATER_INSET.left) / (VOLCANO_RISE * VOLCANO_RISE_SHIFT)
     );
   const search = (keepInView) => {
     let best = null;
@@ -333,13 +314,11 @@ export function volcanoSpot(layout, { slabs = [], flats = [] } = {}) {
           VOLCANO_MAX_RADIUS,
           clearance - VOLCANO_MARGIN_PX,
           sides(x, y) / (1 - VOLCANO_EDGE_OVERHANG),
-          y - seam - VOLCANO_RIVER_GAP_PX,
           keepInView ? inView(x, y) : Infinity
         );
         if (r < VOLCANO_MIN_RADIUS) continue;
         const score = r + 0.12 * (y - seam) - 0.1 * Math.max(0, x - table.x) - 0.3 * Math.max(0, table.x - x);
         if (best && score <= best.score) continue;
-        if (!streamClear({ x, y, r }, seam, rects)) continue;
         best = { x, y, r, score };
       }
     }
@@ -349,16 +328,49 @@ export function volcanoSpot(layout, { slabs = [], flats = [] } = {}) {
 }
 
 /**
- * Whether the cameras show the volcano's crater inside the table's far and left edges (VOLCANO_RISE).
+ * Whether the cameras show the volcano's crater in their frames (VOLCANO_RISE, VOLCANO_CRATER_INSET).
  * @param {{ x: number, y: number, r: number }} spot
  * @param {{ x: number, y: number, w: number, h: number }} table `tableBounds(layout)`
  */
 export function craterInView(spot, table) {
   const rise = VOLCANO_RISE * spot.r;
   return (
-    spot.y + rise <= table.y + table.h - VOLCANO_CRATER_INSET_PX + 1e-9 &&
-    spot.x - rise * VOLCANO_RISE_SHIFT >= table.x + VOLCANO_CRATER_INSET_PX - 1e-9
+    spot.y + rise <= table.y + table.h - VOLCANO_CRATER_INSET.far + 1e-9 &&
+    spot.x - rise * VOLCANO_RISE_SHIFT >= table.x + VOLCANO_CRATER_INSET.left - 1e-9
   );
+}
+
+/**
+ * Design 085: the lava river's course, as the card's wide flow: LAVA_PATH.points points from the
+ * volcano's near foot down to the near margin, each as far toward the cards as their footprints allow
+ * (its bank LAVA_PATH.clear px off every card), bowing a little out toward the margin on its way, never
+ * past the scene's edge; its half width grows downstream. Empty without a volcano or a table.
+ * @param {ReturnType<typeof import('./board-layout.mjs').flatLayout>|null} layout
+ * @param {{ x: number, y: number, r: number }|null} volcano `volcanoSpot(layout, footprints)`
+ * @param {{ slabs: object[], flats: object[] }} footprints `environmentFootprints(layout)`
+ * @returns {{ x: number, y: number, w: number }[]} source first; w the half width
+ */
+export function lavaPath(layout, volcano, { slabs = [], flats = [] } = {}) {
+  const table = tableBounds(layout);
+  if (!volcano || !(table.w > 0 && table.h > 0)) return [];
+  const scene = sceneBounds(layout, 'scorched-earth');
+  const rects = [...slabs, ...flats];
+  const { points, halfWidth, clear } = LAVA_PATH;
+  // The farthest a point may stand toward the cards at height y: left of every footprint near it.
+  const reach = (y, w) =>
+    rects
+      .filter((rect) => rect.y - w - clear < y && rect.y + rect.h + w + clear > y)
+      .reduce((most, rect) => Math.min(most, rect.x - w - clear), Infinity);
+  const source = { x: volcano.x + volcano.r * 0.25, y: volcano.y - volcano.r * 0.9 };
+  const mouth = table.y - 0.5 * (table.y - scene.y);
+  return Array.from({ length: points }, (_, k) => {
+    const t = k / (points - 1);
+    const y = source.y + (mouth - source.y) * t;
+    const w = halfWidth[0] + (halfWidth[1] - halfWidth[0]) * t;
+    const bowed = source.x - 70 * Math.sin(Math.PI * t);
+    const x = Math.max(scene.x + w, Math.min(bowed, reach(y, w)));
+    return { x, y, w };
+  });
 }
 
 const cornersOf = (rect) => [
