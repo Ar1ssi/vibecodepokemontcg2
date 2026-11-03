@@ -300,3 +300,91 @@ test('HB 022 Whimsicott Cotton Breeze moves all damage counters from a Benched P
   assert.equal(zone(res.state, 'p1', 'bench').find((c) => c.name === 'Hurt Friend')?.damage ?? 0, 0);
   assert.equal(damageOf(res), 70);
 });
+
+// ── bucket copy of customhb (published 2026-11-03): attacks the engine ran partly or not at all ──
+// Text is the bucket set.json effect, or the wording the card is being rewritten to
+// (.agent/scratch/customhb-bucket-attack-rewrites.md).
+
+const CRUSHING_GRIP = "This attack does 20 less damage for each Retreat Cost your opponent's Active Pokémon has.";
+
+test('HB 537 Galvantula ex Crushing Grip does 20 less for each {C} in the Defending Pokémon’s Retreat Cost', () => {
+  const two = board('Galvantula ex', CRUSHING_GRIP, { damage: '200-', defenderExtra: { retreatCost: ['Colorless', 'Colorless'] } });
+  assert.equal(damageOf(attack(two.state)), 160);
+  const none = board('Galvantula ex', CRUSHING_GRIP, { damage: '200-', defenderExtra: { retreatCost: [] } });
+  assert.equal(damageOf(attack(none.state)), 200);
+});
+
+test('HB 147 Scyther Harvesting Scythe moves a Basic Energy from the Defending Pokémon to your Benched Pokémon', () => {
+  let fire;
+  let friend;
+  const { state, defender } = board(
+    'Scyther',
+    "Move 1 Basic Energy from your opponent's Active Pokémon to 1 of your Benched Pokémon.",
+    {
+      damage: '70',
+      setup: (s, { defender: d }) => {
+        fire = energy('Fire', d.instanceId);
+        s.players.p2.zones.active.push(specialEnergy(d), fire);
+        friend = mon('My Bench');
+        s.players.p1.zones.bench.push(friend);
+      },
+    }
+  );
+  const res = attack(state);
+  assert.equal(res.error, null);
+  const done = res.state.pendingChoice ? choose(res, [fire.instanceId]) : res;
+  assert.deepEqual(ids(attachedTo(done.state, 'p1', friend)), [fire.instanceId], 'the Fire Energy is on my Benched Pokémon');
+  assert.equal(attachedTo(done.state, 'p2', defender).length, 1, 'only the Special Energy stays');
+  assert.ok(!zone(done.state, 'p2', 'active').some((c) => c.instanceId === fire.instanceId), 'it left their zones');
+});
+
+const TERMINAL_CUT =
+  "Double the number of damage counters on your opponent's Active Pokémon. This attack can't leave it with less than 10 HP remaining";
+
+test('HB 459 Mega Absol ex Terminal Cut doubles the Defending Pokémon’s damage counters, leaving it at least 10 HP', () => {
+  const doubled = board('Mega Absol ex', TERMINAL_CUT, { defenderExtra: { hp: 400, damage: 100 } });
+  assert.equal(attack(doubled.state).state.players.p2.zones.active[0].damage, 200);
+  const capped = board('Mega Absol ex', TERMINAL_CUT, { defenderExtra: { hp: 400, damage: 250 } });
+  assert.equal(attack(capped.state).state.players.p2.zones.active[0].damage, 390);
+  const clean = board('Mega Absol ex', TERMINAL_CUT, { defenderExtra: { hp: 400 } });
+  assert.equal(attack(clean.state).state.players.p2.zones.active[0].damage, 0);
+});
+
+const discardAny = (then) =>
+  `You may discard any number of Energy cards attached to this Pokémon when you use this attack. If you do, ${then}`;
+
+function withThreeEnergy(name, text, damage) {
+  const picks = [];
+  const built = board(name, text, {
+    damage,
+    setup: (s, { attacker: a }) => {
+      for (const t of ['Fire', 'Water', 'Grass']) {
+        const e = energy(t, a.instanceId);
+        picks.push(e);
+        s.players.p1.zones.active.push(e);
+      }
+    },
+  });
+  return { ...built, picks };
+}
+
+test('HB 477 Raticate Gnaw mills one opponent card per Energy discarded, and nothing when none is', () => {
+  const GNAW = discardAny("discard that many cards from the top of your opponent's deck.");
+  const two = withThreeEnergy('Raticate', GNAW, '50');
+  const done = choose(attack(two.state), ids(two.picks.slice(0, 2)));
+  assert.equal(zone(done.state, 'p1', 'discard').length, 2);
+  assert.equal(zone(done.state, 'p2', 'discard').length, 2);
+  const none = withThreeEnergy('Raticate', GNAW, '50');
+  const skipped = choose(attack(none.state), []);
+  assert.equal(zone(skipped.state, 'p2', 'discard').length, 0);
+});
+
+test('HB 466 Regigigas ex Creation draws 2 cards per Energy discarded, and nothing when none is', () => {
+  const CREATION = discardAny('draw 2 cards for each card you discarded in this way.');
+  const two = withThreeEnergy('Regigigas ex', CREATION, '150');
+  const done = choose(attack(two.state), ids(two.picks.slice(0, 2)));
+  assert.equal(zone(done.state, 'p1', 'hand').length, 4);
+  assert.equal(damageOf(done), 150);
+  const none = withThreeEnergy('Regigigas ex', CREATION, '150');
+  assert.equal(zone(choose(attack(none.state), []).state, 'p1', 'hand').length, 0);
+});

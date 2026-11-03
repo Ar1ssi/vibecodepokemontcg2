@@ -290,6 +290,17 @@ const TEMPLATES = [
     (m) => ({ type: 'atkRestOfGame', effect: { kind: 'damageReduce', amount: Number(m[2]), pokemonType: m[1] } }),
   ],
   [/^for the rest of this game, your opponent can't use any gx attacks$/, () => ({ type: 'atkRestOfGame', effect: { kind: 'gxLock' } })],
+  // customhb Scyther Harvesting Scythe: the opponent's Energy onto your own Pokémon.
+  [
+    new RegExp(String.raw`^move (?:an?|1) ${ENERGY_TYPE}energy(?: card)? (?:from|attached to) your opponent's active pokémon to 1 of your (benched )?pokémon$`),
+    (m, s) => ({
+      type: 'atkMoveEnergy',
+      from: 'opponentActive',
+      to: m[2] ? 'ownBench' : 'own',
+      count: 1,
+      ...energyFilter(m[1], s),
+    }),
+  ],
   // Opponent Energy between their own Pokémon.
   [
     new RegExp(String.raw`^move (?:an?|1) ${ENERGY_TYPE}energy(?: card)? (?:from|attached to) your opponent's active pokémon to (?:1 of (?:their|your opponent's) benched pokémon|another of (?:their|your opponent's) pokémon)$`),
@@ -1287,9 +1298,24 @@ const BLOCKS = [
     }),
   ],
   // Moltres [Fossil 12] Wildfire: as many of the opponent's top cards as {R} Energy discarded.
+  // customhb Raticate Gnaw prints the same with no Energy type.
   [
-    /you may discard any number of \{([a-z])\} energy cards attached to this pokémon when you use this attack\. if you do, discard that many cards from the top of your opponent's deck\./g,
-    (m) => ({ type: 'atkDiscardSelfEnergyMillOpp', energyType: m[1].toUpperCase() }),
+    /you may discard any number of (?:\{([a-z])\} )?energy cards attached to this pokémon when you use this attack\. if you do, discard that many cards from the top of your opponent's deck\./g,
+    (m) => ({ type: 'atkDiscardSelfEnergyMillOpp', ...(m[1] ? { energyType: m[1].toUpperCase() } : {}) }),
+  ],
+  // customhb Regigigas ex Creation: the Wildfire discard, paid back in draws.
+  [
+    /you may discard any number of (?:\{([a-z])\} )?energy cards attached to this pokémon when you use this attack\. if you do, draw (\d+) cards for each card you discarded in this way\./g,
+    (m) => ({
+      type: 'atkDiscardSelfEnergyDraw',
+      drawEach: Number(m[2]),
+      ...(m[1] ? { energyType: m[1].toUpperCase() } : {}),
+    }),
+  ],
+  // customhb Mega Absol ex Terminal Cut. The HP floor sentence is optional.
+  [
+    /double the number of damage counters on your opponent's active pokémon\.(?: this attack can't leave it with less than (\d+) hp remaining\.?)?/g,
+    (m) => ({ type: 'atkDoubleDefenderCounters', minHp: m[1] ? Number(m[1]) : 0 }),
   ],
   // Delibird Souvenir (Team Rocket Returns 21): one outcome per heads tier of the 3 coins.
   [

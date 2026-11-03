@@ -559,6 +559,15 @@ export function parseAttackDamage(
     ) {
       total = Math.max(0, base - per * ctx.attackerDamageCounters);
       notes.push(`− ${per} × ${ctx.attackerDamageCounters} damage counters on this Pokémon`);
+    } else if (
+      // customhb Galvantula ex Crushing Grip: "20 less damage for each Retreat Cost your
+      // opponent's Active Pokémon has" — each {C} of that Retreat Cost.
+      /retreat cost/.test(unit) &&
+      /opponent's active|defending/.test(unit) &&
+      typeof ctx.retreatCostColorless === 'number'
+    ) {
+      total = Math.max(0, base - per * ctx.retreatCostColorless);
+      notes.push(`− ${per} × ${ctx.retreatCostColorless} {C} in the opponent's Active's Retreat Cost`);
     } else {
       notes.push('per-counter reduction — resolve the printed count');
     }
