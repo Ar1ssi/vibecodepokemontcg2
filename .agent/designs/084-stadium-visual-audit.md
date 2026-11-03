@@ -1,6 +1,6 @@
 # 084: Stadium boards — visual audit against the card art and general design principles
 Date: 2026-11-02 · Build: main @ 1d7bb60 (designs 077–083 merged) · Read-only; nothing changed.
-Status: building (one-shot, self-approved) — 2026-11-03, branch `feature/084-stadium-visual-fixes`.
+Status: shipped — 2026-11-03 (one-shot, self-approved; branch `feature/084-stadium-visual-fixes` landed on main).
 User request (2026-11-03, verbatim): "@.agent/designs/084-stadium-visual-audit.md Implementing all fixes."
 The audit below is the spec; the build sections (Acceptance, Assumptions, Design, Work plan) follow it.
 
@@ -744,9 +744,7 @@ n/a: client visuals only, no data. Revert: revert the branch's commits; boards f
   barely show (ISSUES line).
 
 ## Landing edits (for the commit that lands this branch on main)
-- ISSUES: `[board3d]` Magma Basin falls show only their feet in tcgl (its frame stops below the far wall).
-- ISSUES: `[board3d]` Community Center far mountains barely in frame (past the opponent's hand row).
-- ISSUES: close I276 (this audit) as shipped by 084.
+- ISSUES: I277 (Magma falls in tcgl), I278 (Community Center far mountains); I276 closed.
 - DECISIONS: `[board3d]` shared contact glow (`GLOW`, `setGlows`, MAX_GLOWS 16) is the one emissive
   hook boards light their surroundings with; `LOOK.pulse` joins `LOOK.blink` for glowing parts.
 - DECISIONS (assumed): Vitality's tree moved top-left per the audit (077 had top right; `HERO_SIDE` flips it).
