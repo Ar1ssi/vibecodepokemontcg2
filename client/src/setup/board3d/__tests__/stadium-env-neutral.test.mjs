@@ -56,6 +56,21 @@ test('neutralSpots: the platform holds every card; columns stand outside it, nev
   }
 });
 
+// Design 084: each column's base light pools round it; the screens float over the rim's side arcs.
+test('neutralSpots: a glow at every column; the screens over the rim beside the platform, facing it', () => {
+  for (const layout of layouts) {
+    const { beams, glows, screens, platform, centre } = neutralSpots(layout);
+    assert.equal(glows.length, beams.length);
+    glows.forEach((glow, i) => assert.deepEqual([glow.x, glow.y], [beams[i].x, beams[i].y]));
+    for (const s of screens) {
+      assert.ok(Math.hypot(s.x - centre.x, s.y - centre.y) > platform, 'past the rim');
+      assert.ok(Math.abs(s.y - centre.y) < platform * 0.5, 'on a side arc, not the far one behind the hand');
+      const toCentre = Math.atan2(centre.y - s.y, centre.x - s.x);
+      assert.ok(Math.abs(Math.cos(toCentre - s.facing) - 1) < 1e-9, 'facing the platform');
+    }
+  }
+});
+
 test('no wall, column or screen covers a card on screen, in either camera preset', () => {
   for (const view of SCREEN_VIEWS) {
     const { layout, projectors } = screenView(view);

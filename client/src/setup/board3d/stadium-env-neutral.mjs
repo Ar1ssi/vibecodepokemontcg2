@@ -12,7 +12,14 @@
 // G; the shared light bake adds nothing. Per frame: TERRAIN paints the platform (panels, rings, the
 // travelling pulse, the polish) and the dark floor round it; PROPS the walls, the machinery, the
 // screens (stadium-env-props); BEAMS the columns of light (additive).
+// Design 084 (the visual audit): each column a bright white-cyan disc at its base, its light pooled
+// round it on the floor (the shared contact glow), the tall shaft over it faint and fading fast (seen
+// from above a bright full shaft read as a comet); the floor's rings emissive lines with a soft bloom,
+// a broad soft streak of the lit ceiling across the polished platform; small green screens floating
+// over the rim's side arcs, facing the platform; the walls the card's pale blue, the navy kept for the
+// floor past the platform.
 import {
+  FOOTPRINTS,
   FULLSCREEN_VERTEX,
   NOISE,
   OUTPUT,
@@ -25,6 +32,7 @@ import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
 import { createKitProps } from './stadium-kit.mjs';
 import { wallBand } from './stadium-env-buildings.mjs';
 import { boardContext, hash } from './stadium-env-spots.mjs';
+import { GLOW } from './stadium-env-ground.mjs';
 import { EDGE_HAZE, STANDARD_TERRAIN_VERTEX } from './stadium-env-surfaces.mjs';
 
 export const NEUTRAL_KEY = 'neutralization-zone';
@@ -34,7 +42,9 @@ export const NEUTRAL_LIGHT = Object.freeze([-0.12, 0.2, 0.97]);
 export const PLATFORM_MARGIN_PX = 24;
 export const RING_SHARES = Object.freeze([0.3, 0.46, 0.62, 0.78, 0.94]);
 export const MAX_BEAMS = 8;
-export const MAX_SCREENS = 3;
+export const MAX_SCREENS = 4;
+/** Design 084: each column's base light on the floor round it. */
+export const COLUMN_GLOW = Object.freeze({ colour: '#7fe0ff', reach: 4.2, strength: 0.9, breath: 0.15 });
 const BEAM_SIDES = 14;
 
 /**
@@ -70,16 +80,21 @@ export function neutralSpots(layout) {
     // Design 083: each column its own height and girth.
     beams.push({ x, y, r: (10 + 6 * hash(k, 5, 2)) * u, h: (170 + 110 * hash(k, 5, 3)) * u, phase: hash(k, 5, 1) * 6.28 });
   }
-  // Screens floating over the far side, each a tilted green-lit panel facing the platform.
-  const screens = [-0.52, 0.04, 0.5].map((share, k) => ({
-    x: centre.x + share * Math.min(wallX, platform) * 0.9,
-    y: handEnd + 120 * u,
-    z: (170 + 30 * hash(k, 6, 1)) * u,
-    w: 96 * u,
-    h: 58 * u,
-    yaw: -share * 0.5,
-  }));
-  return { ...ctx, platform, handEnd, wallX, walls, beams, screens, centre };
+  // Design 084: small screens floating over the rim's side arcs (past the opponent's hand row they
+  // never showed), each a tilted green-lit panel facing the platform.
+  const screens = [0.12, 0.36, Math.PI - 0.36, Math.PI - 0.12].map((angle, k) => {
+    const reach = platform + 64 * u;
+    return {
+      x: centre.x + Math.cos(angle) * reach,
+      y: centre.y + Math.sin(angle) * reach,
+      z: (118 + 22 * hash(k, 6, 1)) * u,
+      w: 62 * u,
+      h: 38 * u,
+      facing: angle + Math.PI,
+    };
+  });
+  const glows = beams.map((beam) => ({ x: beam.x, y: beam.y, r: beam.r * COLUMN_GLOW.reach, colour: COLUMN_GLOW.colour, strength: COLUMN_GLOW.strength, breath: COLUMN_GLOW.breath }));
+  return { ...ctx, platform, handEnd, wallX, walls, beams, screens, centre, glows };
 }
 
 const NEUTRAL = /* glsl */ `
@@ -115,8 +130,10 @@ const vec3 YELLOW = vec3(0.79, 0.79, 0.085);
 export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
+${FOOTPRINTS}
 ${REVEAL}
 ${EDGE_HAZE}
+${GLOW}
 ${PALETTE}
 ${NEUTRAL}
 varying vec2 vPos;
@@ -171,10 +188,20 @@ void main() {
   // as the pulse passes.
   plat += RING * 0.07 * ringBloom * (0.75 + 0.5 * pulse);
   plat = mix(plat, mix(RING * 0.75, RING_WHITE, 0.15 + 0.6 * pulse), ringLight * (0.62 + 0.25 * pulse));
+  // Design 084: the rings emissive, a soft bloom of their light either side (quieter by the cards).
+  float wideBloom = 0.0;
+  for (int i = 0; i < 5; i++) {
+    float rr = (0.3 + 0.16 * float(i)) * uPlatform.z;
+    wideBloom = max(wideBloom, exp(-pow(abs(r - rr) / (16.0 * u), 2.0)));
+  }
+  plat += RING * 0.05 * wideBloom * (1.0 - 0.6 * fieldCalm(p, 60.0));
   // Polish: the floor mirrors the lit ceiling, a broad soft sheen toward the middle that drifts.
   vec3 view = normalize(uEye - vec3(p, 0.0));
   float sheen = pow(max(dot(reflect(-normalize(uSun), vec3(0.0, 0.0, 1.0)), view), 0.0), 5.0);
   plat += vec3(0.08, 0.11, 0.15) * sheen * (0.6 + 0.4 * fbm3(p / 200.0 + t * 0.02));
+  // Design 084: a broad soft streak of the lit ceiling lying across the polished platform.
+  float streakAt = dot(rel, normalize(vec2(0.62, 1.0))) / (uPlatform.z * 0.32) - 0.25 * sin(t * 0.04);
+  plat += vec3(0.07, 0.1, 0.14) * exp(-streakAt * streakAt);
   // The rim: a bright edge line where the platform ends.
   float rim = 1.0 - smoothstep(0.5 * u, 2.0 * u, abs(fromRim));
   plat = mix(plat, RING * (0.9 + 0.4 * pulse), rim * 0.9);
@@ -182,6 +209,8 @@ void main() {
   vec3 col = mix(plat, outer, smoothstep(-1.5, 1.5, fromRim));
   // Light spilling over the dark floor from the rim and the columns.
   col += RING * 0.1 * exp(-max(fromRim, 0.0) / (60.0 * u)) * step(0.0, fromRim);
+  // Design 084: each column's base light pooled on the floor round it.
+  col = glowOn(col, p);
   col = edgeHaze(col, vUv, 0.5);
   col += vec3(0.7, 0.95, 1.2) * revealGlow(p, 0.035) * 0.6;
   col += vec3(0.7, 0.95, 1.2) * exitGlow(p) * 0.6;
@@ -191,11 +220,14 @@ ${OUTPUT}
 `;
 
 // Prop colours (aColor; w: 0 matte, 0.3 metal panel, 0.9 glass, 2 and up a light at w - 1).
-const WALL = [0.196, 0.245, 0.442, 0.3];
-const WALL_LIGHT = [0.2, 0.245, 0.43, 0.3];
-const WALL_DARK = [0.101, 0.12, 0.228, 0.3];
+// Design 084: the card's pale blue walls (the navy kept for the floor past the platform).
+const WALL = [0.55, 0.68, 0.86, 0.3];
+const WALL_LIGHT = [0.62, 0.74, 0.9, 0.3];
+const WALL_DARK = [0.3, 0.4, 0.58, 0.3];
 const STRIP = [0.3, 1.2, 1.7, 2.5];
-const FRAME = [0.228, 0.263, 0.392, 0.3];
+const FRAME = [0.42, 0.52, 0.7, 0.3];
+/** Design 084: a column's base light, white-cyan. */
+const BASE_LIGHT = [1.3, 1.65, 1.85, 2.4];
 const SCREEN = [0.4, 1.5, 0.6, 2.4];
 const SCREEN_WHITE = [1.4, 1.5, 1.35, 2.7];
 const SCREEN_RIM = [0.046, 0.384, 0.135, 0.3];
@@ -228,13 +260,13 @@ function wall(props, box, height, face, u) {
  * the Poke Ball in pale lines (design 080: anonymous pale blocks on a screen read as fake content).
  */
 function screenPanel(props, s, u) {
-  const c = Math.cos(s.yaw);
-  const sn = Math.sin(s.yaw);
+  // Design 084: facing the platform (s.facing: the way to it), leaning back away from it.
+  const face = [Math.cos(s.facing), Math.sin(s.facing)];
+  const along = [-face[1], face[0]];
   const lean = 0.5;
   const at = (x, h, push) => {
-    const px = s.x + x * c - 0 * sn;
-    const py = s.y + x * sn;
-    return [px, py - Math.sin(lean) * (h - s.h / 2) - push * 0.0, s.z + Math.cos(lean) * (h - s.h / 2) + push];
+    const up = h - s.h / 2;
+    return [s.x + along[0] * x - face[0] * Math.sin(lean) * up + face[0] * push * 0.3, s.y + along[1] * x - face[1] * Math.sin(lean) * up + face[1] * push * 0.3, s.z + Math.cos(lean) * up + push];
   };
   const hw = s.w / 2;
   props.quad(at(-hw, 0, 0), at(hw, 0, 0), at(hw, s.h, 0), at(-hw, s.h, 0), SCREEN_RIM);
@@ -289,7 +321,8 @@ function neutralSolids(props, spots) {
   // Each column stands on a round base of dark metal with a glowing ring.
   for (const beam of beams) {
     props.cylinder({ x: beam.x, y: beam.y, z0: -2, z1: 9 * u, r: beam.r * 1.35, color: FRAME, capColor: WALL_LIGHT, sides: 18 });
-    props.cylinder({ x: beam.x, y: beam.y, z0: 9 * u, z1: 11 * u, r: beam.r * 1.05, color: STRIP, sides: 18 });
+    // Design 084: a bright white-cyan disc at the base, the column's foot of light.
+    props.cylinder({ x: beam.x, y: beam.y, z0: 9 * u, z1: 11 * u, r: beam.r * 1.05, color: STRIP, capColor: BASE_LIGHT, sides: 18 });
   }
 }
 
@@ -349,9 +382,11 @@ void main() {
   vec3 toEye = normalize(uEye - vWorld);
   float edge = pow(1.0 - abs(dot(normalize(vNormal), toEye)), 1.6);
   float shimmer = 0.88 + 0.12 * sin(vWorld.z * 0.06 - uTime * 1.0 + vInfo.z);
-  float fade = pow(1.0 - up, 1.25);
+  // Design 084: translucent, fading fast upward, so from above the shaft is a faint haze over its bright
+  // base, not a comet.
+  float fade = pow(1.0 - up, 2.4);
   vec3 col = mix(vec3(0.3, 0.75, 1.5), vec3(1.2, 1.6, 1.9), edge);
-  gl_FragColor = vec4(col * (0.08 + 0.34 * edge) * fade * shimmer, 1.0);
+  gl_FragColor = vec4(col * (0.06 + 0.22 * edge) * fade * shimmer, 1.0);
 ${OUTPUT}
 }
 `;
