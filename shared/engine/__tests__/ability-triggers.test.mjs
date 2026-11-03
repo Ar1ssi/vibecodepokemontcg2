@@ -679,6 +679,11 @@ test('on-KO energy move: Veluza moves its Energy to the only Benched Pokémon', 
   });
   state.players.p2.zones.active.push(attacker);
   state.players.p2.zones.deck.push(createCard({ instanceId: 91, name: 'Deck' }));
+  // Prizes left on both sides: a Knock Out that took the last Prize would end the game first.
+  for (let i = 0; i < 6; i++) {
+    state.players.p1.zones.prizes.push(createCard({ instanceId: 100 + i, name: 'Prize' }));
+    state.players.p2.zones.prizes.push(createCard({ instanceId: 110 + i, name: 'Prize' }));
+  }
 
   const res = applyCommand(
     state,
