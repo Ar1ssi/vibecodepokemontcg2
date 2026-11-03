@@ -14,6 +14,12 @@
 // own, so it never sits over the cards for long. A vortex of dark mist turns over the ground.
 // World scale: a card's footprint is a trampled patch of mud; a reed stands a hand high.
 //
+// Design 084 (the visual audit): re-keyed to the card's night: near-black wet mud (#1c1a24), its
+// colour in the puddles, which hold the aurora's reflection; the aurora itself slow soft bands of
+// green and violet light drifting over the ground (not drawn as sky); the force field's ring lighting
+// the mud round it (the shared contact glow) under an always-faint dome edge; the bolts soft branching
+// glows with a bright core, brief and rare; the reeds in clumps of dry olive at the margins; every coil
+// tower topped with a pink light that pools on the ground.
 // Bake, once per layout: BAKE_FIELD is the flat marsh (R height px) with the clearing's distance in
 // G; the shared light bake adds nothing. Per frame: TERRAIN paints the mud, grass, puddles, the ring,
 // the pads, the iron dust along the field, the mist, the aurora's wash and the lightning's flashes;
@@ -33,7 +39,8 @@ import {
 } from './stadium-environment-glsl.mjs';
 import { craterEmblem } from './stadium-environment-layout.mjs';
 import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
-import { createKitProps } from './stadium-kit.mjs';
+import { createKitProps, glslColour } from './stadium-kit.mjs';
+import { GLOW } from './stadium-env-ground.mjs';
 import { placeAsset } from './stadium-kit-assets.mjs';
 import { boardContext, hash, patchy, shuffled } from './stadium-env-spots.mjs';
 import { EDGE_HAZE, STANDARD_TERRAIN_VERTEX } from './stadium-env-surfaces.mjs';
@@ -45,8 +52,14 @@ export const STORM_LIGHT = Object.freeze([-0.3, 0.5, 0.6]);
 export const CLEARING_PX = 36;
 export const CLEARING_WOBBLE_PX = 70;
 export const MAX_PADS = 4;
-/** Two links between the pads, then one strike from each pad up to the force field. */
-export const MAX_ARCS = 6;
+/**
+ * Two links between the pads, then one strike from each pad up to the force field; design 084: each
+ * with a branch forking off it, flashing with it.
+ */
+export const MAX_ARCS = 12;
+/** Design 084: the coil towers' and the ring's pink light on the mud round them (the shared contact glow). */
+export const TOWER_LIGHT = Object.freeze({ colour: '#ff4fb4', reach: 70, strength: 0.5, breath: 0.1 });
+export const RING_LIGHT = Object.freeze({ colour: '#ff6ac4', reach: 80, strength: 0.4 });
 /** Only every sixth strike from a pad sends a ring out across the field. */
 export const RIPPLE_EVERY = 6;
 /** Seconds a ring runs for. */
@@ -120,9 +133,10 @@ export function stormSpots(layout) {
     const b = pads[side * 2 + 1];
     arcs.push({
       pads: [side * 2, side * 2 + 1],
-      points: boltPath([a.x, a.y, postTop], [b.x, b.y, postTop], 96 * u, 34 * u, side * 7 + 1),
-      // Design 080: the storm keeps its strikes, about half as often (one every 3-4 s over the board).
-      period: 7.5 + 2.2 * side,
+      points: boltPath([a.x, a.y, postTop], [b.x, b.y, postTop], 96 * u, 16 * u, side * 7 + 1),
+      // Design 080: the storm keeps its strikes, about half as often; design 084: rare, about one every
+      // 15-20 s from each.
+      period: 15.0 + 4.4 * side,
       phase: 0.35 + 0.4 * side,
     });
   }
@@ -134,12 +148,22 @@ export function stormSpots(layout) {
     const landing = [dome.x + dome.a * dir[0], dome.y + dome.b * dir[1], dome.h * dir[2]];
     arcs.push({
       pads: [i, i],
-      points: boltPath([pad.x, pad.y, postTop], landing, 30 * u, 30 * u, i * 13 + 3),
-      period: 9.5 + 1.9 * i,
+      points: boltPath([pad.x, pad.y, postTop], landing, 30 * u, 14 * u, i * 13 + 3),
+      period: 19.0 + 3.8 * i,
       phase: 0.1 + 0.23 * i,
       dir,
     });
   });
+  // Design 084: a branch forking off each bolt partway along, a third as long, flashing with it.
+  for (const [k, arc] of [...arcs].entries()) {
+    const at = arc.points[Math.floor(arc.points.length * 0.42)];
+    const end = arc.points[arc.points.length - 1];
+    const along = [end[0] - at[0], end[1] - at[1]];
+    const span = Math.hypot(along[0], along[1]) || 1;
+    const turn = hash(k, 5, 7) < 0.5 ? 1 : -1;
+    const to = [at[0] + (along[0] * 0.3 - (along[1] / span) * turn * span * 0.25), at[1] + (along[1] * 0.3 + (along[0] / span) * turn * span * 0.25), Math.max(4 * u, at[2] * 0.55)];
+    arcs.push({ pads: arc.pads, points: boltPath(at, to, 10 * u, 8 * u, k * 17 + 5), period: arc.period, phase: arc.phase, branch: true });
+  }
   const nearPylon = (x, y, gap) => [...poles, ...pads].every((p) => Math.hypot(x - p.x, y - p.y) > p.r + gap);
   const treeSlots = [
     [-0.82, 0.3],
@@ -163,23 +187,41 @@ export function stormSpots(layout) {
   // Reed clumps over the scene outside the clearing, clear of the pads and the trees' feet. Design
   // 083: gathered in beds (patchy) with open marsh between, every candidate shuffled before the cap
   // (a near-to-far scan spent it all on the near rows).
+  // Design 084: the reeds in clumps at the margins: a few anchors where the marsh runs thick, each
+  // a stand of four to seven fans close round it, the open mud between the stands.
   const reedSpots = [];
-  const step = 62 * u;
+  const step = 150 * u;
+  const reedFits = (x, y) =>
+    ctx.inScene(x, y, 10 * u) &&
+    distanceOut(ctx.core, x, y) >= (CLEARING_PX + CLEARING_WOBBLE_PX * 0.7) * u + 40 * u &&
+    nearPylon(x, y, 22 * u) &&
+    ctx.clear(x, y, 10 * u, 18 * u);
   for (let gy = scene.y + step / 2; gy < scene.y + scene.h; gy += step) {
     for (let gx = scene.x + step / 2; gx < scene.x + scene.w; gx += step) {
       const roll = (salt) => hash(gx, gy, salt + 60);
-      const x = gx + (roll(1) - 0.5) * step * 0.9;
-      const y = gy + (roll(2) - 0.5) * step * 0.9;
-      if (roll(3) > 0.78 * patchy(x, y, { scale: 260 * u, salt: 131 }) || !ctx.inScene(x, y, 10 * u)) continue;
-      const out = distanceOut(ctx.core, x, y);
-      if (out < (CLEARING_PX + CLEARING_WOBBLE_PX * 0.7) * u + 22 * u) continue;
-      if (!nearPylon(x, y, 22 * u)) continue;
-      if (!ctx.clear(x, y, 10 * u, 18 * u)) continue;
-      reedSpots.push({ x, y, h: (20 + 30 * roll(4)) * u, lean: roll(5) * 6.28, seed: roll(6), blades: 6 + Math.floor(roll(7) * 6) });
+      const x = gx + (roll(1) - 0.5) * step * 0.8;
+      const y = gy + (roll(2) - 0.5) * step * 0.8;
+      if (roll(3) > 0.85 * patchy(x, y, { scale: 300 * u, salt: 131 }) || !reedFits(x, y)) continue;
+      const stand = 4 + Math.floor(roll(8) * 4);
+      for (let k = 0; k < stand; k += 1) {
+        const fan = (salt) => hash(x + k, y, salt + 90);
+        const angle = fan(1) * 6.28;
+        const out = (k === 0 ? 0 : 12 + 22 * fan(2)) * u;
+        const rx = x + Math.cos(angle) * out;
+        const ry = y + Math.sin(angle) * out;
+        if (!reedFits(rx, ry)) continue;
+        reedSpots.push({ x: rx, y: ry, h: (24 + 30 * fan(4)) * u, lean: fan(5) * 6.28, seed: fan(6), blades: 6 + Math.floor(fan(7) * 6) });
+      }
     }
   }
   const clumps = shuffled(reedSpots, 11).slice(0, MAX_CLUMPS);
-  return { ...ctx, handEnd, pads, poles, dome, arcs, trees, boulders, clumps, ring: craterEmblem(layout, centre) };
+  // Design 084: pink light pooled round each coil tower and round the ring.
+  const ring = craterEmblem(layout, centre);
+  const glows = [
+    ...(ring?.r > 0 ? [{ x: ring.x, y: ring.y, r: ring.r + RING_LIGHT.reach * u, colour: RING_LIGHT.colour, strength: RING_LIGHT.strength }] : []),
+    ...[...poles, ...pads].map((tower) => ({ x: tower.x, y: tower.y, r: TOWER_LIGHT.reach * u, colour: TOWER_LIGHT.colour, strength: TOWER_LIGHT.strength, breath: TOWER_LIGHT.breath })),
+  ];
+  return { ...ctx, handEnd, pads, poles, dome, arcs, trees, boulders, clumps, ring, glows };
 }
 
 const distanceOut = (rect, x, y) => Math.hypot(Math.max(rect.x - x, 0, x - rect.x - rect.w), Math.max(rect.y - y, 0, y - rect.y - rect.h));
@@ -250,15 +292,16 @@ export const TERRAIN_VERTEX = STANDARD_TERRAIN_VERTEX;
 
 // The card art's colours (pixel samples, inverted through Neutral tone mapping).
 const PALETTE = /* glsl */ `
-const vec3 MUD = vec3(0.056, 0.054, 0.051);
-const vec3 WATER = vec3(0.071, 0.088, 0.094);
+// Design 084: near-black wet mud (the audit's #1c1a24), its colour kept for the puddles.
+const vec3 MUD = ${glslColour('#1c1a24')};
+const vec3 WATER = vec3(0.03, 0.035, 0.05);
+const vec3 AURORA_GREEN = ${glslColour('#3fd0a0')};
+const vec3 AURORA_PURPLE = ${glslColour('#8a4fd0')};
 const vec3 REED = vec3(0.144, 0.117, 0.058);
 const vec3 REED_DARK = vec3(0.045, 0.047, 0.038);
 const vec3 PINK = vec3(1.008, 0.077, 0.479);
 const vec3 PINK_SOFT = vec3(0.617, 0.071, 0.345);
 const vec3 RING_WHITE = vec3(1.866, 1.596, 1.866);
-const vec3 AURORA_BLUE = vec3(0.085, 0.442, 0.618);
-const vec3 AURORA_VIOLET = vec3(0.196, 0.085, 0.496);
 const vec3 DUST = vec3(0.2, 0.25, 0.34);
 const vec3 MIST = vec3(0.07, 0.05, 0.13);
 `;
@@ -271,6 +314,7 @@ ${FILTERING}
 ${REVEAL}
 ${POKE_BALL}
 ${EDGE_HAZE}
+${GLOW}
 ${PALETTE}
 ${STORM}
 varying vec2 vPos;
@@ -289,16 +333,22 @@ void main() {
   // olive-brown grass lying in broad swathes over the mud. The reeds are the kit's clumps standing in
   // the margins. Puddles in the low places hold the sky as still dark glass, the aurora's colour only a
   // gleam on it.
+  // Design 084: near-black wet mud everywhere (no mottle), the dry grass only a thin wash out past
+  // the clearing (the reeds are its clumps); the aurora's slow bands of green and violet light lie
+  // over it, and its colour gathers in the puddles as their reflection.
   float wild = smoothstep(-10.0 * u, 100.0 * u, d + 8.0 * u * (gnoise(p / 24.0) - 0.5));
-  vec3 mud = mix(MUD * 0.8, MUD * 1.5, smoothstep(0.3, 0.7, fbm3(p / 110.0 + 2.0)));
-  vec3 turf = mix(REED_DARK * 1.5, REED * 0.8, smoothstep(0.3, 0.75, fbm3(p / 150.0 + 6.0)));
-  vec3 col = mix(mud, turf, wild * 0.85);
-  float puddleMask = smoothstep(0.66, 0.74, fbm3(p / 70.0 + 9.0)) * (0.35 + 0.65 * smoothstep(0.0, 40.0 * u, d + 20.0 * u));
+  vec3 mud = MUD * (0.92 + 0.16 * fbm3(p / 160.0 + 2.0));
+  vec3 turf = mix(REED_DARK * 1.4, REED * 0.6, smoothstep(0.35, 0.75, fbm3(p / 150.0 + 6.0)));
+  vec3 col = mix(mud, turf, wild * 0.35);
+  float calmHere = fieldCalm(p, 110.0);
+  float bands = 0.5 + 0.5 * sin(p.x * 0.0045 + p.y * 0.0062 + t * 0.09 + 2.4 * fbm3(p / 340.0 + vec2(t * 0.01, 0.0)));
+  float sheet = smoothstep(0.35, 0.8, fbm3(vec2(p.x / 520.0 + t * 0.012, p.y / 260.0)));
+  vec3 aurora = mix(AURORA_PURPLE, AURORA_GREEN, bands);
+  col += aurora * 0.07 * sheet * (1.0 - 0.5 * calmHere);
+  float puddleMask = smoothstep(0.62, 0.7, fbm3(p / 70.0 + 9.0)) * (0.35 + 0.65 * smoothstep(0.0, 40.0 * u, d + 20.0 * u));
   vec3 view = normalize(uEye - vec3(p, 0.0));
   float sky = pow(clamp(view.z, 0.0, 1.0), 3.0);
-  float auroraBand = 0.5 + 0.5 * sin(p.x * 0.007 + p.y * 0.004 + t * 0.12 + 2.0 * fbm3(p / 300.0));
-  vec3 aurora = mix(AURORA_VIOLET, AURORA_BLUE, auroraBand);
-  col = mix(col, WATER * 0.55 + aurora * 0.22 * sky, puddleMask * 0.92);
+  col = mix(col, WATER + aurora * (0.22 + 0.25 * sheet) * (0.5 + 0.5 * sky), puddleMask * 0.92);
 
   // The Poke Ball: the glowing pink and white line the art shows, with a soft bloom.
   float rd = emblemDistance(p, uRing);
@@ -358,9 +408,8 @@ void main() {
     col = mix(col, DUST * (0.7 + 0.8 * pulse * (1.0 - calm) + 0.5 * core), dust * 0.55 * (0.3 + 0.7 * inside));
   }
 
-  // The aurora's wash over the whole marsh, drifting, strongest toward the far end.
-  float far = smoothstep(0.0, 1.0, (p.y - uMin.y) / uSize.y);
-  col += aurora * 0.05 * (0.5 + 0.8 * far) * (0.5 + 0.5 * fbm3(p / 260.0 + t * 0.02));
+  // The pink light round the ring and each coil tower (the shared contact glow, design 084).
+  col = glowOn(col, p);
   col += lightning * (0.5 + 0.5 * puddleMask);
 
   col = edgeHaze(col, vUv, 0.4);
@@ -376,11 +425,11 @@ ${OUTPUT}
 const BARK = [0.07, 0.06, 0.05, 0];
 const ROCK = Object.freeze({ body: [0.11, 0.105, 0.105, 0], light: [0.18, 0.18, 0.2, 0], dark: [0.06, 0.06, 0.065, 0] });
 // Dry straw, lit by the key alone (LOOK.matte): the night's cyan rim would whiten every thin blade.
-const REED_COLOR = [0.3, 0.24, 0.09, 0];
+// Design 084: dry olive, as the card's reeds.
+const REED_COLOR = [0.24, 0.23, 0.08, 0];
 const IRON = [0.07, 0.075, 0.09, 0.3];
 const COPPER = [0.5, 0.2, 0.09, 0.3];
 const ORB_PINK = [1.4, 0.18, 0.8, 2.4];
-const ORB_CYAN = [0.35, 1.0, 1.5, 2.4];
 
 /** A coil pylon: an iron plinth, a tapering iron column wound with copper rings, a glowing orb on top. */
 function pylon(props, p, u) {
@@ -439,7 +488,8 @@ function reedClumps(props, clumps, u) {
 export function stormProps(spots) {
   const props = createPropBuilder();
   for (const tree of spots.trees) bareTree(props, tree, spots.u);
-  for (const pole of spots.poles) pylon(props, { ...pole, orb: pole.side < 0 ? ORB_PINK : ORB_CYAN }, spots.u);
+  // Design 084: every coil tower topped with the pink light.
+  for (const pole of spots.poles) pylon(props, { ...pole, orb: ORB_PINK }, spots.u);
   for (const pad of spots.pads) pylon(props, { x: pad.x, y: pad.y, r: 11 * spots.u, h: PAD_POST_PX * spots.u, orb: ORB_PINK }, spots.u);
   spots.boulders.forEach((rock, k) => placeAsset(props, 'boulder', { x: rock.x, y: rock.y, z: -2, size: rock.r * 1.05, seed: k * 11 + 3, yaw: k, sun: STORM_LIGHT, colors: ROCK }));
   // Design 083: the reeds sway in the storm's wind.
@@ -526,7 +576,7 @@ void main() {
   vec2 aside = vec2(-dir.y, dir.x);
   int id = int(aInfo.z + 0.5);
   float flash = uStrikes[id].x;
-  mv.xy += aside * aInfo.x * aInfo.w * (0.5 + 1.4 * flash);
+  mv.xy += aside * aInfo.x * aInfo.w * (1.2 + 1.6 * flash);
   gl_Position = projectionMatrix * mv;
   vSide = aInfo.x;
   vAlong = aInfo.y;
@@ -539,11 +589,12 @@ varying float vSide;
 varying float vFlash;
 varying float vAlong;
 void main() {
+  // Design 084: a soft glow round a bright core, no hard zig-zag stroke.
   float across = abs(vSide);
-  float core = exp(-across * across * 7.0);
-  float glow = exp(-across * across * 1.4) * 0.5;
-  vec3 col = vec3(0.7, 0.85, 1.2) * glow + vec3(1.4, 1.5, 1.7) * core;
-  gl_FragColor = vec4(col * vFlash * (0.7 + 0.3 * sin(vAlong * 40.0)), 1.0);
+  float core = exp(-across * across * 14.0);
+  float glow = exp(-across * across * 1.1) * 0.45;
+  vec3 col = vec3(0.6, 0.75, 1.15) * glow + vec3(1.4, 1.5, 1.7) * core;
+  gl_FragColor = vec4(col * vFlash * (0.85 + 0.15 * sin(vAlong * 24.0)), 1.0);
 ${OUTPUT}
 }
 `;
@@ -616,7 +667,8 @@ void main() {
     charge += exp(-ahead * ahead) * exp(-hit.w * 1.1);
     flash += exp(-away * away / 7200.0) * exp(-hit.w * 4.5);
   }
-  float intensity = present * (0.2 * rim + 0.05 * sheen * (0.4 + rim)) + charge * 0.2 + flash * 0.3 + (charge + flash) * rim * 0.25;
+  // Design 084: the dome's edge always faintly there, brighter as the field swells into view.
+  float intensity = 0.05 * rim + present * (0.18 * rim + 0.05 * sheen * (0.4 + rim)) + charge * 0.2 + flash * 0.3 + (charge + flash) * rim * 0.25;
   vec3 tint = mix(vec3(0.12, 0.55, 1.0), vec3(0.7, 0.9, 1.0), clamp(charge + flash, 0.0, 1.0) * 0.5);
   gl_FragColor = vec4(tint * intensity * 0.7, 1.0);
 ${OUTPUT}
