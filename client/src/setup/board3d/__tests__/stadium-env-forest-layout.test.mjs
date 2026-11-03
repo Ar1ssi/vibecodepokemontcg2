@@ -16,7 +16,9 @@ import {
   MAX_CARD_RECTS,
   MAX_TREES,
   PLANT_CLEARING_GAP_PX,
+  POOL_GLOW,
   PUFF_REACH,
+  TREE_HEIGHTS,
   TREE_CARD_GAP_PX,
   TREE_CLEARING_REACH_PX,
   TREE_SPACING_PX,
@@ -219,4 +221,30 @@ test('jungleSpots keeps at most MAX_CARD_RECTS footprints; no layout gives no bo
   assert.deepEqual(jungleLeaves(null), []);
   const none = jungleSpots(null);
   assert.deepEqual([none.bogs, none.core, none.trees, none.plants, none.bells, none.spikes], [[], null, [], [], [], []]);
+});
+
+test('design 084: the bogs light the teal pink round them; vines sag to the floor out past the crown; crowns in three heights', () => {
+  const heights = new Set();
+  for (const profile of PROFILES) {
+    for (const half of HALVES) {
+      const spots = jungleSpots(layoutOf(profile, half));
+      const lobes = spots.bogs.flatMap((bog) => bog.lobes);
+      assert.equal(spots.glows.length, lobes.length, 'a glow round every lobe');
+      for (const glow of spots.glows) {
+        assert.equal(glow.colour, POOL_GLOW.colour);
+        assert.ok(lobes.some((lobe) => lobe.x === glow.x && lobe.y === glow.y && glow.r > lobe.r));
+      }
+      for (const tree of spots.trees) {
+        heights.add(Math.round(tree.cz - tree.crown * 0.45));
+        assert.ok(tree.puffs.some((puff) => puff.fringe), 'a fringe to tip pink');
+        for (const vine of tree.vines) {
+          assert.equal(vine.to[2], 0, 'down to the floor');
+          assert.ok((vine.to[0] - tree.cx) * tree.side >= (vine.x - tree.cx) * tree.side - 1e-6, 'out away from the cards');
+          assert.ok(vine.sag > 0 && vine.sag < 0.5);
+        }
+      }
+    }
+  }
+  for (const height of heights) assert.ok(TREE_HEIGHTS.includes(height), `a crown height ${height}`);
+  assert.ok(heights.size >= 2, 'more than one height across the layouts');
 });

@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import * as THREE from 'three';
 import { flatLayout } from '../board-layout.mjs';
 import { getMatLayout } from '../../sizing/mat-layouts.mjs';
 import { NO_MAT_LAYOUT_ID } from '../../sizing/mat-spec.mjs';
@@ -8,13 +9,12 @@ import {
   ARENA_KEY,
   BAKE_FIELD_FRAGMENT,
   BOARD_FRAGMENT,
-  LATTICE_VERTEX,
   GLINT_FRAGMENT,
   GLINT_VERTEX,
   LASER_COUNT,
   LASER_VERTEX,
   POST_PX,
-  PROP_FRAGMENT,
+  RIG_OUT_PX,
   RIG_PX,
   RING_GAP_PX,
   TERRAIN_FRAGMENT,
@@ -24,11 +24,10 @@ import {
   glintGeometry,
   laserGeometry,
   laserLights,
-  latticeCrossings,
-  latticeGeometry,
   rigLamps,
   rigOutline,
 } from '../stadium-env-arena.mjs';
+import { SCREEN_VIEWS, geometryOnCard, screenView } from './stadium-screen.mjs';
 
 // Every mat profile (the no-mat default, the simulator's, one-player and full-size two-player mats)
 // at the board width board3d.js lays out beside the sidebox (0.755 of 1920) and at full width.
@@ -93,8 +92,9 @@ test('the rig runs round outside the ropes, a lamp at each of its corners and th
     const outline = rigOutline(ring);
     assert.equal(outline.length, 8);
     for (const [x, y] of outline) {
-      const outside = Math.max(Math.abs(x - ring.x) - ring.hw, Math.abs(y - ring.y) - ring.hh);
-      assert.ok(Math.abs(outside - RIG_PX.out) < 1e-6, 'every corner lies on the rig\'s rect, out past the ropes');
+      const onSide = Math.abs(Math.abs(x - ring.x) - ring.hw - RIG_OUT_PX.side) < 1e-6;
+      const onEnd = Math.abs(Math.abs(y - ring.y) - ring.hh - RIG_OUT_PX.end) < 1e-6;
+      assert.ok(onSide || onEnd, 'every corner lies on the rig\'s rect, out past the ropes');
     }
     const lamps = rigLamps(ring);
     for (const corner of outline) assert.ok(lamps.some(([x, y]) => x === corner[0] && y === corner[1]));
@@ -108,22 +108,6 @@ test('the rig runs round outside the ropes, a lamp at each of its corners and th
     const glints = glintGeometry(three, lamps, lights);
     assert.equal(glints.attributes.aGlint.array.length / 4, (lamps.length + lights.length) * 4);
     assert.equal(glints.index.length, (lamps.length + lights.length) * 6);
-  }
-});
-
-test('latticeCrossings: the white shafts cross over the side stands, out past the ad boards', () => {
-  for (const layout of layouts) {
-    const spots = arenaSpots(layout);
-    const crossings = latticeCrossings(spots);
-    assert.equal(crossings.length, 4);
-    for (const [x, y] of crossings) {
-      assert.ok(Math.abs(x - spots.ring.x) > spots.boards.hw, 'past the ad boards');
-      assert.ok(Math.abs(y - spots.ring.y) < spots.boards.hh, 'beside the ring');
-    }
-    const lattice = latticeGeometry(three, spots);
-    const count = lattice.attributes.position.array.length / 3;
-    assert.equal(lattice.attributes.aFrom.array.length / 3, count);
-    assert.equal(lattice.attributes.aBeam.array.length / 2, count);
   }
 });
 
@@ -144,8 +128,21 @@ test('laserLights: one high in each corner, out past the ad boards', () => {
 
 test('Fighting Stadium shaders declare no GLSL ES 3.00 reserved word and every one has a main', () => {
   const reserved = /\b(?:float|vec[234]|int|bool)\s+(?:flat|half|smooth|noperspective|sample|patch|input|output|filter|active|common|fixed|long|short|out|in|inout|round|step)\b/;
-  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_FRAGMENT, BOARD_FRAGMENT, LASER_VERTEX, PROP_FRAGMENT, GLINT_VERTEX, GLINT_FRAGMENT, LATTICE_VERTEX]) {
+  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_FRAGMENT, BOARD_FRAGMENT, LASER_VERTEX, GLINT_VERTEX, GLINT_FRAGMENT]) {
     assert.match(shader, /void main\(\)/);
     assert.doesNotMatch(shader, reserved);
+  }
+});
+
+test('no post, rope, truss, lamp or rail covers a card on screen, in either camera preset (the rig runs out by its lean)', () => {
+  for (const view of SCREEN_VIEWS) {
+    const { layout, projectors } = screenView(view);
+    const geometries = [arenaProps(arenaSpots(layout))].map((props) => props.build(THREE));
+    for (const { preset, project } of projectors) {
+      for (const geometry of geometries) {
+        const hit = geometryOnCard(geometry, layout, project);
+        assert.equal(hit, null, `${view.profile} ${view.viewport.w}x${view.viewport.h} ${preset}: ${hit}`);
+      }
+    }
   }
 });

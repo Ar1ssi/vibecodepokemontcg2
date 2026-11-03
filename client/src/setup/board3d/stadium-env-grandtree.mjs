@@ -10,10 +10,22 @@
 // World scale: a card's footprint is a mossy flagstone of the clearing; the trunk is a card and a
 // half through at its foot.
 //
+// Design 081: every solid is the Stadium kit's (stadium-kit.mjs, stadium-kit-assets.mjs): the strands,
+// roots and limbs plain bark, the crown's balls, the small tree, the fern clumps and a few toadstools.
+// Design 082 (Brilliant Diamond / Shining Pearl): the crown is leafy lumps, dark in their creases;
+// the floor is the ground kit's clover grass, a deep jungle green.
+//
+// Design 084 (the visual audit): a jungle clearing, not a lawn: big-leaf plants, ferns and bushes in
+// two or three sizes crowd a band round the table's edge, the floor darker there, so the open middle
+// reads as the clearing; the floor a warmer, more contrasty mossy soil and grass (set apart from Forest
+// of Vitality's meadow); the gold veins glow (emissive, with contact glow on the floor beside each
+// root and round the trunk's foot, the shared GLOW); the trunk a tighter knot of six twisting strands;
+// the crown bigger, overhanging the table (kept off each card only); one warm low sun from the top
+// left, so the roots throw long soft shadows.
 // Bake, once per layout: BAKE_FIELD is the flat floor (R height px; the roots' ridges are props);
-// the shared light bake adds nothing. Per frame: TERRAIN paints the moss, earth, clover, the crown's
-// dappled shadow and the glow round the roots; PROPS the trunk, roots, crown, small tree, ferns
-// (stadium-env-props); MOTES the golden specks rising.
+// the shared light bake adds nothing. Per frame: TERRAIN paints the moss, earth, the crown's
+// shadow and the glow round the roots; the kit's meshes the trunk, roots, crown, small tree, ferns
+// and toadstools; MOTES the golden specks rising.
 import {
   FILTERING,
   FOOTPRINTS,
@@ -22,21 +34,35 @@ import {
   OUTPUT,
   REVEAL,
   TABLE_UNIFORMS,
-  TERRAIN_GROUND,
   TERRAIN_UNIFORMS,
-  VORONOI,
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
-import { PROP_VERTEX, createPropBuilder, propFragment } from './stadium-env-props.mjs';
-import { boardContext, hash } from './stadium-env-spots.mjs';
-import { BLADES, EDGE_HAZE, STANDARD_TERRAIN_VERTEX } from './stadium-env-surfaces.mjs';
+import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
+import { RISE_LEAN, boardContext, distanceToRect, frameWeight, hash, shuffled, visibleArea } from './stadium-env-spots.mjs';
+import { clumpPieces, scaledKinds } from './stadium-env-clumps.mjs';
+import { EDGE_HAZE, STANDARD_TERRAIN_VERTEX } from './stadium-env-surfaces.mjs';
+import { GLOW, GRASS, LIGHT_MOTION } from './stadium-env-ground.mjs';
+import { KEY_GAIN, createKitProps, glslColour, paint } from './stadium-kit.mjs';
+import { SHADOW_SLIDE, measureAsset, placeAsset } from './stadium-kit-assets.mjs';
 
 export const GRAND_KEY = 'grand-tree';
-/** The sun (toward it, table frame): high and a little from the far left, so the crown's shadow falls toward the cards, short and soft. */
-export const GRAND_SUN = Object.freeze([-0.42, 0.28, 0.86]);
-export const MAX_BALLS = 16;
+/**
+ * The sun (toward it, table frame): design 084, one warm low sun from the top left (~40° up), so the
+ * roots and the crown throw long soft shadows across the floor toward the cards.
+ */
+export const GRAND_SUN = Object.freeze([-0.58, 0.46, 0.67]);
+/** Design 084: the veins' gold, emissive (the art's, the audit's #ffcf5a), and its contact glow on the floor round the trunk. */
+export const VEIN_GOLD = '#ffcf5a';
+export const TRUNK_GLOW = Object.freeze({ reach: 2.6, strength: 0.7, breath: 0.12 });
+/** Design 084: the jungle band round the table's edge starts this far past the cards' box (card-scale px). */
+export const JUNGLE_FROM_PX = 120;
+export const MAX_BALLS = 24;
 export const MAX_ROOTS = 8;
-export const MAX_LEAVES = 22;
+/** Design 083: the most clump pieces (ferns, bushes, flowers, rocks, toadstools) over the floor; design 084: the jungle band's. */
+export const GRAND_CLUMP_CAP = 36;
+export const JUNGLE_CAP = 70;
+/** Design 083: the highest the floor swells under a prop (3 + 11 px past the cards and roots, plus the ripple). */
+export const GRAND_GROUND_CEILING_PX = 15;
 const MOTE_COUNT = 60;
 /** The trunk's radius at its foot and at its fork, the fork's height, the crown's height (card-scale px). */
 export const TRUNK = Object.freeze({ foot: 70, top: 46, fork: 210, crown: 290 });
@@ -67,8 +93,8 @@ export function grandSpots(layout) {
   }
   // The crown: balls on a dome over the top-left, kept clear of the cards (and the hand) seen from above.
   const balls = [];
-  const spread = 220 * u;
-  for (let k = 0; k < 40 && balls.length < MAX_BALLS; k += 1) {
+  const spread = 285 * u;
+  for (let k = 0; k < 80 && balls.length < MAX_BALLS; k += 1) {
     const roll = (salt) => hash(k, 6, salt);
     const bx = x + (roll(1) - 0.5) * 2 * spread;
     const by = y + (roll(2) - 0.4) * 1.5 * spread;
@@ -80,26 +106,61 @@ export function grandSpots(layout) {
   }
   // A smaller tree off the far right, ferns and broad leaves clear of everything.
   const small = { x: Math.min(scene.x + scene.w - 90 * u, centre.x + table.w * 0.44), y: Math.min(handEnd + 10 * u, scene.y + scene.h - 120 * u), r: 62 * u, h: 150 * u };
-  // Design 080: the broad leaves grow in clumps, four or five fanning out from one root, as ferns do;
-  // single leaves strewn at random read as litter thrown on the lawn.
-  const leaves = [];
-  for (let k = 0; k < 90 && leaves.length < MAX_LEAVES; k += 1) {
-    const roll = (salt) => hash(k, 8, salt);
-    const cx = scene.x + 40 * u + roll(1) * (scene.w - 80 * u);
-    const cy = scene.y + 40 * u + roll(2) * (scene.h - 80 * u);
-    const len = (66 + 36 * roll(3)) * u;
-    if (!ctx.clear(cx, cy, len * 1.15, 12 * u)) continue;
-    if (Math.hypot(cx - x, cy - y) < tree.foot + 40 * u + len) continue;
-    if (leaves.some((leaf) => Math.hypot(cx - leaf.x, cy - leaf.y) < len * 2.4)) continue;
-    const fronds = 4 + Math.floor(roll(6) * 2);
-    const turn = roll(4) * 6.28;
-    for (let f = 0; f < fronds && leaves.length < MAX_LEAVES; f += 1) {
-      const flen = len * (0.75 + 0.35 * hash(k, f, 10));
-      const yaw = turn + (f / fronds) * 6.28 + (hash(k, f, 9) - 0.5) * 0.5;
-      leaves.push({ x: cx, y: cy, yaw, len: flen, wid: flen * 0.42, seed: hash(k, f, 11) });
-    }
+  // Design 083: ferns, bushes, flowers, rocks and toadstools in clumps over the bare clover (a hero
+  // piece and its satellites, gathered where patchy() runs thick), clear of the cards and the hand
+  // with their lean on screen, of the trunk and its roots, and of the small tree.
+  const pieces = clumpPieces(visibleArea(table, scene, 0.15) ?? scene, {
+    step: 170 * u,
+    mix: scaledKinds(CLUMP_MIX, u),
+    satellites: scaledKinds(CLUMP_SATELLITES, u),
+    thick: 0.95,
+    cap: GRAND_CLUMP_CAP,
+    salt: 61,
+    fits: (cx, cy, reach, height) =>
+      ctx.inScene(cx, cy, reach * 0.5) &&
+      distanceToRect(cx, cy, core) >= reach + 24 * u &&
+      ctx.clear(cx, cy, reach + RISE_LEAN * (height + GRAND_GROUND_CEILING_PX), 12 * u) &&
+      Math.hypot(cx - x, cy - y) >= tree.foot + 230 * u + reach &&
+      Math.hypot(cx - small.x, cy - small.y) >= small.r + reach,
+  });
+  // Design 084: the jungle closing round the clearing: a band of big-leaf plants (the kit's fern at its
+  // biggest), smaller ferns and bushes in two or three sizes, out past the cards' box by JUNGLE_FROM_PX,
+  // thickest where the frame shows it, clear of the trunk, the roots, the small tree and the clumps.
+  const taken = pieces.map((piece) => ({ x: piece.x, y: piece.y, r: piece.reach }));
+  const jungle = clumpPieces(visibleArea(table, scene, 0.15) ?? scene, {
+    step: 118 * u,
+    mix: scaledKinds(JUNGLE_MIX, u),
+    satellites: scaledKinds(JUNGLE_SATELLITES, u),
+    thick: 0.5,
+    count: [2, 4],
+    cap: JUNGLE_CAP,
+    spacing: 0.7,
+    salt: 131,
+    taken,
+    weight: (cx) => 0.65 + 0.35 * frameWeight(cx, table),
+    fits: (cx, cy, reach, height) =>
+      ctx.inScene(cx, cy, reach * 0.4) &&
+      distanceToRect(cx, cy, core) >= JUNGLE_FROM_PX * u + reach &&
+      ctx.clear(cx, cy, reach + RISE_LEAN * (height + GRAND_GROUND_CEILING_PX), 12 * u) &&
+      Math.hypot(cx - x, cy - y) >= tree.foot + 200 * u + reach &&
+      Math.hypot(cx - small.x, cy - small.y) >= small.r + reach,
+  });
+  // Design 084: the trunk's gold lights the floor round its foot (the shared contact glow).
+  const glows = [{ x, y, r: tree.foot * TRUNK_GLOW.reach + 90 * u, colour: VEIN_GOLD, strength: TRUNK_GLOW.strength, breath: TRUNK_GLOW.breath }];
+  const toadstools = [];
+  for (let k = 0; k < 9 && toadstools.length < 4; k += 1) {
+    const angle = hash(k, x, 81) * 2 * Math.PI;
+    const out = tree.foot * (1.6 + 0.9 * hash(k, y, 82));
+    const tx = x + Math.cos(angle) * out;
+    const ty = y + Math.sin(angle) * out;
+    const size = (8 + 4 * hash(k, 3, 83)) * u;
+    if (!ctx.inScene(tx, ty, size) || !ctx.clear(tx, ty, size * 1.1, 12 * u)) continue;
+    if (toadstools.some((t) => Math.hypot(t.x - tx, t.y - ty) < 30 * u)) continue;
+    toadstools.push({ x: tx, y: ty, size, seed: hash(k, 4, 84) });
   }
-  return { ...ctx, handEnd, tree, roots, balls, small, leaves };
+  // Design 083: leaves fall from the crown's balls and the small tree.
+  const driftEmitters = [...shuffled(balls, 3).slice(0, 9).map((ball) => ({ x: ball.x, y: ball.y, r: ball.r, z: ball.z })), { x: small.x, y: small.y, r: small.r, z: small.h }];
+  return { ...ctx, handEnd, tree, roots, balls, small, pieces, jungle, toadstools, driftEmitters, glows };
 }
 
 const GRAND = /* glsl */ `
@@ -129,41 +190,52 @@ float crownShade(vec2 p, vec3 sun) {
 }
 `;
 
-/** Bake: the floor, flat. */
+/**
+ * Bake: the floor, flat round the cards and the tree; design 083: past them it rises in low soft
+ * swells (3 + 11 px of noise), so the clumps stand on hummocks of the forest floor.
+ */
 export const BAKE_FIELD_FRAGMENT = /* glsl */ `
 ${TABLE_UNIFORMS}
+uniform vec4 uTree;
+uniform float uUnit;
 varying vec2 vUv;
 ${NOISE}
+${FOOTPRINTS}
 void main() {
   vec2 p = uMin + vUv * uSize;
-  gl_FragColor = vec4(0.5 * (fbm3(p / 70.0) - 0.5), 0.0, 0.0, 0.0);
+  float away = smoothstep(90.0, 240.0, footprintDistance(p)) * smoothstep(uTree.z + 200.0 * uUnit, uTree.z + 330.0 * uUnit, distance(p, uTree.xy));
+  float h = 0.5 * (fbm3(p / 70.0) - 0.5) + away * (3.0 + 11.0 * fbm3(p / 210.0 + 3.0));
+  gl_FragColor = vec4(h, 0.0, 0.0, 0.0);
 }
 `;
 
 export const TERRAIN_VERTEX = STANDARD_TERRAIN_VERTEX;
 
-// The card art's colours (pixel samples, inverted through Neutral tone mapping).
+// The floor in BDSP's jungle greens (authored as shown), the glow the card art's gold.
 const PALETTE = /* glsl */ `
-const vec3 MOSS = vec3(0.12, 0.263, 0.071);
-const vec3 MOSS_DARK = vec3(0.046, 0.113, 0.054);
-const vec3 GRASS = vec3(0.142, 0.345, 0.085);
-const vec3 EARTH = vec3(0.16, 0.094, 0.046);
-const vec3 EARTH_DARK = vec3(0.077, 0.055, 0.043);
+// Design 084: warmer, more contrasty yellow-green moss over dark soil (set apart from Vitality's lawn).
+const vec3 MOSS = ${glslColour('#6fae36')};
+const vec3 MOSS_LIT = ${glslColour('#a3c840')};
+const vec3 SOIL = ${glslColour('#5e4a2c')};
+const vec3 UNDERGROWTH = ${glslColour('#2f5a2a')};
 const vec3 GLOW = vec3(1.0, 0.68, 0.08);
 const vec3 SHADE_TINT = vec3(0.5, 0.66, 0.82);
+const vec3 FALLEN_LEAF = ${glslColour('#c99a3a')};
 `;
 
 export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
-${FOOTPRINTS}
 ${FILTERING}
-${VORONOI}
+${FOOTPRINTS}
 ${REVEAL}
-${BLADES}
 ${EDGE_HAZE}
+${GRASS}
+${LIGHT_MOTION}
+${GLOW}
 ${PALETTE}
 ${GRAND}
+uniform float uJungle;
 varying vec2 vPos;
 varying vec2 vUv;
 varying float vGrowth;
@@ -176,35 +248,38 @@ void main() {
   vec3 sun = normalize(uSun);
   float u = uUnit;
 
-  // The floor: moss in broad cushions, earth showing between, clover and short grass in tufts.
-  float cushion = smoothstep(0.3, 0.62, fbm3(p / 130.0 + 3.0));
-  vec3 col = mix(MOSS_DARK * 1.1, MOSS, 0.4 + 0.6 * cushion);
-  col = mix(col, EARTH_DARK * 1.4, (1.0 - cushion) * smoothstep(0.62, 0.78, fbm3(p / 70.0 + 8.0)) * 0.55);
-  col *= 0.88 + 0.24 * fbm3(p / 24.0 + 5.0);
-  // Leaf litter: small brown flakes lying flat among it, each a shade of its own. Design 080: litter,
-  // tufts and clover thin out round the cards (moss cushions stay), and none draws finer than the
-  // screen can show.
+  // The floor (design 082): BDSP's clover grass; ferns and toadstools are the kit's solids. Design 084:
+  // a mossy forest floor, warm yellow-green moss in broad patches with dark soil showing between them
+  // out past the cards; darker toward the jungle round the clearing's edge.
   float calm = fieldCalm(p, 110.0);
-  vec4 litter = voronoiCell(p / (6.0 * u) + 9.1);
-  col = mix(col, EARTH * (0.7 + 0.7 * fract(litter.y * 11.0)), (1.0 - smoothstep(0.1, 0.2, length(litter.zw * vec2(1.0, 1.7))))
-    * step(fract(litter.y * 7.7), 0.1) * (1.0 - calm) * patternFade(filterPixel, 6.0 * u));
-  vec4 tuft = voronoiCell(p / (11.0 * u) + 1.1);
-  vec2 blades = bladeFan(-tuft.zw * 11.0 * u, tuft.y, 10.0 * u);
-  col = mix(col, mix(MOSS_DARK, GRASS, blades.y), blades.x * step(fract(tuft.y * 23.1), 0.5 + 0.3 * cushion) * 0.9
-    * (1.0 - 0.6 * calm) * patternFade(filterPixel, 11.0 * u));
-  // Clover: small round leaf triples, paler.
-  vec4 clover = voronoiCell(p / (7.5 * u) + 4.4);
-  col = mix(col, GRASS * 1.15, (1.0 - smoothstep(0.1, 0.22, length(clover.zw))) * step(fract(clover.y * 13.7), 0.14) * 0.8
-    * (1.0 - 0.7 * calm) * patternFade(filterPixel, 7.5 * u));
+  vec3 col = cloverGrass(p, mix(MOSS * 0.85, MOSS_LIT, smoothstep(0.35, 0.72, fbm3(p / 210.0 + 8.0))), calm);
+  float soil = smoothstep(0.56, 0.72, fbm3(p / 95.0 + 4.0)) * (1.0 - calm);
+  col = mix(col, SOIL * (0.85 + 0.3 * gnoise(p / 30.0)), soil * 0.7);
+  float edge = smoothstep(uJungle * 0.6, uJungle * 1.5, length(max(max(uFootprintBox.xy - p, p - uFootprintBox.zw), 0.0)));
+  col = mix(col, UNDERGROWTH * (0.9 + 0.2 * fbm3(p / 60.0)), edge * 0.55);
 
   // The light: the sun's patches through the crown, dappled where it thins; the shade is cool and deep.
   float shade = crownShade(p, sun);
-  // The dapple drifts slowly in broad flecks; over the cards it is faint.
-  float dapple = smoothstep(0.35, 0.65, fbm3((p - vec2(t * 1.2, 0.0)) / 34.0 + 2.0));
-  shade *= mix(1.0, 0.55 + 0.45 * dapple, 0.85 * (1.0 - 0.6 * calm)) * vGrowth;
+  // A few broad soft gaps of sun where the crown is thin; over the cards the shade is faint.
+  float gap = smoothstep(0.6, 0.72, fbm3(p / 120.0 + 2.0));
+  shade *= mix(1.0, 1.0 - 0.6 * gap, 1.0 - 0.6 * calm) * vGrowth;
   col = mix(col * 1.12, col * SHADE_TINT * 0.82, shade * 0.85);
+  // Off the whole block of cards (the field between their rows too), not only off each card.
+  float open = smoothstep(40.0, 140.0, length(max(max(uFootprintBox.xy - p, p - uFootprintBox.zw), 0.0)));
+  // Design 083: sun flecks through the crown, shifting as its leaves move; none near the cards.
+  col *= 1.0 + 0.3 * dapple(p, t, 22.0) * shade * open;
+  // A few fallen leaves on the floor, more under the crown; none near the cards.
+  vec2 cell = floor(p / 26.0);
+  vec2 jitter = hash22(cell + 41.0);
+  vec2 local = p - (cell + 0.2 + 0.6 * jitter) * 26.0;
+  float turn = jitter.x * 6.2832;
+  vec2 along = vec2(cos(turn) * local.x + sin(turn) * local.y, -sin(turn) * local.x + cos(turn) * local.y);
+  float fallen = (1.0 - smoothstep(0.75, 1.0, length(along / vec2(4.6, 2.2)))) * step(0.82 - 0.12 * shade, hash12(cell + 7.0));
+  col = mix(col, FALLEN_LEAF * (0.8 + 0.4 * jitter.y), fallen * 0.55 * open * patternFade(filterPixel, 26.0));
 
-  // The glow of the roots and the trunk's foot, golden on the ground near them.
+  // The glow of the roots and the trunk's foot, golden on the ground near them. Design 084: the veins
+  // are lights, so the floor beside each root is lit gold (tinting what it falls on), and the trunk's
+  // foot pools in it (the shared contact glow).
   float glow = 0.0;
   for (int i = 0; i < ${MAX_ROOTS}; i++) {
     vec4 end = uRootEnds[i];
@@ -213,10 +288,11 @@ void main() {
     vec2 ab = end.xy - a;
     float s = clamp(dot(p - a, ab) / max(dot(ab, ab), 1.0), 0.0, 1.0);
     float d = distance(p, a + ab * s);
-    glow = max(glow, exp(-pow(d / (18.0 * u + 12.0 * u * (1.0 - s)), 2.0)) * (1.0 - 0.6 * s));
+    glow = max(glow, exp(-pow(d / (24.0 * u + 14.0 * u * (1.0 - s)), 2.0)) * (1.0 - 0.55 * s));
   }
-  glow = max(glow, exp(-pow(distance(p, uTree.xy) / (uTree.z * 2.0), 2.0)) * 0.9);
-  col += GLOW * 0.2 * glow * (0.95 + 0.05 * sin(t * 0.6 + p.x * 0.02));
+  float pulse = 0.94 + 0.06 * sin(t * 0.6 + p.x * 0.02);
+  col += (col * 1.4 + 0.04) * GLOW * 0.38 * glow * pulse * vGrowth;
+  col = glowOn(col, p);
 
   col = edgeHaze(col, vUv, 0.55);
   vec3 spark = vec3(0.9, 1.0, 0.6);
@@ -227,36 +303,64 @@ ${OUTPUT}
 }
 `;
 
-// Prop colours (aColor; w: 0 matte, 0.05 foliage, 0.12 bark, 0.1 leaf, 2 and up a light at w - 1).
-const BARK = [0.16, 0.094, 0.046, 0.12];
-const BARK_DARK = [0.077, 0.055, 0.043, 0.12];
-const ROOT = [0.263, 0.142, 0.071, 0.12];
-const VEIN = [1.0, 0.68, 0.08, 2.6];
-const FOLIAGE = [0.068, 0.226, 0.063, 0.05];
-const FOLIAGE_LIT = [0.14, 0.34, 0.07, 0.05];
-const LEAF = [0.085, 0.345, 0.101, 0.1];
-const LEAF_RIB = [0.35, 0.55, 0.2, 0.1];
-const SMALL_FOLIAGE = [0.057, 0.2, 0.06, 0.05];
+// Prop colours, BDSP's (aColor, linear; w 2 and up a light at w - 1): the veins the card art's gold.
+const BARK = paint('#6e4a2c');
+const BARK_DARK = paint('#57391f');
+const ROOT = paint('#86592f');
+// Design 084: the veins a light (w 2 and up) in the art's gold, bright enough to bloom.
+const VEIN = [...paint(VEIN_GOLD, 2).slice(0, 3).map((v) => v * KEY_GAIN), 3.4];
+const FOLIAGE = paint('#3a9a3c');
+const FOLIAGE_LIT = paint('#79c446');
+const FERN = Object.freeze({ leaf: '#3fa03a', leafLight: '#7fcb4c', heart: '#2a6e2c' });
+// Design 083: what the floor's clumps are made of (sizes card-scale px), and their satellites.
+const CLUMP_MIX = Object.freeze([
+  { asset: 'fern', weight: 3, size: [62, 96], options: { fronds: 6, colors: FERN } },
+  { asset: 'bush', weight: 2, size: [26, 42], options: { colors: { leaf: '#3c9a3c', leafLight: '#78c64a' } } },
+  { asset: 'boulder', weight: 0.7, size: [14, 24], options: { colors: { body: '#9a8f78', light: '#c4b898', dark: '#5e5646' } } },
+]);
+const CLUMP_SATELLITES = Object.freeze([
+  { asset: 'fern', weight: 2, size: [40, 64], options: { fronds: 5, colors: FERN } },
+  { asset: 'bush', weight: 1.4, size: [18, 30], options: { colors: { leaf: '#46a23e', leafLight: '#8acd4e' } } },
+  { asset: 'flowers', weight: 1.6, size: [10, 15], options: { petals: ['#ffd84a', '#fff7ec', '#f7a1c4'] } },
+  { asset: 'mushroom', weight: 1, size: [6, 10], options: { colors: { cap: '#f2b33d', spot: '#fff6e0' } } },
+]);
+const SMALL_TREE = Object.freeze({ leaf: '#3a9640', leafLight: '#6fc244', bark: BARK, barkDark: BARK_DARK });
+// Design 084: the jungle round the clearing: big-leaf plants (the kit's fern at its biggest), ferns and
+// bushes in the art's deep and fresh greens, two or three sizes each.
+const JUNGLE_FERN = Object.freeze({ leaf: '#2f8a36', leafLight: '#6fbf45', heart: '#1f5a26' });
+const JUNGLE_MIX = Object.freeze([
+  { asset: 'fern', weight: 2.5, size: [96, 132], options: { fronds: 7, colors: JUNGLE_FERN }, spread: 0.12, lean: 0.06 },
+  { asset: 'bush', weight: 2, size: [34, 52], options: { colors: { leaf: '#2e7f34', leafLight: '#68b847' } }, spread: 0.18, lean: 0.05 },
+  { asset: 'fern', weight: 1.5, size: [60, 84], options: { fronds: 6, colors: FERN }, spread: 0.15, lean: 0.08 },
+]);
+const JUNGLE_SATELLITES = Object.freeze([
+  { asset: 'fern', weight: 2, size: [44, 66], options: { fronds: 5, colors: FERN }, spread: 0.15, lean: 0.08 },
+  { asset: 'bush', weight: 1.6, size: [22, 34], options: { colors: { leaf: '#3a8f38', leafLight: '#7cc44a' } }, spread: 0.2, lean: 0.05 },
+]);
 
 /** The trunk at height s (0 foot, 1 fork): its radius, tapering and flaring at the foot. */
 const trunkRadius = (tree, s) => tree.top + (tree.foot - tree.top) * (1 - s) ** 1.6 + tree.foot * 0.22 * Math.exp(-s * 9);
 
-/** The trunk: strands twisting round each other up from the foot, gold veins creeping along some. */
+/**
+ * The trunk: strands twisting round each other up from the foot, gold veins creeping along some.
+ * Design 084: a tighter knot, as the card's: six strands set apart (a dark groove between each),
+ * turning most of a full turn on the way up, each swelling and thinning along its run.
+ */
 function trunk(props, tree, u) {
   const strands = 6;
-  const levels = 16;
+  const levels = 20;
   for (let k = 0; k < strands; k += 1) {
     const phase = (k / strands) * 2 * Math.PI + 0.3;
-    const twist = 1.7 + 0.25 * hash(k, 2, 1);
+    const twist = 2.6 + 0.4 * hash(k, 2, 1);
     const points = [];
     const radii = [];
     for (let i = 0; i <= levels; i += 1) {
       const s = i / levels;
       const R = trunkRadius(tree, s);
       const angle = phase + twist * s * 2 * Math.PI * 0.5;
-      const around = R * (0.52 - 0.12 * s);
+      const around = R * (0.6 - 0.14 * s);
       points.push([tree.x + Math.cos(angle) * around, tree.y + Math.sin(angle) * around, -4 + s * tree.fork]);
-      radii.push(R * (0.58 - 0.1 * s));
+      radii.push(R * (0.5 - 0.08 * s) * (1 + 0.12 * Math.sin(s * 9 + k * 1.7)));
     }
     props.tube(points, radii, k % 2 ? BARK : BARK_DARK, { sides: 12 });
     // A gold vein lying along every other strand's flank.
@@ -294,6 +398,13 @@ function roots(props, spots, u) {
     }
     props.tube(points, radii, ROOT, { sides: 9 });
     if (root.seed > 0.3) props.tube(points.slice(1, 7).map((p, i) => [p[0], p[1], p[2] + radii[i + 1] * 0.9]), 3.6 * u, VEIN, { sides: 6 });
+    // Design 084: the root's long soft shadow along the floor, thrown away from the low sun.
+    const lift = Math.max(GRAND_SUN[2], 0.25);
+    const slide = [(-GRAND_SUN[0] / lift) * SHADOW_SLIDE * 2.2, (-GRAND_SUN[1] / lift) * SHADOW_SLIDE * 2.2];
+    for (let i = 1; i < steps; i += 2) {
+      const [px, py, pz] = points[i];
+      props.shadow({ x: px + slide[0] * pz, y: py + slide[1] * pz, rx: radii[i] * 1.5 + pz * 0.25, ry: radii[i] * 1.1, yaw: root.angle, strength: 0.5 });
+    }
   }
 }
 
@@ -305,79 +416,38 @@ function crown(props, spots, u) {
     const mid = [(fork[0] + ball.x) / 2, (fork[1] + ball.y) / 2, (fork[2] + ball.z) / 2 + 20 * u];
     props.tube([fork, mid, [ball.x, ball.y, ball.z - ball.r * 0.4]], [tree.top * 0.4, tree.top * 0.28, tree.top * 0.14], BARK, { sides: 9 });
   }
-  balls.forEach((ball, k) => {
-    props.sphere({ x: ball.x, y: ball.y, z: ball.z, r: ball.r, color: k % 3 ? FOLIAGE : FOLIAGE_LIT, sides: 16, rings: 10, squash: 0.82 });
-    props.sphere({ x: ball.x + ball.r * 0.2, y: ball.y - ball.r * 0.15, z: ball.z + ball.r * 0.42, r: ball.r * 0.68, color: FOLIAGE_LIT, sides: 14, rings: 9, squash: 0.8 });
+  // Each ball a leafy lump, a lighter one on its sunward top (the art's yellow light), the crown
+  // dark in the creases between them; built about the trunk so the leaves on its flat tops lie
+  // outward from it.
+  const [sx, sy] = GRAND_SUN;
+  const lumps = balls.flatMap((ball) => {
+    const [x, y] = [ball.x - tree.x, ball.y - tree.y];
+    return [
+      { x, y, z: ball.z, rx: ball.r, rz: ball.r * 0.82, color: FOLIAGE },
+      { x: x + sx * ball.r * 0.3, y: y + sy * ball.r * 0.3, z: ball.z + ball.r * 0.4, rx: ball.r * 0.62, rz: ball.r * 0.5, color: FOLIAGE_LIT },
+    ];
   });
+  props.at({ x: tree.x, y: tree.y, ground: false }, () =>
+    props.look({ kind: LOOK.foliage, leaf: 12 * u }, () => props.lumps(lumps, { crease: 0.5 }))
+  );
 }
 
-/** A fern or broad leaf lying low, its pale midrib raised. */
-function broadLeaf(props, leaf, u) {
-  const along = [Math.cos(leaf.yaw), Math.sin(leaf.yaw)];
-  const side = [-along[1], along[0]];
-  const at = (s, across, z) => [leaf.x + along[0] * s * leaf.len + side[0] * across, leaf.y + along[1] * s * leaf.len + side[1] * across, z];
-  for (let k = 0; k < 8; k += 1) {
-    const s0 = k / 8;
-    const s1 = (k + 1) / 8;
-    const w0 = leaf.wid * Math.sin(Math.PI * s0) ** 0.75;
-    const w1 = leaf.wid * Math.sin(Math.PI * s1) ** 0.75;
-    const z0 = (8 + 16 * Math.sin(Math.PI * s0 ** 0.85)) * u;
-    const z1 = (8 + 16 * Math.sin(Math.PI * s1 ** 0.85)) * u;
-    props.quad(at(s0, -w0 / 2, z0 - 4 * u), at(s1, -w1 / 2, z1 - 4 * u), at(s1, 0, z1), at(s0, 0, z0), LEAF);
-    props.quad(at(s0, 0, z0), at(s1, 0, z1), at(s1, w1 / 2, z1 - 4 * u), at(s0, w0 / 2, z0 - 4 * u), LEAF);
-    props.quad(at(s0, -0.9 * u, z0 + 0.4), at(s1, -0.9 * u, z1 + 0.4), at(s1, 0.9 * u, z1 + 0.4), at(s0, 0.9 * u, z0 + 0.4), LEAF_RIB);
-  }
-}
-
-/** Everything solid, as one prop geometry. */
+/** Everything solid, as one kit builder (design 081). */
 export function grandProps(spots) {
-  const { tree, small, leaves, u } = spots;
+  const { tree, small, toadstools, u } = spots;
   const props = createPropBuilder();
+  const kit = { sun: GRAND_SUN };
   trunk(props, tree, u);
   roots(props, spots, u);
   crown(props, spots, u);
-  props.tube([[small.x, small.y, -3], [small.x, small.y, small.h * 0.55]], [9 * u, 6 * u], BARK, { sides: 10 });
-  for (const [dx, dy, dz, s] of [[0, 0, 0.1, 1], [-0.6, 0.2, -0.1, 0.72], [0.55, -0.3, -0.05, 0.76], [0.1, 0.6, 0, 0.64]]) {
-    props.sphere({ x: small.x + dx * small.r, y: small.y + dy * small.r, z: small.h + dz * small.r, r: small.r * s, color: SMALL_FOLIAGE, sides: 14, rings: 9, squash: 0.85 });
+  placeAsset(props, 'treeRound', { ...kit, x: small.x, y: small.y, size: small.r * 0.95, height: small.h + small.r * 0.5, seed: 7, colors: SMALL_TREE });
+  for (const piece of spots.pieces) placeAsset(props, piece.asset, { ...kit, ...piece.options, x: piece.x, y: piece.y, size: piece.size, seed: piece.seed * 997, yaw: piece.yaw });
+  for (const piece of spots.jungle ?? []) {
+    placeAsset(props, piece.asset, { ...kit, ...piece.options, x: piece.x, y: piece.y, size: piece.size, seed: piece.seed * 983, yaw: piece.yaw, lean: piece.lean ?? undefined });
   }
-  for (const leaf of leaves) broadLeaf(props, leaf, u);
+  for (const t of toadstools) placeAsset(props, 'mushroom', { ...kit, x: t.x, y: t.y, size: t.size, seed: t.seed * 991, colors: { cap: '#f2b33d', spot: '#fff6e0' } });
   return props;
 }
-
-/** The props in the sun: warm light, blue sky fill, foliage in lit lobes, bark furrowed and mossy, the veins aglow. */
-const PROP_LIGHT = /* glsl */ `
-${VORONOI}
-vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
-  vec3 sun = normalize(uSun);
-  float lit = max(dot(n, sun), 0.0);
-  vec3 sky = vec3(0.5, 0.62, 0.85) * (0.6 + 0.4 * n.z);
-  vec3 col = albedo * (sky + vec3(1.1, 1.0, 0.86) * lit * 0.85);
-  if (metal > 0.04 && metal < 0.06) {
-    vec2 q = world.xy / 14.0 + world.z / 11.0;
-    q += 0.35 * (vec2(gnoise(q * 1.7), gnoise(q * 1.7 + 9.1)) - 0.5);
-    vec4 lobe = voronoiCell(q);
-    float inLobe = 1.0 - smoothstep(0.34, 0.62, length(lobe.zw));
-    float bulge = dot(normalize(n + vec3(-lobe.zw, 0.0) * 0.6 * inLobe), sun);
-    float crown = smoothstep(-0.3, 0.7, n.z);
-    col = albedo * (0.42 + 1.1 * smoothstep(-0.1, 0.8, bulge)) * mix(0.62, 1.0, smoothstep(0.0, 0.2, lobe.x)) * (sky * 0.5 + 0.55) * mix(0.5, 1.1, crown);
-    col += vec3(0.16, 0.14, 0.01) * smoothstep(0.55, 0.95, bulge) * crown;
-  } else if (metal > 0.11 && metal < 0.13) {
-    // Bark: furrows running along it, moss on whatever faces up.
-    float furrow = gnoise(vec2(atan(world.y, world.x) * 9.0 + world.z * 0.02, world.z / 26.0));
-    col *= 0.62 + 0.7 * smoothstep(0.25, 0.7, furrow);
-    float moss = smoothstep(0.55, 0.85, n.z) * smoothstep(0.38, 0.62, gnoise(world.xy / 8.0 + 3.0));
-    col = mix(col, vec3(0.12, 0.26, 0.07) * (sky + 0.5), moss * 0.7);
-    // The gold's light on the bark near a vein.
-    col += vec3(0.9, 0.55, 0.05) * 0.1 * pow(1.0 - n.z * n.z, 1.0) * smoothstep(60.0, 0.0, world.z);
-  } else if (metal > 0.09 && metal < 0.11) {
-    col = albedo * (0.7 + 0.5 * lit) * (0.9 + 0.2 * gnoise(world.xy / 6.0));
-  }
-  col *= mix(0.84, 1.0, smoothstep(0.0, 18.0, world.z));
-  return col;
-}
-`;
-
-export const PROP_FRAGMENT = propFragment({ light: PROP_LIGHT, reveal: 'vec3(0.9, 1.0, 0.6)' });
 
 /** Golden motes rising off the roots, drifting a little as they climb, fading at either end of their life. */
 export const MOTE_VERTEX = /* glsl */ `
@@ -427,27 +497,28 @@ export function grandTreeBoard({ three, material, seeded, terrainGrid, replaceGe
     uBalls: { value: Array.from({ length: MAX_BALLS }, () => new three.Vector4()) },
     uRootEnds: { value: Array.from({ length: MAX_ROOTS }, () => new three.Vector4()) },
     uUnit: { value: 1 },
+    uJungle: { value: JUNGLE_FROM_PX },
   };
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
   const materials = {
     terrain: make(TERRAIN_VERTEX, TERRAIN_FRAGMENT),
-    props: make(PROP_VERTEX, PROP_FRAGMENT, { side: three.DoubleSide }),
     motes: make(MOTE_VERTEX, MOTE_FRAGMENT, { transparent: true, depthWrite: false, blending: three.AdditiveBlending }),
     bakeField: make(FULLSCREEN_VERTEX, BAKE_FIELD_FRAGMENT, bakeOptions),
     bakeLight: make(FULLSCREEN_VERTEX, bakeLightFragment(), bakeOptions),
   };
+  const kit = createKitProps({ three, material, own, mood: 'day', reveal: 'vec3(0.9, 1.0, 0.6)', ground: true });
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
-  const props = new three.Mesh(new three.BufferGeometry(), materials.props);
   const motes = new three.Points(seeded(MOTE_COUNT), materials.motes);
   motes.renderOrder = 2;
   return {
-    objects: [terrain, props, motes],
-    materials: Object.values(materials),
+    objects: [terrain, ...kit.objects, motes],
+    materials: [...Object.values(materials), ...kit.materials],
     bakeField: materials.bakeField,
     bakeLight: materials.bakeLight,
     spots: (layout) => grandSpots(layout),
     apply(spots, bounds) {
       own.uUnit.value = spots?.u ?? 1;
+      own.uJungle.value = JUNGLE_FROM_PX * (spots?.u ?? 1);
       const tree = spots?.tree;
       own.uTree.value.set(tree?.x ?? 0, tree?.y ?? 0, tree?.foot ?? 0, tree?.crownZ ?? 0);
       own.uBalls.value.forEach((slot, i) => {
@@ -461,8 +532,7 @@ export function grandTreeBoard({ three, material, seeded, terrainGrid, replaceGe
         return slot.set(tree.x + Math.cos(root.angle) * out, tree.y + Math.sin(root.angle) * out, 1, 0);
       });
       replaceGeometry(terrain, terrainGrid(bounds));
-      props.visible = Boolean(spots);
-      if (spots) replaceGeometry(props, grandProps(spots).build(three));
+      kit.set(spots ? grandProps(spots) : null);
     },
   };
 }

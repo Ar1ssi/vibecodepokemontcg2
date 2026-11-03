@@ -13,6 +13,11 @@
 // nothing but the mezzanine's contact. Per frame: TERRAIN paints the checkered floor, the ring, the
 // polish and every prop's soft shadow on it; PROPS the walls, mezzanine, escalators, tables, mannequins
 // and balloons (stadium-env-props).
+// Design 084 (the visual audit): the checker at about two fifths of its contrast in larger squares,
+// a soft gloss band drifting across the floor (the card's shine); the gold ring a softer mosaic;
+// balloons in the card's yellow, pink, blue and white, in bunches at the hall's corners on visible
+// strings; the tables rounded, their folded stacks in three pastels; taller mannequins in yellow and
+// pink dresses.
 import {
   FOOTPRINTS,
   FULLSCREEN_VERTEX,
@@ -24,14 +29,25 @@ import {
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
 import { craterEmblem } from './stadium-environment-layout.mjs';
-import { PROP_VERTEX, createPropBuilder, propFragment } from './stadium-env-props.mjs';
+import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
+import { createKitProps } from './stadium-kit.mjs';
+
+/** The mall's light for the kit (designs 081, 082): bright and soft from the skylights, a pale rosy fill. */
+export const MALL_MOOD = Object.freeze({
+  key: [0.88, 0.86, 0.84],
+  sky: [0.5, 0.49, 0.53],
+  bounce: [0.38, 0.34, 0.37],
+  sheen: [0.4, 0.7],
+  shadow: [0.7, 0.6, 0.66, 0.45],
+});
 import { boardContext, hash } from './stadium-env-spots.mjs';
 import { EDGE_HAZE, STANDARD_TERRAIN_VERTEX } from './stadium-env-surfaces.mjs';
 
 export const SHOPPING_KEY = 'shopping-center';
 /** The hall's light (toward it): nearly straight above, a little from the far left, so props throw short soft shadows. */
 export const SHOPPING_LIGHT = Object.freeze([-0.08, 0.14, 0.99]);
-export const TILE_PX = 52;
+// Design 084: larger squares (the busiest ground of the 25; tilted, a moire risk).
+export const TILE_PX = 80;
 export const RING_WIDTH_PX = 15;
 const RING_HALF = RING_WIDTH_PX / 2;
 export const MEZZANINE_HEIGHT_PX = 100;
@@ -39,24 +55,20 @@ export const MAX_TABLES = 6;
 export const MAX_RACKS = 4;
 export const MAX_FIXTURES = 16;
 export const MAX_BALLOONS = 22;
+// Design 084: the folded stock in pastels (the art's), three to a table.
 const SHIRTS = [
-  [1.0, 0.62, 0.08],
-  [0.95, 0.35, 0.5],
-  [0.25, 0.5, 0.95],
-  [0.55, 0.4, 0.8],
-  [0.95, 0.4, 0.25],
-  [0.2, 0.75, 0.55],
-  [0.98, 0.82, 0.2],
-  [0.4, 0.75, 0.95],
+  [1.0, 0.62, 0.72],
+  [1.0, 0.88, 0.5],
+  [0.62, 0.8, 1.0],
+  [0.66, 0.93, 0.8],
+  [0.82, 0.7, 0.96],
 ];
+// Design 084: the card's balloons: yellow, pink, blue and white.
 const BALLOON_HUES = [
-  [1.2, 0.9, 0.04],
-  [0.38, 0.8, 0.2],
-  [0.12, 0.5, 0.95],
-  [0.5, 0.28, 0.78],
-  [1.0, 0.18, 0.2],
-  [1.1, 0.46, 0.08],
-  [0.1, 0.75, 0.68],
+  [1.2, 0.9, 0.12],
+  [1.1, 0.42, 0.62],
+  [0.3, 0.58, 1.1],
+  [1.15, 1.12, 1.1],
 ];
 
 /**
@@ -89,24 +101,27 @@ export function shoppingSpots(layout) {
   const tables = [];
   for (const side of [-1, 1]) {
     for (let k = 0; k < 3; k += 1) {
-      const y = core.y + (0.12 + 0.27 * k) * core.h + 34 * u;
-      const table = { x: side * (reach + 96 * u), y, w: 62 * u, d: 150 * u, h: 22 * u, seed: hash(side, k, 1) };
+      // Design 083: the two bands no longer mirror each other: each table its own offset, length and turn.
+      const y = core.y + (0.12 + 0.27 * k + (hash(side, k, 6) - 0.5) * 0.08) * core.h + 34 * u;
+      const table = { x: side * (reach + (84 + 24 * hash(side, k, 7)) * u), y, w: 62 * u, d: (130 + 36 * hash(side, k, 8)) * u, h: 22 * u, seed: hash(side, k, 1), turn: (hash(side, k, 9) - 0.5) * 0.18, end: k === 0 || k === 2 };
       if (ctx.clear(table.x, table.y, table.d / 2 + 4 * u, 6 * u)) tables.push(table);
     }
   }
   const mannequins = [];
   for (const side of [-1, 1]) {
     for (let k = 0; k < 3; k += 1) {
-      const y = core.y + (0.12 + 0.27 * k) * core.h + 34 * u + 124 * u;
-      const m = { x: side * (reach + 150 * u + hash(side, k, 3) * 14 * u), y, h: (100 + 12 * hash(side, k, 4)) * u, top: (k + (side > 0 ? 1 : 0)) % 2, seed: hash(side, k, 5) };
+      const y = core.y + (0.12 + 0.27 * k + (hash(side, k, 10) - 0.5) * 0.1) * core.h + 34 * u + 124 * u;
+      // Design 084: taller, in dresses.
+      const m = { x: side * (reach + 150 * u + hash(side, k, 3) * 14 * u), y, h: (128 + 14 * hash(side, k, 4)) * u, top: (k + (side > 0 ? 1 : 0)) % 2, seed: hash(side, k, 5) };
       if (ctx.clear(m.x, m.y, 22 * u, 8 * u)) mannequins.push(m);
     }
   }
-  // Bunches of balloons tied to the tables, floating over the side bands.
+  // Bunches of balloons tied to the tables, floating over the side bands. Design 084: at the hall's
+  // corners, on the end tables of each band.
   const balloons = [];
-  const bunches = tables.filter((_, i) => i % 2 === 0);
+  const bunches = tables.filter((table) => table.end);
   bunches.forEach((table, b) => {
-    const count = 4 + (b % 2);
+    const count = 5;
     for (let k = 0; k < count; k += 1) {
       const roll = (salt) => hash(b, k, salt + 20);
       const out = Math.sign(table.x) * (30 + 70 * roll(1)) * u;
@@ -162,8 +177,9 @@ const PALETTE = /* glsl */ `
 const vec3 TILE_PINK = vec3(0.93, 0.34, 0.42);
 const vec3 TILE_PALE = vec3(1.0, 0.78, 0.86);
 const vec3 GROUT = vec3(1.1, 0.94, 1.0);
-const vec3 RING_GOLD = vec3(1.3, 0.7, 0.07);
-const vec3 RING_DARK = vec3(0.84, 0.35, 0.07);
+// Design 084: the gold a little less saturated, a mosaic.
+const vec3 RING_GOLD = vec3(1.1, 0.78, 0.3);
+const vec3 RING_DARK = vec3(0.78, 0.48, 0.2);
 `;
 
 export const TERRAIN_FRAGMENT = /* glsl */ `
@@ -198,11 +214,18 @@ void main() {
   // checker), so the hard high-contrast squares never run under the cards; full contrast out by the
   // shops. The pale tile stays a step under the cards' white borders.
   float calm = fieldCalm(p, 120.0);
-  vec3 col = mix(TILE_PINK, TILE_PALE, mix(checker, 0.55, 0.7 * calm));
-  col *= 0.96 + 0.08 * hash12(cell + 3.0);
+  // Design 084: the two pinks at about two fifths of their old contrast round their middle.
+  vec3 tileLo = mix(TILE_PALE, TILE_PINK, 0.68);
+  vec3 tileHi = mix(TILE_PALE, TILE_PINK, 0.28);
+  vec3 col = mix(tileLo, tileHi, mix(checker, 0.5, 0.7 * calm));
+  col *= 0.97 + 0.05 * hash12(cell + 3.0);
   vec2 inTile = abs(fract(p / tile) - 0.5) * tile;
   float grout = 1.0 - smoothstep(0.3, 1.3, tile * 0.5 - max(inTile.x, inTile.y));
-  col = mix(col, GROUT, grout * mix(0.55, 0.25, calm));
+  col = mix(col, GROUT, grout * mix(0.3, 0.12, calm));
+  // Design 084: the card's shine: a soft broad gloss band lying across the floor, drifting slowly.
+  vec2 glossWay = normalize(vec2(0.55, 1.0));
+  float glossAt = dot(p - uEmblem.xy, glossWay) / (240.0 * uUnit) - 0.6 * sin(uTime * 0.05);
+  col += vec3(0.22, 0.18, 0.2) * exp(-glossAt * glossAt) * 0.55;
   // Polish: broad soft lamp reflections drifting across it, a wash of sheen toward the middle.
   vec3 view = normalize(uEye - vec3(p, 0.0));
   float sheen = pow(max(dot(reflect(-sun, vec3(0.0, 0.0, 1.0)), view), 0.0), 6.0);
@@ -214,6 +237,11 @@ void main() {
     float inRing = 1.0 - smoothstep(${(RING_HALF - 1).toFixed(2)} * uUnit, ${(RING_HALF + 1).toFixed(2)} * uUnit, abs(signedRing));
     vec3 gold = mix(RING_DARK, RING_GOLD, smoothstep(-${RING_HALF.toFixed(2)} * uUnit, ${RING_HALF.toFixed(2)} * uUnit, -signedRing));
     gold += vec3(0.5, 0.4, 0.15) * (1.0 - smoothstep(0.0, 3.0 * uUnit, abs(signedRing + ${(RING_HALF - 2).toFixed(2)} * uUnit)));
+    // Design 084: laid in small tesserae, each its own tone, a fine joint round each.
+    vec2 tess = p / (4.5 * uUnit);
+    gold *= 0.9 + 0.18 * hash12(floor(tess) + 5.0);
+    vec2 inTess = abs(fract(tess) - 0.5);
+    gold *= 1.0 - 0.18 * (1.0 - smoothstep(0.36, 0.46, 0.5 - max(inTess.x, inTess.y)));
     col = mix(col, gold, inRing);
   }
   // Each fixture's contact shadow and each balloon's soft coloured one, under a light from overhead.
@@ -253,7 +281,9 @@ const WOOD = [0.45, 0.24, 0.13, 0];
 const PILLAR = [1.1, 1.05, 1.1, 0.1];
 const SKIN = [1.1, 0.95, 0.82, 0];
 const MAN_LEG = [0.9, 0.85, 0.85, 0];
-const MAN_TOPS = [[0.92, 0.55, 0.08, 0], [1.0, 0.36, 0.5, 0]];
+const MAN_TOPS = [[1.05, 0.78, 0.2, 0], [1.05, 0.42, 0.6, 0]];
+const TABLE_TOP = [1.15, 1.08, 1.06, 0.1];
+const TABLE_EDGE = [0.95, 0.82, 0.86, 0.1];
 const LIGHT_GLOBE = [1.8, 1.7, 1.5, 2.6];
 
 /**
@@ -262,28 +292,31 @@ const LIGHT_GLOBE = [1.8, 1.7, 1.5, 2.6];
  */
 const stockColours = (seed) => {
   const first = Math.floor(seed * SHIRTS.length) % SHIRTS.length;
-  return [SHIRTS[first], SHIRTS[(first + 1 + Math.floor(seed * 7) % 2) % SHIRTS.length]];
+  return [SHIRTS[first], SHIRTS[(first + 1) % SHIRTS.length], SHIRTS[(first + 2) % SHIRTS.length]];
 };
 
 /** A table of folded clothes: a wood top on four legs, rows of piles in two colours on it. */
 function displayTable(props, table, u) {
-  props.box({ x: table.x, y: table.y, z0: table.h - 4 * u, z1: table.h, hw: table.w / 2, hh: table.d / 2, color: WOOD, topColor: [0.62, 0.36, 0.2, 0] });
-  for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) props.box({ x: table.x + sx * (table.w / 2 - 4 * u), y: table.y + sy * (table.d / 2 - 4 * u), z0: -1, z1: table.h - 4 * u, hw: 2.2 * u, hh: 2.2 * u, color: WOOD });
+  // Design 084: a rounded white top (wood bricks read as plastic).
+  props.roundBox({ x: table.x, y: table.y, z0: table.h - 5 * u, z1: table.h, hw: table.w / 2, hh: table.d / 2, r: 2.4 * u, color: TABLE_EDGE, topColor: TABLE_TOP });
+  for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) props.roundBox({ x: table.x + sx * (table.w / 2 - 4 * u), y: table.y + sy * (table.d / 2 - 4 * u), z0: -1, z1: table.h - 4 * u, hw: 2.2 * u, hh: 2.2 * u, color: WOOD });
   const rows = 3;
   const cols = 5;
-  const stock = stockColours(hash(table.x, table.y, 7));
+  const [sx0, sy0] = table.stockAt ?? [table.x, table.y];
+  const stock = stockColours(hash(sx0, sy0, 7));
   for (let r = 0; r < rows; r += 1) {
     for (let c = 0; c < cols; c += 1) {
-      const tone = 0.94 + 0.12 * hash(table.x + r, table.y + c, 9);
-      const colour = stock[r % 2].map((v) => v * tone);
+      const tone = 0.94 + 0.12 * hash(sx0 + r, sy0 + c, 9);
+      const colour = stock[r % 3].map((v) => v * tone);
       const height = (4 + 5 * hash(r, c, table.seed * 10)) * u;
-      props.box({
+      props.roundBox({
         x: table.x + (r - 1) * (table.w / 3.2),
         y: table.y + (c - 2) * (table.d / 5.4),
         z0: table.h,
         z1: table.h + height,
         hw: table.w / 7.4,
         hh: table.d / 12.5,
+        r: 1.6 * u,
         color: [colour[0], colour[1], colour[2], 0.2],
         topColor: [colour[0] * 1.08, colour[1] * 1.08, colour[2] * 1.08, 0.2],
       });
@@ -298,10 +331,12 @@ function mannequin(props, m, u) {
   props.tube([[m.x, m.y, 3 * u], [m.x, m.y, m.h * 0.5]], [5 * u, 7 * u], MAN_LEG, { sides: 10 });
   props.tube([[m.x, m.y, m.h * 0.46], [m.x, m.y, m.h * 0.62], [m.x, m.y, m.h * 0.8]], [11 * u, 14 * u, 12 * u], top, { sides: 16 });
   // Shoulders: a broad flat bar across the chest.
-  props.box({ x: m.x, y: m.y, z0: m.h * 0.74, z1: m.h * 0.82, hw: 7 * u, hh: 19 * u, color: top, topColor: top });
+  props.roundBox({ x: m.x, y: m.y, z0: m.h * 0.74, z1: m.h * 0.82, hw: 7 * u, hh: 19 * u, color: top, topColor: top });
   props.tube([[m.x, m.y, m.h * 0.82], [m.x, m.y, m.h * 0.9]], 4.2 * u, SKIN, { sides: 8 });
   props.sphere({ x: m.x, y: m.y, z: m.h * 0.97, r: 9.5 * u, color: SKIN, sides: 14, rings: 9, squash: 1.15 });
   for (const s of [-1, 1]) props.tube([[m.x, m.y + s * 18 * u, m.h * 0.78], [m.x, m.y + s * 21 * u, m.h * 0.5]], [4 * u, 3.2 * u], top, { sides: 8 });
+  // Design 084: a dress: a skirt flaring from the waist.
+  props.cone({ x: m.x, y: m.y, z0: m.h * 0.24, z1: m.h * 0.5, r: 19 * u, color: top, sides: 18 });
 }
 
 /** A rack along a wall: a rail on two posts, shirts hung close along it in the aisle's colours. */
@@ -316,7 +351,7 @@ function shirtRack(props, rack, u) {
     const [from, to] = stockColours(rack.seed);
     const colour = from.map((v, i) => v + (to[i] - v) * (k / Math.max(1, count - 1)));
     const y = rack.y - rack.len / 2 + (k + 0.5) * step;
-    props.box({ x: rack.x, y, z0: 28 * u, z1: 58 * u, hw: 14 * u, hh: 2.6 * u, color: [colour[0], colour[1], colour[2], 0.2], topColor: [colour[0] * 1.1, colour[1] * 1.1, colour[2] * 1.1, 0.2] });
+    props.roundBox({ x: rack.x, y, z0: 28 * u, z1: 58 * u, hw: 14 * u, hh: 2.6 * u, color: [colour[0], colour[1], colour[2], 0.2], topColor: [colour[0] * 1.1, colour[1] * 1.1, colour[2] * 1.1, 0.2] });
   }
 }
 
@@ -325,15 +360,16 @@ function balloon(props, b, u) {
   const hue = BALLOON_HUES[b.hue];
   props.sphere({ x: b.x, y: b.y, z: b.z, r: b.r, color: [hue[0], hue[1], hue[2], 0.15], sides: 16, rings: 11, squash: 1.12 });
   props.cone({ x: b.x, y: b.y, z0: b.z - b.r * 1.2, z1: b.z - b.r * 1.0, r: 2.2 * u, color: [hue[0] * 0.8, hue[1] * 0.8, hue[2] * 0.8, 0], sides: 8 });
-  props.tube([[b.x, b.y, b.z - b.r * 1.2], [(b.x + b.anchor.x) / 2 + 3 * u, (b.y + b.anchor.y) / 2, b.z * 0.5], [b.anchor.x, b.anchor.y, 22 * u]], 0.55 * u, [0.95, 0.95, 0.95, 0], { sides: 4 });
+  // Design 084: a string thick enough to see.
+  props.tube([[b.x, b.y, b.z - b.r * 1.2], [(b.x + b.anchor.x) / 2 + 3 * u, (b.y + b.anchor.y) / 2, b.z * 0.5], [b.anchor.x, b.anchor.y, 22 * u]], 0.95 * u, [1.0, 1.0, 1.0, 0], { sides: 5 });
 }
 
 /** The far mezzanine: a pink-fronted floor with a glass balustrade, white columns, an escalator at each side. */
 function mezzanine(props, spots) {
   const { mezzanine: m, escalators, columns, u } = spots;
   const mid = [(m.x0 + m.x1) / 2, (m.y0 + m.y1) / 2];
-  props.box({ x: mid[0], y: mid[1], z0: -2, z1: m.height, hw: (m.x1 - m.x0) / 2, hh: (m.y1 - m.y0) / 2, color: WALL, topColor: FLOOR_TOP, frontColor: WALL_LIGHT });
-  props.box({ x: mid[0], y: m.y0 + 1.5 * u, z0: m.height - 8 * u, z1: m.height - 2 * u, hw: (m.x1 - m.x0) / 2, hh: 3 * u, color: SKIRT });
+  props.roundBox({ x: mid[0], y: mid[1], z0: -2, z1: m.height, hw: (m.x1 - m.x0) / 2, hh: (m.y1 - m.y0) / 2, color: WALL, topColor: FLOOR_TOP, frontColor: WALL_LIGHT });
+  props.roundBox({ x: mid[0], y: m.y0 + 1.5 * u, z0: m.height - 8 * u, z1: m.height - 2 * u, hw: (m.x1 - m.x0) / 2, hh: 3 * u, color: SKIRT });
   // The balustrade: glass panels between posts along the front edge, a rail on top; gaps where the escalators land.
   const posts = Math.round((m.x1 - m.x0) / (70 * u));
   for (let k = 0; k <= posts; k += 1) {
@@ -368,9 +404,9 @@ function walls(props, spots) {
   for (const [x, side] of [[wall.left, -1], [wall.right, 1]]) {
     const cx = x + side * 30 * u;
     const cy = scene.y - 80 * u + length / 2;
-    props.box({ x: cx, y: cy, z0: -2, z1: 150 * u, hw: 30 * u, hh: length / 2, color: WALL, topColor: WALL_LIGHT });
-    props.box({ x: x + side * 1.5 * u, y: cy, z0: -2, z1: 10 * u, hw: 3 * u, hh: length / 2, color: SKIRT });
-    props.box({ x: x + side * 1.5 * u, y: cy, z0: 108 * u, z1: 118 * u, hw: 3 * u, hh: length / 2, color: WALL_LIGHT });
+    props.roundBox({ x: cx, y: cy, z0: -2, z1: 150 * u, hw: 30 * u, hh: length / 2, color: WALL, topColor: WALL_LIGHT });
+    props.roundBox({ x: x + side * 1.5 * u, y: cy, z0: -2, z1: 10 * u, hw: 3 * u, hh: length / 2, color: SKIRT });
+    props.roundBox({ x: x + side * 1.5 * u, y: cy, z0: 108 * u, z1: 118 * u, hw: 3 * u, hh: length / 2, color: WALL_LIGHT });
     for (let y = scene.y; y < scene.y + scene.h; y += 120 * u) {
       props.sphere({ x: x - side * 2 * u, y, z: 128 * u, r: 7 * u, color: LIGHT_GLOBE, sides: 10, rings: 7, squash: 0.45 });
     }
@@ -384,41 +420,18 @@ export function shoppingProps(spots) {
   walls(props, spots);
   mezzanine(props, spots);
   for (const rack of racks) shirtRack(props, rack, u);
-  for (const table of tables) displayTable(props, table, u);
+  // Design 083: each table turned a little its own way (built about its middle, its stock keeping
+  // the same colours as at its place).
+  for (const table of tables) props.at({ x: table.x, y: table.y, yaw: table.turn ?? 0 }, () => displayTable(props, { ...table, x: 0, y: 0, stockAt: [table.x, table.y] }, u));
   for (const m of mannequins) mannequin(props, m, u);
-  for (const b of balloons) balloon(props, b, u);
+  // Design 083: the balloons bob and drift on their strings, each one whole (built about its own middle).
+  props.look({ kind: LOOK.gloss, sway: 3.5 }, () => {
+    for (const b of balloons) props.at({ x: b.x, y: b.y, ground: false }, () => balloon(props, { ...b, x: 0, y: 0, anchor: { x: b.anchor.x - b.x, y: b.anchor.y - b.y } }, u));
+  });
   return props;
 }
 
-/** The props under the hall's light: bright and soft, glass pale and bright-edged, balloons glossy with a window's highlight. */
-const PROP_LIGHT = /* glsl */ `
-vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
-  vec3 sun = normalize(uSun);
-  vec3 view = normalize(uEye - world);
-  float lit = max(dot(n, sun), 0.0);
-  vec3 col = albedo * (0.66 + 0.2 * n.z + 0.3 * lit);
-  if (metal > 0.6) {
-    float fres = pow(1.0 - abs(dot(n, view)), 2.0);
-    col = mix(albedo * 0.9, vec3(1.7, 1.9, 2.1), 0.1 + 0.55 * fres);
-  } else if (metal > 0.14 && metal < 0.18) {
-    // A balloon: translucent colour, a bright rim, a soft window's highlight.
-    float rim = pow(1.0 - abs(dot(n, view)), 2.2);
-    col = albedo * (0.7 + 0.5 * lit) + albedo * rim * 0.5;
-    col += vec3(1.0) * pow(max(dot(reflect(-normalize(vec3(-0.4, 0.5, 0.8)), n), view), 0.0), 26.0) * 0.8;
-  } else if (metal > 0.1 && metal < 0.14) {
-    // Escalator steps: ridged treads sliding up.
-    float tread = abs(fract((world.y - uTime * 22.0) / (9.0)) - 0.5);
-    col = albedo * (0.8 + 0.4 * smoothstep(0.1, 0.4, tread)) * (0.7 + 0.3 * lit);
-  } else if (metal > 0.19 && metal < 0.24) {
-    // Folded cloth: soft stripes across the pile.
-    col *= 0.9 + 0.12 * sin(world.y * 1.1 + world.x * 0.3);
-  }
-  col *= mix(0.82, 1.0, smoothstep(0.0, 14.0, world.z));
-  return col;
-}
-`;
 
-export const PROP_FRAGMENT = propFragment({ light: PROP_LIGHT, reveal: 'vec3(1.0, 0.9, 0.9)' });
 
 /** Shopping Center's board (stadium-environment-mesh.js BOARDS). */
 export function shoppingCenterBoard({ three, material, terrainGrid, replaceGeometry, bakeOptions }) {
@@ -434,15 +447,14 @@ export function shoppingCenterBoard({ three, material, terrainGrid, replaceGeome
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
   const materials = {
     terrain: make(TERRAIN_VERTEX, TERRAIN_FRAGMENT),
-    props: make(PROP_VERTEX, PROP_FRAGMENT, { side: three.DoubleSide }),
     bakeField: make(FULLSCREEN_VERTEX, BAKE_FIELD_FRAGMENT, bakeOptions),
     bakeLight: make(FULLSCREEN_VERTEX, bakeLightFragment(), bakeOptions),
   };
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
-  const props = new three.Mesh(new three.BufferGeometry(), materials.props);
+  const kit = createKitProps({ three, material, own, mood: MALL_MOOD, reveal: 'vec3(1.0, 0.85, 0.9)' });
   return {
-    objects: [terrain, props],
-    materials: Object.values(materials),
+    objects: [terrain, ...kit.objects],
+    materials: [...Object.values(materials), ...kit.materials],
     bakeField: materials.bakeField,
     bakeLight: materials.bakeLight,
     spots: (layout) => shoppingSpots(layout),
@@ -464,8 +476,7 @@ export function shoppingCenterBoard({ three, material, terrainGrid, replaceGeome
         return b ? slot.set(b.x, b.y, b.r, b.hue) : slot.set(0, 0, 0, 0);
       });
       replaceGeometry(terrain, terrainGrid(bounds));
-      props.visible = Boolean(spots);
-      if (spots) replaceGeometry(props, shoppingProps(spots).build(three));
+      kit.set(spots ? shoppingProps(spots) : null);
     },
   };
 }

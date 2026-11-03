@@ -187,6 +187,7 @@ const NON_BASIC_STAGES = new Set([
   'vstar',
   'mega',
   'megahb',
+  'terahb',
   'vunion',
   'restored',
   'break',

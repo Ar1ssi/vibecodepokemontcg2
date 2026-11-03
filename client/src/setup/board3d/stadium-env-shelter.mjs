@@ -11,6 +11,8 @@
 // No bake of its own: the floor is flat (its bake is empty) and FLOOR paints it, its mirror images
 // and the hologram per frame; WALLS draws the four walls from one geometry built
 // round the hall (shelterSpots), rising off the floor behind the reveal.
+// Design 082 (Brilliant Diamond / Shining Pearl; I273): the walls are lit by the Stadium kit's soft
+// light (stadium-kit.mjs KIT_LIGHT, the hall's own indoor mood), their panelling their own paint.
 import {
   FULLSCREEN_VERTEX,
   NOISE,
@@ -20,6 +22,10 @@ import {
   TERRAIN_UNIFORMS,
 } from './stadium-environment-glsl.mjs';
 import { craterEmblem, environmentFootprints } from './stadium-environment-layout.mjs';
+import { KIT_LIGHT, KIT_UNIFORMS, createKitProps, kitUniforms } from './stadium-kit.mjs';
+import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
+import { instanceTint } from './stadium-kit-assets.mjs';
+import { RISE_LEAN, distanceToRect, hash } from './stadium-env-spots.mjs';
 import { tableBounds } from './table-uv.mjs';
 
 /** Free floor kept between the cards and the side walls' feet, and the far and near walls'. */
@@ -29,6 +35,10 @@ export const WALL_PX = { height: 245, lean: 105, cap: 60 };
 /** The gate on each side wall: half its width at its foot, its height. */
 export const GATE_PX = { half: 300, height: 205 };
 /** The floor's big hex tiles: px per hex unit (inradius half a unit). */
+// Design 084 (the visual audit): a high-key white hall: the floor pale (about #dfe3e8, a step under the
+// cards' white borders) mirroring the hex ceiling at low contrast (pale hexes, bright centres), its
+// seams pale; the emblem's blue a soft pool of light; the walls' cyan strips washing the floor's edge;
+// the walls lighter than the floor's reflections, the gate frames lighter round a darker door.
 const FLOOR_HEX_PX = 260;
 /** How far out from each wall's foot its reflection streaks the floor. */
 const STREAK_PX = 150;
@@ -68,7 +78,59 @@ export function shelterSpots(layout) {
   };
   const gate = { u: hall.y, half: Math.min(GATE_PX.half, hall.hh * 0.62), height: GATE_PX.height };
   const emblem = craterEmblem(layout, { x: table.x + table.w / 2, y: layout.depth });
-  return { hall, gate, emblem };
+  // Design 083: supplies along the side walls' feet, off the gates: stacked crates, barrels, a warning
+  // lamp on a post, at uneven steps, each clear of the cards with its lean.
+  const supplies = [];
+  for (const side of [-1, 1]) {
+    let y = hall.y - hall.hh + 40 + 30 * hash(side, 2, 1);
+    for (let k = 0; y < hall.y + hall.hh - 40 && k < 10; k += 1) {
+      const roll = (salt) => hash(side * 5 + k, y, salt);
+      const pick = hash(k * 2.3 + side, 4, 7);
+      const kind = pick < 0.45 ? 'crates' : pick < 0.8 ? 'barrels' : 'lamp';
+      const size = kind === 'crates' ? 15 + 6 * roll(2) : kind === 'barrels' ? 9 + 3 * roll(2) : 5;
+      const height = kind === 'crates' ? 18 + 16 * roll(3) : kind === 'barrels' ? 20 + 6 * roll(3) : 44;
+      const x = hall.x + side * (hall.hw - size - 10 - 18 * roll(4));
+      const offGate = Math.abs(y - gate.u) > gate.half + size + 20;
+      const clear = rects.every((rect) => distanceToRect(x, y, rect) >= size * 1.4 + RISE_LEAN * height + 14);
+      if (offGate && clear && supplies.every((s) => Math.hypot(s.x - x, s.y - y) > s.size + size + 10)) supplies.push({ kind, x, y, size, height, side, seed: roll(5) });
+      y += 60 + 90 * roll(6);
+    }
+  }
+  return { hall, gate, emblem, supplies };
+}
+
+const CRATE = [0.58, 0.44, 0.28, 0.05];
+const CRATE_TOP = [0.68, 0.53, 0.35, 0.05];
+const BARREL = [[0.2, 0.42, 0.62, 0.35], [0.66, 0.2, 0.16, 0.35], [0.42, 0.44, 0.48, 0.5]];
+const BAND = [0.8, 0.8, 0.82, 0.6];
+const LAMP_AMBER = [1.4, 0.72, 0.1, 2.2];
+
+/** Design 083: the supplies along the walls, one kit builder. */
+export function shelterProps({ supplies = [] } = {}) {
+  const props = createPropBuilder();
+  for (const s of supplies) {
+    const yaw = (s.seed - 0.5) * 0.5;
+    props.tint(instanceTint(s.seed * 991, 1.2), () => {
+      if (s.kind === 'crates') {
+        props.roundBox({ x: s.x, y: s.y, z0: 0, z1: s.height * 0.55, hw: s.size, hh: s.size * 0.85, yaw, color: CRATE, topColor: CRATE_TOP });
+        props.roundBox({ x: s.x - s.side * s.size * 0.15, y: s.y + s.size * 0.2, z0: s.height * 0.55, z1: s.height, hw: s.size * 0.7, hh: s.size * 0.65, yaw: yaw + 0.5, color: CRATE, topColor: CRATE_TOP });
+      } else if (s.kind === 'barrels') {
+        const count = 2 + Math.floor(s.seed * 2);
+        for (let k = 0; k < count; k += 1) {
+          const angle = s.seed * 6.28 + (k / count) * 6.28;
+          const bx = s.x + Math.cos(angle) * s.size * 0.9;
+          const by = s.y + Math.sin(angle) * s.size * 0.9;
+          const colour = BARREL[(k + Math.floor(s.seed * 3)) % BARREL.length];
+          props.cylinder({ x: bx, y: by, z0: 0, z1: s.height, r: s.size * 0.8, color: colour, capColor: [colour[0] * 1.15, colour[1] * 1.15, colour[2] * 1.15, colour[3]], sides: 16 });
+          for (const z of [s.height * 0.25, s.height * 0.75]) props.ring({ x: bx, y: by, z0: z - 1, z1: z + 1, r: s.size * 0.82, color: BAND, sides: 16 });
+        }
+      } else {
+        props.cylinder({ x: s.x, y: s.y, z0: 0, z1: s.height, r: 1.8, color: BAND, sides: 8 });
+        props.look({ kind: LOOK.blink, rate: 0.9 + 0.5 * s.seed, phase: s.seed }, () => props.sphere({ x: s.x, y: s.y, z: s.height + 3, r: 4, color: LAMP_AMBER, sides: 12, rings: 8 }));
+      }
+    });
+  }
+  return props;
 }
 
 const HEX = /* glsl */ `
@@ -149,7 +211,7 @@ vec3 wallPaint(float u, float h, float gated, out vec3 glow) {
   glow = vec3(0.0);
   float bay = mod(u, 170.0);
   float block = floor(u / 170.0);
-  vec3 col = vec3(0.7, 0.72, 0.75) * (0.97 + 0.06 * hash12(vec2(block, 3.0)));
+  vec3 col = vec3(0.84, 0.86, 0.89) * (0.97 + 0.06 * hash12(vec2(block, 3.0)));
   // The louvre band across the block's middle, recessed a little: dark slats.
   if (h > 98.0 && h < 172.0) {
     float slat = smoothstep(0.3, 0.48, abs(fract(h / 7.0) - 0.5));
@@ -182,7 +244,7 @@ vec3 wallPaint(float u, float h, float gated, out vec3 glow) {
       glow = vec3(0.0);
       if (gate.x < 1.5) {
         // The frame: chunky and white, a grey bevel along its edges.
-        col = mix(vec3(0.55, 0.57, 0.6), vec3(0.9, 0.92, 0.95), smoothstep(1.0, 6.0, gate.y));
+        col = mix(vec3(0.74, 0.76, 0.8), vec3(0.97, 0.98, 1.0), smoothstep(1.0, 6.0, gate.y));
       } else if (gate.x < 2.5) {
         // An arm's end: a chunky dark block, its vent slats running level (gate.y is h here).
         col = mix(vec3(0.12, 0.13, 0.15), vec3(0.3, 0.32, 0.36), step(0.55, fract(gate.y / 7.0)));
@@ -193,7 +255,7 @@ vec3 wallPaint(float u, float h, float gated, out vec3 glow) {
         float inset = gate.y;
         float fromSeam = abs(gate.z);
         float top = doorTop();
-        col = mix(vec3(0.5, 0.52, 0.56), vec3(0.6, 0.62, 0.66), smoothstep(0.0, top, h));
+        col = mix(vec3(0.36, 0.38, 0.42), vec3(0.46, 0.48, 0.52), smoothstep(0.0, top, h));
         float vents = step(top - 34.0, h) * step(h, top - 16.0) * step(18.0, fromSeam) * step(fromSeam, 58.0)
           * (1.0 - smoothstep(0.4, 1.2, abs(fract((h - top + 34.0) / 6.0) - 0.5) * 6.0));
         col = mix(col, vec3(0.3, 0.31, 0.34), vents);
@@ -235,9 +297,11 @@ varying vec2 vPos;
 // The ceiling's light panels at q: big hex lights in dark frames.
 vec3 ceilingAt(vec2 q) {
   vec4 panel = hexTile(q / ${CEILING_HEX_PX}.0);
-  // Seen in a polished floor the panels' frames are hairlines of pale grey, as the art's.
+  // Seen in a polished floor the panels' frames are hairlines of pale grey, as the art's; design 084:
+  // each panel brightest at its centre.
   float lit = smoothstep(0.006, 0.02, panel.x);
-  return mix(vec3(0.64, 0.67, 0.7), vec3(0.88, 0.9, 0.92), lit);
+  vec3 lamp = mix(vec3(0.84, 0.86, 0.89), vec3(1.0, 1.02, 1.04), smoothstep(0.08, 0.45, panel.x));
+  return mix(vec3(0.72, 0.74, 0.77), lamp, lit);
 }
 // What the glossy floor mirrors at p: the nearest wall the mirrored ray meets below the wall's top,
 // else the ceiling over the hall.
@@ -270,8 +334,9 @@ void main() {
   // the walls stay white), and its mirror quietens toward the cards.
   vec2 fromWalls = uHall.zw - abs(p - uHall.xy);
   float gloss = mix(0.5, 0.22, smoothstep(30.0, 260.0, min(fromWalls.x, fromWalls.y)));
-  vec3 col = vec3(0.34, 0.36, 0.39) * (0.98 + 0.03 * fbm3(p / 220.0));
-  col = mix(col, mirroredAt(p) * 0.62, gloss);
+  // Design 084: pale (#dfe3e8 less a step), the mirror at low contrast over it.
+  vec3 col = vec3(0.66, 0.69, 0.73) * (0.98 + 0.03 * fbm3(p / 220.0));
+  col = mix(col, mirroredAt(p) * 0.88, gloss * 0.8);
   // The art's floor seen low along it: each wall unit and gate mirrored into a soft streak running
   // out from the wall's foot across the floor's margin, its white panels, dark louvres and gates
   // stretched and blurred, fading out toward the cards.
@@ -291,20 +356,22 @@ void main() {
   }
   col = mix(col, streak / max(streakWeight, 0.0001) * 0.66, min(streakWeight, 1.0) * 0.4);
   vec4 tile = hexTile((p - uHall.xy) / ${FLOOR_HEX_PX}.0);
-  col = mix(col, vec3(0.24, 0.255, 0.28), (1.0 - smoothstep(0.5, 1.2, tile.x * ${FLOOR_HEX_PX}.0)) * 0.8);
+  col = mix(col, vec3(0.5, 0.52, 0.56), (1.0 - smoothstep(0.5, 1.2, tile.x * ${FLOOR_HEX_PX}.0)) * 0.55);
   vec2 rel = abs(p - uHall.xy);
   float corner = dot(rel, vec2(0.8660254, 0.5)) - (0.8660254 * uHall.z + 0.5 * uHall.w * ${CORNER_CUT});
   float groove = (1.0 - smoothstep(-0.5, 0.8, abs(corner) - 5.0)) * step(rel.y, uHall.w)
     * smoothstep(uHall.z - ${CORNER_STRIP_PX}.0, uHall.z - ${CORNER_STRIP_PX - 20}.0, rel.x);
   float hatch = step(0.75, fract(dot(p, vec2(0.7071, 0.7071)) / 8.0));
   // Grey on grey: black and white stripes aimed at the cards were the loudest lines on the board.
-  col = mix(col, mix(vec3(0.17, 0.18, 0.2), vec3(0.27, 0.285, 0.31), hatch), groove);
+  col = mix(col, mix(vec3(0.42, 0.44, 0.48), vec3(0.54, 0.56, 0.6), hatch), groove);
 
   // Shade gathers at the walls' feet; the far reaches of the hall dim a little.
   vec2 fromWall = uHall.zw - abs(p - uHall.xy);
   float nearWall = min(fromWall.x, fromWall.y);
   col *= mix(0.7, 1.0, smoothstep(0.0, 40.0, nearWall));
   col *= mix(0.86, 1.0, smoothstep(-200.0, 300.0, nearWall));
+  // Design 084: the walls' cyan strips wash the floor's edge with their light.
+  col += STRIP_CYAN * 0.06 * exp(-max(nearWall, 0.0) / 46.0);
 
   // The Poke Ball hologram as in the art: bright glowing cyan lines (a doubled outline, the band
   // across, the button's two rings), a tight glow round them, light running round it.
@@ -319,6 +386,8 @@ void main() {
     float core = 1.0 - smoothstep(0.2, 0.9, line);
     // Light runs round it slowly and faintly (design 080: no busy motion under the Actives).
     float shimmer = 0.95 + 0.05 * sin(atan(rel.y, rel.x) * 6.0 - uTime * 0.6);
+    // Design 084: the emblem's blue a soft pool of light over the floor round it.
+    col = mix(col, col * vec3(0.72, 0.86, 1.08) + vec3(0.02, 0.07, 0.14), exp(-r * r / (2.0 * uEmblem.z * uEmblem.z * 0.7)) * 0.6);
     // The bloom is a blue tint round the lines, the lines a saturated cyan with a pale core.
     col = mix(col, vec3(0.3, 0.6, 0.9), exp(-line / 9.0) * 0.35);
     col = mix(col, vec3(0.2, 0.74, 1.15) * shimmer, lit);
@@ -360,6 +429,7 @@ void main() {
 
 export const WALL_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
+${KIT_UNIFORMS}
 ${NOISE}
 ${REVEAL}
 ${HEX}
@@ -367,6 +437,7 @@ ${HALL}
 varying vec4 vPaint;
 varying vec3 vNormal;
 varying vec3 vWall;
+${KIT_LIGHT}
 void main() {
   vec2 vPos = vWall.xy;
   if (revealBurned(vPos) * exitKeep(vPos) < 0.5) discard;
@@ -375,10 +446,7 @@ void main() {
   if (vPaint.w < 0.5 ? past.y > past.x + 0.5 : past.x > past.y + 0.5) discard;
   vec3 glow;
   vec3 col = wallPaint(vPaint.x, vPaint.y, 1.0 - step(0.5, vPaint.w), glow);
-  vec3 n = normalize(vNormal);
-  // The hall's light comes from the ceiling: tops brightest, faces a little dimmer, the foot shaded.
-  col *= 0.72 + 0.28 * n.z;
-  col *= mix(0.78, 1.0, smoothstep(0.0, 26.0, vPaint.y));
+  vec3 n = normalize(gl_FrontFacing ? vNormal : -vNormal);
   if (vPaint.z > 0.5) {
     // The wall's top: a pale cornice, a cyan line along its inner edge, then the dark roof over
     // the rooms beyond the hall, panelled, out to the scene's edge.
@@ -399,6 +467,9 @@ void main() {
     roof = mix(roof, STRIP_CYAN * 0.6, (1.0 - smoothstep(0.6, 1.6, abs(lane - 14.5))) * step(16.0, panel.x) * smoothstep(40.0, 60.0, beyond - ${WALL_PX.cap}.0));
     col = mix(col, roof, smoothstep(${WALL_PX.cap - 20}.0, ${WALL_PX.cap}.0, beyond));
   }
+  // The kit's light (design 082): the panelling's paint as its albedo, a faint sheen on the enamel,
+  // the wall's foot a little darker where it meets the floor.
+  col = kitLight(col * 0.9, n, vWall, vec4(0.0, 0.0, 1.0, 0.0), 0.25) * mix(0.8, 1.0, smoothstep(0.0, 26.0, vPaint.y));
   col += glow;
   col += STRIP_CYAN * revealGlow(vPos, 0.035);
   gl_FragColor = vec4(col, 1.0);
@@ -478,7 +549,16 @@ export function wallGeometry(three, hall, bounds) {
   return geometry;
 }
 
-const NO_SPOTS = { hall: null, gate: null, emblem: null };
+const NO_SPOTS = { hall: null, gate: null, emblem: null, supplies: [] };
+
+/** The hall's light for the kit (design 082): white from the ceiling's panels, a pale cool fill off the white walls and floor. */
+export const SHELTER_MOOD = Object.freeze({
+  key: [0.95, 0.97, 1.0],
+  sky: [0.46, 0.48, 0.52],
+  bounce: [0.38, 0.4, 0.44],
+  sheen: [0.4, 0.7],
+  shadow: [0.55, 0.58, 0.66, 0.5],
+});
 
 /** Steel Shelter's board (stadium-environment-mesh.js BOARDS): the floor and the walls. */
 export function steelShelterBoard({ three, material, replaceGeometry, bakeOptions }) {
@@ -486,6 +566,7 @@ export function steelShelterBoard({ three, material, replaceGeometry, bakeOption
     uHall: { value: new three.Vector4() },
     uGate: { value: new three.Vector3() },
     uEmblem: { value: new three.Vector3() },
+    ...kitUniforms(three, SHELTER_MOOD),
   };
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
   const materials = {
@@ -496,12 +577,14 @@ export function steelShelterBoard({ three, material, replaceGeometry, bakeOption
   };
   const floor = new three.Mesh(new three.BufferGeometry(), materials.floor);
   const walls = new three.Mesh(new three.BufferGeometry(), materials.walls);
+  const kit = createKitProps({ three, material, own, mood: SHELTER_MOOD, reveal: 'vec3(0.6, 0.9, 1.1)' });
   return {
-    objects: [floor, walls],
-    materials: Object.values(materials),
+    objects: [floor, walls, ...kit.objects],
+    materials: [...Object.values(materials), ...kit.materials],
     bakeField: materials.bakeField,
     spots: (layout) => shelterSpots(layout) ?? NO_SPOTS,
-    apply({ hall, gate, emblem }, bounds) {
+    apply({ hall, gate, emblem, supplies }, bounds) {
+      kit.set(hall ? shelterProps({ supplies }) : null);
       own.uHall.value.set(hall?.x ?? 0, hall?.y ?? 0, hall?.hw ?? 0, hall?.hh ?? 0);
       own.uGate.value.set(gate?.u ?? 0, gate?.half ?? 0, gate?.height ?? 0);
       own.uEmblem.value.set(emblem?.x ?? 0, emblem?.y ?? 0, emblem?.r ?? 0);

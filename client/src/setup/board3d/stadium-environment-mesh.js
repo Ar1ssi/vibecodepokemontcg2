@@ -40,6 +40,11 @@ import {
   volcanoSpot,
 } from './stadium-environment-layout.mjs';
 import { createEnvironmentTimeline } from './stadium-environment-timeline.mjs';
+import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
+import { createKitProps, paint } from './stadium-kit.mjs';
+import { MAX_GLOWS } from './stadium-env-ground.mjs';
+import { BOARD_DRIFT, createDrift, driftArea } from './stadium-env-drift.mjs';
+import { oppHandRect, union } from './stadium-env-spots.mjs';
 import { tableBounds } from './table-uv.mjs';
 
 export { EXIT_MS, INTRO_MS } from './stadium-environment-timeline.mjs';
@@ -69,11 +74,14 @@ const SMOKE_COUNT = 14;
 const SPORE_COUNT = 90;
 /**
  * Lightning slots: each strikes about once per cycle (s), at a random moment, some cycles not at all.
- * Design 080: a strike every few seconds round the rim, not every other second.
+ * Design 080: a strike every few seconds round the rim, not every other second. Design 084: a rare
+ * event, about one strike every 10-20 s, each a brief cool pulse of sky light over the scene.
  */
-const BOLT_CYCLES_S = [7.8, 11.3];
+const BOLT_CYCLES_S = [21.5, 27.3];
 const STRIKE_S = 0.6;
-const STRIKE_CHANCE = 0.8;
+const STRIKE_CHANCE = 0.85;
+/** Design 084: Stormy Mountains' emblem glow (its gold, the shared contact glow) and the far peak painted in the cloud sea. */
+const EMBLEM_GLOW = Object.freeze({ colour: '#ffd36a', reach: 70, strength: 0.55 });
 /**
  * Storm clouds a lightning arc runs between, over the cloud sea in a corner of the table (the scene
  * runs on past the table, but not every camera sees that far): `from` + up to `span` px past the
@@ -86,17 +94,62 @@ const STORM_MIN_TURN = 0.08;
 const STORM_ATTEMPTS = 6;
 
 /**
- * Lays the plate on the canvas. During a swap the incoming board's plate (premultiplied: it cleared
- * to transparent) goes over the outgoing board's last plate.
+ * Design 082: the diorama focus, BDSP's tilt-shift. A band through the middle of the screen
+ * (`centre` ± `band`, fractions of its height) stays sharp; past it the plate softens toward the top
+ * and bottom edges, to `edge` plate px of blur there. The cards are drawn over the plate, so they
+ * stay sharp whatever lies under them.
+ */
+export const TILT_SHIFT = Object.freeze({ centre: 0.5, band: 0.2, edge: 5 });
+/**
+ * Design 082: BDSP's soft glow. What the plate holds brighter than `threshold` (linear, before tone
+ * mapping) spills `strength` of its excess round itself, read off a coarse mip of the plate, so
+ * lamps, crystals, lava and sunlit snow glow a little into what lies round them.
+ */
+export const BLOOM = Object.freeze({ threshold: 0.9, strength: 0.22, level: 4 });
+
+/**
+ * Lays the plate on the canvas, through the tilt-shift: eight taps on a disc of the blur's radius
+ * round the pixel, from the plate's mip level of that size, so a wide blur costs no more than a
+ * narrow one. During a swap the incoming board's plate (premultiplied: it cleared to transparent)
+ * goes over the outgoing board's last plate, blurred alike.
  */
 const PLATE_FRAGMENT = `uniform sampler2D uPlate;
 uniform sampler2D uUnder;
 uniform float uUnderOn;
+uniform vec3 uTiltShift;
+uniform vec3 uBloom;
 varying vec2 vUv;
+vec4 tiltShift(sampler2D plate, vec2 uv) {
+  float away = smoothstep(uTiltShift.y, 0.5, abs(uv.y - uTiltShift.x));
+  float radius = uTiltShift.z * away * away;
+  // An explicit level: the radius varies down the screen, so implicit derivatives are not to be trusted here.
+  if (radius < 0.35) return textureLod(plate, uv, 0.0);
+  vec2 texel = 1.0 / vec2(textureSize(plate, 0));
+  float lod = max(log2(radius) - 0.5, 0.0);
+  vec4 sum = textureLod(plate, uv, lod) * 0.2;
+  for (int k = 0; k < 8; k++) {
+    float turn = float(k) * 2.39996;
+    vec2 offset = vec2(cos(turn), sin(turn)) * sqrt((float(k) + 0.5) / 8.0) * radius;
+    sum += textureLod(plate, uv + offset * texel, lod) * 0.1;
+  }
+  return sum;
+}
+// The glow round the plate's brightest parts: four taps on a coarse mip, past the threshold.
+vec3 bloom(sampler2D plate, vec2 uv) {
+  vec2 reach = 2.5 * exp2(uBloom.z) / vec2(textureSize(plate, 0));
+  vec3 sum = vec3(0.0);
+  for (int k = 0; k < 4; k++) {
+    float turn = float(k) * 1.5708 + 0.4;
+    sum += textureLod(plate, uv + vec2(cos(turn), sin(turn)) * reach, uBloom.z).rgb;
+  }
+  return max(sum * 0.25 - uBloom.x, 0.0) * uBloom.y;
+}
 void main() {
-  vec4 top = texture2D(uPlate, vUv);
+  vec4 top = tiltShift(uPlate, vUv);
+  top.rgb += bloom(uPlate, vUv) * top.a;
   if (uUnderOn > 0.5) {
-    vec4 under = texture2D(uUnder, vUv);
+    vec4 under = tiltShift(uUnder, vUv);
+    under.rgb += bloom(uUnder, vUv) * under.a;
     top = vec4(top.rgb + under.rgb * (1.0 - top.a), max(top.a, under.a));
   }
   gl_FragColor = top;
@@ -144,6 +197,38 @@ export function setFootprints(uniforms, { slabs = [], flats = [] } = {}) {
   );
 }
 
+let warnedGlows = false;
+
+/**
+ * Design 084: a board's contact glows (its spots' `glows`) into the shared `uGlows`, `uGlowTints` and
+ * `uGlowCount` (stadium-env-ground.mjs GLOW). Each glow is `{ x, y, r, colour: '#rrggbb', strength = 1,
+ * breath = 0 }` (table px; breath in Hz, 0 steady); its colour is a light's (paint(hex, 2): shown at
+ * its own colour). A glow with no finite place, no radius or no strength is skipped; past MAX_GLOWS
+ * the rest are dropped with one warning.
+ */
+export function setGlows(uniforms, glows = []) {
+  const valid = (Array.isArray(glows) ? glows : []).filter(
+    (glow) => glow && [glow.x, glow.y, glow.r].every(Number.isFinite) && glow.r > 0 && (glow.strength ?? 1) > 0
+  );
+  if (valid.length > MAX_GLOWS && !warnedGlows) {
+    warnedGlows = true;
+    console.warn(`board3d: ${valid.length} Stadium glows, the board lights ${MAX_GLOWS}`);
+  }
+  const kept = valid.slice(0, MAX_GLOWS);
+  const tints = kept.map((glow) => paint(glow.colour, 2));
+  uniforms.uGlows.value.forEach((vector, i) => {
+    const glow = kept[i];
+    if (glow) vector.set(glow.x, glow.y, glow.r, glow.strength ?? 1);
+    else vector.set(0, 0, 0, 0);
+  });
+  uniforms.uGlowTints.value.forEach((vector, i) => {
+    const tint = tints[i];
+    if (tint) vector.set(tint[0], tint[1], tint[2], Math.max(0, kept[i].breath ?? 0));
+    else vector.set(0, 0, 0, 0);
+  });
+  uniforms.uGlowCount.value = kept.length;
+}
+
 /** A deterministic 0..1 from two integers, so a strike looks the same in every frame it spans. */
 const unitHash = (a, b) => {
   let h = Math.imul(a | 0, 0x27d4eb2d) ^ Math.imul((b | 0) + 0x165667b1, 0x85ebca77);
@@ -175,9 +260,12 @@ const replaceGeometry = (mesh, geometry) => {
   mesh.geometry = geometry;
 };
 
-/** Scorched Earth: terrain with its lava, the river's sheet, embers and crater smoke. */
+/**
+ * Scorched Earth: terrain with its lava, the river's sheet, embers and crater smoke. Design 084: the
+ * river open only outside the cards' block (uCrust: its x span, where the river is cooled crust).
+ */
 function scorchedEarthBoard({ three, material, seeded }) {
-  const own = { uRiverY: { value: 0 }, uVolcano: { value: new three.Vector4() } };
+  const own = { uRiverY: { value: 0 }, uVolcano: { value: new three.Vector4() }, uCrust: { value: new three.Vector2(1e5, -1e5) } };
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
   const materials = {
     terrain: make(volcanic.TERRAIN_VERTEX, volcanic.TERRAIN_FRAGMENT),
@@ -205,10 +293,16 @@ function scorchedEarthBoard({ three, material, seeded }) {
     objects: [terrain, lava, embers, smoke],
     materials: Object.values(materials),
     bakeField: materials.bakeField,
-    spots: (layout) => ({ volcano: volcanoSpot(layout, environmentFootprints(layout)), riverY: layout.depth }),
-    apply({ volcano, riverY }, bounds) {
+    spots: (layout) => {
+      const footprints = environmentFootprints(layout);
+      const cards = [...footprints.slabs, ...footprints.flats];
+      const crust = cards.length ? [Math.min(...cards.map((r) => r.x)) - 30, Math.max(...cards.map((r) => r.x + r.w)) + 30] : [1e5, -1e5];
+      return { volcano: volcanoSpot(layout, footprints), riverY: layout.depth, crust };
+    },
+    apply({ volcano, riverY, crust }, bounds) {
       own.uVolcano.value.set(volcano?.x ?? 0, volcano?.y ?? 0, volcano?.r ?? 0, 0);
       own.uRiverY.value = riverY;
+      own.uCrust.value.set(crust[0], crust[1]);
       replaceGeometry(terrain, terrainGrid(three, bounds));
       replaceGeometry(
         lava,
@@ -314,9 +408,19 @@ export function strikePath(index, slot, { bowl, peaks }, bounds) {
   return null;
 }
 
+/** The storm's light on the crater's kit solids: cold blue-white, a deep slate fill (designs 081, 082). */
+const STORMY_MOOD = Object.freeze({
+  key: [0.82, 0.9, 1.0],
+  sky: [0.2, 0.25, 0.36],
+  bounce: [0.08, 0.1, 0.14],
+  sheen: [0.3, 0.55],
+  shadow: [0.34, 0.4, 0.55, 0.55],
+});
+
 /**
  * Stormy Mountains: the mountain and its crater, the cloud sea round it, and two lightning ribbons
- * whose strikes the board schedules itself, lighting the ground and clouds as they fall.
+ * whose strikes the board schedules itself, lighting the ground and clouds as they fall; the crater's
+ * dressing is the kit's (highland.craterDressing, craterProps).
  */
 function stormyMountainsBoard({ three, material }) {
   const own = {
@@ -328,6 +432,7 @@ function stormyMountainsBoard({ three, material }) {
     uRidgeRight: { value: new three.Vector2() },
     uEmblem: { value: new three.Vector3() },
     uFlash: { value: new three.Vector4() },
+    uFarPeak: { value: new three.Vector3() },
   };
   const make = (vertex, fragment, extra, uniforms = own) => material(vertex, fragment, extra, uniforms);
   const materials = {
@@ -341,6 +446,8 @@ function stormyMountainsBoard({ three, material }) {
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
   const clouds = new three.Mesh(new three.BufferGeometry(), materials.clouds);
   clouds.renderOrder = 1;
+  // Design 081: the crater's boulders and pines are the kit's, standing on the baked mountain.
+  const kit = createKitProps({ three, material, own, mood: STORMY_MOOD, reveal: 'vec3(0.7, 0.95, 1.1)', ground: true });
   const bolts = BOLT_CYCLES_S.map(() => {
     const uniforms = {
       uBoltFrom: { value: new three.Vector3() },
@@ -370,18 +477,24 @@ function stormyMountainsBoard({ three, material }) {
   };
 
   return {
-    objects: [terrain, clouds, ...bolts.map((bolt) => bolt.mesh)],
-    materials: [...Object.values(materials), ...bolts.map((bolt) => bolt.material)],
+    objects: [terrain, ...kit.objects, clouds, ...bolts.map((bolt) => bolt.mesh)],
+    materials: [...Object.values(materials), ...kit.materials, ...bolts.map((bolt) => bolt.material)],
     bakePre: materials.bakePre,
     bakeField: materials.bakeField,
     bakeLight: materials.bakeLight,
     spots(layout) {
       const bowl = craterBowl(layout);
+      const peaks = mountainPeaks(layout, bowl);
+      const emblem = craterEmblem(layout, bowl);
+      // Design 084: the emblem is the scene's one bright thing; its gold lights the floor round it.
+      const glows = emblem?.r > 0 ? [{ x: emblem.x, y: emblem.y, r: emblem.r + EMBLEM_GLOW.reach, colour: EMBLEM_GLOW.colour, strength: EMBLEM_GLOW.strength }] : [];
       return {
         bowl,
-        peaks: mountainPeaks(layout, bowl),
-        emblem: craterEmblem(layout, bowl),
+        peaks,
+        emblem,
         table: tableBounds(layout),
+        dressing: highland.craterDressing(layout, bowl, peaks),
+        glows,
       };
     },
     apply(next, nextBounds) {
@@ -398,6 +511,10 @@ function stormyMountainsBoard({ three, material }) {
         own[`uRidge${side}`].value.set(peak?.ridge.x ?? 0, peak?.ridge.y ?? 0);
       }
       own.uEmblem.value.set(emblem?.x ?? 0, emblem?.y ?? 0, emblem?.r ?? 0);
+      // A far peak painted in the cloud sea past the far-left corner, in the frame (not under the panel).
+      const table = next.table;
+      own.uFarPeak.value.set(table.x + table.w * 0.06, table.y + table.h * 1.24, bowl ? Math.min(220, table.w * 0.14) : 0);
+      kit.set(next.dressing?.length ? highland.craterProps(next.dressing) : null);
       replaceGeometry(terrain, terrainGrid(three, bounds));
       clouds.visible = Boolean(bowl);
       replaceGeometry(
@@ -528,71 +645,84 @@ const spikeGeometry = (three, spikes) => {
   ]);
 };
 
-/** Every limb of the trees: per vertex aLathe (along, round), its rings bunched toward the foot. */
-const limbGeometry = (three, trees) => {
-  const { rings, around } = forest.LIMB_SEGMENTS;
-  const parts = [];
-  const index = [];
-  for (let ring = 0; ring <= rings; ring += 1) {
-    // The trunk's buttress roots flare at its foot: more rings there.
-    const s = (ring / rings) ** 1.6;
-    for (let k = 0; k <= around; k += 1) parts.push(s, (k / around) * 2 * Math.PI);
-  }
-  for (let ring = 0; ring < rings; ring += 1) {
-    for (let k = 0; k < around; k += 1) {
-      const a = ring * (around + 1) + k;
-      const b = a + around + 1;
-      index.push(a, b, a + 1, a + 1, b, b + 1);
-    }
-  }
-  const limbs = trees.flatMap((tree) => tree.limbs.map((limb) => ({ tree, limb })));
-  return instancedGeometry(three, { name: 'aLathe', size: 2, parts, index }, [
-    ['aRoot', 4, limbs.flatMap(({ tree, limb }) => [tree.x, tree.y, tree.seed, limb.flare])],
-    ['aFrom', 4, limbs.flatMap(({ limb }) => [...limb.from, limb.r0])],
-    ['aVia', 4, limbs.flatMap(({ limb }) => [...limb.via, 0])],
-    ['aTo', 4, limbs.flatMap(({ limb }) => [...limb.to, limb.r1])],
-  ]);
-};
+/**
+ * The jungle's trees in the kit's light (designs 081, 082): violet bark, crowns of teal or violet
+ * leafy lumps, dark vines; a cool key, the shade violet from the jungle round it.
+ */
+const JUNGLE_MOOD = Object.freeze({
+  key: [0.86, 0.9, 1.0],
+  sky: [0.24, 0.22, 0.44],
+  bounce: [0.12, 0.07, 0.18],
+  sheen: [0.3, 0.55],
+  shadow: [0.32, 0.26, 0.5, 0.55],
+});
+const JUNGLE_BARK = [0.13, 0.07, 0.22, 0];
+// Design 084: every crown two-tone, as the card's: a deep teal body (two teals), its fringe tipped pink.
+const JUNGLE_CROWNS = [
+  { body: [0.03, 0.17, 0.16, 0], light: [0.07, 0.32, 0.28, 0] },
+  { body: [0.03, 0.13, 0.17, 0], light: [0.06, 0.26, 0.3, 0] },
+];
+const JUNGLE_FRINGE = [0.92, 0.26, 0.68, 0];
+const JUNGLE_VINE = [0.05, 0.015, 0.08, 0];
+const JUNGLE_BEAD = [0.95, 0.36, 0.75, 0];
 
-/** Every clump of the crowns' foliage: per vertex the unit sphere, per instance the clump. */
-const crownGeometry = (three, trees) => {
-  const { rings, around } = forest.PUFF_SEGMENTS;
-  const parts = [];
-  const index = [];
-  for (let ring = 0; ring <= rings; ring += 1) {
-    const latitude = -Math.PI / 2 + (Math.PI * ring) / rings;
-    for (let k = 0; k < around; k += 1) {
-      const longitude = (k / around) * 2 * Math.PI;
-      parts.push(Math.cos(latitude) * Math.cos(longitude), Math.cos(latitude) * Math.sin(longitude), Math.sin(latitude));
-    }
-  }
-  for (let ring = 0; ring < rings; ring += 1) {
-    for (let k = 0; k < around; k += 1) {
-      const a0 = ring * around + k;
-      const a1 = ring * around + ((k + 1) % around);
-      index.push(a0, a1, a0 + around, a1, a1 + around, a0 + around);
-    }
-  }
-  const puffs = trees.flatMap((tree) => tree.puffs.map((puff) => ({ tree, puff })));
-  return instancedGeometry(three, { name: 'aSphere', size: 3, parts, index }, [
-    ['aRoot', 4, puffs.flatMap(({ tree, puff }) => [tree.x, tree.y, tree.seed + puff.r * 0.013, tree.palette])],
-    ['aPuff', 4, puffs.flatMap(({ puff }) => [puff.x, puff.y, puff.z, puff.r])],
-    ['aShade', 1, puffs.map(({ puff }) => puff.shade)],
-  ]);
-};
+/** A point on the quadratic curve from `from` via `via` to `to` at t. */
+const onLimb = ({ from, via, to }, t) => [0, 1, 2].map((k) => (1 - t) ** 2 * from[k] + 2 * (1 - t) * t * via[k] + t ** 2 * to[k]);
 
-/** Every vine: per vertex aStrip (across, down), per instance its anchor and size. */
-const vineGeometry = (three, trees) => {
-  const parts = [];
-  const index = [];
-  for (let i = 0; i <= forest.VINE_SEGMENTS; i += 1) parts.push(-1, i / forest.VINE_SEGMENTS, 1, i / forest.VINE_SEGMENTS);
-  for (let i = 0; i < forest.VINE_SEGMENTS; i += 1) index.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 1, i * 2 + 3, i * 2 + 2);
-  const vines = trees.flatMap((tree) => tree.vines.map((vine) => ({ tree, vine })));
-  return instancedGeometry(three, { name: 'aStrip', size: 2, parts, index }, [
-    ['aRoot', 4, vines.flatMap(({ tree, vine }) => [tree.x, tree.y, vine.seed, vine.width])],
-    ['aVine', 4, vines.flatMap(({ vine }) => [vine.x, vine.y, vine.z, vine.length])],
-  ]);
-};
+/**
+ * Every tree as the kit's solids: each limb a tube up its curve (the trunk flaring at its foot), each
+ * clump of the crown a foliage ball (its shade from the layout as how lit it sits), each vine a thin
+ * dark strand hanging from the crown with pink beads down it.
+ */
+export function jungleTreeProps(trees) {
+  const props = createPropBuilder();
+  for (const tree of trees) {
+    for (const limb of tree.limbs) {
+      const points = Array.from({ length: 9 }, (_, i) => onLimb(limb, i / 8));
+      const radii = points.map((_, i) => {
+        const t = i / 8;
+        return (limb.r0 + (limb.r1 - limb.r0) * t) * (1 + limb.flare * 0.6 * Math.exp(-t * 9));
+      });
+      props.tube(points, radii, JUNGLE_BARK, { sides: 12 });
+    }
+  }
+  // Each crown a cluster of leafy lumps (design 082), dark in the creases between them, built about
+  // the crown's centre so the leaves on its flat tops lie outward from it.
+  for (const tree of trees) {
+    const palette = JUNGLE_CROWNS[tree.palette] ?? JUNGLE_CROWNS[0];
+    const lumps = tree.puffs.map((puff) => {
+      const base = palette.body.map((v, k) => (k < 3 ? v + (palette.light[k] - v) * puff.shade : 0));
+      const outward = [puff.x - tree.cx, puff.y - tree.cy];
+      const length = Math.hypot(outward[0], outward[1]) || 1;
+      // A fringe clump's outer, upper face pink-tipped; its body and every inner clump teal.
+      const color = puff.fringe
+        ? (d) => {
+            const tip = Math.max(0, Math.min(1, ((d[0] * outward[0] + d[1] * outward[1]) / length) * 1.4 + d[2] * 0.6 - 0.5));
+            return base.map((v, k) => (k < 3 ? v + (JUNGLE_FRINGE[k] - v) * tip * 0.75 : 0));
+          }
+        : base;
+      return { x: puff.x - tree.cx, y: puff.y - tree.cy, z: puff.z, rx: puff.r, rz: puff.r * 0.8, color };
+    });
+    const leaf = Math.max(6, (tree.puffs.reduce((sum, puff) => sum + puff.r, 0) / Math.max(1, tree.puffs.length)) * 0.2);
+    props.at({ x: tree.cx, y: tree.cy, ground: false }, () => props.look({ kind: LOOK.foliage, leaf, sway: 0.9 }, () => props.lumps(lumps, { crease: 0.5 })));
+  }
+  props.look({ kind: LOOK.foliage, sway: 0.8 }, () => {
+    for (const tree of trees) {
+      // Design 084: each vine a sagging curve from the crown down to the floor, beaded pink.
+      for (const vine of tree.vines) {
+        const strand = Array.from({ length: 11 }, (_, i) => {
+          const t = i / 10;
+          const along = [0, 1, 2].map((k) => vine[['x', 'y', 'z'][k]] + (vine.to[k] - vine[['x', 'y', 'z'][k]]) * t);
+          along[2] -= vine.sag * vine.z * 4 * t * (1 - t);
+          return [along[0], along[1], Math.max(along[2], 0)];
+        });
+        props.tube(strand, vine.width * 0.12, JUNGLE_VINE, { sides: 5 });
+        for (let i = 2; i < 10; i += 3) props.blob({ x: strand[i][0], y: strand[i][1], z: strand[i][2], rx: vine.width * 0.2, color: JUNGLE_BEAD, sides: 8, rings: 6 });
+      }
+    }
+  });
+  return props;
+}
 
 /**
  * Perilous Jungle: the ground, the poison's sheet, every leaf, the bell flowers and flower spikes,
@@ -621,10 +751,6 @@ function perilousJungleBoard({ three, material, seeded }) {
     leaves: make(forest.LEAF_VERTEX, forest.LEAF_FRAGMENT, { side: three.DoubleSide, alphaToCoverage: true }),
     bells: make(forest.BELL_VERTEX, forest.BELL_FRAGMENT, { side: three.DoubleSide }),
     spikes: make(forest.SPIKE_VERTEX, forest.SPIKE_FRAGMENT),
-    limbs: make(forest.LIMB_VERTEX, forest.LIMB_FRAGMENT),
-    crowns: make(forest.CROWN_VERTEX, forest.CROWN_FRAGMENT),
-    // Both sides: a vine turns to face the eye, but its ribbon may still wind either way on screen.
-    vines: make(forest.VINE_VERTEX, forest.VINE_FRAGMENT, { side: three.DoubleSide, alphaToCoverage: true }),
     spores: make(forest.SPORE_VERTEX, forest.SPORE_FRAGMENT, {
       transparent: true,
       depthWrite: false,
@@ -637,14 +763,12 @@ function perilousJungleBoard({ three, material, seeded }) {
   const leaves = new three.Mesh(new three.BufferGeometry(), materials.leaves);
   const bells = new three.Mesh(new three.BufferGeometry(), materials.bells);
   const spikes = new three.Mesh(new three.BufferGeometry(), materials.spikes);
-  const limbs = new three.Mesh(new three.BufferGeometry(), materials.limbs);
-  const crowns = new three.Mesh(new three.BufferGeometry(), materials.crowns);
-  const vines = new three.Mesh(new three.BufferGeometry(), materials.vines);
+  const kit = createKitProps({ three, material, own, mood: JUNGLE_MOOD, reveal: 'vec3(1.0, 0.45, 0.85)' });
   const spores = new three.Points(seeded(SPORE_COUNT), materials.spores);
   spores.renderOrder = 2;
   return {
-    objects: [terrain, poison, leaves, bells, spikes, limbs, crowns, vines, spores],
-    materials: Object.values(materials),
+    objects: [terrain, poison, leaves, bells, spikes, ...kit.objects, spores],
+    materials: [...Object.values(materials), ...kit.materials],
     bakeField: materials.bakeField,
     spots: (layout) => jungleSpots(layout),
     apply(spots, bounds) {
@@ -680,9 +804,7 @@ function perilousJungleBoard({ three, material, seeded }) {
       replaceGeometry(leaves, leafGeometry(three, jungleLeaves(spots)));
       replaceGeometry(bells, bellGeometry(three, spots.bells));
       replaceGeometry(spikes, spikeGeometry(three, spots.spikes));
-      replaceGeometry(limbs, limbGeometry(three, trees));
-      replaceGeometry(crowns, crownGeometry(three, trees));
-      replaceGeometry(vines, vineGeometry(three, trees));
+      kit.set(trees.length ? jungleTreeProps(trees) : null);
     },
   };
 }
@@ -763,6 +885,10 @@ export function createStadiumEnvironment({
     uFootprints: { value: Array.from({ length: glsl.MAX_FOOTPRINTS }, () => new three.Vector4()) },
     uFootprintCount: { value: 0 },
     uFootprintBox: { value: new three.Vector4(-1e5, -1e5, -1e5, -1e5) },
+    // Design 084: the shown board's contact glows, for the shared GLOW chunk (setGlows).
+    uGlows: { value: Array.from({ length: MAX_GLOWS }, () => new three.Vector4()) },
+    uGlowTints: { value: Array.from({ length: MAX_GLOWS }, () => new three.Vector4()) },
+    uGlowCount: { value: 0 },
   };
   const cutout = {
     glsl: glsl.CUTOUT_GLSL,
@@ -844,7 +970,13 @@ export function createStadiumEnvironment({
   const inFlight = new Set();
 
   const plateTargetOf = () => {
-    plateTarget ??= new three.WebGLRenderTarget(1, 1, { type: three.HalfFloatType, samples: PLATE_SAMPLES });
+    // Mipmapped for the tilt-shift's taps (three resolves the samples, then builds the chain).
+    plateTarget ??= new three.WebGLRenderTarget(1, 1, {
+      type: three.HalfFloatType,
+      samples: PLATE_SAMPLES,
+      generateMipmaps: true,
+      minFilter: three.LinearMipmapLinearFilter,
+    });
     return plateTarget;
   };
 
@@ -874,6 +1006,10 @@ export function createStadiumEnvironment({
   const boardOf = (wanted) => {
     if (!boards.has(wanted)) {
       const board = BOARDS[wanted](kit);
+      // Design 083: the board's ambient drift (stadium-env-drift.mjs BOARD_DRIFT), drawn with it.
+      board.drift = createDrift(kit, BOARD_DRIFT[wanted] ?? []);
+      board.objects = [...board.objects, ...board.drift.objects];
+      board.materials = [...board.materials, ...board.drift.materials];
       board.holder = new three.Group();
       board.holder.name = `board3d-stadium-env-${wanted}`;
       for (const object of board.objects) {
@@ -979,7 +1115,12 @@ export function createStadiumEnvironment({
       uniforms.uSize.value.set(bounds.w, bounds.h);
       uniforms.uOrigin.value.set(origin.x, origin.y);
       setFootprints(uniforms, footprints);
+      setGlows(uniforms, spots?.glows ?? []);
       board.apply(spots, bounds);
+      board.drift.setEmitters(spots?.driftEmitters ?? []);
+      board.drift.setArea(driftArea(tableBounds(layout), bounds));
+      const cards = [...footprints.slabs, ...footprints.flats];
+      board.drift.setAvoid(cards.length ? oppHandRect(layout, union(cards)) : null);
       appliedFor = signature;
     }
     if (!bakeToo || signature === bakedFor) return true;
@@ -1222,7 +1363,6 @@ export function createStadiumEnvironment({
     if (camera) uniforms.uEye.value.copy(camera.position).applyMatrix4(cutout.uniforms.uTableFromWorld.value);
     const changing = frame.animating;
     if (changing) plateStale = true;
-    if (plateStale) board.beforeRender?.(renderer);
     if (!changing) scheduleAmbient();
     return changing;
   };
@@ -1272,7 +1412,13 @@ export function createStadiumEnvironment({
       plateMaterial = new three.ShaderMaterial({
         vertexShader: glsl.FULLSCREEN_VERTEX,
         fragmentShader: PLATE_FRAGMENT,
-        uniforms: { uPlate: { value: target.texture }, uUnder: { value: null }, uUnderOn: { value: 0 } },
+        uniforms: {
+          uPlate: { value: target.texture },
+          uUnder: { value: null },
+          uUnderOn: { value: 0 },
+          uTiltShift: { value: new three.Vector3(TILT_SHIFT.centre, TILT_SHIFT.band, TILT_SHIFT.edge) },
+          uBloom: { value: new three.Vector3(BLOOM.threshold, BLOOM.strength, BLOOM.level) },
+        },
         depthTest: false,
         depthWrite: false,
       });
@@ -1302,7 +1448,6 @@ export function createStadiumEnvironment({
       for (const board of released) {
         for (const object of board.objects) object.geometry.dispose();
         for (const material of board.materials) material.dispose();
-        board.dispose?.();
       }
       bakeQuad.geometry.dispose();
       bakeLight.dispose();
@@ -1330,5 +1475,43 @@ export function createStadiumEnvironment({
     });
   };
 
-  return { setLayout, setTarget, play, settle, setKey, update, drawPlate, active: () => key !== null, cutout, dispose };
+  /**
+   * The shown board's light for what stands on it (the cards' shadows): `sun`, toward its sun or
+   * moon (table frame, unit), and `shadow`, its kit's shadow tint and strength [r, g, b, s] (linear).
+   * Read off the board's own materials (its uSun, its kit's uKitShadow), the shared defaults where
+   * it has none; null while no board shows.
+   */
+  const lighting = () => {
+    if (!key) return null;
+    const board = boards.get(key);
+    if (!board) return null;
+    if (!board.lighting) board.lighting = boardLighting(board.materials, uniforms.uSun.value);
+    return board.lighting;
+  };
+
+  return { setLayout, setTarget, play, settle, setKey, update, drawPlate, active: () => key !== null, lighting, cutout, dispose };
+}
+
+/** A daylight shadow's tint and strength where a board's kit gives none (stadium-kit.mjs MOODS.day). */
+export const DEFAULT_GROUND_SHADOW = Object.freeze([0.42, 0.47, 0.62, 0.62]);
+
+/**
+ * A board's light from its materials: the first own `uSun` that differs from the shared one (else
+ * the shared sun), the first `uKitShadow` (else DEFAULT_GROUND_SHADOW).
+ * @param {import('three').ShaderMaterial[]} materials
+ * @param {import('three').Vector3} sharedSun
+ * @returns {{ sun: number[], shadow: number[] }}
+ */
+export function boardLighting(materials, sharedSun) {
+  let sun = null;
+  let shadow = null;
+  for (const material of materials ?? []) {
+    const own = material?.uniforms?.uSun?.value;
+    if (!sun && own && own !== sharedSun && [own.x, own.y, own.z].every(Number.isFinite)) sun = [own.x, own.y, own.z];
+    const tint = material?.uniforms?.uKitShadow?.value;
+    if (!shadow && tint && [tint.x, tint.y, tint.z, tint.w].every(Number.isFinite)) shadow = [tint.x, tint.y, tint.z, tint.w];
+  }
+  const s = sun ?? [sharedSun.x, sharedSun.y, sharedSun.z];
+  const length = Math.hypot(s[0], s[1], s[2]) || 1;
+  return { sun: s.map((v) => v / length), shadow: shadow ?? [...DEFAULT_GROUND_SHADOW] };
 }

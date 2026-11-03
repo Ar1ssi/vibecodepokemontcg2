@@ -82,3 +82,7 @@ test('signatureEntryKind: a Trainer named like a Mega is not a Pokémon entry', 
     null
   );
 });
+
+test('a homebrew Tera stage card gets the Tera entry without the printed rule', () => {
+  assert.equal(signatureEntryKind({ name: 'Dragonite ex', supertype: 'Pokémon', stage: 'TERAHB' }), 'tera');
+});

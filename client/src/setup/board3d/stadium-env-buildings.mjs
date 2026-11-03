@@ -38,7 +38,7 @@ export function wallBand(props, { a, b, depth, z0, z1, over = 0, color, topColor
   const along = [(b[0] - a[0]) / length, (b[1] - a[1]) / length];
   const out = [along[1], -along[0]];
   const mid = [(a[0] + b[0]) / 2 + out[0] * (over - depth) / 2, (a[1] + b[1]) / 2 + out[1] * (over - depth) / 2];
-  props.box({ x: mid[0], y: mid[1], z0, z1, hw: length / 2, hh: (depth + over) / 2, yaw: Math.atan2(along[1], along[0]), color, topColor, frontColor: color });
+  props.roundBox({ x: mid[0], y: mid[1], z0, z1, hw: length / 2, hh: (depth + over) / 2, yaw: Math.atan2(along[1], along[0]), color, topColor, frontColor: color });
 }
 
 /**

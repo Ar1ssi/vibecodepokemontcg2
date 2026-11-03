@@ -154,6 +154,23 @@ SIO_JS=<node_modules/.pnpm/socket.io@*/node_modules/socket.io/client-dist/socket
 - Judge playability on the stills: the cards' borders against the ground, nothing bright or busy beside a
   card, nothing over one (design 080 § Rules).
 
+## The Stadium kit's asset gallery (designs 081, 082, `rec/rec-stadium-kit.mjs`)
+
+Every kit asset (`stadium-kit-assets.mjs`) in the kit's light, drawn the way a board's plate draws it,
+on ground painted with the BDSP ground kit (`stadium-env-ground.mjs`: a clover meadow, a fringed dirt
+path, a flagstone plaza, a sand strip running wet into a pond), beside two cards for scale. No app
+server: the script serves the repo root itself. Use it for asset, leaf, light or ground work before
+looking at a board.
+
+```bash
+OUT=.agent/scratch/kit-gallery.png QUERY='zoom=2.6&cx=-380&cy=250&mood=night' \
+  node .claude/skills/fx-preview/rec/rec-stadium-kit.mjs
+```
+
+- QUERY: `mood` (a MOODS key), `zoom`, `cx`/`cy` (where the camera looks), `tilt`, `t` (the clock), `grass` (#hex).
+- The gallery draws no tilt-shift: the plate's focus blur lives in the board's composite (TILT_SHIFT).
+- Exits non-zero on a shader or page error.
+
 ## Builder tab: the Build & Battle unboxing (`rec/rec-unboxing.mjs`)
 
 The unboxing scene (design 052) lives in the builder tab, not on the board, so its recorder drives

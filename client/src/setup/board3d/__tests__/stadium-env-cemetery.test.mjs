@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import * as three from 'three';
 import { flatLayout } from '../board-layout.mjs';
 import { getMatLayout } from '../../sizing/mat-layouts.mjs';
 import { NO_MAT_LAYOUT_ID } from '../../sizing/mat-spec.mjs';
@@ -12,15 +13,15 @@ import {
   MAX_PINES,
   MIST_FRAGMENT,
   MIST_VERTEX,
+  GRAVE_GROUPS,
   MOON,
   PATH_CARD_GAP_PX,
-  PROP_FRAGMENT,
   TERRAIN_FRAGMENT,
   TERRAIN_VERTEX,
   cemeteryProps,
   cemeterySpots,
 } from '../stadium-env-cemetery.mjs';
-import { SCREEN_VIEWS, pointOnCard, screenView } from './stadium-screen.mjs';
+import { SCREEN_VIEWS, geometryOnCard, screenView } from './stadium-screen.mjs';
 
 const PROFILES = [NO_MAT_LAYOUT_ID, 'sim', 'one-player', 'two-player', 'edge-to-edge-two-player'];
 const HALVES = [
@@ -40,8 +41,8 @@ test('environmentKeyFor: Old Cemetery by id, and by set and number', () => {
   assert.equal(environmentKeyFor({ set: 'customhb', number: '198' }), CEMETERY_KEY);
 });
 
-test('the moon stands beyond the far end, so every shadow falls toward the player', () => {
-  assert.ok(MOON[1] > 0.5 && MOON[2] > 0);
+test('the moon keys the board from the top left (design 084), so every shadow falls one way, toward the near right', () => {
+  assert.ok(MOON[0] < 0 && MOON[1] > 0.5 && MOON[2] > 0);
 });
 
 test('cemeterySpots: the path runs in past one edge and out past another, clear of every card', () => {
@@ -61,30 +62,39 @@ test('cemeterySpots: the path runs in past one edge and out past another, clear 
   }
 });
 
-test('cemeterySpots: graves off the path and every card, in the side bands and off the far end', () => {
+test('cemeterySpots: ten to fifteen headstones in family groups along the path, off it and every card (design 084)', () => {
   for (const layout of layouts) {
-    const { graves, pines, core } = cemeterySpots(layout);
-    assert.ok(graves.length >= 10 && graves.length <= MAX_GRAVES);
+    const { graves, pines, core, path, halfPath } = cemeterySpots(layout);
+    // Narrow profiles (the wide sim mat at 1449 px) leave little room past the path: fewer stones there.
+    assert.ok(graves.length >= 6 && graves.length <= GRAVE_GROUPS.most, `${graves.length} headstones`);
     assert.ok(pines.length <= MAX_PINES);
     for (const grave of graves) {
       assert.ok(grave.y >= core.y, 'none toward the near end');
       for (const card of cardsOf(layout)) assert.ok(distanceToRect(grave.x, grave.y, card) > grave.width * 0.5);
+      const kin = graves.filter((other) => other !== grave && Math.hypot(other.x - grave.x, other.y - grave.y) < 160);
+      assert.ok(kin.length >= 1, 'every stone stands with its family');
+      const fromPath = Math.min(...path.map(([x, y]) => Math.hypot(x - grave.x, y - grave.y)));
+      assert.ok(fromPath < halfPath + 200, 'along the path');
+      assert.ok(Math.abs(grave.lean) <= 0.25 && Math.abs(grave.tilt) <= 0.13, 'a slight lean back and aside');
     }
+  }
+  const { graves } = cemeterySpots(layouts[0]);
+  assert.ok(graves.length >= 10, `the default board holds ten to fifteen (${graves.length})`);
+});
+
+test('the pines stand off the far end only, dark silhouettes (design 084)', () => {
+  for (const layout of layouts) {
+    const { pines, core } = cemeterySpots(layout);
+    for (const pine of pines) assert.ok(pine.y > core.y + core.h, 'past the far end');
   }
 });
 
 test('no grave, pine or the bare tree covers a card on screen, in either camera preset', () => {
   for (const view of SCREEN_VIEWS) {
     const { layout, projectors } = screenView(view);
-    const spots = cemeterySpots(layout);
-    const points = [
-      ...spots.graves.flatMap((g) => [[g.x, g.y, 0], [g.x, g.y + g.lean * g.height, g.height]]),
-      ...spots.pines.flatMap((p) => [[p.x - p.r, p.y, p.h * 0.2], [p.x + p.r, p.y, p.h * 0.2], [p.x, p.y - p.r, p.h * 0.2], [p.x, p.y, p.h]]),
-      [spots.tree.x, spots.tree.y, spots.tree.h],
-      [spots.post.x, spots.post.y, spots.post.h],
-    ];
+    const geometry = cemeteryProps(cemeterySpots(layout)).build(three);
     for (const { preset, project } of projectors) {
-      const hit = pointOnCard(points, layout, project);
+      const hit = geometryOnCard(geometry, layout, project);
       assert.equal(hit, null, `${view.profile} ${view.viewport.w}x${view.viewport.h} ${preset}: ${hit}`);
     }
   }
@@ -97,7 +107,7 @@ test('cemeterySpots is null without a layout; the props build', () => {
 
 test('Old Cemetery shaders declare no GLSL ES 3.00 reserved word and every one has a main', () => {
   const reserved = /\b(?:float|vec[234]|int|bool)\s+(?:flat|half|smooth|noperspective|sample|patch|input|output|filter|active|common|fixed|long|short|out|in|inout|round)\b/;
-  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_VERTEX, TERRAIN_FRAGMENT, PROP_FRAGMENT, MIST_VERTEX, MIST_FRAGMENT]) {
+  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_VERTEX, TERRAIN_FRAGMENT, MIST_VERTEX, MIST_FRAGMENT]) {
     assert.doesNotMatch(shader, reserved);
     assert.match(shader, /void main\(\)/);
   }

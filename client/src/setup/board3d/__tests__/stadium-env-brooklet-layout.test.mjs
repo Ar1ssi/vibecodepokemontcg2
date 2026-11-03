@@ -155,14 +155,15 @@ for (const profile of PROFILES) {
   }
 }
 
-test("brookletSpots places the map's pieces on the default board: four pools, five falls, thirteen boulders", () => {
+test("brookletSpots places the map's pieces on the default board: four pools, five falls, twelve boulders", () => {
   const spots = brookletSpots(layoutOf(NO_MAT_LAYOUT_ID, HALVES[0]));
   assert.equal(spots.towers.length, 4);
   assert.deepEqual(
     spots.falls.map((fall) => fall.kind),
     [FALL_KINDS.lake, FALL_KINDS.pool, FALL_KINDS.lake, FALL_KINDS.pool, FALL_KINDS.basin]
   );
-  assert.equal(spots.rocks.length, 13);
+  // The map has thirteen; one stands too near a card for the kit's boulder and its lean on screen (design 082).
+  assert.equal(spots.rocks.length, 12);
   assert.equal(spots.sunken.length, SUNKEN_MAX);
   assert.ok(spots.cave && spots.basin && spots.ledge && spots.dock, 'the cave, the basin, the ledge and the pier');
   // The pier off the right shore, the basin and the ledge on the left, as the map has them.

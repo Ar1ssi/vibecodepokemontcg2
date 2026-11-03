@@ -11,14 +11,13 @@ import {
   CENTER_KEY,
   MAX_BLOCKS,
   MAX_DISCS,
-  PROP_FRAGMENT,
   TERRAIN_FRAGMENT,
   TERRAIN_VERTEX,
   WALL_GAP_PX,
   centerProps,
   centerSpots,
 } from '../stadium-env-pokecenter.mjs';
-import { SCREEN_VIEWS, pointOnCard, screenView } from './stadium-screen.mjs';
+import { SCREEN_VIEWS, geometryOnCard, screenView } from './stadium-screen.mjs';
 
 const PROFILES = [NO_MAT_LAYOUT_ID, 'sim', 'one-player', 'two-player', 'edge-to-edge-two-player'];
 const HALVES = [
@@ -65,6 +64,20 @@ test('centerSpots: the counter, the lounge, the shelves, the PCs, the bench, the
   }
 });
 
+// Design 084: a doormat inside the entrance, by the near wall, off every card.
+test('centerSpots: the doormat lies inside the room by the near wall, clear of every card', () => {
+  for (const layout of layouts) {
+    const { doormat, room } = centerSpots(layout);
+    assert.ok(doormat.x0 > room.x0 && doormat.x1 < room.x1 && doormat.y0 > room.y0 && doormat.y1 < room.y1, 'inside the room');
+    assert.ok(doormat.y0 - room.y0 < 20, 'by the near wall');
+    const { slabs, flats } = environmentFootprints(layout);
+    for (const rect of [...slabs, ...flats]) {
+      const apart = rect.y >= doormat.y1 || rect.y + rect.h <= doormat.y0 || rect.x >= doormat.x1 || rect.x + rect.w <= doormat.x0;
+      assert.ok(apart, 'off every card');
+    }
+  }
+});
+
 test('centerSpots: the boxes and round pieces the light is cast from fit the shader arrays, none of them over a card', () => {
   for (const layout of layouts) {
     const { blocks, discs, walls } = centerSpots(layout);
@@ -80,24 +93,9 @@ test('centerSpots: the boxes and round pieces the light is cast from fit the sha
 test('no wall, counter, shelf, column or plant covers a card on screen, in either camera preset', () => {
   for (const view of SCREEN_VIEWS) {
     const { layout, projectors } = screenView(view);
-    const { room, walls, wallHeight, counter, shelves, desks, plants, columns, sofa, bench, u } = centerSpots(layout);
-    const along = (from, to, n) => Array.from({ length: n + 1 }, (_, i) => from + ((to - from) * i) / n);
-    const points = [
-      ...along(room.y0, room.y1, 12).flatMap((y) => [[room.x0, y, wallHeight], [room.x1, y, wallHeight]]),
-      ...along(room.x0, room.x1, 12).flatMap((x) => [[x, room.y0, wallHeight], [x, room.y1, wallHeight]]),
-      ...walls.flatMap((w) => [[w.x0, w.y0, w.h], [w.x1, w.y1, w.h]]),
-      ...along(-Math.PI / 2, Math.PI / 2, 12).flatMap((t) => [[counter.x + counter.dir * counter.r * Math.cos(t), counter.y + counter.r * Math.sin(t), counter.h + 24 * u]]),
-      ...shelves.flatMap((s) => [[s.x + s.dir * s.depth, s.y0, s.h], [s.x + s.dir * s.depth, s.y1, s.h]]),
-      ...desks.flatMap((d) => [[d.x + d.dir * d.d, d.y - d.w / 2, d.h + 28 * u], [d.x + d.dir * d.d, d.y + d.w / 2, d.h + 28 * u]]),
-      ...plants.flatMap((p) => [[p.x, p.y, 70 * u], [p.x + 20 * u, p.y, 56 * u], [p.x - 20 * u, p.y, 56 * u], [p.x, p.y + 20 * u, 56 * u], [p.x, p.y - 20 * u, 56 * u]]),
-      ...columns.flatMap((c) => [[c.x, c.y, c.h], [c.x - c.r, c.y, c.h], [c.x + c.r, c.y, c.h], [c.x, c.y - c.r, c.h], [c.x, c.y + c.r, c.h]]),
-      [sofa.x + sofa.depth, sofa.y0, 58 * u],
-      [sofa.x + sofa.depth, sofa.y1, 58 * u],
-      [bench.x + bench.dir * bench.depth, bench.y0, 42 * u],
-      [bench.x + bench.dir * bench.depth, bench.y1, 42 * u],
-    ];
+    const geometry = centerProps(centerSpots(layout)).build(three);
     for (const { preset, project } of projectors) {
-      const hit = pointOnCard(points, layout, project);
+      const hit = geometryOnCard(geometry, layout, project);
       assert.equal(hit, null, `${view.profile} ${view.viewport.w}x${view.viewport.h} ${preset}: ${hit}`);
     }
   }
@@ -113,7 +111,7 @@ test('centerSpots is null without a layout; the props build into a good deal of 
 
 test('Pokemon Center shaders declare no GLSL ES 3.00 reserved word and every one has a main', () => {
   const reserved = /\b(?:float|vec[234]|int|bool)\s+(?:flat|half|smooth|noperspective|sample|patch|input|output|filter|active|common|fixed|long|short|out|in|inout|round)\b/;
-  for (const shader of [BAKE_FIELD_FRAGMENT, BAKE_LIGHT_FRAGMENT, TERRAIN_VERTEX, TERRAIN_FRAGMENT, PROP_FRAGMENT]) {
+  for (const shader of [BAKE_FIELD_FRAGMENT, BAKE_LIGHT_FRAGMENT, TERRAIN_VERTEX, TERRAIN_FRAGMENT]) {
     assert.doesNotMatch(shader, reserved);
     assert.match(shader, /void main\(\)/);
   }

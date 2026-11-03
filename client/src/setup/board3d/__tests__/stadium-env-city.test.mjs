@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import * as three from 'three';
 import { flatLayout } from '../board-layout.mjs';
 import { getMatLayout } from '../../sizing/mat-layouts.mjs';
 import { NO_MAT_LAYOUT_ID } from '../../sizing/mat-spec.mjs';
@@ -9,13 +10,13 @@ import {
   BILLBOARD_FRAGMENT,
   BUILDING_FRAGMENT,
   CITY_KEY,
-  PROP_FRAGMENT,
   ROOF_GAP_PX,
   TERRAIN_FRAGMENT,
   cityBuildings,
   cityProps,
   citySpots,
 } from '../stadium-env-city.mjs';
+import { SCREEN_VIEWS, geometryOnCard, screenView } from './stadium-screen.mjs';
 
 // Every mat profile (the no-mat default, the simulator's, one-player and full-size two-player mats)
 // at the board width board3d.js lays out beside the sidebox (0.755 of 1920) and at full width.
@@ -77,6 +78,24 @@ test('citySpots: the towers stand off the roof, apart from each other and the ro
   }
 });
 
+// Design 084: the round tower's crown is the board's one warm light, falling on what lies round it.
+test('citySpots: the round tower’s crown lights round it (one glow on the tower), the clutter in huddles off the cards', () => {
+  for (const layout of layouts) {
+    const { round, glows, clutter } = citySpots(layout);
+    assert.equal(glows.length, 1);
+    assert.deepEqual([glows[0].x, glows[0].y], [round.x, round.y]);
+    assert.ok(glows[0].r > round.r && glows[0].strength > 0, 'reaches past the tower');
+    const { slabs, flats } = environmentFootprints(layout);
+    for (const piece of clutter) {
+      for (const rect of [...slabs, ...flats]) {
+        const dx = Math.max(rect.x - piece.x, 0, piece.x - rect.x - rect.w);
+        const dy = Math.max(rect.y - piece.y, 0, piece.y - rect.y - rect.h);
+        assert.ok(Math.hypot(dx, dy) >= piece.reach, 'clutter off every card');
+      }
+    }
+  }
+});
+
 test('cityProps and cityBuildings: geometry with every attribute finite', () => {
   const spots = citySpots(layouts[0]);
   for (const builder of [cityProps(spots), cityBuildings(spots)]) {
@@ -86,8 +105,21 @@ test('cityProps and cityBuildings: geometry with every attribute finite', () => 
 
 test('Dark City shaders declare no GLSL ES 3.00 reserved word and every one has a main', () => {
   const reserved = /\b(?:float|vec[234]|int|bool)\s+(?:flat|half|smooth|noperspective|sample|patch|input|output|filter|active|common|fixed|long|short|out|in|inout|round)\b/;
-  for (const shader of [TERRAIN_FRAGMENT, BUILDING_FRAGMENT, BILLBOARD_FRAGMENT, BEAM_VERTEX, PROP_FRAGMENT]) {
+  for (const shader of [TERRAIN_FRAGMENT, BUILDING_FRAGMENT, BILLBOARD_FRAGMENT, BEAM_VERTEX]) {
     assert.match(shader, /void main\(\)/);
     assert.doesNotMatch(shader, reserved);
+  }
+});
+
+test('no tower, the hut or a searchlight covers a card on screen, in either camera preset', () => {
+  for (const view of SCREEN_VIEWS) {
+    const { layout, projectors } = screenView(view);
+    const geometries = [cityProps(citySpots(layout)), cityBuildings(citySpots(layout))].map((props) => props.build(three));
+    for (const { preset, project } of projectors) {
+      for (const geometry of geometries) {
+        const hit = geometryOnCard(geometry, layout, project);
+        assert.equal(hit, null, `${view.profile} ${view.viewport.w}x${view.viewport.h} ${preset}: ${hit}`);
+      }
+    }
   }
 });

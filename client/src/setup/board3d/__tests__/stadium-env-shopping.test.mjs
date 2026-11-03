@@ -9,14 +9,13 @@ import {
   BAKE_FIELD_FRAGMENT,
   MAX_BALLOONS,
   MAX_FIXTURES,
-  PROP_FRAGMENT,
   SHOPPING_KEY,
   TERRAIN_FRAGMENT,
   TERRAIN_VERTEX,
   shoppingProps,
   shoppingSpots,
 } from '../stadium-env-shopping.mjs';
-import { SCREEN_VIEWS, pointOnCard, screenView } from './stadium-screen.mjs';
+import { SCREEN_VIEWS, geometryOnCard, screenView } from './stadium-screen.mjs';
 
 const PROFILES = [NO_MAT_LAYOUT_ID, 'sim', 'one-player', 'two-player', 'edge-to-edge-two-player'];
 const HALVES = [
@@ -53,6 +52,18 @@ test('shoppingSpots: tables, racks and mannequins stand clear of every card, ins
   }
 });
 
+// Design 084: the balloons bunch at the hall's corners: on the end tables of each band.
+test('shoppingSpots: the balloons bunch on the end tables of each band, five to a bunch, four hues', () => {
+  for (const layout of layouts) {
+    const { tables, balloons } = shoppingSpots(layout);
+    const ends = tables.filter((table) => table.end);
+    for (const b of balloons) {
+      assert.ok(ends.some((table) => table.x === b.anchor.x && table.y === b.anchor.y), 'tied to an end table');
+      assert.ok(b.hue >= 0 && b.hue < 4, `hue ${b.hue}`);
+    }
+  }
+});
+
 test('the escalators climb to the mezzanine behind the opponent hand', () => {
   for (const layout of layouts) {
     const { escalators, mezzanine, hand } = shoppingSpots(layout);
@@ -68,17 +79,9 @@ test('the escalators climb to the mezzanine behind the opponent hand', () => {
 test('no balloon, mannequin, rack, column or escalator covers a card on screen, in either camera preset', () => {
   for (const view of SCREEN_VIEWS) {
     const { layout, projectors } = screenView(view);
-    const { balloons, mannequins, racks, columns, escalators, tables } = shoppingSpots(layout);
-    const points = [
-      ...balloons.flatMap((b) => [[b.x, b.y, b.z + b.r], [b.x - b.r, b.y, b.z], [b.x + b.r, b.y, b.z], [b.x, b.y - b.r, b.z], [b.x, b.y + b.r, b.z]]),
-      ...mannequins.flatMap((m) => [[m.x, m.y, m.h], [m.x - 20, m.y - 20, m.h * 0.8], [m.x + 20, m.y + 20, m.h * 0.8]]),
-      ...racks.flatMap((r) => [[r.x, r.y - r.len / 2, 60], [r.x, r.y + r.len / 2, 60]]),
-      ...columns.map((c) => [c.x, c.y, c.h]),
-      ...escalators.flatMap((e) => [[e.x - e.width / 2, e.y0, 38], [e.x + e.width / 2, e.y0, 38], [e.x - e.width / 2, e.y1, e.height + 40], [e.x + e.width / 2, e.y1, e.height + 40]]),
-      ...tables.flatMap((t) => [[t.x - t.w / 2, t.y - t.d / 2, t.h + 9], [t.x + t.w / 2, t.y + t.d / 2, t.h + 9]]),
-    ];
+    const geometry = shoppingProps(shoppingSpots(layout)).build(three);
     for (const { preset, project } of projectors) {
-      const hit = pointOnCard(points, layout, project);
+      const hit = geometryOnCard(geometry, layout, project);
       assert.equal(hit, null, `${view.profile} ${view.viewport.w}x${view.viewport.h} ${preset}: ${hit}`);
     }
   }
@@ -98,7 +101,7 @@ test('shoppingSpots is null without a layout; the props build; fixtures fit the 
 
 test('Shopping Center shaders declare no GLSL ES 3.00 reserved word and every one has a main', () => {
   const reserved = /\b(?:float|vec[234]|int|bool)\s+(?:flat|half|smooth|noperspective|sample|patch|input|output|filter|active|common|fixed|long|short|out|in|inout|round)\b/;
-  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_VERTEX, TERRAIN_FRAGMENT, PROP_FRAGMENT]) {
+  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_VERTEX, TERRAIN_FRAGMENT]) {
     assert.doesNotMatch(shader, reserved);
     assert.match(shader, /void main\(\)/);
   }

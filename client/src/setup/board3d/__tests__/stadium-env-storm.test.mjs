@@ -15,7 +15,6 @@ import {
   MAX_CLUMPS,
   MAX_PADS,
   MAX_TREES,
-  PROP_FRAGMENT,
   RIPPLE_EVERY,
   RIPPLE_SECONDS,
   STORM_KEY,
@@ -28,7 +27,7 @@ import {
   stormProps,
   stormSpots,
 } from '../stadium-env-storm.mjs';
-import { SCREEN_VIEWS, pointOnCard, screenView } from './stadium-screen.mjs';
+import { SCREEN_VIEWS, geometryOnCard, screenView } from './stadium-screen.mjs';
 
 const PROFILES = [NO_MAT_LAYOUT_ID, 'sim', 'one-player', 'two-player', 'edge-to-edge-two-player'];
 const HALVES = [
@@ -95,15 +94,9 @@ test('stormSpots: a pole in the middle of each side band, the force field over t
 test('no pad link, tree, pylon or reed covers a card on screen, in either camera preset', () => {
   for (const view of SCREEN_VIEWS) {
     const { layout, projectors } = screenView(view);
-    const { arcs, trees, clumps, poles } = stormSpots(layout);
-    const points = [
-      ...arcs.slice(0, 2).flatMap((arc) => arc.points),
-      ...trees.flatMap((t) => [[t.x, t.y, t.h], [t.x - t.h * 0.5, t.y, t.h * 0.8], [t.x + t.h * 0.5, t.y, t.h * 0.8], [t.x, t.y - t.h * 0.5, t.h * 0.8], [t.x, t.y + t.h * 0.5, t.h * 0.8]]),
-      ...clumps.map((c) => [c.x, c.y, c.h]),
-      ...poles.flatMap((p) => [[p.x, p.y, p.h + p.r], [p.x - p.r, p.y, 0], [p.x + p.r, p.y, 0], [p.x, p.y - p.r, 0], [p.x, p.y + p.r, 0]]),
-    ];
+    const geometry = stormProps(stormSpots(layout)).build(three);
     for (const { preset, project } of projectors) {
-      const hit = pointOnCard(points, layout, project);
+      const hit = geometryOnCard(geometry, layout, project);
       assert.equal(hit, null, `${view.profile} ${view.viewport.w}x${view.viewport.h} ${preset}: ${hit}`);
     }
   }
@@ -161,8 +154,16 @@ test('domeGeometry: a hemisphere of unit directions, the apex straight up, the r
 
 test('Magnetic Storm shaders declare no GLSL ES 3.00 reserved word and every one has a main', () => {
   const reserved = /\b(?:float|vec[234]|int|bool)\s+(?:flat|half|smooth|noperspective|sample|patch|input|output|filter|active|common|fixed|long|short|out|in|inout|round)\b/;
-  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_VERTEX, TERRAIN_FRAGMENT, PROP_FRAGMENT, BOLT_VERTEX, BOLT_FRAGMENT, DOME_VERTEX, DOME_FRAGMENT]) {
+  for (const shader of [BAKE_FIELD_FRAGMENT, TERRAIN_VERTEX, TERRAIN_FRAGMENT, BOLT_VERTEX, BOLT_FRAGMENT, DOME_VERTEX, DOME_FRAGMENT]) {
     assert.doesNotMatch(shader, reserved);
     assert.match(shader, /void main\(\)/);
+  }
+});
+
+test('the reed beds spread over the near, side and far margins: shuffled before the cap (design 083)', () => {
+  for (const layout of layouts) {
+    const { clumps, core } = stormSpots(layout);
+    const far = clumps.filter((clump) => clump.y > core.y + core.h).length;
+    assert.ok(far >= clumps.length * 0.15, `${far} of ${clumps.length} reed clumps past the far end`);
   }
 });

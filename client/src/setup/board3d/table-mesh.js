@@ -11,6 +11,21 @@ const FLOOR_SCALE = 2.2;
 const ENVIRONMENT_INTENSITY = 0.6;
 const LIGHT_INTENSITY = 1.4;
 const SHADOW_MAP_PX = 2048;
+/** The least a Stadium's sun may stand above the cloth (sin of its elevation) for the cards' shadows. */
+export const MIN_SUN_RISE = 0.45;
+
+/** A direction toward the sun, unit, raised to at least MIN_SUN_RISE (its heading kept). */
+export function risenSun([x, y, z]) {
+  const length = Math.hypot(x, y, z);
+  if (!(length > 0)) return null;
+  const up = z / length;
+  if (up >= MIN_SUN_RISE) return [x / length, y / length, up];
+  const flat = Math.hypot(x, y);
+  // Straight below: no heading to keep.
+  if (!(flat > 0)) return [0, 0, 1];
+  const across = Math.sqrt(1 - MIN_SUN_RISE * MIN_SUN_RISE);
+  return [(x / flat) * across, (y / flat) * across, MIN_SUN_RISE];
+}
 /** Heights off the cloth: layers 0.5 px apart, well inside depth-buffer precision at ~1400 px. */
 const Z = { floor: -2, backing: 0, ambient: 0.25, art: 0.5, overlay: 1 };
 /** Program cache key of a material carrying a Stadium environment cutout (design 077). */
@@ -207,6 +222,7 @@ function halvesFromSpec(spec) {
  * @returns {{ group: import('three').Group, light: import('three').DirectionalLight,
  *   setLayout: (layout: object) => void, setMat: (spec: object|null) => void,
  *   setCutout: (cutout: { glsl: string, uniforms: object }|null) => void,
+ *   setSun: (direction: number[]|null) => void,
  *   onChange: (fn: () => void) => void, dispose: () => void }}
  *   `setMat({ src, farSrc, mode: 'one-player'|'two-player', fit, imageAspect, boxAspect,
  *   overlaySrc, farOverlaySrc, far: { fit, imageAspect, boxAspect }, flip, scale })`: `src` is the near
@@ -265,6 +281,8 @@ export function createTable({ scene, textures, three, renderer = null, RoomEnvir
   };
   const halves = { self: makeHalf('self'), opp: makeHalf('opp') };
 
+  /** Toward the shown Stadium's sun (setSun), or null: the table's own key light. */
+  let sun = null;
   const light = new three.DirectionalLight(0xffffff, LIGHT_INTENSITY);
   light.name = 'board3d-key-light';
   // On every layer, so the attack-FX passes (design 075) see the same lights and lit board
@@ -371,9 +389,18 @@ export function createTable({ scene, textures, three, renderer = null, RoomEnvir
       fitHalf(key);
     }
 
-    // Key light from the far-left, high above the cloth; its shadow box spans the table.
+    placeLight(bounds, centre);
+  };
+
+  /**
+   * Key light from the far-left, high above the cloth; with a Stadium showing, from that Stadium's
+   * sun (`sun`, setSun), so what stands on the board casts its shadows as the Stadium's own props
+   * do. Its shadow box spans the table either way.
+   */
+  const placeLight = (bounds, centre) => {
     const reach = Math.hypot(bounds.w, bounds.h);
-    light.position.set(bounds.x - 0.35 * bounds.w, bounds.y + 1.4 * bounds.h, 1.1 * reach);
+    if (sun) light.position.set(centre.x + sun[0] * 1.6 * reach, centre.y + sun[1] * 1.6 * reach, sun[2] * 1.6 * reach);
+    else light.position.set(bounds.x - 0.35 * bounds.w, bounds.y + 1.4 * bounds.h, 1.1 * reach);
     light.target.position.set(centre.x, centre.y, 0);
     const radius = (reach / 2) * 1.05;
     const distance = light.position.distanceTo(light.target.position);
@@ -385,6 +412,20 @@ export function createTable({ scene, textures, three, renderer = null, RoomEnvir
     camera.near = Math.max(1, distance - radius * 2);
     camera.far = distance + radius * 2;
     camera.updateProjectionMatrix();
+  };
+
+  /**
+   * Aims the key light along a direction toward the sun ([x, y, z], table frame), or back to the
+   * table's own light (null). The sun is kept at least MIN_SUN_RISE up, so no shadow runs off the table.
+   */
+  const setSun = (direction) => {
+    if (disposed) return;
+    const valid = Array.isArray(direction) && direction.length >= 3 && direction.slice(0, 3).every(Number.isFinite);
+    const next = valid ? risenSun(direction) : null;
+    if (next === sun || (next && sun && next.every((v, k) => Math.abs(v - sun[k]) < 1e-6))) return;
+    sun = next;
+    const { bounds } = halfSize();
+    if (bounds.w > 0 && bounds.h > 0) placeLight(bounds, { x: bounds.x + bounds.w / 2, y: bounds.y + bounds.h / 2 });
   };
 
   const releaseSlot = (slot) => {
@@ -536,5 +577,5 @@ export function createTable({ scene, textures, three, renderer = null, RoomEnvir
     }
   };
 
-  return { group, light, setLayout, setMat, setCutout, onChange, dispose };
+  return { group, light, setLayout, setMat, setCutout, setSun, onChange, dispose };
 }

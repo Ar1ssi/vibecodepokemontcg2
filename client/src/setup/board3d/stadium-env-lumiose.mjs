@@ -17,8 +17,16 @@
 // casts their sun shadows and darkens their feet), G px from the plaza's edge (negative on it), B
 // the bed mask, A the kind (0 street, 1 plaza, 2 bed). The ground stays flat: this board's terrain
 // vertex shader ignores the height. Per frame: TERRAIN paints the paving, its inlay, the setts, the beds,
-// the tree grates, the street, the baked shadows and the tower's; PROPS the buildings, trees, lamps,
-// benches, cafes and the tower (stadium-env-props).
+// the tree grates, the street, the baked shadows and the tower's; the kit's meshes (design 081:
+// stadium-kit.mjs) draw the buildings, lamps and tower in the kit's one light, and the kit's own
+// street trees, benches, cafe parasols and flower clumps on the beds. The paving is clean stone:
+// each slab its own tone, no grain or stains.
+// Design 084 (the visual audit): the warmth back: cream stone (#e8dcc3) fronts, warm light grey paving
+// with a darker band of setts along the fronts, the compass inlaid at about a fifth's contrast so it
+// reads; one sun low from the top-left, every tree and lamp casting a long soft shadow; the Prism
+// Tower stands at the far end of the left strip (the top-left), where both cameras show it upright,
+// its long shadow across the plaza; blue-grey mansards with bigger dormers, the Pokemon Center's red
+// roof and big blade sign a second landmark, a striped cafe awning at one corner.
 import {
   FILTERING,
   FOOTPRINTS,
@@ -29,16 +37,22 @@ import {
   TABLE_UNIFORMS,
   TERRAIN_GROUND,
   TERRAIN_UNIFORMS,
-  VORONOI,
 } from './stadium-environment-glsl.mjs';
-import { PROP_VERTEX, createPropBuilder, propFragment } from './stadium-env-props.mjs';
+import { GRASS as GRASS_KIT } from './stadium-env-ground.mjs';
+import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
+import { createKitProps } from './stadium-kit.mjs';
+import { placeAsset } from './stadium-kit-assets.mjs';
 import { disc, wallBand, windowRun } from './stadium-env-buildings.mjs';
 import { boardContext, hash } from './stadium-env-spots.mjs';
-import { BLADES, BOX_SHADOW, EDGE_HAZE, PAVING } from './stadium-env-surfaces.mjs';
+import { BOX_SHADOW, EDGE_HAZE, PAVING } from './stadium-env-surfaces.mjs';
 
 export const LUMIOSE_KEY = 'lumiose-city';
-/** The bright day's sun (toward it, table frame): high from the far left, so the buildings' shadows fall across the plaza. */
-export const LUMIOSE_SUN = Object.freeze([-0.55, 0.32, 0.77]);
+/**
+ * The bright day's sun (toward it, table frame): from the far left (the top-left on screen), so the
+ * buildings' shadows fall across the plaza. Design 084: lower, so trees, lamps and the tower cast long
+ * shadows (about 1.1 times their height).
+ */
+export const LUMIOSE_SUN = Object.freeze([-0.6, 0.42, 0.68]);
 /** The strips of plaza either side of the cards, and the least gap kept between a prop's foot and a card. */
 export const STRIP_PX = 250;
 export const MAX_BUILDINGS = 20;
@@ -46,6 +60,8 @@ export const MAX_TREES = 8;
 export const MAX_LAMPS = 10;
 export const MAX_BEDS = 2;
 export const MAX_CAFES = 3;
+/** Design 084: the trees' and lamps' shadows (the terrain casts them: the kit's props cast none). */
+export const MAX_CASTERS = MAX_TREES + MAX_LAMPS;
 const BUILDING_GAP_PX = 14;
 /** The Prism Tower's height in card-scale px. */
 export const TOWER_HEIGHT_PX = 460;
@@ -63,7 +79,8 @@ export const towerRadius = (s, h) => h * (0.036 + 0.082 * Math.exp(-s * 9) + 0.0
 
 /** The wall palettes (aColor, linear): cream, taupe, pale stone, sand, purple-grey brick, rose, dark purple (the screen's building). */
 const WALLS = [
-  [0.77, 0.657, 0.519],
+  // Design 084: the art's cream (#e8dcc3).
+  [0.807, 0.716, 0.546],
   [0.62, 0.5, 0.4],
   [0.7, 0.66, 0.62],
   [0.68, 0.53, 0.3],
@@ -72,15 +89,20 @@ const WALLS = [
   [0.142, 0.105, 0.221],
 ];
 const DARK_PURPLE = 6;
-/** The palettes the plain blocks draw from: limestone, taupe, pale stone, sand, limestone, taupe. */
-const FACADES = [0, 1, 2, 3, 0, 1];
+/** The palettes the plain blocks draw from (design 084: cream most of all, as the art's boulevard). */
+const FACADES = [0, 0, 3, 0, 1, 2];
 /** The roofs: a steep slope in slate, a shallow top in zinc; blue-grey, patina green, dark violet, terracotta. */
 const ROOFS = [
-  { steep: [0.116, 0.133, 0.184], top: [0.235, 0.286, 0.372] },
+  // Design 084: the blue-grey slate a step lighter, so the mansard reads from above.
+  { steep: [0.16, 0.19, 0.26], top: [0.27, 0.32, 0.4] },
   { steep: [0.24, 0.42, 0.33], top: [0.345, 0.519, 0.392] },
   { steep: [0.15, 0.13, 0.2], top: [0.28, 0.27, 0.36] },
-  { steep: [0.36, 0.13, 0.09], top: [0.442, 0.18, 0.12] },
+  // The Pokemon Center's red roof.
+  { steep: [0.5, 0.055, 0.05], top: [0.62, 0.09, 0.07] },
 ];
+const CENTER_ROOF = 3;
+/** The roofs the plain blocks draw from: blue-grey slate most of all, some patina, some violet. */
+const ROOF_PICKS = [0, 0, 1, 0, 2, 0];
 /** aColor w of a roof's slates (courses across the slope) and of its zinc (seams down it). */
 const SLATE = 0.07;
 const ZINC = 0.08;
@@ -111,7 +133,7 @@ export function lumioseSpots(layout) {
     }
   };
   const depth = 250 * u;
-  const base = (roll) => ({ palette: FACADES[Math.floor(roll(3) * FACADES.length)], roof: Math.floor(roll(5) * ROOFS.length), seed: roll(4), role: null });
+  const base = (roll) => ({ palette: FACADES[Math.floor(roll(3) * FACADES.length)], roof: ROOF_PICKS[Math.floor(roll(5) * ROOF_PICKS.length)], seed: roll(4), role: null });
   for (const side of [-1, 1]) {
     const edge = side < 0 ? square.x0 : square.x1;
     along(scene.y + 20 * u, scene.y + scene.h - 10 * u, (y, len, roll) => {
@@ -123,7 +145,7 @@ export function lumioseSpots(layout) {
   // The Pokemon Center in the left row and the screen's dark purple corner in the right.
   const left = buildings.filter((b) => b.side < 0);
   const right = buildings.filter((b) => b.side > 0);
-  if (left.length) Object.assign(left[Math.min(2, left.length - 1)], { role: 'center', palette: 0, roof: 0 });
+  if (left.length) Object.assign(left[Math.min(2, left.length - 1)], { role: 'center', palette: 0, roof: CENTER_ROOF });
   if (right.length) Object.assign(right[Math.min(1, right.length - 1)], { role: 'screen', palette: DARK_PURPLE, roof: 2 });
   // Across the far end, lower, beyond the opponent's hand, between the two rows.
   const farY = square.y1 + 20 * u;
@@ -146,23 +168,32 @@ export function lumioseSpots(layout) {
   for (const side of [-1, 1]) {
     const outer = side < 0 ? square.x0 + 36 * u : square.x1 - 36 * u;
     const inner = side < 0 ? square.x0 + strip * 0.88 : square.x1 - strip * 0.88;
+    // Design 083: the trees off a strict line (some a little further in from the edge), each its own
+    // size; the lamps at uneven steps, never one regular row.
     treeShares[side].forEach((share, k) => {
-      trees.push({ x: outer, y: core.y + core.h * share, r: (42 + 10 * hash(side, k, 1)) * u, h: (78 + 20 * hash(side, k, 2)) * u, seed: hash(side, k, 3) });
+      const wander = (hash(side, k, 4) - 0.5) * 34 * u;
+      trees.push({ x: outer - side * Math.max(0, wander), y: core.y + core.h * share + (hash(side, k, 5) - 0.5) * 30 * u, r: (36 + 20 * hash(side, k, 1)) * u, h: (70 + 34 * hash(side, k, 2)) * u, seed: hash(side, k, 3) });
     });
     for (let k = 0; k < 4; k += 1) {
-      lamps.push({ x: inner, y: core.y + core.h * (0.05 + 0.3 * k), h: 118 * u, side });
+      lamps.push({ x: inner, y: core.y + core.h * (0.05 + 0.3 * k + (hash(side, k, 6) - 0.5) * 0.09), h: (112 + 12 * hash(side, k, 7)) * u, side });
     }
     for (const share of benchShares[side]) {
       benches.push({ x: inner, y: core.y + core.h * share, side, w: 14 * u, d: 50 * u });
     }
   }
-  // Cafe tables under parasols in the right strip's far half.
+  // Cafe tables under parasols in the right strip's far half; design 084: the block behind them a cafe,
+  // its awning striped.
   const cafes = [0.68, 0.9].map((share, k) => ({ x: square.x1 - strip * 0.5, y: core.y + core.h * share, r: 36 * u, seed: hash(share, k, 7), k }));
+  const cafeAt = core.y + core.h * 0.79;
+  const cafeBlock = right.filter((b) => b.role === null).sort((a, b) => Math.abs((a.y0 + a.y1) / 2 - cafeAt) - Math.abs((b.y0 + b.y1) / 2 - cafeAt))[0];
+  if (cafeBlock) cafeBlock.role = 'cafe';
   const keep = (list, r) => list.filter((item) => ctx.clear(item.x, item.y, typeof r === 'function' ? r(item) : r, 10 * u));
   const keptTrees = keep(trees, (t) => t.r).slice(0, MAX_TREES);
-  // The tower: in the left strip a little past its middle, its foot clear of the cards, its crown leaning up toward the view's corner.
+  // The tower: design 084: at the far end of the left strip (the view's top-left), past the far cards,
+  // where both cameras draw it upright (in the strip's middle tcgl laid it across the plaza).
   const h = TOWER_HEIGHT_PX * u;
-  const tower = { x: core.x - strip * 0.5, y: core.y + core.h * 0.62, h, r: towerRadius(0, h) };
+  const tower = { x: core.x - strip * 0.5, y: core.y + core.h + 60 * u, h, r: towerRadius(0, h) };
+  const keptLamps = keep(lamps, 8 * u).slice(0, MAX_LAMPS);
   return {
     ...ctx,
     handEnd,
@@ -171,10 +202,14 @@ export function lumioseSpots(layout) {
     beds,
     trees: keptTrees,
     pits: keptTrees.map((t) => ({ x: t.x, y: t.y, half: 11 * u })),
-    lamps: keep(lamps, 8 * u).slice(0, MAX_LAMPS),
+    lamps: keptLamps,
+    // Design 084: each tree's crown and each lamp's post and head cast a long soft shadow (r 0: a lamp).
+    casters: [...keptTrees.map((t) => ({ x: t.x, y: t.y, r: t.r, h: t.h })), ...keptLamps.map((l) => ({ x: l.x, y: l.y, r: 0, h: l.h }))],
     benches: keep(benches, 26 * u),
     cafes: keep(cafes, (c) => c.r).slice(0, MAX_CAFES),
     tower,
+    // Design 083: leaves fall from the plaza's trees.
+    driftEmitters: keptTrees.slice(0, 12).map((t) => ({ x: t.x, y: t.y, r: t.r * 0.8, z: t.h })),
     medal: { x: centre.x, y: centre.y, r: core.w * 0.4 },
     strip,
     centre,
@@ -222,7 +257,8 @@ void main() {
   float bed = 1e5;
   for (int i = 0; i < ${MAX_BEDS}; i++) bed = min(bed, bedDistance(p, uBeds[i]));
   float kind = bed < 0.0 ? 2.0 : (sd < 0.0 ? 1.0 : 0.0);
-  gl_FragColor = vec4(h, sd, bed, kind);
+  // Design 084: clamped under the half-float target's 65504 (no beds leaves bed at 1e5, stored as Inf).
+  gl_FragColor = vec4(h, sd, min(bed, 9000.0), kind);
 }
 `;
 
@@ -287,21 +323,19 @@ void main() {
 // darker than the art's so white card borders keep their edges.
 const PALETTE = /* glsl */ `
 // Design 080: the plaza a step darker than the art's pale stone, so white card borders keep their edge.
-const vec3 SLAB = vec3(0.42, 0.392, 0.344);
-const vec3 SLAB_LO = vec3(0.3, 0.284, 0.256);
-const vec3 SLAB_HI = vec3(0.6, 0.57, 0.515);
-const vec3 INLAY = vec3(0.33, 0.345, 0.4);
-const vec3 SETT = vec3(0.345, 0.372, 0.442);
+// Design 084: warm light grey paving, a darker warm band of setts, the inlay a fifth darker.
+const vec3 SLAB = vec3(0.5, 0.45, 0.36);
+const vec3 SLAB_HI = vec3(0.7, 0.64, 0.53);
+const vec3 INLAY = vec3(0.31, 0.28, 0.245);
+const vec3 SETT = vec3(0.25, 0.22, 0.19);
 const vec3 CURB = vec3(0.698, 0.485, 0.382);
 const vec3 CURB_CAP = vec3(0.817, 0.74, 0.66);
 const vec3 BED_GRASS = vec3(0.196, 0.416, 0.101);
 const vec3 BED_GRASS_DARK = vec3(0.09, 0.22, 0.07);
-const vec3 PETAL_PINK = vec3(0.836, 0.168, 0.264);
-const vec3 PETAL_YELLOW = vec3(1.008, 0.752, 0.095);
-const vec3 PETAL_WHITE = vec3(0.92, 0.9, 0.88);
 const vec3 GRATE = vec3(0.05, 0.05, 0.058);
 const vec3 ASPHALT = vec3(0.129, 0.133, 0.157);
-const vec3 SHADE_TINT = vec3(0.58, 0.68, 0.98);
+// Design 084: deeper, so the long shadows of one low sun read (cool, as BDSP's).
+const vec3 SHADE_TINT = vec3(0.5, 0.56, 0.74);
 `;
 
 /** The Prism Tower's and the plaza's inlay: the tower (x, y, height, foot radius) and the compass (x, y, radius). */
@@ -338,6 +372,31 @@ float towerShadow(vec2 p, vec3 sun) {
   float glass = smoothstep(0.3, 0.34, s) * (1.0 - smoothstep(0.66, 0.7, s)) * 0.5;
   return body * max(lattice, glass) * (1.0 - 0.25 * smoothstep(0.5, 1.0, s));
 }
+// Design 084: the trees' and lamps' long soft shadows: (x, y, crown radius, height); radius 0 is a lamp
+// (its post a thin line out to its head's blob). A crown's shadow is the sphere's: an ellipse its
+// radius across, stretched along the sun's way by 1/sun.z.
+uniform vec4 uCasters[${MAX_CASTERS}];
+float casterShadow(vec2 p, vec3 sun) {
+  vec2 dir = -sun.xy / sun.z;
+  vec2 way = normalize(dir);
+  float shade = 0.0;
+  for (int i = 0; i < ${MAX_CASTERS}; i++) {
+    vec4 c = uCasters[i];
+    if (c.w <= 0.0) continue;
+    vec2 rel = p - c.xy;
+    vec2 tip = dir * c.w;
+    if (dot(rel, rel) > dot(tip, tip) * 1.6 + 4.0 * c.z * c.z + 900.0) continue;
+    float t = clamp(dot(rel, tip) / dot(tip, tip), 0.0, 1.0);
+    float post = 1.0 - smoothstep(1.2 * uUnit, 3.6 * uUnit, length(rel - tip * t));
+    shade = max(shade, post * (c.z > 0.0 ? 0.55 : 0.45));
+    float headR = c.z > 0.0 ? c.z : 13.0 * uUnit;
+    vec2 at = rel - dir * (c.z > 0.0 ? c.w * 0.9 : c.w * 1.05);
+    vec2 local = vec2(dot(at, way) * sun.z, dot(at, vec2(-way.y, way.x)));
+    float d = length(local) - headR;
+    shade = max(shade, (1.0 - smoothstep(-headR * 0.45, headR * 0.35, d)) * (c.z > 0.0 ? 0.85 : 0.5));
+  }
+  return shade;
+}
 // Two rings of inlay round the tower's foot.
 float towerFoot(vec2 p) {
   if (uTower.w <= 0.0) return 0.0;
@@ -351,8 +410,9 @@ float medallion(vec2 p) {
   if (uMedal.z <= 0.0) return 0.0;
   vec2 rel = p - uMedal.xy;
   float r = length(rel);
-  float w0 = 0.8 * uUnit;
-  float w1 = 2.2 * uUnit;
+  // Design 084: a little wider, so it reads.
+  float w0 = 1.5 * uUnit;
+  float w1 = 3.2 * uUnit;
   float rings = max(1.0 - smoothstep(w0, w1, abs(r - uMedal.z)), 1.0 - smoothstep(w0, w1, abs(r - uMedal.z * 0.78)));
   float sector = 0.7853982;
   float toSpoke = abs(fract(atan(rel.y, rel.x) / sector + 0.5) - 0.5) * sector * r;
@@ -367,10 +427,9 @@ ${TERRAIN_UNIFORMS}
 ${NOISE}
 ${FOOTPRINTS}
 ${FILTERING}
-${VORONOI}
 ${REVEAL}
+${GRASS_KIT}
 ${PAVING}
-${BLADES}
 ${EDGE_HAZE}
 ${PALETTE}
 ${LUMIOSE}
@@ -391,47 +450,34 @@ void main() {
 
   // The street past the plaza: dark asphalt with a worn crown.
   vec3 col = mix(ASPHALT, ASPHALT * 1.25, smoothstep(0.3, 0.7, fbm3(p / 140.0 + 3.0)));
-  col *= 0.93 + 0.14 * grain(p, 3.0);
-  // The plaza: big pale slabs in staggered rows, each its own tone, hairline joints, wear and stain.
+  // The plaza: big pale slabs in staggered rows, each its own tone, hairline joints (design 081: clean
+  // stone, no grain or stains).
   if (kind > 0.5) {
     vec3 slab = paving(p, vec2(108.0, 72.0) * u, 0.5);
-    vec3 stone = mix(SLAB * 0.92, SLAB * 1.08, slab.y);
-    stone *= 0.94 + 0.12 * fbm3(p / 28.0 + slab.y * 7.0);
-    stone *= 0.97 + 0.06 * grain(p, 3.2);
+    vec3 stone = mix(SLAB * 0.93, SLAB * 1.07, slab.y);
     // Design 080: the joints are shallower round the cards, so the slabs read as one floor under them.
     stone = mix(stone, stone * mix(0.7, 0.84, fieldCalm(p, 100.0)), 1.0 - smoothstep(0.4, 1.4, slab.x));
-    // A paler diagonal polish across some slabs.
-    stone *= 1.0 + 0.06 * step(0.6, slab.y) * smoothstep(0.35, 0.65, gnoise(vec2(dot(p, vec2(0.7, 0.7)) / 60.0, slab.y * 9.0)));
-    stone = mix(stone, SLAB_LO, 0.35 * smoothstep(0.62, 0.78, fbm3(p / 52.0 + 8.0)));
-    // The compass inlaid in blue-grey stone, worn a little.
-    stone = mix(stone, INLAY * (0.9 + 0.2 * grain(p, 5.0)), max(medallion(p), towerFoot(p)) * 0.85);
+    // The compass inlaid in blue-grey stone.
+    stone = mix(stone, INLAY, max(medallion(p), towerFoot(p)) * 0.85);
     col = stone;
     // Along the building fronts a band of setts, small blue-grey stones in running bond, a pale kerb line at its edge.
     float band = 1.0 - smoothstep(30.0 * u, 31.5 * u, -sd);
     vec3 sett = paving(p, vec2(9.0, 6.0) * u, 0.5);
-    vec3 setts = mix(SETT * 0.82, SETT * 1.12, sett.y) * (0.94 + 0.1 * grain(p, 2.2));
+    vec3 setts = mix(SETT * 0.86, SETT * 1.1, sett.y);
     setts *= 1.0 - 0.4 * (1.0 - smoothstep(0.25, 0.8, sett.x)) * patternFade(filterPixel, 6.0 * u);
     col = mix(col, setts, band);
     col = mix(col, SLAB_HI, 0.6 * (1.0 - smoothstep(0.5, 1.6 * u, abs(-sd - 31.5 * u))));
     col *= 1.0 - 0.14 * (1.0 - smoothstep(0.0, 14.0 * u, -sd));
   }
-  // The beds: grass in tufts and a few flowers, under a curb of salmon-tan stone with a pale cap.
-  if (kind > 1.5) {
-    vec4 tuft = voronoiCell(p / (10.0 * u) + 1.3);
-    vec2 blades = bladeFan(-tuft.zw * 10.0 * u, tuft.y, 9.0 * u);
-    vec3 grass = mix(BED_GRASS_DARK, BED_GRASS, 0.5 + 0.5 * fbm3(p / 30.0 + 2.0));
-    grass = mix(grass, mix(BED_GRASS, BED_GRASS * 1.4, blades.y), blades.x * 0.85);
-    float cellSize = 13.0 * u;
-    vec4 bloom = voronoiCell(p / cellSize + 7.7);
-    float flower = step(0.82, bloom.y) * (1.0 - smoothstep(0.9 * u, 1.9 * u, length(bloom.zw) * cellSize));
-    vec3 petal = mix(mix(PETAL_PINK, PETAL_YELLOW, step(0.5, fract(bloom.y * 13.0))), PETAL_WHITE, step(0.7, fract(bloom.y * 29.0)));
-    col = mix(grass, petal, flower);
-  }
+  // The beds: short grass in two greens (the kit's flower clumps stand on it), under a curb of
+  // salmon-tan stone with a pale cap.
+  // Design 082: BDSP's clover grass.
+  if (kind > 1.5) col = cloverGrass(p, mix(BED_GRASS_DARK, BED_GRASS, 0.6 + 0.3 * smoothstep(0.35, 0.65, fbm3(p / 70.0 + 2.0))), 0.0);
   // The curb: the bed's outer 9 px, laid in blocks with a pale lip along its outer edge.
   float inCurb = step(-9.0 * u, field.b) * step(field.b, 0.0);
   float jointAt = (0.5 - abs(fract(p.y / (26.0 * u)) - 0.5)) * 26.0 * u;
   float joint = 1.0 - smoothstep(0.3, 0.9, jointAt);
-  vec3 curb = mix(CURB, CURB_CAP, smoothstep(-3.2 * u, -1.6 * u, field.b)) * (0.94 + 0.1 * grain(p, 3.0)) * (1.0 - 0.2 * joint);
+  vec3 curb = mix(CURB, CURB_CAP, smoothstep(-3.2 * u, -1.6 * u, field.b)) * (1.0 - 0.2 * joint);
   col = mix(col, curb, inCurb);
   // The street trees' iron grates, set in the paving.
   for (int i = 0; i < ${MAX_TREES}; i++) {
@@ -440,7 +486,7 @@ void main() {
     vec2 q = abs(p - pit.xy) - pit.z;
     float edge = max(q.x, q.y);
     float slits = step(0.45, fract((p.x - pit.x) / (3.6 * u))) * step(0.3, fract((p.y - pit.y) / (11.0 * u)));
-    vec3 grate = GRATE * (0.8 + 0.7 * slits) + vec3(0.06, 0.05, 0.045) * smoothstep(0.0, 0.7, grain(p, 2.0));
+    vec3 grate = GRATE * (0.8 + 0.7 * slits);
     col = mix(col, CURB_CAP * 0.9, (1.0 - smoothstep(-0.3, 0.8, abs(edge - 2.2 * u) - 2.2 * u)) * step(0.0, edge));
     col = mix(col, grate, 1.0 - smoothstep(-0.6, 0.4, edge));
   }
@@ -448,7 +494,11 @@ void main() {
   // The baked sun: the buildings' shadows (alpha), their feet's occlusion (blue); the tower's lattice shadow.
   float lit = light.a;
   col *= mix(0.78, 1.0, light.b);
-  float shade = max((1.0 - lit) * step(field.r, 1.0), towerShadow(p, sun));
+  // Design 084: by the cards the tower's lattice and the lamps' thin posts soften to a plain soft shade.
+  float nearCard = fieldCalm(p, 70.0);
+  float tower = towerShadow(p, sun);
+  float props = casterShadow(p, sun);
+  float shade = max((1.0 - lit) * step(field.r, 1.0), max(mix(tower, 0.45 * step(0.01, tower), nearCard), props * (1.0 - 0.45 * nearCard)));
   col = mix(col, col * SHADE_TINT, shade * 0.8);
   // Clouds' shadows drifting over it all, slowly.
   float cloud = smoothstep(0.58, 0.74, fbm3((p - vec2(uTime * 6.0, uTime * 2.0)) / 380.0 + 4.0));
@@ -474,9 +524,8 @@ const AWNINGS = [
   [0.101, 0.196, 0.442, 0.02],
 ];
 const AWNING_RED = [0.684, 0.071, 0.071, 0.02];
+const AWNING_CREAM = [0.95, 0.88, 0.74, 0.02];
 const BANNER = [0.142, 0.555, 0.196, 0.02];
-const FOLIAGE = [0.094, 0.215, 0.114, 0.05];
-const FOLIAGE_LIT = [0.25, 0.5, 0.33, 0.05];
 const FOLIAGE_MID = [0.16, 0.36, 0.2, 0.05];
 const TRUNK = [0.142, 0.1, 0.09, 0];
 const BENCH_WOOD = [0.142, 0.101, 0.101, 0];
@@ -498,7 +547,6 @@ const PARASOLS = [
   [[0.101, 0.345, 0.167, 0.02], [1.1, 1.08, 1.0, 0.02]],
 ];
 const TABLE_TOP = [0.9, 0.88, 0.84, 0.3];
-const POT = [0.38, 0.17, 0.12, 0];
 const FLOWER_PINK = [0.836, 0.168, 0.264, 0.02];
 
 /** The point `t` px inside a building's face from `s` px along it, at height z. */
@@ -534,11 +582,12 @@ function roof(props, b, face, u) {
   props.tube([...mid, mid[0]].map((p) => [...p, z1 + 0.4]), 0.9 * u, ROOF_TRIM, { sides: 4 });
   props.tube([...ridge, ridge[0]].map((p) => [...p, z2 + 0.4]), 0.9 * u, ROOF_TRIM, { sides: 4 });
   // Dormers in the steep slope on the face to the plaza: a front wall with a window, a gable roof back into the slope.
-  const count = Math.max(2, Math.round(face.length / (62 * u)));
+  // Design 084: bigger and closer, so the mansard reads from above.
+  const count = Math.max(2, Math.round(face.length / (52 * u)));
   const slope = rise1 / i1;
   for (let k = 0; k < count; k += 1) {
     const s = (face.length * (k + 0.5)) / count;
-    const half = 8.5 * u;
+    const half = 11 * u;
     const front = 3 * u;
     const zFront = H + slope * front;
     const eave = H + 26 * u;
@@ -564,18 +613,19 @@ function roof(props, b, face, u) {
   for (const share of [0.28, 0.74]) {
     const cx = (b.x0 + b.x1) / 2 + (hash(b.seed, share, 4) - 0.5) * w;
     const cy = b.y0 + iy + d * share;
-    props.box({ x: cx, y: cy, z0: z2 - 2, z1: z2 + 26 * u, hw: 8 * u, hh: 6 * u, color: BRICK, topColor: [0.12, 0.1, 0.1, 0] });
+    props.roundBox({ x: cx, y: cy, z0: z2 - 2, z1: z2 + 26 * u, hw: 8 * u, hh: 6 * u, color: BRICK, topColor: [0.12, 0.1, 0.1, 0] });
     for (const dx of [-3.2, 3.2]) props.cylinder({ x: cx + dx * u, y: cy, z0: z2 + 26 * u, z1: z2 + 33 * u, r: 2.2 * u, color: BRICK, capColor: [0.1, 0.09, 0.09, 0], sides: 8 });
   }
   const sky = { x: (b.x0 + b.x1) / 2, y: b.y0 + iy + d * 0.5 };
-  props.box({ x: sky.x, y: sky.y, z0: z2, z1: z2 + 4 * u, hw: Math.min(10 * u, w / 2 - 1), hh: 8 * u, color: TRIM, topColor: GLASS });
+  props.roundBox({ x: sky.x, y: sky.y, z0: z2, z1: z2 + 4 * u, hw: Math.min(10 * u, w / 2 - 1), hh: 8 * u, color: TRIM, topColor: GLASS });
 }
 
 /** The Pokemon Center's blade sign: a Poke Ball on a bracket, standing out from the wall. */
 function pokeSign(props, b, face, u) {
-  const r = 17 * u;
+  // Design 084: bigger, a landmark (the art's sign over the street).
+  const r = 25 * u;
   const s = face.length * 0.5;
-  const z = 128 * u;
+  const z = 140 * u;
   const wall = onFace(face, s, 0, z);
   const centre = [wall[0] + face.out[0] * (r + 8 * u), wall[1] + face.out[1] * (r + 8 * u), z];
   props.tube([wall, [wall[0] + face.out[0] * 8 * u, wall[1] + face.out[1] * 8 * u, z]], 1.3 * u, IRON, { sides: 6 });
@@ -603,7 +653,7 @@ function pokeSign(props, b, face, u) {
 function building(props, b, u) {
   const wall = WALLS[b.palette];
   const mid = [(b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2];
-  props.box({ x: mid[0], y: mid[1], z0: -2, z1: b.height, hw: (b.x1 - b.x0) / 2, hh: (b.y1 - b.y0) / 2, color: [...wall, 0], topColor: [...ROOFS[b.roof].steep, SLATE] });
+  props.roundBox({ x: mid[0], y: mid[1], z0: -2, z1: b.height, hw: (b.x1 - b.x0) / 2, hh: (b.y1 - b.y0) / 2, color: [...wall, 0], topColor: [...ROOFS[b.roof].steep, SLATE] });
   // The face to the plaza: a to b runs so its outer side is on the right.
   let a;
   let c;
@@ -630,7 +680,18 @@ function building(props, b, u) {
   wallBand(props, { a, b: c, depth: 10 * u, z0: -2, z1: 7 * u, over: 2 * u, color: trim });
   windowRun(props, { a, b: c, z0: 8 * u, z1: 34 * u, panes: Math.max(2, Math.round(length / (isCenter ? 70 : 52) / u)), rows: 1, glass: isCenter ? GLASS : GLASS_DARK, frame: IRON, frameW: 9 * u });
   const awning = isCenter ? AWNING_RED : AWNINGS[Math.floor(b.seed * AWNINGS.length) % AWNINGS.length];
-  wallBand(props, { a, b: c, depth: 4 * u, z0: 36 * u, z1: 44 * u, over: 15 * u, color: awning, topColor: awning });
+  if (b.role === 'cafe') {
+    // Design 084: the cafe's awning in red and cream stripes.
+    const stripes = Math.max(6, Math.round(length / (14 * u)));
+    for (let k = 0; k < stripes; k += 1) {
+      const from = [a[0] + along[0] * ((length * k) / stripes), a[1] + along[1] * ((length * k) / stripes)];
+      const to = [a[0] + along[0] * ((length * (k + 1)) / stripes), a[1] + along[1] * ((length * (k + 1)) / stripes)];
+      const stripe = k % 2 ? AWNING_CREAM : AWNING_RED;
+      wallBand(props, { a: from, b: to, depth: 4 * u, z0: 36 * u, z1: 44 * u, over: 18 * u, color: stripe, topColor: stripe });
+    }
+  } else {
+    wallBand(props, { a, b: c, depth: 4 * u, z0: 36 * u, z1: 44 * u, over: 15 * u, color: awning, topColor: awning });
+  }
   wallBand(props, { a, b: c, depth: 8 * u, z0: 44 * u, z1: 50 * u, over: 4 * u, color: isCenter ? [1.1, 1.08, 1.0, 0.02] : trim });
   // Upper floors: long windows in stone piers, a trim band every floor, a balcony slab and rail on some.
   for (let floor = 0; floor < b.floors - 1; floor += 1) {
@@ -648,17 +709,29 @@ function building(props, b, u) {
   if (isCenter) pokeSign(props, b, face, u);
 }
 
-/** A round street tree: a slim trunk and a crown of overlapping balls, pale where the sun lands. */
-function tree(props, t, u) {
-  props.tube([[t.x, t.y, -2], [t.x, t.y, t.h * 0.3], [t.x, t.y, t.h * 0.62]], [3.6 * u, 2.6 * u, 2 * u], TRUNK, { sides: 8 });
-  const balls = [[0, 0, 0.2, 1], [-0.55, 0.25, -0.05, 0.74], [0.55, -0.2, 0, 0.76], [0.1, 0.55, 0.1, 0.64], [-0.15, -0.55, 0.08, 0.66], [0, 0, 0.6, 0.66], [0.3, 0.3, 0.45, 0.5]];
-  balls.forEach(([dx, dy, dz, s], k) => {
-    props.sphere({ x: t.x + dx * t.r, y: t.y + dy * t.r, z: t.h + dz * t.r, r: t.r * s, color: [FOLIAGE, FOLIAGE_LIT, FOLIAGE_MID][k % 3], sides: 14, rings: 9, squash: 0.9 });
+/** A round street tree (the kit's), trimmed, in Lumiose's greens. */
+function tree(props, t) {
+  placeAsset(props, 'treeRound', {
+    x: t.x,
+    y: t.y,
+    size: t.r * 0.94,
+    height: t.h + t.r * 0.6,
+    seed: t.seed * 1009,
+    sun: LUMIOSE_SUN,
+    colors: { leaf: [0.1, 0.28, 0.12, 0], leafLight: [0.19, 0.42, 0.19, 0], bark: TRUNK, barkDark: TRUNK },
   });
 }
 
 /** A lamppost: a fluted iron post, a bracket with three globes, a green banner hung from it. */
 function lamp(props, l, u) {
+  lampPost(props, l, u);
+  // Design 083: the banner stirs in the breeze (a little: it hangs from the post).
+  props.look({ kind: LOOK.plain, sway: 0.6 }, () =>
+    props.quad([l.x + l.side * -0.6 * u, l.y - 5 * u, l.h * 0.46], [l.x + l.side * -0.6 * u, l.y + 5 * u, l.h * 0.46], [l.x + l.side * -0.6 * u, l.y + 5 * u, l.h * 0.78], [l.x + l.side * -0.6 * u, l.y - 5 * u, l.h * 0.78], BANNER)
+  );
+}
+
+function lampPost(props, l, u) {
   props.tube([[l.x, l.y, -2], [l.x, l.y, l.h * 0.5], [l.x, l.y, l.h]], [6 * u, 3.6 * u, 2.6 * u], IRON, { sides: 12 });
   props.cylinder({ x: l.x, y: l.y, z0: -2, z1: 14 * u, r: 9 * u, color: IRON, sides: 12 });
   props.ring({ x: l.x, y: l.y, z0: l.h * 0.46, z1: l.h * 0.46 + 3 * u, r: 5 * u, color: IRON, sides: 12 });
@@ -671,35 +744,29 @@ function lamp(props, l, u) {
   // A basket of flowers hung from the post, and the banner.
   props.sphere({ x: l.x + l.side * 7 * u, y: l.y, z: l.h * 0.62, r: 5 * u, color: FOLIAGE_MID, sides: 10, rings: 7, squash: 0.7 });
   props.sphere({ x: l.x + l.side * 7 * u, y: l.y + 1.5 * u, z: l.h * 0.62 + 3 * u, r: 2.4 * u, color: FLOWER_PINK, sides: 8, rings: 5 });
-  props.quad([l.x + l.side * -0.6 * u, l.y - 5 * u, l.h * 0.46], [l.x + l.side * -0.6 * u, l.y + 5 * u, l.h * 0.46], [l.x + l.side * -0.6 * u, l.y + 5 * u, l.h * 0.78], [l.x + l.side * -0.6 * u, l.y - 5 * u, l.h * 0.78], BANNER);
 }
 
-/** A bench: two dark slats on iron legs, its back to the strip's edge. */
-function bench(props, b, u) {
-  props.box({ x: b.x, y: b.y, z0: 6 * u, z1: 9 * u, hw: b.w / 2, hh: b.d / 2, color: BENCH_WOOD });
-  props.box({ x: b.x - b.side * 6 * u, y: b.y, z0: 9 * u, z1: 22 * u, hw: 1.5 * u, hh: b.d / 2, color: BENCH_WOOD });
-  for (const y of [b.y - b.d / 2 + 4 * u, b.y + b.d / 2 - 4 * u]) props.box({ x: b.x, y, z0: -1, z1: 6 * u, hw: b.w / 2 - 1 * u, hh: 1.2 * u, color: IRON });
+/** A bench (the kit's), its back to the strip's edge. */
+function bench(props, b) {
+  placeAsset(props, 'bench', { x: b.x, y: b.y, size: b.d, yaw: (b.side * Math.PI) / 2, sun: LUMIOSE_SUN, colors: { wood: BENCH_WOOD, woodDark: BENCH_WOOD, iron: IRON } });
 }
 
-/** A cafe table under a parasol: a round top on a pedestal, three chairs round it, eight striped wedges overhead. */
+/** A cafe table and chairs under a striped parasol (the kit's). */
 function cafe(props, c, u) {
   const [stripe, white] = PARASOLS[Math.floor(c.seed * PARASOLS.length) % PARASOLS.length];
-  props.cylinder({ x: c.x, y: c.y, z0: -2, z1: 2.5 * u, r: 8 * u, color: IRON, sides: 14 });
-  props.tube([[c.x, c.y, 0], [c.x, c.y, 24 * u]], 1.3 * u, IRON, { sides: 8 });
-  props.cylinder({ x: c.x, y: c.y, z0: 24 * u, z1: 26 * u, r: 15 * u, color: TABLE_TOP, sides: 18 });
-  for (let k = 0; k < 3; k += 1) {
-    const angle = c.seed * 6 + (k / 3) * 2 * Math.PI;
-    const cx = c.x + Math.cos(angle) * 24 * u;
-    const cy = c.y + Math.sin(angle) * 24 * u;
-    props.box({ x: cx, y: cy, z0: 10 * u, z1: 12 * u, hw: 6 * u, hh: 6 * u, yaw: angle, color: IRON });
-    props.box({ x: cx + Math.cos(angle) * 5.4 * u, y: cy + Math.sin(angle) * 5.4 * u, z0: 12 * u, z1: 25 * u, hw: 0.8 * u, hh: 6 * u, yaw: angle, color: IRON });
-    for (const [dx, dy] of [[-4, -4], [4, -4], [4, 4], [-4, 4]]) props.box({ x: cx + dx * u, y: cy + dy * u, z0: -1, z1: 10 * u, hw: 0.7 * u, hh: 0.7 * u, color: IRON });
+  placeAsset(props, 'parasol', { x: c.x, y: c.y, size: c.r, height: 70 * u, seed: c.seed * 997, stripes: [stripe, white], sun: LUMIOSE_SUN, colors: { pole: IRON, table: TABLE_TOP, chair: IRON } });
+}
+
+/** Flowers in clumps down each bed (the kit's), pink, yellow and white by turns. */
+function bedFlowers(props, bed, u) {
+  const across = bed.x1 - bed.x0;
+  const size = across * 0.32;
+  const count = Math.max(1, Math.floor((bed.y1 - bed.y0) / (size * 2.6)));
+  for (let k = 0; k < count; k += 1) {
+    const y = bed.y0 + ((bed.y1 - bed.y0) * (k + 0.5)) / count;
+    const petals = [[FLOWER_PINK, '#fff6ea'], ['#ffd84a', '#fff6ea'], [FLOWER_PINK, '#ffd84a']][k % 3];
+    placeAsset(props, 'flowers', { x: (bed.x0 + bed.x1) / 2, y, size, head: 4.6 * u, count: 6, seed: k * 31 + bed.x0, petals, sun: LUMIOSE_SUN });
   }
-  props.tube([[c.x, c.y, 26 * u], [c.x, c.y, 82 * u]], 1.1 * u, IRON, { sides: 8 });
-  const rim = (k) => [c.x + Math.cos((k / 8) * 2 * Math.PI) * c.r, c.y + Math.sin((k / 8) * 2 * Math.PI) * c.r, 62 * u];
-  const apex = [c.x, c.y, 82 * u];
-  for (let k = 0; k < 8; k += 1) props.triangle(apex, rim(k), rim(k + 1), k % 2 ? white : stripe);
-  props.sphere({ x: c.x, y: c.y, z: 83 * u, r: 2 * u, color: IRON, sides: 8, rings: 5 });
 }
 
 /**
@@ -736,7 +803,7 @@ function prismTower(props, t, u) {
   }
   // The foot: a white pavilion between the legs, arched windows on its faces.
   const pavilion = radius(0.02) * 0.62;
-  props.box({ x: t.x, y: t.y, z0: -2, z1: 0.075 * t.h, hw: pavilion, hh: pavilion, yaw: Math.PI / 4, color: TOWER_WHITE, topColor: [0.5, 0.58, 0.68, 0.3] });
+  props.roundBox({ x: t.x, y: t.y, z0: -2, z1: 0.075 * t.h, hw: pavilion, hh: pavilion, yaw: Math.PI / 4, color: TOWER_WHITE, topColor: [0.5, 0.58, 0.68, 0.3] });
   for (let k = 0; k < 4; k += 1) {
     const angle = (k / 4) * 2 * Math.PI;
     const px = t.x + Math.cos(angle) * (pavilion * 1.0 + 0.3);
@@ -776,61 +843,14 @@ export function lumioseProps(spots) {
     building(props, b, u);
     billboard(props, b, u);
   }
-  for (const t of trees) tree(props, t, u);
+  for (const t of trees) tree(props, t);
   for (const l of lamps) lamp(props, l, u);
-  for (const b of benches) bench(props, b, u);
+  for (const b of benches) bench(props, b);
   for (const c of cafes) cafe(props, c, u);
+  for (const bed of spots.beds) bedFlowers(props, bed, u);
   prismTower(props, tower, u);
   return props;
 }
-
-/** The props in the bright day: sun and a blue sky, stone warm in the sun and blue in its shade, glass reflecting the sky, foliage in lobes. */
-const PROP_LIGHT = /* glsl */ `
-${VORONOI}
-vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
-  vec3 sun = normalize(uSun);
-  vec3 view = normalize(uEye - world);
-  float lit = max(dot(n, sun), 0.0);
-  vec3 sky = vec3(0.5, 0.6, 0.86) * (0.6 + 0.4 * n.z);
-  vec3 col = albedo * (sky + vec3(1.05, 0.98, 0.88) * lit * 0.85);
-  if (metal > 0.6) {
-    vec3 r = reflect(-view, n);
-    vec3 refl = mix(vec3(0.4, 0.58, 0.85), vec3(0.88, 0.95, 1.02), clamp(r.z + 0.2, 0.0, 1.0));
-    float fres = pow(1.0 - abs(dot(n, view)), 2.0);
-    col = mix(albedo * (0.6 + 0.8 * lit), refl * 0.9, 0.22 + 0.5 * fres);
-    col += vec3(1.0) * pow(max(dot(reflect(-sun, n), view), 0.0), 50.0) * 0.5;
-  } else if (metal > 0.04 && metal < 0.06) {
-    vec2 q = world.xy / 12.0 + world.z / 10.0;
-    q += 0.35 * (vec2(gnoise(q * 1.7), gnoise(q * 1.7 + 9.1)) - 0.5);
-    vec4 lobe = voronoiCell(q);
-    float inLobe = 1.0 - smoothstep(0.34, 0.62, length(lobe.zw));
-    float bulge = dot(normalize(n + vec3(-lobe.zw, 0.0) * 0.6 * inLobe), sun);
-    float crown = smoothstep(-0.3, 0.7, n.z);
-    col = albedo * (0.45 + 0.95 * smoothstep(-0.1, 0.8, bulge)) * mix(0.82, 1.0, smoothstep(0.0, 0.2, lobe.x)) * (sky * 0.5 + 0.55) * mix(0.6, 1.08, crown);
-    col *= 0.86 + 0.28 * gnoise(world.xy / 2.4 + world.z / 2.0);
-  } else if (metal > 0.065 && metal < 0.075) {
-    // Roof slates: courses running across the slope, each slate a shade of its own.
-    float s = length(n.xy) > 0.25 ? dot(world.xy, normalize(n.xy)) / max(length(n.xy), 0.3) : world.y;
-    float course = fract(s / 7.0);
-    float slate = hash12(vec2(floor(s / 7.0), floor((world.x + world.y * 0.3) / 9.0)));
-    col = albedo * (0.8 + 0.4 * slate) * (sky * 0.45 + 0.3 + lit * 1.15) * (0.84 + 0.16 * smoothstep(0.0, 0.2, course) * (1.0 - smoothstep(0.85, 1.0, course)));
-  } else if (metal > 0.075 && metal < 0.085) {
-    // Zinc: standing seams running down the slope, a soft sheen where the sun catches it.
-    vec2 down = length(n.xy) > 0.05 ? normalize(n.xy) : vec2(1.0, 0.0);
-    float seam = abs(fract(dot(world.xy, vec2(-down.y, down.x)) / 11.0) - 0.5) * 2.0;
-    col = albedo * (sky * 0.5 + 0.3 + lit * 1.0) * (0.86 + 0.14 * smoothstep(0.0, 0.14, 1.0 - seam)) * (0.94 + 0.12 * gnoise(world.xy / 9.0));
-    col += vec3(0.6, 0.66, 0.72) * pow(max(dot(reflect(-sun, n), view), 0.0), 18.0) * 0.18;
-  } else if (metal > 0.01 && metal < 0.03) {
-    // Stone and cloth: faint stains running down, a little grain.
-    col *= 0.94 + 0.1 * gnoise(vec2((world.x + world.y) * 0.4, world.z * 0.09));
-    col *= 0.96 + 0.08 * gnoise(world.xy / 3.0 + world.z / 4.0);
-  }
-  col *= mix(0.82, 1.0, smoothstep(0.0, 16.0, world.z));
-  return col;
-}
-`;
-
-export const PROP_FRAGMENT = propFragment({ light: PROP_LIGHT, reveal: 'vec3(0.9, 1.0, 1.1)' });
 
 /** Lumiose City's board (stadium-environment-mesh.js BOARDS). */
 export function lumioseCityBoard({ three, material, terrainGrid, replaceGeometry, bakeOptions }) {
@@ -844,19 +864,19 @@ export function lumioseCityBoard({ three, material, terrainGrid, replaceGeometry
     uUnit: { value: 1 },
     uBlocks: { value: Array.from({ length: MAX_BUILDINGS }, () => new three.Vector4()) },
     uBlockHeights: { value: Array.from({ length: MAX_BUILDINGS }, () => 0) },
+    uCasters: { value: Array.from({ length: MAX_CASTERS }, () => new three.Vector4()) },
   };
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
   const materials = {
     terrain: make(TERRAIN_VERTEX, TERRAIN_FRAGMENT),
-    props: make(PROP_VERTEX, PROP_FRAGMENT, { side: three.DoubleSide }),
     bakeField: make(FULLSCREEN_VERTEX, BAKE_FIELD_FRAGMENT, bakeOptions),
     bakeLight: make(FULLSCREEN_VERTEX, BAKE_LIGHT_FRAGMENT, bakeOptions),
   };
+  const kit = createKitProps({ three, material, own, mood: 'day', reveal: 'vec3(0.9, 1.0, 1.1)' });
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
-  const props = new three.Mesh(new three.BufferGeometry(), materials.props);
   return {
-    objects: [terrain, props],
-    materials: Object.values(materials),
+    objects: [terrain, ...kit.objects],
+    materials: [...Object.values(materials), ...kit.materials],
     bakeField: materials.bakeField,
     bakeLight: materials.bakeLight,
     spots: (layout) => lumioseSpots(layout),
@@ -881,9 +901,12 @@ export function lumioseCityBoard({ three, material, terrainGrid, replaceGeometry
         own.uBlockHeights.value[i] = b ? b.height + 26 * u : 0;
         return b ? slot.set(b.x0, b.y0, b.x1, b.y1) : slot.set(0, 0, 0, 0);
       });
+      own.uCasters.value.forEach((slot, i) => {
+        const c = spots?.casters[i];
+        return c ? slot.set(c.x, c.y, c.r, c.h) : slot.set(0, 0, 0, 0);
+      });
       replaceGeometry(terrain, terrainGrid(bounds));
-      props.visible = Boolean(spots);
-      if (spots) replaceGeometry(props, lumioseProps(spots).build(three));
+      kit.set(spots ? lumioseProps(spots) : null);
     },
   };
 }

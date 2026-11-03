@@ -16,17 +16,153 @@
 // Per frame: TERRAIN paints the ground, the emblem and the lightning's flash; CLOUDS is the cloud
 // sea, domes turning round the mountain on a grid of their own; BOLT draws one lightning stroke and
 // its fork as a camera-facing ribbon (the mesh schedules the strikes).
+// Design 084 (the visual audit): re-keyed low as the card is a storm: slate rock, a darker blue-grey
+// cloud sea with lighter tops, a dark floor, snow only as caps on the highest crags; the emblem the one
+// bright thing (an emissive gold line with a soft halo and the shared contact glow); each rare strike a
+// brief cool pulse of sky light over the scene; a far peak painted in the cloud sea; the pines dark,
+// no snow on them.
 import {
+  FILTERING,
   FOOTPRINTS,
   NOISE,
   OUTPUT,
   REVEAL,
   TABLE_UNIFORMS,
   TERRAIN_GROUND,
+  TERRAIN_SPACING_PX,
   TERRAIN_UNIFORMS,
   VORONOI,
 } from './stadium-environment-glsl.mjs';
 import { RIDGE_HALF_WIDTH } from './stadium-environment-layout.mjs';
+import { GLOW, STRATA } from './stadium-env-ground.mjs';
+import { createPropBuilder } from './stadium-env-props.mjs';
+import { RISE_LEAN, boardContext, clumpAround, hash, patchy } from './stadium-env-spots.mjs';
+import { measureAsset, placeAsset } from './stadium-kit-assets.mjs';
+
+/** The crest's tallest round the mountain (BAKE_MOUNTAIN crestHeight: a swell to 130 px, crags of 34 and 14). */
+const CREST_MAX_PX = 130 + 34 + 14;
+/** How far in and out round the mountain the rim wanders from its mean (BOWL rimAt: 34 × -0.35..0.65). */
+const RIM_IN_PX = 34 * 0.35;
+const RIM_OUT_PX = 34 * 0.65;
+
+/** A peak's height with its ridge at its tallest within `near` px of (x, y) (PEAKS ridgedPeak). */
+const peakCeiling = (peak, x, y, near) => {
+  const fromSummit = Math.max(0, Math.hypot(x - peak.x, y - peak.y) - near);
+  const cone = fromSummit < peak.r ? peak.h * (1 - fromSummit / peak.r) ** 1.15 : 0;
+  const along = { x: peak.ridge.x - peak.x, y: peak.ridge.y - peak.y };
+  const span = along.x ** 2 + along.y ** 2;
+  if (span < 1) return cone;
+  const s = Math.min(1, Math.max(0, ((x - peak.x) * along.x + (y - peak.y) * along.y) / span));
+  const across = Math.max(0, Math.hypot(x - peak.x - along.x * s, y - peak.y - along.y * s) - near) / (peak.r * RIDGE_HALF_WIDTH);
+  const nearest = Math.max(0, s - near / Math.sqrt(span));
+  const crest = peak.h * (0.72 - 0.5 * nearest) * 1.15;
+  return Math.max(cone, crest * Math.max(1 - across, 0) ** 1.2);
+};
+
+/**
+ * The highest the mountain's ground can stand at (x, y), px: the field bake's height with every noise
+ * at its tallest. BAKE_MOUNTAIN's wall (from the floor's edge, never nearer than the floor's radius,
+ * up to the crest) or outer slope (down from the crest to the cloud sea's floor, CLOUD_LEVEL - 40)
+ * or a peak and its ridge, blended (smaxUp, +6.5); then BAKE_FIELD's faces (+20) and dust (+6);
+ * anywhere within groundAt's neighbour samples and a bake texel of (x, y). The crater's dressing
+ * stands on this ground, so it keeps off the cards by this rise too.
+ * @param {{ x: number, y: number, floor: number, rim: number, foot: number }} bowl craterBowl
+ * @param {{ left: object|null, right: object|null }|null} peaks mountainPeaks
+ */
+export function craterCeiling(bowl, peaks, x, y) {
+  const near = TERRAIN_SPACING_PX / 2 + 2;
+  const d = Math.hypot(x - bowl.x, y - bowl.y);
+  const rimNear = bowl.rim - RIM_IN_PX;
+  const rimFar = bowl.rim + RIM_OUT_PX;
+  let mountain = 0;
+  // The wall climbs with distance out: at its steepest from the floor's radius to the rim's nearest.
+  if (d - near <= rimFar && d + near > bowl.floor) {
+    const s = Math.min(1, Math.max(0, (Math.min(d + near, rimFar) - bowl.floor) / Math.max(rimNear - bowl.floor, 1)));
+    mountain = CREST_MAX_PX * (1 - (1 - s) ** 1.8) + 8;
+  }
+  // The outer slope falls with distance out: at its slowest from the rim's farthest to the foot.
+  if (d + near > rimNear) {
+    const fall = Math.min(1, Math.max(0, (Math.max(d - near, rimNear) - rimFar) / Math.max(bowl.foot - rimFar, 1)));
+    const base = CLOUD_LEVEL - 40;
+    mountain = Math.max(mountain, CREST_MAX_PX - (CREST_MAX_PX - base) * (1 - (1 - fall) ** 1.5) + 10 * (1 - fall));
+  }
+  for (const peak of [peaks?.left, peaks?.right]) if (peak) mountain = Math.max(mountain, peakCeiling(peak, x, y, near));
+  return mountain + 6.5 + 20 + 6;
+}
+
+/**
+ * Design 081: the crater's dressing in the Stadium kit's assets: boulders fallen against the crater
+ * wall's foot, snow-dusted pines up the outer slopes (each standing on the baked mountain), every one
+ * clear of the cards and the opponent's hand by its reach and by RISE_LEAN of its top's height on the
+ * mountain (craterCeiling). Pure; [] without a crater.
+ * @param {ReturnType<typeof import('./board-layout.mjs').flatLayout>|null} layout
+ * @param {{ x: number, y: number, floor: number, rim: number, foot: number }|null} bowl
+ * @param {{ left: object|null, right: object|null }|null} peaks mountainPeaks
+ */
+export function craterDressing(layout, bowl, peaks) {
+  const ctx = boardContext(layout, 'stormy-mountains');
+  if (!ctx || !bowl) return [];
+  const { u } = ctx;
+  const pieces = [];
+  const fits = (x, y, reach, height) =>
+    ctx.inScene(x, y, reach) &&
+    ctx.clear(x, y, reach + RISE_LEAN * (craterCeiling(bowl, peaks, x, y) + height), 16 * u) &&
+    pieces.every((p) => Math.hypot(p.x - x, p.y - y) >= (p.reach + reach) * 1.1);
+  // Design 083: boulders fall in heaps against the wall's foot and pines stand in groves up the
+  // outer slopes (patchy round the crater, each hero with smaller ones beside it), not one per slot.
+  const heap = (asset, x, y, size, seed, extra = {}) => {
+    const height = asset === 'pine' ? size * 3 : measureAsset(asset, { size }).height;
+    const { reach } = measureAsset(asset, { size, height });
+    if (!fits(x, y, reach, height)) return null;
+    const piece = { asset, x, y, size, reach, seed, ...(asset === 'pine' ? { height } : {}), ...extra };
+    pieces.push(piece);
+    return piece;
+  };
+  for (let k = 0; k < 64 && pieces.length < 18; k += 1) {
+    const angle = ((k + (hash(k, 1, 3) - 0.5) * 0.7) / 64) * 2 * Math.PI;
+    const out = bowl.floor + (bowl.rim - bowl.floor) * (0.15 + 0.25 * hash(k, 2, 3));
+    const x = bowl.x + Math.cos(angle) * out;
+    const y = bowl.y + Math.sin(angle) * out;
+    if (hash(k, 4, 3) > 0.65 * patchy(x, y, { scale: 260 * u, salt: 111 })) continue;
+    const hero = heap('boulder', x, y, (20 + 14 * hash(k, 3, 3)) * u, hash(k, 5, 3));
+    if (!hero) continue;
+    for (const spot of clumpAround(hero, { count: 1 + Math.floor(hash(k, 11, 3) * 3), reach: [hero.reach * 1.1, hero.reach * 1.9], salt: k })) {
+      if (pieces.length >= 18) break;
+      heap('boulder', spot.x, spot.y, hero.size * spot.share, spot.seed);
+    }
+  }
+  let pines = 0;
+  for (let k = 0; k < 80 && pines < 16; k += 1) {
+    const angle = ((k + (hash(k, 6, 3) - 0.5) * 0.8) / 80) * 2 * Math.PI;
+    const out = bowl.rim + (bowl.foot - bowl.rim) * (0.25 + 0.6 * hash(k, 7, 3));
+    const x = bowl.x + Math.cos(angle) * out;
+    const y = bowl.y + Math.sin(angle) * out;
+    if (hash(k, 9, 3) > 0.6 * patchy(x, y, { scale: 300 * u, salt: 113 })) continue;
+    const hero = heap('pine', x, y, (24 + 12 * hash(k, 8, 3)) * u, hash(k, 10, 3));
+    if (!hero) continue;
+    pines += 1;
+    for (const spot of clumpAround(hero, { count: 1 + Math.floor(hash(k, 12, 3) * 2), reach: [hero.reach * 1.2, hero.reach * 2], salt: k + 70 })) {
+      if (pines >= 16) break;
+      if (heap('pine', spot.x, spot.y, hero.size * (0.55 + 0.35 * spot.share), spot.seed)) pines += 1;
+    }
+  }
+  return pieces;
+}
+
+// Design 084: slate (the audit's #3a4756), dark storm pines.
+const CRATER_ROCK = Object.freeze({ body: '#4a5668', light: '#6f7c90', dark: '#2c3442' });
+const SNOW_PINE = Object.freeze({ pine: '#1f4a47', pineLight: '#2c5f5a', pineDark: '#132f2d', bark: '#3e3029', snow: '#eef6ff' });
+
+/** The crater's dressing (craterDressing) as one kit builder: slate boulders, snow-dusted pines. */
+export function craterProps(pieces) {
+  const props = createPropBuilder();
+  for (const piece of pieces) {
+    const common = { x: piece.x, y: piece.y, size: piece.size, seed: piece.seed * 997, yaw: piece.seed * 6.28 };
+    if (piece.asset === 'pine') placeAsset(props, 'pine', { ...common, height: piece.height, snow: false, tiers: 3, colors: SNOW_PINE });
+    else placeAsset(props, 'boulder', { ...common, colors: CRATER_ROCK });
+  }
+  return props;
+}
 
 /** Base of the cloud sea round the mountain, px off the cloth. */
 export const CLOUD_LEVEL = 60;
@@ -127,6 +263,10 @@ vec3 flashLight(vec3 at, vec3 n) {
   float dist = length(toStrike);
   float facing = max(dot(n, toStrike / max(dist, 1.0)), 0.0);
   return vec3(0.4, 0.62, 1.0) * uFlash.w * exp(-dist / 240.0) * (0.2 + 0.8 * facing) * 0.55;
+}
+// Design 084: a strike's brief cool pulse of sky light over the whole scene (no whiteout: a soft lift).
+vec3 skyPulse(vec3 n) {
+  return vec3(0.07, 0.11, 0.18) * uFlash.w * (0.5 + 0.5 * n.z);
 }
 `;
 
@@ -294,6 +434,9 @@ export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
 ${REVEAL}
+${FILTERING}
+${STRATA}
+${GLOW}
 ${BOWL}
 ${EMBLEM}
 ${FLASH}
@@ -303,6 +446,7 @@ varying float vGrowth;
 
 void main() {
   vec2 p = vPos;
+  filterPixel = pixelSize(p);
   if (revealBurned(p) * exitKeep(p) < 0.5) discard;
   vec4 field = texture2D(uField, vUv);
   vec4 light = texture2D(uLight, vUv);
@@ -321,20 +465,26 @@ void main() {
   // Rock in three painted cold tones, each face taking one: deep blue in shadow, slate, pale steel
   // blue on the faces to the light. Steep faces turned from the light catch the storm's cyan; frost
   // dusts the summits and the highest crags.
-  vec3 rock = mix(vec3(0.04, 0.046, 0.066), vec3(0.15, 0.165, 0.2), smoothstep(0.4, 0.52, facing));
-  rock = mix(rock, vec3(0.37, 0.4, 0.46), smoothstep(0.8, 0.92, facing));
+  // Design 084: re-keyed down, slate (#3a4756) to the light, near-black blue in shade.
+  vec3 rock = mix(vec3(0.026, 0.03, 0.045), vec3(0.085, 0.1, 0.13), smoothstep(0.4, 0.52, facing));
+  rock = mix(rock, vec3(0.19, 0.22, 0.27), smoothstep(0.8, 0.92, facing));
   rock *= 0.84 + 0.32 * tone;
+  // Design 082: Mt. Coronet's rock, laid in BDSP's strata: courses each its own tone, a dark groove
+  // under each, on the walls and the slopes (the floor and the summits' snow cover them).
+  vec2 course = strata(ground, p, 22.0);
+  rock *= mix(0.62, 1.0, course.x) * (0.9 + 0.2 * course.y);
   float away = clamp(-dot(n.xy, normalize(sun.xy)), 0.0, 1.0);
   rock += vec3(0.01, 0.03, 0.045) * smoothstep(0.1, 0.45, away);
   // Summits and high crags catch the light; the low slopes sink into the storm's gloom.
   rock *= mix(0.72, 1.12, smoothstep(30.0, 200.0, ground));
   // Broad snow fields, not flecks: a fine noise edge reads as crumpled foil from above.
-  float snow = smoothstep(148.0, 168.0, ground + (fbm3(p / 90.0) - 0.5) * 40.0) * smoothstep(0.3, 0.55, n.z);
-  vec3 snowColor = mix(vec3(0.34, 0.45, 0.58), vec3(0.86, 0.93, 1.0), smoothstep(0.5, 0.85, facing));
-  rock = mix(rock, snowColor, snow * 0.92);
+  // Design 084: snow only as caps on the highest crags and the summits.
+  float snow = smoothstep(176.0, 196.0, ground + (fbm3(p / 90.0) - 0.5) * 30.0) * smoothstep(0.3, 0.55, n.z);
+  vec3 snowColor = mix(vec3(0.24, 0.3, 0.4), vec3(0.7, 0.78, 0.86), smoothstep(0.5, 0.85, facing));
+  rock = mix(rock, snowColor, snow * 0.85);
 
   // The floor: warm grey dust, cool in shadow, mottled, darker toward the bowl's edge.
-  vec3 dust = mix(vec3(0.1, 0.1, 0.11), vec3(0.24, 0.215, 0.18), smoothstep(0.35, 0.8, facing));
+  vec3 dust = mix(vec3(0.05, 0.05, 0.058), vec3(0.12, 0.112, 0.1), smoothstep(0.35, 0.8, facing));
   dust *= 0.9 + 0.18 * fbm3(p / 80.0);
   dust *= mix(1.0, 0.68, smoothstep(-140.0, 0.0, floorSD));
   vec3 col = mix(rock, dust, onFloor);
@@ -357,17 +507,21 @@ void main() {
   col = mix(vec3(0.018, 0.024, 0.045), col, smoothstep(0.3, 0.9, light.b));
   col += vec3(0.008, 0.02, 0.032) * n.z;
   float haze = (1.0 - smoothstep(${(CLOUD_LEVEL - 30).toFixed(1)}, ${(CLOUD_LEVEL + 60).toFixed(1)}, ground)) * cloudPresence(p);
-  col = mix(col, vec3(0.16, 0.34, 0.4), haze * 0.55);
+  col = mix(col, vec3(0.08, 0.13, 0.17), haze * 0.55);
   // Rock out past the mountain's foot stands far off in the storm and fades toward the cloud.
   float distant = smoothstep(uFoot - 20.0, uFoot + 160.0, length(p - uBowl.xy));
-  col = mix(col, vec3(0.22, 0.45, 0.54), distant * 0.45 * (1.0 - onFloor));
+  col = mix(col, vec3(0.11, 0.17, 0.21), distant * 0.45 * (1.0 - onFloor));
 
-  // The emblem glows steadily in its groove (design 080: nothing pulses under the Actives).
+  // The emblem glows steadily in its groove (design 080: nothing pulses under the Actives). Design
+  // 084: the scene's one bright thing, an emissive gold line with a soft halo, its light on the floor.
   float emblem = emblemDistance(p);
-  col += vec3(1.0, 0.8, 0.42) * ((1.0 - smoothstep(0.6, 2.2, emblem)) * 0.62 + exp(-emblem / 10.0) * 0.12) * onFloor;
+  col = mix(col, glowOn(col, p), onFloor);
+  col += vec3(1.5, 1.12, 0.5) * ((1.0 - smoothstep(0.6, 2.4, emblem)) * 0.8 + exp(-emblem / 18.0) * 0.18) * onFloor;
 
-  // A strike lights the rock; on the floor among the cards only faintly.
+  // A strike lights the rock; on the floor among the cards only faintly. Design 084: and the whole
+  // scene a little, a brief cool pulse of sky light.
   col += flashLight(vec3(p, ground), n) * mix(1.0, 0.25, onFloor);
+  col += skyPulse(n) * mix(1.0, 0.3, onFloor);
 
   vec2 edgeUv = min(vUv, 1.0 - vUv);
   col *= mix(0.6, 1.0, smoothstep(0.0, 0.03, min(edgeUv.x, edgeUv.y)));
@@ -382,6 +536,11 @@ void main() {
   gl_FragColor = vec4(col, 1.0);
 ${OUTPUT}
 }
+`;
+
+const FAR_PEAK = /* glsl */ `
+// Design 084: the far peak painted in the cloud sea: centre x, y and radius (0: none).
+uniform vec3 uFarPeak;
 `;
 
 const DOMES = /* glsl */ `
@@ -457,6 +616,7 @@ ${REVEAL}
 ${BOWL}
 ${DOMES}
 ${FLASH}
+${FAR_PEAK}
 varying vec2 vPos;
 void main() {
   vec2 p = vPos;
@@ -468,11 +628,21 @@ void main() {
   vec3 n = normalize(dome.xyz);
   // Lit by the sun on the domes' tops and their sides to it, dark in the creases between them.
   float shade = max(dot(n, normalize(uSun)), 0.0) * 0.55 + clamp(dome.w / 55.0, 0.0, 1.0) * 0.45;
-  vec3 col = mix(vec3(0.1, 0.26, 0.35), vec3(0.34, 0.64, 0.73), smoothstep(0.3, 0.55, shade));
-  col = mix(col, vec3(0.8, 0.96, 1.0), smoothstep(0.68, 0.88, shade));
+  // Design 084: a darker blue-grey storm cloud, lighter only on its tops.
+  vec3 col = mix(vec3(0.05, 0.08, 0.11), vec3(0.14, 0.21, 0.26), smoothstep(0.3, 0.55, shade));
+  col = mix(col, vec3(0.4, 0.5, 0.56), smoothstep(0.7, 0.9, shade));
   vec2 uv = (p - uMin) / uSize;
   col *= mix(0.62, 1.0, texture2D(uLight, uv).a);
-  col += flashLight(vec3(p, top), n) * 1.6;
+  // Design 084: a far peak painted in the cloud sea, a slate silhouette with a pale cap and a lit face.
+  if (uFarPeak.z > 0.0) {
+    vec2 rel = (p - uFarPeak.xy) / uFarPeak.z;
+    float body = 1.0 - smoothstep(0.92, 1.0, length(rel * vec2(1.0, 1.25)) + 0.12 * (fbm3(p / 60.0) - 0.5));
+    float lit = smoothstep(-0.2, 0.4, dot(normalize(rel + 1e-3), normalize(uSun.xy)));
+    vec3 far = mix(vec3(0.07, 0.085, 0.11), vec3(0.16, 0.19, 0.24), lit);
+    far = mix(far, vec3(0.45, 0.52, 0.6), smoothstep(0.38, 0.18, length(rel)) * 0.8);
+    col = mix(col, far, body * 0.9);
+  }
+  col += flashLight(vec3(p, top), n) * 1.6 + skyPulse(n) * 1.3;
   float lap = smoothstep(0.0, 8.0, top - texture2D(uField, uv).r);
   float wisp = clamp(presence * 1.4 - (1.0 - fbm3(p / 60.0 + uTime * 0.05)) * 0.4, 0.0, 1.0);
   // Thinned out toward the scene's edges, past which the table's dark floor shows.

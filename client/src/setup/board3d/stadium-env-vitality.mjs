@@ -1,20 +1,28 @@
 // Design 077 (prototype): Forest of Vitality (customhb-030) after its card art (MEG 117, Ayumi
 // Odashima): a sunlit forest whose great broadleaf stands over a carpet of rounded bushes, a yellow-
 // green glow of vitality welling up between them and round its foot. The user asked for one huge tree
-// at the top right of the mat, casting its shadow from there. The cards lie on a soft meadow; the
-// carpet of bushes runs round it; the tree's trunk stands in the band right of the cards near the far
-// end, its crown of teal pads (lit jade on top, yellow-green at their scalloped rims, as the art's)
-// spreading over the top-right corner and never over a card. The board's sun stands beyond the tree,
-// high at the far right, so the crown's dappled shadow falls from the top right across the mat.
+// at the top right of the mat, casting its shadow from there; design 084 (the visual audit) moved it
+// to the top-left margin (HERO_SIDE), out from under the chat panel. The cards lie on a soft meadow;
+// the carpet of bushes runs round it; the tree's trunk stands in the band beside the cards near the
+// far end, its crown of teal pads (lit jade on top, yellow-green at their rims, as the art's)
+// spreading over the corner and overhanging the table, kept off every card (not off the cards' whole
+// box). The board's sun stands beyond the tree, so the crown's shadow falls from it across the mat.
+// Design 084: the shadow is lighter and soft-edged in two tones, dappled; a warm yellow-green light
+// pools under the tree (the shared contact glow) and the ground grades warm near it to cool far off;
+// the card's own flat-topped broadleaves stand in groves of three and five among the low bushes;
+// flower beds ring the light pool; no toadstools (the card has none).
 // World scale: a card's footprint is about a picnic blanket; the trunk is over a card wide.
+// Design 081: every solid is the Stadium kit's (stadium-kit.mjs, stadium-kit-assets.mjs): the crown's
+// pads, the kit's bushes, tall grass along the meadow's edge, beds of flowers, toadstools by the
+// trunk. Design 082 (Brilliant Diamond / Shining Pearl): the crown is a canopy of leafy lumps, dark in
+// its creases; the meadow and the undergrowth are the ground kit's clover grass (stadium-env-ground).
 //
 // Bake, once per layout: BAKE_FIELD writes R height px, G signed px from the meadow's edge (negative
-// on it), B the crown's shade 0..1 (light leaks through it per frame), A the trunk's and boughs'
-// shade 0..1; the shared light bake (with this board's sun) adds normals, occlusion and the ground's
-// own shadow. Per frame: TERRAIN paints the meadow, the undergrowth, the glow and the dappled shade;
-// PUFFS draw every pad of the crown and every bush, one instanced sphere each; TRUNK the trunk, a
-// lathe whose buttress fins run on into the roots' ridges in the ground; BOUGHS its boughs
-// (stadium-env-props); MOTES the motes of light rising off the glow.
+// on it), B the crown's shade 0..1, A the trunk's and boughs' shade 0..1; the shared light bake (with
+// this board's sun) adds normals, occlusion and the ground's own shadow. Per frame: TERRAIN paints the
+// meadow, the undergrowth, the glow and the crown's shade; the kit's meshes draw the trunk (a lathe
+// up its curved spine whose buttress fins run on into the roots' ridges in the ground), boughs,
+// crown, bushes and plants; MOTES the motes of light rising off the glow.
 import {
   FILTERING,
   FOOTPRINTS,
@@ -25,36 +33,54 @@ import {
   TABLE_UNIFORMS,
   TERRAIN_GROUND,
   TERRAIN_UNIFORMS,
-  VORONOI,
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
 import { environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
-import { PROP_VERTEX, createPropBuilder, propFragment } from './stadium-env-props.mjs';
+import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
+import { GLOW, GRASS, LIGHT_MOTION } from './stadium-env-ground.mjs';
+import { RISE_LEAN, frameWeight, patchy, shuffled, visibleArea } from './stadium-env-spots.mjs';
+import { clumpPieces, scaledKinds } from './stadium-env-clumps.mjs';
+import { createKitProps, glslColour, paint } from './stadium-kit.mjs';
+import { measureAsset, placeAsset } from './stadium-kit-assets.mjs';
 import { tableBounds } from './table-uv.mjs';
 
 export const VITALITY_KEY = 'forest-of-vitality';
 /**
- * This board's sun (toward it, table frame): beyond the tree, low from the right and the far end
- * (~27° up), so the crown's long shadow falls toward the near left, well across the mat.
+ * Design 084: the side of the table the great tree stands on, -1 left, 1 right. The audit moved it
+ * left, out from under the chat panel; 077 had it right at the user's ask. Flip here to move it back.
  */
-export const VITALITY_SUN = Object.freeze([0.7128, 0.5346, 0.454]);
+export const HERO_SIDE = -1;
+/**
+ * This board's sun (toward it, table frame): beyond the tree, low from its side and the far end
+ * (~27° up), so the crown's long shadow falls toward the near end, well across the mat.
+ */
+export const VITALITY_SUN = Object.freeze([0.7128 * HERO_SIDE, 0.5346, 0.454]);
+/** Design 084: the light pool under the tree (the shared contact glow): its colour, reach past the trunk's flare, strength. */
+export const LIGHT_POOL = Object.freeze({ colour: '#d9e86a', reachPx: 230, strength: 0.75, breath: 0.07 });
 /** Meadow kept round the cards' box before the bushes begin, and how far its edge wanders out. */
 export const CLEARING_PX = 30;
 export const CLEARING_WOBBLE_PX = 26;
 /** Least gap between any part of the tree, seen from above, and a card or the opponent's hand. */
 export const TREE_CARD_GAP_PX = 16;
-/** Least gap between a bush's foot and the cards' box (its puffs may lean in over the meadow's edge). */
+/** Least gap between a bush, seen from above, and a card or the opponent's hand. */
 export const BUSH_CARD_GAP_PX = 10;
+/** Least gap between tall grass, a flower bed or a toadstool, seen from above, and a card or the hand. */
+export const PLANT_CARD_GAP_PX = 12;
+/**
+ * Design 083: the highest the ground rises under a prop (the swells past the meadow, 4 + 12 px of
+ * noise, plus its ±0.4 px ripple): the kit stands on it, the screen test bounds it.
+ */
+export const VITALITY_GROUND_CEILING_PX = 17;
 export const MAX_PADS = 72;
 export const MAX_LIMBS = 10;
 export const MAX_POOLS = 20;
 /** Buttress fins round the trunk's foot, each running on into a root. */
 export const TRUNK_FINS = 5;
-/** Rings and segments of the instanced sphere every pad and bush is drawn with. */
-export const PUFF_SEGMENTS = { rings: 16, around: 28 };
 const MOTE_COUNT = 70;
-/** How far a pad reaches past its radius once its lumps are on (the vertex shader's 0.1). */
-const PUFF_REACH = 1.12;
+/** How far a pad reaches past its radius, seen from above (a margin). */
+const PUFF_REACH = 1.06;
+/** A flower's width in the beds out among the bushes (px at world unit 1): BDSP's chunky blooms. */
+export const FLOWER_HEAD_PX = 7;
 
 /** A small deterministic 0..1 from three numbers. */
 const hash = (x, y, salt) => {
@@ -91,23 +117,27 @@ const oppHandRect = (layout, core) => {
 };
 
 /**
- * The great tree: its trunk's root in the band right of the cards, toward the far end; its crown of
- * pads domed over the top-right corner, every pad clear of the cards and the opponent's hand by
- * TREE_CARD_GAP_PX seen from above (the cameras stand over the table's middle, so on screen a pad
- * only moves further out); boughs from the trunk's fork up into the inner pads; roots spreading over
- * the ground and diving into it.
+ * The great tree: its trunk's root in the band beside the cards on HERO_SIDE, toward the far end; its
+ * crown of pads domed over that corner and overhanging the table, every pad clear of every card and
+ * the opponent's hand by TREE_CARD_GAP_PX seen from above (design 084: of each card, not of the
+ * cards' whole box, so the crown is not cut down to a stump; the cameras stand over the table's
+ * middle, so on screen a pad out past the cards only moves further out); boughs from the trunk's
+ * fork up into the inner pads; roots spreading over the ground and diving into it.
  */
 function growTree(table, scene, core, obstacles, u) {
+  const side = HERO_SIDE;
   const radius = 58 * u;
   const flare = radius * 1.7;
-  const x = Math.min(core.x + core.w + TREE_CARD_GAP_PX + flare + 30 * u, scene.x + scene.w - flare * 1.2);
-  const y = table.y + table.h * 0.8;
-  const fork = [x + 34 * u, y + 52 * u, 215 * u];
+  const edge = side < 0 ? core.x : core.x + core.w;
+  const wanted = edge + side * (TREE_CARD_GAP_PX + flare + 70 * u);
+  const x = side < 0 ? Math.max(wanted, scene.x + flare * 1.2) : Math.min(wanted, scene.x + scene.w - flare * 1.2);
+  const y = table.y + table.h * 0.7;
+  const fork = [x + side * 30 * u, y + 48 * u, 190 * u];
   // The crown: a dome of overlapping pads over an ellipse out past the trunk (longer up the table
   // than across it), highest in its middle; pads on a jittered grid, so no two rings line up.
-  const centre = { x: x + 90 * u, y: y + 160 * u };
-  const reach = { x: 340 * u, y: 450 * u };
-  const step = 62 * u;
+  const centre = { x: x + side * 50 * u, y: y + 130 * u };
+  const reach = { x: 330 * u, y: 400 * u };
+  const step = 60 * u;
   const clear = (px, py, r) => obstacles.every((rect) => distanceToRect(px, py, rect) >= r * PUFF_REACH + TREE_CARD_GAP_PX);
   const pads = [];
   for (let gy = -reach.y; gy <= reach.y; gy += step * 0.87) {
@@ -121,7 +151,7 @@ function growTree(table, scene, core, obstacles, u) {
       const r = (50 + 30 * roll(4)) * u * (1.15 - 0.3 * out);
       const inScene = px > scene.x - r && px < scene.x + scene.w + r * 2 && py > scene.y - r && py < scene.y + scene.h + r * 2;
       if (!inScene || !clear(px, py, r)) continue;
-      pads.push({ x: px, y: py, z: (345 - 170 * out * out + 22 * (roll(5) - 0.5)) * u, r, tier: out, seed: roll(6) });
+      pads.push({ x: px, y: py, z: (300 - 140 * out * out + 22 * (roll(5) - 0.5)) * u, r, tier: out, seed: roll(6) });
     }
   }
   // A skirt of lower pads round the fork, so the trunk's top ends under foliage, not in a cut face.
@@ -129,11 +159,11 @@ function growTree(table, scene, core, obstacles, u) {
     const roll = (salt) => hash(k + 0.5, x, salt + 60);
     const angle = (k / 11) * 2 * Math.PI + roll(1) * 0.5;
     const out = (62 + 70 * roll(2)) * u;
-    const px = fork[0] + 24 * u + Math.cos(angle) * out;
+    const px = fork[0] + side * 24 * u + Math.cos(angle) * out;
     const py = fork[1] + 34 * u + Math.sin(angle) * out;
     const r = (52 + 22 * roll(3)) * u;
     if (!clear(px, py, r)) continue;
-    pads.push({ x: px, y: py, z: (214 + 34 * roll(4)) * u, r, tier: 0.45 + 0.1 * roll(5), seed: roll(6) });
+    pads.push({ x: px, y: py, z: (190 + 30 * roll(4)) * u, r, tier: 0.45 + 0.1 * roll(5), seed: roll(6) });
   }
   pads.sort((a, b) => a.tier - b.tier);
   const shown = pads.slice(0, MAX_PADS);
@@ -165,7 +195,7 @@ function growTree(table, scene, core, obstacles, u) {
   for (let i = 0; i < TRUNK_FINS; i += 1) {
     const angle = (2 * Math.PI * i - finTurn) / TRUNK_FINS;
     const dir = [Math.cos(angle), Math.sin(angle)];
-    const away = Math.max(0, Math.cos(angle));
+    const away = Math.max(0, side * Math.cos(angle));
     let length = radius + (45 + 55 * hash(i, x, 41) + 50 * away) * u;
     while (length > radius * 1.3 && distanceToRect(x + dir[0] * length, y + dir[1] * length, core) < TREE_CARD_GAP_PX + 6 * u) {
       length -= 6 * u;
@@ -211,9 +241,12 @@ export function vitalitySpots(layout) {
   const scene = sceneBounds(layout, VITALITY_KEY);
   const u = (layout.self.cardBox?.active?.w ?? 100) / 100;
   const hand = oppHandRect(layout, core);
-  const obstacles = [core, ...(hand ? [hand] : [])];
+  const obstacles = hand ? [...cards, hand] : cards;
   const tree = growTree(table, scene, core, obstacles, u);
   const inScene = (x, y, inset) => x > scene.x + inset && x < scene.x + scene.w - inset && y > scene.y + inset && y < scene.y + scene.h - inset;
+  // Design 084: the warm light pooling under the tree, as the card's vitality glow (the shared GLOW).
+  const poolReach = tree.flare + LIGHT_POOL.reachPx * u;
+  const glows = [{ x: tree.x, y: tree.y, r: poolReach, colour: LIGHT_POOL.colour, strength: LIGHT_POOL.strength, breath: LIGHT_POOL.breath }];
 
   // Pools of glow: one at the trunk's foot, the rest on a coarse jittered grid out in the bushes.
   const pools = [{ x: tree.x, y: tree.y, r: tree.radius * 2.4, strength: 1 }];
@@ -230,39 +263,106 @@ export function vitalitySpots(layout) {
       pools.push({ x, y, r, strength: 0.75 + 0.35 * roll(5) });
     }
   }
-  const glowAt = (x, y) =>
-    Math.min(1, pools.reduce((sum, pool) => sum + pool.strength * Math.exp(-(((x - pool.x) / (pool.r * 1.7)) ** 2) - ((y - pool.y) / (pool.r * 1.7)) ** 2), 0));
+  const clear = (x, y, r) => obstacles.every((rect) => distanceToRect(x, y, rect) >= r);
+  const offPools = (x, y, r) => pools.every((pool) => Math.hypot(x - pool.x, y - pool.y) >= pool.r * 0.55 + r * 0.5);
+  const area = visibleArea(table, scene) ?? scene;
+  const wanted = (x) => frameWeight(x, table);
 
-  // The carpet of bushes: a jittered grid over the scene, every bush outside the meadow, clear of
-  // the tree's roots and of the pools' bright cores.
-  const bushes = [];
-  // Design 080: fewer, bigger bushes; a carpet of small lumps read as noise from above.
-  const step = 96 * u;
-  for (let gy = scene.y + step / 2; gy < scene.y + scene.h; gy += step) {
-    for (let gx = scene.x + step / 2; gx < scene.x + scene.w; gx += step) {
-      const roll = (salt) => hash(gx, gy, salt + 100);
-      const x = gx + (roll(1) - 0.5) * step * 0.7;
-      const y = gy + (roll(2) - 0.5) * step * 0.7;
-      const r = (32 + 44 * roll(3) ** 1.5) * u;
-      if (!inScene(x, y, r * 0.5)) continue;
-      if (clearingDistance(core, x, y) < -r * 0.3 || distanceToRect(x, y, core) < r + BUSH_CARD_GAP_PX) continue;
-      if (Math.hypot(x - tree.x, y - tree.y) < tree.reach + r * 0.4) continue;
-      if (pools.some((pool) => Math.hypot(x - pool.x, y - pool.y) < pool.r * 0.55 + r * 0.5)) continue;
-      const puffs = [{ x, y, z: r * 0.42, r }];
-      const satellites = 2 + Math.floor(roll(4) * 3);
-      for (let k = 0; k < satellites; k += 1) {
-        const angle = roll(10 + k) * 2 * Math.PI;
-        const sr = r * (0.5 + 0.25 * roll(20 + k));
-        const out = r * (0.6 + 0.3 * roll(30 + k));
-        const sx = x + Math.cos(angle) * out;
-        const sy = y + Math.sin(angle) * out;
-        if (distanceToRect(sx, sy, core) < sr + BUSH_CARD_GAP_PX) continue;
-        puffs.push({ x: sx, y: sy, z: sr * 0.4, r: sr });
-      }
-      bushes.push({ x, y, r, seed: roll(6), glow: glowAt(x, y), puffs });
+  // Design 084: the card's flat-topped broadleaves in groves of three and five (two sizes, the
+  // satellites smaller), well out past the meadow, where the frame shows them; then the carpet of low
+  // bushes in thickets round and between them (design 083's patches), in three greens. Each piece
+  // leans a little and varies in size, so no two stand alike; every one clears the cards and the hand
+  // by its reach, its lean over the tilted view (RISE_LEAN of its height on the swells) and a gap.
+  const reachOff = (gap) => (x, y, reach, height) =>
+    inScene(x, y, reach * 0.5) &&
+    clear(x, y, reach + RISE_LEAN * (height + VITALITY_GROUND_CEILING_PX) + gap) &&
+    Math.hypot(x - tree.x, y - tree.y) >= tree.reach + reach * 0.4 &&
+    offPools(x, y, reach);
+  const groveFits = reachOff(TREE_CARD_GAP_PX);
+  const groves = clumpPieces(area, {
+    step: 300 * u,
+    mix: scaledKinds(
+      [
+        { asset: 'treeRound', weight: 1, size: [50, 62], options: { crown: 'umbrella' }, lean: 0.05, spread: 0.08 },
+        { asset: 'treeRound', weight: 1, size: [34, 44], options: { crown: 'umbrella' }, lean: 0.06, spread: 0.1 },
+      ],
+      u
+    ),
+    satellites: scaledKinds(
+      [
+        { asset: 'treeRound', weight: 2, size: [32, 42], options: { crown: 'umbrella' }, lean: 0.07, spread: 0.12 },
+        { asset: 'bush', weight: 1, size: [30, 42], lean: 0.05, spread: 0.2 },
+      ],
+      u
+    ),
+    fits: (x, y, reach, height) => clearingDistance(core, x, y) > 70 * u && groveFits(x, y, reach, height),
+    thick: 0.72,
+    count: [2, 4],
+    cap: 16,
+    spacing: 0.72,
+    salt: 61,
+    taken: [{ x: tree.x, y: tree.y, r: tree.reach }],
+    weight: (x) => 0.5 + 0.5 * wanted(x),
+  }).map((piece) => ({ ...piece, palette: Math.floor(hash(piece.x, piece.y, 67) * 2) }));
+  // Design 084: the flower beds round the light pool's rim, as the card's blossoms gather where the
+  // glow spreads; then tall grass along the meadow's edge. Each clear of every card, the hand, the
+  // tree, the groves and one another.
+  const taken = [{ x: tree.x, y: tree.y, r: tree.reach }, ...groves.map((piece) => ({ x: piece.x, y: piece.y, r: piece.reach * 0.85 }))];
+  const free = (x, y, r) => taken.every((spot) => Math.hypot(x - spot.x, y - spot.y) >= spot.r + r);
+  const flowers = [];
+  for (let k = 0; k < 60 && flowers.length < 8; k += 1) {
+    const angle = hash(k, tree.x, 81) * 2 * Math.PI;
+    const out = poolReach * (0.74 + 0.26 * hash(k, tree.y, 82));
+    const x = tree.x + Math.cos(angle) * out;
+    const y = tree.y + Math.sin(angle) * out;
+    const size = (18 + 12 * hash(k, 3, 83)) * u;
+    const { reach } = measureAsset('flowerBed', { size, head: FLOWER_HEAD_PX * u });
+    if (!inScene(x, y, reach) || !clear(x, y, reach + PLANT_CARD_GAP_PX) || !free(x, y, reach)) continue;
+    flowers.push({ x, y, size, reach, seed: hash(k, 4, 84), warm: hash(k, 5, 85) < 0.6 });
+    taken.push({ x, y, r: reach });
+  }
+  const bushFits = reachOff(BUSH_CARD_GAP_PX);
+  const bushes = clumpPieces(area, {
+    step: 104 * u,
+    mix: scaledKinds([{ asset: 'bush', weight: 1, size: [30, 46], lean: 0.06, spread: 0.22 }], u),
+    fits: (x, y, reach, height) => clearingDistance(core, x, y) >= -reach * 0.25 && bushFits(x, y, reach, height),
+    thick: 0.62,
+    count: [2, 4],
+    cap: 110,
+    spacing: 0.8,
+    salt: 71,
+    taken: taken.map((spot) => ({ ...spot })),
+    weight: (x) => 0.55 + 0.45 * wanted(x),
+  }).map((piece) => ({
+    ...piece,
+    palette: Math.min(2, Math.floor(patchy(piece.x, piece.y, { scale: 420 * u, contrast: 0.6, salt: 47 }) * 1.66)),
+  }));
+  taken.push(...bushes.map((piece) => ({ x: piece.x, y: piece.y, r: piece.reach * 0.85 })));
+  const grass = [];
+  const dress = 58 * u;
+  for (let gy = scene.y + dress / 2; gy < scene.y + scene.h; gy += dress) {
+    for (let gx = scene.x + dress / 2; gx < scene.x + scene.w; gx += dress) {
+      const roll = (salt) => hash(gx, gy, salt + 300);
+      const x = gx + (roll(1) - 0.5) * dress * 0.8;
+      const y = gy + (roll(2) - 0.5) * dress * 0.8;
+      const edge = clearingDistance(core, x, y);
+      if (!(edge > 0 && edge < 70 * u && roll(3) < 0.6)) continue;
+      const size = (18 + 10 * roll(4)) * u;
+      const blade = 15 * u;
+      const { reach } = measureAsset('tallGrass', { size, blade });
+      if (!inScene(x, y, reach) || !clear(x, y, reach + PLANT_CARD_GAP_PX) || !free(x, y, reach * 0.7)) continue;
+      grass.push({ x, y, size, blade, reach, seed: roll(5) });
+      taken.push({ x, y, r: reach * 0.7 });
     }
   }
-  return { table, scene, core, u, hand, tree, pools, bushes };
+  // Design 083: leaves fall from the crown's outer pads and from the broadleaves of the groves.
+  const crownPads = shuffled(tree.pads.filter((pad) => pad.tier > 0.5), 5).slice(0, 8);
+  const heroes = shuffled(groves.filter((grove) => grove.asset === 'treeRound'), 9).slice(0, 4);
+  const driftEmitters = [
+    ...crownPads.map((pad) => ({ x: pad.x, y: pad.y, r: pad.r, z: pad.z })),
+    ...heroes.map((grove) => ({ x: grove.x, y: grove.y, r: grove.reach, z: grove.height * 0.75 })),
+  ];
+  return { table, scene, core, u, hand, tree, pools, groves, bushes, grass, flowers, driftEmitters, glows };
 }
 
 const VITALITY = /* glsl */ `
@@ -311,10 +411,6 @@ vec2 rootRidge(vec2 p) {
   }
   return best;
 }
-// The crown's sway (px at 300 px up): slow, so the pads and their shadow drift together.
-vec2 crownSway(float t) {
-  return vec2(sin(t * 0.7), sin(t * 0.53 + 1.0)) * 2.4;
-}
 `;
 
 const CANOPY = /* glsl */ `
@@ -324,7 +420,8 @@ uniform vec4 uLimbTo[${MAX_LIMBS}];
 // The ground the tree's shadow can reach (x0, y0, x1, y1): the bake skips the rest.
 uniform vec4 uShadowBox;
 // How much of the sun the crown's pads hide from the point p at height h, 0..1: the ray toward the
-// sun passing through a pad's lumpy outline.
+// sun passing through a pad's lumpy outline. Design 084: a soft edge (a broad penumbra), so the
+// shadow reads as light through foliage, not a cut-out stain.
 float padShade(vec2 p, float h) {
   vec3 s = normalize(uSun);
   vec3 o = vec3(p, h);
@@ -337,10 +434,10 @@ float padShade(vec2 p, float h) {
     if (t <= 0.0) continue;
     vec3 off = c - s * t;
     float miss = length(off);
-    if (miss > pad.w * 1.12) continue;
-    if (miss < pad.w * 0.7) return 1.0;
+    if (miss > pad.w * 1.25) continue;
+    if (miss < pad.w * 0.5) return 1.0;
     float edge = pad.w * (0.96 + 0.16 * (gnoise(off.xy / (pad.w * 0.38) + pad.xy * 0.013) - 0.5));
-    shade = max(shade, 1.0 - smoothstep(edge * 0.8, edge * 1.02, miss));
+    shade = max(shade, 1.0 - smoothstep(edge * 0.55, edge * 1.15, miss));
   }
   return shade;
 }
@@ -409,23 +506,21 @@ void main() {
 }
 `;
 
-// The card art's colours (pixel samples, inverted through Neutral tone mapping).
+// The meadow and the undergrowth as BDSP paints them (authored as shown, inverted through Neutral
+// tone mapping), the glow the card art's.
 const PALETTE = /* glsl */ `
-const vec3 GRASS = vec3(0.137, 0.255, 0.069);
-const vec3 GRASS_DARK = vec3(0.071, 0.154, 0.058);
-const vec3 GRASS_LIT = vec3(0.25, 0.37, 0.07);
-const vec3 BUSH_DARK = vec3(0.033, 0.162, 0.063);
-const vec3 BUSH_MID = vec3(0.154, 0.294, 0.071);
-const vec3 BUSH_LIT = vec3(0.31, 0.416, 0.07);
-const vec3 BUSH_YELLOW = vec3(0.66, 0.614, 0.039);
-const vec3 CROWN_DARK = vec3(0.02, 0.159, 0.108);
-const vec3 CROWN_BODY = vec3(0.0, 0.27, 0.205);
-const vec3 CROWN_TOP = vec3(0.04, 0.46, 0.33);
-const vec3 FRINGE = vec3(0.345, 0.469, 0.131);
+// Design 084: the meadow grades from a warm green by the tree to a cooler one far from it, the depth
+// the card has (warm gold foreground, cool blue-green distance); the undergrowth likewise.
+const vec3 MEADOW_WARM = ${glslColour('#86c45a')};
+const vec3 MEADOW_COOL = ${glslColour('#5fa36a')};
+const vec3 UNDERGROWTH_WARM = ${glslColour('#4a9238')};
+const vec3 UNDERGROWTH_COOL = ${glslColour('#2f7c4a')};
 const vec3 GLOW = vec3(0.836, 0.828, 0.131);
 const vec3 GLOW_CORE = vec3(0.95, 0.94, 0.45);
-// Shade under the crown is lit by the blue sky: cooler, not just darker.
-const vec3 SHADE_TINT = vec3(0.36, 0.44, 0.52);
+// Shade under the crown is lit by the blue sky: cooler, not just darker. Design 084: two tones, a
+// light soft one where the crown is thin and a deeper one under its dense middle (no dark blob).
+const vec3 SHADE_SOFT = vec3(0.74, 0.8, 0.86);
+const vec3 SHADE_DEEP = vec3(0.54, 0.62, 0.72);
 vec3 edgeHaze(vec3 col, vec2 uv) {
   vec2 edgeUv = min(uv, 1.0 - uv);
   return col * mix(0.5, 1.0, smoothstep(0.0, 0.035, min(edgeUv.x, edgeUv.y)));
@@ -435,34 +530,20 @@ vec3 edgeHaze(vec3 col, vec2 uv) {
 export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
-${FOOTPRINTS}
 ${FILTERING}
-${VORONOI}
+${FOOTPRINTS}
 ${REVEAL}
+${GRASS}
+${LIGHT_MOTION}
+${GLOW}
 ${PALETTE}
 ${VITALITY}
-// A fan of three blades from a tuft's foot, as (stroke, 0..1 up its length). v: px from the foot,
-// h: the tuft's hash. Each bends over a little as it rises, as long grass does.
-vec2 grassBlades(vec2 v, float h) {
-  float stroke = 0.0;
-  float tip = 0.0;
-  for (int k = 0; k < 3; k++) {
-    float a = 1.571 + (float(k) - 1.0) * 0.55 + (fract(h * (7.0 + float(k) * 3.1)) - 0.5) * 0.8;
-    vec2 d = vec2(cos(a), sin(a));
-    float len = 4.0 + 3.5 * fract(h * (11.0 + float(k)));
-    float s = clamp(dot(v, d), 0.0, len);
-    vec2 bent = d * s + vec2(-d.y, d.x) * (s * s / len) * 0.14;
-    float m = 1.0 - smoothstep(0.35, 0.95, length(v - bent) / mix(1.0, 0.45, s / len));
-    stroke = max(stroke, m);
-    tip = max(tip, m * s / len);
-  }
-  return vec2(stroke, tip);
-}
 varying vec2 vPos;
 varying vec2 vUv;
 varying float vGrowth;
 void main() {
   vec2 p = vPos;
+  filterPixel = pixelSize(p);
   if (revealBurned(p) * exitKeep(p) < 0.5) discard;
   vec4 field = texture2D(uField, vUv);
   vec4 light = texture2D(uLight, vUv);
@@ -473,69 +554,50 @@ void main() {
   vec3 sun = normalize(uSun);
   // 1 on flat ground in full sun.
   float sunlit = clamp(dot(n, sun) / sun.z, 0.0, 1.3) * mix(0.55, 1.0, light.a);
-
-  // The meadow: soft grass in broad patches and smaller mottles, small tufts catching the light.
-  float patchTone = smoothstep(0.25, 0.75, fbm3(p / 170.0 + 2.0));
-  vec3 col = mix(GRASS_DARK, GRASS, 0.45 + 0.55 * patchTone);
-  col *= 0.94 + 0.12 * fbm3(p / 38.0 + 5.0);
-  vec4 tuft = voronoiCell(p / 13.0 + 1.7);
-  float tuftShape = 1.0 - smoothstep(0.18, 0.42, length(tuft.zw * vec2(1.0, 0.6)));
-  float hasTuft = step(fract(tuft.y * 41.7), 0.22) * smoothstep(0.3, 0.7, fbm3(p / 120.0 + 1.0));
-  col = mix(col, GRASS_LIT, tuftShape * hasTuft * 0.3);
-  // Blades: a small fan out of most cells' points, dark at the foot and lit at the tip, thick
-  // where the grass is long. Broad soft patches of sun break the lawn's green between them.
-  // Design 080: round the cards the lawn is short and even (the blades fade), and no blade finer
-  // than the screen can draw shimmers.
   float calm = fieldCalm(p, 120.0);
-  vec2 blades = grassBlades(-tuft.zw * 13.0, tuft.y);
-  float lawn = step(fract(tuft.y * 23.1), 0.55 + 0.35 * smoothstep(0.35, 0.65, fbm3(p / 95.0 + 8.0)));
-  float bladeShow = (1.0 - 0.7 * calm) * patternFade(pixelSize(p), 13.0);
-  col = mix(col, mix(GRASS_DARK * 0.8, GRASS_LIT * 1.25, blades.y), blades.x * lawn * 0.85 * bladeShow);
-  col *= 1.0 + 0.16 * smoothstep(0.5, 0.78, fbm3(p / 52.0 + 3.0));
 
-  // Past the meadow's edge, the undergrowth under the bushes: deep green, lighter on the swells.
-  vec3 under = mix(BUSH_DARK * 0.55, BUSH_DARK, smoothstep(4.0, 14.0, field.r));
+  // Design 082: the meadow is BDSP's clover grass (broad soft patches, little clover marks, quieter
+  // round the cards); tufts and flowers are the kit's solids. Design 084: warm by the tree, cool far off.
+  float far = smoothstep(0.1, 0.85, distance(p, uRoot.xy) / length(uSize));
+  vec3 col = cloverGrass(p, mix(MEADOW_WARM, MEADOW_COOL, far), calm);
+
+  // Past the meadow's edge, the undergrowth under the bushes: a deeper green, lighter on the swells.
+  vec3 under = cloverGrass(p + 31.0, mix(UNDERGROWTH_WARM, UNDERGROWTH_COOL, far), 0.0) * mix(0.8, 1.05, smoothstep(4.0, 14.0, field.r));
   vec2 ridge = rootRidge(p);
   float wild = smoothstep(16.0, 44.0, d) * smoothstep(uRoot.w * 0.75, uRoot.w + 40.0, distance(p, uRoot.xy));
   col = mix(col, under, wild);
-  // The roots: olive-brown bark ridged along them, moss on their backs, sinking into the grass.
+  // The roots: plain bark, lighter along their backs, sinking into the grass.
   float rootMask = smoothstep(0.8, 3.0, ridge.x);
-  vec3 rootBark = vec3(0.2, 0.14, 0.065) * (0.8 + 0.4 * gnoise(vec2(ridge.y * 30.0, dot(p, vec2(0.31, -0.27)) / 4.0)));
-  rootBark = mix(rootBark, GRASS_DARK, smoothstep(0.88, 0.98, n.z) * smoothstep(0.45, 0.6, gnoise(p / 9.0)) * 0.7);
+  vec3 rootBark = vec3(0.2, 0.14, 0.065) * mix(0.72, 1.1, smoothstep(0.6, 0.95, n.z));
   col = mix(col, rootBark, rootMask);
 
   col *= (0.6 + 0.4 * min(sunlit, 1.15)) * mix(0.45, 1.0, smoothstep(0.3, 0.9, light.b));
 
-  // The crown's shade, its leaves letting light through in flecks: ellipses stretched along the
-  // sun's way across the ground, as sun flecks are, stirring as the crown sways.
+  // The crown's shade, cool and deep, opened by a few broad soft gaps where the crown is thin.
   float t = uTime;
-  vec2 sway = crownSway(t);
-  float crownShade = texture2D(uField, vUv + sway / uSize).b;
-  vec2 sunWay = normalize(sun.xy);
-  vec2 fleckFrame = vec2(dot(p - sway * 0.6, sunWay) * sun.z, dot(p - sway * 0.6, vec2(-sunWay.y, sunWay.x)));
-  // Where the crown is thin, flecks gather and a few broader gaps open; elsewhere the shade is
-  // deep. Soft-edged, of every size, as the sun's disc blurs them.
-  float thin = smoothstep(0.42, 0.72, fbm3(fleckFrame / 75.0 + 4.0));
-  vec4 fleckCell = voronoiCell(fleckFrame / 17.0 + 3.1);
-  float fleckRadius = 0.1 + 0.3 * pow(fract(fleckCell.y * 7.3), 2.0);
-  float fleck = (1.0 - smoothstep(fleckRadius * 0.55, fleckRadius + 0.07, length(fleckCell.zw)))
-    * step(fract(fleckCell.y * 13.7), 0.1 + 0.55 * thin);
-  float gap = smoothstep(0.64, 0.74, fbm3(fleckFrame / 48.0 + 9.0)) * thin;
+  float crownShade = field.b;
+  float gap = smoothstep(0.6, 0.72, fbm3(p / 120.0 + 9.0)) * 0.7 * (1.0 - 0.6 * calm);
   // The shadow comes and goes with the tree, as the reveal grows it from its root and the exit sinks it.
   float treeUp = uReveal >= 1.0 ? 1.0 : 1.0 - smoothstep(revealFront() - 0.12, revealFront(), revealReach(uRoot.xy));
   treeUp = treeUp * treeUp * (3.0 - 2.0 * treeUp) * exitKeep(uRoot.xy);
-  // Over the cards the shade is lighter and its flecks fainter (design 080), so the field keeps one
-  // value band under its cards; out in the bushes it is as deep as the crown makes it.
-  float flecks = max(fleck, gap * 0.85) * (1.0 - 0.6 * calm);
-  float shade = max(crownShade * (1.0 - 0.9 * flecks), field.a) * vGrowth * treeUp * mix(1.0, 0.6, calm);
-  col = mix(col, col * SHADE_TINT, shade);
+  // Over the cards the shade is lighter (design 080), so the field keeps one value band under its
+  // cards; out in the bushes it is as deep as the crown makes it. Design 084: soft, in two tones (a
+  // light one where the crown is thin, a deeper one under its dense middle), and dappled.
+  float shade = max(crownShade * (1.0 - gap), field.a) * vGrowth * treeUp * mix(1.0, 0.5, calm);
+  vec3 shadeTint = mix(SHADE_SOFT, SHADE_DEEP, smoothstep(0.55, 0.95, shade));
+  col = mix(col, col * shadeTint, smoothstep(0.0, 0.5, shade));
+  // Design 083: sun flecks through the crown, shifting as its leaves move; none near the cards.
+  float offBlock = smoothstep(40.0, 140.0, length(max(max(uFootprintBox.xy - p, p - uFootprintBox.zw), 0.0)));
+  col *= 1.0 + 0.34 * dapple(p, t, 24.0) * crownShade * treeUp * offBlock;
 
   // The glow welling up between the bushes and round the trunk's foot: it lights the ground yellow,
-  // brightest at each pool's heart.
-  // A faint glow wells up through all the undergrowth too, as the art's light between every bush.
+  // brightest at each pool's heart. A faint glow wells up through all the undergrowth too, as the
+  // art's light between every bush.
   float glow = (poolGlow(p, t) + 0.05 * wild * smoothstep(0.35, 0.7, fbm3(p / 90.0 + 13.0))) * vGrowth;
   col += GLOW * glow * 0.5 * (1.0 - 0.6 * rootMask);
   col = mix(col, GLOW_CORE, smoothstep(0.75, 1.2, glow) * 0.3);
+  // Design 084: the warm light pooling under the tree (the shared contact glow), grown in with it.
+  col = mix(col, glowOn(col, p), treeUp);
 
   col = edgeHaze(col, vUv);
   vec3 dawn = vec3(0.85, 0.95, 0.35);
@@ -546,182 +608,33 @@ ${OUTPUT}
 }
 `;
 
-/**
- * One pad of the crown or one bush: an instanced sphere, flattened and lumpy, grown from its root as
- * the reveal passes; the crown's pads sway.
- */
-export const PUFF_VERTEX = /* glsl */ `
-${TERRAIN_UNIFORMS}
-${NOISE}
-${REVEAL}
-${TERRAIN_GROUND}
-${VITALITY}
-// Centre x, y, z (px off the ground), radius.
-attribute vec4 aPuff;
-// The point it grows from (the trunk's root for a pad, its own foot for a bush) x, y; kind (0 pad,
-// 1 bush); seed.
-attribute vec4 aBase;
-// The glow under it 0..1; how deep in the crown a pad lies 0..1 (1 low and inner).
-attribute vec2 aTone;
-varying vec3 vNormal;
-varying vec3 vPos;
-varying vec3 vSphere;
-varying vec4 vInfo;
-varying vec2 vShadeUv;
-varying float vTreeUp;
-void main() {
-  vec3 dir = position;
-  vTreeUp = terrainGrowth(uRoot.xy);
-  float seed = aBase.w;
-  float lumps = sin(dir.x * 4.1 + seed * 20.0) * sin(dir.y * 3.7 + seed * 11.0) * sin(dir.z * 3.3 + 1.0);
-  vec3 offset = dir * aPuff.w * (1.0 + 0.1 * lumps);
-  offset.z *= aBase.z < 0.5 ? 0.78 : 0.7;
-  vec3 local = aPuff.xyz + offset;
-  float pad = 1.0 - aBase.z;
-  local.xy += crownSway(uTime) * (local.z / 300.0) * pad;
-  local.xy += vec2(sin(uTime * 1.1 + seed * 20.0), cos(uTime * 0.9 + seed * 13.0)) * 0.6 * aBase.z * (local.z / 40.0);
-  vec2 root = aBase.xy;
-  vec2 uv = clamp((root - uMin) / uSize, 0.0, 1.0);
-  float growth = terrainGrowth(root);
-  vec3 grown = vec3(root, 0.0) + (local - vec3(root, 0.0)) * growth;
-  grown.z += groundAt(uv) * growth * edgeSkirt(uv);
-  vNormal = normalize(dir * vec3(1.0, 1.0, aBase.z < 0.5 ? 1.0 / 0.78 : 1.0 / 0.7));
-  vPos = grown;
-  vSphere = dir;
-  vInfo = vec4(aTone, aBase.z, seed);
-  vShadeUv = clamp((aPuff.xy - uMin) / uSize, 0.0, 1.0);
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(grown, 1.0);
-}
-`;
-
-/**
- * Foliage blocked in as the art paints it: round leaf clusters packed over each pad, each bulging so
- * it takes the light on its own sunward side, dark hollows between; the crown's pads teal, lit jade
- * on top, their rims scalloped yellow-green where the glow from below catches them; the bushes the
- * art's grass greens, lit yellow over the glow; anything in the crown's shade cooler and darker.
- */
-export const PUFF_FRAGMENT = /* glsl */ `
-uniform vec3 uSun;
-uniform vec3 uEye;
-uniform sampler2D uField;
-uniform vec2 uMin;
-uniform vec2 uSize;
-uniform float uTime;
-${NOISE}
-${VORONOI}
-${PALETTE}
-varying vec3 vNormal;
-varying vec3 vPos;
-varying vec3 vSphere;
-varying vec4 vInfo;
-varying vec2 vShadeUv;
-varying float vTreeUp;
-void main() {
-  vec3 toEye = normalize(uEye - vPos);
-  vec3 n = normalize(vNormal);
-  vec3 sun = normalize(uSun);
-  float bush = vInfo.z;
-  float seed = vInfo.w;
-  // Two scales of leaf clumps, as the art paints foliage: broad lobes, each carrying smaller leaf
-  // clusters. Each bulges the normal, so it takes the light on its own sunward side.
-  vec2 q = vSphere.xy / (1.3 + vSphere.z) * mix(2.5, 1.7, bush) + seed * 17.0;
-  // Warped, so the lobes' borders wander like brush strokes rather than run straight.
-  q += 0.32 * (vec2(gnoise(q * 1.6), gnoise(q * 1.6 + 9.1)) - 0.5);
-  vec4 cluster = voronoiCell(q);
-  float size = 0.5 + 0.2 * fract(cluster.y * 13.0);
-  float inCluster = 1.0 - smoothstep(size - 0.14, size, length(cluster.zw));
-  vec2 ql = q * 3.4 + 5.3;
-  ql += 0.3 * (vec2(gnoise(ql * 1.3), gnoise(ql * 1.3 + 4.7)) - 0.5);
-  vec4 leaf = voronoiCell(ql);
-  float leafSize = 0.46 + 0.18 * fract(leaf.y * 9.0);
-  float inLeaf = 1.0 - smoothstep(leafSize - 0.16, leafSize, length(leaf.zw));
-  // Design 080: a bush is a few broad lobes; the small leaf clusters are the crown's alone (on every
-  // bush they read as speckle from above).
-  float leafBulge = mix(0.16, 0.07, bush);
-  vec3 bulged = normalize(n - vec3(cluster.zw / size, 0.0) * 0.55 * inCluster - vec3(leaf.zw / leafSize, 0.0) * leafBulge * inLeaf);
-  float light = dot(bulged, sun);
-  // Painted tone bands with soft, short edges: shadow, body, lit, and a sun-struck crest.
-  float body = smoothstep(-0.02, 0.22, light);
-  float top = smoothstep(0.55, 0.7, light);
-  float crest = smoothstep(0.8, 0.92, light) * inLeaf;
-  // The rim: the band round each pad's middle and under it, scalloped by its clusters.
-  float rim = smoothstep(0.2, -0.15, vSphere.z + 0.2 * (fract(cluster.y * 5.1) - 0.5)) * inCluster;
-  float glow = vInfo.x;
-  vec3 col;
-  if (bush < 0.5) {
-    col = mix(CROWN_DARK, CROWN_BODY, body);
-    col = mix(col, CROWN_TOP, top);
-    col = mix(col, CROWN_TOP * vec3(1.5, 1.45, 1.1) + 0.05, crest * 0.55);
-    col = mix(col, FRINGE, rim * (0.7 + 0.3 * vInfo.y));
-    col *= mix(1.0, 0.7, vInfo.y);
-  } else {
-    // Each bush its own green, from the art's grass greens toward its blue-green trees.
-    vec3 mid = mix(BUSH_MID, CROWN_BODY * 1.15, fract(seed * 7.13) * 0.22);
-    col = mix(BUSH_DARK, mid, body);
-    col = mix(col, mix(BUSH_LIT, mid * 1.5, 0.25), top);
-    col = mix(col, BUSH_LIT * vec3(1.3, 1.25, 0.9), crest * 0.3);
-    col = mix(col, BUSH_YELLOW, rim * smoothstep(0.05, 0.6, glow) * 0.6);
-  }
-  // Shade tucked between lobes, soft and wide so it reads as a hollow, not a drawn line.
-  col *= mix(0.68, 1.0, smoothstep(0.0, 0.22, cluster.x)) * mix(mix(0.9, 0.97, bush), 1.0, smoothstep(0.0, 0.12, leaf.x));
-  col *= mix(0.86, 1.0, inCluster);
-  // A bush in the crown's shade (a pad's own depth in the crown darkens it above).
-  vec4 ground = texture2D(uField, vShadeUv);
-  float shade = max(ground.b, ground.a) * bush * vTreeUp;
-  col = mix(col, col * SHADE_TINT, shade * 0.8);
-  // The glow from below lights a bush's underside.
-  col += GLOW * glow * 0.22 * max(-n.z + 0.3, 0.0) * bush;
-  float edgeOn = 1.0 - abs(dot(n, toEye));
-  col = mix(col, col * 0.55, smoothstep(0.72, 0.92, edgeOn));
-  gl_FragColor = vec4(col, 1.0);
-${OUTPUT}
-}
-`;
-
-/**
- * Bark lit by this board's sun and the sky: olive-brown, ridged up the trunk, darker up into the
- * crown's shade, the glow at its foot washing its lower trunk yellow, as the art's.
- */
-const BARK_LIGHT = /* glsl */ `
-uniform vec4 uRoot;
-vec3 lightProp(vec3 albedo, vec3 n, vec3 world, float metal) {
-  vec3 sun = normalize(uSun);
-  float around = atan(world.y - uRoot.y, world.x - uRoot.x);
-  // Long furrows in two scales, a little slanted, with moss on the up-facing swells and the roots.
-  float ridge = gnoise(vec2(around * 7.0, world.z / 55.0 + around * 0.35));
-  float fine = gnoise(vec2(around * 23.0, world.z / 12.0 + around));
-  vec3 bark = albedo * (0.5 + 0.7 * smoothstep(0.3, 0.7, ridge)) * (0.8 + 0.4 * fine);
-  float moss = smoothstep(0.5, 0.85, n.z) * smoothstep(0.38, 0.62, gnoise(world.xy / 9.0 + 3.0));
-  bark = mix(bark, vec3(0.07, 0.17, 0.045) * (0.7 + 0.6 * fine), moss * 0.75);
-  float underCrown = smoothstep(130.0, 220.0, world.z);
-  vec3 sky = vec3(0.5, 0.56, 0.6) * (0.75 + 0.25 * n.z);
-  vec3 sunLight = vec3(1.25, 1.15, 0.9) * max(dot(n, sun), 0.0) * (1.0 - 0.8 * underCrown);
-  vec3 col = bark * (sky + sunLight);
-  // The glow at its foot washes the lowest trunk and the roots' flanks yellow.
-  col += vec3(0.836, 0.828, 0.131) * 0.16 * exp(-max(world.z, 0.0) / 45.0) * (1.0 - abs(n.z));
-  return col;
-}
-`;
-
-export const PROP_FRAGMENT = propFragment({ light: BARK_LIGHT, reveal: 'vec3(0.85, 0.95, 0.35)' });
-
-const BARK = [0.22, 0.155, 0.07, 0];
+// The kit's solids in BDSP's greens, the crown keeping the card art's teal jade (pixel samples:
+// #038577, #1da095) with its yellow-green rim.
+const BARK = paint('#7d5232');
+const CROWN = Object.freeze({ body: paint('#1f8a6c'), top: paint('#34a88a'), fringe: paint('#9cc447') });
+const BUSH_COLOURS = Object.freeze({ leaf: '#3f9a3a', leafLight: '#7cc44a' });
+// Design 083: the thickets in three greens, and the broadleaves standing over them.
+const BUSH_PALETTES = Object.freeze([BUSH_COLOURS, Object.freeze({ leaf: '#327f34', leafLight: '#5fae46' }), Object.freeze({ leaf: '#5aa63a', leafLight: '#a4d24e' })]);
+// Design 084: the groves' broadleaves in the card's teal greens, two of them so a grove is not one stamp.
+const BROADLEAVES = Object.freeze([Object.freeze({ leaf: '#22896b', leafLight: '#8fc24a' }), Object.freeze({ leaf: '#2f8f55', leafLight: '#a6c843' })]);
+const TALL_GRASS = Object.freeze({ grass: '#2f7f34', tip: '#86c94e' });
+const BLOOMS = Object.freeze({ warm: ['#fff4d6', '#ffd94a'], cool: ['#ffffff', '#f7a1c4'] });
 
 /** A point on the quadratic curve from `from` via `via` to `to` at t. */
 const onCurve = ({ from, via, to }, t) => [0, 1, 2].map((k) => (1 - t) ** 2 * from[k] + 2 * (1 - t) * t * via[k] + t ** 2 * to[k]);
 
 /**
- * The trunk: a smooth lathe up its curved spine, tapering to the fork, its foot swelling into
- * TRUNK_FINS buttress fins (each running on into a root ridge in the ground); position, normal and
- * aColor as stadium-env-props' geometry, so the props' material draws it.
+ * The trunk's surface: rings up its curved spine, bunched toward the foot, tapering to the fork,
+ * its foot swelling into TRUNK_FINS buttress fins (each running on into a root ridge in the
+ * ground); every ring square to the spine, its angle kept in the table's frame so the fins line up
+ * with the roots. grid[ring][around].
  */
-export function trunkGeometry(three, tree) {
+export function trunkGrid(tree) {
   const rings = 30;
   const around = 40;
   const { r0, r1 } = tree.trunk;
   const grid = [];
   for (let i = 0; i <= rings; i += 1) {
-    // Rings bunched toward the foot, where the fins swell.
     const t = (i / rings) ** 1.5;
     const centre = onCurve(tree.trunk, t);
     const ahead = onCurve(tree.trunk, Math.min(1, t + 0.01));
@@ -735,8 +648,6 @@ export function trunkGeometry(three, tree) {
       const angle = (k / around) * 2 * Math.PI;
       const fin = 0.5 + 0.5 * Math.cos(TRUNK_FINS * angle + tree.finTurn);
       const r = (r0 + (r1 - r0) * t) * (1 + flare * (0.25 + 0.75 * fin ** 1.6));
-      // Round the spine, square to it, the angle kept in the table's own frame (the fins line up
-      // with the roots).
       const radial = [Math.cos(angle), Math.sin(angle), 0];
       const along = radial[0] * unitTangent[0] + radial[1] * unitTangent[1];
       const square = radial.map((v, axis) => v - unitTangent[axis] * along);
@@ -745,87 +656,51 @@ export function trunkGeometry(three, tree) {
     }
     grid.push(row);
   }
-  const positions = [];
-  const normals = [];
-  const colors = [];
-  const index = [];
-  const at = (i, k) => grid[Math.max(0, Math.min(rings, i))][(k + around) % around];
-  for (let i = 0; i <= rings; i += 1) {
-    for (let k = 0; k < around; k += 1) {
-      const p = at(i, k);
-      const dk = at(i, k + 1).map((v, axis) => v - at(i, k - 1)[axis]);
-      const di = at(i + 1, k).map((v, axis) => v - at(i - 1, k)[axis]);
-      const n = [dk[1] * di[2] - dk[2] * di[1], dk[2] * di[0] - dk[0] * di[2], dk[0] * di[1] - dk[1] * di[0]];
-      const nLength = Math.hypot(...n) || 1;
-      positions.push(...p);
-      normals.push(...n.map((v) => v / nLength));
-      colors.push(...BARK);
-    }
-  }
-  for (let i = 0; i < rings; i += 1) {
-    for (let k = 0; k < around; k += 1) {
-      const a0 = i * around + k;
-      const a1 = i * around + ((k + 1) % around);
-      index.push(a0, a1, a0 + around, a1, a1 + around, a0 + around);
-    }
-  }
-  const geometry = new three.BufferGeometry();
-  geometry.setAttribute('position', new three.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute('normal', new three.Float32BufferAttribute(normals, 3));
-  geometry.setAttribute('aColor', new three.Float32BufferAttribute(colors, 4));
-  geometry.setIndex(index);
-  return geometry;
+  return grid;
 }
 
-/** The boughs: tubes of bark from the trunk's fork up into the crown (stadium-env-props). */
-export function boughProps(tree) {
+/**
+ * Everything solid on the board in the kit's one look (design 081): the trunk and its boughs, the
+ * crown's pads as leafy lumps (teal, the highest jade, the rim yellow-green as the art's), the
+ * groves of flat-topped broadleaves and the low bushes (design 084), tall grass on the meadow's edge
+ * and the beds of flowers round the light pool.
+ */
+export function vitalityProps(spots) {
   const props = createPropBuilder();
-  for (const bough of tree.boughs) {
-    const points = Array.from({ length: 11 }, (_, i) => onCurve(bough, i / 10));
-    const radii = points.map((_, i) => bough.r0 + ((bough.r1 - bough.r0) * i) / 10);
-    props.tube(points, radii, BARK, { sides: 12 });
+  const { tree } = spots;
+  const kit = { sun: VITALITY_SUN };
+  if (tree.trunk) {
+    props.surface(trunkGrid(tree), { color: BARK, wrap: true });
+    for (const bough of tree.boughs) {
+      const points = Array.from({ length: 11 }, (_, i) => onCurve(bough, i / 10));
+      props.tube(points, points.map((_, i) => bough.r0 + ((bough.r1 - bough.r0) * i) / 10), BARK, { sides: 12 });
+    }
+  }
+  // The crown: every pad a leafy lump, dark where it tucks in under its neighbours, built about the
+  // trunk so the leaves on its flat tops lie outward from it.
+  const zTop = Math.max(...tree.pads.map((pad) => pad.z), 1);
+  const lumps = tree.pads.map((pad) => ({
+    x: pad.x - tree.x,
+    y: pad.y - tree.y,
+    z: pad.z,
+    rx: pad.r,
+    rz: pad.r * 0.78,
+    color: pad.tier > 0.84 ? CROWN.fringe : pad.z > zTop * 0.84 ? CROWN.top : CROWN.body,
+  }));
+  props.at({ x: tree.x, y: tree.y, ground: false }, () =>
+    props.look({ kind: LOOK.foliage, leaf: 11 * spots.u }, () => props.lumps(lumps, { crease: 0.5 }))
+  );
+  const piece = (p, colors) => ({ ...kit, ...p.options, x: p.x, y: p.y, size: p.size, yaw: p.yaw, lean: p.lean ?? undefined, seed: p.seed * 997, colors });
+  for (const grove of spots.groves) {
+    const colors = grove.asset === 'bush' ? BUSH_PALETTES[1] : BROADLEAVES[grove.palette] ?? BROADLEAVES[0];
+    placeAsset(props, grove.asset, piece(grove, colors));
+  }
+  for (const bush of spots.bushes) placeAsset(props, 'bush', piece(bush, BUSH_PALETTES[bush.palette] ?? BUSH_COLOURS));
+  for (const patch of spots.grass) placeAsset(props, 'tallGrass', { ...kit, x: patch.x, y: patch.y, size: patch.size, blade: patch.blade, seed: patch.seed * 991, colors: TALL_GRASS });
+  for (const clump of spots.flowers) {
+    placeAsset(props, 'flowerBed', { ...kit, x: clump.x, y: clump.y, size: clump.size, depth: 0.7, head: FLOWER_HEAD_PX * spots.u, seed: clump.seed * 983, petals: clump.warm ? BLOOMS.warm : BLOOMS.cool, yaw: clump.seed * 6.28 });
   }
   return props;
-}
-
-/** Every pad and bush as one instanced sphere each: per vertex the unit sphere, per instance its puff. */
-export function puffGeometry(three, { tree, bushes }) {
-  const { rings, around } = PUFF_SEGMENTS;
-  const positions = [];
-  const index = [];
-  for (let ring = 0; ring <= rings; ring += 1) {
-    const latitude = -Math.PI / 2 + (Math.PI * ring) / rings;
-    for (let k = 0; k < around; k += 1) {
-      const longitude = (k / around) * 2 * Math.PI;
-      positions.push(Math.cos(latitude) * Math.cos(longitude), Math.cos(latitude) * Math.sin(longitude), Math.sin(latitude));
-    }
-  }
-  for (let ring = 0; ring < rings; ring += 1) {
-    for (let k = 0; k < around; k += 1) {
-      const a0 = ring * around + k;
-      const a1 = ring * around + ((k + 1) % around);
-      index.push(a0, a1, a0 + around, a1, a1 + around, a0 + around);
-    }
-  }
-  const puffs = [];
-  const zTop = Math.max(...tree.pads.map((pad) => pad.z), 1);
-  for (const pad of tree.pads) {
-    const depth = Math.min(1, Math.max(0, 1 - (pad.z - pad.r * 0.3) / zTop + pad.tier * 0.06));
-    puffs.push({ puff: [pad.x, pad.y, pad.z, pad.r], base: [tree.x, tree.y, 0, pad.seed], tone: [0.3, depth] });
-  }
-  for (const bush of bushes) {
-    bush.puffs.forEach((puff, k) =>
-      puffs.push({ puff: [puff.x, puff.y, puff.z, puff.r], base: [bush.x, bush.y, 1, (bush.seed + k * 0.137) % 1], tone: [bush.glow, 0] })
-    );
-  }
-  const geometry = new three.InstancedBufferGeometry();
-  geometry.setAttribute('position', new three.Float32BufferAttribute(positions, 3));
-  geometry.setIndex(index);
-  geometry.setAttribute('aPuff', new three.InstancedBufferAttribute(Float32Array.from(puffs.flatMap((p) => p.puff)), 4));
-  geometry.setAttribute('aBase', new three.InstancedBufferAttribute(Float32Array.from(puffs.flatMap((p) => p.base)), 4));
-  geometry.setAttribute('aTone', new three.InstancedBufferAttribute(Float32Array.from(puffs.flatMap((p) => p.tone)), 2));
-  geometry.instanceCount = puffs.length;
-  return geometry;
 }
 
 /** Motes of light rising off the pools of glow, drifting as they climb. */
@@ -900,21 +775,17 @@ export function forestOfVitalityBoard({ three, material, seeded, terrainGrid, re
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
   const materials = {
     terrain: make(TERRAIN_VERTEX, TERRAIN_FRAGMENT),
-    puffs: make(PUFF_VERTEX, PUFF_FRAGMENT),
-    props: make(PROP_VERTEX, PROP_FRAGMENT, { side: three.DoubleSide }),
     motes: make(MOTE_VERTEX, MOTE_FRAGMENT, { transparent: true, depthWrite: false, blending: three.AdditiveBlending }),
     bakeField: make(FULLSCREEN_VERTEX, BAKE_FIELD_FRAGMENT, bakeOptions),
     bakeLight: make(FULLSCREEN_VERTEX, bakeLightFragment(), bakeOptions),
   };
+  const kit = createKitProps({ three, material, own, mood: 'day', reveal: 'vec3(0.85, 0.95, 0.35)', ground: true });
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
-  const puffs = new three.Mesh(new three.BufferGeometry(), materials.puffs);
-  const trunk = new three.Mesh(new three.BufferGeometry(), materials.props);
-  const boughs = new three.Mesh(new three.BufferGeometry(), materials.props);
   const motes = new three.Points(seeded(MOTE_COUNT), materials.motes);
   motes.renderOrder = 2;
   return {
-    objects: [terrain, puffs, trunk, boughs, motes],
-    materials: Object.values(materials),
+    objects: [terrain, ...kit.objects, motes],
+    materials: [...Object.values(materials), ...kit.materials],
     bakeField: materials.bakeField,
     bakeLight: materials.bakeLight,
     spots: (layout) => vitalitySpots(layout),
@@ -941,12 +812,7 @@ export function forestOfVitalityBoard({ three, material, seeded, terrainGrid, re
       const box = shadowBox(tree);
       own.uShadowBox.value.set(box.x0, box.y0, box.x1, box.y1);
       replaceGeometry(terrain, terrainGrid(bounds));
-      const shown = Boolean(spots?.tree);
-      for (const mesh of [puffs, trunk, boughs]) mesh.visible = shown;
-      if (!shown) return;
-      replaceGeometry(puffs, puffGeometry(three, spots));
-      replaceGeometry(trunk, trunkGeometry(three, spots.tree));
-      replaceGeometry(boughs, boughProps(spots.tree).build(three));
+      kit.set(spots?.tree ? vitalityProps(spots) : null);
     },
   };
 }
