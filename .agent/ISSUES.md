@@ -6,7 +6,7 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I279). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I280). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Umbrella lines name every member as `(merged I<a>, I<b>…)`: grep any id to find its line.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (`pnpm harness:check`); maintain.md moves older Closed lines to .agent/archive/ISSUES-closed.md.
@@ -14,6 +14,7 @@
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I279 2026-11-03 P3 [rules] An Energy moved onto the other player's Pokémon (customhb Scyther Harvesting Scythe) is owned by its zone: discarded, it lands in the taker's discard pile, not its owner's — discardCard's ownerOf ignores card.ownerId (set in state.mjs:151)
 - I275 2026-11-01 P3 [mat-fx] Design 083 rows left for a later pass (lawn/marsh/island swells, raised beds, snow drifts, Magma rim rocks, billboard/sign blink, roof tones, Lab crates, Shelter floor marks): see 083 Deviations
 - I274 2026-10-31 P3 [mat-fx] KIT_LEAVES loops 27 cells per foliage pixel each plate redraw (30 fps while a board sways): measure on a low-end GPU; past budget, fade leaves to plain foliage (refs: D234, design 082)
 - I272 2026-10-24 P3 [rules] Homebrew set customhb: every attack/ability runs; only Gloom Drowziness is inert (Asleep cannot retreat). Limits in client/src/assets/custom-sets/customhb/ENGINE-CHECK.md; recheck: node scripts/custom-sets/engine-check.mjs
