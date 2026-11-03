@@ -260,9 +260,12 @@ const replaceGeometry = (mesh, geometry) => {
   mesh.geometry = geometry;
 };
 
-/** Scorched Earth: terrain with its lava, the river's sheet, embers and crater smoke. */
+/**
+ * Scorched Earth: terrain with its lava, the river's sheet, embers and crater smoke. Design 084: the
+ * river open only outside the cards' block (uCrust: its x span, where the river is cooled crust).
+ */
 function scorchedEarthBoard({ three, material, seeded }) {
-  const own = { uRiverY: { value: 0 }, uVolcano: { value: new three.Vector4() } };
+  const own = { uRiverY: { value: 0 }, uVolcano: { value: new three.Vector4() }, uCrust: { value: new three.Vector2(1e5, -1e5) } };
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
   const materials = {
     terrain: make(volcanic.TERRAIN_VERTEX, volcanic.TERRAIN_FRAGMENT),
@@ -290,10 +293,16 @@ function scorchedEarthBoard({ three, material, seeded }) {
     objects: [terrain, lava, embers, smoke],
     materials: Object.values(materials),
     bakeField: materials.bakeField,
-    spots: (layout) => ({ volcano: volcanoSpot(layout, environmentFootprints(layout)), riverY: layout.depth }),
-    apply({ volcano, riverY }, bounds) {
+    spots: (layout) => {
+      const footprints = environmentFootprints(layout);
+      const cards = [...footprints.slabs, ...footprints.flats];
+      const crust = cards.length ? [Math.min(...cards.map((r) => r.x)) - 30, Math.max(...cards.map((r) => r.x + r.w)) + 30] : [1e5, -1e5];
+      return { volcano: volcanoSpot(layout, footprints), riverY: layout.depth, crust };
+    },
+    apply({ volcano, riverY, crust }, bounds) {
       own.uVolcano.value.set(volcano?.x ?? 0, volcano?.y ?? 0, volcano?.r ?? 0, 0);
       own.uRiverY.value = riverY;
+      own.uCrust.value.set(crust[0], crust[1]);
       replaceGeometry(terrain, terrainGrid(three, bounds));
       replaceGeometry(
         lava,

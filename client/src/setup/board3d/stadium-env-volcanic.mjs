@@ -19,6 +19,12 @@
 //    LAVA is one sheet at LAVA_LEVEL for the river, which sits lower; EMBERS and SMOKE rise off it.
 // Design 082 (Brilliant Diamond / Shining Pearl, Stark Mountain): the stones warm basalt on a smooth
 // ramp in BDSP's soft light.
+// Design 084 (the visual audit): the scene runs on past the table (the board's margins); the volcano
+// is the top-left landmark, its main stream running down into the river; the river runs open only
+// out past the cards' block, through the free band left of the cards and out to the margins, and
+// under the cards it is cooled dark crust with a few dim cracks; the stones take the kit's soft
+// wrapped key with deep creases between them, so the board joins the set; the lava cracks gather
+// near the river and fade toward the Benches.
 import {
   FOOTPRINTS,
   NOISE,
@@ -59,6 +65,21 @@ const VOLCANO = /* glsl */ `
 // Centre x, y and base radius (0: no volcano) in table px.
 uniform vec4 uVolcano;
 uniform float uRiverY;
+// Design 084: the cards' block's x span, where the river lies cooled under a crust (x0, x1).
+uniform vec2 uCrust;
+// The way the volcano's streams fan out round: toward the river on the seam below it.
+float streamHeading() {
+  return atan(uRiverY - uVolcano.y, 0.35 * uVolcano.z);
+}
+// 1 where the river runs open (out past the cards' block), 0 where it lies under its crust.
+float riverOpen(float x) {
+  return 1.0 - smoothstep(uCrust.x - 50.0, uCrust.x + 10.0, x) * (1.0 - smoothstep(uCrust.y - 10.0, uCrust.y + 50.0, x));
+}
+// 1 where the river lies under its crust: under the cards' block, and within about 20 px of any card
+// out past it (calm: fieldCalm(p, 80.0)).
+float riverShutBy(float x, float calm) {
+  return max(1.0 - riverOpen(x), smoothstep(0.74, 0.84, calm));
+}
 // Angle between the volcano's streams: the middle one runs downstream (+x), one either side of it.
 const float STREAM_SPREAD = 1.05;
 float angleBetween(float a, float b) {
@@ -84,13 +105,17 @@ vec2 volcanoLava(vec2 p) {
   float crater = craterRadius();
   float best = d - crater * 0.82;
   float angle = atan(rel.y, rel.x);
+  // Design 084: the streams fan out round the way to the river below; the middle one runs on down to
+  // it, the side ones end at the cone's foot (they would cross the cards' band past it).
+  float heading = streamHeading();
+  float toRiver = max(abs(uVolcano.y - uRiverY), r) + 30.0;
   for (int k = 0; k < 3; k++) {
     float fk = float(k);
     // A slight wiggle: an angle on the cone, a small constant sway (in px) past its foot.
-    float course = (fk - 1.0) * STREAM_SPREAD + 0.06 * sin(d * 0.02 + fk * 1.7) * min(1.0, r / max(d, 1.0));
+    float course = heading + (fk - 1.0) * STREAM_SPREAD + 0.06 * sin(d * 0.02 + fk * 1.7) * min(1.0, r / max(d, 1.0));
     float width = mix(3.0, 8.5, clamp((d - crater) / r, 0.0, 1.0));
     float across = abs(angleBetween(angle, course)) * d - width;
-    float reach = k == 1 ? r * 1.3 : 100000.0;
+    float reach = k == 1 ? toRiver : r * 1.02;
     best = min(best, max(across, max(crater * 0.7 - d, d - reach)));
   }
   return vec2(1.0 - smoothstep(-0.8, 0.8, best), best);
@@ -101,9 +126,8 @@ const RIVER = /* glsl */ `
 // The river splits the halves the whole width of the table. It leaves the volcano (when there is
 // one) at the volcano's height and bends onto the seam downstream.
 float riverCenter(float x) {
-  float seam = uRiverY + 16.0 * sin(x * 0.003 + 1.3) + 24.0 * (fbm3(vec2(x / 600.0, 3.1)) - 0.5);
-  if (uVolcano.z <= 0.0) return seam;
-  return mix(uVolcano.y, seam, smoothstep(uVolcano.x, uVolcano.x + 420.0, x));
+  // Design 084: the river keeps to the seam; the volcano (the top-left landmark) feeds it a stream.
+  return uRiverY + 16.0 * sin(x * 0.003 + 1.3) + 24.0 * (fbm3(vec2(x / 600.0, 3.1)) - 0.5);
 }
 float riverHalfWidth(float x) {
   return 56.0 + 18.0 * (fbm3(vec2(x / 380.0, 7.7)) - 0.5);
@@ -167,6 +191,11 @@ void main() {
   float inLava = 1.0 - smoothstep(-14.0, 0.0, lavaSD);
   float bank = 1.0 - smoothstep(-26.0, 0.0, lavaSD);
   float base = mix(landHeight(p), ${LAVA_LEVEL.toFixed(1)} - 7.0, nearLava) - 16.0 * bank;
+  // Design 084: under the cards' block the river has cooled: its bed rises to a crust just over the
+  // lava's level (no open sheet there), a little lower than the land round it. Out past the block it
+  // runs open, cooled only within a card's reach (no card sits on open lava).
+  float crusted = riverShutBy(p.x, fieldCalm(p, 80.0));
+  base = mix(base, max(base, ${LAVA_LEVEL.toFixed(1)} + 3.0 + 2.0 * fbm3(p / 40.0)), crusted * nearLava);
   // The volcano's side streams run level, down a broad valley eased into the land: over the hills
   // a straight stream would bow on screen under the tilted camera.
   vec2 lava = volcanoLava(p);
@@ -204,8 +233,9 @@ void main() {
   float nearHeat = max(1.0 - smoothstep(0.0, 220.0, lavaSD),
     step(0.001, uVolcano.z) * (1.0 - smoothstep(uVolcano.z, uVolcano.z * 2.2, vd)));
   // Design 080: the cracks round the cards run dry (dark ash), so no glowing line lies beside a card.
-  float crackLava = crackOn * smoothstep(0.6, 0.68, fbm3(p / 230.0 + 13.0) + 0.3 * nearHeat)
-    * (1.0 - fieldCalm(p, 70.0));
+  // Design 084: the lava cracks gather near the river and the volcano and fade out toward the Benches.
+  float crackLava = crackOn * smoothstep(0.6, 0.68, fbm3(p / 230.0 + 13.0) + 0.45 * nearHeat - 0.15)
+    * (1.0 - fieldCalm(p, 70.0)) * smoothstep(0.05, 0.35, nearHeat);
 
   // Past the cone's foot the streams run on in beds cleared of stones.
   float pastFoot = step(uVolcano.z * 0.9, vd) * step(0.001, uVolcano.z);
@@ -305,13 +335,15 @@ void main() {
   vec3 n = normalize(vec3(nxy / nz * vGrowth, 1.0));
   vec3 sun = normalize(uSun);
 
-  // Design 082 (Brilliant Diamond / Shining Pearl, Stark Mountain): warm basalt in BDSP's soft light,
-  // a smooth ramp from its shade on faces turned away to warm grey-brown on faces to the sun; the
-  // baked sun shadow pushes faces toward the shade.
+  // Design 082 (Brilliant Diamond / Shining Pearl, Stark Mountain): warm basalt in BDSP's soft light.
+  // Design 084: lit as the kit lights its solids, a soft key wrapping round each stone's form (no hard
+  // terminator), the warm fill of the lava's light from below and the sky's from above; the baked sun
+  // shadow pushes faces toward the fill.
   float tone = fract(id * 13.7) * isStone;
-  float facing = dot(n, sun) * mix(0.45, 1.0, light.a);
-  vec3 col = mix(vec3(0.07, 0.055, 0.06), vec3(0.13, 0.1, 0.095), smoothstep(0.15, 0.6, facing));
-  col = mix(col, vec3(0.24, 0.18, 0.155), smoothstep(0.6, 1.0, facing));
+  float wrapKey = clamp((dot(n, sun) + 0.35) / 1.35, 0.0, 1.0);
+  wrapKey = wrapKey * wrapKey * (3.0 - 2.0 * wrapKey) * mix(0.5, 1.0, light.a);
+  vec3 basalt = vec3(0.17, 0.13, 0.115);
+  vec3 col = basalt * (vec3(1.0, 0.92, 0.84) * wrapKey * 1.05 + mix(vec3(0.16, 0.08, 0.07), vec3(0.2, 0.2, 0.26), 0.5 + 0.5 * n.z));
   col *= 0.9 + 0.2 * tone;
   col *= 0.88 + 0.16 * smoothstep(-6.0, 50.0, ground);
   // Design 083: not one basalt: some stones cool slate, some rusty, and broad soft patches of ash
@@ -339,8 +371,18 @@ void main() {
     * smoothstep(0.55, 0.7, gnoise(p / 26.0 + id * 5.0)) * isStone * step(0.4, tone);
   col = mix(col, col * 1.45 + 0.01, crackLine * 0.4 * (1.0 - calm));
 
-  // Occlusion: crevices and the feet of stones go deep blue-grey.
-  col = mix(vec3(0.045, 0.034, 0.038), col, smoothstep(0.3, 0.9, light.b));
+  // Occlusion: crevices and the feet of stones go deep (design 084: the lump creases, deeper).
+  col = mix(vec3(0.03, 0.022, 0.026), col, smoothstep(0.38, 0.92, light.b));
+  // Design 084: the cooled river under the cards: dark crust, a few dim red cracks across it.
+  float shut = riverShutBy(p.x, calm);
+  float crustBand = shut * (1.0 - smoothstep(-30.0, 30.0, riverSD));
+  if (crustBand > 0.001) {
+    vec4 plate = voronoiCell(p / 46.0 + 3.0);
+    float seam = 1.0 - smoothstep(0.02, 0.06, plate.x);
+    vec3 crustCol = vec3(0.05, 0.035, 0.032) * (0.85 + 0.3 * plate.y) * (0.75 + 0.35 * wrapKey);
+    crustCol += vec3(0.5, 0.05, 0.0) * seam * 0.12 * smoothstep(0.55, 0.8, gnoise(p / 60.0)) * (1.0 - fieldCalm(p, 40.0));
+    col = mix(col, crustCol, crustBand);
+  }
 
   // Lava light. Lava near the river and the volcano runs hotter than out in the cracks. Rock just
   // above the lava beside it (the river's sheet, or the lava in its own cracks) glows red, side
@@ -348,13 +390,13 @@ void main() {
   vec2 rel = p - uVolcano.xy;
   float vd = length(rel);
   float hasVolcano = step(0.001, uVolcano.z);
-  float hot = max(1.0 - smoothstep(-20.0, 170.0, riverSD), hasVolcano * (1.0 - smoothstep(uVolcano.z, uVolcano.z * 2.4, vd)));
+  float hot = max((1.0 - smoothstep(-20.0, 170.0, riverSD)) * mix(0.15, 1.0, 1.0 - shut), hasVolcano * (1.0 - smoothstep(uVolcano.z, uVolcano.z * 2.4, vd)));
   float aboveLava = max(ground - max(lavaTable, ${LAVA_LEVEL.toFixed(1)}), 0.0);
   // A slow breath, not a flicker: light pulsing beside the cards pulls the eye off them.
   float flicker = 0.95 + 0.05 * gnoise(vec2(uTime * 0.35, p.x / 160.0 + p.y / 240.0));
   float sideFacing = 1.0 - smoothstep(0.55, 0.95, n.z);
   float underglow = exp(-aboveLava / 3.0) * mix(0.2, 1.0, sideFacing) * mix(0.18, 0.36, hot);
-  float bounce = exp(-max(riverSD, 0.0) / 45.0) * exp(-max(ground - ${LAVA_LEVEL.toFixed(1)}, 0.0) / 24.0) * mix(0.15, 1.0, sideFacing);
+  float bounce = exp(-max(riverSD, 0.0) / 45.0) * exp(-max(ground - ${LAVA_LEVEL.toFixed(1)}, 0.0) / 24.0) * mix(0.15, 1.0, sideFacing) * (1.0 - shut);
   col += vec3(1.0, 0.16, 0.02) * (underglow + bounce * 0.1) * flicker;
 
   // The volcano: its streams warm the rock right beside them; the crater lights its rim and inner
@@ -527,7 +569,8 @@ void main() {
   vec2 spread = (hash22(aSeed.zy * 53.0 + cycle) - 0.5) * craterRadius() * 1.2;
   vec3 crater = vec3(uVolcano.xy + spread + jitter * life * 170.0, craterRimHeight() - 4.0 + life * (130.0 + 90.0 * aSeed.y));
   pos = mix(pos, crater, fromCrater);
-  float onTable = smoothstep(uMin.x + 20.0, uMin.x + 90.0, pos.x) * (1.0 - smoothstep(uMin.x + uSize.x - 90.0, uMin.x + uSize.x - 20.0, pos.x));
+  float onTable = smoothstep(uMin.x + 20.0, uMin.x + 90.0, pos.x) * (1.0 - smoothstep(uMin.x + uSize.x - 90.0, uMin.x + uSize.x - 20.0, pos.x))
+    * riverOpen(x);
   // Design 080: none rise beside a card (motion there pulls the eye off it).
   float shown = revealBurned(pos.xy) * exitKeep(pos.xy) * max(onTable, fromCrater) * (1.0 - fieldCalm(pos.xy, 60.0));
   vec4 mv = modelViewMatrix * vec4(pos, 1.0);
