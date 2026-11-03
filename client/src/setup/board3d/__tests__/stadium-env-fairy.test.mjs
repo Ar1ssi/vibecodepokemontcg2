@@ -11,6 +11,7 @@ import {
   FAIRY_KEY,
   MAX_LEAVES,
   MAX_ORBS,
+  ORB_LIGHT,
   MAX_TREES,
   ORB_FRAGMENT,
   ORB_VERTEX,
@@ -80,4 +81,18 @@ test('the undergrowth gathers in clumps of mixed kinds; the swells stay under th
   assert.ok(new Set(spots.pieces.map((piece) => piece.asset)).size >= 2);
   assert.match(BAKE_FIELD_FRAGMENT, /away \* \(2\.0 \+ 9\.0 \* fbm3\(p \/ 190\.0 \+ 5\.0\)\)/);
   assert.ok(0.2 + 2 + 9 <= FAIRY_GROUND_CEILING_PX);
+});
+
+test('design 084: five to eight green orbs, each lighting the carpet under it; the carpet painted, no flower beds strewn', () => {
+  for (const layout of layouts) {
+    const spots = fairySpots(layout);
+    assert.ok(spots.orbs.length >= 5 && spots.orbs.length <= MAX_ORBS, `${spots.orbs.length} orbs`);
+    assert.equal(spots.glows.length, spots.orbs.length);
+    spots.glows.forEach((glow, i) => {
+      assert.equal(glow.colour, ORB_LIGHT.colour);
+      assert.deepEqual([glow.x, glow.y], [spots.orbs[i].x, spots.orbs[i].y]);
+    });
+    assert.ok(spots.pieces.every((piece) => piece.asset !== 'flowerBed'), 'no flower-bed sprites');
+  }
+  assert.match(TERRAIN_FRAGMENT, /vec3 col = mix\(CARPET_UNDER, CARPET,/, 'the carpet is the ground');
 });

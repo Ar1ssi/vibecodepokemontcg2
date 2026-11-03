@@ -14,6 +14,11 @@
 // ORBS the glowing orbs and their halos; SPARKLES the trails of four-pointed twinkles.
 // Design 082 (Brilliant Diamond / Shining Pearl): the moss under the blossoms and the grass inside the
 // ring are the ground kit's clover grass (stadium-env-ground.mjs); the trees the kit's leafy ones.
+// Design 084 (the visual audit): the flowers are one continuous carpet painted in the ground (dense,
+// low in contrast, a faint glow, a few brighter blossoms), giving way to a clear lighter grass inside
+// the ring; the ground lighter inside the ring, darker toward the edges; five to eight green orbs,
+// bigger and brighter, each lighting the carpet under it (the shared contact glow); the trees
+// near-black silhouettes with a thin cool rim; no flower-bed sprites strewn over it.
 import {
   FILTERING,
   FOOTPRINTS,
@@ -26,12 +31,12 @@ import {
   VORONOI,
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
-import { GRASS as GRASS_KIT } from './stadium-env-ground.mjs';
+import { GLOW, GRASS as GRASS_KIT } from './stadium-env-ground.mjs';
 import { craterEmblem } from './stadium-environment-layout.mjs';
 import { createPropBuilder } from './stadium-env-props.mjs';
-import { createKitProps } from './stadium-kit.mjs';
+import { createKitProps, glslColour } from './stadium-kit.mjs';
 import { measureAsset, placeAsset } from './stadium-kit-assets.mjs';
-import { RISE_LEAN, boardContext, hash, patchy, visibleArea } from './stadium-env-spots.mjs';
+import { RISE_LEAN, boardContext, frameWeight, hash, patchy, visibleArea } from './stadium-env-spots.mjs';
 import { clumpPieces, scaledKinds } from './stadium-env-clumps.mjs';
 import { EDGE_HAZE, STANDARD_TERRAIN_VERTEX } from './stadium-env-surfaces.mjs';
 
@@ -39,7 +44,9 @@ export const FAIRY_KEY = 'fairy-garden';
 /** The moon (toward it, table frame): high, a little from the far left; the forest keeps most of it out. */
 export const FAIRY_MOON = Object.freeze([-0.3, 0.3, 0.9]);
 export const MAX_TREES = 12;
-export const MAX_ORBS = 6;
+export const MAX_ORBS = 8;
+/** Design 084: the orbs' green (the audit's #8df28a) and the light each throws on the carpet under it. */
+export const ORB_LIGHT = Object.freeze({ colour: '#8df28a', reach: 120, strength: 0.75, breath: 0.15 });
 export const MAX_LEAVES = 8;
 /** Design 083: the highest the floor swells under a prop (2 + 9 px past the cards, plus the ripple). */
 export const FAIRY_GROUND_CEILING_PX = 12;
@@ -78,18 +85,30 @@ export function fairySpots(layout) {
   // Orbs of light over the margins, between the trees: on a grid over the scene, each far enough
   // off every card that even raised to its height it never leans over one in the tilted view
   // (a raised point shows further up the screen, so the clearance grows with its height).
+  // Design 084: over the part of the margins the cameras see (visibleArea), the frame's side first.
   const orbs = [];
-  const orbStep = 130 * u;
-  for (let gy = scene.y + orbStep / 2; gy < scene.y + scene.h && orbs.length < MAX_ORBS; gy += orbStep) {
-    for (let gx = scene.x + orbStep / 2; gx < scene.x + scene.w && orbs.length < MAX_ORBS; gx += orbStep) {
+  const orbStep = 110 * u;
+  const seen = visibleArea(ctx.table, scene, 0.06) ?? scene;
+  const orbSpots = [];
+  for (let gy = seen.y + orbStep / 2; gy < seen.y + seen.h; gy += orbStep) {
+    for (let gx = seen.x + orbStep / 2; gx < seen.x + seen.w; gx += orbStep) orbSpots.push([gx, gy]);
+  }
+  orbSpots.sort((a, b) => frameWeight(b[0], ctx.table) - frameWeight(a[0], ctx.table) || hash(a[0], a[1], 41) - hash(b[0], b[1], 41));
+  // Where the frame holds too few (a narrow mat), the rest of the scene's margins after them.
+  for (let gy = scene.y + orbStep / 2; gy < scene.y + scene.h; gy += orbStep) {
+    for (let gx = scene.x + orbStep / 2; gx < scene.x + scene.w; gx += orbStep) orbSpots.push([gx, gy]);
+  }
+  for (const [gx, gy] of orbSpots) {
+    if (orbs.length >= MAX_ORBS) break;
+    {
       const roll = (salt) => hash(gx, gy, salt + 30);
-      if (roll(1) > 0.45) continue;
+      if (roll(1) > 0.7) continue;
       const z = (62 + 46 * roll(2)) * u;
       const x = gx + (roll(3) - 0.5) * orbStep * 0.6;
       const y = gy + (roll(4) - 0.5) * orbStep * 0.6;
       if (!ctx.inScene(x, y, 30 * u) || !ctx.clear(x, y, 34 * u + z * 1.15, 14 * u)) continue;
-      if (orbs.some((o) => Math.hypot(x - o.x, y - o.y) < 150 * u)) continue;
-      orbs.push({ x, y, z, r: (13 + 5 * roll(5)) * u, phase: roll(6) * 6.28 });
+      if (orbs.some((o) => Math.hypot(x - o.x, y - o.y) < 140 * u)) continue;
+      orbs.push({ x, y, z, r: (16 + 6 * roll(5)) * u, phase: roll(6) * 6.28 });
     }
   }
   // Big leaves framing the margins, lying low, pointing in toward the clearing (design 083: on
@@ -121,7 +140,8 @@ export function fairySpots(layout) {
       return (side || far) && y > core.y + 40 * u && ctx.inScene(x, y, r * 0.5) && ctx.clear(x, y, r + RISE_LEAN * (height + FAIRY_GROUND_CEILING_PX), 14 * u);
     },
   });
-  return { ...ctx, reach, handEnd, trees, orbs, leaves, pieces, ring: craterEmblem(layout, centre) };
+  const glows = orbs.map((orb) => ({ x: orb.x, y: orb.y, r: ORB_LIGHT.reach * u, colour: ORB_LIGHT.colour, strength: ORB_LIGHT.strength, breath: ORB_LIGHT.breath }));
+  return { ...ctx, reach, handEnd, trees, orbs, leaves, pieces, ring: craterEmblem(layout, centre), glows };
 }
 
 const FAIRY = /* glsl */ `
@@ -163,11 +183,11 @@ export const TERRAIN_VERTEX = STANDARD_TERRAIN_VERTEX;
 // The card art's colours (pixel samples, inverted through Neutral tone mapping).
 const PALETTE = /* glsl */ `
 const vec3 FLOOR_DARK = vec3(0.024, 0.06, 0.047);
-const vec3 GRASS = vec3(0.067, 0.183, 0.113);
-const vec3 GRASS_LIT = vec3(0.14, 0.34, 0.2);
-const vec3 PETAL = vec3(0.92, 0.84, 1.0);
-const vec3 PETAL_SHADE = vec3(0.38, 0.33, 0.52);
-const vec3 PETAL_HI = vec3(1.4, 1.34, 1.5);
+// Design 084: the clear lighter green inside the ring; the carpet's lavender over its dark slate.
+const vec3 GRASS = ${glslColour('#3f8a52')};
+const vec3 GRASS_LIT = ${glslColour('#6fbf72')};
+const vec3 CARPET = ${glslColour('#b9a6e0')};
+const vec3 CARPET_UNDER = ${glslColour('#3b4a63')};
 const vec3 RING = vec3(1.06, 1.0, 1.22);
 const vec3 ORB = vec3(0.55, 1.4, 0.95);
 `;
@@ -181,6 +201,7 @@ ${VORONOI}
 ${REVEAL}
 ${EDGE_HAZE}
 ${GRASS_KIT}
+${GLOW}
 ${PALETTE}
 ${FAIRY}
 varying vec2 vPos;
@@ -210,30 +231,19 @@ void main() {
   float t = uTime;
   vec3 moon = normalize(uSun);
 
-  // The floor under the blossoms: BDSP's clover grass at night, paler where the moon reaches it.
-  vec3 col = cloverGrass(p, mix(FLOOR_DARK * 1.4, FLOOR_DARK * 2.6 + vec3(0.0, 0.016, 0.01), smoothstep(0.35, 0.7, fbm3(p / 90.0 + 4.0))), fieldCalm(p, 120.0));
-  // Two layers of blossoms: small ones among the big, the carpet thinning in patches where the moss
-  // shows, and heaping into drifts.
-  // Design 080: round the cards the carpet thins to moss with a blossom here and there, so a field of
-  // small flowers never runs under them; it is full out under the trees.
+  // Design 084: the flowers are one continuous carpet, painted, not strewn: the art's pale lavender
+  // over a dark slate, dense and low in contrast (a fine blossom texture faded by distance), thicker
+  // and paler in broad drifts, a faint glow in it, and here and there a brighter blossom. Round the
+  // cards (design 080) its texture is quieter still.
   float calm = fieldCalm(p, 120.0);
   float size = ${FLOWER_PX}.0 * uUnit;
-  // The blossoms lie in drifts: broad patches, thick in their hearts, with bare moss between them (a
-  // carpet of the same small flower everywhere read as speckle).
-  float drift = smoothstep(0.42, 0.68, fbm3(p / 230.0 + 11.0) + 0.08 * (fbm3(p / 70.0 + 3.0) - 0.5));
-  vec3 small = blossoms(p + 7.0, size * 0.7, 0.85 * drift * (1.0 - 0.9 * calm));
-  vec3 big = blossoms(p, size, 0.9 * smoothstep(0.15, 0.6, drift) * (1.0 - 0.8 * calm));
-  vec3 smallCol = mix(PETAL_SHADE, PETAL * 0.9, small.y) * (0.82 + 0.28 * fract(small.z * 9.0));
-  vec3 bigCol = mix(PETAL_SHADE * 1.3, mix(PETAL, PETAL_HI, small.y * 0.7), big.y) * (0.88 + 0.22 * fract(big.z * 11.0));
-  col = mix(col, smallCol, small.x);
-  // A blossom's shadow on those under it.
-  col *= 1.0 - 0.3 * (1.0 - big.x) * smoothstep(0.0, 0.5, big.y) * (1.0 - small.x);
-  col = mix(col, bigCol, big.x);
-  // A dark heart in each big blossom, a yellow-green stamen in some.
-  vec4 heart = voronoiCell(p / size);
-  float heartD = length(heart.zw);
-  col = mix(col, FLOOR_DARK * 1.5, (1.0 - smoothstep(0.05, 0.1, heartD)) * big.x * 0.9);
-  col = mix(col, vec3(0.5, 0.55, 0.12), (1.0 - smoothstep(0.02, 0.045, heartD)) * big.x * step(0.7, fract(heart.y * 5.3)));
+  float drift = smoothstep(0.3, 0.75, fbm3(p / 230.0 + 11.0));
+  vec3 fine = blossoms(p + 7.0, size * 0.42, 0.95);
+  float texture = mix(0.5, fine.x * (0.55 + 0.45 * fine.y), patternFade(filterPixel, size * 0.42)) * (1.0 - 0.6 * calm);
+  vec3 col = mix(CARPET_UNDER, CARPET, 0.55 + 0.25 * drift + 0.2 * (texture - 0.5));
+  col += CARPET * 0.06 * (0.6 + 0.4 * drift);
+  vec3 big = blossoms(p, size, 0.05 * (1.0 - 0.9 * calm));
+  col = mix(col, CARPET * mix(1.1, 1.35, big.y), big.x * 0.45);
 
   // The fairy ring: the carpet gives way to short grass inside it, the ring a thread of pale light with a lilac bloom.
   float t0 = 0.0;
@@ -241,7 +251,7 @@ void main() {
     float toRing = distance(p, uRing.xy);
     float inside = 1.0 - smoothstep(uRing.z - 8.0 * uUnit, uRing.z - 1.0 * uUnit, toRing);
     vec3 grass = cloverGrass(p + 13.0, GRASS, 0.5);
-    grass += GRASS_LIT * 0.35 * (1.0 - smoothstep(0.0, uRing.z, toRing));
+    grass = mix(grass, GRASS_LIT, 0.45 * (1.0 - smoothstep(0.0, uRing.z, toRing)));
     col = mix(col, grass, inside);
     float line = 1.0 - smoothstep(0.0, 1.6 * uUnit, abs(toRing - uRing.z) - 1.6 * uUnit);
     float angle = atan(p.y - uRing.y, p.x - uRing.x);
@@ -263,7 +273,11 @@ void main() {
   }
   float moonPatch = smoothstep(0.3, 0.7, fbm3(p / 130.0 + vec2(t * 0.01, 2.0)));
   col *= (0.56 + 0.28 * moonPatch) * (1.0 - 0.55 * shade);
-  col += ORB * 0.2 * orb * (0.4 + 0.6 * smoothstep(0.0, 0.8, small.x + big.x));
+  // Design 084: lighter inside the ring, darker toward the edges; the orbs' green on the carpet.
+  float fromRing = uRing.z > 0.0 ? distance(p, uRing.xy) / uRing.z : 2.0;
+  col *= mix(1.3, 0.5, smoothstep(0.9, 3.6, fromRing));
+  col += ORB * 0.12 * orb;
+  col = glowOn(col, p);
   col *= 1.0 + 0.4 * t0;
   col = edgeHaze(col, vUv, 0.45);
   col += vec3(0.7, 1.0, 0.9) * revealGlow(p, 0.035) * 0.6;
@@ -274,11 +288,12 @@ ${OUTPUT}
 `;
 
 // Prop colours (aColor; w: 0 matte, 0.05 foliage, 0.1 big leaf, 0.12 root bark, 2 and up a light at w - 1).
-const FOLIAGE = [0.04, 0.14, 0.09, 0];
-const FOLIAGE_LIT = [0.07, 0.22, 0.13, 0];
-const BARK = [0.1, 0.075, 0.06, 0];
+// Design 084: the trees near-black silhouettes against the carpet (a thin cool rim from the moon).
+const FOLIAGE = [0.008, 0.026, 0.02, 0];
+const FOLIAGE_LIT = [0.016, 0.045, 0.035, 0];
+const BARK = [0.03, 0.022, 0.02, 0];
 const LEAF = [0.03, 0.12, 0.07, 0];
-const ORB_CORE = [0.9, 1.5, 1.1, 2.9];
+const ORB_CORE = [0.9, 1.5, 1.1, 3.4];
 
 /** One broad leaf: a pointed outline arching over a midrib, lying low. */
 const NIGHT_TREE = Object.freeze({ leaf: FOLIAGE, leafLight: FOLIAGE_LIT, bark: BARK, barkDark: [0.07, 0.05, 0.045, 0] });
@@ -286,7 +301,6 @@ const NIGHT_FERN = Object.freeze({ leaf: LEAF, leafLight: [0.05, 0.16, 0.1, 0], 
 // Design 083: the undergrowth's clumps (sizes card-scale px).
 const UNDERGROWTH = Object.freeze([
   { asset: 'bush', weight: 2.4, size: [22, 38], options: { colors: { leaf: FOLIAGE, leafLight: FOLIAGE_LIT } } },
-  { asset: 'flowerBed', weight: 1.8, size: [18, 30], options: { depth: 0.7, head: 7, petals: ['#ffffff', '#ffd0e6', '#f6a8cf'] } },
   { asset: 'fern', weight: 1.2, size: [40, 62], options: { fronds: 5, colors: NIGHT_FERN } },
   { asset: 'mushroom', weight: 0.9, size: [6, 10], options: { colors: { cap: '#f6c8e8', spot: '#ffffff' } } },
 ]);
@@ -301,7 +315,7 @@ export function fairyProps(spots) {
   }
   for (const leaf of spots.leaves) placeAsset(props, 'fern', { ...kit, x: leaf.x, y: leaf.y, size: leaf.size, fronds: 5, yaw: leaf.yaw, seed: leaf.seed * 991, colors: NIGHT_FERN });
   for (const piece of spots.pieces) placeAsset(props, piece.asset, { ...kit, ...piece.options, x: piece.x, y: piece.y, size: piece.size, seed: piece.seed * 997, yaw: piece.yaw });
-  for (const orb of spots.orbs) props.sphere({ x: orb.x, y: orb.y, z: orb.z, r: orb.r * 0.5, color: ORB_CORE, sides: 12, rings: 8 });
+  for (const orb of spots.orbs) props.sphere({ x: orb.x, y: orb.y, z: orb.z, r: orb.r * 0.6, color: ORB_CORE, sides: 14, rings: 10 });
   return props;
 }
 
@@ -309,8 +323,12 @@ export function fairyProps(spots) {
 const FAIRY_GLOW = /* glsl */ `
 ${FAIRY}
 const vec3 ORB_GLOW = vec3(0.45, 1.0, 0.8);
+const vec3 COOL_RIM = vec3(0.32, 0.5, 0.58);
 vec3 kitGlow(vec3 albedo, vec3 n, vec3 world) {
-  return ORB_GLOW * orbLight(world, uTime) * albedo * 2.2 * (0.5 + 0.5 * n.z);
+  // Design 084: a thin cool rim on what faces the moon, so the dark trees read as silhouettes.
+  vec3 view = normalize(uEye - world);
+  float rim = pow(1.0 - clamp(abs(dot(n, view)), 0.0, 1.0), 2.5) * clamp(dot(n, normalize(uSun)), 0.0, 1.0);
+  return ORB_GLOW * orbLight(world, uTime) * albedo * 2.2 * (0.5 + 0.5 * n.z) + COOL_RIM * rim * 0.35;
 }
 `;
 
@@ -337,7 +355,7 @@ void main() {
   vec4 mv = modelViewMatrix * vec4(pos, 1.0);
   gl_Position = projectionMatrix * mv;
   vPulse = 0.94 + 0.06 * sin(uTime * 0.6 + orb.y * 0.02);
-  gl_PointSize = orb.w * 5.2 * uFocal / -mv.z * step(0.5, orb.w) * revealBurned(orb.xy) * exitKeep(orb.xy);
+  gl_PointSize = orb.w * 7.0 * uFocal / -mv.z * step(0.5, orb.w) * revealBurned(orb.xy) * exitKeep(orb.xy);
 }
 `;
 
@@ -346,8 +364,8 @@ varying float vPulse;
 void main() {
   float d = length(gl_PointCoord - 0.5) * 2.0;
   float core = 1.0 - smoothstep(0.1, 0.3, d);
-  float halo = exp(-d * d * 7.0) * 0.4 + exp(-d * d * 30.0) * 0.6;
-  gl_FragColor = vec4((vec3(0.45, 1.1, 0.85) * halo + vec3(0.85, 1.0, 0.9) * core * 0.55) * vPulse * (1.0 - smoothstep(0.8, 1.0, d)), 1.0);
+  float halo = exp(-d * d * 6.0) * 0.5 + exp(-d * d * 26.0) * 0.7;
+  gl_FragColor = vec4((vec3(0.5, 1.2, 0.6) * halo + vec3(0.85, 1.05, 0.85) * core * 0.75) * vPulse * (1.0 - smoothstep(0.8, 1.0, d)), 1.0);
 ${OUTPUT}
 }
 `;
