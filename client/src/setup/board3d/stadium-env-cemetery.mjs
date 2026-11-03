@@ -15,6 +15,11 @@
 // ground's own shadow. Per frame: TERRAIN paints the grass, the path, the mounds and the boulder in
 // moonlight; PROPS are the headstones, obelisks, the post, the pines and the bare tree
 // (stadium-env-props); MIST is a sheet of drifting fog low over the ground.
+// Design 084 (the visual audit): the moon keys the board from the top left, its pale rim catching
+// the headstones' tops and the grass tufts against dark grass (re-keyed darker: the moonlight is the
+// one bright thing); the headstones are slabs with a flat face, a rounded top and a base, ten to
+// fifteen in three or four family groups along the path, each leaning its own way; the haze is gone,
+// fog lies in low bands at the margins only; the pines are dark silhouettes along the far edge.
 import {
   FILTERING,
   FOOTPRINTS,
@@ -30,7 +35,7 @@ import {
 import { environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
 import { GRASS as GRASS_KIT } from './stadium-env-ground.mjs';
 import { createPropBuilder } from './stadium-env-props.mjs';
-import { createKitProps } from './stadium-kit.mjs';
+import { createKitProps, glslColour } from './stadium-kit.mjs';
 import { instanceTint, measureAsset, placeAsset } from './stadium-kit-assets.mjs';
 
 /**
@@ -48,8 +53,15 @@ import { tableBounds } from './table-uv.mjs';
 import { patchy, shuffled } from './stadium-env-spots.mjs';
 
 export const CEMETERY_KEY = 'old-cemetery';
-/** The moon (toward it, table frame): low beyond the far end, a little to the right. */
-export const MOON = Object.freeze([0.24, 0.8, 0.55]);
+/**
+ * The moon (toward it, table frame): design 084, one cool key from the top left (beyond the far end,
+ * off to the left), so every shadow falls one way, toward the near right.
+ */
+export const MOON = Object.freeze([-0.5, 0.62, 0.6]);
+/** Design 084: the headstones in family groups along the path: at most this many groups, stones a group, stones in all. */
+export const GRAVE_GROUPS = Object.freeze({ groups: 4, each: [3, 5], most: 15 });
+/** Design 084: the moon's pale rim on the stones' tops and the tufts' tips (the art's lit yellow-green). */
+export const MOON_RIM = '#c8e6a0';
 /** The path's half width, and the least gap between its edge and a card. */
 export const PATH_HALF_PX = 30;
 export const PATH_CARD_GAP_PX = 22;
@@ -169,37 +181,79 @@ export function cemeterySpots(layout) {
   ];
   const off = (x, y, r) => keepOff.every((k) => Math.hypot(x - k.x, y - k.y) >= k.keep + r);
 
-  // Graves in rows facing the player, either side of the path and off the far end. Design 083: the
-  // rows past the far end thinned, every candidate shuffled before the cap, so the stones spread over
-  // the sides and the far end instead of filling one far row.
-  const graveSpots = [];
-  const across = 82 * u;
-  const along = 104 * u;
-  for (let gy = scene.y + along / 2, row = 0; gy < scene.y + scene.h; gy += along, row += 1) {
-    for (let gx = scene.x + across / 2 + (row % 2) * across * 0.4; gx < scene.x + scene.w; gx += across) {
-      const roll = (salt) => hash(gx, gy, salt);
-      const x = gx + (roll(1) - 0.5) * across * 0.5;
-      const y = gy + (roll(2) - 0.5) * along * 0.3;
-      const kindRoll = roll(3);
-      const kind = kindRoll < 0.7 ? GRAVE.round : GRAVE.pointed;
-      const width = (30 + 22 * roll(4)) * u;
-      const height = (40 + 42 * roll(5) ** 1.4) * (y > far ? 1.2 : 1) * u;
+  // Design 084: the headstones in three or four family groups along the path, each a short row of
+  // three or four slabs beside it on the side away from the cards, facing the path, every stone its
+  // own size, turn and lean (old stones lean back and a little aside). Groups never crowd one another;
+  // none stands toward the near end (a tall stone there leans up over the player's cards in the
+  // tilted view) nor among the cards (design 080: the graves ring the field, they don't sit in it).
+  const graves = [];
+  const groups = [];
+  /** One family's stones beside the path at point i, on side `away` (1: the path's left, -1: its right). */
+  const family = (i, away) => {
+    const [ax, ay] = path[i];
+    const [bx, by] = path[i + 1];
+    const run = Math.hypot(bx - ax, by - ay) || 1;
+    const dir = [(bx - ax) / run, (by - ay) / run];
+    const normal = [-dir[1], dir[0]];
+    const roll = (salt) => hash(ax, ay, salt + away);
+    const offset = halfPath + (50 + 26 * roll(1)) * u;
+    const centre = [ax + normal[0] * away * offset, ay + normal[1] * away * offset];
+    if (groups.some(([x, y]) => Math.hypot(x - centre[0], y - centre[1]) < 330 * u)) return null;
+    const [fewest, most] = GRAVE_GROUPS.each;
+    const count = fewest + Math.floor(roll(2) * (most - fewest + 1));
+    // A family stands close: a short row along the path, each stone a little in front or behind.
+    const spacing = (42 + 10 * roll(3)) * u;
+    // The slab's back faces away from the path: its own +y turned onto the away normal.
+    const facing = Math.atan2(-normal[0] * away, normal[1] * away);
+    const stones = [];
+    for (let k = 0; k < count && graves.length + stones.length < GRAVE_GROUPS.most; k += 1) {
+      const stone = (salt) => hash(centre[0] + k, centre[1], salt);
+      const along = (k - (count - 1) / 2) * spacing;
+      const back = (stone(3) - 0.5) * 18 * u;
+      const x = centre[0] + dir[0] * along + (stone(1) - 0.5) * 10 * u + normal[0] * away * back;
+      const y = centre[1] + dir[1] * along + (stone(2) - 0.5) * 10 * u + normal[1] * away * back;
+      const kind = stone(4) < 0.75 ? GRAVE.round : GRAVE.pointed;
+      const width = (32 + 14 * stone(5)) * u;
+      const height = (50 + 30 * stone(6) ** 1.3) * (y > far ? 1.12 : 1) * u;
       const reach = Math.max(width, 46 * u) * 0.75;
-      // Toward the near end a tall stone leans up over the player's cards in the tilted view; and
-      // none stands among the cards (design 080: the graves ring the field, they don't sit in it).
       if (y < core.y || distanceToRect(x, y, core) < reach + 24 * u) continue;
-      const share = y > far ? 0.38 : 0.7;
-      if (roll(6) > share || !inScene(x, y, 30 * u) || !clear(x, y, reach + height * 0.35) || !pathClear(x, y, reach) || !off(x, y, reach)) {
-        continue;
-      }
-      // Old stones lean back, away from the path's walkers, each its own way: from above the face shows.
-      const lean = 0.2 + 0.3 * roll(8);
-      graveSpots.push({ x, y, yaw: (roll(7) - 0.5) * 0.7, lean, width, height, thick: (8 + 5 * roll(10)) * u, kind, seed: roll(9) });
+      if (!inScene(x, y, 30 * u) || !clear(x, y, reach + height * 0.35) || !pathClear(x, y, reach) || !off(x, y, reach)) continue;
+      if ([...graves, ...stones].some((g) => Math.hypot(x - g.x, y - g.y) < (reach + Math.max(g.width, 46 * u) * 0.75) * 0.8)) continue;
+      stones.push({
+        x,
+        y,
+        yaw: facing + (stone(7) - 0.5) * 0.6,
+        lean: 0.06 + 0.16 * stone(8),
+        tilt: (stone(9) - 0.5) * 0.24,
+        width,
+        height,
+        thick: (9 + 4 * stone(10)) * u,
+        kind,
+        seed: stone(11),
+      });
     }
+    return stones.length >= 2 ? { centre, stones } : null;
+  };
+  // Every other point along the path, the side away from the cards first, then the cards' side
+  // (whichever holds more of the family).
+  for (let i = 1; i < path.length - 1; i += 2) {
+    if (groups.length >= GRAVE_GROUPS.groups || graves.length >= GRAVE_GROUPS.most) break;
+    const [ax, ay] = path[i];
+    const [bx, by] = path[i + 1];
+    const normal = [-(by - ay), bx - ax];
+    const length = Math.hypot(normal[0], normal[1]) || 1;
+    const probe = 90 * u;
+    const left = distanceToRect(ax + (normal[0] / length) * probe, ay + (normal[1] / length) * probe, core);
+    const right = distanceToRect(ax - (normal[0] / length) * probe, ay - (normal[1] / length) * probe, core);
+    const away = left >= right ? 1 : -1;
+    const first = family(i, away);
+    const found = first?.stones.length >= GRAVE_GROUPS.each[0] ? first : [first, family(i, -away)].filter(Boolean).sort((a, b) => b.stones.length - a.stones.length)[0];
+    if (!found) continue;
+    graves.push(...found.stones);
+    groups.push(found.centre);
   }
-  const graves = shuffled(graveSpots, 13).slice(0, MAX_GRAVES);
-  // Pines round the scene's outer edge, off the far end most. Design 083: shuffled before the cap
-  // (a near-to-far scan filled it from the near strip) and gathered in stands (patchy).
+  // Design 084: the pines are dark silhouettes along the far edge (and its corners), gathered in
+  // stands (design 083: patchy, shuffled before the cap).
   const pineSpots = [];
   const pineStep = 118 * u;
   for (let gy = scene.y + pineStep / 2; gy < scene.y + scene.h; gy += pineStep) {
@@ -209,9 +263,8 @@ export function cemeterySpots(layout) {
       const y = gy + (roll(2) - 0.5) * pineStep * 0.6;
       const r = (44 + 26 * roll(3)) * u;
       const outside = distanceToRect(x, y, core);
-      if (outside < 130 * u || roll(4) > 0.6 * patchy(x, y, { scale: 300 * u, salt: 57 }) || !inScene(x, y, r * 0.3)) continue;
-      // Tall only off the far end; elsewhere they lean over the cards in the tilted view.
-      const h = (y > far ? 190 + 110 * roll(5) : 120 + 50 * roll(5)) * u;
+      if (y < far + 60 * u || outside < 130 * u || roll(4) > 0.75 * patchy(x, y, { scale: 300 * u, salt: 57 }) || !inScene(x, y, r * 0.3)) continue;
+      const h = (190 + 110 * roll(5)) * u;
       if (!clear(x, y, r + h * 0.25) || !pathClear(x, y, r) || !off(x, y, r)) continue;
       if (graves.some((g) => Math.hypot(x - g.x, y - g.y) < r + 30 * u)) continue;
       pineSpots.push({ x, y, r, h, seed: roll(6) });
@@ -227,9 +280,10 @@ export function cemeterySpots(layout) {
   const at = path[Math.floor(path.length * 0.3)];
   const post = { x: at[0] + halfPath + 26 * u, y: at[1], h: 70 * u };
   // Design 081: the art's tufts of long grass, their tips lit pale yellow-green, as the kit's tall
-  // grass among the graves, clear of the cards, the path, the stones and the pines.
+  // grass among the graves, clear of the cards, the path, the stones and the pines. Design 084: more
+  // of them, the moon's pale tips the night's contrast against the dark grass.
   const tufts = [];
-  for (let k = 0; k < 220 && tufts.length < 16; k += 1) {
+  for (let k = 0; k < 400 && tufts.length < 26; k += 1) {
     const roll = (salt) => hash(k, 61, salt);
     const x = scene.x + roll(1) * scene.w;
     const y = scene.y + roll(2) * scene.h;
@@ -429,7 +483,8 @@ void main() {
   float calm = fieldCalm(p, 110.0);
   // Design 082: BDSP's clover grass in the night's two teals; the lit tufts are the kit's tall grass,
   // standing among the graves.
-  vec3 col = cloverGrass(p, mix(GROUND, GROUND_LIT, smoothstep(0.35, 0.75, fbm3(p / 160.0 + 1.0))), calm);
+  // Design 084: re-keyed darker, the moonlit patches standing apart from the dark grass.
+  vec3 col = cloverGrass(p, mix(GROUND * 0.8, GROUND_LIT * 1.1, smoothstep(0.42, 0.78, fbm3(p / 160.0 + 1.0))), calm);
   // The path: worn earth, paler down its middle, the grass fringing over its edge.
   float pathEdge = 1.0 - grassFringe(-field.g, p, 6.0);
   vec3 earth = mix(EARTH_DARK, EARTH, smoothstep(-4.0, -20.0, field.g)) * (1.0 - 0.25 * fringeShade(-field.g, 6.0));
@@ -449,16 +504,16 @@ void main() {
   vec3 rock = mix(MOSS * 0.8, STONE * 0.9, smoothstep(0.4, 0.9, n.z) * 0.7);
   col = mix(col, rock, step(2.5, kind));
 
-  col *= (0.24 + 0.46 * moonlit) * mix(0.5, 1.0, smoothstep(0.3, 0.9, light.b));
+  col *= (0.18 + 0.5 * moonlit) * mix(0.45, 1.0, smoothstep(0.3, 0.9, light.b));
   // Night closes in round the graveyard: darker, bluer toward the scene's edge.
   float outside = length(max(max(uCore.xy - p, p - uCore.zw), 0.0));
-  col = mix(col, col * vec3(0.5, 0.62, 0.8), smoothstep(80.0, 480.0, outside));
-  // Toward the far end, where the moon hangs, the night thins into pale teal haze.
-  col = mix(col, MIST * 0.34, 0.5 * smoothstep(uCore.w - 120.0, uCore.w + 460.0, p.y));
-  col += MOONLIGHT * 0.1 * pow(clamp(dot(n, moon), 0.0, 1.0), 6.0) * step(2.5, kind);
-  // Low mist pooled in the hollows, thicker out past the graves.
-  float mist = smoothstep(0.45, 0.75, fbm3(p / 260.0 + vec2(uTime * 0.012, uTime * 0.004)));
-  col = mix(col, MIST * 0.32, mist * 0.35);
+  col = mix(col, col * vec3(0.45, 0.56, 0.76), smoothstep(80.0, 480.0, outside));
+  // The boulder's crown catches the moon; so does the path's worn middle, a little.
+  col += MOONLIGHT * 0.12 * pow(clamp(dot(n, moon), 0.0, 1.0), 6.0) * step(2.5, kind);
+  col += MOONLIGHT * 0.025 * onPath * smoothstep(-6.0, -22.0, field.g);
+  // Design 084: no haze over the graveyard; low bands of ground fog lie out at the margins only.
+  float fog = smoothstep(0.48, 0.74, fbm3(p / vec2(340.0, 150.0) + vec2(uTime * 0.012, uTime * 0.004)));
+  col = mix(col, MIST * 0.3, fog * 0.38 * smoothstep(160.0, 420.0, outside));
   col = edgeHaze(col, vUv);
   vec3 ghost = vec3(0.6, 0.95, 0.9);
   col += ghost * revealGlow(p, 0.035) * 0.6;
@@ -471,22 +526,29 @@ ${OUTPUT}
 // Prop colours (aColor; w 0..1 how much a surface takes a sheen).
 const STONE_COLOR = [0.5, 0.68, 0.7, 0.1];
 const STONE_PALE = [0.7, 0.88, 0.86, 0.1];
+const STONE_BASE = [0.24, 0.34, 0.36, 0.05];
 const MOSS_COLOR = [0.12, 0.26, 0.2, 0];
-const PINE_COLOR = [0.05, 0.14, 0.14, 0];
+// Design 084: the pines near-black teal, silhouettes against the moonlit graves.
+const PINE_COLOR = [0.025, 0.07, 0.075, 0];
 const DEAD_WOOD = [0.62, 0.78, 0.76, 0];
 const WOOD = [0.2, 0.17, 0.16, 0];
 
 /**
- * A headstone, BDSP's: a slab with every edge rounded, leaning back a little (higher up, further from
- * the player), a rounded or pointed top; moss on the crown of some.
+ * A headstone, BDSP's: a slab, leaning back a little (higher up, further from the path) and a little
+ * aside, a rounded or pointed top; moss on the crown of some. Design 084: a flat face (its edges only
+ * just rounded, so from above it reads as a slab, not a pill) on a darker, wider base.
  */
 const headstone = (props, g) => {
   const halfW = g.width / 2;
   const shoulder = g.height - halfW;
   const half = g.thick / 2;
   const crown = g.seed > 0.4 ? MOSS_COLOR : STONE_PALE;
-  props.at({ x: g.x, y: g.y, yaw: g.yaw, lean: [-Math.atan(g.lean), 0] }, () => {
-    props.roundBox({ x: 0, y: 0, z0: 0, z1: shoulder + half, hw: halfW, hh: half, r: half * 0.5, color: STONE_COLOR, topColor: STONE_PALE });
+  const base = Math.min(g.height * 0.12, 7 * (g.width / 40));
+  props.at({ x: g.x, y: g.y, yaw: g.yaw }, () =>
+    props.roundBox({ x: 0, y: 0, z0: -2, z1: base, hw: halfW * 1.22, hh: half * 2.1, r: half * 0.35, color: STONE_BASE, topColor: STONE_BASE })
+  );
+  props.at({ x: g.x, y: g.y, z: base * 0.6, yaw: g.yaw, lean: [-Math.atan(g.lean), g.tilt ?? 0] }, () => {
+    props.roundBox({ x: 0, y: 0, z0: 0, z1: shoulder + half, hw: halfW, hh: half, r: half * 0.22, color: STONE_COLOR, topColor: STONE_PALE });
     if (g.kind === GRAVE.pointed) {
       // A pointed arch: a low four-sided cap over the slab's shoulder.
       const points = [[-halfW, -half, shoulder], [halfW, -half, shoulder], [halfW, half, shoulder], [-halfW, half, shoulder], [0, 0, shoulder + halfW * 1.2]];
@@ -509,7 +571,7 @@ const pine = (props, p) => {
     seed: p.seed * 977,
     sun: MOON,
     shadows: false,
-    colors: { pine: PINE_COLOR, pineLight: [0.08, 0.2, 0.2, 0], pineDark: [0.03, 0.08, 0.09, 0], tip: [0.16, 0.34, 0.27, 0], bark: WOOD },
+    colors: { pine: PINE_COLOR, pineLight: [0.04, 0.1, 0.105, 0], pineDark: [0.015, 0.04, 0.045, 0], tip: [0.07, 0.15, 0.13, 0], bark: WOOD },
   });
 };
 
@@ -544,10 +606,27 @@ export function cemeteryProps({ graves, pines, tree, post, tufts = [], u }) {
   bareTree(props, tree, u);
   brokenPost(props, post, u);
   for (const t of tufts) {
-    placeAsset(props, 'tallGrass', { x: t.x, y: t.y, size: t.size, blade: 16 * u, seed: t.seed * 991, sun: MOON, colors: { grass: [0.05, 0.16, 0.15, 0], tip: [0.62, 0.78, 0.36, 0] } });
+    placeAsset(props, 'tallGrass', { x: t.x, y: t.y, size: t.size, blade: 16 * u, seed: t.seed * 991, sun: MOON, colors: { grass: [0.04, 0.13, 0.12, 0], tip: MOON_RIM } });
   }
   return props;
 }
+
+/**
+ * Design 084: the moon's pale rim on the kit's solids: on their moon-facing edges (a thin line round
+ * a silhouette) and their tops, strongest on pale stone and lit tufts, faint on the near-black pines.
+ */
+const MOON_RIM_GLOW = /* glsl */ `
+const vec3 RIM = ${glslColour(MOON_RIM)};
+vec3 kitGlow(vec3 albedo, vec3 n, vec3 world) {
+  vec3 moon = normalize(uSun);
+  vec3 view = normalize(uEye - world);
+  float facing = clamp(dot(n, moon), 0.0, 1.0);
+  float edge = pow(1.0 - clamp(abs(dot(n, view)), 0.0, 1.0), 2.0);
+  float top = smoothstep(0.55, 0.95, n.z);
+  float pale = 0.3 + 0.7 * smoothstep(0.03, 0.3, dot(albedo, vec3(0.333)));
+  return RIM * (0.5 * edge + 0.22 * top) * facing * pale;
+}
+`;
 
 
 
@@ -578,7 +657,8 @@ void main() {
   float band = fbm3((p - drift) / vec2(380.0, 150.0) + uLayer * 7.0);
   float wisps = fbm3((p - drift * 1.6) / 90.0 + uLayer * 3.0);
   float outside = length(max(max(uCore.xy - p, p - uCore.zw), 0.0));
-  float density = smoothstep(0.4, 0.72, band) * (0.55 + 0.45 * wisps) * mix(0.25, 1.0, smoothstep(20.0, 220.0, outside));
+  // Design 084: the fog keeps to the margins (a band of it, never a haze over the graveyard's middle).
+  float density = smoothstep(0.42, 0.72, band) * (0.55 + 0.45 * wisps) * smoothstep(150.0, 380.0, outside);
   vec2 uv = (p - uMin) / uSize;
   vec2 edgeUv = min(uv, 1.0 - uv);
   density *= smoothstep(0.0, 0.05, min(edgeUv.x, edgeUv.y));
@@ -610,7 +690,7 @@ export function oldCemeteryBoard({ three, material, terrainGrid, replaceGeometry
     bakeLight: make(FULLSCREEN_VERTEX, bakeLightFragment(), bakeOptions),
   };
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
-  const kit = createKitProps({ three, material, own, mood: MOONLIT, reveal: 'vec3(0.6, 0.95, 0.9)' });
+  const kit = createKitProps({ three, material, own, mood: MOONLIT, reveal: 'vec3(0.6, 0.95, 0.9)', glow: MOON_RIM_GLOW });
   const mists = [[materials.mistLow, 10]].map(([mist, z]) => {
     const mesh = new three.Mesh(new three.BufferGeometry(), mist);
     mesh.renderOrder = 1;
