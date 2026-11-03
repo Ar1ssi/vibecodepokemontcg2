@@ -236,6 +236,15 @@ test('builder look(): a blink look writes its phase and rate, unscaled by the fr
   }
 });
 
+test('builder look(): a pulse look packs as blink does, its own kind (design 084)', () => {
+  const props = createPropBuilder();
+  props.look({ kind: LOOK.pulse, rate: 0.25, phase: 0.5 }, () => props.box({ x: 0, y: 0, z0: 0, z1: 2, hw: 1, hh: 1, color: [1, 0, 0, 2.2] }));
+  const look = props.build(three).getAttribute('aLook');
+  for (let i = 0; i < look.count; i += 1) {
+    assert.deepEqual([look.getX(i), look.getY(i), look.getZ(i), look.getW(i)], [8, 0, 0.5, 0.25]);
+  }
+});
+
 test('builder: shadows are quads round their centres, scaled with the frame, none inside withoutShadows', () => {
   const props = createPropBuilder();
   props.at({ x: 10, y: 0, scale: 2 }, () => props.shadow({ rx: 3, strength: 0.5 }));

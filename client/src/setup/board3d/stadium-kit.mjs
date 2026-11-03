@@ -303,6 +303,10 @@ void main() {
   if (vColor.w >= 1.5 && vLook.x > 6.5 && vLook.x < 7.5) {
     col *= mix(0.18, 1.0, smoothstep(-0.2, 0.2, sin(6.2831853 * (uTime * vLook.w + vLook.z))));
   }
+  // Design 084: a pulsing light (LOOK.pulse): a soft swell and ebb, never off.
+  if (vColor.w >= 1.5 && vLook.x > 7.5 && vLook.x < 8.5) {
+    col *= 0.62 + 0.38 * (0.5 + 0.5 * sin(6.2831853 * (uTime * vLook.w + vLook.z)));
+  }
   ${glow ? 'if (vColor.w < 1.5) col += kitGlow(vColor.rgb, n, vWorld);' : ''}
   if (vColor.w < 1.5 && uGlowCount > 0) col += albedo * glowLight(vWorld.xy) * (0.55 + 0.45 * max(n.z, 0.0));
   col += (${reveal}) * revealGlow(vWorld.xy, 0.035);

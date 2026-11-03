@@ -121,7 +121,7 @@ test('every kit shader is a full program: one main, balanced brackets, no unfill
 });
 
 test('kitLight: the kinds by their LOOK numbers; a matte part takes no sheen, only chrome the mirror', () => {
-  assert.deepEqual(LOOK, { plain: 0, foliage: 1, gloss: 2, crystal: 3, cloud: 4, chrome: 5, matte: 6, blink: 7 });
+  assert.deepEqual(LOOK, { plain: 0, foliage: 1, gloss: 2, crystal: 3, cloud: 4, chrome: 5, matte: 6, blink: 7, pulse: 8 });
   assert.match(KIT_LIGHT, /bool leafy = kind > 0\.5 && kind < 1\.5;/);
   assert.match(KIT_LIGHT, /bool cloud = kind > 3\.5 && kind < 4\.5;/);
   assert.match(KIT_LIGHT, /bool chrome = kind > 4\.5 && kind < 5\.5;/);
@@ -130,6 +130,13 @@ test('kitLight: the kinds by their LOOK numbers; a matte part takes no sheen, on
   assert.match(guarded, /uKitSheen/, 'the sheen sits inside the matte guard');
   assert.equal(KIT_LIGHT.split('\n').filter((line) => line.includes('uKitSheen')).length, 2, 'and nowhere else');
   assert.doesNotMatch(KIT_LIGHT, /uKitRim|uKitShade|uKitOutline/, 'no toon rim, shade or outline (design 082)');
+});
+
+test('kitFragment: a glowing part with the pulse look swells and ebbs softly, never off (design 084)', () => {
+  const shader = kitFragment();
+  const at = shader.indexOf('if (vColor.w >= 1.5 && vLook.x > 7.5 && vLook.x < 8.5) {');
+  assert.ok(at > 0, 'a pulse branch for glowing parts');
+  assert.match(shader.slice(at, at + 200), /col \*= 0\.62 \+ 0\.38 \* \(0\.5 \+ 0\.5 \* sin\(6\.2831853 \* \(uTime \* vLook\.w \+ vLook\.z\)\)\);/);
 });
 
 test('kitFragment: a glowing part with the blink look dims and brightens at its own rate and phase; lit parts do not (design 083)', () => {

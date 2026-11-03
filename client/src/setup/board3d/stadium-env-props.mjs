@@ -27,8 +27,10 @@ const faceNormal = (n) => (Math.hypot(n[0], n[1], n[2]) > 1e-9 ? unit(n) : [0, 0
  * Kinds a part is lit as (aLook.x; stadium-kit.mjs KIT_LIGHT). `matte`: a thin dry stalk or blade,
  * lit without sheen (seen from above it is all edge). `blink` (design 083): a glowing part (aColor.w
  * ≥ 1.5) that blinks `rate` times a second from `phase` (0..1): aLook = (blink, 0, phase, rate).
+ * `pulse` (design 084): a glowing part whose brightness swells and ebbs softly (never off), packed as
+ * blink; parts with phases stepped across a screen make a slow scrolling wave.
  */
-export const LOOK = Object.freeze({ plain: 0, foliage: 1, gloss: 2, crystal: 3, cloud: 4, chrome: 5, matte: 6, blink: 7 });
+export const LOOK = Object.freeze({ plain: 0, foliage: 1, gloss: 2, crystal: 3, cloud: 4, chrome: 5, matte: 6, blink: 7, pulse: 8 });
 
 /**
  * A part's look unless it says otherwise: plain, still, unshaded, no leaves. `leaf` (px, in the
@@ -113,7 +115,7 @@ export function createPropBuilder() {
     const glow = (color[3] ?? 0) >= 1.5;
     const factor = tinting && !glow ? tinting : null;
     colors.push(factor ? color[0] * factor[0] : color[0], factor ? color[1] * factor[1] : color[1], factor ? color[2] * factor[2] : color[2], color[3] ?? 0);
-    if (look.kind === LOOK.blink) looks.push(LOOK.blink, 0, look.phase ?? 0, look.rate ?? 1);
+    if (look.kind === LOOK.blink || look.kind === LOOK.pulse) looks.push(look.kind, 0, look.phase ?? 0, look.rate ?? 1);
     else looks.push(look.kind, look.sway, look.shade, look.leaf > 0 ? look.leaf * frame.k : 0);
     if (foot) feet.push(foot[0], foot[1], foot[2]);
     else feet.push(at[0], at[1], 0);

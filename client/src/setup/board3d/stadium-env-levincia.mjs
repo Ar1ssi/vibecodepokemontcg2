@@ -15,6 +15,10 @@
 // bake adds normals, occlusion and the sun's shadow. Per frame: TERRAIN paints the stage (panels,
 // the mosaic band, the swirl), the rim wall, the walkway and the bridges; WATER one sheet at
 // WATER_LEVEL; PROPS the railings, the billboards and the towers (stadium-env-props).
+// Design 084 (the visual audit): the swirl and the mosaic band at about a quarter of their contrast
+// under the cards; the billboards upright boards along the rim, abstract LED gradients in yellow, pink
+// and cyan scrolling slowly (no icons: they read as media-player chips); the towers tall pale glass
+// prisms past the walkway's far arc, one bright vertical highlight each, streaked in the water below.
 import {
   FILTERING,
   FOOTPRINTS,
@@ -99,18 +103,19 @@ export function levinciaSpots(layout) {
     if (!inScene(spot.x, spot.y, boardWidth * 0.5)) continue;
     billboards.push({ ...spot, angle: centreAngle, width: boardWidth, height: h * u, seed: hash(centreAngle, 1, 1), variant: Math.floor(hash(k, 3, 4) * 3) });
   }
-  // Towers: in the water past the walkway, on the far end and in the corners.
+  // Towers: in the water past the walkway, on the far end and in the corners. Design 084: tall pale
+  // glass prisms (square or five-sided), slimmer, taller off the far end.
   const towers = [];
   for (let k = 0; k < 40 && towers.length < MAX_TOWERS; k += 1) {
     const angle = Math.PI * (0.08 + 0.84 * hash(k, 2, 1));
     const out = walkOut + (70 + 150 * hash(k, 2, 2)) * u;
     const spot = at(angle, out);
-    const r = (46 + 26 * hash(k, 2, 3)) * u;
+    const r = (36 + 18 * hash(k, 2, 3)) * u;
     if (!inScene(spot.x, spot.y, r)) continue;
     if (towers.some((tower) => Math.hypot(tower.x - spot.x, tower.y - spot.y) < tower.r + r + 30 * u)) continue;
-    // Off the far end they may rise higher; out to the sides they stay lower.
+    // Off the far end they rise highest; out to the sides they stay lower.
     const far = Math.sin(angle);
-    towers.push({ ...spot, r, h: (120 + 140 * far * hash(k, 2, 4)) * u, sides: 4 + Math.floor(hash(k, 2, 5) * 3), turn: hash(k, 2, 6) * Math.PI, cut: hash(k, 2, 7) * Math.PI * 2 });
+    towers.push({ ...spot, r, h: (190 + 170 * far * (0.5 + 0.5 * hash(k, 2, 4))) * u, sides: 4 + Math.floor(hash(k, 2, 5) * 2), turn: hash(k, 2, 6) * Math.PI, cut: hash(k, 2, 7) * Math.PI * 2 });
   }
   return { table, scene, u, centre, stage, walkIn, walkOut, billboards, towers };
 }
@@ -119,6 +124,8 @@ const CITY = /* glsl */ `
 // The stage's centre (x, y), its rim's radius, the walkway's inner and outer radius (uRing).
 uniform vec4 uStage;
 uniform float uWalkOut;
+// Design 084: the towers (x, y, radius, height; height 0 none), for their reflections in the water.
+uniform vec4 uTowers[${MAX_TOWERS}];
 const float BRIDGE_TURNS[4] = float[4](${BRIDGE_TURNS.map((turn) => turn.toFixed(5)).join(', ')});
 // px from the nearest bridge's middle line, measured across it.
 float bridgeAcross(vec2 rel) {
@@ -210,6 +217,7 @@ vec3 edgeHaze(vec3 col, vec2 uv) {
 export const TERRAIN_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
+${FOOTPRINTS}
 ${REVEAL}
 ${PALETTE}
 ${CITY}
@@ -243,8 +251,11 @@ void main() {
   // The mosaic band round the rim; a blue line in.
   float band = smoothstep(uStage.z - 48.0, uStage.z - 46.0, r) * (1.0 - smoothstep(uStage.z - 8.0, uStage.z - 6.0, r));
   // Design 081: the band is one even mosaic yellow, a crisp painted shape (no per-tile speckle).
+  // Design 084: at about a quarter of its contrast under the cards (it ran under both Benches).
   vec3 mosaic = mix(YELLOW, YELLOW_PALE, 0.25);
-  col = mix(col, mosaic, band * 0.9);
+  float underCards = smoothstep(0.25, 0.85, fieldCalm(p, 60.0));
+  float quietUnder = 1.0 - 0.75 * underCards;
+  col = mix(col, mosaic, band * 0.9 * quietUnder);
   float blueLine = smoothstep(uStage.z - 58.0, uStage.z - 56.0, r) * (1.0 - smoothstep(uStage.z - 50.0, uStage.z - 48.0, r));
   col = mix(col, BLUE_BAND, blueLine);
   // The swirl at the middle: a yellow spiral of mosaic, as the art's.
@@ -260,8 +271,10 @@ void main() {
   float swirlEdge = max(min(armEdge, armEnds), eyeEdge);
   // Design 080: the swirl under the Actives is an inlay a few steps quieter than the rim's band, a
   // pale yellow on the pale blue with a thin blue edge, so the eye keeps the cards over it.
-  col = mix(col, BLUE_BAND, (1.0 - swirl) * smoothstep(-6.0, -4.5, swirlEdge) * (1.0 - smoothstep(-2.0, -0.8, swirlEdge)) * 0.5);
-  col = mix(col, mix(mosaic, FLOOR_PALE, 0.35), swirl * 0.6);
+  // Design 084: a quarter of its contrast under the cards (its arms ran under the Actives and the
+  // Stadium card).
+  col = mix(col, BLUE_BAND, (1.0 - swirl) * smoothstep(-6.0, -4.5, swirlEdge) * (1.0 - smoothstep(-2.0, -0.8, swirlEdge)) * 0.5 * quietUnder);
+  col = mix(col, mix(mosaic, FLOOR_PALE, 0.35), swirl * 0.6 * quietUnder);
 
   // The rim wall: blue panels, dark joints.
   vec3 rim = mix(RIM_DARK, RIM, 0.5 + 0.5 * step(0.5, fract(angle * 40.0)));
@@ -351,6 +364,20 @@ void main() {
   float quiet = 1.0 - 0.8 * fieldCalm(p, 110.0);
   col += vec3(0.8, 0.9, 1.0) * lightStreaks(p, t) * 0.24 * quiet;
   col += vec3(1.2) * sparkles(p, t) * 0.7 * quiet;
+  // Design 084: each tower's reflection, a pale streak running from its foot toward the viewer (the
+  // near side), broken by the ripples, sparkling.
+  for (int i = 0; i < ${MAX_TOWERS}; i++) {
+    vec4 tw = uTowers[i];
+    if (tw.w <= 0.0) continue;
+    vec2 rel = p - tw.xy;
+    float along = -rel.y / (tw.w * 0.7);
+    if (along < 0.0 || along > 1.0 || abs(rel.x) > tw.z * 1.3) continue;
+    float across = 1.0 - smoothstep(tw.z * 0.35, tw.z * 1.1, abs(rel.x + 6.0 * sin(p.y * 0.08 + t * 1.3)));
+    float broken = smoothstep(0.3, 0.7, fbm3(vec2(p.x / 30.0, p.y / 7.0 + t * 0.4)));
+    float streak = across * broken * (1.0 - along) * (1.0 - along);
+    col = mix(col, vec3(0.78, 0.88, 1.0), streak * 0.45);
+    col += vec3(1.3) * sparkles(p * 1.7, t) * streak * 0.8;
+  }
   col = mix(col, vec3(0.97, 1.0, 1.03), foam * 0.85);
   col = edgeHaze(col, vUv);
   vec3 spark = vec3(1.1, 0.95, 0.4);
@@ -372,8 +399,10 @@ const SCREEN_NAVY = [0.14, 0.2, 0.42, 2.15];
 const SCREEN_PINK = [1.0, 0.56, 0.72, 2.2];
 const SCREEN_WHITE = [0.98, 0.98, 0.96, 2.3];
 const SCREEN_INK = [0.1, 0.11, 0.16, 2.05];
-const GLASS = [0.1, 0.2, 0.58, 0.9];
-const GLASS_LIT = [0.34, 0.54, 0.9, 0.9];
+// Design 084: pale glass, as the art's towers (dark glass read as blobs).
+const GLASS = [0.3, 0.44, 0.78, 0.9];
+const GLASS_LIT = [0.62, 0.76, 1.0, 0.9];
+const GLASS_GLINT = [1.3, 1.45, 1.7, 2.3];
 const BASE = [0.55, 0.62, 0.74, 0.3];
 
 /** A disc (or the arc a0..a1 of one) laid on a billboard's screen at (s, h), `push` px proud of it. */
@@ -395,7 +424,8 @@ const screenDisc = (props, frontAt, [s, h], r, color, push, a0 = 0, a1 = 2 * Mat
 const billboard = (props, board, centre, deck, u) => {
   const out = [Math.cos(board.angle), Math.sin(board.angle)];
   const along = [-out[1], out[0]];
-  const lean = 0.7;
+  // Design 084: upright, as the art's boards (a slight lean back).
+  const lean = 0.22;
   const foot = [board.x, board.y];
   const at = (s, h) => [foot[0] + along[0] * s + out[0] * Math.sin(lean) * h, foot[1] + along[1] * s + out[1] * Math.sin(lean) * h, deck + 10 * u + Math.cos(lean) * h];
   const halfW = board.width / 2;
@@ -407,36 +437,32 @@ const billboard = (props, board, centre, deck, u) => {
   for (const s of [-halfW * 0.6, halfW * 0.6]) props.tube([[foot[0] + along[0] * s, foot[1] + along[1] * s, deck - 1], at(s, board.height * 0.3)], 2.6 * u, FRAME, { sides: 6 });
   // The frame's back and face.
   props.quad(at(halfW, 0), at(-halfW, 0), at(-halfW, board.height), at(halfW, board.height), FRAME);
-  const variant = (board.variant ?? 0) % 3;
-  const field = [SCREEN_SKY, SCREEN_NAVY, SCREEN_PINK][variant];
+  // Design 084: the screen an abstract LED gradient (yellow, pink, cyan, starting where the board's own
+  // seed says), in upright stripes whose light swells in a wave that scrolls slowly across it.
   const inset = 5 * u;
-  props.quad(frontAt(-halfW + inset, inset, 1.5), frontAt(halfW - inset, inset, 1.5), frontAt(halfW - inset, board.height - inset, 1.5), frontAt(-halfW + inset, board.height - inset, 1.5), field);
+  const stripes = Math.max(8, Math.round((board.width - 2 * inset) / (9 * u)));
+  const start = (board.variant ?? 0) / 3 + board.seed * 0.2;
+  for (let k = 0; k < stripes; k += 1) {
+    const s0 = -halfW + inset + ((board.width - 2 * inset) * k) / stripes;
+    const s1 = -halfW + inset + ((board.width - 2 * inset) * (k + 1)) / stripes;
+    const color = ledGradient(start + (0.6 * k) / stripes);
+    props.look({ kind: LOOK.pulse, rate: 0.18, phase: -k / stripes + board.seed }, () =>
+      props.quad(frontAt(s0, inset, 1.5), frontAt(s1, inset, 1.5), frontAt(s1, board.height - inset, 1.5), frontAt(s0, board.height - inset, 1.5), color)
+    );
+  }
   // Design 083: a little light in the frame's corner blinks, each board on its own beat.
-  props.look({ kind: LOOK.blink, rate: 0.7 + 0.6 * board.seed, phase: board.seed }, () => screenDisc(props, frontAt, [halfW - inset * 1.6, board.height - inset * 1.6], 2.6 * u, SCREEN_RED, 2.4));
-  const mid = [0, board.height / 2];
-  const size = (board.height - 2 * inset) * 0.8;
-  if (variant === 0) {
-    // A Poké Ball: red over white, a dark band, a white button in a dark ring.
-    const r = size / 2;
-    screenDisc(props, frontAt, mid, r, SCREEN_RED, 2.1, 0, Math.PI);
-    screenDisc(props, frontAt, mid, r, SCREEN_WHITE, 2.1, Math.PI, 2 * Math.PI);
-    props.quad(frontAt(-r, mid[1] - r * 0.09, 2.7), frontAt(r, mid[1] - r * 0.09, 2.7), frontAt(r, mid[1] + r * 0.09, 2.7), frontAt(-r, mid[1] + r * 0.09, 2.7), SCREEN_INK);
-    screenDisc(props, frontAt, mid, r * 0.32, SCREEN_INK, 3.3);
-    screenDisc(props, frontAt, mid, r * 0.2, SCREEN_WHITE, 3.9);
-    return;
-  }
-  // The icon's own frame: x across the screen, y up it, both 0..1 over a square `size` wide.
-  const icon = (x, y) => [(x - 0.5) * size, mid[1] + (y - 0.5) * size];
-  const on = ([x, y], push = 2.1) => frontAt(...icon(x, y), push);
-  if (variant === 1) {
-    // A lightning bolt in the electric city's yellow: a slanted bar, then a point striking down.
-    props.quad(on([0.3, 0.5]), on([0.56, 0.5]), on([0.78, 1.0]), on([0.52, 1.0]), SCREEN_YELLOW);
-    props.triangle(on([0.3, 0.0]), on([0.74, 0.56]), on([0.34, 0.56]), SCREEN_YELLOW);
-    return;
-  }
-  // A play button: a white triangle in a dark disc.
-  screenDisc(props, frontAt, mid, size * 0.42, SCREEN_INK, 2.1);
-  props.triangle(on([0.37, 0.27], 2.7), on([0.71, 0.5], 2.7), on([0.37, 0.73], 2.7), SCREEN_WHITE);
+  props.look({ kind: LOOK.blink, rate: 0.7 + 0.6 * board.seed, phase: board.seed }, () => screenDisc(props, frontAt, [halfW - inset * 1.6, board.height - inset * 1.6], 2.6 * u, SCREEN_WHITE, 2.4));
+};
+
+/** Design 084: the LED gradient's colour at `t` (wrapping): yellow to pink to cyan and round again. */
+const LED_STOPS = [SCREEN_YELLOW, SCREEN_PINK, SCREEN_SKY];
+const ledGradient = (t) => {
+  const at = (((t % 1) + 1) % 1) * LED_STOPS.length;
+  const k = Math.floor(at);
+  const f = at - k;
+  const a = LED_STOPS[k];
+  const b = LED_STOPS[(k + 1) % LED_STOPS.length];
+  return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f, a[3]];
 };
 
 /**
@@ -465,6 +491,17 @@ const tower = (props, t, u) => {
     const b = ring[(k + 1) % t.sides];
     props.quad([...a, topAt(a)], [...b, topAt(b)], middle, middle, GLASS_LIT);
   }
+  // Design 084: one bright vertical highlight down the edge turned most to the sun.
+  let best = 0;
+  for (let k = 1; k < t.sides; k += 1) {
+    if (Math.cos(t.turn + (k / t.sides) * 2 * Math.PI - 0.6) > Math.cos(t.turn + (best / t.sides) * 2 * Math.PI - 0.6)) best = k;
+  }
+  const edge = ring[best];
+  const outward = [(edge[0] - t.x) / t.r, (edge[1] - t.y) / t.r];
+  const side = [-outward[1], outward[0]];
+  const w = 2.2 * u;
+  const lift = (s) => [edge[0] + outward[0] * 0.6 + side[0] * s, edge[1] + outward[1] * 0.6 + side[1] * s];
+  props.quad([...lift(-w), z0 + 6 * u], [...lift(w), z0 + 6 * u], [...lift(w), topAt(edge) - 4 * u], [...lift(-w), topAt(edge) - 4 * u], GLASS_GLINT);
 };
 
 /** Railings along the walkway's two edges and the bridges' sides, the billboards, the towers. */
@@ -533,6 +570,7 @@ export function levinciaBoard({ three, material, terrainGrid, replaceGeometry, b
     uSun: { value: new three.Vector3(...NOON_SUN).normalize() },
     uStage: { value: new three.Vector4() },
     uWalkOut: { value: 0 },
+    uTowers: { value: Array.from({ length: MAX_TOWERS }, () => new three.Vector4()) },
   };
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
   const materials = {
@@ -554,6 +592,10 @@ export function levinciaBoard({ three, material, terrainGrid, replaceGeometry, b
     apply(spots, bounds) {
       own.uStage.value.set(spots?.centre.x ?? 0, spots?.centre.y ?? 0, spots?.stage ?? 1e5, spots?.walkIn ?? 1e5);
       own.uWalkOut.value = spots?.walkOut ?? 1e5;
+      own.uTowers.value.forEach((slot, i) => {
+        const t = spots?.towers[i];
+        return t ? slot.set(t.x, t.y, t.r, t.h) : slot.set(0, 0, 0, 0);
+      });
       replaceGeometry(terrain, terrainGrid(bounds));
       replaceGeometry(water, new three.PlaneGeometry(bounds.w, bounds.h).translate(bounds.x + bounds.w / 2, bounds.y + bounds.h / 2, 0));
       kit.set(spots ? levinciaProps(spots) : null);
