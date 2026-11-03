@@ -15,6 +15,12 @@
 // sheet, flowing round the island; EMBERS rise off the moat and spray off the falls' splashes.
 // Design 082 (Brilliant Diamond / Shining Pearl): the rock on a smooth ramp in BDSP's soft light, the
 // walls laid in strata (stadium-env-ground.mjs).
+// Design 084 (the visual audit): the falls, the card's identity, pour down the far wall's corners,
+// where both cameras see them past the opponent's hand row: bright vertical streaks that bloom,
+// feeding the moat; the moat narrower, a dark cracked crust along both shores and the bright slow
+// channel only down its middle, its light on the island's rim; the Poké Ball a low-contrast embossed
+// ring in two near values of the basalt with a faint heat in its grooves; the island dark basalt lumps,
+// worn smooth under the cards.
 import {
   FILTERING,
   FLOW_STREAKS,
@@ -53,8 +59,11 @@ const EMBLEM_BUTTON = '0.36';
  * board's near edge, and its cards read poorly on bright lava, so the near moat lies past it.
  */
 export const NEAR_REACH_PX = 140;
-/** Width of the moat along the table's sides (left, right) and its ends (near, far). */
-export const MOAT_PX = { side: 122, end: 80 };
+/**
+ * Width of the moat along the table's sides (left, right) and its ends (near, far). Design 084:
+ * narrower (it was the brightest thing on screen, wide and flat beside the Benches and piles).
+ */
+export const MOAT_PX = { side: 76, end: 56 };
 /** About how far the shores wander out past their rounded outline (the shader's islandWobble). */
 const SHORE_DRIFT_PX = 34;
 /** Run of the wall from the moat's outer shore up to its crest. */
@@ -62,19 +71,21 @@ export const WALL_RUN_PX = 108;
 /** Most lavafalls a basin has (the uniform array's length). */
 export const MAX_FALLS = 4;
 /**
- * The lavafalls: only the art's four, down its back wall, so on the far wall (the middle pair
- * beside the opponent's hand, not behind it). Falls on the side walls (tried three times) run
- * across the screen in both presets, from the screen's edge to the moat, and read as rays. Where
- * each pours, as the side of the basin and a share along that side's straight run (-1 left end,
- * 1 right end), and whether it forks into three strands near its foot (the art's second fall from
- * the right).
+ * The lavafalls: the art's four, down its back wall. Falls on the side walls (tried three times) run
+ * across the screen in both presets, from the screen's edge to the moat, and read as rays; on the far
+ * wall's straight run they hide behind the opponent's hand row. Design 084: so they pour down the far
+ * wall's two corners, where both cameras see them, each straight up the screen (angle +y): which
+ * corner (-1 left, 1 right), how far round its arc from the far run (0) toward the side run (1), and
+ * whether it forks into three strands near its foot (the art's second fall from the right).
  */
 const FALL_RECIPES = [
-  { side: 'far', at: -0.9, fork: false },
-  { side: 'far', at: -0.58, fork: false },
-  { side: 'far', at: 0.58, fork: true },
-  { side: 'far', at: 0.9, fork: false },
+  { corner: -1, turn: 0.62, fork: false },
+  { corner: -1, turn: 0.3, fork: false },
+  { corner: 1, turn: 0.3, fork: true },
+  { corner: 1, turn: 0.62, fork: false },
 ];
+/** A distance past every fall that still fits the bake's half-float target. */
+const FAR_PX = 9000;
 const FALL_DIP_PX = 14;
 const FALL_OVER_PX = 16;
 const FORK_AT_PX = 58;
@@ -82,10 +93,6 @@ const FORK_AT_PX = 58;
 const FACET_PX = 110;
 const SEAM_PX = 7;
 export const EMBER_COUNT = 160;
-
-const SIDE_DIRECTIONS = {
-  far: { angle: Math.PI / 2, axis: 'x', sign: 1 },
-};
 
 /**
  * Magma Basin's landmarks: the island (a rounded rect round every card footprint, each corner of the
@@ -122,14 +129,15 @@ export function basinSpots(layout) {
     r,
   };
   const moat = { side: MOAT_PX.side, end: MOAT_PX.end };
-  // Each fall meets the moat about where its outer shore runs (the shader's shores wander a little
-  // further out); along the straight run of its side.
-  const falls = FALL_RECIPES.map(({ side, at, fork }) => {
-    const { angle, axis, sign } = SIDE_DIRECTIONS[side];
-    const run = (axis === 'y' ? island.hh : island.hw) - r;
-    return axis === 'y'
-      ? { x: island.x + sign * (island.hw + MOAT_PX.side + SHORE_DRIFT_PX), y: island.y + at * run, angle, fork }
-      : { x: island.x + at * run, y: island.y + sign * (island.hh + MOAT_PX.end + SHORE_DRIFT_PX), angle, fork };
+  // Each fall meets the moat about where its outer shore runs round the far corner's arc (the
+  // shader's shores wander a little further out; it finds the wall band itself), pouring straight up
+  // the screen.
+  const falls = FALL_RECIPES.map(({ corner, turn, fork }) => {
+    const a = Math.PI / 2 - corner * turn * (Math.PI / 2);
+    const reach = r + MOAT_PX.end + (MOAT_PX.side - MOAT_PX.end) * turn + SHORE_DRIFT_PX;
+    const x = island.x + corner * (island.hw - r) + Math.cos(a) * reach;
+    const y = island.y + (island.hh - r) + Math.sin(a) * reach;
+    return { x, y, angle: Math.PI / 2, fork };
   });
   const emblem = craterEmblem(layout, { x: table.x + table.w / 2, y: layout.depth });
   return { island, moat, falls, emblem };
@@ -177,7 +185,7 @@ float islandDistance(vec2 p) {
 }
 // The moat's width at p: wide beside the cards, narrower at the ends, swelling and pinching.
 float moatWidth(vec2 p) {
-  return mix(uMoat.y, uMoat.x, sideness(p)) + 78.0 * (fbm3(p / 160.0 + 7.7) - 0.5);
+  return mix(uMoat.y, uMoat.x, sideness(p)) + 40.0 * (fbm3(p / 160.0 + 7.7) - 0.5);
 }
 // Signed px from the moat's outer shore, positive on the wall.
 float outerDistance(vec2 p, float islandSD) {
@@ -189,22 +197,24 @@ const FALLS = /* glsl */ `
 // Each lavafall: where it meets the moat (x, y), the way up the wall (angle), its kind (0 none,
 // 1 one stream, 2 forked).
 uniform vec4 uFalls[${MAX_FALLS}];
-// One fall: x signed px from its edge (negative in it), y px up the wall from the moat's shore,
-// z px across from its line.
-vec3 fallAt(vec2 p, vec4 fall) {
+// One fall: x signed px from its edge (negative in it), y px along its line from its foot, z px
+// across from its line. up: px up the wall from the moat's outer shore (outerSD), so the fall widens
+// at its foot wherever the shore actually runs (design 084: its foot is only near the shore, on a
+// corner's arc).
+vec3 fallAt(vec2 p, vec4 fall, float up) {
   vec2 dir = vec2(cos(fall.z), sin(fall.z));
   vec2 rel = p - fall.xy;
   float along = dot(rel, dir);
   float across = dot(rel, vec2(-dir.y, dir.x));
-  if (along < -60.0 || along > ${WALL_RUN_PX + 80}.0) return vec3(100000.0, along, across);
-  float t = clamp(along / ${WALL_RUN_PX}.0, 0.0, 1.0);
+  if (along < -260.0 || along > 360.0) return vec3(100000.0, along, across);
+  float t = clamp(up / ${WALL_RUN_PX}.0, 0.0, 1.0);
   float line = across - (gnoise(vec2(along / 46.0, fall.x * 0.013 + fall.z * 3.0)) - 0.5) * 9.0 * t;
   // Wider where it spills out over the moat at its foot.
-  float width = mix(4.5, 3.0, t) + max(12.0 - along, 0.0) * 0.4;
+  float width = mix(6.0, 3.6, t) + max(12.0 - up, 0.0) * 0.4;
   float d = abs(line) - width;
   if (fall.w > 1.5) {
     // Below the fork the stream splits into three strands fanning apart toward the moat.
-    float spread = clamp(1.0 - along / ${FORK_AT_PX}.0, 0.0, 1.0);
+    float spread = clamp(1.0 - up / ${FORK_AT_PX}.0, 0.0, 1.0);
     float strandWidth = mix(width, 2.6, spread);
     d = 100000.0;
     for (int k = -1; k <= 1; k++) {
@@ -221,7 +231,7 @@ float fallsDistance(vec2 p, float outerSD) {
   float d = 100000.0;
   for (int i = 0; i < ${MAX_FALLS}; i++) {
     if (uFalls[i].w < 0.5) continue;
-    d = min(d, fallAt(p, uFalls[i]).x);
+    d = min(d, fallAt(p, uFalls[i], outerSD).x);
   }
   return max(d, outerSD - ${WALL_RUN_PX + FALL_OVER_PX - 4}.0);
 }
@@ -260,7 +270,10 @@ void main() {
     h = mix(${MOAT_BED}.0, crestHeight(p), rise) - 0.25 * beyond
       + 22.0 * (fbm3(p / 110.0) - 0.5) * smoothstep(0.0, 50.0, beyond);
   }
-  gl_FragColor = vec4(h, islandSD, outerSD, fallsDistance(p, outerSD));
+  // The bake's target is half float (largest 65504): fallsDistance's "no fall" 100000 would store as
+  // Inf, which filters to NaN, and the falls' glow then lit every wall (design 084: the walls read as
+  // a pale orange wash, not the card's crimson cliffs). Clamped to a far distance that fits.
+  gl_FragColor = vec4(h, islandSD, outerSD, min(fallsDistance(p, outerSD), ${FAR_PX}.0));
 }
 `;
 
@@ -309,9 +322,10 @@ void main() {
     // Cooled basalt, as the art's: broad swells under a pebbly grain of small faceted lumps packed
     // together.
     // Design 080: round the cards the grain is worn low (the lumps flatter, the fine roughness gone).
+    // Design 084: dark basalt lumps, bigger, their creases deeper, worn smooth under the cards.
     float calm = fieldCalm(p, 90.0);
-    vec3 lump = stones(p + 5.0, mix(16.0, 24.0, fbm3(p / 150.0)), 0.3);
-    h += (4.0 * (fbm3(p / 46.0) - 0.5) + 1.6 * lump.x * (1.0 - 0.6 * calm) + 0.6 * (gnoise(p / 4.0) - 0.5) * (1.0 - calm)) * inland;
+    vec3 lump = stones(p + 5.0, mix(30.0, 56.0, fbm3(p / 150.0)), 1.2);
+    h += (4.0 * (fbm3(p / 46.0) - 0.5) + 3.2 * lump.x * (1.0 - 0.9 * calm) + 0.6 * (gnoise(p / 4.0) - 0.5) * (1.0 - calm)) * inland;
     // A few long cracks wander across it in broken runs, some still glowing.
     vec2 warped = p + (vec2(fbm3(p / 80.0), fbm3(p / 80.0 + 5.3)) - 0.5) * 70.0;
     vec4 plate = voronoiCell(warped / 170.0 + 3.0);
@@ -332,8 +346,9 @@ void main() {
       float cushion = sqrt(clamp(edge / 60.0, 0.0, 1.0));
       float band = (1.0 - smoothstep(bandHalf, bandHalf + 1.5, abs(rel.y))) * step(buttonR, r);
       float ring = smoothstep(buttonR - 7.0, buttonR - 5.0, r) * (1.0 - smoothstep(buttonR + 2.0, buttonR + 4.0, r));
-      h = mix(h, pre.r + 1.0 + 6.0 * cushion - 3.0 * max(band, ring), disc);
-      h -= 5.0 * (1.0 - smoothstep(2.0, 6.0, abs(r - uEmblem.z - 2.5)));
+      // Design 084: embossed, low: the light bake shades its relief, no deep crevice round it.
+      h = mix(h, pre.r + 1.0 + 3.5 * cushion - 2.0 * max(band, ring), disc);
+      h -= 2.0 * (1.0 - smoothstep(2.0, 6.0, abs(r - uEmblem.z - 2.5)));
     }
   } else if (outerSD > 0.0) {
     kind = 0.0;
@@ -427,7 +442,9 @@ void main() {
   // (BDSP's soft light, no hard steps), the walls laid in strata.
   vec3 islandRock = mix(vec3(0.045, 0.036, 0.034), vec3(0.09, 0.068, 0.06), smoothstep(0.15, 0.65, facing));
   islandRock = mix(islandRock, vec3(0.15, 0.108, 0.09), smoothstep(0.65, 1.0, facing));
-  islandRock *= 0.86 + 0.28 * tone;
+  // Design 084: each lump's own tone fades out under the cards.
+  float cardCalm = fieldCalm(p, 90.0);
+  islandRock *= 0.86 + 0.28 * mix(tone, 0.5, 0.85 * cardCalm);
   vec3 wallRock = mix(vec3(0.065, 0.035, 0.032), vec3(0.15, 0.055, 0.042), smoothstep(0.2, 0.62, facing));
   wallRock = mix(wallRock, vec3(0.31, 0.088, 0.058), smoothstep(0.62, 1.0, facing));
   vec2 course = strata(ground, p, 20.0);
@@ -440,7 +457,7 @@ void main() {
   float laplace = texture2D(uField, vUv + vec2(t2.x, 0.0)).r + texture2D(uField, vUv - vec2(t2.x, 0.0)).r
     + texture2D(uField, vUv + vec2(0.0, t2.y)).r + texture2D(uField, vUv - vec2(0.0, t2.y)).r - 4.0 * ground;
   float convex = smoothstep(0.4, 2.2, -laplace) * vGrowth;
-  col = mix(col, col * 1.7 + vec3(0.028, 0.016, 0.01), convex * mix(0.55, 0.25 * (1.0 - 0.7 * fieldCalm(p, 90.0)), onIsland));
+  col = mix(col, col * 1.7 + vec3(0.028, 0.016, 0.01), convex * mix(0.55, 0.25 * (1.0 - 0.7 * cardCalm), onIsland));
   col = mix(vec3(0.026, 0.018, 0.02), col, smoothstep(0.25, 0.9, light.b));
 
   // The lava lights the rock: the moat the island's shore and the wall's foot, faces turned to it
@@ -460,9 +477,11 @@ void main() {
   // The walls take less of it than the island: their faces lean away from the moat's middle.
   float moatGlow = exp(-fromMoat / mix(34.0, 38.0, onIsland)) * exp(-above / 70.0) * (0.25 + 0.75 * turned);
   col += mix(vec3(1.0, 0.24, 0.08), vec3(1.0, 0.35, 0.1), onIsland) * moatGlow * flicker * mix(0.55, 0.55, onIsland);
-  // The island's lip catches a bright orange rim of the lava's light.
-  col += vec3(1.0, 0.36, 0.06) * exp(-fromMoat / 7.0) * onIsland * 0.5 * flicker;
-  col += vec3(1.0, 0.3, 0.12) * exp(-max(fallSD, 0.0) / 6.0) * onWall * 0.55 * flicker;
+  // The island's lip catches a bright orange rim of the lava's light (design 084: a softer, broader
+  // contact glow, the moat's own edges now dark crust).
+  col += vec3(1.0, 0.36, 0.06) * exp(-fromMoat / 14.0) * onIsland * 0.32 * flicker;
+  // Each fall lights the rock either side of it (design 084: further, so it reads from afar).
+  col += vec3(1.0, 0.3, 0.12) * exp(-max(fallSD, 0.0) / 12.0) * onWall * 0.7 * flicker;
   // Design 083: thin veins of lava threading the walls, each breathing slowly on its own beat.
   float vein = (1.0 - smoothstep(0.0, 0.035, abs(fbm3(p / 95.0 + 7.0) - 0.5))) * step(0.58, gnoise(p / 150.0 + 3.0));
   col += vec3(1.0, 0.32, 0.08) * vein * onWall * smoothstep(20.0, 60.0, ground) * (0.22 + 0.14 * sin(uTime * 0.7 + p.x * 0.013 + p.y * 0.007));
@@ -471,11 +490,12 @@ void main() {
   // none round the cards, where glowing dots read as speckle on the field).
   col = mix(col, basinLava(0.26 + 0.1 * flicker), field.b * 0.85);
   float specks = speck(p, 12.0, 0.1, 1.0) + speck(p, 27.0, 0.16, 2.0) * 1.5;
-  col += vec3(1.7, 0.42, 0.05) * specks * mix(0.35, 0.7, onIsland) * (1.0 - fieldCalm(p, 90.0));
+  col += vec3(1.7, 0.42, 0.05) * specks * mix(0.35, 0.7, onIsland) * (1.0 - cardCalm);
 
-  // The Poke Ball set in the island, as in the art: two domed halves of red stone, brightest along
-  // their crowns, warm as if lit from within, a sheen along the far rim; the band, the button's ring
-  // and the thick crevice round it near-black; the button's core red. It glows faintly, breathing.
+  // The Poke Ball set in the island. Design 084: a low-contrast embossed ring (it read as a washer
+  // under the Actives): its halves the basalt a step lighter and warmer, the band, the button's ring
+  // and the groove round it a step darker, a faint heat breathing in the grooves; the light bake shades
+  // its low relief.
   if (uEmblem.z > 0.0 && onIsland > 0.5) {
     vec2 rel = p - uEmblem.xy;
     float r = length(rel);
@@ -485,35 +505,28 @@ void main() {
     float inside = 1.0 - smoothstep(uEmblem.z - 1.5, uEmblem.z, r);
     float halves = inside * smoothstep(bandHalf, bandHalf + 1.5, abs(rel.y)) * smoothstep(buttonR + 3.0, buttonR + 5.0, r);
     float crown = clamp(min(min(uEmblem.z - r, abs(rel.y) - bandHalf), r - buttonR - 4.0) / 60.0, 0.0, 1.0);
-    // The art's (110,45,35) at the edges, (145,57,45) over the halves, a hotter (150,62,45) on their
-    // crowns, inverted through Neutral tone mapping.
-    vec3 stone = mix(vec3(0.16, 0.045, 0.036), vec3(0.3, 0.07, 0.05), sqrt(crown)) + vec3(0.08, 0.02, 0.005) * crown;
-    stone *= (0.86 + 0.24 * smoothstep(-uEmblem.z, uEmblem.z, rel.y)) * breathe * (0.92 + 0.16 * fbm3(p / 22.0));
-    stone += vec3(0.4, 0.14, 0.05) * smoothstep(0.84, 0.97, r / uEmblem.z) * smoothstep(0.1, 0.7, rel.y / uEmblem.z);
     float buttonRing = smoothstep(buttonR - 7.0, buttonR - 4.0, r) * (1.0 - smoothstep(buttonR + 3.0, buttonR + 5.0, r));
-    float dark = max(inside * (1.0 - halves) * step(buttonR - 4.0, r), buttonRing);
-    float core = 1.0 - smoothstep(buttonR - 8.0, buttonR - 6.0, r);
-    // A thick charred groove round the rim, as the art's.
-    float outline = 1.0 - smoothstep(5.5, 7.5, abs(r - uEmblem.z - 3.0));
-    col = mix(col, stone, halves);
-    col += vec3(1.7, 0.42, 0.05) * specks * halves;
-    col = mix(col, vec3(0.035, 0.016, 0.014), max(dark * 0.85, outline * 0.85));
-    col = mix(col, vec3(0.24, 0.07, 0.06) * breathe, core);
-    col += vec3(0.5, 0.07, 0.01) * exp(-max(r - uEmblem.z, 0.0) / 14.0) * 0.12 * step(uEmblem.z, r);
+    float groove = max(max(inside * (1.0 - halves) * step(buttonR - 4.0, r), buttonRing),
+      1.0 - smoothstep(4.0, 6.5, abs(r - uEmblem.z - 3.0)));
+    vec3 raised = col * vec3(1.2, 1.14, 1.1) + vec3(0.008, 0.003, 0.001) * sqrt(crown);
+    col = mix(col, raised, halves);
+    col = mix(col, col * 0.74, groove * 0.85);
+    col += vec3(0.5, 0.07, 0.01) * 0.06 * breathe * groove;
   }
 
-  // The falls: lava streaming down the wall, a gold core, faster streaks racing down it.
+  // The falls: lava streaming down the wall, a gold core, faster streaks racing down it. Design 084:
+  // the core past the bloom's threshold, so each fall blooms.
   if (fallSD < 1.5 && onWall > 0.5) {
     vec3 nearest = vec3(100000.0, 0.0, 0.0);
     for (int i = 0; i < ${MAX_FALLS}; i++) {
       if (uFalls[i].w < 0.5) continue;
-      vec3 f = fallAt(p, uFalls[i]);
+      vec3 f = fallAt(p, uFalls[i], outerSD);
       if (f.x < nearest.x) nearest = f;
     }
     float streak = flowStreaks(vec2(-nearest.y, nearest.z), 70.0, 1.6, vec2(30.0, 3.0));
-    float core = smoothstep(0.0, -2.0, fallSD);
-    float heat = 0.55 + 0.42 * core + (streak - 0.5) * 0.3 + 0.1 * smoothstep(40.0, 0.0, nearest.y);
-    col = mix(col, basinLava(heat), 1.0 - smoothstep(-0.6, 0.8, fallSD));
+    float core = smoothstep(0.0, -2.5, fallSD);
+    float heat = 0.6 + 0.4 * core + (streak - 0.5) * 0.3 + 0.1 * smoothstep(40.0, 0.0, outerSD);
+    col = mix(col, basinLava(heat) * (1.0 + 0.6 * core), 1.0 - smoothstep(-0.6, 0.8, fallSD));
   }
 
   // Past the crest the rock sinks into the basin's smoky haze.
@@ -581,7 +594,8 @@ void main() {
   vec2 grad = vec2(texture2D(uPre, uv + vec2(e.x, 0.0)).g - texture2D(uPre, uv - vec2(e.x, 0.0)).g,
     texture2D(uPre, uv + vec2(0.0, e.y)).g - texture2D(uPre, uv - vec2(0.0, e.y)).g);
   vec2 outward = length(grad) > 0.0001 ? normalize(grad) : vec2(0.0, 1.0);
-  vec2 velocity = vec2(-outward.y, outward.x) * (6.0 + 8.0 * sin(across * 3.14159));
+  // Design 084: slow, fastest down the middle channel.
+  vec2 velocity = vec2(-outward.y, outward.x) * (3.0 + 5.0 * sin(across * 3.14159));
 
   float period = 5.0;
   float jitter = fbm3(p / 260.0) * 2.0;
@@ -591,15 +605,17 @@ void main() {
   vec2 flow = mix(flowPhase(p - velocity * phaseB * period + vec2(53.0, 29.0)), flowPhase(p - velocity * phaseA * period), weightA);
 
   float middle = sin(across * 3.14159);
-  // Gold flow lines down the middle; orange out to a thin red-orange lip at both shores, as the art's
-  // moat (no bright rim along them). Design 080: a step cooler than the art's pale gold, so the ring of
-  // lava hugging the cards glows without glaring.
-  float heat = 0.42 + 0.34 * middle + (flow.x - 0.5) * 0.12 + flow.y * 0.16 * middle;
-  heat -= 0.36 * (1.0 - smoothstep(0.0, 14.0, shore));
-  // A thin dark crust right against the rock.
-  heat -= 0.4 * (1.0 - smoothstep(1.5, 5.0, shore));
+  // Design 084: the bright slow channel only down the middle, gold flow lines in it; out from it the
+  // lava cools to orange, then to a dark crust along both shores, cracked with dim red, so the moat no
+  // longer glares beside the Benches and piles. (Design 080: a step cooler than the art's pale gold.)
+  float channel = smoothstep(0.35, 0.95, middle);
+  float heat = 0.3 + 0.5 * channel + (flow.x - 0.5) * 0.1 + flow.y * 0.16 * channel;
+  float crust = 1.0 - smoothstep(8.0, 24.0, shore);
+  float crack = (1.0 - smoothstep(0.0, 0.05, abs(gnoise((p - velocity * uTime * 0.3) / 22.0) - 0.5)))
+    * smoothstep(2.0, 6.0, shore);
+  heat = mix(heat, 0.08 + 0.22 * crack, crust);
   // Dark crust plates drifting where the flow runs cool.
-  float skin = smoothstep(0.66, 0.74, fbm3((p - velocity * uTime * 0.6) / 70.0 + 9.0)) * smoothstep(8.0, 30.0, shore);
+  float skin = smoothstep(0.66, 0.74, fbm3((p - velocity * uTime * 0.6) / 70.0 + 9.0)) * smoothstep(20.0, 36.0, shore);
   heat -= skin * 0.2;
 
   // Each fall's splash where its line meets the outer shore: a hot churning pool, rings running out
@@ -610,7 +626,7 @@ void main() {
     vec2 dir = vec2(cos(fall.z), sin(fall.z));
     vec2 rel = p - fall.xy;
     float across = dot(rel, vec2(-dir.y, dir.x));
-    if (abs(dot(rel, dir)) > 160.0) continue;
+    if (abs(dot(rel, dir)) > 260.0) continue;
     float d = length(vec2(across, outerSD + 10.0));
     float pool = exp(-d / 24.0);
     float rings = smoothstep(0.6, 1.0, sin(d / 5.0 - uTime * 2.2)) * exp(-d / 40.0) * smoothstep(6.0, 14.0, d);

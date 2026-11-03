@@ -36,6 +36,8 @@ const roundedRect = (x, y, island) => {
   return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - island.r;
 };
 
+const close = (actual, expected, label) => assert.ok(Math.abs(actual - expected) < 1e-9, `${label}: ${actual} vs ${expected}`);
+
 const cornersOf = (rect) => [
   [rect.x, rect.y],
   [rect.x + rect.w, rect.y],
@@ -72,24 +74,20 @@ test('basinSpots: the island holds every card footprint, its margin clear inside
   }
 });
 
-test('basinSpots: the falls stand on the far wall\'s outer shore, facing up it', () => {
+// Design 084: the falls pour down the far wall's corners, where both cameras see them past the
+// opponent's hand row, each straight up the screen.
+test('basinSpots: the falls stand round the far corners past the moat, pouring straight up the screen, two each side', () => {
   for (const layout of layouts) {
     const { island, falls } = basinSpots(layout);
-    assert.ok(falls.length > 0 && falls.length <= MAX_FALLS);
+    assert.equal(falls.length, MAX_FALLS);
     for (const fall of falls) {
-      const dx = Math.round(Math.cos(fall.angle));
-      const dy = Math.round(Math.sin(fall.angle));
-      if (dx !== 0) {
-        assert.ok(Math.abs(fall.x - island.x) >= island.hw + MOAT_PX.side, 'beyond the side moat');
-        assert.equal(Math.sign(fall.x - island.x), dx, 'faces away from the island');
-        assert.ok(Math.abs(fall.y - island.y) <= island.hh - island.r, 'on the straight run of its side');
-      } else {
-        assert.ok(Math.abs(fall.y - island.y) >= island.hh + MOAT_PX.end, 'beyond the end moat');
-        assert.equal(Math.sign(fall.y - island.y), dy, 'faces away from the island');
-        assert.ok(Math.abs(fall.x - island.x) <= island.hw - island.r, 'on the straight run of its side');
-      }
+      close(fall.angle, Math.PI / 2, 'straight up the screen');
+      assert.ok(fall.y > island.y + island.hh - island.r, 'past the far corners\' centres');
+      assert.ok(Math.abs(fall.x - island.x) > island.hw - island.r, 'round a corner, off the far run');
+      assert.ok(roundedRect(fall.x, fall.y, island) >= MOAT_PX.end, 'past the moat');
     }
-    assert.ok(falls.every((fall) => fall.y > island.y - island.hh), 'none on the near wall, under the hand');
+    assert.equal(falls.filter((fall) => fall.x < island.x).length, 2, 'two on the left corner');
+    assert.equal(falls.filter((fall) => fall.fork).length, 1, 'one forked');
   }
 });
 
@@ -103,6 +101,14 @@ test('basinSpots: the emblem rings the Actives at the table\'s middle, where it 
     assert.equal(emblem.y, layout.depth);
   }
   assert.equal(basinSpots(null), null);
+});
+
+// Design 084: the bake's target is half float (largest 65504). The falls' "no fall" distance stored
+// unclamped became Inf, filtered to NaN, and lit every wall with the falls' glow.
+test('BAKE_BASIN stores the falls distance clamped under the half-float maximum', () => {
+  const stored = BAKE_BASIN_FRAGMENT.match(/gl_FragColor = vec4\([^;]*min\(fallsDistance\(p, outerSD\), ([0-9.]+)\)\)/);
+  assert.ok(stored, 'the A channel is min(fallsDistance(...), cap)');
+  assert.ok(Number(stored[1]) < 65504, `cap ${stored[1]}`);
 });
 
 test('Magma Basin shaders declare no GLSL ES 3.00 reserved word and every one has a main', () => {
