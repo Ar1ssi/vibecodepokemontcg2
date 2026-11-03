@@ -16,6 +16,11 @@
 // Per frame: TERRAIN paints the ground, the emblem and the lightning's flash; CLOUDS is the cloud
 // sea, domes turning round the mountain on a grid of their own; BOLT draws one lightning stroke and
 // its fork as a camera-facing ribbon (the mesh schedules the strikes).
+// Design 084 (the visual audit): re-keyed low as the card is a storm: slate rock, a darker blue-grey
+// cloud sea with lighter tops, a dark floor, snow only as caps on the highest crags; the emblem the one
+// bright thing (an emissive gold line with a soft halo and the shared contact glow); each rare strike a
+// brief cool pulse of sky light over the scene; a far peak painted in the cloud sea; the pines dark,
+// no snow on them.
 import {
   FILTERING,
   FOOTPRINTS,
@@ -29,7 +34,7 @@ import {
   VORONOI,
 } from './stadium-environment-glsl.mjs';
 import { RIDGE_HALF_WIDTH } from './stadium-environment-layout.mjs';
-import { STRATA } from './stadium-env-ground.mjs';
+import { GLOW, STRATA } from './stadium-env-ground.mjs';
 import { createPropBuilder } from './stadium-env-props.mjs';
 import { RISE_LEAN, boardContext, clumpAround, hash, patchy } from './stadium-env-spots.mjs';
 import { measureAsset, placeAsset } from './stadium-kit-assets.mjs';
@@ -144,15 +149,16 @@ export function craterDressing(layout, bowl, peaks) {
   return pieces;
 }
 
-const CRATER_ROCK = Object.freeze({ body: '#7f8aa0', light: '#aeb9cc', dark: '#545d72' });
-const SNOW_PINE = Object.freeze({ pine: '#2e6b62', pineLight: '#3f8576', pineDark: '#1d4a45', bark: '#5a4436', snow: '#eef6ff' });
+// Design 084: slate (the audit's #3a4756), dark storm pines.
+const CRATER_ROCK = Object.freeze({ body: '#4a5668', light: '#6f7c90', dark: '#2c3442' });
+const SNOW_PINE = Object.freeze({ pine: '#1f4a47', pineLight: '#2c5f5a', pineDark: '#132f2d', bark: '#3e3029', snow: '#eef6ff' });
 
 /** The crater's dressing (craterDressing) as one kit builder: slate boulders, snow-dusted pines. */
 export function craterProps(pieces) {
   const props = createPropBuilder();
   for (const piece of pieces) {
     const common = { x: piece.x, y: piece.y, size: piece.size, seed: piece.seed * 997, yaw: piece.seed * 6.28 };
-    if (piece.asset === 'pine') placeAsset(props, 'pine', { ...common, height: piece.height, snow: true, tiers: 3, colors: SNOW_PINE });
+    if (piece.asset === 'pine') placeAsset(props, 'pine', { ...common, height: piece.height, snow: false, tiers: 3, colors: SNOW_PINE });
     else placeAsset(props, 'boulder', { ...common, colors: CRATER_ROCK });
   }
   return props;
@@ -257,6 +263,10 @@ vec3 flashLight(vec3 at, vec3 n) {
   float dist = length(toStrike);
   float facing = max(dot(n, toStrike / max(dist, 1.0)), 0.0);
   return vec3(0.4, 0.62, 1.0) * uFlash.w * exp(-dist / 240.0) * (0.2 + 0.8 * facing) * 0.55;
+}
+// Design 084: a strike's brief cool pulse of sky light over the whole scene (no whiteout: a soft lift).
+vec3 skyPulse(vec3 n) {
+  return vec3(0.07, 0.11, 0.18) * uFlash.w * (0.5 + 0.5 * n.z);
 }
 `;
 
@@ -426,6 +436,7 @@ ${NOISE}
 ${REVEAL}
 ${FILTERING}
 ${STRATA}
+${GLOW}
 ${BOWL}
 ${EMBLEM}
 ${FLASH}
@@ -454,8 +465,9 @@ void main() {
   // Rock in three painted cold tones, each face taking one: deep blue in shadow, slate, pale steel
   // blue on the faces to the light. Steep faces turned from the light catch the storm's cyan; frost
   // dusts the summits and the highest crags.
-  vec3 rock = mix(vec3(0.04, 0.046, 0.066), vec3(0.15, 0.165, 0.2), smoothstep(0.4, 0.52, facing));
-  rock = mix(rock, vec3(0.37, 0.4, 0.46), smoothstep(0.8, 0.92, facing));
+  // Design 084: re-keyed down, slate (#3a4756) to the light, near-black blue in shade.
+  vec3 rock = mix(vec3(0.026, 0.03, 0.045), vec3(0.085, 0.1, 0.13), smoothstep(0.4, 0.52, facing));
+  rock = mix(rock, vec3(0.19, 0.22, 0.27), smoothstep(0.8, 0.92, facing));
   rock *= 0.84 + 0.32 * tone;
   // Design 082: Mt. Coronet's rock, laid in BDSP's strata: courses each its own tone, a dark groove
   // under each, on the walls and the slopes (the floor and the summits' snow cover them).
@@ -466,12 +478,13 @@ void main() {
   // Summits and high crags catch the light; the low slopes sink into the storm's gloom.
   rock *= mix(0.72, 1.12, smoothstep(30.0, 200.0, ground));
   // Broad snow fields, not flecks: a fine noise edge reads as crumpled foil from above.
-  float snow = smoothstep(148.0, 168.0, ground + (fbm3(p / 90.0) - 0.5) * 40.0) * smoothstep(0.3, 0.55, n.z);
-  vec3 snowColor = mix(vec3(0.34, 0.45, 0.58), vec3(0.86, 0.93, 1.0), smoothstep(0.5, 0.85, facing));
-  rock = mix(rock, snowColor, snow * 0.92);
+  // Design 084: snow only as caps on the highest crags and the summits.
+  float snow = smoothstep(176.0, 196.0, ground + (fbm3(p / 90.0) - 0.5) * 30.0) * smoothstep(0.3, 0.55, n.z);
+  vec3 snowColor = mix(vec3(0.24, 0.3, 0.4), vec3(0.7, 0.78, 0.86), smoothstep(0.5, 0.85, facing));
+  rock = mix(rock, snowColor, snow * 0.85);
 
   // The floor: warm grey dust, cool in shadow, mottled, darker toward the bowl's edge.
-  vec3 dust = mix(vec3(0.1, 0.1, 0.11), vec3(0.24, 0.215, 0.18), smoothstep(0.35, 0.8, facing));
+  vec3 dust = mix(vec3(0.05, 0.05, 0.058), vec3(0.12, 0.112, 0.1), smoothstep(0.35, 0.8, facing));
   dust *= 0.9 + 0.18 * fbm3(p / 80.0);
   dust *= mix(1.0, 0.68, smoothstep(-140.0, 0.0, floorSD));
   vec3 col = mix(rock, dust, onFloor);
@@ -494,17 +507,21 @@ void main() {
   col = mix(vec3(0.018, 0.024, 0.045), col, smoothstep(0.3, 0.9, light.b));
   col += vec3(0.008, 0.02, 0.032) * n.z;
   float haze = (1.0 - smoothstep(${(CLOUD_LEVEL - 30).toFixed(1)}, ${(CLOUD_LEVEL + 60).toFixed(1)}, ground)) * cloudPresence(p);
-  col = mix(col, vec3(0.16, 0.34, 0.4), haze * 0.55);
+  col = mix(col, vec3(0.08, 0.13, 0.17), haze * 0.55);
   // Rock out past the mountain's foot stands far off in the storm and fades toward the cloud.
   float distant = smoothstep(uFoot - 20.0, uFoot + 160.0, length(p - uBowl.xy));
-  col = mix(col, vec3(0.22, 0.45, 0.54), distant * 0.45 * (1.0 - onFloor));
+  col = mix(col, vec3(0.11, 0.17, 0.21), distant * 0.45 * (1.0 - onFloor));
 
-  // The emblem glows steadily in its groove (design 080: nothing pulses under the Actives).
+  // The emblem glows steadily in its groove (design 080: nothing pulses under the Actives). Design
+  // 084: the scene's one bright thing, an emissive gold line with a soft halo, its light on the floor.
   float emblem = emblemDistance(p);
-  col += vec3(1.0, 0.8, 0.42) * ((1.0 - smoothstep(0.6, 2.2, emblem)) * 0.62 + exp(-emblem / 10.0) * 0.12) * onFloor;
+  col = mix(col, glowOn(col, p), onFloor);
+  col += vec3(1.5, 1.12, 0.5) * ((1.0 - smoothstep(0.6, 2.4, emblem)) * 0.8 + exp(-emblem / 18.0) * 0.18) * onFloor;
 
-  // A strike lights the rock; on the floor among the cards only faintly.
+  // A strike lights the rock; on the floor among the cards only faintly. Design 084: and the whole
+  // scene a little, a brief cool pulse of sky light.
   col += flashLight(vec3(p, ground), n) * mix(1.0, 0.25, onFloor);
+  col += skyPulse(n) * mix(1.0, 0.3, onFloor);
 
   vec2 edgeUv = min(vUv, 1.0 - vUv);
   col *= mix(0.6, 1.0, smoothstep(0.0, 0.03, min(edgeUv.x, edgeUv.y)));
@@ -519,6 +536,11 @@ void main() {
   gl_FragColor = vec4(col, 1.0);
 ${OUTPUT}
 }
+`;
+
+const FAR_PEAK = /* glsl */ `
+// Design 084: the far peak painted in the cloud sea: centre x, y and radius (0: none).
+uniform vec3 uFarPeak;
 `;
 
 const DOMES = /* glsl */ `
@@ -594,6 +616,7 @@ ${REVEAL}
 ${BOWL}
 ${DOMES}
 ${FLASH}
+${FAR_PEAK}
 varying vec2 vPos;
 void main() {
   vec2 p = vPos;
@@ -605,11 +628,21 @@ void main() {
   vec3 n = normalize(dome.xyz);
   // Lit by the sun on the domes' tops and their sides to it, dark in the creases between them.
   float shade = max(dot(n, normalize(uSun)), 0.0) * 0.55 + clamp(dome.w / 55.0, 0.0, 1.0) * 0.45;
-  vec3 col = mix(vec3(0.1, 0.26, 0.35), vec3(0.34, 0.64, 0.73), smoothstep(0.3, 0.55, shade));
-  col = mix(col, vec3(0.8, 0.96, 1.0), smoothstep(0.68, 0.88, shade));
+  // Design 084: a darker blue-grey storm cloud, lighter only on its tops.
+  vec3 col = mix(vec3(0.05, 0.08, 0.11), vec3(0.14, 0.21, 0.26), smoothstep(0.3, 0.55, shade));
+  col = mix(col, vec3(0.4, 0.5, 0.56), smoothstep(0.7, 0.9, shade));
   vec2 uv = (p - uMin) / uSize;
   col *= mix(0.62, 1.0, texture2D(uLight, uv).a);
-  col += flashLight(vec3(p, top), n) * 1.6;
+  // Design 084: a far peak painted in the cloud sea, a slate silhouette with a pale cap and a lit face.
+  if (uFarPeak.z > 0.0) {
+    vec2 rel = (p - uFarPeak.xy) / uFarPeak.z;
+    float body = 1.0 - smoothstep(0.92, 1.0, length(rel * vec2(1.0, 1.25)) + 0.12 * (fbm3(p / 60.0) - 0.5));
+    float lit = smoothstep(-0.2, 0.4, dot(normalize(rel + 1e-3), normalize(uSun.xy)));
+    vec3 far = mix(vec3(0.07, 0.085, 0.11), vec3(0.16, 0.19, 0.24), lit);
+    far = mix(far, vec3(0.45, 0.52, 0.6), smoothstep(0.38, 0.18, length(rel)) * 0.8);
+    col = mix(col, far, body * 0.9);
+  }
+  col += flashLight(vec3(p, top), n) * 1.6 + skyPulse(n) * 1.3;
   float lap = smoothstep(0.0, 8.0, top - texture2D(uField, uv).r);
   float wisp = clamp(presence * 1.4 - (1.0 - fbm3(p / 60.0 + uTime * 0.05)) * 0.4, 0.0, 1.0);
   // Thinned out toward the scene's edges, past which the table's dark floor shows.

@@ -106,7 +106,8 @@ const PEAK_ANGLE_STEP = 0.04;
  */
 const PEAK_RECIPES = {
   left: { angle: Math.PI * 1.06, out: 0.1, steepness: 1.3, maxHeight: 210 },
-  right: { angle: Math.PI * 0.14, out: 0.1, steepness: 1.6, maxHeight: 280 },
+  // Design 084: the summit on the right markedly taller than the left peak, so the crater is no donut.
+  right: { angle: Math.PI * 0.14, out: 0.1, steepness: 1.85, maxHeight: 340 },
 };
 /**
  * The ridge each peak runs along the rim toward the near end (the card's summit trails a long one,

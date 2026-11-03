@@ -74,11 +74,14 @@ const SMOKE_COUNT = 14;
 const SPORE_COUNT = 90;
 /**
  * Lightning slots: each strikes about once per cycle (s), at a random moment, some cycles not at all.
- * Design 080: a strike every few seconds round the rim, not every other second.
+ * Design 080: a strike every few seconds round the rim, not every other second. Design 084: a rare
+ * event, about one strike every 10-20 s, each a brief cool pulse of sky light over the scene.
  */
-const BOLT_CYCLES_S = [7.8, 11.3];
+const BOLT_CYCLES_S = [21.5, 27.3];
 const STRIKE_S = 0.6;
-const STRIKE_CHANCE = 0.8;
+const STRIKE_CHANCE = 0.85;
+/** Design 084: Stormy Mountains' emblem glow (its gold, the shared contact glow) and the far peak painted in the cloud sea. */
+const EMBLEM_GLOW = Object.freeze({ colour: '#ffd36a', reach: 70, strength: 0.55 });
 /**
  * Storm clouds a lightning arc runs between, over the cloud sea in a corner of the table (the scene
  * runs on past the table, but not every camera sees that far): `from` + up to `span` px past the
@@ -420,6 +423,7 @@ function stormyMountainsBoard({ three, material }) {
     uRidgeRight: { value: new three.Vector2() },
     uEmblem: { value: new three.Vector3() },
     uFlash: { value: new three.Vector4() },
+    uFarPeak: { value: new three.Vector3() },
   };
   const make = (vertex, fragment, extra, uniforms = own) => material(vertex, fragment, extra, uniforms);
   const materials = {
@@ -472,12 +476,16 @@ function stormyMountainsBoard({ three, material }) {
     spots(layout) {
       const bowl = craterBowl(layout);
       const peaks = mountainPeaks(layout, bowl);
+      const emblem = craterEmblem(layout, bowl);
+      // Design 084: the emblem is the scene's one bright thing; its gold lights the floor round it.
+      const glows = emblem?.r > 0 ? [{ x: emblem.x, y: emblem.y, r: emblem.r + EMBLEM_GLOW.reach, colour: EMBLEM_GLOW.colour, strength: EMBLEM_GLOW.strength }] : [];
       return {
         bowl,
         peaks,
-        emblem: craterEmblem(layout, bowl),
+        emblem,
         table: tableBounds(layout),
         dressing: highland.craterDressing(layout, bowl, peaks),
+        glows,
       };
     },
     apply(next, nextBounds) {
@@ -494,6 +502,9 @@ function stormyMountainsBoard({ three, material }) {
         own[`uRidge${side}`].value.set(peak?.ridge.x ?? 0, peak?.ridge.y ?? 0);
       }
       own.uEmblem.value.set(emblem?.x ?? 0, emblem?.y ?? 0, emblem?.r ?? 0);
+      // A far peak painted in the cloud sea past the far-left corner, in the frame (not under the panel).
+      const table = next.table;
+      own.uFarPeak.value.set(table.x + table.w * 0.06, table.y + table.h * 1.24, bowl ? Math.min(220, table.w * 0.14) : 0);
       kit.set(next.dressing?.length ? highland.craterProps(next.dressing) : null);
       replaceGeometry(terrain, terrainGrid(three, bounds));
       clouds.visible = Boolean(bowl);
