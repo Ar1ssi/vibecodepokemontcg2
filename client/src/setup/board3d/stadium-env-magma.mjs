@@ -74,15 +74,17 @@ export const MAX_FALLS = 4;
  * The lavafalls: the art's four, down its back wall. Falls on the side walls (tried three times) run
  * across the screen in both presets, from the screen's edge to the moat, and read as rays; on the far
  * wall's straight run they hide behind the opponent's hand row. Design 084: so they pour down the far
- * wall's two corners, where both cameras see them, each straight up the screen (angle +y): which
- * corner (-1 left, 1 right), how far round its arc from the far run (0) toward the side run (1), and
- * whether it forks into three strands near its foot (the art's second fall from the right).
+ * wall's corners, each straight up the screen (angle +y): which corner (-1 left, 1 right), how far
+ * round its arc from the far run (0) toward the side run (1), and whether it forks into three strands
+ * near its foot (the art's second fall from the right). tcgl's frame shows the far-left corner only
+ * from about 0.6 round (its right corner lies under the chat panel), so three pour there, two of them
+ * past 0.6, and one on the right for the top-down preset (I277).
  */
 const FALL_RECIPES = [
-  { corner: -1, turn: 0.62, fork: false },
-  { corner: -1, turn: 0.3, fork: false },
-  { corner: 1, turn: 0.3, fork: true },
-  { corner: 1, turn: 0.62, fork: false },
+  { corner: -1, turn: 0.5, fork: false },
+  { corner: -1, turn: 0.68, fork: false },
+  { corner: -1, turn: 0.82, fork: false },
+  { corner: 1, turn: 0.55, fork: true },
 ];
 /** A distance past every fall that still fits the bake's half-float target. */
 const FAR_PX = 9000;

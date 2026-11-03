@@ -120,7 +120,8 @@ export function communitySpots(layout) {
   for (let k = 0; k < 18; k += 1) {
     const y = cliffStart + 60 * u + (k / 17) * (scene.y + scene.h - cliffStart - 120 * u);
     const x = cliffFoot - 4 * u + (hash(k, 9, 1) - 0.4) * 60 * u;
-    if (Math.hypot(x - pool.x, y - pool.y) < pool.r * 1.3 || x > hall.x0 - 4 * u && y > hall.y0 - 20 * u && y < hall.y1 + 20 * u) continue;
+    // Design 084: none past the pool, where the mountain's foot steps in over them.
+    if (Math.hypot(x - pool.x, y - pool.y) < pool.r * 1.3 || x > hall.x0 - 4 * u && y > hall.y0 - 20 * u && y < hall.y1 + 20 * u || y > fall.y + 50 * u) continue;
     boulders.push({ x, y, r: (9 + 16 * hash(k, 9, 2) ** 1.5) * u });
   }
   // Design 081: bushes and flower clumps (the kit's) on the grass among the trees and kiosks, clear
@@ -195,13 +196,22 @@ void main() {
     kind = 1.0;
   }
   float yMask = smoothstep(uCliff.w, uCliff.w + 150.0, p.y + 70.0 * (fbm3(vec2(p.x / 230.0, 8.0)) - 0.5));
-  float foot = uCliff.x + 120.0 * (fbm3(vec2(p.y / 260.0, 3.0)) - 0.5) + 24.0 * (gnoise(p / 36.0) - 0.5);
+  // Design 084 (I278): past the pool the mountain's foot steps in toward the square, filling the
+  // corner past the hall's far end, where both cameras look.
+  float foot = uCliff.x + 120.0 * (fbm3(vec2(p.y / 260.0, 3.0)) - 0.5) + 24.0 * (gnoise(p / 36.0) - 0.5)
+    + 150.0 * smoothstep(uFall.x + 50.0, uFall.x + 140.0, p.y);
   float t = clamp((foot - p.x) / uCliff.y, 0.0, 1.0);
   if (t > 0.0 && yMask > 0.0) {
     vec3 big = stones(p, 120.0, 4.0);
     vec3 mid = stones(p + 37.0, 58.0, 3.0);
     float rock = max(big.x, mid.x * 0.55);
     float slope = uCliff.z * t * t * (3.0 - 2.0 * t);
+    // Design 084 (I278): toward the far end the cliff rises into the card's mountain behind the hall,
+    // ridged peaks over the waterfall: the band both cameras show (the far margin itself lies past the
+    // opponent's hand row, out of both frames).
+    float massif = smoothstep(uFall.x - 260.0, uFall.x + 60.0, p.y);
+    float peaks = 1.0 - abs(2.0 * fbm3(p / 170.0 + 2.0) - 1.0);
+    slope *= 1.0 + massif * (0.55 + 0.6 * peaks * peaks);
     float wallH = (slope * (0.5 + 0.5 * rock) + 38.0 * rock * smoothstep(0.0, 0.25, t)) * yMask;
     float chute = 1.0 - smoothstep(uFall.y * 0.6, uFall.y * 1.15, abs(p.y - uFall.x));
     wallH = mix(wallH, slope * 0.82 * yMask, chute);

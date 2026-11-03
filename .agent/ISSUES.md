@@ -14,8 +14,6 @@
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
-- I278 2026-11-03 P3 [mat-fx] Community Center's far mountains (084) start past the opponent's hand row, so both presets show little of them; the scene's far margin ends ~80 px past the square (refs: 084)
-- I277 2026-11-03 P3 [mat-fx] Magma Basin's lava falls (084) pour down the far wall's corners: tilt12 shows them, tcgl's frame stops below the far wall and shows only their feet (refs: 084)
 - I275 2026-11-01 P3 [mat-fx] Design 083 rows left for a later pass (lawn/marsh/island swells, raised beds, snow drifts, Magma rim rocks, billboard/sign blink, roof tones, Lab crates, Shelter floor marks): see 083 Deviations
 - I274 2026-10-31 P3 [mat-fx] KIT_LEAVES loops 27 cells per foliage pixel each plate redraw (30 fps while a board sways): measure on a low-end GPU; past budget, fade leaves to plain foliage (refs: D234, design 082)
 - I272 2026-10-24 P3 [rules] Homebrew set customhb: every attack/ability runs; only Gloom Drowziness is inert (Asleep cannot retreat). Limits in client/src/assets/custom-sets/customhb/ENGINE-CHECK.md; recheck: node scripts/custom-sets/engine-check.mjs
@@ -67,6 +65,8 @@
 - I1 2026-09-07 P2 [rules] Legacy ISSUES.txt items unverified: turn-start auto-draw both players (I1), +Turn/End Turn rework (I2), Garland Ray discard parse on multipliers (I3) (merged I1–I3)
 
 ## Closed (newest first; older history in the archive)
+- I278 2026-11-03 P3 [mat-fx] Community Center's far mountains barely in frame (refs: 084) → closed 2026-11-03 S337: the cliff's far end rises into the mountain past the pool, in both frames (tested)
+- I277 2026-11-03 P3 [mat-fx] Magma Basin's falls showed only their feet in tcgl (refs: 084) → closed 2026-11-03 S337: three falls on the far-left corner's side arc, both presets show two or more (tested)
 - I276 2026-11-03 P2 [mat-fx] Stadium boards flatter than their cards: night keys off, hero cues missing, emissives lighting nothing, stamped scatter, clipped trees, off-family props (refs: 084) → closed 2026-11-03 S337: design 084 shipped on all 25 boards; limits in I277, I278
 - I273 2026-10-31 P3 [mat-fx] Brooklet Hill, Steel Shelter, Scorched Earth, Magma Basin off the Stadium kit: GLSL-only or own-shader solids (refs: D233, design 081) → closed 2026-10-31: design 082; Brooklet's rocks and bushes are kit props, Shelter kit-lit, Scorched/Magma stay baked (082 Deviations)
 - I242 2026-10-11 P3 [board-ui] Card focus gaps (merged I242, I243): own Active only, no buff/debuff HUD, no damage split for W/R tint and arrows (refs: D208, design 067) → closed 2026-10-16: design 074, D219; action drawer wontfix (not in landscape)

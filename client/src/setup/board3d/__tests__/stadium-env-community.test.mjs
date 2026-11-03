@@ -53,6 +53,25 @@ test('communitySpots: the square holds every card, the hall stands on its left e
 });
 
 // Design 084: the mountains rise past the square's far end, never on it.
+// Design 084 (I278): the mountain the hall stands before rises off the cliff's far end, over the
+// waterfall: the default board's cameras both show that stretch of the left band.
+test('the cliff\'s mountain over the waterfall lies in both camera presets\' frames', () => {
+  // The default board at 1920 and 2560 px wide windows (at 1366 the frame cuts its upper slopes).
+  for (const view of [SCREEN_VIEWS[0], SCREEN_VIEWS[2]]) {
+    const { layout, projectors } = screenView(view);
+    const { cliffFoot, fall, plaza } = communitySpots(layout);
+    // Past the pool the mountain's foot steps in by up to 150 px: a point on its lower slope there.
+    const at = [cliffFoot + 60, fall.y + 120];
+    assert.ok(at[0] < plaza.x0, 'off the square');
+    for (const { preset, project } of projectors) {
+      for (const z of [0, 150]) {
+        const p = project(at[0], at[1], z);
+        assert.ok(p && p.x >= 0 && p.x <= view.viewport.w * 0.755 && p.y >= 0 && p.y <= view.viewport.h, `${view.viewport.w} ${preset}: the massif at ${z} px stands in frame`);
+      }
+    }
+  }
+});
+
 test("communitySpots: the mountains start past the square's far end", () => {
   for (const layout of layouts) {
     const { farEdge, plaza } = communitySpots(layout);

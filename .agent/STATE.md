@@ -6,7 +6,7 @@
 Focus: all 25 Stadium boards restyled per the 084 visual audit (D236): night boards re-keyed, hero cues lit through one shared contact
   glow, shared water body, varied scatter, landmarks kept in frame, Scorched Earth margins. Attack FX are per-type element shaders (079,
   D229–D231); custom sets reach Render (076, D228) via cardback "Publish to site".
-Active: user localhost checks — 084 on all 25 Stadium boards (`?stadiumEnv=<key>`, both cameras; limits I277, I278); attack FX on all
+Active: user localhost checks — 084 on all 25 Stadium boards (`?stadiumEnv=<key>`, both cameras); attack FX on all
   types (known: water spray reads icy, psychic rings large, Pin Missile needles small, impact centres can blow out, leaf orientation
   unconfirmed); first custom-set publish + Render check; older: 3D board H1-H3 (I266), TCG Live attack UI (074). No review on 078/079.
 Next: maintenance is due (`pnpm harness:check`: caps over, 250+ commits since the last maintain) → maintain.md. Then tune 079 from the
