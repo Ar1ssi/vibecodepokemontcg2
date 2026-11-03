@@ -289,7 +289,7 @@ export function attachTo(player, card, root, events) {
   });
 }
 
-function drawCards(player, count, events) {
+export function drawCards(player, count, events) {
   const deck = player.zones.deck || [];
   const drawn = deck.splice(0, Math.max(0, Math.min(count, deck.length)));
   player.zones.hand.push(...drawn);

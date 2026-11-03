@@ -59,6 +59,7 @@ import {
   benchRootsOf,
   damageCounterMoveLocked,
   discardCard,
+  drawCards,
   isBasicEnergy,
   isSpecialEnergy,
   isToolCard,
@@ -438,10 +439,13 @@ function moveEnergyEnds(ctx) {
     }
     case 'opponentActive': {
       const active = activeOf(opponent);
+      const toOwn = step.to === 'own' || step.to === 'ownBench';
       return {
         owner: opponent,
+        // Harvesting Scythe: the Energy lands on one of the attacker's own Pokémon.
+        ...(toOwn ? { targetOwner: player } : {}),
         energies: active ? removableEnergy(ctx, opponent, attachedCards(opponent, active.instanceId).filter(matches)) : [],
-        targets: benchRootsOf(opponent),
+        targets: !toOwn ? benchRootsOf(opponent) : step.to === 'ownBench' ? benchRootsOf(player) : rootsOf(player),
       };
     }
     case 'opponentAny':
@@ -477,9 +481,15 @@ function moveEnergyEnds(ctx) {
   }
 }
 
+// An Energy moved onto the other player's Pokémon (Harvesting Scythe) leaves its owner's zones.
+function moveEnergyTo(owner, targetOwner, energy, target, events) {
+  if (targetOwner && targetOwner !== owner) removeFromZones(owner, energy);
+  attachTo(targetOwner || owner, energy, target, events);
+}
+
 function atkMoveEnergy(ctx) {
   const { step } = ctx;
-  const { owner, energies, targets } = moveEnergyEnds(ctx);
+  const { owner, targetOwner, energies, targets } = moveEnergyEnds(ctx);
   const byId = (id) => energies.find((c) => c.instanceId === id);
 
   // "in any way you like" between all of your Pokémon: one Energy, then its new host, repeated.
@@ -519,14 +529,14 @@ function atkMoveEnergy(ctx) {
     const picked = ctx.memo.energyIds.map(byId).filter(Boolean);
     if (!target) return skip(ctx, 'target_not_found');
     const batch = step.spread ? picked.slice(0, 1) : picked;
-    for (const energy of batch) attachTo(owner, energy, target, ctx.events);
-    return moveToTargets(ctx, picked.slice(batch.length), targets, owner);
+    for (const energy of batch) moveEnergyTo(owner, targetOwner, energy, target, ctx.events);
+    return moveToTargets(ctx, picked.slice(batch.length), targets, owner, targetOwner);
   }
 
-  if (ctx.selection) return moveToTargets(ctx, pickById(energies, ctx.selection), targets, owner);
+  if (ctx.selection) return moveToTargets(ctx, pickById(energies, ctx.selection), targets, owner, targetOwner);
   if (energies.length === 0) return skip(ctx, 'no_energy_to_move');
   if (targets.length === 0) return skip(ctx, 'no_target');
-  if (step.all) return moveToTargets(ctx, energies, targets, owner);
+  if (step.all) return moveToTargets(ctx, energies, targets, owner, targetOwner);
   if (step.anyNumber) {
     return ctx.ask({
       prompt: `${attackName(ctx)}: Choose any number of ${energyLabel(step)} to move`,
@@ -536,7 +546,7 @@ function atkMoveEnergy(ctx) {
     });
   }
   const count = step.count || 1;
-  if (energies.length <= count) return moveToTargets(ctx, energies, targets, owner);
+  if (energies.length <= count) return moveToTargets(ctx, energies, targets, owner, targetOwner);
   return ctx.ask({
     prompt: `${attackName(ctx)}: Choose ${count} ${energyLabel(step)} to move`,
     options: energies,
@@ -556,11 +566,11 @@ function askNextEnergy(ctx, energies) {
 
 // `targets` never holds the Pokémon the Energy comes from (moveEnergyEnds), so one target
 // takes everything without a prompt.
-function moveToTargets(ctx, picked, targets, owner) {
+function moveToTargets(ctx, picked, targets, owner, targetOwner) {
   if (picked.length === 0) return null;
   if (targets.length === 0) return skip(ctx, 'no_target');
   if (targets.length === 1) {
-    for (const energy of picked) attachTo(owner, energy, targets[0], ctx.events);
+    for (const energy of picked) moveEnergyTo(owner, targetOwner, energy, targets[0], ctx.events);
     return null;
   }
   const what = ctx.step.spread || picked.length === 1 ? picked[0].name : `${picked.length} Energy`;
@@ -584,10 +594,10 @@ function atkDiscardSelfEnergy(ctx) {
   return discardChosen(ctx, energies, { label: energyLabel(step) });
 }
 
-// Moltres Wildfire: "You may discard any number of {R} Energy cards attached to Moltres when you
-// use this attack. If you do, discard that many cards from the top of your opponent's deck."
-function atkDiscardSelfEnergyMillOpp(ctx) {
-  const { player, opponent, step } = ctx;
+// "You may discard any number of [{R}] Energy cards attached to this Pokémon when you use this
+// attack. If you do, …": asks for the Energy, discards it, and hands `then` the count.
+function discardAnySelfEnergyThen(ctx, then) {
+  const { player, step } = ctx;
   const ref = attackerRef(ctx);
   const energies = ref ? attachedCards(player, ref.card.instanceId).filter((c) => energyMatches(c, step)) : [];
   if (!ctx.selection) {
@@ -601,9 +611,21 @@ function atkDiscardSelfEnergyMillOpp(ctx) {
   }
   const picked = pickById(energies, ctx.selection);
   for (const card of picked) discardCard(ctx.draft, card, ctx.events);
-  if (picked.length === 0 || !opponent) return null;
-  discardCards(opponent, opponent.zones.deck.slice(0, picked.length), ctx.events);
+  if (picked.length > 0) then(picked.length);
   return null;
+}
+
+// Moltres Wildfire: "… If you do, discard that many cards from the top of your opponent's deck."
+function atkDiscardSelfEnergyMillOpp(ctx) {
+  const { opponent } = ctx;
+  return discardAnySelfEnergyThen(ctx, (count) => {
+    if (opponent) discardCards(opponent, opponent.zones.deck.slice(0, count), ctx.events);
+  });
+}
+
+// customhb Regigigas ex Creation: "… If you do, draw 2 cards for each card you discarded in this way."
+function atkDiscardSelfEnergyDraw(ctx) {
+  return discardAnySelfEnergyThen(ctx, (count) => drawCards(ctx.player, count * (ctx.step.drawEach || 1), ctx.events));
 }
 
 // Reshiram & Zekrom-GX Fabled Flarebolts: "Discard up to 3 in any combination of basic {R} and
@@ -3731,6 +3753,18 @@ function atkCountersUntilHp(ctx) {
   return null;
 }
 
+// customhb Mega Absol ex Terminal Cut: "Double the number of damage counters on your opponent's
+// Active Pokémon. This attack can't leave it with less than 10 HP remaining."
+function atkDoubleDefenderCounters(ctx) {
+  const { opponent, step } = ctx;
+  const defender = activeOf(opponent);
+  if (!defender) return skip(ctx, 'no_opponent_active');
+  const amount = Math.min(defender.damage || 0, remainingHp(ctx, opponent, defender) - (step.minHp || 0));
+  if (amount <= 0) return skip(ctx, 'no_counters');
+  placeCounters(ctx, defender, opponent.playerId, amount);
+  return null;
+}
+
 // "Look at the top N cards of your / either player's deck and put them back in any order."
 function atkLookDeckReorder(ctx) {
   const { player, opponent, step } = ctx;
@@ -4115,6 +4149,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkShuffleOwnDeck,
   atkChangeType,
   atkDiscardSelfEnergyMillOpp,
+  atkDiscardSelfEnergyDraw,
   atkCureOppConditions,
   atkKnockOutChoose,
   atkCountersEach,
@@ -4141,6 +4176,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkLostZoneOppHandPokemon,
   atkSwapCounters,
   atkCountersUntilHp,
+  atkDoubleDefenderCounters,
   atkDiscardOppToolsAndStadium,
   atkCountersByRetreat,
   atkCountersEachChosenType,
