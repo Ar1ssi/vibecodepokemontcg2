@@ -323,8 +323,10 @@ const flowerSpot = (spots, x, y) =>
  */
 
 /**
- * One vine hanging from the crown: its anchor (x, y, z), `length` and `width` px, `seed` 0..1.
- * @typedef {{ x: number, y: number, z: number, length: number, width: number, seed: number }} Vine
+ * One vine from the crown (design 084): its anchor (x, y, z) in the crown, the point on the floor it
+ * reaches (`to`, [x, y, 0]), how far it sags (`sag`, a share of the anchor's height at its middle),
+ * `width` px, `seed` 0..1.
+ * @typedef {{ x: number, y: number, z: number, to: number[], sag: number, width: number, seed: number }} Vine
  */
 
 /**
@@ -339,7 +341,19 @@ const flowerSpot = (spots, x, y) =>
 /** How far a clump of foliage reaches past its centre, lumps and all, as a share of its radius. */
 export const PUFF_REACH = 1.15;
 
-/** The limbs, foliage and vines of a tree planted at `tree`. */
+/**
+ * Design 084: the jungle's trees in three heights (the crown's height over the floor before its own
+ * radius is added), so the canopy is not one level.
+ */
+export const TREE_HEIGHTS = Object.freeze([175, 222, 272]);
+
+/**
+ * The limbs, foliage and vines of a tree planted at `tree`. Design 084: a tall violet trunk with the
+ * crown held high, the crown a compact canopy (its clumps a little smaller than the crown's circle
+ * allows, so the trunk and limbs show under it from the tilted view); its fringe clumps marked
+ * (`fringe`) for the pink-tipped leaves; vines hang in sagging curves from the crown's outer side down
+ * to the floor, out away from the cards.
+ */
 const growTree = (tree) => {
   const { x, y, cx, cy, cz, crown, trunk, seed } = tree;
   const roll = (k) => hash(x, y, 400 + k);
@@ -370,8 +384,8 @@ const growTree = (tree) => {
     const core = fit({
       x: cx + Math.cos(angle) * out,
       y: cy + Math.sin(angle) * out,
-      z: cz + crown * (roll(13 + c) - 0.5) * 0.24,
-      r: crown * (0.32 + 0.08 * roll(18 + c)),
+      z: cz + crown * (roll(13 + c) - 0.5) * 0.2,
+      r: crown * (0.28 + 0.07 * roll(18 + c)),
     });
     clumps.push(core);
     limbs.push({
@@ -401,21 +415,24 @@ const growTree = (tree) => {
   const puffs = clumps.map((clump) => {
     const up = (clump.z + clump.r * 0.5 - (cz - crown * 0.5)) / (crown * 1.2);
     const out = Math.hypot(clump.x - cx, clump.y - cy) / crown;
-    return { ...clump, shade: Math.min(1, Math.max(0, 0.3 + 0.5 * up + 0.3 * out)) };
+    return { ...clump, shade: Math.min(1, Math.max(0, 0.3 + 0.5 * up + 0.3 * out)), fringe: out > 0.42 };
   });
+  // Design 084: vines in sagging curves from the crown's outer side to the floor, out away from the
+  // cards (on the tree's own side), every one ending within VINE_REACH of the crown's circle.
   const vines = [];
-  const low = puffs.filter((puff) => puff.z < cz);
-  const count = Math.min(low.length, 4 + Math.floor(roll(5) * 4));
+  const outer = puffs.filter((puff) => (puff.x - cx) * tree.side > 0 && puff.fringe);
+  const count = Math.min(outer.length, 2 + Math.floor(roll(5) * 2));
   for (let k = 0; k < count; k += 1) {
-    const puff = low[Math.floor(roll(500 + k) * low.length)];
-    const z = puff.z - puff.r * 0.5;
-    const length = Math.min(60 + 90 * roll(510 + k), z - 40);
-    if (length < 20) continue;
+    const puff = outer[Math.floor(roll(500 + k) * outer.length)];
+    const z = puff.z - puff.r * 0.4;
+    const turn = (roll(520 + k) - 0.5) * 1.4;
+    const reach = crown * (0.35 + 0.35 * roll(510 + k));
     vines.push({
-      x: puff.x + (roll(520 + k) - 0.5) * puff.r,
-      y: puff.y + (roll(530 + k) - 0.5) * puff.r,
+      x: puff.x,
+      y: puff.y,
       z,
-      length,
+      to: [puff.x + tree.side * Math.cos(turn) * reach, puff.y + Math.sin(turn) * reach, 0],
+      sag: 0.2 + 0.15 * roll(530 + k),
       width: 16 + 8 * roll(540 + k),
       seed: roll(550 + k),
     });
@@ -462,7 +479,7 @@ export function jungleTrees(layout, spots) {
         side,
         cx,
         cy,
-        cz: 165 + crown * (0.45 + 0.3 * roll(6)),
+        cz: TREE_HEIGHTS[Math.min(TREE_HEIGHTS.length - 1, Math.floor(roll(6) * TREE_HEIGHTS.length))] + crown * 0.45,
         crown,
         seed: roll(7),
         order: roll(8),
@@ -788,5 +805,12 @@ export function jungleSpots(layout) {
   const wooded = { ...ground, trees: jungleTrees(layout, ground) };
   const scene = sceneBounds(layout, JUNGLE_KEY);
   const spots = { ...wooded, plants: scene.w > 0 && scene.h > 0 ? junglePlants(wooded, scene) : [] };
-  return { ...spots, bells: jungleBells(spots), spikes: jungleSpikes(spots) };
+  // Design 084: the poison lights the teal round each bog pink, out about a card's width (the shared
+  // contact glow), breathing slowly.
+  const u = (layout?.self?.cardBox?.active?.w ?? 100) / 100;
+  const glows = ground.bogs.flatMap((bog) => bog.lobes).map((lobe) => ({ x: lobe.x, y: lobe.y, r: lobe.r + POOL_GLOW.reach * u, colour: POOL_GLOW.colour, strength: POOL_GLOW.strength, breath: POOL_GLOW.breath }));
+  return { ...spots, bells: jungleBells(spots), spikes: jungleSpikes(spots), glows };
 }
+
+/** Design 084: the bogs' pink light on the ground round them: colour, reach past a lobe (card-scale px), strength. */
+export const POOL_GLOW = Object.freeze({ colour: '#ff5fd0', reach: 100, strength: 0.42, breath: 0.08 });

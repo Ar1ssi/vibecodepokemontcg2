@@ -30,7 +30,7 @@ import {
   TERRAIN_UNIFORMS,
   VORONOI,
 } from './stadium-environment-glsl.mjs';
-import { GRASS } from './stadium-env-ground.mjs';
+import { GLOW, GRASS } from './stadium-env-ground.mjs';
 import {
   BOG_BLEND_PX,
   CLEARING_BLEND_PX,
@@ -281,6 +281,7 @@ const PALETTE = /* glsl */ `
 // The card art's palette in linear RGB, a little above the art (Neutral tone mapping darkens).
 const vec3 INDIGO = vec3(0.016, 0.014, 0.05);
 const vec3 POISON_GLOW = vec3(1.0, 0.2, 0.66);
+const vec3 MIST_PINK = vec3(0.42, 0.16, 0.36);
 // Haze toward the scene's edges, past which the table's own floor shows.
 vec3 edgeHaze(vec3 col, vec2 uv) {
   vec2 edgeUv = min(uv, 1.0 - uv);
@@ -296,6 +297,7 @@ ${FILTERING}
 ${VORONOI}
 ${REVEAL}
 ${GRASS}
+${GLOW}
 ${PALETTE}
 ${CANOPY}
 varying vec2 vPos;
@@ -373,9 +375,14 @@ void main() {
   col = mix(col, vec3(0.32, 0.26, 0.55), convex * 0.5);
   col = mix(INDIGO, col, smoothstep(0.25, 0.9, light.b));
 
-  // The trees' shade, broken by flecks of light through the leaves.
+  // Design 084: the clearing mossy teal, darker and wetter toward the bogs, lighter toward its middle.
+  float offBlock = length(max(max(uFootprintBox.xy - p, p - uFootprintBox.zw), 0.0));
+  col *= mix(0.78, 1.0, smoothstep(10.0, 170.0, waterSD)) * (1.0 + 0.16 * (1.0 - smoothstep(0.0, 260.0, offBlock)) * step(kind, -0.5));
+
+  // The trees' shade, broken by flecks of light through the leaves; faint by the cards (design 084:
+  // no dark stain beside the Bench).
   float dapple = smoothstep(0.52, 0.68, fbm3(p / 44.0 + vec2(uTime * 0.03, 0.0) + 21.0));
-  col *= 1.0 - mix(0.28, 0.5, step(0.5, kind)) * canopyShade(p, ground) * vGrowth * (1.0 - 0.75 * dapple);
+  col *= 1.0 - mix(0.28, 0.5, step(0.5, kind)) * canopyShade(p, ground) * vGrowth * (1.0 - 0.75 * dapple) * (1.0 - 0.8 * calm);
 
   // The poison tints the banks right by it pink, side faces most, flickering slowly: a faint sheen,
   // not a halo, so the bogs read as water.
@@ -383,6 +390,11 @@ void main() {
   float sideFacing = 1.0 - smoothstep(0.55, 0.95, n.z);
   float glow = exp(-max(waterSD, 0.0) / 22.0) * exp(-max(ground - ${WATER_LEVEL.toFixed(1)}, 0.0) / 24.0);
   col += POISON_GLOW * glow * mix(0.08, 0.26, sideFacing) * flicker * mix(1.0, 0.35, step(3.5, kind));
+  // Design 084: the bogs' pink light out over the teal round them (the shared contact glow).
+  col = glowOn(col, p);
+  // Design 084: a thin pink mist drifting low at the margins, never over the cards.
+  float mist = smoothstep(0.5, 0.76, fbm3(p / vec2(300.0, 140.0) + vec2(uTime * 0.015, uTime * 0.005) + 3.0));
+  col = mix(col, MIST_PINK, mist * 0.22 * smoothstep(180.0, 420.0, offBlock));
 
   col = edgeHaze(col, vUv);
   vec3 toxic = vec3(1.1, 0.3, 0.85);

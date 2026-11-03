@@ -637,10 +637,12 @@ const JUNGLE_MOOD = Object.freeze({
   shadow: [0.32, 0.26, 0.5, 0.55],
 });
 const JUNGLE_BARK = [0.13, 0.07, 0.22, 0];
+// Design 084: every crown two-tone, as the card's: a deep teal body (two teals), its fringe tipped pink.
 const JUNGLE_CROWNS = [
-  { body: [0.04, 0.2, 0.18, 0], light: [0.09, 0.36, 0.3, 0] },
-  { body: [0.08, 0.075, 0.27, 0], light: [0.15, 0.13, 0.44, 0] },
+  { body: [0.03, 0.17, 0.16, 0], light: [0.07, 0.32, 0.28, 0] },
+  { body: [0.03, 0.13, 0.17, 0], light: [0.06, 0.26, 0.3, 0] },
 ];
+const JUNGLE_FRINGE = [0.92, 0.26, 0.68, 0];
 const JUNGLE_VINE = [0.05, 0.015, 0.08, 0];
 const JUNGLE_BEAD = [0.95, 0.36, 0.75, 0];
 
@@ -668,23 +670,34 @@ export function jungleTreeProps(trees) {
   // the crown's centre so the leaves on its flat tops lie outward from it.
   for (const tree of trees) {
     const palette = JUNGLE_CROWNS[tree.palette] ?? JUNGLE_CROWNS[0];
-    const lumps = tree.puffs.map((puff) => ({
-      x: puff.x - tree.cx,
-      y: puff.y - tree.cy,
-      z: puff.z,
-      rx: puff.r,
-      rz: puff.r * 0.82,
-      color: palette.body.map((v, k) => (k < 3 ? v + (palette.light[k] - v) * puff.shade : 0)),
-    }));
+    const lumps = tree.puffs.map((puff) => {
+      const base = palette.body.map((v, k) => (k < 3 ? v + (palette.light[k] - v) * puff.shade : 0));
+      const outward = [puff.x - tree.cx, puff.y - tree.cy];
+      const length = Math.hypot(outward[0], outward[1]) || 1;
+      // A fringe clump's outer, upper face pink-tipped; its body and every inner clump teal.
+      const color = puff.fringe
+        ? (d) => {
+            const tip = Math.max(0, Math.min(1, ((d[0] * outward[0] + d[1] * outward[1]) / length) * 1.4 + d[2] * 0.6 - 0.5));
+            return base.map((v, k) => (k < 3 ? v + (JUNGLE_FRINGE[k] - v) * tip * 0.75 : 0));
+          }
+        : base;
+      return { x: puff.x - tree.cx, y: puff.y - tree.cy, z: puff.z, rx: puff.r, rz: puff.r * 0.8, color };
+    });
     const leaf = Math.max(6, (tree.puffs.reduce((sum, puff) => sum + puff.r, 0) / Math.max(1, tree.puffs.length)) * 0.2);
     props.at({ x: tree.cx, y: tree.cy, ground: false }, () => props.look({ kind: LOOK.foliage, leaf, sway: 0.9 }, () => props.lumps(lumps, { crease: 0.5 })));
   }
   props.look({ kind: LOOK.foliage, sway: 0.8 }, () => {
     for (const tree of trees) {
+      // Design 084: each vine a sagging curve from the crown down to the floor, beaded pink.
       for (const vine of tree.vines) {
-        const strand = Array.from({ length: 7 }, (_, i) => [vine.x + Math.sin(i * 0.9 + vine.seed * 6) * 2, vine.y, vine.z - (vine.length * i) / 6]);
+        const strand = Array.from({ length: 11 }, (_, i) => {
+          const t = i / 10;
+          const along = [0, 1, 2].map((k) => vine[['x', 'y', 'z'][k]] + (vine.to[k] - vine[['x', 'y', 'z'][k]]) * t);
+          along[2] -= vine.sag * vine.z * 4 * t * (1 - t);
+          return [along[0], along[1], Math.max(along[2], 0)];
+        });
         props.tube(strand, vine.width * 0.12, JUNGLE_VINE, { sides: 5 });
-        for (let i = 1; i < 6; i += 2) props.blob({ x: strand[i][0], y: strand[i][1], z: strand[i][2], rx: vine.width * 0.2, color: JUNGLE_BEAD, sides: 8, rings: 6 });
+        for (let i = 2; i < 10; i += 3) props.blob({ x: strand[i][0], y: strand[i][1], z: strand[i][2], rx: vine.width * 0.2, color: JUNGLE_BEAD, sides: 8, rings: 6 });
       }
     }
   });
