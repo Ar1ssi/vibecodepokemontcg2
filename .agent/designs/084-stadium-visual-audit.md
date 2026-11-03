@@ -609,39 +609,39 @@ Every row is the audit's own words: the eight cross-cutting items of "Suggested 
 per board, its numbered suggestions in § Per-board detail (and its scorecard "one fix").
 | # | Criterion (the brief's words) | Evidence |
 |---|---|---|
-| X1 | Hero light pass: the one emissive cue per board actually emits; one shader hook (`uGlowSpots` or similar) serves most boards | |
-| X2 | Re-key the night boards (Stormy Mountains, Dark City, Old Cemetery, Magnetic Storm): darker ground values, warm/cool split, the hero cue as the only bright thing | |
-| X3 | Tree crowns overhang, don't clip (Vitality, Grand Tree); a lighter, soft-edged shadow | |
-| X4 | Replace the four off-family props: Mountain Ring rope, Neutralization pillars, Lab railing, Dimension Valley islands/void | |
-| X5 | Water material shared by Beach, Brooklet, Levincia, Mystery Garden: depth gradient, highlight band, shore translucency; Brooklet to teal so card backs separate | |
-| X6 | Scatter variety: per-kind scale/rotation jitter and species mix in `stadium-env-clumps.mjs`; cap density (Cemetery, Fairy Garden) | |
-| X7 | Frame-aware layout: bias landmarks and props to the visible three quarters | |
-| X8 | Scorched Earth: margins + BDSP shading; move the river off the hero cards | |
-| B1 | Forest of Vitality suggestions 1–5 | |
-| B2 | Grand Tree suggestions 1–5 | |
-| B3 | Perilous Jungle suggestions 1–4 | |
-| B4 | Fairy Garden suggestions 1–4 | |
-| B5 | Mystery Garden suggestions 1–4 | |
-| B6 | Old Cemetery suggestions 1–4 | |
-| B7 | Surfing Beach suggestions 1–3 | |
-| B8 | Brooklet Hill suggestions 1–4 | |
-| B9 | Stormy Mountains suggestions 1–4 | |
-| B10 | Mountain Ring suggestions 1–4 | |
-| B11 | Crystal Cave suggestions 1–4 | |
-| B12 | Dimension Valley suggestions 1–4 | |
-| B13 | Magnetic Storm suggestions 1–4 | |
-| B14 | Scorched Earth suggestions 1–4 | |
-| B15 | Magma Basin suggestions 1–4 | |
-| B16 | Lumiose City suggestions 1–4 | |
-| B17 | Community Center suggestions 1–3 | |
-| B18 | Levincia suggestions 1–3 | |
-| B19 | Dark City suggestions 1–4 | |
-| B20 | Pokémon Center suggestions 1–4 | |
-| B21 | Shopping Center suggestions 1–4 | |
-| B22 | Full Metal Lab suggestions 1–3 | |
-| B23 | Fighting Stadium suggestions 1–3 | |
-| B24 | Neutralization Zone suggestions 1–4 | |
-| B25 | Steel Shelter suggestions 1–3 | |
+| X1 | Hero light pass: the one emissive cue per board actually emits; one shader hook (`uGlowSpots` or similar) serves most boards | Shared hook: `GLOW` (`uGlows`, `glowLight`, `glowOn`) + `setGlows` + kit `glow` (32daabed; stadium-environment-mesh.test `setGlows` rows). Boards lit through it: Vitality, Mystery Garden, Crystal Cave, Fairy Garden, Perilous Jungle, Stormy Mountains, Magnetic Storm, Dark City (crown), Neutralization Zone (columns); own emissives fixed on Magma (falls), Lab (dais core), Arena (canvas), Shelter (emblem pool, strips) |
+| X2 | Re-key the night boards (Stormy Mountains, Dark City, Old Cemetery, Magnetic Storm): darker ground values, warm/cool split, the hero cue as the only bright thing | Stormy 626eb114, Old Cemetery 41516243, Magnetic Storm d33bf5f8 (#1c1a24 mud), Dark City c3061f95 (#2a3040 roof); stills `.agent/scratch/084/final/` |
+| X3 | Tree crowns overhang, don't clip (Vitality, Grand Tree); a lighter, soft-edged shadow | Vitality 81ce61ea (crown cut per card, umbrella crowns), Grand Tree e511ef64; `treeRound` true-bound measure (asset sweep test) |
+| X4 | Replace the four off-family props: Mountain Ring rope, Neutralization pillars, Lab railing, Dimension Valley islands/void | Mountain Ring rope/chain a7c8dbe3; Neutralization columns 05f9a481; Lab railing b9e78594 (`railRuns`/`evenPosts` tests); Dimension Valley slabs/void a9fb363d |
+| X5 | Water material shared by Beach, Brooklet, Levincia, Mystery Garden: depth gradient, highlight band, shore translucency; Brooklet to teal so card backs separate | `waterBody`/`foamBands` (stadium-env-ground) used by Beach 1b4ae96a, Brooklet d8036630 (teal), Mystery Garden a2dd83b1, Levincia (close slice) |
+| X6 | Scatter variety: per-kind scale/rotation jitter and species mix in `stadium-env-clumps.mjs`; cap density (Cemetery, Fairy Garden) | `clumpPieces` lean/spread/weight (32daabed; stadium-env-clumps.test); density caps Cemetery 41516243, Fairy Garden 579cd88a |
+| X7 | Frame-aware layout: bias landmarks and props to the visible three quarters | `PANEL_SHARE`/`frameWeight` (32daabed; stadium-env-spots.test) used by Beach, Fairy Garden, Mystery Garden, Grand Tree, Vitality; landmarks moved left/top-left (Vitality tree, Scorched volcano, Lumiose tower) |
+| X8 | Scorched Earth: margins + BDSP shading; move the river off the hero cards | 99d50781: margins (`sceneBounds` test), river crusted under the cards, wrapped-key stones; volcano tests in stadium-environment-layout.test |
+| B1 | Forest of Vitality suggestions 1–5 | 81ce61ea |
+| B2 | Grand Tree suggestions 1–5 | e511ef64 |
+| B3 | Perilous Jungle suggestions 1–4 | b022dee6 |
+| B4 | Fairy Garden suggestions 1–4 | 579cd88a |
+| B5 | Mystery Garden suggestions 1–4 | a2dd83b1 |
+| B6 | Old Cemetery suggestions 1–4 | 41516243 |
+| B7 | Surfing Beach suggestions 1–3 | 1b4ae96a |
+| B8 | Brooklet Hill suggestions 1–4 | d8036630 |
+| B9 | Stormy Mountains suggestions 1–4 | 626eb114 |
+| B10 | Mountain Ring suggestions 1–4 | a7c8dbe3 |
+| B11 | Crystal Cave suggestions 1–4 | 253e94fa |
+| B12 | Dimension Valley suggestions 1–4 | a9fb363d |
+| B13 | Magnetic Storm suggestions 1–4 | d33bf5f8 |
+| B14 | Scorched Earth suggestions 1–4 | 99d50781 |
+| B15 | Magma Basin suggestions 1–4 | 16534a6a (falls show in tilt12; tcgl's frame shows only their feet — ISSUES line) |
+| B16 | Lumiose City suggestions 1–4 | 7d5b8516 |
+| B17 | Community Center suggestions 1–3 | 26671d5a (far mountains barely in frame — ISSUES line) |
+| B18 | Levincia suggestions 1–3 | c80fb5a1 + close slice (shared water) |
+| B19 | Dark City suggestions 1–4 | c3061f95 |
+| B20 | Pokémon Center suggestions 1–4 | aac56579 |
+| B21 | Shopping Center suggestions 1–4 | bf442472 |
+| B22 | Full Metal Lab suggestions 1–3 | b9e78594 |
+| B23 | Fighting Stadium suggestions 1–3 | d9f77d84 |
+| B24 | Neutralization Zone suggestions 1–4 | 05f9a481 |
+| B25 | Steel Shelter suggestions 1–3 | c632f0e2 |
 
 ## Assumptions
 - (assumed) Forest of Vitality's tree moves to the top-left margin as suggestion 1 says, although
@@ -694,16 +694,16 @@ cross-cutting rows that name it. Colour values are lookdev starting points check
 ## Edge cases & failure modes
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | no glows / spots null | uGlowCount 0: glowLight is 0, no loop work | [ ] stadium-environment-mesh.test: setGlows none |
-| 2 | bad glow entry (NaN, r ≤ 0, bad colour) | skipped; a bad colour throws in paint as every kit colour does | [ ] setGlows test |
-| 3 | more glows than MAX_GLOWS | the first 16 kept, one warning | [ ] setGlows test |
-| 4 | reduced motion | uTime frozen: glows steady, lightning and aurora still | [ ] by construction (functions of uTime / tick(null)) |
-| 5 | glow, lightning, aurora near a card | glows are broad light, no detail; lightning and particles keep off cards on screen | [ ] stills; bolt-path tests |
-| 6 | leaned clump piece near a card | clearance grows by height × sin(lean) | [ ] stadium-env-clumps.test |
-| 7 | new/changed props | every built vertex off every card on screen, both presets | [ ] each board's screen test |
-| 8 | GLSL | every changed program declares every name it uses | [ ] stadium-glsl-idents.test |
-| 9 | reveal / exit | new meshes gated by revealBurned/exitKeep like the rest | [ ] by construction; stills after reveal |
-| 10 | no table / no cards | boards' spots null: kit set(null), glows cleared | [ ] each board's null-layout test |
+| 1 | no glows / spots null | uGlowCount 0: glowLight is 0, no loop work | [x] stadium-environment-mesh.test: setGlows none |
+| 2 | bad glow entry (NaN, r ≤ 0, bad colour) | skipped; a bad colour throws in paint as every kit colour does | [x] setGlows test |
+| 3 | more glows than MAX_GLOWS | the first 16 kept, one warning | [x] setGlows test |
+| 4 | reduced motion | uTime frozen: glows steady, lightning and aurora still | [x] by construction (functions of uTime / tick(null)) |
+| 5 | glow, lightning, aurora near a card | glows are broad light, no detail; lightning and particles keep off cards on screen | [x] stills; bolt-path tests |
+| 6 | leaned clump piece near a card | clearance grows by height × sin(lean) | [x] stadium-env-clumps.test |
+| 7 | new/changed props | every built vertex off every card on screen, both presets | [x] each board's screen test |
+| 8 | GLSL | every changed program declares every name it uses | [x] stadium-glsl-idents.test |
+| 9 | reveal / exit | new meshes gated by revealBurned/exitKeep like the rest | [x] by construction; stills after reveal |
+| 10 | no table / no cards | boards' spots null: kit set(null), glows cleared | [x] each board's null-layout test |
 
 ## Test plan
 - Unit: setGlows (none, invalid, cap, colours); GLOW/WATER chunks compile in full programs
@@ -724,3 +724,30 @@ n/a: client visuals only, no data. Revert: revert the branch's commits; boards f
 | 27 Close | design, harness, captures | — | full `pnpm test`, lint, gates | Done checklist |
 
 ## Deviations (Builder appends here during build)
+- Magma Basin's falls moved from the far wall's straight run (hidden behind the opponent's hand
+  row) to its two corners, each pouring straight up the screen; tcgl still shows only their feet.
+- Magma Basin bug found and fixed in passing: the falls' "no fall" distance (100000) overflowed the
+  half-float bake to Inf/NaN, lighting every wall pale orange (the audit read it as "a wide moat").
+  Other boards' sentinels are an ISSUES line (not audited here).
+- Scorched Earth's volcano keeps its crater in view (`craterInView`, VOLCANO_RISE): the tilted
+  cameras push a tall cone's crater toward the far edge, off screen at the table's corner.
+- Lumiose's Prism Tower stands at the far end of the left strip (both cameras draw it upright),
+  not out in the margin (the margin is built up with blocks).
+- Levincia's billboards' scrolling LED needed a new kit look (`LOOK.pulse`: a soft swell, never off).
+- Fighting Stadium: the white lattice of shafts was removed with the star flares (both read as
+  scratches/sunbursts); four wedges replace eight lasers.
+- Full Metal Lab: the railing runs on the round dais's edge only, so it breaks at the docking pads
+  (a rail round the pads crossed their cards' edges or wandered); short arcs left and right remain.
+- Community Center's mountains sit in the ~80 px of scene past the opponent's hand row, so they
+  barely show (ISSUES line).
+
+## Landing edits (for the commit that lands this branch on main)
+- ISSUES: `[board3d]` half-float bake sentinels (100000/1e5) audit across boards (Magma fixed).
+- ISSUES: `[board3d]` Magma Basin falls show only their feet in tcgl (its frame stops below the far wall).
+- ISSUES: `[board3d]` Community Center far mountains barely in frame (past the opponent's hand row).
+- ISSUES: close I276 (this audit) as shipped by 084.
+- DECISIONS: `[board3d]` shared contact glow (`GLOW`, `setGlows`, MAX_GLOWS 16) is the one emissive
+  hook boards light their surroundings with; `LOOK.pulse` joins `LOOK.blink` for glowing parts.
+- DECISIONS (assumed): Vitality's tree moved top-left per the audit (077 had top right; `HERO_SIDE` flips it).
+- STATE: Focus/Next after 084; design Status: shipped; ledger to the archive.
+

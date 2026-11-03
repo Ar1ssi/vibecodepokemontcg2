@@ -351,19 +351,20 @@ void main() {
   if (field.r > ${WATER_LEVEL.toFixed(1)} + 0.5 || revealBurned(p) * exitKeep(p) < 0.5) discard;
   float t = uTime;
   float r = field.g;
-  vec3 col = mix(WATER, WATER_DEEP, smoothstep(uWalkOut, uWalkOut + 300.0, r));
+  float wallDist = r < uStage.w ? min(r - uStage.z, uStage.w - r) : r - uWalkOut;
+  // Design 084: the shared water body (Beach, Brooklet, Mystery Garden): light shallows by the walls,
+  // the moat a middling depth, deep out past the walkway; its streaks and sparkles quiet by the cards.
+  float quiet = 1.0 - 0.8 * fieldCalm(p, 110.0);
+  float depth = r < uStage.w ? smoothstep(0.0, 40.0, wallDist) * 0.6 : smoothstep(0.0, 300.0, wallDist);
+  vec3 col = waterBody(WATER_DEEP, WATER, WATER * 1.12, depth * quiet, p, t);
   // Shade under the rim and the walkway's edges, and a white line of foam where the water meets them.
   col *= mix(0.75, 1.0, smoothstep(uStage.z, uStage.z + 24.0, r));
-  float wallDist = r < uStage.w ? min(r - uStage.z, uStage.w - r) : r - uWalkOut;
   // Design 081: a broad slow swell, a crisp white line of foam lapping where it meets the walls.
   // Design 082: BDSP's ribbons of sky light and a few slow sparkles across it, quiet near the cards.
   float lap = 0.5 + 0.5 * sin(t * 0.9 + r * 0.05);
   float foam = 1.0 - smoothstep(1.5, 2.5 + 3.0 * lap, wallDist);
   float swell = fbm3((p - vec2(t * 6.0, t * 2.0)) / vec2(160.0, 90.0));
   col *= 0.95 + 0.1 * swell;
-  float quiet = 1.0 - 0.8 * fieldCalm(p, 110.0);
-  col += vec3(0.8, 0.9, 1.0) * lightStreaks(p, t) * 0.24 * quiet;
-  col += vec3(1.2) * sparkles(p, t) * 0.7 * quiet;
   // Design 084: each tower's reflection, a pale streak running from its foot toward the viewer (the
   // near side), broken by the ripples, sparkling.
   for (int i = 0; i < ${MAX_TOWERS}; i++) {
@@ -393,12 +394,9 @@ const RAIL = [0.85, 0.9, 0.96, 0.4];
 const POST = [0.6, 0.66, 0.76, 0.4];
 const FRAME = [0.16, 0.22, 0.36, 0.5];
 const SCREEN_YELLOW = [1.0, 0.82, 0.25, 2.25];
-const SCREEN_RED = [1.0, 0.36, 0.28, 2.25];
 const SCREEN_SKY = [0.55, 0.8, 1.0, 2.25];
-const SCREEN_NAVY = [0.14, 0.2, 0.42, 2.15];
 const SCREEN_PINK = [1.0, 0.56, 0.72, 2.2];
 const SCREEN_WHITE = [0.98, 0.98, 0.96, 2.3];
-const SCREEN_INK = [0.1, 0.11, 0.16, 2.05];
 // Design 084: pale glass, as the art's towers (dark glass read as blobs).
 const GLASS = [0.3, 0.44, 0.78, 0.9];
 const GLASS_LIT = [0.62, 0.76, 1.0, 0.9];

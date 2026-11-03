@@ -2,8 +2,8 @@
 # Cap ~60 lines. A finished ledger moves to .agent/archive/NEXTSTEPS-history.md in the session
 # that finishes it.
 
-# oneshot 084-stadium-visual-audit · worktree .claude/worktrees/084-stadium-fixes · branch feature/084-stadium-visual-fixes · slice 0/27
-Spec: .agent/designs/084-stadium-visual-audit.md (§ Build). Board order = § Per-board detail. Stills: .agent/scratch/084/ (before/, after/).
+# oneshot 084-stadium-visual-audit · worktree .claude/worktrees/084-stadium-fixes · branch feature/084-stadium-visual-fixes · slice 27/27 (closed; Land: branch, awaiting the user's landing call)
+Spec: .agent/designs/084-stadium-visual-audit.md (§ Build; § Landing edits lists the harness lines). Stills: .agent/scratch/084/ (before/, final/).
 
 # Parked — S264 batch leftovers (tracked as issues, not increments)
 #5 "basic prompt gone" → I87 · #6 match logging → I85 (design 028) · #4 30th anniversary → I86 (design 029).
