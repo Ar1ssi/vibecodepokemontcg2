@@ -27,6 +27,11 @@
 // kit's (stadium-kit-assets.mjs), the bushes standing on the land (the kit's ground-follow), the
 // boulders at the lake's level, half in the water; the grass and sand are the ground kit's
 // (stadium-env-ground.mjs); the water a clear BDSP blue under the map's ripples.
+// Design 084 (the visual audit): the lake teal-cyan (the card's, so the blue card backs on it stand
+// apart), on the shared water body: lighter in the shallows, darker out in the middle, the sand
+// showing through along the shore, a band of sky drifting over it, the sun's sparkles gathered toward
+// the top left; soft shores (a wet band, faint foam, the grass fringing over the sand); the pools in
+// three sizes with strata cliff faces and rocky rims; the bigger bushes round trees.
 import {
   FILTERING,
   FOOTPRINTS,
@@ -74,12 +79,14 @@ import {
   TOWER_MAX,
   TOWER_WALL_PX,
   ZONE_BLEND_PX,
+  TREE_HEIGHT,
+  TREE_SIZE,
   brookletSpots,
   stonework,
 } from './stadium-env-brooklet-layout.mjs';
-import { GRASS as GRASS_KIT, LIGHT_MOTION, SAND as SAND_KIT } from './stadium-env-ground.mjs';
+import { GRASS as GRASS_KIT, LIGHT_MOTION, SAND as SAND_KIT, STRATA, WATER } from './stadium-env-ground.mjs';
 import { createPropBuilder } from './stadium-env-props.mjs';
-import { createKitProps } from './stadium-kit.mjs';
+import { createKitProps, glslColour } from './stadium-kit.mjs';
 import { placeAsset } from './stadium-kit-assets.mjs';
 
 export const MIST_COUNT = 40;
@@ -378,9 +385,10 @@ const vec3 GRASS_LIGHT = vec3(0.13, 0.44, 0.08);
 const vec3 WOOD_DARK = vec3(0.07, 0.06, 0.045);
 const vec3 WOOD_LIGHT = vec3(0.45, 0.41, 0.32);
 // The water (design 082): a clear BDSP blue, deep, base, light; the art's white strokes.
-const vec3 WATER_DEEP = vec3(0.01, 0.12, 0.42);
-const vec3 WATER = vec3(0.03, 0.27, 0.66);
-const vec3 WATER_LIGHT = vec3(0.16, 0.52, 0.84);
+// Design 084: the card's teal-cyan (pixel samples #089ec6, #047e95, #70bcc9), not the card backs' blue.
+const vec3 WATER_DEEP = ${glslColour('#167f9c')};
+const vec3 WATER = ${glslColour('#3fb9d6')};
+const vec3 WATER_LIGHT = ${glslColour('#8fe0ec')};
 const vec3 WATER_STREAK = vec3(0.8, 0.95, 0.95);
 const vec3 FALL_TEAL = vec3(0.05, 0.32, 0.32);
 const vec3 FALL_LIGHT = vec3(0.4, 0.66, 0.64);
@@ -402,18 +410,22 @@ vec3 grassColour(vec2 p) {
 // Sand (design 082): BDSP's warm sand with soft ripples, lighter in drifts, damp and dark at the water.
 vec3 sandColour(vec2 p, float land) {
   vec3 c = bdspSand(p, mix(SAND_DRY, SAND_LIGHT, smoothstep(0.4, 0.8, fbm3(p / 60.0 + 5.0)) * 0.7), 0.0);
-  return mix(SAND_WET, c, smoothstep(0.5, 7.0, land));
+  // Design 084: a soft band of wet sand along the water, not a hard line.
+  return mix(SAND_WET * 1.15, c, smoothstep(0.5, 18.0, land));
 }
 `;
 
 // The ground's materials, the game's: earth cliffs and laid stone. After NOISE, VORONOI and PALETTE.
 const MATERIALS = /* glsl */ `
 // The earth cliffs: dark red-brown, mottled, lighter strata running along their faces (by height,
-// wavering), seen from above as bands along each cliff.
+// wavering), seen from above as bands along each cliff. Design 084: the card's layered cliffs, tan
+// and grey-olive courses of rock over the earth, so every cliff reads as the art's.
 vec3 earthColour(vec2 p, float height) {
   vec3 c = mix(EARTH_DARK, EARTH, smoothstep(0.25, 0.75, gnoise(p / 6.0)));
   float strata = sin(height / 4.5 + gnoise(p / 30.0) * 5.0);
-  return mix(c, EARTH_LIGHT, smoothstep(0.7, 0.95, strata) * 0.55);
+  c = mix(c, EARTH_LIGHT, smoothstep(0.7, 0.95, strata) * 0.55);
+  vec3 rock = mix(STONE_MID * 0.8, STONE_LIGHT, 0.3 + 0.5 * smoothstep(-0.6, 0.9, sin(height / 3.2 + gnoise(p / 40.0) * 4.0)));
+  return mix(c, rock, 0.55);
 }
 // A wall's courses as the game lays them: rows of big rough stones 17 px high and 24..44 px long,
 // well rounded, each row's joints set off from the last, each stone's outline a little lumpy. x 0 in
@@ -677,11 +689,14 @@ void main() {
   float hill = hillShare(p);
   float near = nearShare(p);
   float bank = max(1.0 - hill - near, 0.0);
-  float beachTop = 1.0 - smoothstep(beachWidth(p) - 3.0, beachWidth(p) + 1.0, land);
+  // Design 084: the grass fringes over the beach's top in little tufts (no hard edge between the fills).
+  float grassEdge = beachWidth(p) - land;
+  float beachTop = 1.0 - grassFringe(grassEdge, p, 9.0);
   float pathTop = (1.0 - smoothstep(pathWidth(p) - 2.0, pathWidth(p) + 1.0, land)) * pathShare(p);
   float sandy = clamp(hill + bank * beachTop + near * pathTop, 0.0, 1.0);
   vec3 albedo = sandy > 0.99 ? sandColour(p, land) : grassColour(p);
   if (sandy > 0.01 && sandy <= 0.99) albedo = mix(albedo, sandColour(p, land), sandy);
+  albedo *= 1.0 - 0.22 * fringeShade(grassEdge, 9.0) * bank * sandy;
   float stoneShare = hill * face;
   if (face > 0.01) {
     vec3 faceColour = hill > 0.99 ? stoneColour(faceUv, 0.0, 0.0) : earthColour(p, vHeight);
@@ -811,6 +826,22 @@ ${STRUCTURES}
 ${PALETTE}
 ${SHADING}
 ${MATERIALS}
+${STRATA}
+// Design 084: the pools' walls as the card's cliffs, layered rock (the ground kit's strata), moss in
+// the grooves; their rims a crown of rough rocks, each lump lit on its sun side.
+vec3 cliffFace(vec2 p, float height, float block) {
+  vec2 course = strata(height, p, 10.0 + 2.0 * fract(block * 0.37));
+  vec3 c = mix(STONE_MID * 0.85, STONE_LIGHT * 1.05, 0.2 + 0.65 * course.y) * mix(0.62, 1.0, course.x);
+  float moss = smoothstep(0.58, 0.76, gnoise(p / 18.0 + block * 3.0)) * (1.0 - course.x * 0.6);
+  return mix(c, MOSS, moss * 0.4);
+}
+vec3 rockRim(vec2 p, float block) {
+  vec4 cell = voronoiCell(p / 15.0 + block * 5.0);
+  float lump = smoothstep(0.0, 0.35, cell.x);
+  float lit = dot(normalize(-cell.zw + 1e-4), normalize(uSun.xy + 1e-4)) * (1.0 - lump * 0.6);
+  vec3 c = mix(STONE_MID, STONE_RIM, 0.35 + 0.5 * cell.y) * (0.8 + 0.22 * lit);
+  return mix(STONE_DARK, c, 0.25 + 0.75 * lump);
+}
 varying vec3 vPart;
 varying vec2 vLevels;
 varying vec3 vNormal;
@@ -830,7 +861,11 @@ void main() {
   float height = vPos.z;
   bool top = (part > 0.5 && part < 1.5) || (part > 3.5 && part < 4.5);
   float block = which * 7.0 + 1.0;
-  vec3 albedo = top ? stoneColour(p, block, 1.0) : stoneColour(vec2(along, height), block, 0.0);
+  // The ledge keeps the map's laid stone; the pools' rings are the card's natural rock.
+  bool ledge = part > 3.5;
+  vec3 albedo = top
+    ? (ledge ? stoneColour(p, block, 1.0) : rockRim(p, block))
+    : (ledge ? stoneColour(vec2(along, height), block, 0.0) : cliffFace(p, height, block));
   vec3 col = lit(albedo, n, top ? light.a : 1.0, 1.0);
   if (!top) {
     // The game lights its walls nearly evenly: fill on every face, the lake's bounce low on them.
@@ -1028,6 +1063,7 @@ float sparkles(vec2 p, float time, float swell, float path) {
 export const LAKE_FRAGMENT = /* glsl */ `
 ${TERRAIN_UNIFORMS}
 ${NOISE}
+${FILTERING}
 ${FOOTPRINTS}
 ${REVEAL}
 ${TERRAIN_GROUND}
@@ -1040,10 +1076,12 @@ ${SHADING}
 ${CELLS}
 ${WATER_LOOK}
 ${WAVES}
+${WATER}
 varying vec2 vPos;
 varying vec2 vUv;
 void main() {
   vec2 p = vPos;
+  filterPixel = pixelSize(p);
   if (revealBurned(p) * exitKeep(p) < 0.5) discard;
   vec4 field = texture2D(uField, vUv);
   float growth = terrainGrowth(p);
@@ -1065,12 +1103,14 @@ void main() {
   vec2 gradient = (wave.yz * 1.1 * (1.0 - 0.6 * calm) + rings.yz * 1.2) * still;
   vec3 n = normalize(vec3(-gradient, 1.0));
 
-  // The water: the game's teal and ripples; the sand shows through only in the first px of the
-  // shallows. Darker in the walls' shade and close under them.
-  vec3 col = gameWater(p + gradient * 6.0, uTime);
-  col = mix(col, mix(WATER_DEEP, WATER, 0.62) * (0.92 + 0.16 * fbm3(p / 220.0 + uTime * 0.01)), calm * 0.65);
-  vec3 bed = BED_SAND * (0.9 + 0.15 * gnoise(p / 30.0)) + caustics(p * 0.7, uTime) * 0.25;
-  col = mix(col, bed * vec3(0.72, 0.93, 1.0), exp(-max(offshore, 0.0) / 4.0) * growth * 0.8);
+  // The water (design 084): the shared water body in the card's teal-cyan, lighter in the shallows
+  // and darker out in the middle, the sand showing through along the shore, a band of sky drifting
+  // over it; the game's ripple texture over that, quiet round the cards. Darker in the walls' shade
+  // and close under them.
+  vec3 bed = (BED_SAND * (0.9 + 0.15 * gnoise(p / 30.0)) + caustics(p * 0.7, uTime) * 0.25) * vec3(0.72, 0.93, 1.0);
+  vec3 body = waterBody(WATER_DEEP, WATER_LIGHT, bed, smoothstep(0.0, 260.0, offshore) * growth, p, uTime);
+  float ripple = ripplePattern(p + gradient * 6.0, uTime);
+  vec3 col = body * mix(0.84 + 0.3 * ripple, 1.0, calm * 0.65);
   col *= mix(0.6, 1.0, light.a) * mix(0.72, 1.0, light.b);
   // Rocks under the surface: dark, lighter on their tops, wavering with the water.
   vec2 sunken = sunkenRock(p + gradient * 8.0) * still * (1.0 - calm);
@@ -1086,15 +1126,19 @@ void main() {
   float fresnel = 0.02 + 0.98 * pow(1.0 - max(dot(n, eye), 0.0), 5.0);
   col = mix(col, skyColor(mirror), clamp(fresnel * 2.0, 0.0, 0.5));
   float path = smoothstep(0.86, 0.98, dot(reflect(-eye, vec3(0.0, 0.0, 1.0)), sun));
-  float glint = sparkles(p, uTime, swell, path) * light.a * still * (1.0 - calm);
+  // Design 084: the sun's sparkles gather toward the top left of the lake, the sun's side.
+  vec2 across = (p - uMin) / uSize;
+  float sunSide = smoothstep(0.1, 0.75, across.y - across.x + 0.35);
+  float glint = sparkles(p, uTime, swell, max(path, sunSide)) * light.a * still * (1.0 - calm) * mix(0.35, 1.0, sunSide);
 
   // Foam: the plunges' churn and the lace they send off, white water round the boulders, and the
   // game's crisp white line at every waterline, the water a little darker just inside it.
   float foam = max(plungeFoam(p, uTime), rockFoam(p, uTime));
   float lapping = 0.5 * sin(uTime * 1.3 + (p.x + p.y) * 0.045);
-  float line = 1.0 - smoothstep(0.8, 2.2, offshore + lapping * 0.4);
-  col *= 1.0 - 0.24 * (1.0 - smoothstep(3.0, 36.0, offshore)) * growth;
-  foam = max(foam, line * 0.95);
+  // Design 084: a faint foam line, the shore soft rather than drawn.
+  float line = 1.0 - smoothstep(0.8, 3.2, offshore + lapping * 0.4);
+  col *= 1.0 - 0.08 * (1.0 - smoothstep(3.0, 36.0, offshore)) * growth;
+  foam = max(foam, line * 0.55);
   col = mix(col, mix(FOAM_SHADE, FOAM_LIT, light.a), foam);
   col += vec3(1.0, 0.97, 0.9) * glint * (1.0 - foam);
 
@@ -1340,6 +1384,9 @@ const setEach = (vectors, items, toValues) =>
 // The kit's colours: the art's warm brown boulders, the map's round bushes in BDSP's greens.
 const BOULDER = Object.freeze({ body: '#8d6a52', light: '#b48f72', dark: '#5f4636' });
 const BUSH = Object.freeze({ leaf: '#3f9a3a', leafLight: '#7cc44a' });
+const BUSHES = Object.freeze([BUSH, Object.freeze({ leaf: '#2f8a3e', leafLight: '#6db84a' })]);
+// The card's round trees above the banks: a deep green and a fresher one.
+const TREES = Object.freeze([Object.freeze({ leaf: '#2f8a44', leafLight: '#79c255' }), Object.freeze({ leaf: '#3b9a3a', leafLight: '#93cf58' })]);
 
 /**
  * The boulders and the round bushes as the Stadium kit's solids (design 082, I273): each boulder at
@@ -1350,7 +1397,14 @@ export function brookletProps({ rocks = [], trees = [], clumps = [] } = {}) {
   rocks.forEach((rock, k) => {
     placeAsset(props, 'boulder', { x: rock.x, y: rock.y, z: 0, ground: false, size: rock.r, depth: 0.82, yaw: rock.seed * 6.28, seed: k * 13 + 5, colors: BOULDER });
   });
-  trees.forEach((tree, k) => placeAsset(props, 'bush', { x: tree.x, y: tree.y, size: tree.r * BUSH_SIZE, seed: k * 17 + 3, colors: BUSH }));
+  // Design 084: the bigger bushes round trees, in two greens; the smaller ones bushes, in two.
+  trees.forEach((tree, k) => {
+    if (tree.kind === 'tree') {
+      placeAsset(props, 'treeRound', { x: tree.x, y: tree.y, size: tree.r * TREE_SIZE, height: tree.r * TREE_HEIGHT, seed: k * 17 + 3, colors: TREES[k % TREES.length] });
+    } else {
+      placeAsset(props, 'bush', { x: tree.x, y: tree.y, size: tree.r * BUSH_SIZE, seed: k * 17 + 3, colors: BUSHES[k % BUSHES.length] });
+    }
+  });
   // Design 083: the banks' clumps, standing on the land.
   for (const piece of clumps) {
     const colors = piece.asset === 'bush' || piece.asset === 'treeRound' ? BUSH : piece.options.colors;

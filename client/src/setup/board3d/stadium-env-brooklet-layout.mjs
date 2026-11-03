@@ -107,16 +107,16 @@ export const POOL_SINK_PX = 7;
  * and the cave in its wall (over the ledge's top) at offsets (px) from the main one's centre.
  */
 const MAIN_TOWER = Object.freeze({ share: 0.12, front: 14, r: 140, rim: 92 });
-const UPPER_TOWER = Object.freeze({ x: -290, y: -86, r: 160, rim: 128 });
+const UPPER_TOWER = Object.freeze({ x: -300, y: -92, r: 176, rim: 128 });
 const CAVE = Object.freeze({ x: -340, halfWidth: 22, height: 36 });
 /** The side pool: a tower SIDE_POOL.share of the way down the left shore from its far end, `gap` px off it, standing a little over the ledge, its fall into the lake. */
-const SIDE_POOL = Object.freeze({ share: 0.38, gap: 6, r: 92, rim: 74 });
+const SIDE_POOL = Object.freeze({ share: 0.38, gap: 6, r: 84, rim: 74 });
 /**
  * The middle pool: a tower on the ledge between the side pool and the upper tower, `gap` px off each,
  * up to `r` across, its rim `rise` px over the side pool's, spilling into it: the map's pools stepping
  * down the hill.
  */
-const MIDDLE_POOL = Object.freeze({ r: 74, gap: 12, rise: 26 });
+const MIDDLE_POOL = Object.freeze({ r: 56, gap: 12, rise: 26 });
 /** The left bank's pieces need this much room between the lake and the view's left edge. */
 const SIDE_ROOM_PX = 170;
 /**
@@ -208,6 +208,13 @@ const SUNKEN_STEP_PX = 12;
 /** Round bushes on the banks' grass (the kit's bush, size BUSH_SIZE × r). */
 export const TREE_MAX = 10;
 export const BUSH_SIZE = 0.95;
+/**
+ * Design 084: the map's bigger bushes (r at least TREE_FROM_PX) stand as round broadleaf trees instead
+ * (the kit's treeRound, size TREE_SIZE × r, TREE_HEIGHT × r tall), as the card's trees above the banks.
+ */
+export const TREE_FROM_PX = 28;
+export const TREE_SIZE = 1.05;
+export const TREE_HEIGHT = 2.6;
 /**
  * A bush stands on grass at least this far past its cliff's top, and this far from every card past
  * its reach and its lean on screen (RISE_LEAN of its top over the highest the land rises, BANK_CEILING_PX).
@@ -722,12 +729,18 @@ const onBankGround = (spots, rects, view, x, y, r, reach, height) => {
   return land + r < step - 8 || land - r > step + CLIFF_RUN_PX + 8;
 };
 
-/** The bushes where the map has them, each moved onto grass in view nearby if its own spot misses it, clear of each other and `avoid`. */
+/**
+ * The bushes where the map has them, each moved onto grass in view nearby if its own spot misses it,
+ * clear of each other and `avoid`; design 084: the bigger ones round trees (`kind` 'tree').
+ */
 const placeBushes = (spots, rects, view, avoid) => {
   const corner = { x: spots.core.x1, y: spots.core.y1 };
   const trees = [];
   for (const [index, bush] of BUSHES.entries()) {
     if (trees.length >= TREE_MAX) break;
+    const tree = bush.r >= TREE_FROM_PX;
+    const dims = tree ? measureAsset('treeRound', { size: bush.r * TREE_SIZE, height: bush.r * TREE_HEIGHT }) : null;
+    const fits = (x, y) => (tree ? onBankGround(spots, rects, view, x, y, bush.r, dims.reach, dims.height) : onBankGrass(spots, rects, view, x, y, bush.r));
     const home = { x: corner.x + bush.x, y: corner.y + bush.y };
     let best = null;
     for (let dy = -TREE_SEARCH_PX; dy <= TREE_SEARCH_PX; dy += TREE_STEP_PX) {
@@ -736,13 +749,13 @@ const placeBushes = (spots, rects, view, avoid) => {
         if (distance > TREE_SEARCH_PX || (best && distance >= best.distance)) continue;
         const x = home.x + dx;
         const y = home.y + dy;
-        if (!onBankGrass(spots, rects, view, x, y, bush.r)) continue;
+        if (!fits(x, y)) continue;
         if (trees.some((tree) => Math.hypot(tree.x - x, tree.y - y) < tree.r + bush.r + 4)) continue;
         if (avoid.some((spot) => Math.hypot(spot.x - x, spot.y - y) < spot.r + bush.r)) continue;
         best = { x, y, distance };
       }
     }
-    if (best) trees.push({ x: best.x, y: best.y, r: bush.r, seed: spotHash(best.x, best.y, index + 11) });
+    if (best) trees.push({ x: best.x, y: best.y, r: bush.r, seed: spotHash(best.x, best.y, index + 11), kind: tree ? 'tree' : 'bush' });
   }
   return trees;
 };
