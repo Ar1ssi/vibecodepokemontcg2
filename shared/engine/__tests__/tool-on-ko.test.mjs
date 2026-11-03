@@ -635,33 +635,51 @@ test('Exp. Share (Scarlet & Violet 174) asks which Basic Energy to move when the
   assert.ok(res.state.players.p2.zones.discard.some((c) => c.instanceId === fire.instanceId));
 });
 
-test('Wishful Baton (Crimson Invasion 121) asks which Benched Pokémon gets the Energy when there are several', () => {
-  const benchA = defender({ name: 'Bench A' });
-  const benchB = defender({ name: 'Bench B' });
+const WISHFUL_BATON =
+  'If the Pokémon this card is attached to is your Active Pokémon and is Knocked Out by damage from an opponent’s attack, move up to 3 basic Energy cards from that Pokémon to 1 of your Benched Pokémon.';
+const batonBoard = (bench, energies) => {
   const victim = defender();
-  const state = game({ p1Active: attacker(), p2Active: victim, p2Bench: [benchA, benchB] });
-  const baton = tool(
-    'Wishful Baton',
-    'If the Pokémon this card is attached to is your Active Pokémon and is Knocked Out by damage from an opponent’s attack, move up to 3 basic Energy cards from that Pokémon to 1 of your Benched Pokémon.'
-  );
-  const e1 = energy();
-  const e2 = energy();
-  attach(state, 'p2', baton, victim);
-  attach(state, 'p2', e1, victim);
-  attach(state, 'p2', e2, victim);
-  let res = attack(state);
+  const state = game({ p1Active: attacker(), p2Active: victim, p2Bench: bench });
+  attach(state, 'p2', tool('Wishful Baton', WISHFUL_BATON), victim);
+  for (const e of energies) attach(state, 'p2', e, victim);
+  return state;
+};
+
+test('Wishful Baton (Crimson Invasion 121): the Energy target is chosen before promotion, among every Benched Pokémon', () => {
+  const benches = [defender({ name: 'Bench A' }), defender({ name: 'Bench B' }), defender({ name: 'Bench C' })];
+  const [e1, e2] = [energy(), energy()];
+  let res = attack(batonBoard(benches, [e1, e2]));
   assert.equal(res.error, null);
-  for (let i = 0; i < 4 && res.state.pendingChoice?.resumeToken?.effectType !== 'koEnergy'; i++) {
-    if (!res.state.pendingChoice) break;
-    // Promote Bench A; the Energy then goes to the chosen remaining Benched Pokémon.
-    const promote = res.state.pendingChoice.options.find((o) => o.instanceId === benchA.instanceId) || res.state.pendingChoice.options[0];
-    res = resolveAs(res, [promote.instanceId]);
-  }
-  const choice = res.state.pendingChoice;
-  if (choice?.resumeToken?.effectType === 'koEnergy') {
-    res = resolveAs(res, [benchB.instanceId]);
-    assert.equal(res.error, null);
-  }
-  assert.equal(holderOf(res.state, e1.instanceId), benchB.instanceId);
-  assert.equal(holderOf(res.state, e2.instanceId), benchB.instanceId);
+  const target = res.state.pendingChoice;
+  assert.equal(target?.resumeToken?.effectType, 'koEnergy', 'the KO effect resolves before the promotion prompt');
+  assert.equal(target.options.length, 3);
+  res = resolveAs(res, [benches[1].instanceId]);
+  assert.equal(res.error, null);
+  assert.equal(res.state.pendingChoice?.resumeToken?.effectType, 'promote');
+  res = resolveAs(res, [benches[1].instanceId]);
+  assert.equal(res.error, null);
+  assert.equal(holderOf(res.state, e1.instanceId), benches[1].instanceId);
+  assert.equal(holderOf(res.state, e2.instanceId), benches[1].instanceId);
+  assert.equal(res.state.players.p2.zones.active.find((c) => !c.attachedTo)?.instanceId, benches[1].instanceId);
+});
+
+test('Wishful Baton with one Benched Pokémon and 4 different Energy: the 3 picked reach the promoted Pokémon', () => {
+  const bench = defender({ name: 'Only Bench' });
+  const kinds = ['Fire', 'Water', 'Grass', 'Lightning'];
+  const energies = kinds.map((t) => energy(`Basic ${t} Energy`, { types: [t] }));
+  let res = attack(batonBoard([bench], energies));
+  assert.equal(res.error, null);
+  assert.equal(res.state.pendingChoice?.resumeToken?.effectType, 'koEnergy');
+  const picked = energies.slice(1).map((e) => e.instanceId);
+  res = resolveAs(res, picked);
+  assert.equal(res.error, null);
+  for (const id of picked) assert.equal(holderOf(res.state, id), bench.instanceId);
+  assert.ok(res.state.players.p2.zones.discard.some((c) => c.instanceId === energies[0].instanceId));
+});
+
+test('Wishful Baton on the last Pokémon in play opens no picker once the game is over', () => {
+  const kinds = ['Fire', 'Water', 'Grass', 'Lightning'];
+  const res = attack(batonBoard([], kinds.map((t) => energy(`Basic ${t} Energy`, { types: [t] }))));
+  assert.equal(res.error, null);
+  assert.equal(res.state.pendingChoice, null);
 });

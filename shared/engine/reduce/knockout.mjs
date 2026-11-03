@@ -843,6 +843,11 @@ export function moveKoEnergy(player, target, obligation, events) {
 
 export function settleKoEnergyMoves(draft, { events }) {
   if (draft.pendingChoice) return;
+  // A finished game resolves nothing more (the last Pokémon's Knock Out ended it).
+  if (isGameConcluded(draft)) {
+    delete draft.__koEnergyMoves;
+    return;
+  }
   const pending = draft.__koEnergyMoves;
   if (!Array.isArray(pending) || pending.length === 0) {
     delete draft.__koEnergyMoves;
@@ -859,8 +864,13 @@ export function settleKoEnergyMoves(draft, { events }) {
       remaining.shift();
       continue;
     }
-    // Which Energy moves is the player's pick when the cards differ and not all of them go.
+    // Which Energy moves is the player's pick when the cards differ and not all of them go;
+    // only worth asking once something can receive them.
     const available = (player.zones?.discard || []).filter((c) => obligation.energyIds.includes(c.instanceId));
+    if (obligation.targetKind !== 'hand' && koEnergyTargets(player, obligation).length === 0) {
+      remaining.shift();
+      continue;
+    }
     if (!obligation.energyPicked && available.length > obligation.upTo && new Set(available.map((c) => c.name)).size > 1) {
       delete draft.__koEnergyMoves;
       draft.pendingChoice = createPendingChoice({

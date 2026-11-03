@@ -446,8 +446,9 @@ export function applyCommand(state, command, rng = null) {
     discardBenchedAttachedTrainers(draft, { events });
   }
   resolveDamageCounterKnockouts(draft, { events });
-  settlePromotionChoices(draft, { events });
+  // Knock Out effects (Energy moves) resolve before the replacement Active is promoted.
   settleKoEnergyMoves(draft, { events });
+  settlePromotionChoices(draft, { events });
   settleKoHandDiscards(draft, { events });
   settleKoToolCounters(draft);
   settlePrizeEntitlements(draft, { events });
