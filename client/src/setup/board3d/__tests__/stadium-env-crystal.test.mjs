@@ -102,3 +102,15 @@ test('the clusters reach the far end too: shuffled before the cap, not spent on 
     assert.ok(new Set(clusters.map((cluster) => cluster.hue)).size >= 4, 'many hues');
   }
 });
+
+test('design 084: fewer, larger clusters, each lighting the floor round it in its own hue; the emblem gold', () => {
+  const spots = crystalSpots(flatLayout(getMatLayout(NO_MAT_LAYOUT_ID), { w: 1449.6, h: 540 }));
+  assert.ok(MAX_CLUSTERS <= 14);
+  const lights = spots.glows.slice(0, spots.clusters.length);
+  spots.clusters.forEach((cluster, i) => {
+    assert.deepEqual([lights[i].x, lights[i].y], [cluster.x, cluster.y]);
+    assert.match(lights[i].colour, /^#[0-9a-f]{6}$/);
+    assert.ok(lights[i].r > cluster.r);
+  });
+  if (spots.emblem?.r > 0) assert.equal(spots.glows.length, spots.clusters.length + 1, 'and the emblem');
+});

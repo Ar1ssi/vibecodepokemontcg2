@@ -19,6 +19,11 @@
 // Design 082 (Brilliant Diamond / Shining Pearl): the Grand Underground's caves. The floor is rounded
 // cobbles of warm sandstone lit from the skylight's side, worn to smooth packed sand round the cards;
 // the walls rough rock laid in strata (stadium-env-ground.mjs); no ink outlines.
+// Design 084 (the visual audit): the crystals glow: dark at their base, their upper half a light of
+// their own hue (so it blooms), each cluster tinting the floor round it (the shared contact glow);
+// fewer, larger clusters; the skylight a soft ellipse of light round the Actives, the cave sinking to
+// near-dark at its edges, cobbles only in the light, the floor smooth and dark away from it; the
+// emblem a glowing gold inlay with a pale-blue heart; the sparkle dust only inside the shaft.
 import {
   FILTERING,
   FOOTPRINTS,
@@ -33,7 +38,7 @@ import {
   VORONOI,
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
-import { STONEWORK, STRATA } from './stadium-env-ground.mjs';
+import { GLOW, STONEWORK, STRATA } from './stadium-env-ground.mjs';
 import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
 import { createKitProps } from './stadium-kit.mjs';
 import { placeAsset } from './stadium-kit-assets.mjs';
@@ -50,7 +55,7 @@ export const WALL_RUN_PX = 230;
 export const WALL_HEIGHT_PX = 170;
 /** Least gap between any crystal, seen from above, and a card or the opponent's hand. */
 export const CRYSTAL_CARD_GAP_PX = 14;
-export const MAX_CLUSTERS = 36;
+export const MAX_CLUSTERS = 14;
 /**
  * The art's crystal colours (sRGB, linearised in the shader). Design 080: its four main ones (pink,
  * sky blue, lavender, teal); seven read as a rainbow assortment. Design 083: two softer ones join
@@ -68,7 +73,10 @@ export const CRYSTAL_HUES = Object.freeze([
  * How tall a cluster's crystals grow, by where it stands: off the far end, in the side bands, toward
  * the near end (a tall crystal there leans up over the player's cards in the tilted view).
  */
-const CLUSTER_HEIGHT = { far: [120, 210], side: [70, 125], near: [30, 55] };
+const CLUSTER_HEIGHT = { far: [150, 250], side: [85, 150], near: [34, 62] };
+/** Design 084: each cluster's light on the floor round it (its reach past its glow radius), and the emblem's gold. */
+const CLUSTER_LIGHT = Object.freeze({ reach: 1.5, strength: 0.55, breath: 0.08 });
+const EMBLEM_LIGHT = Object.freeze({ colour: '#ffc94d', reach: 40, strength: 0.35 });
 const SPARKLE_COUNT = 70;
 
 /** A small deterministic 0..1 from three numbers. */
@@ -190,7 +198,7 @@ export function crystalSpots(layout) {
   // Clusters on a jittered grid over the ring between the cards and the walls' middle. Design 083:
   // every candidate first, then shuffled before the cap (a near-to-far scan left the far end bare).
   const candidates = [];
-  const step = 150 * u;
+  const step = 190 * u;
   for (let gy = scene.y + step / 2; gy < scene.y + scene.h; gy += step) {
     for (let gx = scene.x + step / 2; gx < scene.x + scene.w; gx += step) {
       const roll = (salt) => hash(gx, gy, salt);
@@ -206,24 +214,44 @@ export function crystalSpots(layout) {
       candidates.push({
         x,
         y,
-        r: (28 + 44 * roll(4) ** 1.3) * u,
+        r: (38 + 52 * roll(4) ** 1.3) * u,
         count: zone === 'near' ? 3 + Math.floor(roll(5) * 3) : 5 + Math.floor(roll(5) * 7),
         height: (low + (high - low) * roll(6)) * u,
         hue: Math.floor(roll(7) * CRYSTAL_HUES.length) % CRYSTAL_HUES.length,
         outward,
         fromCards,
+        zone,
       });
     }
   }
+  // Design 084: fewer clusters, so the cap takes them from the far end, the sides and the near end in
+  // turn (each zone's own shuffled order), not wherever the shuffle happens to put most of them.
+  // The far end, where the tall clusters stand and the frame shows them best, takes two turns a round.
+  const [far, side, near] = ['far', 'side', 'near'].map((zone) => shuffled(candidates.filter((c) => c.zone === zone), 7));
+  const turns = [];
+  for (let i = 0; 2 * i < far.length || i < side.length || i < near.length; i += 1) {
+    turns.push(...[far[2 * i], side[i], far[2 * i + 1], near[i]].filter(Boolean));
+  }
   const clusters = [];
-  for (const { fromCards, ...cluster } of shuffled(candidates, 7)) {
+  for (const { fromCards, zone, ...cluster } of turns) {
     if (clusters.length >= MAX_CLUSTERS) break;
     // Crystals that would reach a card are left out; a cluster left with fewer than two goes.
     const crystals = growCluster({ ...cluster, z: wallFloorAt(fromCards, u) }, u).filter(clear);
     if (crystals.length < 2) continue;
     clusters.push({ ...cluster, crystals });
   }
-  return { table, scene, core, u, hand, centre, emblem, clusters };
+  // Design 084: each cluster lights the floor round it in its own hue; the emblem's gold too.
+  const hex = (rgb) => `#${rgb.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`;
+  const glows = clusters.map((cluster) => ({
+    x: cluster.x,
+    y: cluster.y,
+    r: (cluster.r * 1.3 + cluster.height * 0.2) * CLUSTER_LIGHT.reach,
+    colour: hex(CRYSTAL_HUES[cluster.hue]),
+    strength: CLUSTER_LIGHT.strength,
+    breath: CLUSTER_LIGHT.breath,
+  }));
+  if (emblem?.r > 0) glows.push({ x: emblem.x, y: emblem.y, r: emblem.r + EMBLEM_LIGHT.reach * u, colour: EMBLEM_LIGHT.colour, strength: EMBLEM_LIGHT.strength });
+  return { table, scene, core, u, hand, centre, emblem, clusters, glows };
 }
 
 const CAVE = /* glsl */ `
@@ -317,6 +345,7 @@ ${FOOTPRINTS}
 ${REVEAL}
 ${STONEWORK}
 ${STRATA}
+${GLOW}
 ${PALETTE}
 ${CAVE}
 varying vec2 vPos;
@@ -338,13 +367,18 @@ void main() {
 
   // The floor (design 082): BDSP's cave cobbles, rounded sandstone each its own tone, lit on the
   // skylight's side, sand packed in the gaps; worn to smooth packed sand where the cards lie (design
-  // 080) and broad soft stains across it.
+  // 080) and broad soft stains across it. Design 084: cobbles only in the skylight's pool; away from it
+  // the floor smooth and dark.
+  vec2 fromHeart = p - uEmblem.xy;
+  vec2 shaftR = vec2(400.0, 300.0);
+  float shaft = 1.0 - smoothstep(0.55, 1.15, length(fromHeart / shaftR));
   float calm = fieldCalm(p, 110.0);
   float stain = smoothstep(0.35, 0.7, fbm3(p / 180.0 + 6.0));
   vec3 worn = mix(FLOOR_LIT, FLOOR_DARK, 0.2 + 0.45 * stain);
   vec3 stone = cobbles(p, 26.0, sunDir);
   vec3 cobble = mix(FLOOR_DARK * 1.2, FLOOR_LIT * 1.15, 0.35 + 0.5 * stone.y) * (0.88 + 0.32 * stone.z);
-  vec3 col = mix(mix(worn * 0.72, cobble, stone.x), worn, calm);
+  vec3 bare = mix(worn, FLOOR_DARK, 0.5);
+  vec3 col = mix(mix(bare, cobble, stone.x * shaft), worn, calm);
   // The walls: rough brown rock laid in strata, each course its own tone, its top faces catching the
   // skylight, sinking into the dark the further it climbs from the floor.
   vec2 course = strata(field.r, p, 18.0);
@@ -354,28 +388,22 @@ void main() {
   col *= mix(1.0, 0.3, smoothstep(40.0, uCave.y + 60.0, d));
   col *= (0.55 + 0.5 * lit) * mix(0.5, 1.0, smoothstep(0.3, 0.9, light.b));
 
-  // The shaft of skylight falls on the floor round the emblem in a soft pool; out toward the walls
-  // the cave is dim.
-  vec2 fromHeart = p - uEmblem.xy;
-  float pool = exp(-dot(fromHeart / vec2(430.0, 330.0), fromHeart / vec2(430.0, 330.0)));
-  col *= 0.62 + 0.55 * pool;
-  col += SKYLIGHT * 0.05 * pool;
+  // The shaft of skylight falls on the floor round the emblem in a soft ellipse; out toward the walls
+  // the cave sinks to near-dark (design 084).
+  col *= 0.26 + 0.98 * shaft;
+  col += SKYLIGHT * 0.07 * shaft;
 
-  // Each cluster lights the floor and the rock round it in its own colour, breathing slowly.
-  vec3 glow = vec3(0.0);
+  // The crystals' feet shut the light out of the rock they grow from.
   float seat = 0.0;
   for (int i = 0; i < ${MAX_CLUSTERS}; i++) {
     vec4 cluster = uClusters[i];
     if (cluster.z <= 0.0) continue;
     vec2 q = (p - cluster.xy) / cluster.z;
-    float breath = 0.93 + 0.07 * sin(uTime * 0.5 + cluster.x * 0.02 + cluster.y * 0.013);
-    float q2 = dot(q, q);
-    glow += uHues[int(cluster.w)] * exp(-q2 * 4.2) * breath;
-    // The crystals' feet shut the light out of the rock they grow from.
-    seat = max(seat, exp(-q2 * 16.0));
+    seat = max(seat, exp(-dot(q, q) * 16.0));
   }
   col *= 1.0 - 0.45 * seat;
-  col += glow * 0.22 * (0.6 + 0.4 * n.z);
+  // Each cluster lights the floor and the rock round it in its own colour (the shared contact glow).
+  col = glowOn(col, p);
 
   // The emblem: a thin gold line round its outline, across its middle and round its button, and a
   // pale-blue glow at its heart, as the art's.
@@ -385,10 +413,11 @@ void main() {
     float line = min(abs(r - uEmblem.z), abs(r - button));
     if (r > button && r < uEmblem.z) line = min(line, abs(fromHeart.y));
     float stroke = 1.0 - smoothstep(1.6, 3.2, line);
-    col = mix(col, GOLD * (0.9 + 0.12 * fbm3(p / 18.0)), stroke * 0.9);
-    // A soft heart, steady: a bright pool between the Actives pulls the eye off them.
+    // Design 084: a glowing gold inlay (a light, so it blooms), its pale-blue heart as the card's.
+    col = mix(col, GOLD * 1.9 * (0.92 + 0.1 * fbm3(p / 18.0)), stroke * 0.95);
+    col += GOLD * 0.18 * exp(-line / 7.0);
     float heart = exp(-pow(r / (button * 1.25), 2.0));
-    col += HEART * heart * 0.12;
+    col += HEART * heart * 0.3;
   }
 
   col = edgeHaze(col, vUv);
@@ -411,7 +440,14 @@ export function crystalProps(clusters) {
     for (const cluster of clusters) {
       const hue = CRYSTAL_HUES[cluster.hue].map((v) => toLinear(v));
       const tipHue = hue.map((v) => v + (1 - v) * 0.55);
-      const tint = (t) => [...hue.map((v, k) => v + (tipHue[k] - v) * Math.min(1, Math.max(0, t))), 0];
+      // Design 084: dark at the base; past half way up a light of its own hue, brightening to the tip
+      // (w 2 and up: emissive, so the crystal glows and blooms).
+      const tint = (t) => {
+        const s = Math.min(1, Math.max(0, t));
+        if (s < 0.45) return [...hue.map((v) => v * (0.45 + 0.9 * s)), 0];
+        const glow = (s - 0.45) / 0.55;
+        return [...hue.map((v, k) => (v + (tipHue[k] - v) * glow) * 0.9), 2.2 + 0.9 * glow];
+      };
       for (const crystal of cluster.crystals) {
         const axis = crystal.axis;
         const helper = Math.abs(axis[2]) > 0.9 ? [1, 0, 0] : [0, 0, 1];
@@ -466,6 +502,8 @@ export const SPARKLE_VERTEX = /* glsl */ `
 ${TABLE_UNIFORMS}
 uniform float uTime;
 uniform float uFocal;
+uniform vec3 uEye;
+uniform vec3 uEmblem;
 uniform vec3 uHues[${CRYSTAL_HUES.length}];
 ${NOISE}
 ${FOOTPRINTS}
@@ -478,12 +516,16 @@ void main() {
   float clock = uTime + aSeed.z * period;
   float life = fract(clock / period);
   float cycle = floor(clock / period);
-  // Dust drifts out among the crystals; design 080: none over the cards.
-  vec2 start = uMin + hash22(aSeed.xy * 53.0 + cycle) * uSize;
+  // Design 084: the dust drifts only in the skylight's shaft (born inside its ellipse), and never
+  // over a card: the ground it covers on screen (the eye's ray through it) keeps off every card.
+  vec2 spot = hash22(aSeed.xy * 53.0 + cycle) * 2.0 - 1.0;
+  vec2 start = uEmblem.xy + spot * vec2(400.0, 300.0) * 0.95;
   vec3 pos = vec3(start, 6.0 + 70.0 * aSeed.y * aSeed.y);
   pos.xy += vec2(sin(life * 3.0 + aSeed.x * 20.0), cos(life * 2.0 + aSeed.y * 20.0)) * 14.0;
   pos.z += life * 26.0;
-  float shown = revealBurned(start) * exitKeep(start) * step(fieldCalm(start, 90.0), 0.001);
+  vec2 covered = uEye.xy + (pos.xy - uEye.xy) * (uEye.z / max(uEye.z - pos.z, 1.0));
+  float inShaft = step(length(spot), 1.0);
+  float shown = revealBurned(start) * exitKeep(start) * inShaft * step(fieldCalm(covered, 34.0), 0.001);
   vec4 mv = modelViewMatrix * vec4(pos, 1.0);
   gl_Position = projectionMatrix * mv;
   float fade = smoothstep(0.0, 0.2, life) * (1.0 - smoothstep(0.75, 1.0, life));
