@@ -37,6 +37,10 @@ import {
       loadStarterDecks,
       starterDecksLoaded,
     } from '../../../setup/deck-builder/core/starter-decks.mjs';
+    import {
+      RENUMBER_SET_ID,
+      repairRenumberedDecks,
+    } from '../../../setup/deck-builder/core/deck-library-renumber.mjs';
     import { DECK_FORMAT_BUILD_BATTLE } from '../../../../../shared/engine/formats.mjs';
     
     const escapeHtml = (value = '') => String(value)
@@ -224,7 +228,26 @@ import {
           (error) => console.warn('[deck library] starter decks unavailable.', error)
         );
       }
-    
+
+      // Decks saved before cardback numbers became stable name cards by ids that now belong to other
+      // cards. Once per browser, point them at the cards of those names, then redraw over a fresh read.
+      if (typeof window.fetch === 'function') {
+        repairRenumberedDecks(window.localStorage, async () => {
+          const response = await window.fetch(`/src/assets/custom-sets/${RENUMBER_SET_ID}/set.json`, {
+            cache: 'no-store',
+          });
+          if (!response.ok) throw new Error(`set.json ${response.status}`);
+          return response.json();
+        }).then(
+          (result) => {
+            if (!result.changed) return;
+            reload();
+            render();
+          },
+          (error) => console.warn('[deck library] renumbered-card repair skipped.', error?.message ?? error)
+        );
+      }
+
       const showStatus = (message) => {
         if (!statusEl) return;
         statusEl.textContent = message;
