@@ -970,6 +970,21 @@ export function createOverlayMeshes({
     for (const key of entry.shared) dropShared(key);
   };
 
+  // Card focus (design 067): the lifted card shows bare; the popup draws its own Energy and HUD.
+  let suppressedId = null;
+  const applySuppression = (instanceId, entry) => {
+    entry.root.visible = instanceId !== suppressedId;
+  };
+
+  /** Hides the in-card overlays (coin, badges, tokens, status loop) of one card; null shows all. */
+  const suppress = (instanceId) => {
+    const next = Number.isFinite(instanceId) ? instanceId : null;
+    if (disposed || next === suppressedId) return;
+    suppressedId = next;
+    for (const [id, entry] of entries) applySuppression(id, entry);
+    onNeedsRender();
+  };
+
   const remove = (instanceId) => {
     teraSince.delete(instanceId);
     const entry = entries.get(instanceId);
@@ -1037,6 +1052,7 @@ export function createOverlayMeshes({
 
     const entry = { key, parent: cardMesh, root, cardRoot, ringRoot, meshes: [], owned: [], art: [], shared: [], loop: null, tera: null };
     entries.set(instanceId, entry);
+    applySuppression(instanceId, entry);
 
     if (front) {
       const aspect = box.h / box.w;
@@ -1103,5 +1119,5 @@ export function createOverlayMeshes({
     teraSince.clear();
   };
 
-  return { sync, remove, update, count, dispose };
+  return { sync, remove, suppress, update, count, dispose };
 }
