@@ -307,6 +307,7 @@ export function createBoardScene({
     const startedAt = globalThis.performance?.now?.() ?? Date.now();
     const now = clock.now();
     const cardsAnimating = pool.update(now);
+    overlays.suppress(pool.liftedId());
     const cardsMoving = cardDemand.drawn(pool.moving());
     const pilesMoving = piles.update(now);
     const overlaysAnimating = overlays.update(now);
