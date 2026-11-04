@@ -43,17 +43,17 @@ test('setupGame: deals 7 cards to hand and 6 cards to prizes', () => {
   const { events, mulligans } = setupGame(state);
   assert.ok(Array.isArray(events));
 
-  const starter = state.turn.player;
-  const p1Bonus = starter === 'p1' ? 1 : 0;
-  const p2Bonus = starter === 'p2' ? 1 : 0;
+  // The starter's turn-1 draw is owed, not dealt: it comes once both Actives are placed.
+  assert.equal(state.openingDrawPending, state.turn.player);
+  assert.equal(events.filter((e) => e.type === 'cardsDrawn').length, 0);
 
-  assert.equal(state.players.p1.zones.hand.length, 7 + p1Bonus);
+  assert.equal(state.players.p1.zones.hand.length, 7);
   assert.equal(state.players.p1.zones.prizes.length, 6);
-  assert.equal(state.players.p1.zones.deck.length, 30 - 7 - 6 - p1Bonus);
+  assert.equal(state.players.p1.zones.deck.length, 30 - 7 - 6);
 
-  assert.equal(state.players.p2.zones.hand.length, 7 + p2Bonus);
+  assert.equal(state.players.p2.zones.hand.length, 7);
   assert.equal(state.players.p2.zones.prizes.length, 6);
-  assert.equal(state.players.p2.zones.deck.length, 30 - 7 - 6 - p2Bonus);
+  assert.equal(state.players.p2.zones.deck.length, 30 - 7 - 6);
 
   assert.equal(mulligans.p1, 0);
   assert.equal(mulligans.p2, 0);
@@ -78,8 +78,7 @@ test('setupGame: evaluates mulligans when player has no basic Pokemon and awards
   assert.ok(mulligans.p1 > 0, 'p1 should have taken mulligans');
   assert.equal(mulligans.p2, 0, 'p2 should have 0 mulligans');
   // p2 should have received bonus draws equal to p1 mulligan count
-  const starterBonus = state.turn.player === 'p2' ? 1 : 0;
-  assert.equal(state.players.p2.zones.hand.length, 7 + mulligans.p1 + starterBonus);
+  assert.equal(state.players.p2.zones.hand.length, 7 + mulligans.p1);
 
   const mulliganEvents = events.filter((e) => e.type === 'mulliganTaken');
   assert.equal(mulliganEvents.length, mulligans.p1);
@@ -117,9 +116,8 @@ test('setupGame: lockstep mulligans award no bonus draws', () => {
 
   assert.equal(mulligans.p1, 2);
   assert.equal(mulligans.p2, 2);
-  const starterBonus = state.turn.player === 'p1' ? [1, 0] : [0, 1];
-  assert.equal(state.players.p1.zones.hand.length, 7 + starterBonus[0]);
-  assert.equal(state.players.p2.zones.hand.length, 7 + starterBonus[1]);
+  assert.equal(state.players.p1.zones.hand.length, 7);
+  assert.equal(state.players.p2.zones.hand.length, 7);
   assert.equal(events.filter((e) => e.type === 'bonusDrawAwarded').length, 0);
 });
 
@@ -243,10 +241,9 @@ test('setupGame: a Build & Battle deck of 40 deals 7 to hand and 4 Prizes, leavi
   const { events } = setupGame(state, { firstPlayerId: 'p1' });
 
   for (const pid of ['p1', 'p2']) {
-    const bonus = pid === 'p1' ? 1 : 0; // the starter's first-turn draw
     assert.equal(state.players[pid].zones.prizes.length, 4, pid);
-    assert.equal(state.players[pid].zones.hand.length, 7 + bonus, pid);
-    assert.equal(state.players[pid].zones.deck.length, 29 - bonus, pid);
+    assert.equal(state.players[pid].zones.hand.length, 7, pid);
+    assert.equal(state.players[pid].zones.deck.length, 29, pid);
   }
   const prizeEvents = events.filter((e) => e.type === 'prizesSet');
   assert.deepEqual(prizeEvents.map((e) => e.count), [4, 4]);
