@@ -186,3 +186,21 @@ test('deck limit: each Zygarde form keeps its own 4 copies', () => {
   assert.equal(formDeckName('Zygarde-EX', { name: 'Zygarde-EX', stage: 'Basic' }), 'Zygarde-EX');
   assert.equal(formDeckName('Mega Zygarde ex', zMega), 'Mega Zygarde ex');
 });
+
+test('deck builder: each Zygarde form shows its own sprite and label', async () => {
+  const { cardSpriteFor } = await import('../../../client/src/setup/deck-builder/core/card-sprites.mjs');
+  const { shownPokemonForm } = await import('../rules/pokemon-forms.mjs');
+  const pokemon = (data) => ({ supertype: 'Pokémon', ...data });
+  // Live customhb records: no `form` stored on old decks, so the entry and the stage tell.
+  assert.equal(cardSpriteFor(pokemon({ name: 'Zygarde', stage: 'Basic', description: TEN_SWSH })).slug, 'zygarde-10');
+  assert.equal(cardSpriteFor(pokemon({ name: 'Zygarde', stage: 'Stage1', description: FIFTY })).slug, 'zygarde');
+  assert.equal(cardSpriteFor(pokemon({ name: 'Zygarde', stage: 'Stage2', description: COMPLETE })).slug, 'zygarde-complete');
+  assert.equal(cardSpriteFor(pokemon({ name: 'Zygarde', stage: 'Stage2' })).slug, 'zygarde-complete');
+  assert.equal(cardSpriteFor(pokemon(zComplete)).slug, 'zygarde-complete');
+  assert.equal(cardSpriteFor(pokemon(zMega)).slug, 'zygarde-mega');
+  assert.equal(shownPokemonForm(z10).label, '10% Forme');
+  assert.equal(shownPokemonForm({ name: 'Zygarde', stage: 'Basic', description: COMPLETE }).label, 'Complete Forme');
+  assert.equal(shownPokemonForm(zMega), null);
+  assert.equal(shownPokemonForm({ name: 'Zygarde-EX', stage: 'Basic' }), null);
+  assert.equal(shownPokemonForm({ name: 'Pikachu', stage: 'Basic' }), null);
+});

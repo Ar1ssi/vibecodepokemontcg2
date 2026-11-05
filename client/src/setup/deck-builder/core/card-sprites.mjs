@@ -16,6 +16,7 @@ import {
   pokemonSpriteUrl,
 } from './deck-sprites.mjs';
 import { ITEM_SPRITE_CATALOG } from './item-sprite-catalog.generated.mjs';
+import { shownPokemonForm } from '../../../../../shared/engine/rules/pokemon-forms.mjs';
 
 export const ITEM_SPRITE_BASE_PATH = '/src/assets/items';
 
@@ -262,7 +263,10 @@ function isNonItemTrainer(card) {
 export function cardSpriteFor(card) {
   const supertype = String(card?.supertype ?? '').toLowerCase();
   if (supertype.startsWith('pok')) {
-    const pokemon = pokemonSpriteForName(card?.name, { types: card?.types });
+    // Zygarde's forms print one name; the card's form (pokemon-forms.mjs) picks the sprite. 50% Forme is the base.
+    const form = shownPokemonForm(card);
+    const formEntry = form && (POKEMON_BY_SLUG.get(form.key) || POKEMON_BY_SLUG.get(form.key.replace(/-50$/, '')));
+    const pokemon = formEntry ? entryResult(formEntry) : pokemonSpriteForName(card?.name, { types: card?.types });
     if (!pokemon) return null;
     return {
       kind: 'pokemon',

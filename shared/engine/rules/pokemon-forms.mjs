@@ -131,3 +131,17 @@ export function formDeckName(officialName, card) {
   const index = formIndex(line, card);
   return index == null ? officialName : `${officialName} (${line.forms[index].label})`;
 }
+
+/**
+ * The form a plain-named card of FORM_LINES shows, for the deck builder's labels and sprites:
+ * `{key, label}` ("zygarde-10", "10% Forme"), else null. "Mega Zygarde ex" and "Zygarde-EX" print their own
+ * names, so they get none.
+ * @param {object} card the card record (name, form, description, stage)
+ */
+export function shownPokemonForm(card) {
+  const line = lineOf(card?.name);
+  const plain = String(card?.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (!line || plain !== formSpecies(card?.name)) return null;
+  const index = formIndex(line, card);
+  return index == null ? null : { key: line.forms[index].key, label: line.forms[index].label };
+}
