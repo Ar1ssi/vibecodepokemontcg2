@@ -4,6 +4,7 @@
     
     import { printedRarity } from './card-classify.mjs';
     import { withParadoxSubtype } from './paradox-tags.mjs';
+    import { pokemonFormKey } from './pokemon-forms.mjs';
     import { legacyTrainerType } from './legacy-trainer-type.mjs';
     import { createCachedFetchJson } from '../../tcgdex/tcgdex-cache.mjs';
     import { isReverseHoloId, tcgdexApiUrl, tcgdexLookupId } from '../../tcgdex/tcgdex-url.mjs';
@@ -499,6 +500,7 @@
         const fetched = await fetchCardDetail(card.id);
         if (!fetched) throw new Error(`no detail for ${card.id}`);
         const detail = withPrintedStageFix(fetched);
+        const form = pokemonFormKey(detail);
         const data = {
           hp: detail.hp ? Number(detail.hp) : null,
           types: detail.types || [],
@@ -508,6 +510,8 @@
           attacks: mapDetailAttacks(detail.attacks),
           stage: (await inferMissingStage(detail)) || null,
           evolvesFrom: detail.evolvesFrom || detail.evolveFrom || null,
+          // Zygarde's forms play as different Pokémon (pokemon-forms.mjs); read off the Pokédex entry.
+          ...(form ? { form } : {}),
           ability: tcgAbilityFromDetail(detail),
           subtypes: detail.subtypes || subtypesFromSuffix(detail.suffix),
           trainerType: detail.trainerType || legacyTrainerType(detail) || null,

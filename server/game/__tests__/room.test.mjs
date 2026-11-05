@@ -376,7 +376,7 @@ test('resetGame: explicit leave frees the leaver seat and restarts the game for 
     type: 'cardStats',
     payload: {
       stats: [
-        { syncInstance: 0, hp: 60 },
+        { syncInstance: 0, hp: 60, form: 'zygarde-10' },
         { syncInstance: 2, text: 'This card provides {C} Energy.', subtypes: ['Special'] },
       ],
     },
@@ -406,6 +406,7 @@ test('resetGame: explicit leave frees the leaver seat and restarts the game for 
   assert.equal(room.state.players.p2.zones.deck.length, 3, 'stayer deck reloaded in full');
   const pikachu = room.state.players.p2.zones.deck.find((c) => c.syncInstance === 0);
   assert.equal(pikachu.hp, 60, 'printed stats carried across the reset');
+  assert.equal(pikachu.form, 'zygarde-10', 'the Zygarde form (pokemon-forms.mjs) carried across the reset');
   const energy = room.state.players.p2.zones.deck.find((c) => c.syncInstance === 2);
   assert.equal(energy.text, 'This card provides {C} Energy.', 'effect text carried across the reset');
   assert.deepEqual(energy.subtypes, ['Special']);

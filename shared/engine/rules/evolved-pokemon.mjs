@@ -5,6 +5,7 @@
 
 import { isPokemon } from '../cards.mjs';
 import { normalizeStage } from './evolution.mjs';
+import { formsAllowEvolution } from './pokemon-forms.mjs';
 
 const STAGE_RANK = { Basic: 0, 'Stage 1': 1, 'Stage 2': 2, MEGAHB: 3, TERAHB: 3, BREAK: 3 };
 
@@ -129,6 +130,7 @@ function isToolKind(card) {
  * @param {object[]} knownCards Cards whose evolvesFrom can name the Stage 1's Basic
  */
 export function stage2EvolvesFromBasic(stage2, basic, knownCards = []) {
+  if (!formsAllowEvolution(stage2, basic, { rareCandy: true })) return false;
   const stage1Name = stage2?.evolvesFrom;
   if (!stage1Name) return true;
   const stage1s = knownCards.filter((c) => c?.name === stage1Name && c.evolvesFrom);

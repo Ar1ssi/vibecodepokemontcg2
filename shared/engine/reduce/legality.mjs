@@ -45,6 +45,7 @@ import { serverEnergyDescriptor } from '../rules/server-energy.mjs';
 import { trainerTargetCounts, ownedCards, topPokemonCard } from '../rules/evolved-pokemon.mjs';
 import { evolvesSameTurn, isNextStage, normalizeStage, pokemonNamesMatch } from '../rules/evolution.mjs';
 import { isBabyEvolution } from '../rules/baby-rule.mjs';
+import { formMismatchReason, formsAllowEvolution } from '../rules/pokemon-forms.mjs';
 import { listConditions } from '../rules/special-conditions.mjs';
 import {
   activeAttackMarkers, inPlayView, energyProvisionContext, cardText, cardEffectiveHp, markerCount,
@@ -1109,6 +1110,9 @@ export function validateLegality(state, command) {
             allowed: false,
             reason: `${cardRef.card.name} evolves from ${cardRef.card.evolvesFrom}, not ${topTarget.name}.`,
           };
+        }
+        if (!formsAllowEvolution(cardRef.card, topTarget)) {
+          return { allowed: false, reason: formMismatchReason(cardRef.card, topTarget) };
         }
       }
       // Anything that is not Energy, a Pokémon Tool, or a Pokémon (evolution)

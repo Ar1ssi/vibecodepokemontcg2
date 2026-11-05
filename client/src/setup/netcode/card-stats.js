@@ -85,6 +85,11 @@ function extractStats(card) {
     stats.evolvesFrom = String(card.evolvesFrom);
     hasAny = true;
   }
+  // Zygarde's form (pokemon-forms.mjs): the server tells the forms apart for evolution with it.
+  if (typeof card.form === 'string' && card.form) {
+    stats.form = card.form;
+    hasAny = true;
+  }
   if (Array.isArray(card.abilities) && card.abilities.length > 0) {
     stats.abilities = card.abilities
       .filter((a) => a && (typeof a === 'string' || typeof a.text === 'string'))

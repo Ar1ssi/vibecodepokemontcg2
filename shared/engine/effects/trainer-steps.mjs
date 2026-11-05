@@ -8,6 +8,7 @@
 
 import { findCard, discardCardToPlayerZone } from '../state.mjs';
 import { shuffleInPlace } from '../rng.mjs';
+import { formsAllowEvolution } from '../rules/pokemon-forms.mjs';
 import { isAttachedAsTool, isEnergy, isPokemon, isTrainer } from '../cards.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
 import { isUltraBeastCard, isRuleBoxPokemon, isVCard } from '../rules/card-classify.mjs';
@@ -2093,7 +2094,10 @@ function hasAbility(card) {
 function evolvesFromTop(player, card) {
   const from = String(card.evolvesFrom || '').toLowerCase();
   if (!from) return [];
-  return rootsOf(player).filter((root) => String(topPokemonCard(player, root).name || '').toLowerCase() === from);
+  return rootsOf(player).filter((root) => {
+    const top = topPokemonCard(player, root);
+    return String(top.name || '').toLowerCase() === from && formsAllowEvolution(card, top);
+  });
 }
 
 // Salvatore: search the deck for an Evolution card and put it onto the Pokémon it evolves from.
@@ -2144,7 +2148,11 @@ function searchEvolve(ctx) {
     }
     const evolvedName = String(evolvedCard.name || '').toLowerCase();
     const candidates = deck.filter(
-      (c) => isPokemon(c) && evolvedName && String(c.evolvesFrom || '').toLowerCase() === evolvedName
+      (c) =>
+        isPokemon(c) &&
+        evolvedName &&
+        String(c.evolvesFrom || '').toLowerCase() === evolvedName &&
+        formsAllowEvolution(c, evolvedCard)
     );
     if (candidates.length === 0) {
       shuffleDeck(player, ctx);

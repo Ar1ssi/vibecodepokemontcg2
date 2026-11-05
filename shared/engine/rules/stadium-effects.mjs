@@ -10,6 +10,7 @@ import { attachedTools, applyHpBonus } from './ability-executors.mjs';
 import { toolHpBonusFor } from './tool-conditions.mjs';
 import { abilityHpBonus } from './ability-combat.mjs';
 import { pokemonNamesMatch, normalizeStage } from './evolution.mjs';
+import { formsAllowEvolution } from './pokemon-forms.mjs';
 import { priorEvolutionCards, topPokemonCard } from './evolved-pokemon.mjs';
 import { isPokemon } from '../cards.mjs';
 import { getAttachedSpecialEnergies, parseSpecialEnergyEffects } from './special-energy-parse.mjs';
@@ -1262,7 +1263,7 @@ export function matchesStadiumEvolveSearch(deckCard, inPlayPokemon = []) {
   if (!deckCard || !inPlayPokemon.length) return false;
   const from = lower(deckCard.evolvesFrom);
   if (!from) return false;
-  return inPlayPokemon.some((host) => pokemonNamesMatch(host?.name, from));
+  return inPlayPokemon.some((host) => pokemonNamesMatch(host?.name, from) && formsAllowEvolution(deckCard, host));
 }
 
 /** Deck/hand search filter for stadium once-per-turn effects. */
