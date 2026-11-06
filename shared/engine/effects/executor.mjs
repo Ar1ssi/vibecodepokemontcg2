@@ -291,6 +291,12 @@ function inPlayRoots(player) {
   return [...(player.zones.active || []), ...(player.zones.bench || [])].filter((c) => !c.attachedTo);
 }
 
+// An evolved Pokémon is its Basic (the root) with the Evolution attached on top. What it is —
+// its types and name — is the top card's; only damage and conditions live on the root.
+function inPlayTop(player, root) {
+  return topPokemonCard([...(player.zones.active || []), ...(player.zones.bench || [])], root) || root;
+}
+
 // A drawUntil target descriptor (design 035 slice 8), a numeric back-compat read,
 // or the 5-card default.
 function drawUntilTargetFor(target, opponent) {
@@ -1118,11 +1124,12 @@ export function executeSteps(draft, {
         // in play"), not a printed number.
         if (step.targetType) {
           const want = String(step.targetType).toLowerCase();
-          target = inPlayRoots(player).filter((c) =>
-            (Array.isArray(c.types) ? c.types : [])
+          target = inPlayRoots(player).filter((root) => {
+            const { types } = inPlayTop(player, root);
+            return (Array.isArray(types) ? types : [])
               .map((v) => String(v).toLowerCase())
-              .includes(want)
-          ).length;
+              .includes(want);
+          }).length;
         } else if (step.bonusTarget && drawUntilBonusApplies(step.bonusWhen, draft, player)) {
           target = drawUntilTargetFor(step.bonusTarget, opponent);
         }
@@ -1974,7 +1981,7 @@ export function executeSteps(draft, {
           ? String(step.nameFilter).toLowerCase()
           : null;
         const target = inPlayRoots(player).find(
-          (c) => !filter || String(c.name || '').toLowerCase().includes(filter)
+          (c) => !filter || String(inPlayTop(player, c).name || '').toLowerCase().includes(filter)
         );
         if (!target) {
           events.push({ type: 'effectStepSkipped', reason: 'no_matching_pokemon' });
@@ -2273,7 +2280,7 @@ export function executeSteps(draft, {
         for (const side of sides) {
           const targetActive = side?.zones?.active?.find((c) => !c.attachedTo);
           if (!targetActive) continue;
-          if (statusTarget === 'bothActiveNonDark' && isDark(targetActive)) continue;
+          if (statusTarget === 'bothActiveNonDark' && isDark(inPlayTop(side, targetActive))) continue;
           if (shieldedTarget(side, targetActive)) {
             events.push({ type: 'effectStepSkipped', reason: 'effect_shield', step: step.type, instanceId: targetActive.instanceId });
             continue;

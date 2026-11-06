@@ -190,6 +190,56 @@ test('stadium: Mystery Garden discards an Energy then draws until hand size equa
   assert.equal(p1.flags.stadiumUsedThisTurn, true);
 });
 
+// An evolved Pokémon counts as its top card's type: Eevee {C} under Espeon {P} is a {P} Pokémon.
+// (`basicMon` is declared with the Artazon tests below; the tests only call it after load.)
+const evolutionOver = (instanceId, name, types, attachedTo) =>
+  createCard({ instanceId, name, hp: 100, stage: 'Stage 1', supertype: 'Pokémon', type: 'Pokémon', types, attachedTo });
+
+// Pays the Energy cost (hand 2 → 1), then returns the hand size once the draw resolves.
+function mysteryGardenHandSize(placePokemon) {
+  const { state, rng } = setupGame();
+  state.stadium = createCard({
+    instanceId: 57,
+    name: 'Mystery Garden',
+    supertype: 'Trainer',
+    subtypes: ['Stadium'],
+    text: MYSTERY_GARDEN_TEXT,
+  });
+  placePokemon(state.players.p1.zones);
+  state.players.p1.zones.hand.push(
+    energyCard(90, 'Psychic Energy', ['Psychic']),
+    trainerStub(91, 'Card X')
+  );
+  state.players.p1.zones.deck.push(
+    trainerStub(100, 'D1'),
+    trainerStub(101, 'D2'),
+    trainerStub(102, 'D3'),
+    trainerStub(103, 'D4')
+  );
+
+  const res1 = activate(state, rng);
+  assert.equal(res1.error, null);
+  const res2 = resolveChoice(res1, [90], rng);
+  assert.equal(res2.error, null);
+  return res2.state.players.p1.zones.hand.length;
+}
+
+test('stadium: Mystery Garden counts a {P} Evolution over a non-{P} Basic as a {P} Pokémon', () => {
+  const handSize = mysteryGardenHandSize((zones) => {
+    zones.active.push(basicMon(80, 'Eevee', ['Colorless']), evolutionOver(81, 'Espeon', ['Psychic'], 80));
+    zones.bench.push(basicMon(82, 'Ralts', ['Psychic']));
+  });
+  assert.equal(handSize, 2, 'two {P} Pokémon in play → hand of 2');
+});
+
+test('stadium: Mystery Garden does not count a {P} Basic under a non-{P} Evolution', () => {
+  const handSize = mysteryGardenHandSize((zones) => {
+    zones.active.push(basicMon(80, 'Abra', ['Psychic']), evolutionOver(81, 'Charmeleon', ['Fire'], 80));
+    zones.bench.push(basicMon(82, 'Ralts', ['Psychic']), basicMon(83, 'Gastly', ['Psychic']));
+  });
+  assert.equal(handSize, 2, 'two {P} Pokémon in play → hand of 2');
+});
+
 const LEVINCIA_TEXT =
   "Once during each player's turn, that player may put up to 2 Basic {L} Energy cards from their discard pile into their hand.";
 

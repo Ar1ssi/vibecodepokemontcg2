@@ -618,6 +618,92 @@ test('trainer effect: Dark Bell skips a {D} Active', () => {
   assert.ok(!hasCondition(res.state.players.p2.zones.active[0], 'Confused'), '{D} Active skipped');
 });
 
+// An evolved Pokémon is its Basic (the root) with the Evolution attached on top; type and name
+// checks read the top card, so a {D} Greninja ex over a {W} Froakie is a {D} Pokémon.
+function playDarkBellOverEvolution({ basicTypes, evolutionTypes }) {
+  const { state, rng } = setupGame();
+  const basic = state.players.p2.zones.active[0];
+  basic.name = 'Froakie';
+  basic.types = basicTypes;
+  state.players.p2.zones.active.push(createCard({
+    instanceId: 3,
+    name: 'Greninja ex',
+    hp: 250,
+    stage: 'Stage 1',
+    evolvesFrom: 'Froakie',
+    supertype: 'Pokémon',
+    type: 'Pokémon',
+    types: evolutionTypes,
+    attachedTo: basic.instanceId,
+  }));
+  state.players.p1.zones.hand.push(createCard({
+    instanceId: 82,
+    name: 'Dark Bell',
+    supertype: 'Trainer',
+    trainerType: 'Item',
+    text: 'Both Active non-{D} Pokémon are now Confused.',
+  }));
+
+  const res = applyCommand(state, {
+    type: 'playTrainer',
+    payload: { instanceId: 82 },
+    playerId: 'p1',
+  }, rng);
+
+  assert.equal(res.error, null);
+  return res.state.players.p2.zones.active.find((c) => c.instanceId === basic.instanceId);
+}
+
+test('trainer effect: Dark Bell skips an Active whose top Evolution is {D} over a non-{D} Basic', () => {
+  const stack = playDarkBellOverEvolution({ basicTypes: ['Water'], evolutionTypes: ['Darkness'] });
+  assert.ok(!hasCondition(stack, 'Confused'), 'the {D} Evolution is the Active Pokémon');
+});
+
+test('trainer effect: Dark Bell confuses an Active whose top Evolution is non-{D} over a {D} Basic', () => {
+  const stack = playDarkBellOverEvolution({ basicTypes: ['Darkness'], evolutionTypes: ['Water'] });
+  assert.ok(hasCondition(stack, 'Confused'), 'the non-{D} Evolution is the Active Pokémon');
+});
+
+// Fuchsia City Gym: "1 of your Pokémon in play with Koga in its name" — the name a Pokémon has
+// in play is its top Evolution's.
+function shuffleKogaPokemon({ basicName, evolutionName }) {
+  const { state, rng } = setupGame();
+  const basic = state.players.p1.zones.active[0];
+  basic.name = basicName;
+  state.players.p1.zones.active.push(createCard({
+    instanceId: 4,
+    name: evolutionName,
+    hp: 100,
+    stage: 'Stage 1',
+    evolvesFrom: basicName,
+    supertype: 'Pokémon',
+    type: 'Pokémon',
+    attachedTo: basic.instanceId,
+  }));
+  const events = [];
+  executeSteps(state, {
+    steps: [{ type: 'shuffleOwnPokemon', nameFilter: 'koga' }],
+    effectType: 'stadium',
+    sourceCard: createCard({ instanceId: 99, name: 'Fuchsia City Gym', supertype: 'Trainer' }),
+    playerId: 'p1',
+    activeRng: rng,
+    events,
+  });
+  return { zones: state.players.p1.zones, events };
+}
+
+test('Fuchsia City Gym: shuffles a Koga Evolution in play together with its Basic', () => {
+  const { zones } = shuffleKogaPokemon({ basicName: 'Weedle', evolutionName: "Koga's Beedrill" });
+  assert.equal(zones.active.length, 0);
+  assert.equal(zones.deck.length, 2, 'Basic and Evolution both went back to the deck');
+});
+
+test('Fuchsia City Gym: skips a Koga Basic whose top Evolution has no Koga in its name', () => {
+  const { zones, events } = shuffleKogaPokemon({ basicName: "Koga's Koffing", evolutionName: 'Weezing' });
+  assert.equal(zones.active.length, 2);
+  assert.ok(events.some((e) => e.type === 'effectStepSkipped' && e.reason === 'no_matching_pokemon'));
+});
+
 // ── coin-conditional turn ends (I155) ───────────────────────────────────
 
 const TICKLING_MACHINE =
