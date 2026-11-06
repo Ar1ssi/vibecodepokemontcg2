@@ -1,3 +1,4 @@
+import { shownPokemonForm } from '../../../../../shared/engine/rules/pokemon-forms.mjs';
 import {
   createTapGesture,
   isPhoneLayout,
@@ -159,7 +160,9 @@ import {
           .map((card) => {
             const thumb = card.images?.small || card.image || '';
             const preview = card.images?.large || card.image || '';
-            const safeName = escapeHtml(card.name);
+            // Zygarde's forms share a printed name; the tile names the form (pokemon-forms.mjs).
+            const form = shownPokemonForm(card);
+            const safeName = escapeHtml(`${card.name}${form ? ` (${form.label})` : ''}`);
             const safeThumb = escapeHtml(thumb);
             const safePreview = escapeHtml(preview);
             const displayTitle = card.rarity === 'Reverse Holo'

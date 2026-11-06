@@ -896,6 +896,7 @@ export function cardStatsCommand({ draft, playerId, payload, events }) {
     if (entry.stage != null) card.stage = entry.stage;
     if (typeof entry.evolvesFrom === 'string')
       card.evolvesFrom = entry.evolvesFrom;
+    if (typeof entry.form === 'string') card.form = entry.form;
     if (Array.isArray(entry.abilities)) {
       // The printed kind tells a Pokémon Power from a Poké-Body (Toxic Gas, Goop Gas).
       const printedKind = (t) =>

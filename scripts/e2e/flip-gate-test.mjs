@@ -153,8 +153,8 @@ try {
     a.page.evaluate(() => window.__ptcg.zone('self', 'hand').count),
     b.page.evaluate(() => window.__ptcg.zone('self', 'hand').count),
   ]);
-  const countsLegal = (aCount === 8 && bCount === 7) || (aCount === 7 && bCount === 8);
-  T('2. both hands dealt (starter has 8 with turn-1 draw, defender has 7)', countsLegal, `A=${aCount}, B=${bCount}`);
+  // The starter's turn-1 draw waits until both Starting Actives are placed.
+  T('2. both hands dealt (7 each; the turn-1 draw waits for setup)', aCount === 7 && bCount === 7, `A=${aCount}, B=${bCount}`);
 
   // Until the first server view lands, rulesState.turnPlayer is still the local coin
   // flip's guess, which the server never agreed to (I27) — both clients can believe it is
@@ -170,8 +170,16 @@ try {
   const defender = attacker === a ? b : a;
   console.log('attacker page:', attacker.name);
 
-  // moveCard is turn-gated server-side ("It's not your turn."), so the two sides cannot
-  // place their actives simultaneously — each does it on its own first turn and passes.
+  // Setup: both place a Starting Active (the one move legal off-turn); the second placement
+  // ends setup and the starter draws for turn 1.
+  for (const side of [a, b]) {
+    await side.page.evaluate(() => window.__ptcg.playFromHand(0, 'active'));
+    await waitFor(side.page, () => window.__ptcg.zone('self', 'active').count === 1);
+  }
+  const starterPage = attacker;
+  const starterDrew = await waitFor(starterPage.page, () => window.__ptcg.zone('self', 'hand').count === 7);
+  T('2b. the starter draws for turn 1 once both Actives are down (6 + 1)', Boolean(starterDrew));
+
   // Once both have an active, the attacker attacks every turn and the defender passes.
   let attacks = 0;
   let turns = 0;

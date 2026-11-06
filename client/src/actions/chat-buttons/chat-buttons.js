@@ -45,6 +45,7 @@ import {
 } from '/shared/engine/rules/tool-combat.mjs';
 import { parseAbility } from '/shared/engine/rules/abilities.mjs';
 import { canEvolve, markEvolvedThisTurn, normalizeStage, pokemonNamesMatch } from '/shared/engine/rules/evolution.mjs';
+import { formsAllowEvolution } from '/shared/engine/rules/pokemon-forms.mjs';
 import { parseAttackDamage, healTarget, planHeal, drawCount, drawUntilTarget, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, moveEnergyClause, revealHandClause, conditionalKoClause, exactCounterKoThreshold, redirectDamageCount, handScalingDamage, returnEnergyClause, returnEnergyCount, immunityClause, mirrorHealClause, copyAttackScope, retaliateCount, returnSelfClause, deferredDamageCount, lookOpponentDeckCount, lookOwnDeckCount, eachPlayerDrawCount, opponentCounterClause, attackTargetClause, devolveActiveClause, bothActiveKoClause, specialEnergyKoClause, nextTurnBonusClause, devolveOpponentClause, recoverAllStatusClause, hpCapRemaining, returnOpponentEnergyClause, returnOpponentEnergyCount, benchExactKoThreshold } from '/shared/engine/rules/damage-parser.mjs';
 import { draw } from '../zones/deck-actions.js';
 import { takePrizes } from '../zones/prizes-actions.js';
@@ -4497,7 +4498,7 @@ async function runStadiumSearchEvolve(user, card, emit, action = {}) {
   }
 
   const evolvePicked = async (picked) => {
-    const host = inPlay.find((p) => pokemonNamesMatch(p.name, picked.evolvesFrom));
+    const host = inPlay.find((p) => pokemonNamesMatch(p.name, picked.evolvesFrom) && formsAllowEvolution(picked, p));
     if (!host) {
       appendMessage(user, `⛔ No in-play Pokémon for ${picked.name} to evolve onto.`, 'announcement', false);
       finish();
@@ -4519,7 +4520,7 @@ async function runStadiumSearchEvolve(user, card, emit, action = {}) {
     );
     if (action.chainStage2) {
       const nextHost = zone.array.find((c) => c === picked) || zone.array[hostIdx];
-      const stage2 = deck.array.filter((c) => pokemonNamesMatch(c.evolvesFrom, picked.name));
+      const stage2 = deck.array.filter((c) => pokemonNamesMatch(c.evolvesFrom, picked.name) && formsAllowEvolution(c, picked));
       if (stage2.length) {
         openAbilityChoicePicker({
           user,
@@ -4603,7 +4604,7 @@ async function executeGrandTreeSpecialRule(user, card, emit) {
   const isEvolvesFromHost = (c, hostList) => {
     const from = getEvolvesFrom(c);
     if (!from) return false;
-    return hostList.some((h) => pokemonNamesMatch(h?.name, from));
+    return hostList.some((h) => pokemonNamesMatch(h?.name, from) && formsAllowEvolution(c, h));
   };
 
   const basicHosts = inPlay.filter((p) => {
@@ -4656,9 +4657,12 @@ async function executeGrandTreeSpecialRule(user, card, emit) {
         return;
       }
       const fromName = getEvolvesFrom(picked);
-      const host = eligibleHosts.find((p) => pokemonNamesMatch(p?.name, fromName)) ||
-                   inPlay.find((p) => pokemonNamesMatch(p?.name, fromName)) ||
-                   eligibleHosts[0] || inPlay[0];
+      const fits = (p) => pokemonNamesMatch(p?.name, fromName) && formsAllowEvolution(picked, p);
+      // The loose fallback never crosses forms: a Zygarde only lands on the form below it.
+      const formFits = (p) => formsAllowEvolution(picked, p);
+      const host = eligibleHosts.find(fits) ||
+                   inPlay.find(fits) ||
+                   eligibleHosts.find(formFits) || inPlay.find(formFits);
 
       if (!host) {
         appendMessage(user, `⛔ No matching in-play Pokémon for ${picked.name} to evolve onto.`, 'announcement', false);
@@ -4694,7 +4698,7 @@ async function executeGrandTreeSpecialRule(user, card, emit) {
         const isPoke = c.type === 'Pokémon' || c.type === 'Pokemon' || String(c.type || '').toLowerCase().includes('pok');
         if (!isPoke) return false;
         if (!getEvolvesFrom(c)) return false;
-        return pokemonNamesMatch(getEvolvesFrom(c), picked.name);
+        return pokemonNamesMatch(getEvolvesFrom(c), picked.name) && formsAllowEvolution(c, picked);
       });
 
       if (stage2Candidates.length > 0) {

@@ -17,6 +17,7 @@ import {
   isRadiantCard,
 } from '../../../../../shared/engine/rules/card-classify.mjs';
 import { specialEnergyDeckLimit } from '../../../../../shared/engine/rules/special-energy-parse.mjs';
+import { formDeckName } from '../../../../../shared/engine/rules/pokemon-forms.mjs';
 import { DECK_FORMAT_BUILD_BATTLE, DECK_FORMAT_TCG } from '../../../../../shared/engine/formats.mjs';
 
 export const DECK_FORMATS = {
@@ -131,14 +132,18 @@ export function validateDeck(decklist = {}, selectedFormat = DECK_FORMATS.POCKET
 
     const representativeCard = group.cards[0]?.data || {};
     const officialName = officialCardName(representativeCard) || displayName;
-    const key = officialName.toLowerCase();
-    const entry = byOfficialName.get(key) || {
-      name: officialName,
-      count: 0,
-      card: representativeCard,
-    };
-    entry.count += Number(group.totalCount || 0);
-    byOfficialName.set(key, entry);
+    // Zygarde's forms are different Pokémon here (pokemon-forms.mjs): each form keeps its own copy allowance.
+    const formNames = group.cards.map((variant) => formDeckName(officialName, variant?.data || {}));
+    const shares = formNames.every((name) => name === officialName);
+    const counts = shares
+      ? [[officialName, representativeCard, Number(group.totalCount || 0)]]
+      : group.cards.map((variant, i) => [formNames[i], variant?.data || {}, Number(variant?.count || 0)]);
+    for (const [name, card, count] of counts) {
+      const key = name.toLowerCase();
+      const entry = byOfficialName.get(key) || { name, count: 0, card };
+      entry.count += count;
+      byOfficialName.set(key, entry);
+    }
   }
 
   // At least one Basic Pokémon is required (p.22).

@@ -17,6 +17,7 @@ import {
   isHomebrewMegaCard,
 } from './card-classify.mjs';
 import { isBabyEvolution } from './baby-rule.mjs';
+import { formMismatchReason, formsAllowEvolution } from './pokemon-forms.mjs';
 import { isCustomCardId } from '../../custom-sets/custom-set-schema.mjs';
 
 export const STAGE1_EVOLVES_FROM = new Map([
@@ -276,6 +277,9 @@ export async function canEvolve(
         reason: `${evolutionCardInHand.name} evolves from ${evolutionCardInHand.evolvesFrom}${parentLine}, not ${baseCardInPlay.name}.`,
       };
     }
+    if (!formsAllowEvolution(evolutionCardInHand, baseCardInPlay, { rareCandy: true })) {
+      return { allowed: false, reason: formMismatchReason(evolutionCardInHand, baseCardInPlay) };
+    }
   } else if (!babyEvolution) {
     // Normal evolution without Rare Candy
     if (evolvesFrom && baseName && !pokemonNamesMatch(evolvesFrom, baseName)) {
@@ -283,6 +287,9 @@ export async function canEvolve(
         allowed: false,
         reason: `${evolutionCardInHand.name} evolves from ${evolutionCardInHand.evolvesFrom}, not ${baseCardInPlay.name}.`,
       };
+    }
+    if (!formsAllowEvolution(evolutionCardInHand, baseCardInPlay)) {
+      return { allowed: false, reason: formMismatchReason(evolutionCardInHand, baseCardInPlay) };
     }
 
     if (!isNextStage(baseStage, evoStage) && !rareCandyJump) {

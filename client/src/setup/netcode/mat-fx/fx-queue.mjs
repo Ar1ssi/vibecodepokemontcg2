@@ -32,6 +32,10 @@ export const createFxQueue = ({
   let committedMs = 0;
   let headLed = false;
   let idleWaiters = [];
+  // Plans started so far: lets a caller waiting on idle tell a long chain from a stuck one.
+  let started = 0;
+  // `timer` while a gate plan waits on its promise: not a schedule id, so never cancelled.
+  const GATE = Symbol('gate');
   // Bumped by clear(); `step` checks it after `run` so an effect that clears
   // the queue synchronously (one that dispatches `game-restarted`, say) cannot
   // have a fresh timer armed on top of the stop it just requested.
@@ -78,6 +82,19 @@ export const createFxQueue = ({
     headLed = false;
     const plan = queue.shift();
     const startedIn = epoch;
+    started += 1;
+    // A gate (`until`: a promise) holds the chain until something outside the queue ends — the
+    // opening coin ceremony, whose length depends on its renderer loading. Never run.
+    if (typeof plan.until?.then === 'function') {
+      timer = GATE;
+      const release = () => {
+        if (epoch !== startedIn || timer !== GATE) return;
+        timer = null;
+        step();
+      };
+      plan.until.then(release, release);
+      return;
+    }
     let hold = 0;
     try {
       hold = holdOf(run(plan));
@@ -113,7 +130,7 @@ export const createFxQueue = ({
     clear() {
       epoch += 1;
       if (timer !== null) {
-        cancel(timer);
+        if (timer !== GATE) cancel(timer);
         timer = null;
       }
       queue.length = 0;
@@ -130,5 +147,8 @@ export const createFxQueue = ({
       }),
 
     pending: () => queue.length,
+
+    /** How many plans have started: a waiter's backstop re-arms while this keeps moving. */
+    startedCount: () => started,
   };
 };

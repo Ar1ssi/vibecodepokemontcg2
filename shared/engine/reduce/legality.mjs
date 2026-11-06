@@ -45,6 +45,7 @@ import { serverEnergyDescriptor } from '../rules/server-energy.mjs';
 import { trainerTargetCounts, ownedCards, topPokemonCard } from '../rules/evolved-pokemon.mjs';
 import { evolvesSameTurn, isNextStage, normalizeStage, pokemonNamesMatch } from '../rules/evolution.mjs';
 import { isBabyEvolution } from '../rules/baby-rule.mjs';
+import { formMismatchReason, formsAllowEvolution } from '../rules/pokemon-forms.mjs';
 import { listConditions } from '../rules/special-conditions.mjs';
 import {
   activeAttackMarkers, inPlayView, energyProvisionContext, cardText, cardEffectiveHp, markerCount,
@@ -126,6 +127,16 @@ function attackAbilityLockReason(state, cardRef, player, abilityIndex) {
  * from the opponent, a spent GX attack, or a spent VSTAR Power. Shared by attack legality and
  * every copy-candidate filter so a copied attack obeys the same limits (design 049 O5).
  */
+// Game actions refused while setup is unfinished (rules/opening-draw.mjs).
+const OPENING_SETUP_BLOCKED = new Set([
+  'attack', 'retreat', 'pass', 'takeTurn', 'moveCard', 'attachCard', 'draw', 'playTrainer', 'useAbility',
+  'takePrizes', 'takePrizesByIndex', 'stadium-effect', 'useVStarGX', 'playRandomCardFaceDown',
+]);
+
+const startingActivesMissing = (state) =>
+  state.openingDrawPending != null &&
+  Object.values(state.players || {}).some((player) => !(player?.zones?.active || []).length);
+
 export function onceAttackBlockReason(state, playerId, attack, attacker = null) {
   const player = state.players?.[playerId];
   if (isGxAttack(attack)) {
@@ -684,6 +695,12 @@ export function validateLegality(state, command) {
     return { allowed: false, reason: 'Set up the game first (Set Up button).' };
   }
 
+  // Setup ends when every player has a Starting Active; until then (the starter's turn-1 draw is
+  // still owed) the only game action is placing one.
+  if (startingActivesMissing(state) && OPENING_SETUP_BLOCKED.has(type) && !isStartingActiveMove) {
+    return { allowed: false, reason: 'Both players must choose a Starting Active Pokémon first.' };
+  }
+
   // Turn player validation
   if (
     [
@@ -1093,6 +1110,9 @@ export function validateLegality(state, command) {
             allowed: false,
             reason: `${cardRef.card.name} evolves from ${cardRef.card.evolvesFrom}, not ${topTarget.name}.`,
           };
+        }
+        if (!formsAllowEvolution(cardRef.card, topTarget)) {
+          return { allowed: false, reason: formMismatchReason(cardRef.card, topTarget) };
         }
       }
       // Anything that is not Energy, a Pokémon Tool, or a Pokémon (evolution)

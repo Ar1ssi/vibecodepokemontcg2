@@ -1090,6 +1090,7 @@ const PRINTED_STAT_FIELDS = [
   'retreatCost',
   'stage',
   'evolvesFrom',
+  'form',
   'abilities',
   'text',
   'trainerType',

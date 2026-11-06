@@ -1,4 +1,5 @@
 import { cardSpriteFor } from '../../../setup/deck-builder/core/card-sprites.mjs';
+import { shownPokemonForm } from '../../../../../shared/engine/rules/pokemon-forms.mjs';
 import { ownedTileLabel } from '../../../setup/deck-builder/core/elite-trainer-box/etb-view.mjs';
 import {
   createTapGesture,
@@ -63,7 +64,7 @@ const escapeHtml = (value = '') => String(value)
             <button class="native-deck-builder-result" data-card-id="${escapeHtml(card.id)}" data-result-index="${index}"${previewImage ? ` data-preview-image="${escapeHtml(previewImage)}"` : ''} title="${escapeHtml(card.name)} · ${setName}"${qty > 0 ? ` data-in-deck="${qty}"` : ''}>
               <span class="native-deck-builder-result-frame">
                 <img src="${escapeHtml(thumbImage)}" alt="${escapeHtml(card.name)}" class="native-deck-builder-result-image" loading="lazy" />${searchBadgesHtml(qty, owned[card.id])}<span class="native-deck-builder-result-text">
-                  <strong>${escapeHtml(card.name)}</strong>
+                  <strong>${escapeHtml(card.name)}${shownPokemonForm(card) ? ` <small>${escapeHtml(shownPokemonForm(card).label)}</small>` : ''}</strong>
                   <span>${setName}</span>
                 </span>
               </span>
@@ -317,7 +318,9 @@ const escapeHtml = (value = '') => String(value)
           // thumbnail stays low-res (fast), but the PREVIEW must use the
           // full-resolution scan (600x825) so right-click previews are crisp
           const imageUrl = card.images?.large || card.images?.small || card.image || '';
-          const safeName = escapeHtml(card.name || 'Unknown Card');
+          // Zygarde's forms share a printed name: the row names the form so they read as different Pokémon.
+          const form = shownPokemonForm(card);
+          const safeName = escapeHtml(`${card.name || 'Unknown Card'}${form ? ` (${form.label})` : ''}`);
           const safeSupertype = escapeHtml(card.supertype || 'Unknown');
           const safeTypeLabel = card.rarity === 'Reverse Holo'
             ? `${safeSupertype} · Reverse Holo`

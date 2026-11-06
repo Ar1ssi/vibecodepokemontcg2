@@ -71,7 +71,8 @@ test('integration: scripted two-player game reaches server-side win condition vi
   assert.equal(state.turn.phase, 'main');
   assert.equal(state.turn.player, 'p1');
   assert.equal(state.turn.number, 1);
-  assert.equal(state.players.p1.zones.hand.length, 8);
+  // The starter's turn-1 draw waits until both Starting Actives are down.
+  assert.equal(state.players.p1.zones.hand.length, 7);
   assert.equal(state.players.p1.zones.prizes.length, 6);
   assert.equal(state.players.p2.zones.hand.length, 7);
   assert.equal(state.players.p2.zones.prizes.length, 6);
@@ -89,6 +90,26 @@ test('integration: scripted two-player game reaches server-side win condition vi
   }, rng);
   assert.equal(res.error, null);
   state = res.state;
+
+  // Setup is unfinished until Gary has an Active: Ash can do nothing else yet.
+  const blocked = applyCommand(state, { type: 'pass', payload: {}, playerId: 'p1' }, rng);
+  assert.equal(blocked.error, 'Both players must choose a Starting Active Pokémon first.');
+
+  // Gary places his Starting Active; that ends setup and Ash draws for turn 1.
+  const p2Pokemon = state.players.p2.zones.hand.find((c) => c.supertype === 'Pokémon');
+  assert.ok(p2Pokemon);
+  res = applyCommand(state, {
+    type: 'moveCard',
+    payload: { instanceId: p2Pokemon.instanceId, from: 'hand', to: 'active' },
+    playerId: 'p2',
+  }, rng);
+  assert.equal(res.error, null);
+  assert.deepEqual(
+    res.events.filter((e) => e.type === 'cardsDrawn').map((e) => [e.playerId, e.count]),
+    [['p1', 1]]
+  );
+  state = res.state;
+  assert.equal(state.players.p1.zones.hand.length, 7);
 
   // Attach an Energy card to active
   const p1Energy = state.players.p1.zones.hand.find((c) => c.supertype === 'Energy');
@@ -124,19 +145,7 @@ test('integration: scripted two-player game reaches server-side win condition vi
   assert.equal(state.turn.number, 2);
   assert.equal(state.turn.phase, 'main');
   // p2 should have automatically drawn 1 card
-  assert.equal(state.players.p2.zones.hand.length, 8);
-
-  // Gary plays Pokemon to active
-  const p2Pokemon = state.players.p2.zones.hand.find((c) => c.supertype === 'Pokémon');
-  assert.ok(p2Pokemon);
-
-  res = applyCommand(state, {
-    type: 'moveCard',
-    payload: { instanceId: p2Pokemon.instanceId, from: 'hand', to: 'active' },
-    playerId: 'p2',
-  }, rng);
-  assert.equal(res.error, null);
-  state = res.state;
+  assert.equal(state.players.p2.zones.hand.length, 7);
 
   // Gary attaches Energy
   const p2Energy = state.players.p2.zones.hand.find((c) => c.supertype === 'Energy');

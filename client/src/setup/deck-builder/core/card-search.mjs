@@ -1,6 +1,7 @@
 import { cachedFetchJson as fetchJson } from './tcgdex-cache.mjs';
 import { isReverseHoloId, tcgdexApiUrl, tcgdexLookupId } from '../../../../../shared/tcgdex/tcgdex-url.mjs';
 import { printedRarity } from '../../../../../shared/engine/rules/card-classify.mjs';
+import { pokemonFormKey } from '../../../../../shared/engine/rules/pokemon-forms.mjs';
 import { cardArtImageBase } from '../../../../../shared/tcgdex/card-art.mjs';
 import { SET_RELEASE_DATES } from './set-release-dates.generated.mjs';
 const HUGE_RESULT_THRESHOLD = 2000;
@@ -217,6 +218,7 @@ function getSupertypeFromCategory(category = '') {
 export function normalizeTcgdexCard(card) {
   const imageBase = cardArtImageBase(card.id) || card.image || '';
   const image = imageBase ? `${imageBase}/high.webp` : '';
+  const form = pokemonFormKey(card);
 
   return {
     id: card.id,
@@ -258,6 +260,8 @@ export function normalizeTcgdexCard(card) {
       expanded: card.legal?.expanded === true,
     },
     suffix: card.suffix || '',
+    // Zygarde's forms count apart for the deck limit (pokemon-forms.mjs); null for every other card.
+    ...(form ? { form } : {}),
     _provider: 'tcgdex',
   };
 }

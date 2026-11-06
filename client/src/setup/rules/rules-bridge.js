@@ -97,7 +97,7 @@ import {
 } from './mat-coin.js';
 import { playCoinFlipCeremony } from './coin-flip-ceremony.js';
 import { coinCeremonyTimeline } from '../netcode/mat-fx/coin-pose.mjs';
-import { holdFxQueue, whenFxQueueIdle } from '../netcode/advisory-animations.js';
+import { holdFxQueueUntil, whenFxQueueIdle } from '../netcode/advisory-animations.js';
 import { playFxSound, playUiCue } from '../netcode/mat-fx/fx-audio.js';
 import {
   hasAuthoritativeView,
@@ -167,7 +167,8 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
     let serverTurnOrderStarter = null;
     let serverTurnOrderShown = false;
     let serverTurnOrderAnimationDone = false;
-    let serverCoinCeremonyEndsAt = 0;
+    // Settles once the opening coin has left the screen (null before the flip is shown).
+    let serverCoinCeremonyEnded = null;
     let serverTurnOrderResult = null;
     let serverTurnOrderAnnounced = false;
     // True while this seat's "Do you want to go first?" prompt is open.
@@ -190,6 +191,9 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
     const OPENING_HAND_TIMEOUT_MS = 20000;
     // The beat between the turn-order coin leaving the screen and the opening deal.
     const OPENING_DEAL_GAP_MS = 300;
+    // The coin's own renderer loads before its clock starts, so the ceremony can outlast its
+    // timeline; past this much extra the opening stops waiting for it.
+    const COIN_CEREMONY_BACKSTOP_MS = 8000;
     const TURN_ORDER_CHOICE_OVERLAY_ID = 'rulesTurnOrderChoiceOverlay';
 
     // Events that can bring the opening hand onto the board.
@@ -306,8 +310,13 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
         <span class="rules-hud-flags"></span>`;
       document.body.appendChild(hud);
     
+      // startGame leaves phase 'draw' on turn 0 while the Starting Actives are still being
+      // chosen: that is still setup, so no "draw phase" banner over the placement.
+      const placingStartingActives = () =>
+        rulesState.phase === 'draw' && !(rulesState.turnNumber > 0) && !rulesState.startingActiveDone;
+
       const refresh = () => {
-        if (!rulesState.enabled || rulesState.phase === 'setup') {
+        if (!rulesState.enabled || rulesState.phase === 'setup' || placingStartingActives()) {
           hud.hidden = true;
           return;
         }
@@ -733,7 +742,7 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
       serverTurnOrderStarter = null;
       serverTurnOrderShown = false;
       serverTurnOrderAnimationDone = false;
-      serverCoinCeremonyEndsAt = 0;
+      serverCoinCeremonyEnded = null;
       serverTurnOrderResult = null;
       serverTurnOrderAnnounced = false;
       closeTurnOrderChoicePicker();
@@ -1203,7 +1212,7 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
         'announcement',
         false
       );
-      withCatalogCoin(coinId, (named) =>
+      const ceremony = withCatalogCoin(coinId, (named) =>
         playCoinFlipCeremony({
           coin: named || fallbackCoin,
           result,
@@ -1215,15 +1224,20 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
         })
       );
 
+      // The prompt and the deal follow the coin off the screen: the ceremony's own end, not its
+      // timeline, which starts before the coin's renderer has loaded. The harness keeps the timeline.
       const ceremonyMs = e2eDelayMs(coinCeremonyTimeline(1).totalMs);
-      serverCoinCeremonyEndsAt = Date.now() + ceremonyMs;
+      const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+      serverCoinCeremonyEnded = isE2eMode()
+        ? delay(ceremonyMs)
+        : Promise.race([Promise.resolve(ceremony).catch(() => {}), delay(ceremonyMs + COIN_CEREMONY_BACKSTOP_MS)]);
       const session = rulesSessionGeneration;
-      setTimeout(() => {
+      serverCoinCeremonyEnded.then(() => {
         if (session !== rulesSessionGeneration) return;
         serverTurnOrderAnimationDone = true;
         afterServerCoinLands(flip);
         maybeBeginServerTurnOrder();
-      }, ceremonyMs);
+      });
       return true;
     };
 
@@ -1239,8 +1253,10 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
       serverTurnOrderStarter = result.starter;
       closeTurnOrderChoicePicker();
       // The opening hands fly in once the coin has faded out, not underneath it.
-      const ceremonyLeftMs = Math.max(0, serverCoinCeremonyEndsAt - Date.now());
-      holdFxQueue(ceremonyLeftMs + e2eDelayMs(OPENING_DEAL_GAP_MS));
+      const gapMs = e2eDelayMs(OPENING_DEAL_GAP_MS);
+      holdFxQueueUntil(
+        (serverCoinCeremonyEnded || Promise.resolve()).then(() => new Promise((resolve) => setTimeout(resolve, gapMs)))
+      );
       maybeBeginServerTurnOrder();
       return true;
     };

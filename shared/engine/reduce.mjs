@@ -9,6 +9,8 @@ import { validateCommandShape } from './commands.mjs';
 import { createRng, withForcedCoin, withForcedCoinOnce } from './rng.mjs';
 import { abilityForcesOpponentTails } from './rules/ability-combat.mjs';
 import { settleFossilCards } from './rules/fossil.mjs';
+import { settleRevealedHandCards } from './rules/revealed-hand.mjs';
+import { settleOpeningDraw } from './rules/opening-draw.mjs';
 import { stampRevealedArt } from './rules/reveal-picks.mjs';
 import { settleSpecialEnergyPassives } from './effects/special-energy.mjs';
 import { abilitySideContext } from './reduce/shared.mjs';
@@ -457,6 +459,8 @@ export function applyCommand(state, command, rng = null) {
   clearFaceDownOffBoard(draft);
   clearDetachedCardMarkers(draft);
   settleFossilCards(draft);
+  settleOpeningDraw(draft, { events });
+  settleRevealedHandCards(state, draft, events, findCard);
   delete draft.__attackEffectPhase;
   delete draft.__attackLostZoneKnockouts;
   // Design 059: a public reveal carries each card's art, so the opponent can draw a card
