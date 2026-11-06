@@ -227,8 +227,7 @@ export async function canEvolve(
   await ensureCardData(baseCardInPlay);
   await ensureCardData(evolutionCardInHand);
 
-  const sameTurnEvolution = evolvesSameTurn(evolutionCardInHand);
-  if (wasPlayedThisTurn && !stadiumRelaxes && !bypassJustEvolvedGate && !sameTurnEvolution) {
+  if (wasPlayedThisTurn && !stadiumRelaxes && !bypassJustEvolvedGate) {
     return { allowed: false, reason: "That Pokémon was just played this turn — it can't evolve yet." };
   }
 
@@ -302,7 +301,7 @@ export async function canEvolve(
 
   // once per turn per card instance — Grand Tree's chained Stage 2 step is
   // the one printed exception (see bypassJustEvolvedGate above).
-  if (!bypassJustEvolvedGate && !stadiumRelaxes && !sameTurnEvolution) {
+  if (!bypassJustEvolvedGate && !stadiumRelaxes) {
     const instanceId = getCardInstanceId(baseCardInPlay);
     if (instanceId && rulesState.flags[player]?.evolved?.[instanceId]) {
       return { allowed: false, reason: 'Already evolved that Pokémon this turn.' };
@@ -352,15 +351,10 @@ export function normalizeStage(stage) {
 export const MEGAHB = 'MEGAHB';
 
 // The homebrew set's Tera stage (cardback stage 4; stamped the same way): a
-// MEGAHB's placement, and it may go on the turn its previous stage was played
-// or evolved (evolvesSameTurn). The first-turn gate still holds.
+// MEGAHB's placement, with the ordinary evolution timing gates.
 export const TERAHB = 'TERAHB';
 
 const NUMBERED_STAGES = ['Basic', 'Stage 1', 'Stage 2'];
-
-export function evolvesSameTurn(evolutionCard) {
-  return normalizeStage(evolutionCard?.stage) === TERAHB;
-}
 
 // Whether `evoStage` is one evolution step onto a Pokémon of `baseStage`
 // (both normalized). The evolvesFrom name check is the caller's.

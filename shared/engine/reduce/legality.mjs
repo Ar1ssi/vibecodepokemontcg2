@@ -43,7 +43,7 @@ import {
 } from '../rules/trainer-play-conditions.mjs';
 import { serverEnergyDescriptor } from '../rules/server-energy.mjs';
 import { trainerTargetCounts, ownedCards, topPokemonCard } from '../rules/evolved-pokemon.mjs';
-import { evolvesSameTurn, isNextStage, normalizeStage, pokemonNamesMatch } from '../rules/evolution.mjs';
+import { isNextStage, normalizeStage, pokemonNamesMatch } from '../rules/evolution.mjs';
 import { isBabyEvolution } from '../rules/baby-rule.mjs';
 import { formMismatchReason, formsAllowEvolution } from '../rules/pokemon-forms.mjs';
 import { listConditions } from '../rules/special-conditions.mjs';
@@ -1060,11 +1060,9 @@ export function validateLegality(state, command) {
           pokemon: topTarget,
           evolution: cardRef.card,
         });
-        const sameTurnEvolution = evolvesSameTurn(cardRef.card);
         if (
           !evolvePermission &&
           !stadiumRelaxes &&
-          !sameTurnEvolution &&
           targetRef.card.enteredPlayTurn === state.turn?.number
         ) {
           return {
@@ -1073,7 +1071,7 @@ export function validateLegality(state, command) {
               "That Pokémon was just played this turn — it can't evolve yet.",
           };
         }
-        if (!stadiumRelaxes && !freeEvolve && !sameTurnEvolution && player.flags?.evolved?.[payload.targetInstanceId]) {
+        if (!stadiumRelaxes && !freeEvolve && player.flags?.evolved?.[payload.targetInstanceId]) {
           return {
             allowed: false,
             reason: 'Already evolved that Pokémon this turn.',
