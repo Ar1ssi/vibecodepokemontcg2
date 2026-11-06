@@ -159,3 +159,18 @@ test('visibleStackId: the top card id, so a 3D scene drives the evolved mesh and
   assert.equal(visibleStackId(registry, 99), 99, 'unknown id passes through');
   assert.equal(visibleStackId(null, 1), 1);
 });
+
+test('captureOrigins: a hit target is snapshotted at its on-screen rect, so a knocked-out card is aimed at in its slot', () => {
+  const slot = { left: 300, top: 40, width: 120, height: 168 };
+  captureOrigins(
+    [{ type: 'damageUpdated', playerId: 'p2', instanceId: 1, damage: 120 }],
+    board(),
+    capture,
+    () => 'opp',
+    (id) => (id === 2 ? slot : null)
+  );
+  assert.deepEqual(peekCombatOrigin(1).rect, slot, 'the projected rect of the top card (Kakuna), not the mirror box');
+  assert.equal(peekCombatOrigin(1).src, 'kakuna.png');
+  captureOrigins([{ type: 'damageUpdated', playerId: 'p2', instanceId: 5, damage: 10 }], board(), capture, () => 'opp', () => null);
+  assert.equal(peekCombatOrigin(5).rect.width, 79, 'no projection: the element box stands');
+});

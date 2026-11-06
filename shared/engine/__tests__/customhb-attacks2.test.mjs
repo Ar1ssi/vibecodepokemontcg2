@@ -336,6 +336,32 @@ test('HB 124 Dragapult Dragon Launcher ignores Weakness on the chosen Pokémon',
   assert.equal(zone(done.state, 'p2', 'bench').find((c) => c.instanceId === foe.instanceId).damage, 100);
 });
 
+test('HB 124 Dragapult Dragon Launcher deals its damage after every pick, so a Knock Out waits for the last choice', () => {
+  let dreepyA;
+  let dreepyB;
+  let foe;
+  const { state, defender } = board('Dragapult', DRAGON_LAUNCHER, {
+    defenderExtra: { hp: 100 },
+    setup: (s) => {
+      dreepyA = mon('Dreepy');
+      dreepyB = mon('Dreepy');
+      s.players.p1.zones.bench.push(dreepyA, dreepyB);
+      foe = mon('Foe', { hp: 300 });
+      s.players.p2.zones.bench.push(foe);
+    },
+  });
+  const first = choose(attack(state), ids([dreepyA, dreepyB]));
+  const second = choose(first, [defender.instanceId]);
+  assert.equal(second.state.pendingChoice?.player, 'p1', 'the attacker still picks');
+  assert.deepEqual(ids(zone(second.state, 'p2', 'active')), [defender.instanceId], 'the Active is still in play');
+  assert.equal(zone(second.state, 'p2', 'active')[0].damage ?? 0, 0, 'no damage before the last pick');
+  assert.ok(!second.state.players.p2.promotionPending, 'the opponent is not asked to promote mid-attack');
+  const done = choose(second, [foe.instanceId]);
+  assert.ok(zone(done.state, 'p2', 'discard').some((c) => c.instanceId === defender.instanceId), 'the Active is Knocked Out');
+  const foeNow = [...zone(done.state, 'p2', 'active'), ...zone(done.state, 'p2', 'bench')].find((c) => c.instanceId === foe.instanceId);
+  assert.equal(foeNow.damage, 100);
+});
+
 test('HB 124 Dragapult Dragon Launcher with no Benched Dreepy does nothing', () => {
   const { state } = board('Dragapult', DRAGON_LAUNCHER, {
     setup: (s) => s.players.p2.zones.bench.push(mon('Foe', { hp: 300 })),

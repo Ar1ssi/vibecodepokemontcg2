@@ -27,7 +27,7 @@ import { shouldAnimateMirror } from '../image-logic/draw-flight-predicate.mjs';
 import { playShuffleFlight } from '../image-logic/shuffle-flight.js';
 import { hideForFlight, playDrawBatch, showAfterFlight, takePrizeHandoff } from '../image-logic/draw-flight.js';
 import { captureKnockoutGhost, playKnockoutGhost } from '../image-logic/knockout-flight.js';
-import { fxDisabled, motionReduced } from '../image-logic/mat-fx.mjs';
+import { fxDisabled, motionReduced, rectForInstance } from '../image-logic/mat-fx.mjs';
 import { onFxSettingsChanged } from '../image-logic/fx-settings.js';
 import { playFx } from './mat-fx/index.js';
 import { pinKnockoutOrigins, pinSlideOrigins, releaseSlidePins } from './mat-fx/lifecycle.js';
@@ -253,8 +253,12 @@ export function handleBeforeApply(events, selfPlayerId) {
     pendingKnockoutGhosts.set(event.instanceId, { ...ghost, attached, instanceId: shown.card?.instanceId });
   }
   if (!fxDisabled() && !motionReduced()) {
-    captureOrigins(events, registry, captureKnockoutGhost, (event) =>
-      event.playerId === selfPlayerId ? 'self' : 'opp'
+    captureOrigins(
+      events,
+      registry,
+      captureKnockoutGhost,
+      (event) => (event.playerId === selfPlayerId ? 'self' : 'opp'),
+      (instanceId) => rectForInstance(instanceId, registry)
     );
     pinSlideOrigins(events, registry);
     pinKnockoutOrigins(events, registry);

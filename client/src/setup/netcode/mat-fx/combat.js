@@ -7,7 +7,7 @@
 // Design 024 slice 2: `attackBanner` opens the sequence — the attack's name
 // sweeps across screen while a ring marks the defender, so an attack reads as
 // name -> target -> impact -> number rather than all at once (see fx-holds).
-import { board3dActive, getBoardScene } from '../../board3d/board3d.js';
+import { getBoardScene } from '../../board3d/board3d.js';
 import { getCardRegistry } from '../apply-view.js';
 import {
   animateFrames,
@@ -78,13 +78,14 @@ const combatCard = (instanceId, registry) => shownRecord(instanceId, registry)?.
 const IN_PLAY_ZONES = new Set(['active', 'bench']);
 
 /**
- * The card's rect on screen now. On the flat board a knocked-out card's element already lies in
- * the discard pile, so it has none; the 3D board pins its mesh in its slot until its scene.
+ * The card's rect on screen now. A knocked-out card already lies in the discard pile (its element
+ * on the flat board, its mesh or mirror on the 3D board), so it has none: the attack aims at the
+ * pre-diff snapshot of its slot instead.
  */
 const liveRect = (instanceId, registry) => {
   const shown = shownRecord(instanceId, registry);
   const zone = shown?.element?.dataset?.zone;
-  if (!board3dActive() && zone && !IN_PLAY_ZONES.has(zone)) return null;
+  if (zone && !IN_PLAY_ZONES.has(zone)) return null;
   return rectForInstance(shown?.instanceId ?? instanceId, registry);
 };
 

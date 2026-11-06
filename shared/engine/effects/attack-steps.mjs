@@ -1976,10 +1976,11 @@ function moveAttachedThenDiscard(ctx, attacker, target) {
 }
 
 // Dragapult Dragon Launcher: discard up to as many Benched `name` Pokémon as the opponent has in
-// play, then `amount` damage to a different opposing Pokémon for each one discarded. Each pick is an
-// `attackDamageRequest` event that runAttackSteps (reduce/attack-steps.mjs) applies as attack
-// damage: Weakness and Resistance are skipped as printed, every prevention and Knock Out hook still
-// runs. Memo `picksLeft`/`hit` carries the picks between choices.
+// play, then `amount` damage to a different opposing Pokémon for each one discarded. Every pick is
+// made first; the last one queues an `attackDamageRequest` event per target that runAttackSteps
+// (reduce/attack-steps.mjs) applies as attack damage, so a Knock Out lands after all the choices, not
+// between them. Weakness and Resistance are skipped as printed, every prevention and Knock Out hook
+// still runs. Memo `picksLeft`/`hit` carries the picks between choices.
 function atkBenchDiscardDamageEach(ctx) {
   const { player, opponent, step } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
@@ -2020,17 +2021,21 @@ function askOpposingDamageTarget(ctx, picksLeft, hit) {
 function damageOnePick(ctx, memo) {
   const { opponent, step } = ctx;
   const target = rootsOf(opponent).find((c) => c.instanceId === ctx.selection?.[0] && !memo.hit.includes(c.instanceId));
-  if (!target) return skip(ctx, 'target_not_found');
-  ctx.events.push({
-    type: 'attackDamageRequest',
-    instanceId: target.instanceId,
-    victimPlayerId: opponent.playerId,
-    amount: step.amount,
-    immunity: step.immunity || null,
-    attackName: attackName(ctx),
-  });
-  if (memo.picksLeft <= 1) return null;
-  return askOpposingDamageTarget(ctx, memo.picksLeft - 1, [...memo.hit, target.instanceId]);
+  const hit = target ? [...memo.hit, target.instanceId] : memo.hit;
+  if (target && memo.picksLeft > 1 && rootsOf(opponent).some((c) => !hit.includes(c.instanceId))) {
+    return askOpposingDamageTarget(ctx, memo.picksLeft - 1, hit);
+  }
+  for (const instanceId of hit) {
+    ctx.events.push({
+      type: 'attackDamageRequest',
+      instanceId,
+      victimPlayerId: opponent.playerId,
+      amount: step.amount,
+      immunity: step.immunity || null,
+      attackName: attackName(ctx),
+    });
+  }
+  return target ? null : skip(ctx, 'target_not_found');
 }
 
 /** Ability form (Dudunsparce, Run Away Draw): "If you drew any cards in this way" gates the shuffle. */

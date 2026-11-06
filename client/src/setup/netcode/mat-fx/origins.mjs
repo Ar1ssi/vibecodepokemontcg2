@@ -63,6 +63,8 @@ const idsToCapture = (event) => {
  * @param {Map<any, {element?: Element}>} registry - getCardRegistry()
  * @param {(user: string, el: Element) => object|null} capture - captureKnockoutGhost
  * @param {(event: object) => 'self'|'opp'} sideOf
+ * @param {(instanceId: any) => object|null} [rectOf] - the card's rect on screen (rectForInstance):
+ *   on the 3D board the mesh's projection, which the mirror element's box is not
  */
 const combatIdsFor = (event) => {
   if (event?.type === 'attackExecuted') return [event.attackerId, event.defenderId].filter((id) => id != null);
@@ -128,16 +130,17 @@ const captureSweep = (event, registry, capture, sideOf) => {
   sweeps.set(sweepKey(user, event.from), ids);
 };
 
-export function captureOrigins(events, registry, capture, sideOf) {
+export function captureOrigins(events, registry, capture, sideOf, rectOf = null) {
   combatOrigins.clear();
   for (const event of events) {
     captureSweep(event, registry, capture, sideOf);
     for (const id of combatIdsFor(event)) {
       if (combatOrigins.has(id)) continue;
       // An evolved Pokémon is snapshotted as the card on top of its stack, not its Basic.
-      const element = (visibleStackRecord(registry, id) || registry.get(id))?.element;
-      const ghost = element && capture(sideOf(event), element);
-      if (ghost) combatOrigins.set(id, ghost);
+      const shown = visibleStackRecord(registry, id) || registry.get(id);
+      const ghost = shown?.element && capture(sideOf(event), shown.element);
+      const rect = rectOf?.(shown?.instanceId ?? shown?.card?.instanceId ?? id) || ghost?.rect;
+      if (ghost || rect) combatOrigins.set(id, { ...ghost, rect });
     }
     for (const id of idsToCapture(event)) {
       const element = registry.get(id)?.element;
