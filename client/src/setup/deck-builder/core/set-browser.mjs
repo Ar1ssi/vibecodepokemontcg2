@@ -369,6 +369,82 @@ const TCGDEX_BASE = tcgdexApiBase();
       return sets;
     }
 
+    // Format pills: a historical tournament format is a fixed list of TCGdex sets, shown newest first.
+    // Promo sets (POP, Black Star) are left out; only expansions are listed.
+    // SM-LOT: Sun & Moon through Lost Thunder, including the Shining Legends and Dragon Majesty minis.
+    // 2010 Worlds: the 2008-10 Modified format (Diamond & Pearl through HeartGold & SoulSilver: Unleashed);
+    // Undaunted released after the Aug 2010 event, so it is not in.
+    export const FORMAT_PILLS = Object.freeze([
+      {
+        id: 'sm-lot',
+        label: 'SM-LOT',
+        title: 'Sun & Moon through Lost Thunder',
+        sets: [
+          ['sm1', 'sm'],
+          ['sm2', 'sm'],
+          ['sm3', 'sm'],
+          ['sm3.5', 'sm'],
+          ['sm4', 'sm'],
+          ['sm5', 'sm'],
+          ['sm6', 'sm'],
+          ['sm7', 'sm'],
+          ['sm7.5', 'sm'],
+          ['sm8', 'sm'],
+        ],
+      },
+      {
+        id: '2010-worlds',
+        label: '2010 Worlds',
+        title: 'Diamond & Pearl through HeartGold & SoulSilver: Unleashed (2008-10 Modified)',
+        sets: [
+          ['dp1', 'dp'],
+          ['dp2', 'dp'],
+          ['dp3', 'dp'],
+          ['dp4', 'dp'],
+          ['dp5', 'dp'],
+          ['dp6', 'dp'],
+          ['dp7', 'dp'],
+          ['pl1', 'pl'],
+          ['pl2', 'pl'],
+          ['pl3', 'pl'],
+          ['pl4', 'pl'],
+          ['hgss1', 'hgss'],
+          ['hgss2', 'hgss'],
+        ],
+      },
+    ]);
+
+    export const FORMAT_PILL_IDS = Object.freeze(FORMAT_PILLS.map((pill) => pill.id));
+
+    // Every set of a format pill that TCGdex can answer, newest first. A set that fails to load is
+    // skipped so one outage does not blank the pill.
+    export async function fetchFormatSets(formatId) {
+      const format = FORMAT_PILLS.find((pill) => pill.id === formatId);
+      if (!format) return [];
+      const entries = await Promise.all(
+        format.sets.map(async ([setId, series]) => {
+          try {
+            const record = await fetchSetRecord(setId, series);
+            return {
+              setId: record.id,
+              name: record.name,
+              seriesId: series,
+              releaseDate: record.releaseDate || '',
+              logo: normalizeAssetUrl(record.logo),
+              symbol: normalizeAssetUrl(record.symbol),
+              cardCount: (record.cards || []).filter((c) => c.image).length,
+              category: 'generation',
+            };
+          } catch {
+            return null;
+          }
+        })
+      );
+      return entries
+        .filter((entry) => entry && entry.cardCount > 0)
+        .sort((a, b) => String(b.releaseDate || '').localeCompare(String(a.releaseDate || '')));
+    }
+
     // Custom sets (design 075): the sets installed in this repo (client/src/assets/custom-sets),
     // listed by the server's manifest; their cards come through the TCGdex proxy like any set's.
     // A set.json's `group` picks the pill: "custom" (or none) → Custom, "homebrew" → Homebrew sets.

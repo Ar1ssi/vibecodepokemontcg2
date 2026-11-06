@@ -8,6 +8,9 @@ import {
       fetchLegalStandardSets,
       fetchGenerationSets,
       fetchHomebrewSets,
+      fetchFormatSets,
+      FORMAT_PILLS,
+      FORMAT_PILL_IDS,
       fetchCustomSets,
       forgetCustomSetRecords,
       CUSTOM_CATEGORY,
@@ -100,6 +103,10 @@ import {
       let filterPassId = 0;
 
       // ── DOM scaffold (injected once) ────────────────────────────────────
+      const formatPillsHtml = FORMAT_PILLS.map(
+        (format) =>
+          `<button class="native-deck-builder-set-browser-series-tag" data-category="${format.id}" type="button" title="${escapeHtml(format.title)}">${escapeHtml(format.label)}</button>`
+      ).join('');
       const generationPillsHtml = GENERATIONS.map(
         (gen) =>
           `<button class="native-deck-builder-set-browser-series-tag native-deck-builder-set-browser-series-tag--generation" data-category="${generationCategoryId(gen)}" type="button">Generation ${gen}</button>`
@@ -114,6 +121,7 @@ import {
         '    <button class="native-deck-builder-set-browser-series-tag" data-category="homebrew" type="button">Homebrew</button>',
         `    <button class="native-deck-builder-set-browser-series-tag" data-category="${CUSTOM_CATEGORY}" type="button" title="Sets made in the card editor and stored in this repo">Custom</button>`,
         `    <button class="native-deck-builder-set-browser-series-tag" data-category="${HOMEBREW_SETS_CATEGORY}" type="button" title="Homebrew cards made in the card editor and stored in this repo">Homebrew sets</button>`,
+        formatPillsHtml,
         generationPillsHtml,
         '  </div>',
         '  <div class="native-deck-builder-set-browser-controls">',
@@ -224,6 +232,8 @@ import {
         if (activeCategory === CUSTOM_CATEGORY) {
           return { label: 'Custom sets', sets: state.sets };
         }
+        const format = FORMAT_PILLS.find((pill) => pill.id === activeCategory);
+        if (format) return { label: format.title, sets: state.sets };
         // Generation pills and Homebrew sets show their sets with no group label.
         return { label: '', sets: state.sets };
       };
@@ -470,6 +480,10 @@ import {
             otherState.loading = false;
           } else if (categoryId === 'homebrew') {
             state.sets = await fetchHomebrewSets();
+            state.loaded = true;
+            state.loading = false;
+          } else if (FORMAT_PILL_IDS.includes(categoryId)) {
+            state.sets = await fetchFormatSets(categoryId);
             state.loaded = true;
             state.loading = false;
           } else if (categoryId === CUSTOM_CATEGORY || categoryId === HOMEBREW_SETS_CATEGORY) {
