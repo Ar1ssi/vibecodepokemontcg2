@@ -481,6 +481,16 @@ export function optionalCostOffer(draft, { playerId, attacker, attack, clause })
     case 'drawback':
       return yesNo(`do ${bonus} more damage (${cost.text.replace(/\.$/, '')})`);
     case 'selfCounters':
+      if (cost.exactly) {
+        const { paid, unpaid } = clause.counterSwap;
+        return {
+          prompt: `${attack.name}: put ${cost.exactly} damage counters on this Pokémon to put ${paid} instead of ${unpaid} damage counters on your opponent's Pokémon?`,
+          options: YES_NO_OPTIONS(`${paid} counters, ${cost.exactly} on this Pokémon`),
+          min: 1,
+          max: 1,
+          allowedIds: [],
+        };
+      }
       return {
         prompt: `${attack.name}: how many damage counters to put on this Pokémon?`,
         options: Array.from({ length: cost.upTo + 1 }, (_, k) => ({
@@ -597,7 +607,9 @@ export function payOptionalCost(draft, { playerId, attacker, token, selection, a
       return { paid: true, count: 0 };
     }
     case 'selfCounters': {
-      const k = Math.max(0, Math.min(cost.upTo, Number((selection || [])[0]) - 1 || 0));
+      const k = cost.exactly
+        ? (yes ? cost.exactly : 0)
+        : Math.max(0, Math.min(cost.upTo, Number((selection || [])[0]) - 1 || 0));
       if (k === 0 || !attacker) return declined;
       attacker.damage = (attacker.damage || 0) + k * 10;
       events.push({ type: 'damageCountersPlaced', instanceId: attacker.instanceId, count: k, playerId });

@@ -95,6 +95,11 @@ const BASE_BONUS = /^if you do, this attack's base damage is (\d+) instead of (\
 const PUT_COUNTERS = /^put up to (\d+) damage counters on this pokémon\.$/;
 const PER_COUNTER = /^this attack does (\d+) (?:more )?damage for each damage counter you (?:put|placed)(?: on this pokémon)? in this way\.$/;
 
+// Blacephalon (Cosmic Eclipse 104) Mind Blown: the self-counter cost picks which spread lands.
+const SWAP_COST = /^you may put (\d+) damage counters on this pokémon\.$/;
+const SWAP_PAID = /^if you do, put (\d+) damage counters on your opponent's pokémon in any way you like\.$/;
+const SWAP_UNPAID = /^otherwise, put (\d+) damage counters on your opponent's pokémon in any way you like\.$/;
+
 const stripPeriod = (sentence) => sentence.replace(/\.$/, '');
 
 /**
@@ -107,6 +112,19 @@ const stripPeriod = (sentence) => sentence.replace(/\.$/, '');
 export function optionalCostBonusClause(attackText, selfName = '') {
   const sentences = normalizeAttackText(attackText, selfName).split(/(?<=\.)\s+/);
   for (let i = 0; i < sentences.length - 1; i++) {
+    const swapCost = SWAP_COST.exec(sentences[i]);
+    const swapPaid = swapCost && SWAP_PAID.exec(sentences[i + 1]);
+    const swapUnpaid = swapPaid && SWAP_UNPAID.exec(sentences[i + 2] || '');
+    if (swapUnpaid) {
+      return {
+        cost: { kind: 'selfCounters', exactly: Number(swapCost[1]) },
+        bonus: 0,
+        extraCondition: null,
+        perEach: false,
+        counterSwap: { paid: Number(swapPaid[1]), unpaid: Number(swapUnpaid[1]) },
+        consumed: [i, i + 1, i + 2].map((j) => stripPeriod(sentences[j])),
+      };
+    }
     // Annihilape ex Angry Grudge: a mandatory "up to" cost the damage counts.
     const counters = PUT_COUNTERS.exec(sentences[i]);
     const scaled = counters && PER_COUNTER.exec(sentences[i + 1]);

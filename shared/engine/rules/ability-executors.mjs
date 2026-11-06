@@ -35,7 +35,8 @@ function modernWording(text) {
   if (!text) return text;
   let rewritten = legacyRewriteCache.get(text);
   if (rewritten === undefined) {
-    rewritten = rewriteLegacyPowerWording(text);
+    // Custom-set prints say "in your Active slot" for "in the Active Spot" (customhb Neutralizing Gas).
+    rewritten = rewriteLegacyPowerWording(text).replace(/\bin (?:your|the) active slot\b/g, 'in the active spot');
     legacyRewriteCache.set(text, rewritten);
   }
   return rewritten;

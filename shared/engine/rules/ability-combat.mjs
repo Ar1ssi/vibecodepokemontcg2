@@ -1387,6 +1387,12 @@ function selfExemptFromSuppression(text, holder, card) {
   return sameCard(holder, card);
 }
 
+/** Lowercased printed names of the Abilities `card` has (plural server shape or singular). */
+function abilityNamesOf(card) {
+  const entries = Array.isArray(card?.abilities) ? card.abilities : card?.ability ? [card.ability] : [];
+  return entries.map((entry) => lower(typeof entry === 'string' ? entry : entry?.name)).filter(Boolean);
+}
+
 /** True when the suppression text's target filter matches `card`. */
 function suppressionTargets(text, holder, card, ctx) {
   const holderSide = sideOf(holder, ctx);
@@ -1394,6 +1400,14 @@ function suppressionTargets(text, holder, card, ctx) {
   const bothSides = /\(both yours and your opponent's\)/.test(text);
   if (!bothSides && /your opponent's/.test(text)) {
     if (!holderSide || !targetSide || targetSide === holderSide) return false;
+  }
+  // Rayquaza Air Lock: "Pokémon with the Drizzle or Drought Ability have no Abilities" reaches
+  // only Pokémon that have an Ability of one of those names.
+  const named = /pok[eé]mon with the (.+?) abilit(?:y|ies) have no abilities/.exec(text);
+  if (named) {
+    const wanted = named[1].split(/\s*(?:,|\bor\b|\band\b)\s*/).filter(Boolean);
+    const own = abilityNamesOf(card);
+    if (!wanted.some((name) => own.includes(name))) return false;
   }
   if (/pok[eé]mon-gx and pok[eé]mon-ex/.test(text) && !isExCard(card) && !isGxCard(card)) {
     return false;

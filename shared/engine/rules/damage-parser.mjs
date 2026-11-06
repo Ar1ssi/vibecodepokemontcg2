@@ -1290,6 +1290,12 @@ const PRIZE_ON_KO_CLAUSES = [
     /the defending pok[ée]mon is knocked out (?:by damage from this attack|by this attack), take (a|\d+) more prize cards?/,
     null,
   ],
+  // Beedrill Fell Stinger (customhb): "If this attack knocks out the Defending Pokémon, take an
+  // additional Prize card".
+  [
+    /if this attack knocks out the defending pok[ée]mon, take (an?|\d+) (?:additional|more) prize cards?/,
+    null,
+  ],
 ];
 
 /**

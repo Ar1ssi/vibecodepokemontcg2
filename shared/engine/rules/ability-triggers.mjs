@@ -257,6 +257,17 @@ export function parseOnDamageStatus(holder, ctx = {}) {
   };
 }
 
+// Golisopod ex (customhb Emergency Exit): "During your opponent's turn, if this Pokémon is
+// attacked, switch this Pokémon with 1 of your Benched Pokémon." The whole sentence must match.
+const ON_ATTACKED_SWITCH =
+  /(?:^|\.\s)during your opponent's turn, if this pokémon is attacked, switch this pokémon with 1 of your benched pokémon\./;
+
+/** True when the holder's live Ability switches it out after it is attacked. */
+export function parseOnAttackedSwitch(holder, ctx = {}) {
+  if (!holderCanTrigger(holder, ctx)) return false;
+  return ON_ATTACKED_SWITCH.test(selfNamedText(holder).replace(/’/g, "'"));
+}
+
 // Energy-attach triggers. Self: "when(ever) you attach a [Basic] [{W}] Energy card from your hand
 // to this Pokémon [during your turn], <effect>." Team: "as long as this Pokémon is in the Active
 // Spot / your Active Pokémon, whenever you attach an Energy card from your hand to 1 of your

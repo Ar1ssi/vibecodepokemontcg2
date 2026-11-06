@@ -1818,6 +1818,7 @@ export function resolveCoinGates(steps, { coin, headsCount, flips = [] }) {
 }
 
 const ATTACH_CHAIN = /^if (?:you do|you attached energy (?:to this pokémon )?in this way), /;
+const ENERGY_DISCARD_SENTENCE = /^discard (?:an?|d+) (?:basic )?(?:{[a-z]} )?energy(?: cards?)? (?:attached to|from) this pokémon.?$/;
 const HAND_COST_TYPES = new Set(['atkDiscardOwnHand', 'atkDiscardHandEnergy', 'atkLostZoneFromHand']);
 
 function isAttachStep(step) {
@@ -1929,10 +1930,15 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
     const optionalChain =
       Boolean(chained) && /^if you do, /.test(body) && !handChain && !isAttachStep(previous) && previous?.optional;
     if (optionalChain) previous.cost = true;
-    if (chained && !handChain && !isAttachStep(previous) && !optionalChain) continue;
+    // Golisopod ex Swing and Skedaddle: "Discard an Energy from this Pokémon. If you do, switch
+    // it …" runs only when the printed discard moved an Energy (requiresEnergyDiscard).
+    const discardChain =
+      Boolean(chained) && /^if you do, /.test(body) && ENERGY_DISCARD_SENTENCE.test((sentences[index - 1] || '').trim());
+    if (chained && !handChain && !isAttachStep(previous) && !optionalChain && !discardChain) continue;
     const { rest, flags } = stripGates(chained ? body.slice(chained[0].length) : body);
     if (extra) flags.requiresExtraEnergy = extra.requirements;
     if (handChain) flags.requiresHandCost = true;
+    else if (discardChain) flags.requiresEnergyDiscard = true;
     else if (chained && !optionalChain) flags.requiresAttach = true;
     const templates = chained && !handChain && !optionalChain ? [...CHAIN_TEMPLATES, ...TEMPLATES] : TEMPLATES;
     for (const [re, build] of templates) {

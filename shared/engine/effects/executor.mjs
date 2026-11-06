@@ -474,6 +474,15 @@ export function executeSteps(draft, {
       events.push({ type: 'effectStepSkipped', reason: 'nothing_attached', step: step.type });
       continue;
     }
+    // "Discard an Energy from this Pokémon. If you do, …" (Swing and Skedaddle): the printed
+    // discard must have moved an Energy this attack.
+    if (
+      step.requiresEnergyDiscard &&
+      !events.some((e) => e.type === 'cardMoved' && e.reason === 'attack-energy-discard' && e.playerId === playerId)
+    ) {
+      events.push({ type: 'effectStepSkipped', reason: 'nothing_discarded', step: step.type });
+      continue;
+    }
     // GX "If this Pokémon has at least N extra Energy attached to it, …" (Tropical Hour-GX).
     if (
       effectType === 'attackSteps' &&

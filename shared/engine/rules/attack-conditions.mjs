@@ -491,8 +491,9 @@ const CLAUSES = [
     () => ({ desc: { kind: 'movedToActiveThisTurn' }, printedNegated: true }),
   ],
   [
-    // Swellow Mach Descent: "If Swellow was on your Bench this turn".
-    /^this pokémon (?:moved from (?:the|your) bench to the active spot|was on (?:the|your) bench and became your active pokémon|was on (?:the|your) bench) this turn$/,
+    // Swellow Mach Descent: "If Swellow was on your Bench this turn"; Mega Golisopod ex First
+    // Impression: "moved into your Active Spot this turn".
+    /^this pokémon (?:moved from (?:the|your) bench to the active spot|moved into (?:the|your) active spot|was on (?:the|your) bench and became your active pokémon|was on (?:the|your) bench) this turn$/,
     () => ({ desc: { kind: 'movedToActiveThisTurn' }, printedNegated: false }),
   ],
   [

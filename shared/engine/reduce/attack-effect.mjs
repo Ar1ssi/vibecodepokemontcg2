@@ -24,7 +24,7 @@ import { stadiumAttackCoinModifier } from '../rules/stadium-triggers.mjs';
 import { turnDamageBonusAfterWR } from '../rules/turn-damage-bonus.mjs';
 import { getEnergyValue } from '../rules/retreat.mjs';
 import { abilityHandDiscardProtector, extraAttackAvailable, healBlockedByAbility } from '../rules/ability-combat.mjs';
-import { parseOnDamageAbilities, parseOnDamageStatus } from '../rules/ability-triggers.mjs';
+import { parseOnDamageAbilities, parseOnDamageStatus, parseOnAttackedSwitch } from '../rules/ability-triggers.mjs';
 import { textRevealsPicks } from '../rules/reveal-picks.mjs';
 import { createPendingChoice } from '../effects/executor.mjs';
 import { eachFilterMatches } from '../rules/each-filter.mjs';
@@ -47,7 +47,7 @@ import {
   conditionsUpdatedEvent, isGameConcluded, abilitySideContext, shuffleDeckWithRng, rootsIn,
 } from './shared.mjs';
 import {
-  endTurnAfterFailedAttack, spendGxAttack, spendVstarAttack, withSelfNamedAttack,
+  endTurnAfterFailedAttack, spendGxAttack, spendVstarAttack, withSelfNamedAttack, ninjaTrickSwitch,
 } from './attack.mjs';
 import {
   damageBenchedPokemon, abilityEffectShield, resolveAttackTargetClause, attackTargetOptions, infiltratorPreventsDamage,
@@ -1362,6 +1362,11 @@ export function resolveAttackEffectPhase(draft, ctx) {
               attack,
             })
           : resolveAttackTargetClause(attack.text, parsed, spread);
+      // Blacephalon Mind Blown: the self-counter answer picks the spread's total.
+      if (attackTarget?.distributable && optionalBonus?.counterSwap) {
+        const { paid, unpaid } = optionalBonus.counterSwap;
+        attackTarget = { ...attackTarget, remaining: optionalCostPaid ? paid : unpaid };
+      }
       // Bronzong BREAK Metal Rain: one 30-damage pick per Energy card the discard paid.
       if (attackTarget?.remainingFromDiscard) {
         attackTarget = energyDiscarded > 0 ? { ...attackTarget, remaining: energyDiscarded } : null;
@@ -1787,6 +1792,36 @@ export function grantPrizeOnKoBonus(draft, { playerId, attack, events, paid }) {
 }
 
 /**
+ * "During your opponent's turn, if this Pokémon is attacked, switch this Pokémon with 1 of your
+ * Benched Pokémon" (Golisopod ex Emergency Exit). Applies at once with one Benched Pokémon;
+ * with several, asks the defender and returns true (the attack's end waits for the answer).
+ * A Knocked Out holder is no longer in the Active Spot, so nothing happens.
+ */
+function raiseAttackedSwitch(draft, { defenderId, defenderPlayerId, playerId, oppId, extraRemains, events }) {
+  const ref = defenderId != null ? findCard(draft, defenderId) : null;
+  if (!ref || ref.playerId !== defenderPlayerId || ref.zoneId !== 'active') return false;
+  const side = draft.players[defenderPlayerId];
+  const holderView = inPlayView(draft, ref.card);
+  if (!parseOnAttackedSwitch(holderView, { ...abilitySideContext(draft, defenderPlayerId), isActive: true })) return false;
+  const bench = benchTargets(side);
+  if (bench.length === 0) return false;
+  if (bench.length === 1) {
+    ninjaTrickSwitch(draft, side, bench[0], events);
+    return false;
+  }
+  draft.pendingChoice = createPendingChoice({
+    player: defenderPlayerId,
+    source: 'ability',
+    prompt: `${holderView?.name || 'Your Pokémon'}: Emergency Exit — switch it with 1 of your Benched Pokémon.`,
+    options: bench,
+    min: 1,
+    max: 1,
+    resumeToken: { effectType: 'attackedSwitch', initiatorPlayerId: playerId, oppId, extraRemains: Boolean(extraRemains) },
+  });
+  return true;
+}
+
+/**
  * The end of an attack: deck search, chosen-target damage, the attackExecuted event, the
  * GX flag, attach-afterwards effects, and the checkup / turn hand-off. Split out so an
  * `attackSteps` suspension can resume into it (design 030). `tail` is plain JSON.
@@ -2010,6 +2045,13 @@ export function finishAttackTail(draft, { tail, activeRng, events }) {
           stadium: draft.stadium,
           attacksThisTurn: attackerPlayer.flags.attacksThisTurn,
         }).allowed;
+
+      // Golisopod ex Emergency Exit: the attacked Pokémon switches out once the attack is done.
+      if (!searchTriggered && !draft.pendingChoice && !isGameConcluded(draft)) {
+        if (raiseAttackedSwitch(draft, { defenderId: defender?.instanceId, defenderPlayerId, playerId, oppId, extraRemains, events })) {
+          return;
+        }
+      }
 
       // Auto-end turn after attacking (unless paused by pendingChoice)
       if (!searchTriggered && !extraRemains && !isGameConcluded(draft)) {

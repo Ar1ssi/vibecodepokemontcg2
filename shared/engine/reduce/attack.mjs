@@ -167,7 +167,7 @@ function offerNinjaTrick(draft, declared) {
 }
 
 /** Swaps the defending side's Active for the chosen Benched Pokémon, attachments following. */
-function ninjaTrickSwitch(draft, player, benchRoot, events) {
+export function ninjaTrickSwitch(draft, player, benchRoot, events) {
   const active = player.zones.active.find((c) => !c.attachedTo);
   if (!active || !benchRoot) return;
   const moveStack = (root, from, to) => {

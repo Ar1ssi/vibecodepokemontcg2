@@ -11,10 +11,10 @@ import { createPendingChoice, attachToRoot } from '../effects/executor.mjs';
 import { resumeSpecialEnergyTrigger, SPECIAL_ENERGY_EFFECT } from '../effects/special-energy.mjs';
 import { executeStadium } from '../effects/stadium.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
-import { setGameEnded, ensureOncePerGame, isGameConcluded, shuffleDeckWithRng } from './shared.mjs';
+import { setGameEnded, ensureOncePerGame, isGameConcluded, shuffleDeckWithRng, benchTargets } from './shared.mjs';
 import {
   flipAttackCoins, coinCountReader, NINJA_TRICK_EFFECT, resumeNinjaTrick, spendVstarAttack,
-  attackViewFor, resumeCopiedAttack,
+  attackViewFor, resumeCopiedAttack, ninjaTrickSwitch,
 } from './attack.mjs';
 import { attackTargetOptions, distributedPrompt, applyAttackTargets } from './attack-damage.mjs';
 import {
@@ -409,6 +409,16 @@ export function resolveChoiceCommand({ draft, playerId, activeRng, events, paylo
       if (!isGameConcluded(draft)) {
         advanceTurn(draft, { nextPlayerId: token.oppId, events });
       }
+    }
+  } else if (token.effectType === 'attackedSwitch') {
+    // Emergency Exit: the attacked Pokémon's owner picked the Benched Pokémon; the attack's end follows.
+    draft.pendingChoice = null;
+    const side = draft.players[choice.player];
+    const picked = benchTargets(side).find((c) => c.instanceId === (payload.selection || [])[0]);
+    if (picked) ninjaTrickSwitch(draft, side, picked, events);
+    if (!token.extraRemains && !isGameConcluded(draft)) {
+      resolveCheckup(draft, { rng: activeRng, events, endingPlayerId: initiatorPlayerId });
+      if (!isGameConcluded(draft)) advanceTurn(draft, { nextPlayerId: token.oppId, events });
     }
   } else if (token.effectType === 'attackAttachMilled') {
     // Raikou: attach the milled Energy to the chosen Pokémon, then end the turn
