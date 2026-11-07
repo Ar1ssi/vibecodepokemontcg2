@@ -352,6 +352,11 @@ export function rootMatchesTarget(player, root, target = '') {
     return false;
   }
   const top = topPokemonCard(player, root);
+  // "your Solgaleo or Lunala": printed names, not a category.
+  const names = t.match(/^your ([a-z0-9 .'’-]+? or [a-z0-9 .'’-]+?)$/)?.[1];
+  if (names && !/pok[eé]mon/.test(names)) {
+    return names.split(' or ').some((n) => String(top?.name || '').toLowerCase().includes(n.trim()));
+  }
   const owner = ownerQualifier(t);
   if (owner && !String(top?.name || '').toLowerCase().startsWith(`${owner}'s`)) return false;
   if (t.includes('stage 2') && stageOf(top) !== 'Stage 2') return false;

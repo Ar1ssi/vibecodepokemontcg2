@@ -1895,3 +1895,38 @@ test('evolved holders: an evolved Metang with Energy on its root has no Retreat 
   assert.equal(combinedToolRetreatCost(2, beldum, zone), 0);
   assert.equal(combinedToolRetreatCost(2, beldum, [beldum, metang]), 2);
 });
+
+// Solgaleo Armor of the Sunne, pkmn corpus: Cosmic Eclipse 142.
+test('abilityDamageReduction: Armor of the Sunne covers Solgaleo and Lunala only, once, with Lunala in play', () => {
+  const armor = ability(
+    'Armor of the Sunne',
+    "If you have Lunala in play, your Solgaleo and Lunala take 50 less damage from your opponent's attacks (after applying Weakness and Resistance). You can't apply more than 1 Armor of the Sunne Ability at a time."
+  );
+  const solgaleo = mon('Solgaleo', { abilities: [armor] });
+  const secondSolgaleo = mon('Solgaleo', { abilities: [armor] });
+  const lunala = mon('Lunala');
+  const other = mon('Other');
+  const attacker = mon('Attacker');
+  const reduction = (target, sideCards) => abilityDamageReduction(target, attacker, { sideCards }).afterWR;
+
+  assert.equal(reduction(solgaleo, [solgaleo, lunala]), 50);
+  assert.equal(reduction(lunala, [solgaleo, lunala]), 50);
+  assert.equal(reduction(other, [solgaleo, lunala, other]), 0, 'other Pokémon are not covered');
+  assert.equal(reduction(solgaleo, [solgaleo]), 0, 'needs Lunala in play');
+  assert.equal(reduction(solgaleo, [solgaleo, secondSolgaleo, lunala]), 50, 'two copies do not stack');
+});
+
+test('abilityActivationBlockReason: a named partner in play gates the ability (Lunala needs Solgaleo)', () => {
+  const lunala = mon('Lunala', {
+    abilities: [
+      ability(
+        'Blessing of the Moone',
+        'Once during your turn (before your attack), if you have Solgaleo in play, you may search your deck for up to 2 Energy cards and attach them to your Solgaleo or Lunala in any way you like. Then, shuffle your deck.'
+      ),
+    ],
+  });
+  const solgaleo = mon('Solgaleo');
+  const base = { rulesEnabled: true, zone: 'active' };
+  assert.match(abilityActivationBlockReason(lunala, { ...base, sideCards: [lunala] }) || '', /solgaleo/i);
+  assert.equal(abilityActivationBlockReason(lunala, { ...base, sideCards: [lunala, solgaleo] }), null);
+});

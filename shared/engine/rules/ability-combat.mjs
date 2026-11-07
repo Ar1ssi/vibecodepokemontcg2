@@ -99,7 +99,8 @@ function nonStackingOnce(cards) {
   const seen = new Set();
   return cards.filter((card) => {
     const t = cardAbilityText(card);
-    if (!/doesn't stack|does not stack/.test(t)) return true;
+    // "You can't apply more than 1 Armor of the Sunne Ability at a time" (Solgaleo) is the same clause.
+    if (!/doesn't stack|does not stack|can't apply more than 1 [^.]*? ability at a time/.test(t)) return true;
     const key = t.replace(/\s+/g, ' ').trim();
     if (seen.has(key)) return false;
     seen.add(key);
@@ -325,6 +326,14 @@ function sourceConditionMet(text, holder, target, attacker, ctx) {
     if (holderZone(holder, ctx) !== 'active') return false;
   }
   return inPlayConditionMet(text, target, ctx);
+}
+
+// "your Solgaleo and Lunala take 50 less damage": the printed names a team reduction covers, or
+// null when the wording names a category ("your Pokémon", "your {W} Pokémon") instead.
+function namedReductionTargets(text) {
+  const plain = "(?:(?!pok[eé]mon)[a-z0-9 .'’-])+?";
+  const m = text.match(new RegExp(`\\byour (${plain}(?: and ${plain})*) take \\d+ less damage`));
+  return m ? m[1].split(' and ').map((n) => n.trim()) : null;
 }
 
 /** True when the holder itself is the only legal target ("this Pokémon"). */
@@ -568,6 +577,9 @@ export function abilityDamageReduction(defender, attacker, ctx = {}) {
     if (!t || !parseDamageReduction(holder).reduce) continue;
     if (isAbilitySuppressed(holder, ctx)) continue;
     if (isSelfScoped(t) && !sameCard(holder, defender)) continue;
+    // The printed text, not `t`: `t` reads the holder's own name as "this pokémon".
+    const named = namedReductionTargets(lower(cardAbilityText(holder)));
+    if (named && !named.some((n) => lower(defender?.name).includes(n))) continue;
     if (!sourceConditionMet(t, holder, defender, attacker, ctx)) continue;
     if (!attackerTypeRequirementMet(t, attacker)) continue;
     const red = reductionForCard(holder, defender, attacker, {
@@ -1594,7 +1606,11 @@ export function abilityActivationBlockReason(card, ctx = {}) {
   // "If you have any {R} Mega Evolution Pokémon ex in play, you may use this Ability"
   // (Oricorio ex, I164). Callers without `sideCards` fail open.
   const needed = requiredInPlayDescriptor(card);
-  if (rulesEnabled && needed && Array.isArray(ctx.sideCards) && !sideTops(ctx.sideCards).some((top) => matchesInPlayDescriptor(top, needed))) {
+  const sideTopCards = needed && Array.isArray(ctx.sideCards) ? sideTops(ctx.sideCards) : [];
+  const neededInPlay = needed?.names
+    ? needed.names.every((name) => sideTopCards.some((top) => lower(top.name).includes(name)))
+    : sideTopCards.some((top) => matchesInPlayDescriptor(top, needed));
+  if (rulesEnabled && needed && Array.isArray(ctx.sideCards) && !neededInPlay) {
     return `You need ${needed.label} in play to use this Ability.`;
   }
   // Legacy powers are off while the holder has the printed Special Conditions. Callers
@@ -1648,9 +1664,18 @@ export function abilityActivationBlockReason(card, ctx = {}) {
 
 const REQUIRED_IN_PLAY = /if you have (?:any|an?) ([^,.]+?) in play, you may use this ability/;
 
+// "if you have Solgaleo in play, you may search…" (Lunala), "if you have Moltres and Articuno in
+// play, you may…" (Zapdos): a partner named by printed name; every name must be in play.
+const NAMED_IN_PLAY = /if you have (?!any |an? )([a-z0-9 .'’-]+?) in play, you may/;
+
 function requiredInPlayDescriptor(card) {
-  const match = lower(cardAbilityText(card)).match(REQUIRED_IN_PLAY);
-  if (!match) return null;
+  const text = lower(cardAbilityText(card));
+  const match = text.match(REQUIRED_IN_PLAY);
+  if (!match) {
+    const named = text.match(NAMED_IN_PLAY)?.[1];
+    if (!named) return null;
+    return { label: named, names: named.split(' and ').map((n) => n.trim()) };
+  }
   const what = match[1];
   return {
     label: what,

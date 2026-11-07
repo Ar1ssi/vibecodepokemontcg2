@@ -2079,3 +2079,52 @@ test('ability: Mysterious Potion flips once — heads heals 50, tails puts 2 cou
   }
   assert.deepEqual([...results].sort((a, b) => a - b), [50, 120]);
 });
+
+// Lunala Blessing of the Moone, pkmn corpus: Cosmic Eclipse 102.
+const BLESSING_OF_THE_MOONE_TEXT =
+  'Once during your turn (before your attack), if you have Solgaleo in play, you may search your deck for up to 2 Energy cards and attach them to your Solgaleo or Lunala in any way you like. Then, shuffle your deck.';
+
+function setupBlessing({ withSolgaleo }) {
+  const { state, rng } = setupGame();
+  const p1 = state.players.p1;
+  p1.zones.active.push(
+    createCard({
+      instanceId: 70,
+      name: 'Lunala',
+      hp: 160,
+      supertype: 'Pokémon',
+      abilities: [{ name: 'Blessing of the Moone', type: 'Ability', text: BLESSING_OF_THE_MOONE_TEXT }],
+    })
+  );
+  p1.zones.bench.push(createCard({ instanceId: 72, name: 'Other', hp: 60, supertype: 'Pokémon' }));
+  if (withSolgaleo) p1.zones.bench.push(createCard({ instanceId: 73, name: 'Solgaleo', hp: 170, supertype: 'Pokémon' }));
+  state.players.p2.zones.active.push(createCard({ instanceId: 71, name: 'Opp', hp: 200, supertype: 'Pokémon' }));
+  p1.zones.deck.push(energyCard(81, 'Metal'), energyCard(82, 'Psychic'), energyCard(83, 'Fire'));
+  return { state, rng };
+}
+
+test('ability: Lunala Blessing of the Moone needs Solgaleo in play (CEC 102)', () => {
+  const { state, rng } = setupBlessing({ withSolgaleo: false });
+  const res = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
+  assert.ok(res.error, 'blocked without Solgaleo');
+  assert.equal(res.state.players.p1.zones.deck.length, 3, 'deck untouched');
+});
+
+test('ability: Lunala Blessing of the Moone attaches up to 2 searched Energy to Solgaleo or Lunala only (CEC 102)', () => {
+  const { state, rng } = setupBlessing({ withSolgaleo: true });
+  const res1 = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
+  assert.equal(res1.error, null);
+  const res2 = resolveWith(res1, [81, 82], rng);
+  assert.deepEqual(
+    res2.pendingChoice.options.map((c) => c.instanceId).sort(),
+    [70, 73],
+    'only Lunala and Solgaleo can receive the Energy'
+  );
+  const res3 = resolveWith(res2, [73], rng);
+  const res4 = resolveWith(res3, [70], rng);
+  assert.equal(res4.error, null);
+  assert.deepEqual(attachedTo(res4.state, 'p1', 73), [81]);
+  assert.deepEqual(attachedTo(res4.state, 'p1', 70), [82]);
+  assert.equal(res4.state.players.p1.zones.hand.length, 0, 'Energy never goes to hand');
+  assert.equal(res4.state.players.p1.zones.deck.length, 1, 'the third Energy stays in the deck');
+});

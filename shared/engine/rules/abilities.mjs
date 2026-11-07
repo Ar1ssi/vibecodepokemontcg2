@@ -674,7 +674,7 @@ export function parseAbility(text = '') {
     // Pokémon, not into the hand.
     // "…and attach to one of your Pokémon" (Alolan Golem Electrum Deposit) drops the pronoun.
     const attachClause = lower.match(
-      /search your deck for [^.]*? and attach (?:(?:it|them) )?to (this pok[eé]mon|(?:1|one) of your [^.]*?pok[eé]mon|your [^.]*?pok[eé]mon in any way you like)/
+      /search your deck for [^.]*? and attach (?:(?:it|them) )?to (this pok[eé]mon|(?:1|one) of your [^.]*?pok[eé]mon|your (?:[^.]*?pok[eé]mon|[a-z0-9 .'’-]+? or [a-z0-9 .'’-]+?) in any way you like)/
     )?.[1];
     const attachEach = Boolean(attachClause?.endsWith('in any way you like'));
     const attachTarget = !attachClause
