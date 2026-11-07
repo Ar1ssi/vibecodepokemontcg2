@@ -980,6 +980,17 @@ function parseSearchDeckKind(lower) {
     };
   }
 
+  // "an Evolution Pokémon or an Energy card" (homebrew Hilda): one card of either kind, not
+  // the first kind alone.
+  if (/search your deck for an evolution pok[ée]mon or an energy card\b/.test(lower)) {
+    return {
+      what: 'Evolution Pokémon or Energy',
+      count: 1,
+      destination,
+      ...(reveal ? { reveal: true } : {}),
+    };
+  }
+
   // up to N Basic Pokémon → bench WITH an HP cap (Buddy-Buddy Poffin, etc.)
   const basicHpBench = lower.match(
     /search your deck for (?:up to\s+)?(\d+)\s+basic pok[ée]mon(?:\s+cards?)?\s+with\s+(\d+)\s+hp\s+or\s+less/
