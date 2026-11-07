@@ -14,9 +14,9 @@ line in the commit message, not edits.
    they must honor (immediate caller, type/interface, existing test). Not the whole area.
 3. **Implement** — the smallest change that is *fully correct*: cover the error/empty/boundary paths
    the change implies. Match local style exactly, even if you dislike it.
-4. **Verify** — the post-edit hook covers per-file tests. Logic change: add a test that fails without
+4. **Verify** — the post-edit hook only lints. Logic change: add a test that fails without
    it (bug → regression test). Visual-only change (CSS, mat FX, animation, layout): no test; the user
-   checks localhost. Run `pnpm test:changed` before commit (full `pnpm test` if it touched engine/rules).
+   checks localhost. No `pnpm test`/`test:changed`/`gates`/`audit:*` before commit (CLAUDE.md § Code standard).
 5. **Record** — Light END (CLAUDE.md § Session protocol): the commit message is the journal; STATE
    only if Focus/Active/Next/Blocked changed. No design doc. MAP only if files were added/moved; DECISIONS only for a
    genuinely lasting choice.
@@ -24,6 +24,6 @@ line in the commit message, not edits.
 Done — tick in your final message:
 - [ ] Plan posted (cause named with evidence, for bugs)
 - [ ] Test that fails without the change (logic changes only)
-- [ ] `pnpm test:changed` (or `pnpm test`) green (output shown)
+- [ ] New test (if any) passes via `node --test <file>` (output shown)
 - [ ] Diff contains nothing but the change
 - [ ] Commit message carries the why + any `flag:` lines (Light END)

@@ -47,9 +47,10 @@ END — whenever you changed anything:
 - Maintenance due when ≥30 commits landed on `main` since the last `maintain:` commit
   or any harness cap is blown: `pnpm harness:check` (exit 1 = run `.agent/workflows/maintain.md`).
 - **"Push to main"** (the user's phrase) means push to GitHub's `main`: `git fetch origin main`, merge or
-  rebase onto `origin/main`, run `TEST_BASE=origin/main pnpm gates`, run the full `pnpm test` only if it
-  says REQUIRED (a green run records the tree, so an identical landing skips it), then
-  `git push origin HEAD:main`. This rule is the user's standing authorization for that push; don't ask
+  rebase onto `origin/main`, then `git push origin HEAD:main`. No `pnpm gates`/`pnpm test`/`pnpm audit:*`
+  on this push (they never fail on small work). Exception: a landing that closes a large slice or
+  implementation plan (feature.md, exec-plan, oneshot-feature) runs `TEST_BASE=origin/main pnpm gates`
+  first and the full `pnpm test` if it says REQUIRED. This rule is the user's standing authorization for that push; don't ask
   again. Never force-push.
 
 ## Routing
@@ -112,9 +113,11 @@ Each workflow states an exit test; on the fence, start with the lighter workflow
 - Engine, rules, netcode, and state-logic changes ship with a test that fails without them.
   Visual-only changes (CSS, mat FX, animation, layout) are exempt — the user checks those on localhost.
 - Verification is never a question. The PostToolUse hook (`scripts/hooks/post-edit-check.mjs`) lints
-  each edited JS file and runs its own `__tests__/<name>.test.mjs`; fix what it reports. Iterate with
-  `node --test <file>`. Before commit: `pnpm test:changed` for patch work; full `pnpm test` when
-  `pnpm gates` says REQUIRED (engine, netcode, dependency or lockfile changes).
+  each edited JS file (it no longer runs tests); fix what it reports. Run a new test with
+  `node --test <file>`. Commits unrelated to a large slice or implementation plan (patch, debug,
+  refactor, small feature): no `pnpm test`, `pnpm test:changed`, `pnpm gates` or `pnpm audit:*` — they
+  never fail there. Large slices/plans (feature.md, exec-plan, oneshot-feature): `pnpm test:changed` per
+  slice; full `pnpm test` and `pnpm gates`/audits at the landing.
 - Comments only for constraints and whys. No dead or commented-out code. Match the file's local style.
 - Board animations play one after another, never on top of each other: each goes through the FX
   queue (`netcode/advisory-animations.js`) and its plan returns a hold that lasts until its scene ends.

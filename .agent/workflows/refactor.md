@@ -10,7 +10,7 @@ separately; never bundle the two in one diff.
    (CLAUDE.md § User sync); proceed on it directly only when unattended.
 3. **Execute** — one move at a time: apply it everywhere (grep to enumerate every caller/import/
    config reference — never from recall), run tests, commit if permitted. Never bundle two moves.
-4. **Verify** — full suite green with test logic unmodified (mechanical renames inside tests are
+4. **Verify** — affected tests (`node --test <file>`; no full `pnpm test`) green with test logic unmodified (mechanical renames inside tests are
    the only allowed test edits). Had to change an assertion? You changed behavior → stop, revert
    that move, reroute to feature.md.
 5. **Record** — MAP.md (paths moved!) · area docs that mention moved files · journal · STATE.

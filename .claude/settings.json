@@ -15,7 +15,7 @@
             "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR/scripts/hooks/post-edit-check.mjs\"",
             "timeout": 120,
-            "statusMessage": "Linting and testing the edited file..."
+            "statusMessage": "Linting the edited file..."
           }
         ]
       }

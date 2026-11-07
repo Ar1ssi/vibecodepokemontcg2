@@ -1,7 +1,6 @@
-// Claude Code PostToolUse hook (Edit|Write): lints the edited JS file and runs its own test
-// file, so the agent gets fast feedback without spending turns on it. Exit 2 = report the
-// failure back to the agent; exit 0 = pass or nothing to check. The full suite
-// (`pnpm test`) still runs once before commit — this hook only covers the touched file.
+// Claude Code PostToolUse hook (Edit|Write): lints the edited JS file so the agent gets fast
+// feedback without spending turns on it. Exit 2 = report the failure back to the agent; exit 0 =
+// pass or nothing to check. Tests are not run here (user decision: they never fail on small work).
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -48,10 +47,6 @@ function main() {
   const eslintEntry = path.join(repoRoot, 'node_modules', 'eslint', 'bin', 'eslint.js');
   if (plan.lint && existsSync(eslintEntry)) {
     failures.push(run('eslint', process.execPath, [eslintEntry, '--quiet', plan.lint], repoRoot));
-  }
-  for (const testFile of plan.tests) {
-    const label = `node --test ${path.relative(repoRoot, testFile)}`;
-    failures.push(run(label, process.execPath, ['--test', testFile], repoRoot));
   }
 
   const report = failures.filter(Boolean).join('\n\n');
