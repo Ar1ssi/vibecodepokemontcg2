@@ -227,7 +227,7 @@ const CONDITIONAL_PROVISION = [
   ]],
   [/^neo upper energy$/, () => [
     { type: 'provide', energyTypes: ['Colorless'], count: 1 },
-    { type: 'provide', energyTypes: ['Any'], count: 2, condition: 'stage2' },
+    { type: 'provide', energyTypes: ['Any'], count: 2, condition: 'stage2Plus' },
   ]],
   [/^reversal energy$/, () => [
     { type: 'provide', energyTypes: ['Colorless'], count: 1 },
@@ -1142,6 +1142,11 @@ function stageKey(pokemon) {
   return 'basic';
 }
 
+// The homebrew MEGA and Tera stages are Stage 3 in play, so they count as "Stage 2 or higher" (Neo Upper Energy).
+function isStage2OrHigher(pokemon) {
+  return ['stage2', 'megahb', 'terahb'].includes(stageKey(pokemon));
+}
+
 function conditionMet(condition, pokemon, zoneArray) {
   if (!condition) return true;
   const img = pokemon?.image;
@@ -1153,6 +1158,8 @@ function conditionMet(condition, pokemon, zoneArray) {
       return stageKey(pokemon) === 'basic';
     case 'stage2':
       return stageKey(pokemon) === 'stage2';
+    case 'stage2Plus':
+      return isStage2OrHigher(pokemon);
     case 'evolution':
       return stageKey(pokemon) !== 'basic';
     case 'delta':
@@ -1516,6 +1523,8 @@ function provisionConditionMet(condition, { host = null, attached = [], self = n
       return stageKey(host) === 'basic';
     case 'stage2':
       return stageKey(host) === 'stage2';
+    case 'stage2Plus':
+      return isStage2OrHigher(host);
     case 'evolution':
       return stageKey(host) !== 'basic';
     case 'threeStage2':

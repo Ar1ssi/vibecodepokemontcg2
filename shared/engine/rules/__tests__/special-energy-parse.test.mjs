@@ -302,6 +302,18 @@ test('Neo Upper Energy pays two symbols of any type on a Stage 2, whatever the s
   }
 });
 
+test('Neo Upper Energy also pays two symbols on a homebrew MEGA or Tera host (Stage 3)', async () => {
+  const { serverEnergyDescriptor } = await import('../server-energy.mjs');
+  const { canPayAttackCost } = await import('../attack-engine.mjs');
+  const neoUpper = { name: 'Neo Upper Energy', type: 'Energy', subtypes: ['Special'], types: ['Colorless'] };
+  for (const stage of ['MEGAHB', 'TERAHB']) {
+    const host = { name: 'Mega Greninja ex', type: 'Pokémon', stage, types: ['Water'] };
+    const entry = serverEnergyDescriptor(neoUpper, { hostPokemon: host });
+    assert.equal(canPayAttackCost([entry], ['Water', 'Psychic']), true, stage);
+    assert.equal(canPayAttackCost([entry], ['Water', 'Water', 'Water']), false, stage);
+  }
+});
+
 test('Neo Upper Energy provides only one Energy on a non-Stage 2 host', async () => {
   const { serverEnergyDescriptor } = await import('../server-energy.mjs');
   const { canPayAttackCost } = await import('../attack-engine.mjs');
