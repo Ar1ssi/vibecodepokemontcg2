@@ -8,8 +8,10 @@ import { extractTcgdexIdFromImageUrl } from '../../engine/rules/legacy-set-ids.m
 
 const CLIENT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../client');
 const OWN_ART_IDS = [
-  'bw1-107', 'bw1-108', 'bw1-109', 'bw1-110', 'bw1-111', 'sm3.5-69', 'sm3.5-70',
+  'bw1-107', 'bw1-108', 'bw1-109', 'bw1-110', 'bw1-111',
+  ...Array.from({ length: 78 }, (_, i) => `sm3.5-${i + 1}`),
   ...Array.from({ length: 78 }, (_, i) => `sm7.5-${i + 1}`),
+  ...Array.from({ length: 122 }, (_, i) => `swsh4.5sv-SV${String(i + 1).padStart(3, '0')}`),
   ...Array.from({ length: 24 }, (_, i) => `sve-${String(i + 1).padStart(3, '0')}`),
 ];
 
@@ -18,6 +20,10 @@ test('League-stamped and imageless cards map to a TCGdex-style base under our ow
   assert.equal(cardArtImageBase('sm3.5-69'), `${CARD_ART_ROOT}/sm/sm3.5/69`);
   assert.equal(cardArtImageBase('sm7.5-70'), `${CARD_ART_ROOT}/sm/sm7.5/70`, 'Dragon Majesty Zinnia');
   assert.equal(cardArtImageBase('sm7.5-79'), null, 'no card 79 in Dragon Majesty');
+  assert.equal(cardArtImageBase('sm3.5-1'), `${CARD_ART_ROOT}/sm/sm3.5/1`, 'Shining Legends Bulbasaur (TCGdex has no image)');
+  assert.equal(cardArtImageBase('swsh4.5sv-SV122'), `${CARD_ART_ROOT}/swsh/swsh4.5sv/SV122`, 'Shining Fates Shiny Vault');
+  assert.equal(cardArtImageBase('swsh4.5sv-SV123'), null, 'no SV123');
+  assert.equal(cardArtImageBase('swsh4.5-1'), null, 'Shining Fates main set keeps TCGdex art');
   assert.equal(cardArtImageBase('sve-024'), `${CARD_ART_ROOT}/sv/sve/024`);
   assert.equal(cardArtImageBase('bw1-105'), null, 'Grass Energy has no stamp; TCGdex art stays');
   assert.equal(cardArtImageBase(undefined), null);
@@ -43,6 +49,7 @@ test('withCardArt swaps only the image of a raw TCGdex record', () => {
 test('our art URLs still resolve to the TCGdex id, relative or absolute', () => {
   assert.equal(extractTcgdexIdFromImageUrl(`${CARD_ART_ROOT}/sv/sve/001/high.webp`), 'sve-001');
   assert.equal(extractTcgdexIdFromImageUrl(`http://localhost:4000${CARD_ART_ROOT}/sm/sm3.5/70/low.webp`), 'sm3.5-70');
+  assert.equal(extractTcgdexIdFromImageUrl(`${CARD_ART_ROOT}/swsh/swsh4.5sv/SV001/high.webp`), 'swsh4.5sv-SV001');
   assert.deepEqual(cardArtImageParts(`${CARD_ART_ROOT}/bw/bw1/111/high.webp`), { series: 'bw', set: 'bw1', number: '111' });
   assert.equal(cardArtImageParts('https://assets.tcgdex.net/en/bw/bw1/111/high.webp'), null);
 });
