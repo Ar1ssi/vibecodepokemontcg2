@@ -333,6 +333,34 @@ const WHOLE_BORROWS = [
   ],
 ];
 
+// Ultra Necrozma Ultra Burst: "If either Lunala or Solgaleo is in play, this Pokémon can use 1 of
+// their attacks as this Pokémon's attack." No cost sentence: an attack used as this Pokémon's own
+// is paid with this Pokémon's Energy. "In play" names no side, so both players' Pokémon count.
+function parseNamedPokemonBorrow(text) {
+  const t = normalize(text);
+  const phrase = t.match(
+    /^if (?:either )?(.+?) (?:is|are) in play, this pokemon can use 1 of (?:their|its) attacks as this pokemon's attack\./
+  )?.[1];
+  if (!phrase) return null;
+  const names = phrase
+    .split(/,\s*(?:or\s+)?|\s+or\s+/)
+    .map((n) => n.trim())
+    .filter(Boolean);
+  if (names.length === 0) return null;
+  return {
+    scopes: ['ownInPlay', 'oppInPlay'],
+    basic: false,
+    noRuleBox: false,
+    gxOrEx: false,
+    evolvesFrom: null,
+    names,
+    namePrefix: null,
+    requiresActive: false,
+    bonusBeforeWR: 0,
+    powerStatus: null,
+  };
+}
+
 /**
  * Attack-borrowing Abilities (design 034 slice 6, design 049 slice 3): "This Pokémon can use the
  * attacks of … (You still need the necessary Energy …)", "can use any attack from …", Mimic and
@@ -344,6 +372,8 @@ const WHOLE_BORROWS = [
  */
 export function parseAttackBorrowAbility(text) {
   const raw = String(text || '').toLowerCase().replace(/[’‘]/g, "'");
+  const namedBorrow = parseNamedPokemonBorrow(text);
+  if (namedBorrow) return namedBorrow;
   if (!BORROW_KEEPS_COST.test(raw)) return null;
   const t = normalize(text);
   const base = {

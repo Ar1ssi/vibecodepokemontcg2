@@ -944,6 +944,36 @@ test("ability: LINK borrows every Unown's attacks on both sides, not its own", a
   assert.deepEqual(await extrasOf(state, 70), ['A Hit', 'B Hit']);
 });
 
+// Ultra Necrozma Ultra Burst (card text read from the card image; not yet in out/pkmn-pokemon-cards.json).
+const ULTRA_BURST =
+  "If either Lunala or Solgaleo is in play, this Pokémon can use 1 of their attacks as this Pokémon's attack.";
+
+test('ability: Ultra Burst borrows attacks of Lunala and Solgaleo in play on either side, nobody else', async () => {
+  const { state } = setupGame();
+  holder(state, ULTRA_BURST, { name: 'Ultra Necrozma', attacks: [] });
+  assert.deepEqual(await extrasOf(state, 70), [], 'no Lunala or Solgaleo in play');
+  state.players.p1.zones.bench.push(
+    mon(72, 'Solgaleo', { attacks: [{ name: 'Sun Strike', cost: [], damage: '60', text: '' }] }),
+    mon(73, 'Pikachu', { attacks: [{ name: 'Gnaw', cost: [], damage: '10', text: '' }] })
+  );
+  state.players.p2.zones.bench.push(mon(74, 'Lunala', { attacks: [{ name: 'Moon Blast', cost: [], damage: '50', text: '' }] }));
+  assert.deepEqual(await extrasOf(state, 70), ['Sun Strike', 'Moon Blast']);
+});
+
+test("ability: Ultra Burst's borrowed attack still needs this Pokémon's Energy and hits for its damage", () => {
+  const { state, rng } = setupGame();
+  holder(state, ULTRA_BURST, { name: 'Ultra Necrozma', attacks: [] });
+  state.players.p1.zones.bench.push(
+    mon(72, 'Lunala', { attacks: [{ name: 'Moon Blast', cost: ['Psychic'], damage: '50', text: '' }] })
+  );
+  state.players.p2.zones.active[0].hp = 300;
+  assert.ok(attackCmd(state, 0, rng).error, 'no Energy attached to Ultra Necrozma');
+  state.players.p1.zones.active.push(basicEnergy(80, 'Psychic', 70));
+  const res = attackCmd(state, 0, rng);
+  assert.equal(res.error, null);
+  assert.equal(res.state.players.p2.zones.active[0].damage, 50);
+});
+
 test("ability: Dragon DNA uses its Basic's attack with 30 more damage to the Defending Pokémon", () => {
   const { state, rng } = setupGame();
   const magikarp = mon(60, 'Magikarp', {
