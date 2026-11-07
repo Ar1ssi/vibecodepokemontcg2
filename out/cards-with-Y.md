@@ -1,0 +1,212 @@
+# Cards with {Y} in text
+
+147 printings, 56 unique names. Source: out/pkmn-*-cards.json.
+
+## Unique names
+
+- Alolan Ninetales
+- Alolan Ninetales-GX
+- Alolan Vulpix
+- Altaria-GX
+- Aromatisse
+- Azumarill
+- Carbink
+- Comfey
+- Diancie-EX
+- Diantha
+- Fairy Charm Ability
+- Fairy Charm UB
+- Fairy Charm {F}
+- Fairy Charm {G}
+- Fairy Charm {L}
+- Fairy Charm {N}
+- Fairy Charm {P}
+- Fairy Drop
+- Fairy Garden
+- Flabébé
+- Floette
+- Florges
+- Florges-EX
+- Gardevoir & Sylveon-GX
+- Gardevoir-EX
+- Gardevoir-GX
+- Goodra
+- Goomy
+- Kecleon
+- Klefki
+- M Altaria-EX
+- M Diancie-EX
+- M Gardevoir-EX
+- M Mawile-EX
+- Mawile-EX
+- Mimikyu-GX
+- Mina
+- Mr. Mime
+- Ribombee
+- Shiinotic
+- Slurpuff
+- Sylveon-EX
+- Sylveon-GX
+- Tapu Lele
+- Togekiss
+- Togekiss-EX
+- Togepi & Cleffa & Igglybuff-GX
+- Unit Energy {F}{D}{Y}
+- Whimsicott-GX
+- Wigglytuff-GX
+- Wonder Energy
+- Wondrous Labyrinth Prism Star
+- Xerneas BREAK
+- Xerneas Prism Star
+- Xerneas-EX
+- Xerneas-GX
+
+## Printings
+
+- Alolan Ninetales — Team Up 111 (pokemon)
+- Alolan Ninetales-GX — Lost Thunder 225 (gx)
+- Alolan Ninetales-GX — Lost Thunder 205 (gx)
+- Alolan Ninetales-GX — Lost Thunder 132 (gx)
+- Alolan Ninetales-GX — Lost Thunder 225 (pokemon)
+- Alolan Ninetales-GX — Lost Thunder 205 (pokemon)
+- Alolan Ninetales-GX — Lost Thunder 132 (pokemon)
+- Alolan Vulpix — Lost Thunder 53 (pokemon)
+- Altaria-GX — Dragon Majesty SV77 (gx)
+- Altaria-GX — Dragon Majesty 72 (gx)
+- Altaria-GX — Dragon Majesty 68 (gx)
+- Altaria-GX — Dragon Majesty 41 (gx)
+- Altaria-GX — Dragon Majesty SV77 (pokemon)
+- Altaria-GX — Dragon Majesty 72 (pokemon)
+- Altaria-GX — Dragon Majesty 68 (pokemon)
+- Altaria-GX — Dragon Majesty 41 (pokemon)
+- Aromatisse — XY 93 (pokemon)
+- Azumarill — Primal Clash 104 (ancient-trait)
+- Azumarill — Primal Clash 104 (pokemon)
+- Carbink — Roaring Skies 47 (pokemon)
+- Comfey — Guardians Rising 93 (pokemon)
+- Diancie-EX — Fates Collide 72 (pokemon)
+- Diancie-EX — XY Promos XY43 (pokemon)
+- Diantha — Forbidden Light 130 (trainer)
+- Diantha — Forbidden Light 105 (trainer)
+- Fairy Charm {F} — Lost Thunder 176 (trainer)
+- Fairy Charm {G} — Lost Thunder 174 (trainer)
+- Fairy Charm {L} — Unbroken Bonds 172 (trainer)
+- Fairy Charm {N} — Lost Thunder 177 (trainer)
+- Fairy Charm {P} — Lost Thunder 175 (trainer)
+- Fairy Charm Ability — Unbroken Bonds 171 (trainer)
+- Fairy Charm UB — Team Up 142 (trainer)
+- Fairy Drop — Fates Collide 99 (trainer)
+- Fairy Garden — Fates Collide 100 (trainer)
+- Fairy Garden — XY 117 (trainer)
+- Flabébé — Forbidden Light 83 (pokemon)
+- Floette — Cosmic Eclipse 151 (pokemon)
+- Floette — Flashfire 64 (pokemon)
+- Florges — Cosmic Eclipse 152 (pokemon)
+- Florges — Forbidden Light 86 (pokemon)
+- Florges — BREAKthrough 103 (pokemon)
+- Florges-EX — Phantom Forces 116 (pokemon)
+- Florges-EX — Phantom Forces 67 (pokemon)
+- Gardevoir & Sylveon-GX — Unbroken Bonds 225 (gx)
+- Gardevoir & Sylveon-GX — Unbroken Bonds 205 (gx)
+- Gardevoir & Sylveon-GX — Unbroken Bonds 204 (gx)
+- Gardevoir & Sylveon-GX — Unbroken Bonds 130 (gx)
+- Gardevoir & Sylveon-GX — Unbroken Bonds 225 (pokemon)
+- Gardevoir & Sylveon-GX — Unbroken Bonds 205 (pokemon)
+- Gardevoir & Sylveon-GX — Unbroken Bonds 204 (pokemon)
+- Gardevoir & Sylveon-GX — Unbroken Bonds 130 (pokemon)
+- Gardevoir-EX — Steam Siege 116 (pokemon)
+- Gardevoir-EX — Steam Siege 111 (pokemon)
+- Gardevoir-EX — Steam Siege 78 (pokemon)
+- Gardevoir-EX — Generations RC30 (pokemon)
+- Gardevoir-EX — Primal Clash 155 (pokemon)
+- Gardevoir-EX — Primal Clash 105 (pokemon)
+- Gardevoir-GX — Burning Shadows SV75 (gx)
+- Gardevoir-GX — Burning Shadows 159 (gx)
+- Gardevoir-GX — Burning Shadows 140 (gx)
+- Gardevoir-GX — Burning Shadows 93 (gx)
+- Gardevoir-GX — Burning Shadows SV75 (pokemon)
+- Gardevoir-GX — Burning Shadows 159 (pokemon)
+- Gardevoir-GX — Burning Shadows 140 (pokemon)
+- Gardevoir-GX — Burning Shadows 93 (pokemon)
+- Goodra — Forbidden Light 94 (pokemon)
+- Goodra — Phantom Forces 77 (pokemon)
+- Goodra — Flashfire 74 (pokemon)
+- Goomy — Forbidden Light 91 (pokemon)
+- Goomy — Ancient Origins 58 (pokemon)
+- Kecleon — Lost Thunder 162 (pokemon)
+- Klefki — Steam Siege 80 (pokemon)
+- Klefki — Furious Fists 73 (pokemon)
+- M Altaria-EX — Fates Collide 121 (pokemon)
+- M Altaria-EX — Fates Collide 69 (pokemon)
+- M Diancie-EX — XY Promos XY44 (pokemon)
+- M Gardevoir-EX — 30th Celebration 106 (pokemon)
+- M Gardevoir-EX — Steam Siege 112 (pokemon)
+- M Gardevoir-EX — Steam Siege 79 (pokemon)
+- M Gardevoir-EX — Generations RC31 (pokemon)
+- M Gardevoir-EX — Primal Clash 156 (pokemon)
+- M Gardevoir-EX — Primal Clash 106 (pokemon)
+- M Mawile-EX — XY Promos XY104 (pokemon)
+- Mawile-EX — XY Promos XY103 (pokemon)
+- Mimikyu-GX — Lost Thunder 226 (gx)
+- Mimikyu-GX — Lost Thunder 206 (gx)
+- Mimikyu-GX — Lost Thunder 149 (gx)
+- Mimikyu-GX — Lost Thunder 226 (pokemon)
+- Mimikyu-GX — Lost Thunder 206 (pokemon)
+- Mimikyu-GX — Lost Thunder 149 (pokemon)
+- Mina — Lost Thunder 211 (trainer)
+- Mina — Lost Thunder 183 (trainer)
+- Mr. Mime — Generations 52 (pokemon)
+- Mr. Mime — BREAKthrough 97 (pokemon)
+- Ribombee — Lost Thunder 146 (pokemon)
+- Ribombee — Sun & Moon 93 (pokemon)
+- Shiinotic — Lost Thunder 148 (pokemon)
+- Shiinotic — Ultra Prism 93 (pokemon)
+- Slurpuff — Phantom Forces 69 (pokemon)
+- Slurpuff — XY 95 (pokemon)
+- Sylveon-EX — Generations RC32 (pokemon)
+- Sylveon-EX — Generations RC21 (pokemon)
+- Sylveon-GX — Guardians Rising SV76 (gx)
+- Sylveon-GX — Guardians Rising 92a (gx)
+- Sylveon-GX — Guardians Rising 158 (gx)
+- Sylveon-GX — Guardians Rising 140 (gx)
+- Sylveon-GX — Guardians Rising 92 (gx)
+- Sylveon-GX — Guardians Rising SV76 (pokemon)
+- Sylveon-GX — Guardians Rising 92a (pokemon)
+- Sylveon-GX — Guardians Rising 158 (pokemon)
+- Sylveon-GX — Guardians Rising 140 (pokemon)
+- Sylveon-GX — Guardians Rising 92 (pokemon)
+- Tapu Lele — Lost Thunder 150 (pokemon)
+- Tapu Lele — Sun & Moon Promos SM152 (pokemon)
+- Togekiss — Roaring Skies 46 (ancient-trait)
+- Togekiss — Unbroken Bonds 138 (pokemon)
+- Togekiss — Roaring Skies 46 (pokemon)
+- Togekiss-EX — BREAKpoint 83 (pokemon)
+- Togepi & Cleffa & Igglybuff-GX — Cosmic Eclipse 143a (gx)
+- Togepi & Cleffa & Igglybuff-GX — Cosmic Eclipse 143 (gx)
+- Togepi & Cleffa & Igglybuff-GX — Cosmic Eclipse 143a (pokemon)
+- Togepi & Cleffa & Igglybuff-GX — Cosmic Eclipse 143 (pokemon)
+- Unit Energy {F}{D}{Y} — Forbidden Light 146 (special-energy)
+- Unit Energy {F}{D}{Y} — Forbidden Light 118 (special-energy)
+- Whimsicott-GX — Unbroken Bonds 226 (gx)
+- Whimsicott-GX — Unbroken Bonds 206 (gx)
+- Whimsicott-GX — Unbroken Bonds 140 (gx)
+- Whimsicott-GX — Unbroken Bonds 226 (pokemon)
+- Whimsicott-GX — Unbroken Bonds 206 (pokemon)
+- Whimsicott-GX — Unbroken Bonds 140 (pokemon)
+- Wigglytuff-GX — Hidden Fates 42 (gx)
+- Wigglytuff-GX — Hidden Fates 42 (pokemon)
+- Wonder Energy — Primal Clash 144 (special-energy)
+- Wondrous Labyrinth Prism Star — Team Up 158 (trainer)
+- Xerneas BREAK — Steam Siege 82 (pokemon)
+- Xerneas Prism Star — Lost Thunder 144 (pokemon)
+- Xerneas-EX — Celebrations 97 (pokemon)
+- Xerneas-EX — XY Promos XY149 (pokemon)
+- Xerneas-EX — XY Promos XY07 (pokemon)
+- Xerneas-EX — XY 146 (pokemon)
+- Xerneas-EX — XY 97 (pokemon)
+- Xerneas-GX — Forbidden Light 139 (gx)
+- Xerneas-GX — Forbidden Light 126 (gx)
+- Xerneas-GX — Forbidden Light 90 (gx)
+- Xerneas-GX — Forbidden Light 139 (pokemon)
+- Xerneas-GX — Forbidden Light 126 (pokemon)
+- Xerneas-GX — Forbidden Light 90 (pokemon)
