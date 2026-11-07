@@ -187,6 +187,34 @@
    "wp": "026-wp.webp",
    "cc": "TEX_SouthernCross"
   },
+  "027": {
+   "tcgl": "swsh6_155",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "027-front.webp",
+   "wp": "027-wp.webp"
+  },
+  "028": {
+   "tcgl": "sm8_187",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "028-front.webp",
+   "wp": "028-wp.webp"
+  },
+  "029": {
+   "tcgl": "swsh10_143",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "029-front.webp",
+   "wp": "029-wp.webp"
+  },
+  "030": {
+   "tcgl": "me1_117",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "030-front.webp",
+   "wp": "030-wp.webp"
+  },
   "031": {
    "tcgl": "sv1_7",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
@@ -294,6 +322,55 @@
    "front": "045-front.webp",
    "wp": "045-wp.webp"
   },
+  "046": {
+   "tcgl": "swsh12_159",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "046-front.webp",
+   "wp": "046-wp.webp"
+  },
+  "047": {
+   "tcgl": "sm12_200",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "047-front.webp",
+   "wp": "047-wp.webp"
+  },
+  "048": {
+   "tcgl": "sv8_172",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "048-front.webp",
+   "wp": "048-wp.webp"
+  },
+  "049": {
+   "tcgl": "me2-5_211",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "049-front.webp",
+   "wp": "049-wp.webp"
+  },
+  "050": {
+   "tcgl": "sv8-5_111",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "050-front.webp",
+   "wp": "050-wp.webp"
+  },
+  "051": {
+   "tcgl": "swsh7_161",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "051-front.webp",
+   "wp": "051-wp.webp"
+  },
+  "052": {
+   "tcgl": "swsh7_144",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "052-front.webp",
+   "wp": "052-wp.webp"
+  },
   "053": {
    "tcgl": "sm2_98",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
@@ -321,6 +398,20 @@
    "material": "MAT_Cards3D_SvHolo",
    "front": "056-front.webp",
    "wp": "056-wp.webp"
+  },
+  "057": {
+   "tcgl": "sm7-5_64",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "057-front.webp",
+   "wp": "057-wp.webp"
+  },
+  "058": {
+   "tcgl": "sm7-5_59",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "058-front.webp",
+   "wp": "058-wp.webp"
   },
   "059": {
    "tcgl": "swsh2_91",
@@ -710,103 +801,100 @@
    "wp": "112-wp.webp"
   },
   "113": {
-   "tcgl": "swsh6_58",
-   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
-   "material": "MAT_Cards3D_SunPillar",
-   "front": "113-front.webp",
-   "wp": "113-wp.webp",
-   "cc": "TEX_SouthernCross"
-  },
-  "114": {
-   "tcgl": "swsh6_80",
-   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
-   "material": "MAT_Cards3D_SunPillar",
-   "front": "114-front.webp",
-   "wp": "114-wp.webp",
-   "cc": "TEX_SouthernCross"
-  },
-  "115": {
    "tcgl": "swsh7_93",
    "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
    "material": "MAT_Cards3D_SvHolo",
+   "front": "113-front.webp",
+   "wp": "113-wp.webp"
+  },
+  "114": {
+   "tcgl": "swsh6_54",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "114-front.webp",
+   "wp": "114-wp.webp"
+  },
+  "115": {
+   "tcgl": "swsh5_92",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
    "front": "115-front.webp",
    "wp": "115-wp.webp"
   },
   "116": {
-   "tcgl": "swsh6_97",
-   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
-   "material": "MAT_Cards3D_SunPillar",
-   "front": "116-front.webp",
-   "wp": "116-wp.webp",
-   "cc": "TEX_SouthernCross"
-  },
-  "117": {
-   "tcgl": "swsh6_54",
-   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
-   "material": "MAT_Cards3D_FlatSilver",
-   "front": "117-front.webp",
-   "wp": "117-wp.webp"
-  },
-  "118": {
-   "tcgl": "swsh5_92",
-   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
-   "material": "MAT_Cards3D_FlatSilver",
-   "front": "118-front.webp",
-   "wp": "118-wp.webp"
-  },
-  "119": {
    "tcgl": "swsh6_98",
    "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
    "material": "MAT_Cards3D_SvHolo",
+   "front": "116-front.webp",
+   "wp": "116-wp.webp"
+  },
+  "117": {
+   "tcgl": "swsh3_99",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
+   "front": "117-front.webp",
+   "wp": "117-wp.webp",
+   "cc": "TEX_SouthernCross"
+  },
+  "118": {
+   "tcgl": "swsh6_99",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
+   "front": "118-front.webp",
+   "wp": "118-wp.webp",
+   "cc": "TEX_SouthernCross"
+  },
+  "119": {
+   "tcgl": "me2-5_158",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
    "front": "119-front.webp",
    "wp": "119-wp.webp"
   },
   "120": {
-   "tcgl": "swsh3_99",
-   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
-   "material": "MAT_Cards3D_SunPillar",
+   "tcgl": "me2-5_159",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
    "front": "120-front.webp",
-   "wp": "120-wp.webp",
-   "cc": "TEX_SouthernCross"
+   "wp": "120-wp.webp"
   },
   "121": {
-   "tcgl": "swsh6_99",
-   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
-   "material": "MAT_Cards3D_SunPillar",
+   "tcgl": "swsh12_89",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
    "front": "121-front.webp",
-   "wp": "121-wp.webp",
-   "cc": "TEX_SouthernCross"
+   "wp": "121-wp.webp"
   },
   "122": {
-   "tcgl": "me2-5_158",
+   "tcgl": "sv7_103",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "122-front.webp",
    "wp": "122-wp.webp"
   },
   "123": {
-   "tcgl": "me2-5_159",
+   "tcgl": "zsv10-5_15",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "123-front.webp",
    "wp": "123-wp.webp"
   },
   "124": {
-   "tcgl": "swsh12_89",
-   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
-   "material": "MAT_Cards3D_SvHolo",
+   "tcgl": "sv8_25",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
    "front": "124-front.webp",
    "wp": "124-wp.webp"
   },
   "125": {
-   "tcgl": "sv7_103",
-   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
-   "material": "MAT_Cards3D_FlatSilver",
+   "tcgl": "me2-5_67",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
    "front": "125-front.webp",
    "wp": "125-wp.webp"
   },
   "126": {
-   "tcgl": "sv7_105",
+   "tcgl": "sv9_51",
    "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
    "material": "MAT_Cards3D_SunPillar",
    "front": "126-front.webp",
@@ -814,180 +902,180 @@
    "cc": "TEX_SouthernCross"
   },
   "127": {
-   "tcgl": "zsv10-5_15",
-   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
-   "material": "MAT_Cards3D_FlatSilver",
+   "tcgl": "sv8_92",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
    "front": "127-front.webp",
    "wp": "127-wp.webp"
   },
   "128": {
-   "tcgl": "sv8_25",
-   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
-   "material": "MAT_Cards3D_FlatSilver",
+   "tcgl": "sv6-5_6",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
    "front": "128-front.webp",
    "wp": "128-wp.webp"
   },
   "129": {
-   "tcgl": "me2-5_67",
+   "tcgl": "swsh6_40",
    "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
    "material": "MAT_Cards3D_SvHolo",
    "front": "129-front.webp",
    "wp": "129-wp.webp"
   },
   "130": {
-   "tcgl": "sv9_51",
-   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
-   "material": "MAT_Cards3D_SunPillar",
+   "tcgl": "swsh6_72",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
    "front": "130-front.webp",
-   "wp": "130-wp.webp",
-   "cc": "TEX_SouthernCross"
+   "wp": "130-wp.webp"
   },
   "131": {
-   "tcgl": "sv8_92",
+   "tcgl": "swsh6_73",
    "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
    "material": "MAT_Cards3D_SvHolo",
    "front": "131-front.webp",
    "wp": "131-wp.webp"
   },
   "132": {
-   "tcgl": "sv6-5_6",
-   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
-   "material": "MAT_Cards3D_SvHolo",
+   "tcgl": "swshbsp_55",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
    "front": "132-front.webp",
-   "wp": "132-wp.webp"
+   "wp": "132-wp.webp",
+   "cc": "TEX_SouthernCross"
   },
   "133": {
-   "tcgl": "swsh6_40",
-   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
-   "material": "MAT_Cards3D_SvHolo",
+   "tcgl": "rsv10-5_21",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
    "front": "133-front.webp",
    "wp": "133-wp.webp"
   },
   "134": {
-   "tcgl": "swsh6_72",
+   "tcgl": "rsv10-5_22",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "134-front.webp",
    "wp": "134-wp.webp"
   },
   "135": {
-   "tcgl": "swsh6_73",
-   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
-   "material": "MAT_Cards3D_SvHolo",
-   "front": "135-front.webp",
-   "wp": "135-wp.webp"
-  },
-  "136": {
-   "tcgl": "swshbsp_55",
+   "tcgl": "swsh10_101",
    "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
    "material": "MAT_Cards3D_SunPillar",
-   "front": "136-front.webp",
-   "wp": "136-wp.webp",
+   "front": "135-front.webp",
+   "wp": "135-wp.webp",
    "cc": "TEX_SouthernCross"
   },
+  "136": {
+   "tcgl": "swsh10_100",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "136-front.webp",
+   "wp": "136-wp.webp"
+  },
   "137": {
-   "tcgl": "rsv10-5_21",
-   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
-   "material": "MAT_Cards3D_FlatSilver",
+   "tcgl": "rsv10-5_23",
+   "shader": "TPCi/Cards3D/HoloFoil/Tinsel",
+   "material": "MAT_Cards3D_Tinsel",
    "front": "137-front.webp",
    "wp": "137-wp.webp"
   },
   "138": {
-   "tcgl": "rsv10-5_22",
-   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
-   "material": "MAT_Cards3D_FlatSilver",
-   "front": "138-front.webp",
-   "wp": "138-wp.webp"
-  },
-  "139": {
-   "tcgl": "swsh10_101",
+   "tcgl": "sv1_86",
    "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
    "material": "MAT_Cards3D_SunPillar",
-   "front": "139-front.webp",
-   "wp": "139-wp.webp",
+   "front": "138-front.webp",
+   "wp": "138-wp.webp",
    "cc": "TEX_SouthernCross"
   },
-  "140": {
-   "tcgl": "swsh10_100",
+  "139": {
+   "tcgl": "swsh6_61",
    "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
    "material": "MAT_Cards3D_SvHolo",
+   "front": "139-front.webp",
+   "wp": "139-wp.webp"
+  },
+  "140": {
+   "tcgl": "swsh6_81",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
    "front": "140-front.webp",
    "wp": "140-wp.webp"
   },
   "141": {
-   "tcgl": "rsv10-5_23",
-   "shader": "TPCi/Cards3D/HoloFoil/Tinsel",
-   "material": "MAT_Cards3D_Tinsel",
-   "front": "141-front.webp",
-   "wp": "141-wp.webp"
-  },
-  "142": {
-   "tcgl": "sv1_86",
+   "tcgl": "swshbsp_258",
    "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
    "material": "MAT_Cards3D_SunPillar",
-   "front": "142-front.webp",
-   "wp": "142-wp.webp",
+   "front": "141-front.webp",
+   "wp": "141-wp.webp",
    "cc": "TEX_SouthernCross"
   },
+  "142": {
+   "tcgl": "swsh2_83",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "142-front.webp",
+   "wp": "142-wp.webp"
+  },
   "143": {
-   "tcgl": "swsh6_61",
-   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
-   "material": "MAT_Cards3D_SvHolo",
+   "tcgl": "sv3-5_123",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
    "front": "143-front.webp",
    "wp": "143-wp.webp"
   },
   "144": {
-   "tcgl": "swsh6_81",
+   "tcgl": "sm10_123",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "144-front.webp",
    "wp": "144-wp.webp"
   },
   "145": {
-   "tcgl": "swshbsp_258",
-   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
-   "material": "MAT_Cards3D_SunPillar",
+   "tcgl": "sm10_124",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
    "front": "145-front.webp",
-   "wp": "145-wp.webp",
-   "cc": "TEX_SouthernCross"
+   "wp": "145-wp.webp"
   },
   "146": {
-   "tcgl": "swsh2_83",
+   "tcgl": "swsh6_111",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "146-front.webp",
    "wp": "146-wp.webp"
   },
   "147": {
-   "tcgl": "sv3-5_123",
-   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
-   "material": "MAT_Cards3D_FlatSilver",
+   "tcgl": "swsh9_96",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
    "front": "147-front.webp",
-   "wp": "147-wp.webp"
+   "wp": "147-wp.webp",
+   "cc": "TEX_SouthernCross"
   },
   "148": {
-   "tcgl": "sm10_123",
-   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
-   "material": "MAT_Cards3D_FlatSilver",
+   "tcgl": "swsh12-5_89",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
    "front": "148-front.webp",
    "wp": "148-wp.webp"
   },
   "149": {
-   "tcgl": "sm10_124",
+   "tcgl": "swsh12_117",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "149-front.webp",
    "wp": "149-wp.webp"
   },
   "150": {
-   "tcgl": "swsh6_111",
+   "tcgl": "me4_60",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "150-front.webp",
    "wp": "150-wp.webp"
   },
   "151": {
-   "tcgl": "swsh9_96",
+   "tcgl": "swsh6_112",
    "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
    "material": "MAT_Cards3D_SunPillar",
    "front": "151-front.webp",
@@ -995,557 +1083,3329 @@
    "cc": "TEX_SouthernCross"
   },
   "152": {
-   "tcgl": "swsh12-5_89",
-   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
-   "material": "MAT_Cards3D_SvHolo",
+   "tcgl": "me4_61",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
    "front": "152-front.webp",
    "wp": "152-wp.webp"
   },
   "153": {
-   "tcgl": "swsh12_117",
+   "tcgl": "me2-5_146",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "153-front.webp",
    "wp": "153-wp.webp"
   },
   "154": {
-   "tcgl": "me4_60",
+   "tcgl": "me2-5_147",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "154-front.webp",
    "wp": "154-wp.webp"
   },
   "155": {
-   "tcgl": "swsh6_112",
-   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
-   "material": "MAT_Cards3D_SunPillar",
+   "tcgl": "me2-5_148",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
    "front": "155-front.webp",
-   "wp": "155-wp.webp",
-   "cc": "TEX_SouthernCross"
+   "wp": "155-wp.webp"
   },
   "156": {
-   "tcgl": "me4_61",
+   "tcgl": "me2-5_144",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "156-front.webp",
    "wp": "156-wp.webp"
   },
   "157": {
-   "tcgl": "me2-5_146",
-   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
-   "material": "MAT_Cards3D_FlatSilver",
+   "tcgl": "sv2_151",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
    "front": "157-front.webp",
    "wp": "157-wp.webp"
   },
   "158": {
-   "tcgl": "me2-5_147",
+   "tcgl": "xy4_105",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "158-front.webp",
    "wp": "158-wp.webp"
   },
   "159": {
-   "tcgl": "me2-5_148",
-   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
-   "material": "MAT_Cards3D_SvHolo",
+   "tcgl": "sv5_148",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
    "front": "159-front.webp",
    "wp": "159-wp.webp"
   },
   "160": {
-   "tcgl": "me2-5_144",
+   "tcgl": "swsh1_170",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "160-front.webp",
    "wp": "160-wp.webp"
   },
   "161": {
-   "tcgl": "sv2_151",
-   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
-   "material": "MAT_Cards3D_SvHolo",
+   "tcgl": "sm10_180",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
    "front": "161-front.webp",
    "wp": "161-wp.webp"
   },
-  "167": {
+  "162": {
+   "tcgl": "sm9_148",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "162-front.webp",
+   "wp": "162-wp.webp"
+  },
+  "163": {
    "tcgl": "sv3-5_65",
    "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
    "material": "MAT_Cards3D_SunPillar",
-   "front": "167-front.webp",
-   "wp": "167-wp.webp",
+   "front": "163-front.webp",
+   "wp": "163-wp.webp",
    "cc": "TEX_SouthernCross"
   },
-  "168": {
+  "164": {
    "tcgl": "me1_56",
    "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
    "material": "MAT_Cards3D_SvHolo",
+   "front": "164-front.webp",
+   "wp": "164-wp.webp"
+  },
+  "165": {
+   "tcgl": "me1_55",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "165-front.webp",
+   "wp": "165-wp.webp"
+  },
+  "166": {
+   "tcgl": "me1_54",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "166-front.webp",
+   "wp": "166-wp.webp"
+  },
+  "167": {
+   "tcgl": "me2_39",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "167-front.webp",
+   "wp": "167-wp.webp"
+  },
+  "168": {
+   "tcgl": "rsv10-5_43",
+   "shader": "TPCi/Cards3D/HoloFoil/Tinsel",
+   "material": "MAT_Cards3D_Tinsel",
    "front": "168-front.webp",
    "wp": "168-wp.webp"
   },
   "169": {
-   "tcgl": "me1_55",
+   "tcgl": "rsv10-5_42",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "169-front.webp",
    "wp": "169-wp.webp"
   },
   "170": {
-   "tcgl": "me1_54",
+   "tcgl": "rsv10-5_41",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "170-front.webp",
    "wp": "170-wp.webp"
   },
   "171": {
-   "tcgl": "me2_39",
-   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
-   "material": "MAT_Cards3D_FlatSilver",
+   "tcgl": "sv1_96",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
    "front": "171-front.webp",
    "wp": "171-wp.webp"
   },
   "172": {
-   "tcgl": "rsv10-5_43",
-   "shader": "TPCi/Cards3D/HoloFoil/Tinsel",
-   "material": "MAT_Cards3D_Tinsel",
+   "tcgl": "sv4-5_159",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
    "front": "172-front.webp",
+   "etch": "172-etch.webp",
    "wp": "172-wp.webp"
   },
   "173": {
-   "tcgl": "rsv10-5_42",
+   "tcgl": "sv6_91",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "173-front.webp",
    "wp": "173-wp.webp"
   },
   "174": {
-   "tcgl": "rsv10-5_41",
+   "tcgl": "sv6_92",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "174-front.webp",
    "wp": "174-wp.webp"
   },
   "175": {
-   "tcgl": "sv1_96",
+   "tcgl": "sv8_83",
    "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
    "material": "MAT_Cards3D_SvHolo",
    "front": "175-front.webp",
    "wp": "175-wp.webp"
   },
   "176": {
-   "tcgl": "sv4-5_159",
-   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
-   "material": "MAT_Cards3D_SunPillar",
+   "tcgl": "sv7_62",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
    "front": "176-front.webp",
-   "etch": "176-etch.webp",
    "wp": "176-wp.webp"
   },
   "177": {
-   "tcgl": "sv6_91",
-   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
-   "material": "MAT_Cards3D_FlatSilver",
+   "tcgl": "sv1_88",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
    "front": "177-front.webp",
-   "wp": "177-wp.webp"
+   "wp": "177-wp.webp",
+   "cc": "TEX_SouthernCross"
   },
   "178": {
-   "tcgl": "sv6_92",
+   "tcgl": "me5_33",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "178-front.webp",
    "wp": "178-wp.webp"
   },
   "179": {
-   "tcgl": "sv8_83",
+   "tcgl": "svbsp_38",
    "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
    "material": "MAT_Cards3D_SvHolo",
    "front": "179-front.webp",
    "wp": "179-wp.webp"
   },
   "180": {
-   "tcgl": "sv7_62",
+   "tcgl": "sv3_84",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "180-front.webp",
    "wp": "180-wp.webp"
   },
   "181": {
-   "tcgl": "sv1_88",
-   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
-   "material": "MAT_Cards3D_SunPillar",
+   "tcgl": "sv8_70",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
    "front": "181-front.webp",
-   "wp": "181-wp.webp",
-   "cc": "TEX_SouthernCross"
+   "wp": "181-wp.webp"
   },
   "182": {
-   "tcgl": "me5_33",
+   "tcgl": "sv6_89",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "182-front.webp",
    "wp": "182-wp.webp"
   },
   "183": {
-   "tcgl": "svbsp_38",
-   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
-   "material": "MAT_Cards3D_SvHolo",
+   "tcgl": "me2-5_94",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
    "front": "183-front.webp",
    "wp": "183-wp.webp"
   },
   "184": {
-   "tcgl": "sv3_84",
+   "tcgl": "me3_75",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "184-front.webp",
    "wp": "184-wp.webp"
   },
   "185": {
-   "tcgl": "sv8_70",
+   "tcgl": "sv4_181",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "185-front.webp",
    "wp": "185-wp.webp"
   },
   "186": {
-   "tcgl": "sv6_89",
+   "tcgl": "me1_123",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "186-front.webp",
    "wp": "186-wp.webp"
   },
   "187": {
-   "tcgl": "me2-5_94",
+   "tcgl": "sm8_186",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "187-front.webp",
    "wp": "187-wp.webp"
   },
-  "200": {
+  "188": {
+   "tcgl": "me2_94",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "188-front.webp",
+   "wp": "188-wp.webp"
+  },
+  "189": {
+   "tcgl": "swsh6_140",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "189-front.webp",
+   "wp": "189-wp.webp"
+  },
+  "190": {
+   "tcgl": "sv7_141",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "190-front.webp",
+   "wp": "190-wp.webp"
+  },
+  "191": {
+   "tcgl": "sm8_190",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "191-front.webp",
+   "wp": "191-wp.webp"
+  },
+  "192": {
+   "tcgl": "sm8_175",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "192-front.webp",
+   "wp": "192-wp.webp"
+  },
+  "193": {
+   "tcgl": "me1_122",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "193-front.webp",
+   "wp": "193-wp.webp"
+  },
+  "194": {
+   "tcgl": "swsh6_147",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "194-front.webp",
+   "wp": "194-wp.webp"
+  },
+  "195": {
+   "tcgl": "xy4_93",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "195-front.webp",
+   "wp": "195-wp.webp"
+  },
+  "196": {
    "tcgl": "sm12_39",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
+   "front": "196-front.webp",
+   "wp": "196-wp.webp"
+  },
+  "197": {
+   "tcgl": "sm3_28",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "197-front.webp",
+   "wp": "197-wp.webp"
+  },
+  "198": {
+   "tcgl": "sm2_19",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "198-front.webp",
+   "wp": "198-wp.webp"
+  },
+  "199": {
+   "tcgl": "sm2_20",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "199-front.webp",
+   "wp": "199-wp.webp"
+  },
+  "200": {
+   "tcgl": "xy1_41",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
    "front": "200-front.webp",
    "wp": "200-wp.webp"
   },
   "201": {
-   "tcgl": "sm3_28",
+   "tcgl": "sm7_32",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "201-front.webp",
    "wp": "201-wp.webp"
   },
   "202": {
-   "tcgl": "sm2_19",
+   "tcgl": "sm7_34",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "202-front.webp",
    "wp": "202-wp.webp"
   },
   "203": {
-   "tcgl": "sm2_20",
-   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
-   "material": "MAT_Cards3D_FlatSilver",
+   "tcgl": "swsh8_64",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
    "front": "203-front.webp",
    "wp": "203-wp.webp"
   },
   "204": {
-   "tcgl": "xy1_41",
+   "tcgl": "smbsp_92",
    "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
    "material": "MAT_Cards3D_SvHolo",
    "front": "204-front.webp",
    "wp": "204-wp.webp"
   },
   "205": {
-   "tcgl": "sm7_32",
+   "tcgl": "me1_129",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "205-front.webp",
    "wp": "205-wp.webp"
   },
   "206": {
-   "tcgl": "sm7_34",
+   "tcgl": "xy5_125",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "206-front.webp",
    "wp": "206-wp.webp"
   },
   "207": {
-   "tcgl": "swsh8_64",
-   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
-   "material": "MAT_Cards3D_SvHolo",
+   "tcgl": "sm2_119",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
    "front": "207-front.webp",
    "wp": "207-wp.webp"
   },
   "208": {
-   "tcgl": "smbsp_92",
-   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
-   "material": "MAT_Cards3D_SvHolo",
+   "tcgl": "sm2_120",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
    "front": "208-front.webp",
    "wp": "208-wp.webp"
   },
-  "213": {
+  "209": {
    "tcgl": "svbsp_155",
    "shader": "TPCi/Cards3D/HoloFoil/Cosmos",
    "material": "MAT_Cards3D_Cosmos",
+   "front": "209-front.webp",
+   "wp": "209-wp.webp"
+  },
+  "210": {
+   "tcgl": "svbsp_156",
+   "shader": "TPCi/Cards3D/HoloFoil/Cosmos",
+   "material": "MAT_Cards3D_Cosmos",
+   "front": "210-front.webp",
+   "wp": "210-wp.webp"
+  },
+  "211": {
+   "tcgl": "swsh12_47",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "211-front.webp",
+   "wp": "211-wp.webp"
+  },
+  "212": {
+   "tcgl": "sm11_49",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "212-front.webp",
+   "wp": "212-wp.webp"
+  },
+  "213": {
+   "tcgl": "swsh12_48",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
    "front": "213-front.webp",
    "wp": "213-wp.webp"
   },
   "214": {
-   "tcgl": "svbsp_156",
-   "shader": "TPCi/Cards3D/HoloFoil/Cosmos",
-   "material": "MAT_Cards3D_Cosmos",
+   "tcgl": "swsh5_41",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
    "front": "214-front.webp",
    "wp": "214-wp.webp"
   },
   "215": {
-   "tcgl": "swsh12_47",
+   "tcgl": "swsh5_42",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "215-front.webp",
    "wp": "215-wp.webp"
   },
   "216": {
-   "tcgl": "sm11_49",
+   "tcgl": "sv8_101",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "216-front.webp",
    "wp": "216-wp.webp"
   },
   "217": {
-   "tcgl": "swsh12_48",
+   "tcgl": "me2-5_112",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "217-front.webp",
    "wp": "217-wp.webp"
   },
   "218": {
-   "tcgl": "swsh5_41",
-   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
-   "material": "MAT_Cards3D_FlatSilver",
+   "tcgl": "sv8-5_51",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
    "front": "218-front.webp",
    "wp": "218-wp.webp"
   },
   "219": {
-   "tcgl": "swsh5_42",
+   "tcgl": "sv1_114",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "219-front.webp",
    "wp": "219-wp.webp"
   },
   "220": {
-   "tcgl": "sv8_101",
+   "tcgl": "swsh6_93",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "220-front.webp",
    "wp": "220-wp.webp"
   },
   "221": {
-   "tcgl": "me2-5_112",
-   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
-   "material": "MAT_Cards3D_FlatSilver",
+   "tcgl": "swsh6_44",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
    "front": "221-front.webp",
    "wp": "221-wp.webp"
   },
   "222": {
-   "tcgl": "sv8-5_51",
-   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
-   "material": "MAT_Cards3D_SunPillar",
+   "tcgl": "swsh6_108",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
    "front": "222-front.webp",
    "wp": "222-wp.webp"
   },
   "223": {
-   "tcgl": "sv1_114",
+   "tcgl": "me3_39",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "223-front.webp",
    "wp": "223-wp.webp"
   },
   "224": {
-   "tcgl": "swsh6_93",
+   "tcgl": "sv10_106",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "224-front.webp",
    "wp": "224-wp.webp"
   },
   "225": {
-   "tcgl": "swsh6_44",
-   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
-   "material": "MAT_Cards3D_SvHolo",
+   "tcgl": "sv9_77",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
    "front": "225-front.webp",
    "wp": "225-wp.webp"
   },
   "226": {
-   "tcgl": "swsh6_108",
-   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
-   "material": "MAT_Cards3D_SvHolo",
+   "tcgl": "sv9_78",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
    "front": "226-front.webp",
    "wp": "226-wp.webp"
   },
   "227": {
-   "tcgl": "me3_39",
-   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
-   "material": "MAT_Cards3D_FlatSilver",
+   "tcgl": "sv9_79",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
    "front": "227-front.webp",
-   "wp": "227-wp.webp"
+   "wp": "227-wp.webp",
+   "cc": "TEX_SouthernCross"
   },
   "228": {
-   "tcgl": "sv10_106",
-   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
-   "material": "MAT_Cards3D_FlatSilver",
+   "tcgl": "xy8_82",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
    "front": "228-front.webp",
    "wp": "228-wp.webp"
   },
   "229": {
-   "tcgl": "sv9_77",
+   "tcgl": "me1_70",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "229-front.webp",
    "wp": "229-wp.webp"
   },
   "230": {
-   "tcgl": "sv9_78",
-   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
-   "material": "MAT_Cards3D_FlatSilver",
+   "tcgl": "swsh8_139",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
    "front": "230-front.webp",
    "wp": "230-wp.webp"
   },
   "231": {
-   "tcgl": "sv9_79",
-   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
-   "material": "MAT_Cards3D_SunPillar",
+   "tcgl": "me2_49",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
    "front": "231-front.webp",
-   "wp": "231-wp.webp",
-   "cc": "TEX_SouthernCross"
+   "wp": "231-wp.webp"
   },
   "232": {
-   "tcgl": "xy8_82",
-   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
-   "material": "MAT_Cards3D_SvHolo",
+   "tcgl": "sv4_92",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
    "front": "232-front.webp",
    "wp": "232-wp.webp"
   },
   "233": {
-   "tcgl": "me1_70",
+   "tcgl": "me2-5_187",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "233-front.webp",
    "wp": "233-wp.webp"
   },
   "234": {
-   "tcgl": "swsh8_139",
-   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
-   "material": "MAT_Cards3D_SvHolo",
+   "tcgl": "xy9_99",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
    "front": "234-front.webp",
    "wp": "234-wp.webp"
   },
   "235": {
-   "tcgl": "me2_49",
+   "tcgl": "xy3_90",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "235-front.webp",
    "wp": "235-wp.webp"
   },
   "236": {
-   "tcgl": "sv4_92",
+   "tcgl": "xy3_97",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "236-front.webp",
    "wp": "236-wp.webp"
   },
-  "241": {
+  "237": {
    "tcgl": "swsh11_120",
    "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
    "material": "MAT_Cards3D_SvHolo",
-   "front": "241-front.webp",
-   "wp": "241-wp.webp"
+   "front": "237-front.webp",
+   "wp": "237-wp.webp"
   },
-  "242": {
+  "238": {
    "tcgl": "xybsp_24",
    "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
    "material": "MAT_Cards3D_SvHolo",
+   "front": "238-front.webp",
+   "wp": "238-wp.webp"
+  },
+  "239": {
+   "tcgl": "sm10_70",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "239-front.webp",
+   "wp": "239-wp.webp"
+  },
+  "240": {
+   "tcgl": "swsh10_97",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "240-front.webp",
+   "wp": "240-wp.webp"
+  },
+  "241": {
+   "tcgl": "sv3_135",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
+   "front": "241-front.webp",
+   "wp": "241-wp.webp",
+   "cc": "TEX_SouthernCross"
+  },
+  "242": {
+   "tcgl": "sv2_133",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
    "front": "242-front.webp",
    "wp": "242-wp.webp"
   },
   "243": {
-   "tcgl": "sm10_70",
+   "tcgl": "swsh9_87",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "243-front.webp",
    "wp": "243-wp.webp"
   },
   "244": {
-   "tcgl": "swsh10_97",
-   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
-   "material": "MAT_Cards3D_SvHolo",
+   "tcgl": "sv6-5_35",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
    "front": "244-front.webp",
    "wp": "244-wp.webp"
   },
   "245": {
-   "tcgl": "sv3_135",
-   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
-   "material": "MAT_Cards3D_SunPillar",
+   "tcgl": "me1_88",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
    "front": "245-front.webp",
-   "wp": "245-wp.webp",
-   "cc": "TEX_SouthernCross"
+   "wp": "245-wp.webp"
   },
   "246": {
-   "tcgl": "sv2_133",
+   "tcgl": "me2_90",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "246-front.webp",
    "wp": "246-wp.webp"
   },
   "247": {
-   "tcgl": "swsh9_87",
+   "tcgl": "me5_75",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "247-front.webp",
    "wp": "247-wp.webp"
   },
   "248": {
-   "tcgl": "sv6-5_35",
+   "tcgl": "sv8-5_112",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "248-front.webp",
    "wp": "248-wp.webp"
   },
   "249": {
-   "tcgl": "me1_88",
-   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
-   "material": "MAT_Cards3D_SvHolo",
+   "tcgl": "sv5_156",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
    "front": "249-front.webp",
    "wp": "249-wp.webp"
   },
-  "257": {
+  "250": {
+   "tcgl": "sm11_193",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "250-front.webp",
+   "wp": "250-wp.webp"
+  },
+  "251": {
+   "tcgl": "swsh10_139",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "251-front.webp",
+   "wp": "251-wp.webp"
+  },
+  "252": {
+   "tcgl": "bw5_92",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "252-front.webp",
+   "wp": "252-wp.webp"
+  },
+  "253": {
    "tcgl": "rsv10-5_65",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "253-front.webp",
+   "wp": "253-wp.webp"
+  },
+  "254": {
+   "tcgl": "rsv10-5_66",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "254-front.webp",
+   "wp": "254-wp.webp"
+  },
+  "255": {
+   "tcgl": "rsv10-5_67",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
+   "front": "255-front.webp",
+   "wp": "255-wp.webp",
+   "cc": "TEX_SouthernCross"
+  },
+  "256": {
+   "tcgl": "sv2_140",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "256-front.webp",
+   "wp": "256-wp.webp"
+  },
+  "257": {
+   "tcgl": "sm9_138",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "257-front.webp",
    "wp": "257-wp.webp"
   },
   "258": {
-   "tcgl": "rsv10-5_66",
+   "tcgl": "xy8_51",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "258-front.webp",
    "wp": "258-wp.webp"
   },
   "259": {
-   "tcgl": "rsv10-5_67",
-   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
-   "material": "MAT_Cards3D_SunPillar",
+   "tcgl": "xy8_53",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
    "front": "259-front.webp",
-   "wp": "259-wp.webp",
-   "cc": "TEX_SouthernCross"
+   "wp": "259-wp.webp"
   },
   "260": {
-   "tcgl": "sv2_140",
+   "tcgl": "xy8_54",
    "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
    "material": "MAT_Cards3D_SvHolo",
    "front": "260-front.webp",
    "wp": "260-wp.webp"
   },
-  "281": {
+  "262": {
+   "tcgl": "me4_27",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "262-front.webp",
+   "wp": "262-wp.webp"
+  },
+  "263": {
+   "tcgl": "svbsp_15",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "263-front.webp",
+   "wp": "263-wp.webp"
+  },
+  "264": {
+   "tcgl": "swsh7_56",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "264-front.webp",
+   "wp": "264-wp.webp"
+  },
+  "265": {
+   "tcgl": "sv8_65",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "265-front.webp",
+   "wp": "265-wp.webp"
+  },
+  "266": {
+   "tcgl": "sv9_44",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "266-front.webp",
+   "wp": "266-wp.webp"
+  },
+  "267": {
+   "tcgl": "sv9_45",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "267-front.webp",
+   "wp": "267-wp.webp"
+  },
+  "268": {
+   "tcgl": "sv9_46",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "268-front.webp",
+   "wp": "268-wp.webp"
+  },
+  "269": {
+   "tcgl": "sv7_46",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "269-front.webp",
+   "wp": "269-wp.webp"
+  },
+  "270": {
+   "tcgl": "sv5_54",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "270-front.webp",
+   "wp": "270-wp.webp"
+  },
+  "272": {
+   "tcgl": "sm8_172",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "272-front.webp",
+   "wp": "272-wp.webp"
+  },
+  "273": {
+   "tcgl": "sv1_170",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "273-front.webp",
+   "wp": "273-wp.webp"
+  },
+  "274": {
+   "tcgl": "sv9_150",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "274-front.webp",
+   "wp": "274-wp.webp"
+  },
+  "275": {
+   "tcgl": "me2-5_185",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "275-front.webp",
+   "wp": "275-wp.webp"
+  },
+  "276": {
+   "tcgl": "sm9_139",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "276-front.webp",
+   "wp": "276-wp.webp"
+  },
+  "277": {
    "tcgl": "me2-5_1",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "277-front.webp",
+   "wp": "277-wp.webp"
+  },
+  "278": {
+   "tcgl": "swsh9_24",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "278-front.webp",
+   "wp": "278-wp.webp"
+  },
+  "279": {
+   "tcgl": "sv6_32",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "279-front.webp",
+   "wp": "279-wp.webp"
+  },
+  "280": {
+   "tcgl": "sv6_33",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "280-front.webp",
+   "wp": "280-wp.webp"
+  },
+  "281": {
+   "tcgl": "me4_11",
    "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
    "material": "MAT_Cards3D_FlatSilver",
    "front": "281-front.webp",
    "wp": "281-wp.webp"
+  },
+  "282": {
+   "tcgl": "me4_12",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "282-front.webp",
+   "wp": "282-wp.webp"
+  },
+  "283": {
+   "tcgl": "me4_13",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "283-front.webp",
+   "wp": "283-wp.webp"
+  },
+  "285": {
+   "tcgl": "swsh9_144",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "285-front.webp",
+   "wp": "285-wp.webp"
+  },
+  "286": {
+   "tcgl": "sm10_189",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "286-front.webp",
+   "wp": "286-wp.webp"
+  },
+  "287": {
+   "tcgl": "sm3_116",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "287-front.webp",
+   "wp": "287-wp.webp"
+  },
+  "288": {
+   "tcgl": "me5_11",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "288-front.webp",
+   "wp": "288-wp.webp"
+  },
+  "289": {
+   "tcgl": "sv3_44",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "289-front.webp",
+   "wp": "289-wp.webp"
+  },
+  "291": {
+   "tcgl": "sv4-5_15",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "291-front.webp",
+   "wp": "291-wp.webp"
+  },
+  "292": {
+   "tcgl": "sv4-5_40",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "292-front.webp",
+   "wp": "292-wp.webp"
+  },
+  "293": {
+   "tcgl": "xy5_138",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "293-front.webp",
+   "wp": "293-wp.webp"
+  },
+  "294": {
+   "tcgl": "sm1_77",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "294-front.webp",
+   "wp": "294-wp.webp"
+  },
+  "295": {
+   "tcgl": "me1_131",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "295-front.webp",
+   "wp": "295-wp.webp"
+  },
+  "296": {
+   "tcgl": "me1_119",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "296-front.webp",
+   "wp": "296-wp.webp"
+  },
+  "297": {
+   "tcgl": "me3_76",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "297-front.webp",
+   "wp": "297-wp.webp"
+  },
+  "298": {
+   "tcgl": "swsh12-5_132",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "298-front.webp",
+   "wp": "298-wp.webp"
+  },
+  "299": {
+   "tcgl": "me2-5_181",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "299-front.webp",
+   "wp": "299-wp.webp"
+  },
+  "300": {
+   "tcgl": "sv6_156",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "300-front.webp",
+   "wp": "300-wp.webp"
+  },
+  "301": {
+   "tcgl": "sv8_175",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "301-front.webp",
+   "wp": "301-wp.webp"
+  },
+  "302": {
+   "tcgl": "swsh10_141",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "302-front.webp",
+   "wp": "302-wp.webp"
+  },
+  "303": {
+   "tcgl": "swsh5_129",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "303-front.webp",
+   "wp": "303-wp.webp"
+  },
+  "304": {
+   "tcgl": "swsh4-5_57",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "304-front.webp",
+   "wp": "304-wp.webp"
+  },
+  "305": {
+   "tcgl": "xy1_120",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "305-front.webp",
+   "wp": "305-wp.webp"
+  },
+  "306": {
+   "tcgl": "xy6_88",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "306-front.webp",
+   "wp": "306-wp.webp"
+  },
+  "307": {
+   "tcgl": "me5_80",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "307-front.webp",
+   "wp": "307-wp.webp"
+  },
+  "308": {
+   "tcgl": "me3_73",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "308-front.webp",
+   "wp": "308-wp.webp"
+  },
+  "309": {
+   "tcgl": "rsv10-5_82",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "309-front.webp",
+   "wp": "309-wp.webp"
+  },
+  "310": {
+   "tcgl": "sv10_164",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "310-front.webp",
+   "wp": "310-wp.webp"
+  },
+  "311": {
+   "tcgl": "zsv10-5_81",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "311-front.webp",
+   "wp": "311-wp.webp"
+  },
+  "312": {
+   "tcgl": "swsh12-5_129",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "312-front.webp",
+   "wp": "312-wp.webp"
+  },
+  "313": {
+   "tcgl": "sv2_189",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "313-front.webp",
+   "wp": "313-wp.webp"
+  },
+  "314": {
+   "tcgl": "sv3-5_159",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "314-front.webp",
+   "wp": "314-wp.webp"
+  },
+  "315": {
+   "tcgl": "swsh1_160",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "315-front.webp",
+   "wp": "315-wp.webp"
+  },
+  "316": {
+   "tcgl": "sm2_122",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "316-front.webp",
+   "wp": "316-wp.webp"
+  },
+  "317": {
+   "tcgl": "zsv10-5_85",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "317-front.webp",
+   "wp": "317-wp.webp"
+  },
+  "318": {
+   "tcgl": "xy9_112",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "318-front.webp",
+   "wp": "318-wp.webp"
+  },
+  "319": {
+   "tcgl": "sm7_130",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "319-front.webp",
+   "wp": "319-wp.webp"
+  },
+  "320": {
+   "tcgl": "sm12_195",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "320-front.webp",
+   "wp": "320-wp.webp"
+  },
+  "321": {
+   "tcgl": "xy10_107",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "321-front.webp",
+   "wp": "321-wp.webp"
+  },
+  "322": {
+   "tcgl": "xy11_105",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "322-front.webp",
+   "wp": "322-wp.webp"
+  },
+  "323": {
+   "tcgl": "xy11_102",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "323-front.webp",
+   "wp": "323-wp.webp"
+  },
+  "324": {
+   "tcgl": "sv9_158",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "324-front.webp",
+   "wp": "324-wp.webp"
+  },
+  "325": {
+   "tcgl": "swsh3-5_54",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "325-front.webp",
+   "wp": "325-wp.webp"
+  },
+  "326": {
+   "tcgl": "swsh1_177",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "326-front.webp",
+   "wp": "326-wp.webp"
+  },
+  "327": {
+   "tcgl": "sm11_198",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "327-front.webp",
+   "wp": "327-wp.webp"
+  },
+  "328": {
+   "tcgl": "sm7_135",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "328-front.webp",
+   "wp": "328-wp.webp"
+  },
+  "329": {
+   "tcgl": "sm2_128",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "329-front.webp",
+   "wp": "329-wp.webp"
+  },
+  "330": {
+   "tcgl": "swsh2_159",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "330-front.webp",
+   "wp": "330-wp.webp"
+  },
+  "331": {
+   "tcgl": "sv6_148",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "331-front.webp",
+   "wp": "331-wp.webp"
+  },
+  "332": {
+   "tcgl": "swsh12-5_125",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "332-front.webp",
+   "wp": "332-wp.webp"
+  },
+  "333": {
+   "tcgl": "sm8_192",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "333-front.webp",
+   "wp": "333-wp.webp"
+  },
+  "334": {
+   "tcgl": "xy9_98",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "334-front.webp",
+   "wp": "334-wp.webp"
+  },
+  "335": {
+   "tcgl": "xy8_133",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "335-front.webp",
+   "wp": "335-wp.webp"
+  },
+  "336": {
+   "tcgl": "xy3_91",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "336-front.webp",
+   "wp": "336-wp.webp"
+  },
+  "337": {
+   "tcgl": "swsh6_152",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "337-front.webp",
+   "wp": "337-wp.webp"
+  },
+  "338": {
+   "tcgl": "swsh9_146",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "338-front.webp",
+   "wp": "338-wp.webp"
+  },
+  "339": {
+   "tcgl": "sv1_193",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "339-front.webp",
+   "wp": "339-wp.webp"
+  },
+  "340": {
+   "tcgl": "sv6_158",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "340-front.webp",
+   "wp": "340-wp.webp"
+  },
+  "341": {
+   "tcgl": "sm8_169",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "341-front.webp",
+   "wp": "341-wp.webp"
+  },
+  "342": {
+   "tcgl": "me3_77",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "342-front.webp",
+   "wp": "342-wp.webp"
+  },
+  "343": {
+   "tcgl": "swsh12-5_141",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "343-front.webp",
+   "wp": "343-wp.webp"
+  },
+  "344": {
+   "tcgl": "swsh5_125",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "344-front.webp",
+   "wp": "344-wp.webp"
+  },
+  "345": {
+   "tcgl": "swsh7_162",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "345-front.webp",
+   "wp": "345-wp.webp"
+  },
+  "346": {
+   "tcgl": "sm1_124",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "346-front.webp",
+   "wp": "346-wp.webp"
+  },
+  "347": {
+   "tcgl": "xy4_103",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "347-front.webp",
+   "wp": "347-wp.webp"
+  },
+  "348": {
+   "tcgl": "swsh3-5_60",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "348-front.webp",
+   "wp": "348-wp.webp"
+  },
+  "349": {
+   "tcgl": "xy2_91",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "349-front.webp",
+   "wp": "349-wp.webp"
+  },
+  "350": {
+   "tcgl": "me1_114",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "350-front.webp",
+   "wp": "350-wp.webp"
+  },
+  "351": {
+   "tcgl": "swsh7_157",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "351-front.webp",
+   "wp": "351-wp.webp"
+  },
+  "352": {
+   "tcgl": "sv6_146",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "352-front.webp",
+   "wp": "352-wp.webp"
+  },
+  "353": {
+   "tcgl": "bw4_90",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "353-front.webp",
+   "wp": "353-wp.webp"
+  },
+  "354": {
+   "tcgl": "sv8-5_116",
+   "shader": "TPCi/Cards3D/HoloFoil/AceFoil",
+   "material": "MAT_Cards3D_AceFoil",
+   "front": "354-front.webp",
+   "etch": "354-etch.webp",
+   "wp": "354-wp.webp"
+  },
+  "355": {
+   "tcgl": "sv8-5_119",
+   "shader": "TPCi/Cards3D/HoloFoil/AceFoil",
+   "material": "MAT_Cards3D_AceFoil",
+   "front": "355-front.webp",
+   "etch": "355-etch.webp",
+   "wp": "355-wp.webp"
+  },
+  "356": {
+   "tcgl": "sv8-5_117",
+   "shader": "TPCi/Cards3D/HoloFoil/AceFoil",
+   "material": "MAT_Cards3D_AceFoil",
+   "front": "356-front.webp",
+   "etch": "356-etch.webp",
+   "wp": "356-wp.webp"
+  },
+  "357": {
+   "tcgl": "sv8-5_128",
+   "shader": "TPCi/Cards3D/HoloFoil/AceFoil",
+   "material": "MAT_Cards3D_AceFoil",
+   "front": "357-front.webp",
+   "etch": "357-etch.webp",
+   "wp": "357-wp.webp"
+  },
+  "358": {
+   "tcgl": "sv8-5_131",
+   "shader": "TPCi/Cards3D/HoloFoil/AceFoil",
+   "material": "MAT_Cards3D_AceFoil",
+   "front": "358-front.webp",
+   "etch": "358-etch.webp",
+   "wp": "358-wp.webp"
+  },
+  "359": {
+   "tcgl": "sv8_162",
+   "shader": "TPCi/Cards3D/HoloFoil/AceFoil",
+   "material": "MAT_Cards3D_AceFoil",
+   "front": "359-front.webp",
+   "etch": "359-etch.webp",
+   "wp": "359-wp.webp"
+  },
+  "360": {
+   "tcgl": "sv8_164",
+   "shader": "TPCi/Cards3D/HoloFoil/AceFoil",
+   "material": "MAT_Cards3D_AceFoil",
+   "front": "360-front.webp",
+   "etch": "360-etch.webp",
+   "wp": "360-wp.webp"
+  },
+  "361": {
+   "tcgl": "sv8_176",
+   "shader": "TPCi/Cards3D/HoloFoil/AceFoil",
+   "material": "MAT_Cards3D_AceFoil",
+   "front": "361-front.webp",
+   "etch": "361-etch.webp",
+   "wp": "361-wp.webp"
+  },
+  "362": {
+   "tcgl": "sv8_182",
+   "shader": "TPCi/Cards3D/HoloFoil/AceFoil",
+   "material": "MAT_Cards3D_AceFoil",
+   "front": "362-front.webp",
+   "etch": "362-etch.webp",
+   "wp": "362-wp.webp"
+  },
+  "363": {
+   "tcgl": "sv8_183",
+   "shader": "TPCi/Cards3D/HoloFoil/AceFoil",
+   "material": "MAT_Cards3D_AceFoil",
+   "front": "363-front.webp",
+   "etch": "363-etch.webp",
+   "wp": "363-wp.webp"
+  },
+  "364": {
+   "tcgl": "sv8_186",
+   "shader": "TPCi/Cards3D/HoloFoil/AceFoil",
+   "material": "MAT_Cards3D_AceFoil",
+   "front": "364-front.webp",
+   "etch": "364-etch.webp",
+   "wp": "364-wp.webp"
+  },
+  "365": {
+   "tcgl": "sv7_134",
+   "shader": "TPCi/Cards3D/HoloFoil/AceFoil",
+   "material": "MAT_Cards3D_AceFoil",
+   "front": "365-front.webp",
+   "etch": "365-etch.webp",
+   "wp": "365-wp.webp"
+  },
+  "366": {
+   "tcgl": "sv8_185",
+   "shader": "TPCi/Cards3D/HoloFoil/AceFoil",
+   "material": "MAT_Cards3D_AceFoil",
+   "front": "366-front.webp",
+   "etch": "366-etch.webp",
+   "wp": "366-wp.webp"
+  },
+  "367": {
+   "tcgl": "sv7_136",
+   "shader": "TPCi/Cards3D/HoloFoil/AceFoil",
+   "material": "MAT_Cards3D_AceFoil",
+   "front": "367-front.webp",
+   "etch": "367-etch.webp",
+   "wp": "367-wp.webp"
+  },
+  "368": {
+   "tcgl": "sv6-5_58",
+   "shader": "TPCi/Cards3D/HoloFoil/AceFoil",
+   "material": "MAT_Cards3D_AceFoil",
+   "front": "368-front.webp",
+   "etch": "368-etch.webp",
+   "wp": "368-wp.webp"
+  },
+  "369": {
+   "tcgl": "sv6-5_60",
+   "shader": "TPCi/Cards3D/HoloFoil/AceFoil",
+   "material": "MAT_Cards3D_AceFoil",
+   "front": "369-front.webp",
+   "etch": "369-etch.webp",
+   "wp": "369-wp.webp"
+  },
+  "370": {
+   "tcgl": "sv6-5_62",
+   "shader": "TPCi/Cards3D/HoloFoil/AceFoil",
+   "material": "MAT_Cards3D_AceFoil",
+   "front": "370-front.webp",
+   "etch": "370-etch.webp",
+   "wp": "370-wp.webp"
+  },
+  "371": {
+   "tcgl": "sv6_152",
+   "shader": "TPCi/Cards3D/HoloFoil/AceFoil",
+   "material": "MAT_Cards3D_AceFoil",
+   "front": "371-front.webp",
+   "etch": "371-etch.webp",
+   "wp": "371-wp.webp"
+  },
+  "372": {
+   "tcgl": "sv6_163",
+   "shader": "TPCi/Cards3D/HoloFoil/AceFoil",
+   "material": "MAT_Cards3D_AceFoil",
+   "front": "372-front.webp",
+   "etch": "372-etch.webp",
+   "wp": "372-wp.webp"
+  },
+  "373": {
+   "tcgl": "sv6_165",
+   "shader": "TPCi/Cards3D/HoloFoil/AceFoil",
+   "material": "MAT_Cards3D_AceFoil",
+   "front": "373-front.webp",
+   "etch": "373-etch.webp",
+   "wp": "373-wp.webp"
+  },
+  "374": {
+   "tcgl": "sv6_164",
+   "shader": "TPCi/Cards3D/HoloFoil/AceFoil",
+   "material": "MAT_Cards3D_AceFoil",
+   "front": "374-front.webp",
+   "etch": "374-etch.webp",
+   "wp": "374-wp.webp"
+  },
+  "375": {
+   "tcgl": "sv5_152",
+   "shader": "TPCi/Cards3D/HoloFoil/AceFoil",
+   "material": "MAT_Cards3D_AceFoil",
+   "front": "375-front.webp",
+   "etch": "375-etch.webp",
+   "wp": "375-wp.webp"
+  },
+  "376": {
+   "tcgl": "sv5_153",
+   "shader": "TPCi/Cards3D/HoloFoil/AceFoil",
+   "material": "MAT_Cards3D_AceFoil",
+   "front": "376-front.webp",
+   "etch": "376-etch.webp",
+   "wp": "376-wp.webp"
+  },
+  "377": {
+   "tcgl": "rsv10-5_84",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "377-front.webp",
+   "wp": "377-wp.webp"
+  },
+  "378": {
+   "tcgl": "sm2_166",
+   "shader": "TPCi/Cards3D/HoloFoil/Rainbow",
+   "material": "MAT_Cards3D_Rainbow",
+   "front": "378-front.webp",
+   "wp": "378-wp.webp"
+  },
+  "379": {
+   "tcgl": "sm1_136",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "379-front.webp",
+   "wp": "379-wp.webp"
+  },
+  "380": {
+   "tcgl": "sv1_257",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "380-front.webp",
+   "etch": "380-etch.webp",
+   "wp": "380-wp.webp"
+  },
+  "381": {
+   "tcgl": "sv1_258",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "381-front.webp",
+   "etch": "381-etch.webp",
+   "wp": "381-wp.webp"
+  },
+  "382": {
+   "tcgl": "sv2_278",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "382-front.webp",
+   "etch": "382-etch.webp",
+   "wp": "382-wp.webp"
+  },
+  "383": {
+   "tcgl": "sv2_279",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "383-front.webp",
+   "etch": "383-etch.webp",
+   "wp": "383-wp.webp"
+  },
+  "384": {
+   "tcgl": "sv3_230",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "384-front.webp",
+   "etch": "384-etch.webp",
+   "wp": "384-wp.webp"
+  },
+  "385": {
+   "tcgl": "sv3-5_207",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "385-front.webp",
+   "etch": "385-etch.webp",
+   "wp": "385-wp.webp"
+  },
+  "386": {
+   "tcgl": "sv6-5_98",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "386-front.webp",
+   "etch": "386-etch.webp",
+   "wp": "386-wp.webp"
+  },
+  "387": {
+   "tcgl": "sv6-5_99",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "387-front.webp",
+   "etch": "387-etch.webp",
+   "wp": "387-wp.webp"
+  },
+  "388": {
+   "tcgl": "me5_83",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "388-front.webp",
+   "wp": "388-wp.webp"
+  },
+  "389": {
+   "tcgl": "me4_84",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "389-front.webp",
+   "wp": "389-wp.webp"
+  },
+  "390": {
+   "tcgl": "me5_84",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "390-front.webp",
+   "wp": "390-wp.webp"
+  },
+  "391": {
+   "tcgl": "me4_85",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "391-front.webp",
+   "wp": "391-wp.webp"
+  },
+  "392": {
+   "tcgl": "me3_86",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "392-front.webp",
+   "wp": "392-wp.webp"
+  },
+  "393": {
+   "tcgl": "me4_86",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "393-front.webp",
+   "wp": "393-wp.webp"
+  },
+  "394": {
+   "tcgl": "me3_87",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "394-front.webp",
+   "wp": "394-wp.webp"
+  },
+  "395": {
+   "tcgl": "me3_88",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "395-front.webp",
+   "wp": "395-wp.webp"
+  },
+  "396": {
+   "tcgl": "sv6_167",
+   "shader": "TPCi/Cards3D/HoloFoil/AceFoil",
+   "material": "MAT_Cards3D_AceFoil",
+   "front": "396-front.webp",
+   "etch": "396-etch.webp",
+   "wp": "396-wp.webp"
+  },
+  "397": {
+   "tcgl": "sv8_191",
+   "shader": "TPCi/Cards3D/HoloFoil/AceFoil",
+   "material": "MAT_Cards3D_AceFoil",
+   "front": "397-front.webp",
+   "etch": "397-etch.webp",
+   "wp": "397-wp.webp"
+  },
+  "398": {
+   "tcgl": "sv5_162",
+   "shader": "TPCi/Cards3D/HoloFoil/AceFoil",
+   "material": "MAT_Cards3D_AceFoil",
+   "front": "398-front.webp",
+   "etch": "398-etch.webp",
+   "wp": "398-wp.webp"
+  },
+  "399": {
+   "tcgl": "sv2_188",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "399-front.webp",
+   "wp": "399-wp.webp"
+  },
+  "400": {
+   "tcgl": "sv3-5_163",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "400-front.webp",
+   "wp": "400-wp.webp"
+  },
+  "401": {
+   "tcgl": "xy6_57",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "401-front.webp",
+   "wp": "401-wp.webp"
+  },
+  "402": {
+   "tcgl": "swsh12_67",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "402-front.webp",
+   "wp": "402-wp.webp"
+  },
+  "403": {
+   "tcgl": "sv1_85",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "403-front.webp",
+   "wp": "403-wp.webp"
+  },
+  "404": {
+   "tcgl": "swsh12_69",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "404-front.webp",
+   "wp": "404-wp.webp"
+  },
+  "405": {
+   "tcgl": "sv3-5_109",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "405-front.webp",
+   "wp": "405-wp.webp"
+  },
+  "406": {
+   "tcgl": "swsh6_96",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "406-front.webp",
+   "wp": "406-wp.webp"
+  },
+  "407": {
+   "tcgl": "swsh12_70",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
+   "front": "407-front.webp",
+   "wp": "407-wp.webp",
+   "cc": "TEX_SouthernCross"
+  },
+  "408": {
+   "tcgl": "swsh10_68",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "408-front.webp",
+   "wp": "408-wp.webp"
+  },
+  "409": {
+   "tcgl": "me1_64",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "409-front.webp",
+   "wp": "409-wp.webp"
+  },
+  "410": {
+   "tcgl": "sv9_107",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "410-front.webp",
+   "wp": "410-wp.webp"
+  },
+  "411": {
+   "tcgl": "sm5_91",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "411-front.webp",
+   "wp": "411-wp.webp"
+  },
+  "412": {
+   "tcgl": "me2-5_83",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "412-front.webp",
+   "wp": "412-wp.webp"
+  },
+  "413": {
+   "tcgl": "sv8_74",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "413-front.webp",
+   "wp": "413-wp.webp"
+  },
+  "414": {
+   "tcgl": "sm6_105",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "414-front.webp",
+   "wp": "414-wp.webp"
+  },
+  "415": {
+   "tcgl": "sm8_183",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "415-front.webp",
+   "wp": "415-wp.webp"
+  },
+  "416": {
+   "tcgl": "xy10_99",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "416-front.webp",
+   "wp": "416-wp.webp"
+  },
+  "417": {
+   "tcgl": "xy10_100",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "417-front.webp",
+   "wp": "417-wp.webp"
+  },
+  "418": {
+   "tcgl": "sm1_172",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "418-front.webp",
+   "etch": "418-etch.webp",
+   "wp": "418-wp.webp"
+  },
+  "419": {
+   "tcgl": "me1_130",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "419-front.webp",
+   "wp": "419-wp.webp"
+  },
+  "420": {
+   "tcgl": "xy5_144",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "420-front.webp",
+   "wp": "420-wp.webp"
+  },
+  "421": {
+   "tcgl": "me3_54",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "421-front.webp",
+   "wp": "421-wp.webp"
+  },
+  "422": {
+   "tcgl": "sv6_110",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "422-front.webp",
+   "wp": "422-wp.webp"
+  },
+  "423": {
+   "tcgl": "sv8_15",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "423-front.webp",
+   "wp": "423-wp.webp"
+  },
+  "424": {
+   "tcgl": "sv2_27",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
+   "front": "424-front.webp",
+   "wp": "424-wp.webp",
+   "cc": "TEX_SouthernCross"
+  },
+  "425": {
+   "tcgl": "sv2_127",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
+   "front": "425-front.webp",
+   "wp": "425-wp.webp",
+   "cc": "TEX_SouthernCross"
+  },
+  "426": {
+   "tcgl": "sv2_40",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
+   "front": "426-front.webp",
+   "wp": "426-wp.webp",
+   "cc": "TEX_SouthernCross"
+  },
+  "427": {
+   "tcgl": "sv3-5_151",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
+   "front": "427-front.webp",
+   "wp": "427-wp.webp",
+   "cc": "TEX_SouthernCross"
+  },
+  "428": {
+   "tcgl": "me1_31",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "428-front.webp",
+   "wp": "428-wp.webp"
+  },
+  "429": {
+   "tcgl": "sv8_56",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "429-front.webp",
+   "wp": "429-wp.webp"
+  },
+  "430": {
+   "tcgl": "svbsp_179",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
+   "front": "430-front.webp",
+   "wp": "430-wp.webp"
+  },
+  "431": {
+   "tcgl": "swsh8_158",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
+   "front": "431-front.webp",
+   "wp": "431-wp.webp",
+   "cc": "TEX_SouthernCross"
+  },
+  "432": {
+   "tcgl": "svbsp_110",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
+   "front": "432-front.webp",
+   "wp": "432-wp.webp"
+  },
+  "433": {
+   "tcgl": "swsh8_73",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
+   "front": "433-front.webp",
+   "wp": "433-wp.webp",
+   "cc": "TEX_SouthernCross"
+  },
+  "434": {
+   "tcgl": "me5_8",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "434-front.webp",
+   "etch": "434-etch.webp",
+   "wp": "434-wp.webp"
+  },
+  "435": {
+   "tcgl": "me5_65",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "435-front.webp",
+   "etch": "435-etch.webp",
+   "wp": "435-wp.webp"
+  },
+  "436": {
+   "tcgl": "me4_22",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "436-front.webp",
+   "etch": "436-etch.webp",
+   "wp": "436-wp.webp"
+  },
+  "437": {
+   "tcgl": "me4_48",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "437-front.webp",
+   "etch": "437-etch.webp",
+   "wp": "437-wp.webp"
+  },
+  "438": {
+   "tcgl": "me3_55",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "438-front.webp",
+   "etch": "438-etch.webp",
+   "wp": "438-wp.webp"
+  },
+  "439": {
+   "tcgl": "me2-5_22",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "439-front.webp",
+   "etch": "439-etch.webp",
+   "wp": "439-wp.webp"
+  },
+  "440": {
+   "tcgl": "me2_13",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "440-front.webp",
+   "etch": "440-etch.webp",
+   "wp": "440-wp.webp"
+  },
+  "441": {
+   "tcgl": "me2-5_152",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "441-front.webp",
+   "etch": "441-etch.webp",
+   "wp": "441-wp.webp"
+  },
+  "442": {
+   "tcgl": "me2-5_113",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "442-front.webp",
+   "etch": "442-etch.webp",
+   "wp": "442-wp.webp"
+  },
+  "443": {
+   "tcgl": "me2-5_89",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "443-front.webp",
+   "etch": "443-etch.webp",
+   "wp": "443-wp.webp"
+  },
+  "444": {
+   "tcgl": "me2_41",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "444-front.webp",
+   "etch": "444-etch.webp",
+   "wp": "444-wp.webp"
+  },
+  "445": {
+   "tcgl": "me2_56",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "445-front.webp",
+   "etch": "445-etch.webp",
+   "wp": "445-wp.webp"
+  },
+  "446": {
+   "tcgl": "me1_3",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "446-front.webp",
+   "etch": "446-etch.webp",
+   "wp": "446-wp.webp"
+  },
+  "447": {
+   "tcgl": "me1_86",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "447-front.webp",
+   "etch": "447-etch.webp",
+   "wp": "447-wp.webp"
+  },
+  "448": {
+   "tcgl": "me1_94",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "448-front.webp",
+   "etch": "448-etch.webp",
+   "wp": "448-wp.webp"
+  },
+  "449": {
+   "tcgl": "me5_48",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "449-front.webp",
+   "etch": "449-etch.webp",
+   "wp": "449-wp.webp"
+  },
+  "450": {
+   "tcgl": "zsv10-5_1",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "450-front.webp",
+   "wp": "450-wp.webp"
+  },
+  "451": {
+   "tcgl": "zsv10-5_2",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "451-front.webp",
+   "wp": "451-wp.webp"
+  },
+  "452": {
+   "tcgl": "zsv10-5_3",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
+   "front": "452-front.webp",
+   "wp": "452-wp.webp",
+   "cc": "TEX_SouthernCross"
+  },
+  "453": {
+   "tcgl": "me3_6",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "453-front.webp",
+   "wp": "453-wp.webp"
+  },
+  "455": {
+   "tcgl": "sv8-5_86",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "455-front.webp",
+   "wp": "455-wp.webp"
+  },
+  "457": {
+   "tcgl": "sv1_145",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "457-front.webp",
+   "wp": "457-wp.webp"
+  },
+  "458": {
+   "tcgl": "sv6_133",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "458-front.webp",
+   "wp": "458-wp.webp"
+  },
+  "459": {
+   "tcgl": "sv10_151",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "459-front.webp",
+   "wp": "459-wp.webp"
+  },
+  "460": {
+   "tcgl": "me4_69",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "460-front.webp",
+   "wp": "460-wp.webp"
+  },
+  "461": {
+   "tcgl": "sv4_142",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "461-front.webp",
+   "wp": "461-wp.webp"
+  },
+  "462": {
+   "tcgl": "sv4_143",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "462-front.webp",
+   "wp": "462-wp.webp"
+  },
+  "463": {
+   "tcgl": "sv4_144",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "463-front.webp",
+   "wp": "463-wp.webp"
+  },
+  "464": {
+   "tcgl": "me3_60",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "464-front.webp",
+   "wp": "464-wp.webp"
+  },
+  "465": {
+   "tcgl": "me3_61",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "465-front.webp",
+   "wp": "465-wp.webp"
+  },
+  "466": {
+   "tcgl": "rsv10-5_76",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "466-front.webp",
+   "wp": "466-wp.webp"
+  },
+  "467": {
+   "tcgl": "rsv10-5_75",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "467-front.webp",
+   "wp": "467-wp.webp"
+  },
+  "468": {
+   "tcgl": "rsv10-5_74",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "468-front.webp",
+   "wp": "468-wp.webp"
+  },
+  "469": {
+   "tcgl": "sv3-5_84",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "469-front.webp",
+   "wp": "469-wp.webp"
+  },
+  "470": {
+   "tcgl": "sv3-5_85",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "470-front.webp",
+   "wp": "470-wp.webp"
+  },
+  "471": {
+   "tcgl": "me1_102",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "471-front.webp",
+   "wp": "471-wp.webp"
+  },
+  "472": {
+   "tcgl": "me1_103",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "472-front.webp",
+   "wp": "472-wp.webp"
+  },
+  "473": {
+   "tcgl": "xy6_89",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "473-front.webp",
+   "wp": "473-wp.webp"
+  },
+  "474": {
+   "tcgl": "sm8_185",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "474-front.webp",
+   "wp": "474-wp.webp"
+  },
+  "475": {
+   "tcgl": "sv4_147",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "475-front.webp",
+   "wp": "475-wp.webp"
+  },
+  "476": {
+   "tcgl": "sv9_42",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "476-front.webp",
+   "wp": "476-wp.webp"
+  },
+  "477": {
+   "tcgl": "sv9_82",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "477-front.webp",
+   "wp": "477-wp.webp"
+  },
+  "478": {
+   "tcgl": "sv8_125",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "478-front.webp",
+   "wp": "478-wp.webp"
+  },
+  "479": {
+   "tcgl": "swsh10_51",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "479-front.webp",
+   "wp": "479-wp.webp"
+  },
+  "480": {
+   "tcgl": "swsh10_118",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "480-front.webp",
+   "wp": "480-wp.webp"
+  },
+  "481": {
+   "tcgl": "swshbsp_105",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
+   "front": "481-front.webp",
+   "wp": "481-wp.webp",
+   "cc": "TEX_SouthernCross"
+  },
+  "482": {
+   "tcgl": "xy9_68",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "482-front.webp",
+   "wp": "482-wp.webp"
+  },
+  "483": {
+   "tcgl": "xy9_69",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "483-front.webp",
+   "wp": "483-wp.webp"
+  },
+  "484": {
+   "tcgl": "xy9_70",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "484-front.webp",
+   "wp": "484-wp.webp"
+  },
+  "485": {
+   "tcgl": "xy1_113",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "485-front.webp",
+   "wp": "485-wp.webp"
+  },
+  "486": {
+   "tcgl": "xy1_27",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "486-front.webp",
+   "wp": "486-wp.webp"
+  },
+  "487": {
+   "tcgl": "xy6_15",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "487-front.webp",
+   "wp": "487-wp.webp"
+  },
+  "488": {
+   "tcgl": "me3_72",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "488-front.webp",
+   "wp": "488-wp.webp"
+  },
+  "489": {
+   "tcgl": "swshbsp_107",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
+   "front": "489-front.webp",
+   "wp": "489-wp.webp",
+   "cc": "TEX_SouthernCross"
+  },
+  "490": {
+   "tcgl": "swshbsp_106",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
+   "front": "490-front.webp",
+   "wp": "490-wp.webp",
+   "cc": "TEX_SouthernCross"
+  },
+  "491": {
+   "tcgl": "me2-5_193",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "491-front.webp",
+   "wp": "491-wp.webp"
+  },
+  "492": {
+   "tcgl": "swsh1_179",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "492-front.webp",
+   "wp": "492-wp.webp"
+  },
+  "493": {
+   "tcgl": "xy3_95",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "493-front.webp",
+   "wp": "493-wp.webp"
+  },
+  "494": {
+   "tcgl": "sv4_58",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "494-front.webp",
+   "etch": "494-etch.webp",
+   "wp": "494-wp.webp"
+  },
+  "495": {
+   "tcgl": "sv3_66",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "495-front.webp",
+   "etch": "495-etch.webp",
+   "wp": "495-wp.webp"
+  },
+  "496": {
+   "tcgl": "sv4-5_54",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "496-front.webp",
+   "etch": "496-etch.webp",
+   "wp": "496-wp.webp"
+  },
+  "497": {
+   "tcgl": "sv4_38",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "497-front.webp",
+   "etch": "497-etch.webp",
+   "wp": "497-wp.webp"
+  },
+  "498": {
+   "tcgl": "sv6_106",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "498-front.webp",
+   "etch": "498-etch.webp",
+   "wp": "498-wp.webp"
+  },
+  "499": {
+   "tcgl": "me2-5_160",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "499-front.webp",
+   "etch": "499-etch.webp",
+   "wp": "499-wp.webp"
+  },
+  "500": {
+   "tcgl": "sv3_159",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "500-front.webp",
+   "etch": "500-etch.webp",
+   "wp": "500-wp.webp"
+  },
+  "501": {
+   "tcgl": "me2-5_46",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "501-front.webp",
+   "wp": "501-wp.webp"
+  },
+  "502": {
+   "tcgl": "sv6_53",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "502-front.webp",
+   "wp": "502-wp.webp"
+  },
+  "503": {
+   "tcgl": "me2-5_47",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "503-front.webp",
+   "etch": "503-etch.webp",
+   "wp": "503-wp.webp"
+  },
+  "504": {
+   "tcgl": "sv4_3",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "504-front.webp",
+   "etch": "504-etch.webp",
+   "wp": "504-wp.webp"
+  },
+  "505": {
+   "tcgl": "sv3-5_129",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "505-front.webp",
+   "wp": "505-wp.webp"
+  },
+  "506": {
+   "tcgl": "sv3-5_130",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "506-front.webp",
+   "wp": "506-wp.webp"
+  },
+  "507": {
+   "tcgl": "sv1_45",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "507-front.webp",
+   "etch": "507-etch.webp",
+   "wp": "507-wp.webp"
+  },
+  "508": {
+   "tcgl": "sv8_188",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "508-front.webp",
+   "wp": "508-wp.webp"
+  },
+  "509": {
+   "tcgl": "sv4-5_90",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "509-front.webp",
+   "wp": "509-wp.webp"
+  },
+  "510": {
+   "tcgl": "sv4_176",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "510-front.webp",
+   "wp": "510-wp.webp"
+  },
+  "511": {
+   "tcgl": "sv4_177",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "511-front.webp",
+   "wp": "511-wp.webp"
+  },
+  "512": {
+   "tcgl": "sv4_178",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "512-front.webp",
+   "wp": "512-wp.webp"
+  },
+  "513": {
+   "tcgl": "sv4_179",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "513-front.webp",
+   "wp": "513-wp.webp"
+  },
+  "514": {
+   "tcgl": "swsh10-5_30",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
+   "front": "514-front.webp",
+   "wp": "514-wp.webp",
+   "cc": "TEX_SouthernCross"
+  },
+  "515": {
+   "tcgl": "sv6-5_57",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "515-front.webp",
+   "wp": "515-wp.webp"
+  },
+  "516": {
+   "tcgl": "xy8_140",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "516-front.webp",
+   "wp": "516-wp.webp"
+  },
+  "517": {
+   "tcgl": "sm1_13",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "517-front.webp",
+   "wp": "517-wp.webp"
+  },
+  "518": {
+   "tcgl": "swsh2_65",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "518-front.webp",
+   "wp": "518-wp.webp"
+  },
+  "519": {
+   "tcgl": "sm1_52",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "519-front.webp",
+   "wp": "519-wp.webp"
+  },
+  "522": {
+   "tcgl": "sv7_50",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "522-front.webp",
+   "wp": "522-wp.webp"
+  },
+  "523": {
+   "tcgl": "sv6-5_2",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "523-front.webp",
+   "wp": "523-wp.webp"
+  },
+  "525": {
+   "tcgl": "sv4_65",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "525-front.webp",
+   "wp": "525-wp.webp"
+  },
+  "526": {
+   "tcgl": "sv3_153",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
+   "front": "526-front.webp",
+   "wp": "526-wp.webp",
+   "cc": "TEX_SouthernCross"
+  },
+  "527": {
+   "tcgl": "sm6_71",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "527-front.webp",
+   "wp": "527-wp.webp"
+  },
+  "528": {
+   "tcgl": "sm6_72",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "528-front.webp",
+   "wp": "528-wp.webp"
+  },
+  "529": {
+   "tcgl": "smbsp_15",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "529-front.webp",
+   "wp": "529-wp.webp"
+  },
+  "530": {
+   "tcgl": "me3_47",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "530-front.webp",
+   "etch": "530-etch.webp",
+   "wp": "530-wp.webp"
+  },
+  "531": {
+   "tcgl": "me3_70",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "531-front.webp",
+   "wp": "531-wp.webp"
+  },
+  "532": {
+   "tcgl": "sm9_95",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "532-front.webp",
+   "wp": "532-wp.webp"
+  },
+  "533": {
+   "tcgl": "sm4_73",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "533-front.webp",
+   "wp": "533-wp.webp"
+  },
+  "534": {
+   "tcgl": "sm3_100",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "534-front.webp",
+   "wp": "534-wp.webp"
+  },
+  "535": {
+   "tcgl": "swsh12_134",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "535-front.webp",
+   "wp": "535-wp.webp"
+  },
+  "536": {
+   "tcgl": "swsh3-5_28",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "536-front.webp",
+   "wp": "536-wp.webp"
+  },
+  "537": {
+   "tcgl": "sm11_53",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "537-front.webp",
+   "wp": "537-wp.webp"
+  },
+  "538": {
+   "tcgl": "sm11_69",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "538-front.webp",
+   "wp": "538-wp.webp"
+  },
+  "539": {
+   "tcgl": "sm8_150",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "539-front.webp",
+   "wp": "539-wp.webp"
+  },
+  "540": {
+   "tcgl": "sm8_37",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "540-front.webp",
+   "wp": "540-wp.webp"
+  },
+  "541": {
+   "tcgl": "xy7_54",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "541-front.webp",
+   "wp": "541-wp.webp"
+  },
+  "542": {
+   "tcgl": "sv3-5_150",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "542-front.webp",
+   "wp": "542-wp.webp"
+  },
+  "543": {
+   "tcgl": "sv8-5_82",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
+   "front": "543-front.webp",
+   "wp": "543-wp.webp"
+  },
+  "544": {
+   "tcgl": "swsh3_140",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "544-front.webp",
+   "wp": "544-wp.webp"
+  },
+  "545": {
+   "tcgl": "me4_10",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "545-front.webp",
+   "wp": "545-wp.webp"
+  },
+  "546": {
+   "tcgl": "svbsp_178",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
+   "front": "546-front.webp",
+   "wp": "546-wp.webp"
+  },
+  "547": {
+   "tcgl": "me1_34",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "547-front.webp",
+   "wp": "547-wp.webp"
+  },
+  "548": {
+   "tcgl": "me2-5_108",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "548-front.webp",
+   "wp": "548-wp.webp"
+  },
+  "549": {
+   "tcgl": "swsh12-5_100",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
+   "front": "549-front.webp",
+   "wp": "549-wp.webp",
+   "cc": "TEX_SouthernCross"
+  },
+  "550": {
+   "tcgl": "me1_95",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "550-front.webp",
+   "wp": "550-wp.webp"
+  },
+  "551": {
+   "tcgl": "swsh10_113",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
+   "front": "551-front.webp",
+   "wp": "551-wp.webp",
+   "cc": "TEX_SouthernCross"
+  },
+  "552": {
+   "tcgl": "sv4_40",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "552-front.webp",
+   "wp": "552-wp.webp"
+  },
+  "553": {
+   "tcgl": "swsh10_39",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
+   "front": "553-front.webp",
+   "wp": "553-wp.webp",
+   "cc": "TEX_SouthernCross"
+  },
+  "554": {
+   "tcgl": "swsh11_130",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
+   "front": "554-front.webp",
+   "wp": "554-wp.webp",
+   "cc": "TEX_SouthernCross"
+  },
+  "555": {
+   "tcgl": "sm11_86",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "555-front.webp",
+   "wp": "555-wp.webp"
+  },
+  "556": {
+   "tcgl": "zsv10-5_34",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
+   "front": "556-front.webp",
+   "wp": "556-wp.webp",
+   "cc": "TEX_SouthernCross"
+  },
+  "557": {
+   "tcgl": "xy6_64",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "557-front.webp",
+   "wp": "557-wp.webp"
+  },
+  "558": {
+   "tcgl": "sv9_30",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
+   "front": "558-front.webp",
+   "wp": "558-wp.webp",
+   "cc": "TEX_SouthernCross"
+  },
+  "559": {
+   "tcgl": "xy6_63",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "559-front.webp",
+   "wp": "559-wp.webp"
+  },
+  "560": {
+   "tcgl": "bw7_102",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "560-front.webp",
+   "wp": "560-wp.webp"
+  },
+  "561": {
+   "tcgl": "bw7_100",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "561-front.webp",
+   "wp": "561-wp.webp"
+  },
+  "562": {
+   "tcgl": "xy10_21",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "562-front.webp",
+   "wp": "562-wp.webp"
+  },
+  "563": {
+   "tcgl": "xybsp_160",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "563-front.webp",
+   "wp": "563-wp.webp"
+  },
+  "564": {
+   "tcgl": "bwbsp_44",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "564-front.webp",
+   "wp": "564-wp.webp"
+  },
+  "565": {
+   "tcgl": "sm12_102",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "565-front.webp",
+   "wp": "565-wp.webp"
+  },
+  "566": {
+   "tcgl": "sm12_142",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "566-front.webp",
+   "wp": "566-wp.webp"
+  },
+  "567": {
+   "tcgl": "sm11_101",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "567-front.webp",
+   "wp": "567-wp.webp"
+  },
+  "568": {
+   "tcgl": "sm12_164",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "568-front.webp",
+   "wp": "568-wp.webp"
+  },
+  "569": {
+   "tcgl": "bw6_128",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "569-front.webp",
+   "wp": "569-wp.webp"
+  },
+  "570": {
+   "tcgl": "svbsp_180",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
+   "front": "570-front.webp",
+   "wp": "570-wp.webp"
+  },
+  "571": {
+   "tcgl": "sv8_136",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "571-front.webp",
+   "wp": "571-wp.webp"
+  },
+  "572": {
+   "tcgl": "sm12_100",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "572-front.webp",
+   "wp": "572-wp.webp"
+  },
+  "573": {
+   "tcgl": "sm12_101",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "573-front.webp",
+   "wp": "573-wp.webp"
+  },
+  "574": {
+   "tcgl": "sm7_144",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "574-front.webp",
+   "wp": "574-wp.webp"
+  },
+  "575": {
+   "tcgl": "sm2_117",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "575-front.webp",
+   "wp": "575-wp.webp"
+  },
+  "576": {
+   "tcgl": "sm2_118",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "576-front.webp",
+   "wp": "576-wp.webp"
+  },
+  "577": {
+   "tcgl": "swsh10_155",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "577-front.webp",
+   "wp": "577-wp.webp"
+  },
+  "578": {
+   "tcgl": "swsh9_122",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
+   "front": "578-front.webp",
+   "wp": "578-wp.webp",
+   "cc": "TEX_SouthernCross"
+  },
+  "579": {
+   "tcgl": "me4_31",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "579-front.webp",
+   "wp": "579-wp.webp"
+  },
+  "580": {
+   "tcgl": "me4_32",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "580-front.webp",
+   "wp": "580-wp.webp"
+  },
+  "581": {
+   "tcgl": "me4_33",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "581-front.webp",
+   "wp": "581-wp.webp"
+  },
+  "582": {
+   "tcgl": "me4_34",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "582-front.webp",
+   "wp": "582-wp.webp"
+  },
+  "583": {
+   "tcgl": "me4_65",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "583-front.webp",
+   "etch": "583-etch.webp",
+   "wp": "583-wp.webp"
+  },
+  "584": {
+   "tcgl": "xy9_86",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "584-front.webp",
+   "wp": "584-wp.webp"
+  },
+  "585": {
+   "tcgl": "xy2_71",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "585-front.webp",
+   "wp": "585-wp.webp"
+  },
+  "586": {
+   "tcgl": "me4_58",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "586-front.webp",
+   "wp": "586-wp.webp"
+  },
+  "587": {
+   "tcgl": "swsh12-5_82",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "587-front.webp",
+   "wp": "587-wp.webp"
+  },
+  "588": {
+   "tcgl": "me2_64",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "588-front.webp",
+   "wp": "588-wp.webp"
+  },
+  "589": {
+   "tcgl": "me2_65",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "589-front.webp",
+   "wp": "589-wp.webp"
+  },
+  "590": {
+   "tcgl": "me2_66",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "590-front.webp",
+   "wp": "590-wp.webp"
+  },
+  "591": {
+   "tcgl": "me4_55",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
+   "front": "591-front.webp",
+   "wp": "591-wp.webp",
+   "cc": "TEX_SouthernCross"
+  },
+  "592": {
+   "tcgl": "sm8_146",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "592-front.webp",
+   "wp": "592-wp.webp"
+  },
+  "593": {
+   "tcgl": "sm1_92",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "593-front.webp",
+   "wp": "593-wp.webp"
+  },
+  "594": {
+   "tcgl": "me6_84",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "594-front.webp",
+   "etch": "594-etch.webp",
+   "wp": "594-wp.webp"
+  },
+  "595": {
+   "tcgl": "me6_11",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "595-front.webp",
+   "etch": "595-etch.webp",
+   "wp": "595-wp.webp"
+  },
+  "596": {
+   "tcgl": "me6_69",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "596-front.webp",
+   "etch": "596-etch.webp",
+   "wp": "596-wp.webp"
+  },
+  "597": {
+   "tcgl": "me6_47",
+   "shader": "TPCi/Cards3D/HoloFoil/SvUltra",
+   "material": "MAT_Cards3D_SvUltra",
+   "front": "597-front.webp",
+   "etch": "597-etch.webp",
+   "wp": "597-wp.webp"
+  },
+  "598": {
+   "tcgl": "swsh2_121",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
+   "front": "598-front.webp",
+   "wp": "598-wp.webp",
+   "cc": "TEX_SouthernCross"
+  },
+  "599": {
+   "tcgl": "swsh7_70",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
+   "front": "599-front.webp",
+   "wp": "599-wp.webp",
+   "cc": "TEX_SouthernCross"
+  },
+  "600": {
+   "tcgl": "me6_46",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "600-front.webp",
+   "wp": "600-wp.webp"
+  },
+  "601": {
+   "tcgl": "sv4_50",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
+   "front": "601-front.webp",
+   "wp": "601-wp.webp",
+   "cc": "TEX_SouthernCross"
+  },
+  "602": {
+   "tcgl": "me6_10",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "602-front.webp",
+   "wp": "602-wp.webp"
+  },
+  "603": {
+   "tcgl": "me6_68",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "603-front.webp",
+   "wp": "603-wp.webp"
+  },
+  "604": {
+   "tcgl": "me5_52",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "604-front.webp",
+   "wp": "604-wp.webp"
+  },
+  "605": {
+   "tcgl": "sv1_174",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "605-front.webp",
+   "wp": "605-wp.webp"
+  },
+  "606": {
+   "tcgl": "sm8_188",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "606-front.webp",
+   "wp": "606-wp.webp"
+  },
+  "607": {
+   "tcgl": "sm7_143",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "607-front.webp",
+   "wp": "607-wp.webp"
+  },
+  "608": {
+   "tcgl": "sm3_112",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "608-front.webp",
+   "wp": "608-wp.webp"
+  },
+  "609": {
+   "tcgl": "sm1_133",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "609-front.webp",
+   "wp": "609-wp.webp"
+  },
+  "610": {
+   "tcgl": "sv3_186",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "610-front.webp",
+   "wp": "610-wp.webp"
+  },
+  "611": {
+   "tcgl": "me6_28",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "611-front.webp",
+   "wp": "611-wp.webp"
+  },
+  "612": {
+   "tcgl": "sv8_189",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "612-front.webp",
+   "wp": "612-wp.webp"
+  },
+  "613": {
+   "tcgl": "swsh1_165",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "613-front.webp",
+   "wp": "613-wp.webp"
+  },
+  "614": {
+   "tcgl": "sm1_120",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "614-front.webp",
+   "wp": "614-wp.webp"
+  },
+  "615": {
+   "tcgl": "sv1_180",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "615-front.webp",
+   "wp": "615-wp.webp"
+  },
+  "616": {
+   "tcgl": "swsh7_28",
+   "shader": "TPCi/Cards3D/HoloFoil/SunPillar",
+   "material": "MAT_Cards3D_SunPillar",
+   "front": "616-front.webp",
+   "wp": "616-wp.webp",
+   "cc": "TEX_SouthernCross"
+  },
+  "617": {
+   "tcgl": "sv5_76",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "617-front.webp",
+   "wp": "617-wp.webp"
+  },
+  "618": {
+   "tcgl": "sv5_75",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "618-front.webp",
+   "wp": "618-wp.webp"
+  },
+  "619": {
+   "tcgl": "rsv10-5_80",
+   "shader": "TPCi/Cards3D/HoloFoil/FlatSilver",
+   "material": "MAT_Cards3D_FlatSilver",
+   "front": "619-front.webp",
+   "wp": "619-wp.webp"
+  },
+  "620": {
+   "tcgl": "sm11-5_109",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "620-front.webp",
+   "wp": "620-wp.webp"
+  },
+  "621": {
+   "tcgl": "bwbsp_99",
+   "shader": "TPCi/Cards3D/HoloFoil/SvHolo",
+   "material": "MAT_Cards3D_SvHolo",
+   "front": "621-front.webp",
+   "wp": "621-wp.webp"
   }
  }
 }
