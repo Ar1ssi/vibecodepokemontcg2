@@ -1,4 +1,4 @@
-// Vendors card fronts for sets TCGdex has no image for (sm3.5 Shining Legends, swsh4.5sv Shining Fates
+// Fallback for scripts/import-card-art-tcgl.py (TCG Live fronts win): vendors card fronts for sets TCGdex has no image for (sm3.5 Shining Legends, swsh4.5sv Shining Fates
 // Shiny Vault) from the pokemontcg.io API/CDN into client/src/assets/card-art/<series>/<set>/<localId>/
 // {high,low}.webp, the layout shared/tcgdex/card-art.mjs serves. Existing files are kept (sm3.5 69–70 are
 // TCG Live art). Needs ImageMagick `convert`. Usage: node scripts/vendor-card-art-ptcgio.mjs [tcgdexSetId...]

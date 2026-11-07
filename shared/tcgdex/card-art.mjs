@@ -13,10 +13,10 @@ const CARD_ART_IDS = new Set([
   'bw1-109', // Psychic Energy
   'bw1-110', // Fighting Energy
   'bw1-111', // Darkness Energy
-  ...Array.from({ length: 78 }, (_, i) => `sm3.5-${i + 1}`), // Shining Legends (69–70 are TCG Live art, the rest pokemontcg.io)
+  ...Array.from({ length: 78 }, (_, i) => `sm3.5-${i + 1}`), // Shining Legends (TCG Live art, scripts/import-card-art-tcgl.py; pokemontcg.io is the fallback)
   ...Array.from({ length: 78 }, (_, i) => `sm7.5-${i + 1}`), // Dragon Majesty (TCGdex has no image for any)
   ...Array.from({ length: 24 }, (_, i) => `sve-${String(i + 1).padStart(3, '0')}`), // Basic Energy
-  ...Array.from({ length: 122 }, (_, i) => `swsh4.5sv-SV${String(i + 1).padStart(3, '0')}`), // Shining Fates Shiny Vault (pokemontcg.io)
+  ...Array.from({ length: 122 }, (_, i) => `swsh4.5sv-SV${String(i + 1).padStart(3, '0')}`), // Shining Fates Shiny Vault (TCG Live art, same script)
 ]);
 
 /** TCGdex-style image base (no `/high.webp`) for a card this app serves itself, else null. */
