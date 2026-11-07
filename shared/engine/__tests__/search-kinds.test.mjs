@@ -642,3 +642,32 @@ test('Ball Guy keeps one card per name', () => {
   assert.equal(res.pendingChoice ?? null, null);
   assert.deepEqual(state.players.p1.zones.hand.map((c) => c.instanceId), [1, 3]);
 });
+
+// Summon Lightning, customhb set.json (Tapu Koko-style attack text)
+test('Summon Lightning picks any 2 of {L} Pokémon and Basic Energy, not Energy alone', async () => {
+  const { parseAttackSearchClause } = await import('../rules/damage-parser.mjs');
+  const params = parseAttackSearchClause(
+    'Search your deck for any combination of 2 {L} Pokémon and Basic Energy, reveal them, and put them into your hand. Then, shuffle your deck.'
+  );
+  assert.deepEqual(params, {
+    what: 'Lightning Pokémon or Basic Energy',
+    count: 2,
+    destination: 'hand',
+    upTo: true,
+    reveal: true,
+  });
+  const basic = { supertype: 'Pokémon', subtypes: 'Basic', stage: 'Basic' };
+  const deck = [
+    { name: 'Pikachu', types: ['Lightning'], ...basic },
+    { name: 'Squirtle', types: ['Water'], ...basic },
+    { name: 'Lightning Energy', supertype: 'Energy', type: 'Basic Energy' },
+    { name: 'Fire Energy', supertype: 'Energy', type: 'Basic Energy' },
+    { name: 'Potion', supertype: 'Trainer', type: 'Item' },
+  ];
+  const inHand = (selection) =>
+    searchDeckWith([{ type: 'searchDeck', ...params }], deck, selection).state.players.p1.zones.hand.map((c) => c.name);
+  assert.deepEqual(inHand([1, 3]), ['Pikachu', 'Lightning Energy']);
+  assert.deepEqual(inHand([3, 4]), ['Lightning Energy', 'Fire Energy']);
+  const offers = deck.filter((c) => matchesSearch(createCard(c), params.what)).map((c) => c.name);
+  assert.deepEqual(offers, ['Pikachu', 'Lightning Energy', 'Fire Energy']);
+});

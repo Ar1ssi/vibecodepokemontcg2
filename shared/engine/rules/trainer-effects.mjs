@@ -814,6 +814,21 @@ function parseSearchDeckKind(lower) {
     };
   }
 
+  // Summon Lightning: "any combination of 2 {L} Pokémon and Basic Energy" is N picks from one
+  // pool holding both kinds, not the Energy kind alone.
+  const searchCombo = lower.match(
+    /search your deck for any combination of (\d+) ([^,.]+?)(?=,|\.| and put)/
+  );
+  if (searchCombo) {
+    return {
+      what: combinationDiscardWhat(searchCombo[2]),
+      count: Number(searchCombo[1]),
+      destination,
+      upTo: true,
+      ...(reveal ? { reveal: true } : {}),
+    };
+  }
+
   // Precious Trolley: "any number of Basic Pokémon … onto your Bench". The executor caps picks at
   // the open Bench slots, so a count of 5 (the full Bench) means "as many as fit".
   if (/search your deck for any number of basic pok[ée]mon\b/.test(lower) && destination === 'bench') {
