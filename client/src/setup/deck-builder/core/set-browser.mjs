@@ -369,6 +369,112 @@ const TCGDEX_BASE = tcgdexApiBase();
       return sets;
     }
 
+    // Format pills: a historical tournament format is a fixed list of TCGdex sets, shown newest first.
+    // An entry is [setId, series] or [setId, series, lastNumber]: a set cut off at lastNumber shows only
+    // the cards numbered up to it, under a synthetic set id (formatLimitedSetId).
+    // SM-LOT: Sun & Moon through Lost Thunder, with the minis (Shining Legends, Dragon Majesty), the two
+    // SM Trainer Kits and the SM Black Star Promos SM01-SM157. Promos rotate with the set they came with and
+    // the 2020-21 format starts at SM158 (Team Up), so SM157 is the last promo of the Lost Thunder era.
+    // 2010 Worlds: the 2008-10 Modified format (Diamond & Pearl through HeartGold & SoulSilver: Unleashed),
+    // with POP 6-9, the DP and HS Trainer Kits and DP01-DP56. PkmnCards' "DP-on (2010)" list names no HGSS
+    // Black Star Promos and leaves out Undaunted (released after the August 2010 event).
+    export const FORMAT_PILLS = Object.freeze([
+      {
+        id: 'sm-lot',
+        label: 'SM-LOT',
+        title: 'Sun & Moon through Lost Thunder, with promos SM01-SM157',
+        sets: [
+          ['sm1', 'sm'],
+          ['sm2', 'sm'],
+          ['sm3', 'sm'],
+          ['sm3.5', 'sm'],
+          ['sm4', 'sm'],
+          ['sm5', 'sm'],
+          ['sm6', 'sm'],
+          ['sm7', 'sm'],
+          ['sm7.5', 'sm'],
+          ['sm8', 'sm'],
+          ['smp', 'sm', 157],
+          ['tk-sm-l', 'tk'],
+          ['tk-sm-r', 'tk'],
+        ],
+      },
+      {
+        id: '2010-worlds',
+        label: '2010 Worlds',
+        title: 'Diamond & Pearl through HeartGold & SoulSilver: Unleashed (2008-10 Modified)',
+        sets: [
+          ['dp1', 'dp'],
+          ['dp2', 'dp'],
+          ['dp3', 'dp'],
+          ['dp4', 'dp'],
+          ['dp5', 'dp'],
+          ['dp6', 'dp'],
+          ['dp7', 'dp'],
+          ['pl1', 'pl'],
+          ['pl2', 'pl'],
+          ['pl3', 'pl'],
+          ['pl4', 'pl'],
+          ['hgss1', 'hgss'],
+          ['hgss2', 'hgss'],
+          ['dpp', 'dp'],
+          ['pop6', 'pop'],
+          ['pop7', 'pop'],
+          ['pop8', 'pop'],
+          ['pop9', 'pop'],
+          ['tk-dp-l', 'tk'],
+          ['tk-dp-m', 'tk'],
+          ['tk-hs-g', 'tk'],
+          ['tk-hs-r', 'tk'],
+        ],
+      },
+    ]);
+
+    export const FORMAT_PILL_IDS = Object.freeze(FORMAT_PILLS.map((pill) => pill.id));
+
+    const FORMAT_LIMITED_SET_RE = /^__format_([^_]+)_(.+)__$/;
+    export const formatLimitedSetId = (formatId, setId) => `__format_${formatId}_${setId}__`;
+
+    // The cards of a set cut off at lastNumber, by the digits of each card's local id ("SM57" -> 57).
+    const withinLastNumber = (cards, lastNumber) =>
+      cards.filter((card) => Number.parseInt(String(card.localId).replace(/\D+/g, ''), 10) <= lastNumber);
+
+    async function fetchFormatLimitedSetCards(formatId, setId) {
+      const entry = FORMAT_PILLS.find((pill) => pill.id === formatId)?.sets.find(([id]) => id === setId);
+      if (!entry) return [];
+      return withinLastNumber(await fetchSetCards(setId), entry[2]);
+    }
+
+    // Every set of a format pill that TCGdex can answer, newest first. A set that fails to load is
+    // skipped so one outage does not blank the pill. Promo and kit sets sort by their own release date.
+    export async function fetchFormatSets(formatId) {
+      const format = FORMAT_PILLS.find((pill) => pill.id === formatId);
+      if (!format) return [];
+      const entries = await Promise.all(
+        format.sets.map(async ([setId, series, lastNumber]) => {
+          try {
+            const record = await fetchSetRecord(setId, series);
+            const imaged = (record.cards || []).filter((c) => c.image);
+            return {
+              setId: lastNumber ? formatLimitedSetId(formatId, record.id) : record.id,
+              name: record.name,
+              seriesId: series,
+              releaseDate: record.releaseDate || '',
+              logo: normalizeAssetUrl(record.logo),
+              symbol: normalizeAssetUrl(record.symbol),
+              cardCount: (lastNumber ? withinLastNumber(imaged, lastNumber) : imaged).length,
+              category: 'generation',
+            };
+          } catch {
+            return null;
+          }
+        })
+      );
+      return entries
+        .filter((entry) => entry && entry.cardCount > 0)
+        .sort((a, b) => String(b.releaseDate || '').localeCompare(String(a.releaseDate || '')));
+    }
+
     // Custom sets (design 075): the sets installed in this repo (client/src/assets/custom-sets),
     // listed by the server's manifest; their cards come through the TCGdex proxy like any set's.
     // A set.json's `group` picks the pill: "custom" (or none) → Custom, "homebrew" → Homebrew sets.
@@ -919,6 +1025,9 @@ const TCGDEX_BASE = tcgdexApiBase();
       if (setId === OTHER_151_SET_ID) return fetchOther151Cards();
       if (setId === GEN_1_2_SET_ID) return fetchGen12Cards();
       if (setId === HOMEBREW_ENERGY_SET_ID) return fetchHomebrewEnergyCards();
+
+      const limited = FORMAT_LIMITED_SET_RE.exec(setId);
+      if (limited) return fetchFormatLimitedSetCards(limited[1], limited[2]);
 
       const generationEnergyMatch = GENERATION_ENERGY_SET_ID_RE.exec(setId);
       if (generationEnergyMatch) return fetchGenerationEnergyCards(Number(generationEnergyMatch[1]));
