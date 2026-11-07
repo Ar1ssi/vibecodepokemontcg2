@@ -1661,6 +1661,31 @@ test('stadium: Shrine of Punishment damages every GX/EX between turns', () => {
   assert.equal(res.state.players.p2.zones.bench[0].damage, 10);
 });
 
+test('stadium: Shrine of Punishment hits an ex Evolution stacked on a plain Basic, not a plain Evolution on an ex', () => {
+  const { state, rng } = setupGame();
+  state.stadium = stadiumWith(
+    92,
+    'Shrine of Punishment',
+    "Between turns, put 1 damage counter on each Pokémon-GX and Pokémon-EX (both yours and your opponent's)."
+  );
+  const mon = (instanceId, name, stage, extra = {}) =>
+    createCard({ instanceId, name, hp: 200, stage, supertype: 'Pokémon', type: 'Pokémon', ...extra });
+  state.players.p1.zones.active.push(mon(70, 'Charmander', 'Basic'));
+  state.players.p1.zones.active.push(
+    mon(71, 'Charizard ex', 'Stage 2', { evolvesFrom: 'Charmander', attachedTo: 70, subtypes: ['ex'] })
+  );
+  state.players.p2.zones.active.push(mon(72, 'Shaymin-EX', 'Basic', { subtypes: ['EX'] }));
+  state.players.p2.zones.active.push(
+    mon(73, 'Plain Stage 1', 'Stage 1', { evolvesFrom: 'Shaymin-EX', attachedTo: 72 })
+  );
+
+  const res = applyCommand(state, { type: 'pass', payload: {}, playerId: 'p1' }, rng);
+  assert.equal(res.error, null);
+  const root = (pid, id) => res.state.players[pid].zones.active.find((c) => c.instanceId === id);
+  assert.equal(root('p1', 70).damage, 10);
+  assert.equal(root('p2', 72).damage || 0, 0);
+});
+
 test('stadium: Cursed Stone damages Pokémon with a Poké-Power between turns', () => {
   const { state, rng } = setupGame();
   state.stadium = stadiumWith(

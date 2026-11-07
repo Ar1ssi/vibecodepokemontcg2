@@ -105,11 +105,13 @@ function applyBetweenTurnsStadiumDamage(draft, { events }) {
   const playerIds = Object.keys(draft.players || {});
   for (const pid of playerIds) {
     const player = draft.players[pid];
+    const sideCards = [...(player.zones?.active || []), ...(player.zones?.bench || [])];
     for (const zone of [player.zones?.active, player.zones?.bench]) {
       if (!Array.isArray(zone)) continue;
       for (const mon of [...zone]) {
         if (mon.attachedTo) continue;
-        const dmg = stadiumBetweenTurnsDamageFor(mon, card);
+        // An ex/GX Evolution stacked on a plain Basic is still an ex/GX: judge the top card.
+        const dmg = stadiumBetweenTurnsDamageFor(topPokemonCard(sideCards, mon) || mon, card);
         if (dmg <= 0) continue;
         // Lunatone New Moon (I219): "prevent all effects of any Stadium done to your Pokémon in play".
         if (cardEffectShielded(draft, { owner: player, root: mon, source: 'Stadium' })) continue;
