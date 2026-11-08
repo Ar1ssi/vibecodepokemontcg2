@@ -1111,7 +1111,7 @@ export function parseToolCap(card) {
 
 // Technical Machine: Confuse etc.: "The Pokémon this card is attached to can have 1 more Pokémon
 // Tool attached to it." Counted from the Tools attached to the host.
-const TOOL_GRANTED_SLOT = /can have (d+|an|1) (?:more|extra) pok[eé]mon tools? attached/;
+const TOOL_GRANTED_SLOT = /can have (\d+|an|1) (?:more|extra) pok[eé]mon tools? attached/;
 
 /** How many Pokémon Tools a host may hold: 1, plus its own Ability and its attached Tools' extra slots. */
 export function toolCapacity(host, zoneCards = []) {

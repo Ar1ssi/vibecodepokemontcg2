@@ -14,7 +14,7 @@ import {
   legacyAttachedTrainer, attachedTrainerTurnEnd,
 } from '../rules/legacy-attached-trainer.mjs';
 import {
-  toolDiscardsAtEndOfTurn, toolDiscardsAtEndOfOpponentTurn, toolEndOfTurnActiveHeal,
+  toolDiscardsAtEndOfTurn, toolDiscardsAtEndOfOpponentTurn, toolEndOfTurnActiveHeal, toolCheckupEffect,
 } from '../rules/tool-attacks.mjs';
 import { stadiumCheckupCoinModifiers } from '../rules/stadium-triggers.mjs';
 import {
@@ -27,7 +27,7 @@ import { addAttackMarker, markerFromTurn, markerUntilTurn } from '../rules/attac
 import { isEvolutionCard } from '../rules/tool-combat.mjs';
 import { normalizeStage } from '../rules/evolution.mjs';
 import { topPokemonCard } from '../rules/evolved-pokemon.mjs';
-import { cardEffectShielded } from '../effects/trainer-steps.mjs';
+import { cardEffectShielded, pokemonHasType } from '../effects/trainer-steps.mjs';
 import {
   runEndOfTurnSpecialEnergies, applySpecialEnergyStatusImmunity, discardEndOfTurnSpecialEnergies,
 } from '../effects/special-energy.mjs';
@@ -326,6 +326,40 @@ export function discardBenchedAttachedTrainers(draft, { events }) {
 }
 
 /**
+ * Tool Checkup text: a matching-type holder is healed, any other holder takes damage. Damage lands
+ * now (and the holder joins `affected` for the Knock Out sweep); the heals are returned so they
+ * run with the other between-turns heals. Blocked by a Stadium that stops Tool effects.
+ */
+function applyToolCheckupEffects(draft, { events, affected }) {
+  const heals = [];
+  if (stadiumBlocksToolEffects(draft.stadium?.card || draft.stadium)) return heals;
+  for (const [playerId, player] of Object.entries(draft.players || {})) {
+    const sideCards = [...(player.zones?.active || []), ...(player.zones?.bench || [])];
+    for (const root of sideCards) {
+      if (root.attachedTo) continue;
+      const top = topPokemonCard(sideCards, root) || root;
+      for (const tool of sideCards.filter((c) => c.attachedTo === root.instanceId)) {
+        const effect = toolCheckupEffect(tool);
+        if (!effect) continue;
+        if (pokemonHasType(top, effect.symbol.toLowerCase())) {
+          heals.push(() => {
+            const before = root.damage || 0;
+            if (before <= 0 || stadiumBlocksHealing(draft.stadium) || healBlockedByAbility(draft, root)) return;
+            root.damage = Math.max(0, before - effect.heal);
+            events.push({ type: 'damageUpdated', instanceId: root.instanceId, damage: root.damage, healed: before - root.damage, source: tool.name });
+          });
+          continue;
+        }
+        root.damage = (root.damage || 0) + effect.damage;
+        events.push({ type: 'checkupAbilityDamage', source: tool.name, instanceId: root.instanceId, playerId, damage: effect.damage });
+        affected.push({ card: root, playerId });
+      }
+    }
+  }
+  return heals;
+}
+
+/**
  * Pokémon Checkup damage from abilities (design 034 slice 4): Froslass, Magmortar,
  * Pecharunt, Team Rocket's Tyranitar, Trevenant. Applied after the per-condition
  * Checkup damage and before between-turns Stadium damage, with a Knockout sweep.
@@ -340,6 +374,8 @@ function applyCheckupAbilities(draft, { events, ctx, betweenEffects = [], checku
     if (targets.length > 0) effects.push({ ...effect, targets });
   }
   const affected = [];
+  // Tools with their own Checkup text (Poison Barb): every Pokémon holding one, on both sides.
+  const toolHeals = applyToolCheckupEffects(draft, { events, affected });
   for (const effect of effects) {
     for (const target of effect.targets) {
       // I219: "Prevent all effects of your opponent's Pokémon's Abilities done to this Pokémon."
@@ -366,6 +402,7 @@ function applyCheckupAbilities(draft, { events, ctx, betweenEffects = [], checku
   }
   // Between-turns heals resolve before the Knock Out sweep, so a heal and the
   // damage it offsets in the same phase cancel instead of Knocking Out (I163).
+  for (const heal of toolHeals) heal();
   for (const effect of betweenEffects) {
     if (effect.kind !== 'heal') continue;
     if (stadiumBlocksHealing(draft.stadium)) continue;

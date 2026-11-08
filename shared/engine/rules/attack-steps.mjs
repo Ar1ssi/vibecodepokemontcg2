@@ -183,7 +183,7 @@ const TEMPLATES = [
   ],
   // Technical Machine: Confuse Trick.
   [
-    /^move the pokémon tool attached to this pokémon to your opponent's active pokémon(?:. if that pokémon already has a pokémon tool attached to it, discard that pokémon tool and attach the moved pokémon tool to it instead)?$/,
+    /^move the pokémon tool attached to this pokémon to your opponent's active pokémon(?:\. if that pokémon already has a pokémon tool attached to it, discard that pokémon tool and attach the moved pokémon tool to it instead)?$/,
     () => ({ type: 'atkMoveToolToOpponent' }),
   ],
   // Cofagrigus Slap of Misfortune, Unown E Hidden Power.

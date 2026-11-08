@@ -148,6 +148,20 @@ export function toolEndOfTurnActiveHeal(card) {
 }
 
 /**
+ * "If the Pokémon this card is attached to is a {D} Pokémon, heal 10 damage from that Pokémon during
+ * Pokémon Checkup. Otherwise, that Pokémon takes 20 damage during Pokémon Checkup." (customhb Poison
+ * Barb). Null for any other Tool.
+ * @returns {{ symbol: string, heal: number, damage: number } | null}
+ */
+export function toolCheckupEffect(card) {
+  if (!card || isPokemon(card) || isEnergy(card)) return null;
+  const m = normalizeText(cardTextOf(card)).match(
+    /if the pok[eé]mon this card is attached to is an? \{([a-z])\} pok[eé]mon, heal (\d+) damage from that pok[eé]mon during pok[eé]mon checkup\. otherwise, that pok[eé]mon takes (\d+) damage during pok[eé]mon checkup/
+  );
+  return m ? { symbol: m[1].toUpperCase(), heal: Number(m[2]), damage: Number(m[3]) } : null;
+}
+
+/**
  * True when a Pokémon Tool discards itself at the end of its owner's opponent's turn:
  * "If this card is attached to 1 of your Pokémon, discard it at the end of your opponent's turn"
  * (Metal Core Barrier sm10-180, customhb-165).
