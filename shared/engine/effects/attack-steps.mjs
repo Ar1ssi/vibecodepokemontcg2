@@ -3008,6 +3008,25 @@ function atkOppAttackLock(ctx) {
   return null;
 }
 
+// Origin Forme Dialga ex Temporal Freeze: "Neither player can attack or retreat during their next
+// turn. Trainer cards and Abilities can't affect either Active Pokémon." The opponent's next turn
+// is N+1 and the attacker's is N+2; the Trainer/Ability shield holds through both (effectFreezeUntilTurn,
+// read by trainer-steps.mjs freezeShields).
+function atkFreezeBoth(ctx) {
+  const { player, opponent } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const turn = ctx.draft.turn?.number || 1;
+  const stamp = (side, lockUntil) => {
+    side.attackLockUntilTurn = Math.max(side.attackLockUntilTurn || 0, lockUntil);
+    side.retreatLockUntilTurn = Math.max(side.retreatLockUntilTurn || 0, lockUntil);
+    side.effectFreezeUntilTurn = Math.max(side.effectFreezeUntilTurn || 0, turn + 2);
+  };
+  stamp(opponent, turn + 1);
+  stamp(player, turn + 2);
+  ctx.events.push({ type: 'freezeApplied', playerId: player.playerId, untilTurn: turn + 2 });
+  return null;
+}
+
 // Dialga-GX Timeless-GX / Togepi & Cleffa & Igglybuff-GX Supreme Puff-GX: the attack tail
 // consumes `flags.extraTurn` and advances the turn to the same player without a checkup.
 function atkTakeAnotherTurn(ctx) {
@@ -4201,6 +4220,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkBounceOwnInPlay,
   atkOppPlayLock,
   atkOppAttackLock,
+  atkFreezeBoth,
   atkTakeAnotherTurn,
   atkShuffleOppAllBench,
   atkBothDrawUntil,

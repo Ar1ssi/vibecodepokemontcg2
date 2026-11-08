@@ -1296,6 +1296,10 @@ export function validateLegality(state, command) {
       if (player.flags?.retreatedThisTurn) {
         return { allowed: false, reason: 'Already retreated this turn.' };
       }
+      // Origin Forme Dialga ex Temporal Freeze: a player-scoped lock on both sides.
+      if (player.retreatLockUntilTurn && player.retreatLockUntilTurn >= (state.turn?.number || 1)) {
+        return { allowed: false, reason: "Temporal Freeze — neither player can retreat." };
+      }
       const active = player.zones?.active?.find((c) => !c.attachedTo);
       if (!active) {
         return { allowed: false, reason: 'No active Pokémon to retreat.' };

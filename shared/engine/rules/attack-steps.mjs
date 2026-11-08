@@ -1297,6 +1297,22 @@ const BLOCKS = [
       immunity: { ignoreWeakness: true, ignoreResistance: true },
     }),
   ],
+  // Origin Forme Dialga ex Time Sickness: Checkup counters by the Defending Pokémon's stage, kept
+  // until it is switched out (the marker is cleared with the Active Spot; evolving ends it).
+  [
+    /if your opponent's active pokémon is a basic pokémon, put (\d+) damage counters? on it during pokémon checkup\. if your opponent's active pokémon is an evolution pokémon, put (\d+) damage counters? on it during pokémon checkup\. this effect lasts until your opponent's active pokémon is switched out\./g,
+    (m) => ({
+      type: 'atkAddMarker',
+      target: 'opponentActive',
+      window: 'whileActive',
+      marker: { kind: 'checkupCounters', basic: Number(m[1]), evolution: Number(m[2]) },
+    }),
+  ],
+  // Origin Forme Dialga ex Temporal Freeze (see effects/attack-steps.mjs atkFreezeBoth).
+  [
+    /neither player can attack or retreat during their next turn\. trainer cards and abilities can't affect either active pokémon\./g,
+    () => ({ type: 'atkFreezeBoth' }),
+  ],
   // Moltres [Fossil 12] Wildfire: as many of the opponent's top cards as {R} Energy discarded.
   // customhb Raticate Gnaw prints the same with no Energy type.
   [

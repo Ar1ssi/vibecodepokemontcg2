@@ -24,6 +24,8 @@ import {
 } from '../rules/ability-triggers.mjs';
 import { flipCoin } from '../rng.mjs';
 import { addAttackMarker, markerFromTurn, markerUntilTurn } from '../rules/attack-markers.mjs';
+import { isEvolutionCard } from '../rules/tool-combat.mjs';
+import { normalizeStage } from '../rules/evolution.mjs';
 import { topPokemonCard } from '../rules/evolved-pokemon.mjs';
 import { cardEffectShielded } from '../effects/trainer-steps.mjs';
 import {
@@ -398,6 +400,35 @@ function applyCheckupAbilities(draft, { events, ctx, betweenEffects = [], checku
 }
 
 /**
+ * Origin Forme Dialga ex Time Sickness: each Checkup puts 1 damage counter on a Basic Active
+ * Pokémon and 2 on an Evolution one while the marker holds. Two copies of the marker do not stack.
+ */
+function applyCheckupCounterMarkers(draft, { events }) {
+  for (const pid of Object.keys(draft.players || {})) {
+    if (isGameConcluded(draft)) return;
+    const active = draft.players[pid].zones?.active?.find((c) => !c.attachedTo);
+    const marker = activeAttackMarkers(draft, pid, active).find((m) => m.kind === 'checkupCounters');
+    if (!marker) continue;
+    const view = inPlayView(draft, active);
+    const stage = normalizeStage(view.stage);
+    const evolved = (stage && stage !== 'Basic') || isEvolutionCard(view);
+    const counters = evolved ? marker.evolution : marker.basic;
+    if (!(counters > 0)) continue;
+    active.damage = (active.damage || 0) + counters * 10;
+    events.push({ type: 'checkupDamage', instanceId: active.instanceId, condition: marker.sourceAttack, damage: counters * 10, playerId: pid });
+    const hp = cardEffectiveHp(draft, active, pid);
+    if (hp > 0 && active.damage >= hp) {
+      handleKnockout(draft, {
+        victimPlayerId: pid,
+        attackerPlayerId: Object.keys(draft.players).find((id) => id !== pid),
+        victim: active,
+        events,
+      });
+    }
+  }
+}
+
+/**
  * Mandatory end-of-turn ability effects (Great Tusk ex Quaking Demolition:
  * discard the top 5 cards of your deck while it is in the Active Spot). Optional
  * end-of-turn abilities are activated through useAbility instead.
@@ -579,6 +610,7 @@ export function resolveCheckup(
   // Pokémon Checkup abilities resolve after the conditions and before the
   // between-turns Stadium damage (design 034 slice 4).
   applyCheckupAbilities(draft, { events, ctx: triggerCtx, betweenEffects, checkupEffects });
+  applyCheckupCounterMarkers(draft, { events });
 
   applyOpponentTurnStartBarriers(draft, { rng, events, ctx: triggerCtx, endingPlayerId });
 

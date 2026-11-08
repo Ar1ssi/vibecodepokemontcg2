@@ -174,11 +174,22 @@ export function cardEffectSource(effectType, sourceCard) {
   return null;
 }
 
+/**
+ * Origin Forme Dialga ex Temporal Freeze: "Trainer cards and Abilities can't affect either Active
+ * Pokémon", for both sides until `effectFreezeUntilTurn`. Position-based, so a promoted Active is covered.
+ */
+function freezeShields(draft, owner, root, source) {
+  if (!owner || !root || !['Item', 'Supporter', 'Stadium', 'Ability'].includes(source)) return false;
+  if (!(owner.effectFreezeUntilTurn >= (draft?.turn?.number || 1))) return false;
+  return (owner.zones?.active || []).includes(root) && !root.attachedTo;
+}
+
 /** Whether an Ability on `owner`'s side shields its in-play `root` from `source` (I219). */
 export function cardEffectShielded(draft, { owner, root, source }) {
   if (!source || !owner || !root) return false;
   const zone = zoneOfRoot(owner, root);
   if (!zone) return false;
+  if (freezeShields(draft, owner, root, source)) return true;
   const other = Object.values(draft?.players || {}).find((p) => p && p.playerId !== owner.playerId);
   const sideCtx = { ...sideContextFor(draft, owner.playerId), opponentPrizesLeft: other?.zones?.prizes?.length };
   return abilityPreventsCardEffects(evolvedView(zone, root), source, sideCtx);
@@ -194,7 +205,8 @@ export function effectShieldBlocks(ctx, side, root) {
   const source = cardEffectSource(ctx.effectType, ctx.sourceCard);
   if (!source) return false;
   // Card and Ability shields name the opponent's; Lunatone's "any Stadium" includes its own side's.
-  if (side === ctx.player && source !== 'Stadium') return false;
+  // Temporal Freeze guards both Active Pokémon, the attacker's own included.
+  if (side === ctx.player && source !== 'Stadium') return freezeShields(ctx.draft, side, root, source);
   if (source === 'Ability' && specialEnergyShielded(side, root, 'ability')) return true;
   return cardEffectShielded(ctx.draft, { owner: side, root, source });
 }
