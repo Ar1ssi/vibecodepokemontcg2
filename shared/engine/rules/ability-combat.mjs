@@ -100,8 +100,11 @@ function nonStackingOnce(cards) {
   return cards.filter((card) => {
     const t = cardAbilityText(card);
     // "You can't apply more than 1 Armor of the Sunne Ability at a time" (Solgaleo) is the same clause.
-    if (!/doesn't stack|does not stack|can't apply more than 1 [^.]*? ability at a time/.test(t)) return true;
-    const key = t.replace(/\s+/g, ' ').trim();
+    // Unified Defense scales by "each Pokémon with the Ability X in play", so one copy already
+    // carries the whole count (abilityHolderCount); it is keyed by Ability name across wordings.
+    const counted = /for each pok[eé]mon with the ability ([a-z0-9 '’-]+?) in play/.exec(t.toLowerCase())?.[1];
+    if (!counted && !/doesn't stack|does not stack|can't apply more than 1 [^.]*? ability at a time/.test(t)) return true;
+    const key = counted ? `counted:${counted}` : t.replace(/\s+/g, ' ').trim();
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -586,10 +589,22 @@ export function abilityDamageReduction(defender, attacker, ctx = {}) {
       skipSymbolFilter: true,
     });
     if (!red) continue;
-    if (/before applying weakness and resistance/.test(t)) out.beforeWR += red;
-    else out.afterWR += red;
+    const scaled = red * abilityHolderCount(t, ctx);
+    if (/before applying weakness and resistance/.test(t)) out.beforeWR += scaled;
+    else out.afterWR += scaled;
   }
   return out;
+}
+
+// Regirock / Regice Unified Defense: "take 10 less damage for each Pokémon with the Ability Unified
+// Defense in play". In play spans both sides; same-named Abilities do not stack (nonStackingOnce),
+// so each holder's own text carries the whole count. 1 when the text has no such scaling.
+function abilityHolderCount(text, ctx) {
+  const named = /for each pok[eé]mon with the ability ([a-z0-9 '’-]+?) in play/.exec(text)?.[1];
+  if (!named) return 1;
+  return [...sideInPlay(ctx), ...opponentInPlay(ctx)].filter(
+    (card) => !isAbilitySuppressed(card, ctx) && (card.abilities || []).some((a) => lower(a?.name) === named)
+  ).length;
 }
 
 /**

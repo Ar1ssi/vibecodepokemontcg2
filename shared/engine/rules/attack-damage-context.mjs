@@ -342,6 +342,10 @@ export function buildServerAttackContext(
     damagedOwnPokemonCount: ownInPlay.filter(({ card }) => (card.damage || 0) > 0).length,
     damagedBenchCount: ownBench.filter(({ card }) => (card.damage || 0) > 0).length,
     roundAttackCount: ownInPlay.filter(hasRoundAttack).length,
+    // Regigigas Unified Attack: "each Pokémon in play with the Unified Defense Ability" spans both sides.
+    inPlayAbilityNames: [...ownInPlay, ...inPlayPokemon(opponent)].map(({ view }) =>
+      (view?.abilities || []).map((ability) => String(ability?.name || '').toLowerCase())
+    ),
     teamRocketCount: ownInPlay.filter(isTeamRocketPokemon).length,
     ancientCount: ownInPlay.filter(isAncientPokemon).length,
     speciesCount: ownInPlay.filter(isBeedrillPokemon).length,

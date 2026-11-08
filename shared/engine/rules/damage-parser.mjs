@@ -672,6 +672,12 @@ export function parseAttackDamage(
     } else if (/card in your opponent's hand/.test(unit)) {
       count = opponentHandCount;
       label = "cards in opponent's hand";
+    } else if (/pok[ée]mon in play with the (.+?) ability/.test(unit)) {
+      const named = /pok[ée]mon in play with the (.+?) ability/.exec(unit)[1];
+      count = Array.isArray(ctx.inPlayAbilityNames)
+        ? ctx.inPlayAbilityNames.filter((names) => names.includes(named)).length
+        : undefined;
+      label = `Pokémon in play with the ${named} Ability`;
     } else if (/round attack/.test(unit)) {
       count = roundAttackCount;
       label = 'Pokémon in play with the Round attack';

@@ -396,6 +396,59 @@ test('HB 124 Dragapult Dragon Launcher still asks when Dragapult evolved from a 
   );
 });
 
+// ── HB 455 Regigigas Unified Attack (customhb-455 set.json) ────────────────────────────────
+
+const UNIFIED_ATTACK = 'This attack does 20 more damage for each Pokémon in play with the Unified Defense Ability.';
+const unifiedDefense = { abilities: [{ name: 'Unified Defense', text: 'Your Pokémon take 10 less damage from your opponent’s attacks for each Pokémon with the Ability Unified Defense in play.' }] };
+
+test('HB 455 Regigigas Unified Attack counts only Pokémon with Unified Defense, on both sides', () => {
+  const { state } = board('Regigigas', UNIFIED_ATTACK, {
+    damage: '50+',
+    setup: (s) => {
+      s.players.p1.zones.bench.push(mon('Regirock', unifiedDefense), mon('Plain Ally'));
+      s.players.p2.zones.bench.push(mon('Regice', unifiedDefense), mon('Plain Foe'));
+    },
+  });
+  const res = attack(state);
+  assert.equal(res.error, null);
+  const scaled = res.events.find((e) => e.type === 'attackDamageScaled');
+  assert.equal(scaled.total, 90, '50 + 20 x 2 Unified Defense Pokémon; the 3 plain Pokémon add nothing');
+  assert.equal(damageOf(res), 70, "the defender's Regice takes 10 less for each of the 2 in play");
+});
+
+test('HB 455 Regigigas Unified Attack counts own Unified Defense Pokémon when the defender has none', () => {
+  const { state } = board('Regigigas', UNIFIED_ATTACK, {
+    damage: '50+',
+    setup: (s) => s.players.p1.zones.bench.push(mon('Regirock', unifiedDefense), mon('Registeel', unifiedDefense)),
+  });
+  assert.equal(damageOf(attack(state)), 90);
+});
+
+test('HB 476-480 Unified Defense takes 10 less damage for each Pokémon with it in play, both sides counted', () => {
+  const { state } = board('Plain Attacker', '', {
+    damage: '100',
+    setup: (s) => {
+      s.players.p1.zones.bench.push(mon('Regidrago', unifiedDefense));
+      s.players.p2.zones.bench.push(mon('Regirock', unifiedDefense), mon('Regice', unifiedDefense));
+    },
+  });
+  assert.equal(damageOf(attack(state)), 70, 'Benched Regirock and Regice cover the Defender: 3 in play, 30 less once');
+  const { state: guarded } = board('Plain Attacker', '', {
+    damage: '100',
+    defenderExtra: unifiedDefense,
+    setup: (s) => {
+      s.players.p1.zones.bench.push(mon('Regidrago', unifiedDefense));
+      s.players.p2.zones.bench.push(mon('Regirock', unifiedDefense));
+    },
+  });
+  assert.equal(damageOf(attack(guarded)), 70, 'three holders still take 30 off once: the copies do not stack');
+});
+
+test('HB 455 Regigigas Unified Attack does only its base damage with no Unified Defense in play', () => {
+  const { state } = board('Regigigas', UNIFIED_ATTACK, { damage: '50+', setup: (s) => s.players.p1.zones.bench.push(mon('Plain Ally')) });
+  assert.equal(damageOf(attack(state)), 50);
+});
+
 // ── HB 114 Galarian Zapdos ex Bulk Up ───────────────────────────────────────────────────────
 
 const BULK_UP =
