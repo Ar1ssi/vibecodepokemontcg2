@@ -181,6 +181,11 @@ const TEMPLATES = [
     /^devolve (?:any number of|as many of) your benched pokémon as many times as you like$/,
     () => ({ type: 'atkDevolveOwnBench' }),
   ],
+  // Technical Machine: Confuse Trick.
+  [
+    /^move the pokémon tool attached to this pokémon to your opponent's active pokémon(?:. if that pokémon already has a pokémon tool attached to it, discard that pokémon tool and attach the moved pokémon tool to it instead)?$/,
+    () => ({ type: 'atkMoveToolToOpponent' }),
+  ],
   // Cofagrigus Slap of Misfortune, Unown E Hidden Power.
   [
     /^(?:whenever your opponent flips a coin during their next turn|during your opponent's next turn, whenever your opponent flips a coin), treat it as tails$/,

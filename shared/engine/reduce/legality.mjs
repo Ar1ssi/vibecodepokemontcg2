@@ -14,7 +14,7 @@ import {
 } from '../rules/tool-attacks.mjs';
 import { isPokemonToolCard, attachedTools, isExCard } from '../rules/tool-combat.mjs';
 import {
-  parseToolCap, parseUnlimitedHandEnergyAcceleration, costDiscountRead, applyCostDiscount,
+  toolCapacity, parseUnlimitedHandEnergyAcceleration, costDiscountRead, applyCostDiscount,
   isHandActivatedAbility,
 } from '../rules/ability-executors.mjs';
 import {
@@ -1003,7 +1003,7 @@ export function validateLegality(state, command) {
         const targetZoneCards =
           targetRef.player?.zones?.[targetRef.zoneId] || [];
         const currentTools = attachedTools(targetRef.card, targetZoneCards);
-        const maxTools = 1 + (parseToolCap(targetRef.card)?.extra || 0);
+        const maxTools = toolCapacity(targetRef.card, targetZoneCards);
         if (currentTools.length >= maxTools) {
           return {
             allowed: false,

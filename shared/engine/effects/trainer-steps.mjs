@@ -47,7 +47,7 @@ import {
   sideContextFor,
 } from '../rules/ability-combat.mjs';
 import { TYPE_LETTER } from '../rules/tool-combat.mjs';
-import { attachedTools, parseToolCap } from '../rules/ability-executors.mjs';
+import { attachedTools, toolCapacity } from '../rules/ability-executors.mjs';
 import {
   attachTargetAllowed,
   energyRemovalGuarded,
@@ -4394,8 +4394,7 @@ function selfAttachEnergyAbility(ctx) {
 /** Whether `root` has room for one more Pokémon Tool (θ Double raises the cap). */
 function hasToolRoom(player, root) {
   const zone = zoneOfRoot(player, root) || [];
-  const cap = 1 + (parseToolCap(topPokemonCard(player, root))?.extra || 0);
-  return attachedTools(root, zone).length < cap;
+  return attachedTools(root, zone).length < toolCapacity(topPokemonCard(player, root), zone);
 }
 
 /**
@@ -4461,12 +4460,12 @@ function selfAttachToolAbility(ctx) {
 }
 
 /**
- * Sableye / Grafaiai / Whimsicott Trickster: move the Tool on this Pokémon to the opponent's Active
+ * Sableye / Grafaiai / Whimsicott Trickster and Technical Machine: Confuse's Trick: move the Tool on this Pokémon to the opponent's Active
  * Pokémon. A full Pokémon (θ Double holds two) discards one Tool first. One choice is asked per
  * resume: which of this Pokémon's Tools moves, else which of the opponent's Tools is discarded.
  * The moved card stays owned by its player (`ownerId`).
  */
-function moveToolToOpponentAbility(ctx) {
+export function moveToolToOpponent(ctx) {
   const { draft, player, opponent } = ctx;
   const self = sourceRoot(ctx);
   const target = opponent && activeOf(opponent);
@@ -6340,7 +6339,7 @@ export const EXTRA_STEP_HANDLERS = {
   transformAbility,
   selfAttachEnergyAbility,
   selfAttachToolAbility,
-  moveToolToOpponentAbility,
+  moveToolToOpponentAbility: moveToolToOpponent,
   fossilItem,
   searchOrRecover,
   returnPokemonToHand,
