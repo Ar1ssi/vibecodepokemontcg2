@@ -659,6 +659,22 @@ export function parseAbility(text = '') {
     ];
   }
 
+  // Sableye / Grafaiai / Whimsicott Trickster: move this Pokémon's Tool to the opponent's Active
+  // Pokémon, discarding the Tool already there.
+  if (
+    /you may move the pok[eé]mon tool attached to this pok[eé]mon to your opponent's active pok[eé]mon/.test(
+      lower.replace(/[‘’]/g, "'")
+    )
+  ) {
+    return [
+      {
+        type: 'moveToolToOpponentAbility',
+        guidance:
+          "Once during your turn: move the Pokémon Tool attached to this Pokémon to your opponent's Active Pokémon, discarding any Tool already there (as described).",
+      },
+    ];
+  }
+
   // ── 1. Search (deck → hand / bench) ─────────────────────────────────────
   if (
     lower.includes('search your deck') ||

@@ -4460,6 +4460,46 @@ function selfAttachToolAbility(ctx) {
   });
 }
 
+/**
+ * Sableye / Grafaiai / Whimsicott Trickster: move the Tool on this Pokémon to the opponent's Active
+ * Pokémon. A full Pokémon (θ Double holds two) discards one Tool first. One choice is asked per
+ * resume: which of this Pokémon's Tools moves, else which of the opponent's Tools is discarded.
+ * The moved card stays owned by its player (`ownerId`).
+ */
+function moveToolToOpponentAbility(ctx) {
+  const { draft, player, opponent } = ctx;
+  const self = sourceRoot(ctx);
+  const target = opponent && activeOf(opponent);
+  if (!self || !target) return skip(ctx, 'source_not_found');
+  const mine = attachedTools(self, zoneOfRoot(player, self) || []);
+  if (mine.length === 0) return skip(ctx, 'no_tool_attached');
+  if (effectShieldBlocks(ctx, opponent, target)) return skip(ctx, 'effect_shield');
+
+  const theirs = attachedTools(target, zoneOfRoot(opponent, target) || []);
+  const full = !hasToolRoom(opponent, target);
+  const picked = (cards) => cards.find((c) => c.instanceId === ctx.selection?.[0]);
+  const ask = (cards, what) =>
+    ctx.ask({ prompt: `${sourceName(ctx, 'Ability')}: Choose ${what}`, options: cards, min: 1, max: 1 });
+
+  const moved = mine.length === 1 ? mine[0] : picked(mine);
+  if (!moved) return ask(mine, "the Pokémon Tool to move to your opponent's Active Pokémon");
+  const discarded = full ? (theirs.length === 1 ? theirs[0] : picked(theirs)) : null;
+  if (full && !discarded) return ask(theirs, "the Pokémon Tool to discard from your opponent's Active Pokémon");
+
+  if (discarded) discardCard(draft, discarded, ctx.events);
+  moved.ownerId = moved.ownerId || player.playerId;
+  removeFromZones(player, moved);
+  moved.attachedTo = target.instanceId;
+  opponent.zones[zoneIdOf(opponent, target)].push(moved);
+  ctx.events.push({
+    type: 'cardAttached',
+    instanceId: moved.instanceId,
+    targetInstanceId: target.instanceId,
+    playerId: opponent.playerId,
+  });
+  return null;
+}
+
 // ── I154: the parsed Trainer step kinds that had no server executor ───────
 
 /** Attached Energy a step's `energy` filter selects ('Special Energy' or any). */
@@ -6300,6 +6340,7 @@ export const EXTRA_STEP_HANDLERS = {
   transformAbility,
   selfAttachEnergyAbility,
   selfAttachToolAbility,
+  moveToolToOpponentAbility,
   fossilItem,
   searchOrRecover,
   returnPokemonToHand,

@@ -151,6 +151,12 @@ export function planAbilitySteps(steps = [], { mode = 'auto' } = {}) {
           action: mode === 'auto' ? 'announce' : 'self-attach-tool',
         });
         break;
+      case 'moveToolToOpponentAbility':
+        planned.push({
+          ...base,
+          action: mode === 'auto' ? 'announce' : 'move-tool',
+        });
+        break;
       case 'turnDamageBonusAbility':
         planned.push({
           ...base,
