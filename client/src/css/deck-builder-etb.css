@@ -149,6 +149,20 @@
   height: 30%;
   background: transparent;
 }
+/* A vendored exterior (design 078): the printed front panel fills the lid, the other faces are plain. */
+.etb-host .db-live .etb-pf--print {
+  background: #f6f6f8;
+}
+.etb-host .db-live .etb-print__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.etb-host .db-live .etb-pf--print-side {
+  background: #e9e9ee;
+}
 /* The near long side: the plate and the pack count below the lid's rim. */
 .etb-host .db-live .etb-pf--near {
   display: flex;

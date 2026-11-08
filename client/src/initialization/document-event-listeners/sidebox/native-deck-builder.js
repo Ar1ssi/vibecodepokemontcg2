@@ -31,9 +31,10 @@ import {
   deckLoadFormat,
   withPoolErrors,
 } from '../../../setup/deck-builder/core/build-battle/build-battle-view.mjs';
-import { DECK_FORMAT_BUILD_BATTLE } from '../../../../../shared/engine/formats.mjs';
+import { DECK_FORMAT_BUILD_BATTLE, DECK_FORMAT_TCG } from '../../../../../shared/engine/formats.mjs';
 import { initializeBuildBattle } from './native-deck-builder-build-battle.js';
 import { initializeBuildBattleRun } from './native-deck-builder-bnb-run.js';
+import { initializeHomebrewBattle } from './native-deck-builder-homebrew-battle.js';
 import { BUILD_BATTLE_DEFAULT_FLOW } from '../../../setup/deck-builder/core/builder-window.mjs';
 import { initializeEliteTrainerBox } from './native-deck-builder-etb.js';
 import { systemState, selfContainerDocument, oppContainerDocument } from '../../../state.js';
@@ -272,8 +273,9 @@ const createRemoteGameLink = ({ onHostState }) => {
  *   tab, 'host' on the game tab (see builder-window.mjs resolveBuilderRole).
  * @param {'standard'|'build-battle'} [options.mode] - 'build-battle' on the
  *   Build & Battle tab (design 051): Box and Pool replace Search and Browse.
- * @param {'run'|'legacy'} [options.flow] - which Build & Battle flow the tab runs (design 071):
- *   'run' is TCG Live's run (Run and Pool tabs), 'legacy' the one-shot box flow.
+ * @param {'run'|'legacy'|'homebrew'} [options.flow] - which Build & Battle flow the tab runs (design 071):
+ *   'run' is TCG Live's run (Run and Pool tabs), 'legacy' the one-shot box flow, 'homebrew' the
+ *   Homebrew set's 30 packs and Standard 60-card deck (design 078; Packs and Pool tabs).
  */
 export const initializeNativeDeckBuilder = ({
   role = 'host',
@@ -283,6 +285,8 @@ export const initializeNativeDeckBuilder = ({
   const isEditor = role === 'editor';
   const isBuildBattle = isEditor && mode === 'build-battle';
   const isBuildBattleRun = isBuildBattle && flow === 'run';
+  // The Homebrew flow builds a Standard deck (60 cards, 6 Prizes) from its pool.
+  const isHomebrew = isBuildBattle && flow === 'homebrew';
   const targetMainButton = document.getElementById(
     'nativeDeckBuilderTargetMain'
   );
@@ -1167,14 +1171,16 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
   let buildBattle = null;
   // null means "read it from the cards" (detectDeckFormat): only Build & Battle is recorded.
   const currentDeckFormat = () =>
-    isBuildBattle
-      ? DECK_FORMAT_BUILD_BATTLE
-      : deckLibrary?.getActiveDeckFormat?.(currentLoadTarget) || null;
+    isHomebrew
+      ? DECK_FORMAT_TCG
+      : isBuildBattle
+        ? DECK_FORMAT_BUILD_BATTLE
+        : deckLibrary?.getActiveDeckFormat?.(currentLoadTarget) || null;
   // What the game is told: the saved record's own format wins, so a Standard deck
   // opened from My Decks in the Build & Battle tab still plays with 6 Prizes.
   const loadFormat = () =>
     deckLoadFormat({
-      isBuildBattle,
+      isBuildBattle: isBuildBattle && !isHomebrew,
       recordedFormat: deckLibrary?.getActiveDeckFormat?.(currentLoadTarget),
       isUnsaved: !deckLibrary?.getActiveDeckId?.(currentLoadTarget),
     });
@@ -2239,7 +2245,9 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     tabBox?.addEventListener('click', () => switchMode('box'));
     tabPool?.addEventListener('click', () => switchMode('pool'));
     // The Run flow (design 071) drives the same Play button: its lobby Play presses it.
-    const buildBattleController = isBuildBattleRun
+    const buildBattleController = isHomebrew
+      ? (options) => initializeHomebrewBattle({ ...options, boxPanelEl: boxPanel })
+      : isBuildBattleRun
       ? (options) =>
           initializeBuildBattleRun({
             ...options,
@@ -2255,8 +2263,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
             showBox: () => switchMode('box'),
             waitForRoom: isEditor && gameLink.isConnected(),
           });
-    if (isBuildBattleRun) {
-      if (tabBox) tabBox.textContent = 'Run';
+    if (isBuildBattleRun || isHomebrew) {
+      if (tabBox) tabBox.textContent = isHomebrew ? 'Packs' : 'Run';
       document.body.classList.add('bb-flow-run');
     }
     buildBattle = buildBattleController({
@@ -2298,7 +2306,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     });
     switchMode(buildBattle.initialMode());
     // Play was last drawn before the run controller existed to block it.
-    if (isBuildBattleRun) render();
+    if (isBuildBattleRun || isHomebrew) render();
   }
 
   if (isEditor && !isBuildBattle && shelfPanel) {

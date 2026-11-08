@@ -413,6 +413,17 @@ const etbPlate = (look) => el('div', 'etb-plate', look.labels.productTitle);
 // pill and the set logo at its foot.
 const etbLidFace = (look) => {
   const face = el('div', 'bb-pf etb-pf etb-pf--lid');
+  // A vendored exterior (`skin.lidArt`): the printed front panel, with nothing drawn over it.
+  if (look.skin.lidArt) {
+    face.classList.add('etb-pf--print');
+    const print = el('img', 'etb-print__img');
+    print.alt = '';
+    print.draggable = false;
+    print.addEventListener('error', () => print.remove(), { once: true });
+    print.src = look.skin.lidArt;
+    face.append(print);
+    return face;
+  }
   const keyArt = el('div', 'etb-keyart');
   if (look.skin.keyArtUrl) {
     const img = el('img', 'etb-keyart__img');
@@ -448,6 +459,8 @@ const etbFarFace = (look) => {
 // the lid's rim strips are black with the slashes running on.
 const proceduralEtbFace = (name, look, packCount) => {
   if (name === 'lid') return etbLidFace(look);
+  // The sides of a vendored exterior are plain: the print is the lid's.
+  if (look.skin.lidArt) return el('div', 'bb-pf etb-pf etb-pf--print-side');
   if (name === 'near') return etbNearFace(look, packCount);
   if (name === 'far') return etbFarFace(look);
   if (name === 'under') return el('div', 'bb-pf etb-pf etb-pf--under');
@@ -502,6 +515,10 @@ const etbDoneText = (packs, contents) => {
  *   design 057); null for a Build & Battle box. With contents the box lifts its lid, the tray holds
  *   the promo pouch, the props (sleeves, Energy, dice and coin, dividers, guide, code card) and the
  *   packs, which leave when tapped, and the end of the scene points at the collection.
+ * @param {{doneText: string, finishLabel: string, singleExit: boolean}|null} [options.presentation]
+ *   another product's words (the Homebrew box, design 078): the end line, the one button's label, and
+ *   `singleExit` drops "Open another". A `contents` without a promo skips the pouch: the box
+ *   unwraps itself after the lid, and a prop with a zero count is not in the tray.
  * @param {(destination: 'collection'|'shelf', extra: {wantsGuide: boolean}) => void} options.onFinish
  *   ends the opening: the last summary's button asks for 'collection', Skip scene and Open another
  *   for 'shelf' (Build & Battle ignores both and shows its Pool tab); `wantsGuide` is whether the
@@ -519,6 +536,7 @@ export const mountUnboxingScene = ({
   seed,
   promo,
   contents = null,
+  presentation = null,
   onFinish,
 }) => {
   const artIndexes = packArtIndexes(seed, packs.length, look.skin.packArts.length);
@@ -534,7 +552,8 @@ export const mountUnboxingScene = ({
   const trayCount = ETB_PROP_COUNT + packs.length;
   const flipDieIndex = contents?.props?.damageDice ?? 6;
   const dieCount = isEtb ? flipDieIndex + (contents.props?.flipDie ?? 1) : 0;
-  const doneText = isEtb ? etbDoneText(packs, contents) : 'All four packs are open.';
+  const doneText = presentation?.doneText ?? (isEtb ? etbDoneText(packs, contents) : 'All four packs are open.');
+  const finishLabel = presentation?.finishLabel ?? (isEtb ? 'See collection' : 'Build your deck');
   const textures = new Map();
   const tearEdges = packs.map((_, index) => packTearEdge(seed, index));
   const slotOf = (packIndex, cardIndex) =>
@@ -1033,16 +1052,19 @@ export const mountUnboxingScene = ({
   // Tray order (§ Scene beat 3): pouch, sleeves, Energy, dice, dividers, guide, code card, packs.
   const renderEtbTray = (u) => {
     const tray = el('div', 'bb-tray etb-tray');
-    tray.append(
-      trayItem(0, u.stage === 'opened' ? renderPouch() : renderPromo()),
-      trayItem(1, renderSleeves()),
-      trayItem(2, renderEnergy()),
-      trayItem(3, renderDice()),
-      trayItem(4, renderDividers()),
-      trayItem(5, renderGuide()),
-      trayItem(6, renderCodeCard()),
-      renderPackFan(u)
-    );
+    const { props = {} } = contents;
+    // A prop the product has none of is left out; the others keep their tray places.
+    const items = [
+      [0, Boolean(promo), () => (u.stage === 'opened' ? renderPouch() : renderPromo())],
+      [1, contents.sleeveCount > 0, renderSleeves],
+      [2, contents.energy.length > 0, renderEnergy],
+      [3, (props.damageDice ?? 0) + (props.flipDie ?? 0) + (props.coin ?? 0) > 0, renderDice],
+      [4, (props.dividers ?? 0) > 0, renderDividers],
+      [5, (props.guide ?? 0) > 0, renderGuide],
+      [6, (props.codeCard ?? 0) > 0, renderCodeCard],
+    ];
+    for (const [index, present, render] of items) if (present) tray.append(trayItem(index, render()));
+    tray.append(renderPackFan(u));
     return tray;
   };
 
@@ -1268,7 +1290,6 @@ export const mountUnboxingScene = ({
     if (view === 'pocket') {
       controls.append(control('Reveal all', 'reveal-all', () => revealAllPack(lastTorn(getUnboxing()))));
     }
-    const finishLabel = isEtb ? 'See collection' : 'Build your deck';
     if (view === 'summary' && u.stage === 'done') {
       controls.append(control(finishLabel, 'build', () => finishScene('collection'), true));
     } else if (view === 'summary') {
@@ -1276,7 +1297,7 @@ export const mountUnboxingScene = ({
     } else if (u.stage === 'done') {
       controls.append(control(finishLabel, 'build', () => finish('collection'), true));
     }
-    if (isEtb && u.stage === 'done') {
+    if (isEtb && !presentation?.singleExit && u.stage === 'done') {
       controls.append(control('Open another', 'open-another', () => finish('shelf')));
     }
     if (u.stage !== 'done') controls.append(control('Skip scene', 'skip', skipScene));
@@ -1418,8 +1439,18 @@ export const mountUnboxingScene = ({
     });
   };
 
+  // A box with no promo has no pouch to tap: once the lid is up, the tray settles and the packs show.
+  const autoUnwrap = () => {
+    if (!isEtb || promo || getUnboxing().stage !== 'opened') return;
+    later(
+      () => runBeat({ type: 'unwrapDeck' }, unboxingVoiceFor('unwrapDeck'), () => Promise.resolve(), null),
+      instant() ? 0 : trayRiseMs(trayCount)
+    );
+  };
+
   const playEntrance = (entrance) => {
     if (entrance === 'tray') {
+      autoUnwrap();
       root.querySelectorAll('.bb-tray__item').forEach((item) => {
         const index = Number(item.dataset.trayIndex);
         playPose(
@@ -2028,6 +2059,8 @@ export const mountUnboxingScene = ({
   }
 
   render();
+  // A reload that lands on the lifted lid has no entrance to start the unwrap.
+  if (getUnboxing().stage === 'opened') autoUnwrap();
   loadPackStage();
 
   return {

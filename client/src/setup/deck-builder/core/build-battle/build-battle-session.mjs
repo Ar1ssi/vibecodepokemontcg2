@@ -76,7 +76,7 @@ function evolutionFields({ groupKeys, evolutionPack, energy }) {
 }
 
 /** @returns {[string, number][]|null} the stored pairs, or null when absent or untrustworthy. */
-function parseUnsavedDeck(value) {
+export function parseUnsavedDeck(value) {
   if (!Array.isArray(value) || value.length > MAX_UNSAVED_ENTRIES) return null;
   const valid = value.every(
     (entry) =>

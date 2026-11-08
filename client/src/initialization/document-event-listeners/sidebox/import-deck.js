@@ -1,5 +1,5 @@
 import { systemState } from '../../../state.js';
-import { openBuildBattleWindow, openDeckBuilderWindow } from './deck-builder-window.js';
+import { openBuildBattleWindow, openDeckBuilderWindow, openHomebrewBattleWindow } from './deck-builder-window.js';
 
 /**
  * Opens (or focuses) the deck builder tab from the Deck tab (design 050) and
@@ -9,6 +9,7 @@ export const openDeckBuilderFromDeckTab = () => showIfBlocked(openDeckBuilderWin
 
 /** The same for the Build & Battle tab (design 051); both buttons share the blocked message. */
 export const openBuildBattleFromDeckTab = () => showIfBlocked(openBuildBattleWindow());
+export const openHomebrewBattleFromDeckTab = () => showIfBlocked(openHomebrewBattleWindow());
 
 function showIfBlocked(openedTab) {
   const blockedText = document.getElementById('deckBuilderBlockedText');
@@ -72,4 +73,7 @@ export const initializeImport = () => {
   document
     .getElementById('openBuildBattleButton')
     ?.addEventListener('click', openBuildBattleFromDeckTab);
+  document
+    .getElementById('openHomebrewBattleButton')
+    ?.addEventListener('click', openHomebrewBattleFromDeckTab);
 };

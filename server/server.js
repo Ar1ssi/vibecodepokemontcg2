@@ -352,17 +352,20 @@ async function main() {
   // Build & Battle (designs 051, 071): the builder tab in Build & Battle mode. The client picks the
   // flow from the path (builder-window.mjs resolveBuildBattleFlow); `-legacy` is the one-shot box
   // flow of designs 051-055, and `/build-and-battle/legacy` forwards to it.
-  const renderBuildBattle = (canonicalPath) => (req, res) => {
+  const renderBuildBattle = (canonicalPath, builderFlow = null) => (req, res) => {
     if (req.path.endsWith('/')) return res.redirect(301, canonicalPath);
     res.render('index', {
       importDataJSON: null,
       e2eAllowed: E2E_ENABLED,
       builderWindow: true,
       builderMode: 'build-battle',
+      builderFlow,
     });
   };
   app.get('/build-and-battle', renderBuildBattle('/build-and-battle'));
   app.get('/build-and-battle-legacy', renderBuildBattle('/build-and-battle-legacy'));
+  // Design 078: Homebrew Build & Battle, the same tab with its own flow (resolveBuildBattleFlow).
+  app.get('/homebrew-battle', renderBuildBattle('/homebrew-battle', 'homebrew'));
   app.get('/build-and-battle/legacy', (req, res) => {
     const at = req.originalUrl.indexOf('?');
     res.redirect(302, `/build-and-battle-legacy${at === -1 ? '' : req.originalUrl.slice(at)}`);

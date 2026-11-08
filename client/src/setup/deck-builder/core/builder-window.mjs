@@ -22,6 +22,10 @@ export const BUILD_BATTLE_WINDOW_PATH = '/build-and-battle';
 export const BUILD_BATTLE_LEGACY_PATH = '/build-and-battle-legacy';
 // The flow `/build-and-battle` runs. Point this at 'legacy' to bring the old flow back there.
 export const BUILD_BATTLE_DEFAULT_FLOW = 'run';
+// Homebrew Build & Battle (design 078): the same editor tab with the Homebrew set's 30 packs and a
+// Standard 60-card deck. A sibling path of the other two, for the same relative-asset reason.
+export const HOMEBREW_BATTLE_WINDOW_NAME = 'ptcgHomebrewBattle';
+export const HOMEBREW_BATTLE_WINDOW_PATH = '/homebrew-battle';
 export const BUILDER_MESSAGE_SOURCE = 'ptcg-deck-builder';
 const PROTOCOL_VERSION = 1;
 
@@ -35,7 +39,9 @@ const MAX_ROW_LENGTH = 7;
 const trimPath = (pathname) => String(pathname ?? '').replace(/\/+$/, '');
 
 const isBuildBattlePath = (path) =>
-  path === BUILD_BATTLE_WINDOW_PATH || path === BUILD_BATTLE_LEGACY_PATH;
+  path === BUILD_BATTLE_WINDOW_PATH ||
+  path === BUILD_BATTLE_LEGACY_PATH ||
+  path === HOMEBREW_BATTLE_WINDOW_PATH;
 
 /** `'editor'` on every builder tab path, `'host'` everywhere else. */
 export function resolveBuilderRole(pathname = '') {
@@ -43,14 +49,20 @@ export function resolveBuilderRole(pathname = '') {
   return path === BUILDER_WINDOW_PATH || isBuildBattlePath(path) ? 'editor' : 'host';
 }
 
-/** `'build-battle'` on the Build & Battle paths, `'standard'` everywhere else. */
+/** `'build-battle'` on the Build & Battle paths (Homebrew's included), `'standard'` everywhere else. */
 export function resolveBuilderMode(pathname = '') {
   return isBuildBattlePath(trimPath(pathname)) ? 'build-battle' : 'standard';
 }
 
-/** Which Build & Battle flow a path runs: `'legacy'` on its own path, else the default flow. */
+/**
+ * Which Build & Battle flow a path runs: `'legacy'` and `'homebrew'` on their own paths, else the
+ * default flow.
+ */
 export function resolveBuildBattleFlow(pathname = '') {
-  return trimPath(pathname) === BUILD_BATTLE_LEGACY_PATH ? 'legacy' : BUILD_BATTLE_DEFAULT_FLOW;
+  const path = trimPath(pathname);
+  if (path === BUILD_BATTLE_LEGACY_PATH) return 'legacy';
+  if (path === HOMEBREW_BATTLE_WINDOW_PATH) return 'homebrew';
+  return BUILD_BATTLE_DEFAULT_FLOW;
 }
 
 export function buildBuilderMessage(type, payload = {}) {

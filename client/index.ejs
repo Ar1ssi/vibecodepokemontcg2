@@ -3,7 +3,8 @@
 <head>
     <% const isBuilderWindow = typeof builderWindow !== 'undefined' && builderWindow; %>
     <% const isBuildBattle = isBuilderWindow && typeof builderMode !== 'undefined' && builderMode === 'build-battle'; %>
-    <title><%= isBuildBattle ? 'Build & Battle | PTCG-sim' : isBuilderWindow ? 'Deck Builder | PTCG-sim' : 'PTCG-sim | Pokémon TCG Tabletop Simulator' %></title>
+    <% const isHomebrewBattle = isBuildBattle && typeof builderFlow !== 'undefined' && builderFlow === 'homebrew'; %>
+    <title><%= isHomebrewBattle ? 'Homebrew Build & Battle | PTCG-sim' : isBuildBattle ? 'Build & Battle | PTCG-sim' : isBuilderWindow ? 'Deck Builder | PTCG-sim' : 'PTCG-sim | Pokémon TCG Tabletop Simulator' %></title>
     <meta name="description" content="PTCG-sim is an open-source Pokémon Trading Card Game (Pokémon TCG) tabletop simulator supporting single player and online multiplayer. Simulate your favorite card game!">
     <meta name="keywords" content="ptcg sim,ptcg,pokemon trading card game simulator,pokemon trading card game sim,pokemon tcg simulator,pokemon tcg sim,pokemon sim,pokemon simulator,pokemon card simulator,pokemon card sim,pokemon tabletop simulator,pokemon tabletop sim,pokemon,pokemon card,pokemonsim,pokemon game sim,ptcg os,pokemon open source"/>
     <meta charset="UTF-8">
@@ -39,7 +40,7 @@
 </head>
 <%# /deck-builder renders this same page as the deck builder's own tab (design 050);
     /build-and-battle is that tab in Build & Battle mode (design 051). %>
-<body<% if (isBuildBattle) { %> class="deck-builder-window build-battle-window"<% } else if (isBuilderWindow) { %> class="deck-builder-window etb-host"<% } %>>
+<body<% if (isHomebrewBattle) { %> class="deck-builder-window build-battle-window etb-host"<% } else if (isBuildBattle) { %> class="deck-builder-window build-battle-window"<% } else if (isBuilderWindow) { %> class="deck-builder-window etb-host"<% } %>>
     <div id="importDataJSON" style="display: none;"><%= importDataJSON %></div>
     <div id="cover"></div>
     <div id="battleMat">
@@ -214,6 +215,7 @@
             <p class="deck-tab-intro">Build and load decks in the <strong>Deck Builder</strong> tab. Press <strong>Play</strong> there to load the deck into this game.</p>
             <button id="openDeckBuilderButton" class="self-color">Open Deck Builder</button>
             <button id="openBuildBattleButton" class="self-color" title="Open a Phantasmal Flames Build &amp; Battle Box and build a 40-card deck (4 Prizes)">Build &amp; Battle</button>
+            <button id="openHomebrewBattleButton" class="self-color" title="Open 30 Homebrew booster packs and build a 60-card deck (6 Prizes)">Homebrew Battle</button>
             <p id="deckBuilderBlockedText" class="deck-tab-warning" role="alert" hidden>Your browser blocked the new tab. Allow pop-ups for this site, then press the button again.</p>
         </div>
         <div id="uploadButtonsContainer">
@@ -227,7 +229,7 @@
             <!-- One header row: title, which deck is being edited, and actions. -->
             <div class="native-deck-builder-header">
                 <div>
-                    <strong><%= isBuildBattle ? 'Build & Battle' : 'Deck Builder' %></strong>
+                    <strong><%= isHomebrewBattle ? 'Homebrew Build & Battle' : isBuildBattle ? 'Build & Battle' : 'Deck Builder' %></strong>
                 </div>
                 <div class="native-deck-builder-targetbar">
                     <span class="native-deck-builder-target-label">Current Deck</span>

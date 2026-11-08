@@ -3,6 +3,8 @@ import {
   BUILD_BATTLE_WINDOW_PATH,
   BUILDER_WINDOW_NAME,
   BUILDER_WINDOW_PATH,
+  HOMEBREW_BATTLE_WINDOW_NAME,
+  HOMEBREW_BATTLE_WINDOW_PATH,
   buildBuilderMessage,
   parseBuilderMessage,
 } from '../../../setup/deck-builder/core/builder-window.mjs';
@@ -25,6 +27,10 @@ export const openDeckBuilderWindow = () => openBuilderTab(BUILDER_WINDOW_NAME, B
 /** The Build & Battle tab (design 051): the same editor in its own named tab. */
 export const openBuildBattleWindow = () =>
   openBuilderTab(BUILD_BATTLE_WINDOW_NAME, BUILD_BATTLE_WINDOW_PATH);
+
+/** The Homebrew Build & Battle tab (design 078): the same editor in its own named tab. */
+export const openHomebrewBattleWindow = () =>
+  openBuilderTab(HOMEBREW_BATTLE_WINDOW_NAME, HOMEBREW_BATTLE_WINDOW_PATH);
 
 function openBuilderTab(name, path) {
   let builder = null;
