@@ -46,7 +46,7 @@ catalog entry (`BUILD_BATTLE_BOXES` stays real products only), the 3D tabletop u
 | My Decks full | `at the deck limit the box deck opens unsaved…`; `saving the unsaved deck under the box name…` |
 | deck uses a card/copies the pool lacks | `the pool limits the deck…` |
 | reload on the lifted lid | `a lifted lid with no promo unwraps itself…` |
-| second tab opens/clears a box | storage listener in the controller (adopt / detach); not unit-tested |
+| second tab opens/clears a box | `another tab clearing the box…`; `another tab opening a newer box is adopted…` |
 | restart | `Start over asks first…` |
 
 ## Known limits

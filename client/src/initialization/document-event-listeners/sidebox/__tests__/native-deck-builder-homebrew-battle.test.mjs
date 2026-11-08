@@ -250,3 +250,52 @@ test('saving the unsaved deck under the box name binds the session; another deck
   assert.equal(page.stored().deckId, 'deck-7');
   assert.equal(page.stored().unsavedDeck, null);
 });
+
+const notifyStorage = (page) =>
+  page.dom.window.dispatchEvent(
+    new page.dom.window.StorageEvent('storage', {
+      key: HOMEBREW_STORAGE_KEY,
+      storageArea: page.dom.window.localStorage,
+    })
+  );
+
+test('another tab clearing the box empties this tab: buy-in again and the editor detached', async (t) => {
+  const page = boot(t, { session: finishedSession({ deckId: 'deck-1' }), library: { has: 'deck-1' } });
+  await settle();
+  assert.match(page.boxEl.textContent, /30 packs opened/);
+  page.dom.window.localStorage.removeItem(HOMEBREW_STORAGE_KEY);
+  notifyStorage(page);
+  await settle();
+  assert.ok(page.boxEl.querySelector('#homebrewOpenBox'));
+  assert.equal(page.calls.detach, 1);
+  assert.equal(page.controller.playBlock(), 'Open your packs on the Packs tab to play');
+});
+
+test('another tab opening a newer box is adopted: its seed shows and its deck reopens', async (t) => {
+  const page = boot(t, { session: finishedSession({ deckId: 'deck-1' }), library: { has: 'deck-1' } });
+  await settle();
+  const other = openHomebrewBox({ cards, rng: createRng(21) });
+  const newer = {
+    ...createHomebrewSession({ seed: 21, packs: other, now: 9000 }),
+    unboxing: finishedUnboxing({ packCount: HOMEBREW_PACK_COUNT, cardsPerPack: 10 }),
+    deckId: 'deck-1',
+  };
+  page.dom.window.localStorage.setItem(HOMEBREW_STORAGE_KEY, JSON.stringify(newer));
+  notifyStorage(page);
+  await settle();
+  assert.match(page.boxEl.textContent, /Box #21 · 30 packs opened/);
+  assert.equal(page.calls.opened.length, 2, 'the adopted box reopened its deck');
+});
+
+test('a storage event for another key or the same box changes nothing', async (t) => {
+  const page = boot(t, { session: finishedSession({ deckId: 'deck-1' }), library: { has: 'deck-1' } });
+  await settle();
+  page.dom.window.dispatchEvent(
+    new page.dom.window.StorageEvent('storage', { key: 'other-key', storageArea: page.dom.window.localStorage })
+  );
+  notifyStorage(page);
+  await settle();
+  assert.equal(page.calls.opened.length, 1);
+  assert.equal(page.calls.detach, 0);
+  assert.match(page.boxEl.textContent, /Box #9/);
+});
