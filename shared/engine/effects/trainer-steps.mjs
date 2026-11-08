@@ -1090,7 +1090,7 @@ function evolveStage2(ctx) {
 // mat; the Energy is asked for only when the source holds different Basic Energy cards.
 function moveEnergy(ctx) {
   const { player } = ctx;
-  const roots = rootsOf(player);
+  const roots = rootsOf(player).filter((root) => !effectShieldBlocks(ctx, player, root));
   const basicEnergyOn = (root) => attachedCards(player, root.instanceId).filter(isBasicEnergy);
   const askTarget = (energy) =>
     ctx.ask({
@@ -1145,6 +1145,7 @@ function moveEnergyToActive(ctx) {
   const { player, step } = ctx;
   const active = activeOf(player);
   if (!active) return skip(ctx, 'no_active');
+  if (effectShieldBlocks(ctx, player, active)) return skip(ctx, 'effect_shield');
   if (step.activeName) {
     const name = String(topPokemonCard(player, active)?.name || '').toLowerCase();
     if (!name.includes(String(step.activeName).toLowerCase())) {
@@ -2380,8 +2381,9 @@ function attachLegacyTrainer(ctx) {
 // Full Heal / Double Full Heal — remove Special Conditions from the Active (or every own Pokémon).
 function clearStatus(ctx) {
   const { player, step } = ctx;
-  const targets =
-    step.target === 'allYourPokémon' ? rootsOf(player) : [activeOf(player)].filter(Boolean);
+  const targets = (step.target === 'allYourPokémon' ? rootsOf(player) : [activeOf(player)].filter(Boolean)).filter(
+    (root) => !effectShieldBlocks(ctx, player, root)
+  );
   if (targets.length === 0) return skip(ctx, 'no_target');
   for (const card of targets) {
     if (!hasAnyCondition(card)) continue;
@@ -2509,7 +2511,7 @@ function healPerHeads(ctx) {
   }
   const amount = heads * (step.perHeads || 3) * 10;
   if (amount <= 0) return skip(ctx, 'no_healing');
-  const candidates = rootsOf(player).filter((c) => (c.damage || 0) > 0);
+  const candidates = rootsOf(player).filter((c) => (c.damage || 0) > 0 && !effectShieldBlocks(ctx, player, c));
   if (ctx.selection) {
     const target = candidates.find((c) => c.instanceId === ctx.selection[0]);
     if (!target) return skip(ctx, 'target_not_found');
@@ -4970,7 +4972,7 @@ function searchToTop(ctx) {
 function healAllOwnAndDiscardEnergy(ctx) {
   const { player } = ctx;
   if (stadiumBlocksHealing(ctx.draft.stadium)) return skip(ctx, 'healing_blocked');
-  const damaged = rootsOf(player).filter((root) => (root.damage || 0) > 0);
+  const damaged = rootsOf(player).filter((root) => (root.damage || 0) > 0 && !effectShieldBlocks(ctx, player, root));
   if (damaged.length === 0) return skip(ctx, 'no_damaged_pokemon');
   for (const root of damaged) {
     root.damage = 0;
@@ -4996,7 +4998,7 @@ function healAllOwnAndDiscardEnergy(ctx) {
 function healOneDiscardEnergy(ctx) {
   const { player } = ctx;
   if (stadiumBlocksHealing(ctx.draft.stadium)) return skip(ctx, 'healing_blocked');
-  const candidates = rootsOf(player).filter((root) => (root.damage || 0) > 0);
+  const candidates = rootsOf(player).filter((root) => (root.damage || 0) > 0 && !effectShieldBlocks(ctx, player, root));
   const apply = (root) => {
     root.damage = 0;
     ctx.events.push({ type: 'damageUpdated', instanceId: root.instanceId, damage: 0 });

@@ -105,3 +105,46 @@ test('Temporal Freeze shields both Active Pokémon from Trainer and Ability effe
     'expires after the attacker next turn'
   );
 });
+
+const item = (name, text) =>
+  createCard({ instanceId: nextId++, name, supertype: 'Trainer', trainerType: 'Item', type: 'Item', text });
+const playItem = (state, card) =>
+  applyCommand(state, { type: 'playTrainer', playerId: 'p1', payload: { instanceId: card.instanceId } }, createRng(3));
+
+function frozenBoard() {
+  const state = board('');
+  state.players.p1.effectFreezeUntilTurn = 99;
+  state.players.p2.effectFreezeUntilTurn = 99;
+  return state;
+}
+
+test('Temporal Freeze: Potion cannot heal the frozen Active but still heals the Bench', () => {
+  const state = frozenBoard();
+  activeOf(state, 'p1').damage = 50;
+  state.players.p1.zones.bench[0].damage = 50;
+  const potion = item('Potion', 'Heal 30 damage from 1 of your Pokémon.');
+  state.players.p1.zones.hand.push(potion);
+  const res = playItem(state, potion);
+  assert.equal(res.error, null);
+  assert.equal(activeOf(res.state, 'p1').damage, 50, 'Active untouched');
+  assert.equal(res.state.players.p1.zones.bench[0].damage, 20, 'Bench healed');
+});
+
+test('Temporal Freeze: Switch cannot move the frozen Active out', () => {
+  const state = frozenBoard();
+  const before = activeOf(state, 'p1').instanceId;
+  const sw = item('Switch', 'Switch your Active Pokémon with 1 of your Benched Pokémon.');
+  state.players.p1.zones.hand.push(sw);
+  const res = playItem(state, sw);
+  assert.equal(res.error, null);
+  assert.equal(activeOf(res.state, 'p1').instanceId, before);
+});
+
+test('without Temporal Freeze the same Potion heals the Active', () => {
+  const state = board('');
+  activeOf(state, 'p1').damage = 50;
+  state.players.p1.zones.bench[0].damage = 0;
+  const potion = item('Potion', 'Heal 30 damage from 1 of your Pokémon.');
+  state.players.p1.zones.hand.push(potion);
+  assert.equal(activeOf(playItem(state, potion).state, 'p1').damage, 20);
+});

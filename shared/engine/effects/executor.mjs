@@ -548,6 +548,14 @@ export function executeSteps(draft, {
     // I219: an Ability shield on the other side stops this Item/Supporter/Ability/Stadium effect.
     const shieldedTarget = (side, root) =>
       effectShieldBlocks({ draft, player, effectType, sourceCard, events }, side, root);
+    // An option that is a frozen side's Active Pokémon or a card attached to it.
+    const frozenPick = (opt) =>
+      Object.values(draft.players || {}).some((side) => {
+        const host = (side.zones?.active || []).find(
+          (c) => c.instanceId === opt.instanceId || (opt.attachedTo != null && c.instanceId === opt.attachedTo)
+        );
+        return Boolean(host) && !host.attachedTo && shieldedTarget(side, host);
+      });
 
     // Handle choice resumption for the current step
     const stepSelection = currentSelection;
@@ -585,6 +593,15 @@ export function executeSteps(draft, {
           context.effectText = text;
         },
         ask: ({ player: chooser = playerId, prompt, options, min, max, memo = {} }) => {
+          // Temporal Freeze: a frozen Active Pokémon (and what is attached to it) is not offered.
+          const allowed = options.filter((opt) => !frozenPick(opt));
+          if (allowed.length < options.length) {
+            events.push({ type: 'effectStepSkipped', reason: 'effect_shield', step: step.type });
+            if (allowed.length === 0) return null;
+            options = allowed;
+            if (min > allowed.length) min = allowed.length;
+            if (max > allowed.length) max = allowed.length;
+          }
           context[memoKey] = memo;
           return createPendingChoice({
             player: chooser,
@@ -1414,6 +1431,12 @@ export function executeSteps(draft, {
         };
         const bench = (player.zones.bench || []).filter((c) => !c.attachedTo && (step.selfSwap || benchAllowed(c)));
         const active = (player.zones.active || []).find((c) => !c.attachedTo);
+        // Temporal Freeze: a Trainer or Ability can't switch the frozen Active Pokémon out.
+        if (active && shieldedTarget(player, active)) {
+          context.ownSwitchSkipped = true;
+          events.push({ type: 'effectStepSkipped', reason: 'effect_shield', step: step.type, instanceId: active.instanceId });
+          break;
+        }
         if (!active || bench.length === 0) {
           context.ownSwitchSkipped = true;
           events.push({ type: 'effectStepSkipped', reason: 'no_bench_pokemon', step: step.type });
@@ -1735,6 +1758,7 @@ export function executeSteps(draft, {
                 (ty) => typeFilter.includes(String(ty).toLowerCase())
               )) &&
             healTargetAllowed(draft, player, c, step) &&
+            !shieldedTarget(player, c) &&
             (step.target === 'attached Pokémon'
               ? c.instanceId === context.attachedTargetId
               : step.target === 'costHost'

@@ -19,6 +19,12 @@ any session pick up work with minimal context. First session? `.agent/STATE.md` 
    lasting choices → `.agent/DECISIONS.md`, deferred work → `.agent/ISSUES.md`.
 7. Card text and rulings are looked up, never recalled — however familiar the card. Source order: the
    corpora in `out/pkmn-*-cards.json`, then TCGdex. Name the source (corpus row or TCGdex id) in the test or commit.
+   A card not in either (unreleased): the user's scan or `set.json` text, verbatim, named as the source.
+8. Bugs and gaps found while implementing are part of the task: fix them in the same session, with a
+   test that fails without the fix. Never ship a known gap as a `flag:` line or a closing caveat.
+   Only a defect that is large (new design, schema/netcode change) or unrelated to the files and
+   behavior you are touching goes to `.agent/ISSUES.md` (or a `start_session` card) — and the task
+   close says so in one line, with the issue number. Before closing, ask: "what did I notice and not fix?"
 
 ## Reading budget — large files are grep-only
 Never load these whole: `MAP.md`, `DECISIONS.md`, `ISSUES.md`, `journal/*` (frozen, pre-S313), `.agent/archive/*`.
@@ -34,7 +40,7 @@ DURING: work on your own branch in a worktree. Crash insurance = WIP commits on 
   Context auto-compacts (1M window): never wrap up early or hand off mid-task to save context.
 END — whenever you changed anything:
 - **The journal is the commit message.** Subject `<workflow>: <outcome>`; body ≤4 lines of why,
-  plus optional `flag: <debt/risk>` lines. Never append to `.agent/journal/` (frozen history).
+  plus optional `flag: <debt/risk>` lines (only for what directive 8 allows deferring). Never append to `.agent/journal/` (frozen history).
   Wherever a workflow says "journal", it means this commit message.
 - **Shared harness files** (STATE, DECISIONS, ISSUES, MAP) change only in the commit that lands on
   `main`, after rebasing/merging on the latest `main` — never on the primary folder mid-task.
