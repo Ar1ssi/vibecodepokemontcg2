@@ -730,7 +730,8 @@ export const HEAL_STEP_TYPES = ['atkHealEach', 'atkHealCounted', 'atkMirrorHeal'
 /**
  * The attack's printed clauses that run as executor steps (design 030), with the attack's
  * own coin result applied: "If heads/tails" steps are dropped on the other face and
- * "For each heads" steps scale their count by the heads flipped.
+ * "For each heads" steps scale their count by the heads flipped. `attacker` must be the evolved
+ * view, not the stack root (Dreepy under Dragapult): "this Pokémon" is the top card's printed name.
  */
 export function planAttackSteps(attack, attacker, { coin, headsCount, flips = [] }) {
   const parsed = parseAttackSteps(attack?.text, { selfName: attacker?.name });

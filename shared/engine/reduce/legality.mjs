@@ -1274,7 +1274,9 @@ export function validateLegality(state, command) {
       if (!attackCostPayable(state, playerId, active, attack)) {
         return { allowed: false, reason: 'Not enough energy attached.' };
       }
-      const beforeSteps = parseAttackSteps(attack?.text, { selfName: active.name }).before;
+      const beforeSteps = parseAttackSteps(attack?.text, {
+        selfName: inPlayView(state, active)?.name || active.name,
+      }).before;
       const handCost = beforeSteps.find((step) => step.type === 'atkDiscardHandEnergy');
       if (handCost && handEnergyForDiscard(player, handCost).length < (handCost.count || 1)) {
         return {

@@ -611,7 +611,7 @@ export function resolveAttackEffectPhase(draft, ctx) {
 
   // "Before doing damage, …" clauses (design 030). A gust there moves the damage to the
   // opponent's new Active Pokémon.
-  const attackSteps = planAttackSteps(attack, attacker, { coin, headsCount, flips });
+  const attackSteps = planAttackSteps(attack, attackerView || attacker, { coin, headsCount, flips });
   if (attackSteps.before.length > 0) {
     if (!ctx.preStepsDone) {
       // An attach the damage counts starts from 0, so "attached none" reads as paid nothing.

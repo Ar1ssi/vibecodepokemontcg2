@@ -372,6 +372,30 @@ test('HB 124 Dragapult Dragon Launcher with no Benched Dreepy does nothing', () 
   assert.equal(zone(res.state, 'p2', 'bench')[0].damage ?? 0, 0);
 });
 
+test('HB 124 Dragapult Dragon Launcher still asks when Dragapult evolved from a Dreepy root', () => {
+  let benchDreepy;
+  const { state } = board('Dreepy', '', {
+    setup: (s) => {
+      const dragapult = mon('Dragapult', {
+        stage: 'Stage2',
+        attacks: [{ name: 'Dragon Launcher', cost: [], damage: '', text: DRAGON_LAUNCHER }],
+        attachedTo: s.players.p1.zones.active[0].instanceId,
+      });
+      s.players.p1.zones.active.push(dragapult);
+      benchDreepy = mon('Dreepy');
+      s.players.p1.zones.bench.push(benchDreepy);
+      s.players.p2.zones.bench.push(mon('Foe', { hp: 300 }));
+    },
+  });
+  const res = attack(state);
+  assert.equal(res.error, null);
+  assert.deepEqual(
+    res.state.pendingChoice.options.map((o) => o.instanceId),
+    [benchDreepy.instanceId],
+    'the Benched Dreepy is offered even though the attacker stack root is named Dreepy'
+  );
+});
+
 // ── HB 114 Galarian Zapdos ex Bulk Up ───────────────────────────────────────────────────────
 
 const BULK_UP =
