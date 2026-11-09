@@ -2,23 +2,27 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { test } from 'node:test';
 import {
-  BOX_SCREEN_ASPECT,
+  BAND_MARGIN_PX,
+  CARD_SIZE,
+  BOX_DEPTH,
+  HOVER_PITCH_DEG,
   LID_CUT_Z,
   MAX_FLYING_CARDS,
-  MIN_REST_HEIGHT,
+  REST_YAW_DEG,
   STACK_DEPTH,
+  boxScaleFor,
   boxTravel,
   cardPhase,
   cardsLaunched,
-  cameraDistance,
   dealTimeline,
   flyingCardCount,
-  hoverPlacement,
+  hoverPose,
+  landPose,
   lidProgress,
   meshToBox,
-  offBoardPlacement,
-  restPlacement,
-  screenToWorld,
+  offTablePose,
+  restFootprintPx,
+  restPose,
   splitBoxMesh,
   stackDepthAfter,
 } from '../deck-box-math.mjs';
@@ -75,67 +79,77 @@ test('splitBoxMesh hinges the lid on the back edge of the cut, rims nested insid
   assert.ok(rim.outer.z1 < 2.1, `outer rim front z ${rim.outer.z1}`);
 });
 
-const board = { left: 0, top: 540, width: 1450, height: 540 };
-const mat = { left: 285, top: 540, width: 880, height: 416 };
-const rightDeck = { left: 1020, top: 589, width: 105, height: 125 };
+// A 1450 px-wide table (x −725 … 725) whose mat art spans x −480 … 480: 245 px bands either side.
+const table = { x0: -725, x1: 725 };
+const art = { x0: -480, x1: 480 };
+const selfDeck = { x: 430, y: 180, widthPx: 88 };
+const oppDeck = { x: -430, y: 900, widthPx: 88 };
 
-test('restPlacement sits a right-side deck’s box in the right band, level with the deck', () => {
-  const rest = restPlacement({ deckRect: rightDeck, matRect: mat, boardRect: board });
-  assert.equal(rest.side, 'right');
-  assert.ok(near(rest.cx, 1165 + 285 / 2));
-  assert.ok(near(rest.cy, 589 + 125 / 2));
-  assert.ok(near(rest.height, 125 * 1.15));
+test('restPose lays a right-side deck’s box on its back in the right band, level with the deck', () => {
+  const rest = restPose({ deck: selfDeck, art, table });
+  assert.equal(rest.dir, 1);
+  assert.ok(near(rest.x, 480 + 245 / 2));
+  assert.equal(rest.y, 180);
+  assert.ok(near(rest.z, (BOX_DEPTH / 2) * rest.scale));
+  assert.equal(rest.pitchDeg, 0);
+  assert.equal(rest.yawDeg, -REST_YAW_DEG);
+  assert.ok(near(rest.scale, 88 / CARD_SIZE.width));
 });
 
-test('restPlacement mirrors to the left band for a deck left of the mat’s centre', () => {
-  const leftDeck = { left: 330, top: 600, width: 105, height: 125 };
-  const rest = restPlacement({ deckRect: leftDeck, matRect: mat, boardRect: board });
-  assert.equal(rest.side, 'left');
-  assert.ok(near(rest.cx, 285 / 2));
+test('restPose mirrors to the left band for the far seat’s deck left of centre', () => {
+  const rest = restPose({ deck: oppDeck, art, table });
+  assert.equal(rest.dir, -1);
+  assert.ok(near(rest.x, -480 - 245 / 2));
+  assert.equal(rest.yawDeg, REST_YAW_DEG);
 });
 
-test('restPlacement shrinks the box to the band and refuses a band too narrow to hold one', () => {
-  const narrow = { ...mat, width: 1450 - 285 - 100 }; // right band 100 px wide
-  const fitted = restPlacement({ deckRect: rightDeck, matRect: narrow, boardRect: board });
-  assert.ok(near(fitted.height, (100 - 24) / BOX_SCREEN_ASPECT));
-  const none = { ...mat, width: 1450 - 285 - 40 };
-  assert.equal(restPlacement({ deckRect: rightDeck, matRect: none, boardRect: board }), null);
-  assert.ok((40 - 24) / BOX_SCREEN_ASPECT < MIN_REST_HEIGHT);
+test('restPose refuses a band too narrow to hold the box', () => {
+  const footprint = restFootprintPx(boxScaleFor(88));
+  const fits = { x0: -480.5 - footprint - 2 * BAND_MARGIN_PX, x1: 480.5 + footprint + 2 * BAND_MARGIN_PX };
+  assert.ok(restPose({ deck: selfDeck, art, table: fits }));
+  const tight = { x0: fits.x0 + 1, x1: fits.x1 - 1 };
+  assert.equal(restPose({ deck: selfDeck, art, table: tight }), null);
 });
 
-test('restPlacement returns null for a missing or empty rect', () => {
-  assert.equal(restPlacement({ deckRect: null, matRect: mat, boardRect: board }), null);
-  assert.equal(restPlacement({ deckRect: { ...rightDeck, width: 0 }, matRect: mat, boardRect: board }), null);
-  assert.equal(restPlacement({ deckRect: rightDeck, matRect: mat, boardRect: { left: NaN, top: 0, width: 1, height: 1 } }), null);
+test('restPose with no mat art measures the band from the deck’s outer edge', () => {
+  const rest = restPose({ deck: selfDeck, art: null, table });
+  assert.ok(near(rest.x, (430 + 44 + 725) / 2));
 });
 
-test('restPlacement stays inside its board half and steps below chrome it would sit under', () => {
-  const lowDeck = { ...rightDeck, top: 1040 };
-  const clamped = restPlacement({ deckRect: lowDeck, matRect: mat, boardRect: board });
-  assert.ok(near(clamped.cy, 1080 - 12 - clamped.height / 2));
-
-  const buttons = { left: 1200, top: 560, width: 240, height: 80 };
-  const dodged = restPlacement({ deckRect: rightDeck, matRect: mat, boardRect: board, avoidRects: [buttons] });
-  assert.ok(near(dodged.cy - dodged.height / 2, 640 + 8));
+test('restPose returns null for a missing pile or table', () => {
+  assert.equal(restPose({ deck: null, art, table }), null);
+  assert.equal(restPose({ deck: { ...selfDeck, widthPx: 0 }, art, table }), null);
+  assert.equal(restPose({ deck: selfDeck, art, table: { x0: 5, x1: 5 } }), null);
 });
 
-test('hoverPlacement floats the box beside its deck toward the mat centre', () => {
-  const hover = hoverPlacement({ deckRect: rightDeck, matRect: mat });
+test('hoverPose stands the box up over its half beside the deck, toward the centre, turned at the deck', () => {
+  const hover = hoverPose({ deck: selfDeck, table });
   assert.equal(hover.dir, 1);
-  assert.ok(near(hover.cx, 1072.5 - 105 * 1.9));
-  assert.ok(near(hover.cy, 651.5));
-  assert.ok(near(hover.height, 125 * 1.35));
-  const leftDeck = { left: 330, top: 200, width: 105, height: 125 };
-  assert.equal(hoverPlacement({ deckRect: leftDeck, matRect: mat }).dir, -1);
-  assert.equal(hoverPlacement({ deckRect: null, matRect: mat }), null);
+  assert.ok(hover.x < selfDeck.x && hover.x > 0);
+  assert.equal(hover.y, selfDeck.y);
+  assert.ok(hover.z > 0);
+  assert.equal(hover.pitchDeg, HOVER_PITCH_DEG);
+  assert.ok(hover.yawDeg < 0);
+  const far = hoverPose({ deck: oppDeck, table });
+  assert.equal(far.dir, -1);
+  assert.ok(far.x > oppDeck.x && far.x < 0);
+  assert.equal(far.pitchDeg, HOVER_PITCH_DEG);
+  assert.ok(far.yawDeg > 0);
+  assert.equal(hoverPose({ deck: null, table }), null);
 });
 
-test('offBoardPlacement starts a box with no band just past the board edge on its deck’s side', () => {
-  const hover = hoverPlacement({ deckRect: rightDeck, matRect: mat });
-  const start = offBoardPlacement({ hover, boardRect: board });
-  assert.equal(start.side, 'right');
-  assert.ok(start.cx > board.left + board.width);
-  assert.equal(offBoardPlacement({ hover: null, boardRect: board }), null);
+test('offTablePose starts a box with no band just past the table edge on its deck’s side', () => {
+  assert.ok(offTablePose({ deck: selfDeck, table }).x > table.x1);
+  assert.ok(offTablePose({ deck: oppDeck, table }).x < table.x0);
+  assert.equal(offTablePose({ deck: selfDeck, table: null }), null);
+});
+
+test('landPose stacks the flying cards from the cloth up to the real deck’s top', () => {
+  assert.ok(near(landPose({ deck: selfDeck, k: 0, cards: 24, topZ: 48 }).z, 2));
+  assert.ok(near(landPose({ deck: selfDeck, k: 23, cards: 24, topZ: 48 }).z, 48));
+  assert.equal(landPose({ deck: selfDeck, k: 99, cards: 24, topZ: 48 }).z, 48);
+  assert.equal(landPose({ deck: selfDeck, k: 0, cards: 0, topZ: 48 }).z, 0);
+  assert.equal(landPose({ deck: oppDeck, k: 0, cards: 4, topZ: 8, yawDeg: 180 }).yawDeg, 180);
 });
 
 test('flyingCardCount clamps the deck to at most the flying cap', () => {
@@ -199,10 +213,4 @@ test('lidProgress and boxTravel follow the schedule', () => {
   assert.deepEqual(boxTravel(timeline, 2000), { leg: 'hover', u: 1 });
   assert.deepEqual(boxTravel(timeline, timeline.returnStartMs + 325), { leg: 'home', u: 0.5 });
   assert.deepEqual(boxTravel(timeline, timeline.totalMs + 50), { leg: 'home', u: 1 });
-});
-
-test('the camera maps one world unit to one CSS pixel at z = 0', () => {
-  assert.ok(near(cameraDistance(1080, 20), 540 / Math.tan(Math.PI / 18)));
-  assert.deepEqual(screenToWorld({ x: 960, y: 540 }, { width: 1920, height: 1080 }), { x: 0, y: 0 });
-  assert.deepEqual(screenToWorld({ x: 0, y: 0 }, { width: 1920, height: 1080 }), { x: -960, y: 540 });
 });

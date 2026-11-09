@@ -57,7 +57,7 @@ const geometryOf = (mesh) => {
  * The card mesh's face UVs span only this window of a texture (the game's sleeve art is padded); our
  * sleeve and card-back images are full-bleed, so the texture is stretched to put its edges on the window's.
  */
-const faceWindow = (mesh) => {
+export const faceWindow = (mesh) => {
   const uv = mesh.submeshes[0];
   let min = Infinity;
   let max = -Infinity;
@@ -69,7 +69,7 @@ const faceWindow = (mesh) => {
   return { min, span: max - min };
 };
 
-const fitFace = (texture, { min, span }) => {
+export const fitFace = (texture, { min, span }) => {
   texture.repeat.set(1 / span, 1);
   texture.offset.set(-min / span, 0);
   texture.wrapS = THREE.ClampToEdgeWrapping;

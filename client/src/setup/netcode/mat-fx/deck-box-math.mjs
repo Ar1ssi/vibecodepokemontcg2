@@ -4,7 +4,8 @@
 // x to its right, in the deck-box mesh's own units (the box is 6.85 wide, 9.48 tall, 4.3 deep).
 // The imported mesh is in mesh space (x mirrored, z down the box's height, y front-to-back); the
 // mesh's slot quaternion in scene.json turns it into box space: box (x, y, z) = mesh (−x, −z, −y).
-// Screen numbers are CSS pixels in the parent viewport.
+// Table numbers are the three.js board's flat table px (board-layout.mjs): x right, y up the table
+// (away from the near player), z off the cloth.
 
 export const BOX_HEIGHT = 9.48;
 /** Mesh-space z of the groove that rings the box: the seam between the body and its cap. */
@@ -19,16 +20,22 @@ export const STACK_BACK_Z = -2.0;
 export const STACK_FLOOR_Y = 0.12;
 /** At most this many cards fly; the rest of the deck is the stack shrinking to nothing. */
 export const MAX_FLYING_CARDS = 24;
-/** Below this the band is too narrow for a box to rest in (two-player and sim layouts). */
-export const MIN_REST_HEIGHT = 48;
-export const BAND_EDGE_PX = 12;
-/** On-screen width of a resting box per pixel of its height: front 0.72·cos 25° + depth 0.45·sin 25°. */
-export const BOX_SCREEN_ASPECT = 0.85;
-export const REST_HEIGHT_PER_DECK = 1.15;
-export const HOVER_HEIGHT_PER_DECK = 1.35;
+/** Box-space width and depth of the box (mesh x ±3.43, y −2.22 … 2.08). */
+export const BOX_WIDTH = 6.86;
+export const BOX_DEPTH = 4.3;
+/** Clear table px a band keeps on each side of a resting box. */
+export const BAND_MARGIN_PX = 10;
+/** A resting box lies on its back, front art up, its top turned this far off straight up the table. */
+export const REST_YAW_DEG = 10;
 /** How far beside its deck, toward the mat's centre, the box hovers while it deals (deck widths). */
-export const HOVER_OFFSET_DECKS = 1.9;
-const AVOID_GAP_PX = 8;
+export const HOVER_OFFSET_DECKS = 1.45;
+/** How high the hovering box's centre floats off the cloth (deck-card heights). */
+export const HOVER_LIFT_CARDS = 0.4;
+/** The hovering box stands up off its back this far, its open top toward the camera, turned toward its deck. */
+export const HOVER_PITCH_DEG = 48;
+export const HOVER_YAW_DEG = 14;
+/** Where a box with no band to rest in comes from: this many box widths past the table's edge. */
+export const OFF_TABLE_WIDTHS = 1.2;
 
 /** A flap vertex sits in front of the body's front wall (mesh y < −2.03) and clear of its bottom rim. */
 const FLAP_FRONT_Y = -2.03;
@@ -95,72 +102,84 @@ export function splitBoxMesh(mesh, cutZ = LID_CUT_Z) {
   };
 }
 
-const isUsableRect = (rect) =>
-  !!rect && [rect.left, rect.top, rect.width, rect.height].every(Number.isFinite) && rect.width > 1 && rect.height > 1;
-
 const clamp = (value, min, max) => Math.min(Math.max(value, min), Math.max(min, max));
-const centerOf = (rect) => ({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+const finite = (...values) => values.every(Number.isFinite);
+const isPile = (deck) => Boolean(deck) && finite(deck.x, deck.y, deck.widthPx) && deck.widthPx > 0;
+const isSpan = (span) => Boolean(span) && finite(span.x0, span.x1) && span.x1 > span.x0;
 
-const overlaps = (a, b) =>
-  a.left < b.left + b.width && b.left < a.left + a.width && a.top < b.top + b.height && b.top < a.top + a.height;
+/** Table px per box-space unit: a box is drawn at its deck's card scale (card mesh 6.4 wide). */
+export const boxScaleFor = (deckWidthPx) => deckWidthPx / CARD_SIZE.width;
+
+/** Table px a box lying on its back covers across the table, turned REST_YAW_DEG. */
+export const restFootprintPx = (scale) => {
+  const yaw = (REST_YAW_DEG * Math.PI) / 180;
+  return scale * (BOX_WIDTH * Math.cos(yaw) + BOX_HEIGHT * Math.sin(yaw));
+};
+
+/** Height of a box's centre off the cloth while it lies on its back. */
+const lyingZ = (scale) => (BOX_DEPTH / 2) * scale;
+
+/** +1 when the deck sits right of the table's centre, −1 left of it. */
+const sideOf = (deck, table) => (deck.x >= (table.x0 + table.x1) / 2 ? 1 : -1);
 
 /**
- * Where a box rests: in the blurred band on its deck's side of the mat, level with the deck. The band
- * runs from the mat art's edge to the board half's edge. Null when that band cannot hold a box.
+ * Where a box rests: lying on its back, front art up, in the blurred band on its deck's side of the
+ * mat, level with the deck. Poses place the box's centre. The band runs from the mat art's edge (`art`, its
+ * x-span on this half; null when the half shows no art: the deck's outer edge then) to the table's
+ * edge. Null when the band cannot hold the box.
  *
- * @param {{ deckRect: object, matRect: object, boardRect: object, avoidRects?: object[] }} input
- *   `matRect` the mat art's extent on this half (its `.hover-gutter-probe`), `boardRect` this half's
- *   iframe, `avoidRects` chrome the box should not sit under (the board buttons).
- * @returns {{ side: 'left'|'right', cx: number, cy: number, height: number } | null}
+ * @param {{ deck: { x: number, y: number, widthPx: number }, art: { x0: number, x1: number } | null,
+ *   table: { x0: number, x1: number } }} input
+ * @returns {{ x: number, y: number, z: number, yawDeg: number, pitchDeg: number, scale: number, dir: 1|-1 } | null}
  */
-export function restPlacement({ deckRect, matRect, boardRect, avoidRects = [] }) {
-  if (!isUsableRect(deckRect) || !isUsableRect(matRect) || !isUsableRect(boardRect)) return null;
-  const deck = centerOf(deckRect);
-  const side = deck.x >= centerOf(matRect).x ? 'right' : 'left';
-  const bandLeft = side === 'right' ? matRect.left + matRect.width : boardRect.left;
-  const bandRight = side === 'right' ? boardRect.left + boardRect.width : matRect.left;
-  const bandWidth = bandRight - bandLeft;
-  const height = Math.min(deckRect.height * REST_HEIGHT_PER_DECK, (bandWidth - 2 * BAND_EDGE_PX) / BOX_SCREEN_ASPECT);
-  if (!(height >= MIN_REST_HEIGHT)) return null;
+export function restPose({ deck, art, table }) {
+  if (!isPile(deck) || !isSpan(table)) return null;
+  const dir = sideOf(deck, table);
+  const deckEdge = deck.x + (dir * deck.widthPx) / 2;
+  const artEdge = isSpan(art) ? (dir > 0 ? art.x1 : art.x0) : deckEdge;
+  const inner = dir > 0 ? Math.max(artEdge, deckEdge) : Math.min(artEdge, deckEdge);
+  const outer = dir > 0 ? table.x1 : table.x0;
+  const band = dir * (outer - inner);
+  const scale = boxScaleFor(deck.widthPx);
+  if (!(band >= restFootprintPx(scale) + 2 * BAND_MARGIN_PX)) return null;
+  return { x: inner + (dir * band) / 2, y: deck.y, z: lyingZ(scale), yawDeg: -dir * REST_YAW_DEG, pitchDeg: 0, scale, dir };
+}
 
-  const width = height * BOX_SCREEN_ASPECT;
-  const cx = bandLeft + bandWidth / 2;
-  const minY = boardRect.top + BAND_EDGE_PX + height / 2;
-  const maxY = boardRect.top + boardRect.height - BAND_EDGE_PX - height / 2;
-  let cy = clamp(deck.y, minY, maxY);
-  for (const avoid of avoidRects.filter(isUsableRect)) {
-    const box = { left: cx - width / 2, top: cy - height / 2, width, height };
-    if (!overlaps(box, avoid)) continue;
-    const below = cy >= centerOf(avoid).y;
-    cy = below ? avoid.top + avoid.height + AVOID_GAP_PX + height / 2 : avoid.top - AVOID_GAP_PX - height / 2;
-    cy = clamp(cy, minY, maxY);
-  }
-  return { side, cx, cy, height };
+/** Where a box with no room to rest flies in from and back to: just past the table's edge on its deck's side. */
+export function offTablePose({ deck, table }) {
+  if (!isPile(deck) || !isSpan(table)) return null;
+  const dir = sideOf(deck, table);
+  const scale = boxScaleFor(deck.widthPx);
+  const x = (dir > 0 ? table.x1 : table.x0) + dir * OFF_TABLE_WIDTHS * BOX_WIDTH * scale;
+  return { x, y: deck.y, z: lyingZ(scale), yawDeg: -dir * REST_YAW_DEG, pitchDeg: 0, scale, dir };
 }
 
 /**
- * Where a box hovers while it deals: over its owner's half of the mat, beside the deck toward the
- * mat's centre, a little larger than at rest. `dir` is +1 when the deck is right of the mat's centre.
- *
- * @returns {{ cx: number, cy: number, height: number, dir: 1|-1 } | null}
+ * Where a box hovers while it deals: over its owner's half beside the deck, toward the mat's centre,
+ * lifted off the cloth and stood up off its back so its open top faces the camera, turned toward the deck.
  */
-export function hoverPlacement({ deckRect, matRect }) {
-  if (!isUsableRect(deckRect) || !isUsableRect(matRect)) return null;
-  const deck = centerOf(deckRect);
-  const dir = deck.x >= centerOf(matRect).x ? 1 : -1;
+export function hoverPose({ deck, table }) {
+  if (!isPile(deck) || !isSpan(table)) return null;
+  const dir = sideOf(deck, table);
+  const scale = boxScaleFor(deck.widthPx);
   return {
-    cx: deck.x - dir * deckRect.width * HOVER_OFFSET_DECKS,
-    cy: deck.y,
-    height: deckRect.height * HOVER_HEIGHT_PER_DECK,
+    x: deck.x - dir * deck.widthPx * HOVER_OFFSET_DECKS,
+    y: deck.y,
+    z: HOVER_LIFT_CARDS * CARD_SIZE.height * scale,
+    yawDeg: -dir * HOVER_YAW_DEG,
+    pitchDeg: HOVER_PITCH_DEG,
+    scale,
     dir,
   };
 }
 
-/** Where a box comes from when its band has no room to rest in: just past the board's outer edge. */
-export function offBoardPlacement({ hover, boardRect }) {
-  if (!hover || !isUsableRect(boardRect)) return null;
-  const edge = hover.dir > 0 ? boardRect.left + boardRect.width + hover.height : boardRect.left - hover.height;
-  return { side: hover.dir > 0 ? 'right' : 'left', cx: edge, cy: hover.cy, height: hover.height };
+/**
+ * Where flying card k of `cards` comes to rest on the deck spot: flat, sleeve up, turned with its
+ * seat, the pile growing from the cloth to the real deck's top (`topZ`).
+ */
+export function landPose({ deck, k, cards, topZ, yawDeg = 0 }) {
+  const step = cards > 0 && topZ > 0 ? topZ / cards : 0;
+  return { x: deck.x, y: deck.y, z: (clamp(k, 0, Math.max(0, cards - 1)) + 1) * step, yawDeg };
 }
 
 /** How many cards fly out of the box for a deck of `deckCount`. */
@@ -253,9 +272,3 @@ export const easeOutBack = (t, overshoot = 1.4) => 1 + (overshoot + 1) * (t - 1)
 
 /** Quadratic Bézier between points given as equal-length arrays. */
 export const bezier2 = (p0, p1, p2, u) => p0.map((a, i) => (1 - u) ** 2 * a + 2 * (1 - u) * u * p1[i] + u ** 2 * p2[i]);
-
-/** The camera puts 1 world unit on 1 CSS pixel at z = 0: its distance for a viewport `height` and fov. */
-export const cameraDistance = (height, fovDeg) => height / 2 / Math.tan((fovDeg * Math.PI) / 360);
-
-/** Parent-viewport point → world point on the z = 0 plane. */
-export const screenToWorld = ({ x, y }, viewport) => ({ x: x - viewport.width / 2, y: viewport.height / 2 - y });

@@ -267,6 +267,8 @@ export function createTable({ scene, textures, three, renderer = null, RoomEnvir
     ambient.visible = false;
     const artMaterial = keep(new three.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85, metalness: 0 }));
     const art = new three.Mesh(keep(new three.PlaneGeometry(1, 1)), artMaterial);
+    // Named so the deck boxes (design 073) can find where the art ends and the blurred band begins.
+    art.name = 'board3d-mat-art';
     art.receiveShadow = true;
     art.visible = false;
     const overlayMaterial = keep(

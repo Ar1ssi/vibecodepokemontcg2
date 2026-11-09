@@ -1,5 +1,5 @@
 # 073: Deck boxes beside the mat, and the opening deal out of them
-Status: built (awaiting the user's localhost check) — approved (user) 2026-10-15: send the box, rest beside each deck, fly back open
+Status: rebuilt for the three.js board 2026-11-09 (Revision B; awaiting the user's localhost check) — approved (user) 2026-10-15: send the box, rest beside each deck, fly back open
 Date: 2026-10-15 · Session: S-deckbox-deal · Branch: `claude/practical-pasteur-phs3b5`
 
 ## Problem
@@ -179,12 +179,35 @@ Additive. Revert: drop the trailing wire params (old packets still parse), remov
 - The resting box steps clear of `#boardButtonContainer` (`avoidRects`), seen overlapping it with the sidebox shut.
 - Recording: `.claude/skills/fx-preview/rec/rec-deck-box.mjs` (rest.png, deal.webm, after.png).
 
+## Revision B (2026-11-09): the three.js board
+The iframe board this design was built on was deleted (074 G3, D220) before 073 landed; the branch sat 596
+commits behind. Ported onto `feature/deck-box-deal` and reworked:
+- **In the board's scene, not an overlay canvas.** `board3d/deck-box-rig.js` adds `board3d-deck-boxes` to the
+  board's table frame (`board3d-table-frame`): one camera, the board's lights and shadow map, cards land on the
+  real deck pile. `deck-box.js` reads the scene's `inspect()` (layout, model) and redraws via `invalidate()`;
+  a new scene (context loss) gets new rigs. `#deckBoxStage`, `deck-box-stage.js` and the iframe CSS are gone.
+- **Table-space poses** replace the screen placements in `deck-box-math.mjs`: `restPose` (band = mat art edge,
+  read from the `board3d-mat-art` meshes, … table edge; the deck's outer edge when no art), `offTablePose`,
+  `hoverPose`, `landPose` (flying cards stack up to the deck's real top).
+- **The resting box lies on its back, front art up.** The board camera is nearly top-down (12° tilt), so a
+  standing box showed its lid. While dealing it stands up off its back (pitch 48°), turned toward its deck; the
+  lid springs open, cards rise out and arc flat onto the deck spot; the real pile shows when the last lands.
+- **The lid shuts on the way home** (a box lying on its back cannot rest open: the lid would swing into the
+  cloth). Replaces "fly back open"; a dealt box rests shut and empty.
+- The deck pile is hidden by its scene object (`board3d-pile-<side>:deck`) until the last card lands.
+- `PROTOCOL_VERSION` 2.3.0 (074 had taken 2.2.0). Solo rooms (074 D7) take the far deck's box from the builder.
+- Flying cards and the in-box stack wear the deck's sleeve fitted to the card face's UV window (`fitFace`).
+- Found in passing: the Customize stage stretched the box atlas with the sleeve's `fitFace` (6af0cc4d4), so
+  every box's sides drew white in 3D. Fixed in its own commit (c992a4e2c).
+- Recording: `.claude/skills/fx-preview/rec/rec-deck-box.mjs` (board-mode helpers; mat with art on both halves).
+
 ## Landing notes (apply in the commit that lands on main)
 - DECISIONS (next id D213 at the time of writing):
-  `[mat-fx] 073: deck boxes rest in the blurred band beside each deck and deal it at game start, on one
-  page-wide three.js canvas (z 850); lid = mesh cut at the cap groove plus the front flap.`
+  `[mat-fx] 073: deck boxes lie in the blurred band beside each deck and deal it at game start, drawn in the
+  three.js board's own scene (table frame); lid = mesh cut at the cap groove plus the front flap.`
   `[netcode] 073: the deck box id rides exchangeData/loadDeckData as a display-only param after format
-  (PROTOCOL_VERSION 2.2.0); the opening coin's call/flip/result wait for the deck box deal (deck-box-gate).`
-- MAP: `client/src/setup/netcode/mat-fx/deck-box.js + deck-box-stage.js (three) — both deck boxes beside the mat
-  and the opening deal; pure deck-box-math/-gate/-state.mjs; wire arg deck-constructor/deck-box-args.mjs (design 073)`.
+  (PROTOCOL_VERSION 2.3.0); the opening coin's call/flip/result wait for the deck box deal (deck-box-gate).`
+- MAP: `client/src/setup/netcode/mat-fx/deck-box.js + board3d/deck-box-rig.js (three, in the board scene) — both
+  deck boxes in the blurred band and the opening deal; pure deck-box-math/-gate/-state.mjs; wire arg
+  deck-constructor/deck-box-args.mjs (design 073)`.
 - STATE: Active gains "deck box deal (073) awaiting the user's localhost check".

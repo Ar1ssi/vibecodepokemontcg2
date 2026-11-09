@@ -379,7 +379,8 @@ test('commands: Slice 5 schemas validation (attack, retreat, pass, takePrizes, t
 });
 
 test('commands: an optional seat p1/p2 is accepted on any command (design 074 D7, protocol 2.2.0)', () => {
-  assert.equal(PROTOCOL_VERSION, '2.2.0');
+  // Seats arrived with 2.2.0; 2.3.0 (design 073) added the deck box param after them.
+  assert.ok(['2.2.0', '2.3.0'].includes(PROTOCOL_VERSION));
   assert.equal(validateCommandShape({ type: 'draw', payload: {} }).valid, true);
   assert.equal(validateCommandShape({ type: 'draw', payload: {}, seat: 'p1' }).valid, true);
   assert.equal(validateCommandShape({ type: 'pass', payload: {}, seat: 'p2' }).valid, true);
