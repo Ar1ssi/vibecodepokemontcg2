@@ -20,6 +20,7 @@ tools/ — compare-sync-logs.mjs + coin id mappings (coindl*.tsv/txt, coinmap.tx
 client/src/setup/deck-builder/ — deck builder (themes, filters, counter, sprites, wallpapers, coins) → .agent/areas/deck-builder.md
 client/src/setup/netcode/ — client transport, authoritative view renderer (apply-view.js), pickers/adapters, battle log → .agent/areas/netcode.md
 client/src/setup/netcode/mat-fx/ — mat cosmetic effects (D94/D103; Mega/Tera entries D118–D122[mat-fx]; evolution/devolution scenes D207, canvas stage D154) → .agent/areas/netcode.md § Mat FX
+client/src/setup/netcode/mat-fx/deck-box.js + board3d/deck-box-rig.js (three, in the board scene) — both deck boxes in the blurred band and the opening deal (D243/D244, design 073); pure deck-box-math/-gate/-state.mjs; wire arg deck-constructor/deck-box-args.mjs; stills/video .claude/skills/fx-preview/rec/rec-deck-box.mjs
 client/src/setup/netcode/mat-fx/slide-pins.mjs — holds retreat/switch/promote meshes at their pre-diff spot (pinSlideOrigins in lifecycle.js, from handleBeforeApply) until the slide takes over (I265)
 client/src/setup/netcode/mat-fx/moves/attack-sound.mjs — attack scene → sound fields (tier, contact, type) for the sampled hit (D206)
 client/src/setup/netcode/mat-fx/sfx-cues.mjs + sample-bank.js + ui-cue.mjs + status-ambience.mjs + crowd.mjs + retreat-lock-watch.mjs — sampled SFX (D203, design 064): cue map, buffer bank, UI chrome cues, status loops, crowd bus

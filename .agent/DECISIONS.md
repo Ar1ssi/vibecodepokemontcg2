@@ -6,8 +6,10 @@
 # Pruned or shortened lines, verbatim: .agent/archive/DECISIONS-pruned-2026-10-15.md (grep the D-number).
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
-#   Next id = highest D number in this file and the archives + 1 (next: D241).
+#   Next id = highest D number in this file and the archives + 1 (next: D245).
 
+- D244 2026-11-09 [netcode] 073: the deck box id rides exchangeData/loadDeckData as a display-only param after format (PROTOCOL_VERSION 2.3.0); the opening coin waits for the deal (deck-box-gate).
+- D243 2026-11-09 [mat-fx] 073: deck boxes lie in the blurred band beside each deck and deal it at game start, drawn in the three.js board's table frame; lid = mesh cut at the cap groove + front flap.
 - D242 2026-11-09 [deck-builder] Homebrew Build & Battle is the 'homebrew' flow of the B&B tab (/homebrew-battle): customhb packs, Standard 60-card/6-Prize deck, ETB scene skinned as the 151 Ultra-Premium exterior. (design 086)
 - D240 2026-11-05 [rules] Zygarde forms play as different Pokémon (10% Basic, 50% Stage 1, Complete Stage 2, Mega from Complete): form from the Pokédex entry, 4 copies per form. (pokemon-forms.mjs, user request)
 - D239 2026-11-03 [engine] Server-side setup: the starter's turn-1 draw waits until both Starting Actives are placed, and placing one is the only game action until then — official order. (opening-draw.mjs)
