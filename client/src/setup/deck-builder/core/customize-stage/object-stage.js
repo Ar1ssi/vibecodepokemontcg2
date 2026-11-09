@@ -241,9 +241,10 @@ export async function createObjectStage({ host, onLost = () => {} }) {
   /**
    * Swaps `material.map` to `url` once it loads, or to `fallback` (null = none, shown as
    * `fallbackColor`) for no url or a load that fails. A newer request for the same slot wins.
-   * `fallback` is owned by the stage and never disposed here.
+   * `fallback` is owned by the stage and never disposed here. `prepare` adjusts a loaded texture before
+   * it shows: the sleeve is stretched to the card face's UV window; the box atlas is used as authored.
    */
-  const swapMap = async (material, url, tokenKey, fallback, fallbackColor) => {
+  const swapMap = async (material, url, tokenKey, fallback, fallbackColor, prepare = (texture) => texture) => {
     state[tokenKey] += 1;
     const token = state[tokenKey];
     const show = (map) => {
@@ -270,14 +271,16 @@ export async function createObjectStage({ host, onLost = () => {} }) {
       texture.dispose();
       return;
     }
-    fitFace(texture, state.face);
+    prepare(texture);
     texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
     state.owned.add(texture);
     show(texture);
   };
 
   const setBoxAtlas = (url) => swapMap(exterior, url, 'boxToken', null, BOX_FALLBACK_COLOR);
-  const setSleeveTexture = (url) => swapMap(sleeveFace, url, 'sleeveToken', state.defaultSleeve, 0xffffff);
+  const setSleeveTexture = (url) => swapMap(sleeveFace, url, 'sleeveToken', state.defaultSleeve, 0xffffff, (texture) =>
+    fitFace(texture, state.face)
+  );
 
   const render = () => {
     if (state.closed || state.lost) return;
