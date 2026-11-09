@@ -8,6 +8,7 @@
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
 #   Next id = highest D number in this file and the archives + 1 (next: D241).
 
+- D242 2026-11-09 [deck-builder] Homebrew Build & Battle is the 'homebrew' flow of the B&B tab (/homebrew-battle): customhb packs, Standard 60-card/6-Prize deck, ETB scene skinned as the 151 Ultra-Premium exterior. (design 086)
 - D240 2026-11-05 [rules] Zygarde forms play as different Pokémon (10% Basic, 50% Stage 1, Complete Stage 2, Mega from Complete): form from the Pokédex entry, 4 copies per form. (pokemon-forms.mjs, user request)
 - D239 2026-11-03 [engine] Server-side setup: the starter's turn-1 draw waits until both Starting Actives are placed, and placing one is the only game action until then — official order. (opening-draw.mjs)
 - D238 2026-11-03 [mat-fx] Scorched Earth's river is a layout path (lavaPath) off every card; Vitality's crown is three underlit shelves (kitGlow) with mist and light columns. (design 085)

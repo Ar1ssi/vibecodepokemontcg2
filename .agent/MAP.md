@@ -72,6 +72,7 @@ client/src/setup/deck-constructor/card.js — `Card` class; identity is `card.im
 client/src/setup/deck-constructor/own-deck.mjs — `systemState.ownDeck`: the deck this player loaded (set by import.js loadDeckData on emit); leaving a room restores selfDeckData from it (I198)
 
 ## Build & Battle and Elite Trainer Box openings (designs 051–055, 057)
+client/src/setup/deck-builder/core/homebrew-battle/ — Homebrew Build & Battle (design 086, D242): homebrew-pack.mjs (customhb set hydrate, pack model with a guaranteed Trainer + Energy, `openHomebrewBox`, pool), homebrew-session.mjs, homebrew-look.mjs (UPC exterior + 151 booster skin); DOM sidebox/native-deck-builder-homebrew-battle.js; route /homebrew-battle; art via scripts/build-battle/vendor-homebrew-skin.mjs
 client/src/setup/deck-builder/core/build-battle/pack3d.mjs — pure 3D pack math: pillow shape, peel/rip/strip flight, cards out, tilt/sway, screen↔world, floor reflection bands (design 055)
 client/src/initialization/document-event-listeners/sidebox/native-deck-builder-pack3d.js — WebGL pack stage (three.js, lazy `import()`), mirror layer; falls back to the DOM scene
 client/src/initialization/document-event-listeners/sidebox/tabletop/ — three.js tabletop unboxing (design 073-tabletop-unboxing) on both B&B flows' stage (bb-shared `mountBoxOnStage`): tabletop-scene.js mount + WebGL fallback, tabletop-app.js orchestrator, tt-*.js stage/meshes/print/audio; pure motion/layout in core/build-battle/tabletop/*.mjs
