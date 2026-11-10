@@ -334,41 +334,6 @@ const TCGDEX_BASE = tcgdexApiBase();
       return sets;
     }
 
-    // Generations behind the Homebrew pill: Black & White (5) and XY (6).
-    export const HOMEBREW_GENERATIONS = [5, 6];
-
-    // Synthetic set id for the Homebrew pill's single Energy tab, which combines
-    // the Energy cards of every Homebrew generation.
-    export const HOMEBREW_ENERGY_SET_ID = '__energy_homebrew__';
-
-    // Every real set from the Homebrew generations, newest first, then one combined
-    // Energy tab. The per-generation Energy tabs are folded into it; Energy cards
-    // still show inside their own sets.
-    export async function fetchHomebrewSets(generations = HOMEBREW_GENERATIONS) {
-      const perGeneration = await Promise.all(generations.map((gen) => fetchGenerationSets(gen)));
-      const allSets = perGeneration.flat();
-      const sets = allSets
-        .filter((set) => !GENERATION_ENERGY_SET_ID_RE.test(set.setId))
-        .sort((a, b) => String(b.releaseDate || '').localeCompare(String(a.releaseDate || '')));
-
-      const energyCardCount = allSets
-        .filter((set) => GENERATION_ENERGY_SET_ID_RE.test(set.setId))
-        .reduce((total, set) => total + set.cardCount, 0);
-      if (energyCardCount > 0) {
-        sets.push({
-          setId: HOMEBREW_ENERGY_SET_ID,
-          name: 'Energy',
-          seriesId: '',
-          releaseDate: '',
-          logo: ENERGY_SET_LOGO,
-          symbol: '',
-          cardCount: energyCardCount,
-          category: 'generation',
-        });
-      }
-      return sets;
-    }
-
     // Format pills: a historical tournament format is a fixed list of TCGdex sets, shown newest first.
     // An entry is [setId, series] or [setId, series, lastNumber]: a set cut off at lastNumber shows only
     // the cards numbered up to it, under a synthetic set id (formatLimitedSetId).
@@ -477,15 +442,11 @@ const TCGDEX_BASE = tcgdexApiBase();
 
     // Custom sets (design 075): the sets installed in this repo (client/src/assets/custom-sets),
     // listed by the server's manifest; their cards come through the TCGdex proxy like any set's.
-    // A set.json's `group` picks the pill: "custom" (or none) → Custom, "homebrew" → Homebrew sets.
     export const CUSTOM_CATEGORY = 'custom';
-    export const HOMEBREW_SETS_CATEGORY = 'homebrew-sets';
-    const CATEGORY_BY_GROUP = Object.freeze({ custom: CUSTOM_CATEGORY, homebrew: HOMEBREW_SETS_CATEGORY });
 
-    export async function fetchCustomSets(manifest = null, category = CUSTOM_CATEGORY) {
+    export async function fetchCustomSets(manifest = null) {
       const { sets } = manifest || (await fetchCustomSetManifest());
       return sets
-        .filter((set) => (CATEGORY_BY_GROUP[set.group] ?? CUSTOM_CATEGORY) === category)
         .map((set) => ({
           setId: set.id,
           name: set.name,
@@ -494,15 +455,9 @@ const TCGDEX_BASE = tcgdexApiBase();
           logo: '',
           symbol: '',
           cardCount: set.cardCount,
-          category,
+          category: CUSTOM_CATEGORY,
         }))
         .sort((a, b) => String(b.releaseDate).localeCompare(String(a.releaseDate)) || a.name.localeCompare(b.name));
-    }
-
-    // Every Energy card across the Homebrew generations, A to Z.
-    export async function fetchHomebrewEnergyCards(generations = HOMEBREW_GENERATIONS) {
-      const perGeneration = await Promise.all(generations.map((gen) => fetchGenerationEnergyCards(gen)));
-      return sortCardsWithinGroup(perGeneration.flat(), { sortBy: 'name', sortDirection: 'asc' });
     }
 
     // Fetch all legal Standard-format sets, newest first, with logo + release date.
@@ -1024,7 +979,6 @@ const TCGDEX_BASE = tcgdexApiBase();
       if (setId === ENERGY_SET_ID) return fetchLegalEnergyCards();
       if (setId === OTHER_151_SET_ID) return fetchOther151Cards();
       if (setId === GEN_1_2_SET_ID) return fetchGen12Cards();
-      if (setId === HOMEBREW_ENERGY_SET_ID) return fetchHomebrewEnergyCards();
 
       const limited = FORMAT_LIMITED_SET_RE.exec(setId);
       if (limited) return fetchFormatLimitedSetCards(limited[1], limited[2]);

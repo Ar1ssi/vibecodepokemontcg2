@@ -727,37 +727,6 @@ body.board3d-active #stadium {
   display: block;
   border-radius: 10px 10px 0 0; 
 }
-#videoContainer {
-  display: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 1000;
-}
-#videoContainer iframe {
-  position: absolute;
-  left: 10%;
-  width: 55.5%;
-  height: 60%;
-  bottom: 50%;
-  transform: translateY(50%);
-}
-#changelog, #donationsPage {
-  display: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 76%;
-  height: 100%;
-  background: rgba(222, 221, 221, 0.852);
-  z-index: 1000;
-  overflow: auto;
-  padding: 60px;
-  box-sizing: border-box;
-}
 .shift-font {
   font-family: monospace;
 }

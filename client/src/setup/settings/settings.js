@@ -128,8 +128,6 @@ export const darkMode = () => {
     });
 
   // Dark Mode 6
-  document.getElementById('changelog').classList.toggle('dark-mode-6');
-  document.getElementById('donationsPage').classList.toggle('dark-mode-6');
   document.getElementById('keybindModal').classList.toggle('dark-mode-6');
 
   //HTML body

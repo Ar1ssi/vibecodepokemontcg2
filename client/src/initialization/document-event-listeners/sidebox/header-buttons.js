@@ -92,10 +92,6 @@ export const initializeHeaderButtons = () => {
     document.dispatchEvent(new CustomEvent('deck-builder-closing'));
     const panel = document.getElementById('nativeDeckBuilderWorkspace');
     if (panel) panel.classList.remove('open');
-    const changelog = document.getElementById('changelog');
-    if (changelog) changelog.style.display = 'none';
-    const donationsPage = document.getElementById('donationsPage');
-    if (donationsPage) donationsPage.style.display = 'none';
   };
 
   const p2Button = document.getElementById('p2Button');

@@ -7,14 +7,12 @@ import {
 import {
       fetchLegalStandardSets,
       fetchGenerationSets,
-      fetchHomebrewSets,
       fetchFormatSets,
       FORMAT_PILLS,
       FORMAT_PILL_IDS,
       fetchCustomSets,
       forgetCustomSetRecords,
       CUSTOM_CATEGORY,
-      HOMEBREW_SETS_CATEGORY,
       fetchSetCards,
       filterCardsByName,
       filterCardsBySupertype,
@@ -51,8 +49,7 @@ import {
 
     /**
      * "Browse Sets" panel for the native deck builder. Pills switch between the
-     * current Standard-legal sets, an "other" bucket, a "homebrew" pill (every
-     * Black & White and XY set), and one pill per Pokémon
+     * current Standard-legal sets, an "other" bucket, and one pill per Pokémon
      * generation (9 down to 1) that loads every set from that TCG era via
      * TCGdex's series grouping. Cards are fetched lazily the first time a set is
      * expanded, then cached. Clicking a card adds it to the currently edited deck.
@@ -118,9 +115,7 @@ import {
         '    <div class="native-deck-builder-section-title">Browse Sets</div>',
         '    <button class="native-deck-builder-set-browser-series-tag active" data-category="standard" type="button">Standard 2026-27</button>',
         '    <button class="native-deck-builder-set-browser-series-tag native-deck-builder-set-browser-series-tag--other" data-category="other" type="button">other</button>',
-        '    <button class="native-deck-builder-set-browser-series-tag" data-category="homebrew" type="button">Homebrew</button>',
-        `    <button class="native-deck-builder-set-browser-series-tag" data-category="${CUSTOM_CATEGORY}" type="button" title="Sets made in the card editor and stored in this repo">Custom</button>`,
-        `    <button class="native-deck-builder-set-browser-series-tag" data-category="${HOMEBREW_SETS_CATEGORY}" type="button" title="Homebrew cards made in the card editor and stored in this repo">Homebrew sets</button>`,
+            `    <button class="native-deck-builder-set-browser-series-tag" data-category="${CUSTOM_CATEGORY}" type="button" title="Sets made in the card editor and stored in this repo">Custom</button>`,
         formatPillsHtml,
         generationPillsHtml,
         '  </div>',
@@ -226,22 +221,19 @@ import {
             sets: state.sets.filter((set) => ((set.category || 'standard') === 'other') === isOther),
           };
         }
-        if (activeCategory === 'homebrew') {
-          return { label: 'Black & White + XY', sets: state.sets };
-        }
         if (activeCategory === CUSTOM_CATEGORY) {
           return { label: 'Custom sets', sets: state.sets };
         }
         const format = FORMAT_PILLS.find((pill) => pill.id === activeCategory);
         if (format) return { label: format.title, sets: state.sets };
-        // Generation pills and Homebrew sets show their sets with no group label.
+        // Generation pills show their sets with no group label.
         return { label: '', sets: state.sets };
       };
 
       const showCategoryStatus = () => {
         const state = categoryState.get(activeCategory);
         if (!state?.loaded) return;
-        if ((activeCategory === CUSTOM_CATEGORY || activeCategory === HOMEBREW_SETS_CATEGORY) && state.sets.length === 0) {
+        if (activeCategory === CUSTOM_CATEGORY && state.sets.length === 0) {
           showStatus(
             'No custom sets installed. Send a set from the card editor, or drop its folder into client/src/assets/custom-sets/.'
           );
@@ -478,16 +470,12 @@ import {
             otherState.sets = sets;
             otherState.loaded = true;
             otherState.loading = false;
-          } else if (categoryId === 'homebrew') {
-            state.sets = await fetchHomebrewSets();
-            state.loaded = true;
-            state.loading = false;
           } else if (FORMAT_PILL_IDS.includes(categoryId)) {
             state.sets = await fetchFormatSets(categoryId);
             state.loaded = true;
             state.loading = false;
-          } else if (categoryId === CUSTOM_CATEGORY || categoryId === HOMEBREW_SETS_CATEGORY) {
-            state.sets = await fetchCustomSets(null, categoryId);
+          } else if (categoryId === CUSTOM_CATEGORY) {
+            state.sets = await fetchCustomSets();
             state.loaded = true;
             state.loading = false;
           } else {
@@ -559,14 +547,12 @@ import {
 
       // The card editor pushed a set and the server reloaded it: drop what this panel holds of custom
       // sets, then redraw the custom pill (and its open set) on screen with the new cards.
-      const isCustomPill = (category) => category === CUSTOM_CATEGORY || category === HOMEBREW_SETS_CATEGORY;
       const refreshCustomSets = async () => {
         forgetCustomSetRecords();
         categoryState.delete(CUSTOM_CATEGORY);
-        categoryState.delete(HOMEBREW_SETS_CATEGORY);
         for (const setId of [...cardsBySet.keys()]) if (isCustomSetId(setId)) cardsBySet.delete(setId);
         for (const setId of [...pendingBySet.keys()]) if (isCustomSetId(setId)) pendingBySet.delete(setId);
-        if (!isCustomPill(activeCategory)) return;
+        if (activeCategory !== CUSTOM_CATEGORY) return;
         const category = activeCategory;
         await loadCategory(category);
         const openSetId = expandedSetId;
