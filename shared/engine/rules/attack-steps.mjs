@@ -1093,6 +1093,8 @@ const TEMPLATES = [
     () => ({ type: 'atkOppDiscardToPrizes', count: 1 }),
   ],
   [/^turn all of your prize cards face up$/, () => ({ type: 'atkPrizesFaceUp' })],
+  // Homebrew Blacephalon Blazer: the player picks the card; the "remains face up" reminder is rules text.
+  [/^turn 1 of your face-down prize cards face up$/, () => ({ type: 'atkPrizesFaceUp', count: 1 })],
   [/^your opponent's active pokémon is knocked out$/, () => ({ type: 'atkKnockOut', condition: null })],
   // A4 (design 036): the Active is Knocked Out when its printed condition holds
   // (Haxorus Axe Blast, Haxorus Bring Down the Axe, Armaldo Reaping Claw), and the

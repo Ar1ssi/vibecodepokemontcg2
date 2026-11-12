@@ -591,3 +591,63 @@ test('HB 454 Regigigas ex Destruction: keeping the Stadium, or having none, make
   assert.equal(bare.state.pendingChoice, null);
   assert.equal(zone(bare.state, 'p2', 'discard').length, 0, 'no Stadium to discard, no discard');
 });
+
+// ── HB 087 Blacephalon Blazer (customhb-087 set.json) ────────────────────────────────────────
+
+const BLAZER =
+  'Flip a coin. If heads, turn 1 of your face-down Prize cards face up. (That Prize card remains face up for the rest of the game.)';
+const revealedPrizes = (state) => zone(state, 'p1', 'prizes').filter((c) => c.revealed);
+
+test('HB 087 Blacephalon Blazer: heads turns the chosen face-down Prize face up and keeps it so', () => {
+  const outcomes = new Set();
+  for (let seed = 1; seed <= 30; seed++) {
+    const { state } = board('Blacephalon', BLAZER, { damage: '50' });
+    const res = attack(state, seed);
+    assert.equal(res.error, null);
+    assert.equal(damageOf(res), 50);
+    if (!res.state.pendingChoice) {
+      outcomes.add('tails');
+      assert.equal(revealedPrizes(res.state).length, 0, 'tails: nothing turns up');
+      continue;
+    }
+    outcomes.add('heads');
+    assert.equal(res.state.pendingChoice.player, 'p1');
+    assert.equal(res.state.pendingChoice.options.length, 6);
+    const pick = res.state.pendingChoice.options[2].instanceId;
+    const done = choose(res, [pick]);
+    assert.deepEqual(ids(revealedPrizes(done.state)), [pick], 'only the chosen Prize is face up');
+  }
+  assert.deepEqual([...outcomes].sort(), ['heads', 'tails'], 'both coin outcomes occur');
+});
+
+test('HB 087 Blacephalon Blazer never offers a Prize that is already face up, and a lone face-down Prize turns without asking', () => {
+  const headsSeed = [...Array(30).keys()].map((i) => i + 1).find((seed) => attack(board('Blacephalon', BLAZER).state, seed).state.pendingChoice);
+  const { state } = board('Blacephalon', BLAZER, {
+    setup: (s) => {
+      const prizes = zone(s, 'p1', 'prizes');
+      for (const card of prizes.slice(0, 4)) card.revealed = true;
+    },
+  });
+  const res = attack(state, headsSeed);
+  assert.equal(res.state.pendingChoice.options.length, 2, 'only the 2 face-down Prizes are offered');
+  const faceDown = zone(res.state, 'p1', 'prizes').filter((c) => !c.revealed);
+  const second = choose(res, [faceDown[0].instanceId]);
+  assert.equal(revealedPrizes(second.state).length, 5);
+
+  const { state: one } = board('Blacephalon', BLAZER, {
+    setup: (s) => zone(s, 'p1', 'prizes').slice(1).forEach((c) => (c.revealed = true)),
+  });
+  const auto = attack(one, headsSeed);
+  assert.equal(auto.state.pendingChoice ?? null, null, 'one candidate: no question');
+  assert.equal(revealedPrizes(auto.state).length, 6);
+});
+
+test('HB 087 Blacephalon Blazer with every Prize already face up does nothing more', () => {
+  const { state } = board('Blacephalon', BLAZER, { damage: '50', setup: (s) => zone(s, 'p1', 'prizes').forEach((c) => (c.revealed = true)) });
+  for (let seed = 1; seed <= 10; seed++) {
+    const res = attack(state, seed);
+    assert.equal(res.error, null);
+    assert.equal(res.state.pendingChoice ?? null, null);
+    assert.equal(damageOf(res), 50);
+  }
+});

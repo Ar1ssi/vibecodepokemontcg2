@@ -2665,11 +2665,36 @@ function atkOppDiscardToPrizes(ctx) {
   });
 }
 
+// Blacephalon Blazer: one still-face-down Prize of the user's choice turns face up.
+function atkOnePrizeFaceUp(ctx, prizes) {
+  const { player } = ctx;
+  const turnUp = (card) => {
+    card.revealed = true;
+    ctx.events.push({ type: 'prizesRevealed', playerId: player.playerId, count: 1 });
+    return null;
+  };
+  if (ctx.selection) {
+    const card = prizes.find((c) => c.instanceId === ctx.selection[0] && !c.revealed);
+    return card ? turnUp(card) : skip(ctx, 'target_not_found');
+  }
+  const faceDown = prizes.filter((c) => !c.revealed);
+  if (faceDown.length === 0) return skip(ctx, 'no_face_down_prizes');
+  if (faceDown.length === 1) return turnUp(faceDown[0]);
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose 1 of your face-down Prize cards to turn face up`,
+    // Identity only: Prize cards stay face down.
+    options: faceDown.map((c) => ({ instanceId: c.instanceId })),
+    min: 1,
+    max: 1,
+  });
+}
+
 // Celesteela-GX Blaster-GX: every Prize card is turned face up for the rest of the game. The
 // per-card `revealed` flag is what `view.mjs` exposes, and it survives the flags rebuild.
 function atkPrizesFaceUp(ctx) {
   const { player } = ctx;
   const prizes = player.zones.prizes || [];
+  if (ctx.step.count === 1) return atkOnePrizeFaceUp(ctx, prizes);
   if (prizes.length === 0) return skip(ctx, 'no_prizes');
   for (const card of prizes) card.revealed = true;
   ctx.events.push({ type: 'prizesRevealed', playerId: player.playerId, count: prizes.length });
