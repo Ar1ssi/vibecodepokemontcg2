@@ -2,7 +2,7 @@ import { chromium } from 'playwright';
 // Design 069: the Multiplayer tab's always-open rooms. Click to join or watch, seat tokens, and
 // the seat release rule (immediate before set-up, PUBLIC_SEAT_RELEASE_MS after).
 // Needs a fresh server (PTCG_URL, default :4000) started with
-//   SERVER_AUTHORITATIVE=1 PUBLIC_SEAT_RELEASE_MS=4000
+//   PUBLIC_SEAT_RELEASE_MS=4000
 // so the held-seat step finishes quickly. Room 1 must be empty when it starts.
 // OUT=<dir> saves a screenshot per step; CHROMIUM_PATH picks the browser binary.
 const BASE = process.env.PTCG_URL || 'http://localhost:4000';

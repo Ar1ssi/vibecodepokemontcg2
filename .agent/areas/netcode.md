@@ -4,7 +4,7 @@
      commands to shared/engine state, sends per-player views); deck-packet.mjs, sync-check.mjs beside it. -->
 Purpose: how client actions reach the server and how server views/events render back.
 
-## Legacy transport (flag-off relay path)
+## Action transport (relay-era pipeline, still used under server authority: design 087)
 client/src/initialization/socket-event-listeners/socket-event-listeners.js — all inbound socket handlers; sync orchestration
 client/src/setup/general/process-action.js — appends to action log, increments counter, emits pushAction/requestAction
 client/src/setup/general/accept-action.js — 59-entry action→function dispatch table; the command vocabulary

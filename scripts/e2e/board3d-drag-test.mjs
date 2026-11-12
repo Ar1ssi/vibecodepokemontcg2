@@ -43,7 +43,7 @@ async function startServer() {
   const port = await freePort();
   const child = spawn(process.execPath, ['server/server.js'], {
     cwd: ROOT,
-    env: { ...process.env, PORT: String(port), PTCG_E2E: '1', SERVER_AUTHORITATIVE: '1' },
+    env: { ...process.env, PORT: String(port), PTCG_E2E: '1' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let output = '';

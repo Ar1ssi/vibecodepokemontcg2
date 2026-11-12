@@ -3,7 +3,7 @@
 // Usage: pnpm test:spectator   (spawns its own authoritative server on a free port)
 // Runs on the three.js board (design 074): hands are read from the board mirror's shadow roots
 // and `__ptcg.cardRect`.
-//   PTCG_URL=http://host:port   reuse a running server (started with SERVER_AUTHORITATIVE=1 PTCG_E2E=1)
+//   PTCG_URL=http://host:port   reuse a running server (started with PTCG_E2E=1)
 //   CHROMIUM_PATH=/path/to/chrome   picks the browser (PW_CHROMIUM is the older name)
 //   SHOTS=<dir>   saves a screenshot per view
 import { spawn } from 'node:child_process';
@@ -37,7 +37,7 @@ async function startServer() {
   const port = await freePort();
   const child = spawn(process.execPath, ['server/server.js'], {
     cwd: ROOT,
-    env: { ...process.env, PORT: String(port), PTCG_E2E: '1', SERVER_AUTHORITATIVE: '1' },
+    env: { ...process.env, PORT: String(port), PTCG_E2E: '1' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let output = '';

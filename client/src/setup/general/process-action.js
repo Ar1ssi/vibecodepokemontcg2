@@ -96,7 +96,6 @@ export const processAction = (user, emit, action, parameters) => {
         }
       }
       const data = createAction(action, user, exportParameters, { emit });
-      // systemState.spectatorActionData.push(data);
       if (action !== 'exchangeData' && action !== 'loadDeckData') {
         systemState.exportActionData.push(data);
       }

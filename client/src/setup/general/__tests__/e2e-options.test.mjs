@@ -298,7 +298,7 @@ test('e2e options: every option is plain JSON, as the page boundary requires', a
   assert.ok(options.length > 1);
 });
 
-// Under SERVER_AUTHORITATIVE the option's index addresses the SERVER view array, while
+// Under server authority the option's index addresses the SERVER view array, while
 // moveCardBundle's legacy fallback indexes the local DOM zone array — so an index alone
 // cannot address a card. Options therefore carry the server's instanceId when the cards
 // they were built from have one, which act() forwards as the authoritative dispatch's

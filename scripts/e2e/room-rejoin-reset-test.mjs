@@ -3,8 +3,7 @@
 // Reported live on Render (server-authoritative): the rejoiner saw
 // "YOUR TURN — main phase", a dealt hand and prizes without pressing Set Up,
 // plus repeated "The game may be out of sync" warnings.
-// Needs a server (PTCG_URL, default :4000). Run it with SERVER_AUTHORITATIVE=1
-// to match production; the out-of-sync heartbeat only runs in that mode.
+// Needs a server (PTCG_URL, default :4000).
 import { chromium } from 'playwright';
 
 const BASE = process.env.PTCG_URL || 'http://localhost:4000';

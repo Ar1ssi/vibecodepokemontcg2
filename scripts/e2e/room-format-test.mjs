@@ -1,7 +1,6 @@
 import { chromium } from 'playwright';
 // Design 053: two players agree on the room's format, and the deal holds them to it.
-// Needs a server (PTCG_URL, default :4000); run it with SERVER_AUTHORITATIVE=1 to match
-// production — the legacy relay server cannot tell when cards are dealt, so row 6 needs it.
+// Needs a server (PTCG_URL, default :4000).
 // OUT=<dir> saves a screenshot per step; CHROMIUM_PATH picks the browser binary.
 const BASE = process.env.PTCG_URL || 'http://localhost:4000';
 const ROOM = `rf-${Date.now()}`;

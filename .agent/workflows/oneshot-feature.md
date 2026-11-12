@@ -58,7 +58,7 @@ first unticked slice → confirm `pnpm test:changed` is green there → continue
    coupling → pin the schema/naming contract first (feature.md §2 step 4).
 2. Edge-case table: TEMPLATE rows plus this repo's usual ones — hidden info never reaches the
    opponent · reconnect/resync mid-feature · both seats see the right thing · card variants across
-   eras. Netcode: verify with `SERVER_AUTHORITATIVE=1` only.
+   eras. Netcode: the server always runs the rules (design 087).
 3. Scope line: all of the request is in scope. Cut something only when it is truly blocked; each cut
    = one ISSUES line + an ✗ row in Acceptance. Silent narrowing is the classic one-shot failure.
 4. Work plan: slices each green on their own, ordered so behavior runs early (rules → server →

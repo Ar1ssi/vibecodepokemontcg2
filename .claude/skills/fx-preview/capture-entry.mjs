@@ -6,7 +6,6 @@
 //        BASE_URL  server origin (default http://localhost:4000)
 //        CHROMIUM  browser executable (omit to use Playwright's own install; CHROMIUM_PATH works too)
 //        SIO_JS    local socket.io client file, only where cdn.socket.io is unreachable
-//        The server must run with SERVER_AUTHORITATIVE=1 (the three.js board, design 074).
 import { chromium } from 'playwright';
 import { mkdirSync, rmSync, existsSync } from 'node:fs';
 import path from 'node:path';

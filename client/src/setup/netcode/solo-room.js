@@ -3,9 +3,6 @@
  * `solo-` room whose two seats belong to this one socket; leaving puts the local board back
  * the way leaving a Multiplayer room does. The `joinGame` acknowledgement is handled in
  * socket-event-listeners.js (`handleSoloJoinGame`).
- *
- * A server without authority refuses solo rooms (`solo_needs_authority`); the Solo tab then
- * stays on the local board for the rest of the page's life.
  */
 
 import { reset } from '../../actions/general/reset.js';
@@ -22,14 +19,12 @@ import {
 } from '../../initialization/socket-event-listeners/socket-event-listeners.js';
 import { makeSoloRoomId, soloOwnerName } from './solo-seat.mjs';
 
-let soloUnavailable = false;
 let refusalListenerInstalled = false;
 
 const onSoloRoomRefused = (event) => {
   const reason = event.detail?.reason;
   // A solo room this socket could not reclaim (reconnect) is gone: back to the local board.
   if (!leaveSoloRoom()) systemState.roomId = '';
-  if (reason === 'solo_needs_authority') soloUnavailable = true;
   appendMessage('', roomRejectMessage(reason).replace('\n', ' '), 'announcement', false);
 };
 
@@ -47,7 +42,7 @@ const installRefusalListener = () => {
  */
 export function joinSoloRoom() {
   installRefusalListener();
-  if (soloUnavailable || systemState.solo || systemState.isTwoPlayer || systemState.roomId) {
+  if (systemState.solo || systemState.isTwoPlayer || systemState.roomId) {
     return false;
   }
   const roomId = makeSoloRoomId();

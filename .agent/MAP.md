@@ -6,7 +6,7 @@
 .agent/ — agent harness: state, workflows, designs, journal (human manual: .agent/README.md); spawn-or-inline cost guide: .agent/DELEGATION.md
 .claude/agents/ — project subagents: slice-builder (low effort, pinned-contract slices; D171), fx-designer (high effort, board visuals/CSS in the 041–046 house style; D173)
 client/ — client application (EJS layout, CSS styles, client JS, deck builder, rules engine); entry: client/src/front-end.js
-server/ — Express + Socket.IO + SQLite; entry: server/server.js; game rooms in server/game/room.mjs (GameRoom runs shared/engine commands, sends per-player views); server/netcode-mode.mjs: server authority unless SERVER_AUTHORITATIVE=0|false|off|no; server/game/room-sweep.mjs: idle-room sweep plan
+server/ — Express + Socket.IO + SQLite; entry: server/server.js; game rooms in server/game/room.mjs (GameRoom runs shared/engine commands, sends per-player views); server/netcode-mode.mjs: startup warning when SERVER_AUTHORITATIVE still opts out (the server always runs the rules, design 087); server/game/room-sweep.mjs: idle-room sweep plan
 shared/tcgdex/ — TCGdex URL builder (browser → server proxy server/tcgdex-proxy.mjs, D164) + IndexedDB JSON cache (D102); card-art.mjs maps cards to own fronts in client/src/assets/card-art (TCG Live art for League-stamped/imageless TCGdex cards); custom-sets.mjs: custom ids, image path → id, `/api/custom-sets` manifest
 shared/custom-sets/custom-set-schema.mjs — custom sets (design 075, D223): the set.json contract (`validateCustomSet`) for client/src/assets/custom-sets/<setId>/ (cardback export: TCGdex-shaped records + <nnn>/{high,low}.webp); server/custom-sets.mjs loads them (live: `createLiveCustomSets` watches the folder, broadcasts customSetsChanged, D227) and `withCustomSets` answers them through the TCGdex proxy (records, set, `/cards?` list merges); scripts/custom-sets/check.mjs validates the committed sets; scripts/custom-sets/engine-check.mjs runs a set's attacks, abilities and Trainers through the oracle classifiers (customhb ENGINE-CHECK.md); optional set.json `group` "homebrew" lists a set under the Homebrew sets pill (customhb) instead of Custom
 docs/ — project documentation (card types taxonomy, rule specs); entry: docs/card-types-taxonomy.md
@@ -68,7 +68,7 @@ shared/engine/room-format.mjs — room format propose/accept/cancel reducer `app
 shared/engine/view.mjs — `viewFor(state, playerId)` authoritative redacted view per player/spectator (H1, Invariant 5)
 client/src/setup/zones/get-zone.js — `getZone(user, zoneId)` → { array, element, ... }; 10 zones/player, stadium neutral
 shared/engine/zones/zone-hash.mjs — `hashCardList`/`hashBoardSnapshot`; `SYNC_HASH_ZONES` is 8 zones (excludes UI scratch)
-shared/engine/zones/*.mjs — pure: board-snapshot, card-state, hand-sort, resolve-card-index, active-pokemon
+shared/engine/zones/*.mjs — pure: card-state, hand-sort, resolve-card-index, active-pokemon
 client/src/setup/deck-constructor/card.js — `Card` class; identity is `card.image` (HTMLImageElement)
 client/src/setup/deck-constructor/own-deck.mjs — `systemState.ownDeck`: the deck this player loaded (set by import.js loadDeckData on emit); leaving a room restores selfDeckData from it (I198)
 
@@ -116,9 +116,7 @@ scripts/prune-merged-branches.mjs — dry-run/delete remote branches fully conta
 scripts/custom-sets/import-foil.py — cardback foil exports (zip/folder) → <set>/foil.json + foil/*.webp (D225); scripts/custom-sets/check.mjs validates them
 shared/custom-sets/custom-sets-index.mjs — sets published to R2 (design 076, D228): bucket index.json contract (`validateCustomSetsIndex`); scripts/custom-sets/publish.mjs (`pnpm custom-sets:publish`) uploads blobs/<sha256> + swaps the index via rclone; server/custom-sets-remote.mjs makes the site poll it, mirror set.json into the store's second root, serve art from a blob cache
 scripts/harness-check.mjs — `pnpm harness:check`: measures every .agent budget in workflows/maintain.md plus the 30-commit maintain trigger; exit 1 = OVER (test: scripts/__tests__/harness-check.test.mjs)
-scripts/e2e/two-player-sync-test.mjs — Playwright two-browser sync harness (legacy mode: needs a
-  `SERVER_AUTHORITATIVE=0` server on PTCG_URL, `pnpm test:2p`)
-scripts/e2e/flip-gate-test.mjs — Playwright two-browser full game under SERVER_AUTHORITATIVE=1: design 002's
+scripts/e2e/flip-gate-test.mjs — Playwright two-browser full game: design 002's
   3.12 flip gate (`pnpm test:flip`; needs a hand-started authoritative server on PTCG_URL)
 scripts/e2e/test-card-inspector-e2e.mjs — Playwright two-browser design-013/067 card-inspector + card-focus gate
   (`pnpm test:inspector`; needs a hand-started authoritative server on PTCG_URL). Step 9 clicks the

@@ -8,7 +8,6 @@
   ],
   "scripts": {
     "start": "pnpm -C server start",
-    "test:2p": "node scripts/e2e/two-player-sync-test.mjs",
     "test:solo": "node scripts/e2e/solo-authority-test.mjs",
     "test:board3d": "node scripts/e2e/board3d-view-test.mjs",
     "test:board3d-input": "node scripts/e2e/board3d-input-test.mjs",

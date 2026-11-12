@@ -1,7 +1,7 @@
 // Design 072: the opening coin with real prompts (not the e2e auto-answers). Joins two clients with the
 // e2e bridge for setup, then drops ?e2e=1 from the URL and turns rules back on, so the
 // call picker, the ceremony and the "Do you want to go first?" prompt run as for players.
-// Usage: SERVER_AUTHORITATIVE=1 PORT=4100 node server/server.js &
+// Usage: PORT=4100 node server/server.js &
 //        PTCG_URL=http://localhost:4100 CHOICE=second|first node scripts/e2e/opening-coin-choice-test.mjs
 import { chromium } from 'playwright';
 

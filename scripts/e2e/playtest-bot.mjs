@@ -6,7 +6,7 @@
 // just failing — a failing seed must be re-runnable from its dump.
 //
 // Usage:
-//   node server/server.js &          # server authority; SERVER_AUTHORITATIVE=0 for design 004's legacy path
+//   node server/server.js &
 //   node scripts/e2e/playtest-bot.mjs --games=50 --seed=1 [--max-turns=60] [--deck=<path.json>] [--headed]
 //                          [--scorer=heuristic|coverage]
 //   node scripts/e2e/playtest-bot.mjs --deckA=<path.json> --deckB=<path.json>   # two different decks
@@ -203,48 +203,8 @@ async function setupGame(browser, room, deckRowsA, deckRowsB, pageErrors) {
   await waitFor(a.page, () => window.__ptcg.zone('self', 'prizes').count === 6);
   await waitFor(b.page, () => window.__ptcg.zone('self', 'prizes').count === 6);
 
-  // Under SERVER_AUTHORITATIVE the server owns setup: it deals, sets the prizes and picks
-  // the first player, and no #rulesCoinCallOverlay is ever shown. The coin ritual below is
-  // legacy-only, and waiting on it against an authoritative server fails every run with
-  // "coin call overlay never opened" before a single action is taken. Ask the client which
-  // netcode is live rather than inferring it from a phase poll, which races with the server
-  // resolving the flip mid-loop.
-  const authoritative = await a.page.evaluate(() => window.__ptcg.isAuthoritative());
-  if (!authoritative) {
-    const callBtn = '#rulesCoinCallOverlay button[data-coin-call="heads"]';
-    const overlayDeadline = Date.now() + 30000;
-    let called = false;
-    let attempts = 0;
-    while (Date.now() < overlayDeadline && !called) {
-      attempts += 1;
-      // Belt and braces: even in legacy mode the flip can be resolved out from under this
-      // loop, leaving no overlay to click.
-      const phase = await a.page.evaluate(() => window.__ptcg.turnState().phase);
-      if (phase !== 'setup') {
-        called = true;
-        break;
-      }
-      await a.page.evaluate(() => window.__ptcg.nudgeCoinSetup());
-      await b.page.evaluate(() => window.__ptcg.nudgeCoinSetup());
-      for (const client of [a, b]) {
-        if (await client.page.locator(callBtn).isVisible().catch(() => false)) {
-          await client.page.locator(callBtn).click();
-          called = true;
-          break;
-        }
-      }
-      if (!called) await a.page.waitForTimeout(300);
-    }
-    if (!called) {
-      const [aTs, bTs] = await Promise.all([
-        a.page.evaluate(() => window.__ptcg.turnState()).catch((e) => String(e)),
-        b.page.evaluate(() => window.__ptcg.turnState()).catch((e) => String(e)),
-      ]);
-      throw new Error(
-        `coin call overlay never opened after ${attempts} attempts; aTurnState=${JSON.stringify(aTs)} bTurnState=${JSON.stringify(bTs)}`
-      );
-    }
-  }
+  // The server owns setup: it deals, sets the prizes and picks the first player, so there is
+  // no client coin ritual to drive here.
 
   // A mulligan (no Basic Pokémon in the opening hand — real decks can draw this, unlike the
   // guaranteed-Basic e2e fixture deck) redraws 7 and gives the opponent a bonus card, so a
@@ -254,12 +214,7 @@ async function setupGame(browser, room, deckRowsA, deckRowsB, pageErrors) {
   await waitFor(a.page, () => window.__ptcg.zone('self', 'hand').count >= 7);
   await waitFor(b.page, () => window.__ptcg.zone('self', 'hand').count >= 7);
 
-  // Design 004 targeted the legacy client path (now SERVER_AUTHORITATIVE=0),
-  // where turnPlayer is decided by a peer-to-peer coin flip and broadcast directly
-  // (rules-bridge.js's runTurnOrderCoinFlip) rather than confirmed by a pushed server
-  // view — turnState().fromServer never becomes true in this mode, unlike flip-gate-
-  // test.mjs's SERVER_AUTHORITATIVE=1 harness. requestView()/fromServer only matter
-  // under that other mode, so the sync point here is turnNumber ticking up instead.
+  // The sync point is turnNumber ticking up in the view each client pulls.
   await a.page.evaluate(() => window.__ptcg.requestView());
   await b.page.evaluate(() => window.__ptcg.requestView());
   await waitFor(a.page, () => window.__ptcg.turnState().turnNumber >= 1);

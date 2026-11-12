@@ -1,7 +1,7 @@
 // Regression: the multiplayer Reset button must stay clickable while a pending-choice
 // overlay (the starting-active picker) is open, including after View Board turns that
 // overlay see-through. The overlay used to cover the whole window, side menu included,
-// so Reset silently swallowed every click. Run against a SERVER_AUTHORITATIVE=1 server.
+// so Reset silently swallowed every click. Run against a running server.
 import { chromium } from 'playwright';
 
 const BASE = process.env.PTCG_URL || 'http://localhost:4000';

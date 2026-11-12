@@ -11,7 +11,7 @@ Active: user localhost checks — deck box deal (073 rev B: Set Up Both; rec-dec
   unconfirmed); first custom-set publish + Render check; older: 3D board H1-H3 (I266), TCG Live attack UI (074). No review on 078/079.
 Next: maintenance is due (`pnpm harness:check`: caps over, 250+ commits since the last maintain) → maintain.md. Then tune 079 from the
   user's verdict; I264, I259, 072 coin prompts, B&B run flow, I242, I239, I227; prune merged branches; ETB (057) slice 6 unstarted.
-Blocked: I85/I86 need design approval (028/029); I87 needs the user's description; I235 needs a face-down-card design.
+Blocked: 087 slices 3–5 (client rules layer, ~12 k lines) need the user's two decisions in the design; I85/I86 need design approval (028/029); I87 needs the user's description; I235 needs a face-down-card design.
 
 ## Watch-outs (≤5)
 - Gates after engine changes: `pnpm audit:oracle`, `audit:abilities`, `audit:trainers`,

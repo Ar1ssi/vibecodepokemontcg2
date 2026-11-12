@@ -1,9 +1,9 @@
-// Design 002 slice 3.12 — the flip gate. Plays a full 2-browser game with
-// SERVER_AUTHORITATIVE=1 (server owns rendering + gameplay resolution, per O4-A/D11) to a
+// Design 002 slice 3.12 — the flip gate. Plays a full 2-browser game (the server owns
+// rendering + gameplay resolution, per O4-A/D11) to a
 // real win condition, asserting per-turn cross-client hash agreement and zero cmdRejected.
 //
 // Usage:
-//   SERVER_AUTHORITATIVE=1 PORT=4100 node server/server.js &
+//   PORT=4100 node server/server.js &
 //   PTCG_URL=http://localhost:4100 node scripts/e2e/flip-gate-test.mjs
 //
 // Fixture deck (client/src/setup/general/e2e-mode.mjs): 20 uniquely named Basics, 60 HP,

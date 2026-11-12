@@ -232,9 +232,6 @@ Seven dark themes are available, with light-mode overrides per component. Ambien
   differing zone, and recovery routes into the same catch-up path.
 - The server emits advisory events for attacks, knockouts, and trainer plays, and each client
   phrases them for its own side in the battle log.
-- Without the flag the server is a relay and the clients sync through an action log. Rules mode
-  still works, but a few server-side behaviors listed under [Known limitations](#known-limitations)
-  are not enforced on this path.
 
 ### Game state import, export, and replay
 
@@ -279,9 +276,8 @@ attacks, trainers, abilities, stadiums, and special energy. It is served to the 
 `/shared`.
 
 Card data comes from the TCGdex API (`api.tcgdex.net/v2/en`) at runtime for search, set browsing,
-and art. No card database is bundled. The server is the authority by default; with
-`SERVER_AUTHORITATIVE=0` it is a relay and clients own the game state, the legacy mode kept until
-its client rules layer is retired.
+and art. No card database is bundled. The server is always the authority: it runs the rules and
+each client renders the views it sends.
 
 ## Project layout
 
@@ -310,13 +306,12 @@ docs/                   Deep reference docs (taxonomy, netcode audit, parsing gu
 | `node --test <glob>`                                   | Run a subset, e.g. `node --test "shared/**/*.test.mjs"`.                    |
 | `pnpm lint`                                            | ESLint 9 over the repo.                                                     |
 | `pnpm format`                                          | Prettier over `**/*.{js,json,md}`.                                          |
-| `pnpm test:2p`                                         | Playwright two-browser sync/room harness (server on `:4000`).               |
 | `pnpm test:flip`                                       | Server-authoritative full-game "flip gate" (`:4100`, authoritative server). |
 | `pnpm test:inspector`                                  | Card-inspector UI end-to-end (`:4100`, authoritative server).               |
 | `node scripts/e2e/playtest-bot.mjs --games=N --seed=S` | Bot-vs-bot soak; writes replayable dumps to `out/playtest/` on failure.     |
 | `node scripts/e2e/integration-test.mjs`                | jsdom integration test of the deck builder (no server needed).              |
 
-Other one-off harnesses live in `scripts/e2e/`: `two-player-sync-test.mjs`, `flip-gate-test.mjs`,
+Other one-off harnesses live in `scripts/e2e/`: `flip-gate-test.mjs`,
 `test-card-inspector-e2e.mjs`, `coin-flip-visual-test.mjs`, `room-change-reset-test.mjs`,
 `room-rejoin-reset-test.mjs`, `join-deck-sync-test.mjs`, `browser-test.mjs`, `explore-ui.mjs`, and
 `fullview-test.mjs`.
@@ -328,7 +323,6 @@ Environment variables:
 | Variable               | Default                        | Purpose                                                                           |
 | ---------------------- | ------------------------------ | --------------------------------------------------------------------------------- |
 | `PORT`                 | `4000`                         | HTTP port.                                                                        |
-| `SERVER_AUTHORITATIVE` | on                             | Server-authoritative protocol; `0`, `false`, `off` or `no` runs the legacy relay. |
 | `PTCG_E2E`             | off                            | Arm the `?e2e=1` test bridge; also armed whenever `NODE_ENV` is not `production`. |
 | `NODE_ENV`             | none                           | `production` closes the `?e2e=1` test bridge (also set on the deploy config).     |
 | `ROOM_GRACE_MS`        | 30 minutes                     | How long an empty room is kept before the sweep.                                  |
@@ -353,9 +347,8 @@ involved. They cover the pure engine (state, reducer, commands, attacks, trainer
 stadiums, special energy, zones, hashing, redaction), the `GameRoom`, the client's pure modules
 (deck builder, netcode adapters, models, image logic), and the bot.
 
-Four Playwright harnesses in `scripts/e2e/` drive real browsers against a manually started server:
-`two-player-sync-test.mjs` for legacy sync, `flip-gate-test.mjs` and `test-card-inspector-e2e.mjs`
-for server-authoritative full-game gates, and `coin-flip-visual-test.mjs` for the turn-order
+Three Playwright harnesses in `scripts/e2e/` drive real browsers against a manually started server:
+`flip-gate-test.mjs` and `test-card-inspector-e2e.mjs` for full-game gates, and `coin-flip-visual-test.mjs` for the turn-order
 ceremony.
 
 The corpus audits, `scripts/audit-*.mjs`, classify and parse every
@@ -369,8 +362,8 @@ pre-existing assertion in `client/src/setup/rules/__tests__/card-inspector-model
 
 ## Deployment
 
-`render.yaml` defines two services. `ptcg-sim` is production, with `NODE_ENV=production` and
-`SERVER_AUTHORITATIVE=1`. `ptcg-sim-staging` is a clone with `PTCG_E2E=1` so the Playwright bot can
+`render.yaml` defines two services. `ptcg-sim` is production, with `NODE_ENV=production`.
+`ptcg-sim-staging` is a clone with `PTCG_E2E=1` so the Playwright bot can
 drive a real deploy:
 
 ```bash
@@ -388,9 +381,7 @@ only for the 30-day state-export feature, so a restart drops exported links but 
   rooms cap at two players plus spectators.
 - Small-scale by design. No clustering, rate limiting, or durable game persistence, so an
   in-progress game is lost if the server restarts.
-- Legacy parity gaps. With `SERVER_AUTHORITATIVE=0`, GX once-per-game and Fossil Item bench
-  placement are not enforced client-side. Further engine-level gaps are tracked in
-  `.agent/ISSUES.md`.
+- Engine-level gaps are tracked in `.agent/ISSUES.md`.
 - Long-tail card effects. A small number of exotic printed effects are recognized and announced but
   must be played manually.
 
