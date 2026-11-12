@@ -1,5 +1,5 @@
 # 087: Retire the legacy relay — the server always runs the rules
-Status: building — slices 1–2 built 2026-11-12 on the user's go-ahead ("higher risk, do them yourself"); slice 3 struck by the user's decision 1 (D246); what the no-room board becomes is open (§ No-room board)
+Status: building — slices 1–2 built 2026-11-12 on the user's go-ahead ("higher risk, do them yourself"); slice 3 struck by the user's decision 1 (D246); the no-room board is left as is and tracked (I283)
 Date: 2026-11-12 · Session: cleanup after the 2026-11-12 size audit (I251 step 2)
 
 ## Problem
@@ -94,7 +94,7 @@ clicked: `loadFixtureDeck` both sides → local zones deck 20/20, mat empty; Set
 deck 14 / prizes 6, chat prints "Both players are ready", the client "Call the coin" prompt opens,
 and the mat still shows no cards. Clicking the Solo tab joins `solo-…` and the board draws. Design
 074 § Deviations knew the page "still boots on the local board"; nothing draws that board (I283).
-Open choice (user): (a) join the solo room at page load, so "outside a multiplayer room" is the solo
+The user picked (c) on 2026-11-12: leave it, tracked as I283. The choices were: (a) join the solo room at page load, so "outside a multiplayer room" is the solo
 room; (b) keep the local rules and give three.js a second model source built from the local zones;
 (c) leave it and tell the player to click Solo.
 

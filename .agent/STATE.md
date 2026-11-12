@@ -9,9 +9,9 @@ Focus: all 25 Stadium boards restyled per the 084 visual audit (D236): night boa
 Active: user localhost checks — deck box deal (073 rev B: Set Up Both; rec-deck-box.mjs), 084 on all 25 Stadium boards, 085's Scorched Earth and Vitality rework (`?stadiumEnv=<key>`, both cameras); attack FX on all
   types (known: water spray reads icy, psychic rings large, Pin Missile needles small, impact centres can blow out, leaf orientation
   unconfirmed); first custom-set publish + Render check; older: 3D board H1-H3 (I266), TCG Live attack UI (074). No review on 078/079.
-Next: maintenance is due (`pnpm harness:check`: caps over, 250+ commits since the last maintain) → maintain.md. Then tune 079 from the
+Next: I283 (P1: the no-room board draws no cards; user chose to track it, client rules layer stays, D246). Maintenance is due (`pnpm harness:check`: caps over, 250+ commits since the last maintain) → maintain.md. Then tune 079 from the
   user's verdict; I264, I259, 072 coin prompts, B&B run flow, I242, I239, I227; prune merged branches; ETB (057) slice 6 unstarted.
-Blocked: I283 (the no-room board draws no cards) needs the user's pick in design 087 § No-room board; client rules layer stays (D246); I85/I86 need design approval (028/029); I87 needs the user's description; I235 needs a face-down-card design.
+Blocked: I85/I86 need design approval (028/029); I87 needs the user's description; I235 needs a face-down-card design.
 
 ## Watch-outs (≤5)
 - Gates after engine changes: `pnpm audit:oracle`, `audit:abilities`, `audit:trainers`,
