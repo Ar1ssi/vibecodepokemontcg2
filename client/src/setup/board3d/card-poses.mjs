@@ -234,7 +234,7 @@ export function stadiumCardPose(model, layout) {
   return pose && { ...pose, face: 'front', hidden: false };
 }
 
-/** mat-ambient.css "Board card hover lift": `scale: 1.045` about the card's bottom edge. */
+/** The old DOM mat ambient "Board card hover lift": `scale: 1.045` about the card's bottom edge. */
 export const BOARD_HOVER_SCALE = 1.045;
 /** Its `drop-shadow(0 6px 8px …)`: the scene's shadow grows with height, so the card rises. */
 export const BOARD_HOVER_LIFT_PX = 6;

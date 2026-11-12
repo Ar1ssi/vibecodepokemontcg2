@@ -15,7 +15,7 @@ const BADGE_FONT = 0.5;
 const BADGE_GAP_BEFORE = 0.06;
 const BADGE_GAP_AFTER = 0.15;
 // Rough advance of one bold digit/"x" and the pill's side padding, in em
-// (energy-token.css): only places the next token, so a near guess is enough.
+// (the old DOM energy token): only places the next token, so a near guess is enough.
 const BADGE_CHAR_EM = 0.62;
 const BADGE_PADDING_EM = 0.5;
 

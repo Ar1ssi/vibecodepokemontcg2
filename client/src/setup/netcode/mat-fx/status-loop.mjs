@@ -3,7 +3,7 @@
 // on an overlay beside the card in its zone, reconciled from the view by
 // apply-view.js like the condition markers. Pure: which conditions show, where
 // the box goes, and each part's layout and timing as CSS text. The DOM twin is
-// status-loop.js; textures, paint and keyframes are in status-marker.css.
+// status-loop.js; textures, paint and keyframes are in the old DOM status-marker styles.
 //
 // A Unity emitter becomes a fixed number of parts, each replaying one particle
 // on a cycle: `period` is the time between its particles, `life` how long each

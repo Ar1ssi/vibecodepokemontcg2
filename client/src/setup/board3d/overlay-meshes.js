@@ -3,15 +3,15 @@
 // attached-Energy token row with its "Nx" badges, the held-condition idle loop, and the
 // selection ring, glow ring and mat-pick outline. Every overlay is a plane parented to its
 // card's mesh, so it tilts and tweens with the card. Placement comes from overlay-plan.mjs and
-// status-loop-frame.mjs; looks follow the stylesheets the iframe board uses (damage-counter.css,
-// status-marker.css, energy-token.css, the `.self-tab`/`.opp-tab`, `.selectHighlight`,
+// status-loop-frame.mjs; looks follow the stylesheets the iframe board uses (the old DOM damage counter,
+// the old DOM status marker, energy token, the `.self-tab`/`.opp-tab`, `.selectHighlight`,
 // `.has-glow` rules, and mat-picker.js's outline).
 //
 // Frames, as on the iframe board: the counter, markers, tab and tokens are placed on the card's
 // FOOTPRINT (apply-view measures the turned card's bounding box), upright in its seat's frame,
 // so they undo the server `rotation` but keep the far seat's 180°; rings hug the card itself;
 // the idle loop's card parts turn with the card and its sky parts stay upright on the screen.
-// The Tera crystal skin (mat-fx/tera-skin.js, css/mat-ambient.css) rides the card's face: tint,
+// The Tera crystal skin (mat-fx/tera-skin.js, the old DOM mat ambient styles) rides the card's face: tint,
 // facets, sheen, rim glow and glints, put on by `setUiState(id, { teraSkin: palette | null })`.
 // `three` is the namespace from `import('three')`; this module never imports it statically.
 import { textureUrlFor } from '../gl/card-art-hosts.mjs';
@@ -24,7 +24,7 @@ import { TERA_SKIN_LOOK, teraGlintFrame, teraRimOpacity, teraSheenLeft, teraSkin
 
 const DEG = Math.PI / 180;
 const ASSETS = '/src/assets';
-/** damage-counter.css: one TCG Live orange coin for every amount (the tier classes no longer change it). */
+/** The old DOM damage counter: one TCG Live orange coin for every amount (the tier classes no longer change it). */
 const COUNTER_ART = `${ASSETS}/damage-counter/counter-flat.webp`;
 /** The coin's darker underside, shown under it like the CSS `::before` (shifted 11 %, scaled 0.9). */
 const COUNTER_BACK_ART = `${ASSETS}/damage-counter/counter-back.webp`;
@@ -35,7 +35,7 @@ const BADGE_ART = {
   poison: `${ASSETS}/status-markers/poison-badge.webp`,
   burn: `${ASSETS}/status-markers/burn-badge.webp`,
 };
-/** status-marker.css: the rotation-condition marker's colours, with apply-view's codes. */
+/** The old DOM status marker: the rotation-condition marker's colours, with apply-view's codes. */
 const CONDITION_MARKER = {
   Asleep: { code: 'A', background: '#3b8dad', color: '#fff' },
   Paralyzed: { code: 'PA', background: '#f4d03f', color: '#111' },
@@ -546,7 +546,7 @@ export function createOverlayMeshes({
       order: LAYER.counterBack.order,
     });
     addMesh(entry, root, disc, holdArt(COUNTER_ART).material, { x, y, z: LAYER.counter.z, w: size, h: size, order: LAYER.counter.order });
-    // damage-counter.css: font-size = card width / 6 (half the coin), heavy, stroked, dropped shadow.
+    // The old DOM damage counter: font-size = card width / 6 (half the coin), heavy, stroked, dropped shadow.
     const fontPx = size / 2;
     addCanvasPlane(entry, root, size * 1.4, size, (ctx) => {
       ctx.font = fontOf(fontPx, 900);
@@ -584,7 +584,7 @@ export function createOverlayMeshes({
     if (plan.conditionLabel) {
       const look = CONDITION_MARKER[plan.conditionLabel.text] ?? { ...DEFAULT_MARKER, code: plan.conditionLabel.text };
       const [u, v] = plan.conditionLabel.anchor;
-      // status-marker.css: a filled circle with an inset shade; apply-view sizes the code at width / 4.
+      // The old DOM status marker: a filled circle with an inset shade; apply-view sizes the code at width / 4.
       const fontPx = box.w / 4;
       addCanvasPlane(entry, root, size, size, (ctx) => {
         ctx.beginPath();
@@ -629,7 +629,7 @@ export function createOverlayMeshes({
     row.tokens.forEach((token, i) => {
       const { src, double } = ordered[i];
       entry.art.push(src);
-      // energy-token.css: single tokens are round-cropped discs; two-orb tokens keep their square art.
+      // The old DOM energy token: single tokens are round-cropped discs; two-orb tokens keep their square art.
       addMesh(entry, root, double ? plane : disc, holdArt(src).material, {
         x: token.anchor[0] * box.w,
         y: token.anchor[1] * box.h,
@@ -716,7 +716,7 @@ export function createOverlayMeshes({
     poseLoop(entry.loop, frozenAt ?? now);
   };
 
-  // ── the Tera crystal skin, on the card's face (css/mat-ambient.css `.fx-tera-crystal__*`).
+  // ── the Tera crystal skin, on the card's face (the old DOM mat ambient styles, `.fx-tera-crystal__*`).
   /** The card's rounded box, white on black: the sheen's alpha map (the rotator clips the strip). */
   const cardMaskTexture = (w, h) => {
     const { canvas, ctx } = makeCanvas(w, h);

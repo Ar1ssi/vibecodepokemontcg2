@@ -1,7 +1,7 @@
 // The held-condition idle loop (mat-fx/status-loop.mjs) evaluated at a time, for the three.js
 // board, which paints the parts on a canvas instead of animating DOM nodes (design 074 §D3
 // "Overlays in scene"). Pure: reproduces the CSS that status-loop.mjs's part styles drive in
-// status-marker.css — the `status-fx-life-<k>` fade windows, `status-fx-rock`, and the
+// the old DOM status-marker styles — the `status-fx-life-<k>` fade windows, `status-fx-rock`, and the
 // `status-fx-step-x/-y` flipbook steps — so a part sits, fades, drifts, grows, rocks and steps
 // exactly as on the iframe board. Lengths are card widths; y points down the card (as
 // status-loop.mjs's parts do).
@@ -11,7 +11,7 @@ import { CARD_ASPECT } from '../netcode/mat-fx/status-units.mjs';
 const FX = '/src/assets/status-fx';
 
 /**
- * How each sprite is painted (status-marker.css `.status-fx-part--<sprite>`): `multiply` = the
+ * How each sprite is painted (the old DOM status-marker styles, `.status-fx-part--<sprite>`): `multiply` = the
  * sheet times the tint, cut to the sheet's alpha; `alpha` = the tint cut to the sheet's alpha;
  * `luma` = the tint cut to the sheet's brightness; `wisp` = `luma` times a radial falloff;
  * `self` = the sheet cut to its own brightness; `radial` = a radial falloff in the tint.

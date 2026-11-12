@@ -1,20 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import {
-  LOOP_WINDOWS,
-  STATUS_LOOP_PARTS,
   loopPart,
   loopPartStyle,
   loopWindowFor,
   statusLoopBox,
   statusLoopKeys,
 } from '../status-loop.mjs';
-import { STATUS_CONDITION_KEYS } from '../sfx-cues.mjs';
 
 const near = (a, b, eps = 1e-3) => Math.abs(a - b) < eps;
-const css = readFileSync(fileURLToPath(new URL('../../../../css/status-marker.css', import.meta.url)), 'utf8');
 
 test('statusLoopKeys: Poison and Burn stack with the rotation condition, in Checkup order', () => {
   assert.deepEqual(statusLoopKeys({ poisoned: true, burned: true, specialCondition: 'Asleep' }), [
@@ -25,22 +19,6 @@ test('statusLoopKeys: Poison and Burn stack with the rotation condition, in Chec
   assert.deepEqual(statusLoopKeys({ specialCondition: 'Confused' }), ['confusion']);
   assert.deepEqual(statusLoopKeys({}), []);
   assert.deepEqual(statusLoopKeys(null), []);
-});
-
-test('every condition key has a loop of parts the stylesheet can paint', () => {
-  for (const key of Object.values(STATUS_CONDITION_KEYS)) {
-    const parts = STATUS_LOOP_PARTS[key];
-    assert.ok(parts?.length > 0, `no loop for ${key}`);
-    for (const part of parts) {
-      assert.ok(['card', 'sky'].includes(part.layer));
-      assert.ok(css.includes(`.status-fx-part--${part.sprite} `), `no paint for ${part.sprite}`);
-      assert.ok(part.period > 0 && part.w > 0 && part.h > 0, `${key} ${part.sprite}`);
-    }
-  }
-});
-
-test('every window a part can snap to has its keyframes in the sheet', () => {
-  for (const k of LOOP_WINDOWS) assert.ok(css.includes(`@keyframes status-fx-life-${k} {`), `life-${k}`);
 });
 
 test('loopWindowFor: snaps a particle life to the nearest period / k', () => {

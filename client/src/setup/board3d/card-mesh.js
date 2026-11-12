@@ -28,7 +28,7 @@ import { OCCLUDER_LAYER } from './fx/fx-layers.mjs';
 import { createTween, easeOutCubic } from './tween.mjs';
 
 const DEG = Math.PI / 180;
-/** mat-ambient.css `.mat-holo .card__rotator { transition: transform 0.12s ease-out }`, as a time constant. */
+/** The old DOM mat ambient styles: `.mat-holo .card__rotator { transition: transform 0.12s ease-out }`, as a time constant. */
 const HOVER_TILT_TAU_MS = 40;
 const HOVER_TILT_SNAP_DEG = 0.01;
 /** Material group indices of every card geometry. */
@@ -552,7 +552,7 @@ export function createCardMeshPool({
       'XZY'
     );
     if (card.tilt) applyTilt(target, card.tilt, tiltDeg);
-    // mat-ambient.css's holo tilt, `rotateY(x) rotateX(y)` about the card itself (its y is up).
+    // the old DOM mat ambient holo tilt, `rotateY(x) rotateX(y)` about the card itself (its y is up).
     if (hoverTilt && card.hoverTilt) {
       target.rotateY(card.hoverTilt.x * DEG);
       target.rotateX(-card.hoverTilt.y * DEG);
