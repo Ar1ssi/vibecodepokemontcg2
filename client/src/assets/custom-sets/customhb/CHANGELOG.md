@@ -1,6 +1,6 @@
 # Homebrew: changelog
 
-Changes from each printed card, 2026-11-07 06:22.
+Changes from each printed card, 2026-11-12 20:35.
 
 ## Weedle (me04-001)
 
@@ -556,8 +556,8 @@ Changes from each printed card, 2026-11-07 06:22.
 ## Blacephalon (sm12-104)
 
 - Restyled as a Mega Evolution card
-- HP: 110 → 100
-- Attack Fireworks Bomb: name: Fireworks Bomb → Mind Blown; text: “Put 4 damage counters on your opponent’s Pokémon in any way you like. If your opponent has exactly 3 Prize cards remaining, put 12 damage counters on them instead.” → “You may put 5 damage counters on this Pokémon. If you do, put 12 damage counters on your opponent’s Pokémon in any way you like. Otherwise, put 5 damage counters on your opponent’s Pokémon in any way you like.”
+- HP: 110 → 90
+- Attack Fireworks Bomb: name: Fireworks Bomb → Mind Blown; damage: none → 100; text: “Put 4 damage counters on your opponent’s Pokémon in any way you like. If your opponent has exactly 3 Prize cards remaining, put 12 damage counters on them instead.” → “You may put 5 damage counters on this Pokémon. If you do, this attack does 30 damage to each of your opponent’s Benched Pokémon.”
 
 ## Bulbasaur (sv03.5-001)
 
@@ -581,7 +581,7 @@ Changes from each printed card, 2026-11-07 06:22.
 ## Scizor ex (sv05-111)
 
 - HP: 270 → 160
-- Attack Steel Wing: damage: 70 → 60; text: “During your opponent’s next turn, this Pokémon takes 50 less damage from attacks (after applying Weakness and Resistance).” → “During your opponent’s next turn, this Pokémon takes 30 less damage from attacks (after applying Weakness and Resistance).”
+- Attack Steel Wing: cost: {C}{C} → {M}{M}; damage: 70 → 60; text: “During your opponent’s next turn, this Pokémon takes 50 less damage from attacks (after applying Weakness and Resistance).” → “During your opponent’s next turn, this Pokémon takes 30 less damage from attacks (after applying Weakness and Resistance).”
 - Attack Cross Breaker: cost: {M}{M} → {M}{M}{C}{C}; damage: 120× → 90×; text: “Discard up to 2 {M} Energy from this Pokémon. This attack does 120 damage for each card you discarded in this way.” → “Discard up to 2 {M} Energy from this Pokémon. This attack does 90 damage for each card you discarded in this way.”
 
 ## Scizor (sv03-141)
@@ -1275,6 +1275,7 @@ Changes from each printed card, 2026-11-07 06:22.
 
 ## Lucario (sv01-114)
 
+- Type: Fighting → Fighting / Metal
 - Attack Accelerating Stab: text: “During your next turn, this Pokémon can’t use Accelerating Stab.” → “Flip a coin. If heads, draw 3 cards. If tails, attach an Energy card from your discard pile to 1 of your Benched Pokémon.”
 - Resistance: none → Darkness -30
 - Illustrator: “Nurikabe” → none
@@ -1289,9 +1290,9 @@ Changes from each printed card, 2026-11-07 06:22.
 
 - Restyled as a Mega Evolution card
 - HP: 140 → 130
-- Type: Water → Fighting
+- Type: Water → Fighting / Water
 - Ability added: Unseen Fist: “Attacks used by this Pokémon bypass all forms of immunity and damage reduction.”
-- Attack Rapid-Fisted Rush: name: Rapid-Fisted Rush → Surging Strikes; cost: {W}{C} → {F}{W}; text: “This attack does 30 damage for each of your Rapid Strike Pokémon in play.” → “Flip a coin for each of your {F} or {W} Pokémon in play. This attack does 20 damage for each heads.”
+- Attack Rapid-Fisted Rush: name: Rapid-Fisted Rush → Surging Strikes; cost: {W}{C} → {F}{W}; text: “This attack does 30 damage for each of your Rapid Strike Pokémon in play.” → “Flip a coin for each of your {F} or {W} Pokémon in play. This attack does 30 damage for each heads.”
 - Weakness: Lightning ×2 → Psychic ×2
 - Resistance: none → Darkness -30
 
@@ -1299,10 +1300,10 @@ Changes from each printed card, 2026-11-07 06:22.
 
 - Restyled as a Mega Evolution card
 - HP: 140 → 130
-- Type: Darkness → Fighting
+- Type: Darkness → Fighting / Darkness
 - Ability added: Unseen Fist: “Attacks used by this Pokémon bypass all forms of immunity and damage reduction.”
 - Attack Field Crush: cost: {D}{C} → {F}
-- Attack Fists of Strife: name: Fists of Strife → Wicked Blow; cost: {D}{D}{C} → {F}{F}{D}; text: “If this Pokémon has any damage counters on it, this attack does 100 more damage.” → “If this Pokémon has any damage counters on it, this attack does 50 more damage.”
+- Attack Fists of Strife: name: Fists of Strife → Wicked Blow; cost: {D}{D}{C} → {F}{F}{D}; text: “If this Pokémon has any damage counters on it, this attack does 100 more damage.” → “This attack does 20 more damage for each additional {D} Energy attached to this Pokémon.”
 - Weakness: Grass ×2 → Fairy ×2
 - Resistance: none → Psychic -30
 
@@ -1312,8 +1313,10 @@ Changes from each printed card, 2026-11-07 06:22.
 
 ## Hippowdon (sv10-106)
 
-- HP: 160 → 140
+- HP: 160 → 150
 - Attack Ram: text: none → “Discard the top card of your opponent’s deck.”
+- Attack Super Sandstorm: cost: {F}{F}{C} → {F}{F}{C}{C}; damage: 150 → 140; text: “This attack also does 40 damage to each Benched Pokémon that has any damage counters on it (both yours and your opponent’s). (Don’t apply Weakness and Resistance for Benched Pokémon.)” → “Your opponent’s Active Pokémon can no longer retreat.”
+- Attack added: {C} Recover: “Discard an Energy from this Pokémon and heal all damage from it.”
 - Resistance: none → Lightning -30
 - Illustrator: “Minahamu” → none
 
@@ -1439,6 +1442,10 @@ Changes from each printed card, 2026-11-07 06:22.
 - Attack Dark Feather: name: Dark Feather → Oblivion Wing; text: none → “Heal 30 damage from this Pokémon.”
 - Illustrator: “akagi” → none
 
+## Perilous Jungle (sv05-156)
+
+- Text: “During Pokémon Checkup, put 2 more damage counters on each Poisoned non-{D} Pokémon (both yours and your opponent’s).” → “During Pokémon Checkup, put 1 damage counter on each non-{D} Pokémon affected by a Special Condition (both yours and your opponent’s).”
+
 ## Dark City (sm11-193)
 
 - Restyled as a Scarlet & Violet Trainer
@@ -1531,7 +1538,7 @@ Changes from each printed card, 2026-11-07 06:22.
 
 ## Tapu Koko (sv08-065)
 
-- Attack Summon Lightning: text: “Search your deck for up to 2 {L} Pokémon, reveal them, and put them into your hand. Then, shuffle your deck.” → “Search your deck for any combination of 2 {L} Pokémon and Basic Energy, reveal them, and put them into your hand. Then, shuffle your deck.”
+- Attack Summon Lightning: text: “Search your deck for up to 2 {L} Pokémon, reveal them, and put them into your hand. Then, shuffle your deck.” → “Search your deck for any combination of up to 2 {L} Pokémon and Basic Energy cards, reveal them, and put them into your hand. Then, shuffle your deck.”
 - Resistance: none → Dragon -30
 - Illustrator: “Souichirou Gunjima” → none
 
@@ -1636,7 +1643,7 @@ Changes from each printed card, 2026-11-07 06:22.
 ## Welder (sm10-189)
 
 - Restyled as a Scarlet & Violet Trainer
-- Text: “Attach up to 2 {R} Energy cards from your hand to 1 of your Pokémon. If you do, draw 3 cards.” → “Attach a {R} Energy cards from your hand to 1 of your Pokémon. If you do, draw 2 cards.”
+- Text: “Attach up to 2 {R} Energy cards from your hand to 1 of your Pokémon. If you do, draw 3 cards.” → “Attach a {R} Energy card from your hand to 1 of your Pokémon. If you do, draw 2 cards.”
 
 ## Kiawe (sm3-116)
 
@@ -1821,6 +1828,7 @@ Changes from each printed card, 2026-11-07 06:22.
 ## Poison Barb (sm1-124)
 
 - Restyled as a Scarlet & Violet Trainer
+- Text: “If the Pokémon this card is attached to is your Active Pokémon and is damaged by an opponent’s attack (even if this Pokémon is Knocked Out), the Attacking Pokémon is now Poisoned.” → “If the Pokémon this card is attached to is a {D} Pokémon, heal 10 damage from that Pokémon during Pokémon Checkup. Otherwise, that Pokémon takes 20 damage during Pokémon Checkup.”
 
 ## Roller Skates (xy4-103)
 
@@ -2177,11 +2185,12 @@ Changes from each printed card, 2026-11-07 06:22.
 ## Mega Lucario ex (me02.5-113)
 
 - HP: 340 → 200
+- Type: Fighting → Fighting / Metal
 - Stage: Stage 1 → Mega
 - Evolves from: Riolu → Lucario
 - Mega Evolution rule: added
 - Attack Aura Jab: damage: 130 → 80; text: “Attach up to 3 Basic {F} Energy cards from your discard pile to your Benched Pokémon in any way you like.” → “Attach up to 2 Basic {F} Energy cards from your discard pile to your Benched Pokémon in any way you like.”
-- Attack Mega Brave: cost: {F}{F} → {F}{F}{C}; damage: 270 → 180
+- Attack Mega Brave: cost: {F}{F} → {F}{F}{C}{C}; damage: 270 → 210
 - Weakness: Psychic ×2 → Fighting ×2
 - Resistance: none → Darkness -30
 
@@ -2331,6 +2340,8 @@ Changes from each printed card, 2026-11-07 06:22.
 ## Porygon (sv04-142)
 
 - HP: 60 → 50
+- Attack Data Displacement: text: “Flip a coin. If heads, move an Energy from your opponent’s Active Pokémon to 1 of their Benched Pokémon.” → “Flip a coin. If heads, move 1 Energy from your opponent’s Active Pokémon to 1 of your opponent’s Benched Pokémon.”
+- Weakness: Fighting ×2 → none
 
 ## Porygon2 (sv04-143)
 
@@ -2342,6 +2353,7 @@ Changes from each printed card, 2026-11-07 06:22.
 ## Porygon-Z (sv04-144)
 
 - HP: 150 → 130
+- Ability Buggy Turbo: text: “Once during your turn, you may flip a coin. If heads, attach up to 4 Basic Energy cards from your discard pile to this Pokémon. If tails, discard an Energy from this Pokémon.” → “Once during your turn, you may flip a coin. If heads, attach a Basic Energy card from your discard pile to this Pokémon. If tails, discard an Energy from this Pokémon.”
 - Weakness: Fighting ×2 → none
 - Retreat: 2 → 1
 
@@ -2415,7 +2427,6 @@ Changes from each printed card, 2026-11-07 06:22.
 - Ability added: Unified Defense: “Whenever you are damaged by an attack, take 10 less damage for each Pokémon with the Ability Unified Defense in play.”
 - Attack Icicle: cost: {W}{C} → {W}
 - Resistance: none → Water -30
-- Retreat: 3 → 2
 
 ## Regirock (sv09-082)
 
@@ -2423,14 +2434,12 @@ Changes from each printed card, 2026-11-07 06:22.
 - Ability Rock Armor: name: Rock Armor → Unified Defense; text: “If this Pokémon has any Energy attached, it takes 30 less damage from attacks (after applying Weakness and Resistance).” → “Your Pokémon take 10 less damage from your opponent’s attacks for each Pokémon with the Ability Unified Defense in play.”
 - Attack Breaching Lariat: cost: {F}{F}{F} → {F}{F}{C}
 - Resistance: none → Lightning -30
-- Retreat: 3 → 2
 
 ## Registeel (sv08-125)
 
 - HP: 130 → 110
 - Ability added: Unified Defense: “Your Pokémon take 10 less damage from your opponent’s attacks for each Pokémon with the Ability Unified Defense in play.”
 - Attack Raging Hammer: damage: 60+ → 20+
-- Retreat: 3 → 2
 
 ## Regieleki (swsh10-051)
 
@@ -2595,7 +2604,7 @@ Changes from each printed card, 2026-11-07 06:22.
 - Stage: Stage 2 → Tera
 - Evolves from: Dragonair → Dragonite
 - Attack Wing Attack: name: Wing Attack → Air Cutter; damage: 70 → none; text: none → “This attack does 40 damage to 1 of your opponent’s Pokémon. (Don’t apply Weakness and Resistance for Benched Pokémon.)”
-- Attack Mighty Meteor: name: Mighty Meteor → Fly; cost: {W}{L} → {C}{C}{C}; damage: 140+ → 100; text: “Flip a coin. If heads, this attack does 140 more damage. If tails, during your next turn, this Pokémon can’t attack.” → “During your opponent’s next turn, if their Active Pokémon tries to attack, your opponent flips a coin. If tails, this Pokémon takes no damage.”
+- Attack Mighty Meteor: name: Mighty Meteor → Fly; cost: {W}{L} → {C}{C}{C}{C}; damage: 140+ → 100; text: “Flip a coin. If heads, this attack does 140 more damage. If tails, during your next turn, this Pokémon can’t attack.” → “During your opponent’s next turn, if their Active Pokémon tries to attack, your opponent flips a coin. If tails, this Pokémon takes no damage.”
 
 ## Froslass (sv06-053)
 
@@ -2666,9 +2675,9 @@ Changes from each printed card, 2026-11-07 06:22.
 
 ## Technical Machine: Devolution (sv04-177)
 
-- Name: Technical Machine: Devolution → Technical Machine: Confuse
-- Text: “The Pokémon this card is attached to can use the attack on this card. (You still need the necessary Energy to use this attack.) If this card is attached to 1 of your Pokémon, discard it at the end of your turn.” → “The Pokémon this card is attached to can use the attack on this card. (You still need the necessary Energy to use this attack.)”
-- Attack Devolution: name: Devolution → Confuse; text: “Devolve each of your opponent’s evolved Pokémon by putting the highest Stage Evolution card on it into your opponent’s hand.” → “Your opponent’s Active Pokémon is now Confused.”
+- Name: Technical Machine: Devolution → Technical Machine: Trick
+- Text: “The Pokémon this card is attached to can use the attack on this card. (You still need the necessary Energy to use this attack.) If this card is attached to 1 of your Pokémon, discard it at the end of your turn.” → “The Pokémon this card is attached to can use the attack on this card. (You still need the necessary Energy to use this attack.) The Pokémon this card is attached to can have 1 more Pokémon Tool attached to it.”
+- Attack Devolution: name: Devolution → Trick; text: “Devolve each of your opponent’s evolved Pokémon by putting the highest Stage Evolution card on it into your opponent’s hand.” → “Move the Pokémon Tool attached to this Pokémon to your opponent’s Active Pokémon. If that Pokémon already has a Pokémon Tool attached to it, discard that Pokémon Tool and attach the moved Pokémon Tool to it instead.”
 
 ## Technical Machine: Evolution (sv04-178)
 
@@ -2785,8 +2794,10 @@ Changes from each printed card, 2026-11-07 06:22.
 ## Mega Zygarde ex (me03-047)
 
 - HP: 310 → 200
+- Type: Fighting → Fighting / Dragon
 - Stage: Basic → Mega
 - Evolves from: none → Zygarde
+- Mega Evolution rule: added
 - Attack Gaia Wave: cost: {F}{F}{F} → {F}{F}; damage: 200 → 90
 - Attack Nullifying Zero: damage: none → 130; text: “For each of your opponent’s Pokémon, flip a coin. If heads, this attack does 150 damage to that Pokémon. (Don’t apply Weakness and Resistance for Benched Pokémon.)” → “For each of your opponent’s Pokémon, flip a coin. If heads, this attack does 100 damage to that Pokémon. (Don’t apply Weakness and Resistance for Benched Pokémon.)”
 - Weakness: Grass ×2 → Dragon ×2
@@ -2821,7 +2832,7 @@ Changes from each printed card, 2026-11-07 06:22.
 - Restyled as a Mega Evolution card
 - HP: 90 → 70
 - Attack Shout of Power: cost: {G} → {Y}; text: “Attach a basic Energy card from your discard pile to 1 of your Benched Pokémon.” → “Attach a Basic Energy card from your discard pile to 1 of your Benched Pokémon.”
-- Attack Speed Attack: cost: {G}{F} → {Y}{D}; damage: 70 → 50
+- Attack Speed Attack: cost: {G}{F} → {Y}{D}; damage: 70 → 40
 
 ## Zygarde (swsh3.5-28)
 
@@ -2937,8 +2948,8 @@ Changes from each printed card, 2026-11-07 06:22.
 
 - Restyled as a Scarlet & Violet ex card
 - HP: 220 → 150
-- Attack Metal Coating: name: Metal Coating → Energy Loop; cost: {C} → {M}{M}
-- Attack Temporal Rupture: cost: {M}{M}{M}{C} → {M}{M}{M}{M}{M}; damage: 180 → none; text: none → “Shuffle this Pokémon and all attached cards into your deck. Your opponent shuffles their Active Pokémon and all attached cards into their deck.”
+- Attack Metal Coating: name: Metal Coating → Time Sickness; cost: {C} → {M}{M}; text: “Attach up to 2 Metal Energy cards from your discard pile to this Pokémon.” → “If your opponent’s Active Pokémon is a Basic Pokémon, put 1 damage counter on it during Pokémon Checkup. If your opponent’s Active Pokémon is an Evolution Pokémon, put 2 damage counters on it during Pokémon Checkup. This effect lasts until your opponent’s Active Pokémon is switched out.”
+- Attack Temporal Rupture: name: Temporal Rupture → Temporal Freeze; cost: {M}{M}{M}{C} → {M}{M}{M}{C}{C}; damage: 180 → 70; text: none → “Neither player can attack or retreat during their next turn. Trainer cards and Abilities can’t affect either Active Pokémon.”
 
 ## Palkia (sv04-040)
 
@@ -3014,13 +3025,16 @@ Changes from each printed card, 2026-11-07 06:22.
 
 - Restyled as a Mega Evolution card
 - HP: 130 → 110
+- Attack Burning Icicles: text: “If this Pokémon has any Fire Energy attached to it, this attack does 20 damage to 2 of your opponent’s Benched Pokémon. (Don’t apply Weakness and Resistance for Benched Pokémon.)” → “If this Pokémon has any {F} Energy attached to it, this attack does 20 damage to 2 of your opponent’s Benched Pokémon. (Don’t apply Weakness and Resistance for Benched Pokémon.)”
 - Attack Blizzard Burn: name: Blizzard Burn → Fusion Flare
+- Resistance: none → Grass -30
 
 ## Black Kyurem (xyp-XY160)
 
 - Restyled as a Mega Evolution card
 - HP: 130 → 110
 - Attack Frosty Thunder: name: Frosty Thunder → Fusion Bolt; text: “If this Pokémon has any Lightning Energy attached to it, this attack does 20 damage to each of your opponent’s Benched Pokémon. (Don’t apply weakness and Resistance for Benched Pokémon.)” → “If this Pokémon has any {L} Energy attached to it, this attack does 20 damage to each of your opponent’s Benched Pokémon. (Don’t apply Weakness and Resistance for Benched Pokémon.)”
+- Resistance: none → Grass -30
 
 ## Kyurem (bwp-BW44)
 
@@ -3098,9 +3112,11 @@ Changes from each printed card, 2026-11-07 06:22.
 ## Arceus V (swsh9-122)
 
 - Restyled as a Scarlet & Violet ex card
-- HP: 220 → 150
+- HP: 220 → 140
 - Ability added: Multitype: “This Pokémon’s type changes based on the most recently attached Energy.”
+- Attack Power Edge: cost: {C}{C}{C} → {C}{C}{C}{C}; damage: 130 → 110
 - Attack removed: {C}{C} Trinity Charge: “Search your deck for up to 3 basic Energy cards and attach them to your Pokémon V in any way you like. Then, shuffle your deck.”
+- Weakness: Fighting ×2 → none
 
 ## Deoxys (me04-031)
 
@@ -3203,39 +3219,45 @@ Changes from each printed card, 2026-11-07 06:22.
 - Evolves from: none → Rayquaza
 - Mega Evolution rule: added
 - Ability removed: Ruler’s Roar: “Once during your turn, when you play this Pokémon from your hand onto your Bench, you may use this Ability. Look at the top 4 cards of your deck and attach a Basic Energy card you find there to this Pokémon. Shuffle the other cards and put them on the bottom of your deck.”
-- Attack Storm Emerald: name: Storm Emerald → Meteor Shower; cost: {R}{L}{C} → {R}{L}; damage: 50× → none; text: “This attack does 50 damage for each {R} Energy and each {L} Energy attached to all of your Pokémon.” → “This attack does 30 damage to each of your opponent’s Pokémon. (Don’t apply Weakness and Resistance for Benched Pokémon.)”
+- Attack Storm Emerald: name: Storm Emerald → Meteor Shower; cost: {R}{L}{C} → {R}{L}; damage: 50× → none; text: “This attack does 50 damage for each <span class="energy-symbol Fire" title="Fire">Fire</span> Energy and each <span class="energy-symbol Lightning" title="Lightning">Lightning</span> Energy attached to all of your Pokémon.” → “This attack does 30 damage to each of your opponent’s Pokémon. (Don’t apply Weakness and Resistance for Benched Pokémon.)”
 - Attack added: {R}{L}{C}{C} Dragon Ascent 170: “During your opponent’s next turn, this Pokémon takes 50 more damage from attacks.”
 - Attack added: {R}{W}{L}{G}{C} V-Create 180
 - Weakness: Lightning ×2 → Dragon ×2
+- Illustrator: “takuyoa” → none
 
 ## Mega Golisopod ex (me06-011)
 
 - HP: 340 → 180
 - Type: Grass → Grass / Metal
-- Stage: Stage 1 → Mega
-- Evolves from: Wimpod → Golisopod
+- Stage: Basic → Mega
+- Evolves from: none → Golisopod
 - Mega Evolution rule: added
 - Attack Finishing Blow: name: Finishing Blow → First Impression; damage: 60+ → 140; text: “If your opponent’s Active Pokémon already has any damage counters on it, this attack does 160 more damage.” → “You can use this attack only if this Pokémon moved into your Active Spot this turn.”
 - Attack Quadruple Hold: cost: {C}{C}{C} → {G}{C}{C}; damage: 160 → 100
 - Resistance: none → Dragon -30
+- Illustrator: “5ban Graphics” → none
 
 ## Mega Malamar ex (me06-069)
 
 - HP: 320 → 170
 - Type: Darkness → Darkness / Psychic
+- Stage: Basic → Stage 1
+- Evolves from: none → Inkay
 - Mega Evolution rule: added
 - Attack Psychic Marionette: damage: 70× → 30×; text: “This attack does 70 damage for each of your opponent’s Benched Pokémon.” → “This attack does 30 damage for each of your opponent’s Benched Pokémon.”
 - Attack Eerie Wave: damage: 200 → 120; text: “Your opponent’s Active Pokémon is now Confused.” → “Your opponent’s Active Pokémon is now Asleep.”
 - Resistance: none → Psychic -30
+- Illustrator: “5ban Graphics” → none
 
 ## Mega Golurk ex (me06-047)
 
 - HP: 350 → 250
 - Type: Psychic → Psychic / Fighting
-- Stage: Stage 1 → Mega
-- Evolves from: Golett → Golurk
+- Stage: Basic → Mega
+- Evolves from: none → Golurk
 - Mega Evolution rule: added
 - Attack Goliath’s Punch: damage: 300 → 200
+- Illustrator: “5ban Graphics” → none
 
 ## Malamar V (swsh2-121)
 
@@ -3257,6 +3279,7 @@ Changes from each printed card, 2026-11-07 06:22.
 ## Golett (me06-046)
 
 - HP: 90 → 80
+- Illustrator: “Hideki Ishikawa” → none
 
 ## Golisopod ex (sv04-050)
 
@@ -3268,6 +3291,11 @@ Changes from each printed card, 2026-11-07 06:22.
 ## Wimpod (me06-010)
 
 - HP: 70 → 60
+- Illustrator: “Jerky” → none
+
+## Inkay (me06-068)
+
+- Illustrator: “kawayoo” → none
 
 ## Malamar (me05-052)
 
@@ -3296,8 +3324,11 @@ Changes from each printed card, 2026-11-07 06:22.
 
 ## Jellicent (me06-028)
 
+- Evolves from: none → Frillish
+- Ability Deep Sea Draw: text: “Once during your turn, you may use this Ability.		Draw a card. If you do, you may put a card from your hand on the bottom of your deck.” → “Once during your turn, you may use this Ability. Draw a card. If you do, you may put a card from your hand on the bottom of your deck.”
 - Attack Gentle Slap: name: Gentle Slap → Water Gun; cost: {W}{C}{C} → {W}{C}; damage: 100 → 70
 - Resistance: none → Fighting -30
+- Illustrator: “Nurikabe” → none
 
 ## Hop (swsh1-165)
 
@@ -3322,8 +3353,325 @@ Changes from each printed card, 2026-11-07 06:22.
 ## Garchomp (sma-SV40)
 
 - Restyled as a Mega Evolution card
+- Attack Quick Dive: name: Quick Dive → Crunch; cost: {C}{C} → {F}{C}; damage: none → 70; text: “This attack does 50 damage to 1 of your opponent’s Pokémon. (Don’t apply Weakness and Resistance for Benched Pokémon.)” → “Discard a Special Energy attached to your opponent’s Active Pokémon.”
+- Attack Royal Blades: name: Royal Blades → Dragon Dive; cost: {F}{C}{C} → {G}{F}{C}; damage: 100 → 120+; text: “If you played Cynthia from your hand during this turn, this attack does 100 more damage.” → “Flip a coin. If heads, this attack does 20 more damage. if tails, discard 1 Energy from this Pokémon.”
 
 ## Genesect (bwp-BW99)
+
+- Restyled as a Mega Evolution card
+
+## Excadrill (sv08-109)
+
+- HP: 120 → 110
+- Attack Drill Smash: name: Drill Smash → Rock Slide; damage: 60+ → 40; text: “If you have any {M} Pokémon on your Bench, this attack does 80 more damage.” → “Flip a coin. If heads, the opponent’s Active Pokémon cannot attack during their next turn.”
+- Resistance: none → Lightning -30
+
+## Broken Time-Space (pl1-104)
+
+- Restyled as a Scarlet & Violet Trainer
+
+## Peonia (swsh6-149)
+
+- Restyled as a Scarlet & Violet Trainer
+
+## V Guard Energy (swsh12-169)
+
+- Restyled as a Mega Evolution Energy
+- Name: V Guard Energy → Guard Energy
+- Text: “As long as this card is attached to a Pokémon, it provides {C} Energy. / The Pokémon this card is attached to takes 30 less damage from attacks from your opponent’s Pokémon V (after applying Weakness and Resistance). This effect can’t be applied more than once at a time to the same Pokémon.” → “As long as this card is attached to a Pokémon, it provides {C} Energy. / If the Pokémon this card is attached to doesn’t have a Rule Box, it takes 30 less damage from attacks from your opponent’s Pokémon ex. (after applying Weakness and Resistance). (Pokémon V, Pokémon ex etc. have Rule Boxes.) This effect can’t be applied more than once at a time to the same Pokémon.”
+
+## Memory Energy (sm8-194)
+
+- Restyled as a Mega Evolution Energy
+
+## Grafaiai (sv04.5-190)
+
+- Ability added: Trickster: “Once during your turn, if this Pokémon is in the Active Spot, you may move the Pokémon Tool attached to this Pokémon to your opponent’s Active Pokémon. If that Pokémon already has a Pokémon Tool attached to it, discard that Pokémon Tool and attach the moved Pokémon Tool to it instead.”
+- Attack removed: {D} Colorful Graffiti 40×: “You may discard as many Basic Energy cards as you like from your hand. This attack does 40 damage for each type of Basic Energy you discarded in this way.”
+- Resistance: none → Fairy -30
+
+## Shroodle (sv04.5-189)
+
+- Resistance: none → Fairy -30
+
+## Iron Defender (me01-118)
+
+- Name: Iron Defender → Iron Burden
+- Trainer type: Item → Tool
+- Text: “During your opponent’s next turn, all of your {M} Pokémon take 30 less damage from attacks from your opponent’s Pokémon (after applying Weakness and Resistance). (This includes new Pokémon that come into play.)” → “The Pokémon this card is attached to has its Retreat Cost increased by 2 {C} and its HP increased by 40. / The Pokémon this card is attached to can’t be switched out by an Ability or a Trainer card.”
+
+## Whimsicott (sm12-148)
+
+- Restyled as a Mega Evolution card
+- Ability added: Trickster: “Once during your turn, if this Pokémon is in the Active Spot, you may move the Pokémon Tool attached to this Pokémon to your opponent’s Active Pokémon. If that Pokémon already has a Pokémon Tool attached to it, discard that Pokémon Tool and attach the moved Pokémon Tool to it instead.”
+- Attack Sneaky Pocket: text: “Put a card from your hand in the Lost Zone. If you do, draw 3 cards.” → “Put a card from your hand in the discard pile. If you do, your opponent discards a card from their hand.”
+- Attack removed: {C}{C} Lost March 20×: “This attack does 20 damage for each of your Pokémon, except ◇ (Prism Star) Pokémon, in the Lost Zone.”
+
+## Sableye (sv04.5-184)
+
+- Type: Darkness → Darkness / Psychic
+- Ability added: Trickster: “Once during your turn, if this Pokémon is in the Active Spot, you may move the Pokémon Tool attached to this Pokémon to your opponent’s Active Pokémon. If that Pokémon already has a Pokémon Tool attached to it, discard that Pokémon Tool and attach the moved Pokémon Tool to it instead.”
+- Attack Night Eyes: cost: {C} → {D}
+- Attack removed: {D} Unseen Claw 20+: “If your opponent’s Active Pokémon is affected by a Special Condition, this attack does 70 more damage.”
+- Weakness: Grass ×2 → Fairy ×2
+- Resistance: none → Fighting -30
+
+## Sableye (sv02-136)
+
+- Type: Darkness → Darkness / Psychic
+- Ability added: Trickster: “Once during your turn, if this Pokémon is in the Active Spot, you may move the Pokémon Tool attached to this Pokémon to your opponent’s Active Pokémon. If that Pokémon already has a Pokémon Tool attached to it, discard that Pokémon Tool and attach the moved Pokémon Tool to it instead.”
+- Attack Night Eyes: cost: {C} → {D}
+- Attack removed: {D} Unseen Claw 20+: “If your opponent’s Active Pokémon is affected by a Special Condition, this attack does 70 more damage.”
+
+## Steven’s Resolve (sm7-145)
+
+- Restyled as a Scarlet & Violet Trainer
+- Text: “Search your deck for up to 3 cards and put them into your hand. Then, shuffle your deck. Your turn ends.” → “Flip 2 coins. For each heads, shuffle a card from your discard pile back into your deck.”
+
+## Genesect ex (sv10.5b-067)
+
+- HP: 220 → 150
+- Ability Metallic Signal: name: Metallic Signal → Drive Change; text: “Once during your turn, you may search your deck for up to 2 Evolution {M} Pokémon, reveal them, and put them into your hand. Then, shuffle your deck.” → “Once during your turn (before your attack), you may put a Pokémon Tool card attached to this Pokémon into your hand.”
+- Attack Protect Charge: name: Protect Charge → Rapid Blaster; cost: {M}{M}{C} → {M}{M}{M}; damage: 150 → 100+; text: “During your opponent’s next turn, this Pokémon takes 30 less damage from attacks (after applying Weakness and Resistance).” → “Discard as many Metal Energy attached to this Pokémon as you like. This attack does 20 more damage for each Energy card discarded in this way.”
+
+## Hatenna (swsh4.5sv-SV054)
+
+- Restyled as a Mega Evolution card
+
+## Hattrem (swsh4.5sv-SV055)
+
+- Restyled as a Mega Evolution card
+- Attack Calm Mind: name: Calm Mind → Spiral Drain; cost: {C} → {P}; damage: none → 30
+- Attack removed: {C}{C} Brutal Swing 30+: “Flip a coin. If heads, this attack does 30 more damage.”
+
+## Hatterene (swsh4.5sv-SV056)
+
+- Restyled as a Mega Evolution card
+- Ability Mind Hat: name: Mind Hat → Magic Bounce; text: “Once during your turn, you may use this Ability. Each player discards a card from their hand. (Your opponent discards first.)” → “This Pokémon can’t be affected by any Special Conditions. If an effect would make this Pokémon Asleep, Burned, Confused, Paralyzed, or Poisoned, your opponent’s Active Pokémon is affected by that Special Condition instead.”
+- Attack Dripping Grudge: name: Dripping Grudge → Psychic; cost: {P} → {C}{C}; damage: none → 30+; text: “Put 1 damage counter on your opponent’s Active Pokémon for each Pokémon in your discard pile.” → “This attack does 50 more damage for each Energy attached to your opponent’s Active Pokémon.”
+
+## Dreepy (swsh4.5sv-SV060)
+
+- Restyled as a Mega Evolution card
+- Type: Psychic → Dragon
+- Attack Quick Attack: name: Quick Attack → Petty Grudge; text: “Flip a coin. If heads, this attack does 10 more damage.” → none
+- Attack added: {R}{P} Bite 40
+
+## Drakloak (swsh4.5sv-SV061)
+
+- Restyled as a Mega Evolution card
+- Ability added: Recon Directive: “Once during your turn, you may look at the top 2 cards of your deck and put 1 of them into your hand. Put the other card on the bottom of your deck.”
+- Attack Summon: name: Summon → Dragon Headbutt; cost: {C} → {R}{P}; damage: none → 70; text: “Search your deck for a Dreepy and put it onto your Bench. Then, shuffle your deck.” → none
+- Attack removed: {P}{P} Bite 40
+
+## Dragapult (swsh4.5sv-SV062)
+
+- Restyled as a Mega Evolution card
+- HP: 150 → 140
+- Type: Psychic → Dragon
+- Ability Infiltrator: text: “If any damage is done to this Pokémon by attacks, flip a coin. If heads, prevent that damage.” → “This Pokémon’s attacks ignore Resistance.”
+- Attack Phantom Force: cost: {P}{P} → {P}{R}; damage: 120 → 90
+
+## Corviknight (swsh4.5sv-SV089)
+
+- Restyled as a Mega Evolution card
+- HP: 170 → 150
+- Attack Peck: name: Peck → Accelerate; cost: {C} → {M}
+- Attack Iron Wings: name: Iron Wings → Brave Bird; text: “You may discard 2 Energy from this Pokémon. If you do, during your opponent’s next turn, this Pokémon takes 100 less damage from attacks (after applying Weakness and Resistance).” → “This Pokémon does 30 damage to itself.”
+- Resistance: Fighting -30 → Dragon -30
+
+## Rookidee (swsh4.5sv-SV101)
+
+- Restyled as a Mega Evolution card
+
+## Corvisquire (swsh4.5sv-SV102)
+
+- Restyled as a Mega Evolution card
+- HP: 80 → 100
+- Attack Pluck: name: Pluck → Fury Attack; cost: {C} → {C}{C}; damage: 20 → 30×; text: “Before doing damage, discard all Pokémon Tools from your opponent’s Active Pokémon.” → “Flip 3 coins. This attack does 30 damage for each heads”
+- Attack removed: {C}{C} Drill Peck 50
+
+## Inkay (sma-SV17)
+
+- Restyled as a Mega Evolution card
+
+## Malamar (sma-SV18)
+
+- Restyled as a Mega Evolution card
+- HP: 90 → 110
+- Type: Psychic → Darkness
+- Attack Psychic Sphere: name: Psychic Sphere → Perplex; cost: {P}{P}{C} → {D}; damage: 60 → none; text: none → “Your opponent’s Active Pokémon is now Confused.”
+- Attack added: {D} Brain Crush 100: “If your opponent’s Active Pokémon isn’t Confused, this attack does nothing.”
+- Weakness: Psychic ×2 → Grass ×2
+
+## Riolu (sma-SV21)
+
+- Restyled as a Mega Evolution card
+
+## Lucario (sma-SV22)
+
+- Restyled as a Mega Evolution card
+- Type: Fighting → Fighting / Metal
+- Ability Precognitive Aura: text: “Once during your turn (before your attack), if you have Garchomp in play, you may search your deck for a card and put it into your hand. Then, shuffle your deck.” → “Once during your turn, you may have your opponent reveal a Trainer card in their hand.”
+- Attack Missile Jab: damage: 70 → 90
+- Weakness: Psychic ×2 → Fighting ×2
+- Resistance: none → Darkness -30
+
+## Magnemite (sma-SV27)
+
+- Restyled as a Mega Evolution card
+
+## Magneton (sma-SV28)
+
+- Restyled as a Mega Evolution card
+
+## Magnezone (sma-SV29)
+
+- Restyled as a Mega Evolution card
+- HP: 150 → 140
+- Ability Magnetic Circuit: text: “As often as you like during your turn (before your attack), you may attach a Metal Energy card from your hand to 1 of your Pokémon.” → “As often as you like during your turn (before your attack), you may attach a {M} Energy card from your hand to 1 of your Pokémon.”
+
+## Ralts (sma-SV34)
+
+- Restyled as a Mega Evolution card
+- HP: 60 → 50
+
+## Kirlia (sma-SV35)
+
+- Restyled as a Mega Evolution card
+- HP: 80 → 70
+- Attack Smack: name: Smack → Magical Draw; cost: {C} → {Y}{C}; damage: 20 → 30; text: none → “Draw a card.”
+- Attack Magical Shot: name: Magical Shot → Psychic; cost: {Y}{C} → {Y}{P}{C}; damage: 30 → 60+; text: none → “This attack does 20 more damage for each Energy attached to your opponent’s Active Pokémon.”
+
+## Gible (sma-SV38)
+
+- Restyled as a Mega Evolution card
+- Attack Ascension: name: Ascension → Sand Attack; text: “Search your deck for a card that evolves from this Pokémon and put it onto this Pokémon to evolve it. Then, shuffle your deck.” → “If the Defending Pokémon tires to attak during your opponent’s next turn, your opponent flips a coin. If tails, that attack does nothing.”
+- Attack added: {G}{C} Knock Away 20
+- Resistance: none → Lightning -30
+
+## Gabite (sma-SV39)
+
+- Restyled as a Mega Evolution card
+- Ability added: Dragon Call: “Once during your turn (before you attack), you may search your deck for a {N} Pokémon, reveal it, and put it into your hand. Shuffle your deck afterward.”
+- Attack Ascension: name: Ascension → Dragonslice; cost: {F} → {F}{G}; damage: none → 50; text: “Search your deck for a card that evolves from this Pokémon and put it onto this Pokémon to evolve it. Then, shuffle your deck.” → none
+- Attack removed: {C}{C} Slash 40
+- Resistance: none → Lightning -30
+
+## Energy Switch (bw11-112)
+
+- Restyled as a Scarlet & Violet Trainer
+- Text: “Move a basic Energy from 1 of your Pokémon to another of your Pokémon.” → “Move a Basic Energy from 1 of your Pokémon to another of your Pokémon.”
+
+## Energy Switch (xy3-89)
+
+- Restyled as a Scarlet & Violet Trainer
+- Text: “Move a basic Energy from 1 of your Pokémon to another of your Pokémon.” → “Move a Basic Energy from 1 of your Pokémon to another of your Pokémon.”
+
+## Tyranitar (sv09-095)
+
+- HP: 190 → 150
+- Attack Cracking Stomp: cost: {D}{C} → {D}{D}{D}{C}
+- Attack added: {D} Tyrant’s Quake: “This attack does 20 damage to each of your opponent’s Pokémon (Do not apply Weakness and Resistance to Benched Pokémon).”
+
+## Metang (sv09-062)
+
+- HP: 100 → 90
+- Attack Psypunch: name: Psypunch → Optimized Compute; damage: 30 → none; text: none → “Draw 2 cards.”
+
+## Paldean Tauros (sv08-018)
+
+- HP: 130 → 110
+- Type: Fire → Fire / Fighting
+- Attack Spirited Tackle: text: “If your opponent’s Active Pokémon is a Stage 1 Pokémon, this attack does 90 more damage.” → “If your opponent’s Active Pokémon is an Evolution Pokémon, this attack does 30 more damage.”
+- Weakness: Water ×2 → Fighting ×2
+- Resistance: none → Darkness -30
+
+## Paldean Tauros (sv08-039)
+
+- HP: 130 → 100
+- Type: Water → Water / Fighting
+- Attack Upthrusting Horns: text: “You may put 2 Energy attached to your opponent’s Active Stage 2 Pokémon into their hand.” → “You may put 2 Energy attached to your opponent’s Active Pokémon into their hand.”
+- Attack Jet Headbutt: cost: {W}{W}{C} → {W}{C}{C}; text: none → “If this Pokémon has any {F} Energy attached, discard a random card from your opponent’s hand.”
+- Resistance: none → Darkness -30
+
+## Power Memory (xy10-108)
+
+- Restyled as a Scarlet & Violet Trainer
+- Text: “The Zygarde-EX this card is attached to can also use the attack on this card. (You still need the necessary Energy to use this attack.)” → “The Zygarde this card is attached to can also use the attack on this card. (You still need the necessary Energy to use this attack.)”
+- Attack All Cells Burn: name: All Cells Burn → All Cells Grow; cost: {F}{F}{C} → {F}; damage: 200 → none; text: “Discard 3 Energy attached to this Pokémon.” → “Search your deck for a Pokémon Tool card and an Energy card, and attach them to this Pokémon. Then, shuffle your deck.”
+
+## G Scope (bw10-93)
+
+- Restyled as a Scarlet & Violet Trainer
+- Text: “The Genesect-EX this card is attached to can also use the attack on this card. (You still need the necessary Energy to use this attack.)” → “The Genesect this card is attached to can also use the attack on this card. (You still need the necessary Energy to use this attack.)”
+
+## G Booster (bw10-92)
+
+- Restyled as a Scarlet & Violet Trainer
+- Attack G Booster: cost: {G}{G}{C} → {G}{G}{C}{C}; text: “Discard 2 Energy attached to this Pokémon. This attack’s damage isn’t affected by any effects on the Defending Pokémon.” → “Discard 3 Energy attached to this Pokémon. This attack’s damage isn’t affected by any effects on the Defending Pokémon.”
+
+## Crystal Wall (bw7-139)
+
+- Restyled as a Scarlet & Violet Trainer
+- Text: “If this card is attached to Black Kyurem-EX, its maximum HP is 300.” → “If this card is attached to Black Kyurem, its maximum HP is 200.”
+
+## Crystal Edge (bw7-138)
+
+- Restyled as a Scarlet & Violet Trainer
+- Text: “If this card is attached to White Kyurem-EX, each of its attacks does 50 more damage to the Active Pokémon (before applying Weakness and Resistance).” → “If this card is attached to White Kyurem, each of its attacks do 50 more damage to the Active Pokémon (before applying Weakness and Resistance).”
+
+## Rock Guard (bw9-108)
+
+- Restyled as a Scarlet & Violet Trainer
+
+## Life Dew (bw9-107)
+
+- Restyled as a Scarlet & Violet Trainer
+
+## Genesect (sm10-127)
+
+- Restyled as a Mega Evolution card
+- HP: 130 → 110
+- Ability Fast-Flight Configuration: text: “If your opponent has any Pokémon-GX or Pokémon-EX in play, this Pokémon has no Retreat Cost.” → “If your opponent has any Pokémon ex in play, this Pokémon has no Retreat Cost.”
+
+## Genesect (bwp-BW101)
+
+- Restyled as a Mega Evolution card
+- Attack Breaker Bazooka: damage: 100 → 140; text: “Discard all Grass Energy attached to this Pokémon.” → “Discard all {G} Energy attached to this Pokémon.”
+
+## Alolan Ninetales (smp-SM128)
+
+- Restyled as a Mega Evolution card
+- Attack Smash Kick: cost: {C}{C} → {Y}{W}
+- Attack Spiral Drain: cost: {Y}{Y}{C} → {Y}{W}{C}; damage: 80 → 90; text: “Heal 30 damage from this Pokémon.” → “Discard an Energy from your opponent’s Active Pokémon.”
+
+## Boss's Orders (Giovanni) (swsh2-154)
+
+- Restyled as a Scarlet & Violet Trainer
+
+## Boss's Orders (Lysandre) (swsh4.5-58)
+
+- Restyled as a Scarlet & Violet Trainer
+
+## Boss's Orders (swsh9-132)
+
+- Restyled as a Scarlet & Violet Trainer
+
+## Aegislash (xy1-85)
+
+- Restyled as a Mega Evolution card
+
+## Aegislash (xy1-86)
+
+- Restyled as a Mega Evolution card
+
+## Bronzong (xy10-61)
+
+- Restyled as a Mega Evolution card
+- Ability Metal Fortress: name: Metal Fortress → Metal Links; text: “Prevent all effects of your opponent’s attacks, including damage, done to your Benched Pokémon.” → “Once during your turn (before your attack), you may attach a {M} Energy card from your discard pile to 1 of your Benched Pokémon.”
+
+## Bronzor (xy4-60)
 
 - Restyled as a Mega Evolution card
 
@@ -3347,7 +3695,6 @@ Changes from each printed card, 2026-11-07 06:22.
 - Grimsley's Move (me02-090)
 - Dark Bell (me05-075)
 - Janine's Secret Art (sv08.5-112)
-- Perilous Jungle (sv05-156)
 - Electric Generator (sv01-170)
 - Levincia (sv09-150)
 - Canari (me02.5-185)
@@ -3419,9 +3766,21 @@ Changes from each printed card, 2026-11-07 06:22.
 - Energy Search (me03-072)
 - Snorunt (me02.5-046)
 - Galvantula (sv04-065)
-- Inkay (me06-068)
 - Exp. Share (sv01-174)
 - Tera Orb (sv08-189)
 - Nemona (sv01-180)
 - Cutiefly (sv05-075)
 - Brave Bangle (sv10.5w-080)
+- Medical Energy (sv04-182)
+- Pawniard (sv04.5-185)
+- Bisharp (sv04.5-186)
+- Kingambit (sv04.5-187)
+- Sneasel (sv04.5-182)
+- Weavile (sv04.5-183)
+- Scizor (sv04.5-191)
+- Scyther (sv04.5-095)
+- Riolu (sv04.5-173)
+- Lucario (sv04.5-174)
+- Energy Switch (sv01-173)
+- Beldum (sv09-061)
+- Boss's Orders (me02.5-183)
