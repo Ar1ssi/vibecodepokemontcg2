@@ -99,6 +99,7 @@ import { playCoinFlipCeremony } from './coin-flip-ceremony.js';
 import { coinCeremonyTimeline } from '../netcode/mat-fx/coin-pose.mjs';
 import { holdFxQueueUntil, whenFxQueueIdle } from '../netcode/advisory-animations.js';
 import { afterOpeningDeal } from '../netcode/mat-fx/deck-box-gate.mjs';
+import { enrichWithinBound } from './bounded-enrichment.mjs';
 import { playFxSound, playUiCue } from '../netcode/mat-fx/fx-audio.js';
 import {
   hasAuthoritativeView,
@@ -811,8 +812,8 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
     const getBasicPokemonFromHand = async (user) => {
       const hand = liveZoneArray(user, 'hand');
       const basics = [];
+      await enrichWithinBound(hand, ensureCardData);
       for (const card of hand) {
-        await ensureCardData(card);
         if (!isTrainer(card) && !isEnergy(card) && (isBasicPokemon(card) || (card.stage || 'Basic') === 'Basic')) {
           basics.push(card);
         }

@@ -1365,6 +1365,16 @@ export function resolveAttackEffectPhase(draft, ctx) {
               attack,
             })
           : resolveAttackTargetClause(attack.text, parsed, spread);
+      // Homebrew Burning Icicles: "If this Pokémon has any {R} Energy attached to it, this attack
+      // does 20 damage to 2 of your opponent's Benched Pokémon." No such Energy, no snipe.
+      const energyGate = attackTarget
+        ? /^if this pok[eé]mon has any \{([a-z])\} energy attached(?: to it)?, this attack does/i.exec(
+            normalizeAttackText(attack.text, attackerView?.name)
+          )
+        : null;
+      if (energyGate && attachedEnergyOfType(draft, attacker, energyGate[1].toUpperCase()) === 0) {
+        attackTarget = null;
+      }
       // Blacephalon Mind Blown: the self-counter answer picks the spread's total.
       if (attackTarget?.distributable && optionalBonus?.counterSwap) {
         const { paid, unpaid } = optionalBonus.counterSwap;
