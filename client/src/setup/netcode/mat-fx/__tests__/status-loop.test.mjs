@@ -1,14 +1,27 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  STATUS_LOOP_PARTS,
   loopPart,
   loopPartStyle,
   loopWindowFor,
   statusLoopBox,
   statusLoopKeys,
 } from '../status-loop.mjs';
+import { STATUS_CONDITION_KEYS } from '../sfx-cues.mjs';
 
 const near = (a, b, eps = 1e-3) => Math.abs(a - b) < eps;
+
+test('every condition key has a loop of drawable parts', () => {
+  for (const key of Object.values(STATUS_CONDITION_KEYS)) {
+    const parts = STATUS_LOOP_PARTS[key];
+    assert.ok(parts?.length > 0, `no loop for ${key}`);
+    for (const part of parts) {
+      assert.ok(['card', 'sky'].includes(part.layer), `${key} ${part.sprite} layer`);
+      assert.ok(part.period > 0 && part.w > 0 && part.h > 0, `${key} ${part.sprite}`);
+    }
+  }
+});
 
 test('statusLoopKeys: Poison and Burn stack with the rotation condition, in Checkup order', () => {
   assert.deepEqual(statusLoopKeys({ poisoned: true, burned: true, specialCondition: 'Asleep' }), [

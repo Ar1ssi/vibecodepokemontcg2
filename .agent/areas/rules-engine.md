@@ -44,7 +44,7 @@ shared/engine/rules/attack-copy.mjs - copy-attack parser (`parseCopyAttack`: sou
 shared/engine/rules/each-filter.mjs - "each of your opponent's Pokémon that …" filters shared by counter-spread steps and reduce damage-each (design 036 A9)
 shared/engine/rules/turn-damage-bonus.mjs - Trainer/Ability "during this turn, your … attacks do N more damage" bonuses (`turnDamageBonusTotal`; possessive, per-Prize, Basic-only, instance-scoped)
 ## Opening coin flip (designs 013, 072)
-shared/engine/rules/rules-turnorder.mjs — deterministic coin-flip caller selection (flag-OFF 2P only since design 013)
+shared/engine/rules/rules-turnorder.mjs — deterministic coin-flip caller selection (no-room local board only: rooms use the server's turn order, designs 013/087)
 shared/engine/rules/turn-order-flip.mjs — pure opening-coin helpers in absolute playerId space: `flipCoinFace`, `pickCoinCaller`, `resolveCoinWinnerPlayerId`, `resolveStarterFromChoice`; the server authority's side of the coin call (D50, D212)
 server/game/turn-order-transport.mjs — opening coin over sockets (TCG Live StartingCoinFlip, design 072): call → `turnOrderFlip` → winner's `turnOrderChoice` → `turnOrderResult` + deal; answer timeouts, seat-lost auto answers, `replayTo` on rejoin. State lives on GameRoom.turnOrder; e2e: scripts/e2e/opening-coin-choice-test.mjs
 ## WotC legacy wording, classification, markers

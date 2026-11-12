@@ -9,7 +9,7 @@
 #   Next id = highest D number in this file and the archives + 1 (next: D247).
 
 - D246 2026-11-12 [client] The board outside a room stays (user): the client rules layer is its engine and is not deleted; 087 slice 3 struck. It draws nothing today (I283). (design 087)
-- D245 2026-11-12 [netcode] Legacy relay removed: the server always runs the rules; SERVER_AUTHORITATIVE opt-outs only log a warning. Client `serverAuthoritative` false = not in a room. (Supersedes D216; design 087)
+- D245 2026-11-12 [netcode] Legacy relay removed: the server always runs the rules; SERVER_AUTHORITATIVE opt-outs only warn; no shadow mode; room-sweep.mjs frees roomInfo past grace. (Supersedes D216; design 087)
 - D244 2026-11-09 [netcode] 073: the deck box id rides exchangeData/loadDeckData as a display-only param after format (PROTOCOL_VERSION 2.3.0); the opening coin waits for the deal (deck-box-gate).
 - D243 2026-11-09 [mat-fx] 073: deck boxes lie in the blurred band beside each deck and deal it at game start, drawn in the three.js board's table frame; lid = mesh cut at the cap groove + front flap.
 - D242 2026-11-09 [deck-builder] Homebrew Build & Battle is the 'homebrew' flow of the B&B tab (/homebrew-battle): customhb packs, Standard 60-card/6-Prize deck, ETB scene skinned as the 151 Ultra-Premium exterior. (design 086)

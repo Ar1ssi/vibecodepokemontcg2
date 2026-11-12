@@ -90,7 +90,6 @@ test('rng.advance reproduces skipping to the same cursor point', () => {
   assert.equal(skippedValue, directValue);
 });
 
-
 // Review finding 4: Will's one-shot force must release back to an inherited
 // all-flips force (Malamar Contrary), not shadow it with null.
 test('withForcedCoinOnce: the parent all-flips force survives the one shot', () => {
@@ -112,4 +111,3 @@ test('withForcedCoinOnce: the parent all-flips force survives the one shot', () 
   const overOnce = withForcedCoin(withForcedCoinOnce(createRng(5), 'heads'), 'tails');
   for (let i = 0; i < 4; i++) assert.equal(flipCoin(overOnce), 'tails');
 });
-

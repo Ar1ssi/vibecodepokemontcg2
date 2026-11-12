@@ -221,7 +221,7 @@ Seven dark themes are available, with light-mode overrides per component. Ambien
 - Rooms are identified by a code you enter or generate. Join as a player or as a spectator; two
   names hold the seats, and there are no accounts.
 - The opening deal runs only when both seated players have loaded decks and pressed Set Up.
-- By default (server authority), the Express and Socket.IO server owns one `GameState`, validates
+- The Express and Socket.IO server owns one `GameState`, validates
   and applies commands, and broadcasts a per-player redacted view. Turn player, turn number, and
   per-turn flags are reconciled from the server, so both clients agree.
 - Every command is appended to a deterministic log with a seeded RNG cursor, which powers undo
