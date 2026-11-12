@@ -55,4 +55,3 @@ const appGate = createOpeningDealGate();
 export const beginOpeningDeal = (ms) => appGate.begin(ms);
 export const endOpeningDeal = () => appGate.end();
 export const afterOpeningDeal = (fn) => appGate.afterOpeningDeal(fn);
-export const openingDealBusy = () => appGate.busy();

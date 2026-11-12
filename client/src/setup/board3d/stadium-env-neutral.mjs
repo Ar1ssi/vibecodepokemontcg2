@@ -40,7 +40,6 @@ export const NEUTRAL_KEY = 'neutralization-zone';
 export const NEUTRAL_LIGHT = Object.freeze([-0.12, 0.2, 0.97]);
 /** Free platform kept round every card footprint inside the rim; the rings' radii as shares of the platform's. */
 export const PLATFORM_MARGIN_PX = 24;
-export const RING_SHARES = Object.freeze([0.3, 0.46, 0.62, 0.78, 0.94]);
 export const MAX_BEAMS = 8;
 export const MAX_SCREENS = 4;
 /** Design 084: each column's base light on the floor round it. */

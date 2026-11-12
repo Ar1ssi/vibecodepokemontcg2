@@ -31,15 +31,6 @@ vec3 edgeHaze(vec3 col, vec2 uv, float floorShade) {
 }
 `;
 
-/** The normal, shaded sun and bake light every terrain fragment starts from (after the field and light reads). */
-export const SURFACE_LIGHT = /* glsl */ `
-vec3 surfaceNormal(vec4 light, float growth) {
-  vec2 nxy = light.rg * 2.0 - 1.0;
-  float nz = sqrt(max(1.0 - dot(nxy, nxy), 0.02));
-  return normalize(vec3(nxy / nz * growth, 1.0));
-}
-`;
-
 /**
  * Grass and reeds: `bladeFan(v, h, len)` is a fan of `blades` strokes out of a tuft's foot, as
  * (stroke 0..1, how far up the blade 0..1); v is the px offset from the foot, h the tuft's hash,

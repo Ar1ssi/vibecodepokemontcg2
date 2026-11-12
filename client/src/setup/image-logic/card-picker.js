@@ -1422,6 +1422,3 @@ export const openCarouselViewer = async ({
     decorate,
   });
 };
-
-export const isCarouselViewerOpen = isCardPickerOpen;
-export const closeCarouselViewer = closeCardPicker;

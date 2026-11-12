@@ -52,7 +52,6 @@ export const TIER_BAND = Object.freeze({ 1: [900, 1100], 2: [1200, 1500], 3: [16
 export const S_CONTACT = Object.freeze([900, 1200]);
 export const CONTACT_BAND = Object.freeze({ min: 0.38, max: 0.62, tier1Max: 0.7 });
 export const PAD_RANGE = Object.freeze([1.2, 2.6]);
-export const DEFAULT_PAD = 1.7;
 export const TONGUE_BUDGET = 30;
 export const PARTICLE_BUDGET = 28;
 export const MAX_BURSTS = 2;
