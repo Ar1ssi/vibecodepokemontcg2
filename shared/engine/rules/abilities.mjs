@@ -670,6 +670,22 @@ export function parseAbility(text = '') {
     ];
   }
 
+  // Doduo Two Minds: look at the bottom N cards of your deck, may move 1 of them to the top.
+  {
+    const twoMinds = lower.match(
+      /look at the bottom (\d+) cards of your deck\. you may move 1 of those cards to the top of your deck/
+    );
+    if (twoMinds) {
+      return [
+        {
+          type: 'bottomCardToTopAbility',
+          count: Number(twoMinds[1]),
+          guidance: `Once during your turn: look at the bottom ${twoMinds[1]} cards of your deck and you may move 1 of them to the top.`,
+        },
+      ];
+    }
+  }
+
   // ── 1. Search (deck → hand / bench) ─────────────────────────────────────
   if (
     lower.includes('search your deck') ||

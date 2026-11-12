@@ -4517,6 +4517,37 @@ export function moveToolToOpponent(ctx) {
   return null;
 }
 
+/**
+ * Homebrew Doduo Two Minds: look at the bottom 2 cards of your deck; you may move 1 of them to the
+ * top. Declining (an empty selection) leaves the deck as it was.
+ */
+function bottomCardToTopAbility(ctx) {
+  const { player, step } = ctx;
+  const deck = player.zones.deck || [];
+  if (deck.length === 0) return skip(ctx, 'empty_deck');
+  const viewed = deck.slice(-Math.min(step.count || 2, deck.length));
+  if (ctx.selection) {
+    const card = viewed.find((c) => c.instanceId === ctx.selection[0]);
+    if (!card) return null;
+    removeFromZones(player, card);
+    deck.unshift(card);
+    ctx.events.push({ type: 'cardMoved', instanceId: card.instanceId, from: 'deck', to: 'deck', playerId: player.playerId });
+    return null;
+  }
+  ctx.events.push({
+    type: 'cardsRevealed',
+    playerId: player.playerId,
+    revealedTo: player.playerId,
+    cards: viewed.map((c) => ({ instanceId: c.instanceId, name: c.name })),
+  });
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Ability')}: You may move 1 of the bottom ${viewed.length} cards of your deck to the top`,
+    options: viewed,
+    min: 0,
+    max: 1,
+  });
+}
+
 // ── I154: the parsed Trainer step kinds that had no server executor ───────
 
 /** Attached Energy a step's `energy` filter selects ('Special Energy' or any). */
@@ -6359,6 +6390,7 @@ export const EXTRA_STEP_HANDLERS = {
   selfAttachEnergyAbility,
   selfAttachToolAbility,
   moveToolToOpponentAbility: moveToolToOpponent,
+  bottomCardToTopAbility,
   fossilItem,
   searchOrRecover,
   returnPokemonToHand,
