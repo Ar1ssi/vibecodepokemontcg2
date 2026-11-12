@@ -162,3 +162,47 @@ test('candidate name falls back to the choice option when the record has no card
   assert.equal(req.candidates[0].name, 'Swinub');
   assert.equal(req.candidates[0].instanceId, 1);
 });
+
+// Peonia (Chilling Reign 149/196/219): "Put up to 3 Prize cards into your hand." The Prize pick is
+// blind, so the cards on the mat are the picker, not a menu of card backs.
+const PEONIA = {
+  prompt: 'Peonia: Choose up to 3 Prize card(s) to put into your hand',
+  options: [{ instanceId: 20 }, { instanceId: 21 }, { instanceId: 22 }, { instanceId: 23 }],
+  min: 0,
+  max: 3,
+};
+const prizeRecords = () => [20, 21, 22, 23].map((id) => record(id, 'prizes', 'Card Back'));
+
+test('a Peonia Prize pick maps every face-down Prize card to a mat candidate', () => {
+  const registry = registryOf(prizeRecords());
+  const req = buildMatPickerRequest(PEONIA, registry);
+
+  assert.ok(req, 'the Prize cards are click targets');
+  assert.equal(req.title, PEONIA.prompt);
+  assert.deepEqual(req.candidates.map((c) => c.instanceId), [20, 21, 22, 23]);
+  assert.equal(req.candidates[2].image, registry.get(22).element);
+  assert.equal(req.candidates[2].wrapper, registry.get(22).holoCard.wrapper);
+  assert.equal(req.min, 0);
+  assert.equal(req.max, 3, '"up to 3" stays a multi-pick');
+  assert.equal(req.cancellable, true, 'taking none is allowed');
+});
+
+test('a Prize pick with a missing element, or Prize cards mixed with other zones, is not a mat pick', () => {
+  assert.equal(
+    buildMatPickerRequest(PEONIA, registryOf([...prizeRecords().slice(0, 3), { instanceId: 23, zone: 'prizes' }])),
+    null
+  );
+  assert.equal(
+    buildMatPickerRequest(PEONIA, registryOf([...prizeRecords().slice(0, 3), record(23, 'hand')])),
+    null
+  );
+  assert.equal(
+    buildMatPickerRequest(PEONIA, registryOf([...prizeRecords().slice(0, 3), record(23, 'bench')])),
+    null
+  );
+});
+
+test('Peonia\'s second pick (hand cards to set as Prizes) is not a mat pick', () => {
+  const hand = { prompt: 'Peonia: Choose 2 card(s) from your hand to set face down as Prizes', options: [{ instanceId: 30 }, { instanceId: 31 }], min: 2, max: 2 };
+  assert.equal(buildMatPickerRequest(hand, registryOf([record(30, 'hand'), record(31, 'hand')])), null);
+});

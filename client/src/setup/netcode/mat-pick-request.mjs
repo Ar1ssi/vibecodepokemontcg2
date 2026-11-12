@@ -1,6 +1,6 @@
 /**
- * @file Maps a server PendingChoice whose options are all in-play Pokémon onto
- * the mat picker (the legacy click-the-card UI, D19).
+ * @file Maps a server PendingChoice whose options are all in-play Pokémon, or all
+ * face-down Prize cards (Peonia), onto the mat picker (the legacy click-the-card UI, D19).
  *
  * Pure and DOM-free so it runs under `node --test`; the browser adapter
  * (`mat-picker-adapter.js`) only forwards the result to `openMatPick`. The
@@ -21,6 +21,12 @@ function isInPlayPokemon(record) {
   return record.card?.attachedTo == null;
 }
 
+// A face-down Prize card on the mat (Peonia, Gladion). The pick is blind, so the player clicks the
+// Prize card itself rather than choosing among identical card backs in a menu.
+function isPrizeCard(record) {
+  return Boolean(record?.element) && record.zone === 'prizes';
+}
+
 /**
  * @param {object} choice PendingChoice from the authoritative view
  * @param {Map<number, {instanceId:number, element:any, zone:string, card?:object, holoCard?:object}>} registry
@@ -32,7 +38,9 @@ export function buildMatPickerRequest(choice, registry) {
   if (options.length === 0) return null;
 
   const records = options.map((opt) => registry?.get?.(opt.instanceId));
-  if (records.some((record) => !isInPlayPokemon(record))) {
+  // All in-play Pokémon, or all Prize cards: a mixed set has no single thing to click.
+  const pickingPrizes = records.every(isPrizeCard);
+  if (!pickingPrizes && !records.every(isInPlayPokemon)) {
     return null;
   }
 
@@ -44,7 +52,7 @@ export function buildMatPickerRequest(choice, registry) {
   const max = Math.max(min, Math.min(Math.max(maxRaw, 1), options.length));
 
   return {
-    title: choice.prompt || 'Choose a Pokémon',
+    title: choice.prompt || (pickingPrizes ? 'Choose a Prize card' : 'Choose a Pokémon'),
     candidates: records.map((record, i) => ({
       instanceId: record.instanceId ?? options[i].instanceId,
       name: record.card?.name || options[i].name || '',

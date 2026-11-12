@@ -2615,3 +2615,74 @@ test('069: the end screen names the winner to a spectator watching the winning s
   const title = doc.getElementById('netcodeEndModal').querySelector('.game-end-modal-title');
   assert.equal(title.textContent, 'Ash Wins!');
 });
+
+// Peonia (Chilling Reign): the first pick is "up to 3 Prize cards into your hand". The cards are
+// face down, so the player clicks the Prize cards on the mat instead of using the grid modal.
+const PEONIA_CHOICE = {
+  choiceId: 'choice_p1_peonia_3',
+  player: 'p1',
+  prompt: 'Peonia: Choose up to 3 Prize card(s) to put into your hand',
+  options: [20, 21, 22, 23].map((instanceId) => ({ instanceId, faceDown: true })),
+  min: 0,
+  max: 3,
+  cancellable: false,
+  resumeToken: { effectType: 'trainer', initiatorPlayerId: 'p1' },
+};
+
+const peoniaView = (stateVersion, pendingChoice = null) => ({
+  stateVersion,
+  pendingChoice,
+  you: {
+    playerId: 'p1',
+    zones: {
+      active: [{ instanceId: 10, name: 'Swinub', src: '/s.png' }],
+      prizes: [20, 21, 22, 23].map((instanceId) => ({ instanceId })),
+    },
+  },
+  them: { playerId: 'p2', zones: {} },
+});
+
+test('mat choice: a Peonia Prize pick opens the mat picker over the Prize cards, not the grid modal', async () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const matPicker = fakeChoicePicker();
+  const choicePicker = fakeChoicePicker();
+  const resolved = [];
+  const opts = {
+    document: doc,
+    getZone: mockGetZone,
+    cardBackSrc: 'cardback.png',
+    matPicker,
+    choicePicker,
+    onResolveChoice: (sel) => resolved.push(sel),
+  };
+
+  applyView(peoniaView(1), [], opts);
+  applyView(peoniaView(2, PEONIA_CHOICE), [], opts);
+  applyView(peoniaView(3, PEONIA_CHOICE), [], opts);
+
+  assert.equal(doc.getElementById('netcodeChoiceModal'), null);
+  assert.equal(choicePicker.opened.length, 0);
+  assert.equal(matPicker.opened.length, 1, 're-applied view does not reopen the mat picker');
+  const request = matPicker.opened[0];
+  assert.deepEqual(request.candidates.map((c) => c.instanceId), [20, 21, 22, 23]);
+  assert.equal(request.candidates[1].image, getCardRegistry().get(21).element);
+  assert.equal(request.min, 0);
+  assert.equal(request.max, 3);
+  assert.equal(request.cancellable, true, 'taking no Prize card is allowed');
+
+  await request.onResolve([21, 23]);
+  assert.deepEqual(resolved, [{ choiceId: 'choice_p1_peonia_3', selection: [21, 23] }]);
+});
+
+test('mat choice: declining a Peonia Prize pick reports an empty selection so the effect completes', async () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const matPicker = fakeChoicePicker();
+  const resolved = [];
+  const opts = { document: doc, getZone: mockGetZone, cardBackSrc: 'cardback.png', matPicker, onResolveChoice: (sel) => resolved.push(sel) };
+
+  applyView(peoniaView(1), [], opts);
+  applyView(peoniaView(2, PEONIA_CHOICE), [], opts);
+  await matPicker.opened[0].onCancel();
+
+  assert.deepEqual(resolved, [{ choiceId: 'choice_p1_peonia_3', selection: [] }]);
+});
