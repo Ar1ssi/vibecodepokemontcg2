@@ -489,6 +489,22 @@ Revert: revert the slice commits; no state outlives the process except `out/logs
 - 2026-11-12 (cosmetic): `window.__PTCG_BUILD` moved from slice 2 to slice 5, so slices 2 and 4 touch
   no common file and can be built in parallel. Built on the session branch in the primary folder
   (cloud container, one task), not a `.claude/worktrees/` worktree.
+- 2026-11-12 (cosmetic, pinned before slices 2/4): event names carry the thing they are about, so
+  the flood gate (60/s per `cat|ev`) is per event and one chatty type cannot starve the rest:
+  socket taps log `in.<event>` / `out.<event>` (not `in`/`out`); `capture-app` logs cat `app` with
+  ev = the CustomEvent type; failures get their own name (`req.failed`, `fetch.failed`,
+  `resource.failed`).
+- 2026-11-12 (cosmetic): the logger's sink payload also carries `room`, which is how the server
+  sink routes an entry to `room:<id>`; `shared/log/console-wrap.mjs` (`wrapConsole`) is shared by
+  the server process tap and the client console capture; `ring.dropOldest(n)` serves the store
+  sweep; `server/log/index.mjs` (`createServerLogging`) composes the server pieces so
+  `server/server.js` gets one object.
+- 2026-11-12 (cosmetic): journal records are serialized with plain `JSON.stringify` (engine data is
+  plain JSON); `safeStringify`'s string/array limits would cut deck lists and break replay.
+- 2026-11-12 (edge row 30 refined): `/unboxing` loads no Socket.IO script, so that page captures
+  into its local ring only (`window.__ptcgLog`); every `index.ejs` page ships.
+- 2026-11-12 (cosmetic): CLI tests live in `scripts/__tests__/log-cli.test.mjs` with the fixture in
+  `scripts/__tests__/fixtures/`, because `pnpm test` globs `scripts/**` and not `tools/**`.
 
 ---
 Self-approval checklist (only when the user is unreachable):
