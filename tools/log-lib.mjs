@@ -137,7 +137,7 @@ function lastSvLines(data) {
   for (const source of sourcesOf(data)) {
     const svs = data.timeline.filter((e) => e.src === source.src && Number.isInteger(e.sv)).map((e) => e.sv);
     const snap = data.snaps.find((s) => s.src === source.src);
-    const parts = [`  ${source.src} last sv=${svs.length ? Math.max(...svs) : '-'}`];
+    const parts = [`  last sv ${source.src}=${svs.length ? Math.max(...svs) : '-'}`];
     if (snap) parts.push(`snapshot lastRenderedVersion=${snap.netcode?.lastRenderedVersion ?? '-'}`);
     lines.push(parts.join(' '));
   }
@@ -164,7 +164,7 @@ export function summarize(data) {
   const complete = header?.journal?.complete ?? data.journal.length > 0;
   const games = header?.journal?.games ?? new Set(data.journal.map((r) => r.game)).size;
   lines.push(`journal: games=${games} records=${data.journal.length} complete=${complete}`);
-  lines.push('last sv:');
+  lines.push('last sv per source:');
   lines.push(...lastSvLines(data));
 
   const bad = selectErrors(data, { warn: true }).slice(0, 10);
