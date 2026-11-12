@@ -8,6 +8,7 @@ import { installProcessTap } from './process-tap.mjs';
 import { httpLog } from './http-tap.mjs';
 import { tapServer, tapSocket } from './socket-tap.mjs';
 import { readBuild } from './build-info.mjs';
+import { NO_JOURNAL, createJournal } from './journal.mjs';
 
 function createInert(now) {
   const log = createLogger({ now, sink: () => {}, level: 'error' });
@@ -16,6 +17,8 @@ function createInert(now) {
     store: null,
     log,
     forRoom: () => log,
+    createJournal: () => NO_JOURNAL,
+    journalFor: () => null,
     build: null,
     bootId: null,
     diskSink: null,
@@ -54,7 +57,13 @@ export function createServerLogging({
   const store = createLogStore({ now, totalBytes: totalBytesFrom(env), sink: diskSink });
   const { log, forRoom } = createServerLog({ store, now });
   const uninstallProcessTap = installProcessTap({ log, diskSink, consoleRef, processRef });
-  const sweepTimer = setInterval(() => store.sweep(), LIMITS.sweepMs);
+  const journals = new Map();
+  const sweepTimer = setInterval(() => {
+    store.sweep();
+    for (const roomId of journals.keys()) {
+      if (!store.stream(`room:${roomId}`)) journals.delete(roomId);
+    }
+  }, LIMITS.sweepMs);
   sweepTimer.unref();
   const build = readBuild({ env, cwd: repoRoot });
   log.info('boot', 'start', { commit: build.commit, node: build.node, pid: process.pid, logDir: diskSink?.dir ?? null });
@@ -65,6 +74,15 @@ export function createServerLogging({
     store,
     log,
     forRoom,
+    createJournal(roomId) {
+      let journal = journals.get(roomId);
+      if (!journal) {
+        journal = createJournal({ roomId, log: forRoom(roomId) });
+        journals.set(roomId, journal);
+      }
+      return journal;
+    },
+    journalFor: (roomId) => journals.get(roomId) ?? null,
     build,
     bootId,
     diskSink,

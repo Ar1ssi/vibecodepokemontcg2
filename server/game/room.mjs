@@ -14,6 +14,7 @@ import { deckFormatMismatch } from '../../shared/engine/setup.mjs';
 import { deckPeekFor, viewFor, viewForSolo } from '../../shared/engine/view.mjs';
 import { applyCommand, attackExtrasFor, costDiscountsFor } from '../../shared/engine/reduce.mjs';
 import { PROTOCOL_VERSION } from '../../shared/engine/commands.mjs';
+import { NO_JOURNAL } from '../log/journal.mjs';
 import {
   flipCoinFace,
   isCoinFace,
@@ -50,6 +51,7 @@ export class GameRoom {
    * @param {boolean} [options.rulesEnabled=true]
    * @param {string|number} [options.seed] PRNG seed
    * @param {object} [options.initialState] Optional pre-configured GameState
+   * @param {object} [options.journal] Command journal (design 087); defaults to the no-op NO_JOURNAL
    */
   constructor({
     roomId,
@@ -57,11 +59,13 @@ export class GameRoom {
     seed = null,
     initialState = null,
     rng = null,
+    journal = NO_JOURNAL,
   }) {
     this.roomId = roomId;
     this.rulesEnabled = Boolean(rulesEnabled);
     this.seed = seed ?? Math.floor(Math.random() * 0x7fffffff);
     this.rng = rng || createRng(this.seed);
+    this.journal = journal;
 
     this.state =
       initialState ||
@@ -105,6 +109,8 @@ export class GameRoom {
     // periodic empty-socket sweep can distinguish a brief double-disconnect
     // from an actually-abandoned room.
     this.lastActivityAt = Date.now();
+
+    this.journal.rebase(this.state, this.rng, 'created');
   }
 
   /** Marks the room as active now (Finding 5 — sweep grace). */
@@ -173,6 +179,7 @@ export class GameRoom {
       if (!this.state.turn.player) {
         this.state.turn.player = playerId;
       }
+      this.journal.rebase(this.state, this.rng, `seated:${playerId}`);
     } else if (username) {
       this.state.players[playerId].username = username;
     }
@@ -387,6 +394,7 @@ export class GameRoom {
     // dedupe entirely. Every real client stamps one (cmd-emitter.js); server-internal
     // calls (setup, loadDeck, shadow) go through handleCommand directly.
     if (!Number.isInteger(cmd?.clientSeq) || cmd.clientSeq < 0) {
+      this.journal.refused({ cmd, error: 'bad_command', reason: 'clientSeq must be a non-negative integer' });
       return {
         success: false,
         error: 'bad_command',
@@ -416,6 +424,7 @@ export class GameRoom {
    */
   handleCommand(socketId, cmd = {}, actingSeat = undefined) {
     if (actingSeat === BAD_SEAT) {
+      this.journal.refused({ cmd, error: BAD_SEAT });
       return {
         ok: false,
         success: false,
@@ -431,6 +440,7 @@ export class GameRoom {
     if (!playerId) {
       if (this.spectatorSockets.has(socketId)) {
         // Edge Case 13: Spectator sends command rejected spectator_readonly
+        this.journal.refused({ cmd, error: 'spectator_readonly' });
         return {
           success: false,
           error: 'spectator_readonly',
@@ -438,6 +448,7 @@ export class GameRoom {
           clientSeq: cmd.clientSeq,
         };
       }
+      this.journal.refused({ cmd, error: 'unauthorized' });
       return {
         success: false,
         error: 'unauthorized',
@@ -448,6 +459,7 @@ export class GameRoom {
 
     // Edge Case 17: Protocol version negotiation
     if (cmd.protocolVersion && cmd.protocolVersion !== PROTOCOL_VERSION) {
+      this.journal.refused({ cmd, playerId, error: 'version_mismatch' });
       return {
         success: false,
         error: 'version_mismatch',
@@ -461,6 +473,7 @@ export class GameRoom {
     if (typeof cmd.clientSeq === 'number') {
       const lastSeq = this.clientSeqByPlayer.get(playerId) ?? -1;
       if (cmd.clientSeq <= lastSeq) {
+        this.journal.refused({ cmd, playerId, error: 'dedupe' });
         return {
           success: true,
           dedupe: true,
@@ -478,7 +491,19 @@ export class GameRoom {
       playerId,
     };
 
+    const stateBefore = this.state;
+    const cursorBefore = this.rng?.cursor ?? null;
+    const startedAt = performance.now();
     const result = applyCommand(this.state, commandWithPlayer, this.rng);
+    this.journal.command({
+      cmd: commandWithPlayer,
+      playerId,
+      stateBefore,
+      cursorBefore,
+      result,
+      cursorAfter: this.rng?.cursor ?? null,
+      ms: performance.now() - startedAt,
+    });
 
     if (result.error) {
       return {
@@ -1015,6 +1040,7 @@ export class GameRoom {
 
     this.state.stateVersion = Math.max(this.state.stateVersion || 0, minimumVersion);
     this.touchActivity();
+    this.journal.rebase(this.state, this.rng, 'reset');
     return kept.map(({ playerId, socketId }) => ({ playerId, socketId }));
   }
 

@@ -837,7 +837,7 @@ async function main() {
       }
       let gameRoom = gameRooms.get(roomId);
       const createdRoom = !gameRoom;
-      if (createdRoom) gameRoom = new GameRoom({ roomId });
+      if (createdRoom) gameRoom = new GameRoom({ roomId, journal: logging.createJournal(roomId) });
       const decks = options.decks && typeof options.decks === 'object' ? options.decks : {};
       if (!gameRoom.addSoloPlayer(socket.id, username, decks)) {
         socket.emit('roomReject', { reason: 'solo_room' });
@@ -957,7 +957,7 @@ async function main() {
         if (SERVER_AUTHORITATIVE) {
           let activeGameRoom = gameRoom;
           if (!activeGameRoom) {
-            activeGameRoom = new GameRoom({ roomId });
+            activeGameRoom = new GameRoom({ roomId, journal: logging.createJournal(roomId) });
             activeGameRoom.roomFormat = room.format?.format ?? null;
             gameRooms.set(roomId, activeGameRoom);
           }
@@ -1103,7 +1103,7 @@ async function main() {
       if (SERVER_AUTHORITATIVE && !soloRoom?.solo) {
         let gameRoom = gameRooms.get(data.roomId);
         if (!gameRoom) {
-          gameRoom = new GameRoom({ roomId: data.roomId });
+          gameRoom = new GameRoom({ roomId: data.roomId, journal: logging.createJournal(data.roomId) });
           gameRoom.roomFormat = room.format?.format ?? null;
           gameRooms.set(data.roomId, gameRoom);
         }

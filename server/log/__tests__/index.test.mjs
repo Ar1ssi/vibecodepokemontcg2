@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServerLogging } from '../index.mjs';
+import { NO_JOURNAL } from '../journal.mjs';
 
 const quietConsole = () => ({ log() {}, info() {}, warn() {}, error() {}, debug() {} });
 const stubProcess = () => ({ on() {}, removeListener() {}, stderr: { write() {} } });
@@ -64,4 +65,24 @@ test('attachIo/attachSocket wire the taps and seatOf', () => {
   } finally {
     logging.shutdown();
   }
+});
+
+test('createJournal returns one journal per room, journalFor looks it up, LOG_OFF yields NO_JOURNAL', () => {
+  const logging = createServerLogging({
+    env: { LOG_DIR: 'off' },
+    repoRoot: '/r',
+    processRef: stubProcess(),
+    consoleRef: quietConsole(),
+  });
+  try {
+    const journal = logging.createJournal('r1');
+    assert.equal(logging.createJournal('r1'), journal);
+    assert.equal(logging.journalFor('r1'), journal);
+    assert.equal(logging.journalFor('nope'), null);
+  } finally {
+    logging.shutdown();
+  }
+  const off = createServerLogging({ env: { LOG_OFF: '1' }, repoRoot: '/r', processRef: stubProcess(), consoleRef: quietConsole() });
+  assert.equal(off.createJournal('r1'), NO_JOURNAL);
+  assert.equal(off.journalFor('r1'), null);
 });
