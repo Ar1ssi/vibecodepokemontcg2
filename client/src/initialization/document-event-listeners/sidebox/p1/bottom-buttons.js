@@ -22,6 +22,7 @@ import {
   copyDecisionCompareLog,
   exportDecisionLog,
 } from '../../../../setup/general/decision-logger-bridge.js';
+import { exportFullLog, markMoment, toggleVerbose } from '../../../../log/export-ui.js';
 import { acceptAction } from '../../../../setup/general/accept-action.js';
 import { cleanActionData } from '../../../../setup/general/clean-action-data.js';
 import { refreshBoardImages } from '../../../../setup/sizing/refresh-board.js';
@@ -86,6 +87,28 @@ export const initializeP1BottomButtons = () => {
   const exportLog = document.getElementById('exportLog');
   exportLog.addEventListener('click', () => {
     exportChatboxContent();
+    optionsContextMenu.style.display = 'none';
+  });
+
+  const exportFullLogButton = document.getElementById('exportFullLog');
+  exportFullLogButton.addEventListener('click', () => {
+    optionsContextMenu.style.display = 'none';
+    const note = window.prompt('Optional: describe what went wrong (saved in the log).', '');
+    if (note === null) return;
+    exportFullLog({ note }).catch((err) => console.error('Export full log failed:', err));
+  });
+
+  const markLogMomentButton = document.getElementById('markLogMoment');
+  markLogMomentButton.addEventListener('click', () => {
+    optionsContextMenu.style.display = 'none';
+    const note = window.prompt('Optional: note for this moment.', '');
+    if (note === null) return;
+    markMoment(note);
+  });
+
+  const verboseLoggingButton = document.getElementById('verboseLogging');
+  verboseLoggingButton.addEventListener('click', () => {
+    toggleVerbose();
     optionsContextMenu.style.display = 'none';
   });
 

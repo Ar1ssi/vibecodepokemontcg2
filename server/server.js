@@ -116,6 +116,11 @@ async function main() {
   const app = express();
   app.use(logging.httpMiddleware);
   app.post('/api/log/beacon', express.text({ type: '*/*', limit: LIMITS.beaconMaxBytes }), logging.beaconHandler);
+  app.get('/api/log/export/:token', logging.exportDownloadHandler);
+  if (process.env.NODE_ENV !== 'production') {
+    app.get('/api/log/rooms', logging.devRoomsHandler);
+    app.get('/api/log/export', logging.devExportHandler);
+  }
   app.locals.build = logging.build?.commit ?? null;
   // HTTP Server Setup
   const server = http.createServer(app);
@@ -410,6 +415,7 @@ async function main() {
   const roomInfo = new Map();
   const gameRooms = new Map();
   logging.attachIo(io, {
+    netcode: SERVER_AUTHORITATIVE ? 'server-authoritative' : 'legacy',
     seatOf: (socketId, roomId) => {
       const room = gameRooms.get(roomId);
       if (!room) return null;

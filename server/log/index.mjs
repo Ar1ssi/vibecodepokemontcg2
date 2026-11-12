@@ -10,6 +10,9 @@ import { tapServer, tapSocket } from './socket-tap.mjs';
 import { readBuild } from './build-info.mjs';
 import { NO_JOURNAL, createJournal } from './journal.mjs';
 import { createLogIngest } from './client-ingest.mjs';
+import { createLogExport } from './export-routes.mjs';
+
+const notFound = (req, res) => res.status(404).end();
 
 function createInert(now) {
   const log = createLogger({ now, sink: () => {}, level: 'error' });
@@ -28,6 +31,9 @@ function createInert(now) {
     levelFor: () => 'debug',
     attachIo() {},
     attachSocket() {},
+    exportDownloadHandler: notFound,
+    devRoomsHandler: notFound,
+    devExportHandler: notFound,
     shutdown() {},
   };
 }
@@ -73,6 +79,8 @@ export function createServerLogging({
 
   let seatOf = () => null;
   let ingest = null;
+  let exporter = null;
+  const delegate = (name) => (req, res) => (exporter ? exporter[name](req, res) : notFound(req, res));
   return {
     enabled: true,
     store,
@@ -93,14 +101,34 @@ export function createServerLogging({
     httpMiddleware: httpLog({ log }),
     beaconHandler: (req, res) => (ingest ? ingest.beaconHandler(req, res) : res.status(204).end()),
     levelFor: (roomId) => ingest?.levelFor(roomId) ?? 'debug',
+    exportDownloadHandler: delegate('downloadHandler'),
+    devRoomsHandler: delegate('devRoomsHandler'),
+    devExportHandler: delegate('devExportHandler'),
     attachIo(io, options = {}) {
       if (options.seatOf) seatOf = options.seatOf;
       tapServer(io, { log, store, clientOf: (id) => io.sockets.sockets.get(id)?.data?.logClientId ?? null });
       ingest = createLogIngest({ store, log, io });
+      exporter = createLogExport({
+        store,
+        log,
+        io,
+        journalFor: (roomId) => journals.get(roomId) ?? null,
+        levelFor: (roomId) => ingest?.levelFor(roomId) ?? 'debug',
+        build,
+        netcode: options.netcode ?? null,
+        describe: (socketId, roomId) => {
+          const sock = socketId ? io.sockets.sockets.get(socketId) : null;
+          return {
+            username: sock?.data?.seat?.roomId === roomId ? (sock.data.seat.username ?? null) : null,
+            seat: socketId && roomId ? seatOf(socketId, roomId) : null,
+          };
+        },
+      });
     },
     attachSocket(socket) {
       tapSocket(socket, { log, seatOf: (id, room) => seatOf(id, room) });
       ingest?.attachSocket(socket);
+      exporter?.attachSocket(socket);
     },
     shutdown() {
       clearInterval(sweepTimer);

@@ -408,6 +408,15 @@ export function whenFxQueueIdle() {
 }
 
 /**
+ * Queue depth and plans started so far, for the log export snapshot (design 087 §6).
+ *
+ * @returns {{ pending: number, started: number }}
+ */
+export function fxQueueStats() {
+  return { pending: fxQueue.pending(), started: fxQueue.startedCount() };
+}
+
+/**
  * Handles one server advisory event: builds the plan (pure), then — unless
  * catch-up replay or a hidden tab (edge cases 5, 6) — queues the animation.
  * An event may produce several plans (an attack is a banner then a lunge);

@@ -1,15 +1,16 @@
 // What a socket payload contributes to the log. `log:*` is never logged (no feedback loop).
 import { LIMITS } from './log-schema.mjs';
-import { safeStringify } from './safe-json.mjs';
 
-const SIZE_PROBE = { maxBytes: 4194304, maxString: 4194304, maxArray: 100000, maxDepth: 32 };
 const KEY_LIMIT = 20;
 const KEYS_ONLY = new Set(['instanceMap', 'dealOrder', 'spectatorActionData', 'storeGameState']);
-const RELAY = new Set(['pushAction', 'requestAction', 'peerLog']);
+// Logged up to the larger relay cap: the legacy relay's only record, and exactly what a client sent.
+const FULL = new Set(['pushAction', 'requestAction', 'peerLog', 'cmd', 'resolveChoice']);
 
+// Socket payloads are plain JSON, so the native stringify is the cheap size probe (this runs for
+// every view on the command path); anything it cannot take just reports 0.
 function byteLength(args) {
   try {
-    return safeStringify(args, SIZE_PROBE).length;
+    return JSON.stringify(args)?.length ?? 0;
   } catch {
     return 0;
   }
@@ -36,6 +37,6 @@ export function summarizePayload(event, args, { trace = false } = {}) {
   const bytes = byteLength(args);
   if (event === 'view') return summarizeView(bytes, args, trace);
   if (KEYS_ONLY.has(event)) return { bytes, keys: firstKeys(args?.[0]) };
-  if (RELAY.has(event)) return { bytes, maxBytes: LIMITS.relayDetailBytes, args };
+  if (FULL.has(event)) return { bytes, maxBytes: LIMITS.relayDetailBytes, args };
   return { bytes, args };
 }

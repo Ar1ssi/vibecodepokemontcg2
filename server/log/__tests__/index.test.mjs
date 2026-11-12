@@ -18,6 +18,11 @@ test('LOG_OFF=1 builds an inert twin', () => {
   logging.beaconHandler({}, { status: (code) => ({ end: () => { status = code; } }) });
   assert.equal(status, 204);
   assert.equal(logging.levelFor('r'), 'debug');
+  for (const handler of ['exportDownloadHandler', 'devRoomsHandler', 'devExportHandler']) {
+    let code = null;
+    logging[handler]({}, { status: (c) => ({ end: () => { code = c; } }) });
+    assert.equal(code, 404, handler);
+  }
   assert.doesNotThrow(() => {
     logging.log.error('boot', 'x');
     logging.forRoom('r').error('room', 'x');
@@ -89,4 +94,21 @@ test('createJournal returns one journal per room, journalFor looks it up, LOG_OF
   const off = createServerLogging({ env: { LOG_OFF: '1' }, repoRoot: '/r', processRef: stubProcess(), consoleRef: quietConsole() });
   assert.equal(off.createJournal('r1'), NO_JOURNAL);
   assert.equal(off.journalFor('r1'), null);
+});
+
+test('export handlers answer 404 until attachIo, then delegate to the exporter', () => {
+  const logging = createServerLogging({ env: { LOG_DIR: 'off' }, repoRoot: '/r', processRef: stubProcess(), consoleRef: quietConsole() });
+  try {
+    let code = null;
+    logging.devRoomsHandler({}, { status: (c) => ({ end: () => { code = c; } }) });
+    assert.equal(code, 404);
+    const adapter = { on() {} };
+    logging.attachIo({ engine: { on() {} }, of: () => ({ adapter }), sockets: { sockets: new Map() } }, { netcode: 'legacy' });
+    logging.store.append('room:r1', { seq: 1, t: 1, lvl: 'info', line: '{"t":1,"seq":1,"lvl":"info","cat":"room","ev":"x"}' });
+    let body = null;
+    logging.devRoomsHandler({}, { json: (b) => { body = b; } });
+    assert.equal(body.rooms[0].roomId, 'r1');
+  } finally {
+    logging.shutdown();
+  }
 });

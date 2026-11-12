@@ -214,3 +214,15 @@ test('diffViews tracks pending choices for both players', () => {
   assert.equal(diff.choiceChanged, true);
   assert.equal(diff.pendingChoice.current.choiceId, 'choice_1');
 });
+
+test('diffViews: no Stadium before or after is not a Stadium change', () => {
+  const view = (stateVersion, stadium = null) => ({
+    stateVersion,
+    stadium,
+    you: { playerId: 'p1', zones: {} },
+    them: { playerId: 'p2', zones: {} },
+  });
+  assert.equal(diffViews(view(1), view(2)).stadiumChanged, false);
+  assert.equal(diffViews(view(1), view(2, { instanceId: 9, name: 'Stadium' })).stadiumChanged, true);
+  assert.equal(diffViews(view(1, { instanceId: 9, name: 'Stadium' }), view(2)).stadiumChanged, true);
+});

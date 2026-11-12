@@ -8,6 +8,7 @@ import { installPerfCapture } from './capture-perf.js';
 import { installAppEventCapture } from './capture-app.js';
 import { tapClientSocket } from './capture-socket.js';
 import { startShipping } from './ship.js';
+import { initExport, exportFullLog, markMoment } from './export-ui.js';
 
 const originalConsoleError = console.error.bind(console);
 
@@ -49,8 +50,15 @@ try {
         const shipping = startShipping({ socket, log, ring: clientRing, onEntry, clientId, loadId });
         window.__ptcgLog.ship = shipping.state;
         window.__ptcgLog.flush = shipping.flushNow;
+        initExport({ socket, shipping, log });
+        window.__ptcgLog.export = exportFullLog;
+        window.__ptcgLog.mark = markMoment;
       })
       .catch((error) => log.warn('log', 'socket.tap.failed', { error }));
+  } else {
+    initExport({ log });
+    window.__ptcgLog.export = exportFullLog;
+    window.__ptcgLog.mark = markMoment;
   }
 } catch (error) {
   originalConsoleError('[log] boot failed', error);

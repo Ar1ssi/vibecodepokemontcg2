@@ -102,9 +102,10 @@ export function diffViews(previousView, nextView) {
 
   const prevStadiumId = getCardInstanceId(prev.stadium);
   const nextStadiumId = getCardInstanceId(nextView.stadium);
+  // No Stadium before or after is not a change (hasCardChanged treats a missing card as changed).
   const stadiumChanged =
     prevStadiumId !== nextStadiumId ||
-    hasCardChanged(prev.stadium, nextView.stadium);
+    (Boolean(prev.stadium || nextView.stadium) && hasCardChanged(prev.stadium, nextView.stadium));
 
   const prevChoiceId = prev.pendingChoice?.choiceId || null;
   const nextChoiceId = nextView.pendingChoice?.choiceId || null;
