@@ -14,6 +14,7 @@ import {
 } from '../cmd-emitter.js';
 import { PROTOCOL_VERSION } from '../../../../../shared/engine/commands.mjs';
 import { soloCommandSeat } from '../solo-seat.mjs';
+import { onEntry } from '../../../log/client-log.js';
 
 class MockSocket {
   constructor() {
@@ -291,4 +292,36 @@ test('emitCmd sends nothing while spectating', async () => {
     if (hadDocument) globalThis.document = previous;
     else delete globalThis.document;
   }
+});
+
+test('emitCmd without a room id is refused locally and logged', async () => {
+  const socket = new MockSocket();
+  const entries = [];
+  const off = onEntry((e) => entries.push(JSON.parse(e.line)));
+  try {
+    const result = await emitCmd({ socket, roomId: '', type: 'moveCard' });
+    assert.deepEqual(result, { success: false, error: 'missing_room_id' });
+  } finally {
+    off();
+  }
+  assert.equal(socket.emitted.length, 0);
+  const refused = entries.filter((e) => e.cat === 'cmd' && e.ev === 'refused.local');
+  assert.equal(refused.length, 1);
+  assert.equal(refused[0].d.error, 'missing_room_id');
+});
+
+test('a successful emitCmd logs cmd/emit carrying the returned clientSeq', async () => {
+  const socket = new MockSocket();
+  const entries = [];
+  const off = onEntry((e) => entries.push(JSON.parse(e.line)));
+  let result;
+  try {
+    result = await emitCmd({ socket, roomId: 'room-1', type: 'moveCard', payload: { instanceId: 1, from: 'hand', to: 'bench' } });
+  } finally {
+    off();
+  }
+  const emitted = entries.filter((e) => e.cat === 'cmd' && e.ev === 'emit');
+  assert.equal(emitted.length, 1);
+  assert.equal(emitted[0].cs, result.clientSeq);
+  assert.equal(emitted[0].room, 'room-1');
 });

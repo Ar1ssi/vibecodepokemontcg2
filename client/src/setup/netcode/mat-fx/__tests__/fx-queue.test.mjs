@@ -361,3 +361,44 @@ test('fx-queue: a rejected gate releases the chain; clear() drops a waiting gate
   queue.push({ id: 'fresh' });
   assert.deepEqual(ran, ['after', 'fresh']);
 });
+
+test('fx-queue: onEvent reports start, start, idle in order', () => {
+  const events = [];
+  const { queue, clock } = make(() => 100, { onEvent: (e) => events.push(e.type) });
+  queue.push({ id: 'a' });
+  queue.push({ id: 'b' });
+  clock.drain();
+  assert.deepEqual(events, ['start', 'start', 'idle']);
+});
+
+test('fx-queue: clear reports how many pending plans it dropped', () => {
+  const events = [];
+  const { queue } = make(() => 100, { onEvent: (e) => events.push(e) });
+  queue.push({ id: 'a' });
+  queue.push({ id: 'b' });
+  queue.clear();
+  const cleared = events.find((e) => e.type === 'clear');
+  assert.equal(cleared.dropped, 1);
+});
+
+test('fx-queue: a throwing onEvent does not change the run order', () => {
+  const run = (log) => (p) => {
+    log.push(p.id);
+    return 100;
+  };
+  const plain = [];
+  const withObserver = [];
+  const a = make(run(plain));
+  const b = make(run(withObserver), {
+    onEvent: () => {
+      throw new Error('observer down');
+    },
+  });
+  for (const { queue, clock } of [a, b]) {
+    queue.push({ id: 'x' });
+    queue.push({ id: 'y' });
+    clock.drain();
+  }
+  assert.deepEqual(withObserver, plain);
+  assert.deepEqual(withObserver, ['x', 'y']);
+});
