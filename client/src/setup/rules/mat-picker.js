@@ -13,7 +13,7 @@
  */
 
 import { imageAnchor } from '../deck-constructor/hydrate-holo.js';
-import { buildMatPickEntry, findMatPickHit } from './mat-pick.mjs';
+import { buildMatPickEntry, findMatPickHit, planMatToggle } from './mat-pick.mjs';
 import {
   selfContainerDocument,
   oppContainerDocument,
@@ -179,15 +179,14 @@ export function openMatPick({
   updateCount();
 
   const toggle = (card) => {
-    const entry = entries.find((e) => e.card === card);
-    if (!entry) return;
-    if (selected.has(card)) {
-      selected.delete(card);
-      paint(entry, false);
-    } else {
-      if (selected.size >= maxCount) return;
-      selected.add(card);
-      paint(entry, true);
+    const { add, remove } = planMatToggle(entries, selected, card, maxCount);
+    if (remove) {
+      selected.delete(remove);
+      paint(entries.find((e) => e.card === remove), false);
+    }
+    if (add) {
+      selected.add(add);
+      paint(entries.find((e) => e.card === add), true);
     }
     updateCount();
   };

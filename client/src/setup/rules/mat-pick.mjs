@@ -18,7 +18,26 @@ export function buildMatPickEntry(card, imageAnchorFn = null) {
     img?.closest?.('.play-container') ||
     targetEl?.closest?.('.play-container') ||
     null;
-  return { card, img, targetEl, container };
+  // Identical copies stacked in the hand share one click target (`stackKey`, see planMatToggle).
+  return { card, img, targetEl, container, stackKey: card?.stackKey ?? null };
+}
+
+/**
+ * What a click on `card` does to a multi-pick. A click on a card that is not picked picks it (while
+ * the pick has room). A click on a picked card un-picks it, except that copies stacked in the hand
+ * sit on one click target, so there it picks the next unpicked copy until the pick is full: without
+ * that, the second copy of a stack could never be chosen. Pure.
+ * @returns {{ add: any|null, remove: any|null }} the card to pick and the card to un-pick
+ */
+export function planMatToggle(entries, selected, card, maxCount) {
+  const entry = (entries || []).find((e) => e.card === card);
+  if (!entry) return { add: null, remove: null };
+  if (!selected.has(card)) return selected.size >= maxCount ? { add: null, remove: null } : { add: card, remove: null };
+  const copy =
+    entry.stackKey && selected.size < maxCount
+      ? entries.find((e) => e.stackKey === entry.stackKey && !selected.has(e.card))
+      : null;
+  return copy ? { add: copy.card, remove: null } : { add: null, remove: card };
 }
 
 export function findMatPickHit(entries, eventTarget) {

@@ -1,12 +1,15 @@
 /**
- * @file Maps a server PendingChoice whose options are all in-play Pokémon onto
- * the mat picker (the legacy click-the-card UI, D19).
+ * @file Maps a server PendingChoice whose options are all in-play Pokémon, all face-down Prize
+ * cards, or the hand cards of a Prize swap (Peonia), onto the mat picker (the legacy
+ * click-the-card UI, D19).
  *
  * Pure and DOM-free so it runs under `node --test`; the browser adapter
  * (`mat-picker-adapter.js`) only forwards the result to `openMatPick`. The
  * registry is apply-view.js's `cardRegistry` (instanceId -> rendered record),
  * passed in so this module never touches the DOM itself.
  */
+
+import { getPrintingKey } from '../../../../shared/engine/zones/hand-stack.mjs';
 
 const PLAY_ZONES = new Set(['active', 'bench']);
 
@@ -21,6 +24,26 @@ function isInPlayPokemon(record) {
   return record.card?.attachedTo == null;
 }
 
+// A blind Prize pick (Peonia, Gladion): the options are face-down Prize cards, so the player clicks
+// the Prize card itself rather than choosing among identical card backs in a menu. A Prize option
+// the owner has looked at carries its name and art, and keeps the menu that shows what it is.
+function isBlindPrize(record, option) {
+  return option?.faceDown === true && Boolean(record?.element) && record.zone === 'prizes';
+}
+
+// The Prize swap step (Peonia, Gladion) asks twice: Prize cards into the hand, then hand cards set
+// back as Prizes. Both picks carry that step in the resume token.
+function isPrizeSwapChoice(choice) {
+  const token = choice?.resumeToken;
+  return token?.steps?.[token.stepIndex]?.type === 'prizeToHand';
+}
+
+// A hand card on the mat. Only the Prize swap's hand pick is made there: every other hand pick
+// keeps the card carousel.
+function isHandCard(record) {
+  return Boolean(record?.element) && record.zone === 'hand';
+}
+
 /**
  * @param {object} choice PendingChoice from the authoritative view
  * @param {Map<number, {instanceId:number, element:any, zone:string, card?:object, holoCard?:object}>} registry
@@ -32,7 +55,11 @@ export function buildMatPickerRequest(choice, registry) {
   if (options.length === 0) return null;
 
   const records = options.map((opt) => registry?.get?.(opt.instanceId));
-  if (records.some((record) => !isInPlayPokemon(record))) {
+  // All in-play Pokémon, all blind Prize cards, or the Prize swap's hand cards: a mixed set has no
+  // single thing to click.
+  const pickingPrizes = options.every((opt, i) => isBlindPrize(records[i], opt));
+  const pickingSwapHand = !pickingPrizes && isPrizeSwapChoice(choice) && records.every(isHandCard);
+  if (!pickingPrizes && !pickingSwapHand && !records.every(isInPlayPokemon)) {
     return null;
   }
 
@@ -44,12 +71,14 @@ export function buildMatPickerRequest(choice, registry) {
   const max = Math.max(min, Math.min(Math.max(maxRaw, 1), options.length));
 
   return {
-    title: choice.prompt || 'Choose a Pokémon',
+    title: choice.prompt || (pickingPrizes ? 'Choose a Prize card' : pickingSwapHand ? 'Choose a card from your hand' : 'Choose a Pokémon'),
     candidates: records.map((record, i) => ({
       instanceId: record.instanceId ?? options[i].instanceId,
       name: record.card?.name || options[i].name || '',
       image: record.element,
       wrapper: record.holoCard?.wrapper,
+      // Copies of one printing stack in the hand on a shared click target (planMatToggle).
+      ...(pickingSwapHand ? { stackKey: `${record.card?.name || options[i].name || ''}|${getPrintingKey(record.card)}` } : {}),
     })),
     // A required pick (min ≥ 1) cannot be declined; only an optional choice gets
     // the Cancel affordance and reports an empty selection.
