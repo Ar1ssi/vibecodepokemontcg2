@@ -38,11 +38,9 @@ import { startKeybindsSleep } from '../../actions/keybinds/keybindSleep.js';
 import { forceRulesEnabledForMultiplayer } from '../../setup/rules/rules-bridge.js';
 import { getStoredMatId } from '../../setup/sizing/apply-mat-layout.js';
 import { restoreLastUsedDeckToPlaymat } from '../document-event-listeners/sidebox/native-deck-builder.js';
-import { enableSyncLogForMultiplayer } from '../../setup/general/sync-logger-bridge.js';
 import { logSync } from '../../log/sync-log.js';
 import { log } from '../../log/client-log.js';
 import { applyViewLogged } from '../../setup/netcode/apply-view-logged.js';
-import { enableDecisionLogForMultiplayer } from '../../setup/general/decision-logger-bridge.js';
 import {
   applyView,
   setDefaultNetcodeContext,
@@ -409,8 +407,6 @@ export const initializeSocketEventListeners = () => {
     announceHostState();
     startSyncCheckHeartbeat();
     forceRulesEnabledForMultiplayer();
-    enableSyncLogForMultiplayer();
-    enableDecisionLogForMultiplayer();
     cleanActionData('self');
     cleanActionData('opp');
     reset('opp', true, false, false, false);

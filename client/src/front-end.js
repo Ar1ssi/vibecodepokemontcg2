@@ -5,8 +5,6 @@ import { loadImportData } from './initialization/load-import-data/load-import-da
 import { initializeMutationObservers } from './initialization/mutation-observers/initialize-mutation-observers.js';
 import { initializeSocketEventListeners } from './initialization/socket-event-listeners/socket-event-listeners.js';
 import { initializeMatLayout } from './setup/sizing/apply-mat-layout.js';
-import { initSyncLogger } from './setup/general/sync-logger-bridge.js';
-import { initDecisionLogger } from './setup/general/decision-logger-bridge.js';
 import { installE2eApi } from './setup/general/e2e-api.js';
 import { initializeRoomFormatPanel } from './setup/general/room-format-panel.js';
 import { applyFxSettings, watchFxSettingTargets } from './setup/image-logic/fx-settings.js';
@@ -17,8 +15,6 @@ import { installDeckBoxes } from './setup/netcode/mat-fx/deck-box.js';
 applyFxSettings();
 loadFoilManifest();
 watchFxSettingTargets();
-initSyncLogger();
-initDecisionLogger();
 initializeSocketEventListeners();
 initializeRoomFormatPanel();
 initializeDOMEventListeners();

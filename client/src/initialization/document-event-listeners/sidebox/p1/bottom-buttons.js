@@ -14,14 +14,6 @@ import {
   exportChatboxContent,
 } from '../../../../setup/chatbox/export-chat.js';
 import { hideOptionsContextMenu } from '../../../../setup/chatbox/hide-options-context-menu.js';
-import {
-  copySyncCompareLog,
-  exportSyncLog,
-} from '../../../../setup/general/sync-logger-bridge.js';
-import {
-  copyDecisionCompareLog,
-  exportDecisionLog,
-} from '../../../../setup/general/decision-logger-bridge.js';
 import { exportFullLog, markMoment, toggleVerbose } from '../../../../log/export-ui.js';
 import { acceptAction } from '../../../../setup/general/accept-action.js';
 import { cleanActionData } from '../../../../setup/general/clean-action-data.js';
@@ -109,38 +101,6 @@ export const initializeP1BottomButtons = () => {
   const verboseLoggingButton = document.getElementById('verboseLogging');
   verboseLoggingButton.addEventListener('click', () => {
     toggleVerbose();
-    optionsContextMenu.style.display = 'none';
-  });
-
-  const exportSyncLogButton = document.getElementById('exportSyncLog');
-  exportSyncLogButton.addEventListener('click', () => {
-    exportSyncLog().catch((err) => console.error('Export sync log failed:', err));
-    optionsContextMenu.style.display = 'none';
-  });
-
-  const copySyncCompareLogButton = document.getElementById('copySyncCompareLog');
-  copySyncCompareLogButton.addEventListener('click', async () => {
-    try {
-      await copySyncCompareLog();
-    } catch (err) {
-      console.error('Copy sync compare failed:', err);
-    }
-    optionsContextMenu.style.display = 'none';
-  });
-
-  const exportDecisionLogButton = document.getElementById('exportDecisionLog');
-  exportDecisionLogButton.addEventListener('click', () => {
-    exportDecisionLog().catch((err) => console.error('Export decision log failed:', err));
-    optionsContextMenu.style.display = 'none';
-  });
-
-  const copyDecisionCompareLogButton = document.getElementById('copyDecisionCompareLog');
-  copyDecisionCompareLogButton.addEventListener('click', async () => {
-    try {
-      await copyDecisionCompareLog();
-    } catch (err) {
-      console.error('Copy decision compare failed:', err);
-    }
     optionsContextMenu.style.display = 'none';
   });
 

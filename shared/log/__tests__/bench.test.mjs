@@ -1,0 +1,26 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { performance } from 'node:perf_hooks';
+import { createLogger } from '../logger.mjs';
+import { createRing } from '../ring.mjs';
+import { LIMITS } from '../log-schema.mjs';
+
+const CALLS = 50000;
+const BUDGET_MS = 500;
+
+test('50 000 log.debug calls into a real ring finish under 500 ms, none flooded or lost', (t) => {
+  const ring = createRing(LIMITS.clientRing);
+  let clock = 0;
+  // 17 ms per call keeps one cat|ev under the 60-per-second flood gate (1 ms per call would trip it).
+  const logger = createLogger({ now: () => (clock += 17), sink: (entry) => ring.push(entry) });
+  const detail = { applied: true, ms: 3.2, events: ['cardMoved'], you: { added: 0, moved: 1 } };
+
+  const start = performance.now();
+  for (let i = 0; i < CALLS; i++) logger.debug('view', 'apply', detail, { sv: i });
+  const elapsed = performance.now() - start;
+  t.diagnostic(`${CALLS} calls: ${elapsed.toFixed(1)} ms`);
+
+  assert.equal(ring.size() + ring.dropped(), CALLS);
+  assert.equal(logger.suppressed().flooded, 0);
+  assert.ok(elapsed < BUDGET_MS, `${elapsed.toFixed(1)} ms >= ${BUDGET_MS} ms`);
+});
