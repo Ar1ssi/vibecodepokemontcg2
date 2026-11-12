@@ -58,6 +58,7 @@ import { createCardImageHandler } from './card-image-proxy.mjs';
 import { CARD_ART_PROXY_HOSTS } from './card-art-proxy-hosts.mjs';
 import { cacheControlFor } from './sfx-cache.mjs';
 import { readServerAuthoritative } from './netcode-mode.mjs';
+import { createServerLogging } from './log/index.mjs';
 import { customFoilSets, resolveFoilTextureBase } from './tcgl-foil-config.mjs';
 
 // On unless SERVER_AUTHORITATIVE is 0, false, off or no (the legacy relay, kept until I251 retires it).
@@ -110,7 +111,9 @@ function generateRandomKey(length = 8) {
 }
 
 async function main() {
+  const logging = createServerLogging({ repoRoot: path.join(__dirname, '..') });
   const app = express();
+  app.use(logging.httpMiddleware);
   // HTTP Server Setup
   const server = http.createServer(app);
 
@@ -403,6 +406,13 @@ async function main() {
 
   const roomInfo = new Map();
   const gameRooms = new Map();
+  logging.attachIo(io, {
+    seatOf: (socketId, roomId) => {
+      const room = gameRooms.get(roomId);
+      if (!room) return null;
+      return room.socketToPlayer.get(socketId) ?? (room.spectatorSockets.has(socketId) ? 'spec' : null);
+    },
+  });
 
   // Function to periodically clean up empty rooms
   const cleanUpEmptyRooms = () => {
@@ -662,6 +672,7 @@ async function main() {
 
   //Socket.IO Connection Handling
   io.on('connection', async (socket) => {
+    logging.attachSocket(socket);
     // Function to handle disconnections (unintended)
     const disconnectHandler = (roomId, username, asSpectator = false) => {
       if (!socket.data.leaveRoom) {
@@ -1511,6 +1522,11 @@ async function main() {
   server.listen(port, () => {
     // eslint-disable-next-line no-console
     console.log(`Server is running at http://localhost:${port}`);
+    logging.log.info('boot', 'listening', {
+      port,
+      netcode: SERVER_AUTHORITATIVE ? 'server-authoritative' : 'legacy',
+      e2e: E2E_ENABLED,
+    });
     // eslint-disable-next-line no-console
     console.log(
       `Netcode mode: ${SERVER_AUTHORITATIVE ? 'server-authoritative' : 'legacy'}` +
