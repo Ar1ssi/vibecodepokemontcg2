@@ -46,8 +46,7 @@ tools/log.mjs + tools/log-lib.mjs — the CLI above · scripts/e2e/log-export-te
 Client: `import { log } from '<rel>/log/client-log.js'`; server: `logging.log` / `logging.forRoom(id)`.
 `log.debug(cat, ev, detail?, { room, seat, sv, cs })` — always pass `sv`/`cs` when you have them.
 Never throws, never does I/O. No layout reads in details (`describeElement` reads attributes only).
-New category → `CATEGORIES` in log-schema.mjs. High-frequency site → gate it with
-`log.enabled('trace')` (trace is off unless the room's Verbose logging is on).
+New category → `CATEGORIES` in log-schema.mjs. High-frequency site → gate on `log.enabled('trace')`.
 
 ## Landmines
 - Never logged: keystrokes in editable targets (`[text]`; `change` logs length only) and any detail
@@ -55,8 +54,8 @@ New category → `CATEGORIES` in log-schema.mjs. High-frequency site → gate it
   in an export would hand over the seat. A submitted search or chat line IS logged (URL / socket).
 - The export is complete on purpose (both hands, deck order); exports are announced in room chat.
 - Replay needs every `applyCommand` to go through `GameRoom.handleCommand`, and a `journal.rebase`
-  after any in-place change to `room.state`; a missing one shows as `why: unjournaled-change`.
-- `stateVersion` is not unique (an undo rewinds it, I286): state lines carry `game` and `n`.
+  after any in-place change to `room.state` (else `why: unjournaled-change`). `stateVersion`
+  repeats after an undo (I286), so state lines carry `game` and `n`.
 - A closed stream stays closed on late entries (`store.reopen` only on join/hello/batch), or rooms
   and their journals would never expire. A payload's `roomId` counts only if the socket is in it.
 - `/unboxing` has no Socket.IO client: local capture only, and no app modules are imported there.
