@@ -384,3 +384,37 @@ test('Greedy Dice taken as a Prize may be played: heads owes 1 more Prize', () =
   assert.equal(res.state.players.p1.flags.prizesOwed, 1);
   assert.ok(res.state.players.p1.zones.discard.some((c) => c.instanceId === dice.instanceId));
 });
+
+// ── HB 286 Welder (customhb-286, edit of sm10-189) ──────────────────────────────────────────
+// Text: the cardback edit in customhb set.json, matching the user's scan.
+
+const WELDER = 'Attach a {R} Energy card from your hand to 1 of your Pokémon. If you do, draw 2 cards.';
+const fire = () => createCard({ instanceId: nextId++, name: 'Basic Fire Energy', type: 'Energy', supertype: 'Energy', subtypes: ['Basic'], energyType: 'Fire' });
+const water = () => createCard({ instanceId: nextId++, name: 'Basic Water Energy', type: 'Energy', supertype: 'Energy', subtypes: ['Basic'], energyType: 'Water' });
+
+test('HB 286 Welder attaches one Fire Energy from hand, then draws 2; only Fire is offered', () => {
+  const f = fire();
+  const w = water();
+  const state = board({ p1: { hand: [f, w] } });
+  const res = play(state, trainer('Welder', 'Supporter', WELDER));
+  assert.equal(res.error ?? null, null);
+  assert.deepEqual(optionNames(res.prompts[0]), ['Basic Fire Energy']);
+  const zones = res.state.players.p1.zones;
+  assert.ok(zones.active.some((c) => c.instanceId === f.instanceId && c.attachedTo), 'Fire Energy is attached');
+  assert.equal(zones.hand.length, 1 + 2, 'the Water Energy plus 2 drawn cards');
+});
+
+test('HB 286 Welder with no Fire Energy in hand attaches nothing and draws nothing', () => {
+  const state = board({ p1: { hand: [water()] } });
+  const res = play(state, trainer('Welder', 'Supporter', WELDER));
+  assert.equal(res.error ?? null, null);
+  assert.equal(res.state.players.p1.zones.hand.length, 1, 'no attach, so no draw');
+});
+
+test('Welder as printed (up to 2 {R}, draw 3) also draws only after an attach', () => {
+  const printed = 'Attach up to 2 {R} Energy cards from your hand to 1 of your Pokémon. If you do, draw 3 cards.';
+  const none = play(board({ p1: { hand: [water()] } }), trainer('Welder', 'Supporter', printed));
+  assert.equal(none.state.players.p1.zones.hand.length, 1);
+  const two = play(board({ p1: { hand: [fire(), fire()] } }), trainer('Welder', 'Supporter', printed));
+  assert.equal(two.state.players.p1.zones.hand.length, 3, 'two attached, 3 drawn');
+});

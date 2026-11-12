@@ -2652,7 +2652,12 @@ function parseTrainerStepsInner(lower) {
         // only resolves when the leading draw actually drew (review finding 4).
         ...(leadingDraw ? { requiresDraw: true } : {}),
       });
-      if (!leadingDraw) appendTrailingDraw(steps, lower);
+      if (!leadingDraw) {
+        appendTrailingDraw(steps, lower);
+        // "Attach … from your hand. If you do, draw N cards" (Welder): the draw needs a real attach.
+        const draw = steps[steps.length - 1];
+        if (draw.type === 'draw' && /if you do, draw/.test(lower)) draw.requiresAttach = true;
+      }
       return { steps, recognizable: true };
     }
   }
