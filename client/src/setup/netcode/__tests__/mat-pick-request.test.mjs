@@ -167,9 +167,10 @@ test('candidate name falls back to the choice option when the record has no card
 // blind, so the cards on the mat are the picker, not a menu of card backs.
 const PEONIA = {
   prompt: 'Peonia: Choose up to 3 Prize card(s) to put into your hand',
-  options: [{ instanceId: 20 }, { instanceId: 21 }, { instanceId: 22 }, { instanceId: 23 }],
+  options: [20, 21, 22, 23].map((instanceId) => ({ instanceId, faceDown: true })),
   min: 0,
   max: 3,
+  resumeToken: { stepIndex: 0, steps: [{ type: 'prizeToHand', count: 3, replace: true }] },
 };
 const prizeRecords = () => [20, 21, 22, 23].map((id) => record(id, 'prizes', 'Card Back'));
 
@@ -202,7 +203,59 @@ test('a Prize pick with a missing element, or Prize cards mixed with other zones
   );
 });
 
-test('Peonia\'s second pick (hand cards to set as Prizes) is not a mat pick', () => {
-  const hand = { prompt: 'Peonia: Choose 2 card(s) from your hand to set face down as Prizes', options: [{ instanceId: 30 }, { instanceId: 31 }], min: 2, max: 2 };
-  assert.equal(buildMatPickerRequest(hand, registryOf([record(30, 'hand'), record(31, 'hand')])), null);
+// "… put a card from your hand face down as a Prize card": the hand pick of the same step.
+const PEONIA_HAND = {
+  prompt: 'Peonia: Choose 2 card(s) from your hand to set face down as Prizes',
+  options: [{ instanceId: 30, name: 'Ultra Ball', src: '/u.png' }, { instanceId: 31, name: 'Fire Energy', src: '/f.png' }],
+  min: 2,
+  max: 2,
+  resumeToken: PEONIA.resumeToken,
+};
+const handRecords = () => [record(30, 'hand', 'Ultra Ball'), record(31, 'hand', 'Fire Energy')];
+
+test("Peonia's hand pick (cards to set as Prizes) maps the hand cards to mat candidates", () => {
+  const registry = registryOf(handRecords());
+  const req = buildMatPickerRequest(PEONIA_HAND, registry);
+
+  assert.ok(req, 'the hand cards are click targets');
+  assert.deepEqual(req.candidates.map((c) => [c.instanceId, c.name]), [[30, 'Ultra Ball'], [31, 'Fire Energy']]);
+  assert.equal(req.candidates[0].image, registry.get(30).element);
+  assert.equal(req.min, 2);
+  assert.equal(req.max, 2);
+  assert.equal(req.cancellable, false, 'the Prize swap must be completed');
+});
+
+test('only the Prize swap picks on the mat: any other hand pick, or a named Prize, keeps its menu', () => {
+  const { resumeToken, ...plainHand } = PEONIA_HAND;
+  assert.equal(buildMatPickerRequest(plainHand, registryOf(handRecords())), null, 'a plain hand pick keeps the card carousel');
+  assert.equal(
+    buildMatPickerRequest({ ...plainHand, resumeToken: { stepIndex: 0, steps: [{ type: 'discardHandThenDraw' }] } }, registryOf(handRecords())),
+    null,
+    'another step does not qualify'
+  );
+  assert.equal(
+    buildMatPickerRequest({ ...PEONIA_HAND, options: [{ instanceId: 30, name: 'Ultra Ball' }, { instanceId: 20 }] }, registryOf([record(30, 'hand'), record(20, 'prizes')])),
+    null,
+    'hand cards mixed with a Prize card'
+  );
+  const named = { ...PEONIA, options: PEONIA.options.map(({ instanceId }) => ({ instanceId, name: 'Pikachu', src: '/p.png' })) };
+  assert.equal(buildMatPickerRequest(named, registryOf(prizeRecords())), null, 'a Prize the owner looked at keeps the menu that names it');
+});
+
+test("Peonia's hand candidates carry a stackKey per printing; in-play and Prize candidates carry none", () => {
+  const same = { id: 'sv1-1' };
+  const registry = registryOf([
+    { ...record(30, 'hand', 'Fire Energy'), card: { name: 'Fire Energy', ...same } },
+    { ...record(31, 'hand', 'Fire Energy'), card: { name: 'Fire Energy', ...same } },
+    { ...record(32, 'hand', 'Fire Energy'), card: { name: 'Fire Energy', id: 'sv2-9' } },
+  ]);
+  const hand = { ...PEONIA_HAND, options: [30, 31, 32].map((instanceId) => ({ instanceId, name: 'Fire Energy', src: '/f.png' })), min: 2, max: 2 };
+  const [a, b, c] = buildMatPickerRequest(hand, registry).candidates.map((x) => x.stackKey);
+  assert.equal(a, b, 'two copies of one printing share a stack');
+  assert.notEqual(a, c, 'another printing is its own stack');
+
+  const prizes = buildMatPickerRequest(PEONIA, registryOf(prizeRecords())).candidates;
+  assert.ok(prizes.every((x) => !('stackKey' in x)));
+  const inPlay = buildMatPickerRequest(choice(), registryOf([record(1, 'active'), record(2, 'bench')])).candidates;
+  assert.ok(inPlay.every((x) => !('stackKey' in x)));
 });

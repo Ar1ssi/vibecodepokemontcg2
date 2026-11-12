@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildMatPickEntry, findMatPickHit } from '../mat-pick.mjs';
+import { buildMatPickEntry, findMatPickHit, planMatToggle } from '../mat-pick.mjs';
 
 class MockElement {
   constructor(tagName = 'div', parent = null) {
@@ -225,4 +225,51 @@ test('multi-document click simulation: event dispatched on iframe document reach
   picked = null;
   iframeDoc.dispatchEvent({ type: 'click', target: fixture.shine, preventDefault() {}, stopPropagation() {} });
   assert.equal(picked, null);
+});
+
+// Copies of one printing stack in the hand on a single click target, so the second copy of a stack
+// can only be chosen by letting a click on a picked copy pick the next one (Peonia's hand pick).
+const stackEntry = (instanceId, stackKey = null) => ({ card: { instanceId, stackKey }, stackKey });
+
+test('buildMatPickEntry carries the candidate stackKey, null when it has none', () => {
+  assert.equal(buildMatPickEntry({ instanceId: 1, stackKey: 'Fire Energy|id:a' }).stackKey, 'Fire Energy|id:a');
+  assert.equal(buildMatPickEntry({ instanceId: 2 }).stackKey, null);
+});
+
+test('planMatToggle: a click on an unpicked card picks it while the pick has room', () => {
+  const entries = [stackEntry(1), stackEntry(2)];
+  assert.deepEqual(planMatToggle(entries, new Set(), entries[0].card, 2), { add: entries[0].card, remove: null });
+  const full = new Set([entries[0].card, entries[1].card]);
+  const extra = [...entries, stackEntry(3)];
+  assert.deepEqual(planMatToggle(extra, full, extra[2].card, 2), { add: null, remove: null }, 'a full pick takes no more');
+  assert.deepEqual(planMatToggle(entries, new Set(), { instanceId: 99 }, 2), { add: null, remove: null }, 'not a candidate');
+});
+
+test('planMatToggle: a click on a picked card un-picks it when it has no stacked copy', () => {
+  const entries = [stackEntry(1), stackEntry(2)];
+  const picked = new Set([entries[0].card]);
+  assert.deepEqual(planMatToggle(entries, picked, entries[0].card, 2), { add: null, remove: entries[0].card });
+  const sameKeyOnce = [stackEntry(1, 'A'), stackEntry(2, 'B')];
+  assert.deepEqual(planMatToggle(sameKeyOnce, new Set([sameKeyOnce[0].card]), sameKeyOnce[0].card, 2), { add: null, remove: sameKeyOnce[0].card });
+});
+
+test('planMatToggle: a click on a picked stack picks its next copy until the pick is full, then un-picks', () => {
+  const stack = [stackEntry(1, 'Fire Energy|id:a'), stackEntry(2, 'Fire Energy|id:a'), stackEntry(3, 'Fire Energy|id:a')];
+  const picked = new Set();
+  const click = () => {
+    const { add, remove } = planMatToggle(stack, picked, stack[0].card, 2);
+    if (remove) picked.delete(remove);
+    if (add) picked.add(add);
+    return [...picked].map((c) => c.instanceId);
+  };
+  assert.deepEqual(click(), [1], 'the first click picks the top copy');
+  assert.deepEqual(click(), [1, 2], 'the second click picks the next copy, not un-picks');
+  assert.deepEqual(click(), [2], 'at max, a click un-picks the clicked copy');
+  assert.deepEqual(click(), [2, 1], 'and the freed room takes it again');
+});
+
+test('planMatToggle: copies of another stack are not mistaken for the clicked one', () => {
+  const entries = [stackEntry(1, 'Fire Energy|id:a'), stackEntry(2, 'Water Energy|id:b')];
+  const picked = new Set([entries[0].card]);
+  assert.deepEqual(planMatToggle(entries, picked, entries[0].card, 3), { add: null, remove: entries[0].card });
 });

@@ -2686,3 +2686,81 @@ test('mat choice: declining a Peonia Prize pick reports an empty selection so th
 
   assert.deepEqual(resolved, [{ choiceId: 'choice_p1_peonia_3', selection: [] }]);
 });
+
+// … then "put a card from your hand face down as a Prize card": the hand pick of the same step is
+// also made on the mat, while an ordinary hand pick keeps the card carousel.
+const PRIZE_SWAP_TOKEN = { effectType: 'trainer', initiatorPlayerId: 'p1', stepIndex: 0, steps: [{ type: 'prizeToHand', count: 3, replace: true }] };
+const PEONIA_HAND_CHOICE = {
+  choiceId: 'choice_p1_peonia_4',
+  player: 'p1',
+  prompt: 'Peonia: Choose 2 card(s) from your hand to set face down as Prizes',
+  options: [
+    { instanceId: 30, name: 'Ultra Ball', src: '/u.png', type: 'Item' },
+    { instanceId: 31, name: 'Fire Energy', src: '/f.png', type: 'Energy' },
+  ],
+  min: 2,
+  max: 2,
+  cancellable: false,
+  resumeToken: PRIZE_SWAP_TOKEN,
+};
+
+const handView = (stateVersion, pendingChoice = null) => ({
+  stateVersion,
+  pendingChoice,
+  you: {
+    playerId: 'p1',
+    zones: {
+      active: [{ instanceId: 10, name: 'Swinub', src: '/s.png' }],
+      hand: [
+        { instanceId: 30, name: 'Ultra Ball', src: '/u.png' },
+        { instanceId: 31, name: 'Fire Energy', src: '/f.png' },
+        { instanceId: 32, name: 'Potion', src: '/p.png' },
+      ],
+    },
+  },
+  them: { playerId: 'p2', zones: {} },
+});
+
+test("mat choice: Peonia's hand pick opens the mat picker over the hand cards and submits the clicked ones", async () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const matPicker = fakeChoicePicker();
+  const choicePicker = fakeChoicePicker();
+  const resolved = [];
+  const opts = { document: doc, getZone: mockGetZone, matPicker, choicePicker, onResolveChoice: (sel) => resolved.push(sel) };
+
+  applyView(handView(1), [], opts);
+  applyView(handView(2, PEONIA_HAND_CHOICE), [], opts);
+  applyView(handView(3, PEONIA_HAND_CHOICE), [], opts);
+
+  assert.equal(doc.getElementById('netcodeChoiceModal'), null);
+  assert.equal(choicePicker.opened.length, 0, 'not the card carousel');
+  assert.equal(matPicker.opened.length, 1, 're-applied view does not reopen the mat picker');
+  const request = matPicker.opened[0];
+  assert.deepEqual(request.candidates.map((c) => c.instanceId), [30, 31]);
+  assert.equal(request.candidates[1].image, getCardRegistry().get(31).element);
+  assert.equal(request.min, 2);
+  assert.equal(request.max, 2);
+  assert.equal(request.cancellable, false);
+
+  await request.onResolve([30, 31]);
+  assert.deepEqual(resolved, [{ choiceId: 'choice_p1_peonia_4', selection: [30, 31] }]);
+});
+
+test('mat choice: an ordinary hand pick (no Prize swap) keeps the card carousel', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const matPicker = fakeChoicePicker();
+  const choicePicker = fakeChoicePicker();
+  const opts = { document: doc, getZone: mockGetZone, matPicker, choicePicker };
+
+  applyView(handView(1), [], opts);
+  const discard = {
+    ...PEONIA_HAND_CHOICE,
+    choiceId: 'choice_p1_discard_5',
+    prompt: 'Ultra Ball: Discard 2 cards from your hand',
+    resumeToken: { effectType: 'trainer', initiatorPlayerId: 'p1', stepIndex: 0, steps: [{ type: 'discardFromHand', count: 2 }] },
+  };
+  applyView(handView(2, discard), [], opts);
+
+  assert.equal(matPicker.opened.length, 0);
+  assert.equal(choicePicker.opened.length, 1);
+});
