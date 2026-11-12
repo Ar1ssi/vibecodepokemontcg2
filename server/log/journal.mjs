@@ -26,7 +26,14 @@ function choiceSummary(pending) {
   };
 }
 
-export function createJournal({ roomId, log, limits = LIMITS, now = Date.now, hash = hashState }) {
+export function createJournal({
+  roomId,
+  log,
+  limits = LIMITS,
+  now = Date.now,
+  hash = hashState,
+  onRecord = null,
+}) {
   const games = [];
   let game = 0;
   let n = 0;
@@ -41,6 +48,12 @@ export function createJournal({ roomId, log, limits = LIMITS, now = Date.now, ha
     const entry = current();
     entry.records.push(line);
     entry.bytes += line.length;
+    if (!onRecord) return;
+    try {
+      onRecord(line);
+    } catch {
+      // a failing mirror (disk) must not disturb the in-memory journal
+    }
   }
 
   function pushRing(sv, state) {

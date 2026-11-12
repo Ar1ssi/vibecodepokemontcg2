@@ -89,7 +89,11 @@ export function createServerLogging({
     createJournal(roomId) {
       let journal = journals.get(roomId);
       if (!journal) {
-        journal = createJournal({ roomId, log: forRoom(roomId) });
+        journal = createJournal({
+          roomId,
+          log: forRoom(roomId),
+          onRecord: diskSink ? (line) => diskSink.write(`journal:${roomId}`, line) : null,
+        });
         journals.set(roomId, journal);
       }
       return journal;

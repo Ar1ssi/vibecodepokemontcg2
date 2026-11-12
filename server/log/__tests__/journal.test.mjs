@@ -185,3 +185,21 @@ test('a room without a journal keeps the no-op default', () => {
   assert.deepEqual(NO_JOURNAL.games(), []);
   assert.equal(NO_JOURNAL.stats().complete, true);
 });
+
+test('onRecord receives every record line in order, and a throwing onRecord leaves the journal intact', () => {
+  const seen = [];
+  const { journal, send } = setup({ onRecord: (line) => seen.push(line) });
+  assert.equal(send('sock-a', 'draw').success, true);
+  const stored = journal.games().flatMap((g) => g.records);
+  assert.deepEqual(seen, stored);
+  assert.ok(seen.length > 0);
+
+  const { journal: sturdy, entries, send: sendSturdy } = setup({
+    onRecord: () => {
+      throw new Error('disk full');
+    },
+  });
+  assert.equal(sendSturdy('sock-a', 'draw').success, true);
+  assert.ok(sturdy.games().flatMap((g) => g.records).length > 0);
+  assert.equal(entries.filter((e) => e.cat === 'journal' && e.ev === 'failed').length, 0);
+});
