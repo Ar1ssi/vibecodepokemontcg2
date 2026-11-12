@@ -46,17 +46,6 @@ export function setCardAbilityUsed(card, used) {
   return card.abilityUsed;
 }
 
-export function getCardParent(card, zoneCards = []) {
-  if (!card) return null;
-  if (card.parentCard) return card.parentCard;
-  if (card.image?.relative) {
-    if (card.image.relative.card) return card.image.relative.card;
-    const parent = zoneCards.find((c) => c !== card && c?.image === card.image.relative);
-    if (parent) return parent;
-  }
-  return null;
-}
-
 export function setCardAttachment(childCard, parentCard) {
   if (!childCard) return;
   childCard.attached = !!parentCard;

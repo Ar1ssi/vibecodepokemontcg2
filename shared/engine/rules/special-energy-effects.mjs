@@ -89,10 +89,6 @@ export function parseTypedSpecialEnergy(card) {
   return null;
 }
 
-export function isTypedSpecialEnergy(card) {
-  return parseTypedSpecialEnergy(card) != null;
-}
-
 export function describeTypedSpecialEnergy(card) {
   const def = parseTypedSpecialEnergy(card);
   return def?.description || null;

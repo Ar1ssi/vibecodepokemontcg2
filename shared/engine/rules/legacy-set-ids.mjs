@@ -129,8 +129,7 @@ export const LEGACY_SET_CODE_TO_TCGDEX_ID = {
 // distinguish Phantasmal Flames Piloswine (me02-024) from Skyridge Piloswine
 // (ecard3-24). Pair the short code with the number via buildSetCardId().
 export const MODERN_SET_CODE_TO_TCGDEX_ID = {
-  // Mega Evolution era (find-type.js MEGEra; keep in sync with
-  // scripts/generate-starter-decks.mjs SET_MAP)
+  // Mega Evolution era (keep in sync with scripts/generate-starter-decks.mjs SET_MAP)
   MEG: 'me01',
   PFL: 'me02',
   ASC: 'me02.5',
@@ -141,7 +140,7 @@ export const MODERN_SET_CODE_TO_TCGDEX_ID = {
   MEE: 'mee',
   // 30th Celebration (Limitless code 30C; TCGdex 30th-066 Mew ex, design 049)
   '30C': '30th',
-  // Scarlet & Violet (find-type.js SVEra)
+  // Scarlet & Violet
   SVI: 'sv01',
   PAL: 'sv02',
   OBF: 'sv03',
@@ -160,7 +159,7 @@ export const MODERN_SET_CODE_TO_TCGDEX_ID = {
   WHT: 'sv10.5w',
   SVP: 'svp',
   SVE: 'sve',
-  // Sword & Shield (find-type.js SSEra — partial; legacy table covers many older codes)
+  // Sword & Shield (partial; legacy table covers many older codes)
   SSH: 'swsh1',
   RCL: 'swsh2',
   DAA: 'swsh3',
