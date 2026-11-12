@@ -1,5 +1,5 @@
 # 028: Match logging — one structured log for server, client, sync and errors
-Status: draft — waiting on user approval
+Status: superseded by 087
 Date: 2026-09-23 · Session: S264
 
 ## Problem
