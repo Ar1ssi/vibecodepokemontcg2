@@ -4,6 +4,7 @@ import { gzip } from 'node:zlib';
 import { LIMITS } from '../../shared/log/log-schema.mjs';
 import { buildExport } from './export.mjs';
 
+const LOBBY_WATCHERS = 'lobby:watchers';
 const MAX_TOKENS = 8;
 const FILENAME_ROOM_CHARS = 40;
 
@@ -61,6 +62,11 @@ export function createLogExport({
   randomToken = () => randomBytes(16).toString('hex'),
 }) {
   const tokens = new Map();
+  // An export walks every stream of a room and asks each client for a snapshot: one at a time
+  // per socket, spaced out, and announced to a room at most once per interval.
+  const inFlight = new WeakSet();
+  const lastExportAt = new WeakMap();
+  const lastAnnouncedAt = new Map();
 
   const filenameFor = (roomId) =>
     `ptcg-log_${(roomId ?? 'session').replace(/[^\w.-]+/g, '_').slice(0, FILENAME_ROOM_CHARS)}_${utcStamp(now())}.ndjson`;
@@ -94,8 +100,34 @@ export function createLogExport({
 
   async function exportFor(socket, payload) {
     const roomId = typeof payload?.roomId === 'string' && payload.roomId ? payload.roomId : null;
-    if (roomId && !socket.rooms.has(roomId)) return { ok: false, reason: 'not_in_room' };
+    // The lobby channel and a socket's own room are Socket.IO rooms, but never a game to export.
+    const isGameRoom = roomId !== LOBBY_WATCHERS && roomId !== socket.id;
+    if (roomId && (!isGameRoom || !socket.rooms.has(roomId))) return { ok: false, reason: 'not_in_room' };
     if (!roomId && !socket.data.logClientId) return { ok: false, reason: 'no_hello' };
+    if (inFlight.has(socket)) return { ok: false, reason: 'busy' };
+    if (now() - (lastExportAt.get(socket) ?? -Infinity) < limits.exportMinIntervalMs) return { ok: false, reason: 'too_soon' };
+    inFlight.add(socket);
+    lastExportAt.set(socket, now());
+    try {
+      return await buildAndStore(socket, payload, roomId);
+    } finally {
+      inFlight.delete(socket);
+    }
+  }
+
+  function announce(roomId, username) {
+    for (const [room, at] of lastAnnouncedAt) if (now() - at >= limits.exportAnnounceMs) lastAnnouncedAt.delete(room);
+    if (lastAnnouncedAt.has(roomId)) return;
+    lastAnnouncedAt.set(roomId, now());
+    io.to(roomId).emit('appendMessage', {
+      user: '',
+      message: `${username ?? 'A player'} exported the match log.`,
+      type: 'announcement',
+      emit: false,
+    });
+  }
+
+  async function buildAndStore(socket, payload, roomId) {
 
     const snapshots = await collectSnapshots(socket, roomId);
     const who = describe(socket.id, roomId);
@@ -115,14 +147,7 @@ export function createLogExport({
     const filename = filenameFor(roomId);
     const token = storeToken({ lines, filename, expires: now() + limits.exportTokenMs });
 
-    if (roomId) {
-      io.to(roomId).emit('appendMessage', {
-        user: '',
-        message: `${who.username ?? 'A player'} exported the match log.`,
-        type: 'announcement',
-        emit: false,
-      });
-    }
+    if (roomId) announce(roomId, who.username);
     log.info(
       'log',
       'export',

@@ -4,10 +4,15 @@ import { summarizePayload } from '../../shared/log/payload-policy.mjs';
 
 const LOBBY_WATCHERS = 'lobby:watchers';
 
+// A payload's room id counts only when the socket is in that room: any other string (a typo, a
+// refused join, a hostile client) would open a room stream that nothing ever closes.
 export function defaultRoomOf(socket, payload) {
   if (payload && typeof payload === 'object') {
-    if (typeof payload.roomId === 'string') return payload.roomId;
-    if (typeof payload.gameId === 'string') return payload.gameId;
+    for (const named of [payload.roomId, payload.gameId]) {
+      if (typeof named === 'string' && named !== LOBBY_WATCHERS && named !== socket.id && socket.rooms?.has(named)) {
+        return named;
+      }
+    }
   }
   for (const room of socket.rooms ?? []) {
     if (room !== socket.id && room !== LOBBY_WATCHERS) return room;
@@ -79,6 +84,7 @@ export function tapServer(io, { log, store, clientOf = () => null }) {
     'join-room',
     swallow((room, id) => {
       if (ignored(room, id)) return;
+      store.reopen(`room:${room}`);
       log.info('room', 'join', { id }, { room });
       const clientId = clientOf(id);
       if (typeof clientId === 'string') store.link(clientId, room, { socketId: id });

@@ -1,13 +1,25 @@
 // Server side of client log shipping (design 087 §5): hello/batch/ping/level sockets and the pagehide beacon.
-import { LEVEL_RANK, LIMITS } from '../../shared/log/log-schema.mjs';
+import { CATEGORIES, LEVEL_RANK, LIMITS } from '../../shared/log/log-schema.mjs';
 
 const CLIENT_ID = /^[0-9a-f]{16}$/;
 const LOAD_ID = /^[0-9a-f]{8}$/;
 const NOT_A_ROOM = 'lobby:watchers';
+const CATEGORY_SET = new Set(CATEGORIES);
+const EVENT_NAME_MAX = 120;
+const BUILD_MAX = 80;
+// Keys the export writes in front of every client line; a line that carried its own would
+// override them when the file is parsed (a client forging `src: server`).
+const RESERVED_KEYS = ['k', 'ts', 'src', 'load'];
+// Sanity bounds on client clocks: beyond them `t + offset` stops being a finite, sortable number.
+const TIME_MAX = 1e14;
+const OFFSET_MAX = 1e12;
+
+const shortString = (value, max) => (typeof value === 'string' ? value.slice(0, max) : null);
 
 function parseLine(line, limits) {
   if (typeof line !== 'string' || line.length > limits.ingestMaxLineBytes) return null;
-  if (line.includes('\n') || line.includes('\r')) return null;
+  // The export patches each line by position, so it must be exactly what the logger writes.
+  if (!line.startsWith('{"t":') || line.includes('\n') || line.includes('\r')) return null;
   let entry;
   try {
     entry = JSON.parse(line);
@@ -15,9 +27,12 @@ function parseLine(line, limits) {
     return null;
   }
   if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) return null;
-  if (typeof entry.t !== 'number' || !Number.isFinite(entry.t)) return null;
-  if (!Number.isInteger(entry.seq) || entry.seq <= 0) return null;
+  if (typeof entry.t !== 'number' || !(Math.abs(entry.t) < TIME_MAX)) return null;
+  if (!Number.isInteger(entry.seq) || entry.seq <= 0 || entry.seq > limits.ingestMaxSeq) return null;
   if (typeof entry.lvl !== 'string' || !Object.hasOwn(LEVEL_RANK, entry.lvl)) return null;
+  if (!CATEGORY_SET.has(entry.cat)) return null;
+  if (typeof entry.ev !== 'string' || entry.ev.length > EVENT_NAME_MAX) return null;
+  if (RESERVED_KEYS.some((key) => Object.hasOwn(entry, key))) return null;
   return entry;
 }
 
@@ -70,7 +85,7 @@ export function createLogIngest({ store, log, io, now = Date.now, limits = LIMIT
 
   function storeBatch({ clientId, loadId, lines, payload }) {
     const key = `${clientId}/${loadId}`;
-    const offset = Number.isFinite(payload.offset) ? payload.offset : 0;
+    const offset = Math.abs(payload.offset) < OFFSET_MAX ? payload.offset : 0;
     const result = ingestLines({ store, clientId, loadId, lines, offset, lastSeq: seqByLoad.get(key) ?? 0, limits });
     seqByLoad.set(key, result.lastSeq);
     store.setMeta(`client:${clientId}`, {
@@ -89,17 +104,24 @@ export function createLogIngest({ store, log, io, now = Date.now, limits = LIMIT
       ack({ ok: false, reason: 'bad_hello' });
       return;
     }
+    // One identity per socket: a socket that could re-hello as someone new would mint a stream
+    // (and its metadata) per call.
+    const bound = socket.data.logClientId;
+    if (bound && (bound !== clientId || socket.data.logLoadId !== loadId)) {
+      ack({ ok: false, reason: 'client_changed' });
+      return;
+    }
     socket.data.logClientId = clientId;
     socket.data.logLoadId = loadId;
     const streamId = `client:${clientId}`;
-    const page = String(payload.page ?? '').slice(0, 200);
-    const build = payload.build ?? null;
-    const existing = store.stream(streamId)?.meta?.loads ?? {};
-    store.setMeta(streamId, {
-      ua: String(payload.ua ?? '').slice(0, 300),
-      build,
-      loads: { ...existing, [loadId]: { helloAt: now(), page, build } },
-    });
+    const page = shortString(payload.page, 200) ?? '';
+    const build = shortString(payload.build, BUILD_MAX);
+    const loads = { ...(store.stream(streamId)?.meta?.loads ?? {}), [loadId]: { helloAt: now(), page, build } };
+    const kept = Object.entries(loads)
+      .sort(([, a], [, b]) => b.helloAt - a.helloAt)
+      .slice(0, limits.helloMaxLoads);
+    store.setMeta(streamId, { ua: shortString(payload.ua, 300) ?? '', build, loads: Object.fromEntries(kept) });
+    store.reopen(streamId);
     for (const room of socket.rooms) {
       if (room === socket.id || room === NOT_A_ROOM) continue;
       store.link(clientId, room, { socketId: socket.id });
@@ -137,6 +159,7 @@ export function createLogIngest({ store, log, io, now = Date.now, limits = LIMIT
       }
       return ack({ ok: false, reason: 'rate' });
     }
+    store.reopen(`client:${clientId}`);
     const result = storeBatch({ clientId, loadId: socket.data.logLoadId, lines: payload.lines, payload });
     return ack({ ok: true, acked: result.lastSeq, bad: result.bad, level: levelForSocket(socket) });
   }
@@ -145,7 +168,9 @@ export function createLogIngest({ store, log, io, now = Date.now, limits = LIMIT
     const level = payload?.level;
     if (level !== 'debug' && level !== 'trace') return ack({ ok: false, reason: 'bad_request' });
     if (payload.roomId == null) return setClientLevel(socket, level, ack);
-    if (!socket.rooms.has(payload.roomId)) return ack({ ok: false, reason: 'bad_request' });
+    // The lobby channel and a socket's own room are Socket.IO rooms too, but never a game room.
+    const isGameRoom = typeof payload.roomId === 'string' && payload.roomId !== NOT_A_ROOM && payload.roomId !== socket.id;
+    if (!isGameRoom || !socket.rooms.has(payload.roomId)) return ack({ ok: false, reason: 'bad_request' });
     if (level === 'trace') roomLevels.set(payload.roomId, 'trace');
     else roomLevels.delete(payload.roomId);
     const by = socket.data.logClientId ?? socket.id;

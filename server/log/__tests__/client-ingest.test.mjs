@@ -212,3 +212,86 @@ test('acceptTail stores a snapshot tail once; the later batch of the same lines 
   assert.equal(store.stream(`client:${CLIENT}`).size, 3);
   assert.equal(ingest.acceptTail(c.socket, { loadId: LOAD, lines: 'nope' }), 0);
 });
+
+test('lines that would corrupt or forge the export are dropped', () => {
+  const { makeSocket, store } = setup();
+  const c = makeSocket();
+  c.call('log:hello', hello);
+  const good = line(1);
+  const lines = [
+    good,
+    ` ${line(2)}`, // leading space: the export cuts the first character
+    JSON.stringify({ t: 1e308, seq: 3, lvl: 'info', cat: 'app', ev: 'x' }), // ts would be Infinity
+    line(4, { src: 'server' }),
+    line(5, { k: 'header' }),
+    line(6, { ts: 1 }),
+    line(7, { load: 'x' }),
+    JSON.stringify({ t: 5, seq: 8, lvl: 'info', cat: 'not-a-category', ev: 'x' }),
+    JSON.stringify({ t: 5, seq: 9, lvl: 'info', cat: 'app', ev: 'e'.repeat(121) }),
+    JSON.stringify({ t: 5, seq: 9e15, lvl: 'info', cat: 'app', ev: 'x' }), // would block every later seq
+    JSON.stringify({ seq: 10, t: 5, lvl: 'info', cat: 'app', ev: 'x' }), // keys out of order
+  ];
+  const ack = c.call('log:batch', { loadId: LOAD, lines, offset: 1e300 });
+  assert.equal(ack.bad, lines.length - 1);
+  const stored = store.stream(`client:${CLIENT}`).entries();
+  assert.equal(stored.length, 1);
+  assert.equal(stored[0].ts, stored[0].t, 'an absurd offset is ignored');
+  assert.equal(c.call('log:batch', { loadId: LOAD, lines: [line(11)] }).acked, 11, 'later lines still land');
+});
+
+test('a relay entry at the 16 KB detail cap fits the ingest line cap', () => {
+  const { makeSocket, store } = setup();
+  const c = makeSocket();
+  c.call('log:hello', hello);
+  const big = JSON.stringify({ t: 5, seq: 1, lvl: 'debug', cat: 'socket', ev: 'out.pushAction', room: 'r'.repeat(40), d: { args: 'x'.repeat(16300) } });
+  assert.ok(big.length > 16384);
+  assert.equal(c.call('log:batch', { loadId: LOAD, lines: [big] }).bad, 0);
+  assert.equal(store.stream(`client:${CLIENT}`).size, 1);
+});
+
+test('hello metadata is bounded and a socket cannot change identity', () => {
+  const { makeSocket, store, clock } = setup();
+  const c = makeSocket();
+  const ack = c.call('log:hello', { ...hello, build: 'b'.repeat(900000), page: { not: 'a string' }, ua: 'u'.repeat(5000) });
+  assert.equal(ack.ok, true);
+  const meta = store.stream(`client:${CLIENT}`).meta;
+  assert.equal(meta.build.length, 80);
+  assert.equal(meta.ua.length, 300);
+  assert.equal(meta.loads[LOAD].page, '');
+  assert.ok(JSON.stringify(meta).length < 2000);
+  assert.deepEqual(c.call('log:hello', { ...hello, clientId: 'ffffffffffffffff' }), { ok: false, reason: 'client_changed' });
+  assert.equal(store.stream('client:ffffffffffffffff'), null);
+  assert.equal(c.call('log:hello', hello).ok, true, 'the same identity may say hello again');
+
+  for (let i = 0; i < 15; i++) {
+    clock.advance(1000);
+    makeSocket().call('log:hello', { ...hello, loadId: i.toString(16).padStart(8, '0') });
+  }
+  const loads = Object.keys(store.stream(`client:${CLIENT}`).meta.loads);
+  assert.equal(loads.length, 10);
+  assert.ok(loads.includes('0000000e') && !loads.includes(LOAD), 'the newest loads are kept');
+});
+
+test('a beacon after the disconnect does not reopen the client stream; a hello does', () => {
+  const { makeSocket, store, ingest } = setup();
+  const c = makeSocket();
+  c.call('log:hello', hello);
+  c.handlers.disconnect();
+  const res = { status: () => res, end() {} };
+  ingest.beaconHandler({ body: JSON.stringify({ clientId: CLIENT, loadId: LOAD, lines: [line(1)] }) }, res);
+  assert.equal(store.stream(`client:${CLIENT}`).size, 1);
+  assert.notEqual(store.stream(`client:${CLIENT}`).closedAt, null);
+  makeSocket().call('log:hello', hello);
+  assert.equal(store.stream(`client:${CLIENT}`).closedAt, null);
+});
+
+test('the lobby channel and a socket\'s own room are not rooms a level can be set for', () => {
+  const { makeSocket, emitted, ingest } = setup();
+  const c = makeSocket(['lobby:watchers']);
+  c.call('log:hello', hello);
+  assert.equal(c.call('log:setLevel', { roomId: 'lobby:watchers', level: 'trace' }).reason, 'bad_request');
+  assert.equal(c.call('log:setLevel', { roomId: c.socket.id, level: 'trace' }).reason, 'bad_request');
+  assert.equal(c.call('log:setLevel', { roomId: { toString: () => 'lobby:watchers' }, level: 'trace' }).reason, 'bad_request');
+  assert.equal(emitted.length, 0);
+  assert.equal(ingest.levelFor('lobby:watchers'), 'debug');
+});

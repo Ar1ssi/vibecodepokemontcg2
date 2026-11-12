@@ -18,6 +18,7 @@ function createInert(now) {
   const log = createLogger({ now, sink: () => {}, level: 'error' });
   return {
     enabled: false,
+    sweep() {},
     store: null,
     log,
     forRoom: () => log,
@@ -53,8 +54,10 @@ export function createServerLogging({
   if (env.LOG_OFF === '1') return createInert(now);
 
   const bootId = `${Date.now().toString(36)}-${process.pid}`;
-  // Captured before the console is wrapped, so a disk warning is not re-logged as a console entry.
-  const warnToConsole = (line) => consoleRef.warn(line);
+  // The method itself is captured before the console is wrapped, so a disk warning is printed
+  // without being re-logged as a console entry (which would be written to that same disk sink).
+  const originalWarn = consoleRef.warn;
+  const warnToConsole = (line) => originalWarn.call(consoleRef, line);
   const logDir = resolveLogDir(env, repoRoot);
   const diskSink = logDir
     ? createDiskSink({
@@ -63,16 +66,25 @@ export function createServerLogging({
         onWarn: ({ streamId, reason }) => warnToConsole(`[log] disk sink disabled for ${streamId}: ${reason}`),
       })
     : null;
-  const store = createLogStore({ now, totalBytes: totalBytesFrom(env), sink: diskSink });
+  const journals = new Map();
+  // Journals live and die with their room's stream, and their bytes count against LOG_MAX_MB.
+  const journalBytes = () => {
+    let sum = 0;
+    for (const [roomId, journal] of journals) {
+      if (store.stream(`room:${roomId}`)) sum += journal.stats().bytes;
+    }
+    return sum;
+  };
+  const store = createLogStore({ now, totalBytes: totalBytesFrom(env), sink: diskSink, externalBytes: journalBytes });
   const { log, forRoom } = createServerLog({ store, now });
   const uninstallProcessTap = installProcessTap({ log, diskSink, consoleRef, processRef });
-  const journals = new Map();
-  const sweepTimer = setInterval(() => {
+  const sweep = () => {
     store.sweep();
     for (const roomId of journals.keys()) {
       if (!store.stream(`room:${roomId}`)) journals.delete(roomId);
     }
-  }, LIMITS.sweepMs);
+  };
+  const sweepTimer = setInterval(sweep, LIMITS.sweepMs);
   sweepTimer.unref();
   const build = readBuild({ env, cwd: repoRoot });
   log.info('boot', 'start', { commit: build.commit, node: build.node, pid: process.pid, logDir: diskSink?.dir ?? null });
@@ -83,17 +95,23 @@ export function createServerLogging({
   const delegate = (name) => (req, res) => (exporter ? exporter[name](req, res) : notFound(req, res));
   return {
     enabled: true,
+    sweep,
     store,
     log,
     forRoom,
     createJournal(roomId) {
       let journal = journals.get(roomId);
       if (!journal) {
-        journal = createJournal({
+        const created = createJournal({
           roomId,
           log: forRoom(roomId),
-          onRecord: diskSink ? (line) => diskSink.write(`journal:${roomId}`, line) : null,
+          onRecord: (line) => {
+            // A room that outlived its swept stream is still journaling: keep it findable.
+            if (journals.get(roomId) !== created) journals.set(roomId, created);
+            diskSink?.write(`journal:${roomId}`, line);
+          },
         });
+        journal = created;
         journals.set(roomId, journal);
       }
       return journal;

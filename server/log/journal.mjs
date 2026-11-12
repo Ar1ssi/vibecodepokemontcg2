@@ -39,7 +39,6 @@ export function createJournal({
   let n = 0;
   let last = { state: null, sv: null, cursor: null };
   let ring = [];
-  let complete = true;
   let failureReported = false;
 
   const current = () => games[games.length - 1];
@@ -56,8 +55,11 @@ export function createJournal({
     }
   }
 
+  const overBudget = (line) => current().bytes + line.length > limits.journalGameBytes;
+
+  // `sv` repeats (an undo rewinds it), so each ring entry also says which game and command made it.
   function pushRing(sv, state) {
-    ring.push({ sv, state });
+    ring.push({ sv, state, game, n });
     if (ring.length > limits.stateRing) ring = ring.slice(ring.length - limits.stateRing);
   }
 
@@ -80,14 +82,20 @@ export function createJournal({
     if (games.length === 0 || why === 'created' || why === 'reset') {
       game += 1;
       n = 0;
-      games.push({ game, records: [], bytes: 0 });
+      games.push({ game, records: [], bytes: 0, complete: true });
       if (games.length > limits.journalGames) games.splice(0, games.length - limits.journalGames);
     }
-    append(
-      JSON.stringify({ k: 'rebase', game, why, t: now(), seed: state.seed, cursor, sv: state.stateVersion, state })
-    );
-    pushRing(state.stateVersion, state);
+    // Before anything that can throw: a failed record must not make every later command look
+    // like an unjournaled change (which would snapshot the whole state each time).
     last = { state, sv: state.stateVersion, cursor };
+    const head = { k: 'rebase', game, why, t: now(), seed: state.seed, cursor, sv: state.stateVersion };
+    let line = JSON.stringify({ ...head, state });
+    if (overBudget(line)) {
+      line = JSON.stringify({ ...head, state: null, _truncated: true });
+      current().complete = false;
+    }
+    append(line);
+    pushRing(state.stateVersion, state);
     log.info('engine', 'rebase', { why, game, seed: state.seed, cursor }, { room: roomId, sv: state.stateVersion });
   }
 
@@ -106,6 +114,7 @@ export function createJournal({
     const ok = !result.error;
     const stateAfter = ok ? result.state : stateBefore;
     n += 1;
+    last = { state: stateAfter, sv: stateAfter.stateVersion, cursor: cursorAfter };
     const record = {
       k: 'cmd',
       game,
@@ -123,14 +132,13 @@ export function createJournal({
       ms: Math.round(ms * 100) / 100,
     };
     let line = JSON.stringify(record);
-    if (current().bytes + line.length > limits.journalGameBytes) {
+    if (overBudget(line)) {
       line = JSON.stringify({ ...record, cmd: { type: cmd?.type, _truncated: true }, events: [] });
-      complete = false;
+      current().complete = false;
     }
     append(line);
 
     if (ok) pushRing(stateAfter.stateVersion, stateAfter);
-    last = { state: stateAfter, sv: stateAfter.stateVersion, cursor: cursorAfter };
 
     log[ok ? 'debug' : 'info'](
       'engine',
@@ -164,7 +172,7 @@ export function createJournal({
   function stats() {
     const records = games.reduce((sum, g) => sum + g.records.length, 0);
     const bytes = games.reduce((sum, g) => sum + g.bytes, 0);
-    return { games: games.length, records, bytes, complete };
+    return { games: games.length, records, bytes, complete: games.every((g) => g.complete) };
   }
 
   return {

@@ -18,6 +18,8 @@ export function createLogStore({
   limits = LIMITS,
   totalBytes = LIMITS.totalBytesDefault,
   sink = null,
+  // Memory held for these streams outside the rings (the room journals), counted in the total.
+  externalBytes = () => 0,
 } = {}) {
   const streams = new Map();
   const links = new Map(); // roomId -> Map(clientId -> participant row)
@@ -42,11 +44,12 @@ export function createLogStore({
     if (streamId.startsWith(ROOM_PREFIX)) links.delete(streamId.slice(ROOM_PREFIX.length));
   }
 
-  const totalSize = () => {
+  const ringBytes = () => {
     let sum = 0;
     for (const s of streams.values()) sum += s.ring.bytes();
     return sum;
   };
+  const totalSize = () => ringBytes() + externalBytes();
 
   function oldestClosed() {
     let oldest = null;
@@ -70,7 +73,8 @@ export function createLogStore({
       const s = open(streamId);
       s.ring.push(load === undefined ? { seq, t, ts, lvl, line } : { seq, t, ts, lvl, line, load });
       s.lastAt = now();
-      s.closedAt = null;
+      // A late entry (a socket's disconnect, logged after its room was deleted) must not reopen a
+      // closed stream, or the stream would never expire: only reopen() does that.
       if (!sink) return;
       try {
         sink.write(streamId, diskLine ?? line);
@@ -121,6 +125,11 @@ export function createLogStore({
       const s = streams.get(streamId);
       if (s) s.closedAt = now();
     },
+    /** The room or client is live again (a socket joined, a client said hello or sent a batch). */
+    reopen(streamId) {
+      const s = streams.get(streamId);
+      if (s) s.closedAt = null;
+    },
     sweep() {
       const result = { expired: [], evicted: [], trimmed: [] };
       const at = now();
@@ -152,7 +161,7 @@ export function createLogStore({
         dropped: s.ring.dropped(),
         closedAt: s.closedAt,
       }));
-      return { streams: byStream.length, bytes: totalSize(), byStream };
+      return { streams: byStream.length, bytes: ringBytes(), externalBytes: externalBytes(), byStream };
     },
   };
 }

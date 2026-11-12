@@ -2,6 +2,10 @@
 import { describeElement } from './describe-element.mjs';
 
 const STACK_CHARS = 4000;
+// Values under keys that look like credentials never reach a log (a seat token in a logged
+// socket payload would let whoever reads an export take that seat).
+const SECRET_KEY = /token|passw|secret|authorization|cookie/i;
+export const REDACTED = '[redacted]';
 const TRUNCATED_KEYS = 20;
 
 const more = (n) => `…(+${n})`;
@@ -26,6 +30,10 @@ function sanitizeObject(obj, state, depth) {
   const out = {};
   for (const key of Object.keys(obj)) {
     try {
+      if (SECRET_KEY.test(key)) {
+        out[key] = REDACTED;
+        continue;
+      }
       const v = sanitize(obj[key], state, depth + 1);
       if (v !== undefined) out[key] = v;
     } catch {

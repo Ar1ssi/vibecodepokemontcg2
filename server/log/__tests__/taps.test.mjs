@@ -135,9 +135,13 @@ function fakeSocket(extra = {}) {
 }
 
 test('defaultRoomOf order', () => {
-  const s = fakeSocket({ rooms: new Set(['sock1', 'lobby:watchers', 'live']) });
-  assert.equal(defaultRoomOf(s, { roomId: 'a', gameId: 'b' }), 'a');
-  assert.equal(defaultRoomOf(s, { gameId: 'b' }), 'b');
+  const s = fakeSocket({ rooms: new Set(['sock1', 'lobby:watchers', 'live', 'other']) });
+  assert.equal(defaultRoomOf(s, { roomId: 'other', gameId: 'live' }), 'other');
+  assert.equal(defaultRoomOf(s, { gameId: 'other' }), 'other');
+  // A room the socket is not in is never trusted: it would open a stream nothing closes.
+  assert.equal(defaultRoomOf(s, { roomId: 'not-joined', gameId: 'nor-this' }), 'live');
+  assert.equal(defaultRoomOf(s, { roomId: 'lobby:watchers' }), 'live');
+  assert.equal(defaultRoomOf(s, { roomId: 'sock1' }), 'live');
   assert.equal(defaultRoomOf(s, { roomId: 5 }), 'live');
   assert.equal(defaultRoomOf(s, null), 'live');
   assert.equal(defaultRoomOf(fakeSocket(), undefined), null);
@@ -147,6 +151,7 @@ test('socket tap: connect, in, out, log:batch, disconnect, error', () => {
   const { log, parsed } = setup();
   const s = fakeSocket({ recovered: true });
   tapSocket(s, { log, seatOf: (id, room) => (room === 'r' ? 'p1' : null) });
+  s.rooms = new Set(['sock1', 'r']);
   const connect = parsed('server')[0];
   assert.equal(connect.ev, 'connect');
   assert.deepEqual(connect.d, { id: 'sock1', transport: 'websocket', recovered: true, ua: 'UA' });
@@ -160,7 +165,7 @@ test('socket tap: connect, in, out, log:batch, disconnect, error', () => {
   assert.equal(inEntry.cs, 4);
 
   s.anyOut('view', { stateVersion: 9, events: [{ type: 'attack' }] });
-  const out = parsed('server').at(-1);
+  const out = parsed('room:r').at(-1);
   assert.equal(out.ev, 'out.view');
   assert.equal(out.sv, 9);
   assert.equal(out.d.sv, 9);
@@ -172,7 +177,6 @@ test('socket tap: connect, in, out, log:batch, disconnect, error', () => {
 
   s.handlers.error(new Error('bad'));
   assert.equal(parsed('server').at(-1).ev, 'error');
-  s.rooms = new Set(['sock1', 'r']);
   s.handlers.disconnecting();
   s.rooms = new Set();
   s.handlers.disconnect('transport close');
@@ -221,4 +225,25 @@ test('tapServer: connection_error, joins, leaves, delete-room', () => {
   adapter.emit('delete-room', 'r');
   assert.equal(parsed('room:r').at(-1).ev, 'deleted');
   assert.notEqual(store.stream('room:r').closedAt, null);
+});
+
+test('a payload naming a room the socket never joined opens no room stream', () => {
+  const { log, store } = setup();
+  const s = fakeSocket();
+  tapSocket(s, { log });
+  for (let i = 0; i < 50; i++) s.any('joinGame', { roomId: `typo-${i}` });
+  assert.deepEqual(store.stats().byStream.map((row) => row.id), ['server']);
+});
+
+test('seat tokens never reach the log: object keys and the joinGame positional argument', () => {
+  const { log, store } = setup();
+  const s = fakeSocket({ rooms: new Set(['sock1', 'r']) });
+  tapSocket(s, { log });
+  s.any('joinGame', 'private-room', 'Ash', false, 'SECRET-SEAT-TOKEN-1', { solo: false });
+  s.anyOut('joinGame', { roomId: 'r', seatToken: 'SECRET-SEAT-TOKEN-2' });
+  s.any('userReconnected', { roomId: 'r', username: 'Ash', seatToken: 'SECRET-SEAT-TOKEN-3', nested: { password: 'hunter2' } });
+  const everything = store.stats().byStream.flatMap((row) => store.stream(row.id).entries().map((e) => e.line)).join('\n');
+  assert.doesNotMatch(everything, /SECRET-SEAT-TOKEN|hunter2/);
+  assert.match(everything, /"Ash"/);
+  assert.match(everything, /\[redacted\]/);
 });

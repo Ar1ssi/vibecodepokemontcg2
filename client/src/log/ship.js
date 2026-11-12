@@ -70,7 +70,9 @@ export function startShipping({ socket, log, ring, onEntry, clientId, loadId, wi
         if (err) batcher.failed('timeout', now());
         else if (!ack?.ok) batcher.failed(ack?.reason ?? 'refused', now());
         else {
-          batcher.acked(Number(ack.acked) || batch.to, now());
+          // An ok ack settles the whole batch: a line the server refused is refused for good,
+          // and re-sending it every flush would never end.
+          batcher.acked(Math.max(Number(ack.acked) || 0, batch.to), now());
           if (ack.level && ack.level !== log.level()) log.setLevel(ack.level);
         }
         settleWaiting(Boolean(!err && ack?.ok));

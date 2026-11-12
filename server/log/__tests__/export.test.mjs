@@ -87,10 +87,14 @@ test('a room with nothing logged exports a header, the created rebase and its st
 test('every line is single-line JSON and state lines carry commandLogLength only', () => {
   const store = storeWithRoom();
   push(store, 'room:r1', 1, 100, 'info', 'engine');
+  // sv 1 appears twice with different states (an undo rewound to it): both must be exported,
+  // and the same state object listed twice (a rebase of the current state) only once.
+  const rewound = { stateVersion: 1, commandLog: [{ a: 1 }, { a: 2 }, { a: 3 }] };
   const states = [
-    { sv: 1, state: { stateVersion: 1, commandLog: [{ a: 1 }, { a: 2 }], note: 'multi\nline' } },
-    { sv: 1, state: { stateVersion: 1, commandLog: [{ a: 1 }, { a: 2 }, { a: 3 }] } },
-    { sv: 2, state: { stateVersion: 2 } },
+    { sv: 1, game: 1, n: 1, state: { stateVersion: 1, commandLog: [{ a: 1 }, { a: 2 }], note: 'multi\nline' } },
+    { sv: 2, game: 1, n: 2, state: { stateVersion: 2 } },
+    { sv: 1, game: 1, n: 3, state: rewound },
+    { sv: 1, game: 1, n: 3, state: rewound },
   ];
   const lines = build(store, { journal: stubJournal(states) });
   for (const line of lines) {
@@ -98,8 +102,9 @@ test('every line is single-line JSON and state lines carry commandLogLength only
     JSON.parse(line);
   }
   const stateLines = lines.map((l) => JSON.parse(l)).filter((r) => r.k === 'state');
-  assert.deepEqual(stateLines.map((s) => s.sv), [1, 2]);
-  assert.equal(stateLines[0].state.commandLogLength, 3);
+  assert.deepEqual(stateLines.map((s) => [s.sv, s.game, s.n]), [[1, 1, 1], [2, 1, 2], [1, 1, 3]]);
+  assert.equal(stateLines[0].state.commandLogLength, 2);
+  assert.equal(stateLines[2].state.commandLogLength, 3);
   assert.equal('commandLog' in stateLines[0].state, false);
   assert.equal(stateLines[1].state.commandLogLength, 0);
 });
@@ -124,8 +129,8 @@ test('the server source takes room entries plus server entries from 60 s before 
   const store = storeWithRoom();
   push(store, 'room:r1', 1, 200_000, 'info', 'engine');
   push(store, `client:${CLIENT_A}`, 1, 200_500, 'info', 'app', 'deadbeef');
-  push(store, 'server', 1, 200_000 - 120_000, 'info', 'http');
-  push(store, 'server', 2, 200_000 - 30_000, 'info', 'http');
+  push(store, 'server', 1, 200_000 - 120_000, 'info', 'boot');
+  push(store, 'server', 2, 200_000 - 30_000, 'info', 'boot');
   const lines = build(store);
   const serverTs = entriesOf(lines).filter((e) => e.src === 'server').map((e) => e.ts);
   assert.deepEqual(serverTs, [170_000, 200_000]);
@@ -155,10 +160,37 @@ test('client scope exports only that client stream and the server window', () =>
   push(store, 'room:r1', 1, 100, 'info', 'engine');
   push(store, `client:${CLIENT_A}`, 1, 100, 'info', 'app', 'deadbeef');
   push(store, `client:${CLIENT_B}`, 1, 100, 'info', 'app', 'deadbeef');
-  push(store, 'server', 1, 90, 'info', 'http');
+  push(store, 'server', 1, 90, 'info', 'process');
   const lines = buildExport({ store, scope: { clientId: CLIENT_A }, now: () => NOW });
   const header = headerOf(lines);
   assert.equal(header.room, null);
   assert.deepEqual(header.sources.map((s) => s.src), ['server', 'c:a1b2c3d4']);
   assert.deepEqual(entriesOf(lines).map((e) => e.src).sort(), ['c:a1b2c3d4', 'server']);
+});
+
+test('from the shared server stream an export takes process entries and its own clients\' HTTP, never other sockets\' traffic', () => {
+  const store = storeWithRoom();
+  push(store, `client:${CLIENT_A}`, 1, 1000, 'info', 'app', 'deadbeef');
+  const server = (seq, cat, detail) =>
+    store.append('server', { seq, t: 1000, ts: 1000, lvl: 'info', line: `{"t":1000,"seq":${seq},"lvl":"info","cat":"${cat}","ev":"x","d":${JSON.stringify(detail)}}` });
+  server(1, 'socket', { id: 'other', args: ['their-private-room', 'Stranger'] });
+  server(2, 'room', { id: 'other' });
+  server(3, 'http', { path: '/api/x', client: CLIENT_A });
+  server(4, 'http', { path: '/api/y', client: 'ffffffffffffffff' });
+  server(5, 'http', { path: '/api/z', client: null });
+  server(6, 'process', { warning: 'w' });
+  server(7, 'console', { args: ['boot line'] });
+  const text = build(store).join('\n');
+  assert.doesNotMatch(text, /their-private-room|Stranger|\/api\/y|\/api\/z/);
+  assert.match(text, /\/api\/x/);
+  assert.deepEqual(entriesOf(build(store)).filter((e) => e.src === 'server').map((e) => e.cat), ['http', 'process', 'console']);
+});
+
+test('a snapshot cannot rename itself: k and src are set by the export', () => {
+  const store = storeWithRoom();
+  push(store, `client:${CLIENT_A}`, 1, 100, 'info', 'app', 'deadbeef');
+  const lines = build(store, { snapshots: { [CLIENT_A]: { k: 'header', src: 'server', meta: { w: 1 } } } });
+  const records = lines.map((l) => JSON.parse(l));
+  assert.equal(records.filter((r) => r.k === 'header').length, 1);
+  assert.deepEqual(records.filter((r) => r.k === 'snap').map((r) => r.src), ['c:a1b2c3d4']);
 });

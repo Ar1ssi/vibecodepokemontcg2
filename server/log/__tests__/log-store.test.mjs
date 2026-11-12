@@ -48,14 +48,36 @@ test('closed stream is gone after 31 minutes, kept before', () => {
   assert.deepEqual(store.participants('a'), []);
 });
 
-test('close then append reopens the stream', () => {
-  const store = createLogStore();
+test('a late append keeps a closed stream closed, so it still expires; only reopen() reopens it', () => {
+  let t = 0;
+  const store = createLogStore({ now: () => t });
   store.append('room:a', entry(1));
   store.close('room:a');
   assert.notEqual(store.stream('room:a').closedAt, null);
   store.append('room:a', entry(2));
-  assert.equal(store.stream('room:a').closedAt, null);
+  assert.notEqual(store.stream('room:a').closedAt, null, 'a disconnect entry after delete-room must not reopen');
+  assert.equal(store.stream('room:a').size, 2);
+  t += 31 * 60 * 1000;
+  assert.deepEqual(store.sweep().expired, ['room:a']);
+
+  store.append('room:b', entry(1));
+  store.close('room:b');
+  store.reopen('room:b');
+  assert.equal(store.stream('room:b').closedAt, null);
   store.close('room:missing');
+  store.reopen('room:missing');
+});
+
+test('memory held outside the rings counts against the total cap', () => {
+  let t = 0;
+  let external = 0;
+  const store = createLogStore({ now: () => t, totalBytes: 1000, externalBytes: () => external });
+  store.append('room:a', entry(1));
+  store.close('room:a');
+  assert.deepEqual(store.sweep().evicted, []);
+  external = 5000;
+  assert.deepEqual(store.sweep().evicted, ['room:a']);
+  assert.equal(store.stats().externalBytes, 5000);
 });
 
 test('over the total cap the oldest closed stream goes first, before any trim', () => {

@@ -9,6 +9,10 @@ export function replayJournal(records, { applyCommand, createRng, hashState, to 
 
   for (const record of records) {
     if (record.k === 'rebase') {
+      if (!record.state) {
+        divergence = { n: null, game: record.game, kind: 'truncated' };
+        break;
+      }
       state = structuredClone(record.state);
       seed = record.seed;
       rng = createRng(seed, record.cursor);
@@ -38,6 +42,12 @@ export function replayJournal(records, { applyCommand, createRng, hashState, to 
         divergence = { n, game, kind: 'hash', expected: record.after.hash, actual };
         break;
       }
+    }
+    // The hash covers the zones; the rng cursor catches a draw that went differently without
+    // moving a card yet.
+    if (Number.isInteger(record.after.cursor) && rng.cursor !== record.after.cursor) {
+      divergence = { n, game, kind: 'cursor', expected: record.after.cursor, actual: rng.cursor };
+      break;
     }
     commands += 1;
     if (record.after.sv >= to) break;

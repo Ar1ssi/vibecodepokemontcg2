@@ -91,12 +91,28 @@ test('append failure disables that stream with the error message', () => {
 test('only the newest diskKeepBoots-1 old boot dirs survive next to the new one', () => {
   const dir = tmp();
   for (let i = 0; i < 4; i++) {
-    const d = path.join(dir, `old${i}`);
+    const d = path.join(dir, `old${i}-${100 + i}`);
     fs.mkdirSync(d);
     fs.utimesSync(d, 1000 + i, 1000 + i);
   }
-  const sink = createDiskSink({ dir, bootId: 'new', limits: { ...LIMITS, diskKeepBoots: 3 }, setIntervalRef: noTimer });
-  assert.deepEqual(fs.readdirSync(dir).sort(), ['new', 'old2', 'old3']);
+  const sink = createDiskSink({ dir, bootId: 'new-1', limits: { ...LIMITS, diskKeepBoots: 3 }, setIntervalRef: noTimer });
+  assert.deepEqual(fs.readdirSync(dir).sort(), ['new-1', 'old2-102', 'old3-103']);
+  sink.close();
+  fs.rmSync(dir, { recursive: true });
+});
+
+test('pruning never touches a folder that is not a boot folder (LOG_DIR may hold other things)', () => {
+  const dir = tmp();
+  for (const name of ['.git', 'server', 'My Notes', 'abc-12x']) {
+    fs.mkdirSync(path.join(dir, name));
+    fs.utimesSync(path.join(dir, name), 1, 1);
+  }
+  for (let i = 0; i < 3; i++) {
+    fs.mkdirSync(path.join(dir, `boot${i}-${i}`));
+    fs.utimesSync(path.join(dir, `boot${i}-${i}`), 1000 + i, 1000 + i);
+  }
+  const sink = createDiskSink({ dir, bootId: 'new-1', limits: { ...LIMITS, diskKeepBoots: 2 }, setIntervalRef: noTimer });
+  assert.deepEqual(fs.readdirSync(dir).sort(), ['.git', 'My Notes', 'abc-12x', 'boot2-2', 'new-1', 'server']);
   sink.close();
   fs.rmSync(dir, { recursive: true });
 });

@@ -67,12 +67,31 @@ function countLines(timeline) {
   return { entries: timeline.length, byLevel, byCat };
 }
 
+// In ring order, one line per distinct state object. `sv` is not unique (an undo rewinds it, a
+// recreated room restarts it), so each line also carries the game and command number that made it.
 function stateLines(journal) {
-  const bySv = new Map();
-  for (const { sv, state } of journal.states()) bySv.set(sv, state);
-  return [...bySv].map(([sv, state]) =>
-    JSON.stringify({ k: 'state', sv, state: { ...state, commandLog: undefined, commandLogLength: state.commandLog?.length ?? 0 } })
-  );
+  const seen = new Set();
+  const lines = [];
+  for (const { sv, state, game = null, n = null } of journal.states()) {
+    if (seen.has(state)) continue;
+    seen.add(state);
+    lines.push(
+      JSON.stringify({ k: 'state', sv, game, n, state: { ...state, commandLog: undefined, commandLogLength: state.commandLog?.length ?? 0 } })
+    );
+  }
+  return lines;
+}
+
+// What an export takes from the shared `server` stream: process-level entries, and HTTP requests
+// made by this export's own clients. Socket and room entries there belong to sockets that were
+// in no room yet — other people's lobby traffic, room ids and usernames — and are never exported.
+const SHARED_CATEGORIES = new Set(['boot', 'process', 'console', 'log']);
+
+function exportableServerEntry(entry, clientIds) {
+  const cat = PREFIX_FIELDS.exec(entry.line)?.[2];
+  if (SHARED_CATEGORIES.has(cat)) return true;
+  if (cat !== 'http') return false;
+  return clientIds.some((id) => entry.line.includes(`"client":"${id}"`));
 }
 
 function gatherClients({ store, scope }) {
@@ -103,6 +122,7 @@ export function buildExport({
   const roomEntries = roomStream?.entries() ?? [];
   const clients = gatherClients({ store, scope });
 
+  const clientIds = clients.map((client) => client.row.clientId);
   let from = Infinity;
   for (const entry of roomEntries) from = Math.min(from, entry.ts);
   for (const client of clients) for (const entry of client.entries) from = Math.min(from, entry.ts);
@@ -111,7 +131,9 @@ export function buildExport({
   const serverStream = store.stream('server');
   const serverEntries = [
     ...roomEntries,
-    ...(serverStream?.entries() ?? []).filter((entry) => entry.ts >= from - SERVER_WINDOW_MS),
+    ...(serverStream?.entries() ?? []).filter(
+      (entry) => entry.ts >= from - SERVER_WINDOW_MS && exportableServerEntry(entry, clientIds)
+    ),
   ];
 
   const serverSource = {
@@ -126,7 +148,8 @@ export function buildExport({
     const snapshot = snapshots[row.clientId];
     const { username = null, seat = null } = describe(row.clientId, row) ?? {};
     buildByClient[src] = meta.build ?? null;
-    if (snapshot !== null && typeof snapshot === 'object') snapLines.push(JSON.stringify({ k: 'snap', src, ...snapshot }));
+    // `k` and `src` last: a snapshot is client data and must not be able to name itself.
+    if (snapshot !== null && typeof snapshot === 'object') snapLines.push(JSON.stringify({ ...snapshot, k: 'snap', src }));
     return {
       src,
       clientId: row.clientId,

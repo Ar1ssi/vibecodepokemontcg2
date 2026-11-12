@@ -1,5 +1,6 @@
 // What a socket payload contributes to the log. `log:*` is never logged (no feedback loop).
 import { LIMITS } from './log-schema.mjs';
+import { REDACTED } from './safe-json.mjs';
 
 const KEY_LIMIT = 20;
 const KEYS_ONLY = new Set(['instanceMap', 'dealOrder', 'spectatorActionData', 'storeGameState']);
@@ -32,8 +33,19 @@ function summarizeView(bytes, args, trace) {
   return trace ? { ...summary, args } : summary;
 }
 
-export function summarizePayload(event, args, { trace = false } = {}) {
+// Events that carry a credential as a bare positional argument (object keys are redacted by name
+// in safeStringify): joinGame(roomId, username, isSpectator, seatToken, options).
+const SECRET_ARGS = { joinGame: [3] };
+
+function withoutSecretArgs(event, args) {
+  const positions = SECRET_ARGS[event];
+  if (!positions || !Array.isArray(args)) return args;
+  return args.map((arg, i) => (positions.includes(i) && arg != null ? REDACTED : arg));
+}
+
+export function summarizePayload(event, rawArgs, { trace = false } = {}) {
   if (typeof event === 'string' && event.startsWith('log:')) return null;
+  const args = withoutSecretArgs(event, rawArgs);
   const bytes = byteLength(args);
   if (event === 'view') return summarizeView(bytes, args, trace);
   if (KEYS_ONLY.has(event)) return { bytes, keys: firstKeys(args?.[0]) };

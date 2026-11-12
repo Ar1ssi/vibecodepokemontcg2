@@ -239,3 +239,66 @@ test('a solo room journals the seat the command acted for', () => {
   );
   assert.equal(replayJournal(parsed(journal), ENGINE).ok, true);
 });
+
+test('a failing record costs one entry, not a full-state rebase on every later command', () => {
+  let failing = true;
+  const { room, journal, send, entries } = setup({ hash: (state) => { if (failing) throw new Error('hash down'); return hashState(state); } });
+  for (let i = 0; i < 5; i++) assert.equal(send('sock-a', 'draw').success, true);
+  failing = false;
+  assert.equal(send('sock-a', 'draw').success, true);
+  const records = parsed(journal);
+  assert.equal(records.filter((r) => r.k === 'rebase' && r.why === 'unjournaled-change').length, 0);
+  assert.equal(cmds(journal).at(-1).after.hash, hashState(room.state));
+  assert.equal(entries.filter((e) => e.cat === 'journal' && e.ev === 'failed').length, 1);
+});
+
+test('the byte cap also holds for rebases: a truncated rebase carries no state and stops the replay', () => {
+  const { room, journal, send } = setup({ limits: { ...LIMITS, journalGameBytes: 3000 } });
+  for (let i = 0; i < 4; i++) send('sock-a', 'draw');
+  room.state.stateVersion += 1; // forces an unjournaled-change rebase, now over the budget
+  send('sock-a', 'draw');
+  const rebases = parsed(journal).filter((r) => r.k === 'rebase');
+  assert.equal(rebases.at(-1).why, 'unjournaled-change');
+  assert.equal(rebases.at(-1).state, null);
+  assert.equal(rebases.at(-1)._truncated, true);
+  assert.ok(JSON.stringify(rebases.at(-1)).length < 300, 'a truncated rebase is a stub, not a state copy');
+  assert.equal(journal.stats().complete, false);
+  assert.equal(replayJournal(parsed(journal), ENGINE).divergence.kind, 'truncated');
+});
+
+test('complete is per game: it is true again once the truncated game is dropped', () => {
+  const { room, journal, send } = setup({ limits: { ...LIMITS, journalGameBytes: 200 } });
+  send('sock-a', 'draw');
+  assert.equal(journal.stats().complete, false);
+  const roomy = createJournal({ roomId: 'r2', log: makeLogCollector().log, limits: { ...LIMITS, journalGames: 1, journalGameBytes: 200 } });
+  const other = new GameRoom({ roomId: 'r2', rulesEnabled: false, seed: 7, journal: roomy });
+  assert.equal(roomy.stats().complete, false, 'the created rebase alone is over 200 bytes');
+  assert.equal(other.state.stateVersion, 0);
+  assert.equal(room.journal, journal);
+});
+
+test('the state ring tells apart states that share a stateVersion (undo rewinds it)', () => {
+  const { journal, send } = setup();
+  send('sock-a', 'draw');
+  send('sock-a', 'draw');
+  send('sock-a', 'undo', { count: 1 });
+  send('sock-a', 'draw');
+  const ring = journal.states();
+  const bySv = new Map();
+  for (const entry of ring) bySv.set(entry.sv, (bySv.get(entry.sv) ?? 0) + 1);
+  assert.ok([...bySv.values()].some((count) => count > 1), 'an undo makes a stateVersion repeat');
+  assert.ok(ring.every((entry) => Number.isInteger(entry.game) && Number.isInteger(entry.n)));
+  assert.equal(new Set(ring.map((entry) => `${entry.game}/${entry.n}/${entry.sv}`)).size, new Set(ring.map((entry) => entry.state)).size);
+});
+
+test('replay catches an rng cursor that went differently even when the hash still matches', () => {
+  const { journal, send } = setup();
+  send('sock-a', 'draw');
+  const records = parsed(journal);
+  const lastCmd = records.filter((r) => r.k === 'cmd').at(-1);
+  lastCmd.after.cursor += 1;
+  const result = replayJournal(records, ENGINE);
+  assert.equal(result.ok, false);
+  assert.equal(result.divergence.kind, 'cursor');
+  assert.equal(result.divergence.n, lastCmd.n);
+});

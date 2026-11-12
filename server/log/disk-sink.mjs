@@ -12,11 +12,15 @@ export function resolveLogDir(env, repoRoot) {
 
 const fileNameOf = (streamId) => `${streamId.replace(/[^A-Za-z0-9._-]/g, '_')}.ndjson`;
 
+// Only folders this sink names itself (`<base36 time>-<pid>`) are ever removed: LOG_DIR can point
+// at a directory that holds other things.
+const BOOT_ID = /^[0-9a-z]+-\d+$/;
+
 function pruneOldBoots(dir, bootId, keep, fsRef) {
   try {
     const boots = fsRef
       .readdirSync(dir, { withFileTypes: true })
-      .filter((d) => d.isDirectory() && d.name !== bootId)
+      .filter((d) => d.isDirectory() && d.name !== bootId && BOOT_ID.test(d.name))
       .map((d) => ({ name: d.name, mtimeMs: fsRef.statSync(path.join(dir, d.name)).mtimeMs }))
       .sort((a, b) => b.mtimeMs - a.mtimeMs);
     for (const old of boots.slice(Math.max(0, keep - 1))) {

@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { createServerLogging } from '../index.mjs';
 import { NO_JOURNAL } from '../journal.mjs';
 
@@ -66,7 +69,7 @@ test('attachIo/attachSocket wire the taps and seatOf', () => {
     logging.attachIo(io, { seatOf: () => 'p2' });
     handlers['join-room'].forEach((fn) => fn('room1', 's1'));
     assert.equal(logging.store.participants('room1')[0].clientId, 'cl');
-    const socket = { id: 's1', data: {}, rooms: new Set(), handshake: {}, onAny(fn) { this.any = fn; }, onAnyOutgoing() {}, on() {} };
+    const socket = { id: 's1', data: {}, rooms: new Set(['s1', 'room1']), handshake: {}, onAny(fn) { this.any = fn; }, onAnyOutgoing() {}, on() {} };
     logging.attachSocket(socket);
     socket.any('cmd', { roomId: 'room1' });
     const last = JSON.parse(logging.store.stream('room:room1').entries().at(-1).line);
@@ -108,6 +111,46 @@ test('export handlers answer 404 until attachIo, then delegate to the exporter',
     let body = null;
     logging.devRoomsHandler({}, { json: (b) => { body = b; } });
     assert.equal(body.rooms[0].roomId, 'r1');
+  } finally {
+    logging.shutdown();
+  }
+});
+
+test('a room journal is dropped when its room stream expires, and comes back if the room is still journaling', () => {
+  let t = 1_000_000;
+  const logging = createServerLogging({ env: { LOG_DIR: 'off' }, repoRoot: '/r', now: () => t, processRef: stubProcess(), consoleRef: quietConsole() });
+  try {
+    const journal = logging.createJournal('r1');
+    const state = { seed: 1, stateVersion: 0, commandLog: [] };
+    journal.rebase(state, { cursor: 0 }, 'created');
+    assert.ok(logging.store.stream('room:r1'), 'the rebase entry opened the room stream');
+    assert.ok(logging.store.stats().externalBytes > 0, 'journal bytes count against the cap');
+    logging.store.close('room:r1');
+    t += 31 * 60 * 1000;
+    logging.sweep();
+    assert.equal(logging.store.stream('room:r1'), null);
+    assert.equal(logging.journalFor('r1'), null);
+    assert.equal(logging.store.stats().externalBytes, 0);
+    journal.rebase(state, { cursor: 0 }, 'reset');
+    assert.equal(logging.journalFor('r1'), journal);
+  } finally {
+    logging.shutdown();
+  }
+});
+
+test('a disk warning is printed through the original console.warn, not re-logged', () => {
+  const printed = [];
+  const consoleRef = { ...quietConsole(), warn: (line) => printed.push(line) };
+  // A path under a regular file can never be created (ENOTDIR).
+  const blocker = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ptcg-log-')), 'file');
+  fs.writeFileSync(blocker, 'x');
+  const logging = createServerLogging({ env: { LOG_DIR: path.join(blocker, 'logs') }, repoRoot: '/r', processRef: stubProcess(), consoleRef });
+  try {
+    logging.log.info('boot', 'x');
+    logging.diskSink?.flushSync();
+    assert.ok(printed.some((line) => /disk sink disabled/.test(line)));
+    const consoleEntries = logging.store.stream('server').entries().filter((e) => /"cat":"console"/.test(e.line) && /disk sink disabled/.test(e.line));
+    assert.equal(consoleEntries.length, 0);
   } finally {
     logging.shutdown();
   }

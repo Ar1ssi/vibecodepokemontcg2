@@ -144,8 +144,9 @@ test('two exports get distinct tokens that each work once', async () => {
   const [a, b] = twoPlayers();
   const { exporter } = setup({ sockets: [a, b] });
   exporter.attachSocket(a);
+  exporter.attachSocket(b);
   const first = await call(a, { roomId: 'r1' });
-  const second = await call(a, { roomId: 'r1' });
+  const second = await call(b, { roomId: 'r1' });
   assert.notEqual(first.url, second.url);
   for (const ack of [first, second]) {
     const res = response();
@@ -159,7 +160,10 @@ test('at most 8 tokens are kept; the oldest is dropped', async () => {
   const { exporter } = setup({ sockets: [a, b] });
   exporter.attachSocket(a);
   const urls = [];
-  for (let i = 0; i < 9; i++) urls.push((await call(a, { roomId: 'r1' })).url);
+  for (let i = 0; i < 9; i++) {
+    urls.push((await call(a, { roomId: 'r1' })).url);
+    clock.ms += 5000;
+  }
   const oldest = response();
   exporter.downloadHandler(request({ params: { token: urls[0].split('/').pop() } }), oldest);
   assert.equal(oldest.code, 404);
@@ -226,4 +230,50 @@ test('a snapshot reply carrying a tail hands it to ingest and keeps it out of th
   const snaps = res.body.split('\n').filter(Boolean).map((l) => JSON.parse(l)).filter((r) => r.k === 'snap');
   assert.equal(snaps.length, 2);
   assert.ok(snaps.every((snap) => !('tail' in snap)));
+});
+
+test('one export at a time per socket, spaced by the minimum interval', async () => {
+  const [a, b] = twoPlayers();
+  const { exporter } = setup({ sockets: [a, b] });
+  exporter.attachSocket(a);
+  assert.equal((await call(a, { roomId: 'r1' })).ok, true);
+  assert.deepEqual(await call(a, { roomId: 'r1' }), { ok: false, reason: 'too_soon' });
+  clock.ms += 5000;
+  assert.equal((await call(a, { roomId: 'r1' })).ok, true);
+
+  // A second request while the first is still collecting snapshots is refused, not queued.
+  let release;
+  const slow = fakeSocket('s3', { clientId: 'c3d4e5f607182930', rooms: ['r1'] });
+  slow.timeout = () => ({ emit: (event, payload, cb) => { release = () => cb(null, { meta: {} }); } });
+  const waiting = setup({ sockets: [slow] });
+  waiting.exporter.attachSocket(slow);
+  const first = call(slow, { roomId: 'r1' });
+  await Promise.resolve();
+  assert.deepEqual(await call(slow, { roomId: 'r1' }), { ok: false, reason: 'busy' });
+  release();
+  assert.equal((await first).ok, true);
+});
+
+test('the lobby channel and a socket\'s own room cannot be exported', async () => {
+  const lobbyist = fakeSocket('s5', { clientId: CLIENT_A, rooms: ['s5', 'lobby:watchers'], answer: { meta: {} } });
+  const { exporter, emitted } = setup({ sockets: [lobbyist] });
+  exporter.attachSocket(lobbyist);
+  assert.deepEqual(await call(lobbyist, { roomId: 'lobby:watchers' }), { ok: false, reason: 'not_in_room' });
+  assert.deepEqual(await call(lobbyist, { roomId: 's5' }), { ok: false, reason: 'not_in_room' });
+  assert.equal(emitted.length, 0, 'nobody in the lobby is told anything');
+});
+
+test('a room is told about exports at most once per announce interval', async () => {
+  const [a, b] = twoPlayers();
+  const { exporter, emitted } = setup({ sockets: [a, b] });
+  exporter.attachSocket(a);
+  exporter.attachSocket(b);
+  await call(a, { roomId: 'r1' });
+  await call(b, { roomId: 'r1' });
+  clock.ms += 6000;
+  await call(a, { roomId: 'r1' });
+  assert.equal(emitted.length, 1);
+  clock.ms += 30000;
+  await call(a, { roomId: 'r1' });
+  assert.equal(emitted.length, 2);
 });
