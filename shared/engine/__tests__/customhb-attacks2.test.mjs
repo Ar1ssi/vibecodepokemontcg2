@@ -510,3 +510,84 @@ test('only Bulk Up’s "remains in the Active Spot" marker follows an evolution 
     markerOf("Your opponent's Active Pokémon can't retreat.");
   assert.ok(!web?.presence, 'a no-window lock keeps the top-card tracking');
 });
+
+// ── HB 479 Regieleki Overclocked Explosion ───────────────────────────────────────────────────
+
+const OVERCLOCKED_EXPLOSION = 'After using this attack, this Pokémon is Knocked Out.';
+
+test('HB 479 Regieleki Overclocked Explosion: the attacker is Knocked Out after its damage lands', () => {
+  const { state, attacker } = board('Regieleki', OVERCLOCKED_EXPLOSION, {
+    damage: '200',
+    attackerExtra: { hp: 70 },
+    setup: (s) => s.players.p1.zones.bench.push(mon('Own Bench')),
+  });
+  const res = attack(state);
+  assert.equal(res.error, null);
+  assert.equal(damageOf(res), 200, 'the Defender still takes the damage');
+  assert.ok(zone(res.state, 'p1', 'discard').some((c) => c.instanceId === attacker.instanceId), 'Regieleki is in its discard pile');
+  assert.equal(zone(res.state, 'p1', 'active').some((c) => c.instanceId === attacker.instanceId), false);
+  assert.ok(res.events.some((e) => e.type === 'pokemonKnockedOut' && e.instanceId === attacker.instanceId));
+});
+
+test('HB 479 Regieleki Overclocked Explosion: a Defender it Knocks Out goes with it', () => {
+  const { state, attacker, defender } = board('Regieleki', OVERCLOCKED_EXPLOSION, {
+    damage: '200',
+    attackerExtra: { hp: 70 },
+    defenderExtra: { hp: 150 },
+    setup: (s) => {
+      s.players.p1.zones.bench.push(mon('Own Bench'));
+      s.players.p2.zones.bench.push(mon('Their Bench'));
+    },
+  });
+  const res = attack(state);
+  assert.equal(res.error, null);
+  for (const [id, card] of [['p1', attacker], ['p2', defender]]) {
+    assert.ok(zone(res.state, id, 'discard').some((c) => c.instanceId === card.instanceId), `${card.name} is Knocked Out`);
+  }
+});
+
+// ── HB 454 Regigigas ex Destruction ──────────────────────────────────────────────────────────
+
+const DESTRUCTION = 'You may discard a Stadium card in play. If you do so, your opponent must discard 3 cards from their hand.';
+const handOf = (state, id) => zone(state, id, 'hand').map((c) => c.name);
+
+/** p1 attacks with Destruction; p2 holds 5 cards in hand and a Stadium may be in play. */
+function destructionBoard({ stadium = true } = {}) {
+  return board('Regigigas ex', DESTRUCTION, {
+    damage: '160',
+    setup: (s) => {
+      for (let i = 0; i < 5; i++) s.players.p2.zones.hand.push(trainer(`Hand ${i}`, 'Item'));
+      if (stadium) s.stadium = trainer('Old Cemetery', 'Stadium');
+    },
+  });
+}
+
+test('HB 454 Regigigas ex Destruction: discarding the Stadium makes the opponent discard 3 cards of their choice', () => {
+  const { state } = destructionBoard();
+  const offered = attack(state);
+  assert.match(offered.state.pendingChoice.prompt, /Discard Old Cemetery\?/);
+  const yes = offered.state.pendingChoice.options[0].instanceId;
+  const pick = choose(offered, [yes]);
+  assert.equal(pick.state.pendingChoice.player, 'p2', 'the opponent picks what to discard');
+  assert.equal(pick.state.pendingChoice.min, 3);
+  const keep = zone(pick.state, 'p2', 'hand').slice(3).map((c) => c.name);
+  const res = choose(pick, ids(zone(pick.state, 'p2', 'hand').slice(0, 3)));
+  assert.equal(res.error, null);
+  assert.equal(res.state.stadium, null, 'the Stadium is gone');
+  assert.equal(damageOf(res), 160);
+  assert.deepEqual(handOf(res.state, 'p2').filter((n) => keep.includes(n)), keep, 'the other 2 cards stay in hand');
+  assert.equal(zone(res.state, 'p2', 'discard').filter((c) => /^Hand /.test(c.name)).length, 3);
+});
+
+test('HB 454 Regigigas ex Destruction: keeping the Stadium, or having none, makes the opponent discard nothing', () => {
+  const { state } = destructionBoard();
+  const declined = choose(attack(state), [attack(state).state.pendingChoice.options[1].instanceId]);
+  assert.equal(declined.error, null);
+  assert.equal(declined.state.stadium?.name, 'Old Cemetery');
+  assert.equal(zone(declined.state, 'p2', 'discard').length, 0);
+
+  const bare = attack(destructionBoard({ stadium: false }).state);
+  assert.equal(bare.error, null);
+  assert.equal(bare.state.pendingChoice, null);
+  assert.equal(zone(bare.state, 'p2', 'discard').length, 0, 'no Stadium to discard, no discard');
+});
