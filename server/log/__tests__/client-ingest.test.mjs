@@ -198,3 +198,17 @@ test('setLevel with no room sets a per-client level that survives a reconnect', 
   assert.deepEqual(second.call('log:setLevel', { level: 'debug' }), { ok: true, level: 'debug' });
   assert.equal(second.call('log:batch', { loadId: LOAD, lines: [line(2)] }).level, 'debug');
 });
+
+test('acceptTail stores a snapshot tail once; the later batch of the same lines is a no-op', () => {
+  const { makeSocket, ingest, store } = setup();
+  const c = makeSocket();
+  assert.equal(ingest.acceptTail(c.socket, { loadId: LOAD, lines: [line(1)] }), 0, 'no hello yet');
+  c.call('log:hello', hello);
+  assert.equal(ingest.acceptTail(c.socket, { loadId: 'ffffffff', lines: [line(1)] }), 0, 'another load');
+  assert.equal(ingest.acceptTail(c.socket, { loadId: LOAD, lines: [line(1), line(2)], offset: 5 }), 2);
+  assert.equal(store.stream(`client:${CLIENT}`).size, 2);
+  const ack = c.call('log:batch', { loadId: LOAD, lines: [line(1), line(2), line(3)] });
+  assert.equal(ack.acked, 3);
+  assert.equal(store.stream(`client:${CLIENT}`).size, 3);
+  assert.equal(ingest.acceptTail(c.socket, { loadId: LOAD, lines: 'nope' }), 0);
+});

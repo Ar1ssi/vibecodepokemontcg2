@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildSnapshot } from '../snapshot.js';
+import {
+  buildSnapshot,
+  buildSnapshotSync,
+  preloadSnapshotModules,
+  preloadedSnapshotModules,
+} from '../snapshot.js';
 import { LIMITS } from '../../../../shared/log/log-schema.mjs';
 
 const SECTIONS = ['meta', 'socket', 'netcode', 'registry', 'systemState', 'fx', 'settings', 'storage', 'perf'];
@@ -91,4 +96,18 @@ test('with every module missing the snapshot still has meta and omitted', async 
   assert.equal(snapshot.socket, null);
   assert.equal(snapshot.registry, null);
   assert.equal(snapshot.fx, null);
+});
+
+test('after a preload the snapshot is built synchronously from the cached modules', async () => {
+  const env = stubEnv();
+  assert.equal(preloadedSnapshotModules(), null);
+  const modules = await preloadSnapshotModules({ load: async () => stubModules() });
+  assert.equal(preloadedSnapshotModules(), modules);
+  const snapshot = buildSnapshotSync({ ...env, modules: preloadedSnapshotModules() });
+  assert.equal(typeof snapshot.then, 'undefined');
+  assert.equal(snapshot.netcode.lastRenderedVersion, 7);
+  assert.equal(snapshot.registry[0].id, 12);
+  const bare = buildSnapshotSync({ ...env, modules: null });
+  assert.equal(bare.registry, null);
+  assert.equal(bare.meta.w, 1000);
 });

@@ -1,5 +1,5 @@
 # 087: Unified logging — one export with both clients and the server
-Status: building — approved (user) 2026-11-12
+Status: shipped 2026-11-12 — approved (user); built by slice-builder agents, verified per slice
 Date: 2026-11-12 · Session: cloud (branch claude/dazzling-gauss-q4cr9n)
 Supersedes: 028 (match logging, never approved). Closes I85 when shipped.
 
@@ -417,36 +417,36 @@ Network: ≤ 1 small message per client per 2 s; nothing when idle. Server memor
 ## Edge cases & failure modes
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | Export with no entries / room with no commands | Valid file: header (counts 0), a `rebase` journal record, no timeline lines | [ ] |
-| 2 | `log()` given a cyclic object, DOM node, throwing getter, `undefined`, 5 MB string | One valid line ≤ cap; never throws | [ ] |
-| 3 | Malformed `log:batch` (not an array, line with `\n`, non-JSON, missing `seq`, 501 lines) | Bad line dropped and counted, or batch refused; one server `warn`; socket stays open | [ ] |
-| 4 | Ring at its byte cap | Oldest entries dropped; `dropped` and `firstSeq` reported in the header source | [ ] |
-| 5 | Same batch delivered twice (ack lost, reconnect resend) | `seq ≤ last` dropped; no duplicates in the export | [ ] |
-| 6 | Client offline for minutes, then reconnects | Entries stay in the local ring and are shipped in order after `connect`; anything the ring evicted shows as a `gaps` range | [ ] |
-| 7 | Tab closed / reloaded mid-game | History up to the last batch plus the beacon tail is in the export; `snapshot: 'offline'`; the reload appears as a new `loadId` under the same `src` | [ ] |
-| 8 | Tab frozen at export | Its `log:snapshot` times out at 3 s; export completes with `snapshot: 'timeout'` | [ ] |
-| 9 | Server unreachable at export | Client downloads the local-only file after 5 s | [ ] |
-| 10 | Two players export at once / double click | Each request builds its own bundle and token; a token works once | [ ] |
-| 11 | Export token reused, expired or guessed | 404; nothing leaks | [ ] |
-| 12 | Requester not in the named room | `{ ok: false, reason: 'not_in_room' }` | [ ] |
-| 13 | Error loop logging thousands of entries a second | Flood gate: 60/s per `cat|ev`, one `suppressed` entry per second with the count | [ ] |
-| 14 | A client floods the server with batches | > 512 KB / 10 s refused with `reason: 'rate'`; client backs off 10 s; game traffic unaffected | [ ] |
-| 15 | Logger sink or serializer throws | Caught; failure counter incremented; caller unaffected | [ ] |
-| 16 | `applyView` throws mid-reconcile | `view`/`apply.threw` with stack and `sv`; error rethrown (behavior unchanged) | [ ] |
-| 17 | Server uncaught exception | Monitor logs it, flushes the disk sink synchronously, prints one JSON line to stderr; process exits as before | [ ] |
-| 18 | State changed outside `applyCommand` (new mutation site added later) | Next `command()` detects the mismatch and writes a `rebase` (`unjournaled-change`); replay still correct | [ ] |
-| 19 | `undo` (replays `commandLog` internally) | One `cmd` record like any other; replay reproduces it because `rebase.state` carries `commandLog` | [ ] |
-| 20 | Reset / rematch | `rebase` (`reset`) starts game n+1; the previous game's journal is kept (last 2) | [ ] |
-| 21 | Clock skew or a client clock change mid-session | `t` is monotonic (`timeOrigin + now()`); offset from lowest-RTT ping; header carries `offset` and `rtt` per source | [ ] |
-| 22 | Server memory over `LOG_MAX_MB` | Sweep drops closed streams oldest-first, then trims the largest ring; counted in `dropped` | [ ] |
-| 23 | Solo room (one socket, both seats) | One client source; journal `playerId` and entry `seat` name the acted seat | [ ] |
-| 24 | Spectator | Its entries ship like a player's; it may export (it already sees both hands) | [ ] |
-| 25 | Legacy relay mode | Taps and client capture work; header `journal: null`; relay actions logged in full ≤ 16 KB | [ ] |
-| 26 | `localStorage` blocked / private window | Per-load `clientId`; logging otherwise unchanged | [ ] |
-| 27 | Disk sink directory unwritable or file at 50 MB | One `warn`; sink disables itself for that stream; memory logging continues | [ ] |
-| 28 | Typed text (chat box, deck names, search) | Keys inside editable targets are logged as `"[text]"`; `change` logs length only. Sent chat messages are game content and appear via the socket tap | [ ] |
-| 29 | Snapshot over 800 KB | Sections dropped last-to-first; `omitted` lists them | [ ] |
-| 30 | Pages with no room (deck builder, Build & Battle, unboxing) | Client capture and shipping work; export scope is the own session | [ ] |
+| 1 | Export with no entries / room with no commands | Valid file: header (counts 0), a `rebase` journal record, no timeline lines | [x] export.test `a room with nothing logged exports a header, the created rebase and its state` (a state line too: the ring holds the rebase state) |
+| 2 | `log()` given a cyclic object, DOM node, throwing getter, `undefined`, 5 MB string | One valid line ≤ cap; never throws | [x] safe-json.test (cyclic, 5 MB string, throwing getter, DOM-like node, undefined, `output never contains a raw line break`) |
+| 3 | Malformed `log:batch` (not an array, line with `\n`, non-JSON, missing `seq`, 501 lines) | Bad line dropped and counted, or batch refused; one server `warn`; socket stays open | [x] client-ingest.test `batch validation: too many, bad load, bad lines, duplicates`, `batch before hello is refused…` |
+| 4 | Ring at its byte cap | Oldest entries dropped; `dropped` and `firstSeq` reported in the header source | [x] ring.test `byte cap evicts the oldest…`; log-store.test `room stream stays within 8 MB and counts dropped`; e2e check 15 |
+| 5 | Same batch delivered twice (ack lost, reconnect resend) | `seq ≤ last` dropped; no duplicates in the export | [x] client-ingest.test duplicates + `reconnect hello with the same ids reports the last stored seq`; `acceptTail stores a snapshot tail once…` |
+| 6 | Client offline for minutes, then reconnects | Entries stay in the local ring and are shipped in order after `connect`; anything the ring evicted shows as a `gaps` range | [x] batcher.test `acked then reconnect…`, `a ring that evicted unacked entries…`; export.test `client entries seq 1, 2, 5 produce one gap…` |
+| 7 | Tab closed / reloaded mid-game | History up to the last batch plus the beacon tail is in the export; `snapshot: 'offline'`; the reload appears as a new `loadId` under the same `src` | [x] ship.test `pagehide beacons the unacked lines`; client-ingest.test `beacon stores lines…`; export.test `snapshot states: … missing -> offline` |
+| 8 | Tab frozen at export | Its `log:snapshot` times out at 3 s; export completes with `snapshot: 'timeout'` | [x] export-routes.test `room export: snapshots in parallel…` (one socket times out → `timeout`) |
+| 9 | Server unreachable at export | Client downloads the local-only file after 5 s | [x] e2e checks 20–21 (socket disconnected → `ptcg-log_local_*.ndjson`, partial header, snapshot, own timeline) |
+| 10 | Two players export at once / double click | Each request builds its own bundle and token; a token works once | [x] export-routes.test `two exports get distinct tokens that each work once` |
+| 11 | Export token reused, expired or guessed | 404; nothing leaks | [x] export-routes.test `an expired token is a 404, and an unknown one too` |
+| 12 | Requester not in the named room | `{ ok: false, reason: 'not_in_room' }` | [x] export-routes.test `requester outside the named room gets not_in_room…` |
+| 13 | Error loop logging thousands of entries a second | Flood gate: 60/s per `cat|ev`, one `suppressed` entry per second with the count | [x] logger.test `flood gate: 100 same-ev entries -> 60 lines then one suppressed n=40` |
+| 14 | A client floods the server with batches | > 512 KB / 10 s refused with `reason: 'rate'`; client backs off 10 s; game traffic unaffected | [x] client-ingest.test `rate window: 600 KB refused…`; batcher.test `failed('rate') backs off 10 s…`; ship.test `a rate refusal pauses shipping for 10 s` |
+| 15 | Logger sink or serializer throws | Caught; failure counter incremented; caller unaffected | [x] logger.test `sink throwing is counted, never propagates`; journal.test `a throwing hash never reaches the room…`; apply-view-logged.test `a logger that throws never changes the result` |
+| 16 | `applyView` throws mid-reconcile | `view`/`apply.threw` with stack and `sv`; error rethrown (behavior unchanged) | [x] apply-view-logged.test `a throwing apply logs view/apply.threw and rethrows the same error` |
+| 17 | Server uncaught exception | Monitor logs it, flushes the disk sink synchronously, prints one JSON line to stderr; process exits as before | [x] taps.test `process tap: monitor logs one error entry, flushes disk and writes a fatal JSON line` |
+| 18 | State changed outside `applyCommand` (new mutation site added later) | Next `command()` detects the mismatch and writes a `rebase` (`unjournaled-change`); replay still correct | [x] journal.test `a state change outside a command adds an unjournaled-change rebase, replay stays ok` |
+| 19 | `undo` (replays `commandLog` internally) | One `cmd` record like any other; replay reproduces it because `rebase.state` carries `commandLog` | [x] journal.test `an undo is one journaled command and the replay reproduces the rewound state` |
+| 20 | Reset / rematch | `rebase` (`reset`) starts game n+1; the previous game's journal is kept (last 2) | [x] journal.test `resetGame starts a new game and only the last two are kept` |
+| 21 | Clock skew or a client clock change mid-session | `t` is monotonic (`timeOrigin + now()`); offset from lowest-RTT ping; header carries `offset` and `rtt` per source | [x] clock-sync.test; client-ingest.test `stored entry carries ts = t + offset…`; e2e header offsets (−0.05…−3.6 ms observed) |
+| 22 | Server memory over `LOG_MAX_MB` | Sweep drops closed streams oldest-first, then trims the largest ring; counted in `dropped` | [x] log-store.test `over the total cap the oldest closed stream goes first…`, `still over … trims the largest open ring by a quarter` |
+| 23 | Solo room (one socket, both seats) | One client source; journal `playerId` and entry `seat` name the acted seat | [x] journal.test `a solo room journals the seat the command acted for` |
+| 24 | Spectator | Its entries ship like a player's; it may export (it already sees both hands) | [x] export-routes.test membership check (a spectator is in the Socket.IO room, so it passes `socket.rooms.has`); ingest is seat-agnostic |
+| 25 | Legacy relay mode | Taps and client capture work; header `journal: null`; relay actions logged in full ≤ 16 KB | [x] payload-policy.test `relay events forward the 16 KB hint…`; export.test `client scope exports only that client stream…` (journal null); `journalFor` is null without a GameRoom |
+| 26 | `localStorage` blocked / private window | Per-load `clientId`; logging otherwise unchanged | [x] client-log.test `client log counts entries, has a hex clientId…` (node has no localStorage: the per-load id path) |
+| 27 | Disk sink directory unwritable or file at 50 MB | One `warn`; sink disables itself for that stream; memory logging continues | [x] disk-sink.test `unwritable dir: no throw, one warn…`, `size cap disables the stream after one warn…` |
+| 28 | Typed text (chat box, deck names, search) | Keys inside editable targets are logged as `"[text]"`; `change` logs length only. Sent chat messages are game content and appear via the socket tap | [x] input-filter.test `describeKey hides typed text in editable targets only`, `describeChange never leaks free text` |
+| 29 | Snapshot over 800 KB | Sections dropped last-to-first; `omitted` lists them | [x] snapshot.test `an oversized view drops sections last-to-first, keeps meta, stays under the cap` |
+| 30 | Pages with no room (deck builder, Build & Battle, unboxing) | Client capture and shipping work; export scope is the own session | [x] browser boot check (33 entries, 0 page errors, shipped 32/32); export-routes.test `client-scope export (no room)…`; `/unboxing` local-only (Deviations) |
 
 ## Test plan
 Unit (`node --test`, pure `.mjs`): `safe-json`, `describe-element` (stub nodes), `ring`, `logger`
@@ -520,6 +520,15 @@ Revert: revert the slice commits; no state outlives the process except `out/logs
 - 2026-11-12 (slice 9): the fixture `scripts/__tests__/fixtures/log-export.ndjson` is a real export
   from `scripts/e2e/log-export-test.mjs` (`PTCG_LOG_OUT`), not from a node integration test — no
   Socket.IO client is installed for node, so the three-party path is proven in two real browsers.
+- 2026-11-12 (structural, decided by the session lead after the two-browser test, within the
+  approved protocol — no new event): the `log:snapshot` reply is built in ONE synchronous step.
+  A starved main thread (2 s long tasks) gave each event-loop turn seconds, and the original
+  reply needed several (dynamic imports, then a flush round trip): 13 s measured. Now
+  `preloadSnapshotModules()` runs once after `load`, `buildSnapshotSync()` reads the cached
+  modules, and the client's unshipped entries ride inside the reply as `tail`
+  (`{ loadId, lines, offset, rtt }`, ≤ 128 KB); the server stores them through
+  `ingest.acceptTail` (same validation and seq dedupe as a batch) and strips `tail` from the
+  file. The janking tab is the one whose snapshot matters.
 
 ---
 Self-approval checklist (only when the user is unreachable):

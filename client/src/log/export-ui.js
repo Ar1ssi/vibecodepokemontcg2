@@ -1,7 +1,7 @@
 // Export, mark and verbose-logging controls (design 087 §6), plus the "A problem was logged." toast.
 import { LIMITS, LOG_FORMAT } from '../../../shared/log/log-schema.mjs';
 import { clientId, clientRing, loadId, onEntry } from './client-log.js';
-import { buildSnapshot } from './snapshot.js';
+import { buildSnapshot, buildSnapshotSync, preloadSnapshotModules, preloadedSnapshotModules } from './snapshot.js';
 
 const TOAST_VISIBLE_MS = 12000;
 const LABEL_REFRESH_DELAY_MS = 300;
@@ -72,6 +72,21 @@ function maybeToast(entry) {
   showToast();
 }
 
+// One synchronous step when the modules are preloaded (the normal case): the server waits a
+// bounded time, and a janking tab gets few turns. The unshipped tail rides in the same reply.
+async function answerSnapshot(ack) {
+  const modules = preloadedSnapshotModules() ?? (await preloadSnapshotModules());
+  const snapshot = buildSnapshotSync({ win, doc, modules });
+  const tail = shipping?.tail?.() ?? null;
+  ack(tail && tail.lines.length > 0 ? { ...snapshot, tail } : snapshot);
+}
+
+function preloadWhenLoaded() {
+  const start = () => preloadSnapshotModules().catch(() => {});
+  if (doc.readyState === 'complete') start();
+  else win.addEventListener('load', start, { once: true });
+}
+
 export function initExport({ socket: appSocket = null, shipping: shipper = null, log: logger, win: w = window, doc: d = document }) {
   socket = appSocket;
   shipping = shipper;
@@ -87,20 +102,15 @@ export function initExport({ socket: appSocket = null, shipping: shipper = null,
         systemState = state.systemState;
       })
       .catch((error) => log.warn('log', 'export.state_import_failed', { error }));
-    socket.on('log:snapshot', async (payload, ack) => {
+    socket.on('log:snapshot', (payload, ack) => {
       if (typeof ack !== 'function') return;
-      try {
-        // Side by side: the server waits a bounded time for this answer.
-        const [snapshot] = await Promise.all([buildSnapshot(), shipping?.flushNow()]);
-        ack(snapshot);
-      } catch {
-        ack(null);
-      }
+      answerSnapshot(ack).catch(() => ack(null));
     });
     socket.on('log:level', refreshLabelSoon);
   }
   onEntry(maybeToast);
   refreshLabel();
+  preloadWhenLoaded();
 }
 
 export async function exportLocal(note = '') {

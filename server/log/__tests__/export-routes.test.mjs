@@ -35,6 +35,7 @@ function setup({ sockets }) {
   store.append('room:r1', { seq: 1, t: clock.ms, ts: clock.ms, lvl: 'info', line: `{"t":${clock.ms},"seq":1,"lvl":"info","cat":"room","ev":"x"}` });
   const emitted = [];
   const logged = [];
+  const tails = [];
   const io = {
     sockets: {
       adapter: { rooms: new Map([['r1', new Set(sockets.map((s) => s.id))]]) },
@@ -52,10 +53,11 @@ function setup({ sockets }) {
     build: { commit: 'abc' },
     netcode: 'server-authoritative',
     describe: (socketId) => ({ username: socketId === 's1' ? 'Ash' : null, seat: socketId === 's1' ? 'p1' : null }),
+    acceptTail: (socket, tail) => tails.push({ id: socket.id, tail }),
     now: () => clock.ms,
     randomToken: () => (n++).toString(16).padStart(32, '0'),
   });
-  return { exporter, store, emitted, logged };
+  return { exporter, store, emitted, logged, tails };
 }
 
 function response() {
@@ -209,4 +211,19 @@ test('dev routes: unknown room 404, known room exports with a header, rooms list
   assert.equal(rooms.jsonBody.rooms.length, 1);
   assert.equal(rooms.jsonBody.rooms[0].roomId, 'r1');
   assert.equal(rooms.jsonBody.rooms[0].participants, 2);
+});
+
+test('a snapshot reply carrying a tail hands it to ingest and keeps it out of the file', async () => {
+  const tail = { loadId: 'deadbeef', lines: ['{"t":1,"seq":2,"lvl":"info","cat":"app","ev":"y"}'] };
+  const a = fakeSocket('s1', { clientId: CLIENT_A, rooms: ['r1'], answer: { meta: { w: 1 }, tail } });
+  const b = fakeSocket('s2', { clientId: CLIENT_B, rooms: ['r1'], answer: { meta: { w: 2 } } });
+  const { exporter, tails } = setup({ sockets: [a, b] });
+  exporter.attachSocket(a);
+  const ack = await call(a, { roomId: 'r1' });
+  assert.deepEqual(tails, [{ id: 's1', tail }]);
+  const res = response();
+  exporter.downloadHandler(request({ params: { token: ack.url.split('/').pop() } }), res);
+  const snaps = res.body.split('\n').filter(Boolean).map((l) => JSON.parse(l)).filter((r) => r.k === 'snap');
+  assert.equal(snaps.length, 2);
+  assert.ok(snaps.every((snap) => !('tail' in snap)));
 });

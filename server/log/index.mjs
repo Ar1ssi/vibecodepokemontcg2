@@ -120,6 +120,7 @@ export function createServerLogging({
         levelFor: (roomId) => ingest?.levelFor(roomId) ?? 'debug',
         build,
         netcode: options.netcode ?? null,
+        acceptTail: (socket, tail) => ingest.acceptTail(socket, tail),
         describe: (socketId, roomId) => {
           const sock = socketId ? io.sockets.sockets.get(socketId) : null;
           return {

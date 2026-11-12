@@ -207,5 +207,19 @@ export function createLogIngest({ store, log, io, now = Date.now, limits = LIMIT
       res.status(204).end();
     },
     levelFor,
+    /**
+     * A client's unshipped entries, sent inside its snapshot reply so an export has them without
+     * a second round trip. Same validation and seq dedupe as a batch; the later batch is a no-op.
+     */
+    acceptTail(socket, tail) {
+      try {
+        const clientId = socket?.data?.logClientId;
+        if (!clientId || tail?.loadId !== socket.data.logLoadId) return 0;
+        if (!Array.isArray(tail.lines) || tail.lines.length > limits.ingestMaxLines) return 0;
+        return storeBatch({ clientId, loadId: tail.loadId, lines: tail.lines, payload: tail }).stored;
+      } catch {
+        return 0;
+      }
+    },
   };
 }

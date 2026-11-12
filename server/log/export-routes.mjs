@@ -29,12 +29,16 @@ function sendLines(req, res, { lines, filename }) {
   });
 }
 
-function requestSnapshot(sock, exportId, limits) {
+function requestSnapshot(sock, exportId, limits, acceptTail) {
   return new Promise((resolve) => {
     try {
       sock.timeout(limits.snapshotTimeoutMs).emit('log:snapshot', { exportId }, (err, snap) => {
         const usable = !err && snap !== null && typeof snap === 'object' && !Array.isArray(snap);
-        resolve(usable ? snap : 'timeout');
+        if (!usable) return resolve('timeout');
+        // The client's unshipped entries ride in the reply; store them, keep them out of the file.
+        const { tail, ...snapshot } = snap;
+        if (tail) acceptTail(sock, tail);
+        return resolve(snapshot);
       });
     } catch {
       resolve('timeout');
@@ -51,6 +55,7 @@ export function createLogExport({
   build,
   netcode,
   describe,
+  acceptTail = () => 0,
   now = Date.now,
   limits = LIMITS,
   randomToken = () => randomBytes(16).toString('hex'),
@@ -79,7 +84,7 @@ export function createLogExport({
       targets.push(socket);
     }
     const exportId = randomToken();
-    const answers = await Promise.all(targets.map((sock) => requestSnapshot(sock, exportId, limits)));
+    const answers = await Promise.all(targets.map((sock) => requestSnapshot(sock, exportId, limits, acceptTail)));
     const snapshots = {};
     targets.forEach((sock, i) => {
       snapshots[sock.data.logClientId] = answers[i];

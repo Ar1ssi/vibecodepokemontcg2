@@ -127,6 +127,28 @@ function trimToBudget(snapshot) {
   }
 }
 
+let preloaded = null;
+
+/**
+ * Loads the app modules a snapshot reads, once. Called after the page has loaded so that a later
+ * snapshot is one synchronous step: a tab that is janking gets very few event-loop turns, and
+ * that is the tab whose snapshot matters.
+ *
+ * @returns {Promise<object>} the module set `buildSnapshotSync` takes
+ */
+export function preloadSnapshotModules({ hasSocket = typeof globalThis.io === 'function', load = defaultLoad } = {}) {
+  const pending = Promise.resolve(load({ hasSocket })).then((modules) => {
+    preloaded = modules;
+    return modules;
+  });
+  return pending;
+}
+
+/** The module set from `preloadSnapshotModules`, or null until it has resolved. */
+export function preloadedSnapshotModules() {
+  return preloaded;
+}
+
 export async function buildSnapshot({
   win = window,
   doc = document,
@@ -134,7 +156,12 @@ export async function buildSnapshot({
   hasSocket = typeof globalThis.io === 'function',
   load = defaultLoad,
 } = {}) {
-  const { applyView, cmdEmitter, fx, state } = await load({ hasSocket });
+  return buildSnapshotSync({ win, doc, nav, modules: await load({ hasSocket }) });
+}
+
+/** One synchronous pass over already-loaded modules (missing ones leave their section null). */
+export function buildSnapshotSync({ win = window, doc = document, nav = navigator, modules = {} } = {}) {
+  const { applyView = null, cmdEmitter = null, fx = null, state = null } = modules ?? {};
   const storage = () => win.localStorage;
   const snapshot = {
     clientId,

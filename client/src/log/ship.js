@@ -164,6 +164,13 @@ export function startShipping({ socket, log, ring, onEntry, clientId, loadId, wi
       });
     },
     state: () => ({ ...batcher.state(), offset: clock.offset(), rtt: clock.rtt() }),
+    /** The entries the server has not acked yet, in `log:batch` shape, to ride inside a snapshot reply. */
+    tail: () => ({
+      loadId,
+      lines: batcher.unacked(ring, LIMITS.batchMaxBytes),
+      offset: clock.offset(),
+      rtt: clock.rtt(),
+    }),
     stop() {
       clearInterval(tick);
       stopPings();
