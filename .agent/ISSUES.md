@@ -6,7 +6,7 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I283). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I284). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Umbrella lines name every member as `(merged I<a>, I<b>…)`: grep any id to find its line.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (`pnpm harness:check`); maintain.md moves older Closed lines to .agent/archive/ISSUES-closed.md.
@@ -14,6 +14,7 @@
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I283 2026-11-12 P1 [board-ui] No-room board draws no cards: before the Solo tab is clicked, deck load and Set Up run on the hidden mirror (chat lines, client coin prompt) while the three.js board stays empty. Repro: load page, load both decks, Set Up Both (refs: D246, design 087 § No-room board)
 - I282 2026-11-09 P2 [mat-fx] stadium-environment-layout.test "environmentKeyFor gives every Homebrew Stadium in set.json a board" fails on origin/main: 27 committed customhb Stadiums unmapped (Altar of the Moone, Sky Field, Brooklet Hill…) — repro: node --test that file (design 077)
 - I280 2026-11-05 P3 [deck] Per-form Zygarde deck limit (D240) reads `form`/description/stage off deck data; rows with none (CSV imports, decks saved before D240) count under plain "Zygarde" or by stage, so a 50% Basic can read as 10% — backfill `form` on hydrate (review of D240)
 - I279 2026-11-03 P3 [rules] An Energy moved onto the other player's Pokémon (customhb Scyther Harvesting Scythe) is owned by its zone: discarded, it lands in the taker's discard pile, not its owner's — discardCard's ownerOf ignores card.ownerId (set in state.mjs:151)
@@ -36,7 +37,7 @@
 - I256 2026-10-16 P3 [board-ui] r2.dev public URL for foil textures is rate-limited and not for production; move ptcg-foil to a custom domain when one is on Cloudflare (refs: D217)
 - I255 2026-10-15 P3 [netcode] joinGame/reconnect add the socket to the Socket.IO room before roomReject (server.js:789/:925 vs :810/:940/:949): rejected sockets get room broadcasts and keep roomInfo alive past the sweep; join only after the seat checks pass (refs: D216 review)
 - I254 2026-10-15 P3 [board-ui] scripts/generate-mat-thumbs.mjs rewrites mats-catalog.mjs from manifest.json, which has no custom-* entries, so a rerun drops the hand-kept block (header warns; merge by hand) — make the generator keep it (refs: D215; dead PNG entries removed 2026-10-16)
-- I251 2026-10-15 P2 [legacy] Client rules layer still loaded (rules-bridge.js, trainer-execution.js, chat-buttons.js, ~12 k lines; 19 isAuthoritativeDispatchActive gates). Relay mode removed 2026-11-12 (D245); slices 3–5 need the user's two decisions (refs: design 087)
+- I251 2026-10-15 P2 [legacy] Client rules layer (rules-bridge.js, trainer-execution.js, chat-buttons.js, ~12 k lines) stays: it is the no-room board's rules (D246). Relay mode removed 2026-11-12 (D245). Open: what the no-room board becomes (I283; refs: design 087)
 - I247 2026-10-15 P3 [netcode] Design 072 seat-loss (merged I247, I248): a seat rejoining after the opening deal gets no dealOrder/turnOrderResult replay (Set Up shuffles locally after 45 s); a caller or coin winner whose socket blips is answered for at once, no reconnect grace (refs: design 072)
 - I245 2026-10-15 P2 [netcode] e2e tests failing on main (merged I245, I246): scripts/e2e/flip-gate-test.mjs step 3 throws `reading 'image'` via e2e-api.js:570, steps 1/2 flake; scripts/e2e/room-change-reset-test.mjs waits for a legacy coin-call picker the bridge auto-answers (design 072)
 - I239 2026-10-01 P2 [rules] I233 follow-ups (merged I239, I240, I241): "has no Abilities" locks (Garbotoxin) also stop Powers/Bodies (isAbilitySuppressed ignores type; Toxic Gas skips promos); rules-bridge.js ~2981 may auto-run old wordings on play (audit); empty TCGdex ability entries (neo2-49…)

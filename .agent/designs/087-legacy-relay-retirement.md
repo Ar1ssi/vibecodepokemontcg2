@@ -1,5 +1,5 @@
 # 087: Retire the legacy relay — the server always runs the rules
-Status: building — slices 1–2 built 2026-11-12 on the user's go-ahead ("higher risk, do them yourself"); slices 3–5 wait on § Decisions the user owns
+Status: building — slices 1–2 built 2026-11-12 on the user's go-ahead ("higher risk, do them yourself"); slice 3 struck by the user's decision 1 (D246); what the no-room board becomes is open (§ No-room board)
 Date: 2026-11-12 · Session: cleanup after the 2026-11-12 size audit (I251 step 2)
 
 ## Problem
@@ -77,15 +77,26 @@ No data. `render.yaml` drops the env var. Revert: `git revert` the slice commit.
 |---|---|---|---|---|
 | 1 ✔ | server/server.js, server/netcode-mode.mjs, server/__tests__/netcode-mode.test.mjs | as Design | 4 cases above | server + netcode suites pass |
 | 2 ✔ | socket-event-listeners.js, spectator-join.js, clean-action-data.js, process-action.js, global-variables.js, header-buttons.js, room-buttons.js, solo-room.js, public-room-view.mjs (+test), shared/engine/rng.mjs (+test), scripts/e2e, package.json, README, render.yaml | as Design | harness parity with base | lint clean; suites pass |
-| 3 | not pinned — needs decision 1 | delete the state-(b) arms: local undo replay, local shuffle/deal, `shouldExecuteLocalRulesEffect` callers, `trainer-execution.js` (2,979 lines, one call site rules-bridge.js `runTrainerSteps`), the client attack path in chat-buttons.js | | |
+| 3 | STRUCK 2026-11-12 (D246: the board outside a room stays) | delete the state-(b) arms: local undo replay, local shuffle/deal, `shouldExecuteLocalRulesEffect` callers, `trainer-execution.js` (2,979 lines, one call site rules-bridge.js `runTrainerSteps`), the client attack path in chat-buttons.js | | |
 | 4 | not pinned — needs decision 2 | state export/import on the action log: keep, or rebuild on server views | | |
 | 5 | not pinned | move the relayed `manual_override` / look-reveal actions to server commands, then drop `pushAction` mirroring and `requestAction` | | |
 
 ## Decisions the user owns
-1. Should a board exist outside a room? The Solo tab joins a solo room when clicked
-   (header-buttons.js), so the no-room state is what a page shows before any tab is picked and
-   between rooms; if "no" the client rules layer (~12 k lines) can go in slice 3.
-2. Keep game-state export/import (it replays the client action log)?
+1. Should a board exist outside a room? → **Answered 2026-11-12: keep it** (D246). Slice 3 is struck.
+2. Keep game-state export/import (it replays the client action log)? Moot while decision 1 stands:
+   the action log and the client rules it replays stay.
+
+## No-room board — found 2026-11-12, after decision 1
+The board outside a room draws nothing today. The three.js board renders only server views
+(board3d.js `onViewApplied` ← apply-view's `board-view-applied`); with no room there is no view, and
+the local rules write to the hidden mirror (D220). Browser probe on 6852bd1f, page loaded, no tab
+clicked: `loadFixtureDeck` both sides → local zones deck 20/20, mat empty; Set Up Both → local zones
+deck 14 / prizes 6, chat prints "Both players are ready", the client "Call the coin" prompt opens,
+and the mat still shows no cards. Clicking the Solo tab joins `solo-…` and the board draws. Design
+074 § Deviations knew the page "still boots on the local board"; nothing draws that board (I283).
+Open choice (user): (a) join the solo room at page load, so "outside a multiplayer room" is the solo
+room; (b) keep the local rules and give three.js a second model source built from the local zones;
+(c) leave it and tell the player to click Solo.
 
 ## Deviations
 - The size audit expected the three legacy files to be deletable with the mode. They are not:
