@@ -38,10 +38,10 @@ import { startKeybindsSleep } from '../../actions/keybinds/keybindSleep.js';
 import { forceRulesEnabledForMultiplayer } from '../../setup/rules/rules-bridge.js';
 import { getStoredMatId } from '../../setup/sizing/apply-mat-layout.js';
 import { restoreLastUsedDeckToPlaymat } from '../document-event-listeners/sidebox/native-deck-builder.js';
-import {
-  enableSyncLogForMultiplayer,
-  logSync,
-} from '../../setup/general/sync-logger-bridge.js';
+import { enableSyncLogForMultiplayer } from '../../setup/general/sync-logger-bridge.js';
+import { logSync } from '../../log/sync-log.js';
+import { log } from '../../log/client-log.js';
+import { applyViewLogged } from '../../setup/netcode/apply-view-logged.js';
 import { enableDecisionLogForMultiplayer } from '../../setup/general/decision-logger-bridge.js';
 import {
   applyView,
@@ -594,12 +594,20 @@ export const initializeSocketEventListeners = () => {
   });
 
   socket.on('view', (data) => {
-    if (!isViewForRoom(data, systemState.roomId)) return;
+    if (!isViewForRoom(data, systemState.roomId)) {
+      log.debug('view', 'ignored', { reason: 'not_for_room', gameId: data?.gameId ?? null }, { sv: data?.stateVersion });
+      return;
+    }
     if (typeof data?.lastClientSeq === 'number') {
       seedClientSeq(data.lastClientSeq);
     }
-    if (data?.view && systemState.solo && !acceptSoloPerspective(data.view)) return;
-    if (data?.view) {
+    if (data?.view && systemState.solo && !acceptSoloPerspective(data.view)) {
+      log.debug('view', 'ignored', { reason: 'solo_perspective' }, { sv: data?.stateVersion });
+      return;
+    }
+    if (!data?.view) {
+      log.warn('view', 'ignored', { reason: 'no_view' }, { sv: data?.stateVersion });
+    } else {
       const options = {
         socket,
         roomId: systemState.roomId,
@@ -614,9 +622,9 @@ export const initializeSocketEventListeners = () => {
         },
       };
       if (isSpectatingAuthoritative()) {
-        applySpectatorView(data.view, data.events || [], options);
+        applyViewLogged(applySpectatorView, data.view, data.events || [], options, log);
       } else {
-        applyView(data.view, data.events || [], options);
+        applyViewLogged(applyView, data.view, data.events || [], options, log);
       }
     }
   });

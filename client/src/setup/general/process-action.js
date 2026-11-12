@@ -1,6 +1,5 @@
 import { socket, systemState } from '../../state.js';
-import { logSyncAction, logSync } from './sync-logger-bridge.js';
-import { logDecision } from './decision-logger-bridge.js';
+import { logSyncAction, logSync, logDecision } from '../../log/sync-log.js';
 import { createAction } from './action-event.mjs';
 import { translateActionToCmd } from '../netcode/dual-run-bridge.js';
 import { emitCmd } from '../netcode/cmd-emitter.js';

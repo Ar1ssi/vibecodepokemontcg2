@@ -65,8 +65,7 @@ import { exchangeData } from '../deck-constructor/exchange-data.js';
 import { changeCardBack, loadDeckData } from '../deck-constructor/import.js';
 import { changePlaymat } from '../sizing/apply-mat-layout.js';
 import { isBlockedByReplay } from './replay-block.js';
-import { logSyncAction } from './sync-logger-bridge.js';
-import { logDecision } from './decision-logger-bridge.js';
+import { logSyncAction, logDecision } from '../../log/sync-log.js';
 import { systemState } from '../../state.js';
 import { isMirrorSuppressedAction } from '../netcode/authoritative-dispatch.js';
 

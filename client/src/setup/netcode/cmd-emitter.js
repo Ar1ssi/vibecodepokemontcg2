@@ -4,6 +4,7 @@
  * affordances to interacting elements during server round-trips.
  */
 import { uiCue } from './mat-fx/ui-cue.mjs';
+import { log } from '../../log/client-log.js';
 
 let clientSeq = 0;
 const pendingElements = new Set();
@@ -157,7 +158,22 @@ export function createCommandEnvelope(type, payload = {}, seq = 0) {
  *   (design 074 D7, `soloCommandSeat`); a normal room's command carries none.
  * @returns {Promise<{ success: boolean, clientSeq?: number, error?: string, command?: object }>}
  */
-export async function emitCmd({
+export async function emitCmd(options) {
+  const result = await sendCmd(options);
+  if (result.success) {
+    log.debug('cmd', 'emit', { type: options.type, seat: options.seat ?? null }, { room: options.roomId, cs: result.clientSeq });
+  } else {
+    log.warn(
+      'cmd',
+      'refused.local',
+      { type: options?.type ?? null, error: result.error, reason: result.reason ?? null },
+      { room: options?.roomId || undefined }
+    );
+  }
+  return result;
+}
+
+async function sendCmd({
   socket,
   roomId,
   type,
@@ -231,7 +247,31 @@ export async function emitCmd({
  *   view names whose choice is open, design 074 D7); sent as `seat` when present.
  * @returns {Promise<{ success: boolean, clientSeq?: number, error?: string }>}
  */
-export async function emitResolveChoice({
+export async function emitResolveChoice(options) {
+  const result = await sendResolveChoice(options);
+  if (result.success) {
+    log.debug(
+      'cmd',
+      'emit',
+      {
+        type: 'resolveChoice',
+        choiceId: options.choiceId ?? null,
+        selection: Array.isArray(options.selection) ? options.selection.length : 0,
+      },
+      { room: options.roomId, cs: result.clientSeq }
+    );
+  } else {
+    log.warn(
+      'cmd',
+      'refused.local',
+      { type: 'resolveChoice', error: result.error, reason: result.reason ?? null },
+      { room: options?.roomId || undefined }
+    );
+  }
+  return result;
+}
+
+async function sendResolveChoice({
   socket,
   roomId,
   choiceId,
@@ -299,6 +339,12 @@ const PLAY_LOCK_REFUSAL = /^Your opponent's attack stops you playing that card d
  * @param {(key: string) => void} [options.playUiCue] UI sound player (tests inject one)
  */
 export function handleCmdRejected(rejectionData = {}, options = {}) {
+  log.warn(
+    'cmd',
+    'rejected',
+    { reason: rejectionData.reason ?? null, details: rejectionData.details ?? null },
+    { cs: Number.isInteger(rejectionData.clientSeq) ? rejectionData.clientSeq : undefined }
+  );
   clearInFlightAffordances();
   (options.playUiCue ?? uiCue)(PLAY_LOCK_REFUSAL.test(rejectionData.reason) ? 'itchy-pollen-hand-card' : 'card-no-match');
 
