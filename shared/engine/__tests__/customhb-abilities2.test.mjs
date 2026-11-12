@@ -596,3 +596,42 @@ test('HB 082 Greninja ex Pain Points: attacks are not affected by Infiltrator (n
   assert.equal(hit(false, 'heads'), 0, 'control: Infiltrator heads prevents');
   assert.equal(hit(true, 'heads'), 60, 'Pain Points ignores Infiltrator');
 });
+
+// ── HB Unseen Fist (customhb set.json; text verbatim, matches the user's card scan) ──────────
+
+const UNSEEN_FIST = 'Attacks used by this Pokémon bypass all forms of immunity and damage reduction.';
+
+test('HB Unseen Fist: attacks ignore the defender Resistance', () => {
+  const damageDealt = (withFist) => {
+    const { state } = board('Fist User', '', {
+      damage: '60',
+      attackerExtra: {
+        types: ['Fighting'],
+        abilities: withFist ? ability('Unseen Fist', UNSEEN_FIST) : [],
+      },
+      defenderExtra: { resistance: { type: 'Fighting', value: -30 } },
+    });
+    return damageOn(attack(state).state, 'p2');
+  };
+  assert.equal(damageDealt(true), 60, 'Resistance ignored');
+  assert.equal(damageDealt(false), 30, 'Resistance applies without Unseen Fist');
+});
+
+test('HB Unseen Fist: attacks bypass Infiltrator prevention and Ability damage reduction', () => {
+  const hit = (withFist, defenderAbility) => {
+    const { state } = board('Fist User', '', {
+      damage: '60',
+      attackerExtra: withFist ? { abilities: ability('Unseen Fist', UNSEEN_FIST) } : {},
+      setup: (s) => {
+        s.players.p2.zones.active[0].abilities = defenderAbility;
+      },
+    });
+    return damageOn(attackWithFace(state, 'heads').state, 'p2');
+  };
+  const infiltrator = ability('Infiltrator', INFILTRATOR);
+  assert.equal(hit(false, infiltrator), 0, 'control: Infiltrator heads prevents');
+  assert.equal(hit(true, infiltrator), 60, 'Unseen Fist ignores Infiltrator');
+  const thick = ability('Thick Hide', 'This Pokémon takes 30 less damage from attacks.');
+  assert.equal(hit(false, thick), 30, 'control: reduction applies');
+  assert.equal(hit(true, thick), 60, 'Unseen Fist ignores the reduction');
+});

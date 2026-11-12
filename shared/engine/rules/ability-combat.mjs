@@ -1224,9 +1224,14 @@ export function abilityIgnoresDefenderEffects(attacker) {
   return (
     /isn't affected by any effects on your opponent's active pok[eé]mon/.test(t) ||
     /ignore (?:any )?effects on the defending pok[eé]mon/.test(t) ||
-    /ignore (?:any )?effects of (?:the )?defending pok[eé]mon/.test(t)
+    /ignore (?:any )?effects of (?:the )?defending pok[eé]mon/.test(t) ||
+    BYPASS_IMMUNITY_AND_REDUCTION.test(t)
   );
 }
+
+// Homebrew Unseen Fist: "Attacks used by this Pokémon bypass all forms of immunity and damage reduction."
+const BYPASS_IMMUNITY_AND_REDUCTION =
+  /attacks used by this pok[eé]mon bypass all forms of immunity and damage reduction/;
 
 /**
  * Greninja ex Pain Points: "This Pokémon's attacks are not affected by Abilities or Resistance."
@@ -1236,7 +1241,8 @@ export function abilityIgnoresDefenderEffects(attacker) {
 export function abilityIgnoresDefenderAbilities(attacker, ctx = {}) {
   if (!isPokemon(attacker)) return false;
   return (
-    /attacks are not affected by abilities or resistance/.test(cardAbilityText(attacker)) &&
+    (/attacks are not affected by abilities or resistance/.test(cardAbilityText(attacker)) ||
+      BYPASS_IMMUNITY_AND_REDUCTION.test(cardAbilityText(attacker))) &&
     !isAbilitySuppressed(attacker, ctx)
   );
 }
