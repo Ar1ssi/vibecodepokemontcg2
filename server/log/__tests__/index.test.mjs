@@ -14,6 +14,10 @@ test('LOG_OFF=1 builds an inert twin', () => {
   let nexted = false;
   logging.httpMiddleware({}, {}, () => { nexted = true; });
   assert.ok(nexted);
+  let status = null;
+  logging.beaconHandler({}, { status: (code) => ({ end: () => { status = code; } }) });
+  assert.equal(status, 204);
+  assert.equal(logging.levelFor('r'), 'debug');
   assert.doesNotThrow(() => {
     logging.log.error('boot', 'x');
     logging.forRoom('r').error('room', 'x');

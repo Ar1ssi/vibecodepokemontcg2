@@ -135,3 +135,15 @@ test('sink receives lines and a throwing sink does not break append', () => {
   bad.append('server', entry(1));
   assert.equal(bad.stream('server').size, 1);
 });
+
+test('append keeps load on the ring entry and writes diskLine to the sink', () => {
+  const written = [];
+  const store = createLogStore({ sink: { write: (id, line) => written.push([id, line]) } });
+  store.append('client:c', { ...entry(1, '{"a":1}'), load: 'abcd1234', diskLine: '{"ts":5,"a":1}' });
+  store.append('client:c', entry(2, '{"b":2}'));
+  const [first, second] = store.stream('client:c').entries();
+  assert.equal(first.load, 'abcd1234');
+  assert.equal(first.line, '{"a":1}');
+  assert.equal('load' in second, false);
+  assert.deepEqual(written, [['client:c', '{"ts":5,"a":1}'], ['client:c', '{"b":2}']]);
+});

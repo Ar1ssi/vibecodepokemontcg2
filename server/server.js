@@ -59,6 +59,7 @@ import { CARD_ART_PROXY_HOSTS } from './card-art-proxy-hosts.mjs';
 import { cacheControlFor } from './sfx-cache.mjs';
 import { readServerAuthoritative } from './netcode-mode.mjs';
 import { createServerLogging } from './log/index.mjs';
+import { LIMITS } from '../shared/log/log-schema.mjs';
 import { customFoilSets, resolveFoilTextureBase } from './tcgl-foil-config.mjs';
 
 // On unless SERVER_AUTHORITATIVE is 0, false, off or no (the legacy relay, kept until I251 retires it).
@@ -114,6 +115,8 @@ async function main() {
   const logging = createServerLogging({ repoRoot: path.join(__dirname, '..') });
   const app = express();
   app.use(logging.httpMiddleware);
+  app.post('/api/log/beacon', express.text({ type: '*/*', limit: LIMITS.beaconMaxBytes }), logging.beaconHandler);
+  app.locals.build = logging.build?.commit ?? null;
   // HTTP Server Setup
   const server = http.createServer(app);
 

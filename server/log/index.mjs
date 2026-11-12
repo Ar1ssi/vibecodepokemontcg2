@@ -9,6 +9,7 @@ import { httpLog } from './http-tap.mjs';
 import { tapServer, tapSocket } from './socket-tap.mjs';
 import { readBuild } from './build-info.mjs';
 import { NO_JOURNAL, createJournal } from './journal.mjs';
+import { createLogIngest } from './client-ingest.mjs';
 
 function createInert(now) {
   const log = createLogger({ now, sink: () => {}, level: 'error' });
@@ -23,6 +24,8 @@ function createInert(now) {
     bootId: null,
     diskSink: null,
     httpMiddleware: (req, res, next) => next(),
+    beaconHandler: (req, res) => res.status(204).end(),
+    levelFor: () => 'debug',
     attachIo() {},
     attachSocket() {},
     shutdown() {},
@@ -69,6 +72,7 @@ export function createServerLogging({
   log.info('boot', 'start', { commit: build.commit, node: build.node, pid: process.pid, logDir: diskSink?.dir ?? null });
 
   let seatOf = () => null;
+  let ingest = null;
   return {
     enabled: true,
     store,
@@ -87,12 +91,16 @@ export function createServerLogging({
     bootId,
     diskSink,
     httpMiddleware: httpLog({ log }),
+    beaconHandler: (req, res) => (ingest ? ingest.beaconHandler(req, res) : res.status(204).end()),
+    levelFor: (roomId) => ingest?.levelFor(roomId) ?? 'debug',
     attachIo(io, options = {}) {
       if (options.seatOf) seatOf = options.seatOf;
       tapServer(io, { log, store, clientOf: (id) => io.sockets.sockets.get(id)?.data?.logClientId ?? null });
+      ingest = createLogIngest({ store, log, io });
     },
     attachSocket(socket) {
       tapSocket(socket, { log, seatOf: (id, room) => seatOf(id, room) });
+      ingest?.attachSocket(socket);
     },
     shutdown() {
       clearInterval(sweepTimer);

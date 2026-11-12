@@ -66,14 +66,14 @@ export function createLogStore({
   }
 
   return {
-    append(streamId, { seq, t, ts = t, lvl, line }) {
+    append(streamId, { seq, t, ts = t, lvl, line, load, diskLine }) {
       const s = open(streamId);
-      s.ring.push({ seq, t, ts, lvl, line });
+      s.ring.push(load === undefined ? { seq, t, ts, lvl, line } : { seq, t, ts, lvl, line, load });
       s.lastAt = now();
       s.closedAt = null;
       if (!sink) return;
       try {
-        sink.write(streamId, line);
+        sink.write(streamId, diskLine ?? line);
       } catch {
         // disk mirroring is best effort; memory logging continues
       }

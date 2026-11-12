@@ -1,5 +1,5 @@
 // Design 087: first module on the page. Installs every capture, then taps the app socket.
-import { log, clientRing, clientId, logStats } from './client-log.js';
+import { log, clientRing, clientId, loadId, logStats, onEntry } from './client-log.js';
 import { installConsoleCapture } from './capture-console.js';
 import { installErrorCapture } from './capture-errors.js';
 import { installInputCapture } from './capture-input.js';
@@ -7,6 +7,7 @@ import { installNetCapture } from './capture-net.js';
 import { installPerfCapture } from './capture-perf.js';
 import { installAppEventCapture } from './capture-app.js';
 import { tapClientSocket } from './capture-socket.js';
+import { startShipping } from './ship.js';
 
 const originalConsoleError = console.error.bind(console);
 
@@ -43,7 +44,12 @@ try {
 
   if (typeof globalThis.io === 'function') {
     import('../state.js')
-      .then(({ socket }) => tapClientSocket(socket, { log }))
+      .then(({ socket }) => {
+        tapClientSocket(socket, { log });
+        const shipping = startShipping({ socket, log, ring: clientRing, onEntry, clientId, loadId });
+        window.__ptcgLog.ship = shipping.state;
+        window.__ptcgLog.flush = shipping.flushNow;
+      })
       .catch((error) => log.warn('log', 'socket.tap.failed', { error }));
   }
 } catch (error) {
