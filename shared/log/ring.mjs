@@ -26,6 +26,14 @@ export function createRing({ maxBytes, maxEntries }) {
       bytes += entry.line.length;
       while (size() > 1 && (bytes > maxBytes || size() > maxEntries)) evictHead();
     },
+    /** Evicts up to `count` of the oldest entries (the store's memory sweep); counted as dropped. */
+    dropOldest(count) {
+      let left = Math.min(Math.max(0, Math.floor(count) || 0), size());
+      while (left > 0) {
+        evictHead();
+        left -= 1;
+      }
+    },
     since(seq) {
       return entries.slice(head).filter((e) => e.seq > seq);
     },

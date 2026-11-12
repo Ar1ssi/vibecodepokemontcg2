@@ -114,3 +114,12 @@ test('child shares seq, level, and sink; ctx merges', () => {
   logger.info('app', 'c');
   assert.equal(out.length, 2);
 });
+
+test('the sink payload names the room so a server sink can route by it', () => {
+  const seen = [];
+  const logger = createLogger({ now: () => 5, sink: (entry) => seen.push(entry.room) });
+  logger.info('room', 'join', { id: 'a' }, { room: 'r1' });
+  logger.child({ room: 'r2' }).info('room', 'join');
+  logger.info('boot', 'start');
+  assert.deepEqual(seen, ['r1', 'r2', null]);
+});

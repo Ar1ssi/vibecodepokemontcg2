@@ -29,7 +29,7 @@ function emit(state, lvl, cat, ev, detail, ctx, t) {
   }
   if (detail !== undefined) line += `,"d":${safeStringify(detail, { maxBytes })}`;
   line += '}';
-  state.sink({ seq, t, lvl, cat, ev, line });
+  state.sink({ seq, t, lvl, cat, ev, room: fields.room ?? null, line });
 }
 
 function emitSuppressed(state, nowMs) {

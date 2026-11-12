@@ -42,3 +42,17 @@ test('compaction keeps order and counts across many evictions', () => {
   assert.equal(ring.bytes(), 100);
   assert.equal(ring.toArray().at(-1).seq, 5000);
 });
+
+test('dropOldest evicts from the head, counts the drops, and clamps to the size', () => {
+  const ring = createRing({ maxBytes: 10000, maxEntries: 100 });
+  for (let seq = 1; seq <= 5; seq++) ring.push({ seq, t: seq, line: 'x'.repeat(10) });
+  ring.dropOldest(2);
+  assert.equal(ring.size(), 3);
+  assert.equal(ring.firstSeq(), 3);
+  assert.equal(ring.dropped(), 2);
+  assert.equal(ring.bytes(), 30);
+  ring.dropOldest(99);
+  assert.equal(ring.size(), 0);
+  assert.equal(ring.firstSeq(), null);
+  assert.equal(ring.dropped(), 5);
+});
