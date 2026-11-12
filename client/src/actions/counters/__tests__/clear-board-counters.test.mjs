@@ -26,7 +26,7 @@ test('legacy counters are zeroed and removed without emitting', () => {
   assert.deepEqual(ability.removedWith, [false]);
 });
 
-// The repro: under SERVER_AUTHORITATIVE=1 the winner, with 50 damage on its Active,
+// The repro: under server authority the winner, with 50 damage on its Active,
 // pressed Reset and got "element.handleRemove is not a function" (reset.js), so the
 // reset never reached the server.
 test('a server-rendered counter (no handleRemove) is left for the renderer and does not throw', () => {

@@ -18,8 +18,7 @@ export const initializeHeaderButtons = () => {
   const p2Chatbox = document.getElementById('p2Chatbox');
   const p2ExplanationBox = document.getElementById('p2ExplanationBox');
 
-  // Design 074 D7: the Solo tab plays a solo room through the server (solo-room.js); a
-  // server without authority refuses it and the tab keeps the local board.
+  // Design 074 D7: the Solo tab plays a solo room through the server (solo-room.js).
   const p1Button = document.getElementById('p1Button');
   p1Button.addEventListener('click', () => {
     if (systemState.solo || !systemState.isTwoPlayer) {
@@ -71,7 +70,6 @@ export const initializeHeaderButtons = () => {
       // and client-seq counter, not just the sync intervals, so the next
       // room starts clean.
       resetNetcodeForRoomChange();
-      systemState.spectatorId = '';
       if (systemState.selfDeckData) {
         processAction('self', true, 'loadDeckData', [
           systemState.selfDeckData,

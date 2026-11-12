@@ -1,4 +1,4 @@
-// Pure journal replay (design 087 §4): re-applies recorded commands to a rebase snapshot and
+// Pure journal replay (design 088 §4): re-applies recorded commands to a rebase snapshot and
 // compares outcomes and state hashes. Engine functions are injected so a CLI can reuse it.
 export function replayJournal(records, { applyCommand, createRng, hashState, to = Infinity }) {
   let state = null;

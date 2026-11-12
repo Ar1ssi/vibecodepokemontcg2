@@ -103,8 +103,6 @@ export const COLUMN_PX = Object.freeze({ width: 30, height: 120 });
 export const MIST_CARD_GAP_PX = 40;
 /** How far a pad reaches past its radius, seen from above (a margin). */
 const PUFF_REACH = 1.06;
-/** A flower's width in the beds out among the bushes (px at world unit 1): BDSP's chunky blooms. */
-export const FLOWER_HEAD_PX = 7;
 
 /** A small deterministic 0..1 from three numbers. */
 const hash = (x, y, salt) => {

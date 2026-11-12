@@ -1,4 +1,4 @@
-// Drives the batcher over the app socket (design 087 §5). Nothing here may throw or log its own traffic.
+// Drives the batcher over the app socket (design 088 §5). Nothing here may throw or log its own traffic.
 import { createBatcher } from '../../../shared/log/batcher.mjs';
 import { createClockSync } from '../../../shared/log/clock-sync.mjs';
 import { LIMITS } from '../../../shared/log/log-schema.mjs';

@@ -2,11 +2,6 @@
 // The printed-reveal rule is design 059's, shared with the server engine (reveal-picks.mjs).
 
 import { textRevealsPicks } from './reveal-picks.mjs';
-import {
-  closeDeckSearchAccess,
-  deckSearchAccessReason,
-  sourceNameFromDeckSearchReason,
-} from './deck-search-access.mjs';
 
 let lastSearchShuffleAt = 0;
 const SEARCH_SHUFFLE_DEDUPE_MS = 400;
@@ -40,14 +35,11 @@ export function shuffleDeckAfterSearch(
   if (now - lastSearchShuffleAt < SEARCH_SHUFFLE_DEDUPE_MS) return;
   lastSearchShuffleAt = now;
 
-  const label = sourceName || sourceNameFromDeckSearchReason(deckSearchAccessReason());
-
   shuffleZone(user, user, 'deck', undefined, false);
-  closeDeckSearchAccess();
   if (message === null) return;
   const text =
     message ??
-    (label ? `  🔀 ${label} — deck shuffled` : '  🔀 deck shuffled');
+    (sourceName ? `  🔀 ${sourceName} — deck shuffled` : '  🔀 deck shuffled');
   appendMessage(user, text, 'announcement', false);
 }
 

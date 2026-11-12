@@ -1,4 +1,4 @@
-// Pure helpers behind tools/log.mjs (design 087 §7): load an export file or a disk-sink boot
+// Pure helpers behind tools/log.mjs (design 088 §7): load an export file or a disk-sink boot
 // directory, and answer questions about it. No printing, no process.exit.
 import fs from 'node:fs';
 import path from 'node:path';

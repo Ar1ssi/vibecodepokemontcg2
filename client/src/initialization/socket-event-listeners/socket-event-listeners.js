@@ -107,40 +107,13 @@ import {
 } from '../../setup/netcode/sync-check.js';
 
 let isImporting = false;
-let spectatorDebounceTimer = null;
 let pushActionQueue = Promise.resolve();
 let peerLogTimeout = null;
 let syncCheckIntervalId = null;
 const requestActionQueue = createRequestActionQueue();
 let requestActionStaleTimer = null;
 
-export const sendSpectatorData = () => {
-  // Design 069: an authoritative room's spectators render server views, not this replay.
-  if (systemState.serverAuthoritative) return;
-  if (systemState.isTwoPlayer && systemState.roomId) {
-    const data = {
-      selfUsername: systemState.p2SelfUsername,
-      selfDeckData: systemState.selfDeckData,
-      oppDeckData: systemState.p2OppDeckData,
-      oppUsername: systemState.p2OppUsername,
-      roomId: systemState.roomId,
-      spectatorActionData: systemState.exportActionData,
-      socketId: socket.id,
-    };
-    socket.emit('spectatorActionData', data);
-  }
-};
-
-export const emitSpectatorDataDebounced = (delay = 200) => {
-  if (spectatorDebounceTimer) clearTimeout(spectatorDebounceTimer);
-  spectatorDebounceTimer = setTimeout(() => {
-    spectatorDebounceTimer = null;
-    sendSpectatorData();
-  }, delay);
-};
-
 export const removeSyncIntervals = () => {
-  if (spectatorDebounceTimer) clearTimeout(spectatorDebounceTimer);
   if (peerLogTimeout) {
     clearTimeout(peerLogTimeout);
     peerLogTimeout = null;
@@ -231,7 +204,6 @@ const applyPeerAction = async (action, parameters) => {
       parameters,
     });
   }
-  emitSpectatorDataDebounced();
 };
 
 // O2-B: ask the peer for the tail of its action log past what we've already
@@ -455,22 +427,13 @@ export const initializeSocketEventListeners = () => {
     }
     appendMessage('', 'Solo game started — you play both seats.', 'announcement', false);
   };
-  socket.on('requestSpectatorData', () => {
-    sendSpectatorData();
-  });
   socket.on('spectatorJoin', (data) => {
     systemState.serverAuthoritative = Boolean(data?.serverAuthoritative);
     resetNetcodeForRoomChange();
     spectatorJoin();
-    if (systemState.serverAuthoritative) {
-      // Design 069: the server's spectator view is the whole board; ask for it now.
-      startSpectatorSession();
-      emitRequestView({ socket, roomId: systemState.roomId });
-      return;
-    }
-    if (systemState.roomId) {
-      socket.emit('requestSpectatorData', { roomId: systemState.roomId });
-    }
+    // Design 069: the server's spectator view is the whole board; ask for it now.
+    startSpectatorSession();
+    emitRequestView({ socket, roomId: systemState.roomId });
   });
   socket.on('roomReject', (data) => {
     // Design 074 D7: a refused solo join (or a solo room lost on reconnect) leaves the Solo
@@ -583,9 +546,6 @@ export const initializeSocketEventListeners = () => {
     appendMessage('', data.username + ' left the room', 'announcement', false);
   });
   socket.on('appendMessage', (data) => {
-    if (data.socketId === systemState.spectatorId) {
-      data.user = data.user === 'self' ? 'opp' : 'self';
-    }
     appendMessage(data.user, data.message, data.type, data.emit);
   });
 
@@ -733,7 +693,6 @@ export const initializeSocketEventListeners = () => {
 
   // reset counter when importing game state
   socket.on('initiateImport', () => {
-    systemState.spectatorCounter = 0; //reset spectator counter to make sure it catches all of the actions
     isImporting = true;
     cleanActionData('self');
     cleanActionData('opp');
@@ -819,10 +778,6 @@ export const initializeSocketEventListeners = () => {
     emitRequestView({ socket, roomId: systemState.roomId });
   });
   socket.on('lookAtCards', (data) => {
-    if (data.socketId === systemState.spectatorId) {
-      data.user = data.user === 'self' ? 'opp' : 'self';
-      data.initiator = data.initiator === 'self' ? 'opp' : 'self';
-    }
     lookAtCards(
       data.user,
       data.initiator,
@@ -832,10 +787,6 @@ export const initializeSocketEventListeners = () => {
     );
   });
   socket.on('stopLookingAtCards', (data) => {
-    if (data.socketId === systemState.spectatorId) {
-      data.user = data.user === 'self' ? 'opp' : 'self';
-      data.initiator = data.initiator === 'self' ? 'opp' : 'self';
-    }
     stopLookingAtCards(
       data.user,
       data.initiator,
@@ -845,24 +796,12 @@ export const initializeSocketEventListeners = () => {
     );
   });
   socket.on('revealCards', (data) => {
-    if (data.socketId === systemState.spectatorId) {
-      data.user = data.user === 'self' ? 'opp' : 'self';
-      data.initiator = data.initiator === 'self' ? 'opp' : 'self';
-    }
     revealCards(data.user, data.initiator, data.zoneId, data.emit);
   });
   socket.on('hideCards', (data) => {
-    if (data.socketId === systemState.spectatorId) {
-      data.user = data.user === 'self' ? 'opp' : 'self';
-      data.initiator = data.initiator === 'self' ? 'opp' : 'self';
-    }
     hideCards(data.user, data.initiator, data.zoneId, data.emit);
   });
   socket.on('revealShortcut', (data) => {
-    if (data.socketId === systemState.spectatorId) {
-      data.user = data.user === 'self' ? 'opp' : 'self';
-      data.initiator = data.initiator === 'self' ? 'opp' : 'self';
-    }
     revealShortcut(
       data.user,
       data.initiator,
@@ -873,10 +812,6 @@ export const initializeSocketEventListeners = () => {
     );
   });
   socket.on('hideShortcut', (data) => {
-    if (data.socketId === systemState.spectatorId) {
-      data.user = data.user === 'self' ? 'opp' : 'self';
-      data.initiator = data.initiator === 'self' ? 'opp' : 'self';
-    }
     hideShortcut(
       data.user,
       data.initiator,
@@ -887,17 +822,9 @@ export const initializeSocketEventListeners = () => {
     );
   });
   socket.on('lookShortcut', (data) => {
-    if (data.socketId === systemState.spectatorId) {
-      data.user = data.user === 'self' ? 'opp' : 'self';
-      data.initiator = data.initiator === 'self' ? 'opp' : 'self';
-    }
     lookShortcut(data.user, data.initiator, data.zoneId, data.index, data.emit);
   });
   socket.on('stopLookingShortcut', (data) => {
-    if (data.socketId === systemState.spectatorId) {
-      data.user = data.user === 'self' ? 'opp' : 'self';
-      data.initiator = data.initiator === 'self' ? 'opp' : 'self';
-    }
     stopLookingShortcut(
       data.user,
       data.initiator,
@@ -936,11 +863,6 @@ export const initializeSocketEventListeners = () => {
     typeof document !== 'undefined' &&
     typeof document.addEventListener === 'function'
   ) {
-    document.addEventListener('action-processed', () => {
-      if (systemState.isTwoPlayer) {
-        emitSpectatorDataDebounced();
-      }
-    });
     document.addEventListener('visibilitychange', () => {
       if (
         document.visibilityState === 'visible' &&

@@ -162,8 +162,6 @@ const toggleSelect = (card, host) => {
   }
 };
 
-export const isPrizeTakePending = () => pending != null;
-
 export const cancelPrizeTake = () => {
   if (!pending) return;
   finishPrizeTake(0);

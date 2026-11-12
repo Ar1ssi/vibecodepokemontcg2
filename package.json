@@ -8,7 +8,6 @@
   ],
   "scripts": {
     "start": "pnpm -C server start",
-    "test:2p": "node scripts/e2e/two-player-sync-test.mjs",
     "test:log-export": "node scripts/e2e/log-export-test.mjs",
     "test:solo": "node scripts/e2e/solo-authority-test.mjs",
     "test:board3d": "node scripts/e2e/board3d-view-test.mjs",

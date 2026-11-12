@@ -51,8 +51,6 @@ export const TILE_PX = 80;
 export const RING_WIDTH_PX = 15;
 const RING_HALF = RING_WIDTH_PX / 2;
 export const MEZZANINE_HEIGHT_PX = 100;
-export const MAX_TABLES = 6;
-export const MAX_RACKS = 4;
 export const MAX_FIXTURES = 16;
 export const MAX_BALLOONS = 22;
 // Design 084: the folded stock in pastels (the art's), three to a table.

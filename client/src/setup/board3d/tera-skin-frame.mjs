@@ -1,12 +1,12 @@
 // The persistent Tera crystal skin (design 037, mat-fx/tera-skin.js) evaluated at a time, for the
 // three.js board, which animates planes instead of CSS layers (design 074 §D6 "In-card-DOM
-// effects"). Pure: reproduces css/mat-ambient.css's `fx-tera-skin-in` fade, `fx-tera-sheen` sweep,
+// effects"). Pure: reproduces the old DOM mat ambient styles' `fx-tera-skin-in` fade, `fx-tera-sheen` sweep,
 // `fx-tera-rim` breathing and `fx-tera-glint` twinkle. Times are ms since the skin went on.
 import { easeInOut } from './status-loop-frame.mjs';
 
 export const TERA_SKIN_TIMING = Object.freeze({ fadeMs: 450, sheenMs: 6000, rimMs: 3200, glintMs: 3300 });
 
-/** mat-ambient.css: the tint layer's opacity, the facets', and the sheen strip's width (of the card). */
+/** The old DOM mat ambient styles: the tint layer's opacity, the facets', and the sheen strip's width (of the card). */
 export const TERA_SKIN_LOOK = Object.freeze({ tintAlpha: 0.55, facetAlpha: 0.85, sheenSpan: 2.5 });
 
 /** `ease-out` = cubic-bezier(0, 0, 0.58, 1), solved for x by bisection. */

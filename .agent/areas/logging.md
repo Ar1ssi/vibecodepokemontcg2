@@ -1,6 +1,5 @@
-# Area: logging (design 087 — one export with both clients and the server)
-<!-- Cap 60 lines. Read this before debugging from a user-supplied log, or before adding a log call. -->
-Purpose: every party logs all the time; clients ship to the server; one NDJSON export holds all of it.
+# Area: logging (design 088 — one export with both clients and the server)
+<!-- Cap 60 lines. Every party logs all the time; clients ship to the server; one NDJSON export holds it all. -->
 
 ## Debugging from a log — start here
 1. `node tools/log.mjs summary <file>` — sources, gaps/dropped, first errors, last `sv` per party.
@@ -55,7 +54,7 @@ New category → `CATEGORIES` in log-schema.mjs. High-frequency site → gate on
 - The export is complete on purpose (both hands, deck order); exports are announced in room chat.
 - Replay needs every `applyCommand` to go through `GameRoom.handleCommand`, and a `journal.rebase`
   after any in-place change to `room.state` (else `why: unjournaled-change`). `stateVersion`
-  repeats after an undo (I286), so state lines carry `game` and `n`.
+  repeats after an undo (I287), so state lines carry `game` and `n`.
 - A closed stream stays closed on late entries (`store.reopen` only on join/hello/batch), or rooms
   and their journals would never expire. A payload's `roomId` counts only if the socket is in it.
 - `/unboxing` has no Socket.IO client: local capture only, and no app modules are imported there.

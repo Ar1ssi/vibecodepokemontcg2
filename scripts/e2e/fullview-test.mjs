@@ -4,7 +4,7 @@
 // attaches an Energy to the near one through moveCardBundle { moving, target }, then drives the
 // previews at the rects `__ptcg.cardRect` reports (real mouse input).
 // Usage: node scripts/e2e/fullview-test.mjs
-//   PTCG_URL=http://host:port   reuse a running server (started with SERVER_AUTHORITATIVE=1 PTCG_E2E=1)
+//   PTCG_URL=http://host:port   reuse a running server (started with PTCG_E2E=1)
 //   CHROMIUM_PATH=/path/to/chrome   picks the browser, as the other e2e harnesses do
 // Not part of `pnpm test`.
 import { spawn } from 'node:child_process';
@@ -52,7 +52,7 @@ async function startServer() {
   const port = await freePort();
   const child = spawn(process.execPath, ['server/server.js'], {
     cwd: ROOT,
-    env: { ...process.env, PORT: String(port), PTCG_E2E: '1', SERVER_AUTHORITATIVE: '1' },
+    env: { ...process.env, PORT: String(port), PTCG_E2E: '1' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let output = '';

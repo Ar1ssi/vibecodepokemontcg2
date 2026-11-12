@@ -1,4 +1,4 @@
-// Design 087 §5: wraps applyView/applySpectatorView with a `view/apply` log entry and
+// Design 088 §5: wraps applyView/applySpectatorView with a `view/apply` log entry and
 // `choice/open|closed` transitions. Logging can never change what `apply` returns or throws.
 import { diffViews } from './view-diff.mjs';
 

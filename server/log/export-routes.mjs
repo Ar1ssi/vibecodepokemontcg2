@@ -1,4 +1,4 @@
-// `log:export` socket event, the one-time download route and the dev-only routes (design 087 §6).
+// `log:export` socket event, the one-time download route and the dev-only routes (design 088 §6).
 import { randomBytes } from 'node:crypto';
 import { gzip } from 'node:zlib';
 import { LIMITS } from '../../shared/log/log-schema.mjs';

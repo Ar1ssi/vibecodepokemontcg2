@@ -31,7 +31,7 @@ function resolveCounterTarget(user, zoneId, index, hint) {
 
 /**
  * Design 024 slice 3: the single funnel for a counter's look. `motion` replays
- * one of the keyframes in damage-counter.css — 'land' when the counter was
+ * one of the keyframes of the old DOM damage counter — 'land' when the counter was
  * just created, 'bump' when its value changed. Re-adding a class the element
  * already carries does not restart a CSS animation, hence the forced reflow
  * between the remove and the add.

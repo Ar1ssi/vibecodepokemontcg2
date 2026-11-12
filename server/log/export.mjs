@@ -1,4 +1,4 @@
-// Builds the export file (design 087 §6): header, journal, state ring, client snapshots, merged timeline.
+// Builds the export file (design 088 §6): header, journal, state ring, client snapshots, merged timeline.
 // Pure: reads the store and journal it is given, returns one JSON record per array element.
 import { LOG_FORMAT } from '../../shared/log/log-schema.mjs';
 

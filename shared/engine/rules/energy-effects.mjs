@@ -19,18 +19,6 @@
 import { describeTypedSpecialEnergy } from './special-energy-effects.mjs';
 import { specialEnergyProvision } from './special-energy-parse.mjs';
 
-// Effect families a special energy can be classified into.
-export const ENERGY_EFFECT_FAMILIES = [
-  'double',           // provides 2 energy of the printed type
-  'double-colorless', // provides 2 Colorless energy (satisfies any 2 symbols)
-  'lock',             // Lock Energy — attached energy cannot be removed
-  'redirect',         // Switching Energy — may be used to switch your Active
-  'protect',          // Buddy-Buddy Energy — shields this Pokémon from some effects
-  'attach-type',      // letter / named specials that change the attached type
-  'basic',            // standard single-type basic energy
-  'unknown',          // energy we can't place
-];
-
 const lower = (v) => String(v ?? '').toLowerCase();
 
 const subtypesOf = (card) =>

@@ -1,5 +1,5 @@
 /* One colour per special condition, shared by the apply/clear pops (mat-fx.css,
-   parent page) and the held-condition loops (status-marker.css, both playmat
+   parent page) and the held-condition loops (the old DOM status-marker styles, both playmat
    iframes). Keys match the condition sound keys (sfx-cues.mjs). Each is the
    dominant colour of TCG Live's prefab for it (vfx_dump status-vfx-spec.md):
    Poison's outline _MainColor, the Burned glow, the sleep Zs, the paralyze

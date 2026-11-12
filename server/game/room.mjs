@@ -51,7 +51,7 @@ export class GameRoom {
    * @param {boolean} [options.rulesEnabled=true]
    * @param {string|number} [options.seed] PRNG seed
    * @param {object} [options.initialState] Optional pre-configured GameState
-   * @param {object} [options.journal] Command journal (design 087); defaults to the no-op NO_JOURNAL
+   * @param {object} [options.journal] Command journal (design 088); defaults to the no-op NO_JOURNAL
    */
   constructor({
     roomId,

@@ -130,22 +130,6 @@ export function clearInFlightAffordances() {
 }
 
 /**
- * Creates and formats a structured command envelope.
- *
- * @param {string} type
- * @param {object} payload
- * @param {number} seq
- * @returns {object}
- */
-export function createCommandEnvelope(type, payload = {}, seq = 0) {
-  return {
-    type,
-    payload: payload && typeof payload === 'object' ? payload : {},
-    clientSeq: seq,
-  };
-}
-
-/**
  * Validates and emits a command to the authoritative server over Socket.IO.
  *
  * @param {object} options

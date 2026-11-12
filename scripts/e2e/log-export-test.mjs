@@ -1,4 +1,4 @@
-// Design 087: two players set up a game, one clicks "Export full log", and the downloaded
+// Design 088: two players set up a game, one clicks "Export full log", and the downloaded
 // NDJSON must hold all three parties (server + both clients), a replayable command journal,
 // and both client snapshots. Run against a SERVER_AUTHORITATIVE=1 server with the e2e bridge:
 //   node server/server.js            (another shell)

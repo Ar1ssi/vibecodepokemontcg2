@@ -7,14 +7,10 @@ import { isAuthoritativeDispatchActive } from '../netcode/authoritative-dispatch
 import {
   closeCardPicker,
   getCardPickerMode,
-  isCardPickerOpen,
   openCarouselViewer,
 } from './card-picker.js';
 import { uiCue } from '../netcode/mat-fx/ui-cue.mjs';
 import { resolveViewerIndex, toViewerCards } from './discard-pile-source.mjs';
-
-export const isDiscardPileViewerOpen = () =>
-  isCardPickerOpen() && getCardPickerMode() === 'browse';
 
 export const closeDiscardPileViewer = (event) => {
   if (getCardPickerMode() === 'browse') {

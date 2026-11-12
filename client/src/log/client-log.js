@@ -1,4 +1,4 @@
-// Client logging singleton (design 087 §5). Safe to import in Node: storage access is guarded.
+// Client logging singleton (design 088 §5). Safe to import in Node: storage access is guarded.
 import { createLogger } from '../../../shared/log/logger.mjs';
 import { createRing } from '../../../shared/log/ring.mjs';
 import { LIMITS } from '../../../shared/log/log-schema.mjs';

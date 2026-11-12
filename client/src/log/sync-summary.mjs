@@ -1,4 +1,4 @@
-// Pure summarizers for sync/decision log entries (design 087 §5); no DOM or state imports.
+// Pure summarizers for sync/decision log entries (design 088 §5); no DOM or state imports.
 
 /** Short hint summary safe for logs (no huge deck arrays). */
 export function summarizeCardHint(hint) {

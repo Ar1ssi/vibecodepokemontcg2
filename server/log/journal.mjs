@@ -1,4 +1,4 @@
-// Command journal (design 087 §4): one JSON line per rebase / rng jump / command, enough to
+// Command journal (design 088 §4): one JSON line per rebase / rng jump / command, enough to
 // replay a room's game and prove each step by state hash. Plain JSON.stringify on purpose:
 // safeStringify's string/array limits would cut deck lists and break replay.
 import { LIMITS } from '../../shared/log/log-schema.mjs';

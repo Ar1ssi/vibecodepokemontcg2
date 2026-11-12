@@ -3,7 +3,7 @@
 // #turnOrderCoinFlipOverlay with the same chosen coin, then fade it away.
 //
 // Usage:
-//   SERVER_AUTHORITATIVE=1 PORT=4100 node server/server.js &
+//   PORT=4100 node server/server.js &
 //   PTCG_URL=http://localhost:4100 node scripts/e2e/coin-flip-visual-test.mjs
 import { chromium } from 'playwright';
 

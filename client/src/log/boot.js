@@ -1,4 +1,4 @@
-// Design 087: first module on the page. Installs every capture, then taps the app socket.
+// Design 088: first module on the page. Installs every capture, then taps the app socket.
 import { log, clientRing, clientId, loadId, logStats, onEntry } from './client-log.js';
 import { installConsoleCapture } from './capture-console.js';
 import { installErrorCapture } from './capture-errors.js';

@@ -68,9 +68,6 @@ export const withCatalogCoin = (coinId, play, catalog = COIN_CATALOG) => {
   return play(null);
 };
 
-/** Position is CSS-driven inside each board mirror root (#matCoinSlot). */
-export const positionMatCoinSlots = () => {};
-
 export const renderMatCoinSlot = (target) => {
   const slot = MAT_COIN_SLOTS[target]?.();
   if (!slot) return;

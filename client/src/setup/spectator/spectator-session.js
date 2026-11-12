@@ -19,7 +19,6 @@ let lastOptions = {};
 let switchWired = false;
 
 export const isSpectatingAuthoritative = () => active;
-export const getSpectatorMode = () => mode;
 
 /** `{ playerId: username }` for every seat of the last spectator view (battle-log lines). */
 export const spectatorPlayerNames = () => {

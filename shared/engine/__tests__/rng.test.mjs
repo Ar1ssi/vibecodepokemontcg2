@@ -2,7 +2,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createRng,
-  createRelayedRng,
   flipCoin,
   withForcedCoin,
   withForcedCoinOnce,
@@ -91,21 +90,6 @@ test('rng.advance reproduces skipping to the same cursor point', () => {
   assert.equal(skippedValue, directValue);
 });
 
-test('createRelayedRng consumes queued shuffle indices when available', () => {
-  const rng = createRelayedRng(100);
-  const cards = ['a', 'b', 'c', 'd'];
-
-  // Queued shuffle
-  rng.queueShuffle([3, 0, 2, 1]);
-  const shuffled = rng.shuffle(cards);
-  assert.deepEqual(shuffled, ['d', 'a', 'c', 'b']);
-
-  // Next shuffle without queue falls back to base PRNG
-  const fallback = rng.shuffle(cards);
-  assert.equal(fallback.length, cards.length);
-  assert.deepEqual([...fallback].sort(), [...cards].sort());
-});
-
 // Review finding 4: Will's one-shot force must release back to an inherited
 // all-flips force (Malamar Contrary), not shadow it with null.
 test('withForcedCoinOnce: the parent all-flips force survives the one shot', () => {
@@ -126,17 +110,4 @@ test('withForcedCoinOnce: the parent all-flips force survives the one shot', () 
   // (it resets the one-shot fields as its own properties).
   const overOnce = withForcedCoin(withForcedCoinOnce(createRng(5), 'heads'), 'tails');
   for (let i = 0; i < 4; i++) assert.equal(flipCoin(overOnce), 'tails');
-});
-
-test('createRelayedRng consumes queued coin values', () => {
-  const rng = createRelayedRng(100);
-
-  rng.queueCoin('heads');
-  assert.ok(rng.next() < 0.5); // heads
-
-  rng.queueCoin('tails');
-  assert.ok(rng.next() >= 0.5); // tails
-
-  // Fallback to deterministic PRNG
-  assert.equal(typeof rng.next(), 'number');
 });

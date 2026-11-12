@@ -125,7 +125,6 @@ const returnToLobby = () => {
   // room starts clean.
   resetNetcodeForRoomChange();
   document.dispatchEvent(new CustomEvent('room-changed'));
-  systemState.spectatorId = '';
   // add the deck data back to the actiondata list
   if (systemState.selfDeckData) {
     processAction('self', true, 'loadDeckData', [

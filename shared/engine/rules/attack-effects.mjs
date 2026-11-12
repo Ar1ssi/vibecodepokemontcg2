@@ -107,15 +107,6 @@ const TYPES = [
 const TYPE_RE = TYPES.join('|');
 const hasTypeMention = (t) => new RegExp(`\\b(${TYPE_RE})\\b`).test(t);
 
-// Status nouns (lowercased) used to detect "X and Y" dual-status applications.
-export const STATUS_NOUNS = [
-  'asleep',
-  'paralyzed',
-  'poisoned',
-  'burned',
-  'confused',
-];
-
 // Detect a dual-status application: "now Asleep and Poisoned",
 // "is now Burned and Confused", etc. Returns the two status nouns or null.
 export function dualStatus(t) {

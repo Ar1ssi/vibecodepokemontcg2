@@ -1,4 +1,4 @@
-# 087: Unified logging — one export with both clients and the server
+# 088: Unified logging — one export with both clients and the server
 Status: shipped 2026-11-12 — approved (user); built by slice-builder agents, verified per slice
 Date: 2026-11-12 · Session: cloud (branch claude/dazzling-gauss-q4cr9n)
 Supersedes: 028 (match logging, never approved). Closes I85 when shipped.
@@ -571,11 +571,19 @@ Fixed, each with a test that fails without it:
 Decided, not changed: request URLs keep their query string (`/api/tcgdex/...?name=<card>`): which
 lookup failed is the point of logging it. Row 28 is therefore narrower than first written — text is
 never captured from the keyboard, but a search the user submits appears as the request it made.
-Filed: I286 (an undo lowers `stateVersion`, which the client's out-of-order guard then drops —
+Filed: I287 (an undo lowers `stateVersion`, which the client's out-of-order guard then drops —
 pre-existing, found by the review, visible as `view/apply applied:false reason:out_of_order`).
 Not done (nits, accepted): a `clientId` is not bound to the first socket that used it; beacons and
 snapshot tails are outside the rate window; `src` is the first 8 hex characters of the client id;
 DevTools attributes console output to `console-wrap.mjs`.
+
+## Merge with main (2026-11-12)
+Built as "design 087" in parallel with another session that landed its own design 087 (legacy relay
+retirement, D245–D246, I283) on main first. On merge this design became **088**, its decisions
+D247–D250 and its issues I284–I287; commit messages on the branch still say 087. Main's change
+removed the legacy relay, so edge row 25 and the "legacy" branches of the text are history: the
+server always runs the rules and every export has a journal (`netcode` in the header is always
+`server-authoritative`).
 
 ---
 Self-approval checklist (only when the user is unreachable):

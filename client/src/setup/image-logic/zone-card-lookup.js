@@ -1,15 +1,5 @@
 import { imageAnchor } from '../deck-constructor/hydrate-holo.js';
 
-/** Map a click/drop target (plain or holo-wrapped) to a Card instance. */
-export function findZoneCard(zone, eventTarget) {
-  if (!zone?.array || !eventTarget) return null;
-  if (eventTarget.card && zone.array.includes(eventTarget.card)) {
-    return eventTarget.card;
-  }
-  const idx = findZoneCardIndex(zone, eventTarget);
-  return idx >= 0 ? zone.array[idx] : null;
-}
-
 /** Map a click/drop target (plain or holo-wrapped) to a zone array index. */
 export function findZoneCardIndex(zone, eventTarget) {
   if (!zone?.array || !eventTarget) return -1;

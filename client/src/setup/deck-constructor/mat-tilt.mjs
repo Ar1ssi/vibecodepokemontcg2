@@ -1,5 +1,5 @@
 // Design 022 slice 5: subtle pointer-driven tilt on board cards. Writes
-// --fx-tilt-x/y on the holo wrapper (consumed by css/mat-ambient.css) from the
+// --fx-tilt-x/y on the holo wrapper (consumed by the old DOM mat ambient styles) from the
 // pointer position over that wrapper, leaving holo.mjs's own drift untouched.
 // Separate from holo.mjs because mat cards are deliberately `tilt: false`
 // there (MAT_HOLO_OPTIONS); this is the guarded opt-in layer.

@@ -1,13 +1,9 @@
 import { reset } from '../../actions/general/reset.js';
-import { socket, systemState } from '../../state.js';
+import { systemState } from '../../state.js';
 import { appendMessage } from '../chatbox/append-message.js';
-import { acceptAction } from '../general/accept-action.js';
 import { cleanActionData } from '../general/clean-action-data.js';
 import { handleSpectatorButtons } from './handle-spectator-buttons.js';
 import { forceRulesEnabledForMultiplayer } from '../rules/rules-bridge.js';
-
-let socketId = '';
-let spectatorTimerId;
 
 export const spectatorJoin = () => {
   const connectedRoom = document.getElementById('connectedRoom');
@@ -38,50 +34,4 @@ export const spectatorJoin = () => {
     'announcement',
     true
   );
-
-  socketId = '';
-  systemState.spectatorCounter = 0;
 };
-
-socket.on('spectatorActionData', (data) => {
-  // Design 069: an authoritative room's spectator draws server views; a replay would fight them.
-  if (systemState.serverAuthoritative) return;
-  const isSpectator =
-    document.getElementById('spectatorModeCheckbox').checked &&
-    systemState.isTwoPlayer;
-
-  if (isSpectator) {
-    if (socketId === '') {
-      appendMessage(
-        '',
-        'Loading spectator view...',
-        'loading-spectator',
-        false
-      );
-      socketId = data.socketId;
-    }
-    if (socketId === data.socketId) {
-      systemState.spectatorId = socketId;
-      if (spectatorTimerId) {
-        clearTimeout(spectatorTimerId);
-      }
-      const timerId = setTimeout(() => {
-        socketId = '';
-        systemState.spectatorCounter = 0;
-      }, 5000);
-      spectatorTimerId = timerId;
-
-      systemState.p2SelfUsername = data.selfUsername;
-      systemState.selfDeckData = data.selfDeckData;
-      systemState.p2OppUsername = data.oppUsername;
-      systemState.p2OppDeckData = data.oppDeckData;
-      const actionData = data.spectatorActionData;
-      const missingActions = actionData.slice(systemState.spectatorCounter);
-      systemState.spectatorCounter = actionData.length;
-
-      missingActions.forEach((data) => {
-        acceptAction(data.user, data.action, data.parameters);
-      });
-    }
-  }
-});

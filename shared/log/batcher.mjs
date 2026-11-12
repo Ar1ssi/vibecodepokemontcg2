@@ -1,4 +1,4 @@
-// Decides when and what to ship (design 087 §5). Pure: the caller supplies the clock and the ring.
+// Decides when and what to ship (design 088 §5). Pure: the caller supplies the clock and the ring.
 import { LIMITS } from './log-schema.mjs';
 
 export function createBatcher({ limits = LIMITS } = {}) {

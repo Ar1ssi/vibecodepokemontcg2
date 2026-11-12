@@ -1,4 +1,4 @@
-// Export, mark and verbose-logging controls (design 087 §6), plus the "A problem was logged." toast.
+// Export, mark and verbose-logging controls (design 088 §6), plus the "A problem was logged." toast.
 import { LIMITS, LOG_FORMAT } from '../../../shared/log/log-schema.mjs';
 import { clientId, clientRing, loadId, onEntry } from './client-log.js';
 import { buildSnapshot, buildSnapshotSync, preloadSnapshotModules, preloadedSnapshotModules } from './snapshot.js';

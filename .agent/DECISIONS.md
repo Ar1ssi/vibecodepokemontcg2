@@ -6,12 +6,14 @@
 # Pruned or shortened lines, verbatim: .agent/archive/DECISIONS-pruned-2026-10-15.md (grep the D-number).
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
-#   Next id = highest D number in this file and the archives + 1 (next: D249).
+#   Next id = highest D number in this file and the archives + 1 (next: D251).
 
-- D248 2026-11-12 [logging] 087: an export is complete on purpose (both hands, deck order) and each one is announced in room chat; entries join on sv/cs, no correlation id; format NDJSON v1, read with tools/log.mjs.
-- D247 2026-11-12 [netcode] 087: GameRoom journals every applyCommand (rng cursor + state hash) and rebases on any in-place state change, so an export replays; a new mutation site must call journal.rebase.
-- D246 2026-11-12 [logging] 087: server logs live in byte-capped memory streams (LOG_MAX_MB) plus an out/logs NDJSON mirror outside production; never read back by the game, so S2 "no durable game log" stands.
-- D245 2026-11-12 [logging] 087: always-on structured log on both clients and the server; clients ship theirs (log:batch) so one export holds all three; the opt-in sync/decision loggers are deleted. (Replaces draft 028.)
+- D250 2026-11-12 [logging] 088: an export is complete on purpose (both hands, deck order) and each one is announced in room chat; entries join on sv/cs, no correlation id; format NDJSON v1, read with tools/log.mjs.
+- D249 2026-11-12 [netcode] 088: GameRoom journals every applyCommand (rng cursor + state hash) and rebases on any in-place state change, so an export replays; a new mutation site must call journal.rebase.
+- D248 2026-11-12 [logging] 088: server logs live in byte-capped memory streams (LOG_MAX_MB) plus an out/logs NDJSON mirror outside production; never read back by the game, so S2 "no durable game log" stands.
+- D247 2026-11-12 [logging] 088: always-on structured log on both clients and the server; clients ship theirs (log:batch) so one export holds all three; the opt-in sync/decision loggers are deleted. (Replaces draft 028.)
+- D246 2026-11-12 [client] The board outside a room stays (user): the client rules layer is its engine and is not deleted; 087 slice 3 struck. It draws nothing today (I283). (design 087)
+- D245 2026-11-12 [netcode] Legacy relay removed: the server always runs the rules; SERVER_AUTHORITATIVE opt-outs only warn; no shadow mode; room-sweep.mjs frees roomInfo past grace. (Supersedes D216; design 087)
 - D244 2026-11-09 [netcode] 073: the deck box id rides exchangeData/loadDeckData as a display-only param after format (PROTOCOL_VERSION 2.3.0); the opening coin waits for the deal (deck-box-gate).
 - D243 2026-11-09 [mat-fx] 073: deck boxes lie in the blurred band beside each deck and deal it at game start, drawn in the three.js board's table frame; lid = mesh cut at the cap groove + front flap.
 - D242 2026-11-09 [deck-builder] Homebrew Build & Battle is the 'homebrew' flow of the B&B tab (/homebrew-battle): customhb packs, Standard 60-card/6-Prize deck, ETB scene skinned as the 151 Ultra-Premium exterior. (design 086)
@@ -40,7 +42,6 @@
 - D219 2026-10-16 [rules-ui] In-play taps route as TCG Live: own Active, or own Bench with a usable action, open the AttackOverlay; else the stack view. 013 print chrome retired for Pokémon. (Supersedes D210; design 074)
 - D218 2026-10-16 [engine] Commands live in shared/engine/reduce/<domain>.mjs; reduce.mjs is a facade with the 3 exports; handlers get locals explicitly; reduce/ cycles are call-time only, never read at load. (I250)
 - D217 2026-10-16 [board-ui] TCG Live foil/reverse cards wear its own shader+masks; lossless WebP streamed from R2 (`FOIL_TEXTURE_URL`), never in git; others keep CSS holo. (design 069-tcgl-card-foil)
-- D216 2026-10-15 [netcode] SERVER_AUTHORITATIVE defaults on (server/netcode-mode.mjs); only 0/false/off/no runs the legacy relay; shadow mode deleted, room-sweep.mjs frees roomInfo past grace. (supersedes D17)
 - D215 2026-10-15 [board-ui] Custom playmats ship as WebP in `thumbs/` and `board/`; PNG originals in `custom/` are untracked. Don't rerun `generate-mat-thumbs.mjs` blindly: manifest.json lacks custom entries. (052f8ac)
 - D214 2026-10-15 [harness] Playwright/jsdom e2e harnesses live in `scripts/e2e/`; the repo root holds config and entry docs only, no probe scripts, logs, `.bak` files or notes. (052f8ac, design 073)
 - D213 2026-10-16 [deck-builder] Sleeves are TCG Live's 415 (scripts/import-tcgl-sleeves.py: face crop 73-439 px, webp, ids `cs_*`), not the sleeve database; old stored ETB sleeve id remaps.

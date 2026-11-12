@@ -157,11 +157,6 @@ export const ancientTraitIn = (text) => {
   return null;
 };
 
-/** True when a parsed ability step came from an Ancient Trait, not an Ability. */
-export function isAncientTraitStep(step) {
-  return Boolean(step?.trait);
-}
-
 /**
  * True when every parsed ability step on a card is an Ancient Trait, i.e. the
  * card has no real Ability for a "no Abilities" effect to suppress.
@@ -2382,8 +2377,4 @@ export function parseAbility(text = '') {
   }
 
   return steps;
-}
-
-export function describeAbilityStep(step) {
-  return step.guidance || '';
 }

@@ -1,4 +1,4 @@
-// Server side of client log shipping (design 087 §5): hello/batch/ping/level sockets and the pagehide beacon.
+// Server side of client log shipping (design 088 §5): hello/batch/ping/level sockets and the pagehide beacon.
 import { CATEGORIES, LEVEL_RANK, LIMITS } from '../../shared/log/log-schema.mjs';
 
 const CLIENT_ID = /^[0-9a-f]{16}$/;

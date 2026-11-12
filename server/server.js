@@ -57,16 +57,15 @@ import { CUSTOM_SETS_CHANGED_EVENT } from '../shared/custom-sets/custom-set-sche
 import { createCardImageHandler } from './card-image-proxy.mjs';
 import { CARD_ART_PROXY_HOSTS } from './card-art-proxy-hosts.mjs';
 import { cacheControlFor } from './sfx-cache.mjs';
-import { readServerAuthoritative } from './netcode-mode.mjs';
+import { retiredLegacyRelayWarning } from './netcode-mode.mjs';
 import { createServerLogging } from './log/index.mjs';
 import { LIMITS } from '../shared/log/log-schema.mjs';
 import { customFoilSets, resolveFoilTextureBase } from './tcgl-foil-config.mjs';
 
-// On unless SERVER_AUTHORITATIVE is 0, false, off or no (the legacy relay, kept until I251 retires it).
-const netcodeMode = readServerAuthoritative(process.env.SERVER_AUTHORITATIVE);
-const SERVER_AUTHORITATIVE = netcodeMode.serverAuthoritative;
+// The server always runs the rules; SERVER_AUTHORITATIVE no longer selects a mode (design 087).
+const legacyRelayWarning = retiredLegacyRelayWarning(process.env.SERVER_AUTHORITATIVE);
 // eslint-disable-next-line no-console
-if (netcodeMode.warning) console.warn(netcodeMode.warning);
+if (legacyRelayWarning) console.warn(legacyRelayWarning);
 
 // The `?e2e=1` test bridge (window.__ptcg) is a scripting API over the local player's own
 // board. It is shipped to every browser but must only ARM where a harness is meant to run:
@@ -415,7 +414,7 @@ async function main() {
   const roomInfo = new Map();
   const gameRooms = new Map();
   logging.attachIo(io, {
-    netcode: SERVER_AUTHORITATIVE ? 'server-authoritative' : 'legacy',
+    netcode: 'server-authoritative',
     seatOf: (socketId, roomId) => {
       const room = gameRooms.get(roomId);
       if (!room) return null;
@@ -430,21 +429,19 @@ async function main() {
         roomInfo.delete(roomId);
       }
     });
-    if (SERVER_AUTHORITATIVE) {
-      // Players who drop without Leave keep their roomInfo seat, so an abandoned private
-      // room's roomInfo goes with its GameRoom, but only past the grace (Finding 5).
-      const due = planRoomSweep({
-        gameRooms,
-        now: Date.now(),
-        graceMs: ROOM_GRACE_MS,
-        socketCount: (roomId) => io.sockets.adapter.rooms.get(roomId)?.size ?? 0,
-      });
-      for (const { roomId, forgetRoomInfo } of due) {
-        gameRooms.get(roomId).clearTurnOrderCall();
-        clearTurnOrderTimer(roomId);
-        gameRooms.delete(roomId);
-        if (forgetRoomInfo) roomInfo.delete(roomId);
-      }
+    // Players who drop without Leave keep their roomInfo seat, so an abandoned private
+    // room's roomInfo goes with its GameRoom, but only past the grace (Finding 5).
+    const due = planRoomSweep({
+      gameRooms,
+      now: Date.now(),
+      graceMs: ROOM_GRACE_MS,
+      socketCount: (roomId) => io.sockets.adapter.rooms.get(roomId)?.size ?? 0,
+    });
+    for (const { roomId, forgetRoomInfo } of due) {
+      gameRooms.get(roomId).clearTurnOrderCall();
+      clearTurnOrderTimer(roomId);
+      gameRooms.delete(roomId);
+      if (forgetRoomInfo) roomInfo.delete(roomId);
     }
   };
   // Set up a timer to clean up empty rooms every 5 minutes (adjust as needed)
@@ -575,7 +572,6 @@ async function main() {
   const clearTurnOrderTimer = (roomId) => turnOrderTransport.clearTimer(roomId);
 
   const replayTurnOrderToSeat = (roomId, socketId) => {
-    if (!SERVER_AUTHORITATIVE) return;
     const gameRoom = gameRooms.get(roomId);
     const playerId = gameRoom?.socketToPlayer.get(socketId);
     if (playerId) turnOrderTransport.replayTo(gameRoom, roomId, playerId);
@@ -593,8 +589,8 @@ async function main() {
     turnOrderTransport.open(gameRoom, roomId);
   };
 
-  // Design 053: the format both seated players agreed on lives on roomInfo (both server modes)
-  // and is mirrored onto the GameRoom, whose deal check reads it.
+  // Design 053: the format both seated players agreed on lives on roomInfo and is mirrored onto
+  // the GameRoom, whose deal check reads it.
   const roomFormatPayload = (roomId, room) => {
     const { format, proposal } = room.format || emptyRoomFormat();
     return { roomId, format, proposal, seated: [...room.players], dealt: roomHasDealt(roomId) };
@@ -607,12 +603,10 @@ async function main() {
   };
   const setRoomFormat = (roomId, room, next) => {
     room.format = next;
-    if (SERVER_AUTHORITATIVE) {
-      const gameRoom = gameRooms.get(roomId);
-      if (gameRoom) gameRoom.roomFormat = next.format;
-    }
+    const gameRoom = gameRooms.get(roomId);
+    if (gameRoom) gameRoom.roomFormat = next.format;
   };
-  const roomHasDealt = (roomId) => SERVER_AUTHORITATIVE && roomFormatLocked(gameRooms.get(roomId));
+  const roomHasDealt = (roomId) => roomFormatLocked(gameRooms.get(roomId));
 
   // Design 069: the Multiplayer tab's list of public rooms.
   const lobbySnapshot = () => buildLobbySnapshot({ roomInfo, isInGame: roomHasDealt });
@@ -622,17 +616,15 @@ async function main() {
   const notifyLobby = (roomId) => {
     if (isPublicRoomId(roomId)) emitLobbySnapshot();
   };
-  // Without server authority the server cannot see set-up, so a dropped seat always gets the grace.
-  const publicSeatHeld = (roomId) => !SERVER_AUTHORITATIVE || roomHasDealt(roomId);
+  // A dropped public seat keeps its grace only once the game has dealt.
+  const publicSeatHeld = roomHasDealt;
 
   const deleteRoomIfEmpty = (roomId, room) => {
     if (room.players.size > 0 || room.spectators.size > 0) return false;
     roomInfo.delete(roomId);
-    if (SERVER_AUTHORITATIVE) {
-      gameRooms.get(roomId)?.clearTurnOrderCall();
-      clearTurnOrderTimer(roomId);
-      gameRooms.delete(roomId);
-    }
+    gameRooms.get(roomId)?.clearTurnOrderCall();
+    clearTurnOrderTimer(roomId);
+    gameRooms.delete(roomId);
     return true;
   };
 
@@ -644,7 +636,7 @@ async function main() {
     forgetSeat(room, username);
     setRoomFormat(roomId, room, clearRoomFormatProposal(room.format));
     if (deleteRoomIfEmpty(roomId, room)) return;
-    if (SERVER_AUTHORITATIVE) resetGameAfterPlayerLeft(roomId, username);
+    resetGameAfterPlayerLeft(roomId, username);
     broadcastRoomFormat(roomId);
   };
 
@@ -687,7 +679,7 @@ async function main() {
       if (!socket.data.leaveRoom) {
         socket.to(roomId).emit('userDisconnected', username);
       }
-      if (SERVER_AUTHORITATIVE && gameRooms.has(roomId)) {
+      if (gameRooms.has(roomId)) {
         const gameRoom = gameRooms.get(roomId);
         // Designs 013/072: a seat the opening coin is waiting on (to call, or to
         // choose first or second) is answered for, so the other seat never waits
@@ -753,7 +745,7 @@ async function main() {
       if (eventName === 'leaveRoom') {
         socket.leave(data.roomId);
         // Design 069: a spectator that left must stop receiving the room's views.
-        if (SERVER_AUTHORITATIVE) gameRooms.get(data.roomId)?.removeSpectator(socket.id);
+        gameRooms.get(data.roomId)?.removeSpectator(socket.id);
         if (socket.data.disconnectListener) {
           socket.data.leaveRoom = true;
           socket.data.disconnectListener();
@@ -765,7 +757,6 @@ async function main() {
     // Design 069: a disconnected spectator socket is gone for good (a reconnect registers its
     // new socket), so it leaves the room's view broadcasts and stops keeping the room alive.
     const dropSpectatorOnDisconnect = (roomId) => {
-      if (!SERVER_AUTHORITATIVE) return;
       socket.once('disconnect', () => gameRooms.get(roomId)?.removeSpectator(socket.id));
     };
     // rules-engine events: relay to the opponent in the same room
@@ -832,10 +823,6 @@ async function main() {
     // Design 074 D7: one socket plays both seats of an authoritative room. The room is never
     // public (so never listed), takes no spectators, and issues no seat token.
     const joinSoloGame = (roomId, username, options) => {
-      if (!SERVER_AUTHORITATIVE) {
-        socket.emit('roomReject', { reason: 'solo_needs_authority' });
-        return;
-      }
       if (typeof roomId !== 'string' || !roomId || isPublicRoomId(roomId)) {
         socket.emit('roomReject', { reason: 'solo_room' });
         return;
@@ -903,7 +890,7 @@ async function main() {
         return;
       }
       // Design 074 D7: a solo room has exactly one socket; nobody else seats or watches.
-      if (SERVER_AUTHORITATIVE && gameRooms.get(roomId)?.solo) {
+      if (gameRooms.get(roomId)?.solo) {
         socket.emit('roomReject', { reason: 'solo_room' });
         return;
       }
@@ -922,7 +909,7 @@ async function main() {
       }
       const room = roomInfo.get(roomId);
 
-      const gameRoom = SERVER_AUTHORITATIVE ? gameRooms.get(roomId) : null;
+      const gameRoom = gameRooms.get(roomId);
 
       // Identity protection & seat management (Finding 7)
       let isExistingPlayer = false;
@@ -963,44 +950,39 @@ async function main() {
       if (isSpectator || isExistingPlayer || !roomIsFull) {
         socket.leave(LOBBY_WATCHERS);
         socket.join(roomId);
-        if (SERVER_AUTHORITATIVE) {
-          let activeGameRoom = gameRoom;
-          if (!activeGameRoom) {
-            activeGameRoom = new GameRoom({ roomId, journal: logging.createJournal(roomId) });
-            activeGameRoom.roomFormat = room.format?.format ?? null;
-            gameRooms.set(roomId, activeGameRoom);
-          }
-          if (isSpectator) {
-            activeGameRoom.addSpectator(socket.id);
-          } else {
-            const targetPid =
-              activeGameRoom.getPlayerIdByUsername(username) ||
-              activeGameRoom.getNextAvailablePlayerId() ||
-              'p1';
-            const added = activeGameRoom.addPlayer(
-              socket.id,
-              targetPid,
-              username
-            );
-            if (!added) {
-              socket.emit('roomReject', { reason: 'seat_failed' });
-              return;
-            }
+        let activeGameRoom = gameRoom;
+        if (!activeGameRoom) {
+          activeGameRoom = new GameRoom({ roomId, journal: logging.createJournal(roomId) });
+          activeGameRoom.roomFormat = room.format?.format ?? null;
+          gameRooms.set(roomId, activeGameRoom);
+        }
+        if (isSpectator) {
+          activeGameRoom.addSpectator(socket.id);
+        } else {
+          const targetPid =
+            activeGameRoom.getPlayerIdByUsername(username) ||
+            activeGameRoom.getNextAvailablePlayerId() ||
+            'p1';
+          const added = activeGameRoom.addPlayer(
+            socket.id,
+            targetPid,
+            username
+          );
+          if (!added) {
+            socket.emit('roomReject', { reason: 'seat_failed' });
+            return;
           }
         }
         // Check if the user is a spectator or there are fewer than 2 players
         if (isSpectator) {
           room.spectators.add(username);
           watchDisconnect(roomId, username, true);
-          // Design 069: an authoritative room's spectator renders server views, so it
-          // needs the mode up front and never the players' legacy action replay.
+          // Design 069: a spectator renders server views. `serverAuthoritative` stays in the
+          // payload because the client reads it to enter the view-driven mode.
           socket.emit('spectatorJoin', {
-            serverAuthoritative: SERVER_AUTHORITATIVE,
+            serverAuthoritative: true,
             protocolVersion: PROTOCOL_VERSION,
           });
-          if (!SERVER_AUTHORITATIVE) {
-            socket.to(roomId).emit('requestSpectatorData', { roomId });
-          }
           dropSpectatorOnDisconnect(roomId);
         } else {
           room.players.add(username);
@@ -1010,7 +992,7 @@ async function main() {
             if (issueToken) issuedToken = issueSeatToken(room, username);
           }
           socket.emit('joinGame', {
-            serverAuthoritative: SERVER_AUTHORITATIVE,
+            serverAuthoritative: true,
             protocolVersion: PROTOCOL_VERSION,
             // A seated player reloading into a running game: the client pulls
             // the current view once its room setup is done.
@@ -1057,13 +1039,10 @@ async function main() {
     });
 
     socket.on('userReconnected', (data) => {
-      // Design 069: checked before the restart branch, because under server authority a released
-      // public seat whose room emptied looks the same as a server restart. Without authority a
-      // missing room keeps the old path: the relay recreates it and play goes on.
+      // Design 069: checked before the restart branch, because a released public seat whose
+      // room emptied looks the same as a server restart.
       const publicRoom = isPublicRoomId(data?.roomId);
-      const checkPublicSeat =
-        publicRoom && data.notSpectator && (SERVER_AUTHORITATIVE || roomInfo.has(data.roomId));
-      if (checkPublicSeat) {
+      if (publicRoom && data.notSpectator) {
         const decision = decideReconnect({
           room: roomInfo.get(data.roomId),
           username: data.username,
@@ -1082,23 +1061,16 @@ async function main() {
         }
       }
       if (!roomInfo.has(data.roomId)) {
-        if (SERVER_AUTHORITATIVE) {
-          socket.emit('gameEnded', {
-            winner: null,
-            reason: 'server_restart',
-            message: 'Game session terminated due to server restart.',
-          });
-          return;
-        }
-        roomInfo.set(data.roomId, {
-          players: new Set(),
-          spectators: new Set(),
-          format: emptyRoomFormat(),
+        socket.emit('gameEnded', {
+          winner: null,
+          reason: 'server_restart',
+          message: 'Game session terminated due to server restart.',
         });
+        return;
       }
       const room = roomInfo.get(data.roomId);
       // Design 074 D7: only the solo player's own new socket reclaims a solo room.
-      const soloRoom = SERVER_AUTHORITATIVE ? gameRooms.get(data.roomId) : null;
+      const soloRoom = gameRooms.get(data.roomId);
       if (soloRoom?.solo) {
         const reclaimed =
           data.notSpectator && soloRoom.addSoloPlayer(socket.id, data.username);
@@ -1109,7 +1081,7 @@ async function main() {
       }
       socket.leave(LOBBY_WATCHERS);
       socket.join(data.roomId);
-      if (SERVER_AUTHORITATIVE && !soloRoom?.solo) {
+      if (!soloRoom?.solo) {
         let gameRoom = gameRooms.get(data.roomId);
         if (!gameRoom) {
           gameRoom = new GameRoom({ roomId: data.roomId, journal: logging.createJournal(data.roomId) });
@@ -1140,11 +1112,6 @@ async function main() {
       if (!data.notSpectator) {
         room.spectators.add(data.username);
         watchDisconnect(data.roomId, data.username, true);
-        if (!SERVER_AUTHORITATIVE) {
-          socket
-            .to(data.roomId)
-            .emit('requestSpectatorData', { roomId: data.roomId });
-        }
         dropSpectatorOnDisconnect(data.roomId);
       } else {
         room.players.add(data.username);
@@ -1173,7 +1140,7 @@ async function main() {
         seat,
         requestRoomId: data?.roomId,
         room,
-        gameRoom: SERVER_AUTHORITATIVE ? gameRooms.get(seat?.roomId) : null,
+        gameRoom: gameRooms.get(seat?.roomId),
         socketId: socket.id,
       });
       if (refusal) {
@@ -1203,8 +1170,6 @@ async function main() {
       'requestPeerLog',
       'peerLog',
       'appendMessage',
-      'spectatorActionData',
-      'requestSpectatorData',
       'initiateImport',
       'endImport',
       'lookAtCards',
@@ -1222,7 +1187,7 @@ async function main() {
     // solo room the seat the packet names (`data.seat`; missing or unknown → bad_seat).
     const handleSeatSetupAction = (data) => {
       const roomId = data.roomId || [...socket.rooms].find((r) => r !== socket.id);
-      const gameRoom = SERVER_AUTHORITATIVE ? gameRooms.get(roomId) : null;
+      const gameRoom = gameRooms.get(roomId);
       gameRoom?.touchActivity();
       if (!isSeatSetupAction(data)) return;
       const { seat, refused } = setupActionSeat(gameRoom, socket.id, data);
@@ -1277,249 +1242,245 @@ async function main() {
       });
     }
 
-    if (SERVER_AUTHORITATIVE) {
-      // Design 013: the designated caller's heads/tails pick. The client supplies
-      // only the call — the coin itself is flipped by the room's seeded rng (D10).
-      socket.on('turnOrderCall', (data) => {
-        const roomId =
-          data?.roomId || [...socket.rooms].find((r) => r !== socket.id);
-        const gameRoom = gameRooms.get(roomId);
-        if (!gameRoom) return;
-        gameRoom.touchActivity();
-        turnOrderTransport.receiveCall(gameRoom, roomId, socket.id, data);
-      });
+    // Design 013: the designated caller's heads/tails pick. The client supplies
+    // only the call — the coin itself is flipped by the room's seeded rng (D10).
+    socket.on('turnOrderCall', (data) => {
+      const roomId =
+        data?.roomId || [...socket.rooms].find((r) => r !== socket.id);
+      const gameRoom = gameRooms.get(roomId);
+      if (!gameRoom) return;
+      gameRoom.touchActivity();
+      turnOrderTransport.receiveCall(gameRoom, roomId, socket.id, data);
+    });
 
-      // Design 072: the coin winner's answer to "Do you want to go first?".
-      socket.on('turnOrderChoice', (data) => {
-        const roomId =
-          data?.roomId || [...socket.rooms].find((r) => r !== socket.id);
-        const gameRoom = gameRooms.get(roomId);
-        if (!gameRoom) return;
-        gameRoom.touchActivity();
-        turnOrderTransport.receiveChoice(gameRoom, roomId, socket.id, data);
-      });
-    }
+    // Design 072: the coin winner's answer to "Do you want to go first?".
+    socket.on('turnOrderChoice', (data) => {
+      const roomId =
+        data?.roomId || [...socket.rooms].find((r) => r !== socket.id);
+      const gameRoom = gameRooms.get(roomId);
+      if (!gameRoom) return;
+      gameRoom.touchActivity();
+      turnOrderTransport.receiveChoice(gameRoom, roomId, socket.id, data);
+    });
 
-    if (SERVER_AUTHORITATIVE) {
-      const broadcastGameResult = (gameRoom, result) => {
-        for (const broadcast of result.broadcasts || []) {
-          io.to(broadcast.socketId).emit('view', {
-            gameId: gameRoom.roomId,
-            stateVersion: result.stateVersion,
-            view: broadcast.view,
-            events: result.events,
-            pendingChoice: broadcast.view?.pendingChoice || null,
-            lastClientSeq: broadcast.lastClientSeq,
-          });
-        }
-
-        const gameEndedEvent =
-          (result.events || []).find((e) => e.type === 'gameEnded') ||
-          gameRoom.state.turn?.phase === 'ended';
-
-        if (gameEndedEvent) {
-          for (const broadcast of result.broadcasts || []) {
-            const payload = gameRoom.getGameEndedPayload(broadcast.playerId);
-            if (payload) {
-              io.to(broadcast.socketId).emit('gameEnded', payload);
-            }
-          }
-        }
-      };
-
-      socket.on('cmd', (cmd) => {
-        const roomId =
-          cmd?.roomId || [...socket.rooms].find((r) => r !== socket.id);
-        const gameRoom = gameRooms.get(roomId);
-        if (!gameRoom) {
-          socket.emit('cmdRejected', {
-            clientSeq: cmd?.clientSeq,
-            reason: 'room_not_found',
-          });
-          socket.emit('gameEnded', {
-            winner: null,
-            reason: 'server_restart',
-            message: 'Game session terminated due to server restart.',
-          });
-          return;
-        }
-
-        if (cmd?.protocolVersion && cmd.protocolVersion !== PROTOCOL_VERSION) {
-          socket.emit('cmdRejected', {
-            clientSeq: cmd?.clientSeq,
-            reason: 'version_mismatch',
-            details: `Server protocol is ${PROTOCOL_VERSION}, client sent ${cmd.protocolVersion}`,
-          });
-          return;
-        }
-
-        const result = gameRoom.handleClientCommand(socket.id, cmd);
-        if (!result.success) {
-          socket.emit('cmdRejected', {
-            clientSeq: cmd?.clientSeq,
-            reason: result.error,
-            details: result.reason,
-          });
-        } else if (result.dedupe) {
-          socket.emit('view', {
-            gameId: gameRoom.roomId,
-            stateVersion: result.stateVersion,
-            view: result.view,
-            events: [],
-            pendingChoice: result.view?.pendingChoice || null,
-            lastClientSeq: result.lastClientSeq ?? result.clientSeq,
-          });
-          const gameEndedPayload = gameRoom.getGameEndedPayload(
-            gameRoom.socketToPlayer.get(socket.id) || null
-          );
-          if (gameEndedPayload) {
-            socket.emit('gameEnded', gameEndedPayload);
-          }
-        } else {
-          broadcastGameResult(gameRoom, result);
-        }
-      });
-
-      socket.on('resolveChoice', (data) => {
-        const roomId =
-          data?.roomId ||
-          data?.gameId ||
-          [...socket.rooms].find((r) => r !== socket.id);
-        const gameRoom = gameRooms.get(roomId);
-        if (!gameRoom) {
-          socket.emit('cmdRejected', {
-            clientSeq: data?.clientSeq,
-            reason: 'room_not_found',
-          });
-          socket.emit('gameEnded', {
-            winner: null,
-            reason: 'server_restart',
-            message: 'Game session terminated due to server restart.',
-          });
-          return;
-        }
-
-        const result = gameRoom.handleClientCommand(socket.id, {
-          type: 'resolveChoice',
-          payload: data,
-          clientSeq: data?.clientSeq,
-          ...(data?.seat !== undefined ? { seat: data.seat } : {}),
+    const broadcastGameResult = (gameRoom, result) => {
+      for (const broadcast of result.broadcasts || []) {
+        io.to(broadcast.socketId).emit('view', {
+          gameId: gameRoom.roomId,
+          stateVersion: result.stateVersion,
+          view: broadcast.view,
+          events: result.events,
+          pendingChoice: broadcast.view?.pendingChoice || null,
+          lastClientSeq: broadcast.lastClientSeq,
         });
-        if (!result.success) {
-          socket.emit('cmdRejected', {
-            clientSeq: data?.clientSeq,
-            reason: result.error,
-            details: result.reason,
-          });
-        } else if (result.dedupe) {
-          socket.emit('view', {
-            gameId: gameRoom.roomId,
-            stateVersion: result.stateVersion,
-            view: result.view,
-            events: [],
-            pendingChoice: result.view?.pendingChoice || null,
-            lastClientSeq: result.lastClientSeq ?? result.clientSeq,
-          });
-          const gameEndedPayload = gameRoom.getGameEndedPayload(
-            gameRoom.socketToPlayer.get(socket.id) || null
-          );
-          if (gameEndedPayload) {
-            socket.emit('gameEnded', gameEndedPayload);
-          }
-        } else {
-          broadcastGameResult(gameRoom, result);
-        }
-      });
+      }
 
-      // Design 012: "look at the top/bottom N cards of a deck", answered to the asker only.
-      socket.on('peekDeck', (data, ack) => {
-        if (typeof ack !== 'function') return;
-        const roomId =
-          data?.roomId || [...socket.rooms].find((r) => r !== socket.id);
-        const gameRoom = gameRooms.get(roomId);
-        if (!gameRoom) {
-          ack({ ok: false, reason: 'room_not_found' });
-          return;
+      const gameEndedEvent =
+        (result.events || []).find((e) => e.type === 'gameEnded') ||
+        gameRoom.state.turn?.phase === 'ended';
+
+      if (gameEndedEvent) {
+        for (const broadcast of result.broadcasts || []) {
+          const payload = gameRoom.getGameEndedPayload(broadcast.playerId);
+          if (payload) {
+            io.to(broadcast.socketId).emit('gameEnded', payload);
+          }
         }
-        ack(
-          gameRoom.peekDeck(socket.id, {
-            side: data?.side,
-            count: data?.count,
-            fromTop: data?.fromTop,
-            seat: data?.seat,
-          })
+      }
+    };
+
+    socket.on('cmd', (cmd) => {
+      const roomId =
+        cmd?.roomId || [...socket.rooms].find((r) => r !== socket.id);
+      const gameRoom = gameRooms.get(roomId);
+      if (!gameRoom) {
+        socket.emit('cmdRejected', {
+          clientSeq: cmd?.clientSeq,
+          reason: 'room_not_found',
+        });
+        socket.emit('gameEnded', {
+          winner: null,
+          reason: 'server_restart',
+          message: 'Game session terminated due to server restart.',
+        });
+        return;
+      }
+
+      if (cmd?.protocolVersion && cmd.protocolVersion !== PROTOCOL_VERSION) {
+        socket.emit('cmdRejected', {
+          clientSeq: cmd?.clientSeq,
+          reason: 'version_mismatch',
+          details: `Server protocol is ${PROTOCOL_VERSION}, client sent ${cmd.protocolVersion}`,
+        });
+        return;
+      }
+
+      const result = gameRoom.handleClientCommand(socket.id, cmd);
+      if (!result.success) {
+        socket.emit('cmdRejected', {
+          clientSeq: cmd?.clientSeq,
+          reason: result.error,
+          details: result.reason,
+        });
+      } else if (result.dedupe) {
+        socket.emit('view', {
+          gameId: gameRoom.roomId,
+          stateVersion: result.stateVersion,
+          view: result.view,
+          events: [],
+          pendingChoice: result.view?.pendingChoice || null,
+          lastClientSeq: result.lastClientSeq ?? result.clientSeq,
+        });
+        const gameEndedPayload = gameRoom.getGameEndedPayload(
+          gameRoom.socketToPlayer.get(socket.id) || null
         );
-      });
+        if (gameEndedPayload) {
+          socket.emit('gameEnded', gameEndedPayload);
+        }
+      } else {
+        broadcastGameResult(gameRoom, result);
+      }
+    });
 
-      socket.on('requestView', (data) => {
-        const roomId =
-          data?.roomId || [...socket.rooms].find((r) => r !== socket.id);
-        const gameRoom = gameRooms.get(roomId);
-        if (gameRoom) {
-          // Design 069: an unregistered socket would get the spectator view (both hands).
-          if (!gameRoom.canView(socket.id)) return;
-          // Design 074 D7: a solo board flip names the seat to draw at the bottom.
-          if (data?.nearSeat !== undefined) gameRoom.setSoloNearSeat(socket.id, data.nearSeat);
-          const view = gameRoom.getViewForSocket(socket.id);
-          const playerId = gameRoom.solo
-            ? gameRoom.soloNearSeat
-            : gameRoom.socketToPlayer.get(socket.id) || null;
-          const lastClientSeq = gameRoom.getClientSeqForSocket(socket.id);
-          socket.emit('view', {
-            gameId: gameRoom.roomId,
-            stateVersion: gameRoom.state.stateVersion,
-            view,
-            events: [],
-            pendingChoice: view?.pendingChoice || null,
-            lastClientSeq,
-          });
-          const gameEndedPayload = gameRoom.getGameEndedPayload(playerId);
-          if (gameEndedPayload) {
-            socket.emit('gameEnded', gameEndedPayload);
-          }
-        } else if (roomId) {
-          socket.emit('gameEnded', {
-            winner: null,
-            reason: 'server_restart',
-            message: 'Game session terminated due to server restart.',
-          });
-        }
-      });
+    socket.on('resolveChoice', (data) => {
+      const roomId =
+        data?.roomId ||
+        data?.gameId ||
+        [...socket.rooms].find((r) => r !== socket.id);
+      const gameRoom = gameRooms.get(roomId);
+      if (!gameRoom) {
+        socket.emit('cmdRejected', {
+          clientSeq: data?.clientSeq,
+          reason: 'room_not_found',
+        });
+        socket.emit('gameEnded', {
+          winner: null,
+          reason: 'server_restart',
+          message: 'Game session terminated due to server restart.',
+        });
+        return;
+      }
 
-      // Design 002 slice 3.11: the client's periodic self-reported per-zone
-      // board hashes. Compared against this room's own authoritative state;
-      // the first zone that disagrees is named back so the client's existing
-      // slice-1.1 peer-log catch-up has something concrete to recover.
-      // Spectators have no personal authoritative state to compare against.
-      socket.on('syncCheck', (data) => {
-        const roomId =
-          data?.roomId || [...socket.rooms].find((r) => r !== socket.id);
-        const gameRoom = gameRooms.get(roomId);
-        if (!gameRoom) return;
-        const playerId = gameRoom.socketToPlayer.get(socket.id);
-        if (!playerId) return;
-        gameRoom.touchActivity();
-        // I42: a command applied between the client hashing its zones and
-        // this handler running would make an up-to-date client look
-        // divergent for a state it has since moved past. Skip the compare
-        // this beat rather than report it — the next heartbeat re-checks
-        // against whatever state has settled by then.
-        if (
-          typeof data?.stateVersion === 'number' &&
-          data.stateVersion !== gameRoom.state.stateVersion
-        ) {
-          return;
-        }
-        // Compare against what this player's view shows, not raw state: the
-        // client can only hash its own view, which redacts the deck (I24) and
-        // unrevealed prizes. Raw-state hashing made prizes diverge every beat.
-        const serverZones = hashOwnerViewZones(gameRoom.getView(playerId));
-        const zoneId = findFirstDivergentZone(serverZones, data?.zones);
-        if (zoneId) {
-          socket.emit('desync', { roomId, zoneId });
-        }
+      const result = gameRoom.handleClientCommand(socket.id, {
+        type: 'resolveChoice',
+        payload: data,
+        clientSeq: data?.clientSeq,
+        ...(data?.seat !== undefined ? { seat: data.seat } : {}),
       });
-    }
+      if (!result.success) {
+        socket.emit('cmdRejected', {
+          clientSeq: data?.clientSeq,
+          reason: result.error,
+          details: result.reason,
+        });
+      } else if (result.dedupe) {
+        socket.emit('view', {
+          gameId: gameRoom.roomId,
+          stateVersion: result.stateVersion,
+          view: result.view,
+          events: [],
+          pendingChoice: result.view?.pendingChoice || null,
+          lastClientSeq: result.lastClientSeq ?? result.clientSeq,
+        });
+        const gameEndedPayload = gameRoom.getGameEndedPayload(
+          gameRoom.socketToPlayer.get(socket.id) || null
+        );
+        if (gameEndedPayload) {
+          socket.emit('gameEnded', gameEndedPayload);
+        }
+      } else {
+        broadcastGameResult(gameRoom, result);
+      }
+    });
+
+    // Design 012: "look at the top/bottom N cards of a deck", answered to the asker only.
+    socket.on('peekDeck', (data, ack) => {
+      if (typeof ack !== 'function') return;
+      const roomId =
+        data?.roomId || [...socket.rooms].find((r) => r !== socket.id);
+      const gameRoom = gameRooms.get(roomId);
+      if (!gameRoom) {
+        ack({ ok: false, reason: 'room_not_found' });
+        return;
+      }
+      ack(
+        gameRoom.peekDeck(socket.id, {
+          side: data?.side,
+          count: data?.count,
+          fromTop: data?.fromTop,
+          seat: data?.seat,
+        })
+      );
+    });
+
+    socket.on('requestView', (data) => {
+      const roomId =
+        data?.roomId || [...socket.rooms].find((r) => r !== socket.id);
+      const gameRoom = gameRooms.get(roomId);
+      if (gameRoom) {
+        // Design 069: an unregistered socket would get the spectator view (both hands).
+        if (!gameRoom.canView(socket.id)) return;
+        // Design 074 D7: a solo board flip names the seat to draw at the bottom.
+        if (data?.nearSeat !== undefined) gameRoom.setSoloNearSeat(socket.id, data.nearSeat);
+        const view = gameRoom.getViewForSocket(socket.id);
+        const playerId = gameRoom.solo
+          ? gameRoom.soloNearSeat
+          : gameRoom.socketToPlayer.get(socket.id) || null;
+        const lastClientSeq = gameRoom.getClientSeqForSocket(socket.id);
+        socket.emit('view', {
+          gameId: gameRoom.roomId,
+          stateVersion: gameRoom.state.stateVersion,
+          view,
+          events: [],
+          pendingChoice: view?.pendingChoice || null,
+          lastClientSeq,
+        });
+        const gameEndedPayload = gameRoom.getGameEndedPayload(playerId);
+        if (gameEndedPayload) {
+          socket.emit('gameEnded', gameEndedPayload);
+        }
+      } else if (roomId) {
+        socket.emit('gameEnded', {
+          winner: null,
+          reason: 'server_restart',
+          message: 'Game session terminated due to server restart.',
+        });
+      }
+    });
+
+    // Design 002 slice 3.11: the client's periodic self-reported per-zone
+    // board hashes. Compared against this room's own authoritative state;
+    // the first zone that disagrees is named back so the client's existing
+    // slice-1.1 peer-log catch-up has something concrete to recover.
+    // Spectators have no personal authoritative state to compare against.
+    socket.on('syncCheck', (data) => {
+      const roomId =
+        data?.roomId || [...socket.rooms].find((r) => r !== socket.id);
+      const gameRoom = gameRooms.get(roomId);
+      if (!gameRoom) return;
+      const playerId = gameRoom.socketToPlayer.get(socket.id);
+      if (!playerId) return;
+      gameRoom.touchActivity();
+      // I42: a command applied between the client hashing its zones and
+      // this handler running would make an up-to-date client look
+      // divergent for a state it has since moved past. Skip the compare
+      // this beat rather than report it — the next heartbeat re-checks
+      // against whatever state has settled by then.
+      if (
+        typeof data?.stateVersion === 'number' &&
+        data.stateVersion !== gameRoom.state.stateVersion
+      ) {
+        return;
+      }
+      // Compare against what this player's view shows, not raw state: the
+      // client can only hash its own view, which redacts the deck (I24) and
+      // unrevealed prizes. Raw-state hashing made prizes diverge every beat.
+      const serverZones = hashOwnerViewZones(gameRoom.getView(playerId));
+      const zoneId = findFirstDivergentZone(serverZones, data?.zones);
+      if (zoneId) {
+        socket.emit('desync', { roomId, zoneId });
+      }
+    });
   });
 
   const port = process.env.PORT || 4000;
@@ -1529,12 +1490,12 @@ async function main() {
     console.log(`Server is running at http://localhost:${port}`);
     logging.log.info('boot', 'listening', {
       port,
-      netcode: SERVER_AUTHORITATIVE ? 'server-authoritative' : 'legacy',
+      netcode: 'server-authoritative',
       e2e: E2E_ENABLED,
     });
     // eslint-disable-next-line no-console
     console.log(
-      `Netcode mode: ${SERVER_AUTHORITATIVE ? 'server-authoritative' : 'legacy'}` +
+      'Netcode mode: server-authoritative' +
         ` | e2e bridge: ${E2E_ENABLED ? 'ARMED (?e2e=1 works)' : 'disabled'}`
     );
   });

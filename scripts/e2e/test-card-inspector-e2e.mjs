@@ -2,7 +2,7 @@
 // Usage: pnpm test:inspector   (spawns its own server on a free port)
 // Runs on the three.js board (design 074): cards are read through `__ptcg.cardRect` and the
 // board mirror's shadow roots.
-//   PTCG_URL=http://host:port   reuse a running server (started with SERVER_AUTHORITATIVE=1)
+//   PTCG_URL=http://host:port   reuse a running server
 //   CHROMIUM_PATH=/path/to/chrome   picks the browser, as the other e2e harnesses do
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
@@ -31,7 +31,7 @@ async function startServer() {
   const port = await freePort();
   const child = spawn(process.execPath, ['server/server.js'], {
     cwd: ROOT,
-    env: { ...process.env, PORT: String(port), PTCG_E2E: '1', SERVER_AUTHORITATIVE: '1' },
+    env: { ...process.env, PORT: String(port), PTCG_E2E: '1' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let output = '';

@@ -5,7 +5,7 @@
 // writes <OUT>/after.png. The deal is skipped in e2e mode on purpose, so the script disarms e2e and
 // calls playOpeningDeal() directly (the real flow is Set Up / Set Up Both).
 //
-// usage: PORT=4100 pnpm start   (worktree server; SERVER_AUTHORITATIVE on, e2e bridge armed)
+// usage: PORT=4100 pnpm start   (worktree server; e2e bridge armed)
 //        node .claude/skills/fx-preview/rec/rec-deck-box.mjs
 // env:   BASE_URL (http://localhost:4100) · OUT (.agent/scratch/deck-box) · W, H (1600 × 900)
 //        MAT (custom-mega-lucario-edge-to-edge) · OPP_BOX (db_151_sv3-5_etb) · CHROMIUM / CHROMIUM_PATH

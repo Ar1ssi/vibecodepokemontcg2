@@ -17,20 +17,14 @@ export const DECK_UNWRAP_MS = 300;
 export const PROMO_LIFT_MS = 620;
 export const PROMO_HOLD_MS = 900;
 export const PACK_TEAR_MS = 260;
-export const PACK_SPILL_MS = 340;
 export const CARD_LIFT_MS = 220;
 export const CARD_FLIP_MS = 320;
 export const CARD_SETTLE_MS = 260;
 export const REVEAL_STAGGER_MS = 90;
 export const HIT_LIFT_MS = 520;
-export const HIT_FLARE_MS = 700;
 export const HIT_HOLD_MS = 600;
 export const FAN_COLLAPSE_MS = 380;
 export const SCENE_BACKSTOP_MS = 4000;
-
-export const EASE_LIFT = 'cubic-bezier(.2,.8,.2,1)';
-export const EASE_FLIP = 'cubic-bezier(.4,0,.2,1)';
-export const EASE_LID = 'cubic-bezier(.3,1.2,.4,1)';
 
 // Tray items: deck, packs 1–4, code card, tip sheet.
 export const TRAY_ITEM_COUNT = 7;

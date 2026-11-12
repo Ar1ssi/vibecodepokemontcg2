@@ -1,4 +1,4 @@
-// One schema for every log source (design 087 §1-2). Pure: served to the browser and imported by the server.
+// One schema for every log source (design 088 §1-2). Pure: served to the browser and imported by the server.
 export const LOG_FORMAT = 1;
 
 export const LEVELS = Object.freeze(['error', 'warn', 'info', 'debug', 'trace']);

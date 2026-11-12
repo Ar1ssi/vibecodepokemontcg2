@@ -6,10 +6,8 @@ import { fileURLToPath } from 'node:url';
 const read = (name) =>
   readFileSync(fileURLToPath(new URL(`../${name}`, import.meta.url)), 'utf8');
 
-// The board cards, damage counters and status tokens live inside the playmat
-// iframes, which cannot see the parent page's `body.fx-off`. Design 022 shipped
-// idle motion that therefore kept running with effects "off"; design 024 slice
-// 5 mirrors the marker classes onto each iframe's <html> instead.
+// Idle motion must stop when effects are off (`body.fx-off`, reduced motion). The board
+// itself is three.js now, so these sheets are the page-level scenes that still animate in CSS.
 //
 // These tests parse the sheets rather than grepping for a substring: a new
 // unguarded idle loop has to actually FAIL them. The check is coverage by
@@ -17,9 +15,6 @@ const read = (name) =>
 // subset of the rule's (`:root.fx-off .self-circle.status-marker` covers
 // `.self-circle.status-marker.status-asleep`), which is how the guards are
 // written and what makes them win on specificity too.
-const IFRAME_SHEETS = ['mat-ambient.css', 'status-marker.css', 'damage-counter.css'];
-const GUARDS = [':root.fx-off', ':root.fx-reduced'];
-
 /** Every `selector { ... }` block in a sheet, with @-blocks stripped. */
 function rules(css) {
   const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, '');
@@ -86,30 +81,6 @@ function guardSelectors(css, guard) {
   return out;
 }
 
-test('every iframe sheet with idle motion carries both marker guards', () => {
-  for (const name of IFRAME_SHEETS) {
-    const css = read(name);
-    assert.ok(idleSelectors(css).length > 0, `${name} is expected to define idle motion`);
-    for (const guard of GUARDS) {
-      assert.ok(guardSelectors(css, guard).length > 0, `${name} has no ${guard} rule`);
-    }
-  }
-});
-
-test('every infinite idle loop in the iframes is covered by a guard', () => {
-  for (const name of IFRAME_SHEETS) {
-    const css = read(name);
-    for (const guard of GUARDS) {
-      const guarded = guardSelectors(css, guard).map(tokensOf);
-      for (const selector of idleSelectors(css)) {
-        const tokens = tokensOf(selector);
-        const covered = guarded.some((g) => isSubset(g, tokens));
-        assert.ok(covered, `${name}: "${selector}" is not covered by any ${guard} rule`);
-      }
-    }
-  }
-});
-
 test('the coverage check rejects an unguarded loop', () => {
   // Guards the guard: proves the test above can actually fail. Mirrors the
   // real failure mode — someone adds an idle animation and no :root rule.
@@ -139,17 +110,6 @@ test('the coverage check accepts a broader guard compound', () => {
   `;
   const guarded = guardSelectors(fake, ':root.fx-off').map(tokensOf);
   assert.ok(isSubset(guarded[0], tokensOf(idleSelectors(fake)[0])));
-});
-
-test('iframe stylesheets also keep their prefers-reduced-motion fallback', () => {
-  // The class guard is for the in-app toggle; the media query still has to
-  // cover a user who never opens Settings at all.
-  for (const name of IFRAME_SHEETS) {
-    assert.ok(
-      read(name).includes('prefers-reduced-motion'),
-      `${name} lost its reduced-motion query`
-    );
-  }
 });
 
 test('the unboxing scene sheet guards every idle loop with body.fx-off and reduced motion', () => {

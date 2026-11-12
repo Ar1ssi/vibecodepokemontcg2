@@ -1,10 +1,9 @@
 // Design 002 slice 3.5 — records a real 2-player legacy trace (self-initiated actions +
 // per-step client boardHash) for the offline server-truth replay harness
 // (server/game/__tests__/replay-harness.test.mjs). Not part of `pnpm test`; run manually
-// against a live server to refresh the fixture. Must run with SERVER_AUTHORITATIVE=1 —
-// that's what makes the client wait for and use the server's 'dealOrder' (I17) instead of
-// a local shuffle; without it the fixture won't exercise the fix the harness checks for:
-//   SERVER_AUTHORITATIVE=1 node server/server.js &
+// against a live server to refresh the fixture. The client waits for and uses the server's
+// 'dealOrder' (I17) instead of a local shuffle, which is the fix the harness checks for:
+//   node server/server.js &
 //   node scripts/e2e/record-legacy-2p-fixture.mjs
 import { chromium } from 'playwright';
 import fs from 'fs';

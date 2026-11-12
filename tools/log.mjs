@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Agent CLI for unified logs (design 087 §7): node tools/log.mjs <command> [options] <file-or-dir>
+// Agent CLI for unified logs (design 088 §7): node tools/log.mjs <command> [options] <file-or-dir>
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';

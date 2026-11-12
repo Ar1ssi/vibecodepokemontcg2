@@ -27,9 +27,7 @@ export const systemState = {
   selfCounter: 0,
   selfActionData: [],
   oppActionData: [],
-  spectatorCounter: 0,
   exportActionData: [],
-  spectatorId: '',
   oppCounter: 0,
   isTwoPlayer: false,
   isReplay: false, // should be treated as false no matter what if isTwoPlayer is true

@@ -33,9 +33,6 @@ export const BOX_FACE_TEXTURES = Object.freeze({
   }),
 });
 
-/** Faces drawn in CSS from the palette tokens (no sharp source photo). */
-export const PROCEDURAL_FACES = Object.freeze(['right', 'back', 'top', 'bottom']);
-
 /** @returns {object|null} the vendored texture for `face`, or null when the face is procedural. */
 export function boxFaceTexture(face) {
   return Object.hasOwn(BOX_FACE_TEXTURES, face) ? BOX_FACE_TEXTURES[face] : null;

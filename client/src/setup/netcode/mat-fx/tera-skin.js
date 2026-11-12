@@ -7,7 +7,7 @@
 // gets only the CSS rim glow (an <img> cannot hold the layers). On the 3D board (design 074 §D6)
 // the mirror holds no skin: the scene wears it (`setUiState(id, { teraSkin: palette | null })`,
 // drawn by board3d/overlay-meshes.js).
-// Styles: css/mat-ambient.css (the cards live in the playmat iframes).
+// Styles: the old DOM mat ambient styles (the cards live in the playmat iframes).
 import { board3dActive, getBoardScene } from '../../board3d/board3d.js';
 import { fxDisabled } from '../../image-logic/mat-fx.mjs';
 import {

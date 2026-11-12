@@ -109,60 +109,6 @@ export function createRng(seed = 0, initialCursor = 0) {
 }
 
 /**
- * Creates an RNG source capable of consuming relayed randomness (e.g. client shuffle indices,
- * coin flip faces) for shadow mode, falling back to deterministic mulberry32.
- *
- * @param {string|number} [seed=0]
- * @param {number} [initialCursor=0]
- */
-export function createRelayedRng(seed = 0, initialCursor = 0) {
-  const base = createRng(seed, initialCursor);
-  const queuedShuffles = [];
-  const queuedCoins = [];
-
-  return {
-    queueShuffle(indices) {
-      if (Array.isArray(indices)) {
-        queuedShuffles.push([...indices]);
-      }
-    },
-    queueCoin(coin) {
-      queuedCoins.push(coin);
-    },
-    next() {
-      if (queuedCoins.length > 0) {
-        const c = queuedCoins.shift();
-        return c === 'heads' || c === true ? 0.25 : 0.75;
-      }
-      return base.next();
-    },
-    int(n) {
-      if (queuedCoins.length > 0) {
-        const c = queuedCoins.shift();
-        return c === 'heads' || c === true
-          ? 0
-          : Math.min(1, Math.max(0, n - 1));
-      }
-      return base.int(n);
-    },
-    shuffle(array) {
-      if (!Array.isArray(array)) return [];
-      if (queuedShuffles.length > 0) {
-        const indices = queuedShuffles.shift();
-        return indices.map((i) => array[i]).filter((c) => c !== undefined);
-      }
-      return base.shuffle(array);
-    },
-    get cursor() {
-      return base.cursor;
-    },
-    advance(steps) {
-      base.advance(steps);
-    },
-  };
-}
-
-/**
  * Shuffles `array` in place with `rng` (whose own `shuffle` returns a new array) and returns it.
  * A missing rng leaves the order unchanged.
  *

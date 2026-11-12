@@ -36,11 +36,6 @@ let cardPreviewState = null;
 
 export const isCardPreviewOpen = () => cardPreviewState != null;
 
-// Attack-preview overlay (design 008) mounts its hit-zones inside the pop
-// host created here — this is the one seam it needs, not the whole state
-// object (which callers must not mutate).
-export const getPreviewPopHost = () => cardPreviewState?.popHost ?? null;
-
 export const resolvePreviewSleeveSrc = (card, image) => {
   const user = card?.user ?? card?.image?.user ?? image?.user ?? 'self';
   return cardBackSrcForUser(user) || DEFAULT_SLEEVE;

@@ -194,7 +194,7 @@ function serializePlayerObservation(user) {
 }
 
 // Card-identity bundle for moveCardBundle's authoritative dispatch gate
-// (authoritative-dispatch.js buildAuthoritativeCardHints). Under SERVER_AUTHORITATIVE
+// (authoritative-dispatch.js buildAuthoritativeCardHints). Under server authority
 // the option's handIndex addresses the SERVER view array, while moveCardBundle's legacy
 // fallback indexes the local DOM zone array — passing the index alone made the gate fail
 // open and the legacy body then read a different array, crashing on an undefined card.

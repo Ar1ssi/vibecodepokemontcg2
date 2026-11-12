@@ -3,7 +3,7 @@
 // Each board opens in a fresh page (the Stadium in the view picks the board, as in a game) and is
 // shot once its programs are ready and its reveal has ended.
 //
-// usage: PORT=4100 pnpm start   (worktree server; SERVER_AUTHORITATIVE on, e2e bridge armed)
+// usage: PORT=4100 pnpm start   (worktree server; e2e bridge armed)
 //        node .claude/skills/fx-preview/rec/rec-stadium-boards.mjs
 // env:   BOARDS=scorched-earth,levincia   (default: every board)
 //        PRESETS=tilt12,tcgl              (default: both camera presets)

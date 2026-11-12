@@ -58,12 +58,6 @@ export function isPlaceholderCoin(coin) {
   return /\/coins\/bulbapedia\//.test(String(coin?.url ?? ''));
 }
 
-export function filterCoinsByName(coins = [], term = '') {
-  const needle = String(term || '').trim().toLowerCase();
-  if (!needle) return [...coins];
-  return coins.filter((c) => String(c.name ?? '').toLowerCase().includes(needle));
-}
-
 /**
  * Faceted filter over a coin list. Every facet is optional; omitted/`'all'`
  * facets are ignored. Matching is case-insensitive for `material`/`region`.

@@ -1,4 +1,4 @@
-// One client's state at export time (design 087 §6): what this tab believes, for diffing against the server.
+// One client's state at export time (design 088 §6): what this tab believes, for diffing against the server.
 import { LIMITS } from '../../../shared/log/log-schema.mjs';
 import { safeStringify } from '../../../shared/log/safe-json.mjs';
 import { describeElement } from '../../../shared/log/describe-element.mjs';

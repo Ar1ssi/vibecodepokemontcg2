@@ -59,8 +59,7 @@ node .claude/skills/fx-preview/capture-board.mjs .agent/scratch/skin
 It writes `<prefix>-board.png` (active and bench, cropped) and `<prefix>-full.png`.
 
 **Which board.** Every capture and `rec/` script below runs on the three.js board (design 074); there is no
-board-selection env var. The server must be authoritative (`SERVER_AUTHORITATIVE=1`; `pnpm start`
-prints `server-authoritative`) and the browser needs WebGL2 (the scripts launch it on SwiftShader).
+board-selection env var. The browser needs WebGL2 (the scripts launch it on SwiftShader).
 `board-mode.mjs` holds the launch options and the page-side `window.__fxBoard`
 helpers (`zoneRect`, `pauseAll`, `stepTo`, `pushView`, `imageOf`); `window.__ptcg.cardRect(id)` and
 `boardMode()` are the e2e API. `CHROMIUM_PATH` works wherever `CHROMIUM` does; `CARD_DIR` (a folder of

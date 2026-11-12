@@ -1,4 +1,4 @@
-// Call-site API for the old sync/decision loggers, now backed by the unified client log (design 087 §5).
+// Call-site API for the old sync/decision loggers, now backed by the unified client log (design 088 §5).
 import { log } from './client-log.js';
 import { systemState } from '../state.js';
 import { summarizeDecision, summarizeMoveCardParams, summarizeMoveParamsLine } from './sync-summary.mjs';

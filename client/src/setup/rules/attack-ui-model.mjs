@@ -18,10 +18,6 @@ import { liveAttackMarkers, parseDamageImmunity } from '../../../../shared/engin
 import { listConditions } from '../../../../shared/engine/rules/special-conditions.mjs';
 import { isPokemonToolCard } from '../../../../shared/engine/rules/ability-executors.mjs';
 
-// AttackOption.weaknessColor / resistanceColor (AttackActionOption_L prefab).
-export const WEAKNESS_INK = '#0e800e';
-export const RESISTANCE_INK = '#e61717';
-
 const TYPED = [
   'grass',
   'fire',

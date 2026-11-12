@@ -1,5 +1,4 @@
-// The board the fx-preview scripts drive (design 074 F1): always the three.js board. It needs a
-// server started with SERVER_AUTHORITATIVE=1 (`pnpm start` prints "server-authoritative"), and
+// The board the fx-preview scripts drive (design 074 F1): always the three.js board. It needs
 // WebGL: this module launches Chromium on SwiftShader for it.
 //
 // Page side, installed before any page script runs: `window.__fxBoard`
@@ -130,7 +129,7 @@ export async function openBoard(page, base) {
     .then(() => true)
     .catch(() => false);
   if (!running) {
-    throw new Error(`the 3D board did not start (board mode ${await page.evaluate(() => window.__ptcg.boardMode())}); the server needs SERVER_AUTHORITATIVE=1 and the browser WebGL2`);
+    throw new Error(`the 3D board did not start (board mode ${await page.evaluate(() => window.__ptcg.boardMode())}); the browser needs WebGL2`);
   }
   await page.waitForTimeout(BOARD_SETTLE_MS);
 }

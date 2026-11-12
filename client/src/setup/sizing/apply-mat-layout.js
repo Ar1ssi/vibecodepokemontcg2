@@ -313,16 +313,6 @@ export const currentMatSpec = () =>
     scale: Number.parseFloat(currentMatScaleText()) || 1,
   });
 
-/**
- * Push a layout profile's variables onto the page.
- * Prefer `applyMatForTarget` when zones should differ per player.
- */
-export const applyMatLayout = (layoutId) => {
-  const layout = getMatLayout(layoutId);
-  applyMatLayoutToDoc(layout, document);
-  return layout;
-};
-
 /** Apply one player's mat and zone layout without touching the other half. */
 export const applyMatForTarget = (target, mat) => {
   const key = normalizeTarget(target);
@@ -351,23 +341,6 @@ export const applyMatForTarget = (target, mat) => {
 
   return layoutForTarget(key);
 };
-
-/** @deprecated Use applyMatForTarget; kept so a single mat clears both sides. */
-export const applyMat = (mat) => {
-  currentMats = { self: mat || null, opp: mat || null };
-  writeStoredMats(currentMats);
-  syncLayouts();
-  syncMatArt();
-  return layoutForTarget('self');
-};
-
-/** @param {'self'|'opp'} [target] */
-export const getCurrentMat = (target) => {
-  if (target) return currentMats[normalizeTarget(target)];
-  return currentMats.self || currentMats.opp || null;
-};
-
-export const getCurrentMats = () => ({ ...currentMats });
 
 /** @param {'self'|'opp'} target */
 export const getStoredMatId = (target) => {

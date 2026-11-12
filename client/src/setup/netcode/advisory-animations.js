@@ -408,7 +408,7 @@ export function whenFxQueueIdle() {
 }
 
 /**
- * Queue depth and plans started so far, for the log export snapshot (design 087 §6).
+ * Queue depth and plans started so far, for the log export snapshot (design 088 §6).
  *
  * @returns {{ pending: number, started: number }}
  */

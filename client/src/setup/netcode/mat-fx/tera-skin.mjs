@@ -226,7 +226,7 @@ export function teraSkinGlints(seed) {
 
 /**
  * The CSS custom properties that colour the skin's tint, rim and glints
- * (css/mat-ambient.css), as `r, g, b` triplets for `rgba(var(--x), a)`.
+ * (the old DOM mat ambient styles), as `r, g, b` triplets for `rgba(var(--x), a)`.
  *
  * @param {typeof TERA_PALETTE} [palette] from `teraPaletteFor` (the card's type)
  * @returns {Record<string, string>}
