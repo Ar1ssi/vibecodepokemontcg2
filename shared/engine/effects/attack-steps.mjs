@@ -2375,6 +2375,13 @@ function atkKnockOut(ctx) {
   // Mist/Rocky/Wash/Wonder Energy: an automatic Knock Out from an attack effect is
   // prevented on the shielded Pokémon (Bring Down ruling), damage-only KOs are not.
   const shielded = Boolean(target) && attackEffectShielded(ctx, opponent, target);
+  // Regieleki Overclocked Explosion: the attacker goes after its damage; nothing on the board shields it.
+  if (step.scope === 'self') {
+    const self = activeOf(ctx.player);
+    if (!self) return skip(ctx, 'no_active');
+    markKnockOut(ctx, ctx.player, self);
+    return null;
+  }
   if (step.scope === 'both') {
     // Annihilape Destined Fight / Forretress Double KO: both Active Pokémon go at once.
     const self = activeOf(ctx.player);

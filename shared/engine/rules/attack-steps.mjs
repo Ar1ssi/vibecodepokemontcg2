@@ -573,7 +573,7 @@ const TEMPLATES = [
     (m) => ({ type: 'atkDiscardOppHand', count: countOf(m[2]), perAttachedEnergyType: m[1].toUpperCase() }),
   ],
   [
-    /^your opponent discards (an?|\d+) cards? from their hand$/,
+    /^your opponent (?:must )?discards? (an?|\d+) cards? from their hand$/,
     (m) => ({ type: 'atkDiscardOppHand', count: countOf(m[1]) }),
   ],
   // Ninjask Chip Off (random) / Feraligatr Pull Away ("5 of more", sic; the opponent picks).
@@ -1110,6 +1110,8 @@ const TEMPLATES = [
     (m) => ({ type: 'atkKnockOut', condition: 'maxRemainingHp', maxRemainingHp: Number(m[1]) }),
   ],
   [/^both active pokémon are knocked out$/, () => ({ type: 'atkKnockOut', scope: 'both' })],
+  // Homebrew Regieleki Overclocked Explosion: "After using this attack, this Pokémon is Knocked Out."
+  [/^(?:after using this attack, )?this pokémon is (?:also )?knocked out$/, () => ({ type: 'atkKnockOut', scope: 'self' })],
   [
     /^if your opponent's active pokémon is affected by a special condition, (?:it|that pokémon) is knocked out$/,
     () => ({ type: 'atkKnockOut', condition: 'specialCondition' }),
@@ -1864,7 +1866,9 @@ export function resolveCoinGates(steps, { coin, headsCount, flips = [] }) {
     );
 }
 
-const ATTACH_CHAIN = /^if (?:you do|you attached energy (?:to this pokémon )?in this way), /;
+const ATTACH_CHAIN = /^if (?:you do(?: so)?|you attached energy (?:to this pokémon )?in this way), /;
+// "If you do" and the older "If you do so" (Regigigas ex Destruction) both read the step before them.
+const IF_YOU_DO = /^if you do(?: so)?, /;
 const ENERGY_DISCARD_SENTENCE = /^discard (?:an?|d+) (?:basic )?(?:{[a-z]} )?energy(?: cards?)? (?:attached to|from) this pokémon.?$/;
 const HAND_COST_TYPES = new Set(['atkDiscardOwnHand', 'atkDiscardHandEnergy', 'atkLostZoneFromHand']);
 
@@ -1971,16 +1975,16 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
     const chained = ATTACH_CHAIN.exec(body);
     const previous = result.after[result.after.length - 1];
     // "Discard a card from your hand. If you do, draw 3 cards." runs only when the hand paid.
-    const handChain = Boolean(chained) && /^if you do, /.test(body) && HAND_COST_TYPES.has(previous?.type);
+    const handChain = Boolean(chained) && IF_YOU_DO.test(body) && HAND_COST_TYPES.has(previous?.type);
     // "You may <step>. If you do, <step>." (Palkia Pearl Blast): the optional step becomes the
     // cost the executor checks; a declined or skipped cost ends the effect.
     const optionalChain =
-      Boolean(chained) && /^if you do, /.test(body) && !handChain && !isAttachStep(previous) && previous?.optional;
+      Boolean(chained) && IF_YOU_DO.test(body) && !handChain && !isAttachStep(previous) && previous?.optional;
     if (optionalChain) previous.cost = true;
     // Golisopod ex Swing and Skedaddle: "Discard an Energy from this Pokémon. If you do, switch
     // it …" runs only when the printed discard moved an Energy (requiresEnergyDiscard).
     const discardChain =
-      Boolean(chained) && /^if you do, /.test(body) && ENERGY_DISCARD_SENTENCE.test((sentences[index - 1] || '').trim());
+      Boolean(chained) && IF_YOU_DO.test(body) && ENERGY_DISCARD_SENTENCE.test((sentences[index - 1] || '').trim());
     if (chained && !handChain && !isAttachStep(previous) && !optionalChain && !discardChain) continue;
     const { rest, flags } = stripGates(chained ? body.slice(chained[0].length) : body);
     if (extra) flags.requiresExtraEnergy = extra.requirements;
