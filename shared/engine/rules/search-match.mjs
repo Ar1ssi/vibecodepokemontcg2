@@ -65,6 +65,33 @@ function matchesHpCap(card, maxHp) {
   return true;
 }
 
+/**
+ * Printed Retreat Cost count, or null when the card's data has not loaded yet (deck cards are
+ * enriched lazily, like HP above). Reads the symbol array, a plain number, or TCGdex's `retreat`.
+ */
+function printedRetreatCount(card) {
+  const cost = card.retreatCost ?? card.retreat;
+  if (Array.isArray(cost)) return cost.length;
+  const count = Number(cost);
+  return cost != null && Number.isFinite(count) ? count : null;
+}
+
+/** "Retreat Cost of 3 or more" (Heavy Ball), "of exactly 4" (Poké Maniac), "no Retreat Cost" (Feather Ball). */
+function retreatRequirement(w) {
+  if (/\bno retreat cost\b/.test(w)) return { exactly: 0 };
+  const atLeast = w.match(/retreat cost of (\d+) or more/);
+  if (atLeast) return { atLeast: Number(atLeast[1]) };
+  const exactly = w.match(/retreat cost of exactly (\d+)/);
+  return exactly ? { exactly: Number(exactly[1]) } : null;
+}
+
+/** A card whose Retreat Cost is unknown stays in the pool, so the picker is usable (see matchesHpCap). */
+function matchesRetreatRequirement(card, { atLeast, exactly }) {
+  const count = printedRetreatCount(card);
+  if (count === null) return true;
+  return exactly !== undefined ? count === exactly : count >= atLeast;
+}
+
 export function energySearchWhat({ basic = false, energyType = null } = {}) {
   const TYPE_TO_SYM = {
     water: 'W', fire: 'R', grass: 'G', lightning: 'L', psychic: 'P',
@@ -127,11 +154,11 @@ export function matchesSearch(card, what = '') {
   // Fossil Researcher: "up to 2 in any combination of Amaura or Tyrunt".
   what = String(what).replace(/^\s*in any combination of\s+/i, '');
   const w = what.toLowerCase();
-  // "90 HP or less" is a range, not an or-clause: splitting it dropped the cap
-  // and matched every card (same class as the typed-Basic HP cap bug below).
+  // "90 HP or less" and "Retreat Cost of 3 or more" are ranges, not or-clauses: splitting them
+  // dropped the cap and matched every card (same class as the typed-Basic HP cap bug below).
   if (
     /\s+or\s+/.test(w) &&
-    !/(?:hp|prize cards?)\s+or\s+(?:less|fewer|more|higher)\b/.test(w)
+    !/(?:hp|prize cards?|\d+)\s+or\s+(?:less|fewer|more|higher)\b/.test(w)
   ) {
     return w.split(/\s+or\s+/).some((seg) => matchesSearch(card, seg.trim()));
   }
@@ -205,6 +232,8 @@ export function matchesSearch(card, what = '') {
   }
   if (w.includes('basic') || w.includes('pokémon') || w.includes('pokemon')) {
     if (!isPokemon) return false;
+    const retreat = retreatRequirement(w);
+    if (retreat && !matchesRetreatRequirement(card, retreat)) return false;
     if (/pok[eé]mon-gx\b/.test(w)) return isGxCard(card);
     if (/^basic pok[eé]mon-ex$/.test(w)) return normalizeStage(card.stage) === 'Basic' && /(?:-| )EX$/.test(String(card.name || ''));
     if (/^pok[eé]mon-ex$/.test(w)) return /(?:-| )ex$/i.test(String(card.name || ''));
