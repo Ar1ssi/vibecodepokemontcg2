@@ -1117,7 +1117,23 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
         }
         case 'shuffleFromDiscard': {
           const discard = zone(_effectOwner, 'discard');
-          const choices = step.choices || [{ what: step.what, count: step.count }];
+          let choices = step.choices || [{ what: step.what, count: step.count }];
+          // "Flip 2 coins. For each heads, shuffle a card …" (Steven's Resolve, Electrocharger):
+          // the heads set how many cards the pick takes.
+          if (step.coins) {
+            let heads = 0;
+            for (let i = 0; i < Number(step.coins); i++) {
+              const face = await (_playCoinFlip ? _playCoinFlip(_effectOwner, card.name) : 'heads');
+              if (face === 'heads') heads++;
+            }
+            if (heads === 0) {
+              msg('  coins: no heads — no cards shuffled');
+              runAt(idx + 1);
+              return;
+            }
+            choices = [{ what: step.what, count: heads * (Number(step.perHeads) || 1) }];
+          }
+          const nameFilter = step.nameFilter ? String(step.nameFilter).toLowerCase() : '';
           const runChoice = (choiceIdx) => {
             if (choiceIdx >= choices.length) {
               _shuffleZone(_effectOwner, _effectOwner, 'deck');
@@ -1125,7 +1141,11 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
               return;
             }
             const choice = choices[choiceIdx];
-            const pool = discard.array.filter((c) => _matchesSearch(c, choice.what));
+            const pool = discard.array.filter(
+              (c) =>
+                (!nameFilter || String(c?.name || '').toLowerCase().includes(nameFilter)) &&
+                _matchesSearch(c, choice.what)
+            );
             if (!pool.length) {
               runChoice(choiceIdx + 1);
               return;

@@ -2900,6 +2900,15 @@ function parseTrainerStepsInner(lower) {
   // shuffle from discard into deck (Energy Recycler, Sacred Ash, Great Haul
   // Net, Super Rod — "from your discard pile back into your deck")
   if (lower.includes('from your discard pile') && /(?:back )?into your deck/.test(lower)) {
+    // Homebrew Steven's Resolve: "Flip 2 coins. For each heads, shuffle a card from your discard
+    // pile back into your deck." — any card, one per heads.
+    const perHeadsAny = lower.match(
+      /^flip (\d+) coins\. for each heads, shuffle an? card from your discard pile (?:back )?into your deck/
+    );
+    if (perHeadsAny) {
+      steps.push({ type: 'shuffleFromDiscard', what: 'card', coins: Number(perHeadsAny[1]), perHeads: 1 });
+      return { steps, recognizable: true };
+    }
     // Electrocharger (Team Up): "Flip 2 coins. For each heads, shuffle an Electropower card …".
     const perHeads = lower.match(
       /^flip (\d+) coins\. for each heads, shuffle an? ([^.]+?) card from your discard pile into your deck/

@@ -100,13 +100,19 @@ const SWAP_COST = /^you may put (\d+) damage counters on this pokémon\.$/;
 const SWAP_PAID = /^if you do, put (\d+) damage counters on your opponent's pokémon in any way you like\.$/;
 const SWAP_UNPAID = /^otherwise, put (\d+) damage counters on your opponent's pokémon in any way you like\.$/;
 
+// Homebrew Blacephalon Mind Blown: the self-counter cost unlocks the Bench spread — "You may put
+// 5 damage counters on this Pokémon. If you do, this attack does 30 damage to each of your
+// opponent's Benched Pokémon." The reducer applies the spread only when the cost was paid.
+const BENCH_IF_PAID = /^if you do, this attack does (\d+) damage to each of your opponent's benched pokémon\.$/;
+
 const stripPeriod = (sentence) => sentence.replace(/\.$/, '');
 
 /**
  * @param {string} attackText Printed attack text
  * @param {string} [selfName] The attacker's printed name (older prints name themselves)
  * @returns {{ cost: object, bonus: number, extraCondition: string|null, perEach: boolean,
- *   mandatory?: boolean, consumed?: string[] }|null} `consumed` lists the normalized sentences
+ *   mandatory?: boolean, counterSwap?: { paid: number, unpaid: number },
+ *   benchSpread?: { amount: number }, consumed?: string[] }|null} `consumed` lists the normalized sentences
  *   this clause owns, so the step parser does not also run them.
  */
 export function optionalCostBonusClause(attackText, selfName = '') {
@@ -123,6 +129,17 @@ export function optionalCostBonusClause(attackText, selfName = '') {
         perEach: false,
         counterSwap: { paid: Number(swapPaid[1]), unpaid: Number(swapUnpaid[1]) },
         consumed: [i, i + 1, i + 2].map((j) => stripPeriod(sentences[j])),
+      };
+    }
+    const benchIfPaid = swapCost && BENCH_IF_PAID.exec(sentences[i + 1]);
+    if (benchIfPaid) {
+      return {
+        cost: { kind: 'selfCounters', exactly: Number(swapCost[1]) },
+        bonus: 0,
+        extraCondition: null,
+        perEach: false,
+        benchSpread: { amount: Number(benchIfPaid[1]) },
+        consumed: [i, i + 1].map((j) => stripPeriod(sentences[j])),
       };
     }
     // Annihilape ex Angry Grudge: a mandatory "up to" cost the damage counts.

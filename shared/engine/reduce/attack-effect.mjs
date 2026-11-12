@@ -1341,6 +1341,9 @@ export function resolveAttackEffectPhase(draft, ctx) {
       // `parsed.bench`'s looser regex, so a spread attack matches both. Spread wins: applying
       // both would double every benched Pokémon's damage.
       const spread = allBenchDamage(attack.text);
+      // Homebrew Blacephalon Mind Blown: "If you do, … to each of your opponent's Benched
+      // Pokémon" — the spread only lands when the offered self-counter cost was paid.
+      const spreadUnpaid = Boolean(optionalBonus?.benchSpread) && optionalCostPaid !== true;
 
       // A printed clause that lets the player choose which opponent Pokémon take
       // damage / counters. Resolved after the attack's other effects below so a
@@ -1456,7 +1459,7 @@ export function resolveAttackEffectPhase(draft, ctx) {
 
       // Spread damage: the same amount to EVERY benched Pokémon the defender has. The target
       // list is snapshotted first, because a KO inside the loop mutates the bench array.
-      if (spread > 0) {
+      if (spread > 0 && !spreadUnpaid) {
         const targets = benchTargets(draft.players[defenderPlayerId]);
         if (targets.length === 0) {
           events.push({

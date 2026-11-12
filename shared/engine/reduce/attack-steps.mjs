@@ -481,6 +481,16 @@ export function optionalCostOffer(draft, { playerId, attacker, attack, clause })
     case 'drawback':
       return yesNo(`do ${bonus} more damage (${cost.text.replace(/\.$/, '')})`);
     case 'selfCounters':
+      if (cost.exactly && clause.benchSpread) {
+        const { amount } = clause.benchSpread;
+        return {
+          prompt: `${attack.name}: put ${cost.exactly} damage counters on this Pokémon to do ${amount} damage to each of your opponent's Benched Pokémon?`,
+          options: YES_NO_OPTIONS(`${amount} to each Benched Pokémon, ${cost.exactly} counters on this Pokémon`),
+          min: 1,
+          max: 1,
+          allowedIds: [],
+        };
+      }
       if (cost.exactly) {
         const { paid, unpaid } = clause.counterSwap;
         return {

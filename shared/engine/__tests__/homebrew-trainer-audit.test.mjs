@@ -202,6 +202,53 @@ test('Electrocharger (Team Up) flips 2 coins and returns only Electropower', () 
   assert.equal(res.prompts.length, 0, 'two tails return nothing');
 });
 
+// HB 634 Steven's Resolve — set.json customhb-634, the user's cardback edit of sm7-145 (printed:
+// "Search your deck for up to 3 cards …"); text as on its screenshot.
+const STEVENS_RESOLVE = 'Flip 2 coins. For each heads, shuffle a card from your discard pile back into your deck.';
+/** Coin stub: the flips land on `faces` in order; every later draw (shuffles) reads tails. */
+const coinSequence = (...faces) => ({ next: () => (faces.shift() === 'heads' ? 0.1 : 0.9) });
+const stevensDiscard = () => [mon('Beldum', 'Metal'), energy('Metal'), trainer('Potion', 'Item', 'x'), special('Double Turbo Energy')];
+const playStevens = (discard, rng) =>
+  play(board({ p1: { discard } }), trainer("Steven's Resolve", 'Supporter', STEVENS_RESOLVE), { rng });
+
+test("HB 634 Steven's Resolve parses as 2 coins and one card of any kind per heads", () => {
+  const { steps, recognizable } = parseTrainerEffect(STEVENS_RESOLVE);
+  assert.equal(recognizable, true);
+  assert.deepEqual(steps, [{ type: 'shuffleFromDiscard', what: 'card', coins: 2, perHeads: 1 }]);
+});
+
+test("HB 634 Steven's Resolve: 2 heads shuffle up to 2 cards of any kind from the discard pile into the deck", () => {
+  const discard = stevensDiscard();
+  const res = playStevens(discard, coinSequence('heads', 'heads'));
+  assert.equal(res.prompts.length, 1);
+  assert.equal(res.prompts[0].max, 2);
+  assert.deepEqual(optionNames(res.prompts[0]), discard.map((c) => c.name), 'Pokémon, Trainer and Energy are all offered');
+  const { deck, hand } = res.state.players.p1.zones;
+  const [first, second] = res.prompts[0].options;
+  assert.ok(deck.some((c) => c.instanceId === first.instanceId) && deck.some((c) => c.instanceId === second.instanceId));
+  assert.equal(deck.length, 12);
+  assert.equal(hand.some((c) => c.name === 'Beldum'), false, 'the cards go to the deck, not the hand');
+});
+
+test("HB 634 Steven's Resolve: 1 heads shuffles 1 card, 2 tails shuffle none", () => {
+  const oneHead = playStevens(stevensDiscard(), coinSequence('tails', 'heads'));
+  assert.equal(oneHead.prompts[0].max, 1);
+  assert.equal(oneHead.state.players.p1.zones.deck.length, 11);
+  const noHeads = playStevens(stevensDiscard(), coinSequence('tails', 'tails'));
+  assert.equal(noHeads.prompts.length, 0, 'no prompt without a heads');
+  assert.equal(noHeads.state.players.p1.zones.deck.length, 10);
+  assert.equal(noHeads.state.players.p1.zones.discard.filter((c) => c.name !== "Steven's Resolve").length, 4);
+});
+
+test("HB 634 Steven's Resolve: a short discard pile caps the pick, an empty one skips it without an error", () => {
+  const single = playStevens([mon('Beldum', 'Metal')], coinSequence('heads', 'heads'));
+  assert.equal(single.prompts[0].max, 1);
+  const empty = playStevens([], coinSequence('heads', 'heads'));
+  assert.equal(empty.error ?? null, null);
+  assert.equal(empty.prompts.length, 0);
+  assert.equal(empty.state.players.p1.zones.deck.length, 10);
+});
+
 test('Special Charge (Steam Siege) returns only Special Energy', () => {
   const res = play(
     board({ p1: { discard: [special('Double Turbo Energy'), energy('Fire'), mon('Dead', 'Fire')] } }),
