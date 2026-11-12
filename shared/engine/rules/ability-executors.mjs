@@ -659,6 +659,8 @@ export function parseHpBonus(card) {
     t.match(/(\d+)\s+hp\s+more/) ||
     t.match(/gets\s+\+(\d+)\s+hp/) ||
     t.match(/\+(\d+)\s+hp/) ||
+    // Iron Burden: "… its HP increased by 40."
+    t.match(/\bhp\s+increased\s+by\s+(\d+)/) ||
     t.match(/for each[^.]*?\+(\d+)\s+hp/);
   return { bonus: parseNumber(m) };
 }
@@ -879,6 +881,10 @@ export function parseRetreatCostModifier(card, board = {}) {
   // is a CONDITION, not a modifier — Heavy Boots, I133/A4). TCGdex prints
   // retreat modifiers with energy symbols, not numerals: Air Balloon is
   // "{C}{C} less" (two Colorless), counted by symbolCount below.
+  // Iron Burden: "Retreat Cost increased by 2 {C} and its HP increased by 40" names the number and
+  // the direction itself, so the HP clause's "increased" and the symbol count cannot misread it.
+  const by = t.match(/retreat cost (?:is |are )?(increased|reduced|decreased) by (\d+)/);
+  if (by) return { delta: (by[1] === 'increased' ? 1 : -1) * (parseInt(by[2], 10) || 0) };
   const m = t.match(/(\d+)\s*(?:more|less|fewer)/);
   const symbolCount = (t.match(/\{[a-z]\}/g) || []).length;
   const n = m ? parseInt(m[1], 10) || 1 : symbolCount;

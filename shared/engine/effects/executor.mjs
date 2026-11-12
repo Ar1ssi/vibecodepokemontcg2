@@ -38,6 +38,7 @@ import {
   attachedCards,
   removeFromZones,
   effectShieldBlocks,
+  switchOutBlocked,
   cardEffectShielded,
   playerShieldBlocks,
 } from './trainer-steps.mjs';
@@ -548,6 +549,8 @@ export function executeSteps(draft, {
     // I219: an Ability shield on the other side stops this Item/Supporter/Ability/Stadium effect.
     const shieldedTarget = (side, root) =>
       effectShieldBlocks({ draft, player, effectType, sourceCard, events }, side, root);
+    // Iron Burden: the side's Active Pokémon holds a Tool that forbids Ability/Trainer switch-outs.
+    const switchLocked = (side, root) => switchOutBlocked({ draft, effectType, sourceCard }, side, root);
     // An option that is a frozen side's Active Pokémon or a card attached to it.
     const frozenPick = (opt) =>
       Object.values(draft.players || {}).some((side) => {
@@ -1353,6 +1356,11 @@ export function executeSteps(draft, {
             events.push({ type: 'effectStepSkipped', reason: 'no_opponent_bench', step: step.type });
             break;
           }
+          if (switchLocked(opponent, oppActive)) {
+            context.opponentSwitchSkipped = true;
+            events.push({ type: 'effectStepSkipped', reason: 'switch_locked', step: step.type, instanceId: oppActive.instanceId });
+            break;
+          }
           let chosenBenchId = null;
           if (stepSelection && stepSelection.length > 0) {
             chosenBenchId = stepSelection[0];
@@ -1435,6 +1443,11 @@ export function executeSteps(draft, {
         if (active && shieldedTarget(player, active)) {
           context.ownSwitchSkipped = true;
           events.push({ type: 'effectStepSkipped', reason: 'effect_shield', step: step.type, instanceId: active.instanceId });
+          break;
+        }
+        if (active && switchLocked(player, active)) {
+          context.ownSwitchSkipped = true;
+          events.push({ type: 'effectStepSkipped', reason: 'switch_locked', step: step.type, instanceId: active.instanceId });
           break;
         }
         if (!active || bench.length === 0) {
@@ -1545,6 +1558,11 @@ export function executeSteps(draft, {
           // Guzma, Cross Switcher: "If you do, switch your Active Pokémon …" reads this.
           context.opponentSwitchSkipped = true;
           events.push({ type: 'effectStepSkipped', reason: 'no_opponent_bench', step: step.type });
+          break;
+        }
+        if (switchLocked(opponent, oppActive)) {
+          context.opponentSwitchSkipped = true;
+          events.push({ type: 'effectStepSkipped', reason: 'switch_locked', step: step.type, instanceId: oppActive.instanceId });
           break;
         }
 

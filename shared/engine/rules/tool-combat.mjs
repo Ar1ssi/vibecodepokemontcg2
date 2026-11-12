@@ -471,6 +471,16 @@ export function combinedToolHpBonus(
   return bonus;
 }
 
+// Iron Burden: "The Pokémon this card is attached to can't be switched out by an Ability or a
+// Trainer card." Attacks and retreating are not Abilities or Trainer cards, so they stay free.
+const SWITCH_OUT_LOCK = /can't be switched out by an ability or a trainer card/;
+
+/** Whether an attached Tool stops Abilities and Trainer cards from switching `holder` out. */
+export function holderSwitchOutLocked(holder, zoneCards, { blockTools = false, stadium = null } = {}) {
+  if (toolBlocked(blockTools, stadium)) return false;
+  return attachedTools(holder, zoneCards).some((tool) => SWITCH_OUT_LOCK.test(lower(cardAbilityText(tool))));
+}
+
 /** Retreat cost delta from Pokémon + attached Tools. */
 export function combinedToolRetreatCost(
   baseRetreat,

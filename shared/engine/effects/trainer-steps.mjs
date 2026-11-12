@@ -46,7 +46,7 @@ import {
   healBlockedByAbility,
   sideContextFor,
 } from '../rules/ability-combat.mjs';
-import { TYPE_LETTER } from '../rules/tool-combat.mjs';
+import { TYPE_LETTER, holderSwitchOutLocked } from '../rules/tool-combat.mjs';
 import { attachedTools, toolCapacity } from '../rules/ability-executors.mjs';
 import {
   attachTargetAllowed,
@@ -209,6 +209,16 @@ export function effectShieldBlocks(ctx, side, root) {
   if (side === ctx.player && source !== 'Stadium') return freezeShields(ctx.draft, side, root, source);
   if (source === 'Ability' && specialEnergyShielded(side, root, 'ability')) return true;
   return cardEffectShielded(ctx.draft, { owner: side, root, source });
+}
+
+/**
+ * Iron Burden: true when the running Ability, Item, Supporter or Stadium effect would switch out
+ * `root`, a side's Active Pokémon, and an attached Tool forbids it. Attacks and retreating are
+ * not card effects here, so they never reach this check.
+ */
+export function switchOutBlocked(ctx, side, root) {
+  if (!side || !root || !cardEffectSource(ctx.effectType, ctx.sourceCard)) return false;
+  return holderSwitchOutLocked(root, side.zones?.active, { stadium: ctx.draft?.stadium });
 }
 
 /**
@@ -2953,7 +2963,14 @@ function opponentHandToBenchBasic(ctx) {
         playerId: opponent.playerId,
       });
     }
-    if (step.switchActive && picks[0]) switchBenchToActive(ctx.draft, opponent, picks[0], ctx.events);
+    if (step.switchActive && picks[0]) {
+      const outgoing = activeOf(opponent);
+      if (switchOutBlocked(ctx, opponent, outgoing)) {
+        ctx.events.push({ type: 'effectStepSkipped', reason: 'switch_locked', step: step.type, instanceId: outgoing.instanceId });
+      } else {
+        switchBenchToActive(ctx.draft, opponent, picks[0], ctx.events);
+      }
+    }
     return null;
   }
 
@@ -3765,6 +3782,7 @@ function selfBenchPlacementAbility(ctx) {
   if (step.condition === 'lastCardInHand' && player.zones.hand.length !== 1) {
     return skip(ctx, 'condition_unmet');
   }
+  if (step.swapActive && switchOutBlocked(ctx, player, activeOf(player))) return skip(ctx, 'switch_locked');
   removeFromZones(player, card);
   card.attachedTo = null;
   if (step.swapActive) {
@@ -4874,6 +4892,7 @@ function putHandBasicAsActive(ctx) {
   const { player } = ctx;
   const active = activeOf(player);
   if (!active || benchRootsOf(player).length >= BENCH_LIMIT) return skip(ctx, 'bench_full');
+  if (switchOutBlocked(ctx, player, active)) return skip(ctx, 'switch_locked');
   const basics = (player.zones.hand || []).filter((c) => isPokemon(c) && stageOf(c) === 'Basic');
   const apply = (card) => {
     removeFromZones(player, card);
