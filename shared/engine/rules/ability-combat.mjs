@@ -1628,6 +1628,15 @@ export function abilityActivationBlockReason(card, ctx = {}) {
   if (rulesEnabled && needed && Array.isArray(ctx.sideCards) && !neededInPlay) {
     return `You need ${needed.label} in play to use this Ability.`;
   }
+  // Homebrew Dodrio Three of a Kind: "if you have exactly 3 Pokémon with the same name in play".
+  const sameNameCount = exactSameNameCount(card);
+  if (rulesEnabled && sameNameCount && Array.isArray(ctx.sideCards)) {
+    const byName = new Map();
+    for (const top of sideTops(ctx.sideCards)) byName.set(lower(top.name), (byName.get(lower(top.name)) || 0) + 1);
+    if (![...byName.values()].includes(sameNameCount)) {
+      return `You need exactly ${sameNameCount} Pokémon with the same name in play to use this Ability.`;
+    }
+  }
   // Legacy powers are off while the holder has the printed Special Conditions. Callers
   // without `holderConditions` (presence-only pickers) fail open.
   const restriction = powerConditionRestriction(card);
@@ -1698,6 +1707,13 @@ function requiredInPlayDescriptor(card) {
     mega: /\bmega\b/.test(what),
     ex: /\bex\b/.test(what),
   };
+}
+
+const EXACT_SAME_NAME = /if you have exactly (\d+) pok[eé]mon with the same name in play, you may/;
+
+function exactSameNameCount(card) {
+  const count = lower(cardAbilityText(card)).match(EXACT_SAME_NAME)?.[1];
+  return count ? Number(count) : 0;
 }
 
 function matchesInPlayDescriptor(card, needed) {
