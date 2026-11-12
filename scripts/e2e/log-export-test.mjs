@@ -140,6 +140,19 @@ try {
   const summary = cli(['summary']);
   T('18. the CLI summary names three sources', summary.ok && (summary.out.match(/^\s+(server|c:[0-9a-f]{8})\b/gm) ?? []).length === 3);
 
+  // Server unreachable: the export falls back to this client's own ring and snapshot.
+  await b.evaluate(async () => (await import('/src/state.js')).socket.disconnect());
+  const localDownloadPromise = b.waitForEvent('download', { timeout: 20000 });
+  const localResult = await b.evaluate(() => window.__ptcgLog.export({ note: 'offline' }));
+  const localDownload = await localDownloadPromise;
+  const localRecords = parseLines(readFileSync(await localDownload.path(), 'utf8'));
+  T('20. with no server the export is local-only', localResult.mode === 'local' &&
+    /^ptcg-log_local_\d{8}-\d{6}\.ndjson$/.test(localDownload.suggestedFilename()), `(${localDownload.suggestedFilename()})`);
+  T('21. the local file has a partial header, a snapshot and this client\'s timeline',
+    localRecords[0].partial === 'local-only' && localRecords[1].k === 'snap' &&
+      localRecords.filter((r) => r.k === 'e').length > 50 &&
+      localRecords.filter((r) => r.k === 'e').every((r) => r.src === localRecords[0].sources[0].src));
+
   T('19. zero page errors', pageErrors.length === 0, pageErrors.join('; '));
   if (process.env.PTCG_LOG_OUT) copyFileSync(file, process.env.PTCG_LOG_OUT);
 } catch (err) {

@@ -1,5 +1,18 @@
 import { describeElement } from '../../../shared/log/describe-element.mjs';
 
+// The renderer string of the first WebGL context the page itself created. Read there, so a
+// snapshot never has to create a context of its own (slow under software GL).
+let gpuRenderer = null;
+
+export function getGpuRenderer() {
+  return gpuRenderer;
+}
+
+function readRenderer(gl) {
+  const info = gl.getExtension?.('WEBGL_debug_renderer_info');
+  return info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : null;
+}
+
 function wrapGetContext(win, log) {
   const proto = win.HTMLCanvasElement?.prototype;
   if (!proto || typeof proto.getContext !== 'function') return () => {};
@@ -14,7 +27,8 @@ function wrapGetContext(win, log) {
           log.warn('fx', 'gl.context.failed', { type, el });
         } else if (!seen.has(this)) {
           seen.add(this);
-          log.debug('fx', 'gl.context', { type, el, w: this.width, h: this.height });
+          if (gpuRenderer === null) gpuRenderer = readRenderer(result);
+          log.debug('fx', 'gl.context', { type, el, w: this.width, h: this.height, gpu: gpuRenderer });
           this.addEventListener?.('webglcontextlost', () => log.warn('fx', 'gl.context.lost', { el }));
           this.addEventListener?.('webglcontextrestored', () => log.info('fx', 'gl.context.restored', { el }));
         }

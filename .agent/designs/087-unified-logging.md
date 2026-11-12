@@ -184,7 +184,7 @@ Categories (`shared/log/log-schema.mjs` `CATEGORIES`, frozen):
   batchMaxBytes: 131072, errorFlushMs: 250, rateBackoffMs: 10000, ingestMaxLines: 500,
   ingestMaxLineBytes: 16384, ingestWindowMs: 10000, ingestWindowBytes: 524288,
   beaconMaxBytes: 262144, pingFastCount: 3, pingFastMs: 1000, pingMs: 30000, clockKeep: 8,
-  stateRing: 24, journalGames: 2, journalGameBytes: 16777216, snapshotTimeoutMs: 3000,
+  stateRing: 24, journalGames: 2, journalGameBytes: 16777216, snapshotTimeoutMs: 5000,
   snapshotMaxBytes: 819200, exportTokenMs: 60000, exportAckMs: 5000, diskFileBytes: 52428800,
   diskFlushMs: 1000, diskKeepBoots: 10, toastMinMs: 60000 }`.
 - `safe-json.mjs` — `safeStringify(value, { maxBytes = 2048, maxDepth = 6, maxArray = 50,
@@ -505,6 +505,21 @@ Revert: revert the slice commits; no state outlives the process except `out/logs
   into its local ring only (`window.__ptcgLog`); every `index.ejs` page ships.
 - 2026-11-12 (cosmetic): CLI tests live in `scripts/__tests__/log-cli.test.mjs` with the fixture in
   `scripts/__tests__/fixtures/`, because `pnpm test` globs `scripts/**` and not `tools/**`.
+- 2026-11-12 (cosmetic, found by the two-browser test): a client under load missed the 3 s snapshot
+  window (2 s long tasks under software GL — the log itself showed them). The snapshot is now built
+  alongside the flush, the GPU string comes from the page's own first WebGL context instead of a
+  new one, and `snapshotTimeoutMs` is 5000 (the client waits `exportAckMs + snapshotTimeoutMs` =
+  10 s before falling back to a local-only export).
+- 2026-11-12 (cosmetic): `payload-policy` sizes payloads with the native `JSON.stringify` (it runs
+  for every view on the command path) and logs `cmd` / `resolveChoice` up to the 16 KB relay cap,
+  so the client's own record of what it sent is whole; `apply-view-logged.js` logs `view/apply`
+  only (the socket tap's `in.view` is the receipt) and keeps its own previous view for the diff;
+  `log:setLevel` with no room sets a per-client verbose level (deck builder, lobby).
+- 2026-11-12 (bug fixed in passing, test `diffViews: no Stadium before or after is not a Stadium
+  change`): `view-diff.mjs` reported `stadiumChanged: true` whenever no Stadium was in play.
+- 2026-11-12 (slice 9): the fixture `scripts/__tests__/fixtures/log-export.ndjson` is a real export
+  from `scripts/e2e/log-export-test.mjs` (`PTCG_LOG_OUT`), not from a node integration test — no
+  Socket.IO client is installed for node, so the three-party path is proven in two real browsers.
 
 ---
 Self-approval checklist (only when the user is unreachable):

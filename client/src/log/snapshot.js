@@ -3,6 +3,7 @@ import { LIMITS } from '../../../shared/log/log-schema.mjs';
 import { safeStringify } from '../../../shared/log/safe-json.mjs';
 import { describeElement } from '../../../shared/log/describe-element.mjs';
 import { clientId, loadId, logStats } from './client-log.js';
+import { getGpuRenderer } from './capture-errors.js';
 
 const DROP_ORDER = ['socket', 'netcode', 'registry', 'systemState', 'fx', 'settings', 'storage', 'perf'];
 const SETTINGS_PREFIX = 'ptcg';
@@ -37,16 +38,6 @@ function section(build) {
   }
 }
 
-function readGpu(doc) {
-  try {
-    const gl = doc.createElement('canvas').getContext('webgl');
-    const info = gl?.getExtension('WEBGL_debug_renderer_info');
-    return info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : null;
-  } catch {
-    return null;
-  }
-}
-
 function metaSection({ win, doc, nav }) {
   return {
     url: win.location.pathname + win.location.search,
@@ -60,7 +51,7 @@ function metaSection({ win, doc, nav }) {
     online: nav.onLine,
     cores: nav.hardwareConcurrency ?? null,
     memoryGB: nav.deviceMemory ?? null,
-    gpu: readGpu(doc),
+    gpu: getGpuRenderer(),
   };
 }
 

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createLogger } from '../../../../shared/log/logger.mjs';
-import { installErrorCapture } from '../capture-errors.js';
+import { getGpuRenderer, installErrorCapture } from '../capture-errors.js';
 import { installNetCapture } from '../capture-net.js';
 import { tapClientSocket } from '../capture-socket.js';
 import { installAppEventCapture } from '../capture-app.js';
@@ -101,4 +101,46 @@ test('app event capture logs custom events once and restores the prototype', () 
     uninstall();
   }
   assert.equal(EventTarget.prototype.dispatchEvent, original);
+});
+
+test('the first WebGL context the page creates supplies the GPU string, and a lost context is logged', () => {
+  const { log, entries } = makeLog();
+  const RENDERER = 0x9246;
+  const gl = {
+    getExtension: (name) => (name === 'WEBGL_debug_renderer_info' ? { UNMASKED_RENDERER_WEBGL: RENDERER } : null),
+    getParameter: (param) => (param === RENDERER ? 'Test GPU' : null),
+  };
+  class Canvas {
+    constructor() {
+      this.tagName = 'CANVAS';
+      this.width = 300;
+      this.height = 150;
+      this.listeners = {};
+    }
+    addEventListener(type, handler) {
+      this.listeners[type] = handler;
+    }
+    getContext(type) {
+      return type === 'webgl-broken' ? null : gl;
+    }
+  }
+  const win = { addEventListener() {}, removeEventListener() {}, HTMLCanvasElement: Canvas };
+  const originalGetContext = Canvas.prototype.getContext;
+  const uninstall = installErrorCapture({ log, win });
+  try {
+    const canvas = new Canvas();
+    assert.equal(canvas.getContext('webgl2'), gl);
+    assert.equal(getGpuRenderer(), 'Test GPU');
+    canvas.getContext('webgl2');
+    const created = entries.filter((e) => e.ev === 'gl.context');
+    assert.equal(created.length, 1);
+    assert.equal(JSON.parse(created[0].line).d.gpu, 'Test GPU');
+    assert.equal(new Canvas().getContext('webgl-broken'), null);
+    assert.equal(entries.filter((e) => e.ev === 'gl.context.failed').length, 1);
+    canvas.listeners.webglcontextlost();
+    assert.equal(entries.filter((e) => e.ev === 'gl.context.lost').length, 1);
+  } finally {
+    uninstall();
+  }
+  assert.equal(Canvas.prototype.getContext, originalGetContext);
 });

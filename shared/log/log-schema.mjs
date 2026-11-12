@@ -65,7 +65,7 @@ export const LIMITS = deepFreeze({
   stateRing: 24,
   journalGames: 2,
   journalGameBytes: 16777216,
-  snapshotTimeoutMs: 3000,
+  snapshotTimeoutMs: 5000,
   snapshotMaxBytes: 819200,
   exportTokenMs: 60000,
   exportAckMs: 5000,

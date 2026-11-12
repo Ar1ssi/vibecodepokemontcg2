@@ -90,8 +90,9 @@ export function initExport({ socket: appSocket = null, shipping: shipper = null,
     socket.on('log:snapshot', async (payload, ack) => {
       if (typeof ack !== 'function') return;
       try {
-        await shipping?.flushNow();
-        ack(await buildSnapshot());
+        // Side by side: the server waits a bounded time for this answer.
+        const [snapshot] = await Promise.all([buildSnapshot(), shipping?.flushNow()]);
+        ack(snapshot);
       } catch {
         ack(null);
       }

@@ -203,3 +203,39 @@ test('onRecord receives every record line in order, and a throwing onRecord leav
   assert.ok(sturdy.games().flatMap((g) => g.records).length > 0);
   assert.equal(entries.filter((e) => e.cat === 'journal' && e.ev === 'failed').length, 0);
 });
+
+test('an undo is one journaled command and the replay reproduces the rewound state', () => {
+  const { room, journal, send } = setup();
+  assert.equal(send('sock-a', 'draw').success, true);
+  assert.equal(send('sock-a', 'draw').success, true);
+  const handBefore = room.state.players.p1.zones.hand.length;
+  assert.equal(send('sock-a', 'undo', { count: 1 }).success, true);
+  assert.equal(room.state.players.p1.zones.hand.length, handBefore - 1);
+
+  const commands = cmds(journal);
+  assert.equal(commands[commands.length - 1].cmd.type, 'undo');
+  assert.equal(commands[commands.length - 1].ok, true);
+  const result = replayJournal(parsed(journal), ENGINE);
+  assert.equal(result.ok, true, JSON.stringify(result.divergence));
+  assert.equal(hashState(result.state), hashState(room.state));
+});
+
+test('a solo room journals the seat the command acted for', () => {
+  const { entries, log } = makeLogCollector();
+  const journal = createJournal({ roomId: 'r1', log });
+  const room = new GameRoom({ roomId: 'r1', rulesEnabled: false, seed: 7, journal });
+  assert.equal(room.addSoloPlayer('sock-solo', 'Ash', { p1: deck, p2: deck }), true);
+  const result = room.handleClientCommand('sock-solo', { type: 'loadDeck', payload: { deckData: deck }, clientSeq: 1, seat: 'p2' });
+  assert.equal(result.success, true, JSON.stringify(result));
+
+  const last = cmds(journal).at(-1);
+  assert.equal(last.playerId, 'p2');
+  const mirror = entries.filter((e) => e.cat === 'engine' && e.ev === 'applied').at(-1);
+  assert.equal(mirror.seat, 'p2');
+  assert.equal(mirror.cs, 1);
+  assert.deepEqual(
+    parsed(journal).filter((r) => r.k === 'rebase').map((r) => r.why),
+    ['created', 'seated:p1', 'seated:p2']
+  );
+  assert.equal(replayJournal(parsed(journal), ENGINE).ok, true);
+});
