@@ -35,6 +35,15 @@ export function tapClientSocket(socket, { log }) {
   const onAttempt = safe((n) => log.info('socket', 'reconnect_attempt', { n }));
   const onReconnect = safe((n) => log.info('socket', 'reconnect', { n }));
   const onFailed = safe(() => log.error('socket', 'reconnect_failed'));
+  // The engine is replaced on every reconnect, so the listener is (re)attached on each open.
+  const onUpgrade = safe((transport) => log.info('socket', 'upgrade', { transport: transport?.name ?? null }));
+  const tappedEngines = new WeakSet();
+  const onOpen = safe(() => {
+    const engine = manager?.engine;
+    if (!engine?.on || tappedEngines.has(engine)) return;
+    tappedEngines.add(engine);
+    engine.on('upgrade', onUpgrade);
+  });
 
   socket.onAny?.(onIn);
   socket.onAnyOutgoing?.(onOut);
@@ -44,6 +53,8 @@ export function tapClientSocket(socket, { log }) {
   manager?.on?.('reconnect_attempt', onAttempt);
   manager?.on?.('reconnect', onReconnect);
   manager?.on?.('reconnect_failed', onFailed);
+  manager?.on?.('open', onOpen);
+  onOpen();
   if (socket.connected) onConnect();
 
   return () => {
@@ -55,5 +66,7 @@ export function tapClientSocket(socket, { log }) {
     manager?.off?.('reconnect_attempt', onAttempt);
     manager?.off?.('reconnect', onReconnect);
     manager?.off?.('reconnect_failed', onFailed);
+    manager?.off?.('open', onOpen);
+    manager?.engine?.off?.('upgrade', onUpgrade);
   };
 }

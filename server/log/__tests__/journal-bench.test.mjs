@@ -44,7 +44,11 @@ function timeCommands(send) {
 }
 
 test('handleCommand with a journal is at most 0.5 ms slower (median of 200) than without', (t) => {
-  const log = createLogger({ now: Date.now, sink: () => {} }).child({ room: 'r1' });
+  // A clock that steps 20 ms per entry keeps `engine/applied` under the flood gate, so every
+  // command pays for its mirror entry too (a wall clock would suppress most of them).
+  let clock = 0;
+  let mirrored = 0;
+  const log = createLogger({ now: () => (clock += 20), sink: () => { mirrored += 1; } }).child({ room: 'r1' });
   const journal = createJournal({ roomId: 'r1', log });
   const withJournal = makeRoom(journal);
   const withoutJournal = makeRoom(null);
@@ -55,5 +59,6 @@ test('handleCommand with a journal is at most 0.5 ms slower (median of 200) than
   t.diagnostic(`median with journal ${withJ.toFixed(4)} ms, without ${without.toFixed(4)} ms`);
 
   assert.equal(journal.stats().complete, true);
+  assert.ok(mirrored >= COMMANDS * 2, 'every measured command wrote its mirror entry');
   assert.ok(withJ - without <= BUDGET_MS, `${(withJ - without).toFixed(4)} ms > ${BUDGET_MS} ms`);
 });

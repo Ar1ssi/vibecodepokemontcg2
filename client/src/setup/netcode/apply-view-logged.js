@@ -49,6 +49,12 @@ function summarizeDiff(d) {
   return summary;
 }
 
+function isNewBaseline(previous, view) {
+  if (!previous) return false;
+  if (Number.isFinite(view?.stateVersion) && view.stateVersion < previous.stateVersion) return true;
+  return (previous.you?.playerId ?? null) !== (view?.you?.playerId ?? null);
+}
+
 function logChoiceTransition(log, view, sv) {
   const pc = view.pendingChoice;
   const id = pc?.choiceId ?? null;
@@ -79,6 +85,9 @@ function logApplied(log, result, view, events, ms, diff) {
   const detail = { applied, reason, ms: Math.round(ms * 10) / 10, events: eventTypesOf(events) };
   let d = null;
   if (applied) {
+    // A lower stateVersion or another seat's perspective is a new game or a board flip: diffing
+    // against the old view would report a whole board of bogus moves.
+    if (isNewBaseline(lastLoggedView, view)) resetApplyViewLog();
     try {
       d = diff(lastLoggedView, view);
       Object.assign(detail, summarizeDiff(d));

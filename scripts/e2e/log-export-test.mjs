@@ -137,6 +137,13 @@ try {
   };
   const replay = cli(['replay']);
   T('17. the journal replays with no divergence', replay.ok && /0 divergences/.test(replay.out), `(${replay.out.trim().split('\n').pop()})`);
+  const moved = timeline.find((e) => e.src === 'server' && e.cat === 'engine' && e.d?.type === 'moveCard' && Number.isInteger(e.cs));
+  const trace = cli(['trace', '--cs', `${moved?.seat}#${moved?.cs}`]);
+  const traced = (pattern) => trace.out.search(pattern);
+  T('17b. the CLI traces that move from the client emit through the engine to both renders',
+    trace.ok && traced(/socket\/out\.cmd/) >= 0 && traced(/socket\/out\.cmd/) < traced(/engine\/applied/) &&
+      traced(/engine\/applied/) < traced(/view\/apply/) && (trace.out.match(/view\/apply/g) ?? []).length === 2,
+    `(${trace.out.trim().split('\n').pop()})`);
   const summary = cli(['summary']);
   T('18. the CLI summary names three sources', summary.ok && (summary.out.match(/^\s+(server|c:[0-9a-f]{8})\b/gm) ?? []).length === 3);
 

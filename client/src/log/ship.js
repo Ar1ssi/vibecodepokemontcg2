@@ -7,7 +7,6 @@ const TICK_MS = 250;
 const FLUSH_WAIT_MS = 1500;
 const ACK_TIMEOUT_MS = 5000;
 const BATCH_TIMEOUT_MS = 10000;
-const BEACON_ENVELOPE_BYTES = 512;
 
 export function startShipping({ socket, log, ring, onEntry, clientId, loadId, win = window, doc = document, nav = navigator }) {
   const now = () => performance.timeOrigin + performance.now();
@@ -124,7 +123,9 @@ export function startShipping({ socket, log, ring, onEntry, clientId, loadId, wi
   });
 
   const onPageHide = swallow(() => {
-    const lines = batcher.unacked(ring, LIMITS.beaconMaxBytes - BEACON_ENVELOPE_BYTES);
+    // Browsers refuse a beacon over ~64 KiB, and each line is escaped again inside the body:
+    // send the newest lines that fit (an older gap is reported by the export).
+    const lines = batcher.unackedNewest(ring, LIMITS.beaconBodyChars);
     if (lines.length === 0) return;
     nav.sendBeacon?.('/api/log/beacon', JSON.stringify({ clientId, loadId, lines, offset: clock.offset(), rtt: clock.rtt() }));
   });
@@ -169,7 +170,7 @@ export function startShipping({ socket, log, ring, onEntry, clientId, loadId, wi
     /** The entries the server has not acked yet, in `log:batch` shape, to ride inside a snapshot reply. */
     tail: () => ({
       loadId,
-      lines: batcher.unacked(ring, LIMITS.batchMaxBytes),
+      lines: batcher.unackedNewest(ring, LIMITS.snapshotTailChars),
       offset: clock.offset(),
       rtt: clock.rtt(),
     }),

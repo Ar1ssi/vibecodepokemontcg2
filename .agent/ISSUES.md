@@ -6,7 +6,7 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I286). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I287). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Umbrella lines name every member as `(merged I<a>, I<b>…)`: grep any id to find its line.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (`pnpm harness:check`); maintain.md moves older Closed lines to .agent/archive/ISSUES-closed.md.
@@ -14,6 +14,7 @@
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I286 2026-11-12 P2 [netcode] An undo lowers stateVersion (draw,draw,undo,draw → 3,4,3,4 from GameRoom) and apply-view.js's monotonic guard drops any view ≤ lastRenderedVersion, so the undo may not render; in a log: view/apply applied:false out_of_order (refs: design 087 Review)
 - I285 2026-11-12 P2 [server] No socket handler in server/server.js has a try/catch: a throw in any one is an uncaught exception that ends the process and every room. Now logged (087 process tap, stderr fatal line) but not contained (refs: design 087 Current state)
 - I284 2026-11-12 P3 [netcode] applyView's own diff is always "initial": no caller passes options.previousView, so the returned diff lists every card as added. Unused today; apply-view-logged.js keeps its own previous view (refs: design 087)
 - I283 2026-11-12 P3 [client] The Socket.IO client loads from cdn.socket.io (client/index.ejs:22): CDN blocked or down → `io is not defined` and the app never boots, though the server serves /socket.io/socket.io.js itself (seen in the 087 e2e sandbox)

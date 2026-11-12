@@ -141,3 +141,18 @@ test('empty ring slice acks nothing pending and returns null', () => {
   assert.equal(batcher.take(ring, 0), null);
   assert.equal(batcher.pending(), 0);
 });
+
+test('unackedNewest keeps the newest lines whose JSON-array form fits the budget', () => {
+  const ring = createRing({ maxBytes: 1e6, maxEntries: 1000 });
+  const batcher = createBatcher();
+  const line = (seq) => `{"t":1,"seq":${seq},"lvl":"info","cat":"app","ev":"x","d":{"q":"a \\"quoted\\" word"}}`;
+  for (let seq = 1; seq <= 10; seq++) ring.push({ seq, t: seq, line: line(seq) });
+  const all = batcher.unackedNewest(ring, 1e6);
+  assert.equal(all.length, 10);
+  const budget = JSON.stringify(all.slice(-3)).length;
+  const newest = batcher.unackedNewest(ring, budget);
+  assert.deepEqual(newest, all.slice(-3), 'the three newest, oldest first');
+  assert.ok(JSON.stringify(newest).length <= budget, 'measured as it will be sent (escaped inside a JSON body)');
+  assert.ok(newest.join('').length < budget, 'the raw lines are shorter than their escaped form');
+  assert.deepEqual(batcher.unackedNewest(ring, 5), []);
+});

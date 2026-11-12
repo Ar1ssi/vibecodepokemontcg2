@@ -214,12 +214,82 @@ test('CLI grep caps output at 200 lines and says how many more', () => {
   const total = grepEntries(load(), { cat: 'net' }).length;
   assert.ok(total > 200);
   const capped = runCli('grep', '--cat', 'net', FIXTURE).stdout.trimEnd().split('\n');
+  // One extra line: the listing starts with its absolute time base (t0=…).
   assert.equal(capped.length, 201);
-  assert.equal(capped.at(-1), `… ${total - 200} more lines (use --all)`);
-  assert.equal(runCli('grep', '--cat', 'net', '--all', FIXTURE).stdout.trimEnd().split('\n').length, total);
+  assert.match(capped[0], /^t0=\d/);
+  assert.equal(capped.at(-1), `… ${total + 1 - 200} more lines (use --all)`);
+  assert.equal(runCli('grep', '--cat', 'net', '--all', FIXTURE).stdout.trimEnd().split('\n').length, total + 1);
 });
 
 test('CLI help lists every command', () => {
   const out = runCli('--help').stdout;
   for (const name of ['summary', 'errors', 'around', 'trace', 'replay', 'diff-view', 'grep']) assert.match(out, new RegExp(name));
+});
+
+test('a bare clientSeq used by both seats is refused with the seats to choose from', () => {
+  const data = load();
+  const trace = traceCommand(data, { seat: null, cs: 1 });
+  assert.deepEqual(trace.steps, []);
+  assert.match(trace.error, /clientSeq 1 was used by p1 and p2.*--cs p1#1/);
+  assert.match(selectAround(data, { cs: { seat: null, cs: 1 } }).error, /p1 and p2/);
+  assert.equal(traceCommand(data, { seat: 'p2', cs: 1 }).steps.some((e) => e.cs === 1 && e.seat === 'p1'), false);
+  assert.equal(traceCommand(data, { seat: null, cs: 3 }).sv, 8, 'only p1 used clientSeq 3');
+});
+
+test('diffView reports a card still rendered that the applied view no longer has', () => {
+  const data = load();
+  data.snaps[0].registry.push({ id: 999, side: 'you', zone: 'bench', connected: true });
+  const stale = diffView(data, ENGINE).filter((f) => f.kind === 'stale-rendered');
+  assert.equal(stale.length, 1);
+  assert.deepEqual(stale[0].detail, { id: 999, rendered: 'you.bench', connected: true });
+});
+
+test('diffView does not compare a spectator against a server view it never had', () => {
+  const data = load();
+  data.header.sources.find((s) => s.src === P2).seat = 'spec';
+  const findings = diffView(data, ENGINE).filter((f) => f.src === P2);
+  assert.deepEqual(findings.map((f) => f.kind), ['skipped']);
+  assert.match(findings[0].detail, /spectator/);
+});
+
+test('diffView uses the latest state when a stateVersion repeats (after an undo)', () => {
+  const data = load();
+  const sv = data.snaps[0].netcode.lastRenderedVersion;
+  const real = data.states.find((s) => s.sv === sv);
+  // An older state that carried the same version before an undo rewound to it.
+  data.states.unshift({ sv, state: { ...real.state, players: {} } });
+  assert.deepEqual(diffView(data, ENGINE).filter((f) => f.kind !== 'skipped'), []);
+});
+
+test('summarize says when lines were unreadable and what a local-only export lacks', () => {
+  const dir = tempDir();
+  const file = path.join(dir, 'local.ndjson');
+  fs.writeFileSync(file, '{"k":"header","partial":"local-only","sources":[{"src":"c:aaaaaaaa","entries":1}]}\n{"k":"e","ts":1,"src":"c:aaaaaaaa","t":1,"seq":1,"lvl":"info","cat":"app","ev":"x"}\n{"k":"e","ts":2,"src":"c:aaa');
+  const text = summarize(loadExport(file)).join('\n');
+  assert.match(text, /local-only\): this client only/);
+  assert.match(text, /1 unreadable line\(s\) skipped/);
+});
+
+test('CLI listings start with the absolute time base, and diff-view exits 1 on a difference', () => {
+  const trace = runCli('trace', '--cs', 'p1#3', FIXTURE);
+  assert.equal(trace.status, 0);
+  const base = /^t0=(\d+(?:\.\d+)?) \(\d{4}-\d\d-\d\dT/.exec(trace.stdout);
+  assert.ok(base, trace.stdout.slice(0, 80));
+  const around = runCli('around', '--ts', base[1], '--window', '50ms', FIXTURE);
+  assert.equal(around.status, 0);
+  assert.match(around.stdout, /socket\/out\.cmd cs=3/);
+  assert.equal(runCli('trace', '--cs', '1', FIXTURE).status, 1);
+
+  assert.equal(runCli('diff-view', FIXTURE).status, 0);
+  const dir = tempDir();
+  const broken = path.join(dir, 'broken.ndjson');
+  const lines = fs.readFileSync(FIXTURE, 'utf8').split('\n');
+  const snapAt = lines.findIndex((l) => l.startsWith('{"k":"snap"'));
+  const snap = JSON.parse(lines[snapAt]);
+  snap.registry.push({ id: 999, side: 'you', zone: 'bench', connected: true });
+  lines[snapAt] = JSON.stringify(snap);
+  fs.writeFileSync(broken, lines.join('\n'));
+  const diff = runCli('diff-view', broken);
+  assert.equal(diff.status, 1);
+  assert.match(diff.stdout, /stale-rendered/);
 });

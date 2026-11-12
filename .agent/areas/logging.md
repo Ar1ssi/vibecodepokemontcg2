@@ -50,11 +50,13 @@ New category → `CATEGORIES` in log-schema.mjs. High-frequency site → gate it
 `log.enabled('trace')` (trace is off unless the room's Verbose logging is on).
 
 ## Landmines
-- Typed text is never logged: keys inside editable targets become `[text]`, `change` logs length only.
-- The export is complete on purpose (both hands, deck order); every export is announced in room chat.
-- Journal replay depends on every `applyCommand` going through `GameRoom.handleCommand`, and on a
-  `journal.rebase` after any in-place change to `room.state` (seat added, reset). A new mutation
-  site without one shows up as a `rebase` with `why: unjournaled-change` — add the call.
-- `/unboxing` loads no Socket.IO client: it captures locally only (`window.__ptcgLog.export()`).
-- Classic scripts that fail before boot.js runs (the Socket.IO CDN tag) leave no resource entry;
-  the resulting `io is not defined` is logged as `error/uncaught`.
+- Never logged: keystrokes in editable targets (`[text]`; `change` logs length only) and any detail
+  key matching `token|passw|secret|authorization|cookie` (`[redacted]`, safe-json.mjs) — a seat token
+  in an export would hand over the seat. A submitted search or chat line IS logged (URL / socket).
+- The export is complete on purpose (both hands, deck order); exports are announced in room chat.
+- Replay needs every `applyCommand` to go through `GameRoom.handleCommand`, and a `journal.rebase`
+  after any in-place change to `room.state`; a missing one shows as `why: unjournaled-change`.
+- `stateVersion` is not unique (an undo rewinds it, I286): state lines carry `game` and `n`.
+- A closed stream stays closed on late entries (`store.reopen` only on join/hello/batch), or rooms
+  and their journals would never expire. A payload's `roomId` counts only if the socket is in it.
+- `/unboxing` has no Socket.IO client: local capture only, and no app modules are imported there.

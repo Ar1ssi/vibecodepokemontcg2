@@ -111,3 +111,29 @@ test('after a preload the snapshot is built synchronously from the cached module
   assert.equal(bare.registry, null);
   assert.equal(bare.meta.w, 1000);
 });
+
+test('a page with no socket loads no app modules for the snapshot', async () => {
+  const env = stubEnv();
+  let loaded = 0;
+  const realIo = globalThis.io;
+  delete globalThis.io;
+  try {
+    const modules = await preloadSnapshotModules({ hasSocket: false });
+    assert.deepEqual(modules, { applyView: null, cmdEmitter: null, fx: null, state: null });
+    const snapshot = await buildSnapshot({ ...env, hasSocket: false });
+    assert.equal(snapshot.registry, null);
+    assert.equal(snapshot.netcode.lastAppliedView, null);
+    assert.equal(snapshot.meta.w, 1000);
+    assert.equal(loaded, 0);
+  } finally {
+    if (realIo !== undefined) globalThis.io = realIo;
+  }
+});
+
+test('the snapshot leaves room for the tail inside one socket message', async () => {
+  const env = stubEnv();
+  const big = { blob: 'x'.repeat(LIMITS.snapshotMaxBytes - 50_000) };
+  const snapshot = await buildSnapshot({ ...env, load: async () => stubModules({ view: big }) });
+  assert.ok(JSON.stringify(snapshot).length <= LIMITS.snapshotMaxBytes - LIMITS.snapshotTailChars);
+  assert.ok(snapshot.omitted.includes('netcode'));
+});

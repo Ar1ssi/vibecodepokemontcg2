@@ -94,3 +94,18 @@ test('a logger that throws never changes the result', () => {
   const log = { debug: throwing, warn: throwing, info: throwing, error: throwing, trace: throwing, enabled: () => true };
   assert.equal(applyViewLogged(() => stubResult, emptyView(1), [], {}, log), stubResult);
 });
+
+test('a new game (lower stateVersion) or another perspective starts a fresh baseline', () => {
+  const { log, lines } = makeLog();
+  const ok = () => ({ applied: true });
+  applyViewLogged(ok, viewWith(40, { hand: [], active: [{ instanceId: 5 }] }, { pendingChoice: { choiceId: 'c1', player: 'p1' } }), [], {}, log);
+  applyViewLogged(ok, viewWith(1, { hand: [{ instanceId: 5 }], active: [] }), [], {}, log);
+  const applies = lines.filter((l) => l.ev === 'apply');
+  assert.equal(applies[1].d.initial, true);
+  assert.deepEqual(applies[1].d.moves, []);
+  assert.equal(lines.filter((l) => l.cat === 'choice' && l.ev === 'closed').length, 0, 'no choice/closed for a game that is gone');
+
+  const flipped = { stateVersion: 2, you: { playerId: 'p2', zones: { hand: [], active: [] } }, them: { playerId: 'p1', zones: {} } };
+  applyViewLogged(ok, flipped, [], {}, log);
+  assert.equal(lines.filter((l) => l.ev === 'apply')[2].d.initial, true);
+});

@@ -110,7 +110,7 @@ export function initExport({ socket: appSocket = null, shipping: shipper = null,
   }
   onEntry(maybeToast);
   refreshLabel();
-  preloadWhenLoaded();
+  if (socket) preloadWhenLoaded();
 }
 
 export async function exportLocal(note = '') {
@@ -161,13 +161,21 @@ function requestServerExport(note) {
   });
 }
 
-export async function exportFullLog({ note = '' } = {}) {
+// The server answering "not now" (an export already running, or one seconds ago): the file from
+// that export is the answer, so no local-only file is produced on top of it.
+const NOT_NOW = new Set(['busy', 'too_soon']);
+
+/** @param {string | { note?: string }} [options] a note, or `{ note }` */
+export async function exportFullLog(options = {}) {
+  const note = typeof options === 'string' ? options : (options?.note ?? '');
   log.info('user', 'export.request', { note: String(note).slice(0, NOTE_MAX) });
   if (!socket?.connected) return exportLocal(note);
   await shipping?.flushNow();
   const { err, ack } = await requestServerExport(note);
   if (err || !ack?.ok) {
-    log.warn('log', 'export.failed', { reason: err ? 'timeout' : (ack?.reason ?? 'refused') });
+    const reason = err ? 'timeout' : (ack?.reason ?? 'refused');
+    log.warn('log', 'export.failed', { reason });
+    if (NOT_NOW.has(reason)) return { ok: false, mode: 'none', reason };
     return exportLocal(note);
   }
   download({ href: ack.url, filename: ack.filename });
@@ -179,10 +187,18 @@ export function markMoment(note = '') {
   shipping?.flushNow();
 }
 
-export function toggleVerbose() {
-  const next = log.level() === 'trace' ? 'debug' : 'trace';
-  if (socket?.connected) socket.emit('log:setLevel', { roomId: systemState?.roomId || null, level: next });
-  else log.setLevel(next);
+/**
+ * Sets the capture level. With a server it is the server's to hold (room-wide in a room,
+ * per client outside one) — a level set only locally would be reset by the next batch ack.
+ */
+export function setVerbose(level) {
+  if (level !== 'debug' && level !== 'trace') return log.level();
+  if (socket?.connected) socket.emit('log:setLevel', { roomId: systemState?.roomId || null, level });
+  else log.setLevel(level);
   refreshLabelSoon();
-  return next;
+  return level;
+}
+
+export function toggleVerbose() {
+  return setVerbose(log.level() === 'trace' ? 'debug' : 'trace');
 }

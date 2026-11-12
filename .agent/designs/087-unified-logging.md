@@ -444,7 +444,7 @@ Network: ≤ 1 small message per client per 2 s; nothing when idle. Server memor
 | 25 | Legacy relay mode | Taps and client capture work; header `journal: null`; relay actions logged in full ≤ 16 KB | [x] payload-policy.test `relay events forward the 16 KB hint…`; export.test `client scope exports only that client stream…` (journal null); `journalFor` is null without a GameRoom |
 | 26 | `localStorage` blocked / private window | Per-load `clientId`; logging otherwise unchanged | [x] client-log.test `client log counts entries, has a hex clientId…` (node has no localStorage: the per-load id path) |
 | 27 | Disk sink directory unwritable or file at 50 MB | One `warn`; sink disables itself for that stream; memory logging continues | [x] disk-sink.test `unwritable dir: no throw, one warn…`, `size cap disables the stream after one warn…` |
-| 28 | Typed text (chat box, deck names, search) | Keys inside editable targets are logged as `"[text]"`; `change` logs length only. Sent chat messages are game content and appear via the socket tap | [x] input-filter.test `describeKey hides typed text in editable targets only`, `describeChange never leaks free text` |
+| 28 | Typed text (chat box, deck names, search) | Keys inside editable targets are logged as `"[text]"`; `change` logs length only. What the user submits is logged as what it became: a sent chat message via the socket tap, a card search as its request URL | [x] input-filter.test `describeKey hides typed text in editable targets only`, `describeChange never leaks free text` |
 | 29 | Snapshot over 800 KB | Sections dropped last-to-first; `omitted` lists them | [x] snapshot.test `an oversized view drops sections last-to-first, keeps meta, stays under the cap` |
 | 30 | Pages with no room (deck builder, Build & Battle, unboxing) | Client capture and shipping work; export scope is the own session | [x] browser boot check (33 entries, 0 page errors, shipped 32/32); export-routes.test `client-scope export (no room)…`; `/unboxing` local-only (Deviations) |
 
@@ -529,6 +529,53 @@ Revert: revert the slice commits; no state outlives the process except `out/logs
   (`{ loadId, lines, offset, rtt }`, ≤ 128 KB); the server stores them through
   `ingest.acceptTail` (same validation and seq dedupe as a batch) and strips `tail` from the
   file. The janking tab is the one whose snapshot matters.
+
+## Review (2026-11-12) — two independent reviewers on the whole diff, every finding reproduced
+Fixed, each with a test that fails without it:
+- **Room streams and journals never expired** — a socket's `disconnect` entry is logged after
+  `delete-room` and `append()` reopened the stream. Append no longer reopens (`store.reopen` on
+  `join-room` / hello / batch); a journal is dropped with its room stream and its bytes count
+  against `LOG_MAX_MB`; `journalGameBytes` is 4 MB.
+- **Seat tokens in exports** (design 069's only proof of a seat) — `safeStringify` redacts any key
+  matching `token|passw|secret|authorization|cookie` in every log detail on both sides, and
+  `payload-policy` redacts `joinGame`'s positional token. From the shared `server` stream an export
+  now takes only `boot|process|console|log` entries and its own clients' HTTP — other sockets'
+  pre-room traffic (room ids, usernames) never leaves the server.
+- **`log:hello` unbounded** — `build`/`page`/`ua` are capped strings, one identity per socket
+  (`client_changed`), at most 10 loads kept per client.
+- **A client line could corrupt or forge the export** — lines must start `{"t":`, carry no
+  `k|ts|src|load`, a known category, a bounded `ev`, `seq ≤ 1e9`, a finite sortable time; a
+  snapshot cannot set its own `k`/`src`.
+- **Any payload `roomId` opened a room stream** — a room id is trusted only when the socket is in
+  that room. **`lobby:watchers`** is refused for exports and log levels.
+- **Exports unthrottled** — one in flight per socket, 5 s apart, one chat announcement per room
+  per 30 s; the client treats `busy`/`too_soon` as "the file you just got is the answer".
+- **State lines keyed by `sv`** (an undo rewinds it) — emitted in ring order with `game` and `n`,
+  de-duplicated by object identity; the CLI takes the latest state with that version.
+- **Journal failure → a full-state rebase per command** — `last` is set before fallible work; the
+  byte cap also holds for rebases (`state: null, _truncated`); `complete` is per game.
+- **Line cap = relay cap** — `ingestMaxLineBytes` 20 480; an ok ack settles the whole batch.
+- **Disk pruning removed any directory under `LOG_DIR`** — only `<base36>-<pid>` boot folders.
+- **`/unboxing` loaded the netcode graph and raised a false toast** — no app modules are imported
+  for a snapshot on a page with no socket.
+- **Beacon and snapshot over transport limits** — both carry the newest unshipped lines measured
+  as sent (beacon ≤ 48 000 chars; snapshot ≤ 700 KB + tail ≤ 100 KB).
+- **`view/apply` diffed across games** — a lower `stateVersion` or another perspective starts a
+  new baseline. **CLI**: a bare `--cs N` used by both seats is refused with the seats named;
+  `diff-view` skips spectators' server comparison, reports `stale-rendered` cards and exits 1 on a
+  difference; listings print their absolute `t0`; replay also compares the rng cursor.
+- Smaller: the stall monitor is a 250 ms timer, not a permanent `requestAnimationFrame` loop; the
+  resource observer skips `/socket.io/` and `/api/log/`; `__ptcgLog.level()` goes through the
+  server; the hidden-tab flush test now tests it; benchmarks are best-of-3 and pay for the mirror
+  entry; README documents the feature and no longer names the removed loggers.
+Decided, not changed: request URLs keep their query string (`/api/tcgdex/...?name=<card>`): which
+lookup failed is the point of logging it. Row 28 is therefore narrower than first written — text is
+never captured from the keyboard, but a search the user submits appears as the request it made.
+Filed: I286 (an undo lowers `stateVersion`, which the client's out-of-order guard then drops —
+pre-existing, found by the review, visible as `view/apply applied:false reason:out_of_order`).
+Not done (nits, accepted): a `clientId` is not bound to the first socket that used it; beacons and
+snapshot tails are outside the rate window; `src` is the first 8 hex characters of the client id;
+DevTools attributes console output to `console-wrap.mjs`.
 
 ---
 Self-approval checklist (only when the user is unreachable):

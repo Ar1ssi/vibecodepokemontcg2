@@ -241,8 +241,29 @@ Seven dark themes are available, with light-mode overrides per component. Ambien
 The Options menu exports the current game state, imports a state (or a link to one), replays a
 recorded game, and exports or clears the battle log. Exported states can be stored server-side
 under a short key and reopened with `/import?key=...`; SQLite holds them for 30 days, and nothing
-else is persisted. Two diagnostics loggers, enabled with `?syncLog=1` and `?decisionLog=1`, record
-sync and decision traces for tracking down desyncs.
+else is persisted. For bug reports, **Export full log** in the same menu downloads one file holding
+what both browsers and the server recorded (see [Diagnostic log](#diagnostic-log)).
+
+### Diagnostic log
+
+Every page records a structured log all the time (console output, errors, clicks, socket traffic,
+rendering, FX), ships it to the server, and the server records its own side plus a replayable
+journal of every game command. **Options → Export full log** downloads one `.ndjson` file with
+both players' logs, the server's, and a snapshot of each browser. **Mark this moment** drops a
+marker when something goes wrong; **Verbose logging** adds more detail for a reproduce-and-export
+run. The export holds both players' hands and deck order, so each export is announced in room chat.
+Typed text is not recorded from the keyboard, and seat tokens are redacted.
+
+```bash
+node tools/log.mjs summary ptcg-log_<room>_<time>.ndjson   # sources, gaps, first errors
+node tools/log.mjs trace --cs p1#41 <file>                 # one command across all three parties
+node tools/log.mjs replay <file>                           # re-run the engine, find the first divergence
+node tools/log.mjs diff-view <file>                        # server state vs what each browser rendered
+```
+
+Locally the server also mirrors everything to `out/logs/<boot>/`. Server settings: `LOG_OFF=1`
+turns logging off, `LOG_MAX_MB` caps its memory (default 64), `LOG_DIR` moves or (`off`) disables
+the local mirror. Details: `.agent/areas/logging.md`.
 
 ## Architecture
 
@@ -340,7 +361,6 @@ Browser flags:
 | ------------------------------ | ------------------------------------------------------------------------------------ |
 | `?e2e=1`                       | Install the `window.__ptcg` scripting bridge (requires the server gate to allow it). |
 | `?norules`, `?debug`           | Force rules off for the current solo session.                                        |
-| `?syncLog=1`, `?decisionLog=1` | Enable sync / decision diagnostic logging in the browser.                            |
 
 Client-persisted `localStorage` keys include `ptcg-sim.deck-library.v1` (saved decks),
 `ptcg-sim.last-session.v1`, `ptcg-sim.playmat.v1`, `ptcg-sim.rules-enforced.v1`,

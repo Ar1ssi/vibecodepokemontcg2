@@ -20,12 +20,17 @@ async function tryImport(importer) {
   }
 }
 
+const NO_MODULES = Object.freeze({ applyView: null, cmdEmitter: null, fx: null, state: null });
+
 async function defaultLoad({ hasSocket = typeof globalThis.io === 'function' } = {}) {
+  // A page with no Socket.IO client (/unboxing) is not the game: importing the board modules
+  // there would evaluate the whole netcode graph against a DOM that has no board.
+  if (!hasSocket) return NO_MODULES;
   const [applyView, cmdEmitter, fx, state] = await Promise.all([
     tryImport(() => import('../setup/netcode/apply-view.js')),
     tryImport(() => import('../setup/netcode/cmd-emitter.js')),
     tryImport(() => import('../setup/netcode/advisory-animations.js')),
-    hasSocket ? tryImport(() => import('../state.js')) : null,
+    tryImport(() => import('../state.js')),
   ]);
   return { applyView, cmdEmitter, fx, state };
 }
@@ -119,7 +124,8 @@ function perfSection({ win, doc }) {
 }
 
 function trimToBudget(snapshot) {
-  while (JSON.stringify(snapshot).length > LIMITS.snapshotMaxBytes) {
+  // The reply also carries the unshipped tail, and both must fit one socket message.
+  while (JSON.stringify(snapshot).length > LIMITS.snapshotMaxBytes - LIMITS.snapshotTailChars) {
     const victim = DROP_ORDER.findLast((name) => name in snapshot);
     if (!victim) return;
     delete snapshot[victim];

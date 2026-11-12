@@ -54,7 +54,7 @@ function setup(t) {
   const nav = { userAgent: 'UA', sendBeacon: (url, body) => beacons.push({ url, body }) };
   const ship = startShipping({ socket, log, ring, onEntry, clientId: CLIENT, loadId: LOAD, win, doc, nav });
   const eventsOf = (name) => sent.filter((s) => s.event === name);
-  return { ship, log, sent, handlers, winHandlers, docHandlers, beacons, eventsOf };
+  return { ship, log, sent, handlers, winHandlers, docHandlers, doc, beacons, eventsOf };
 }
 
 const okHello = { ok: true, serverT: 1, level: 'debug', acked: 0 };
@@ -126,7 +126,7 @@ test('pagehide beacons the unacked lines', (t) => {
 });
 
 test('hidden visibility flushes immediately; flushNow resolves on ack', async (t) => {
-  const { ship, log, eventsOf, docHandlers } = setup(t);
+  const { ship, log, eventsOf, docHandlers, doc } = setup(t);
   eventsOf('log:hello')[0].cb(null, okHello);
   log.info('app', 'a');
   const flushed = ship.flushNow();
@@ -137,8 +137,51 @@ test('hidden visibility flushes immediately; flushNow resolves on ack', async (t
   assert.equal(await ship.flushNow(), true);
   log.info('app', 'b');
   docHandlers.visibilitychange();
-  assert.equal(eventsOf('log:batch').length, 1);
-  docHandlers.visibilitychange.call(null);
+  assert.equal(eventsOf('log:batch').length, 1, 'a visible tab waits for the normal flush');
+  doc.visibilityState = 'hidden';
+  docHandlers.visibilitychange();
+  assert.equal(eventsOf('log:batch').length, 2, 'a hidden tab flushes at once');
+  assert.equal(eventsOf('log:batch')[1].payload.lines.length, 1);
+  ship.stop();
+});
+
+test('a large backlog still fits one beacon: the newest lines, measured as sent', (t) => {
+  const { ship, log, winHandlers, beacons } = setup(t);
+  for (let i = 0; i < 2000; i++) {
+    clock.ms += 20; // under the flood gate's 60 per second
+    log.info('app', 'x', { text: `entry "${i}" ${'y'.repeat(120)}` });
+  }
+  winHandlers.pagehide();
+  assert.equal(beacons.length, 1);
+  assert.ok(beacons[0].body.length < 64 * 1024, `body is ${beacons[0].body.length} chars`);
+  const lines = JSON.parse(beacons[0].body).lines;
+  assert.ok(lines.length > 50);
+  assert.equal(JSON.parse(lines.at(-1)).seq, 2000, 'the newest entry is included');
+  ship.stop();
+});
+
+test('an ok ack settles the whole batch even when the server refused its last line', (t) => {
+  const { ship, log, eventsOf } = setup(t);
+  eventsOf('log:hello')[0].cb(null, okHello);
+  log.info('app', 'a');
+  log.info('app', 'b');
+  advance(t, 2000);
+  eventsOf('log:batch')[0].cb(null, { ok: true, acked: 1, bad: 1 });
+  assert.equal(ship.state().acked, 2);
+  advance(t, 4000);
+  assert.equal(eventsOf('log:batch').length, 1, 'the refused line is not sent again');
+  ship.stop();
+});
+
+test('tail() is the unacked entries in batch shape, for a snapshot reply', (t) => {
+  const { ship, log, eventsOf } = setup(t);
+  eventsOf('log:hello')[0].cb(null, okHello);
+  assert.deepEqual(ship.tail().lines, []);
+  log.info('app', 'a');
+  const tail = ship.tail();
+  assert.equal(tail.loadId, LOAD);
+  assert.equal(tail.lines.length, 1);
+  assert.equal(JSON.parse(tail.lines[0]).ev, 'a');
   ship.stop();
 });
 

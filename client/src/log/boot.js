@@ -8,7 +8,7 @@ import { installPerfCapture } from './capture-perf.js';
 import { installAppEventCapture } from './capture-app.js';
 import { tapClientSocket } from './capture-socket.js';
 import { startShipping } from './ship.js';
-import { initExport, exportFullLog, markMoment } from './export-ui.js';
+import { exportFullLog, initExport, markMoment, setVerbose } from './export-ui.js';
 
 const originalConsoleError = console.error.bind(console);
 
@@ -36,8 +36,9 @@ try {
   window.__ptcgLog = {
     stats: logStats,
     entries: () => clientRing.toArray().map((e) => e.line),
+    // Through the export UI, so the server holds the level (a local-only change would be reset).
     level: (lvl) => {
-      if (lvl) log.setLevel(lvl);
+      if (lvl) setVerbose(lvl);
       return log.level();
     },
     mark: (note) => log.info('user', 'mark', { note: String(note ?? '').slice(0, 500) }),

@@ -1,6 +1,9 @@
 const LONGTASK_WARN_MS = 500;
 const LONGTASK_DEBUG_MS = 100;
 const JANK_GAP_MS = 250;
+// A slow timer is enough to notice a stalled main thread; a requestAnimationFrame loop would
+// keep every page producing frames forever, and the board renders on demand.
+const JANK_TICK_MS = 250;
 const SAMPLE_MS = 30000;
 
 function observeLongTasks(win, log) {
@@ -34,21 +37,20 @@ export function installPerfCapture({ log, win = window, doc = document, ring }) 
   };
   doc.addEventListener('visibilitychange', onVisibility);
 
-  let rafId = null;
-  let lastFrame = null;
-  const onFrame = (frameTime) => {
+  const clock = () => (win.performance ?? performance).now();
+  let lastTick = clock();
+  const jankTimer = setInterval(() => {
     try {
-      if (lastFrame !== null && frameTime - lastFrame > JANK_GAP_MS && visibleThroughout) {
-        log.debug('perf', 'jank', { gapMs: Math.round(frameTime - lastFrame) });
-      }
-      lastFrame = frameTime;
+      const at = clock();
+      const late = at - lastTick - JANK_TICK_MS;
+      // Hidden tabs throttle timers; only a gap spent fully visible is a stall.
+      if (late > JANK_GAP_MS && visibleThroughout) log.debug('perf', 'jank', { gapMs: Math.round(at - lastTick) });
+      lastTick = at;
       visibleThroughout = doc.visibilityState === 'visible';
     } catch {
       // swallow
     }
-    rafId = win.requestAnimationFrame(onFrame);
-  };
-  if (typeof win.requestAnimationFrame === 'function') rafId = win.requestAnimationFrame(onFrame);
+  }, JANK_TICK_MS);
 
   const sampleTimer = setInterval(() => {
     try {
@@ -58,6 +60,7 @@ export function installPerfCapture({ log, win = window, doc = document, ring }) 
         domNodes: doc.getElementsByTagName('*').length,
         ringBytes: ring.bytes(),
         ringEntries: ring.size(),
+        unacked: win.__ptcgLog?.ship?.().pending ?? null,
       });
     } catch {
       // swallow
@@ -67,7 +70,7 @@ export function installPerfCapture({ log, win = window, doc = document, ring }) 
   return () => {
     stopLongTasks();
     doc.removeEventListener('visibilitychange', onVisibility);
-    if (rafId !== null) win.cancelAnimationFrame?.(rafId);
+    clearInterval(jankTimer);
     clearInterval(sampleTimer);
   };
 }

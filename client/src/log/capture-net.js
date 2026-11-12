@@ -1,5 +1,6 @@
 const URL_MAX = 300;
 const SLOW_MS = 1500;
+const OWN_TRAFFIC = /\/socket\.io\/|\/api\/log\//;
 
 function requestParts(input, win) {
   const raw = typeof input === 'string' ? input : (input?.url ?? String(input));
@@ -71,6 +72,8 @@ function observeResources(win, log) {
     const observer = new Observer((list) => {
       for (const entry of list.getEntries()) {
         try {
+          // The socket transport's long polls and the log's own beacon are not page resources.
+          if (OWN_TRAFFIC.test(entry.name)) continue;
           const detail = { url: String(entry.name).slice(0, URL_MAX), ms: Math.round(entry.duration), type: entry.initiatorType };
           if (entry.duration > SLOW_MS) log.debug('net', 'resource.slow', detail);
           else log.trace('net', 'resource', detail);

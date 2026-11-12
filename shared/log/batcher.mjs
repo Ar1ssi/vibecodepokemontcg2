@@ -81,6 +81,22 @@ export function createBatcher({ limits = LIMITS } = {}) {
       }
       return lines;
     },
+    /**
+     * The NEWEST unacked lines whose JSON-array form fits `maxChars` (each line is a string that
+     * gets escaped again inside a JSON body, so it is measured the way it will be sent). Used
+     * where only one bounded message can go out: the pagehide beacon, a snapshot's tail.
+     */
+    unackedNewest(ring, maxChars) {
+      const pendingEntries = ring.since(ackedSeq);
+      const lines = [];
+      let chars = 1; // two brackets, and one comma fewer than there are lines
+      for (let i = pendingEntries.length - 1; i >= 0; i--) {
+        chars += JSON.stringify(pendingEntries[i].line).length + 1;
+        if (chars > maxChars) break;
+        lines.unshift(pendingEntries[i].line);
+      }
+      return lines;
+    },
     state: () => ({ acked: ackedSeq, lastSeq, pending: pending(), connected, inFlight, backoffUntil }),
   };
 }

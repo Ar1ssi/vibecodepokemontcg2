@@ -58,6 +58,8 @@ export const LIMITS = deepFreeze({
   ingestWindowMs: 10000,
   ingestWindowBytes: 524288,
   beaconMaxBytes: 262144,
+  beaconBodyChars: 48000,
+  snapshotTailChars: 100000,
   pingFastCount: 3,
   pingFastMs: 1000,
   pingMs: 30000,

@@ -135,9 +135,12 @@ function sourceLine(source) {
 function lastSvLines(data) {
   const lines = [];
   for (const source of sourcesOf(data)) {
-    const svs = data.timeline.filter((e) => e.src === source.src && Number.isInteger(e.sv)).map((e) => e.sv);
+    let last = null;
+    for (const e of data.timeline) {
+      if (e.src === source.src && Number.isInteger(e.sv) && (last === null || e.sv > last)) last = e.sv;
+    }
     const snap = data.snaps.find((s) => s.src === source.src);
-    const parts = [`  last sv ${source.src}=${svs.length ? Math.max(...svs) : '-'}`];
+    const parts = [`  last sv ${source.src}=${last ?? '-'}`];
     if (snap) parts.push(`snapshot lastRenderedVersion=${snap.netcode?.lastRenderedVersion ?? '-'}`);
     lines.push(parts.join(' '));
   }
@@ -147,7 +150,9 @@ function lastSvLines(data) {
 export function summarize(data) {
   const { header } = data;
   const lines = [];
-  if (header?.partial) lines.push(`partial export (${header.partial}): no snapshots, states or build info`);
+  if (header?.partial === 'disk') lines.push('partial export (disk): no snapshots, states or build info');
+  else if (header?.partial) lines.push(`partial export (${header.partial}): this client only, no server entries or journal`);
+  if (data.badLines > 0) lines.push(`warning: ${data.badLines} unreadable line(s) skipped — the file may be truncated`);
   lines.push(`exported: ${header?.exportedAt ?? 'unknown'}`);
   lines.push(`room: ${header?.room ?? 'unknown'}`);
   lines.push(`netcode: ${header?.netcode ?? 'unknown'}`);
@@ -190,6 +195,23 @@ function entrySeat(data, entry) {
   return entry.seat ?? seatOfSrc(data, entry.src);
 }
 
+// Each client numbers its commands from 1, so a bare clientSeq usually names one command per seat.
+function seatsUsing(data, cs) {
+  const seats = new Set();
+  for (const e of data.timeline) {
+    if (e.cs !== cs) continue;
+    const seat = entrySeat(data, e);
+    if (seat) seats.add(seat);
+  }
+  return [...seats].sort();
+}
+
+function ambiguousCs(data, cs) {
+  const seats = seatsUsing(data, cs);
+  if (seats.length < 2) return null;
+  return `clientSeq ${cs} was used by ${seats.join(' and ')}: say which, e.g. --cs ${seats[0]}#${cs}`;
+}
+
 export function selectAround(data, { sv, cs, ts, mark = false, windowMs = 5000 }) {
   let anchor;
   if (sv !== undefined && sv !== null) {
@@ -197,6 +219,8 @@ export function selectAround(data, { sv, cs, ts, mark = false, windowMs = 5000 }
   } else if (cs !== undefined && cs !== null) {
     const seat = typeof cs === 'object' ? cs.seat : null;
     const number = typeof cs === 'object' ? cs.cs : cs;
+    const ambiguous = seat ? null : ambiguousCs(data, number);
+    if (ambiguous) return { error: ambiguous };
     anchor = data.timeline.find((e) => e.cs === number && (!seat || entrySeat(data, e) === seat));
   } else if (ts !== undefined && ts !== null) {
     anchor = { ts };
@@ -237,6 +261,8 @@ function fxBetweenViews(data, src, sv) {
 }
 
 export function traceCommand(data, { seat = null, cs }) {
+  const ambiguous = seat ? null : ambiguousCs(data, cs);
+  if (ambiguous) return { steps: [], error: ambiguous };
   const emit = findClientEmit(data, { seat, cs });
   const serverSteps = data.timeline.filter((e) => isServerStep(e, cs, seat));
   if (!emit && serverSteps.length === 0) return { steps: [], error: 'no command with that clientSeq' };
@@ -270,18 +296,24 @@ export function replayExport(data, engine, { to = Infinity } = {}) {
   return replayJournal(data.journal, { ...engine, to });
 }
 
+const PLAYER_SEATS = ['p1', 'p2'];
 const finding = (src, seat, sv, kind, detail) => ({ src, seat, sv, kind, detail });
 
 function serverStateAt(data, engine, sv) {
-  const recorded = data.states.find((s) => s.sv === sv);
+  // stateVersion repeats after an undo; the client rendered the latest state that has it.
+  const recorded = data.states.findLast((s) => s.sv === sv);
   if (recorded) return { state: recorded.state };
   if (data.journal.length > 0) {
     const replayed = replayExport(data, engine, { to: sv });
     if (replayed.state?.stateVersion === sv) return { state: replayed.state };
   }
-  const known = data.states.map((s) => s.sv);
-  const range = known.length ? `${Math.min(...known)}..${Math.max(...known)}` : 'none';
-  return { error: range };
+  let low = Infinity;
+  let high = -Infinity;
+  for (const { sv: known } of data.states) {
+    low = Math.min(low, known);
+    high = Math.max(high, known);
+  }
+  return { error: data.states.length ? `${low}..${high}` : 'none' };
 }
 
 const zoneArrays = (view, side) =>
@@ -326,6 +358,15 @@ function compareRegistry(src, seat, sv, clientView, registry) {
       }
     }
   }
+  // The other direction: a card still on the page that the applied view no longer has.
+  const inView = new Set();
+  for (const side of SIDES) for (const [, cards] of zoneArrays(clientView, side)) for (const id of idsOf(cards)) inView.add(id);
+  const stadiumId = clientView?.stadium?.instanceId;
+  if (stadiumId !== undefined && stadiumId !== null) inView.add(stadiumId);
+  for (const row of registry ?? []) {
+    if (inView.has(row.id)) continue;
+    findings.push(finding(src, seat, sv, 'stale-rendered', { id: row.id, rendered: `${row.side}.${row.zone}`, connected: row.connected }));
+  }
   return findings;
 }
 
@@ -342,6 +383,13 @@ export function diffView(data, engine, { seat = null } = {}) {
     }
     if (!clientView) {
       findings.push(finding(snap.src, snapSeat, sv, 'skipped', 'snapshot has no lastAppliedView'));
+      continue;
+    }
+    if (!PLAYER_SEATS.includes(snapSeat)) {
+      // A spectator's view is drawn from a watched seat the export does not record: only its own
+      // view against its own page can be checked.
+      findings.push(finding(snap.src, snapSeat, sv, 'skipped', 'spectator: the server view is not compared'));
+      findings.push(...compareRegistry(snap.src, snapSeat, sv, clientView, snap.registry));
       continue;
     }
     const server = serverStateAt(data, engine, sv);

@@ -96,7 +96,10 @@ function print(lines, all) {
   if (shown.length < lines.length) process.stdout.write(`… ${lines.length - shown.length} more lines (use --all)\n`);
 }
 
-const formatAll = (entries) => entries.map((e) => formatEntry(e, entries[0].ts));
+// Printed times are relative; this first line gives the absolute base, usable with `around --ts`.
+const baseLine = (ts) => `t0=${ts} (${Number.isFinite(ts) ? new Date(ts).toISOString() : 'unknown'})`;
+const formatFrom = (entries, baseTs) => [baseLine(baseTs), ...entries.map((e) => formatEntry(e, baseTs))];
+const formatAll = (entries) => formatFrom(entries, entries[0].ts);
 
 function currentCommit() {
   try {
@@ -145,7 +148,7 @@ function runAround(data, options) {
   }
   const result = selectAround(data, query);
   if (result.error) return { lines: [result.error], code: 1 };
-  return { lines: result.entries.map((e) => formatEntry(e, result.anchorTs)), code: 0 };
+  return { lines: formatFrom(result.entries, result.anchorTs), code: 0 };
 }
 
 function runTrace(data, options) {
@@ -153,7 +156,7 @@ function runTrace(data, options) {
   if (!cs) throw new UsageError('trace needs --cs [seat#]N');
   const result = traceCommand(data, cs);
   if (result.error) return { lines: [result.error], code: 1 };
-  const lines = result.steps.map((e) => formatEntry(e, result.steps[0].ts));
+  const lines = formatAll(result.steps);
   lines.push(`sv=${result.sv}`);
   return { lines, code: 0 };
 }
@@ -164,11 +167,17 @@ function runDiffView(data, options) {
   if (checked.length === 0) return { lines: ['no snapshots to check'], code: 1 };
   const findings = diffView(data, ENGINE, { seat: options.seat ?? null });
   if (findings.length === 0) return { lines: [`no differences (${checked.length} snapshots checked)`], code: 0 };
+  const real = findings.filter((f) => f.kind !== 'skipped');
+  if (real.length === 0 && findings.some((f) => f.detail.startsWith?.('spectator'))) {
+    const notes = findings.map((f) => `${f.src} seat=${f.seat} sv=${f.sv} ${f.kind} ${f.detail}`);
+    return { lines: [...notes, `no differences (${checked.length} snapshots checked)`], code: 0 };
+  }
   const lines = findings.map((f) => {
     const detail = typeof f.detail === 'string' ? f.detail : JSON.stringify(f.detail);
     return `${f.src} seat=${f.seat} sv=${f.sv} ${f.kind} ${detail.length > 200 ? `${detail.slice(0, 200)}…` : detail}`;
   });
-  return { lines, code: findings.every((f) => f.kind === 'skipped') ? 1 : 0 };
+  // Like `replay`: 0 means checked and clean, 1 means a difference (or nothing could be checked).
+  return { lines, code: 1 };
 }
 
 function runGrep(data, options) {
