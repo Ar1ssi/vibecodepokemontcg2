@@ -6,8 +6,12 @@
 # Pruned or shortened lines, verbatim: .agent/archive/DECISIONS-pruned-2026-10-15.md (grep the D-number).
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
-#   Next id = highest D number in this file and the archives + 1 (next: D245).
+#   Next id = highest D number in this file and the archives + 1 (next: D249).
 
+- D248 2026-11-12 [logging] 087: an export is complete on purpose (both hands, deck order) and each one is announced in room chat; entries join on sv/cs, no correlation id; format NDJSON v1, read with tools/log.mjs.
+- D247 2026-11-12 [netcode] 087: GameRoom journals every applyCommand (rng cursor + state hash) and rebases on any in-place state change, so an export replays; a new mutation site must call journal.rebase.
+- D246 2026-11-12 [logging] 087: server logs live in byte-capped memory streams (LOG_MAX_MB) plus an out/logs NDJSON mirror outside production; never read back by the game, so S2 "no durable game log" stands.
+- D245 2026-11-12 [logging] 087: always-on structured log on both clients and the server; clients ship theirs (log:batch) so one export holds all three; the opt-in sync/decision loggers are deleted. (Replaces draft 028.)
 - D244 2026-11-09 [netcode] 073: the deck box id rides exchangeData/loadDeckData as a display-only param after format (PROTOCOL_VERSION 2.3.0); the opening coin waits for the deal (deck-box-gate).
 - D243 2026-11-09 [mat-fx] 073: deck boxes lie in the blurred band beside each deck and deal it at game start, drawn in the three.js board's table frame; lid = mesh cut at the cap groove + front flap.
 - D242 2026-11-09 [deck-builder] Homebrew Build & Battle is the 'homebrew' flow of the B&B tab (/homebrew-battle): customhb packs, Standard 60-card/6-Prize deck, ETB scene skinned as the 151 Ultra-Premium exterior. (design 086)

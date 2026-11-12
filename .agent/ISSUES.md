@@ -6,7 +6,7 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I283). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I286). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Umbrella lines name every member as `(merged I<a>, I<b>…)`: grep any id to find its line.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (`pnpm harness:check`); maintain.md moves older Closed lines to .agent/archive/ISSUES-closed.md.
@@ -14,6 +14,9 @@
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I285 2026-11-12 P2 [server] No socket handler in server/server.js has a try/catch: a throw in any one is an uncaught exception that ends the process and every room. Now logged (087 process tap, stderr fatal line) but not contained (refs: design 087 Current state)
+- I284 2026-11-12 P3 [netcode] applyView's own diff is always "initial": no caller passes options.previousView, so the returned diff lists every card as added. Unused today; apply-view-logged.js keeps its own previous view (refs: design 087)
+- I283 2026-11-12 P3 [client] The Socket.IO client loads from cdn.socket.io (client/index.ejs:22): CDN blocked or down → `io is not defined` and the app never boots, though the server serves /socket.io/socket.io.js itself (seen in the 087 e2e sandbox)
 - I282 2026-11-09 P2 [mat-fx] stadium-environment-layout.test "environmentKeyFor gives every Homebrew Stadium in set.json a board" fails on origin/main: 27 committed customhb Stadiums unmapped (Altar of the Moone, Sky Field, Brooklet Hill…) — repro: node --test that file (design 077)
 - I280 2026-11-05 P3 [deck] Per-form Zygarde deck limit (D240) reads `form`/description/stage off deck data; rows with none (CSV imports, decks saved before D240) count under plain "Zygarde" or by stage, so a 50% Basic can read as 10% — backfill `form` on hydrate (review of D240)
 - I279 2026-11-03 P3 [rules] An Energy moved onto the other player's Pokémon (customhb Scyther Harvesting Scythe) is owned by its zone: discarded, it lands in the taker's discard pile, not its owner's — discardCard's ownerOf ignores card.ownerId (set in state.mjs:151)
@@ -57,7 +60,6 @@
 - I121 2026-09-23 P3 [rules] Residuals of designs 032–039 (merged I121–I125, I137, I166, I167, I181): Bowed Whip/Blast Burn gates; unparsed Trainer conditions/steps (Lt. Surge, Kahili); ~160 conditional-status sentences and self-heal conditions unread; hand locks; copy-attack deferrals
 - I87 2026-09-23 P2 [netcode] "basic prompt gone in most recent match" not reproduced; waiting on the user's description (refs: S264, design 028)
 - I86 2026-09-23 P2 [feature] 30th Celebration + Classic Collection support — design 029 awaiting user approval (refs: S264)
-- I85 2026-09-23 P1 [feature] Match logging (user: IMPORTANT) — design 028 awaiting user approval (refs: S264)
 - I84 2026-09-23 P3 [legacy] Legacy client gaps; untested by policy, retire with I251 (merged I20, I41, I45, I70, I79, I80, I84, I177, I214, I222): ability executors, Special Energy triggers, no GX once-per-game, Fossils to Bench, no mat FX/sound, trainer pickers skip attach targets/chooseMode
 - I81 2026-09-22 P3 [deck-builder] Autosave makes the explicit Save button a no-op when a deck is loaded — decide autosave vs dirty-indicator (refs: S252)
 - I73 2026-09-21 P3 [netcode] Battle logs diverge between players (merged I73, I74): reconnect catch-up skips appends while `isCatchingUp`; "Clear battle log" clears only the local client (refs: S230)
@@ -68,6 +70,7 @@
 - I1 2026-09-07 P2 [rules] Legacy ISSUES.txt items unverified: turn-start auto-draw both players (I1), +Turn/End Turn rework (I2), Garland Ray discard parse on multipliers (I3) (merged I1–I3)
 
 ## Closed (newest first; older history in the archive)
+- I85 2026-09-23 P1 [feature] Match logging (user: IMPORTANT) — design 028 awaiting user approval (refs: S264) → closed 2026-11-12 (cloud session): design 087 shipped — unified client+server log, one export, journal replay, tools/log.mjs (D245–D248)
 - I278 2026-11-03 P3 [mat-fx] Community Center's far mountains barely in frame (refs: 084) → closed 2026-11-03 S337: the cliff's far end rises into the mountain past the pool, in both frames (tested)
 - I277 2026-11-03 P3 [mat-fx] Magma Basin's falls showed only their feet in tcgl (refs: 084) → closed 2026-11-03 S337: falls down the far-left corner's wall face, crossing the moat on screen in both presets (tested) (tested)
 - I276 2026-11-03 P2 [mat-fx] Stadium boards flatter than their cards: night keys off, hero cues missing, emissives lighting nothing, stamped scatter, clipped trees, off-family props (refs: 084) → closed 2026-11-03 S337: design 084 shipped on all 25 boards; limits in I277, I278
