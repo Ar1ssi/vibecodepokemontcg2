@@ -56,12 +56,12 @@ test('attachIo/attachSocket wire the taps and seatOf', () => {
   try {
     const sockets = new Map([['s1', { data: { logClientId: 'cl' } }]]);
     const handlers = {};
-    const adapter = { on: (ev, fn) => { handlers[ev] = fn; } };
+    const adapter = { on: (ev, fn) => { (handlers[ev] ??= []).push(fn); } };
     const io = { engine: { on() {} }, of: () => ({ adapter }), sockets: { sockets } };
     logging.attachIo(io, { seatOf: () => 'p2' });
-    handlers['join-room']('room1', 's1');
+    handlers['join-room'].forEach((fn) => fn('room1', 's1'));
     assert.equal(logging.store.participants('room1')[0].clientId, 'cl');
-    const socket = { id: 's1', rooms: new Set(), handshake: {}, onAny(fn) { this.any = fn; }, onAnyOutgoing() {}, on() {} };
+    const socket = { id: 's1', data: {}, rooms: new Set(), handshake: {}, onAny(fn) { this.any = fn; }, onAnyOutgoing() {}, on() {} };
     logging.attachSocket(socket);
     socket.any('cmd', { roomId: 'room1' });
     const last = JSON.parse(logging.store.stream('room:room1').entries().at(-1).line);

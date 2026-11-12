@@ -31,7 +31,7 @@ export function ingestLines({ store, clientId, loadId, lines, offset = 0, lastSe
       continue;
     }
     if (entry.seq <= lastSeq) continue;
-    const ts = entry.t + offset;
+    const ts = Math.round((entry.t + offset) * 10) / 10;
     store.append(`client:${clientId}`, {
       seq: entry.seq,
       t: entry.t,
@@ -50,6 +50,8 @@ export function ingestLines({ store, clientId, loadId, lines, offset = 0, lastSe
 export function createLogIngest({ store, log, io, now = Date.now, limits = LIMITS }) {
   const seqByLoad = new Map();
   const roomLevels = new Map();
+  // A client outside any room (deck builder, lobby) can still ask for verbose capture.
+  const clientLevels = new Map();
   const windows = new WeakMap();
 
   const adapter = io.of('/').adapter;
@@ -61,6 +63,7 @@ export function createLogIngest({ store, log, io, now = Date.now, limits = LIMIT
   const levelFor = (roomId) => roomLevels.get(roomId) ?? 'debug';
 
   function levelForSocket(socket) {
+    if (clientLevels.get(socket.data?.logClientId) === 'trace') return 'trace';
     for (const room of socket.rooms ?? []) if (roomLevels.get(room) === 'trace') return 'trace';
     return 'debug';
   }
@@ -106,6 +109,9 @@ export function createLogIngest({ store, log, io, now = Date.now, limits = LIMIT
     for (const known of seqByLoad.keys()) {
       if (known !== key && store.stream(`client:${known.split('/')[0]}`) === null) seqByLoad.delete(known);
     }
+    for (const known of clientLevels.keys()) {
+      if (known !== clientId && store.stream(`client:${known}`) === null) clientLevels.delete(known);
+    }
     ack({ ok: true, serverT: now(), level: levelForSocket(socket), acked: seqByLoad.get(key) ?? 0 });
   }
 
@@ -137,15 +143,25 @@ export function createLogIngest({ store, log, io, now = Date.now, limits = LIMIT
 
   function setLevel(socket, payload, ack) {
     const level = payload?.level;
-    if ((level !== 'debug' && level !== 'trace') || !socket.rooms.has(payload.roomId)) {
-      return ack({ ok: false, reason: 'bad_request' });
-    }
+    if (level !== 'debug' && level !== 'trace') return ack({ ok: false, reason: 'bad_request' });
+    if (payload.roomId == null) return setClientLevel(socket, level, ack);
+    if (!socket.rooms.has(payload.roomId)) return ack({ ok: false, reason: 'bad_request' });
     if (level === 'trace') roomLevels.set(payload.roomId, 'trace');
     else roomLevels.delete(payload.roomId);
     const by = socket.data.logClientId ?? socket.id;
     io.to(payload.roomId).emit('log:level', { level, by });
     log.info('log', 'level', { level, by }, { room: payload.roomId });
     return ack({ ok: true, level });
+  }
+
+  function setClientLevel(socket, level, ack) {
+    const clientId = socket.data.logClientId;
+    if (!clientId) return ack({ ok: false, reason: 'no_hello' });
+    if (level === 'trace') clientLevels.set(clientId, 'trace');
+    else clientLevels.delete(clientId);
+    socket.emit?.('log:level', { level: levelForSocket(socket), by: clientId });
+    log.info('log', 'level', { level, by: clientId, scope: 'client' });
+    return ack({ ok: true, level: levelForSocket(socket) });
   }
 
   function guarded(handler) {
