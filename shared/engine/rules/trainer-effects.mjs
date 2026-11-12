@@ -888,9 +888,24 @@ function parseSearchDeckKind(lower) {
   if (/search your deck for any number of basic energy cards of different types/.test(lower)) {
     return { what: 'Basic Energy', count: 9, destination: 'hand', upTo: true, reveal: true, distinctTypes: true };
   }
-  // Feather Ball (Astral Radiance): "a Pokémon that has no Retreat Cost".
+  // The Retreat Cost rides in `what`, so matchesSearch filters the deck on the server and in the
+  // client picker alike. Feather Ball (Astral Radiance): "a Pokémon that has no Retreat Cost".
   if (/search your deck for a pokémon that has no retreat cost/.test(lower)) {
-    return { what: 'Pokémon', count: 1, destination: 'hand', reveal: true, noRetreatCost: true };
+    return { what: 'Pokémon with no Retreat Cost', count: 1, destination: 'hand', reveal: true };
+  }
+  // Heavy Ball (Next Destinies, BREAKthrough): "a Pokémon with a Retreat Cost of 3 or more";
+  // Poké Maniac: "up to 3 Pokémon that have a Retreat Cost of exactly 4".
+  const retreatSearch = lower.match(
+    /search your deck for (?:a|up to (\d+)) pokémon (?:with|that (?:has|have)) a retreat cost of (exactly \d+|\d+ or more)/
+  );
+  if (retreatSearch && lower.includes('into your hand')) {
+    return {
+      what: `Pokémon with a Retreat Cost of ${retreatSearch[2]}`,
+      count: retreatSearch[1] ? Number(retreatSearch[1]) : 1,
+      destination: 'hand',
+      reveal: true,
+      ...(retreatSearch[1] ? { upTo: true } : {}),
+    };
   }
   // Love Ball (Twilight Masquerade): "a Pokémon with the same name as 1 of your opponent's
   // Pokémon in play".

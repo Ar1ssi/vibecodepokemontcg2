@@ -356,13 +356,6 @@ function inPlayNames(player) {
   );
 }
 
-/** Printed Retreat Cost as a count: an array of symbols or a number (Feather Ball). */
-function retreatCostCount(card) {
-  const cost = card?.retreatCost;
-  if (Array.isArray(cost)) return cost.length;
-  return Number(cost) || 0;
-}
-
 export function attachToRoot(player, card, root, events) {
   for (const zone of [player.zones.deck, player.zones.discard, player.zones.hand]) {
     const i = (zone || []).indexOf(card);
@@ -746,7 +739,6 @@ export function executeSteps(draft, {
         const opponentNames = step.sameNameAsOpponent ? inPlayNames(opponent) : null;
         const cardMatches = (c) =>
           matchesKind(c, { what, exclude: step.exclude }) &&
-          (!step.noRetreatCost || retreatCostCount(c) === 0) &&
           (!opponentNames || opponentNames.has(String(c?.name || '').toLowerCase())) &&
           (!nameFilter || String(c?.name || '').toLowerCase().includes(nameFilter)) &&
           (!evolvesFrom || String(c?.evolvesFrom || '').toLowerCase() === evolvesFrom) &&

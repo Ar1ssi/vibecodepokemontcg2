@@ -209,3 +209,40 @@ test('Cherish Ball (UNM 191, pkmncards): "a Pokémon-GX" matches only GX Pokémo
   assert.equal(matchesSearch({ name: 'Pikachu', hp: 60 }, step.what), false);
   assert.equal(matchesSearch({ name: 'Ultra Ball', type: 'Item' }, step.what), false);
 });
+
+// Heavy Ball (BREAKthrough 140, Next Destinies 88), Poké Maniac (Unified Minds 204/236) and Feather
+// Ball (Astral Radiance 141), out/pkmn-trainer-cards.json: the Retreat Cost is a search filter. The
+// "3 or more" range used to be split at its "or" and matched every card.
+test('Retreat Cost searches: "3 or more", "exactly 4" and "no Retreat Cost" filter the Pokémon', async () => {
+  const withCost = (name, retreatCost) => card({ name, retreatCost: Array(retreatCost).fill('Colorless') });
+  const free = withCost('Free', 0);
+  const two = withCost('Two', 2);
+  const three = withCost('Three', 3);
+  const four = withCost('Four', 4);
+  const heavy = 'Pokémon with a Retreat Cost of 3 or more';
+  assert.deepEqual([free, two, three, four].filter((c) => matchesSearch(c, heavy)).map((c) => c.name), ['Three', 'Four']);
+  assert.deepEqual([free, two, three, four].filter((c) => matchesSearch(c, 'Pokémon with a Retreat Cost of exactly 4')).map((c) => c.name), ['Four']);
+  assert.deepEqual([free, two, three, four].filter((c) => matchesSearch(c, 'Pokémon with no Retreat Cost')).map((c) => c.name), ['Free']);
+  assert.equal(matchesSearch({ name: 'Ultra Ball', supertype: 'Trainer', type: 'Item' }, heavy), false, 'Trainers never match');
+  assert.equal(matchesSearch(card({ name: 'Numeric', retreatCost: 3 }), heavy), true, 'a numeric retreatCost counts');
+  assert.equal(matchesSearch(card({ name: 'Tcgdex', retreat: 1 }), heavy), false, 'TCGdex retreat counts too');
+  assert.equal(matchesSearch(card({ name: 'Unloaded' }), heavy), true, 'a card whose data has not loaded stays in the pool');
+});
+
+test('Heavy Ball and Poké Maniac parse their Retreat Cost into the search target', async () => {
+  const { parseSearchDeckParams } = await import('../trainer-effects.mjs');
+  const heavy = parseSearchDeckParams(
+    'search your deck for a pokémon with a retreat cost of 3 or more, reveal it, and put it into your hand. shuffle your deck afterward.'
+  );
+  assert.deepEqual(
+    { what: heavy.what, count: heavy.count, destination: heavy.destination, reveal: heavy.reveal },
+    { what: 'Pokémon with a Retreat Cost of 3 or more', count: 1, destination: 'hand', reveal: true }
+  );
+  const maniac = parseSearchDeckParams(
+    'search your deck for up to 3 pokémon that have a retreat cost of exactly 4, reveal them, and put them into your hand. then, shuffle your deck.'
+  );
+  assert.deepEqual(
+    { what: maniac.what, count: maniac.count, upTo: maniac.upTo },
+    { what: 'Pokémon with a Retreat Cost of exactly 4', count: 3, upTo: true }
+  );
+});

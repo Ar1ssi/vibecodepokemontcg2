@@ -159,6 +159,23 @@ test('Feather Ball (Astral Radiance) finds only a Pokémon with no Retreat Cost'
   assert.deepEqual(optionNames(res.prompts[0]), ['Free']);
 });
 
+const retreatMon = (name, cost) => mon(name, 'Colorless', { retreatCost: Array(cost).fill('Colorless') });
+
+test('Heavy Ball (BREAKthrough 140) finds only a Pokémon with a Retreat Cost of 3 or more', () => {
+  const deck = [retreatMon('Free', 0), retreatMon('Two', 2), retreatMon('Three', 3), retreatMon('Four', 4), ...filler(3)];
+  const res = play(board({ p1: { deck } }), trainer('Heavy Ball', 'Item', 'Search your deck for a Pokémon with a Retreat Cost of 3 or more, reveal it, and put it into your hand. Shuffle your deck afterward.'));
+  assert.deepEqual(optionNames(res.prompts[0]), ['Three', 'Four']);
+  assert.equal(res.prompts[0].max, 1);
+});
+
+test('Poké Maniac (Unified Minds 204) finds up to 3 Pokémon with a Retreat Cost of exactly 4', () => {
+  const deck = [retreatMon('Three', 3), ...['A', 'B', 'C', 'D'].map((n) => retreatMon(`Four ${n}`, 4)), retreatMon('Five', 5), ...filler(3)];
+  const res = play(board({ p1: { deck } }), trainer('Poké Maniac', 'Supporter', 'Search your deck for up to 3 Pokémon that have a Retreat Cost of exactly 4, reveal them, and put them into your hand. Then, shuffle your deck.'));
+  assert.deepEqual(optionNames(res.prompts[0]), ['Four A', 'Four B', 'Four C', 'Four D']);
+  assert.equal(res.prompts[0].max, 3);
+  assert.deepEqual(res.state.players.p1.zones.hand.map((c) => c.name), ['Four A', 'Four B', 'Four C']);
+});
+
 test("Love Ball (Twilight Masquerade) finds only a Pokémon named like an opponent's in play", () => {
   const deck = [mon('Pikachu', 'Lightning'), mon('Eevee', 'Colorless'), ...filler(3)];
   const res = play(
