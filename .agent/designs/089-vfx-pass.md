@@ -1,5 +1,5 @@
 # 089: VFX pass — sequencing, layering, missing animations, new shuffle, varied moves, reworked shaders
-Status: approved (self — one-shot)
+Status: built on `feature/089-vfx-pass`, reviewed, not landed (approved: self — one-shot)
 Date: 2026-11-13 · Session: one-shot (worktree `.claude/worktrees/088-vfx-pass`, branch `feature/089-vfx-pass`)
 
 ## Problem
@@ -197,7 +197,7 @@ verdict (kept / tuned / rebuilt) · what changed.
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
 | 1 | attack with no events but `attackStarted` (suspended before any consequence) | nothing plays yet; `openAttack` carried; the batch with the first consequence plays the strike | [x] `netcode/__tests__/attack-sequencing.test.mjs` "edge 1" |
-| 2 | `attackStarted` twice for one attack (copy/re-flip paths) | second is ignored (same key, already open) | [x] "edge 2" |
+| 2 | ~~`attackStarted` twice for one attack (copy/re-flip paths): second is ignored~~ Struck at review: the engine emits one marker per attack, so a marker always opens a new attack. Ignoring a second one let an attack left open by a lost batch swallow the next | a new marker replaces the open attack | [x] "edge 2: a marker always opens a new attack; one left open by a batch whose end never arrived does not swallow it" |
 | 3 | self-switch after damage, auto (1 Benched) | banner → scene from the Active → damage → slide | [x] "edge 3" |
 | 4 | self-switch after damage, choice (≥2 Benched) | batch 1: banner → scene → damage; batch 2: slide only | [x] "edge 4"; e2e B, C |
 | 5 | no-damage switch attack | banner → aura on the Active → slide | [x] "edge 5" |
@@ -205,7 +205,7 @@ verdict (kept / tuned / rebuilt) · what changed.
 | 7 | before-damage gust (switch after `attackStarted`, hits follow) | slide, then banner → scene on the new Active | [x] "edge 7" |
 | 8 | attack KO whose batch has no card-move event | KO'd stack stays whole in its slot through banner and scene, then burns/flies | [x] e2e A; `card-mesh-drive.test.mjs` "a pinned card answers its pre-diff pose until unpinned" |
 | 9 | pin never taken (plan dropped, tab hidden) | released when the queue goes idle or after `SLIDE_PIN_MAX_MS`; retained mesh freed | [x] `slide-pins.test.mjs` "the backstop frees a pin nobody took, claimed or not", "releaseAll lets a pin whose slide never came glide"; `card-mesh-drive.test.mjs` "retains are counted; the scene hears the last one go" |
-| 10 | pinned card released by a room reset / view without it | pin and retain dropped, mesh freed, no throw | [ ] not automated: the release itself is row 9's tests; a reset reaching it is read in `board-scene.js freeCard` only |
+| 10 | pinned card released by a room reset / view without it | pin and retain dropped, mesh freed, no throw | [x] `slide-pins.test.mjs` "design 089 edge 10: a reset lets every pin go, the claimed ones too"; `game-restarted` calls `dropSlidePins` and `cancelPendingKnockouts` (the wiring is not driven by a test) |
 | 11 | ghost mesh whose flight is cancelled | removed by its own backstop | [ ] in part: e2e D3 (the ghost is gone once it has landed); a cancelled flight is not driven by a test |
 | 12 | FX off / reduced motion | no pins (as today); effects skip or use their static form; choice gate opens at once with FX off | [x] `choice-gate.test.mjs` "opens at once when nothing is playing"; `pile-shuffle.test.mjs` "reduced motion: the pile taps"; `mat-fx.test.mjs` "motionReduced: ignores the OS reduced-motion query" |
 | 13 | queue cleared with held draws | cards show at once | [x] `fx-queue.test.mjs` "design 089: clear hands every plan it drops to onDrop"; `netcode/__tests__/attack-sequencing.test.mjs` "a dropped draw shows its cards at once, cancels its backstop and releases a Prize sleeve" |
@@ -344,6 +344,14 @@ Self-approval checklist:
   target's own depth cannot be read while it is drawn into) and a self-shadowed `fireball` volume. `smoke`,
   `waterDrop` and `debris` shaders are as 079 left them: the stills showed no fault in them that outranked the
   ones above. Leaf orientation was read on the stills (leaves lie along their flight) and left as is.
+- Review (slice 10, an agent that did not write the diff; engine, netcode and state logic only): no blocker, no
+  rule or hidden-information change. Four findings, all fixed with tests: (1) the open attack was keyed by player
+  alone, so one left open by a batch the client never saw the end of swallowed that player's next attack (edge 2,
+  rewritten); (2) a Knock Out in a hidden tab claimed its pins and never took them: frozen until the 9 s backstop;
+  (3) the scene flies the Pokémon and five attached cards, and the rest of a larger stack stayed frozen the same
+  way, as did a whole stack whose scene could not play (`knockout-flight.js` now lets the stack's untaken pins go
+  as the scene starts); (4) edge 10 was not implemented: a reset now drops every pin and cancels the knockouts
+  still waiting for their hit.
 - Slice 9, the non-attack pass. "Still" = judged on frozen frames (`rec/rec-board-fx.mjs`, which now also fires
   the banners, tags, status pops, Prize claim and game over); "code" = read against the house rules, not re-rendered.
 

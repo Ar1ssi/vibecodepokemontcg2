@@ -81,6 +81,23 @@ test('design 089: a claimed pin outlives releaseAll (its scene is about to play)
   ]);
 });
 
+test('design 089 edge 10: a reset lets every pin go, the claimed ones too, and the cards can be pinned again', () => {
+  const { pins, log } = harness();
+  pins.pin(7);
+  pins.pin(8);
+  pins.claim(7);
+  pins.releaseAll({ claimed: true });
+  assert.equal(pins.has(7), false);
+  assert.equal(pins.has(8), false);
+  assert.deepEqual(log.slice(2), [
+    ['unpin', 7, SLIDE_PIN_GLIDE_MS],
+    ['unpin', 8, SLIDE_PIN_GLIDE_MS],
+  ]);
+  // A leftover entry made `pin` answer "already pinned" without freezing the card.
+  assert.equal(pins.pin(7), true);
+  assert.deepEqual(log.at(-1), ['pin', 7]);
+});
+
 test('the backstop frees a pin nobody took, claimed or not', () => {
   const { pins, log, fireTimers } = harness();
   pins.pin(7);

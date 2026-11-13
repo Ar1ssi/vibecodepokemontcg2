@@ -800,8 +800,11 @@ export function prepareAttackBatch(events, open = null) {
       segment = [];
       acted = false;
     } else if (type === 'attackStarted') {
-      // A second marker for the attack already open changes nothing.
-      if (!current || current.playerId !== event.playerId) current = openAttackOf(event);
+      // The engine emits one marker per attack, so a marker always opens a new one. An attack
+      // left open by a batch whose end this client never saw (its connection dropped before the
+      // `attackExecuted`, and a resync view carries no events) must not pass for the next attack:
+      // that attack's real `attackExecuted` was skipped, and it played with no banner or scene.
+      current = openAttackOf(event);
       segment = [];
       acted = false;
     } else {

@@ -4,6 +4,14 @@
 // fade-out. DOM-free so it can be unit-tested without a browser; the paired
 // knockout-flight.js drives an overlay element with it.
 
+/**
+ * Design 089: every card of a knocked-out stack (the Pokémon, then what was attached to it), as
+ * instance ids. These are the cards pinned in the slot for the scene; the ones the scene does
+ * not fly are let go when it starts (knockout-flight.js).
+ */
+export const knockoutStackIds = (ghost) =>
+  [ghost?.instanceId, ...(Array.isArray(ghost?.attached) ? ghost.attached.map((card) => card?.instanceId) : [])].filter((id) => id != null);
+
 export const KNOCKOUT_DURATION_MS = 900;
 export const KNOCKOUT_FLASH_END = 0.35;
 

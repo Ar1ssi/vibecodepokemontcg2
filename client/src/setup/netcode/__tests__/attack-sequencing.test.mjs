@@ -171,14 +171,28 @@ test('an attack with no start marker and no hit keeps its place (an older server
   assert.deepEqual(effects(run(events)), ['retreat', 'attack-banner', 'attack']);
 });
 
-test('edge 2: a second attackStarted for the attack already open is ignored', () => {
+test('edge 2: a marker always opens a new attack; one left open by a batch whose end never arrived does not swallow it', () => {
   const started = { type: 'attackStarted', playerId: 'p1', attackerId: 1, defenderId: 20, attackName: 'Hit' };
   const hit = { type: 'damageUpdated', instanceId: 20, damage: 30, dealt: 30 };
-  const batch = prepareAttackBatch([started, { ...started, attackName: 'Copied' }, hit], null);
-  const strikes = batch.events.filter((event) => event.type === 'attackExecuted');
+  const executed = { type: 'attackExecuted', playerId: 'p1', attackerId: 1, defenderId: 20, attackName: 'Hit' };
+  // The client played the early strike of a suspended attack, then lost its connection: the
+  // batch with that attack's `attackExecuted` and the turns after it never came. Next turn the
+  // same Pokémon uses the same attack.
+  const stale = { playerId: 'p1', attackerId: 1, defenderId: 20, attackName: 'Hit', played: true };
+  const batch = prepareAttackBatch([started, hit, executed], stale);
+  assert.equal(batch.skipped.size, 0, 'the new attack is not taken for the old one');
+  assert.deepEqual(batch.events.filter((event) => event.type === 'attackExecuted'), [executed]);
+  assert.equal(batch.open, null);
+  // The same through the planner: batch 1 of a suspended attack plays its early strike, the
+  // batch that ends it is lost, and the next attack still gets its banner and its scene.
+  const run = createSequencer();
+  run(attackWith(board({ text: SWITCH_SELF })).events);
+  assert.deepEqual(turnEffects(run([started, hit, executed])), ['attack-banner', 'attack', 'damage']);
+  // Two markers in one batch are two attacks: the second one's hits are its own strike.
+  const twice = prepareAttackBatch([started, { ...started, attackName: 'Again' }, hit], null);
+  const strikes = twice.events.filter((event) => event.type === 'attackExecuted');
   assert.equal(strikes.length, 1);
-  assert.equal(strikes[0].attackName, 'Hit');
-  assert.equal(batch.open.played, true);
+  assert.equal(strikes[0].attackName, 'Again');
 });
 
 test('the early strike counts what the attack dealt: the defender’s damage, the rest as Bench damage, never the attacker’s own', () => {

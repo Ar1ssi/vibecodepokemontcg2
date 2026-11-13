@@ -26,3 +26,6 @@ export const claimSlidePin = (id) => slidePins.claim(id);
 
 /** Lets go of pins whose scene never played (the FX queue went idle or was cleared). */
 export const releaseSlidePins = () => slidePins.releaseAll();
+
+/** Lets go of every pin, claimed or not: the game was reset and the scenes they waited for will not play. */
+export const dropSlidePins = () => slidePins.releaseAll({ claimed: true });

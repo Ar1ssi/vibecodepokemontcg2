@@ -32,13 +32,13 @@ import {
 import { shouldAnimateMirror } from '../image-logic/draw-flight-predicate.mjs';
 import { playShuffleFlight } from '../image-logic/shuffle-flight.js';
 import { hideForFlight, playDrawBatch, showAfterFlight, takePrizeHandoff } from '../image-logic/draw-flight.js';
-import { captureKnockoutGhost, KO_START_BACKSTOP_MS, playKnockoutGhost } from '../image-logic/knockout-flight.js';
-import { KNOCKOUT_DURATION_MS } from '../image-logic/knockout-pose.mjs';
+import { cancelPendingKnockouts, captureKnockoutGhost, KO_START_BACKSTOP_MS, playKnockoutGhost } from '../image-logic/knockout-flight.js';
+import { KNOCKOUT_DURATION_MS, knockoutStackIds } from '../image-logic/knockout-pose.mjs';
 import { fxDisabled, motionReduced, rectForInstance } from '../image-logic/mat-fx.mjs';
 import { onFxSettingsChanged } from '../image-logic/fx-settings.js';
 import { playFx } from './mat-fx/index.js';
 import { pinKnockoutOrigins, pinSlideOrigins, pinTransitOrigins } from './mat-fx/lifecycle.js';
-import { claimSlidePin, releaseSlidePins } from './mat-fx/slide-pin-store.js';
+import { claimSlidePin, dropSlidePins, releaseSlidePins } from './mat-fx/slide-pin-store.js';
 import { pileOf } from './mat-fx/card-flight.js';
 import { listConditions } from '../../../../shared/engine/rules/special-conditions.mjs';
 import { afterHit, attackSceneEndsAt, knockoutHoldFor } from './mat-fx/combat.js';
@@ -369,7 +369,7 @@ function runPlan(plan) {
     if (!ghost) return 0;
     // Design 089: the scene starts on its hit, which may come after the queue has gone idle; its
     // cards stay pinned until it takes them.
-    for (const id of [ghost.instanceId, ...(ghost.attached || []).map((card) => card.instanceId)]) claimSlidePin(id);
+    knockoutStackIds(ghost).forEach(claimSlidePin);
     const sceneStarted = knockoutScenes.track();
     // Design 069: a knockout lands on its own card's hit (a ripple hit lands after the contact).
     playKnockoutGhost(ghost, {
@@ -441,6 +441,9 @@ if (typeof document !== 'undefined') {
   document.addEventListener('game-restarted', () => {
     openAttack = null;
     clearFxQueue();
+    // Design 089 edge 10: no scene of the old game is coming for the cards it pinned.
+    cancelPendingKnockouts();
+    dropSlidePins();
   });
   // Design 073: what arrives while the deck boxes deal plays after them.
   document.addEventListener('opening-deal-started', (event) => holdFxQueue(event.detail?.ms));

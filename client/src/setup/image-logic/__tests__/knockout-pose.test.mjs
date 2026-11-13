@@ -4,7 +4,36 @@ import {
   KNOCKOUT_DURATION_MS,
   KNOCKOUT_FLASH_END,
   knockoutPose,
+  knockoutStackIds,
 } from '../knockout-pose.mjs';
+import { createSlidePins } from '../../netcode/mat-fx/slide-pins.mjs';
+
+test('design 089: a knocked-out stack is the Pokémon then its attached cards; junk has no ids', () => {
+  assert.deepEqual(knockoutStackIds({ instanceId: 5, attached: [{ instanceId: 6 }, { src: 'x' }, { instanceId: 7 }] }), [5, 6, 7]);
+  assert.deepEqual(knockoutStackIds({ instanceId: 5 }), [5]);
+  assert.deepEqual(knockoutStackIds(null), []);
+  assert.deepEqual(knockoutStackIds({ attached: 'nope' }), []);
+});
+
+test('design 089: the cards of a stack the knockout scene does not fly are let go when it starts, not at the 9 s backstop', () => {
+  const log = [];
+  const pins = createSlidePins({ pin: () => true, unpin: (id, { ms }) => log.push([id, ms]), setTimer: () => 0, clearTimer: () => {} });
+  // A Pokémon with eight cards attached: the scene flies it and five of them.
+  const ghost = { instanceId: 1, attached: [2, 3, 4, 5, 6, 7, 8, 9].map((instanceId) => ({ instanceId })) };
+  const stack = knockoutStackIds(ghost);
+  stack.forEach((id) => pins.pin(id));
+  stack.forEach((id) => pins.claim(id));
+  // The queue goes idle: claimed pins stay.
+  pins.releaseAll();
+  assert.ok(stack.every((id) => pins.has(id)));
+  const flown = stack.slice(0, 6);
+  flown.forEach((id) => pins.take(id));
+  // What knockout-flight.js does once the scene has started.
+  stack.forEach((id) => pins.release(id));
+  assert.ok(stack.every((id) => !pins.has(id)), 'nothing is left frozen in the slot');
+  assert.deepEqual(log.filter(([id]) => flown.includes(id)).length, 6, 'a flown card is not released a second time');
+  assert.deepEqual(log.filter(([, ms]) => ms > 0).map(([id]) => id), [7, 8, 9]);
+});
 
 const fromRect = { left: 100, top: 100, width: 80, height: 110 };
 const toRect = { left: 400, top: 600, width: 60, height: 80 };

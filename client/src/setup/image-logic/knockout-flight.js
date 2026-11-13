@@ -11,11 +11,26 @@ import {
   selfContainerDocument,
 } from '../../state.js';
 import { visualRectOf } from '../board3d/board-rects.js';
-import { KNOCKOUT_DURATION_MS, knockoutPose } from './knockout-pose.mjs';
+import { KNOCKOUT_DURATION_MS, knockoutPose, knockoutStackIds } from './knockout-pose.mjs';
 import { fxDisabled, motionReduced, runPose, spawnOverlay } from './mat-fx.mjs';
 import { flightSrcOf, meshCanFly } from '../netcode/mat-fx/card-flight.js';
 import { frameTurnOf } from '../netcode/mat-fx/evolve-scene.js';
 import { playKnockoutScene } from '../netcode/mat-fx/ko-scene.js';
+import { releaseSlidePin } from '../netcode/mat-fx/slide-pin-store.js';
+
+// Design 089: a reset game cancels the knockouts still waiting for their hit (a scene started by
+// its backstop after the reset flew whatever card then had that instance id).
+let resetCount = 0;
+export const cancelPendingKnockouts = () => {
+  resetCount += 1;
+};
+
+/**
+ * Lets go of the stack's cards the scene did not take. The scene flies the Pokémon and at most
+ * KO_FAN_MAX attached cards, and takes each one's pin as its flight starts; a card past that, or
+ * a whole stack whose scene could not play, stayed frozen in the slot until the pin's backstop.
+ */
+const releaseStackPins = (ghost) => knockoutStackIds(ghost).forEach(releaseSlidePin);
 
 const discardRectFor = (user) => {
   const doc = user === 'self' ? selfContainerDocument : oppContainerDocument;
@@ -58,7 +73,13 @@ export const KO_START_BACKSTOP_MS = 1500;
  *   until `deferStart` calls back, so the KO lands on the attacker's strike.
  */
 export const playKnockoutGhost = (ghost, { deferStart } = {}) => {
-  if (!ghost || typeof document === 'undefined' || document.hidden) return;
+  if (!ghost || typeof document === 'undefined') return;
+  // A hidden tab plays no scene: the stack's pins go now, not at their backstop.
+  if (document.hidden) {
+    releaseStackPins(ghost);
+    return;
+  }
+  const bornAt = resetCount;
   const toRect = discardRectFor(ghost.user) || ghost.rect;
   const turn = ghost.turn || 0;
 
@@ -79,8 +100,15 @@ export const playKnockoutGhost = (ghost, { deferStart } = {}) => {
   const start = () => {
     if (started) return;
     started = true;
+    if (bornAt !== resetCount) {
+      standIn?.host.remove();
+      return;
+    }
     // Design 078: with motion reduced the scene only burns the card's mesh where it stood.
-    if (!fxDisabled() && playKnockoutScene(ghost, { reduced: motionReduced() })) {
+    const played = !fxDisabled() && playKnockoutScene(ghost, { reduced: motionReduced() });
+    // The scene took the pins of the cards it flies as it started them; the rest are let go.
+    releaseStackPins(ghost);
+    if (played) {
       standIn?.host.remove();
       return;
     }

@@ -55,9 +55,12 @@ export function createSlidePins({
       const entry = pinned.get(id);
       if (entry) entry.claimed = true;
     },
-    /** Lets every unclaimed card go to where the view has it (the queue went idle or was cleared). */
-    releaseAll() {
-      for (const [id, entry] of [...pinned]) if (!entry.claimed) letGo(id, SLIDE_PIN_GLIDE_MS);
+    /**
+     * Lets every unclaimed card go to where the view has it (the queue went idle or was cleared).
+     * `claimed: true` lets the claimed ones go too: the game was reset, and no scene is coming.
+     */
+    releaseAll({ claimed = false } = {}) {
+      for (const [id, entry] of [...pinned]) if (claimed || !entry.claimed) letGo(id, SLIDE_PIN_GLIDE_MS);
     },
     has: (id) => pinned.has(id),
   };
