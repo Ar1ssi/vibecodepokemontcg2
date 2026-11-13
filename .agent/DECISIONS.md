@@ -10,7 +10,7 @@
 
 - D250 2026-11-13 [harness] CI (.github/workflows/ci.yml) runs `eslint --quiet .` and the unit suite on pushes to main and on PRs: lint errors are a gate, formatting warnings are not.
 - D249 2026-11-13 [mat-fx] A Stadium board is keyed by its Homebrew card's name (lower case, `-` joined), never its number: a set renumbering sent 22 Stadiums to no board or the wrong one (I282). (environmentKeyFor)
-- D248 2026-11-13 [server] Access lives in server/access-policy.mjs: production admin UI only with its own ADMIN_PASSWORD, other origins only by ALLOWED_ORIGINS; the page loads the server's own /socket.io/socket.io.js.
+- D248 2026-11-13 [server] server/access-policy.mjs: production admin UI only with its own ADMIN_PASSWORD; CORS only by ALLOWED_ORIGINS (WebSocket upgrades unchecked); the page loads the server's own Socket.IO client.
 - D247 2026-11-13 [server] Deploys serve an esbuild bundle (one hashed script + sheet, immutable); unhashed files are `no-cache`; dev stays unbundled ESM. Deps: esbuild, compression. (Amends D4; design 088)
 - D246 2026-11-12 [client] The board outside a room stays (user): the client rules layer is its engine and is not deleted; 087 slice 3 struck. It draws nothing today (I283). (design 087)
 - D245 2026-11-12 [netcode] Legacy relay removed: the server always runs the rules; SERVER_AUTHORITATIVE opt-outs only warn; no shadow mode; room-sweep.mjs frees roomInfo past grace. (Supersedes D216; design 087)

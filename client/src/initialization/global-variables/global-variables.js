@@ -13,7 +13,7 @@ const defaultCardBackSrc = resolveDefaultCardBackSrc();
 
 export const version = '1.5.1';
 
-// exports a WebSocket connection using the Socket.IO library, loaded via CDN in index.ejs
+// exports a WebSocket connection using the Socket.IO library, which index.ejs loads from this server
 const socketUrl = window.location.hostname === 'ptcgsim.online'
   ? 'https://ptcgsim.online'
   : window.location.origin || 'https://ptcgsim.online';

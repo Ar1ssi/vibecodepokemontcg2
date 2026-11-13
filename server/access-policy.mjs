@@ -1,5 +1,8 @@
 // Who may reach the server from outside its own pages: the Socket.IO admin UI, and browsers on
 // another origin. The game's own pages are same-origin and need neither.
+// CORS only governs what a browser lets another site's page read: HTTP routes and Socket.IO's
+// polling transport. A WebSocket upgrade carries no such check, so this is not an access
+// control (the server has no cookie or session to protect; seats are held by tokens).
 
 /** The password the admin UI takes on a developer's machine when none is set. */
 export const DEV_ADMIN_PASSWORD = 'defaultPassword';
@@ -65,8 +68,8 @@ function httpOrigin(entry) {
 }
 
 /**
- * The cross-origin allowances for the HTTP routes and for Socket.IO. With `ALLOWED_ORIGINS` unset
- * no other site is allowed; the admin UI's own origin is added for Socket.IO while it is on.
+ * The CORS allowances for the HTTP routes and for Socket.IO. With `ALLOWED_ORIGINS` unset
+ * no other site gets one; the admin UI's own origin is added for Socket.IO while it is on.
  * @param {Record<string, string | undefined>} env the process environment
  * @param {{ enabled: boolean }} adminUi the result of `planAdminUi`
  * @returns {{ http: { origin: string[] | false },

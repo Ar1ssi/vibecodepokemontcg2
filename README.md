@@ -341,7 +341,7 @@ Environment variables:
 | `NODE_ENV`             | none                           | `production` closes the `?e2e=1` test bridge (also set on the deploy config).     |
 | `ROOM_GRACE_MS`        | 30 minutes                     | How long an empty room is kept before the sweep.                                  |
 | `ADMIN_PASSWORD`       | `defaultPassword` (dev only)   | Password for the Socket.IO admin UI. With `NODE_ENV=production` the admin UI is off until this is set to something else. |
-| `ALLOWED_ORIGINS`      | none                           | Comma-separated origins of other sites allowed to call the server from a browser; the game's own pages need none. |
+| `ALLOWED_ORIGINS`      | none                           | Comma-separated origins of other sites given a CORS allowance (HTTP routes and Socket.IO polling; WebSocket upgrades are not origin-checked). The game's own pages need none. |
 | `CLIENT_BUNDLE`        | on for deploys, else off       | `1` serves the bundle in `client/dist/` (`pnpm build`), `0` the source files.     |
 | `KEEP_AWAKE`           | off                            | `1` pings the site's own URL every 10 minutes so a free Render instance never sleeps. |
 | `KEEP_AWAKE_URL`       | `RENDER_EXTERNAL_URL`          | The address `KEEP_AWAKE` pings, when the host does not provide one.               |
