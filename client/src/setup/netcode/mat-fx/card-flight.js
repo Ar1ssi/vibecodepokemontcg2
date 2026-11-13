@@ -149,9 +149,9 @@ export function playGhostTrack({ src, backSrc = null, face = 'front', rect, pose
   return playMeshTrack({ instanceId: ghostId, rect, pose, duration, delay, lift }).then(() => scene.removeGhostCard(ghostId));
 }
 
-/** A soft gold glow on the pile as a card lands in it. */
-export function playPileCatch(pileRect, delay = 0) {
-  const host = spawnOverlay({ rect: pileRect, className: 'fx-overlay fx-pile-catch' });
+/** A soft glow on the pile as a card lands in it: gold, or the pile's own colour with `variant` (a class). */
+export function playPileCatch(pileRect, delay = 0, variant = '') {
+  const host = spawnOverlay({ rect: pileRect, className: `fx-overlay fx-pile-catch ${variant}`.trim() });
   const frames = [
     { transform: 'scale(0.9)', opacity: 0 },
     { transform: 'scale(1.05)', opacity: 1, offset: 0.25 },

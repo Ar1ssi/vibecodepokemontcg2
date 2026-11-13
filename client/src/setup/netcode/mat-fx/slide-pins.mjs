@@ -46,6 +46,10 @@ export function createSlidePins({
     take(id) {
       letGo(id, 0);
     },
+    /** Card `id` flies nowhere after all: it glides to where the view has it. */
+    release(id) {
+      letGo(id, SLIDE_PIN_GLIDE_MS);
+    },
     /** A scene that is about to play owns card `id`'s pin: `releaseAll` leaves it (the backstop still frees it). */
     claim(id) {
       const entry = pinned.get(id);

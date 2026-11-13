@@ -561,7 +561,7 @@ function putHandOnTop(ctx) {
     const chosen = pickById(hand, ctx.selection);
     for (const card of chosen) removeFromZones(player, card);
     player.zones.deck.unshift(...chosen);
-    ctx.events.push({ type: 'cardsMovedToDeckTop', count: chosen.length, playerId: player.playerId });
+    ctx.events.push({ type: 'cardsMovedToDeckTop', count: chosen.length, playerId: player.playerId, from: 'hand' });
     return null;
   }
   const count = Math.min(step.count || 1, hand.length);
@@ -583,7 +583,7 @@ function opponentShuffleHandDraw(ctx) {
     // opponent draws even when the hand was empty.
     const hand = opponent.zones.hand.splice(0);
     opponent.zones.deck.push(...hand);
-    if (hand.length > 0) ctx.events.push({ type: 'cardsShuffledIntoDeck', count: hand.length, playerId: opponent.playerId });
+    if (hand.length > 0) ctx.events.push({ type: 'cardsShuffledIntoDeck', count: hand.length, playerId: opponent.playerId, from: 'hand' });
     shuffleDeck(opponent, ctx);
     // Reset Stamp (Unified Minds 206): "a card for each of their remaining Prize cards" (I231).
     const count = step.perPrize ? (opponent.zones.prizes || []).length : step.count || 3;
@@ -5780,7 +5780,7 @@ function eachPlayerShuffleHandTrainers(ctx) {
       removeFromZones(side, card);
       side.zones.deck.push(card);
     }
-    ctx.events.push({ type: 'cardsShuffledIntoDeck', count: trainers.length, playerId: side.playerId, cards: namedCards(trainers) });
+    ctx.events.push({ type: 'cardsShuffledIntoDeck', count: trainers.length, playerId: side.playerId, cards: namedCards(trainers), from: 'hand' });
     shuffleDeck(side, ctx);
   }
   return null;
@@ -6076,7 +6076,7 @@ function eachPlayerShuffleDiscardCards(ctx) {
       removeFromZones(side, card);
       side.zones.deck.push(card);
     }
-    ctx.events.push({ type: 'cardsShuffledIntoDeck', count: cards.length, playerId: side.playerId, cards: namedCards(cards) });
+    ctx.events.push({ type: 'cardsShuffledIntoDeck', count: cards.length, playerId: side.playerId, cards: namedCards(cards), from: 'discard' });
     shuffleDeck(side, ctx);
   };
   let turn = ctx.memo?.turn ?? 0;

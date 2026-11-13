@@ -27,6 +27,8 @@ import {
   trainerPlay,
 } from './lifecycle.js';
 import { prizeClaim } from './prize.js';
+import { attackFail, block, prizePulse, retreatBlocked } from './board-fx.js';
+import { pileCatch, prizesDeal, transit } from './transit.js';
 import { coinFlip } from './coin.js';
 import { status, statusClear } from './status.js';
 
@@ -50,6 +52,14 @@ const EFFECTS = {
   'ability-banner': abilityBanner,
   'prize-claim': prizeClaim,
   'game-over': gameOver,
+  // Design 089: what the engine reported and nothing showed.
+  block,
+  'retreat-blocked': retreatBlocked,
+  'attack-fail': attackFail,
+  'prize-pulse': prizePulse,
+  'prizes-set': prizesDeal,
+  transit,
+  'pile-catch': pileCatch,
 };
 // The coin ceremony has its own reduced-motion form (faces shown without the tumble).
 const STATIC_FALLBACKS = { 'coin-flip': coinFlip };

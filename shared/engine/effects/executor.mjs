@@ -1255,7 +1255,7 @@ export function executeSteps(draft, {
             const returned = hand.splice(0, hand.length);
             (p.zones.deck || []).push(...returned);
             if (activeRng) shuffleInPlace(activeRng, p.zones.deck);
-            events.push({ type: 'cardsShuffledIntoDeck', count: returned.length, playerId: p.playerId });
+            events.push({ type: 'cardsShuffledIntoDeck', count: returned.length, playerId: p.playerId, from: 'hand' });
             const drawn = p.zones.deck.splice(0, Math.min(step.drawCount, p.zones.deck.length));
             hand.push(...drawn);
             events.push({
@@ -1290,6 +1290,7 @@ export function executeSteps(draft, {
                 type: 'cardsMovedToDeckBottom',
                 count,
                 playerId: p.playerId,
+                from: 'hand',
               });
             } else {
               (p.zones.deck || []).push(...returned);
@@ -1298,6 +1299,7 @@ export function executeSteps(draft, {
                 type: 'cardsShuffledIntoDeck',
                 count,
                 playerId: p.playerId,
+                from: 'hand',
               });
             }
           }

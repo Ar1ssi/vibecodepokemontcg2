@@ -19,6 +19,7 @@ import {
   spawnParticles,
 } from '../../image-logic/mat-fx.mjs';
 import { playBanner } from './banner.js';
+import { playHeal, playPowerFlare } from './board-fx.js';
 import { classifyHitOnce, peekHit } from './damage-hit.mjs';
 import {
   AURA_PULSE_MS,
@@ -364,6 +365,8 @@ export const damage = (plan) => {
     const secondary = hitDelayFor(strikeCtx, plan.instanceId) > 0;
     const ctx = secondary ? hitContextFor(strikeCtx, rect) : strikeCtx;
     showDamageNumber(plan.instanceId, rect, hit);
+    // Design 089: a heal is more than its number.
+    if (hit.kind === 'heal') playHeal(plan.instanceId);
     if (hit.kind !== 'hit') return;
     const dressing = hitDressingFor(ctx?.family);
     if (!playImpactPrefab(ctx, target, hit)) strikeTarget(rect, hit, ctx, dressing);
@@ -594,6 +597,7 @@ export const attack = (plan) => {
 };
 
 const MAX_TARGET_RINGS = 6;
+const POWER_TAGS = Object.freeze({ gx: 'GX attack', vstar: 'VSTAR Power' });
 
 const showTargetRing = (rect) => {
   const host = spawnOverlay({ rect, className: 'fx-overlay fx-target-ring' });
@@ -615,7 +619,10 @@ export const attackBanner = (plan) => {
   if (attacker) prepareImpact(impactTypeFor(attacker, pickSignature(plan, attacker)?.spec.vgType ?? pickMove(plan, attacker)?.vgType ?? null));
   const text = attackBannerText(plan.attackName, attackerName);
   if (!text) return 0;
-  playBanner(text, plan.user, 'attack');
+  // Design 089: a GX attack and a VSTAR Power attack say so, and flare on the attacker.
+  const powerTag = POWER_TAGS[plan.power];
+  playBanner(powerTag ? { ...text, tag: powerTag } : text, plan.user, powerTag ? `attack ${plan.power}` : 'attack');
+  if (powerTag) playPowerFlare(plan.attackerId, plan.power);
   // Design 069: every card the attack damages is marked, not only the Active.
   const hitRects = hitTargetsOf(plan, registry).slice(0, MAX_TARGET_RINGS).map((target) => target.rect);
   if (hitRects.length > 0) {

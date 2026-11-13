@@ -23,11 +23,12 @@ const textNode = (className, text) => {
 /**
  * Sweeping centre-screen banner: a striped band, a light sweep across it, and
  * the text trailing the band in and leading it out.
- * @param {{title:string, sub?:string}} text
+ * @param {{title:string, sub?:string, tag?:string}} text - `tag` (design 089): a pill under the
+ *   text, e.g. "GX attack".
  * @param {'self'|'opp'|null} side - tints the banner; 'neutral' when unknown.
- * @param {string} [variant] - extra `fx-banner--<variant>` modifier class.
+ * @param {string} [variant] - extra `fx-banner--<variant>` modifier classes (space-separated names).
  */
-export const playBanner = ({ title, sub }, side, variant) => {
+export const playBanner = ({ title, sub, tag }, side, variant) => {
   const rect = viewportRect();
   if (rect.width < 2) return;
   const strip = { left: 0, top: rect.height * 0.39, width: rect.width, height: rect.height * 0.18 };
@@ -35,7 +36,10 @@ export const playBanner = ({ title, sub }, side, variant) => {
     'fx-overlay',
     'fx-banner',
     `fx-banner--${side || 'neutral'}`,
-    variant ? `fx-banner--${variant}` : '',
+    ...String(variant || '')
+      .split(' ')
+      .filter(Boolean)
+      .map((name) => `fx-banner--${name}`),
   ]
     .filter(Boolean)
     .join(' ');
@@ -49,6 +53,7 @@ export const playBanner = ({ title, sub }, side, variant) => {
   content.className = 'fx-banner__content';
   content.appendChild(textNode('fx-banner__title', title));
   if (sub) content.appendChild(textNode('fx-banner__sub', sub));
+  if (tag) content.appendChild(textNode('fx-banner__power', tag));
   host.append(band, content);
 
   const bandFrames = sampleKeyframes(

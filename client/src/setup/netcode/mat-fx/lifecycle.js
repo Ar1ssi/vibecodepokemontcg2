@@ -27,7 +27,9 @@ import {
   RETREAT_SLIDE_MS,
   discardPuffPose,
   energySnapPose,
+  deckSweepSource,
   moveIdsForEvent,
+  pileTransitOf,
   presentDimPose,
   presentPoseFor,
   presentSrcFor,
@@ -38,10 +40,10 @@ import {
   slideMeshPose,
 } from './lifecycle-pose.mjs';
 import { getBoardScene } from '../../board3d/board3d.js';
-import { createSlidePins } from './slide-pins.mjs';
+import { pinSlide, slidePinned, takeSlidePin } from './slide-pin-store.js';
 import { sweepPose } from './flow-pose.mjs';
 import { holdFor } from './fx-holds.mjs';
-import { discardedIds, knockoutStack, takeOrigin, takeZoneSweep } from './origins.mjs';
+import { discardedIds, knockoutStack, takeOrigin, takeZoneSweep, zoneCardIds } from './origins.mjs';
 import { cardShapedRect } from './card-flight.mjs';
 import { meshCanFly, pileOf, playDiscardFlights, playMeshTrack } from './card-flight.js';
 import { playsOppPreview } from './opp-play.mjs';
@@ -190,23 +192,18 @@ function slideStackMeshes(registry, id, origin, { duration, liftFrac }) {
       duration,
       lift: liftFrac * to.height,
     });
-    slidePins.take(memberId);
+    takeSlidePin(memberId);
     flown += 1;
   }
   return flown;
 }
-
-const slidePins = createSlidePins({
-  pin: (id) => Boolean(getBoardScene()?.pinCard?.(id)),
-  unpin: (id, options) => getBoardScene()?.unpinCard?.(id, options),
-});
 
 /**
  * Where a sliding card will stand. A pinned card is frozen in its old slot, and so is its rect on
  * screen: its target is where the scene's model has it.
  */
 function slideTargetRect(id, registry) {
-  const modelled = slidePins.has(id) ? getBoardScene()?.cardModelRect?.(id) : null;
+  const modelled = slidePinned(id) ? getBoardScene()?.cardModelRect?.(id) : null;
   return modelled ?? rectForInstance(id, registry);
 }
 
@@ -220,7 +217,7 @@ export function pinSlideOrigins(events, registry) {
   for (const event of events) {
     for (const id of slideIdsForEvent(event)) {
       for (const memberId of stackIdsOf(registry, id)) {
-        if (meshCanFly(memberId)) slidePins.pin(memberId);
+        if (meshCanFly(memberId)) pinSlide(memberId);
       }
     }
   }
@@ -236,19 +233,27 @@ export function pinKnockoutOrigins(events, registry) {
   for (const event of events) {
     if (event?.type !== 'pokemonKnockedOut' || event.instanceId == null) continue;
     for (const memberId of stackIdsOf(registry, event.instanceId)) {
-      if (meshCanFly(memberId)) slidePins.pin(memberId);
+      if (meshCanFly(memberId)) pinSlide(memberId);
     }
   }
 }
 
-/** The scene flying card `id` takes its pin over (call it after the flight has started). */
-export const takeSlidePin = (id) => slidePins.take(id);
-
-/** A scene about to play owns card `id`'s pin: an idle queue no longer releases it (design 089). */
-export const claimSlidePin = (id) => slidePins.claim(id);
-
-/** Lets go of pins whose slide never played (the FX queue went idle or was cleared). */
-export const releaseSlidePins = () => slidePins.releaseAll();
+/**
+ * Design 089, before the diff: holds the mesh of every card the events put into the deck or the
+ * Lost Zone where it stands now. The view frees those meshes at once (a pile shows no card of
+ * its own); the `transit` effect flies each one into its pile and lets it go.
+ * @param {(event: object) => 'self'|'opp'} sideOf whose zone an unnamed sweep empties
+ */
+export function pinTransitOrigins(events, registry, sideOf) {
+  if (!Array.isArray(events)) return;
+  for (const event of events) {
+    const source = deckSweepSource(event);
+    const swept = source ? zoneCardIds(registry, sideOf(event), source) : [];
+    for (const id of [...(pileTransitOf(event)?.ids ?? []), ...swept]) {
+      if (meshCanFly(id)) pinSlide(id);
+    }
+  }
+}
 
 export const retreat = (plan) => {
   const registry = getCardRegistry();

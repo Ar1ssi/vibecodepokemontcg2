@@ -35,11 +35,17 @@ test('advisoryAnimationPlan: zoneShuffled -> shuffle plan for the shuffling side
 test('advisoryAnimationPlan: zoneShuffledIntoDeck animates the deck, not the source zone', () => {
   for (const zoneId of ['hand', 'discard', 'board']) {
     const event = { type: 'zoneShuffledIntoDeck', zoneId, playerId: 'p1' };
-    assert.deepEqual(advisoryAnimationPlan(event, 'p1'), {
-      kind: 'shuffle',
-      user: 'self',
-      zoneId: 'deck',
-    });
+    const plans = advisoryAnimationPlan(event, 'p1');
+    assert.deepEqual(plans.at(-1), { kind: 'shuffle', user: 'self', zoneId: 'deck' });
+    // Design 089: the zone's cards go into the deck first — flown when the board shows them (a
+    // hand, a board), a light on the deck when it does not (a discard pile's buried cards).
+    assert.deepEqual(
+      plans[0],
+      zoneId === 'discard'
+        ? { kind: 'fx', effect: 'pile-catch', user: 'self', zoneId: 'deck' }
+        : { kind: 'fx', effect: 'transit', user: 'self', to: 'deck', sweep: zoneId }
+    );
+    assert.equal(plans.length, 2);
   }
 });
 
@@ -281,12 +287,14 @@ test('advisoryAnimationPlan: board-to-board and out-of-play moves are not an ent
     ['active', 'bench'],
     ['active', 'hand'],
     ['deck', 'hand'],
-    ['active', 'lostZone'],
   ];
   for (const [from, to] of moves) {
     const event = { type: 'cardMoved', playerId: 'p1', instanceId: 3, from, to };
     assert.equal(advisoryAnimationPlan(event, 'p1'), null, `${from} -> ${to}`);
   }
+  // Design 089: into the Lost Zone is no entry either, but the card flies there.
+  const lost = advisoryAnimationPlan({ type: 'cardMoved', playerId: 'p1', instanceId: 3, from: 'active', to: 'lostZone' }, 'p1');
+  assert.equal(lost.effect, 'transit');
   assert.equal(advisoryAnimationPlan({ type: 'cardMoved', playerId: 'p1', from: 'hand', to: 'bench' }, 'p1'), null);
 });
 
@@ -468,16 +476,18 @@ test('deckShuffles: a shuffle an effect reports twice animates once; a lone hand
   assert.equal(sounds.has(recoverIn), false);
   assert.equal(sounds.get(judgeIn), 'search-shuffle');
   assert.equal(sounds.get(shuffleDraw), 'search-shuffle');
-  assert.deepEqual(advisoryAnimationPlan(judgeIn, 'A', undefined, { shuffleSound: sounds.get(judgeIn) }), {
-    kind: 'shuffle',
-    user: 'opp',
-    zoneId: 'deck',
-    sound: 'search-shuffle',
-  });
-  assert.equal(advisoryAnimationPlan(redCardIn, 'A', undefined, { shuffleSound: sounds.get(redCardIn) }), null);
+  // Design 089: the cards go into the deck (a light on it: the event names no zone), then the shuffle.
+  assert.deepEqual(advisoryAnimationPlan(judgeIn, 'A', undefined, { shuffleSound: sounds.get(judgeIn) }), [
+    { kind: 'fx', effect: 'pile-catch', user: 'opp', zoneId: 'deck' },
+    { kind: 'shuffle', user: 'opp', zoneId: 'deck', sound: 'search-shuffle' },
+  ]);
+  // The shuffle Red Card reports twice still animates once, on its deckShuffled.
+  assert.deepEqual(advisoryAnimationPlan(redCardIn, 'A', undefined, { shuffleSound: sounds.get(redCardIn) }), [
+    { kind: 'fx', effect: 'pile-catch', user: 'opp', zoneId: 'deck' },
+  ]);
 });
 
-test('design 064: prizesSet and retreatBlocked plan as sound-only fx for their player', () => {
+test('design 064: prizesSet and retreatBlocked plan as fx for their player', () => {
   assert.deepEqual(advisoryAnimationPlan({ type: 'prizesSet', playerId: 'p2', count: 6 }, 'p1'), {
     kind: 'fx',
     user: 'opp',
@@ -487,8 +497,10 @@ test('design 064: prizesSet and retreatBlocked plan as sound-only fx for their p
   const blocked = advisoryAnimationPlan({ type: 'retreatBlocked', playerId: 'p1', instanceId: 7 }, 'p1');
   assert.equal(blocked.effect, 'retreat-blocked');
   assert.equal(blocked.user, 'self');
+  // Design 089: both have a visual now (the Prize deal, the lock shield), so they pace the queue.
   for (const effect of ['prizes-set', 'retreat-blocked']) {
-    assert.ok(SOUND_ONLY_FX.has(effect), effect);
+    assert.ok(!SOUND_ONLY_FX.has(effect), effect);
+    assert.ok(Object.hasOwn(HOLD_MS, effect), effect);
   }
 });
 

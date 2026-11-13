@@ -279,3 +279,25 @@ Self-approval checklist:
 - Slice 4: `patch/choice-after-fx` (bc8fb2c49) cherry-picked whole (its tests and its playtest-bot and e2e-api
   parts too); two import/KO-plan conflicts with slice 3 resolved by keeping both. `settleDroppedPlan` is pure
   (in `advisory-animations.mjs`) so the dropped-plan rule has a node test.
+- Slice 5 (planner): the Prize deal keeps the engine's effect name `prizes-set` (its sound cue); GX / VSTAR
+  use is shown by the attack's own banner (a `power` tag on its plans from `attackPowers`, a pill under the
+  attack name and a flare on the attacker) instead of a separate `power-flare` plan after the strike, where it
+  read as an afterthought; `gx-used` / `vstar-used` stay the crowd's sound. `attackBenchFizzled` plans nothing:
+  the attack still executes. Cards taken out of a pile into the hand reuse the `draw` plan (one per player and
+  pile, `source` names a pile other than the deck). An unnamed "into the deck" sweeps the zone's cards only when
+  the event says which zone they left: `cardsShuffledIntoDeck`, `cardsMovedToDeckBottom` and `cardsMovedToDeckTop`
+  now carry `from` at the seven engine sites that know it (additive); without it the deck only lights.
+- Slice 5 (look, after the first renders): the first shield, heal, Prize pulse and power flare filled the card
+  with a bright plate and threw a ray burst — a white card and a sunburst, both against the user's standing
+  corrections. Rebuilt on one rule: a card is never washed out. Light goes round the card (a halo on the cloth
+  behind it, depth-tested so the card hides its inside; a thin outline; a glint crossing the face) and the
+  ring a Pokémon lands with is drawn on the cloth under it. Sprites that lie on the cloth lean toward the camera
+  and so drew over cards: ground rings are canvas gradients on the depth-tested back pass instead.
+- Slice 5: `slide-pin-store.js` holds the one pin set, so `transit.js`, `ko-scene.js` and `lifecycle.js` do
+  not import each other (entry.js → transit.js → lifecycle.js → entry.js was a cycle).
+- Slice 8: the shuffle is played by the pile's own layer meshes (`pile-mesh.js shuffle`, posed by
+  `shuffle-math.mjs`), not a separate rig: no second set of card meshes, and the pile cannot show under its own
+  shuffle. The riffle drifts 0.45 card widths toward the table's middle for the cut and back as it is squared: the
+  first renders had the outer packet over the deck box. `shuffle-pose.mjs`, its test and the `.card-shuffle-flight`
+  CSS are deleted. The Prize deal landed with slice 5 (`transit.js prizesDeal`); the Prize claim burst is part of
+  the slice 9 pass. Stills: `.claude/skills/fx-preview/rec/rec-board-fx.mjs` (ONLY=shuffle).

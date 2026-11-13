@@ -130,6 +130,21 @@ const STATIC_VOICES = Object.freeze({
   ],
   'status-clear': arpeggio([622, 831, 1109], { step: 0.05, dur: 0.16, gain: 0.12, wave: 'sine' }),
   discard: [noise(0.12, 0.14, { type: 'lowpass', freq: 1100, q: 0.7 })],
+  // Design 089: the synth fallbacks of the gap effects (their samples are in sfx-cues.mjs). A
+  // shield rings glassy and high; a failed attack sags; cards sliding into a pile hush.
+  block: [
+    tone(1320, 0.16, 0.14, { wave: 'sine', freqTo: 1760 }),
+    tone(660, 0.22, 0.1, { wave: 'triangle', delay: 0.02 }),
+  ],
+  'retreat-blocked': [tone(330, 0.2, 0.15, { wave: 'square', freqTo: 247 })],
+  'attack-fail': [
+    tone(392, 0.3, 0.14, { wave: 'triangle', freqTo: 196 }),
+    noise(0.22, 0.08, { type: 'lowpass', freq: 700, q: 0.7 }),
+  ],
+  'prize-pulse': arpeggio([988, 1319], { step: 0.07, dur: 0.2, gain: 0.11, wave: 'sine' }),
+  'prizes-set': [noise(0.3, 0.12, { type: 'bandpass', freq: 900, q: 0.8 })],
+  transit: [noise(0.2, 0.13, { type: 'bandpass', freq: 760, q: 0.9 })],
+  'pile-catch': [noise(0.1, 0.12, { type: 'lowpass', freq: 900, q: 0.7 })],
   // Design 052: the Build & Battle unboxing (builder tab). The hit chime climbs with the tier.
   'unbox-tear': [noise(0.18, 0.35, { type: 'bandpass', freq: 1800, q: 0.9 })],
   // Design 055: one tick per 10 % of the rip while the finger peels the 3D pack's strip.

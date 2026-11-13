@@ -17,7 +17,7 @@ import {
   playTrailTrack,
 } from './card-flight.js';
 import { burstParticles } from './particles.mjs';
-import { takeSlidePin } from './lifecycle.js';
+import { takeSlidePin } from './slide-pin-store.js';
 import {
   KO_FAN_MAX,
   KO_REDUCED_BURN_MS,

@@ -288,6 +288,12 @@ const CUE_PLAYS_FOR_EFFECT = {
   'deck-reveal': () => single('card-reveal'),
   enter: enterPlays,
   'retreat-blocked': () => single('retreat-lock-flare'),
+  // Design 089: the gap effects reuse the game's own samples.
+  block: () => single('retreat-lock-flare'),
+  'attack-fail': () => single('coin-loss'),
+  'prize-pulse': () => single('card-flip'),
+  transit: () => [['card-swoosh', 0]],
+  'pile-catch': () => single('discard-deposit'),
   'retreat-lock-applied': () => single('retreat-lock-intro'),
   'play-lock': playLockPlays,
   'attack-marker': (plan) => (plan?.markerKind === 'deferredKnockOut' ? [['doom-curse-1', 0]] : []),

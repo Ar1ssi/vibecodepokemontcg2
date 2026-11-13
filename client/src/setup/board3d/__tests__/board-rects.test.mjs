@@ -137,6 +137,8 @@ test('fxSettleHoldMs: a card-moving batch waits for the 3D pose tween; nothing e
   assert.equal(fxSettleHoldMs(moved, true), BOARD3D_SETTLE_MS);
   assert.equal(fxSettleHoldMs([{ type: 'cardsDrawn', cards: [] }], true), BOARD3D_SETTLE_MS);
   assert.equal(fxSettleHoldMs([{ type: 'pokemonEvolved' }], true), BOARD3D_SETTLE_MS);
+  // Design 089: the Prize deal flies the Prize cards' meshes, which exist once the view is applied.
+  assert.equal(fxSettleHoldMs([{ type: 'prizesSet', playerId: 'p1', count: 6 }], true), BOARD3D_SETTLE_MS);
   assert.equal(fxSettleHoldMs([{ type: 'damageUpdated' }, { type: 'statusApplied' }], true), 0);
   assert.equal(fxSettleHoldMs(moved, false), 0, 'the iframe board never waits');
   assert.equal(fxSettleHoldMs(null, true), 0);

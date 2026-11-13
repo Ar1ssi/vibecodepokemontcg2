@@ -1109,3 +1109,85 @@ body.fx-off .fx-mega-field {
   height: 100vh;
   z-index: 2456;
 }
+
+/* ── Design 089: responses and gaps ───────────────────────────────────── */
+
+/* A word over a card (No damage, Survived, Can't retreat): crisp text over the shield the board's
+   FX layer draws. The host is the card's rect; the label is what moves. */
+.fx-tag-pop {
+  z-index: 2462;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+  --fx-tag-rgb: 150, 215, 255;
+  --fx-tag-ink: #04233a;
+}
+
+.fx-tag-pop--lock {
+  --fx-tag-rgb: 255, 200, 110;
+  --fx-tag-ink: #3a2204;
+}
+
+.fx-tag-pop__label {
+  padding: 0.24em 0.7em 0.2em;
+  font: 900 1em var(--fx-font);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--fx-tag-ink);
+  background: linear-gradient(180deg, #fff, rgb(var(--fx-tag-rgb)));
+  border-radius: 0.34em;
+  box-shadow: 0 0 0.7em rgba(var(--fx-tag-rgb), 0.85), 0 0.2em 0.5em rgba(0, 0, 0, 0.5);
+  transform-origin: 50% 60%;
+  will-change: transform, opacity;
+}
+
+/* An attack that does not happen: the attack banner, drained of its heat, its name struck out. */
+.fx-banner--attack-fail {
+  --fx-banner-color: #b9b4cc;
+  --fx-banner-deep: 22, 20, 34;
+}
+
+.fx-banner--attack-fail .fx-banner__title {
+  color: #d9d6e6;
+  text-decoration: line-through;
+  text-decoration-thickness: 0.09em;
+  text-decoration-color: rgba(255, 255, 255, 0.75);
+}
+
+.fx-banner--attack-fail .fx-banner__sub {
+  letter-spacing: 0.18em;
+}
+
+/* A GX attack and a VSTAR Power attack keep the attack banner's shape in their own metal. */
+.fx-banner--gx {
+  --fx-banner-color: #8fd0ff;
+  --fx-banner-deep: 6, 26, 58;
+}
+
+.fx-banner--vstar {
+  --fx-banner-color: #ffd872;
+  --fx-banner-deep: 48, 32, 4;
+}
+
+.fx-banner__power {
+  margin-top: 0.3em;
+  padding: 0.16em 0.9em 0.12em;
+  font: 900 clamp(0.7rem, 1.7vh, 1rem) var(--fx-font);
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: rgb(var(--fx-banner-deep));
+  background: linear-gradient(180deg, #fff, var(--fx-banner-color));
+  border-radius: 999px;
+  box-shadow: 0 0 0.9em var(--fx-banner-color);
+}
+
+/* The Lost Zone catches a card in its own violet. */
+.fx-pile-catch--lost {
+  background: radial-gradient(circle, rgba(196, 150, 255, 0.5) 0%, rgba(130, 80, 230, 0.2) 45%, rgba(110, 60, 220, 0) 70%);
+}
+
+.fx-pile-catch--deck {
+  background: radial-gradient(circle, rgba(170, 215, 255, 0.45) 0%, rgba(90, 160, 255, 0.18) 45%, rgba(70, 140, 255, 0) 70%);
+}

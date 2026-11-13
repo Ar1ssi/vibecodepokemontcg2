@@ -24,7 +24,9 @@ import {
   svgDataUrl,
 } from './entry-art.mjs';
 import { placeCentered, playCanvasStage } from './canvas-stage.js';
+import { playLanding } from './board-fx.js';
 import { signatureEntryKind } from './entry-kind.mjs';
+import { flyFromPile } from './transit.js';
 import { buildMegaShell, drawMegaOrb, megaOrbPose } from './mega-orb.mjs';
 import { drawMegaVortex } from './mega-vortex.mjs';
 import {
@@ -342,16 +344,27 @@ export function playSignatureEntry(kind, rect, instanceId, card) {
   return false;
 }
 
-/** `enter` effect: a Pokémon was put into play; only Mega/Tera get an animation. */
+/**
+ * `enter` effect: a Pokémon was put into play. A Mega or Tera plays its signature entry; any other
+ * lands on its slot (design 089: the card settles, a ring in its type colour rolls out from under
+ * it). One that came out of the deck or the discard pile flies in from that pile first
+ * (`plan.held`: the card, hidden since the plan was queued).
+ */
 export const enter = (plan) => {
+  clearTimeout(plan.backstop);
   const registry = getCardRegistry();
   const card = registry.get(plan.instanceId)?.card;
+  const held = Array.isArray(plan.held) ? plan.held[0] : null;
+  const flightMs = held ? flyFromPile(held, plan.user, plan.from) : 0;
   const kind = signatureEntryKind(card);
-  if (!kind) return;
-  playSignatureEntry(
-    kind,
-    rectForInstance(plan.instanceId, registry),
-    plan.instanceId,
-    card
-  );
+  const land = () => {
+    if (kind) playSignatureEntry(kind, rectForInstance(plan.instanceId, registry), plan.instanceId, card);
+    else playLanding(plan.instanceId, card);
+  };
+  if (flightMs > 0) {
+    setTimeout(land, flightMs);
+    return flightMs * 0.8;
+  }
+  land();
+  return undefined;
 };

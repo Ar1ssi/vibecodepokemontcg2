@@ -36,6 +36,52 @@ export function moveIdsForEvent(event) {
 
 const SLIDE_EVENTS = new Set(['cardRetreated', 'pokemonSwapped', 'cardSwitched']);
 
+// Design 089: piles a card can go into with nothing left on screen where it was.
+const PILE_TARGETS = new Set(['deck', 'lostZone']);
+// Events that name the cards they put into a pile.
+const NAMED_TRANSITS = Object.freeze({ cardsLostZoned: 'lostZone', cardsPutInDeck: 'deck' });
+// Zones whose cards are on screen, so a "put them in the deck" can fly them there.
+const SWEEP_SOURCES = new Set(['hand', 'active', 'bench', 'board']);
+// The two manual hand shuffles name no zone: it is the hand.
+const HAND_SWEEP_EVENTS = new Set(['handShuffledIntoDeckAndDrawn', 'handShuffledToDeckBottomAndDrawn']);
+const DECK_SWEEP_EVENTS = new Set([
+  ...HAND_SWEEP_EVENTS,
+  'cardsShuffledIntoDeck',
+  'cardsMovedToDeck',
+  'cardsMovedToDeckTop',
+  'cardsMovedToDeckBottom',
+  'zoneShuffledIntoDeck',
+  'zoneMovedToDeckBottom',
+]);
+
+const idOf = (card) => (card != null && typeof card === 'object' ? card.instanceId : card);
+
+/**
+ * Design 089: the pile a view event puts named cards into, with those cards — a `cardMoved` into
+ * the deck or the Lost Zone, a `cardsLostZoned`, a `cardsPutInDeck`. Null for anything else.
+ * @returns {{ to: 'deck'|'lostZone', ids: any[] }|null}
+ */
+export function pileTransitOf(event) {
+  if (event?.type === 'cardMoved' && isId(event.instanceId) && PILE_TARGETS.has(event.to)) {
+    return { to: event.to, ids: [event.instanceId] };
+  }
+  if (!Object.hasOwn(NAMED_TRANSITS, event?.type ?? '')) return null;
+  const ids = (Array.isArray(event.cards) ? event.cards : []).map(idOf).filter(isId);
+  return { to: NAMED_TRANSITS[event.type], ids };
+}
+
+/**
+ * Design 089: for an event that puts a zone's cards into the deck without naming them, the zone
+ * they left when its cards are on screen (so they can fly), else null. Undefined for any other
+ * event. `zoneId` / `from` name the zone; only the two manual hand shuffles need neither.
+ * @returns {string|null|undefined}
+ */
+export function deckSweepSource(event) {
+  if (!DECK_SWEEP_EVENTS.has(event?.type)) return undefined;
+  const source = event.zoneId ?? event.from ?? (HAND_SWEEP_EVENTS.has(event.type) ? 'hand' : null);
+  return SWEEP_SOURCES.has(source) ? source : null;
+}
+
 /**
  * The ids a view event slides on the 3D board (retreat/switch: both cards; promote: the
  * promoted card), keyed by the raw event's type. Empty for anything else.

@@ -30,6 +30,7 @@
 // Trainer reveal (deck → reveal spot → hand) as one `reveal` plan per player and
 // batch; `deckRevealRuns` groups them before the batch is handled.
 import { coinFlipFaces, MAX_CEREMONY_FLIPS } from './mat-fx/coin-pose.mjs';
+import { deckSweepSource, pileTransitOf } from './mat-fx/lifecycle-pose.mjs';
 
 export const EVENT_FX = {
   damageUpdated: 'damage',
@@ -53,9 +54,24 @@ export const EVENT_FX = {
   pokemonDevolved: 'devolve',
   statusCleared: 'status-clear',
   cardsDiscarded: 'discard',
-  // Design 064: sound-only effects (no visual): they exist so the dispatcher sounds them.
+  // Design 089: what the engine reported and nothing showed. The Prize cards are dealt from the
+  // deck; a blocked retreat, prevented damage and a Knock Out survived flash a shield; an attack
+  // that does not happen says so; anything else that touches the Prizes pulses them.
   prizesSet: 'prizes-set',
   retreatBlocked: 'retreat-blocked',
+  damagePrevented: 'block',
+  koPrevented: 'block',
+  attackPrevented: 'attack-fail',
+  attackConditionFailed: 'attack-fail',
+  attackConfusedFizzle: 'attack-fail',
+  attackCopyNothing: 'attack-fail',
+  prizesRevealed: 'prize-pulse',
+  prizeSwapped: 'prize-pulse',
+  prizesReset: 'prize-pulse',
+  prizesRedrawn: 'prize-pulse',
+  prizeHandSwapped: 'prize-pulse',
+  prizesShuffledToDeckBottom: 'prize-pulse',
+  // Design 064: sound-only effects (no visual): they exist so the dispatcher sounds them.
   playLockApplied: 'play-lock',
   deferredKnockOut: 'deferred-ko',
   // Crowd cheers for the once-per-game GX attack and VSTAR Power (no visual, no synth voice).
@@ -66,8 +82,6 @@ export const EVENT_FX = {
 
 // Effects with no visual: the registry and hold table have no entry for them, only a sound.
 export const SOUND_ONLY_FX = new Set([
-  'prizes-set',
-  'retreat-blocked',
   'play-lock',
   'deferred-ko',
   'attack-marker',
@@ -119,6 +133,16 @@ export const drawnCards = (cards) => {
 const entersPlay = (event) =>
   event.instanceId != null && ENTRY_SOURCES.has(event.from) && ENTRY_TARGETS.has(event.to);
 
+// Design 089: piles a card can come out of into the hand without a draw or a reveal naming it.
+const HAND_SOURCES = new Set(['deck', 'discard', 'lostZone']);
+
+const ATTACK_FAIL_CAUSE = {
+  attackPrevented: 'prevented',
+  attackConditionFailed: 'condition',
+  attackConfusedFizzle: 'confused',
+  attackCopyNothing: 'nothing-to-copy',
+};
+
 // Design 045: taken prizes naming their cards also fly into the hand, after the
 // claim burst on the prize zone.
 const PRIZE_TAKES = new Set(['prizesTaken', 'prizeTaken']);
@@ -145,14 +169,19 @@ const coinPlan = (event, selfPlayerId, run) => {
  * @param {string|null} selfPlayerId
  * @param {string[]} [coinRun] this event's entry from coinFlipRuns, if any
  * @param {{ shuffleSound?: string, revealRun?: object[]|null, setup?: boolean, effectKo?: Set<number>, hits?: object[]|null,
- *   strike?: object|null, moreKnockouts?: boolean }} [options]
+ *   strike?: object|null, moreKnockouts?: boolean, conditionPlans?: object[]|null,
+ *   handRun?: { source: string, cards: object[] }|null, transitTaken?: Set<*>|null, power?: string|null }} [options]
  *   `shuffleSound`: this event's entry from deckShuffles; a deck-shuffle event without one plans
  *   nothing. `revealRun`: this event's entry from deckRevealRuns, if any. `setup`: the batch
  *   arrived while the opening placement was unfinished (tags `enter` plans). `effectKo`: the batch's
  *   effectKnockoutIds (tags those `knockout` plans). `hits`: this `attackExecuted`'s entry from
  *   attackHitIds (design 069: rides on both attack plans as `plan.hits`). `strike`: this event's
  *   entry from attackStrikes (design 069: tags its `fx` and `knockout` plans as `plan.strike`).
- *   `moreKnockouts`: this knockout is in strikeKnockouts' `notLast` (tags it, with a `strike`)
+ *   `moreKnockouts`: this knockout is in strikeKnockouts' `notLast` (tags it, with a `strike`).
+ *   Design 089: `conditionPlans`: this `specialConditionUpdated`'s entry from conditionChanges;
+ *   `handRun`: this `cardMoved`'s entry from pileToHandRuns; `transitTaken`: the batch's
+ *   transitCardIds (a `cardsLostZoned` / `cardsPutInDeck` leaves those cards to their `cardMoved`);
+ *   `power`: this `attackExecuted`'s entry from attackPowers ('gx' | 'vstar', on both attack plans)
  */
 export function advisoryAnimationPlan(event, selfPlayerId, coinRun, options = {}) {
   const planned = planFor(event, selfPlayerId, coinRun, options);
@@ -168,18 +197,71 @@ export function advisoryAnimationPlan(event, selfPlayerId, coinRun, options = {}
   return Array.isArray(planned) ? planned.map(tag) : tag(planned);
 }
 
+/** A deck shuffle an effect made: animated only when the batch gave it a sound (deckShuffles). */
+const deckShufflePlan = (event, selfPlayerId, shuffleSound) => {
+  const user = sideOf(event.playerId, selfPlayerId);
+  return shuffleSound && user ? { kind: 'shuffle', user, zoneId: 'deck', sound: shuffleSound } : null;
+};
+
+/**
+ * Design 089: a zone's cards put into the deck. The cards on screen fly there (`transit` with
+ * `sweep`: the zone they left), a zone that shows no cards pulses the deck instead; then the
+ * shuffle the event stands for, then the cards it drew.
+ */
+function sweepToDeckPlans(event, selfPlayerId, shuffleSound) {
+  const user = sideOf(event.playerId, selfPlayerId);
+  if (!user) return null;
+  const source = deckSweepSource(event);
+  const plans = [
+    source
+      ? { kind: 'fx', effect: 'transit', user, to: 'deck', sweep: source }
+      : { kind: 'fx', effect: 'pile-catch', user, zoneId: 'deck' },
+  ];
+  if (DECK_SHUFFLE_EVENTS.has(event.type)) plans.push(deckShufflePlan(event, selfPlayerId, shuffleSound));
+  // event.zoneId is the SOURCE zone (hand, discard, board); the shuffle itself happens in the deck.
+  else if (event.type === 'zoneShuffledIntoDeck') plans.push({ kind: 'shuffle', user, zoneId: 'deck' });
+  const drawn = drawnCards(event.drawn);
+  if (drawn.length > 0) plans.push({ kind: 'draw', user, cards: drawn, count: drawn.length });
+  return plans.filter(Boolean);
+}
+
+/** Design 089: cards an event names as put into a pile, minus those a `cardMoved` already flies. */
+function namedTransitPlan(event, selfPlayerId, transitTaken) {
+  const user = sideOf(event.playerId, selfPlayerId);
+  if (!user) return null;
+  const { to, ids: named } = pileTransitOf(event);
+  if (named.length === 0) return { kind: 'fx', effect: 'pile-catch', user, zoneId: to };
+  const cards = named.filter((id) => !transitTaken?.has(id));
+  return cards.length > 0 ? { kind: 'fx', effect: 'transit', user, to, cards } : null;
+}
+
 function planFor(
   event,
   selfPlayerId,
   coinRun,
-  { shuffleSound = null, revealRun = null, setup = false, effectKo = null, hits = null } = {}
+  {
+    shuffleSound = null,
+    revealRun = null,
+    setup = false,
+    effectKo = null,
+    hits = null,
+    conditionPlans = null,
+    handRun = null,
+    transitTaken = null,
+    power = null,
+  } = {}
 ) {
   if (!event || typeof event !== 'object') return null;
-  if (DECK_SHUFFLE_EVENTS.has(event.type)) {
-    if (!shuffleSound || event.playerId == null || selfPlayerId == null) return null;
-    const user = event.playerId === selfPlayerId ? 'self' : 'opp';
-    return { kind: 'shuffle', user, zoneId: 'deck', sound: shuffleSound };
+  if (deckSweepSource(event) !== undefined) return sweepToDeckPlans(event, selfPlayerId, shuffleSound);
+  if (DECK_SHUFFLE_EVENTS.has(event.type)) return deckShufflePlan(event, selfPlayerId, shuffleSound);
+  if (event.type !== 'cardMoved' && pileTransitOf(event)) return namedTransitPlan(event, selfPlayerId, transitTaken);
+  if (event.type === 'specialConditionUpdated') {
+    return Array.isArray(conditionPlans) && conditionPlans.length > 0 ? conditionPlans : null;
   }
+  if (Object.hasOwn(ATTACK_FAIL_CAUSE, event.type)) {
+    return { ...fxPlan(event, selfPlayerId), cause: ATTACK_FAIL_CAUSE[event.type] };
+  }
+  if (event.type === 'koPrevented') return { ...fxPlan(event, selfPlayerId), survived: true };
   // Explicit, never via fxPlan: its `...fields` spread would replace the plan `kind` with the marker's.
   if (event.type === 'attackMarkerAdded') {
     return {
@@ -194,15 +276,28 @@ function planFor(
   if (event.type === 'vstarUsed') return { ...fxPlan(event, selfPlayerId), kind: 'fx' };
   if (COIN_EVENTS.has(event.type)) return coinPlan(event, selfPlayerId, coinRun);
   if (PRIZE_TAKES.has(event.type)) return prizePlans(event, selfPlayerId);
-  if (event.type === 'attackExecuted' && Array.isArray(hits)) {
-    return fxPlan(event, selfPlayerId).map((plan) => ({ ...plan, hits }));
+  if (event.type === 'attackExecuted' && (Array.isArray(hits) || power)) {
+    const extra = { ...(Array.isArray(hits) ? { hits } : {}), ...(power ? { power } : {}) };
+    return fxPlan(event, selfPlayerId).map((plan) => ({ ...plan, ...extra }));
   }
   if (Object.hasOwn(EVENT_FX, event.type)) return fxPlan(event, selfPlayerId);
   if (event.type === 'cardMoved') {
     if (event.to === 'discard' && event.instanceId != null) {
       return { ...fxPlan(event, selfPlayerId, 'discard'), cards: [event.instanceId] };
     }
-    return entersPlay(event) ? withSetup(fxPlan(event, selfPlayerId, 'enter'), setup) : null;
+    if (entersPlay(event)) return withSetup(fxPlan(event, selfPlayerId, 'enter'), setup);
+    // Design 089: into the deck or the Lost Zone, the card flies there from where it was.
+    if (pileTransitOf(event)) return { ...fxPlan(event, selfPlayerId, 'transit'), cards: [event.instanceId] };
+    // Out of a pile into the hand with no draw or reveal naming it: it flies in like a draw.
+    const user = sideOf(event.playerId, selfPlayerId);
+    if (!handRun || handRun.cards.length === 0 || !user) return null;
+    return {
+      kind: 'draw',
+      user,
+      cards: handRun.cards,
+      count: handRun.cards.length,
+      ...(handRun.source === 'deck' ? {} : { source: handRun.source }),
+    };
   }
   if (event.type === 'zoneMoved') {
     return event.to === 'discard' && event.from ? { ...fxPlan(event, selfPlayerId, 'discard'), sweep: event.from } : null;
@@ -214,11 +309,6 @@ function planFor(
     case 'zoneShuffled':
       if (!event.zoneId) return null;
       return { kind: 'shuffle', user, zoneId: event.zoneId };
-
-    // event.zoneId is the SOURCE zone (hand, discard, board); the shuffle
-    // itself happens in the deck, so that is where it animates.
-    case 'zoneShuffledIntoDeck':
-      return { kind: 'shuffle', user, zoneId: 'deck' };
 
     // Design 044: the opening hand, a mulligan redeal and a bonus draw fly in
     // like any other draw.
@@ -314,6 +404,127 @@ const dedupeById = (cards) => {
     return true;
   });
 };
+
+const DRAW_EVENTS = ['cardsDrawn', 'openingHandDealt', 'mulliganTaken', 'bonusDrawAwarded', 'prizesTaken', 'prizeTaken'];
+
+/**
+ * Design 089: the cards each player takes out of a pile into the hand with no flight of their own —
+ * a `cardMoved` deck / discard / Lost Zone → hand that no draw event and no deck reveal of the
+ * batch names (a search that reveals nothing, a card recovered from the discard pile). Grouped by
+ * player and pile: the group's first event maps to every card, the others to an empty list, so
+ * each group flies in once.
+ *
+ * @param {object[]} events
+ * @param {Map<object, {instanceId: *}[]>} [revealRuns] deckRevealRuns of the batch
+ * @returns {Map<object, { source: string, cards: {instanceId: *}[] }>}
+ */
+export function pileToHandRuns(events, revealRuns = new Map()) {
+  const runs = new Map();
+  if (!Array.isArray(events)) return runs;
+  const flown = new Set();
+  for (const cards of revealRuns.values()) for (const card of cards) flown.add(card.instanceId);
+  for (const event of events) {
+    if (DRAW_EVENTS.includes(event?.type)) for (const card of drawnCards(event.cards)) flown.add(card.instanceId);
+    for (const card of drawnCards(event?.drawn)) flown.add(card.instanceId);
+  }
+  const leaders = new Map();
+  for (const event of events) {
+    const moved =
+      event?.type === 'cardMoved' &&
+      event.to === 'hand' &&
+      HAND_SOURCES.has(event.from) &&
+      event.instanceId != null &&
+      event.playerId != null &&
+      !flown.has(event.instanceId);
+    if (!moved) continue;
+    flown.add(event.instanceId);
+    const key = `${event.playerId}|${event.from}`;
+    const leader = leaders.get(key);
+    if (!leader) {
+      leaders.set(key, event);
+      runs.set(event, { source: event.from, cards: [{ instanceId: event.instanceId }] });
+      continue;
+    }
+    runs.get(leader).cards.push({ instanceId: event.instanceId });
+    runs.set(event, { source: event.from, cards: [] });
+  }
+  return runs;
+}
+
+/** Design 089: the cards a `cardMoved` of the batch flies into the deck or the Lost Zone. */
+export function transitCardIds(events) {
+  const ids = new Set();
+  if (!Array.isArray(events)) return ids;
+  for (const event of events) {
+    if (event?.type === 'cardMoved' && pileTransitOf(event)) ids.add(event.instanceId);
+  }
+  return ids;
+}
+
+/**
+ * Design 089: what each `specialConditionUpdated` changed on its card, as the `status` /
+ * `status-clear` plans the pops play. The event carries the card's conditions after it
+ * (`conditions`), or only the one it set (`condition`), or `condition: null` when it cleared them;
+ * the change is read against the card's conditions before the batch (`before`, off the board) as
+ * the batch's earlier events left them. A condition a `statusApplied` / `statusCleared` already
+ * announced is not announced twice.
+ *
+ * @param {object[]} events
+ * @param {Map<*, string[]>} [before] instanceId -> conditions before the batch
+ * @returns {Map<object, object[]>} the event -> its plans (none for an event that changed nothing)
+ */
+export function conditionChanges(events, before = new Map()) {
+  const changes = new Map();
+  if (!Array.isArray(events)) return changes;
+  const current = new Map();
+  const conditionsOf = (instanceId) => {
+    if (!current.has(instanceId)) current.set(instanceId, new Set(before.get(instanceId) ?? []));
+    return current.get(instanceId);
+  };
+  for (const event of events) {
+    if (event?.instanceId == null) continue;
+    if (event.type === 'statusApplied' && event.condition) conditionsOf(event.instanceId).add(event.condition);
+    else if (event.type === 'statusCleared' && event.condition) conditionsOf(event.instanceId).delete(event.condition);
+    if (event.type !== 'specialConditionUpdated') continue;
+    const had = conditionsOf(event.instanceId);
+    const now = Array.isArray(event.conditions)
+      ? new Set(event.conditions)
+      : event.condition
+        ? new Set([...had, event.condition])
+        : new Set();
+    const plan = (effect, condition) => ({ kind: 'fx', effect, user: null, instanceId: event.instanceId, condition });
+    const plans = [
+      ...[...had].filter((condition) => !now.has(condition)).map((condition) => plan('status-clear', condition)),
+      ...[...now].filter((condition) => !had.has(condition)).map((condition) => plan('status', condition)),
+    ];
+    current.set(event.instanceId, now);
+    if (plans.length > 0) changes.set(event, plans);
+  }
+  return changes;
+}
+
+const POWER_EVENTS = { gxAttackUsed: 'gx', vstarUsed: 'vstar' };
+
+/**
+ * Design 089: the attacks of the batch that spent the player's once-per-game GX attack or VSTAR
+ * Power. The engine reports the spend right after `attackExecuted`; the attack's banner names it.
+ *
+ * @param {object[]} events
+ * @returns {Map<object, 'gx'|'vstar'>} the `attackExecuted` -> its power
+ */
+export function attackPowers(events) {
+  const powers = new Map();
+  if (!Array.isArray(events)) return powers;
+  let attack = null;
+  for (const event of events) {
+    if (event?.type === 'attackExecuted') attack = event;
+    else if (event?.type === 'turnStarted' || event?.type === 'attackStarted') attack = null;
+    else if (attack && Object.hasOwn(POWER_EVENTS, event?.type) && event.playerId === attack.playerId && event.attackName != null) {
+      powers.set(attack, POWER_EVENTS[event.type]);
+    }
+  }
+  return powers;
+}
 
 /**
  * Design 064: Pokémon knocked out by an effect rather than damage. A knockout counts when the
@@ -721,9 +932,11 @@ export function settleDroppedPlan(plan, { show, clearTimer, forgetKnockout }) {
     forgetKnockout(plan.instanceId);
     return;
   }
-  if (plan.kind !== 'draw' && plan.kind !== 'reveal') return;
+  // A draw holds `drawn`; a reveal and a Prize deal hold `held`.
+  const cards = plan.kind === 'draw' ? plan.drawn : plan.held;
+  if (!Array.isArray(cards)) return;
   if (plan.backstop != null) clearTimer(plan.backstop);
-  for (const card of plan.kind === 'draw' ? plan.drawn || [] : plan.held || []) {
+  for (const card of cards) {
     card?.from?.release?.();
     show(card);
   }

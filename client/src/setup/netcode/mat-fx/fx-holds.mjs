@@ -41,6 +41,16 @@ export const HOLD_MS = {
   'ability-banner': 480,
   'turn-banner': 260,
   discard: 120,
+  // Design 089: the shield and the fizzle are read before what follows; a failed attack's banner
+  // is watched like an attack's name. Flights into a pile and the Prize deal return their own
+  // hold (the last card's take-off); these are the holds when nothing could fly.
+  block: 320,
+  'retreat-blocked': 320,
+  'attack-fail': BANNER_MS * 0.6,
+  'prize-pulse': 280,
+  transit: 160,
+  'pile-catch': 120,
+  'prizes-set': 200,
   // One flip's ceremony until its fade; coin.js returns the hold for the plan's
   // actual flip count (coinCeremonyTimeline).
   'coin-flip': 2250,

@@ -184,6 +184,8 @@ const CARD_MOVE_EVENTS = new Set([
   'trainerPlayed',
   'prizeTaken',
   'prizesTaken',
+  // Design 089: the Prize deal flies meshes the scene has only once the view is applied.
+  'prizesSet',
 ]);
 
 /** How long the FX queue waits before a view batch's effects (0 off the 3D board or for a batch moving no card). */

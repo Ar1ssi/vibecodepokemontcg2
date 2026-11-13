@@ -8,6 +8,10 @@ import { rulesState } from '../../../../shared/engine/rules/rules-state.mjs';
 import {
   advisoryAnimationPlan,
   attackLeads,
+  attackPowers,
+  conditionChanges,
+  pileToHandRuns,
+  transitCardIds,
   coinFlipRuns,
   deckShuffles,
   attackHitIds,
@@ -33,7 +37,10 @@ import { KNOCKOUT_DURATION_MS } from '../image-logic/knockout-pose.mjs';
 import { fxDisabled, motionReduced, rectForInstance } from '../image-logic/mat-fx.mjs';
 import { onFxSettingsChanged } from '../image-logic/fx-settings.js';
 import { playFx } from './mat-fx/index.js';
-import { claimSlidePin, pinKnockoutOrigins, pinSlideOrigins, releaseSlidePins } from './mat-fx/lifecycle.js';
+import { pinKnockoutOrigins, pinSlideOrigins, pinTransitOrigins } from './mat-fx/lifecycle.js';
+import { claimSlidePin, releaseSlidePins } from './mat-fx/slide-pin-store.js';
+import { pileOf } from './mat-fx/card-flight.js';
+import { listConditions } from '../../../../shared/engine/rules/special-conditions.mjs';
 import { afterHit, attackSceneEndsAt, knockoutHoldFor } from './mat-fx/combat.js';
 import { seedDamageBaselines } from './mat-fx/damage-hit.mjs';
 import { playDeckReveal } from './mat-fx/deck-reveal.js';
@@ -43,7 +50,7 @@ import { createFxQueue } from './mat-fx/fx-queue.mjs';
 import { holdFor, turnBannerLead } from './mat-fx/fx-holds.mjs';
 import { drawSceneHold } from './mat-fx/draw-scene.mjs';
 import { flightSrcOf } from './mat-fx/card-flight.mjs';
-import { captureOrigins, discardOrigins, knockoutStack } from './mat-fx/origins.mjs';
+import { captureOrigins, discardOrigins, knockoutStack, zoneCardIds } from './mat-fx/origins.mjs';
 import { KO_SCENE_MS } from './mat-fx/ko-scene.mjs';
 import { createChoiceGate, createKnockoutScenes } from './choice-gate.mjs';
 
@@ -100,6 +107,22 @@ let strikeKos = { after: new Map(), moved: new Set(), notLast: new Set() };
 // the batch's `attackExecuted` events whose attack already played with an earlier batch.
 let openAttack = null;
 let playedAttacks = new Set();
+// Design 089: what each Special Condition update of the batch changed (conditionChanges), the
+// cards each player takes out of a pile into the hand (pileToHandRuns), the cards a `cardMoved`
+// flies into a pile (transitCardIds) and the batch's GX / VSTAR attacks (attackPowers).
+let conditionPlansOf = new Map();
+let handRuns = new Map();
+let transitTaken = new Set();
+let powersOf = new Map();
+
+// Design 089: each card's Special Conditions before this batch, for the cards whose conditions an
+// event of the batch updates. Read off the board before the diff applies the new ones.
+const conditionsBefore = (events, registry) =>
+  new Map(
+    events
+      .filter((event) => event?.type === 'specialConditionUpdated' && event.instanceId != null)
+      .map((event) => [event.instanceId, listConditions(registry.get(event.instanceId)?.card)])
+  );
 
 // Design 069: each damaged card's total before this batch, from its counter on the board (no
 // counter = 0). Read before the diff applies the new totals.
@@ -130,6 +153,33 @@ const prizeStartOf = (instanceId) => {
   return takePrizeHandoff(instanceId) || seat;
 };
 
+// Design 089: a card taken out of the discard pile or the Lost Zone starts its flight there.
+const pileStartOf = (plan) => (plan.source === 'discard' || plan.source === 'lostZone' ? pileOf(plan.user, plan.source) : null);
+
+/** The registry cards `ids` that are on the board now, as the flights' hide/show handles. */
+const heldCards = (ids) => {
+  const registry = getCardRegistry();
+  return ids
+    .map((instanceId) => ({ instanceId, record: registry.get(instanceId) }))
+    .filter(({ record }) => record?.element?.isConnected)
+    .map(({ instanceId, record }) => ({ instanceId, image: record.element, wrapper: record.holoCard?.wrapper }));
+};
+
+/**
+ * Design 089: cards a queued plan will fly onto the board are already in their slots. They are
+ * hidden until the plan runs (the Prize cards until their deal, a Pokémon put into play from the
+ * deck until its flight); the backstop shows them if it never does.
+ */
+const holdUntilFlown = (plan, ids) => {
+  if (fxDisabled() || motionReduced()) return { ...plan, held: [] };
+  const held = heldCards(ids);
+  held.forEach(hideForFlight);
+  const backstop = setTimeout(() => held.forEach(showAfterFlight), HELD_DRAW_BACKSTOP_MS);
+  return { ...plan, held, backstop };
+};
+
+const FLOWN_ENTRY_SOURCES = new Set(['deck', 'discard']);
+
 /**
  * Design 044: the drawn cards are in the hand as soon as the view applies.
  * Hide them now, so they do not show while earlier effects play; they fly in
@@ -146,7 +196,7 @@ const holdDrawnCards = (plan) => {
       image: record.element,
       wrapper: record.holoCard?.wrapper,
       redacted: !!record.isRedacted,
-      from: plan.source === 'prizes' ? prizeStartOf(instanceId) : null,
+      from: plan.source === 'prizes' ? prizeStartOf(instanceId) : pileStartOf(plan),
     });
   }
   drawn.forEach(hideForFlight);
@@ -253,12 +303,17 @@ export function handleBeforeApply(events, selfPlayerId) {
   attackHits = attackHitIds(attackBatch.events);
   strikesOf = attackStrikes(attackBatch.events);
   strikeKos = strikeKnockouts(attackBatch.events);
+  powersOf = attackPowers(attackBatch.events);
+  handRuns = pileToHandRuns(events, revealRuns);
+  transitTaken = transitCardIds(events);
+  conditionPlansOf = new Map();
   if (!Array.isArray(events) || selfPlayerId == null) return;
   // Design 074 §D6: on the 3D board the batch's effects start once its moved cards have landed.
   holdFxQueue(fxSettleHoldMs(events));
   const registry = getCardRegistry();
   seedDamageBaselines(damageBaselinesBefore(events, registry));
   capturePrizeSeats(events, registry, selfPlayerId);
+  conditionPlansOf = conditionChanges(events, conditionsBefore(events, registry));
   for (const event of events) {
     if (!event || event.type !== 'pokemonKnockedOut' || event.instanceId == null) continue;
     // Design 042: the card drawn on top (an evolution sits over its Basic),
@@ -284,6 +339,7 @@ export function handleBeforeApply(events, selfPlayerId) {
     );
     pinSlideOrigins(events, registry);
     pinKnockoutOrigins(events, registry);
+    pinTransitOrigins(events, registry, (event) => (event.playerId === selfPlayerId ? 'self' : 'opp'));
     // The batch's plans are queued after this hook returns. Asked now, an idle queue would
     // answer at once and drop the pins before the scenes they wait for (design 089).
     queueMicrotask(() => fxQueue.whenIdle().then(releaseSlidePins));
@@ -489,6 +545,10 @@ function queueEvent(event, selfPlayerId) {
     hits: attackHits.get(event) ?? null,
     strike: strikesOf.get(event) ?? null,
     moreKnockouts: strikeKos.notLast.has(event),
+    conditionPlans: conditionPlansOf.get(event) ?? null,
+    handRun: handRuns.get(event) ?? null,
+    transitTaken,
+    power: powersOf.get(event) ?? null,
   });
   if (!planned) return;
   const plans = Array.isArray(planned) ? planned : [planned];
@@ -511,5 +571,11 @@ function queueEvent(event, selfPlayerId) {
 const queuedPlan = (plan) => {
   if (plan.kind === 'draw') return holdDrawnCards(plan);
   if (plan.kind === 'reveal') return holdRevealedCards(plan);
+  if (plan.kind !== 'fx') return plan;
+  // Design 089: the Prize cards wait hidden for their deal; so does a Pokémon that flies in from a pile.
+  if (plan.effect === 'prizes-set' && plan.user) {
+    return holdUntilFlown(plan, zoneCardIds(getCardRegistry(), plan.user, 'prizes'));
+  }
+  if (plan.effect === 'enter' && FLOWN_ENTRY_SOURCES.has(plan.from)) return holdUntilFlown(plan, [plan.instanceId]);
   return plan;
 };
