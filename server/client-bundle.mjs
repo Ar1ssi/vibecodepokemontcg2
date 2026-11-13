@@ -81,3 +81,40 @@ export function loadClientBundle({ clientDir, env = {}, warn = () => {} }) {
   }
   return manifest;
 }
+
+const manifestStamp = (clientDir) => {
+  try {
+    const stat = fs.statSync(path.join(clientDir, BUNDLE_DIR_NAME, BUNDLE_MANIFEST_FILE));
+    return `${stat.mtimeMs}:${stat.size}`;
+  } catch {
+    return 'none';
+  }
+};
+
+/**
+ * The bundle to serve right now. The manifest is read again whenever its file changes, so a
+ * `pnpm build` under a running server takes effect on the next page load; each distinct problem is
+ * reported once, not once per page.
+ * @param {{clientDir: string, env?: object, warn?: (message: string) => void}} options
+ * @returns {{current: () => ({script: string, style: string}|null)}}
+ */
+export function createClientBundleSource({ clientDir, env = {}, warn = () => {} }) {
+  if (!wantsClientBundle(env)) return { current: () => null };
+  let stamp = null;
+  let bundle = null;
+  let lastWarning = null;
+  const warnOnce = (message) => {
+    if (message !== lastWarning) warn(message);
+    lastWarning = message;
+  };
+  return {
+    current() {
+      const now = manifestStamp(clientDir);
+      if (now === stamp) return bundle;
+      stamp = now;
+      bundle = loadClientBundle({ clientDir, env, warn: warnOnce });
+      if (bundle) lastWarning = null;
+      return bundle;
+    },
+  };
+}

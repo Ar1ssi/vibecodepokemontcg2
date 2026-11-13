@@ -52,9 +52,10 @@ also took 61 s to answer after idling (Render free plan cold start).
    compresses, a local server or tunnel did not. Added.
 
 ## Design
-- `server/cache-policy.mjs` (was sfx-cache.mjs) `cacheControlFor(path)`: hashed SFX → 1 day;
-  `/dist/*-<HASH8>.(js|css)[.map]` → `public, max-age=31536000, immutable`; `/api/` → `no-store`;
-  everything else → `no-cache`.
+- `server/cache-policy.mjs` (was sfx-cache.mjs). `cacheControlFor(path)` is every response's
+  default: `/api/` → `no-store`, everything else → `no-cache`. `staticFileCacheControl(path)`
+  upgrades a static file that is found and sent (`express.static` `setHeaders`): hashed SFX → 1 day;
+  `/dist/*-<HASH8>.(js|css)[.map]` → `public, max-age=31536000, immutable`. A 404 keeps the default.
 - `scripts/build-client.mjs` `buildClient({rootDir, outDir, minify})` → `client/dist/app-<hash>.js`,
   `app-<hash>.css`, source maps, `manifest.json` `{script, style}`. esbuild, `format: 'esm'`, no
   splitting, `keepNames`; CSS bundled with whitespace-only minify. Plugin `served-paths`:
@@ -62,8 +63,12 @@ also took 61 s to answer after idling (Render free plan cold start).
   `import.meta.url` → the module's unbundled URL; CSS `url()` → root-absolute, asset not copied;
   `node:*` external. Returns esbuild's warnings.
 - `server/client-bundle.mjs` `loadClientBundle({clientDir, env, warn})` → manifest or null
-  (not wanted, unreadable, malformed, file missing → warn once, serve source).
-  `app.locals.clientBundle` feeds `client/index.ejs`, which picks bundle or source URLs.
+  (not wanted, unreadable, malformed, file missing → warn, serve source).
+  `createClientBundleSource(...).current()` re-reads it when the manifest file changes and warns
+  once per distinct problem; a middleware after the static mounts sets `res.locals.clientBundle`
+  for `client/index.ejs`, which picks bundle or source URLs.
+- The build writes the new files and manifest first and removes stale files last; both esbuild
+  runs settle before a failure is raised. A failed build leaves the previous bundle served.
 - Source changes so the bundle can follow every import: box-data.mjs resolves its data modules
   against `import.meta.url` (they stay unbundled, import nothing); the pack stage import is a literal.
 - `client/src/assets/cardback.webp`; `DEFAULT_CARD_BACK_PATH` names it, and the four hard-coded
@@ -88,6 +93,10 @@ also took 61 s to answer after idling (Render free plan cold start).
 | 12 | Ping fails repeatedly | one warning per outage | [x] keep-awake.test "reported once per outage" |
 | 13 | A saved deck or the other tab still names `cardback.png` | file still served; resleeve matches it | reasoning: file kept; native-deck-builder.js known-backs set |
 | 14 | Concurrent builds | struck: the build runs once per install, never from the server |
+| 15 | Request for a hashed name that is not on disk (rollback, mid-deploy) | 404 with `no-cache`, never immutable | [x] cache-policy.test "a hashed name gets no long-lived header from its path alone"; curl check |
+| 16 | `pnpm build` under a running bundled server | next page load names the new files | [x] client-bundle.test "a rebuild under a running server…" |
+| 17 | Build fails after an earlier good build | old manifest and files stay | [x] build-client.test "a failed build leaves the previous bundle whole" |
+| 18 | Checkout path under `/src/…` or `/shared/…` | entry point is not remapped | [x] build-client.test "a checkout that lives under /src or /shared…" |
 
 ## Test plan
 Unit: cache-policy, client-bundle (incl. the EJS template in both modes), keep-awake, build-client
@@ -104,6 +113,10 @@ again at once), or revert the commit. Old card-back references keep working beca
 One slice, built inline in the session that designed it.
 
 ## Deviations
+- Review (independent agent, read-only) found rows 15-18 and a flaky test (a failed build was
+  still writing while the test cleaned up); all fixed. `healthCheckPath` stays `/` so a deploy
+  whose page fails to render is still caught; `/healthz` serves only the keep-awake ping.
+  Not done: a deploy that skips `pnpm install` keeps its old bundle (README says to run `pnpm build`).
 - The e2e scripts that `import('/src/…')` inside the page work only against the source build
   (their spawned servers are dev servers, so nothing changes for them).
 - Found and fixed in passing: `index.css` had `[data-action->'rename']` (dark-mode rename-chip hover

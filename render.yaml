@@ -7,7 +7,7 @@ services:
     # host (scripts/build-client.mjs); the server serves it with year-long caching.
     buildCommand: pnpm install --frozen-lockfile
     startCommand: node server/server.js
-    healthCheckPath: /healthz
+    healthCheckPath: /
     envVars:
       - key: NODE_ENV
         value: production
@@ -36,7 +36,7 @@ services:
     plan: free
     buildCommand: pnpm install --frozen-lockfile
     startCommand: node server/server.js
-    healthCheckPath: /healthz
+    healthCheckPath: /
     envVars:
       - key: NODE_ENV
         value: production

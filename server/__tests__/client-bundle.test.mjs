@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import ejs from 'ejs';
 import {
   bundleManifestFromMetafile,
+  createClientBundleSource,
   isDeployHost,
   loadClientBundle,
   validateBundleManifest,
@@ -119,7 +120,51 @@ test('no bundle, a broken manifest or a missing file falls back to the source wi
   }
 });
 
-// The page template (client/index.ejs) switches on the `clientBundle` local server.js sets.
+// Each write gets its own modification time, whatever the file system's clock granularity.
+let writeClock = Date.now() / 1000;
+const writeBundle = (clientDir, manifest) => {
+  const distDir = path.join(clientDir, 'dist');
+  const manifestPath = path.join(distDir, 'manifest.json');
+  for (const url of [manifest.script, manifest.style]) fs.writeFileSync(path.join(distDir, path.basename(url)), '');
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+  writeClock += 10;
+  fs.utimesSync(manifestPath, writeClock, writeClock);
+};
+
+test('a rebuild under a running server is picked up on the next read', (t) => {
+  const clientDir = clientDirWith(t);
+  const warnings = [];
+  const source = createClientBundleSource({
+    clientDir,
+    env: { CLIENT_BUNDLE: '1' },
+    warn: (message) => warnings.push(message),
+  });
+  assert.equal(source.current(), null);
+  assert.equal(source.current(), null);
+  assert.equal(warnings.length, 1, 'the missing bundle is reported once, not per page');
+
+  writeBundle(clientDir, MANIFEST);
+  assert.deepEqual(source.current(), MANIFEST);
+
+  const rebuilt = { script: '/dist/app-CCCCCCCC.js', style: '/dist/app-BBBBBBBB.css' };
+  writeBundle(clientDir, rebuilt);
+  assert.deepEqual(source.current(), rebuilt);
+  assert.equal(warnings.length, 1);
+
+  fs.rmSync(path.join(clientDir, 'dist', 'manifest.json'));
+  assert.equal(source.current(), null);
+  assert.equal(warnings.length, 2, 'a bundle that disappears is reported again');
+});
+
+test('a server that does not want the bundle never reads the folder', (t) => {
+  const clientDir = clientDirWith(t, { manifest: MANIFEST, files: ['app-AAAAAAAA.js', 'app-BBBBBBBB.css'] });
+  const warnings = [];
+  const source = createClientBundleSource({ clientDir, env: {}, warn: (message) => warnings.push(message) });
+  assert.equal(source.current(), null);
+  assert.deepEqual(warnings, []);
+});
+
+// The page template (client/index.ejs) switches on the `clientBundle` local server.js sets per page.
 const templatePath = fileURLToPath(new URL('../../client/index.ejs', import.meta.url));
 const renderPage = (locals) =>
   ejs.render(

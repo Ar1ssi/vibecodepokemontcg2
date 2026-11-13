@@ -57,8 +57,8 @@ import { REMOTE_POLL_MS, createRemoteCustomSets, resolveCustomSetsUrl } from './
 import { CUSTOM_SETS_CHANGED_EVENT } from '../shared/custom-sets/custom-set-schema.mjs';
 import { createCardImageHandler } from './card-image-proxy.mjs';
 import { CARD_ART_PROXY_HOSTS } from './card-art-proxy-hosts.mjs';
-import { cacheControlFor } from './cache-policy.mjs';
-import { loadClientBundle } from './client-bundle.mjs';
+import { cacheControlFor, staticFileCacheControl } from './cache-policy.mjs';
+import { createClientBundleSource } from './client-bundle.mjs';
 import { KEEP_AWAKE_PATH, planKeepAwake, startKeepAwake } from './keep-awake.mjs';
 import { retiredLegacyRelayWarning } from './netcode-mode.mjs';
 import { customFoilSets, resolveFoilTextureBase } from './tcgl-foil-config.mjs';
@@ -202,20 +202,25 @@ async function main() {
   app.set('views', clientDir);
   app.use(cors());
   // Design 088: text responses go out compressed (Brotli or gzip), and every response carries the
-  // cache policy for its path. Visitors always get the current build: only content-hashed files
-  // are kept without asking, everything else is revalidated (cache-policy.mjs).
+  // cache policy for its path. Visitors always get the current build: only a content-hashed file
+  // that is found and sent is kept without asking (`keepHashedFiles`), everything else is
+  // revalidated (cache-policy.mjs).
   app.use(compression());
   app.use((req, res, next) => {
     res.setHeader('Cache-Control', cacheControlFor(req.path));
     next();
   });
+  const keepHashedFiles = (res) => {
+    const cacheControl = staticFileCacheControl(res.req.baseUrl + res.req.path);
+    if (cacheControl) res.setHeader('Cache-Control', cacheControl);
+  };
   // The bundled script and stylesheet the page loads, or null to load the source files.
-  app.locals.clientBundle = loadClientBundle({
+  const clientBundle = createClientBundleSource({
     clientDir,
     env: process.env,
     warn: (message) => console.warn(message),
   });
-  // A liveness answer that renders nothing: the host's health check and the keep-awake ping.
+  // A liveness answer that renders nothing, for the keep-awake ping (keep-awake.mjs).
   app.get(KEEP_AWAKE_PATH, (_, res) => {
     res.set('Cache-Control', 'no-store').type('text/plain').send('ok');
   });
@@ -353,7 +358,12 @@ async function main() {
   });
 
   app.use('/shared', express.static(sharedDir));
-  app.use(express.static(clientDir));
+  app.use(express.static(clientDir, { setHeaders: keepHashedFiles }));
+  // Every page below renders client/index.ejs, which reads `clientBundle` (design 088).
+  app.use((req, res, next) => {
+    res.locals.clientBundle = clientBundle.current();
+    next();
+  });
   app.get('/', (_, res) => {
     res.render('index', { importDataJSON: null, e2eAllowed: E2E_ENABLED });
   });
@@ -1492,7 +1502,7 @@ async function main() {
       'Netcode mode: server-authoritative' +
         ` | e2e bridge: ${E2E_ENABLED ? 'ARMED (?e2e=1 works)' : 'disabled'}`
     );
-    const bundle = app.locals.clientBundle;
+    const bundle = clientBundle.current();
     // eslint-disable-next-line no-console
     console.log(`Client: ${bundle ? `bundle ${bundle.script}` : 'source files (unbundled)'}`);
     const keepAwake = planKeepAwake(process.env);

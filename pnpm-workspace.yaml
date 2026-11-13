@@ -5,3 +5,7 @@ onlyBuiltDependencies:
   - sqlite3
 allowBuilds:
   sqlite3: true
+  # design 088: reviewed, not needed (the platform binary arrives as an optional dependency)
+  esbuild: false
+ignoredBuiltDependencies:
+  - esbuild

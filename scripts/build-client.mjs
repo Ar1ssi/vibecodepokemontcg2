@@ -65,6 +65,8 @@ export function servedPathsPlugin(rootDir = repoDir) {
     setup(pluginBuild) {
       pluginBuild.onResolve({ filter: /^three$/ }, () => ({ path: threeEntry }));
       pluginBuild.onResolve({ filter: /^\/(?:shared|src)\// }, (args) => {
+        // The entry point is a file path; a checkout under /src/… must not be read as an import.
+        if (args.kind === 'entry-point') return null;
         if (args.kind === 'url-token') return { path: args.path, external: true };
         const file = fileForServedUrl(args.path, rootDir);
         return file ? { path: file } : null;
@@ -105,7 +107,6 @@ export async function buildClient({ rootDir = repoDir, outDir, minify = true } =
   const { build } = await import('esbuild');
   const clientDir = path.join(rootDir, 'client');
   const target = outDir ?? path.join(clientDir, 'dist');
-  await fs.rm(target, { recursive: true, force: true });
   const shared = {
     // Paths in comments and source maps are relative to the repo, wherever the build is started.
     absWorkingDir: rootDir,
@@ -119,7 +120,9 @@ export async function buildClient({ rootDir = repoDir, outDir, minify = true } =
     external: ['node:*'],
     plugins: [servedPathsPlugin(rootDir)],
   };
-  const [script, style] = await Promise.all([
+  // Both builds finish before a failure is raised, so nothing is still writing when the caller
+  // reacts; and the old bundle is only removed once the new one is whole (a server keeps serving it).
+  const [scriptBuild, styleBuild] = await Promise.allSettled([
     build({
       ...shared,
       entryPoints: { app: path.join(clientDir, 'src', 'front-end.js') },
@@ -135,13 +138,23 @@ export async function buildClient({ rootDir = repoDir, outDir, minify = true } =
       minifyWhitespace: minify,
     }),
   ]);
+  const failed = [scriptBuild, styleBuild].find((result) => result.status === 'rejected');
+  if (failed) throw failed.reason;
+  const script = scriptBuild.value;
+  const style = styleBuild.value;
   const manifest = bundleManifestFromMetafile({
     outputs: { ...script.metafile.outputs, ...style.metafile.outputs },
     toUrl: (outputPath) =>
       BUNDLE_URL_PREFIX + toPosix(path.relative(target, path.resolve(rootDir, outputPath))),
   });
   await fs.writeFile(path.join(target, BUNDLE_MANIFEST_FILE), `${JSON.stringify(manifest, null, 2)}\n`);
-  const names = (await fs.readdir(target)).filter((name) => !name.endsWith('.map'));
+  const written = new Set([
+    BUNDLE_MANIFEST_FILE,
+    ...Object.keys({ ...script.metafile.outputs, ...style.metafile.outputs }).map((file) => path.basename(file)),
+  ]);
+  const stale = (await fs.readdir(target)).filter((name) => !written.has(name));
+  await Promise.all(stale.map((name) => fs.rm(path.join(target, name), { recursive: true, force: true })));
+  const names = [...written].filter((name) => !name.endsWith('.map'));
   const files = await Promise.all(
     names.map(async (file) => ({ file, bytes: (await fs.stat(path.join(target, file))).size }))
   );

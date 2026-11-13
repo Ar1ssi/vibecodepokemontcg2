@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { buildClient, fileForServedUrl, servedUrlFor } from '../build-client.mjs';
-import { cacheControlFor, IMMUTABLE_CACHE_CONTROL } from '../../server/cache-policy.mjs';
+import { IMMUTABLE_CACHE_CONTROL, staticFileCacheControl } from '../../server/cache-policy.mjs';
 import { validateBundleManifest } from '../../server/client-bundle.mjs';
 
 const tempDir = (t, prefix) => {
@@ -67,9 +67,9 @@ test('the bundle is one hashed script and one hashed stylesheet, named by the ma
   assert.match(manifest.script, /^\/dist\/app-[0-9A-Z]{8}\.js$/);
   assert.match(manifest.style, /^\/dist\/app-[0-9A-Z]{8}\.css$/);
   // The server's cache policy and manifest check must recognize what the build names.
-  assert.equal(cacheControlFor(manifest.script), IMMUTABLE_CACHE_CONTROL);
-  assert.equal(cacheControlFor(manifest.style), IMMUTABLE_CACHE_CONTROL);
-  assert.equal(cacheControlFor(`${manifest.script}.map`), IMMUTABLE_CACHE_CONTROL);
+  assert.equal(staticFileCacheControl(manifest.script), IMMUTABLE_CACHE_CONTROL);
+  assert.equal(staticFileCacheControl(manifest.style), IMMUTABLE_CACHE_CONTROL);
+  assert.equal(staticFileCacheControl(`${manifest.script}.map`), IMMUTABLE_CACHE_CONTROL);
   const written = JSON.parse(fs.readFileSync(path.join(outDir, 'manifest.json'), 'utf8'));
   assert.deepEqual(validateBundleManifest(written), manifest);
   assert.deepEqual(
@@ -131,6 +131,44 @@ test('a url() outside the served folders or a missing import fails the build', a
     'client/src/front-end.js': "import '/shared/nope.mjs';",
   });
   await assert.rejects(buildClient({ rootDir: missing }), /nope\.mjs/);
+});
+
+test('a failed build leaves the previous bundle whole and served', async (t) => {
+  const rootDir = fixtureRoot(t, FIXTURE);
+  const { manifest, outDir } = await buildClient({ rootDir });
+  fs.writeFileSync(path.join(rootDir, 'client/src/local.js'), "import './gone.js';");
+  await assert.rejects(buildClient({ rootDir }), /gone\.js/);
+  const kept = JSON.parse(fs.readFileSync(path.join(outDir, 'manifest.json'), 'utf8'));
+  assert.deepEqual(kept, manifest);
+  assert.ok(fs.existsSync(path.join(outDir, path.basename(manifest.script))));
+  assert.ok(fs.existsSync(path.join(outDir, path.basename(manifest.style))));
+});
+
+test('a build clears whatever else was in the output folder', async (t) => {
+  const rootDir = fixtureRoot(t, FIXTURE);
+  const distDir = path.join(rootDir, 'client', 'dist');
+  fs.mkdirSync(path.join(distDir, 'old-folder'), { recursive: true });
+  fs.writeFileSync(path.join(distDir, 'app-OLDOLDOL.js'), 'stale');
+  fs.writeFileSync(path.join(distDir, 'app-OLDOLDOL.js.map'), 'stale');
+  const { manifest } = await buildClient({ rootDir });
+  const script = path.basename(manifest.script);
+  const style = path.basename(manifest.style);
+  assert.deepEqual(
+    fs.readdirSync(distDir).sort(),
+    [script, `${script}.map`, style, `${style}.map`, 'manifest.json'].sort()
+  );
+});
+
+test('a checkout that lives under /src or /shared still builds', async (t) => {
+  const base = tempDir(t, 'build-client-nested-');
+  const rootDir = path.join(base, 'src', 'shared', 'repo');
+  for (const [relative, text] of Object.entries(FIXTURE)) {
+    const file = path.join(rootDir, relative);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, text);
+  }
+  const { manifest, outDir } = await buildClient({ rootDir, minify: false });
+  assert.ok(read(outDir, manifest.script).includes('shared-marker'));
 });
 
 test('a stylesheet rule esbuild cannot parse is reported as a warning', async (t) => {

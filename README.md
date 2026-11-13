@@ -91,7 +91,9 @@ pnpm build                  # writes client/dist/
 CLIENT_BUNDLE=1 node server/server.js
 ```
 
-Rebuild after changing client code; without `CLIENT_BUNDLE=1` the server ignores `client/dist/`.
+Rebuild after changing client code: a running server picks the new bundle up on the next page
+load. Without `CLIENT_BUNDLE=1` the server ignores `client/dist/`. A deploy that does not run
+`pnpm install` must run `pnpm build` itself, or it keeps serving the previous bundle.
 
 ### Playwright tests
 
