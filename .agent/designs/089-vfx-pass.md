@@ -10,13 +10,13 @@ The user's request, verbatim (2026-11-13):
 ## Acceptance
 | # | Criterion (the brief's words) | Evidence |
 |---|---|---|
-| A1 | "fix sequencing of moves and attacks (ie: a pokemon thats move lets it switch out will end up attacking from bench instead of attacking then switching)" | |
-| A2 | "fix layering errors / cards going invisible" | |
-| A3 | "fill in the gaps for missing animations (such as prize cards)" | |
-| A4 | "make a new shuffle animation" | |
-| A5 | "Currently there is some homogeny with moves" (moves must stop looking alike) | |
-| A6 | "many of the visual shaders could be reworked and improved" | |
-| A7 | "Do a passthrough for all existing vfx and animations and update them" | |
+| A1 | "fix sequencing of moves and attacks (ie: a pokemon thats move lets it switch out will end up attacking from bench instead of attacking then switching)" | ✓ Engine `attack-started-event.test.mjs` (3 tests); client `attack-sequencing.test.mjs` "edge 1"–"edge 7"; e2e `fx-sequence-test.mjs` B (the attacker attacks from the Active Spot) and C (no second banner, ends on the Bench): `ALL PASSED` |
+| A2 | "fix layering errors / cards going invisible" | ✓ `card-mesh-drive.test.mjs` "design 089: a pinned card rests where it stood and still takes a drive", "faces and hidden wait behind a pin"; `slide-pins.test.mjs` (5); e2e A (the knocked-out defender stays drawn through its scene), D (discard flies on a ghost mesh, no HTML clone over the board), E (a card put into the deck keeps its mesh) |
+| A3 | "fill in the gaps for missing animations (such as prize cards)" | ✓ `missing-animations.test.mjs` (12 tests: shield, attack failure, Prize pulse, pile transits, Special Condition updates, GX / VSTAR); e2e F (Prize cards are dealt, not shown all at once); stills `rec/rec-board-fx.mjs`. The look is the user's to judge on localhost |
+| A4 | "make a new shuffle animation" | ✓ `shuffle-math.test.mjs`, `pile-shuffle.test.mjs`; e2e G (a deck of 25 riffles with its own cards and is the same pile after). Look: localhost |
+| A5 | "Currently there is some homogeny with moves" (moves must stop looking alike) | ✓ `motion-variety.test.mjs`: no attacker motion above 18 % of specs (was `rear-lurch` 38 %), no defender motion above 13 % (was `knock` 76 %); `contact-aftermath.test.mjs` (seven contact styles, per-material aftermath); hit-stop in `scene-move-player.test.mjs`. ✗ in part: the 81 signature specs still contact at 1000 ms (Deviations, slice 7) |
+| A6 | "many of the visual shaders could be reworked and improved" | ✓ Composite, water beam, lens, bolt, flame jet, fireball reworked and a `haze` kind added: `tone.test.mjs` (9), kind and kit tests, `pnpm fx:check-elements` 11 / 11 ok. ✗ in part: smoke, plasma, water drop, debris and sprite shaders unchanged, and four § D6 looks not built (Deviations, slice 6) |
+| A7 | "Do a passthrough for all existing vfx and animations and update them" | ✓ Attack side: slices 6–7. Non-attack side: the verdict table under Deviations, slice 9 (every registry effect: kept / tuned / rebuilt). ✗ in part: ten of those effects were read in code and not re-rendered (same table) |
 
 ## Assumptions
 | # | Gap | Decided (assumed) | Why |
@@ -196,28 +196,28 @@ verdict (kept / tuned / rebuilt) · what changed.
 ## Edge cases & failure modes
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | attack with no events but `attackStarted` (suspended before any consequence) | nothing plays yet; `openAttack` carried; the batch with the first consequence plays the strike | [ ] |
-| 2 | `attackStarted` twice for one attack (copy/re-flip paths) | second is ignored (same key, already open) | [ ] |
-| 3 | self-switch after damage, auto (1 Benched) | banner → scene from the Active → damage → slide | [ ] |
-| 4 | self-switch after damage, choice (≥2 Benched) | batch 1: banner → scene → damage; batch 2: slide only | [ ] |
-| 5 | no-damage switch attack | banner → aura on the Active → slide | [ ] |
-| 6 | Koga's Ninja Trick (defender switches before `attackStarted`) | slide first, then the attack against the new Active | [ ] |
-| 7 | before-damage gust (switch after `attackStarted`, hits follow) | slide, then banner → scene on the new Active | [ ] |
-| 8 | attack KO whose batch has no card-move event | KO'd stack stays whole in its slot through banner and scene, then burns/flies | [ ] |
-| 9 | pin never taken (plan dropped, tab hidden) | released when the queue goes idle or after `SLIDE_PIN_MAX_MS`; retained mesh freed | [ ] |
-| 10 | pinned card released by a room reset / view without it | pin and retain dropped, mesh freed, no throw | [ ] |
-| 11 | ghost mesh whose flight is cancelled | removed by its own backstop | [ ] |
-| 12 | FX off / reduced motion | no pins (as today); effects skip or use their static form; choice gate opens at once with FX off | [ ] |
-| 13 | queue cleared with held draws | cards show at once | [ ] |
-| 14 | choice arrives, effects never drain | picker opens at `CHOICE_BACKSTOP_MS` | [ ] |
-| 15 | hidden info: opponent's hand card to deck | flies as their sleeve | [ ] |
-| 16 | reconnect / catch-up replay | plans dropped (mirror guard), `openAttack` cleared, no pins left | [ ] |
-| 17 | both seats | each client derives the same order from the same events; far seat effects turn 180° | [ ] |
-| 18 | spectator | same plans; no picker (banner only) | [ ] |
-| 19 | shuffle with 0–1 cards / no scene / reduced motion | nothing / 0 hold / tap only | [ ] |
-| 20 | Prize count 4 (Build & Battle) | four flights | [ ] |
-| 21 | shader fails to compile | `pnpm fx:check-elements` fails before landing | [ ] |
-| 22 | element capacity reached | instances dropped that frame (079 rule) | [ ] |
+| 1 | attack with no events but `attackStarted` (suspended before any consequence) | nothing plays yet; `openAttack` carried; the batch with the first consequence plays the strike | [x] `netcode/__tests__/attack-sequencing.test.mjs` "edge 1" |
+| 2 | `attackStarted` twice for one attack (copy/re-flip paths) | second is ignored (same key, already open) | [x] "edge 2" |
+| 3 | self-switch after damage, auto (1 Benched) | banner → scene from the Active → damage → slide | [x] "edge 3" |
+| 4 | self-switch after damage, choice (≥2 Benched) | batch 1: banner → scene → damage; batch 2: slide only | [x] "edge 4"; e2e B, C |
+| 5 | no-damage switch attack | banner → aura on the Active → slide | [x] "edge 5" |
+| 6 | Koga's Ninja Trick (defender switches before `attackStarted`) | slide first, then the attack against the new Active | [x] "edge 6" |
+| 7 | before-damage gust (switch after `attackStarted`, hits follow) | slide, then banner → scene on the new Active | [x] "edge 7" |
+| 8 | attack KO whose batch has no card-move event | KO'd stack stays whole in its slot through banner and scene, then burns/flies | [x] e2e A; `card-mesh-drive.test.mjs` "a pinned card answers its pre-diff pose until unpinned" |
+| 9 | pin never taken (plan dropped, tab hidden) | released when the queue goes idle or after `SLIDE_PIN_MAX_MS`; retained mesh freed | [x] `slide-pins.test.mjs` "the backstop frees a pin nobody took, claimed or not", "releaseAll lets a pin whose slide never came glide"; `card-mesh-drive.test.mjs` "retains are counted; the scene hears the last one go" |
+| 10 | pinned card released by a room reset / view without it | pin and retain dropped, mesh freed, no throw | [ ] not automated: the release itself is row 9's tests; a reset reaching it is read in `board-scene.js freeCard` only |
+| 11 | ghost mesh whose flight is cancelled | removed by its own backstop | [ ] in part: e2e D3 (the ghost is gone once it has landed); a cancelled flight is not driven by a test |
+| 12 | FX off / reduced motion | no pins (as today); effects skip or use their static form; choice gate opens at once with FX off | [x] `choice-gate.test.mjs` "opens at once when nothing is playing"; `pile-shuffle.test.mjs` "reduced motion: the pile taps"; `mat-fx.test.mjs` "motionReduced: ignores the OS reduced-motion query" |
+| 13 | queue cleared with held draws | cards show at once | [x] `fx-queue.test.mjs` "design 089: clear hands every plan it drops to onDrop"; `netcode/__tests__/attack-sequencing.test.mjs` "a dropped draw shows its cards at once, cancels its backstop and releases a Prize sleeve" |
+| 14 | choice arrives, effects never drain | picker opens at `CHOICE_BACKSTOP_MS` | [x] `choice-gate.test.mjs` "a queue that never drains still opens the choice at the backstop" |
+| 15 | hidden info: opponent's hand card to deck | flies as their sleeve | [x] by construction, not by a test: `transit.js flyToPile` flies the card's own pinned mesh, or a ghost of its pre-diff snapshot (`origin.src`), so it shows only what was already on screen (their sleeve); no face is read from the event. e2e E drives the viewer's own card |
+| 16 | reconnect / catch-up replay | plans dropped (mirror guard), `openAttack` cleared, no pins left | [ ] in part: `netcode/__tests__/attack-sequencing.test.mjs` "a played attack is forgotten at its attackExecuted and at the next turn" and "nothing is carried into a batch that is not an array"; a reconnect is not replayed in a test |
+| 17 | both seats | each client derives the same order from the same events; far seat effects turn 180° | [x] the plan is a pure function of the events (the tests above run it for `self` and `opp`); far-seat stills of Psychic, Thunder and the shuffle |
+| 18 | spectator | same plans; no picker (banner only) | [ ] not exercised in this design: the spectator path is `apply-view.test.mjs` "069: …" (unchanged, green) |
+| 19 | shuffle with 0–1 cards / no scene / reduced motion | nothing / 0 hold / tap only | [x] `pile-shuffle.test.mjs` "nothing shuffles a pile that is not drawn or holds under two cards", "reduced motion: the pile taps" |
+| 20 | Prize count 4 (Build & Battle) | four flights | [ ] not automated: the deal flies one sleeve per Prize card in the view (e2e F runs six) |
+| 21 | shader fails to compile | `pnpm fx:check-elements` fails before landing | [x] run 2026-11-13: 11 / 11 `ok` (it failed on `haze` drawing 0 px until the check compared against the board alone) |
+| 22 | element capacity reached | instances dropped that frame (079 rule) | [x] `element-layer.test.mjs` "capacity drops the rest (edge 3)" (shared `instanced-kind.js`, which `haze` uses) |
 
 ## Test plan
 - Engine: `attack-started-event.test.mjs` (once per attack, before hits; suspended and resumed paths).
