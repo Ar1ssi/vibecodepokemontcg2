@@ -25,9 +25,11 @@ test('rock and ground bodies are stones; their tongues stones stretched along th
     const { ctx, emits } = live();
     materialFor(key).body(ctx, 0, 0, 10, 1);
     materialFor(key).tongue(ctx, { x: 0, y: 0, angleDeg: -90, length: 60, width: 10, seed: 2 });
-    assert.deepEqual(emits.map((e) => e.kind), ['debris', 'debris'], key);
-    assert.equal(emits[0].params.size, 10 * EARTH_SCALE.body);
-    const shard = emits[1].params;
+    // Design 089: each stone is drawn over its own contact shadow.
+    assert.deepEqual(emits.map((e) => e.kind), ['sprite', 'debris', 'sprite', 'debris'], key);
+    const stones = emits.filter((e) => e.kind === 'debris');
+    assert.equal(stones[0].params.size, 10 * EARTH_SCALE.body);
+    const shard = stones[1].params;
     assert.equal(shard.stretch, 4, 'capped');
     assert.equal(shard.headingDeg, -90);
     // Design 089: capped at 4 widths it is 52 long, shorter than its tongue: it stands on the
@@ -49,6 +51,28 @@ test('design 089: a rock tongue wider than 0.42 card heights is a crown of roote
   }
   assert.ok(Math.min(...spires.map((s) => s.at.x)) < -10 && Math.max(...spires.map((s) => s.at.x)) > 10, 'set across the column');
   assert.ok(new Set(spires.map((s) => Math.round(s.size * 2 * s.stretch))).size > 1, 'of different heights');
+});
+
+test('design 089: a stone darkens the cloth under it; a spire at its root; a stone high in the air leaves none', () => {
+  const shadowsOf = (z, draw) => {
+    const canvas = createGpuCanvas({ triangulate, debug: () => {} });
+    const emits = [];
+    canvas.ctx.fxElements = { live: false, emit: (kind, params) => (emits.push({ kind, params }), true) };
+    canvas.begin({ layer: 'front', z, unit: 100 });
+    draw(canvas.ctx);
+    return emits.filter((e) => e.kind === 'sprite').map((e) => e.params);
+  };
+  const [low] = shadowsOf(3, (ctx) => materialFor('rock').body(ctx, 20, 10, 10, 0.8));
+  assert.deepEqual(low.colour, [0, 0, 0]);
+  assert.equal(low.blend, 'over', 'a shadow covers, it adds no light');
+  assert.equal(low.at.x, 20);
+  assert.ok(low.alpha > 0.2 && low.alpha < 0.8 * 0.5, `soft: ${low.alpha}`);
+  assert.ok(low.size > 10 * EARTH_SCALE.body * 2, 'wider than the stone');
+  // The same stone five of its own sizes up: no shadow under it.
+  assert.deepEqual(shadowsOf(10 * EARTH_SCALE.body * 5 + 1, (ctx) => materialFor('rock').body(ctx, 20, 10, 10, 0.8)), []);
+  // A spire's shadow is at the tongue's root, not its middle.
+  const [root] = shadowsOf(0, (ctx) => materialFor('rock').tongue(ctx, { x: 5, y: 40, angleDeg: -90, length: 60, width: 10, seed: 2 }));
+  assert.deepEqual([root.at.x, root.at.y], [5, 40]);
 });
 
 test('a thrown rock tumbles with time and trails dust; frozen time is stable', () => {

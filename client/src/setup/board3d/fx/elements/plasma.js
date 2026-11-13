@@ -2,6 +2,10 @@
 // arcs crawl over a sphere's surface (3-D noise on it, re-rolled in steps like a discharge), a
 // Fresnel shell brightens the rim, the glow colour falls off outside, and the heart is white.
 // The TCG Live electric-crack flipbook adds forked filaments when it has loaded.
+// Design 089: three short arcs orbit the ball on tilted rings just outside it, each a jagged
+// segment running round its ring. A ball whose light is all inside its disc reads as a lamp;
+// charge that leaves it and comes back reads as a discharge. They scale with `arcs`, so a force
+// sphere or a ball of steel light (arcs 0) has none.
 import { BILLBOARD_GLSL, DISSOLVE_GLSL, NOISE_GLSL, SHARED_UNIFORMS_GLSL } from './element-glsl.mjs';
 import { defineInstancedKind } from './instanced-kind.js';
 import { PLASMA_ATTRIBUTES, PLASMA_FLOATS, normalizePlasma, packPlasma } from './plasma.mjs';
@@ -67,11 +71,27 @@ void main() {
   // Outside only: a halo round the ball, never a fill over it.
   float glow = smoothstep(0.82, 1.0, r) * exp(-max(r - 1.0, 0.0) * 3.0) * (1.0 - smoothstep(1.3, ${PAD.toFixed(2)}, r));
   float heart = (1.0 - smoothstep(0.0, 0.35, r)) * heat;
+  float orbit = 0.0;
+  for (int k = 0; k < 3; k++) {
+    float fk = float(k);
+    // Each ring is a circle seen nearly edge-on: turned in the quad's plane and squashed across.
+    float turn = 0.9 + fk * 2.1 + seed;
+    float squash = 0.3 + 0.14 * fk;
+    vec2 p = vec2(cos(turn) * vLocal.x - sin(turn) * vLocal.y, (sin(turn) * vLocal.x + cos(turn) * vLocal.y) / squash);
+    float along = atan(p.y, p.x);
+    float jag = (elNoise3(vec3(along * 3.0, flicker * 0.43 + fk, seed)) - 0.5) * 0.1;
+    float off = abs(length(p) - (1.12 + 0.06 * fk + jag));
+    // One segment, a third of the ring long, runs round it; alternate rings run the other way.
+    float head = uTime * (5.0 + 1.7 * fk) * (k == 1 ? -1.0 : 1.0) + seed * 3.0;
+    float reach = 1.0 - abs(mod(along - head + 3.14159, 6.28318) - 3.14159) / 1.1;
+    orbit += exp(-off * off * 700.0) * smoothstep(0.0, 0.6, reach);
+  }
   // Mostly dark inside: the light is in the arcs, the rim and the heart, as a real discharge.
   vec3 colour = vC.rgb * glow * 0.45
     + vC.rgb * inside * 0.1
     + vB.rgb * ridge * arcs * inside * 1.6
     + mix(vC.rgb, vB.rgb, 0.5) * shell * shellAmount * 1.2
+    + vB.rgb * orbit * arcs * 1.5
     + vec3(1.0) * heart * heart * 1.4;
   float edge;
   float keep = elDissolve(vLocal, vD.z, seed, edge);

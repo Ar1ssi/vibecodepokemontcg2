@@ -30,6 +30,24 @@ const SWEEP_ASPECT = 6;
 const LEAF_ASPECT = 3.2;
 const MAX_SWEEP_LEAVES = 6;
 const DUST_PUFFS = 3;
+// Design 089: a stone darkens the cloth under it. `reach` is how far up (in stone sizes) the
+// shadow lasts: a stone thrown high leaves none. It rides `clear` px up, over the card faces.
+const SHADOW = Object.freeze({ texture: 'TEX_VFX_Gradient_Radial.webp', size: 3.1, alpha: 0.42, reach: 5, clear: 7 });
+
+/** The contact shadow of a stone of `size` px whose foot is over `foot` (stage px, its height in z). */
+function stoneShadow(ctx, foot, size, alpha, heightPx = 0) {
+  const near = 1 - Math.min(1, Math.max(0, heightPx) / (size * SHADOW.reach));
+  if (!(near > 0) || !(alpha > 0)) return;
+  emit(ctx, 'sprite', {
+    texture: SHADOW.texture,
+    at: { x: foot.x, y: foot.y, z: SHADOW.clear },
+    size: size * SHADOW.size,
+    colour: [0, 0, 0],
+    alpha: alpha * SHADOW.alpha * near,
+    blend: 'over',
+  });
+}
+
 const LEAF_TEXTURE = 'T_VFX_Leaves_2x2.webp';
 const PETAL_TEXTURE = 'T_VFX_Fairy_Petal_Soft_2x2.webp';
 const DEG = Math.PI / 180;
@@ -42,8 +60,10 @@ function stoneKit(look) {
   function body(ctx, x, y, r, alpha) {
     if (!(r > 0) || !(alpha > 0)) return;
     const { colour, light } = lookOf(this.base);
+    const at = stageOf(ctx, x, y);
+    stoneShadow(ctx, at, stageLen(ctx, r) * EARTH_SCALE.body, alphaOf(ctx, alpha), at.z);
     emit(ctx, 'debris', {
-      at: stageOf(ctx, x, y),
+      at,
       size: stageLen(ctx, r) * EARTH_SCALE.body,
       alpha: alphaOf(ctx, alpha),
       seed: r * 0.37,
@@ -61,6 +81,9 @@ function stoneKit(look) {
     // A stone whose stretch is capped is shorter than its tongue: it stands on the tongue's root,
     // not at the tongue's middle (where it hung in the air).
     const mid = 0.5 * Math.min(spec.length, spec.width * EARTH_SCALE.shard * stretch);
+    // A spire throws its shadow at its root, where it leaves the ground.
+    const root = stageOf(ctx, spec.x, spec.y);
+    stoneShadow(ctx, root, stageLen(ctx, spec.width) * 0.5 * EARTH_SCALE.shard, alphaOf(ctx, alpha), root.z);
     emit(ctx, 'debris', {
       at: stageOf(ctx, spec.x + Math.cos(spec.angleDeg * DEG) * mid, spec.y + Math.sin(spec.angleDeg * DEG) * mid),
       size: stageLen(ctx, spec.width) * 0.5 * EARTH_SCALE.shard,
@@ -128,6 +151,7 @@ function stoneKit(look) {
         dissolve,
       });
     }
+    stoneShadow(ctx, at, size, a, at.z);
     emit(ctx, 'debris', { at, size, alpha: a, seed, spin: time * 4 + seed, colour, light, dissolve });
   }
 

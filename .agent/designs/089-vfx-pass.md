@@ -15,7 +15,7 @@ The user's request, verbatim (2026-11-13):
 | A3 | "fill in the gaps for missing animations (such as prize cards)" | ✓ `missing-animations.test.mjs` (12 tests: shield, attack failure, Prize pulse, pile transits, Special Condition updates, GX / VSTAR); e2e F (Prize cards are dealt, not shown all at once); stills `rec/rec-board-fx.mjs`. The look is the user's to judge on localhost |
 | A4 | "make a new shuffle animation" | ✓ `shuffle-math.test.mjs`, `pile-shuffle.test.mjs`; e2e G (a deck of 25 riffles with its own cards and is the same pile after). Look: localhost |
 | A5 | "Currently there is some homogeny with moves" (moves must stop looking alike) | ✓ `motion-variety.test.mjs`: no attacker motion above 18 % of specs (was `rear-lurch` 38 %), no defender motion above 13 % (was `knock` 76 %); `contact-aftermath.test.mjs` (seven contact styles, per-material aftermath); hit-stop in `scene-move-player.test.mjs`. ✗ in part: the 81 signature specs still contact at 1000 ms (Deviations, slice 7) |
-| A6 | "many of the visual shaders could be reworked and improved" | ✓ Composite, water beam, lens, bolt, flame jet, fireball reworked and a `haze` kind added: `tone.test.mjs` (9), kind and kit tests, `pnpm fx:check-elements` 11 / 11 ok. ✗ in part: smoke, plasma, water drop, debris and sprite shaders unchanged, and four § D6 looks not built (Deviations, slice 6) |
+| A6 | "many of the visual shaders could be reworked and improved" | ✓ Composite, water beam, lens, bolt, flame jet, fireball reworked and a `haze` kind added: `tone.test.mjs` (9), kind and kit tests, `pnpm fx:check-elements` 11 / 11 ok. ✗ in part: smoke, water drop, debris and sprite shaders unchanged, and two § D6 looks not built: sprite depth fade, self-shadowed fireball (Deviations, slice 6) |
 | A7 | "Do a passthrough for all existing vfx and animations and update them" | ✓ Attack side: slices 6–7. Non-attack side: the verdict table under Deviations, slice 9 (every registry effect: kept / tuned / rebuilt). ✗ in part: ten of those effects were read in code and not re-rendered (same table) |
 
 ## Assumptions
@@ -337,10 +337,13 @@ Self-approval checklist:
   - `scripts/fx/check-element-shaders.mjs` launches Playwright's own browser when the cloud path is absent, and
     counts changed pixels against the board alone over a two-tone board (a kind that only bends the board drew
     "0 px" over a flat one). 11 / 11 kinds pass.
-- Slice 6, in § D6 and NOT built: `sprite` soft-particle depth fade, `debris` dust trails and contact shadows,
-  `plasma` orbiting arcs, a self-shadowed `fireball` volume. `smoke`, `plasma`, `waterDrop` and `debris` shaders
-  are as 079 left them: the stills showed no fault in them that outranked the ones above. Leaf orientation was
-  read on the stills (leaves lie along their flight) and left as is.
+- Slice 6, added at the close (slice 10): `plasma` has three jagged arcs orbiting the ball on tilted rings
+  (scaled by `arcs`, so force and steel spheres have none); every rock / ground stone is drawn over a soft
+  contact shadow (`earth.js stoneShadow`: at a spire's root, fading out by five stone sizes of height).
+- Slice 6, in § D6 and NOT built: `sprite` soft-particle depth fade (it needs the scene depth as a texture: the FX
+  target's own depth cannot be read while it is drawn into) and a self-shadowed `fireball` volume. `smoke`,
+  `waterDrop` and `debris` shaders are as 079 left them: the stills showed no fault in them that outranked the
+  ones above. Leaf orientation was read on the stills (leaves lie along their flight) and left as is.
 - Slice 9, the non-attack pass. "Still" = judged on frozen frames (`rec/rec-board-fx.mjs`, which now also fires
   the banners, tags, status pops, Prize claim and game over); "code" = read against the house rules, not re-rendered.
 
