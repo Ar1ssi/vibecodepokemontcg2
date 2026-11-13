@@ -57,3 +57,5 @@
   → closed 2026-11-13, shortened in ISSUES.md
 - I261 2026-10-16 P3 [deck-builder] coin-normalize.test "committed coin catalog is already normalized" fails on a CRLF working copy of the catalog: compare normalizes line endings or .gitattributes pins LF
   → closed 2026-11-13, shortened in ISSUES.md
+- I183 2026-09-26 P3 [tests] coin-flip-ceremony.test.mjs is load-sensitive (merged I183, I210, I244): "ceremony mounts a material-stamped coin" and "several flips toss one after another" fail in 2 of 3 full `pnpm test` runs, pass alone — timing-dependent waits (refs: S330)
+  → closed 2026-11-13, shortened in ISSUES.md
