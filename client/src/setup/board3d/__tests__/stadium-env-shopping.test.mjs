@@ -29,10 +29,9 @@ const cardsOf = (layout) => {
 };
 const distanceToRect = (x, y, r) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.y - y, 0, y - r.y - r.h));
 
-// customhb-360 is Shopping Center (EVS 157) in the primary folder's client/src/assets/custom-sets/customhb/set.json.
-test('environmentKeyFor: Shopping Center by id, and by set and number', () => {
-  assert.equal(environmentKeyFor({ id: 'customhb-360' }), SHOPPING_KEY);
-  assert.equal(environmentKeyFor({ set: 'customhb', number: '360' }), SHOPPING_KEY);
+test('environmentKeyFor: Shopping Center by id, and by set', () => {
+  assert.equal(environmentKeyFor({ id: 'customhb-351', name: 'Shopping Center' }), SHOPPING_KEY);
+  assert.equal(environmentKeyFor({ set: 'customhb', name: 'Shopping Center' }), SHOPPING_KEY);
 });
 
 test('shoppingSpots: tables, racks and mannequins stand clear of every card, inside the walls', () => {

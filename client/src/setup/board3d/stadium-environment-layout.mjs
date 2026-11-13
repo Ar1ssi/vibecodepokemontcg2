@@ -7,35 +7,42 @@ import { benchSlotRect } from './board-layout.mjs';
 import { PILE_ZONES, pilePose, prizeSlotPose } from './pile-poses.mjs';
 import { tableBounds } from './table-uv.mjs';
 
-/** Homebrew Stadiums that have a board, by card id (customhb set.json). */
-const ENVIRONMENT_BY_CARD = {
-  'customhb-030': 'forest-of-vitality',
-  'customhb-051': 'stormy-mountains',
-  'customhb-052': 'crystal-cave',
-  'customhb-162': 'steel-shelter',
-  'customhb-163': 'full-metal-lab',
-  'customhb-197': 'mystery-garden',
-  'customhb-198': 'old-cemetery',
-  'customhb-199': 'dimension-valley',
-  'customhb-209': 'surfing-beach',
-  'customhb-212': 'brooklet-hill',
-  'customhb-239': 'fighting-stadium',
-  'customhb-240': 'mountain-ring',
-  'customhb-253': 'perilous-jungle',
-  'customhb-254': 'dark-city',
-  'customhb-278': 'levincia',
-  'customhb-289': 'magma-basin',
-  'customhb-299': 'scorched-earth',
-  'customhb-351': 'lumiose-city',
-  'customhb-358': 'magnetic-storm',
-  'customhb-360': 'shopping-center',
-  'customhb-361': 'community-center',
-  'customhb-362': 'pokemon-center',
-  'customhb-376': 'grand-tree',
-  'customhb-378': 'neutralization-zone',
-  'customhb-428': 'fairy-garden',
-};
-export const ENVIRONMENT_KEYS = Object.freeze([...new Set(Object.values(ENVIRONMENT_BY_CARD))]);
+/** The custom set whose Stadiums have boards (client/src/assets/custom-sets/customhb/set.json). */
+const HOMEBREW_SET = 'customhb';
+
+/**
+ * Stadium boards, each named after its Homebrew Stadium: the card's name in lower case, accents
+ * dropped, words joined by `-`. The name is the key because the set's numbers move when cards are
+ * added (the set was renumbered once, which sent 22 Stadiums to no board or the wrong one).
+ */
+export const ENVIRONMENT_KEYS = Object.freeze([
+  'forest-of-vitality',
+  'stormy-mountains',
+  'crystal-cave',
+  'steel-shelter',
+  'full-metal-lab',
+  'mystery-garden',
+  'old-cemetery',
+  'dimension-valley',
+  'surfing-beach',
+  'brooklet-hill',
+  'fighting-stadium',
+  'mountain-ring',
+  'perilous-jungle',
+  'dark-city',
+  'levincia',
+  'magma-basin',
+  'scorched-earth',
+  'lumiose-city',
+  'magnetic-storm',
+  'shopping-center',
+  'community-center',
+  'pokemon-center',
+  'grand-tree',
+  'neutralization-zone',
+  'fairy-garden',
+]);
+const ENVIRONMENT_KEY_SET = new Set(ENVIRONMENT_KEYS);
 /** Dev check on the real board: `?stadiumEnv=` or `localStorage[ENVIRONMENT_OVERRIDE_KEY]` forces one on. */
 export const ENVIRONMENT_OVERRIDE_KEY = 'ptcg-stadium-env';
 
@@ -192,18 +199,29 @@ export function arenaRects(layout) {
   return SIDES.flatMap((side) => [...activeRectsOf(layout, side), ...benchRectsOf(layout, side)]);
 }
 
+/** `Pokémon Center` → `pokemon-center`. */
+const boardKeyOfName = (name) =>
+  String(name ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+const isHomebrew = (card) =>
+  card.set === HOMEBREW_SET || (typeof card.id === 'string' && card.id.startsWith(`${HOMEBREW_SET}-`));
+
 /**
- * The environment key for the Stadium in play: its card id (`customhb-299`), or the same card
- * named by set and number when the id is missing. Null for any other Stadium or none.
- * @param {{ id?: string, set?: string, number?: string|number }|null|undefined} card
+ * The environment key for the Stadium in play: the board named after it, when the card is a
+ * Homebrew one (by id `customhb-…` or by set). Null for any other Stadium, a Homebrew Stadium
+ * without a board, or none.
+ * @param {{ id?: string, set?: string, name?: string }|null|undefined} card
  * @returns {string|null}
  */
 export function environmentKeyFor(card) {
-  if (!card) return null;
-  if (typeof card.id === 'string' && ENVIRONMENT_BY_CARD[card.id]) return ENVIRONMENT_BY_CARD[card.id];
-  const number = Number.parseInt(card.number, 10);
-  if (card.set !== 'customhb' || !Number.isInteger(number)) return null;
-  return ENVIRONMENT_BY_CARD[`customhb-${String(number).padStart(3, '0')}`] ?? null;
+  if (!card || !isHomebrew(card)) return null;
+  const key = boardKeyOfName(card.name);
+  return ENVIRONMENT_KEY_SET.has(key) ? key : null;
 }
 
 /**

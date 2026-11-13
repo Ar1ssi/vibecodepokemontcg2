@@ -36,10 +36,9 @@ const HALVES = [
 ];
 const layouts = PROFILES.flatMap((profile) => HALVES.map((half) => flatLayout(getMatLayout(profile), half)));
 
-// customhb-358 is Magnetic Storm (FLF 91) in the primary folder's client/src/assets/custom-sets/customhb/set.json.
-test('environmentKeyFor: Magnetic Storm by id, and by set and number', () => {
-  assert.equal(environmentKeyFor({ id: 'customhb-358' }), STORM_KEY);
-  assert.equal(environmentKeyFor({ set: 'customhb', number: '358' }), STORM_KEY);
+test('environmentKeyFor: Magnetic Storm by id, and by set', () => {
+  assert.equal(environmentKeyFor({ id: 'customhb-349', name: 'Magnetic Storm' }), STORM_KEY);
+  assert.equal(environmentKeyFor({ set: 'customhb', name: 'Magnetic Storm' }), STORM_KEY);
 });
 
 test('boltPath: jagged between its ends, arching up, the same every time', () => {

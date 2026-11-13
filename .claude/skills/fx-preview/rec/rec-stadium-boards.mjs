@@ -13,10 +13,10 @@
 //        CHROMIUM / CHROMIUM_PATH, SIO_JS (cloud container: see SKILL.md)
 import { chromium } from 'playwright';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { launchOptions, openBoard } from '../board-mode.mjs';
-import { ENVIRONMENT_KEYS } from '../../../../client/src/setup/board3d/stadium-environment-layout.mjs';
+import { ENVIRONMENT_KEYS, environmentKeyFor } from '../../../../client/src/setup/board3d/stadium-environment-layout.mjs';
 
 const {
   BASE_URL = 'http://localhost:4100',
@@ -31,34 +31,14 @@ const presets = process.env.PRESETS ? process.env.PRESETS.split(',') : ['tilt12'
 const READY_MS = 90000;
 mkdirSync(OUT, { recursive: true });
 
-/** The Homebrew Stadium card each board belongs to (stadium-environment-layout.mjs ENVIRONMENT_BY_CARD). */
-const CARD_OF = {
-  'forest-of-vitality': '030',
-  'stormy-mountains': '051',
-  'crystal-cave': '052',
-  'steel-shelter': '162',
-  'full-metal-lab': '163',
-  'mystery-garden': '197',
-  'old-cemetery': '198',
-  'dimension-valley': '199',
-  'surfing-beach': '209',
-  'brooklet-hill': '212',
-  'fighting-stadium': '239',
-  'mountain-ring': '240',
-  'perilous-jungle': '253',
-  'dark-city': '254',
-  levincia: '278',
-  'magma-basin': '289',
-  'scorched-earth': '299',
-  'lumiose-city': '351',
-  'magnetic-storm': '358',
-  'shopping-center': '360',
-  'community-center': '361',
-  'pokemon-center': '362',
-  'grand-tree': '376',
-  'neutralization-zone': '378',
-  'fairy-garden': '428',
-};
+/** The Homebrew Stadium card each board belongs to: the set's own row, found by the board's key. */
+const HOMEBREW_SET = JSON.parse(readFileSync('client/src/assets/custom-sets/customhb/set.json', 'utf8'));
+const STADIUM_OF = Object.fromEntries(
+  HOMEBREW_SET.cards
+    .filter((card) => card.trainerType === 'Stadium')
+    .map((card) => [environmentKeyFor({ id: card.id, name: card.name }), card])
+    .filter(([key]) => key)
+);
 
 const art = (number) => `/src/assets/custom-sets/customhb/${number}/high.webp`;
 const hasArt = (number) => existsSync(path.join('client/src/assets/custom-sets/customhb', number, 'high.webp'));
@@ -127,14 +107,16 @@ function boardState() {
 
 /** Pushes the board state with the board's Stadium in play, through the real applyView. */
 async function pushBoard(page, board) {
-  const number = CARD_OF[board];
+  const card = STADIUM_OF[board];
+  if (!card) throw new Error(`no Homebrew Stadium in set.json for board "${board}"`);
+  const number = card.localId;
   const stadium = {
     instanceId: 999,
-    id: `customhb-${number}`,
+    id: card.id,
     set: 'customhb',
     number,
-    name: board,
-    src: art(hasArt(number) ? number : '299'),
+    name: card.name,
+    src: art(hasArt(number) ? number : STADIUM_OF['scorched-earth'].localId),
     supertype: 'Trainer',
     subtypes: ['Stadium'],
     types: [],

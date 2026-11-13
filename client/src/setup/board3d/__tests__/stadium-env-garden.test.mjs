@@ -32,10 +32,9 @@ const cardsOf = (layout) => {
   return [...slabs, ...flats];
 };
 
-// customhb-197 is Mystery Garden in client/src/assets/custom-sets/customhb/set.json.
-test('environmentKeyFor: Mystery Garden by id, and by set and number', () => {
-  assert.equal(environmentKeyFor({ id: 'customhb-197' }), GARDEN_KEY);
-  assert.equal(environmentKeyFor({ set: 'customhb', number: '197' }), GARDEN_KEY);
+test('environmentKeyFor: Mystery Garden by id, and by set', () => {
+  assert.equal(environmentKeyFor({ id: 'customhb-193', name: 'Mystery Garden' }), GARDEN_KEY);
+  assert.equal(environmentKeyFor({ set: 'customhb', name: 'Mystery Garden' }), GARDEN_KEY);
 });
 
 test('gardenSpots: the plaza holds every card; the pool rings the Actives inside the Bench', () => {

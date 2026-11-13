@@ -35,9 +35,9 @@ const cornersOf = (rect) => [
   [rect.x + rect.w, rect.y + rect.h],
 ];
 
-test('environmentKeyFor: Full Metal Lab by id, and by set and number', () => {
-  assert.equal(environmentKeyFor({ id: 'customhb-163' }), LAB_KEY);
-  assert.equal(environmentKeyFor({ set: 'customhb', number: '163' }), LAB_KEY);
+test('environmentKeyFor: Full Metal Lab by id, and by set', () => {
+  assert.equal(environmentKeyFor({ id: 'customhb-159', name: 'Full Metal Lab' }), LAB_KEY);
+  assert.equal(environmentKeyFor({ set: 'customhb', name: 'Full Metal Lab' }), LAB_KEY);
 });
 
 test('labSpots: the dais holds every Active and Bench card; every footprint lies on it or a pad', () => {

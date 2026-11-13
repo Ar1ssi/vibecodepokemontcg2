@@ -8,6 +8,14 @@ import {
   playCoinFlipCeremony,
 } from '../coin-flip-ceremony.js';
 
+// I183: a fixed delay before a probe was too short whenever the full suite starved timers, so each
+// probe waits for the state it reads instead (each hold below is far longer than one poll).
+async function until(read, timeoutMs = 5000) {
+  const deadline = Date.now() + timeoutMs;
+  while (!read() && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 5));
+  return read();
+}
+
 const COIN = {
   id: 'SVC_Gold_Pikachu_Coin',
   name: 'SVC Gold Pikachu',
@@ -40,7 +48,6 @@ test('the ceremony mounts a material-stamped coin and removes itself', async () 
     result: 'tails',
     winnerLabel: 'You go',
     revealMs: 5,
-    // Wide hold so the 40 ms probe below lands mid-reveal even when the full suite starves timers.
     holdMs: 500,
     fadeMs: 5,
     doc: document,
@@ -51,7 +58,7 @@ test('the ceremony mounts a material-stamped coin and removes itself', async () 
   const coinEl = overlay.querySelector('[data-coin-flip-el]');
   assert.equal(coinEl.dataset.coinMaterial, 'gold');
 
-  await new Promise((resolve) => setTimeout(resolve, 40));
+  await until(() => overlay.querySelector('.turn-order-coin-flip-result')?.classList.contains('visible'));
 
   const live = document.getElementById(COIN_FLIP_OVERLAY_ID);
   assert.ok(live, 'overlay should still be visible during the reveal');
@@ -122,7 +129,7 @@ test('several flips toss one after another in one overlay with a running tally',
     label: 'Your coin flip — Thunder Jolt',
     passive: true,
     revealMs: 5,
-    // Landings at ~5/460/915 ms; the wide hold keeps the probe inside it under a starved suite.
+    // Landings at ~5/460/915 ms.
     holdMs: 2000,
     fadeMs: 5,
     doc: document,
@@ -132,7 +139,7 @@ test('several flips toss one after another in one overlay with a running tally',
   assert.match(overlay.querySelector('.turn-order-coin-flip-label').textContent, /Thunder Jolt/);
   assert.equal(overlay.querySelector('.turn-order-coin-flip-tally').textContent, 'Flipping 3 coins');
 
-  await new Promise((resolve) => setTimeout(resolve, 1500));
+  await until(() => overlay.querySelector('.turn-order-coin-flip-tally').textContent.startsWith('3 of 3'));
   assert.equal(overlay.querySelector('.turn-order-coin-flip-tally').textContent, '3 of 3 · 2 heads');
   assert.equal(overlay.querySelector('.turn-order-coin-flip-result').textContent, 'Heads!');
   assert.match(overlay.querySelector('[data-coin-flip-el]').getAttribute('style') || '', /5400deg/);
@@ -152,7 +159,7 @@ test('an OS prefers-reduced-motion flag still tumbles the coin and animates its 
   dom.window.matchMedia = (query) => ({ matches: /prefers-reduced-motion/.test(query), media: query });
 
   const done = playCoinFlipCeremony({ coin: COIN, result: 'tails', revealMs: 5, holdMs: 300, fadeMs: 5, doc: document });
-  await new Promise((resolve) => setTimeout(resolve, 120));
+  await until(() => /--coin-flip: 1980deg/.test(document.querySelector('[data-coin-flip-el]')?.getAttribute('style') || ''));
 
   const coinEl = document.querySelector('[data-coin-flip-el]');
   assert.match(coinEl.getAttribute('style') || '', /--coin-flip: 1980deg/, 'the toss spun five turns and landed on tails');
@@ -184,8 +191,8 @@ test('outcomeLabel replaces the "goes first" line on the last landing', async ()
     overlay.querySelector('.turn-order-coin-flip-label').textContent,
     /You chose heads\. Flipping the coin/
   );
-  await new Promise((resolve) => setTimeout(resolve, 40));
   const resultEl = overlay.querySelector('.turn-order-coin-flip-result');
+  await until(() => resultEl.textContent !== '');
   assert.equal(resultEl.textContent, 'Heads! You won the coin flip!');
 
   await done;

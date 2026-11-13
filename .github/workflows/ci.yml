@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Lint errors and unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Errors only: formatting warnings are not a gate (`pnpm lint` shows them).
+      - run: npx eslint --quiet .
+      # The same suite as `pnpm test`, without recording the tree as verified on this machine.
+      - run: >-
+          node --test
+          "shared/**/*.test.mjs" "client/**/*.test.mjs" "server/**/*.test.mjs"
+          "bot/**/*.test.mjs" "scripts/**/*.test.mjs"

@@ -31,7 +31,9 @@ export const setLostZoneEnabled = (enabled) => {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(STORAGE_KEY, isEnabled ? 'true' : 'false');
     }
-  } catch {}
+  } catch {
+    // Storage can be blocked (private window): the choice then lasts for this page only.
+  }
   const rail = document.getElementById(RAIL_ID);
   if (rail) {
     rail.style.display = isEnabled ? 'flex' : 'none';

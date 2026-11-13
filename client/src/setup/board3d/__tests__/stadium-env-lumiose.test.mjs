@@ -34,10 +34,9 @@ const cardsOf = (layout) => {
   return [...slabs, ...flats];
 };
 
-// customhb-351 is Lumiose City (POR 77) in the primary folder's client/src/assets/custom-sets/customhb/set.json.
-test('environmentKeyFor: Lumiose City by id, and by set and number', () => {
-  assert.equal(environmentKeyFor({ id: 'customhb-351' }), LUMIOSE_KEY);
-  assert.equal(environmentKeyFor({ set: 'customhb', number: '351' }), LUMIOSE_KEY);
+test('environmentKeyFor: Lumiose City by id, and by set', () => {
+  assert.equal(environmentKeyFor({ id: 'customhb-342', name: 'Lumiose City' }), LUMIOSE_KEY);
+  assert.equal(environmentKeyFor({ set: 'customhb', name: 'Lumiose City' }), LUMIOSE_KEY);
 });
 
 test('lumioseSpots: the square holds every card; buildings stand outside it, never on a card', () => {

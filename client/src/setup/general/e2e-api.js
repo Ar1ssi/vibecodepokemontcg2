@@ -18,7 +18,7 @@ import { cardRectOf } from './e2e-card-rect.mjs';
 import { board3dActive, getBoardScene } from '../board3d/board3d.js';
 import { viewportRectOf } from '../image-logic/card-pop.mjs';
 import { instanceMapSeats } from '../netcode/dual-run-bridge.js';
-import { liveZoneArray } from '../zones/live-zone-array.js';
+import { liveZoneArray, liveZoneCount } from '../zones/live-zone-array.js';
 import { e2eFixtureDeck, isE2eMode } from './e2e-mode.mjs';
 import { persistRulesEnabled } from '/shared/engine/rules/rules-state.mjs';
 import {
@@ -63,7 +63,7 @@ const SECRET_PLAYER_ZONES = ['hand', 'prizes'];
 function zoneSnapshot(user, zoneId) {
   const cards = liveZoneArray(user, zoneId);
   return {
-    count: cards.length,
+    count: liveZoneCount(user, zoneId),
     names: cards.map((card) => card.name || ''),
   };
 }
@@ -188,7 +188,7 @@ function serializePlayerObservation(user) {
     active: serializePokemonCard(active, attachedCardsFor(user, 'active', active)),
     bench,
     prizeCount: liveZoneArray(user, 'prizes').length,
-    deckCount: liveZoneArray(user, 'deck').length,
+    deckCount: liveZoneCount(user, 'deck'),
     discardCount: liveZoneArray(user, 'discard').length,
   };
 }
@@ -673,7 +673,7 @@ export function installE2eApi() {
     secretZoneCounts(user) {
       const counts = {};
       for (const zoneId of SECRET_PLAYER_ZONES) {
-        counts[zoneId] = liveZoneArray(user, zoneId).length;
+        counts[zoneId] = liveZoneCount(user, zoneId);
       }
       return counts;
     },

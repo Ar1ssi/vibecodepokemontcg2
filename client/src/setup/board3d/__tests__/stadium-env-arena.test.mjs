@@ -58,9 +58,9 @@ const three = {
   },
 };
 
-test('environmentKeyFor: Fighting Stadium by id, and by set and number', () => {
-  assert.equal(environmentKeyFor({ id: 'customhb-239' }), ARENA_KEY);
-  assert.equal(environmentKeyFor({ set: 'customhb', number: '239' }), ARENA_KEY);
+test('environmentKeyFor: Fighting Stadium by id, and by set', () => {
+  assert.equal(environmentKeyFor({ id: 'customhb-235', name: 'Fighting Stadium' }), ARENA_KEY);
+  assert.equal(environmentKeyFor({ set: 'customhb', name: 'Fighting Stadium' }), ARENA_KEY);
 });
 
 test('arenaSpots: the ring holds every card footprint, the ropes the gap clear of them', () => {

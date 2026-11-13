@@ -272,7 +272,9 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
         if (multiplayerLocksRulesEnabled(systemState.isTwoPlayer)) return;
         rulesState.enabled = false;
         appendMessage('', 'Debug mode: rules enforcement disabled (?norules).', 'announcement', false);
-      } catch {}
+      } catch (error) {
+        console.warn('rules-bridge: reading the ?norules debug override failed', error);
+      }
     };
 
     export const initializeRulesEngine = () => {
@@ -479,7 +481,9 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
           document.dispatchEvent(new CustomEvent('rules-game-ended', { detail: { reason } }));
           return true;
         }
-      } catch {}
+      } catch (error) {
+        console.warn('rules-bridge: evaluateAndApplyWinConditions failed', error);
+      }
       return false;
     }
 
@@ -567,7 +571,9 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
               appendMessage('', note, 'announcement', false);
             }
           }
-        } catch {}
+        } catch (error) {
+          console.warn('rules-bridge: end-of-turn status resolution failed', error);
+        }
     
         // end-of-turn ability effects (ability family: end-of-turn):
         // resolve for the ending player's Active + bench, once per turn
@@ -577,7 +583,9 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
               if (abilityUsed(endingPlayer, card)) continue;
               try {
                 await ensureCardData(card);
-              } catch {}
+              } catch (error) {
+                console.warn('rules-bridge: card data for an end-of-turn Ability could not be loaded', error);
+              }
               const effect = parseEndOfTurnEffect(card);
               if (!effect) continue;
               markAbilityUsed(endingPlayer, card);
@@ -1674,7 +1682,9 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
               }
             }
           }
-        } catch {}
+        } catch (error) {
+          console.warn('rules-bridge: checkEnergyAdds failed', error);
+        }
       };
 
       document.addEventListener('rules-energy-attached', checkEnergyAdds);
@@ -2093,14 +2103,18 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
                             }
                           }
                         }
-                      } catch {}
+                      } catch (error) {
+                        console.warn('rules-bridge: moving a Knocked Out Pokémon\'s cards failed', error);
+                      }
                     });
                   }
                 }
               }
             }
           }
-        } catch {}
+        } catch (error) {
+          console.warn('rules-bridge: checkKnockouts failed', error);
+        }
       };
 
       document.addEventListener('rules-damage-changed', checkKnockouts);
@@ -2144,7 +2158,9 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
               }
             }
           }
-        } catch {}
+        } catch (error) {
+          console.warn('rules-bridge: updating status badges failed', error);
+        }
       };
 
       document.addEventListener('rules-status-changed', updateBadges);
@@ -2884,7 +2900,9 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
               false
             );
           }
-        } catch {}
+        } catch (error) {
+          console.warn('rules-bridge: autoExecuteAbilitySteps failed', error);
+        }
       }
     };
 
@@ -3292,7 +3310,7 @@ if (!isTrainer) {
                                     for (const pick of picks) {
                                       const idx = zone.array.indexOf(pick);
                                       if (idx >= 0) {
-                                        try { moveCardBundle(oppSide, oppSide, 'hand', 'discard', idx, false, 'move'); } catch {}
+                                        try { moveCardBundle(oppSide, oppSide, 'hand', 'discard', idx, false, 'move'); } catch (error) { console.warn('rules-bridge: discarding a picked card from the opponent\'s hand failed', error); }
                                       }
                                     }
                                     appendMessage('', `  auto: opponent discarded ${picks.length} card(s).`, 'announcement', false);
@@ -3328,11 +3346,15 @@ if (!isTrainer) {
                       break;
                     }
                   }
-                } catch {}
+                } catch (error) {
+                  console.warn('rules-bridge: discarding the played Trainer from the board failed', error);
+                }
               };
               runTrainerSteps(card, parsed.steps, 0, discardTrainerFromBoard, ownerUser);
             });
-      } catch {}
+      } catch (error) {
+        console.warn('rules-bridge: processBoardCard failed', error);
+      }
     };
 
     const hookTrainerPlay = () => {
@@ -3494,7 +3516,9 @@ if (!isTrainer) {
               if (!board?.array) continue;
               for (const card of board.array) processBoardCard(card, side);
             }
-          } catch {}
+          } catch (error) {
+            console.warn('rules-bridge: checkBoardCards failed', error);
+          }
         };
         document.addEventListener('rules-card-moved', checkBoardCards);
         document.addEventListener('action-processed', checkBoardCards);

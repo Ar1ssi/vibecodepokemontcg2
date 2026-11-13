@@ -1,4 +1,4 @@
-// Design 077 (prototype): Fairy Garden (customhb-428) after its card art (FCO 100, Ryo Ueda): a
+// Design 077 (prototype): Fairy Garden after its card art (FCO 100, Ryo Ueda): a
 // clearing in a night forest, the ground one carpet of small pale lavender flowers, a ring of pale
 // light on it round a patch of green grass, great dark trees closing round, green orbs of light
 // floating among them and white sparkles trailing through the air, big dark leaves framing the

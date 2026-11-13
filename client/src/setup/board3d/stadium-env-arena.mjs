@@ -1,4 +1,4 @@
-// Design 077 (prototype): Fighting Stadium (customhb-239) after its card art (FFI 90, xy3-90 in
+// Design 077 (prototype): Fighting Stadium after its card art (FFI 90, xy3-90 in
 // set.json; Ryo Ueda): a wrestling ring in a packed arena at night. The ring's canvas, white under
 // the rig's spotlight and teal toward the ropes, sits on a square white stage edged in a row of
 // white lights; round the stage the arena floor, then a band of glowing LED ad boards, then the dark

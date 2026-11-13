@@ -143,8 +143,8 @@ try {
   const nearHand = await hand(page, 'self');
   const farHand = await hand(page, 'opp');
   T(
-    '6. both seats were dealt an opening hand of 7 (the starter has drawn its turn card)',
-    [nearHand.count, farHand.count].sort().join('/') === '7/8',
+    "6. both seats were dealt an opening hand of 7 (the starter's turn-1 draw waits for both Starting Actives, D239)",
+    [nearHand.count, farHand.count].sort().join('/') === '7/7',
     `${nearHand.count}/${farHand.count}`
   );
   T('7. the far hand is face up for the solo player', farHand.names.every((name) => name.startsWith('Far')));

@@ -1,4 +1,4 @@
-// Design 077 (prototype): Dimension Valley (customhb-199) after its card art (PHF 93, Ryo Ueda):
+// Design 077 (prototype): Dimension Valley after its card art (PHF 93, Ryo Ueda):
 // grass-topped slabs of earth floating in a void that runs from a rainbow (red, orange, yellow,
 // green) on the left to deep violet on the right, streams of white sparkle pouring through it,
 // glowing coloured discs lying on the grass, the pink Psychic mark painted on the biggest slab, bare
