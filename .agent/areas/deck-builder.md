@@ -43,8 +43,7 @@ client/src/setup/deck-builder/core/set-browser-filters.mjs — the same drawer f
 client/src/setup/deck-builder/core/deck-sprites.mjs — deck Pokémon sprite slots (design 024, D97):
   up to 2 `{slug, shiny}` per deck (D99), catalog search and vendored-art URL building; catalog data in
   pokemon-sprite-catalog.generated.mjs (gen-8 species + Mega/Gmax/regional/transform/type forms, design 039),
-  art in client/src/assets/pokemon/gen8/,
-  both refreshed by scripts/generate-pokemon-sprites.mjs; plus hand-kept pokemon-sprite-catalog-gen9.mjs
+  art in client/src/assets/pokemon/gen8/, both refreshed by scripts/generate-pokemon-sprites.mjs; plus hand-kept pokemon-sprite-catalog-gen9.mjs
   (fan art, regular only, D100) with art in client/src/assets/pokemon/gen9/regular/. UI: renderDeckSprites/renderSpritePicker in
   native-deck-builder-renderers.js + native-deck-builder-sprite-picker.js (popover state only)
 client/src/setup/deck-builder/core/card-sprites.mjs — card → sprite (design 025, D98): cardSpriteFor
@@ -56,7 +55,6 @@ client/src/setup/deck-builder/core/box-wallpapers.mjs — 16 Gen V PC Box wallpa
   client/src/assets/box-wallpapers/), per-deck `wallpaperId`; PC Box look = css/deck-builder-pc-box.css
   (scoped `.db-live:not(.db-light)`, Rodin woff2 in client/src/assets/fonts/)
 client/src/setup/deck-builder/core/coins.mjs — coin catalog (939, unique ids; data in assets/catalogs/, loaded
-  on demand, design 073); normalize via
-  scripts/normalize-coin-catalog.mjs; filterCoins/groupCoinsByRelease/getCoinStats; scans fetched to
+  on demand, design 073); normalize via scripts/normalize-coin-catalog.mjs; filterCoins/groupCoinsByRelease/getCoinStats; scans fetched to
   client/src/assets/coins/historical/ by scripts/download-coin-images.mjs (manifest only, no auto-link);
   coin-effects.mjs + client/src/css/coin/ = material/finish resolver + shared fixed-light foil CSS (D92)

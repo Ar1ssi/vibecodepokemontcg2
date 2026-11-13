@@ -7,6 +7,7 @@
 .claude/agents/ — project subagents: slice-builder (low effort, pinned-contract slices; D171), fx-designer (high effort, board visuals/CSS in the 041–046 house style; D173)
 client/ — client application (EJS layout, CSS styles, client JS, deck builder, rules engine); entry: client/src/front-end.js
 server/ — Express + Socket.IO + SQLite; entry: server/server.js; game rooms in server/game/room.mjs (GameRoom runs shared/engine commands, sends per-player views); server/netcode-mode.mjs: startup warning when SERVER_AUTHORITATIVE still opts out (the server always runs the rules, design 087); server/game/room-sweep.mjs: idle-room sweep plan
+server/access-policy.mjs — who gets in from outside the game's own pages (D248): `planAdminUi` (production needs its own ADMIN_PASSWORD), `planCors` (`ALLOWED_ORIGINS`; none by default)
 scripts/build-client.mjs (`pnpm build`; root `postinstall` on deploy hosts) — esbuild bundle of the client into client/dist/ (design 088, D247); server/client-bundle.mjs decides whether it is served (`CLIENT_BUNDLE`, deploy host) and feeds client/index.ejs; server/cache-policy.mjs: Cache-Control per path; server/keep-awake.mjs: opt-in self-ping (`KEEP_AWAKE`) + `/healthz`
 shared/tcgdex/ — TCGdex URL builder (browser → server proxy server/tcgdex-proxy.mjs, D164) + IndexedDB JSON cache (D102); card-art.mjs maps cards to own fronts in client/src/assets/card-art (TCG Live art for League-stamped/imageless TCGdex cards); custom-sets.mjs: custom ids, image path → id, `/api/custom-sets` manifest
 shared/custom-sets/custom-set-schema.mjs — custom sets (design 075, D223): the set.json contract (`validateCustomSet`) for client/src/assets/custom-sets/<setId>/ (cardback export: TCGdex-shaped records + <nnn>/{high,low}.webp); server/custom-sets.mjs loads them (live: `createLiveCustomSets` watches the folder, broadcasts customSetsChanged, D227) and `withCustomSets` answers them through the TCGdex proxy (records, set, `/cards?` list merges); scripts/custom-sets/check.mjs validates the committed sets; scripts/custom-sets/engine-check.mjs runs a set's attacks, abilities and Trainers through the oracle classifiers (customhb ENGINE-CHECK.md); optional set.json `group` "homebrew" lists a set under the Homebrew sets pill (customhb) instead of Custom
@@ -34,37 +35,24 @@ scripts/special-energy-tokens/ — `make-tokens.py <card pngs> <out> --write-cli
 client/src/setup/rules/card-focus.mjs — TCG Live AttackOverlay popup for your in-play Pokémon (designs 067, 074, D208, D219): CSS-3D flight from the slot to the game's focus pose, hand lowered via `.hand-lowered` on the self iframe, 500 ms click guard (D209), rows from `buildInspectorCard`, HUD Buff/Debuff/Stack/Close, TableCover backdrop; card-focus-geometry.mjs (pure: pose, flight, curves, tilt), card-focus-routing.mjs (`tapRoute`: overlay / stack view), css/card-focus.css; routed from click-events.js, Escape in keybinds.js
 client/src/setup/rules/attack-options.mjs — TCG Live option rows (design 074): `buildAttackOption`, `buildAbilityOption`, `buildWeakResistBar`, type icons; skin in css/attack-options.css; pure cost/damage/effect ports in attack-ui-model.mjs
 client/src/setup/rules/stack-view.mjs + stack-view-panel.mjs — TCG Live stack view (StackedCardOverlay_Landscape): carousel + info panel, css/stack-view.css; status-popup.mjs (+css) — Buff/Debuff MatchModalPopup (design 074)
-client/src/setup/zones/live-zone-array.js — `liveZoneArray(user, zoneId)`: the authoritative view's cards once one is applied, else legacy getZone
+client/src/setup/zones/live-zone-array.js — `liveZoneArray(user, zoneId)`: the authoritative view's cards once one is applied, else legacy getZone; `liveZoneCount` (the deck is a count only in a view)
 client/src/setup/netcode/mat-fx/status-fx.mjs + status.js — condition apply pop / clear sparkle from TCG Live sprites; status-loop.mjs + status-loop.js — held-condition loop overlay, reconciled per card in apply-view.js `reconcileStatusLoopOverlay`; palette in client/src/css/status-fx-palette.css; status-units.mjs — Unity prefab units → card widths (tables keep E:/TCGLive_Extract/vfx_dump numbers)
 
 ## Rules engine — pure, DOM-free, headless-tested (~47,000 lines; portable to Node)
 shared/engine/rules/ + shared/engine/effects/ — the pure rules modules, one line each in .agent/areas/rules-engine.md: rules-state, attack-engine, ability-combat, ability-triggers, special-energy-parse, special-conditions, trainer-effects, reveal-picks, revealed-hand, opening-draw, trainer-play-conditions, tool-conditions, tool-attacks, stadium-triggers, stadium-trigger-apply, evolved-pokemon, server-energy, executor, trainer-steps, abilities, ability-step-plan, fossil, stadium-effects, damage-parser, attack-steps, attack-text, optional-cost-bonus, scaling-count, attack-markers, attack-conditions, attack-status, attack-copy, each-filter, turn-damage-bonus, rules-turnorder, turn-order-flip, turn-order-transport, baby-rule, pokemon-forms, legacy-* wording, card-classify, paradox-tags, card-markers
 shared/engine/reduce.mjs — public reducer entry: `applyCommand` (shape → choice/turn gate → `validateReferences` → `validateLegality` → one `<type>Command` handler per case → post-command settles) and `undo` replay; re-exports `validateLegality`, `attackExtrasFor`. Body split by command domain into reduce/ (design 073 B, I250)
-shared/engine/reduce/shared.mjs — cross-domain reducer helpers: `inPlayView`, `cardEffectiveHp`, `activeAttackMarkers`, `setGameEnded`/`isGameConcluded`/`isGameFrozen`, once-per-game and tiebreak reads, `rootsIn`
-shared/engine/reduce/legality.mjs — `validateReferences` (stale view) + `validateLegality` (rules gate), `attackCostPayable`, `resolveAttacker`, attach/play/ability/once-per-game lock readers
-shared/engine/reduce/attack.mjs — attack declaration: coins, Ninja Trick, declared/copied attack flows, `attackViewFor`/`attackExtrasFor` (granted, borrowed, Stadium/Tool attacks), GX/VSTAR spend; `attack` command
-shared/engine/reduce/attack-damage.mjs — attack damage placement: bench damage/Thorns, target clauses and options, flat and Active-target damage, retaliation, `applyAttackTargets`
-shared/engine/reduce/attack-steps.mjs — attack-time prompts and executor runs: search, discard/mill scaling, spread attaches, optional costs, `attackResumeContext`, `planAttackSteps`/`runAttackSteps`
-shared/engine/reduce/attack-effect.mjs — `resolveAttackEffectPhase` (the whole attack effect phase) + `finishAttackTail`
-shared/engine/reduce/knockout.mjs — `handleKnockout`, Tool on-KO effects, KO win settles, promotions, KO Energy moves, damage-counter KOs, Prize entitlement/choices; `takePrizes`/`takePrizesByIndex`/`promote`
-shared/engine/reduce/turn.mjs — `resolveCheckup`, between-turns/end-of-turn effects, `advanceTurn`, `endTurnFromEffect`; `setup`/`pass`/`takeTurn`/`loadDeck`/`cardStats`
-shared/engine/reduce/retreat.mjs — `computeEffectiveRetreatCost`, retreat Energy choice, `applyRetreatSwap`; `retreat` command
-shared/engine/reduce/attach.mjs — `attachCard` (Energy/Tool attach and Evolution), Energy attach plan, Energy-attach and opponent-evolve triggers
-shared/engine/reduce/trainer.mjs — `promoteTrainerPlay` (hand→board drop becomes playTrainer), Chaos Gym gate, Trainer turn-end/Prize-win settles; `playTrainer`/`stadium-effect`
-shared/engine/reduce/ability.mjs — Call Energy, ability turn-end and outcome settles; `useAbility`/`useVStarGX`
-shared/engine/reduce/board.mjs — manual board commands (move, draw, counters, conditions, zone shuffles/moves, reveal/hide, board ops), `clearFaceDownOffBoard`
-shared/engine/reduce/choice.mjs — `resolveChoice`: routes a pending choice's `resumeToken.effectType` back to the domain that raised it
+shared/engine/reduce/<domain>.mjs — the 14 command-domain modules behind reduce.mjs (shared, legality, attack, attack-damage, attack-steps, attack-effect, knockout, turn, retreat, attach, trainer, ability, board, choice; D218) → .agent/areas/reducer.md
 
 ## Rules engine — DOM-coupled glue (NOT portable; the migration's cost centre)
-client/src/setup/rules/rules-bridge.js — 3527 lines; orchestrates rules via document.dispatchEvent + HUD
-client/src/setup/rules/trainer-execution.js — 2939 lines; resolves effects through synchronous UI pickers
-client/src/actions/chat-buttons/chat-buttons.js — 5421 lines; attack/pass/retreat monolith
+client/src/setup/rules/rules-bridge.js — 3600 lines; orchestrates rules via document.dispatchEvent + HUD
+client/src/setup/rules/trainer-execution.js — 2980 lines; resolves effects through synchronous UI pickers
+client/src/actions/chat-buttons/chat-buttons.js — 5440 lines; attack/pass/retreat monolith
 
 ## State / zones
 shared/engine/cards.mjs — pure `Card` model, `mintInstanceId`, DOM-free (replaces DOM-based Card identity); `isBasicPokemon` treats LEGEND/V-UNION/Restored/BREAK as non-Basic (30c 5.4)
 shared/engine/state.mjs — pure `GameState` model (8 zones/player, neutral stadium), zone accessors, `hashState`; per-player `oncePerGame: { vstarUsed, gxUsed }` survives `advanceTurn` (rulebook 30c 1.2); `discardCardToPlayerZone` routes Prism Star discards to the Lost Zone (30c 3.5)
 shared/engine/rng.mjs — seeded `mulberry32` PRNG, deterministic replay source (Invariant 6)
-shared/engine/formats.mjs — deck formats ('tcg' 6 Prizes | 'build-battle' 4), `prizeCountForFormat`, `formatMismatchMessage`; `player.deckFormat` set by reduce `loadDeck` (refuses `format_mismatch`), read by setup.mjs, room.mjs rematch, client setup-deal.mjs; wire arg order in deck-constructor/deck-format-args.mjs (design 051)
+shared/engine/formats.mjs — deck formats ('tcg' 6 Prizes | 'build-battle' 4), `prizeCountForFormat`, `formatMismatchMessage`; `player.deckFormat` set by reduce `loadDeck` (any format; mixed formats are refused at the deal, D190), read by setup.mjs, room.mjs rematch, client setup-deal.mjs; wire arg order in deck-constructor/deck-format-args.mjs (design 051)
 shared/engine/room-format.mjs — room format propose/accept/cancel reducer `applyRoomFormatAction` (design 053); server/game/room-format-seat.mjs seat check + coin-call lock; client setup/general/room-format-view.mjs (pure) + room-format-panel.js (#roomFormatPanel)
 shared/engine/view.mjs — `viewFor(state, playerId)` authoritative redacted view per player/spectator (H1, Invariant 5)
 client/src/setup/zones/get-zone.js — `getZone(user, zoneId)` → { array, element, ... }; 10 zones/player, stadium neutral
@@ -99,7 +87,7 @@ client/src/setup/image-logic/drag.js + drag-avatar.js + drag-tilt.mjs — native
 
 ## three.js board (design 074-three-board, D220) — the only board; entry: client/src/setup/board3d/board3d.js
 client/src/setup/board3d/ — board-model.mjs (server view → pure model) · board-layout.mjs + board-camera.mjs (zones, 12° tilt camera, TCG Live preset) · board-scene.js (applyModel/rects/hitTest/tween/lift) · card-mesh.js, pile-mesh.js, overlay-meshes.js · board-input.js + drop-router.mjs (pointer → raycast → synthetic clicks/drags) · board-rects.js + flight-pose.mjs (FX geometry)
-client/src/setup/board3d/stadium-environment-*.{js,mjs} + stadium-env-*.mjs — Stadium boards (design 077; field-calm rules, FOOTPRINTS/FILTERING GLSL: 080): layout registry (card id → board), mesh (plate, bakes, cutout), timeline (reveal/swap/exit); wired in board3d.js syncStadiumEnvironment, queued via netcode/mat-fx/board-environment-queue.mjs; stills: .claude/skills/fx-preview/rec/rec-stadium-boards.mjs
+client/src/setup/board3d/stadium-environment-*.{js,mjs} + stadium-env-*.mjs — Stadium boards (design 077; field-calm rules, FOOTPRINTS/FILTERING GLSL: 080): layout registry (card name → board, D249), mesh (plate, bakes, cutout), timeline (reveal/swap/exit); wired in board3d.js syncStadiumEnvironment, queued via netcode/mat-fx/board-environment-queue.mjs; stills: .claude/skills/fx-preview/rec/rec-stadium-boards.mjs
 client/src/setup/board3d/stadium-kit.mjs + stadium-kit-assets.mjs — the Stadium kit (designs 081/082, D234): BDSP's soft light per board mood, leaf splats, contact shadows (createKitProps); ~35 code-modelled assets (placeAsset/measureAsset) built with stadium-env-props.mjs createPropBuilder (lumps, roundBox); stadium-env-ground.mjs the shared BDSP ground GLSL (grass, fringe, flagstones, cobbles, sand, water, strata)
 client/src/setup/board3d/stadium-card-shadows.js — cards' shadows on a Stadium's ground: a catcher for the key light (aimed along the board's sun: table-mesh.js setSun) and soft contact shadows under resting cards and piles, in the board's kit shadow tint, only where the Stadium shows
 client/src/setup/board3d/stadium-env-drift.mjs + stadium-env-clumps.mjs — design 083: ambient drift over every Stadium board (BOARD_DRIFT kinds per board, never over a card or the opponent's hand); clumps of kit assets in place of even scatters (clumpPieces, scaledKinds); patch/patchy/shuffled/clumpAround/visibleArea in stadium-env-spots.mjs
@@ -112,22 +100,15 @@ client/src/setup/netcode/solo-room.js, solo-seat.mjs, server-card-select.{js,mjs
 scripts/e2e/board3d-*-test.mjs, test-card-inspector-e2e.mjs, fullview-test.mjs, spectator-view-test.mjs, .claude/skills/fx-preview/board-mode.mjs — every browser harness/capture runs on the 3D board (CHROMIUM_PATH honoured; SwiftShader GL args)
 
 ## Tests & tooling
-**/__tests__/*.test.mjs — plain `node --test`, no jsdom; `pnpm test` runs them all (~6900); run one file with `node --test <path>`
+**/__tests__/*.test.mjs — plain `node --test`, no jsdom; `pnpm test` runs them all (~9070); CI runs the same suite plus `eslint --quiet .` (.github/workflows/ci.yml, D250); run one file with `node --test <path>`
 scripts/prune-merged-branches.mjs — dry-run/delete remote branches fully contained in origin/main; keeps main, the current branch and open-PR refs (via gh, else --keep); needs local push rights (test: scripts/__tests__/prune-merged-branches.test.mjs)
 scripts/custom-sets/import-foil.py — cardback foil exports (zip/folder) → <set>/foil.json + foil/*.webp (D225); scripts/custom-sets/check.mjs validates them
 shared/custom-sets/custom-sets-index.mjs — sets published to R2 (design 076, D228): bucket index.json contract (`validateCustomSetsIndex`); scripts/custom-sets/publish.mjs (`pnpm custom-sets:publish`) uploads blobs/<sha256> + swaps the index via rclone; server/custom-sets-remote.mjs makes the site poll it, mirror set.json into the store's second root, serve art from a blob cache
 scripts/harness-check.mjs — `pnpm harness:check`: measures every .agent budget in workflows/maintain.md plus the 30-commit maintain trigger; exit 1 = OVER (test: scripts/__tests__/harness-check.test.mjs)
-scripts/e2e/flip-gate-test.mjs — Playwright two-browser full game: design 002's
-  3.12 flip gate (`pnpm test:flip`; needs a hand-started authoritative server on PTCG_URL)
-scripts/e2e/test-card-inspector-e2e.mjs — Playwright two-browser design-013/067 card-inspector + card-focus gate
-  (`pnpm test:inspector`; needs a hand-started authoritative server on PTCG_URL). Step 9 clicks the
-  attack panel with REAL input (locator.click), so it catches pointer-capture regressions el.click() hides
+scripts/e2e/flip-gate-test.mjs — Playwright two-browser full game: design 002's 3.12 flip gate (`pnpm test:flip`; needs a hand-started server on PTCG_URL; stale past attack 5, I284)
+scripts/e2e/test-card-inspector-e2e.mjs — Playwright two-browser design-013/067 card-inspector + card-focus gate (`pnpm test:inspector`; server on PTCG_URL); step 9 clicks with REAL input (locator.click) to catch pointer-capture regressions
 scripts/e2e/*-test.mjs, explore-ui.mjs, record-legacy-2p-fixture.mjs — the other hand-run Playwright/jsdom harnesses (rooms, spectator, public lobby, Build & Battle, coin flip, opening-coin `pnpm test:opening-coin`, reset `pnpm test:reset-choice`, `pnpm test:spectator`); `record-legacy-2p-fixture.mjs` refreshes the replay-harness fixture
-bot/bot.mjs, bot/heuristic-scorer.mjs — design 004 slice 5: pure-Node playtest bot (never-crash
-  scaffold + greedy scorer), driven by scripts/e2e/playtest-bot.mjs via __ptcg observe/options/act
-scripts/e2e/playtest-bot.mjs — design 004 slice 6: the playtest runner. Two Playwright pages, bot vs.
-  bot, either netcode (`node server/server.js` on :4000, then `node scripts/e2e/playtest-bot.mjs
-  --games=N --seed=S`); dumps a replayable trace to out/playtest/ on any failure. Found a real bug
-  on first live run (I30, ISSUES.md) — see design 004 slice 6's Acceptance note.
+bot/bot.mjs, bot/heuristic-scorer.mjs — design 004 slice 5: pure-Node playtest bot (never-crash scaffold + greedy scorer), driven by scripts/e2e/playtest-bot.mjs via __ptcg observe/options/act
+scripts/e2e/playtest-bot.mjs — design 004 slice 6: the playtest runner, two Playwright pages, bot vs. bot (`node server/server.js` on :4000, then `node scripts/e2e/playtest-bot.mjs --games=N --seed=S`); dumps a replayable trace to out/playtest/ on failure
 client/src/css/deck-builder-phone.css — phone layout (<760px) for the builder tab: one pane at a time, bottom Cards/Deck nav; sidebox/native-deck-builder-phone-view.js sets `data-phone-view`
 client/src/setup/deck-builder/core/card-tap-gesture.mjs — phone tap = preview, double tap = add for result tiles (renderers + set-browser); `isPhoneLayout`, `createTapGesture`

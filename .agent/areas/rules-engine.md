@@ -5,7 +5,7 @@
 Purpose: the headless rules layer — legality, damage, abilities, Trainers, Tools, Stadiums, attack text parsing. Ratcheted by `pnpm audit:oracle|abilities|trainers|attacks`.
 Owner code: shared/engine/rules/, shared/engine/effects/ (plus server/game/turn-order-transport.mjs for the opening coin)
 ## Legality and damage
-shared/engine/rules/rules-state.mjs — `rulesState` + `canPerformAction()` legality gate (line 597)
+shared/engine/rules/rules-state.mjs — `rulesState` + `canPerformAction()` legality gate
 shared/engine/rules/attack-engine.mjs — `computeAttackDamage`, `canPayAttackCost`
 ## Abilities, Special Energy, Trainers, Tools, Stadiums
 shared/engine/rules/ability-combat.mjs — pure ability-side passive combat reads (damage bonus/reduction/prevention, weakness override, HP/prize/retreat/cost, extra types, energy multiplier); `computeAttackDamage` takes them as named options, built by reduce's attack sites/effectiveHp/handleKnockout/retreat/attack-cost. Slice-3 gates live here too: `isAbilitySuppressed` (wired into every reader), `abilityActivationBlockReason` (the ONE useAbility gate shared by reduce and the picker), `abilityPlayLocks`, `abilityEvolvePermission/Lock`, `abilityRetreatLock`, `abilityCounterMoveLock`, `abilityStatusImmune`, `abilitySummonRestricted`, `abilityFirstTurnAttack`, `abilityExtraAttack` (design 034, D125/D126)

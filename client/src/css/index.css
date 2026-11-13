@@ -4461,64 +4461,6 @@ body.side-menu-collapsed .opp {
     }
     
     /* rules-engine attack feedback */
-    /* rules battle log */
-    #rulesBattleLog {
-      position: fixed;
-      left: 1vw;
-      bottom: 1vh;
-      width: 24vw;
-      max-width: 380px;
-      max-height: 30vh;
-      background: rgba(24, 26, 34, 0.93);
-      border: 1px solid rgba(120, 144, 214, 0.3);
-      border-radius: 10px;
-      z-index: 1550;
-      display: none; /* rules mode only */
-      flex-direction: column;
-      overflow: hidden;
-      color: #eef3ff;
-      font-size: 1.35vh;
-    }
-    body.rules-mode #rulesBattleLog { display: flex; }
-    .battle-log-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.8vh 0.8vw;
-      font-weight: 700;
-      letter-spacing: 0.05em;
-      border-bottom: 1px solid rgba(120, 144, 214, 0.25);
-      font-size: 1.5vh;
-    }
-    .battle-log-clear {
-      background: none;
-      border: none;
-      color: inherit;
-      opacity: 0.6;
-      cursor: pointer;
-      font-size: 1.5vh;
-    }
-    .battle-log-clear:hover { opacity: 1; }
-    .battle-log-entries {
-      overflow-y: auto;
-      padding: 0.6vh 0.8vw;
-      scrollbar-width: thin;
-    }
-    .battle-log-entry {
-      padding: 0.25vh 0;
-      opacity: 0.85;
-      border-bottom: 1px dotted rgba(120, 144, 214, 0.12);
-    }
-    .battle-log-attack { color: #ffd36e; }
-    .battle-log-ko { color: #ff8a8a; font-weight: 700; }
-    .battle-log-turn { color: #8ee6a0; font-weight: 600; }
-    .battle-log-warn { color: #ffcc66; }
-    .battle-log-win { color: #ffe066; font-weight: 800; }
-    body:not(.dark-mode-1) #rulesBattleLog {
-      background: rgba(247, 248, 250, 0.95);
-      color: #1a2560;
-      border-color: rgba(65, 91, 168, 0.3);
-    }
     
     #attackPanel.waiting-for-opponent {
       opacity: 0.45;
