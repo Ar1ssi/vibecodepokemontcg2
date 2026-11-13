@@ -8,6 +8,15 @@
 import { textureUrlFor } from '../gl/card-art-hosts.mjs';
 import { createCardArtMaterial } from '../gl/card-art-material.js';
 import { CARD_UNITS, cardCornerRadius, cardScaleFor, roundedRectShapePoints } from './card-geometry.mjs';
+import {
+  SHUFFLE_DRIFT,
+  SHUFFLE_MS,
+  SHUFFLE_TAP_MS,
+  shuffleCardCount,
+  shuffleCardPose,
+  shuffleDrift,
+  shuffleTapPose,
+} from './shuffle-math.mjs';
 import { createTween } from './tween.mjs';
 
 const DEG = Math.PI / 180;
@@ -65,12 +74,17 @@ function buildLayerGeometry(three, w) {
  *     pose: { x: number, y: number, yawDeg: number, widthPx: number }|null,
  *     options: { thicknessPx: number }) => void,
  *   clear: (side: string, zone: string) => void, update: (now: number) => boolean,
+ *   shuffle: (side: string, zone: string, o?: { count?: number }) => number,
  *   objects: () => import('three').Object3D[], pileAt: (object3d: import('three').Object3D|null) =>
  *     { side: string, zone: string }|null, meshCount: () => number, dispose: () => void }}
  *   `thicknessPx` = the stack's height (pile-poses.mjs `pileThicknessPx(layers, scale)`).
  *   Count 0, no layers or no pose draws nothing (edge case 7). `update(now)` places every
  *   tweening stack and answers whether another frame is needed. `objects()` / `pileAt()` let
  *   the scene raycast the piles; `meshCount()` counts the layer meshes drawn.
+ *   `shuffle` (design 089) riffle-shuffles a pile of `count` cards (default: the pile's own count)
+ *   with its own card layers (shuffle-math.mjs) on the scene clock and answers how long it runs in
+ *   ms: 0 for a pile that is not drawn or holds under two cards. With motion reduced the pile only
+ *   taps. A `setPile` during the shuffle is kept and applied when it ends.
  */
 export function createPileMeshes({
   group,
@@ -108,10 +122,11 @@ export function createPileMeshes({
   /** The deck's top face: its sleeve once loaded, plain paper until then (or if it fails). */
   const topMaterialOf = (pile) => (pile.sleeve?.state === 'ready' ? pile.sleeve.material : paper);
 
+  // While a pile shuffles its layers lie apart as single cards: each shows the top face.
   const dressLayers = (pile) => {
     const last = pile.meshes.length - 1;
     pile.meshes.forEach((mesh, i) => {
-      mesh.material = [i === last ? topMaterialOf(pile) : paper, paper, rim];
+      mesh.material = [i === last || pile.shuffle ? topMaterialOf(pile) : paper, paper, rim];
     });
   };
 
@@ -176,9 +191,61 @@ export function createPileMeshes({
     pile.meshes.forEach((mesh, i) => {
       mesh.geometry = pile.geometry.geometry;
       mesh.position.set(0, 0, i * step);
+      mesh.rotation.set(0, 0, 0);
       mesh.scale.set(1, 1, stretch);
     });
     dressLayers(pile);
+  };
+
+  // ── the riffle shuffle (design 089): the pile's own layers, posed by shuffle-math.mjs.
+  /** Places a shuffling pile's cards for `now`; true once the shuffle has run its time. */
+  const placeShuffle = (pile, now) => {
+    const { start, ms, cards, poseAt } = pile.shuffle;
+    const t = ms > 0 ? Math.min(1, Math.max(0, (now - start) / ms)) : 1;
+    const w = pile.geometry.key;
+    const h = (w * CARD_UNITS.h) / CARD_UNITS.w;
+    const step = pile.thicknessPx / cards;
+    // The riffle drifts toward the middle of the table (the stack's own x axis may be turned).
+    const inward = -Math.sign(pile.stack.position.x) * Math.cos(pile.stack.rotation.z);
+    const drift = pile.shuffle.drifts ? inward * SHUFFLE_DRIFT * shuffleDrift(t) * w : 0;
+    pile.meshes.forEach((mesh, index) => {
+      const pose = poseAt(index, cards, t);
+      const roll = pose.rollDeg * DEG;
+      // A rolled card rests on its lower edge, not through the cloth.
+      const edge = (Math.abs(Math.sin(roll)) * w) / 2;
+      mesh.position.set(pose.x * w + drift, pose.y * h, pose.level * step + pose.lift * h + edge);
+      // Roll about the card's long axis first (+ lifts its right edge), then the turn on the cloth.
+      mesh.rotation.set(0, -roll, -pose.yawDeg * DEG, 'ZYX');
+    });
+    return t >= 1;
+  };
+
+  /** Ends a shuffle: the pile is drawn again as the last `setPile` asked. */
+  const endShuffle = (pile) => {
+    const rest = pile.rest;
+    pile.shuffle = null;
+    pile.rest = null;
+    if (rest) setLayers(pile, rest.layers, rest.thicknessPx);
+    onNeedsRender();
+  };
+
+  const shuffle = (side, zone, { count } = {}) => {
+    const pile = disposed ? null : piles.get(`${side}:${zone}`);
+    const cards = pile ? shuffleCardCount(Number.isFinite(count) ? count : pile.count) : 0;
+    if (cards === 0) return 0;
+    const reduced = motionReduced();
+    pile.rest ??= { layers: pile.meshes.length, thicknessPx: pile.thicknessPx };
+    pile.shuffle = {
+      start: clock.now(),
+      ms: reduced ? SHUFFLE_TAP_MS : SHUFFLE_MS,
+      cards,
+      poseAt: reduced ? shuffleTapPose : shuffleCardPose,
+      drifts: !reduced,
+    };
+    setLayers(pile, cards, pile.thicknessPx);
+    placeShuffle(pile, pile.shuffle.start);
+    onNeedsRender();
+    return pile.shuffle.ms;
   };
 
   /** The stack's drawn height is `thicknessPx × stack.scale.z`; the tween runs that scale. */
@@ -221,6 +288,9 @@ export function createPileMeshes({
         geometry: holdGeometry(pose.widthPx),
         sleeve: null,
         thicknessPx,
+        count,
+        shuffle: null,
+        rest: null,
         height: createTween({ from: thicknessPx, to: thicknessPx, ms: 0, now }),
       };
       piles.set(key, pile);
@@ -234,9 +304,12 @@ export function createPileMeshes({
         pile.height.retarget(thicknessPx, now, motionReduced() ? 0 : HEIGHT_MS);
       }
       pile.thicknessPx = thicknessPx;
+      pile.count = count;
     }
     setSleeve(pile, topSrc);
-    setLayers(pile, total, thicknessPx);
+    // A pile in mid-shuffle keeps its shuffling cards; it takes this layout when the shuffle ends.
+    if (pile.shuffle) pile.rest = { layers: total, thicknessPx };
+    else setLayers(pile, total, thicknessPx);
     pile.stack.position.set(pose.x, pose.y, PILE_LIFT_PX);
     pile.stack.rotation.set(0, 0, -(Number.isFinite(pose.yawDeg) ? pose.yawDeg : 0) * DEG);
     placeHeight(pile, now);
@@ -249,6 +322,9 @@ export function createPileMeshes({
     for (const pile of piles.values()) {
       placeHeight(pile, now);
       if (!pile.height.done(now)) moving = true;
+      if (!pile.shuffle) continue;
+      if (placeShuffle(pile, now)) endShuffle(pile);
+      moving = true;
     }
     return moving;
   };
@@ -288,5 +364,5 @@ export function createPileMeshes({
     rim.dispose();
   };
 
-  return { setPile, clear, update, objects, footprints, pileAt, meshCount, dispose };
+  return { setPile, clear, update, shuffle, objects, footprints, pileAt, meshCount, dispose };
 }

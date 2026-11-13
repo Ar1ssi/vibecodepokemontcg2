@@ -171,6 +171,7 @@ function offsetAt(keys, elapsed) {
  *     widthPx?: number }) => number|null, removeGhostCard: (id: number) => void,
  *   fx: { add: Function, active: () => boolean, impactsActive: () => boolean, setImpacts: Function,
  *     tiltDeg: () => number },
+ *   playShuffle: (side: 'self'|'opp', zone: string, o?: { count?: number }) => number,
  *   setUiState: (id: number, patch: object) => void, setMat: (spec: object|null) => void,
  *   setHover: (instanceId: number|null) => void, setHandPose: (pose: 'normal'|'lowered') => void,
  *   setPointerTilt: (instanceId: number|null, clientX?: number, clientY?: number) => void,
@@ -873,6 +874,17 @@ export function createBoardScene({
     invalidate();
   };
 
+  /**
+   * Design 089: riffle-shuffles a pile (the deck) with its own card layers; answers how long the
+   * shuffle runs in ms (0 when the pile is not drawn or holds under two cards).
+   */
+  const playShuffle = (side, zone, options) => {
+    if (disposed) return 0;
+    const ms = piles.shuffle(side, zone, options);
+    if (ms > 0) invalidate();
+    return ms;
+  };
+
   /** Re-applies every card's faces, e.g. once the foil manifest has loaded. */
   const refreshCards = () => {
     if (disposed) return;
@@ -1410,6 +1422,7 @@ export function createBoardScene({
     releaseCard,
     spawnGhostCard,
     removeGhostCard,
+    playShuffle,
     cardFrontMap: (id) => (disposed ? null : pool.frontMapOf(id)),
     impactPlacement,
     fx,
