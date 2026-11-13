@@ -1,5 +1,6 @@
 import { getZone } from './get-zone.js';
 import {
+  getAuthoritativeDeckCount,
   getAuthoritativeStadiumArray,
   getAuthoritativeZoneArray,
   hasAuthoritativeView,
@@ -23,4 +24,19 @@ export function liveZoneArray(user, zoneId) {
       : getAuthoritativeZoneArray(side, zoneId);
   }
   return getZone(user, zoneId)?.array || [];
+}
+
+/**
+ * How many cards one side holds in one zone. A server view gives the deck as a count only (it is
+ * redacted even for its owner), so the deck's array is always empty there and never the answer.
+ *
+ * @param {'self'|'opp'} user
+ * @param {string} zoneId
+ * @returns {number}
+ */
+export function liveZoneCount(user, zoneId) {
+  if (zoneId === 'deck' && hasAuthoritativeView()) {
+    return getAuthoritativeDeckCount(user === 'self' ? 'you' : 'them');
+  }
+  return liveZoneArray(user, zoneId).length;
 }

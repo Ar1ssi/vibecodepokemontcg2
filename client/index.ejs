@@ -22,7 +22,8 @@
         stylesheet and script; without it the page loads the source files one by one. %>
     <% const bundle = typeof clientBundle !== 'undefined' ? clientBundle : null; %>
     <link rel="stylesheet" href="<%= bundle ? bundle.style : 'src/css/index.css' %>">
-    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+    <!-- The Socket.IO client the server itself serves: always the server's own version, no third-party host. -->
+    <script src="/socket.io/socket.io.js"></script>
     <script>
         // Server-side gate for the ?e2e=1 test bridge (see E2E_ENABLED in server/server.js).
         // Classic inline script: runs before the deferred module below, which reads this.
