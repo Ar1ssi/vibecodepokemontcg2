@@ -32,10 +32,9 @@ const tipOf = (c) => {
   return [c.x + c.axis[0] * reach, c.y + c.axis[1] * reach, c.z + c.axis[2] * reach];
 };
 
-// customhb-052 is Crystal Cave in client/src/assets/custom-sets/customhb/set.json.
-test('environmentKeyFor: Crystal Cave by id, and by set and number', () => {
-  assert.equal(environmentKeyFor({ id: 'customhb-052' }), CRYSTAL_KEY);
-  assert.equal(environmentKeyFor({ set: 'customhb', number: '52' }), CRYSTAL_KEY);
+test('environmentKeyFor: Crystal Cave by id, and by set', () => {
+  assert.equal(environmentKeyFor({ id: 'customhb-052', name: 'Crystal Cave' }), CRYSTAL_KEY);
+  assert.equal(environmentKeyFor({ set: 'customhb', name: 'Crystal Cave' }), CRYSTAL_KEY);
 });
 
 test('crystalSpots: the emblem between the Actives where it fits, clusters round the cards, every crystal clear of them', () => {

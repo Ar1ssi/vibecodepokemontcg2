@@ -46,9 +46,9 @@ const cornersOf = (rect) => [
   [rect.x + rect.w, rect.y + rect.h],
 ];
 
-test('environmentKeyFor: Magma Basin by id, and by set and number', () => {
-  assert.equal(environmentKeyFor({ id: 'customhb-289' }), 'magma-basin');
-  assert.equal(environmentKeyFor({ set: 'customhb', number: '289' }), 'magma-basin');
+test('environmentKeyFor: Magma Basin by id, and by set', () => {
+  assert.equal(environmentKeyFor({ id: 'customhb-285', name: 'Magma Basin' }), 'magma-basin');
+  assert.equal(environmentKeyFor({ set: 'customhb', name: 'Magma Basin' }), 'magma-basin');
 });
 
 test('basinSpots: the island runs on past the near cards by NEAR_REACH_PX, under the hand row', () => {

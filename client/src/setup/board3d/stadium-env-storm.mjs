@@ -1,4 +1,4 @@
-// Design 077 (prototype): Magnetic Storm (customhb-358) after its card art (FLF 91, Ryo Ueda): a
+// Design 077 (prototype): Magnetic Storm after its card art (FLF 91, Ryo Ueda): a
 // marsh plain at night under a green and violet aurora, dry olive-brown reeds and wet black mud,
 // bare gnarled trees against dark hills, a Poke Ball glowing pink and white on the ground with pink
 // pools of light round it, and white-blue lightning arcing between them. The art looks across the

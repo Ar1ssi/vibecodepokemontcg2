@@ -32,10 +32,9 @@ const cardsOf = (layout) => {
   return [...slabs, ...flats];
 };
 
-// customhb-278 is Levincia in client/src/assets/custom-sets/customhb/set.json.
-test('environmentKeyFor: Levincia by id, and by set and number', () => {
-  assert.equal(environmentKeyFor({ id: 'customhb-278' }), LEVINCIA_KEY);
-  assert.equal(environmentKeyFor({ set: 'customhb', number: '278' }), LEVINCIA_KEY);
+test('environmentKeyFor: Levincia by id, and by set', () => {
+  assert.equal(environmentKeyFor({ id: 'customhb-274', name: 'Levincia' }), LEVINCIA_KEY);
+  assert.equal(environmentKeyFor({ set: 'customhb', name: 'Levincia' }), LEVINCIA_KEY);
 });
 
 test('levinciaSpots: the stage holds every card; the walkway rings it past the water', () => {

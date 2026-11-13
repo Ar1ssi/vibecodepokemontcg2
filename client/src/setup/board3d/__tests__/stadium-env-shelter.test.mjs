@@ -27,9 +27,9 @@ const HALVES = [
 ];
 const layouts = PROFILES.flatMap((profile) => HALVES.map((half) => flatLayout(getMatLayout(profile), half)));
 
-test('environmentKeyFor: Steel Shelter by id, and by set and number', () => {
-  assert.equal(environmentKeyFor({ id: 'customhb-162' }), 'steel-shelter');
-  assert.equal(environmentKeyFor({ set: 'customhb', number: 162 }), 'steel-shelter');
+test('environmentKeyFor: Steel Shelter by id, and by set', () => {
+  assert.equal(environmentKeyFor({ id: 'customhb-158', name: 'Steel Shelter' }), 'steel-shelter');
+  assert.equal(environmentKeyFor({ set: 'customhb', name: 'Steel Shelter' }), 'steel-shelter');
 });
 
 test('shelterSpots: every card footprint lies on the floor, the walls\' feet the gap clear of it', () => {

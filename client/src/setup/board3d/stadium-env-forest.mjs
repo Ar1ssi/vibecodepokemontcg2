@@ -1,4 +1,4 @@
-// Design 077 (prototype): the forest recipe. Perilous Jungle (customhb-253) after its card art
+// Design 077 (prototype): the forest recipe. Perilous Jungle after its card art
 // (Ayumi Odashima, TEF 156): a violet jungle round a clearing, bogs of glowing pink poison, tall
 // trees with violet trunks, deep teal crowns and dark vines fringed in pink, lush teal and violet
 // leaves in deep indigo shade, lit pink wherever they lean over the poison. The cards lie in the

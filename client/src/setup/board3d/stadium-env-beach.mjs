@@ -1,4 +1,4 @@
-// Design 077 (prototype): Surfing Beach (customhb-209) as a procedural three.js place, after its card
+// Design 077 (prototype): Surfing Beach as a procedural three.js place, after its card
 // art (Ayumi Odashima, MEG 129): a sunny bay seen from above, the sea in the far-left corner rolling
 // in to golden sand, rocks at the waterline, palm trees on the dry sand. The far-left is the sun's
 // side (the board's own light).

@@ -26,9 +26,9 @@ const HALVES = [
 ];
 const layouts = PROFILES.flatMap((profile) => HALVES.map((half) => flatLayout(getMatLayout(profile), half)));
 
-test('environmentKeyFor: Mountain Ring by id, and by set and number', () => {
-  assert.equal(environmentKeyFor({ id: 'customhb-240' }), RING_KEY);
-  assert.equal(environmentKeyFor({ set: 'customhb', number: '240' }), RING_KEY);
+test('environmentKeyFor: Mountain Ring by id, and by set', () => {
+  assert.equal(environmentKeyFor({ id: 'customhb-236', name: 'Mountain Ring' }), RING_KEY);
+  assert.equal(environmentKeyFor({ set: 'customhb', name: 'Mountain Ring' }), RING_KEY);
 });
 
 test('ringSpots: the paving holds every card footprint; the stones stand outside it, in the scene', () => {

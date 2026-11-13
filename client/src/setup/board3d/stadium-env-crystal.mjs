@@ -1,4 +1,4 @@
-// Design 077 (prototype): Crystal Cave (customhb-052) after its card art (EVS 144, Toyste Beach): a
+// Design 077 (prototype): Crystal Cave after its card art (EVS 144, Toyste Beach): a
 // warm brown cave floor under a shaft of pale skylight, the Poké Ball drawn on it in a thin gold line
 // with a glowing pale-blue heart, clusters of tall hexagonal crystals (the art's pink, sky blue,
 // lavender and teal) splaying out of the floor round it, coloured sparkle dust in the air among

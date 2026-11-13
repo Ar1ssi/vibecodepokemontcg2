@@ -1,4 +1,4 @@
-// Design 077 (prototype): Mountain Ring (customhb-240) after its card art (FFI 97, xy3-97 in
+// Design 077 (prototype): Mountain Ring after its card art (FFI 97, xy3-97 in
 // set.json; Ryo Ueda): a round arena high in the mountains, paved in rows of grey-brown bricks
 // round the Poké Ball laid in pale stone at its middle; pale standing stones ring it, thick ropes
 // sagging between them, wound round each; a giant chain lies by it; rough rocky ground with boulders

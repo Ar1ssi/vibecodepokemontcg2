@@ -316,7 +316,7 @@ describe('camera preset (design 074 H3)', () => {
 });
 
 describe('Stadium boards (design 077)', () => {
-  const scorched = { cardId: 'customhb-299', set: 'customhb', number: '299' };
+  const scorched = { cardId: 'customhb-293', set: 'customhb', name: 'Scorched Earth' };
   const withStadiums = (deps) => {
     const state = { view: { stadium: null }, off: false, listeners: new Set(), queued: [], log: [] };
     const loadModules = deps.loadModules;
@@ -377,7 +377,8 @@ describe('Stadium boards (design 077)', () => {
     assert.equal(state.queued[0].play(), 1600, 'the queued plan plays the scene transition');
 
     state.log.length = 0;
-    state.view = { stadium: { cardId: 'sv2-191', set: 'sv2', number: '191' } };
+    // Mesagoza, Scarlet & Violet 178 (out/pkmn-trainer-cards.json): a printed Stadium, so no board.
+    state.view = { stadium: { cardId: 'sv1-178', set: 'sv1', name: 'Mesagoza' } };
     doc.dispatchEvent(new doc.defaultView.Event('board-view-applied'));
     assert.deepEqual(state.log, [], 'a Stadium with no board changes nothing');
   });

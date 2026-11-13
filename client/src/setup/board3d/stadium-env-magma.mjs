@@ -1,4 +1,4 @@
-// Design 077 (prototype): Magma Basin (customhb-289) after its card art (BRS 144, swsh9-144 in
+// Design 077 (prototype): Magma Basin after its card art (BRS 144, swsh9-144 in
 // set.json; ORBITALLINK): a basin walled by dark crimson volcanic cliffs, lava pouring down their
 // faces into a moat of molten gold that rings an island of dark brown rock, the Poké Ball set in the
 // island's middle as a smooth brick-red disc, sparks in the air. The art looks across the island at the far wall; the board looks down into the
