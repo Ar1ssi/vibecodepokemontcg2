@@ -133,17 +133,77 @@ test('a driven card reports its rest corners to the board (rects stay on its slo
   assert.notDeepEqual(pool.cornersOf(7), rest, 'the mesh itself has moved');
 });
 
-test('a held card answers its pre-diff pose until released (a KO\'d defender stays the target)', () => {
+test('a pinned card answers its pre-diff pose until unpinned (a knocked-out defender stays the target)', () => {
   const { pool, clock } = makePool();
-  pool.holdTablePose(7);
+  assert.equal(pool.pinPose(7), true);
   pool.setPose(7, { x: 800, y: -200, z: 0, yawDeg: 0, widthPx: 90 }, 0);
   clock.t = 50;
   pool.update(50);
   assert.equal(pool.tablePoseOf(7).x, 0);
   assert.equal(pool.tablePoseOf(7).y, 300);
-  pool.releaseTablePose(7);
+  pool.unpinPose(7);
   assert.equal(pool.tablePoseOf(7).x, 800);
   assert.equal(pool.tablePoseOf(7).y, -200);
-  pool.holdTablePose(99);
-  pool.releaseTablePose(99);
+  assert.equal(pool.pinPose(99), false);
+  pool.unpinPose(99);
+});
+
+test('design 089: a pinned card rests where it stood and still takes a drive (an attacker lunges before its switch)', async () => {
+  const { pool, clock } = makePool();
+  const rest = pool.meshOf(7).position.toArray();
+  pool.pinPose(7);
+  pool.setPose(7, { x: 800, y: -200, z: 0, yawDeg: 0, widthPx: 90 }, 180);
+  clock.t = 400;
+  pool.update(400);
+  assert.deepEqual(pool.meshOf(7).position.toArray(), rest, 'the view moved the card; its mesh did not follow');
+  assert.deepEqual(pool.cornersOf(7, { rest: true }), pool.cornersOf(7), 'its rect is still its old slot');
+
+  const done = pool.drive(7, () => ({ dx: 40, dy: 0, dz: 0, yawDeg: 0, scale: 1, scaleAlong: 1, scaleAcross: 1 }), 200);
+  clock.t = 500;
+  pool.update(500);
+  assert.ok(Math.abs(pool.meshOf(7).position.x - (rest[0] + 40)) < 1e-6, 'driven from the pinned slot');
+  clock.t = 700;
+  pool.update(700);
+  assert.equal(await settled(done), true);
+
+  pool.unpinPose(7, { ms: 0 });
+  pool.update(700);
+  assert.ok(Math.abs(pool.meshOf(7).position.x - (rest[0] + 800)) < 1e-6, 'unpinned: the kept pose applies');
+});
+
+test('design 089: faces and hidden wait behind a pin, and apply together when it lets go', () => {
+  const { pool } = makePool();
+  pool.pinPose(7);
+  pool.setHidden(7, true);
+  assert.equal(pool.meshOf(7).visible, true, 'a card hidden by the view stays shown while pinned');
+  pool.setFaces(7, { face: 'back' });
+  pool.unpinPose(7);
+  assert.equal(pool.meshOf(7).visible, false);
+  assert.equal(pool.pinned(7), false);
+});
+
+test('design 089: retains are counted; the scene hears the last one go', () => {
+  const clock = { t: 0, now() { return this.t; } };
+  const heard = [];
+  const pool = createCardMeshPool({
+    group: new three.Group(),
+    three,
+    textures: { acquire: () => new Promise(() => {}), release() {} },
+    clock,
+    onUnretained: (id) => heard.push(id),
+  });
+  pool.setCamera(camera);
+  pool.acquire(7, { widthPx: 90 });
+  assert.equal(pool.retain(7), true);
+  assert.equal(pool.retain(7), true);
+  assert.equal(pool.retain(99), false);
+  pool.unretain(7);
+  assert.equal(pool.retained(7), true);
+  assert.deepEqual(heard, []);
+  pool.unretain(7);
+  assert.equal(pool.retained(7), false);
+  assert.deepEqual(heard, [7]);
+  pool.unretain(7);
+  pool.unretain(99);
+  assert.deepEqual(heard, [7], 'an extra release is ignored');
 });

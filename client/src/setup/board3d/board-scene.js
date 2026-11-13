@@ -164,7 +164,11 @@ function offsetAt(keys, elapsed) {
  *   cardFx: (instanceId: number, fx: { at: (elapsedMs: number) => ({ dissolve?: number, rim?: number }|null),
  *     ms: number, cut?: boolean, edgeRgb?: number[], rimRgb?: number[] }) => Promise<void>,
  *   cardTablePose: (instanceId: number) => object|null, cardFrontMap: (instanceId: number) => object|null,
- *   holdCardTablePose: (instanceId: number) => void, releaseCardTablePose: (instanceId: number) => void,
+ *   cardModelRect: (instanceId: number) => { left: number, top: number, width: number, height: number }|null,
+ *   pinCard: (instanceId: number) => boolean, unpinCard: (instanceId: number, o?: { ms?: number }) => void,
+ *   retainCard: (instanceId: number) => boolean, releaseCard: (instanceId: number) => void,
+ *   spawnGhostCard: (o: { src?: string|null, backSrc?: string|null, face?: 'front'|'back',
+ *     widthPx?: number }) => number|null, removeGhostCard: (id: number) => void,
  *   fx: { add: Function, active: () => boolean, impactsActive: () => boolean, setImpacts: Function,
  *     tiltDeg: () => number },
  *   setUiState: (id: number, patch: object) => void, setMat: (spec: object|null) => void,
@@ -257,6 +261,12 @@ export function createBoardScene({
   let model = null;
   /** Last pose given to each card mesh, so a pose change without a diff move still tweens. */
   const appliedPoses = new Map();
+  /**
+   * Design 089: cards the model no longer poses whose mesh an effect still uses (a knocked-out
+   * stack waiting for its scene, a card in flight, a ghost). Freed when the effect lets go.
+   */
+  const orphans = new Set();
+  let nextGhostId = -1;
   /** Height of each pile's top surface off its resting height (flat px), by `side:zone`. */
   const pileTops = new Map();
   /** Hand card under the pointer (its fan slot lifts) and the near hand's pose (card focus). */
@@ -383,6 +393,7 @@ export function createBoardScene({
     foil,
     motionReduced,
     onNeedsRender: invalidate,
+    onUnretained: (id) => freeIfOrphan(id),
     viewOrigin: () => canvasBox() ?? { left: 0, top: 0 },
   });
 
@@ -581,12 +592,15 @@ export function createBoardScene({
     const handOptions = { hover: hover === null ? null : { instanceId: hover }, lowered: handPose === 'lowered' };
     const poses = layout && next ? posesFor(next, layout, handOptions) : new Map();
     for (const id of pool.ids()) {
-      if (poses.has(id)) continue;
+      if (poses.has(id)) {
+        orphans.delete(id);
+        continue;
+      }
       if (lifted?.id === id) endLift();
       if (held?.id === id) endHold();
-      overlays.remove(id);
-      pool.release(id);
-      appliedPoses.delete(id);
+      // An effect still uses this mesh: it stays, overlays and all, until the effect lets go.
+      if (pool.retained(id)) orphans.add(id);
+      else freeCard(id);
     }
     const diff = diffModels(prev, next);
     for (const [id, pose] of poses) {
@@ -615,8 +629,79 @@ export function createBoardScene({
       appliedPoses.set(id, pose);
     }
     syncStackBadges(next);
-    for (const id of poses.keys()) syncOverlaysOf(next, id);
+    // A pinned card still shows where it stood, so it keeps the overlays it had there.
+    for (const id of poses.keys()) if (!pool.pinned(id)) syncOverlaysOf(next, id);
   }
+
+  /** Frees a card the model does not pose: its overlays and its mesh. */
+  function freeCard(id) {
+    orphans.delete(id);
+    overlays.remove(id);
+    pool.release(id);
+    appliedPoses.delete(id);
+  }
+
+  /** The last effect let go of card `id`: free it if the model dropped it meanwhile. */
+  function freeIfOrphan(id) {
+    if (disposed || !orphans.has(id)) return;
+    freeCard(id);
+    invalidate();
+  }
+
+  /**
+   * Design 089: freezes a card where it stands and keeps its mesh, whatever the next models say,
+   * until `unpinCard`: a knocked-out stack waits whole in its slot for its scene, a switched card
+   * for its slide. False when the scene does not draw the card.
+   */
+  const pinCard = (id) => {
+    if (disposed) return false;
+    if (pool.pinned(id)) return true;
+    if (!pool.pinPose(id)) return false;
+    pool.retain(id);
+    return true;
+  };
+
+  /**
+   * Lets a pinned card go to where the model has it, over `ms` (0 = at once: a flight on the card
+   * already carries it there). A card the model dropped is freed once nothing else retains it.
+   */
+  const unpinCard = (id, { ms = 0 } = {}) => {
+    if (disposed || !pool.pinned(id)) return;
+    pool.unpinPose(id, { ms });
+    if (!orphans.has(id)) syncOverlaysOf(model, id);
+    pool.unretain(id);
+    invalidate();
+  };
+
+  /** Keeps a card's mesh alive for an effect (counted); `releaseCard` gives it back. */
+  const retainCard = (id) => !disposed && pool.retain(id);
+  const releaseCard = (id) => {
+    if (!disposed) pool.unretain(id);
+  };
+
+  /**
+   * Design 089: a card mesh that belongs to no card in the model, for a flight of a card the board
+   * does not draw (an Energy shown as a token, a card from a hand or a pile). It is hidden until a
+   * `tween` flies it and is drawn, lit and depth-sorted like every other card. Returns its id (a
+   * negative number), or null when the scene cannot draw it; `removeGhostCard` frees it.
+   */
+  const spawnGhostCard = ({ src = null, backSrc = null, face = 'front', widthPx = 0 } = {}) => {
+    if (disposed || !cameraDesc) return null;
+    const id = nextGhostId;
+    nextGhostId -= 1;
+    const width = widthPx > 0 ? widthPx : (layout?.self?.cardBox?.active?.w ?? CARD_UNITS.w);
+    pool.acquire(id, { widthPx: width });
+    pool.setFaces(id, { src: face === 'back' ? null : src, backSrc, face, foilRecord: null });
+    pool.setHidden(id, true);
+    pool.setPose(id, { x: 0, y: 0, z: 0, yawDeg: 0, widthPx: width, face }, 0);
+    pool.retain(id);
+    orphans.add(id);
+    return id;
+  };
+
+  const removeGhostCard = (id) => {
+    if (!disposed && typeof id === 'number' && id < 0) pool.unretain(id);
+  };
 
   /** A card's placement with the scene's UI state (selection, glow, mat pick, hidden) over it. */
   const withUiState = (card, id) => ({
@@ -856,7 +941,8 @@ export function createBoardScene({
     const box = canvasBox() ?? { left: 0, top: 0 };
     for (const id of pool.ids()) {
       // A card hidden by an effect (a draw held until its flight) still stands where its pose puts it.
-      if (!pool.placed(id)) continue;
+      // A ghost (negative id) is no card of the board.
+      if (!pool.placed(id) || (typeof id === 'number' && id < 0)) continue;
       const rect = screenRectOf(pool.cornersOf(id, { rest: true }) ?? [], box);
       if (rect) out[id] = rect;
     }
@@ -878,6 +964,19 @@ export function createBoardScene({
       if (rect) out.stadium = rect;
     }
     return out;
+  };
+
+  /**
+   * Client-px rect of where the model has card `id` (the last pose it was given), whatever its mesh
+   * is doing: a pinned card (design 089) still shows, and `rects()` still reports, its old slot.
+   * Null for a card the model does not pose.
+   */
+  const cardModelRect = (id) => {
+    const pose = appliedPoses.get(id);
+    if (disposed || !cameraDesc || !pose || orphans.has(id)) return null;
+    const box = canvasBox() ?? { left: 0, top: 0 };
+    const heightPx = pose.widthPx * CARD_HEIGHT_PER_WIDTH;
+    return screenRectOf(footprintCorners(pose, pose.widthPx, heightPx, CARD_LIFT_PX + (pose.z ?? 0)), box);
   };
 
   /** Points the raycaster through a client-px point; false when the canvas has no box. */
@@ -1271,6 +1370,7 @@ export function createBoardScene({
       softShadow = null;
     }
     appliedPoses.clear();
+    orphans.clear();
     pileTops.clear();
     groundShadows.dispose();
     environment.dispose();
@@ -1303,8 +1403,13 @@ export function createBoardScene({
     drive,
     cardFx,
     cardTablePose: (id) => (disposed ? null : pool.tablePoseOf(id)),
-    holdCardTablePose: (id) => (disposed ? undefined : pool.holdTablePose(id)),
-    releaseCardTablePose: (id) => (disposed ? undefined : pool.releaseTablePose(id)),
+    cardModelRect,
+    pinCard,
+    unpinCard,
+    retainCard,
+    releaseCard,
+    spawnGhostCard,
+    removeGhostCard,
     cardFrontMap: (id) => (disposed ? null : pool.frontMapOf(id)),
     impactPlacement,
     fx,

@@ -38,7 +38,6 @@ import {
   slideMeshPose,
 } from './lifecycle-pose.mjs';
 import { getBoardScene } from '../../board3d/board3d.js';
-import { flightPoseFromTrack } from '../../board3d/flight-pose.mjs';
 import { createSlidePins } from './slide-pins.mjs';
 import { sweepPose } from './flow-pose.mjs';
 import { holdFor } from './fx-holds.mjs';
@@ -175,15 +174,15 @@ function stackIdsOf(registry, id) {
  * has no origin, no rect or no mesh.
  */
 function slideStackMeshes(registry, id, origin, { duration, liftFrac }) {
-  const rootTo = rectForInstance(id, registry);
+  const rootTo = slideTargetRect(id, registry);
   if (!origin?.rect || !rootTo) return 0;
   const turn = origin.turn ?? frameTurnOf(registry.get(id)?.element);
   const fromScale = origin.rect.width / rootTo.width;
   let flown = 0;
   for (const memberId of stackIdsOf(registry, id)) {
-    const to = rectForInstance(memberId, registry);
+    const to = slideTargetRect(memberId, registry);
     if (!to || !meshCanFly(memberId)) continue;
-    slidePins.take(memberId);
+    // The flight starts first, then takes the pin: the card's own pose jumps to its new slot under it.
     playMeshTrack({
       instanceId: memberId,
       rect: to,
@@ -191,18 +190,25 @@ function slideStackMeshes(registry, id, origin, { duration, liftFrac }) {
       duration,
       lift: liftFrac * to.height,
     });
+    slidePins.take(memberId);
     flown += 1;
   }
   return flown;
 }
 
-const slidePins = createSlidePins(
-  (id, poseFn, ms) => getBoardScene()?.tween(id, poseFn, ms) ?? Promise.resolve(),
-  {
-    hold: (id) => getBoardScene()?.holdCardTablePose?.(id),
-    release: (id) => getBoardScene()?.releaseCardTablePose?.(id),
-  }
-);
+const slidePins = createSlidePins({
+  pin: (id) => Boolean(getBoardScene()?.pinCard?.(id)),
+  unpin: (id, options) => getBoardScene()?.unpinCard?.(id, options),
+});
+
+/**
+ * Where a sliding card will stand. A pinned card is frozen in its old slot, and so is its rect on
+ * screen: its target is where the scene's model has it.
+ */
+function slideTargetRect(id, registry) {
+  const modelled = slidePins.has(id) ? getBoardScene()?.cardModelRect?.(id) : null;
+  return modelled ?? rectForInstance(id, registry);
+}
 
 /**
  * Before the diff (I265): holds the mesh of every card a retreat, switch or promote in `events`
@@ -214,10 +220,7 @@ export function pinSlideOrigins(events, registry) {
   for (const event of events) {
     for (const id of slideIdsForEvent(event)) {
       for (const memberId of stackIdsOf(registry, id)) {
-        const rect = rectForInstance(memberId, registry);
-        if (!rect || !meshCanFly(memberId)) continue;
-        const turn = frameTurnOf(registry.get(memberId)?.element);
-        slidePins.pin(memberId, flightPoseFromTrack(rect, { rotate: turn }, 0, 0));
+        if (meshCanFly(memberId)) slidePins.pin(memberId);
       }
     }
   }
@@ -233,16 +236,16 @@ export function pinKnockoutOrigins(events, registry) {
   for (const event of events) {
     if (event?.type !== 'pokemonKnockedOut' || event.instanceId == null) continue;
     for (const memberId of stackIdsOf(registry, event.instanceId)) {
-      const rect = rectForInstance(memberId, registry);
-      if (!rect || !meshCanFly(memberId)) continue;
-      const turn = frameTurnOf(registry.get(memberId)?.element);
-      slidePins.pin(memberId, flightPoseFromTrack(rect, { rotate: turn }, 0, 0));
+      if (meshCanFly(memberId)) slidePins.pin(memberId);
     }
   }
 }
 
-/** The scene flying card `id` takes its pin over, so letting the rest go does not move it back. */
+/** The scene flying card `id` takes its pin over (call it after the flight has started). */
 export const takeSlidePin = (id) => slidePins.take(id);
+
+/** A scene about to play owns card `id`'s pin: an idle queue no longer releases it (design 089). */
+export const claimSlidePin = (id) => slidePins.claim(id);
 
 /** Lets go of pins whose slide never played (the FX queue went idle or was cleared). */
 export const releaseSlidePins = () => slidePins.releaseAll();
@@ -323,7 +326,8 @@ export const stadiumPlay = (plan) => {
 
 export const promote = (plan) => {
   const registry = getCardRegistry();
-  const rect = rectForInstance(plan.instanceId, registry);
+  // The glow rises where the card lands, not in the Bench slot it is still pinned to.
+  const rect = slideTargetRect(plan.instanceId, registry);
   if (!rect) return 0;
   // The card moves on its own mesh; the glow and the rise stay HTML.
   slideStackMeshes(registry, plan.instanceId, takeOrigin(plan.instanceId), {

@@ -13,7 +13,7 @@ import {
 import { visualRectOf } from '../board3d/board-rects.js';
 import { KNOCKOUT_DURATION_MS, knockoutPose } from './knockout-pose.mjs';
 import { fxDisabled, motionReduced, runPose, spawnOverlay } from './mat-fx.mjs';
-import { flightSrcOf } from '../netcode/mat-fx/card-flight.js';
+import { flightSrcOf, meshCanFly } from '../netcode/mat-fx/card-flight.js';
 import { frameTurnOf } from '../netcode/mat-fx/evolve-scene.js';
 import { playKnockoutScene } from '../netcode/mat-fx/ko-scene.js';
 
@@ -60,15 +60,20 @@ const KO_START_BACKSTOP_MS = 1500;
 export const playKnockoutGhost = (ghost, { deferStart } = {}) => {
   if (!ghost || typeof document === 'undefined' || document.hidden) return;
   const toRect = discardRectFor(ghost.user) || ghost.rect;
-
-  const host = spawnOverlay({ rect: ghost.rect, className: 'card-knockout-ghost' });
-  const img = document.createElement('img');
-  img.src = ghost.src;
-  img.alt = '';
-  img.draggable = false;
-  host.appendChild(img);
   const turn = ghost.turn || 0;
-  host.style.transform = `rotate(${turn}deg)`;
+
+  const buildStandIn = () => {
+    const host = spawnOverlay({ rect: ghost.rect, className: 'card-knockout-ghost' });
+    const img = document.createElement('img');
+    img.src = ghost.src;
+    img.alt = '';
+    img.draggable = false;
+    host.appendChild(img);
+    host.style.transform = `rotate(${turn}deg)`;
+    return { host, img };
+  };
+  // Design 089: a card whose own mesh still stands in its slot (pinned) needs no image laid over it.
+  let standIn = meshCanFly(ghost.instanceId) ? null : buildStandIn();
 
   let started = false;
   const start = () => {
@@ -76,9 +81,11 @@ export const playKnockoutGhost = (ghost, { deferStart } = {}) => {
     started = true;
     // Design 078: with motion reduced the scene only burns the card's mesh where it stood.
     if (!fxDisabled() && playKnockoutScene(ghost, { reduced: motionReduced() })) {
-      host.remove();
+      standIn?.host.remove();
       return;
     }
+    standIn ??= buildStandIn();
+    const { host, img } = standIn;
     runPose(host, KNOCKOUT_DURATION_MS, (t) =>
       applyPose(host, img, knockoutPose(t, { fromRect: ghost.rect, toRect }), turn)
     );

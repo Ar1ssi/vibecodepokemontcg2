@@ -11,7 +11,7 @@ import {
   FLIGHT_LIFT_FRAC,
   meshCanFly,
   pileOf,
-  playCardTrack,
+  playGhostTrack,
   playMeshTrack,
   playPileCatch,
   playTrailTrack,
@@ -59,9 +59,12 @@ function burnCard(instanceId, dissolveAt, ms) {
 function playReducedBurn(ghost) {
   const scene = getBoardScene();
   if (!scene?.cardFx || !meshCanFly(ghost.instanceId)) return false;
-  takeSlidePin(ghost.instanceId);
   const still = flightPoseFromTrack(ghost.rect, { rotate: ghost.turn || 0 }, 0, 0);
-  scene.tween(ghost.instanceId, () => still, KO_REDUCED_HOLD_MS, { still: true });
+  // Retained for the hold: the view has already buried the card, and it burns where it stood.
+  const retained = Boolean(scene.retainCard?.(ghost.instanceId));
+  const held = scene.tween(ghost.instanceId, () => still, KO_REDUCED_HOLD_MS, { still: true });
+  if (retained) held.then(() => scene.releaseCard?.(ghost.instanceId));
+  takeSlidePin(ghost.instanceId);
   burnCard(ghost.instanceId, koReducedDissolveAt, KO_REDUCED_BURN_MS);
   return true;
 }
@@ -97,24 +100,22 @@ export function playKnockoutScene(ghost, { reduced = false } = {}) {
       pileRect: pile?.rect || null,
       seed,
     });
+    const lift = FLIGHT_LIFT_FRAC * rect.height * (1 + STACK_LIFT_STEP * (cards.length - 1 - index));
     if (meshCanFly(cards[index].instanceId)) {
+      // The flight starts (and retains the mesh) before the pin lets go of it.
+      playMeshTrack({ instanceId: cards[index].instanceId, rect, pose: track.pose, duration: KO_SCENE_MS, lift });
       takeSlidePin(cards[index].instanceId);
-      playMeshTrack({
-        instanceId: cards[index].instanceId,
-        rect,
-        pose: track.pose,
-        duration: KO_SCENE_MS,
-        lift: FLIGHT_LIFT_FRAC * rect.height * (1 + STACK_LIFT_STEP * (cards.length - 1 - index)),
-      });
       if (index === 0) burnCard(cards[0].instanceId, koDissolveAt, KO_SCENE_MS);
       playTrailTrack({ rect, trail: track.trail, duration: KO_SCENE_MS, className: 'fx-card-flight--ko' });
     } else {
-      playCardTrack({
-        rect,
+      // A card the board draws no mesh for (an Energy token) flies as a ghost mesh, in the stack's own depth.
+      playGhostTrack({
         src: cards[index].src,
+        rect,
         pose: track.pose,
         trail: track.trail,
         duration: KO_SCENE_MS,
+        lift,
         className: 'fx-card-flight--ko',
       });
     }

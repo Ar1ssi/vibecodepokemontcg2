@@ -106,22 +106,47 @@ export function meshCanFly(instanceId) {
  * `delay` ms; the mesh rises `lift` px off the cloth (default FLIGHT_LIFT_FRAC of `rect`'s height)
  * in flight. Whoever hides the real card keeps it hidden until this resolves; the scene shows the
  * mesh for the flight. Resolves when the flight ends, at once when the 3D board has no such card.
+ * Design 089: the mesh is retained from the call to the landing, so a card the view already
+ * buried (a knocked-out stack in the discard pile) is still there to fly.
  */
 export function playMeshTrack({ instanceId, rect, pose, duration, delay = 0, lift = FLIGHT_LIFT_FRAC * rect.height }) {
+  const held = getBoardScene();
+  const retained = Boolean(held?.retainCard?.(instanceId));
   return new Promise((resolve) => {
+    const land = () => {
+      if (retained) held.releaseCard?.(instanceId);
+      resolve();
+    };
     const fly = () => {
       const scene = getBoardScene();
       if (!scene) {
-        resolve();
+        land();
         return;
       }
       scene
         .tween(instanceId, (u) => flightPoseFromTrack(rect, pose(u), u, lift), duration, { ease: (u) => u })
-        .then(resolve, resolve);
+        .then(land, land);
     };
     if (delay > 0) setTimeout(fly, delay);
     else fly();
   });
+}
+
+/**
+ * Design 089: flies a card the board draws no mesh for (an Energy shown as a token, a card from a
+ * hand or a pile) on a ghost mesh, so it is lit, tilted and depth-sorted with the rest of the
+ * board. An HTML clone would lie flat over every mesh. Same track contract as `playMeshTrack`;
+ * `trail` adds the light streak. `face: 'back'` flies the sleeve `backSrc`. Without a 3D board the
+ * cloned image flies as before.
+ */
+export function playGhostTrack({ src, backSrc = null, face = 'front', rect, pose, trail, duration, delay = 0, lift, className = '' }) {
+  const scene = getBoardScene();
+  const ghostId = scene?.spawnGhostCard?.({ src, backSrc, face }) ?? null;
+  if (ghostId === null) {
+    return playCardTrack({ rect, src: face === 'back' ? backSrc || src : src, pose, trail, duration, delay, className });
+  }
+  if (trail) playTrailTrack({ rect, trail, duration, delay, className });
+  return playMeshTrack({ instanceId: ghostId, rect, pose, duration, delay, lift }).then(() => scene.removeGhostCard(ghostId));
 }
 
 /** A soft gold glow on the pile as a card lands in it. */
@@ -150,7 +175,7 @@ export function playDiscardFlights(cards, pile) {
       ...rectFlightEnds(rect, pile.rect, { fromTurn: turn, toTurn: pile.turn }),
       seed: Math.floor(Math.random() * 1e6),
     });
-    playCardTrack({
+    playGhostTrack({
       rect,
       src,
       pose: (u) => flightPose(u, flight),

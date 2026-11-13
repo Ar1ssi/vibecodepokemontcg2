@@ -31,7 +31,7 @@ import { captureKnockoutGhost, playKnockoutGhost } from '../image-logic/knockout
 import { fxDisabled, motionReduced, rectForInstance } from '../image-logic/mat-fx.mjs';
 import { onFxSettingsChanged } from '../image-logic/fx-settings.js';
 import { playFx } from './mat-fx/index.js';
-import { pinKnockoutOrigins, pinSlideOrigins, releaseSlidePins } from './mat-fx/lifecycle.js';
+import { claimSlidePin, pinKnockoutOrigins, pinSlideOrigins, releaseSlidePins } from './mat-fx/lifecycle.js';
 import { afterHit, attackSceneEndsAt, knockoutHoldFor } from './mat-fx/combat.js';
 import { seedDamageBaselines } from './mat-fx/damage-hit.mjs';
 import { playDeckReveal } from './mat-fx/deck-reveal.js';
@@ -299,6 +299,9 @@ function runPlan(plan) {
     pendingKnockoutGhosts.delete(plan.instanceId);
     soundPlan({ effect: 'knockout', user: plan.user, ruleBoxes: plan.ruleBoxes, effectKo: plan.effectKo });
     if (!ghost) return 0;
+    // Design 089: the scene starts on its hit, which may come after the queue has gone idle; its
+    // cards stay pinned until it takes them.
+    for (const id of [ghost.instanceId, ...(ghost.attached || []).map((card) => card.instanceId)]) claimSlidePin(id);
     // Design 069: a knockout lands on its own card's hit (a ripple hit lands after the contact).
     playKnockoutGhost(ghost, { deferStart: (start) => afterHit(plan, start) });
     return knockoutHoldFor(plan, holdFor('knockout'));

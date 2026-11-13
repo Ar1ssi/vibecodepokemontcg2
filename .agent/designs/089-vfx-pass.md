@@ -269,3 +269,10 @@ Self-approval checklist:
   attack is open at a time) and survives dropped plans (hidden tab, catch-up): the attack then counts as played,
   so a tab that comes back mid-attack shows the slide, never an attack from the Bench (edge 16 reworded). The pin
   release moved behind the batch's plans here (`queueMicrotask`), not in slice 3: a Switch slide needs it.
+- Slice 3: the scene gained `cardModelRect(id)` (where the model has a card): a pinned card's rect on screen and
+  its mirror box stay on its old slot, so a slide reads its target there. The scene's own free helper is
+  `freeCard` (`dropCard` is the drag API). The knockout stand-in image is built only when the card has no mesh:
+  laid over the pinned mesh it covered the card's counters with a flat copy. `board-scene.js` has no node test
+  (it needs a renderer); its retain / orphan / ghost paths are checked by the slice 10 browser test.
+- Found, not fixed (pre-existing on `origin/main`, checked in a clean worktree): `pnpm test:board3d` ends
+  FAILED (4) — its "hand ≥ 7" checks run after a card was played from that hand. An ISSUES line at landing.

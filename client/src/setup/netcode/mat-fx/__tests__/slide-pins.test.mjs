@@ -1,94 +1,93 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { SLIDE_PIN_MAX_MS, createSlidePins } from '../slide-pins.mjs';
+import { SLIDE_PIN_GLIDE_MS, SLIDE_PIN_MAX_MS, createSlidePins } from '../slide-pins.mjs';
 
-const fakeTween = () => {
-  const calls = [];
-  const tween = (id, poseFn, ms) => {
-    let resolve;
-    const done = new Promise((r) => {
-      resolve = r;
-    });
-    calls.push({ id, pose: poseFn(0), ms, resolve });
-    return done;
-  };
-  return { calls, tween };
-};
-
-const POSE = { rect: { left: 10, top: 20, width: 63, height: 88 }, rotateZDeg: 0, tiltXDeg: 0, lift: 0 };
-
-test('pin holds the mesh at the pre-diff pose with the backstop duration', () => {
-  const { calls, tween } = fakeTween();
-  const pins = createSlidePins(tween);
-  pins.pin(7, POSE);
-  assert.deepEqual(
-    calls.map(({ id, pose, ms }) => ({ id, pose, ms })),
-    [{ id: 7, pose: POSE, ms: SLIDE_PIN_MAX_MS }]
-  );
-  assert.equal(pins.has(7), true);
-});
-
-test('a taken pin is not released again when the queue idles', () => {
-  const { calls, tween } = fakeTween();
-  const pins = createSlidePins(tween);
-  pins.pin(7, POSE);
-  pins.take(7);
-  pins.releaseAll();
-  assert.equal(calls.length, 1);
-});
-
-test('releaseAll lets a pin whose slide never came go to its own pose at once', () => {
-  const { calls, tween } = fakeTween();
-  const pins = createSlidePins(tween);
-  pins.pin(7, POSE);
-  pins.pin(8, POSE);
-  pins.releaseAll();
-  assert.deepEqual(
-    calls.slice(2).map(({ id, ms }) => ({ id, ms })),
-    [
-      { id: 7, ms: 0 },
-      { id: 8, ms: 0 },
-    ]
-  );
-  assert.equal(pins.has(7), false);
-});
-
-test('a pin that ran out on its own is forgotten', async () => {
-  const { calls, tween } = fakeTween();
-  const pins = createSlidePins(tween);
-  pins.pin(7, POSE);
-  calls[0].resolve();
-  await Promise.resolve();
-  assert.equal(pins.has(7), false);
-  pins.releaseAll();
-  assert.equal(calls.length, 1);
-});
-
-const fakeHolds = () => {
+/** A fake scene (which cards have a mesh) and a fake clock. */
+const harness = ({ drawn = [7, 8] } = {}) => {
   const log = [];
-  return { log, hold: (id) => log.push(['hold', id]), release: (id) => log.push(['release', id]) };
+  const timers = new Map();
+  let nextTimer = 1;
+  const pins = createSlidePins({
+    pin: (id) => {
+      const ok = drawn.includes(id);
+      if (ok) log.push(['pin', id]);
+      return ok;
+    },
+    unpin: (id, { ms }) => log.push(['unpin', id, ms]),
+    setTimer: (fn, ms) => {
+      const id = nextTimer;
+      nextTimer += 1;
+      timers.set(id, { fn, ms });
+      return id;
+    },
+    clearTimer: (id) => timers.delete(id),
+  });
+  const fireTimers = () => {
+    for (const [id, { fn }] of [...timers]) {
+      timers.delete(id);
+      fn();
+    }
+  };
+  return { pins, log, timers, fireTimers };
 };
 
-test('a pin holds the card\'s table pose until its scene takes it over', () => {
-  const { tween } = fakeTween();
-  const holds = fakeHolds();
-  const pins = createSlidePins(tween, holds);
-  pins.pin(7, POSE);
-  pins.pin(7, POSE);
-  assert.deepEqual(holds.log, [['hold', 7]]);
-  pins.take(7);
-  pins.take(7);
-  assert.deepEqual(holds.log, [['hold', 7], ['release', 7]]);
+test('pin freezes a drawn card once, with the backstop armed; a card with no mesh is not pinned', () => {
+  const { pins, log, timers } = harness();
+  assert.equal(pins.pin(7), true);
+  assert.equal(pins.pin(7), true);
+  assert.equal(pins.pin(99), false);
+  assert.deepEqual(log, [['pin', 7]]);
+  assert.equal(pins.has(7), true);
+  assert.equal(pins.has(99), false);
+  assert.deepEqual([...timers.values()].map((timer) => timer.ms), [SLIDE_PIN_MAX_MS]);
 });
 
-test('releaseAll and the backstop let go of held table poses', async () => {
-  const { calls, tween } = fakeTween();
-  const holds = fakeHolds();
-  const pins = createSlidePins(tween, holds);
-  pins.pin(7, POSE);
-  pins.pin(8, POSE);
-  calls[0].resolve();
-  await Promise.resolve();
+test('take hands the card to a flight: unpinned at once, its backstop cleared, and not released again', () => {
+  const { pins, log, timers } = harness();
+  pins.pin(7);
+  pins.take(7);
+  pins.take(7);
   pins.releaseAll();
-  assert.deepEqual(holds.log, [['hold', 7], ['hold', 8], ['release', 7], ['release', 8]]);
+  assert.deepEqual(log, [['pin', 7], ['unpin', 7, 0]]);
+  assert.equal(timers.size, 0);
+  assert.equal(pins.has(7), false);
+});
+
+test('releaseAll lets a pin whose slide never came glide to where the view has it', () => {
+  const { pins, log } = harness();
+  pins.pin(7);
+  pins.pin(8);
+  pins.releaseAll();
+  assert.deepEqual(log.slice(2), [
+    ['unpin', 7, SLIDE_PIN_GLIDE_MS],
+    ['unpin', 8, SLIDE_PIN_GLIDE_MS],
+  ]);
+  assert.equal(pins.has(7), false);
+});
+
+test('design 089: a claimed pin outlives releaseAll (its scene is about to play) and still goes when taken', () => {
+  const { pins, log } = harness();
+  pins.pin(7);
+  pins.pin(8);
+  pins.claim(7);
+  pins.claim(99);
+  pins.releaseAll();
+  assert.equal(pins.has(7), true);
+  assert.equal(pins.has(8), false);
+  pins.take(7);
+  assert.deepEqual(log.slice(2), [
+    ['unpin', 8, SLIDE_PIN_GLIDE_MS],
+    ['unpin', 7, 0],
+  ]);
+});
+
+test('the backstop frees a pin nobody took, claimed or not', () => {
+  const { pins, log, fireTimers } = harness();
+  pins.pin(7);
+  pins.claim(7);
+  fireTimers();
+  assert.deepEqual(log, [['pin', 7], ['unpin', 7, SLIDE_PIN_GLIDE_MS]]);
+  assert.equal(pins.has(7), false);
+  pins.releaseAll();
+  assert.equal(log.length, 2);
 });

@@ -131,7 +131,9 @@ function buildCardGeometry(three, widthPx, uv) {
  *   cardFxOf: (id: number) => { dissolve: number, rim: number }|null,
  *   tablePoseOf: (id: number) => { x: number, y: number, z: number, yawDeg: number, widthPx: number,
  *     heightPx: number }|null,
- *   holdTablePose: (id: number) => void, releaseTablePose: (id: number) => void,
+ *   pinPose: (id: number) => boolean, unpinPose: (id: number, o?: { ms?: number }) => void,
+ *   pinned: (id: number) => boolean,
+ *   retain: (id: number) => boolean, unretain: (id: number) => void, retained: (id: number) => boolean,
  *   frontMapOf: (id: number) => import('three').Texture|null,
  *   lift: (id: number, pose: object, o?: { ms?: number, ease?: (t: number) => number }) => Promise<void>,
  *   unlift: (id: number, o?: { ms?: number, ease?: (t: number) => number }) => Promise<void>,
@@ -180,6 +182,14 @@ function buildCardGeometry(three, widthPx, uv) {
  *   foil card shows its plain art meanwhile); either way a glow twin draws the ember line (on the
  *   FX layer, bloomed) or the rim (in the board pass, unbloomed). At the end, on a newer `cardFx`, on release or `at` throwing, the
  *   values go back to 0, the card wears its shared materials again and the promise resolves.
+ *   `pinPose` (design 089) freezes a card where it stands: until `unpinPose`, `setPose`, `setFaces`
+ *   and `setHidden` are kept for later instead of applied, so the card rests at its old spot with
+ *   its old face while the view already has it elsewhere (a knocked-out Pokémon waiting for its
+ *   scene, a switched one waiting for its slide). A pinned card is an ordinary resting card: it can
+ *   be driven, flown and burnt, and `tablePoseOf` / `cornersOf` answer its frozen pose.
+ *   `unpinPose(id, { ms })` applies what was kept, the pose over `ms` (default 0).
+ *   `retain` / `unretain` count the effects still using a card's mesh; `onUnretained(id)` (a dep)
+ *   hears the count reach 0, so the scene can free a mesh its model no longer poses.
  */
 export function createCardMeshPool({
   group,
@@ -189,6 +199,7 @@ export function createCardMeshPool({
   foil = null,
   motionReduced = () => false,
   onNeedsRender = () => {},
+  onUnretained = () => {},
   viewOrigin = () => ({ left: 0, top: 0 }),
   timers = {
     set: (fn, ms) => globalThis.setTimeout(fn, ms),
@@ -634,25 +645,14 @@ export function createCardMeshPool({
   };
 
   /**
-   * The card's own pose now, in flat table px, with its drawn size; null when it has none. A held
-   * card answers the pose it was held at: its mesh is pinned there while its own pose already
-   * points at its new zone (a knocked-out defender sits in its slot until its knockout scene).
+   * The card's own pose now, in flat table px, with its drawn size; null when it has none. A
+   * pinned card's pose is frozen, so it answers where it still stands (a knocked-out defender
+   * sits in its slot until its knockout scene).
    */
   const tablePoseOf = (id) => {
     const card = cards.get(id);
     if (!card?.pose) return null;
-    return card.heldTablePose ?? ownTablePose(card);
-  };
-
-  /** Freezes what `tablePoseOf` answers for card `id` at its pose now, until `releaseTablePose`. */
-  const holdTablePose = (id) => {
-    const card = cards.get(id);
-    if (card?.pose) card.heldTablePose = ownTablePose(card);
-  };
-
-  const releaseTablePose = (id) => {
-    const card = cards.get(id);
-    if (card) card.heldTablePose = null;
+    return ownTablePose(card);
   };
 
   /**
@@ -947,7 +947,8 @@ export function createCardMeshPool({
       face: 'front',
       hidden: false,
       pose: null,
-      heldTablePose: null,
+      pin: null,
+      retains: 0,
       flip: null,
       tilt: null,
       hoverTilt: null,
@@ -984,6 +985,10 @@ export function createCardMeshPool({
 
   const setFaces = (id, faces = {}) =>
     withCard(id, (card) => {
+      if (card.pin) {
+        card.pin.faces = { ...(card.pin.faces ?? {}), ...faces };
+        return;
+      }
       if ('src' in faces && (faces.src || null) !== card.frontSrc) {
         dropArt(fronts, card.front);
         card.frontSrc = faces.src || null;
@@ -1010,6 +1015,10 @@ export function createCardMeshPool({
   const setPose = (id, pose, ms) =>
     withCard(id, (card) => {
       if (!pose || !Number.isFinite(pose.x) || !Number.isFinite(pose.y)) return;
+      if (card.pin && card.pose) {
+        card.pin.pose = pose;
+        return;
+      }
       const now = clock.now();
       const duration = durationFor(ms);
       const target = {
@@ -1105,10 +1114,51 @@ export function createCardMeshPool({
 
   const setHidden = (id, hidden) =>
     withCard(id, (card) => {
+      if (card.pin) {
+        card.pin.hidden = Boolean(hidden);
+        return;
+      }
       card.hidden = Boolean(hidden);
       card.mesh.visible = visibleOf(card);
       onNeedsRender();
     });
+
+  // ── pins and retains (design 089): a card kept where it stands, and a mesh kept alive, for an
+  // effect that has not played yet.
+  const pinPose = (id) => {
+    const card = disposed ? null : cards.get(id);
+    if (!card?.pose) return false;
+    if (!card.pin) card.pin = { pose: null, faces: null, hidden: null };
+    return true;
+  };
+
+  const unpinPose = (id, { ms = 0 } = {}) =>
+    withCard(id, (card) => {
+      const { pin } = card;
+      if (!pin) return;
+      card.pin = null;
+      if (pin.faces) setFaces(id, pin.faces);
+      if (pin.hidden !== null) setHidden(id, pin.hidden);
+      if (pin.pose) setPose(id, pin.pose, ms);
+    });
+
+  const pinned = (id) => Boolean(cards.get(id)?.pin);
+
+  const retain = (id) => {
+    const card = disposed ? null : cards.get(id);
+    if (!card) return false;
+    card.retains += 1;
+    return true;
+  };
+
+  const unretain = (id) => {
+    const card = cards.get(id);
+    if (!card || card.retains === 0) return;
+    card.retains -= 1;
+    if (card.retains === 0 && !disposed) onUnretained(id);
+  };
+
+  const retained = (id) => (cards.get(id)?.retains ?? 0) > 0;
 
   const setCamera = (desc) => {
     if (disposed) return;
@@ -1237,8 +1287,12 @@ export function createCardMeshPool({
     cardFxOf,
     tablePoseOf,
     restingPoses,
-    holdTablePose,
-    releaseTablePose,
+    pinPose,
+    unpinPose,
+    pinned,
+    retain,
+    unretain,
+    retained,
     frontMapOf,
     lift,
     unlift,
