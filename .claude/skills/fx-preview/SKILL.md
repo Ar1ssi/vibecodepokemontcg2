@@ -120,6 +120,13 @@ images.pokemontcg.io is blocked (a `client/src/assets/custom-sets/*/NNN/high.web
 row for scoring. Use this, not `rec-move`, to judge a beat: SwiftShader records about one frame a
 second, so a real-time video of a 1.6 s scene holds two states.
 
+Design 089 added two frozen-clock recorders in the same folder. `rec/rec-move-strip.mjs` shoots many
+moves in one page, six times each (`MOVES=a,b,sig:c`, `TIMES`, `SIDE`, `DPR=2`), to compare moves with
+one another: `.agent/scratch/move-strip/`. `rec/rec-board-fx.mjs` shoots the board's non-attack
+effects (`ONLY=block,heal,shuffle,prize-claim,status-burned,turn-banner,…`; the list is its `SHOTS`
+table): `.agent/scratch/board-fx/`. The order of what plays when is asserted by
+`PTCG_URL=http://localhost:4100 node scripts/e2e/fx-sequence-test.mjs` (sections A–G).
+
 ## Attack impact prefabs (design 068, WebGL)
 
 TCG Live's impact prefabs draw on a WebGL2 canvas, so both recorders launch Chromium on
