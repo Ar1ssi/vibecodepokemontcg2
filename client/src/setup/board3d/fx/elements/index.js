@@ -9,6 +9,8 @@ import { defineFireball } from './fireball.js';
 import { fireballSamples } from './fireball.mjs';
 import { defineFlameJet } from './flame-jet.js';
 import { flameJetSamples } from './flame-jet.mjs';
+import { defineHaze } from './haze.js';
+import { hazeSamples } from './haze.mjs';
 import { defineLens } from './lens.js';
 import { lensSamples } from './lens.mjs';
 import { definePlasma } from './plasma.js';
@@ -33,6 +35,7 @@ export const ELEMENT_KINDS = Object.freeze({
   lens: defineLens,
   smoke: defineSmoke,
   debris: defineDebris,
+  haze: defineHaze,
 });
 
 /** Per kind, emits that exercise its shader paths (scripts/fx/check-element-shaders.mjs). */
@@ -47,4 +50,5 @@ export const ELEMENT_SAMPLES = Object.freeze({
   lens: lensSamples,
   smoke: smokeSamples,
   debris: debrisSamples,
+  haze: hazeSamples,
 });

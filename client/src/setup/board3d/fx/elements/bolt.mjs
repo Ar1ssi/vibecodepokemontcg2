@@ -49,22 +49,28 @@ export function packBoltSegment(row, out, index) {
 /**
  * A polyline (`points` stage points) as segment params, `along` accumulated, alpha ramped from
  * `rootAlpha` at its start to full by `rampPx` (so a fan of bolts does not stack at its hub).
- * Points that are not finite are skipped.
+ * `taper` (design 089) is the width at the line's far end as a share of `width` at its start:
+ * a discharge thins as it runs, and a line of one even width is a neon tube. Each segment takes
+ * the width at its middle. Points that are not finite are skipped.
  */
-export function boltSegments(points, { width, alpha = 1, seed = 0, hot, glow, rootAlpha = 1, rampPx = 0 }) {
+export function boltSegments(points, { width, alpha = 1, seed = 0, hot, glow, rootAlpha = 1, rampPx = 0, taper = 1 }) {
   const clean = (points ?? []).map(stagePoint).filter(Boolean);
-  const out = [];
-  let along = 0;
+  const steps = [];
+  let total = 0;
   for (let i = 1; i < clean.length; i += 1) {
     const a = clean[i - 1];
     const b = clean[i];
     const length = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
     if (!(length > 0)) continue;
-    const ramp = rampPx > 0 ? Math.min(1, along / rampPx) : 1;
-    out.push({ a, b, width, alpha: alpha * (rootAlpha + (1 - rootAlpha) * ramp), seed, along, hot, glow });
-    along += length;
+    steps.push({ a, b, length, along: total });
+    total += length;
   }
-  return out;
+  const endShare = Number.isFinite(taper) ? Math.max(0.05, taper) : 1;
+  return steps.map(({ a, b, length, along }) => {
+    const ramp = rampPx > 0 ? Math.min(1, along / rampPx) : 1;
+    const middle = (along + length / 2) / total;
+    return { a, b, width: width * (1 + (endShare - 1) * middle), alpha: alpha * (rootAlpha + (1 - rootAlpha) * ramp), seed, along, hot, glow };
+  });
 }
 
 /** Emits for scripts/fx/check-element-shaders.mjs: a jagged bolt with a branch. */
@@ -78,5 +84,5 @@ export const boltSamples = () => {
     { x: 110, y: 50, z: 30 },
   ];
   const branch = [{ x: -60, y: 10, z: 60 }, { x: -40, y: 70, z: 40 }, { x: -70, y: 110, z: 30 }];
-  return [...boltSegments(trunk, { width: 7, seed: 1 }), ...boltSegments(branch, { width: 4, seed: 2, alpha: 0.8 })];
+  return [...boltSegments(trunk, { width: 7, seed: 1, taper: 0.5 }), ...boltSegments(branch, { width: 4, seed: 2, alpha: 0.8, taper: 0.3 })];
 };

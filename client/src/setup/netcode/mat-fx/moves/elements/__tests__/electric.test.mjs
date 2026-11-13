@@ -47,10 +47,31 @@ test('electric jagStroke → bolt segments for trunk and branches, plus a strike
   materialFor('electric').jagStroke(ctx, [[[0, 0], [10, 0], [20, 5]], [[10, 0], [12, 10]]], { width: 4, alpha: 0.9 });
   const bolts = emits.filter((e) => e.kind === 'bolt');
   assert.equal(bolts.length, 3);
-  assert.equal(bolts[0].params.width, 4 * ELECTRIC_SCALE.bolt);
-  assert.ok(bolts[2].params.width < bolts[0].params.width, 'branches are thinner');
+  // Design 089: the trunk runs thick from its source and thins as it goes.
+  assert.ok(bolts[0].params.width > 4 * ELECTRIC_SCALE.bolt * 0.9 && bolts[0].params.width > bolts[1].params.width, 'the trunk tapers');
+  assert.ok(bolts[2].params.width < bolts[1].params.width, 'branches are thinner');
   assert.equal(emits.filter((e) => e.kind === 'sprite').length, 1);
   assert.equal(canvas.recording().vertexCount, 0);
+});
+
+test('design 089: a bolt leaves an afterimage of its last path, and its forks miss one re-roll in three', () => {
+  const lines = [[[0, 0], [10, 0], [20, 5]], [[10, 0], [12, 10]]];
+  const boltsOf = (opts) => {
+    const { ctx, emits } = live();
+    materialFor('electric').jagStroke(ctx, lines, { width: 4, alpha: 1, ...opts });
+    return emits.filter((e) => e.kind === 'bolt').map((e) => e.params);
+  };
+  const plain = boltsOf({});
+  const withImage = boltsOf({ afterimage: [[[0, 0], [8, 3], [20, 5]]] });
+  assert.equal(withImage.length, plain.length + 2, 'the old path is drawn as well');
+  assert.ok(withImage[0].alpha < plain[0].alpha * 0.5 && withImage[0].width < plain[0].width, 'thin and dim');
+  // Line 1 is a fork: (step + 1) % 3 === 0 hides it.
+  assert.equal(boltsOf({ step: 2 }).length, 2, 'only the trunk on this re-roll');
+  assert.equal(boltsOf({ step: 3 }).length, 3);
+  // A second bolt's trunk is a trunk, not a fork of the first.
+  const two = boltsOf({ trunks: [0, 1], step: 2 });
+  assert.equal(two.length, 3);
+  assert.ok(two[2].width > plain[2].width, 'drawn at trunk width');
 });
 
 test('electric body → plasma; projectile → plasma, forked bolts and sparks, stable for a frozen frame', () => {

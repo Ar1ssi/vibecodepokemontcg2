@@ -6,7 +6,7 @@ import { createGpuCanvas } from '../../../../../board3d/fx/gpu-canvas.mjs';
 import { DRAWERS } from '../../move-drawers.js';
 import { laneGeometry, localLane } from '../../move-geometry.mjs';
 import { materialFor } from '../../materials/index.js';
-import { PSYCHIC_SCALE } from '../psychic.js';
+import { MAX_FIELD_RADIUS, PSYCHIC_SCALE } from '../psychic.js';
 import { PUFF_SCALE } from '../_smoke.js';
 
 const triangulate = (contour, holes) =>
@@ -36,6 +36,21 @@ test('psychic sigil → a lens turning with the beat; body → lens plus light',
   assert.ok(Math.abs(emits[0].params.spin - Math.PI * 1.2) < 1e-9);
   materialFor('psychic').body(ctx, 0, 0, 10, 1);
   assert.deepEqual(emits.slice(1).map((e) => e.kind), ['sprite', 'lens']);
+});
+
+test('design 089: no psychic field is wider than the card it works on', () => {
+  // On a 100 px card: Psychic's sigil is 90 px in radius, an orb 60, a shot 50.
+  const kit = materialFor('psychic');
+  const radii = [
+    (ctx) => kit.sigil(ctx, 0, 0, 90, 0.5),
+    (ctx) => kit.body(ctx, 0, 0, 60, 1),
+    (ctx) => kit.projectile(ctx, { x: 0, y: 0, r: 50, headingDeg: 0, time: 0.2, seed: 1, alpha: 1 }),
+  ].map((draw) => {
+    const { ctx, emits } = live();
+    draw(ctx);
+    return emits.find((e) => e.kind === 'lens').params.radius;
+  });
+  assert.deepEqual(radii, [100 * MAX_FIELD_RADIUS, 100 * MAX_FIELD_RADIUS, 100 * MAX_FIELD_RADIUS]);
 });
 
 test('the glyph drawer reaches the lens through the psychic kit', () => {

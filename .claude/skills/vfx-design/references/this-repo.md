@@ -40,7 +40,8 @@ specs/<type>.mjs  (beats: at/until/layer/drawer/params; attacker/defender motion
 | Bloom | `board3d/fx/fx-layer.js` `BLOOM = { strength 0.2, radius 0.3, threshold 2.4 }` — only HDR > 2.4 blooms; the story behind it is in techniques § HDR |
 | Heights and stand angles (lane units; camera looks almost straight down so nothing stands past 0.5) | `moves/beat-lift.mjs` `LIFT` — read its header before changing a stand |
 | Shared GLSL: noise/fbm, billboard + lean, dissolve, fire ramp, board refraction, blend settings | `board3d/fx/elements/element-glsl.mjs` |
-| Kind capacities | sprite 512 · bolt 1024 · debris 256 · waterDrop 256 · waterBeam 128 · flameJet 128 · smoke 128 · fireball 64 · plasma 64 · lens 32 |
+| Kind capacities | sprite 512 · bolt 1024 · debris 256 · waterDrop 256 · waterBeam 128 · flameJet 128 · smoke 128 · haze 96 · fireball 64 · plasma 64 · lens 32 |
+| Composite (design 089) | `board3d/fx/tone.mjs`: a texel's cover goes over the board exactly; light its alpha cannot account for is rolled off by its brightest channel (`TONE`) and screened on. Light keeps its hue; nothing clips to white |
 | Sprite params | `texture, at{x,y,z}, size, aspect, rotation°, colour rgb 0–1 (HDR ok), alpha, frame, blend 'add'/'over', channel 'r'/'a'/'rgba', alignDeg, dissolve` (`sprite.mjs normalizeSprite`) |
 | Card motion presets | `moves/card-motion.mjs` attacker: brace, lunge, dash, rear-lurch, warp, rise, stomp, spin, none · defender: knock, stagger, float, sink, freeze |
 | Combat timing (lunge, hit flash, shake, recoil, damage pop) | `mat-fx/combat-pose.mjs` |
@@ -126,9 +127,10 @@ the commit), `pnpm test:changed` before commit. Visual-only changes need no new 
 
 - "look like clip art" (Thunderbolt, Psychic, most of the vector kits, 2026-10-25): cause was
   every beat drawn 0.25–4 px above the cloth as a gradient-filled path. Fix was lift/stand/cast
-  (078) and then real GLSL kinds with TCG Live textures (079). Still open at the last check: water
-  spray reads icy · psychic rings large · Pin Missile needles small · impact centres can blow out ·
-  leaf orientation unconfirmed.
+  (078) and then real GLSL kinds with TCG Live textures (079). Design 089 slice 6 answered the five
+  left open then (water spray icy · psychic rings large · Pin Missile needles small · impact centres
+  blow out · leaf orientation); each awaits the user's look on localhost. What changed, per fault:
+  `.agent/designs/089-vfx-pass.md` § Deviations, "Slice 6".
 - "remove the colored explosion thing" — the KO mat-wide burst; gold stars stayed.
 - Evolve: whiteout, sky-blue reveal and turning god rays rejected as off-style; caption, flash and
   ribbons cut; palette light blue/cyan, no purple; spread halved; flip through the hand-over.

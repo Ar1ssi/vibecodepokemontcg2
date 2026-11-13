@@ -56,10 +56,44 @@ test('shared slash: the type tongue plus a slash streak aligned along each arc',
   assert.ok(slashes.every((s) => Number.isFinite(s.params.alignDeg)));
 });
 
-test('shared aura: glow, inner glow and an energy ring', () => {
+test('shared aura: two soft glows, and no ring on the cloth (design 089)', () => {
   const { ctx, emits } = live();
   DRAWERS.aura.draw(ctx, lane, 0.5, info('fighting'));
-  assert.deepEqual(textures(emits), ['TEX_VFX_Gradient_Radial.webp', 'TEX_VFX_Ring_InnerGlow.webp', 'TEX_VFX_Energy_Ring_Soft.webp']);
+  assert.deepEqual(textures(emits), ['TEX_VFX_Gradient_Radial.webp', 'TEX_VFX_Gradient_Radial.webp']);
+  assert.ok(emits[1].params.size < emits[0].params.size, 'the breathing glow sits inside the halo');
+});
+
+test('design 089: poison and mud are thick: their blobs are glossy solid balls, not clear drops', () => {
+  for (const key of ['poison', 'mud']) {
+    const { ctx, emits } = live();
+    materialFor(key).body(ctx, 0, 0, 10, 1);
+    assert.deepEqual(emits.map((e) => e.kind), ['debris'], key);
+    assert.equal(emits[0].params.smooth, 1, 'a round blob');
+    assert.ok(emits[0].params.gloss > 0.5, 'wet');
+    const shot = live();
+    materialFor(key).projectile(shot.ctx, { x: 0, y: 0, r: 10, headingDeg: 0, time: 0.4, seed: 1, alpha: 1 });
+    assert.equal(shot.emits.filter((e) => e.kind === 'waterDrop').length, 0, `${key}: no clear drop in flight`);
+    assert.equal(shot.emits.filter((e) => e.kind === 'debris').length, 1);
+    assert.ok(shot.emits.filter((e) => e.kind === 'waterBeam').every((e) => e.params.tail === 1), 'its wake thins out');
+  }
+  const water = live();
+  materialFor('water').body(water.ctx, 0, 0, 10, 1);
+  assert.equal(water.emits[0].kind, 'waterDrop', 'water stays clear');
+});
+
+test('design 089: a bug shot is a needle along its flight, not an orb', () => {
+  const { ctx, emits } = live();
+  materialFor('bug').projectile(ctx, { x: 0, y: 0, r: 10, headingDeg: 40, time: 0.3, seed: 2, alpha: 1 });
+  const needle = emits.find((e) => e.kind === 'debris');
+  assert.ok(needle, 'a solid needle');
+  assert.ok(Math.abs(needle.params.headingDeg - 40) < 1e-9, 'pointing where it flies');
+  assert.ok(needle.params.stretch >= 4, `long and thin: ${needle.params.stretch}`);
+  assert.ok(needle.params.size * needle.params.stretch * 2 > 10 * 3, 'longer than the orb it replaces was wide');
+  assert.equal(emits.filter((e) => e.kind === 'plasma').length, 0, 'no ring-shell orb');
+  // Ice and steel shots stay orbs.
+  const ice = live();
+  materialFor('ice').projectile(ice.ctx, { x: 0, y: 0, r: 10, headingDeg: 40, time: 0.3, seed: 2, alpha: 1 });
+  assert.equal(ice.emits.filter((e) => e.kind === 'debris').length, 0);
 });
 
 test('dragon burns with the fire kinds in its own palette', () => {
@@ -109,10 +143,10 @@ test('flying gusts are swipes aligned along the gust; flying smoke is white air'
   assert.ok(air.emits.some((e) => e.kind === 'smoke'));
 });
 
-test('poison is a liquid with its own glowing gas; petals are tinted petal sprites', () => {
+test('poison is a thick liquid with its own glowing gas; petals are tinted petal sprites', () => {
   const { ctx, emits } = live();
   materialFor('poison').body(ctx, 0, 0, 10, 1);
-  assert.equal(emits[0].kind, 'waterDrop');
+  assert.equal(emits[0].kind, 'debris');
   const gas = live();
   DRAWERS.smoke.draw(gas.ctx, lane, 0.5, info('poison', { count: 3 }));
   const puffs = gas.emits.filter((e) => e.kind === 'smoke');

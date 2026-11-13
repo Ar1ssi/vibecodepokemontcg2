@@ -73,7 +73,9 @@ vec3 elFireRamp(float t, vec3 deep, vec3 body, vec3 hot, vec3 core, float heat) 
   vec3 c = mix(soot, deep, smoothstep(0.0, 0.22, t));
   c = mix(c, body, smoothstep(0.22, 0.48, t));
   c = mix(c, hot, smoothstep(0.48, 0.7, t));
-  c = mix(c, core, smoothstep(0.74, 0.94, t));
+  // Design 089: the pale core starts late (0.84, was 0.74). A flame is orange and yellow almost
+  // to its heart; a wide core stop made a ball's middle and a jet's root a white disc.
+  c = mix(c, core, smoothstep(0.84, 0.97, t));
   // Only the last few percent pass 1.0: a small white filament blooms, not a white disc.
   return c * (1.0 + 1.4 * heat * smoothstep(0.94, 1.0, t));
 }

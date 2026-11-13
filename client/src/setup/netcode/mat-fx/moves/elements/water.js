@@ -28,16 +28,49 @@ const SPLASH_FRAME_MS = 90;
 const CORE_MAX_W = 0.12;
 const DEG = Math.PI / 180;
 
+const THICK_BALL_SCALE = 0.7;
+
 const paletteOf = (kit) => ({ deep: rgb01(kit.palette.deep), body: rgb01(kit.palette.body), hot: rgb01(kit.palette.hot) });
 
-/** A stream of water from (spec.x, spec.y) along spec.angleDeg: a tapering water beam. */
-function tongue(ctx, spec, { alpha = 1 } = {}) {
+/** A ball of clear water: it bends the board behind it. */
+const clearBall = (ctx, kit, { at, radius, alpha, seed, dissolve }) => emit(ctx, 'waterDrop', { at, radius, alpha, seed, dissolve, palette: paletteOf(kit) });
+
+/**
+ * Design 089: a ball of thick liquid (sludge, mud): opaque, round and wet. As a clear drop a
+ * Sludge Bomb was a soap bubble with the card showing through it; poison "is opaque, glossy,
+ * and bubbles" (the element reference), and so is mud.
+ */
+const thickBall = (ctx, kit, { at, radius, alpha, seed, dissolve }) =>
+  emit(ctx, 'debris', {
+    at,
+    // A solid ball reads larger than a clear drop of the same radius.
+    size: radius * THICK_BALL_SCALE,
+    alpha,
+    seed,
+    spin: seed,
+    smooth: 1,
+    gloss: 0.8,
+    colour: rgb01(kit.palette.body, 0.85),
+    light: rgb01(kit.palette.hot, 1.2),
+    dissolve,
+  });
+
+/**
+ * A stream of water from (spec.x, spec.y) along spec.angleDeg: a tapering water beam, longer and
+ * wider than the pose's tongue. `fixedTip` (a fall landing on a card) keeps the pose's END where
+ * it is: the extra length, and the finger's round cap of half a width, go back toward the root.
+ */
+function tongue(ctx, spec, { alpha = 1, fixedTip = false } = {}) {
   if (!(spec?.length > 0) || !(spec.width > 0) || !(alpha > 0)) return;
   const length = spec.length * WATER_SCALE.streamLength;
+  const width = spec.width * WATER_SCALE.stream;
+  const back = fixedTip ? length - spec.length + width * 0.5 : 0;
+  const cos = Math.cos(spec.angleDeg * DEG);
+  const sin = Math.sin(spec.angleDeg * DEG);
   emit(ctx, 'waterBeam', {
-    from: stageOf(ctx, spec.x, spec.y),
-    to: stageOf(ctx, spec.x + Math.cos(spec.angleDeg * DEG) * length, spec.y + Math.sin(spec.angleDeg * DEG) * length),
-    width: stageLen(ctx, spec.width) * WATER_SCALE.stream,
+    from: stageOf(ctx, spec.x - cos * back, spec.y - sin * back),
+    to: stageOf(ctx, spec.x + cos * (length - back), spec.y + sin * (length - back)),
+    width: stageLen(ctx, width),
     alpha: alphaOf(ctx, alpha),
     seed: spec.seed ?? 0,
     taper: 1,
@@ -47,18 +80,12 @@ function tongue(ctx, spec, { alpha = 1 } = {}) {
   });
 }
 
-/** A ball of water: a refracting drop. */
-function body(ctx, x, y, r, alpha) {
-  if (!(r > 0) || !(alpha > 0)) return;
-  emit(ctx, 'waterDrop', {
-    at: stageOf(ctx, x, y),
-    radius: stageLen(ctx, r) * WATER_SCALE.drop,
-    alpha: alphaOf(ctx, alpha),
-    seed: r * 0.37,
-    dissolve: dissolveOf(ctx),
-    palette: paletteOf(this.base),
-  });
-}
+/** A ball of the kit's liquid (`ball`: clearBall or thickBall). */
+const bodyOf = (ball) =>
+  function body(ctx, x, y, r, alpha) {
+    if (!(r > 0) || !(alpha > 0)) return;
+    ball(ctx, this.base, { at: stageOf(ctx, x, y), radius: stageLen(ctx, r) * WATER_SCALE.drop, alpha: alphaOf(ctx, alpha), seed: r * 0.37, dissolve: dissolveOf(ctx) });
+  };
 
 /** A soft cool light. */
 function glow(ctx, x, y, r, alpha) {
@@ -74,50 +101,53 @@ function glow(ctx, x, y, r, alpha) {
 }
 
 /**
- * A water shot along `headingDeg`: a drop leading streams behind it, droplets thrown off its
- * flanks. Placed by time and seed alone, so a frozen preview stands still.
+ * A shot of the kit's liquid along `headingDeg`: a ball leading streams behind it, droplets thrown
+ * off its flanks. Placed by time and seed alone, so a frozen preview stands still.
  */
-function projectile(ctx, { x, y, r, headingDeg = 0, time = 0, seed = 0, alpha = 1, tongues = 3 }) {
-  if (!(r > 0) || !(alpha > 0)) return;
-  const at = stageOf(ctx, x, y);
-  const radius = stageLen(ctx, r) * WATER_SCALE.projectile;
-  const heading = stageAngle(ctx, headingDeg) * DEG;
-  const a = alphaOf(ctx, alpha);
-  const dissolve = dissolveOf(ctx);
-  const palette = paletteOf(this.base);
-  const back = heading + Math.PI;
-  for (let k = 0; k < Math.max(0, tongues); k += 1) {
-    const spread = (tongues > 1 ? -0.5 + k / (tongues - 1) : 0) * 0.7 + 0.08 * Math.sin(time * 4 + seed + k);
-    const length = radius * (2.6 + 0.8 * Math.abs(Math.sin(seed * 3.1 + k * 1.9)));
-    emit(ctx, 'waterBeam', {
-      from: at,
-      to: { x: at.x + Math.cos(back + spread) * length, y: at.y + Math.sin(back + spread) * length, z: at.z },
-      width: radius * 1.2,
-      alpha: a * 0.9,
-      seed: seed + k * 2.1,
-      taper: 1,
-      flow: 2,
-      dissolve,
-      palette,
-    });
-  }
-  emit(ctx, 'waterDrop', { at, radius, alpha: a, seed, dissolve, palette });
-  for (let k = 0; k < DROPLETS; k += 1) {
-    const phase = (((time * 1.6 + k * 0.173 + seed * 0.29) % 1) + 1) % 1;
-    const side = back + (k % 2 ? 1 : -1) * (0.6 + 0.5 * Math.abs(Math.sin(k * 2.7 + seed)));
-    const distance = radius * (1 + phase * 2.6);
-    emit(ctx, 'sprite', {
-      texture: DROPLET_TEXTURE,
-      at: { x: at.x + Math.cos(side) * distance, y: at.y + Math.sin(side) * distance, z: at.z + radius * 0.6 * Math.sin(Math.PI * phase) },
-      size: radius * (0.35 - 0.15 * phase),
-      // The streak lies along the droplet's flight (its width is across it).
-      alignDeg: (side * 180) / Math.PI - 90,
-      // Droplets are water, not light: body colour, no HDR gain, or they bloom white and read as frost.
-      colour: rgb01(this.base.palette.body, 1),
-      alpha: a * (1 - phase),
-    });
-  }
-}
+const projectileOf = (ball) =>
+  function projectile(ctx, { x, y, r, headingDeg = 0, time = 0, seed = 0, alpha = 1, tongues = 3 }) {
+    if (!(r > 0) || !(alpha > 0)) return;
+    const at = stageOf(ctx, x, y);
+    const radius = stageLen(ctx, r) * WATER_SCALE.projectile;
+    const heading = stageAngle(ctx, headingDeg) * DEG;
+    const a = alphaOf(ctx, alpha);
+    const dissolve = dissolveOf(ctx);
+    const palette = paletteOf(this.base);
+    const back = heading + Math.PI;
+    for (let k = 0; k < Math.max(0, tongues); k += 1) {
+      const spread = (tongues > 1 ? -0.5 + k / (tongues - 1) : 0) * 0.7 + 0.08 * Math.sin(time * 4 + seed + k);
+      const length = radius * (2.6 + 0.8 * Math.abs(Math.sin(seed * 3.1 + k * 1.9)));
+      emit(ctx, 'waterBeam', {
+        from: at,
+        to: { x: at.x + Math.cos(back + spread) * length, y: at.y + Math.sin(back + spread) * length, z: at.z },
+        width: radius * 1.2,
+        alpha: a * 0.9,
+        seed: seed + k * 2.1,
+        taper: 1,
+        // A wake thins out behind the shot; a round-ended finger here hung off it like a drape.
+        tail: 1,
+        flow: 2,
+        dissolve,
+        palette,
+      });
+    }
+    ball(ctx, this.base, { at, radius, alpha: a, seed, dissolve });
+    for (let k = 0; k < DROPLETS; k += 1) {
+      const phase = (((time * 1.6 + k * 0.173 + seed * 0.29) % 1) + 1) % 1;
+      const side = back + (k % 2 ? 1 : -1) * (0.6 + 0.5 * Math.abs(Math.sin(k * 2.7 + seed)));
+      const distance = radius * (1 + phase * 2.6);
+      emit(ctx, 'sprite', {
+        texture: DROPLET_TEXTURE,
+        at: { x: at.x + Math.cos(side) * distance, y: at.y + Math.sin(side) * distance, z: at.z + radius * 0.6 * Math.sin(Math.PI * phase) },
+        size: radius * (0.35 - 0.15 * phase),
+        // The streak lies along the droplet's flight (its width is across it).
+        alignDeg: (side * 180) / Math.PI - 90,
+        // Droplets are water, not light: body colour, no HDR gain, or they bloom white and read as frost.
+        colour: rgb01(this.base.palette.body, 1),
+        alpha: a * (1 - phase),
+      });
+    }
+  };
 
 /**
  * A straight beam (drawer `beam`, kinds solid / widening / segmented): even water columns over
@@ -207,4 +237,6 @@ function beam(ctx, lane, s, info) {
   }
 }
 
-export const waterElements = elementKit({ tongue, body, glow, projectile, beats: { beam } });
+export const waterElements = elementKit({ tongue, body: bodyOf(clearBall), glow, projectile: projectileOf(clearBall), beats: { beam } });
+/** Water's streams and beams with solid, glossy balls: poison and mud. */
+export const thickLiquidElements = elementKit({ tongue, body: bodyOf(thickBall), glow, projectile: projectileOf(thickBall), beats: { beam } });

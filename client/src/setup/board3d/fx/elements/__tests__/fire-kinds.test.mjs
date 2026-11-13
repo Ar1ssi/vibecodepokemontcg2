@@ -60,3 +60,19 @@ test('flame jet: needs two points, a width and some length', () => {
   assert.equal(row[15], 9, 'seed rides with the body colour');
   assert.equal(row[23], 2, 'flow rides with the core colour');
 });
+
+test('design 089: haze — defaults, refusals, packed row', async () => {
+  const { HAZE_FLOATS, normalizeHaze, packHaze } = await import('../haze.mjs');
+  const air = normalizeHaze({ at: { x: 0, y: 0 }, radius: 10 });
+  assert.equal(air.strength, 0.7);
+  assert.equal(air.rise, 1);
+  assert.equal(air.alpha, 1);
+  assert.equal(normalizeHaze({ at: { x: 0, y: 0 }, radius: 0 }), null);
+  assert.equal(normalizeHaze({ at: { x: 0, y: 0 }, radius: 10, alpha: 0 }), null);
+  assert.equal(normalizeHaze({ at: { x: 0, y: 0 }, radius: 10, strength: 0 }), null, 'air that bends nothing is not drawn');
+  assert.equal(normalizeHaze({ radius: 10 }), null);
+  assert.equal(normalizeHaze(null), null);
+  const out = new Float32Array(HAZE_FLOATS);
+  packHaze(normalizeHaze({ at: { x: 1, y: 2, z: 3 }, radius: 4, alpha: 0.5, strength: 0.25, rise: 2, seed: 6 }), out, 0);
+  assert.deepEqual([...out], [1, 2, 3, 4, 0.5, 0.25, 2, 6]);
+});

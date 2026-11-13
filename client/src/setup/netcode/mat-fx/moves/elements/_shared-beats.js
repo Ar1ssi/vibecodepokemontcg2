@@ -22,8 +22,6 @@ const TEXTURES = Object.freeze({
   star: 'TEX_VFX_M_Star_Flare_Glow.webp',
   glints: 'TEX_VFX_Sparkle_Star_Debris.webp',
   slash: 'T_VFX_Slash_1x4.webp',
-  auraRing: 'TEX_VFX_Energy_Ring_Soft.webp',
-  innerGlow: 'TEX_VFX_Ring_InnerGlow.webp',
 });
 /** A Slash_1x4 frame is four times as wide as it is tall. */
 const SLASH_ASPECT = 0.25;
@@ -175,7 +173,12 @@ function slashArc(ctx, lane, s, info) {
   });
 }
 
-/** The aura: a soft glow and an energy ring breathing round the card. */
+/**
+ * The aura: a soft glow breathing round the card. Design 089: no ring. The energy ring and the
+ * ring-with-inner-glow texture it carried each drew a circle on the cloth round the attacker,
+ * which the user had already cut from the canvas drawer as clip art ("charge rings on the floor
+ * around the attacker"). The breathing is a second, tighter glow.
+ */
 function aura(ctx, lane, s, info) {
   const pose = auraPose(s, lane.h, { ...info.params, beatMs: info.beatMs });
   if (!(pose.alpha > 0)) return;
@@ -186,8 +189,7 @@ function aura(ctx, lane, s, info) {
   const a = alphaOf(ctx, pose.alpha);
   const breath = 1 + 0.06 * Math.sin((info.time ?? 0) * 6);
   emit(ctx, 'sprite', { texture: TEXTURES.glow, at, size: size * 1.3, colour: rgb01(palette.body, 1), alpha: a * 0.45 });
-  emit(ctx, 'sprite', { texture: TEXTURES.innerGlow, at, size: size * breath, colour: rgb01(palette.body, 1.2), alpha: a * 0.5 });
-  emit(ctx, 'sprite', { texture: TEXTURES.auraRing, at, size: size * 1.05 * breath, colour: rgb01(palette.hot, 1.4), alpha: a * 0.8 });
+  emit(ctx, 'sprite', { texture: TEXTURES.glow, at, size: size * 0.8 * breath, colour: rgb01(palette.hot, 1.1), alpha: a * 0.3 });
 }
 
 export const sharedBeats = elementKit({ beats: { impactFlash, slashArc, aura } });

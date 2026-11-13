@@ -83,7 +83,10 @@ void main() {
   // Roots fade (design 075's lesson): a fan of jets meets at one point, and full roots stacked
   // there would add up to a white disc; the body drawn at the hub fills it instead.
   float density = smoothstep(0.0, 0.22, shape) * smoothstep(0.02, 0.3, u);
-  float temp = clamp(shape * 1.7 + (n2 - 0.5) * 0.45 - u * 0.3 + 0.12, 0.0, 1.0);
+  // Design 089: hottest in a thin line down the middle near the root, cooling fast outward and
+  // toward the tip (shape × 1.25 − 0.42 u; was × 1.7 − 0.3 u, which ran the pale core stop over
+  // most of the jet and summed to white where a fan of jets meets).
+  float temp = clamp(shape * 1.25 + (n2 - 0.5) * 0.5 - u * 0.42 + 0.1, 0.0, 1.0);
   vec3 colour = elFireRamp(temp, vC.rgb, vD.rgb, vE.rgb, vF.rgb, heat);
   float edge;
   float alpha = density * vB.w * elDissolve(vec2(u * 2.0, v), vE.w, seed, edge);

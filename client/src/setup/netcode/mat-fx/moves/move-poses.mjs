@@ -754,6 +754,19 @@ export function boltPoses(s, lane, seed, elapsedMs, params) {
   return out;
 }
 
+/** Design 089: which re-roll of its path a bolt is on (its forks show on some and not others). */
+export const boltStep = (elapsedMs, params) => Math.floor(Math.max(0, Number(elapsedMs) || 0) / withDefaults('bolt', params).rerollMs);
+
+/**
+ * Design 089: the bolts as they ran one re-roll ago (`[]` during the first): what the eye still
+ * holds of a discharge that has already jumped to a new path.
+ */
+export function boltAfterimage(s, lane, seed, elapsedMs, params) {
+  const { rerollMs } = withDefaults('bolt', params);
+  if (!(elapsedMs >= rerollMs)) return [];
+  return boltPoses(s, lane, seed, elapsedMs - rerollMs, params);
+}
+
 /**
  * Fan: `count` tapered tongues from the anchor, spread evenly over `spread` degrees about
  * `direction` (lane degrees, 180 = away from the defender; 360 = all round), lengths

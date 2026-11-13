@@ -94,6 +94,24 @@ test('an active entry: FX target, card-depth prepass, FX pass, bloom, composite 
   assert.equal(renderer.autoClear, true);
 });
 
+test('design 089: the FX meet the board as cover, then as rolled-off light', () => {
+  const { layer } = makeLayer();
+  const [cover, light] = [...layer.composite.children].sort((a, b) => a.renderOrder - b.renderOrder).map((quad) => quad.material);
+  // Cover: the board × (1 − this draw's colour), nothing added, the canvas's alpha untouched.
+  assert.deepEqual([cover.blendSrc, cover.blendDst], [three.ZeroFactor, three.OneMinusSrcColorFactor]);
+  assert.deepEqual([cover.blendSrcAlpha, cover.blendDstAlpha], [three.ZeroFactor, three.OneFactor]);
+  assert.ok(cover.fragmentShader.includes('(1.0 - cover) * (vec3(1.0) - light)'));
+  assert.ok(light.fragmentShader.includes('matter * (vec3(1.0) - light) + light'));
+  // Light: added to what the cover draw left; alpha composes as a premultiplied over.
+  assert.deepEqual([light.blendSrc, light.blendDst], [three.OneFactor, three.OneFactor]);
+  assert.deepEqual([light.blendSrcAlpha, light.blendDstAlpha], [three.OneFactor, three.OneMinusSrcAlphaFactor]);
+  assert.equal(cover.uniforms, light.uniforms, 'both draws read the one FX target');
+  for (const material of [cover, light]) {
+    assert.ok(material.fragmentShader.includes('light = fxRollOff(c - matter)'), 'the light is rolled off, not clamped');
+    assert.ok(!material.fragmentShader.includes('clamp(fx.rgb'));
+  }
+});
+
 test('the bloom composite adds light without writing alpha', () => {
   const { layer } = makeLayer();
   layer.add({ frame: () => true });

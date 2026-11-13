@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { ShapeUtils, Vector2 } from 'three';
 
 import { VERTEX_FLOATS, createGpuCanvas } from '../../../../board3d/fx/gpu-canvas.mjs';
-import { GLOW_COLOURS, HEAT_VARIANTS, drawHeat, drawRim, tintedGlow } from '../card-glow.mjs';
+import { GLOW_COLOURS, HEAT_VARIANTS, RIM_PASSES, drawHeat, drawRim, tintedGlow } from '../card-glow.mjs';
 import { MATERIAL_KEYS, PARTICLE_KINDS } from '../move-spec.mjs';
 import { PARTICLE_SHAPES, drawParticle } from '../particle-shapes.mjs';
 
@@ -73,6 +73,10 @@ test('the rim is two blurred additive fills, never strokes (no corner spokes); z
   const none = recorder();
   drawRim(none.ctx, { width: 90, height: 126, alpha: 0, material: 'fire' });
   assert.equal(none.recording().vertexCount, 0);
+  // Design 089: a thin bright line in a wide faint falloff, not one fat band.
+  const [[, haloBlur, haloSpread, haloAlpha], [, lineBlur, lineSpread, lineAlpha]] = RIM_PASSES;
+  assert.ok(lineBlur + lineSpread <= 8 && lineAlpha >= 0.75, 'the line is tight and bright');
+  assert.ok(haloBlur >= 30 && haloSpread <= 4 && haloAlpha <= 0.4, 'the halo is wide and faint');
 });
 
 test('a spec tint recolours the rim and the heat; a frozen card keeps its ice sheen', () => {

@@ -7,6 +7,7 @@ import { createGpuCanvas } from './gpu-canvas.mjs';
 import { createGpuCanvasMesh } from './gpu-canvas-mesh.js';
 import { stageToWorldMatrix } from './fx-stage.mjs';
 import { createElementLayer } from './elements/element-layer.js';
+import { ROLL_OFF_GLSL, SPLIT_COVER_GLSL } from './tone.mjs';
 
 // UnrealBloomPass passes a texel's whole colour once its luma clears the threshold and sums five
 // mips, so its glow is ~3 × strength × the source: ordinary additive overlaps (luma 1–2) stay out,
@@ -31,14 +32,32 @@ void main() {
   gl_Position = vec4(position.xy, 0.0, 1.0);
 }
 `;
-const COMPOSITE_FRAGMENT = `
+// Design 089: the FX meet the board in two draws of the same texel. The FX target is premultiplied:
+// alpha is how much of the board a texel covers (smoke, water, the board bent by a lens), and light
+// is colour its alpha cannot account for. tone.mjs splits a texel into the two (`fxSplit`): the
+// matter goes over the board exactly as before; the light is rolled off by its brightest channel,
+// so it keeps its hue as it saturates, and is screened on. A card under a strong hit stays a card
+// with coloured light on it: the old single draw added clamped light, which turned every strong
+// hit into a white slab over the art.
+//   board' = (board × (1 − a) + matter) × (1 − light) + light
+// The cover draw multiplies the board by (1 − a)(1 − light); the light draw adds the rest.
+const compositeFragment = (pass) => `
 precision highp float;
 uniform sampler2D uFx;
 in vec2 vUv;
 out vec4 outColor;
+${ROLL_OFF_GLSL}
+${SPLIT_COVER_GLSL}
 void main() {
-  vec4 fx = texture(uFx, vUv);
-  outColor = vec4(clamp(fx.rgb, 0.0, 1.0), clamp(fx.a, 0.0, 1.0));
+  vec3 matter;
+  vec3 light;
+  float cover;
+  fxSplit(texture(uFx, vUv), matter, light, cover);
+  ${
+    pass === 'cover'
+      ? 'outColor = vec4(vec3(1.0) - (1.0 - cover) * (vec3(1.0) - light), cover);'
+      : 'outColor = vec4(matter * (vec3(1.0) - light) + light, cover);'
+  }
 }
 `;
 
@@ -96,27 +115,44 @@ export function createFxLayer({
   let bloom = null;
   const clearColour = new three.Color();
 
-  const compositeMaterial = new three.RawShaderMaterial({
-    glslVersion: three.GLSL3,
-    vertexShader: COMPOSITE_VERTEX,
-    fragmentShader: COMPOSITE_FRAGMENT,
-    uniforms: { uFx: { value: null } },
-    depthTest: false,
-    depthWrite: false,
-    transparent: true,
-    blending: three.CustomBlending,
-    blendEquation: three.AddEquation,
+  const compositeUniforms = { uFx: { value: null } };
+  const compositeMaterialOf = (pass, blend) =>
+    new three.RawShaderMaterial({
+      name: `fx-composite-${pass}`,
+      glslVersion: three.GLSL3,
+      vertexShader: COMPOSITE_VERTEX,
+      fragmentShader: compositeFragment(pass),
+      uniforms: compositeUniforms,
+      depthTest: false,
+      depthWrite: false,
+      transparent: true,
+      blending: three.CustomBlending,
+      blendEquation: three.AddEquation,
+      ...blend,
+    });
+  // Cover: the board × (1 − what this draw outputs); the canvas's own alpha is left as it is.
+  const coverMaterial = compositeMaterialOf('cover', {
+    blendSrc: three.ZeroFactor,
+    blendDst: three.OneMinusSrcColorFactor,
+    blendSrcAlpha: three.ZeroFactor,
+    blendDstAlpha: three.OneFactor,
+  });
+  // Light: the rolled-off colour added to what the cover draw left; alpha as a premultiplied over.
+  const lightMaterial = compositeMaterialOf('light', {
     blendSrc: three.OneFactor,
-    blendDst: three.OneMinusSrcAlphaFactor,
+    blendDst: three.OneFactor,
     blendSrcAlpha: three.OneFactor,
     blendDstAlpha: three.OneMinusSrcAlphaFactor,
   });
   const fullScreen = new three.BufferGeometry();
   fullScreen.setAttribute('position', new three.Float32BufferAttribute([-1, -1, 0, 3, -1, 0, -1, 3, 0], 3));
-  const compositeQuad = new three.Mesh(fullScreen, compositeMaterial);
-  compositeQuad.frustumCulled = false;
   const compositeScene = new three.Scene();
-  compositeScene.add(compositeQuad);
+  [coverMaterial, lightMaterial].forEach((material, order) => {
+    const quad = new three.Mesh(fullScreen, material);
+    quad.frustumCulled = false;
+    quad.renderOrder = order;
+    compositeScene.add(quad);
+  });
   const compositeCamera = new three.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
   /** The FX target and bloom at the drawing buffer's CSS-pixel size (re-made when it changes). */
@@ -226,7 +262,7 @@ export function createFxLayer({
       if (bloom && !motionReduced()) bloom.render(renderer, null, target, 0, false);
 
       renderer.setRenderTarget(previousTarget);
-      compositeMaterial.uniforms.uFx.value = target.texture;
+      compositeUniforms.uFx.value = target.texture;
       renderer.render(compositeScene, compositeCamera);
     } finally {
       camera.layers.mask = previousMask;
@@ -250,7 +286,8 @@ export function createFxLayer({
     elements.dispose();
     scene.remove(group);
     depthOnly.dispose();
-    compositeMaterial.dispose();
+    coverMaterial.dispose();
+    lightMaterial.dispose();
     fullScreen.dispose();
     target?.dispose();
     bloom?.dispose();
@@ -270,6 +307,8 @@ export function createFxLayer({
     canvas: recorder,
     /** Design 079: the element layer (fx-preview scripts read `counts()`). */
     elements,
+    /** Design 089: the composite's two draws (cover, then light), for the tests. */
+    composite: compositeScene,
     dispose,
   };
 }

@@ -12,6 +12,15 @@ export const FIRE_SCALE = Object.freeze({ body: 1.7, projectile: 1.9, tongueWidt
 const COMET_STRETCH = 0.85;
 const TRAIL_JETS = 3;
 const EMBERS = 10;
+// Design 089: the hot air round a flame bends the board behind it (the haze kind): a disc this
+// many radii (a ball) or this share of the length (a jet) across, drawn under the flame.
+const HAZE = Object.freeze({ body: 2.1, projectile: 2.6, jet: 0.6, strength: 0.8, rise: 1.2 });
+
+/** The shimmer of hot air about `at` (stage px). Fades with the flame's alpha; a dissolving flame's air stills. */
+function haze(ctx, at, radius, alpha, seed) {
+  const dissolve = dissolveOf(ctx);
+  emit(ctx, 'haze', { at, radius, alpha: alpha * (1 - dissolve), strength: HAZE.strength, rise: HAZE.rise, seed });
+}
 // Soft radial falloffs: TEX_VFX_Dot_Glow is a hard-edged disc.
 const EMBER_TEXTURE = 'TEX_VFX_Gradient_Radial_Small.webp';
 const GLOW_TEXTURE = 'TEX_VFX_Gradient_Radial.webp';
@@ -50,6 +59,7 @@ function body(ctx, x, y, r, alpha, hot = 1) {
     dissolve: dissolveOf(ctx),
     palette: paletteOf(this.base),
   });
+  haze(ctx, stageOf(ctx, x, y), stageLen(ctx, r) * FIRE_SCALE.body * HAZE.body, alphaOf(ctx, alpha), r * 0.37);
 }
 
 /** A flame tongue from (spec.x, spec.y) along spec.angleDeg: a flame jet. */
@@ -68,6 +78,8 @@ function tongue(ctx, spec, { alpha = 1, hot = 1 } = {}) {
     dissolve: dissolveOf(ctx),
     palette: paletteOf(this.base),
   });
+  const middle = stageOf(ctx, (spec.x + tipX) / 2, (spec.y + tipY) / 2);
+  haze(ctx, middle, stageLen(ctx, length) * HAZE.jet, alphaOf(ctx, alpha) * 0.7, spec.seed ?? 0);
 }
 
 /**
@@ -101,6 +113,7 @@ function projectile(ctx, { x, y, r, headingDeg = 0, time = 0, seed = 0, alpha = 
     });
   }
   emit(ctx, 'fireball', { at, radius, alpha: a, heat: hot, seed, dissolve, headingDeg: heading, stretch: COMET_STRETCH, palette });
+  haze(ctx, at, radius * HAZE.projectile, a, seed);
   for (let k = 0; k < EMBERS; k += 1) {
     const phase = (((time * 1.4 + k * 0.137 + seed * 0.31) % 1) + 1) % 1;
     const drift = back + (Math.sin(k * 2.3 + seed) * 0.6);

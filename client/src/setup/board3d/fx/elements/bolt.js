@@ -1,8 +1,10 @@
 // Design 079 § Kinds: the bolt — lightning segments as camera-facing capsules. The fragment
 // measures its distance to the segment on screen (in core widths), shakes it with fast noise
-// along the line so the bolt crackles without moving, and lights it: white-hot core past 1.0
-// (it blooms), the hot colour inside, the glow colour falling off outside. Blending takes the
-// brightest (MAX), so overlapping segments meet without a bright knot at every joint.
+// along the line so the bolt crackles without moving, and lights it: a thin hot filament past
+// 1.0 (it blooms), the hot colour round it, then the glow colour as a tight sheath and a faint
+// wide air-glow (design 089: one slow falloff over six widths made every bolt a soft fat line,
+// "plain light"; a bolt is a hard filament in a coloured sheath). Blending takes the brightest
+// (MAX), so overlapping segments meet without a bright knot at every joint.
 import { NOISE_GLSL, SHARED_UNIFORMS_GLSL } from './element-glsl.mjs';
 import { BOLT_ATTRIBUTES, BOLT_FLOATS, normalizeBoltSegment, packBoltSegment } from './bolt.mjs';
 import { defineInstancedKind } from './instanced-kind.js';
@@ -78,11 +80,13 @@ void main() {
   float d = length(vec2(dot(off, side) / vWidth - shake, dot(off, dir) / vWidth));
   // A bolt strobes: brightness steps between frames like a discharge.
   float strobe = 0.78 + 0.22 * step(0.35, elHash3(vec3(flicker, seed, 2.0)));
-  float core = 1.0 - smoothstep(0.18, 0.42, d);
-  float inner = exp(-d * d * 0.9);
-  // The glow falls off slowly and fades out before the quad's edge.
-  float glow = exp(-d * 0.6) * 0.7 * (1.0 - smoothstep(${(REACH * 0.7).toFixed(1)}, ${REACH.toFixed(1)}, d));
-  vec3 colour = vD.rgb * glow + vC.rgb * inner * 0.9 + vec3(1.0) * core * 1.8;
+  float core = 1.0 - smoothstep(0.14, 0.34, d);
+  float inner = exp(-d * d * 1.3);
+  // A tight sheath, and the lit air round it, which fades out before the quad's edge.
+  float sheath = exp(-d * 1.15) * 0.55;
+  float air = exp(-d * 0.42) * 0.16 * (1.0 - smoothstep(${(REACH * 0.7).toFixed(1)}, ${REACH.toFixed(1)}, d));
+  // The filament is the hot colour burnt nearly white, not white: it keeps the move's hue.
+  vec3 colour = vD.rgb * (sheath + air) + vC.rgb * inner * 0.95 + mix(vC.rgb, vec3(1.0), 0.8) * core * 1.8;
   colour *= vAlpha * strobe;
   if (max(colour.r, max(colour.g, colour.b)) <= 0.002) discard;
   fragColor = vec4(colour, 0.0);

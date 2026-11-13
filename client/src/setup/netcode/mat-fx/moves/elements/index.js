@@ -12,13 +12,13 @@ import { fireElements } from './fire.js';
 import { psychicElements } from './psychic.js';
 import { darkElements, ghostElements } from './shadow.js';
 import { smokeBeats } from './_smoke.js';
-import { waterElements } from './water.js';
+import { thickLiquidElements, waterElements } from './water.js';
 import { rgb01 } from './_emit.js';
 
-/** Poison and mud are liquids (water's drops and streams in their palette) with their own gas. */
+/** Poison and mud are thick liquids (water's streams in their palette, solid glossy balls) with their own gas. */
 const liquidGas = (glow) =>
   combineKits(
-    waterElements,
+    thickLiquidElements,
     { methods: {}, beats: smokeBeats((info) => ({
       tint: rgb01(info.material.smoke ?? info.material.palette.deep, 1),
       light: rgb01(info.material.palette.hot, 1.3),

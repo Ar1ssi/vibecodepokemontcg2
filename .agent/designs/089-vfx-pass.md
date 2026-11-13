@@ -312,3 +312,32 @@ Self-approval checklist:
   (`_aftermath.js`) is what stays on the struck card in a game. Stills: `rec/rec-move-strip.mjs`.
 - Found while rendering slice 7 (fixed in slice 6): Solar Beam and Wild Charge clip both cards to white at
   contact; water tongues read as ice; psychic rings cover the card; Razor Leaf's leaves are half a card long.
+- Slice 6, what was built (each judged on frozen stills, `rec/rec-move-strip.mjs`, near seat; Psychic and Thunder
+  also from the far seat):
+  - Composite (`fx/tone.mjs`, `fx-layer.js`): a texel is split into what covers the board (drawn over, exact)
+    and light its alpha cannot account for (rolled off by its brightest channel, screened on). Two draws. Solar
+    Beam, Wild Charge and Fire Blast keep their hue at contact and the card under them stays visible. The first
+    version rolled off everything and screened by alpha; it dimmed a white card seen through a lens by 12 %.
+  - Water (`water-beam.js`): a tapering stream ends round and tears into drops, sways, froths only on its far
+    half, and loses the two long gloss stripes; `tail` thins a shot's wake to nothing. A fall from above lands on
+    the card (`fixedTip`). Poison and mud use solid glossy balls (`thickLiquidElements`), not clear drops.
+  - Psychic (`lens.js`): a glass ball (pull toward the rim, swirl under a radian, outward ripple, dispersion,
+    a prismatic rim with one wavy ring); the three stacked ring textures and the spectrum ring are gone. Field
+    radius capped at 0.62 card heights; scales 1.4 / 1.6 / 1.8 → 1.0 / 1.3 / 1.5.
+  - Electric (`bolt.js`, `bolt.mjs`, `electric.js`, `bolt` drawer): trunks taper, forks miss one re-roll in
+    three, the last path lingers as an afterimage, the glow is a tight sheath plus a faint air-glow, the filament
+    is the hot colour burnt pale. Every bolt of a multi-bolt beat is a trunk (only the first was). Rim halo gold.
+  - Fire (`element-glsl.mjs`, `flame-jet.js`, `fireball.js`, new `haze` kind): the pale core stop starts at 0.84
+    and both temperature fields are cooler, so a ball's heart and a fan's hub are yellow with bright veins; hot
+    air bends the board round every flame (`haze.js`, drawn under everything, no colour of its own).
+  - Grass: a slash is leaves strung along it. Bug: a shot is a needle. Rock / ground: a wide pillar is a crown of
+    rooted spires, and a capped stone stands on its tongue's root.
+  - Shared: the aura has no ring (two ring textures drew the floor circle the user cut from the canvas drawer);
+    the card rim is a thin bright line in a wide faint falloff (`RIM_PASSES`).
+  - `scripts/fx/check-element-shaders.mjs` launches Playwright's own browser when the cloud path is absent, and
+    counts changed pixels against the board alone over a two-tone board (a kind that only bends the board drew
+    "0 px" over a flat one). 11 / 11 kinds pass.
+- Slice 6, in § D6 and NOT built: `sprite` soft-particle depth fade, `debris` dust trails and contact shadows,
+  `plasma` orbiting arcs, a self-shadowed `fireball` volume. `smoke`, `plasma`, `waterDrop` and `debris` shaders
+  are as 079 left them: the stills showed no fault in them that outranked the ones above. Leaf orientation was
+  read on the stills (leaves lie along their flight) and left as is.

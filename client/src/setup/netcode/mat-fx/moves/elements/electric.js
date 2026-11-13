@@ -10,6 +10,12 @@ export const ELECTRIC_SCALE = Object.freeze({ bolt: 1.6, jag: 1.5, body: 1.6, pr
 /** Jags and trailing forks re-roll this often (Hz), like the canvas kit's flicker clock. */
 export const FLICKER_HZ = 14;
 const JAG_POINTS = 7;
+// Design 089: a discharge thins as it runs (the width at a line's end as a share of its start),
+// its forks show on two re-rolls of three, and the path of one re-roll ago lingers thin and dim.
+const TAPER = Object.freeze({ trunk: 0.5, branch: 0.3, jag: 0.35, fork: 0.3 });
+const TRUNK_ROOT = 1.2;
+const FORK_CYCLE = 3;
+const AFTERIMAGE = Object.freeze({ width: 0.5, alpha: 0.3 });
 const SPARKS = 6;
 const GLOW_TEXTURE = 'TEX_VFX_Gradient_Radial.webp';
 const SPARK_TEXTURE = 'TEX_VFX_Sparkle_2x2.webp';
@@ -53,17 +59,29 @@ export function jagPoints({ x, y, angleDeg, length }, { jag = 0.18, seed = 0, ti
   return points;
 }
 
-/** Lightning along the drawer's polylines (`lines` = [[x, y]...][]), in its own space. */
-function jagStroke(ctx, lines, { width, alpha = 1 }) {
+/**
+ * Lightning along the drawer's polylines (`lines` = [[x, y]...][]), in its own space. `trunks`
+ * names the lines that are trunks (default: the first); the rest are forks. `afterimage` is the
+ * trunks' paths one re-roll ago and `step` the re-roll this is (the `bolt` drawer gives both).
+ */
+function jagStroke(ctx, lines, { width, alpha = 1, trunks = [0], afterimage = [], step = 0 }) {
   if (!(width > 0) || !(alpha > 0) || !lines?.length) return;
   const { hot, glow } = colours(this.base);
   const stageWidth = stageLen(ctx, width) * ELECTRIC_SCALE.bolt;
   const a = alphaOf(ctx, alpha);
+  const stagePoints = (line) => line.map(([px, py]) => stageOf(ctx, px, py));
+  afterimage.forEach((line, index) => {
+    emitLine(ctx, stagePoints(line), { width: stageWidth * AFTERIMAGE.width, alpha: a * AFTERIMAGE.alpha, seed: 40 + index * 1.7, hot: glow, glow, taper: TAPER.trunk });
+  });
   lines.forEach((line, index) => {
-    const points = line.map(([px, py]) => stageOf(ctx, px, py));
-    // The first line is the trunk; branches run thinner and dimmer.
-    const trunk = index === 0;
-    emitLine(ctx, points, { width: trunk ? stageWidth : stageWidth * 0.6, alpha: trunk ? a : a * 0.8, seed: index * 1.7, hot, glow });
+    // A trunk runs thick from its source and thins to the strike; forks are thinner, dimmer and
+    // not there on every re-roll.
+    if (trunks.includes(index)) {
+      emitLine(ctx, stagePoints(line), { width: stageWidth * TRUNK_ROOT, alpha: a, seed: index * 1.7, hot, glow, taper: TAPER.trunk });
+      return;
+    }
+    if ((step + index) % FORK_CYCLE === 0) return;
+    emitLine(ctx, stagePoints(line), { width: stageWidth * 0.6, alpha: a * 0.8, seed: index * 1.7, hot, glow, taper: TAPER.branch });
   });
   // A flash of light where the trunk lands.
   const end = lines[0]?.[lines[0].length - 1];
@@ -88,6 +106,7 @@ function tongue(ctx, spec, { alpha = 1, hot = 1, jag = 0 } = {}) {
     glow,
     rootAlpha: 0.1,
     rampPx: length * 0.25,
+    taper: TAPER.jag,
   });
 }
 
@@ -145,7 +164,7 @@ function projectile(ctx, { x, y, r, headingDeg = 0, time = 0, seed = 0, alpha = 
       points.push({ x: at.x + (tip.x - at.x) * t - Math.sin(back) * kink, y: at.y + (tip.y - at.y) * t + Math.cos(back) * kink, z: at.z });
     }
     points.push(tip);
-    emitLine(ctx, points, { width: radius * 0.16, alpha: a * 0.85, seed: seed + k, hot: hotColour, glow: glowColour, rootAlpha: 0.2, rampPx: radius });
+    emitLine(ctx, points, { width: radius * 0.16, alpha: a * 0.85, seed: seed + k, hot: hotColour, glow: glowColour, rootAlpha: 0.2, rampPx: radius, taper: TAPER.fork });
   }
   emit(ctx, 'plasma', { at, radius, alpha: a, heat: hot, seed, dissolve: dissolveOf(ctx), hot: hotColour, glow: glowColour });
   for (let k = 0; k < SPARKS; k += 1) {

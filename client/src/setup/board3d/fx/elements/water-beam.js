@@ -73,18 +73,27 @@ void main() {
   float seed = vC.w;
   float flow = uTime * vD.w;
   float taper = vE.w;
-  // Half-width: even for a beam, a tongue for a tapering stream; the head is a round cap.
-  // A tongue swells out of its root and thins to a rounded tip (smooth: no wedge corners).
-  float tongue = smoothstep(0.0, 0.3, t) * pow(max(1.0 - t, 0.0), 0.55) * 1.25;
-  float body = mix(1.0, tongue, taper);
+  // Half-width: even for a beam, a finger for a tapering stream; the head is a round cap.
+  // Design 089: a finger of water swells out of its root, thins to a little over half its width
+  // and ends ROUND, where it breaks into drops. The old tongue ran to a point with a white line
+  // down each straight edge, and a fan of them read as a cluster of ice crystals.
+  // A wake (tail 1) thins to nothing instead: it is what a shot leaves behind, not a thrown finger.
+  float tc = clamp(t, 0.0, 1.0);
+  float finger = smoothstep(0.0, 0.24, t) * mix(mix(1.12, 0.58, pow(tc, 1.4)), 1.15 * pow(1.0 - tc, 0.75), vF.z);
+  float body = mix(1.0, finger, taper);
   float past = max(along - vLength, 0.0);
   float half_ = body * sqrt(max(1.0 - pow(past / 0.5, 2.0), 0.0));
+  // A finger sways as it runs (never a straight edge), more the further from its root.
+  v += taper * (elNoise3(vec3(along * 0.28 - flow * 0.7, seed * 1.7, 3.0)) - 0.5) * 0.7 * smoothstep(0.1, 0.9, t);
   // Churn: the outline boils at two scales as the water runs.
   float wobble = (elFbm(vec3(along * 0.35 - flow * 1.4, v * 0.5, seed)) - 0.5) * 0.45
     + (elFbm(vec3(along * 1.3 - flow * 3.0, v * 1.4, seed + 2.0)) - 0.5) * 0.3;
-  float shape = half_ * (1.0 + wobble) - abs(v);
+  float shape = half_ * (1.0 + wobble * (1.0 + 0.6 * taper)) - abs(v);
+  // The far third of a finger tears into drops that run on with the flow.
+  float tear = elFbm(vec3(along * 0.85 - flow * 1.6, v * 1.3, seed + 13.0));
+  shape -= taper * smoothstep(0.5, 1.0, t) * smoothstep(0.42, 0.7, tear) * 0.9;
   // A thin stream's edge is spray, not glass: softer the more it tapers.
-  float coverage = smoothstep(0.0, mix(0.06, 0.22, taper), shape) * smoothstep(0.0, 0.25, along);
+  float coverage = smoothstep(0.0, mix(0.06, 0.2, taper), shape) * smoothstep(0.0, 0.25, along);
   if (coverage <= 0.002) discard;
   // The tube's normal across it: nv −1 … 1 side to side, nz toward the camera.
   float nv = clamp(v / max(half_, 1e-3), -1.0, 1.0);
@@ -109,7 +118,8 @@ void main() {
   if (uBeamReady > 0.5) {
     cells = texture(uBeam, vec2(0.5 + nv * 0.45, along * 0.22 - flow * 1.3)).r;
   }
-  vec3 water = mix(vC.rgb, vD.rgb, 0.35 + 0.65 * cells) * shade;
+  // A finger is thick at its root: deeper there, the body colour only toward its thin end.
+  vec3 water = mix(vC.rgb, vD.rgb, (0.35 + 0.65 * cells) * mix(1.0, 0.45 + 0.55 * t, taper)) * shade;
   // A beam is mostly refracted scene (that is its clarity); a thin tongue is mostly its own colour.
   vec3 colour = mix(tinted, water, mix(0.45, 0.72, taper));
   // The shadow side falls to the deep stop and both grazing sides darken: that gradient is the
@@ -117,8 +127,8 @@ void main() {
   colour = mix(colour, vC.rgb * 0.7, (1.0 - shade) * 0.75);
   colour = mix(colour, vC.rgb, (1.0 - nz) * 0.3);
   colour += vD.rgb * 0.15 * pow(nz, 3.0);
-  // A thin stream carries light at its crest only; its sides stay water-coloured, or it reads as ice.
-  colour = mix(colour, vE.rgb, 0.3 * taper * nz);
+  // A thin stream carries a little light at its crest only; its sides stay water-coloured, or it reads as ice.
+  colour = mix(colour, vE.rgb, 0.12 * taper * nz);
   // Foam, tinted white (pure white over blue reads as frost), three kinds: the cell web; long
   // streaks stretched along the flow (SV's white lines: the top ~12 % of a noise squashed along the
   // axis); froth where the water tears, at the edges and the breaking head. A splash tongue
@@ -131,7 +141,10 @@ void main() {
   // Froth is a wide, blobby band (coarse noise over the outer ~30 % of each side), not a hairline.
   float froth = (1.0 - smoothstep(0.0, 0.3 + 0.1 * taper, shape)) * smoothstep(0.3, 0.75, elFbm(vec3(nv * 2.0, along * 0.6 - flow * 3.5, seed + 21.0))) * 1.4;
   float head = smoothstep(0.88, 1.05, t);
-  float foam = clamp(web + lines * 0.9 + froth * (1.0 + 0.3 * taper) + head * (0.5 + 0.3 * taper), 0.0, 1.0) * vF.y;
+  // A finger froths where it tears (its far half), in patches: froth along the whole of both
+  // edges drew two white lines, which is how a facet is drawn.
+  float frothWhere = mix(1.0, smoothstep(0.3, 0.85, t), taper);
+  float foam = clamp(web * (1.0 - 0.5 * taper) + lines * (0.9 - 0.35 * taper) + froth * frothWhere * (1.0 + 0.3 * taper) + head * (0.5 + 0.3 * taper), 0.0, 1.0) * vF.y;
   vec3 foamColour = mix(vE.rgb, vec3(1.0), 0.8);
   colour = mix(colour, foamColour, foam);
   // Shine is light, added after coverage: a thin hot Fresnel rim, a broad sheen on the lit side
@@ -146,7 +159,9 @@ void main() {
   float stripe2 = exp(-pow((nv - 0.74) * 12.0, 2.0)) * 0.9;
   float rimLight = fresnel * smoothstep(0.2, 0.8, nv) * 0.9;
   float sparkle = smoothstep(0.78, 0.86, elFbm(vec3(nv * 7.0, along * 1.6 - flow * 5.0, seed + 33.0))) * nz;
-  vec3 light = vE.rgb * (fresnel * 0.5 + sheen + rimLight) + mix(vE.rgb, vec3(1.0), 0.8) * (stripe * 0.9 + stripe2 * 0.6) + vec3(1.0) * sparkle * 0.7;
+  // A finger's shine is broken glints, not the two long stripes of a smooth column (a glass rod).
+  float gloss = 1.0 - 0.65 * taper;
+  vec3 light = vE.rgb * (fresnel * 0.5 * gloss + sheen + rimLight * gloss) + mix(vE.rgb, vec3(1.0), 0.8) * (stripe * 0.9 + stripe2 * 0.6) * gloss + vec3(1.0) * sparkle * 0.7;
   float edge;
   float alpha = coverage * vB.w * elDissolve(vec2(along * 0.4, v), vF.x, seed, edge);
   if (alpha <= 0.002) discard;

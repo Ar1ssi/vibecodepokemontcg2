@@ -31,6 +31,13 @@ test('boltSegments: one per step, along accumulates, non-finite points are skipp
   assert.deepEqual(boltSegments(null, { width: 1 }), []);
 });
 
+test('design 089: boltSegments taper — each segment takes the width at its middle, down to the end share', () => {
+  const points = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 20, y: 0 }];
+  assert.deepEqual(boltSegments(points, { width: 8, taper: 0.5 }).map((s) => s.width), [7, 5]);
+  assert.deepEqual(boltSegments(points, { width: 8 }).map((s) => s.width), [8, 8], 'no taper by default');
+  assert.ok(boltSegments(points, { width: 8, taper: 0 }).every((s) => s.width > 0), 'never down to nothing');
+});
+
 test('plasma: defaults, clamps and its packed row', () => {
   const ball = normalizePlasma({ at: { x: 1, y: 2 }, radius: 5, arcs: 3 });
   assert.equal(ball.arcs, 1);

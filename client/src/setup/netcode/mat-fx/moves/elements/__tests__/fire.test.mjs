@@ -24,7 +24,11 @@ test('fire body → one fireball at the stage point, scaled up, in the kit palet
   const { canvas, ctx, emits } = live();
   ctx.translate(100, 50);
   materialFor('fire').body(ctx, 10, 0, 20, 0.8, 0.5);
-  assert.equal(emits.length, 1);
+  assert.deepEqual(emits.map((e) => e.kind), ['fireball', 'haze']);
+  // Design 089: the air round the ball shimmers, wider than the ball and as faint as it is.
+  assert.ok(emits[1].params.radius > emits[0].params.radius * 2);
+  assert.equal(emits[1].params.alpha, 0.8);
+  assert.deepEqual(emits[1].params.at, emits[0].params.at);
   const { kind, params } = emits[0];
   assert.equal(kind, 'fireball');
   assert.deepEqual(params.at, { x: 110, y: 50, z: 3 });
@@ -46,6 +50,11 @@ test('fire tongue → a flame jet from its root to its scaled tip; the drawer di
   assert.equal(params.width, 10 * FIRE_SCALE.tongueWidth);
   assert.equal(params.dissolve, 0.4);
   assert.equal(params.seed, 3);
+  // Design 089: haze about the jet's middle; a dissolving flame's air stills with it.
+  const air = emits[1];
+  assert.equal(air.kind, 'haze');
+  assert.ok(Math.abs(air.params.at.x - (40 * FIRE_SCALE.tongueLength) / 2) < 1e-9);
+  assert.ok(Math.abs(air.params.alpha - 0.5 * 0.7 * (1 - 0.4)) < 1e-9);
 });
 
 test('fire projectile → a comet fireball with trailing jets, embers and a glow; frozen time is stable', () => {
@@ -55,6 +64,7 @@ test('fire projectile → a comet fireball with trailing jets, embers and a glow
   const kinds = emits.map((e) => e.kind);
   assert.equal(kinds.filter((k) => k === 'fireball').length, 1);
   assert.equal(kinds.filter((k) => k === 'flameJet').length, 3);
+  assert.equal(kinds.filter((k) => k === 'haze').length, 1, 'one haze for the comet, none per trailing jet');
   assert.ok(kinds.filter((k) => k === 'sprite').length >= 10);
   const ball = emits.find((e) => e.kind === 'fireball').params;
   assert.equal(ball.headingDeg, 0);

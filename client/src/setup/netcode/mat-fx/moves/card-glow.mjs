@@ -16,7 +16,9 @@ export const GLOW_COLOURS = Object.freeze({
   grass: { hot: [201, 242, 122], body: [126, 217, 87], deep: [63, 163, 77], core: [233, 250, 196] },
   petal: { hot: [231, 184, 247], body: [247, 112, 208], deep: [196, 46, 150], core: [255, 236, 250] },
   solar: { hot: [255, 248, 176], body: [242, 233, 107], deep: [63, 163, 77], core: [255, 252, 228] },
-  electric: { hot: [247, 210, 30], body: [159, 213, 255], deep: [185, 138, 0], core: [255, 242, 122] },
+  // Design 089: body is gold (was the pale blue edge colour, 159 213 255): it is the rim's wide
+  // halo, and a blue haze round a yellow line read as two effects (the bolt's halo is gold too).
+  electric: { hot: [247, 210, 30], body: [236, 180, 28], deep: [185, 138, 0], core: [255, 242, 122] },
   fighting: { hot: [242, 166, 107], body: [217, 100, 58], deep: [140, 58, 31], core: [255, 230, 194] },
   aura: { hot: [184, 216, 255], body: [127, 183, 255], deep: [47, 95, 184], core: [230, 242, 255] },
   psychic: { hot: [240, 165, 255], body: [200, 92, 219], deep: [91, 30, 122], core: [255, 225, 255] },
@@ -93,11 +95,22 @@ const roundedRect = (ctx, x, y, w, h, r) => {
 };
 
 /**
- * The rim: the two CSS box-shadows (10 px blur 2 px spread in hot, 28 px blur 8 px spread in body)
- * as blurred rounded rects grown past the card. Call it with the card's transform set (centre at
- * 0, 0); it is meant for a layer the card hides, so only the outside shows, as a box-shadow.
- * Filled, not stroked: a stroke wider than the corner radius folds its inner edge into spokes on
- * the GPU recorder.
+ * The rim's two fills, each `[palette key, blur px, spread px, alpha]` on a ~126 px card. Design
+ * 089: a thin bright line hugging the card (hot: 7 px blur, 1 px spread) in a wide faint falloff
+ * (body: 34 px blur, 4 px spread, alpha 0.36). The CSS box-shadows it came from (10 / 2 at 0.85
+ * and 28 / 8 at 0.55) drew a fat even band round the card: the "pale box" of the water notes,
+ * and on every move the largest lit thing on the board.
+ */
+export const RIM_PASSES = Object.freeze([
+  Object.freeze(['body', 34, 4, 0.36]),
+  Object.freeze(['hot', 7, 1, 0.8]),
+]);
+
+/**
+ * The rim: two blurred rounded rects (RIM_PASSES) grown past the card. Call it with the card's
+ * transform set (centre at 0, 0); it is meant for a layer the card hides, so only the outside
+ * shows, as a box-shadow. Filled, not stroked: a stroke wider than the corner radius folds its
+ * inner edge into spokes on the GPU recorder.
  */
 export function drawRim(ctx, { width, height, alpha, material, colours = null }) {
   if (!(alpha > 0) || !(width > 0) || !(height > 0)) return;
@@ -105,10 +118,7 @@ export function drawRim(ctx, { width, height, alpha, material, colours = null })
   const r = radiusOf(width, height);
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  for (const [key, blur, spread, a] of [
-    ['body', 28, 8, 0.55],
-    ['hot', 10, 2, 0.85],
-  ]) {
+  for (const [key, blur, spread, a] of RIM_PASSES) {
     const grow = spread + blur / 4;
     ctx.filter = `blur(${blur / 2}px)`;
     ctx.fillStyle = rgba(c[key], a * alpha);

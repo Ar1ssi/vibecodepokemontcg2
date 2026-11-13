@@ -22,7 +22,9 @@ import {
   auraPose,
   beamPose,
   anchorPoint,
+  boltAfterimage,
   boltPoses,
+  boltStep,
   chainPose,
   chargeCore,
   clusterPose,
@@ -444,10 +446,13 @@ const pillar = (ctx, lane, s, info) => {
     const x = c.x + column.x + t.x;
     const y = c.y + t.y;
     const seed = index * 4.1;
+    // A column falling from above lands on the card: a kit that draws its tongues longer than the
+    // pose (water) grows them back toward the sky, not on past the card onto the other Pokémon.
+    const fixedTip = info.params?.from === 'above';
     // A column rises off the card's near edge (its base line in the 2D layout).
     ctx.fxLift = standOn({ x, y: c.y + 0.5 * lane.h });
     burnOut(ctx, dissolveTail(column.s, BURN_FROM.pillar), () => {
-      drawTongueAt(ctx, info, x, y, t.angleDeg, t.length, t.width, seed, { alpha: t.alpha, hot: t.hot }, material);
+      drawTongueAt(ctx, info, x, y, t.angleDeg, t.length, t.width, seed, { alpha: t.alpha, hot: t.hot, fixedTip }, material);
       for (const side of [-1, 1]) {
         drawTongueAt(
           ctx,
@@ -458,7 +463,7 @@ const pillar = (ctx, lane, s, info) => {
           t.length * 0.7,
           t.width * 0.55,
           side + 2 + seed,
-          { alpha: t.alpha * 0.85, hot: t.hot },
+          { alpha: t.alpha * 0.85, hot: t.hot, fixedTip },
           material
         );
       }
@@ -625,9 +630,22 @@ const bolt = (ctx, lane, s, info) => {
   const pose = poses[0];
   if (!(pose.alpha > 0)) return;
   const lines = poses.flatMap((one) => [one.points, ...one.branches]);
-  // A material with its own lightning (electric) strokes the polylines in its jag passes.
+  // A material with its own lightning (electric) strokes the polylines in its jag passes. It is
+  // also told which lines are trunks (one per bolt), where the trunks ran one re-roll ago and
+  // which re-roll this is: a kit may taper the trunks, leave an afterimage and time the forks.
   if (typeof info.material.jagStroke === 'function') {
-    info.material.jagStroke(ctx, lines, { width: pose.width, alpha: pose.alpha });
+    const trunks = [];
+    poses.reduce((index, one) => {
+      trunks.push(index);
+      return index + 1 + one.branches.length;
+    }, 0);
+    info.material.jagStroke(ctx, lines, {
+      width: pose.width,
+      alpha: pose.alpha,
+      trunks,
+      afterimage: boltAfterimage(s, lane, info.seed, info.elapsedMs, info.params).map((one) => one.points),
+      step: boltStep(info.elapsedMs, info.params),
+    });
     return;
   }
   const { palette } = info.material;

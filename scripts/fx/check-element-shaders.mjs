@@ -3,6 +3,7 @@
 // SwiftShader, as the fx-preview captures run). Serves client/ on a free port, renders each
 // kind's ELEMENT_SAMPLES once its textures load, and fails on a shader or GL error, a console
 // error, or a kind that draws no pixel. Usage: node scripts/fx/check-element-shaders.mjs [kind…]
+import { existsSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize, resolve } from 'node:path';
@@ -38,7 +39,16 @@ window.runKind = async (name) => {
   const group = new three.Group();
   scene.add(group);
   const layer = createElementLayer({ three, renderer, group, layer: FX_LAYER, kinds: { [name]: ELEMENT_KINDS[name] }, debug: (...a) => errors.push('debug: ' + a.join(' ')) });
-  const board = new three.Mesh(new three.PlaneGeometry(900, 900), new three.MeshBasicMaterial({ color: 0x335577 }));
+  // A two-tone check, not one flat colour: a kind that only bends the board (haze) changes
+  // nothing over a flat one, and would count as having drawn no pixels.
+  const tones = new three.DataTexture(new Uint8Array([51, 85, 119, 255, 96, 132, 168, 255, 96, 132, 168, 255, 51, 85, 119, 255]), 2, 2, three.RGBAFormat);
+  tones.magFilter = three.NearestFilter;
+  tones.minFilter = three.NearestFilter;
+  tones.wrapS = three.RepeatWrapping;
+  tones.wrapT = three.RepeatWrapping;
+  tones.repeat.set(14, 14);
+  tones.needsUpdate = true;
+  const board = new three.Mesh(new three.PlaneGeometry(900, 900), new three.MeshBasicMaterial({ map: tones }));
   board.layers.set(0);
   const gl = renderer.getContext();
   // Names the step a GL error came from (each error is reported once per kind).
@@ -50,17 +60,20 @@ window.runKind = async (name) => {
       errors.push('gl error ' + code + ' after ' + step);
     }
   };
-  const frame = (t) => {
-    layer.begin();
-    layer.emitter.live = true;
-    for (const params of ELEMENT_SAMPLES[name]()) layer.emitter.emit(name, params);
-    layer.finish({ timeSeconds: t, stageToWorld: stageToWorldMatrix(30) });
+  const drawBoard = () => {
     renderer.setClearColor(0x000000, 1);
     renderer.clear();
     camera.layers.set(0);
     scene.add(board);
     renderer.render(scene, camera);
     scene.remove(board);
+  };
+  const frame = (t) => {
+    layer.begin();
+    layer.emitter.live = true;
+    for (const params of ELEMENT_SAMPLES[name]()) layer.emitter.emit(name, params);
+    layer.finish({ timeSeconds: t, stageToWorld: stageToWorldMatrix(30) });
+    drawBoard();
     check('board render');
     layer.captureBoard();
     check('captureBoard');
@@ -75,13 +88,16 @@ window.runKind = async (name) => {
     frame(i * 0.1);
     await new Promise((r) => setTimeout(r, 100));
   }
+  // The board alone, then the board with the element on it: count the pixels the element changed.
+  const alone = new Uint8Array(512 * 512 * 4);
+  drawBoard();
+  gl.readPixels(0, 0, 512, 512, gl.RGBA, gl.UNSIGNED_BYTE, alone);
   frame(3.3);
   const pixels = new Uint8Array(512 * 512 * 4);
   gl.readPixels(0, 0, 512, 512, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-  // The board alone is (51, 85, 119): count pixels the element changed.
   let lit = 0;
   for (let i = 0; i < pixels.length; i += 4) {
-    if (Math.abs(pixels[i] - 51) + Math.abs(pixels[i + 1] - 85) + Math.abs(pixels[i + 2] - 119) > 12) lit += 1;
+    if (Math.abs(pixels[i] - alone[i]) + Math.abs(pixels[i + 1] - alone[i + 1]) + Math.abs(pixels[i + 2] - alone[i + 2]) > 12) lit += 1;
   }
   const counts = layer.counts();
   layer.dispose();
@@ -113,8 +129,12 @@ const server = createServer(async (req, res) => {
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const { port } = server.address();
 
+// CHROMIUM_PATH, else the cloud image's browser when it is there, else Playwright's own (a
+// developer machine: the fixed path failed the launch on Windows).
+const CLOUD_CHROMIUM = '/opt/pw-browsers/chromium';
+const executablePath = process.env.CHROMIUM_PATH || (existsSync(CLOUD_CHROMIUM) ? CLOUD_CHROMIUM : null);
 const browser = await chromium.launch({
-  executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium',
+  ...(executablePath ? { executablePath } : {}),
   args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
 });
 let failed = false;

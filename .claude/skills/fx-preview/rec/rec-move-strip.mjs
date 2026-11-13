@@ -7,7 +7,8 @@
 //      default is by each spec: wind-up, travel, contact + 60, + 250, + 500, + 800) · SIDE (self | opp)
 //      · IMPACT=0 keeps the spec's own contact dressing (default: stripped, as in a game the TCG
 //      Live impact replaces it; the impact itself is not drawn here) · BASE_URL · OUT
-//      (default .agent/scratch/move-strip) · CHROMIUM / CHROMIUM_PATH · SIO_JS · CARD_IMG / CARD_DIR
+//      (default .agent/scratch/move-strip) · DPR (device pixel ratio, default 1; 2 to read detail)
+//      · CHROMIUM / CHROMIUM_PATH · SIO_JS · CARD_IMG / CARD_DIR
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 import { launchOptions, openBoard } from '../board-mode.mjs';
@@ -19,12 +20,13 @@ const {
   IMPACT = '1',
   BASE_URL = 'http://localhost:4100',
   OUT = '.agent/scratch/move-strip',
+  DPR = '1',
   SIO_JS,
 } = process.env;
 mkdirSync(OUT, { recursive: true });
 
 const browser = await chromium.launch(launchOptions());
-const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
+const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: Number(DPR) || 1 });
 const errors = [];
 page.on('pageerror', (e) => errors.push(`pageerror ${e.message}`));
 if (SIO_JS) await page.route('https://cdn.socket.io/**', (r) => r.fulfill({ path: SIO_JS, contentType: 'application/javascript' }));

@@ -10,16 +10,20 @@ import { alphaOf, dissolveOf, emit, rgb01, stageAngle, stageLen, stageOf } from 
 export const CRYSTAL_SCALE = Object.freeze({ shard: 1.3, body: 1.4, projectile: 1.5, glow: 1.4 });
 const MAX_STRETCH = 5;
 const SPARKLES = 6;
+// Design 089: a kit whose shots are darts (bug needles) flies a needle this many of the shot's
+// radii long and wide, with a small light at its point. As an orb of light with no arcs, a Pin
+// Missile was three thin circles ("Pin Missile needles small").
+const DART = Object.freeze({ length: 3.4, width: 0.42, glow: 1.6 });
 const GLOW_TEXTURE = 'TEX_VFX_Gradient_Radial.webp';
 const SPARKLE_TEXTURE = 'T_VFX_Star_Bright_2x2.webp';
 const DEG = Math.PI / 180;
 
 /**
- * A crystal kit. `finish` = `{ gloss, stretchGain, orb: 'drop' | 'light', thin }`: how polished,
- * how much longer its shards run than the canvas tongue's ratio, what its bodies are, and how
- * thin its shards are (needles).
+ * A crystal kit. `finish` = `{ gloss, stretchGain, orb: 'drop' | 'light', thin, dart }`: how
+ * polished, how much longer its shards run than the canvas tongue's ratio, what its bodies are,
+ * how thin its shards are (needles), and whether a shot in flight is a needle instead of an orb.
  */
-function crystalKit({ gloss, stretchGain = 1, orb, thin = 1, mist = false }) {
+function crystalKit({ gloss, stretchGain = 1, orb, thin = 1, mist = false, dart = false }) {
   const colours = (kit) => ({ colour: rgb01(kit.palette.body, 1.05), light: rgb01(kit.palette.hot, 1.1) });
 
   function tongue(ctx, spec, { alpha = 1 } = {}) {
@@ -84,11 +88,31 @@ function crystalKit({ gloss, stretchGain = 1, orb, thin = 1, mist = false }) {
 
   function projectile(ctx, { x, y, r, headingDeg = 0, time = 0, seed = 0, alpha = 1 }) {
     if (!(r > 0) || !(alpha > 0)) return;
-    body.call(this, ctx, x, y, r * (CRYSTAL_SCALE.projectile / CRYSTAL_SCALE.body), alpha);
     const at = stageOf(ctx, x, y);
     const radius = stageLen(ctx, r) * CRYSTAL_SCALE.projectile;
-    const back = stageAngle(ctx, headingDeg) * DEG + Math.PI;
+    const heading = stageAngle(ctx, headingDeg);
+    const back = heading * DEG + Math.PI;
     const a = alphaOf(ctx, alpha);
+    if (dart) {
+      const halfWidth = radius * DART.width * 0.5;
+      emit(ctx, 'debris', {
+        at,
+        size: halfWidth,
+        stretch: Math.min(MAX_STRETCH * 1.6, DART.length / DART.width),
+        headingDeg: heading,
+        alpha: a,
+        seed,
+        // A needle does not tumble: it holds one face to the light.
+        spin: 0,
+        gloss,
+        dissolve: dissolveOf(ctx),
+        ...colours(this.base),
+      });
+      const point = { x: at.x - Math.cos(back) * radius * DART.length * 0.5, y: at.y - Math.sin(back) * radius * DART.length * 0.5, z: at.z };
+      emit(ctx, 'sprite', { texture: GLOW_TEXTURE, at: point, size: radius * DART.glow, colour: rgb01(this.base.palette.hot, 1.3), alpha: a * 0.6 });
+    } else {
+      body.call(this, ctx, x, y, r * (CRYSTAL_SCALE.projectile / CRYSTAL_SCALE.body), alpha);
+    }
     for (let k = 0; k < SPARKLES; k += 1) {
       const phase = (((time * 1.5 + k / SPARKLES + seed * 0.13) % 1) + 1) % 1;
       const sway = Math.sin(k * 2.9 + seed) * 0.7;
@@ -121,4 +145,4 @@ function crystalKit({ gloss, stretchGain = 1, orb, thin = 1, mist = false }) {
 export const iceElements = crystalKit({ gloss: 0.85, stretchGain: 1, orb: 'drop', mist: true });
 export const gemElements = crystalKit({ gloss: 0.9, stretchGain: 0.8, orb: 'light' });
 export const steelElements = crystalKit({ gloss: 1, stretchGain: 1.2, orb: 'light', thin: 0.7 });
-export const needleElements = crystalKit({ gloss: 0.5, stretchGain: 1.5, orb: 'light', thin: 0.5 });
+export const needleElements = crystalKit({ gloss: 0.5, stretchGain: 1.5, orb: 'light', thin: 0.5, dart: true });

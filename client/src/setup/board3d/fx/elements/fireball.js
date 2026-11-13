@@ -109,7 +109,9 @@ void main() {
     float s1 = texture(uFire, uv + vec2(0.19, 0.31) - outward * phase1 * 0.15).r;
     veins = mix(s0, s1, abs(phase0 * 2.0 - 1.0));
   }
-  float temp = clamp((0.98 - r * 0.95) + (n - 0.5) * 1.0 + (veins - 0.4) * 0.45 - trail * 0.3 * r, 0.0, 1.0) * smoothstep(0.0, 0.35, density);
+  // Design 089: the heart starts at 0.88 (was 0.98), so the pale core shows only where the boil
+  // and the veins lift it: bright veins in a yellow heart, not a white disc.
+  float temp = clamp((0.88 - r * 0.9) + (n - 0.5) * 1.0 + (veins - 0.4) * 0.5 - trail * 0.3 * r, 0.0, 1.0) * smoothstep(0.0, 0.35, density);
   vec3 colour = elFireRamp(temp, vB.rgb, vC.rgb, vD.rgb, vE.rgb, heat);
   float edge;
   float alpha = clamp(density, 0.0, 1.0) * vAlpha * elDissolve(q, vD.w, seed, edge);
