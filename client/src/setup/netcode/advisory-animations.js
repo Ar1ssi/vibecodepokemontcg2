@@ -15,6 +15,7 @@ import {
   deckRevealRuns,
   effectKnockoutIds,
   drawnCards,
+  prepareAttackBatch,
   strikeKnockouts,
   supersededDeals,
 } from './advisory-animations.mjs';
@@ -83,6 +84,10 @@ let attackHits = new Map();
 let strikesOf = new Map();
 // Design 069: each attack's knockouts, moved after its last damage (strikeKnockouts).
 let strikeKos = { after: new Map(), moved: new Set(), notLast: new Set() };
+// Design 089: the attack an earlier batch started and has not finished (prepareAttackBatch), and
+// the batch's `attackExecuted` events whose attack already played with an earlier batch.
+let openAttack = null;
+let playedAttacks = new Set();
 
 // Design 069: each damaged card's total before this batch, from its counter on the board (no
 // counter = 0). Read before the diff applies the new totals.
@@ -226,11 +231,16 @@ export function handleBeforeApply(events, selfPlayerId) {
   revealRuns = deckRevealRuns(events);
   batchInSetup = !rulesState.startingActiveDone;
   effectKnockouts = effectKnockoutIds(events);
-  leadingAttacks = attackLeads(events);
+  // Design 089: a suspended attack plays with its first hits; the batch's segment readers see
+  // the batch with that early strike in it and without an attack that already played.
+  const attackBatch = prepareAttackBatch(events, openAttack);
+  openAttack = attackBatch.open;
+  playedAttacks = attackBatch.skipped;
+  leadingAttacks = attackLeads(attackBatch.events, { carried: attackBatch.carried });
   movedAttacks = new Set(leadingAttacks.values());
-  attackHits = attackHitIds(events);
-  strikesOf = attackStrikes(events);
-  strikeKos = strikeKnockouts(events);
+  attackHits = attackHitIds(attackBatch.events);
+  strikesOf = attackStrikes(attackBatch.events);
+  strikeKos = strikeKnockouts(attackBatch.events);
   if (!Array.isArray(events) || selfPlayerId == null) return;
   // Design 074 §D6: on the 3D board the batch's effects start once its moved cards have landed.
   holdFxQueue(fxSettleHoldMs(events));
@@ -262,7 +272,9 @@ export function handleBeforeApply(events, selfPlayerId) {
     );
     pinSlideOrigins(events, registry);
     pinKnockoutOrigins(events, registry);
-    fxQueue.whenIdle().then(releaseSlidePins);
+    // The batch's plans are queued after this hook returns. Asked now, an idle queue would
+    // answer at once and drop the pins before the scenes they wait for (design 089).
+    queueMicrotask(() => fxQueue.whenIdle().then(releaseSlidePins));
   }
 }
 
@@ -342,7 +354,10 @@ onFxSettingsChanged((settings) => {
 });
 
 if (typeof document !== 'undefined') {
-  document.addEventListener('game-restarted', () => clearFxQueue());
+  document.addEventListener('game-restarted', () => {
+    openAttack = null;
+    clearFxQueue();
+  });
   // Design 073: what arrives while the deck boxes deal plays after them.
   document.addEventListener('opening-deal-started', (event) => holdFxQueue(event.detail?.ms));
 }
@@ -409,7 +424,7 @@ export function whenFxQueueIdle() {
  * @param {string|null} selfPlayerId
  */
 export function handleAdvisoryEvent(event, selfPlayerId) {
-  if (movedAttacks.has(event) || strikeKos.moved.has(event)) return;
+  if (movedAttacks.has(event) || strikeKos.moved.has(event) || playedAttacks.has(event)) return;
   const attack = leadingAttacks.get(event);
   if (attack) queueEvent(attack, selfPlayerId);
   queueEvent(event, selfPlayerId);

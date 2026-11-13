@@ -115,6 +115,13 @@ test('withSoundCard renames a Tool attach and leaves Energy and unknown cards al
   assert.equal(keyOf(withSoundCard(missing, cardOf).effect, { user: 'self' }), 'attach-energy');
 });
 
+test('design 089: a switch sounds with the card that comes into the Active Spot (its benchId)', () => {
+  const incoming = { name: 'Pikachu', type: 'Pokémon' };
+  const cardOf = registry({ bench: incoming, active: { name: 'Onix', type: 'Pokémon' } });
+  const plan = { effect: 'retreat', activeId: 'active', benchId: 'bench' };
+  assert.equal(withSoundCard(plan, cardOf).soundCard, incoming);
+});
+
 test('promote and retreat pick the Active type cue; Lightning is electric, unknown is colorless (rows 6, 7)', () => {
   const cardOf = registry({
     a: { types: ['Fire'] },

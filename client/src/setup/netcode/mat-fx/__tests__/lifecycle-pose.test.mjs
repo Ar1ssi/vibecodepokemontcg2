@@ -27,6 +27,13 @@ test('moveIdsForEvent: retreat and swap name both cards, others none', () => {
   assert.deepEqual(moveIdsForEvent(null), []);
 });
 
+test('design 089: a switch (Switch, a gust, an attack switch) names its Active and its Benched card', () => {
+  const switched = { type: 'cardSwitched', playerId: 'p1', activeId: 3, benchId: 4 };
+  assert.deepEqual(moveIdsForEvent(switched), [3, 4]);
+  assert.deepEqual(slideIdsForEvent(switched), [3, 4]);
+  assert.deepEqual(moveIdsForEvent({ benchId: 4 }), [4]);
+});
+
 test('energySnapPose: starts large, lands at scale 1 at the snap, then fades', () => {
   assert.ok(energySnapPose(0).scale > 2);
   assert.ok(Math.abs(energySnapPose(0.55).scale - 1) < 1e-9);

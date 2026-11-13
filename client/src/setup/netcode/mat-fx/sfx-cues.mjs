@@ -324,7 +324,8 @@ export function withSoundCard(plan, cardOf) {
     return card && !isEnergyCard(card) ? { ...plan, effect: 'tool-attach' } : plan;
   }
   if (plan.effect === 'promote' || plan.effect === 'retreat' || plan.effect === 'enter') {
-    const soundCard = cardOf(plan.promotedId ?? plan.instanceId);
+    // The card that comes into the Active Spot: a retreat's `promotedId`, a switch's `benchId`.
+    const soundCard = cardOf(plan.promotedId ?? plan.benchId ?? plan.instanceId);
     return soundCard ? { ...plan, soundCard } : plan;
   }
   return plan;

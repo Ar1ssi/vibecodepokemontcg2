@@ -40,6 +40,8 @@ export const EVENT_FX = {
   abilityUsed: 'ability-banner',
   cardRetreated: 'retreat',
   pokemonSwapped: 'retreat',
+  // Design 089: Switch, Boss's Orders, gusts and attack switches slide like a retreat.
+  cardSwitched: 'retreat',
   trainerPlayed: 'trainer-play',
   stadiumEffectUsed: 'stadium-play',
   turnStarted: 'turn-banner',
@@ -439,24 +441,176 @@ export function coinFlipRuns(events) {
 const ATTACK_HIT_EVENTS = new Set(['damageUpdated', 'pokemonKnockedOut', 'statusApplied']);
 const ATTACK_SEGMENT_BOUNDS = new Set(['attackExecuted', 'turnStarted']);
 
+// Design 089: everything an attack's effect can visibly do to the board. An attack with no hit
+// plays before the first of these (a switch, a draw, an attach), not after it.
+const ATTACK_CONSEQUENCE_EVENTS = new Set([
+  ...ATTACK_HIT_EVENTS,
+  'cardSwitched',
+  'pokemonSwapped',
+  'pokemonPromoted',
+  'cardMoved',
+  'zoneMoved',
+  'cardsDiscarded',
+  'cardsDrawn',
+  'cardAttached',
+  'pokemonEvolved',
+  'pokemonDevolved',
+  'statusCleared',
+  'specialConditionUpdated',
+  'deckShuffled',
+  'cardsShuffledIntoDeck',
+  'handShuffledIntoDeckAndDrawn',
+  'zoneShuffledIntoDeck',
+  'cardsRevealed',
+  'damagePrevented',
+  'koPrevented',
+  'damageCountersPlaced',
+  'cardsLostZoned',
+  'cardsPutInDeck',
+  'cardsMovedToDeck',
+  'cardsMovedToDeckTop',
+  'cardsMovedToDeckBottom',
+  'prizesTaken',
+  'prizeTaken',
+  'prizesRevealed',
+  'prizeSwapped',
+]);
+
+const isAttackConsequence = (event) => ATTACK_CONSEQUENCE_EVENTS.has(event?.type);
+
 /**
- * The engine emits `attackExecuted` after the damage, knockout and status it resolved, so in
- * arrival order the hit would land before the attack's banner and scene. Each attack is moved
- * to just before its first hit in the batch (coin flips that decided it still play first).
+ * The engine emits `attackExecuted` after everything the attack resolved, so in arrival order
+ * the hit would land before the attack's banner and scene. Each attack is moved to just before
+ * its first hit in the batch (coin flips that decided it still play first). Design 089: an attack
+ * with no hit whose start is known (`attackStarted` in its segment, or `carried`: it started in an
+ * earlier batch) is moved before its first other consequence, so a switch or a draw it causes
+ * plays after it. What happened before `attackStarted` (Koga's Ninja Trick) is not the attack's
+ * and stays ahead of it.
  *
  * @param {object[]} events
- * @returns {Map<object, object>} the hit event -> the `attackExecuted` to play before it
+ * @param {{ carried?: boolean }} [options] `carried`: the batch's first segment continues an
+ *   attack an earlier batch started
+ * @returns {Map<object, object>} the event -> the `attackExecuted` to play before it
  */
-export function attackLeads(events) {
+export function attackLeads(events, { carried = false } = {}) {
   const leads = new Map();
   if (!Array.isArray(events)) return leads;
   let firstHit = null;
+  let firstConsequence = null;
+  let started = Boolean(carried);
   for (const event of events) {
-    if (event?.type === 'attackExecuted' && firstHit) leads.set(firstHit, event);
-    if (ATTACK_SEGMENT_BOUNDS.has(event?.type)) firstHit = null;
-    else if (!firstHit && ATTACK_HIT_EVENTS.has(event?.type)) firstHit = event;
+    if (event?.type === 'attackExecuted') {
+      const lead = firstHit ?? (started ? firstConsequence : null);
+      if (lead) leads.set(lead, event);
+    }
+    if (ATTACK_SEGMENT_BOUNDS.has(event?.type)) {
+      firstHit = null;
+      firstConsequence = null;
+      started = false;
+    } else if (event?.type === 'attackStarted') {
+      firstHit = null;
+      firstConsequence = null;
+      started = true;
+    } else {
+      if (!firstHit && ATTACK_HIT_EVENTS.has(event?.type)) firstHit = event;
+      if (!firstConsequence && isAttackConsequence(event)) firstConsequence = event;
+    }
   }
   return leads;
+}
+
+const isAmount = (value) => typeof value === 'number' && Number.isFinite(value);
+
+/**
+ * What a suspended attack dealt so far, for its early strike: `damage` to its defender and
+ * `benchDealt` to every other card but the attacker. An event without `dealt` counts its total.
+ */
+const dealtSoFar = (segment, { attackerId, defenderId }) => {
+  let damage = 0;
+  let benchDealt = 0;
+  for (const event of segment) {
+    if (event?.type !== 'damageUpdated' || event.instanceId == null || event.instanceId === attackerId) continue;
+    const amount = isAmount(event.dealt) ? event.dealt : isAmount(event.damage) ? event.damage : 0;
+    if (!(amount > 0)) continue;
+    if (event.instanceId === defenderId) damage += amount;
+    else benchDealt += amount;
+  }
+  return { damage, benchDealt };
+};
+
+const openAttackOf = ({ playerId, attackerId, defenderId, attackName }) => ({
+  playerId,
+  attackerId: attackerId ?? null,
+  defenderId: defenderId ?? null,
+  attackName,
+  played: false,
+});
+
+/**
+ * Design 089: fits a batch's attacks to what the client should play.
+ *
+ * An attack whose effect asks a choice after its damage (switch with 1 of your Benched Pokémon)
+ * suspends: this batch carries `attackStarted` and the hits, and `attackExecuted` arrives only
+ * with the batch that resumes it, after the switch. Such a batch gets an early strike — a
+ * synthetic `attackExecuted` (`early: true`) at its end, with what the attack dealt so far — so
+ * the scene plays with its hits; the real `attackExecuted` that follows is left out (`skipped`).
+ * An attack that started but did nothing yet (a choice before any effect) stays open and plays
+ * with the batch that resumes it.
+ *
+ * @param {object[]} events
+ * @param {{ playerId: *, attackerId: *, defenderId: *, attackName?: string, played: boolean }|null} [open]
+ *   the attack an earlier batch left open
+ * @returns {{ events: object[], skipped: Set<object>, carried: boolean,
+ *   open: { playerId: *, attackerId: *, defenderId: *, attackName?: string, played: boolean }|null }}
+ *   `events`: the batch as the segment readers (attackLeads, attackHitIds, attackStrikes,
+ *   strikeKnockouts) should see it; `carried`: its first segment continues an unplayed open attack
+ */
+export function prepareAttackBatch(events, open = null) {
+  const skipped = new Set();
+  if (!Array.isArray(events)) return { events: [], skipped, carried: false, open: open ?? null };
+  const carried = Boolean(open && !open.played);
+  const prepared = [];
+  let current = open ? { ...open } : null;
+  let segment = [];
+  let acted = false;
+  for (const event of events) {
+    const type = event?.type;
+    if (type === 'attackExecuted') {
+      if (current?.played && current.playerId === event.playerId) skipped.add(event);
+      else prepared.push(event);
+      current = null;
+      segment = [];
+      acted = false;
+      continue;
+    }
+    prepared.push(event);
+    if (type === 'turnStarted') {
+      current = null;
+      segment = [];
+      acted = false;
+    } else if (type === 'attackStarted') {
+      // A second marker for the attack already open changes nothing.
+      if (!current || current.playerId !== event.playerId) current = openAttackOf(event);
+      segment = [];
+      acted = false;
+    } else {
+      segment.push(event);
+      if (isAttackConsequence(event)) acted = true;
+    }
+  }
+  if (current && !current.played && acted) {
+    prepared.push({
+      type: 'attackExecuted',
+      early: true,
+      playerId: current.playerId,
+      attackerId: current.attackerId,
+      defenderId: current.defenderId,
+      attackName: current.attackName,
+      ...dealtSoFar(segment, current),
+    });
+    current = { ...current, played: true };
+  }
+  return { events: prepared, skipped, carried, open: current };
 }
 
 /**
@@ -550,8 +704,6 @@ export function strikeKnockouts(events) {
   }
   return { after, moved, notLast };
 }
-
-const isAmount = (value) => typeof value === 'number' && Number.isFinite(value);
 
 // A card hit twice in one attack (a clause, then a counter placement) is one hit: the last
 // cumulative total, and `dealt` summed while every event names it (else the total decides).

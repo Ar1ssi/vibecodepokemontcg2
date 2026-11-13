@@ -19,13 +19,14 @@ const isId = (v) => v != null && v !== '';
  * Instance ids whose on-board position changes for a retreat/switch, so their
  * pre-diff rects can be captured. Shape-based so it accepts both the raw event
  * and the fx plan (which drops `type`): `cardRetreated` carries
- * {activeId, promotedId}; `pokemonSwapped` {instanceId, replacedInstanceId}.
+ * {activeId, promotedId}; `pokemonSwapped` {instanceId, replacedInstanceId};
+ * `cardSwitched` (design 089: Switch, gusts, attack switches) {activeId, benchId}.
  * Empty for anything else.
  */
 export function moveIdsForEvent(event) {
   if (!event) return [];
-  if (event.activeId != null || event.promotedId != null) {
-    return [event.activeId, event.promotedId].filter(isId);
+  if (event.activeId != null || event.promotedId != null || event.benchId != null) {
+    return [event.activeId, event.promotedId ?? event.benchId].filter(isId);
   }
   if (event.replacedInstanceId != null) {
     return [event.instanceId, event.replacedInstanceId].filter(isId);
@@ -33,12 +34,14 @@ export function moveIdsForEvent(event) {
   return [];
 }
 
+const SLIDE_EVENTS = new Set(['cardRetreated', 'pokemonSwapped', 'cardSwitched']);
+
 /**
  * The ids a view event slides on the 3D board (retreat/switch: both cards; promote: the
  * promoted card), keyed by the raw event's type. Empty for anything else.
  */
 export function slideIdsForEvent(event) {
-  if (event?.type === 'cardRetreated' || event?.type === 'pokemonSwapped') return moveIdsForEvent(event);
+  if (SLIDE_EVENTS.has(event?.type)) return moveIdsForEvent(event);
   if (event?.type === 'pokemonPromoted' && isId(event.instanceId)) return [event.instanceId];
   return [];
 }

@@ -264,3 +264,8 @@ Self-approval checklist:
   was renumbered (ec59f36e3), so `ENVIRONMENT_BY_CARD` ids name other cards (customhb-351 is now Shopping Center,
   Scorched Earth is 293), and seven new Stadiums have no board. Boards should key on the card name.
 - Slice 1: two client tests that replay real engine events list `attackStarted` first.
+- Slice 2: `board-rects.js CARD_MOVE_EVENTS` is not extended with `cardSwitched`: the switched cards are pinned
+  where they stood, so the settle hold would only delay the slide. `openAttack` is keyed by `playerId` alone (one
+  attack is open at a time) and survives dropped plans (hidden tab, catch-up): the attack then counts as played,
+  so a tab that comes back mid-attack shows the slide, never an attack from the Bench (edge 16 reworded). The pin
+  release moved behind the batch's plans here (`queueMicrotask`), not in slice 3: a Switch slide needs it.
