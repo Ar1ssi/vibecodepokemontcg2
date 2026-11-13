@@ -10,7 +10,7 @@
 - Server must be able to boot and create database directory dynamically for ephemeral host compatibility (e.g. Render).
 - Pure logic / rules tests run via native Node.js test runner (`node --test`) on plain `.mjs` modules with **no jsdom** — they use stub card objects. `jsdom` is a devDependency used only by `scripts/e2e/integration-test.mjs`.
 - Decks stored in `localStorage` detach session editor state upon page reload to prevent accidental overwrites.
-- No build step. Browser loads native ESM (`client/index.ejs:20`); deploy is `pnpm install` then `node server/server.js` (`render.yaml`). A proposal needing a bundler must justify itself in DECISIONS.md first. (S2)
+- No build step in development: the browser loads native ESM (`client/index.ejs`). A deploy bundles the client (`pnpm install` → `postinstall` → `scripts/build-client.mjs` → `client/dist/`, D247, design 088); source stays bundle-free, so new client code must keep `import()` paths literal (`scripts/__tests__/build-client.test.mjs` checks).
 - Scale: small, mostly private. A handful of concurrent games, players known to each other. Prefer the simple mechanism over the scalable one whenever they conflict. (S2)
 - Losing in-progress games on a server restart is acceptable. No durable game log, no crash recovery, no rehydration. (S2)
 - Non-goals unless a decision reopens them: clustering/horizontal scaling, user accounts or auth, rate limiting, adversarial anti-cheat hardening. (S2)

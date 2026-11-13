@@ -37,3 +37,6 @@ client/src/assets/tcgl-foil/tex/
 
 # Python bytecode from running scripts/*.py
 __pycache__/
+
+# design 088: the bundled client, rebuilt on every deploy (`pnpm build`)
+client/dist/

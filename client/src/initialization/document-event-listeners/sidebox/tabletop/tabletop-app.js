@@ -77,6 +77,7 @@ import {
   stackPullPose,
   wrapPeelPose,
 } from '../../../../setup/deck-builder/core/build-battle/tabletop/poses.mjs';
+import { DEFAULT_CARD_BACK_PATH } from '../../../../setup/deck-constructor/default-card-back.mjs';
 import { createTabletopAudio } from './tt-audio.js';
 import { buildBox, interiorSlots, prepareBoxFaces } from './tt-box.js';
 import { createCardKit, disposeCard } from './tt-card.js';
@@ -278,7 +279,7 @@ async function buildTabletopApp(options, life) {
   await loadPrintFont();
   if (stopped()) return abandon();
   const [backImage, promoImage, faces, ...artImages] = await Promise.all([
-    loadImage(assetUrl('src/assets/cardback.png')),
+    loadImage(assetUrl(DEFAULT_CARD_BACK_PATH)),
     loadImage(cardImageOf(promo), { timeoutMs: CARD_TEXTURE_TIMEOUT_MS }),
     prepareBoxFaces({ look, dims, boxKey: box?.key }),
     ...Array.from({ length: packCount }, (_, visual) => packArtFor(look?.skin?.packArts?.[artIndexes[visual]])),

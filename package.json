@@ -8,6 +8,8 @@
   ],
   "scripts": {
     "start": "pnpm -C server start",
+    "build": "node scripts/build-client.mjs",
+    "postinstall": "node scripts/build-client.mjs --if-deploy",
     "test:solo": "node scripts/e2e/solo-authority-test.mjs",
     "test:board3d": "node scripts/e2e/board3d-view-test.mjs",
     "test:board3d-input": "node scripts/e2e/board3d-input-test.mjs",
@@ -60,5 +62,8 @@
     "onlyBuiltDependencies": [
       "sqlite3"
     ]
+  },
+  "dependencies": {
+    "esbuild": "^0.28.2"
   }
 }

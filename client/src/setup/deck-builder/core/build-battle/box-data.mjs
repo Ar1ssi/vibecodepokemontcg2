@@ -6,7 +6,9 @@ import { BUILD_BATTLE_BOXES, getBuildBattleBox } from './box-catalog.mjs';
 
 const TCGDEX_ASSETS = 'https://assets.tcgdex.net/en';
 
-const defaultImporter = (path) => import(path);
+// Resolved against this module's own URL, so the bundled page (design 088) still fetches the data
+// modules from where they are served; they import nothing, so they need no bundling.
+const defaultImporter = (path) => import(new URL(path, import.meta.url).href);
 
 // Memoized per importer: tests pass their own and never share the browser's cache.
 const cachesByImporter = new WeakMap();

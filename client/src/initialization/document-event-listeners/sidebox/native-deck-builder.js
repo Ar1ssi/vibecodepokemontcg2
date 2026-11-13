@@ -147,6 +147,7 @@ import {
 import { updateReadyButtons } from '../../../actions/general/ready.js';
 import {
   LEGACY_DEFAULT_CARD_BACK_SRC,
+  RETIRED_DEFAULT_CARD_BACK_PATH,
   resolveDefaultCardBackSrc,
 } from '../../../setup/deck-constructor/default-card-back.mjs';
     
@@ -969,6 +970,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
                   systemState.p1OppCardBackSrc,
                   systemState.p2OppCardBackSrc,
                   fallback,
+                  RETIRED_DEFAULT_CARD_BACK_PATH,
                   LEGACY_DEFAULT_CARD_BACK_SRC,
                 ]
                   .map(resolve)

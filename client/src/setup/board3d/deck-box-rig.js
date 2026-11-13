@@ -38,9 +38,9 @@ import {
   splitBoxMesh,
   stackDepthAfter,
 } from '../netcode/mat-fx/deck-box-math.mjs';
+import { DEFAULT_CARD_BACK_PATH } from '../deck-constructor/default-card-back.mjs';
 
 const ASSET_DIR = '/src/assets/deckbox/';
-const DEFAULT_CARD_BACK = '/src/assets/cardback.png';
 const DEG = Math.PI / 180;
 /** `deckbox_interior`'s tint (object-stage.js) and what an exterior shows before its atlas lands. */
 const INTERIOR_TINT = 0.915;
@@ -154,7 +154,7 @@ export async function createDeckBoxRigs({ parent, onNeedsRender, findPile }) {
   const [{ scene: layout, boxMesh, cardMesh }, interiorTexture, defaultBack] = await Promise.all([
     loadAssets(),
     staticTexture(`${ASSET_DIR}interior.webp`),
-    staticTexture(DEFAULT_CARD_BACK),
+    staticTexture(DEFAULT_CARD_BACK_PATH),
   ]);
   const split = splitBoxMesh(boxMesh);
   const face = faceWindow(cardMesh);

@@ -18,6 +18,7 @@ import { uiCue } from './mat-fx/ui-cue.mjs';
 import { buildMatPickerRequest } from './mat-pick-request.mjs';
 import { clearInFlightAffordances, emitResolveChoice } from './cmd-emitter.js';
 import { buildCardImage } from '../image-logic/build-card-image.js';
+import { DEFAULT_CARD_BACK_PATH } from '../deck-constructor/default-card-back.mjs';
 import { setStadiumFacing } from '../zones/stadium-facing.mjs';
 import { rulesState } from '../../../../shared/engine/rules/rules-state.mjs';
 import {
@@ -491,7 +492,7 @@ function resolveRenderTargets(options = {}) {
  * @returns {string}
  */
 export function resolveCardBackSrc(side, options = {}) {
-  const fallback = options.cardBackSrc || '/src/assets/cardback.png';
+  const fallback = options.cardBackSrc || DEFAULT_CARD_BACK_PATH;
   const systemState = options.systemState || defaultNetcodeContext.systemState;
   if (!systemState) return fallback;
 

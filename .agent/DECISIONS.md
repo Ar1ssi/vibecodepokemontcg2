@@ -6,8 +6,9 @@
 # Pruned or shortened lines, verbatim: .agent/archive/DECISIONS-pruned-2026-10-15.md (grep the D-number).
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
-#   Next id = highest D number in this file and the archives + 1 (next: D247).
+#   Next id = highest D number in this file and the archives + 1 (next: D248).
 
+- D247 2026-11-13 [server] Deploys serve an esbuild bundle (one hashed script + sheet, immutable); unhashed files are `no-cache`; dev stays unbundled ESM. Deps: esbuild, compression. (Amends D4; design 088)
 - D246 2026-11-12 [client] The board outside a room stays (user): the client rules layer is its engine and is not deleted; 087 slice 3 struck. It draws nothing today (I283). (design 087)
 - D245 2026-11-12 [netcode] Legacy relay removed: the server always runs the rules; SERVER_AUTHORITATIVE opt-outs only warn; no shadow mode; room-sweep.mjs frees roomInfo past grace. (Supersedes D216; design 087)
 - D244 2026-11-09 [netcode] 073: the deck box id rides exchangeData/loadDeckData as a display-only param after format (PROTOCOL_VERSION 2.3.0); the opening coin waits for the deal (deck-box-gate).
@@ -122,5 +123,5 @@
 - D10 2026-09-09 [netcode] Card identity is translated, never punned: server mints instanceId, returns syncInstance→instanceId map; unresolvable hint drops the command.
 - D9 2026-09-09 [netcode] Reconnect = bounded peer action-log catch-up (cap 200, 5 s) with a mandatory loud "reload and rejoin" failure branch.
 - D6 2026-09-07 [netcode] Named-payload commands validate in a pure `applyCommand` reducer; undo = deterministic commandLog replay; models are pure (instanceId, Mulberry32 PRNG, D5). (design 001)
-- D4 2026-09-07 [netcode] Shared engine in shared/ served at /shared, no bundler, no new deps (design 001).
+- D4 2026-09-07 [netcode] Shared engine in shared/ served at /shared; the source needs no bundler to run (deploys bundle it, D247) (design 001).
 - D1–D3 2026-09-07 [stack] Node ES modules + native `node --test`; Express + Socket.IO + SQLite3; pure rules logic tested on plain objects, no jsdom. (observed)

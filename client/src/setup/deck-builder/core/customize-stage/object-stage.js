@@ -8,9 +8,9 @@
 // `holder.q`, exactly as the game's RendertoTextureCamera hierarchy.
 import * as THREE from 'three';
 import { HIDDEN_SCALE } from './stage-math.mjs';
+import { DEFAULT_CARD_BACK_PATH } from '../../../deck-constructor/default-card-back.mjs';
 
 const ASSET_DIR = '/src/assets/deckbox/';
-const DEFAULT_CARD_BACK = '/src/assets/cardback.png';
 /** Light levels tuned by eye against the game's box thumbnails (white boxes stay just under clipping). */
 const AMBIENT_INTENSITY = 1.8;
 const KEY_INTENSITY = 1.6;
@@ -132,7 +132,7 @@ export async function createObjectStage({ host, onLost = () => {} }) {
       staticTexture(`${ASSET_DIR}interior.webp`),
       staticTexture(`${ASSET_DIR}shadow-box.webp`),
       staticTexture(`${ASSET_DIR}shadow-card.webp`),
-      staticTexture(DEFAULT_CARD_BACK),
+      staticTexture(DEFAULT_CARD_BACK_PATH),
     ]);
 
   const canvas = document.createElement('canvas');

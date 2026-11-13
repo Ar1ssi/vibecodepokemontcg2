@@ -1642,7 +1642,7 @@ body.dark-mode-1 .public-room-format {
       background: rgba(198, 59, 59, 0.25);
       color: #ff9d9d;
     }
-    body.dark-mode-1 .native-deck-builder-library-chip-btn[data-action->'rename']:hover {
+    body.dark-mode-1 .native-deck-builder-library-chip-btn[data-action='rename']:hover {
       background: rgba(120, 144, 214, 0.2);
       color: #c5d0ff;
     }

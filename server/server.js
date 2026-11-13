@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import http from 'http';
 import { Server } from 'socket.io';
 import { instrument } from '@socket.io/admin-ui';
@@ -56,7 +57,9 @@ import { REMOTE_POLL_MS, createRemoteCustomSets, resolveCustomSetsUrl } from './
 import { CUSTOM_SETS_CHANGED_EVENT } from '../shared/custom-sets/custom-set-schema.mjs';
 import { createCardImageHandler } from './card-image-proxy.mjs';
 import { CARD_ART_PROXY_HOSTS } from './card-art-proxy-hosts.mjs';
-import { cacheControlFor } from './sfx-cache.mjs';
+import { cacheControlFor } from './cache-policy.mjs';
+import { loadClientBundle } from './client-bundle.mjs';
+import { KEEP_AWAKE_PATH, planKeepAwake, startKeepAwake } from './keep-awake.mjs';
 import { retiredLegacyRelayWarning } from './netcode-mode.mjs';
 import { customFoilSets, resolveFoilTextureBase } from './tcgl-foil-config.mjs';
 
@@ -198,11 +201,23 @@ async function main() {
   app.set('view engine', 'ejs');
   app.set('views', clientDir);
   app.use(cors());
-  // demo: never cache static assets so tunnel visitors always get fresh builds
-  // (except content-hashed sampled SFX, design 064)
+  // Design 088: text responses go out compressed (Brotli or gzip), and every response carries the
+  // cache policy for its path. Visitors always get the current build: only content-hashed files
+  // are kept without asking, everything else is revalidated (cache-policy.mjs).
+  app.use(compression());
   app.use((req, res, next) => {
     res.setHeader('Cache-Control', cacheControlFor(req.path));
     next();
+  });
+  // The bundled script and stylesheet the page loads, or null to load the source files.
+  app.locals.clientBundle = loadClientBundle({
+    clientDir,
+    env: process.env,
+    warn: (message) => console.warn(message),
+  });
+  // A liveness answer that renders nothing: the host's health check and the keep-awake ping.
+  app.get(KEEP_AWAKE_PATH, (_, res) => {
+    res.set('Cache-Control', 'no-store').type('text/plain').send('ok');
   });
 
   const MAT_IMAGE_REMOTE_HOSTS = new Set(['cdn.artofpkm.com']);
@@ -1477,6 +1492,16 @@ async function main() {
       'Netcode mode: server-authoritative' +
         ` | e2e bridge: ${E2E_ENABLED ? 'ARMED (?e2e=1 works)' : 'disabled'}`
     );
+    const bundle = app.locals.clientBundle;
+    // eslint-disable-next-line no-console
+    console.log(`Client: ${bundle ? `bundle ${bundle.script}` : 'source files (unbundled)'}`);
+    const keepAwake = planKeepAwake(process.env);
+    if (keepAwake?.error) console.warn(keepAwake.error);
+    if (keepAwake?.url) {
+      startKeepAwake(keepAwake, { warn: (message) => console.warn(message) });
+      // eslint-disable-next-line no-console
+      console.log(`Keep-awake: pinging ${keepAwake.url} every ${keepAwake.intervalMs / 60000} min`);
+    }
   });
 }
 main();

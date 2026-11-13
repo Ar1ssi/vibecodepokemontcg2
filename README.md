@@ -79,7 +79,19 @@ node server/server.js       # PORT selects the port, default 4000
 ```
 
 The SQLite database directory is created on boot, so the server also runs on ephemeral hosts such
-as Render. There is no build, bundle, or migration step.
+as Render. There is no migration step, and development needs no build: the browser loads the source
+modules directly.
+
+On a deploy host the client is bundled: `pnpm install` runs `scripts/build-client.mjs`, which
+writes one content-hashed script and stylesheet to `client/dist/`, and the server serves those with
+year-long caching. To serve the bundle from your own machine (a demo over a tunnel, say):
+
+```bash
+pnpm build                  # writes client/dist/
+CLIENT_BUNDLE=1 node server/server.js
+```
+
+Rebuild after changing client code; without `CLIENT_BUNDLE=1` the server ignores `client/dist/`.
 
 ### Playwright tests
 
@@ -327,6 +339,9 @@ Environment variables:
 | `NODE_ENV`             | none                           | `production` closes the `?e2e=1` test bridge (also set on the deploy config).     |
 | `ROOM_GRACE_MS`        | 30 minutes                     | How long an empty room is kept before the sweep.                                  |
 | `ADMIN_PASSWORD`       | `defaultPassword`              | Password for the Socket.IO admin UI; change it on any public deploy.              |
+| `CLIENT_BUNDLE`        | on for deploys, else off       | `1` serves the bundle in `client/dist/` (`pnpm build`), `0` the source files.     |
+| `KEEP_AWAKE`           | off                            | `1` pings the site's own URL every 10 minutes so a free Render instance never sleeps. |
+| `KEEP_AWAKE_URL`       | `RENDER_EXTERNAL_URL`          | The address `KEEP_AWAKE` pings, when the host does not provide one.               |
 
 Browser flags:
 
@@ -363,6 +378,9 @@ pre-existing assertion in `client/src/setup/rules/__tests__/card-inspector-model
 ## Deployment
 
 `render.yaml` defines two services. `ptcg-sim` is production, with `NODE_ENV=production`.
+Both serve the bundled client; the boot log says which is in use (`Client: bundle /dist/app-….js`).
+`KEEP_AWAKE` in `render.yaml` is `'0'`: set it to `'1'` on `ptcg-sim` to remove the cold start, at
+the cost of nearly all of the workspace's 750 free instance hours a month.
 `ptcg-sim-staging` is a clone with `PTCG_E2E=1` so the Playwright bot can
 drive a real deploy:
 

@@ -6,7 +6,7 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I284). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I285). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Umbrella lines name every member as `(merged I<a>, I<b>…)`: grep any id to find its line.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (`pnpm harness:check`); maintain.md moves older Closed lines to .agent/archive/ISSUES-closed.md.
@@ -14,6 +14,7 @@
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I284 2026-11-13 P2 [tooling] e2e harness stale since D239, on the source build too: `pnpm test:solo` step 6 expects 7/8 hands before the Actives are placed; playtest-bot fails setup 0/3 ("timeout waiting for page predicate"). Scripts that `import('/src/…')` need the source build (refs: 088)
 - I283 2026-11-12 P1 [board-ui] No-room board draws no cards: before the Solo tab is clicked, deck load and Set Up run on the hidden mirror (chat lines, client coin prompt) while the three.js board stays empty. Repro: load page, load both decks, Set Up Both (refs: D246, design 087 § No-room board)
 - I282 2026-11-09 P2 [mat-fx] stadium-environment-layout.test "environmentKeyFor gives every Homebrew Stadium in set.json a board" fails on origin/main: 27 committed customhb Stadiums unmapped (Altar of the Moone, Sky Field, Brooklet Hill…) — repro: node --test that file (design 077)
 - I280 2026-11-05 P3 [deck] Per-form Zygarde deck limit (D240) reads `form`/description/stage off deck data; rows with none (CSV imports, decks saved before D240) count under plain "Zygarde" or by stage, so a 50% Basic can read as 10% — backfill `form` on hydrate (review of D240)
@@ -45,7 +46,7 @@
 - I227 2026-10-01 P2 [rules] WotC residue after 062 (merged I227, I228, I229): 64 attacks no-effect / 27 partial (Mirror Move, Reflect Shield, Endure, Lock-on); half-run Powers (Sneak Attack, Surprise Bite, Call the Boss, Buzzap); 73 passive Powers unconsumed (Thick Skinned, Energy Burn…)
 - I212 2026-09-29 P2 [rules] Tool-granted Special Condition immunity/recovery unimplemented (Ancient Booster Energy Capsule, Sparkling Robe): addCondition sees only the Pokémon, not its Tools; the Capsule's +60 HP works (refs: special-conditions.mjs addCondition, design 058)
 - I211 2026-09-29 P3 [rules] Old-card residues (merged I211, I234, I236, I237, I238): fossil "KO doesn't count" clauses, Fossil Excavator; attach Trainers (legacy client discards, Platinum PlusPower, Undaunted Defender); Baby residue; Tapu Storm-GX no-Bench; Defender vs "Don't apply W/R" snipes
-- I208 2026-09-29 P3 [deck-builder] Build & Battle 3D box (merged I208, I209): static files go out `no-store` uncompressed, so each opening re-downloads the 733 KB three.js build (gzip ≈ 180 KB); the cuboid wears real faces only on Mega Evolution boxes, other eras need per-box corners (design 056)
+- I208 2026-09-29 P3 [deck-builder] Build & Battle 3D box (merged I208, I209; the `no-store` re-download half is fixed by design 088): the cuboid wears real faces only on Mega Evolution boxes, other eras need per-box corners (design 056)
 - I201 2026-09-28 P3 [client] No UI to attack from the Bench: the engine accepts `attackerInstanceId` (I196, Alakazam ex Dimensional Hand) but chat-buttons.js / dual-run-bridge.js always attack with the Active (refs: S328)
 - I200 2026-09-28 P2 [rules] `atkCountersEach` (effects/attack-steps.mjs) ignores `scope: 'active'`, so "put … damage counters on their Active Pokémon for each card in your opponent's hand" (rules/attack-steps.mjs ~812) hits every opponent Pokémon (refs: S328 I195 review)
 - I183 2026-09-26 P3 [tests] coin-flip-ceremony.test.mjs is load-sensitive (merged I183, I210, I244): "ceremony mounts a material-stamped coin" and "several flips toss one after another" fail in 2 of 3 full `pnpm test` runs, pass alone — timing-dependent waits (refs: S330)

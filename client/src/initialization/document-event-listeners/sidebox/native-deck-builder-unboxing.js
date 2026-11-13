@@ -94,8 +94,6 @@ const BOX_H = Math.round(BOX_W * BOX_PROPORTIONS.height);
 const BOX_D = Math.round(BOX_W * BOX_PROPORTIONS.depth);
 const SPRING_BACK_MS = 160;
 const FADE_TOP_MS = 320;
-// The WebGL pack stage (design 055), loaded only when a box is opened.
-const PACK_STAGE_MODULE = './native-deck-builder-pack3d.js';
 const DRAG_TILT = 0.06;
 const SWEEP_MS = 420;
 const SPARK_COUNT = 16;
@@ -1397,7 +1395,9 @@ export const mountUnboxingScene = ({
     const arts = packs.map((_, packIndex) => look.skin.packArts[artIndexes[packIndex]]);
     // Procedural pack fronts are DOM only until the stage can draw them.
     if (!arts.every((art) => art?.kind === 'vendored')) return;
-    import(PACK_STAGE_MODULE)
+    // The WebGL pack stage (design 055), loaded only when a box is opened. A literal path, so the
+    // client bundle (design 088) can follow it.
+    import('./native-deck-builder-pack3d.js')
       .then((module) =>
         module.createPackStage({
           host: root,
