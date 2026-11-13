@@ -145,7 +145,7 @@ after `withSelfNamedAttack`, before any coin. No state change.
 All new effects register in `mat-fx/index.js` and `fx-holds.mjs`; sound cues in `sfx-cues.mjs` reuse existing
 samples. Hidden info: a transit of a card the viewer cannot see uses the owner's sleeve.
 
-### D6 Element shaders (slice 6, fx-designer) — files `board3d/fx/**`, `moves/elements/**`, `scripts/fx/check-element-shaders.mjs`
+### D6 Element shaders (slice 6) — files `board3d/fx/**`, `moves/elements/**`, `scripts/fx/check-element-shaders.mjs`
 Per kind, rebuild the look as a lit volume (vfx-design skill; `references/elements/*.md`):
 `fireball` (self-shadowed volume, motion-stretched tail, shed embers), `flameJet` (two flow layers with alpha
 erosion, hot core to sooty tip, board heat haze), `bolt` (tapered trunk, timed forks, afterimage of the previous
@@ -158,7 +158,7 @@ fade). FX composite (`fx-layer.js`): soft-knee highlight roll-off so impact cent
 New kinds are allowed where a kind above cannot carry a look (each = `<kind>.js` + pure `<kind>.mjs` + test +
 one line in `elements/index.js` + the shader check).
 
-### D7 Moves (slice 7, fx-designer) — files `mat-fx/moves/**` (not `combat.js`)
+### D7 Moves (slice 7) — files `mat-fx/moves/**` (not `combat.js`)
 - Contact dressing per element: `_shared-beats.js` impact flash stops being one look. Each element kit supplies
   its own contact beat (fire: bloom + rising embers + soot; water: crown splash + falling drops; electric: arc
   burst + arcs crawling the card edge; ice: frost star + shatter shards; grass: leaf burst; rock/ground: debris
@@ -175,7 +175,7 @@ one line in `elements/index.js` + the shader check).
   move's own shape.
 - Validator and the 063/065 tests stay green; a spec pinned by a test keeps its pinned fields.
 
-### D8 Shuffle and Prizes (slice 8, fx-designer) — files `board3d/shuffle-rig.js`, `board3d/shuffle-rig-math.mjs`, `image-logic/shuffle-flight.js`, `shuffle-pose.mjs`, `mat-fx/prize*.{js,mjs}`, CSS
+### D8 Shuffle and Prizes (slice 8) — files `board3d/shuffle-rig.js`, `board3d/shuffle-rig-math.mjs`, `image-logic/shuffle-flight.js`, `shuffle-pose.mjs`, `mat-fx/prize*.{js,mjs}`, CSS
 - `shuffle-rig-math.mjs` (pure): `shufflePlan({ cards, seed })` → per card `poseAt(t)` in table px for the
   beats cut (0–0.18), riffle (0.18–0.62: the two packets' cards fall alternately, each on a short arc),
   bridge (0.62–0.84: the pile arches and springs flat), square (0.84–1: a tap; the pile settles 2 px and back).
@@ -186,7 +186,7 @@ one line in `elements/index.js` + the shader check).
 - Prize deal (`prizes-deal`) and claim (`prize-claim`) restyled in the same visual language: sleeves leave the
   deck top, arc, land with a soft contact shadow pop; the claim is a gold edge sweep over the taken slot.
 
-### D9 Non-attack effects pass (slice 9, fx-designer) — files `mat-fx/{lifecycle,flow,banner,status,entry,prize,coin}*.{js,mjs}`, `combat.js` overlays only, `css/mat-fx.css`
+### D9 Non-attack effects pass (slice 9) — files `mat-fx/{lifecycle,flow,banner,status,entry,prize,coin}*.{js,mjs}`, `combat.js` overlays only, `css/mat-fx.css`
 Every effect in `mat-fx/index.js` EFFECTS plus the slice-5 ones, reviewed against the house rules and updated:
 energy attach, Tool attach, retreat/switch/promote slide dressing, Trainer/Stadium presentation, discard puff
 and catch, damage/heal numbers, target ring, banners (turn, ability, attack, attack-fail), status pops, block
@@ -241,13 +241,13 @@ new client without it orders as before).
 | 3 pins / retain / ghosts (lead) | `board3d/card-mesh.js`, `board-scene.js`, `mat-fx/slide-pins.mjs`, `lifecycle.js`, `ko-scene.js`, `card-flight.js`, `advisory-animations.js`, tests | § D3 | edge rows 8–11 | n/a | board3d + mat-fx tests |
 | 4 choice gate / onDrop (lead) | `netcode/choice-gate.mjs`, `apply-view.js`, `advisory-animations.js`, `mat-fx/fx-queue.mjs`, `socket-event-listeners.js`, `e2e-api.js`, tests | § D4 | edge rows 13–14 | n/a | netcode tests |
 | 5 missing animations (lead) | `advisory-animations.{mjs,js}`, `mat-fx/{index.js,fx-holds.mjs,sfx-cues.mjs}`, new `mat-fx/{response.js,response-pose.mjs,transit.js,transit.mjs,prize-deal.js}`, `combat.js` (heal), `entry.js`, `css/mat-fx.css`, tests | § D5 | D5 rows; edge 15, 20 | n/a | netcode tests |
-| 6 shaders (fx-designer) | § D6 | § D6 | packer tests; `fx:check-elements` | vfx-design element refs | captures + checks |
-| 7 moves (fx-designer) | § D7 | § D7 | pose tests; validator | 063 refs | captures + tests |
-| 8 shuffle / prizes (fx-designer) | § D8 | § D8 | plan tests; edge 19, 20 | n/a | captures + tests |
-| 9 non-attack pass (fx-designer) | § D9 | § D9 | touched pose tests | house rules | captures + tests |
+| 6 shaders (lead) | § D6 | § D6 | packer tests; `fx:check-elements` | vfx-design element refs | captures + checks |
+| 7 moves (lead) | § D7 | § D7 | pose tests; validator | 063 refs | captures + tests |
+| 8 shuffle / prizes (lead) | § D8 | § D8 | plan tests; edge 19, 20 | n/a | captures + tests |
+| 9 non-attack pass (lead) | § D9 | § D9 | touched pose tests | house rules | captures + tests |
 | 10 verify + review (lead) | `scripts/e2e/fx-sequence-test.mjs`, harness docs | — | e2e asserts | — | full `pnpm test`, gates, review findings fixed |
-Slices 6–9 run in the sub-worktree `.claude/worktrees/089-vfx-fx` (branch `feature/089-vfx-fx`), one agent at a
-time, merged into `feature/089-vfx-pass` after the lead reruns tests and reads the diff.
+Every slice is built inline by the lead: the user stopped the fx-designer agent on 2026-11-13 ("do it yourself so
+itll be higher quality"). Visual slices use the fx-preview captures for the render-and-critique loop.
 
 ## Deviations (Builder appends here during build)
 
@@ -255,7 +255,12 @@ time, merged into `feature/089-vfx-pass` after the lead reruns tests and reads t
 Self-approval checklist:
 - [x] Every constraint traceable into the Design section
 - [x] Every edge-case row has an expected behavior
-- [x] Interfaces named and typed (D1–D5); D6–D9 are fx-designer briefs, which own their visual choices
+- [x] Interfaces named and typed (D1–D5); D6–D9 pin scope and looks, their visual tuning is logged under Deviations
 - [x] Slices each ≤1 session and independently green
 - [x] Lead slices pinned; no card rulings involved
 - [x] No section reads "TBD"
+- Found, not fixed (unrelated to this request; an ISSUES line at landing): `stadium-environment-layout.test`
+  "environmentKeyFor gives every Homebrew Stadium … a board" fails on `origin/main` (6f5011bec). The Homebrew set
+  was renumbered (ec59f36e3), so `ENVIRONMENT_BY_CARD` ids name other cards (customhb-351 is now Shopping Center,
+  Scorched Earth is 293), and seven new Stadiums have no board. Boards should key on the card name.
+- Slice 1: two client tests that replay real engine events list `attackStarted` first.

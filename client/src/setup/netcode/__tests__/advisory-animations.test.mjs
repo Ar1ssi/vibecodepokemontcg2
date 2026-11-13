@@ -576,7 +576,8 @@ test('attackLeads: the engine emits the hit and knockout before attackExecuted; 
   const arrival = events.map((event) => event.type);
   assert.ok(arrival.indexOf('damageUpdated') < arrival.indexOf('attackExecuted'), arrival.join(' > '));
   const played = playOrder(events).map((event) => event.type);
-  assert.deepEqual(played.slice(0, 3), ['attackExecuted', 'damageUpdated', 'pokemonKnockedOut']);
+  // Design 089: `attackStarted` opens the batch and plans nothing; the attack still leads its hits.
+  assert.deepEqual(played.slice(0, 4), ['attackStarted', 'attackExecuted', 'damageUpdated', 'pokemonKnockedOut']);
   assert.equal(played.length, events.length);
 });
 

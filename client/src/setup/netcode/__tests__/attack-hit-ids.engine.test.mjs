@@ -108,8 +108,8 @@ test('Buzzwole-GX Jet Punch (30C 57): the resumed batch’s hit is the chosen Be
   });
   const first = applyCommand(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' });
   assert.equal(first.error, null);
-  // The pick suspends the attack: the Active's 30 arrives with no attackExecuted, so it plays bare.
-  assert.deepEqual(first.events.map((event) => event.type), ['damageUpdated']);
+  // The pick suspends the attack: the Active's 30 arrives with the attack's marker (design 089) but no attackExecuted.
+  assert.deepEqual(first.events.map((event) => event.type), ['attackStarted', 'damageUpdated']);
   const choice = first.state.pendingChoice;
   assert.deepEqual(choice.options.map((option) => option.instanceId), [21, 22]);
   const resumed = applyCommand(first.state, {

@@ -613,6 +613,16 @@ export function withSelfNamedAttack(ctx) {
 function flipAndResolveAttack(draft, ctx) {
   ctx = withSelfNamedAttack(ctx);
   const { playerId, activeRng, events, attack, attackerPlayer, atkIdx, targetInstanceId, copiedAttack } = ctx;
+  // Design 089: `attackExecuted` is emitted last, and not at all in the batch of an attack that
+  // suspends on a choice after its damage. This marks where the attack's own effects begin, so a
+  // client can play the attack before them. Advisory only: no state changes with it.
+  events.push({
+    type: 'attackStarted',
+    playerId,
+    attackerId: ctx.attacker?.instanceId ?? null,
+    defenderId: ctx.defender?.instanceId ?? null,
+    attackName: attack?.name,
+  });
   // A new attack starts with no before-damage discard recorded (attack-steps recordDiscardedForDamage).
   delete draft.attackDiscardedForDamage;
   delete draft.attackAttachedForDamage;
