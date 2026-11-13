@@ -14,6 +14,8 @@ import {
   healPose,
   powerFlarePose,
   powerGlint,
+  prizeClaimPose,
+  prizeClaimStarAngles,
   prizePulsePose,
   tagPose,
 } from '../board-fx.mjs';
@@ -35,6 +37,9 @@ test('every layer starts and ends invisible, and its alpha stays in [0, 1]', () 
     'enter ring': (t) => enterPose(t).ring.alpha,
     'enter dust': (t) => enterDust(t, 2, 7, 5).alpha,
     'prize pulse': (t) => prizePulsePose(t, 2, 6).alpha,
+    'prize claim halo': (t) => prizeClaimPose(t).halo,
+    'prize claim edge': (t) => prizeClaimPose(t).edge,
+    'prize claim rise': (t) => prizeClaimPose(t).rise,
     'power halo': (t) => powerFlarePose(t).halo.alpha,
     'power edge': (t) => powerFlarePose(t).edge.alpha,
     'power sheen': (t) => powerFlarePose(t).sheen.alpha,
@@ -102,4 +107,31 @@ test('the tags and the failed-attack banner say why', () => {
   assert.deepEqual(attackFailText(undefined, 'confused'), { title: 'Confused', sub: 'Hurt itself in confusion' });
   assert.deepEqual(attackFailText('  ', 'nothing-to-copy'), { title: 'Attack', sub: 'Nothing to copy' });
   assert.deepEqual(attackFailText('Hit', 'unknown'), { title: 'Hit', sub: 'Attack failed' });
+});
+
+test('design 089: the Prize claim lights the row at once (its peak is early) and its glint only moves forward', () => {
+  const peakAt = (key) => TIMES.reduce((best, t) => (prizeClaimPose(t)[key] > prizeClaimPose(best)[key] ? t : best), 0);
+  assert.ok(peakAt('edge') <= 0.15, `the edge snaps on: ${peakAt('edge')}`);
+  assert.ok(peakAt('halo') <= 0.2, `the halo follows: ${peakAt('halo')}`);
+  let last = -1;
+  for (const t of TIMES) {
+    const { sweep } = prizeClaimPose(t);
+    assert.ok(sweep >= last, `sweep at ${t}`);
+    unit(sweep, `sweep at ${t}`);
+    last = sweep;
+  }
+  assert.deepEqual(prizeClaimPose(-3), prizeClaimPose(0));
+  assert.deepEqual(prizeClaimPose(9), prizeClaimPose(1));
+});
+
+test('design 089: the claim throws a star to each side of the row per card taken, none along it', () => {
+  assert.deepEqual(prizeClaimStarAngles(0), []);
+  assert.deepEqual(prizeClaimStarAngles('junk'), []);
+  assert.deepEqual(prizeClaimStarAngles(1), [0, Math.PI]);
+  for (const count of [1, 2, 3, 6]) {
+    const angles = prizeClaimStarAngles(count);
+    assert.equal(angles.length, count * 2);
+    assert.equal(angles.filter((a) => Math.cos(a) > 0).length, count, 'half to each side');
+    for (const angle of angles) assert.ok(Math.abs(Math.cos(angle)) > 0.3, `sideways, not along the column: ${angle}`);
+  }
 });

@@ -1,10 +1,12 @@
 // Design 024 slice 3: the prize-claim burst. Taking a Prize is how the game is
 // won and it had no effect at all; this fires a halo plus one spark per card
-// at the claiming side's prize zone. Like every other effect here it draws as
-// a detached parent-page overlay and no-ops when its anchor cannot be found.
+// at the claiming side's prize zone. Design 089: on the 3D board the claim is drawn in the
+// scene (board-fx.js `playPrizeClaim`); the detached parent-page overlay below is what plays
+// where no scene draws the board. Either no-ops when its anchor cannot be found.
 import { oppContainerDocument, selfContainerDocument } from '../../../state.js';
 import { pileRect, visualRectOf } from '../../board3d/board-rects.js';
 import { runPose, spawnOverlay } from '../../image-logic/mat-fx.mjs';
+import { playPrizeClaim } from './board-fx.js';
 import { docForSide } from './side-doc.mjs';
 import {
   PRIZE_CLAIM_MS,
@@ -30,6 +32,7 @@ const prizeRectFor = (user) => {
 export const prizeClaim = (plan) => {
   const sparkCount = prizeSparkCount(plan.count ?? plan.cards?.length);
   if (sparkCount === 0) return 0;
+  if (playPrizeClaim(plan.user, sparkCount)) return undefined;
   const zoneRect = prizeRectFor(plan.user);
   if (!zoneRect) return 0;
 

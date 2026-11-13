@@ -77,6 +77,45 @@ test('runPose: poses at 0, ticks to 1, removes host, then calls onDone', () => {
   assert.equal(frames.length, 0);
 });
 
+test('design 089: runPose follows the host\'s own animation clock when it has one (pause, seek, cancel)', () => {
+  const frames = [];
+  setGlobal('requestAnimationFrame', (fn) => frames.push(fn) && frames.length);
+  setGlobal('cancelAnimationFrame', () => {});
+  const clock = { currentTime: 0, playState: 'running' };
+  const asked = [];
+  const seen = [];
+  let removed = 0;
+  let done = 0;
+  const host = {
+    remove: () => removed++,
+    animate: (keyframes, options) => {
+      asked.push(options);
+      return clock;
+    },
+  };
+  runPose(host, 200, (t) => seen.push(t), () => done++);
+  assert.deepEqual(asked, [{ duration: 200, fill: 'forwards' }]);
+  // Wall time passes, the clock is paused: the pose holds.
+  frames.shift()(5000);
+  frames.shift()(9000);
+  assert.deepEqual(seen, [0, 0, 0]);
+  // Seeked forward, then back: the pose follows the clock, not the frame times.
+  clock.currentTime = 150;
+  frames.shift()(9016);
+  clock.currentTime = 50;
+  frames.shift()(9032);
+  assert.deepEqual(seen.slice(3), [0.75, 0.25]);
+  assert.equal(removed, 0);
+  // A cancelled clock ends the run.
+  clock.playState = 'idle';
+  clock.currentTime = null;
+  frames.shift()(9048);
+  assert.equal(seen.at(-1), 1);
+  assert.equal(removed, 1);
+  assert.equal(done, 1);
+  assert.equal(frames.length, 0);
+});
+
 test('runPose: cancel removes the host without onDone', () => {
   setGlobal('requestAnimationFrame', () => 7);
   let cancelled = null;

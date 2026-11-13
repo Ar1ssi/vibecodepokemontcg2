@@ -32,9 +32,12 @@ import {
   healPose,
   powerFlarePose,
   powerGlint,
+  prizeClaimPose,
+  prizeClaimStarAngles,
   prizePulsePose,
   tagPose,
 } from './board-fx.mjs';
+import { PRIZE_CLAIM_MS, prizeSparkCount, prizeSparkPose } from './prize-pose.mjs';
 import { brighten, fxRgbForCard } from './fx-colors.mjs';
 import { drawRim } from './moves/card-glow.mjs';
 import { emit, rgb01 } from './moves/elements/_emit.js';
@@ -376,6 +379,45 @@ export const prizePulse = (plan) => {
   });
   return played ? undefined : 0;
 };
+
+/**
+ * `prize-claim` on the 3D board (design 089): the Prize cards left in the row light gold together
+ * and a glint crosses them, and a star per card taken is thrown out to each side of the row. It
+ * runs on the scene clock in the FX layer; the DOM burst it replaces there was a halo and sparks
+ * on their own animation-frame loop, laid flat over a tilted board. False when no scene draws
+ * the board or the row is empty (the last Prize: game over says it), and the caller falls back.
+ */
+export function playPrizeClaim(user, count) {
+  const scene = getBoardScene();
+  const slots = scene && user ? prizeSlots(scene, user) : [];
+  const angles = prizeClaimStarAngles(prizeSparkCount(count));
+  if (slots.length === 0 || angles.length === 0) return false;
+  const centre = {
+    x: slots.reduce((sum, slot) => sum + slot.x, 0) / slots.length,
+    y: slots.reduce((sum, slot) => sum + slot.y, 0) / slots.length,
+  };
+  const { h, z } = slots[0];
+  return playStageFx(scene, {
+    ms: PRIZE_CLAIM_MS,
+    unit: h,
+    draw({ back, top }, t) {
+      const pose = prizeClaimPose(t);
+      back((ctx) => slots.forEach((slot) => cardHalo(ctx, slot, PRIZE_RGB, pose.halo * 0.9)));
+      top(z, (ctx) => {
+        slots.forEach((slot) => {
+          cardEdge(ctx, slot, PRIZE_RGB, pose.edge);
+          cardSheen(ctx, slot, PRIZE_RGB, pose.edge * 0.6, pose.sweep);
+        });
+        angles.forEach((angle, index) => {
+          const star = prizeSparkPose(angle, t, { distance: h * 1.25 });
+          const at = { x: centre.x + star.x, y: centre.y + star.y, z: z + pose.rise * h * 0.4 };
+          sprite(ctx, TEXTURES.sparkle, at, h * 0.5 * star.scale, PRIZE_RGB, 1.1, star.opacity * 0.5, { frame: index % 4 });
+          sprite(ctx, TEXTURES.stars, at, h * 0.66 * star.scale, brighten(PRIZE_RGB, 0.5), 1.8, star.opacity, { frame: index % 4, rotation: index * 47 + t * 140 });
+        });
+      });
+    },
+  });
+}
 
 /**
  * The flare of a GX attack or a VSTAR Power on the attacker (`power`: 'gx' | 'vstar'): its edge

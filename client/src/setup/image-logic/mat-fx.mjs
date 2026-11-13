@@ -66,16 +66,27 @@ export const spawnOverlay = ({ rect, className }) => {
 };
 
 /**
- * Drive `poseFn(t, host)` from t=0 to t=1 over `durationMs` on rAF, then
- * remove `host` and call `onDone`. Returns a cancel function that stops the
- * loop and removes the host without calling `onDone`.
+ * Drive `poseFn(t, host)` from t=0 to t=1 over `durationMs`, then remove `host` and call
+ * `onDone`. Returns a cancel function that stops the loop and removes the host without calling
+ * `onDone`.
+ *
+ * Design 089 (the one-clock rule, D103 / D118): where the host can animate, an empty WAAPI
+ * animation on it is the clock and each frame poses at that animation's time, so these overlays
+ * (target ring, Tool ring, promote glow, discard puff, Knock Out flight) pause, seek and slow
+ * with every other effect instead of running on wall time. A host that cannot animate (a test
+ * double) is timed from the frame timestamps, as before. A clock that was cancelled ends the run.
  */
 export const runPose = (host, durationMs, poseFn, onDone) => {
   let rafId = null;
   let started = null;
-  const tick = (now) => {
+  const clock = typeof host.animate === 'function' ? host.animate([{}, {}], { duration: durationMs, fill: 'forwards' }) : null;
+  const progressAt = (now) => {
+    if (clock) return clock.playState === 'idle' ? 1 : (Number(clock.currentTime) || 0) / durationMs;
     if (started == null) started = now;
-    const t = Math.min(1, (now - started) / durationMs);
+    return (now - started) / durationMs;
+  };
+  const tick = (now) => {
+    const t = Math.min(1, Math.max(0, progressAt(now)));
     poseFn(t, host);
     if (t < 1) {
       rafId = requestAnimationFrame(tick);

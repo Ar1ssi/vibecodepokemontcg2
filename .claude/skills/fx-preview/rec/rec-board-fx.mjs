@@ -25,6 +25,20 @@ const SHOTS = {
   'power-vstar': { times: [320], crop: 'card:101' },
   shuffle: { times: [0, 130, 255, 420, 600, 780, 930, 1100, 1300, 1500], crop: 'deck' },
   'shuffle-opp': { times: [255, 600, 1100], crop: 'deck-opp' },
+  // Slice 9: the registry's other DOM effects (banners, tags, status pops, the Prize claim, game over).
+  'turn-banner': { times: [120, 420, 900, 1300], crop: 'full' },
+  'turn-banner-opp': { times: [420], crop: 'full' },
+  'attack-banner': { times: [120, 420, 900], crop: 'full' },
+  'ability-tag': { times: [120, 420, 900, 1300], crop: 'card:101' },
+  'status-burned': { times: [120, 320, 620, 900], crop: 'card:201' },
+  'status-poisoned': { times: [120, 320, 620, 900], crop: 'card:201' },
+  'status-asleep': { times: [320, 620], crop: 'card:201' },
+  'status-paralyzed': { times: [320, 620], crop: 'card:201' },
+  'status-confused': { times: [320, 620], crop: 'card:201' },
+  'status-clear': { times: [120, 320, 620, 900], crop: 'card:201' },
+  'prize-claim': { times: [80, 240, 480, 760], crop: 'prizes' },
+  'game-over-win': { times: [200, 700, 1400], crop: 'full' },
+  'game-over-loss': { times: [200, 700, 1400], crop: 'full' },
 };
 const wanted = ONLY ? ONLY.split(',').map((name) => name.trim()) : Object.keys(SHOTS);
 
@@ -114,6 +128,10 @@ const clipFor = (crop) => {
 const fire = (name) =>
   page.evaluate(async (effect) => {
     const fx = await import('/src/setup/netcode/mat-fx/board-fx.js');
+    const flow = await import('/src/setup/netcode/mat-fx/flow.js');
+    const combat = await import('/src/setup/netcode/mat-fx/combat.js');
+    const statusFx = await import('/src/setup/netcode/mat-fx/status.js');
+    const prizeFx = await import('/src/setup/netcode/mat-fx/prize.js');
     const p = window.__boardFx;
     p.start = p.scene.clock.now();
     p.before = new Set(document.getAnimations());
@@ -129,6 +147,17 @@ const fire = (name) =>
       'power-vstar': () => fx.playPowerFlare(101, 'vstar'),
       shuffle: () => p.scene.playShuffle('self', 'deck', { count: 40 }),
       'shuffle-opp': () => p.scene.playShuffle('opp', 'deck', { count: 40 }),
+      'turn-banner': () => flow.turnBanner({ user: 'self', number: 3 }),
+      'turn-banner-opp': () => flow.turnBanner({ user: 'opp', number: 4 }),
+      'attack-banner': () => combat.attackBanner({ attackerId: 101, defenderId: 201, attackName: 'Fire Spin', user: 'self' }),
+      'ability-tag': () => flow.abilityBanner({ instanceId: 101, name: 'Blaze', user: 'self' }),
+      'status-clear': () => statusFx.statusClear({ instanceId: 201, condition: 'Poisoned' }),
+      'prize-claim': () => prizeFx.prizeClaim({ user: 'self', count: 2 }),
+      'game-over-win': () => flow.gameOver({ user: 'self' }),
+      'game-over-loss': () => flow.gameOver({ user: 'opp' }),
+      ...Object.fromEntries(
+        ['Burned', 'Poisoned', 'Asleep', 'Paralyzed', 'Confused'].map((condition) => [`status-${condition.toLowerCase()}`, () => statusFx.status({ instanceId: 201, condition })])
+      ),
     }[effect];
     run();
     // The effect's own DOM animations (a tag, a banner): paused, to be seeked with the scene clock.

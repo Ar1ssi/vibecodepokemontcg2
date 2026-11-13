@@ -182,7 +182,9 @@ const LIME = [0.755, 0.945, 0.494];
 export const STATUS_CLEAR_LAYERS = Object.freeze([
   clear({ ...REMOVE, shape: 'glow', size: 18.08, at: 250, life: 400, tint: [0.748, 1, 0.052], opacity: 0.45, grow: [0, 1], fadeOut: 0.4 }),
   clear({ ...REMOVE, shape: 'square', size: [12, 12 * CARD_ASPECT], at: 0, life: 600, tint: [0.046, 0.745, 0.276], opacity: 0.525, fadeIn: 0.42, fadeOut: 0.58 }),
-  clear({ ...REMOVE, shape: 'ring', size: 20, at: 0, life: 600, tint: [0, 1, 0.436], fadeIn: 0.41, fadeOut: 0.44, grow: [0.352, 1] }),
+  // Design 089: the ring hugs the card (15, was 20: wider than the card is tall) and is half as
+  // strong: full size at full strength it was a flat green hoop round the card for a third of a second.
+  clear({ ...REMOVE, shape: 'ring', size: 15, at: 0, life: 600, tint: [0, 1, 0.436], opacity: 0.55, fadeIn: 0.41, fadeOut: 0.44, grow: [0.352, 1] }),
   clear({ ...REMOVE, sprite: 'shockwave', cells: range(4), size: 6.83, at: 60, life: 500, tint: [0, 0.745, 0.18], opacity: 0.71, fadeIn: 0.47, fadeOut: 0.13, grow: [0.286, 1] }),
   ...range(12).map((i) =>
     clear({

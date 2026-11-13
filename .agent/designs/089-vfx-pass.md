@@ -341,3 +341,18 @@ Self-approval checklist:
   `plasma` orbiting arcs, a self-shadowed `fireball` volume. `smoke`, `plasma`, `waterDrop` and `debris` shaders
   are as 079 left them: the stills showed no fault in them that outranked the ones above. Leaf orientation was
   read on the stills (leaves lie along their flight) and left as is.
+- Slice 9, the non-attack pass. "Still" = judged on frozen frames (`rec/rec-board-fx.mjs`, which now also fires
+  the banners, tags, status pops, Prize claim and game over); "code" = read against the house rules, not re-rendered.
+
+  | Effect | How judged | Verdict | What changed |
+  |---|---|---|---|
+  | `prize-claim` | still | rebuilt | In the scene on the scene clock (`board-fx.js playPrizeClaim`): the row left behind lights gold, a glint crosses it, a star per card taken flies to each side. Was a DOM halo and sparks on its own frame loop, flat over the board; kept as the fallback where no scene draws |
+  | target ring, Tool ring, promote glow, discard puff, Knock Out flight | code | tuned | `runPose` (their driver) follows a WAAPI clock on its host instead of wall time: they pause, seek and slow with the other effects (the one-clock rule) |
+  | `status-clear` | still | tuned | Ring 20 → 15 units and 0.55 strength: it was a flat green hoop wider than the card |
+  | card halos (shield, heal, Prize pulse, power flare, move rim) | still | tuned | One thin bright line in a wide faint falloff (`RIM_PASSES`, slice 6) |
+  | aura (attack wind-up) | still | tuned | No ring on the cloth (slice 6) |
+  | `turn-banner`, `attack-banner`, `ability-banner` (tag), `attack-fail` | still | kept | — |
+  | `status` (five conditions) | still | kept | TCG Live's own layers; the label reads on every card colour |
+  | `game-over` (confetti / dim) | still | kept | — |
+  | `block`, `retreat-blocked`, heal, landing ring, `prize-pulse`, power flare, `prizes-set`, `transit`, `pile-catch`, riffle shuffle | still (slice 5 / 8) | kept | Built in this design |
+  | `attach` (Energy snap), `evolve`, `devolve`, `enter`, `trainer-play`, `stadium-play`, `coin-flip`, `damage` numbers, `retreat` / `promote` slides, `discard` flights | code | kept | Scene-clocked or WAAPI already; no rule broken. Not re-rendered in this pass |

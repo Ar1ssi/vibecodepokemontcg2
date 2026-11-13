@@ -162,6 +162,35 @@ export function prizePulsePose(time, index = 0, count = 1) {
 }
 
 /**
+ * The Prize claim on the board (design 089): the Prize cards left behind light together the
+ * moment one is taken and fade, one glint crossing them all. `rise` (0 → 1 → 0) lifts the stars
+ * thrown from the row (prize-pose.mjs places them on the cloth).
+ */
+export function prizeClaimPose(time) {
+  const t = clamp01(time);
+  return {
+    halo: pulse(span(t, 0, 0.75), 0.18),
+    edge: pulse(span(t, 0, 0.9), 0.12),
+    sweep: easeOutCubic(span(t, 0.04, 0.7)),
+    rise: Math.sin(Math.PI * easeOutCubic(t)),
+  };
+}
+
+const CLAIM_FAN_STEP = (28 * Math.PI) / 180;
+
+/**
+ * Where the claim's stars fly (radians, 0 = stage +x): for each card taken one star to each side
+ * of the Prize row, the pairs fanned 28° apart about the horizontal. The row is a column of lit
+ * cards, so a star thrown along it (the DOM burst's "straight up") is gold on gold; thrown
+ * sideways it crosses dark cloth on one side whichever edge of the board the row is on.
+ */
+export function prizeClaimStarAngles(count) {
+  const n = Math.max(0, Math.floor(Number(count) || 0));
+  const fan = Array.from({ length: n }, (_, i) => (i - (n - 1) / 2) * CLAIM_FAN_STEP);
+  return [...fan, ...fan.map((angle) => Math.PI - angle)];
+}
+
+/**
  * The GX / VSTAR flare on the attacker: its halo beats twice, its edge lights and holds, and a
  * glint crosses its face with each beat.
  */
