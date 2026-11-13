@@ -25,5 +25,5 @@ Gotchas: the dev server for renders is `PORT=4100 pnpm start`; SwiftShader makes
 (the render script skips it unless IMPACT=1); scratch/ is gitignored (videos and stills are not in git).
 
 # 089 vfx pass — one-shot (branch feature/089-vfx-pass; NOT on main)
-oneshot 089-vfx-pass · worktree .claude/worktrees/088-vfx-pass · slice 3/10
+oneshot 089-vfx-pass · worktree .claude/worktrees/088-vfx-pass · slice 4/10
 Design: .agent/designs/089-vfx-pass.md. Every slice inline (user: no fx-designer agent).

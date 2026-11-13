@@ -110,6 +110,10 @@ let openPrizeChoiceId = null;
 let openMatChoiceId = null;
 // choiceId whose prompt already sounded `menu-pop-in`, so each prompt chimes once.
 let announcedChoiceId = null;
+// choiceId whose UI (picker, modal or waiting banner) is up, and `{ choiceId, view }` of a newer
+// choice whose UI is held until the batch that brought it has played (reconcileChoiceAfterEffects).
+let shownChoiceId = null;
+let heldChoice = null;
 
 // Options of the last applied view, reused when overlays re-measure on resize.
 let lastOverlayOptions = null;
@@ -247,6 +251,8 @@ export function resetRenderState() {
   openPrizeChoiceId = null;
   openMatChoiceId = null;
   announcedChoiceId = null;
+  shownChoiceId = null;
+  heldChoice = null;
   lastOverlayOptions = null;
   gameEndAnnounced = false;
   gameEndChatClaimed = false;
@@ -1642,6 +1648,77 @@ function reconcileStadium(stadiumCard, localPlayerId, options = {}) {
 }
 
 /**
+ * Shows the view's pendingChoice: the picker or modal to its owner, the waiting banner to
+ * everyone else. A spectator owns no choice, whichever seat it watches from: it only ever
+ * gets the waiting banner, naming who is choosing.
+ */
+function showPendingChoice(view, options) {
+  const pendingChoice = view.pendingChoice || null;
+  const localPlayerId = view.you?.playerId || null;
+  shownChoiceId = pendingChoice?.choiceId ?? null;
+  if (view.isSpectator) {
+    const chooser = pendingChoice ? usernameOf(view, pendingChoice.player) : null;
+    reconcilePendingChoice(pendingChoice, null, options, chooser);
+    return;
+  }
+  // Design 074 D7: a solo room's player owns both seats' choices (choiceSeat names whose).
+  const chooserId = view.solo ? view.choiceSeat || localPlayerId : localPlayerId;
+  reconcilePendingChoice(pendingChoice, chooserId, options);
+}
+
+/**
+ * A choice not on screen yet arrives with the events that led to it (a knockout's prize
+ * choice with the attack). Its UI waits for `options.whenChoiceMayOpen`, so it opens over
+ * the settled board instead of covering the scene; whatever an earlier choice left up
+ * closes now. A choice already shown, or none, reconciles at once. A view re-sending the
+ * held choice keeps the wait it is in, so a run of views cannot push its backstop out; the
+ * picker then opens from the latest of them.
+ *
+ * @returns {(() => void)|null} starts the wait; call it once the batch's effects are queued
+ */
+function reconcileChoiceAfterEffects(view, options) {
+  const choiceId = view.pendingChoice?.choiceId ?? null;
+  const waitForEffects = options.whenChoiceMayOpen;
+  if (choiceId == null || choiceId === shownChoiceId || typeof waitForEffects !== 'function') {
+    heldChoice = null;
+    showPendingChoice(view, options);
+    return null;
+  }
+  if (heldChoice?.choiceId === choiceId) {
+    heldChoice.view = view;
+    return null;
+  }
+  if (shownChoiceId != null) {
+    shownChoiceId = null;
+    reconcilePendingChoice(null, null, options);
+  }
+  const held = { choiceId, view };
+  heldChoice = held;
+  return () => {
+    Promise.resolve()
+      .then(waitForEffects)
+      .catch(() => {})
+      .then(() => {
+        // A later view (or a room reset) has taken the choice over since.
+        if (heldChoice !== held) return;
+        heldChoice = null;
+        showPendingChoice(held.view, options);
+      })
+      .catch((err) => console.error('[apply-view] held choice failed to open:', err));
+  };
+}
+
+/**
+ * True while a pending choice's UI is held behind the effects of the batch that brought it.
+ * e2e: the bot waits this out instead of reading the board as having no picker open.
+ *
+ * @returns {boolean}
+ */
+export function isChoiceWaitingOnEffects() {
+  return heldChoice !== null;
+}
+
+/**
  * Renders or removes the PendingChoice interactive modal.
  *
  * @param {object|null} pendingChoice
@@ -2481,28 +2558,24 @@ export function applyView(view, events = [], options = {}) {
   // Reconcile neutral Stadium
   reconcileStadium(view.stadium || null, localPlayerId, options);
 
-  // Reconcile PendingChoice modal / banner. A spectator owns no choice, whichever seat it
-  // watches from: it only ever gets the waiting banner, naming who is choosing.
-  if (view.isSpectator) {
-    const chooser = view.pendingChoice ? usernameOf(view, view.pendingChoice.player) : null;
-    reconcilePendingChoice(view.pendingChoice || null, null, options, chooser);
-  } else {
-    // Design 074 D7: a solo room's player owns both seats' choices (choiceSeat names whose).
-    const chooserId = view.solo ? view.choiceSeat || localPlayerId : localPlayerId;
-    reconcilePendingChoice(view.pendingChoice || null, chooserId, options);
-  }
+  const showChoiceAfterEffects = reconcileChoiceAfterEffects(view, options);
+  try {
+    // Sync local turn state — the server is the only turn authority under the flag
+    reconcileTurnState(view, options);
 
-  // Sync local turn state — the server is the only turn authority under the flag
-  reconcileTurnState(view, options);
+    // Reconcile Game Ended modal / banner (Finding 12)
+    reconcileGameEnded(view, options);
 
-  // Reconcile Game Ended modal / banner (Finding 12)
-  reconcileGameEnded(view, options);
-
-  // Play advisory events for UI animations/logs (Invariant 4: deletion leaves client correct)
-  if (Array.isArray(events) && typeof options.onAdvisoryEvent === 'function') {
-    for (const ev of events) {
-      options.onAdvisoryEvent(ev, localPlayerId);
+    // Play advisory events for UI animations/logs (Invariant 4: deletion leaves client correct)
+    if (Array.isArray(events) && typeof options.onAdvisoryEvent === 'function') {
+      for (const ev of events) {
+        options.onAdvisoryEvent(ev, localPlayerId);
+      }
     }
+  } finally {
+    // The batch's effects are queued now, so the held choice waits behind them. In `finally`:
+    // the server is waiting on the choice, so a throw above must not strand it.
+    showChoiceAfterEffects?.();
   }
 
   lastAppliedView = view;

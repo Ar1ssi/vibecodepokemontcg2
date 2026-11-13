@@ -62,6 +62,7 @@ import {
 import {
   handleAdvisoryEvent,
   handleBeforeApply,
+  whenChoiceMayOpen,
 } from '../../setup/netcode/advisory-animations.js';
 import { handleServerBattleLog } from '../../setup/netcode/server-battle-log.js';
 import { getZone } from '../../setup/zones/get-zone.js';
@@ -564,6 +565,7 @@ export const initializeSocketEventListeners = () => {
         socket,
         roomId: systemState.roomId,
         onBeforeApply: handleBeforeApply,
+        whenChoiceMayOpen,
         onAdvisoryEvent: (event, selfPlayerId) => {
           handleAdvisoryEvent(event, selfPlayerId);
           if (isSpectatingAuthoritative()) {

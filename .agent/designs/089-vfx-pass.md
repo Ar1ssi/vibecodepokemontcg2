@@ -276,3 +276,6 @@ Self-approval checklist:
   (it needs a renderer); its retain / orphan / ghost paths are checked by the slice 10 browser test.
 - Found, not fixed (pre-existing on `origin/main`, checked in a clean worktree): `pnpm test:board3d` ends
   FAILED (4) — its "hand ≥ 7" checks run after a card was played from that hand. An ISSUES line at landing.
+- Slice 4: `patch/choice-after-fx` (bc8fb2c49) cherry-picked whole (its tests and its playtest-bot and e2e-api
+  parts too); two import/KO-plan conflicts with slice 3 resolved by keeping both. `settleDroppedPlan` is pure
+  (in `advisory-animations.mjs`) so the dropped-plan rule has a node test.

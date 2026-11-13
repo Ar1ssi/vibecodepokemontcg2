@@ -252,7 +252,7 @@ async function getObservation(page) {
 // as an unhandled overlay and surfaced as a wedge rather than looped on forever.
 async function drainPicker(client) {
   for (let attempt = 0; attempt < 5; attempt += 1) {
-    const state = await client.page.evaluate(() => window.__ptcg.picker());
+    const state = await readPicker(client);
     if (!state.open) return { drained: true };
     if (state.type === 'coinCall' || state.type === 'coinEffect') {
       await client.page.evaluate(() => window.__ptcg.pick([], 'heads'));
@@ -267,8 +267,19 @@ async function drainPicker(client) {
     }
     await client.page.waitForTimeout(50);
   }
-  const stillOpen = await client.page.evaluate(() => window.__ptcg.picker());
+  const stillOpen = await readPicker(client);
   return { drained: !stillOpen.open, state: stillOpen };
+}
+
+// A pending choice's picker opens once the effects that brought it have played (apply-view.js
+// reconcileChoiceAfterEffects, bounded at 9 s): wait for it rather than act against the choice.
+async function readPicker(client) {
+  const deadline = Date.now() + 12000;
+  for (;;) {
+    const state = await client.page.evaluate(() => window.__ptcg.picker());
+    if (state.open || !state.awaitingEffects || Date.now() >= deadline) return state;
+    await client.page.waitForTimeout(100);
+  }
 }
 
 async function readCmdRejectedCounts(a, b) {

@@ -4,7 +4,13 @@
 // same pure steps advisory-animations.js runs (prepareAttackBatch → attackLeads → plan).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { advisoryAnimationPlan, attackHitIds, attackLeads, prepareAttackBatch } from '../advisory-animations.mjs';
+import {
+  advisoryAnimationPlan,
+  attackHitIds,
+  attackLeads,
+  prepareAttackBatch,
+  settleDroppedPlan,
+} from '../advisory-animations.mjs';
 import { moveIdsForEvent, slideIdsForEvent } from '../mat-fx/lifecycle-pose.mjs';
 import { createGameState } from '../../../../../shared/engine/state.mjs';
 import { createCard } from '../../../../../shared/engine/cards.mjs';
@@ -230,4 +236,43 @@ test('attackLeads: a carried attack with no hit leads its first consequence; coi
   assert.equal(attackLeads([flip, draw, attack]).size, 0);
   const started = { type: 'attackStarted', playerId: 'p1', attackerId: 1, defenderId: 20 };
   assert.equal(attackLeads([started, flip, draw, attack]).get(draw), attack);
+});
+
+// ── design 089 D4: a dropped plan gives up what it held back ────────────────────────────────
+
+const settleDeps = () => {
+  const log = [];
+  return {
+    log,
+    deps: {
+      show: (card) => log.push(['show', card.id]),
+      clearTimer: (id) => log.push(['clearTimer', id]),
+      forgetKnockout: (id) => log.push(['forget', id]),
+    },
+  };
+};
+
+test('a dropped draw shows its cards at once, cancels its backstop and releases a Prize sleeve', () => {
+  const { log, deps } = settleDeps();
+  const released = [];
+  settleDroppedPlan(
+    {
+      kind: 'draw',
+      backstop: 41,
+      drawn: [{ id: 'a' }, { id: 'b', from: { release: () => released.push('b') } }],
+    },
+    deps
+  );
+  assert.deepEqual(log, [['clearTimer', 41], ['show', 'a'], ['show', 'b']]);
+  assert.deepEqual(released, ['b']);
+});
+
+test('a dropped reveal shows its held cards; a dropped knockout forgets its snapshot; other plans hold nothing', () => {
+  const { log, deps } = settleDeps();
+  settleDroppedPlan({ kind: 'reveal', backstop: 7, held: [{ id: 'r' }] }, deps);
+  settleDroppedPlan({ kind: 'knockout', instanceId: 20 }, deps);
+  settleDroppedPlan({ kind: 'fx', effect: 'attack' }, deps);
+  settleDroppedPlan({ kind: 'draw' }, deps);
+  settleDroppedPlan(null, deps);
+  assert.deepEqual(log, [['clearTimer', 7], ['show', 'r'], ['forget', 20]]);
 });

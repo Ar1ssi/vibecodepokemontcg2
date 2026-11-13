@@ -26,6 +26,9 @@ export const createFxQueue = ({
   // ms the head plan must still wait before it starts, asked once per plan when its
   // turn comes (the turn banner waiting out an attack scene that outlasts its hold).
   leadIn = () => 0,
+  // Design 089: hears every plan `clear` drops without running, so what a plan was holding
+  // back (cards hidden until their draw flies) is given up at once, not at a backstop.
+  onDrop = () => {},
 }) => {
   const queue = [];
   let timer = null;
@@ -133,9 +136,16 @@ export const createFxQueue = ({
         if (timer !== GATE) cancel(timer);
         timer = null;
       }
-      queue.length = 0;
+      const dropped = queue.splice(0);
       committedMs = 0;
       headLed = false;
+      for (const plan of dropped) {
+        try {
+          onDrop(plan);
+        } catch {
+          // A plan that cannot settle must not keep the others from settling.
+        }
+      }
       releaseIdleWaiters();
     },
 

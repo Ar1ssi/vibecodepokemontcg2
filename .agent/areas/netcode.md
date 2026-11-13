@@ -28,6 +28,7 @@ client/src/setup/netcode/authoritative-dispatch.js — gated-action dispatch pri
 slice 0): cardRegistry-sourced card hints + emitAuthoritativeCommand; processAction injected, not
 imported. Fails open to the legacy body when a command cannot be translated (D12)
 client/src/setup/netcode/prize-picker-adapter.js — injected `prizePicker`: shows a server prize pendingChoice as the fly-up prize fan (actions/zones/prize-take-prompt.js, D46)
+client/src/setup/netcode/choice-gate.mjs — a newly arrived pendingChoice's UI waits for its batch: FX queue idle, knockout scenes landed, attack scene over (9 s backstop); applyView holds it on `options.whenChoiceMayOpen` (advisory-animations.js)
 client/src/setup/netcode/mat-picker-adapter.js + mat-pick-request.mjs — injected `matPicker`:
   routes a server pendingChoice whose options are all in-play Pokémon (single- OR multi-pick)
   to the legacy click-the-card UI (`rules/mat-picker.js`) instead of the carousel (design 016/017,

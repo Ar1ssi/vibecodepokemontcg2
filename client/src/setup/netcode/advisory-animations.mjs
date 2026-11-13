@@ -705,6 +705,30 @@ export function strikeKnockouts(events) {
   return { after, moved, notLast };
 }
 
+/**
+ * Design 089: a plan the FX queue dropped without running gives up what it was holding back. A
+ * draw or reveal hid its cards when it was queued (they are already in the hand): they show now,
+ * their backstop timer is cancelled and a Prize's fan sleeve is released; a knockout forgets the
+ * snapshot kept for its scene. Any other plan held nothing.
+ *
+ * @param {object} plan
+ * @param {{ show: (card: object) => void, clearTimer: (id: unknown) => void,
+ *   forgetKnockout: (instanceId: *) => void }} deps
+ */
+export function settleDroppedPlan(plan, { show, clearTimer, forgetKnockout }) {
+  if (!plan || typeof plan !== 'object') return;
+  if (plan.kind === 'knockout') {
+    forgetKnockout(plan.instanceId);
+    return;
+  }
+  if (plan.kind !== 'draw' && plan.kind !== 'reveal') return;
+  if (plan.backstop != null) clearTimer(plan.backstop);
+  for (const card of plan.kind === 'draw' ? plan.drawn || [] : plan.held || []) {
+    card?.from?.release?.();
+    show(card);
+  }
+}
+
 // A card hit twice in one attack (a clause, then a counter placement) is one hit: the last
 // cumulative total, and `dealt` summed while every event names it (else the total decides).
 const mergeHit = (previous, event) => {

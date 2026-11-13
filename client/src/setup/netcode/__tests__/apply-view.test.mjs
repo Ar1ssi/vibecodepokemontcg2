@@ -17,6 +17,7 @@ import {
   clearRenderedBoard,
   getLastAppliedView,
   soloChoiceSeat,
+  isChoiceWaitingOnEffects,
 } from '../apply-view.js';
 import { spectatorPerspective } from '../../spectator/spectator-view.mjs';
 import {
@@ -2181,6 +2182,185 @@ test('prize choice: a chosen prize hidden by the fan is shown again once it reac
     opts
   );
   assert.equal(img.classList.contains('draw-flight-source'), false);
+});
+
+// A knockout's prize choice arrives in the same view as the attack: its picker waits for
+// `whenChoiceMayOpen` (the batch's effects, advisory-animations.js) instead of covering them.
+function heldEffects() {
+  const held = { calls: 0, release: null };
+  held.wait = () => {
+    held.calls += 1;
+    return new Promise((resolve) => {
+      held.release = resolve;
+    });
+  };
+  return held;
+}
+const settle = () => new Promise((resolve) => setImmediate(resolve));
+const KO_EVENT = { type: 'pokemonKnockedOut', instanceId: 55, playerId: 'p2' };
+
+test('held choice: the prize picker opens only once the batch\'s effects have played', async () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const prizePicker = fakeChoicePicker();
+  const held = heldEffects();
+  const order = [];
+  const opts = {
+    document: doc,
+    getZone: mockGetZone,
+    prizePicker,
+    onAdvisoryEvent: (event) => order.push(event.type),
+    whenChoiceMayOpen: () => {
+      order.push('wait');
+      return held.wait();
+    },
+  };
+
+  applyView(prizeView(1, PRIZE_CHOICE), [KO_EVENT], opts);
+  assert.equal(prizePicker.opened.length, 0, 'no picker over the attack and knockout');
+  assert.equal(isChoiceWaitingOnEffects(), true);
+  await settle();
+  assert.deepEqual(order, ['pokemonKnockedOut', 'wait'], 'the wait starts after the batch is queued');
+  assert.equal(prizePicker.opened.length, 0);
+
+  held.release();
+  await settle();
+  assert.equal(prizePicker.opened.length, 1);
+  assert.deepEqual(prizePicker.opened[0].cards.map((c) => c.instanceId), [101, 102]);
+  assert.equal(isChoiceWaitingOnEffects(), false);
+});
+
+test('held choice: the promote mat pick and the opponent\'s waiting banner wait too', async () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const matPicker = fakeChoicePicker();
+  const held = heldEffects();
+  const opts = { document: doc, getZone: mockGetZone, matPicker, whenChoiceMayOpen: held.wait };
+
+  applyView(matBoardView(1), [], opts);
+  applyView(matBoardView(2, { ...MAT_CHOICE, player: 'p2' }), [KO_EVENT], opts);
+  await settle();
+  assert.equal(doc.getElementById('netcodeChoiceBanner'), null);
+  held.release();
+  await settle();
+  assert.ok(doc.getElementById('netcodeChoiceBanner'));
+
+  applyView(matBoardView(3, { ...MAT_CHOICE, choiceId: 'choice_p1_promote' }), [KO_EVENT], opts);
+  assert.equal(doc.getElementById('netcodeChoiceBanner'), null, 'the earlier choice\'s banner goes at once');
+  await settle();
+  assert.equal(matPicker.opened.length, 0);
+  held.release();
+  await settle();
+  assert.equal(matPicker.opened.length, 1);
+});
+
+test('held choice: a choice gone before the effects end never opens', async () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const prizePicker = fakeChoicePicker();
+  const held = heldEffects();
+  const opts = { document: doc, getZone: mockGetZone, prizePicker, whenChoiceMayOpen: held.wait };
+
+  applyView(prizeView(1, PRIZE_CHOICE), [KO_EVENT], opts);
+  await settle();
+  const firstWait = held.release;
+  applyView(prizeView(2, null), [], opts);
+  firstWait();
+  await settle();
+  assert.equal(prizePicker.opened.length, 0);
+  assert.equal(isChoiceWaitingOnEffects(), false);
+});
+
+test('held choice: a choice already shown reopens at once after a rejected pick', async () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const prizePicker = fakeChoicePicker();
+  const held = heldEffects();
+  const opts = {
+    document: doc,
+    getZone: mockGetZone,
+    prizePicker,
+    onResolveChoice: () => {},
+    whenChoiceMayOpen: held.wait,
+  };
+
+  applyView(prizeView(1, PRIZE_CHOICE), [KO_EVENT], opts);
+  await settle();
+  held.release();
+  await settle();
+  await prizePicker.opened[0].onResolve([101]);
+
+  applyView(prizeView(2, PRIZE_CHOICE), [], opts);
+  assert.equal(prizePicker.opened.length, 2, 'no second wait for a choice already on screen');
+  assert.equal(held.calls, 1);
+});
+
+test('held choice: views re-sending the held choice keep its wait and open from the latest', async () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const prizePicker = fakeChoicePicker();
+  const held = heldEffects();
+  const opts = { document: doc, getZone: mockGetZone, prizePicker, whenChoiceMayOpen: held.wait };
+
+  applyView(prizeView(1, PRIZE_CHOICE), [KO_EVENT], opts);
+  await settle();
+  applyView(prizeView(2, { ...PRIZE_CHOICE, prompt: 'Choose a Prize card (resent)' }), [], opts);
+  applyView(prizeView(3, { ...PRIZE_CHOICE, prompt: 'Choose a Prize card (latest)' }), [], opts);
+  await settle();
+  assert.equal(held.calls, 1, 'no fresh wait, so a run of views cannot push the backstop out');
+  assert.equal(prizePicker.opened.length, 0);
+
+  held.release();
+  await settle();
+  assert.equal(prizePicker.opened.length, 1);
+  assert.equal(prizePicker.opened[0].choice.prompt, 'Choose a Prize card (latest)');
+});
+
+test('held choice: a throw while the batch is queued still starts the wait', async () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const prizePicker = fakeChoicePicker();
+  const held = heldEffects();
+  const opts = {
+    document: doc,
+    getZone: mockGetZone,
+    prizePicker,
+    onAdvisoryEvent: () => {
+      throw new Error('battle log broke');
+    },
+    whenChoiceMayOpen: held.wait,
+  };
+
+  assert.throws(() => applyView(prizeView(1, PRIZE_CHOICE), [KO_EVENT], opts), /battle log broke/);
+  await settle();
+  held.release();
+  await settle();
+  assert.equal(prizePicker.opened.length, 1, 'the server is waiting on this choice');
+});
+
+test('held choice: a solo room opens the far seat\'s held choice for its choiceSeat', async () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const choicePicker = fakeChoicePicker();
+  const held = heldEffects();
+  const farChoice = { ...NEST_BALL_CHOICE, choiceId: 'choice_solo_far_held', player: 'p2' };
+  const view = { ...choiceView(1, farChoice), solo: true, choiceSeat: 'p2' };
+
+  applyView(view, [KO_EVENT], { document: doc, getZone: mockGetZone, choicePicker, whenChoiceMayOpen: held.wait });
+  await settle();
+  assert.equal(choicePicker.opened.length, 0);
+  held.release();
+  await settle();
+  assert.equal(doc.getElementById('netcodeChoiceBanner'), null, 'no waiting banner: both seats are ours');
+  assert.equal(choicePicker.opened.length, 1);
+});
+
+test('held choice: a failing wait still opens the picker', async () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const prizePicker = fakeChoicePicker();
+  const opts = {
+    document: doc,
+    getZone: mockGetZone,
+    prizePicker,
+    whenChoiceMayOpen: () => Promise.reject(new Error('fx queue gone')),
+  };
+
+  applyView(prizeView(1, PRIZE_CHOICE), [KO_EVENT], opts);
+  await settle();
+  assert.equal(prizePicker.opened.length, 1);
 });
 
 // A trainer/stadium choice whose options are all in-play Pokémon opens the mat

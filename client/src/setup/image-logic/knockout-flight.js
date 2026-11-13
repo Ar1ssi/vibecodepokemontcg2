@@ -48,7 +48,7 @@ const applyPose = (host, img, pose, turn) => {
   img.style.filter = `brightness(${pose.brightness}) saturate(${pose.saturate})`;
 };
 
-const KO_START_BACKSTOP_MS = 1500;
+export const KO_START_BACKSTOP_MS = 1500;
 
 /**
  * @param {{rect, src, user, turn?, attached?: {src}[]}} ghost - from

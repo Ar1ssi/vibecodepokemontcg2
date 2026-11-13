@@ -5,6 +5,7 @@ import {
   getLastRenderedVersion,
   getCardRegistry,
   hasAuthoritativeView,
+  isChoiceWaitingOnEffects,
 } from '../netcode/apply-view.js';
 import { rulesState, ensureCardData } from '/shared/engine/rules/rules-state.mjs';
 import { hashBoardSnapshot } from '/shared/engine/zones/zone-hash.mjs';
@@ -398,7 +399,8 @@ export function installE2eApi() {
       if (document.getElementById('rulesCoinCallOverlay')) {
         return { type: 'coinCall', open: true };
       }
-      return { open: false };
+      // A pending choice whose picker opens once the effects that brought it have played.
+      return isChoiceWaitingOnEffects() ? { open: false, awaitingEffects: true } : { open: false };
     },
     // Design 004 slice 4: resolves whichever modal picker() reported. `face` answers
     // coinEffect/coinCall (see callCoin); `indices` answers cardPicker/matPick — matPick

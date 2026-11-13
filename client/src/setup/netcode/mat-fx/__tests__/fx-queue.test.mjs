@@ -139,6 +139,23 @@ test('fx-queue: clear drops pending plans without running them', () => {
   assert.equal(clock.armed, null);
 });
 
+test('design 089: clear hands every plan it drops to onDrop, in order; the running plan is not one of them', () => {
+  const dropped = [];
+  const { queue } = make(() => 500, {
+    onDrop: (plan) => {
+      dropped.push(plan.id);
+      if (plan.id === 'b') throw new Error('cannot settle');
+    },
+  });
+  queue.push({ id: 'a' });
+  queue.push({ id: 'b' });
+  queue.push({ id: 'c' });
+  queue.clear();
+  assert.deepEqual(dropped, ['b', 'c'], 'a throw while settling one plan does not strand the next');
+  queue.clear();
+  assert.deepEqual(dropped, ['b', 'c'], 'nothing is dropped twice');
+});
+
 test('fx-queue: a cleared queue accepts new work', () => {
   const ran = [];
   const { queue } = make((p) => ran.push(p.id));

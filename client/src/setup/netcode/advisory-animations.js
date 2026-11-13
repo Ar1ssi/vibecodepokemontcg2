@@ -16,6 +16,7 @@ import {
   effectKnockoutIds,
   drawnCards,
   prepareAttackBatch,
+  settleDroppedPlan,
   strikeKnockouts,
   supersededDeals,
 } from './advisory-animations.mjs';
@@ -27,7 +28,8 @@ import {
 import { shouldAnimateMirror } from '../image-logic/draw-flight-predicate.mjs';
 import { playShuffleFlight } from '../image-logic/shuffle-flight.js';
 import { hideForFlight, playDrawBatch, showAfterFlight, takePrizeHandoff } from '../image-logic/draw-flight.js';
-import { captureKnockoutGhost, playKnockoutGhost } from '../image-logic/knockout-flight.js';
+import { captureKnockoutGhost, KO_START_BACKSTOP_MS, playKnockoutGhost } from '../image-logic/knockout-flight.js';
+import { KNOCKOUT_DURATION_MS } from '../image-logic/knockout-pose.mjs';
 import { fxDisabled, motionReduced, rectForInstance } from '../image-logic/mat-fx.mjs';
 import { onFxSettingsChanged } from '../image-logic/fx-settings.js';
 import { playFx } from './mat-fx/index.js';
@@ -42,12 +44,22 @@ import { holdFor, turnBannerLead } from './mat-fx/fx-holds.mjs';
 import { drawSceneHold } from './mat-fx/draw-scene.mjs';
 import { flightSrcOf } from './mat-fx/card-flight.mjs';
 import { captureOrigins, discardOrigins, knockoutStack } from './mat-fx/origins.mjs';
+import { KO_SCENE_MS } from './mat-fx/ko-scene.mjs';
+import { createChoiceGate, createKnockoutScenes } from './choice-gate.mjs';
 
 // instanceId -> ghost, captured by handleBeforeApply (card still on board)
 // and consumed by handleAdvisoryEvent's 'knockout' branch (card already
 // gone from the DOM diff by then). Edge case 17: capture failure just means
 // no entry lands here, so the plan's lookup falls through to a no-op.
 const pendingKnockoutGhosts = new Map();
+
+// Knockout scenes still playing, for the choice gate (choice-gate.mjs).
+const knockoutScenes = createKnockoutScenes({
+  landsMs: Math.max(KO_SCENE_MS, KNOCKOUT_DURATION_MS),
+  startBackstopMs: KO_START_BACKSTOP_MS,
+  setTimer: (fn, ms) => setTimeout(fn, ms),
+  clearTimer: (id) => clearTimeout(id),
+});
 
 const sideFor = (user) => (user === 'self' ? 'you' : 'them');
 
@@ -302,8 +314,15 @@ function runPlan(plan) {
     // Design 089: the scene starts on its hit, which may come after the queue has gone idle; its
     // cards stay pinned until it takes them.
     for (const id of [ghost.instanceId, ...(ghost.attached || []).map((card) => card.instanceId)]) claimSlidePin(id);
+    const sceneStarted = knockoutScenes.track();
     // Design 069: a knockout lands on its own card's hit (a ripple hit lands after the contact).
-    playKnockoutGhost(ghost, { deferStart: (start) => afterHit(plan, start) });
+    playKnockoutGhost(ghost, {
+      deferStart: (start) =>
+        afterHit(plan, () => {
+          start();
+          sceneStarted();
+        }),
+    });
     return knockoutHoldFor(plan, holdFor('knockout'));
   }
   if (plan.kind === 'fx') return playFx(plan);
@@ -320,6 +339,12 @@ const fxQueue = createFxQueue({
   schedule: (fn, ms) => setTimeout(fn, ms),
   cancel: (id) => clearTimeout(id),
   leadIn: (plan) => turnBannerLead(plan, attackSceneEndsAt(), performance.now()),
+  onDrop: (plan) =>
+    settleDroppedPlan(plan, {
+      show: showAfterFlight,
+      clearTimer: (id) => clearTimeout(id),
+      forgetKnockout: (instanceId) => pendingKnockoutGhosts.delete(instanceId),
+    }),
 });
 
 /** False during catch-up replay or in a hidden tab (edge cases 5, 6): plans are dropped, not queued. */
@@ -414,6 +439,26 @@ export function whenFxQueueIdle() {
       resolve();
     });
   });
+}
+
+const waitForChoiceTurn = createChoiceGate({
+  queueIdle: () => fxQueue.whenIdle(),
+  knockoutScenes: knockoutScenes.playing,
+  attackSceneEndsAt,
+  now: () => performance.now(),
+  sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+});
+
+/**
+ * Resolves when a pending choice that just arrived may open its picker (choice-gate.mjs): once
+ * the batch's effects have played. With effects off or the tab hidden nothing plays, so at once.
+ * Injected into applyView as `whenChoiceMayOpen`.
+ *
+ * @returns {Promise<void>}
+ */
+export function whenChoiceMayOpen() {
+  const hidden = typeof document !== 'undefined' && !!document.hidden;
+  return fxDisabled() || hidden ? Promise.resolve() : waitForChoiceTurn();
 }
 
 /**
