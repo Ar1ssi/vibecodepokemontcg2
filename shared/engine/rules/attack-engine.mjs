@@ -461,14 +461,21 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
       token.includes('|') &&
       token.split('|').includes(symbol);
 
+    // The Darkness type is spelled 'Dark' by some Energy sources (a name guess, Ancient and
+    // Obsidian Energy) and 'Darkness' by attack costs and the rest: one type when a cost is paid.
+    const costType = (type) => (type === 'Dark' ? 'Darkness' : type);
+    const costToken = (token) =>
+      typeof token === 'string' ? token.split('|').map(costType).join('|') : token;
+
     // Solo debug switch (debug menu): when set, every attack and retreat cost counts as paid.
     // Server code never sets it, so authoritative play is unaffected.
     export const debugCosts = { free: false };
 
     export function canPayAttackCost(attachedEnergies = [], cost = []) {
       if (debugCosts.free) return true;
-      const pool = expandEnergyEntries(attachedEnergies);
-      for (const symbol of cost) {
+      const pool = expandEnergyEntries(attachedEnergies).map(costToken);
+      for (const printedSymbol of cost) {
+        const symbol = costType(printedSymbol);
         if (symbol === 'Colorless') {
           const ci = pool.indexOf('Colorless');
           if (ci !== -1) pool.splice(ci, 1);
