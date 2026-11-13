@@ -431,8 +431,10 @@ export function deriveFamily(spec) {
   if ((spec.vgType === 'ghost' || spec.vgType === 'dark') && base === 'chime') return 'ghost';
   if (spec.vgType === 'water' && base === 'burst') return 'splash';
   if (spec.vgType === 'dragon' && (spec.tier === 3 || spec.tier === 'S') && (base === 'burst' || base === 'beam')) return 'roar';
-  if (physical && spec.attacker?.motion === 'dash' && base === 'burst') return 'dash';
-  if (physical && spec.attacker?.motion === 'lunge' && base === 'burst') return 'punch';
+  // Design 089: a sweep is a dash on a curve and a slam a lunge from above; they sound alike.
+  const motion = spec.attacker?.motion;
+  if (physical && (motion === 'dash' || motion === 'sweep') && base === 'burst') return 'dash';
+  if (physical && (motion === 'lunge' || motion === 'slam') && base === 'burst') return 'punch';
   return base;
 }
 

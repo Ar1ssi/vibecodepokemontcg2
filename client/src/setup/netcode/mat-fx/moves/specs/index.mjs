@@ -1,6 +1,7 @@
 // Design 063: every shipped MoveSpec, keyed by move id (the kebab-case ids of move-table.mjs).
 // A type's specs land one slice at a time; a table move without a spec plays the generic
 // lunge until its type ships (move-select.mjs returns null for it).
+import { variedSpecs } from '../motion-variety.mjs';
 import { BUG_SPECS } from './bug.mjs';
 import { DARK_SPECS } from './dark.mjs';
 import { DRAGON_SPECS } from './dragon.mjs';
@@ -19,7 +20,9 @@ import { ROCK_SPECS } from './rock.mjs';
 import { STEEL_SPECS } from './steel.mjs';
 import { WATER_SPECS } from './water.mjs';
 
-export const SPECS = Object.freeze({
+// Design 089: the per-type files hold each move as it was written; what plays has its card
+// motions spread by motion-variety.mjs (a knock becomes the material's reaction, and so on).
+export const SPECS = variedSpecs({
   ...FIRE_SPECS,
   ...WATER_SPECS,
   ...GRASS_SPECS,

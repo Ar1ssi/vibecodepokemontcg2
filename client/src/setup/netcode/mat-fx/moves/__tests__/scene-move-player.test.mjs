@@ -4,6 +4,7 @@ import { ShapeUtils, Vector2 } from 'three';
 
 import { PAINT_TEXELS, createGpuCanvas } from '../../../../board3d/fx/gpu-canvas.mjs';
 import { LAYER_Z } from '../../../../board3d/fx/fx-stage.mjs';
+import { HIT_STOP_MS } from '../hit-stop.mjs';
 import { CAST, playMoveInScene } from '../scene-move-player.js';
 import { SPECS } from '../specs/index.mjs';
 import { fireBlast } from '../specs/fire.mjs';
@@ -51,15 +52,17 @@ test('fire blast plays with the 2D contract and announces contact once', () => {
   const scene = fakeScene();
   const impacts = strikes();
   const played = playMoveInScene({ scene, spec: fireBlast, attackerId: 1, defenderId: 2, seed: 7, impacts, strikeContext: { impactType: 'fire' } });
-  assert.deepEqual(played, { holdMs: 1040, durationMs: 1900, contactMs: 1000, branchEndMs: 0 });
+  // Design 089: Fire Blast is a tier 3 move, so its scene holds at contact; the queue's hold does not.
+  const stop = HIT_STOP_MS[3];
+  assert.deepEqual(played, { holdMs: 1040, durationMs: 1900 + stop, contactMs: 1000, branchEndMs: 0 });
   assert.equal(impacts.calls.length, 1);
   assert.equal(impacts.calls[0].ms, 1000);
   assert.equal(impacts.calls[0].context.move, 'fire-blast');
   assert.equal(impacts.calls[0].context.impactType, 'fire');
   assert.equal(impacts.calls[0].context.direction, -90, 'near card attacks up the screen');
   assert.deepEqual(scene.drives.map(({ id, ms }) => [id, ms]), [
-    [1, 1900],
-    [2, 1900],
+    [1, 1900 + stop],
+    [2, 1900 + stop],
   ]);
 });
 
@@ -78,7 +81,8 @@ test('the drives move the attacker toward the defender around contact', () => {
 test('a frame just after contact records back, front and top runs; the entry ends after the scene', () => {
   const scene = fakeScene();
   playMoveInScene({ scene, spec: fireBlast, attackerId: 1, defenderId: 2, seed: 7 });
-  const { keep, recording } = frameAt(scene, 1060);
+  // 60 ms of scene time after contact: the scene held HIT_STOP_MS[3] of wall time on its contact frame.
+  const { keep, recording } = frameAt(scene, 1060 + HIT_STOP_MS[3]);
   assert.equal(keep, true);
   const layers = new Set(recording.runs.map((run) => run.layer));
   assert.deepEqual([...layers].sort(), ['back', 'front', 'top']);
@@ -188,7 +192,7 @@ test('branch lanes: travel beats fly to each extra card; a card not drawn is ski
       { id: 99, delayMs: 400 },
     ],
   });
-  assert.equal(played.branchEndMs, 1900 + 180);
+  assert.equal(played.branchEndMs, 1900 + 180 + HIT_STOP_MS[3]);
 });
 
 test('every shipped spec plays a frame at each beat without throwing', () => {

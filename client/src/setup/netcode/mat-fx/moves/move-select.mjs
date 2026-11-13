@@ -17,6 +17,7 @@ import {
 import { normalizeEnergyType } from '../../../../actions/move-card-bundle/energy-token-assets.mjs';
 import { pokemonSpriteForName } from '../../../deck-builder/core/card-sprites.mjs';
 import { seededRandom } from '../flow-pose.mjs';
+import { hashString } from './hash.mjs';
 import { cellLookup } from './move-table.mjs';
 import { SPECIES_ID, SPECIES_STATS } from './species-stats.generated.mjs';
 
@@ -65,16 +66,7 @@ const collapseStage = (stage) =>
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '');
 
-/** FNV-1a over UTF-16 code units, as an unsigned 32-bit integer. */
-export function hashString(text) {
-  let hash = 0x811c9dc5;
-  const input = String(text ?? '');
-  for (let i = 0; i < input.length; i += 1) {
-    hash ^= input.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193) >>> 0;
-  }
-  return hash >>> 0;
-}
+export { hashString };
 
 /**
  * Base Attack, Special Attack and main-series types of the card's species, or null when the

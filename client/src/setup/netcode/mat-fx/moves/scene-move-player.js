@@ -9,7 +9,9 @@ import { burstParticles } from '../particles.mjs';
 import { resolveBeatColours, tintCache } from './beat-colours.js';
 import { LIFT, burstLift } from './beat-lift.mjs';
 import { drawHeat, drawRim, tintedGlow } from './card-glow.mjs';
-import { attackerPose, defenderPose } from './card-motion.mjs';
+import { TRAVELLING_MOTIONS, attackerPose, defenderPose } from './card-motion.mjs';
+import { AFTERMATH_DELAY_MS, AFTERMATH_MS, aftermathFor } from './elements/_aftermath.js';
+import { hitStopFor, sceneTimeAt } from './hit-stop.mjs';
 import { DRAWERS } from './move-drawers.js';
 import { laneGeometry, phaseProgress } from './move-geometry.mjs';
 import { terrainPose } from './move-poses.mjs';
@@ -141,7 +143,9 @@ const sceneCard = (scene, id) => {
  * (design 069): more cards the attack damages, `{ id, delayMs }` each; the travel beats also fly to
  * them, `delayMs` after the main contact.
  * @returns {{ holdMs: number, durationMs: number, contactMs: number, branchEndMs: number } | null}
- *   null when it cannot play (effects off, a card the scene does not draw, no lane).
+ *   null when it cannot play (effects off, a card the scene does not draw, no lane). Design 089:
+ *   a heavy move's scene holds at contact (hit-stop.mjs), so `durationMs` is the spec's plus that
+ *   hold; the struck card then carries its element's aftermath (elements/_aftermath.js).
  */
 export function playMoveInScene({
   scene,
@@ -223,6 +227,14 @@ export function playMoveInScene({
   });
   const burstEndMs = Math.max(0, ...bursts.map(({ burst }) => burst.at + burst.durationMs));
 
+  // Design 089: what the hit leaves on the struck card, from just after contact.
+  const aftermath = aftermathFor(spec.material);
+  const aftermathSpan = [contactMs + AFTERMATH_DELAY_MS, contactMs + AFTERMATH_DELAY_MS + AFTERMATH_MS];
+  const struck = { x: defender.centre.x, y: defender.centre.y, w: defender.width, h: defender.height };
+  // Design 089: the scene's own clock stands still on the contact frame of a heavy move.
+  const stopMs = motionReduced() ? 0 : hitStopFor(spec);
+  const sceneMs = (wallMs) => sceneTimeAt(wallMs, contactMs, stopMs);
+
   const travel = Array.isArray(branches) ? travelBeats(spec).map(resolve) : [];
   const lanes =
     travel.length === 0
@@ -237,9 +249,9 @@ export function playMoveInScene({
           }))
           .filter(({ lane: branchLane }) => branchLane);
   const branchEndMs = lanes.length > 0 ? durationMs + Math.max(...lanes.map((entry) => entry.delayMs)) : 0;
-  const endMs = Math.max(durationMs, branchEndMs, burstEndMs);
+  const endMs = Math.max(durationMs, branchEndMs, burstEndMs, aftermath ? aftermathSpan[1] : 0);
 
-  const trails = spec.attacker.motion === 'dash' ? TRAILS : [];
+  const trails = TRAVELLING_MOTIONS.includes(spec.attacker.motion) ? TRAILS : [];
   const echo = spec.attacker.echo ? fillDefaults(ECHO_PARAMS, spec.attacker.echo) : null;
   const cold = spec.defender.motion === 'freeze';
   const particleColour = material.particle?.color ?? '#fff';
@@ -252,12 +264,16 @@ export function playMoveInScene({
     ...strikeContext,
   });
 
-  scene.drive(attackerId, (ms) => offsetWith(attackerAt(ms), ms), durationMs);
-  scene.drive(defenderId, (ms) => offsetWith(defenderAt(ms), ms), durationMs);
+  const driven = (poseAt) => (wallMs) => {
+    const ms = sceneMs(wallMs);
+    return offsetWith(poseAt(ms), ms);
+  };
+  scene.drive(attackerId, driven(attackerAt), durationMs + stopMs);
+  scene.drive(defenderId, driven(defenderAt), durationMs + stopMs);
   // Design 078: the attacker's own edge glows in the move's colour as it charges and lunges.
   if (!motionReduced()) {
     const rimRgb = (glowColours ?? tintedGlow(material.key)).hot;
-    scene.cardFx?.(attackerId, { at: (ms) => ({ rim: attackerAt(ms).glow }), ms: durationMs, rimRgb });
+    scene.cardFx?.(attackerId, { at: (wallMs) => ({ rim: attackerAt(sceneMs(wallMs)).glow }), ms: durationMs + stopMs, rimRgb });
   }
 
   const start = scene.clock.now();
@@ -265,8 +281,9 @@ export function playMoveInScene({
 
   scene.fx.add({
     frame(now, canvas) {
-      const elapsed = now - start;
-      if (elapsed > endMs) return false;
+      const wall = now - start;
+      if (wall > endMs + stopMs) return false;
+      const elapsed = sceneMs(wall);
       const ctx = canvas.ctx;
       const info = sceneInfo(elapsed);
       const jitter = jitterAt(elapsed);
@@ -343,9 +360,18 @@ export function playMoveInScene({
       drawBeats(ctx, beats, 'top', lane, elapsed, info);
       ctx.restore();
       drawBursts(ctx, bursts, elapsed, particleColour);
+      const residue = aftermath ? phaseProgress(elapsed, aftermathSpan) : null;
+      if (residue !== null && ctx.fxElements?.live) {
+        aftermath(ctx, struck, residue, { palette: material.palette, time: info.time, seed });
+      }
       return true;
     },
   });
 
-  return { holdMs: contactMs + 40, durationMs, contactMs, branchEndMs };
+  return {
+    holdMs: contactMs + 40,
+    durationMs: durationMs + stopMs,
+    contactMs,
+    branchEndMs: branchEndMs > 0 ? branchEndMs + stopMs : 0,
+  };
 }

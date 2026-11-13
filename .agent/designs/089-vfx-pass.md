@@ -301,3 +301,14 @@ Self-approval checklist:
   first renders had the outer packet over the deck box. `shuffle-pose.mjs`, its test and the `.card-shuffle-flight`
   CSS are deleted. The Prize deal landed with slice 5 (`transit.js prizesDeal`); the Prize claim burst is part of
   the slice 9 pass. Stills: `.claude/skills/fx-preview/rec/rec-board-fx.mjs` (ONLY=shuffle).
+- Slice 7: the specs' card motions are varied by a rule applied where the tables are merged
+  (`motion-variety.mjs` → `SPECS`, `SIGNATURE_SPECS`), not by editing 225 spec files: the per-type files stay as
+  written (the 063/065 tests that pin them still read them) and what plays is what the merged table holds. After
+  it: no attacker motion above 18 % (was rear-lurch 38 %), no defender motion above 13 % (was knock 76 %). Bug hits
+  buzz (`jolt`) rather than droop. A reaction shortens to fit a scene that ends sooner (tier 1). Not done: spreading
+  the signature specs' contact times (all 1000 ms): their beats are authored to that time; hit-stop and the varied
+  motions change their feel without re-timing 81 specs. Contact dressing: seven contact styles by material in
+  `_shared-beats.js` (in a game the TCG Live impact still replaces the flash), and the new per-material aftermath
+  (`_aftermath.js`) is what stays on the struck card in a game. Stills: `rec/rec-move-strip.mjs`.
+- Found while rendering slice 7 (fixed in slice 6): Solar Beam and Wild Charge clip both cards to white at
+  contact; water tongues read as ice; psychic rings cover the card; Razor Leaf's leaves are half a card long.

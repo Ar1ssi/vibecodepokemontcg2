@@ -32,8 +32,10 @@ test('every material has an element kit (no type is left on canvas only)', () =>
   for (const key of Object.keys(MATERIALS)) assert.ok(Object.hasOwn(ELEMENT_KITS, key), key);
 });
 
-test('shared impact flash: glow, ring, spikes and flash lines for every type, normal included (no white)', () => {
-  for (const key of ['normal', 'steel', 'fire', 'bug']) {
+test('shared impact flash: glow, ring, spikes and flash lines for a blow, normal included (no white)', () => {
+  // Design 089: only blows keep this look; every other material lands in its own contact style
+  // (contact-aftermath.test.mjs).
+  for (const key of ['normal', 'fighting', 'aura']) {
     const { ctx, emits } = live();
     DRAWERS.impactFlash.draw(ctx, lane, 0.2, info(key));
     assert.deepEqual(textures(emits), [

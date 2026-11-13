@@ -232,6 +232,149 @@ const spin = (ms, { contactMs: c, params: p }) => {
   return attackerPose0({ tilt: 360 * p.turns * easeInOutCubic(t), scale: 1 + 0.05 * Math.sin(Math.PI * t) });
 };
 
+// ---- design 089: more ways to attack -------------------------------------------------
+// Fifty-four of 144 moves reared and lurched, and every dash ran the same line. These five give
+// a move's kind its own body language: three stay home (hop, coil, channel), two reach the
+// defender (slam, sweep).
+
+/** A light attacker bounces on the spot, then jabs: crouch, hop toward the camera, a short thrust. */
+const hop = (ms, { contactMs: c, params: p }) => {
+  const jump = span(ms, 0, 0.5 * c);
+  if (jump !== null) {
+    const crouch = Math.sin(Math.PI * Math.min(1, jump / 0.25)) * (jump < 0.25 ? 1 : 0);
+    const air = jump < 0.25 ? 0 : Math.sin((Math.PI * (jump - 0.25)) / 0.75);
+    return attackerPose0({
+      along: -0.05 * jump,
+      scale: 1 - 0.05 * crouch + p.height * air,
+      tilt: 3 * air,
+      glow: 0.6 * jump * p.glow,
+    });
+  }
+  const jab = span(ms, 0.5 * c, 0.7 * c);
+  if (jab !== null) {
+    const f = easeInQuad(jab);
+    return attackerPose0({ along: -0.05 + 0.27 * f, scale: 1, tilt: 5 * f, glow: (0.6 + 0.4 * f) * p.glow });
+  }
+  const recoil = span(ms, 0.7 * c, 1.15 * c);
+  if (recoil !== null) {
+    const r = springHome(recoil, 1.5, 3.5);
+    return attackerPose0({ along: 0.22 * r, tilt: 5 * r, glow: (1 - recoil) ** 2 * p.glow });
+  }
+  return ATTACKER_REST;
+};
+
+/** A whip: the card winds back about its own centre, shrinking, then snaps round the other way. */
+const coil = (ms, { contactMs: c, params: p }) => {
+  const wind = span(ms, 0, 0.6 * c);
+  if (wind !== null) {
+    const w = easeOutCubic(wind);
+    return attackerPose0({ along: -0.07 * w, scale: 1 - 0.04 * w, tilt: -p.turn * w, glow: 0.7 * w * p.glow });
+  }
+  const snap = span(ms, 0.6 * c, 0.74 * c);
+  if (snap !== null) {
+    const f = easeInQuad(snap);
+    return attackerPose0({
+      along: -0.07 + 0.3 * f,
+      scale: 0.96 + 0.08 * f,
+      tilt: -p.turn + p.turn * 1.6 * f,
+      glow: p.glow,
+    });
+  }
+  const settle = span(ms, 0.74 * c, 1.25 * c);
+  if (settle !== null) {
+    const r = springHome(settle, 2, 3.2);
+    return attackerPose0({ along: 0.23 * r, scale: 1 + 0.04 * r, tilt: p.turn * 0.6 * r, glow: (1 - settle) ** 2 * p.glow });
+  }
+  return ATTACKER_REST;
+};
+
+/** A caster never leaves its spot: it swells in slow breaths as the glow builds, then lets go. */
+const channel = (ms, { contactMs: c, params: p }) => {
+  const gather = span(ms, 0, c);
+  if (gather !== null) {
+    const env = easeOutCubic(Math.min(1, gather / 0.3));
+    const breath = 0.5 - 0.5 * Math.cos(gather * TAU * 2);
+    return attackerPose0({
+      across: 0.018 * env * Math.sin(gather * TAU * 1.5),
+      scale: 1 + p.pulse * env * (0.45 + 0.55 * breath),
+      tilt: 1.5 * env * Math.sin(gather * TAU),
+      glow: p.glow * easeOutCubic(gather),
+    });
+  }
+  const release = span(ms, c, 1.3 * c);
+  if (release !== null) {
+    const r = springHome(release, 1.5, 3);
+    return attackerPose0({ along: -0.05 * r, scale: 1 - 0.03 * r, glow: p.glow * (1 - release) ** 2 });
+  }
+  return ATTACKER_REST;
+};
+
+/** A heavy blow: the card rears up off the cloth toward the camera and comes down on the defender. */
+const slam = (ms, { contactMs: c, params: p, laneH }) => {
+  const reach = reachFor(p.reach, laneH);
+  const rear = span(ms, 0, 0.55 * c);
+  if (rear !== null) {
+    const w = easeOutCubic(rear);
+    return attackerPose0({ along: -p.wind * w, scale: 1 + p.rise * w, tilt: -3 * w, glow: p.glow * w });
+  }
+  const fall = span(ms, 0.55 * c, c);
+  if (fall !== null) {
+    const f = easeInQuad(fall);
+    return attackerPose0({
+      along: -p.wind + (reach + p.wind) * f,
+      scale: 1 + p.rise * (1 - f) - 0.03 * f,
+      tilt: -3 + 6 * f,
+      glow: p.glow,
+    });
+  }
+  const recoil = span(ms, c, 1.5 * c);
+  if (recoil !== null) {
+    return attackerPose0({
+      along: reach * springHome(recoil, 1.5, 3.5),
+      scale: 1 - 0.03 * (1 - recoil) ** 2,
+      tilt: 3 * springHome(recoil, 1.5, 3.5),
+      glow: p.glow * (1 - recoil),
+    });
+  }
+  return ATTACKER_REST;
+};
+
+/** A cut: the card swings in on a curve from one side, crosses the defender and curls home the other way. */
+const sweep = (ms, { contactMs: c, params: p, laneH }) => {
+  const reach = reachFor(p.reach, laneH);
+  const wind = span(ms, 0, 0.3 * c);
+  if (wind !== null) {
+    const w = easeOutCubic(wind);
+    return attackerPose0({ along: -p.wind * w, across: -p.arc * 0.35 * w, scale: 1 + 0.06 * w, tilt: -6 * w });
+  }
+  const run = span(ms, 0.3 * c, c);
+  if (run !== null) {
+    const f = easeInQuad(run);
+    return attackerPose0({
+      along: -p.wind + (reach + p.wind) * f,
+      across: -p.arc * (0.35 + 0.65 * Math.sin(Math.PI * run)) * (1 - f),
+      scale: 1.06,
+      tilt: -6 + 18 * f,
+    });
+  }
+  const pass = span(ms, c, 1.15 * c);
+  if (pass !== null) {
+    const e = easeOutCubic(pass);
+    return attackerPose0({ along: reach + p.overshoot * e, across: p.arc * 0.5 * e, scale: 1.06, tilt: 12 });
+  }
+  const back = span(ms, 1.15 * c, 1.7 * c);
+  if (back !== null) {
+    const e = easeInOutCubic(back);
+    return attackerPose0({
+      along: (reach + p.overshoot) * (1 - e),
+      across: p.arc * 0.5 * (1 - e) + p.arc * 0.3 * Math.sin(Math.PI * back),
+      scale: 1 + 0.06 * (1 - e),
+      tilt: 12 * (1 - e),
+    });
+  }
+  return ATTACKER_REST;
+};
+
 const idle = (ms, { durationMs, params: p }) => {
   const t = span(ms, 0, durationMs);
   if (t === null || !(p.glow > 0)) return ATTACKER_REST;
@@ -278,8 +421,34 @@ export const ATTACKER_MOTIONS = Object.freeze({
   rise: { params: {}, endC: 1.6, pose: rise },
   stomp: { params: {}, endC: 1.4, pose: stomp },
   spin: { params: { turns: ['int', 1, 2, 1] }, endC: 1.3, pose: spin },
+  hop: { params: { height: ['num', 0, 0.3, 0.12], glow: ['num', 0, 1, 0.6] }, endC: 1.15, pose: hop },
+  coil: { params: { turn: ['num', 0, 40, 16], glow: ['num', 0, 1, 0.7] }, endC: 1.25, pose: coil },
+  channel: { params: { pulse: ['num', 0, 0.14, 0.07], glow: ['num', 0, 1, 1] }, endC: 1.3, pose: channel },
+  slam: {
+    params: {
+      wind: ['num', 0, 0.4, 0.16],
+      reach: ['num', 0.2, 1.2, 0.9],
+      rise: ['num', 0, 0.3, 0.16],
+      glow: ['num', 0, 1, 0],
+    },
+    endC: 1.5,
+    pose: slam,
+  },
+  sweep: {
+    params: {
+      wind: ['num', 0, 0.4, 0.18],
+      reach: ['num', 0.2, 1.2, 0.9],
+      overshoot: ['num', 0, 0.6, 0.25],
+      arc: ['num', 0, 0.8, 0.42],
+    },
+    endC: 1.7,
+    pose: sweep,
+  },
   none: { params: { glow: ['num', 0, 1, 0] }, endC: 0, pose: idle },
 });
+
+/** Motions that carry the card to the defender: the move player trails them (a dash's smear). */
+export const TRAVELLING_MOTIONS = Object.freeze(['dash', 'sweep', 'slam']);
 
 // ---- defender presets ------------------------------------------------------------
 
@@ -392,7 +561,149 @@ const freeze = (ms, { contactMs: c, params: p }) => {
   return defenderPose0({ heat: t === null ? 0 : p.heat * (1 - t), cold: true });
 };
 
+// ---- design 089: how a hit feels, by what hit -------------------------------------------
+// 109 of 144 defenders took the same knock. A struck card now answers the element: every reaction
+// below takes the knock's own params (`strength`, `heat`), trembles before contact as every
+// defender does, and is over REACT_MS after it — sooner in a scene that ends sooner (a tier 1
+// move leaves ~400 ms after contact), so it can stand in for a knock anywhere.
+
+export const REACT_MS = HEAT_MS;
+const REACT_MIN_MS = 240;
+/** The scene's last frames are the cards at rest. */
+const REACT_TAIL_MS = 20;
+
+/** How long a reaction runs in a scene `durationMs` long whose contact is at `c`. */
+const reactWindow = (c, durationMs) =>
+  durationMs > c ? Math.min(REACT_MS, Math.max(REACT_MIN_MS, durationMs - c - REACT_TAIL_MS)) : REACT_MS;
+
+/** The first instant of any hit: 0 → 1 over the first 14 % of the reaction. */
+const kickOf = (k) => easeOutCubic(clamp01(k / 0.14));
+/** After the kick, a damped spring home (1 → 0). */
+const homeOf = (k, cycles = 1.5, decay = 3) => (k < 0.14 ? 1 : springHome((k - 0.14) / 0.86, cycles, decay));
+/** 1 at the hit, 0 at the end, eased. */
+const fadeOf = (k, power = 2) => (1 - k) ** power;
+
+const reaction = (shape) => (ms, { contactMs: c, durationMs, params: p }) => {
+  const pre = tremble(ms, c);
+  if (pre) return pre;
+  const heat = heatAt(ms, c, p.heat);
+  const k = span(ms, c, c + reactWindow(c, durationMs));
+  if (k === null) return defenderPose0({ heat });
+  return defenderPose0({ ...shape(k, p, (ms - c) / 1000), heat });
+};
+
+/** Electric: the card barely moves back; it buzzes in place, fast, and the buzz dies away. */
+const jolt = reaction((k, p, t) => ({
+  along: p.strength * 0.4 * kickOf(k) * homeOf(k, 2.5, 4),
+  across: 0.034 * Math.sin(TAU * 27 * t) * fadeOf(k),
+  wobble: 5 * Math.sin(TAU * 19 * t) * fadeOf(k),
+  scaleAcross: 1 + 0.03 * Math.sin(TAU * 31 * t) * fadeOf(k),
+}));
+
+/** Fire: knocked back and swollen by the heat, it sways as it cools. */
+const scorch = reaction((k, p) => {
+  const swell = Math.sin(Math.PI * k) * 0.05;
+  return {
+    along: p.strength * 0.85 * kickOf(k) * homeOf(k, 1.5, 2.6),
+    scaleAlong: 1 + swell,
+    scaleAcross: 1 + swell,
+    wobble: 4 * Math.sin(k * Math.PI * 2) * fadeOf(k, 1.5),
+  };
+});
+
+/** Water: carried back by the weight of it, then sloshing home with no bounce. */
+const drench = reaction((k, p) => {
+  const slosh = Math.sin(k * Math.PI * 2.5) * fadeOf(k, 1.5);
+  return {
+    along: p.strength * 1.1 * kickOf(k) * (k < 0.14 ? 1 : 1 - easeInOutCubic((k - 0.14) / 0.86)),
+    across: 0.05 * Math.sin(k * Math.PI * 3) * fadeOf(k, 1.5),
+    scaleAlong: 1 - 0.07 * slosh,
+    scaleAcross: 1 + 0.07 * slosh,
+    wobble: 4 * Math.sin(k * Math.PI * 2) * fadeOf(k, 1.5),
+  };
+});
+
+/** Rock and ground: pressed flat under the weight, then it springs back up with a small hop. */
+const crush = reaction((k, p) => {
+  const press = k < 0.12 ? k / 0.12 : Math.max(0, 1 - (k - 0.12) / 0.4) ** 2;
+  return {
+    along: p.strength * 0.35 * kickOf(k) * homeOf(k),
+    scaleAlong: 1 - 0.2 * press,
+    scaleAcross: 1 + 0.13 * press,
+    lift: 0.05 * Math.sin(Math.PI * clamp01((k - 0.3) / 0.4)),
+    wobble: 2 * Math.sin(k * Math.PI * 4) * fadeOf(k),
+  };
+});
+
+/** Wind: lifted off the cloth and turned about, it drifts sideways and settles. */
+const whirl = reaction((k, p) => ({
+  along: p.strength * 0.5 * kickOf(k) * homeOf(k, 1.5, 2.6),
+  across: 0.08 * Math.sin(k * Math.PI * 2) * fadeOf(k, 1.5),
+  lift: 0.14 * Math.sin(Math.PI * k) ** 0.8,
+  wobble: 22 * Math.sin(k * Math.PI * 3) * fadeOf(k, 1.5),
+}));
+
+/** Grass, poison, bug: it droops, drained, and sways slowly back. */
+const wither = reaction((k, p) => {
+  const droop = Math.sin(Math.PI * k);
+  return {
+    along: p.strength * 0.3 * kickOf(k) * homeOf(k),
+    scaleAlong: 1 - 0.07 * droop,
+    scaleAcross: 1 - 0.04 * droop,
+    wobble: 6 * Math.sin(k * Math.PI * 4) * fadeOf(k, 1.5),
+  };
+});
+
+/** Psychic and fairy: it floats a little and its shape bends, long one way then the other. */
+const warpHit = reaction((k, p) => {
+  const bend = 0.08 * Math.sin(k * Math.PI * 4) * fadeOf(k, 1.5);
+  return {
+    along: p.strength * 0.3 * kickOf(k) * homeOf(k, 1.5, 2.5),
+    lift: 0.07 * Math.sin(Math.PI * k),
+    scaleAlong: 1 + bend,
+    scaleAcross: 1 - bend,
+    wobble: 5 * Math.sin(k * Math.PI * 2) * fadeOf(k, 1.5),
+  };
+});
+
+/** Ghost and dark: it shrinks back slowly, shuddering, and is slow to come home. */
+const dread = reaction((k, p, t) => {
+  const away = easeOutCubic(clamp01(k / 0.3)) * (1 - easeInOutCubic(clamp01((k - 0.55) / 0.45)));
+  const shrink = Math.sin(Math.PI * k) * 0.08;
+  return {
+    along: p.strength * 0.7 * away,
+    across: 0.012 * Math.sin(TAU * 22 * t) * fadeOf(k),
+    scaleAlong: 1 - shrink,
+    scaleAcross: 1 - shrink,
+    wobble: 2 * Math.sin(TAU * 14 * t) * fadeOf(k),
+  };
+});
+
+/** Steel, ice, gem: a hard, short knock that leaves the card ringing. */
+const clang = reaction((k, p, t) => ({
+  along: p.strength * 0.55 * kickOf(k) * homeOf(k, 2.5, 5),
+  scaleAlong: 1 - 0.05 * (k < 0.08 ? k / 0.08 : Math.max(0, 1 - (k - 0.08) / 0.2)),
+  wobble: 5 * Math.sin(TAU * 17 * t) * fadeOf(k, 2.5),
+}));
+
+const REACTION_PARAMS = Object.freeze({ strength: ['num', 0.05, 0.6, 0.3], heat: ['num', 0, 1, 1] });
+const reactionEntry = (pose) => ({
+  params: REACTION_PARAMS,
+  // The pose is at rest once its window is over; its heat fades over HEAT_MS as a knock's does.
+  endMs: (c) => c + HEAT_MS,
+  pose,
+});
+
 export const DEFENDER_MOTIONS = Object.freeze({
+  jolt: reactionEntry(jolt),
+  scorch: reactionEntry(scorch),
+  drench: reactionEntry(drench),
+  crush: reactionEntry(crush),
+  whirl: reactionEntry(whirl),
+  wither: reactionEntry(wither),
+  'warp-hit': reactionEntry(warpHit),
+  dread: reactionEntry(dread),
+  clang: reactionEntry(clang),
   knock: {
     params: { strength: ['num', 0.05, 0.6, 0.3], heat: ['num', 0, 1, 1] },
     endMs: (c) => c + HEAT_MS,
