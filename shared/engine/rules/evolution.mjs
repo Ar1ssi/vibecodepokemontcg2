@@ -178,6 +178,18 @@ export async function resolveStage1EvolvesFrom(stage1Name) {
   return null;
 }
 
+/**
+ * Stamps `evolvesFromBase` (the Basic) on an enriched Stage 2 card. A Stage 2 only names its
+ * Stage 1, so the Basic needs the Stage 1's own lookup. Leaves the card alone when unresolved.
+ */
+export async function stampEvolvesFromBase(card) {
+  if (!card || card.evolvesFromBase || !card.evolvesFrom) return card;
+  if (normalizeStage(card.stage) !== 'Stage 2') return card;
+  const base = await resolveStage1EvolvesFrom(String(card.evolvesFrom));
+  if (base) card.evolvesFromBase = base;
+  return card;
+}
+
 export function getCardInstanceId(card) {
   if (!card || typeof card !== 'object') return null;
   if (card.cardId) return String(card.cardId);

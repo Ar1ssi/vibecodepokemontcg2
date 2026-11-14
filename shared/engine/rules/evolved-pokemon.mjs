@@ -4,7 +4,7 @@
 // Damage, Special Conditions and instanceId stay on the root. Pure and DOM-free.
 
 import { isPokemon } from '../cards.mjs';
-import { normalizeStage } from './evolution.mjs';
+import { normalizeStage, pokemonNamesMatch, STAGE1_EVOLVES_FROM, cleanPokemonName } from './evolution.mjs';
 import { formsAllowEvolution } from './pokemon-forms.mjs';
 
 const STAGE_RANK = { Basic: 0, 'Stage 1': 1, 'Stage 2': 2, MEGAHB: 3, TERAHB: 3, BREAK: 3 };
@@ -123,8 +123,9 @@ function isToolKind(card) {
 
 /**
  * Whether Rare Candy may put this Stage 2 onto this Basic. A Stage 2 names only its Stage 1
- * (evolvesFrom), so the Basic is found through a known Stage 1 card of that name. When the
- * line cannot be traced (no evolvesFrom data, or no such Stage 1 card seen) it is allowed.
+ * (evolvesFrom), so the Basic comes from, in order: the `evolvesFromBase` the client resolved
+ * at deck load, a known Stage 1 card of that name, the static Stage 1 table. Only when none
+ * of them can trace the line (no evolvesFrom data) is it allowed.
  * @param {object} stage2
  * @param {object} basic
  * @param {object[]} knownCards Cards whose evolvesFrom can name the Stage 1's Basic
@@ -133,9 +134,12 @@ export function stage2EvolvesFromBasic(stage2, basic, knownCards = []) {
   if (!formsAllowEvolution(stage2, basic, { rareCandy: true })) return false;
   const stage1Name = stage2?.evolvesFrom;
   if (!stage1Name) return true;
+  if (stage2.evolvesFromBase) return pokemonNamesMatch(stage2.evolvesFromBase, basic?.name);
   const stage1s = knownCards.filter((c) => c?.name === stage1Name && c.evolvesFrom);
-  if (stage1s.length === 0) return true;
-  return stage1s.some((stage1) => stage1.evolvesFrom === basic?.name);
+  if (stage1s.length > 0) return stage1s.some((stage1) => stage1.evolvesFrom === basic?.name);
+  const tabled = STAGE1_EVOLVES_FROM.get(String(stage1Name).toLowerCase()) ||
+    STAGE1_EVOLVES_FROM.get(cleanPokemonName(stage1Name));
+  return tabled ? pokemonNamesMatch(tabled, basic?.name) : true;
 }
 
 /**
