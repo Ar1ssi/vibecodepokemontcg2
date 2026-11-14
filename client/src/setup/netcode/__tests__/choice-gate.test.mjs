@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { setImmediate } from 'node:timers';
 import test from 'node:test';
-import { CHOICE_BACKSTOP_MS, createChoiceGate, createKnockoutScenes } from '../choice-gate.mjs';
+import { CHOICE_BACKSTOP_MS, createChoiceGate, createKnockoutScenes, waitOutFlights } from '../choice-gate.mjs';
 
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 
@@ -172,4 +172,29 @@ test('knockout scenes: a scene that never starts settles when the start backstop
   await clock.advance(1);
   assert.equal(landed.settled, true);
   assert.deepEqual(scenes.playing(), []);
+});
+
+test('waitOutFlights: waits for the last flight, and for one pushed out while waiting', async () => {
+  const clock = fakeClock();
+  let endsAt = 500;
+  let done = false;
+  waitOutFlights({ endsAt: () => endsAt, now: clock.now, sleep: clock.sleep }).then(() => {
+    done = true;
+  });
+  await clock.advance(400);
+  endsAt = 900; // a draw queued behind another lands later
+  await clock.advance(200);
+  assert.equal(done, false);
+  await clock.advance(300);
+  assert.equal(done, true);
+});
+
+test('waitOutFlights: resolves at once when nothing is flying', async () => {
+  const clock = fakeClock();
+  let done = false;
+  waitOutFlights({ endsAt: () => 0, now: clock.now, sleep: clock.sleep }).then(() => {
+    done = true;
+  });
+  await clock.advance(0);
+  assert.equal(done, true);
 });

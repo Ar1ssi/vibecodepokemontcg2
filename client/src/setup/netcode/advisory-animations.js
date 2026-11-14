@@ -31,12 +31,13 @@ import {
 } from './apply-view.js';
 import { shouldAnimateMirror } from '../image-logic/draw-flight-predicate.mjs';
 import { playShuffleFlight } from '../image-logic/shuffle-flight.js';
-import { hideForFlight, playDrawBatch, showAfterFlight, takePrizeHandoff } from '../image-logic/draw-flight.js';
+import { drawFlightsEndAt, hideForFlight, playDrawBatch, showAfterFlight, takePrizeHandoff } from '../image-logic/draw-flight.js';
 import { cancelPendingKnockouts, captureKnockoutGhost, KO_START_BACKSTOP_MS, playKnockoutGhost } from '../image-logic/knockout-flight.js';
 import { KNOCKOUT_DURATION_MS, knockoutStackIds } from '../image-logic/knockout-pose.mjs';
 import { fxDisabled, motionReduced, rectForInstance } from '../image-logic/mat-fx.mjs';
 import { onFxSettingsChanged } from '../image-logic/fx-settings.js';
 import { playFx } from './mat-fx/index.js';
+import { prizeDealEndsAt } from './mat-fx/transit.js';
 import { pinKnockoutOrigins, pinSlideOrigins, pinTransitOrigins } from './mat-fx/lifecycle.js';
 import { claimSlidePin, dropSlidePins, releaseSlidePins } from './mat-fx/slide-pin-store.js';
 import { pileOf } from './mat-fx/card-flight.js';
@@ -52,7 +53,7 @@ import { drawSceneHold } from './mat-fx/draw-scene.mjs';
 import { flightSrcOf } from './mat-fx/card-flight.mjs';
 import { captureOrigins, discardOrigins, knockoutStack, zoneCardIds } from './mat-fx/origins.mjs';
 import { KO_SCENE_MS } from './mat-fx/ko-scene.mjs';
-import { createChoiceGate, createKnockoutScenes } from './choice-gate.mjs';
+import { createChoiceGate, createKnockoutScenes, waitOutFlights } from './choice-gate.mjs';
 
 // instanceId -> ghost, captured by handleBeforeApply (card still on board)
 // and consumed by handleAdvisoryEvent's 'knockout' branch (card already
@@ -473,15 +474,17 @@ export function holdFxQueueUntil(promise) {
 }
 
 /**
- * Resolves once every queued effect has played out its hold (the opening deal, so the
- * Starting Active picker opens after it instead of over it). The backstop keeps a caller
+ * Resolves once every queued effect has played out its hold and its cards have landed (the
+ * opening deal, so the Starting Active picker opens after it instead of over it). Holds end
+ * before the last flight does: the opponent's draw holds nothing, your draw skips its last
+ * drop, the Prize deal ends at 60% of its last card. The backstop keeps a caller
  * that gates input on this from waiting forever: it fires only after HELD_DRAW_BACKSTOP_MS
  * in which no plan started, so a long chain that is still moving is waited out.
  *
  * @returns {Promise<void>}
  */
 export function whenFxQueueIdle() {
-  return new Promise((resolve) => {
+  const queueIdle = new Promise((resolve) => {
     let seen = fxQueue.startedCount();
     let backstop = null;
     const arm = () => {
@@ -498,6 +501,13 @@ export function whenFxQueueIdle() {
       resolve();
     });
   });
+  return queueIdle.then(() =>
+    waitOutFlights({
+      endsAt: () => Math.max(drawFlightsEndAt(), prizeDealEndsAt()),
+      now: () => performance.now(),
+      sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    })
+  );
 }
 
 const waitForChoiceTurn = createChoiceGate({

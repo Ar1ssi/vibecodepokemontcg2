@@ -106,6 +106,9 @@ const sideBusyUntil = { self: 0, opp: 0 };
 
 const sideKey = (user) => (user === 'self' ? 'self' : 'opp');
 
+/** When the last queued draw flight lands (performance.now clock); the FX queue's own holds end before it. */
+export const drawFlightsEndAt = () => Math.max(sideBusyUntil.self, sideBusyUntil.opp);
+
 const runBatch = (user, items) => {
   const live = items.filter((item) => item.image?.isConnected);
   items.filter((item) => !live.includes(item)).forEach(settle);

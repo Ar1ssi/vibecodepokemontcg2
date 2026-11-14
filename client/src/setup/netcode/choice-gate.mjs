@@ -44,6 +44,24 @@ export function createChoiceGate({
 }
 
 /**
+ * Resolves once `endsAt()` is in the past. The end can move out while waiting (a draw queued
+ * behind another lands later), so it is read again after each sleep.
+ *
+ * @param {object} deps
+ * @param {() => number} deps.endsAt when the last flight lands (same clock as `now`)
+ * @param {() => number} deps.now
+ * @param {(ms: number) => Promise<void>} deps.sleep
+ * @returns {Promise<void>}
+ */
+export async function waitOutFlights({ endsAt, now, sleep }) {
+  for (;;) {
+    const tail = endsAt() - now();
+    if (!Number.isFinite(tail) || !(tail > 0)) return;
+    await sleep(tail);
+  }
+}
+
+/**
  * The knockout scenes still playing, for the choice gate. Each settles once its card has
  * landed: `landsMs` after its scene starts on its hit, else `startBackstopMs + landsMs` after
  * it was tracked, when playKnockoutGhost's own backstop start lands it. A hit later than that

@@ -25,6 +25,10 @@ import { discardedIds, takeOrigin, takeZoneSweep, zoneCardIds } from './origins.
 export const PRIZE_DEAL_STAGGER_MS = 95;
 export const PRIZE_DEAL_MS = 460;
 
+let prizeDealEnd = 0;
+/** When the last Prize card of the latest deal lands (performance.now clock); the plan's hold ends before it. */
+export const prizeDealEndsAt = () => prizeDealEnd;
+
 const PILE_OF = { deck: 'deck', lostZone: 'lostZone' };
 const CATCH_CLASS = { deck: 'fx-pile-catch--deck', lostZone: 'fx-pile-catch--lost' };
 
@@ -161,6 +165,9 @@ export const prizesDeal = (plan) => {
       showAfterFlight(card)
     );
     dealt += 1;
+  }
+  if (dealt > 0) {
+    prizeDealEnd = Math.max(prizeDealEnd, performance.now() + (dealt - 1) * PRIZE_DEAL_STAGGER_MS + PRIZE_DEAL_MS);
   }
   return dealt === 0 ? 0 : (dealt - 1) * PRIZE_DEAL_STAGGER_MS + PRIZE_DEAL_MS * 0.6;
 };
