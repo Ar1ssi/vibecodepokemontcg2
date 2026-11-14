@@ -194,3 +194,29 @@ test('"Heal 20 damage from each of your Pokémon that has any Energy attached" s
   assert.equal(damageOf(res.state, 'p1', 1), 60);
   assert.equal(damageOf(res.state, 'p1', 10), 40);
 });
+
+// customhb Primarina (me05-020) Sparkling Aria — printed text from client/src/assets/custom-sets/customhb/set.json.
+const ARIA = 'Remove all Special Conditions from this Pokémon. If this Pokémon has no Special Condition, heal 20 damage from 1 of your Benched Pokémon.';
+
+test('parser: Sparkling Aria is one cure-instead-of-heal step', () => {
+  assert.deepEqual(steps(ARIA, 'Primarina'), [
+    { type: 'atkHealCounted', count: 2, target: 'chosen', scope: 'bench', cureSelfInstead: true },
+  ]);
+});
+
+test('Sparkling Aria cures the attacker and heals nobody while a condition is on it', () => {
+  const state = board({ text: ARIA, name: 'Primarina', damage: 120, bench: [60], conditions: ['Poisoned'] });
+  const res = attack(state, coins());
+  assert.deepEqual(listConditions(res.state.players.p1.zones.active[0]), []);
+  assert.deepEqual(listConditions(state.players.p1.zones.active[0]), ['Poisoned'], 'precondition: attacker started Poisoned');
+  assert.equal(damageOf(res.state, 'p1', 10), 60);
+});
+
+test('Sparkling Aria heals 20 from a chosen Benched Pokémon when the attacker has no condition', () => {
+  const state = board({ text: ARIA, name: 'Primarina', damage: 120, bench: [60, 40] });
+  const res = attack(state, coins());
+  assert.ok(res.state.pendingChoice, 'two damaged Benched Pokémon: the attacker chooses');
+  const done = choose(res.state, [11]);
+  assert.equal(damageOf(done.state, 'p1', 11), 20);
+  assert.equal(damageOf(done.state, 'p1', 10), 60);
+});

@@ -3165,6 +3165,10 @@ function atkHealEach(ctx) {
 // among damaged Pokémon; `distribute` heals one counter per pick until the count is spent.
 function atkHealCounted(ctx) {
   const { player, opponent, step } = ctx;
+  if (step.cureSelfInstead) {
+    const self = attackerRef(ctx)?.card;
+    if (self && hasAnyCondition(self)) return atkCureSelf(ctx);
+  }
   if (stadiumBlocksHealing(ctx.draft.stadium)) return skip(ctx, 'healing_blocked');
   // Ludicolo Healing Steps: "If you do, remove that many damage counters from Ludicolo."
   const limit =

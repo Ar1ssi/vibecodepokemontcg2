@@ -1275,6 +1275,12 @@ const BLOCKS = [
   // Brock's Mankey [Gym Heroes 68] Fidget: "Shuffle your deck." as the whole effect. Anchored on
   // the whole text: the same sentence after a deck search is that search's own shuffle.
   [/^shuffle your deck\.$/g, () => ({ type: 'atkShuffleOwnDeck' })],
+  // Primarina Sparkling Aria (customhb): the cure replaces the heal while a Special Condition is on
+  // this Pokémon (effects/attack-steps.mjs atkHealCounted `cureSelfInstead`).
+  [
+    /remove all special conditions from this pokémon\. if this pokémon has no special condition, heal (\d+) damage from 1 of your benched pokémon\./g,
+    (m) => ({ type: 'atkHealCounted', count: Math.floor(Number(m[1]) / 10), target: 'chosen', scope: 'bench', cureSelfInstead: true }),
+  ],
   // Klefki Return Keys: the Energy and Pokémon Tools move, then this Pokémon is discarded. Both
   // sentences are one step, so the discard waits on the move.
   [
