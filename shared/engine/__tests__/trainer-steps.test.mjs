@@ -296,16 +296,18 @@ test('lookAtTop (Raifort): discard any number of the top 5', () => {
   assert.deepEqual(ids(zone(done, 'p1', 'deck')), [top[0].instanceId, top[2].instanceId]);
 });
 
-test("lookAtTop (Grimsley's Move): Darkness Basic to Bench, rest to the bottom", () => {
+test("lookAtTop (Grimsley's Move): any-Stage Darkness Pokémon to Bench, rest to the bottom", () => {
   const game = setup();
   const dark = pokemon('Zorua', { types: ['Darkness'] });
+  const darkStage2 = pokemon('Hydreigon', { types: ['Darkness'], stage: 'Stage 2' });
+  const fireBasic = pokemon('Charmander', { types: ['Fire'] });
   const other = card({ name: 'x' });
   const below = card({ name: 'below-window' });
-  game.p1.zones.deck.push(other, dark);
-  for (let i = 0; i < 5; i++) game.p1.zones.deck.push(card({ name: `w${i}` }));
+  game.p1.zones.deck.push(other, dark, darkStage2, fireBasic);
+  for (let i = 0; i < 3; i++) game.p1.zones.deck.push(card({ name: `w${i}` }));
   game.p1.zones.deck.push(below);
   const { res } = play(game, "Look at the top 7 cards of your deck and put a {D} Pokémon you find there onto your Bench. Shuffle the other cards and put them on the bottom of your deck. You can't use this card during your first turn.", { trainerType: 'Supporter' });
-  assert.deepEqual(ids(res.pendingChoice.options), [dark.instanceId]);
+  assert.deepEqual(ids(res.pendingChoice.options).sort(), [dark.instanceId, darkStage2.instanceId].sort());
   const done = resolve(game, res, [dark.instanceId]);
   assert.ok(zone(done, 'p1', 'bench').some((c) => c.instanceId === dark.instanceId));
   assert.equal(zone(done, 'p1', 'deck')[0].instanceId, below.instanceId);
@@ -458,7 +460,7 @@ test('lookAtTop (generic bench wording): only Basic Pokémon are offered (I132)'
   assert.deepEqual(ids(res.pendingChoice.options), [basic.instanceId]);
 });
 
-test('lookAtTop (typed bench wording): type + Basic filter (I132)', () => {
+test('lookAtTop (typed bench wording): type filter, any Stage (I132)', () => {
   const game = setup();
   const fighting = pokemon('Machop', { types: ['Fighting'] });
   const water = pokemon('Psyduck', { types: ['Water'] });
@@ -468,7 +470,7 @@ test('lookAtTop (typed bench wording): type + Basic filter (I132)', () => {
     game,
     'Look at the top 5 cards of your deck and put a {F} Pokémon you find there onto your Bench. Shuffle the other cards back into your deck.'
   );
-  assert.deepEqual(ids(res.pendingChoice.options), [fighting.instanceId]);
+  assert.deepEqual(ids(res.pendingChoice.options).sort(), [fighting.instanceId, fightingStage1.instanceId].sort());
 });
 
 test('lookAtBottom (Dusk Ball): Pokémon from the bottom 7', () => {
