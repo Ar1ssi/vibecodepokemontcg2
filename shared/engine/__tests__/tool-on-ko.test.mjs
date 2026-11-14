@@ -683,3 +683,26 @@ test('Wishful Baton on the last Pokémon in play opens no picker once the game i
   assert.equal(res.error, null);
   assert.equal(res.state.pendingChoice, null);
 });
+
+// Handheld Fan (Twilight Masquerade 150): "move an Energy from the Attacking Pokémon to 1 of your
+// opponent's Benched Pokémon" — the Fan holder's owner (p2) picks which one.
+for (const [label, hp] of [['survives', 300], ['is Knocked Out', 100]]) {
+  test(`Handheld Fan: p2 chooses which of p1's Benched Pokémon gets the Energy when the holder ${label}`, () => {
+    const benches = [defender({ name: 'Bench A' }), defender({ name: 'Bench B' })];
+    const victim = defender({ name: 'Holder', hp });
+    const state = game({ p1Active: attacker(), p2Active: victim, p1Bench: benches, p2Bench: [defender({ name: 'p2 Bench' })] });
+    attach(state, 'p2', tool('Handheld Fan', TEXT.handheldFan), victim);
+    const basic = energy();
+    attach(state, 'p1', basic, state.players.p1.zones.active[0]);
+    let res = attack(state);
+    assert.equal(res.error, null);
+    const choice = res.state.pendingChoice;
+    assert.equal(choice?.resumeToken?.effectType, 'toolEnergyBench');
+    assert.equal(choice.player, 'p2');
+    assert.deepEqual(choice.options.map((c) => c.instanceId), benches.map((b) => b.instanceId));
+    res = resolveAs(res, [benches[1].instanceId]);
+    assert.equal(res.error, null);
+    const moved = res.state.players.p1.zones.bench.find((c) => c.instanceId === basic.instanceId);
+    assert.equal(moved?.attachedTo, benches[1].instanceId);
+  });
+}

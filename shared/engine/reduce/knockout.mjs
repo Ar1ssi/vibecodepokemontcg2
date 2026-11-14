@@ -841,6 +841,62 @@ export function moveKoEnergy(player, target, obligation, events) {
   return moved;
 }
 
+export const TOOL_ENERGY_BENCH_EFFECT = 'toolEnergyBench';
+
+/** The Benched Pokémon `ownerId` holds, which the Tool holder's owner may move an Energy to. */
+function toolEnergyBenchTargets(draft, ownerId) {
+  return (draft.players?.[ownerId]?.zones?.bench || []).filter((c) => !c.attachedTo && isPokemon(c));
+}
+
+/** The Energy `energyId` still on `ownerId`'s Active Pokémon, or null once it has left. */
+function toolEnergyOnActive(draft, ownerId, energyId) {
+  const energy = (draft.players?.[ownerId]?.zones?.active || []).find((c) => c.instanceId === energyId);
+  return energy?.attachedTo ? energy : null;
+}
+
+/** Moves the Attacking Pokémon's Energy onto one of its owner's Benched Pokémon (Handheld Fan). */
+export function moveToolEnergyToBench(draft, { ownerId, energyId, benchId, events }) {
+  const owner = draft.players?.[ownerId];
+  const energy = toolEnergyOnActive(draft, ownerId, energyId);
+  const bench = toolEnergyBenchTargets(draft, ownerId).find((c) => c.instanceId === benchId);
+  if (!owner || !energy || !bench) return false;
+  owner.zones.active.splice(owner.zones.active.indexOf(energy), 1);
+  energy.attachedTo = bench.instanceId;
+  owner.zones.bench.push(energy);
+  events.push({ type: 'cardMoved', instanceId: energy.instanceId, from: 'inPlay', to: 'bench', playerId: ownerId });
+  return true;
+}
+
+/**
+ * Handheld Fan with several Benched Pokémon to choose from: the Fan holder's owner picks which one
+ * receives the Energy. Queued by the attack (the Knock Out of the holder must settle first) and
+ * asked here at the command tail, once no other choice is pending.
+ */
+export function settleToolEnergyBenchMoves(draft) {
+  if (draft.pendingChoice) return;
+  const pending = draft.__toolEnergyBench;
+  delete draft.__toolEnergyBench;
+  if (isGameConcluded(draft) || !Array.isArray(pending)) return;
+  const remaining = [...pending];
+  while (remaining.length > 0) {
+    const move = remaining.shift();
+    const targets = toolEnergyBenchTargets(draft, move.ownerId);
+    if (!toolEnergyOnActive(draft, move.ownerId, move.energyId) || targets.length === 0) continue;
+    draft.pendingChoice = createPendingChoice({
+      player: move.chooserId,
+      source: move.source,
+      prompt: `${move.source}: choose 1 of your opponent's Benched Pokémon to move the Energy to`,
+      options: targets,
+      min: 1,
+      max: 1,
+      cancellable: false,
+      stateVersion: draft.stateVersion,
+      resumeToken: { effectType: TOOL_ENERGY_BENCH_EFFECT, initiatorPlayerId: move.chooserId, move, remaining },
+    });
+    return;
+  }
+}
+
 export function settleKoEnergyMoves(draft, { events }) {
   if (draft.pendingChoice) return;
   // A finished game resolves nothing more (the last Pokémon's Knock Out ended it).

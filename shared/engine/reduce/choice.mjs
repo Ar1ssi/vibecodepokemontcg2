@@ -29,7 +29,7 @@ import {
   promoteBenchToActive, koEnergyTargets, moveKoEnergy, PRIZE_CHOICE_EFFECT, resolvePrizeChoice,
   KO_HAND_DISCARD_EFFECT, resolveKoHandDiscard, KO_TOOL_COUNTERS_EFFECT, resolveKoToolCounter,
   PRIZE_BENCH_EFFECT, PRIZE_ATTACH_EFFECT, resumePrizeAttach, resumePrizeToBench,
-  PRIZE_TRAINER_EFFECT, resumePrizeTrainer,
+  PRIZE_TRAINER_EFFECT, resumePrizeTrainer, TOOL_ENERGY_BENCH_EFFECT, moveToolEnergyToBench,
 } from './knockout.mjs';
 import { resolveCheckup, advanceTurn, endTurnFromEffect } from './turn.mjs';
 import { continueRetreat, isExactRetreatPayment, applyRetreatSwap } from './retreat.mjs';
@@ -518,6 +518,17 @@ export function resolveChoiceCommand({ draft, playerId, activeRng, events, paylo
       if (target) moveKoEnergy(player, target, obligation, events);
     }
     draft.__koEnergyMoves = pending;
+  } else if (token.effectType === TOOL_ENERGY_BENCH_EFFECT) {
+    // Handheld Fan: the holder's owner picked which Benched Pokémon gets the Energy.
+    draft.pendingChoice = null;
+    const { move } = token;
+    moveToolEnergyToBench(draft, {
+      ownerId: move.ownerId,
+      energyId: move.energyId,
+      benchId: (payload.selection || [])[0],
+      events,
+    });
+    draft.__toolEnergyBench = Array.isArray(token.remaining) ? [...token.remaining] : [];
   } else if (token.effectType === 'stadium') {
     const result = executeStadium(draft, {
       playerId: initiatorPlayerId,

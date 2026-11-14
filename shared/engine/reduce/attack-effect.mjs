@@ -1143,7 +1143,19 @@ export function resolveAttackEffectPhase(draft, ctx) {
               const benchRoot = benchZone?.find((c) => !c.attachedTo) || null;
               const toHand = eff.moveEnergyOnKo.to === 'opponentHand';
               const dest = toHand ? draft.players[playerId]?.zones?.hand : benchZone;
-              if (energy && dest) {
+              const benchRoots = (benchZone || []).filter((c) => !c.attachedTo);
+              if (energy && !toHand && benchRoots.length > 1) {
+                // The Fan holder's owner picks the Benched Pokémon (settleToolEnergyBenchMoves).
+                draft.__toolEnergyBench = [
+                  ...(draft.__toolEnergyBench || []),
+                  {
+                    chooserId: defenderPlayerId,
+                    ownerId: playerId,
+                    energyId: energy.instanceId,
+                    source: eff.tool?.name || 'Pokémon Tool',
+                  },
+                ];
+              } else if (energy && dest) {
                 attackerZone.splice(attackerZone.indexOf(energy), 1);
                 energy.attachedTo = toHand ? null : benchRoot?.instanceId ?? null;
                 dest.push(energy);
