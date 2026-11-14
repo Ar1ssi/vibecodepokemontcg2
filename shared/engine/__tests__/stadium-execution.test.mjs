@@ -4,6 +4,7 @@ import { createGameState, createPlayerZones } from '../state.mjs';
 import { createCard } from '../cards.mjs';
 import { createRng } from '../rng.mjs';
 import { applyCommand } from '../reduce.mjs';
+import { addCondition } from '../rules/special-conditions.mjs';
 
 function setupGame() {
   const rng = createRng(42);
@@ -2280,4 +2281,32 @@ test('stadium: Fairy Garden is a no-op (and not consumed) without a {Y} Energy i
   assert.equal(res.pendingChoice, null);
   assert.equal(res.state.players.p1.zones.deck.length, 1);
   assert.ok(!res.state.players.p1.flags.stadiumUsedThisTurn);
+});
+
+// Perilous Jungle, the printing with "affected by a Special Condition" (user's scan; not yet in the corpus).
+test('stadium: Perilous Jungle puts 1 counter only on non-{D} Pokémon with a Special Condition', () => {
+  const { state, rng } = setupGame();
+  state.stadium = stadiumWith(
+    92,
+    'Perilous Jungle',
+    "During Pokémon Checkup, put 1 damage counter on each non-{D} Pokémon affected by a Special Condition (both yours and your opponent's)."
+  );
+  const mon = (instanceId, name, types) =>
+    createCard({ instanceId, name, hp: 300, stage: 'Basic', supertype: 'Pokémon', type: 'Pokémon', types });
+  const burned = mon(93, 'Burned Fire', ['Fire']);
+  addCondition(burned, 'Burned');
+  const darkPoisoned = mon(94, 'Poisoned Dark', ['Darkness']);
+  addCondition(darkPoisoned, 'Poisoned');
+  state.players.p1.zones.active.push(burned);
+  state.players.p1.zones.bench.push(mon(95, 'Healthy Bench', ['Water']));
+  state.players.p2.zones.active.push(darkPoisoned);
+  state.players.p2.zones.bench.push(mon(96, 'Healthy Bench 2', ['Grass']));
+
+  const res = applyCommand(state, { type: 'pass', payload: {}, playerId: 'p1' }, rng);
+  assert.equal(res.error, null);
+  const damageOf = (pid, zone, id) => res.state.players[pid].zones[zone].find((c) => c.instanceId === id)?.damage || 0;
+  assert.equal(res.events.filter((e) => e.type === 'stadiumBetweenTurnsDamage').length, 1, 'one Pokémon takes the counter');
+  assert.equal(res.events.find((e) => e.type === 'stadiumBetweenTurnsDamage').instanceId, 93);
+  assert.equal(damageOf('p1', 'bench', 95), 0);
+  assert.equal(damageOf('p2', 'bench', 96), 0);
 });

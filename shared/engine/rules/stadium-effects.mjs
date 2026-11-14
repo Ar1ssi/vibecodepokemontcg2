@@ -2251,6 +2251,7 @@ export function parseStadiumBetweenTurnsDamage(card) {
   else if (/pokémon-ex with maximum hp of at least \d+/.test(t))
     filter = 'ex-high-hp';
   else if (/pokémon that has a poké-power/.test(t)) filter = 'poke-power';
+  else if (/non-\{d\} pokémon affected by a special condition/.test(t)) filter = 'conditioned-non-d';
   return { amount: counters * 10, counters, filter };
 }
 
@@ -2259,7 +2260,7 @@ export function isStadiumBetweenTurnsDamage(card) {
 }
 
 /** Damage counters this Stadium's between-turns effect places on `pokemon`. */
-export function stadiumBetweenTurnsDamageFor(pokemon, card) {
+export function stadiumBetweenTurnsDamageFor(pokemon, card, { affected = false } = {}) {
   const parsed = parseStadiumBetweenTurnsDamage(card);
   if (!parsed || !pokemon) return 0;
   switch (parsed.filter) {
@@ -2272,6 +2273,9 @@ export function stadiumBetweenTurnsDamageFor(pokemon, card) {
     }
     case 'poke-power':
       return pokemonHasPokePower(pokemon) ? parsed.amount : 0;
+    // Perilous Jungle (Mega Evolution wording, user's scan): only a non-{D} Pokémon with a Special Condition.
+    case 'conditioned-non-d':
+      return affected && !pokemonHasTypeWord(pokemon, 'darkness') ? parsed.amount : 0;
     default:
       return parsed.amount;
   }
