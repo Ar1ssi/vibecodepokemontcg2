@@ -6,8 +6,10 @@
 # Pruned or shortened lines, verbatim: .agent/archive/DECISIONS-pruned-2026-10-15.md (grep the D-number).
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
-#   Next id = highest D number in this file and the archives + 1 (next: D248).
+#   Next id = highest D number in this file and the archives + 1 (next: D250).
 
+- D249 2026-11-14 [mat-fx] FX composite is two draws: cover by alpha, then light screened after a hue-keeping roll-off (fx/tone.mjs); no effect may clip to white. Motions are spread by rule (motion-variety.mjs). (design 089)
+- D248 2026-11-14 [engine] `attackStarted` opens every attack before its first effect; the client plays the attack scene from it, then the slide, and holds choice prompts until the scene ends (choice-gate.mjs). (design 089)
 - D247 2026-11-13 [server] Deploys serve an esbuild bundle (one hashed script + sheet, immutable); unhashed files are `no-cache`; dev stays unbundled ESM. Deps: esbuild, compression. (Amends D4; design 088)
 - D246 2026-11-12 [client] The board outside a room stays (user): the client rules layer is its engine and is not deleted; 087 slice 3 struck. It draws nothing today (I283). (design 087)
 - D245 2026-11-12 [netcode] Legacy relay removed: the server always runs the rules; SERVER_AUTHORITATIVE opt-outs only warn; no shadow mode; room-sweep.mjs frees roomInfo past grace. (Supersedes D216; design 087)

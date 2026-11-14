@@ -1,5 +1,5 @@
 # 089: VFX pass — sequencing, layering, missing animations, new shuffle, varied moves, reworked shaders
-Status: built on `feature/089-vfx-pass`, reviewed, not landed (approved: self — one-shot)
+Status: shipped 2026-11-14 (reviewed) (approved: self — one-shot)
 Date: 2026-11-13 · Session: one-shot (worktree `.claude/worktrees/088-vfx-pass`, branch `feature/089-vfx-pass`)
 
 ## Problem

@@ -3,13 +3,13 @@
      Every stale line here taxes every session. History belongs to git log (commit messages are the
      journal). Contradicts git log? Trust git: rebuild from `git log -20 main`. -->
 
-Focus: all 25 Stadium boards restyled per the 084 visual audit (D236): night boards re-keyed, hero cues lit through one shared contact
+Focus: 089 VFX pass landed (D248/D249): attacks play before their switch, pinned cards stay visible, riffle shuffle, Prize/heal/block/fizzle
+  effects, tone roll-off composite, move motions spread by rule. Before it: all 25 Stadium boards restyled per the 084 visual audit (D236): night boards re-keyed, hero cues lit through one shared contact
   glow, shared water body, varied scatter, landmarks kept in frame, Scorched Earth margins. Attack FX are per-type element shaders (079,
   D229–D231); custom sets reach Render (076, D228) via cardback "Publish to site".
-Active: user localhost checks — deck box deal (073 rev B: Set Up Both; rec-deck-box.mjs), 084 on all 25 Stadium boards, 085's Scorched Earth and Vitality rework (`?stadiumEnv=<key>`, both cameras); attack FX on all
-  types (known: water spray reads icy, psychic rings large, Pin Missile needles small, impact centres can blow out, leaf orientation
-  unconfirmed); first custom-set publish + Render check; 088 fast refresh (D247): confirm the deploy's boot log reads `Client: bundle`, decide `KEEP_AWAKE`; older: 3D board H1-H3 (I266), TCG Live attack UI (074). No review on 078/079.
-Next: I283 (P1: the no-room board draws no cards; user chose to track it, client rules layer stays, D246). Maintenance is due (`pnpm harness:check`: caps over, 250+ commits since the last maintain) → maintain.md. Then tune 079 from the
+Active: user localhost checks — deck box deal (073 rev B: Set Up Both; rec-deck-box.mjs), 084 on all 25 Stadium boards, 085's Scorched Earth and Vitality rework (`?stadiumEnv=<key>`, both cameras); 089 look (Waterfall, Hydro Pump, Psychic, Psycho Cut, Thunder, Fire Blast, Solar Beam, Razor Leaf, Pin Missile, Earthquake, Sludge Bomb, Wild Charge; a Prize take; a shuffle; an attack that switches out);
+  first custom-set publish + Render check; 088 fast refresh (D247): confirm the deploy's boot log reads `Client: bundle`, decide `KEEP_AWAKE`; older: 3D board H1-H3 (I266), TCG Live attack UI (074). No review on 078/079.
+Next: I283 (P1: the no-room board draws no cards; user chose to track it, client rules layer stays, D246). Maintenance is due (`pnpm harness:check`: caps over, 250+ commits since the last maintain) → maintain.md. Then tune 089 from the
   user's verdict; I264, I259, 072 coin prompts, B&B run flow, I242, I239, I227; prune merged branches; ETB (057) slice 6 unstarted.
 Blocked: I85/I86 need design approval (028/029); I87 needs the user's description; I235 needs a face-down-card design.
 

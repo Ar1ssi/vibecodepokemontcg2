@@ -6,7 +6,7 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I285). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I287). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Umbrella lines name every member as `(merged I<a>, I<b>…)`: grep any id to find its line.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (`pnpm harness:check`); maintain.md moves older Closed lines to .agent/archive/ISSUES-closed.md.
@@ -14,6 +14,8 @@
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I286 2026-11-14 P3 [tooling] `scripts/e2e/board3d-view-test.mjs` reports 4 FAILs on origin/main `6f5011bec` too (not from 089); not triaged (refs: 089)
+- I285 2026-11-14 P3 [board-ui] `environmentKeyFor` Homebrew Stadium test fails since the customhb renumber in `ec59f36e3`: the test names a card id that moved (refs: 077, 089)
 - I284 2026-11-13 P2 [tooling] e2e harness stale since D239, on the source build too: `pnpm test:solo` step 6 expects 7/8 hands before the Actives are placed; playtest-bot fails setup 0/3 ("timeout waiting for page predicate"). Scripts that `import('/src/…')` need the source build (refs: 088)
 - I283 2026-11-12 P1 [board-ui] No-room board draws no cards: before the Solo tab is clicked, deck load and Set Up run on the hidden mirror (chat lines, client coin prompt) while the three.js board stays empty. Repro: load page, load both decks, Set Up Both (refs: D246, design 087 § No-room board)
 - I282 2026-11-09 P2 [mat-fx] stadium-environment-layout.test "environmentKeyFor gives every Homebrew Stadium in set.json a board" fails on origin/main: 27 committed customhb Stadiums unmapped (Altar of the Moone, Sky Field, Brooklet Hill…) — repro: node --test that file (design 077)
