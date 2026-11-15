@@ -1,11 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TERA_PALETTE, teraPaletteFor } from '../tera-crystal.mjs';
+import { TERA_PALETTE, teraPaletteFor } from '../tera-palette.mjs';
 import {
   FACET_VIEW,
   TERA_SKIN_GLINTS,
   createSkinReconciler,
   skinSeed,
+  svgDataUrl,
   teraSkinColors,
   teraSkinFacets,
   teraSkinGlints,
@@ -76,13 +77,13 @@ test('teraSkinTargets: an evolved stack is skinned by its top card', () => {
   assert.deepEqual([...teraSkinTargets(zoneArrayOf)], [12]);
 });
 
-test('teraSkinTargets: held ids wait, bad zones and cards are skipped', () => {
+test('teraSkinTargets: bad zones and cards are skipped', () => {
   const zoneArrayOf = board({
     'you.active': [teraBasic(1)],
     'you.bench': { count: 3 },
     'them.active': [null, 'x', teraBasic(null), teraBasic(2)],
   });
-  assert.deepEqual([...teraSkinTargets(zoneArrayOf, new Set([1]))], [2]);
+  assert.deepEqual([...teraSkinTargets(zoneArrayOf)], [1, 2]);
   assert.equal(teraSkinTargets(null).size, 0);
   assert.equal(teraSkinTargets(() => undefined).size, 0);
 });
@@ -170,38 +171,17 @@ test('teraSkinGlints: a few staggered glints inside the card', () => {
   assert.deepEqual(teraSkinGlints(9), glints);
 });
 
-// A reconciler over fakes: `wants` is the id list targetIds returns (minus
-// held ids), `nodes` maps id -> node, and `log` records every apply/remove.
+// A reconciler over fakes: `wants` is the id list targetIds returns, `nodes`
+// maps id -> node, and `log` records every apply/remove.
 function fakeReconciler() {
-  const state = {
-    wants: [],
-    nodes: new Map(),
-    log: [],
-    timers: new Map(),
-    cancelled: [],
-  };
-  let nextHandle = 1;
+  const state = { wants: [], nodes: new Map(), log: [] };
   const reconciler = createSkinReconciler({
-    targetIds: (held) => state.wants.filter((id) => !held.has(id)),
+    targetIds: () => state.wants,
     nodeFor: (id) => state.nodes.get(id) ?? null,
     apply: (node, id) => state.log.push(['apply', node, id]),
     remove: (node) => state.log.push(['remove', node]),
-    schedule: (fn, ms) => {
-      const handle = nextHandle++;
-      state.timers.set(handle, { fn, ms });
-      return handle;
-    },
-    cancel: (handle) => {
-      state.cancelled.push(handle);
-      state.timers.delete(handle);
-    },
   });
-  const fire = (handle) => {
-    const { fn } = state.timers.get(handle);
-    state.timers.delete(handle);
-    fn();
-  };
-  return { ...reconciler, state, fire };
+  return { ...reconciler, state };
 }
 
 test('createSkinReconciler: refresh applies wanted skins once, skips missing nodes', () => {
@@ -246,70 +226,16 @@ test('createSkinReconciler: a new node for the card moves the skin; untargeted s
   );
 });
 
-test('createSkinReconciler: hold strips the skin until its timer fires', () => {
-  const r = fakeReconciler();
-  r.state.wants = [1];
-  r.state.nodes.set(1, 'img-1');
-  r.refresh();
-  r.state.log.length = 0;
-
-  r.hold(1, 2640);
-  assert.deepEqual(r.state.log, [['remove', 'img-1']]);
-  const [[handle, { ms }]] = [...r.state.timers];
-  assert.equal(ms, 2640);
-
-  r.refresh();
-  assert.deepEqual(r.state.log, [['remove', 'img-1']], 'held across refreshes');
-
-  r.fire(handle);
-  assert.deepEqual(r.state.log, [
-    ['remove', 'img-1'],
-    ['apply', 'img-1', 1],
-  ]);
+test('svgDataUrl: a CSS url() the SVG survives in', () => {
+  const url = svgDataUrl('<svg fill=\'#fff\'><path d="M0 0"/></svg>');
+  assert.ok(url.startsWith('url("data:image/svg+xml,'));
+  assert.ok(url.endsWith('")'));
+  const body = url.slice('url("'.length, -2);
+  assert.ok(!/[#<>"]/.test(body), 'no character that ends the value or the url');
+  assert.ok(body.includes('%23fff') && body.includes("d='M0 0'"));
 });
 
-test('createSkinReconciler: hold before the card is skinned, re-hold restarts the timer', () => {
-  const r = fakeReconciler();
-  r.state.wants = [1];
-  r.state.nodes.set(1, 'img-1');
-
-  r.hold(1, 100);
-  r.refresh();
-  assert.deepEqual(
-    r.state.log,
-    [],
-    'held before its first refresh: nothing to strip, nothing applied'
-  );
-
-  const [first] = r.state.timers.keys();
-  r.hold(1, 500);
-  assert.deepEqual(r.state.cancelled, [first]);
-  const [[second, { ms }]] = [...r.state.timers];
-  assert.equal(ms, 500);
-
-  r.fire(second);
-  assert.deepEqual(r.state.log, [['apply', 'img-1', 1]]);
-});
-
-test('createSkinReconciler: hold ignores a missing id or a non-positive duration', () => {
-  const r = fakeReconciler();
-  r.state.wants = [1];
-  r.state.nodes.set(1, 'img-1');
-  r.refresh();
-  for (const [id, ms] of [
-    [null, 100],
-    [undefined, 100],
-    [1, 0],
-    [1, -5],
-    [1, NaN],
-    [1, undefined],
-  ])
-    r.hold(id, ms);
-  assert.equal(r.state.timers.size, 0);
-  assert.deepEqual(r.state.log, [['apply', 'img-1', 1]]);
-});
-
-test('teraSkinFacets: each triangle with its fill, as the SVG paints it (3D board facets)', () => {
+test('teraSkinFacets: each triangle with its fill, as the SVG paints it', () => {
   const { svg, triangles, facets } = teraSkinFacets(5, teraPaletteFor('Fire'));
   assert.equal(facets.length, triangles.length);
   facets.forEach((facet, i) => {

@@ -3,6 +3,8 @@
 // push(params) → boolean, finish(uniforms), counts?(), dispose() }.
 import { defineBolt } from './bolt.js';
 import { boltSamples } from './bolt.mjs';
+import { defineCrystal } from './crystal.js';
+import { crystalSamples } from './crystal.mjs';
 import { defineDebris } from './debris.js';
 import { debrisSamples } from './debris.mjs';
 import { defineFireball } from './fireball.js';
@@ -15,6 +17,8 @@ import { defineLens } from './lens.js';
 import { lensSamples } from './lens.mjs';
 import { definePlasma } from './plasma.js';
 import { plasmaSamples } from './plasma.mjs';
+import { defineShell } from './shell.js';
+import { shellSamples } from './shell.mjs';
 import { defineSmoke } from './smoke.js';
 import { smokeSamples } from './smoke.mjs';
 import { defineSprite } from './sprite.js';
@@ -36,6 +40,8 @@ export const ELEMENT_KINDS = Object.freeze({
   smoke: defineSmoke,
   debris: defineDebris,
   haze: defineHaze,
+  crystal: defineCrystal,
+  shell: defineShell,
 });
 
 /** Per kind, emits that exercise its shader paths (scripts/fx/check-element-shaders.mjs). */
@@ -51,4 +57,6 @@ export const ELEMENT_SAMPLES = Object.freeze({
   smoke: smokeSamples,
   debris: debrisSamples,
   haze: hazeSamples,
+  crystal: crystalSamples,
+  shell: shellSamples,
 });

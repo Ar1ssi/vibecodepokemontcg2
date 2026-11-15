@@ -1,12 +1,12 @@
 // Design 037: the persistent Tera crystal skin, pure half. Which in-play
-// Pokémon wear it, and the per-card art (facet mesh, glint spots) that
-// tera-skin.js lays over them. Seeded by instanceId so a card keeps the same
-// facets across re-renders.
+// Pokémon wear it, where its star glints sit, and the facet mesh the mirror's
+// DOM skin wears. Seeded by instanceId so a card keeps the same look across
+// re-renders. The 3D board's coat is board3d/tera-coat.mjs.
 import { isPokemon } from '../../../../../shared/engine/cards.mjs';
 import { topPokemonCard } from '../../../../../shared/engine/rules/evolved-pokemon.mjs';
 import { signatureEntryKind } from './entry-kind.mjs';
 import { seededRandom } from './flow-pose.mjs';
-import { TERA_PALETTE } from './tera-crystal.mjs';
+import { TERA_PALETTE } from './tera-palette.mjs';
 
 export const TERA_SKIN_SIDES = ['you', 'them'];
 export const TERA_SKIN_ZONES = ['active', 'bench'];
@@ -15,10 +15,9 @@ export const TERA_SKIN_ZONES = ['active', 'bench'];
  * The instanceIds of the visible (top) card of every in-play Tera Pokémon.
  *
  * @param {(side: string, zoneId: string) => object[]} zoneArrayOf
- * @param {{ has: (id: unknown) => boolean }} [held] ids whose skin waits (entry playing)
  * @returns {Set<unknown>}
  */
-export function teraSkinTargets(zoneArrayOf, held = new Set()) {
+export function teraSkinTargets(zoneArrayOf) {
   const targets = new Set();
   if (typeof zoneArrayOf !== 'function') return targets;
   for (const side of TERA_SKIN_SIDES) {
@@ -30,7 +29,7 @@ export function teraSkinTargets(zoneArrayOf, held = new Set()) {
         if (root.attachedTo != null || !isPokemon(root)) continue;
         const top = topPokemonCard(cards, root);
         if (signatureEntryKind(top) !== 'tera') continue;
-        if (top.instanceId == null || held.has(top.instanceId)) continue;
+        if (top.instanceId == null) continue;
         targets.add(top.instanceId);
       }
     }
@@ -39,33 +38,23 @@ export function teraSkinTargets(zoneArrayOf, held = new Set()) {
 }
 
 /**
- * The skin bookkeeping without the DOM: which node wears which id's skin, and
- * which ids are held back while their entry animation still hides the card.
+ * The skin bookkeeping without the DOM: which node wears which id's skin.
  * `refresh` diffs the wanted skins against the applied ones, so a card whose
- * node changed (a holo wrapper arrived) moves its skin to the new node.
+ * node changed (a holo wrapper arrived, a scene was rebuilt) moves its skin to
+ * the new node.
  *
  * @param {object} hooks
- * @param {(held: Map<unknown, unknown>) => Iterable<unknown>} hooks.targetIds ids that want a skin
+ * @param {() => Iterable<unknown>} hooks.targetIds ids that want a skin
  * @param {(id: unknown) => object | null} hooks.nodeFor the node showing that card, if any
  * @param {(node: object, id: unknown) => void} hooks.apply
  * @param {(node: object) => void} hooks.remove
- * @param {(fn: () => void, ms: number) => unknown} hooks.schedule
- * @param {(handle: unknown) => void} hooks.cancel
  */
-export function createSkinReconciler({
-  targetIds,
-  nodeFor,
-  apply,
-  remove,
-  schedule,
-  cancel,
-}) {
+export function createSkinReconciler({ targetIds, nodeFor, apply, remove }) {
   const applied = new Map();
-  const held = new Map();
 
   function refresh() {
     const wanted = new Map();
-    for (const id of targetIds(held)) {
+    for (const id of targetIds()) {
       const node = nodeFor(id);
       if (node) wanted.set(id, node);
     }
@@ -81,25 +70,12 @@ export function createSkinReconciler({
     }
   }
 
-  /** Keeps `id`'s skin off for `ms`, then refreshes so it goes on. */
-  function hold(id, ms) {
-    if (id == null || !(ms > 0)) return;
-    if (held.has(id)) cancel(held.get(id));
-    held.set(
-      id,
-      schedule(() => {
-        held.delete(id);
-        refresh();
-      }, ms)
-    );
-    const node = applied.get(id);
-    if (!node) return;
-    remove(node);
-    applied.delete(id);
-  }
-
-  return { refresh, hold };
+  return { refresh };
 }
+
+/** `url("data:…")` for a standalone SVG string, safe inside a CSS value. */
+export const svgDataUrl = (svg) =>
+  `url("data:image/svg+xml,${svg.replace(/#/g, '%23').replace(/</g, '%3C').replace(/>/g, '%3E').replace(/"/g, "'")}")`;
 
 /** A 32-bit seed from a numeric or string id (FNV-1a for strings). */
 export function skinSeed(id) {
@@ -160,7 +136,7 @@ const f1 = (n) => Math.round(n * 10) / 10;
  * @param {typeof TERA_PALETTE} [palette] from `teraPaletteFor` (the card's type)
  * @returns {{ svg: string, triangles: number[][][],
  *   facets: { points: number[][], fill: string, opacity: number }[] }}
- *   `facets` = each triangle with its fill, for painters that draw no SVG (the 3D board).
+ *   `facets` = each triangle with its fill, for painters that draw no SVG.
  */
 export function teraSkinFacets(seed, palette = TERA_PALETTE) {
   const rand = seededRandom(skinSeed(seed));

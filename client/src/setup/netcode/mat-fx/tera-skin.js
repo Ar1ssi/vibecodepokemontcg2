@@ -1,12 +1,11 @@
 // Design 037: the persistent Tera crystal skin. Every Tera Pokémon in play wears
-// a crystal overlay (tint, facet mesh, drifting sheen, rim glow, glints) in its
-// type's colour until it leaves play. Reconciled from the last applied view on
-// `board-view-applied` (apply-view.js) and `holo-wrapper-changed`
-// (hydrate-holo.js); a Tera entry holds the skin back until its reveal so the
-// card comes out of the burst already crystal. A card without a holo wrapper
-// gets only the CSS rim glow (an <img> cannot hold the layers). On the 3D board (design 074 §D6)
-// the mirror holds no skin: the scene wears it (`setUiState(id, { teraSkin: palette | null })`,
-// drawn by board3d/overlay-meshes.js).
+// a crystal coat in its type's colour until it leaves play. Reconciled from the
+// last applied view on `board-view-applied` (apply-view.js) and
+// `holo-wrapper-changed` (hydrate-holo.js); a Tera entry says when the coat
+// forms (`formTeraSkinAt`), so the crystals close over the card inside its scene.
+// On the 3D board (design 074 §D6) the mirror holds no skin: the scene wears it
+// (`setUiState(id, { teraSkin: palette | null, teraFormAt })`, drawn by
+// board3d/overlay-meshes.js from board3d/tera-coat.mjs).
 // Styles: the old DOM mat ambient styles (the cards live in the playmat iframes).
 import { board3dActive, getBoardScene } from '../../board3d/board3d.js';
 import { fxDisabled } from '../../image-logic/mat-fx.mjs';
@@ -15,10 +14,10 @@ import {
   getCardRegistry,
   hasAuthoritativeView,
 } from '../apply-view.js';
-import { svgDataUrl } from './entry-art.mjs';
-import { teraPaletteForCard } from './tera-crystal.mjs';
+import { teraPaletteForCard } from './tera-palette.mjs';
 import {
   createSkinReconciler,
+  svgDataUrl,
   teraSkinColors,
   teraSkinFacets,
   teraSkinGlints,
@@ -102,7 +101,7 @@ function applySkin(node, instanceId) {
 
 function removeSkin(node) {
   if (isSceneHandle(node)) {
-    node.scene.setUiState(node.instanceId, { teraSkin: null });
+    node.scene.setUiState(node.instanceId, { teraSkin: null, teraFormAt: null });
     sceneHandles.get(node.scene).delete(node.instanceId);
     return;
   }
@@ -113,10 +112,7 @@ function removeSkin(node) {
 }
 
 const skins = createSkinReconciler({
-  targetIds: (held) =>
-    !fxDisabled() && hasAuthoritativeView()
-      ? teraSkinTargets(getAuthoritativeZoneArray, held)
-      : [],
+  targetIds: () => (!fxDisabled() && hasAuthoritativeView() ? teraSkinTargets(getAuthoritativeZoneArray) : []),
   nodeFor: (id) => {
     if (!board3dActive()) return skinNodeFor(getCardRegistry().get(id));
     const scene = getBoardScene();
@@ -124,21 +120,23 @@ const skins = createSkinReconciler({
   },
   apply: applySkin,
   remove: removeSkin,
-  schedule: (fn, ms) => setTimeout(fn, ms),
-  cancel: (handle) => clearTimeout(handle),
 });
 
 /** Brings every skin in line with the last applied view. */
 export const refreshTeraSkins = skins.refresh;
 
 /**
- * Keeps one Pokémon's skin off for `ms` (its entry animation is still hiding
- * the card), then lets the next refresh put it on.
+ * Sets when one Pokémon's coat forms on the 3D board: `sceneMs` on the scene's
+ * clock (its entry's crystallize beat). The coat stays unseen until then,
+ * whether it is on the card already or goes on later.
  *
  * @param {unknown} instanceId
- * @param {number} ms
+ * @param {number} sceneMs
  */
-export const holdTeraSkin = skins.hold;
+export function formTeraSkinAt(instanceId, sceneMs) {
+  if (instanceId == null || !Number.isFinite(sceneMs) || !board3dActive()) return;
+  getBoardScene()?.setUiState(instanceId, { teraFormAt: sceneMs });
+}
 
 let installed = false;
 

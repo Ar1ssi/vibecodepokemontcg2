@@ -426,6 +426,10 @@ export function createBoardScene({
       invalidate();
     },
     tiltDeg: () => cameraDesc?.tiltDeg ?? 0,
+    /** Starts loading element textures by file name, so a scene's later beats find them ready. */
+    warm: (names) => {
+      for (const name of Array.isArray(names) ? names : []) fxLayer.elements.textures.get(name);
+    },
   };
 
   /**

@@ -212,10 +212,19 @@ function knockoutPlays(plan) {
   return plays;
 }
 
+// A Mega or Tera entry (index.js sets `signatureBurstMs`) plays the game's evolve sample with its
+// peak on the entry's burst; a card that first flies in from a pile bursts that much later.
+function signaturePlays(plan) {
+  if (!Number.isFinite(plan?.signatureBurstMs)) return [];
+  const flightMs = Array.isArray(plan.held) && plan.held.length > 0 ? FLIGHT_MS : 0;
+  return [['evolve-card', 0, plan.signatureBurstMs + flightMs]];
+}
+
 // `plan.setup` (advisory-animations.js) marks an entry during the opening placement.
 function enterPlays(plan) {
   const plays = placePlays(plan);
-  return plays.length > 0 && plan.soundCard?.name === DARKRAI_EX ? [['darkrai-ex-entrance', 0]] : plays;
+  if (plays.length > 0 && plan.soundCard?.name === DARKRAI_EX) return [['darkrai-ex-entrance', 0]];
+  return plays.length > 0 ? [...plays, ...signaturePlays(plan)] : plays;
 }
 
 function placePlays(plan) {
@@ -266,7 +275,7 @@ const CUE_PLAYS_FOR_EFFECT = {
   'prize-claim': () => single('prize-card'),
   promote: (plan) => single(activeCueKey(plan?.soundCard)),
   retreat: (plan) => [['card-swoosh', 0], [activeCueKey(plan?.soundCard), RETREAT_SLIDE_MS]],
-  evolve: () => single('evolve-card'),
+  evolve: (plan) => (signaturePlays(plan).length > 0 ? signaturePlays(plan) : single('evolve-card')),
   'evolve-scene': () => single('evolve-card'),
   damage: (plan) => single(classifyHitOnce(plan)?.kind === 'heal' ? 'heal-card' : null),
   status: (plan) => {

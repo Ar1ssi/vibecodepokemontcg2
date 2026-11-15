@@ -1,13 +1,8 @@
-// The persistent Tera crystal skin (design 037, mat-fx/tera-skin.js) evaluated at a time, for the
-// three.js board, which animates planes instead of CSS layers (design 074 §D6 "In-card-DOM
-// effects"). Pure: reproduces the old DOM mat ambient styles' `fx-tera-skin-in` fade, `fx-tera-sheen` sweep,
-// `fx-tera-rim` breathing and `fx-tera-glint` twinkle. Times are ms since the skin went on.
+// The star glints of the Tera crystal coat (design 037, mat-fx/tera-skin.js) evaluated at a time,
+// for the three.js board. Pure. Times are ms; the coat's own timing is tera-coat.mjs.
 import { easeInOut } from './status-loop-frame.mjs';
 
-export const TERA_SKIN_TIMING = Object.freeze({ fadeMs: 450, sheenMs: 6000, rimMs: 3200, glintMs: 3300 });
-
-/** The old DOM mat ambient styles: the tint layer's opacity, the facets', and the sheen strip's width (of the card). */
-export const TERA_SKIN_LOOK = Object.freeze({ tintAlpha: 0.55, facetAlpha: 0.85, sheenSpan: 2.5 });
+export const TERA_SKIN_TIMING = Object.freeze({ fadeMs: 450, glintMs: 3300 });
 
 /** `ease-out` = cubic-bezier(0, 0, 0.58, 1), solved for x by bisection. */
 function easeOut(x) {
@@ -26,7 +21,7 @@ function easeOut(x) {
 
 const cycle = (elapsed, duration) => (((elapsed % duration) + duration) % duration) / duration;
 
-/** Values at keyframes `[[p, ...values]]`, eased in-out per segment (CSS's per-keyframe timing). */
+/** Values at keyframes `[[p, ...values]]`, eased in-out per segment. */
 function keyframesAt(keys, p) {
   for (let i = 1; i < keys.length; i++) {
     const [p1, ...v1] = keys[i];
@@ -38,47 +33,12 @@ function keyframesAt(keys, p) {
   return keys.at(-1).slice(1);
 }
 
-/** `fx-tera-skin-in`: every layer fades in over 0.45 s, ease-out. */
+/** The glints fade in over 0.45 s, ease-out, once the coat has formed (`elapsedMs` since then). */
 export const teraSkinFade = (elapsedMs) => easeOut(elapsedMs / TERA_SKIN_TIMING.fadeMs);
 
 /**
- * `fx-tera-sheen` (6 s, after the 0.45 s fade-in): the strip's `background-position` goes 160 % →
- * −60 % over the first 55 % and rests there. Returned as the strip's left edge in card widths
- * (CSS: `(1 - span) × position`): −2.4 puts its bright band left of the card, 0.9 right of it.
- */
-export function teraSheenLeft(elapsedMs) {
-  const span = TERA_SKIN_LOOK.sheenSpan;
-  const at = (position) => (1 - span) * position;
-  const t = elapsedMs - TERA_SKIN_TIMING.fadeMs;
-  if (!(t > 0)) return at(1.6);
-  const [position] = keyframesAt(
-    [
-      [0, 1.6],
-      [0.55, -0.6],
-      [1, -0.6],
-    ],
-    cycle(t, TERA_SKIN_TIMING.sheenMs)
-  );
-  return at(position);
-}
-
-/** `fx-tera-rim`: the rim glow breathes 0.75 → 1 → 0.75 over 3.2 s. */
-export function teraRimOpacity(elapsedMs) {
-  const [opacity] = keyframesAt(
-    [
-      [0, 0.75],
-      [0.5, 1],
-      [1, 0.75],
-    ],
-    cycle(Math.max(0, elapsedMs), TERA_SKIN_TIMING.rimMs)
-  );
-  return opacity;
-}
-
-/**
- * `fx-tera-glint` (3.3 s, after its `delay` in s): hidden until 62 %, flares to full size turned
- * 25° at 72 %, shrinks to a quarter at 84 %, gone again by 100 %. Before its delay a glint shows
- * its base style (scale 0, opacity 0).
+ * One glint's 3.3 s cycle, after its `delay` in s: hidden until 62 %, flares to full size turned
+ * 25° at 72 %, shrinks to a quarter at 84 %, gone again by 100 %. Before its delay it is hidden.
  *
  * @returns {{ scale: number, rotateDeg: number, opacity: number }}
  */

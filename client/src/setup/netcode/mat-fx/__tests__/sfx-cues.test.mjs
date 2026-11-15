@@ -353,6 +353,26 @@ test('design 064 slice 7b: Darkrai ex replaces the place cue, by exact name only
   assert.deepEqual(withSoundCard({ effect: 'enter', instanceId: 3 }, () => card).soundCard, card);
 });
 
+test('a Mega or Tera entry plays the evolve sample with its peak on the burst', () => {
+  const rows = (effect, plan) => cuesFor(effect, plan).map((cue) => [cue.key, cue.delayMs, cue.alignMs]);
+  // An evolution: the sample alone, aligned; without a burst time it plays from its start as before.
+  assert.deepEqual(rows('evolve', { signatureBurstMs: 1300 }), [['evolve-card', 0, 1300]]);
+  assert.deepEqual(rows('evolve', {}), [['evolve-card', 0, undefined]]);
+  assert.deepEqual(rows('evolve', { signatureBurstMs: NaN }), [['evolve-card', 0, undefined]]);
+  // Put into play: the place cue, then the sample; a card that flies in from a pile bursts later.
+  assert.deepEqual(rows('enter', { to: 'bench', signatureBurstMs: 1350 }), [
+    ['place-bench', 0, undefined],
+    ['evolve-card', 0, 1350],
+  ]);
+  const flown = rows('enter', { to: 'active', signatureBurstMs: 1350, held: [{ instanceId: 4 }] });
+  assert.equal(flown[1][0], 'evolve-card');
+  assert.ok(flown[1][2] > 1350, 'the flight is added before the burst');
+  assert.deepEqual(rows('enter', { to: 'bench' }), [['place-bench', 0, undefined]]);
+  // Nowhere to place it (not the Active Spot or the Bench): silent, entry or not.
+  assert.deepEqual(rows('enter', { to: 'discard', signatureBurstMs: 1350 }), []);
+  assert.deepEqual(rows('enter', { to: 'bench', signatureBurstMs: 1350, soundCard: { name: 'Darkrai ex' } }), [['darkrai-ex-entrance', 0, undefined]]);
+});
+
 test('design 064 slice 7b: new cues sit on their buses', () => {
   assert.equal(CUES['itchy-pollen-hand-card'].bus, 'ui');
   for (const key of ['itchy-pollen-hand', 'doom-curse-1', 'doom-curse-2', 'instant-ko-impact', 'darkrai-ex-entrance']) {

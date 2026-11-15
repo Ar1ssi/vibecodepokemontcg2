@@ -13,7 +13,7 @@ import { holdFor } from './fx-holds.mjs';
 import { playsOppPreview } from './opp-play.mjs';
 import { attack, attackBanner, attackSoundFor, damage, installImpactWarmup } from './combat.js';
 import { createFxDispatcher } from './dispatcher.mjs';
-import { enter } from './entry.js';
+import { enter, signatureBurstMs } from './entry.js';
 import { abilityBanner, gameOver, turnBanner } from './flow.js';
 import { installTeraSkins } from './tera-skin.js';
 import {
@@ -64,9 +64,9 @@ const EFFECTS = {
 // The coin ceremony has its own reduced-motion form (faces shown without the tumble).
 const STATIC_FALLBACKS = { 'coin-flip': coinFlip };
 
-// Design 041: a Mega/Tera evolution keeps the short `evolve` arpeggio under its
-// signature entry; any other plays the evolution scene's score. The dispatcher
-// sounds before the effect runs, so the evolved card is read here.
+// Design 041: a Mega/Tera evolution sounds as `evolve` under its signature entry, the sample's
+// peak on the entry's burst (`signatureBurstMs`); any other plays the evolution scene's score.
+// The dispatcher sounds before the effect runs, so the evolved card is read here.
 // Design 043: the opponent's Trainer sounds with its preview's timing.
 const cardOf = (instanceId) => getCardRegistry().get(instanceId)?.card;
 
@@ -80,14 +80,20 @@ const withCoinSound = (plan) => {
   };
 };
 
+// A Mega or Tera coming into play: when its entry's burst lands, for the cue (sfx-cues.mjs).
+const withSignature = (plan) => {
+  const burstMs = signatureBurstMs(signatureEntryKind(cardOf(plan.instanceId)));
+  return burstMs === null ? plan : { ...plan, signatureBurstMs: burstMs };
+};
+
 // Design 063: an attack sounds with its move's family (the same pure pick the scene plays).
 const soundPlanFor = (plan) => {
   if (plan?.effect === 'coin-flip') return withCoinSound(plan);
   if (plan?.effect === 'trainer-play' && playsOppPreview(plan)) return { ...plan, effect: 'opp-trainer-play' };
   if (plan?.effect === 'attack') return { ...plan, ...attackSoundFor(plan) };
+  if (plan?.effect === 'enter') return withSignature(withSoundCard(plan, cardOf));
   if (plan?.effect !== 'evolve') return withSoundCard(plan, cardOf);
-  const evolved = getCardRegistry().get(plan.instanceId)?.card;
-  return signatureEntryKind(evolved) ? plan : { ...plan, effect: 'evolve-scene' };
+  return signatureEntryKind(cardOf(plan.instanceId)) ? withSignature(plan) : { ...plan, effect: 'evolve-scene' };
 };
 
 export const playFx = createFxDispatcher({

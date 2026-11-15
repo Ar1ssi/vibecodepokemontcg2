@@ -6,8 +6,9 @@
 # Pruned or shortened lines, verbatim: .agent/archive/DECISIONS-pruned-2026-10-15.md (grep the D-number).
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
-#   Next id = highest D number in this file and the archives + 1 (next: D250).
+#   Next id = highest D number in this file and the archives + 1 (next: D251).
 
+- D250 2026-11-15 [mat-fx] Mega/Tera entries are FX-layer scenes on the scene clock (kinds `crystal`, `shell`) after TCG Live’s prefabs; the Tera skin is one coat shader (tera-coat.mjs). (Supersedes D122)
 - D249 2026-11-14 [mat-fx] FX composite is two draws: cover by alpha, then light screened after a hue-keeping roll-off (fx/tone.mjs); no effect may clip to white. Motions are spread by rule (motion-variety.mjs). (design 089)
 - D248 2026-11-14 [engine] `attackStarted` opens every attack before its first effect; the client plays the attack scene from it, then the slide, and holds choice prompts until the scene ends (choice-gate.mjs). (design 089)
 - D247 2026-11-13 [server] Deploys serve an esbuild bundle (one hashed script + sheet, immutable); unhashed files are `no-cache`; dev stays unbundled ESM. Deps: esbuild, compression. (Amends D4; design 088)
@@ -79,7 +80,6 @@
 - D126 2026-09-24 [rules] Ability activation legality is ONE reader, `abilityActivationBlockReason` (ability-combat.mjs), used by validateLegality and the picker; `addCondition` gates status immunity. (design 034)
 - D125 2026-09-24 [rules] Ability passive reads live in pure `rules/ability-combat.mjs`; tool-combat/stadium-effects never import it (acyclic); `cardAbilityText` is the only text accessor. (Folds D127; design 034)
 - D124 2026-09-24 [rules] `pnpm audit:trainers` ratchets per-card trainer gaps and play conditions against scripts/trainer-behaviour-baseline.json; conditions gate in pure `trainerPlayBlockReason`. (design 035)
-- D122 2026-09-24 [mat-fx] Mega/Tera entries are canvas scenes (orb shell, brush vortex, Tera crystal by `teraPaletteFor`, skin) sharing `playCanvasStage`. (Folds D104, D118/D119/D121[mat-fx]; designs 035-037)
 - D115 2026-09-23 [board-ui] #stadium's transform belongs to the table tilt; owner-facing flip is class `.stadium-opp-facing` rotating the img (`setStadiumFacing`), never an inline transform on #stadium. (S273)
 - D108 2026-09-23 [tooling] Attack/ability execution claims are gated by `pnpm audit:oracle` (~2 min) against scripts/oracle-baseline.json; 0-row families only via ORACLE_BLIND_FAMILIES with a reason. (design 032)
 - D107 2026-09-23 [rules] Attack effects run as parsed executor steps (design 030); coin sentences are steps, timed effects live in `card.attackMarkers`, locks are `attackLock` markers (D109-D113).

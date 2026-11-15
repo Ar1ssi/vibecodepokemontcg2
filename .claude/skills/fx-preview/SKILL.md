@@ -38,17 +38,20 @@ Playwright is a devDependency. Install its browser once per machine:
 Both scripts need `CARD_IMG`: a local PNG/JPG of any card face, or a card image URL. Write
 output under `.agent/scratch/`, which is not committed.
 
-**Entry animations** (a one-shot burst when a card enters play):
+**Entry animations** (the Tera and Mega scenes, mat-fx/tera-entry.js and mega-entry.js):
 
 ```powershell
 $env:CARD_IMG = "C:\path\to\card.png"; $env:TYPE = "Fire"
-node .claude/skills/fx-preview/capture-entry.mjs tera .agent/scratch/tera-fire 100 2400
+node .claude/skills/fx-preview/capture-entry.mjs tera .agent/scratch/tera-fire 100 2600
 node .claude/skills/fx-preview/capture-entry.mjs mega .agent/scratch/mega
 ```
 
-The script writes frames `f000.png…` every `stepMs` over `durationMs`. Read a handful of them
-(the Read tool shows images), or tile them into one sheet:
-`ffmpeg -framerate 1 -i f%03d.png -vf "scale=480:-1,tile=5x5" sheet%d.png`.
+The script puts a real Tera / Mega card in the Active Spot, plays its entry on a frozen scene clock
+and writes `t<ms>.png` every `stepMs` over `durationMs`, cropped round the card at 2× density.
+`TIMES=0,400,1300,…` shoots chosen times instead, `SIDE=opp` the far seat, `GPU=1` runs on the
+machine's own GPU (seconds instead of minutes; judge final frames on SwiftShader too). Read a
+handful of them (the Read tool shows images), or tile them into one sheet with ffmpeg `tile`.
+The burst is at 1300 ms (Tera) / 1350 ms (Mega), after a 70 ms hit stop the pieces leave.
 
 **Persistent board looks** (Tera crystal skin, anything drawn from card state):
 
@@ -79,9 +82,10 @@ few frames a second: the 3D pages are slower, and frame-time probes (`rec-move`)
   `window.__fxBoard.root(side)` returns the root and `__fxBoard.zoneRect(side, id)` the zone's
   page-space rect. `visualRectOf` (`/src/setup/board3d/board-rects.js`) gives the page-space rect of a
   mirror element.
-- **Entry effects** are `playSignatureEntry(kind, rect, instanceId, card)` from
-  `/src/setup/netcode/mat-fx/entry.js`. Call it directly; there is no need to drive an evolution
-  through the rules engine.
+- **Entry effects** are `playSignatureEntry(kind, instanceId, card)` from
+  `/src/setup/netcode/mat-fx/entry.js`. The card must be on the board (push a view first): the
+  scene draws round its mesh. Call it directly; there is no need to drive an evolution through
+  the rules engine.
 - **Freeze time.** Pause every `document.getAnimations()` (or the mirror root's, for
   on-board CSS animations). Set `currentTime = t` and wait two `requestAnimationFrame`s,
   then screenshot. This gives deterministic frames regardless of machine speed. Canvas-drawn

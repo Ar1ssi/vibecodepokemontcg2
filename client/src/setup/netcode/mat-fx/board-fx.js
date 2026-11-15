@@ -67,7 +67,7 @@ const POWER_RGB = Object.freeze({ gx: [92, 176, 255], vstar: [255, 196, 72] });
 const rgba = ([r, g, b], a) => `rgba(${r}, ${g}, ${b}, ${Math.max(0, Math.min(1, a)).toFixed(3)})`;
 
 /** A card as the scene draws it: its stage rect, centre, size and height off the cloth. Null when not drawn. */
-function stageCard(scene, instanceId) {
+export function stageCard(scene, instanceId) {
   const pose = instanceId == null ? null : scene.cardTablePose(instanceId);
   if (!pose) return null;
   const rect = stageRectOf(pose);
@@ -81,7 +81,7 @@ function stageCard(scene, instanceId) {
 }
 
 /** The card drawn on top of `instanceId`'s stack (an evolved Pokémon's id is its Basic's). */
-const shownId = (instanceId) => visibleStackId(getCardRegistry(), instanceId);
+export const shownId = (instanceId) => visibleStackId(getCardRegistry(), instanceId);
 
 /**
  * Runs `draw({ back, top }, t, elapsedMs)` every frame for `ms` of scene time. `back(fn)` draws on
@@ -89,7 +89,7 @@ const shownId = (instanceId) => visibleStackId(getCardRegistry(), instanceId);
  * cloth over everything. Each hands `fn` the recorder's context (Canvas2D calls and sprite emits).
  * False when no scene draws the board.
  */
-function playStageFx(scene, { ms, unit, seed = 0, draw }) {
+export function playStageFx(scene, { ms, unit, seed = 0, draw }) {
   if (!scene?.fx || !(ms > 0)) return false;
   const start = scene.clock.now();
   scene.fx.add({
@@ -113,7 +113,7 @@ function playStageFx(scene, { ms, unit, seed = 0, draw }) {
   return true;
 }
 
-const sprite = (ctx, texture, at, size, rgb, gain, alpha, extra = {}) =>
+export const sprite = (ctx, texture, at, size, rgb, gain, alpha, extra = {}) =>
   emit(ctx, 'sprite', { texture, at, size, colour: rgb01(rgb, gain), alpha, ...extra });
 
 const cardPath = (ctx, w, h) => {
@@ -134,7 +134,7 @@ const cardPath = (ctx, w, h) => {
 };
 
 /** The halo round a card on the cloth behind it: only what the card does not cover shows. */
-function cardHalo(ctx, card, rgb, alpha, scale = 1) {
+export function cardHalo(ctx, card, rgb, alpha, scale = 1) {
   if (!(alpha > 0)) return;
   ctx.save();
   ctx.translate(card.x, card.y);
@@ -144,7 +144,7 @@ function cardHalo(ctx, card, rgb, alpha, scale = 1) {
 }
 
 /** A thin line of light on the card's edge. */
-function cardEdge(ctx, card, rgb, alpha, scale = 1) {
+export function cardEdge(ctx, card, rgb, alpha, scale = 1) {
   if (!(alpha > 0)) return;
   ctx.save();
   ctx.translate(card.x, card.y);
@@ -182,7 +182,7 @@ function cardSheen(ctx, card, rgb, alpha, sweep) {
 }
 
 /** A ring of light lying on the cloth, `radius` wide to its bright line. */
-function groundRing(ctx, x, y, radius, width, rgb, alpha) {
+export function groundRing(ctx, x, y, radius, width, rgb, alpha) {
   if (!(alpha > 0) || !(radius > 0)) return;
   const inner = Math.max(0, radius - width);
   const outer = radius + width;

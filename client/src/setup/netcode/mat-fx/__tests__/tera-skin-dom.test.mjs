@@ -1,6 +1,6 @@
 // tera-skin.js on both boards (design 037 / 074 §D6): the iframe board injects the crystal layers into
 // the holo wrapper; under the 3D board flag the scene wears the skin through
-// `setUiState(id, { teraSkin: palette | null })` and the mirror gets nothing. apply-view.js and
+// `setUiState(id, { teraSkin: palette | null, teraFormAt })` and the mirror gets nothing. apply-view.js and
 // board3d.js are stubbed: the zones, card registry, flag and scene come from globals.
 import { beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -25,8 +25,8 @@ registerHooks({
   },
 });
 
-const { refreshTeraSkins, holdTeraSkin } = await import('../tera-skin.js');
-const { teraPaletteFor } = await import('../tera-crystal.mjs');
+const { refreshTeraSkins, formTeraSkinAt } = await import('../tera-skin.js');
+const { teraPaletteFor } = await import('../tera-palette.mjs');
 
 const teraCard = (instanceId) => ({
   instanceId,
@@ -77,11 +77,11 @@ test('the skin moves from the mirror DOM to the scene when the 3D board takes ov
 
   globalThis.__teraZones = { you: { active: [] } };
   refreshTeraSkins();
-  assert.deepEqual(scene.calls.at(-1), [7, { teraSkin: null }]);
+  assert.deepEqual(scene.calls.at(-1), [7, { teraSkin: null, teraFormAt: null }]);
   assert.equal(wrapper.querySelectorAll('.fx-tera-crystal__layer').length, 0);
 });
 
-test('3D board: a held entry keeps the skin off; a rebuilt scene gets the skin again; the mirror stays bare', async () => {
+test('3D board: an entry says when the coat forms; a rebuilt scene gets the skin again; the mirror stays bare', () => {
   const card = teraCard(9);
   globalThis.__board3dActive = true;
   const first = fakeScene();
@@ -90,16 +90,21 @@ test('3D board: a held entry keeps the skin off; a rebuilt scene gets the skin a
   refreshTeraSkins();
   assert.deepEqual(first.calls, [[9, { teraSkin: teraPaletteFor('Water') }]]);
 
-  holdTeraSkin(9, 5);
-  assert.deepEqual(first.calls.at(-1), [9, { teraSkin: null }]);
-  await new Promise((resolve) => setTimeout(resolve, 20));
-  assert.deepEqual(first.calls.at(-1), [9, { teraSkin: teraPaletteFor('Water') }]);
+  // The skin stays on; the scene is told the scene-clock time its coat forms at.
+  formTeraSkinAt(9, 4200);
+  assert.deepEqual(first.calls.at(-1), [9, { teraFormAt: 4200 }]);
+  for (const [id, at] of [[null, 100], [9, NaN], [9, undefined]]) formTeraSkinAt(id, at);
+  assert.equal(first.calls.length, 2, 'a missing id or time is ignored');
+  globalThis.__board3dActive = false;
+  formTeraSkinAt(9, 5000);
+  assert.equal(first.calls.length, 2, 'without the 3D board there is no coat to time');
+  globalThis.__board3dActive = true;
 
   const second = fakeScene();
   globalThis.__board3dScene = second;
   refreshTeraSkins();
   assert.deepEqual(second.calls, [[9, { teraSkin: teraPaletteFor('Water') }]]);
-  assert.deepEqual(first.calls.at(-1), [9, { teraSkin: null }]);
+  assert.deepEqual(first.calls.at(-1), [9, { teraSkin: null, teraFormAt: null }]);
   assert.equal(wrapper.classList.contains('fx-tera-crystal'), false);
   assert.equal(wrapper.querySelectorAll('[class*="fx-tera-crystal"]').length, 0);
 });
