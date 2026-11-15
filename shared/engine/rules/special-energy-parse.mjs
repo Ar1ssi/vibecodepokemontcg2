@@ -517,9 +517,11 @@ function parseEffects(lower) {
     const what = searchAttach[3] ? `Basic ${SYMBOL_TYPES[searchAttach[3]]} Pokémon` : 'Basic Pokémon';
     push({ type: 'onAttachSearch', what, count: Number(searchAttach[2]), destination: 'bench', hostType });
   }
-  const searchAttachSingle = lower.match(/when you attach this card from your hand to a pokémon, search your deck for a basic pokémon and put it onto your bench/);
+  const searchAttachSingle = lower.match(/when you attach this card from your hand to a? ?\{?([a-z])?\}? ?pokémon, search your deck for a basic (?:pokémon|\{([a-z])\} pokémon) and put it onto your bench/);
   if (searchAttachSingle) {
-    push({ type: 'onAttachSearch', what: 'Basic Pokémon', count: 1, destination: 'bench' });
+    const hostType = searchAttachSingle[1] ? SYMBOL_TYPES[searchAttachSingle[1]] : undefined;
+    const what = searchAttachSingle[2] ? `Basic ${SYMBOL_TYPES[searchAttachSingle[2]]} Pokémon` : 'Basic Pokémon';
+    push({ type: 'onAttachSearch', what, count: 1, destination: 'bench', hostType });
   }
   const healAttach = lower.match(/when you attach this card from your hand to 1 of your(?: \{([a-z])\})? pokémon, heal (\d+) damage from that pokémon/);
   if (healAttach) {

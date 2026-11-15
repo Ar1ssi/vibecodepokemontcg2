@@ -474,6 +474,38 @@ test('SE10: on-attach search caps at the open Bench slots and shuffles the deck'
   assert.ok(done.events.some((e) => e.type === 'deckShuffled' && e.playerId === 'p1'));
 });
 
+// Source: user's scan of Telepathic {P} Energy, Perfect Order 088/088 (single Basic {P} Pokémon, "put it").
+test('Telepathic {P} Energy (POR 088 scan): searches one Basic {P} Pokémon onto the Bench', () => {
+  const state = game();
+  state.players.p1.zones.active.push(pokemon({ instanceId: 1, name: 'Mew', types: ['Psychic'] }));
+  state.players.p1.zones.hand.push(
+    specialEnergy({
+      instanceId: 2,
+      name: 'Telepathic Psychic Energy',
+      text: 'As long as this card is attached to a Pokémon, it provides {P} Energy. When you attach this card from your hand to a {P} Pokémon, search your deck for a Basic {P} Pokémon and put it onto your Bench. Then, shuffle your deck.',
+    })
+  );
+  state.players.p1.zones.deck.push(
+    pokemon({ instanceId: 50, name: 'Ralts', types: ['Psychic'] }),
+    pokemon({ instanceId: 51, name: 'Pikachu', types: ['Lightning'] })
+  );
+  state.players.p2.zones.active.push(pokemon({ instanceId: 9, name: 'Budew' }));
+
+  const res = applyCommand(state, { type: 'attachCard', payload: { instanceId: 2, targetInstanceId: 1 }, playerId: 'p1' });
+  assert.equal(res.error, null);
+  assert.equal(res.pendingChoice.max, 1);
+  assert.deepEqual(res.pendingChoice.options.map((o) => o.instanceId), [50], 'only the Basic {P} Pokémon is offered');
+
+  const done = applyCommand(res.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: res.pendingChoice.choiceId, selection: [50] },
+    playerId: 'p1',
+  });
+  assert.equal(done.error, null);
+  assert.equal(done.state.players.p1.zones.bench.filter((c) => !c.attachedTo).length, 1);
+  assert.ok(done.events.some((e) => e.type === 'deckShuffled' && e.playerId === 'p1'));
+});
+
 test('SE11d: Warp Energy attached to a Benched Pokémon does not switch', () => {
   const state = game();
   state.players.p1.zones.active.push(pokemon({ instanceId: 1, name: 'Pikachu' }));
