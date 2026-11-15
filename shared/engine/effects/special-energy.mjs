@@ -137,6 +137,14 @@ function benchSpace(draft, playerId) {
   return Math.max(0, BENCH_LIMIT - roots.length);
 }
 
+const searchDestination = (plan) => (plan.destination === 'hand' ? 'hand' : 'bench');
+
+/** Cards an on-attach search may take: the printed count, capped by open Bench slots when it benches. */
+function searchPickLimit(draft, ctx, plan) {
+  if (searchDestination(plan) === 'hand') return plan.count;
+  return Math.min(plan.count, benchSpace(draft, ctx.hostPlayerId));
+}
+
 /** "Then, shuffle your deck." — every on-attach search ends with it (audit SE10). */
 function shuffleSearchedDeck(draft, ctx) {
   if (ctx.rng) shuffleInPlace(ctx.rng, zoneOf(draft, ctx.hostPlayerId, 'deck'));
@@ -259,18 +267,19 @@ function applyPlan(draft, plan, ctx, selection = null) {
     }
     case 'search': {
       const deck = zoneOf(draft, ctx.hostPlayerId, 'deck');
-      const chosen = (selection || []).slice(0, benchSpace(draft, ctx.hostPlayerId));
+      const to = searchDestination(plan);
+      const chosen = (selection || []).slice(0, searchPickLimit(draft, ctx, plan));
       for (const id of chosen) {
         const idx = deck.findIndex((c) => c.instanceId === id);
         if (idx < 0) continue;
         const [c] = deck.splice(idx, 1);
         c.attachedTo = null;
-        draft.players[ctx.hostPlayerId].zones.bench.push(c);
+        draft.players[ctx.hostPlayerId].zones[to].push(c);
         events.push({
           type: 'cardMoved',
           instanceId: c.instanceId,
           from: 'deck',
-          to: 'bench',
+          to,
           playerId: ctx.hostPlayerId,
         });
       }
@@ -390,7 +399,7 @@ function handleChoicePlan(draft, item, ctx, queue, index) {
   if (plan.action === 'search') {
     const deck = zoneOf(draft, ctx.hostPlayerId, 'deck');
     const matches = deck.filter((c) => matchesSearch(c, plan.what));
-    const max = Math.min(plan.count, matches.length, benchSpace(draft, ctx.hostPlayerId));
+    const max = Math.min(matches.length, searchPickLimit(draft, ctx, plan));
     if (max === 0) {
       shuffleSearchedDeck(draft, ctx);
       return 'done';

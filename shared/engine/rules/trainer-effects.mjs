@@ -70,7 +70,7 @@
 // parseTrainerEffect also returns `playCondition` (see parsePlayCondition; e.g. 'opponentPrizes<=N',
 // 'lostZone>=N', 'koedLastTurn:type=p', 'handCount<=N') when the card can only be played under it.
 
-import { WORD_POKEMON_TYPES } from './search-match.mjs';
+import { WORD_POKEMON_TYPES } from './pokemon-type-words.mjs';
 import { parseFossilPlay, parseNamedFossilSearch } from './fossil.mjs';
 import { parseTurnDamageBonus } from './turn-damage-bonus.mjs';
 import { rewriteLegacyTrainerWording } from './legacy-trainer-wording.mjs';
@@ -768,9 +768,41 @@ function typedEnergyOrPokemonWhat(lower) {
 // Shared search-deck target parsing — used by the main search branch, coin-flip
 // sub-clauses, and attack search (parseAttackSearchClause in damage-parser.mjs).
 export function parseSearchDeckParams(lower) {
-  if (!BABY_EXCLUSION_RE.test(lower)) return parseSearchDeckKind(lower);
-  const params = parseSearchDeckKind(lower.replace(BABY_EXCLUSION_RE, ''));
+  if (!BABY_EXCLUSION_RE.test(lower)) return withPrintedOrList(parseSearchDeckKind(lower), lower);
+  const stripped = lower.replace(BABY_EXCLUSION_RE, '');
+  const params = withPrintedOrList(parseSearchDeckKind(stripped), stripped);
   return params.type ? params : { ...params, exclude: 'Baby Pokémon' };
+}
+
+// "a Stadium card or an Energy card", "a Supporter card, an Item card, or a Stadium card", "up
+// to 2 Item or Supporter cards": one pool holding every listed kind. Null when the clause is not
+// an or-list of kinds the matcher knows ("90 HP or less"), or when a kind carries its own count.
+const OR_LIST_SEARCH_RE =
+  /search your deck for (up to )?(\d+|an?) ([^.]+?)(?=, (?:reveal|show)|,? and (?:put|discard|reveal|show|shuffle|attach|switch)|\.)/;
+
+function printedOrListSearch(lower) {
+  const m = lower.match(OR_LIST_SEARCH_RE);
+  if (!m || !/ or /.test(m[3])) return null;
+  const kinds = m[3].split(/,? or |, /).map((item) => knownKindWhat(item.replace(/^an? /, '')));
+  if (kinds.length < 2 || !kinds.every(Boolean) || kinds.includes('card')) return null;
+  return { what: kinds.join(' or '), count: /^\d+$/.test(m[2]) ? Number(m[2]) : 1, upTo: Boolean(m[1]) };
+}
+
+const orKindCount = (what) => String(what).split(' or ').length;
+
+// The branches of parseSearchDeckKind each read one printed wording, and several latch onto the
+// first kind of an or-list. A printed or-list naming more kinds than the branch kept wins, so a
+// reworded card ("and" → "or", a third kind added) needs no branch of its own.
+function withPrintedOrList(params, lower) {
+  if (params.type || params.alternatives || params.nameFilter) return params;
+  const printed = printedOrListSearch(lower);
+  if (!printed || orKindCount(params.what) >= orKindCount(printed.what)) return params;
+  return {
+    ...params,
+    what: printed.what,
+    count: printed.count,
+    ...(printed.upTo ? { upTo: true } : {}),
+  };
 }
 
 function parseSearchDeckKind(lower) {
@@ -1006,17 +1038,6 @@ function parseSearchDeckKind(lower) {
         { what: 'Basic Pokémon', count: Number(basicOrEvo[1]) },
         { what: 'Evolution Pokémon', count: Number(basicOrEvo[2]) },
       ],
-      ...(reveal ? { reveal: true } : {}),
-    };
-  }
-
-  // "an Evolution Pokémon or an Energy card" (homebrew Hilda): one card of either kind, not
-  // the first kind alone.
-  if (/search your deck for an evolution pok[ée]mon or an energy card\b/.test(lower)) {
-    return {
-      what: 'Evolution Pokémon or Energy',
-      count: 1,
-      destination,
       ...(reveal ? { reveal: true } : {}),
     };
   }

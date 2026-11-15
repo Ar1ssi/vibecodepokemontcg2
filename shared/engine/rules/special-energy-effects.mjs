@@ -31,7 +31,7 @@ export const TYPED_SPECIAL_ENERGY_DEFS = [
     requiredPokemonType: 'Psychic',
     onAttachFromHandSearch: { what: 'Basic Psychic Pokémon', count: 2, destination: 'bench' },
     description:
-      'Telepathic Psychic Energy: provides Psychic Energy; when attached from hand to a Psychic Pokémon, search your deck for up to 2 Basic Psychic Pokémon and put them on your Bench.',
+      'Telepathic Psychic Energy: provides Psychic Energy; when attached from hand to a Psychic Pokémon, search your deck for Basic Psychic Pokémon (the printed number) and put them on your Bench.',
   },
   {
     id: 'bubbly-water',

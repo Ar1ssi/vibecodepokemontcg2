@@ -12,6 +12,7 @@ import {
 import { hasCardMarker } from './card-markers.mjs';
 import { normalizeStage } from './evolution.mjs';
 import { isAncientCard, isFutureCard } from './paradox-tags.mjs';
+import { WORD_POKEMON_TYPES } from './pokemon-type-words.mjs';
 
 const SYMBOL_TO_TYPE = {
   c: 'Colorless',
@@ -27,23 +28,7 @@ const SYMBOL_TO_TYPE = {
   y: 'Fairy',
 };
 
-// Word-form Pokémon types ("a Water Pokémon", "Basic Psychic Pokémon") as they
-// appear on trainer/attack search clauses. Kept in sync with pokemonMatchesEnergyType,
-// which understands both 'Darkness' and the data's 'Dark' spelling.
-export const WORD_POKEMON_TYPES = {
-  grass: 'Grass',
-  fire: 'Fire',
-  water: 'Water',
-  lightning: 'Lightning',
-  psychic: 'Psychic',
-  fighting: 'Fighting',
-  darkness: 'Darkness',
-  dark: 'Darkness',
-  metal: 'Metal',
-  dragon: 'Dragon',
-  colorless: 'Colorless',
-  fairy: 'Fairy',
-};
+export { WORD_POKEMON_TYPES };
 
 const POKEMON_TYPE_WORD_RE =
   /\b(grass|fire|water|lightning|psychic|fighting|darkness|dark|metal|dragon|colorless|fairy)\b/i;

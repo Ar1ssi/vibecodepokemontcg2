@@ -60,6 +60,7 @@
 
 import { isEnergyCard } from './energy-effects.mjs';
 import { isExCard, isGxCard, isRuleBoxPokemon, isUltraBeastCard, isVCard } from './card-classify.mjs';
+import { parseSearchDeckParams } from './trainer-effects.mjs';
 
 const SYMBOL_TYPES = {
   c: 'Colorless',
@@ -76,6 +77,9 @@ const SYMBOL_TYPES = {
 };
 
 const ALL_STATUS = ['Asleep', 'Confused', 'Paralyzed', 'Poisoned', 'Burned'];
+
+// Where the on-attach search executor (effects/special-energy.mjs) can put the cards it finds.
+const ATTACH_SEARCH_DESTINATIONS = new Set(['bench', 'hand']);
 
 function normalizeText(text) {
   return String(text ?? '')
@@ -511,17 +515,21 @@ function parseEffects(lower) {
     const count = drawAttach[2] === 'a card' ? 1 : Number(drawAttach[2].match(/\d+/)[0]);
     push({ type: 'onAttachDraw', count, hostType: drawAttach[1] ? SYMBOL_TYPES[drawAttach[1]] : undefined });
   }
-  const searchAttach = lower.match(/when you attach this card from your hand to a? ?\{?([a-z])?\}? ?pokémon, search your deck for up to (\d+) basic (?:pokémon|\{([a-z])\} pokémon) and put them onto your bench/);
+  // The search clause goes to the shared deck-search grammar (trainer-effects), which reads
+  // the printed count, kind and destination: "up to 2 Basic {P} Pokémon … onto your Bench" and
+  // a reworded "a Basic {P} Pokémon … put it onto your Bench" need no clause of their own.
+  const searchAttach = lower.match(/when you attach this card from your hand to (?:an? |1 of your )?(?:\{([a-z])\} )?pokémon, (search your deck for [^.]*\.?)/);
   if (searchAttach) {
-    const hostType = searchAttach[1] ? SYMBOL_TYPES[searchAttach[1]] : (searchAttach[3] ? SYMBOL_TYPES[searchAttach[3]] : undefined);
-    const what = searchAttach[3] ? `Basic ${SYMBOL_TYPES[searchAttach[3]]} Pokémon` : 'Basic Pokémon';
-    push({ type: 'onAttachSearch', what, count: Number(searchAttach[2]), destination: 'bench', hostType });
-  }
-  const searchAttachSingle = lower.match(/when you attach this card from your hand to a? ?\{?([a-z])?\}? ?pokémon, search your deck for a basic (?:pokémon|\{([a-z])\} pokémon) and put it onto your bench/);
-  if (searchAttachSingle) {
-    const hostType = searchAttachSingle[1] ? SYMBOL_TYPES[searchAttachSingle[1]] : undefined;
-    const what = searchAttachSingle[2] ? `Basic ${SYMBOL_TYPES[searchAttachSingle[2]]} Pokémon` : 'Basic Pokémon';
-    push({ type: 'onAttachSearch', what, count: 1, destination: 'bench', hostType });
+    const search = parseSearchDeckParams(searchAttach[2]);
+    if (!search.type && search.what !== 'card' && ATTACH_SEARCH_DESTINATIONS.has(search.destination)) {
+      push({
+        type: 'onAttachSearch',
+        what: search.what,
+        count: search.count,
+        destination: search.destination,
+        hostType: searchAttach[1] ? SYMBOL_TYPES[searchAttach[1]] : undefined,
+      });
+    }
   }
   const healAttach = lower.match(/when you attach this card from your hand to 1 of your(?: \{([a-z])\})? pokémon, heal (\d+) damage from that pokémon/);
   if (healAttach) {

@@ -1799,11 +1799,12 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
                   appendMessage('', `  no matching cards in your deck`, 'announcement', false);
                   break;
                 }
+                const toHand = plan.destination === 'hand';
                 openChoicePicker({
-                  title: `${energy.name} — choose up to ${plan.count} ${plan.what} for your Bench`,
+                  title: `${energy.name} — choose up to ${plan.count} ${plan.what} for your ${toHand ? 'hand' : 'Bench'}`,
                   candidates: pool,
                   zoneFrom: 'deck',
-                  destination: 'bench',
+                  destination: toHand ? 'hand' : 'bench',
                   multiSelect: true,
                   requiredCount: Math.min(plan.count, pool.length),
                   minCount: 0,
@@ -1813,7 +1814,7 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
                   onConfirm: (selected) => {
                     appendMessage(
                       '',
-                      `  ${selected.map((s) => s.name).join(', ')} → Bench`,
+                      `  ${selected.map((s) => s.name).join(', ')} → ${toHand ? 'hand' : 'Bench'}`,
                       'announcement',
                       false,
                     );
