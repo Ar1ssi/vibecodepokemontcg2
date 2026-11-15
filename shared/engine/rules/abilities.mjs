@@ -24,6 +24,7 @@ import { symbolizeTypeWords } from './attack-text.mjs';
 import { textRevealsPicks } from './reveal-picks.mjs';
 import { rewriteLegacyPowerWording } from './legacy-power-wording.mjs';
 import { parseSelfAttachTool } from './self-attach-tool.mjs';
+import { parseSearchDeckParams } from './trainer-effects.mjs';
 
 export { rewriteLegacyPowerWording };
 
@@ -264,6 +265,9 @@ export function parseMoveEnergyShape(lower) {
 }
 
 /** Ability deck-search parsing — separate from trainer parseSearchDeckParams(). */
+const GUESSED_POKEMON_WHATS = new Set(['a Pokémon', 'a Basic Pokémon']);
+const GENERIC_POKEMON_KINDS = new Set(['Pokémon', 'Basic Pokémon']);
+
 export function parseAbilitySearchParams(lower) {
   let what = 'a card';
   let count = 1;
@@ -409,6 +413,16 @@ export function parseAbilitySearchParams(lower) {
       count = Number(upToM[1]);
       upTo = true;
     }
+  }
+
+  // The branches above reduce a Pokémon kind to "a Pokémon" / "a Basic Pokémon". The printed
+  // kind may say more ("a {C} Pokémon with 100 HP or less", "an Evolution Pokémon"): the shared
+  // deck-search grammar reads it, so a reworded Ability keeps its type, stage and HP cap.
+  if (GUESSED_POKEMON_WHATS.has(what)) {
+    const searchClause = lower.match(/search your deck for [^.]*\.?/)?.[0];
+    const printed = searchClause ? parseSearchDeckParams(searchClause) : null;
+    const plain = !printed || printed.type || printed.alternatives || printed.nameFilter;
+    if (!plain && /pokémon/i.test(printed.what) && !GENERIC_POKEMON_KINDS.has(printed.what)) what = printed.what;
   }
 
   return { what, count, destination, upTo };

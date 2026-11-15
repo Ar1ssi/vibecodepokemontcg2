@@ -228,9 +228,11 @@ export function matchesSearch(card, what = '') {
     if (!isPokemon) return false;
     const retreat = retreatRequirement(w);
     if (retreat && !matchesRetreatRequirement(card, retreat)) return false;
-    if (/pok[eé]mon-gx\b/.test(w)) return isGxCard(card);
+    // A rule-box kind is a filter, not the whole answer: "{L} Pokémon-GX" (Electromagnetic
+    // Radar) must still pass the type check below.
+    if (/pok[eé]mon-gx\b/.test(w) && !isGxCard(card)) return false;
     if (/^basic pok[eé]mon-ex$/.test(w)) return normalizeStage(card.stage) === 'Basic' && /(?:-| )EX$/.test(String(card.name || ''));
-    if (/^pok[eé]mon-ex$/.test(w)) return /(?:-| )ex$/i.test(String(card.name || ''));
+    if (/pok[eé]mon-ex\b/.test(w) && !/(?:-| )ex$/i.test(String(card.name || ''))) return false;
     const noRuleBox =
       w.includes("doesn't have a rule box") ||
       w.includes("does not have a rule box") ||

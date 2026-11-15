@@ -371,8 +371,8 @@ const TEMPLATES = [
   ],
   // Thundurus-EX Raiden Knuckle: "… to 1 of your Benched Team Plasma Pokémon".
   [
-    new RegExp(String.raw`^attach an? ${ENERGY_TYPE}energy card from your discard pile to 1 of your benched team plasma pokémon$`),
-    (m, s) => ({ type: 'atkAttach', source: 'discard', count: 1, ...energyFilter(m[1], s), target: 'bench', tag: 'team plasma' }),
+    new RegExp(String.raw`^attach (an?|\d+) ${ENERGY_TYPE}energy cards? from your discard pile to 1 of your benched team plasma pokémon$`),
+    (m, s) => ({ type: 'atkAttach', source: 'discard', count: countOf(m[1]), ...energyFilter(m[2], s), target: 'bench', tag: 'team plasma' }),
   ],
   // Pichu Paste: "… attach it to 1 of your Pokémon that has δ on its card".
   [
@@ -884,7 +884,7 @@ const TEMPLATES = [
     () => ({ type: 'atkPutSelf', to: 'deckBottom' }),
   ],
   // Comfey Sweet Kiss / Light Togetic Sweet Kiss.
-  [/^your opponent (may )?draws? a card$/, (m) => ({ type: 'atkDraw', side: 'opponent', count: 1, ...(m[1] ? { opponentMay: true } : {}) })],
+  [/^your opponent (may )?draws? (a|an|\d+) cards?$/, (m) => ({ type: 'atkDraw', side: 'opponent', count: countOf(m[2]), ...(m[1] ? { opponentMay: true } : {}) })],
   // Togetic Shared Peace: both players draw.
   [/^each player draws (a|an|\d+) cards?$/, (m) => ({ type: 'atkDraw', side: 'each', count: countOf(m[1]) })],
   [/^draw up to (\d+) cards$/,(m) => ({ type: 'atkDraw', count: Number(m[1]), upTo: true })],
@@ -1877,7 +1877,7 @@ export function resolveCoinGates(steps, { coin, headsCount, flips = [] }) {
 const ATTACH_CHAIN = /^if (?:you do(?: so)?|you attached energy (?:to this pokémon )?in this way), /;
 // "If you do" and the older "If you do so" (Regigigas ex Destruction) both read the step before them.
 const IF_YOU_DO = /^if you do(?: so)?, /;
-const ENERGY_DISCARD_SENTENCE = /^discard (?:an?|d+) (?:basic )?(?:{[a-z]} )?energy(?: cards?)? (?:attached to|from) this pokémon.?$/;
+const ENERGY_DISCARD_SENTENCE = /^discard (?:an?|\d+) (?:basic )?(?:\{[a-z]\} )?energy(?: cards?)? (?:attached to|from) this pokémon\.?$/;
 const HAND_COST_TYPES = new Set(['atkDiscardOwnHand', 'atkDiscardHandEnergy', 'atkLostZoneFromHand']);
 
 function isAttachStep(step) {

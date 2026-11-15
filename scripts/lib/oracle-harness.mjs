@@ -177,6 +177,11 @@ export function buildState(holder, holderZone) {
       z.bench.push(energy(own && b === 1 ? 'Psychic' : 'Grass', benched.instanceId));
     }
     z.deck.push(...deckFor(pid));
+    // "Search your deck for a Cynthia's Pokémon" (Cynthia's Gabite), "a Team Aqua Pokémon"
+    // (Team Aqua's Sharpedo): an owner-named holder needs a deck card of the same owner, or
+    // its filtered search finds nothing and the row reads as a dropped clause.
+    const owner = own ? String(holder().name || '').match(/^(.+?)'s /)?.[1] : null;
+    if (owner) z.deck.push(mon(`${owner}'s Deckmate`));
     z.hand.push(
       energy('Fire'),
       trainer('Hand Item', 'Item'),

@@ -3382,7 +3382,7 @@
    "name": "Gliscor",
    "attack": "Cutting Turn",
    "family": "coin-flip",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "cyber drive#rpwgsj": {
    "name": "Miraidon ex",

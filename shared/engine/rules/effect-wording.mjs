@@ -13,18 +13,32 @@ const NUMBER_WORD_RE = new RegExp(
   'gi'
 );
 
+// "up to two Grookey cards": after "up to" a number word is a count whatever follows it.
+const UP_TO_NUMBER_WORD_RE = new RegExp(`(?<=\\bup to )(${Object.keys(NUMBER_WORDS).join('|')})\\b`, 'gi');
+const digitsOf = (word) => String(NUMBER_WORDS[word.toLowerCase()]);
+
 const REWRITES = [
+  [UP_TO_NUMBER_WORD_RE, digitsOf],
   // "one of your Benched Pokémon", "one of their Pokémon", "one of your opponent's Pokémon".
   [/\bone of (your|their|his or her|the|those|them)\b/gi, '1 of $1'],
-  [NUMBER_WORD_RE, (word) => String(NUMBER_WORDS[word.toLowerCase()])],
+  [NUMBER_WORD_RE, digitsOf],
   // "place them on your Bench" / "put it on your Bench" → "put … onto your Bench".
   [/\bplace (it|them|that card|those cards|that pok[ée]mon|those pok[ée]mon) (?:on|onto|in|into) your\b/gi, 'put $1 onto your'],
   [/\b(put (?:it|them|that card|those cards|that pok[ée]mon|those pok[ée]mon)) on your bench\b/gi, '$1 onto your Bench'],
   [/\bput (it|them|that card|those cards) onto your hand\b/gi, 'put $1 into your hand'],
+  // "Switch out your opponent's Active Pokémon with 1 of their Benched Pokémon" is the gust
+  // "Switch your opponent's Active Pokémon with 1 of their Benched Pokémon".
+  [/\bswitch out (your opponent's active pok[ée]mon with)\b/gi, 'switch $1'],
+  // "Then switch this Pokémon …" → "Then, switch this Pokémon …". Only before "switch": older
+  // printings read "Then discard …" without the comma, and their parsers match it that way.
+  [/(^|[.)] )then (?=switch )/gi, '$1Then, '],
+  // "prevent all damage done to this Pokémon." names attacks on every printed card.
+  [/\b(prevent all damage done to this pok[ée]mon)(?=\s*(?:[.,]|$))/gi, '$1 by attacks'],
   // Missing apostrophe: "your opponents Active Pokémon".
   [/\b(your|their) opponents (?=active|bench|pok[ée]mon|hand|deck|discard|prize|next|turn|attack)/gi, "$1 opponent's "],
   [/\bactive (?:slot|position)\b/gi, 'Active Spot'],
-  [/\bcannot\b/gi, "can't"],
+  // Not inside reminder text: "(… you cannot put it face down …)" states no effect.
+  [/\bcannot\b(?![^()]*\))/gi, "can't"],
   [/\bcan no longer\b/gi, "can't"],
   [/\b(\d+)hp\b/gi, '$1 HP'],
   [/\bpokemon\b/g, 'pokémon'],

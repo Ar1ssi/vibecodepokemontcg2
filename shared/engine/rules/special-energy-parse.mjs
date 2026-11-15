@@ -426,6 +426,43 @@ function parseAttachRestriction(lower) {
   return steps;
 }
 
+// Phrases the clause matchers share. A card may print the host with or without a type
+// ("the {G} Pokémon this card is attached to" / "the Pokémon this card is attached to"), and a
+// count as any number, singular or plural: each matcher reads those from the text, so a card
+// reworded to another type, no type or another amount needs no matcher of its own.
+const TYPED = '(?:\\{([a-z])\\} )?';
+const HOST = `the ${TYPED}pokémon (?:that )?this card is attached to`;
+const ATTACH_TO = `when you attach this card from your hand to (?:an? |1 of your )?${TYPED}pokémon`;
+const COUNTERS = '(\\d+) damage counters?';
+const CARDS = '(a card|\\d+ cards?)';
+const clause = (source) => new RegExp(source);
+const typeOf = (symbol) => (symbol ? SYMBOL_TYPES[symbol] : undefined);
+// `{ hostType }` for a typed host, nothing for an untyped one (the effect then has no host gate).
+const hosted = (symbol) => (symbol ? { hostType: SYMBOL_TYPES[symbol] } : {});
+const cardCount = (phrase) => (phrase === 'a card' ? 1 : Number(phrase.match(/\d+/)[0]));
+
+const ATTACH_DRAW_RE = clause(`${ATTACH_TO}, draw ${CARDS}`);
+const ATTACH_SEARCH_RE = clause(`${ATTACH_TO}, (search your deck for [^.]*\\.?)`);
+const ATTACH_HEAL_RE = clause(`${ATTACH_TO}, heal (\\d+) damage from (?:that pokémon|it)`);
+const ATTACH_REMOVE_RE = clause(`${ATTACH_TO}, remove (?:up to )?${COUNTERS}( and all special conditions)?`);
+const ATTACH_CURE_RE = clause(`${ATTACH_TO}, remove all special conditions`);
+const ATTACH_COUNTER_RE = clause(`${ATTACH_TO}, put ${COUNTERS} on that pokémon`);
+const ATTACH_DAMAGE_RE = clause(`${ATTACH_TO}, it does (\\d+) damage to that pokémon`);
+const HP_BONUS_RE = clause(`${HOST} gets \\+(\\d+) hp`);
+const DAMAGE_BONUS_RE = clause(`(?:attacks used by|the attacks of) ${HOST} do (\\d+) more damage`);
+const DAMAGE_PENALTY_RE = clause(`the attacks of ${HOST} do (\\d+) less damage`);
+const TAKES_LESS_RE = clause(`${HOST} takes (\\d+) less damage from attacks from your opponent's pokémon( v\\b|-ex\\b| ex\\b)?`);
+const OPPONENT_DOES_LESS_RE = clause(`the attacks of your opponent's pokémon do (\\d+) less damage to ${HOST}`);
+const NO_WEAKNESS_RE = clause(`${HOST} (?:has|gets) no weakness`);
+const FREE_RETREAT_RE = clause(`${HOST} has no retreat cost`);
+const RETREAT_LESS_RE = clause(`retreat cost of ${HOST} is ((?:\\{c\\})+) less`);
+const FULL_IMMUNITY_RE = clause(`${HOST} recovers from all special conditions and can't be affected by any special conditions`);
+const ONE_IMMUNITY_RE = clause(`${HOST} can't be (asleep|confused|paralyzed|poisoned|burned)`);
+const EFFECT_SHIELD_RE = clause(`prevent all effects of (?:your opponent's )?attacks[^.]*?done to ${HOST}`);
+const ABILITY_SHIELD_RE = clause(`prevent all effects of your opponent's pokémon's abilities done to ${HOST}`);
+const BENCH_SHIELD_RE = clause(`as long as ${HOST} is on your bench, prevent all damage done to it by attacks from your opponent's pokémon`);
+const STATUS_WORDS = { asleep: 'Asleep', confused: 'Confused', paralyzed: 'Paralyzed', poisoned: 'Poisoned', burned: 'Burned' };
+
 // Generic effect-clause matchers. Order matters only for readability; steps are
 // additive, so a card can match several.
 function parseEffects(lower) {
@@ -436,7 +473,7 @@ function parseEffects(lower) {
   if (/discard (?:it|this card|boost energy|mirror|r energy|magma energy|aqua energy|miracle energy)\b[^.]*at the end of (?:your|the) turn|discard .* at the end of the turn it was attached|at the end of your turn, discard|when your turn ends, discard/.test(lower)) {
     push({ type: 'discardAtEndOfTurn' });
   }
-  if (/at the end of every turn, put (\d+) damage counter on the pokémon (?:darkness|\{d\}) energy is attached to/.test(lower)) {
+  if (/at the end of every turn, put (\d+) damage counters? on the pokémon (?:darkness|\{d\}) energy is attached to/.test(lower)) {
     const m = lower.match(/put (\d+) damage counter/);
     push({ type: 'endOfTurnDamageCounter', count: Number(m[1]), unless: 'host:Dark' });
   }
@@ -486,8 +523,8 @@ function parseEffects(lower) {
 
   // ── reactive damage effects ────────────────────────────────────────────
   if (/is in the active spot and is damaged by (?:an|a) (?:attack|opponent's attack|attack from your opponent's pokémon)/.test(lower)
-    && /put (\d+) damage counters on the attacking pokémon/.test(lower)) {
-    const m = lower.match(/put (\d+) damage counters on the attacking pokémon/);
+    && /put (\d+) damage counters? on the attacking pokémon/.test(lower)) {
+    const m = lower.match(/put (\d+) damage counters? on the attacking pokémon/);
     const hostTypeMatch = lower.match(/the \{([a-z])\} pokémon this card is attached to is in the active spot/);
     push({
       type: 'onDamagedDamageCounters',
@@ -497,13 +534,14 @@ function parseEffects(lower) {
       against: /opponent's pokémon-ex/.test(lower) ? 'pokemonEx' : undefined,
     });
   } else if (/whenever the \{([a-z])\} pokémon this card is attached to is your active pokémon and is damaged by an attack from your opponent's pokémon-ex/.test(lower)
-    && /put (\d+) damage counters on the attacking pokémon-ex/.test(lower)) {
-    const m = lower.match(/put (\d+) damage counters on the attacking pokémon-ex/);
+    && /put (\d+) damage counters? on the attacking pokémon-ex/.test(lower)) {
+    const m = lower.match(/put (\d+) damage counters? on the attacking pokémon-ex/);
     const host = lower.match(/whenever the \{([a-z])\} pokémon/);
     push({ type: 'onDamagedDamageCounters', count: Number(m[1]), activeOnly: true, hostType: SYMBOL_TYPES[host[1]], against: 'pokemonEx' });
   }
-  if (/is in the active spot and is damaged by an attack from your opponent's pokémon[^.]*draw a card/.test(lower)) {
-    push({ type: 'onDamagedDraw', count: 1 });
+  const damagedDraw = lower.match(/is in the active spot and is damaged by an attack from your opponent's pokémon[^.]*draw (a card|\d+ cards?)/);
+  if (damagedDraw) {
+    push({ type: 'onDamagedDraw', count: cardCount(damagedDraw[1]) });
   }
   if (/whenever you play a pokémon from your hand to evolve the pokémon v this card is attached to, heal (\d+) damage/.test(lower)) {
     const m = lower.match(/heal (\d+) damage/);
@@ -511,15 +549,14 @@ function parseEffects(lower) {
   }
 
   // ── on-attach triggers ─────────────────────────────────────────────────
-  const drawAttach = lower.match(/when you attach this card from your hand to (?:a \{([a-z])\} pokémon|a pokémon), draw (a card|\d+ cards?)/);
+  const drawAttach = lower.match(ATTACH_DRAW_RE);
   if (drawAttach) {
-    const count = drawAttach[2] === 'a card' ? 1 : Number(drawAttach[2].match(/\d+/)[0]);
-    push({ type: 'onAttachDraw', count, hostType: drawAttach[1] ? SYMBOL_TYPES[drawAttach[1]] : undefined });
+    push({ type: 'onAttachDraw', count: cardCount(drawAttach[2]), hostType: typeOf(drawAttach[1]) });
   }
   // The search clause goes to the shared deck-search grammar (trainer-effects), which reads
   // the printed count, kind and destination: "up to 2 Basic {P} Pokémon … onto your Bench" and
   // a reworded "a Basic {P} Pokémon … put it onto your Bench" need no clause of their own.
-  const searchAttach = lower.match(/when you attach this card from your hand to (?:an? |1 of your )?(?:\{([a-z])\} )?pokémon, (search your deck for [^.]*\.?)/);
+  const searchAttach = lower.match(ATTACH_SEARCH_RE);
   if (searchAttach) {
     const search = parseSearchDeckParams(searchAttach[2]);
     if (!search.type && search.what !== 'card' && ATTACH_SEARCH_DESTINATIONS.has(search.destination)) {
@@ -528,26 +565,24 @@ function parseEffects(lower) {
         what: search.what,
         count: search.count,
         destination: search.destination,
-        hostType: searchAttach[1] ? SYMBOL_TYPES[searchAttach[1]] : undefined,
+        hostType: typeOf(searchAttach[1]),
       });
     }
   }
-  const healAttach = lower.match(/when you attach this card from your hand to 1 of your(?: \{([a-z])\})? pokémon, heal (\d+) damage from that pokémon/);
+  const healAttach = lower.match(ATTACH_HEAL_RE);
   if (healAttach) {
-    push({ type: 'onAttachHeal', amount: Number(healAttach[2]), hostType: healAttach[1] ? SYMBOL_TYPES[healAttach[1]] : undefined });
+    push({ type: 'onAttachHeal', amount: Number(healAttach[2]), hostType: typeOf(healAttach[1]) });
   }
-  const removeAttach = lower.match(/when you attach this card from your hand to 1 of your pokémon, remove (up to )?(\d+) damage counters?(?! and all special conditions)/);
+  const removeAttach = lower.match(ATTACH_REMOVE_RE);
   if (removeAttach) {
-    push({ type: 'onAttachRemoveDamage', count: Number(removeAttach[2]) });
+    push({ type: 'onAttachRemoveDamage', count: Number(removeAttach[2]), ...(removeAttach[3] ? { alsoCure: true } : {}) });
   }
-  if (/when you attach this card from your hand to 1 of your pokémon, remove 1 damage counter and all special conditions/.test(lower)) {
-    push({ type: 'onAttachRemoveDamage', count: 1, alsoCure: true });
-  }
-  if (/when you attach this card from your hand to 1 of your pokémon, remove all special conditions/.test(lower)) {
+  if (ATTACH_CURE_RE.test(lower)) {
     push({ type: 'onAttachClearStatus', conditions: ALL_STATUS });
   }
-  if (/when you attach this card from your hand to 1 of your pokémon, put 1 damage counter on that pokémon/.test(lower)) {
-    push({ type: 'onAttachDamageCounter', count: 1 });
+  const counterAttach = lower.match(ATTACH_COUNTER_RE);
+  if (counterAttach) {
+    push({ type: 'onAttachDamageCounter', count: Number(counterAttach[2]) });
   }
   if (/when you attach this card from your hand to 1 of your benched pokémon, switch that pokémon with your active pokémon/.test(lower)) {
     push({ type: 'onAttachSwitch', side: 'self', target: 'benchedToActive', hostZone: 'bench' });
@@ -569,11 +604,13 @@ function parseEffects(lower) {
   if (/when you play this card from your hand and attach it to 1 of your pokémon, return a basic energy card attached to that pokémon to your hand/.test(lower)) {
     push({ type: 'onAttachReturnBasicEnergy' });
   }
-  if (/when you play this card from your hand and attach it to 1 of your evolved pokémon, you may remove up to 2 damage counters from that pokémon and discard the top card from it/.test(lower)) {
-    push({ type: 'onAttachDevolve', count: 2 });
+  const devolveAttach = lower.match(/when you play this card from your hand and attach it to 1 of your evolved pokémon, you may remove (?:up to )?(\d+) damage counters? from that pokémon and discard the top card from it/);
+  if (devolveAttach) {
+    push({ type: 'onAttachDevolve', count: Number(devolveAttach[1]) });
   }
-  if (/if you play this card from your hand, remove 1 damage counter from the pokémon you attach it to/.test(lower)) {
-    push({ type: 'onAttachRemoveDamage', count: 1 });
+  const potionAttach = lower.match(/if you play this card from your hand, remove (\d+) damage counters? from the pokémon you attach it to/);
+  if (potionAttach) {
+    push({ type: 'onAttachRemoveDamage', count: Number(potionAttach[1]) });
   }
   if (/if you play this card from your hand, the pokémon you attach it to is no longer affected by a special condition/.test(lower)) {
     push({ type: 'onAttachClearStatus', conditions: ['Special Condition'] });
@@ -582,17 +619,21 @@ function parseEffects(lower) {
     push({ type: 'onAttachClearStatus', conditions: ['Asleep', 'Confused', 'Paralyzed', 'Poisoned'] });
   }
   // Team Rocket Rainbow Energy: "it does 10 damage to that Pokémon (Don't apply W/R)".
-  if (/when you attach this card from your hand to 1 of your pokémon, it does 10 damage to that pokémon/.test(lower)) {
-    push({ type: 'onAttachDamageCounter', count: 1 });
+  const damageAttach = lower.match(ATTACH_DAMAGE_RE);
+  if (damageAttach) {
+    push({ type: 'onAttachDamageCounter', count: Math.round(Number(damageAttach[2]) / 10) });
   }
   if (/if this card is put into your discard pile from play, return it to your hand/.test(lower)) {
     push({ type: 'onDiscardReturnToHand' });
   }
-  const callSearch = lower.match(/once during your turn, if the pokémon call energy is attached to is your active pokémon, you may search your deck for up to (\d+) basic pokémon and put them onto your bench/);
+  const callSearch = lower.match(/once during your turn, if the pokémon call energy is attached to is your active pokémon, you may (search your deck for [^.]*\.?)/);
   if (callSearch) {
     // An activated once-per-turn action that ends the turn, not an attach trigger. No command
     // runs it yet (I169), so it fails closed instead of granting a free search on attach.
-    push({ type: 'activatedSearch', what: 'Basic Pokémon', count: Number(callSearch[1]), destination: 'bench', oncePerTurn: true, endsTurn: true, requiresActive: true });
+    const search = parseSearchDeckParams(callSearch[1]);
+    if (!search.type) {
+      push({ type: 'activatedSearch', what: search.what, count: search.count, destination: search.destination, oncePerTurn: true, endsTurn: true, requiresActive: true });
+    }
   }
   if (/if you took this card as a face-down prize card during your turn, before you put it into your hand, you may attach this card to 1 of your pokémon/.test(lower)) {
     push({ type: 'attachFromPrize' });
@@ -600,21 +641,17 @@ function parseEffects(lower) {
 
   // ── continuous combat modifiers ────────────────────────────────────────
   // HP bonus.
-  const hp = lower.match(/the \{([a-z])\} pokémon this card is attached to gets \+(\d+) hp/);
+  const hp = lower.match(HP_BONUS_RE);
   if (hp) {
-    push({ type: 'hpBonus', amount: Number(hp[2]), hostType: SYMBOL_TYPES[hp[1]] });
+    push({ type: 'hpBonus', amount: Number(hp[2]), hostType: typeOf(hp[1]) });
   }
   // Damage bonus to the attached Pokémon's attacks.
-  let bonus = lower.match(/attacks used by the \{([a-z])\} pokémon this card is attached to do (\d+) more damage/);
-  if (!bonus) bonus = lower.match(/the attacks of the \{([a-z])\} pokémon this card is attached to do (\d+) more damage/);
-  if (!bonus) bonus = lower.match(/the attacks of the pokémon this card is attached to do (\d+) more damage[^.]*opponent's active/);
-  if (!bonus) bonus = lower.match(/the attacks of the (ultra beast) this card is attached to do (\d+) more damage/);
+  const bonus = lower.match(DAMAGE_BONUS_RE);
+  const beastBonus = !bonus && lower.match(/the attacks of the ultra beast this card is attached to do (\d+) more damage/);
   if (bonus) {
-    let hostType;
-    if (bonus[1] && /ultra beast/.test(bonus[1])) hostType = 'Ultra Beast';
-    else if (bonus[1] && SYMBOL_TYPES[bonus[1]]) hostType = SYMBOL_TYPES[bonus[1]];
-    const m2 = lower.match(/do (\d+) more damage/);
-    push({ type: 'damageBonus', amount: Number(m2[1]), hostType, target: 'opponentActive' });
+    push({ type: 'damageBonus', amount: Number(bonus[2]), hostType: typeOf(bonus[1]), target: 'opponentActive' });
+  } else if (beastBonus) {
+    push({ type: 'damageBonus', amount: Number(beastBonus[1]), hostType: 'Ultra Beast', target: 'opponentActive' });
   }
   // Unseen Forces prints "is attached to attack," (SE14).
   if (/if the pokémon (?:darkness|\{d\}) energy is attached to attacks?, the attack does (\d+) more damage/.test(lower)) {
@@ -632,9 +669,9 @@ function parseEffects(lower) {
     push({ type: 'damageBonus', amount: Number(m[1]), target: 'active' });
   }
   // Penalty to the attached Pokémon's own attacks.
-  if (/the attacks of the pokémon this card is attached to do (\d+) less damage/.test(lower)) {
-    const m = lower.match(/do (\d+) less damage/);
-    push({ type: 'attackDamagePenalty', amount: Number(m[1]), target: 'opponentPokemon' });
+  const penalty = lower.match(DAMAGE_PENALTY_RE);
+  if (penalty) {
+    push({ type: 'attackDamagePenalty', amount: Number(penalty[2]), target: 'opponentPokemon', ...hosted(penalty[1]) });
   }
   if (/damage done to your opponent's pokémon by the pokémon double rainbow energy is attached to is reduced by (\d+)/.test(lower)) {
     const m = lower.match(/is reduced by (\d+)/);
@@ -646,41 +683,39 @@ function parseEffects(lower) {
     });
   }
   // Damage reduction on the attached Pokémon.
-  let red = lower.match(/the \{([a-z])\} pokémon this card is attached to takes (\d+) less damage from attacks from your opponent's pokémon/);
-  if (red) {
-    push({ type: 'damageReduction', amount: Number(red[2]), hostType: SYMBOL_TYPES[red[1]], source: 'opponentPokemon', afterWR: true });
+  const takesLess = lower.match(TAKES_LESS_RE);
+  if (takesLess) {
+    const attackerKind = (takesLess[3] || '').trim();
+    const source = attackerKind === 'v' ? 'opponentPokemonV' : attackerKind ? 'opponentPokemonEx' : 'opponentPokemon';
+    push({ type: 'damageReduction', amount: Number(takesLess[2]), ...hosted(takesLess[1]), source, afterWR: true });
   }
-  if (/the pokémon this card is attached to takes (\d+) less damage from attacks from your opponent's pokémon v/.test(lower)) {
-    const m = lower.match(/takes (\d+) less damage/);
-    push({ type: 'damageReduction', amount: Number(m[1]), source: 'opponentPokemonV', afterWR: true });
-  }
-  if (/the attacks of your opponent's pokémon do (\d+) less damage to the \{([a-z])\} pokémon this card is attached to/.test(lower)) {
-    const m = lower.match(/do (\d+) less damage to the \{([a-z])\} pokémon/);
-    push({ type: 'damageReduction', amount: Number(m[1]), hostType: SYMBOL_TYPES[m[2]], source: 'opponentPokemon', afterWR: false });
+  const doesLess = lower.match(OPPONENT_DOES_LESS_RE);
+  if (doesLess) {
+    push({ type: 'damageReduction', amount: Number(doesLess[1]), ...hosted(doesLess[2]), source: 'opponentPokemon', afterWR: false });
   }
   // Metal Energy: Call of Legends gates the reduction on a {M} host ("Ignore this effect
   // if … isn't {M}"); Aquapolis / Expedition print it for any host (SE14).
-  const metalIncoming = lower.match(/damage done (?:by attacks )?to the pokémon (?:that )?(?:metal|\{m\}) energy is attached to is reduced by (\d+) \(after applying weakness and resistance\)/);
+  const metalIncoming = lower.match(/damage done (?:by attacks )?to the pokémon (?:that )?(?:metal|\{[a-z]\}) energy is attached to is reduced by (\d+) \(after applying weakness and resistance\)/);
   if (metalIncoming) {
-    const gated = /ignore this effect if the pokémon that (?:metal|\{m\}) energy is attached to isn't \{m\}/.test(lower);
+    const gated = lower.match(/ignore this effect if the pokémon that (?:metal|\{[a-z]\}) energy is attached to isn't \{([a-z])\}/);
     push({
       type: 'damageReduction',
       amount: Number(metalIncoming[1]),
       source: 'opponentPokemon',
       afterWR: true,
-      ...(gated && { condition: 'host:Metal' }),
+      ...(gated && { condition: `host:${SYMBOL_TYPES[gated[1]]}` }),
     });
   }
   // "…isn't {M}, whenever it damages a Pokémon, reduce that damage by 10" is the host's
   // own outgoing damage, not incoming (SE14).
-  const metalOutgoing = lower.match(/if the pokémon (?:metal|\{m\}) energy is attached to isn't \{m\}, whenever it damages a pokémon[^.]*reduce that damage by (\d+) \((before|after) applying/);
+  const metalOutgoing = lower.match(/if the pokémon (?:metal|\{[a-z]\}) energy is attached to isn't \{([a-z])\}, whenever it damages a pokémon[^.]*reduce that damage by (\d+) \((before|after) applying/);
   if (metalOutgoing) {
     push({
       type: 'attackDamagePenalty',
-      amount: Number(metalOutgoing[1]),
+      amount: Number(metalOutgoing[2]),
       target: 'opponentPokemon',
-      afterWR: metalOutgoing[2] === 'after',
-      condition: 'not:Metal',
+      afterWR: metalOutgoing[3] === 'after',
+      condition: `not:${SYMBOL_TYPES[metalOutgoing[1]]}`,
     });
   }
   // Holon Energy GL: the Pokémon-ex reduction needs a basic {L} Energy (DF 85 and DS 105 word it differently).
@@ -701,10 +736,10 @@ function parseEffects(lower) {
   }
 
   // ── type / retreat / status modifiers ──────────────────────────────────
-  if (/the \{([a-z])\} pokémon this card is attached to (?:has no weakness|gets no weakness)/.test(lower)) {
-    const m = lower.match(/the \{([a-z])\} pokémon/);
-    push({ type: 'noWeakness', hostType: SYMBOL_TYPES[m[1]] });
-  } else if (/the (?:pokémon this card is attached to|pokémon weakness guard energy is attached to) has no weakness/.test(lower)) {
+  const noWeakness = lower.match(NO_WEAKNESS_RE);
+  if (noWeakness) {
+    push({ type: 'noWeakness', ...hosted(noWeakness[1]) });
+  } else if (/the pokémon weakness guard energy is attached to has no weakness/.test(lower)) {
     push({ type: 'noWeakness' });
   }
   if (/if the pokémon that holon energy ff is attached to also has a basic \{([a-z])\} energy card attached to it, that pokémon has no weakness/.test(lower)) {
@@ -713,53 +748,46 @@ function parseEffects(lower) {
   if (/damage done by that pokémon's attack isn't affected by resistance/.test(lower)) {
     push({ type: 'ignoresResistance', condition: 'hostHasBasic:Fighting' });
   }
-  if (/the \{([a-z])\} pokémon this card is attached to has no retreat cost/.test(lower)) {
-    const m = lower.match(/the \{([a-z])\} pokémon/);
-    push({ type: 'freeRetreat', hostType: SYMBOL_TYPES[m[1]] });
+  const freeRetreat = lower.match(FREE_RETREAT_RE);
+  if (freeRetreat) {
+    push({ type: 'freeRetreat', ...hosted(freeRetreat[1]) });
   }
-  if (/retreat cost of the pokémon this card is attached to is \{c\}\{c\} less/.test(lower)) {
-    push({ type: 'retreatReduction', amount: 2 });
+  const retreatLess = lower.match(RETREAT_LESS_RE);
+  if (retreatLess) {
+    push({ type: 'retreatReduction', amount: retreatLess[2].length / '{c}'.length });
   }
   if (/the pokémon boost energy is attached to can't retreat/.test(lower)) {
     push({ type: 'cannotRetreat' });
   }
-  const typedImmunity = lower.match(/the \{([a-z])\} pokémon this card is attached to recovers from all special conditions and can't be affected by any special conditions/);
-  if (typedImmunity) {
-    push({ type: 'statusImmunity', conditions: ALL_STATUS, hostType: SYMBOL_TYPES[typedImmunity[1]] });
+  const fullImmunity = lower.match(FULL_IMMUNITY_RE);
+  if (fullImmunity) {
+    push({ type: 'statusImmunity', conditions: ALL_STATUS, ...hosted(fullImmunity[1]) });
   } else if (/the pokémon this card is attached to recovers from being asleep, confused, or paralyzed and can't be affected by those special conditions/.test(lower)) {
     push({ type: 'statusImmunity', conditions: ['Asleep', 'Confused', 'Paralyzed'] });
   }
   if (/if the pokémon that holon energy gl is attached to also has a basic \{([a-z])\} energy card attached to it, that pokémon can't be affected by any special conditions/.test(lower)) {
     push({ type: 'statusImmunity', conditions: ALL_STATUS, condition: 'hostHasBasic:Grass' });
   }
-  if (/the pokémon this card is attached to can't be paralyzed/.test(lower)) {
-    push({ type: 'statusImmunity', conditions: ['Paralyzed'] });
-  }
-  if (/the pokémon this card is attached to can't be poisoned/.test(lower)) {
-    push({ type: 'statusImmunity', conditions: ['Poisoned'] });
+  for (const oneImmunity of lower.matchAll(new RegExp(ONE_IMMUNITY_RE, 'g'))) {
+    push({ type: 'statusImmunity', conditions: [STATUS_WORDS[oneImmunity[2]]], ...hosted(oneImmunity[1]) });
   }
 
   // ── effect shields ─────────────────────────────────────────────────────
-  if (/prevent all effects of attacks[^.]*done to the \{([a-z])\} pokémon this card is attached to/.test(lower)) {
-    const m = lower.match(/done to the \{([a-z])\} pokémon/);
-    push({ type: 'effectShield', hostType: SYMBOL_TYPES[m[1]], source: 'opponentPokemon', excludeDamage: true });
-  } else if (/prevent all effects of attacks used by your opponent's pokémon done to the pokémon this card is attached to/.test(lower)) {
-    push({ type: 'effectShield', source: 'opponentPokemon', excludeDamage: true });
-  }
-  if (/prevent all effects of your opponent's attacks, except damage, done to the \{([a-z])\} pokémon (?:that )?this card is attached to/.test(lower)) {
-    const m = lower.match(/done to the \{([a-z])\} pokémon/);
-    push({ type: 'effectShield', hostType: SYMBOL_TYPES[m[1]], source: 'opponentPokemon', excludeDamage: true });
+  const effectShield = lower.match(EFFECT_SHIELD_RE);
+  if (effectShield) {
+    push({ type: 'effectShield', ...hosted(effectShield[1]), source: 'opponentPokemon', excludeDamage: true });
   }
   // Dragon Frontiers: "all effects of attacks, excluding damage"; Delta Species: "all effects, excluding damage".
   if (/if the pokémon that holon energy wp is attached to also has a basic \{([a-z])\} energy card attached to it, prevent all effects(?: of attacks)?, excluding damage/.test(lower)) {
     push({ type: 'effectShield', source: 'opponentPokemon', excludeDamage: true, condition: 'hostHasBasic:Water' });
   }
-  if (/prevent all effects of your opponent's pokémon's abilities done to the pokémon this card is attached to/.test(lower)) {
-    push({ type: 'abilityShield', source: 'opponentPokemon' });
+  const abilityShield = lower.match(ABILITY_SHIELD_RE);
+  if (abilityShield) {
+    push({ type: 'abilityShield', source: 'opponentPokemon', ...hosted(abilityShield[1]) });
   }
-  if (/as long as the \{([a-z])\} pokémon this card is attached to is on your bench, prevent all damage done to it by attacks from your opponent's pokémon/.test(lower)) {
-    const m = lower.match(/as long as the \{([a-z])\} pokémon/);
-    push({ type: 'benchDamageShield', hostType: SYMBOL_TYPES[m[1]] });
+  const benchShield = lower.match(BENCH_SHIELD_RE);
+  if (benchShield) {
+    push({ type: 'benchDamageShield', ...hosted(benchShield[1]) });
   }
   if (/if the pokémon that holon energy wp is attached to also has a basic \{([a-z])\} energy card attached to it, that pokémon's retreat cost is 0/.test(lower)) {
     push({ type: 'freeRetreat', condition: 'hostHasBasic:Psychic' });

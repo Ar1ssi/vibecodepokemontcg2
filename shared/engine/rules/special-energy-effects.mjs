@@ -97,8 +97,9 @@ export function describeTypedSpecialEnergy(card) {
 export function pokemonMatchesEnergyType(pokemon, energyType) {
   if (!pokemon || !energyType) return false;
   const want = energyType.toLowerCase();
-  const fromData = String(pokemon?.types?.[0] ?? '').trim().toLowerCase();
-  if (fromData) {
+  // Every printed type counts: a dual-type Pokémon is found by either type.
+  for (const type of Array.isArray(pokemon?.types) ? pokemon.types : []) {
+    const fromData = String(type ?? '').trim().toLowerCase();
     if (fromData === want) return true;
     if (want === 'darkness' && fromData === 'dark') return true;
     if (want === 'dark' && fromData === 'darkness') return true;

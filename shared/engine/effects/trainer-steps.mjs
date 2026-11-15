@@ -11,7 +11,7 @@ import { shuffleInPlace } from '../rng.mjs';
 import { formsAllowEvolution } from '../rules/pokemon-forms.mjs';
 import { isAttachedAsTool, isEnergy, isPokemon, isTrainer } from '../cards.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
-import { isUltraBeastCard, isRuleBoxPokemon, isVCard } from '../rules/card-classify.mjs';
+import { isUltraBeastCard, isRuleBoxPokemon, isVCard, isVmaxCard } from '../rules/card-classify.mjs';
 import { isAncientCard, isFutureCard } from '../rules/paradox-tags.mjs';
 import { becomeFossilPokemon } from '../rules/fossil.mjs';
 import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
@@ -387,6 +387,9 @@ export function rootMatchesTarget(player, root, target = '') {
   if (t.includes('mega evolution') && !/^mega .* ex$/i.test(top.name || '')) return false;
   if (/\bancient pok[eé]mon\b/.test(t) && !isAncientCard(top)) return false;
   if (/\bfuture pok[eé]mon\b/.test(t) && !isFutureCard(top)) return false;
+  // "1 of your Pokémon V" (Melony) / "Pokémon VMAX" (Rose): isVCard covers V, VMAX, VSTAR, V-UNION.
+  if (/\bpok[eé]mon vmax\b/.test(t) && !isVmaxCard(top)) return false;
+  if (/\bpok[eé]mon v\b/.test(t) && !isVCard(top)) return false;
   const typed = t.match(/\{([a-z])\}/);
   if (typed && typed[1] !== 'c') return pokemonHasType(top, typed[1]);
   return true;

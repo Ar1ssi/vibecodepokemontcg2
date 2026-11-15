@@ -2,18 +2,18 @@
   "corpusRows": 4228,
   "totals": {
     "n": 4228,
-    "runs": 1590,
-    "partial": 354,
-    "dead": 56,
-    "consumed": 1192,
-    "unconsumed": 1035,
+    "runs": 1668,
+    "partial": 291,
+    "dead": 44,
+    "consumed": 1321,
+    "unconsumed": 903,
     "unparsed": 1
   },
   "families": {
     "attach": {
       "n": 211,
-      "runs": 170,
-      "partial": 7,
+      "runs": 172,
+      "partial": 5,
       "dead": 6,
       "consumed": 0,
       "unconsumed": 28,
@@ -111,11 +111,11 @@
     },
     "damage-prevent": {
       "n": 305,
-      "runs": 3,
-      "partial": 13,
+      "runs": 6,
+      "partial": 11,
       "dead": 0,
-      "consumed": 188,
-      "unconsumed": 101,
+      "consumed": 218,
+      "unconsumed": 70,
       "unparsed": 0
     },
     "damage-reduce": {
@@ -129,8 +129,8 @@
     },
     "deck-peek": {
       "n": 3,
-      "runs": 1,
-      "partial": 2,
+      "runs": 2,
+      "partial": 1,
       "dead": 0,
       "consumed": 0,
       "unconsumed": 0,
@@ -156,8 +156,8 @@
     },
     "draw": {
       "n": 219,
-      "runs": 180,
-      "partial": 16,
+      "runs": 184,
+      "partial": 12,
       "dead": 21,
       "consumed": 0,
       "unconsumed": 2,
@@ -168,8 +168,8 @@
       "runs": 0,
       "partial": 0,
       "dead": 0,
-      "consumed": 100,
-      "unconsumed": 51,
+      "consumed": 102,
+      "unconsumed": 49,
       "unparsed": 0
     },
     "end-of-turn": {
@@ -201,8 +201,8 @@
     },
     "energy-redirect": {
       "n": 95,
-      "runs": 75,
-      "partial": 12,
+      "runs": 86,
+      "partial": 1,
       "dead": 0,
       "consumed": 7,
       "unconsumed": 1,
@@ -246,11 +246,11 @@
     },
     "heal": {
       "n": 211,
-      "runs": 146,
-      "partial": 8,
+      "runs": 147,
+      "partial": 7,
       "dead": 0,
-      "consumed": 13,
-      "unconsumed": 44,
+      "consumed": 38,
+      "unconsumed": 19,
       "unparsed": 0
     },
     "hp-bonus": {
@@ -276,14 +276,14 @@
       "runs": 9,
       "partial": 2,
       "dead": 0,
-      "consumed": 15,
-      "unconsumed": 37,
+      "consumed": 17,
+      "unconsumed": 35,
       "unparsed": 0
     },
     "look-at-top": {
       "n": 67,
-      "runs": 58,
-      "partial": 8,
+      "runs": 59,
+      "partial": 7,
       "dead": 1,
       "consumed": 0,
       "unconsumed": 0,
@@ -300,11 +300,11 @@
     },
     "move-damage": {
       "n": 294,
-      "runs": 144,
-      "partial": 28,
-      "dead": 1,
-      "consumed": 56,
-      "unconsumed": 65,
+      "runs": 152,
+      "partial": 21,
+      "dead": 0,
+      "consumed": 88,
+      "unconsumed": 33,
       "unparsed": 0
     },
     "on-opponent-evolve": {
@@ -318,20 +318,20 @@
     },
     "opponent-disrupt": {
       "n": 223,
-      "runs": 43,
-      "partial": 36,
+      "runs": 45,
+      "partial": 34,
       "dead": 0,
-      "consumed": 61,
-      "unconsumed": 83,
+      "consumed": 62,
+      "unconsumed": 82,
       "unparsed": 0
     },
     "passive": {
       "n": 167,
-      "runs": 22,
-      "partial": 7,
+      "runs": 26,
+      "partial": 3,
       "dead": 0,
-      "consumed": 78,
-      "unconsumed": 59,
+      "consumed": 80,
+      "unconsumed": 57,
       "unparsed": 1
     },
     "prize-modify": {
@@ -339,8 +339,8 @@
       "runs": 2,
       "partial": 0,
       "dead": 0,
-      "consumed": 25,
-      "unconsumed": 25,
+      "consumed": 30,
+      "unconsumed": 20,
       "unparsed": 0
     },
     "recursion": {
@@ -357,14 +357,14 @@
       "runs": 0,
       "partial": 0,
       "dead": 0,
-      "consumed": 101,
-      "unconsumed": 71,
+      "consumed": 104,
+      "unconsumed": 68,
       "unparsed": 0
     },
     "search": {
       "n": 295,
-      "runs": 210,
-      "partial": 76,
+      "runs": 218,
+      "partial": 68,
       "dead": 3,
       "consumed": 0,
       "unconsumed": 6,
@@ -381,8 +381,8 @@
     },
     "self-return": {
       "n": 12,
-      "runs": 9,
-      "partial": 3,
+      "runs": 11,
+      "partial": 1,
       "dead": 0,
       "consumed": 0,
       "unconsumed": 0,
@@ -399,11 +399,11 @@
     },
     "status": {
       "n": 507,
-      "runs": 183,
-      "partial": 38,
-      "dead": 21,
-      "consumed": 111,
-      "unconsumed": 154,
+      "runs": 202,
+      "partial": 30,
+      "dead": 10,
+      "consumed": 135,
+      "unconsumed": 130,
       "unparsed": 0
     },
     "status-recover": {
@@ -417,8 +417,8 @@
     },
     "switch": {
       "n": 256,
-      "runs": 224,
-      "partial": 19,
+      "runs": 234,
+      "partial": 9,
       "dead": 0,
       "consumed": 0,
       "unconsumed": 13,
@@ -426,10 +426,10 @@
     },
     "tool-cap": {
       "n": 48,
-      "runs": 0,
+      "runs": 2,
       "partial": 2,
       "dead": 0,
-      "consumed": 46,
+      "consumed": 44,
       "unconsumed": 0,
       "unparsed": 0
     },
@@ -447,8 +447,8 @@
       "runs": 1,
       "partial": 3,
       "dead": 0,
-      "consumed": 208,
-      "unconsumed": 110,
+      "consumed": 213,
+      "unconsumed": 105,
       "unparsed": 0
     },
     "when-played": {
@@ -462,20 +462,6 @@
     }
   },
   "flagged": {
-    "Aipom|snappy move#kkic62": {
-      "card": "Aipom",
-      "name": "Snappy Move",
-      "flags": [
-        "clause:search-to-bench"
-      ]
-    },
-    "Azumarill|bubble turn#112vkl4": {
-      "card": "Azumarill",
-      "name": "Bubble Turn",
-      "flags": [
-        "clause:search-to-bench"
-      ]
-    },
     "Beldum|metal chain#1x9kgpb": {
       "card": "Beldum",
       "name": "Metal Chain",
@@ -535,13 +521,6 @@
     "Darkrai-GX|restoration#17weqbm": {
       "card": "Darkrai-GX",
       "name": "Restoration",
-      "flags": [
-        "clause:search-to-bench"
-      ]
-    },
-    "Dragonite|step in#1qa356l": {
-      "card": "Dragonite",
-      "name": "Step In",
       "flags": [
         "clause:search-to-bench"
       ]
@@ -638,13 +617,6 @@
         "clause:attach-from-deck"
       ]
     },
-    "Genesect ex|metallic signal#2jn8u": {
-      "card": "Genesect ex",
-      "name": "Metallic Signal",
-      "flags": [
-        "clause:search-to-hand"
-      ]
-    },
     "Gengar|manipulate#uq45zm": {
       "card": "Gengar",
       "name": "Manipulate",
@@ -673,13 +645,6 @@
         "clause:discard-opp-energy"
       ]
     },
-    "Haunter|head trip#yjar7s": {
-      "card": "Haunter",
-      "name": "Head Trip",
-      "flags": [
-        "clause:search-to-bench"
-      ]
-    },
     "Ho-Oh V|reviving flame#x6dyfd": {
       "card": "Ho-Oh V",
       "name": "Reviving Flame",
@@ -701,34 +666,6 @@
         "clause:discard-self-energy"
       ]
     },
-    "Kabuto|revive friends#t1vzo": {
-      "card": "Kabuto",
-      "name": "Revive Friends",
-      "flags": [
-        "clause:search-to-bench"
-      ]
-    },
-    "Light Machamp|tag team#jrgcv7": {
-      "card": "Light Machamp",
-      "name": "Tag Team",
-      "flags": [
-        "clause:search-to-bench"
-      ]
-    },
-    "Lunala|blessing of the moone#1qgyxpl": {
-      "card": "Lunala",
-      "name": "Blessing of the Moone",
-      "flags": [
-        "clause:attach-from-deck"
-      ]
-    },
-    "Machamp|fighting tag#8m7mim": {
-      "card": "Machamp",
-      "name": "Fighting Tag",
-      "flags": [
-        "clause:search-to-bench"
-      ]
-    },
     "Magcargo|streaming mantle#kv2llk": {
       "card": "Magcargo",
       "name": "Streaming Mantle",
@@ -748,13 +685,6 @@
       "name": "Hyper Hypnosis",
       "flags": [
         "clause:attach-from-hand"
-      ]
-    },
-    "Marshtomp|plunge#5wyrm5": {
-      "card": "Marshtomp",
-      "name": "Plunge",
-      "flags": [
-        "clause:search-to-bench"
       ]
     },
     "Meganium ex|nurture and heal#1cf1yl": {
@@ -813,25 +743,10 @@
         "clause:search-to-bench"
       ]
     },
-    "Pelipper|delta transport#xs029h": {
-      "card": "Pelipper",
-      "name": "Delta Transport",
-      "flags": [
-        "clause:search-to-bench"
-      ]
-    },
     "Politoed|leap frog#fjbscs": {
       "card": "Politoed",
       "name": "Leap Frog",
       "flags": [
-        "clause:search-to-bench"
-      ]
-    },
-    "Poliwrath|plunge#1pqhf0n": {
-      "card": "Poliwrath",
-      "name": "Plunge",
-      "flags": [
-        "clause:attach-from-deck",
         "clause:search-to-bench"
       ]
     },
@@ -845,13 +760,6 @@
     "Porygon-Z|buggy turbo#uzix60": {
       "card": "Porygon-Z",
       "name": "Buggy Turbo",
-      "flags": [
-        "clause:discard-self-energy"
-      ]
-    },
-    "Pyroar|flare command#1olvdu3": {
-      "card": "Pyroar",
-      "name": "Flare Command",
       "flags": [
         "clause:discard-self-energy"
       ]
@@ -897,13 +805,6 @@
       "name": "Regi Cycle",
       "flags": [
         "clause:discard-own-hand"
-      ]
-    },
-    "Rocket's Persian ex|night cry#1e7yk85": {
-      "card": "Rocket's Persian ex",
-      "name": "Night Cry",
-      "flags": [
-        "clause:search-to-bench"
       ]
     },
     "Roserade|energy signal#1t15j73": {
@@ -983,37 +884,9 @@
         "clause:attach-from-deck"
       ]
     },
-    "Unown ?|?#7bbknf": {
-      "card": "Unown ?",
-      "name": "?",
-      "flags": [
-        "clause:search-to-bench"
-      ]
-    },
-    "Unown A|analyze#17ypb6r": {
-      "card": "Unown A",
-      "name": "ANALYZE",
-      "flags": [
-        "clause:search-to-bench"
-      ]
-    },
-    "Unown D|draw#1bg40b": {
-      "card": "Unown D",
-      "name": "DRAW",
-      "flags": [
-        "clause:search-to-bench"
-      ]
-    },
     "Unown F|[find]#1nfgh76": {
       "card": "Unown F",
       "name": "[Find]",
-      "flags": [
-        "clause:search-to-bench"
-      ]
-    },
-    "Unown F|fake#cpgthh": {
-      "card": "Unown F",
-      "name": "FAKE",
       "flags": [
         "clause:search-to-bench"
       ]
@@ -1054,20 +927,6 @@
         "clause:search-to-bench"
       ]
     },
-    "Unown P|put#1inrwvx": {
-      "card": "Unown P",
-      "name": "PUT",
-      "flags": [
-        "clause:search-to-bench"
-      ]
-    },
-    "Unown R|retire#1ctbo8q": {
-      "card": "Unown R",
-      "name": "RETIRE",
-      "flags": [
-        "clause:search-to-bench"
-      ]
-    },
     "Unown U|[undo]#j47pmi": {
       "card": "Unown U",
       "name": "[Undo]",
@@ -1085,13 +944,6 @@
     "Unown X|x-ray#1yf9ubx": {
       "card": "Unown X",
       "name": "X-RAY",
-      "flags": [
-        "clause:search-to-bench"
-      ]
-    },
-    "Unown Y|yawn#1796co6": {
-      "card": "Unown Y",
-      "name": "YAWN",
       "flags": [
         "clause:search-to-bench"
       ]
@@ -1115,13 +967,6 @@
       "name": "Grand Wing",
       "flags": [
         "clause:opp-shuffle-hand"
-      ]
-    },
-    "Wigglytuff|good neighbor#u4duwr": {
-      "card": "Wigglytuff",
-      "name": "Good Neighbor",
-      "flags": [
-        "clause:search-to-bench"
       ]
     }
   }
