@@ -7,6 +7,7 @@ import { isE2eMode, stampE2eCard } from '../general/e2e-mode.mjs';
 import { emitCardStats } from '../netcode/card-stats.js';
 import { soloCommandSeat } from '../netcode/solo-seat.mjs';
 import { ensureCardData } from '/shared/engine/rules/rules-state.mjs';
+import { stampEvolvesFromBase } from '/shared/engine/rules/evolution.mjs';
 
 
 export const buildDeck = (user) => {
@@ -63,6 +64,7 @@ export const buildDeck = (user) => {
       while (next < cards.length) {
         const card = cards[next++];
         await ensureCardData(card);
+        await stampEvolvesFromBase(card);
       }
     };
     await Promise.all(

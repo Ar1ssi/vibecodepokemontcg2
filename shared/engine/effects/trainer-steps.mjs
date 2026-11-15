@@ -946,8 +946,9 @@ function lookPickMatches(card, pick) {
   return matchesSearch(card, pick);
 }
 
-// `(bench)` forms (I132): a named Pokémon ("Anorith (bench)"), a typed Basic
-// ("Darkness Pokémon (bench)"), or any Basic ("Pokémon (bench)").
+// `(bench)` forms (I132): a named Pokémon ("Anorith (bench)"), a typed Pokémon
+// of any Stage ("Darkness Pokémon (bench)" — Grimsley's Move says "a {D} Pokémon"),
+// or any Basic ("Pokémon (bench)").
 function benchPickMatches(card, what) {
   if (!isPokemon(card)) return false;
   const label = what.trim();
@@ -955,11 +956,7 @@ function benchPickMatches(card, what) {
   const typed = label.match(/^(.+) Pokémon$/);
   if (typed) {
     const symbol = typeSymbolForWord(typed[1]);
-    return (
-      symbol != null &&
-      stageOf(card) === 'Basic' &&
-      pokemonHasType(card, symbol)
-    );
+    return symbol != null && pokemonHasType(card, symbol);
   }
   return String(card.name || '').trim().toLowerCase() === label.toLowerCase();
 }

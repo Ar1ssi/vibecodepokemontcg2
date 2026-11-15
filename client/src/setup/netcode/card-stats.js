@@ -85,6 +85,11 @@ function extractStats(card) {
     stats.evolvesFrom = String(card.evolvesFrom);
     hasAny = true;
   }
+  // The Basic a Stage 2 descends from: Rare Candy's line check on the server (evolved-pokemon.mjs).
+  if (typeof card.evolvesFromBase === 'string' && card.evolvesFromBase) {
+    stats.evolvesFromBase = card.evolvesFromBase;
+    hasAny = true;
+  }
   // Zygarde's form (pokemon-forms.mjs): the server tells the forms apart for evolution with it.
   if (typeof card.form === 'string' && card.form) {
     stats.form = card.form;

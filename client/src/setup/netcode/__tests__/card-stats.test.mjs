@@ -91,6 +91,16 @@ test('Pokémon carry evolvesFrom and their Ability text for server-side Salvator
   ]);
 });
 
+test('a Stage 2 carries the Basic it descends from for the server-side Rare Candy check', () => {
+  const { stats } = buildCardStatsPayload([
+    { syncInstance: 4, stage: 'Stage 2', evolvesFrom: 'Zweilous', evolvesFromBase: 'deino' },
+  ]);
+
+  assert.deepEqual(stats, [
+    { syncInstance: 4, stage: 'Stage 2', evolvesFrom: 'Zweilous', evolvesFromBase: 'deino' },
+  ]);
+});
+
 // Toxic Gas / Goop Gas / Seal Off tell a Pokémon Power from a Poké-Body by the printed type alone;
 // dropping it here made every Power look like an Ability on the server.
 test('abilities carry their printed type (Pokemon Power, Poke-BODY) to the server', () => {

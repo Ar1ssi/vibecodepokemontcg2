@@ -196,8 +196,20 @@ test('stage2EvolvesFromBasic: traces the line through a known Stage 1, allows un
 
   assert.equal(stage2EvolvesFromBasic(greninja, froakie, [frogadier]), true);
   assert.equal(stage2EvolvesFromBasic(greninja, budew, [frogadier]), false);
-  assert.equal(stage2EvolvesFromBasic(greninja, budew, []), true, 'no Stage 1 seen');
+  assert.equal(stage2EvolvesFromBasic(greninja, budew, []), false, 'no Stage 1 seen: static table still traces Frogadier');
   assert.equal(stage2EvolvesFromBasic(pokemon({ name: 'X', stage: 'Stage 2' }), budew, [frogadier]), true, 'no evolvesFrom');
+  const unknownLine = pokemon({ name: 'Mystery ex', stage: 'Stage 2', evolvesFrom: 'Mysteryo' });
+  assert.equal(stage2EvolvesFromBasic(unknownLine, budew, []), true, 'line untraceable everywhere');
+});
+
+test('stage2EvolvesFromBasic: Hydreigon ex stays off Larvitar with no Zweilous in the deck (battle-log 5)', () => {
+  const larvitar = pokemon({ name: 'Larvitar' });
+  const deino = pokemon({ name: 'Deino' });
+  const hydreigon = pokemon({ name: 'Hydreigon ex', stage: 'Stage 2', evolvesFrom: 'Zweilous', evolvesFromBase: 'Deino' });
+  assert.equal(stage2EvolvesFromBasic(hydreigon, larvitar, []), false);
+  assert.equal(stage2EvolvesFromBasic(hydreigon, deino, []), true);
+  const unstamped = pokemon({ name: 'Hydreigon ex', stage: 'Stage 2', evolvesFrom: 'Zweilous' });
+  assert.equal(stage2EvolvesFromBasic(unstamped, larvitar, []), false, 'static table: Zweilous evolves from Deino');
 });
 
 test('rareCandyOptions: offers only Basics on the Stage 2 line', () => {
