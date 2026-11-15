@@ -9,7 +9,7 @@
 //
 // Backward-compat: the bridge auto-draws by finding `type === 'drawAbility'`
 // and reading `.count`. That step type + property are preserved.
-import { energySearchWhat } from './search-match.mjs';
+import { energySearchWhat, NAME_WORD_CLAUSE } from './search-match.mjs';
 
 // "When you play this Pokémon from your hand to evolve 1 of your Pokémon during your turn, …" with
 // no "you may": the effect is mandatory and runs on the evolve itself (effects/ability.mjs
@@ -399,6 +399,9 @@ export function parseAbilitySearchParams(lower) {
   } else if (scope.includes('pokémon') || scope.includes('pokemon')) {
     what = 'a Pokémon';
   }
+
+  const nameWord = scope.match(NAME_WORD_CLAUSE)?.[0];
+  if (nameWord && what) what = `${what}${nameWord.startsWith(' ') ? '' : ' '}${nameWord.trim()}`;
 
   if (!upTo) {
     const upToM = lower.match(/up to\s+(\d+)/);

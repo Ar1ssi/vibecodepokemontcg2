@@ -149,10 +149,19 @@ function markerKindMatch(card, w) {
   return null;
 }
 
+// "an Item card that has the word "Ball" in its name" (Lopunny Bunny Business).
+export const NAME_WORD_CLAUSE =
+  /\s*(?:that |which )?(?:has|with) the word ["“”]([^"“”]+)["“”] in (?:its|their) names?/i;
+
 /** Match a card against a parsed search-step `what` string. */
 export function matchesSearch(card, what = '') {
   // Fossil Researcher: "up to 2 in any combination of Amaura or Tyrunt".
   what = String(what).replace(/^\s*in any combination of\s+/i, '');
+  const nameWord = what.match(NAME_WORD_CLAUSE);
+  if (nameWord) {
+    if (!lowerName(card).includes(nameWord[1].toLowerCase())) return false;
+    return matchesSearch(card, what.replace(NAME_WORD_CLAUSE, ''));
+  }
   const w = what.toLowerCase();
   // "90 HP or less" and "Retreat Cost of 3 or more" are ranges, not or-clauses: splitting them
   // dropped the cap and matched every card (same class as the typed-Basic HP cap bug below).

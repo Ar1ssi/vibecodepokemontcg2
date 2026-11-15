@@ -2128,3 +2128,37 @@ test('ability: Lunala Blessing of the Moone attaches up to 2 searched Energy to 
   assert.equal(res4.state.players.p1.zones.hand.length, 0, 'Energy never goes to hand');
   assert.equal(res4.state.players.p1.zones.deck.length, 1, 'the third Energy stays in the deck');
 });
+
+// Source: user's scan of Lopunny, Bunny Business (also in customhb/set.json).
+test('ability: Bunny Business offers only Item cards with "Ball" in their name', () => {
+  const { state, rng } = setupGame();
+  const text = 'Once during your turn, you may search your deck for an Item card that has the word "Ball" in its name. Then, shuffle your deck.';
+  state.players.p1.zones.active.push(createCard({
+    instanceId: 30,
+    name: 'Lopunny',
+    hp: 110,
+    supertype: 'Pokémon',
+    abilityText: `Bunny Business: ${text}`,
+    abilities: [{ name: 'Bunny Business', type: 'Ability', text }],
+  }));
+  state.players.p1.zones.deck.push(
+    createCard({ instanceId: 60, name: 'Ultra Ball', supertype: 'Trainer', type: 'Item' }),
+    createCard({ instanceId: 61, name: 'Nest Ball', supertype: 'Trainer', type: 'Item' }),
+    createCard({ instanceId: 62, name: 'Switch', supertype: 'Trainer', type: 'Item' }),
+    createCard({ instanceId: 63, name: 'Ball Guy', supertype: 'Trainer', type: 'Supporter' }),
+    createCard({ instanceId: 64, name: 'Ballonea', supertype: 'Pokémon', hp: 60 }),
+  );
+
+  const res1 = applyCommand(state, { type: 'useAbility', payload: { instanceId: 30 }, playerId: 'p1' }, rng);
+  assert.equal(res1.error, null);
+  assert.deepEqual(res1.pendingChoice.options.map((o) => o.instanceId).sort(), [60, 61]);
+
+  const res2 = applyCommand(res1.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: res1.pendingChoice.choiceId, selection: [61] },
+    playerId: 'p1',
+  }, rng);
+  assert.equal(res2.error, null);
+  assert.deepEqual(res2.state.players.p1.zones.hand.map((c) => c.instanceId), [61]);
+  assert.ok(res2.events.some((e) => e.type === 'deckShuffled' && e.playerId === 'p1'));
+});
