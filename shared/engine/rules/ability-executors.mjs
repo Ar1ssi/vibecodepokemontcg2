@@ -20,7 +20,7 @@ const firstAbilityText = (card) => {
   const arr = Array.isArray(card?.abilities) ? card.abilities : [];
   if (arr.length === 0) return '';
   const first = arr[0];
-  return typeof first === 'string' ? first : first?.text || '';
+  return typeof first === 'string' ? first : first?.text || first?.effect || '';
 };
 
 // The single ability-text accessor for the engine, lowercased for matching.
@@ -1077,10 +1077,23 @@ export function parseCheckupEffect(card) {
   };
 }
 
+// Talonflame Gale Wings: "{C} Energy attached to this Pokémon is treated as {R} Energy."
+const ENERGY_TYPE_CONVERSION =
+  /\{([a-z])\} energy attached to this pok[eé]mon (?:is|are) treated as \{([a-z])\} energy/;
+
+/** `{ from, to }` Energy types for a host's own re-typing ability, or null. */
+export function parseEnergyTypeConversion(card) {
+  const m = textOf(card).match(ENERGY_TYPE_CONVERSION);
+  const from = m && ENERGY_LETTER_TO_TYPE[m[1]];
+  const to = m && ENERGY_LETTER_TO_TYPE[m[2]];
+  return from && to ? { from, to } : null;
+}
+
 // Wild Growth: Basic {G} provides {G}{G}
 export function parseEnergyMultiplier(card) {
   const t = textOf(card);
   if (!t || !t.includes('energy')) return { multiplier: 0, energyType: null };
+  if (ENERGY_TYPE_CONVERSION.test(t)) return { multiplier: 0, energyType: null };
   const matches =
     t.includes('×') ||
     t.includes('x2') ||

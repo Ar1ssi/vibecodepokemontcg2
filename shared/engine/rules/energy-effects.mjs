@@ -18,6 +18,7 @@
 
 import { describeTypedSpecialEnergy } from './special-energy-effects.mjs';
 import { specialEnergyProvision } from './special-energy-parse.mjs';
+import { parseEnergyTypeConversion } from './ability-executors.mjs';
 
 const lower = (v) => String(v ?? '').toLowerCase();
 
@@ -341,7 +342,30 @@ const ANY_TYPE_NAME = /(^|\b)(prism|stellar) energy/;
  *   opponentPrizes, ownStage2InPlay}` for prize- and board-conditional provisions.
  * @returns {{type:string, family:string, dualType?:string, provides?:string[]}}
  */
-export function rewriteEnergyDescriptor(
+export function rewriteEnergyDescriptor(descriptor, args = {}) {
+  const rewritten = rewriteForStadium(descriptor, args);
+  return retypeForHost(rewritten, args?.hostPokemon);
+}
+
+// Gale Wings: the host's own Ability re-types the {C} its attached Energy provides.
+// A `double-colorless` pair becomes a `double` of the new type; a Wildcard stays any-type.
+function retypeForHost(descriptor, hostPokemon) {
+  const conversion = descriptor && hostPokemon ? parseEnergyTypeConversion(hostPokemon) : null;
+  if (!conversion) return descriptor;
+  const { from, to } = conversion;
+  if (Array.isArray(descriptor.provides)) {
+    return { ...descriptor, provides: descriptor.provides.map((t) => (t === from ? to : t)) };
+  }
+  if (descriptor.family === 'double-colorless' && from === 'Colorless') {
+    return { type: to, family: 'double' };
+  }
+  if (descriptor.family === 'basic' && descriptor.type === from) {
+    return { ...descriptor, type: to };
+  }
+  return descriptor;
+}
+
+function rewriteForStadium(
   descriptor,
   { card = null, stadiumCard = null, hostPokemon = null, attachedCards = [], board = {} } = {}
 ) {
