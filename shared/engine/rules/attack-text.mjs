@@ -1,8 +1,9 @@
 /**
- * @file Printed attack wording → one normalized form. A leaf module (no imports) so the
+ * @file Printed attack wording → one normalized form. Imports only the effect-wording leaf, so the
  * damage parser and the condition vocabulary can share it without an import cycle.
  * Pure.
  */
+import { canonicalEffectWording } from './effect-wording.mjs';
 
 export function escapeRegExp(text) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -76,7 +77,7 @@ const symbolOf = (word) => `{${TYPE_WORD_SYMBOLS[word.toLowerCase()]}}`;
  */
 export function symbolizeTypeWords(text) {
   const each = new RegExp(`(?:${TYPE_WORD})`, 'gi');
-  return String(text || '')
+  return canonicalEffectWording(text)
     .replace(ENERGY_SYMBOL_SPAN, (_, word) => symbolOf(word))
     .replace(TYPE_WORD_RUN, (run) => run.replace(each, symbolOf))
     .replace(TYPE_WORD_LIST, (list) => list.replace(each, symbolOf))

@@ -71,6 +71,7 @@
 // 'lostZone>=N', 'koedLastTurn:type=p', 'handCount<=N') when the card can only be played under it.
 
 import { WORD_POKEMON_TYPES } from './pokemon-type-words.mjs';
+import { canonicalEffectWording } from './effect-wording.mjs';
 import { parseFossilPlay, parseNamedFossilSearch } from './fossil.mjs';
 import { parseTurnDamageBonus } from './turn-damage-bonus.mjs';
 import { rewriteLegacyTrainerWording } from './legacy-trainer-wording.mjs';
@@ -113,7 +114,7 @@ function typedPokemonSearchWhat(lower) {
 //   curly quotes  ’ ‘ ‚ ʼ `  →  straight '
 //   energy symbol { P } {G}  →  {P} (no inner spaces)
 function normalizeText(text) {
-  return String(text)
+  return canonicalEffectWording(text)
     .replace(/[\u2018\u2019\u201A\u201B\u201A`]/g, "'")
     .replace(/\{\s*([A-Za-z])\s*\}/g, '{$1}')
     .toLowerCase();

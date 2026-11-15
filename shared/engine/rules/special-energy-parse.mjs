@@ -61,6 +61,7 @@
 import { isEnergyCard } from './energy-effects.mjs';
 import { isExCard, isGxCard, isRuleBoxPokemon, isUltraBeastCard, isVCard } from './card-classify.mjs';
 import { parseSearchDeckParams } from './trainer-effects.mjs';
+import { canonicalEffectWording } from './effect-wording.mjs';
 
 const SYMBOL_TYPES = {
   c: 'Colorless',
@@ -82,7 +83,7 @@ const ALL_STATUS = ['Asleep', 'Confused', 'Paralyzed', 'Poisoned', 'Burned'];
 const ATTACH_SEARCH_DESTINATIONS = new Set(['bench', 'hand']);
 
 function normalizeText(text) {
-  return String(text ?? '')
+  return canonicalEffectWording(text)
     .replace(/[\u2018\u2019\u201A\u201B\u201A`]/g, "'")
     .replace(/\{\s*([A-Za-z])\s*\}/g, '{$1}')
     .toLowerCase();
