@@ -12,6 +12,7 @@ import { NO_MAT_LAYOUT_ID } from '../../sizing/mat-spec.mjs';
 import {
   CRATER_FLOOR_MARGIN_PX,
   EMBLEM_CLEARANCE_PX,
+  ENVIRONMENT_KEYS,
   ENVIRONMENT_OVERRIDE_KEY,
   PEAK_CARD_GAP_PX,
   PEAK_EDGE_OVERHANG,
@@ -61,28 +62,49 @@ const assertSameRect = (actual, expected, label) => {
   for (const key of ['x', 'y', 'w', 'h']) close(actual[key], expected[key], `${label}.${key}`);
 };
 
-// customhb-299 is Scorched Earth in client/src/assets/custom-sets/customhb/set.json.
-test('environmentKeyFor maps Scorched Earth by id, or by set and number when the id is missing', () => {
-  assert.equal(environmentKeyFor({ id: 'customhb-299' }), 'scorched-earth');
-  assert.equal(environmentKeyFor({ set: 'customhb', number: '299' }), 'scorched-earth');
-  assert.equal(environmentKeyFor({ id: '', set: 'customhb', number: 299 }), 'scorched-earth');
-  // customhb-001 is Weedle: not a Stadium.
-  assert.equal(environmentKeyFor({ id: 'customhb-001' }), null);
-  assert.equal(environmentKeyFor({ set: 'customhb', number: 'abc' }), null);
-  assert.equal(environmentKeyFor({ set: 'sv1', number: '299' }), null);
+test('environmentKeyFor maps a Homebrew Stadium by its name, whatever its number', () => {
+  assert.equal(environmentKeyFor({ id: 'customhb-293', name: 'Scorched Earth' }), 'scorched-earth');
+  // The set is renumbered when cards are added: the number never picks the board.
+  assert.equal(environmentKeyFor({ id: 'customhb-999', name: 'Scorched Earth' }), 'scorched-earth');
+  assert.equal(environmentKeyFor({ id: '', set: 'customhb', name: 'Scorched Earth' }), 'scorched-earth');
+  assert.equal(environmentKeyFor({ id: 'customhb-353', name: 'Pokémon Center' }), 'pokemon-center');
+  // customhb-351 was Lumiose City before the renumbering and is Shopping Center after it.
+  assert.equal(environmentKeyFor({ id: 'customhb-351', name: 'Shopping Center' }), 'shopping-center');
+});
+
+test('environmentKeyFor gives no board to other sets, other cards, or a card without a name', () => {
+  // xy5-138 is the printed Scorched Earth: boards belong to the Homebrew set only.
+  assert.equal(environmentKeyFor({ id: 'xy5-138', set: 'xy5', name: 'Scorched Earth' }), null);
+  assert.equal(environmentKeyFor({ name: 'Scorched Earth' }), null);
+  assert.equal(environmentKeyFor({ id: 'customhb-001', name: 'Weedle' }), null);
+  assert.equal(environmentKeyFor({ id: 'customhb-293' }), null);
+  assert.equal(environmentKeyFor({ id: 'customhb-293', name: '' }), null);
+  assert.equal(environmentKeyFor({ id: 293, set: 'customhb', name: null }), null);
   assert.equal(environmentKeyFor(null), null);
 });
 
-test('environmentKeyFor gives every Homebrew Stadium in set.json a board of its own, and no other card one', () => {
+// Homebrew Stadiums nobody has built a board for yet (I282). A Stadium added to the set fails the
+// test below until it has a board or is named here.
+const STADIUMS_WITHOUT_A_BOARD = [
+  'Altar of the Moone',
+  'Altar of the Sunne',
+  'Broken Time-Space',
+  'Shrine of Punishment',
+  'Sky Field',
+  'Sky Pillar',
+  'Temple of Sinnoh',
+];
+
+test('every board belongs to exactly one Homebrew Stadium in set.json, and no other card has one', () => {
   const set = JSON.parse(readFileSync(new URL('../../../assets/custom-sets/customhb/set.json', import.meta.url), 'utf8'));
   const stadiums = set.cards.filter((card) => card.trainerType === 'Stadium');
-  // The worktree's set.json holds 17 Stadiums; the full set (primary folder) holds 25, each with a board here.
-  assert.ok(stadiums.length >= 17);
-  const keys = stadiums.map((card) => environmentKeyFor({ id: card.id }));
-  assert.ok(keys.every(Boolean), `unmapped: ${stadiums.filter((_, i) => !keys[i]).map((card) => card.name)}`);
-  assert.equal(new Set(keys).size, stadiums.length);
+  const keyOf = (card) => environmentKeyFor({ id: card.id, name: card.name });
+  const boarded = stadiums.filter(keyOf);
+  assert.deepEqual(boarded.map(keyOf).sort(), [...ENVIRONMENT_KEYS].sort());
+  const boardless = stadiums.filter((card) => !keyOf(card)).map((card) => card.name);
+  assert.deepEqual(boardless.sort(), STADIUMS_WITHOUT_A_BOARD);
   for (const card of set.cards.filter((each) => each.trainerType !== 'Stadium')) {
-    assert.equal(environmentKeyFor({ id: card.id }), null, card.name);
+    assert.equal(keyOf(card), null, card.name);
   }
 });
 
@@ -204,17 +226,15 @@ test('volcanoSpot is null without a Stadium rect or when no circle fits', () => 
   assert.equal(volcanoSpot(layout, { slabs: [sceneBounds(layout, 'scorched-earth')], flats: [] }), null);
 });
 
-// customhb-051 is Stormy Mountains in client/src/assets/custom-sets/customhb/set.json.
-test('environmentKeyFor maps Stormy Mountains by id, or by set and number when the id is missing', () => {
-  assert.equal(environmentKeyFor({ id: 'customhb-051' }), 'stormy-mountains');
-  assert.equal(environmentKeyFor({ set: 'customhb', number: '51' }), 'stormy-mountains');
+test('environmentKeyFor maps Stormy Mountains, by id or by set when the id is missing', () => {
+  assert.equal(environmentKeyFor({ id: 'customhb-051', name: 'Stormy Mountains' }), 'stormy-mountains');
+  assert.equal(environmentKeyFor({ set: 'customhb', name: 'Stormy Mountains' }), 'stormy-mountains');
   assert.equal(environmentOverride(null, '?stadiumEnv=stormy-mountains'), 'stormy-mountains');
 });
 
-// customhb-253 is Perilous Jungle in client/src/assets/custom-sets/customhb/set.json.
-test('environmentKeyFor maps Perilous Jungle by id, or by set and number when the id is missing', () => {
-  assert.equal(environmentKeyFor({ id: 'customhb-253' }), 'perilous-jungle');
-  assert.equal(environmentKeyFor({ set: 'customhb', number: '253' }), 'perilous-jungle');
+test('environmentKeyFor maps Perilous Jungle, by id or by set when the id is missing', () => {
+  assert.equal(environmentKeyFor({ id: 'customhb-249', name: 'Perilous Jungle' }), 'perilous-jungle');
+  assert.equal(environmentKeyFor({ set: 'customhb', name: 'Perilous Jungle' }), 'perilous-jungle');
   assert.equal(environmentOverride(null, '?stadiumEnv=perilous-jungle'), 'perilous-jungle');
   const layout = layoutOf(NO_MAT_LAYOUT_ID, HALVES[0]);
   assert.deepEqual(sceneBounds(layout, 'perilous-jungle'), sceneBounds(layout, 'stormy-mountains'));

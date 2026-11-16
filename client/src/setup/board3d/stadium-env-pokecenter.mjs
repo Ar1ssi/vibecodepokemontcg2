@@ -1,4 +1,4 @@
-// Design 077 (prototype): Pokemon Center (customhb-362): the inside of the games' Pokemon Center (the
+// Design 077 (prototype): Pokemon Center: the inside of the games' Pokemon Center (the
 // orange and cream lobbies of Let's Go, Brilliant Diamond and Omega Ruby), where the card shows its
 // outside (NXD 90, 5ban Graphics). Cream and peach floor tiles in a checker, an orange border along the
 // walls, a big Poke Ball laid in tiles between the Actives, orange walls with a red rail and crown over

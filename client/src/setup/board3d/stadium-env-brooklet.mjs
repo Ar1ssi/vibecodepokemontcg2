@@ -1,4 +1,4 @@
-// Design 077 (prototype): the coast recipe's Brooklet Hill (customhb-212), after the place as
+// Design 077 (prototype): the coast recipe's Brooklet Hill, after the place as
 // Pokémon Sun and Moon's 3DS map draws it, cross-checked with the card's art (5ban Graphics, GRI 120):
 // a teal lake every card lies on, stone towers holding round pools past its far-left corner with
 // their falls and a cave, the left bank a sand-topped ledge on a stone wall straight out of the water

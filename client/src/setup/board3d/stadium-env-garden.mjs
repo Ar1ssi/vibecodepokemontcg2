@@ -1,4 +1,4 @@
-// Design 077 (prototype): Mystery Garden (customhb-197) after its card art (MEG 122, Ayumi Odashima):
+// Design 077 (prototype): Mystery Garden after its card art (MEG 122, Ayumi Odashima):
 // a garden at night, a round plaza paved in rings of lavender flagstones round a pool whose water
 // glows cyan and swirls in rainbow rings, crackling with light; two steps up from the plaza a stone
 // balustrade rings it, black iron lanterns on its posts and white flowers in pale urns, big pale-blue

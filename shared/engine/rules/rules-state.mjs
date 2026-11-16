@@ -978,7 +978,9 @@
         if (typeof localStorage !== 'undefined') {
           localStorage.setItem(RULES_STORAGE_KEY, rulesState.enabled ? '1' : '0');
         }
-      } catch {}
+      } catch {
+        // Storage can be blocked (private window): the toggle then lasts for this page only.
+      }
     }
     export function loadRulesEnabled() {
       try {
@@ -987,7 +989,9 @@
           // Rules mode is ON by default; only an explicitly stored '0' keeps it off.
           rulesState.enabled = stored === null ? true : stored === '1';
         }
-      } catch {}
+      } catch {
+        // Storage can be blocked (private window): the current value stands.
+      }
       return rulesState.enabled;
     }
     

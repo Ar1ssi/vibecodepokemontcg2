@@ -1,4 +1,4 @@
-// Design 077 (prototype): Old Cemetery (customhb-198) after its card art (CRE 147, Oswaldo Kato): a
+// Design 077 (prototype): Old Cemetery after its card art (CRE 147, Oswaldo Kato): a
 // graveyard at night under a crescent moon low beyond it, dark teal grass with tufts lit pale
 // yellow-green, a worn earth path winding through, pale teal headstones with rounded tops (their rims
 // bright, their faces dark against the moon), a broken wooden grave post, a great mossy boulder,

@@ -1,4 +1,4 @@
-// Design 077 (prototype): Levincia (customhb-278) after its card art (JTG 150, Marina Chikazawa): a
+// Design 077 (prototype): Levincia after its card art (JTG 150, Marina Chikazawa): a
 // bright city on the water at noon, a round stage of pale blue panels ringed by a band of yellow
 // mosaic with a yellow swirl at its middle, its rim wall dropping to clear light-blue water; a curved
 // walkway on piers circling it, white railings, bridges across to the stage, a row of bright yellow

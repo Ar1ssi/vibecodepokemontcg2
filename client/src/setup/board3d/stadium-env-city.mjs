@@ -1,4 +1,4 @@
-// Design 077 (prototype): Dark City (customhb-254) after its card art (UNM 193, sm11-193 in set.json;
+// Design 077 (prototype): Dark City after its card art (UNM 193, sm11-193 in set.json;
 // Ryo Ueda): a city at night seen from a rooftop. Office towers with grids of lit windows rise round
 // the roof, the round tower with its lit crown among them; Team Skull has sprayed its marks over two
 // billboards; searchlights sweep the purple-blue night; a stairwell hut with a red door and a lamp

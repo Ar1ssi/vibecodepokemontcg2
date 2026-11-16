@@ -1,4 +1,4 @@
-// Design 077 (prototype): the volcanic recipe. Scorched Earth (customhb-299) as a procedural three.js
+// Design 077 (prototype): the volcanic recipe. Scorched Earth as a procedural three.js
 // environment, in the style of TCG Live's own board art (board_fire in the extracted client): chunky
 // sculpted stones with a few broad facets on rounded shoulders, mid slate greys, cool shadows, thin
 // painted highlights on their rims, and saturated lava glowing in the gaps. No photographic

@@ -30,10 +30,9 @@ const cardsOf = (layout) => {
   return [...slabs, ...flats];
 };
 
-// customhb-362 is Pokemon Center (NXD 90) in the primary folder's client/src/assets/custom-sets/customhb/set.json.
-test('environmentKeyFor: Pokemon Center by id, and by set and number', () => {
-  assert.equal(environmentKeyFor({ id: 'customhb-362' }), CENTER_KEY);
-  assert.equal(environmentKeyFor({ set: 'customhb', number: '362' }), CENTER_KEY);
+test('environmentKeyFor: Pokemon Center by id, and by set', () => {
+  assert.equal(environmentKeyFor({ id: 'customhb-353', name: 'Pokémon Center' }), CENTER_KEY);
+  assert.equal(environmentKeyFor({ set: 'customhb', name: 'Pokémon Center' }), CENTER_KEY);
 });
 
 test('centerSpots: the room holds every card with the walls a gap past them, and the walls run round it', () => {

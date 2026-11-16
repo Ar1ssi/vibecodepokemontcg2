@@ -1,4 +1,4 @@
-// Design 077 (prototype): Shopping Center (customhb-360) after its card art (EVS 157, Oswaldo Kato):
+// Design 077 (prototype): Shopping Center after its card art (EVS 157, Oswaldo Kato):
 // the hall of a mall in pink and white, a polished checkered floor with a thick gold ring set in it,
 // tables of folded clothes and racks of shirts down both sides, mannequins in yellow and pink,
 // bunches of balloons floating up under the ceiling, pale-blue glass escalators climbing to a

@@ -1,4 +1,4 @@
-// Design 077 (prototype): the highland recipe. Stormy Mountains (customhb-051) after its card art
+// Design 077 (prototype): the highland recipe. Stormy Mountains after its card art
 // (Toyste Beach, swsh7-161): the arena is the floor of a crater high in a storm. The mountain is
 // round, centred on the table's middle, the crater in its own middle (stadium-environment-layout.mjs
 // craterBowl); every Active and Bench card lies on the crater floor, and the scene runs on past the

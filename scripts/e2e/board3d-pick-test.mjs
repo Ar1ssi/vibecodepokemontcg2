@@ -231,7 +231,6 @@ const waitUi = (page, id, accept, timeout = 4000) =>
     page,
     async ([instanceId, src]) => {
       const { getBoardScene } = await import('/src/setup/board3d/board3d.js');
-      // eslint-disable-next-line no-new-func
       const test = new Function('ui', `return (${src})(ui)`);
       const ui = getBoardScene()?.inspect().uiState.get(instanceId) ?? {};
       return test(ui) ? ui : null;

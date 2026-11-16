@@ -53,10 +53,9 @@ const cardsOf = (layout) => {
   return [...slabs, ...flats];
 };
 
-// customhb-030 is Forest of Vitality in client/src/assets/custom-sets/customhb/set.json.
-test('environmentKeyFor: Forest of Vitality by id, and by set and number', () => {
-  assert.equal(environmentKeyFor({ id: 'customhb-030' }), VITALITY_KEY);
-  assert.equal(environmentKeyFor({ set: 'customhb', number: '30' }), VITALITY_KEY);
+test('environmentKeyFor: Forest of Vitality by id, and by set', () => {
+  assert.equal(environmentKeyFor({ id: 'customhb-030', name: 'Forest of Vitality' }), VITALITY_KEY);
+  assert.equal(environmentKeyFor({ set: 'customhb', name: 'Forest of Vitality' }), VITALITY_KEY);
 });
 
 test('vitalitySpots: one tree, its trunk beside every card on HERO_SIDE in the far half, clear of them (design 084: left)', () => {

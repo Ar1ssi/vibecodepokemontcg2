@@ -234,7 +234,7 @@ export async function initializeBoard3d({
     }
     if (override) return override;
     const stadium = model?.stadium;
-    return stadium ? environmentKeyFor({ id: stadium.cardId, set: stadium.set, number: stadium.number }) : null;
+    return stadium ? environmentKeyFor({ id: stadium.cardId, set: stadium.set, name: stadium.name }) : null;
   };
 
   /**

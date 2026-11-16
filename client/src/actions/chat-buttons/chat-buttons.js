@@ -497,7 +497,9 @@ export function evaluateWinCondition(turnPlayer = rulesState.turnPlayer) {
       document.dispatchEvent(new CustomEvent('rules-game-ended', { detail: { reason } }));
       return true;
     }
-  } catch {}
+  } catch (error) {
+    console.warn('chat-buttons: evaluateWinCondition failed', error);
+  }
   return false;
 }
 

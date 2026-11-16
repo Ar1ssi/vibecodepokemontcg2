@@ -1,4 +1,4 @@
-// Design 077 (prototype): Lumiose City (customhb-351) after its card art (POR 77, Marina Chikazawa)
+// Design 077 (prototype): Lumiose City after its card art (POR 77, Marina Chikazawa)
 // and the city of the games (Pokemon X and Y, Legends Z-A): a Parisian plaza on a bright day, pale
 // stone paving inlaid with the plaza's compass of rings and spokes, a band of blue-grey setts along the
 // building fronts, long lawn beds in salmon-tan curbs, trimmed street trees in iron grates, black iron

@@ -40,10 +40,9 @@ const cardsOf = (layout) => {
 };
 const distanceToRect = (x, y, r) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.y - y, 0, y - r.y - r.h));
 
-// customhb-199 is Dimension Valley in client/src/assets/custom-sets/customhb/set.json.
-test('environmentKeyFor: Dimension Valley by id, and by set and number', () => {
-  assert.equal(environmentKeyFor({ id: 'customhb-199' }), VALLEY_KEY);
-  assert.equal(environmentKeyFor({ set: 'customhb', number: '199' }), VALLEY_KEY);
+test('environmentKeyFor: Dimension Valley by id, and by set', () => {
+  assert.equal(environmentKeyFor({ id: 'customhb-195', name: 'Dimension Valley' }), VALLEY_KEY);
+  assert.equal(environmentKeyFor({ set: 'customhb', name: 'Dimension Valley' }), VALLEY_KEY);
 });
 
 test('valleySpots: every card lies well inside the island; its outline traces the edge', () => {

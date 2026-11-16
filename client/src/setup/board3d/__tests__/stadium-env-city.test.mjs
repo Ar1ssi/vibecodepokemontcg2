@@ -29,9 +29,9 @@ const layouts = PROFILES.flatMap((profile) => HALVES.map((half) => flatLayout(ge
 const overlaps = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
 const boxOf = ({ x, y, w, d }) => ({ x0: x - w / 2, x1: x + w / 2, y0: y - d / 2, y1: y + d / 2 });
 
-test('environmentKeyFor: Dark City by id, and by set and number', () => {
-  assert.equal(environmentKeyFor({ id: 'customhb-254' }), CITY_KEY);
-  assert.equal(environmentKeyFor({ set: 'customhb', number: '254' }), CITY_KEY);
+test('environmentKeyFor: Dark City by id, and by set', () => {
+  assert.equal(environmentKeyFor({ id: 'customhb-250', name: 'Dark City' }), CITY_KEY);
+  assert.equal(environmentKeyFor({ set: 'customhb', name: 'Dark City' }), CITY_KEY);
 });
 
 test('citySpots: every card lies on the roof, the hut clear of the cards and the parapet', () => {

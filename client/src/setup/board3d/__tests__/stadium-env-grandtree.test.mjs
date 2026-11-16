@@ -32,10 +32,9 @@ const HALVES = [
 ];
 const layouts = PROFILES.flatMap((profile) => HALVES.map((half) => flatLayout(getMatLayout(profile), half)));
 
-// customhb-376 is Grand Tree (SCR 136) in the primary folder's client/src/assets/custom-sets/customhb/set.json.
-test('environmentKeyFor: Grand Tree by id, and by set and number', () => {
-  assert.equal(environmentKeyFor({ id: 'customhb-376' }), GRAND_KEY);
-  assert.equal(environmentKeyFor({ set: 'customhb', number: '376' }), GRAND_KEY);
+test('environmentKeyFor: Grand Tree by id, and by set', () => {
+  assert.equal(environmentKeyFor({ id: 'customhb-367', name: 'Grand Tree' }), GRAND_KEY);
+  assert.equal(environmentKeyFor({ set: 'customhb', name: 'Grand Tree' }), GRAND_KEY);
 });
 
 test('grandSpots: the trunk beside the cards, roots, crown balls and ferns clear of them seen from above', () => {

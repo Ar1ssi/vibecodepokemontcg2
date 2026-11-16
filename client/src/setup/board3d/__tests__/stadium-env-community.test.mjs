@@ -32,10 +32,9 @@ const cardsOf = (layout) => {
   return [...slabs, ...flats];
 };
 
-// customhb-361 is Community Center (TWM 146) in the primary folder's client/src/assets/custom-sets/customhb/set.json.
-test('environmentKeyFor: Community Center by id, and by set and number', () => {
-  assert.equal(environmentKeyFor({ id: 'customhb-361' }), COMMUNITY_KEY);
-  assert.equal(environmentKeyFor({ set: 'customhb', number: '361' }), COMMUNITY_KEY);
+test('environmentKeyFor: Community Center by id, and by set', () => {
+  assert.equal(environmentKeyFor({ id: 'customhb-352', name: 'Community Center' }), COMMUNITY_KEY);
+  assert.equal(environmentKeyFor({ set: 'customhb', name: 'Community Center' }), COMMUNITY_KEY);
 });
 
 test('communitySpots: the square holds every card, the hall stands on its left edge, the cliff behind it', () => {

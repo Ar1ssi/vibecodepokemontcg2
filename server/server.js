@@ -61,6 +61,7 @@ import { cacheControlFor, staticFileCacheControl } from './cache-policy.mjs';
 import { createClientBundleSource } from './client-bundle.mjs';
 import { KEEP_AWAKE_PATH, planKeepAwake, startKeepAwake } from './keep-awake.mjs';
 import { retiredLegacyRelayWarning } from './netcode-mode.mjs';
+import { planAdminUi, planCors } from './access-policy.mjs';
 import { customFoilSets, resolveFoilTextureBase } from './tcgl-foil-config.mjs';
 
 // The server always runs the rules; SERVER_AUTHORITATIVE no longer selects a mode (design 087).
@@ -116,13 +117,16 @@ async function main() {
   // HTTP Server Setup
   const server = http.createServer(app);
 
+  // The game's pages are same-origin. Another site gets in only by ALLOWED_ORIGINS, and the
+  // admin UI only with a password that is not the development default (access-policy.mjs).
+  const adminUi = planAdminUi(process.env);
+  const corsPlan = planCors(process.env, adminUi);
+  for (const warning of corsPlan.warnings) console.warn(warning);
+
   // Socket.IO Server Setup
   const io = new Server(server, {
     connectionStateRecovery: {},
-    cors: {
-      origin: true, // demo tunnel: reflect request origin
-      credentials: true,
-    },
+    cors: corsPlan.socket,
   });
   // Create a new SQLite database
   const dbDir = path.join(__dirname, 'database');
@@ -183,24 +187,24 @@ async function main() {
     1000 * 60 * 60 * 24
   );
 
-  // Bcrypt Configuration
-  const saltRounds = 10;
-  const plainPassword = process.env.ADMIN_PASSWORD || 'defaultPassword';
-  const hashedPassword = bcrypt.hashSync(plainPassword, saltRounds);
-
   // Socket.IO Admin Instrumentation
-  instrument(io, {
-    auth: {
-      type: 'basic',
-      username: 'admin',
-      password: hashedPassword,
-    },
-    mode: 'development',
-  });
+  if (adminUi.enabled) {
+    const saltRounds = 10;
+    instrument(io, {
+      auth: {
+        type: 'basic',
+        username: 'admin',
+        password: bcrypt.hashSync(adminUi.password, saltRounds),
+      },
+      mode: adminUi.mode,
+    });
+  } else {
+    console.warn(adminUi.warning);
+  }
 
   app.set('view engine', 'ejs');
   app.set('views', clientDir);
-  app.use(cors());
+  app.use(cors(corsPlan.http));
   // Design 088: text responses go out compressed (Brotli or gzip), and every response carries the
   // cache policy for its path. Visitors always get the current build: only a content-hashed file
   // that is found and sent is kept without asking (`keepHashedFiles`), everything else is

@@ -35,10 +35,9 @@ const cardsOf = (layout) => {
 };
 const distanceToRect = (x, y, r) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.y - y, 0, y - r.y - r.h));
 
-// customhb-198 is Old Cemetery in client/src/assets/custom-sets/customhb/set.json.
-test('environmentKeyFor: Old Cemetery by id, and by set and number', () => {
-  assert.equal(environmentKeyFor({ id: 'customhb-198' }), CEMETERY_KEY);
-  assert.equal(environmentKeyFor({ set: 'customhb', number: '198' }), CEMETERY_KEY);
+test('environmentKeyFor: Old Cemetery by id, and by set', () => {
+  assert.equal(environmentKeyFor({ id: 'customhb-194', name: 'Old Cemetery' }), CEMETERY_KEY);
+  assert.equal(environmentKeyFor({ set: 'customhb', name: 'Old Cemetery' }), CEMETERY_KEY);
 });
 
 test('the moon keys the board from the top left (design 084), so every shadow falls one way, toward the near right', () => {

@@ -1,4 +1,4 @@
-// Design 077 (prototype): Full Metal Lab (customhb-163) after its card art (TEF 148, sv05-148 in
+// Design 077 (prototype): Full Metal Lab after its card art (TEF 148, sv05-148 in
 // set.json; AYUMI ODASHIMA): a round steel lab. The cards lie on its raised dais, a blue disc lit
 // from the machine's lens overhead and ringed in pale steel plates, the Poké Ball lit brighter in
 // white lines in its middle; yellow railings run round the dais's edge and a teal-grey stair with yellow

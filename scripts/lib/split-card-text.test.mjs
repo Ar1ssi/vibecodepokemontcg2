@@ -29,11 +29,11 @@ test('every printed {symbol} cost is payable by the matching Basic Energy', () =
   }
 });
 
-test('{D} is Darkness, not the unpayable "Dark" alias', () => {
+test('{D} is Darkness; the "Dark" spelling is the same type when a cost is paid (I262)', () => {
   assert.deepEqual(parseCost('{D}'), ['Darkness']);
   const darkness = serverEnergyDescriptor(basicEnergy('Darkness'));
   assert.equal(canPayAttackCost([darkness], parseCost('{D}')), true);
-  assert.equal(canPayAttackCost([darkness], ['Dark']), false);
+  assert.equal(canPayAttackCost([darkness], ['Dark']), true);
 });
 
 test('parseCost keeps multiple symbols in printed order', () => {

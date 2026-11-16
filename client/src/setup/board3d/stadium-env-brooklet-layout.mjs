@@ -1,4 +1,4 @@
-// Design 077 (prototype): where Brooklet Hill's pieces lie (customhb-212), after the place as Pokémon
+// Design 077 (prototype): where Brooklet Hill's pieces lie, after the place as Pokémon
 // Sun and Moon's 3DS map draws it, cross-checked with the card's art (GRI 120), from the board layout
 // (board-layout.mjs flatLayout). Every card lies on the lake; the map's land fills the scene round it
 // (stadium-environment-layout.mjs sceneBounds), each piece on the side of the lake where the map has

@@ -205,6 +205,10 @@ try {
       await waitFor(active.page, () => window.__ptcg.zone('self', 'active').count === 1);
       await active.page.evaluate(() => window.__ptcg.passTurn());
       did = 'place+pass';
+    } else if (active === attacker && turns === 1) {
+      // The attacker is the starter, and the player going first can't attack on turn 1.
+      await active.page.evaluate(() => window.__ptcg.passTurn());
+      did = 'pass (first turn: no attack)';
     } else if (active === attacker && idleHasActive) {
       await active.page.evaluate(() => window.__ptcg.attack(0));
       attacks += 1;

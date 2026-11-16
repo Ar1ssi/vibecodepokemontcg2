@@ -1,4 +1,4 @@
-// Design 077 (prototype): Neutralization Zone (customhb-378) after its card art (SFA 60, imoniii): a
+// Design 077 (prototype): Neutralization Zone after its card art (SFA 60, imoniii): a
 // round hall of pale-blue panelled walls round a glossy blue platform, rings of white-cyan light
 // set in its floor, tall columns of blue light standing up round it, green-lit screens floating
 // under the ceiling, yellow guide lines on the dark floor at its edge. The art looks across the

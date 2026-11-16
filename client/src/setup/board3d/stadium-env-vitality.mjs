@@ -1,4 +1,4 @@
-// Design 077 (prototype): Forest of Vitality (customhb-030) after its card art (MEG 117, Ayumi
+// Design 077 (prototype): Forest of Vitality after its card art (MEG 117, Ayumi
 // Odashima): a sunlit forest whose great broadleaf stands over a carpet of rounded bushes, a yellow-
 // green glow of vitality welling up between them and round its foot. The user asked for one huge tree
 // at the top right of the mat, casting its shadow from there; design 084 (the visual audit) moved it

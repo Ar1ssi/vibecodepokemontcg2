@@ -1,4 +1,4 @@
-// Design 077 (prototype): Community Center (customhb-361) after its card art (TWM 146, Marina
+// Design 077 (prototype): Community Center after its card art (TWM 146, Marina
 // Chikazawa): a white two-storey hall with a red-brown roof band and rail, a tall green banner down
 // its face and a green flag on a pole, a red-awninged door, a white pop-up tent with a green and a
 // red kiosk beside it, round green trees, a pale paved square in front of it all and a rock cliff

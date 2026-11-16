@@ -1,4 +1,4 @@
-// Design 077 (prototype): Steel Shelter (customhb-162) after its card art (PHF 105, xy4-105 in
+// Design 077 (prototype): Steel Shelter after its card art (PHF 105, xy4-105 in
 // set.json; Ryo Ueda): a bright white hall. A mirror-gloss pale floor reflects the hex light
 // panels of the ceiling and the walls round it (the hexes on the art's floor are those
 // reflections); a cyan hologram of the Poké Ball glows in its middle. The walls are blocks of white

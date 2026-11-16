@@ -1,4 +1,4 @@
-// Design 077 (prototype): Grand Tree (customhb-376) after its card art (SCR 136, Ayumi Odashima): a
+// Design 077 (prototype): Grand Tree after its card art (SCR 136, Ayumi Odashima): a
 // jungle clearing in bright daylight under one vast ancient tree, its trunk a knot of twisting
 // strands veined with glowing gold, its great roots crawling over the ground, a broad green crown
 // shot with yellow light, ferns and big-leaved plants all round, a small tree beyond. The art looks

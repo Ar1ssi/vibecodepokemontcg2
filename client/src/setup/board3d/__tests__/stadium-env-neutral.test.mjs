@@ -32,10 +32,9 @@ const cardsOf = (layout) => {
   return [...slabs, ...flats];
 };
 
-// customhb-378 is Neutralization Zone (SFA 60) in the primary folder's client/src/assets/custom-sets/customhb/set.json.
-test('environmentKeyFor: Neutralization Zone by id, and by set and number', () => {
-  assert.equal(environmentKeyFor({ id: 'customhb-378' }), NEUTRAL_KEY);
-  assert.equal(environmentKeyFor({ set: 'customhb', number: '378' }), NEUTRAL_KEY);
+test('environmentKeyFor: Neutralization Zone by id, and by set', () => {
+  assert.equal(environmentKeyFor({ id: 'customhb-369', name: 'Neutralization Zone' }), NEUTRAL_KEY);
+  assert.equal(environmentKeyFor({ set: 'customhb', name: 'Neutralization Zone' }), NEUTRAL_KEY);
 });
 
 test('neutralSpots: the platform holds every card; columns stand outside it, never on the near arc', () => {

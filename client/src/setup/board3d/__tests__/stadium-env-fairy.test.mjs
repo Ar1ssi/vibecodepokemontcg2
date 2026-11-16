@@ -31,10 +31,9 @@ const HALVES = [
 ];
 const layouts = PROFILES.flatMap((profile) => HALVES.map((half) => flatLayout(getMatLayout(profile), half)));
 
-// customhb-428 is Fairy Garden (FCO 100) in the primary folder's client/src/assets/custom-sets/customhb/set.json.
-test('environmentKeyFor: Fairy Garden by id, and by set and number', () => {
-  assert.equal(environmentKeyFor({ id: 'customhb-428' }), FAIRY_KEY);
-  assert.equal(environmentKeyFor({ set: 'customhb', number: '428' }), FAIRY_KEY);
+test('environmentKeyFor: Fairy Garden by id, and by set', () => {
+  assert.equal(environmentKeyFor({ id: 'customhb-417', name: 'Fairy Garden' }), FAIRY_KEY);
+  assert.equal(environmentKeyFor({ set: 'customhb', name: 'Fairy Garden' }), FAIRY_KEY);
 });
 
 test('fairySpots: the ring between the Actives, trees, orbs and leaves clear of every card and the hand', () => {
