@@ -19,6 +19,7 @@ client/src/assets/playmats/upscaled/
 
 # design 004 slice 6: scripts/e2e/playtest-bot.mjs failure dumps (replayable traces, not source)
 out/playtest/
+out/logs/
 .superdesign/tmp/
 
 # Logs, editor backups and recorder output (design 073 A, I249)

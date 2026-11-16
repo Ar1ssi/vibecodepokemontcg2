@@ -8,6 +8,8 @@ every probe you add goes on a ledger and comes out at the end.
 1. **Reproduce** — a command/script/test that shows the failure deterministically (or a measured
    flake rate). Can't reproduce? Gather evidence from logs/reports, file an ISSUES.md line holding
    your repro attempts + best hypothesis, report honestly — do not "fix" blind.
+   User supplied an exported log (`ptcg-log_*.ndjson`), or the bug happened on localhost (`out/logs/`)?
+   `node tools/log.mjs summary <file>` first, then `.agent/areas/logging.md` (`trace`, `replay`, `diff-view`).
 2. **Hypothesize** — read the failing path (MAP → grep → targeted reads). List hypotheses ranked
    by likelihood, each with a discriminating check: "if H1, then X will show Y".
 3. **Discriminate** — run the checks: targeted logging, debugger, `git bisect`, input minimization.

@@ -5,9 +5,13 @@
 # Caps: ≤90 active lines / ≤20 KB (`pnpm harness:check`). Superseded lines are deleted (git + archive keep them).
 # Pruned, folded or shortened lines, verbatim: .agent/archive/DECISIONS-pruned-2026-11-13.md, DECISIONS-pruned-2026-10-15.md (grep the D-number).
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
-# ID collisions from parallel sessions: D43, D44, D86, D117–D120, D214 each exist twice — cite as `D119[rules]`.
-#   Next id = highest D number in this file and the archives + 1 (next: D254).
+# ID collisions from parallel sessions: D43, D44, D86, D117–D120, D214 each exist twice — cite as `D119[rules]`. Designs 074 and 088 name two each: cite by file name.
+#   Next id = highest D number in this file and the archives + 1 (next: D258).
 
+- D257 2026-11-12 [logging] 088-unified-logging: an export is complete on purpose (both hands, deck order) and each one is announced in room chat; entries join on sv/cs, no correlation id; format NDJSON v1, read with tools/log.mjs.
+- D256 2026-11-12 [netcode] 088-unified-logging: GameRoom journals every applyCommand (rng cursor + state hash) and rebases on any in-place state change, so an export replays; a new mutation site must call journal.rebase.
+- D255 2026-11-12 [logging] 088-unified-logging: server logs live in byte-capped memory streams (LOG_MAX_MB) plus an out/logs NDJSON mirror outside production; never read back by the game, so S2 "no durable game log" stands.
+- D254 2026-11-12 [logging] 088-unified-logging: always-on structured log on both clients and the server; clients ship theirs (log:batch) so one export holds all three; the opt-in sync/decision loggers are deleted. (Replaces draft 028.)
 - D253 2026-11-13 [harness] CI (.github/workflows/ci.yml) runs `eslint --quiet .` and the unit suite on pushes to main and on PRs: lint errors are a gate, formatting warnings are not.
 - D252 2026-11-13 [mat-fx] A Stadium board is keyed by its Homebrew card's name (lower case, `-` joined), never its number: a set renumbering sent 22 Stadiums to no board or the wrong one (I282). (environmentKeyFor)
 - D251 2026-11-13 [server] server/access-policy.mjs: production admin UI only with its own ADMIN_PASSWORD; CORS only by ALLOWED_ORIGINS (WebSocket upgrades unchecked); the page loads the server's own Socket.IO client.

@@ -13,6 +13,7 @@
 // Design 063: a full attack is banner 2000 + a tier-3 move's hold ≤ 1240 + damage
 // 180 + status 260 + knockout 900; the budget covers that chain so only what
 // follows a knockout collapses.
+// `onEvent` (gate/start/idle/clear) is observability only: it never affects pacing.
 const DEFAULT_MAX_QUEUE_MS = 3800;
 
 const holdOf = (value) =>
@@ -29,8 +30,18 @@ export const createFxQueue = ({
   // Design 089: hears every plan `clear` drops without running, so what a plan was holding
   // back (cards hidden until their draw flies) is given up at once, not at a backstop.
   onDrop = () => {},
+  onEvent = () => {},
 }) => {
   const queue = [];
+  // True once a plan started since the last idle/clear: idle() only reports a real drain.
+  let ranSinceIdle = false;
+  const notify = (type, extra) => {
+    try {
+      onEvent({ type, ...extra });
+    } catch {
+      // observers must not disturb pacing
+    }
+  };
   let timer = null;
   let committedMs = 0;
   let headLed = false;
@@ -53,6 +64,10 @@ export const createFxQueue = ({
   const idle = () => {
     timer = null;
     committedMs = 0;
+    if (ranSinceIdle) {
+      ranSinceIdle = false;
+      notify('idle', {});
+    }
     releaseIdleWaiters();
   };
 
@@ -86,10 +101,12 @@ export const createFxQueue = ({
     const plan = queue.shift();
     const startedIn = epoch;
     started += 1;
+    ranSinceIdle = true;
     // A gate (`until`: a promise) holds the chain until something outside the queue ends — the
     // opening coin ceremony, whose length depends on its renderer loading. Never run.
     if (typeof plan.until?.then === 'function') {
       timer = GATE;
+      notify('gate', { plan, pending: queue.length });
       const release = () => {
         if (epoch !== startedIn || timer !== GATE) return;
         timer = null;
@@ -114,6 +131,7 @@ export const createFxQueue = ({
       if (committedMs >= maxQueueMs) hold = 0;
       committedMs += hold;
     }
+    notify('start', { plan, hold, pending: queue.length });
     timer = schedule(step, hold);
   };
 
@@ -132,6 +150,7 @@ export const createFxQueue = ({
     /** Drop everything pending without running it (mirror guard, fx-off). */
     clear() {
       epoch += 1;
+      const wasActive = timer !== null;
       if (timer !== null) {
         if (timer !== GATE) cancel(timer);
         timer = null;
@@ -139,6 +158,7 @@ export const createFxQueue = ({
       const dropped = queue.splice(0);
       committedMs = 0;
       headLed = false;
+      ranSinceIdle = false;
       for (const plan of dropped) {
         try {
           onDrop(plan);
@@ -146,6 +166,7 @@ export const createFxQueue = ({
           // A plan that cannot settle must not keep the others from settling.
         }
       }
+      if (dropped.length > 0 || wasActive) notify('clear', { dropped: dropped.length });
       releaseIdleWaiters();
     },
 

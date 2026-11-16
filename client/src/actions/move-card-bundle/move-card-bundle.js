@@ -9,7 +9,7 @@ import {
 } from '/shared/engine/zones/resolve-card-index.mjs';
 import { moveCardMessage } from './move-card-message.js';
 import { moveCard } from './move-card.js';
-import { logSync } from '../../setup/general/sync-logger-bridge.js';
+import { logSync } from '../../log/sync-log.js';
 import { reportMirrorDesync } from '../../setup/netcode/mirror-resync.mjs';
 import { dispatchAuthoritativeMoveCardBundle } from '../../setup/netcode/authoritative-dispatch.js';
 

@@ -14,7 +14,7 @@ client/src/initialization/global-variables/global-variables.js — `socket` + `s
 client/src/setup/netcode/peer-log-catchup.js — DOM-free peer-log request/response/replay logic
 client/src/setup/netcode/request-action-queue.js — counter-ordered requestAction buffer (design 002
 slice 1.2); gap open past 2s falls through to peer-log-catchup instead of misapplying
-client/src/setup/general/sync-logger.mjs + sync-logger-bridge.js — desync diagnostics ring buffer
+client/src/log/sync-log.js — `logSync`/`logDecision` for the legacy call sites, now entries (`sync`, `decision`) in the unified log → .agent/areas/logging.md
 client/src/setup/general/sync-action-args.mjs — normalize emit/hint/RNG args across local vs replay
 client/src/setup/netcode/sync-check.js + server/game/sync-check.mjs — desync detection (design 002
 slice 3.11): client heartbeat sends per-zone hashes, server names first divergent zone, recovery

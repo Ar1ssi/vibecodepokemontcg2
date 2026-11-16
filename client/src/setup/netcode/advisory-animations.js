@@ -3,6 +3,7 @@
 // `applyView` in socket-event-listeners.js, so both players — originator
 // included — animate from the SAME server event: one source, no double-play.
 import { systemState } from '../../state.js';
+import { log } from '../../log/client-log.js';
 import { fxSettleHoldMs } from '../board3d/board-rects.js';
 import { rulesState } from '../../../../shared/engine/rules/rules-state.mjs';
 import {
@@ -402,6 +403,14 @@ const fxQueue = createFxQueue({
       clearTimer: (id) => clearTimeout(id),
       forgetKnockout: (instanceId) => pendingKnockoutGhosts.delete(instanceId),
     }),
+  onEvent: ({ type, plan, hold, pending, dropped }) =>
+    log.debug('fx', type, {
+      effect: plan?.effect ?? plan?.kind ?? null,
+      instanceId: plan?.instanceId ?? null,
+      hold: hold ?? null,
+      pending: pending ?? null,
+      dropped: dropped ?? null,
+    }),
 });
 
 /** False during catch-up replay or in a hidden tab (edge cases 5, 6): plans are dropped, not queued. */
@@ -528,6 +537,15 @@ const waitForChoiceTurn = createChoiceGate({
 export function whenChoiceMayOpen() {
   const hidden = typeof document !== 'undefined' && !!document.hidden;
   return fxDisabled() || hidden ? Promise.resolve() : waitForChoiceTurn();
+}
+
+/**
+ * Queue depth and plans started so far, for the log export snapshot (design 088 §6).
+ *
+ * @returns {{ pending: number, started: number }}
+ */
+export function fxQueueStats() {
+  return { pending: fxQueue.pending(), started: fxQueue.startedCount() };
 }
 
 /**

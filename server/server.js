@@ -62,6 +62,8 @@ import { createClientBundleSource } from './client-bundle.mjs';
 import { KEEP_AWAKE_PATH, planKeepAwake, startKeepAwake } from './keep-awake.mjs';
 import { retiredLegacyRelayWarning } from './netcode-mode.mjs';
 import { planAdminUi, planCors } from './access-policy.mjs';
+import { createServerLogging } from './log/index.mjs';
+import { LIMITS } from '../shared/log/log-schema.mjs';
 import { customFoilSets, resolveFoilTextureBase } from './tcgl-foil-config.mjs';
 
 // The server always runs the rules; SERVER_AUTHORITATIVE no longer selects a mode (design 087).
@@ -113,7 +115,16 @@ function generateRandomKey(length = 8) {
 }
 
 async function main() {
+  const logging = createServerLogging({ repoRoot: path.join(__dirname, '..') });
   const app = express();
+  app.use(logging.httpMiddleware);
+  app.post('/api/log/beacon', express.text({ type: '*/*', limit: LIMITS.beaconMaxBytes }), logging.beaconHandler);
+  app.get('/api/log/export/:token', logging.exportDownloadHandler);
+  if (process.env.NODE_ENV !== 'production') {
+    app.get('/api/log/rooms', logging.devRoomsHandler);
+    app.get('/api/log/export', logging.devExportHandler);
+  }
+  app.locals.build = logging.build?.commit ?? null;
   // HTTP Server Setup
   const server = http.createServer(app);
 
@@ -431,6 +442,14 @@ async function main() {
 
   const roomInfo = new Map();
   const gameRooms = new Map();
+  logging.attachIo(io, {
+    netcode: 'server-authoritative',
+    seatOf: (socketId, roomId) => {
+      const room = gameRooms.get(roomId);
+      if (!room) return null;
+      return room.socketToPlayer.get(socketId) ?? (room.spectatorSockets.has(socketId) ? 'spec' : null);
+    },
+  });
 
   // Function to periodically clean up empty rooms
   const cleanUpEmptyRooms = () => {
@@ -683,6 +702,7 @@ async function main() {
 
   //Socket.IO Connection Handling
   io.on('connection', async (socket) => {
+    logging.attachSocket(socket);
     // Function to handle disconnections (unintended)
     const disconnectHandler = (roomId, username, asSpectator = false) => {
       if (!socket.data.leaveRoom) {
@@ -842,7 +862,7 @@ async function main() {
       }
       let gameRoom = gameRooms.get(roomId);
       const createdRoom = !gameRoom;
-      if (createdRoom) gameRoom = new GameRoom({ roomId });
+      if (createdRoom) gameRoom = new GameRoom({ roomId, journal: logging.createJournal(roomId) });
       const decks = options.decks && typeof options.decks === 'object' ? options.decks : {};
       if (!gameRoom.addSoloPlayer(socket.id, username, decks)) {
         socket.emit('roomReject', { reason: 'solo_room' });
@@ -961,7 +981,7 @@ async function main() {
         socket.join(roomId);
         let activeGameRoom = gameRoom;
         if (!activeGameRoom) {
-          activeGameRoom = new GameRoom({ roomId });
+          activeGameRoom = new GameRoom({ roomId, journal: logging.createJournal(roomId) });
           activeGameRoom.roomFormat = room.format?.format ?? null;
           gameRooms.set(roomId, activeGameRoom);
         }
@@ -1093,7 +1113,7 @@ async function main() {
       if (!soloRoom?.solo) {
         let gameRoom = gameRooms.get(data.roomId);
         if (!gameRoom) {
-          gameRoom = new GameRoom({ roomId: data.roomId });
+          gameRoom = new GameRoom({ roomId: data.roomId, journal: logging.createJournal(data.roomId) });
           gameRoom.roomFormat = room.format?.format ?? null;
           gameRooms.set(data.roomId, gameRoom);
         }
@@ -1178,10 +1198,6 @@ async function main() {
       'pushAction',
       'requestPeerLog',
       'peerLog',
-      'requestSyncLogBundle',
-      'syncLogBundle',
-      'requestDecisionLogBundle',
-      'decisionLogBundle',
       'appendMessage',
       'initiateImport',
       'endImport',
@@ -1501,6 +1517,11 @@ async function main() {
   server.listen(port, () => {
     // eslint-disable-next-line no-console
     console.log(`Server is running at http://localhost:${port}`);
+    logging.log.info('boot', 'listening', {
+      port,
+      netcode: 'server-authoritative',
+      e2e: E2E_ENABLED,
+    });
     // eslint-disable-next-line no-console
     console.log(
       'Netcode mode: server-authoritative' +

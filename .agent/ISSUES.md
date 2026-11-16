@@ -6,7 +6,7 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I289). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I296). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Umbrella lines name every member as `(merged I<a>, I<b>…)`: grep any id to find its line.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (`pnpm harness:check`); maintain.md moves older Closed lines to .agent/archive/ISSUES-closed.md.
@@ -14,6 +14,9 @@
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I295 2026-11-12 P2 [netcode] An undo lowers stateVersion (draw,draw,undo,draw → 3,4,3,4 from GameRoom) and apply-view.js's monotonic guard drops any view ≤ lastRenderedVersion, so the undo may not render; in a log: view/apply applied:false out_of_order (refs: design 088 Review)
+- I294 2026-11-12 P2 [server] No socket handler in server/server.js has a try/catch: a throw in any one is an uncaught exception that ends the process and every room. Now logged (088 process tap, stderr fatal line) but not contained (refs: design 088 Current state)
+- I293 2026-11-12 P3 [netcode] applyView's own diff is always "initial": no caller passes options.previousView, so the returned diff lists every card as added. Unused today; apply-view-logged.js keeps its own previous view (refs: design 088)
 - I292 2026-11-13 P3 [rules] From commit flags since October: a failed "can use only if" attack fizzles and ends the turn instead of being unselectable; Handheld Fan/Rugged Helmet auto-pick; `.types`/`.name` readers unaudited for top-Evolution reads; tcgl-foil-sparkles.mjs is unused
 - I291 2026-11-13 P2 [netcode] No independent review (CLAUDE.md § Delegation) of design 087 slices 1–2 (relay removal, 6852bd1f) or of 078/079; run review.md on them before the next netcode change builds on top
 - I290 2026-11-13 P3 [tooling] `pnpm lint` shows ~29,900 prettier warnings in 560 of 592 non-client files, burying 470 real ones; a reformat touches ~500 files at any printWidth. Decide: one format commit, or drop the prettier rule from eslint (CI gates errors only, D253)
@@ -50,7 +53,7 @@
 - I162 2026-09-24 P3 [rules] Ability backlog (merged I162, I191, I223; `pnpm audit:abilities --rows`): 257 partial, 62 dead, 1064 unconsumed of 4228 (S287); families <50% unclaimed (D136); gaps: on-damage, attach search, KO recursion; probes miss rule-box filters (I191); shields miss passives (I223)
 - I121 2026-09-23 P3 [rules] Residuals of designs 032–039 (merged I121–I126, I137, I166, I167, I181): Bowed Whip/Blast Burn gates; unparsed Trainer conditions/steps (Lt. Surge, Kahili); ~160 conditional-status sentences unread; hand locks; copy-attack deferrals; Aqua Tube/Dark Cloak team retreat
 - I87 2026-09-23 P2 [netcode] "basic prompt gone in most recent match" not reproduced; waiting on the user's description (refs: S264, design 028)
-- I85 2026-09-23 P1 [feature] Waiting on the user's design approval (merged I85, I86): match logging (user: IMPORTANT), design 028; 30th Celebration + Classic Collection support, design 029 (refs: S264)
+- I86 2026-09-23 P2 [feature] 30th Celebration + Classic Collection support — design 029 awaiting user approval (refs: S264)
 - I84 2026-09-23 P3 [legacy] Legacy client gaps; untested by policy, retire with I251 (merged I20, I41, I45, I70, I79, I80, I84, I177, I214, I222): ability executors, Special Energy triggers, no GX once-per-game, Fossils to Bench, no mat FX/sound, trainer pickers skip attach targets/chooseMode
 - I81 2026-09-22 P3 [deck-builder] Autosave makes the explicit Save button a no-op when a deck is loaded — decide autosave vs dirty-indicator (refs: S252)
 - I55 2026-09-18 P2 [netcode] Server-authority keybind gaps (merged I55, I56): keybinds reading `mouseClick.card.image` throw on server-drawn cards (`c`, `z`/alt-z, `e`/`q`, move keys); a peeked deck card can only go to hand; `changeType` on the opponent's card doesn't move it (refs: design 012)
@@ -62,6 +65,7 @@
 - I262 2026-10-16 P3 [rules] attack-mirror-heal.test "Absorb Vitality" failed ('0' !== '20') → closed 2026-11-13: canPayAttackCost treats 'Dark' and 'Darkness' as one type; the legacy name guess read a typeless Darkness Energy as 'Dark' (attack-cost-darkness.test)
 - I261 2026-10-16 P3 [deck-builder] coin-normalize.test "committed coin catalog is already normalized" failed on a CRLF working copy → closed 2026-11-13: already fixed, the test normalizes line endings before comparing (coin-normalize.test.mjs:70)
 - I72 2026-09-21 P3 [board-ui] Dead `.battle-log-*` CSS rules in index.css:4476-4509 (the `#rulesBattleLog` element is gone) — delete (refs: S230) → closed 2026-11-13: the block is deleted (no JS or EJS named those classes)
+- I85 2026-09-23 P1 [feature] Match logging (user: IMPORTANT) — design 028 awaiting user approval (refs: S264) → closed 2026-11-12 (cloud session): design 088-unified-logging shipped — unified client+server log, one export, journal replay, tools/log.mjs (D254–D257)
 - I199 2026-09-28 P3 [deck-builder] find-type.js, find-old-type.js (+ its database/updater) and tcgdex-image-url.mjs lost their only caller when the text decklist importer was removed (design 050); delete them with their tests or revive them for a new importer → closed 2026-11-12: deleted
 - I278 2026-11-03 P3 [mat-fx] Community Center's far mountains barely in frame (refs: 084) → closed 2026-11-03 S337: the cliff's far end rises into the mountain past the pool, in both frames (tested)
 - I277 2026-11-03 P3 [mat-fx] Magma Basin's falls showed only their feet in tcgl (refs: 084) → closed 2026-11-03 S337: falls down the far-left corner's wall face, crossing the moat on screen in both presets (tested) (tested)

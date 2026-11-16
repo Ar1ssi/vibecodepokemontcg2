@@ -9,7 +9,7 @@ import { sort } from './general.js';
 import { hydrateHolo, unhydrateHolo } from '../../setup/deck-constructor/hydrate-holo.js';
 import { playShuffleFlight } from '../../setup/image-logic/shuffle-flight.js';
 import { dispatchAuthoritativeZoneOp } from '../../setup/netcode/authoritative-dispatch.js';
-import { logSync } from '../../setup/general/sync-logger-bridge.js';
+import { logSync } from '../../log/sync-log.js';
 import { shouldAnimateMirror } from '../../setup/image-logic/draw-flight-predicate.mjs';
 
 export const shuffleZone = (
