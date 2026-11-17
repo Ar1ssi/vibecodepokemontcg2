@@ -163,8 +163,8 @@ export const initializeBuildBattle = ({
     return session.groupKeys.map((key) => deckEntryOf(session, key)?.sprites?.[0]).filter(Boolean);
   };
 
-  // The box deck goes into My Decks as a Build & Battle record and opens in the editor. At the
-  // deck limit it still opens, unsaved, and the session keeps its cards so edits survive a
+  // The box deck goes into My Decks as a Build & Battle record and opens in the editor. When
+  // storage refuses the write it still opens, unsaved, and the session keeps its cards so edits survive a
   // reload (I207); the Box tab says so until the player saves it.
   const openBoxDeck = (cards = deckFromRows(boxStartingRows())) => {
     const deckEntry = deckEntryOf(session);
@@ -202,7 +202,7 @@ export const initializeBuildBattle = ({
   const unboxingDone = () => !session || session.unboxing.stage === 'done';
 
   // A saved box resumes once its box's data is in: the pool is built, and its deck reopens from My
-  // Decks (or, unsaved at the deck limit, from the session). Cards the data no longer has put the
+  // Decks (or, unsaved because storage refused the write, from the session). Cards the data no longer has put the
   // box away (design 054 row 2).
   const resumeLoadedSession = (saved) => {
     if (!verifySessionCards(saved, loaded)) {
@@ -214,7 +214,7 @@ export const initializeBuildBattle = ({
     computePool();
     const reopened = session.deckId && deckLibrary?.openDeckById?.(getTarget(), session.deckId);
     if (!reopened) {
-      // Unsaved at the deck limit: reopen the player's edits. A bound deck deleted from My Decks
+      // Unsaved because storage refused the write: reopen the player's edits. A bound deck deleted from My Decks
       // is built again from the box.
       openBoxDeck(
         session.unsavedDeck ? deckFromCardCounts(session.unsavedDeck, knownCards()) : undefined

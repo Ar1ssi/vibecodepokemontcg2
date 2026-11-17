@@ -49,8 +49,11 @@ function makeStorage(initial) {
 
 // Boots the library controller on a fresh page whose storage holds one user
 // deck, "Mine", with 4 Pikachu. Starter decks are seeded on top of it.
-function boot({ allowDeckWrites = true, onExternalDeckChange } = {}) {
-  const { library, deckId } = createDeckInLibrary(createEmptyLibrary(), 'Mine', pikachu(4), 1);
+function boot({ allowDeckWrites = true, onExternalDeckChange, extraDecks = 0 } = {}) {
+  let { library, deckId } = createDeckInLibrary(createEmptyLibrary(), 'Mine', pikachu(4), 1);
+  for (let i = 0; i < extraDecks; i += 1) {
+    library = createDeckInLibrary(library, `Filler ${i}`, pikachu(4), 2 + i).library;
+  }
   const storage = makeStorage(serializeLibrary(library));
   const dom = new JSDOM(`<!doctype html><body>${MARKUP}</body>`, { url: 'http://localhost/' });
   Object.defineProperty(dom.window, 'localStorage', { value: storage, configurable: true });
@@ -152,6 +155,23 @@ test('a new deck that storage refuses is not created or left bound', () => {
   assert.deepEqual(result, { saved: false, created: false, name: null, reason: 'storage' });
   assert.equal(controller.getActiveDeckId('self'), null);
   assert.equal(controller.getLibrary().order.length, decksBefore);
+});
+
+test('My Decks has no size limit: every way of making a deck still works past 100 decks', () => {
+  const { controller, stored } = boot({ extraDecks: 120 });
+  const decksBefore = stored().order.length;
+  assert.ok(decksBefore > 100);
+  window.prompt = () => 'One more';
+
+  const saved = controller.saveCurrentDeck(pikachu(4));
+  assert.equal(saved.saved, true);
+  assert.equal(saved.created, true);
+
+  const boxDeckId = controller.createAndOpenDeck('self', 'Box deck', pikachu(2));
+  assert.equal(typeof boxDeckId, 'string');
+
+  document.getElementById('nativeDeckBuilderNewDeck').click();
+  assert.equal(stored().order.length, decksBefore + 3);
 });
 
 test('deleting a seeded starter deck remembers it, so reseeding skips it', () => {

@@ -18,7 +18,6 @@ import test from 'node:test';
       loadLibraryFromStorage,
       saveLibraryToStorage,
       LIBRARY_STORAGE_KEY,
-      MAX_LIBRARY_DECKS,
       deckCardsKey,
       hasUnsavedDraft,
     } from '../core/deck-library.mjs';
@@ -77,7 +76,6 @@ import test from 'node:test';
     test('createDeckInLibrary caps name length at 60 characters', () => {
       const { library, deckId } = createDeckInLibrary(createEmptyLibrary(), 'x'.repeat(200), {}, 1000);
       assert.equal(library.decks[deckId].name.length, 60);
-      assert.equal(MAX_LIBRARY_DECKS, 60);
     });
     
     test('renameDeckInLibrary renames and ignores unknown ids', () => {
