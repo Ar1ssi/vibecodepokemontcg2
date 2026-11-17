@@ -22,8 +22,8 @@
     justify-content: flex-start;
     align-items: stretch;
     height: auto;
-    gap: 6px;
-    padding: 6px 8px;
+    gap: 4px;
+    padding: 4px 6px;
   }
   body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-targetbar,
   body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-actions {
@@ -54,9 +54,9 @@
   }
   body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-header button,
   body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-actions label {
-    min-height: 36px;
-    padding: 6px 10px;
-    font-size: 14px;
+    min-height: 30px;
+    padding: 4px 9px;
+    font-size: 13px;
     white-space: nowrap;
   }
   body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-link-banner {
@@ -71,7 +71,7 @@
   body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-body {
     flex-direction: column;
     gap: 0;
-    padding: 6px;
+    padding: 4px;
   }
   body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-pane {
     flex: 1 1 0;
@@ -93,14 +93,14 @@
     display: flex;
     flex: 0 0 auto;
     gap: 6px;
-    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+    padding: 4px 8px calc(4px + env(safe-area-inset-bottom));
     background: var(--db-panel, rgb(207, 211, 218));
     border-top: 1px solid var(--db-border, rgba(0, 0, 0, 0.12));
   }
   body.deck-builder-window #nativeDeckBuilderPhoneNav button {
     flex: 1 1 0;
-    min-height: 44px;
-    font-size: 16px;
+    min-height: 38px;
+    font-size: 15px;
     font-weight: 700;
     border: 1px solid var(--db-border-strong, rgba(0, 0, 0, 0.2));
     border-radius: 999px;
@@ -122,13 +122,14 @@
   }
   body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-mode-tab {
     flex: 0 0 auto;
-    min-height: 40px;
-    padding: 0 14px;
-    font-size: 14px;
+    min-height: 32px;
+    padding: 0 11px;
+    font-size: 13px;
     white-space: nowrap;
   }
   body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-pane-main-header {
-    padding: 8px;
+    padding: 4px 6px;
+    gap: 4px;
   }
   body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-section-title {
     font-size: 16px;
@@ -143,31 +144,123 @@
   }
   body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-search-input {
     flex: 1 1 100%;
-    min-height: 40px;
-    padding: 8px 10px;
+    min-height: 34px;
+    padding: 5px 10px;
     /* 16px stops iOS zooming the page when the field is focused. */
     font-size: 16px;
   }
   body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-search-select {
     flex: 1 1 0;
-    min-height: 36px;
-    padding: 6px;
-    font-size: 14px;
+    min-height: 32px;
+    padding: 4px;
+    font-size: 13px;
   }
   body.deck-builder-window #nativeDeckBuilderWorkspace #nativeDeckBuilderSearchButton,
   body.deck-builder-window #nativeDeckBuilderWorkspace #nativeDeckBuilderFiltersButton {
     flex: 1 1 0;
-    min-height: 36px;
-    padding: 6px 10px;
-    font-size: 14px;
+    min-height: 32px;
+    padding: 4px 10px;
+    font-size: 13px;
   }
   body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-search-status {
     font-size: 13px;
   }
-  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-search-results {
-    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
-    gap: 8px;
+  /* Three cards across on a 360-390px phone, four on wider ones. */
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-search-results,
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-set-browser-group-cards {
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: 6px;
+    padding: 2px;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-results-shell,
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-set-browser-results {
+    padding: 4px;
+  }
+
+  /* Browse Sets: the pill rows scroll sideways on one line each instead of wrapping, and the
+   * whole set strip is capped, so the card grid keeps most of the pane. */
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-set-browser {
+    padding: 4px;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-set-browser .native-deck-builder-section-title-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    margin-bottom: 4px;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-set-browser .native-deck-builder-section-title {
+    display: none;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-set-browser .native-deck-builder-section-title-wrap,
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-set-browser-group-tabs {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 4px;
+    scrollbar-width: none;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-set-browser-series-tag,
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-set-browser-tab {
+    flex: 0 0 auto;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace button.native-deck-builder-set-browser-series-tag {
+    min-height: 26px;
+    padding: 2px 9px;
+    font-size: 12px;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-set-browser-controls {
+    gap: 6px;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-set-browser-filter {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    min-height: 32px;
     padding: 4px 8px;
+    font-size: 16px;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace #nativeDeckBuilderBrowseFiltersButton {
+    flex: 0 0 auto;
+    min-height: 32px;
+    padding: 4px 10px;
+    font-size: 13px;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-set-browser-status {
+    font-size: 12px;
+    margin: 0 0 2px;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-set-browser-status:empty {
+    display: none;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-set-browser-tabs {
+    max-height: 96px;
+    overflow-y: auto;
+    gap: 4px;
+    padding-bottom: 4px;
+    margin-bottom: 4px;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-set-browser-group {
+    gap: 2px;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-set-browser-group-label {
+    font-size: 11px;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-set-browser-tab {
+    height: 34px;
+    padding: 2px 8px;
+    gap: 4px;
+    font-size: 12px;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-set-browser-tab-logo {
+    height: 24px;
+    max-width: 84px;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-set-browser-tab-name {
+    max-width: 120px;
+  }
+  body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-set-browser-tab-count {
+    font-size: 10px;
+    padding: 0 4px;
   }
 
   /* Double tap adds a card; without this the browser zooms the page instead. */
