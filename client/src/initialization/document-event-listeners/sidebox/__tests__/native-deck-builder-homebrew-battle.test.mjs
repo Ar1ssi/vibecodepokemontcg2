@@ -220,7 +220,7 @@ test('a box whose cards the set no longer has is put away with a note', async (t
   assert.ok(page.boxEl.querySelector('#homebrewOpenBox'));
 });
 
-test('at the deck limit the box deck opens unsaved and the session keeps the edits', async (t) => {
+test('when storage refuses the write the box deck opens unsaved and the session keeps the edits', async (t) => {
   const page = boot(t, { library: { full: true } });
   await settle();
   page.boxEl.querySelector('#homebrewOpenBox').click();

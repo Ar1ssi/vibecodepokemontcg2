@@ -128,7 +128,7 @@ export const initializeHomebrewBattle = ({
   const knownCards = () => [...pool.map((entry) => entry.card), ...energyCards];
 
   // The session's deck goes into My Decks as an empty deck named for the box and opens in the
-  // editor. At the deck limit it still opens, unsaved, and the session keeps its cards so edits
+  // editor. When storage refuses the write it still opens, unsaved, and the session keeps its cards so edits
   // survive a reload.
   const openBoxDeck = (cards = {}) => {
     const deckId =
@@ -157,7 +157,7 @@ export const initializeHomebrewBattle = ({
 
   // ── Loading and resuming ──────────────────────────────────────────────────
   // A saved box resumes once the set's cards are in: the pool is built and its deck reopens from My
-  // Decks (or, unsaved at the deck limit, from the session). Cards the set no longer has put it away.
+  // Decks (or, unsaved because storage refused the write, from the session). Cards the set no longer has put it away.
   const resumeLoadedSession = () => {
     if (!session || deckBound || !loaded) return;
     if (!verifyHomebrewSession(session, loaded.cards)) {

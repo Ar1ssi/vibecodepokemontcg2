@@ -22,7 +22,6 @@ import {
       setDeckWallpaper,
       setDeckSuggestPrefs,
       getDeckSuggestPrefs,
-      MAX_LIBRARY_DECKS,
     } from '../../../setup/deck-builder/core/deck-library.mjs';
     import {
       deckSpriteImageUrl,
@@ -283,10 +282,6 @@ import {
     
       const createNewDeck = () => {
         reload();
-        if (listDecks(library).length >= MAX_LIBRARY_DECKS) {
-          showStatus(`Deck limit reached (${MAX_LIBRARY_DECKS}). Delete a deck first.`);
-          return;
-        }
         const name = window.prompt('Name your new deck:');
         if (name === null) return;
         const { library: nextLibrary, deckId } = createDeckInLibrary(
@@ -450,15 +445,11 @@ import {
         /**
          * Creates a deck without prompting (Build & Battle box decks) and opens it for `target`.
          *
-         * @returns {string|null} the new deck id, or null at the deck limit, on the read-only game tab, or when storage refuses the write.
+         * @returns {string|null} the new deck id, or null on the read-only game tab or when storage refuses the write.
          */
         createAndOpenDeck: (target, name, cards, options = {}) => {
           if (!allowDeckWrites) return null;
           reload();
-          if (listDecks(library).length >= MAX_LIBRARY_DECKS) {
-            showStatus(`Deck limit reached (${MAX_LIBRARY_DECKS}). Delete a deck first.`);
-            return null;
-          }
           const { library: nextLibrary, deckId } = createDeckInLibrary(
             library,
             name,
@@ -549,7 +540,7 @@ import {
          * the work away.
          *
          * @returns {{saved: boolean, created: boolean, name: string|null,
-         *   reason?: 'cancelled'|'limit'|'read-only'|'storage'}}
+         *   reason?: 'cancelled'|'read-only'|'storage'}}
          */
         saveCurrentDeck: (cards, cosmetics = {}) => {
           if (!allowDeckWrites) {
@@ -561,12 +552,6 @@ import {
 
           let name;
           if (isNew) {
-            if (listDecks(library).length >= MAX_LIBRARY_DECKS) {
-              showStatus(
-                `Deck limit reached (${MAX_LIBRARY_DECKS}). Delete a deck first.`
-              );
-              return { saved: false, created: false, name: null, reason: 'limit' };
-            }
             name = window.prompt('Name this deck:');
             if (name === null) {
               return { saved: false, created: false, name: null, reason: 'cancelled' };

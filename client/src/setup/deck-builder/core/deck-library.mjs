@@ -7,7 +7,6 @@ import { DECK_FORMAT_TCG, isDeckFormat } from '../../../../../shared/engine/form
     const MAX_DECK_NAME_LENGTH = 60;
     
     export const LIBRARY_STORAGE_KEY = 'ptcg-sim.deck-library.v1';
-    export const MAX_LIBRARY_DECKS = 60;
     
     export function createEmptyLibrary() {
       return { decks: {}, order: [] };

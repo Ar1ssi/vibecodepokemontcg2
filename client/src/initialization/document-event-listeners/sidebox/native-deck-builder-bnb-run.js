@@ -196,8 +196,8 @@ export const initializeBuildBattleRun = ({
     return current.groupKeys.map((key) => deckEntryOf(current, key)?.sprites?.[0]).filter(Boolean);
   };
 
-  // The box deck goes into My Decks as a Build & Battle record and opens in the editor. At the deck
-  // limit it still opens, unsaved, and the session keeps its cards so edits survive a reload.
+  // The box deck goes into My Decks as a Build & Battle record and opens in the editor. When storage
+  // refuses the write it still opens, unsaved, and the session keeps its cards so edits survive a reload.
   const openBoxDeck = (cards = deckFromRows(boxStartingRows())) => {
     const current = session();
     const deckEntry = deckEntryOf(current);
@@ -237,7 +237,7 @@ export const initializeBuildBattleRun = ({
 
   // ── Loading and resuming ──────────────────────────────────────────────────
   // A saved run resumes once its box's data is in: the pool is built, and its deck reopens from My
-  // Decks (or, unsaved at the deck limit, from the session). Cards the data no longer has put the
+  // Decks (or, unsaved because storage refused the write, from the session). Cards the data no longer has put the
   // run away.
   const resumeLoadedRun = () => {
     if (!run || deckBound) return;
