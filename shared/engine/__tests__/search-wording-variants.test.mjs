@@ -10,6 +10,7 @@ import { createGameState } from '../state.mjs';
 import { createCard } from '../cards.mjs';
 import { applyCommand } from '../reduce.mjs';
 import { parseTrainerEffect } from '../rules/trainer-effects.mjs';
+import { parseAbility } from '../rules/abilities.mjs';
 import { parseSpecialEnergyEffects } from '../rules/special-energy-parse.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
 
@@ -153,4 +154,18 @@ test('an on-attach search reworded to the hand puts the card into the hand', () 
   assert.equal(done.error, null);
   assert.deepEqual(done.state.players.p1.zones.hand.map((c) => c.instanceId), [51]);
   assert.equal(done.state.players.p1.zones.bench.length, 0);
+});
+
+// Continent Tow: the user's scan (no corpus row) — "a Stadium", no "card", no reveal.
+test('Ability "search your deck for a Stadium" filters the deck to Stadiums only', () => {
+  const step = parseAbility(
+    'Once during your turn, you may search your deck for a Stadium and put it into your hand. Then, shuffle your deck.'
+  ).find((s) => s.type === 'searchAbility');
+  assert.equal(step.what, 'Stadium');
+  assert.equal(step.destination, 'hand');
+  const trainer = (trainerType) => ({ name: trainerType, supertype: 'Trainer', type: 'Trainer', trainerType });
+  assert.equal(matchesSearch(trainer('Stadium'), step.what), true);
+  assert.equal(matchesSearch(trainer('Item'), step.what), false);
+  assert.equal(matchesSearch(trainer('Supporter'), step.what), false);
+  assert.equal(matchesSearch({ name: 'Ralts', supertype: 'Pokémon', type: 'Pokémon', hp: 60 }, step.what), false);
 });

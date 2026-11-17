@@ -827,6 +827,53 @@ test('attack: Articuno-GX Cold Crush-GX discards all Energy from both Active Pok
   assert.equal(zone(res, 'p2', 'discard').filter((c) => c.supertype === 'Energy').length, 1);
 });
 
+// Vise Grip (user's scan, not in the corpora): "Discard 1 Energy from both Active Pokémon"
+const VISE_GRIP = 'Discard 1 Energy from both Active Pokémon';
+
+test('parseAttackSteps: "Discard 1 Energy from both Active Pokémon" is a counted both-Active discard', () => {
+  const parsed = parseAttackSteps(VISE_GRIP);
+  assert.deepEqual(parsed.after.map((s) => ({ type: s.type, count: s.count })), [
+    { type: 'atkDiscardBothActiveEnergy', count: 1 },
+  ]);
+});
+
+test('attack: Vise Grip discards exactly 1 Energy from each Active, the attacker choosing', () => {
+  let oppKeep;
+  let ownKeep;
+  const b = board(VISE_GRIP, {
+    name: 'Vise Grip User',
+    setup: ({ p1, p2, attacker, defender }) => {
+      p1.zones.active.push(energy('Water', { attachedTo: attacker.instanceId }));
+      ownKeep = energy('Fire', { attachedTo: attacker.instanceId });
+      p1.zones.active.push(ownKeep);
+      p2.zones.active.push(energy('Grass', { attachedTo: defender.instanceId }));
+      oppKeep = energy('Lightning', { attachedTo: defender.instanceId });
+      p2.zones.active.push(oppKeep);
+    },
+  });
+  let res = attack(b);
+  const oppPick = res.state.pendingChoice.options.find((c) => c.instanceId !== oppKeep.instanceId);
+  res = choose(res, [oppPick.instanceId], b.rng);
+  const ownPick = res.state.pendingChoice.options.find((c) => c.instanceId !== ownKeep.instanceId);
+  res = choose(res, [ownPick.instanceId], b.rng);
+  assert.deepEqual(attachedTo(res, 'p2', activeRoot(res, 'p2').instanceId), [oppKeep.instanceId]);
+  assert.deepEqual(attachedTo(res, 'p1', activeRoot(res, 'p1').instanceId), [ownKeep.instanceId]);
+  assert.equal(zone(res, 'p1', 'discard').filter((c) => c.supertype === 'Energy').length, 1);
+  assert.equal(zone(res, 'p2', 'discard').filter((c) => c.supertype === 'Energy').length, 1);
+});
+
+test('attack: Vise Grip with a single Energy per side discards it without asking; empty side is skipped', () => {
+  const b = board(VISE_GRIP, {
+    setup: ({ p1, attacker }) => {
+      p1.zones.active.push(energy('Water', { attachedTo: attacker.instanceId }));
+    },
+  });
+  const res = attack(b);
+  assert.equal(res.state.pendingChoice ?? null, null);
+  assert.equal(attachedTo(res, 'p1', activeRoot(res, 'p1').instanceId).length, 0);
+  assert.equal(zone(res, 'p2', 'discard').filter((c) => c.supertype === 'Energy').length, 0);
+});
+
 test('attack: Palkia-GX Zero Vanish-GX shuffles all opposing Energy into the deck', () => {
   const b = board("Shuffle all Energy from each of your opponent's Pokémon into their deck.", {
     name: 'Palkia-GX',

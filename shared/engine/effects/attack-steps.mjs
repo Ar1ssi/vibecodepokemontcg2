@@ -891,6 +891,7 @@ function atkSearchDeckFallback(ctx) {
 function atkDiscardBothActiveEnergy(ctx) {
   const { player, opponent, step } = ctx;
   const matches = (c) => energyMatches(c, step);
+  if (!step.all && step.count) return discardCountFromBothActives(ctx, matches);
   let discarded = 0;
   const drain = (owner, root) => {
     if (!root) return;
@@ -904,6 +905,45 @@ function atkDiscardBothActiveEnergy(ctx) {
     if (root && !attackEffectShielded(ctx, opponent, root, 'effect')) drain(opponent, root);
   }
   drain(player, activeOf(player));
+  return discarded === 0 ? skip(ctx, 'no_energy') : null;
+}
+
+// "Discard 1 Energy from both Active Pokémon": the attacker picks each side's Energy when it has
+// a choice; the opponent's Active is skipped when an effect shield protects it.
+function discardCountFromBothActives(ctx, matches) {
+  const { player, opponent, step } = ctx;
+  const sides = [];
+  const oppRoot = opponent ? activeOf(opponent) : null;
+  if (oppRoot && !attackEffectShielded(ctx, opponent, oppRoot, 'effect')) sides.push({ owner: opponent, root: oppRoot });
+  const ownRoot = activeOf(player);
+  if (ownRoot) sides.push({ owner: player, root: ownRoot });
+  const energiesOf = ({ owner, root }) =>
+    removableEnergy(ctx, owner, attachedCards(owner, root.instanceId).filter(matches));
+
+  let index = ctx.memo?.index ?? 0;
+  let discarded = ctx.memo?.discarded ?? 0;
+  if (ctx.memo && ctx.selection) {
+    const picked = pickById(energiesOf(sides[index]), ctx.selection);
+    for (const card of picked) discardCard(ctx.draft, card, ctx.events);
+    discarded += picked.length;
+    index += 1;
+  }
+  for (; index < sides.length; index++) {
+    const energies = energiesOf(sides[index]);
+    if (energies.length === 0) continue;
+    if (energies.length <= step.count) {
+      for (const card of energies) discardCard(ctx.draft, card, ctx.events);
+      discarded += energies.length;
+      continue;
+    }
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: Choose ${step.count} Energy to discard from ${sides[index].root.name || 'that Pokémon'}`,
+      options: energies,
+      min: step.count,
+      max: step.count,
+      memo: { index, discarded },
+    });
+  }
   return discarded === 0 ? skip(ctx, 'no_energy') : null;
 }
 

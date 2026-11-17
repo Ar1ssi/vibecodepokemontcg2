@@ -535,6 +535,11 @@ const TEMPLATES = [
     /^discard all (special )?energy(?: cards?)? (?:from|attached to) both active pokémon$/,
     (m) => ({ type: 'atkDiscardBothActiveEnergy', ...(m[1] ? { special: true } : {}) }),
   ],
+  // Vise Grip (user's scan): "Discard 1 Energy from both Active Pokémon".
+  [
+    /^discard (an?|\d+) (special )?energy(?: cards?)? (?:from|attached to) both active pokémon$/,
+    (m) => ({ type: 'atkDiscardBothActiveEnergy', count: countOf(m[1]), ...(m[2] ? { special: true } : {}) }),
+  ],
   // Blastoise ex Hyper Whirlpool: the opponent picks the Energy.
   [
     /^your opponent discards (an?|\d+) (special )?energy(?: cards?)? (?:from|attached to) your opponent's active pokémon$/,

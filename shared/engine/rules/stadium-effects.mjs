@@ -1365,23 +1365,28 @@ export function stadiumFilterMatches(card, stadiumCard) {
   if (/hop's pokémon/.test(t) && !name.includes('hop')) return false;
   if (/n's pokémon/.test(t) && !/\bn's\b/.test(name) && !name.startsWith('n '))
     return false;
-  if (/\{c\} pokémon/.test(t)) {
-    const types = (card?.types || []).map(lower);
-    if (types.length && !types.includes('colorless')) return false;
+  const cardTypes = (card?.types || []).map(lower);
+  const typeMap = {
+    c: 'colorless',
+    w: 'water',
+    l: 'lightning',
+    f: 'fighting',
+    m: 'metal',
+    p: 'psychic',
+    d: 'darkness',
+    g: 'grass',
+    y: 'fairy',
+    n: 'dragon',
+  };
+  // "non-{C} Pokémon" excludes that type instead of requiring it (Sky Field).
+  for (const m of t.matchAll(/non-\{([a-z])\}/g)) {
+    if (cardTypes.includes(typeMap[m[1]])) return false;
   }
-  const typeMatches = [...t.matchAll(/\{([wlfmpdgyn])\}/gi)];
+  if (/(?<!non-)\{c\} pokémon/.test(t)) {
+    if (cardTypes.length && !cardTypes.includes('colorless')) return false;
+  }
+  const typeMatches = [...t.matchAll(/(?<!non-)\{([wlfmpdgyn])\}/gi)];
   if (typeMatches.length) {
-    const typeMap = {
-      w: 'water',
-      l: 'lightning',
-      f: 'fighting',
-      m: 'metal',
-      p: 'psychic',
-      d: 'darkness',
-      g: 'grass',
-      y: 'fairy',
-      n: 'dragon',
-    };
     const wanted = typeMatches
       .map((m) => typeMap[m[1].toLowerCase()])
       .filter(Boolean);

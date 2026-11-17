@@ -380,6 +380,9 @@ export function parseAbilitySearchParams(lower) {
   } else if (/pok[eé]mon tool/.test(scope)) {
     // Farfetch'd Impromptu Carrier: a Tool, not a Pokémon.
     what = 'Pokémon Tool';
+  } else if (/\bstadiums?\b/.test(scope) && !/supporter|item|trainer|energy|pok[eé]mon/.test(scope)) {
+    // Continent Tow (user's scan): "search your deck for a Stadium" — no "card", no reveal.
+    what = 'Stadium';
   } else if (scope.includes('supporter')) {
     what = 'Supporter';
   } else if (scope.includes('item')) {
