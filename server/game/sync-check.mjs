@@ -3,29 +3,10 @@ import { hashZoneMap, SYNC_HASH_ZONES } from '../../shared/engine/zones/zone-has
 /**
  * @file Pure desync-detection comparison (design 002 slice 3.11).
  * The client periodically sends its own per-zone board hashes; the server
- * compares them against `hashStateZones(gameRoom.state, playerId)` and names
+ * compares them against `hashOwnerViewZones(gameRoom.getView(playerId))` and names
  * the first zone that disagrees, so recovery (the existing slice-1.1
  * peer-log catch-up) has something concrete to act on.
  */
-
-/**
- * Drops zones the client can never legitimately hash from a server-side
- * zone map before it's compared against the client's report. `deck` is
- * redacted to `{ count }` even for its own owner (design O4-A / I5), so a
- * per-card `deck` hash from the client would never match the server's real
- * deck and would falsely report a desync on every heartbeat (design 002
- * I24). The client applies the matching exclusion in
- * `client/src/setup/netcode/sync-check.js`'s `PLAYER_ZONES`.
- *
- * @param {Record<string, string>|null} zones
- * @returns {Record<string, string>|null}
- */
-export function excludeOwnerSecretZones(zones) {
-  if (!zones) return zones;
-  const rest = { ...zones };
-  delete rest.deck;
-  return rest;
-}
 
 /**
  * @param {Record<string, string>|null} serverZones
@@ -45,7 +26,8 @@ export function findFirstDivergentZone(serverZones, clientZones) {
 }
 
 // Zones the client hashes from its own view: everything in SYNC_HASH_ZONES
-// except deck (redacted to { count } even for its owner) — the exact set the
+// except deck (redacted to { count } even for its owner, design O4-A / I5/I24: a per-card
+// deck hash would falsely report a desync on every heartbeat) — the exact set the
 // client's computeSyncCheckZones (client/src/setup/netcode/sync-check.js) builds.
 const VIEW_HASH_PLAYER_ZONES = SYNC_HASH_ZONES.filter(
   (zoneId) => zoneId !== 'stadium' && zoneId !== 'deck'

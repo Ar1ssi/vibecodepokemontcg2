@@ -40,8 +40,24 @@ const VIEW_READERS = { attackExtrasFor, costDiscountsFor };
 
 const BAD_SEAT = 'bad_seat';
 
-function isSoloSeat(seat) {
-  return SOLO_SEATS.includes(seat);
+const BAD_CLIENT_SEQ_REASON = 'clientSeq must be a non-negative integer';
+
+/** A fresh seat's player record; `deckList` is what a reload of the seat's deck starts from. */
+function newSeatRecord(playerId, username, deckList = []) {
+  return {
+    playerId,
+    username,
+    deckList,
+    deckFormat: DECK_FORMAT_TCG,
+    zones: createPlayerZones(),
+    flags: {},
+    oncePerGame: { vstarUsed: false, gxUsed: false },
+  };
+}
+
+/** A clientSeq is a client counter: a safe non-negative integer, else it is not one. */
+function isValidClientSeq(value) {
+  return Number.isSafeInteger(value) && value >= 0;
 }
 
 export class GameRoom {
@@ -127,7 +143,7 @@ export class GameRoom {
    * @param {object[]} [deckList]
    */
   addPlayer(socketId, playerId, username = '', deckList = []) {
-    if (!socketId || !playerId) return false;
+    if (!socketId || !playerId || typeof username !== 'string') return false;
     // A solo room's seats belong to its one socket (addSoloPlayer).
     if (this.solo) return false;
     this.touchActivity();
@@ -166,22 +182,24 @@ export class GameRoom {
   /** Creates the seat's player record on first join, else refreshes its username. */
   #seatPlayer(playerId, username, deckList) {
     if (!this.state.players[playerId]) {
-      this.state.players[playerId] = {
+      this.#addSeatRecord(
         playerId,
-        username: username || playerId,
-        deckList: Array.isArray(deckList) ? [...deckList] : [],
-        deckFormat: DECK_FORMAT_TCG,
-        zones: createPlayerZones(),
-        flags: {},
-        oncePerGame: { vstarUsed: false, gxUsed: false },
-      };
-      // If turn player wasn't initialized, set to first joined player
-      if (!this.state.turn.player) {
-        this.state.turn.player = playerId;
-      }
+        username || playerId,
+        Array.isArray(deckList) ? [...deckList] : []
+      );
       this.journal.rebase(this.state, this.rng, `seated:${playerId}`);
-    } else if (username) {
+    } else if (username && this.state.players[playerId].username !== username) {
       this.state.players[playerId].username = username;
+      // In place, so the journal's last-seen state object would not notice the change.
+      this.journal.rebase(this.state, this.rng, `renamed:${playerId}`);
+    }
+  }
+
+  #addSeatRecord(playerId, username, deckList) {
+    this.state.players[playerId] = newSeatRecord(playerId, username, deckList);
+    // If turn player wasn't initialized, set to first joined player
+    if (!this.state.turn.player) {
+      this.state.turn.player = playerId;
     }
   }
 
@@ -235,7 +253,22 @@ export class GameRoom {
     if (!this.solo) return this.socketToPlayer.get(socketId) || null;
     if (!this.socketToPlayer.has(socketId)) return null;
     const seat = payload?.seat;
-    return isSoloSeat(seat) && this.soloSeats.has(seat) ? seat : null;
+    return this.soloSeats.has(seat) ? seat : null;
+  }
+
+  /**
+   * The seat a socket-addressed call acts for, or why it may not. A solo socket naming no
+   * valid seat is refused `bad_seat`; any other unseated socket gets `{ seat: null,
+   * refused: null }`, which handleCommand answers as spectator or unauthorized.
+   *
+   * @param {string} socketId
+   * @param {{ seat?: string }} [payload]
+   * @returns {{ seat: 'p1'|'p2'|null, refused: 'bad_seat'|null }}
+   */
+  resolveSeat(socketId, payload = {}) {
+    const seat = this.seatFor(socketId, payload);
+    if (seat) return { seat, refused: null };
+    return { seat: null, refused: this.socketToPlayer.has(socketId) ? BAD_SEAT : null };
   }
 
   /**
@@ -246,7 +279,7 @@ export class GameRoom {
    * @returns {boolean} false outside a solo room, for another socket, or a seat not 'p1'|'p2'
    */
   setSoloNearSeat(socketId, seat) {
-    if (!this.solo || !this.socketToPlayer.has(socketId) || !isSoloSeat(seat)) return false;
+    if (!this.solo || !this.socketToPlayer.has(socketId) || !this.soloSeats.has(seat)) return false;
     this.soloNearSeat = seat;
     return true;
   }
@@ -278,7 +311,7 @@ export class GameRoom {
   getClientSeqForSocket(socketId) {
     if (this.solo) {
       if (!this.socketToPlayer.has(socketId)) return 0;
-      return Math.max(...SOLO_SEATS.map((seat) => this.getClientSeq(seat)));
+      return Math.max(...[...this.soloSeats].map((seat) => this.getClientSeq(seat)));
     }
     const playerId = this.socketToPlayer.get(socketId);
     return playerId ? this.getClientSeq(playerId) : 0;
@@ -362,7 +395,7 @@ export class GameRoom {
     const playerId = this.socketToPlayer.get(socketId);
     if (!playerId) return;
     this.socketToPlayer.delete(socketId);
-    const seats = this.solo ? SOLO_SEATS : [playerId];
+    const seats = this.solo ? this.soloSeats : [playerId];
     for (const seat of seats) {
       if (this.playerToSocket.get(seat) !== socketId) continue;
       this.playerToSocket.delete(seat);
@@ -393,24 +426,18 @@ export class GameRoom {
     // Audit A-9: dedupe keys on clientSeq, so a socket command without one would skip
     // dedupe entirely. Every real client stamps one (cmd-emitter.js); server-internal
     // calls (setup, loadDeck, shadow) go through handleCommand directly.
-    if (!Number.isInteger(cmd?.clientSeq) || cmd.clientSeq < 0) {
-      this.journal.refused({ cmd, error: 'bad_command', reason: 'clientSeq must be a non-negative integer' });
-      return {
-        success: false,
-        error: 'bad_command',
-        reason: 'clientSeq must be a non-negative integer',
-        clientSeq: cmd?.clientSeq,
-      };
-    }
-    if (!this.solo) return this.handleCommand(socketId, cmd);
-    const seat = this.seatFor(socketId, cmd);
-    if (!seat) return this.handleCommand(socketId, cmd, this.#badSeatOr(socketId));
-    return this.handleCommand(socketId, cmd, seat);
+    if (!isValidClientSeq(cmd?.clientSeq)) return this.#refuseBadClientSeq(cmd);
+    return this.handleCommand(socketId, cmd, this.resolveSeat(socketId, cmd));
   }
 
-  // A stranger's command in a solo room keeps its spectator/unauthorized refusal.
-  #badSeatOr(socketId) {
-    return this.socketToPlayer.has(socketId) ? BAD_SEAT : null;
+  #refuseBadClientSeq(cmd) {
+    this.journal.refused({ cmd, error: 'bad_command', reason: BAD_CLIENT_SEQ_REASON });
+    return {
+      success: false,
+      error: 'bad_command',
+      reason: BAD_CLIENT_SEQ_REASON,
+      clientSeq: cmd?.clientSeq,
+    };
   }
 
   /**
@@ -419,11 +446,11 @@ export class GameRoom {
    *
    * @param {string} socketId
    * @param {object} [cmd]
-   * @param {string|null} [actingSeat] the seat already resolved by seatFor (solo rooms);
-   *   omitted, the socket's own seat acts — server-internal commands (setup, loadDeck)
+   * @param {{ seat: string|null, refused: 'bad_seat'|null }|null} [acting] the decision from
+   *   resolveSeat; omitted, the socket's own seat acts — server-internal commands (setup)
    */
-  handleCommand(socketId, cmd = {}, actingSeat = undefined) {
-    if (actingSeat === BAD_SEAT) {
+  handleCommand(socketId, cmd = {}, acting = null) {
+    if (acting?.refused) {
       this.journal.refused({ cmd, error: BAD_SEAT });
       return {
         ok: false,
@@ -434,8 +461,7 @@ export class GameRoom {
       };
     }
     this.touchActivity();
-    const playerId =
-      actingSeat === undefined ? this.socketToPlayer.get(socketId) : actingSeat;
+    const playerId = acting ? acting.seat : this.socketToPlayer.get(socketId);
 
     if (!playerId) {
       if (this.spectatorSockets.has(socketId)) {
@@ -458,7 +484,7 @@ export class GameRoom {
     }
 
     // Edge Case 17: Protocol version negotiation
-    if (cmd.protocolVersion && cmd.protocolVersion !== PROTOCOL_VERSION) {
+    if (cmd.protocolVersion != null && cmd.protocolVersion !== PROTOCOL_VERSION) {
       this.journal.refused({ cmd, playerId, error: 'version_mismatch' });
       return {
         success: false,
@@ -586,9 +612,9 @@ export class GameRoom {
    * @returns {{ ok: true, cards: object[], deckCount: number } | { ok: false, reason: string }}
    */
   peekDeck(socketId, request = {}) {
-    const playerId = this.seatFor(socketId, request);
+    const { seat: playerId, refused } = this.resolveSeat(socketId, request);
     if (!playerId) {
-      if (this.#badSeatOr(socketId) === BAD_SEAT) return { ok: false, reason: BAD_SEAT };
+      if (refused) return { ok: false, reason: refused };
       return { ok: false, reason: 'Only a seated player can look at a deck.' };
     }
     this.touchActivity();
@@ -715,10 +741,8 @@ export class GameRoom {
     if (this.turnOrder.phase !== 'awaiting-call') {
       return { ok: false, reason: 'already_resolved' };
     }
-    const playerId = this.seatFor(socketId, { seat });
-    if (!playerId && this.#badSeatOr(socketId) === BAD_SEAT) {
-      return { ok: false, reason: BAD_SEAT };
-    }
+    const { seat: playerId, refused } = this.resolveSeat(socketId, { seat });
+    if (refused) return { ok: false, reason: refused };
     if (!playerId || playerId !== this.turnOrder.callerPlayerId) {
       return { ok: false, reason: 'not_caller' };
     }
@@ -821,10 +845,8 @@ export class GameRoom {
   submitTurnOrderChoice(socketId, { choiceId = null, goFirst = null, seat = null } = {}) {
     const refusal = this.#choiceRefusal();
     if (refusal) return refusal;
-    const playerId = this.seatFor(socketId, { seat });
-    if (!playerId && this.#badSeatOr(socketId) === BAD_SEAT) {
-      return { ok: false, reason: BAD_SEAT };
-    }
+    const { seat: playerId, refused } = this.resolveSeat(socketId, { seat });
+    if (refused) return { ok: false, reason: refused };
     if (!playerId || playerId !== this.turnOrder.winnerPlayerId) {
       return { ok: false, reason: 'not_winner' };
     }
@@ -1009,18 +1031,7 @@ export class GameRoom {
     });
 
     for (const entry of kept) {
-      this.state.players[entry.playerId] = {
-        playerId: entry.playerId,
-        username: entry.username,
-        deckList: [],
-        deckFormat: DECK_FORMAT_TCG,
-        zones: createPlayerZones(),
-        flags: {},
-        oncePerGame: { vstarUsed: false, gxUsed: false },
-      };
-      if (!this.state.turn.player) {
-        this.state.turn.player = entry.playerId;
-      }
+      this.#addSeatRecord(entry.playerId, entry.username, []);
       if (entry.deckList.length > 0) {
         const result = applyCommand(
           this.state,
@@ -1066,16 +1077,10 @@ export class GameRoom {
    * @returns {object}
    */
   resolveChoice(socketId, payload = {}, clientSeq = null) {
-    const seq =
-      typeof clientSeq === 'number'
-        ? clientSeq
-        : typeof payload?.clientSeq === 'number'
-          ? payload.clientSeq
-          : null;
+    const seq = clientSeq ?? payload?.clientSeq ?? null;
     const cmd = { type: 'resolveChoice', payload, clientSeq: seq };
-    if (!this.solo) return this.handleCommand(socketId, cmd);
-    const seat = this.seatFor(socketId, payload);
-    return this.handleCommand(socketId, cmd, seat ?? this.#badSeatOr(socketId));
+    if (seq !== null && !isValidClientSeq(seq)) return this.#refuseBadClientSeq(cmd);
+    return this.handleCommand(socketId, cmd, this.resolveSeat(socketId, payload));
   }
 
   /**

@@ -56,12 +56,14 @@ import { createLiveCustomSets, customSetsManifestHandler, withCustomSets } from 
 import { REMOTE_POLL_MS, createRemoteCustomSets, resolveCustomSetsUrl } from './custom-sets-remote.mjs';
 import { CUSTOM_SETS_CHANGED_EVENT } from '../shared/custom-sets/custom-set-schema.mjs';
 import { createCardImageHandler } from './card-image-proxy.mjs';
+import { BodyTooLargeError, readCapped } from './upstream-limits.mjs';
 import { CARD_ART_PROXY_HOSTS } from './card-art-proxy-hosts.mjs';
 import { cacheControlFor, staticFileCacheControl } from './cache-policy.mjs';
 import { createClientBundleSource } from './client-bundle.mjs';
 import { KEEP_AWAKE_PATH, planKeepAwake, startKeepAwake } from './keep-awake.mjs';
 import { retiredLegacyRelayWarning } from './netcode-mode.mjs';
 import { planAdminUi, planCors } from './access-policy.mjs';
+import { isDeployHost, isOn, readDurationMs } from './env-settings.mjs';
 import { createServerLogging } from './log/index.mjs';
 import { LIMITS } from '../shared/log/log-schema.mjs';
 import { customFoilSets, resolveFoilTextureBase } from './tcgl-foil-config.mjs';
@@ -74,28 +76,19 @@ if (legacyRelayWarning) console.warn(legacyRelayWarning);
 // The `?e2e=1` test bridge (window.__ptcg) is a scripting API over the local player's own
 // board. It is shipped to every browser but must only ARM where a harness is meant to run:
 // without this, any visitor could enable it from the address bar. Opt in explicitly with
-// PTCG_E2E=1, or implicitly outside production (Render sets NODE_ENV=production, so the
-// deployed site is closed by default while local dev keeps working with no extra flags).
-const E2E_ENABLED =
-  process.env.PTCG_E2E === '1' ||
-  process.env.PTCG_E2E === 'true' ||
-  process.env.NODE_ENV !== 'production';
+// PTCG_E2E=1, or implicitly off a deploy host (Render and NODE_ENV=production both close it,
+// so the deployed site is closed by default while local dev keeps working with no extra flags).
+const E2E_ENABLED = isOn(process.env.PTCG_E2E) || !isDeployHost(process.env);
 
 // Sweep grace (Finding 5): a GameRoom with no connected sockets is only swept
 // once it has also been idle this long, so a brief double-disconnect during
 // reconnection does not get mistaken for an abandoned room. `0` restores the
 // pre-slice-2.1 immediate-sweep behavior (operational revert).
-const ROOM_GRACE_MS =
-  process.env.ROOM_GRACE_MS !== undefined
-    ? Number(process.env.ROOM_GRACE_MS)
-    : 30 * 60 * 1000;
+const ROOM_GRACE_MS = readDurationMs(process.env, 'ROOM_GRACE_MS', 30 * 60 * 1000);
 
 // Design 069: once a public room's game is set up, a dropped seat is held this long for a
 // reconnect; before set-up it is freed at once.
-const DEFAULT_PUBLIC_SEAT_RELEASE_MS = 3 * 60 * 1000;
-const PUBLIC_SEAT_RELEASE_MS = Number.isFinite(Number(process.env.PUBLIC_SEAT_RELEASE_MS ?? NaN))
-  ? Number(process.env.PUBLIC_SEAT_RELEASE_MS)
-  : DEFAULT_PUBLIC_SEAT_RELEASE_MS;
+const PUBLIC_SEAT_RELEASE_MS = readDurationMs(process.env, 'PUBLIC_SEAT_RELEASE_MS', 3 * 60 * 1000);
 const PUBLIC_SEAT_SWEEP_MS = 15 * 1000;
 // Sockets watching the Multiplayer tab's room list. A socket in a game room is never in it:
 // several handlers take "the socket's first non-own room" as its game room.
@@ -120,7 +113,7 @@ async function main() {
   app.use(logging.httpMiddleware);
   app.post('/api/log/beacon', express.text({ type: '*/*', limit: LIMITS.beaconMaxBytes }), logging.beaconHandler);
   app.get('/api/log/export/:token', logging.exportDownloadHandler);
-  if (process.env.NODE_ENV !== 'production') {
+  if (!isDeployHost(process.env)) {
     app.get('/api/log/rooms', logging.devRoomsHandler);
     app.get('/api/log/export', logging.devExportHandler);
   }
@@ -153,33 +146,37 @@ async function main() {
   const db = new sqlite3.Database(dbFilePath);
   let isDatabaseCapacityReached = false;
 
-  // Check database size (async to avoid blocking the event loop)
+  // Check database size (async to avoid blocking the event loop). A file that is not there yet
+  // is empty; any other failure is the caller's to report.
   const checkDatabaseSizeGB = async () => {
     try {
       const stats = await fs.promises.stat(dbFilePath);
-      const fileSizeInBytes = stats.size;
-      return fileSizeInBytes / (1024 * 1024 * 1024); // Convert bytes to gigabytes
-    } catch {
-      return 0; // File may not exist yet
+      return stats.size / (1024 * 1024 * 1024);
+    } catch (err) {
+      if (err.code === 'ENOENT') return 0;
+      throw err;
     }
   };
 
-  // Perform size check periodically
-  setInterval(
-    async () => {
-      const currentSize = await checkDatabaseSizeGB();
-      if (currentSize > maxSizeGB) {
-        isDatabaseCapacityReached = true;
-      }
-    },
-    1000 * 60 * 60
-  );
+  // Sets isDatabaseCapacityReached from a measurement. A size that cannot be measured leaves
+  // the flag as it was and says so.
+  const refreshDatabaseCapacity = async () => {
+    try {
+      isDatabaseCapacityReached = (await checkDatabaseSizeGB()) > maxSizeGB;
+    } catch (err) {
+      console.error(`Database size check failed (${err.code ?? err.message}); saves stay ${isDatabaseCapacityReached ? 'blocked' : 'allowed'}.`);
+    }
+  };
+  refreshDatabaseCapacity();
+  setInterval(refreshDatabaseCapacity, 1000 * 60 * 60);
 
   // Create a table to store key-value pairs (with TTL support)
   db.serialize(() => {
     db.run(
       "CREATE TABLE IF NOT EXISTS KeyValuePairs (key TEXT PRIMARY KEY, value TEXT, created_at TEXT DEFAULT (datetime('now')))"
     );
+    // Revert: DROP INDEX IF EXISTS idx_kvp_created_at. Only the daily eviction below reads it.
+    db.run('CREATE INDEX IF NOT EXISTS idx_kvp_created_at ON KeyValuePairs (created_at)');
   });
 
   // Evict saved game states older than 30 days (runs once per day)
@@ -189,9 +186,13 @@ async function main() {
       db.run(
         `DELETE FROM KeyValuePairs WHERE created_at < datetime('now', '-${EVICTION_DAYS} days')`,
         (err) => {
-          if (!err) {
-            isDatabaseCapacityReached = false; // Re-enable saves after cleanup
+          if (err) {
+            console.error(`Eviction of saved game states failed: ${err.message}`);
+            return;
           }
+          // The file does not shrink, but SQLite reuses the freed pages: saves fit again until
+          // the next hourly measurement says otherwise.
+          isDatabaseCapacityReached = false;
         }
       );
     },
@@ -241,6 +242,7 @@ async function main() {
   });
 
   const MAT_IMAGE_REMOTE_HOSTS = new Set(['cdn.artofpkm.com']);
+  const MAT_IMAGE_MAX_BYTES = 25 * 1024 * 1024;
 
   // Proxy playmat CDN art so browsers never hit cdn.artofpkm.com directly.
   // That CDN 302s to a watermark when a Referer is present.
@@ -261,15 +263,15 @@ async function main() {
       res.status(403).send('host not allowed');
       return;
     }
+    // The timer runs until the body is read: a slow upstream body is as bad as a slow header.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10_000);
       const upstream = await fetch(target.href, {
         headers: { 'User-Agent': 'PTCG-sim/1.0' },
         redirect: 'manual',
         signal: controller.signal,
       });
-      clearTimeout(timeout);
       // If the CDN redirects, validate the redirect target stays in allowed hosts
       if ([301, 302, 303, 307, 308].includes(upstream.status)) {
         const location = upstream.headers.get('location');
@@ -294,13 +296,17 @@ async function main() {
       const contentType = upstream.headers.get('content-type');
       if (contentType) res.setHeader('Content-Type', contentType);
       res.setHeader('Cache-Control', 'public, max-age=86400');
-      res.send(Buffer.from(await upstream.arrayBuffer()));
+      res.send(await readCapped(upstream, MAT_IMAGE_MAX_BYTES));
     } catch (err) {
-      if (err.name === 'AbortError') {
+      if (err instanceof BodyTooLargeError) {
+        res.status(413).send('image too large');
+      } else if (err.name === 'AbortError') {
         res.status(504).send('upstream timeout');
       } else {
         res.status(502).send('fetch failed');
       }
+    } finally {
+      clearTimeout(timeout);
     }
   });
 
@@ -420,7 +426,7 @@ async function main() {
   });
   app.get('/import', (req, res) => {
     const key = req.query.key;
-    if (!key) {
+    if (typeof key !== 'string' || !key) {
       return res.status(400).json({ error: 'Key parameter is missing' });
     }
 
@@ -431,7 +437,7 @@ async function main() {
         if (err) {
           return res.status(500).json({ error: 'Internal server error' });
         }
-        if (row) {
+        if (row?.value) {
           res.render('index', { importDataJSON: row.value, e2eAllowed: E2E_ENABLED });
         } else {
           res.status(404).json({ error: 'Key not found' });
@@ -442,6 +448,20 @@ async function main() {
 
   const roomInfo = new Map();
   const gameRooms = new Map();
+  // Socket.IO puts every socket in a room named by its own id, which is where its private views
+  // and instance maps go, and the lobby channel is a room too: neither can be joined as a game.
+  const isGameRoomId = (roomId) =>
+    typeof roomId === 'string' &&
+    roomId !== '' &&
+    roomId !== LOBBY_WATCHERS &&
+    !io.sockets.sockets.has(roomId);
+  // The client contract for "this room is gone": it leaves the room and returns to the lobby.
+  // The room may have been closed, swept or never existed, as well as lost to a restart.
+  const roomGoneEvent = () => ({
+    winner: null,
+    reason: 'server_restart',
+    message: 'This game room is no longer available (it was closed, or the server restarted).',
+  });
   logging.attachIo(io, {
     netcode: 'server-authoritative',
     seatOf: (socketId, roomId) => {
@@ -630,10 +650,19 @@ async function main() {
     const room = roomInfo.get(roomId);
     if (room) io.to(roomId).emit('roomFormat', roomFormatPayload(roomId, room));
   };
+  const mirrorRoomFormat = (gameRoom, room) => {
+    gameRoom.roomFormat = room.format?.format ?? null;
+  };
   const setRoomFormat = (roomId, room, next) => {
     room.format = next;
     const gameRoom = gameRooms.get(roomId);
-    if (gameRoom) gameRoom.roomFormat = next.format;
+    if (gameRoom) mirrorRoomFormat(gameRoom, room);
+  };
+  const openGameRoom = (roomId, room) => {
+    const gameRoom = new GameRoom({ roomId, journal: logging.createJournal(roomId) });
+    mirrorRoomFormat(gameRoom, room);
+    gameRooms.set(roomId, gameRoom);
+    return gameRoom;
   };
   const roomHasDealt = (roomId) => roomFormatLocked(gameRooms.get(roomId));
 
@@ -765,10 +794,17 @@ async function main() {
       socket.on('disconnect', socket.data.disconnectListener);
     };
     // Function to handle event emission
+    // The game room a packet is for: the one it names, else the single game room this socket is
+    // in (never its own id or the lobby channel).
+    const roomOfPacket = (data) => {
+      const named = data?.roomId;
+      if (typeof named === 'string' && named) return named;
+      return [...socket.rooms].find((r) => r !== socket.id && r !== LOBBY_WATCHERS);
+    };
     // Design 069: the lobby channel is never a relay target, and a public room only takes relayed
     // events (and cached deck exchanges) from its own members: its id is listed for anyone to see.
     const mayRelayTo = (roomId) =>
-      roomId !== LOBBY_WATCHERS && (!isPublicRoomId(roomId) || socket.rooms.has(roomId));
+      isGameRoomId(roomId) && (!isPublicRoomId(roomId) || socket.rooms.has(roomId));
     const emitToRoom = (eventName, data) => {
       socket.broadcast.to(data.roomId).emit(eventName, data);
       if (eventName === 'leaveRoom') {
@@ -790,69 +826,58 @@ async function main() {
     };
     // rules-engine events: relay to the opponent in the same room
     socket.on('rulesEvent', (payload) => {
-      const rooms = [...socket.rooms].filter((r) => r !== socket.id);
+      const rooms = [...socket.rooms].filter(isGameRoomId);
       for (const room of rooms) {
         socket.to(room).emit('rulesEvent', payload);
       }
     });
 
     socket.on('storeGameState', (exportData) => {
+      const failExport = () =>
+        socket.emit(
+          'exportGameStateFailed',
+          'Error exporting game! Please try again or save as a file.'
+        );
       if (isDatabaseCapacityReached) {
         socket.emit(
           'exportGameStateFailed',
           'No more storage for game states! You should probably tell Michael/Xiao Xiao.'
         );
-      } else {
-        // Attempt up to 5 times to find a unique key
-        const tryInsert = (attemptsLeft) => {
-          if (attemptsLeft <= 0) {
-            socket.emit(
-              'exportGameStateFailed',
-              'Error exporting game! Please try again or save as a file.'
-            );
-            return;
-          }
-          const key = generateRandomKey();
-          db.get(
-            'SELECT key FROM KeyValuePairs WHERE key = ?',
-            [key],
-            (err, row) => {
-              if (err) {
-                socket.emit(
-                  'exportGameStateFailed',
-                  'Error exporting game! Please try again or save as a file.'
-                );
-                return;
-              }
-              if (row) {
-                // Key collision — retry with a new key
-                tryInsert(attemptsLeft - 1);
-                return;
-              }
-              db.run(
-                'INSERT INTO KeyValuePairs (key, value) VALUES (?, ?)',
-                [key, exportData],
-                (insertErr) => {
-                  if (insertErr) {
-                    socket.emit(
-                      'exportGameStateFailed',
-                      'Error exporting game! Please try again or save as a file.'
-                    );
-                  } else {
-                    socket.emit('exportGameStateSuccessful', key);
-                  }
-                }
-              );
-            }
-          );
-        };
-        tryInsert(5);
+        return;
       }
+      // A save is the exported game's JSON text; anything else could not be loaded back.
+      if (typeof exportData !== 'string' || exportData === '') {
+        failExport();
+        return;
+      }
+      // Attempt up to 5 times to find a unique key; the primary key is the uniqueness check.
+      const tryInsert = (attemptsLeft) => {
+        if (attemptsLeft <= 0) {
+          failExport();
+          return;
+        }
+        const key = generateRandomKey();
+        db.run(
+          'INSERT INTO KeyValuePairs (key, value) VALUES (?, ?) ON CONFLICT(key) DO NOTHING',
+          [key, exportData],
+          function onInserted(err) {
+            if (err) {
+              console.error(`storeGameState insert failed: ${err.message}`);
+              failExport();
+            } else if (this.changes === 0) {
+              tryInsert(attemptsLeft - 1); // key collision
+            } else {
+              socket.emit('exportGameStateSuccessful', key);
+            }
+          }
+        );
+      };
+      tryInsert(5);
     });
     // Design 074 D7: one socket plays both seats of an authoritative room. The room is never
     // public (so never listed), takes no spectators, and issues no seat token.
     const joinSoloGame = (roomId, username, options) => {
-      if (typeof roomId !== 'string' || !roomId || isPublicRoomId(roomId)) {
+      if (!isGameRoomId(roomId) || isPublicRoomId(roomId)) {
         socket.emit('roomReject', { reason: 'solo_room' });
         return;
       }
@@ -860,10 +885,14 @@ async function main() {
         socket.emit('roomReject', { reason: 'seat_failed' });
         return;
       }
+      const { decks } = options;
+      if (decks !== undefined && (decks === null || typeof decks !== 'object' || Array.isArray(decks))) {
+        socket.emit('roomReject', { reason: 'bad_request' });
+        return;
+      }
       let gameRoom = gameRooms.get(roomId);
       const createdRoom = !gameRoom;
       if (createdRoom) gameRoom = new GameRoom({ roomId, journal: logging.createJournal(roomId) });
-      const decks = options.decks && typeof options.decks === 'object' ? options.decks : {};
       if (!gameRoom.addSoloPlayer(socket.id, username, decks)) {
         socket.emit('roomReject', { reason: 'solo_room' });
         return;
@@ -878,7 +907,7 @@ async function main() {
         });
       }
       const room = roomInfo.get(roomId);
-      gameRoom.roomFormat = room.format?.format ?? null;
+      mirrorRoomFormat(gameRoom, room);
       room.players.add(username);
 
       socket.leave(LOBBY_WATCHERS);
@@ -916,6 +945,10 @@ async function main() {
       if (typeof username === 'string') username = username.trim();
       if (options?.solo === true) {
         joinSoloGame(roomId, username, options);
+        return;
+      }
+      if (!isGameRoomId(roomId) || typeof username !== 'string' || !username) {
+        socket.emit('roomReject', { reason: 'bad_request' });
         return;
       }
       // Design 074 D7: a solo room has exactly one socket; nobody else seats or watches.
@@ -979,12 +1012,7 @@ async function main() {
       if (isSpectator || isExistingPlayer || !roomIsFull) {
         socket.leave(LOBBY_WATCHERS);
         socket.join(roomId);
-        let activeGameRoom = gameRoom;
-        if (!activeGameRoom) {
-          activeGameRoom = new GameRoom({ roomId, journal: logging.createJournal(roomId) });
-          activeGameRoom.roomFormat = room.format?.format ?? null;
-          gameRooms.set(roomId, activeGameRoom);
-        }
+        const activeGameRoom = gameRoom ?? openGameRoom(roomId, room);
         if (isSpectator) {
           activeGameRoom.addSpectator(socket.id);
         } else {
@@ -1068,18 +1096,30 @@ async function main() {
     });
 
     socket.on('userReconnected', (data) => {
+      if (
+        !data ||
+        typeof data !== 'object' ||
+        !isGameRoomId(data.roomId) ||
+        typeof data.username !== 'string' ||
+        !data.username
+      ) {
+        socket.emit('roomReject', { reason: 'bad_request' });
+        return;
+      }
+      const { roomId, username } = data;
+      const notSpectator = Boolean(data.notSpectator);
       // Design 069: checked before the restart branch, because a released public seat whose
       // room emptied looks the same as a server restart.
-      const publicRoom = isPublicRoomId(data?.roomId);
-      if (publicRoom && data.notSpectator) {
+      const publicRoom = isPublicRoomId(roomId);
+      if (publicRoom && notSpectator) {
         const decision = decideReconnect({
-          room: roomInfo.get(data.roomId),
-          username: data.username,
+          room: roomInfo.get(roomId),
+          username,
           token: data.seatToken,
         });
         if (decision.action === 'reject') {
           // A recovered connection (connectionStateRecovery) comes back still in the room.
-          socket.leave(data.roomId);
+          socket.leave(roomId);
           if (socket.data.disconnectListener) {
             socket.removeListener('disconnect', socket.data.disconnectListener);
             delete socket.data.disconnectListener;
@@ -1089,39 +1129,30 @@ async function main() {
           return;
         }
       }
-      if (!roomInfo.has(data.roomId)) {
-        socket.emit('gameEnded', {
-          winner: null,
-          reason: 'server_restart',
-          message: 'Game session terminated due to server restart.',
-        });
+      if (!roomInfo.has(roomId)) {
+        socket.emit('gameEnded', roomGoneEvent());
         return;
       }
-      const room = roomInfo.get(data.roomId);
+      const room = roomInfo.get(roomId);
       // Design 074 D7: only the solo player's own new socket reclaims a solo room.
-      const soloRoom = gameRooms.get(data.roomId);
+      const soloRoom = gameRooms.get(roomId);
       if (soloRoom?.solo) {
         const reclaimed =
-          data.notSpectator && soloRoom.addSoloPlayer(socket.id, data.username);
+          notSpectator && soloRoom.addSoloPlayer(socket.id, username);
         if (!reclaimed) {
           socket.emit('roomReject', { reason: 'solo_room' });
           return;
         }
       }
       socket.leave(LOBBY_WATCHERS);
-      socket.join(data.roomId);
+      socket.join(roomId);
       if (!soloRoom?.solo) {
-        let gameRoom = gameRooms.get(data.roomId);
-        if (!gameRoom) {
-          gameRoom = new GameRoom({ roomId: data.roomId, journal: logging.createJournal(data.roomId) });
-          gameRoom.roomFormat = room.format?.format ?? null;
-          gameRooms.set(data.roomId, gameRoom);
-        }
-        if (!data.notSpectator) {
+        const gameRoom = gameRooms.get(roomId) ?? openGameRoom(roomId, room);
+        if (!notSpectator) {
           gameRoom.addSpectator(socket.id);
         } else {
           const existingPid =
-            gameRoom.getPlayerIdByUsername(data.username) ||
+            gameRoom.getPlayerIdByUsername(username) ||
             gameRoom.getNextAvailablePlayerId();
           if (!existingPid) {
             socket.emit('roomReject', { reason: 'full' });
@@ -1130,7 +1161,7 @@ async function main() {
           const added = gameRoom.addPlayer(
             socket.id,
             existingPid,
-            data.username
+            username
           );
           if (!added) {
             socket.emit('roomReject', { reason: 'seat_failed' });
@@ -1138,26 +1169,22 @@ async function main() {
           }
         }
       }
-      if (!data.notSpectator) {
-        room.spectators.add(data.username);
-        watchDisconnect(data.roomId, data.username, true);
-        dropSpectatorOnDisconnect(data.roomId);
+      if (!notSpectator) {
+        room.spectators.add(username);
+        watchDisconnect(roomId, username, true);
+        dropSpectatorOnDisconnect(roomId);
       } else {
-        room.players.add(data.username);
-        if (publicRoom) seatPublicSocket(room, data.username, socket.id);
-        watchDisconnect(data.roomId, data.username, false);
-        socket.data.seat = { roomId: data.roomId, username: data.username };
+        room.players.add(username);
+        if (publicRoom) seatPublicSocket(room, username, socket.id);
+        watchDisconnect(roomId, username, false);
+        socket.data.seat = { roomId, username };
         // Designs 013/072: a seat that (re)joins mid-handshake gets its pending
         // prompt again, and a result whose deal found no socket is dealt now.
-        replayTurnOrderToSeat(data.roomId, socket.id);
+        replayTurnOrderToSeat(roomId, socket.id);
         // Never relay the payload whole: it carries this player's seat token (design 069).
-        io.to(data.roomId).emit('userReconnected', {
-          roomId: data.roomId,
-          username: data.username,
-          notSpectator: data.notSpectator,
-        });
+        io.to(roomId).emit('userReconnected', { roomId, username, notSpectator });
       }
-      broadcastRoomFormat(data.roomId);
+      broadcastRoomFormat(roomId);
     });
 
     // Design 053: propose / accept / withdraw the room's format. Only a seated player of this
@@ -1215,7 +1242,7 @@ async function main() {
     // Design 074 D7: deck loads, Set Up and Reset act for one seat — the socket's own, or in a
     // solo room the seat the packet names (`data.seat`; missing or unknown → bad_seat).
     const handleSeatSetupAction = (data) => {
-      const roomId = data.roomId || [...socket.rooms].find((r) => r !== socket.id);
+      const roomId = roomOfPacket(data);
       const gameRoom = gameRooms.get(roomId);
       gameRoom?.touchActivity();
       if (!isSeatSetupAction(data)) return;
@@ -1226,7 +1253,7 @@ async function main() {
       }
       if (isDeckLoadAction(data)) {
         cacheSetupAction(
-          roomInfo.get(data.roomId)?.setupActionCache,
+          roomInfo.get(roomId)?.setupActionCache,
           setupActionCacheKey(gameRoom, socket.id, seat),
           data
         );
@@ -1252,7 +1279,8 @@ async function main() {
     // Register event listeners using the common function
     for (const event of events) {
       socket.on(event, (data) => {
-        if (!mayRelayTo(data?.roomId)) return;
+        if (!data || typeof data !== 'object') return;
+        if (!mayRelayTo(roomOfPacket(data))) return;
         if (event === 'requestPeerLog' && data?.roomId) {
           const roomSockets = io.sockets.adapter.rooms.get(data.roomId);
           const hasPeer = [...(roomSockets || [])].some((id) => id !== socket.id);
@@ -1274,8 +1302,7 @@ async function main() {
     // Design 013: the designated caller's heads/tails pick. The client supplies
     // only the call — the coin itself is flipped by the room's seeded rng (D10).
     socket.on('turnOrderCall', (data) => {
-      const roomId =
-        data?.roomId || [...socket.rooms].find((r) => r !== socket.id);
+      const roomId = roomOfPacket(data);
       const gameRoom = gameRooms.get(roomId);
       if (!gameRoom) return;
       gameRoom.touchActivity();
@@ -1284,8 +1311,7 @@ async function main() {
 
     // Design 072: the coin winner's answer to "Do you want to go first?".
     socket.on('turnOrderChoice', (data) => {
-      const roomId =
-        data?.roomId || [...socket.rooms].find((r) => r !== socket.id);
+      const roomId = roomOfPacket(data);
       const gameRoom = gameRooms.get(roomId);
       if (!gameRoom) return;
       gameRoom.touchActivity();
@@ -1319,19 +1345,14 @@ async function main() {
     };
 
     socket.on('cmd', (cmd) => {
-      const roomId =
-        cmd?.roomId || [...socket.rooms].find((r) => r !== socket.id);
+      const roomId = roomOfPacket(cmd);
       const gameRoom = gameRooms.get(roomId);
       if (!gameRoom) {
         socket.emit('cmdRejected', {
           clientSeq: cmd?.clientSeq,
           reason: 'room_not_found',
         });
-        socket.emit('gameEnded', {
-          winner: null,
-          reason: 'server_restart',
-          message: 'Game session terminated due to server restart.',
-        });
+        socket.emit('gameEnded', roomGoneEvent());
         return;
       }
 
@@ -1372,21 +1393,14 @@ async function main() {
     });
 
     socket.on('resolveChoice', (data) => {
-      const roomId =
-        data?.roomId ||
-        data?.gameId ||
-        [...socket.rooms].find((r) => r !== socket.id);
+      const roomId = roomOfPacket(data);
       const gameRoom = gameRooms.get(roomId);
       if (!gameRoom) {
         socket.emit('cmdRejected', {
           clientSeq: data?.clientSeq,
           reason: 'room_not_found',
         });
-        socket.emit('gameEnded', {
-          winner: null,
-          reason: 'server_restart',
-          message: 'Game session terminated due to server restart.',
-        });
+        socket.emit('gameEnded', roomGoneEvent());
         return;
       }
 
@@ -1425,8 +1439,7 @@ async function main() {
     // Design 012: "look at the top/bottom N cards of a deck", answered to the asker only.
     socket.on('peekDeck', (data, ack) => {
       if (typeof ack !== 'function') return;
-      const roomId =
-        data?.roomId || [...socket.rooms].find((r) => r !== socket.id);
+      const roomId = roomOfPacket(data);
       const gameRoom = gameRooms.get(roomId);
       if (!gameRoom) {
         ack({ ok: false, reason: 'room_not_found' });
@@ -1443,8 +1456,7 @@ async function main() {
     });
 
     socket.on('requestView', (data) => {
-      const roomId =
-        data?.roomId || [...socket.rooms].find((r) => r !== socket.id);
+      const roomId = roomOfPacket(data);
       const gameRoom = gameRooms.get(roomId);
       if (gameRoom) {
         // Design 069: an unregistered socket would get the spectator view (both hands).
@@ -1469,11 +1481,7 @@ async function main() {
           socket.emit('gameEnded', gameEndedPayload);
         }
       } else if (roomId) {
-        socket.emit('gameEnded', {
-          winner: null,
-          reason: 'server_restart',
-          message: 'Game session terminated due to server restart.',
-        });
+        socket.emit('gameEnded', roomGoneEvent());
       }
     });
 
@@ -1483,8 +1491,7 @@ async function main() {
     // slice-1.1 peer-log catch-up has something concrete to recover.
     // Spectators have no personal authoritative state to compare against.
     socket.on('syncCheck', (data) => {
-      const roomId =
-        data?.roomId || [...socket.rooms].find((r) => r !== socket.id);
+      const roomId = roomOfPacket(data);
       const gameRoom = gameRooms.get(roomId);
       if (!gameRoom) return;
       const playerId = gameRoom.socketToPlayer.get(socket.id);

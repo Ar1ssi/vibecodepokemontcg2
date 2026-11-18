@@ -18,6 +18,7 @@ import {
   validateCustomSetsIndex,
 } from '../shared/custom-sets/custom-sets-index.mjs';
 import { RESERVED_SET_CODES } from './custom-sets.mjs';
+import { createLimiter, readCapped } from './upstream-limits.mjs';
 
 export const REMOTE_POLL_MS = 10_000;
 const INDEX_TIMEOUT_MS = 15_000;
@@ -63,37 +64,6 @@ function writeAtomic(file, data) {
   fs.renameSync(temp, file);
 }
 
-// A small FIFO limiter: the deck builder asks for a whole set's tiles at once. A finished task hands its slot
-// straight to the next waiter, so a newcomer can never slip in between.
-function createLimiter(limit) {
-  let active = 0;
-  const waiting = [];
-  return async (task) => {
-    if (active >= limit) await new Promise((resolve) => waiting.push(resolve));
-    else active += 1;
-    try {
-      return await task();
-    } finally {
-      const next = waiting.shift();
-      if (next) next();
-      else active -= 1;
-    }
-  };
-}
-
-async function readCapped(response, cap) {
-  const declared = Number(response.headers.get('content-length'));
-  if (Number.isFinite(declared) && declared > cap) throw new Error(`${declared} bytes, over ${cap}`);
-  const chunks = [];
-  let total = 0;
-  for await (const chunk of response.body ?? []) {
-    total += chunk.length;
-    if (total > cap) throw new Error(`over ${cap} bytes`);
-    chunks.push(chunk);
-  }
-  return Buffer.concat(chunks, total);
-}
-
 /**
  * @param {{ baseUrl: string, cacheDir: string, fetchImpl?: typeof fetch, log?: (line: string) => void,
  *   onUpdate?: (update: { changed: string[] }) => void, pollMs?: number }} options
@@ -111,9 +81,10 @@ export function createRemoteCustomSets({ baseUrl, cacheDir, fetchImpl = globalTh
   const active = new Map(); // setId -> index entry whose set.json is valid and mirrored
   const refused = new Map(); // setId -> entry whose set.json failed validation: not fetched or logged again
   const inFlight = new Map(); // sha256 -> Promise<abs path>
-  const limit = createLimiter(BLOB_CONCURRENCY);
+  const limiter = createLimiter(BLOB_CONCURRENCY);
   let etag = null;
   let failing = null; // the reason last logged, so a bucket that stays down logs once
+  let loggedMissingIndex = false; // a 404 for index.json is logged once, until an index is read again
   const setErrors = new Map(); // setId -> the failure last logged for it, so a retry every poll logs once
   let running = null;
   let timer = null;
@@ -158,7 +129,7 @@ export function createRemoteCustomSets({ baseUrl, cacheDir, fetchImpl = globalTh
     if (fs.existsSync(blobPath(sha256))) return Promise.resolve(blobPath(sha256));
     let pending = inFlight.get(sha256);
     if (!pending) {
-      pending = limit(() => download(sha256, size))
+      pending = limiter.run(() => download(sha256, size))
         .catch((error) => {
           throw new Error(`blob ${sha256.slice(0, 12)} from the bucket: ${error.message}`);
         })
@@ -184,10 +155,15 @@ export function createRemoteCustomSets({ baseUrl, cacheDir, fetchImpl = globalTh
     // Nothing published yet. Once sets are loaded, a missing index is a fault (a wrong URL, a deleted prefix), not a
     // request to drop them: `publish.mjs --unpublish` takes sets off by writing an index without them.
     if (response.status === 404) {
-      if (!active.size) return { index: emptyIndex(), etag: null };
-      noteFailure('index.json is gone (404)');
-      return null;
+      if (active.size) {
+        noteFailure('index.json is gone (404)');
+        return null;
+      }
+      if (!loggedMissingIndex) log(`custom sets remote: no index.json at ${baseUrl} (404); no custom sets published`);
+      loggedMissingIndex = true;
+      return { index: emptyIndex(), etag: null };
     }
+    loggedMissingIndex = false;
     if (response.status !== 200) {
       noteFailure(`index.json answered ${response.status}`);
       return null;
