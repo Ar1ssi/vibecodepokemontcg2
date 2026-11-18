@@ -10,6 +10,7 @@ import { rulesState, abilityUsed, canUsePlayedToBenchTrigger, ensureCardData } f
 import { appendMessage } from '../setup/chatbox/append-message.js';
 import { runAbilitySteps } from '../setup/rules/rules-bridge.js';
 import { parseAbility } from '/shared/engine/rules/abilities.mjs';
+import { cardAbilityText } from '/shared/engine/rules/ability-executors.mjs';
 import {
   collectUsableAbilityCandidates,
   filterUsableAbilities,
@@ -19,20 +20,13 @@ import {
 // per-turn abilitiesUsed map (that resets every turn) — they're gated by the
 // one-shot window opened when the card is played from hand to Bench. The
 // evolve wording ("from your hand to evolve") is gated by the turn it evolved.
-const abilityTextOf = (card) => {
-  const first = Array.isArray(card?.abilities) && card.abilities.length > 0
-    ? (typeof card.abilities[0] === 'string' ? card.abilities[0] : card.abilities[0]?.text)
-    : '';
-  return first || card?.ability?.text || card?.abilityText || card?.text || '';
-};
-
 const isPlayedToBenchTrigger = (card) =>
-  parseAbility(abilityTextOf(card)).some(
+  parseAbility(cardAbilityText(card)).some(
     (s) => s.type === 'whenPlayedAbility' && !s.evolve
   );
 
 const isEvolvePlayedTrigger = (card) =>
-  parseAbility(abilityTextOf(card)).some(
+  parseAbility(cardAbilityText(card)).some(
     (s) => s.type === 'whenPlayedAbility' && s.evolve === true
   );
 
@@ -65,8 +59,9 @@ export async function collectUsableAbilities(user) {
   for (const { card } of candidates) {
     try {
       await ensureCardData(card);
-    } catch {
-      /* card data may not be ready yet */
+    } catch (error) {
+      // Kept as a candidate: the card may already carry its ability text from the deck list.
+      console.warn('ability-picker: card data did not load for', card?.name, error);
     }
   }
 
@@ -75,14 +70,16 @@ export async function collectUsableAbilities(user) {
     ...(getZone(who, 'active').array || []),
     ...(getZone(who, 'bench').array || []),
   ];
+  const abilityIsSpent = (card) => {
+    if (isEvolvePlayedTrigger(card)) {
+      return abilityUsed(user, card) || card.enteredPlayTurn !== rulesState.turnNumber;
+    }
+    if (isPlayedToBenchTrigger(card)) return !canUsePlayedToBenchTrigger(user, card);
+    return abilityUsed(user, card);
+  };
   const usable = filterUsableAbilities(candidates, {
     rulesEnabled: rulesState.enabled,
-    isUsed: (card) =>
-      isPlayedToBenchTrigger(card) || isEvolvePlayedTrigger(card)
-        ? isEvolvePlayedTrigger(card)
-          ? abilityUsed(user, card) || card.enteredPlayTurn !== rulesState.turnNumber
-          : !canUsePlayedToBenchTrigger(user, card)
-        : abilityUsed(user, card),
+    isUsed: abilityIsSpent,
     // Fezandipiti ex-style KO-window abilities are refused by the server when
     // the flag is unset; do not offer them.
     koedLastOppTurn: !!rulesState.flags?.[user]?.koedLastOppTurn,

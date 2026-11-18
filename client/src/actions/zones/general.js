@@ -72,6 +72,14 @@ export const shuffleAll = (user, initiator, zoneId, indices, emit = true) => {
         ' card(s) into deck';
     } else if (zoneId === 'discard') {
       message = determineUsername(initiator) + ' shuffled discard into deck';
+    } else {
+      message =
+        determineUsername(initiator) +
+        ' shuffled ' +
+        count +
+        ' card(s) from ' +
+        zoneId +
+        ' into deck';
     }
     appendMessage(initiator, message, 'player', false);
   }
@@ -298,38 +306,33 @@ export const leaveAll = (
     appendMessage(initiator, message, 'player', false);
   }
 
-  try {
-    let targetImage;
-    const oZoneCount1 = oZone.getCount() - 1;
-    for (let i = oZoneCount1; i >= 0; i--) {
-      if (oZone.array[i].type === 'Pokémon') {
-        targetImage = oZone.array[i].image;
-        moveCard(user, initiator, oZoneId, dZoneId, i);
-        break;
-      }
+  let targetImage;
+  const oZoneCount1 = oZone.getCount() - 1;
+  for (let i = oZoneCount1; i >= 0; i--) {
+    if (oZone.array[i].type === 'Pokémon') {
+      targetImage = oZone.array[i].image;
+      moveCard(user, initiator, oZoneId, dZoneId, i);
+      break;
     }
-    const oZoneCount2 = oZone.getCount() - 1;
-    for (let i = oZoneCount2; i >= 0; i--) {
-      if (oZone.array[i].type === 'Pokémon') {
-        const targetIndex = dZone.array.findIndex(
-          (card) => card.image === targetImage
-        );
-        targetImage = oZone.array[i].image;
-        moveCard(user, initiator, oZoneId, dZoneId, i, targetIndex);
-      }
-    }
-    const oZoneCount3 = oZone.getCount();
-    for (let i = 0; i < oZoneCount3; i++) {
+  }
+  const oZoneCount2 = oZone.getCount() - 1;
+  for (let i = oZoneCount2; i >= 0; i--) {
+    if (oZone.array[i].type === 'Pokémon') {
       const targetIndex = dZone.array.findIndex(
         (card) => card.image === targetImage
       );
-      moveCard(user, initiator, oZoneId, dZoneId, 0, targetIndex);
+      targetImage = oZone.array[i].image;
+      moveCard(user, initiator, oZoneId, dZoneId, i, targetIndex);
     }
-    oZone.element.style.display = 'none';
-  } catch (e) {
-    console.error('Error in leaveAll:', e, { user, oZoneId, dZoneId });
-    return;
   }
+  const oZoneCount3 = oZone.getCount();
+  for (let i = 0; i < oZoneCount3; i++) {
+    const targetIndex = dZone.array.findIndex(
+      (card) => card.image === targetImage
+    );
+    moveCard(user, initiator, oZoneId, dZoneId, 0, targetIndex);
+  }
+  oZone.element.style.display = 'none';
 
   processAction(user, emit, 'leaveAll', [oInitiator, oZoneId, dZoneId]);
 };
@@ -368,30 +371,18 @@ export const sort = (user, zoneId) => {
     const sorted = sortCardsByDeckList(zone.array, deckData);
     zone.array.length = 0;
     zone.array.push(...sorted);
-    zone.array.forEach((card) => {
-      // eslint-disable-next-line no-self-assign
-      card.image.src = card.image.src; // redraw trick as insurance
-      const appended = appendZoneImage(zone, zoneId, card.image);
-      if (appended && card.image.abilityCounter) {
-        const index = zone.array.findIndex(
-          (selectedCard) => selectedCard === card
-        );
-        addAbilityCounter(user, zoneId, index);
-      }
-    });
-  } else {
-    zone.array.forEach((card) => {
-      // eslint-disable-next-line no-self-assign
-      card.image.src = card.image.src; // redraw trick as insurance
-      const appended = appendZoneImage(zone, zoneId, card.image);
-      if (appended && card.image.abilityCounter) {
-        const index = zone.array.findIndex(
-          (selectedCard) => selectedCard === card
-        );
-        addAbilityCounter(user, zoneId, index);
-      }
-    });
   }
+  zone.array.forEach((card) => {
+    // eslint-disable-next-line no-self-assign
+    card.image.src = card.image.src; // redraw trick as insurance
+    const appended = appendZoneImage(zone, zoneId, card.image);
+    if (appended && card.image.abilityCounter) {
+      const index = zone.array.findIndex(
+        (selectedCard) => selectedCard === card
+      );
+      addAbilityCounter(user, zoneId, index);
+    }
+  });
   if (['hand', 'prizes', 'discard', 'lostZone'].includes(zoneId)) {
     zone.array.forEach((card) => hydrateHolo(card));
   }

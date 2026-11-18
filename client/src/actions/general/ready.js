@@ -7,6 +7,7 @@ import { rulesState } from '/shared/engine/rules/rules-state.mjs';
 import { decksMismatchFormat, formatMismatchMessage } from '/shared/engine/formats.mjs';
 import { deckFormatOf } from '../../setup/deck-constructor/deck-format-args.mjs';
 import { setup, setupPrizes } from './setup.js';
+import { localReadySeat, readyKeyOf } from './ready-seat.mjs';
 import { playOpeningDeal } from '../../setup/netcode/mat-fx/deck-box.js';
 
 const SETUP_BUTTON_IDS = ['setupButton', 'p2SetupButton'];
@@ -14,15 +15,9 @@ const SETUP_BUTTON_IDS = ['setupButton', 'p2SetupButton'];
 // Reflects the current readiness state on the Set Up button(s) so a player
 // can see whether they've readied up and are waiting on their opponent.
 export const updateReadyButtons = () => {
-  // In 2P each client owns the self zones; initiator only reflects mat flip.
-  const mySideKey = systemState.isTwoPlayer
-    ? 'selfReady'
-    : systemState.initiator === 'self'
-      ? 'selfReady'
-      : 'oppReady';
-  const iAmReady = systemState[mySideKey];
-  const initiator = systemState.initiator;
-  const deckLoaded = hasDeckLoaded(initiator);
+  const mySeat = localReadySeat(systemState);
+  const iAmReady = systemState[readyKeyOf(mySeat)];
+  const deckLoaded = hasDeckLoaded(mySeat);
 
   SETUP_BUTTON_IDS.forEach((id) => {
     const button = document.getElementById(id);
@@ -58,7 +53,7 @@ export const updateReadyButtons = () => {
 // a side that had already readied up doesn't leave a stale ready state
 // blocking (or prematurely triggering) the next game's setup.
 export const clearReady = (user) => {
-  const readyKey = user === 'self' ? 'selfReady' : 'oppReady';
+  const readyKey = readyKeyOf(user);
   if (systemState[readyKey]) {
     systemState[readyKey] = false;
     updateReadyButtons();
@@ -74,19 +69,24 @@ const agreedRoomFormat = () =>
     ? systemState.roomFormat.format
     : null;
 
-const refuseDealOnFormatMismatch = () => {
+// The refusal message when the two decks cannot deal together, else null.
+const dealFormatMismatchMessage = () => {
   const players = [
     { username: determineUsername('self'), format: deckFormatOf(systemState, 'self') },
     { username: determineUsername('opp'), format: deckFormatOf(systemState, 'opp') },
   ];
   // Design 053: in a room both players agreed on a format, every deck must be that format.
   const roomFormat = agreedRoomFormat();
-  if (!decksMismatchFormat(players, roomFormat)) return false;
+  return decksMismatchFormat(players, roomFormat)
+    ? formatMismatchMessage(players, roomFormat)
+    : null;
+};
+
+const refuseDeal = (message) => {
   systemState.selfReady = false;
   systemState.oppReady = false;
-  appendMessage('', formatMismatchMessage(players, roomFormat), 'announcement', false);
+  appendMessage('', message, 'announcement', false);
   updateReadyButtons();
-  return true;
 };
 
 // Called when a player presses their Set Up button. Rather than drawing a
@@ -100,7 +100,7 @@ export const readyUp = async (user, emit = true) => {
     user = 'self';
   }
 
-  const readyKey = user === 'self' ? 'selfReady' : 'oppReady';
+  const readyKey = readyKeyOf(user);
   if (systemState[readyKey]) {
     // already marked ready -- ignore repeat clicks/syncs
     return;
@@ -126,7 +126,11 @@ export const readyUp = async (user, emit = true) => {
   }
 
   if (systemState.selfReady && systemState.oppReady) {
-    if (refuseDealOnFormatMismatch()) return;
+    const mismatchMessage = dealFormatMismatchMessage();
+    if (mismatchMessage) {
+      refuseDeal(mismatchMessage);
+      return;
+    }
     if (systemState.syncReplaying) {
       updateReadyButtons();
       return;

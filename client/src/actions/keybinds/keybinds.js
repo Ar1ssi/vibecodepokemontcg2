@@ -2,15 +2,6 @@ import { mouseClick, systemState } from '../../state.js';
 import { appendMessage } from '../../setup/chatbox/append-message.js';
 import { manualDeckActionAllowed } from '/shared/engine/rules/rules-state.mjs';
 
-// Gate a manual (keybind-triggered) deck action through the rules layer.
-function gate(actionKey, initiator) {
-  const check = manualDeckActionAllowed(actionKey);
-  if (!check.allowed) {
-    appendMessage(initiator, '⛔ ' + check.reason, 'announcement', false);
-    return false;
-  }
-  return true;
-}
 import { determineUsername } from '../../setup/general/determine-username.js';
 import { isBlockedByReplay } from '../../setup/general/replay-block.js';
 import { doubleClick } from '../../setup/image-logic/click-events.js';
@@ -70,9 +61,31 @@ import {
 } from '../zones/hand-actions.js';
 
 import { areKeybindsSleeping } from './keybindSleep.js';
+import { isKeydownBlockedByReplay } from './replay-keybind-guard.mjs';
+
+// Gates a manual (keybind-triggered) deck action through the rules layer; on refusal it also
+// posts the reason to chat, so callers only `return`.
+function gate(actionKey, initiator) {
+  const check = manualDeckActionAllowed(actionKey);
+  if (!check.allowed) {
+    appendMessage(initiator, '⛔ ' + check.reason, 'announcement', false);
+    return false;
+  }
+  return true;
+}
 
 const isAltKeyPressed = (event) => {
   return event.altKey || event.getModifierState('Alt');
+};
+
+// Special-condition cycle (Poisoned > Burned > Paralyzed > Confused > Asleep), keyed by the
+// upper-cased code the marker currently shows.
+const NEXT_SPECIAL_CONDITION_CODE = {
+  P: 'B',
+  B: 'Pa',
+  PA: 'C',
+  C: 'A',
+  A: 'P',
 };
 
 const isNonZeroDigitKeyPressed = (event) => {
@@ -123,11 +136,7 @@ export const keyDown = (event) => {
   ) {
     return;
   }
-  if (
-    !isAltKeyPressed &&
-    isBlockedByReplay('keybind', event.key) &&
-    !isBlockedByReplay('keybind', event.code)
-  ) {
+  if (isKeydownBlockedByReplay(event, isBlockedByReplay)) {
     return;
   }
   if (event.key === 'Escape' || event.code === 'Escape') {
@@ -170,10 +179,6 @@ export const keyDown = (event) => {
       ).element;
       selectedDeckElement.style.display = 'block';
 
-      const notSpectator = !(
-        document.getElementById('spectatorModeCheckbox').checked &&
-        systemState.isTwoPlayer
-      );
       if (notSpectator) {
         appendMessage(
           systemState.initiator,
@@ -349,7 +354,7 @@ export const keyDown = (event) => {
         }
         mouseClick.card.image.damageCounter.textContent =
           damageAmount.toString();
-        if (mouseClick.card.image.damageCounter.textContent <= 0) {
+        if (damageAmount <= 0) {
           deselectCard();
           mouseClick.card.image.damageCounter.handleRemove(true);
         } else {
@@ -378,27 +383,10 @@ export const keyDown = (event) => {
       } else {
         if (!isAltKeyPressed(event)) {
           const sc = mouseClick.card.image.specialCondition;
-          switch (getSpecialConditionCode(sc).toUpperCase()) {
-            case 'P':
-              setSpecialConditionCode(sc, 'B');
-              sc.handleColor();
-              break;
-            case 'B':
-              setSpecialConditionCode(sc, 'Pa');
-              sc.handleColor();
-              break;
-            case 'PA':
-              setSpecialConditionCode(sc, 'C');
-              sc.handleColor();
-              break;
-            case 'C':
-              setSpecialConditionCode(sc, 'A');
-              sc.handleColor();
-              break;
-            case 'A':
-              setSpecialConditionCode(sc, 'P');
-              sc.handleColor();
-              break;
+          const nextCode = NEXT_SPECIAL_CONDITION_CODE[getSpecialConditionCode(sc).toUpperCase()];
+          if (nextCode) {
+            setSpecialConditionCode(sc, nextCode);
+            sc.handleColor();
           }
         } else {
           setSpecialConditionCode(mouseClick.card.image.specialCondition, '');
@@ -499,7 +487,7 @@ export const keyDown = (event) => {
     }
     if (
       (event.key === 'r' || event.code === 'KeyR') &&
-      !(event.altKey || event.getModifierState('Alt')) &&
+      !isAltKeyPressed(event) &&
       ['stadium', 'active', 'bench'].includes(mouseClick.zoneId) &&
       !isInFullView(mouseClick.card.image) &&
       !isCardPreviewOpen() &&
@@ -509,7 +497,7 @@ export const keyDown = (event) => {
     }
     if (
       (event.key === 'r' || event.code === 'KeyR') &&
-      (event.altKey || event.getModifierState('Alt')) &&
+      isAltKeyPressed(event) &&
       ['active', 'bench'].includes(mouseClick.zoneId) &&
       !isInFullView(mouseClick.card.image) &&
       !isCardPreviewOpen() &&
