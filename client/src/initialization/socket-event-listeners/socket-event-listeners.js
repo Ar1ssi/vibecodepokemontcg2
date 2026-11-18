@@ -47,6 +47,8 @@ import {
   resetRenderState,
   getLastRenderedVersion,
   getLastAppliedView,
+  hasAuthoritativeView,
+  viewBackedGetZone,
   clearRenderedBoard,
   claimGameEndChat,
 } from '../../setup/netcode/apply-view.js';
@@ -79,6 +81,7 @@ import {
   reconcileHandStacks,
 } from '../../setup/zones/hand-stack-dom.js';
 import { setInstanceMap } from '../../setup/netcode/dual-run-bridge.js';
+import { resetMirrorResyncThrottle } from '../../setup/netcode/mirror-resync.mjs';
 import { setDealOrder } from '../../setup/netcode/deal-order.js';
 import { registerTurnOrderCallListeners } from '../../setup/netcode/turn-order-call.js';
 import {
@@ -103,7 +106,6 @@ import {
 import {
   computeSyncCheckZones,
   emitSyncCheck,
-  viewBackedGetZone,
   SYNC_CHECK_INTERVAL_MS,
 } from '../../setup/netcode/sync-check.js';
 
@@ -113,6 +115,10 @@ let peerLogTimeout = null;
 let syncCheckIntervalId = null;
 const requestActionQueue = createRequestActionQueue();
 let requestActionStaleTimer = null;
+
+// A spectator ticks the Spectate box before joining; it only means anything in a room.
+const isSpectatorSocket = () =>
+  systemState.isTwoPlayer && document.getElementById('spectatorModeCheckbox').checked;
 
 export const removeSyncIntervals = () => {
   if (peerLogTimeout) {
@@ -130,14 +136,14 @@ export const removeSyncIntervals = () => {
 const startSyncCheckHeartbeat = () => {
   if (syncCheckIntervalId || !systemState.serverAuthoritative) return;
   syncCheckIntervalId = setInterval(() => {
-    const isSpectator = document.getElementById(
-      'spectatorModeCheckbox'
-    ).checked;
     if (
-      isSpectator ||
+      isSpectatorSocket() ||
       !systemState.isTwoPlayer ||
       !systemState.roomId ||
-      !socket.connected
+      !socket.connected ||
+      // No view drawn yet: every zone would hash as empty and report a divergence that is
+      // only this client having nothing to report.
+      !hasAuthoritativeView()
     ) {
       return;
     }
@@ -174,6 +180,9 @@ const stopSyncCheckHeartbeat = () => {
 // dropped rather than drawn and then undone.
 const acceptSoloPerspective = (view) => {
   const nearSeat = seatForSide('self', systemState.nearSeat);
+  // A player's view always names its seat; one that does not cannot be shown to be the near
+  // seat's, so it is not drawn as that board.
+  if (!view.isSpectator && !view.you?.playerId) return false;
   if (view.you?.playerId && view.you.playerId !== nearSeat) return false;
   const previous = getLastAppliedView();
   if (previous?.you?.playerId && previous.you.playerId !== nearSeat) clearRenderedBoard();
@@ -303,6 +312,7 @@ export const resetNetcodeForRoomChange = () => {
   resetRenderState();
   // The next room's seats send their own maps (design 074 D7 keys them by seat).
   setInstanceMap(null);
+  resetMirrorResyncThrottle();
   seedNetcodeContext();
   resetClientSeq(0);
 };
@@ -439,7 +449,7 @@ export const initializeSocketEventListeners = () => {
   socket.on('roomReject', (data) => {
     // Design 074 D7: a refused solo join (or a solo room lost on reconnect) leaves the Solo
     // tab on the local board (solo-room.js).
-    if (String(data?.reason).startsWith('solo_')) {
+    if (typeof data?.reason === 'string' && data.reason.startsWith('solo_')) {
       document.dispatchEvent(new CustomEvent('solo-room-refused', { detail: { reason: data.reason } }));
       return;
     }
@@ -481,10 +491,7 @@ export const initializeSocketEventListeners = () => {
     noteCustomSetsChanged(change).catch((error) => console.error('custom set reload notice failed', error));
   });
   socket.on('connect', () => {
-    const notSpectator = !(
-      document.getElementById('spectatorModeCheckbox').checked &&
-      systemState.isTwoPlayer
-    );
+    const notSpectator = !isSpectatorSocket();
     if (systemState.isTwoPlayer) {
       const data = {
         roomId: systemState.roomId,
@@ -528,10 +535,7 @@ export const initializeSocketEventListeners = () => {
   });
   socket.on('disconnect', () => {
     if (systemState.isTwoPlayer) {
-      const isSpectator =
-        systemState.isTwoPlayer &&
-        document.getElementById('spectatorModeCheckbox').checked;
-      const username = isSpectator
+      const username = isSpectatorSocket()
         ? systemState.spectatorUsername
         : systemState.p2SelfUsername;
       appendMessage('', username + ' disconnected', 'announcement', false);
@@ -588,8 +592,13 @@ export const initializeSocketEventListeners = () => {
   });
 
   // Design 074 D7: each map names its seat (a solo socket gets both seats').
+  // Queued behind joinGame: its room reset (after an await) clears the maps, so a map applied
+  // on arrival can be wiped before the room it belongs to has finished joining.
   socket.on('instanceMap', (data) => {
-    if (data?.map) setInstanceMap(data.map, data.seat);
+    if (!data?.map) return;
+    pushActionQueue = pushActionQueue
+      .then(() => setInstanceMap(data.map, data.seat))
+      .catch((err) => console.error('instanceMap apply failed', err));
   });
 
   // Design 002 I17: the server's authoritative opening-deal order, so this client's
@@ -645,7 +654,8 @@ export const initializeSocketEventListeners = () => {
       systemState.solo = false;
       systemState.nearSeat = 'p1';
       systemState.serverAuthoritative = false;
-      systemState.roomId = null;
+      // '' is the no-room value (global-variables.js, solo-room.js, header-buttons.js).
+      systemState.roomId = '';
       removeSyncIntervals();
       endSpectatorSession();
       document.dispatchEvent(new CustomEvent('room-changed'));
@@ -658,11 +668,7 @@ export const initializeSocketEventListeners = () => {
   });
 
   socket.on('requestAction', (data) => {
-    const notSpectator = !(
-      document.getElementById('spectatorModeCheckbox').checked &&
-      systemState.isTwoPlayer
-    );
-    if (!notSpectator) return;
+    if (isSpectatorSocket()) return;
     if (isImporting) {
       applyRequestAction(data.action, data.parameters);
       return;
@@ -709,11 +715,7 @@ export const initializeSocketEventListeners = () => {
   });
 
   socket.on('pushAction', (data) => {
-    const notSpectator = !(
-      document.getElementById('spectatorModeCheckbox').checked &&
-      systemState.isTwoPlayer
-    );
-    if (!notSpectator) return;
+    if (isSpectatorSocket()) return;
     pushActionQueue = pushActionQueue.then(() =>
       applyPeerAction(data.action, data.parameters)
     );
@@ -721,12 +723,7 @@ export const initializeSocketEventListeners = () => {
 
   // A peer reconnected and is asking for the tail of our action log (O2-B).
   socket.on('requestPeerLog', (data) => {
-    const notSpectator = !(
-      document.getElementById('spectatorModeCheckbox').checked &&
-      systemState.isTwoPlayer
-    );
-    if (!notSpectator || !systemState.isTwoPlayer || !systemState.roomId)
-      return;
+    if (isSpectatorSocket() || !systemState.isTwoPlayer || !systemState.roomId) return;
     const response = buildPeerLogResponse({
       selfActionData: systemState.selfActionData,
       fromCounter: data?.fromCounter,
@@ -854,7 +851,7 @@ export const initializeSocketEventListeners = () => {
   //     VSTARGXFunction(data.user, data.type, data.emit)
   // });
   socket.on('exportGameStateSuccessful', (key) => {
-    const url = `https://ptcgsim.online/import?key=${key}`;
+    const url = `https://ptcgsim.online/import?key=${encodeURIComponent(key)}`;
     appendMessage('self', url, 'announcement', false);
   });
   socket.on('exportGameStateFailed', (message) => {

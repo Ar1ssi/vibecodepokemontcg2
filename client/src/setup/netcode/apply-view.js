@@ -46,6 +46,7 @@ import {
   ROTATION_CONDITIONS,
 } from '../../../../shared/engine/rules/special-conditions.mjs';
 import { board3dActive as board3dFlagActive } from '../board3d/board3d.js';
+import { PLAY_ZONES, damageOf, userOfSide, sideOfUser } from './view-card-vocabulary.mjs';
 
 let lastRenderedVersion = -1;
 const cardRegistry = new Map(); // instanceId -> { instanceId, element, card, side, zone, container }
@@ -124,8 +125,6 @@ let resizeListenerBound = false;
 // it re-sends with every resync, must not bring the end screen or its chat line back.
 let gameEndAnnounced = false;
 let gameEndChatClaimed = false;
-
-const PLAY_ZONES = ['active', 'bench'];
 
 // Zones legacy move-card.js gives a holofoil wrapper; stadium and attached cards
 // never get one.
@@ -359,6 +358,23 @@ export function getAuthoritativeStadiumArray() {
 }
 
 /**
+ * Zone accessor matching legacy `getZone`'s `(user, zoneId) => { array }` shape, but sourced
+ * from the last-applied view (design 002 I24) instead of legacy's `zoneArrays`, which are never
+ * populated under server-authoritative rendering (I15). The sync-check heartbeat hashes from it.
+ *
+ * @param {string} user 'self' | 'opp'
+ * @param {string} zoneId
+ * @returns {{ array: object[] }}
+ */
+export function viewBackedGetZone(user, zoneId) {
+  const array =
+    zoneId === 'stadium'
+      ? getAuthoritativeStadiumArray()
+      : getAuthoritativeZoneArray(sideOfUser(user), zoneId);
+  return { array };
+}
+
+/**
  * Your spent once-per-game allowances from the last view (`{ vstarUsed, gxUsed }`), or null
  * before any view. The attack panel greys a spent GX / VSTAR Power attack with them (design 049).
  *
@@ -399,8 +415,9 @@ export function getAuthoritativeAttackExtras(instanceId) {
 /**
  * The passive attack-cost discounts the server prices one of your in-play Pokémon with (its Ability
  * and attached Tools, `[{ count, symbol }]`), keyed like the attack extras by the in-play root.
- * `[]` when that Pokémon has none; `null` when the card is not your in-play Pokémon or the last view
- * carries no `costDiscounts` (legacy mode, an older server), so callers price it themselves.
+ * `[]` when that Pokémon has none (the server omits an empty `costDiscounts` map, so an absent map
+ * is the same answer); `null` when the card is not your in-play Pokémon or there is no
+ * authoritative view (legacy mode), so callers price it themselves.
  *
  * @param {number} instanceId
  * @returns {Array<{count: number, symbol: string|null}>|null}
@@ -419,7 +436,7 @@ export function getAuthoritativeCostDiscounts(instanceId) {
 function ownPokemonRootId(instanceId) {
   const you = lastAppliedView?.you;
   if (!you || instanceId == null) return null;
-  const zone = ['active', 'bench']
+  const zone = PLAY_ZONES
     .map((zoneId) => (Array.isArray(you.zones?.[zoneId]) ? you.zones[zoneId] : []))
     .find((cards) => cards.some((card) => card?.instanceId === instanceId));
   if (!zone) return null;
@@ -453,8 +470,7 @@ function resolveZone(side, zoneId, options = {}) {
   // adapted from this renderer's `side` terminology ('you' | 'them') here so
   // the injected module itself stays untouched.
   if (typeof defaultNetcodeContext.getZone === 'function') {
-    const user = side === 'you' ? 'self' : 'opp';
-    return defaultNetcodeContext.getZone(user, zoneId);
+    return defaultNetcodeContext.getZone(userOfSide(side), zoneId);
   }
 
   const doc =
@@ -588,7 +604,7 @@ function createOrUpdateCardElement(cardData, side, zoneId, options = {}) {
   img.dataset.side = side;
 
   // Track damage counter overlay on the element
-  if (typeof cardData.damage === 'number' && cardData.damage > 0) {
+  if (damageOf(cardData) > 0) {
     img.dataset.damage = String(cardData.damage);
   } else {
     delete img.dataset.damage;
@@ -704,7 +720,7 @@ function positionOverlay(
 function overlaySideClass(side, options = {}) {
   const systemState = options.systemState || defaultNetcodeContext.systemState;
   const initiatorIsSelf = systemState?.initiator === 'self';
-  const user = side === 'you' ? 'self' : 'opp';
+  const user = userOfSide(side);
   if (user === 'self') return initiatorIsSelf ? 'self-circle' : 'opp-circle';
   return initiatorIsSelf ? 'opp-circle' : 'self-circle';
 }
@@ -732,10 +748,7 @@ function reconcileDamageOverlay(
   options = {},
   rectImg = img
 ) {
-  const damage =
-    typeof cardData.damage === 'number' && cardData.damage > 0
-      ? cardData.damage
-      : 0;
+  const damage = damageOf(cardData);
 
   if (damage <= 0) {
     if (img.damageCounter) {
@@ -1484,9 +1497,11 @@ function reconcileZoneCounts(side, zones, options = {}) {
   for (const zoneId of COUNT_ZONES) {
     const zoneData = zones[zoneId];
     if (zoneData === undefined) continue;
-    const count = Array.isArray(zoneData)
-      ? zoneData.length
-      : Number(zoneData?.count) || 0;
+    const count = Array.isArray(zoneData) ? zoneData.length : zoneData?.count;
+    if (!Number.isFinite(count)) {
+      console.error(`[apply-view] ${side}.${zoneId} carries no count; label left as is`);
+      continue;
+    }
     const doc = zoneRootOf(resolveZone(side, zoneId, options).element);
     const label = doc?.getElementById?.(`${zoneId}Count`);
     if (label) label.textContent = String(count);
@@ -1564,7 +1579,7 @@ function reconcileZoneCover(side, zoneId, zoneData, options = {}) {
 
   const coverListeners =
     options.coverListeners || defaultNetcodeContext.coverListeners;
-  const user = side === 'you' ? 'self' : 'opp';
+  const user = userOfSide(side);
   const id = `${zoneId}Cover`;
 
   let img = coverRegistry.get(key);
@@ -1739,6 +1754,7 @@ function reconcilePendingChoice(pendingChoice, localPlayerId, options = {}, choo
 
   if (!pendingChoice) {
     announcedChoiceId = null;
+    clearChoiceSendError(options);
     closePrizePicker(options);
     closeMatPicker(options);
     closeChoicePicker(options);
@@ -1749,11 +1765,16 @@ function reconcilePendingChoice(pendingChoice, localPlayerId, options = {}, choo
     return;
   }
 
-  const isOwner =
-    !pendingChoice.player || pendingChoice.player === localPlayerId;
+  // The server names the choosing seat on every choice, redacted or not. One without it is
+  // nobody's to answer: owning it by default would hand a spectator the picker.
+  if (!pendingChoice.player) {
+    console.error('[apply-view] pendingChoice carries no player', pendingChoice.choiceId);
+  }
+  const isOwner = Boolean(pendingChoice.player) && pendingChoice.player === localPlayerId;
 
   if (!isOwner) {
     // Opponent is choosing: show non-interactive waiting banner
+    clearChoiceSendError(options);
     closePrizePicker(options);
     closeMatPicker(options);
     closeChoicePicker(options);
@@ -1889,29 +1910,89 @@ function reconcilePendingChoice(pendingChoice, localPlayerId, options = {}, choo
   confirmBtn?.addEventListener?.('click', async () => {
     confirmBtn.disabled = true;
     const selection = Array.from(selectedIds);
-    try {
-      await submitChoiceSelection(pendingChoice, selection, options);
-    } finally {
-      if (modal.parentNode) modal.parentNode.removeChild(modal);
+    const sent = await submitChoiceSelection(pendingChoice, selection, options);
+    // An answer that never left stays on screen so the player can send it again.
+    if (!sent) {
+      confirmBtn.disabled = false;
+      return;
     }
+    if (modal.parentNode) modal.parentNode.removeChild(modal);
   });
 }
 
+/**
+ * Tells the player their choice answer was not sent. Lives inside the choice modal when
+ * one is up, else on the body (the pickers tear their own UI down).
+ */
+function showChoiceSendError(options = {}) {
+  const doc =
+    options.document || (typeof document !== 'undefined' ? document : null);
+  if (!doc) return;
+  let notice = doc.getElementById?.('netcodeChoiceSendError') || null;
+  if (!notice) {
+    notice = doc.createElement('div');
+    notice.id = 'netcodeChoiceSendError';
+    notice.className = 'choice-waiting-banner choice-send-error';
+    notice.setAttribute?.('role', 'alert');
+    const modalContainer = doc
+      .getElementById?.('netcodeChoiceModal')
+      ?.querySelector?.('.choice-modal-container');
+    (modalContainer || doc.body)?.appendChild(notice);
+  }
+  notice.textContent = 'Your choice could not be sent. Check your connection and try again.';
+}
+
+function clearChoiceSendError(options = {}) {
+  const doc =
+    options.document || (typeof document !== 'undefined' ? document : null);
+  const notice = doc?.getElementById?.('netcodeChoiceSendError');
+  notice?.parentNode?.removeChild(notice);
+}
+
+/**
+ * Sends the player's answer to a pending choice.
+ *
+ * @returns {Promise<boolean>} false when the answer could not leave this client (no socket
+ *   or room, or the emit refused or threw); the player has been told and the prompt must stay up
+ */
 async function submitChoiceSelection(pendingChoice, selection, options = {}) {
   if (typeof options.onResolveChoice === 'function') {
     options.onResolveChoice({ choiceId: pendingChoice.choiceId, selection });
-    return;
+    return true;
   }
-  const { socket, roomId } = await resolveNetcodeContext(options);
-  if (socket && roomId) {
-    emitResolveChoice({
+  const { socket, roomId } = resolveNetcodeContext(options);
+  let result;
+  try {
+    result = await emitResolveChoice({
       socket,
       roomId,
       choiceId: pendingChoice.choiceId,
       selection,
       choiceSeat: soloChoiceSeat(lastAppliedView),
     });
+  } catch (err) {
+    result = { success: false, error: err?.message || String(err) };
   }
+  if (!result?.success) {
+    console.error('[apply-view] choice answer not sent:', result?.error ?? 'unknown', pendingChoice.choiceId);
+    showChoiceSendError(options);
+    return false;
+  }
+  clearChoiceSendError(options);
+  return true;
+}
+
+/**
+ * A picker closes its own UI when it resolves. If the answer did not leave, reopen the
+ * prompt from the latest view so the player is not left without it.
+ */
+async function submitPickerSelection(pendingChoice, selection, options) {
+  const sent = await submitChoiceSelection(pendingChoice, selection, options);
+  if (sent) return;
+  setTimeout(() => {
+    if (lastAppliedView?.pendingChoice?.choiceId !== pendingChoice.choiceId) return;
+    showPendingChoice(lastAppliedView, options);
+  }, 0);
 }
 
 function choicePickerApi(options = {}) {
@@ -1944,7 +2025,7 @@ function openChoiceInCardPicker(pendingChoice, options = {}) {
         // Mirrors the modal, which unmounts on confirm: a later view that
         // still carries this choice (e.g. the server rejected it) reopens.
         openPickerChoiceId = null;
-        return submitChoiceSelection(pendingChoice, selection, options);
+        return submitPickerSelection(pendingChoice, selection, options);
       },
     });
   } catch (err) {
@@ -1987,7 +2068,7 @@ function openChoiceInPrizePicker(pendingChoice, options = {}) {
       cards,
       onResolve: (selection) => {
         openPrizeChoiceId = null;
-        return submitChoiceSelection(pendingChoice, selection, options);
+        return submitPickerSelection(pendingChoice, selection, options);
       },
     });
   } catch (err) {
@@ -2032,7 +2113,7 @@ function openChoiceInMatPicker(pendingChoice, options = {}) {
         // Mirrors the card picker: a resolved pick already tore its own UI down,
         // so a later view that still carries this choice reopens if rejected.
         openMatChoiceId = null;
-        return submitChoiceSelection(pendingChoice, selection, options);
+        return submitPickerSelection(pendingChoice, selection, options);
       },
       onCancel: () => {
         // Only a cancellable choice (min 0) reaches here; the required case hides
@@ -2040,7 +2121,7 @@ function openChoiceInMatPicker(pendingChoice, options = {}) {
         // the effect instead of leaving the choice pending forever.
         openMatChoiceId = null;
         if (request.cancellable) {
-          return submitChoiceSelection(pendingChoice, [], options);
+          return submitPickerSelection(pendingChoice, [], options);
         }
       },
     });
@@ -2092,6 +2173,13 @@ export function reconcileTurnState(view, options = {}) {
   // `you`, and its turn display follows that seat like a player's would.
   if (!view.you?.playerId) {
     return { applied: false, reason: 'spectator' };
+  }
+
+  // The server stamps a boolean on every view; guessing 'opp' for a missing one would
+  // freeze the local turn on the wrong player and get the next command rejected.
+  if (typeof turn.isYourTurn !== 'boolean') {
+    console.error('[apply-view] view turn carries no isYourTurn; local turn state left alone');
+    return { applied: false, reason: 'no_turn' };
   }
 
   const state = options.rulesState || rulesState;
@@ -2352,34 +2440,18 @@ export function clearRenderedBoard(options = {}) {
 }
 
 /**
- * Resolves netcode socket and roomId context from options, defaults, or dynamic state import.
+ * Resolves the netcode socket and roomId from options, then the injected default context
+ * (socket-event-listeners.js seeds it, and re-seeds it on every room change).
  *
  * @param {object} [options={}]
- * @returns {Promise<{ socket: any, roomId: string|null }>}
+ * @returns {{ socket: any, roomId: string|null }}
  */
-async function resolveNetcodeContext(options = {}) {
+function resolveNetcodeContext(options = {}) {
   const defaultCtx = getDefaultNetcodeContext();
-  let socket = options.socket || defaultCtx.socket;
-  let roomId = options.roomId || defaultCtx.roomId;
-
-  if (typeof window !== 'undefined') {
-    if (!socket && window.socket) socket = window.socket;
-    if (!roomId && window.systemState?.roomId)
-      roomId = window.systemState.roomId;
-  }
-
-  if ((!socket || !roomId) && typeof window !== 'undefined') {
-    try {
-      const state = await import('../../state.js');
-      if (!socket && state.socket) socket = state.socket;
-      if (!roomId && state.systemState?.roomId)
-        roomId = state.systemState.roomId;
-    } catch {
-      // dynamic import fallback ignored if unavailable
-    }
-  }
-
-  return { socket, roomId };
+  return {
+    socket: options.socket || defaultCtx.socket,
+    roomId: options.roomId || defaultCtx.roomId,
+  };
 }
 
 /**
@@ -2405,6 +2477,7 @@ export function applyView(view, events = [], options = {}) {
   }
 
   // Edge Case 8: Monotonic stateVersion guard (ignore out-of-order or duplicate views)
+  const previousVersion = lastRenderedVersion;
   if (typeof view.stateVersion === 'number') {
     if (view.stateVersion <= lastRenderedVersion) {
       return {
@@ -2416,6 +2489,17 @@ export function applyView(view, events = [], options = {}) {
     }
     lastRenderedVersion = view.stateVersion;
   }
+  // A throw leaves the board half drawn: the version stays unspent so the server's resend of
+  // this same view is applied, not dropped as a duplicate.
+  try {
+    return renderAuthoritativeView(view, events, options);
+  } catch (err) {
+    lastRenderedVersion = previousVersion;
+    throw err;
+  }
+}
+
+function renderAuthoritativeView(view, events, options) {
   lastPlacedIn = new WeakMap();
 
   // Clear in-flight affordances now that server response has landed

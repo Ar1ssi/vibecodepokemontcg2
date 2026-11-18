@@ -11,12 +11,12 @@
  */
 
 import { listConditions } from '../../../../shared/engine/rules/special-conditions.mjs';
+import { PLAY_ZONES, damageOf } from './view-card-vocabulary.mjs';
 
 // Legacy's `y` cycle (keybinds.js: P → B → Pa → C → A → P), in server condition names.
 export const CONDITION_CYCLE = ['Poisoned', 'Burned', 'Paralyzed', 'Confused', 'Asleep'];
 
-const IN_PLAY = ['active', 'bench'];
-const ROTATABLE = ['stadium', 'active', 'bench'];
+const ROTATABLE = ['stadium', ...PLAY_ZONES];
 const TYPE_KEYS = { e: 'Energy', t: 'Trainer', p: 'Pokémon' };
 
 const command = (action, param) => ({ action, params: [param] });
@@ -33,12 +33,9 @@ function readLetter(key, code) {
   return match ? match[1].toLowerCase() : null;
 }
 
-const currentDamage = (card) =>
-  typeof card.damage === 'number' && card.damage > 0 ? card.damage : 0;
-
 function planDamage(card, digit, subtract) {
   const instanceId = card.instanceId;
-  const damage = currentDamage(card);
+  const damage = damageOf(card);
   if (digit === 0) {
     return damage > 0 ? [command('updateDamageCounter', { instanceId, amount: 0 })] : null;
   }
@@ -108,17 +105,17 @@ export function planCardKeyCommands({ key, code, alt = false, zoneId, isOwnCard 
 
   const digit = readDigit(key, code);
   if (digit != null) {
-    return IN_PLAY.includes(zoneId) ? planDamage(card, digit, alt) : null;
+    return PLAY_ZONES.includes(zoneId) ? planDamage(card, digit, alt) : null;
   }
 
   const letter = readLetter(key, code);
   if (letter === 'y' && zoneId === 'active') return planConditionCycle(card, alt);
   if (letter === 'r' && !alt && ROTATABLE.includes(zoneId)) return planRotation(card, false);
-  if (letter === 'r' && alt && IN_PLAY.includes(zoneId)) return planRotation(card, true);
+  if (letter === 'r' && alt && PLAY_ZONES.includes(zoneId)) return planRotation(card, true);
   if (alt && TYPE_KEYS[letter]) {
     return planChangeType(card, TYPE_KEYS[letter], { zoneId, isOwnCard });
   }
-  if (letter === 'w' && card.abilityUsed === true && [...IN_PLAY, 'stadium', 'discard'].includes(zoneId)) {
+  if (letter === 'w' && card.abilityUsed === true && [...PLAY_ZONES, 'stadium', 'discard'].includes(zoneId)) {
     return [command('removeAbilityCounter', { instanceId: card.instanceId })];
   }
   return null;
