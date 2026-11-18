@@ -139,6 +139,13 @@ function leadingExtraEnergy(sentence) {
 
 const ENERGY_TYPE = String.raw`(?:basic )?(?:\{([a-z])\} )?(?:basic )?`;
 
+// The five Special Conditions: lower-case words for the printed-text patterns, and capitalised
+// names for the steps.
+const CONDITION_WORDS = ['asleep', 'burned', 'confused', 'paralyzed', 'poisoned'];
+const CONDITION = CONDITION_WORDS.join('|');
+const capitalize = (word) => word[0].toUpperCase() + word.slice(1);
+const SPECIAL_CONDITIONS = CONDITION_WORDS.map(capitalize);
+
 // "heal 30 damage" / "heal all damage" / "remove 3 damage counters" / "remove a damage counter".
 const HEAL = String.raw`(?:heal (\d+|all) damage|remove (\d+|an?|all) damage counters?)`;
 
@@ -209,7 +216,7 @@ const TEMPLATES = [
   // Unown Hidden Power (Unseen Forces I): after its switch, "The new Defending Pokémon is now
   // Burned and Confused."
   [
-    /^the new defending pokémon is now (asleep|burned|confused|paralyzed|poisoned)(?: and (asleep|burned|confused|paralyzed|poisoned))?$/,
+    new RegExp(String.raw`^the new defending pokémon is now (${CONDITION})(?: and (${CONDITION}))?$`),
     (m) => conditionList(m.slice(1).filter(Boolean).join(' ')).map((condition) => ({ type: 'atkApplyCondition', condition })),
   ],
   // Forretress Rapid Spin: the opponent switches first, then the attacker.
@@ -447,10 +454,6 @@ const TEMPLATES = [
     /^switch 1 of your (?:face-down )?prize(?: card)?s? with the top card of your deck$/,
     () => ({ type: 'atkOpponentPrizeDeckSwap', own: true }),
   ],
-  [
-    new RegExp(String.raw`^move an? ${ENERGY_TYPE}energy(?: card)? from your opponent's active pokémon to 1 of their benched pokémon$`),
-    (m, s) => ({ type: 'atkMoveEnergy', from: 'opponentActive', to: 'opponentBench', count: 1, ...energyFilter(m[1], s) }),
-  ],
 
   // Self Energy discard behind the attack's own coin (design 032); parseAttackSteps drops
   // the ungated form, which parseAttackEnergyDiscard runs.
@@ -520,14 +523,10 @@ const TEMPLATES = [
     /^(?:before doing damage, )?discard all trainer cards attached to your opponent's active pokémon$/,
     () => ({ type: 'atkDiscardOppTools', scope: 'active', all: true, beforeDamage: true }),
   ],
-  [
-    /^discard (an?|\d+|all|up to \d+) (special )?energy(?: cards?)? (?:from|attached to) your opponent's active pokémon(?:, if any)?$/,
-    (m) => ({ type: 'atkDiscardOppEnergy', scope: 'active', ...discardCount(m[1]), ...(m[2] ? { special: true } : {}) }),
-  ],
   // Araquanid Drowning Ball (customhb): "… is now Paralyzed, and discard an Energy from that
   // Pokémon" — the status is read by attack-status.mjs; this clause is the discard.
   [
-    /^your opponent's active pokémon is now (?:asleep|burned|confused|paralyzed|poisoned), and discard (an?|\d+) (special )?energy(?: cards?)? from (?:it|that pokémon)$/,
+    new RegExp(String.raw`^your opponent's active pokémon is now (?:${CONDITION}), and discard (an?|\d+) (special )?energy(?: cards?)? from (?:it|that pokémon)$`),
     (m) => ({ type: 'atkDiscardOppEnergy', scope: 'active', ...discardCount(m[1]), ...(m[2] ? { special: true } : {}) }),
   ],
   // Articuno-GX Cold Crush-GX: both Active Pokémon shed all their Energy.
@@ -588,7 +587,7 @@ const TEMPLATES = [
   ],
   // Glaceon Ice Bind.
   [
-    /^if your opponent doesn't discard a card from their hand, your opponent's active pokémon is now (asleep|burned|confused|paralyzed|poisoned)$/,
+    new RegExp(String.raw`^if your opponent doesn't discard a card from their hand, your opponent's active pokémon is now (${CONDITION})$`),
     (m) => ({ type: 'atkOppDiscardOrCondition', condition: conditionList(m[1])[0] }),
   ],
   // Umbreon-EX Veil of Darkness: "Discard as many cards as you like from your hand. Then, draw
@@ -830,7 +829,7 @@ const TEMPLATES = [
   ],
   // Dark Wigglytuff [Neo Destiny 40] Slap Awake: "Then, the Defending Pokémon is no longer Asleep or Confused."
   [
-    /^your opponent's active pokémon is no longer ((?:asleep|burned|confused|paralyzed|poisoned)(?: or (?:asleep|burned|confused|paralyzed|poisoned))*)$/,
+    new RegExp(String.raw`^your opponent's active pokémon is no longer ((?:${CONDITION})(?: or (?:${CONDITION}))*)$`),
     (m) => ({ type: 'atkCureOppConditions', conditions: conditionList(m[1]) }),
   ],
 
@@ -896,8 +895,8 @@ const TEMPLATES = [
   [/^draw (a|an|\d+) cards?$/, (m) => ({ type: 'atkDraw', count: countOf(m[1]) })],
   [/^draw a number of cards equal to the number of cards in your opponent's hand$/, () => ({ type: 'atkDraw', countFrom: 'opponentHand' })],
   [
-    /^if your opponent's active pokémon is (asleep|paralyzed|poisoned|burned|confused), your opponent shuffles all energy from it into their deck$/,
-    (m) => ({ type: 'atkShuffleOppActiveEnergy', condition: m[1][0].toUpperCase() + m[1].slice(1) }),
+    new RegExp(String.raw`^if your opponent's active pokémon is (${CONDITION}), your opponent shuffles all energy from it into their deck$`),
+    (m) => ({ type: 'atkShuffleOppActiveEnergy', condition: capitalize(m[1]) }),
   ],
 
   // Damage counters
@@ -1081,7 +1080,7 @@ const TEMPLATES = [
 
   // Porygon2 Delta Beam: "choose whether … becomes Asleep, Confused, or Paralyzed"
   [
-    /^choose whether your opponent's active pokémon becomes ((?:asleep|burned|confused|paralyzed|poisoned)(?:,? (?:or )?(?:asleep|burned|confused|paralyzed|poisoned))+)$/,
+    new RegExp(String.raw`^choose whether your opponent's active pokémon becomes ((?:${CONDITION})(?:,? (?:or )?(?:${CONDITION}))+)$`),
     (m) => ({ type: 'atkChooseCondition', options: conditionList(m[1]) }),
   ],
 
@@ -1124,8 +1123,8 @@ const TEMPLATES = [
     () => ({ type: 'atkKnockOut', condition: 'specialCondition' }),
   ],
   [
-    /^if your opponent's active pokémon is (asleep|paralyzed|poisoned|burned|confused), (?:it|that pokémon) is knocked out$/,
-    (m) => ({ type: 'atkKnockOut', condition: m[1][0].toUpperCase() + m[1].slice(1) }),
+    new RegExp(String.raw`^if your opponent's active pokémon is (${CONDITION}), (?:it|that pokémon) is knocked out$`),
+    (m) => ({ type: 'atkKnockOut', condition: capitalize(m[1]) }),
   ],
   [
     /^if your opponent's active pokémon has exactly (\d+) damage counters on it, (?:it|that pokémon) is knocked out$/,
@@ -1231,10 +1230,8 @@ const TEMPLATES = [
   ...MARKER_TEMPLATES,
 ];
 
-const SPECIAL_CONDITIONS = ['Asleep', 'Burned', 'Confused', 'Paralyzed', 'Poisoned'];
-
 function conditionList(phrase) {
-  return phrase.match(/asleep|burned|confused|paralyzed|poisoned/g).map((c) => c[0].toUpperCase() + c.slice(1));
+  return phrase.match(new RegExp(CONDITION, 'g')).map(capitalize);
 }
 
 function energyFilter(symbol, sentence) {
@@ -1291,11 +1288,6 @@ const BLOCKS = [
   [
     /move all attached energy and pokémon tools from this pokémon to 1 of your benched pokémon\. then, discard this pokémon\./g,
     () => ({ type: 'atkMoveAttachedToBench' }),
-  ],
-  // Active-only doubling that stops at 10 HP remaining (effects/attack-steps.mjs atkDoubleCountersActive).
-  [
-    /double the number of damage counters on your opponent's active pokémon\. this attack can't leave it with less than 10 hp remaining\./g,
-    () => ({ type: 'atkDoubleCountersActive', hpFloor: 10 }),
   ],
   // Weavile Ransack: on at least one heads the opponent's hand is revealed, then the attacker
   // puts one revealed card per heads on the bottom of their deck.
@@ -1391,7 +1383,7 @@ const BLOCKS = [
   ],
   // Crobat BREAK Silent Bite ("… all cards attached to into your deck", sic).
   [
-    /you may leave your opponent's active pokémon (asleep|burned|confused|paralyzed|poisoned)\. if you do, shuffle this pokémon and all cards attached to (?:it )?into your deck\./g,
+    new RegExp(String.raw`you may leave your opponent's active pokémon (${CONDITION})\. if you do, shuffle this pokémon and all cards attached to (?:it )?into your deck\.`, 'g'),
     (m) => [
       { type: 'atkApplyCondition', condition: conditionList(m[1])[0], optional: true, cost: true },
       { type: 'atkShuffleSelf' },
