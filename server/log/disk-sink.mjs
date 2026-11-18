@@ -10,7 +10,7 @@ export function resolveLogDir(env, repoRoot) {
   return env.NODE_ENV !== 'production' ? path.join(repoRoot, 'out', 'logs') : null;
 }
 
-const fileNameOf = (streamId) => `${streamId.replace(/[^A-Za-z0-9._-]/g, '_')}.ndjson`;
+const fileStemOf = (streamId) => streamId.replace(/[^A-Za-z0-9._-]/g, '_');
 
 // Only folders this sink names itself (`<base36 time>-<pid>`) are ever removed: LOG_DIR can point
 // at a directory that holds other things.
@@ -41,7 +41,17 @@ export function createDiskSink({
 }) {
   const bootDir = path.join(dir, bootId);
   const streams = new Map(); // streamId -> { file, buffer: string[], written, disabled }
+  const fileOwners = new Map(); // file name -> streamId
   let allDisabled = false;
+
+  // The stem is lossy ('room:a b' and 'room:a_b' share one), so a second stream gets its own file.
+  function fileFor(streamId) {
+    const stem = fileStemOf(streamId);
+    let name = `${stem}.ndjson`;
+    for (let n = 2; fileOwners.has(name) && fileOwners.get(name) !== streamId; n++) name = `${stem}~${n}.ndjson`;
+    fileOwners.set(name, streamId);
+    return path.join(bootDir, name);
+  }
 
   function warn(info) {
     try {
@@ -109,7 +119,7 @@ export function createDiskSink({
       if (allDisabled) return;
       let s = streams.get(streamId);
       if (!s) {
-        s = { file: path.join(bootDir, fileNameOf(streamId)), buffer: [], written: 0, disabled: false, failed: false };
+        s = { file: fileFor(streamId), buffer: [], written: 0, disabled: false, failed: false };
         streams.set(streamId, s);
       }
       if (s.disabled) return;

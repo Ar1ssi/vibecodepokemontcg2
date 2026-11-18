@@ -11,22 +11,20 @@ export function summarizeCardHint(hint) {
   return parts.join(' ') || null;
 }
 
+// moveCardBundle's positional parameters, named once for both summarizers.
+function decodeMoveCard(parameters) {
+  const [initiator, from, to, index, targetIndex, action, cardHints] = parameters ?? [];
+  return { initiator, from, to, index, targetIndex, action, cardHints };
+}
+
 /** Trim moveCardBundle parameters for logging. */
 export function summarizeMoveCardParams(parameters) {
   if (!parameters?.length) return {};
-  const [
-    initiator,
-    oZoneId,
-    dZoneId,
-    index,
-    targetIndex,
-    action,
-    cardHints,
-  ] = parameters;
+  const { initiator, from, to, index, targetIndex, action, cardHints } = decodeMoveCard(parameters);
   return {
     initiator,
-    from: oZoneId,
-    to: dZoneId,
+    from,
+    to,
     index,
     targetIndex,
     action,
@@ -54,10 +52,10 @@ export function summarizeMoveParamsLine(parameters) {
 export function summarizeDecision(action, parameters = []) {
   switch (action) {
     case 'moveCardBundle': {
-      const [, from, to, , , subAction, hints] = parameters;
+      const { from, to, index, action: subAction, cardHints: hints } = decodeMoveCard(parameters);
       const moving = hints?.moving?.name || (hints?.moving?.syncInstance ?? '?');
       const target = hints?.target?.name ? ` →${hints.target.name}` : '';
-      return `${moving} ${from}[${parameters[3]}] ${subAction} →${to}${target}`;
+      return `${moving} ${from}[${index}] ${subAction} →${to}${target}`;
     }
     case 'attack':
       return `attack[${parameters[0] ?? 0}]`;

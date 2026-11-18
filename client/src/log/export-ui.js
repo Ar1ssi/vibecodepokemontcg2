@@ -1,12 +1,12 @@
 // Export, mark and verbose-logging controls (design 088 §6), plus the "A problem was logged." toast.
-import { LIMITS, LOG_FORMAT } from '../../../shared/log/log-schema.mjs';
+import { LIMITS, LOG_EVENTS, LOG_FORMAT, MARK_NOTE_MAX, isCaptureLevel } from '../../../shared/log/log-schema.mjs';
+import { LEGEND, alignedTs, clientSrc, exportNote, logFileName, timelineLine } from '../../../shared/log/export-format.mjs';
+import { isE2eMode } from '../setup/general/e2e-mode.mjs';
 import { clientId, clientRing, loadId, onEntry } from './client-log.js';
 import { buildSnapshot, buildSnapshotSync, preloadSnapshotModules, preloadedSnapshotModules } from './snapshot.js';
 
 const TOAST_VISIBLE_MS = 12000;
 const LABEL_REFRESH_DELAY_MS = 300;
-const NOTE_MAX = 500;
-const HEADER_NOTE_MAX = 2000;
 
 let socket = null;
 let shipping = null;
@@ -15,10 +15,6 @@ let win = null;
 let doc = null;
 let systemState = null;
 let lastToastAt = -Infinity;
-
-const shortSrc = () => `c:${clientId.slice(0, 8)}`;
-
-const utcStamp = (ms) => new Date(ms).toISOString().slice(0, 19).replace(/[-:]/g, '').replace('T', '-');
 
 function refreshLabel() {
   const el = doc?.getElementById('verboseLogging');
@@ -65,7 +61,7 @@ function showToast() {
 function maybeToast(entry) {
   const problem = entry.lvl === 'error' || (entry.cat === 'sync' && entry.ev === 'desync.detected');
   if (!problem) return;
-  if (win.location?.search?.includes('e2e=1') || win.location?.href?.includes('e2e=1')) return;
+  if (isE2eMode(win.location?.search ?? '', null, win.__PTCG_E2E_ALLOWED === true)) return;
   const at = Date.now();
   if (at - lastToastAt < LIMITS.toastMinMs) return;
   lastToastAt = at;
@@ -102,11 +98,11 @@ export function initExport({ socket: appSocket = null, shipping: shipper = null,
         systemState = state.systemState;
       })
       .catch((error) => log.warn('log', 'export.state_import_failed', { error }));
-    socket.on('log:snapshot', (payload, ack) => {
+    socket.on(LOG_EVENTS.snapshot, (payload, ack) => {
       if (typeof ack !== 'function') return;
       answerSnapshot(ack).catch(() => ack(null));
     });
-    socket.on('log:level', refreshLabelSoon);
+    socket.on(LOG_EVENTS.level, refreshLabelSoon);
   }
   onEntry(maybeToast);
   refreshLabel();
@@ -114,7 +110,7 @@ export function initExport({ socket: appSocket = null, shipping: shipper = null,
 }
 
 export async function exportLocal(note = '') {
-  const src = shortSrc();
+  const src = clientSrc(clientId);
   const offset = shipping?.state().offset ?? 0;
   const snapshot = await buildSnapshot();
   const header = {
@@ -122,7 +118,7 @@ export async function exportLocal(note = '') {
     format: LOG_FORMAT,
     partial: 'local-only',
     exportedAt: new Date().toISOString(),
-    note: String(note).slice(0, HEADER_NOTE_MAX),
+    note: exportNote(note),
     room: null,
     sources: [
       {
@@ -135,13 +131,13 @@ export async function exportLocal(note = '') {
         snapshot: 'ok',
       },
     ],
-    legend: { cli: 'node tools/log.mjs summary <file>' },
+    legend: { cli: LEGEND.cli },
   };
   const lines = [JSON.stringify(header), JSON.stringify({ k: 'snap', src, ...snapshot })];
   for (const entry of clientRing.toArray()) {
-    lines.push(`{"k":"e","ts":${entry.t + offset},"src":${JSON.stringify(src)},"load":${JSON.stringify(loadId)},${entry.line.slice(1)}`);
+    lines.push(timelineLine({ ts: alignedTs(entry.t, offset), src, load: loadId, line: entry.line }));
   }
-  const filename = `ptcg-log_local_${utcStamp(Date.now())}.ndjson`;
+  const filename = logFileName('local', Date.now());
   const url = URL.createObjectURL(new Blob([`${lines.join('\n')}\n`], { type: 'application/x-ndjson' }));
   try {
     download({ href: url, filename });
@@ -154,7 +150,7 @@ export async function exportLocal(note = '') {
 function requestServerExport(note) {
   return new Promise((resolve) => {
     socket.timeout(LIMITS.exportAckMs + LIMITS.snapshotTimeoutMs).emit(
-      'log:export',
+      LOG_EVENTS.export,
       { roomId: systemState?.roomId || null, note },
       (err, ack) => resolve({ err, ack })
     );
@@ -168,7 +164,7 @@ const NOT_NOW = new Set(['busy', 'too_soon']);
 /** @param {string | { note?: string }} [options] a note, or `{ note }` */
 export async function exportFullLog(options = {}) {
   const note = typeof options === 'string' ? options : (options?.note ?? '');
-  log.info('user', 'export.request', { note: String(note).slice(0, NOTE_MAX) });
+  log.info('user', 'export.request', { note: String(note).slice(0, MARK_NOTE_MAX) });
   if (!socket?.connected) return exportLocal(note);
   await shipping?.flushNow();
   const { err, ack } = await requestServerExport(note);
@@ -183,7 +179,7 @@ export async function exportFullLog(options = {}) {
 }
 
 export function markMoment(note = '') {
-  log.info('user', 'mark', { note: String(note).slice(0, NOTE_MAX) });
+  log.info('user', 'mark', { note: String(note).slice(0, MARK_NOTE_MAX) });
   shipping?.flushNow();
 }
 
@@ -192,8 +188,8 @@ export function markMoment(note = '') {
  * per client outside one) — a level set only locally would be reset by the next batch ack.
  */
 export function setVerbose(level) {
-  if (level !== 'debug' && level !== 'trace') return log.level();
-  if (socket?.connected) socket.emit('log:setLevel', { roomId: systemState?.roomId || null, level });
+  if (!isCaptureLevel(level)) return log.level();
+  if (socket?.connected) socket.emit(LOG_EVENTS.setLevel, { roomId: systemState?.roomId || null, level });
   else log.setLevel(level);
   refreshLabelSoon();
   return level;

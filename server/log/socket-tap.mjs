@@ -1,8 +1,8 @@
 // Socket.IO taps: every in/out event (through `summarizePayload`), connect/disconnect/error, and
 // room membership via the adapter. Handler bodies swallow errors so a tap never breaks a socket.
-import { summarizePayload } from '../../shared/log/payload-policy.mjs';
-
-const LOBBY_WATCHERS = 'lobby:watchers';
+import { LOBBY_WATCHERS } from '../../shared/log/log-schema.mjs';
+import { payloadLogFields, summarizePayload } from '../../shared/log/payload-policy.mjs';
+import { roomStreamId } from './log-store.mjs';
 
 // A payload's room id counts only when the socket is in that room: any other string (a typo, a
 // refused join, a hostile client) would open a room stream that nothing ever closes.
@@ -37,20 +37,9 @@ export function tapSocket(socket, { log, roomOf = defaultRoomOf, seatOf = () => 
   function record(direction, event, args) {
     const summary = summarizePayload(event, args);
     if (summary === null) return;
-    const { maxBytes, ...detail } = summary;
+    const { detail, envelope } = payloadLogFields(summary, args);
     const room = roomOf(socket, args[0]);
-    log.debug(
-      'socket',
-      `${direction}.${event}`,
-      { id, ...detail },
-      {
-        room,
-        seat: seatOf(id, room),
-        cs: Number.isInteger(args[0]?.clientSeq) ? args[0].clientSeq : undefined,
-        sv: detail.sv,
-        maxBytes,
-      }
-    );
+    log.debug('socket', `${direction}.${event}`, { id, ...detail }, { room, seat: seatOf(id, room), ...envelope });
   }
 
   try {
@@ -84,7 +73,7 @@ export function tapServer(io, { log, store, clientOf = () => null }) {
     'join-room',
     swallow((room, id) => {
       if (ignored(room, id)) return;
-      store.reopen(`room:${room}`);
+      store.reopen(roomStreamId(room));
       log.info('room', 'join', { id }, { room });
       const clientId = clientOf(id);
       if (typeof clientId === 'string') store.link(clientId, room, { socketId: id });
@@ -102,9 +91,9 @@ export function tapServer(io, { log, store, clientOf = () => null }) {
   adapter.on(
     'delete-room',
     swallow((room) => {
-      if (room === LOBBY_WATCHERS || !store.stream(`room:${room}`)) return;
+      if (room === LOBBY_WATCHERS || !store.stream(roomStreamId(room))) return;
       log.info('room', 'deleted', {}, { room });
-      store.close(`room:${room}`);
+      store.close(roomStreamId(room));
     })
   );
 }

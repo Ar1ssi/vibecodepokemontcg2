@@ -1,4 +1,4 @@
-import { summarizePayload } from '../../../shared/log/payload-policy.mjs';
+import { payloadLogFields, summarizePayload } from '../../../shared/log/payload-policy.mjs';
 
 export function tapClientSocket(socket, { log }) {
   const safe = (fn) => (...args) => {
@@ -12,12 +12,10 @@ export function tapClientSocket(socket, { log }) {
     safe((event, ...args) => {
       const summary = summarizePayload(event, args, { trace: log.enabled('trace') });
       if (!summary) return;
-      const { maxBytes, ...detail } = summary;
+      const { detail, envelope } = payloadLogFields(summary, args);
       log.debug('socket', `${direction}.${event}`, detail, {
         room: typeof args[0]?.roomId === 'string' ? args[0].roomId : undefined,
-        cs: Number.isInteger(args[0]?.clientSeq) ? args[0].clientSeq : undefined,
-        sv: detail.sv,
-        maxBytes,
+        ...envelope,
       });
     });
   const onIn = record('in');

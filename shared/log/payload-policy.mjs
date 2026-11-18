@@ -52,3 +52,13 @@ export function summarizePayload(event, rawArgs, { trace = false } = {}) {
   if (FULL.has(event)) return { bytes, maxBytes: LIMITS.relayDetailBytes, args };
   return { bytes, args };
 }
+
+/**
+ * Splits a summary into the entry's detail and the envelope fields every socket tap writes with
+ * it. The room and seat differ per side and stay with the tap.
+ */
+export function payloadLogFields(summary, args) {
+  const { maxBytes, ...detail } = summary;
+  const clientSeq = args?.[0]?.clientSeq;
+  return { detail, envelope: { cs: Number.isInteger(clientSeq) ? clientSeq : undefined, sv: detail.sv, maxBytes } };
+}
