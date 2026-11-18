@@ -34,12 +34,20 @@ import { isBabyPokemon } from '../rules/baby-rule.mjs';
 import { clearConditions, listConditions } from '../rules/special-conditions.mjs';
 import {
   benchTargets, activeAttackMarkers, inPlayView, cardText, ensureOncePerGame, isGameConcluded,
-  abilitySideContext, shuffleDeckWithRng, rootsIn,
+  abilitySideContext, shuffleDeckWithRng, rootsIn, cardEffectiveHp,
 } from './shared.mjs';
 import { onceAttackBlockReason, resolveAttacker, attackCostPayable } from './legality.mjs';
 import { resolveAttackEffectPhase } from './attack-effect.mjs';
 import { handleKnockout } from './knockout.mjs';
 import { resolveCheckup, advanceTurn } from './turn.mjs';
+
+/** The one face an attack's flips share (all heads, all tails, or the lone flip); null when mixed. */
+function singleFaceOf(flips, headsCount) {
+  if (flips.length === 1) return flips[0];
+  if (headsCount === flips.length) return 'heads';
+  if (headsCount === 0) return 'tails';
+  return null;
+}
 
 /**
  * Coin flips an attack's own printed text calls for, rolled from the command's RNG so a
@@ -78,18 +86,7 @@ export function flipAttackCoins(attack, rng, countOf = null) {
       : 0;
     const flips = Array.from({ length: count }, flip);
     const headsCount = flips.filter((f) => f === 'heads').length;
-    return {
-      coin:
-        count === 1
-          ? flips[0]
-          : headsCount === count
-            ? 'heads'
-            : headsCount === 0
-              ? 'tails'
-              : null,
-      headsCount,
-      flips,
-    };
+    return { coin: singleFaceOf(flips, headsCount), headsCount, flips };
   }
   // "Flip a coin until you get tails": every flip but the last is heads. No single face, so
   // only "for each heads" clauses read it. Capped like the printed count above.
@@ -1105,7 +1102,8 @@ export function attackCommand({ draft, playerId, payload, activeRng, events }) {
       });
 
       // Check if confused self-damage KO'd attacker
-      if (attackerView.hp && attacker.damage >= attackerView.hp) {
+      const effectiveHp = cardEffectiveHp(draft, attacker, playerId);
+      if (effectiveHp > 0 && attacker.damage >= effectiveHp) {
         handleKnockout(draft, {
           victimPlayerId: playerId,
           attackerPlayerId: oppId,
