@@ -25,15 +25,13 @@
       shouldAutoDrawAtTurnStart,
       markTurnDrawn,
       markMulligansResolved,
-      markAttacked,
       resetRulesSessionState,
       canUsePlayedToBenchTrigger,
       consumePlayedToBenchTrigger,
     } from '/shared/engine/rules/rules-state.mjs';
-    import { executeAttack, canPayAttackCost } from '/shared/engine/rules/attack-engine.mjs';
-    import { handleKO, checkWinConditions, occupiedZoneCount, resetPrizes, prizeState } from '/shared/engine/rules/ko-flow.mjs';
+    import { checkWinConditions, occupiedZoneCount, resetPrizes, prizeState } from '/shared/engine/rules/ko-flow.mjs';
 import { isPrismStarCard } from '/shared/engine/rules/card-classify.mjs';
-    import { applyStatus, parseStatusFromAttackText, resolveTurnBoundary, resetStatuses, clearStatuses } from '/shared/engine/rules/status.mjs';
+    import { resolveTurnBoundary, resetStatuses, clearStatuses } from '/shared/engine/rules/status.mjs';
 import { statusState } from '/shared/engine/rules/status.mjs';
 import { initTrainerExecution, runTrainerSteps, switchBenchToActive } from './trainer-execution.js';
 import { parseTrainerEffect, describeStep } from '/shared/engine/rules/trainer-effects.mjs';
@@ -55,12 +53,11 @@ function shouldEmitTurnStartDraw({ isTwoPlayer = false, turnPlayer = 'self' } = 
   if (!isTwoPlayer) return true;
   return turnPlayer === 'self';
 }
-import { canEvolve, markEvolvedThisTurn } from '/shared/engine/rules/evolution.mjs';
 import { parseAbility } from '/shared/engine/rules/abilities.mjs';
 import { shuffleZone } from '../../actions/zones/shuffle-zone.js';
-import { parseEndOfTurnEffect, parseWhenPlayedEffect, parseOpponentDiscard, isHandProtected, parseCheckupEffect, parseSetupFaceDown, parseOnOpponentEvolve, blocksItemPlay, combinedHandProtected } from '/shared/engine/rules/ability-executors.mjs';
+import { parseEndOfTurnEffect, parseWhenPlayedEffect, parseOpponentDiscard, parseCheckupEffect, parseSetupFaceDown, parseOnOpponentEvolve, combinedHandProtected } from '/shared/engine/rules/ability-executors.mjs';
 import { isStadiumCard, isStadiumHandProtect, effectiveHp, getStadiumCheckupPoisonBonus, stadiumBlocksToolEffects, isStadiumEnergyAttachHeal, stadiumExtraAttacksFromZone } from '/shared/engine/rules/stadium-effects.mjs';
-import { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, energyMatchesSearchWhat, isEnergyCard } from '/shared/engine/rules/energy-effects.mjs';
+import { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, isEnergyCard } from '/shared/engine/rules/energy-effects.mjs';
 import { isPokemonCard, matchesSearch, filterSearchMatches, matchesDiscardCost, isEnergyDiscardCost, searchPickerAllCandidates } from '/shared/engine/rules/search-match.mjs';
 import { maybeAnnounceSearchReveal, announceDiscardPick, shuffleDeckAfterSearch } from '/shared/engine/rules/search-reveal.mjs';
 import {
@@ -84,7 +81,7 @@ import {
 import { healAbility, switchAbility, attachAbility, energyRedirectAbility, statusAbility, moveDamageAbility, selfDamageAbility, moveDamageBetweenAbility, lookAtTopAbility, recursionAbility, evolveAbility } from '../../actions/chat-buttons/chat-buttons.js';
 import { hideCard } from '../../actions/general/reveal-and-hide.js';
 import { addDamageCounter, updateDamageCounter, removeDamageCounter } from '../../actions/counters/damage-counter.js';
-import { evaluateMulligans, bonusDrawsOwed } from '/shared/engine/rules/mulligan.mjs';
+import { evaluateMulligans } from '/shared/engine/rules/mulligan.mjs';
 import { draw } from '../../actions/zones/deck-actions.js';
 import { shuffleAndDraw, drawOpeningHand } from '../../actions/zones/hand-actions.js';
 import { e2eDelayMs, isE2eMode } from '../general/e2e-mode.mjs';
@@ -144,9 +141,6 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
     // arrives via the opponent's turnOrderCoinCall event (they clicked
     // Set Up first), so a late click on our side mirrors their call.
     let coinCallChoice = null;
-    // Who the caller is from our perspective ('self' unless the opponent
-    // clicked Set Up first and broadcast their call).
-    let coinCallCaller = 'self';
     // True while the heads/tails call picker is open.
     let coinCallPending = false;
     // True once both players have readied up and prizes are on the mat —
@@ -433,6 +427,16 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
       return occupiedZoneCount({ arrayCount: zone.getCount(), renderedCount: zone.getRenderedCount?.() });
     };
 
+    const readDamage = (card) => parseInt(card?.image?.damageCounter?.textContent || '0', 10) || 0;
+
+    // Puts `amount` more damage on the Pokémon at user/zoneId/index. addDamageCounter reads a
+    // falsy amount as 10, so a zero amount must never reach it.
+    const addDamage = (user, zoneId, index, card, amount) => {
+      if (!(amount > 0)) return;
+      if (card.image?.damageCounter) updateDamageCounter(user, zoneId, index, readDamage(card) + amount);
+      else addDamageCounter(user, zoneId, index, amount);
+    };
+
     export function evaluateAndApplyWinConditions(turnPlayer = rulesState.turnPlayer) {
       if (!rulesState.enabled || rulesState.phase === 'setup' || rulesState.phase === 'ended') {
         return false;
@@ -459,12 +463,11 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
         // they've acted. Withhold the check until then — otherwise the very first pass ends
         // the game.
         const bothHaveStarted = rulesState.turnNumber >= 3;
+        // Deck-out is not swept here: an empty deck loses only when the turn player must draw and cannot
+        // (reduce/turn.mjs), which checkDeckOut decides at rules-turn-began. Testing it here
+        // ended the game when a player merely drew their last card, or on the pass after.
         const win = checkWinConditions({
           activeCounts: bothHaveStarted && inGame.self && inGame.opp ? counts : null,
-          deckCounts: {
-            self: inGame.self ? getZone('self', 'deck').getCount() : 1,
-            opp: inGame.opp ? getZone('opp', 'deck').getCount() : 1,
-          },
           turnPlayer,
         });
         if (win.over) {
@@ -533,15 +536,7 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
                       ) {
                         continue;
                       }
-                      const existing = parseInt(
-                        target.image?.damageCounter?.textContent || '0',
-                        10
-                      ) || 0;
-                      if (target.image?.damageCounter) {
-                        updateDamageCounter(targetPlayer, targetZone, tIdx, existing + checkup.count, true);
-                      } else {
-                        addDamageCounter(targetPlayer, targetZone, tIdx, checkup.count, true);
-                      }
+                      addDamage(targetPlayer, targetZone, tIdx, target, checkup.count);
                     }
                   }
                 }
@@ -559,14 +554,7 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
             const boundary = resolveTurnBoundary(endingPlayer, key, Math.random, {
               checkupPoisonBonus: getStadiumCheckupPoisonBonus(active, endingPlayer),
             });
-            if (boundary.damage > 0) {
-              const current = parseInt(active.image?.damageCounter?.textContent || '0', 10) || 0;
-              if (active.image?.damageCounter) {
-                updateDamageCounter(endingPlayer, 'active', 0, current + boundary.damage, true);
-              } else {
-                addDamageCounter(endingPlayer, 'active', 0, boundary.damage, true);
-              }
-            }
+            addDamage(endingPlayer, 'active', 0, active, boundary.damage);
             for (const note of boundary.notes) {
               appendMessage('', note, 'announcement', false);
             }
@@ -636,13 +624,7 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
                   for (const plan of plans) {
                     if (plan.action !== 'addDamage') continue;
                     const amount = plan.count * 10;
-                    const current =
-                      parseInt(host.image?.damageCounter?.textContent || '0', 10) || 0;
-                    if (host.image?.damageCounter) {
-                      updateDamageCounter(player, zoneId, i, current + amount, true);
-                    } else {
-                      addDamageCounter(player, zoneId, i, amount, true);
-                    }
+                    addDamage(player, zoneId, i, host, amount);
                     appendMessage(
                       '',
                       `⏰ End of turn: ${plan.count} damage counter(s) on ${host.name || 'a Pokémon'} (${energy.name}).`,
@@ -768,7 +750,6 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
       turnEndedByAttack = false;
       flipSuperseded = false;
       coinCallChoice = null;
-      coinCallCaller = 'self';
       coinCallPending = false;
       coinFlipPending = false;
       openingSetupReadyForCoinFlip = false;
@@ -1015,7 +996,6 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
           // forever; a legal deck draws a hand with a Basic within a couple
           // of mulligans, so this is generous headroom.
           const MAX_ROUNDS = 10;
-          let anyMulligans = false;
 
           for (let round = 0; round < MAX_ROUNDS; round++) {
             if (session !== rulesSessionGeneration) return;
@@ -1038,7 +1018,6 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
 
             // Both local hands legal — done.
             if (!selfMulliganned && !oppMulliganned) break;
-            anyMulligans = true;
 
             for (const step of steps) {
               if (step.mulligan) {
@@ -1707,8 +1686,7 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
             const bench = getZone(user, 'bench');
             const idx = bench.array.indexOf(pokemon);
             if (idx < 0) return;
-            const current =
-              parseInt(pokemon.image?.damageCounter?.textContent || '0', 10) || 0;
+            const current = readDamage(pokemon);
             if (current <= 0) return;
             if (current - 10 <= 0) removeDamageCounter(user, 'bench', idx);
             else updateDamageCounter(user, 'bench', idx, current - 10);
@@ -1742,8 +1720,7 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
           const hostZone = getZone(user, hostZoneId);
           const hostIndex = hostZone?.array ? hostZone.array.indexOf(pokemon) : -1;
           const statusKey = pokemon.image?.dataset?.cardId || pokemon.name;
-          const currentDamage = () =>
-            parseInt(pokemon.image?.damageCounter?.textContent || '0', 10) || 0;
+          const currentDamage = () => readDamage(pokemon);
           const setDamage = (value) => {
             if (hostIndex < 0) return;
             const v = Math.max(0, value);
@@ -1920,8 +1897,8 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
                 break;
             }
           }
-        } catch {
-          /* card data may not be ready */
+        } catch (error) {
+          console.warn('rules-bridge: special-energy attach effects failed', error);
         }
       });
     };
@@ -1933,26 +1910,12 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
     const turnAutomation = () => {
       let lastProcessedTurn = -1;
     
-      const drawCard = (player) => {
-        try {
-          const deck = getZone(player, 'deck');
-          const hand = getZone(player, 'hand');
-          if (deck.getCount() > 0) {
-            // moveCardBundle(user, initiator, fromZone, toZone, index, targetIndex, action)
-            import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
-              moveCardBundle(player, player, 'deck', 'hand', 0, false, 'move');
-            });
-            return true;
-          }
-          return false;
-        } catch {
-          return false;
-        }
-      };
-    
       const checkDeckOut = () => {
         if (!rulesState.enabled || rulesState.phase === 'ended') return;
         if (rulesState.phase !== 'main') return;
+        // advanceTurn ends the game itself on an empty deck (reduce/turn.mjs); the view it
+        // sends arrives already drawn, so a local count here would call the last draw a loss.
+        if (systemState.serverAuthoritative) return;
 
         // auto-draw once per new turn for the turn player (skip turn 1's
         // opening hand — setup handles that)
@@ -1989,8 +1952,7 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
               if (!zone?.array) continue;
               for (const card of zone.array) {
                 if (!card?.image || card.__rulesKODetected) continue;
-                const dmgText = card.image.damageCounter?.textContent || '0';
-                const damage = parseInt(dmgText, 10) || 0;
+                const damage = readDamage(card);
                 if (damage <= 0 || !card.hp) continue;
                 await ensureCardData(card);
                 const effHp = effectiveHp(card.hp, player, card, zone.array);
@@ -2039,8 +2001,6 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
                   const destinationLabel =
                     koDestination === 'lostZone' ? 'the Lost Zone' : koDestination === 'hand' ? 'your hand' : 'discard';
                   appendMessage('', `💀 ${who} ${card.name || 'Pokémon'} has ${damage}/${effHp} damage — KO! Move it to ${destinationLabel}${zoneId === 'active' ? ' and promote a new Active' : ''}.`, 'announcement', false);
-    
-                  playAttackFeedback(true);
     
                   // Auto-discard the KO'd Pokémon — but ONLY on the side that
                   // actually owns this zone. This loop runs on BOTH clients,
@@ -2412,7 +2372,7 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
           const i = zone.array.indexOf(cand);
           if (i >= 0) { zoneId = z; idx = i; break; }
         }
-        const current = parseInt(cand.image?.damageCounter?.textContent || '0', 10) || 0;
+        const current = readDamage(cand);
         if (!zoneId || current === 0) {
           appendMessage('', `  ${cand.name} has no damage to heal`, 'announcement', false);
           return;
@@ -2511,8 +2471,6 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
               // their call instead of picking its own.
               coinCallChoice =
                 data.call === 'heads' || data.call === 'tails' ? data.call : null;
-              // sender's 'self' means THEY are the caller → 'opp' from ours
-              coinCallCaller = data.caller === 'self' ? 'opp' : 'self';
               // If our call picker happens to be open (both clicked at once),
               // close it — the caller's call is authoritative.
               if (coinCallPending) {
@@ -2579,12 +2537,6 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
       }, 500);
     };
     
-    
-    // ── attack/KO visual feedback ────────────────────────────────────────
-    const playAttackFeedback = () => {
-      // TCG Live style: no board shake — feedback is card-level only
-      // (KO pulse is applied directly on the knocked-out card image)
-    };
     
     // ── game-over banner ──────────────────────────────────────────────────
     const buildEndScreen = () => {
@@ -2782,16 +2734,7 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
         ran = true;
       } else if (effect?.kind === 'damage') {
         const oppActive = getZone('opp', 'active').array[0];
-        const existing = parseInt(oppActive?.image?.damageCounter?.textContent || '0', 10) || 0;
-        if (oppActive?.image) {
-          if (existing) {
-            const { updateDamageCounter } = await import('../../actions/counters/damage-counter.js');
-            updateDamageCounter('opp', 'active', 0, existing + effect.n);
-          } else {
-            const { addDamageCounter } = await import('../../actions/counters/damage-counter.js');
-            addDamageCounter('opp', 'active', 0, effect.n);
-          }
-        }
+        if (oppActive?.image) addDamage('opp', 'active', 0, oppActive, effect.n);
         appendMessage('', `  auto: when played — placed ${effect.n} damage counter(s) on opponent's Active`, 'announcement', false);
         ran = true;
       }
@@ -2840,13 +2783,7 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
         const damage = counters * 10;
         const applyDamage = async (pick) => {
           const { card: target, zone, idx } = pick;
-          if (target.image?.damageCounter) {
-            const current =
-              parseInt(target.image.damageCounter.textContent || '0', 10) || 0;
-            updateDamageCounter(oppPlayer, zone, idx, current + damage, true);
-          } else {
-            addDamageCounter(oppPlayer, zone, idx, damage, true);
-          }
+          addDamage(oppPlayer, zone, idx, target, damage);
           appendMessage(
             '',
             `⬆️ ${card.name} — ${promo.guidance}`,
@@ -2918,7 +2855,7 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
         if (c?.type === 'Pokémon') candidates.push(c);
       }
       const damaged = candidates.filter(
-        (c) => (parseInt(c.image?.damageCounter?.textContent || '0', 10) || 0) > 0
+        (c) => readDamage(c) > 0
       );
       if (damaged.length === 0) {
         appendMessage('', `  ${source.name}: no damaged Pokémon to heal`, 'announcement', false);
@@ -3433,16 +3370,7 @@ if (!isTrainer) {
             const tZone = getZone(evolvingPlayer, zoneId);
             const tIdx = tZone.array.findIndex((c) => c.image === evolvedCard.image);
             if (tIdx < 0) return;
-            const existing =
-              parseInt(
-                evolvedCard.image?.damageCounter?.textContent || '0',
-                10
-              ) || 0;
-            if (evolvedCard.image?.damageCounter) {
-              evolvedCard.image.damageCounter.textContent = existing + trigger.count;
-            } else {
-              addDamageCounter(evolvingPlayer, zoneId, tIdx, trigger.count);
-            }
+            addDamage(evolvingPlayer, zoneId, tIdx, evolvedCard, trigger.count);
             appendMessage(
               '',
               `⚡ ${source.name}: ${trigger.count} damage counter(s) on evolved ${evolvedCard.name}!`,
@@ -3475,12 +3403,11 @@ if (!isTrainer) {
           });
           for (const plan of plans) {
             if (plan.action !== 'heal') continue;
-            const current =
-              parseInt(evolvedCard.image?.damageCounter?.textContent || '0', 10) || 0;
+            const current = readDamage(evolvedCard);
             if (current <= 0) continue;
             const next = Math.max(0, current - plan.amount);
             if (next <= 0) removeDamageCounter(evolvingPlayer, zoneId, idx);
-            else updateDamageCounter(evolvingPlayer, zoneId, idx, next, true);
+            else updateDamageCounter(evolvingPlayer, zoneId, idx, next);
             appendMessage(
               '',
               `💚 ${evolvedCard.name}: healed ${plan.amount} on evolve (${energy.name}).`,
@@ -3594,9 +3521,6 @@ if (!isTrainer) {
         }
       });
     };
-    
-    const escapeHtml = (v = '') => String(v)
-      .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
     
     const toastRulesBlocked = (reason) => {
       appendMessage('', `⛔ ${reason}`, 'announcement', false);
