@@ -13,6 +13,7 @@
 
 import { extractTcgdexIdFromImageUrl } from '../../../../../shared/engine/rules/legacy-set-ids.mjs';
 import { cardArtImageParts } from '../../../../../shared/tcgdex/card-art.mjs';
+import { tcgdexLookupId } from '../../../../../shared/tcgdex/tcgdex-url.mjs';
 import { foilCoverage, foilRecordFor } from '../../foil/tcgl-foil-manifest.mjs';
 import { foilManifestNow } from '../../foil/tcgl-foil-store.js';
 import { deferTcglFoil, mountTcglFoil } from '../../foil/tcgl-foil-view.js';
@@ -69,35 +70,32 @@ const GOLD_STAR_NAME = /\u2605/;
 // Energy cards have no art window, so reverse-holo energy gets its own value.
 // It still ends in "reverse holo", so the shared [data-rarity$="reverse holo"]
 // rules apply and reverse-holo.css only overrides the clip and strength.
+// A card record is either flat or wraps the printed fields in `data`.
+const cardField = (card, field) => card?.[field] || card?.data?.[field];
+
+const cardKinds = (card) => [
+  card.supertype,
+  card.category,
+  card.type,
+  card?.data?.supertype,
+  card?.data?.category,
+];
+
 export const isTrainerCard = (card) => {
   if (!card) return false;
-  const kinds = [
-    card.supertype,
-    card.category,
-    card.type,
-    card?.data?.supertype,
-    card?.data?.category,
-  ];
-  return kinds.some((kind) => /^trainer$/i.test(String(kind || '')));
+  return cardKinds(card).some((kind) => /^trainer$/i.test(String(kind || '')));
 };
 
 const isEnergyCard = (card) => {
-  const kinds = [
-    card.supertype,
-    card.category,
-    card.type,
-    card?.data?.supertype,
-    card?.data?.category,
-  ];
-  if (kinds.some((kind) => /energy/i.test(String(kind || '')))) return true;
-  return /\benergy$/i.test(String(card.name || card?.data?.name || '').trim());
+  if (cardKinds(card).some((kind) => /energy/i.test(String(kind || '')))) return true;
+  return /\benergy$/i.test(String(cardField(card, 'name') || '').trim());
 };
 
 export function resolveHoloEffect(card = {}) {
   const effect = resolveRarityEffect(card);
   if (effect === 'reverse holo' && isEnergyCard(card))
     return 'energy reverse holo';
-  const name = String(card.name || card?.data?.name || '').trim();
+  const name = String(cardField(card, 'name') || '').trim();
   if (effect === 'rare holo' && GOLD_STAR_NAME.test(name)) return 'gold star';
   // VMAX foil is rainbow glitter over the whole card, not the V texture.
   if (effect === 'rare holo' && /(?:^|\s)vmax$/i.test(name)) return 'vmax rare';
@@ -112,9 +110,7 @@ export function resolveHoloEffect(card = {}) {
 // every card while the manifest is not loaded — keep the CSS holo above.
 export const TCGL_FOIL_RARITY = 'tcgl';
 
-// The set browser's reverse-holo copies carry `<tcgdex id>-reverse` (set-browser buildReverseHoloEnergyCard).
-const REVERSE_ID_SUFFIX = /-reverse$/i;
-
+// The set browser's reverse-holo copies carry `<tcgdex id>-reverse`; tcgdexLookupId strips it.
 const cardIdCandidates = (card) =>
   [
     card?.id,
@@ -122,7 +118,7 @@ const cardIdCandidates = (card) =>
     extractTcgdexIdFromImageUrl(card?.image?.src ?? card?.imageUrl ?? card?.src),
   ]
     .filter(Boolean)
-    .map((id) => String(id).replace(REVERSE_ID_SUFFIX, ''));
+    .map((id) => tcgdexLookupId(String(id)));
 
 // BW through SV (gens 5–9) Pokémon and Trainers that TCG Live prints NonFoil but also prints as a reverse
 // holo show the reverse printing in place of the plain one (user call, 2026-10-18). Main and special sets
@@ -172,7 +168,7 @@ export function resolveFoilEffect(card = {}, manifest = foilManifestNow()) {
 }
 
 function resolveRarityEffect(card) {
-  const rarity = String(card.rarity || card?.data?.rarity || '').trim();
+  const rarity = String(cardField(card, 'rarity') || '').trim();
   if (!rarity) return null;
   if (RARITY_EFFECTS[rarity]) return RARITY_EFFECTS[rarity];
   const lower = rarity.toLowerCase();
@@ -323,11 +319,15 @@ const LAYOUT_BY_SERIES = {
   fut: 'swsh',
 };
 
-const eraFromCode = (code) => {
+// The leading letters of a series code ("hgss", "dp"), when `table` knows them.
+const knownSeriesLetters = (code, table) => {
   const series = /^[a-z]+/.exec(String(code || '').toLowerCase())?.[0];
-  return series && Object.hasOwn(ERA_BY_SERIES, series)
-    ? ERA_BY_SERIES[series]
-    : null;
+  return series && Object.hasOwn(table, series) ? series : null;
+};
+
+const eraFromCode = (code) => {
+  const series = knownSeriesLetters(code, ERA_BY_SERIES);
+  return series ? ERA_BY_SERIES[series] : null;
 };
 
 // Splits a known card image URL into its series, set and card number.
@@ -372,21 +372,14 @@ export function cardEraFromImageUrl(src) {
 }
 
 export function cardLayoutFromImageUrl(src) {
-  const series = /^[a-z]+/.exec(
-    String(cardImageParts(src)?.series || '').toLowerCase()
-  )?.[0];
-  return series && Object.hasOwn(LAYOUT_BY_SERIES, series)
-    ? LAYOUT_BY_SERIES[series]
-    : null;
+  const series = knownSeriesLetters(cardImageParts(src)?.series, LAYOUT_BY_SERIES);
+  return series ? LAYOUT_BY_SERIES[series] : null;
 }
 
 // The leading letters of the series code ("hgss", "dp", "base"), for foil
 // patterns that changed within one layout era. Null when the series is unknown.
 export function cardSeriesFromImageUrl(src) {
-  const series = /^[a-z]+/.exec(
-    String(cardImageParts(src)?.series || '').toLowerCase()
-  )?.[0];
-  return series && Object.hasOwn(ERA_BY_SERIES, series) ? series : null;
+  return knownSeriesLetters(cardImageParts(src)?.series, ERA_BY_SERIES);
 }
 
 // The lowercase set code ("base1", "ex5"), for foil patterns used by only one
