@@ -30,6 +30,7 @@ import {
     } from '../../../setup/deck-builder/core/deck-sprites.mjs';
     import { resolveDisplaySprites } from '../../../setup/deck-builder/core/card-sprites.mjs';
     import { renderDeckSprites } from './native-deck-builder-renderers.js';
+    import { sideOf } from './native-deck-builder-shared-logic.js';
     import {
       getStarterDeckCatalog,
       getStarterDecks,
@@ -272,7 +273,7 @@ import {
         reload();
         const cards = getDeckFromLibrary(library, deckId);
         if (!cards) return;
-        const key = target === 'opp' ? 'opp' : 'self';
+        const key = sideOf(target);
         activeDeckIds[key] = deckId;
         baselines[key] = deckCardsKey(cards);
         closePicker();
@@ -420,7 +421,7 @@ import {
       // Cosmetic setters: re-read, then write only this deck's field.
       const setActiveField = (target, value, setField, { silent = true } = {}) => {
         reload();
-        const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+        const activeId = activeDeckIds[sideOf(target)];
         if (!activeId || !library?.decks?.[activeId]) return false;
         commit(setField(library, activeId, value), { silent });
         return true;
@@ -432,7 +433,7 @@ import {
           render();
         },
         setTarget: (target) => {
-          currentTarget = target === 'opp' ? 'opp' : 'self';
+          currentTarget = sideOf(target);
           render();
         },
         /** Opens a saved deck into the editor, as picking it from My Decks does. */
@@ -465,7 +466,7 @@ import {
           return deckId;
         },
         setActiveDeck: (target, deckId) => {
-          const key = target === 'opp' ? 'opp' : 'self';
+          const key = sideOf(target);
           activeDeckIds[key] = deckId || null;
           const cards = deckId ? getDeckFromLibrary(library, deckId) : null;
           baselines[key] = cards ? deckCardsKey(cards) : null;
@@ -483,41 +484,41 @@ import {
         // Suggest-tab steering (design 069); false when no saved deck is loaded.
         setActiveSuggestPrefs: (target, prefs) => setActiveField(target, prefs, setDeckSuggestPrefs),
         getActiveSuggestPrefs: (target) => {
-          const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+          const activeId = activeDeckIds[sideOf(target)];
           return activeId && library?.decks?.[activeId] ? getDeckSuggestPrefs(library, activeId) : null;
         },
         getActiveWallpaper: (target) => {
-              const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+              const activeId = activeDeckIds[sideOf(target)];
               return activeId && library?.decks?.[activeId]
                 ? library.decks[activeId].wallpaperId || null
                 : null;
             },
         getActiveSprites: (target) => {
-              const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+              const activeId = activeDeckIds[sideOf(target)];
               return activeId && library?.decks?.[activeId]
                 ? normalizeDeckSprites(library.decks[activeId].sprites)
                 : [];
             },
             getActiveDeckName: (target) => {
-          const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+          const activeId = activeDeckIds[sideOf(target)];
           return activeId && library?.decks?.[activeId]
             ? library.decks[activeId].name || null
             : null;
         },
         getActiveSleeve: (target) => {
-              const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+              const activeId = activeDeckIds[sideOf(target)];
               return activeId && library?.decks?.[activeId] ? library.decks[activeId].sleeveId || null : null;
             },
         getActiveCoin: (target) => {
-              const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+              const activeId = activeDeckIds[sideOf(target)];
               return activeId && library?.decks?.[activeId] ? library.decks[activeId].coinId || null : null;
             },
         getActiveMat: (target) => {
-              const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+              const activeId = activeDeckIds[sideOf(target)];
               return activeId && library?.decks?.[activeId] ? library.decks[activeId].matId || null : null;
             },
         getActiveDeckBox: (target) => {
-              const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+              const activeId = activeDeckIds[sideOf(target)];
               return activeId && library?.decks?.[activeId] ? library.decks[activeId].deckBoxId || null : null;
             },
             saveActiveDeck: (cards) => {
@@ -585,12 +586,12 @@ import {
         // 'build-battle' for Build & Battle decks, null otherwise: a Standard record must leave
         // room for detectDeckFormat to spot a Pocket deck (design 051, slice 2 pin).
         getActiveDeckFormat: (target) => {
-          const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+          const activeId = activeDeckIds[sideOf(target)];
           const format = activeId ? getDeckFormat(library, activeId) : null;
           return format === DECK_FORMAT_BUILD_BATTLE ? format : null;
         },
         getActiveDeckId: (target) =>
-          activeDeckIds[target === 'opp' ? 'opp' : 'self'] ??
+          activeDeckIds[sideOf(target)] ??
           activeDeckIds[currentTarget],
         getLibrary: () => library,
       };

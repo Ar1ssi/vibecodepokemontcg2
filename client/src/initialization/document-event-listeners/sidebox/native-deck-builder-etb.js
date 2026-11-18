@@ -47,6 +47,7 @@ import {
 import { buildModernBasicEnergy } from '../../../setup/deck-builder/core/modern-energy.mjs';
 import { loadCoinCatalog } from '../../../setup/deck-builder/core/coins.mjs';
 import { loadSleeveCatalog } from '../../../setup/deck-builder/core/sleeves.mjs';
+import { cardImage } from './native-deck-builder-shared-logic.js';
 import { createStage } from './native-deck-builder-stage.js';
 import { mountUnboxingScene } from './native-deck-builder-unboxing.js';
 
@@ -81,9 +82,6 @@ const el = (tag, className, text) => {
   if (text !== undefined) node.textContent = text;
   return node;
 };
-
-const cardImage = (card, size = 'small') =>
-  card?.images?.[size] || card?.images?.small || card?.image || '';
 
 const LOADING_TEXT = 'Loading the card data…';
 const LOAD_FAILED_TEXT = 'The card data could not be loaded. Reload the page to try again.';
