@@ -3,6 +3,7 @@ import { flipCoin } from '../../../actions/general/flip-coin.js';
 import { systemState } from '../../../state.js';
 import { refreshBoardImages } from '../../../setup/sizing/refresh-board.js';
 import { wireButtonCues } from '../../../setup/netcode/mat-fx/ui-cue.mjs';
+import { notifyMatResized } from './mat-resize.js';
 
 // Lets the player drag the Pass/Coin/Flip/Refresh/Fullscreen row anywhere
 // on screen. Position persists across reloads via localStorage so it stays
@@ -11,10 +12,19 @@ const DRAG_POSITION_KEY = 'boardButtonContainerPosition';
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
-const applyStoredDragPosition = (container) => {
-  const stored = localStorage.getItem(DRAG_POSITION_KEY);
-  if (!stored) return;
+// Storage can throw (blocked site data, private windows, quota); the row then just doesn't persist.
+const storeDragPosition = (left, top) => {
   try {
+    localStorage.setItem(DRAG_POSITION_KEY, JSON.stringify({ left, top }));
+  } catch {
+    // Position stays session-only.
+  }
+};
+
+const applyStoredDragPosition = (container) => {
+  try {
+    const stored = localStorage.getItem(DRAG_POSITION_KEY);
+    if (!stored) return;
     const { left, top } = JSON.parse(stored);
     if (typeof left !== 'number' || typeof top !== 'number') return;
     const rect = container.getBoundingClientRect();
@@ -23,14 +33,14 @@ const applyStoredDragPosition = (container) => {
     container.style.right = 'auto';
     container.style.transform = 'none';
   } catch {
-    // Ignore corrupt stored position; fall back to the CSS default.
+    // Unreadable storage or a corrupt stored position: fall back to the CSS default.
   }
 };
 
 // Once the row has been dragged, it sits at a fixed pixel position and
 // stops tracking the mat's right edge. The side menu (and fullscreen)
-// toggles resize #battleMat and fire a 'resize' event 260ms later — reuse
-// that to slide the dragged row along with the mat edge instead of leaving
+// toggles resize #battleMat and fire a 'resize' event once the transition
+// settles (notifyMatResized) — reuse that to slide the dragged row along with the mat edge instead of leaving
 // it stranded on top of the mat or floating in empty space.
 const trackMatEdgeForDraggedPosition = (container) => {
   const battleMat = document.getElementById('battleMat');
@@ -48,10 +58,7 @@ const trackMatEdgeForDraggedPosition = (container) => {
     const rect = container.getBoundingClientRect();
     const newLeft = clamp(rect.left + delta, 0, window.innerWidth - rect.width);
     container.style.left = `${newLeft}px`;
-    localStorage.setItem(
-      DRAG_POSITION_KEY,
-      JSON.stringify({ left: newLeft, top: parseFloat(container.style.top) })
-    );
+    storeDragPosition(newLeft, parseFloat(container.style.top));
   });
 };
 
@@ -101,12 +108,9 @@ const initializeBoardButtonDrag = () => {
   const stopDragging = (event) => {
     if (!dragging) return;
     dragging = false;
-    localStorage.setItem(
-      DRAG_POSITION_KEY,
-      JSON.stringify({
-        left: parseFloat(container.style.left),
-        top: parseFloat(container.style.top),
-      })
+    storeDragPosition(
+      parseFloat(container.style.left),
+      parseFloat(container.style.top)
     );
     if (container.hasPointerCapture(event.pointerId)) {
       container.releasePointerCapture(event.pointerId);
@@ -147,7 +151,7 @@ export const initializeBoardButtons = () => {
     // Toggle the CSS class on body and html for layout adjustments
     document.body.classList.toggle('sidebox-hidden', isVisible);
     document.documentElement.classList.toggle('sidebox-hidden', isVisible);
-    window.setTimeout(() => window.dispatchEvent(new Event('resize')), 260);
+    notifyMatResized();
 
     // Toggle background position based on sidebox visibility
     if (isVisible) {

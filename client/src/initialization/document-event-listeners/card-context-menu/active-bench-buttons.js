@@ -13,82 +13,56 @@ import { openAttachedCardsPanel } from '../../../setup/image-logic/full-view.js'
 import { dispatchServerCardMenu } from '../../../setup/netcode/manual-card-dispatch.js';
 import { mouseClick, systemState } from '../../../state.js';
 
-export const initializeActiveAndBenchButtons = () => {
-  const damageCounterButton = document.getElementById('damageCounterButton');
-  damageCounterButton.addEventListener('click', () => {
-    if (dispatchServerCardMenu('damageCounterButton')) return;
-    addDamageCounter(
-      mouseClick.cardUser,
-      mouseClick.zoneId,
-      mouseClick.cardIndex
-    );
+// A menu button acts through the server when the selected card is server-drawn
+// (dispatchServerCardMenu), and runs its legacy local action otherwise.
+const onMenuButton = (buttonId, localAction) => {
+  document.getElementById(buttonId).addEventListener('click', () => {
+    if (dispatchServerCardMenu(buttonId)) return;
+    localAction();
   });
+};
 
-  const specialConditionButton = document.getElementById(
-    'specialConditionButton'
+const changeSelectedCardType = (type) =>
+  changeType(
+    mouseClick.cardUser,
+    systemState.initiator,
+    mouseClick.zoneId,
+    mouseClick.cardIndex,
+    type
   );
-  specialConditionButton.addEventListener('click', () => {
-    if (dispatchServerCardMenu('specialConditionButton')) return;
+
+// With a counter already on the card the button removes it; otherwise it uses the ability.
+const removeAbilityCounterOrUseAbility = () => {
+  if (mouseClick.card?.image?.abilityCounter) {
+    mouseClick.card.image.abilityCounter.handleRemove();
+    return;
+  }
+  useAbility(
+    mouseClick.cardUser,
+    systemState.initiator,
+    mouseClick.zoneId,
+    mouseClick.cardIndex,
+    true,
+    undefined,
+    mouseClick.cardInstanceId
+  );
+};
+
+export const initializeActiveAndBenchButtons = () => {
+  onMenuButton('damageCounterButton', () =>
+    addDamageCounter(mouseClick.cardUser, mouseClick.zoneId, mouseClick.cardIndex)
+  );
+  onMenuButton('specialConditionButton', () =>
     addSpecialCondition(
       mouseClick.cardUser,
       mouseClick.zoneId,
       mouseClick.cardIndex
-    );
-  });
-
-  const abilityCounterButton = document.getElementById('abilityCounterButton');
-  abilityCounterButton.addEventListener('click', () => {
-    if (dispatchServerCardMenu('abilityCounterButton')) return;
-    if (mouseClick.card?.image?.abilityCounter) {
-      mouseClick.card.image.abilityCounter.handleRemove();
-    } else {
-      useAbility(
-        mouseClick.cardUser,
-        systemState.initiator,
-        mouseClick.zoneId,
-        mouseClick.cardIndex,
-        true,
-        undefined,
-        mouseClick.cardInstanceId
-      );
-    }
-  });
-
-  const changeToEnergyButton = document.getElementById('changeToEnergyButton');
-  changeToEnergyButton.addEventListener('click', () => {
-    if (dispatchServerCardMenu('changeToEnergyButton')) return;
-    changeType(
-      mouseClick.cardUser,
-      systemState.initiator,
-      mouseClick.zoneId,
-      mouseClick.cardIndex,
-      'Energy'
-    );
-  });
-  const changeToToolButton = document.getElementById('changeToToolButton');
-  changeToToolButton.addEventListener('click', () => {
-    if (dispatchServerCardMenu('changeToToolButton')) return;
-    changeType(
-      mouseClick.cardUser,
-      systemState.initiator,
-      mouseClick.zoneId,
-      mouseClick.cardIndex,
-      'Trainer'
-    );
-  });
-  const changeToPokémonButton = document.getElementById(
-    'changeToPokémonButton'
+    )
   );
-  changeToPokémonButton.addEventListener('click', () => {
-    if (dispatchServerCardMenu('changeToPokémonButton')) return;
-    changeType(
-      mouseClick.cardUser,
-      systemState.initiator,
-      mouseClick.zoneId,
-      mouseClick.cardIndex,
-      'Pokémon'
-    );
-  });
+  onMenuButton('abilityCounterButton', removeAbilityCounterOrUseAbility);
+  onMenuButton('changeToEnergyButton', () => changeSelectedCardType('Energy'));
+  onMenuButton('changeToToolButton', () => changeSelectedCardType('Trainer'));
+  onMenuButton('changeToPokémonButton', () => changeSelectedCardType('Pokémon'));
 
   // View the play-container panel (Pokémon + attached cards in a row).
   const viewAttachedCardsButton = document.getElementById(

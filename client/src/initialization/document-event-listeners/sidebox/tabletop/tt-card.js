@@ -24,6 +24,9 @@ const FOIL_SURFACE_BY_MODE = Object.freeze({
   5: [0.45, 0.2, 0.15],
 });
 const PATTERN = Object.freeze({ none: 0, sheen: 1, starlight: 2, cosmos: 3, etched: 4, glitter: 5, swirl: 6 });
+// What a face shows before its printed texture loads: the card-back blue.
+const CARD_BACK_BLUE = 0x1d3f8f;
+const faceTint = (map) => (map ? 0xffffff : CARD_BACK_BLUE);
 
 const FOIL_HEAD = /* glsl */ `
 uniform int uFoilMode;
@@ -218,7 +221,7 @@ export function createFaceMaterial({ map, envMap, finish = null }) {
   };
   const material = new MeshPhysicalMaterial({
     map,
-    color: new Color(map ? 0xffffff : 0x1d3f8f),
+    color: new Color(faceTint(map)),
     // Card stock is satin: a soft sheen, not a mirror coat.
     roughness: 0.42,
     metalness: 0,
@@ -268,7 +271,7 @@ export function createCardKit({ envMap, backTexture, edgeTexture }) {
   const geometry = cardSlab(CARD.width, CARD.height, CARD.thickness, CARD.cornerRadius, 6);
   const back = new MeshPhysicalMaterial({
     map: backTexture,
-    color: new Color(backTexture ? 0xffffff : 0x1d3f8f),
+    color: new Color(faceTint(backTexture)),
     roughness: 0.42,
     metalness: 0,
     clearcoat: 0.16,
@@ -294,7 +297,7 @@ export function createCardKit({ envMap, backTexture, edgeTexture }) {
   const setFace = (mesh, map, finish = null) => {
     const face = mesh.userData.face;
     face.map = map;
-    face.color.set(map ? 0xffffff : 0x1d3f8f);
+    face.color.set(faceTint(map));
     face.userData.setFinish(finish);
     face.needsUpdate = true;
   };

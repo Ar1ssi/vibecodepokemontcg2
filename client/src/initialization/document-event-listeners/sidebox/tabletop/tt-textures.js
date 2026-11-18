@@ -12,7 +12,7 @@ import { artSources } from '../../../../setup/deck-builder/core/build-battle/tab
 
 /**
  * Textures for the tabletop (design 073): image loading that never throws, and the canvas-made
- * surfaces no photo exists for (film crinkle, board, wood grain, card edges). Asset paths resolve
+ * surfaces no photo exists for (film crinkle, board, card edges). Asset paths resolve
  * against the client root next to this module, so a static copy of `client/` works anywhere.
  */
 

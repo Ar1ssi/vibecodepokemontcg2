@@ -20,17 +20,39 @@ import { cleanActionData } from '../../../../setup/general/clean-action-data.js'
 import { refreshBoardImages } from '../../../../setup/sizing/refresh-board.js';
 import { wireButtonCues } from '../../../../setup/netcode/mat-fx/ui-cue.mjs';
 
+// Zone buttons that change the board; a replay only plays back, so it hides them.
+const ZONE_ACTION_BUTTON_IDS = [
+  'shuffleDeckButton',
+  'shuffleDiscardButton',
+  'discardViewCardsButton',
+  'shuffleViewCardsButton',
+  'shuffleBottomViewCardsButton',
+  'lostZoneViewCardsButton',
+  'handViewCardsButton',
+  'discardAttachedCardsButton',
+  'shuffleAttachedCardsButton',
+  'lostZoneAttachedCardsButton',
+  'handAttachedCardsButton',
+  'leaveAttachedCardsButton',
+];
+
+const setZoneActionButtonsDisplay = (display) => {
+  [oppContainerDocument, selfContainerDocument].forEach((doc) => {
+    ZONE_ACTION_BUTTON_IDS.forEach((id) => {
+      doc.getElementById(id).style.display = display;
+    });
+  });
+};
+
 export const initializeP1BottomButtons = () => {
   const setupButton = document.getElementById('setupButton');
   const setupFunction = () => readyUp(systemState.initiator);
-  setupButton.addEventListener('click', setupFunction);
 
   const setupBothButton = document.getElementById('setupBothButton');
   const setupBothFunction = () => {
     readyUp('self');
     readyUp('opp');
   };
-  setupBothButton.addEventListener('click', setupBothFunction);
 
   updateReadyButtons();
   wireButtonCues([
@@ -46,18 +68,18 @@ export const initializeP1BottomButtons = () => {
 
   const resetButton = document.getElementById('resetButton');
   const resetFunction = () => reset(systemState.initiator);
-  resetButton.addEventListener('click', resetFunction);
 
   const resetBothButton = document.getElementById('resetBothButton');
   const resetBothFunction = () => {
     reset('self');
     reset('opp');
   };
-  resetBothButton.addEventListener('click', resetBothFunction);
 
   const restartButton = document.getElementById('restartButton');
   const restartFunction = () => restartGame();
-  restartButton.addEventListener('click', restartFunction);
+
+  // Replay mode swaps these five for the transport controls and back.
+  addNormalListeners();
 
   const optionsContextMenu = document.getElementById('optionsContextMenu');
 
@@ -110,7 +132,9 @@ export const initializeP1BottomButtons = () => {
     event.preventDefault();
     fileInput.click();
   });
-  fileInput.addEventListener('change', handleFileSelect);
+  fileInput.addEventListener('change', (event) =>
+    importGameFile(event.target.files[0])
+  );
 
   const importReplay = document.getElementById('importReplay');
   importReplay.addEventListener('click', async (event) => {
@@ -119,9 +143,7 @@ export const initializeP1BottomButtons = () => {
 
     try {
       const [fileHandle] = await window.showOpenFilePicker();
-      const file = await fileHandle.getFile();
-      const event = { target: { files: [file] } };
-      handleFileSelect(event);
+      importGameFile(await fileHandle.getFile());
     } catch {
       systemState.isReplay = false;
     }
@@ -222,24 +244,7 @@ export const initializeP1BottomButtons = () => {
     document.getElementById('flipCoinButton').style.display = 'none';
     restartButton.style.display = 'none';
 
-    [oppContainerDocument, selfContainerDocument].forEach((doc) => {
-      [
-        'shuffleDeckButton',
-        'shuffleDiscardButton',
-        'discardViewCardsButton',
-        'shuffleViewCardsButton',
-        'shuffleBottomViewCardsButton',
-        'lostZoneViewCardsButton',
-        'handViewCardsButton',
-        'discardAttachedCardsButton',
-        'shuffleAttachedCardsButton',
-        'lostZoneAttachedCardsButton',
-        'handAttachedCardsButton',
-        'leaveAttachedCardsButton',
-      ].forEach((id) => {
-        doc.getElementById(id).style.display = 'none';
-      });
-    });
+    setZoneActionButtonsDisplay('none');
 
     removeNormalListeners();
     addReplayListeners();
@@ -278,24 +283,7 @@ export const initializeP1BottomButtons = () => {
     document.getElementById('flipCoinButton').style.display = 'block';
     restartButton.style.display = '';
 
-    [oppContainerDocument, selfContainerDocument].forEach((doc) => {
-      [
-        'shuffleDeckButton',
-        'shuffleDiscardButton',
-        'discardViewCardsButton',
-        'shuffleViewCardsButton',
-        'shuffleBottomViewCardsButton',
-        'lostZoneViewCardsButton',
-        'handViewCardsButton',
-        'discardAttachedCardsButton',
-        'shuffleAttachedCardsButton',
-        'lostZoneAttachedCardsButton',
-        'handAttachedCardsButton',
-        'leaveAttachedCardsButton',
-      ].forEach((id) => {
-        doc.getElementById(id).style.display = '';
-      });
-    });
+    setZoneActionButtonsDisplay('');
 
     removeReplayListeners();
     addNormalListeners();
@@ -321,8 +309,8 @@ export const initializeP1BottomButtons = () => {
     systemState.isReplay = false;
   }
 
-  function handleFileSelect(event) {
-    const file = event.target.files[0];
+  // Loads an exported game: replays it step by step in replay mode, otherwise applies it at once.
+  function importGameFile(file) {
     if (!file) {
       return;
     }
@@ -390,20 +378,18 @@ export const initializeP1BottomButtons = () => {
 
   const exportState = document.getElementById('exportState');
 
-  // Function to handle the user's choice
-  function handleUserChoice(choice, jsonData) {
-    if (choice === '2') {
-      socket.emit('storeGameState', jsonData);
-    } else if (choice === '1') {
-      const blob = new Blob([jsonData], { type: 'application/json' });
-      const link = document.createElement('a');
-      link.href = window.URL.createObjectURL(blob);
-      link.download = 'data.json';
-      link.click();
-    }
-    // Hide the options menu after handling the choice
-    optionsContextMenu.style.display = 'none';
-  }
+  const downloadGameState = (jsonData) => {
+    const blob = new Blob([jsonData], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = window.URL.createObjectURL(blob);
+    link.download = 'data.json';
+    link.click();
+  };
+
+  const EXPORT_CHOICES = new Map([
+    ['1', downloadGameState],
+    ['2', (jsonData) => socket.emit('storeGameState', jsonData)],
+  ]);
 
   exportState.addEventListener('click', () => {
     const selfData = {
@@ -435,9 +421,10 @@ export const initializeP1BottomButtons = () => {
     const userChoice = prompt(
       "Enter '1' to save a file or enter '2' to generate a URL"
     );
-    if (userChoice === '1' || userChoice === '2') {
-      handleUserChoice(userChoice, jsonData);
-    }
+    const exportGameState = EXPORT_CHOICES.get(userChoice);
+    if (!exportGameState) return;
+    exportGameState(jsonData);
+    optionsContextMenu.style.display = 'none';
   });
 
   const fullscreenButton = document.getElementById('fullscreenButton');
