@@ -25,7 +25,7 @@ test('bulk events carry bytes and keys only', () => {
   assert.deepEqual(Object.keys(out), ['bytes', 'keys']);
   assert.deepEqual(out.keys, ['a', 'b']);
   const many = Object.fromEntries(Array.from({ length: 30 }, (_, i) => [`k${i}`, i]));
-  assert.equal(summarizePayload('storeGameState', [many]).keys.length, 20);
+  assert.equal(summarizePayload('spectatorActionData', [many]).keys.length, 20);
 });
 
 test('relay events forward the 16 KB hint, others plain args', () => {

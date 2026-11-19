@@ -11,7 +11,6 @@ export const spectatorJoin = () => {
   const roomHeaderText = document.getElementById('roomHeaderText');
   const chatbox = document.getElementById('chatbox');
   const p2ExplanationBox = document.getElementById('p2ExplanationBox');
-  document.getElementById('importState').style.display = 'none';
   roomHeaderText.textContent = 'id: ' + systemState.roomId;
   chatbox.innerHTML = '';
   connectedRoom.style.display = 'flex';

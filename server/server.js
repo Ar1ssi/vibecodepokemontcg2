@@ -5,10 +5,8 @@ import http from 'http';
 import { Server } from 'socket.io';
 import { instrument } from '@socket.io/admin-ui';
 import bcrypt from 'bcryptjs';
-import crypto from 'crypto';
 import path from 'path';
 import dotenv from 'dotenv';
-import sqlite3 from 'sqlite3';
 import fs from 'fs';
 import os from 'os';
 import { fileURLToPath } from 'url';
@@ -103,10 +101,6 @@ const sharedDir = path.join(__dirname, '../shared');
 const envFilePath = path.join(__dirname, 'socket-admin-password.env');
 dotenv.config({ path: envFilePath });
 
-function generateRandomKey(length = 8) {
-  return crypto.randomBytes(length).toString('base64url').slice(0, length);
-}
-
 async function main() {
   const logging = createServerLogging({ repoRoot: path.join(__dirname, '..') });
   const app = express();
@@ -132,73 +126,6 @@ async function main() {
     connectionStateRecovery: {},
     cors: corsPlan.socket,
   });
-  // Create a new SQLite database
-  const dbDir = path.join(__dirname, 'database');
-  const dbFilePath = path.join(dbDir, 'db.sqlite');
-  const maxSizeGB = 15;
-
-  // ensure the database directory exists BEFORE opening the DB
-  // (ephemeral hosts like Render wipe this on every deploy/restart)
-  if (!fs.existsSync(dbDir)) {
-    fs.mkdirSync(dbDir, { recursive: true });
-  }
-
-  const db = new sqlite3.Database(dbFilePath);
-  let isDatabaseCapacityReached = false;
-
-  // Check database size (async to avoid blocking the event loop). A file that is not there yet
-  // is empty; any other failure is the caller's to report.
-  const checkDatabaseSizeGB = async () => {
-    try {
-      const stats = await fs.promises.stat(dbFilePath);
-      return stats.size / (1024 * 1024 * 1024);
-    } catch (err) {
-      if (err.code === 'ENOENT') return 0;
-      throw err;
-    }
-  };
-
-  // Sets isDatabaseCapacityReached from a measurement. A size that cannot be measured leaves
-  // the flag as it was and says so.
-  const refreshDatabaseCapacity = async () => {
-    try {
-      isDatabaseCapacityReached = (await checkDatabaseSizeGB()) > maxSizeGB;
-    } catch (err) {
-      console.error(`Database size check failed (${err.code ?? err.message}); saves stay ${isDatabaseCapacityReached ? 'blocked' : 'allowed'}.`);
-    }
-  };
-  refreshDatabaseCapacity();
-  setInterval(refreshDatabaseCapacity, 1000 * 60 * 60);
-
-  // Create a table to store key-value pairs (with TTL support)
-  db.serialize(() => {
-    db.run(
-      "CREATE TABLE IF NOT EXISTS KeyValuePairs (key TEXT PRIMARY KEY, value TEXT, created_at TEXT DEFAULT (datetime('now')))"
-    );
-    // Revert: DROP INDEX IF EXISTS idx_kvp_created_at. Only the daily eviction below reads it.
-    db.run('CREATE INDEX IF NOT EXISTS idx_kvp_created_at ON KeyValuePairs (created_at)');
-  });
-
-  // Evict saved game states older than 30 days (runs once per day)
-  const EVICTION_DAYS = 30;
-  setInterval(
-    () => {
-      db.run(
-        `DELETE FROM KeyValuePairs WHERE created_at < datetime('now', '-${EVICTION_DAYS} days')`,
-        (err) => {
-          if (err) {
-            console.error(`Eviction of saved game states failed: ${err.message}`);
-            return;
-          }
-          // The file does not shrink, but SQLite reuses the freed pages: saves fit again until
-          // the next hourly measurement says otherwise.
-          isDatabaseCapacityReached = false;
-        }
-      );
-    },
-    1000 * 60 * 60 * 24
-  );
-
   // Socket.IO Admin Instrumentation
   if (adminUi.enabled) {
     const saltRounds = 10;
@@ -386,13 +313,13 @@ async function main() {
     next();
   });
   app.get('/', (_, res) => {
-    res.render('index', { importDataJSON: null, e2eAllowed: E2E_ENABLED });
+    res.render('index', { e2eAllowed: E2E_ENABLED });
   });
   // The deck builder's own tab (design 050): the same page in builder mode.
   // The page's asset URLs are relative, so a trailing slash would break them.
   app.get('/deck-builder', (req, res) => {
     if (req.path.endsWith('/')) return res.redirect(301, '/deck-builder');
-    res.render('index', { importDataJSON: null, e2eAllowed: E2E_ENABLED, builderWindow: true });
+    res.render('index', { e2eAllowed: E2E_ENABLED, builderWindow: true });
   });
   // Build & Battle (designs 051, 071): the builder tab in Build & Battle mode. The client picks the
   // flow from the path (builder-window.mjs resolveBuildBattleFlow); `-legacy` is the one-shot box
@@ -400,7 +327,6 @@ async function main() {
   const renderBuildBattle = (canonicalPath, builderFlow = null) => (req, res) => {
     if (req.path.endsWith('/')) return res.redirect(301, canonicalPath);
     res.render('index', {
-      importDataJSON: null,
       e2eAllowed: E2E_ENABLED,
       builderWindow: true,
       builderMode: 'build-battle',
@@ -423,27 +349,6 @@ async function main() {
       return res.redirect(301, `/unboxing${at === -1 ? '' : req.originalUrl.slice(at)}`);
     }
     res.sendFile(path.join(clientDir, 'unboxing.html'));
-  });
-  app.get('/import', (req, res) => {
-    const key = req.query.key;
-    if (typeof key !== 'string' || !key) {
-      return res.status(400).json({ error: 'Key parameter is missing' });
-    }
-
-    db.get(
-      'SELECT value FROM KeyValuePairs WHERE key = ?',
-      [key],
-      (err, row) => {
-        if (err) {
-          return res.status(500).json({ error: 'Internal server error' });
-        }
-        if (row?.value) {
-          res.render('index', { importDataJSON: row.value, e2eAllowed: E2E_ENABLED });
-        } else {
-          res.status(404).json({ error: 'Key not found' });
-        }
-      }
-    );
   });
 
   const roomInfo = new Map();
@@ -832,48 +737,6 @@ async function main() {
       }
     });
 
-    socket.on('storeGameState', (exportData) => {
-      const failExport = () =>
-        socket.emit(
-          'exportGameStateFailed',
-          'Error exporting game! Please try again or save as a file.'
-        );
-      if (isDatabaseCapacityReached) {
-        socket.emit(
-          'exportGameStateFailed',
-          'No more storage for game states! You should probably tell Michael/Xiao Xiao.'
-        );
-        return;
-      }
-      // A save is the exported game's JSON text; anything else could not be loaded back.
-      if (typeof exportData !== 'string' || exportData === '') {
-        failExport();
-        return;
-      }
-      // Attempt up to 5 times to find a unique key; the primary key is the uniqueness check.
-      const tryInsert = (attemptsLeft) => {
-        if (attemptsLeft <= 0) {
-          failExport();
-          return;
-        }
-        const key = generateRandomKey();
-        db.run(
-          'INSERT INTO KeyValuePairs (key, value) VALUES (?, ?) ON CONFLICT(key) DO NOTHING',
-          [key, exportData],
-          function onInserted(err) {
-            if (err) {
-              console.error(`storeGameState insert failed: ${err.message}`);
-              failExport();
-            } else if (this.changes === 0) {
-              tryInsert(attemptsLeft - 1); // key collision
-            } else {
-              socket.emit('exportGameStateSuccessful', key);
-            }
-          }
-        );
-      };
-      tryInsert(5);
-    });
     // Design 074 D7: one socket plays both seats of an authoritative room. The room is never
     // public (so never listed), takes no spectators, and issues no seat token.
     const joinSoloGame = (roomId, username, options) => {
@@ -1226,8 +1089,6 @@ async function main() {
       'requestPeerLog',
       'peerLog',
       'appendMessage',
-      'initiateImport',
-      'endImport',
       'lookAtCards',
       'stopLookingAtCards',
       'revealCards',
@@ -1236,7 +1097,6 @@ async function main() {
       'hideShortcut',
       'lookShortcut',
       'stopLookingShortcut',
-      'resetCounter',
     ];
 
     // Design 074 D7: deck loads, Set Up and Reset act for one seat — the socket's own, or in a

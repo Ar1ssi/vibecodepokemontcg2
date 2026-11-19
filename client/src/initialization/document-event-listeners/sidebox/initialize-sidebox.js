@@ -6,7 +6,6 @@ import { initializeP2Page } from './p2/initialize-p2-page.js';
 import { initializeSettings } from './settings.js';
 import { initializeSideMenuToggle } from './side-menu-toggle.js';
 import { initializeRulesEngine, buildRulesToggle } from '../../../setup/rules/rules-bridge.js';
-import { buildDebugMenu } from '../../../setup/rules/debug-menu.js';
 import {
   resolveBuildBattleFlow,
   resolveBuilderMode,
@@ -31,5 +30,4 @@ export const initializeSidebox = () => {
   initializeSideMenuToggle();
   initializeRulesEngine();
   buildRulesToggle();
-  buildDebugMenu();
 };

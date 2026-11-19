@@ -109,7 +109,6 @@ import {
   SYNC_CHECK_INTERVAL_MS,
 } from '../../setup/netcode/sync-check.js';
 
-let isImporting = false;
 let pushActionQueue = Promise.resolve();
 let peerLogTimeout = null;
 let syncCheckIntervalId = null;
@@ -206,14 +205,6 @@ const applyPeerAction = async (action, parameters) => {
   startKeybindsSleep();
   await acceptAction('opp', action, parameters);
   systemState.oppCounter++;
-  if (action !== 'exchangeData' && action !== 'loadDeckData') {
-    systemState.exportActionData.push({
-      user: 'opp',
-      emit: true,
-      action,
-      parameters,
-    });
-  }
 };
 
 // O2-B: ask the peer for the tail of its action log past what we've already
@@ -669,10 +660,6 @@ export const initializeSocketEventListeners = () => {
 
   socket.on('requestAction', (data) => {
     if (isSpectatorSocket()) return;
-    if (isImporting) {
-      applyRequestAction(data.action, data.parameters);
-      return;
-    }
     const expected = systemState.selfCounter;
     const admission = admitRequestAction(data.counter, expected);
     if (admission === 'stale') {
@@ -697,21 +684,6 @@ export const initializeSocketEventListeners = () => {
       parameters: data.parameters,
     });
     armRequestActionStaleTimer();
-  });
-
-  // reset counter when importing game state
-  socket.on('initiateImport', () => {
-    isImporting = true;
-    cleanActionData('self');
-    cleanActionData('opp');
-  });
-
-  socket.on('endImport', () => {
-    isImporting = false;
-  });
-
-  socket.on('resetCounter', () => {
-    cleanActionData('opp');
   });
 
   socket.on('pushAction', (data) => {
@@ -850,13 +822,6 @@ export const initializeSocketEventListeners = () => {
   // socket.on('VSTARGXFunction', (data) => {
   //     VSTARGXFunction(data.user, data.type, data.emit)
   // });
-  socket.on('exportGameStateSuccessful', (key) => {
-    const url = `https://ptcgsim.online/import?key=${encodeURIComponent(key)}`;
-    appendMessage('self', url, 'announcement', false);
-  });
-  socket.on('exportGameStateFailed', (message) => {
-    appendMessage('self', message, 'announcement', false);
-  });
 
   if (
     typeof document !== 'undefined' &&

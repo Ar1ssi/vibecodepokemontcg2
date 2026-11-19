@@ -37,6 +37,6 @@ test('preflight hands the translator the acting seat', () => {
   const base = { translate, processAction: () => {} };
   emitAuthoritativeCommand('pass', [], { ...base, user: 'self', systemState: soloState });
   emitAuthoritativeCommand('pass', [], { ...base, user: 'opp', systemState: soloState });
-  emitAuthoritativeCommand('pass', [], { ...base, user: 'self', systemState: { solo: false } });
+  emitAuthoritativeCommand('pass', [], { ...base, user: 'self', systemState: { solo: false, isTwoPlayer: true } });
   assert.deepEqual(seats, ['p1', 'p2', undefined]);
 });

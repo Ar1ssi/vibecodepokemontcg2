@@ -93,9 +93,6 @@ export const refuseBoardDrop = () => {
 };
 
 export const dragStart = (event) => {
-  if (systemState.isReplay && !systemState.isTwoPlayer) {
-    return;
-  }
   event.target.classList.add('high-zIndex');
   if (event.target.attached) {
     event.target.style.opacity = '0';
@@ -130,9 +127,6 @@ export const dragStart = (event) => {
 };
 
 export const dragOver = (event) => {
-  if (systemState.isReplay && !systemState.isTwoPlayer) {
-    return;
-  }
   event.preventDefault();
   const explicitDrop = explicitDropZoneOf(event.target);
   if (explicitDrop) {

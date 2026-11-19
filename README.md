@@ -78,9 +78,8 @@ For a plain run without nodemon:
 node server/server.js       # PORT selects the port, default 4000
 ```
 
-The SQLite database directory is created on boot, so the server also runs on ephemeral hosts such
-as Render. There is no migration step, and development needs no build: the browser loads the source
-modules directly.
+The server keeps no database, so it also runs on ephemeral hosts such as Render. There is no
+migration step, and development needs no build: the browser loads the source modules directly.
 
 On a deploy host the client is bundled: `pnpm install` runs `scripts/build-client.mjs`, which
 writes one content-hashed script and stylesheet to `client/dist/`, and the server serves those with
@@ -247,13 +246,12 @@ Seven dark themes are available, with light-mode overrides per component. Ambien
 - The server emits advisory events for attacks, knockouts, and trainer plays, and each client
   phrases them for its own side in the battle log.
 
-### Game state import, export, and replay
+### Battle log and game record
 
-The Options menu exports the current game state, imports a state (or a link to one), replays a
-recorded game, and exports or clears the battle log. Exported states can be stored server-side
-under a short key and reopened with `/import?key=...`; SQLite holds them for 30 days, and nothing
-else is persisted. For bug reports, **Export full log** in the same menu downloads one file holding
-what both browsers and the server recorded (see [Diagnostic log](#diagnostic-log)).
+The Options menu exports or clears the battle log. Game-state export, import, the replay viewer and
+`/import?key=...` links were removed with the client-side rules (design 090); nothing is persisted
+server-side. The record of a game is **Export full log** in the same menu: one file holding what
+both browsers and the server recorded (see [Diagnostic log](#diagnostic-log)).
 
 ### Diagnostic log
 
@@ -286,12 +284,11 @@ Browser (player 1)                    Browser (player 2)
    +--------- Socket.IO ---------+
                                  v
                     server/server.js  (Express + Socket.IO)
-                      |-- static files, EJS render, /import
+                      |-- static files, EJS render
                       |-- server/game/room.mjs: authoritative GameRoom
                       |     per-player views, pending choices,
                       |     turn-order coin call, reconnect, reset
-                      |-- server/game/sync-check.mjs: client/server zone-hash desync check
-                      +-- SQLite (server/database/db.sqlite): state export/import only
+                      +-- server/game/sync-check.mjs: client/server zone-hash desync check
                                  |
                     shared/engine/**: pure, DOM-free, headless-tested
                       state, cards, rng, view, commands, reduce
@@ -302,7 +299,7 @@ Browser (player 1)                    Browser (player 2)
 The client is the whole front end: `index.ejs` as the page shell, two iframe documents for the
 playmats, around 36 stylesheets, and `src/` organized by area (`setup/`, `actions/`,
 `initialization/`). The server handles statics and EJS rendering through Express, transport through
-Socket.IO, the authoritative `GameRoom`, and SQLite through `sqlite3`.
+Socket.IO, and the authoritative `GameRoom`.
 Between them sits `shared/engine/`, the pure rules and game engine of about 90 modules with no DOM
 or browser APIs: `state.mjs` for zones and hashing, `cards.mjs`, `rng.mjs`, `view.mjs` for
 redaction, `commands.mjs` with roughly 70 command schemas, `reduce.mjs` for validation, reduction,
@@ -320,7 +317,6 @@ each client renders the views it sends.
 client/                 Front end (EJS shell, iframes, ES modules, CSS, assets)
 server/                 Express + Socket.IO server, GameRoom
   game/                 room.mjs, deck-packet.mjs, sync-check.mjs, tests
-  database/             SQLite file (created at boot, gitignored)
 shared/engine/          Pure game + rules engine shared by server, client and tests
 bot/                    Headless bot brains (heuristic + coverage scorers)
 scripts/                Asset pipelines and card-corpus audit scripts
@@ -412,8 +408,7 @@ PTCG_URL=https://ptcg-sim-staging.onrender.com node scripts/e2e/playtest-bot.mjs
 ```
 
 Both build with `pnpm install --frozen-lockfile`, start with `node server/server.js`, and health
-check `/`. The SQLite file lives on the instance's ephemeral disk. It is created at boot and used
-only for the 30-day state-export feature, so a restart drops exported links but no live games.
+check `/`. No game data is persisted, so a restart ends the games in progress and loses nothing else.
 
 ## Known limitations
 

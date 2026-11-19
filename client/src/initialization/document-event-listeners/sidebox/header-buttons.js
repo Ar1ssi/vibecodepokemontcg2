@@ -47,7 +47,6 @@ export const initializeHeaderButtons = () => {
       p2ExplanationBox.style.display = 'block';
       lobby.style.display = 'block';
       connectedRoom.style.display = 'none';
-      document.getElementById('importState').style.display = 'inline';
       document.getElementById('flipBoardButton').style.display = 'inline-block';
       systemState.isTwoPlayer = false;
       systemState.serverAuthoritative = false;

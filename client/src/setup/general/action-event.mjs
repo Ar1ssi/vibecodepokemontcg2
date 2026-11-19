@@ -20,7 +20,6 @@ export function createAction(type, user, payload = [], options = {}) {
 export function isReplayActive(systemState) {
   return Boolean(
     systemState?.syncReplaying ||
-    systemState?.isCatchingUp ||
-    systemState?.isReplay
+    systemState?.isCatchingUp
   );
 }

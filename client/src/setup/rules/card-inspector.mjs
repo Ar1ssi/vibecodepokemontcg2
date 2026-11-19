@@ -32,10 +32,7 @@ import {
   stadiumCardFor,
   abilityUsedFor,
 } from './attack-preview-sources.mjs';
-import {
-  isAuthoritativeDispatchActive,
-  dispatchAuthoritativeUseAbility,
-} from '../netcode/authoritative-dispatch.js';
+import { dispatchAuthoritativeUseAbility } from '../netcode/authoritative-dispatch.js';
 import { getZone } from '../zones/get-zone.js';
 import {
   getAuthoritativeStadiumArray,
@@ -43,7 +40,6 @@ import {
   getAuthoritativeCostDiscounts,
   getAuthoritativeOncePerGame,
 } from '../netcode/apply-view.js';
-import { runAbilitySteps } from './rules-bridge.js';
 import { computeContentBox } from './attack-zone-geometry.js';
 import { buildInspectorModel } from './card-inspector-model.mjs';
 import { damagePreviewAgainst } from './attack-ui-model.mjs';
@@ -595,35 +591,24 @@ const hydrateContext = (state) => {
 };
 
 /**
- * Use the card's ability — the dispatch design 008's ability zone used, unchanged. Under server
- * authority the SERVER runs it (and asks for any picks through a pendingChoice); the local step
- * runner would mutate legacy zone arrays the server never sees.
+ * Use the card's ability: the SERVER runs it (and asks for any picks through a pendingChoice).
  *
  * Unlike an attack this does not end the turn, so the inspector stays open and re-renders on the
  * resulting board event — a once-per-turn ability flips to spent, and one that attached Energy
  * can make a previously unpayable attack payable.
  */
 const useAbility = (card, zone) => {
-  // `dispatchAuthoritativeUseAbility` fails OPEN by contract: a false return means "this action
-  // was not dispatched", and the gated call site must then run its legacy body (see
-  // emitAuthoritativeCommand in authoritative-dispatch.js). Returning regardless discarded every
-  // refused dispatch — no command sent, no chat line, nothing on the board, which is
-  // indistinguishable from a dead click.
-  if (
-    card?.instanceId != null &&
-    isAuthoritativeDispatchActive() &&
-    dispatchAuthoritativeUseAbility({
-      user: 'self',
-      emit: true,
-      oInitiator: 'opp',
-      zoneId: zone,
-      index: 0,
-      authoritativeId: card.instanceId,
-    })
-  ) {
-    return;
-  }
-  runAbilitySteps('self', card);
+  // No local body exists to fall back on: a card the server has not registered, or no room, is
+  // refused with a chat line and a `dispatch.refused` log entry (failClosed).
+  dispatchAuthoritativeUseAbility({
+    user: 'self',
+    emit: true,
+    oInitiator: 'opp',
+    zoneId: zone,
+    index: 0,
+    authoritativeId: card?.instanceId,
+    failClosed: true,
+  });
 };
 
 /**

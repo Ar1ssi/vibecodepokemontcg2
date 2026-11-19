@@ -1,5 +1,5 @@
-// Socket payloads are untrusted: what joinGame, userReconnected, the relay events and
-// storeGameState do with room names the server reserves and with payloads of the wrong shape.
+// Socket payloads are untrusted: what joinGame, userReconnected and the relay events
+// do with room names the server reserves and with payloads of the wrong shape.
 // Drives a real server over the Socket.IO wire format (engine.io v4 text frames) with Node's
 // built-in WebSocket, since the client library is not a dependency.
 import { test } from 'node:test';
@@ -183,20 +183,5 @@ test('a game room that does not exist is reported as gone, not as a restart', as
     assert.equal(ended.winner, null);
     assert.doesNotMatch(ended.message, /^Game session terminated due to server restart\.$/);
     assert.match(ended.message, /no longer available/);
-  });
-});
-
-test('storeGameState saves a string and refuses anything else', async () => {
-  await withServer(async ({ port }) => {
-    const client = await connect(port);
-    client.emit('storeGameState', { not: 'a string' });
-    assert.match(await client.waitFor('exportGameStateFailed'), /Error exporting game/);
-    client.received.length = 0;
-    client.emit('storeGameState', undefined);
-    assert.match(await client.waitFor('exportGameStateFailed'), /Error exporting game/);
-    client.received.length = 0;
-    client.emit('storeGameState', '[{"deslop":"core"}]');
-    const key = await client.waitFor('exportGameStateSuccessful');
-    assert.match(key, /^[A-Za-z0-9_-]{8}$/);
   });
 });

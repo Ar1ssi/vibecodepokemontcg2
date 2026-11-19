@@ -60,29 +60,16 @@ export const flipBoard = () => {
   const colorToggledButtonIds = [
     'attackButton',
     'retreatButton',
-    'healButton',
-    'switchButton',
-    'attachButton',
-    'searchButton',
-    'abilityButton',
-    'energyRedirectButton',
     'undoButton',
     'FREEBUTTON',
     'p2AttackButton',
     'p2RetreatButton',
-    'p2HealButton',
-    'p2SwitchButton',
-    'p2AttachButton',
-    'p2SearchButton',
-    'p2AbilityButton',
-    'p2EnergyRedirectButton',
     'p2PassButton',
     'p2FREEBUTTON',
     'p2SetupButton',
     'p2ResetButton',
   ];
-  // The replay board has no local Set Up / Reset buttons to recolor.
-  if (!systemState.isReplay) colorToggledButtonIds.push('setupButton', 'resetButton');
+  colorToggledButtonIds.push('setupButton', 'resetButton');
   for (const buttonId of colorToggledButtonIds) {
     toggleClasses(document.getElementById(buttonId), 'self-color', 'opp-color');
   }

@@ -84,22 +84,6 @@ export const processAction = (user, emit, action, parameters) => {
       socket.emit('requestAction', data);
     }
 
-    if (!systemState.isTwoPlayer || ownsAction) {
-      //for storing spectator/export data (use a copy to avoid mutating selfActionData)
-      const exportParameters = [...parameters];
-      if (exportParameters[0]) {
-        if (exportParameters[0] === 'self') {
-          exportParameters[0] = 'opp';
-        } else if (exportParameters[0] === 'opp') {
-          exportParameters[0] = 'self';
-        }
-      }
-      const data = createAction(action, user, exportParameters, { emit });
-      if (action !== 'exchangeData' && action !== 'loadDeckData') {
-        systemState.exportActionData.push(data);
-      }
-    }
-
     if (typeof document !== 'undefined' && typeof document.dispatchEvent === 'function') {
       document.dispatchEvent(
         new CustomEvent('action-processed', { detail: { action, user } })

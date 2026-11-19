@@ -3,7 +3,7 @@ import { LIMITS } from './log-schema.mjs';
 import { REDACTED } from './safe-json.mjs';
 
 const KEY_LIMIT = 20;
-const KEYS_ONLY = new Set(['instanceMap', 'dealOrder', 'spectatorActionData', 'storeGameState']);
+const KEYS_ONLY = new Set(['instanceMap', 'dealOrder', 'spectatorActionData']);
 // Logged up to the larger relay cap: the legacy relay's only record, and exactly what a client sent.
 const FULL = new Set(['pushAction', 'requestAction', 'peerLog', 'cmd', 'resolveChoice']);
 

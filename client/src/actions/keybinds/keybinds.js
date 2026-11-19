@@ -3,7 +3,6 @@ import { appendMessage } from '../../setup/chatbox/append-message.js';
 import { manualDeckActionAllowed } from '/shared/engine/rules/rules-state.mjs';
 
 import { determineUsername } from '../../setup/general/determine-username.js';
-import { isBlockedByReplay } from '../../setup/general/replay-block.js';
 import { doubleClick } from '../../setup/image-logic/click-events.js';
 import { refreshBoardImages } from '../../setup/sizing/refresh-board.js';
 import { getZone } from '../../setup/zones/get-zone.js';
@@ -61,7 +60,6 @@ import {
 } from '../zones/hand-actions.js';
 
 import { areKeybindsSleeping } from './keybindSleep.js';
-import { isKeydownBlockedByReplay } from './replay-keybind-guard.mjs';
 
 // Gates a manual (keybind-triggered) deck action through the rules layer; on refusal it also
 // posts the reason to chat, so callers only `return`.
@@ -134,9 +132,6 @@ export const keyDown = (event) => {
     ) ||
     areKeybindsSleeping
   ) {
-    return;
-  }
-  if (isKeydownBlockedByReplay(event, isBlockedByReplay)) {
     return;
   }
   if (event.key === 'Escape' || event.code === 'Escape') {
@@ -490,8 +485,7 @@ export const keyDown = (event) => {
       !isAltKeyPressed(event) &&
       ['stadium', 'active', 'bench'].includes(mouseClick.zoneId) &&
       !isInFullView(mouseClick.card.image) &&
-      !isCardPreviewOpen() &&
-      !systemState.isReplay
+      !isCardPreviewOpen()
     ) {
       rotateCard(mouseClick.cardUser, mouseClick.zoneId, mouseClick.cardIndex);
     }
@@ -500,8 +494,7 @@ export const keyDown = (event) => {
       isAltKeyPressed(event) &&
       ['active', 'bench'].includes(mouseClick.zoneId) &&
       !isInFullView(mouseClick.card.image) &&
-      !isCardPreviewOpen() &&
-      !systemState.isReplay
+      !isCardPreviewOpen()
     ) {
       rotateCard(
         mouseClick.cardUser,
@@ -529,8 +522,7 @@ export const keyDown = (event) => {
     }
     if (
       (event.key === 'f' || event.code === 'KeyF') &&
-      !isAltKeyPressed(event) &&
-      !systemState.isReplay
+      !isAltKeyPressed(event)
     ) {
       flipCoin(systemState.initiator);
     }

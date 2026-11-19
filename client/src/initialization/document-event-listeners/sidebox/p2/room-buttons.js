@@ -4,6 +4,7 @@ import { cleanActionData } from '../../../../setup/general/clean-action-data.js'
 import { processAction } from '../../../../setup/general/process-action.js';
 import { restoreOwnDeck } from '../../../../setup/deck-constructor/own-deck.mjs';
 import { handleSpectatorButtons } from '../../../../setup/spectator/handle-spectator-buttons.js';
+import { leaveSoloRoom } from '../../../../setup/netcode/solo-room.js';
 import {
   removeSyncIntervals,
   resetNetcodeForRoomChange,
@@ -76,6 +77,8 @@ export const chooseUsername = (roomId) => {
  */
 export const joinRoomById = (roomId, { spectate }) => {
   if (!roomId) return;
+  // The page may have joined its solo room by itself (design 090); an explicit join replaces it.
+  leaveSoloRoom();
   // The checkbox is the "am I spectating" state many handlers read.
   document.getElementById('spectatorModeCheckbox').checked = spectate;
   document.getElementById('roomIdInput').value = roomId;
@@ -102,7 +105,6 @@ const returnToLobby = () => {
   const p2Chatbox = document.getElementById('p2Chatbox');
   lobby.style.display = 'block';
   p2ExplanationBox.style.display = 'block';
-  document.getElementById('importState').style.display = 'inline';
   document.getElementById('flipBoardButton').style.display = 'inline-block';
   connectedRoom.style.display = 'none';
   clearSeatToken(systemState.roomId);

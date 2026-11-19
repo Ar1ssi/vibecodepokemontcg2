@@ -4,8 +4,6 @@
     
     // FULL page — same modules the browser loads, in the same order
     let html = fs.readFileSync('./client/index.ejs', 'utf-8');
-    // ejs render: replace the one ejs variable with null (as the server does)
-    html = html.replace('<%= importDataJSON %>', '');
     
     const vc = new VirtualConsole();
     vc.on('jsdomError', (e) => { /* resource load noise */ });

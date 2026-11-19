@@ -21,7 +21,6 @@ test('isReplayActive returns true when any replay flag is active', () => {
   assert.equal(isReplayActive({}), false);
   assert.equal(isReplayActive({ syncReplaying: true }), true);
   assert.equal(isReplayActive({ isCatchingUp: true }), true);
-  assert.equal(isReplayActive({ isReplay: true }), true);
 });
 
 test('rules events (damage-changed, status-changed) dispatch with expected details', () => {

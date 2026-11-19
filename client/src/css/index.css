@@ -898,14 +898,6 @@ body.board3d-active #stadium {
 #p2AttackButton.attacks-available:hover {
   background: linear-gradient(to bottom, rgba(224, 196, 96, 0.9), rgba(190, 160, 55, 0.9));
 }
-#abilityButton.abilities-available,
-#p2AbilityButton.abilities-available {
-  background: linear-gradient(to bottom, rgba(80, 150, 220, 0.864), rgba(60, 120, 190, 0.864));
-}
-#abilityButton.abilities-available:hover,
-#p2AbilityButton.abilities-available:hover {
-  background: linear-gradient(to bottom, rgba(112, 178, 238, 0.9), rgba(84, 142, 212, 0.9));
-}
 .chat-button-container button.turn-disabled {
   opacity: 0.4;
   pointer-events: none;

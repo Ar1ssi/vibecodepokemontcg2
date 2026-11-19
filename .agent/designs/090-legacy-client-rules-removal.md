@@ -1,5 +1,5 @@
 # 090: Remove the legacy client rules layer
-Status: approved (user) — building
+Status: shipped 2026-11-19 (slices A–D in one commit)
 Date: 2026-11-19
 
 ## Problem
@@ -78,15 +78,15 @@ Inventory of 2026-11-19 (session scratch; summarised here):
 ## Edge cases & failure modes
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | Page load, socket not yet connected | solo join waits for connect; no action is possible before the join ack | [ ] |
-| 2 | URL joins a multiplayer room / spectator link / builder window | no solo auto-join | [ ] |
-| 3 | Solo join refused or server unreachable | the board stays empty with a visible message; actions refuse | [ ] |
-| 4 | Player in the Multiplayer lobby clicks Attack / Set Up | one refusal line; no local state changes | [ ] |
-| 5 | Gate miss in a room (unregistered card, untranslatable action) | refusal + log line `dispatch.refused`; no local mutation | [ ] |
-| 6 | Relayed mirror of a server_command action arrives | still suppressed (accept-action.js); no body runs | [ ] |
-| 7 | Old `/import?key=` link opened | normal page (404 for the key is acceptable); no crash | [ ] |
-| 8 | Reconnect mid-game | unchanged: views redraw the board | [ ] |
-| 9 | Spectator | unchanged | [ ] |
+| 1 | Page load, socket not yet connected | solo join waits for connect; no action is possible before the join ack | [x] covered: design090-solo-at-load 'row 1' |
+| 2 | Builder window / e2e page | no solo auto-join (the client has no URL that joins or spectates a room today) | [x] covered: design090-solo-at-load 'row 2' |
+| 3 | Solo join refused or server unreachable | the board stays empty with a visible message; actions refuse | [x] covered: design090-solo-at-load 'row 3' |
+| 4 | Player in the Multiplayer lobby clicks Attack / Undo | one refusal line; no local state changes | [x] covered: authoritative-dispatch.test (no-room refusals), design090-chat-entry |
+| 5 | Gate miss in a room (unregistered card, untranslatable action) | refusal + log line `dispatch.refused`; no local mutation | [x] covered: authoritative-dispatch.test 'gate miss in a room: failClosed', design090-chat-entry |
+| 6 | Relayed mirror of a server_command action arrives | still suppressed (accept-action.js); no body runs | [x] covered: design090-chat-entry 'a relayed mirror call' |
+| 7 | Old `/import?key=` link opened | normal page (404 for the key is acceptable); no crash | [x] covered: design090-export-removed |
+| 8 | Reconnect mid-game | unchanged: views redraw the board | struck: no code on this path changed; scripts/e2e/public-lobby-test and spectator-view-test results are unchanged from before |
+| 9 | Spectator | unchanged | struck: as row 8 (spectator-view-test results unchanged) |
 
 ## Test plan
 Unit: gate refusals (authoritative-dispatch), solo-at-load decision (pure helper), chat-button entry
@@ -107,3 +107,18 @@ No data migration. Revert: `git revert` the slice commits; saved game states rem
 | D | header-buttons.js, room-buttons.js, solo-room.js, socket-event-listeners.js, front-end.js, authoritative-dispatch.js and the per-file gates in client/src/actions/, undo.js | solo at load; gates fail closed | gate refusal tests; solo-at-load helper test | lint clean; netcode tests pass |
 
 ## Deviations
+- The e2e bridge does not auto-join: `?e2e=1` stays in no room, `?e2e=1&autosolo=1` joins, so the
+  harnesses keep driving their own joins.
+- A no-room refusal returns true from the dispatcher ("the caller stops") and posts the line there,
+  so entry points add no second line.
+- Wider than planned: the debug menu went whole (its spawn and free-cost tools only acted locally),
+  as did the legacy end screen (in a room `#netcodeEndModal` in apply-view is the end screen) and
+  every replay flag (`isReplay`, `exportActionData`, `isStateImport`, `replay-block.js`).
+- `status.mjs` stays: move-card.js and e2e-options.mjs import it.
+- Left for follow-up: local fallbacks that still run with no room in manual-card-dispatch.js,
+  server-card-select.js and deck-peek.js; ungated counter and rotate actions; dead CSS for the
+  removed controls; dead `isUndoInProgress` reads; `sqlite3` in package.json; `card-search.mjs`
+  `queryCardsByName`; docs that cite the deleted files.
+- Browser check: 15 harnesses run before and after; no check passes before and fails after.
+  `opening-coin-choice-test` ("the loser is told…") and `board3d-input-test` 6a (hover preview)
+  are timing-flaky on both sides (failed 1/3 and 2/3 on the pre-removal commit).

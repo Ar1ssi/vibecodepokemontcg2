@@ -1,5 +1,6 @@
-// undo(): relaying the opponent's undo must not leave this client stuck in "Loading…", and a
-// replay with no earlier reset starts from the first recorded action.
+// undo(): the server replays the undo (design 090 removed the local replay arm). An opponent
+// undo in a 2P room is relayed before any state is set; a self undo announces and sends one
+// command; with no room it refuses through authoritative-dispatch's helper and sends nothing.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { registerHooks } from 'node:module';
@@ -7,10 +8,10 @@ import { registerHooks } from 'node:module';
 const STUBS = {
   'state.js': 'export const systemState = globalThis.__undoState;',
   'setup/chatbox/append-message.js': 'export const appendMessage = (...a) => globalThis.__undo.messages.push(a[1]);',
-  'setup/general/accept-action.js': 'export const acceptAction = async (...a) => { globalThis.__undo.accepted.push(a[1]); };',
   'setup/general/determine-username.js': 'export const determineUsername = (user) => user;',
   'setup/general/process-action.js': 'export const processAction = (...a) => globalThis.__undo.processed.push(a.slice(0, 3));',
-  'setup/netcode/authoritative-dispatch.js': 'export const isAuthoritativeDispatchActive = () => false;',
+  'setup/netcode/authoritative-dispatch.js':
+    'export const refuseWithoutRoom = (options) => { globalThis.__undo.refusalChecks.push(options.action); return globalThis.__undo.noRoom; };',
 };
 
 registerHooks({
@@ -22,44 +23,41 @@ registerHooks({
 });
 
 globalThis.__undoState = {};
-const button = { textContent: 'Undo' };
-globalThis.document = { getElementById: () => button };
-globalThis.requestAnimationFrame = (fn) => fn();
 
-function arrange(state) {
-  Object.assign(globalThis.__undoState, { isUndoInProgress: false, isTwoPlayer: false, solo: false, selfActionData: [], oppActionData: [], ...state });
-  globalThis.__undo = { messages: [], accepted: [], processed: [] };
-  button.textContent = 'Undo';
+function arrange(state, { noRoom = false } = {}) {
+  Object.assign(globalThis.__undoState, { isTwoPlayer: false, solo: false, ...state });
+  globalThis.__undo = { messages: [], processed: [], refusalChecks: [], noRoom };
 }
 
 const { undo } = await import('../undo.js');
 
-test('an opponent undo in a 2P room is relayed once and leaves this client idle', async () => {
+test('an opponent undo in a 2P room is relayed once, before any room check or announcement', () => {
   arrange({ isTwoPlayer: true });
-  await undo('opp', undefined, true);
+  undo('opp', undefined, true);
   assert.deepEqual(globalThis.__undo.processed, [['opp', true, 'undo']]);
-  assert.equal(globalThis.__undoState.isUndoInProgress, false);
-  assert.equal(button.textContent, 'Undo');
+  assert.deepEqual(globalThis.__undo.refusalChecks, []);
   assert.deepEqual(globalThis.__undo.messages, []);
 });
 
-test('undo replays the recorded actions except the last, from the start when no reset was recorded', async () => {
-  arrange({
-    selfActionData: [
-      { action: 'draw', parameters: [] },
-      { action: 'shuffleZone', parameters: [] },
-      { action: 'moveCard', parameters: [] },
-    ],
-  });
-  await undo('self', undefined, true);
-  assert.deepEqual(globalThis.__undo.accepted, ['draw', 'shuffleZone']);
-  assert.equal(globalThis.__undoState.isUndoInProgress, false);
+test('a self undo in a room announces it and sends one undo command', () => {
+  arrange({ isTwoPlayer: true, solo: true });
+  undo('self', undefined, true);
+  assert.deepEqual(globalThis.__undo.refusalChecks, ['undo']);
+  assert.deepEqual(globalThis.__undo.messages, ['self took back their last move!']);
+  assert.deepEqual(globalThis.__undo.processed, [['self', true, 'undo']]);
 });
 
-test('undo with nothing recorded ends quietly and re-enables the button', async () => {
-  arrange({});
-  await undo('self', undefined, true);
-  assert.equal(button.textContent, 'Undo');
-  assert.equal(globalThis.__undoState.isUndoInProgress, false);
-  assert.deepEqual(globalThis.__undo.accepted, []);
+test('undo with no room refuses: nothing is announced or sent (design 090 row 4)', () => {
+  arrange({}, { noRoom: true });
+  undo('self', undefined, true);
+  assert.deepEqual(globalThis.__undo.refusalChecks, ['undo']);
+  assert.deepEqual(globalThis.__undo.messages, []);
+  assert.deepEqual(globalThis.__undo.processed, []);
+});
+
+test('a relayed undo (emit false) is never refused for want of a room', () => {
+  arrange({}, { noRoom: true });
+  undo('opp', undefined, false);
+  assert.deepEqual(globalThis.__undo.refusalChecks, []);
+  assert.deepEqual(globalThis.__undo.processed, [['opp', false, 'undo']]);
 });

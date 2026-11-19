@@ -234,7 +234,7 @@ export function installE2eApi() {
     stepLog: [],
     // Design 002/003 slice 3.12 flip-gate harness: count of 'cmdRejected' events this
     // client has received, and the most recent 'rules-game-ended' detail (server's
-    // authoritative gameEnded under the flag; local evaluateWinCondition off the flag).
+    // authoritative gameEnded).
     cmdRejectedCount: 0,
     lastCmdRejected: null,
     cmdLog: [],
