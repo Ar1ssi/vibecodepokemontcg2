@@ -513,7 +513,7 @@ function stormyMountainsBoard({ three, material }) {
         ['Right', peaks.right],
       ]) {
         own[`uPeak${side}`].value.set(peak?.x ?? 0, peak?.y ?? 0, peak?.r ?? 0, peak?.h ?? 0);
-        own[`uRidge${side}`].value.set(peak?.ridge.x ?? 0, peak?.ridge.y ?? 0);
+        own[`uRidge${side}`].value.set(peak?.ridge?.x ?? 0, peak?.ridge?.y ?? 0);
       }
       own.uEmblem.value.set(emblem?.x ?? 0, emblem?.y ?? 0, emblem?.r ?? 0);
       // A far peak painted in the cloud sea past the far-left corner, in the frame (not under the panel).

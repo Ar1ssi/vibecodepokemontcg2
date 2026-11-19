@@ -2,11 +2,12 @@
 // queued plan plays the change later (`play`), and a skipped or cleared plan snaps to it (`settle`).
 // Pure: the mesh (stadium-environment-mesh.js) reads `frame(now)` into its uniforms.
 
+import { easeOutCubic } from './tween.mjs';
+
 export const INTRO_MS = 1600;
 export const EXIT_MS = 900;
 
 const clamp01 = (t) => Math.min(1, Math.max(0, t));
-const easeOutCubic = (t) => 1 - (1 - t) ** 3;
 const easeInQuad = (t) => t * t;
 
 /**
