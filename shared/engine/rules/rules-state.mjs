@@ -40,8 +40,8 @@
       pendingEffects: { self: [], opp: [] },
       // per-player per-turn facts
       flags: {
-        self: { energyAttached: false, attackerAttacked: false, evolved: {}, supporterPlayed: false, lastSupporterName: '', abilitiesUsed: {}, turnAttackBonus: null },
-        opp: { energyAttached: false, attackerAttacked: false, evolved: {}, supporterPlayed: false, lastSupporterName: '', abilitiesUsed: {}, turnAttackBonus: null },
+        self: { energyAttached: false, attackerAttacked: false, retreatedThisTurn: false, evolved: {}, supporterPlayed: false, lastSupporterName: '', abilitiesUsed: {}, turnAttackBonus: null },
+        opp: { energyAttached: false, attackerAttacked: false, retreatedThisTurn: false, evolved: {}, supporterPlayed: false, lastSupporterName: '', abilitiesUsed: {}, turnAttackBonus: null },
       },
       // Survives resetTurnFlags: a second endTurn on the same turn used to
       // clear drewThisTurn and let hookTurnStartDraw deal another card.
@@ -626,7 +626,7 @@
     }
     
     function resetTurnFlags(player) {
-      rulesState.flags[player] = { energyAttached: false, attackerAttacked: false, evolved: {}, supporterPlayed: false, lastSupporterName: '', abilitiesUsed: {}, turnAttackBonus: null, stadiumUsed: false, stadiumPlayed: false, drewThisTurn: false };
+      rulesState.flags[player] = { energyAttached: false, attackerAttacked: false, retreatedThisTurn: false, evolved: {}, supporterPlayed: false, lastSupporterName: '', abilitiesUsed: {}, turnAttackBonus: null, stadiumUsed: false, stadiumPlayed: false, drewThisTurn: false };
     }
 
     // Mark that the start-of-turn draw already happened for this player this
@@ -807,9 +807,6 @@
       const f = rulesState.flags[player];
       if (f) f.evolved[cardName] = true;
     }
-    export function markPrizeTaken(player) {
-      // prize-taking after a KO doesn't change phase; just tracked
-    }
     
     // ── action gating ────────────────────────────────────────────────────
     // Every free-form sim action flows through here when rules are enabled.
@@ -853,10 +850,7 @@
           if (S.phase === 'attack') {
             return { allowed: false, reason: 'You already attacked — end your turn.' };
           }
-          // energy attach: once per turn
-          if (targetZoneId === 'active' || targetZoneId === 'bench') {
-            // more specific checks happen at attach time via canAttachEnergy
-          }
+          // energy attach once per turn is checked at attach time by canAttachEnergy
           return { allowed: true };
         }
     
@@ -933,8 +927,6 @@
           return { allowed: true };
       }
     }
-    
-    function flow() { return false; }
     
     // Gate for MANUAL (button/keybind/drag) deck & hand<->deck actions.
     // Parsed card-effect flows (setup draws, Iono, stadium effects, etc.) call

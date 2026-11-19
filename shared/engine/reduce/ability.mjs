@@ -8,7 +8,7 @@ import { findCard, attachmentHostId } from '../state.mjs';
 import { isBasicPokemon, isPokemon } from '../cards.mjs';
 import { shuffleInPlace } from '../rng.mjs';
 import { executeAbility, resolveAbilitySteps } from '../effects/ability.mjs';
-import { selfAttachTargets } from '../effects/trainer-steps.mjs';
+import { selfAttachTargets, BENCH_LIMIT } from '../effects/trainer-steps.mjs';
 import { createPendingChoice } from '../effects/executor.mjs';
 import { isSpecialEnergyCard, parseSpecialEnergyEffects } from '../rules/special-energy-parse.mjs';
 import {
@@ -36,7 +36,7 @@ export function callEnergyBlockReason(state, cardRef, playerId) {
   if (cardRef.playerId !== playerId || cardRef.card.attachedTo == null) return 'This Energy is not attached to your Pokémon.';
   if (step.requiresActive && cardRef.zoneId !== 'active') return 'The Pokémon it is attached to must be your Active Pokémon.';
   if (step.oncePerTurn && player?.flags?.abilitiesUsed?.[cardRef.card.instanceId]) return 'Already used this turn.';
-  if (rootsIn(player?.zones?.bench || []).length >= 5) return 'Your Bench is full.';
+  if (rootsIn(player?.zones?.bench || []).length >= BENCH_LIMIT) return 'Your Bench is full.';
   return null;
 }
 
@@ -46,7 +46,7 @@ function startCallEnergy(draft, { cardRef, playerId, activeRng, events }) {
   if (!player.flags) player.flags = {};
   player.flags.abilitiesUsed = { ...(player.flags.abilitiesUsed || {}), [cardRef.card.instanceId]: true };
   events.push({ type: 'abilityUsed', instanceId: cardRef.card.instanceId, name: cardRef.card.name, playerId });
-  const room = 5 - rootsIn(player.zones.bench).length;
+  const room = BENCH_LIMIT - rootsIn(player.zones.bench).length;
   const options = (player.zones.deck || []).filter((c) => isBasicPokemon(c));
   const max = Math.min(step.count || 1, room, options.length);
   if (max <= 0) {
@@ -71,7 +71,7 @@ export function resumeCallEnergy(draft, { token, selection, activeRng, events })
   const picked = (selection || []).slice(0, token.max);
   for (const id of picked) {
     const card = player.zones.deck.find((c) => c.instanceId === Number(id));
-    if (!card || !isBasicPokemon(card) || rootsIn(player.zones.bench).length >= 5) continue;
+    if (!card || !isBasicPokemon(card) || rootsIn(player.zones.bench).length >= BENCH_LIMIT) continue;
     player.zones.deck.splice(player.zones.deck.indexOf(card), 1);
     card.enteredPlayTurn = draft.turn?.number ?? null;
     player.zones.bench.push(card);

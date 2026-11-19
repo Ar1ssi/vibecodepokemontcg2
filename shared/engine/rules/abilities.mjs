@@ -31,11 +31,10 @@ export { rewriteLegacyPowerWording };
 // Normalize printed card text before matching.
 //   curly quotes  ' ' `  →  straight '
 //   energy symbol { P } {G}  →  {P} (no inner spaces)
+const tightenSymbols = (text) => text.replace(/\{\s*([A-Za-z])\s*\}/g, '{$1}');
+
 function normalizeText(text) {
-  return symbolizeTypeWords(text)
-    .replace(/[\u2018\u2019\u201A\u201B`]/g, "'")
-    .replace(/\{\s*([A-Za-z])\s*\}/g, '{$1}')
-    .toLowerCase();
+  return tightenSymbols(symbolizeTypeWords(text).replace(/[\u2018\u2019\u201A\u201B`]/g, "'")).toLowerCase();
 }
 
 // Detect "attach" as a VERB (not the adjective "attached" describing state).
@@ -189,6 +188,12 @@ const isSelfHandDiscardCost = (t) =>
   !t.includes("opponent's hand") &&
   !t.includes('from your opponent');
 
+// Printed {X} Energy symbol letter → type name, the one table for every symbol read in this file.
+const ENERGY_SYMBOL_TYPES = {
+  g: 'Grass', r: 'Fire', w: 'Water', l: 'Lightning', p: 'Psychic',
+  f: 'Fighting', d: 'Darkness', m: 'Metal', y: 'Fairy', n: 'Dragon', c: 'Colorless',
+};
+
 const parseEnergyTypeHint = (t) => {
   const types = [
     'water', 'fire', 'grass', 'lightning', 'psychic', 'fighting',
@@ -198,13 +203,7 @@ const parseEnergyTypeHint = (t) => {
     if (t.includes(type)) return type;
   }
   const sym = t.match(/\{([a-z])\}/);
-  if (sym) {
-    const map = {
-      w: 'water', r: 'fire', g: 'grass', l: 'lightning', p: 'psychic',
-      f: 'fighting', d: 'darkness', m: 'metal', n: 'dragon', y: 'fairy', c: 'colorless',
-    };
-    return map[sym[1]] || null;
-  }
+  if (sym) return ENERGY_SYMBOL_TYPES[sym[1]]?.toLowerCase() || null;
   return null;
 };
 
@@ -431,11 +430,6 @@ export function parseAbilitySearchParams(lower) {
   return { what, count, destination, upTo };
 }
 
-const ENERGY_SYMBOL_TYPES = {
-  g: 'Grass', r: 'Fire', w: 'Water', l: 'Lightning', p: 'Psychic',
-  f: 'Fighting', d: 'Darkness', m: 'Metal', y: 'Fairy', n: 'Dragon',
-};
-
 // "attach a Basic {R} Energy card from your hand to 1 of your Benched {R} Pokémon" (Energy
 // Carnival, Golden Flame, …) → which hand Energy may go where. Null when the text is not a
 // hand attach. handTarget is the printed target phrase ("this pokémon", "1 of your pokémon").
@@ -506,11 +500,6 @@ function parseTransformShape(lower) {
   };
 }
 
-const PROVIDES_SYMBOL_TYPES = {
-  g: 'Grass', r: 'Fire', w: 'Water', l: 'Lightning', p: 'Psychic',
-  f: 'Fighting', d: 'Darkness', m: 'Metal', n: 'Dragon', y: 'Fairy', c: 'Colorless',
-};
-
 // Buzzap / Buzzap Thunder / Battery: what the card provides once attached as Energy and
 // which of your Pokémon may receive it.
 function parseSelfAttachEnergyShape(lower) {
@@ -518,8 +507,8 @@ function parseSelfAttachEnergyShape(lower) {
   const typed = lower.match(/provides (\d+) \{([a-z])\} energy/);
   const provides = every
     ? Array(Number(every[1])).fill('Wildcard')
-    : typed && PROVIDES_SYMBOL_TYPES[typed[2]]
-      ? Array(Number(typed[1])).fill(PROVIDES_SYMBOL_TYPES[typed[2]])
+    : typed && ENERGY_SYMBOL_TYPES[typed[2]]
+      ? Array(Number(typed[1])).fill(ENERGY_SYMBOL_TYPES[typed[2]])
       : null;
   const target = lower.match(
     /attach (?:this card|it) (?:from your hand )?to (?:1|one) of your (other )?([^.]*?) as a special energy/
@@ -605,7 +594,7 @@ function withIfYouDoHalves(lower, parsed) {
   const lostCost = lower.match(/you may put (\d+) \{([a-z])\} energy cards? from your hand in the lost zone\. if you do/);
   if (lostCost) {
     steps = [
-      { type: 'lostZoneCost', count: Number(lostCost[1]), energyType: PROVIDES_SYMBOL_TYPES[lostCost[2]] || null, cost: true, guidance: 'Put Energy from your hand in the Lost Zone (cost).' },
+      { type: 'lostZoneCost', count: Number(lostCost[1]), energyType: ENERGY_SYMBOL_TYPES[lostCost[2]] || null, cost: true, guidance: 'Put Energy from your hand in the Lost Zone (cost).' },
       ...steps,
     ];
   }
@@ -655,6 +644,12 @@ function parseWinCondition(lower) {
   if (counters) return { kind: 'benchDamageCounters', count: Number(counters[1]) };
   return null;
 }
+
+export const PLAY_LOCK_CLAUSE = /can'?t play [^.]*from (?:his or her|their) hand/;
+// "each play" is the corpus typo for "each player"; it must not match the
+// substring inside "each player's hand" (Chandelure TWM's draw text parsed as
+// a play lock that would have blocked every card in hand).
+export const EACH_PLAYER_LOCK = /(?:each player|neither player|each play) can'?t play any/;
 
 export function parseAbility(text = '') {
   const lower = rewriteLegacyPowerWording(normalizeText(text));
@@ -1839,13 +1834,8 @@ export function parseAbility(text = '') {
   }
 
   // ── 47. Card-play / evolve locks (continuous) ───────────────────────────
-  const canPlayLock = /can'?t play [^.]*from (?:his or her|their) hand/.test(lower);
-  // "each play" is the corpus typo for "each player"; it must not match the
-  // substring inside "each player's hand" (Chandelure TWM's draw text parsed as
-  // a play lock that would have blocked every card in hand).
-  const eachPlayerLock = /(?:each player|neither player|each play) can'?t play any/.test(
-    lower
-  );
+  const canPlayLock = PLAY_LOCK_CLAUSE.test(lower);
+  const eachPlayerLock = EACH_PLAYER_LOCK.test(lower);
   const neitherCanPlay = /neither player can play/.test(lower);
   // Walrein ex Chilling Breath: a one-shot lock for the opponent's next turn, set when the
   // Ability is used (the attack step's player-level playLocks).
@@ -2272,8 +2262,9 @@ export function parseAbility(text = '') {
   );
   if (handCardCost && !steps.some((step) => step.type === 'discardCostAbility')) {
     const count = /^\d+$/.test(handCardCost[1]) ? Number(handCardCost[1]) : 1;
-    // Read the noun from the printed text so the guidance keeps its original casing.
-    const printedCost = String(text || '').match(
+    // Read the noun from the printed text so the guidance keeps its original casing; the
+    // symbols are tightened the same way as `lower` so "{ R }" still reads as a type.
+    const printedCost = tightenSymbols(String(text || '')).match(
       /discard (a|an|\d+) ([^.]*?) from your hand(?: in order to (?:use this ability|draw)|\. (?:if you do|then)\b)/i
     );
     const noun = (printedCost?.[2] || handCardCost[2]).trim();

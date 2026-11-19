@@ -6,6 +6,7 @@
 
 import { findCard, discardCardToPlayerZone } from '../state.mjs';
 import { isEnergy, isPokemon, isBasicPokemon } from '../cards.mjs';
+import { flipCoin } from '../rng.mjs';
 import { stadiumOnBenchTriggers } from '../rules/stadium-triggers.mjs';
 import { applyStadiumTriggerEffect } from '../effects/stadium-trigger-apply.mjs';
 import { discardCurrentStadium } from '../effects/trainer.mjs';
@@ -126,7 +127,7 @@ export function moveCardCommand({ payload, draft, playerId, events, activeRng })
         for (const effect of stadiumOnBenchTriggers(benchStadium, { pokemon: card })) {
           // Rocket's Minefield Gym: only tails puts the counters on.
           if (effect.coin) {
-            const face = activeRng.next() < 0.5 ? 'heads' : 'tails';
+            const face = flipCoin(activeRng);
             events.push({
               type: 'coinFlipped',
               playerId,

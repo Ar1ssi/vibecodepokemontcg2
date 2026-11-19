@@ -59,6 +59,7 @@
 //   { type: 'officialIllegal' }
 
 import { isEnergyCard } from './energy-effects.mjs';
+import { isAttachedToHost } from './energy-attachment.mjs';
 import { isExCard, isGxCard, isRuleBoxPokemon, isUltraBeastCard, isVCard } from './card-classify.mjs';
 import { parseSearchDeckParams } from './trainer-effects.mjs';
 import { canonicalEffectWording } from './effect-wording.mjs';
@@ -1113,15 +1114,7 @@ export function planSpecialEnergyTriggers(
 
 export function getAttachedSpecialEnergies(pokemonCard, zoneArray = []) {
   if (!pokemonCard) return [];
-  const targetImg = pokemonCard.image;
-  const targetId = pokemonCard.instanceId;
-  return (zoneArray || []).filter(
-    (c) =>
-      c &&
-      c.type === 'Energy' &&
-      ((targetId != null && c.attachedTo === targetId) ||
-        (targetImg && c.image?.relative === targetImg))
-  );
+  return (zoneArray || []).filter((c) => c && c.type === 'Energy' && isAttachedToHost(c, pokemonCard));
 }
 
 // "Ignore these effects if Holon Energy GL is attached to Pokémon-ex" / Heal Energy (I173).

@@ -474,22 +474,22 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     export function canPayAttackCost(attachedEnergies = [], cost = []) {
       if (debugCosts.free) return true;
       const pool = expandEnergyEntries(attachedEnergies).map(costToken);
+      // Colored symbols are paid first whatever the cost's listed order; any Energy left over
+      // (including Wildcard/dual) pays a Colorless symbol.
+      let colorless = 0;
       for (const printedSymbol of cost) {
         const symbol = costType(printedSymbol);
         if (symbol === 'Colorless') {
-          const ci = pool.indexOf('Colorless');
-          if (ci !== -1) pool.splice(ci, 1);
-          else if (pool.length === 0) return false;
-          else pool.pop(); // any single energy (including Wildcard/dual) pays a Colorless symbol
-        } else {
-          let idx = pool.indexOf(symbol);
-          if (idx === -1) idx = pool.findIndex((token) => dualMatches(token, symbol));
-          if (idx === -1) idx = pool.indexOf('Wildcard');
-          if (idx === -1) return false;
-          pool.splice(idx, 1);
+          colorless += 1;
+          continue;
         }
+        let idx = pool.indexOf(symbol);
+        if (idx === -1) idx = pool.findIndex((token) => dualMatches(token, symbol));
+        if (idx === -1) idx = pool.indexOf('Wildcard');
+        if (idx === -1) return false;
+        pool.splice(idx, 1);
       }
-      return true;
+      return pool.length >= colorless;
     }
     
     // Full attack flow. Returns a result object for the UI to announce.

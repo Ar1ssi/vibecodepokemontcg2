@@ -6,6 +6,7 @@
 
 import { findCard, discardCardToPlayerZone } from '../state.mjs';
 import { isTrainer } from '../cards.mjs';
+import { flipCoin } from '../rng.mjs';
 import { isPokemonToolCard } from '../rules/tool-combat.mjs';
 import { stadiumTrainerPlayCoin } from '../rules/stadium-triggers.mjs';
 import { abilityTurnNotEnd } from '../rules/ability-combat.mjs';
@@ -25,7 +26,7 @@ import { endTurnFromEffect } from './turn.mjs';
 export function chaosGymBlocks(draft, { card, playerId, activeRng, events }) {
   const chaos = stadiumTrainerPlayCoin(draft.stadium?.card || draft.stadium, card);
   if (!chaos) return false;
-  const face = activeRng.next() < 0.5 ? 'heads' : 'tails';
+  const face = flipCoin(activeRng);
   events.push({ type: 'coinFlipped', playerId, face, source: chaos.source });
   if (face === 'heads') return false;
   const hand = draft.players[playerId].zones.hand;

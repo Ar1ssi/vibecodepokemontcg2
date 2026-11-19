@@ -13,6 +13,8 @@
 import { findCard, discardCardToPlayerZone } from '../state.mjs';
 import { shuffleInPlace, flipCoin } from '../rng.mjs';
 import { isEnergy, isPokemon } from '../cards.mjs';
+import { createPendingChoice } from './pending-choice.mjs';
+import { BENCH_LIMIT } from './bench-limit.mjs';
 import { normalizeStage } from '../rules/evolution.mjs';
 import { topPokemonCard } from '../rules/evolved-pokemon.mjs';
 import { becomeFossilPokemon, isFossilItem } from '../rules/fossil.mjs';
@@ -45,6 +47,7 @@ import {
 import { ATTACK_STEP_HANDLERS, EXTRA_ENERGY_SELF_GATED, stepExtraEnergySatisfied } from './attack-steps.mjs';
 import { applyStadiumSwitchTriggers } from './stadium-trigger-apply.mjs';
 
+export { createPendingChoice };
 export const MAX_EFFECT_STEPS = 200;
 
 // Step kinds with a case in executeSteps' switch (kept in sync by executor-step-types.test).
@@ -176,49 +179,6 @@ function hasRuleBoxKind(player, root, kind) {
   const zone = [...(player.zones.active || []), ...(player.zones.bench || [])];
   const name = String((topPokemonCard(zone, root) || root).name || '');
   return Boolean(RULE_BOX_SUFFIX[kind]?.test(name));
-}
-
-/**
- * Deterministically creates a PendingChoice without Math.random (Invariant 6).
- */
-export function createPendingChoice({
-  choiceId = null,
-  player,
-  prompt,
-  source = '',
-  options = [],
-  min = 1,
-  max = 1,
-  cancellable = false,
-  resumeToken = {},
-  stateVersion = 0,
-  stepIndex = 0,
-}) {
-  const token = resumeToken ? { ...resumeToken } : {};
-  if (token && !token.initiatorPlayerId && player) {
-    token.initiatorPlayerId = player;
-  }
-  return {
-    choiceId: choiceId || `choice_${player}_${stateVersion}_${stepIndex}`,
-    player,
-    prompt,
-    source,
-    // Blind picks (face-down Prizes) reach the chooser without name or image (I141).
-    options: options.map((opt) =>
-      opt.faceDown
-        ? { instanceId: opt.instanceId, faceDown: true }
-        : {
-            instanceId: opt.instanceId,
-            name: opt.name || '',
-            src: opt.src || '',
-            type: opt.type || '',
-          }
-    ),
-    min,
-    max,
-    cancellable: Boolean(cancellable),
-    resumeToken: token,
-  };
 }
 
 const ORDINALS = ['1st', '2nd', '3rd', '4th', '5th'];
@@ -672,13 +632,11 @@ export function executeSteps(draft, {
         // Needs input: prompt player to discard N cards. An Energy-discard cost
         // (`energyOnly`) must not offer a non-Energy card just because the cost
         // names a type loosely ("discard an Energy card").
-        const isEnergyCard = (c) =>
-          /energy/i.test(String(c?.type || '') + String(c?.name || ''));
         const candidates = (player.zones.hand || []).filter(
           (c) =>
             c.instanceId !== sourceCard?.instanceId &&
             matchesEnergyTypeFilter(c, step.energyTypes) &&
-            (!step.energyOnly || isEnergyCard(c)) &&
+            (!step.energyOnly || isEnergy(c)) &&
             (!step.basicOnly || classifyEnergyEffect(c) === 'basic') &&
             (!step.what || matchesSearch(c, step.what)) &&
             matchesEnergyTypeFilter(c, step.pokemonTypes) &&
@@ -978,7 +936,7 @@ export function executeSteps(draft, {
             if (dest === 'bench') {
               const currentBench = player.zones.bench || [];
               const benchCount = currentBench.filter((b) => !b.attachedTo).length;
-              if (benchCount >= 5) {
+              if (benchCount >= BENCH_LIMIT) {
                 // Hard limit: bench is full, do not overfill bench
                 continue;
               }
@@ -1032,7 +990,7 @@ export function executeSteps(draft, {
         if (dest === 'bench') {
           const bench = player.zones.bench || [];
           const benchCount = bench.filter((c) => !c.attachedTo).length;
-          const availableBenchSlots = Math.max(0, 5 - benchCount);
+          const availableBenchSlots = Math.max(0, BENCH_LIMIT - benchCount);
           if (availableBenchSlots <= 0) {
             events.push({
               type: 'effectStepSkipped',
@@ -1060,7 +1018,7 @@ export function executeSteps(draft, {
         if (dest === 'bench') {
           const bench = player.zones.bench || [];
           const benchCount = bench.filter((c) => !c.attachedTo).length;
-          const availableBenchSlots = Math.max(0, 5 - benchCount);
+          const availableBenchSlots = Math.max(0, BENCH_LIMIT - benchCount);
           effectiveMaxCount = Math.min(maxCount, availableBenchSlots);
         }
 
@@ -1919,22 +1877,11 @@ export function executeSteps(draft, {
           : flip.face === 'heads'
             ? step.heads
             : step.tails;
+        // The branch runs inline, so a pick inside it resumes with the steps after the flip
+        // still in the token.
         const branch = normalizeSteps(branchSteps);
         if (branch.length > 0) {
-          const subResult = executeSteps(draft, {
-            steps: branch,
-            fromStepIndex: 0,
-            effectType,
-            sourceCard,
-            playerId,
-            activeRng,
-            events,
-            context,
-            budget,
-          });
-          if (subResult.pendingChoice) {
-            return subResult;
-          }
+          steps = [...steps.slice(0, idx + 1), ...branch, ...steps.slice(idx + 1)];
         }
         break;
       }
@@ -2228,7 +2175,7 @@ export function executeSteps(draft, {
         // Twist Mountain: Restored Pokémon from hand to Bench.
         const hand = player.zones.hand || [];
         const bench = player.zones.bench || [];
-        if (bench.filter((c) => !c.attachedTo).length >= 5) {
+        if (bench.filter((c) => !c.attachedTo).length >= BENCH_LIMIT) {
           events.push({ type: 'effectStepSkipped', reason: 'bench_full' });
           break;
         }
@@ -2255,7 +2202,7 @@ export function executeSteps(draft, {
         const zoneKey = step.source === 'discard' ? 'discard' : 'hand';
         const zone = player.zones[zoneKey] || [];
         const bench = player.zones.bench || [];
-        if (bench.filter((c) => !c.attachedTo).length >= 5) {
+        if (bench.filter((c) => !c.attachedTo).length >= BENCH_LIMIT) {
           events.push({ type: 'effectStepSkipped', reason: 'bench_full' });
           break;
         }
@@ -2340,8 +2287,6 @@ export function executeSteps(draft, {
         const maxCount = step.count || 1;
         const energyTypes =
           step.energyTypes || (step.typeFilter ? [step.typeFilter] : null);
-        const isEnergy = (c) =>
-          /energy/i.test(String(c?.type || '') + String(c?.name || ''));
         const candidates = discard.filter(
           (c) =>
             isEnergy(c) &&

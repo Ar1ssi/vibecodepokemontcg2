@@ -71,6 +71,16 @@ function gxReuseGranted(card, oncePerGame) {
   return (card?.types || []).some((t) => granted.includes(String(t).toLowerCase()));
 }
 
+// App. 9/19: the server rejects a GX or VSTAR Power attack once that allowance is spent
+// (design 049), so the panel greys it with the same reason.
+function gameAllowanceReason(card, atk, oncePerGame) {
+  if (isGxAttack(atk) && oncePerGame?.gxUsed && !gxReuseGranted(card, oncePerGame)) {
+    return 'Only one GX attack can be used per game.';
+  }
+  if (isVstarPowerAttack(atk) && oncePerGame?.vstarUsed) return 'VSTAR Power already used this game.';
+  return '';
+}
+
 export function listAttacks(card, opts = {}) {
   const {
     energyTypes = [],
@@ -92,11 +102,12 @@ export function listAttacks(card, opts = {}) {
   // (`parseAttackInheritance`); `extraAttacks` (Stadium inheritance / grants)
   // apply unconditionally.
   const attacks = mergeAttacks(mergeInheritedAttacks(card, priorAttacks), extraAttacks);
-  const passiveReads = !rulesEnabled
-    ? []
-    : Array.isArray(passiveDiscounts)
+  let passiveReads = [];
+  if (rulesEnabled) {
+    passiveReads = Array.isArray(passiveDiscounts)
       ? passiveDiscounts
       : [{ count: passiveCostDiscount(card), symbol: null }];
+  }
   const passiveDiscount = passiveReads.reduce((sum, read) => sum + (read?.count || 0), 0);
   const stadiumDiscount = rulesEnabled ? stadiumCostModifier : 0;
   const discounts = [...passiveReads, { count: stadiumDiscount, symbol: stadiumCostSymbol }];
@@ -109,15 +120,7 @@ export function listAttacks(card, opts = {}) {
         : rawCost;
 
     const payable = canPayAttackCost(energyTypes, effectiveCost);
-    // App. 9/19: the server rejects a GX or VSTAR Power attack once that allowance is spent
-    // (design 049), so the panel greys it with the same reason.
-    const gameUsedReason = !rulesEnabled
-      ? ''
-      : isGxAttack(atk) && oncePerGame?.gxUsed && !gxReuseGranted(card, oncePerGame)
-        ? 'Only one GX attack can be used per game.'
-        : isVstarPowerAttack(atk) && oncePerGame?.vstarUsed
-          ? 'VSTAR Power already used this game.'
-          : '';
+    const gameUsedReason = rulesEnabled ? gameAllowanceReason(card, atk, oncePerGame) : '';
     const onceUsed = (rulesEnabled && oncePerTurnClause(atk.text) && abilityUsed) || !!gameUsedReason;
     const blocked = rulesEnabled && !!blockedReason;
 
@@ -173,6 +176,11 @@ export function listAbilities(card, opts = {}) {
   const oncePerTurn = /once during your turn/i.test(cardAbilityText(card));
   const used = rulesEnabled && oncePerTurn && abilityUsed;
   const offSpot = rulesEnabled && zone !== 'active' && requiresActiveSpot(card);
+  // `used` wins the slot: it is the more specific state, and a card that has already spent a
+  // once-per-turn ability reads the same from either spot.
+  let reason = '';
+  if (used) reason = 'Already used this turn (once per turn).';
+  else if (offSpot) reason = 'This ability can only be used from the Active Spot.';
 
   return [
     {
@@ -184,13 +192,7 @@ export function listAbilities(card, opts = {}) {
       oncePerTurn,
       used,
       usable: !used && !offSpot,
-      // `used` wins the slot: it is the more specific state, and a card that has already spent a
-      // once-per-turn ability reads the same from either spot.
-      reason: used
-        ? 'Already used this turn (once per turn).'
-        : offSpot
-          ? 'This ability can only be used from the Active Spot.'
-          : '',
+      reason,
     },
   ];
 }

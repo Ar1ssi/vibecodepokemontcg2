@@ -55,8 +55,8 @@ export async function resolveAttackContext({
 
   // `extraAttacks` carries Stadium-granted inheritance (Shrine of Memories,
   // Meteor Falls, Holon Lake, Rocket's Tricky Gym); the caller resolves them
-  // from the evolution stack. `priorAttacks` remains the card's own text-driven
-  // inheritance (I44).
+  // from the evolution stack. `priorAttacks` is empty by design; `inheritsAttacks`
+  // flags the card's own text-driven inheritance.
   const priorAttacks = [];
   const inheritsAttacks = !!parseAttackInheritance(activeCard);
 

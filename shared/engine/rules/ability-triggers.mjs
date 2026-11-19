@@ -221,7 +221,7 @@ export function parseOnDamageAbilities(holder, ctx = {}) {
   if (!holderCanTrigger(holder, ctx)) return { count: 0, zone: 'any' };
   const thorns = parseThorns(holder);
   if (!thorns || !(thorns.count > 0)) return { count: 0, zone: 'any' };
-  if (thorns.zone === 'active' && ctx.isActive === false) {
+  if (thorns.zone === 'active' && ctx.isActive !== true) {
     return { count: 0, zone: thorns.zone };
   }
   return thorns;
@@ -382,7 +382,7 @@ export function parseEndOfTurnAbilities(entries = [], ctx = {}) {
     if (!text || !/end of your turn/.test(text)) continue;
     const discard = text.match(/discard the top (\d+) cards? of your deck/);
     if (!discard) continue;
-    if (/in the active spot/.test(text) && !holderIsActive(card, ctx)) continue;
+    if (HOLDER_ACTIVE_CLAUSE.test(selfNamedText(printed)) && !holderIsActive(card, ctx)) continue;
     out.push({
       holder: card,
       playerId,
