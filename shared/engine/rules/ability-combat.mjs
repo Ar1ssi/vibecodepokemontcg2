@@ -560,6 +560,44 @@ export function abilityDamageBonus(attacker, defender, ctx = {}) {
     if (ctx.opponentPrizesLeft == null) continue;
     total += bonus * prizesTakenFor(ctx.opponentPrizesLeft, ctx.opponentDeckFormat);
   }
+  return total + inPlayEnergyBonus(attacker, ctx);
+}
+
+// The Ability ctx of a holder on the attacker's opposing side, seen from that holder's own side.
+function opponentHolderCtx(ctx) {
+  return {
+    ...ctx,
+    sideCards: ctx.opponentSideCards,
+    opponentSideCards: ctx.sideCards,
+    sideActive: ctx.opponentActive,
+    sideBench: ctx.opponentBench,
+    opponentActive: ctx.sideActive,
+    opponentBench: ctx.sideBench,
+  };
+}
+
+const IN_PLAY_ENERGY_BONUS =
+  /(?:^|, )pok[eé]mon that have ((?:\{[a-z]\}(?:,? (?:or )?)?)+) energy attached(?: to them)? do (\d+) more damage/;
+
+/**
+ * Kyogre ex Drizzle (customhb 546): "As long as this Pokémon is in play, Pokémon that have {W} or
+ * {L} Energy attached to them do 20 more damage with their attacks." Unscoped "Pokémon" boosts
+ * attackers on both sides, so holders are read from either side, each with its own suppression.
+ */
+function inPlayEnergyBonus(attacker, ctx) {
+  const holders = [
+    ...sideInPlay(ctx).map((holder) => ({ holder, holderCtx: ctx })),
+    ...opponentInPlay(ctx).map((holder) => ({ holder, holderCtx: opponentHolderCtx(ctx) })),
+  ];
+  let total = 0;
+  for (const { holder, holderCtx } of holders) {
+    const m = cardAbilityText(holder).match(IN_PLAY_ENERGY_BONUS);
+    if (!m) continue;
+    if (isAbilitySuppressed(holder, holderCtx)) continue;
+    const types = typeSymbols(m[1]);
+    if (!types.some((type) => hasEnergyOfType(attacker, ctx.sideCards || ctx.inPlayCards, type))) continue;
+    total += Number(m[2]);
+  }
   return total;
 }
 
@@ -986,6 +1024,14 @@ export function abilityWeaknessOverride(defender, ctx = {}) {
       const t = cardAbilityText(holder);
       if (!t) continue;
       if (isAbilitySuppressed(holder, holderCtx)) continue;
+
+      // Kyogre ex Drizzle (customhb 546): "Pokémon that have a {R} Weakness have no Weakness."
+      // Unscoped, so it reads from either side.
+      const typedNone = t.match(/(?:^|\. )pok[eé]mon that have an? \{([a-z])\} weakness have no weakness/);
+      if (typedNone) {
+        const weak = lower(defender.weakness?.type || defender.weaknesses?.[0]?.type);
+        if (weak && weak === lower(TYPE_LETTER[typedNone[1]])) return { none: true };
+      }
 
       if (
         holderSide === 'defender' &&
