@@ -1470,6 +1470,11 @@ const BLOCKS = [
       rest: /lost zone/.test(m[4]) ? 'lostZone' : 'shuffle',
     }),
   ],
+  // Dialga ex Time Twister (customhb set.json, the user's custom set): no shuffle afterward.
+  [
+    /look at the top and bottom cards of your deck\. put one into your hand and discard the other\./g,
+    () => ({ type: 'atkLookTopTake', look: 'topAndBottom', take: 1, rest: 'discard' }),
+  ],
   [
     /choose (\d+) of your opponent's benched pokémon\. shuffle those pokémon and all attached cards into your opponent's deck\./g,
     (m) => ({ type: 'atkShuffleOppBench', count: Number(m[1]) }),

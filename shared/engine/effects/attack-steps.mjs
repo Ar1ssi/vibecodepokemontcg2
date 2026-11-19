@@ -1489,15 +1489,24 @@ function atkMirrorHeal(ctx) {
 
 // ── look at the top of the deck ─────────────────────────────────────────────
 
+// The cards an `atkLookTopTake` looks at: the top `look`, or the top and bottom cards
+// (`look: 'topAndBottom'`; one card when the deck holds one).
+function lookedAtCards(deck, look) {
+  if (look === 'topAndBottom') return deck.length > 1 ? [deck[0], deck[deck.length - 1]] : deck.slice(0, 1);
+  return deck.slice(0, look || 1);
+}
+
 // Giratina V Abyss Seeking / Pichu Baby Steps: keep `take` of the top `look` cards; the rest
-// go to the Lost Zone or are shuffled back.
+// go to the Lost Zone or are shuffled back. Dialga ex Time Twister: top and bottom, the other
+// is discarded (`rest: 'discard'`).
 function atkLookTopTake(ctx) {
   const { player, step } = ctx;
-  const viewed = player.zones.deck.slice(0, step.look || 1);
+  const viewed = lookedAtCards(player.zones.deck, step.look);
   const finish = (kept) => {
     for (const card of kept) moveToZone(player, card, 'hand', 'deck', ctx.events);
     const rest = viewed.filter((c) => !kept.includes(c));
     if (step.rest === 'lostZone') moveToLostZone(ctx, player, rest);
+    else if (step.rest === 'discard') discardCards(player, rest, ctx.events, { from: 'deck' });
     else shuffleOwnDeck(player, ctx);
     return null;
   };
