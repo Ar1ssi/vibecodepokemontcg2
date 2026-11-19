@@ -108,8 +108,9 @@ export function deckSpriteLabel(sprite = {}) {
 }
 
 /**
- * Coerces whatever is stored on a deck into a renderable slot list: unknown
- * slugs, duplicates, non-objects and anything past the cap are dropped. A deck
+ * Coerces whatever is stored on a deck into a renderable slot list: a slot is
+ * `{slug, shiny}` or a bare slug string (never shiny); unknown slugs, duplicates,
+ * other values and anything past the cap are dropped. A deck
  * saved before sprites existed normalizes to [], so old libraries just work.
  *
  * @returns {{slug: string, shiny: boolean}[]}

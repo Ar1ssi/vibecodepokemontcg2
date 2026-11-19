@@ -50,6 +50,12 @@ export const clearBoardReady = () => {
   }
 };
 
+// The card being dragged, found by its `.dragging` class across the page and both board mirrors.
+const draggedImageOf = () =>
+  document.querySelector('.dragging') ||
+  selfContainerDocument?.querySelector('.dragging') ||
+  oppContainerDocument?.querySelector('.dragging');
+
 const heldCard = (image) =>
   image.card ?? getZone(mouseClick.cardUser, mouseClick.zoneId)?.array?.[mouseClick.cardIndex];
 
@@ -87,9 +93,6 @@ export const refuseBoardDrop = () => {
 };
 
 export const dragStart = (event) => {
-  if (systemState.isReplay && !systemState.isTwoPlayer) {
-    return;
-  }
   event.target.classList.add('high-zIndex');
   if (event.target.attached) {
     event.target.style.opacity = '0';
@@ -124,9 +127,6 @@ export const dragStart = (event) => {
 };
 
 export const dragOver = (event) => {
-  if (systemState.isReplay && !systemState.isTwoPlayer) {
-    return;
-  }
   event.preventDefault();
   const explicitDrop = explicitDropZoneOf(event.target);
   if (explicitDrop) {
@@ -152,10 +152,9 @@ export const dragOver = (event) => {
     mouseClick.playContainer.style.zIndex = '-1';
     mouseClick.playContainerParent.style.zIndex = '-1';
   }
-  let draggedImage =
-    document.querySelector('.dragging') ||
-    selfContainerDocument.querySelector('.dragging') ||
-    oppContainerDocument.querySelector('.dragging');
+  const draggedImage = draggedImageOf();
+  // A drag that is not a card drag (a file, selected text) or whose card left the DOM mid-drag.
+  if (!draggedImage) return;
 
   if (
     zoneOf(event.target)?.id === 'board' &&
@@ -308,10 +307,8 @@ export const drop = (event) => {
   clearExplicitDropHighlights();
   clearBoardReady();
 
-  let draggedImage =
-    document.querySelector('.dragging') ||
-    selfContainerDocument.querySelector('.dragging') ||
-    oppContainerDocument.querySelector('.dragging');
+  const draggedImage = draggedImageOf();
+  if (!draggedImage) return;
   //reset opacity of attached cards
   draggedImage.parentElement.querySelectorAll('img').forEach((image) => {
     if (image.attached) {
@@ -352,7 +349,7 @@ export const drop = (event) => {
     } else if (
       // if target image exists and it isn't itself
       event.target.tagName === 'IMG' &&
-      event.target !== draggedImage[0] &&
+      event.target !== draggedImage &&
       ['active', 'bench'].includes(zoneOf(event.target)?.id)
     ) {
       dZoneId = zoneOf(event.target)?.id;

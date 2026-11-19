@@ -45,7 +45,9 @@ const MASK_OVERLAP_PX = 1.5;
 const PW = PACK.width;
 const PH = PACK.height;
 
-function maskTexture(line, keepBelow) {
+/** Alpha mask for the pack's `part`: the 'body' below the tear line or the torn-off 'strip' above it. */
+function maskTexture(line, part) {
+  const keepBelow = part === 'body';
   const canvas = makeCanvas(MASK_W, MASK_H);
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = '#000';
@@ -72,6 +74,52 @@ function maskTexture(line, keepBelow) {
 
 const SURFACE_W = 384;
 const SURFACE_H = 704;
+const SEAL_TEETH = 80;
+const SEAL_TOOTH_DEPTH = 0.09;
+// Scales a crease's summed height so the normal map shows it as a fold, not a scratch.
+const CREASE_GAIN = 9;
+
+/** Where the crimped seals end, as fractions down the wrapper (the art's own bounds, trimmed to hide the seam). */
+function sealBoundsV(shape) {
+  const { sealTopV, sealBottomV } = packShape(shape);
+  return { topV: sealTopV * 0.96, bottomV: Math.min(1, sealBottomV * 1.004) };
+}
+
+// A crease: a narrow ridge or trough from (x0, y0) running `length` px along `angle`, fading out.
+function addCrease(heights, w, h, x0, y0, angle, length, depth, width) {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const reach = Math.ceil(width * 2.5);
+  for (let s = 0; s < length; s += 1) {
+    const fade = 1 - s / length;
+    const cx = x0 + cos * s;
+    const cy = y0 + sin * s;
+    for (let oy = -reach; oy <= reach; oy += 1) {
+      for (let ox = -reach; ox <= reach; ox += 1) {
+        const px = Math.round(cx + ox);
+        const py = Math.round(cy + oy);
+        if (px < 0 || px >= w || py < 0 || py >= h) continue;
+        const d = Math.abs(ox * -sin + oy * cos);
+        heights[py * w + px] += ((depth * fade * Math.exp(-(d * d) / (width * width))) / length) * CREASE_GAIN;
+      }
+    }
+  }
+}
+
+/** Short folds along a seal's inner `edge` (px), fanning into the body (`inward` +1 down, -1 up). */
+function addSealFolds(heights, w, h, edge, inward, rand) {
+  let x = rand() * 10;
+  while (x < w) {
+    // Folds crowd toward the corners, where the pillow pinches hardest.
+    const corner = Math.min(x, w - x) / (w / 2);
+    const length = (14 + rand() * 46) * (1.25 - 0.5 * corner);
+    const lean = (rand() - 0.5) * 0.7 + (x < w / 2 ? 0.25 : -0.25) * (1 - corner);
+    const depth = (rand() < 0.5 ? -1 : 1) * (0.6 + rand() * 0.6);
+    const width = 1.1 + rand() * 1.2;
+    addCrease(heights, w, h, x, edge, (Math.PI / 2) * inward + lean * inward, length, depth, width);
+    x += 6 + rand() * 16 * (0.4 + corner);
+  }
+}
 
 /**
  * The wrapper's relief as a normal map: the heat-sealer's fine teeth across both crimped seals,
@@ -80,55 +128,23 @@ const SURFACE_H = 704;
  * same pack.
  */
 function packSurfaceTexture(shape, seed) {
-  const { sealTopV, sealBottomV } = packShape(shape);
+  const { topV, bottomV } = sealBoundsV(shape);
   const w = SURFACE_W;
   const h = SURFACE_H;
   const heights = new Float32Array(w * h);
-  const topSeal = sealTopV * 0.96 * h;
-  const bottomSeal = Math.min(1, sealBottomV * 1.004) * h;
+  const topSeal = topV * h;
+  const bottomSeal = bottomV * h;
   for (let y = 0; y < h; y += 1) {
     const inSeal = y < topSeal || y > bottomSeal;
     for (let x = 0; x < w; x += 1) {
-      const teeth = inSeal ? Math.cos((x / w) * Math.PI * 2 * 80) * 0.09 : 0;
+      const teeth = inSeal ? Math.cos((x / w) * Math.PI * 2 * SEAL_TEETH) * SEAL_TOOTH_DEPTH : 0;
       const dent = (fbm(x / 48, y / 48, w / 48, 3, seed) - 0.5) * 2.2;
       heights[y * w + x] = teeth + dent;
     }
   }
   const rand = prng(seed + 17);
-  // A crease: a narrow ridge or trough from (x0, y0) running `length` px along `angle`, fading out.
-  const crease = (x0, y0, angle, length, depth, width) => {
-    const cos = Math.cos(angle);
-    const sin = Math.sin(angle);
-    const reach = Math.ceil(width * 2.5);
-    for (let s = 0; s < length; s += 1) {
-      const fade = 1 - s / length;
-      const cx = x0 + cos * s;
-      const cy = y0 + sin * s;
-      for (let oy = -reach; oy <= reach; oy += 1) {
-        for (let ox = -reach; ox <= reach; ox += 1) {
-          const px = Math.round(cx + ox);
-          const py = Math.round(cy + oy);
-          if (px < 0 || px >= w || py < 0 || py >= h) continue;
-          const d = Math.abs(ox * -sin + oy * cos);
-          heights[py * w + px] += (depth * fade * Math.exp(-(d * d) / (width * width))) / length * 9;
-        }
-      }
-    }
-  };
-  for (const [edge, inward] of [
-    [topSeal, 1],
-    [bottomSeal, -1],
-  ]) {
-    let x = rand() * 10;
-    while (x < w) {
-      // Folds crowd toward the corners, where the pillow pinches hardest.
-      const corner = Math.min(x, w - x) / (w / 2);
-      const length = (14 + rand() * 46) * (1.25 - 0.5 * corner);
-      const lean = (rand() - 0.5) * 0.7 + (x < w / 2 ? 0.25 : -0.25) * (1 - corner);
-      crease(x, edge, Math.PI / 2 * inward + lean * inward, length, (rand() < 0.5 ? -1 : 1) * (0.6 + rand() * 0.6), 1.1 + rand() * 1.2);
-      x += 6 + rand() * 16 * (0.4 + corner);
-    }
-  }
+  addSealFolds(heights, w, h, topSeal, 1, rand);
+  addSealFolds(heights, w, h, bottomSeal, -1, rand);
   return normalTextureFromHeights(heights, w, h, 1, null, { repeat: false });
 }
 
@@ -137,17 +153,17 @@ const SEAL_ROUGHNESS = 0.55;
 
 /** Roughness across the wrapper (green channel): the heat-pressed seals are duller than the body. */
 function packRoughnessTexture(shape) {
-  const { sealTopV, sealBottomV } = packShape(shape);
+  const { topV, bottomV } = sealBoundsV(shape);
   const w = 8;
   const h = 256;
   const canvas = makeCanvas(w, h);
   const ctx = canvas.getContext('2d');
-  const shade = (roughness) => `rgb(0,${Math.round(roughness * 255)},0)`;
-  ctx.fillStyle = shade(BODY_ROUGHNESS);
+  const roughnessRgb = (roughness) => `rgb(0,${Math.round(roughness * 255)},0)`;
+  ctx.fillStyle = roughnessRgb(BODY_ROUGHNESS);
   ctx.fillRect(0, 0, w, h);
-  ctx.fillStyle = shade(SEAL_ROUGHNESS);
-  ctx.fillRect(0, 0, w, Math.round(sealTopV * 0.96 * h));
-  const bottom = Math.round(Math.min(1, sealBottomV * 1.004) * h);
+  ctx.fillStyle = roughnessRgb(SEAL_ROUGHNESS);
+  ctx.fillRect(0, 0, w, Math.round(topV * h));
+  const bottom = Math.round(bottomV * h);
   ctx.fillRect(0, bottom, w, h - bottom);
   const texture = new CanvasTexture(canvas);
   texture.colorSpace = NoColorSpace;
@@ -167,6 +183,8 @@ function pillowGrid(width, height, segX, segY, vFrom, vTo, shape, sign) {
     position.setZ(i, sign * pillowZ(u, v, shape) * PW);
   }
   if (sign < 0) {
+    // The back grid is the front's plane pushed to -z: swap two vertices per triangle so its
+    // faces wind the other way and point out of the back.
     const index = geometry.getIndex();
     for (let i = 0; i < index.count; i += 3) {
       const a = index.getX(i + 1);
@@ -227,8 +245,8 @@ export function createPackKit({ envMap, renderer }) {
     const backTexture = track(new CanvasTexture(backCanvas));
     backTexture.colorSpace = SRGBColorSpace;
     backTexture.anisotropy = anisotropy;
-    const bodyMask = track(maskTexture(line, true));
-    const stripMask = track(maskTexture(line, false));
+    const bodyMask = track(maskTexture(line, 'body'));
+    const stripMask = track(maskTexture(line, 'strip'));
     const surface = surfaceFor(shape, packIndex);
 
     // Roughness comes from the map (body 0.3, seals 0.55); the clearcoat scales the same map.
@@ -244,10 +262,14 @@ export function createPackKit({ envMap, renderer }) {
       normalMap: surface.relief,
       alphaTest: 0.5,
     };
-    const frontMaterial = (alphaMap) =>
-      track(new MeshPhysicalMaterial({ ...look, map: artTexture, alphaMap, side: FrontSide }));
-    const backMaterial = (alphaMap) =>
-      track(new MeshPhysicalMaterial({ ...look, map: backTexture, alphaMap, side: FrontSide }));
+    const materials = [];
+    const surfaceMaterial = (map, alphaMap) => {
+      const material = track(new MeshPhysicalMaterial({ ...look, map, alphaMap, side: FrontSide }));
+      materials.push(material);
+      return material;
+    };
+    const frontMaterial = (alphaMap) => surfaceMaterial(artTexture, alphaMap);
+    const backMaterial = (alphaMap) => surfaceMaterial(backTexture, alphaMap);
 
     const group = new Group();
     group.name = `tt-pack-${packIndex}`;
@@ -329,9 +351,7 @@ export function createPackKit({ envMap, renderer }) {
 
     const setDim = (amount) => {
       const level = Math.max(0, Math.min(1, amount));
-      for (const material of disposables) {
-        if (material.isMaterial) material.color = new Color(level, level, level);
-      }
+      for (const material of materials) material.color = new Color(level, level, level);
     };
 
     return {

@@ -1,5 +1,6 @@
 /**
- * @file Design 074 D7: the Solo tab plays through the server. Joining makes a private
+ * @file Design 074 D7: the Solo tab plays through the server; design 090 joins it at page load
+ * too (`autoJoinSoloAtLoad`). Joining makes a private
  * `solo-` room whose two seats belong to this one socket; leaving puts the local board back
  * the way leaving a Multiplayer room does. The `joinGame` acknowledgement is handled in
  * socket-event-listeners.js (`handleSoloJoinGame`).
@@ -17,7 +18,12 @@ import {
   removeSyncIntervals,
   resetNetcodeForRoomChange,
 } from '../../initialization/socket-event-listeners/socket-event-listeners.js';
+import { isE2eMode } from '../general/e2e-mode.mjs';
 import { makeSoloRoomId, soloOwnerName } from './solo-seat.mjs';
+import { shouldAutoJoinSolo } from './solo-at-load.mjs';
+
+const SERVER_UNREACHABLE_MESSAGE =
+  'Cannot reach the server yet. The board stays empty until it connects, then your solo game starts.';
 
 let refusalListenerInstalled = false;
 
@@ -49,6 +55,34 @@ export function joinSoloRoom() {
   systemState.roomId = roomId;
   systemState.p2SelfUsername = chooseUsername(roomId);
   socket.emit('joinGame', roomId, systemState.p2SelfUsername, false, null, { solo: true });
+  return true;
+}
+
+/**
+ * Design 090: the page joins its solo room by itself, as the Solo tab does, once the socket is
+ * connected (a join sent earlier would not be acknowledged), unless the page was opened for
+ * something else (`shouldAutoJoinSolo`). One attempt: a refused join is reported by
+ * `onSoloRoomRefused` and leaves the board empty; an unreachable server gets one message and
+ * the join goes out when the socket first connects.
+ *
+ * @returns {boolean} true when the page set out to join solo
+ */
+export function autoJoinSoloAtLoad() {
+  const { pathname, search } = window.location;
+  if (!shouldAutoJoinSolo({ pathname, search, e2eMode: isE2eMode(search) })) return false;
+  if (socket.connected) {
+    joinSoloRoom();
+    return true;
+  }
+  const onConnectError = () => {
+    socket.off('connect_error', onConnectError);
+    appendMessage('', SERVER_UNREACHABLE_MESSAGE, 'announcement', false);
+  };
+  socket.once('connect', () => {
+    socket.off('connect_error', onConnectError);
+    joinSoloRoom();
+  });
+  socket.on('connect_error', onConnectError);
   return true;
 }
 

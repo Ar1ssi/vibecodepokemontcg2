@@ -4,11 +4,11 @@
 //
 // Off by default: an always-on service uses about 730 of the 750 free instance hours a Render
 // workspace gets per month, so it is the owner's call (and only one service can have it).
+import { isOn } from './env-settings.mjs';
+
 export const KEEP_AWAKE_PATH = '/healthz';
 export const KEEP_AWAKE_INTERVAL_MS = 10 * 60 * 1000;
 const PING_TIMEOUT_MS = 10_000;
-
-const isOn = (value) => /^(1|true|on|yes)$/i.test(String(value ?? '').trim());
 
 /**
  * @param {object} [env] `KEEP_AWAKE` turns it on; the address is `KEEP_AWAKE_URL`, else the

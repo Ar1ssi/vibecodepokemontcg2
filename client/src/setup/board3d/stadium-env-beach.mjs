@@ -496,7 +496,7 @@ void main() {
   // Foam: three bands rolling in parallel to the shore over the shallows (design 084), the rollers
   // and fresh breaks as crisp white bands, a collar round each rock, and a thin white line where the
   // water meets the sand.
-  float bands = foamBands(offshore, p, uTime, 3.0, 38.0) * smoothstep(150.0, 70.0, offshore) * quiet;
+  float bands = foamBands(offshore, p, uTime, 3.0, 38.0) * (1.0 - smoothstep(70.0, 150.0, offshore)) * quiet;
   float amount = max(max(max(sea.foam, sea.fresh), sea.cap * 0.55) * calm, bands);
   amount = max(amount, rockWash(p, smoothstep(0.5, 3.0, sea.height)));
   float foam = smoothstep(0.42, 0.56, amount);

@@ -31,9 +31,10 @@ import {
 } from './stadium-environment-glsl.mjs';
 import { craterEmblem, environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
 import { createPropBuilder } from './stadium-env-props.mjs';
+import { STANDARD_TERRAIN_VERTEX } from './stadium-env-surfaces.mjs';
 import { createKitProps } from './stadium-kit.mjs';
 import { tableBounds } from './table-uv.mjs';
-import { RISE_LEAN, visibleArea } from './stadium-env-spots.mjs';
+import { RISE_LEAN, distanceToRect, visibleArea } from './stadium-env-spots.mjs';
 import { clumpPieces } from './stadium-env-clumps.mjs';
 import { instanceTint, placeAsset } from './stadium-kit-assets.mjs';
 
@@ -104,9 +105,6 @@ const hashOf = (n) => {
   const s = Math.sin(n * 127.1 + 311.7) * 43758.5453;
   return s - Math.floor(s);
 };
-
-/** px from (x, y) to the rect (0 inside it). */
-const distanceToRect = (x, y, r) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.y - y, 0, y - r.y - r.h));
 
 /**
  * The chain's links, [x, y, z] centres in order: from the anchor stone's inner face, half way up it,
@@ -558,25 +556,6 @@ void main() {
 }
 `;
 
-export const TERRAIN_VERTEX = /* glsl */ `
-${TERRAIN_UNIFORMS}
-${NOISE}
-${REVEAL}
-${TERRAIN_GROUND}
-varying vec2 vPos;
-varying vec2 vUv;
-varying float vGrowth;
-void main() {
-  vec2 p = position.xy;
-  vec2 uv = (p - uMin) / uSize;
-  float growth = terrainGrowth(p);
-  vPos = p;
-  vUv = uv;
-  vGrowth = growth;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(p, groundAt(uv) * growth * edgeSkirt(uv), 1.0);
-}
-`;
-
 const OVERCAST = /* glsl */ `
 // The art's overcast air: the haze the far ground fades into.
 const vec3 HAZE = vec3(0.42, 0.37, 0.3);
@@ -635,7 +614,7 @@ void main() {
     vec3 boulderRock = mix(vec3(0.24, 0.225, 0.2), vec3(0.42, 0.4, 0.36), smoothstep(0.2, 0.9, facing)) * (0.9 + 0.25 * (id - 0.6));
     rock = mix(rock, boulderRock, boulder);
     vec3 dust = vec3(0.27, 0.245, 0.205) * (0.94 + 0.12 * smoothstep(0.35, 0.65, fbm3(p / 120.0)));
-    rock = mix(dust, rock, max(smoothstep(0.92, 0.75, n.z), boulder));
+    rock = mix(dust, rock, max((1.0 - smoothstep(0.75, 0.92, n.z)), boulder));
     col = rock * (0.75 + 0.3 * sky);
   }
   col = mix(col * 0.55, col, smoothstep(0.3, 0.9, light.b));
@@ -679,7 +658,7 @@ export function mountainRingBoard({ three, material, terrainGrid, replaceGeometr
   };
   const make = (vertex, fragment, extra) => material(vertex, fragment, extra, own);
   const materials = {
-    terrain: make(TERRAIN_VERTEX, TERRAIN_FRAGMENT),
+    terrain: make(STANDARD_TERRAIN_VERTEX, TERRAIN_FRAGMENT),
     bakeField: make(FULLSCREEN_VERTEX, BAKE_FIELD_FRAGMENT, bakeOptions),
     bakeLight: make(FULLSCREEN_VERTEX, bakeLightFragment({ aoFollowsSlope: true }), bakeOptions),
   };

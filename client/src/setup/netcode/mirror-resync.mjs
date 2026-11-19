@@ -32,7 +32,7 @@ export const MIRROR_RESYNC_MIN_INTERVAL_MS = 5000;
 const NEVER = Number.NEGATIVE_INFINITY;
 let lastReportAt = NEVER;
 
-/** @internal test seam */
+/** Called on every room change, so the next game's first divergence is never throttled. */
 export function resetMirrorResyncThrottle() {
   lastReportAt = NEVER;
 }
@@ -49,17 +49,16 @@ export function resetMirrorResyncThrottle() {
  *   The zone source this client actually renders from — legacy `getZone`, or the view
  *   accessor under server authority.
  * @param {string} [options.zoneId] The zone the rejected move was reading, for the log only.
- * @param {string} [options.reason]
  * @param {number} [options.now] Test seam.
  * @param {number} [options.minIntervalMs] Test seam.
- * @returns {{ sent: boolean, reason: string, zones?: Record<string, string>, zoneId?: string }}
+ * @returns {{ sent: false, reason: string } | { sent: boolean, zones: Record<string, string>, zoneId: string }}
+ *   `reason` names why nothing was sent; a result with `zones` was reported
  */
 export function reportMirrorDesync({
   socket,
   roomId,
   getZoneFn,
   zoneId = '',
-  reason = 'mirror_abort',
   now = Date.now(),
   minIntervalMs = MIRROR_RESYNC_MIN_INTERVAL_MS,
 } = {}) {
@@ -84,5 +83,5 @@ export function reportMirrorDesync({
   const zones = computeSyncCheckZones('self', getZoneFn);
   const sent = emitSyncCheck({ socket, roomId, zones });
   if (sent) lastReportAt = now;
-  return { sent, zones, zoneId, reason };
+  return { sent, zones, zoneId };
 }

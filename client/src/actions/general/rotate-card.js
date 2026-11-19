@@ -1,9 +1,7 @@
 import { systemState } from '../../state.js';
 import { processAction } from '../../setup/general/process-action.js';
 import { getZone } from '../../setup/zones/get-zone.js';
-import { addAbilityCounter } from '../counters/ability-counter.js';
-import { addDamageCounter } from '../counters/damage-counter.js';
-import { addSpecialCondition } from '../counters/special-condition.js';
+import { refreshZoneCounters } from '../move-card-bundle/update-counters.js';
 
 export const rotateCard = (
   user,
@@ -13,6 +11,7 @@ export const rotateCard = (
   rotationAngle = null,
   emit = true
 ) => {
+  // refresh-board.js calls (user, zoneId, index, false, emit) without an angle.
   if (typeof rotationAngle === 'boolean') {
     emit = rotationAngle;
     rotationAngle = null;
@@ -61,18 +60,7 @@ export const rotateCard = (
     }
   }
   //update any damagecounters/specialconditions/abilitycounters
-  for (let i = 0; i < zone.getCount(); i++) {
-    const image = zone.array[i].image;
-    if (image.damageCounter) {
-      addDamageCounter(user, zoneId, i, false, false);
-    }
-    if (image.specialCondition) {
-      addSpecialCondition(user, zoneId, i, false);
-    }
-    if (image.abilityCounter) {
-      addAbilityCounter(user, zoneId, i);
-    }
-  }
+  refreshZoneCounters(user, zoneId, zone);
 
   processAction(user, emit, 'rotateCard', [zoneId, index, single, newRotation]);
 };

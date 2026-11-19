@@ -44,8 +44,9 @@ import {
 import { environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
 import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
 import { GLOW, GRASS, LIGHT_MOTION } from './stadium-env-ground.mjs';
-import { RISE_LEAN, frameWeight, patchy, shuffled, visibleArea } from './stadium-env-spots.mjs';
+import { RISE_LEAN, distanceToRect, frameWeight, hash, oppHandRect, patchy, shuffled, union, visibleArea } from './stadium-env-spots.mjs';
 import { clumpPieces, scaledKinds } from './stadium-env-clumps.mjs';
+import { EDGE_HAZE, STANDARD_TERRAIN_VERTEX } from './stadium-env-surfaces.mjs';
 import { createKitProps, glslColour, paint } from './stadium-kit.mjs';
 import { measureAsset, placeAsset } from './stadium-kit-assets.mjs';
 import { tableBounds } from './table-uv.mjs';
@@ -104,14 +105,6 @@ export const MIST_CARD_GAP_PX = 40;
 /** How far a pad reaches past its radius, seen from above (a margin). */
 const PUFF_REACH = 1.06;
 
-/** A small deterministic 0..1 from three numbers. */
-const hash = (x, y, salt) => {
-  const s = Math.sin(x * 127.1 + y * 311.7 + salt * 74.7) * 43758.5453;
-  return s - Math.floor(s);
-};
-
-const distanceToRect = (x, y, r) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.y - y, 0, y - r.y - r.h));
-
 /** The meadow edge's wander, 0..1, as the shader's `wobble`. */
 export const clearingWobble = (x, y) =>
   0.5 + 0.3 * Math.sin(x * 0.021 + 1.3) * Math.sin(y * 0.017 + 0.4) + 0.2 * Math.sin((x + y) * 0.013 + 2.2);
@@ -119,24 +112,6 @@ export const clearingWobble = (x, y) =>
 /** Signed px from the meadow's edge at (x, y) (negative on the meadow), as the shader's `clearingDistance`. */
 export const clearingDistance = (core, x, y) =>
   distanceToRect(x, y, core) - CLEARING_PX - CLEARING_WOBBLE_PX * clearingWobble(x, y);
-
-const union = (rects) => {
-  const x = Math.min(...rects.map((r) => r.x));
-  const y = Math.min(...rects.map((r) => r.y));
-  return { x, y, w: Math.max(...rects.map((r) => r.x + r.w)) - x, h: Math.max(...rects.map((r) => r.y + r.h)) - y };
-};
-
-/**
- * The opponent's hand where the board fans it, past the far edge: the cards' width either side of
- * the middle (a full hand), its card height deep.
- */
-const oppHandRect = (layout, core) => {
-  const hand = layout.opp?.hand;
-  const cardH = layout.opp?.cardBox?.hand?.h ?? 0;
-  if (!hand || !(cardH > 0) || !Number.isFinite(hand.baselineY)) return null;
-  const halfW = Math.max(Math.abs(core.x), Math.abs(core.x + core.w));
-  return { x: -halfW, y: hand.baselineY - cardH, w: 2 * halfW, h: cardH };
-};
 
 /**
  * The great tree: its trunk's root in the band beside the cards on HERO_SIDE, toward the far end; its
@@ -560,24 +535,7 @@ void main() {
 }
 `;
 
-export const TERRAIN_VERTEX = /* glsl */ `
-${TERRAIN_UNIFORMS}
-${NOISE}
-${REVEAL}
-${TERRAIN_GROUND}
-varying vec2 vPos;
-varying vec2 vUv;
-varying float vGrowth;
-void main() {
-  vec2 p = position.xy;
-  vec2 uv = (p - uMin) / uSize;
-  float growth = terrainGrowth(p);
-  vPos = p;
-  vUv = uv;
-  vGrowth = growth;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(p, groundAt(uv) * growth * edgeSkirt(uv), 1.0);
-}
-`;
+export const TERRAIN_VERTEX = STANDARD_TERRAIN_VERTEX;
 
 // The meadow and the undergrowth as BDSP paints them (authored as shown, inverted through Neutral
 // tone mapping), the glow the card art's.
@@ -596,10 +554,7 @@ const vec3 GLOW_CORE = vec3(0.95, 0.94, 0.45);
 // light soft one where the crown is thin and a deeper one under its dense middle (no dark blob).
 const vec3 SHADE_SOFT = vec3(0.74, 0.8, 0.86);
 const vec3 SHADE_DEEP = vec3(0.54, 0.62, 0.72);
-vec3 edgeHaze(vec3 col, vec2 uv) {
-  vec2 edgeUv = min(uv, 1.0 - uv);
-  return col * mix(0.5, 1.0, smoothstep(0.0, 0.035, min(edgeUv.x, edgeUv.y)));
-}
+${EDGE_HAZE}
 `;
 
 export const TERRAIN_FRAGMENT = /* glsl */ `
@@ -679,7 +634,7 @@ void main() {
 
   // Design 085: the far margin cools into the card's blue-green distance.
   col = mix(col, FAR_HAZE * 0.8, smoothstep(0.74, 1.0, vUv.y) * 0.45);
-  col = edgeHaze(col, vUv);
+  col = edgeHaze(col, vUv, 0.5);
   vec3 dawn = vec3(0.85, 0.95, 0.35);
   col += dawn * revealGlow(p, 0.035) * 0.7;
   col += dawn * exitGlow(p) * 0.7;
@@ -844,7 +799,7 @@ ${OUTPUT}
  */
 const UNDERLIGHT = /* glsl */ `
 vec3 kitGlow(vec3 albedo, vec3 n, vec3 world) {
-  float under = smoothstep(0.35, -0.45, n.z);
+  float under = 1.0 - smoothstep(-0.45, 0.35, n.z);
   float low = exp(-max(world.z, 0.0) / 230.0);
   return ${glslColour('#c8cf3c')} * under * (0.3 + 0.7 * low) * 0.42;
 }

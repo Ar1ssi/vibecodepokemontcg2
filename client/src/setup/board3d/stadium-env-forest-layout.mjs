@@ -6,9 +6,9 @@
 // island, lie in opposite corners away from the seam: the far end left of the cards and the near end
 // right of them. stadium-env-forest.mjs draws all of it.
 // Pure: no three.js, no DOM.
-import { environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
+import { distanceToRect, environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
 import { tableBounds } from './table-uv.mjs';
-import { patchy } from './stadium-env-spots.mjs';
+import { patchy, smoothstep } from './stadium-env-spots.mjs';
 
 export const JUNGLE_KEY = 'perilous-jungle';
 /**
@@ -83,17 +83,6 @@ export const TREE_CLEARING_REACH_PX = 24;
 const TREE_SCENE_INSET_PX = 12;
 /** How far a crown may stand out past where it would touch TREE_CARD_GAP_PX, px. */
 const TREE_CROWN_SLACK_PX = 24;
-
-const distanceToRect = (x, y, rect) => {
-  const dx = Math.max(rect.x - x, 0, x - (rect.x + rect.w));
-  const dy = Math.max(rect.y - y, 0, y - (rect.y + rect.h));
-  return Math.hypot(dx, dy);
-};
-
-const smoothstep = (from, to, value) => {
-  const t = Math.min(1, Math.max(0, (value - from) / (to - from)));
-  return t * t * (3 - 2 * t);
-};
 
 const cardRectsOf = (layout) => {
   const { slabs, flats } = environmentFootprints(layout);

@@ -74,10 +74,9 @@ export const hideZoneElementsIfEmpty = (event) => {
 export const deselectCard = () => {
   // Server-drawn cards carry their selection on their registry <img> (design 074 D3).
   clearServerSelection();
-  if (!mouseClick.card) mouseClick.selectingCard = false;
+  mouseClick.selectingCard = false;
   if (mouseClick.card) {
     mouseClick.card.image.classList.remove('highlight');
-    mouseClick.selectingCard = false;
 
     const users = ['self', 'opp'];
     const zoneIds = ['active', 'bench'];
@@ -102,8 +101,7 @@ export const closeFullView = (event) => {
     // Primary (non-attached) image, used for the container width revert.
     const targetImage = Array.from(
       fullViewElement.querySelectorAll('img')
-    )
-      .filter((image) => !image.attached)[0];
+    ).find((image) => !image.attached);
 
     const revert = () => {
       // Hand any holo shine in the container back to the auto-sweep before the
@@ -132,10 +130,9 @@ export const closeFullView = (event) => {
       });
 
       if (targetImage) {
-        const currentWidth = parseFloat(targetImage.clientWidth);
         const newWidth =
-          currentWidth +
-          (targetImage.clientWidth / 6) * targetImage.energyLayer;
+          targetImage.clientWidth +
+          (targetImage.clientWidth / 6) * (targetImage.energyLayer || 0);
         fullViewElement.style.width = newWidth + 'px';
       }
       fullViewElement.style.zIndex = '0';

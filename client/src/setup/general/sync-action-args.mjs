@@ -97,9 +97,16 @@ export function rngFromCoin(result) {
   return Math.random;
 }
 
+/** A recorded coin as a face: the boolean spelling is heads/tails too (see rngFromCoin). */
+const recordedFace = (value) => {
+  if (value === true) return 'heads';
+  if (value === false) return 'tails';
+  return value === 'heads' || value === 'tails' ? value : null;
+};
+
 export function flipCoin(bundle, key) {
-  const existing = bundle?.[key];
-  if (existing === 'heads' || existing === 'tails') return existing;
+  const existing = recordedFace(bundle?.[key]);
+  if (existing) return existing;
   const value = Math.random() < 0.5 ? 'heads' : 'tails';
   if (bundle) bundle[key] = value;
   return value;

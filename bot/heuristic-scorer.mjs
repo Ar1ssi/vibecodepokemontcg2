@@ -10,7 +10,7 @@
 //   1. Never pass or attack with an empty bench if a Basic can be benched.
 //      (Satisfied by the order itself: playBasic-to-bench always outranks
 //      attack/pass, so this tier is never skipped over while such an option
-//      exists — no special-casing needed. Covered by a regression test below.)
+//      exists — no special-casing needed. Covered by heuristic-scorer.test.mjs.)
 //   2. Among attack options pick highest expected damage; among attach options
 //      prefer the active Pokémon's unmet attack cost.
 //   3. A Trainer that stayed in hand after being played resolved to nothing this
@@ -19,6 +19,8 @@
 //      `observation.triedThisTurn` (see optionKey) and they are skipped until the
 //      turn ends. Trainers rank above `attach` because draw/search Supporters are
 //      what find the Energy an attach would otherwise be guessing at.
+
+import { pickRandom } from './pick-random.mjs';
 
 /**
  * Stable identity for an option across a single turn, used by the runner to mark a
@@ -31,12 +33,6 @@ export function optionKey(option, observation) {
   if (option?.kind !== 'playTrainer') return `${option?.kind}`;
   const hand = observation?.self?.hand || [];
   return `playTrainer:${hand[option.handIndex]?.name || option.handIndex}`;
-}
-
-function pickRandom(list, rng) {
-  if (list.length === 1) return list[0];
-  const index = Math.floor(rng() * list.length) % list.length;
-  return list[index];
 }
 
 // "20", "30+", "10x", "" (no fixed damage / effect-only attack) → a comparable

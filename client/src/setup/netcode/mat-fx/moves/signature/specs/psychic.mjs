@@ -8,30 +8,12 @@
 // smaller, orbs are kept small so their white core never blooms into a slab, the flash is small
 // and the heat faint (the TCG Live impact replaces the dressing in a game).
 
-/** Five spikes 72° apart: the entries' "starFlare arms 'ring'" inside the 30-tongue budget. */
-const RING5 = Object.freeze([-90, -18, 54, 126, 198].map((angle) => Object.freeze({ angle, reach: 0.85 })));
+import { motes, RING5 } from './_shared.mjs';
 
 /** The small contact flash the signatures keep. */
 const flash = (at, tint) => ({ at, until: at + 150, layer: 'top', drawer: 'impactFlash', params: { r0: 0.2, r1: 0.6, tint } });
 /** A star flare landing smaller and nearly whole, breaking up late. */
-const star = (at, until, arms, tint, over = {}) => ({ at, until, layer: 'front', drawer: 'starFlare', params: { arms, size: 0.4, width: 0.3, core: 0.14, grow: 0.12, breakAt: 0.7, tint, ...over } });
-
-const motes = (at, count, over = {}) =>
-  Object.freeze({
-    at,
-    anchor: 'defender',
-    count,
-    distance: 1.1,
-    direction: -90,
-    spread: 360,
-    size: [0.03, 0.07],
-    aspect: 1,
-    gravity: 0,
-    maxDelay: 0.2,
-    durationMs: 800,
-    kind: 'mote',
-    ...over,
-  });
+const star = (at, until, arms, tint) => ({ at, until, layer: 'front', drawer: 'starFlare', params: { arms, size: 0.4, width: 0.3, core: 0.14, grow: 0.12, breakAt: 0.7, tint } });
 
 const ORB = Object.freeze({ deep: '#5A2A9A', body: '#A65BEB', hot: '#CFABFF', core: '#FEFCFF' });
 const ICE_BEAM = Object.freeze({ deep: '#0735F3', body: '#13B7FF', hot: '#CFF4FF', core: '#FEFCFF' });

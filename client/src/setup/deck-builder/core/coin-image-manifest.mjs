@@ -124,7 +124,7 @@ export function buildManifest(rows = [], { requireCoinInName = true, fullSize = 
 }
 
 /**
- * Match manifest entries to catalog coins by `description` (exact, then prefix).
+ * Match manifest entries to catalog coins by `description` (exact, then a prefix that names one image).
  * @returns {{ matches: { coinId: string, fileName: string }[], unmatched: object[] }}
  */
 export function matchManifestToCoins(manifest = [], coins = []) {
@@ -152,8 +152,13 @@ export function matchManifestToCoins(manifest = [], coins = []) {
     }
     let entry = byDescription.get(key);
     if (!entry) {
-      const hit = keys.find((candidate) => candidate.startsWith(key) || key.startsWith(candidate));
-      entry = hit ? byDescription.get(hit) : null;
+      // A prefix that fits several images is ambiguous: report the coin rather than guess one.
+      const hits = new Set(
+        keys
+          .filter((candidate) => candidate.startsWith(key) || key.startsWith(candidate))
+          .map((candidate) => byDescription.get(candidate))
+      );
+      entry = hits.size === 1 ? [...hits][0] : null;
     }
     if (entry) matches.push({ coinId: coin.id, fileName: entry.fileName });
     else unmatched.push(coin);

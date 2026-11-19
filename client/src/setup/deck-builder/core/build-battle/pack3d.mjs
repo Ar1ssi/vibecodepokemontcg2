@@ -3,7 +3,11 @@
 // World units: the pack is 1 wide; y points up; the camera looks down −z at the z = 0 plane.
 
 import {
-  cubicBezier,
+  TEAR_LINE_PCT,
+  TOOTH_MAX_PCT,
+  clamp01,
+  easeLift,
+  lerp,
   packFlyPose,
   packSpreadSlot,
   packTearPoints,
@@ -17,8 +21,8 @@ export const SEAL_BOTTOM_V = 1277 / 1426;
 export const BODY_INSET_U = 17 / 780;
 export const BULGE = 0.05;
 export const BULGE_RAMP_V = 0.06;
-// The strip mesh covers the top of the art down past the deepest tooth (7 % + 5 %).
-export const STRIP_V = 0.12;
+// The strip mesh covers the top of the art down past the deepest tooth of the tear.
+export const STRIP_V = (TEAR_LINE_PCT + TOOTH_MAX_PCT) / 100;
 
 // ── Peel, rip, flight ───────────────────────────────────────────────────────
 export const PEEL_MAX_DEG = 150;
@@ -73,12 +77,8 @@ export const CARD_TEXTURE_TIMEOUT_MS = 1500;
 
 const TICK_EPSILON = 1e-9;
 
-const clamp01 = (value) =>
-  Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
 const clampUnit = (value) =>
   Number.isFinite(value) ? Math.min(1, Math.max(-1, value)) : 0;
-const lerp = (from, to, t) => from + (to - from) * t;
-const easeLift = cubicBezier(0.2, 0.8, 0.2, 1);
 const radians = (deg) => (deg * Math.PI) / 180;
 
 /** Hermite smoothstep of `x` between `edge0` and `edge1`, 0..1. */

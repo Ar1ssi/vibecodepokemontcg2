@@ -95,6 +95,12 @@ test('design 069 row 7: a full room offers Rejoin to the tab holding one of its 
   assert.equal(stranger.joinLabel, 'Join');
 });
 
+test('a malformed join and a failed seating are not reported as a full room', () => {
+  assert.match(roomRejectMessage('bad_request'), /could not read that join request/);
+  assert.match(roomRejectMessage('seat_failed'), /could not seat you/);
+  assert.equal(rejectEndsSeat('bad_request'), false);
+});
+
 test('design 074 D7: solo-room refusals have their own messages and keep the seat', () => {
   assert.match(roomRejectMessage('solo_room'), /solo game/);
   assert.equal(rejectEndsSeat('solo_room'), false);

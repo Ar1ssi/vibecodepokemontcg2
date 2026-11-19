@@ -8,8 +8,8 @@
 // dressing is a small flash and fewer splinters, puffs and flakes, and the frost sheen stays
 // faint (heat <= 0.35).
 
-/** Five spikes 72° apart: "starFlare arms 'ring'" inside the 30-tongue budget (slice 5). */
-const RING5 = Object.freeze([-90, -18, 54, 126, 198].map((angle) => Object.freeze({ angle, reach: 0.85 })));
+import { RING5 } from './_shared.mjs';
+
 /** The six-point crystal: arms at 0, 60 … 300°. */
 const SIX = Object.freeze([0, 60, 120, 180, 240, 300].map((angle) => Object.freeze({ angle, reach: 1 })));
 

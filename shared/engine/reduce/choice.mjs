@@ -42,6 +42,19 @@ import {
   CALL_ENERGY_EFFECT, resumeCallEnergy, endTurnAfterAbility, settleAbilityOutcomes,
 } from './ability.mjs';
 
+/**
+ * The attacker left the Active Spot (or its attack no longer exists) while the attack waited on a
+ * choice: the attack ends here, without damage, and the turn passes.
+ */
+function endAttackWithoutResolving(draft, { playerId, activeRng, events }) {
+  const oppId = Object.keys(draft.players || {}).find((id) => id !== playerId);
+  const resumer = draft.players[playerId];
+  if (!resumer.flags) resumer.flags = {};
+  resumer.flags.attackerAttacked = true;
+  resolveCheckup(draft, { rng: activeRng, events, endingPlayerId: playerId });
+  if (!isGameConcluded(draft)) advanceTurn(draft, { nextPlayerId: oppId, events });
+}
+
 export function resolveChoiceCommand({ draft, playerId, activeRng, events, payload }) {
   const choice = draft.pendingChoice;
   const token = choice?.resumeToken || {};
@@ -214,14 +227,7 @@ export function resolveChoiceCommand({ draft, playerId, activeRng, events, paylo
             preStepsDone: true,
           });
         } else {
-          // The attacker left the Active Spot before damage: the attack ends here.
-          const resumer = draft.players[initiatorPlayerId];
-          if (!resumer.flags) resumer.flags = {};
-          resumer.flags.attackerAttacked = true;
-          resolveCheckup(draft, { rng: activeRng, events, endingPlayerId: initiatorPlayerId });
-          if (!isGameConcluded(draft)) {
-            advanceTurn(draft, { nextPlayerId: oppOfInitiator, events });
-          }
+          endAttackWithoutResolving(draft, { playerId: initiatorPlayerId, activeRng, events });
         }
       } else if (cont.tail) {
         finishAttackTail(draft, { tail: cont.tail, activeRng, events });
@@ -232,7 +238,9 @@ export function resolveChoiceCommand({ draft, playerId, activeRng, events, paylo
     // effect phase with the discarded count driving the damage.
     draft.pendingChoice = null;
     const resumeCtx = attackResumeContext(draft, token, { activeRng, events });
-    if (resumeCtx) {
+    if (!resumeCtx) {
+      endAttackWithoutResolving(draft, { playerId: initiatorPlayerId, activeRng, events });
+    } else {
       const { selection, allowedIds } = discardScaleSelection(token, payload.selection);
       const energyDiscarded = discardScalingEnergy(draft, {
         playerId: initiatorPlayerId,
@@ -249,7 +257,9 @@ export function resolveChoiceCommand({ draft, playerId, activeRng, events, paylo
     // the discard itself happens after damage.
     draft.pendingChoice = null;
     const resumeCtx = attackResumeContext(draft, token, { activeRng, events });
-    if (resumeCtx) {
+    if (!resumeCtx) {
+      endAttackWithoutResolving(draft, { playerId: initiatorPlayerId, activeRng, events });
+    } else {
       const allowed = new Set(token.allowedIds || []);
       const picked = [...new Set((payload.selection || []).map(Number))]
         .filter((id) => allowed.has(id))
@@ -263,7 +273,9 @@ export function resolveChoiceCommand({ draft, playerId, activeRng, events, paylo
     // then resume the attack with the bonus decision settled.
     draft.pendingChoice = null;
     const resumeCtx = attackResumeContext(draft, token, { activeRng, events });
-    if (resumeCtx) {
+    if (!resumeCtx) {
+      endAttackWithoutResolving(draft, { playerId: initiatorPlayerId, activeRng, events });
+    } else {
       const accepted = Number((payload.selection || [])[0]) === 1;
       const moved =
         accepted &&
@@ -283,7 +295,9 @@ export function resolveChoiceCommand({ draft, playerId, activeRng, events, paylo
     // then the attack re-enters its damage step with the count settled.
     draft.pendingChoice = null;
     const resumeCtx = attackResumeContext(draft, token, { activeRng, events });
-    if (resumeCtx) {
+    if (!resumeCtx) {
+      endAttackWithoutResolving(draft, { playerId: initiatorPlayerId, activeRng, events });
+    } else {
       const protectorDiscarded = discardHandCards(draft, {
         playerId: choice.player,
         instanceIds: payload.selection || [],
@@ -304,7 +318,9 @@ export function resolveChoiceCommand({ draft, playerId, activeRng, events, paylo
     // Charity: the attack re-enters its damage step with the chosen reduction.
     draft.pendingChoice = null;
     const resumeCtx = attackResumeContext(draft, token, { activeRng, events });
-    if (resumeCtx) {
+    if (!resumeCtx) {
+      endAttackWithoutResolving(draft, { playerId: initiatorPlayerId, activeRng, events });
+    } else {
       const pick = Number((payload.selection || [])[0]);
       const charityReduction = (token.charityAmounts || [])[pick - 1] || 0;
       resolveAttackEffectPhase(draft, { ...resumeCtx, ...(token.values || {}), charityReduction });
@@ -313,7 +329,9 @@ export function resolveChoiceCommand({ draft, playerId, activeRng, events, paylo
     // "You may <cost>. If you do, …": pay the accepted cost, then resume with the answer.
     draft.pendingChoice = null;
     const resumeCtx = attackResumeContext(draft, token, { activeRng, events });
-    if (resumeCtx) {
+    if (!resumeCtx) {
+      endAttackWithoutResolving(draft, { playerId: initiatorPlayerId, activeRng, events });
+    } else {
       const { paid, count } = payOptionalCost(draft, {
         playerId: initiatorPlayerId,
         attacker: resumeCtx.attacker,
@@ -339,7 +357,9 @@ export function resolveChoiceCommand({ draft, playerId, activeRng, events, paylo
     // the opponent shuffles the rest back.
     draft.pendingChoice = null;
     const resumeCtx = attackResumeContext(draft, token, { activeRng, events });
-    if (resumeCtx) {
+    if (!resumeCtx) {
+      endAttackWithoutResolving(draft, { playerId: initiatorPlayerId, activeRng, events });
+    } else {
       const oppPlayer = draft.players[resumeCtx.oppId];
       const deck = oppPlayer?.zones?.deck || [];
       let picked = 0;
@@ -448,7 +468,9 @@ export function resolveChoiceCommand({ draft, playerId, activeRng, events, paylo
     // Deck mill "up to N" / "you may": option id = count + 1.
     draft.pendingChoice = null;
     const resumeCtx = attackResumeContext(draft, token, { activeRng, events });
-    if (resumeCtx) {
+    if (!resumeCtx) {
+      endAttackWithoutResolving(draft, { playerId: initiatorPlayerId, activeRng, events });
+    } else {
       const pick = Number((payload.selection || [])[0]);
       const millCount = Number.isInteger(pick) && pick > 0 ? pick - 1 : 0;
       resolveAttackEffectPhase(draft, { ...resumeCtx, millCount });

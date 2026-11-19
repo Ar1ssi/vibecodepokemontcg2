@@ -43,7 +43,7 @@ import { createPropBuilder } from './stadium-env-props.mjs';
 import { KIT_LIGHT, KIT_UNIFORMS, createKitProps, kitUniforms } from './stadium-kit.mjs';
 import { placeAsset } from './stadium-kit-assets.mjs';
 import { tableBounds } from './table-uv.mjs';
-import { patchy } from './stadium-env-spots.mjs';
+import { distanceToRect, hash, oppHandRect, patchy, union } from './stadium-env-spots.mjs';
 
 export const VALLEY_KEY = 'dimension-valley';
 /** The island runs this far past the cards' box, its corners this round, its edge wandering this much. */
@@ -66,20 +66,6 @@ export const DISC_HUES = Object.freeze([
 ]);
 const SPARKLE_COUNT = 150;
 
-/** A small deterministic 0..1 from three numbers. */
-const hash = (x, y, salt) => {
-  const s = Math.sin(x * 127.1 + y * 311.7 + salt * 74.7) * 43758.5453;
-  return s - Math.floor(s);
-};
-
-const distanceToRect = (x, y, r) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.y - y, 0, y - r.y - r.h));
-
-const union = (rects) => {
-  const x = Math.min(...rects.map((r) => r.x));
-  const y = Math.min(...rects.map((r) => r.y));
-  return { x, y, w: Math.max(...rects.map((r) => r.x + r.w)) - x, h: Math.max(...rects.map((r) => r.y + r.h)) - y };
-};
-
 /** The island edge's wander at (x, y), -1..1 (the shader's `wander`). */
 export const edgeWander = (x, y) =>
   0.55 * Math.sin(x * 0.013 + 1.1) * Math.sin(y * 0.017 + 0.3) +
@@ -94,15 +80,6 @@ export function islandDistance(island, x, y) {
   const box = Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - island.corner;
   return box - island.wander * edgeWander(x, y);
 }
-
-/** The opponent's hand where the board fans it, past the far edge: the cards' width either side of the middle. */
-const oppHandRect = (layout, core) => {
-  const hand = layout.opp?.hand;
-  const cardH = layout.opp?.cardBox?.hand?.h ?? 0;
-  if (!hand || !(cardH > 0) || !Number.isFinite(hand.baselineY)) return null;
-  const halfW = Math.max(Math.abs(core.x), Math.abs(core.x + core.w));
-  return { x: -halfW, y: hand.baselineY - cardH, w: 2 * halfW, h: cardH };
-};
 
 /**
  * Dimension Valley's layout: the great island round every card, its edge's outline, the painted mark
@@ -254,7 +231,7 @@ ${VALLEY}
 void main() {
   vec2 p = uMin + vUv * uSize;
   float sd = islandDistance(p);
-  float h = 1.6 * fbm3(p / 50.0) + 2.0 * smoothstep(-26.0, -4.0, sd) * smoothstep(2.0, -4.0, sd);
+  float h = 1.6 * fbm3(p / 50.0) + 2.0 * smoothstep(-26.0, -4.0, sd) * (1.0 - smoothstep(-4.0, 2.0, sd));
   gl_FragColor = vec4(h, sd, fbm3(p / 120.0 + 3.0), 0.0);
 }
 `;

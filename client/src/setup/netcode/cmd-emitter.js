@@ -17,16 +17,37 @@ let cachedProtocolVersion = null;
  *
  * @returns {Promise<object|null>}
  */
-async function loadCommandsModule() {
+async function importCommandsModule() {
   try {
     return await import('/shared/engine/commands.mjs');
   } catch {
     try {
       return await import('../../../../shared/engine/commands.mjs');
-    } catch {
+    } catch (err) {
+      if (!commandsImportFailureLogged) {
+        commandsImportFailureLogged = true;
+        log.error('cmd', 'commands_module.import_failed', { message: String(err?.message ?? err) });
+      }
       return null;
     }
   }
+}
+
+let commandsLoader = importCommandsModule;
+let commandsImportFailureLogged = false;
+
+const loadCommandsModule = () => commandsLoader();
+
+/**
+ * Test seam: swaps the commands-module loader and drops what was cached from the last one.
+ *
+ * @param {(() => Promise<object|null>)|null} [loader] Omit to restore the real import.
+ */
+export function setCommandsModuleLoaderForTests(loader = null) {
+  commandsLoader = loader ?? importCommandsModule;
+  cachedValidateShape = null;
+  cachedProtocolVersion = null;
+  commandsImportFailureLogged = false;
 }
 
 /**
@@ -179,17 +200,24 @@ async function sendCmd({
     return { success: false, error: 'spectator_readonly' };
   }
 
-  // Pre-validate command shape if validator available
+  // Fail closed: without the shared module there is no shape check and no protocol version,
+  // and the server would be handed a command nobody validated.
   const validator = await getShapeValidator();
-  if (validator) {
-    const shapeResult = validator({ type, payload });
-    if (!shapeResult.valid) {
-      return {
-        success: false,
-        error: 'bad_command',
-        reason: shapeResult.reason,
-      };
-    }
+  if (!validator) {
+    return { success: false, error: 'commands_module_unavailable' };
+  }
+  const shapeResult = validator({ type, payload });
+  if (!shapeResult.valid) {
+    return {
+      success: false,
+      error: 'bad_command',
+      reason: shapeResult.reason,
+    };
+  }
+
+  const protocolVersion = await getProtocolVersion();
+  if (!protocolVersion) {
+    return { success: false, error: 'commands_module_unavailable' };
   }
 
   clientSeq += 1;
@@ -197,15 +225,13 @@ async function sendCmd({
 
   addInFlightAffordance(element);
 
-  const protocolVersion = await getProtocolVersion();
-
   const command = {
     gameId: roomId,
     roomId,
     clientSeq: currentSeq,
     type,
     payload,
-    ...(protocolVersion ? { protocolVersion } : {}),
+    protocolVersion,
     ...(seat ? { seat } : {}),
   };
 

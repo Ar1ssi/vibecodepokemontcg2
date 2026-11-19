@@ -2,8 +2,7 @@
 // board mapping (`.agent/designs/065-signature-move-animations.md` § Appendix S › Fire);
 // departures from an entry are listed under the design's Deviations (slice 5).
 
-/** Five spikes 72° apart: the entries' "starFlare arms 'ring'" inside the 30-tongue budget. */
-const RING5 = Object.freeze([-90, -18, 54, 126, 198].map((angle) => Object.freeze({ angle, reach: 0.85 })));
+import { RING5 } from './_shared.mjs';
 
 const BLUE_FIRE = Object.freeze({ deep: '#0B1B6E', body: '#1E5BD6', hot: '#4FD8FF', core: '#E8FBFF' });
 

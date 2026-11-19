@@ -62,7 +62,7 @@ export function buildDeck({ envMap, count, promoMap, promoFinish, backMap, edgeT
   const pad = 0.45;
   const wrapGeometry = new BoxGeometry(CARD.width + 2 * pad, CARD.height + 2 * pad, thickness + 2 * pad, 6, 8, 2);
   // A deck's cellophane is thinner and tighter than the box's wrap: a glint, not a veil.
-  const film = createFilmMaterials({ envMap, crinkle, envIntensity: 0.55, haze: 0.035 });
+  const film = createFilmMaterials({ envMap, crinkle, envIntensity: 0.55, hazeOpacity: 0.035 });
   const haze = new Mesh(wrapGeometry, film.haze);
   haze.renderOrder = 4;
   const gloss = new Mesh(wrapGeometry, film.gloss);

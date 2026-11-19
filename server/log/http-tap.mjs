@@ -1,10 +1,12 @@
 // Express middleware: one log entry per finished response (level by status and cost).
+import { CLIENT_HEADER, LOG_API_PREFIX, isClientId } from '../../shared/log/log-schema.mjs';
+
 const QUERY_MAX = 200;
 
 function levelAndEvent(status, ms, path) {
   if (status >= 500) return ['error', 'req.failed'];
   if (status >= 400) return ['warn', 'req.failed'];
-  const notable = ms >= 500 || (path.startsWith('/api/') && !path.startsWith('/api/log/'));
+  const notable = ms >= 500 || (path.startsWith('/api/') && !path.startsWith(LOG_API_PREFIX));
   return [notable ? 'debug' : 'trace', 'req'];
 }
 
@@ -23,7 +25,8 @@ export function httpLog({ log, now = () => performance.now() }) {
         detail.status = status;
         detail.ms = ms;
         detail.bytes = Number(res.getHeader('content-length')) || null;
-        detail.client = req.get('x-ptcg-client') || null;
+        const client = req.get(CLIENT_HEADER);
+        detail.client = isClientId(client) ? client : null;
         const [lvl, ev] = levelAndEvent(status, ms, path);
         log[lvl]('http', ev, detail);
       } catch {

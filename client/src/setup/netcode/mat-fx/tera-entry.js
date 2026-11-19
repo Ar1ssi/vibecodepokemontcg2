@@ -77,7 +77,7 @@ function gemGround(ctx, x, y, headingDeg, reach, width, rgb, alpha) {
 export function playTeraEntry(instanceId, cardData) {
   const scene = getBoardScene();
   const id = shownId(instanceId);
-  const card = scene ? stageCard(scene, id) : null;
+  const card = scene?.fx ? stageCard(scene, id) : null;
   if (!card) return false;
   const h = card.h;
   const seed = Number(instanceId) || 1;

@@ -1,3 +1,5 @@
+import { deckVariants } from './deck-variants.mjs';
+
 // Pre-fetches every card of a saved deck into the persistent TCGdex cache
 // (shared/tcgdex/tcgdex-cache.mjs), so the next game resolves the deck's stages,
 // attacks and Tool/Energy types locally instead of fetching 60 cards at deal time.
@@ -13,11 +15,9 @@ const WARM_CONCURRENCY = 2;
  */
 export function deckCardIds(deck = {}) {
   const ids = new Set();
-  for (const group of Object.values(deck || {})) {
-    for (const variant of group?.cards || []) {
-      const id = variant?.data?.id;
-      if (typeof id === 'string' && id) ids.add(id);
-    }
+  for (const variant of deckVariants(deck)) {
+    const id = variant?.data?.id;
+    if (typeof id === 'string' && id) ids.add(id);
   }
   return [...ids];
 }

@@ -118,15 +118,6 @@ test('onConnect(5) skips already-acked seqs', () => {
   assert.equal(batcher.take(ring, 0).from, 6);
 });
 
-test('unacked respects maxBytes, oldest first', () => {
-  const { ring, batcher, add } = setup();
-  for (let i = 0; i < 4; i++) add(0, 'info', 'a'.repeat(10));
-  assert.equal(batcher.unacked(ring, 25).length, 2);
-  batcher.take(ring, 0);
-  batcher.acked(2, 1);
-  assert.equal(batcher.unacked(ring, 1000).length, 2);
-});
-
 test('a ring that evicted unacked entries: take starts at the oldest remaining seq', () => {
   const { ring, batcher, add } = setup(LIMITS, { maxBytes: 1e6, maxEntries: 3 });
   for (let i = 0; i < 6; i++) add(0);

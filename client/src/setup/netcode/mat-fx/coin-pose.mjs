@@ -85,6 +85,21 @@ export function coinCeremonyTimeline(count, options = {}) {
 }
 
 /**
+ * Where a ceremony sits when ceremonies run one after another: it starts once the previous one has
+ * ended (`chainFreeAt`, same clock as `now`), so the queue's hold covers that wait too.
+ * @param {{ totalMs: number, fadeMs: number }} timeline from coinCeremonyTimeline
+ * @returns {{ holdMs: number, endsAt: number }} the hold (ceremony read, overlay fading) and when the
+ *   ceremony ends
+ */
+export function chainedCeremonySlot(timeline, now, chainFreeAt) {
+  const startsAt = Math.max(now, Number.isFinite(chainFreeAt) ? chainFreeAt : now);
+  return {
+    holdMs: startsAt - now + timeline.totalMs - timeline.fadeMs,
+    endsAt: startsAt + timeline.totalMs,
+  };
+}
+
+/**
  * The coin's X rotation after toss `index` lands on `face`. Each toss adds
  * COIN_SPINS full turns; tails is the half-turn that shows the back.
  */

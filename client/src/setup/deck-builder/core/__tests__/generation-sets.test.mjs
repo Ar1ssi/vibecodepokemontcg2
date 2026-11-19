@@ -45,7 +45,7 @@ function stubFetch(handlers) {
   };
 }
 
-// fetchEnergyCardSummaries() caches the /cards?category=Energy response at
+// The /cards?category=Energy response is cached at
 // module scope forever (it's genuinely global data — every Energy card across
 // every TCGdex set), so every Energy-tab test below must share ONE canonical
 // response rather than each stubbing its own: whichever test's fetch runs
@@ -73,6 +73,8 @@ const SHARED_ENERGY_SUMMARY = [
   { id: 'sv02-192', name: 'Reversal Energy', localId: '192' },
   { id: 'sv02-278', name: 'Basic Grass Energy', localId: '278' },
   { id: 'sv05-162', name: 'Neo Upper Energy', localId: '162' },
+  // Read by the supertype index too, which shares this one Energy list.
+  { id: 'gts1-003', name: 'Basic Grass Energy', localId: '003' },
 ];
 
 describe('fetchGenerationSets', () => {
@@ -585,7 +587,6 @@ describe('fetchSetCards tags each card with its TCGdex supertype', () => {
     stubFetch([
       ['/cards?category=Pokemon', [{ id: 'gts1-001' }]],
       ['/cards?category=Trainer', [{ id: 'gts1-002' }]],
-      ['/cards?category=Energy', [{ id: 'gts1-003' }]],
       [
         '/sets/gts1',
         {

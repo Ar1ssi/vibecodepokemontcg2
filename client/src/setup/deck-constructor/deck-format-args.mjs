@@ -3,6 +3,7 @@ import {
   isDeckFormat,
   normalizeDeckFormat,
 } from '../../../../shared/engine/formats.mjs';
+import { isRoomOpponent } from './opponent-seat.mjs';
 
 /**
  * Design 051: loadDeckData and exchangeData take `format` as the positional argument
@@ -41,6 +42,5 @@ export function deckFormatSlot(user, isTwoPlayer) {
  * @param {'self'|'opp'} user
  */
 export function deckFormatOf(state, user) {
-  const roomOpponent = Boolean(state?.isTwoPlayer) && !state?.solo;
-  return normalizeDeckFormat(state?.deckFormat?.[deckFormatSlot(user, roomOpponent)]);
+  return normalizeDeckFormat(state?.deckFormat?.[deckFormatSlot(user, isRoomOpponent(state))]);
 }

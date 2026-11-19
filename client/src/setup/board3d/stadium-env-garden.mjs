@@ -42,7 +42,7 @@ import { createPropBuilder } from './stadium-env-props.mjs';
 import { createKitProps } from './stadium-kit.mjs';
 import { measureAsset, placeAsset } from './stadium-kit-assets.mjs';
 import { tableBounds } from './table-uv.mjs';
-import { RISE_LEAN, frameWeight, patchy } from './stadium-env-spots.mjs';
+import { RISE_LEAN, distanceToRect, frameWeight, hash, oppHandRect, patchy, union } from './stadium-env-spots.mjs';
 
 export const GARDEN_KEY = 'mystery-garden';
 /** The moon (toward it, table frame): high, from the far left. */
@@ -67,23 +67,6 @@ export const LANTERN_POOL = Object.freeze({ colour: '#ffa8d8', reachPx: 110, str
 export const AXIS_URN = Object.freeze({ out: 44, half: 15, height: 34, urn: 13 });
 /** Rings and segments of the instanced sphere every hedge, leaf and flower is drawn with. */
 const FIREFLY_COUNT = 45;
-
-/** A small deterministic 0..1 from three numbers. */
-const hash = (x, y, salt) => {
-  const s = Math.sin(x * 127.1 + y * 311.7 + salt * 74.7) * 43758.5453;
-  return s - Math.floor(s);
-};
-
-const distanceToRect = (x, y, r) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.y - y, 0, y - r.y - r.h));
-
-/** The opponent's hand where the board fans it, past the far edge: the cards' width either side of the middle. */
-const oppHandRect = (layout, cards) => {
-  const hand = layout.opp?.hand;
-  const cardH = layout.opp?.cardBox?.hand?.h ?? 0;
-  if (!hand || !(cardH > 0) || !Number.isFinite(hand.baselineY)) return null;
-  const halfW = Math.max(...cards.map((r) => Math.max(Math.abs(r.x), Math.abs(r.x + r.w))));
-  return { x: -halfW, y: hand.baselineY - cardH, w: 2 * halfW, h: cardH };
-};
 
 /**
  * Mystery Garden's layout: the plaza (a circle round every card footprint, PLAZA_MARGIN_PX clear),
@@ -110,7 +93,7 @@ export function gardenSpots(layout) {
   const emblem = craterEmblem(layout, centre);
   const ground = 2 * STEP.rise * u;
   const ringR = plaza + 2 * STEP.width * u + BALUSTRADE.gap * u;
-  const hand = oppHandRect(layout, cards);
+  const hand = oppHandRect(layout, union(cards));
   const obstacles = [...cards, ...(hand ? [hand] : [])];
   const inScene = (x, y, inset) => x > scene.x + inset && x < scene.x + scene.w - inset && y > scene.y + inset && y < scene.y + scene.h - inset;
   const clear = (x, y, r) => obstacles.every((rect) => distanceToRect(x, y, rect) >= r + PROP_CARD_GAP_PX);
@@ -415,7 +398,7 @@ void main() {
   // rings and streaks stay faint (design 080) and nothing on it flashes.
   if (kind < -1.5) {
     float fromMiddle = r / max(uPlaza.w, 1.0);
-    vec3 water = waterBody(vec3(0.02, 0.12, 0.2), vec3(0.05, 0.36, 0.48), STONE_PALE * 0.5, smoothstep(0.98, 0.7, fromMiddle), p, t);
+    vec3 water = waterBody(vec3(0.02, 0.12, 0.2), vec3(0.05, 0.36, 0.48), STONE_PALE * 0.5, (1.0 - smoothstep(0.7, 0.98, fromMiddle)), p, t);
     water += POOL_CYAN * 0.32 * exp(-fromMiddle * fromMiddle * 2.6);
     float ripple = 0.5 + 0.5 * sin((r - t * 7.0) / 11.0 + 3.0 * fbm3(p / 80.0 + t * 0.02));
     float rings = smoothstep(0.55, 0.95, ripple) * smoothstep(0.08, 0.3, fromMiddle) * (1.0 - 0.6 * smoothstep(0.85, 1.0, fromMiddle));

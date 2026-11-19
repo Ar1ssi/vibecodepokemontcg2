@@ -36,7 +36,7 @@ test('parser: filtered and both-sides counter wordings', () => {
   ]);
   assert.deepEqual(
     steps("Double the number of damage counters on your opponent's Active Pokémon. This attack can't leave it with less than 10 HP remaining."),
-    [{ type: 'atkDoubleCountersActive', hpFloor: 10 }]
+    [{ type: 'atkDoubleDefenderCounters', minHp: 10 }]
   );
   assert.deepEqual(steps("Knock Out each of your opponent's Pokémon that has 50 HP or less remaining."), [
     { type: 'atkKnockOutAll', maxRemainingHp: 50 },

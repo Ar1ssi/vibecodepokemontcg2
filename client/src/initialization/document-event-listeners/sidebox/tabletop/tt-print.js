@@ -18,7 +18,10 @@ let fontPromise = null;
 /** Loads the condensed face once; resolves (never rejects) when it is usable or given up on. */
 export function loadPrintFont() {
   if (fontPromise) return fontPromise;
-  if (typeof FontFace !== 'function' || !document.fonts) return (fontPromise = Promise.resolve(false));
+  if (typeof FontFace !== 'function' || !document.fonts) {
+    fontPromise = Promise.resolve(false);
+    return fontPromise;
+  }
   const face = new FontFace(FONT_FAMILY, `url(${assetUrl(FONT_URL)})`);
   const loaded = face
     .load()
@@ -35,12 +38,13 @@ export function loadPrintFont() {
 // Era palettes for faces drawn without a photo (the 052 tokens for ME; the others read off each
 // era's renders).
 const PALETTES = Object.freeze({
-  me: { base: '#0b0b10', a: '#ff2fa3', b: '#7fe000', c: '#ffd400', d: '#2f7bff', band: '#e0b431' },
-  sv: { base: '#101422', a: '#e8483d', b: '#7a48d8', c: '#ffcf33', d: '#2ab3e6', band: '#d8dde6' },
-  swsh: { base: '#0f1730', a: '#1f8be0', b: '#c8102e', c: '#f2c230', d: '#6fd6ff', band: '#d6dbe3' },
-  sm: { base: '#1d1230', a: '#f08a24', b: '#1f6fd1', c: '#ffd23a', d: '#36b37e', band: '#e7c45a' },
-  xy: { base: '#101826', a: '#2e7bd6', b: '#d93a3a', c: '#f2d14b', d: '#58c2a7', band: '#c9ced8' },
+  me: { base: '#0b0b10', a: '#ff2fa3', b: '#7fe000', c: '#ffd400', d: '#2f7bff', band: '#e0b431', bandRed: '#d62828' },
+  sv: { base: '#101422', a: '#e8483d', b: '#7a48d8', c: '#ffcf33', d: '#2ab3e6', band: '#d8dde6', bandRed: '#c8102e' },
+  swsh: { base: '#0f1730', a: '#1f8be0', b: '#c8102e', c: '#f2c230', d: '#6fd6ff', band: '#d6dbe3', bandRed: '#c8102e' },
+  sm: { base: '#1d1230', a: '#f08a24', b: '#1f6fd1', c: '#ffd23a', d: '#36b37e', band: '#e7c45a', bandRed: '#c8102e' },
+  xy: { base: '#101826', a: '#2e7bd6', b: '#d93a3a', c: '#f2d14b', d: '#58c2a7', band: '#c9ced8', bandRed: '#c8102e' },
 });
+/** The palette for an era key; any unknown or missing era gets the ME palette. */
 export const paletteFor = (era) => PALETTES[era] || PALETTES.me;
 
 const GOLD_STOPS = ['#a77a17', '#f6d65a', '#d9a92c', '#fff1a8', '#b88a1e'];
@@ -70,7 +74,11 @@ function blackLattice(ctx, w, h, base = '#0d0d12') {
   ctx.restore();
 }
 
-function fitText(ctx, text, maxWidth, sizePx, weight = 'bold') {
+/**
+ * Sets `ctx.font` to the largest size, at most `sizePx`, at which `text` fits `maxWidth`, and
+ * returns that size. Callers draw with the font it leaves.
+ */
+function applyFittedFont(ctx, text, maxWidth, sizePx, weight = 'bold') {
   let size = sizePx;
   ctx.font = `${weight} ${size}px ${PRINT_FONT}`;
   while (size > 6 && ctx.measureText(text).width > maxWidth) {
@@ -82,7 +90,7 @@ function fitText(ctx, text, maxWidth, sizePx, weight = 'bold') {
 
 /** The yellow-on-blue "Pokémon" wordmark set in type, with its red "TRADING CARD GAME" plate. */
 export function drawWordmark(ctx, cx, cy, width) {
-  const size = fitText(ctx, 'POKÉMON', width, width * 0.32, '900');
+  const size = applyFittedFont(ctx, 'POKÉMON', width, width * 0.32, '900');
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.lineJoin = 'round';
@@ -99,7 +107,7 @@ export function drawWordmark(ctx, cx, cy, width) {
   roundRect(ctx, cx - plateW / 2, cy + size * 0.52, plateW, plateH, plateH * 0.2);
   ctx.fill();
   ctx.stroke();
-  fitText(ctx, 'TRADING CARD GAME', plateW * 0.9, plateH * 0.78);
+  applyFittedFont(ctx, 'TRADING CARD GAME', plateW * 0.9, plateH * 0.78);
   ctx.fillStyle = '#ffffff';
   ctx.fillText('TRADING CARD GAME', cx, cy + size * 0.52 + plateH / 2);
 }
@@ -120,7 +128,7 @@ function drawPlayMark(ctx, x, y, size) {
 function drawBuildBattle(ctx, x, y, width, height, title = 'BUILD & BATTLE', color = '#111') {
   drawPlayMark(ctx, x, y + height * 0.1, height * 0.8);
   const textX = x + height * 0.95;
-  const size = fitText(ctx, title.toUpperCase(), width - height, height * 0.86, '900');
+  const size = applyFittedFont(ctx, title.toUpperCase(), width - height, height * 0.86, '900');
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = color;
@@ -166,7 +174,7 @@ export function drawBoxBack(ctx, w, h, { labels, palette }) {
   ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  fitText(ctx, 'Inside, you’ll find:', w * 0.7, h * 0.036);
+  applyFittedFont(ctx, 'Inside, you’ll find:', w * 0.7, h * 0.036);
   ctx.fillText('Inside, you’ll find:', w / 2, h * 0.26);
   const lines = labels?.backLines || [];
   let y = h * 0.31;
@@ -192,7 +200,7 @@ export function drawBoxBack(ctx, w, h, { labels, palette }) {
   }
   rule(Math.max(y + h * 0.01, h * 0.47));
   const bandY = h * 0.66;
-  ctx.fillStyle = palette?.a === '#ff2fa3' ? '#d62828' : '#c8102e';
+  ctx.fillStyle = palette.bandRed;
   ctx.beginPath();
   ctx.moveTo(0, bandY);
   ctx.lineTo(w * 0.86, bandY);
@@ -202,12 +210,12 @@ export function drawBoxBack(ctx, w, h, { labels, palette }) {
   ctx.fill();
   ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'left';
-  fitText(ctx, 'WWW.POKEMON.COM', w * 0.6, h * 0.03);
+  applyFittedFont(ctx, 'WWW.POKEMON.COM', w * 0.6, h * 0.03);
   ctx.fillText('WWW.POKEMON.COM', pad, bandY + h * 0.0235);
   greyLines(ctx, pad, h * 0.725, w - 2 * pad, 7, h * 0.016, 41);
   ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'right';
-  fitText(ctx, 'Gotta catch ’em all!', w * 0.5, h * 0.03, 'italic bold');
+  applyFittedFont(ctx, 'Gotta catch ’em all!', w * 0.5, h * 0.03, 'italic bold');
   ctx.fillText('Gotta catch ’em all!', w - pad, h * 0.93);
 }
 
@@ -261,7 +269,7 @@ export function drawProceduralSide(ctx, w, h, { palette, labels }) {
   ctx.fillStyle = palette.base;
   ctx.fillRect(0, 0, w, h);
   slashes(ctx, w, h, palette, 1);
-  bottomBand(ctx, w, h, labels, true);
+  bottomBand(ctx, w, h, labels, { playMarkOnly: true });
 }
 
 function slashes(ctx, w, h, palette, alpha) {
@@ -286,14 +294,14 @@ function slashes(ctx, w, h, palette, alpha) {
   ctx.restore();
 }
 
-function bottomBand(ctx, w, h, labels, narrow = false) {
+function bottomBand(ctx, w, h, labels, { playMarkOnly = false } = {}) {
   const bandH = h * 0.075;
   const y = h - bandH - h * 0.01;
   ctx.fillStyle = goldGradient(ctx, 0, y, w, y + bandH);
   ctx.fillRect(0, y, w, bandH);
   ctx.fillStyle = '#111';
   ctx.fillRect(0, y - h * 0.004, w, h * 0.004);
-  if (narrow) {
+  if (playMarkOnly) {
     drawPlayMark(ctx, w * 0.12, y + bandH * 0.15, bandH * 0.7);
     return;
   }
@@ -365,6 +373,11 @@ export function mirrorCanvas(canvas) {
  * The folded leaflet's cover: its heading (a Prerelease Kit's is a player's guide), the box's
  * title, "Deck list" and the deck's card names when known, the rest as grey lines.
  */
+const LEAFLET_ROWS_PER_COLUMN = 11;
+const LEAFLET_MAX_ROWS = 2 * LEAFLET_ROWS_PER_COLUMN;
+// Longer names are cut to fit the column.
+const LEAFLET_ROW_MAX_CHARS = 26;
+
 export function drawLeafletCover(ctx, w, h, { title, deckRows = [], palette, heading = 'BUILDING TIPS' }) {
   ctx.fillStyle = '#f6f4ee';
   ctx.fillRect(0, 0, w, h);
@@ -375,31 +388,34 @@ export function drawLeafletCover(ctx, w, h, { title, deckRows = [], palette, hea
   ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  fitText(ctx, heading, w * 0.8, h * 0.06, '900');
+  applyFittedFont(ctx, heading, w * 0.8, h * 0.06, '900');
   ctx.fillText(heading, w / 2, h * 0.065);
-  fitText(ctx, String(title || '').toUpperCase(), w * 0.84, h * 0.04);
+  applyFittedFont(ctx, String(title || '').toUpperCase(), w * 0.84, h * 0.04);
   ctx.fillText(String(title || '').toUpperCase(), w / 2, h * 0.125);
   ctx.fillStyle = '#1b1b20';
   ctx.textAlign = 'left';
-  fitText(ctx, 'Deck list', w * 0.5, h * 0.034);
+  applyFittedFont(ctx, 'Deck list', w * 0.5, h * 0.034);
   ctx.fillText('Deck list', w * 0.08, h * 0.225);
-  const rows = deckRows.slice(0, 22);
+  const rows = deckRows.slice(0, LEAFLET_MAX_ROWS);
   const lineH = h * 0.028;
   ctx.font = `${Math.round(lineH * 0.78)}px ${PRINT_FONT}`;
   rows.forEach((row, index) => {
-    const col = index < 11 ? 0 : 1;
-    const y = h * 0.265 + (index % 11) * lineH;
+    const col = Math.floor(index / LEAFLET_ROWS_PER_COLUMN);
+    const y = h * 0.265 + (index % LEAFLET_ROWS_PER_COLUMN) * lineH;
     const x = w * (col === 0 ? 0.08 : 0.53);
-    ctx.fillText(`${row.qty || 1} ${row.name}`.slice(0, 26), x, y);
+    ctx.fillText(`${row.qty || 1} ${row.name}`.slice(0, LEAFLET_ROW_MAX_CHARS), x, y);
   });
   greyLines(ctx, w * 0.08, h * 0.6, w * 0.84, 10, h * 0.026, 13);
 }
+
+// A neutral slate for a pack whose front colour cannot be read.
+const DEFAULT_TINT = '#3a3f4c';
 
 /**
  * A pack's back: the front's dominant colour, darkened, the vertical fin seam, the wordmark and
  * grey legal lines (Pokémon wrappers carry the logo and fine print on the back).
  */
-export function drawPackBack(ctx, w, h, { tint = '#3a3f4c', seamU = 0.5 }) {
+export function drawPackBack(ctx, w, h, { tint = DEFAULT_TINT, seamU = 0.5 }) {
   const gradient = ctx.createLinearGradient(0, 0, w, 0);
   gradient.addColorStop(0, shade(tint, -0.25));
   gradient.addColorStop(0.5, shade(tint, 0.05));
@@ -417,7 +433,8 @@ export function drawPackBack(ctx, w, h, { tint = '#3a3f4c', seamU = 0.5 }) {
 
 /** Lighten (amount > 0) or darken (< 0) a hex colour. */
 export function shade(hex, amount) {
-  const value = /^#?([0-9a-f]{6})$/i.exec(hex)?.[1] || '808080';
+  const value = /^#?([0-9a-f]{6})$/i.exec(hex)?.[1];
+  if (!value) throw new TypeError(`shade: expected a six-digit hex colour, got ${hex}`);
   const channels = [0, 2, 4].map((i) => parseInt(value.slice(i, i + 2), 16));
   const out = channels.map((c) =>
     Math.round(Math.max(0, Math.min(255, amount >= 0 ? c + (255 - c) * amount : c * (1 + amount))))
@@ -425,7 +442,10 @@ export function shade(hex, amount) {
   return `#${out.map((c) => c.toString(16).padStart(2, '0')).join('')}`;
 }
 
-/** @returns {string} the average colour of an image's middle band, as hex. */
+/**
+ * @returns {string} the average colour of an image's middle band, as hex; DEFAULT_TINT when the
+ *   pixels cannot be read (a cross-origin image taints the canvas).
+ */
 export function averageColor(image) {
   try {
     const canvas = makeCanvas(16, 16);
@@ -443,7 +463,7 @@ export function averageColor(image) {
     const n = data.length / 4;
     return `#${[r, g, b].map((c) => Math.round(c / n).toString(16).padStart(2, '0')).join('')}`;
   } catch {
-    return '#3a3f4c';
+    return DEFAULT_TINT;
   }
 }
 
@@ -477,7 +497,7 @@ export function drawProceduralWrapper(ctx, w, h, { image, palette }) {
   ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  fitText(ctx, '10 ADDITIONAL GAME CARDS', w * 0.8, h * 0.035, '900');
+  applyFittedFont(ctx, '10 ADDITIONAL GAME CARDS', w * 0.8, h * 0.035, '900');
   ctx.fillText('10 ADDITIONAL GAME CARDS', w / 2, h * 0.835);
   const crimp = (y0, y1) => {
     const gradient = ctx.createLinearGradient(0, y0, 0, y1);

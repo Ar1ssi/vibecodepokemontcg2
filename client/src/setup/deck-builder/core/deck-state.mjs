@@ -1,4 +1,6 @@
 import { areCardsEqual } from './card-compare.mjs';
+import { deckVariants } from './deck-variants.mjs';
+import { parseSupertype } from './supertype.mjs';
 
 export function createEmptyDeck() {
   return {};
@@ -42,9 +44,6 @@ export function removeCard(deck = {}, card = {}) {
   for (const [index, cardVariant] of newDeck[cardName].cards.entries()) {
     if (areCardsEqual(cardVariant.data, card)) {
       cardVariant.count -= 1;
-      if (Object.prototype.hasOwnProperty.call(cardVariant.data, 'count')) {
-        cardVariant.data.count -= 1;
-      }
       if (cardVariant.count <= 0) {
         newDeck[cardName].cards.splice(index, 1);
       }
@@ -67,16 +66,11 @@ export function getDeckCounts(deck = {}) {
     total: 0,
   };
 
-  for (const cardName in deck) {
-    const group = deck[cardName];
-    for (const variant of group?.cards || []) {
-      const type = variant?.data?.supertype;
-      const count = Number(variant?.count || 0);
-      if (type === 'Pokémon' || type === 'Pokemon') counts.pokemon += count;
-      if (type === 'Trainer') counts.trainer += count;
-      if (type === 'Energy') counts.energy += count;
-      counts.total += count;
-    }
+  for (const variant of deckVariants(deck)) {
+    const type = parseSupertype(variant?.data?.supertype);
+    const count = Number(variant?.count || 0);
+    if (type) counts[type] += count;
+    counts.total += count;
   }
 
   return counts;
@@ -91,10 +85,8 @@ export function filterDeck(deck = {}, filters = {}) {
 
   return Object.entries(deck).reduce((acc, [key, value]) => {
     const filteredCards = (value?.cards || []).filter((card) => {
-      const type = card?.data?.supertype;
-      return (pokemon && (type === 'Pokémon' || type === 'Pokemon')) ||
-        (trainer && type === 'Trainer') ||
-        (energy && type === 'Energy');
+      const type = parseSupertype(card?.data?.supertype);
+      return (pokemon && type === 'pokemon') || (trainer && type === 'trainer') || (energy && type === 'energy');
     });
 
     if (filteredCards.length > 0) {

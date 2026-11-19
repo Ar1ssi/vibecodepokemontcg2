@@ -267,7 +267,7 @@ void main() {
   // Design 085: crisp cracks only by the heat; out in the field the big plates meet in broad soft
   // creases (crisp lines everywhere read as cracked tiles).
   rock *= mix(1.0, smoothstep(0.0, mix(36.0, 7.0, smoothstep(0.2, 0.5, nearHeat)), gap), crackOn);
-  float dip = 2.0 * smoothstep(0.0, -1.5, gap) * crackOn;
+  float dip = 2.0 * (1.0 - smoothstep(-1.5, 0.0, gap)) * crackOn;
   // Design 080: the cracks round the cards run dry (dark ash), so no glowing line lies beside a card.
   // Design 084: the lava cracks gather near the river and the volcano and fade out toward the Benches.
   // Design 085: none within 140 px of a card (a red smear beside an Active).

@@ -87,16 +87,22 @@ const isRowCell = (cell) =>
   (typeof cell === 'number' && Number.isFinite(cell)) ||
   (typeof cell === 'string' && cell.length <= MAX_URL_LENGTH);
 
-const isDeckRows = (rows) =>
-  Array.isArray(rows) &&
-  rows.length <= MAX_DECK_ROWS &&
-  rows.every(
-    (row) =>
-      Array.isArray(row) &&
-      row.length >= MIN_ROW_LENGTH &&
-      row.length <= MAX_ROW_LENGTH &&
-      row.every(isRowCell)
-  );
+const isRowText = (cell) => typeof cell === 'string' && cell.length > 0 && cell.length <= MAX_URL_LENGTH;
+
+const isQuantity = (cell) =>
+  (Number.isInteger(cell) && cell > 0) || (typeof cell === 'string' && /^[1-9]\d*$/.test(cell));
+
+// [qty, name, type, url, number?, set?, tcgId?]: a whole-number quantity (the builder sends it as text)
+// and the text a card needs to be shown; the identity cells after them may be empty.
+const isDeckRow = (row) =>
+  Array.isArray(row) &&
+  row.length >= MIN_ROW_LENGTH &&
+  row.length <= MAX_ROW_LENGTH &&
+  isQuantity(row[0]) &&
+  row.slice(1, 4).every(isRowText) &&
+  row.slice(4).every(isRowCell);
+
+const isDeckRows = (rows) => Array.isArray(rows) && rows.length <= MAX_DECK_ROWS && rows.every(isDeckRow);
 
 const PAYLOAD_VALIDATORS = {
   ready: () => true,

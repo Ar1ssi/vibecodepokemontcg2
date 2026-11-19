@@ -230,7 +230,7 @@ export function placementPose(placement, layout, { boardCounts, piles, handPoses
  * @returns {CardPose|null}
  */
 export function stadiumCardPose(model, layout) {
-  const pose = stadiumPose(model?.stadium ?? null, layout, model?.nearSeat);
+  const pose = stadiumPose(model?.stadium ?? null, layout);
   return pose && { ...pose, face: 'front', hidden: false };
 }
 

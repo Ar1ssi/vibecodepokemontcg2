@@ -156,7 +156,7 @@ const makeUniforms = () => ({
 function inject(
   material,
   uniforms,
-  { rimColor, crumpleBoost = 0, stressAlpha = 0, crumpleLight = 1, crumpleTint = 1, crumpleAlpha = 0 }
+  { rimLevel, crumpleBoost = 0, stressAlpha = 0, crumpleLight = 1, crumpleTint = 1, crumpleAlpha = 0 }
 ) {
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
@@ -175,7 +175,7 @@ function inject(
       .replace(
         '#include <opaque_fragment>',
         `outgoingLight *= mix(1.0, ${crumpleLight.toFixed(2)}, smoothstep(0.0, 1.0, uCrumple));\n` +
-          `outgoingLight += vec3(${rimColor}) * max(ttRim, ttStress * 0.35);\n#include <opaque_fragment>\n` +
+          `outgoingLight += vec3(${rimLevel.toFixed(2)}) * max(ttRim, ttStress * 0.35);\n#include <opaque_fragment>\n` +
           `gl_FragColor.a = max(gl_FragColor.a, ttStress * ${stressAlpha.toFixed(2)}) * uFade * (1.0 + uCrumple * ${crumpleBoost.toFixed(1)});\n` +
           `{ float ttEdgeOn = 1.0 - abs(dot(normalize(normal), normalize(vViewPosition)));\n` +
           `  float ttBody = smoothstep(0.0, 1.0, uCrumple) * ${crumpleAlpha.toFixed(2)} * (0.35 + 0.65 * ttEdgeOn);\n` +
@@ -184,16 +184,16 @@ function inject(
   };
   // One program per film kind: the uniforms object differs per mesh, the code does not.
   material.customProgramCacheKey = () =>
-    `tt-film-${rimColor}-${crumpleBoost}-${stressAlpha}-${crumpleLight}-${crumpleTint}-${crumpleAlpha}`;
+    `tt-film-${rimLevel}-${crumpleBoost}-${stressAlpha}-${crumpleLight}-${crumpleTint}-${crumpleAlpha}`;
 }
 
 /**
  * @param {{envMap: object, crinkle: object|null, seams?: object|null, envIntensity?: number,
- *   haze?: number}} options
+ *   hazeOpacity?: number}} options
  * @returns {{gloss: MeshPhysicalMaterial, haze: MeshStandardMaterial, uniforms: object,
  *   dispose: () => void}}
  */
-export function createFilmMaterials({ envMap, crinkle, seams = null, envIntensity = 0.85, haze = 0.07 }) {
+export function createFilmMaterials({ envMap, crinkle, seams = null, envIntensity = 0.85, hazeOpacity = 0.07 }) {
   const uniforms = makeUniforms();
   // A tight film is nearly flat; the crinkle only breaks up its reflections.
   const normalScale = new Vector2(0.22, 0.22);
@@ -217,7 +217,7 @@ export function createFilmMaterials({ envMap, crinkle, seams = null, envIntensit
     depthWrite: false,
     side: DoubleSide,
   });
-  inject(gloss, uniforms, { rimColor: '0.22', crumpleLight: 0.3 });
+  inject(gloss, uniforms, { rimLevel: 0.22, crumpleLight: 0.3 });
   const hazeMaterial = new MeshStandardMaterial({
     color: new Color(0xf4f7fb),
     roughness: 0.35,
@@ -228,14 +228,14 @@ export function createFilmMaterials({ envMap, crinkle, seams = null, envIntensit
     normalScale,
     alphaMap: seams,
     transparent: true,
-    opacity: haze,
+    opacity: hazeOpacity,
     blending: NormalBlending,
     depthWrite: false,
     side: DoubleSide,
   });
   // Balled-up film scatters light: the crumpled wad reads milky, greying where its folds turn away.
   inject(hazeMaterial, uniforms, {
-    rimColor: '0.55',
+    rimLevel: 0.55,
     crumpleBoost: 5,
     stressAlpha: 0.3,
     crumpleTint: 0.62,

@@ -1,14 +1,13 @@
 // `log:export` socket event, the one-time download route and the dev-only routes (design 088 §6).
 import { randomBytes } from 'node:crypto';
 import { gzip } from 'node:zlib';
-import { LIMITS } from '../../shared/log/log-schema.mjs';
+import { LIMITS, LOG_EVENTS, LOG_ROUTES, isGameRoom } from '../../shared/log/log-schema.mjs';
+import { logFileName } from '../../shared/log/export-format.mjs';
 import { buildExport } from './export.mjs';
+import { isRoomStream, roomIdOfStream, roomStreamId } from './log-store.mjs';
 
-const LOBBY_WATCHERS = 'lobby:watchers';
 const MAX_TOKENS = 8;
 const FILENAME_ROOM_CHARS = 40;
-
-const utcStamp = (ms) => new Date(ms).toISOString().slice(0, 19).replace(/[-:]/g, '').replace('T', '-');
 
 function sendLines(req, res, { lines, filename }) {
   const body = `${lines.join('\n')}\n`;
@@ -33,16 +32,16 @@ function sendLines(req, res, { lines, filename }) {
 function requestSnapshot(sock, exportId, limits, acceptTail) {
   return new Promise((resolve) => {
     try {
-      sock.timeout(limits.snapshotTimeoutMs).emit('log:snapshot', { exportId }, (err, snap) => {
-        const usable = !err && snap !== null && typeof snap === 'object' && !Array.isArray(snap);
-        if (!usable) return resolve('timeout');
+      sock.timeout(limits.snapshotTimeoutMs).emit(LOG_EVENTS.snapshot, { exportId }, (err, snap) => {
+        if (err) return resolve('timeout');
+        if (snap === null || typeof snap !== 'object' || Array.isArray(snap)) return resolve('malformed');
         // The client's unshipped entries ride in the reply; store them, keep them out of the file.
         const { tail, ...snapshot } = snap;
         if (tail) acceptTail(sock, tail);
         return resolve(snapshot);
       });
     } catch {
-      resolve('timeout');
+      resolve('error');
     }
   });
 }
@@ -68,8 +67,7 @@ export function createLogExport({
   const lastExportAt = new WeakMap();
   const lastAnnouncedAt = new Map();
 
-  const filenameFor = (roomId) =>
-    `ptcg-log_${(roomId ?? 'session').replace(/[^\w.-]+/g, '_').slice(0, FILENAME_ROOM_CHARS)}_${utcStamp(now())}.ndjson`;
+  const filenameFor = (roomId) => logFileName((roomId ?? 'session').replace(/[^\w.-]+/g, '_').slice(0, FILENAME_ROOM_CHARS), now());
 
   function storeToken(entry) {
     for (const [token, held] of tokens) if (held.expires <= now()) tokens.delete(token);
@@ -100,9 +98,7 @@ export function createLogExport({
 
   async function exportFor(socket, payload) {
     const roomId = typeof payload?.roomId === 'string' && payload.roomId ? payload.roomId : null;
-    // The lobby channel and a socket's own room are Socket.IO rooms, but never a game to export.
-    const isGameRoom = roomId !== LOBBY_WATCHERS && roomId !== socket.id;
-    if (roomId && (!isGameRoom || !socket.rooms.has(roomId))) return { ok: false, reason: 'not_in_room' };
+    if (roomId && (!isGameRoom(roomId, socket.id) || !socket.rooms.has(roomId))) return { ok: false, reason: 'not_in_room' };
     if (!roomId && !socket.data.logClientId) return { ok: false, reason: 'no_hello' };
     if (inFlight.has(socket)) return { ok: false, reason: 'busy' };
     if (now() - (lastExportAt.get(socket) ?? -Infinity) < limits.exportMinIntervalMs) return { ok: false, reason: 'too_soon' };
@@ -128,7 +124,6 @@ export function createLogExport({
   }
 
   async function buildAndStore(socket, payload, roomId) {
-
     const snapshots = await collectSnapshots(socket, roomId);
     const who = describe(socket.id, roomId);
     const lines = buildExport({
@@ -157,7 +152,7 @@ export function createLogExport({
     const header = JSON.parse(lines[0]);
     return {
       ok: true,
-      url: `/api/log/export/${token}`,
+      url: `${LOG_ROUTES.exportDownload}${token}`,
       filename,
       sources: header.sources.map(({ src, snapshot }) => ({ src, snapshot })),
     };
@@ -165,7 +160,7 @@ export function createLogExport({
 
   return {
     attachSocket(socket) {
-      socket.on('log:export', async (payload, maybeAck) => {
+      socket.on(LOG_EVENTS.export, async (payload, maybeAck) => {
         const ack = typeof maybeAck === 'function' ? maybeAck : () => {};
         try {
           ack(await exportFor(socket, payload));
@@ -190,16 +185,16 @@ export function createLogExport({
     devRoomsHandler(req, res) {
       const rooms = store
         .stats()
-        .byStream.filter((stream) => stream.id.startsWith('room:'))
+        .byStream.filter((stream) => isRoomStream(stream.id))
         .map(({ id, bytes, size, closedAt }) => {
-          const roomId = id.slice('room:'.length);
+          const roomId = roomIdOfStream(id);
           return { roomId, bytes, size, closedAt, participants: store.participants(roomId).length };
         });
       res.json({ rooms });
     },
     devExportHandler(req, res) {
       const roomId = String(req.query.room ?? '');
-      if (!roomId || !store.stream(`room:${roomId}`)) {
+      if (!roomId || !store.stream(roomStreamId(roomId))) {
         res.status(404).end();
         return;
       }

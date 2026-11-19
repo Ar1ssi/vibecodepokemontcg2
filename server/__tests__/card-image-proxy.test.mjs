@@ -84,10 +84,12 @@ test('a host outside the allowed set is a 403 and never fetches', async () => {
   assert.equal(calls.length, 0);
 });
 
-test('an upstream 404 is a 502', async () => {
-  const { impl } = fakeFetch(() => upstream({ status: 404 }));
+test('an upstream 404 is a 404, and the miss is remembered', async () => {
+  const { impl, calls } = fakeFetch(() => upstream({ status: 404 }));
   const handler = createCardImageHandler({ fetchImpl: impl, allowedHosts: CARD_ART_PROXY_HOSTS });
-  assert.equal((await run(handler, ART)).statusCode, 502);
+  assert.equal((await run(handler, ART)).statusCode, 404);
+  assert.equal((await run(handler, ART)).statusCode, 404);
+  assert.equal(calls.length, 1);
 });
 
 test('a fetch aborted by the timeout is a 504', async () => {

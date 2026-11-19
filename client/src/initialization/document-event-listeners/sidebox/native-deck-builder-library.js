@@ -30,6 +30,8 @@ import {
     } from '../../../setup/deck-builder/core/deck-sprites.mjs';
     import { resolveDisplaySprites } from '../../../setup/deck-builder/core/card-sprites.mjs';
     import { renderDeckSprites } from './native-deck-builder-renderers.js';
+    import { sideOf, escapeHtml } from './native-deck-builder-shared-logic.js';
+    import { browserStorage } from './native-deck-builder-storage.js';
     import {
       getStarterDeckCatalog,
       getStarterDecks,
@@ -41,13 +43,6 @@ import {
       repairRenumberedDecks,
     } from '../../../setup/deck-builder/core/deck-library-renumber.mjs';
     import { DECK_FORMAT_BUILD_BATTLE } from '../../../../../shared/engine/formats.mjs';
-    
-    const escapeHtml = (value = '') => String(value)
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&#39;');
     
     /**
      * Saved deck library ("My Decks") bar inside the native deck builder.
@@ -120,14 +115,35 @@ import {
         else closePicker();
       });
     
-      let library = loadLibraryFromStorage(window.localStorage);
+      let library = loadLibraryFromStorage(browserStorage());
       let currentTarget = 'self';
       const activeDeckIds = { self: null, opp: null };
       // deckCardsKey of each target's cards as this tab last loaded or wrote them.
       const baselines = { self: null, opp: null };
 
       const reload = () => {
-        library = loadLibraryFromStorage(window.localStorage);
+        library = loadLibraryFromStorage(browserStorage());
+      };
+    
+      const showStatus = (message) => {
+        if (!statusEl) return;
+        statusEl.textContent = message;
+        statusEl.classList.add('visible');
+        setTimeout(() => statusEl.classList.remove('visible'), 2400);
+      };
+    
+      const STORAGE_FAILED_MESSAGE =
+        'Could not save: browser storage is full or blocked. Delete a deck or allow site data.';
+
+      // Returns whether the write reached storage; a failed write keeps the
+      // in-memory library but says so instead of claiming the deck was saved.
+      const commit = (nextLibrary, { savedMessage, silent = false } = {}) => {
+        library = nextLibrary;
+        const stored = saveLibraryToStorage(browserStorage(), library);
+        if (!silent) render();
+        if (!stored) showStatus(STORAGE_FAILED_MESSAGE);
+        else if (savedMessage) showStatus(savedMessage);
+        return stored;
       };
     
       // Seed premade starter/battle decks so every player has playable lists.
@@ -142,7 +158,7 @@ import {
             .filter((d) => d.starterKey)
             .map((d) => [d.starterKey, d.id])
         );
-        const dismissed = loadDismissedStarters(window.localStorage);
+        const dismissed = loadDismissedStarters(browserStorage());
         let nextLibrary = library;
         let changed = false;
 
@@ -207,10 +223,7 @@ import {
           changed = true;
         }
 
-        if (changed) {
-          library = nextLibrary;
-          saveLibraryToStorage(window.localStorage, library);
-        }
+        if (changed) commit(nextLibrary, { silent: true });
         return changed;
       };
       // The starter decks are JSON loaded on demand (design 073). Already in memory, they seed now,
@@ -231,7 +244,7 @@ import {
       // Decks saved before cardback numbers became stable name cards by ids that now belong to other
       // cards. Once per browser, point them at the cards of those names, then redraw over a fresh read.
       if (typeof window.fetch === 'function') {
-        repairRenumberedDecks(window.localStorage, async () => {
+        repairRenumberedDecks(browserStorage(), async () => {
           const response = await window.fetch(`/src/assets/custom-sets/${RENUMBER_SET_ID}/set.json`, {
             cache: 'no-store',
           });
@@ -247,32 +260,11 @@ import {
         );
       }
 
-      const showStatus = (message) => {
-        if (!statusEl) return;
-        statusEl.textContent = message;
-        statusEl.classList.add('visible');
-        setTimeout(() => statusEl.classList.remove('visible'), 2400);
-      };
-    
-      const STORAGE_FAILED_MESSAGE =
-        'Could not save: browser storage is full or blocked. Delete a deck or allow site data.';
-
-      // Returns whether the write reached storage; a failed write keeps the
-      // in-memory library but says so instead of claiming the deck was saved.
-      const commit = (nextLibrary, { savedMessage, silent = false } = {}) => {
-        library = nextLibrary;
-        const stored = saveLibraryToStorage(window.localStorage, library);
-        if (!silent) render();
-        if (!stored) showStatus(STORAGE_FAILED_MESSAGE);
-        else if (savedMessage) showStatus(savedMessage);
-        return stored;
-      };
-    
       const openDeck = (target, deckId) => {
         reload();
         const cards = getDeckFromLibrary(library, deckId);
         if (!cards) return;
-        const key = target === 'opp' ? 'opp' : 'self';
+        const key = sideOf(target);
         activeDeckIds[key] = deckId;
         baselines[key] = deckCardsKey(cards);
         closePicker();
@@ -314,7 +306,7 @@ import {
         // Starters not loaded yet: a name match is unknowable, so only a tagged deck is remembered.
         const starterKey =
           deck.starterKey ?? getStarterDeckCatalog().find((entry) => entry.name === deck.name)?.key;
-        if (starterKey) dismissStarter(window.localStorage, starterKey);
+        if (starterKey) dismissStarter(browserStorage(), starterKey);
         const nextLibrary = deleteDeckFromLibrary(library, deckId);
         for (const key of ['self', 'opp']) {
           if (activeDeckIds[key] === deckId) {
@@ -420,7 +412,7 @@ import {
       // Cosmetic setters: re-read, then write only this deck's field.
       const setActiveField = (target, value, setField, { silent = true } = {}) => {
         reload();
-        const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+        const activeId = activeDeckIds[sideOf(target)];
         if (!activeId || !library?.decks?.[activeId]) return false;
         commit(setField(library, activeId, value), { silent });
         return true;
@@ -432,7 +424,7 @@ import {
           render();
         },
         setTarget: (target) => {
-          currentTarget = target === 'opp' ? 'opp' : 'self';
+          currentTarget = sideOf(target);
           render();
         },
         /** Opens a saved deck into the editor, as picking it from My Decks does. */
@@ -465,7 +457,7 @@ import {
           return deckId;
         },
         setActiveDeck: (target, deckId) => {
-          const key = target === 'opp' ? 'opp' : 'self';
+          const key = sideOf(target);
           activeDeckIds[key] = deckId || null;
           const cards = deckId ? getDeckFromLibrary(library, deckId) : null;
           baselines[key] = cards ? deckCardsKey(cards) : null;
@@ -483,41 +475,41 @@ import {
         // Suggest-tab steering (design 069); false when no saved deck is loaded.
         setActiveSuggestPrefs: (target, prefs) => setActiveField(target, prefs, setDeckSuggestPrefs),
         getActiveSuggestPrefs: (target) => {
-          const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+          const activeId = activeDeckIds[sideOf(target)];
           return activeId && library?.decks?.[activeId] ? getDeckSuggestPrefs(library, activeId) : null;
         },
         getActiveWallpaper: (target) => {
-              const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+              const activeId = activeDeckIds[sideOf(target)];
               return activeId && library?.decks?.[activeId]
                 ? library.decks[activeId].wallpaperId || null
                 : null;
             },
         getActiveSprites: (target) => {
-              const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+              const activeId = activeDeckIds[sideOf(target)];
               return activeId && library?.decks?.[activeId]
                 ? normalizeDeckSprites(library.decks[activeId].sprites)
                 : [];
             },
             getActiveDeckName: (target) => {
-          const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+          const activeId = activeDeckIds[sideOf(target)];
           return activeId && library?.decks?.[activeId]
             ? library.decks[activeId].name || null
             : null;
         },
         getActiveSleeve: (target) => {
-              const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+              const activeId = activeDeckIds[sideOf(target)];
               return activeId && library?.decks?.[activeId] ? library.decks[activeId].sleeveId || null : null;
             },
         getActiveCoin: (target) => {
-              const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+              const activeId = activeDeckIds[sideOf(target)];
               return activeId && library?.decks?.[activeId] ? library.decks[activeId].coinId || null : null;
             },
         getActiveMat: (target) => {
-              const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+              const activeId = activeDeckIds[sideOf(target)];
               return activeId && library?.decks?.[activeId] ? library.decks[activeId].matId || null : null;
             },
         getActiveDeckBox: (target) => {
-              const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+              const activeId = activeDeckIds[sideOf(target)];
               return activeId && library?.decks?.[activeId] ? library.decks[activeId].deckBoxId || null : null;
             },
             saveActiveDeck: (cards) => {
@@ -585,12 +577,12 @@ import {
         // 'build-battle' for Build & Battle decks, null otherwise: a Standard record must leave
         // room for detectDeckFormat to spot a Pocket deck (design 051, slice 2 pin).
         getActiveDeckFormat: (target) => {
-          const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+          const activeId = activeDeckIds[sideOf(target)];
           const format = activeId ? getDeckFormat(library, activeId) : null;
           return format === DECK_FORMAT_BUILD_BATTLE ? format : null;
         },
         getActiveDeckId: (target) =>
-          activeDeckIds[target === 'opp' ? 'opp' : 'self'] ??
+          activeDeckIds[sideOf(target)] ??
           activeDeckIds[currentTarget],
         getLibrary: () => library,
       };

@@ -16,7 +16,7 @@
 // riding above it; every pass stands at its own height over the drawer's lift, so the ember core
 // sits on top of the flame and the cast pass pools violet light on the cloth.
 import { rgbCss } from '../../fx-colors.mjs';
-import { mergeFxMods, withFxMod, withLiftZ } from './_mods.js';
+import { edgedBy, mergeFxMods, withFxMod, withLiftZ } from './_mods.js';
 import { grainPass, shardOutline, sphere, styledKit, tongueOutline, traceOutline, wobble } from './_shared.js';
 
 // Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
@@ -95,9 +95,7 @@ export function helixStrands(r, phase, tiltDeg = HELIX_TILT) {
 /** The dragon material drawn in `palette` (any palette with the same keys). */
 function dragonKit(palette) {
   const edge = Object.freeze({ dissolve: Object.freeze({ edge: palette.hot, width: 0.12, gain: 1.6 }) });
-  /** `draw` with this kit's dissolve edge named for every fill it makes. */
-  const edged = (draw) => (ctx, ...args) =>
-    ctx && typeof ctx === 'object' ? withFxMod(ctx, edge, () => draw(ctx, ...args)) : draw(ctx, ...args);
+  const edged = edgedBy(edge);
 
   /** A soft violet halo fading through deep to nothing. */
   function glow(ctx, x, y, r, alpha) {

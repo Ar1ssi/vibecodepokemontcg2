@@ -3,6 +3,8 @@ import { isReverseHoloId, tcgdexApiUrl, tcgdexLookupId } from '../../../../../sh
 import { printedRarity } from '../../../../../shared/engine/rules/card-classify.mjs';
 import { pokemonFormKey } from '../../../../../shared/engine/rules/pokemon-forms.mjs';
 import { cardArtImageBase } from '../../../../../shared/tcgdex/card-art.mjs';
+import { TCGDEX_FILTER_PARAM_DROP_ORDER } from './card-filters.mjs';
+import { compareReleaseDateNewestFirst } from './release-date-order.mjs';
 import { SET_RELEASE_DATES } from './set-release-dates.generated.mjs';
 const HUGE_RESULT_THRESHOLD = 2000;
 const DETAIL_FETCH_LIMIT = 150;
@@ -13,12 +15,8 @@ function compareReleaseDate(a, b, direction = 'desc') {
   const dateA = String(a.set?.releaseDate || '');
   const dateB = String(b.set?.releaseDate || '');
 
-  if (dateA && dateB && dateA !== dateB) {
-    return direction === 'asc' ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA);
-  }
-
-  if (dateA && !dateB) return direction === 'asc' ? 1 : -1;
-  if (!dateA && dateB) return direction === 'asc' ? -1 : 1;
+  const byDate = compareReleaseDateNewestFirst(dateA, dateB);
+  if (byDate !== 0) return direction === 'asc' ? -byDate : byDate;
 
   const nameCompare = String(a.name || '').localeCompare(String(b.name || ''));
   if (nameCompare !== 0) {
@@ -107,7 +105,7 @@ export function normalizeSearchQuery(term) {
   if (/ E4 LV\.X$/i.test(t)) return t.replace(/ E4 LV\.X$/i, ' 4');
   if (/ E4$/i.test(t)) return t.replace(/ E4$/i, ' 4');
 
-  // Normalise LV.X (no space) → LV. X (with space) so queryCardsByName has one
+  // Normalise LV.X (no space) → LV. X (with space) so the query has one
   // consistent form to detect via /\bLV\. X$/i — works for both suffix and standalone.
   t = t.replace(/\bLV\.X$/i, 'LV. X');
 
@@ -160,24 +158,6 @@ export function resolveSearchPlan(term) {
 // (MAX_QUERY_LENGTH in server/tcgdex-proxy.mjs).
 const MAX_QUERY_LENGTH = 300;
 
-// Filter params dropped first when a query would be too long: the loosest
-// narrowing goes first. The client filter still applies every one of them,
-// so dropping a param only widens what TCGdex returns.
-const PARAM_DROP_ORDER = [
-  'rarity',
-  'suffix',
-  'retreat',
-  'regulationMark',
-  'trainerType',
-  'energyType',
-  'hp',
-  'stage',
-  'types',
-  'legal.standard',
-  'legal.expanded',
-  'category',
-];
-
 /**
  * Builds the `/cards` query params for one summary fetch, dropping filter
  * params (never the name or stage) until the query fits the proxy's limit.
@@ -192,7 +172,7 @@ export function buildSummaryQuery({ cardName, cardStage, params = {} } = {}) {
   if (cardStage) query.stage = cardStage;
 
   const fits = () => new URLSearchParams(query).toString().length <= MAX_QUERY_LENGTH;
-  for (const key of PARAM_DROP_ORDER) {
+  for (const key of TCGDEX_FILTER_PARAM_DROP_ORDER) {
     if (fits()) break;
     if (key === 'stage' && cardStage) continue;
     delete query[key];
@@ -285,12 +265,7 @@ export function releaseDateOfCardId(cardId) {
 // Newest printing first, unknown dates last. Returns a new array; the input is left alone.
 export function newestSummariesFirst(summaries = []) {
   return [...summaries].sort((a, b) => {
-    const dateA = releaseDateOfCardId(a?.id);
-    const dateB = releaseDateOfCardId(b?.id);
-    if (dateA === dateB) return 0;
-    if (!dateA) return 1;
-    if (!dateB) return -1;
-    return dateB.localeCompare(dateA);
+    return compareReleaseDateNewestFirst(releaseDateOfCardId(a?.id), releaseDateOfCardId(b?.id));
   });
 }
 
@@ -438,9 +413,4 @@ export async function fetchCardDetail(cardId) {
   const detail = await fetchJson(tcgdexApiUrl(`/cards/${encodeURIComponent(tcgdexLookupId(cardId))}`));
   const card = normalizeTcgdexCard(detail);
   return isReverseHoloId(cardId) ? { ...card, id: cardId, rarity: 'Reverse Holo' } : card;
-}
-
-/** Name-only search, for callers with no filters (the rules debug menu). */
-export function queryCardsByName(term = '') {
-  return queryCards({ term });
 }

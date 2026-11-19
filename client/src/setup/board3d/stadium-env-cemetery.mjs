@@ -50,7 +50,7 @@ export const MOONLIT = Object.freeze({
   shadow: [0.38, 0.46, 0.5, 0.55],
 });
 import { tableBounds } from './table-uv.mjs';
-import { patchy, shuffled } from './stadium-env-spots.mjs';
+import { distanceToRect, hash, oppHandRect, patchy, shuffled, union } from './stadium-env-spots.mjs';
 
 export const CEMETERY_KEY = 'old-cemetery';
 /**
@@ -72,29 +72,6 @@ export const MAX_PINES = 24;
 export const PROP_CARD_GAP_PX = 14;
 /** Grave kinds. */
 export const GRAVE = Object.freeze({ round: 0, pointed: 1 });
-
-/** A small deterministic 0..1 from three numbers. */
-const hash = (x, y, salt) => {
-  const s = Math.sin(x * 127.1 + y * 311.7 + salt * 74.7) * 43758.5453;
-  return s - Math.floor(s);
-};
-
-const distanceToRect = (x, y, r) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.y - y, 0, y - r.y - r.h));
-
-const union = (rects) => {
-  const x = Math.min(...rects.map((r) => r.x));
-  const y = Math.min(...rects.map((r) => r.y));
-  return { x, y, w: Math.max(...rects.map((r) => r.x + r.w)) - x, h: Math.max(...rects.map((r) => r.y + r.h)) - y };
-};
-
-/** The opponent's hand where the board fans it, past the far edge: the cards' width either side of the middle. */
-const oppHandRect = (layout, core) => {
-  const hand = layout.opp?.hand;
-  const cardH = layout.opp?.cardBox?.hand?.h ?? 0;
-  if (!hand || !(cardH > 0) || !Number.isFinite(hand.baselineY)) return null;
-  const halfW = Math.max(Math.abs(core.x), Math.abs(core.x + core.w));
-  return { x: -halfW, y: hand.baselineY - cardH, w: 2 * halfW, h: cardH };
-};
 
 /** Catmull-Rom through `points` ([x, y]), `per` steps a span. */
 const smoothPath = (points, per) => {
@@ -146,6 +123,8 @@ export function cemeterySpots(layout) {
   const core = union(cards);
   const scene = sceneBounds(layout, CEMETERY_KEY);
   const u = (layout.self.cardBox?.active?.w ?? 100) / 100;
+  // The pine scan steps by 118 * u, so a zero or negative scale would never finish.
+  if (!(u > 0)) return null;
   const hand = oppHandRect(layout, core);
   const obstacles = [...cards, ...(hand ? [hand] : [])];
   const clear = (x, y, r) => obstacles.every((rect) => distanceToRect(x, y, rect) >= r + PROP_CARD_GAP_PX);
@@ -348,7 +327,7 @@ void main() {
   float kind = 0.0;
   float d = pathDistance(p);
   if (d < 0.0) {
-    h -= 0.7 * smoothstep(0.0, -18.0, d);
+    h -= 0.7 * (1.0 - smoothstep(-18.0, 0.0, d));
     kind = 1.0;
   }
   for (int i = 0; i < ${MAX_GRAVES}; i++) {
@@ -487,12 +466,12 @@ void main() {
   vec3 col = cloverGrass(p, mix(GROUND * 0.8, GROUND_LIT * 1.1, smoothstep(0.42, 0.78, fbm3(p / 160.0 + 1.0))), calm);
   // The path: worn earth, paler down its middle, the grass fringing over its edge.
   float pathEdge = 1.0 - grassFringe(-field.g, p, 6.0);
-  vec3 earth = mix(EARTH_DARK, EARTH, smoothstep(-4.0, -20.0, field.g)) * (1.0 - 0.25 * fringeShade(-field.g, 6.0));
+  vec3 earth = mix(EARTH_DARK, EARTH, (1.0 - smoothstep(-20.0, -4.0, field.g))) * (1.0 - 0.25 * fringeShade(-field.g, 6.0));
   // Grass creeps back over it in patches where few walk.
   float regrown = smoothstep(0.62, 0.75, fbm3(p / 45.0 + 9.0)) * 0.8;
   float onPath = pathEdge * (1.0 - regrown);
   // Puddles holding the moon's pale light.
-  float puddle = smoothstep(0.68, 0.73, fbm3(p / 36.0 + 5.0)) * smoothstep(-4.0, -14.0, field.g);
+  float puddle = smoothstep(0.68, 0.73, fbm3(p / 36.0 + 5.0)) * (1.0 - smoothstep(-14.0, -4.0, field.g));
   vec3 toEye = normalize(uEye - vec3(p, 0.0));
   vec3 mirror = reflect(-normalize(uSun), vec3(0.0, 0.0, 1.0));
   vec3 water = vec3(0.07, 0.15, 0.17) + MOONLIGHT * 0.3 * pow(max(dot(mirror, toEye), 0.0), 10.0);
@@ -510,7 +489,7 @@ void main() {
   col = mix(col, col * vec3(0.45, 0.56, 0.76), smoothstep(80.0, 480.0, outside));
   // The boulder's crown catches the moon; so does the path's worn middle, a little.
   col += MOONLIGHT * 0.12 * pow(clamp(dot(n, moon), 0.0, 1.0), 6.0) * step(2.5, kind);
-  col += MOONLIGHT * 0.025 * onPath * smoothstep(-6.0, -22.0, field.g);
+  col += MOONLIGHT * 0.025 * onPath * (1.0 - smoothstep(-22.0, -6.0, field.g));
   // Design 084: no haze over the graveyard; low bands of ground fog lie out at the margins only.
   float fog = smoothstep(0.48, 0.74, fbm3(p / vec2(340.0, 150.0) + vec2(uTime * 0.012, uTime * 0.004)));
   col = mix(col, MIST * 0.3, fog * 0.38 * smoothstep(160.0, 420.0, outside));

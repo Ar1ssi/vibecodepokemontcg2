@@ -15,7 +15,6 @@ export const DAMAGE_COUNTER_TIERS = [
  */
 export function getDamageCounterTier(damage) {
   const amount = Math.max(0, parseInt(String(damage ?? '0'), 10) || 0);
-  if (amount <= 0) return 'dmg-tier-10';
   if (amount <= 20) return 'dmg-tier-10';
   if (amount <= 30) return 'dmg-tier-20';
   if (amount <= 40) return 'dmg-tier-30';

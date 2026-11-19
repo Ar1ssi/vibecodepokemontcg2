@@ -28,7 +28,7 @@ export function legalFallback(options) {
  * @param {{ onFallback?: (reason: 'no-options'|'scorer-null'|'scorer-threw', detail?: unknown) => void }} [hooks]
  *   Optional fallback logger for the runner (design: "log every fallback — a fallback is a
  *   finding, not a shrug"). Never required — decide() never throws either way.
- * @returns {object} a legal option
+ * @returns {object} a legal option, or the synthetic `{ kind: 'pass' }` when there are no options
  */
 export function decide(observation, scorer, { onFallback } = {}) {
   const options = Array.isArray(observation?.options) ? observation.options : [];

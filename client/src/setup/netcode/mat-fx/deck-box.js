@@ -172,7 +172,7 @@ function scheduleSync() {
 }
 
 const shouldSkipDeal = () =>
-  isE2eMode() || fxDisabled() || motionReduced() || document.hidden || boardHidden() || Boolean(systemState.isReplay);
+  isE2eMode() || fxDisabled() || motionReduced() || document.hidden || boardHidden();
 
 const waitForRigs = (scene) =>
   Promise.race([ensureRigs(scene), new Promise((resolve) => setTimeout(() => resolve(null), RIGS_WAIT_MS))]);

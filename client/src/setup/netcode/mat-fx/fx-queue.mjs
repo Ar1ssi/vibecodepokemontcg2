@@ -45,6 +45,8 @@ export const createFxQueue = ({
   let timer = null;
   let committedMs = 0;
   let headLed = false;
+  // True while `run` executes a plan: the chain is mid-step, whatever is pushed must queue.
+  let running = false;
   let idleWaiters = [];
   // Plans started so far: lets a caller waiting on idle tell a long chain from a stuck one.
   let started = 0;
@@ -116,15 +118,17 @@ export const createFxQueue = ({
       return;
     }
     let hold = 0;
+    running = true;
     try {
       hold = holdOf(run(plan));
     } catch {
       hold = 0;
+    } finally {
+      running = false;
     }
-    // `run` is synchronous but arbitrary: it may have cleared the queue, or
-    // pushed and re-armed one of its own. Either way this call no longer owns
-    // the chain and must not overwrite what happened while it ran.
-    if (epoch !== startedIn || timer !== null) return;
+    // `run` is synchronous but arbitrary: it may have cleared the queue. A plan pushed while it ran
+    // waits for the hold armed below; one pushed after a clear in the same run starts now.
+    if (epoch !== startedIn) return queue.length > 0 ? step() : undefined;
     // A `blocking` plan (a coin ceremony covering the board) always waits out its
     // hold and does not spend the budget: what queues behind it must not play under it.
     if (!plan.blocking) {
@@ -135,9 +139,10 @@ export const createFxQueue = ({
     timer = schedule(step, hold);
   };
 
-  // Idle means no hold outstanding, so the plan can start in this same tick.
+  // Idle means no hold outstanding, so the plan can start in this same tick. Not while `run` is
+  // still going: its own hold is not armed yet, and a plan started now would skip it.
   const start = () => {
-    if (timer === null) step();
+    if (timer === null && !running) step();
   };
 
   return {

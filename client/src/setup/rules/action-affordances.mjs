@@ -19,22 +19,16 @@ import {
   filterUsableAbilities,
 } from '../../../../shared/engine/rules/collect-usable-abilities.mjs';
 import { parseAbility } from '../../../../shared/engine/rules/abilities.mjs';
-
-const abilityTextOf = (card) => {
-  const first = Array.isArray(card?.abilities) && card.abilities.length > 0
-    ? (typeof card.abilities[0] === 'string' ? card.abilities[0] : card.abilities[0]?.text)
-    : '';
-  return first || card?.ability?.text || card?.abilityText || card?.text || '';
-};
+import { cardAbilityText } from '../../../../shared/engine/rules/ability-executors.mjs';
 
 /**
- * Same gate as ability-picker.js: "When you play this Pokémon onto your
+ * "When you play this Pokémon onto your
  * Bench" triggers are gated by the one-shot window, not the per-turn
  * abilitiesUsed map. The evolve wording ("from your hand to evolve") has its
  * own gate (the turn the Pokémon evolved) and is excluded here.
  */
 export function isPlayedToBenchTriggerCard(card) {
-  return parseAbility(abilityTextOf(card)).some(
+  return parseAbility(cardAbilityText(card)).some(
     (s) => s.type === 'whenPlayedAbility' && !s.evolve
   );
 }
@@ -45,7 +39,7 @@ export function isPlayedToBenchTriggerCard(card) {
  * that Pokémon evolved, not every turn.
  */
 export function isEvolvePlayedTriggerCard(card) {
-  return parseAbility(abilityTextOf(card)).some(
+  return parseAbility(cardAbilityText(card)).some(
     (s) => s.type === 'whenPlayedAbility' && s.evolve === true
   );
 }
@@ -64,8 +58,7 @@ export function isEvolvePlayedTriggerCard(card) {
  *   Special Energy pricing (prizes, Stage 2 count)
  * @param {(card: object) => boolean} [opts.isAbilityUsed] merged already-spent
  *   predicate — legacy flag, stamped flag, server flags, and the
- *   when-played-to-bench window all folded in by the caller (same shape as
- *   ability-picker.js)
+ *   when-played-to-bench window all folded in by the caller
  * @param {(card: object) => Promise<void>} [opts.ensureCardData]
  * @returns {Promise<{ attackAvailable: boolean, abilityAvailable: boolean,
  *   usableAbilities: Array<{ card, zone, index, family, abilityName }> }>}

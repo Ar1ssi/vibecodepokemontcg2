@@ -28,31 +28,10 @@ import { isEnergy } from '../cards.mjs';
 import { discardCardToPlayerZone, findCard } from '../state.mjs';
 import { shuffleInPlace } from '../rng.mjs';
 import { applyStadiumSwitchTriggers } from './stadium-trigger-apply.mjs';
+import { BENCH_LIMIT } from './bench-limit.mjs';
+import { createPendingChoice } from './pending-choice.mjs';
 
 const SPECIAL_ENERGY_EFFECT = 'specialEnergy';
-// Same value as trainer-steps BENCH_LIMIT; importing it would close an import cycle.
-const BENCH_LIMIT = 5;
-
-/** Deterministic PendingChoice (Invariant 6) — inlined to avoid an effects cycle. */
-function makeChoice({ player, prompt, options, min, max, resumeToken, stateVersion = 0, stepIndex = 0 }) {
-  const token = { ...resumeToken, initiatorPlayerId: player };
-  return {
-    choiceId: `choice_${player}_${stateVersion}_${stepIndex}`,
-    player,
-    prompt,
-    source: SPECIAL_ENERGY_EFFECT,
-    options: (options || []).map((opt) => ({
-      instanceId: opt.instanceId,
-      name: opt.name || '',
-      src: opt.src || '',
-      type: opt.type || '',
-    })),
-    min,
-    max,
-    cancellable: false,
-    resumeToken: token,
-  };
-}
 
 function zoneOf(draft, playerId, zoneId) {
   return draft.players?.[playerId]?.zones?.[zoneId] || [];
@@ -129,6 +108,13 @@ function swapActiveBench(draft, playerId, benchRoot, events, { duringOwnersTurn 
     viaTrainer: false,
     duringOwnersTurn,
     events,
+  });
+  clearConditions(active);
+  events.push({
+    type: 'cardSwitched',
+    playerId,
+    activeId: active.instanceId,
+    benchId: benchRoot.instanceId,
   });
 }
 
@@ -348,7 +334,8 @@ function handleChoicePlan(draft, item, ctx, queue, index) {
       discardFromHand(draft, ctx, hand.map((c) => c.instanceId));
       return 'done';
     }
-    return makeChoice({
+    return createPendingChoice({
+      source: SPECIAL_ENERGY_EFFECT,
       player: ctx.hostPlayerId,
       prompt: `Discard ${count} card${count === 1 ? '' : 's'} from your hand`,
       options: hand,
@@ -373,7 +360,8 @@ function handleChoicePlan(draft, item, ctx, queue, index) {
     const host = findCard(draft, ctx.hostInstanceId)?.card;
     const zone = zoneOf(draft, ctx.hostPlayerId, ctx.hostZoneId);
     if (!host || topPokemonCard(zone, host) === host) return 'done';
-    return makeChoice({
+    return createPendingChoice({
+      source: SPECIAL_ENERGY_EFFECT,
       player: ctx.hostPlayerId,
       prompt: 'Retro Energy: remove up to 2 damage counters and discard the top card (devolve)?',
       options: [
@@ -404,7 +392,8 @@ function handleChoicePlan(draft, item, ctx, queue, index) {
       shuffleSearchedDeck(draft, ctx);
       return 'done';
     }
-    return makeChoice({
+    return createPendingChoice({
+      source: SPECIAL_ENERGY_EFFECT,
       player: ctx.hostPlayerId,
       prompt: `Search your deck for up to ${max} ${plan.what}`,
       options: matches,
@@ -444,7 +433,8 @@ function handleChoicePlan(draft, item, ctx, queue, index) {
   }
   // Cyclone: "your opponent switches …" — the switching player picks (audit SE11f).
   const chooserId = plan.chooser === 'opponent' ? playerId : ctx.hostPlayerId;
-  return makeChoice({
+  return createPendingChoice({
+    source: SPECIAL_ENERGY_EFFECT,
     player: chooserId,
     prompt: `${plan.side === 'self' || chooserId !== ctx.hostPlayerId ? 'Switch your Active Pokémon' : "Switch your opponent's Active Pokémon"} — choose a Benched Pokémon`,
     options: bench,
@@ -587,7 +577,10 @@ export function runEndOfTurnSpecialEnergies(draft, { events } = {}) {
  * energy returns to its owner's hand, `'reattach'` when it stays attached
  * (Boomerang/Burning), or null to discard normally.
  */
-export function resolveSpecialEnergyDiscard(draft, { energy, host, hostTop = null, hostPlayerId, hostZoneId }) {
+export function resolveSpecialEnergyDiscard(
+  draft,
+  { energy, host, hostTop = null, hostPlayerId, hostZoneId, attackExecuting = !!draft.__attackEffectPhase }
+) {
   if (!energy || !isSpecialEnergyCard(energy)) return null;
   if (!host) return null;
   const zone = zoneOf(draft, hostPlayerId, hostZoneId);
@@ -595,7 +588,7 @@ export function resolveSpecialEnergyDiscard(draft, { energy, host, hostTop = nul
     trigger: 'discard',
     host: hostTop || host,
     zoneArray: zone,
-    attackExecuting: !!draft.__attackEffectPhase,
+    attackExecuting,
   });
   if (plans.some((p) => p.action === 'returnToHand')) return 'hand';
   if (plans.some((p) => p.action === 'reattach')) return 'reattach';
@@ -605,7 +598,7 @@ export function resolveSpecialEnergyDiscard(draft, { energy, host, hostTop = nul
 /**
  * On-discard resolution for an attached Energy an attack is discarding right now. Callers that
  * discard outside `resolveAttackEffectPhase` (a resumed choice, an optional cost) have no
- * `__attackEffectPhase` flag, so the attack gate is forced on. Call BEFORE removing the card from
+ * `__attackEffectPhase` flag, so the attack gate is passed in as on. Call BEFORE removing the card from
  * its zone. Returns `'hand'`, `'reattach'`, or null to discard normally.
  */
 export function resolveAttackEnergyDiscard(draft, energy) {
@@ -613,20 +606,14 @@ export function resolveAttackEnergyDiscard(draft, energy) {
   const hostRef = findCard(draft, energy.attachedTo);
   if (!hostRef) return null;
   const zone = zoneOf(draft, hostRef.playerId, hostRef.zoneId);
-  const previous = draft.__attackEffectPhase;
-  draft.__attackEffectPhase = true;
-  try {
-    return resolveSpecialEnergyDiscard(draft, {
-      energy,
-      host: hostRef.card,
-      hostTop: topPokemonCard(zone, hostRef.card),
-      hostPlayerId: hostRef.playerId,
-      hostZoneId: hostRef.zoneId,
-    });
-  } finally {
-    if (previous === undefined) delete draft.__attackEffectPhase;
-    else draft.__attackEffectPhase = previous;
-  }
+  return resolveSpecialEnergyDiscard(draft, {
+    energy,
+    host: hostRef.card,
+    hostTop: topPokemonCard(zone, hostRef.card),
+    hostPlayerId: hostRef.playerId,
+    hostZoneId: hostRef.zoneId,
+    attackExecuting: true,
+  });
 }
 
 /**

@@ -1,24 +1,24 @@
 // Special-energy effect engine (taxonomy Section F, Gap #4).
 //
-// Today the sim only understands an energy's *type* (what it satisfies in an
-// attack cost, via `canPayAttackCost`). The *effect* a special-energy card
-// carries (Double, Double Colorless, Lock, Switching, Buddy-Buddy, letter /
-// named specials that change the attached type, …) is recognized and described
-// here, but NOT executed.
+// Classifies an energy card into an effect family and reads the *type* it counts as for
+// attack and retreat costs (`classifyEnergyEffect`, `resolveAttachedEnergyType`,
+// `rewriteEnergyDescriptor`; server-energy.mjs feeds them to the cost check). The
+// printed effects themselves (damage, HP, status, trigger clauses) are parsed and applied by
+// special-energy-parse.mjs and its callers.
 //
-// This module is pure + DOM-free (node:test friendly). It deliberately matches
-// the project's existing "announce-only / guidance" convention:
+// This module is pure + DOM-free (node:test friendly):
 //   - `classifyEnergyEffect` buckets a card into an effect family (from
 //     TCGdex `subtypes` + `name`, with a name fallback so it works before
 //     async card data loads).
 //   - `describeEnergyEffect` builds a human-readable announcement line.
-//   - `applyEnergyEffect` is an announce-only stub: it returns a result object
-//     and does NOT mutate any game state. Full per-family execution is deferred
-//     pending user confirmation (taxonomy: do not silently build execution).
+//   - `applyEnergyEffect` mutates no game state. It reports the effective type for an
+//     'attach-type' energy (executed: true); every other family is announced only
+//     (executed: false) because those effects run through the readers named above.
 
 import { describeTypedSpecialEnergy } from './special-energy-effects.mjs';
 import { specialEnergyProvision } from './special-energy-parse.mjs';
 import { parseEnergyTypeConversion } from './ability-executors.mjs';
+import { SYMBOL_TO_TYPE, titleTypeForSymbol } from './energy-symbols.mjs';
 
 const lower = (v) => String(v ?? '').toLowerCase();
 
@@ -33,20 +33,6 @@ const isBasicNamedEnergy = (name) => BASIC_ENERGY_NAME.test(lower(name).trim());
 // "Rocky Fighting Energy", "Growing Grass Energy", …
 const TYPED_ENERGY_NAME =
   /\b(colorless|grass|fire|water|lightning|psychic|fighting|metal|darkness|dragon|fairy)\s+energy\b/i;
-
-const ENERGY_SYMBOL_TYPES = {
-  c: 'Colorless',
-  g: 'Grass',
-  r: 'Fire',
-  w: 'Water',
-  l: 'Lightning',
-  p: 'Psychic',
-  f: 'Fighting',
-  m: 'Metal',
-  d: 'Darkness',
-  n: 'Dragon',
-  y: 'Fairy',
-};
 
 const normalizeEnergyType = (raw) => {
   const t = String(raw ?? '').trim();
@@ -66,7 +52,7 @@ const typeHintFromEffect = (card) => {
   const text = String(card?.effect ?? card?.text ?? '');
   const sym = text.match(/\{([a-z])\}/i);
   if (!sym) return null;
-  return ENERGY_SYMBOL_TYPES[sym[1].toLowerCase()] || null;
+  return titleTypeForSymbol(sym[1]);
 };
 
 const providesTypedEnergy = (card) => {
@@ -235,19 +221,8 @@ export function effectiveEnergyType(card) {
 // Covers every printed energy symbol, Dragon and Fairy included — a missing
 // entry made "Basic {Y} Energy" / "Basic {N} Energy" searches match nothing
 // (audit S&M F1, energyMatchesSearchWhat early-returns on an unmatched symbol).
-export const ENERGY_SYMBOL_TO_TYPE = {
-  c: 'colorless',
-  g: 'grass',
-  r: 'fire',
-  w: 'water',
-  l: 'lightning',
-  p: 'psychic',
-  f: 'fighting',
-  d: 'dark',
-  m: 'metal',
-  n: 'dragon',
-  y: 'fairy',
-};
+// Search filters spell Darkness 'dark'.
+export const ENERGY_SYMBOL_TO_TYPE = { ...SYMBOL_TO_TYPE, d: 'dark' };
 
 function primaryEnergyTypeName(card) {
   const fromEffective = effectiveEnergyType(card);

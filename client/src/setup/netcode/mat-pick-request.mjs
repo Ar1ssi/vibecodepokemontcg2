@@ -10,8 +10,7 @@
  */
 
 import { getPrintingKey } from '../../../../shared/engine/zones/hand-stack.mjs';
-
-const PLAY_ZONES = new Set(['active', 'bench']);
+import { PLAY_ZONES } from './view-card-vocabulary.mjs';
 
 const clampCount = (value, fallback) =>
   Number.isInteger(value) && value >= 0 ? value : fallback;
@@ -20,7 +19,7 @@ const clampCount = (value, fallback) =>
 // card. Attached Energy/Tools share the zone array but are not mat targets (the
 // hit-test would resolve an attachment click to its host, i.e. the wrong id).
 function isInPlayPokemon(record) {
-  if (!record?.element || !PLAY_ZONES.has(record.zone)) return false;
+  if (!record?.element || !PLAY_ZONES.includes(record.zone)) return false;
   return record.card?.attachedTo == null;
 }
 

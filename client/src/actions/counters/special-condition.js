@@ -211,21 +211,15 @@ export const addSpecialCondition = (
       getSpecialConditionCode(specialCondition) === '' ||
       getSpecialConditionCode(specialCondition) === '0'
     ) {
-      targetCard.image.specialCondition.removeEventListener(
-        'input',
-        targetCard.image.specialCondition.handleColor
-      );
+      specialCondition.removeEventListener('input', specialCondition.handleColor);
       specialCondition.handleColor = null;
-      targetCard.image.specialCondition.removeEventListener(
+      specialCondition.removeEventListener(
         'blur',
-        targetCard.image.specialCondition.handleRemoveWrapper
+        specialCondition.handleRemoveWrapper
       );
-      targetCard.image.specialCondition.handleRemove = null;
-      window.removeEventListener(
-        'resize',
-        targetCard.image.specialCondition.handleResize
-      );
-      targetCard.image.specialCondition.remove();
+      specialCondition.handleRemove = null;
+      window.removeEventListener('resize', specialCondition.handleResize);
+      specialCondition.remove();
       targetCard.image.specialCondition = null;
 
       if (fromBlurEvent) {

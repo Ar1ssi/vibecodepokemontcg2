@@ -52,7 +52,7 @@ function ballShadow(ctx, x, y, radius, lift, alpha) {
 export function playMegaEntry(instanceId) {
   const scene = getBoardScene();
   const id = shownId(instanceId);
-  const card = scene ? stageCard(scene, id) : null;
+  const card = scene?.fx ? stageCard(scene, id) : null;
   if (!card) return false;
   const h = card.h;
   const seed = Number(instanceId) || 1;

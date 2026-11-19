@@ -1,3 +1,5 @@
+import { notifyMatResized } from '../table/mat-resize.js';
+
 /**
      * Collapsible right side menu. Adds a toggle handle riding the left edge of
      * the side menu; clicking it slides the whole menu (tab row + panels) off
@@ -37,7 +39,7 @@
         // the menu's space. The sim recalculates card positions from live
         // container dimensions, so a window resize event after the 220ms slide
         // lets all existing sizing handlers run.
-        window.setTimeout(() => window.dispatchEvent(new Event('resize')), 260);
+        notifyMatResized();
       };
     
       // restore persisted state

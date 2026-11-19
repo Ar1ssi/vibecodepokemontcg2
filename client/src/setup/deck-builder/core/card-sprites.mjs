@@ -16,6 +16,8 @@ import {
   pokemonSpriteUrl,
 } from './deck-sprites.mjs';
 import { ITEM_SPRITE_CATALOG } from './item-sprite-catalog.generated.mjs';
+import { deckVariants } from './deck-variants.mjs';
+import { parseSupertype } from './supertype.mjs';
 import { shownPokemonForm } from '../../../../../shared/engine/rules/pokemon-forms.mjs';
 
 export const ITEM_SPRITE_BASE_PATH = '/src/assets/items';
@@ -181,7 +183,7 @@ export function pokemonSpriteForName(cardName, { types } = {}) {
   const raw = String(cardName ?? '').trim();
   if (!raw) return null;
   const isVmax = /[\s-]vmax$/i.test(raw);
-  const isEx = /\sex$/.test(raw);
+  const isEx = /\sex$/i.test(raw);
 
   let name = stripSuffixes(raw).replace(OWNER_PREFIX, '');
   let previous;
@@ -261,8 +263,8 @@ function isNonItemTrainer(card) {
  * @returns {{kind: 'pokemon'|'item', url: string, label: string, slug?: string}|null}
  */
 export function cardSpriteFor(card) {
-  const supertype = String(card?.supertype ?? '').toLowerCase();
-  if (supertype.startsWith('pok')) {
+  const supertype = parseSupertype(card?.supertype);
+  if (supertype === 'pokemon') {
     // Zygarde's forms print one name; the card's form (pokemon-forms.mjs) picks the sprite. 50% Forme is the base.
     const form = shownPokemonForm(card);
     const formEntry = form && (POKEMON_BY_SLUG.get(form.key) || POKEMON_BY_SLUG.get(form.key.replace(/-50$/, '')));
@@ -288,13 +290,6 @@ export function cardSpriteFor(card) {
   return null;
 }
 
-function deckCardEntries(cards) {
-  if (!cards || typeof cards !== 'object') return [];
-  return Object.values(cards).flatMap((group) =>
-    Array.isArray(group?.cards) ? group.cards : []
-  );
-}
-
 /**
  * The Pokémon a deck shows beside its name: always up to MAX_DECK_SPRITES.
  * The user's chosen sprites come first; empty slots are filled from the
@@ -310,7 +305,7 @@ export function resolveDisplaySprites(sprites, cards) {
   if (chosen.length >= MAX_DECK_SPRITES) return chosen;
 
   const copiesBySlug = new Map();
-  for (const entry of deckCardEntries(cards)) {
+  for (const entry of deckVariants(cards)) {
     const sprite = cardSpriteFor(entry?.data);
     if (sprite?.kind !== 'pokemon') continue;
     const count = Number(entry?.count) || 0;

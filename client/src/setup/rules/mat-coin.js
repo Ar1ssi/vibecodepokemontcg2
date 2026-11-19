@@ -14,13 +14,12 @@ import {
 } from '../deck-builder/core/coins.mjs';
 import {
   applyCoinEffect,
-  coinArtUrl,
   coinEffectLayerMarkup,
   COIN_BACK_URL,
   startCoinDrift,
   stopCoinDrift,
 } from '../deck-builder/core/coin-effects.mjs';
-import { playCoinFlipCeremony } from './coin-flip-ceremony.js';
+import { coinFaceArtUrl, escapeHtml, playCoinFlipCeremony } from './coin-flip-ceremony.js';
 
 const MAT_COIN_SLOTS = {
   self: () => selfContainerDocument.getElementById('matCoinSlot'),
@@ -29,14 +28,6 @@ const MAT_COIN_SLOTS = {
 
 const selectedCoins = { self: null, opp: null };
 let layoutHooked = false;
-
-const escapeHtml = (value = '') =>
-  String(value)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
 
 export const getSelectedCoin = (target) => selectedCoins[target] || null;
 
@@ -85,14 +76,14 @@ export const renderMatCoinSlot = (target) => {
   slot.innerHTML = [
     `<span class="coin-toss-wrap mat-coin-toss-wrap" data-mat-coin-toss="${target}">`,
     `<div class="coin-3d mat-coin-token" data-mat-coin-el="${target}">`,
-    `<div class="coin-face coin-front"><img src="${escapeHtml(coinArtUrl(coin.thumb))}" alt="${escapeHtml(coin.name || 'coin')}">${layers}</div>`,
+    `<div class="coin-face coin-front"><img src="${escapeHtml(coinFaceArtUrl(coin))}" alt="${escapeHtml(coin.name || 'coin')}">${layers}</div>`,
     `<div class="coin-face coin-backc"><img src="${COIN_BACK_URL}" alt="">${layers}</div>`,
     `</div>`,
     `</span>`,
   ].join('');
   const coinEl = slot.querySelector('[data-mat-coin-el]');
   // The mask URL must be resolved the same way as the <img>.
-  applyCoinEffect(coinEl, { ...coin, thumb: coinArtUrl(coin.thumb) });
+  applyCoinEffect(coinEl, { ...coin, thumb: coinFaceArtUrl(coin) });
   startCoinDrift(coinEl, { phaseOffset: target === 'opp' ? 0.5 : 0 });
 };
 

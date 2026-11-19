@@ -1,5 +1,3 @@
-import { systemState } from '../../initialization/global-variables/global-variables.js';
-
 export const show = (id, button) => {
   const deckImport = document.getElementById('deckImport');
   const settings = document.getElementById('settings');
@@ -10,25 +8,12 @@ export const show = (id, button) => {
   const settingsButton = document.getElementById('settingsButton');
   const deckImportButton = document.getElementById('deckImportButton');
   const page = document.getElementById(id);
-  const jsonReplayDiv = document.getElementById('jsonReplayDiv');
-  const exitReplay = document.getElementById('exitReplay');
 
   deckImport.style.display = 'none';
   settings.style.display = 'none';
   p1Box.style.display = 'none';
   p2Box.style.display = 'none';
   page.style.display = 'flex';
-
-  if (systemState.isReplay) {
-    jsonReplayDiv.style.display = 'none';
-    exitReplay.style.display = 'block';
-  } else if (id === 'p1Box') {
-    jsonReplayDiv.style.display = 'block';
-    exitReplay.style.display = 'none';
-  } else {
-    jsonReplayDiv.style.display = 'none';
-    exitReplay.style.display = 'none';
-  }
 
   const buttons = [p1Button, p2Button, settingsButton, deckImportButton];
 

@@ -7,13 +7,7 @@ import {
     } from '../../../setup/deck-builder/core/sleeves.mjs';
     import { deferredPicker } from '../../../setup/deck-builder/core/catalog-loader.mjs';
     import { DEFAULT_CARD_BACK_PATH } from '../../../setup/deck-constructor/default-card-back.mjs';
-    
-    const escapeHtml = (value = '') => String(value)
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&#39;');
+import { escapeHtml } from './native-deck-builder-shared-logic.js';
     
     /**
      * Card sleeve picker for the native deck builder. Renders a horizontally
@@ -122,7 +116,8 @@ import {
         galleryEl.querySelectorAll('[data-sleeve-id]').forEach((button) => {
           button.addEventListener('click', () => {
             const id = button.dataset.sleeveId || null;
-            selectedId = id && selectedId === id ? null : id;
+            const isReselect = Boolean(id) && selectedId === id;
+            selectedId = isReselect ? null : id;
             renderPreview();
             renderGallery();
             const sleeve = sleeves.find((s) => s.id === selectedId) || null;

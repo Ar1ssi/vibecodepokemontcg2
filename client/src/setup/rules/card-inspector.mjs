@@ -32,10 +32,7 @@ import {
   stadiumCardFor,
   abilityUsedFor,
 } from './attack-preview-sources.mjs';
-import {
-  isAuthoritativeDispatchActive,
-  dispatchAuthoritativeUseAbility,
-} from '../netcode/authoritative-dispatch.js';
+import { dispatchAuthoritativeUseAbility } from '../netcode/authoritative-dispatch.js';
 import { getZone } from '../zones/get-zone.js';
 import {
   getAuthoritativeStadiumArray,
@@ -43,7 +40,6 @@ import {
   getAuthoritativeCostDiscounts,
   getAuthoritativeOncePerGame,
 } from '../netcode/apply-view.js';
-import { runAbilitySteps } from './rules-bridge.js';
 import { computeContentBox } from './attack-zone-geometry.js';
 import { buildInspectorModel } from './card-inspector-model.mjs';
 import { damagePreviewAgainst } from './attack-ui-model.mjs';
@@ -54,6 +50,7 @@ import {
   buildStadiumOption,
   buildWeakResistBar,
 } from './attack-options.mjs';
+import { el, OVERLAY_CLOSE_EVENTS } from './overlay-chrome.mjs';
 
 // Events that can change what the inspector reports while it is open. Owned here because this
 // module outlives attack-preview.js — slice 3 deletes that file and its copy of this list.
@@ -65,7 +62,6 @@ const REFRESH_EVENTS = [
   'action-processed',
   'rules-mode-changed',
 ];
-const CLOSE_EVENTS = ['rules-turn-began', 'rules-session-reset'];
 
 // Last-resort glyphs for a type the token art does not cover — the same "data we don't
 // recognise" path attack-preview.js takes.
@@ -78,16 +74,9 @@ const TYPE_GLYPHS = {
   Psychic: '🔮',
   Fighting: '🥊',
   Metal: '⚙️',
-  Dark: '🌑',
+  Darkness: '🌑',
   Dragon: '🐉',
   Fairy: '✨',
-};
-
-const el = (tag, className, text) => {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text != null) node.textContent = String(text);
-  return node;
 };
 
 const orb = (type, className) => {
@@ -210,7 +199,7 @@ const detachState = (state) => {
 
 const unwireBoundaryIfIdle = () => {
   if (boundaryWired && states.size === 0) {
-    CLOSE_EVENTS.forEach((name) =>
+    OVERLAY_CLOSE_EVENTS.forEach((name) =>
       document.removeEventListener(name, teardownAll)
     );
     boundaryWired = false;
@@ -221,7 +210,7 @@ const teardownAll = () => {
   states.forEach(detachState);
   states.clear();
   if (boundaryWired) {
-    CLOSE_EVENTS.forEach((name) =>
+    OVERLAY_CLOSE_EVENTS.forEach((name) =>
       document.removeEventListener(name, teardownAll)
     );
     boundaryWired = false;
@@ -230,7 +219,7 @@ const teardownAll = () => {
 
 const wireBoundary = () => {
   if (boundaryWired) return;
-  CLOSE_EVENTS.forEach((name) => document.addEventListener(name, teardownAll));
+  OVERLAY_CLOSE_EVENTS.forEach((name) => document.addEventListener(name, teardownAll));
   boundaryWired = true;
 };
 
@@ -280,7 +269,9 @@ export const decorateInspectorSlide = (built, card, getContext, actions = null) 
     context: null,
     model,
   };
-  state.refresh = () => rerender(state);
+  // The async snapshot is what carries the Stadium cost modifier and the once-per-turn flags, so
+  // every refresh re-resolves it; a Stadium has no snapshot and re-reads `getContext` directly.
+  state.refresh = () => (isStadiumCard(card) ? rerender(state) : hydrateContext(state));
   // The chrome is sized from the slide's layout box, so a resize (window, or the focus card's
   // viewport-derived size) must re-place it.
   if (typeof ResizeObserver !== 'undefined') {
@@ -294,6 +285,7 @@ export const decorateInspectorSlide = (built, card, getContext, actions = null) 
     state.observer.observe(wrap);
   }
   states.add(state);
+  REFRESH_EVENTS.forEach((name) => document.addEventListener(name, state.refresh));
   wireBoundary();
   applyAffordances(state, model);
   wirePanelClicks(state);
@@ -418,13 +410,16 @@ const retreatBoardContext = () => ({
   benchCards: getZone('self', 'bench').array,
 });
 
+// Damage counters on the attacker, for attacks that scale with them.
+const attackerDamageOf = (card) => Math.max(0, Math.round(Number(card?.damage) || 0) / 10);
+
 const stampContextFor = (card, zone = 'active') => ({
   energyTypes: stampEnergyTypes(card),
   attacker: card,
   zone,
   ...retreatBoardContext(),
   damageCtx: {
-    attackerDamage: Math.max(0, Math.round(Number(card?.damage) || 0) / 10),
+    attackerDamage: attackerDamageOf(card),
   },
   rulesEnabled: true,
 });
@@ -566,7 +561,7 @@ async function resolveLiveContext(card, zone = 'active') {
     zone,
     ...retreatBoardContext(),
     damageCtx: {
-      attackerDamage: Math.max(0, Math.round(Number(card?.damage) || 0) / 10),
+      attackerDamage: attackerDamageOf(card),
       energyCount: energyTypes.length,
     },
     rulesEnabled: Boolean(rulesState.enabled),
@@ -581,9 +576,11 @@ const hydrateContext = (state) => {
   // A Stadium has nothing async to resolve — its context is the live rules flags, which
   // `getContext` re-reads on every REFRESH_EVENT, so the panel stays accurate while open.
   if (isStadiumCard(state.card)) return;
+  const seq = (state.hydrateSeq = (state.hydrateSeq ?? 0) + 1);
   resolveLiveContext(state.card, state.getContext().zone).then(
     (context) => {
-      if (!state.wrap.isConnected) return;
+      // A newer resolve is in flight: this one read the board before the latest event.
+      if (!state.wrap.isConnected || seq !== state.hydrateSeq) return;
       state.context = context;
       rerender(state);
     },
@@ -594,35 +591,24 @@ const hydrateContext = (state) => {
 };
 
 /**
- * Use the card's ability — the dispatch design 008's ability zone used, unchanged. Under server
- * authority the SERVER runs it (and asks for any picks through a pendingChoice); the local step
- * runner would mutate legacy zone arrays the server never sees.
+ * Use the card's ability: the SERVER runs it (and asks for any picks through a pendingChoice).
  *
  * Unlike an attack this does not end the turn, so the inspector stays open and re-renders on the
  * resulting board event — a once-per-turn ability flips to spent, and one that attached Energy
  * can make a previously unpayable attack payable.
  */
 const useAbility = (card, zone) => {
-  // `dispatchAuthoritativeUseAbility` fails OPEN by contract: a false return means "this action
-  // was not dispatched", and the gated call site must then run its legacy body (see
-  // emitAuthoritativeCommand in authoritative-dispatch.js). Returning regardless discarded every
-  // refused dispatch — no command sent, no chat line, nothing on the board, which is
-  // indistinguishable from a dead click.
-  if (
-    card?.instanceId != null &&
-    isAuthoritativeDispatchActive() &&
-    dispatchAuthoritativeUseAbility({
-      user: 'self',
-      emit: true,
-      oInitiator: 'opp',
-      zoneId: zone,
-      index: 0,
-      authoritativeId: card.instanceId,
-    })
-  ) {
-    return;
-  }
-  runAbilitySteps('self', card);
+  // No local body exists to fall back on: a card the server has not registered, or no room, is
+  // refused with a chat line and a `dispatch.refused` log entry (failClosed).
+  dispatchAuthoritativeUseAbility({
+    user: 'self',
+    emit: true,
+    oInitiator: 'opp',
+    zoneId: zone,
+    index: 0,
+    authoritativeId: card?.instanceId,
+    failClosed: true,
+  });
 };
 
 /**

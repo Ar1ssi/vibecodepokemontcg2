@@ -226,8 +226,8 @@ export async function canEvolve(
   // — the card explicitly allows chaining a Stage 2 evolve onto a Pokémon
   // that evolved into Stage 1 earlier THIS SAME activation, skipping both
   // the just-played and already-evolved-this-turn gates for that one
-  // chained step. It does NOT relax the Basic's own "put into play this
-  // turn" gate (still enforced above via wasPlayedThisTurn on the Basic).
+  // chained step (the Stage 1 placed a moment ago counts as just played). The
+  // first step's Basic is still gated: the client calls without the bypass there.
   const evoSpeed = getStadiumEvolutionSpeed(player, baseCardInPlay);
   const bypassJustEvolvedGate = Boolean(options.bypassJustEvolvedGate);
   // Evolution-speed Stadiums (Forest of Vitality) also allow a second evolution this turn
@@ -381,8 +381,7 @@ export function isNextStage(baseStage, evoStage) {
 // to be playable — the item rules are handled by trainer guidance)
 export function isRareCandyJump(baseCardInPlay, evolutionCardInHand) {
   const baseStage = normalizeStage(baseCardInPlay.stage) || 'Basic';
-  const evoStage = normalizeStage(evolutionCardInHand.stage) || 'Stage 1';
-  return baseStage === 'Basic' && evoStage === 'Stage 2';
+  return baseStage === 'Basic' && normalizeStage(evolutionCardInHand.stage) === 'Stage 2';
 }
 
 export function markEvolvedThisTurn(player, targetCardOrName) {

@@ -17,6 +17,8 @@
  * flip's outcome match the server's instead of guessing.
  */
 
+import { log } from '../../log/client-log.js';
+
 // One slot per seat: a normal room uses the unnamed slot; a solo room (design 074 D7)
 // gets both seats' deals and keys them by seat, each with its seat-relative starter.
 const UNNAMED_SEAT = '';
@@ -81,6 +83,7 @@ export function waitForDealOrder(timeoutMs = 5000, seat = null) {
     };
     const timer = setTimeout(() => {
       slot.waiters = slot.waiters.filter((w) => w !== onOrder);
+      log.warn('sync', 'dealOrder.timeout', { seat, timeoutMs });
       resolve(null);
     }, timeoutMs);
     slot.waiters.push(onOrder);

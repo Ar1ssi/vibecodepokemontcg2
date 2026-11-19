@@ -24,7 +24,7 @@ import {
   TERRAIN_UNIFORMS,
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
-import { arenaRects, craterEmblem, environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
+import { arenaRects, craterEmblem, environmentFootprints, isRect, sceneBounds } from './stadium-environment-layout.mjs';
 import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
 import { createKitProps } from './stadium-kit.mjs';
 import { tableBounds } from './table-uv.mjs';
@@ -119,7 +119,6 @@ const BUTTON = [0.22, 0.25, 0.3, 0.3];
 const STATUS_GREEN = [0.2, 1.1, 0.45, 2.0];
 const STATUS_AMBER = [1.2, 0.7, 0.12, 2.0];
 
-const isRect = (rect) => rect && [rect.x, rect.y, rect.w, rect.h].every(Number.isFinite) && rect.w > 0 && rect.h > 0;
 const cornersOf = (rect) => [
   [rect.x, rect.y],
   [rect.x + rect.w, rect.y],
@@ -729,7 +728,7 @@ void main() {
     col = mix(col, paleSteel, plates);
     col = mix(col, vec3(0.02, 0.025, 0.035), (1.0 - smoothstep(0.8, 2.2, abs(fromCentre - uDais.z + 80.5))) * step(-60.0, d) * 0.9 * (1.0 - pad));
     // A dark seam round each pad, where its plate meets the disc.
-    col = mix(col, vec3(0.02, 0.025, 0.035), (1.0 - smoothstep(0.8, 2.2, abs(onPad + 1.5))) * smoothstep(uDais.z - 90.0, uDais.z - 120.0, fromCentre) * 0.9);
+    col = mix(col, vec3(0.02, 0.025, 0.035), (1.0 - smoothstep(0.8, 2.2, abs(onPad + 1.5))) * (1.0 - smoothstep(uDais.z - 120.0, uDais.z - 90.0, fromCentre)) * 0.9);
     float rim = smoothstep(-28.0, -24.0, d);
     vec3 steel = mix(vec3(0.16, 0.18, 0.22), vec3(0.34, 0.37, 0.42), smoothstep(-24.0, -8.0, d));
     steel = mix(steel, vec3(0.6, 0.64, 0.7), 1.0 - smoothstep(0.8, 2.6, abs(d + 4.0)));

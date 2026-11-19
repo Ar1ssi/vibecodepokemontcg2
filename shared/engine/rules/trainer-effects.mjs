@@ -75,6 +75,8 @@ import { canonicalEffectWording } from './effect-wording.mjs';
 import { parseFossilPlay, parseNamedFossilSearch } from './fossil.mjs';
 import { parseTurnDamageBonus } from './turn-damage-bonus.mjs';
 import { rewriteLegacyTrainerWording } from './legacy-trainer-wording.mjs';
+import { cardPrintedText } from './trainer-card-text.mjs';
+import { SYMBOL_TO_TYPE, titleTypeForSymbol } from './energy-symbols.mjs';
 
 const POKEMON_TYPE_WORDS = Object.keys(WORD_POKEMON_TYPES).join('|');
 
@@ -177,7 +179,7 @@ function passiveDetail(lower) {
   if (lower.includes('can evolve into')) return 'Evolution timing modifier — applies automatically.';
   if (lower.includes("don't recover") || lower.includes('do not recover')) return 'Special Condition modifier — applies automatically.';
   if (lower.includes('retreat cost')) return 'Retreat Cost modifier — applies automatically.';
-  if (lower.includes("can't retreat") || lower.includes('can’t retreat')) return 'Retreat restriction — Poisoned Pokémon cannot retreat.';
+  if (lower.includes("can't retreat")) return 'Retreat restriction — Poisoned Pokémon cannot retreat.';
   if (lower.includes('fewer prize card')) return 'Fewer Prize cards on KO — applies when the Pokémon is Knocked Out.';
   if (lower.includes('would be knocked out') && lower.includes('is not knocked out')) return 'KO prevention — applies when the condition is met.';
   if (lower.includes('can use the attack on this card')) return 'Grants an attack — applies while attached.';
@@ -240,7 +242,6 @@ const PASSIVE_KEYWORDS = [
   "don't recover",
   'do not recover',
   "can't retreat",
-  'can’t retreat',
   'fewer prize card',
   'would be knocked out',
   'can use the attack on this card',
@@ -294,16 +295,15 @@ function parseEnergyType(lower) {
 // Legacy discard-pile wording ("Search your discard pile for X …") names the
 // target loosely; map it to the closest search filter.
 // Energy-type word → symbol, for "a Fire Energy card" / "basic Water Energy" kinds.
-const TYPE_WORD_SYMBOLS = {
-  colorless: 'C', grass: 'G', fire: 'R', water: 'W', lightning: 'L', psychic: 'P',
-  fighting: 'F', darkness: 'D', metal: 'M', dragon: 'N', fairy: 'Y',
-};
+const TYPE_WORD_SYMBOLS = Object.fromEntries(
+  Object.entries(SYMBOL_TO_TYPE).map(([letter, type]) => [type, letter.toUpperCase()])
+);
 
 function titleCaseKind(phrase) {
   return phrase
     .split(' ')
     .map((word) => {
-      if (/^\{[a-z]\}$/.test(word)) return SYMBOL_TYPE_WORDS[word[1]] || word.toUpperCase();
+      if (/^\{[a-z]\}$/.test(word)) return titleTypeForSymbol(word[1]) || word.toUpperCase();
       if (word === 'pokémon-gx') return 'Pokémon-GX';
       if (word === 'pokémon-ex') return 'Pokémon-EX';
       return word.replace(/^[a-z]/, (ch) => ch.toUpperCase());
@@ -465,21 +465,6 @@ function discardSearchCount(lower) {
   return m ? Number(m[1]) : 1;
 }
 
-// Energy-symbol → type word for the Pokémon half of "any combination" discard
-// clauses (matchesSearch filters typed Pokémon by word form, not by symbol).
-const SYMBOL_TYPE_WORDS = {
-  c: 'Colorless',
-  g: 'Grass',
-  r: 'Fire',
-  w: 'Water',
-  l: 'Lightning',
-  p: 'Psychic',
-  f: 'Fighting',
-  d: 'Darkness',
-  m: 'Metal',
-  n: 'Dragon',
-  y: 'Fairy',
-};
 
 // Look-at-deck cards that bench a card ("…onto your Bench", I132). Grimsley's
 // Move picks a {D} Pokémon; the fossil Items name the Pokémon in their own text
@@ -494,8 +479,8 @@ function benchLookPick(lower) {
     return `${name} (bench)`;
   }
   const typed = lower.match(/\{([a-z])\} pok[eé]mon you find there/);
-  if (typed && SYMBOL_TYPE_WORDS[typed[1]]) {
-    return `${SYMBOL_TYPE_WORDS[typed[1]]} Pokémon (bench)`;
+  if (typed && titleTypeForSymbol(typed[1])) {
+    return `${titleTypeForSymbol(typed[1])} Pokémon (bench)`;
   }
   return 'Pokémon (bench)';
 }
@@ -524,7 +509,7 @@ function combinationDiscardWhat(clause) {
         : part.includes('basic')
           ? 'Basic '
           : '';
-      const word = sym ? SYMBOL_TYPE_WORDS[sym[1]] : null;
+      const word = sym ? titleTypeForSymbol(sym[1]) : null;
       return word ? `${stage}${word} Pokémon` : `${stage}Pokémon`;
     }
     if (part.includes('supporter')) return 'Supporter';
@@ -547,10 +532,6 @@ function matchesSwitchOpponentIn(lower) {
   );
 }
 
-const POKEMON_TYPE_BY_SYMBOL = {
-  g: 'grass', r: 'fire', w: 'water', l: 'lightning', p: 'psychic', f: 'fighting',
-  d: 'darkness', m: 'metal', y: 'fairy', n: 'dragon', c: 'colorless',
-};
 
 // The Pokémon a "Heal N damage from …" Trainer may pick, kept with its printed zone and type so
 // rootMatchesTarget filters it: "your Active {N} Pokémon" (Dragon Elixir, Surging Sparks),
@@ -577,7 +558,7 @@ function healTargetConditions(lower) {
   const minEnergy = target.match(/that has at least (\d+) energy attached/);
   if (minEnergy) conditions.minEnergy = Number(minEnergy[1]);
   const energyType = target.match(/that has any \{([a-z])\} energy attached/);
-  if (energyType) conditions.energyType = POKEMON_TYPE_BY_SYMBOL[energyType[1]];
+  if (energyType) conditions.energyType = SYMBOL_TO_TYPE[energyType[1]];
   const maxHp = target.match(/that has (\d+) hp or less remaining/);
   if (maxHp) conditions.maxRemainingHp = Number(maxHp[1]);
   return conditions;
@@ -1502,7 +1483,7 @@ function parsePlayCondition(lower) {
  * Coin-conditional endings ("If tails, your turn ends immediately") are not this.
  */
 export function trainerEndsTurn(card) {
-  const text = String(card?.text || card?.effect || card?.cardText || '').trim();
+  const text = cardPrintedText(card).trim();
   return /(?:^|[.!)]\s+)your turn ends\.$/i.test(text);
 }
 
@@ -1539,20 +1520,6 @@ export function parseTrainerEffect(text = '') {
   return playCondition ? { ...result, playCondition } : result;
 }
 
-// Printed energy symbol → type word for typed discard costs.
-const SYMBOL_ENERGY_WORDS = {
-  g: 'grass',
-  r: 'fire',
-  w: 'water',
-  l: 'lightning',
-  p: 'psychic',
-  f: 'fighting',
-  d: 'darkness',
-  m: 'metal',
-  n: 'dragon',
-  y: 'fairy',
-  c: 'colorless',
-};
 
 // Costs printed in the first sentence are not part of every branch's parse, so
 // lift them out in one wrapper:
@@ -1569,7 +1536,7 @@ function appendLeadingHandDiscardCost(steps, lower) {
   if (/\bmay\b/.test(first.slice(0, discardAt))) return;
   const typed = first.match(/discard (\d+) \{([a-z])\} energy cards? from your hand/);
   if (typed) {
-    const type = SYMBOL_ENERGY_WORDS[typed[2]];
+    const type = SYMBOL_TO_TYPE[typed[2]];
     steps.unshift({
       type: 'discardCost',
       count: Number(typed[1]),
@@ -1687,7 +1654,7 @@ function parseOptionalCostBonus(tail) {
   if (benchCut) return [{ type: 'eachPlayerDiscardBenchUntil', count: Number(benchCut[1]), opponentFirst: true }];
   // Misty & Lorelei (CEC 199): a spent GX attack does not stop that type's GX attacks this turn.
   const gxReuse = tail.match(/^during this turn, your \{([a-z])\} pokémon can use their gx attacks even if you have used your gx attack\.?$/);
-  const gxReuseType = gxReuse && SYMBOL_ENERGY_WORDS[gxReuse[1]];
+  const gxReuseType = gxReuse && SYMBOL_TO_TYPE[gxReuse[1]];
   if (gxReuseType) return [{ type: 'gxReuseTurn', pokemonType: gxReuseType }];
   return [];
 }
@@ -1809,7 +1776,7 @@ function parseWotcTrainerSteps(lower) {
   // (pkmncards prints "2 {R} Energy cards", TCGdex "2 Fire Energy cards".)
   const blaine = text.match(/^during this turn, instead of attaching your free energy card, you may instead attach (\d+) (?:\{([a-z])\}|([a-z]+)) energy cards to 1 of your pokémon with ([a-z.' ]+?) in its name\./);
   if (blaine) {
-    const energyType = blaine[2] ? SYMBOL_ENERGY_WORDS[blaine[2]] : blaine[3];
+    const energyType = blaine[2] ? SYMBOL_TO_TYPE[blaine[2]] : blaine[3];
     return [{ type: 'energyAttachPlan', count: Number(blaine[1]), energyType, nameTag: blaine[4] }];
   }
   return null;
@@ -2355,7 +2322,7 @@ function parseTrainerStepsInner(lower) {
     /^choose up to (\d+) of your (?:\{([a-z])\} )?pok[ée]mon and heal each of them for (\d+) hp/
   );
   if (healChosen) {
-    const type = healChosen[2] ? POKEMON_TYPE_BY_SYMBOL[healChosen[2]] : null;
+    const type = healChosen[2] ? SYMBOL_TO_TYPE[healChosen[2]] : null;
     steps.push({
       type: 'healAmount',
       amount: Number(healChosen[3]),
@@ -2591,7 +2558,7 @@ function parseTrainerStepsInner(lower) {
     // Dangerous Drill: "You can play this card only if you discard a {D} Pokémon from your hand."
     const pokemonCost = lower.match(/only if you discard an? (?:\{([a-z])\} )?pokémon from your hand/);
     if (pokemonCost) {
-      const type = SYMBOL_ENERGY_WORDS[pokemonCost[1]];
+      const type = SYMBOL_TO_TYPE[pokemonCost[1]];
       steps.push({
         type: 'discardCost',
         count: 1,
@@ -2687,7 +2654,7 @@ function parseTrainerStepsInner(lower) {
       else if (lower.includes('benched')) target = '1 of your Benched Pokémon';
       else if (lower.includes('stage 2')) target = '1 of your Stage 2 Pokémon';
       const symbol = at[2] || at[4];
-      const typeWord = symbol ? SYMBOL_ENERGY_WORDS[symbol] : at[5] || null;
+      const typeWord = symbol ? SYMBOL_TO_TYPE[symbol] : at[5] || null;
       const basic = Boolean(at[3] || typeWord);
       // Gardenia's Vigor prints "Draw 2 cards. If you drew any cards in this
       // way, attach …": the draw leads and the attach follows it (review 5).

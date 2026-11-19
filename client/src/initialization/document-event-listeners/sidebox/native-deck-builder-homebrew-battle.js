@@ -33,7 +33,8 @@ import {
   verifyHomebrewSession,
   HOMEBREW_STORAGE_KEY,
 } from '../../../setup/deck-builder/core/homebrew-battle/homebrew-session.mjs';
-import { browserStorage, cardImage, createPoolTab, el, unlimitedEnergyCards } from './native-deck-builder-bb-shared.js';
+import { cardImage, createPoolTab, el, unlimitedEnergyCards } from './native-deck-builder-bb-shared.js';
+import { browserStorage } from './native-deck-builder-storage.js';
 import { createStage } from './native-deck-builder-stage.js';
 import { mountUnboxingScene } from './native-deck-builder-unboxing.js';
 

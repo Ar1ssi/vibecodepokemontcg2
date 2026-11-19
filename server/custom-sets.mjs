@@ -19,6 +19,7 @@ import {
 } from '../shared/custom-sets/custom-set-schema.mjs';
 import { PTCGL_SET_IDS } from '../client/src/setup/deck-builder/core/deck-text-import.mjs';
 import { LEGACY_SET_CODE_TO_TCGDEX_ID } from '../shared/engine/rules/legacy-set-ids.mjs';
+import { parseTcgdexKey } from './tcgdex-proxy.mjs';
 
 export const CUSTOM_SERIES = Object.freeze({ id: 'custom', name: 'Custom Sets' });
 // A custom code must not shadow a printed set's decklist code ("4 Pikachu ex SVI 57"): printed wins in resolveEntry.
@@ -65,14 +66,14 @@ function setBriefOf(record) {
   };
 }
 
-function cardRecordOf(card, set) {
+function cardRecordOf(card, setRecord) {
   return {
     ...card,
     set: {
-      id: set.id,
-      name: set.name,
-      cardCount: { official: set.cards.length, total: set.cards.length },
-      releaseDate: set.releaseDate || '',
+      id: setRecord.id,
+      name: setRecord.name,
+      cardCount: { ...setRecord.cardCount },
+      releaseDate: setRecord.releaseDate,
     },
   };
 }
@@ -141,7 +142,7 @@ export function loadCustomSets(rootDirs, { log = () => {}, previous = null } = {
   for (const dir of [...chosen.keys()].sort()) {
     const entry = chosen.get(dir);
     sets.set(entry.set.id, entry);
-    for (const card of entry.set.cards) cards.set(card.id, cardRecordOf(card, entry.set));
+    for (const card of entry.set.cards) cards.set(card.id, cardRecordOf(card, entry.record));
   }
   return createCustomSetStore({ sets, cards });
 }
@@ -327,12 +328,12 @@ export function createCustomSetStore({ sets = new Map(), cards = new Map() } = {
     setBriefs: () => setList.map((entry) => setBriefOf(entry.record)),
     allCards: () => [...cards.values()],
     manifest: () => ({
-      sets: setList.map(({ set }) => ({
+      sets: setList.map(({ set, record }) => ({
         id: set.id,
         code: set.code,
         name: set.name,
         cardCount: set.cards.length,
-        releaseDate: set.releaseDate || '',
+        releaseDate: record.releaseDate,
         group: set.group || DEFAULT_CUSTOM_SET_GROUP,
       })),
     }),
@@ -414,11 +415,6 @@ export function matchesTcgdexQuery(record, params) {
   return true;
 }
 
-function parseCanonicalKey(key) {
-  const [pathPart, query = ''] = String(key).split('?');
-  return { path: pathPart, params: [...new URLSearchParams(query)] };
-}
-
 function parseListBody(body) {
   try {
     const parsed = JSON.parse(body);
@@ -448,10 +444,8 @@ export function withCustomSets(proxy, store) {
 
   return {
     async get(key) {
-      const { path: p, params } = parseCanonicalKey(key);
-      const record = /^\/v2\/en\/(cards|sets|series)\/([^/]+)$/.exec(p);
-      if (record) {
-        const [, kind, id] = record;
+      const { resource: kind, id, params } = parseTcgdexKey(key);
+      if (id !== null) {
         if (kind === 'cards' && isCustomCardId(id)) {
           const card = store.card(id);
           return card ? json(200, card) : noStore(404, NOT_FOUND);
@@ -465,15 +459,15 @@ export function withCustomSets(proxy, store) {
         }
         return proxy.get(key);
       }
-      if (p === '/v2/en/cards') {
+      if (kind === 'cards') {
         const matches = store.allCards().filter((card) => matchesTcgdexQuery(card, params)).map(cardBriefOf);
         return appendToList(key, matches);
       }
-      if (p === '/v2/en/sets') {
+      if (kind === 'sets') {
         const matches = store.setBriefs().filter((brief) => matchesTcgdexQuery(brief, params));
         return appendToList(key, matches);
       }
-      if (p === '/v2/en/series') {
+      if (kind === 'series') {
         const series = { ...CUSTOM_SERIES, logo: '' };
         return appendToList(key, matchesTcgdexQuery(series, params) ? [series] : []);
       }

@@ -44,10 +44,7 @@ export function isSeatSetupAction(data) {
  */
 export function setupActionSeat(gameRoom, socketId, data) {
   if (!gameRoom) return { seat: null, refused: null };
-  const seat = gameRoom.seatFor(socketId, data);
-  if (seat) return { seat, refused: null };
-  const refused = gameRoom.solo && gameRoom.socketToPlayer.has(socketId) ? 'bad_seat' : null;
-  return { seat: null, refused };
+  return gameRoom.resolveSeat(socketId, data);
 }
 
 /**
@@ -86,10 +83,11 @@ export function cacheSetupAction(cache, key, data) {
  * @param {string} socketId
  * @param {string} seat from setupActionSeat
  * @param {object} data a pushAction packet
- * @returns {{ readied: boolean, deckLoaded: boolean, resetRequested: boolean }}
+ * @returns {{ readied: boolean, deckLoaded: boolean, deckError: { error: string, reason?: string }|null,
+ *   resetRequested: boolean }} `deckError` says why a deck packet did not load
  */
 export function applySetupAction(gameRoom, socketId, seat, data) {
-  const outcome = { readied: false, deckLoaded: false, resetRequested: false };
+  const outcome = { readied: false, deckLoaded: false, deckError: null, resetRequested: false };
   if (!gameRoom || !seat) return outcome;
   if (data?.action === 'readyUp') {
     gameRoom.markReady(seat);
@@ -98,15 +96,18 @@ export function applySetupAction(gameRoom, socketId, seat, data) {
   if (isPlayerRequestedReset(data)) outcome.resetRequested = true;
   if (isDeckLoadAction(data)) {
     const deckData = extractDeckData(data.action, data.parameters);
-    if (Array.isArray(deckData)) {
-      const format = extractDeckFormat(data.action, data.parameters);
-      const result = gameRoom.handleCommand(
-        socketId,
-        { type: 'loadDeck', payload: { deckData, format } },
-        seat
-      );
-      outcome.deckLoaded = Boolean(result.success);
+    if (!Array.isArray(deckData)) {
+      outcome.deckError = { error: 'bad_deck', reason: 'The packet carries no deck list' };
+      return outcome;
     }
+    const format = extractDeckFormat(data.action, data.parameters);
+    const result = gameRoom.handleCommand(
+      socketId,
+      { type: 'loadDeck', payload: { deckData, format } },
+      { seat, refused: null }
+    );
+    outcome.deckLoaded = Boolean(result.success);
+    if (!result.success) outcome.deckError = { error: result.error, reason: result.reason };
   }
   return outcome;
 }

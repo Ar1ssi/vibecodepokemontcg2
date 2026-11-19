@@ -10,6 +10,7 @@ import { moveCard } from '../move-card-bundle/move-card.js';
 import { sort } from '../zones/general.js';
 import { deselectCard } from './close-popups.js';
 import {
+  cardBackSrcForUser,
   hydrateHolo,
   unhydrateHolo,
 } from '../../setup/deck-constructor/hydrate-holo.js';
@@ -28,12 +29,7 @@ const toggleCard = (card, targetCardBackSrc) => {
 };
 
 export const hideCard = (user, card) => {
-  const targetCardBackSrc =
-    user === 'self'
-      ? systemState.cardBackSrc
-      : systemState.isTwoPlayer
-        ? systemState.p2OppCardBackSrc
-        : systemState.p1OppCardBackSrc;
+  const targetCardBackSrc = cardBackSrcForUser(user);
 
   unhydrateHolo(card);
   if (card.image.src !== targetCardBackSrc) {
@@ -42,12 +38,7 @@ export const hideCard = (user, card) => {
 };
 
 export const revealCard = (user, card) => {
-  const targetCardBackSrc =
-    user === 'self'
-      ? systemState.cardBackSrc
-      : systemState.isTwoPlayer
-        ? systemState.p2OppCardBackSrc
-        : systemState.p1OppCardBackSrc;
+  const targetCardBackSrc = cardBackSrcForUser(user);
 
   if (card.image.src === targetCardBackSrc) {
     toggleCard(card, targetCardBackSrc);
@@ -164,8 +155,8 @@ export const revealCards = (user, initiator, zoneId, emit = true) => {
   )
     return;
 
-  const prizesCount = getZone(user, 'prizes').getCount();
-  for (let i = 0; i < prizesCount; i++) {
+  const cardCount = getZone(user, zoneId).getCount();
+  for (let i = 0; i < cardCount; i++) {
     revealShortcut(user, initiator, zoneId, i, false, false);
   }
   appendMessage(
@@ -204,8 +195,8 @@ export const hideCards = (user, initiator, zoneId, emit = true) => {
   )
     return;
 
-  const prizesCount = getZone(user, 'prizes').getCount();
-  for (let i = 0; i < prizesCount; i++) {
+  const cardCount = getZone(user, zoneId).getCount();
+  for (let i = 0; i < cardCount; i++) {
     hideShortcut(user, initiator, zoneId, i, false, false);
   }
   appendMessage(
@@ -256,12 +247,7 @@ export const revealShortcut = (
   card.image.faceDown = false;
   card.image.public = true;
 
-  const targetCardBackSrc =
-    user === 'self'
-      ? systemState.cardBackSrc
-      : systemState.isTwoPlayer
-        ? systemState.p2OppCardBackSrc
-        : systemState.p1OppCardBackSrc;
+  const targetCardBackSrc = cardBackSrcForUser(user);
   if (card.image.src === targetCardBackSrc) {
     toggleCard(card, targetCardBackSrc);
     hydrateHolo(card);
@@ -340,12 +326,7 @@ export const hideShortcut = (
 
   card.image.public = false;
 
-  const targetCardBackSrc =
-    user === 'self'
-      ? systemState.cardBackSrc
-      : systemState.isTwoPlayer
-        ? systemState.p2OppCardBackSrc
-        : systemState.p1OppCardBackSrc;
+  const targetCardBackSrc = cardBackSrcForUser(user);
   unhydrateHolo(card);
   if (card.image.src !== targetCardBackSrc) {
     toggleCard(card, targetCardBackSrc);
@@ -387,12 +368,7 @@ export const hideShortcut = (
 };
 
 export const lookShortcut = (user, initiator, zoneId, index, emit = true) => {
-  const targetCardBackSrc =
-    user === 'self'
-      ? systemState.cardBackSrc
-      : systemState.isTwoPlayer
-        ? systemState.p2OppCardBackSrc
-        : systemState.p1OppCardBackSrc;
+  const targetCardBackSrc = cardBackSrcForUser(user);
 
   if (emit) {
     //only apply for initiator
@@ -437,12 +413,7 @@ export const stopLookingShortcut = (
   index,
   emit = true
 ) => {
-  const targetCardBackSrc =
-    user === 'self'
-      ? systemState.cardBackSrc
-      : systemState.isTwoPlayer
-        ? systemState.p2OppCardBackSrc
-        : systemState.p1OppCardBackSrc;
+  const targetCardBackSrc = cardBackSrcForUser(user);
 
   if (emit) {
     //only apply for initiator

@@ -101,9 +101,9 @@ export const moveToBoard = (user, initiator, oZoneId, index) => {
 };
 
 export const draw = (user, initiator, drawAmount, emit = true) => {
-  drawAmount = drawAmount
-    ? drawAmount
-    : parseInt(window.prompt('Draw how many cards?', '1'));
+  // 0 is a count, not "ask": a mirrored draw from an empty deck arrives as 0.
+  drawAmount =
+    drawAmount ?? parseInt(window.prompt('Draw how many cards?', '1'));
   const selectedDeckCount = getZone(user, 'deck').getCount();
   drawAmount = Math.min(drawAmount, selectedDeckCount);
 

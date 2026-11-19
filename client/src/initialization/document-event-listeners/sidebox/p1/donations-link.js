@@ -1,5 +1,6 @@
 export const initializeDonationsLink = () => {
   const changelog = document.getElementById('changelog');
+  const donationsPage = document.getElementById('donationsPage');
 
   const donationsLink = document.getElementById('donationsLink');
   donationsLink.addEventListener('click', () => {
@@ -11,7 +12,6 @@ export const initializeDonationsLink = () => {
     }
   });
 
-  const donationsPage = document.getElementById('donationsPage');
   donationsPage.addEventListener('click', () => {
     if (donationsPage.style.display === 'block') {
       donationsPage.style.display = 'none';

@@ -100,8 +100,21 @@ const el = (tag, className, text) => {
   return node;
 };
 
-let selectedKey = getBuildBattleBox(params.get('box'))?.key || readJson(STORAGE_KEY)?.boxKey || DEFAULT_BOX_KEY;
+let selectedKey =
+  getBuildBattleBox(params.get('box'))?.key ||
+  getBuildBattleBox(readJson(STORAGE_KEY)?.boxKey)?.key ||
+  DEFAULT_BOX_KEY;
 let seedText = params.get('seed') ?? '';
+
+const SEED_NOTE = 'Box # must be a whole number from 0 to 2147483647, or empty for a random box.';
+
+/** Blank means a random box; anything else must parse, never quietly become a random one. */
+function seedFromText(text) {
+  const trimmed = text.trim();
+  if (!trimmed) return { seed: undefined };
+  const seed = parseSeed(trimmed);
+  return seed === null ? { error: SEED_NOTE } : { seed };
+}
 let scene = null;
 let openRun = 0;
 
@@ -223,7 +236,11 @@ function renderPicker(note = '') {
   qualityLabel.append(qualitySelect);
   const open = el('button', 'ub-btn ub-btn--primary', 'Open the box');
   open.type = 'button';
-  open.addEventListener('click', () => openSelected(selectedKey, parseSeed(seedText.trim())));
+  open.addEventListener('click', () => {
+    const { seed, error } = seedFromText(seedText);
+    if (error) renderPicker(error);
+    else openSelected(selectedKey, seed);
+  });
   controls.append(seedLabel, surfaceLabel, qualityLabel, open);
   root.append(controls);
   if (note) root.append(el('p', 'ub-note', note));
@@ -425,8 +442,11 @@ function cardStrip(entries) {
 // ── Boot ──────────────────────────────────────────────────────────────────
 if (params.get('fresh') === '1') writeJson(STORAGE_KEY, null);
 const deepLinkBox = getBuildBattleBox(params.get('box'));
-if (deepLinkBox && params.has('seed')) {
-  openSelected(deepLinkBox.key, parseSeed(params.get('seed') || ''), { resume: true });
+const deepLinkSeed = seedFromText(params.get('seed') ?? '');
+if (deepLinkBox && params.has('seed') && !deepLinkSeed.error) {
+  openSelected(deepLinkBox.key, deepLinkSeed.seed, { resume: true });
+} else if (deepLinkSeed.error) {
+  renderPicker(deepLinkSeed.error);
 } else {
   renderPicker();
 }

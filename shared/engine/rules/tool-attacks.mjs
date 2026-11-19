@@ -9,20 +9,8 @@
 
 import { isEnergy, isPokemon } from '../cards.mjs';
 import { isExCard } from './card-classify.mjs';
-
-const TYPE_SYMBOLS = {
-  g: 'Grass',
-  r: 'Fire',
-  w: 'Water',
-  l: 'Lightning',
-  p: 'Psychic',
-  f: 'Fighting',
-  d: 'Darkness',
-  m: 'Metal',
-  n: 'Dragon',
-  y: 'Fairy',
-  c: 'Colorless',
-};
+import { titleTypeForSymbol, typeForSymbol } from './energy-symbols.mjs';
+import { cardPrintedText } from './trainer-card-text.mjs';
 
 const ARROW = /[→⇢]/;
 // The cost symbols immediately before an arrow ("… discard Fighting Cube 01. {F} →").
@@ -33,11 +21,13 @@ const DAMAGE_SPLIT = /^\s*(.*?)\s*:\s*([0-9]+\s*[+×xX-]?)(?:\s+|$)(.*)$/s;
 const EFFECT_STARTERS =
   /(?:^|\s)(The Defending|If |Flip |Devolve |Choose|Before doing damage|This attack|Your opponent|Draw |Put |Search |Each |During |You may|For each|Remove |Attach |Shuffle |Move |Look at|Take |Prevent |Does |Return |Switch |Reveal |Until |Whenever |Once |As long as|When |Then, |You can|Do |Both |At the end|Discard |Knock Out|Heal |Place )/;
 
+/** The printed cost as type names, or null when it holds a symbol that is not an Energy type. */
 function parseCost(prefix) {
   const cost = [];
   for (const m of String(prefix || '').matchAll(/\{([A-Za-z])\}/g)) {
-    const name = TYPE_SYMBOLS[m[1].toLowerCase()];
-    if (name) cost.push(name);
+    const name = titleTypeForSymbol(m[1]);
+    if (!name) return null;
+    cost.push(name);
   }
   return cost;
 }
@@ -70,7 +60,7 @@ export function parseGrantedAttacks(card) {
   const printed = Array.isArray(card.attacks) ? card.attacks.filter((a) => a?.name) : [];
   if (printed.length > 0) return printed.map((a) => ({ ...a, granted: true }));
 
-  const text = cardTextOf(card);
+  const text = cardPrintedText(card);
   const segments = text.split(ARROW);
   if (segments.length < 2) return knownAttacksFor(card);
 
@@ -80,14 +70,11 @@ export function parseGrantedAttacks(card) {
     const body = segments[i].trim();
     if (!body) continue;
     const parsed = splitBody(body);
-    if (!parsed.name) continue;
-    out.push({ ...parsed, cost: parseCost(costPrefix), granted: true });
+    const cost = parseCost(costPrefix);
+    if (!parsed.name || !cost) continue;
+    out.push({ ...parsed, cost, granted: true });
   }
   return out;
-}
-
-function cardTextOf(card) {
-  return [card?.text, card?.effect, card?.cardText].find((v) => typeof v === 'string' && v) || '';
 }
 
 const normalizeName = (name) =>
@@ -131,7 +118,7 @@ const normalizeText = (text) => String(text || '').replace(/[‘’]/g, "'").toL
  */
 export function toolDiscardsAtEndOfTurn(card) {
   if (!card || isPokemon(card) || isEnergy(card)) return false;
-  const t = normalizeText(cardTextOf(card));
+  const t = normalizeText(cardPrintedText(card));
   return /discard it at the end of your turn|at the end of your turn, discard /.test(t);
 }
 
@@ -141,7 +128,7 @@ export function toolDiscardsAtEndOfTurn(card) {
  */
 export function toolEndOfTurnActiveHeal(card) {
   if (!card || isPokemon(card) || isEnergy(card)) return 0;
-  const m = normalizeText(cardTextOf(card)).match(
+  const m = normalizeText(cardPrintedText(card)).match(
     /at the end of your turn, if the pok[eé]mon this card is attached to is (?:in the active spot|your active pok[eé]mon), heal (\d+) damage from it/
   );
   return m ? Number(m[1]) : 0;
@@ -155,7 +142,7 @@ export function toolEndOfTurnActiveHeal(card) {
  */
 export function toolCheckupEffect(card) {
   if (!card || isPokemon(card) || isEnergy(card)) return null;
-  const m = normalizeText(cardTextOf(card)).match(
+  const m = normalizeText(cardPrintedText(card)).match(
     /if the pok[eé]mon this card is attached to is an? \{([a-z])\} pok[eé]mon, heal (\d+) damage from that pok[eé]mon during pok[eé]mon checkup\. otherwise, that pok[eé]mon takes (\d+) damage during pok[eé]mon checkup/
   );
   return m ? { symbol: m[1].toUpperCase(), heal: Number(m[2]), damage: Number(m[3]) } : null;
@@ -168,7 +155,7 @@ export function toolCheckupEffect(card) {
  */
 export function toolDiscardsAtEndOfOpponentTurn(card) {
   if (!card || isPokemon(card) || isEnergy(card)) return false;
-  return /discard it at the end of your opponent's turn/.test(normalizeText(cardTextOf(card)));
+  return /discard it at the end of your opponent's turn/.test(normalizeText(cardPrintedText(card)));
 }
 
 /**
@@ -176,7 +163,7 @@ export function toolDiscardsAtEndOfOpponentTurn(card) {
  * your <X> in play" (ex5-84, ex4 Team Magma/Aqua TM 01, pl2-95). Null when unrestricted
  * or when the card prints no such clause (SV TMs attach like any Tool).
  * @returns {{ evolved?: true, excludeEx?: true, excludeOwners?: true, sp?: true,
- *   nameIncludes?: string }|null}
+ *   nameIncludes?: string, types?: string[], unrecognized?: true }|null}
  */
 export function parseTmAttachRestriction(text) {
   const t = normalizeText(text);
@@ -190,7 +177,16 @@ export function parseTmAttachRestriction(text) {
   if (/^pok[ée]mon sp$/.test(target)) out.sp = true;
   const named = target.match(/^pok[ée]mon that has (.+?) in its name$/);
   if (named) out.nameIncludes = named[1];
-  return Object.keys(out).length > 0 ? out : null;
+  // "{W} Pokémon" (Water Cube 01), "Evolved {G}, {W}, or {L} Pokémon" (Miracle Sphere γ).
+  const typed = target.match(/^(?:evolved )?((?:\{[a-z]\}(?:,\s*|,?\s+or\s+|\s+and\s+)?)+) pok[ée]mon$/);
+  if (typed) {
+    out.types = [...typed[1].matchAll(/\{([a-z])\}/g)].map((sym) => typeForSymbol(sym[1]));
+    if (/^evolved /.test(target)) out.evolved = true;
+  }
+  if (Object.keys(out).length > 0) return out;
+  // Plain "Pokémon" is unrestricted; any other wording is a restriction this parser does not
+  // know, and an unknown restriction must block the attach rather than lift it.
+  return /^pok[ée]mon$/.test(target) ? null : { unrecognized: true };
 }
 
 // Owner's Pokémon print a possessive trainer name ("Team Magma's Groudon", "Brock's Onix").
@@ -206,7 +202,11 @@ const isSpPokemon = (card) =>
  */
 export function tmAttachAllowed(restriction, { top, evolved = false, mayAttachAnyTm = false } = {}) {
   if (!restriction || mayAttachAnyTm) return true;
-  if (!top) return false;
+  if (!top || restriction.unrecognized) return false;
+  if (restriction.types) {
+    const held = (top.types || []).map((type) => String(type).toLowerCase());
+    if (!restriction.types.some((type) => held.includes(type))) return false;
+  }
   const name = normalizeText(top.name);
   if (restriction.evolved && !evolved) return false;
   if (restriction.excludeEx && isExCard(top)) return false;
@@ -222,7 +222,7 @@ export function mayAttachAnyTechnicalMachine(top) {
   const texts = [
     ...(Array.isArray(top.abilities) ? top.abilities.map((a) => a?.text || a?.effect) : []),
     top.ability?.text,
-    cardTextOf(top),
+    cardPrintedText(top),
   ];
   return texts.some((t) => /attach any technical machine to/.test(normalizeText(t)));
 }

@@ -7,9 +7,9 @@
 // dressing is a small flash and fewer splashes, puffs and drops, and the struck card's sheen
 // stays faint (heat <= 0.35).
 
-/** Five spikes 72° apart: "starFlare arms 'ring'" inside the 30-tongue budget (slice 5). */
-const RING5 = Object.freeze([-90, -18, 54, 126, 198].map((angle) => Object.freeze({ angle, reach: 0.85 })));
+import { RING5 } from './_shared.mjs';
 
+/** Five spikes 72° apart: "starFlare arms 'ring'" inside the 30-tongue budget (slice 5). */
 const STEAM = Object.freeze({ deep: '#2E7CE6', body: '#A8F0FF', hot: '#E8FCFF', core: '#FFFFFF' });
 const MIST = Object.freeze({ deep: '#8FA3B5', body: '#C7D8E6', hot: '#EEF4FA', core: '#FFFFFF' });
 /** The contact flash: small, so the move's own shape stays legible. */

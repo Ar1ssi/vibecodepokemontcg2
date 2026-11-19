@@ -17,9 +17,8 @@ import { inPlayEntries, parseOpponentSwitchDamage } from '../rules/ability-trigg
 import { healBlockedByAbility, sideContextFor } from '../rules/ability-combat.mjs';
 
 /**
- * Applies one Stadium trigger descriptor to a Pokémon. `draft` is accepted for
- * symmetry with the reducer's other helpers; the descriptor itself carries
- * everything needed.
+ * Applies one Stadium trigger descriptor to a Pokémon. `draft` is read only for the
+ * Ability check that can block a heal.
  */
 export function applyStadiumTriggerEffect(draft, effect, { host, hostPlayerId, events }) {
   if (!host || !effect) return;

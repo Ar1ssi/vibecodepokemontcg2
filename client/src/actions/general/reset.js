@@ -38,8 +38,7 @@ export const reset = (
   clearReady(user);
   if (
     stadium.array[0] &&
-    ((stadium.array[0].image.user === 'self' && user === 'self') ||
-      (stadium.array[0].image.user !== 'self' && user !== 'self'))
+    (stadium.array[0].image.user === 'self') === (user === 'self')
   ) {
     stadium.array.length = 0;
     document.querySelectorAll('.tab').forEach((element) => {

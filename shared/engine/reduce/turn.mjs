@@ -958,7 +958,11 @@ export function cardStatsCommand({ draft, playerId, payload, events }) {
   for (const entry of stats) {
     const card = bySyncInstance.get(entry.syncInstance);
     if (!card) continue;
-    if (entry.hp != null) card.hp = Number(entry.hp);
+    // A non-numeric hp would store NaN, which cardEffectiveHp reads as 0: the card could never be
+    // Knocked Out. Keep the HP the card already has instead.
+    if (entry.hp != null && Number.isFinite(Number(entry.hp)) && Number(entry.hp) >= 0) {
+      card.hp = Number(entry.hp);
+    }
     if (Array.isArray(entry.attacks))
       card.attacks = entry.attacks.map((a) => ({ ...a }));
     if (Array.isArray(entry.types)) card.types = [...entry.types];

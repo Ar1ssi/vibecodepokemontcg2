@@ -14,6 +14,12 @@ export const wobble = (s, time, seed) =>
   0.3 * Math.sin(s * 13.1 - time * 11 + seed * 1.7) +
   0.2 * Math.sin(s * 23 + time * 17 + seed * 2.9);
 
+/** A stable pseudo-random value in [0, 1) for (seed, index): the same on every client. */
+export const seedHash = (seed, index) => {
+  const v = Math.sin(seed * 12.9898 + index * 78.233) * 43758.5453;
+  return v - Math.floor(v);
+};
+
 /**
  * The outline of one tongue: from (x, y) along `angleDeg`, `length` long, `width` wide at
  * the shoulder, tapering to a tip that drifts with time. `scale` shrinks it about its base

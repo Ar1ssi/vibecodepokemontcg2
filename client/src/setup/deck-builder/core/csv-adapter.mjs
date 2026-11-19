@@ -29,6 +29,81 @@ export function formatCardType(cardObj = {}) {
 
 const SIM_CSV_HEADER = 'QTY,Name,Type,URL,Number,Set,TcgId';
 
+// A field holding a comma or a quote is wrapped in quotes with inner quotes doubled; every other
+// field stays bare, so exports of ordinary decks read as they always did.
+function csvCell(value) {
+  const text = String(value ?? '');
+  return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
+
+function csvRow(cells) {
+  return cells.map(csvCell).join(',');
+}
+
+// Splits one CSV line into fields, honouring quoted fields; an unquoted line splits on commas alone.
+function splitCsvRow(line) {
+  const cells = [];
+  let cell = '';
+  let quoted = false;
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    if (quoted) {
+      if (char !== '"') cell += char;
+      else if (line[index + 1] === '"') {
+        cell += '"';
+        index += 1;
+      } else quoted = false;
+    } else if (char === '"' && cell === '') {
+      quoted = true;
+    } else if (char === ',') {
+      cells.push(cell);
+      cell = '';
+    } else {
+      cell += char;
+    }
+  }
+  cells.push(cell);
+  return cells;
+}
+
+const positiveWhole = (value) => {
+  const number = Number(String(value ?? '').trim());
+  return Number.isInteger(number) && number > 0 ? number : null;
+};
+
+// One sim row, in the shape both readers merge: [qty, name, type, url, number?, set?, tcgId?].
+// Returns null for a row without qty, name, type and url or whose qty is not a positive whole number.
+function simRowToCard(cells) {
+  if (cells.length < 4) return null;
+  const [quantity, name, type, url, number, set, tcgId] = cells;
+  const count = positiveWhole(quantity);
+  if (count === null) return null;
+  const text = (value) => String(value ?? '').trim();
+  return {
+    count,
+    card: {
+      name,
+      supertype: type,
+      image: text(url),
+      ...deckCardIdentityFields({
+        number: text(number) || null,
+        localId: text(number) || null,
+        id: text(tcgId) || null,
+        set: text(set) ? { id: text(set) } : undefined,
+      }),
+    },
+  };
+}
+
+// Adds one parsed row to a grouped deck, merging copies of the same print (same image and id).
+function addCardToDecklist(decklist, { card, count }) {
+  const group = (decklist[card.name] ??= { cards: [], totalCount: 0 });
+  const entry = group.cards.find(({ data }) => data.image === card.image && data.id === card.id);
+  if (entry) entry.count += count;
+  else group.cards.push({ data: card, count });
+  group.totalCount += count;
+}
+
 function deckCardNumber(data = {}) {
   return data.number || data.localId || '';
 }
@@ -69,7 +144,7 @@ export function serializeDeckToSimCsv(decklist = {}, meta = {}) {
       const tcgId = data.id || '';
 
       if (cardName !== '' && type !== '' && url !== '') {
-        rows.push([quantity, cardName, type, url, number, set, tcgId].join(','));
+        rows.push(csvRow([quantity, cardName, type, url, number, set, tcgId]));
       }
     }
   }
@@ -104,52 +179,29 @@ export function parseCsvMeta(csvData = '') {
   return meta;
 }
 
+/**
+ * @throws {Error} naming the line of a row that lacks qty, name, type and url, or whose qty is not
+ *   a positive whole number; the import reports it instead of building a shorter deck.
+ */
 export function parseSimCsv(csvData = '') {
-  const rows = String(csvData).split('\n');
   const newDecklist = {};
   let headerSeen = false;
 
-  for (const row of rows) {
-    if (row.startsWith('#')) continue;
-    if (!headerSeen) {
-      headerSeen = true;
-      continue;
-    }
-    if (!row.trim()) continue;
-
-    const cells = row.split(',');
-    const card = {
-      count: cells[0],
-      name: cells[1],
-      supertype: cells[2],
-      image: cells[3]?.trim(),
-      ...deckCardIdentityFields({
-        number: cells[4]?.trim() || null,
-        localId: cells[4]?.trim() || null,
-        id: cells[6]?.trim() || null,
-        set: cells[5]?.trim() ? { id: cells[5].trim() } : undefined,
-      }),
-    };
-
-    if (!newDecklist[card.name]) {
-      newDecklist[card.name] = { cards: [], totalCount: 0 };
-    }
-
-    let cardFound = false;
-    for (const cardEntry of newDecklist[card.name].cards) {
-      if (cardEntry.data.image === card.image) {
-        cardEntry.count += Number(card.count);
-        cardFound = true;
-        break;
+  String(csvData)
+    .split('\n')
+    .forEach((line, index) => {
+      const row = line.replace(/\r$/, '');
+      if (row.startsWith('#')) return;
+      if (!headerSeen) {
+        headerSeen = true;
+        return;
       }
-    }
+      if (!row.trim()) return;
 
-    if (!cardFound) {
-      newDecklist[card.name].cards.push({ data: card, count: Number(card.count) });
-    }
-
-    newDecklist[card.name].totalCount += Number(card.count);
-  }
+      const parsed = simRowToCard(splitCsvRow(row));
+      if (!parsed) throw new Error(`line ${index + 1} is not "QTY,Name,Type,URL" with a whole-number QTY`);
+      addCardToDecklist(newDecklist, parsed);
+    });
 
   return newDecklist;
 }
@@ -160,42 +212,8 @@ export function parseDeckDataRows(deckRows = []) {
   const newDecklist = {};
 
   for (const row of deckRows) {
-    if (!Array.isArray(row) || row.length < 4) continue;
-
-    const [quantity, name, type, url, number, set, tcgId] = row;
-    const card = {
-      name,
-      supertype: type,
-      image: String(url || '').trim(),
-      ...deckCardIdentityFields({
-        number: number || null,
-        localId: number || null,
-        id: tcgId || null,
-        set: set ? { id: set } : undefined,
-      }),
-    };
-
-    if (!newDecklist[card.name]) {
-      newDecklist[card.name] = { cards: [], totalCount: 0 };
-    }
-
-    let cardFound = false;
-    for (const cardEntry of newDecklist[card.name].cards) {
-      if (cardEntry.data.image === card.image && cardEntry.data.id === card.id) {
-        cardEntry.count += Number(quantity);
-        cardFound = true;
-        break;
-      }
-    }
-
-    if (!cardFound) {
-      newDecklist[card.name].cards.push({
-        data: card,
-        count: Number(quantity),
-      });
-    }
-
-    newDecklist[card.name].totalCount += Number(quantity);
+    const parsed = Array.isArray(row) ? simRowToCard(row) : null;
+    if (parsed) addCardToDecklist(newDecklist, parsed);
   }
 
   return newDecklist;
@@ -206,7 +224,7 @@ export function deckDataRowsToSimCsv(deckRows = []) {
     .filter((row) => Array.isArray(row) && row.length >= 4)
     .map((row) => {
       const [quantity, name, type, url, number = '', set = '', tcgId = ''] = row;
-      return [quantity, name, type, url, number || '', set || '', tcgId || ''].join(',');
+      return csvRow([quantity, name, type, url, number || '', set || '', tcgId || '']);
     });
 
   return `${SIM_CSV_HEADER}\n${body.join('\n')}`;

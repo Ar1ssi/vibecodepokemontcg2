@@ -65,14 +65,13 @@ export function prizeSlotPose(side, index, layout) {
 
 /**
  * The Stadium card at the layout's stadium rect, upright for whoever played it
- * (stadium-facing.mjs): yaw 0 when `facing === 'self'`, 180 when `'opp'`.
+ * (stadium-facing.mjs): yaw 0 when `facing === 'self'`, 180 when `'opp'`. `stadium.facing` is already
+ * relative to the near player (board-model.mjs `stadiumOf`), so the pose needs no seat of its own.
  * @param {import('./board-model.mjs').StadiumPlacement|null} stadium
  * @param {ReturnType<typeof import('./board-layout.mjs').flatLayout>|null} layout
- * @param {string} [_nearSeat] the model's near seat. Unread: `stadium.facing` is already relative
- *   to the near player (board-model.mjs `stadiumOf`), so the pose needs no seat of its own.
  * @returns {{ x:number, y:number, z:number, yawDeg:number, widthPx:number }|null}
  */
-export function stadiumPose(stadium, layout, _nearSeat) {
+export function stadiumPose(stadium, layout) {
   const rect = layout?.stadium;
   if (!stadium || !rect) return null;
   return {

@@ -67,6 +67,8 @@ export function createJournal({
     try {
       fn();
     } catch (error) {
+      // The record that failed is missing from the game being written: its journal is not whole.
+      if (current()) current().complete = false;
       if (failureReported) return;
       failureReported = true;
       log.error('journal', 'failed', { error: String(error?.stack ?? error) });

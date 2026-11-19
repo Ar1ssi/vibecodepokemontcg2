@@ -6,10 +6,18 @@ import { LIMITS } from '../../shared/log/log-schema.mjs';
 const MAX_ENTRIES = 1_000_000;
 const MAX_TRIM_ROUNDS = 64;
 const ROOM_PREFIX = 'room:';
+const CLIENT_PREFIX = 'client:';
+
+// The one place stream ids are spelled and taken apart.
+export const SERVER_STREAM = 'server';
+export const roomStreamId = (roomId) => `${ROOM_PREFIX}${roomId}`;
+export const clientStreamId = (clientId) => `${CLIENT_PREFIX}${clientId}`;
+export const isRoomStream = (streamId) => streamId.startsWith(ROOM_PREFIX);
+export const roomIdOfStream = (streamId) => streamId.slice(ROOM_PREFIX.length);
 
 function capFor(streamId, limits) {
-  if (streamId.startsWith(ROOM_PREFIX)) return limits.roomStreamBytes;
-  if (streamId.startsWith('client:')) return limits.clientStreamBytes;
+  if (isRoomStream(streamId)) return limits.roomStreamBytes;
+  if (streamId.startsWith(CLIENT_PREFIX)) return limits.clientStreamBytes;
   return limits.serverStreamBytes;
 }
 
@@ -41,7 +49,7 @@ export function createLogStore({
 
   function deleteStream(streamId) {
     streams.delete(streamId);
-    if (streamId.startsWith(ROOM_PREFIX)) links.delete(streamId.slice(ROOM_PREFIX.length));
+    if (isRoomStream(streamId)) links.delete(roomIdOfStream(streamId));
   }
 
   const ringBytes = () => {

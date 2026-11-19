@@ -8,7 +8,8 @@
  * as the game toggles the overlay's close hitbox. Entries come from attack-ui-model's statusEffectsFor.
  */
 
-const CLOSE_EVENTS = ['rules-turn-began', 'rules-session-reset'];
+import { el, OVERLAY_CLOSE_EVENTS } from './overlay-chrome.mjs';
+
 const ARROW_SRC = {
   positive: '/src/assets/attack-ui/arrow-up.png',
   negative: '/src/assets/attack-ui/arrow-down.png',
@@ -18,13 +19,6 @@ const ARROW_SRC = {
 let popupState = null;
 
 export const isStatusPopupOpen = () => popupState !== null;
-
-const el = (tag, className, text) => {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text != null) node.textContent = String(text);
-  return node;
-};
 
 const arrow = (polarity, className) => {
   const img = el('img', className);
@@ -114,7 +108,7 @@ export function openStatusPopup({
   close.addEventListener('click', closeImmediately);
 
   popupState = { root, onClose };
-  CLOSE_EVENTS.forEach((name) => document.addEventListener(name, closeImmediately));
+  OVERLAY_CLOSE_EVENTS.forEach((name) => document.addEventListener(name, closeImmediately));
   document.body.appendChild(root);
   close.focus?.({ preventScroll: true });
   return true;
@@ -125,7 +119,7 @@ export function closeStatusPopup() {
   const state = popupState;
   if (!state) return;
   popupState = null;
-  CLOSE_EVENTS.forEach((name) => document.removeEventListener(name, closeImmediately));
+  OVERLAY_CLOSE_EVENTS.forEach((name) => document.removeEventListener(name, closeImmediately));
   state.root.remove();
   state.onClose?.();
 }

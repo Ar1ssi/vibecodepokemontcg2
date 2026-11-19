@@ -18,11 +18,10 @@
 // The board's cameras see little of the scene past the table's sides: where a side of the lake has no
 // room inside the view (the sim mat's cards run to the table's side edges), its pieces move round to
 // the near shore. stadium-env-brooklet.mjs draws all of it. Pure: no three.js, no DOM.
-import { environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
-import { RISE_LEAN } from './stadium-env-spots.mjs';
+import { distanceToRect, environmentFootprints, isRect, sceneBounds } from './stadium-environment-layout.mjs';
 import { measureAsset } from './stadium-kit-assets.mjs';
 import { clumpPieces } from './stadium-env-clumps.mjs';
-import { clumpAround } from './stadium-env-spots.mjs';
+import { RISE_LEAN, clumpAround, smoothstep } from './stadium-env-spots.mjs';
 import { tableBounds } from './table-uv.mjs';
 
 export const BROOKLET_KEY = 'brooklet-hill';
@@ -278,21 +277,8 @@ export const FENCE_INSET_PX = 8;
 const FENCE_STEP_PX = 4;
 const FENCE_WALK_MAX = 600;
 
-const isRect = (rect) => rect && [rect.x, rect.y, rect.w, rect.h].every(Number.isFinite) && rect.w > 0 && rect.h > 0;
-
-const distanceToRect = (x, y, rect) => {
-  const dx = Math.max(rect.x - x, 0, x - (rect.x + rect.w));
-  const dy = Math.max(rect.y - y, 0, y - (rect.y + rect.h));
-  return Math.hypot(dx, dy);
-};
-
 /** px from (x, y) to the nearest card footprint (Infinity without any). */
 export const cardGap = (rects, x, y) => rects.reduce((nearest, rect) => Math.min(nearest, distanceToRect(x, y, rect)), Infinity);
-
-const smoothstep = (from, to, x) => {
-  const t = Math.min(1, Math.max(0, (x - from) / (to - from)));
-  return t * t * (3 - 2 * t);
-};
 
 /** The shaders' smin: the smaller of a and b, blended over k. */
 export const smin = (a, b, k) => {

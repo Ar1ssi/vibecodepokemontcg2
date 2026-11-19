@@ -919,8 +919,9 @@ export function validateLegality(state, command) {
         }
       }
       if (cardRef && isEnergy(cardRef.card)) {
-        const plan = cardRef.zoneId === 'hand' ? energyAttachPlanMatch(state, player, cardRef.card, payload.targetInstanceId) : null;
-        const planAllows = Boolean(plan && plan.plan.hostId === plan.hostId && plan.plan.attached < plan.plan.count);
+        const match = cardRef.zoneId === 'hand' ? energyAttachPlanMatch(state, player, cardRef.card, payload.targetInstanceId) : null;
+        // match.plan.hostId is the host the plan fixed on the turn's first attach; match.hostId is this target's.
+        const planAllows = Boolean(match && match.plan.hostId === match.hostId && match.plan.attached < match.plan.count);
         if (player.flags?.energyAttached && !planAllows) {
           // Check for unlimited energy acceleration abilities (Phase 4)
           const inPlayPokemon = [

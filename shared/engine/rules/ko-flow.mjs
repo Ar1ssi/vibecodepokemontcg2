@@ -77,7 +77,7 @@
     
     // Called when the attack engine reports a KO. Handles prize award + any
     // win check. Returns an announcement payload for the UI.
-    export function handleKO({ attackerPlayer, defender, defenderBoard, prizeCountOverride, attackerFormat }) {
+    export function handleKO({ attackerPlayer, defender, prizeCountOverride, attackerFormat }) {
       // A Knockout always awards prizes (GX included: 2). The attacker only
       // wins when the award reaches all of its format's Prizes; simultaneous board-empties are
       // detected separately by checkWinConditions.

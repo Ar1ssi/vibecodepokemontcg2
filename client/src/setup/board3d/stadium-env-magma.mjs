@@ -321,7 +321,7 @@ void main() {
   float joint = 0.0;
   if (islandSD < 0.0) {
     kind = -1.0;
-    float inland = smoothstep(0.0, -24.0, islandSD);
+    float inland = 1.0 - smoothstep(-24.0, 0.0, islandSD);
     // Cooled basalt, as the art's: broad swells under a pebbly grain of small faceted lumps packed
     // together.
     // Design 080: round the cards the grain is worn low (the lumps flatter, the fine roughness gone).
@@ -527,8 +527,8 @@ void main() {
       if (f.x < nearest.x) nearest = f;
     }
     float streak = flowStreaks(vec2(-nearest.y, nearest.z), 70.0, 1.6, vec2(30.0, 3.0));
-    float core = smoothstep(0.0, -2.5, fallSD);
-    float heat = 0.6 + 0.4 * core + (streak - 0.5) * 0.3 + 0.1 * smoothstep(40.0, 0.0, outerSD);
+    float core = 1.0 - smoothstep(-2.5, 0.0, fallSD);
+    float heat = 0.6 + 0.4 * core + (streak - 0.5) * 0.3 + 0.1 * (1.0 - smoothstep(0.0, 40.0, outerSD));
     col = mix(col, basinLava(heat) * (1.0 + 0.6 * core), 1.0 - smoothstep(-0.6, 0.8, fallSD));
   }
 

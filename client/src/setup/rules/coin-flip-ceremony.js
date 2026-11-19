@@ -43,13 +43,16 @@ const COIN_IMPACT_URLS = {
 const LANDING_RING_MS = 650;
 const LANDING_IMPACT_MS = 450;
 
-const escapeHtml = (value = '') =>
+export const escapeHtml = (value = '') =>
   String(value)
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
+
+/** The art a coin shows on its face: the catalog thumb, else its url, else the coin back. */
+export const coinFaceArtUrl = (coin) => coinArtUrl(coin?.thumb || coin?.url);
 
 const scheduleFrame = (doc, fn) => {
   const view = doc?.defaultView || (typeof window !== 'undefined' ? window : null);
@@ -110,7 +113,7 @@ export const coinFlipCeremonyMarkup = ({
   stage = false,
 } = {}) => {
   const heading = label || defaultLabel({ ownerLabel, turnOrder });
-  const front = coinArtUrl(coin?.thumb || coin?.url);
+  const front = coinFaceArtUrl(coin);
   const layers = coinEffectLayerMarkup();
   const stageHost = stage
     ? [
@@ -220,7 +223,7 @@ export const playCoinFlipCeremony = ({
     const stageHost = overlay.querySelector('[data-coin-stage]');
     const shadowEl = overlay.querySelector('[data-coin-shadow]');
 
-    applyCoinEffect(coinEl, { ...(coin || {}), thumb: coinArtUrl(coin?.thumb || coin?.url) });
+    applyCoinEffect(coinEl, { ...(coin || {}), thumb: coinFaceArtUrl(coin) });
 
     let finished = false;
     let fellBack = false;
@@ -356,7 +359,7 @@ export const playCoinFlipCeremony = ({
       try {
         const { createCoinStage } = await import('../netcode/mat-fx/coin-stage.js');
         stage = await createCoinStage({ host: stageHost, onLost: fallBackToCss });
-        await stage.setCoin(coin ? { id: coin.id, artUrl: coinArtUrl(coin.thumb || coin.url) } : null);
+        await stage.setCoin(coin ? { id: coin.id, artUrl: coinFaceArtUrl(coin) } : null);
       } catch (error) {
         stage?.dispose();
         warnStageFallbackOnce(error);

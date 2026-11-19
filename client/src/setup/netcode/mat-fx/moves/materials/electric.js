@@ -23,7 +23,7 @@
 // pass pools each one's light on the cloth at its own offset.
 import { rgbCss } from '../../fx-colors.mjs';
 import { seededRandom } from '../../flow-pose.mjs';
-import { mergeFxMods, withFxMod, withLiftZ } from './_mods.js';
+import { edgedBy, mergeFxMods, withFxMod, withLiftZ } from './_mods.js';
 import { rootFaded } from './_root-fade.js';
 import { grainPass, sphere } from './_shared.js';
 
@@ -178,9 +178,7 @@ export function jagOutline({ x, y, angleDeg, length, width, time, seed }, { jag 
 /** The electric material drawn in `palette` (any palette with the same keys). */
 function electricKit(palette) {
   const edge = Object.freeze({ dissolve: Object.freeze({ edge: palette.edge, width: 0.08, gain: 1.6 }) });
-  /** `draw` with this kit's dissolve edge named for every fill it makes. */
-  const edged = (draw) => (ctx, ...args) =>
-    ctx && typeof ctx === 'object' ? withFxMod(ctx, edge, () => draw(ctx, ...args)) : draw(ctx, ...args);
+  const edged = edgedBy(edge);
 
   /** Trace a jag outline as a closed polygon, its width scaled by `scale`. */
   function traceJag(ctx, points, scale) {

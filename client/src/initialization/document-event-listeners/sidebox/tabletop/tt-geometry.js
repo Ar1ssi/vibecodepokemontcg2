@@ -144,8 +144,8 @@ export function cardSlab(width, height, thickness, radius, segments = 6) {
     const length = Math.hypot(x1 - x0, y1 - y0);
     if (length < 1e-9) continue;
     // Smooth normals around the rounded corners: each vertex takes its two edges' bisector.
-    const n0 = edgeNormal(outline, i);
-    const n1 = edgeNormal(outline, (i + 1) % outline.length);
+    const n0 = vertexNormal(outline, i);
+    const n1 = vertexNormal(outline, (i + 1) % outline.length);
     const u0 = run / perimeter;
     const u1 = (run + length) / perimeter;
     run += length;
@@ -168,7 +168,7 @@ export function cardSlab(width, height, thickness, radius, segments = 6) {
 }
 
 // The outward normal at outline vertex `i`: the bisector of its two edges.
-function edgeNormal(outline, i) {
+function vertexNormal(outline, i) {
   const prev = outline[(i - 1 + outline.length) % outline.length];
   const point = outline[i];
   const next = outline[(i + 1) % outline.length];
