@@ -8,81 +8,51 @@ import { moveCard } from '../move-card-bundle/move-card.js';
 import { shuffleZone } from '../zones/shuffle-zone.js';
 import { dispatchAuthoritativeZoneOp } from '../../setup/netcode/authoritative-dispatch.js';
 
-export const discardBoard = (user, initiator, message = true, emit = true) => {
-  const oInitiator = initiator === 'self' ? 'opp' : 'self';
-  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
-    processAction(user, emit, 'discardBoard', [oInitiator, message]);
-    return;
-  }
-
-  if (
-    dispatchAuthoritativeZoneOp('discardBoard', {
-      user,
-      emit,
-      oInitiator,
-      commandArgs: [message],
-    })
-  )
-    return;
-
-  const selectedBoardCount = getZone(user, 'board').getCount();
-  if (selectedBoardCount > 0) {
-    for (let i = 0; i < selectedBoardCount; i++) {
-      moveCard(user, initiator, 'board', 'discard', 0);
+// Moves every card on the board zone to `destZoneId` (discardBoard, handBoard, lostZoneBoard).
+const moveBoardTo =
+  (actionName, destZoneId, destLabel) =>
+  (user, initiator, message = true, emit = true) => {
+    const oInitiator = initiator === 'self' ? 'opp' : 'self';
+    if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
+      processAction(user, emit, actionName, [oInitiator, message]);
+      return;
     }
-    if (message) {
-      appendMessage(
-        initiator,
-        determineUsername(initiator) +
-          ' moved ' +
-          selectedBoardCount +
-          ' card(s) from board to discard',
-        'player',
-        false
-      );
+
+    if (
+      dispatchAuthoritativeZoneOp(actionName, {
+        user,
+        emit,
+        oInitiator,
+        commandArgs: [message],
+      })
+    )
+      return;
+
+    const selectedBoardCount = getZone(user, 'board').getCount();
+    if (selectedBoardCount > 0) {
+      for (let i = 0; i < selectedBoardCount; i++) {
+        moveCard(user, initiator, 'board', destZoneId, 0);
+      }
+      if (message) {
+        appendMessage(
+          initiator,
+          determineUsername(initiator) +
+            ' moved ' +
+            selectedBoardCount +
+            ' card(s) from board to ' +
+            destLabel,
+          'player',
+          false
+        );
+      }
     }
-  }
 
-  processAction(user, emit, 'discardBoard', [oInitiator, message]);
-};
+    processAction(user, emit, actionName, [oInitiator, message]);
+  };
 
-export const handBoard = (user, initiator, message = true, emit = true) => {
-  const oInitiator = initiator === 'self' ? 'opp' : 'self';
-  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
-    processAction(user, emit, 'handBoard', [oInitiator, message]);
-    return;
-  }
+export const discardBoard = moveBoardTo('discardBoard', 'discard', 'discard');
 
-  if (
-    dispatchAuthoritativeZoneOp('handBoard', {
-      user,
-      emit,
-      oInitiator,
-      commandArgs: [message],
-    })
-  )
-    return;
-
-  const selectedBoardCount = getZone(user, 'board').getCount();
-  if (selectedBoardCount > 0) {
-    for (let i = 0; i < selectedBoardCount; i++) {
-      moveCard(user, initiator, 'board', 'hand', 0);
-    }
-    if (message) {
-      appendMessage(
-        initiator,
-        determineUsername(initiator) +
-          ' moved ' +
-          selectedBoardCount +
-          ' card(s) from board to hand',
-        'player',
-        false
-      );
-    }
-  }
-
-  processAction(user, emit, 'handBoard', [oInitiator, message]);
-};
+export const handBoard = moveBoardTo('handBoard', 'hand', 'hand');
 
 export const shuffleBoard = (
   user,
@@ -132,40 +102,4 @@ export const shuffleBoard = (
   processAction(user, emit, 'shuffleBoard', [oInitiator, message, indices]);
 };
 
-export const lostZoneBoard = (user, initiator, message = true, emit = true) => {
-  const oInitiator = initiator === 'self' ? 'opp' : 'self';
-  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
-    processAction(user, emit, 'lostZoneBoard', [oInitiator, message]);
-    return;
-  }
-
-  if (
-    dispatchAuthoritativeZoneOp('lostZoneBoard', {
-      user,
-      emit,
-      oInitiator,
-      commandArgs: [message],
-    })
-  )
-    return;
-
-  const selectedBoardCount = getZone(user, 'board').getCount();
-  if (selectedBoardCount > 0) {
-    for (let i = 0; i < selectedBoardCount; i++) {
-      moveCard(user, initiator, 'board', 'lostZone', 0);
-    }
-    if (message) {
-      appendMessage(
-        initiator,
-        determineUsername(initiator) +
-          ' moved ' +
-          selectedBoardCount +
-          ' card(s) from board to lost zone',
-        'player',
-        false
-      );
-    }
-  }
-
-  processAction(user, emit, 'lostZoneBoard', [oInitiator, message]);
-};
+export const lostZoneBoard = moveBoardTo('lostZoneBoard', 'lostZone', 'lost zone');

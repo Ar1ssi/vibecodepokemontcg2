@@ -109,7 +109,7 @@ const onRoomFormat = (data) => {
 
 const onRoomFormatRejected = (data) => {
   if (!data || data.roomId !== systemState.roomId) return;
-  appendMessage('', REJECTION_TEXT[data.reason] || 'That format choice was not accepted.', 'announcement', false);
+  appendMessage('', (Object.hasOwn(REJECTION_TEXT, data.reason) ? REJECTION_TEXT[data.reason] : 'That format choice was not accepted.'), 'announcement', false);
 };
 
 export const initializeRoomFormatPanel = () => {

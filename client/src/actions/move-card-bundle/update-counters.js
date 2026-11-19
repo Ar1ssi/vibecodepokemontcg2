@@ -2,6 +2,22 @@ import { addAbilityCounter } from '../counters/ability-counter.js';
 import { addDamageCounter } from '../counters/damage-counter.js';
 import { addSpecialCondition } from '../counters/special-condition.js';
 
+/** Redraws every counter overlay in a zone after cards in it changed size, place or rotation. */
+export const refreshZoneCounters = (user, zoneId, zone) => {
+  for (let i = 0; i < zone.getCount(); i++) {
+    const image = zone.array[i].image;
+    if (image.damageCounter) {
+      addDamageCounter(user, zoneId, i, false, false);
+    }
+    if (image.specialCondition) {
+      addSpecialCondition(user, zoneId, i, false);
+    }
+    if (image.abilityCounter) {
+      addAbilityCounter(user, zoneId, i);
+    }
+  }
+};
+
 export const updateCounters = (
   user,
   movingCard,
@@ -41,31 +57,9 @@ export const updateCounters = (
   }
   //update damage counter placements on all cards from the same origin/destination zones
   if (counterZones.includes(oZoneId)) {
-    for (let i = 0; i < oZone.getCount(); i++) {
-      const image = oZone.array[i].image;
-      if (image.damageCounter) {
-        addDamageCounter(user, oZoneId, i, false, false);
-      }
-      if (image.specialCondition) {
-        addSpecialCondition(user, oZoneId, i, false);
-      }
-      if (image.abilityCounter) {
-        addAbilityCounter(user, oZoneId, i);
-      }
-    }
+    refreshZoneCounters(user, oZoneId, oZone);
   }
   if (counterZones.includes(dZoneId)) {
-    for (let i = 0; i < dZone.getCount(); i++) {
-      const image = dZone.array[i].image;
-      if (image.damageCounter) {
-        addDamageCounter(user, dZoneId, i, false, false);
-      }
-      if (image.specialCondition) {
-        addSpecialCondition(user, dZoneId, i, false);
-      }
-      if (image.abilityCounter) {
-        addAbilityCounter(user, dZoneId, i);
-      }
-    }
+    refreshZoneCounters(user, dZoneId, dZone);
   }
 };

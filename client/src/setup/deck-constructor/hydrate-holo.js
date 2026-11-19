@@ -13,6 +13,7 @@ import {
 import { ensureCardData } from '/shared/engine/rules/rules-state.mjs';
 import { fxDisabled, motionReduced } from '../image-logic/mat-fx.mjs';
 import { attachMatTilt } from './mat-tilt.mjs';
+import { cardBackSrcFor } from './opponent-seat.mjs';
 import { loadFoilManifest } from '../foil/tcgl-foil-store.js';
 import { unmountTcglFoil } from '../foil/tcgl-foil-view.js';
 import { board3dActive } from '../board3d/board3d.js';
@@ -29,11 +30,7 @@ const announceHoloChange = () => {
 };
 
 export function cardBackSrcForUser(user) {
-  return user === 'self'
-    ? systemState.cardBackSrc
-    : systemState.isTwoPlayer
-      ? systemState.p2OppCardBackSrc
-      : systemState.p1OppCardBackSrc;
+  return cardBackSrcFor(systemState, user);
 }
 
 export function isCardHidden(card) {

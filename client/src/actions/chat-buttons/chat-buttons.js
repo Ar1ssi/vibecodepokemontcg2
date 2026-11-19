@@ -46,7 +46,7 @@ import {
 import { parseAbility } from '/shared/engine/rules/abilities.mjs';
 import { canEvolve, markEvolvedThisTurn, normalizeStage, pokemonNamesMatch } from '/shared/engine/rules/evolution.mjs';
 import { formsAllowEvolution } from '/shared/engine/rules/pokemon-forms.mjs';
-import { parseAttackDamage, healTarget, planHeal, drawCount, drawUntilTarget, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, moveEnergyClause, revealHandClause, conditionalKoClause, exactCounterKoThreshold, redirectDamageCount, handScalingDamage, returnEnergyClause, returnEnergyCount, immunityClause, mirrorHealClause, copyAttackScope, retaliateCount, returnSelfClause, deferredDamageCount, lookOpponentDeckCount, lookOwnDeckCount, eachPlayerDrawCount, opponentCounterClause, attackTargetClause, devolveActiveClause, bothActiveKoClause, specialEnergyKoClause, nextTurnBonusClause, devolveOpponentClause, recoverAllStatusClause, hpCapRemaining, returnOpponentEnergyClause, returnOpponentEnergyCount, benchExactKoThreshold } from '/shared/engine/rules/damage-parser.mjs';
+import { parseAttackDamage, healTarget, planHeal, drawCount, drawUntilTarget, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, ownBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, moveEnergyClause, revealHandClause, conditionalKoClause, exactCounterKoThreshold, redirectDamageCount, handScalingDamage, returnEnergyClause, returnEnergyCount, immunityClause, mirrorHealClause, copyAttackScope, retaliateCount, returnSelfClause, deferredDamageCount, lookOpponentDeckCount, lookOwnDeckCount, eachPlayerDrawCount, opponentCounterClause, attackTargetClause, devolveActiveClause, bothActiveKoClause, specialEnergyKoClause, nextTurnBonusClause, devolveOpponentClause, recoverAllStatusClause, hpCapRemaining, returnOpponentEnergyClause, returnOpponentEnergyCount, benchExactKoThreshold } from '/shared/engine/rules/damage-parser.mjs';
 import { draw } from '../zones/deck-actions.js';
 import { takePrizes } from '../zones/prizes-actions.js';
 import { promptPrizeTake } from '../zones/prize-take-prompt.js';
@@ -475,12 +475,10 @@ export function evaluateWinCondition(turnPlayer = rulesState.turnPlayer) {
     // the *incoming* player's count immediately, before they've acted. Withhold the check
     // until then — otherwise the very first pass ends the game.
     const bothHaveStarted = rulesState.turnNumber >= 3;
+    // Deck-out is not swept here: an empty deck loses only when the turn player must draw and
+    // cannot (reduce/turn.mjs), decided at rules-turn-began; rules-bridge's sweep agrees.
     const win = checkWinConditions({
       activeCounts: bothHaveStarted && inGame.self && inGame.opp ? counts : null,
-      deckCounts: {
-        self: inGame.self ? getZone('self', 'deck').getCount() : 1,
-        opp: inGame.opp ? getZone('opp', 'deck').getCount() : 1,
-      },
       turnPlayer,
     });
     if (win.over) {
@@ -1767,7 +1765,11 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
         // whole Bench ("each of your opponent's Benched Pokémon") also reads as
         // bench damage to the parser; the multi-target block below owns it.
         const allBench = allBenchDamage(atk.text);
-        if (parsed?.bench > 0 && allBench === 0) {
+        const ownSpread = ownBenchDamage(atk.text);
+        // parsed.bench also reads "…to each of your Benched Pokémon" (recoil); that clause
+        // hurts the attacker's own Bench and is applied after the opponent's side below.
+        const recoilOnly = ownSpread > 0 && !/opponent's\s+benched/i.test(atk.text);
+        if (parsed?.bench > 0 && allBench === 0 && !recoilOnly) {
           const oppBench = getZone(oppPlayer, 'bench').array
             .map((card, idx) => ({ card, idx }))
             .filter(({ card }) => card.type === 'Pokémon');
@@ -1822,6 +1824,17 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
             for (const { card: benchTarget, idx: benchIdx } of oppBench) {
               await damageBenchedPokemon(user, oppPlayer, benchTarget, benchIdx, allBench);
             }
+          }
+        }
+
+        // Self-recoil spread ("This attack also does N damage to each of your Benched
+        // Pokémon"): a KO there gives the opponent the Prizes, so the opponent is the taker.
+        if (ownSpread > 0) {
+          const ownBench = getZone(user, 'bench').array
+            .map((card, idx) => ({ card, idx }))
+            .filter(({ card }) => card.type === 'Pokémon');
+          for (const { card: benchTarget, idx: benchIdx } of ownBench) {
+            await damageBenchedPokemon(oppPlayer, user, benchTarget, benchIdx, ownSpread);
           }
         }
 

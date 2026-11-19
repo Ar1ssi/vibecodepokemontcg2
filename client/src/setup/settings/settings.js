@@ -141,17 +141,17 @@ export const changeBackground = () => {
     "Paste your image URL, or type 'blank' or 'theme':"
   );
 
-  if (userInput !== null && userInput.trim() !== '') {
-    if (userInput.toLowerCase() === 'theme') {
-      const randomNumber = Math.random();
-      userInput =
-        randomNumber < 0.5
-          ? 'https://ptcgsim.online/src/assets/background1.jpg'
-          : 'https://ptcgsim.online/src/assets/background2.webp';
-    } else if (userInput.toLowerCase() === 'blank') {
-      document.body.style.backgroundImage = 'none';
-      return;
-    }
+  // Cancel (null) or an empty answer changes nothing; it is not a bad URL.
+  if (userInput === null || userInput.trim() === '') return;
+  if (userInput.toLowerCase() === 'theme') {
+    const randomNumber = Math.random();
+    userInput =
+      randomNumber < 0.5
+        ? 'https://ptcgsim.online/src/assets/background1.jpg'
+        : 'https://ptcgsim.online/src/assets/background2.webp';
+  } else if (userInput.toLowerCase() === 'blank') {
+    document.body.style.backgroundImage = 'none';
+    return;
   }
   const img = new Image();
   img.onload = () => {

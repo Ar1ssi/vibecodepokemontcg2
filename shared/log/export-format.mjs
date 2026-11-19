@@ -9,7 +9,7 @@ export const LEGEND = Object.freeze({
 });
 
 /** The `src` label a client's entries carry in an export. */
-export const clientSrc = (clientId) => `c:${clientId.slice(0, 8)}`;
+export const clientSrc = (clientId) => `c:${String(clientId ?? '').slice(0, 8)}`;
 
 /** A client's clock mapped onto the server's, to 0.1 ms. */
 export const alignedTs = (t, offset) => Math.round((t + offset) * 10) / 10;

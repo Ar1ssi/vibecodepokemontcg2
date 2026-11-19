@@ -21,13 +21,12 @@ import { dispatchAuthoritativeMoveCardBundle } from '../../setup/netcode/authori
  *
  * @returns {boolean} whether the divergence was reported to the server
  */
-function reportMirrorAbort(reason, oZoneId) {
+function reportMirrorAbort(oZoneId) {
   return reportMirrorDesync({
     socket,
     roomId: systemState.roomId,
     getZoneFn: getZone,
     zoneId: oZoneId,
-    reason,
   }).sent;
 }
 
@@ -182,7 +181,7 @@ export const moveCardBundle = async (
         relayIndex: index,
         resolvedIndex,
         moving: cardHints.moving,
-        reported: reportMirrorAbort('hint_mismatch', oZoneId),
+        reported: reportMirrorAbort(oZoneId),
       });
       return false;
     }
@@ -195,7 +194,7 @@ export const moveCardBundle = async (
         reason: 'missing_card',
         oZoneId,
         resolvedIndex,
-        reported: reportMirrorAbort('missing_card', oZoneId),
+        reported: reportMirrorAbort(oZoneId),
       });
       return false;
     }

@@ -71,6 +71,11 @@ test('flipCoin stores and replays the same face', () => {
   assert.equal(bundle.wake, coin1);
 });
 
+test('flipCoin replays a boolean coin recorded in the bundle instead of re-flipping it', () => {
+  assert.equal(flipCoin({ burn: true }, 'burn'), 'heads');
+  assert.equal(flipCoin({ burn: false }, 'burn'), 'tails');
+});
+
 test('deckDataEquals matches identical arrays of deck card tuples', () => {
   const a = [['Pikachu', 'src1'], ['Raichu', 'src2']];
   const b = [['Pikachu', 'src1'], ['Raichu', 'src2']];

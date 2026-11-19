@@ -14,6 +14,7 @@ import { deckFormatSlot } from './deck-format-args.mjs';
 import { resolveDeckPacketTail } from './deck-box-args.mjs';
 import { deckBoxes } from '../netcode/mat-fx/deck-box-state.mjs';
 import { rememberOwnDeck } from './own-deck.mjs';
+import { isRoomOpponent, opponentCardBackKey } from './opponent-seat.mjs';
 
 // Decks are built and loaded in the deck builder's own tab (design 050); this
 // module keeps the board-side loaders it calls and the Deck tab's card back.
@@ -24,7 +25,7 @@ const mainImportHeaderButton = document.getElementById('mainImportHeaderButton')
 export const loadDeckData = (user, deckData, format, deckBoxArg, emitArg) => {
   const { format: deckFormat, emit, deckBoxId } = resolveDeckPacketTail(format, deckBoxArg, emitArg);
   // Design 074 D7: a solo room's far deck is the solo "alt" deck, not a room opponent's.
-  const roomOpponent = systemState.isTwoPlayer && !systemState.solo;
+  const roomOpponent = isRoomOpponent(systemState);
   systemState.deckFormat[deckFormatSlot(user, roomOpponent)] = deckFormat;
   if (user === 'self') {
     systemState.selfDeckData = deckData;
@@ -95,10 +96,8 @@ export const changeCardBack = (user, userInput, emit = true) => {
   });
   if (user === 'self') {
     systemState.cardBackSrc = userInput;
-  } else if (systemState.isTwoPlayer) {
-    systemState.p2OppCardBackSrc = userInput;
   } else {
-    systemState.p1OppCardBackSrc = userInput;
+    systemState[opponentCardBackKey(systemState)] = userInput;
   }
 
   processAction(user, emit, 'changeCardBack', [userInput]);

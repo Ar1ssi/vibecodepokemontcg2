@@ -5,13 +5,10 @@ import { determineUsername } from '../../setup/general/determine-username.js';
 import { processAction } from '../../setup/general/process-action.js';
 import { isAuthoritativeDispatchActive } from '../../setup/netcode/authoritative-dispatch.js';
 
+const NO_ACTION_DATA = 'No action data to undo';
+
 const undoAsync = async (user, filteredActionData, emit = true) => {
   return new Promise((resolve, reject) => {
-    if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
-      processAction(user, emit, 'undo', [filteredActionData]);
-      return;
-    }
-
     // Design 003 slice 6: under serverAuthoritative, the server's own commandLog-minus-tail
     // replay (002 slice 3.4e) is the sole undo mechanism. Replaying locally through
     // acceptAction here would re-enter every gated action's own dispatch gate — each one
@@ -63,14 +60,12 @@ const undoAsync = async (user, filteredActionData, emit = true) => {
         );
 
       // Retrieve all entries starting from the most recent reset/setup entry
-      const mostRecentResetAndAfterEntries =
+      const replay =
         mostRecentResetEntryIndex !== -1
           ? filteredActionData.slice(
               filteredActionData.length - mostRecentResetEntryIndex - 1
             )
-          : 0;
-
-      const replay = mostRecentResetAndAfterEntries || filteredActionData;
+          : filteredActionData;
       (async () => {
         for (const data of replay) {
           await acceptAction(
@@ -86,7 +81,7 @@ const undoAsync = async (user, filteredActionData, emit = true) => {
         .catch(reject);
       return;
     }
-    reject('No action data to undo');
+    reject(NO_ACTION_DATA);
   });
 };
 
@@ -96,7 +91,12 @@ export const undo = async (user, filteredActionData, emit = true) => {
     return;
   }
 
-  // const undoButton = systemState.isTwoPlayer ? document.getElementById('p2UndoButton') : document.getElementById('undoButton');
+  // The opponent's undo is theirs to perform: relay it and leave this client's board alone.
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
+    processAction(user, emit, 'undo', [filteredActionData]);
+    return;
+  }
+
   const undoButton = document.getElementById('undoButton');
 
   systemState.isUndoInProgress = true;
@@ -120,8 +120,9 @@ export const undo = async (user, filteredActionData, emit = true) => {
       false
     );
     processAction(user, emit, 'undo', [filteredActionData]);
-  } catch {
+  } catch (error) {
     undoButton.textContent = 'Undo';
     systemState.isUndoInProgress = false;
+    if (error !== NO_ACTION_DATA) console.warn('undo: replaying the earlier actions failed', error);
   }
 };

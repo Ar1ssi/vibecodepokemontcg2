@@ -9,6 +9,7 @@ import {
   selfContainerDocument,
 } from '../../initialization/global-variables/containers.js';
 import { adjustAlignment } from '../sizing/adjust-alignment.js';
+import { cardBackSrcFor } from '../deck-constructor/opponent-seat.mjs';
 import {
   computeHandStacks,
   DEFAULT_STACK_STEP_OFFSET_PX,
@@ -32,12 +33,7 @@ function isImageHidden(img, card) {
   const sysState = typeof window !== 'undefined' ? window.systemState : null;
   if (sysState) {
     const user = card?.user ?? img?.user;
-    const backSrc =
-      user === 'self'
-        ? sysState.cardBackSrc
-        : sysState.isTwoPlayer
-          ? sysState.p2OppCardBackSrc
-          : sysState.p1OppCardBackSrc;
+    const backSrc = cardBackSrcFor(sysState, user);
     if (backSrc && src === backSrc) return true;
   }
 

@@ -132,13 +132,9 @@ const functions = {
 };
 
 const actionToFunction = (action) => {
-  const selectedFunction = functions[action];
-
-  if (typeof selectedFunction === 'function') {
-    return selectedFunction;
-  } else {
-    return null;
-  }
+  // The name comes off the wire: only the table's own entries, never inherited members
+  // such as 'constructor' or 'toString'.
+  return Object.hasOwn(functions, action) ? functions[action] : null;
 };
 
 export const acceptAction = async (
