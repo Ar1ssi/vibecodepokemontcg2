@@ -216,6 +216,12 @@ export function stepExtraEnergySatisfied(ctx) {
   return extraEnergySatisfied(ctx, ctx.step.requiresExtraEnergy);
 }
 
+/** Whether the attacker has any Energy of the step's `requiresAttachedEnergy` type (executor gate). */
+export function stepAttachedEnergySatisfied(ctx) {
+  const letter = ctx.step.requiresAttachedEnergy;
+  return !letter || attachedEnergyOfType(ctx, letter) > 0;
+}
+
 function extraEnergySatisfied(ctx, requirement) {
   if (!requirement) return true;
   const requirements = Array.isArray(requirement) ? requirement : [requirement];
@@ -3284,6 +3290,14 @@ function atkHealCounted(ctx) {
 
 const whatOf = (step) => energyLabel(step);
 
+// Paldean Tauros Upthrusting Horns: "You may put 2 Energy … into their hand" is no discard.
+function oppEnergyOffer(step) {
+  if (!step.toHand) return `Discard ${whatOf(step)} from your opponent's Pokémon`;
+  const count = Number.isInteger(step.count) && step.count > 1 ? `${step.count} ` : '';
+  const where = step.scope === 'active' ? 'Active Pokémon' : 'Pokémon';
+  return `Put ${count}${whatOf(step)} attached to your opponent's ${where} into their hand`;
+}
+
 // "except any Simisage" arrives as SELF_NAME; the name is the attacker's at attack time.
 function resolveSelfName(marker, ctx) {
   if (marker.filter?.exceptName !== SELF_NAME) return marker;
@@ -4193,7 +4207,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkMoveEnergy: optional(atkMoveEnergy, (step) => `Move ${whatOf(step)}`),
   atkDiscardSelfEnergy,
   atkMoveSelfEnergyToHand: optional(atkMoveSelfEnergyToHand, () => 'Return an Energy attached to this Pokémon to your hand'),
-  atkDiscardOppEnergy: optional(atkDiscardOppEnergy, (step) => `Discard ${whatOf(step)} from your opponent's Pokémon`),
+  atkDiscardOppEnergy: optional(atkDiscardOppEnergy, oppEnergyOffer),
   atkDiscardBothActiveEnergy: optional(
     atkDiscardBothActiveEnergy,
     () => 'Discard all Energy from both Active Pokémon'
