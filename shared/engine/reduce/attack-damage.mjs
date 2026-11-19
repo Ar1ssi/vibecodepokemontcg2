@@ -547,7 +547,7 @@ export function legacyModifiedDamage(draft, { victim, victimPlayerId, amount }) 
 
 // `legacyApplied`: the amount already went through computeAttackDamage, which applies the same
 // Powers (or skips them for damage that ignores effects on the Defending Pokémon).
-function applyFlatDamageToTarget(
+export function applyFlatDamageToTarget(
   draft,
   { ref, amount, attackerPlayerId, countersPlaced = false, legacyApplied = false, events }
 ) {

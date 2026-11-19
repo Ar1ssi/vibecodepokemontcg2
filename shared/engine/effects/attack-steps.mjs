@@ -34,7 +34,7 @@ import {
   isUltraBeastCard,
 } from '../rules/card-classify.mjs';
 import { shuffleInPlace } from '../rng.mjs';
-import { parseGrantedAttacks } from '../rules/tool-attacks.mjs';
+import { parseGrantedAttacks, toolGrantsAttackTo } from '../rules/tool-attacks.mjs';
 import {
   addAttackMarker,
   clearAttackMarkers,
@@ -2252,39 +2252,36 @@ function damageOnePick(ctx, memo) {
 
 // Giratina ex Alpha Rage (customhb): "Choose 1 of your opponent's Pokémon. That Pokémon attacks 1 of
 // your opponent's other Pokémon." Picks: the opponent's Pokémon, one of its attacks that does
-// damage, and the other Pokémon it hits. That attack's printed damage lands with the chosen
-// Pokémon's own type against the target's Weakness and Resistance (Active target only, as for any
-// attack); its other printed effects do not run. The damage is queued as an `attackDamageRequest`.
+// damage, and the other Pokémon it hits. The hit is queued as an `attackDamageRequest` carrying
+// `controlled`; reduce/controlled-attack.mjs resolves it with the chosen Pokémon as the attacker.
 function atkOpponentAttacksOwn(ctx) {
   const { opponent } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
   const memo = ctx.memo || {};
   const viewOf = (root) => topPokemonCard(opponent, root) || root;
   const printedDamage = (attack) => parseInt(String(attack?.damage ?? ''), 10) || 0;
-  const damaging = (root) => (viewOf(root).attacks || []).filter((a) => printedDamage(a) > 0);
+  // Its printed attacks and those its attached Tools grant it (Technical Machines, Core Memory).
+  const toolAttacks = (root) =>
+    (opponent.zones?.[findCard(ctx.draft, root.instanceId)?.zoneId] || [])
+      .filter((c) => c.attachedTo === root.instanceId && !isPokemon(c) && !isEnergy(c) && toolGrantsAttackTo(c, viewOf(root)))
+      .flatMap((tool) => parseGrantedAttacks(tool));
+  const damaging = (root) => [...(viewOf(root).attacks || []), ...toolAttacks(root)].filter((a) => printedDamage(a) > 0);
   if (memo.stage === 'target') {
     const user = rootsOf(opponent).find((c) => c.instanceId === memo.userId);
     const target = rootsOf(opponent).find((c) => c.instanceId === ctx.selection?.[0] && c.instanceId !== memo.userId);
     if (!user || !target) return skip(ctx, 'target_not_found');
     const attack = damaging(user)[memo.attackIndex];
-    let amount = printedDamage(attack);
-    if (findCard(ctx.draft, target.instanceId)?.zoneId === 'active') {
-      const userTypes = viewOf(user).types || [];
-      const targetView = viewOf(target);
-      // In play a card carries `weakness` / `resistance` ({ type, value }); a raw record, arrays.
-      const listOf = (one, many) => (one ? [one] : Array.isArray(many) ? many : []);
-      const weak = listOf(targetView.weakness, targetView.weaknesses).find((w) => userTypes.includes(w.type));
-      const resist = listOf(targetView.resistance, targetView.resistances).find((r) => userTypes.includes(r.type));
-      if (weak) amount *= Math.max(2, Number(String(weak.value ?? 2).replace(/[^0-9]/g, '')) || 2);
-      if (resist) amount = Math.max(0, amount - (Math.abs(parseInt(String(resist.value).replace(/[^0-9-]/g, ''), 10)) || 30));
-    }
+    if (!attack) return skip(ctx, 'attack_not_found');
     ctx.events.push({
       type: 'attackDamageRequest',
       instanceId: target.instanceId,
       victimPlayerId: opponent.playerId,
-      amount,
-      immunity: { ignoreWeakness: true, ignoreResistance: true },
+      amount: printedDamage(attack),
       attackName: attackName(ctx),
+      controlled: {
+        userId: user.instanceId,
+        attack: { name: attack.name, cost: attack.cost || [], damage: String(attack.damage ?? ''), text: attack.text || attack.effect || '' },
+      },
     });
     return null;
   }

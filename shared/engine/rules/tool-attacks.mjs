@@ -226,3 +226,20 @@ export function mayAttachAnyTechnicalMachine(top) {
   ];
   return texts.some((t) => /attach any technical machine to/.test(normalizeText(t)));
 }
+
+const normalizedPokemonName = (name) =>
+  String(name || '')
+    .toLowerCase()
+    .replace(/-(ex|gx|v)$/, ' $1')
+    .trim();
+
+/**
+ * Whether `tool` grants its attack to `holder`: "The Mega Zygarde ex this card is attached to can use
+ * the attack on this card" (Core Memory, G Booster, G Scope, Power Memory; customhb) names the only
+ * holder that gets it; "The Pokémon this card is attached to …" grants it to any holder.
+ */
+export function toolGrantsAttackTo(tool, holder) {
+  const named = /the ([^.]+?) this card is attached to can (?:also )?use the attack on this card/i.exec(cardTextOf(tool))?.[1];
+  if (!named || /^pok[ée]mon$/i.test(named.trim())) return true;
+  return normalizedPokemonName(holder?.name) === normalizedPokemonName(named);
+}

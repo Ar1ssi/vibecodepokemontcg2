@@ -13,7 +13,7 @@ import {
 } from '../rules/legacy-attached-trainer.mjs';
 import { countUnit, normalizeUnit } from '../rules/scaling-count.mjs';
 import { buildServerAttackContext } from '../rules/attack-damage-context.mjs';
-import { parseGrantedAttacks } from '../rules/tool-attacks.mjs';
+import { parseGrantedAttacks, toolGrantsAttackTo } from '../rules/tool-attacks.mjs';
 import { attachedTools, isTeraCard } from '../rules/tool-combat.mjs';
 import {
   isAbilitySuppressed, abilityAttackFlipGate, abilityVictoryStar,
@@ -424,22 +424,10 @@ function toolGrantedAttacksFor(state, card) {
     if (isPokemon(attached) || isEnergy(attached)) continue;
     // "The Mega Zygarde ex this card is attached to can use the attack on this card" (Core Memory,
     // G Booster, G Scope, Power Memory; customhb): only a holder of that name gets the attack.
-    if (!toolAttackHolderAllowed(attached, inPlayView(state, card))) continue;
+    if (!toolGrantsAttackTo(attached, inPlayView(state, card))) continue;
     out.push(...parseGrantedAttacks(attached));
   }
   return out;
-}
-
-const normalizedPokemonName = (name) =>
-  String(name || '')
-    .toLowerCase()
-    .replace(/-(ex|gx|v)$/, ' $1')
-    .trim();
-
-function toolAttackHolderAllowed(tool, holder) {
-  const named = /the ([^.]+?) this card is attached to can (?:also )?use the attack on this card/i.exec(cardText(tool))?.[1];
-  if (!named || /^pok[ée]mon$/i.test(named.trim())) return true;
-  return normalizedPokemonName(holder?.name) === normalizedPokemonName(named);
 }
 
 function borrowSourceMatches(card, borrow) {

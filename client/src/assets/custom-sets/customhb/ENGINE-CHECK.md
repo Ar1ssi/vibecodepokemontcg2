@@ -13,6 +13,6 @@ The check script still lists 48 rows. All of them work in play; they are blind s
 - **Stadiums the Trainer classifier cannot label** (continuous effects): Altar of the Sunne, Broken Time-Space, Forest of Vitality, Magnetic Storm, Perilous Jungle, Shrine of Punishment, Temple of Sinnoh; and the turn-long bonus of Electropower.
 
 ## Engine limits to know
-- HB 554 **Giratina ex** *Alpha Rage*: the chosen Pokémon's attack does its printed damage (with its own type against Weakness and Resistance); that attack's other effects do not run.
+- HB 554 **Giratina ex** *Alpha Rage*: the chosen Pokémon attacks as itself (its Tools, Energy, Abilities and damage text apply; the target's Weakness, Resistance, Tools and Abilities apply; a Knock Out gives you the Prize), but that attack's other printed effects (status, discards, draws) do not run (I297).
 - HB 015 **Gloom** *Drowziness*: the −1 Retreat Cost is read, but an Asleep Pokémon cannot retreat under the rules, so it never shows in play.
 - Landorus *Abundance* draws automatically (no prompt) and skips the draw when the deck holds one card.

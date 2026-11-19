@@ -21,6 +21,7 @@ import { inPlayView, setGameEnded, isGameConcluded, shuffleDeckWithRng } from '.
 import { attackViewFor } from './attack.mjs';
 import { resolveDamageCounterKnockouts } from './knockout.mjs';
 import { applyAttackTargets } from './attack-damage.mjs';
+import { applyControlledAttack } from './controlled-attack.mjs';
 
 /**
  * Builds the attack deck-search PendingChoice for the first stage (at or after
@@ -904,6 +905,19 @@ function applyAttackDamageRequests(draft, { events, playerId, activeRng }) {
   for (let i = events.length - 1; i >= 0; i--) if (events[i].type === 'attackDamageRequest') events.splice(i, 1);
   for (const request of requests) {
     if (isGameConcluded(draft)) return;
+    if (request.controlled) {
+      applyControlledAttack(draft, {
+        userId: request.controlled.userId,
+        ownerId: request.victimPlayerId,
+        targetId: request.instanceId,
+        attack: request.controlled.attack,
+        controllerId: playerId,
+        attackName: request.attackName,
+        activeRng,
+        events,
+      });
+      continue;
+    }
     applyAttackTargets(draft, {
       selection: [request.instanceId],
       clause: { kind: 'damage', amount: request.amount, activeWR: true, immunity: request.immunity || {} },

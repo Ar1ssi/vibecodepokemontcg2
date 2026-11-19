@@ -14,7 +14,7 @@
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
-- I297 2026-11-19 P3 [rules] customhb HB 554 Giratina ex Alpha Rage runs only the chosen opposing attack's printed damage, not its other effects — running another player's attack against its own side needs a design (atkOpponentAttacksOwn in effects/attack-steps.mjs)
+- I297 2026-11-19 P3 [rules] customhb HB 554 Giratina ex Alpha Rage: the chosen Pokémon's attack does its damage as that Pokémon (reduce/controlled-attack.mjs) but its other printed effects (status, self-discard, draws) do not run — mapping "you"/"Defending Pokémon" for a controlled attack needs a design
 - I296 2026-11-19 P2 [client] The attack-button glow ignores marker cost increases (Head Ringer Tool, Flapple V Sour Spit): listUsableActions gets only `costDiscounts`, so it lights an attack the server then refuses (legality.mjs attackCostPayable markerIncrease). Needs a view `costIncreases` map.
 - I295 2026-11-12 P2 [netcode] An undo lowers stateVersion (draw,draw,undo,draw → 3,4,3,4 from GameRoom) and apply-view.js's monotonic guard drops any view ≤ lastRenderedVersion, so the undo may not render; in a log: view/apply applied:false out_of_order (refs: design 088 Review)
 - I294 2026-11-12 P2 [server] No socket handler in server/server.js has a try/catch: a throw in any one is an uncaught exception that ends the process and every room. Now logged (088 process tap, stderr fatal line) but not contained (refs: design 088 Current state)
