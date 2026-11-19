@@ -261,6 +261,69 @@ test("attack: discard all Pokémon Tools before damage; random hand discard (I10
   assert.equal(zone(resHand, 'p2', 'hand').filter((c) => /^H\d$/.test(c.name)).length, handBefore - 1);
 });
 
+// Paldean Tauros Jet Headbutt — source: client/src/assets/custom-sets/customhb/set.json customhb-672.
+const JET_HEADBUTT = "If this Pokémon has any {F} Energy attached, discard a random card from your opponent's hand.";
+const jetHeadbutt = (energyType) =>
+  board(JET_HEADBUTT, {
+    damage: '100',
+    setup: ({ p1, p2, attacker }) => {
+      p1.zones.active.push(energy(energyType, { attachedTo: attacker.instanceId }));
+      p2.zones.hand.push(trainer('H1'), trainer('H2'), trainer('H3'));
+    },
+  });
+const handDiscards = (res) => zone(res, 'p2', 'discard').filter((c) => /^H\d$/.test(c.name)).length;
+
+test('attack: Jet Headbutt discards a random card from the opponent\'s hand with {F} Energy attached', () => {
+  assert.equal(handDiscards(attack(jetHeadbutt('Fighting'))), 1);
+});
+
+test('attack: Jet Headbutt discards nothing without {F} Energy attached', () => {
+  assert.equal(handDiscards(attack(jetHeadbutt('Water'))), 0);
+});
+
+// Paldean Tauros Upthrusting Horns — source: client/src/assets/custom-sets/customhb/set.json customhb-672.
+const upthrustingHorns = () =>
+  board("You may put 2 Energy attached to your opponent's Active Pokémon into their hand.", {
+    damage: '30',
+    setup: ({ p2, defender }) =>
+      p2.zones.active.push(
+        energy('Water', { attachedTo: defender.instanceId }),
+        energy('Fire', { attachedTo: defender.instanceId }),
+        energy('Grass', { attachedTo: defender.instanceId })
+      ),
+  });
+const energyNames = (cards) => cards.filter((c) => c.supertype === 'Energy').map((c) => c.name);
+
+test('attack: Upthrusting Horns offers to put 2 Energy from the opponent\'s Active into their hand', () => {
+  const b = upthrustingHorns();
+  const offered = attack(b);
+  assert.equal(
+    offered.state.pendingChoice.prompt,
+    "Test Attack: Put 2 Energy attached to your opponent's Active Pokémon into their hand?"
+  );
+  const picking = choose(offered, [ATTACK_YES], b.rng);
+  const [first, second] = picking.state.pendingChoice.options;
+  const res = choose(picking, [first.instanceId, second.instanceId], b.rng);
+  assert.deepEqual(energyNames(zone(res, 'p2', 'hand')).sort(), ['Basic Fire Energy', 'Basic Water Energy']);
+  assert.deepEqual(energyNames(zone(res, 'p2', 'active')), ['Basic Grass Energy']);
+  assert.equal(energyNames(zone(res, 'p2', 'discard')).length, 0);
+  assert.equal(zone(res, 'p2', 'active')[0].damage, 30);
+});
+
+test('attack: Upthrusting Horns moves no Energy when declined', () => {
+  const b = upthrustingHorns();
+  const res = choose(attack(b), [ATTACK_NO], b.rng);
+  assert.equal(energyNames(zone(res, 'p2', 'active')).length, 3);
+  assert.equal(energyNames(zone(res, 'p2', 'hand')).length, 0);
+});
+
+test('attack: an "any {X} Energy attached" gate before a damage clause is left to the damage parser', () => {
+  const steps = parseAttackSteps(
+    "If this Pokémon has any {R} Energy attached to it, this attack does 20 damage to 2 of your opponent's Benched Pokémon."
+  );
+  assert.equal([...steps.before, ...steps.after].some((step) => step.requiresAttachedEnergy), false);
+});
+
 test("attack: \"Your opponent discards 2 cards from their hand\" lets the opponent choose (I104)", () => {
   const b = board('Your opponent discards 2 cards from their hand.', {
     setup: ({ p2 }) => p2.zones.hand.push(trainer('H1'), trainer('H2'), trainer('H3')),

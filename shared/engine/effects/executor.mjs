@@ -44,7 +44,12 @@ import {
   cardEffectShielded,
   playerShieldBlocks,
 } from './trainer-steps.mjs';
-import { ATTACK_STEP_HANDLERS, EXTRA_ENERGY_SELF_GATED, stepExtraEnergySatisfied } from './attack-steps.mjs';
+import {
+  ATTACK_STEP_HANDLERS,
+  EXTRA_ENERGY_SELF_GATED,
+  stepAttachedEnergySatisfied,
+  stepExtraEnergySatisfied,
+} from './attack-steps.mjs';
 import { applyStadiumSwitchTriggers } from './stadium-trigger-apply.mjs';
 
 export const MAX_EFFECT_STEPS = 200;
@@ -535,6 +540,15 @@ export function executeSteps(draft, {
       !stepExtraEnergySatisfied({ draft, player, sourceCard, step })
     ) {
       events.push({ type: 'effectStepSkipped', reason: 'extra_energy_unmet', step: step.type });
+      continue;
+    }
+    // Jet Headbutt: "If this Pokémon has any {F} Energy attached, …".
+    if (
+      effectType === 'attackSteps' &&
+      step.requiresAttachedEnergy &&
+      !stepAttachedEnergySatisfied({ draft, player, sourceCard, step })
+    ) {
+      events.push({ type: 'effectStepSkipped', reason: 'attached_energy_unmet', step: step.type });
       continue;
     }
     // Hypno Spiral Aura: "If the Defending Pokémon isn't Knocked Out by the damage from this

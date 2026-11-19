@@ -138,6 +138,15 @@ function leadingExtraEnergy(sentence) {
   return requirements.length > 0 ? { length: m[0].length, requirements } : null;
 }
 
+// Paldean Tauros Jet Headbutt (customhb-672): a leading "If this Pokémon has any {F} Energy
+// attached, …" gates the rest of the sentence. A damage clause behind it ("this attack does …")
+// belongs to the damage parser (reduce/attack-effect.mjs), not to a step.
+const ATTACHED_ENERGY_PREFIX = /^if this pokémon has any \{([a-z])\} energy attached(?: to it)?, (?!this attack does)/;
+function leadingAttachedEnergy(sentence) {
+  const m = ATTACHED_ENERGY_PREFIX.exec(sentence);
+  return m ? { length: m[0].length, energyType: m[1].toUpperCase() } : null;
+}
+
 const ENERGY_TYPE = String.raw`(?:basic )?(?:\{([a-z])\} )?(?:basic )?`;
 
 // "heal 30 damage" / "heal all damage" / "remove 3 damage counters" / "remove a damage counter".
@@ -2070,7 +2079,9 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
     const wrOrder = /<wr:(before|after)>/.exec(sentence)?.[1];
     const plain = sentence.replace(/\s*<wr:(?:before|after)>/g, '');
     const extra = leadingExtraEnergy(plain);
-    const body = extra ? plain.slice(extra.length) : plain;
+    const attached = extra ? null : leadingAttachedEnergy(plain);
+    const gate = extra || attached;
+    const body = gate ? plain.slice(gate.length) : plain;
     const chained = ATTACH_CHAIN.exec(body);
     const previous = result.after[result.after.length - 1];
     // "Discard a card from your hand. If you do, draw 3 cards." runs only when the hand paid.
@@ -2087,6 +2098,7 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
     if (chained && !handChain && !isAttachStep(previous) && !optionalChain && !discardChain) continue;
     let { rest, flags } = stripGates(chained ? body.slice(chained[0].length) : body);
     if (extra) flags.requiresExtraEnergy = extra.requirements;
+    if (attached) flags.requiresAttachedEnergy = attached.energyType;
     if (handChain) flags.requiresHandCost = true;
     else if (discardChain) flags.requiresEnergyDiscard = true;
     else if (chained && !optionalChain) flags.requiresAttach = true;

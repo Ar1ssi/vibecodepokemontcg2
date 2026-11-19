@@ -605,13 +605,13 @@ function placeEffect(effect) {
 }
 
 /**
- * Design 075: where the board camera puts the effect, from its card's place in the scene now (the
- * last known place once the card has left the board).
+ * Design 075: where the board camera puts the effect: where its card stood when the hit landed. A
+ * knocked-out card's scene flies it to the discard pile on that same hit, and the impact must not
+ * ride along with it.
  */
 function placeEffectInScene(effect, view) {
-  const placement = stage.scene.placementOf(effect.cardId) ?? effect.lastPlacement;
+  const { placement } = effect;
   if (!placement) throw new Error('its card is not on the board');
-  effect.lastPlacement = placement;
   const frame = sceneEffectFrame({ ...view, ...placement, bench: effect.bench });
   effect.viewProjection = frame.viewProjection;
   effect.camera = frame.camera;
@@ -835,8 +835,7 @@ export function playImpact({ type, variant, rect, cardId = null, bench = false, 
     simulation,
     camera: boardCamera({ target: [0, 0, 0], height: CAMERA_HEIGHT, fovDeg: CAMERA_FOV_DEG }),
     rect: rect ? { left: rect.left, top: rect.top, width: rect.width, height: rect.height } : null,
-    cardId,
-    lastPlacement: null,
+    placement,
     bench,
     turn: rootTurn,
     art: null,
