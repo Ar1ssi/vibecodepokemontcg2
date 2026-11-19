@@ -444,6 +444,30 @@ test('HB 476-480 Unified Defense takes 10 less damage for each Pokémon with it 
   assert.equal(damageOf(attack(guarded)), 70, 'three holders still take 30 off once: the copies do not stack');
 });
 
+// customhb set.json texts: Regice 476 and Regieleki 479 print different wordings of the Ability.
+const regiceDefense = { abilities: [{ name: 'Unified Defense', text: 'Whenever you are damaged by an attack, take 10 less damage for each Pokémon with the Ability Unified Defense in play.' }] };
+const regielekiDefense = { abilities: [{ name: 'Unified Defense', text: "Your Pokémon take 10 less damage from your opponent's attacks for each Pokémon with the Ability Unified Defense in play." }] };
+
+test('HB 476-480 Unified Defense counts each differently named holder once (user ruling)', () => {
+  const twoRegice = board('Plain Attacker', '', {
+    damage: '100',
+    defenderExtra: { name: 'Regice', ...regiceDefense },
+    setup: (s) => s.players.p2.zones.bench.push(mon('Regice', regiceDefense)),
+  });
+  assert.equal(damageOf(attack(twoRegice.state)), 90, 'two Regice are one unique holder: 10 less');
+  const regiceAndRegieleki = board('Plain Attacker', '', {
+    damage: '100',
+    defenderExtra: { name: 'Regice', ...regiceDefense },
+    setup: (s) => s.players.p2.zones.bench.push(mon('Regieleki', regielekiDefense)),
+  });
+  assert.equal(damageOf(attack(regiceAndRegieleki.state)), 80, 'Regice and Regieleki are two: 20 less');
+  const benchedPair = board('Plain Attacker', '', {
+    damage: '100',
+    setup: (s) => s.players.p2.zones.bench.push(mon('Regieleki', regielekiDefense), mon('Regieleki', regielekiDefense), mon('Regirock', unifiedDefense)),
+  });
+  assert.equal(damageOf(attack(benchedPair.state)), 80, 'two Regieleki and a Regirock on the Bench cover the Active: 20 less');
+});
+
 test('HB 455 Regigigas Unified Attack does only its base damage with no Unified Defense in play', () => {
   const { state } = board('Regigigas', UNIFIED_ATTACK, { damage: '50+', setup: (s) => s.players.p1.zones.bench.push(mon('Plain Ally')) });
   assert.equal(damageOf(attack(state)), 50);
