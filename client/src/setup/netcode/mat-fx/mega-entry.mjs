@@ -8,6 +8,7 @@
 //
 // Lengths are card heights (h); positions are from the card's centre in the stage frame (x right,
 // y down the screen, z up off the cloth); angles are radians unless named Deg; times are ms.
+import { clamp01, easeInCubic, easeOutBack, easeOutCubic, lerp, pulse, span, spring } from './entry-math.mjs';
 import { tossHeight, tossReach } from './entry-toss.mjs';
 import { seededRandom } from './flow-pose.mjs';
 
@@ -38,15 +39,6 @@ const CRACK_FROM_MS = 980;
 const RELEASE_MS = MEGA_BURST_MS + MEGA_HIT_STOP_MS;
 const DROP_MS = 120;
 const TAU = Math.PI * 2;
-
-const clamp01 = (t) => (t < 0 ? 0 : t > 1 ? 1 : t);
-const span = (t, a, b) => clamp01((t - a) / (b - a));
-const lerp = (a, b, t) => a + (b - a) * t;
-const easeOutCubic = (t) => 1 - (1 - t) ** 3;
-const easeInCubic = (t) => t ** 3;
-const easeOutBack = (t) => (t <= 0 ? 0 : 1 + 2.70158 * (t - 1) ** 3 + 1.70158 * (t - 1) ** 2);
-const pulse = (t, peak) => (t <= 0 || t >= 1 ? 0 : t <= peak ? t / peak : 1 - (t - peak) / (1 - peak));
-const spring = (t) => Math.cos(Math.PI * 1.5 * t) * Math.exp(-3 * t);
 
 /** How hard the shell strains before it bursts: 0 until the cracks start, 1 at the burst. */
 export const megaStrain = (ms) => easeInCubic(span(ms, CRACK_FROM_MS, MEGA_BURST_MS));

@@ -55,7 +55,7 @@ export function createSampleBank(deps = {}) {
   const loops = new Set();
 
   const busNode = (bus) => {
-    const name = bus in BUS_GAIN ? bus : 'sfx';
+    const name = Object.hasOwn(BUS_GAIN, bus) ? bus : 'sfx';
     if (!buses.has(name)) {
       const node = ctx.createGain();
       node.gain.value = BUS_GAIN[name];

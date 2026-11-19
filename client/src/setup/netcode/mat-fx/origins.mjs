@@ -63,14 +63,6 @@ const idsToCapture = (event) => {
   return moveIdsForEvent(event);
 };
 
-/**
- * @param {object[]} events
- * @param {Map<any, {element?: Element}>} registry - getCardRegistry()
- * @param {(user: string, el: Element) => object|null} capture - captureKnockoutGhost
- * @param {(event: object) => 'self'|'opp'} sideOf
- * @param {(instanceId: any) => object|null} [rectOf] - the card's rect on screen (rectForInstance):
- *   on the 3D board the mesh's projection, which the mirror element's box is not
- */
 const combatIdsFor = (event) => {
   if (event?.type === 'attackExecuted') return [event.attackerId, event.defenderId].filter((id) => id != null);
   if (event?.type === 'damageUpdated' && event.instanceId != null) return [event.instanceId];
@@ -136,6 +128,14 @@ const captureSweep = (event, registry, capture, sideOf) => {
   sweeps.set(sweepKey(user, source), ids);
 };
 
+/**
+ * @param {object[]} events
+ * @param {Map<any, {element?: Element}>} registry - getCardRegistry()
+ * @param {(user: string, el: Element) => object|null} capture - captureKnockoutGhost
+ * @param {(event: object) => 'self'|'opp'} sideOf
+ * @param {(instanceId: any) => object|null} [rectOf] - the card's rect on screen (rectForInstance):
+ *   on the 3D board the mesh's projection, which the mirror element's box is not
+ */
 export function captureOrigins(events, registry, capture, sideOf, rectOf = null) {
   combatOrigins.clear();
   for (const event of events) {

@@ -8,6 +8,7 @@
 //
 // Lengths are card heights (h); positions are from the card's centre in the stage frame (x right,
 // y down the screen, z up off the cloth); angles are degrees; times are ms of the scene.
+import { clamp01, easeInCubic, easeOutBack, easeOutCubic, lerp, pulse, span, spring } from './entry-math.mjs';
 import { tossHeight, tossReach } from './entry-toss.mjs';
 import { seededRandom } from './flow-pose.mjs';
 
@@ -31,17 +32,6 @@ const DROP_MS = 130;
 const CARD_ASPECT = 0.716;
 const DEG = Math.PI / 180;
 const TAU = Math.PI * 2;
-
-const clamp01 = (t) => (t < 0 ? 0 : t > 1 ? 1 : t);
-const span = (t, a, b) => clamp01((t - a) / (b - a));
-const lerp = (a, b, t) => a + (b - a) * t;
-const easeOutCubic = (t) => 1 - (1 - t) ** 3;
-const easeInCubic = (t) => t ** 3;
-const easeOutBack = (t) => (t <= 0 ? 0 : 1 + 2.70158 * (t - 1) ** 3 + 1.70158 * (t - 1) ** 2);
-/** Up over [0, peak], down over [peak, 1]. */
-const pulse = (t, peak) => (t <= 0 || t >= 1 ? 0 : t <= peak ? t / peak : 1 - (t - peak) / (1 - peak));
-/** A damped swing from 1 to 0: one and a half swings, decaying by e⁻³. */
-const spring = (t) => Math.cos(Math.PI * 1.5 * t) * Math.exp(-3 * t);
 
 /** Growth in three lurches with a rest after each, as crystal grows: 0 → 1 over u in [0, 1]. */
 export function lurch(u) {
