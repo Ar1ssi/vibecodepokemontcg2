@@ -92,69 +92,54 @@ import { DECK_FORMAT_TCG, isDeckFormat } from '../../../../../shared/engine/form
       return normalizeDeckFormat(deck.format);
     }
     
-    export function setDeckSleeve(library = {}, deckId, sleeveId = null) {
+    // The deck copy with one field written and `updatedAt` stamped; the library unchanged (cloned)
+    // when no such deck exists. `touch: false` is for metadata the player did not edit.
+    function withDeckField(library, deckId, field, value, { touch = true } = {}) {
       if (!library?.decks?.[deckId]) return structuredClone(library);
       const nextLibrary = structuredClone(library);
-      nextLibrary.decks[deckId].sleeveId = sleeveId || null;
-      nextLibrary.decks[deckId].updatedAt = Date.now();
+      nextLibrary.decks[deckId][field] = value;
+      if (touch) nextLibrary.decks[deckId].updatedAt = Date.now();
       return nextLibrary;
     }
-    
-        export function setDeckCoin(library = {}, deckId, coinId = null) {
-          if (!library?.decks?.[deckId]) return structuredClone(library);
-          const nextLibrary = structuredClone(library);
-          nextLibrary.decks[deckId].coinId = coinId || null;
-          nextLibrary.decks[deckId].updatedAt = Date.now();
-          return nextLibrary;
-        }
-    
-        export function setDeckMat(library = {}, deckId, matId = null) {
-          if (!library?.decks?.[deckId]) return structuredClone(library);
-          const nextLibrary = structuredClone(library);
-          nextLibrary.decks[deckId].matId = matId || null;
-          nextLibrary.decks[deckId].updatedAt = Date.now();
-          return nextLibrary;
-        }
 
-        /** Stores the deck's TCG Live deck box (design 071); null is the default box. */
-        export function setDeckBox(library = {}, deckId, deckBoxId = null) {
-          if (!library?.decks?.[deckId]) return structuredClone(library);
-          const nextLibrary = structuredClone(library);
-          nextLibrary.decks[deckId].deckBoxId = deckBoxId || null;
-          nextLibrary.decks[deckId].updatedAt = Date.now();
-          return nextLibrary;
-        }
-    
-        /**
-         * Writes the deck's Pokémon sprite slots (design 024). Anything the
-         * caller cannot back with vendored art is dropped by the normalizer,
-         * so a bad slug can never reach the renderer.
-         */
-        /** Stores the deck's PC Box wallpaper; null falls back to the default. */
-        export function setDeckWallpaper(library = {}, deckId, wallpaperId = null) {
-          if (!library?.decks?.[deckId]) return structuredClone(library);
-          const nextLibrary = structuredClone(library);
-          nextLibrary.decks[deckId].wallpaperId = wallpaperId || null;
-          nextLibrary.decks[deckId].updatedAt = Date.now();
-          return nextLibrary;
-        }
+    // An empty id and null both mean "the default", on every write path.
+    const idOrNull = (id) => id || null;
 
-        export function setDeckSprites(library = {}, deckId, sprites = []) {
-          if (!library?.decks?.[deckId]) return structuredClone(library);
-          const nextLibrary = structuredClone(library);
-          nextLibrary.decks[deckId].sprites = normalizeDeckSprites(sprites);
-          nextLibrary.decks[deckId].updatedAt = Date.now();
-          return nextLibrary;
-        }
+    export function setDeckSleeve(library = {}, deckId, sleeveId = null) {
+      return withDeckField(library, deckId, 'sleeveId', idOrNull(sleeveId));
+    }
 
-        /** Stores the deck's Suggest-tab steering (design 069); anything malformed normalizes. */
-        export function setDeckSuggestPrefs(library = {}, deckId, prefs = null) {
-          if (!library?.decks?.[deckId]) return structuredClone(library);
-          const nextLibrary = structuredClone(library);
-          nextLibrary.decks[deckId].suggestPrefs = normalizeSuggestPrefs(prefs);
-          nextLibrary.decks[deckId].updatedAt = Date.now();
-          return nextLibrary;
-        }
+    export function setDeckCoin(library = {}, deckId, coinId = null) {
+      return withDeckField(library, deckId, 'coinId', idOrNull(coinId));
+    }
+
+    export function setDeckMat(library = {}, deckId, matId = null) {
+      return withDeckField(library, deckId, 'matId', idOrNull(matId));
+    }
+
+    /** Stores the deck's TCG Live deck box (design 071); null is the default box. */
+    export function setDeckBox(library = {}, deckId, deckBoxId = null) {
+      return withDeckField(library, deckId, 'deckBoxId', idOrNull(deckBoxId));
+    }
+
+    /** Stores the deck's PC Box wallpaper; null falls back to the default. */
+    export function setDeckWallpaper(library = {}, deckId, wallpaperId = null) {
+      return withDeckField(library, deckId, 'wallpaperId', idOrNull(wallpaperId));
+    }
+
+    /**
+     * Writes the deck's Pokémon sprite slots (design 024). Anything the
+     * caller cannot back with vendored art is dropped by the normalizer,
+     * so a bad slug can never reach the renderer.
+     */
+    export function setDeckSprites(library = {}, deckId, sprites = []) {
+      return withDeckField(library, deckId, 'sprites', normalizeDeckSprites(sprites));
+    }
+
+    /** Stores the deck's Suggest-tab steering (design 069); anything malformed normalizes. */
+    export function setDeckSuggestPrefs(library = {}, deckId, prefs = null) {
+      return withDeckField(library, deckId, 'suggestPrefs', normalizeSuggestPrefs(prefs));
+    }
 
         /** The deck's steering; decks saved before design 069 read as empty. */
         export function getDeckSuggestPrefs(library = {}, deckId) {
@@ -188,11 +173,11 @@ import { DECK_FORMAT_TCG, isDeckFormat } from '../../../../../shared/engine/form
     ) {
       if (!deckId || !library?.decks?.[deckId]) {
         const created = createDeckInLibrary(library, name, cards, now, {
-          sleeveId: sleeveId ?? null,
-          coinId: coinId ?? null,
-          matId: matId ?? null,
-          deckBoxId: deckBoxId ?? null,
-          wallpaperId: wallpaperId ?? null,
+          sleeveId: idOrNull(sleeveId),
+          coinId: idOrNull(coinId),
+          matId: idOrNull(matId),
+          deckBoxId: idOrNull(deckBoxId),
+          wallpaperId: idOrNull(wallpaperId),
           sprites,
           format,
           suggestPrefs,
@@ -203,11 +188,11 @@ import { DECK_FORMAT_TCG, isDeckFormat } from '../../../../../shared/engine/form
       const nextLibrary = structuredClone(library);
       const deck = nextLibrary.decks[deckId];
       deck.cards = structuredClone(cards);
-      if (sleeveId !== undefined) deck.sleeveId = sleeveId;
-      if (coinId !== undefined) deck.coinId = coinId;
-      if (matId !== undefined) deck.matId = matId;
-      if (deckBoxId !== undefined) deck.deckBoxId = deckBoxId;
-      if (wallpaperId !== undefined) deck.wallpaperId = wallpaperId;
+      if (sleeveId !== undefined) deck.sleeveId = idOrNull(sleeveId);
+      if (coinId !== undefined) deck.coinId = idOrNull(coinId);
+      if (matId !== undefined) deck.matId = idOrNull(matId);
+      if (deckBoxId !== undefined) deck.deckBoxId = idOrNull(deckBoxId);
+      if (wallpaperId !== undefined) deck.wallpaperId = idOrNull(wallpaperId);
       if (sprites !== undefined) deck.sprites = normalizeDeckSprites(sprites);
       if (format !== undefined) deck.format = normalizeDeckFormat(format);
       if (suggestPrefs !== undefined) deck.suggestPrefs = normalizeSuggestPrefs(suggestPrefs);
@@ -310,10 +295,7 @@ import { DECK_FORMAT_TCG, isDeckFormat } from '../../../../../shared/engine/form
 
     /** Remembers which starter-catalog deck a library deck was seeded from, so a rename keeps the link. */
     export function setDeckStarterKey(library = {}, deckId, starterKey = null) {
-      if (!library?.decks?.[deckId]) return structuredClone(library);
-      const nextLibrary = structuredClone(library);
-      nextLibrary.decks[deckId].starterKey = starterKey || null;
-      return nextLibrary;
+      return withDeckField(library, deckId, 'starterKey', starterKey || null, { touch: false });
     }
 
     export function saveLibraryToStorage(storage, library = {}) {

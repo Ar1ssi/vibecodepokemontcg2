@@ -2,7 +2,7 @@
 // Violet—151 Ultra-Premium Collection and its Mew booster front, nothing else — no promo, props or
 // tray contents. Art is vendored by scripts/build-battle/vendor-homebrew-skin.mjs. Pure.
 
-import { HOMEBREW_PACK_COUNT } from './homebrew-pack.mjs';
+import { HOMEBREW_DECK_SIZE, HOMEBREW_PACK_COUNT } from './homebrew-pack.mjs';
 
 const ART_BASE = 'src/assets/build-battle/homebrew';
 const TCGDEX_151 = 'https://assets.tcgdex.net/en/sv/sv03.5';
@@ -46,7 +46,7 @@ export function homebrewLook(packCount = HOMEBREW_PACK_COUNT) {
     labels: {
       productTitle: 'Ultra-Premium Collection',
       deckLabel: '',
-      backLines: [`${packCount} Homebrew booster packs`, 'Build a 60-card deck from your pull'],
+      backLines: [`${packCount} Homebrew booster packs`, `Build a ${HOMEBREW_DECK_SIZE}-card deck from your pull`],
       codeCardGame: '',
     },
     seriesName: 'Scarlet & Violet',
@@ -61,7 +61,7 @@ export function homebrewLook(packCount = HOMEBREW_PACK_COUNT) {
  */
 export function homebrewPresentation(packCount = HOMEBREW_PACK_COUNT) {
   return {
-    doneText: `All ${packCount} packs are open. Build your 60-card deck from your pool.`,
+    doneText: `All ${packCount} packs are open. Build your ${HOMEBREW_DECK_SIZE}-card deck from your pool.`,
     finishLabel: 'Build your deck',
     singleExit: true,
   };

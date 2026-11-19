@@ -86,7 +86,7 @@ test('hydrateBoxData turns fixed-deck references into full rows with qty and ind
   const data = hydrateBoxData({
     kind: 'fixed-decks',
     cards: [{ id: 'a-1', name: 'A' }, { id: 'b-2', name: 'B' }],
-    decks: { one: [{ id: 'a-1', qty: 3 }, { id: 'missing', qty: 1 }, { id: 'b-2', qty: 1 }] },
+    decks: { one: [{ id: 'a-1', qty: 3 }, { id: 'b-2', qty: 1 }] },
   });
   assert.deepEqual(data.decks.one, [
     { id: 'a-1', name: 'A', qty: 3 },
@@ -95,6 +95,18 @@ test('hydrateBoxData turns fixed-deck references into full rows with qty and ind
   assert.equal(data.cardsById.get('b-2').name, 'B');
   assert.deepEqual([data.common, data.trainers, data.energySwaps, data.energyNeeds], [[], [], [], {}]);
   assert.equal(hydrateBoxData(undefined).cardsById.size, 0);
+});
+
+test('hydrateBoxData rejects a fixed deck that names a card the box does not hold', () => {
+  assert.throws(
+    () =>
+      hydrateBoxData({
+        kind: 'fixed-decks',
+        cards: [{ id: 'a-1', name: 'A' }],
+        decks: { one: [{ id: 'a-1', qty: 3 }, { id: 'missing', qty: 1 }] },
+      }),
+    /deck one names card missing/
+  );
 });
 
 test('loadBoxData imports the set and box module once per key and hydrates them', async () => {

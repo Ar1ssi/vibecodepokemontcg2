@@ -757,13 +757,20 @@ export function packTearPoints(seed, packIndex, teeth = 12) {
   return points;
 }
 
+const tearLine = (seed, packIndex, teeth) =>
+  packTearPoints(seed, packIndex, teeth).map(({ xPct, yPct }) => `${pct(xPct)} ${pct(yPct)}`);
+
 /**
  * The torn top strip as a `clip-path` polygon in the pack's own percent space: the full top edge,
  * then the jagged `packTearPoints` whose teeth reach 2–5 % of the pack height below the crimp.
  */
 export function packTearEdge(seed, packIndex, teeth = 12) {
-  const line = packTearPoints(seed, packIndex, teeth).map(({ xPct, yPct }) => `${pct(xPct)} ${pct(yPct)}`);
-  return `polygon(${['0% 0%', '100% 0%', ...line].join(', ')})`;
+  return `polygon(${['0% 0%', '100% 0%', ...tearLine(seed, packIndex, teeth)].join(', ')})`;
+}
+
+/** The pack body left after the tear: the same jagged line, then the bottom corners. */
+export function packBodyEdge(seed, packIndex, teeth = 12) {
+  return `polygon(${[...tearLine(seed, packIndex, teeth), '0% 100%', '100% 100%'].join(', ')})`;
 }
 
 // ── Box face perspective ─────────────────────────────────────────────────────

@@ -123,10 +123,14 @@ export function parseRun(json) {
     return null;
   if (!isTimestamp(value.startedAt) || typeof value.endedEarly !== 'boolean') return null;
   if (value.armedAt !== null && !isTimestamp(value.armedAt)) return null;
+  // An ended run played every match or was forfeited; any other mix cannot come from this module.
+  const playedAll = results.length >= RUN_MATCH_COUNT;
+  if (value.endedEarly && value.status !== RUN_ENDED) return null;
+  if (value.status === RUN_ENDED && !value.endedEarly && !playedAll) return null;
   const session = parseSession(JSON.stringify(value.session ?? null));
   if (!session || session.boxKey !== value.boxKey || session.seed !== value.seed) return null;
   // A run that played every match is over whatever its stored status says.
-  const status = results.length >= RUN_MATCH_COUNT ? RUN_ENDED : value.status;
+  const status = playedAll ? RUN_ENDED : value.status;
   return {
     version: RUN_VERSION,
     status,
