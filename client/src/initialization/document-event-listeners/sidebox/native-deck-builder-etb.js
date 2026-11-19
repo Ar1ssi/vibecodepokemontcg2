@@ -1,4 +1,5 @@
 import { createRng } from '../../../../../shared/engine/rng.mjs';
+import { browserStorage } from './native-deck-builder-storage.js';
 import { BUILD_BATTLE_BOXES } from '../../../setup/deck-builder/core/build-battle/box-catalog.mjs';
 import {
   loadSetData,
@@ -66,15 +67,6 @@ const POOL_GROUPS = [
   ['Pokémon', 'Pokémon'],
   ['Trainer', 'Trainers'],
 ];
-
-// Reading `window.localStorage` itself throws when site data is blocked.
-const browserStorage = () => {
-  try {
-    return window.localStorage;
-  } catch {
-    return null;
-  }
-};
 
 const el = (tag, className, text) => {
   const node = document.createElement(tag);

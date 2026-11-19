@@ -7,6 +7,8 @@ import {
 import { shufflePrizesToDeckBottom } from '../../../actions/zones/prizes-actions.js';
 import { shuffleZone } from '../../../actions/zones/shuffle-zone.js';
 import { mouseClick, systemState } from '../../../state.js';
+import { gate } from './manual-deck-gate.js';
+import { clickedCardIsFaceDown } from './face-down-card.js';
 
 export const initializePrizesButtons = () => {
   const shufflePrizesButton = document.getElementById('shufflePrizesButton');
@@ -16,13 +18,7 @@ export const initializePrizesButtons = () => {
 
   const lookPrizesButton = document.getElementById('lookPrizesButton');
   lookPrizesButton.addEventListener('click', () => {
-    if (
-      [
-        systemState.cardBackSrc,
-        systemState.p1OppCardBackSrc,
-        systemState.p2OppCardBackSrc,
-      ].includes(mouseClick.card.image.src)
-    ) {
+    if (clickedCardIsFaceDown()) {
       lookAtCards(mouseClick.cardUser, systemState.initiator, 'prizes');
     } else {
       stopLookingAtCards(mouseClick.cardUser, systemState.initiator, 'prizes');
@@ -33,13 +29,7 @@ export const initializePrizesButtons = () => {
     'revealHidePrizesButton'
   );
   revealHidePrizesButton.addEventListener('click', () => {
-    if (
-      [
-        systemState.cardBackSrc,
-        systemState.p1OppCardBackSrc,
-        systemState.p2OppCardBackSrc,
-      ].includes(mouseClick.card.image.src)
-    ) {
+    if (clickedCardIsFaceDown()) {
       revealCards(mouseClick.cardUser, systemState.initiator, 'prizes');
     } else {
       hideCards(mouseClick.cardUser, systemState.initiator, 'prizes');
@@ -50,6 +40,7 @@ export const initializePrizesButtons = () => {
     'shufflePrizesToDeckBottomButton'
   );
   shufflePrizesToDeckBottomButton.addEventListener('click', () => {
+    if (!gate('moveToDeck', systemState.initiator)) return;
     shufflePrizesToDeckBottom(mouseClick.cardUser, systemState.initiator);
   });
 };

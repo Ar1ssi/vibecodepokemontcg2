@@ -6,14 +6,8 @@ import {
   isPhoneLayout,
   previewTile,
 } from '../../../setup/deck-builder/core/card-tap-gesture.mjs';
+import { escapeHtml } from './native-deck-builder-shared-logic.js';
 
-const escapeHtml = (value = '') => String(value)
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&#39;');
-    
     const escapeCssUrl = (url = '') => String(url)
       .replaceAll("'", '%27')
       .replaceAll(')', '%29')

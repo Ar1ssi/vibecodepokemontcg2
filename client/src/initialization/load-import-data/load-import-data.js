@@ -1,14 +1,19 @@
 import { acceptAction } from '../../setup/general/accept-action.js';
 import { refreshBoardImages } from '../../setup/sizing/refresh-board.js';
+import { parseImportActions } from './parse-import-actions.js';
 
 export function loadImportData() {
-  const importDataJSON = document.getElementById('importDataJSON').textContent;
-  if (importDataJSON && importDataJSON.trim() !== '') {
-    const importData = JSON.parse(importDataJSON);
-    let actions = importData.filter((obj) => !('version' in obj)); // Remove any objects containing version property
-    actions.forEach((data) => {
-      acceptAction(data.user, data.action, data.parameters, true);
-    });
-    refreshBoardImages();
+  const importDataElement = document.getElementById('importDataJSON');
+  let actions;
+  try {
+    actions = parseImportActions(importDataElement?.textContent);
+  } catch (error) {
+    console.error('Saved state could not be loaded; starting empty.', error);
+    return;
   }
+  if (actions.length === 0) return;
+  actions.forEach((data) => {
+    acceptAction(data.user, data.action, data.parameters, true);
+  });
+  refreshBoardImages();
 }

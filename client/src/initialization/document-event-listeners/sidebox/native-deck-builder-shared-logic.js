@@ -4,6 +4,15 @@
 /** The mirror / library side a load target names; anything but 'opp' is 'self'. */
 export const sideOf = (target) => (target === 'opp' ? 'opp' : 'self');
 
+/** `value` as text safe inside HTML markup and quoted attribute values. */
+export const escapeHtml = (value = '') =>
+  String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+
 /** The picture a card shows at `size`, falling back to its small image, then its single `image`. */
 export const cardImage = (card, size = 'small') =>
   card?.images?.[size] || card?.images?.small || card?.image || '';

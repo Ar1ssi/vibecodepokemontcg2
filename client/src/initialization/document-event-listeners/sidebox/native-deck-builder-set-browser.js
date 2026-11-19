@@ -36,13 +36,7 @@ import {
     } from '../../../setup/deck-builder/core/set-browser-filters.mjs';
     import { ownedBadgeHtml } from './native-deck-builder-renderers.js';
     import { isCustomSetId, onCustomSetsChanged } from '../../../../../shared/tcgdex/custom-sets.mjs';
-
-    const escapeHtml = (value = '') => String(value)
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&#39;');
+import { escapeHtml } from './native-deck-builder-shared-logic.js';
 
     const KEEP_FETCH_ORDER_SET_IDS = new Set([OTHER_151_SET_ID, BLACK_BOLT_WHITE_FLARE_SET_ID, GEN_1_2_SET_ID]);
 

@@ -33,15 +33,6 @@ const POOL_GROUPS = [
   ['Energy', 'Energy'],
 ];
 
-// Reading `window.localStorage` itself throws when site data is blocked.
-export const browserStorage = () => {
-  try {
-    return window.localStorage;
-  } catch {
-    return null;
-  }
-};
-
 export const el = (tag, className, text) => {
   const node = document.createElement(tag);
   if (className) node.className = className;

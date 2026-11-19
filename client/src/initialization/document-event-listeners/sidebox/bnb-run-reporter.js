@@ -1,15 +1,7 @@
 import { reportMatchResult } from '../../../setup/deck-builder/core/build-battle-run/run-reporter.mjs';
 import { deckFormatOf } from '../../../setup/deck-constructor/deck-format-args.mjs';
 import { systemState } from '../../../state.js';
-
-// Reading `window.localStorage` itself throws when site data is blocked.
-const browserStorage = () => {
-  try {
-    return window.localStorage;
-  } catch {
-    return null;
-  }
-};
+import { browserStorage } from './native-deck-builder-storage.js';
 
 /**
  * Game tab only (design 071): a finished game fills the next node of a Build & Battle run that the

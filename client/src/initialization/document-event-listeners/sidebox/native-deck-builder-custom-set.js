@@ -13,13 +13,7 @@ import {
   saveCustomSetToStorage,
   serializeCustomSet,
 } from '../../../setup/deck-builder/core/custom-set.mjs';
-
-const escapeHtml = (value = '') => String(value)
-  .replaceAll('&', '&amp;')
-  .replaceAll('<', '&lt;')
-  .replaceAll('>', '&gt;')
-  .replaceAll('"', '&quot;')
-  .replaceAll("'", '&#39;');
+import { escapeHtml } from './native-deck-builder-shared-logic.js';
 
 const tileHtml = (card, index) => {
   const image = card.images?.small || card.image || '';

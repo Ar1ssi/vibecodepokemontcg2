@@ -34,19 +34,10 @@ export const initializeSettings = () => {
 
   const hideHandCheckbox = document.getElementById('hideHandCheckbox');
   hideHandCheckbox.addEventListener('change', () => {
-    if (hideHandCheckbox.checked) {
-      if (systemState.initiator === 'self' && !systemState.isTwoPlayer) {
-        stopLookingAtCards('opp', '', 'hand', false, true);
-      } else if (!systemState.isTwoPlayer) {
-        stopLookingAtCards('self', '', 'hand', false, true);
-      }
-    } else {
-      if (systemState.initiator === 'self' && !systemState.isTwoPlayer) {
-        lookAtCards('opp', '', 'hand', false, true);
-      } else if (!systemState.isTwoPlayer) {
-        lookAtCards('self', '', 'hand', false, true);
-      }
-    }
+    if (systemState.isTwoPlayer) return;
+    const otherHand = systemState.initiator === 'self' ? 'opp' : 'self';
+    const setHandVisibility = hideHandCheckbox.checked ? stopLookingAtCards : lookAtCards;
+    setHandVisibility(otherHand, '', 'hand', false, true);
   });
 
   const showLostZoneCheckbox = document.getElementById('showLostZoneCheckbox');

@@ -33,7 +33,6 @@ import { advanceUnboxing, boxSkin } from '../../../setup/deck-builder/core/build
 import {
   boxShot,
   boxUnboxingOptions,
-  browserStorage,
   cardImage,
   createPoolTab,
   el,
@@ -41,6 +40,7 @@ import {
   renderBoxPicker,
   unlimitedEnergyCards,
 } from './native-deck-builder-bb-shared.js';
+import { browserStorage } from './native-deck-builder-storage.js';
 import { createStage } from './native-deck-builder-stage.js';
 import { mountUnboxingScene } from './native-deck-builder-unboxing.js';
 

@@ -1,5 +1,6 @@
 export const initializeChangelog = () => {
   const donationsPage = document.getElementById('donationsPage');
+  const changelog = document.getElementById('changelog');
 
   const changelogLink = document.getElementById('changelogLink');
   changelogLink.addEventListener('click', () => {
@@ -11,7 +12,6 @@ export const initializeChangelog = () => {
     }
   });
 
-  const changelog = document.getElementById('changelog');
   changelog.addEventListener('click', () => {
     if (changelog.style.display === 'block') {
       changelog.style.display = 'none';
