@@ -3676,64 +3676,6 @@ a:hover {
   background-color: #555;
 }
 
-/* Ability Picker Popup */
-.ability-picker-popup {
-  min-width: 320px;
-  max-width: 420px;
-  text-align: left;
-}
-.ability-picker-title {
-  font-size: 16px;
-  font-weight: bold;
-  margin-bottom: 12px;
-  text-align: center;
-}
-.ability-picker-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 12px;
-}
-.ability-picker-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 10px;
-  background-color: #f5f5f5;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  transition: background-color 0.15s;
-}
-.ability-picker-row:hover {
-  background-color: #e8e8e8;
-}
-.ability-picker-name {
-  flex: 1;
-  font-size: 14px;
-  font-weight: 500;
-}
-.ability-picker-family {
-  font-size: 13px;
-  color: #555;
-  margin: 0 10px;
-  white-space: nowrap;
-}
-.ability-picker-use-btn {
-  background-color: #333;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  padding: 5px 14px;
-  cursor: pointer;
-  font-size: 13px;
-  transition: background-color 0.15s;
-}
-.ability-picker-use-btn:hover {
-  background-color: #555;
-}
-.ability-picker-cancel {
-  width: 100%;
-}
 #loadingCircle {
   width: 1vh; /* Adjust size as needed */
   height: 1vh; /* Adjust size as needed */
@@ -4327,20 +4269,6 @@ body.side-menu-collapsed .opp {
       background: rgba(198, 120, 59, 0.45);
     }
     
-    /* rules-engine status badges on cards */
-    .rules-status-badge {
-      position: absolute;
-      top: 4px;
-      right: 4px;
-      background: rgba(20, 22, 30, 0.85);
-      border: 1px solid rgba(255, 120, 120, 0.5);
-      border-radius: 10px;
-      padding: 2px 6px;
-      font-size: 12px;
-      z-index: 60;
-      pointer-events: none;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-    }
     
     /* rules-engine turn HUD */
     #rulesTurnHUD {
@@ -4387,50 +4315,6 @@ body.side-menu-collapsed .opp {
     body:not(.dark-mode-1) #rulesTurnHUD.my-turn {
       background: rgba(230, 246, 233, 0.95);
       border-color: rgba(60, 160, 80, 0.5);
-    }
-    
-    #rulesEndScreen {
-      position: fixed;
-      inset: 0;
-      z-index: 2500;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(0, 0, 0, 0.7);
-    }
-    #rulesEndScreen[hidden] { display: none; }
-    .rules-end-card {
-      background: rgba(24, 26, 34, 0.98);
-      border: 1px solid rgba(220, 120, 120, 0.5);
-      border-radius: 14px;
-      padding: 4vh 4vw;
-      text-align: center;
-      color: #eef3ff;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.6);
-    }
-    .rules-end-title {
-      font-size: 4vh;
-      font-weight: 800;
-      letter-spacing: 0.06em;
-      margin-bottom: 1.5vh;
-    }
-    .rules-end-reason {
-      font-size: 1.8vh;
-      opacity: 0.8;
-      margin-bottom: 2.5vh;
-    }
-    .rules-end-close {
-      background: rgba(65, 91, 168, 0.4);
-      border: 1px solid rgba(120, 144, 214, 0.5);
-      color: #eef3ff;
-      border-radius: 8px;
-      padding: 1vh 2vw;
-      font-size: 1.7vh;
-      cursor: pointer;
-    }
-    body:not(.dark-mode-1) .rules-end-card {
-      background: rgba(247, 248, 250, 0.98);
-      color: #1a2560;
     }
     
     /* rules-engine attack feedback */

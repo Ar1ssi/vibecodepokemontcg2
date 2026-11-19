@@ -222,8 +222,8 @@ export function buildAuthoritativeCardHints(instanceIds = {}, options = {}) {
  * "must never silently no-op"). That throw is deliberately not caught here; a missing
  * classification is a build-time bug, not a runtime fallback.
  *
- * `pushAction` relaying and the `exportActionData` append both live inside
- * `processAction` and are untouched by this path (design 003 §Constraints, edge case 8).
+ * `pushAction` relaying lives inside `processAction` and is untouched by this path
+ * (design 003 §Constraints, edge case 8).
  *
  * @param {string} action Legacy action name, e.g. `'moveCardBundle'`.
  * @param {any[]} parameters Parameters exactly as the legacy call site would have passed

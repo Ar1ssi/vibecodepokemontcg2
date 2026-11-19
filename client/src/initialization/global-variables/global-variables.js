@@ -23,7 +23,6 @@ export const socket = io(socketUrl);
 // create globally accessible variable systemState, which holds information relevant to the state of the user's game
 export const systemState = {
   coachingMode: false,
-  isUndoInProgress: false,
   selfCounter: 0,
   selfActionData: [],
   oppActionData: [],

@@ -733,6 +733,7 @@ export const initializeSocketEventListeners = () => {
       actions: data.actions,
       currentQueue: pushActionQueue,
       applyAction: applyPeerAction,
+      onFailed: announceDesync,
       onSettled: () => {
         systemState.isCatchingUp = false;
       },

@@ -1,5 +1,8 @@
 # Card-Type Taxonomy — What the Sim Parses vs. What It Still Needs
 
+> **2026-11-19 (design 090):** the client-side rules layer this document describes was removed. `chat-buttons.js` now only sends server commands, `trainer-execution.js`, the ability buttons and the client attack/Trainer/ability bodies are gone, and the rules run only in `shared/engine` on the server. Client file references below are historical.
+
+
 > **Purpose.** A reference catalog of every card type, ability family, attack-effect
 > family, status condition, energy, stadium, and turn rule the PTCG-sim would need
 > to **parse and enforce**. It doubles as a gap report: for each family it records

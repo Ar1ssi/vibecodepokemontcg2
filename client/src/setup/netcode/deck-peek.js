@@ -11,7 +11,7 @@ import { socket, systemState } from '../../state.js';
 import { appendMessage } from '../chatbox/append-message.js';
 import { determineUsername } from '../general/determine-username.js';
 import { openCardPicker } from '../image-logic/card-picker.js';
-import { isAuthoritativeDispatchActive } from './authoritative-dispatch.js';
+import { isAuthoritativeDispatchActive, refuseWithoutRoom } from './authoritative-dispatch.js';
 import { emitCmd } from './cmd-emitter.js';
 import { buildDeckPeekPickerRequest } from './deck-peek-request.mjs';
 import { soloCommandSeat } from './solo-seat.mjs';
@@ -56,6 +56,7 @@ async function takeIntoHand(instanceIds, seat) {
  * @returns {boolean} true when handled here (the legacy look must not run)
  */
 export function peekServerDeck({ user, count, top }) {
+  if (refuseWithoutRoom({ action: 'peekDeck' })) return true;
   if (!isAuthoritativeDispatchActive() || !systemState.isTwoPlayer) return false;
 
   // Design 074 D7: a solo room asks as the seat whose deck it is, so that deck is 'you'.

@@ -16,6 +16,7 @@ import { getCardRegistry } from './apply-view.js';
 import {
   emitAuthoritativeCommand,
   isAuthoritativeDispatchActive,
+  refuseWithoutRoom,
 } from './authoritative-dispatch.js';
 import { emitCmd } from './cmd-emitter.js';
 import { planCardKeyCommands, planMenuCommands } from './manual-card-commands.mjs';
@@ -95,6 +96,8 @@ export function dispatchServerCardKey(event) {
  * @returns {boolean} true when the button acted on the selected server card
  */
 export function dispatchServerCardMenu(buttonId) {
+  // With no room there is no server card and no local rules to act instead (design 090).
+  if (refuseWithoutRoom({ action: buttonId })) return true;
   const record = selectedServerCard();
   if (!record) return false;
   const commands = planMenuCommands({ buttonId, ...planInputFor(record) });
@@ -111,6 +114,7 @@ export function dispatchServerCardMenu(buttonId) {
  * @returns {boolean} true when sent to the server
  */
 export function dispatchServerRandomFaceDown(user) {
+  if (refuseWithoutRoom({ action: 'playRandomCardFaceDown' })) return true;
   if (!isAuthoritativeDispatchActive() || !systemState.isTwoPlayer) return false;
   if (user !== 'self' && !systemState.solo) {
     appendMessage('', "You can only play a random card from your own hand.", 'announcement', false);

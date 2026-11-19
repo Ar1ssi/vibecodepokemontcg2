@@ -1,12 +1,12 @@
 import { mouseClick, systemState } from '../../state.js';
 import { appendMessage } from '../../setup/chatbox/append-message.js';
-import { manualDeckActionAllowed } from '/shared/engine/rules/rules-state.mjs';
 
 import { determineUsername } from '../../setup/general/determine-username.js';
 import { doubleClick } from '../../setup/image-logic/click-events.js';
 import { refreshBoardImages } from '../../setup/sizing/refresh-board.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { dispatchServerCardKey } from '../../setup/netcode/manual-card-dispatch.js';
+import { refuseWithoutRoom } from '../../setup/netcode/authoritative-dispatch.js';
 import { beginServerAttach } from '../../setup/netcode/server-card-select.js';
 import { isInFullView } from '../../setup/deck-constructor/hydrate-holo.js';
 import { isCardPreviewOpen } from '../../setup/image-logic/full-view.js';
@@ -61,16 +61,7 @@ import {
 
 import { areKeybindsSleeping } from './keybindSleep.js';
 
-// Gates a manual (keybind-triggered) deck action through the rules layer; on refusal it also
-// posts the reason to chat, so callers only `return`.
-function gate(actionKey, initiator) {
-  const check = manualDeckActionAllowed(actionKey);
-  if (!check.allowed) {
-    appendMessage(initiator, '⛔ ' + check.reason, 'announcement', false);
-    return false;
-  }
-  return true;
-}
+import { gate } from '../../initialization/document-event-listeners/card-context-menu/manual-deck-gate.js';
 
 const isAltKeyPressed = (event) => {
   return event.altKey || event.getModifierState('Alt');
@@ -195,6 +186,8 @@ export const keyDown = (event) => {
     event.preventDefault();
     // Design 012: a server-drawn card has no legacy zone entry for the handlers below.
     if (dispatchServerCardKey(event)) return;
+    // With no room a selected card has no server to act on it and no local rules (design 090).
+    if (refuseWithoutRoom({ action: 'cardKey' })) return;
 
     const keyBinds = {
       h: 'hand',

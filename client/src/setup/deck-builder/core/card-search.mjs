@@ -105,7 +105,7 @@ export function normalizeSearchQuery(term) {
   if (/ E4 LV\.X$/i.test(t)) return t.replace(/ E4 LV\.X$/i, ' 4');
   if (/ E4$/i.test(t)) return t.replace(/ E4$/i, ' 4');
 
-  // Normalise LV.X (no space) → LV. X (with space) so queryCardsByName has one
+  // Normalise LV.X (no space) → LV. X (with space) so the query has one
   // consistent form to detect via /\bLV\. X$/i — works for both suffix and standalone.
   t = t.replace(/\bLV\.X$/i, 'LV. X');
 
@@ -413,9 +413,4 @@ export async function fetchCardDetail(cardId) {
   const detail = await fetchJson(tcgdexApiUrl(`/cards/${encodeURIComponent(tcgdexLookupId(cardId))}`));
   const card = normalizeTcgdexCard(detail);
   return isReverseHoloId(cardId) ? { ...card, id: cardId, rarity: 'Reverse Holo' } : card;
-}
-
-/** Name-only search, for callers with no filters (the rules debug menu). */
-export function queryCardsByName(term = '') {
-  return queryCards({ term });
 }

@@ -185,3 +185,16 @@ test('a game room that does not exist is reported as gone, not as a restart', as
     assert.match(ended.message, /no longer available/);
   });
 });
+
+test('a deck load the room refuses is reported to its sender', async () => {
+  await withServer(async ({ port }) => {
+    const alice = await connect(port);
+    alice.emit('joinGame', 'deslop-core-room-deck', 'alice', false, null);
+    await alice.waitFor('joinGame');
+    alice.emit('pushAction', { roomId: 'deslop-core-room-deck', action: 'loadDeckData', parameters: ['self'], clientSeq: 4 });
+    const rejected = await alice.waitFor('cmdRejected');
+    assert.equal(rejected.reason, 'bad_deck');
+    assert.equal(rejected.clientSeq, 4);
+    alice.close();
+  });
+});

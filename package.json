@@ -60,9 +60,6 @@
     "typescript": "^5.9.3"
   },
   "pnpm": {
-    "onlyBuiltDependencies": [
-      "sqlite3"
-    ],
     "ignoredBuiltDependencies": [
       "esbuild"
     ]

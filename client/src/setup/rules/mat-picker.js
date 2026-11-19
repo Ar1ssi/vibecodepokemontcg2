@@ -1,5 +1,5 @@
 /**
- * Click-on-the-real-mat picker, extracted from trainer-execution.js so the
+ * Click-on-the-real-mat picker, a module of its own so the
  * server-authoritative netcode path (choice-picker-adapter / mat-picker-adapter)
  * can reuse the exact same UI and hit-testing as legacy rules mode (D19).
  *

@@ -1122,6 +1122,14 @@ async function main() {
       // Deck loads go through handleCommand (design 002 slice 3.4e / I16), the only way
       // they land in commandLog, which undo's replay depends on.
       const outcome = applySetupAction(gameRoom, socket.id, seat, data);
+      // A deck packet the room refused is told to its sender; silence would read as loaded.
+      if (outcome.deckError) {
+        socket.emit('cmdRejected', {
+          clientSeq: data.clientSeq,
+          reason: outcome.deckError.error,
+          details: outcome.deckError.reason,
+        });
+      }
       if (outcome.readied) dealOpeningHandsIfReady(gameRoom, roomId);
       if (outcome.resetRequested) resetGameOnPlayerRequest(gameRoom, roomId);
       if (outcome.deckLoaded) {

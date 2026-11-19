@@ -18,7 +18,7 @@ export const processAction = (user, emit, action, parameters) => {
     document.getElementById('spectatorModeCheckbox').checked &&
     systemState.isTwoPlayer
   );
-  if (!systemState.isUndoInProgress && emit && notSpectator) {
+  if (emit && notSpectator) {
     // Design 074 D7: a solo room's player owns both sides, so neither side's action is
     // requested from a peer; each names its seat for the server instead.
     const ownsAction = user === 'self' || systemState.solo;

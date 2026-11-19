@@ -19,6 +19,7 @@ import { buildMatPickerRequest } from './mat-pick-request.mjs';
 import { clearInFlightAffordances, emitResolveChoice } from './cmd-emitter.js';
 import { buildCardImage } from '../image-logic/build-card-image.js';
 import { DEFAULT_CARD_BACK_PATH } from '../deck-constructor/default-card-back.mjs';
+import { cardBackSrcFor } from '../deck-constructor/opponent-seat.mjs';
 import { setStadiumFacing } from '../zones/stadium-facing.mjs';
 import { rulesState } from '../../../../shared/engine/rules/rules-state.mjs';
 import {
@@ -521,12 +522,7 @@ export function resolveCardBackSrc(side, options = {}) {
   const systemState = options.systemState || defaultNetcodeContext.systemState;
   if (!systemState) return fallback;
 
-  if (side === 'you') return systemState.cardBackSrc || fallback;
-  return (
-    (systemState.isTwoPlayer
-      ? systemState.p2OppCardBackSrc
-      : systemState.p1OppCardBackSrc) || fallback
-  );
+  return cardBackSrcFor(systemState, side === 'you' ? 'self' : 'opp') || fallback;
 }
 
 /**
@@ -2281,18 +2277,12 @@ export function reconcileGameEnded(view, options = {}) {
   const existingModal = doc.getElementById
     ? doc.getElementById('netcodeEndModal')
     : null;
-  const rulesEndScreen = doc.getElementById
-    ? doc.getElementById('rulesEndScreen')
-    : null;
 
   if (!view || view.turn?.phase !== 'ended') {
     gameEndAnnounced = false;
     gameEndChatClaimed = false;
     if (existingModal?.parentNode) {
       existingModal.parentNode.removeChild(existingModal);
-    }
-    if (rulesEndScreen) {
-      rulesEndScreen.hidden = true;
     }
     return;
   }
@@ -2334,12 +2324,6 @@ export function reconcileGameEnded(view, options = {}) {
   const reasonText = view.winReason
     ? `Reason: ${view.winReason}`
     : 'The game has ended.';
-
-  // The legacy rules end screen is a second full-screen overlay. Under the
-  // server this modal is the end screen, so one Close uncovers the board.
-  if (rulesEndScreen) {
-    rulesEndScreen.hidden = true;
-  }
 
   // Mount or update netcodeEndModal
   let modal = existingModal;

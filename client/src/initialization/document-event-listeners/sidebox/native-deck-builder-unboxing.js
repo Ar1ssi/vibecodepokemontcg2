@@ -53,7 +53,8 @@ import {
   packFlyPose,
   packSlotKind,
   packSpreadSlot,
-  packTearPoints,
+  packBodyEdge,
+  packTearEdge,
   packTearProgress,
   packTornAt,
   promoLiftPose,
@@ -205,17 +206,11 @@ const launchRectFrom = (rect) => {
 const promoTransform = ({ translateYPx, rotateXDeg, rotateYDeg, scale }) =>
   `translateY(${translateYPx}px) rotateX(${rotateXDeg}deg) rotateY(${rotateYDeg}deg) scale(${scale})`;
 
-const percent = (value) => `${Number(value.toFixed(2))}%`;
-
-// A pack's tear as two clip-paths cut along `packTearPoints`: the strip above the line and the
-// body below it.
-const tearClips = (seed, packIndex) => {
-  const line = packTearPoints(seed, packIndex).map(({ xPct, yPct }) => `${percent(xPct)} ${percent(yPct)}`);
-  return {
-    strip: `polygon(${['0% 0%', '100% 0%', ...line].join(', ')})`,
-    body: `polygon(${[...line, '0% 100%', '100% 100%'].join(', ')})`,
-  };
-};
+// A pack's tear as two clip-paths: the strip above the tear line and the body below it.
+const tearClips = (seed, packIndex) => ({
+  strip: packTearEdge(seed, packIndex),
+  body: packBodyEdge(seed, packIndex),
+});
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
