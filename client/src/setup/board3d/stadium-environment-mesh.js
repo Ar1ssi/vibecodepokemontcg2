@@ -1390,6 +1390,10 @@ export function createStadiumEnvironment({
     if (plateStale) {
       const mask = camera.layers.mask;
       const shadowsAuto = renderer.shadowMap.autoUpdate;
+      // three draws shadow casters on the camera's layers only, and any render clears the map's
+      // pending redraw. Drawn here (environment layer: no cards), the map would lose the cards'
+      // shadows until the next redraw, so they flicker: the board pass below redraws it instead.
+      const shadowsDue = renderer.shadowMap.needsUpdate;
       const previous = renderer.getRenderTarget();
       // Over an outgoing board the plate clears to transparent: where the incoming one hasn't
       // revealed yet, the under plate shows through it.
@@ -1400,12 +1404,14 @@ export function createStadiumEnvironment({
       }
       camera.layers.set(STADIUM_ENV_LAYER);
       renderer.shadowMap.autoUpdate = false;
+      renderer.shadowMap.needsUpdate = false;
       renderer.setRenderTarget(target);
       try {
         renderer.render(scene, camera);
       } finally {
         renderer.setRenderTarget(previous);
         renderer.shadowMap.autoUpdate = shadowsAuto;
+        renderer.shadowMap.needsUpdate = shadowsDue;
         camera.layers.mask = mask;
         if (clearAlpha !== null) renderer.setClearColor(clearColour, clearAlpha);
       }
