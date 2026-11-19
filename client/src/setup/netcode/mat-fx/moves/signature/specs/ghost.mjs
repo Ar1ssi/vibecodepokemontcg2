@@ -2,22 +2,7 @@
 // board mapping (`.agent/designs/065-signature-move-animations.md` § Appendix S › Ghost);
 // departures from an entry are listed under the design's Deviations (slice 14).
 
-const motes = (at, count, over = {}) =>
-  Object.freeze({
-    at,
-    anchor: 'defender',
-    count,
-    distance: 1.1,
-    direction: -90,
-    spread: 360,
-    size: [0.03, 0.07],
-    aspect: 1,
-    gravity: 0,
-    maxDelay: 0.2,
-    durationMs: 800,
-    kind: 'mote',
-    ...over,
-  });
+import { motes } from './_shared.mjs';
 
 const STEED = Object.freeze({ deep: '#1A0A2E', body: '#7A3CFF', hot: '#C9A8FF', core: '#FFFFFF' });
 const GROUND_FLAME = Object.freeze({ deep: '#7A3CFF', body: '#E43BE0', hot: '#FFC0F5', core: '#FFFFFF' });

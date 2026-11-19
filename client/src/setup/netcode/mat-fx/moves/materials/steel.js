@@ -18,7 +18,7 @@
 // rising heights over the drawer's lift. The blade body keeps its own brushed gradient lighting:
 // its gradient runs across the blade, so the volume tube would wrap the wrong axis.
 import { rgbCss } from '../../fx-colors.mjs';
-import { mergeFxMods, withFxMod, withLiftZ } from './_mods.js';
+import { edgedBy, mergeFxMods, withFxMod, withLiftZ } from './_mods.js';
 import { grainPass, shardOutline, sphere, styledKit, traceOutline } from './_shared.js';
 
 // Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
@@ -108,9 +108,7 @@ export function reticleTicks(s, r) {
 /** The steel material drawn in `palette` (any palette with the same keys). */
 function steelKit(palette) {
   const edge = Object.freeze({ dissolve: Object.freeze({ edge: palette.edge, width: 0.06, gain: 1.2 }) });
-  /** `draw` with this kit's dissolve edge named for every fill it makes. */
-  const edged = (draw) => (ctx, ...args) =>
-    ctx && typeof ctx === 'object' ? withFxMod(ctx, edge, () => draw(ctx, ...args)) : draw(ctx, ...args);
+  const edged = edgedBy(edge);
 
   /** A cool haze: the bright steel at the centre fading through the blue edge to clear. */
   function glow(ctx, x, y, r, alpha) {

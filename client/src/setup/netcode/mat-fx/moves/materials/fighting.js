@@ -20,7 +20,7 @@
 // their rings and swirls lit tubes riding above them; a streak's passes stand at rising heights
 // over the drawer's lift, so the white centre sits on the body and the cast pass pools light.
 import { rgbCss } from '../../fx-colors.mjs';
-import { mergeFxMods, withFxMod, withLiftZ } from './_mods.js';
+import { edgedBy, mergeFxMods, withFxMod, withLiftZ } from './_mods.js';
 import { grainPass, sphere, styledKit } from './_shared.js';
 
 // Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
@@ -71,11 +71,7 @@ const layered = (ctx, z, mod, draw) => withLiftZ(ctx, z, () => withFxMod(ctx, mo
 const streakGrain = (angleDeg) => ({ detail: { amount: 0.35, speed: 3, scale: 5, angle: angleDeg } });
 
 /** `draw` with a dissolve edge in `palette`'s hot tone named for every fill it makes. */
-const edgedIn = (palette) => {
-  const edge = Object.freeze({ dissolve: Object.freeze({ edge: palette.hot, width: 0.1, gain: 1.2 }) });
-  return (draw) => (ctx, ...args) =>
-    ctx && typeof ctx === 'object' ? withFxMod(ctx, edge, () => draw(ctx, ...args)) : draw(ctx, ...args);
-};
+const edgedIn = (palette) => edgedBy(Object.freeze({ dissolve: Object.freeze({ edge: palette.hot, width: 0.1, gain: 1.2 }) }));
 
 const freezeAll = (palette) => Object.freeze(Object.fromEntries(Object.entries(palette).map(([k, v]) => [k, Object.freeze(v)])));
 

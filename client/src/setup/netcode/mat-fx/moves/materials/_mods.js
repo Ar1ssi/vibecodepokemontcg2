@@ -28,6 +28,10 @@ export function withFxMod(ctx, mod, draw) {
   }
 }
 
+/** A wrapper that runs a drawing method under `edge` (a kit's dissolve edge mod) for every fill it makes. */
+export const edgedBy = (edge) => (draw) => (ctx, ...args) =>
+  ctx && typeof ctx === 'object' ? withFxMod(ctx, edge, () => draw(ctx, ...args)) : draw(ctx, ...args);
+
 /**
  * Dissolve amount for a beat's tail: 0 until `from` of its progress, rising to 1 at its end.
  * Non-finite progress reads as 0 (whole).

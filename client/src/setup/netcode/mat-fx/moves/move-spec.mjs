@@ -4,8 +4,8 @@
 // drawer's parameters (design § Pinned contracts B); `validateSpec` is the gate every
 // shipped spec passes (specs.test.mjs). Units: lengths in card heights, times in ms on
 // the scene clock, angles in lane space except `direction`/`arms`, which are screen
-// degrees. DOM-free.
-import { MOTION_PARAMS } from './card-motion.mjs';
+// degrees (`fan`'s `direction` is the exception: lane degrees). DOM-free.
+import { MOTION_PARAMS, TRAVELLING_MOTIONS } from './card-motion.mjs';
 import { VG_TYPES } from './move-table.mjs';
 import { checkAgainst, fillDefaults } from './param-kinds.mjs';
 
@@ -354,7 +354,7 @@ export function tonguesAt(drawer, params) {
   }
 }
 
-const resolveArmCount = (arms) => {
+export const resolveArmCount = (arms) => {
   if (Array.isArray(arms)) return arms.length;
   if (arms === 'cross') return 4;
   if (arms === 'ring') return 8;
@@ -564,8 +564,8 @@ const costErrors = (spec) => {
   const particles = bursts.reduce((sum, b) => sum + (isNum(b.count) ? b.count : 0), 0);
   if (bursts.length > MAX_BURSTS) errors.push(`cost: ${bursts.length} particle bursts exceeds ${MAX_BURSTS}`);
   if (particles > PARTICLE_BUDGET) errors.push(`cost: ${particles} particles exceeds ${PARTICLE_BUDGET}`);
-  // Two dash trails are a ghost + its art each.
-  const trails = spec.attacker?.motion === 'dash' ? 4 : 0;
+  // Every travelling motion (dash, sweep, slam) draws two trails, a ghost + its art each.
+  const trails = TRAVELLING_MOTIONS.includes(spec.attacker?.motion) ? 4 : 0;
   const echo = spec.attacker?.echo !== undefined ? 1 : 0;
   const nodes = 1 + 2 + 2 * 4 + trails + echo + bursts.reduce((sum, b) => sum + 1 + (isNum(b.count) ? b.count : 0), 0);
   if (nodes > MAX_NODES) errors.push(`cost: ${nodes} DOM nodes exceeds ${MAX_NODES}`);

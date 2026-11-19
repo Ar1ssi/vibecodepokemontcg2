@@ -2,8 +2,8 @@
 // board mapping (`.agent/designs/065-signature-move-animations.md` § Appendix S › Ground);
 // departures from an entry are listed under the design's Deviations (slice 8).
 
-/** Five spikes 72° apart: "starFlare arms 'ring'" inside the 30-tongue budget (slice 5). */
-const RING5 = Object.freeze([-90, -18, 54, 126, 198].map((angle) => Object.freeze({ angle, reach: 0.85 })));
+import { RING5 } from './_shared.mjs';
+
 /** Three spikes up and out: an arrow-strike star that leaves room for the rain. */
 const TRIAD = Object.freeze([-90, 30, 150].map((angle) => Object.freeze({ angle, reach: 0.9 })));
 
