@@ -87,33 +87,36 @@ function redactOwnerZones(player) {
 
 /**
  * Setup is still open: the starter's turn-1 draw is owed and some player has no Starting Active
- * yet (rules/opening-draw.mjs). Starting Pokémon are placed face down until then, so neither
+ * yet (rules/opening-draw.mjs). The Starting Active is placed face down until then, so neither
  * player sees the other's choice before committing their own.
  *
  * @param {object} state
  * @returns {boolean}
  */
-export function openingSetupHidden(state) {
+function openingSetupHidden(state) {
   if (state?.openingDrawPending == null) return false;
   return Object.values(state.players || {}).some((player) => !(player?.zones?.active || []).length);
 }
+
+// A face-down Starting Active keeps `attachedTo` so a rules-off game's attachments still lay out.
+const faceDownInPlay = (card) =>
+  card?.attachedTo != null ? { ...redactCard(card), attachedTo: card.attachedTo } : redactCard(card);
 
 /**
  * Redacts a player's zones for the opponent ('them').
  *
  * @param {object} player
- * @param {{ setupHidden?: boolean }} [options] hide the Active and Bench while setup is open
+ * @param {{ setupHidden?: boolean }} [options] hide the Starting Active while setup is open
  * @returns {object} Redacted zones
  */
 function redactOpponentZones(player, { setupHidden = false } = {}) {
   const zones = player.zones || {};
-  const inPlayCard = setupHidden ? redactCard : sanitizeCard;
   return {
     deck: { count: (zones.deck || []).length },
     hand: (zones.hand || []).map((c) => (c.revealed ? sanitizeCard(c) : redactCard(c))),
     prizes: prizeCards(player),
-    active: (zones.active || []).map(inPlayCard),
-    bench: (zones.bench || []).map(inPlayCard),
+    active: (zones.active || []).map(setupHidden ? faceDownInPlay : sanitizeCard),
+    bench: (zones.bench || []).map(sanitizeCard),
     discard: (zones.discard || []).map(sanitizeCard),
     lostZone: (zones.lostZone || []).map(sanitizeCard),
     board: (zones.board || []).map(boardCard),

@@ -229,3 +229,13 @@ test('viewFor hides the opponent Starting Active until both Actives are placed',
   delete state.openingDrawPending;
   assert.equal(viewFor(state, 'p1').them.zones.active[0].name, 'Opponent Public Pidgeot ex');
 });
+
+test('viewFor keeps attachedTo on a face-down Starting Active card so attachments lay out', () => {
+  const state = setupSampleGame();
+  state.players.p2.zones.active.length = 0;
+  state.openingDrawPending = 'p1';
+  state.players.p1.zones.active.push(createCard({ instanceId: 17, name: 'Lightning Energy', attachedTo: 16 }));
+
+  const active = viewFor(state, 'p2').them.zones.active;
+  assert.deepEqual(active, [{ instanceId: 16 }, { instanceId: 17, attachedTo: 16 }]);
+});

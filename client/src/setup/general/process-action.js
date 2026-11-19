@@ -1,6 +1,7 @@
 import { socket, systemState } from '../../state.js';
 import { logSyncAction, logSync, logDecision } from '../../log/sync-log.js';
 import { createAction } from './action-event.mjs';
+import { relayParameters } from './relay-params.mjs';
 import { translateActionToCmd } from '../netcode/dual-run-bridge.js';
 import { emitCmd } from '../netcode/cmd-emitter.js';
 import { appendMessage } from '../chatbox/append-message.js';
@@ -41,7 +42,7 @@ export const processAction = (user, emit, action, parameters) => {
         action: action,
         counter: user === 'self' ? systemState.selfCounter : systemState.oppCounter,
         roomId: systemState.roomId,
-        parameters: parameters,
+        parameters: relayParameters(action, parameters),
         ...(seat ? { seat } : {}),
       };
       socket.emit('pushAction', data);
