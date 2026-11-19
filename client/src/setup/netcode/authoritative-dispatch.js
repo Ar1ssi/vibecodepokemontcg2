@@ -16,6 +16,7 @@
 
 import { getCardRegistry } from './apply-view.js';
 import { translateActionToCmd } from './dual-run-bridge.js';
+import { soloCommandSeat } from './solo-seat.mjs';
 import { DISPOSITION_TABLE } from '../../../../shared/engine/commands.mjs';
 
 let dispatchContext = {
@@ -168,9 +169,14 @@ export function emitAuthoritativeCommand(
   if (typeof processAction !== 'function') return false;
 
   const translate = options.translate || translateActionToCmd;
-  if (!translate(action, parameters)) return false;
+  const user = options.user === 'opp' ? 'opp' : 'self';
+  // The seat processAction will translate for: a solo room holds one instance map per seat,
+  // so a seatless check cannot resolve a syncInstance the send itself can.
+  const systemState = options.systemState || dispatchContext.systemState;
+  const seat = soloCommandSeat({ ...systemState, user });
+  if (!translate(action, parameters, { seat })) return false;
 
-  processAction(options.user === 'opp' ? 'opp' : 'self', true, action, parameters);
+  processAction(user, true, action, parameters);
   return true;
 }
 

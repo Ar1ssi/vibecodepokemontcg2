@@ -319,6 +319,8 @@ export function translateActionToCmd(action, parameters = [], { seat } = {}) {
   }
 }
 
+const isIndex = (value) => Number.isInteger(value) && value >= 0;
+
 function translateAction(action, parameters) {
   if (!action || typeof action !== 'string') return null;
 
@@ -329,21 +331,23 @@ function translateAction(action, parameters) {
         parameters;
       const moving = cardHints?.moving;
 
-      let instanceId;
-      if (moving?.instanceId != null || moving?.syncInstance != null) {
-        instanceId = resolveHintInstanceId(moving);
-        if (instanceId == null) {
-          console.warn(
-            'translateActionToCmd: moveCardBundle unresolved syncInstance',
-            moving?.syncInstance
-          );
-          return null;
-        }
-      } else {
-        instanceId = Number(index);
+      // `index` is a legacy zone position, not a server instanceId: with no moving-card
+      // hint the card cannot be addressed, and the caller must not send a guess.
+      if (moving?.instanceId == null && moving?.syncInstance == null) {
+        console.warn(
+          'translateActionToCmd: moveCardBundle without a moving-card hint',
+          index
+        );
+        return null;
       }
-
-      if (instanceId == null || Number.isNaN(instanceId)) return null;
+      const instanceId = resolveHintInstanceId(moving);
+      if (instanceId == null) {
+        console.warn(
+          'translateActionToCmd: moveCardBundle unresolved syncInstance',
+          moving?.syncInstance
+        );
+        return null;
+      }
 
       const isAttach =
         actionType === 'attach' ||
@@ -399,11 +403,16 @@ function translateAction(action, parameters) {
     case 'attack': {
       // parameters: [attackIndex]
       const [attackIndex] = parameters;
+      if (!isIndex(attackIndex)) {
+        console.warn(
+          'translateActionToCmd: attack without a valid attackIndex',
+          attackIndex
+        );
+        return null;
+      }
       return {
         type: 'attack',
-        payload: {
-          attackIndex: typeof attackIndex === 'number' ? attackIndex : 0,
-        },
+        payload: { attackIndex },
       };
     }
 
@@ -487,8 +496,17 @@ function translateAction(action, parameters) {
         instanceId = resolved;
       } else {
         const [rawId, rawIndex] = parameters;
-        instanceId = Number(rawId) || 0;
-        abilityIndex = typeof rawIndex === 'number' ? rawIndex : 0;
+        const id = rawId == null || typeof rawId === 'boolean' ? NaN : Number(rawId);
+        if (!Number.isInteger(id) || !isIndex(rawIndex)) {
+          console.warn(
+            'translateActionToCmd: useAbility without a valid instanceId and abilityIndex',
+            rawId,
+            rawIndex
+          );
+          return null;
+        }
+        instanceId = id;
+        abilityIndex = rawIndex;
       }
 
       return {

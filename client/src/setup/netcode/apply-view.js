@@ -105,6 +105,8 @@ let defaultNetcodeContext = {
 // choiceId the injected card picker is currently showing, so re-applying a view
 // that still carries the same pendingChoice doesn't reopen (and reset) it.
 let openPickerChoiceId = null;
+// A choice whose card picker failed to open after `open` returned: it uses the modal instead.
+let failedPickerChoiceId = null;
 // Same guard for the prize picker.
 let openPrizeChoiceId = null;
 // Same guard for the mat picker.
@@ -247,6 +249,7 @@ export function resetRenderState() {
   loadFxAudio().then((m) => m.resetStatusAmbience()).catch(() => {});
   clearInFlightAffordances();
   openPickerChoiceId = null;
+  failedPickerChoiceId = null;
   openPrizeChoiceId = null;
   openMatChoiceId = null;
   announcedChoiceId = null;
@@ -2014,12 +2017,13 @@ function openChoiceInCardPicker(pendingChoice, options = {}) {
     : [];
   if (choiceOptions.length === 0 || !choiceOptions.every((opt) => opt?.src))
     return false;
+  if (failedPickerChoiceId === pendingChoice.choiceId) return false;
   if (openPickerChoiceId === pendingChoice.choiceId) return true;
 
   closeChoicePicker(options);
   openPickerChoiceId = pendingChoice.choiceId;
   try {
-    picker.open({
+    const opening = picker.open({
       choice: pendingChoice,
       onResolve: (selection) => {
         // Mirrors the modal, which unmounts on confirm: a later view that
@@ -2028,6 +2032,18 @@ function openChoiceInCardPicker(pendingChoice, options = {}) {
         return submitPickerSelection(pendingChoice, selection, options);
       },
     });
+    // The real picker opens asynchronously, so its failure arrives after this call returned.
+    if (typeof opening?.then === 'function') {
+      opening.then(undefined, (err) => {
+        if (openPickerChoiceId !== pendingChoice.choiceId) return;
+        openPickerChoiceId = null;
+        failedPickerChoiceId = pendingChoice.choiceId;
+        console.error('[apply-view] card picker failed, using choice modal:', err);
+        if (lastAppliedView?.pendingChoice?.choiceId === pendingChoice.choiceId) {
+          showPendingChoice(lastAppliedView, options);
+        }
+      });
+    }
   } catch (err) {
     openPickerChoiceId = null;
     console.error('[apply-view] card picker failed, using choice modal:', err);

@@ -26,7 +26,8 @@ function requestPeek(request) {
       .timeout(PEEK_TIMEOUT_MS)
       .emit('peekDeck', { roomId: systemState.roomId, ...request }, (err, reply) => {
         if (err) resolve({ ok: false, reason: 'The server did not answer.' });
-        else resolve(reply && typeof reply === 'object' ? reply : { ok: false, reason: 'Bad reply.' });
+        else if (reply && typeof reply === 'object' && (!reply.ok || Array.isArray(reply.cards))) resolve(reply);
+        else resolve({ ok: false, reason: 'Bad reply.' });
       });
   });
 }
@@ -82,6 +83,9 @@ export function peekServerDeck({ user, count, top }) {
     });
     if (!request) return;
     openCardPicker(request).catch((err) => console.error('[deck-peek] picker failed:', err));
+  }).catch((err) => {
+    console.error('[deck-peek] look failed:', err);
+    announce("Can't look at the deck: something went wrong.");
   });
   return true;
 }

@@ -7,6 +7,8 @@
  * announcement rather than guess at partial state.
  */
 
+import { log } from '../../log/client-log.js';
+
 export const PEER_LOG_MAX = 200;
 export const PEER_LOG_TIMEOUT_MS = 5000;
 
@@ -72,29 +74,63 @@ export function emitRequestPeerLog({
   return true;
 }
 
+function runCallback(callback, ...args) {
+  if (typeof callback !== 'function') return;
+  try {
+    callback(...args);
+  } catch (error) {
+    log.error('sync', 'peerLog.replay.callback_failed', {
+      message: String(error?.message ?? error),
+    });
+  }
+}
+
 /**
  * Chains a batch of peer actions onto the existing action queue, preserving
  * ordering with any live traffic already enqueued on it.
+ *
+ * The log is ordered state: each action assumes the ones before it applied.
+ * One failed action therefore stops the rest of the replay (a gap would leave
+ * partial state the peers disagree on) and is reported through `onFailed`,
+ * which the caller uses for the O2-C failure announcement. `onSettled` runs on
+ * every exit, success or failure, and the returned tail always resolves so one
+ * bad replay does not stall the live traffic queued behind it.
  *
  * @param {object} options
  * @param {Array<{action: string, parameters: any}>} options.actions
  * @param {Promise} [options.currentQueue]
  * @param {(action: string, parameters: any) => Promise<void>} options.applyAction
- * @param {() => void} [options.onSettled] Called once, after every action has applied.
- * @returns {Promise} The new queue tail — assign this back to the caller's queue variable.
+ * @param {(error: unknown, entry: {action: string, parameters: any}) => void} [options.onFailed]
+ *   Called once with the first failure; the remaining actions are not applied.
+ * @param {() => void} [options.onSettled] Called once, after the replay ends for any reason.
+ * @returns {Promise<void>} The new queue tail — assign this back to the caller's queue variable.
  */
 export function scheduleReplay({
   actions,
   currentQueue,
   applyAction,
+  onFailed,
   onSettled,
 }) {
-  let queue = currentQueue || Promise.resolve();
-  for (const entry of actions) {
-    queue = queue.then(() => applyAction(entry.action, entry.parameters));
-  }
-  if (typeof onSettled === 'function') {
-    queue = queue.then(() => onSettled());
-  }
-  return queue;
+  const replay = async () => {
+    let failure = null;
+    for (const entry of actions) {
+      try {
+        await applyAction(entry.action, entry.parameters);
+      } catch (error) {
+        failure = { error, entry };
+        break;
+      }
+    }
+    if (failure) {
+      log.error('sync', 'peerLog.replay.failed', {
+        action: failure.entry.action,
+        message: String(failure.error?.message ?? failure.error),
+      });
+      runCallback(onFailed, failure.error, failure.entry);
+    }
+    runCallback(onSettled);
+  };
+  // An earlier failure on the shared queue must not skip the replay and leave the flag set.
+  return (currentQueue || Promise.resolve()).then(replay, replay);
 }

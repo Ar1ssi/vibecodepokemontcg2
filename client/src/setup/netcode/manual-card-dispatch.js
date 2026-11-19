@@ -58,6 +58,7 @@ function sendPlanned(commands, user = 'self') {
     }
     if (!emitAuthoritativeCommand(action, params, { user })) {
       console.warn('manual-card-dispatch: command not sent', action, params);
+      reportFailure({ error: `${action} was not sent` });
       return;
     }
   }

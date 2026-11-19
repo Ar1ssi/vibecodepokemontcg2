@@ -37,6 +37,7 @@ import { cancelPendingKnockouts, captureKnockoutGhost, KO_START_BACKSTOP_MS, pla
 import { KNOCKOUT_DURATION_MS, knockoutStackIds } from '../image-logic/knockout-pose.mjs';
 import { fxDisabled, motionReduced, rectForInstance } from '../image-logic/mat-fx.mjs';
 import { onFxSettingsChanged } from '../image-logic/fx-settings.js';
+import { sideOfUser } from './view-card-vocabulary.mjs';
 import { playFx } from './mat-fx/index.js';
 import { prizeDealEndsAt } from './mat-fx/transit.js';
 import { pinKnockoutOrigins, pinSlideOrigins, pinTransitOrigins } from './mat-fx/lifecycle.js';
@@ -70,10 +71,8 @@ const knockoutScenes = createKnockoutScenes({
   clearTimer: (id) => clearTimeout(id),
 });
 
-const sideFor = (user) => (user === 'self' ? 'you' : 'them');
-
 const shuffleZoneCount = (user, zoneId) => {
-  const side = sideFor(user);
+  const side = sideOfUser(user);
   return zoneId === 'deck'
     ? getAuthoritativeDeckCount(side)
     : getAuthoritativeZoneArray(side, zoneId).length;
@@ -249,7 +248,7 @@ const soundPlan = (plan) => {
   try {
     playFxSound(plan);
   } catch (err) {
-    console.warn(`[mat-fx] ${plan.effect} sound failed`, err);
+    log.warn('fx', 'sound.failed', { effect: plan.effect, message: String(err?.message ?? err) });
   }
 };
 
@@ -273,7 +272,7 @@ const playRevealPlan = (plan) => {
   try {
     return playDeckReveal(plan.user, held, showAfterFlight, { onStart: () => playRevealSound(plan.user) });
   } catch (err) {
-    console.warn('[mat-fx] deck-reveal failed', err);
+    log.warn('fx', 'deck-reveal.failed', { message: String(err?.message ?? err) });
     held.forEach(showAfterFlight);
     return 0;
   }
@@ -525,6 +524,7 @@ const waitForChoiceTurn = createChoiceGate({
   attackSceneEndsAt,
   now: () => performance.now(),
   sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  onError: (error) => log.warn('fx', 'choice-gate.waiter_failed', { message: String(error?.message ?? error) }),
 });
 
 /**
