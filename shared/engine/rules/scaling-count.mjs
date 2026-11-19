@@ -289,6 +289,10 @@ function counterCount(unit, ctx) {
       label: 'Prize cards your opponent has taken',
     };
   }
+  // Mega Mawile ex Gobble Down (customhb): "for each Prize card you have taken".
+  if (/^prize cards? you have taken$/.test(unit) && typeof ctx.ownPrizes === 'number') {
+    return { count: prizesTakenFor(ctx.ownPrizes, ctx.ownDeckFormat), label: 'Prize cards you have taken' };
+  }
   // Azelf LV.X Deep Balance.
   if (/^energy attached to all of your opponent's pokémon$/.test(unit) && typeof ctx.opponentAllEnergyCount === 'number') {
     return { count: ctx.opponentAllEnergyCount, label: "Energy on your opponent's Pokémon" };

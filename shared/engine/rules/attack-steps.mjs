@@ -86,7 +86,8 @@ const GATES = [
   // Hypno Spiral Aura.
   [/^if your opponent's active pokémon isn't knocked out by the damage from this attack, /, { requiresDefenderSurvived: true }],
   // Scizor Accelerate.
-  [/^if your opponent's active pokémon is knocked out by (?:damage from )?this attack, /, { requiresDefenderKnockedOut: true }],
+  // Corviknight Accelerate (customhb) says "your opponent's Pokémon".
+  [/^if your opponent's (?:active )?pokémon is knocked out by (?:damage from )?this attack, /, { requiresDefenderKnockedOut: true }],
   [/^after your attack, /, {}],
   [/^after doing damage, /, {}],
   [/^then, /, {}],
@@ -467,6 +468,8 @@ const TEMPLATES = [
   // Disaster, Desert Hurricane, Somersault Dive): the damage parser reads the bonus, this
   // clears the Stadium after damage. (Flygon Desert Geyser's conditional wording is a BLOCK.)
   [/^discard that stadium(?: card)?$/, () => ({ type: 'atkDiscardStadium', owner: 'any' })],
+  // Single Strike Urshifu Field Crush (customhb).
+  [/^if your opponent has a stadium in play, discard it$/, () => ({ type: 'atkDiscardStadium', owner: 'opponent' })],
   // Great Tusk ex Bedrock Breaker, Kingdra-EX Big Storm, Lugia VSTAR Tempest Dive ("You may …"),
   // Brock's Primeape Mega Thrash / Light Piloswine Knock Over ("If there is a Stadium card in
   // play, [you may] discard it").
@@ -646,6 +649,12 @@ const TEMPLATES = [
   [
     /^your opponent discards the top (?:(\d+) cards|card) (?:of|from) their deck$/,
     (m) => ({ type: 'atkMill', side: 'opponent', count: m[1] ? Number(m[1]) : 1 }),
+  ],
+  // Joltik Jolting Charge (customhb): "For each Energy card attached, discard a card from the top
+  // of your deck." — the cards this attack attached.
+  [
+    /^for each energy card attached(?: in this way)?, discard a card from the top of your deck$/,
+    () => ({ type: 'atkMill', side: 'self', perAttachedThisEffect: true }),
   ],
   // Dialga-EX Fast Forward.
   [
@@ -877,6 +886,18 @@ const TEMPLATES = [
   // Leave play
   [/^shuffle this pokémon and all (?:attached cards|cards attached to it) (?:back )?into your deck$/, () => ({ type: 'atkShuffleSelf' })],
   [/^shuffle your hand into your deck$/, () => ({ type: 'atkShuffleHandIntoDeck' })],
+  [/^shuffle all energy attached to this pokémon into your deck$/, () => ({ type: 'atkShuffleSelfEnergy' })],
+  [
+    /^each player shuffles (a|an|\d+) cards? from their hand into their deck$/,
+    (m) => ({ type: 'atkEachShuffleHandCards', count: countOf(m[1]) }),
+  ],
+  // After a switch: Clefable Baton Pass "Transfer all attached cards from this Pokémon to the new
+  // Active Pokémon"; Origin Forme Palkia ex Spacial Rend "Move all cards attached from that
+  // Pokémon to the new Active Pokémon" (customhb).
+  [
+    /^(?:transfer|move) all (?:attached cards|cards attached) from (this|that) pokémon to the new active pokémon$/,
+    (m) => ({ type: 'atkMoveAttachedToNewActive', side: m[1] === 'this' ? 'self' : 'opponent' }),
+  ],
   // Shaymin-EX Sky Return; Team Rocket's Crobat ex ("… into your hand", its reminder discards
   // the attached cards); Revavroom ex / Weezing ("Discard this Pokémon …"); Uxie Psychic Restore.
   [/^return this pokémon and all cards attached to it to your hand$/, () => ({ type: 'atkPutSelf', to: 'hand', attached: 'hand' })],
@@ -1306,6 +1327,22 @@ const BLOCKS = [
       { type: 'atkOppHandToDeck', count: 1, perHeads: true, chooser: 'attacker', bottom: true },
     ],
   ],
+  // Giratina ex Alpha Rage (customhb): one of the opponent's Pokémon attacks another of theirs
+  // (effects/attack-steps.mjs atkOpponentAttacksOwn).
+  [
+    /choose 1 of your opponent's pokémon\. that pokémon attacks 1 of your opponent's other pokémon\./g,
+    () => ({ type: 'atkOpponentAttacksOwn' }),
+  ],
+  // Gardevoir Telekinesis (customhb): damage to a chosen opposing Pokémon, then an Energy moves
+  // from it to another of their Pokémon (effects/attack-steps.mjs atkSnipeMoveEnergy).
+  [
+    /this attack does (\d+) damage to 1 of your opponent's pokémon\. move an energy from that pokémon to another of their pokémon\.(?: this attack's damage isn't affected by weakness or resistance\.)?/g,
+    (m) => ({
+      type: 'atkSnipeMoveEnergy',
+      amount: Number(m[1]),
+      immunity: /isn't affected by weakness or resistance/.test(m[0]) ? { ignoreWeakness: true, ignoreResistance: true } : null,
+    }),
+  ],
   // Dragapult Dragon Launcher: discard Benched Dreepy, then 100 damage to a different Pokémon of
   // the opponent's for each one discarded (see effects/attack-steps.mjs atkBenchDiscardDamageEach).
   [
@@ -1609,6 +1646,13 @@ const BLOCKS = [
     /(?:during your opponent's next turn, if your opponent's active pokémon tries to (?:use an )?attack|if your opponent's active pokémon tries to attack during your opponent's next turn), your opponent flips a coin\. if tails, (?:that|this) attack (?:doesn't happen|does nothing)\./g,
     () => ({ type: 'atkAddMarker', target: 'opponentActive', window: 'opponentNextTurn', marker: { kind: 'attackFlipOrFail' } }),
   ],
+  // Dragonite ex Fly (customhb): "During your opponent's next turn, if their Active Pokémon tries
+  // to attack, your opponent flips a coin. If tails, this Pokémon takes no damage." The marker sits
+  // on this Pokémon; the attack command flips when the opponent attacks (reduce/attack.mjs).
+  [
+    /during your opponent's next turn, if (?:their|your opponent's) active pokémon tries to attack, your opponent flips a coin\. if tails, this pokémon takes no damage\./g,
+    () => ({ type: 'atkAddMarker', target: 'self', window: 'opponentNextTurn', marker: { kind: 'flipOrTakeNoDamage' } }),
+  ],
   // Machamp LV.X Strong-Willed: the printed name is the attacker's short name, so any name.
   [
     /during your opponent's next turn, if [^,.]+ would be knocked out by damage from an attack, flip a coin\. if heads, [^,.]+ is not knocked out and its remaining hp becomes 10 instead\./g,
@@ -1780,13 +1824,20 @@ function searchEnergyParams(body) {
 
 // "… up to 2 Basic {G} Energy cards and up to 2 Basic {L} Energy cards and attach them …"
 // (Joltik, Jolting Charge) is one search per Energy type; the single-type reader sees only the first.
-const MULTI_TYPE_SEARCH = /^(search your deck for )(up to \d+ [^.]*?energy cards?) and (up to \d+ [^.]*?energy cards?)( and attach (?:it|them) to [^.]*)$/;
+// Two kinds in one search: "up to 2 {G} Energy cards and up to 2 {L} Energy cards" (Joltik), or
+// one card each, "a Basic Energy card and a Pokémon Tool card," (Tyranitar Tyrant's Roar, customhb).
+const SEARCH_KIND = String.raw`(?:up to \d+|an?) [^.,]*?(?:energy(?: cards?)?|pokémon tool(?: cards?)?)`;
+const MULTI_TYPE_SEARCH = new RegExp(String.raw`^(search your deck for )(${SEARCH_KIND}),? and (${SEARCH_KIND}),?( and attach (?:it|them) to [^.]*)$`);
+// One card of a split two-kind search is attached as "it".
+const singleAttach = (kind, tail) => (/^an? /.test(kind) ? tail.replace(/ attach them /, ' attach it ') : tail);
 
 function searchAttachStep(clause, gate, optional) {
   const multi = MULTI_TYPE_SEARCH.exec(clause.replace(/^(?:if heads|for each heads), /, '').replace(/^you may /, '').replace(/\.(?: then,? shuffle your deck\.)?$/, ''));
   if (multi) {
     const [, lead, first, second, tail] = multi;
-    const steps = [`${lead}${first}${tail}.`, `${lead}${second}${tail}.`].map((part) => searchAttachStep(part, gate, optional));
+    const steps = [`${lead}${first}${singleAttach(first, tail)}.`, `${lead}${second}${singleAttach(second, tail)}.`].map((part) =>
+      searchAttachStep(part, gate, optional)
+    );
     return steps.every(Boolean) ? steps : null;
   }
   const body = clause.replace(/^(?:if heads|for each heads), /, '').replace(/^you may /, '');
@@ -2004,12 +2055,20 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
     const discardChain =
       Boolean(chained) && IF_YOU_DO.test(body) && ENERGY_DISCARD_SENTENCE.test((sentences[index - 1] || '').trim());
     if (chained && !handChain && !isAttachStep(previous) && !optionalChain && !discardChain) continue;
-    const { rest, flags } = stripGates(chained ? body.slice(chained[0].length) : body);
+    let { rest, flags } = stripGates(chained ? body.slice(chained[0].length) : body);
     if (extra) flags.requiresExtraEnergy = extra.requirements;
     if (handChain) flags.requiresHandCost = true;
     else if (discardChain) flags.requiresEnergyDiscard = true;
     else if (chained && !optionalChain) flags.requiresAttach = true;
     const templates = chained && !handChain && !optionalChain ? [...CHAIN_TEMPLATES, ...TEMPLATES] : TEMPLATES;
+    // "If <board condition>, <effect>" (Paldean Tauros Jet Headbutt: "If this Pokémon has any {F}
+    // Energy attached, discard a random card from your opponent's hand"): the executor runs the
+    // effect only when the condition holds (attack-conditions.mjs reads it).
+    const boardGate = !templates.some(([re]) => re.test(rest)) && /^if ([^,]+), (.+)$/.exec(rest);
+    if (boardGate && templates.some(([re]) => re.test(boardGate[2]))) {
+      rest = boardGate[2];
+      flags = { ...flags, boardCondition: boardGate[1] };
+    }
     for (const [re, build] of templates) {
       const m = re.exec(rest);
       if (!m) continue;

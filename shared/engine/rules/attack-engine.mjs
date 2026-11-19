@@ -40,12 +40,17 @@ import { applyLegacyDamageModifiers } from './legacy-power-wording.mjs';
  * per unit, and an attack whose effect already zeroed its damage stays at 0.
  */
 function overrideBaseDamage(rawBase, printedBase, attack, attackerMarkers, attackNameLower) {
-  if (rawBase <= 0 || printedBase <= 0) return rawBase;
   const marker = attackerMarkers.findLast(
     (m) =>
       m.kind === 'nextTurnBaseDamage' &&
       (m.attackName === attackNameLower || `${m.attackName} attack` === attackNameLower)
   );
+  // Serperior Solar Coiling (customhb) prints no damage: "On your next turn, this attack does 160
+  // damage." The marker's value is then the whole base.
+  if (marker && printedBase <= 0 && rawBase <= 0 && !marker.doubled && !String(attack?.damage ?? '').trim()) {
+    return marker.value;
+  }
+  if (rawBase <= 0 || printedBase <= 0) return rawBase;
   if (!marker) return rawBase;
   const newBase = marker.doubled ? printedBase * 2 : marker.value;
   if (/[×x]\s*$/i.test(String(attack?.damage || ''))) return Math.round((rawBase / printedBase) * newBase);

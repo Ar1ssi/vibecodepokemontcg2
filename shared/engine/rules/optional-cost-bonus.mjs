@@ -60,6 +60,10 @@ const COSTS = [
     (m) => ({ kind: 'returnEnergy', all: true, energyType: LETTER_TYPES[m[1]] || null }),
   ],
   [/^discard (?:a|any) stadium(?: card)? in play$/, () => ({ kind: 'discardStadium' })],
+  // Kommo-o Scaly Uppercut / Aegislash Smart Strike (customhb).
+  [/^discard a pokémon tool(?: card)? (?:attached to|from) this pokémon$/, () => ({ kind: 'discardTool' })],
+  // Dialga Chrono Burst (customhb).
+  [/^shuffle all energy(?: cards?)? attached to this pokémon into your deck$/, () => ({ kind: 'shuffleEnergy', all: true })],
   [/^show your hand to your opponent$/, () => ({ kind: 'showHand' })],
   [/^put up to (\d+) damage counters on this pokémon$/, (m) => ({ kind: 'selfCounters', upTo: Number(m[1]) })],
 ];
@@ -105,6 +109,12 @@ const SWAP_UNPAID = /^otherwise, put (\d+) damage counters on your opponent's po
 // opponent's Benched Pokémon." The reducer applies the spread only when the cost was paid.
 const BENCH_IF_PAID = /^if you do, this attack does (\d+) damage to each of your opponent's benched pokémon\.$/;
 
+// Tsareena V / Aegislash ex Royal Command: "You may discard any number of your Benched Pokémon.
+// This attack does 40 more damage for each Benched Pokémon you discarded in this way." M
+// Gardevoir-EX: "Discard as many of your Benched Pokémon as you like. …".
+const DISCARD_BENCH = /^(?:you may discard any number of your benched pokémon|discard as many of your benched pokémon as you like)\.$/;
+const PER_BENCH = /^this attack does (\d+) more damage for each benched pokémon you discarded in this way\.$/;
+
 const stripPeriod = (sentence) => sentence.replace(/\.$/, '');
 
 /**
@@ -140,6 +150,16 @@ export function optionalCostBonusClause(attackText, selfName = '') {
         perEach: false,
         benchSpread: { amount: Number(benchIfPaid[1]) },
         consumed: [i, i + 1].map((j) => stripPeriod(sentences[j])),
+      };
+    }
+    const perBench = DISCARD_BENCH.test(sentences[i]) && PER_BENCH.exec(sentences[i + 1]);
+    if (perBench) {
+      return {
+        cost: { kind: 'discardBench' },
+        bonus: Number(perBench[1]),
+        extraCondition: null,
+        perEach: true,
+        consumed: [stripPeriod(sentences[i])],
       };
     }
     // Annihilape ex Angry Grudge: a mandatory "up to" cost the damage counts.

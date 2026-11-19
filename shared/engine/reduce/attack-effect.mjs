@@ -4,6 +4,7 @@
  * public entry.
  */
 
+import { discardCurrentStadium } from '../effects/trainer.mjs';
 import { findCard, discardCardToPlayerZone } from '../state.mjs';
 import { isEnergy, isPokemon } from '../cards.mjs';
 import { flipCoin } from '../rng.mjs';
@@ -1479,9 +1480,16 @@ export function resolveAttackEffectPhase(draft, ctx) {
       }
       let benchDealt = 0;
 
+      // Ting-Lu Ground Crasher (customhb): "If a Stadium is in play, this attack also does 30
+      // damage to each of your opponent's Benched Pokémon, and discard that Stadium."
+      const stadiumGatedSpread = /if a stadium is in play, this attack also does \d+ damage to each of your opponent's benched pok[ée]mon, and discard that stadium/i.test(
+        attack.text || ''
+      );
+      const spreadGateClosed = stadiumGatedSpread && !draft.stadium;
+
       // Spread damage: the same amount to EVERY benched Pokémon the defender has. The target
       // list is snapshotted first, because a KO inside the loop mutates the bench array.
-      if (spread > 0 && !spreadUnpaid) {
+      if (spread > 0 && !spreadUnpaid && !spreadGateClosed) {
         const targets = benchTargets(draft.players[defenderPlayerId]);
         if (targets.length === 0) {
           events.push({
@@ -1514,7 +1522,9 @@ export function resolveAttackEffectPhase(draft, ctx) {
       // The Active takes the damage-each clause through Weakness and Resistance unless the
       // text waives them; the Bench never does.
       // Chingling Uproar: "If heads, this attack does 10 damage to each of your opponent's Pokémon."
-      if (eachDamage && (!eachDamage.gate || coin === eachDamage.gate)) {
+      // Garchomp ex Surf: "For each Energy you discard, this attack does 30 damage to each …".
+      if (eachDamage?.perDiscard) eachDamage.amount *= energyDiscarded || 0;
+      if (eachDamage && eachDamage.amount > 0 && (!eachDamage.gate || coin === eachDamage.gate)) {
         const victimPlayer = draft.players[defenderPlayerId];
         const zones = victimPlayer?.zones || {};
         const roots = eachDamage.activeOnly
@@ -1557,6 +1567,7 @@ export function resolveAttackEffectPhase(draft, ctx) {
 
       // Self-recoil spread ("This attack also does 30 damage to each of your Benched
       // Pokémon"): the attacker's own Bench, and a KO there gives the opponent Prizes.
+      if (stadiumGatedSpread && draft.stadium) discardCurrentStadium(draft, events, playerId);
       const ownSpread = ownBenchDamage(attack.text);
       if (ownSpread > 0) {
         for (const victim of benchTargets(draft.players[playerId])) {
@@ -1635,6 +1646,7 @@ export function resolveAttackEffectPhase(draft, ctx) {
       const locks = parseNextTurnLock(effectiveAttack, {
         coin,
         headsCount,
+        flips,
         conditionHolds: (clause) => {
           const condition = parseConditionClause(normalizeAttackText(clause, attackerView?.name || attacker?.name));
           if (!condition) return false;
@@ -1757,6 +1769,8 @@ function discardScalePrompt(attack, discardScaling) {
   const per =
     /(\d+) (?:more )?damage (?:for each|times)/i.exec(text)?.[1] ||
     /do (\d+) damage to it/i.exec(text)?.[1] ||
+    // Garchomp ex Surf: "For each Energy you discard, this attack does 30 damage to each …".
+    /for each energy[^,.]* discard(?:ed)?[^,.]*, this attack does (\d+) damage/i.exec(text)?.[1] ||
     parseInt(attack?.damage, 10) ||
     0;
   const verb = discardScaling.destination === 'deck' ? 'shuffle into your deck' : 'discard';

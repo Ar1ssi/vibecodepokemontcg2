@@ -235,6 +235,13 @@ function stadiumOwnerOf(stadiumCard, attackerPlayerId, defenderPlayerId) {
   return owner === defenderPlayerId ? 'opponent' : null;
 }
 
+function weaknessTypes(view) {
+  const raw = view?.weakness ?? view?.weaknesses;
+  return (Array.isArray(raw) ? raw : raw ? [raw] : [])
+    .map((entry) => (typeof entry === 'string' ? entry : entry?.type))
+    .filter(Boolean);
+}
+
 function resistanceTypes(view) {
   const raw = view?.resistance ?? view?.resistances;
   return (Array.isArray(raw) ? raw : raw ? [raw] : [])
@@ -289,6 +296,8 @@ export function buildServerAttackContext(
   const own = state?.players?.[attackerPlayerId] || null;
   const opponent = state?.players?.[defenderPlayerId] || null;
   const attackerCard = attackerView || attacker || {};
+  // Rolling Tackle: the earlier uses of this attack by this Pokémon (reduce/attack.mjs counts them).
+  const earlierUses = Math.max(0, (attacker?.attackUses?.[attack?.name] || 0) - 1);
   const defenderCard = defenderView || defender || {};
   const stadiumCard = state?.stadium?.card || state?.stadium || null;
 
@@ -299,6 +308,7 @@ export function buildServerAttackContext(
 
   const attackerEnergy = attachedEnergyCards(own, attacker);
   const ctx = {
+    earlierUses,
     energyCount: energyOn(own, attacker, { stadiumCard, opponent }).length,
     attackerEnergyTypeList: attackerEnergy.map((card) =>
       String(serverEnergyDescriptor(card).type || '').toLowerCase()
@@ -324,6 +334,7 @@ export function buildServerAttackContext(
       .map((card) => String(serverEnergyDescriptor(card).type || '').toLowerCase()),
     opponentPrizes: zoneOf(opponent, 'prizes').length,
     opponentDeckFormat: opponent?.deckFormat,
+    ownDeckFormat: own?.deckFormat,
     turnCount: Math.max(1, Number(state?.turn?.number) || 1),
     attackerHp: Number(attackerCard.hp) || 0,
     attackerDamage: attacker?.damage || 0,
@@ -385,6 +396,9 @@ export function buildServerAttackContext(
       ? priorEvolutionCards(attackerZone(own, attacker), attacker).map((card) => card.name || '')
       : [],
     attackerHealedThisTurn: attacker != null && Number(attacker.healedTurn) === turnNumber,
+    attackerHealedLastOwnTurn:
+      attacker != null &&
+      [attacker.healedTurn, attacker.healedPreviousTurn].some((turn) => turn != null && Number(turn) === turnNumber - 2),
     ownHealedTypesThisTurn: ownInPlay
       .filter(({ card }) => Number(card.healedTurn) === turnNumber)
       .map(({ card, view }) => [...(view?.types || card?.types || [])]),
@@ -490,6 +504,7 @@ export function buildServerAttackContext(
     ctx.defenderName = defenderCard.name || '';
     ctx.defenderAbilityKinds = abilityKinds(defenderCard);
     ctx.defenderResistanceTypes = resistanceTypes(defenderCard);
+    ctx.defenderWeaknessTypes = weaknessTypes(defenderCard);
     ctx.defenderToolCount = toolCountOn(opponent, defender);
     ctx.defenderBasicEnergyCount = attachedEnergyCards(opponent, defender).filter(
       (card) => classifyEnergyEffect(card) === 'basic'

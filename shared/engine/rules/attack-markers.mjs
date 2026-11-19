@@ -249,7 +249,8 @@ const FROM_ATTACKS = "by attacks(?: from ((?:your opponent's )?[^,]+?(?:, except
 const MARKER_BODIES = [
   [/^this pokémon has no weakness$/, 'self', null, () => ({ kind: 'noWeakness' })],
   [
-    /^this pokémon takes (\d+) less damage from attacks$/,
+    // Lillipup Play Nice (customhb) leaves off "from attacks".
+    /^this pokémon takes (\d+) less damage(?: from attacks)?$/,
     'self',
     null,
     (m, { wrOrder }) => incomingReduce(m[1], undefined, wrOrder),
@@ -403,6 +404,17 @@ const MARKER_BODIES = [
     'opponentActive',
     ['yourNextTurn', 'throughYourNextTurn'],
     (m, { wrOrder }) => incomingBonus(m[1], wrOrder),
+  ],
+  // Zeraora ex Plasma Fists (customhb): "During your opponent's next turn, their Active Pokémon is
+  // treated as a {L} type." Read by inPlayView (reduce/shared.mjs).
+  [
+    /^(?:their|your opponent's) active pokémon is treated as an? \{([a-z])\} (?:type|pokémon)$/,
+    'opponentActive',
+    null,
+    (m) => {
+      const type = TYPE_LETTER[m[1]];
+      return type ? { kind: 'typeOverride', type: type[0].toUpperCase() + type.slice(1) } : null;
+    },
   ],
   // Oranguru: only the Weakness type changes, not its amount.
   [

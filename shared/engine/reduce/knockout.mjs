@@ -700,7 +700,12 @@ export function stampHealedPokemon(prev, next) {
       delete card.__counterMoveOnly;
       if (counterMoveOnly) continue;
       const before = findCard(prev, card.instanceId)?.card;
-      if (before && (card.damage || 0) < (before.damage || 0)) card.healedTurn = turnNumber;
+      if (before && (card.damage || 0) < (before.damage || 0)) {
+        // Gardevoir ex Swelling Pulse reads a heal on the owner's previous turn; keep the last
+        // heal turn before this one too.
+        if (card.healedTurn != null && card.healedTurn !== turnNumber) card.healedPreviousTurn = card.healedTurn;
+        card.healedTurn = turnNumber;
+      }
     }
   }
 }

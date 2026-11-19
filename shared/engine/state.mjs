@@ -80,6 +80,8 @@ export function clearDetachedCardMarkers(state) {
       const inPlay = zoneId === 'active' || zoneId === 'bench';
       for (const card of zone) {
         if (card && !(inPlay && card.attachedTo != null)) clear(card);
+        // Alolan Graveler Rolling Tackle counts uses while the Pokémon stays in play.
+        if (card && !inPlay) delete card.attackUses;
       }
     }
   }

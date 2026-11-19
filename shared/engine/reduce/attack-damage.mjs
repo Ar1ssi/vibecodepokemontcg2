@@ -7,7 +7,7 @@
 import { findCard } from '../state.mjs';
 import { computeAttackDamage } from '../rules/attack-engine.mjs';
 import {
-  attackTargetClause, ownTargetClause, opponentCounterClause,
+  attackTargetClause, ownTargetClause, opponentCounterClause, ownBenchDamage,
 } from '../rules/damage-parser.mjs';
 import { attachedTrainerDamageReduction } from '../rules/legacy-attached-trainer.mjs';
 import { applyLegacyDamageModifiers } from '../rules/legacy-power-wording.mjs';
@@ -437,7 +437,8 @@ export function resolveAttackTargetClause(text, parsed, spread) {
       immunity: parseDamageImmunity(t),
     };
   }
-  if (parsed?.bench > 0) {
+  // Damage to each of your own Benched Pokémon (Aggron Seismic Rift) is no opponent snipe.
+  if (parsed?.bench > 0 && ownBenchDamage(t) !== parsed.bench) {
     return { kind: 'damage', amount: parsed.bench, count: 1, scope: 'bench' };
   }
   return ownTargetClause(t);

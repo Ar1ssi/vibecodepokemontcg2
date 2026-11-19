@@ -1119,7 +1119,9 @@ function atkMill(ctx) {
     ? (ref ? attachedCards(player, ref.card.instanceId) : []).filter(
         (c) => isEnergy(c) && String(c.name || '').toLowerCase().includes(step.perAttachedEnergy)
       ).length
-    : step.count || 1;
+    : step.perAttachedThisEffect
+      ? ctx.attachedThisEffect || 0
+      : step.count || 1;
   if (count === 0) return skip(ctx, 'nothing_to_mill');
   for (const side of sides.filter(Boolean)) {
     const cards = side.zones.deck.slice(0, count);
@@ -1762,6 +1764,83 @@ function atkShuffleOppActiveEnergy(ctx) {
   return null;
 }
 
+// After this attack switched a side's Active: the cards attached to the Pokémon that left the
+// Active Spot go to the new Active Pokémon (Clefable Baton Pass, Palkia Spacial Rend).
+function atkMoveAttachedToNewActive(ctx) {
+  const side = ctx.step.side === 'self' ? ctx.player : ctx.opponent;
+  if (!side) return skip(ctx, 'no_player');
+  const swap = ctx.events.findLast((e) => e.type === 'cardSwitched' && e.playerId === side.playerId);
+  if (!swap) return skip(ctx, 'no_switch');
+  const newActive = activeOf(side);
+  if (!newActive || newActive.instanceId !== swap.benchId) return skip(ctx, 'no_switch');
+  const moved = attachedCards(side, swap.activeId);
+  if (moved.length === 0) return skip(ctx, 'nothing_attached');
+  for (const card of moved) {
+    removeFromZones(side, card);
+    card.attachedTo = newActive.instanceId;
+    side.zones.active.push(card);
+    ctx.events.push({
+      type: 'cardMoved',
+      instanceId: card.instanceId,
+      from: 'bench',
+      to: 'active',
+      playerId: side.playerId,
+      targetInstanceId: newActive.instanceId,
+      reason: 'attack-move-attached',
+    });
+  }
+  return null;
+}
+
+// Origin Forme Palkia ex Disruption (customhb): "Each player shuffles 2 cards from their hand
+// into their deck." The attacking player picks first, then the opponent picks from their own hand.
+function atkEachShuffleHandCards(ctx) {
+  const { step } = ctx;
+  const order = [ctx.player, ctx.opponent].filter(Boolean);
+  const count = step.count || 1;
+  const shuffleIn = (side, cards) => {
+    for (const card of cards) moveToZone(side, card, 'deck', 'hand', ctx.events);
+    shuffleOwnDeck(side, ctx);
+  };
+  let index = ctx.memo?.index ?? 0;
+  if (ctx.selection && ctx.memo) {
+    const side = order[index];
+    shuffleIn(side, pickById(side.zones.hand || [], ctx.selection).slice(0, count));
+    index += 1;
+  }
+  for (; index < order.length; index++) {
+    const side = order[index];
+    const hand = side.zones.hand || [];
+    if (hand.length === 0) continue;
+    if (hand.length <= count) {
+      shuffleIn(side, [...hand]);
+      continue;
+    }
+    return ctx.ask({
+      player: side.playerId,
+      prompt: `${attackName(ctx)}: Choose ${count} cards from your hand to shuffle into your deck`,
+      options: hand,
+      min: count,
+      max: count,
+      memo: { index },
+    });
+  }
+  return null;
+}
+
+// Mega Skarmory ex Sonic Ripper (customhb): "Shuffle all Energy attached to this Pokémon into
+// your deck."
+function atkShuffleSelfEnergy(ctx) {
+  const { player } = ctx;
+  const ref = attackerRef(ctx);
+  if (!ref) return skip(ctx, 'no_attacker');
+  const energy = attachedCards(player, ref.card.instanceId).filter(isEnergy);
+  if (energy.length === 0) return skip(ctx, 'no_energy');
+  for (const card of energy) moveToZone(player, card, 'deck', ref.zoneId, ctx.events);
+  shuffleOwnDeck(player, ctx);
+  return null;
+}
+
 // Palkia-GX Zero Vanish-GX: every opponent Pokémon sheds its Energy into their deck. A
 // shielding special Energy protects only the Pokémon it is attached to.
 function atkShuffleOppEnergy(ctx) {
@@ -2086,6 +2165,156 @@ function damageOnePick(ctx, memo) {
     });
   }
   return target ? null : skip(ctx, 'target_not_found');
+}
+
+// Giratina ex Alpha Rage (customhb): "Choose 1 of your opponent's Pokémon. That Pokémon attacks 1 of
+// your opponent's other Pokémon." Picks: the opponent's Pokémon, one of its attacks that does
+// damage, and the other Pokémon it hits. That attack's printed damage lands with the chosen
+// Pokémon's own type against the target's Weakness and Resistance (Active target only, as for any
+// attack); its other printed effects do not run. The damage is queued as an `attackDamageRequest`.
+function atkOpponentAttacksOwn(ctx) {
+  const { opponent } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const memo = ctx.memo || {};
+  const viewOf = (root) => topPokemonCard(opponent, root) || root;
+  const printedDamage = (attack) => parseInt(String(attack?.damage ?? ''), 10) || 0;
+  const damaging = (root) => (viewOf(root).attacks || []).filter((a) => printedDamage(a) > 0);
+  if (memo.stage === 'target') {
+    const user = rootsOf(opponent).find((c) => c.instanceId === memo.userId);
+    const target = rootsOf(opponent).find((c) => c.instanceId === ctx.selection?.[0] && c.instanceId !== memo.userId);
+    if (!user || !target) return skip(ctx, 'target_not_found');
+    const attack = damaging(user)[memo.attackIndex];
+    let amount = printedDamage(attack);
+    if (findCard(ctx.draft, target.instanceId)?.zoneId === 'active') {
+      const userTypes = viewOf(user).types || [];
+      const targetView = viewOf(target);
+      const weak = (targetView.weaknesses || []).find((w) => userTypes.includes(w.type));
+      const resist = (targetView.resistances || []).find((r) => userTypes.includes(r.type));
+      if (weak) amount *= 2;
+      if (resist) amount = Math.max(0, amount - (Math.abs(parseInt(resist.value, 10)) || 30));
+    }
+    ctx.events.push({
+      type: 'attackDamageRequest',
+      instanceId: target.instanceId,
+      victimPlayerId: opponent.playerId,
+      amount,
+      immunity: { ignoreWeakness: true, ignoreResistance: true },
+      attackName: attackName(ctx),
+    });
+    return null;
+  }
+  const others = (root) => rootsOf(opponent).filter((c) => c.instanceId !== root.instanceId);
+  const askTarget = (user, attackIndex) =>
+    ctx.ask({
+      prompt: `${attackName(ctx)}: Choose the Pokémon ${user.name} attacks`,
+      options: others(user),
+      min: 1,
+      max: 1,
+      memo: { stage: 'target', userId: user.instanceId, attackIndex },
+    });
+  if (memo.stage === 'attack') {
+    const user = rootsOf(opponent).find((c) => c.instanceId === memo.userId);
+    const index = Number(ctx.selection?.[0]) - 1;
+    if (!user || !damaging(user)[index]) return skip(ctx, 'attack_not_found');
+    return askTarget(user, index);
+  }
+  const users = rootsOf(opponent).filter((root) => damaging(root).length > 0 && others(root).length > 0);
+  if (!ctx.selection) {
+    if (users.length === 0) return skip(ctx, 'no_target');
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: Choose 1 of your opponent's Pokémon to attack another of their Pokémon`,
+      options: users,
+      min: 1,
+      max: 1,
+    });
+  }
+  const user = pickById(users, ctx.selection)[0];
+  if (!user) return skip(ctx, 'target_not_found');
+  const attacks = damaging(user);
+  if (attacks.length === 1) return askTarget(user, 0);
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose the attack ${user.name} uses`,
+    options: attacks.map((a, i) => ({ instanceId: i + 1, name: `${a.name} (${a.damage})`, type: 'option' })),
+    min: 1,
+    max: 1,
+    memo: { stage: 'attack', userId: user.instanceId },
+  });
+}
+
+// Gardevoir Telekinesis (customhb): "This attack does 50 damage to 1 of your opponent's Pokémon.
+// Move an Energy from that Pokémon to another of their Pokémon." Picks: the target, then (when it
+// will survive the hit and has Energy) the Energy and its new host. The damage is queued as an
+// `attackDamageRequest` so prevention and Knock Out hooks run (reduce/attack-steps.mjs).
+function atkSnipeMoveEnergy(ctx) {
+  const { opponent, step } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const queueDamage = (instanceId) => {
+    ctx.events.push({
+      type: 'attackDamageRequest',
+      instanceId,
+      victimPlayerId: opponent.playerId,
+      amount: step.amount,
+      immunity: step.immunity || null,
+      attackName: attackName(ctx),
+    });
+    return null;
+  };
+  const memo = ctx.memo || {};
+  if (memo.stage === 'host') {
+    const host = rootsOf(opponent).find((c) => c.instanceId === ctx.selection?.[0] && c.instanceId !== memo.targetId);
+    const energy = attachedCards(opponent, memo.targetId).find((c) => c.instanceId === memo.energyId);
+    if (host && energy) {
+      const zone = findCard(ctx.draft, host.instanceId)?.zoneId || 'bench';
+      removeFromZones(opponent, energy);
+      energy.attachedTo = host.instanceId;
+      opponent.zones[zone].push(energy);
+      ctx.events.push({
+        type: 'cardMoved',
+        instanceId: energy.instanceId,
+        to: zone,
+        playerId: opponent.playerId,
+        targetInstanceId: host.instanceId,
+        reason: 'attack-move-energy',
+      });
+    }
+    return queueDamage(memo.targetId);
+  }
+  if (memo.stage === 'energy') {
+    const energy = attachedCards(opponent, memo.targetId).find((c) => isEnergy(c) && c.instanceId === ctx.selection?.[0]);
+    const hosts = rootsOf(opponent).filter((c) => c.instanceId !== memo.targetId);
+    if (!energy || hosts.length === 0) return queueDamage(memo.targetId);
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: Choose a Pokémon to move ${energy.name} to`,
+      options: hosts,
+      min: 1,
+      max: 1,
+      memo: { stage: 'host', targetId: memo.targetId, energyId: energy.instanceId },
+    });
+  }
+  const targets = rootsOf(opponent);
+  if (!ctx.selection) {
+    if (targets.length === 0) return skip(ctx, 'no_target');
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: Choose 1 of your opponent's Pokémon to take ${step.amount} damage`,
+      options: targets,
+      min: 1,
+      max: 1,
+    });
+  }
+  const target = pickById(targets, ctx.selection)[0];
+  if (!target) return skip(ctx, 'target_not_found');
+  const energy = attachedCards(opponent, target.instanceId).filter(isEnergy);
+  const hosts = targets.filter((c) => c.instanceId !== target.instanceId);
+  // A Pokémon this hit Knocks Out has no Energy left to move: it goes to the discard pile with it.
+  const survives = !maxHp(ctx, opponent, target) || remainingHp(ctx, opponent, target) > step.amount;
+  if (energy.length === 0 || hosts.length === 0 || !survives) return queueDamage(target.instanceId);
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose an Energy to move from ${target.name}`,
+    options: energy,
+    min: 1,
+    max: 1,
+    memo: { stage: 'energy', targetId: target.instanceId },
+  });
 }
 
 /** Ability form (Dudunsparce, Run Away Draw): "If you drew any cards in this way" gates the shuffle. */
@@ -4251,6 +4480,11 @@ export const ATTACK_STEP_HANDLERS = {
   atkShuffleHandIntoDeck,
   atkDraw,
   atkShuffleOppActiveEnergy,
+  atkShuffleSelfEnergy,
+  atkOpponentAttacksOwn,
+  atkSnipeMoveEnergy,
+  atkEachShuffleHandCards,
+  atkMoveAttachedToNewActive,
   atkShuffleOppEnergy: optional(
     atkShuffleOppEnergy,
     () => "Shuffle all Energy from your opponent's Pokémon into their deck"

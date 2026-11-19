@@ -11,6 +11,7 @@ import { createPendingChoice, attachToRoot, executeSteps } from '../effects/exec
 import { resolveAttackEnergyDiscard } from '../effects/special-energy.mjs';
 import { parseAttackSteps, resolveCoinGates } from '../rules/attack-steps.mjs';
 import { isBasicEnergy } from '../rules/card-classify.mjs';
+import { isPokemonToolCard } from '../rules/ability-executors.mjs';
 import { isAncientCard, isFutureCard } from '../rules/paradox-tags.mjs';
 import { serverEnergyDescriptor } from '../rules/server-energy.mjs';
 import { clearConditions } from '../rules/special-conditions.mjs';
@@ -476,6 +477,30 @@ export function optionalCostOffer(draft, { playerId, attacker, attack, clause })
       };
     case 'discardStadium':
       return draft.stadium ? yesNo('discard the Stadium in play') : null;
+    case 'discardTool': {
+      const tools = attachedToolCards(draft, playerId, attacker);
+      if (tools.length === 0) return null;
+      return {
+        prompt: `${attack.name}: choose a Pokémon Tool to discard from this Pokémon for ${bonus} more damage (pick none to decline).`,
+        options: tools.map((c) => ({ instanceId: c.instanceId, name: c.name, type: 'card' })),
+        min: 0,
+        max: 1,
+        allowedIds: tools.map((c) => c.instanceId),
+      };
+    }
+    case 'shuffleEnergy':
+      return energy.length > 0 ? yesNo('shuffle all Energy attached to this Pokémon into your deck') : null;
+    case 'discardBench': {
+      const bench = (draft.players[playerId]?.zones?.bench || []).filter((c) => !c.attachedTo && isPokemon(c));
+      if (bench.length === 0) return null;
+      return {
+        prompt: `${attack.name}: choose Benched Pokémon to discard (${bonus} more damage each, pick none to decline).`,
+        options: bench.map((c) => ({ instanceId: c.instanceId, name: c.name, type: 'card' })),
+        min: 0,
+        max: bench.length,
+        allowedIds: bench.map((c) => c.instanceId),
+      };
+    }
     case 'showHand':
       return yesNo('show your hand to your opponent');
     case 'drawback':
@@ -525,6 +550,15 @@ function costEnergyCards(draft, { playerId, attacker, cost }) {
   );
   if (types.length === 0) return cards;
   return cards.filter((c) => types.some((type) => matchesSearch(c, `${type} Energy`)));
+}
+
+/** The Pokémon Tools attached to the attacker. */
+function attachedToolCards(draft, playerId, attacker) {
+  if (!attacker) return [];
+  const player = draft.players[playerId];
+  return [...(player?.zones?.active || []), ...(player?.zones?.bench || [])].filter(
+    (c) => c.attachedTo === attacker.instanceId && isPokemonToolCard(c)
+  );
 }
 
 /** Moves attached cards (by id) off the attacker to their owner's discard pile or hand. */
@@ -585,6 +619,58 @@ export function payOptionalCost(draft, { playerId, attacker, token, selection, a
       const ids = cost.all ? (yes ? energy() : []) : picked.slice(0, 1);
       if (ids.length === 0) return declined;
       const n = moveAttachedCards(draft, { playerId, ids, to: 'hand', reason: 'attack-return-energy', events });
+      return { paid: n > 0, count: n };
+    }
+    case 'discardTool': {
+      const ids = picked.slice(0, 1);
+      if (ids.length === 0) return declined;
+      const n = moveAttachedCards(draft, { playerId, ids, to: 'discard', reason: 'attack-tool-discard', events });
+      return { paid: n > 0, count: n };
+    }
+    case 'discardBench': {
+      const player = draft.players[playerId];
+      const bench = player?.zones?.bench || [];
+      let n = 0;
+      for (const id of [...new Set(picked)]) {
+        const root = bench.find((c) => c.instanceId === id && !c.attachedTo);
+        if (!root) continue;
+        const cards = [root, ...bench.filter((c) => c.attachedTo === id)];
+        for (const card of cards) {
+          bench.splice(bench.indexOf(card), 1);
+          card.attachedTo = null;
+          discardCardToPlayerZone(player, card);
+        }
+        root.damage = 0;
+        clearConditions(root);
+        events.push({
+          type: 'cardsDiscarded',
+          playerId,
+          reason: 'attack-bench-discard',
+          cards: cards.map((c) => ({ instanceId: c.instanceId, name: c.name })),
+        });
+        n++;
+      }
+      return { paid: n > 0, count: n };
+    }
+    case 'shuffleEnergy': {
+      if (!yes) return declined;
+      const player = draft.players[playerId];
+      let n = 0;
+      for (const id of energy()) {
+        const ref = findCard(draft, id);
+        const zone = ref?.player?.zones?.[ref.zoneId];
+        const idx = zone ? zone.findIndex((c) => c.instanceId === id) : -1;
+        if (idx < 0) continue;
+        const [card] = zone.splice(idx, 1);
+        card.attachedTo = null;
+        player.zones.deck.push(card);
+        events.push({ type: 'cardMoved', instanceId: id, from: ref.zoneId, to: 'deck', playerId, reason: 'attack-energy-shuffle' });
+        n++;
+      }
+      if (n > 0) {
+        shuffleDeckWithRng(player, activeRng);
+        events.push({ type: 'deckShuffled', playerId });
+      }
       return { paid: n > 0, count: n };
     }
     case 'discardStadium':

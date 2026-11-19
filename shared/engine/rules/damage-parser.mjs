@@ -571,6 +571,19 @@ export function parseAttackDamage(
     } else {
       notes.push('per-counter reduction — resolve the printed count');
     }
+  } else if (text && namedInPlayClauses(text)) {
+    // Aegislash ex Royal Guard (customhb): "30 more damage for each Honedge in play, 40 more damage
+    // for each Doublade in play, and 60 more damage Aegislash in play (both yours and your
+    // opponent's)" — one per-name bonus per clause, counted on both sides.
+    const names = (ctx.allInPlayNames || []).map((n) => String(n).toLowerCase());
+    let added = 0;
+    for (const { per, name } of namedInPlayClauses(text)) {
+      const count = names.filter((n) => n === name).length;
+      added += per * count;
+      notes.push(`+ ${per} × ${count} (${name} in play)`);
+    }
+    total = base + added;
+    components.push('per-each');
   } else if (
     text &&
     /number of energy|× the number|\* the number/.test(text) &&
@@ -621,7 +634,7 @@ export function parseAttackDamage(
       // Revealed-hand scaling (Poltergeist, Liberation-GX, Wonder Flare) counts one card kind.
       count = handKind === 'trainer' ? ctx.opponentHandTrainerCount : ctx.opponentHandEnergyCount;
       label = `${handKind === 'trainer' ? 'Trainer' : 'Energy'} cards in opponent's hand`;
-    } else if (/^(?:energy )?cards? you returned|^damage counters? you (?:put|placed)/.test(unit)) {
+    } else if (/^(?:energy )?cards? you returned|^damage counters? you (?:put|placed)|^benched pok[ée]mon you discarded in this way/.test(unit)) {
       // Yanmega Wind Return / Meganium Bouncy Move: the optional cost the player paid
       // (ctx.optionalCostCount, set with ctx.optionalCostPaid by the reducer).
       count = ctx.optionalCostCount;
@@ -1031,6 +1044,15 @@ export function parseAttackDamage(
     notes.push(`coin: ${ctx.coin || 'pending'} (attack effect)`);
   }
 
+  // Alolan Graveler Rolling Tackle (customhb): "This attack does 20 more damage each time it is
+  // used" — once for each earlier use by this Pokémon (ctx.earlierUses).
+  const perUse = /this attack does (\d+) more damage each time it is used/.exec(text);
+  if (perUse && typeof ctx.earlierUses === 'number') {
+    total += Number(perUse[1]) * ctx.earlierUses;
+    if (!components.includes('per-each')) components.push('per-each');
+    notes.push(`+ ${perUse[1]} × ${ctx.earlierUses} (earlier uses)`);
+  }
+
   // Recoil / self-damage (printed text specifies damage dealt to this Pokémon)
   const perCounterSelf = amount(
     text,
@@ -1052,12 +1074,20 @@ export function parseAttackDamage(
     // 100 damage to itself." — the recoil is part of the accepted offer.
     const selfSentence = text.split(/(?<=\.)\s+/).find((s) => /does \d+ damage to itself/.test(s)) || '';
     const declinedRecoil = /^if you do,/.test(selfSentence) && ctx.optionalCostPaid !== true;
+    // Alolan Golem Electromagnetic Catapult (customhb): "Flip 4 coins. … This Pokémon does 70
+    // damage to itself for each tails."
+    const perTails = /does \d+ damage to itself for each tails/.test(selfSentence);
     if (
       directSelfDamage > 0 &&
       !declinedRecoil &&
+      !perTails &&
       !/if tails|if both of them are tails/.test(text)
     ) {
       selfDamage += directSelfDamage;
+    }
+    const flipCount = Number(/\bflip (\d+) coins\b/.exec(text)?.[1]);
+    if (perTails && flipCount > 0 && typeof headsCount === 'number') {
+      selfDamage += directSelfDamage * Math.max(0, flipCount - headsCount);
     }
   }
   // Beldum Metal Charge / Gengar V Pain Explosion: "Put 3 damage counters on this Pokémon."
@@ -1107,6 +1137,18 @@ export function parseAttackDamage(
     selfDamage,
     resolved,
   };
+}
+
+// Several "N more damage for each <Name> in play" clauses in one sentence, both sides
+// ("(both yours and your opponent's)"). Null unless the sentence lists two or more names.
+function namedInPlayClauses(text) {
+  const sentence = /this attack does (\d+) more damage for each [^.]* in play[^.]*\(both yours and your opponent's\)/.exec(text)?.[0];
+  if (!sentence) return null;
+  const clauses = [...sentence.matchAll(/(\d+) more damage (?:for each )?([a-z][a-z' -]*?) in play/g)].map((m) => ({
+    per: Number(m[1]),
+    name: m[2].trim(),
+  }));
+  return clauses.length >= 2 && clauses.every((c) => !/pok[ée]mon/.test(c.name)) ? clauses : null;
 }
 
 // ── §D heal family helpers (pure — execution happens in attack()) ──
@@ -1697,12 +1739,12 @@ export function eachPokemonDamage(attackText) {
     };
     return { amount: Number(amount), activeOnly: false, filter, bothSides: true };
   }
-  const m = /(?:^|\.\s+)(?:if (heads|tails), )?(?:this attack )?does (\d+) damage to each (of your opponent's pokémon|defending pokémon|pokémon)([^.(]*)(\(both yours and your opponent's\))?/.exec(
+  const m = /(?:^|\.\s+)(?:if (heads|tails), )?(for each energy (?:card )?you discard(?:ed)?(?: in this way)?, )?(?:this attack )?does (\d+) damage to each (of your opponent's pokémon|defending pokémon|pokémon)([^.(]*)(\(both yours and your opponent's\))?/.exec(
     text
   );
   if (!m) return null;
-  const [, gate, amount, scope, rawTail, both] = m;
-  const gated = gate ? { gate } : {};
+  const [, gate, perDiscard, amount, scope, rawTail, both] = m;
+  const gated = { ...(gate ? { gate } : {}), ...(perDiscard ? { perDiscard: true } : {}) };
   const tail = rawTail.trimEnd();
   if (scope === 'defending pokémon') return tail ? null : { amount: Number(amount), activeOnly: true, filter: {}, ...gated };
   // Manectric Power Wave: "each Pokémon that has any Poké-Powers (both yours and your opponent's)".
@@ -1740,6 +1782,8 @@ export function attackTargetClause(attackText) {
   // TCGdex prints typographic apostrophes ("opponent’s"); normalize them so the
   // patterns below match the fetched card text (Dusk Shot et al.).
   const t = String(attackText || '').replace(/[‘’]/g, "'").replace(/\s+/g, ' ');
+  // Gardevoir Telekinesis: the snipe and its Energy move are one step (atkSnipeMoveEnergy).
+  if (/damage to 1 of your opponent's pok[ée]mon\. move an energy from that pok[ée]mon to another of their pok[ée]mon/i.test(t)) return null;
   const withFilter = (clause, phrase) => {
     const described = targetFilter(phrase);
     if (!described) return null;

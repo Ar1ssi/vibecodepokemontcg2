@@ -482,6 +482,11 @@ const CLAUSES = [
     new RegExp(`^${DEFENDER} has \\{([a-z])\\} resistance$`),
     (m) => ({ desc: { kind: 'defenderResistance', type: ENERGY_LETTER_TYPES[m[1]] }, printedNegated: false }),
   ],
+  // Tapu Lele Psyshock (customhb): "If your opponent's Active Pokémon is weak to {P}".
+  [
+    new RegExp(`^${DEFENDER} (?:is weak to|has (?:a )?weakness to) \\{([a-z])\\}(?: type)?$`),
+    (m) => ({ desc: { kind: 'defenderWeakness', type: ENERGY_LETTER_TYPES[m[1]] }, printedNegated: false }),
+  ],
   // Armaldo ex Vortex Chop: "If the Defending Pokémon has any Resistance".
   [
     new RegExp(`^${DEFENDER} has any resistance$`),
@@ -533,6 +538,11 @@ const CLAUSES = [
     /^this pokémon was healed during this turn$/,
     () => ({ desc: { kind: 'healedThisTurn' }, printedNegated: false }),
   ],
+  // Gardevoir ex Swelling Pulse (customhb): "If this Pokémon was healed during your last turn".
+  [
+    /^this pokémon was healed during your last turn$/,
+    () => ({ desc: { kind: 'healedLastOwnTurn' }, printedNegated: false }),
+  ],
   // Tapu Fini Shining Currents: "If any of your Water Pokémon were healed during this turn".
   [
     /^any of your (?:\{([a-z])\} )?pokémon were healed during this turn$/,
@@ -563,8 +573,16 @@ const CLAUSES = [
   ],
   // Alakazam ex Spoon Bend: "If the opponent's Active Pokémon has any {M} Energy attached".
   [
-    /^(?:your opponent's active pokémon|the defending pokémon) has any \{([a-z])\} energy(?: cards?)? attached(?: to it)?$/,
-    (m) => ({ desc: { kind: 'defenderEnergyType', type: ENERGY_LETTER_TYPES[m[1]] }, printedNegated: false }),
+    /^(?:your opponent's active pokémon|the defending pokémon) has any \{([a-z])\}(?: or \{([a-z])\})? energy(?: cards?)? attached(?: to it)?$/,
+    // Melmetal ex Fire Punch (customhb): "… has any {M} or {G} Energy attached".
+    (m) => ({
+      desc: {
+        kind: 'defenderEnergyType',
+        type: ENERGY_LETTER_TYPES[m[1]],
+        ...(m[2] ? { types: [ENERGY_LETTER_TYPES[m[1]], ENERGY_LETTER_TYPES[m[2]]] } : {}),
+      },
+      printedNegated: false,
+    }),
   ],
   [
     /^you attach(?:ed)? an? (?:\{([a-z])\} )?energy card from your hand to this pokémon during this turn$/,
@@ -1073,7 +1091,10 @@ const CHECKS = {
     list(ctx.defenderResistanceTypes).some(
       (type) => cond.type == null || String(type).toLowerCase() === String(cond.type).toLowerCase()
     ),
+  defenderWeakness: (cond, ctx) =>
+    list(ctx.defenderWeaknessTypes).some((type) => String(type).toLowerCase() === String(cond.type).toLowerCase()),
   healedThisTurn: (cond, ctx) => ctx.attackerHealedThisTurn === true,
+  healedLastOwnTurn: (cond, ctx) => ctx.attackerHealedLastOwnTurn === true,
   ownHealedThisTurn: (cond, ctx) =>
     list(ctx.ownHealedTypesThisTurn).some(
       (types) => !cond.type || list(types).some((t) => sameType(t, cond.type))
@@ -1085,7 +1106,10 @@ const CHECKS = {
   attackerRemainingHp: (cond, ctx) => compare(num(ctx.attackerRemainingHp), cond.op, cond.n),
   defenderEnergyType: (cond, ctx) =>
     list(ctx.defenderEnergyUnits).some((unit) =>
-      String(unit).toLowerCase().split('|').some((part) => sameType(part, cond.type))
+      String(unit)
+        .toLowerCase()
+        .split('|')
+        .some((part) => (cond.types || [cond.type]).some((type) => sameType(part, type)))
     ),
   damagedLastOpponentTurn: (cond, ctx) => num(ctx.attackerDamageTakenLastTurn) > 0,
   discardedCardIs: (cond, ctx) => {
@@ -1159,6 +1183,7 @@ const DEFENDER_KINDS = new Set([
   'defenderName',
   'defenderAbility',
   'defenderResistance',
+  'defenderWeakness',
   'energyVsDefender',
   'defenderEnergyCount',
   'defenderEnergyType',

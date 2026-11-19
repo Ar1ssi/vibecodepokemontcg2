@@ -19,7 +19,9 @@ import { becomeFossilPokemon, isFossilItem } from '../rules/fossil.mjs';
 import { addCondition, clearConditions, hasAnyCondition } from '../rules/special-conditions.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
 import { isGxCard, isVCard } from '../rules/card-classify.mjs';
-import { cardEffectiveHp } from '../reduce/shared.mjs';
+import { cardEffectiveHp, inPlayView } from '../reduce/shared.mjs';
+import { parseConditionClause, attackConditionMet } from '../rules/attack-conditions.mjs';
+import { buildServerAttackContext } from '../rules/attack-damage-context.mjs';
 import { effectTextFor, stepRevealsPicks } from '../rules/reveal-picks.mjs';
 import {
   healLocked, addAttackMarker, markerFromTurn, markerUntilTurn,
@@ -411,6 +413,25 @@ function normalizeStatusAbilityStep(step) {
   };
 }
 
+/** A printed "If <board condition>, …" gate on an attack step, read as the attack reads it. */
+function attackBoardConditionHolds(draft, { playerId, oppId, sourceCard, clause }) {
+  const condition = parseConditionClause(clause);
+  if (!condition) return false;
+  const attacker = (sourceCard && findCard(draft, sourceCard.instanceId)?.card) || sourceCard || null;
+  const defender = (draft.players[oppId]?.zones?.active || []).find((c) => !c.attachedTo) || null;
+  return attackConditionMet(
+    condition,
+    buildServerAttackContext(draft, {
+      attackerPlayerId: playerId,
+      defenderPlayerId: oppId,
+      attacker,
+      defender,
+      attackerView: attacker ? inPlayView(draft, attacker) : null,
+      defenderView: defender ? inPlayView(draft, defender) : null,
+    })
+  );
+}
+
 function normalizeSteps(branch) {
   if (!branch) return [];
   if (Array.isArray(branch)) return branch;
@@ -479,6 +500,9 @@ export function executeSteps(draft, {
 
     // "If you attached Energy … in this way" bonuses (I93): remember the attach across resumes.
     const lastAttach = events.findLast((e) => e.type === 'cardAttached');
+    // Joltik Jolting Charge: "For each Energy card attached, …" counts every attach of the effect.
+    const attachedIds = events.filter((e) => e.type === 'cardAttached' && e.playerId === playerId).map((e) => e.instanceId);
+    if (attachedIds.length > 0) context.attachedIds = [...new Set([...(context.attachedIds || []), ...attachedIds])];
     if (lastAttach) {
       context.attachedEnergy = true;
       context.attachedTargetId = lastAttach.targetInstanceId;
@@ -525,6 +549,14 @@ export function executeSteps(draft, {
     }
     if (step.requiresDefenderKnockedOut && !context.defenderKnockedOut) {
       events.push({ type: 'effectStepSkipped', reason: 'defender_not_knocked_out', step: step.type });
+      continue;
+    }
+    if (
+      effectType === 'attackSteps' &&
+      step.boardCondition &&
+      !attackBoardConditionHolds(draft, { playerId, oppId, sourceCard, clause: step.boardCondition })
+    ) {
+      events.push({ type: 'effectStepSkipped', reason: 'condition_unmet', step: step.type });
       continue;
     }
     if (
@@ -598,6 +630,8 @@ export function executeSteps(draft, {
         revealsPicks: stepRevealsPicks(step, effectTextFor({ effectType, sourceCard, context })),
         selection: stepSelection,
         memo: context[memoKey],
+        // Joltik Jolting Charge: how many cards this effect attached (across resumes).
+        attachedThisEffect: (context.attachedIds || []).length,
         // Runs `more` right after this step (a Supporter's effect used as an attack's, design
         // 036 E). The widened list rides on later resume tokens.
         insertSteps: (more) => {

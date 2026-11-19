@@ -5,9 +5,10 @@
  */
 
 import { findCard, discardCardToPlayerZone } from '../state.mjs';
-import { isPokemon } from '../cards.mjs';
+import { isEnergy, isPokemon } from '../cards.mjs';
 import { attachedTrainerMarkers } from '../rules/legacy-attached-trainer.mjs';
-import { sideContextFor } from '../rules/ability-combat.mjs';
+import { isAbilitySuppressed, sideContextFor } from '../rules/ability-combat.mjs';
+import { resolveAttachedEnergyType } from '../rules/energy-effects.mjs';
 import { pokemonHasType } from '../effects/trainer-steps.mjs';
 import { liveAttackMarkers } from '../rules/attack-markers.mjs';
 import { effectiveHp, isStadiumToolNegation } from '../rules/stadium-effects.mjs';
@@ -79,7 +80,27 @@ export function inPlayView(state, card) {
   if (!card) return card;
   const ref = findCard(state, card.instanceId);
   const zone = ref?.player?.zones?.[ref.zoneId];
-  return Array.isArray(zone) ? evolvedView(zone, card) : card;
+  return Array.isArray(zone) ? withTypeChange(state, evolvedView(zone, card), card, zone, ref.playerId) : card;
+}
+
+const MULTITYPE_RE = /this pok[ée]mon's type changes based on the most recently attached energy/i;
+
+/**
+ * The types an in-play Pokémon has right now, when an effect changes them: Zeraora ex Plasma
+ * Fists' `typeOverride` marker ("treated as a {L} type"), or Arceus ex Multitype ("This Pokémon's
+ * type changes based on the most recently attached Energy"; customhb).
+ */
+function withTypeChange(state, view, card, zone, ownerId) {
+  if (!view) return view;
+  const marker = liveAttackMarkers(card, { turnNumber: state.turn?.number, zoneCards: zone }).findLast(
+    (m) => m.kind === 'typeOverride'
+  );
+  if (marker?.type) return { ...view, types: [marker.type] };
+  const abilities = Array.isArray(view.abilities) ? view.abilities : [];
+  if (!abilities.some((a) => MULTITYPE_RE.test(String(a?.text ?? a?.effect ?? '')))) return view;
+  const latest = zone.filter((c) => c.attachedTo === card.instanceId && isEnergy(c)).at(-1);
+  if (!latest || isAbilitySuppressed(view, sideContextFor(state, ownerId))) return view;
+  return { ...view, types: [resolveAttachedEnergyType(latest)] };
 }
 
 // Context a special Energy's provision conditions read (energy-effects

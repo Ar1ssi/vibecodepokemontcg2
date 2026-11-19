@@ -26,6 +26,7 @@
 
 // Effect families an attack can be classified into (taxonomy Section D).
 import { optionalCostBonusClause } from './optional-cost-bonus.mjs';
+import { canonicalEffectWording } from './effect-wording.mjs';
 
 export const ATTACK_FAMILIES = [
   'flat', // bare "30" damage number
@@ -821,6 +822,21 @@ export function applyAttackEffect(attack, attackerCard = {}) {
   };
 }
 
+// Gates of a multi-coin attack, read against the attack's own flips.
+const MULTI_COIN_GATES = [
+  [/^if both (?:of them )?are heads,\s*/, () => ({ headsCount }) => headsCount >= 2],
+  [/^if all (?:of them )?are heads,\s*/, () => ({ headsCount, flips }) => flips.length > 0 && headsCount === flips.length],
+  [/^if (?:at least (\d+) of them are|(\d+) or more (?:of them )?are) heads,\s*/, (m) => ({ headsCount }) => headsCount >= Number(m[1] || m[2])],
+];
+
+function multiCoinGate(sentence) {
+  for (const [re, build] of MULTI_COIN_GATES) {
+    const m = re.exec(sentence);
+    if (m) return { length: m[0].length, holds: build(m) };
+  }
+  return null;
+}
+
 /**
  * Next-turn locks from attack text:
  * - selfCannotAttack: "can't attack during your next turn"
@@ -832,17 +848,23 @@ export function applyAttackEffect(attack, attackerCard = {}) {
  * other "If <condition>, …" sentence counts when `conditionHolds(condition)` is true (Dialga-EX
  * Chrono Wind: "If the Defending Pokémon is a Pokémon-EX, it can't attack …").
  * @param {object} attack Printed attack ({ name, text })
- * @param {{ coin?: 'heads'|'tails'|null, headsCount?: number,
+ * @param {{ coin?: 'heads'|'tails'|null, headsCount?: number, flips?: string[],
  *   conditionHolds?: (condition: string) => boolean }} [flip] The attack's coin result and a
  *   board-condition reader; without one, conditional sentences set no lock
  */
-export function parseNextTurnLock(attack, { coin = null, headsCount = 0, conditionHolds = () => false } = {}) {
+export function parseNextTurnLock(
+  attack,
+  { coin = null, headsCount = 0, flips = [], conditionHolds = () => false } = {}
+) {
   const shows = (face) => coin === face || (face === 'heads' && headsCount > 0);
-  const t = lower(attack?.text ?? '')
+  const t = lower(canonicalEffectWording(attack?.text ?? ''))
     .split(/(?<=\.)\s+/)
     .flatMap((sentence) => {
       const gate = /^if (heads|tails),\s*/.exec(sentence);
       if (gate) return shows(gate[1]) ? [sentence.slice(gate[0].length)] : [];
+      // Several coins: "If both are heads, …" (Melmetal ex), "If at least 2 of them are heads, …".
+      const multi = multiCoinGate(sentence);
+      if (multi) return multi.holds({ headsCount, flips }) ? [sentence.slice(multi.length)] : [];
       const condition = /^if ([^,]+), (.+)$/.exec(sentence);
       if (condition) return conditionHolds(condition[1]) === true ? [condition[2]] : [];
       return /^if\b/.test(sentence) ? [] : [sentence];
@@ -878,6 +900,8 @@ export function parseNextTurnLock(attack, { coin = null, headsCount = 0, conditi
     /can(?:'t|not)\s+retreat\s+during\s+your\s+opponent's\s+next\s+turn/i.test(
       t
     ) ||
+    // Older wording with no duration (Pinsir Vise Grip): "the Defending Pokémon can't retreat."
+    /(?:^|[.,] )(?:the defending pok[ée]mon|your opponent's active pok[ée]mon) can't retreat(?:\.|$)/.test(t) ||
     // Carvanha Big Bite: "… can't retreat until the end of your opponent's next turn"; Umbreon
     // ex Black Cry: "… can't retreat or use any Poké-Powers during …".
     /(?:defending pok[ée]mon|it)\s+can(?:'t|not)\s+retreat(?:\s+or\s+[^.]*?)?\s+(?:during|until\s+the\s+end\s+of)\s+your\s+opponent's\s+next\s+turn/i.test(
