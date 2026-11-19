@@ -129,6 +129,8 @@ function cardsOfView(view) {
 let active = false;
 /** The running board: everything `disposeBoard3d` tears down. */
 let session = null;
+/** The in-flight `initializeBoard3d`, so concurrent calls build one scene. */
+let starting = null;
 
 /** True while the three.js board is the board on screen. */
 export const board3dActive = () => active;
@@ -193,7 +195,16 @@ const freshCanvas = (host, old) => {
  *   'legacy-netcode', 'load-failed', 'no-webgl2'; a later second context loss reports
  *   'context-lost-twice' after this resolved.
  */
-export async function initializeBoard3d({
+export async function initializeBoard3d(options) {
+  if (session) return { active, reason: null };
+  // The session only exists after the awaits in startBoard3d: a second call meanwhile joins the first.
+  starting ??= startBoard3d(options).finally(() => {
+    starting = null;
+  });
+  return starting;
+}
+
+async function startBoard3d({
   deps: injected = {},
   host = (injected.document ?? globalThis.document)?.getElementById('board3dHost') ?? null,
 } = {}) {
@@ -201,7 +212,6 @@ export async function initializeBoard3d({
   const doc = deps.document ?? globalThis.document;
   const win = deps.window ?? globalThis.window;
 
-  if (session) return { active, reason: null };
   if (!host || !doc) return fail(deps, 'no-host');
 
   const systemState = await deps.systemState();

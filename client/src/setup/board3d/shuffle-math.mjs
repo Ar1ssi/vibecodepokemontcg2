@@ -58,15 +58,17 @@ export function riffleSlot(index, count) {
   const other = count - size;
   const paired = Math.min(place, other);
   // Below `other` the two packets alternate; above it only the longer packet is left.
-  const level = place < other ? 2 * place + (side < 0 ? 0 : 1) : 2 * paired + (place - paired);
+  const alternating = 2 * place + (side < 0 ? 0 : 1);
+  const tail = 2 * paired + (place - paired);
+  const level = place < other ? alternating : tail;
   return { side, place, size, level };
 }
 
 /** When a card of a packet starts to fall (share of the shuffle); the right packet runs half a card behind. */
 function fallStart({ side, place, size }) {
   const { riffleStart, riffleEnd } = SHUFFLE_BEATS;
-  const window = riffleEnd - riffleStart - FALL;
-  const step = window / Math.max(1, size);
+  const fallSpan = riffleEnd - riffleStart - FALL;
+  const step = fallSpan / Math.max(1, size);
   return riffleStart + step * (place + (side > 0 ? 0.5 : 0));
 }
 
@@ -100,7 +102,7 @@ export function shuffleCardPose(index, count, time) {
     const u = span(t, start, start + FALL);
     if (u <= 0) {
       // Still in its packet, which sinks as the cards under this one fall away.
-      const taken = (span(t, riffleStart, riffleEnd - FALL) * size) / 1;
+      const taken = span(t, riffleStart, riffleEnd - FALL) * size;
       return {
         x: side * PACKET_X,
         y: 0,

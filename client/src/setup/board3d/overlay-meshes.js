@@ -98,6 +98,10 @@ function makeCanvas(wPx, hPx) {
   return { canvas, ctx };
 }
 
+let measureCtx = null;
+/** One shared 1×1 context for measuring text (each badge sets its own font before measuring). */
+const measureContext = () => (measureCtx ??= makeCanvas(1, 1).ctx);
+
 /** `newPath: false` adds the outline to the current path (an even-odd frame round the card). */
 function roundedRectPath(ctx, x, y, w, h, rx, ry, newPath = true) {
   if (newPath) ctx.beginPath();
@@ -630,7 +634,7 @@ export function createOverlayMeshes({
     for (const badge of row.badges) {
       const fontPx = badge.fontSize * box.w;
       const heightPx = 1.4 * fontPx;
-      const ctxProbe = makeCanvas(1, 1).ctx;
+      const ctxProbe = measureContext();
       if (ctxProbe) ctxProbe.font = fontOf(fontPx, 800);
       const textW = ctxProbe ? ctxProbe.measureText(badge.label).width : badge.label.length * 0.62 * fontPx;
       const widthPx = textW + 0.5 * fontPx;

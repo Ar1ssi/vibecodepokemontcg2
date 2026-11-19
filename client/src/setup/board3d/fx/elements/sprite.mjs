@@ -7,6 +7,8 @@
 // Positions are stage px (y down the screen) with z px above the cloth; the vertex shader takes
 // them to the world through uStageToWorld and faces the quad to the camera.
 
+import { clamp01, finite, headingOf } from './element-params.mjs';
+
 export const SPRITE_FLOATS = 16;
 export const SPRITE_BLENDS = Object.freeze(['add', 'over']);
 /**
@@ -17,8 +19,6 @@ export const SPRITE_BLENDS = Object.freeze(['add', 'over']);
 export const SPRITE_CHANNELS = Object.freeze(['r', 'a', 'rgba']);
 
 const DEG = Math.PI / 180;
-const finite = (v) => typeof v === 'number' && Number.isFinite(v);
-const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
 /**
  * The cols × rows a flipbook texture holds, from the `AxB` its name ends with (`_2x2`,
@@ -76,7 +76,7 @@ export function normalizeSprite(params) {
     alpha,
     frame: finite(params.frame) && params.frame > 0 ? Math.floor(params.frame) : 0,
     dissolve: finite(params.dissolve) ? clamp01(params.dissolve) : 0,
-    align: finite(params.alignDeg) ? { x: Math.cos(params.alignDeg * DEG), y: Math.sin(params.alignDeg * DEG) } : null,
+    align: finite(params.alignDeg) ? headingOf(params.alignDeg) : null,
   };
 }
 
