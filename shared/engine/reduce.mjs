@@ -32,6 +32,8 @@ import {
 import {
   discardBenchedAttachedTrainers, setupCommand, takeTurnCommand, loadDeckCommand, cardStatsCommand,
   applyAbilitySleepLocks,
+  applyAbilityStatusImmunity,
+  trackEnergyDiscards,
   applyStadiumStatusImmunity,
 } from './reduce/turn.mjs';
 import { retreatCommand } from './reduce/retreat.mjs';
@@ -450,6 +452,8 @@ export function applyCommand(state, command, rng = null) {
   if (draft.rulesEnabled) {
     settleSpecialEnergyPassives(draft, { events });
     applyAbilitySleepLocks(draft, { events });
+    applyAbilityStatusImmunity(draft, { events });
+    trackEnergyDiscards(draft);
     applyStadiumStatusImmunity(draft, { events });
     discardBenchedAttachedTrainers(draft, { events });
   }

@@ -11,7 +11,7 @@ import { combinedToolRetreatCost } from '../rules/tool-combat.mjs';
 import { teamNoRetreatCostForActive } from '../rules/ability-executors.mjs';
 import { stadiumRetreatCoin } from '../rules/stadium-triggers.mjs';
 import { applyStadiumSwitchTriggers } from '../effects/stadium-trigger-apply.mjs';
-import { abilityRetreatCost } from '../rules/ability-combat.mjs';
+import { abilityNoRetreatCost, abilityRetreatCost } from '../rules/ability-combat.mjs';
 import { createPendingChoice } from '../effects/executor.mjs';
 import { clearAttackMarkers } from '../rules/attack-markers.mjs';
 import {
@@ -47,6 +47,8 @@ export function computeEffectiveRetreatCost(state, card, playerId, { zoneId = 'a
   if (isActive && teamNoRetreatCostForActive(inPlayView(state, card), benchViews, activeZone)) return 0;
   // Magnetic Metal / Hiding Darkness / Holon WP Energy (audit SE6): "has no Retreat Cost".
   if (hasSpecialEnergyFreeRetreat(inPlayView(state, card), activeZone)) return 0;
+  // Giratina Dimension Breach, Wimpod Punk Out (customhb).
+  if (abilityNoRetreatCost(inPlayView(state, card), { ...abilitySideContext(state, playerId), zone: zoneId, isActive })) return 0;
 
   // 1. Tool retreat cost modifier + self ability modifier
   const blockTools = isStadiumToolNegation(stadium?.card || stadium);

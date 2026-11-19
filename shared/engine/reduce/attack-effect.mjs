@@ -46,6 +46,7 @@ import { parseAttackStatusBranches, statusesFromBranches, poisonCheckupCounters 
 import {
   benchTargets, discardCardFromPlayerZone, activeAttackMarkers, inPlayView, cardEffectiveHp,
   conditionsUpdatedEvent, isGameConcluded, abilitySideContext, shuffleDeckWithRng, rootsIn,
+  onlyPokemonInPlay,
 } from './shared.mjs';
 import {
   endTurnAfterFailedAttack, spendGxAttack, spendVstarAttack, withSelfNamedAttack, ninjaTrickSwitch,
@@ -984,6 +985,7 @@ export function resolveAttackEffectPhase(draft, ctx) {
                 baseHp: koHp,
                 stadium: draft.stadium,
                 inHp: true,
+                onlyPokemonInPlay: onlyPokemonInPlay(draft, defenderPlayerId),
                 // Focus Band: the flip is consumed only when a coin-flip candidate is
                 // actually evaluated, so seeded RNG streams stay untouched otherwise.
                 flipCoin: () => (activeRng.next() < 0.5 ? 'heads' : 'tails'),
@@ -1223,8 +1225,9 @@ export function resolveAttackEffectPhase(draft, ctx) {
             let lands = true;
             if (onDamageStatus.coin) {
               const face = flipCoin(activeRng);
-              events.push({ type: 'coinFlipped', playerId: defenderPlayerId, face, source: onDamageStatus.source });
-              lands = face === 'heads';
+              const flipper = onDamageStatus.flipper === 'opponent' ? playerId : defenderPlayerId;
+              events.push({ type: 'coinFlipped', playerId: flipper, face, source: onDamageStatus.source });
+              lands = face === (onDamageStatus.landsOn || 'heads');
             }
             for (const cond of lands ? onDamageStatus.conditions : []) {
               if (addCondition(atkRef.card, cond)) events.push(conditionsUpdatedEvent(atkRef.card, cond));

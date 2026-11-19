@@ -1262,9 +1262,18 @@ function atkAttach(ctx) {
   const { player, step } = ctx;
   if (step.source === 'deckTop' && !ctx.selection && !ctx.memo?.cardIds) {
     ctx.events.push({ type: 'cardsLookedAt', playerId: player.playerId, count: Math.min(step.look, player.zones.deck.length) });
+    // Hydreigon Tri Howl discards the looked-at cards it did not attach: remember which they were
+    // across the attach choices.
+    if (step.rest === 'discard') player.lookedAtTopIds = player.zones.deck.slice(0, step.look).map((c) => c.instanceId);
   }
   const pending = attachFromZone(ctx);
   if (!pending && step.source === 'deckTop' && step.rest === 'shuffle') shuffleOwnDeck(player, ctx);
+  // The looked-at cards not attached are the top `look` minus what this effect attached.
+  if (!pending && step.source === 'deckTop' && step.rest === 'discard') {
+    const looked = new Set(player.lookedAtTopIds || []);
+    delete player.lookedAtTopIds;
+    discardCards(player, player.zones.deck.filter((c) => looked.has(c.instanceId)), ctx.events, { from: 'deck' });
+  }
   return pending;
 }
 
@@ -1509,7 +1518,13 @@ function atkLookTopTake(ctx) {
     const rest = viewed.filter((c) => !kept.includes(c));
     if (step.rest === 'lostZone') moveToLostZone(ctx, player, rest);
     else if (step.rest === 'discard') discardCards(player, rest, ctx.events, { from: 'deck' });
-    else shuffleOwnDeck(player, ctx);
+    else if (step.rest === 'bottom') {
+      for (const card of rest) {
+        removeFromZones(player, card);
+        player.zones.deck.push(card);
+      }
+      if (rest.length > 0) ctx.events.push({ type: 'cardsToDeckBottom', playerId: player.playerId, count: rest.length });
+    } else shuffleOwnDeck(player, ctx);
     return null;
   };
   if (ctx.selection) return finish(pickById(viewed, ctx.selection).slice(0, step.take || 1));
@@ -1826,6 +1841,74 @@ function atkEachShuffleHandCards(ctx) {
     });
   }
   return null;
+}
+
+// Magearna Change Clothes / Genesect ex Drive Change (customhb): "put a Pokémon Tool card attached
+// to 1 of your Pokémon / this Pokémon into your hand".
+function atkToolToHand(ctx) {
+  const { player, step } = ctx;
+  const ref = attackerRef(ctx);
+  const hosts = step.from === 'self' ? (ref ? [ref.card] : []) : rootsOf(player);
+  const tools = hosts.flatMap((host) => attachedCards(player, host.instanceId).filter(isToolCard));
+  const take = (card) => {
+    moveToZone(player, card, 'hand', findCard(ctx.draft, card.instanceId)?.zoneId || 'active', ctx.events);
+    return null;
+  };
+  if (ctx.selection) {
+    const card = pickById(tools, ctx.selection)[0];
+    return card ? take(card) : skip(ctx, 'tool_not_found');
+  }
+  if (tools.length === 0) return skip(ctx, 'no_tool');
+  if (tools.length === 1) return take(tools[0]);
+  return ctx.ask({ prompt: `${attackName(ctx)}: Choose a Pokémon Tool to put into your hand`, options: tools, min: 1, max: 1 });
+}
+
+// Lucario Precognitive Aura (customhb): "have your opponent reveal a Trainer card in their hand" —
+// the opponent chooses which one; with none, they show nothing.
+function atkOppRevealsKind(ctx) {
+  const { opponent, player } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const matching = (opponent.zones.hand || []).filter((c) => isTrainer(c));
+  const reveal = (card) => {
+    ctx.events.push({ type: 'cardsRevealed', playerId: opponent.playerId, toPlayerId: player.playerId, cards: [revealedCard(card)] });
+    return null;
+  };
+  if (ctx.selection) {
+    const card = pickById(matching, ctx.selection)[0];
+    return card ? reveal(card) : skip(ctx, 'card_not_found');
+  }
+  if (matching.length === 0) return skip(ctx, 'no_matching_card');
+  if (matching.length === 1) return reveal(matching[0]);
+  return ctx.ask({
+    player: opponent.playerId,
+    prompt: `${attackName(ctx)}: Choose a Trainer card in your hand to reveal`,
+    options: matching,
+    min: 1,
+    max: 1,
+  });
+}
+
+// Jellicent Deep Sea Draw (customhb): "If you do, you may put a card from your hand on the bottom
+// of your deck." Picking none declines.
+function atkHandToDeckBottom(ctx) {
+  const { player, step } = ctx;
+  const hand = player.zones.hand || [];
+  if (ctx.selection) {
+    const picked = pickById(hand, ctx.selection).slice(0, step.count || 1);
+    for (const card of picked) {
+      removeFromZones(player, card);
+      player.zones.deck.push(card);
+    }
+    if (picked.length > 0) ctx.events.push({ type: 'cardsToDeckBottom', playerId: player.playerId, count: picked.length });
+    return null;
+  }
+  if (hand.length === 0) return skip(ctx, 'empty_hand');
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: You may put a card from your hand on the bottom of your deck`,
+    options: hand,
+    min: step.optional ? 0 : 1,
+    max: step.count || 1,
+  });
 }
 
 // Mega Skarmory ex Sonic Ripper (customhb): "Shuffle all Energy attached to this Pokémon into
@@ -2188,10 +2271,12 @@ function atkOpponentAttacksOwn(ctx) {
     if (findCard(ctx.draft, target.instanceId)?.zoneId === 'active') {
       const userTypes = viewOf(user).types || [];
       const targetView = viewOf(target);
-      const weak = (targetView.weaknesses || []).find((w) => userTypes.includes(w.type));
-      const resist = (targetView.resistances || []).find((r) => userTypes.includes(r.type));
-      if (weak) amount *= 2;
-      if (resist) amount = Math.max(0, amount - (Math.abs(parseInt(resist.value, 10)) || 30));
+      // In play a card carries `weakness` / `resistance` ({ type, value }); a raw record, arrays.
+      const listOf = (one, many) => (one ? [one] : Array.isArray(many) ? many : []);
+      const weak = listOf(targetView.weakness, targetView.weaknesses).find((w) => userTypes.includes(w.type));
+      const resist = listOf(targetView.resistance, targetView.resistances).find((r) => userTypes.includes(r.type));
+      if (weak) amount *= Math.max(2, Number(String(weak.value ?? 2).replace(/[^0-9]/g, '')) || 2);
+      if (resist) amount = Math.max(0, amount - (Math.abs(parseInt(String(resist.value).replace(/[^0-9-]/g, ''), 10)) || 30));
     }
     ctx.events.push({
       type: 'attackDamageRequest',
@@ -4481,6 +4566,9 @@ export const ATTACK_STEP_HANDLERS = {
   atkDraw,
   atkShuffleOppActiveEnergy,
   atkShuffleSelfEnergy,
+  atkToolToHand,
+  atkOppRevealsKind,
+  atkHandToDeckBottom,
   atkOpponentAttacksOwn,
   atkSnipeMoveEnergy,
   atkEachShuffleHandCards,

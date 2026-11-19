@@ -10,6 +10,7 @@ import { isBasicPokemon, isPokemon, isEnergy, isAttachedAsTool } from '../cards.
 import { isExCard, isGxCard, isVCard, isVmaxCard, isTeraCard } from './card-classify.mjs';
 import { prizesTakenFor } from '../formats.mjs';
 import { rewriteLegacyPowerWording, parseLegacyDamageModifier } from './legacy-power-wording.mjs';
+import { canonicalEffectWording } from './effect-wording.mjs';
 
 const lower = (v) =>
   String(v ?? '')
@@ -36,7 +37,11 @@ function modernWording(text) {
   let rewritten = legacyRewriteCache.get(text);
   if (rewritten === undefined) {
     // Custom-set prints say "in your Active slot" for "in the Active Spot" (customhb Neutralizing Gas).
-    rewritten = rewriteLegacyPowerWording(text).replace(/\bin (?:your|the) active slot\b/g, 'in the active spot');
+    // Hand-typed wordings read as their printed spelling first (effect-wording.mjs).
+    rewritten = rewriteLegacyPowerWording(canonicalEffectWording(text).toLowerCase()).replace(
+      /\bin (?:your|the) active (?:slot|spot)\b/g,
+      'in the active spot'
+    );
     legacyRewriteCache.set(text, rewritten);
   }
   return rewritten;
@@ -171,7 +176,7 @@ const ACTIVATED_ABILITY_CLAUSE =
 export function isActivatedAbility(card, abilityIndex = 0) {
   const ability = Array.isArray(card?.abilities) ? card.abilities[abilityIndex] : null;
   const text = typeof ability === 'string' ? ability : ability?.text;
-  return ACTIVATED_ABILITY_CLAUSE.test(text != null ? lower(text) : textOf(card));
+  return ACTIVATED_ABILITY_CLAUSE.test(text != null ? modernWording(lower(text)) : textOf(card));
 }
 
 // --- passive -----------------------------------------------------------
@@ -997,13 +1002,18 @@ export function parseKoPrevention(card) {
         t.includes('flip'))) ||
     (t.includes('full hp') &&
       t.includes('would be knocked out') &&
-      t.includes('not knocked out'));
+      t.includes('not knocked out')) ||
+    // Togepi Egg Shell (customhb): "… would be Knocked Out by an attack, this Pokémon is not
+    // Knocked Out. Instead, it remains in play with 10 HP remaining."
+    (t.includes('would be knocked out') && t.includes('not knocked out') && /remains in play/.test(t));
   if (!matches) return out;
   out.fullHpOnly = t.includes('full hp');
   out.coinFlip = /flip a coin/.test(t);
+  // "… has 10 HP remaining instead" (Ribombee Survival of the Cutest), "… with 10 HP remaining".
   const survive =
-    t.match(/remaining hp becomes?\s+(\d+)/) || t.match(/hp becomes?\s+(\d+)/);
+    t.match(/remaining hp becomes?\s+(\d+)/) || t.match(/hp becomes?\s+(\d+)/) || t.match(/(\d+)\s*hp remaining/);
   if (survive) out.surviveHp = parseInt(survive[1], 10);
+  if (/if this pok[ée]mon is your only pok[ée]mon in play/.test(t)) out.onlyPokemonInPlay = true;
   return out;
 }
 

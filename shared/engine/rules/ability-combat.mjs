@@ -48,6 +48,7 @@ import {
   requiresKoOnOpponentTurn,
   isEvolvePlayedTrigger,
   isBenchPlayedTrigger,
+  isPokemonToolCard,
 } from './ability-executors.mjs';
 import {
   reductionForCard,
@@ -532,10 +533,17 @@ export function abilityDamageBonus(attacker, defender, ctx = {}) {
     // "for each Prize card your opponent has taken" (Kingambit) scales the bonus; any other
     // "for each" is not read.
     const perOpponentPrize = /for each prize card your opponent has taken/.test(t);
+    // Gyarados Moxie (customhb): "for each Prize card you have taken".
+    const perOwnPrize = /for each prize card you have taken/.test(t);
     // Huge Power: each differently named Energy card (a special Energy counts apart
     // from the basic of its type) attached to the attacker adds the printed bonus.
     const perUniqueEnergy = /for each unique type of energy attached to it/.test(t);
-    if (/for each/.test(t) && !perOpponentPrize && !perUniqueEnergy) continue;
+    // Beedrill Hivemind (customhb): "for each Beedrill in play (both yours and your opponent's)".
+    // The printed name, before selfNamedText folds the holder's own name into "this pokémon".
+    const perNamed = /for each ([a-z][a-z' -]*?) in play \(both yours and your opponent's\)/.exec(
+      lower(cardAbilityText(holder))
+    )?.[1];
+    if (/for each/.test(t) && !perOpponentPrize && !perOwnPrize && !perUniqueEnergy && !perNamed) continue;
     // An activated power's "during your next turn … more damage" is its effect, not a passive.
     if (/^(?:once during your turn|as often as you like)/.test(t)) continue;
     if (!attackerQualifies(t, attacker, holder, ctx)) continue;
@@ -552,6 +560,17 @@ export function abilityDamageBonus(attacker, defender, ctx = {}) {
       total += bonus * unique.size;
       continue;
     }
+    if (perNamed) {
+      const named = sideTops([...(ctx.sideCards || []), ...(ctx.opponentSideCards || [])]).filter(
+        (top) => lower(top.name) === perNamed
+      );
+      total += bonus * named.length;
+      continue;
+    }
+    if (perOwnPrize) {
+      if (ctx.ownPrizesLeft != null) total += bonus * prizesTakenFor(ctx.ownPrizesLeft, ctx.ownDeckFormat);
+      continue;
+    }
     if (!perOpponentPrize) {
       total += bonus;
       continue;
@@ -560,7 +579,17 @@ export function abilityDamageBonus(attacker, defender, ctx = {}) {
     if (ctx.opponentPrizesLeft == null) continue;
     total += bonus * prizesTakenFor(ctx.opponentPrizesLeft, ctx.opponentDeckFormat);
   }
-  return total + inPlayEnergyBonus(attacker, ctx);
+  return total + inPlayEnergyBonus(attacker, ctx) - toolGatedAttackPenalty(attacker, ctx);
+}
+
+// Aegislash Stance Change (customhb): "As long as this Pokémon has a Pokémon Tool attached, … its
+// attacks do 50 less damage."
+function toolGatedAttackPenalty(attacker, ctx) {
+  const t = selfNamedText(attacker);
+  const m = /as long as this pok[eé]mon has a pok[eé]mon tool attached, [^.]*?its attacks do (\d+) less damage/.exec(t || '');
+  if (!m || isAbilitySuppressed(attacker, ctx)) return 0;
+  const hasTool = (ctx.sideCards || []).some((c) => c.attachedTo === attacker.instanceId && isPokemonToolCard(c));
+  return hasTool ? Number(m[1]) : 0;
 }
 
 // The Ability ctx of a holder on the attacker's opposing side, seen from that holder's own side.
@@ -933,8 +962,16 @@ function cardShieldConditionMet(condition, holder, ctx) {
 
 // The target wordings effectShieldCovers does not read: "in play", "your Benched …", "… Pokémon V",
 // ", except any Enamorus V". An unread qualifier still fails closed there.
+const TYPE_WORD_LETTER = {
+  grass: 'g', fire: 'r', water: 'w', lightning: 'l', psychic: 'p', fighting: 'f',
+  darkness: 'd', metal: 'm', fairy: 'y', dragon: 'n', colorless: 'c',
+};
+
 function cardShieldCovers(target, holder, defender, ctx) {
-  let t = target.trim();
+  // Ribombee Fairy Dust (customhb) names the type in words: "your Fairy Pokémon in play".
+  let t = target
+    .trim()
+    .replace(/\b(grass|fire|water|lightning|psychic|fighting|darkness|metal|fairy|dragon|colorless) (?=pok[eé]mon\b)/g, (_, w) => `{${TYPE_WORD_LETTER[w]}} `);
   const except = t.match(/, except any (.+)$/);
   if (except) {
     if (lower(defender?.name) === except[1]) return false;
@@ -1170,6 +1207,19 @@ export function abilityRetreatCost(target, ctx = {}) {
       }
       continue;
     }
+    // Yveltal Dark Aura (customhb): "your Pokémon have their Retreat Cost reduced by {C} for each
+    // {D} Energy attached to them."
+    const perTyped = t.match(
+      /your pok[eé]mon have their retreat cost reduced by (?:(\d+)|((?:\{c\})+)) for each \{([a-z])\} energy attached to them/
+    );
+    if (perTyped) {
+      const want = lower(TYPE_LETTER[perTyped[3]]);
+      const typed = attachedEnergy(target, ctx.sideCards || []).filter((e) =>
+        [e.energyType, ...(Array.isArray(e.types) ? e.types : []), e.name].map(lower).join(' ').includes(want)
+      ).length;
+      delta -= (amount(perTyped[1], perTyped[2]) || 1) * typed;
+      continue;
+    }
     // "The Retreat Cost of each of your Pokémon that has any {R} Energy attached is
     // {C}{C} less." (Ninetales Byway of the Nine-Tailed Fox, I161)
     const teamLess = t.match(
@@ -1229,6 +1279,27 @@ export function abilityRetreatCost(target, ctx = {}) {
     delta += amount(teamMore[2], teamMore[3]) || 1;
   }
   return delta;
+}
+
+/**
+ * Abilities that leave a Pokémon with no Retreat Cost at all: Giratina Dimension Breach ("As long as
+ * this Pokémon is in play, all Pokémon have no Retreat Cost.") from either side, and Wimpod Punk Out /
+ * Genesect Fast-Flight Configuration ("If your opponent has any Pokémon ex in play, this Pokémon has
+ * no Retreat Cost.") on the Pokémon itself (customhb).
+ */
+export function abilityNoRetreatCost(target, ctx = {}) {
+  if (!target) return false;
+  for (const card of dedupe([...sideInPlay(ctx), ...opponentInPlay(ctx)])) {
+    if (isAbilitySuppressed(card, ctx)) continue;
+    if (/as long as this pok[eé]mon is in play, all pok[eé]mon have no retreat cost/.test(cardAbilityText(card))) return true;
+  }
+  if (
+    /if your opponent has any pok[eé]mon ex in play, this pok[eé]mon has no retreat cost/.test(cardAbilityText(target)) &&
+    !isAbilitySuppressed(target, ctx)
+  ) {
+    return sideTops(ctx.opponentSideCards || []).some((top) => isExCard(top));
+  }
+  return false;
 }
 
 // --- attack cost ---------------------------------------------------------
@@ -1291,6 +1362,12 @@ export function abilityIgnoresDefenderAbilities(attacker, ctx = {}) {
       BYPASS_IMMUNITY_AND_REDUCTION.test(cardAbilityText(attacker))) &&
     !isAbilitySuppressed(attacker, ctx)
   );
+}
+
+/** Dragapult Infiltrator (customhb): "This Pokémon's attacks ignore Resistance." */
+export function abilityIgnoresResistance(attacker, ctx = {}) {
+  if (!isPokemon(attacker)) return false;
+  return /this pok[eé]mon's attacks ignore resistance/.test(cardAbilityText(attacker)) && !isAbilitySuppressed(attacker, ctx);
 }
 
 /**
@@ -1680,6 +1757,14 @@ export function abilityActivationBlockReason(card, ctx = {}) {
   if (rulesEnabled && needed && Array.isArray(ctx.sideCards) && !neededInPlay) {
     return `You need ${needed.label} in play to use this Ability.`;
   }
+  // Miltank Milk Drink (customhb): "Once per turn, if this Pokémon was healed during this turn, …".
+  if (
+    rulesEnabled &&
+    /if this pok[eé]mon was healed during this turn/.test(lower(cardAbilityText(card))) &&
+    Number(card.healedTurn) !== Number(turnNumber)
+  ) {
+    return 'This Pokémon has not been healed this turn.';
+  }
   // Homebrew Dodrio Three of a Kind: "if you have exactly 3 Pokémon with the same name in play".
   const sameNameCount = exactSameNameCount(card);
   if (rulesEnabled && sameNameCount && Array.isArray(ctx.sideCards)) {
@@ -1727,6 +1812,8 @@ export function abilityActivationBlockReason(card, ctx = {}) {
   // oracle rows that place cards directly in the Active) fails OPEN — only a
   // *stale* stamp is rejected.
   if (rulesEnabled && isOnPromotionTrigger(card)) {
+    // Weavile Assaulting Hunt (customhb): only the Pokémon that moved into the Active Spot.
+    if (zone !== 'active') return 'This ability can only be used the turn this Pokémon moved to the Active Spot.';
     if (
       movedToActiveTurn !== undefined &&
       movedToActiveTurn !== null &&
@@ -2150,6 +2237,34 @@ export function abilityStatusImmune(card, condition) {
   ).test(t);
 }
 
+/** Hatterene Magic Bounce (customhb): the refused Special Condition goes to the opponent's Active. */
+export function abilityBouncesConditions(card) {
+  return /if an effect would make this pok[eé]mon [^.]*?, your opponent's active pok[eé]mon is affected by that special condition instead/.test(
+    cardAbilityText(card)
+  );
+}
+
+/**
+ * Xerneas Fairy Aura (customhb): "As long as this Pokémon is in play, your Pokémon that have {Y}
+ * Energy attached are immune to Special Conditions." True when a live holder on `pokemon`'s side
+ * covers it (`ctx` is that side's context).
+ */
+export function abilityTeamStatusImmunity(pokemon, ctx = {}) {
+  if (!pokemon) return false;
+  for (const holder of dedupe(sideInPlay(ctx))) {
+    const m = cardAbilityText(holder).match(
+      /as long as this pok[eé]mon is in play, your pok[eé]mon that have \{([a-z])\} energy attached are immune to special conditions/
+    );
+    if (!m || isAbilitySuppressed(holder, ctx)) continue;
+    const want = lower(TYPE_LETTER[m[1]]);
+    const has = attachedEnergy(pokemon, ctx.sideCards || []).some((e) =>
+      [e.energyType, ...(Array.isArray(e.types) ? e.types : []), e.name].map(lower).join(' ').includes(want)
+    );
+    if (has) return true;
+  }
+  return false;
+}
+
 // Basic Energy reads the same with or without "Basic" in its printed name.
 const energyIdentity = (card) => lower(card?.name).replace(/^basic /, '').trim();
 
@@ -2220,6 +2335,29 @@ export function abilityFirstTurnAttack(card, ctx = {}) {
   if (!/use attacks? during your first turn/.test(t)) return false;
   if (ctx.turnNumber != null && Number(ctx.turnNumber) !== 1) return false;
   return true;
+}
+
+/** Mega Golurk ex Restricted Activation (customhb): the hand size the holder needs to attack, or 0. */
+export function abilityAttackHandMinimum(card, ctx = {}) {
+  const m = cardAbilityText(card).match(/this pok[eé]mon can't use attacks unless you have (\d+) or more cards in your hand/);
+  if (!m || isAbilitySuppressed(card, ctx)) return 0;
+  return Number(m[1]);
+}
+
+/**
+ * Lugia ex Pressure (customhb): "As long as this Pokémon is in the Active Spot, your opponent's
+ * attacks cost {C} more." `ctx` is the attacking side's context; holders sit on the other side.
+ */
+export function abilityOpponentAttackCostIncrease(ctx = {}) {
+  let total = 0;
+  for (const holder of dedupe(opponentInPlay(ctx))) {
+    const t = cardAbilityText(holder);
+    const m = t.match(/your opponent's attacks cost ((?:\{c\})+) more/);
+    if (!m || isAbilitySuppressed(holder, opponentHolderCtx(ctx))) continue;
+    if (!holderPositionMet(t, holder, ctx)) continue;
+    total += (m[1].match(/\{c\}/g) || []).length;
+  }
+  return total;
 }
 
 /**

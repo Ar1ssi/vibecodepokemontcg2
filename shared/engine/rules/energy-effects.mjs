@@ -344,7 +344,15 @@ const ANY_TYPE_NAME = /(^|\b)(prism|stellar) energy/;
  */
 export function rewriteEnergyDescriptor(descriptor, args = {}) {
   const rewritten = rewriteForStadium(descriptor, args);
-  return retypeForHost(rewritten, args?.hostPokemon);
+  return alsoCountsAs(retypeForHost(rewritten, args?.hostPokemon), args?.board?.energyAlsoCounts);
+}
+
+// Zygarde Aura Break (customhb): a basic Energy of one type also counts as another, one unit.
+function alsoCountsAs(descriptor, pairs) {
+  if (!descriptor || !Array.isArray(pairs) || pairs.length === 0) return descriptor;
+  if (descriptor.family !== 'basic' || descriptor.dualType) return descriptor;
+  const pair = pairs.find(([from]) => from === descriptor.type);
+  return pair ? { ...descriptor, dualType: pair[1] } : descriptor;
 }
 
 // Gale Wings: the host's own Ability re-types the {C} its attached Energy provides.

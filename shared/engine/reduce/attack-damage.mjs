@@ -19,7 +19,7 @@ import {
   abilityDamageBonus, abilityDamageReduction, abilityDamagePrevention, abilityLegacyDamageModifiers,
   abilityPreventsAttackEffects, sideContextFor, powersOffActive, abilityWeaknessOverride,
   abilityIgnoresDefenderEffects, abilityExtraTypes, isAbilitySuppressed,
-  abilityIgnoresDefenderAbilities, abilityIgnoresAttackerBoosts, abilityFlipPreventsAttackDamage,
+  abilityIgnoresResistance, abilityIgnoresDefenderAbilities, abilityIgnoresAttackerBoosts, abilityFlipPreventsAttackDamage,
   abilityEnergyAttackerShield, healBlockedByAbility,
 } from '../rules/ability-combat.mjs';
 import { serverEnergyDescriptor } from '../rules/server-energy.mjs';
@@ -39,6 +39,7 @@ import { isGxCard, isUltraBeastCard } from '../rules/card-classify.mjs';
 import {
   discardCardFromPlayerZone, activeAttackMarkers, inPlayView, cardEffectiveHp, abilitySideContext,
   rootsIn,
+  onlyPokemonInPlay,
 } from './shared.mjs';
 import { handleKnockout } from './knockout.mjs';
 
@@ -217,6 +218,7 @@ export function damageBenchedPokemon(
       baseHp: koHp,
       stadium: draft.stadium,
       inHp: true,
+      onlyPokemonInPlay: onlyPokemonInPlay(draft, victimPlayerId),
       // Without an RNG (non-attack callers) Focus Band cannot flip, so it never prevents.
       ...(activeRng && { flipCoin: () => (activeRng.next() < 0.5 ? 'heads' : 'tails') }),
     });
@@ -693,6 +695,7 @@ export function attackAbilityReads(
     ownPrizesLeft: (attackerZones.prizes || []).length,
     opponentPrizesLeft: (defenderZones.prizes || []).length,
     opponentDeckFormat: draft.players[defenderPlayerId]?.deckFormat,
+    ownDeckFormat: draft.players[playerId]?.deckFormat,
     powersOff: powersOffActive(draft),
   };
   const defenderCtx = {
@@ -735,7 +738,7 @@ export function attackAbilityReads(
         },
     weaknessOverride: ignoresDefenderAbilities ? null : abilityWeaknessOverride(defender, defenderCtx),
     ignoreDefenderEffects: abilityIgnoresDefenderEffects(attackerView),
-    ignoreResistance: ignoresDefenderAbilities,
+    ignoreResistance: ignoresDefenderAbilities || abilityIgnoresResistance(attackerView, attackerCtx),
     ignoresDefenderAbilities,
     ignoresAttackerBoosts,
   };

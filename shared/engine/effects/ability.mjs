@@ -231,7 +231,16 @@ export function resolveAbilitySteps(rawText, { selfName } = {}) {
   const { steps: templateSteps, holderZone } = parseAbilityEffectSteps(text, { selfName });
   const parserFallsShort =
     actionable.length === 0 || actionable.some((step) => !isExecutableStepType(step.type));
-  if (parserFallsShort && templateSteps.length > 0) {
+  // The attack templates read more of the text than the parser did (Buggy Turbo's tails branch,
+  // Vikavolt Strong Charge's second Energy, Ninetales Exploding Energy's Knock Out). VSTAR Powers
+  // and "When you play this Pokémon" triggers keep their parser steps (their own gates).
+  // "Look at the top N cards" without the rest of the sentence read (lookAtTopAbility only
+  // offers a card): the template's reading names what happens to every card looked at
+  // (Drakloak Recon Directive, Hydreigon Tri Howl, Premonition).
+  const templateReadsMore =
+    (templateSteps.length > actionable.length || actionable.some((step) => step.type === 'lookAtTopAbility')) &&
+    !/vstar power|^when you play/i.test(String(text || '').trim());
+  if ((parserFallsShort || templateReadsMore) && templateSteps.length > 0) {
     return { source: 'template', steps: templateSteps, holderZone, parsedSteps: steps };
   }
   // "When you play this Pokémon …" is the trigger, not an effect — abilityActivationBlockReason

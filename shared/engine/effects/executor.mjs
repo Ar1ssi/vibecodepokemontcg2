@@ -1491,6 +1491,14 @@ export function executeSteps(draft, {
         };
         const bench = (player.zones.bench || []).filter((c) => !c.attachedTo && (step.selfSwap || benchAllowed(c)));
         const active = (player.zones.active || []).find((c) => !c.attachedTo);
+        // Dragonite ex Dragon Transport (customhb): "Switch your Active {N} Pokémon with …" — only
+        // an Active of that type switches.
+        const activeTop = active ? topPokemonCard(player.zones.active || [], active) || active : null;
+        if (step.activePokemonType && !(activeTop && matchesEnergyTypeFilter({ types: activeTop.types }, [step.activePokemonType]))) {
+          context.ownSwitchSkipped = true;
+          events.push({ type: 'effectStepSkipped', reason: 'active_type_mismatch', step: step.type });
+          break;
+        }
         // Temporal Freeze: a Trainer or Ability can't switch the frozen Active Pokémon out.
         if (active && shieldedTarget(player, active)) {
           context.ownSwitchSkipped = true;

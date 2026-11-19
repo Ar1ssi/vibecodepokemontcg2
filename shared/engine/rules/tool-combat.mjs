@@ -559,6 +559,8 @@ export function evaluateToolKoPrevention(
     inHp = false,
     // Focus Band flips a coin; called only for a coin-flip candidate.
     flipCoin = null,
+    // Togepi Egg Shell reads whether the defender is its player's only Pokémon in play.
+    onlyPokemonInPlay = false,
   } = {}
 ) {
   const isBlocked = toolBlocked(blockTools, stadium);
@@ -596,6 +598,7 @@ export function evaluateToolKoPrevention(
   for (const { source, ko, isTool } of candidates) {
     if (!ko.fullHpOnly && ko.surviveHp == null) continue;
     if (ko.fullHpOnly && dmgCurrent > 0) continue;
+    if (ko.onlyPokemonInPlay && !onlyPokemonInPlay) continue;
     if (dmgTotal < hpThreshold) continue;
     let coinFace = null;
     if (ko.coinFlip) {

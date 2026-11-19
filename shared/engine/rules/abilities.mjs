@@ -501,6 +501,9 @@ function parseTransformShape(lower) {
     what: what ? what.trim() : null,
     except: lower.match(/except any ([a-z0-9é' -]+?)[,.]/)?.[1]?.trim() || null,
     keepState: onTop || /(?:remain|are now) on the new pok[eé]mon/.test(lower),
+    ...(/any cards attached to this pok[eé]mon and damage counters remain on the new pok[eé]mon/.test(lower)
+      ? { keepConditions: false }
+      : {}),
     onTop,
     shuffle: source === 'deck',
   };
@@ -817,6 +820,7 @@ export function parseAbility(text = '') {
       (lower.includes('benched') || lower.includes('bench')))
   ) {
     const typedBench = lower.match(/benched\s+\{([a-z])\}\s+pok/);
+    const typedActive = lower.match(/switch your active\s+\{([a-z])\}\s+pok/);
     const poisonNewActive =
       lower.includes('if you do') &&
       (lower.includes('now poisoned') || lower.includes('is now poisoned'));
@@ -835,7 +839,11 @@ export function parseAbility(text = '') {
     const ownSwitchFirst = /switch (?:your active pok[eé]mon with 1 of your benched|(?:it|this pok[eé]mon) with your active|1 of your benched [^.]*with your active)[^.]*[.,] if you do/.test(lower);
     // Mabosstiff Intimidating Howl, Shinx Big Roar, Iron Bundle Hyper Blower: the gust is the
     // whole effect and the opponent picks. The Active/Bench position gate lives in the executors.
-    const gustOnly = !opponentFollowUp && /you may switch out your opponent's active pok[eé]mon to the bench/.test(lower);
+    // Salamence Intimidating Roar (customhb): "you may have your opponent switch their Active
+    // Pokémon with 1 of their Benched Pokémon" — the same gust, the opponent picks.
+    const gustOnly =
+      !opponentFollowUp &&
+      /you may (?:switch out your opponent's active pok[eé]mon to the bench|have your opponent switch (?:their|his or her) active pok[eé]mon with 1 of (?:their|his or her) benched pok[eé]mon)/.test(lower);
     if (gustOnly) {
       steps.push({
         type: 'switchOpponentOut',
@@ -857,6 +865,7 @@ export function parseAbility(text = '') {
       // "switch it/this Pokémon with your Active" — the ability's own holder is the bench pick.
       selfSwap: /switch (?:it|this pok[eé]mon) with your active/.test(lower),
       pokemonType: typedBench ? parseEnergyTypeHint(`{${typedBench[1]}}`) : null,
+      ...(typedActive ? { activePokemonType: parseEnergyTypeHint(`{${typedActive[1]}}`) } : {}),
       exceptName: lower.match(/except any ([^.,]+)/)?.[1]?.trim().toLowerCase() || null,
       poisonNewActive,
       guidance: isOpponentBenchSwitch && !opponentFollowUp
@@ -898,7 +907,12 @@ export function parseAbility(text = '') {
     // "Heal all damage from 1 of your Pokémon" (Primarina Enriching Melody) lets the
     // player pick ANY of their Pokémon, unlike a self/Active-only heal. Flag it so the
     // interactive executor opens a target picker instead of healing the ability's owner.
-    const target = /from 1 of your pok[eé]mon/.test(lower) ? '1 of your Pokémon' : null;
+    // Miltank Milk Drink (customhb): "heal 10 damage from each of your Pokémon" heals every one.
+    const target = /from 1 of your pok[eé]mon/.test(lower)
+      ? '1 of your Pokémon'
+      : /heal \d+ damage from each of your pok[eé]mon/.test(lower)
+        ? 'each of your Pokémon'
+        : null;
     steps.push({
       type: 'healAbility',
       amount: amount ? Number(amount) : null,
@@ -2015,6 +2029,15 @@ export function parseAbility(text = '') {
     steps.push({
       type: 'transferStatusAbility',
       guidance: 'Once during your turn: move a Special Condition from your Pokémon to the Defending Pokémon (as described).',
+    });
+  }
+
+  // Swirlix Festival Lead (customhb).
+  if (/if a stadium in play has an effect that can be used only once per turn, you may discard this pok[eé]mon to use that effect 1 additional time/.test(lower)) {
+    steps.length = 0;
+    steps.push({
+      type: 'festivalLeadAbility',
+      guidance: "Discard this Pokémon to use the Stadium's once-per-turn effect 1 more time this turn.",
     });
   }
 

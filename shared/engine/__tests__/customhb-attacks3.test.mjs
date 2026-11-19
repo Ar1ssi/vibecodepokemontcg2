@@ -247,7 +247,7 @@ test('HB 536 Zygarde Thousand Arrows / HB 548 Groudon Rock Slide read "{C} type"
 
 test('HB 539 Tapu Lele Psyshock does 50 more only when the opponent\'s Active is weak to {P}', () => {
   const text = "If your opponent's Active Pokémon is weak to {P}, this attack does 50 more damage.";
-  const weak = { types: ['Fighting'], weaknesses: [{ type: 'Psychic', value: '×2' }] };
+  const weak = { types: ['Fighting'], weakness: { type: 'Psychic', value: 2 } };
   assert.equal(activeDamage(text, { damage: '90+', defenderExtra: weak }), 140);
   assert.equal(activeDamage(text, { damage: '90+' }), 90);
 });
@@ -498,7 +498,7 @@ const TELEKINESIS =
 
 test('HB 541 Gardevoir Telekinesis: 50 to the chosen Pokémon, no Weakness, then one of its Energy moves', () => {
   const { state } = board(TELEKINESIS, {
-    defenderExtra: { weaknesses: [{ type: 'Colorless', value: '×2' }] },
+    defenderExtra: { weakness: { type: 'Colorless', value: 2 } },
     setup: (s, { defender }) => s.players.p2.zones.active.push(energy('Fire', defender.instanceId)),
   });
   const res = resolveAll(attack(state), (pc) => [
@@ -521,7 +521,7 @@ test('HB 554 Giratina ex Alpha Rage: an opposing Pokémon hits another of theirs
   const { state } = board(
     "Choose 1 of your opponent's Pokémon. That Pokémon attacks 1 of your opponent's other Pokémon. This Pokémon can't attack during your next turn.",
     {
-      defenderExtra: { weaknesses: [{ type: 'Fire', value: '×2' }] },
+      defenderExtra: { weakness: { type: 'Fire', value: 2 } },
       setup: (s) => {
         Object.assign(s.players.p2.zones.bench[0], { types: ['Fire'], attacks: [{ name: 'Big Hit', cost: [], damage: '120', text: '' }] });
       },

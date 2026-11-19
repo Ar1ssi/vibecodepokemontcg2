@@ -74,6 +74,32 @@ const REWRITES = [
   [/\bsearch your deck for any combination of up to (\d+) /gi, 'search your deck for up to $1 in any combination of '],
   // Mega Skarmory ex Sonic Ripper: "Shuffle all Energy … into your deck, and this attack does …".
   [/\b(shuffle all energy attached to this pok[ée]mon into your deck), and (this attack does)\b/gi, '$1. This attack does'],
+  // Miltank Milk Drink: "Once per turn, …" is the printed "Once during your turn, …", and "heal
+  // all of your Pokémon in play by 10 HP" is "heal 10 damage from each of your Pokémon".
+  [/^once per turn, /i, 'Once during your turn, '],
+  // Thwackey Jungle Opener (customhb): "You may only use this Ability if you evolved this card from
+  // your hand this turn. Search the top 3 cards of your deck for a Basic {G} Energy and it attach it
+  // to any of your Benched Pokémon. Shuffle your deck afterwards." is the evolve trigger.
+  [
+    /^you may only use this ability if you evolved this card from your hand this turn\. search the top (\d+) cards of your deck for an? (basic \{[a-z]\} energy)(?: card)? and (?:it )?attach it to (?:any|1|one) of your benched pok[ée]mon\. shuffle your deck afterwards?\./i,
+    'When you play this Pokémon from your hand to evolve 1 of your Pokémon during your turn, you may look at the top $1 cards of your deck and attach a $2 card you find there to 1 of your Benched Pokémon. Shuffle the other cards back into your deck.',
+  ],
+  // Aggron Iron Armor (customhb): "As long as this Pokémon is on your Bench, prevent all damage done
+  // to it." is Kakuna Cocoon Cover's printed wording.
+  [
+    /\b(as long as this pok[ée]mon is on your bench), prevent all damage done to it\./gi,
+    "$1, prevent all damage done to this Pokémon by attacks (both yours and your opponent's).",
+  ],
+  // Deoxys Form Change (customhb): returning this Pokémon to the hand and putting another of the
+  // name in its place, attached cards and damage counters moved over, is the Stance Change swap.
+  [
+    /\byou may return this pok[ée]mon to your hand and put another ([^.,]+?) from your hand in its place\. if you do, move all attached cards and damage counters from this pok[ée]mon to the new pok[ée]mon\./gi,
+    'you may switch this Pokémon with a $1 in your hand. (Any cards attached to this Pokémon and damage counters remain on the new Pokémon.)',
+  ],
+  // Jellicent Deep Sea Draw: "Draw a card. If you do, you may put a card from your hand on the
+  // bottom of your deck." — drawing is what "if you do" asks.
+  [/\bdraw a card\. if you do, (you may put a card from your hand on the bottom of your deck)\b/gi, 'Draw a card. $1'],
+  [/\bheal all of your pok[ée]mon in play by (\d+) hp\b/gi, 'heal $1 damage from each of your Pokémon'],
   // "This attack also deals 20 damage …" is "does".
   [/\b(this attack (?:also )?)deals (?=\d+ (?:more )?damage\b)/gi, '$1does '],
   // Slurpuff Belly Drum: "This attack also does 50 damage to this Pokémon" is the printed recoil.

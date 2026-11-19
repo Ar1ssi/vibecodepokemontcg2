@@ -6,7 +6,8 @@
  */
 
 import { discardCardToPlayerZone } from '../state.mjs';
-import { createCard, mintInstanceId } from '../cards.mjs';
+import { createCard, mintInstanceId, isEnergy } from '../cards.mjs';
+import { cardAbilityText } from '../rules/ability-executors.mjs';
 import { DECK_FORMAT_TCG, isDeckFormat } from '../formats.mjs';
 import { deckFormatMismatch, setupGame } from '../setup.mjs';
 import { legacyTrainerType } from '../rules/legacy-trainer-type.mjs';
@@ -36,7 +37,7 @@ import {
   stadiumCheckupPoisonBonusFor, stadiumBlocksToolEffects,
 } from '../rules/stadium-effects.mjs';
 import {
-  healBlockedByAbility, abilitySleepLock, sideContextFor, abilityPoisonHeal,
+  healBlockedByAbility, abilitySleepLock, abilityTeamStatusImmunity, isAbilitySuppressed, sideContextFor, abilityPoisonHeal,
 } from '../rules/ability-combat.mjs';
 import {
   removeCondition, hasCondition, hasAnyCondition, addCondition, listConditions, poisonCheckupDamage,
@@ -58,6 +59,39 @@ export function applyAbilitySleepLocks(draft, { events }) {
     if (!abilitySleepLock(sideContextFor(draft, playerId))) continue;
     removeCondition(active, 'Asleep');
     events.push({ type: 'statusCleared', condition: 'Asleep', instanceId: active.instanceId, playerId, reason: 'ability' });
+  }
+}
+
+/**
+ * Xerneas Fairy Aura (customhb): a side's Pokémon with {Y} Energy attached are immune to Special
+ * Conditions; Hatterene Magic Bounce: a condition its holder refused lands on the opponent's
+ * Active Pokémon. addCondition cannot see the board, so this sweep runs after every command.
+ */
+export function applyAbilityStatusImmunity(draft, { events }) {
+  for (const playerId of Object.keys(draft.players || {})) {
+    const zones = draft.players[playerId]?.zones || {};
+    const ctx = sideContextFor(draft, playerId);
+    for (const zoneId of ['active', 'bench']) {
+      for (const root of zones[zoneId] || []) {
+        if (root.attachedTo) continue;
+        if (Array.isArray(root.bouncedConditions)) {
+          const bounced = root.bouncedConditions;
+          delete root.bouncedConditions;
+          const oppId = Object.keys(draft.players).find((id) => id !== playerId);
+          const target = (draft.players[oppId]?.zones?.active || []).find((c) => !c.attachedTo);
+          for (const condition of target ? bounced : []) {
+            if (addCondition(target, condition)) {
+              events.push({ type: 'specialConditionUpdated', instanceId: target.instanceId, condition, reason: 'magicBounce' });
+            }
+          }
+        }
+        if (!hasAnyCondition(root) || !abilityTeamStatusImmunity(inPlayView(draft, root), ctx)) continue;
+        for (const condition of listConditions(root)) {
+          removeCondition(root, condition);
+          events.push({ type: 'statusCleared', condition, instanceId: root.instanceId, playerId, reason: 'ability' });
+        }
+      }
+    }
   }
 }
 
@@ -823,6 +857,55 @@ export function advanceTurn(draft, { nextPlayerId, events }) {
     });
   }
   applyOpponentTurnStartDraws(draft, { nextPlayerId, events });
+  applyEnergyDiscardedDraws(draft, { nextPlayerId, events });
+}
+
+const DRAGONS_AMBITION = /if this pok[eé]mon discarded energy last turn, draw a card/;
+
+/**
+ * Mega Charizard X ex Dragon's Ambition (customhb): "If this Pokémon discarded Energy last turn,
+ * draw a card." At the start of its player's turn, a holder that lost Energy to the discard pile
+ * during that player's previous turn draws 1 card (trackEnergyDiscards stamps the turn).
+ */
+function applyEnergyDiscardedDraws(draft, { nextPlayerId, events }) {
+  if (isGameConcluded(draft)) return;
+  const player = draft.players[nextPlayerId];
+  const ctx = sideContextFor(draft, nextPlayerId);
+  for (const zoneId of ['active', 'bench']) {
+    for (const root of player.zones[zoneId] || []) {
+      if (root.attachedTo || root.energyDiscardedTurn !== draft.turn.number - 2) continue;
+      const view = inPlayView(draft, root);
+      if (!DRAGONS_AMBITION.test(cardAbilityText(view)) || isAbilitySuppressed(view, ctx)) continue;
+      if (player.zones.deck.length === 0) continue;
+      const [card] = player.zones.deck.splice(0, 1);
+      player.zones.hand.push(card);
+      events.push({ type: 'cardsDrawn', playerId: nextPlayerId, count: 1, cards: [{ instanceId: card.instanceId }], source: view.name });
+    }
+  }
+}
+
+/**
+ * Stamps `energyDiscardedTurn` on Dragon's Ambition holders whose attached Energy went to the
+ * discard pile since the last command, with the turn of the holder's player it happened in.
+ * Runs after every command; other Pokémon carry no snapshot.
+ */
+export function trackEnergyDiscards(draft) {
+  for (const playerId of Object.keys(draft.players || {})) {
+    const player = draft.players[playerId];
+    const discardIds = new Set((player.zones.discard || []).map((c) => c.instanceId));
+    for (const zoneId of ['active', 'bench']) {
+      const zone = player.zones[zoneId] || [];
+      for (const root of zone) {
+        if (root.attachedTo || !DRAGONS_AMBITION.test(cardAbilityText(inPlayView(draft, root)))) continue;
+        const now = zone.filter((c) => c.attachedTo === root.instanceId && isEnergy(c)).map((c) => c.instanceId);
+        if ((root.energyIdsSeen || []).some((id) => discardIds.has(id))) {
+          const turn = Number(draft.turn?.number) || 1;
+          root.energyDiscardedTurn = draft.turn?.player === playerId ? turn : turn - 1;
+        }
+        root.energyIdsSeen = now;
+      }
+    }
+  }
 }
 
 /**

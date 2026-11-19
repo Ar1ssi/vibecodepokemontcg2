@@ -21,7 +21,8 @@ import {
   abilityAttackCostDiscount, applyEnergyMultiplier, abilityActivationBlockReason,
   abilitySupporterLimit, abilitySetupActive, abilityPlayLocks, abilityEvolvePermission,
   abilityEvolveLock, abilityEvolutionCardLock, abilityRetreatLock, abilitySummonRestricted,
-  abilityFirstTurnAttack, extraAttackAvailable,
+  abilityFirstTurnAttack, extraAttackAvailable, abilityAttackHandMinimum, abilityOpponentAttackCostIncrease,
+  sideContextFor,
 } from '../rules/ability-combat.mjs';
 import { handEnergyForDiscard, handCardsForLostZone } from '../effects/attack-steps.mjs';
 import { legacyAttachTargets } from '../effects/trainer-steps.mjs';
@@ -627,8 +628,11 @@ export function attackCostPayable(state, playerId, active, attack) {
   } else if (abilityCost.ignoreColorless) {
     effectiveCost = effectiveCost.filter((symbol) => symbol !== 'Colorless');
   }
+  // Lugia ex Pressure (customhb): "your opponent's attacks cost {C} more" while it is Active.
   const increase =
-    getStadiumAttackCostIncreaseFor(activeView, playerId, stadiumCard, stadiumUser) + markerIncrease;
+    getStadiumAttackCostIncreaseFor(activeView, playerId, stadiumCard, stadiumUser) +
+    markerIncrease +
+    abilityOpponentAttackCostIncrease(sideContextFor(state, playerId));
   if (increase > 0) {
     effectiveCost = [
       ...effectiveCost,
@@ -1197,6 +1201,12 @@ export function validateLegality(state, command) {
             })
           : null;
       if (attackLockReason) return { allowed: false, reason: attackLockReason };
+      // Mega Golurk ex Restricted Activation (customhb): "This Pokémon can't use attacks unless you
+      // have 10 or more cards in your hand."
+      const handGate = abilityAttackHandMinimum(inPlayView(state, active), sideContextFor(state, playerId));
+      if (handGate && (player.zones?.hand || []).length < handGate) {
+        return { allowed: false, reason: `This Pokémon can't attack unless you have ${handGate} or more cards in your hand.` };
+      }
       const atkIdx = payload?.attackIndex ?? 0;
       const attacks = attackViewFor(state, active).attacks || [];
       const attack = attacks[atkIdx];

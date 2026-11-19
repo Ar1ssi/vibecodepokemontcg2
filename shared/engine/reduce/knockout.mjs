@@ -13,7 +13,8 @@ import { prizesForKO } from '../rules/ko-flow.mjs';
 import {
   toolPrizeCountAdjust, attachedToolOnKoEffects, attachedTools, isExCard, isTeraCard,
 } from '../rules/tool-combat.mjs';
-import { parsePrizeModify } from '../rules/ability-executors.mjs';
+import { parsePrizeModify, cardAbilityText } from '../rules/ability-executors.mjs';
+import { isAbilitySuppressed, sideContextFor } from '../rules/ability-combat.mjs';
 import { parseToolCondition, toolConditionMet } from '../rules/tool-conditions.mjs';
 import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
 import {
@@ -491,6 +492,17 @@ export function handleKnockout(
     hostZoneId: koZoneRef?.zoneId || (wasActive ? 'active' : 'bench'),
   });
 
+  // Ho-Oh Rebirth (customhb): "The first time this Pokémon is Knocked Out, move it and all cards
+  // attached to it into your hand." The Prize cards are still taken; the card remembers the use.
+  const victimTop = inPlayView(draft, victim);
+  const rebirth =
+    !victim.rebirthUsed &&
+    /the first time this pok[eé]mon is knocked out, move it and all cards attached to it into your hand/.test(
+      cardAbilityText(victimTop)
+    ) &&
+    !isAbilitySuppressed(victimTop, sideContextFor(draft, victimPlayerId));
+  if (rebirth) victim.rebirthUsed = true;
+
   if (targetZone) {
     for (let i = targetZone.length - 1; i >= 0; i--) {
       const c = targetZone[i];
@@ -503,7 +515,17 @@ export function handleKnockout(
         clearConditions(c);
         clearAttackMarkers(c);
         c.attachedTo = null;
-        if (attackLostZone) {
+        if (rebirth) {
+          victimPlayer.zones.hand.push(c);
+          events.push({
+            type: 'cardMoved',
+            instanceId: c.instanceId,
+            from: koZoneRef?.zoneId || 'active',
+            to: 'hand',
+            playerId: victimPlayerId,
+            reason: 'ability-rebirth',
+          });
+        } else if (attackLostZone) {
           if (!Array.isArray(victimPlayer.zones.lostZone)) victimPlayer.zones.lostZone = [];
           victimPlayer.zones.lostZone.push(c);
         } else if (lostCity && c.instanceId === victim.instanceId) {

@@ -887,6 +887,15 @@ const TEMPLATES = [
   [/^shuffle this pokémon and all (?:attached cards|cards attached to it) (?:back )?into your deck$/, () => ({ type: 'atkShuffleSelf' })],
   [/^shuffle your hand into your deck$/, () => ({ type: 'atkShuffleHandIntoDeck' })],
   [/^shuffle all energy attached to this pokémon into your deck$/, () => ({ type: 'atkShuffleSelfEnergy' })],
+  // Magearna Change Clothes / Genesect ex Drive Change (customhb).
+  [
+    /^put a pokémon tool(?: card)? attached to (this pokémon|1 of your pokémon) into your hand$/,
+    (m) => ({ type: 'atkToolToHand', from: m[1] === 'this pokémon' ? 'self' : 'any' }),
+  ],
+  // Lucario Precognitive Aura (customhb): the opponent picks the Trainer card to show.
+  [/^have your opponent reveal a trainer card in their hand$/, () => ({ type: 'atkOppRevealsKind', kind: 'Trainer' })],
+  // Jellicent Deep Sea Draw (customhb): after "Draw a card. If you do, …".
+  [/^put a card from your hand on the bottom of your deck$/, () => ({ type: 'atkHandToDeckBottom', count: 1 })],
   [
     /^each player shuffles (a|an|\d+) cards? from their hand into their deck$/,
     (m) => ({ type: 'atkEachShuffleHandCards', count: countOf(m[1]) }),
@@ -1442,7 +1451,7 @@ const BLOCKS = [
   // Deck-top Energy attach: Lapras ex Larimar Rain, Dragonite VSTAR Draconic Star ("{W} or {L}"),
   // Ampharos-EX Thunder Rod, Hatterene V Horoscope ("put the other cards back in any order").
   [
-    /look at the top (\d+) cards of your deck(?: and|\. you may) attach (?:any number of|as many) ((?:\{[a-z]\}(?: or \{[a-z]\})? )?)energy cards you find there (?:as you like )?to (this pokémon|your pokémon in any way you like)\. (shuffle the other cards back into your deck|put the other cards back in any order)\./g,
+    /look at the top (\d+) cards of your deck(?: and|\. you may) attach (?:any number of|as many) ((?:\{[a-z]\}(?: or \{[a-z]\})? )?)energy cards you find there (?:as you like )?to (this pokémon|your pokémon in any way you like)\. (shuffle the other cards back into your deck|put the other cards back in any order|discard the other cards)\./g,
     (m) => {
       const types = [...m[2].matchAll(/\{([a-z])\}/g)].map((t) => t[1].toUpperCase());
       return {
@@ -1453,9 +1462,26 @@ const BLOCKS = [
         ...(types.length ? { energyTypes: types } : {}),
         target: m[3] === 'this pokémon' ? 'self' : 'any',
         ...(m[3] === 'this pokémon' ? {} : { spread: true }),
-        rest: /shuffle/.test(m[4]) ? 'shuffle' : 'keep',
+        // Hydreigon Tri Howl (customhb): "Discard the other cards."
+        rest: /shuffle/.test(m[4]) ? 'shuffle' : /discard/.test(m[4]) ? 'discard' : 'keep',
       };
     },
+  ],
+  // Thwackey Jungle Opener (customhb, via effect-wording.mjs): one Basic Energy of a type from the
+  // top of the deck to a Benched Pokémon.
+  [
+    /look at the top (\d+) cards of your deck and attach an? (basic )?\{([a-z])\} energy card you find there to 1 of your benched pokémon\. shuffle the other cards back into your deck\./g,
+    (m) => ({
+      type: 'atkAttach',
+      source: 'deckTop',
+      look: Number(m[1]),
+      count: 1,
+      upTo: true,
+      ...(m[2] ? { basic: true } : {}),
+      energyTypes: [m[3].toUpperCase()],
+      target: 'bench',
+      rest: 'shuffle',
+    }),
   ],
   // Gengar Hurl into Darkness.
   [
@@ -1499,12 +1525,13 @@ const BLOCKS = [
     (m) => ({ type: 'atkBenchFromDeckTop', look: Number(m[1]) }),
   ],
   [
-    /look at the top (\d+) cards of your deck(?:, choose (\d+) of them,)? and put (\d+|it) (?:of them )?into your hand\. (shuffle the other cards back into your deck|put the other cards in the lost zone)\./g,
+    // Drakloak Recon Directive: "Put the other card on the bottom of your deck."
+    /look at the top (\d+) cards of your deck(?:, choose (\d+) of them,)? and put (\d+|it) (?:of them )?into your hand\. (shuffle the other cards back into your deck|put the other cards in the lost zone|put the other cards? on the bottom of your deck)\./g,
     (m) => ({
       type: 'atkLookTopTake',
       look: Number(m[1]),
       take: m[2] ? Number(m[2]) : m[3] === 'it' ? 1 : Number(m[3]),
-      rest: /lost zone/.test(m[4]) ? 'lostZone' : 'shuffle',
+      rest: /lost zone/.test(m[4]) ? 'lostZone' : /bottom/.test(m[4]) ? 'bottom' : 'shuffle',
     }),
   ],
   // Dialga ex Time Twister (customhb set.json, the user's custom set): no shuffle afterward.
@@ -1890,6 +1917,9 @@ export function parseAbilityEffectSteps(text, { selfName = '' } = {}) {
     holderZone = /bench/.test(position[1]) ? 'bench' : 'active';
     effect = effect.slice(position[0].length);
   }
+  // Milk Drink's "if this Pokémon was healed during this turn" is its activation gate
+  // (ability-combat.mjs abilityActivationBlockReason).
+  effect = effect.replace(/^if this pokémon was healed during this turn, (?:you may )?/, '');
   if (/^if /.test(effect)) return { steps: [], holderZone: null };
   const parsed = parseAttackSteps(abilityRevealVoice(effect));
   return { steps: [...parsed.before, ...parsed.after], holderZone };

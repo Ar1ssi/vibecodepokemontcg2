@@ -238,6 +238,16 @@ const ON_DAMAGE_STATUS = new RegExp(
     '\\(even if (?:this pokémon|it) is knocked out\\), (flip a coin\\. if heads, )?' +
     `(?:this |the )(?:attacking|defending) pokémon is now ${STATUS_WORD}(?: and ${STATUS_WORD})?\\.`
 );
+// Homebrew wordings (customhb): Volcarona Flame Body "If this Pokémon is damaged by an attack from
+// your opponent's Pokémon, flip a coin. If heads, your opponent's Active Pokémon is now Burned.";
+// Gloom Drowzy Drool "If this Pokémon takes damage from your opponent's Active Pokémon (even if
+// this Pokémon is Knocked Out), your opponent flips a coin. If tails, your opponent's Active
+// Pokémon is now Asleep." The opponent's Active is the Attacking Pokémon.
+const ON_DAMAGE_STATUS_HOMEBREW = new RegExp(
+  "(?:^|\\.\\s)if this pokémon (?:is damaged by an attack from your opponent's pokémon|takes damage from your opponent's active pokémon)" +
+    '(?: \\(even if this pokémon is knocked out\\))?, (flip a coin\\. if heads|your opponent flips a coin\\. if tails), ' +
+    `your opponent's active pokémon is now ${STATUS_WORD}(?: and ${STATUS_WORD})?\\.`
+);
 const capitalised = (word) => word[0].toUpperCase() + word.slice(1);
 
 /**
@@ -249,10 +259,21 @@ export function parseOnDamageStatus(holder, ctx = {}) {
   if (!holderCanTrigger(holder, ctx)) return null;
   const text = selfNamedText(holder).replace(/’/g, "'");
   const m = text.match(ON_DAMAGE_STATUS);
-  if (!m) return null;
+  if (m) {
+    return {
+      conditions: [m[2], m[3]].filter(Boolean).map(capitalised),
+      coin: Boolean(m[1]),
+      source: holder.name,
+    };
+  }
+  const h = text.match(ON_DAMAGE_STATUS_HOMEBREW);
+  if (!h) return null;
+  const tails = /tails/.test(h[1]);
   return {
-    conditions: [m[2], m[3]].filter(Boolean).map(capitalised),
-    coin: Boolean(m[1]),
+    conditions: [h[2], h[3]].filter(Boolean).map(capitalised),
+    coin: true,
+    // Drowzy Drool: the attacking player flips, and tails lands the condition.
+    ...(tails ? { landsOn: 'tails', flipper: 'opponent' } : {}),
     source: holder.name,
   };
 }
@@ -654,7 +675,7 @@ export function parseOpponentTurnStartDraws(entries = [], ctx = {}) {
 // opponents Active Pokémon is now Burned." Read at the holder's own Pokémon Checkup: the attack
 // that damaged it was on the opponent's turn, the turn before (`attackDamageTaken`, set by damage).
 const FLAME_BODY_CLAUSE =
-  /if this pok[eé]mon was attacked last turn, flip a coin\. if heads, your opponents? active pok[eé]mon is now burned/;
+  /if this pok[eé]mon was attacked last turn, flip a coin\. if heads, your opponent(?:'s|s)? active pok[eé]mon is now burned/;
 
 /** `{ holder, playerId, source }` for each live holder that was damaged by an attack last turn. */
 export function parseAttackedLastTurnBurns(entries = [], ctx = {}) {

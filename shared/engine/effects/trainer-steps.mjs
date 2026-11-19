@@ -23,7 +23,7 @@ import {
   hasAnyCondition,
 } from '../rules/special-conditions.mjs';
 import { clearAttackMarkers, healLocked } from '../rules/attack-markers.mjs';
-import { stadiumAllowsSameTurnEvolution, stadiumBlocksHealing } from '../rules/stadium-effects.mjs';
+import { classifyStadiumEffect, stadiumAllowsSameTurnEvolution, stadiumBlocksHealing } from '../rules/stadium-effects.mjs';
 import {
   evolvedView,
   topPokemonCard as topOfStack,
@@ -4048,6 +4048,25 @@ function winGameAbility(ctx) {
   return null;
 }
 
+/**
+ * Swirlix Festival Lead (customhb): "If a Stadium in play has an effect that can be used only once
+ * per turn, you may discard this Pokémon to use that effect 1 additional time." Discarding this
+ * Pokémon (and its attached cards) frees the player's Stadium use for this turn again.
+ */
+function festivalLeadAbility(ctx) {
+  const { player, draft } = ctx;
+  const stadium = draft.stadium?.card || draft.stadium;
+  if (!stadium || classifyStadiumEffect(stadium) !== 'once-per-turn') return skip(ctx, 'no_once_per_turn_stadium');
+  if (!player.flags?.stadiumUsedThisTurn) return skip(ctx, 'stadium_not_used');
+  const holder = rootsOf(player).find((c) => c.instanceId === ctx.sourceCard?.instanceId);
+  if (!holder) return skip(ctx, 'source_not_in_play');
+  const wasActive = findCard(draft, holder.instanceId)?.zoneId === 'active';
+  discardInPlayPokemon(player, holder, ctx.events);
+  if (wasActive) player.promotionPending = true;
+  player.flags.stadiumUsedThisTurn = false;
+  return null;
+}
+
 /** Genesect V Fusion Strike System: draw until the hand matches the tagged Pokémon in play. */
 function drawVariableAbility(ctx) {
   const { player, step } = ctx;
@@ -4327,6 +4346,9 @@ function transformAbility(ctx) {
       attachTo(player, incoming, root, ctx.events);
     } else if (step.keepState) {
       swapInPlace(player, outgoing, incoming, ctx.events);
+      // Deoxys Form Change (customhb): attached cards and damage counters move over; the
+      // Pokémon that went back to the hand took its Special Conditions with it.
+      if (step.keepConditions === false) clearConditions(incoming);
       if (step.source === 'hand') player.zones.hand.push(outgoing);
       // Deoxys Form Change, Castform Temperament: the old form goes back into the deck.
       else if (step.source === 'deck') player.zones.deck.unshift(outgoing);
@@ -6394,6 +6416,7 @@ export const EXTRA_STEP_HANDLERS = {
   selfLeavesAbility,
   // Design 034 slice 6 one-offs.
   winGameAbility,
+  festivalLeadAbility,
   drawVariableAbility,
   discardForDrawAbility,
   deckPlaceAbility,

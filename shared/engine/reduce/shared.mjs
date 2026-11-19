@@ -120,6 +120,9 @@ export function energyProvisionContext(state, playerId, host) {
     hostPokemon: inPlayView(state, host),
     attachedCards: host ? zone.filter((c) => c.attachedTo === host.instanceId) : [],
     board: {
+      // Zygarde Aura Break (customhb): "{Y} Energy attached to your Pokémon also count as {D}
+      // Energy, and {D} Energy … also count as {Y} Energy" — [from, to] pairs from live holders.
+      energyAlsoCounts: energyAlsoCountsPairs(state, playerId, roots),
       ownPrizes: (player?.zones?.prizes || []).length,
       opponentPrizes: (state.players?.[opponentId]?.zones?.prizes || []).length,
       ownStage2InPlay: roots.filter(
@@ -127,6 +130,31 @@ export function energyProvisionContext(state, playerId, host) {
       ).length,
     },
   };
+}
+
+/** Whether `playerId` has exactly one Pokémon in play (Togepi Egg Shell). */
+export function onlyPokemonInPlay(state, playerId) {
+  const zones = state.players?.[playerId]?.zones || {};
+  return [...(zones.active || []), ...(zones.bench || [])].filter((c) => !c.attachedTo && isPokemon(c)).length === 1;
+}
+
+const ALSO_COUNTS_RE =
+  /\{([a-z])\} energy attached to your pok[eé]mon also counts? as \{([a-z])\} energy(?:, and \{([a-z])\} energy attached to your pok[eé]mon also counts? as \{([a-z])\} energy)?/;
+const LETTER_TYPE = { g: 'Grass', r: 'Fire', w: 'Water', l: 'Lightning', p: 'Psychic', f: 'Fighting', d: 'Darkness', m: 'Metal', y: 'Fairy', n: 'Dragon', c: 'Colorless' };
+
+function energyAlsoCountsPairs(state, playerId, roots) {
+  const pairs = [];
+  let ctx = null;
+  for (const view of roots) {
+    const text = String((view?.abilities || []).map((a) => a?.text ?? a?.effect ?? '').join(' ')).toLowerCase();
+    const m = ALSO_COUNTS_RE.exec(text);
+    if (!m) continue;
+    ctx = ctx || sideContextFor(state, playerId);
+    if (isAbilitySuppressed(view, ctx)) continue;
+    pairs.push([LETTER_TYPE[m[1]], LETTER_TYPE[m[2]]]);
+    if (m[3]) pairs.push([LETTER_TYPE[m[3]], LETTER_TYPE[m[4]]]);
+  }
+  return pairs;
 }
 
 export const cardText = (card) =>
