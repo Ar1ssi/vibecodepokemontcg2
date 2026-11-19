@@ -43,6 +43,21 @@ describe('holo CSS contracts', () => {
     assert.doesNotMatch(base, /--mask:\s*none/);
   });
 
+  it('no catch-all rarity rule shows simey layers over a TCG Live foil card', () => {
+    // A `.card[data-rarity]:not(...)` catch-all outranks tcgl-foil.css's `[data-tcgl-foil]` hide
+    // rule, so each must exclude data-rarity="tcgl" itself (the default sparkle once painted its
+    // grain over the foil shader).
+    for (const name of holoCssFiles()) {
+      const selectors = normalize(readHoloCss(name)).match(/[^{}]*\{/g) ?? [];
+      for (const selector of selectors) {
+        for (const part of selector.split(',')) {
+          if (!/\.card\[data-rarity\]:not\(/.test(part)) continue;
+          assert.match(part, /:not\(\[data-rarity="tcgl"\]\)/, `${name}: ${part.trim()}`);
+        }
+      }
+    }
+  });
+
   it('every decorative layer is masked by the card ink (luminance)', () => {
     const base = normalize(readHoloCss('base.css'));
     const rule = base.match(
