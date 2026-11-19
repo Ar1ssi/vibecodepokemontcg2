@@ -86,6 +86,32 @@ export function clearDetachedCardMarkers(state) {
 }
 
 /**
+ * A card in a discard pile or Lost Zone belongs to its owner's. Discard paths file a card with the
+ * player whose zone held it, so a Tool that crossed the table (Trickster, a Team Flare Hyper Gear)
+ * would land in the wrong pile. Rules mode only. Mutates the state.
+ *
+ * @param {{ rulesEnabled?: boolean, players?: Record<string, { zones?: Record<string, object[]> }> }} state
+ */
+export function returnOffBoardCardsToOwners(state) {
+  if (!state?.rulesEnabled) return;
+  const players = state.players || {};
+  for (const [holderId, holder] of Object.entries(players)) {
+    for (const zoneId of ['discard', 'lostZone']) {
+      const zone = holder?.zones?.[zoneId];
+      if (!Array.isArray(zone)) continue;
+      for (let i = zone.length - 1; i >= 0; i--) {
+        const card = zone[i];
+        const owner = card?.ownerId && card.ownerId !== holderId ? players[card.ownerId] : null;
+        if (!owner?.zones) continue;
+        zone.splice(i, 1);
+        if (!Array.isArray(owner.zones[zoneId])) owner.zones[zoneId] = [];
+        owner.zones[zoneId].push(card);
+      }
+    }
+  }
+}
+
+/**
  * Creates a fresh authoritative GameState.
  *
  * @param {object} options

@@ -10,7 +10,8 @@ import { attachedTrainerMarkers } from '../rules/legacy-attached-trainer.mjs';
 import { sideContextFor } from '../rules/ability-combat.mjs';
 import { pokemonHasType } from '../effects/trainer-steps.mjs';
 import { liveAttackMarkers } from '../rules/attack-markers.mjs';
-import { effectiveHp } from '../rules/stadium-effects.mjs';
+import { effectiveHp, isStadiumToolNegation } from '../rules/stadium-effects.mjs';
+import { attachedToolMarkers } from '../rules/tool-combat.mjs';
 import { isGxCard, isVstarCard } from '../rules/card-classify.mjs';
 import { evolvedView } from '../rules/evolved-pokemon.mjs';
 import { listConditions } from '../rules/special-conditions.mjs';
@@ -53,6 +54,8 @@ export function activeAttackMarkers(draft, playerId, card) {
     ...restOfGameMarkers(draft, playerId, card),
     // I224: PlusPower / Defender / Magnifier attached to it, read as the same marker kinds.
     ...attachedTrainerMarkers(active, card),
+    // Head Ringer / Jamming Net: its Tools tax its own attacks (Jamming Tower switches them off).
+    ...(isStadiumToolNegation(draft.stadium?.card || draft.stadium || null) ? [] : attachedToolMarkers(active, card)),
   ];
 }
 

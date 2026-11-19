@@ -4,7 +4,13 @@
  * Enforces Invariants 2, 3, 6, 7, 8.
  */
 
-import { clearDetachedCardMarkers, cloneGameState, findCard, createGameState } from './state.mjs';
+import {
+  clearDetachedCardMarkers,
+  cloneGameState,
+  findCard,
+  createGameState,
+  returnOffBoardCardsToOwners,
+} from './state.mjs';
 import { validateCommandShape } from './commands.mjs';
 import { createRng, withForcedCoin, withForcedCoinOnce } from './rng.mjs';
 import { abilityForcesOpponentTails } from './rules/ability-combat.mjs';
@@ -459,6 +465,7 @@ export function applyCommand(state, command, rng = null) {
   stampHealedPokemon(state, draft);
   clearFaceDownOffBoard(draft);
   clearDetachedCardMarkers(draft);
+  returnOffBoardCardsToOwners(draft);
   settleFossilCards(draft);
   settleOpeningDraw(draft, { events });
   settleRevealedHandCards(state, draft, events, findCard);

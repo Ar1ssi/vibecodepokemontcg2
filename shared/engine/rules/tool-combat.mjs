@@ -413,6 +413,31 @@ export function applyToolDamageReduction(
   return total;
 }
 
+// Head Ringer / Jamming Net (PHF 97/98): a penalty on the holder's own attacks. Read wherever the
+// Tool sits, so a Tool moved by Trickster taxes its new holder.
+const TOOL_ATTACK_COST_MORE = /the attacks of the pok[eé]mon this card is attached to cost ((?:\{[a-z]\})+) more/;
+const TOOL_ATTACK_DO_LESS =
+  /the attacks of the pok[eé]mon this card is attached to do (\d+) less damage to (?:all )?defending pok[eé]mon(?: \(before applying weakness and resistance\))?/;
+
+/**
+ * The attack markers (attack-markers.mjs shapes) of the Tools attached to `root`: an
+ * `attackCostIncrease` and/or an `outgoingReduce` before Weakness and Resistance.
+ * The caller decides Tool negation (Jamming Tower).
+ */
+export function attachedToolMarkers(zoneCards, root) {
+  if (!root) return [];
+  return attachedTools(root, zoneCards || []).flatMap((tool) => {
+    const t = cardAbilityText(tool);
+    const source = tool.name || '';
+    const markers = [];
+    const cost = t.match(TOOL_ATTACK_COST_MORE);
+    if (cost) markers.push({ kind: 'attackCostIncrease', count: (cost[1].match(/\{[a-z]\}/g) || []).length, source });
+    const less = t.match(TOOL_ATTACK_DO_LESS);
+    if (less) markers.push({ kind: 'outgoingReduce', amount: Number(less[1]), afterWR: false, source });
+    return markers;
+  });
+}
+
 /** Attacker-side damage bonus from attached Tools. */
 export function combinedToolAttackBonus(
   attacker,

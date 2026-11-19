@@ -601,6 +601,8 @@ const parseNumber = (m) => (m?.[1] ? parseInt(m[1], 10) || 0 : 0);
 export function parseDamageReduction(card) {
   const t = textOf(card);
   if (!t || parseLegacyDamageModifier(t)) return { reduce: 0 };
+  // Jamming Net: the holder's own attacks do less damage — a penalty, not damage it takes less of.
+  if (/the attacks of the pok[eé]mon this card is attached to do \d+ less damage/.test(t)) return { reduce: 0 };
   const matches =
     t.includes('less damage') ||
     t.includes('reduce damage') ||
