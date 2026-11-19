@@ -636,13 +636,15 @@ export function abilityDamageReduction(defender, attacker, ctx = {}) {
 
 // Regirock / Regice Unified Defense: "take 10 less damage for each Pokémon with the Ability Unified
 // Defense in play". In play spans both sides; same-named Abilities do not stack (nonStackingOnce),
-// so each holder's own text carries the whole count. 1 when the text has no such scaling.
+// so each holder's own text carries the whole count. Holders count once per name (user ruling:
+// two Regice are 10 less, Regice + Regieleki 20 less). 1 when the text has no such scaling.
 function abilityHolderCount(text, ctx) {
   const named = /for each pok[eé]mon with the ability ([a-z0-9 '’-]+?) in play/.exec(text)?.[1];
   if (!named) return 1;
-  return [...sideInPlay(ctx), ...opponentInPlay(ctx)].filter(
+  const holders = [...sideInPlay(ctx), ...opponentInPlay(ctx)].filter(
     (card) => !isAbilitySuppressed(card, ctx) && (card.abilities || []).some((a) => lower(a?.name) === named)
-  ).length;
+  );
+  return new Set(holders.map((card) => lower(card.name))).size;
 }
 
 /**
