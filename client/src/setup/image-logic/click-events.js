@@ -31,7 +31,8 @@ import {
   closeCardFocus,
   isCardFocusOpen,
 } from '../rules/card-focus.mjs';
-import { tapRoute } from '../rules/card-focus-routing.mjs';
+import { overlayAttacker, tapRoute } from '../rules/card-focus-routing.mjs';
+import { appendMessage } from '../chatbox/append-message.js';
 import { statusEffectsFor } from '../rules/attack-ui-model.mjs';
 import { isStackViewOpen, openStackView } from '../rules/stack-view.mjs';
 import { liveZoneArray } from '../zones/live-zone-array.js';
@@ -254,7 +255,17 @@ const openPokemonFocus = (card, zone, retreatUser = systemState.initiator) => {
     onAttack: active
       ? (index) => {
           closeCardFocus({ immediate: true });
-          attack(rulesState.turnPlayer, true, index);
+          const attacker = overlayAttacker({
+            owner: retreatUser,
+            turnPlayer: rulesState.turnPlayer,
+            isTwoPlayer: systemState.isTwoPlayer,
+            solo: systemState.solo,
+          });
+          if (!attacker) {
+            appendMessage(retreatUser, "⛔ It's not your turn.", 'announcement', false);
+            return;
+          }
+          attack(attacker, true, index);
         }
       : null,
     onRetreat: active

@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { tapRoute } from '../card-focus-routing.mjs';
+import { overlayAttacker, tapRoute } from '../card-focus-routing.mjs';
 
 // Design 074 A1: a tap on an in-play Pokémon routes as TCG Live's PlayerCardOwner.OnCardClicked.
 // Fixture shapes only — no card text is asserted.
@@ -43,5 +43,27 @@ describe('tapRoute (PlayerCardOwner.OnCardClicked)', () => {
   it('an attached Energy token in the zone, or a face-down card, is not a Pokémon', () => {
     assert.equal(tapRoute({ zoneId: 'active', cardUser: 'self', card: { name: 'Fire Energy', type: 'Energy', image: {} } }), null);
     assert.equal(tapRoute({ zoneId: 'bench', cardUser: 'opp', card: { image: {} } }), null);
+  });
+});
+
+// Log public:1 2026-11-19: on p2's turn, p1 tapped their own Active Landorus and picked Rock Tumble;
+// the overlay attacked as the turn player ('opp'), which relayed a requestAction that made p2's
+// client attack with its own Landorus.
+describe('overlayAttacker (who an AttackOverlay attack acts for)', () => {
+  it('two-player: on the opponent turn, tapping your own attack does not attack for them', () => {
+    assert.equal(overlayAttacker({ owner: 'self', turnPlayer: 'opp', isTwoPlayer: true }), null);
+  });
+
+  it('two-player: on your turn, you attack', () => {
+    assert.equal(overlayAttacker({ owner: 'self', turnPlayer: 'self', isTwoPlayer: true }), 'self');
+  });
+
+  it('one-player and solo rooms play both sides, so the turn player attacks', () => {
+    assert.equal(overlayAttacker({ owner: 'self', turnPlayer: 'opp', isTwoPlayer: false }), 'opp');
+    assert.equal(overlayAttacker({ owner: 'self', turnPlayer: 'opp', isTwoPlayer: true, solo: true }), 'opp');
+  });
+
+  it('no turn player yet falls back to the owner', () => {
+    assert.equal(overlayAttacker({ owner: 'self', turnPlayer: null, isTwoPlayer: true }), 'self');
   });
 });
