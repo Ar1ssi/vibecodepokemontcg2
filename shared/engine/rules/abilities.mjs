@@ -715,6 +715,13 @@ export function parseAbility(text = '') {
     (lower.includes('from your deck') && lower.includes('into your hand'))
   ) {
     const parsed = parseAbilitySearchParams(lower);
+    // Steven's Metagross ex X-Boot: "a Basic {P} Energy card, a Basic {M} Energy card, or 1 of
+    // each" is up to 2 Basic Energy, at most one of each type.
+    const oneOfEach = lower.match(
+      /search your deck for an? basic \{([a-z])\} energy card, an? basic \{([a-z])\} energy card, or 1 of each/
+    );
+    const oneEachOf = oneOfEach ? [oneOfEach[1], oneOfEach[2]].map((l) => ENERGY_SYMBOL_TYPES[l]) : null;
+    if (oneEachOf) Object.assign(parsed, { what: `Basic ${oneEachOf.join(' or ')} Energy`, count: 2, upTo: true });
     const what = parsed.what;
     // "…and attach it to 1 of your Benched {D} Pokémon" (Sinister Surge), "…attach them to this
     // Pokémon", "…attach them to your Pokémon in any way you like": the searched cards go onto
@@ -741,6 +748,7 @@ export function parseAbility(text = '') {
       count,
       destination: dest,
       ...(attachTarget ? { attachTarget, attachDamage, ...(attachEach ? { attachEach } : {}) } : {}),
+      ...(oneEachOf ? { oneEachOf } : {}),
       upTo: parsed.upTo || false,
       reveal: textRevealsPicks(lower),
       guidance: `Once during your turn: search your deck for ${count > 1 || parsed.upTo ? `up to ${count} ` : ''}${what} → ${destLabel}, then shuffle.`,
@@ -2374,6 +2382,11 @@ export function parseAbility(text = '') {
   // Transformative Start searches the deck itself; Buzzap / Battery attach the card itself.
   if (steps.some((step) => step.type === 'transformAbility' && step.source === 'deck')) {
     steps = steps.filter((step) => step.type !== 'searchAbility');
+  }
+  // A deck search that attaches its own cards: the generic attach branch only echoes it, and a
+  // source-less attach does nothing in the executor.
+  if (steps.some((step) => step.type === 'searchAbility' && step.destination === 'attach')) {
+    steps = steps.filter((step) => step.type !== 'attachAbility' || step.fromHand || step.fromDiscard);
   }
   if (steps.some((step) => step.type === 'selfAttachEnergyAbility')) {
     steps = steps.filter((step) => step.type !== 'attachAbility');

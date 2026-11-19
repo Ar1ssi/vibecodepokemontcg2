@@ -238,6 +238,25 @@ function pickAlternativeBranch(deck, selection, alternatives) {
     .slice(0, branch.count);
 }
 
+// X-Boot "a Basic {P} Energy card, a Basic {M} Energy card, or 1 of each": the listed type a
+// Basic Energy card counts as, or null.
+function oneEachTypeOf(card, types) {
+  if (!matchesSearch(card, 'Basic Energy')) return null;
+  const own = (card?.types || []).map((t) => String(t).toLowerCase());
+  return types.find((type) => own.includes(type.toLowerCase())) ?? null;
+}
+
+// Keeps the first pick of each listed type.
+function keepOnePerType(deck, selection, types) {
+  const seen = new Set();
+  return selection.filter((id) => {
+    const type = oneEachTypeOf(deck.find((c) => c.instanceId === id), types);
+    if (type == null || seen.has(type)) return false;
+    seen.add(type);
+    return true;
+  });
+}
+
 // A search kind (`what`) minus an optional `exclude` kind: "3 Basic Pokémon (except for
 // Pokémon-EX)" (Brigette).
 function matchesKind(card, { what, exclude }) {
@@ -740,8 +759,9 @@ export function executeSteps(draft, {
         const evolvesFrom = step.evolvesFrom ? String(step.evolvesFrom).toLowerCase() : null;
         const opponentTypes = step.sameTypeAsOpponent ? inPlayTypes(opponent) : null;
         const opponentNames = step.sameNameAsOpponent ? inPlayNames(opponent) : null;
+        const oneEachOf = step.oneEachOf || null;
         const cardMatches = (c) =>
-          matchesKind(c, { what, exclude: step.exclude }) &&
+          (oneEachOf ? oneEachTypeOf(c, oneEachOf) != null : matchesKind(c, { what, exclude: step.exclude })) &&
           (!opponentNames || opponentNames.has(String(c?.name || '').toLowerCase())) &&
           (!nameFilter || String(c?.name || '').toLowerCase().includes(nameFilter)) &&
           (!evolvesFrom || String(c?.evolvesFrom || '').toLowerCase() === evolvesFrom) &&
@@ -936,8 +956,12 @@ export function executeSteps(draft, {
         }
 
         if (stepSelection && dest === 'attach') {
-          const picked = stepSelection.filter((id) =>
+          const valid = [...new Set(stepSelection)].filter((id) =>
             (player.zones.deck || []).some((c) => c.instanceId === id && cardMatches(c))
+          );
+          const picked = (oneEachOf ? keepOnePerType(player.zones.deck || [], valid, oneEachOf) : valid).slice(
+            0,
+            maxCount
           );
           const roots = attachRoots();
           if (picked.length === 0 || roots.length === 0) {

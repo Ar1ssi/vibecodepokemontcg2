@@ -390,8 +390,9 @@ export function rootMatchesTarget(player, root, target = '') {
   // "1 of your Pokémon V" (Melony) / "Pokémon VMAX" (Rose): isVCard covers V, VMAX, VSTAR, V-UNION.
   if (/\bpok[eé]mon vmax\b/.test(t) && !isVmaxCard(top)) return false;
   if (/\bpok[eé]mon v\b/.test(t) && !isVCard(top)) return false;
-  const typed = t.match(/\{([a-z])\}/);
-  if (typed && typed[1] !== 'c') return pokemonHasType(top, typed[1]);
+  // "your {P} Pokémon and {M} Pokémon" (X-Boot): a Pokémon of any listed type.
+  const typed = [...t.matchAll(/\{([a-z])\}/g)].map((m) => m[1]).filter((letter) => letter !== 'c');
+  if (typed.length > 0) return typed.some((letter) => pokemonHasType(top, letter));
   return true;
 }
 
