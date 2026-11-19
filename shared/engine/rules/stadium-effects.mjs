@@ -2076,6 +2076,15 @@ export function stadiumAttackDamageReductionFor(stadiumCard, defender) {
   return matches && matches(defender) ? amount : 0;
 }
 
+// Pokémon-EX (XY/BW, uppercase) — not the lowercase Pokémon ex. TCGdex names them "Lucario EX"
+// with suffix "EX" and no subtypes (xy3-54); other sources write "Lucario-EX".
+function isLegacyPokemonEx(card) {
+  if (!card) return false;
+  if (card.suffix === 'EX') return true;
+  if (Array.isArray(card.subtypes) && card.subtypes.map(String).includes('EX')) return true;
+  return /[\s-]EX$/.test(String(card.name || ''));
+}
+
 /**
  * "The attacks of each {F} Pokémon in play (both yours and your opponent's) do 20 more damage to
  * the Defending Pokémon-EX" / "… to the opponent's Active Pokémon (before applying Weakness and
@@ -2092,9 +2101,7 @@ export function stadiumAttackDamageBonusFor(stadiumCard, attacker, defender, { d
   const target = m[2].trim();
   if (!defenderIsActive) return 0;
   if (/pok[eé]mon-ex$/.test(target)) {
-    const name = String(defender?.name || '');
-    const subtypes = Array.isArray(defender?.subtypes) ? defender.subtypes.map(String) : [];
-    return /-EX$/.test(name) || subtypes.includes('EX') ? bonus : 0;
+    return isLegacyPokemonEx(defender) ? bonus : 0;
   }
   return /^(?:opponent'?s active pok[eé]mon|defending pok[eé]mon)$/.test(target) ? bonus : 0;
 }
