@@ -182,3 +182,19 @@ test('HB 625 Guard Energy: a no-Rule-Box holder takes 30 less from Pokémon ex, 
   assert.equal(hit(exMon('Big ex'), exMon('Other ex')), 60);
   assert.equal(hit(exMon('Big ex'), mon('Plain'), 2), 30);
 });
+
+// "For each Prize card you have taken" counts the attacker's own taken Prizes, not the opponent's
+// remaining ones. Corpus rows: Salazzle-GX Burning Shadows 151 Diabolical Claws ("50×"), Gallade V
+// Lost Origin 181 Rising Sword ("20+"); the same wording as HB 448 Mega Mawile ex Gobble Down.
+test('"… for each Prize card you have taken" scales with the attacker\'s taken Prizes', () => {
+  const claws = { name: 'Diabolical Claws', cost: [], damage: '50×', text: 'This attack does 50 damage for each Prize card you have taken.' };
+  const sword = { name: 'Rising Sword', cost: [], damage: '20+', text: 'This attack does 50 more damage for each Prize card you have taken.' };
+  for (const taken of [0, 2, 4]) {
+    for (const [move, base] of [[claws, 0], [sword, 20]]) {
+      const state = game({ p1: [mon('Attacker', { attacks: [move] })], p2: [mon('Def', { hp: 400 })] });
+      state.players.p1.zones.prizes.splice(0, taken);
+      state.players.p2.zones.prizes.splice(0, 1);
+      assert.equal(activeDamage(attack(state)), base + 50 * taken, `${move.name}, ${taken} taken`);
+    }
+  }
+});
