@@ -47,7 +47,7 @@
     },
     "ability:damage-prevent": {
       "n": 305,
-      "observed": 64
+      "observed": 67
     },
     "ability:damage-reduce": {
       "n": 3,
@@ -86,8 +86,8 @@
       "observed": 0
     },
     "ability:energy-redirect": {
-      "n": 95,
-      "observed": 87
+      "n": 101,
+      "observed": 93
     },
     "ability:energy-type": {
       "n": 3,
@@ -118,7 +118,7 @@
       "observed": 0
     },
     "ability:ko-prevention": {
-      "n": 63,
+      "n": 61,
       "observed": 54
     },
     "ability:look-at-top": {
@@ -130,19 +130,19 @@
       "observed": 2
     },
     "ability:move-damage": {
-      "n": 294,
-      "observed": 293
+      "n": 296,
+      "observed": 296
     },
     "ability:on-opponent-evolve": {
       "n": 30,
       "observed": 27
     },
     "ability:opponent-disrupt": {
-      "n": 223,
-      "observed": 127
+      "n": 222,
+      "observed": 126
     },
     "ability:passive": {
-      "n": 167,
+      "n": 170,
       "observed": 30
     },
     "ability:prize-modify": {
@@ -154,7 +154,7 @@
       "observed": 117
     },
     "ability:retreat-cost": {
-      "n": 172,
+      "n": 169,
       "observed": 0
     },
     "ability:search": {
@@ -174,8 +174,8 @@
       "observed": 2
     },
     "ability:status": {
-      "n": 507,
-      "observed": 366
+      "n": 501,
+      "observed": 371
     },
     "ability:status-recover": {
       "n": 38,
@@ -187,7 +187,7 @@
     },
     "ability:tool-cap": {
       "n": 48,
-      "observed": 2
+      "observed": 4
     },
     "ability:type-change": {
       "n": 18,
@@ -198,20 +198,20 @@
       "observed": 8
     },
     "ability:when-played": {
-      "n": 39,
-      "observed": 38
+      "n": 40,
+      "observed": 39
     },
     "attack:bench-damage": {
       "n": 850,
-      "observed": 817
+      "observed": 830
     },
     "attack:coin-flip": {
       "n": 429,
-      "observed": 418
+      "observed": 427
     },
     "attack:conditional-damage": {
       "n": 740,
-      "observed": 380
+      "observed": 392
     },
     "attack:conditional-ko": {
       "n": 20,
@@ -223,11 +223,11 @@
     },
     "attack:damage-prevention": {
       "n": 174,
-      "observed": 8
+      "observed": 174
     },
     "attack:deferred-damage": {
       "n": 3,
-      "observed": 0
+      "observed": 3
     },
     "attack:devolve-opponent": {
       "n": 11,
@@ -259,7 +259,7 @@
     },
     "attack:effect-prevention": {
       "n": 26,
-      "observed": 2
+      "observed": 23
     },
     "attack:extra-by-type": {
       "n": 1,
@@ -279,7 +279,7 @@
     },
     "attack:immunity": {
       "n": 243,
-      "observed": 24
+      "observed": 35
     },
     "attack:look-any-deck": {
       "n": 5,
@@ -315,11 +315,11 @@
     },
     "attack:next-turn-bonus": {
       "n": 36,
-      "observed": 0
+      "observed": 36
     },
     "attack:next-turn-lock": {
       "n": 720,
-      "observed": 653
+      "observed": 673
     },
     "attack:once-per-turn": {
       "n": 5,
@@ -343,7 +343,7 @@
     },
     "attack:retaliate": {
       "n": 2,
-      "observed": 1
+      "observed": 2
     },
     "attack:return-opponent-energy": {
       "n": 3,
