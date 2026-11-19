@@ -4280,8 +4280,21 @@ function swapInPlace(player, outgoing, incoming, events) {
     }
   }
   outgoing.attachedTo = null;
-  // The card leaving play keeps no once-per-turn marker; the incoming card is a different
-  // card, so its own Ability stays usable.
+  // "Any other effects remain on the new Pokémon": attack effects that end when the Pokémon
+  // evolves follow the new top card, and an Ability already used this turn stays used, so the
+  // new Aegislash cannot Stance Change straight back.
+  const root = incoming.attachedTo != null ? zone.find((c) => c.instanceId === incoming.attachedTo) : incoming;
+  if (Array.isArray(root?.attackMarkers)) {
+    root.attackMarkers = root.attackMarkers.map((m) =>
+      m.topId === outgoing.instanceId ? { ...m, topId: incoming.instanceId } : m
+    );
+  }
+  const used = player.flags?.abilitiesUsed || {};
+  if (outgoing.abilityUsed || used[outgoing.instanceId]) {
+    incoming.abilityUsed = true;
+    player.flags = { ...player.flags, abilitiesUsed: { ...used, [incoming.instanceId]: true } };
+  }
+  // The card leaving play keeps no once-per-turn marker.
   outgoing.abilityUsed = false;
   events.push({
     type: 'pokemonSwapped',
