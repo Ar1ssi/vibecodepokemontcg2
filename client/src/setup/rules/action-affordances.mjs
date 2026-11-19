@@ -19,13 +19,7 @@ import {
   filterUsableAbilities,
 } from '../../../../shared/engine/rules/collect-usable-abilities.mjs';
 import { parseAbility } from '../../../../shared/engine/rules/abilities.mjs';
-
-const abilityTextOf = (card) => {
-  const first = Array.isArray(card?.abilities) && card.abilities.length > 0
-    ? (typeof card.abilities[0] === 'string' ? card.abilities[0] : card.abilities[0]?.text)
-    : '';
-  return first || card?.ability?.text || card?.abilityText || card?.text || '';
-};
+import { cardAbilityText } from '../../../../shared/engine/rules/ability-executors.mjs';
 
 /**
  * Same gate as ability-picker.js: "When you play this Pokémon onto your
@@ -34,7 +28,7 @@ const abilityTextOf = (card) => {
  * own gate (the turn the Pokémon evolved) and is excluded here.
  */
 export function isPlayedToBenchTriggerCard(card) {
-  return parseAbility(abilityTextOf(card)).some(
+  return parseAbility(cardAbilityText(card)).some(
     (s) => s.type === 'whenPlayedAbility' && !s.evolve
   );
 }
@@ -45,7 +39,7 @@ export function isPlayedToBenchTriggerCard(card) {
  * that Pokémon evolved, not every turn.
  */
 export function isEvolvePlayedTriggerCard(card) {
-  return parseAbility(abilityTextOf(card)).some(
+  return parseAbility(cardAbilityText(card)).some(
     (s) => s.type === 'whenPlayedAbility' && s.evolve === true
   );
 }

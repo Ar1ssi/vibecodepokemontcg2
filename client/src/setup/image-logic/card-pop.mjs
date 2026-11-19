@@ -83,7 +83,6 @@ const createSpring = (initial, opts) => {
   let rafId = null;
   let invMass = 1;
   let invMassRecoveryRate = 0;
-  let currentToken = 0;
   let runOpts = options;
   const listeners = new Set();
   let pending = [];
@@ -123,8 +122,6 @@ const createSpring = (initial, opts) => {
     },
     set(next, setOpts = {}) {
       targetValue = next;
-      currentToken += 1;
-      const token = currentToken;
       runOpts = {
         ...options,
         stiffness: setOpts.stiffness ?? options.stiffness,
@@ -153,10 +150,7 @@ const createSpring = (initial, opts) => {
         rafId = requestAnimationFrame(loop);
       }
       return new Promise((resolve) => {
-        pending.push(() => {
-          if (token === currentToken) resolve();
-          else resolve();
-        });
+        pending.push(resolve);
       });
     },
     subscribe(fn) {

@@ -64,6 +64,8 @@ export function openMatPick({
     .map((c) => buildMatPickEntry(c, imageAnchor))
     .filter((e) => e.targetEl || e.img);
   if (!entries.length) {
+    // "Nothing to show", not a user decline: callers use it to release their open-choice slot,
+    // so it fires for a required (non-cancellable) pick too.
     onCancel?.();
     return;
   }

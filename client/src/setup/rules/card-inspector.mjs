@@ -54,6 +54,7 @@ import {
   buildStadiumOption,
   buildWeakResistBar,
 } from './attack-options.mjs';
+import { el, OVERLAY_CLOSE_EVENTS } from './overlay-chrome.mjs';
 
 // Events that can change what the inspector reports while it is open. Owned here because this
 // module outlives attack-preview.js — slice 3 deletes that file and its copy of this list.
@@ -65,7 +66,6 @@ const REFRESH_EVENTS = [
   'action-processed',
   'rules-mode-changed',
 ];
-const CLOSE_EVENTS = ['rules-turn-began', 'rules-session-reset'];
 
 // Last-resort glyphs for a type the token art does not cover — the same "data we don't
 // recognise" path attack-preview.js takes.
@@ -78,16 +78,9 @@ const TYPE_GLYPHS = {
   Psychic: '🔮',
   Fighting: '🥊',
   Metal: '⚙️',
-  Dark: '🌑',
+  Darkness: '🌑',
   Dragon: '🐉',
   Fairy: '✨',
-};
-
-const el = (tag, className, text) => {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text != null) node.textContent = String(text);
-  return node;
 };
 
 const orb = (type, className) => {
@@ -210,7 +203,7 @@ const detachState = (state) => {
 
 const unwireBoundaryIfIdle = () => {
   if (boundaryWired && states.size === 0) {
-    CLOSE_EVENTS.forEach((name) =>
+    OVERLAY_CLOSE_EVENTS.forEach((name) =>
       document.removeEventListener(name, teardownAll)
     );
     boundaryWired = false;
@@ -221,7 +214,7 @@ const teardownAll = () => {
   states.forEach(detachState);
   states.clear();
   if (boundaryWired) {
-    CLOSE_EVENTS.forEach((name) =>
+    OVERLAY_CLOSE_EVENTS.forEach((name) =>
       document.removeEventListener(name, teardownAll)
     );
     boundaryWired = false;
@@ -230,7 +223,7 @@ const teardownAll = () => {
 
 const wireBoundary = () => {
   if (boundaryWired) return;
-  CLOSE_EVENTS.forEach((name) => document.addEventListener(name, teardownAll));
+  OVERLAY_CLOSE_EVENTS.forEach((name) => document.addEventListener(name, teardownAll));
   boundaryWired = true;
 };
 
@@ -280,7 +273,9 @@ export const decorateInspectorSlide = (built, card, getContext, actions = null) 
     context: null,
     model,
   };
-  state.refresh = () => rerender(state);
+  // The async snapshot is what carries the Stadium cost modifier and the once-per-turn flags, so
+  // every refresh re-resolves it; a Stadium has no snapshot and re-reads `getContext` directly.
+  state.refresh = () => (isStadiumCard(card) ? rerender(state) : hydrateContext(state));
   // The chrome is sized from the slide's layout box, so a resize (window, or the focus card's
   // viewport-derived size) must re-place it.
   if (typeof ResizeObserver !== 'undefined') {
@@ -294,6 +289,7 @@ export const decorateInspectorSlide = (built, card, getContext, actions = null) 
     state.observer.observe(wrap);
   }
   states.add(state);
+  REFRESH_EVENTS.forEach((name) => document.addEventListener(name, state.refresh));
   wireBoundary();
   applyAffordances(state, model);
   wirePanelClicks(state);
@@ -418,13 +414,16 @@ const retreatBoardContext = () => ({
   benchCards: getZone('self', 'bench').array,
 });
 
+// Damage counters on the attacker, for attacks that scale with them.
+const attackerDamageOf = (card) => Math.max(0, Math.round(Number(card?.damage) || 0) / 10);
+
 const stampContextFor = (card, zone = 'active') => ({
   energyTypes: stampEnergyTypes(card),
   attacker: card,
   zone,
   ...retreatBoardContext(),
   damageCtx: {
-    attackerDamage: Math.max(0, Math.round(Number(card?.damage) || 0) / 10),
+    attackerDamage: attackerDamageOf(card),
   },
   rulesEnabled: true,
 });
@@ -566,7 +565,7 @@ async function resolveLiveContext(card, zone = 'active') {
     zone,
     ...retreatBoardContext(),
     damageCtx: {
-      attackerDamage: Math.max(0, Math.round(Number(card?.damage) || 0) / 10),
+      attackerDamage: attackerDamageOf(card),
       energyCount: energyTypes.length,
     },
     rulesEnabled: Boolean(rulesState.enabled),
@@ -581,9 +580,11 @@ const hydrateContext = (state) => {
   // A Stadium has nothing async to resolve — its context is the live rules flags, which
   // `getContext` re-reads on every REFRESH_EVENT, so the panel stays accurate while open.
   if (isStadiumCard(state.card)) return;
+  const seq = (state.hydrateSeq = (state.hydrateSeq ?? 0) + 1);
   resolveLiveContext(state.card, state.getContext().zone).then(
     (context) => {
-      if (!state.wrap.isConnected) return;
+      // A newer resolve is in flight: this one read the board before the latest event.
+      if (!state.wrap.isConnected || seq !== state.hydrateSeq) return;
       state.context = context;
       rerender(state);
     },

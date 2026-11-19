@@ -51,9 +51,10 @@ import {
 import { suppressHoverPreview } from '../image-logic/hover-preview-bus.mjs';
 import { flightEase, focusMeshId, focusMeshPose, reversed } from './card-focus-mesh.mjs';
 import { closeStatusPopup, openStatusPopup } from './status-popup.mjs';
+import { el, OVERLAY_CLOSE_EVENTS } from './overlay-chrome.mjs';
+import { isEnergy } from '../../../../shared/engine/cards.mjs';
 
 const HAND_LOWERED_CLASS = 'hand-lowered';
-const CLOSE_EVENTS = ['rules-turn-began', 'rules-session-reset'];
 // Clicks on the backdrop and on the card's panels are ignored for this long after the view opens, so
 // the second click of a double-click cannot close it or fire an attack: the Active's slot sits under
 // the landed card, and `event.detail` cannot tell (the two clicks land in different frames, so the
@@ -74,12 +75,6 @@ const MESH_CLASS = 'card-focus--mesh';
 let focusState = null;
 
 export const isCardFocusOpen = () => focusState !== null;
-
-const el = (tag, className) => {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  return node;
-};
 
 const transformString = ({ translateX, translateY, scale, rotateX }) =>
   `translate(${translateX}px, ${translateY}px) scale(${scale}) rotateX(${rotateX}deg)`;
@@ -235,13 +230,10 @@ const buildCover = () => {
 
 // The attached Energy as big tokens under the card, like the game draws it. Anything that is not an
 // Energy with a token (a Tool, a Special Energy with no type) stays reachable behind the Stack button.
-const isEnergyCard = (attached) =>
-  attached?.type === 'Energy' || /energy/i.test(String(attached?.name ?? ''));
-
 const buildEnergyRow = (card) => {
   const row = el('div', 'card-focus__energies');
   for (const attached of card.attachedCards || []) {
-    if (!isEnergyCard(attached)) continue;
+    if (!isEnergy(attached)) continue;
     const key = energyTypeKeyFor({
       types: attached.types ?? (attached.energyType ? [attached.energyType] : undefined),
       name: attached.name,
@@ -317,7 +309,6 @@ export function openCardFocus({
   getContext,
   onUse = null,
 } = {}) {
-  suppressHoverPreview('modal');
   if (focusState) return false;
   const sourceImg = card?.image;
   if (!sourceImg?.isConnected) return false;
@@ -325,6 +316,7 @@ export function openCardFocus({
   const viewport = { width: window.innerWidth, height: window.innerHeight };
   const to = focusRect(viewport);
   if (!(to.width > 0)) return false;
+  suppressHoverPreview('modal');
   const from = viewportRectOf(sourceImg);
 
   const state = {
@@ -426,7 +418,7 @@ export function openCardFocus({
       watchForPickers(),
     ];
     window.addEventListener('resize', onResize);
-    CLOSE_EVENTS.forEach((name) =>
+    OVERLAY_CLOSE_EVENTS.forEach((name) =>
       document.addEventListener(name, closeImmediately)
     );
     if (state.holoWrapper && state.meshId === null) {
@@ -468,7 +460,7 @@ const teardown = (state) => {
   state.cleanups?.forEach((cleanup) => cleanup());
   state.cleanups = null;
   window.removeEventListener('resize', onResize);
-  CLOSE_EVENTS.forEach((name) =>
+  OVERLAY_CLOSE_EVENTS.forEach((name) =>
     document.removeEventListener(name, closeImmediately)
   );
   raiseHand(state);
