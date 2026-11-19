@@ -86,19 +86,34 @@ function redactOwnerZones(player) {
 }
 
 /**
+ * Setup is still open: the starter's turn-1 draw is owed and some player has no Starting Active
+ * yet (rules/opening-draw.mjs). Starting Pokémon are placed face down until then, so neither
+ * player sees the other's choice before committing their own.
+ *
+ * @param {object} state
+ * @returns {boolean}
+ */
+export function openingSetupHidden(state) {
+  if (state?.openingDrawPending == null) return false;
+  return Object.values(state.players || {}).some((player) => !(player?.zones?.active || []).length);
+}
+
+/**
  * Redacts a player's zones for the opponent ('them').
  *
  * @param {object} player
+ * @param {{ setupHidden?: boolean }} [options] hide the Active and Bench while setup is open
  * @returns {object} Redacted zones
  */
-function redactOpponentZones(player) {
+function redactOpponentZones(player, { setupHidden = false } = {}) {
   const zones = player.zones || {};
+  const inPlayCard = setupHidden ? redactCard : sanitizeCard;
   return {
     deck: { count: (zones.deck || []).length },
     hand: (zones.hand || []).map((c) => (c.revealed ? sanitizeCard(c) : redactCard(c))),
     prizes: prizeCards(player),
-    active: (zones.active || []).map(sanitizeCard),
-    bench: (zones.bench || []).map(sanitizeCard),
+    active: (zones.active || []).map(inPlayCard),
+    bench: (zones.bench || []).map(inPlayCard),
     discard: (zones.discard || []).map(sanitizeCard),
     lostZone: (zones.lostZone || []).map(sanitizeCard),
     board: (zones.board || []).map(boardCard),
@@ -245,7 +260,7 @@ export function viewFor(state, playerId, { attackExtrasFor, costDiscountsFor } =
           username: opponent.username,
           deckFormat: opponent.deckFormat,
           flags: playerFlags(opponent),
-          zones: redactOpponentZones(opponent),
+          zones: redactOpponentZones(opponent, { setupHidden: openingSetupHidden(state) }),
         }
       : null,
   };
