@@ -143,8 +143,11 @@ function kindOf(phrase) {
 
 /** "a Pokémon-GX or a Pokémon-EX" → ['gx', 'ex']; null when any part is not a known kind. */
 export function kindsOf(phrase) {
-  const kinds = String(phrase || '')
-    .split(/,? or /)
+  const parts = String(phrase || '').split(/,? or /);
+  // Rapid Strike Urshifu Surging Strikes: "{F} or {W} Pokémon" — the last part's noun is shared.
+  const noun = / (pokémon)$/.exec(parts[parts.length - 1])?.[1];
+  const kinds = parts
+    .map((part, i) => (noun && i < parts.length - 1 && /^(?:an? )?\{[a-z]\}$/.test(part.trim()) ? `${part} ${noun}` : part))
     .map(kindOf);
   return kinds.length > 0 && kinds.every(Boolean) ? kinds : null;
 }
