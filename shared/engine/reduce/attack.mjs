@@ -422,9 +422,24 @@ function toolGrantedAttacksFor(state, card) {
     // Evolution cards sit in the stack attached to the Basic root: their attacks are the
     // previous Evolutions', usable only through a grant (design 049), never as a Tool's.
     if (isPokemon(attached) || isEnergy(attached)) continue;
+    // "The Mega Zygarde ex this card is attached to can use the attack on this card" (Core Memory,
+    // G Booster, G Scope, Power Memory; customhb): only a holder of that name gets the attack.
+    if (!toolAttackHolderAllowed(attached, inPlayView(state, card))) continue;
     out.push(...parseGrantedAttacks(attached));
   }
   return out;
+}
+
+const normalizedPokemonName = (name) =>
+  String(name || '')
+    .toLowerCase()
+    .replace(/-(ex|gx|v)$/, ' $1')
+    .trim();
+
+function toolAttackHolderAllowed(tool, holder) {
+  const named = /the ([^.]+?) this card is attached to can (?:also )?use the attack on this card/i.exec(cardText(tool))?.[1];
+  if (!named || /^pok[ée]mon$/i.test(named.trim())) return true;
+  return normalizedPokemonName(holder?.name) === normalizedPokemonName(named);
 }
 
 function borrowSourceMatches(card, borrow) {

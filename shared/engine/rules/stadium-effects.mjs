@@ -16,7 +16,7 @@ import { isPokemon } from '../cards.mjs';
 import { getAttachedSpecialEnergies, parseSpecialEnergyEffects } from './special-energy-parse.mjs';
 import { isAncientTraitAbility } from './abilities.mjs';
 import { isRuleBoxPokemon, isTeraCard, isExCard, isGxCard, isVCard } from './card-classify.mjs';
-import { isDeltaSpecies } from './energy-effects.mjs';
+import { isDeltaSpecies, resolveAttachedEnergyType } from './energy-effects.mjs';
 import { getSpecialEnergyHpBonus } from './special-energy-parse.mjs';
 import { matchesSearch } from './search-match.mjs';
 //
@@ -1368,6 +1368,7 @@ export function stadiumFilterMatches(card, stadiumCard) {
   const cardTypes = (card?.types || []).map(lower);
   const typeMap = {
     c: 'colorless',
+    r: 'fire',
     w: 'water',
     l: 'lightning',
     f: 'fighting',
@@ -1385,7 +1386,7 @@ export function stadiumFilterMatches(card, stadiumCard) {
   if (/(?<!non-)\{c\} pokémon/.test(t)) {
     if (cardTypes.length && !cardTypes.includes('colorless')) return false;
   }
-  const typeMatches = [...t.matchAll(/(?<!non-)\{([wlfmpdgyn])\}/gi)];
+  const typeMatches = [...t.matchAll(/(?<!non-)\{([rwlfmpdgyn])\}/gi)];
   if (typeMatches.length) {
     const wanted = typeMatches
       .map((m) => typeMap[m[1].toLowerCase()])
@@ -1846,6 +1847,9 @@ export function parseStadiumRetreatModifier(card) {
     return 1;
   }
   if (/(less|reduc|lower)/.test(t)) {
+    // Altar of the Moone: "is {C}{C} less".
+    const symbols = t.match(/((?:\{c\})+)\s+less/);
+    if (symbols) return -(symbols[1].length / 3);
     const m = t.match(/(?:by|less)\s*(\d+)|(\d+)\s+less/);
     return -(m ? parseInt(m[1] || m[2], 10) || 1 : 1);
   }
@@ -1857,14 +1861,21 @@ export function getStadiumRetreatCost(
   baseRetreat,
   pokemon,
   targetPlayer,
-  stadiumOverride = null
+  stadiumOverride = null,
+  zoneCards = null
 ) {
   const stadium = stadiumOverride || (rulesState.enabled ? getStadium() : null);
   const card = stadium?.card || stadium;
   if (!card) return baseRetreat;
   const delta = parseStadiumRetreatModifier(card);
   if (delta === 0) return baseRetreat;
-  if (!stadiumFilterMatches(pokemon, card)) return baseRetreat;
+  // Altar of the Moone: "each Pokémon … that has any {P} or {D} Energy attached to it" is an
+  // Energy filter, not a Pokémon type filter.
+  const energyClause = textOf(card).match(/that has any ((?:\{[a-z]\}(?: or |, )?)+) energy attached/);
+  if (energyClause) {
+    const types = [...energyClause[1].matchAll(/\{([a-z])\}/g)].map((m) => SUBJECT_TYPE_WORDS[m[1]]).filter(Boolean);
+    if (!types.some((type) => hasAttachedEnergy(pokemon, zoneCards || [], { type }))) return baseRetreat;
+  } else if (!stadiumFilterMatches(pokemon, card)) return baseRetreat;
   const scope = stadiumTargetScope(card);
   const stadiumUser = stadium?.user ?? stadium?.playedBy;
   if (scope === 'opponent' && targetPlayer === stadiumUser) return baseRetreat;
@@ -2060,6 +2071,20 @@ function stadiumSubjectPredicate(segment) {
   return (card) => Boolean(card) && preds.some((p) => p(card));
 }
 
+// Sky Pillar (customhb): "All {N} Pokémon in play take 20 less damage from Pokémon with {W}, {F} or {P}
+// Energy attached." The attacker must have an Energy of a named type attached.
+const ENERGY_ATTACKER_REDUCTION =
+  /^(?:all|each) ([^.]*?pok[eé]mon)(?: in play)? take \d+ less damage from pok[eé]mon with ((?:\{[a-z]\}(?:,? (?:or|and) |, )?)+) energy attached/;
+
+function energyAttackerReductionApplies(match, defender, attacker, attackerZoneCards) {
+  const matchesDefender = stadiumSubjectPredicate(match[1]);
+  if (!matchesDefender || !matchesDefender(defender) || !attacker) return false;
+  const wanted = [...match[2].matchAll(/\{([a-z])\}/g)].map((m) => SUBJECT_TYPE_WORDS[m[1]]).filter(Boolean);
+  return (attackerZoneCards || [])
+    .filter((c) => c?.attachedTo === attacker.instanceId && /energy/i.test(String(c.supertype || c.category || c.type || '')))
+    .some((c) => wanted.includes(lower(resolveAttachedEnergyType(c))));
+}
+
 const BOTH_SIDES_RE = /\s*\(both yours and your opponent'?s\)/;
 
 /**
@@ -2067,10 +2092,14 @@ const BOTH_SIDES_RE = /\s*\(both yours and your opponent'?s\)/;
  * opponent's Pokémon (after applying Weakness and Resistance)" (Full Metal Lab, Granite Cave,
  * Circhester Bath). Damage to `defender` is reduced by N; 0 when it does not apply.
  */
-export function stadiumAttackDamageReductionFor(stadiumCard, defender) {
+export function stadiumAttackDamageReductionFor(stadiumCard, defender, { attacker = null, attackerZoneCards = [] } = {}) {
   const amount = parseStadiumDamageReduction(stadiumCard);
   if (amount <= 0 || !defender) return 0;
   const t = textOf(stadiumCard);
+  const fromEnergy = t.match(ENERGY_ATTACKER_REDUCTION);
+  if (fromEnergy) {
+    return energyAttackerReductionApplies(fromEnergy, defender, attacker, attackerZoneCards) ? amount : 0;
+  }
   const m = t.match(/(?:^|\.\s+)([^.]*?)\s*\(both yours and your opponent'?s\)\s+takes?\s+\d+\s+less damage/);
   const matches = m ? stadiumSubjectPredicate(m[1]) : null;
   return matches && matches(defender) ? amount : 0;

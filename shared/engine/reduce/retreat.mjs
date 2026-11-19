@@ -80,7 +80,7 @@ export function computeEffectiveRetreatCost(state, card, playerId, { zoneId = 'a
   });
 
   // 3. Stadium retreat modifier (e.g. Beach Court)
-  cost = getStadiumRetreatCost(cost, card, playerId, stadium);
+  cost = getStadiumRetreatCost(cost, card, playerId, stadium, activeZone);
 
   // 4. "Its Retreat Cost is {C} more" attack markers (Mawile, Grimer).
   cost += markerCount(activeAttackMarkers(state, playerId, card), 'retreatDelta', 'amount');

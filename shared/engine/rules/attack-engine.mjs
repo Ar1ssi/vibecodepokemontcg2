@@ -273,7 +273,7 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
   // "Reduced by N" (Drake's Stadium) and "take N less damage" (Full Metal Lab) are separate wordings.
   const stadiumReduction = stadiumCard
     ? getStadiumTypeDamageReduction(stadiumCard, defender, { defenderIsActive }) +
-      stadiumAttackDamageReductionFor(stadiumCard, defender)
+      stadiumAttackDamageReductionFor(stadiumCard, defender, { attacker, attackerZoneCards })
     : 0;
 
   let damageAfterWR = damageBeforeWR * multiplier + flat - resistance - stadiumReduction;

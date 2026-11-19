@@ -93,7 +93,10 @@ export function damageBenchedPokemon(
       events.push({ type: 'damagePrevented', instanceId: victim.instanceId, attackName, reason: 'stadium' });
       return;
     }
-    const stadiumCut = ownAttack ? 0 : stadiumAttackDamageReductionFor(benchStadium, benchView);
+    const strikerZone = (draft.players[attackerPlayerId]?.zones?.active || []);
+    const stadiumCut = ownAttack
+      ? 0
+      : stadiumAttackDamageReductionFor(benchStadium, benchView, { attacker: striker, attackerZoneCards: strikerZone });
     if (stadiumCut > 0) {
       dealt = Math.max(0, dealt - stadiumCut);
       if (dealt === 0) {

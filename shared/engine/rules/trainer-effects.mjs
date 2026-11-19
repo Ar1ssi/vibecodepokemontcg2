@@ -574,6 +574,8 @@ function healTargetConditions(lower) {
   const target = lower.match(/heal \d+ damage from ([^.]*)/)?.[1] || '';
   const conditions = {};
   if (/pok[ée]mon-gx\b/.test(target)) conditions.subtypes = ['gx'];
+  // Homebrew Great Potion (customhb): "Heal 50 damage from your Active Pokémon ex."
+  if (/pok[ée]mon ex\b/.test(target)) conditions.subtypes = ['ex'];
   const minEnergy = target.match(/that has at least (\d+) energy attached/);
   if (minEnergy) conditions.minEnergy = Number(minEnergy[1]);
   const energyType = target.match(/that has any \{([a-z])\} energy attached/);

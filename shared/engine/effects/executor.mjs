@@ -18,7 +18,7 @@ import { topPokemonCard } from '../rules/evolved-pokemon.mjs';
 import { becomeFossilPokemon, isFossilItem } from '../rules/fossil.mjs';
 import { addCondition, clearConditions, hasAnyCondition } from '../rules/special-conditions.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
-import { isGxCard, isVCard } from '../rules/card-classify.mjs';
+import { isExCard, isGxCard, isVCard } from '../rules/card-classify.mjs';
 import { cardEffectiveHp, inPlayView } from '../reduce/shared.mjs';
 import { parseConditionClause, attackConditionMet } from '../rules/attack-conditions.mjs';
 import { buildServerAttackContext } from '../rules/attack-damage-context.mjs';
@@ -123,6 +123,7 @@ function healTargetAllowed(draft, player, root, step) {
   const sideCards = [...(player.zones.active || []), ...(player.zones.bench || [])];
   const top = topPokemonCard(sideCards, root) || root;
   if (step.subtypes?.includes('gx') && !isGxCard(top)) return false;
+  if (step.subtypes?.includes('ex') && !isExCard(top)) return false;
   const energies = (step.minEnergy || step.energyType)
     ? sideCards.filter((c) => c.attachedTo === root.instanceId && isEnergy(c))
     : [];

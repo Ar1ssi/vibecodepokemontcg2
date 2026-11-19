@@ -362,9 +362,20 @@ const CONDITIONAL_PROVISION = [
   [/^miracle energy$/, () => [{ type: 'provide', energyTypes: ['Any'], count: 2 }]],
 ];
 
+// A name-keyed "provides {Y} only while attached to a {Y} Pokémon" (Wonder Energy) yields to a text
+// that provides the Energy unconditionally: the homebrew Wonder Energy (customhb) reads "As long as
+// this card is attached to a Pokémon, it provides {Y} Energy."
+function textOverridesHostCondition(steps, lower) {
+  if (!steps.length || !steps.every((step) => String(step.condition || '').startsWith('host:'))) return false;
+  return /^as long as this card is attached to a pok[eé]mon, it provides \{[a-z]\} energy\./.test(lower) && !/\bonly while\b/.test(lower);
+}
+
 function parseProvision(name, lower) {
   for (const [re, build] of CONDITIONAL_PROVISION) {
-    if (re.test(name)) return build(lower);
+    if (!re.test(name)) continue;
+    const steps = build(lower);
+    if (!textOverridesHostCondition(steps, lower)) return steps;
+    break;
   }
   const steps = [];
   for (const sentence of lower.split(/(?<=\.)\s+/)) {
@@ -452,6 +463,9 @@ const HP_BONUS_RE = clause(`${HOST} gets \\+(\\d+) hp`);
 const DAMAGE_BONUS_RE = clause(`(?:attacks used by|the attacks of) ${HOST} do (\\d+) more damage`);
 const DAMAGE_PENALTY_RE = clause(`the attacks of ${HOST} do (\\d+) less damage`);
 const TAKES_LESS_RE = clause(`${HOST} takes (\\d+) less damage from attacks from your opponent's pokémon( v\\b|-ex\\b| ex\\b)?`);
+// Guard Energy (customhb): "If the Pokémon this card is attached to doesn't have a Rule Box, it takes 30
+// less damage from attacks from your opponent's Pokémon ex."
+const NO_RULE_BOX_TAKES_LESS_RE = clause(`if ${HOST} doesn't have a rule box, it takes (\\d+) less damage from attacks from your opponent's pokémon( v\\b|-ex\\b| ex\\b)?`);
 const OPPONENT_DOES_LESS_RE = clause(`the attacks of your opponent's pokémon do (\\d+) less damage to ${HOST}`);
 const NO_WEAKNESS_RE = clause(`${HOST} (?:has|gets) no weakness`);
 const FREE_RETREAT_RE = clause(`${HOST} has no retreat cost`);
@@ -688,6 +702,14 @@ function parseEffects(lower) {
     const attackerKind = (takesLess[3] || '').trim();
     const source = attackerKind === 'v' ? 'opponentPokemonV' : attackerKind ? 'opponentPokemonEx' : 'opponentPokemon';
     push({ type: 'damageReduction', amount: Number(takesLess[2]), ...hosted(takesLess[1]), source, afterWR: true });
+  }
+  const noRuleBoxLess = lower.match(NO_RULE_BOX_TAKES_LESS_RE);
+  if (noRuleBoxLess) {
+    const attackerKind = (noRuleBoxLess[3] || '').trim();
+    const source = attackerKind === 'v' ? 'opponentPokemonV' : attackerKind ? 'opponentPokemonEx' : 'opponentPokemon';
+    const step = { type: 'damageReduction', amount: Number(noRuleBoxLess[2]), source, afterWR: true, condition: 'noRuleBox' };
+    if (noRuleBoxLess[1]) step.condition = `host:${SYMBOL_TYPES[noRuleBoxLess[1]]}`;
+    push(step);
   }
   const doesLess = lower.match(OPPONENT_DOES_LESS_RE);
   if (doesLess) {
@@ -1201,6 +1223,8 @@ function conditionMet(condition, pokemon, zoneArray) {
       return isStage2OrHigher(pokemon);
     case 'evolution':
       return stageKey(pokemon) !== 'basic';
+    case 'noRuleBox':
+      return !isRuleBoxPokemon(pokemon);
     case 'delta':
       return /δ|delta/i.test(String(pokemon?.name ?? '')) || (pokemon?.subtypes || []).map((s) => String(s).toLowerCase()).includes('delta species');
     case 'otherSpecial': {

@@ -344,7 +344,25 @@ const ANY_TYPE_NAME = /(^|\b)(prism|stellar) energy/;
  */
 export function rewriteEnergyDescriptor(descriptor, args = {}) {
   const rewritten = rewriteForStadium(descriptor, args);
-  return alsoCountsAs(retypeForHost(rewritten, args?.hostPokemon), args?.board?.energyAlsoCounts);
+  const retyped = retypeForHost(rewritten, args?.hostPokemon);
+  return megaSignalDualType(alsoCountsAs(retyped, args?.board?.energyAlsoCounts), args);
+}
+
+// Mega Signal (customhb Tool): "If a Basic Energy attached to the Mega Evolution Pokémon ex this card
+// is attached to is 1 of that Pokémon's types, it provides both of that Pokémon's types of Energy,
+// but provides only 1 Energy at a time."
+const MEGA_SIGNAL_BOTH_TYPES = /basic energy attached to the mega evolution pok[eé]mon ex this card is attached to is 1 of that pok[eé]mon's types, it provides both/;
+
+function megaSignalDualType(descriptor, { hostPokemon = null, attachedCards = [] } = {}) {
+  if (!descriptor || descriptor.family !== 'basic' || descriptor.dualType || !hostPokemon) return descriptor;
+  const isMegaEx = /^mega .+ ex$/i.test(String(hostPokemon.name || '').trim());
+  const types = Array.isArray(hostPokemon.types) ? hostPokemon.types : [];
+  if (!isMegaEx || types.length < 2 || !types.includes(descriptor.type)) return descriptor;
+  const hasSignal = (attachedCards || []).some((c) =>
+    MEGA_SIGNAL_BOTH_TYPES.test(lower(c?.text ?? c?.effect ?? '').replace(/[\u2018\u2019]/g, "'"))
+  );
+  if (!hasSignal) return descriptor;
+  return { ...descriptor, dualType: types.find((t) => t !== descriptor.type) };
 }
 
 // Zygarde Aura Break (customhb): a basic Energy of one type also counts as another, one unit.
