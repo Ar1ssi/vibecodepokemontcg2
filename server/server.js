@@ -36,6 +36,7 @@ import {
   emptyRoomFormat,
 } from '../shared/engine/room-format.mjs';
 import { roomFormatLocked, roomFormatSeatRefusal } from './game/room-format-seat.mjs';
+import { createClockTransport } from './game/clock-transport.mjs';
 import { isPublicRoomId } from '../shared/lobby/public-rooms.mjs';
 import { buildLobbySnapshot } from './lobby/lobby-directory.mjs';
 import {
@@ -600,6 +601,48 @@ async function main() {
 
   const clearTurnOrderTimer = (roomId) => turnOrderTransport.clearTimer(roomId);
 
+  const broadcastGameResult = (gameRoom, result) => {
+    for (const broadcast of result.broadcasts || []) {
+      io.to(broadcast.socketId).emit('view', {
+        gameId: gameRoom.roomId,
+        stateVersion: result.stateVersion,
+        view: broadcast.view,
+        events: result.events,
+        pendingChoice: broadcast.view?.pendingChoice || null,
+        lastClientSeq: broadcast.lastClientSeq,
+      });
+    }
+
+    const gameEndedEvent =
+      (result.events || []).find((e) => e.type === 'gameEnded') ||
+      gameRoom.state.turn?.phase === 'ended';
+
+    if (gameEndedEvent) {
+      for (const broadcast of result.broadcasts || []) {
+        const payload = gameRoom.getGameEndedPayload(broadcast.playerId);
+        if (payload) {
+          io.to(broadcast.socketId).emit('gameEnded', payload);
+        }
+      }
+    }
+  };
+
+  // Design 090: the homebrew clock. A room's timer fires when the running player's bank runs out;
+  // the room re-checks the clock and ends the game, or the refresh re-arms a timer that ran early.
+  const clockTransport = createClockTransport({
+    emitToRoom: (roomId, payload) => io.to(roomId).emit('homebrewClock', payload),
+    onFlag: (gameRoom, roomId) => {
+      if (gameRooms.get(roomId) !== gameRoom) return;
+      const result = gameRoom.flagTimeOut();
+      if (result?.success) broadcastGameResult(gameRoom, result);
+      else clockTransport.refresh(gameRoom, roomId);
+    },
+  });
+  const wireClock = (gameRoom) => {
+    gameRoom.onClockChange = (room) => clockTransport.refresh(room, room.roomId);
+    return gameRoom;
+  };
+
   const replayTurnOrderToSeat = (roomId, socketId) => {
     const gameRoom = gameRooms.get(roomId);
     const playerId = gameRoom?.socketToPlayer.get(socketId);
@@ -629,6 +672,8 @@ async function main() {
     notifyLobby(roomId);
     const room = roomInfo.get(roomId);
     if (room) io.to(roomId).emit('roomFormat', roomFormatPayload(roomId, room));
+    const gameRoom = gameRooms.get(roomId);
+    if (gameRoom && !gameRoom.solo) io.to(roomId).emit('homebrewClock', gameRoom.clockPayload());
   };
   const setRoomFormat = (roomId, room, next) => {
     room.format = next;
@@ -653,6 +698,7 @@ async function main() {
     roomInfo.delete(roomId);
     gameRooms.get(roomId)?.clearTurnOrderCall();
     clearTurnOrderTimer(roomId);
+    clockTransport.clear(roomId);
     gameRooms.delete(roomId);
     return true;
   };
@@ -862,7 +908,7 @@ async function main() {
       }
       let gameRoom = gameRooms.get(roomId);
       const createdRoom = !gameRoom;
-      if (createdRoom) gameRoom = new GameRoom({ roomId, journal: logging.createJournal(roomId) });
+      if (createdRoom) gameRoom = wireClock(new GameRoom({ roomId, journal: logging.createJournal(roomId) }));
       const decks = options.decks && typeof options.decks === 'object' ? options.decks : {};
       if (!gameRoom.addSoloPlayer(socket.id, username, decks)) {
         socket.emit('roomReject', { reason: 'solo_room' });
@@ -981,7 +1027,7 @@ async function main() {
         socket.join(roomId);
         let activeGameRoom = gameRoom;
         if (!activeGameRoom) {
-          activeGameRoom = new GameRoom({ roomId, journal: logging.createJournal(roomId) });
+          activeGameRoom = wireClock(new GameRoom({ roomId, journal: logging.createJournal(roomId) }));
           activeGameRoom.roomFormat = room.format?.format ?? null;
           gameRooms.set(roomId, activeGameRoom);
         }
@@ -1113,7 +1159,7 @@ async function main() {
       if (!soloRoom?.solo) {
         let gameRoom = gameRooms.get(data.roomId);
         if (!gameRoom) {
-          gameRoom = new GameRoom({ roomId: data.roomId, journal: logging.createJournal(data.roomId) });
+          gameRoom = wireClock(new GameRoom({ roomId: data.roomId, journal: logging.createJournal(data.roomId) }));
           gameRoom.roomFormat = room.format?.format ?? null;
           gameRooms.set(data.roomId, gameRoom);
         }
@@ -1189,6 +1235,24 @@ async function main() {
       }
       setRoomFormat(seat.roomId, room, result.state);
       broadcastRoomFormat(seat.roomId);
+    });
+
+    // Design 090: either seated player switches the homebrew clock on or off until the deal.
+    socket.on('roomClockAction', (data) => {
+      const seat = socket.data.seat;
+      const room = seat ? roomInfo.get(seat.roomId) : null;
+      const gameRoom = gameRooms.get(seat?.roomId);
+      const refusal =
+        roomFormatSeatRefusal({ seat, requestRoomId: data?.roomId, room, gameRoom, socketId: socket.id }) ||
+        (!gameRoom || gameRoom.solo ? 'not_seated' : null) ||
+        (roomHasDealt(seat.roomId) ? 'already_dealt' : null) ||
+        (typeof data?.enabled !== 'boolean' ? 'bad_request' : null);
+      if (refusal) {
+        socket.emit('roomClockRejected', { roomId: data?.roomId, reason: refusal });
+        return;
+      }
+      if (!gameRoom.setClockEnabled(data.enabled)) return;
+      io.to(seat.roomId).emit('roomClockChanged', { roomId: seat.roomId, enabled: data.enabled, by: seat.username });
     });
 
     // List of socket events
@@ -1292,31 +1356,6 @@ async function main() {
       turnOrderTransport.receiveChoice(gameRoom, roomId, socket.id, data);
     });
 
-    const broadcastGameResult = (gameRoom, result) => {
-      for (const broadcast of result.broadcasts || []) {
-        io.to(broadcast.socketId).emit('view', {
-          gameId: gameRoom.roomId,
-          stateVersion: result.stateVersion,
-          view: broadcast.view,
-          events: result.events,
-          pendingChoice: broadcast.view?.pendingChoice || null,
-          lastClientSeq: broadcast.lastClientSeq,
-        });
-      }
-
-      const gameEndedEvent =
-        (result.events || []).find((e) => e.type === 'gameEnded') ||
-        gameRoom.state.turn?.phase === 'ended';
-
-      if (gameEndedEvent) {
-        for (const broadcast of result.broadcasts || []) {
-          const payload = gameRoom.getGameEndedPayload(broadcast.playerId);
-          if (payload) {
-            io.to(broadcast.socketId).emit('gameEnded', payload);
-          }
-        }
-      }
-    };
 
     socket.on('cmd', (cmd) => {
       const roomId =

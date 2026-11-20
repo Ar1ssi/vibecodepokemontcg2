@@ -19,7 +19,8 @@ import { settleRevealedHandCards } from './rules/revealed-hand.mjs';
 import { settleOpeningDraw } from './rules/opening-draw.mjs';
 import { stampRevealedArt } from './rules/reveal-picks.mjs';
 import { settleSpecialEnergyPassives } from './effects/special-energy.mjs';
-import { abilitySideContext } from './reduce/shared.mjs';
+import { abilitySideContext, setGameEnded } from './reduce/shared.mjs';
+import { TIME_OUT_REASON } from './homebrew-clock.mjs';
 import { validateReferences, validateLegality } from './reduce/legality.mjs';
 import { attackCommand } from './reduce/attack.mjs';
 import {
@@ -121,6 +122,13 @@ function undoCommand({ payload, state }) {
   };
 }
 
+// Design 090: the acting player's homebrew clock hit 0:00, so the opponent wins.
+function timeOutCommand({ draft, playerId, events }) {
+  const winner = Object.keys(draft.players || {}).find((id) => id !== playerId) || null;
+  draft.pendingChoice = null;
+  setGameEnded(draft, { winner, reason: TIME_OUT_REASON, events });
+}
+
 export function applyCommand(state, command, rng = null) {
   if (!state || typeof state !== 'object') {
     return {
@@ -165,8 +173,8 @@ export function applyCommand(state, command, rng = null) {
     };
   }
 
-  // Step 2: Turn gate / PendingChoice gate
-  if (state.pendingChoice) {
+  // Step 2: Turn gate / PendingChoice gate (a time-out, design 090, ends the game mid-prompt)
+  if (state.pendingChoice && type !== 'timeOut') {
     if (type !== 'resolveChoice') {
       return {
         state,
@@ -444,6 +452,9 @@ export function applyCommand(state, command, rng = null) {
       break;
     case 'undo':
       return undoCommand({ payload, state });
+    case 'timeOut':
+      timeOutCommand({ draft, playerId, events });
+      break;
 
     default:
       break;

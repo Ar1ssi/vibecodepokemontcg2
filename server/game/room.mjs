@@ -22,6 +22,12 @@ import {
   resolveCoinWinnerPlayerId,
   resolveStarterFromChoice,
 } from '../../shared/engine/rules/turn-order-flip.mjs';
+import {
+  clockSnapshot,
+  createClock,
+  flaggedRunner,
+  syncClock,
+} from '../../shared/engine/homebrew-clock.mjs';
 
 /** How long the designated caller has to answer before the server calls for them. */
 export const TURN_ORDER_CALL_TIMEOUT_MS = 15000;
@@ -52,6 +58,7 @@ export class GameRoom {
    * @param {string|number} [options.seed] PRNG seed
    * @param {object} [options.initialState] Optional pre-configured GameState
    * @param {object} [options.journal] Command journal (design 088); defaults to the no-op NO_JOURNAL
+   * @param {() => number} [options.now] Wall clock in ms (design 090's homebrew clock)
    */
   constructor({
     roomId,
@@ -60,8 +67,10 @@ export class GameRoom {
     initialState = null,
     rng = null,
     journal = NO_JOURNAL,
+    now = Date.now,
   }) {
     this.roomId = roomId;
+    this.now = now;
     this.rulesEnabled = Boolean(rulesEnabled);
     this.seed = seed ?? Math.floor(Math.random() * 0x7fffffff);
     this.rng = rng || createRng(this.seed);
@@ -78,6 +87,13 @@ export class GameRoom {
     // Design 053: the format both seated players agreed on (null = decks just match each other).
     // Room-level, never engine state, so undo replay and rematches are untouched.
     this.roomFormat = null;
+
+    // Design 090: the homebrew chess clock. Room-level like the format: wall time never enters
+    // engine state, so replay and undo stay deterministic. `onClockChange` (set by the server)
+    // hears every clock change so it can re-arm the time-out timer and push the snapshot.
+    this.clockEnabled = true;
+    this.clock = createClock({ enabled: true });
+    this.onClockChange = null;
 
     // Socket and player mappings (Hazard H1)
     this.socketToPlayer = new Map(); // socketId -> playerId
@@ -402,6 +418,11 @@ export class GameRoom {
         clientSeq: cmd?.clientSeq,
       };
     }
+    // Design 090: only the room's own clock may time a player out.
+    if (cmd.type === 'timeOut') {
+      this.journal.refused({ cmd, error: 'bad_command', reason: 'timeOut is server-only' });
+      return { success: false, error: 'bad_command', reason: 'timeOut is server-only', clientSeq: cmd.clientSeq };
+    }
     if (!this.solo) return this.handleCommand(socketId, cmd);
     const seat = this.seatFor(socketId, cmd);
     if (!seat) return this.handleCommand(socketId, cmd, this.#badSeatOr(socketId));
@@ -519,6 +540,7 @@ export class GameRoom {
     if (typeof cmd.clientSeq === 'number') {
       this.clientSeqByPlayer.set(playerId, cmd.clientSeq);
     }
+    this.#syncClock();
 
     // Assemble redacted views for all connected sockets
     const broadcasts = [];
@@ -1040,6 +1062,8 @@ export class GameRoom {
 
     this.state.stateVersion = Math.max(this.state.stateVersion || 0, minimumVersion);
     this.touchActivity();
+    this.clock = createClock({ enabled: this.clockEnabled });
+    this.#notifyClock();
     this.journal.rebase(this.state, this.rng, 'reset');
     return kept.map(({ playerId, socketId }) => ({ playerId, socketId }));
   }
@@ -1076,6 +1100,53 @@ export class GameRoom {
     if (!this.solo) return this.handleCommand(socketId, cmd);
     const seat = this.seatFor(socketId, payload);
     return this.handleCommand(socketId, cmd, seat ?? this.#badSeatOr(socketId));
+  }
+
+  /**
+   * Design 090: switches the homebrew clock on or off. Only before play starts (the clock arms
+   * when the first turn begins); a solo room never runs one.
+   * @param {boolean} enabled
+   * @returns {boolean} true when the setting changed
+   */
+  setClockEnabled(enabled) {
+    const next = Boolean(enabled);
+    if (this.clock.armed !== null || next === this.clockEnabled) return false;
+    this.clockEnabled = next;
+    this.clock = createClock({ enabled: next });
+    this.#notifyClock();
+    return true;
+  }
+
+  /** The `homebrewClock` payload every socket in the room renders (design 090). */
+  clockPayload() {
+    const players = Object.values(this.state.players || {}).map((player) => ({
+      playerId: player.playerId,
+      username: player.username || player.playerId,
+    }));
+    return { roomId: this.roomId, ...clockSnapshot(this.clock, this.now()), players };
+  }
+
+  /**
+   * Ends the game for the player whose clock reached 0:00 (design 090). The server's timer calls
+   * this; it re-checks the clock, so an early or stale timer does nothing.
+   * @returns {object|null} the handleCommand result, or null when nobody is out of time
+   */
+  flagTimeOut() {
+    const loser = flaggedRunner(this.clock, this.now());
+    if (!loser) return null;
+    this.clock.flagged = loser;
+    return this.handleCommand(null, { type: 'timeOut' }, loser);
+  }
+
+  #syncClock() {
+    if (this.solo) return;
+    syncClock(this.clock, this.state, this.now());
+    if (this.clock.armed) this.#notifyClock();
+  }
+
+  #notifyClock() {
+    if (this.solo) return;
+    this.onClockChange?.(this);
   }
 
   /**

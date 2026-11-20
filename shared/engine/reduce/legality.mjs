@@ -665,6 +665,10 @@ export function validateLegality(state, command) {
   if (isGameFrozen(state)) {
     return { allowed: false, reason: 'Game is over.' };
   }
+  // Design 090: a time-out ends the game in any phase, prompt or turn (the room checks the clock).
+  if (type === 'timeOut') {
+    return { allowed: true };
+  }
   if (type === 'setup') {
     if (state.turn?.phase !== 'setup') {
       return { allowed: false, reason: 'Game is already set up.' };
