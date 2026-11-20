@@ -8,8 +8,6 @@ const LOBBY_WATCHERS = 'lobby:watchers';
 const MAX_TOKENS = 8;
 const FILENAME_ROOM_CHARS = 40;
 
-const utcStamp = (ms) => new Date(ms).toISOString().slice(0, 19).replace(/[-:]/g, '').replace('T', '-');
-
 function sendLines(req, res, { lines, filename }) {
   const body = `${lines.join('\n')}\n`;
   res.status(200);
@@ -27,23 +25,6 @@ function sendLines(req, res, { lines, filename }) {
     }
     res.setHeader('Content-Encoding', 'gzip');
     res.end(packed);
-  });
-}
-
-function requestSnapshot(sock, exportId, limits, acceptTail) {
-  return new Promise((resolve) => {
-    try {
-      sock.timeout(limits.snapshotTimeoutMs).emit('log:snapshot', { exportId }, (err, snap) => {
-        const usable = !err && snap !== null && typeof snap === 'object' && !Array.isArray(snap);
-        if (!usable) return resolve('timeout');
-        // The client's unshipped entries ride in the reply; store them, keep them out of the file.
-        const { tail, ...snapshot } = snap;
-        if (tail) acceptTail(sock, tail);
-        return resolve(snapshot);
-      });
-    } catch {
-      resolve('timeout');
-    }
   });
 }
 
@@ -69,15 +50,7 @@ export function createLogExport({
   const lastAnnouncedAt = new Map();
 
   const filenameFor = (roomId) =>
-    `ptcg-log_${(roomId ?? 'session').replace(/[^\w.-]+/g, '_').slice(0, FILENAME_ROOM_CHARS)}_${utcStamp(now())}.ndjson`;
-
-  function storeToken(entry) {
-    for (const [token, held] of tokens) if (held.expires <= now()) tokens.delete(token);
-    while (tokens.size >= MAX_TOKENS) tokens.delete(tokens.keys().next().value);
-    const token = randomToken();
-    tokens.set(token, entry);
-    return token;
-  }
+    `ptcg-log_${(roomId ?? 'session').replace(/[^\w.-]+/g, '_').slice(0, FILENAME_ROOM_CHARS)}_${new Date(now()).toISOString().slice(0, 19).replace(/[-:]/g, '').replace('T', '-')}.ndjson`;
 
   async function collectSnapshots(socket, roomId) {
     const targets = [];
@@ -90,7 +63,20 @@ export function createLogExport({
       targets.push(socket);
     }
     const exportId = randomToken();
-    const answers = await Promise.all(targets.map((sock) => requestSnapshot(sock, exportId, limits, acceptTail)));
+    const answers = await Promise.all(targets.map((sock) => new Promise((resolve) => {
+      try {
+        sock.timeout(limits.snapshotTimeoutMs).emit('log:snapshot', { exportId }, (err, snap) => {
+          const usable = !err && snap !== null && typeof snap === 'object' && !Array.isArray(snap);
+          if (!usable) return resolve('timeout');
+          // The client's unshipped entries ride in the reply; store them, keep them out of the file.
+          const { tail, ...snapshot } = snap;
+          if (tail) acceptTail(sock, tail);
+          return resolve(snapshot);
+        });
+      } catch {
+        resolve('timeout');
+      }
+    })));
     const snapshots = {};
     targets.forEach((sock, i) => {
       snapshots[sock.data.logClientId] = answers[i];
@@ -145,7 +131,11 @@ export function createLogExport({
       describe: (clientId, row) => describe(row?.socketId, roomId),
     });
     const filename = filenameFor(roomId);
-    const token = storeToken({ lines, filename, expires: now() + limits.exportTokenMs });
+    const entry = { lines, filename, expires: now() + limits.exportTokenMs };
+    for (const [token, held] of tokens) if (held.expires <= now()) tokens.delete(token);
+    while (tokens.size >= MAX_TOKENS) tokens.delete(tokens.keys().next().value);
+    const token = randomToken();
+    tokens.set(token, entry);
 
     if (roomId) announce(roomId, who.username);
     log.info(

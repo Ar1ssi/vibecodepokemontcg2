@@ -53,12 +53,6 @@ const EFFECTS = [
   [/attached to attacks, don't apply Resistance for that attack\./i, () => ({ kind: 'ignoreResistance' })],
 ];
 
-const kindText = (card) =>
-  [card.type, card.trainerType, ...(Array.isArray(card.subtypes) ? card.subtypes : [card.subtypes])]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
-
 /**
  * The attach-Trainer spec of a WotC card, or null when the card is not one.
  * @param {object} card
@@ -66,7 +60,10 @@ const kindText = (card) =>
  *   effect: { kind: string, amount?: number } }|null}
  */
 export function legacyAttachedTrainer(card) {
-  if (!card || !isTrainer(card) || /tool|stadium|supporter/.test(kindText(card))) return null;
+  if (!card || !isTrainer(card) || /tool|stadium|supporter/.test([card.type, card.trainerType, ...(Array.isArray(card.subtypes) ? card.subtypes : [card.subtypes])]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase())) return null;
   const text = normalizedText(card);
   const attach = ATTACH.exec(`${text} `);
   if (!attach) return null;
@@ -81,8 +78,6 @@ export function legacyAttachedTrainer(card) {
   };
 }
 
-const straightName = (name) => String(name || '').replace(/[‘’]/g, "'");
-
 /**
  * Whether the printed target allows `top` (the Pokémon's top card) in the given spot.
  * "with Sabrina in its name" matches the word in the Pokémon's name (Sabrina's Abra).
@@ -92,7 +87,7 @@ export function attachTargetAllowed(spec, { top, isActive }) {
   if (spec.activeOnly && !isActive) return false;
   if (!spec.nameIncludes) return true;
   const word = spec.nameIncludes.replace(/[^\p{L}\p{N}]/gu, '');
-  return new RegExp(`(^|[^\\p{L}])${word}(?=$|[^\\p{L}])`, 'iu').test(straightName(top.name));
+  return new RegExp(`(^|[^\\p{L}])${word}(?=$|[^\\p{L}])`, 'iu').test(String(top.name || '').replace(/[‘’]/g, "'"));
 }
 
 /** Attach-Trainers on the Pokémon whose root is `root`, each with its spec. */

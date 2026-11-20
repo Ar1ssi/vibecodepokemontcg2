@@ -87,8 +87,7 @@ export function grandSpots(layout) {
   for (let k = 0; k < MAX_ROOTS; k += 1) {
     const angle = (k / MAX_ROOTS) * 2 * Math.PI + hash(x, k, 1) * 0.5;
     let length = (90 + 110 * hash(k, 3, 2)) * u;
-    const endAt = (len) => [x + Math.cos(angle) * (tree.foot + len), y + Math.sin(angle) * (tree.foot + len)];
-    while (length > 40 * u && !ctx.clear(...endAt(length), 14 * u, gap)) length -= 12 * u;
+    while (length > 40 * u && !ctx.clear(x + Math.cos(angle) * (tree.foot + length), y + Math.sin(angle) * (tree.foot + length), 14 * u, gap)) length -= 12 * u;
     roots.push({ angle, length, radius: (27 + 11 * hash(k, 3, 3)) * u, seed: hash(k, 3, 4) });
   }
   // The crown: balls on a dome over the top-left, kept clear of the cards (and the hand) seen from above.
@@ -338,45 +337,6 @@ const JUNGLE_SATELLITES = Object.freeze([
   { asset: 'bush', weight: 1.6, size: [22, 34], options: { colors: { leaf: '#3a8f38', leafLight: '#7cc44a' } }, spread: 0.2, lean: 0.05 },
 ]);
 
-/** The trunk at height s (0 foot, 1 fork): its radius, tapering and flaring at the foot. */
-const trunkRadius = (tree, s) => tree.top + (tree.foot - tree.top) * (1 - s) ** 1.6 + tree.foot * 0.22 * Math.exp(-s * 9);
-
-/**
- * The trunk: strands twisting round each other up from the foot, gold veins creeping along some.
- * Design 084: a tighter knot, as the card's: six strands set apart (a dark groove between each),
- * turning most of a full turn on the way up, each swelling and thinning along its run.
- */
-function trunk(props, tree, u) {
-  const strands = 6;
-  const levels = 20;
-  for (let k = 0; k < strands; k += 1) {
-    const phase = (k / strands) * 2 * Math.PI + 0.3;
-    const twist = 2.6 + 0.4 * hash(k, 2, 1);
-    const points = [];
-    const radii = [];
-    for (let i = 0; i <= levels; i += 1) {
-      const s = i / levels;
-      const R = trunkRadius(tree, s);
-      const angle = phase + twist * s * 2 * Math.PI * 0.5;
-      const around = R * (0.6 - 0.14 * s);
-      points.push([tree.x + Math.cos(angle) * around, tree.y + Math.sin(angle) * around, -4 + s * tree.fork]);
-      radii.push(R * (0.5 - 0.08 * s) * (1 + 0.12 * Math.sin(s * 9 + k * 1.7)));
-    }
-    props.tube(points, radii, k % 2 ? BARK : BARK_DARK, { sides: 12 });
-    // A gold vein lying along every other strand's flank.
-    if (k % 2 === 0) {
-      const vein = points.map((p, i) => {
-        const s = i / levels;
-        const R = radii[i];
-        const angle = phase + twist * s * Math.PI + 0.9;
-        return [p[0] + Math.cos(angle) * R * 0.92, p[1] + Math.sin(angle) * R * 0.92, p[2]];
-      });
-      props.tube(vein.slice(2), 4.2 * u, VEIN, { sides: 6 });
-    }
-  }
-  props.cylinder({ x: tree.x, y: tree.y, z0: tree.fork - 6 * u, z1: tree.fork + 4 * u, r: tree.top * 1.05, color: BARK, capColor: BARK_DARK, sides: 16 });
-}
-
 /** Roots: thick tubes arching out of the trunk's foot over the ground and diving into it, a vein along some. */
 function roots(props, spots, u) {
   const { tree } = spots;
@@ -437,7 +397,38 @@ export function grandProps(spots) {
   const { tree, small, toadstools, u } = spots;
   const props = createPropBuilder();
   const kit = { sun: GRAND_SUN };
-  trunk(props, tree, u);
+  // The trunk: strands twisting round each other up from the foot, gold veins creeping along some.
+  // Design 084: a tighter knot, as the card's: six strands set apart (a dark groove between each),
+  // turning most of a full turn on the way up, each swelling and thinning along its run.
+  const strands = 6;
+  const levels = 20;
+  for (let k = 0; k < strands; k += 1) {
+    const phase = (k / strands) * 2 * Math.PI + 0.3;
+    const twist = 2.6 + 0.4 * hash(k, 2, 1);
+    const points = [];
+    const radii = [];
+    for (let i = 0; i <= levels; i += 1) {
+      const s = i / levels;
+      // The trunk at height s (0 foot, 1 fork): its radius, tapering and flaring at the foot.
+      const R = tree.top + (tree.foot - tree.top) * (1 - s) ** 1.6 + tree.foot * 0.22 * Math.exp(-s * 9);
+      const angle = phase + twist * s * 2 * Math.PI * 0.5;
+      const around = R * (0.6 - 0.14 * s);
+      points.push([tree.x + Math.cos(angle) * around, tree.y + Math.sin(angle) * around, -4 + s * tree.fork]);
+      radii.push(R * (0.5 - 0.08 * s) * (1 + 0.12 * Math.sin(s * 9 + k * 1.7)));
+    }
+    props.tube(points, radii, k % 2 ? BARK : BARK_DARK, { sides: 12 });
+    // A gold vein lying along every other strand's flank.
+    if (k % 2 === 0) {
+      const vein = points.map((p, i) => {
+        const s = i / levels;
+        const R = radii[i];
+        const angle = phase + twist * s * Math.PI + 0.9;
+        return [p[0] + Math.cos(angle) * R * 0.92, p[1] + Math.sin(angle) * R * 0.92, p[2]];
+      });
+      props.tube(vein.slice(2), 4.2 * u, VEIN, { sides: 6 });
+    }
+  }
+  props.cylinder({ x: tree.x, y: tree.y, z0: tree.fork - 6 * u, z1: tree.fork + 4 * u, r: tree.top * 1.05, color: BARK, capColor: BARK_DARK, sides: 16 });
   roots(props, spots, u);
   crown(props, spots, u);
   placeAsset(props, 'treeRound', { ...kit, x: small.x, y: small.y, size: small.r * 0.95, height: small.h + small.r * 0.5, seed: 7, colors: SMALL_TREE });

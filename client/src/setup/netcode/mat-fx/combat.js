@@ -108,7 +108,10 @@ const markAttackScene = (durationMs) => {
 /** When the last attack scene ends, on the `performance.now()` clock (0 before any attack). */
 export const attackSceneEndsAt = () => attackSceneEnd;
 
-/** Design 063: a move scene announces its own contact moment (ms from now) with its context. */
+/**
+ * Design 063: a move scene announces its own contact moment (ms from now) with its context.
+ * Imported by the fx-preview recorder (.claude/skills/fx-preview/rec/rec-move.mjs).
+ */
 export const announceStrike = (ms, ctx = null) => impacts.strikeIn(ms, ctx);
 
 // Design 069: each attack's contact and context, by the strike key its plans share.
@@ -136,109 +139,9 @@ export const knockoutHoldFor = (plan, holdMs) =>
     holdMs,
   });
 
-const showDamageNumber = (instanceId, rect, hit) => {
-  const index = floatingCount.get(instanceId) || 0;
-  floatingCount.set(instanceId, index + 1);
-  const host = spawnOverlay({ rect, className: `fx-overlay fx-damage-pop fx-damage-pop--${hit.kind}` });
-  host.style.fontSize = `${Math.max(16, rect.width * (hit.weakness ? 0.42 : 0.36))}px`;
-  if (hit.weakness) host.classList.add('fx-damage-pop--weakness');
-  const text = `${hit.kind === 'heal' ? '+' : '−'}${hit.amount}`;
-  const num = document.createElement('span');
-  num.className = 'fx-damage-pop__num';
-  num.dataset.text = text;
-  num.textContent = text;
-  host.appendChild(num);
-  if (hit.weakness) {
-    const tag = document.createElement('span');
-    tag.className = 'fx-damage-pop__tag';
-    tag.textContent = 'Weakness';
-    host.appendChild(tag);
-  }
-  const lift = stackOffset(index, rect.height);
-  const drift = (Math.random() - 0.5) * rect.width * 0.24;
-  const frames = sampleKeyframes(
-    (t) => damagePopPose(t, { rise: rect.height * 0.42, drift }),
-    (p) => ({
-      transform: `translate3d(${p.x}px, ${p.y + lift}px, 0) scale(${p.scale})`,
-      opacity: p.opacity,
-    }),
-    30
-  );
-  removeWhen(host, [animateFrames(host, frames, { duration: DAMAGE_POP_MS })], DAMAGE_POP_MS + BACKSTOP_PAD_MS);
-  setTimeout(() => {
-    const left = (floatingCount.get(instanceId) || 1) - 1;
-    if (left <= 0) floatingCount.delete(instanceId);
-    else floatingCount.set(instanceId, left);
-  }, DAMAGE_POP_MS * 0.6);
-};
-
 const hitRgbFor = (ctx, hit) => {
   if (hit.weakness) return [255, 206, 64];
   return ctx?.attackerCard ? brighten(fxRgbForCard(ctx.attackerCard), 0.3) : FX_NEUTRAL_RGB;
-};
-
-// Design 063: the attacking move's family decides what the hit adds (`hitDressingFor`).
-const strikeTarget = (rect, hit, ctx, dressing) => {
-  const rgb = hitRgbFor(ctx, hit);
-  const direction = ctx?.direction ?? -90;
-  const host = spawnOverlay({ rect, className: 'fx-overlay fx-hit' });
-  host.style.setProperty('--fx-hit-rgb', rgb.join(', '));
-
-  const flash = document.createElement('div');
-  flash.className = 'fx-hit__flash';
-  if (dressing.flashScale !== 1) flash.style.transform = `scale(${dressing.flashScale})`;
-  const slash = document.createElement('div');
-  slash.className = 'fx-hit__slash';
-  slash.style.rotate = `${direction + 90 + (Math.random() - 0.5) * 30}deg`;
-  const sparkLayer = document.createElement('div');
-  sparkLayer.className = 'fx-hit__sparks';
-  host.append(flash, sparkLayer);
-  if (dressing.slash) host.insertBefore(slash, sparkLayer);
-  const impactRing = dressing.ring ? document.createElement('div') : null;
-  if (impactRing) {
-    impactRing.className = 'fx-hit__ring';
-    host.appendChild(impactRing);
-  }
-
-  const amplitude = Math.min(10, 3 + hit.amount / 20);
-  const jitter = sampleKeyframes(
-    (t) => shakePose(t, amplitude),
-    (p) => ({ transform: `translate3d(${p.x}px, 0, 0)` }),
-    16
-  );
-  const flashFrames = sampleKeyframes(hitFlashPose, (p) => ({ opacity: p.opacity }), 12);
-  const slashFrames = sampleKeyframes(
-    slashPose,
-    (p) => ({ transform: `scale(${p.scaleX}, ${p.scaleY})`, opacity: p.opacity }),
-    12
-  );
-  const ringFrames = [
-    { transform: 'scale(0.6)', opacity: 1 },
-    { transform: 'scale(1.4)', opacity: 0 },
-  ];
-  const sparks = burstParticles({
-    count: hit.weakness ? 22 : Math.min(18, 8 + Math.round(hit.amount / 20)),
-    distance: rect.width * (hit.weakness ? 0.95 : 0.75),
-    direction,
-    spread: 150,
-    size: [rect.width * 0.1, rect.width * 0.22],
-    aspect: 0.16,
-    gravity: rect.height * 0.12,
-    maxDelay: 0.08,
-    seed: Math.floor(Math.random() * 1e6),
-  });
-  const done = [
-    animateFrames(host, jitter, { duration: HIT_FLASH_MS }),
-    animateFrames(flash, flashFrames, { duration: HIT_FLASH_MS }),
-    ...(dressing.slash ? [animateFrames(slash, slashFrames, { duration: HIT_FLASH_MS })] : []),
-    ...(impactRing ? [animateFrames(impactRing, ringFrames, { duration: HIT_FLASH_MS })] : []),
-    ...spawnParticles(sparkLayer, sparks, {
-      className: 'fx-particle--streak',
-      color: rgbCss(rgb),
-      duration: HIT_SPARKS_MS,
-    }),
-  ];
-  removeWhen(host, done, HIT_SPARKS_MS + BACKSTOP_PAD_MS);
 };
 
 /**
@@ -277,22 +180,6 @@ export function installImpactWarmup() {
   });
 }
 
-/** Design 068: what the prefab needs of a damaged card, read while the card is still on the board. */
-const impactTargetFor = (instanceId, rect, hit, registry) => {
-  const record = shownRecord(instanceId, registry);
-  const benched = [...zoneCardIds(registry, 'self', 'bench'), ...zoneCardIds(registry, 'opp', 'bench')];
-  return {
-    rect,
-    // Design 075: the 3D board places the prefab by the card it draws.
-    cardId: record?.instanceId ?? instanceId,
-    // The game plays the condensed (`_C`) prefab on a Bench card.
-    bench: benched.includes(instanceId) || benched.includes(record?.instanceId),
-    turn: frameTurnOf(record?.element || null),
-    cardSrc: combatSrc(instanceId, registry),
-    seed: hashString(`${instanceId}|${hit.amount}|impact`),
-  };
-};
-
 /**
  * Design 068: play the prefab on a hit card; false when the attack's scene did not make room
  * for it, or when it could not play — the caller then shows today's dressing.
@@ -313,13 +200,6 @@ const playImpactPrefab = (ctx, target, hit) => {
  * hit, so a Bench snipe's target counts.
  */
 const sceneSpecFor = (spec, impactType, defenderHit) => (impactType && defenderHit ? withoutImpactBeats(spec) : spec);
-
-const shakeTable = (amount) => {
-  const amplitude = screenShakeAmplitude(amount);
-  if (amplitude === 0) return 0;
-  // Design 074 §D6: the three.js board shakes its camera; the page elements stay put.
-  getBoardScene()?.shake(screenShakeKeyframes(amplitude, SCREEN_SHAKE_MS));
-};
 
 /**
  * Design 069: knock a card the attack reached after its main target back from the attacker
@@ -347,30 +227,137 @@ const recoilCard = (instanceId, rect, ctx, registry) => {
   }
 };
 
-/** A ripple hit's sparks and slash fly from the attacker to this card, not along the main lane. */
-const hitContextFor = (ctx, rect) =>
-  ctx?.attackerRect ? { ...ctx, direction: attackAngleDeg(ctx.attackerRect, rect) } : ctx;
-
 export const damage = (plan) => {
   const hit = classifyHitOnce(plan);
   if (!hit) return 0;
   const registry = getCardRegistry();
   const rect = combatRect(plan.instanceId, registry);
   if (!rect) return 0;
-  const target = impactTargetFor(plan.instanceId, rect, hit, registry);
+  // Design 068: what the prefab needs of a damaged card, read while the card is still on the board.
+  const instanceId = plan.instanceId;
+  const record = shownRecord(instanceId, registry);
+  const benched = [...zoneCardIds(registry, 'self', 'bench'), ...zoneCardIds(registry, 'opp', 'bench')];
+  const target = {
+    rect,
+    // Design 075: the 3D board places the prefab by the card it draws.
+    cardId: record?.instanceId ?? instanceId,
+    // The game plays the condensed (`_C`) prefab on a Bench card.
+    bench: benched.includes(instanceId) || benched.includes(record?.instanceId),
+    turn: frameTurnOf(record?.element || null),
+    cardSrc: combatSrc(instanceId, registry),
+    seed: hashString(`${instanceId}|${hit.amount}|impact`),
+  };
   // Design 069: every hit of a multi-target attack lands on that attack's clock, so none holds
   // the FX queue — a held primary would dispatch the ripple hits after their own times.
   const ripple = strikes.isRipple(plan);
   afterHit(plan, (strikeCtx) => {
     const secondary = hitDelayFor(strikeCtx, plan.instanceId) > 0;
-    const ctx = secondary ? hitContextFor(strikeCtx, rect) : strikeCtx;
-    showDamageNumber(plan.instanceId, rect, hit);
+    // A ripple hit's sparks and slash fly from the attacker to this card, not along the main lane.
+    const ctx = secondary ? strikeCtx?.attackerRect ? { ...strikeCtx, direction: attackAngleDeg(strikeCtx.attackerRect, rect) } : strikeCtx : strikeCtx;
+    const instanceId = plan.instanceId;
+    const index = floatingCount.get(instanceId) || 0;
+    floatingCount.set(instanceId, index + 1);
+    const host = spawnOverlay({ rect, className: `fx-overlay fx-damage-pop fx-damage-pop--${hit.kind}` });
+    host.style.fontSize = `${Math.max(16, rect.width * (hit.weakness ? 0.42 : 0.36))}px`;
+    if (hit.weakness) host.classList.add('fx-damage-pop--weakness');
+    const text = `${hit.kind === 'heal' ? '+' : '−'}${hit.amount}`;
+    const num = document.createElement('span');
+    num.className = 'fx-damage-pop__num';
+    num.dataset.text = text;
+    num.textContent = text;
+    host.appendChild(num);
+    if (hit.weakness) {
+      const tag = document.createElement('span');
+      tag.className = 'fx-damage-pop__tag';
+      tag.textContent = 'Weakness';
+      host.appendChild(tag);
+    }
+    const lift = stackOffset(index, rect.height);
+    const drift = (Math.random() - 0.5) * rect.width * 0.24;
+    const frames = sampleKeyframes(
+      (t) => damagePopPose(t, { rise: rect.height * 0.42, drift }),
+      (p) => ({
+        transform: `translate3d(${p.x}px, ${p.y + lift}px, 0) scale(${p.scale})`,
+        opacity: p.opacity,
+      }),
+      30
+    );
+    removeWhen(host, [animateFrames(host, frames, { duration: DAMAGE_POP_MS })], DAMAGE_POP_MS + BACKSTOP_PAD_MS);
+    setTimeout(() => {
+      const left = (floatingCount.get(instanceId) || 1) - 1;
+      if (left <= 0) floatingCount.delete(instanceId);
+      else floatingCount.set(instanceId, left);
+    }, DAMAGE_POP_MS * 0.6);
     // Design 089: a heal is more than its number.
     if (hit.kind === 'heal') playHeal(plan.instanceId);
     if (hit.kind !== 'hit') return;
     const dressing = hitDressingFor(ctx?.family);
-    if (!playImpactPrefab(ctx, target, hit)) strikeTarget(rect, hit, ctx, dressing);
-    shakeTable(hit.amount * dressing.shakeMul);
+    if (!playImpactPrefab(ctx, target, hit)) {
+      // Design 063: the attacking move's family decides what the hit adds (`hitDressingFor`).
+      const rgb = hitRgbFor(ctx, hit);
+      const direction = ctx?.direction ?? -90;
+      const host = spawnOverlay({ rect, className: 'fx-overlay fx-hit' });
+      host.style.setProperty('--fx-hit-rgb', rgb.join(', '));
+
+      const flash = document.createElement('div');
+      flash.className = 'fx-hit__flash';
+      if (dressing.flashScale !== 1) flash.style.transform = `scale(${dressing.flashScale})`;
+      const slash = document.createElement('div');
+      slash.className = 'fx-hit__slash';
+      slash.style.rotate = `${direction + 90 + (Math.random() - 0.5) * 30}deg`;
+      const sparkLayer = document.createElement('div');
+      sparkLayer.className = 'fx-hit__sparks';
+      host.append(flash, sparkLayer);
+      if (dressing.slash) host.insertBefore(slash, sparkLayer);
+      const impactRing = dressing.ring ? document.createElement('div') : null;
+      if (impactRing) {
+        impactRing.className = 'fx-hit__ring';
+        host.appendChild(impactRing);
+      }
+
+      const amplitude = Math.min(10, 3 + hit.amount / 20);
+      const jitter = sampleKeyframes(
+        (t) => shakePose(t, amplitude),
+        (p) => ({ transform: `translate3d(${p.x}px, 0, 0)` }),
+        16
+      );
+      const flashFrames = sampleKeyframes(hitFlashPose, (p) => ({ opacity: p.opacity }), 12);
+      const slashFrames = sampleKeyframes(
+        slashPose,
+        (p) => ({ transform: `scale(${p.scaleX}, ${p.scaleY})`, opacity: p.opacity }),
+        12
+      );
+      const ringFrames = [
+        { transform: 'scale(0.6)', opacity: 1 },
+        { transform: 'scale(1.4)', opacity: 0 },
+      ];
+      const sparks = burstParticles({
+        count: hit.weakness ? 22 : Math.min(18, 8 + Math.round(hit.amount / 20)),
+        distance: rect.width * (hit.weakness ? 0.95 : 0.75),
+        direction,
+        spread: 150,
+        size: [rect.width * 0.1, rect.width * 0.22],
+        aspect: 0.16,
+        gravity: rect.height * 0.12,
+        maxDelay: 0.08,
+        seed: Math.floor(Math.random() * 1e6),
+      });
+      const done = [
+        animateFrames(host, jitter, { duration: HIT_FLASH_MS }),
+        animateFrames(flash, flashFrames, { duration: HIT_FLASH_MS }),
+        ...(dressing.slash ? [animateFrames(slash, slashFrames, { duration: HIT_FLASH_MS })] : []),
+        ...(impactRing ? [animateFrames(impactRing, ringFrames, { duration: HIT_FLASH_MS })] : []),
+        ...spawnParticles(sparkLayer, sparks, {
+          className: 'fx-particle--streak',
+          color: rgbCss(rgb),
+          duration: HIT_SPARKS_MS,
+        }),
+      ];
+      removeWhen(host, done, HIT_SPARKS_MS + BACKSTOP_PAD_MS);
+    }
+    const amplitude = screenShakeAmplitude(hit.amount * dressing.shakeMul);
+    // Design 074 §D6: the three.js board shakes its camera; the page elements stay put.
+    if (amplitude !== 0) getBoardScene()?.shake(screenShakeKeyframes(amplitude, SCREEN_SHAKE_MS));
     if (secondary) recoilCard(plan.instanceId, rect, ctx, registry);
   });
   return ripple ? 0 : undefined;
@@ -438,17 +425,6 @@ const opponentActiveId = (user, registry) => {
   return zoneCardIds(registry, opponent, 'active').find((id) => combatRect(id, registry)) ?? null;
 };
 
-// Design 063: a zero-damage attack has nothing to hit; a type-coloured pulse hugs the attacker.
-const playAuraPulse = (rect, rgb) => {
-  const host = spawnOverlay({ rect, className: 'fx-overlay fx-aura-pulse' });
-  host.style.setProperty('--fx-aura-rgb', rgb.join(', '));
-  const ring = document.createElement('div');
-  ring.className = 'fx-aura-pulse__ring';
-  host.appendChild(ring);
-  const frames = sampleKeyframes(auraPulsePose, (p) => ({ transform: `scale(${p.scale})`, opacity: p.opacity }), 16);
-  removeWhen(host, [animateFrames(ring, frames, { duration: AURA_PULSE_MS })], AURA_PULSE_MS + BACKSTOP_PAD_MS);
-};
-
 /**
  * Design 075: the generic lunge on the 3D board — the attacker's own mesh rears back, strikes and
  * recoils (a drive in table px), its lagged art smearing the strike. Null when the scene does not
@@ -513,15 +489,17 @@ const hitTargetsOf = (plan, registry) =>
       isDefender: hit.instanceId === plan.defenderId,
     }));
 
-/**
- * Design 069: what the scene needs of the attack's hits: the layout (null when the plan names
- * none), the extra strike context, the branch lanes and when the last ripple hit has played.
- */
-const hitsFor = (plan, registry, from) => {
+export const attack = (plan) => {
+  const registry = getCardRegistry();
+  const card = combatCard(plan.attackerId, registry);
+  const from = combatRect(plan.attackerId, registry);
+  if (!from) return 0;
+  // Design 069: what the scene needs of the attack's hits: the layout (null when the plan names
+  // none), the extra strike context, the branch lanes and when the last ripple hit has played.
   const layout = layoutHits(hitTargetsOf(plan, registry));
   const secondaries = layout?.secondaries ?? [];
   const lastDelay = Math.max(0, ...secondaries.map((secondary) => secondary.delayMs));
-  return {
+  const hits = {
     layout,
     strikeContext: { attackerRect: from, hitDelays: hitDelaysOf(layout) },
     branches: secondaries
@@ -534,14 +512,6 @@ const hitsFor = (plan, registry, from) => {
       .filter((branch) => branch.rect),
     rippleEndMs: (contactMs) => (secondaries.length > 0 ? contactMs + lastDelay + HIT_SPARKS_MS : 0),
   };
-};
-
-export const attack = (plan) => {
-  const registry = getCardRegistry();
-  const card = combatCard(plan.attackerId, registry);
-  const from = combatRect(plan.attackerId, registry);
-  if (!from) return 0;
-  const hits = hitsFor(plan, registry, from);
   // Design 069: the scene plays against the primary hit (a Bench snipe's target, not the Active).
   const defenderId =
     hits.layout?.primaryId ?? (combatRect(plan.defenderId, registry) ? plan.defenderId : opponentActiveId(plan.user, registry));
@@ -579,7 +549,15 @@ export const attack = (plan) => {
   }
   if ((isZeroDamage(plan) && !hits.layout) || !to) {
     markAttackScene(AURA_PULSE_MS);
-    playAuraPulse(from, card ? brighten(fxRgbForCard(card), 0.3) : FX_NEUTRAL_RGB);
+    // Design 063: a zero-damage attack has nothing to hit; a type-coloured pulse hugs the attacker.
+    const rgb = card ? brighten(fxRgbForCard(card), 0.3) : FX_NEUTRAL_RGB;
+    const host = spawnOverlay({ rect: from, className: 'fx-overlay fx-aura-pulse' });
+    host.style.setProperty('--fx-aura-rgb', rgb.join(', '));
+    const ring = document.createElement('div');
+    ring.className = 'fx-aura-pulse__ring';
+    host.appendChild(ring);
+    const frames = sampleKeyframes(auraPulsePose, (p) => ({ transform: `scale(${p.scale})`, opacity: p.opacity }), 16);
+    removeWhen(host, [animateFrames(ring, frames, { duration: AURA_PULSE_MS })], AURA_PULSE_MS + BACKSTOP_PAD_MS);
     return;
   }
 

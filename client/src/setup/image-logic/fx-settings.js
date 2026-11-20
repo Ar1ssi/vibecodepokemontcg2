@@ -26,23 +26,12 @@ import {
 } from './fx-settings.mjs';
 import { fxDisabled, motionReduced } from './mat-fx.mjs';
 
-const storage = () => {
+export const storage = () => {
   try {
     return globalThis.localStorage ?? null;
   } catch {
     return null;
   }
-};
-
-/** Every <html>/<body> the marker classes must reach: parent page + both mats. */
-const markerRoots = () => {
-  const roots = [];
-  if (typeof document !== 'undefined' && document.body) roots.push(document.body);
-  for (const doc of [selfContainerDocument, oppContainerDocument]) {
-    const root = doc?.documentElement;
-    if (root) roots.push(root);
-  }
-  return roots;
 };
 
 const volumeListeners = new Set();
@@ -65,7 +54,14 @@ export function applyFxSettings() {
   // test harness, devtools) must not be stripped by the next view apply.
   const settings = { ...stored, fxOff: fxDisabled() || stored.fxOff };
   const reduced = motionReduced();
-  for (const root of markerRoots()) {
+  // Every <html>/<body> the marker classes must reach: parent page + both mats.
+  const roots = [];
+  if (typeof document !== 'undefined' && document.body) roots.push(document.body);
+  for (const doc of [selfContainerDocument, oppContainerDocument]) {
+    const root = doc?.documentElement;
+    if (root) roots.push(root);
+  }
+  for (const root of roots) {
     root.classList.toggle(FX_OFF_CLASS, settings.fxOff);
     root.classList.toggle(FX_REDUCED_CLASS, reduced);
     root.classList.toggle(HOLO_SHAPES_OFF_CLASS, settings.holoShapesOff);

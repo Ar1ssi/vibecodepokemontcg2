@@ -100,16 +100,6 @@ export const coverClick = (event) => {
   }
 };
 
-/**
- * Where the card menu anchors on the 3D board: a mirror card's rect is already on-screen px
- * (board-mirror.js sync); the Stadium's twin is the page's `#stadium img`,
- * hidden while the scene draws the slot, so it anchors on the scene's Stadium footprint.
- */
-const board3dMenuAnchorRect = (target) => {
-  const stadium = target?.closest?.('#stadium') ? getBoardScene()?.rects?.().stadium : null;
-  return stadium ?? visualRectOf(target);
-};
-
 export const openCardContextMenu = (event) => {
   // View Board only looks: the card menu's actions (discard, shuffle, draw…) wait for Back.
   if (isViewingBoard()) {
@@ -219,7 +209,12 @@ export const openCardContextMenu = (event) => {
   if (menuShown) uiCue('card-to-board');
 
   // get the position of the context menu
-  const rect = board3dMenuAnchorRect(event.target);
+  // Where the card menu anchors on the 3D board: a mirror card's rect is already on-screen px
+  // (board-mirror.js sync); the Stadium's twin is the page's `#stadium img`,
+  // hidden while the scene draws the slot, so it anchors on the scene's Stadium footprint.
+  const target = event.target;
+  const stadium = target?.closest?.('#stadium') ? getBoardScene()?.rects?.().stadium : null;
+  const rect = stadium ?? visualRectOf(target);
   const fitsRight =
     rect.left + rect.width + cardContextMenu.offsetWidth <= window.innerWidth;
   const left = fitsRight
@@ -244,10 +239,8 @@ const statusesOf = (card, zone, user) =>
 
 // The stack view's carousel, left to right: the Pokémon, its evolution line (highest stage first),
 // then its Tools, then its Energy — the carousel order read the other way round.
-const stackCardsOf = (card) => [card, ...orderAttachedForCarousel(attachedSlidesOf(card)).reverse()];
-
 const openStackFor = (card, zone, user) =>
-  openStackView({ card, cards: stackCardsOf(card), zone, statuses: statusesOf(card, zone, user) });
+  openStackView({ card, cards: [card, ...orderAttachedForCarousel(attachedSlidesOf(card)).reverse()], zone, statuses: statusesOf(card, zone, user) });
 
 // The TCG Live AttackOverlay for one of your Pokémon (designs 067, 074). The HUD's Stack button
 // closes it and opens the stack view. On the Bench it lists no attacks and Retreat does nothing

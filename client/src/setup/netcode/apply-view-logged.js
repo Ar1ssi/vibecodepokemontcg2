@@ -16,16 +16,6 @@ function eventTypesOf(events) {
   return Array.isArray(events) ? events.map((event) => event?.type) : [];
 }
 
-function sideSummary(sideDiff) {
-  return {
-    added: sideDiff.added.length,
-    removed: sideDiff.removed.length,
-    moved: sideDiff.moved.length,
-    updated: sideDiff.updated.length,
-    deck: sideDiff.deckCount.current,
-  };
-}
-
 function summarizeDiff(d) {
   const summary = {
     initial: d.isInitial,
@@ -38,7 +28,13 @@ function summarizeDiff(d) {
   for (const side of ['you', 'them']) {
     const sideDiff = d.players?.[side];
     if (!sideDiff) continue;
-    summary[side] = sideSummary(sideDiff);
+    summary[side] = {
+      added: sideDiff.added.length,
+      removed: sideDiff.removed.length,
+      moved: sideDiff.moved.length,
+      updated: sideDiff.updated.length,
+      deck: sideDiff.deckCount.current,
+    };
     for (const m of sideDiff.moved) {
       moves.push({ id: m.instanceId, from: `${m.fromSide}.${m.fromZone}`, to: `${m.toSide}.${m.toZone}` });
     }
@@ -53,53 +49,6 @@ function isNewBaseline(previous, view) {
   if (!previous) return false;
   if (Number.isFinite(view?.stateVersion) && view.stateVersion < previous.stateVersion) return true;
   return (previous.you?.playerId ?? null) !== (view?.you?.playerId ?? null);
-}
-
-function logChoiceTransition(log, view, sv) {
-  const pc = view.pendingChoice;
-  const id = pc?.choiceId ?? null;
-  if (id === lastChoiceId) return;
-  if (lastChoiceId !== null) log.info('choice', 'closed', { choiceId: lastChoiceId }, { sv });
-  if (id !== null) {
-    log.info(
-      'choice',
-      'open',
-      {
-        choiceId: id,
-        player: pc.player ?? null,
-        type: pc.type ?? null,
-        min: pc.min ?? null,
-        max: pc.max ?? null,
-        options: Array.isArray(pc.options) ? pc.options.length : null,
-      },
-      { sv }
-    );
-  }
-  lastChoiceId = id;
-}
-
-function logApplied(log, result, view, events, ms, diff) {
-  const sv = view?.stateVersion;
-  const applied = Boolean(result?.applied);
-  const reason = result?.reason ?? null;
-  const detail = { applied, reason, ms: Math.round(ms * 10) / 10, events: eventTypesOf(events) };
-  let d = null;
-  if (applied) {
-    // A lower stateVersion or another seat's perspective is a new game or a board flip: diffing
-    // against the old view would report a whole board of bogus moves.
-    if (isNewBaseline(lastLoggedView, view)) resetApplyViewLog();
-    try {
-      d = diff(lastLoggedView, view);
-      Object.assign(detail, summarizeDiff(d));
-    } catch {
-      d = null;
-    }
-    lastLoggedView = view;
-  }
-  const level = applied || reason === 'out_of_order' ? 'debug' : 'warn';
-  log[level]('view', 'apply', detail, { sv });
-  if (d && log.enabled('trace')) log.trace('view', 'diff', d, { sv });
-  if (applied) logChoiceTransition(log, view, sv);
 }
 
 export function applyViewLogged(
@@ -128,7 +77,54 @@ export function applyViewLogged(
     throw error;
   }
   try {
-    logApplied(log, result, view, events, now() - startedAt, diff);
+    const sv = view?.stateVersion;
+    const applied = Boolean(result?.applied);
+    const reason = result?.reason ?? null;
+    const detail = {
+      applied,
+      reason,
+      ms: Math.round((now() - startedAt) * 10) / 10,
+      events: eventTypesOf(events),
+    };
+    let d = null;
+    if (applied) {
+      // A lower stateVersion or another seat's perspective is a new game or a board flip: diffing
+      // against the old view would report a whole board of bogus moves.
+      if (isNewBaseline(lastLoggedView, view)) resetApplyViewLog();
+      try {
+        d = diff(lastLoggedView, view);
+        Object.assign(detail, summarizeDiff(d));
+      } catch {
+        d = null;
+      }
+      lastLoggedView = view;
+    }
+    const level = applied || reason === 'out_of_order' ? 'debug' : 'warn';
+    log[level]('view', 'apply', detail, { sv });
+    if (d && log.enabled('trace')) log.trace('view', 'diff', d, { sv });
+    if (applied) {
+      const pc = view.pendingChoice;
+      const id = pc?.choiceId ?? null;
+      if (id !== lastChoiceId) {
+        if (lastChoiceId !== null) log.info('choice', 'closed', { choiceId: lastChoiceId }, { sv });
+        if (id !== null) {
+          log.info(
+            'choice',
+            'open',
+            {
+              choiceId: id,
+              player: pc.player ?? null,
+              type: pc.type ?? null,
+              min: pc.min ?? null,
+              max: pc.max ?? null,
+              options: Array.isArray(pc.options) ? pc.options.length : null,
+            },
+            { sv }
+          );
+        }
+        lastChoiceId = id;
+      }
+    }
   } catch {
     // logging must never change the result
   }

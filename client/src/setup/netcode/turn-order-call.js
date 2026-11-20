@@ -138,8 +138,6 @@ export function normalizeTurnOrderResult(data) {
   };
 }
 
-const otherSide = (side) => (side === 'self' ? 'opp' : 'self');
-
 /**
  * Rewrites a copy's seat-relative sides to the near seat's point of view.
  *
@@ -152,11 +150,9 @@ const otherSide = (side) => (side === 'self' ? 'opp' : 'self');
 export function relabelForNearSeat(copy, copySeat, nearSeat, fields) {
   if (sideForSeat(copySeat, nearSeat) === 'self') return copy;
   const relabeled = { ...copy };
-  for (const field of fields) relabeled[field] = otherSide(copy[field]);
+  for (const field of fields) relabeled[field] = copy[field] === 'self' ? 'opp' : 'self';
   return relabeled;
 }
-
-const isSeat = (value) => value === 'p1' || value === 'p2';
 
 /**
  * Wires the inbound turn-order messages onto `document` events.
@@ -175,7 +171,7 @@ export function registerTurnOrderCallListeners(socket, doc = document, { systemS
   const soloCopySeat = (type, data) => {
     const index = soloCopies[type];
     soloCopies[type] = index + 1;
-    if (isSeat(data?.seat)) return data.seat;
+    if (data?.seat === 'p1' || data?.seat === 'p2') return data.seat;
     return index % 2 === 0 ? 'p1' : 'p2';
   };
 

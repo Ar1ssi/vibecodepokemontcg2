@@ -77,8 +77,13 @@ export function boardPanel(points, thickness, outerUv) {
   return geometry;
 }
 
-/** The outline of a rounded rectangle centred on the origin, counter-clockwise. */
-export function roundedRectPoints(width, height, radius, segments = 6) {
+/**
+ * A card-like slab (rounded rectangle `width` × `height`, `thickness` thick) centred on the
+ * origin, front face toward +z. Groups: 0 front (u, v over the face), 1 back (mirrored so the
+ * back's image reads correctly from behind), 2 the edge (u along the outline, v across).
+ */
+export function cardSlab(width, height, thickness, radius, segments = 6) {
+  // The outline of a rounded rectangle centred on the origin, counter-clockwise.
   const r = Math.min(radius, width / 2, height / 2);
   const hw = width / 2;
   const hh = height / 2;
@@ -88,23 +93,13 @@ export function roundedRectPoints(width, height, radius, segments = 6) {
     [-hw + r, hh - r, Math.PI / 2],
     [-hw + r, -hh + r, Math.PI],
   ];
-  const points = [];
+  const outline = [];
   for (const [cx, cy, start] of corners) {
     for (let s = 0; s <= segments; s += 1) {
       const angle = start + (s / segments) * (Math.PI / 2);
-      points.push([cx + r * Math.cos(angle), cy + r * Math.sin(angle)]);
+      outline.push([cx + r * Math.cos(angle), cy + r * Math.sin(angle)]);
     }
   }
-  return points;
-}
-
-/**
- * A card-like slab (rounded rectangle `width` × `height`, `thickness` thick) centred on the
- * origin, front face toward +z. Groups: 0 front (u, v over the face), 1 back (mirrored so the
- * back's image reads correctly from behind), 2 the edge (u along the outline, v across).
- */
-export function cardSlab(width, height, thickness, radius, segments = 6) {
-  const outline = roundedRectPoints(width, height, radius, segments);
   const contour = outline.map(([x, y]) => new Vector2(x, y));
   const triangles = ShapeUtils.triangulateShape(contour, []);
   const positions = [];

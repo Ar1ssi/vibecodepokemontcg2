@@ -100,12 +100,6 @@ function energyFromPhrase(phrase) {
   return { type: ENERGY_LETTER_TYPES[String(symbol || '').toLowerCase()] || null };
 }
 
-function energyWordType(phrase) {
-  const symbol = /\{([a-z])\}/i.exec(String(phrase || ''))?.[1];
-  if (symbol) return ENERGY_LETTER_TYPES[symbol.toLowerCase()] || null;
-  return ENERGY_WORD_TYPES[String(phrase || '').trim().toLowerCase()] || null;
-}
-
 const DEFENDER = "(?:your opponent's active pokémon|the defending pokémon)";
 const NOT_A_NAME = new Set(['damaged', 'evolved', 'active', 'benched', 'healthy', 'unaffected', 'knocked']);
 
@@ -269,7 +263,11 @@ const CLAUSES = [
   [
     /^you have (\d+) or fewer (?:(?:basic )?(?:([a-z]+)|\{([a-z])\}) )?pokémon on your bench$/,
     (m) => {
-      const type = energyWordType(m[2] || (m[3] ? `{${m[3]}}` : ''));
+      const phrase = m[2] || (m[3] ? `{${m[3]}}` : '');
+      const symbol = /\{([a-z])\}/i.exec(phrase)?.[1];
+      const type = symbol
+        ? ENERGY_LETTER_TYPES[symbol.toLowerCase()] || null
+        : ENERGY_WORD_TYPES[phrase.trim().toLowerCase()] || null;
       return {
         desc: { kind: 'benchCount', op: 'lte', n: Number(m[1]), ...(type ? { type } : {}) },
         printedNegated: false,
@@ -995,31 +993,6 @@ function benchCount(ctx, cond) {
   return types.filter((entry) => list(entry).some((t) => String(t).toLowerCase() === wanted)).length;
 }
 
-function energyCheck(cond, ctx) {
-  const wanted = cond.type || cond.name;
-  if (!wanted) return false;
-  const word = String(wanted).toLowerCase();
-  // A Holon Research Tower unit is a dual token ("Lightning|Fighting"): it provides either type.
-  const typeMatches = (token) =>
-    String(token)
-      .toLowerCase()
-      .split('|')
-      .some((part) => part === word);
-  const count = KNOWN_TYPES.has(word)
-    ? list(ctx.attackerEnergyTypes).filter(typeMatches).length
-    : list(ctx.attackerEnergyNames).filter((n) => nameMatches(n, wanted)).length;
-  return count >= num(cond.n || 1);
-}
-
-function discardEnergyCount(ctx, cond) {
-  return list(ctx.ownDiscardEnergy).filter((entry) => {
-    if (cond.basic && entry?.basic !== true) return false;
-    if (cond.type && String(entry?.type || '').toLowerCase() !== String(cond.type).toLowerCase()) return false;
-    if (cond.name && !nameMatches(entry?.name, cond.name)) return false;
-    return true;
-  }).length;
-}
-
 const RULE_BOX_FLAGS = {
   basic: (ctx) => ctx.defenderIsBasic,
   ex: (ctx) => ctx.defenderIsEx,
@@ -1078,8 +1051,27 @@ const CHECKS = {
   opponentPrizes: (cond, ctx) => compare(num(ctx.opponentPrizes), cond.op, cond.n),
   ownPrizes: (cond, ctx) => compare(num(ctx.ownPrizes), cond.op, cond.n),
   opponentHandCount: (cond, ctx) => compare(num(ctx.opponentHandCount), cond.op, cond.n),
-  attackerEnergyType: (cond, ctx) => energyCheck(cond, ctx),
-  discardEnergyCount: (cond, ctx) => compare(discardEnergyCount(ctx, cond), cond.op, cond.n),
+  attackerEnergyType: (cond, ctx) => {
+    const wanted = cond.type || cond.name;
+    if (!wanted) return false;
+    const word = String(wanted).toLowerCase();
+    // A Holon Research Tower unit is a dual token ("Lightning|Fighting"): it provides either type.
+    const typeMatches = (token) =>
+      String(token)
+        .toLowerCase()
+        .split('|')
+        .some((part) => part === word);
+    const count = KNOWN_TYPES.has(word)
+      ? list(ctx.attackerEnergyTypes).filter(typeMatches).length
+      : list(ctx.attackerEnergyNames).filter((n) => nameMatches(n, wanted)).length;
+    return count >= num(cond.n || 1);
+  },
+  discardEnergyCount: (cond, ctx) => compare(list(ctx.ownDiscardEnergy).filter((entry) => {
+    if (cond.basic && entry?.basic !== true) return false;
+    if (cond.type && String(entry?.type || '').toLowerCase() !== String(cond.type).toLowerCase()) return false;
+    if (cond.name && !nameMatches(entry?.name, cond.name)) return false;
+    return true;
+  }).length, cond.op, cond.n),
   attackerDamageCounters: (cond, ctx) => compare(damageCounters(ctx.attackerDamage), cond.op, cond.n),
   defenderDamageCounters: (cond, ctx) => compare(damageCounters(ctx.defenderDamage), cond.op, cond.n),
   defenderRuleBox: (cond, ctx) => (cond.values || [cond.value]).some((value) => defenderIsKind(ctx, value)),

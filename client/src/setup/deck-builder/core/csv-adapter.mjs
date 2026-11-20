@@ -200,14 +200,3 @@ export function parseDeckDataRows(deckRows = []) {
 
   return newDecklist;
 }
-
-export function deckDataRowsToSimCsv(deckRows = []) {
-  const body = (Array.isArray(deckRows) ? deckRows : [])
-    .filter((row) => Array.isArray(row) && row.length >= 4)
-    .map((row) => {
-      const [quantity, name, type, url, number = '', set = '', tcgId = ''] = row;
-      return [quantity, name, type, url, number || '', set || '', tcgId || ''].join(',');
-    });
-
-  return `${SIM_CSV_HEADER}\n${body.join('\n')}`;
-}

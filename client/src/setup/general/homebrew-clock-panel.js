@@ -62,21 +62,18 @@ const rowNode = (row) => {
   return node;
 };
 
-const syncTicker = (running) => {
-  if (running && !ticker) ticker = setInterval(renderHomebrewClockPanel, TICK_MS);
-  if (!running && ticker) {
-    clearInterval(ticker);
-    ticker = null;
-  }
-};
-
 export const renderHomebrewClockPanel = () => {
   const panel = document.getElementById('homebrewClockPanel');
   if (!panel) return;
   const view = currentView();
   panel.hidden = view.mode === 'hidden';
   panel.dataset.mode = view.mode;
-  syncTicker(view.mode === 'clock' && view.rows.some((row) => row.running));
+  const running = view.mode === 'clock' && view.rows.some((row) => row.running);
+  if (running && !ticker) ticker = setInterval(renderHomebrewClockPanel, TICK_MS);
+  if (!running && ticker) {
+    clearInterval(ticker);
+    ticker = null;
+  }
   if (view.mode === 'hidden') {
     panel.replaceChildren();
     return;

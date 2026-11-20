@@ -99,7 +99,6 @@ const fail = (reason) => {
 };
 
 const hasInstanceId = (card) => typeof card?.instanceId === 'number';
-const isRedacted = (card) => !card.name && !card.src;
 
 /**
  * The near and far players of an owner view (`you`/`them`) or a spectator view (`players`).
@@ -133,7 +132,7 @@ function zoneCards(player, zoneId) {
 
 /** Back unless the viewer may see the face, as view.mjs's redaction and the client hand rule decide. */
 function faceOf(card, side, zoneId, player) {
-  if (isRedacted(card)) return 'back';
+  if (!card.name && !card.src) return 'back';
   if (card.faceDown && !card.revealed) return 'back';
   if (zoneId === 'prizes' && !card.revealed && !player?.flags?.prizesFaceUp) return 'back';
   // Spectators receive both hands; the far hand still shows backs unless revealed.
@@ -206,70 +205,6 @@ function setOverlays(placement, root, visibleCard) {
   placement.abilityUsed = Boolean(root.abilityUsed || visibleCard.abilityUsed);
 }
 
-/**
- * One in-play Pokémon's stack (layoutCardStack): the highest Stage is visible; the other
- * Pokémon peek out under it, the one attached last closest; Tools (and token-less Energy)
- * fan out to the right in view order, tucked under the Pokémon; Energy with a token sits in the token row.
- */
-function layoutStack(root, attached, placementOf) {
-  const members = [root, ...attached];
-  const top = topPokemonCard(members, root);
-  const others = members.filter((card) => card !== top && isPokemon(card));
-  if (!isPokemon(root) && root !== top && !others.includes(root)) others.unshift(root);
-
-  const tools = [];
-  const energy = [];
-  for (const card of attached) {
-    if (card === top || isPokemon(card)) continue;
-    const tokenSrc = isEnergyCard(card) ? getEnergyTokenFront(card) : null;
-    if (tokenSrc) energy.push({ card, tokenSrc });
-    else tools.push(card);
-  }
-
-  // Back to front, as apply-view's negative z-indexes drew it: the Tools tuck under the
-  // Pokémon (the first attached closest), the lower Stages above them, the visible card on top.
-  const underTools = tools.length;
-  const topIndex = underTools + others.length;
-
-  tools.forEach((card, i) => {
-    const placement = placementOf(card);
-    placement.role = 'tool';
-    placement.stackIndex = underTools - 1 - i;
-    placement.stackOffset = [(i + 1) * ATTACHED_CARD_SHIFT, 0];
-  });
-
-  others.forEach((card, i) => {
-    const placement = placementOf(card);
-    placement.stackIndex = underTools + i;
-    placement.stackOffset = [0, (others.length - i) * UNDER_POKEMON_SHIFT];
-  });
-  placementOf(top).stackIndex = topIndex;
-
-  const row = planEnergyTokenRow(
-    energy.map((entry) => entry.tokenSrc),
-    1
-  );
-  energy.forEach(({ card, tokenSrc }, i) => {
-    const placement = placementOf(card);
-    placement.role = 'energy';
-    placement.stackIndex = topIndex + 1 + i;
-    placement.energyToken = {
-      src: tokenSrc,
-      double: isDoubleEnergyToken(card),
-      left: row.tokens[i].left,
-      size: row.tokenSize,
-      bottom: ENERGY_TOKEN_BOTTOM,
-      zIndex: row.tokens[i].zIndex,
-    };
-  });
-
-  const visible = placementOf(top);
-  setOverlays(visible, root, top);
-  visible.energyBadges = row.badges.map((badge) => ({ ...badge }));
-  const rotation = quarterTurn(root.rotation);
-  for (const card of members) placementOf(card).rotation = rotation;
-}
-
 /** The hand in the order the page renders it (apply-view's `sortZoneCards`); view order otherwise. */
 function handOrder(cards, side, ctx) {
   let sorted = null;
@@ -279,55 +214,6 @@ function handOrder(cards, side, ctx) {
     sorted = null;
   }
   return Array.isArray(sorted) && sorted.length === cards.length ? sorted : cards;
-}
-
-function sideZonePlacements(player, side, ctx) {
-  const placements = [];
-  for (const zoneId of CARD_ZONES) {
-    const cards = zoneId === 'hand' ? handOrder(zoneCards(player, zoneId), side, ctx) : zoneCards(player, zoneId);
-    const byId = new Map(cards.map((card) => [card.instanceId, card]));
-    const zonePlacements = new Map();
-    cards.forEach((card, index) => {
-      zonePlacements.set(card.instanceId, basePlacement(card, side, zoneId, index, player, ctx));
-    });
-    const placementOf = (card) => zonePlacements.get(card.instanceId);
-
-    const attachedByRoot = new Map();
-    for (const card of cards) {
-      const host = PLAY_ZONES.includes(zoneId) ? hostOf(card, byId) : null;
-      if (host == null) continue;
-      const placement = placementOf(card);
-      placement.host = host;
-      placement.role = isPokemon(card) ? 'stage' : 'tool';
-      if (!attachedByRoot.has(host)) attachedByRoot.set(host, []);
-      attachedByRoot.get(host).push(card);
-    }
-
-    for (const card of cards) {
-      if (placementOf(card).host != null) continue;
-      if (PLAY_ZONES.includes(zoneId)) {
-        layoutStack(card, attachedByRoot.get(card.instanceId) || [], placementOf);
-      } else {
-        const placement = placementOf(card);
-        setOverlays(placement, card, card);
-        placement.rotation = quarterTurn(card.rotation);
-      }
-    }
-    const ordered = [...zonePlacements.values()];
-    if (PLAY_ZONES.includes(zoneId)) {
-      const slotOfRoot = new Map();
-      for (const p of ordered) {
-        if (p.host == null) slotOfRoot.set(p.instanceId, slotOfRoot.size);
-      }
-      for (const p of ordered) p.slot = slotOfRoot.get(p.host ?? p.instanceId);
-    }
-    // Roots before attachments, each group in view order (placeCardInZone).
-    placements.push(
-      ...ordered.filter((p) => p.host == null),
-      ...ordered.filter((p) => p.host != null)
-    );
-  }
-  return placements;
 }
 
 function openPile(placements, side, zoneId) {
@@ -424,7 +310,115 @@ export function boardModelFrom(
       },
     };
     const players = { self: near, opp: far };
-    const placements = SIDES.flatMap((side) => sideZonePlacements(players[side], side, ctx));
+    const placements = SIDES.flatMap((side) => {
+      const player = players[side];
+      const placements = [];
+      for (const zoneId of CARD_ZONES) {
+        const cards = zoneId === 'hand' ? handOrder(zoneCards(player, zoneId), side, ctx) : zoneCards(player, zoneId);
+        const byId = new Map(cards.map((card) => [card.instanceId, card]));
+        const zonePlacements = new Map();
+        cards.forEach((card, index) => {
+          zonePlacements.set(card.instanceId, basePlacement(card, side, zoneId, index, player, ctx));
+        });
+        const placementOf = (card) => zonePlacements.get(card.instanceId);
+
+        const attachedByRoot = new Map();
+        for (const card of cards) {
+          const host = PLAY_ZONES.includes(zoneId) ? hostOf(card, byId) : null;
+          if (host == null) continue;
+          const placement = placementOf(card);
+          placement.host = host;
+          placement.role = isPokemon(card) ? 'stage' : 'tool';
+          if (!attachedByRoot.has(host)) attachedByRoot.set(host, []);
+          attachedByRoot.get(host).push(card);
+        }
+
+        for (const card of cards) {
+          if (placementOf(card).host != null) continue;
+          if (PLAY_ZONES.includes(zoneId)) {
+            // One in-play Pokémon's stack (layoutCardStack): the highest Stage is visible; the other
+            // Pokémon peek out under it, the one attached last closest; Tools (and token-less Energy)
+            // fan out to the right in view order, tucked under the Pokémon; Energy with a token sits in the token row.
+            const root = card;
+            const attached = attachedByRoot.get(card.instanceId) || [];
+            const members = [root, ...attached];
+            const top = topPokemonCard(members, root);
+            const others = members.filter((card) => card !== top && isPokemon(card));
+            if (!isPokemon(root) && root !== top && !others.includes(root)) others.unshift(root);
+
+            const tools = [];
+            const energy = [];
+            for (const card of attached) {
+              if (card === top || isPokemon(card)) continue;
+              const tokenSrc = isEnergyCard(card) ? getEnergyTokenFront(card) : null;
+              if (tokenSrc) energy.push({ card, tokenSrc });
+              else tools.push(card);
+            }
+
+            // Back to front, as apply-view's negative z-indexes drew it: the Tools tuck under the
+            // Pokémon (the first attached closest), the lower Stages above them, the visible card on top.
+            const underTools = tools.length;
+            const topIndex = underTools + others.length;
+
+            tools.forEach((card, i) => {
+              const placement = placementOf(card);
+              placement.role = 'tool';
+              placement.stackIndex = underTools - 1 - i;
+              placement.stackOffset = [(i + 1) * ATTACHED_CARD_SHIFT, 0];
+            });
+
+            others.forEach((card, i) => {
+              const placement = placementOf(card);
+              placement.stackIndex = underTools + i;
+              placement.stackOffset = [0, (others.length - i) * UNDER_POKEMON_SHIFT];
+            });
+            placementOf(top).stackIndex = topIndex;
+
+            const row = planEnergyTokenRow(
+              energy.map((entry) => entry.tokenSrc),
+              1
+            );
+            energy.forEach(({ card, tokenSrc }, i) => {
+              const placement = placementOf(card);
+              placement.role = 'energy';
+              placement.stackIndex = topIndex + 1 + i;
+              placement.energyToken = {
+                src: tokenSrc,
+                double: isDoubleEnergyToken(card),
+                left: row.tokens[i].left,
+                size: row.tokenSize,
+                bottom: ENERGY_TOKEN_BOTTOM,
+                zIndex: row.tokens[i].zIndex,
+              };
+            });
+
+            const visible = placementOf(top);
+            setOverlays(visible, root, top);
+            visible.energyBadges = row.badges.map((badge) => ({ ...badge }));
+            const rotation = quarterTurn(root.rotation);
+            for (const card of members) placementOf(card).rotation = rotation;
+          } else {
+            const placement = placementOf(card);
+            setOverlays(placement, card, card);
+            placement.rotation = quarterTurn(card.rotation);
+          }
+        }
+        const ordered = [...zonePlacements.values()];
+        if (PLAY_ZONES.includes(zoneId)) {
+          const slotOfRoot = new Map();
+          for (const p of ordered) {
+            if (p.host == null) slotOfRoot.set(p.instanceId, slotOfRoot.size);
+          }
+          for (const p of ordered) p.slot = slotOfRoot.get(p.host ?? p.instanceId);
+        }
+        // Roots before attachments, each group in view order (placeCardInZone).
+        placements.push(
+          ...ordered.filter((p) => p.host == null),
+          ...ordered.filter((p) => p.host != null)
+        );
+      }
+      return placements;
+    });
 
     const cardsById = new Map();
     for (const side of SIDES) {
@@ -499,21 +493,6 @@ const sameArray = (a, b) =>
 
 const sameJson = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
-function wasMoved(a, b) {
-  return (
-    MOVE_FIELDS.some((field) => a[field] !== b[field]) || !sameArray(a.stackOffset, b.stackOffset)
-  );
-}
-
-function wasRestyled(a, b) {
-  return (
-    STYLE_FIELDS.some((field) => a[field] !== b[field]) ||
-    !sameArray(a.conditions, b.conditions) ||
-    !sameJson(a.energyToken, b.energyToken) ||
-    !sameJson(a.energyBadges, b.energyBadges)
-  );
-}
-
 const pileKey = (pile) => ({
   ...pile,
   top: pile?.top ? { id: pile.top.instanceId, src: pile.top.src, face: pile.top.face } : null,
@@ -555,8 +534,11 @@ export function diffModels(prev, next) {
       added.add(id);
       continue;
     }
-    if (wasMoved(old, placement)) moved.add(id);
-    if (wasRestyled(old, placement)) restyled.add(id);
+    if (MOVE_FIELDS.some((field) => old[field] !== placement[field]) || !sameArray(old.stackOffset, placement.stackOffset)) moved.add(id);
+    if (STYLE_FIELDS.some((field) => old[field] !== placement[field]) ||
+    !sameArray(old.conditions, placement.conditions) ||
+    !sameJson(old.energyToken, placement.energyToken) ||
+    !sameJson(old.energyBadges, placement.energyBadges)) restyled.add(id);
   }
   for (const id of beforeIndex.keys()) if (!afterIndex.has(id)) removed.add(id);
 

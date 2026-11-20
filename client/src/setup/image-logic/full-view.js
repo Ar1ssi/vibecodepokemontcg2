@@ -36,11 +36,6 @@ let cardPreviewState = null;
 
 export const isCardPreviewOpen = () => cardPreviewState != null;
 
-export const resolvePreviewSleeveSrc = (card, image) => {
-  const user = card?.user ?? card?.image?.user ?? image?.user ?? 'self';
-  return cardBackSrcForUser(user) || DEFAULT_SLEEVE;
-};
-
 // Deck-list/search previews have a real cursor to track — real
 // pointer-tracked hover, not the auto-sweep. A preview cloned from a mat card
 // (double-click) keeps the board's auto-sweep instead, so it flows the way the
@@ -57,15 +52,6 @@ const hideCardCounters = (image) => {
   if (image.burnMarker) image.burnMarker.style.display = 'none';
   if (image.statusLoop) image.statusLoop.style.display = 'none';
   if (image.abilityCounter) image.abilityCounter.style.display = 'none';
-};
-
-const showCardCounters = (image) => {
-  if (image.damageCounter) image.damageCounter.style.display = '';
-  if (image.specialCondition) image.specialCondition.style.display = '';
-  if (image.poisonMarker) image.poisonMarker.style.display = '';
-  if (image.burnMarker) image.burnMarker.style.display = '';
-  if (image.statusLoop) image.statusLoop.style.display = '';
-  if (image.abilityCounter) image.abilityCounter.style.display = '';
 };
 
 // A clone of a board-mirror <img> (design 074 D4) copies the projected rect board-mirror.js
@@ -192,13 +178,19 @@ export const openCardPreview = (targetImage, card) => {
     ...(board3dActive() ? { sourceRect: viewportRectOf(targetImage) } : {}),
     imageUrl: toHighResCardImageUrl(targetImage.currentSrc || targetImage.src),
     card,
-    sleeveSrc: resolvePreviewSleeveSrc(card, targetImage),
+    sleeveSrc:
+      cardBackSrcForUser(card?.user ?? card?.image?.user ?? targetImage.user ?? 'self') || DEFAULT_SLEEVE,
     cloneFrom: card?.wrapper ?? (anchor.classList?.contains('mat-holo') ? anchor : null),
     hideSource: true,
     matHolo: true,
     onClosed: () => {
       anchor.style.visibility = '';
-      showCardCounters(targetImage);
+      if (targetImage.damageCounter) targetImage.damageCounter.style.display = '';
+      if (targetImage.specialCondition) targetImage.specialCondition.style.display = '';
+      if (targetImage.poisonMarker) targetImage.poisonMarker.style.display = '';
+      if (targetImage.burnMarker) targetImage.burnMarker.style.display = '';
+      if (targetImage.statusLoop) targetImage.statusLoop.style.display = '';
+      if (targetImage.abilityCounter) targetImage.abilityCounter.style.display = '';
       attachedImages.forEach((image) => {
         image.style.visibility = '';
       });

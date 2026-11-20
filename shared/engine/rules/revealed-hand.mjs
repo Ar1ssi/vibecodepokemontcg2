@@ -8,10 +8,6 @@
  * a card that comes back (drawn, returned, shuffled in and redrawn) is unknown again.
  */
 
-// A look only its own player had is not a reveal the opponent saw.
-const opponentSaw = (event, ownerId) =>
-  !event.peek && (event.revealedTo == null || event.revealedTo !== ownerId);
-
 // Events that put named cards into a hand: each such card entered the hand this command,
 // even when it was already there before (a hand shuffled into the deck and redrawn).
 const HAND_ENTRY_EVENTS = new Set(['cardsDrawn', 'openingHandDealt', 'mulliganTaken', 'bonusDrawAwarded']);
@@ -27,25 +23,6 @@ const handCardsOf = (state) =>
   Object.values(state?.players || {}).flatMap((player) => player?.zones?.hand || []);
 
 /**
- * @param {object[]} events one command's events
- * @returns {{ revealed: Set<*>, entered: Set<*> }}
- */
-function readEvents(events) {
-  const revealed = new Set();
-  const entered = new Set();
-  for (const event of Array.isArray(events) ? events : []) {
-    if (event?.type === 'cardsRevealed' && opponentSaw(event, event.playerId)) {
-      for (const id of idsOf(event.cards)) revealed.add(id);
-    } else if (HAND_ENTRY_EVENTS.has(event?.type)) {
-      for (const id of idsOf(event.cards)) entered.add(id);
-    } else if (event?.type === 'cardMoved' && event.to === 'hand' && event.instanceId != null) {
-      entered.add(event.instanceId);
-    }
-  }
-  return { revealed, entered };
-}
-
-/**
  * Settles `card.revealed` on every hand after a command: a card revealed this command and now in
  * a hand is marked; a hand card that entered the hand this command without a reveal, and a card
  * that left the hand carrying the hand's mark, lose it (an effect that turns the card face up where
@@ -59,7 +36,22 @@ function readEvents(events) {
  */
 export function settleRevealedHandCards(before, draft, events, findCard) {
   const handBefore = handIdsOf(before);
-  const { revealed, entered } = readEvents(events);
+  const revealed = new Set();
+  const entered = new Set();
+  for (const event of Array.isArray(events) ? events : []) {
+    if (
+      event?.type === 'cardsRevealed' &&
+      // A look only its own player had is not a reveal the opponent saw.
+      !event.peek &&
+      (event.revealedTo == null || event.revealedTo !== event.playerId)
+    ) {
+      for (const id of idsOf(event.cards)) revealed.add(id);
+    } else if (HAND_ENTRY_EVENTS.has(event?.type)) {
+      for (const id of idsOf(event.cards)) entered.add(id);
+    } else if (event?.type === 'cardMoved' && event.to === 'hand' && event.instanceId != null) {
+      entered.add(event.instanceId);
+    }
+  }
   for (const player of Object.values(draft?.players || {})) {
     for (const card of player?.zones?.hand || []) {
       const id = card.instanceId;

@@ -587,22 +587,6 @@ const TCGDEX_BASE = tcgdexApiBase();
     ];
     const MEE_SET = { id: 'mee', name: 'Mega Evolution Energy', releaseDate: '' };
 
-    function getModernBasicEnergyCards() {
-      return MODERN_BASIC_ENERGY_TYPES.map(({ localId, type }) => {
-        const image = `https://pkmncards.com/wp-content/uploads/mee_en_${localId}_std.jpg`;
-        return {
-          id: `mee-${localId}`,
-          name: `${type} Energy`,
-          localId,
-          image,
-          images: { small: image, large: image },
-          set: MEE_SET,
-          supertype: 'Energy',
-          _provider: 'pkmncards-set-browser',
-        };
-      });
-    }
-
     // The gold secret rare "Basic {Type} Energy" cards are each a one-off print in a
     // set that has since rotated out of Standard (sv01/sv02/sv03/151); the Standard-
     // legal sv06.5 (Shrouded Fable) already has its own Darkness/Metal gold prints,
@@ -639,7 +623,19 @@ const TCGDEX_BASE = tcgdexApiBase();
         })
       );
 
-      return [...getModernBasicEnergyCards(), ...cardGroups.flat()];
+      return [...MODERN_BASIC_ENERGY_TYPES.map(({ localId, type }) => {
+        const image = `https://pkmncards.com/wp-content/uploads/mee_en_${localId}_std.jpg`;
+        return {
+          id: `mee-${localId}`,
+          name: `${type} Energy`,
+          localId,
+          image,
+          images: { small: image, large: image },
+          set: MEE_SET,
+          supertype: 'Energy',
+          _provider: 'pkmncards-set-browser',
+        };
+      }), ...cardGroups.flat()];
     }
 
     // Every Energy card (basic, special, and rarer variants) printed across a

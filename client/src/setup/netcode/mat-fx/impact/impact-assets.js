@@ -23,16 +23,6 @@ const fetchOk = async (url, init) => {
 const fetchJson = async (name) => (await fetchOk(`${BASE_URL}${name}`)).json();
 const fetchBitmap = async (url, init) => createImageBitmap(await (await fetchOk(url, init)).blob(), BITMAP_OPTIONS);
 
-const loadShared = () => {
-  sharedPromise ??= Promise.all([fetchJson('shaders.json'), fetchJson('meshes.json'), fetchJson('textures.json')])
-    .then(([shaders, meshes, textures]) => ({ shaders, meshes, textures }))
-    .catch((error) => {
-      sharedPromise = null;
-      throw error;
-    });
-  return sharedPromise;
-};
-
 const loadTexture = async (name, entry) => {
   if (!images.has(name)) images.set(name, await fetchBitmap(`${BASE_URL}textures/${encodeURIComponent(entry.file)}`));
 };
@@ -45,7 +35,13 @@ const loadTexture = async (name, entry) => {
  */
 export function loadImpactAssets(type) {
   if (!typePromises.has(type)) {
-    const promise = Promise.all([loadShared(), fetchJson(`${encodeURIComponent(type)}.json`)])
+    sharedPromise ??= Promise.all([fetchJson('shaders.json'), fetchJson('meshes.json'), fetchJson('textures.json')])
+      .then(([shaders, meshes, textures]) => ({ shaders, meshes, textures }))
+      .catch((error) => {
+        sharedPromise = null;
+        throw error;
+      });
+    const promise = Promise.all([sharedPromise, fetchJson(`${encodeURIComponent(type)}.json`)])
       .then(async ([shared, file]) => {
         await Promise.all(file.textures.map((name) => loadTexture(name, shared.textures[name])));
         const assets = { file, ...shared, images };

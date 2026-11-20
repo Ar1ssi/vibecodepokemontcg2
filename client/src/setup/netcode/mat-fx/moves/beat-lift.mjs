@@ -41,7 +41,6 @@ export const LIFT = Object.freeze({
 });
 
 const pair = (p) => [p.x, p.y];
-const isSky = (target) => target === 'sky' || target === 'sky-attacker';
 
 /** Travelling a → b: at `z` all the way, rising `arc` more mid-segment. */
 export function travelLift(a, b, { arc = LIFT.travelArc, z = LIFT.travelZ } = {}) {
@@ -71,7 +70,7 @@ export function burstLift(c, { stand = LIFT.burstStand, z = LIFT.burstZ } = {}) 
  * above its card on screen; stood on that card's line it hangs that high in the air instead.
  */
 export function anchorLift(lane, target, point, opts = {}) {
-  if (isSky(target)) {
+  if (target === 'sky' || target === 'sky-attacker') {
     const base = target === 'sky' ? { x: lane.bx, y: lane.by } : { x: lane.ax, y: lane.ay };
     return standOn(base);
   }

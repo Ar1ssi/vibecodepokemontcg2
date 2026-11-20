@@ -85,7 +85,7 @@ test('resolveDetachedCardDestination: KO/manual discard takes attached Energy al
   // Energy used to strand in the 'attachedCards' staging zone instead of
   // following it to discard — never auto-discarded, and its arrival there
   // falsely tripped the rules engine's "energy already attached this turn"
-  // check (rules-bridge.js hookEnergyAttach watches that zone for new
+  // check (rules-bridge.js checkEnergyAdds watches that zone for new
   // attaches).
   assert.equal(resolveDetachedCardDestination('discard'), 'discard');
 });

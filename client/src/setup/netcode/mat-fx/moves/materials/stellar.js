@@ -56,9 +56,6 @@ const STELLAR_PALETTE = Object.freeze({
   ...Object.fromEntries(STELLAR_ACCENTS.map((h, k) => [ACCENT_KEYS[k], hex(h)])),
 });
 
-/** The accent key a tongue of `seed` fringes in. */
-export const accentKeyFor = (seed) => ACCENT_KEYS[((Math.floor(Math.abs(seed)) % 5) + 5) % 5];
-
 /** The stellar material drawn in `palette` (any palette with the same keys). */
 function stellarKit(palette) {
   const crystalTongue = ice.withPalette(palette).tongue;
@@ -97,7 +94,7 @@ function stellarKit(palette) {
     crystalTongue(ctx, spec, opts);
     // A 1 px fringe vanished at board scale (slice 15 review): it scales with the tongue.
     ctx.fxStyle = STARLIGHT;
-    ctx.strokeStyle = rgbCss(palette[accentKeyFor(spec.seed ?? 0)], alpha);
+    ctx.strokeStyle = rgbCss(palette[ACCENT_KEYS[((Math.floor(Math.abs(spec.seed ?? 0)) % 5) + 5) % 5]], alpha);
     ctx.lineWidth = Math.max(1.5, spec.width * 0.16);
     traceOutline(ctx, icicleOutline({ ...spec, width: spec.width * 1.12 }));
     layered(ctx, Z_FRINGE, FRINGE_TUBE, () => ctx.stroke());

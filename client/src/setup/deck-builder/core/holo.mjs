@@ -130,8 +130,12 @@ const cardIdCandidates = (card) =>
 // Needs the manifest: without it a card can't be known to have a reverse printing and stays plain.
 const REVERSE_IN_PLACE_SET = /^(?:bw\d+|xy\d+|dc1|g1|sm\d+(?:\.5)?|sm115|swsh\d+(?:\.5)?|sv\d+(?:\.5[bw]?)?)-/i;
 
-const showsReverseInPlace = (card, manifest) =>
-  !!manifest &&
+/**
+ * A card shown as a reverse-holo printing: its rarity says so (set browser copies, rarity "Reverse Holo"), or it
+ * is a plain BW/XY card TCG Live also prints as a reverse holo.
+ */
+export const isReverseHoloCard = (card, manifest = foilManifestNow()) =>
+  !!card && (resolveRarityEffect(card) === 'reverse holo' || !!manifest &&
   resolveRarityEffect(card) === null &&
   !isEnergyCard(card) &&
   cardIdCandidates(card).some(
@@ -139,14 +143,7 @@ const showsReverseInPlace = (card, manifest) =>
       REVERSE_IN_PLACE_SET.test(id) &&
       foilCoverage(manifest, id) === 'flat' &&
       foilCoverage(manifest, id, { reverse: true }) === 'foil'
-  );
-
-/**
- * A card shown as a reverse-holo printing: its rarity says so (set browser copies, rarity "Reverse Holo"), or it
- * is a plain BW/XY card TCG Live also prints as a reverse holo.
- */
-export const isReverseHoloCard = (card, manifest = foilManifestNow()) =>
-  !!card && (resolveRarityEffect(card) === 'reverse holo' || showsReverseInPlace(card, manifest));
+  ));
 
 /**
  * The TCGdex id the foil manifest knows this card by (else the first id it has, else null). `reverse` looks in
@@ -210,18 +207,15 @@ function resolveRarityEffect(card) {
 // transparent black and hides the whole layer, so only hosts verified to send
 // CORS headers (CARD_ART_CORS_HOSTS, card-art-hosts.mjs) get the mask.
 
-// Characters that could break out of a CSS `url("...")` token.
-const isUnsafeInCssUrl = (src) =>
-  [...src].some((ch) => {
+export function foilMaskUrl(src, pageOrigin = globalThis.location?.origin) {
+  if (typeof src !== 'string' || !src) return null;
+  // Characters that could break out of a CSS `url("...")` token.
+  if ([...src].some((ch) => {
     const code = ch.charCodeAt(0);
     return (
       ch === '"' || ch === '\\' || /\s/.test(ch) || code < 0x20 || code === 0x7f
     );
-  });
-
-export function foilMaskUrl(src, pageOrigin = globalThis.location?.origin) {
-  if (typeof src !== 'string' || !src) return null;
-  if (isUnsafeInCssUrl(src)) return null;
+  })) return null;
   let url;
   try {
     url = new URL(src, pageOrigin || undefined);
@@ -323,13 +317,6 @@ const LAYOUT_BY_SERIES = {
   fut: 'swsh',
 };
 
-const eraFromCode = (code) => {
-  const series = /^[a-z]+/.exec(String(code || '').toLowerCase())?.[0];
-  return series && Object.hasOwn(ERA_BY_SERIES, series)
-    ? ERA_BY_SERIES[series]
-    : null;
-};
-
 // Splits a known card image URL into its series, set and card number.
 // Returns null for other hosts or unparseable input.
 const cardImageParts = (src) => {
@@ -347,7 +334,16 @@ const cardImageParts = (src) => {
     return { series: parts[1], set: parts[2], number: parts[3] };
   if (url.hostname === 'images.pokemontcg.io')
     return { series: parts[0], set: parts[0], number: parts[1] };
-  if (LIMITLESS_HOSTS.has(url.hostname)) return limitlessImageParts(src);
+  if (LIMITLESS_HOSTS.has(url.hostname)) {
+    // Limitless names files by printed set code (SVI_001_R_EN.png); map it to the
+    // TCGdex id ("sv01-001") and split at the last dash, since set ids can hold one.
+    const id = extractTcgdexIdFromImageUrl(src);
+    if (!id) return null;
+    const dash = id.lastIndexOf('-');
+    if (dash <= 0) return null;
+    const set = id.slice(0, dash);
+    return { series: set, set, number: id.slice(dash + 1) };
+  }
   return null;
 };
 
@@ -356,19 +352,12 @@ const LIMITLESS_HOSTS = new Set([
   'limitlesstcg.nyc3.cdn.digitaloceanspaces.com',
 ]);
 
-// Limitless names files by printed set code (SVI_001_R_EN.png); map it to the
-// TCGdex id ("sv01-001") and split at the last dash, since set ids can hold one.
-const limitlessImageParts = (src) => {
-  const id = extractTcgdexIdFromImageUrl(src);
-  if (!id) return null;
-  const dash = id.lastIndexOf('-');
-  if (dash <= 0) return null;
-  const set = id.slice(0, dash);
-  return { series: set, set, number: id.slice(dash + 1) };
-};
-
 export function cardEraFromImageUrl(src) {
-  return eraFromCode(cardImageParts(src)?.series);
+  const code = cardImageParts(src)?.series;
+  const series = /^[a-z]+/.exec(String(code || '').toLowerCase())?.[0];
+  return series && Object.hasOwn(ERA_BY_SERIES, series)
+    ? ERA_BY_SERIES[series]
+    : null;
 }
 
 export function cardLayoutFromImageUrl(src) {
@@ -666,56 +655,6 @@ export function startHoloAnimation(
     springRotate.set(target);
   };
 
-  const interact = (event) => {
-    if (interactEndTimer) {
-      clearTimeout(interactEndTimer);
-      interactEndTimer = null;
-    }
-    if (!tilt) return;
-    const rect = card.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return;
-    hovering = true;
-    // offsetHeight is the untransformed layout size; the rect is projected by the tilt itself.
-    card.style.setProperty(
-      '--holo-perspective',
-      `${holoPerspectivePx(card.offsetHeight || rect.height)}px`
-    );
-    const percentX = clamp(
-      round((100 / rect.width) * (event.clientX - rect.left))
-    );
-    const percentY = clamp(
-      round((100 / rect.height) * (event.clientY - rect.top))
-    );
-    const centerX = percentX - 50;
-    const centerY = percentY - 50;
-    setRotateTarget(
-      { x: round(-(centerX / 3.5)), y: round(centerY / 2) },
-      SPRING_INTERACT_SETTINGS
-    );
-  };
-
-  const interactEnd = (delay = 500) => {
-    if (interactEndTimer) clearTimeout(interactEndTimer);
-    interactEndTimer = setTimeout(() => {
-      setRotateTarget({ x: 0, y: 0 }, SNAP_SETTINGS);
-      interactEndTimer = null;
-    }, delay);
-  };
-
-  const applyVars = (light, rotateX, rotateY, tiltAmount) => {
-    const set = (name, value) => card.style.setProperty(name, value);
-    set('--pointer-x', `${light.pointerX.toFixed(2)}%`);
-    set('--pointer-y', `${light.pointerY.toFixed(2)}%`);
-    set('--pointer-from-center', light.fromCenter.toFixed(3));
-    set('--pointer-from-left', light.fromLeft.toFixed(3));
-    set('--pointer-from-top', light.fromTop.toFixed(3));
-    set('--background-x', `${light.backgroundX.toFixed(2)}%`);
-    set('--background-y', `${light.backgroundY.toFixed(2)}%`);
-    set('--rotate-x', `${round(rotateX).toFixed(2)}deg`);
-    set('--rotate-y', `${round(rotateY).toFixed(2)}deg`);
-    set('--tilt-amount', tiltAmount.toFixed(3));
-  };
-
   const tick = (now) => {
     if (!running) return;
     let lightTilt = null;
@@ -745,19 +684,58 @@ export function startHoloAnimation(
     // The TCG Live foil view (design 069) shades its mesh at this same angle.
     const foilTilt = lightTilt ?? rotateTilt;
     card.__foilTilt = foilTilt;
-    applyVars(
-      computeLightVars(foilTilt),
-      springRotate.current.x,
-      springRotate.current.y,
-      tiltAmountOf(rotateTilt.tiltX, rotateTilt.tiltY)
-    );
+    const light = computeLightVars(foilTilt);
+    const rotateX = springRotate.current.x;
+    const rotateY = springRotate.current.y;
+    const tiltAmount = tiltAmountOf(rotateTilt.tiltX, rotateTilt.tiltY);
+    const set = (name, value) => card.style.setProperty(name, value);
+    set('--pointer-x', `${light.pointerX.toFixed(2)}%`);
+    set('--pointer-y', `${light.pointerY.toFixed(2)}%`);
+    set('--pointer-from-center', light.fromCenter.toFixed(3));
+    set('--pointer-from-left', light.fromLeft.toFixed(3));
+    set('--pointer-from-top', light.fromTop.toFixed(3));
+    set('--background-x', `${light.backgroundX.toFixed(2)}%`);
+    set('--background-y', `${light.backgroundY.toFixed(2)}%`);
+    set('--rotate-x', `${round(rotateX).toFixed(2)}deg`);
+    set('--rotate-y', `${round(rotateY).toFixed(2)}deg`);
+    set('--tilt-amount', tiltAmount.toFixed(3));
     rafId = requestAnimationFrame(tick);
   };
 
-  const onPointerMove = (event) => interact(event);
+  const onPointerMove = (event) => {
+    if (interactEndTimer) {
+      clearTimeout(interactEndTimer);
+      interactEndTimer = null;
+    }
+    if (!tilt) return;
+    const rect = card.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    hovering = true;
+    // offsetHeight is the untransformed layout size; the rect is projected by the tilt itself.
+    card.style.setProperty(
+      '--holo-perspective',
+      `${holoPerspectivePx(card.offsetHeight || rect.height)}px`
+    );
+    const percentX = clamp(
+      round((100 / rect.width) * (event.clientX - rect.left))
+    );
+    const percentY = clamp(
+      round((100 / rect.height) * (event.clientY - rect.top))
+    );
+    const centerX = percentX - 50;
+    const centerY = percentY - 50;
+    setRotateTarget(
+      { x: round(-(centerX / 3.5)), y: round(centerY / 2) },
+      SPRING_INTERACT_SETTINGS
+    );
+  };
   const onPointerLeave = () => {
     hovering = false;
-    interactEnd(500);
+    if (interactEndTimer) clearTimeout(interactEndTimer);
+    interactEndTimer = setTimeout(() => {
+      setRotateTarget({ x: 0, y: 0 }, SNAP_SETTINGS);
+      interactEndTimer = null;
+    }, 500);
   };
 
   const hitTarget = card;

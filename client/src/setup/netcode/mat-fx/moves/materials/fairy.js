@@ -58,11 +58,6 @@ const MOON_MOD = Object.freeze({
   volume: Object.freeze({ amount: 0.85, spec: 0.25, rim: 0.45, light: 120, bump: 0.3, bumpScale: 3, ambient: 0.4 }),
 });
 const BEAD_MOD = Object.freeze({ volume: Object.freeze({ amount: 0.6, spec: 0.4, rim: 0.6, light: 120, bump: 0, ambient: 0.45 }) });
-/** A trail's ribbon wavering along it, lit as a tube round its axis. */
-const trailMod = (angleDeg) => ({
-  distort: { strength: 0.05, speed: 1, scale: 3, angle: angleDeg },
-  volume: { amount: 0.6, spec: 0.3, rim: 0.6, light: 120, bump: 0.2, radius: 0.09, ambient: 0.45 },
-});
 // Heights (lane units) over the drawer's lift: soft light on the cloth, trails and shards just off
 // it, a twinkle above them, the star's sparkles and the moon highest.
 const LIFT = Object.freeze({ trail: 0.05, twinkle: 0.08, star: 0.1, moon: 0.12 });
@@ -149,58 +144,35 @@ function fairyKit(palette) {
    */
   function body(ctx, x, y, r, alpha, hot = 1, time = 0) {
     if (!(r > 0) || !(alpha > 0)) return;
-    withLiftZ(ctx, LIFT.twinkle, () => twinkle(ctx, x, y, r, alpha, hot, time));
-  }
-
-  /** The twinkle's bead and sparkle at the current lift. */
-  function twinkle(ctx, x, y, r, alpha, hot, time) {
-    ctx.fxStyle = SHIMMER_SOFT;
-    withFxMod(ctx, BEAD_MOD, () =>
-      sphere(
-        ctx,
-        x,
-        y,
-        r * 0.7,
-        [
-          [0, palette.core, alpha * 0.45],
-          [0.5, palette.hot, alpha * 0.35],
-          [1, palette.body, 0],
-        ],
-        0
-      )
-    );
-    const size = r * twinklePulse(time, x * 0.013 + y * 0.017 + r * 0.05);
-    const g = ctx.createRadialGradient(x, y, 0, x, y, size);
-    g.addColorStop(0, rgbCss(palette.white, alpha * clamp01(hot)));
-    g.addColorStop(0.15, rgbCss(palette.core, alpha * 0.85));
-    g.addColorStop(1, rgbCss(palette.hot, alpha * 0.55));
-    ctx.fillStyle = g;
-    ctx.fxStyle = SHIMMER;
-    ctx.beginPath();
-    addSparkle(ctx, x, y, size);
-    ctx.fill();
-    ctx.fxStyle = null;
-  }
-
-  /** A sparkle shard: a four-point star stretched along the tongue's heading, pink then core. */
-  function sparkleShard(ctx, spec, alpha, hot) {
-    const half = spec.length / 2;
-    const a = rad(spec.angleDeg);
-    const cx = spec.x + Math.cos(a) * half;
-    const cy = spec.y + Math.sin(a) * half;
-    const waist = clamp01((spec.width * 0.5) / half) * 0.6;
-    ctx.fxStyle = SHIMMER;
-    ctx.fillStyle = rgbCss(palette.hot, 0.85 * alpha);
-    ctx.beginPath();
-    addPolygon(ctx, stretchedTwinkle(cx, cy, half, spec.width * 0.5, spec.angleDeg, waist));
-    ctx.fill();
-    if (hot > 0) {
-      ctx.fillStyle = rgbCss(palette.core, 0.95 * alpha * Math.min(1, hot));
+    withLiftZ(ctx, LIFT.twinkle, () => {
+      // The twinkle's bead and sparkle at the current lift.
+      ctx.fxStyle = SHIMMER_SOFT;
+      withFxMod(ctx, BEAD_MOD, () =>
+        sphere(
+          ctx,
+          x,
+          y,
+          r * 0.7,
+          [
+            [0, palette.core, alpha * 0.45],
+            [0.5, palette.hot, alpha * 0.35],
+            [1, palette.body, 0],
+          ],
+          0
+        )
+      );
+      const size = r * twinklePulse(time, x * 0.013 + y * 0.017 + r * 0.05);
+      const g = ctx.createRadialGradient(x, y, 0, x, y, size);
+      g.addColorStop(0, rgbCss(palette.white, alpha * clamp01(hot)));
+      g.addColorStop(0.15, rgbCss(palette.core, alpha * 0.85));
+      g.addColorStop(1, rgbCss(palette.hot, alpha * 0.55));
+      ctx.fillStyle = g;
+      ctx.fxStyle = SHIMMER;
       ctx.beginPath();
-      addPolygon(ctx, stretchedTwinkle(cx, cy, half * 0.55, spec.width * 0.3, spec.angleDeg, waist));
+      addSparkle(ctx, x, y, size);
       ctx.fill();
-    }
-    ctx.fxStyle = null;
+      ctx.fxStyle = null;
+    });
   }
 
   /** A four-point star with a long axis `long` along `angleDeg` and a short axis `short`. */
@@ -227,7 +199,24 @@ function fairyKit(palette) {
   /** The trail (or with `jag`, a sparkle shard) at the current lift. */
   function trail(ctx, spec, { alpha = 1, hot = 1, jag = 0 } = {}) {
     if (jag) {
-      sparkleShard(ctx, spec, alpha, hot);
+      // A sparkle shard: a four-point star stretched along the tongue's heading, pink then core.
+      const half = spec.length / 2;
+      const a = rad(spec.angleDeg);
+      const cx = spec.x + Math.cos(a) * half;
+      const cy = spec.y + Math.sin(a) * half;
+      const waist = clamp01((spec.width * 0.5) / half) * 0.6;
+      ctx.fxStyle = SHIMMER;
+      ctx.fillStyle = rgbCss(palette.hot, 0.85 * alpha);
+      ctx.beginPath();
+      addPolygon(ctx, stretchedTwinkle(cx, cy, half, spec.width * 0.5, spec.angleDeg, waist));
+      ctx.fill();
+      if (hot > 0) {
+        ctx.fillStyle = rgbCss(palette.core, 0.95 * alpha * Math.min(1, hot));
+        ctx.beginPath();
+        addPolygon(ctx, stretchedTwinkle(cx, cy, half * 0.55, spec.width * 0.3, spec.angleDeg, waist));
+        ctx.fill();
+      }
+      ctx.fxStyle = null;
       return;
     }
     const calm = { ...spec, amp: RIBBON_AMP };
@@ -236,7 +225,11 @@ function fairyKit(palette) {
     ctx.fxStyle = SHIMMER_SOFT;
     ctx.fillStyle = rootFaded(ctx, spec, palette.body, 0.5 * alpha);
     traceOutline(ctx, tongueOutline(calm, 1));
-    withFxMod(ctx, trailMod(spec.angleDeg), () => ctx.fill());
+    // A trail's ribbon wavering along it, lit as a tube round its axis.
+    withFxMod(ctx, {
+      distort: { strength: 0.05, speed: 1, scale: 3, angle: spec.angleDeg },
+      volume: { amount: 0.6, spec: 0.3, rim: 0.6, light: 120, bump: 0.2, radius: 0.09, ambient: 0.45 },
+    }, () => ctx.fill());
     ctx.filter = 'none';
     const inner = tongueOutline(calm, 0.55);
     ctx.fillStyle = rootFaded(ctx, spec, palette.hot, 0.7 * alpha);
@@ -282,42 +275,40 @@ function fairyKit(palette) {
         { alpha: alpha * 0.6, hot }
       );
     }
-    withLiftZ(ctx, LIFT.moon, () => moon(ctx, x, y, r, alpha, hot, time, seed));
-  }
-
-  /** The moon's lit disc, crescent and sparkle at the current lift. */
-  function moon(ctx, x, y, r, alpha, hot, time, seed) {
-    ctx.fxStyle = SHIMMER_SOFT;
-    withFxMod(ctx, MOON_MOD, () =>
-      sphere(ctx, x, y, r, [
-        [0, palette.core, alpha * 0.3 * clamp01(hot)],
-        [0.6, palette.hot, alpha * 0.3],
-        [0.92, palette.body, alpha * 0.35],
-        [1, palette.body, 0],
-      ])
-    );
-    // The crescent: the disc minus the same disc pushed down-right, so the lit rim is up-left.
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(x, y, r * 0.94, 0, TAU);
-    ctx.clip();
-    ctx.fillStyle = rgbCss(palette.core, 0.75 * alpha);
-    ctx.beginPath();
-    ctx.arc(x, y, r * 0.94, 0, TAU);
-    const ix = x + r * CRESCENT_SHIFT;
-    const iy = y + r * CRESCENT_SHIFT;
-    ctx.moveTo(ix + r * 0.94, iy);
-    ctx.arc(ix, iy, r * 0.94, 0, TAU, true);
-    ctx.fill();
-    ctx.restore();
-    const tx = x - r * 0.5;
-    const ty = y - r * 0.5;
-    ctx.fxStyle = SHIMMER;
-    ctx.fillStyle = rgbCss(palette.white, 0.9 * alpha * clamp01(hot + 0.3));
-    ctx.beginPath();
-    addSparkle(ctx, tx, ty, r * 0.4 * twinklePulse(time, seed));
-    ctx.fill();
-    ctx.fxStyle = null;
+    withLiftZ(ctx, LIFT.moon, () => {
+      // The moon's lit disc, crescent and sparkle at the current lift.
+      ctx.fxStyle = SHIMMER_SOFT;
+      withFxMod(ctx, MOON_MOD, () =>
+        sphere(ctx, x, y, r, [
+          [0, palette.core, alpha * 0.3 * clamp01(hot)],
+          [0.6, palette.hot, alpha * 0.3],
+          [0.92, palette.body, alpha * 0.35],
+          [1, palette.body, 0],
+        ])
+      );
+      // The crescent: the disc minus the same disc pushed down-right, so the lit rim is up-left.
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(x, y, r * 0.94, 0, TAU);
+      ctx.clip();
+      ctx.fillStyle = rgbCss(palette.core, 0.75 * alpha);
+      ctx.beginPath();
+      ctx.arc(x, y, r * 0.94, 0, TAU);
+      const ix = x + r * CRESCENT_SHIFT;
+      const iy = y + r * CRESCENT_SHIFT;
+      ctx.moveTo(ix + r * 0.94, iy);
+      ctx.arc(ix, iy, r * 0.94, 0, TAU, true);
+      ctx.fill();
+      ctx.restore();
+      const tx = x - r * 0.5;
+      const ty = y - r * 0.5;
+      ctx.fxStyle = SHIMMER;
+      ctx.fillStyle = rgbCss(palette.white, 0.9 * alpha * clamp01(hot + 0.3));
+      ctx.beginPath();
+      addSparkle(ctx, tx, ty, r * 0.4 * twinklePulse(time, seed));
+      ctx.fill();
+      ctx.fxStyle = null;
+    });
   }
 
   /** The fairy star over (x, y) as the glyph beat runs: a gold outline with twinkling tips. */

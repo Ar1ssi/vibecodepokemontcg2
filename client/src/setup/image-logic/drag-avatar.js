@@ -42,19 +42,6 @@ const viewportPoint = (event) => {
   return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
 };
 
-const buildAvatar = (source, rect, grab) => {
-  const avatar = document.createElement('img');
-  avatar.className = AVATAR_CLASS;
-  avatar.src = source.currentSrc || source.src;
-  avatar.alt = '';
-  avatar.draggable = false;
-  avatar.setAttribute('aria-hidden', 'true');
-  avatar.style.width = `${rect.width}px`;
-  avatar.style.height = `${rect.height}px`;
-  avatar.style.transformOrigin = `${grab.x}px ${grab.y}px`;
-  return avatar;
-};
-
 const listen = (views, handlers) => {
   const attached = [];
   for (const view of views) {
@@ -124,7 +111,15 @@ export const startDragAvatar = (event) => {
 
   const grab = grabOffset(rect, pointer);
   const params = motionReduced() ? DRAG_TILT_STILL : DRAG_TILT;
-  const avatar = buildAvatar(source, rect, grab);
+  const avatar = document.createElement('img');
+  avatar.className = AVATAR_CLASS;
+  avatar.src = source.currentSrc || source.src;
+  avatar.alt = '';
+  avatar.draggable = false;
+  avatar.setAttribute('aria-hidden', 'true');
+  avatar.style.width = `${rect.width}px`;
+  avatar.style.height = `${rect.height}px`;
+  avatar.style.transformOrigin = `${grab.x}px ${grab.y}px`;
   const tilt = createDragTilt(pointer);
   avatar.style.transform = dragAvatarTransform(pointer, grab, tilt, params);
   document.body.appendChild(avatar);

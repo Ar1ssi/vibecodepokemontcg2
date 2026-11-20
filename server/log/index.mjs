@@ -14,36 +14,6 @@ import { createLogExport } from './export-routes.mjs';
 
 const notFound = (req, res) => res.status(404).end();
 
-function createInert(now) {
-  const log = createLogger({ now, sink: () => {}, level: 'error' });
-  return {
-    enabled: false,
-    sweep() {},
-    store: null,
-    log,
-    forRoom: () => log,
-    createJournal: () => NO_JOURNAL,
-    journalFor: () => null,
-    build: null,
-    bootId: null,
-    diskSink: null,
-    httpMiddleware: (req, res, next) => next(),
-    beaconHandler: (req, res) => res.status(204).end(),
-    levelFor: () => 'debug',
-    attachIo() {},
-    attachSocket() {},
-    exportDownloadHandler: notFound,
-    devRoomsHandler: notFound,
-    devExportHandler: notFound,
-    shutdown() {},
-  };
-}
-
-function totalBytesFrom(env) {
-  const mb = Number(env.LOG_MAX_MB);
-  return Number.isFinite(mb) && mb > 0 ? mb * 1048576 : LIMITS.totalBytesDefault;
-}
-
 export function createServerLogging({
   env = process.env,
   repoRoot,
@@ -51,19 +21,41 @@ export function createServerLogging({
   processRef = process,
   consoleRef = console,
 } = {}) {
-  if (env.LOG_OFF === '1') return createInert(now);
+  if (env.LOG_OFF === '1') {
+    const log = createLogger({ now, sink: () => {}, level: 'error' });
+    return {
+      enabled: false,
+      sweep() {},
+      store: null,
+      log,
+      forRoom: () => log,
+      createJournal: () => NO_JOURNAL,
+      journalFor: () => null,
+      build: null,
+      bootId: null,
+      diskSink: null,
+      httpMiddleware: (req, res, next) => next(),
+      beaconHandler: (req, res) => res.status(204).end(),
+      levelFor: () => 'debug',
+      attachIo() {},
+      attachSocket() {},
+      exportDownloadHandler: notFound,
+      devRoomsHandler: notFound,
+      devExportHandler: notFound,
+      shutdown() {},
+    };
+  }
 
   const bootId = `${Date.now().toString(36)}-${process.pid}`;
   // The method itself is captured before the console is wrapped, so a disk warning is printed
   // without being re-logged as a console entry (which would be written to that same disk sink).
   const originalWarn = consoleRef.warn;
-  const warnToConsole = (line) => originalWarn.call(consoleRef, line);
   const logDir = resolveLogDir(env, repoRoot);
   const diskSink = logDir
     ? createDiskSink({
         dir: logDir,
         bootId,
-        onWarn: ({ streamId, reason }) => warnToConsole(`[log] disk sink disabled for ${streamId}: ${reason}`),
+        onWarn: ({ streamId, reason }) => originalWarn.call(consoleRef, `[log] disk sink disabled for ${streamId}: ${reason}`),
       })
     : null;
   const journals = new Map();
@@ -75,7 +67,8 @@ export function createServerLogging({
     }
     return sum;
   };
-  const store = createLogStore({ now, totalBytes: totalBytesFrom(env), sink: diskSink, externalBytes: journalBytes });
+  const mb = Number(env.LOG_MAX_MB);
+  const store = createLogStore({ now, totalBytes: Number.isFinite(mb) && mb > 0 ? mb * 1048576 : LIMITS.totalBytesDefault, sink: diskSink, externalBytes: journalBytes });
   const { log, forRoom } = createServerLog({ store, now });
   const uninstallProcessTap = installProcessTap({ log, diskSink, consoleRef, processRef });
   const sweep = () => {

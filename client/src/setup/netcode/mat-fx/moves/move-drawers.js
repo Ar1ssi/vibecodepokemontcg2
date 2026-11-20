@@ -619,12 +619,6 @@ const drawShards = (ctx, lane, s, info, cluster) => {
   });
 };
 
-const strokePolyline = (ctx, points) => {
-  ctx.beginPath();
-  points.forEach(([x, y], index) => (index === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
-  ctx.stroke();
-};
-
 const bolt = (ctx, lane, s, info) => {
   const poses = boltPoses(s, lane, info.seed, info.elapsedMs, info.params);
   const pose = poses[0];
@@ -659,7 +653,11 @@ const bolt = (ctx, lane, s, info) => {
   for (const [rgb, alpha, scale] of passes) {
     ctx.strokeStyle = rgbCss(rgb, alpha * pose.alpha);
     ctx.lineWidth = Math.max(1, pose.width * scale);
-    for (const line of lines) strokePolyline(ctx, line);
+    for (const line of lines) {
+      ctx.beginPath();
+      line.forEach(([x, y], index) => (index === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
+      ctx.stroke();
+    }
   }
 };
 
@@ -691,62 +689,6 @@ const drawRings = (ctx, lane, s, info) => {
   });
 };
 
-/** A 4 x 3 grid of 1 px strokes over a 2r x 1.5r plate, turning 20°/s (`seconds` into the beat). */
-const glyphLattice = (ctx, x, y, r, seconds, palette, alpha) => {
-  ctx.translate(x, y);
-  ctx.rotate((20 * seconds * Math.PI) / 180);
-  ctx.strokeStyle = rgbCss(palette.hot, alpha);
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  const w = r;
-  const hh = r * 0.75;
-  for (let i = 0; i <= 4; i += 1) {
-    const gx = -w + (2 * w * i) / 4;
-    ctx.moveTo(gx, -hh);
-    ctx.lineTo(gx, hh);
-  }
-  for (let j = 0; j <= 3; j += 1) {
-    const gy = -hh + (2 * hh * j) / 3;
-    ctx.moveTo(-w, gy);
-    ctx.lineTo(w, gy);
-  }
-  ctx.stroke();
-};
-
-const glyphHex = (ctx, x, y, r, spin, palette, alpha) => {
-  ctx.translate(x, y);
-  ctx.rotate((spin * Math.PI) / 180);
-  ctx.beginPath();
-  for (let k = 0; k < 6; k += 1) {
-    const a = (k * TAU) / 6;
-    if (k === 0) ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
-    else ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
-  }
-  ctx.closePath();
-  ctx.fillStyle = rgbCss(palette.body, alpha * 0.8);
-  ctx.fill();
-  ctx.strokeStyle = rgbCss(palette.core, alpha);
-  ctx.lineWidth = 1;
-  ctx.stroke();
-};
-
-const glyphHeart = (ctx, x, y, r, s, beatMs, palette, alpha, h) => {
-  const pulse = 1 + 0.06 * Math.sin(TAU * 2 * s * (beatMs / 1000));
-  const k = r * pulse;
-  ctx.translate(x, y);
-  ctx.beginPath();
-  // A heart of height 2r: two lobes over a point.
-  ctx.moveTo(0, k * 1);
-  ctx.bezierCurveTo(-k * 1.3, k * 0.1, -k * 0.9, -k * 1, 0, -k * 0.45);
-  ctx.bezierCurveTo(k * 0.9, -k * 1, k * 1.3, k * 0.1, 0, k * 1);
-  ctx.closePath();
-  ctx.fillStyle = rgbCss(palette.body, alpha * 0.5);
-  ctx.fill();
-  ctx.strokeStyle = rgbCss(palette.deep, alpha);
-  ctx.lineWidth = Math.max(1, h * 0.03);
-  ctx.stroke();
-};
-
 const glyph = (ctx, lane, s, info) => {
   const kind = info.params.kind ?? 'material';
   if (kind === 'material' && typeof info.material.sigil !== 'function') return;
@@ -754,9 +696,78 @@ const glyph = (ctx, lane, s, info) => {
   if (!(pose.alpha > 0)) return;
   const c = anchorOf(lane, info.params);
   const { palette } = info.material;
-  if (kind === 'lattice') return glyphLattice(ctx, c.x, c.y, pose.r, s * (info.beatMs / 1000), palette, pose.alpha);
-  if (kind === 'hex') return glyphHex(ctx, c.x, c.y, pose.r, pose.spin, palette, pose.alpha);
-  if (kind === 'heart') return glyphHeart(ctx, c.x, c.y, pose.r, s, info.beatMs, palette, pose.alpha, lane.h);
+  if (kind === 'lattice') {
+    // A 4 x 3 grid of 1 px strokes over a 2r x 1.5r plate, turning 20°/s (`seconds` into the beat).
+    const x = c.x;
+    const y = c.y;
+    const r = pose.r;
+    const seconds = s * (info.beatMs / 1000);
+    const alpha = pose.alpha;
+    ctx.translate(x, y);
+    ctx.rotate((20 * seconds * Math.PI) / 180);
+    ctx.strokeStyle = rgbCss(palette.hot, alpha);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    const w = r;
+    const hh = r * 0.75;
+    for (let i = 0; i <= 4; i += 1) {
+      const gx = -w + (2 * w * i) / 4;
+      ctx.moveTo(gx, -hh);
+      ctx.lineTo(gx, hh);
+    }
+    for (let j = 0; j <= 3; j += 1) {
+      const gy = -hh + (2 * hh * j) / 3;
+      ctx.moveTo(-w, gy);
+      ctx.lineTo(w, gy);
+    }
+    ctx.stroke();
+    return;
+  }
+  if (kind === 'hex') {
+    const x = c.x;
+    const y = c.y;
+    const r = pose.r;
+    const spin = pose.spin;
+    const alpha = pose.alpha;
+    ctx.translate(x, y);
+    ctx.rotate((spin * Math.PI) / 180);
+    ctx.beginPath();
+    for (let k = 0; k < 6; k += 1) {
+      const a = (k * TAU) / 6;
+      if (k === 0) ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+      else ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    }
+    ctx.closePath();
+    ctx.fillStyle = rgbCss(palette.body, alpha * 0.8);
+    ctx.fill();
+    ctx.strokeStyle = rgbCss(palette.core, alpha);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    return;
+  }
+  if (kind === 'heart') {
+    const x = c.x;
+    const y = c.y;
+    const r = pose.r;
+    const beatMs = info.beatMs;
+    const alpha = pose.alpha;
+    const h = lane.h;
+    const pulse = 1 + 0.06 * Math.sin(TAU * 2 * s * (beatMs / 1000));
+    const k = r * pulse;
+    ctx.translate(x, y);
+    ctx.beginPath();
+    // A heart of height 2r: two lobes over a point.
+    ctx.moveTo(0, k * 1);
+    ctx.bezierCurveTo(-k * 1.3, k * 0.1, -k * 0.9, -k * 1, 0, -k * 0.45);
+    ctx.bezierCurveTo(k * 0.9, -k * 1, k * 1.3, k * 0.1, 0, k * 1);
+    ctx.closePath();
+    ctx.fillStyle = rgbCss(palette.body, alpha * 0.5);
+    ctx.fill();
+    ctx.strokeStyle = rgbCss(palette.deep, alpha);
+    ctx.lineWidth = Math.max(1, h * 0.03);
+    ctx.stroke();
+    return;
+  }
   ctx.globalAlpha = pose.alpha;
   info.material.sigil(ctx, c.x, c.y, pose.r, s);
 };
@@ -848,7 +859,6 @@ const chain = (ctx, lane, s, info) => {
   if (!(pose.alpha > 0)) return;
   const { palette } = info.material;
   const R = info.params.r * lane.h;
-  const toScreen = (x, y) => ({ x: lane.bx + lane.ux * x + lane.nx * y, y: lane.by + lane.uy * x + lane.ny * y });
   const lane0 = (lane.angleDeg * Math.PI) / 180;
   for (const [rgb, width, alpha] of [
     [palette.body, lane.h * 0.025, 1],
@@ -857,7 +867,7 @@ const chain = (ctx, lane, s, info) => {
     ctx.strokeStyle = rgbCss(rgb, alpha * pose.alpha);
     ctx.lineWidth = width;
     for (const link of pose.links) {
-      const at = toScreen(link.x, link.y);
+      const at = { x: lane.bx + lane.ux * link.x + lane.nx * link.y, y: lane.by + lane.uy * link.x + lane.ny * link.y };
       ctx.beginPath();
       ctx.ellipse(at.x, at.y, R * 1.2, R, lane0 + (link.rotDeg * Math.PI) / 180, 0, TAU);
       ctx.stroke();

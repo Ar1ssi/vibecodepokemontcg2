@@ -19,7 +19,6 @@ const span = (v, a, b) => clamp01((v - a) / (b - a));
 const easeOutCubic = (t) => 1 - (1 - t) ** 3;
 const easeInOutCubic = (t) => (t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2);
 const msOf = (t) => clamp01(t) * KO_SCENE_MS;
-const rad = (deg) => (deg * Math.PI) / 180;
 const rectCenter = (r) => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
 
 /**
@@ -54,7 +53,7 @@ export function koFanPose(t, index, { dir = -1, turn = 0, W = 0, H = 0 } = {}) {
   const fan = easeOutCubic(span(ms, FAN_FROM_MS, KO_FLIGHT_AT_MS - 40));
   const lx = index * 0.27 * W * fan * hero.scale;
   const ly = -index * 0.05 * H * fan * hero.scale;
-  const a = rad(turn + hero.rotate);
+  const a = ((turn + hero.rotate) * Math.PI) / 180;
   return {
     x: hero.x + lx * Math.cos(a) - ly * Math.sin(a),
     y: hero.y + lx * Math.sin(a) + ly * Math.cos(a),

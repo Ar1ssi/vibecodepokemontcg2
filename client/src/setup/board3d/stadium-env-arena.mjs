@@ -192,73 +192,72 @@ export const ARENA_LIGHTS = Object.freeze({
 /** The ring's corner posts and ropes, the rig's truss and lamps, and the ad boards' rails. */
 export function arenaProps(spots) {
   const props = createPropBuilder();
-  props.look({ kind: LOOK.chrome }, () => arenaSolids(props, spots));
-  return props;
-}
-
-/** The ring's posts, pads, ropes and apron; the stands' rails. */
-function arenaSolids(props, { ring, boards }) {
-  const corners = [
-    [-1, -1],
-    [1, -1],
-    [1, 1],
-    [-1, 1],
-  ].map(([sx, sy]) => [ring.x + sx * ring.hw, ring.y + sy * ring.hh]);
-  // The posts splay out a little as they rise, so the three ropes a side, one over another, show
-  // apart from above as the art's three white lines.
-  const splayAt = ([x, y], z) => {
-    const out = (ROPES.splay * Math.max(z, 0)) / POST_PX.height;
-    return [x + Math.sign(x - ring.x) * out, y + Math.sign(y - ring.y) * out];
-  };
-  for (const corner of corners) {
-    const [tx, ty] = splayAt(corner, POST_PX.height);
-    props.tube([[corner[0], corner[1], -APRON_PX.drop], [tx, ty, POST_PX.height]], POST_PX.radius, POST_STEEL, { sides: 14 });
-    // The turnbuckle pads on the ropes' side of the post.
-    for (const z of ROPES.heights) {
-      const [px, py] = splayAt(corner, z);
-      props.cylinder({ x: px, y: py, z0: z - 7, z1: z + 7, r: POST_PX.radius + 3.5, color: PAD_BLUE, sides: 14 });
-    }
-  }
-  for (let k = 0; k < 4; k += 1) {
-    for (const [level, z] of ROPES.heights.entries()) {
-      const [ax, ay] = splayAt(corners[k], z);
-      const [bx, by] = splayAt(corners[(k + 1) % 4], z);
-      const points = [];
-      for (let i = 0; i <= 16; i += 1) {
-        const t = i / 16;
-        points.push([ax + (bx - ax) * t, ay + (by - ay) * t, z - ROPES.sag * 4 * t * (1 - t)]);
+  props.look({ kind: LOOK.chrome }, () => {
+    // The ring's posts, pads, ropes and apron; the stands' rails.
+    const { ring, boards } = spots;
+    const corners = [
+      [-1, -1],
+      [1, -1],
+      [1, 1],
+      [-1, 1],
+    ].map(([sx, sy]) => [ring.x + sx * ring.hw, ring.y + sy * ring.hh]);
+    // The posts splay out a little as they rise, so the three ropes a side, one over another, show
+    // apart from above as the art's three white lines.
+    const splayAt = ([x, y], z) => {
+      const out = (ROPES.splay * Math.max(z, 0)) / POST_PX.height;
+      return [x + Math.sign(x - ring.x) * out, y + Math.sign(y - ring.y) * out];
+    };
+    for (const corner of corners) {
+      const [tx, ty] = splayAt(corner, POST_PX.height);
+      props.tube([[corner[0], corner[1], -APRON_PX.drop], [tx, ty, POST_PX.height]], POST_PX.radius, POST_STEEL, { sides: 14 });
+      // The turnbuckle pads on the ropes' side of the post.
+      for (const z of ROPES.heights) {
+        const [px, py] = splayAt(corner, z);
+        props.cylinder({ x: px, y: py, z0: z - 7, z1: z + 7, r: POST_PX.radius + 3.5, color: PAD_BLUE, sides: 14 });
       }
-      props.tube(points, ROPES.radius, ROPE_COLOURS[level], { sides: 6 });
     }
-  }
-  // The lighting rig: a truss of two chords and a zigzag web round over the ropes, a lamp's case
-  // hung under it at each lamp.
-  const outline = rigOutline(ring);
-  const top = RIG_PX.z;
-  const bottom = RIG_PX.z - RIG_PX.depth;
-  for (const z of [top, bottom]) props.tube([...outline, outline[0]].map(([x, y]) => [x, y, z]), 2.6, TRUSS, { sides: 6 });
-  outline.forEach(([ax, ay], i) => {
-    const [bx, by] = outline[(i + 1) % outline.length];
-    const steps = Math.max(1, Math.round(Math.hypot(bx - ax, by - ay) / 28));
-    for (let k = 0; k < steps; k += 1) {
-      const [za, zb] = k % 2 ? [top, bottom] : [bottom, top];
-      const a = [ax + ((bx - ax) * k) / steps, ay + ((by - ay) * k) / steps, za];
-      const b = [ax + ((bx - ax) * (k + 1)) / steps, ay + ((by - ay) * (k + 1)) / steps, zb];
-      props.tube([a, b], 1.2, TRUSS, { sides: 4 });
+    for (let k = 0; k < 4; k += 1) {
+      for (const [level, z] of ROPES.heights.entries()) {
+        const [ax, ay] = splayAt(corners[k], z);
+        const [bx, by] = splayAt(corners[(k + 1) % 4], z);
+        const points = [];
+        for (let i = 0; i <= 16; i += 1) {
+          const t = i / 16;
+          points.push([ax + (bx - ax) * t, ay + (by - ay) * t, z - ROPES.sag * 4 * t * (1 - t)]);
+        }
+        props.tube(points, ROPES.radius, ROPE_COLOURS[level], { sides: 6 });
+      }
+    }
+    // The lighting rig: a truss of two chords and a zigzag web round over the ropes, a lamp's case
+    // hung under it at each lamp.
+    const outline = rigOutline(ring);
+    const top = RIG_PX.z;
+    const bottom = RIG_PX.z - RIG_PX.depth;
+    for (const z of [top, bottom]) props.tube([...outline, outline[0]].map(([x, y]) => [x, y, z]), 2.6, TRUSS, { sides: 6 });
+    outline.forEach(([ax, ay], i) => {
+      const [bx, by] = outline[(i + 1) % outline.length];
+      const steps = Math.max(1, Math.round(Math.hypot(bx - ax, by - ay) / 28));
+      for (let k = 0; k < steps; k += 1) {
+        const [za, zb] = k % 2 ? [top, bottom] : [bottom, top];
+        const a = [ax + ((bx - ax) * k) / steps, ay + ((by - ay) * k) / steps, za];
+        const b = [ax + ((bx - ax) * (k + 1)) / steps, ay + ((by - ay) * (k + 1)) / steps, zb];
+        props.tube([a, b], 1.2, TRUSS, { sides: 4 });
+      }
+    });
+    for (const [x, y] of rigLamps(ring)) props.cylinder({ x, y, z0: bottom - 16, z1: bottom, r: 8, color: LAMP_CASE, sides: 12 });
+    // The ad boards' frame: a dark rail along their foot and another capping their leaning tops.
+    for (const { ax, ay, bx, by, out } of adRuns({ ring, boards })) {
+      const lean = [out[0] * BOARD_PX.lean, out[1] * BOARD_PX.lean];
+      props.tube([[ax, ay, BOARD_Z.foot], [bx, by, BOARD_Z.foot]], 3, BOARD_FRAME, { sides: 6 });
+      props.tube([[ax + lean[0], ay + lean[1], BOARD_Z.top], [bx + lean[0], by + lean[1], BOARD_Z.top]], 3, BOARD_FRAME, { sides: 6 });
+    }
+    // Each laser light: a dark lamp housing on a short bracket, high in its corner.
+    for (const [x, y, z] of laserLights({ ring, boards })) {
+      props.cylinder({ x, y, z0: z - 34, z1: z - 10, r: 3, color: TRUSS, sides: 6 });
+      props.cylinder({ x, y, z0: z - 10, z1: z + 6, r: 12, color: LAMP_CASE, sides: 14 });
     }
   });
-  for (const [x, y] of rigLamps(ring)) props.cylinder({ x, y, z0: bottom - 16, z1: bottom, r: 8, color: LAMP_CASE, sides: 12 });
-  // The ad boards' frame: a dark rail along their foot and another capping their leaning tops.
-  for (const { ax, ay, bx, by, out } of adRuns({ ring, boards })) {
-    const lean = [out[0] * BOARD_PX.lean, out[1] * BOARD_PX.lean];
-    props.tube([[ax, ay, BOARD_Z.foot], [bx, by, BOARD_Z.foot]], 3, BOARD_FRAME, { sides: 6 });
-    props.tube([[ax + lean[0], ay + lean[1], BOARD_Z.top], [bx + lean[0], by + lean[1], BOARD_Z.top]], 3, BOARD_FRAME, { sides: 6 });
-  }
-  // Each laser light: a dark lamp housing on a short bracket, high in its corner.
-  for (const [x, y, z] of laserLights({ ring, boards })) {
-    props.cylinder({ x, y, z0: z - 34, z1: z - 10, r: 3, color: TRUSS, sides: 6 });
-    props.cylinder({ x, y, z0: z - 10, z1: z + 6, r: 12, color: LAMP_CASE, sides: 14 });
-  }
+  return props;
 }
 
 /**

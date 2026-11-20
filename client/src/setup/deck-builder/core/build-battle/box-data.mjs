@@ -78,17 +78,6 @@ export function hydrateBoxData(raw = {}) {
   };
 }
 
-function toLoadedBox(box, setModule, boxModule) {
-  const setInfo = setModule?.SET;
-  const rows = setModule?.default;
-  if (!setInfo || setInfo.id !== box.setId || !Array.isArray(rows)) {
-    throw new Error(`set module ${box.setId} is malformed`);
-  }
-  const data = hydrateBoxData(boxModule?.default);
-  if (data.kind !== box.kind) throw new Error(`box module ${box.key} holds ${data.kind}, not ${box.kind}`);
-  return { box, setInfo, cards: hydrateSetCards(setInfo, rows), data };
-}
-
 /**
  * @param {string} boxKey
  * @param {{importer?: (path: string) => Promise<object>}} [options] tests stub the imports
@@ -104,13 +93,20 @@ export function loadBoxData(boxKey, { importer = defaultImporter } = {}) {
   const loading = Promise.all([
     importer(`./sets/${box.setId}.generated.mjs`),
     importer(`./boxes/${box.key}.generated.mjs`),
-  ]).then(([setModule, boxModule]) => toLoadedBox(box, setModule, boxModule));
+  ]).then(([setModule, boxModule]) => {
+    const setInfo = setModule?.SET;
+    const rows = setModule?.default;
+    if (!setInfo || setInfo.id !== box.setId || !Array.isArray(rows)) {
+      throw new Error(`set module ${box.setId} is malformed`);
+    }
+    const data = hydrateBoxData(boxModule?.default);
+    if (data.kind !== box.kind) throw new Error(`box module ${box.key} holds ${data.kind}, not ${box.kind}`);
+    return { box, setInfo, cards: hydrateSetCards(setInfo, rows), data };
+  });
   cache.set(box.key, loading);
   loading.catch(() => cache.delete(box.key));
   return loading;
 }
-
-const knownSetIds = () => new Set(BUILD_BATTLE_BOXES.map((box) => box.setId));
 
 /**
  * One baked set on its own, for products that are not a Build & Battle box (the Elite Trainer
@@ -121,7 +117,7 @@ const knownSetIds = () => new Set(BUILD_BATTLE_BOXES.map((box) => box.setId));
  *   `Error('unknown set')`, a failed import rejects with its error and is not kept.
  */
 export function loadSetData(setId, { importer = defaultImporter } = {}) {
-  if (typeof setId !== 'string' || !knownSetIds().has(setId)) {
+  if (typeof setId !== 'string' || !new Set(BUILD_BATTLE_BOXES.map((box) => box.setId)).has(setId)) {
     return Promise.reject(new Error('unknown set'));
   }
   const cache = cacheFor(importer);

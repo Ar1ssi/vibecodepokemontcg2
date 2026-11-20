@@ -562,7 +562,12 @@ export function createCardMeshPool({
       -yawDeg * DEG,
       'XZY'
     );
-    if (card.tilt) applyTilt(target, card.tilt, tiltDeg);
+    if (card.tilt) {
+      const { roll, pitch } = card.tilt;
+      tableNormal.set(0, Math.sin(tiltDeg * DEG), Math.cos(tiltDeg * DEG));
+      target.quaternion.premultiply(swing.setFromAxisAngle(tableX, -pitch * DEG));
+      target.quaternion.premultiply(swing.setFromAxisAngle(tableNormal, -roll * DEG));
+    }
     // the old DOM mat ambient holo tilt, `rotateY(x) rotateX(y)` about the card itself (its y is up).
     if (hoverTilt && card.hoverTilt) {
       target.rotateY(card.hoverTilt.x * DEG);
@@ -571,22 +576,17 @@ export function createCardMeshPool({
     target.position.set(x, y, z);
     target.scale.setScalar(scale);
     if (offset && (offset.scaleAlong !== 1 || offset.scaleAcross !== 1)) {
-      const [sx, sy] = squashScales(offset, yawDeg);
+      // A lane squash (scaleAlong / scaleAcross about the lane) as the card's own x / y scales. Exact
+      // when the lane runs along a card axis (Active to Active); a diagonal lane (a Bench snipe) blends
+      // the two by the angle, as a mesh cannot shear.
+      const { scaleAlong = 1, scaleAcross = 1, laneAngleDeg = 0 } = offset;
+      // The lane in table terms is −laneAngleDeg (stage y points down); the card's x axis is −yawDeg.
+      const phi = (yawDeg - laneAngleDeg) * DEG;
+      const c2 = Math.cos(phi) ** 2;
+      const s2 = 1 - c2;
+      const [sx, sy] = [scaleAlong * c2 + scaleAcross * s2, scaleAlong * s2 + scaleAcross * c2];
       target.scale.set(scale * sx, scale * sy, scale);
     }
-  };
-
-  /**
-   * A lane squash (scaleAlong / scaleAcross about the lane) as the card's own x / y scales. Exact
-   * when the lane runs along a card axis (Active to Active); a diagonal lane (a Bench snipe) blends
-   * the two by the angle, as a mesh cannot shear.
-   */
-  const squashScales = ({ scaleAlong = 1, scaleAcross = 1, laneAngleDeg = 0 }, yawDeg) => {
-    // The lane in table terms is −laneAngleDeg (stage y points down); the card's x axis is −yawDeg.
-    const phi = (yawDeg - laneAngleDeg) * DEG;
-    const c2 = Math.cos(phi) ** 2;
-    const s2 = 1 - c2;
-    return [scaleAlong * c2 + scaleAcross * s2, scaleAlong * s2 + scaleAcross * c2];
   };
 
   const placeMesh = (card, now) => {
@@ -682,11 +682,6 @@ export function createCardMeshPool({
   const tableX = new three.Vector3(1, 0, 0);
   const tableNormal = new three.Vector3();
   const swing = new three.Quaternion();
-  const applyTilt = (mesh, { roll, pitch }, tiltDeg) => {
-    tableNormal.set(0, Math.sin(tiltDeg * DEG), Math.cos(tiltDeg * DEG));
-    mesh.quaternion.premultiply(swing.setFromAxisAngle(tableX, -pitch * DEG));
-    mesh.quaternion.premultiply(swing.setFromAxisAngle(tableNormal, -roll * DEG));
-  };
 
   // ── flights (tween): a card flown by a mat-fx pose instead of its own pose.
   /** Shown while flying or just after landing, else by the card's own hidden state. */

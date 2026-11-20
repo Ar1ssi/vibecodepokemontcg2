@@ -438,6 +438,23 @@ export function deriveFamily(spec) {
   return base;
 }
 
+export const motes = (at, count, over = {}) =>
+  Object.freeze({
+    at,
+    anchor: 'defender',
+    count,
+    distance: 1.1,
+    direction: -90,
+    spread: 360,
+    size: [0.03, 0.07],
+    aspect: 1,
+    gravity: 0,
+    maxDelay: 0.2,
+    durationMs: 800,
+    kind: 'mote',
+    ...over,
+  });
+
 export const PARTICLE_PARAMS = Object.freeze({
   at: ['num', 0, 4000, 0],
   anchor: ['target', 'defender'],
@@ -514,37 +531,6 @@ const checkMotion = (side, motion, errors) => {
     else if (!isObject(motion.echo)) errors.push('attacker echo: must be an object');
     else errors.push(...checkAgainst(ECHO_PARAMS, motion.echo, 'attacker echo'));
   }
-};
-
-const checkBeat = (beat, index, spec, errors) => {
-  const label = `beat ${index}`;
-  if (!isObject(beat)) {
-    errors.push(`${label}: must be an object`);
-    return;
-  }
-  for (const key of Object.keys(beat)) if (!BEAT_KEYS.includes(key)) errors.push(`${label}: unknown field '${key}'`);
-  if (!isNum(beat.at) || !isNum(beat.until)) {
-    errors.push(`${label}: at and until must be finite numbers`);
-  } else {
-    if (beat.at < 0) errors.push(`${label}: at must be >= 0`);
-    if (beat.until <= beat.at) errors.push(`${label}: until must be after at`);
-    if (isNum(spec.durationMs) && beat.until > spec.durationMs) errors.push(`${label}: until exceeds durationMs`);
-  }
-  if (!LAYERS.includes(beat.layer)) errors.push(`${label}: unknown layer '${beat.layer}'`);
-  errors.push(...checkParams(beat.drawer, beat.params).map((message) => `${label}: ${message}`));
-};
-
-const checkParticle = (burst, index, spec, errors) => {
-  const label = `particle ${index}`;
-  if (!isObject(burst)) {
-    errors.push(`${label}: must be an object`);
-    return;
-  }
-  for (const key of Object.keys(PARTICLE_PARAMS)) {
-    if (burst[key] === undefined) errors.push(`${label}: missing '${key}'`);
-  }
-  errors.push(...checkAgainst(PARTICLE_PARAMS, burst, label));
-  if (isNum(burst.at) && isNum(spec.durationMs) && burst.at > spec.durationMs) errors.push(`${label}: at exceeds durationMs`);
 };
 
 const costErrors = (spec) => {
@@ -628,11 +614,38 @@ export function validateSpec(spec) {
 
   if (spec.beats !== undefined) {
     if (!Array.isArray(spec.beats) || spec.beats.length === 0) errors.push('beats must be a non-empty array');
-    else spec.beats.forEach((beat, index) => checkBeat(beat, index, spec, errors));
+    else spec.beats.forEach((beat, index) => {
+      const label = `beat ${index}`;
+      if (!isObject(beat)) {
+        errors.push(`${label}: must be an object`);
+        return;
+      }
+      for (const key of Object.keys(beat)) if (!BEAT_KEYS.includes(key)) errors.push(`${label}: unknown field '${key}'`);
+      if (!isNum(beat.at) || !isNum(beat.until)) {
+        errors.push(`${label}: at and until must be finite numbers`);
+      } else {
+        if (beat.at < 0) errors.push(`${label}: at must be >= 0`);
+        if (beat.until <= beat.at) errors.push(`${label}: until must be after at`);
+        if (isNum(spec.durationMs) && beat.until > spec.durationMs) errors.push(`${label}: until exceeds durationMs`);
+      }
+      if (!LAYERS.includes(beat.layer)) errors.push(`${label}: unknown layer '${beat.layer}'`);
+      errors.push(...checkParams(beat.drawer, beat.params).map((message) => `${label}: ${message}`));
+    });
   }
   if (spec.particles !== undefined) {
     if (!Array.isArray(spec.particles)) errors.push('particles must be an array');
-    else spec.particles.forEach((burst, index) => checkParticle(burst, index, spec, errors));
+    else spec.particles.forEach((burst, index) => {
+      const label = `particle ${index}`;
+      if (!isObject(burst)) {
+        errors.push(`${label}: must be an object`);
+        return;
+      }
+      for (const key of Object.keys(PARTICLE_PARAMS)) {
+        if (burst[key] === undefined) errors.push(`${label}: missing '${key}'`);
+      }
+      errors.push(...checkAgainst(PARTICLE_PARAMS, burst, label));
+      if (isNum(burst.at) && isNum(spec.durationMs) && burst.at > spec.durationMs) errors.push(`${label}: at exceeds durationMs`);
+    });
   }
 
   if (errors.length === 0) {

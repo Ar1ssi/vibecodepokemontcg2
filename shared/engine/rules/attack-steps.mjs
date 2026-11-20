@@ -1796,7 +1796,32 @@ const BLOCKS = [
   // reveals …" stays unparsed instead of losing its condition.
   [
     /(?<=(?:^|\. )(?:(?:if heads|if tails|for each heads), )?)your opponent reveals their hand(?:, and you discard (a) card you find there|\. (discard|choose|add) (a|\d+|all) (trainer |supporter |energy )?cards? (?:you find there|from it)(?: (and put it on the bottom of their deck|to their prize cards face down|and shuffle them into their deck))?)?\./g,
-    (m) => revealHandStep(m[1] ? 'discard' : m[2], m[1] || m[3], m[4], m[5]),
+    (m) => {
+      // "Your opponent reveals their hand. Discard a Trainer card you find there." →
+      // { type: 'atkRevealOppHand', then: { action: 'discard', count: 1, filter: 'trainer' } }.
+      // A bare reveal has no `then`; "choose … and put" / "add … to" name the destination.
+      const verb = m[1] ? 'discard' : m[2];
+      const countWord = m[1] || m[3];
+      const kindWord = m[4];
+      const destination = m[5];
+      if (!verb) return { type: 'atkRevealOppHand' };
+      let action = 'discard';
+      if (verb === 'choose') {
+        if (/shuffle them into their deck/.test(destination || '')) action = 'deckShuffle';
+        else if (/bottom of their deck/.test(destination || '')) action = 'deckBottom';
+        else return null;
+      } else if (verb === 'add') {
+        if (!/prize cards/.test(destination || '')) return null;
+        action = 'prize';
+      } else if (destination) {
+        return null;
+      }
+      const filter = kindWord ? kindWord.trim() : undefined;
+      return {
+        type: 'atkRevealOppHand',
+        then: { action, count: countWord === 'all' ? 'all' : countOf(countWord), ...(filter ? { filter } : {}) },
+      };
+    },
   ],
 ];
 
@@ -1830,29 +1855,6 @@ function chainedMarkerStep(step, markerSentence) {
   const wrOrder = /<wr:(before|after)>/.exec(markerSentence)?.[1];
   const then = parseMarkerSentence(markerSentence.replace(/\s*<wr:(?:before|after)>/g, '').trim(), { wrOrder });
   return then ? { ...step, then } : null;
-}
-
-// "Your opponent reveals their hand. Discard a Trainer card you find there." →
-// { type: 'atkRevealOppHand', then: { action: 'discard', count: 1, filter: 'trainer' } }.
-// A bare reveal has no `then`; "choose … and put" / "add … to" name the destination.
-function revealHandStep(verb, countWord, kindWord, destination) {
-  if (!verb) return { type: 'atkRevealOppHand' };
-  let action = 'discard';
-  if (verb === 'choose') {
-    if (/shuffle them into their deck/.test(destination || '')) action = 'deckShuffle';
-    else if (/bottom of their deck/.test(destination || '')) action = 'deckBottom';
-    else return null;
-  } else if (verb === 'add') {
-    if (!/prize cards/.test(destination || '')) return null;
-    action = 'prize';
-  } else if (destination) {
-    return null;
-  }
-  const filter = kindWord ? kindWord.trim() : undefined;
-  return {
-    type: 'atkRevealOppHand',
-    then: { action, count: countWord === 'all' ? 'all' : countOf(countWord), ...(filter ? { filter } : {}) },
-  };
 }
 
 // "search your deck for up to 2 Basic {G} Energy cards" → { what, count, upTo }
@@ -1936,19 +1938,17 @@ export function parseAbilityEffectSteps(text, { selfName = '' } = {}) {
   // (ability-combat.mjs abilityActivationBlockReason).
   effect = effect.replace(/^if this pokémon was healed during this turn, (?:you may )?/, '');
   if (/^if /.test(effect)) return { steps: [], holderZone: null };
-  const parsed = parseAttackSteps(abilityRevealVoice(effect));
+  // Abilities print a reveal in the player's voice ("have your opponent reveal their hand, and
+  // then you choose …"); the attack templates read the attack voice ("your opponent reveals
+  // their hand. choose …").
+  const parsed = parseAttackSteps(
+    effect
+      .replace(/^have your opponent reveal their hand/, 'your opponent reveals their hand')
+      .replace(/^(your opponent reveals their hand),? and (?:then )?(?:you )?/, '$1. ')
+      .replace(/^(your opponent reveals their hand\.) then, /, '$1 ')
+      .replace(/(your opponent reveals their hand\. \w+ .*?)\byour opponent's (deck|bench)\b/, '$1their $2')
+  );
   return { steps: [...parsed.before, ...parsed.after], holderZone };
-}
-
-// Abilities print a reveal in the player's voice ("have your opponent reveal their hand, and
-// then you choose …"); the attack templates read the attack voice ("your opponent reveals
-// their hand. choose …").
-function abilityRevealVoice(effect) {
-  return effect
-    .replace(/^have your opponent reveal their hand/, 'your opponent reveals their hand')
-    .replace(/^(your opponent reveals their hand),? and (?:then )?(?:you )?/, '$1. ')
-    .replace(/^(your opponent reveals their hand\.) then, /, '$1 ')
-    .replace(/(your opponent reveals their hand\. \w+ .*?)\byour opponent's (deck|bench)\b/, '$1their $2');
 }
 
 const HOLDER_POSITION =

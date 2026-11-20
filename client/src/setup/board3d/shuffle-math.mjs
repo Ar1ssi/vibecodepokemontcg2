@@ -32,7 +32,6 @@ const clamp01 = (t) => (t < 0 ? 0 : t > 1 ? 1 : t);
 const lerp = (a, b, t) => a + (b - a) * t;
 const span = (t, a, b) => clamp01((t - a) / (b - a));
 const easeInOut = (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
-const easeOutCubic = (t) => 1 - (1 - t) ** 3;
 
 /**
  * How many card layers shuffle for a pile of `count` cards: none under two cards (nothing to
@@ -138,7 +137,7 @@ export function shuffleCardPose(index, count, time) {
 
   // The tap: the squared pile drops, rebounds a hair and comes to rest.
   const u = span(t, squareEnd, 1);
-  const decay = 1 - easeOutCubic(u);
+  const decay = 1 - (1 - (1 - u) ** 3);
   return {
     x: 0,
     y: 0,

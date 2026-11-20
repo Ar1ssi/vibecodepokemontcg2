@@ -183,27 +183,19 @@ export function isSecretCard(card, setInfo) {
   return Number.isFinite(official) && official > 0 && Number(card.localId) > official;
 }
 
-function matchesClass(card, matcher, setInfo) {
-  if (card?.rarity !== matcher.rarity) return false;
-  if ((matcher.subset || null) !== (card.subset || null)) return false;
-  return matcher.secret === undefined || matcher.secret === isSecretCard(card, setInfo);
-}
-
 /** @returns {string|null} the hit class (`CARD_CLASSES`) the card belongs to in its era, or null. */
 export function cardClass(card, era, setInfo) {
   const classes = RARITY_CLASSES[era];
   if (!card || !classes) return null;
   for (const name of CARD_CLASSES) {
-    if ((classes[name] || []).some((matcher) => matchesClass(card, matcher, setInfo))) return name;
+    if ((classes[name] || []).some((matcher) => {
+      if (card?.rarity !== matcher.rarity) return false;
+      if ((matcher.subset || null) !== (card.subset || null)) return false;
+      return matcher.secret === undefined || matcher.secret === isSecretCard(card, setInfo);
+    })) return name;
   }
   return null;
 }
-
-// Basic Energy is never pack stock: the pack's Energy card is not simulated (design 054 § Pack
-// models) and Build & Battle supplies Basic Energy without limit (D188).
-const isPackCard = (card) => Boolean(card?.id) && !isBasicEnergy(card);
-
-const isFillerCard = (card, setInfo) => isMainSetCard(card) && !isSecretCard(card, setInfo);
 
 /** @returns {Map<string, string[]>} every pool name of the era → the set's card ids in it. */
 function poolIdsFor(era, cards, setInfo) {
@@ -216,11 +208,13 @@ function poolIdsFor(era, cards, setInfo) {
   ]);
   for (const name of CARD_CLASSES) pools.set(name, []);
   for (const card of cards) {
-    if (!isPackCard(card)) continue;
+    // Basic Energy is never pack stock: the pack's Energy card is not simulated (design 054 § Pack
+    // models) and Build & Battle supplies Basic Energy without limit (D188).
+    if (!(Boolean(card?.id) && !isBasicEnergy(card))) continue;
     pools.get('all').push(card.id);
     const className = cardClass(card, era, setInfo);
     if (className) pools.get(className).push(card.id);
-    if (!isFillerCard(card, setInfo)) continue;
+    if (!(isMainSetCard(card) && !isSecretCard(card, setInfo))) continue;
     if (card.rarity === 'Common' || card.rarity === 'Uncommon') {
       pools.get(card.rarity).push(card.id);
       pools.get(REVERSE_POOL).push(card.id);
@@ -230,29 +224,6 @@ function poolIdsFor(era, cards, setInfo) {
     }
   }
   return pools;
-}
-
-// A class the set does not print gives its weight to the slot's filler row, so the other rows'
-// rates stay as the profile says (design 054 row 9).
-function resolveSlot(slot, pools) {
-  if (!Array.isArray(slot.table)) {
-    const rows = (slot.pools || []).map((pool) => ({ pool, weight: 1, ids: pools.get(pool) || [] }));
-    return { count: slot.count || 0, kind: 'pools', rows };
-  }
-  const rows = slot.table.map(([pool, weight]) => ({
-    pool,
-    weight: Number(weight) || 0,
-    ids: pools.get(pool) || [],
-  }));
-  const filler = rows.find((row) => FILLER_POOLS.has(row.pool));
-  if (filler) {
-    for (const row of rows) {
-      if (row === filler || row.ids.length || row.weight <= 0) continue;
-      filler.weight += row.weight;
-      row.weight = 0;
-    }
-  }
-  return { count: slot.count || 0, kind: 'table', rows };
 }
 
 /**
@@ -271,7 +242,28 @@ export function resolvePackModel(modelOrKey, cards = [], setInfo = {}) {
     key: packModel.key || null,
     era: packModel.era,
     size: packModel.size || 10,
-    slots: packModel.slots.map((slot) => resolveSlot(slot, pools)),
+    slots: packModel.slots.map((slot) => {
+      // A class the set does not print gives its weight to the slot's filler row, so the other rows'
+      // rates stay as the profile says (design 054 row 9).
+      if (!Array.isArray(slot.table)) {
+        const rows = (slot.pools || []).map((pool) => ({ pool, weight: 1, ids: pools.get(pool) || [] }));
+        return { count: slot.count || 0, kind: 'pools', rows };
+      }
+      const rows = slot.table.map(([pool, weight]) => ({
+        pool,
+        weight: Number(weight) || 0,
+        ids: pools.get(pool) || [],
+      }));
+      const filler = rows.find((row) => FILLER_POOLS.has(row.pool));
+      if (filler) {
+        for (const row of rows) {
+          if (row === filler || row.ids.length || row.weight <= 0) continue;
+          filler.weight += row.weight;
+          row.weight = 0;
+        }
+      }
+      return { count: slot.count || 0, kind: 'table', rows };
+    }),
     fallbackIds: pools.get(RARE_POOL),
     allIds: pools.get('all'),
   };

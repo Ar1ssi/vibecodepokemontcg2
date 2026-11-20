@@ -33,12 +33,9 @@ function readLetter(key, code) {
   return match ? match[1].toLowerCase() : null;
 }
 
-const currentDamage = (card) =>
-  typeof card.damage === 'number' && card.damage > 0 ? card.damage : 0;
-
 function planDamage(card, digit, subtract) {
   const instanceId = card.instanceId;
-  const damage = currentDamage(card);
+  const damage = typeof card.damage === 'number' && card.damage > 0 ? card.damage : 0;
   if (digit === 0) {
     return damage > 0 ? [command('updateDamageCounter', { instanceId, amount: 0 })] : null;
   }
@@ -48,28 +45,6 @@ function planDamage(card, digit, subtract) {
   }
   const amount = Math.max(0, subtract ? damage - step : damage + step);
   return [command('updateDamageCounter', { instanceId, amount })];
-}
-
-/**
- * The next condition in legacy's single-condition cycle. A card that already carries
- * several (the server stacks Poison and Burn with a rotation condition) cycles on from the
- * last one in Checkup order, and the cycle replaces them all — the `y` key sets one condition.
- */
-function planConditionCycle(card, clear) {
-  const instanceId = card.instanceId;
-  const held = listConditions(card);
-  if (clear) {
-    return held.length > 0 ? [command('removeSpecialCondition', { instanceId })] : null;
-  }
-  if (held.length === 0) {
-    return [command('addSpecialCondition', { instanceId, condition: CONDITION_CYCLE[0] })];
-  }
-  const last = held[held.length - 1];
-  const next = CONDITION_CYCLE[(CONDITION_CYCLE.indexOf(last) + 1) % CONDITION_CYCLE.length];
-  return [
-    command('removeSpecialCondition', { instanceId }),
-    command('addSpecialCondition', { instanceId, condition: next }),
-  ];
 }
 
 function planRotation(card, single) {
@@ -112,7 +87,25 @@ export function planCardKeyCommands({ key, code, alt = false, zoneId, isOwnCard 
   }
 
   const letter = readLetter(key, code);
-  if (letter === 'y' && zoneId === 'active') return planConditionCycle(card, alt);
+  if (letter === 'y' && zoneId === 'active') {
+    // The next condition in legacy's single-condition cycle. A card that already carries
+    // several (the server stacks Poison and Burn with a rotation condition) cycles on from the
+    // last one in Checkup order, and the cycle replaces them all — the `y` key sets one condition.
+    const instanceId = card.instanceId;
+    const held = listConditions(card);
+    if (alt) {
+      return held.length > 0 ? [command('removeSpecialCondition', { instanceId })] : null;
+    }
+    if (held.length === 0) {
+      return [command('addSpecialCondition', { instanceId, condition: CONDITION_CYCLE[0] })];
+    }
+    const last = held[held.length - 1];
+    const next = CONDITION_CYCLE[(CONDITION_CYCLE.indexOf(last) + 1) % CONDITION_CYCLE.length];
+    return [
+      command('removeSpecialCondition', { instanceId }),
+      command('addSpecialCondition', { instanceId, condition: next }),
+    ];
+  }
   if (letter === 'r' && !alt && ROTATABLE.includes(zoneId)) return planRotation(card, false);
   if (letter === 'r' && alt && IN_PLAY.includes(zoneId)) return planRotation(card, true);
   if (alt && TYPE_KEYS[letter]) {

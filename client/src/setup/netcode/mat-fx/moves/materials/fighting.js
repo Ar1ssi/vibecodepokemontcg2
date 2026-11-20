@@ -21,7 +21,7 @@
 // over the drawer's lift, so the white centre sits on the body and the cast pass pools light.
 import { rgbCss } from '../../fx-colors.mjs';
 import { mergeFxMods, withFxMod, withLiftZ } from './_mods.js';
-import { grainPass, sphere, styledKit } from './_shared.js';
+import { grainPass, sphere, styledKit, tracePolygon } from './_shared.js';
 
 // Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
 // Force: impact discs boil, motion blades streak. Aura: steady blue current.
@@ -68,7 +68,6 @@ const KI_ORB = Object.freeze({ volume: Object.freeze({ amount: 0.85, spec: 1, ri
 const RING_TUBE = Object.freeze({ volume: Object.freeze({ amount: 0.7, spec: 0.8, rim: 0.3, ambient: 0.35, light: 120, bump: 0 }) });
 /** `draw` at `z` lane units over the current lift with `mod` merged over the current fxMod. */
 const layered = (ctx, z, mod, draw) => withLiftZ(ctx, z, () => withFxMod(ctx, mod, draw));
-const streakGrain = (angleDeg) => ({ detail: { amount: 0.35, speed: 3, scale: 5, angle: angleDeg } });
 
 /** `draw` with a dissolve edge in `palette`'s hot tone named for every fill it makes. */
 const edgedIn = (palette) => {
@@ -80,8 +79,6 @@ const edgedIn = (palette) => {
 const freezeAll = (palette) => Object.freeze(Object.fromEntries(Object.entries(palette).map(([k, v]) => [k, Object.freeze(v)])));
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
-const rad = (deg) => (deg * Math.PI) / 180;
-const easeOutCubic = (t) => 1 - (1 - t) ** 3;
 const fract = (v) => v - Math.floor(v);
 
 const fightingPalette = freezeAll({
@@ -107,7 +104,7 @@ const auraPalette = freezeAll({
  * @returns {number[][]} the four corners: base, left shoulder, tip, right shoulder
  */
 export function streakOutline({ x, y, angleDeg, length, width }, scale = 1) {
-  const a = rad(angleDeg);
+  const a = (angleDeg * Math.PI) / 180;
   const ux = Math.cos(a);
   const uy = Math.sin(a);
   const len = length * (0.8 + 0.2 * scale);
@@ -121,12 +118,6 @@ export function streakOutline({ x, y, angleDeg, length, width }, scale = 1) {
     [sx + uy * half, sy - ux * half],
   ];
 }
-
-const tracePolygon = (ctx, points) => {
-  ctx.beginPath();
-  points.forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
-  ctx.closePath();
-};
 
 /**
  * The barrage the fighting sigil lays over a defender as the glyph beat runs (`s` 0-1):
@@ -148,7 +139,7 @@ export function barrageStamps(s, r, count = BARRAGE_STAMPS) {
     stamps.push({
       dx: Math.cos(angle) * reach,
       dy: Math.sin(angle) * reach,
-      r: r * size * (0.7 + 0.3 * easeOutCubic(local)),
+      r: r * size * (0.7 + 0.3 * (1 - (1 - local) ** 3)),
       alpha: (1 - local) ** 1.3,
       hot: 1 - 0.6 * order,
     });
@@ -179,7 +170,7 @@ function makeTongue(palette) {
     ctx.filter = `blur(${Math.max(1, spec.width * STREAK_BLUR).toFixed(1)}px)`;
     ctx.fillStyle = rgbCss(palette.body, 0.55 * alpha);
     tracePolygon(ctx, streakOutline(spec, 1));
-    layered(ctx, Z_STREAK, streakGrain(spec.angleDeg), () => ctx.fill());
+    layered(ctx, Z_STREAK, { detail: { amount: 0.35, speed: 3, scale: 5, angle: spec.angleDeg } }, () => ctx.fill());
     ctx.filter = 'none';
     ctx.fillStyle = rgbCss(palette.hot, 0.85 * alpha);
     tracePolygon(ctx, streakOutline(spec, STREAK_MID));

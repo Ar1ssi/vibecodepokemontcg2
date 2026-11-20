@@ -26,38 +26,34 @@ let disabled = false;
 let loopRunning = false;
 let drawingView = null;
 
-function createRuntime() {
-  return (async () => {
-    const [THREE, foil] = await Promise.all([import('three'), import('./tcgl-foil-material.js')]);
-    await foil.loadFoilData();
-    const canvas = document.createElement('canvas');
-    // three r163+ is WebGL2-only and throws here without it.
-    const renderer = new THREE.WebGLRenderer({
-      canvas,
-      alpha: true,
-      antialias: true,
-      premultipliedAlpha: false,
-      preserveDrawingBuffer: true,
-    });
-    renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
-    renderer.setPixelRatio(1);
-    renderer.setClearColor(0x000000, 0);
-    renderer.setScissorTest(true);
-    renderer.debug.onShaderError = () => {
-      if (drawingView) drawingView.shaderFailed = true;
-    };
-    canvas.addEventListener('webglcontextlost', () => {
-      disabled = true;
-      for (const view of [...views]) view.fail('WebGL context lost');
-    });
-    return { THREE, foil, renderer, canvas, size: [0, 0], maxSize: renderer.capabilities.maxTextureSize };
-  })();
-}
-
 function getRuntime() {
   if (disabled) return Promise.reject(new Error('TCG Live foil disabled for this session'));
   if (!runtimePromise) {
-    runtimePromise = createRuntime();
+    runtimePromise = (async () => {
+      const [THREE, foil] = await Promise.all([import('three'), import('./tcgl-foil-material.js')]);
+      await foil.loadFoilData();
+      const canvas = document.createElement('canvas');
+      // three r163+ is WebGL2-only and throws here without it.
+      const renderer = new THREE.WebGLRenderer({
+        canvas,
+        alpha: true,
+        antialias: true,
+        premultipliedAlpha: false,
+        preserveDrawingBuffer: true,
+      });
+      renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+      renderer.setPixelRatio(1);
+      renderer.setClearColor(0x000000, 0);
+      renderer.setScissorTest(true);
+      renderer.debug.onShaderError = () => {
+        if (drawingView) drawingView.shaderFailed = true;
+      };
+      canvas.addEventListener('webglcontextlost', () => {
+        disabled = true;
+        for (const view of [...views]) view.fail('WebGL context lost');
+      });
+      return { THREE, foil, renderer, canvas, size: [0, 0], maxSize: renderer.capabilities.maxTextureSize };
+    })();
     runtimePromise.catch((error) => {
       disabled = true;
       console.warn(`TCG Live foil disabled: ${error.message}`);
@@ -65,26 +61,6 @@ function getRuntime() {
   }
   return runtimePromise;
 }
-
-// Backing size: the canvas's own CSS box at the on-screen scale (zoom, transforms) times the device pixel
-// ratio of the window it lives in, capped only by the GPU's texture limit.
-function backingSize(canvas, rect, win, maxSize) {
-  const layoutW = canvas.clientWidth || rect.width;
-  const layoutH = canvas.clientHeight || rect.height;
-  const screenScale = Math.max(rect.width / layoutW, rect.height / layoutH);
-  let scale = screenScale * (win.devicePixelRatio || 1);
-  scale = Math.min(scale, maxSize / Math.max(layoutW, layoutH));
-  return [Math.max(1, Math.round(layoutW * scale)), Math.max(1, Math.round(layoutH * scale))];
-}
-
-const isDrawable = (canvas, rect, win) =>
-  rect.width >= 2 &&
-  rect.height >= 2 &&
-  rect.right > 0 &&
-  rect.bottom > 0 &&
-  rect.left < win.innerWidth &&
-  rect.top < win.innerHeight &&
-  win.getComputedStyle(canvas).visibility !== 'hidden';
 
 function drawView(view, rt, nowMs) {
   const { wrapper, canvas } = view;
@@ -96,8 +72,22 @@ function drawView(view, rt, nowMs) {
   view.placed = true;
   if (view.state !== 'ready' && view.state !== 'live') return;
   const rect = canvas.getBoundingClientRect();
-  if (!isDrawable(canvas, rect, win)) return;
-  const [w, h] = backingSize(canvas, rect, win, rt.maxSize);
+  if (!(rect.width >= 2 &&
+  rect.height >= 2 &&
+  rect.right > 0 &&
+  rect.bottom > 0 &&
+  rect.left < win.innerWidth &&
+  rect.top < win.innerHeight &&
+  win.getComputedStyle(canvas).visibility !== 'hidden')) return;
+  // Backing size: the canvas's own CSS box at the on-screen scale (zoom, transforms) times the device pixel
+  // ratio of the window it lives in, capped only by the GPU's texture limit.
+  const maxSize = rt.maxSize;
+  const layoutW = canvas.clientWidth || rect.width;
+  const layoutH = canvas.clientHeight || rect.height;
+  const screenScale = Math.max(rect.width / layoutW, rect.height / layoutH);
+  let scale = screenScale * (win.devicePixelRatio || 1);
+  scale = Math.min(scale, maxSize / Math.max(layoutW, layoutH));
+  const [w, h] = [Math.max(1, Math.round(layoutW * scale)), Math.max(1, Math.round(layoutH * scale))];
   if (canvas.width !== w || canvas.height !== h) {
     canvas.width = w;
     canvas.height = h;

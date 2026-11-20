@@ -100,13 +100,6 @@ import {
       const onPickerOutside = (event) => {
         if (!barEl.contains(event.target)) closePicker();
       };
-      const openPicker = () => {
-        if (!popoverEl) return;
-        popoverEl.hidden = false;
-        toggleEl?.setAttribute('aria-expanded', 'true');
-        document.addEventListener('keydown', onPickerKeydown);
-        document.addEventListener('mousedown', onPickerOutside);
-      };
       // Hoisted: openDeck, defined below, closes the picker once a deck is picked.
       function closePicker() {
         if (!popoverEl || popoverEl.hidden) return;
@@ -116,8 +109,12 @@ import {
         document.removeEventListener('mousedown', onPickerOutside);
       }
       toggleEl?.addEventListener('click', () => {
-        if (popoverEl?.hidden) openPicker();
-        else closePicker();
+        if (popoverEl?.hidden) {
+          popoverEl.hidden = false;
+          toggleEl?.setAttribute('aria-expanded', 'true');
+          document.addEventListener('keydown', onPickerKeydown);
+          document.addEventListener('mousedown', onPickerOutside);
+        } else closePicker();
       });
     
       let library = loadLibraryFromStorage(window.localStorage);
@@ -280,23 +277,6 @@ import {
         render();
       };
     
-      const createNewDeck = () => {
-        reload();
-        const name = window.prompt('Name your new deck:');
-        if (name === null) return;
-        const { library: nextLibrary, deckId } = createDeckInLibrary(
-          library,
-          name,
-          {},
-          Date.now()
-        );
-        activeDeckIds[currentTarget] = deckId;
-        baselines[currentTarget] = deckCardsKey({});
-        commit(nextLibrary);
-        onOpenDeck(currentTarget, deckId, {});
-        showStatus('Deck created.');
-      };
-    
       const renameDeck = (deckId) => {
         reload();
         const deck = library?.decks?.[deckId];
@@ -390,28 +370,39 @@ import {
     
       newDeckButton.addEventListener('click', () => {
         onSaveCurrentDeck?.();
-        createNewDeck();
+        reload();
+        const name = window.prompt('Name your new deck:');
+        if (name === null) return;
+        const { library: nextLibrary, deckId } = createDeckInLibrary(
+          library,
+          name,
+          {},
+          Date.now()
+        );
+        activeDeckIds[currentTarget] = deckId;
+        baselines[currentTarget] = deckCardsKey({});
+        commit(nextLibrary);
+        onOpenDeck(currentTarget, deckId, {});
+        showStatus('Deck created.');
       });
-
-      // Another tab rewrote a deck this tab has open: adopt its cards, so this
-      // tab's next autosave builds on them instead of reverting them.
-      const adoptExternalDeckChanges = () => {
-        for (const key of ['self', 'opp']) {
-          const deckId = activeDeckIds[key];
-          const cards = deckId ? getDeckFromLibrary(library, deckId) : null;
-          if (!cards) continue;
-          const storedKey = deckCardsKey(cards);
-          if (storedKey === baselines[key]) continue;
-          baselines[key] = storedKey;
-          onExternalDeckChange?.(key, deckId, cards);
-        }
-      };
 
       // The other tab changed the library (key null = storage cleared).
       window.addEventListener('storage', (event) => {
         if (event.key !== null && event.key !== LIBRARY_STORAGE_KEY) return;
         reload();
-        if (allowDeckWrites) adoptExternalDeckChanges();
+        if (allowDeckWrites) {
+          // Another tab rewrote a deck this tab has open: adopt its cards, so this
+          // tab's next autosave builds on them instead of reverting them.
+          for (const key of ['self', 'opp']) {
+            const deckId = activeDeckIds[key];
+            const cards = deckId ? getDeckFromLibrary(library, deckId) : null;
+            if (!cards) continue;
+            const storedKey = deckCardsKey(cards);
+            if (storedKey === baselines[key]) continue;
+            baselines[key] = storedKey;
+            onExternalDeckChange?.(key, deckId, cards);
+          }
+        }
         render();
       });
 

@@ -42,7 +42,7 @@ import { createPropBuilder } from './stadium-env-props.mjs';
 import { createKitProps } from './stadium-kit.mjs';
 import { measureAsset, placeAsset } from './stadium-kit-assets.mjs';
 import { tableBounds } from './table-uv.mjs';
-import { RISE_LEAN, frameWeight, patchy } from './stadium-env-spots.mjs';
+import { RISE_LEAN, distanceToRect, frameWeight, hash, patchy } from './stadium-env-spots.mjs';
 
 export const GARDEN_KEY = 'mystery-garden';
 /** The moon (toward it, table frame): high, from the far left. */
@@ -67,14 +67,6 @@ export const LANTERN_POOL = Object.freeze({ colour: '#ffa8d8', reachPx: 110, str
 export const AXIS_URN = Object.freeze({ out: 44, half: 15, height: 34, urn: 13 });
 /** Rings and segments of the instanced sphere every hedge, leaf and flower is drawn with. */
 const FIREFLY_COUNT = 45;
-
-/** A small deterministic 0..1 from three numbers. */
-const hash = (x, y, salt) => {
-  const s = Math.sin(x * 127.1 + y * 311.7 + salt * 74.7) * 43758.5453;
-  return s - Math.floor(s);
-};
-
-const distanceToRect = (x, y, r) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.y - y, 0, y - r.y - r.h));
 
 /** The opponent's hand where the board fans it, past the far edge: the cards' width either side of the middle. */
 const oppHandRect = (layout, cards) => {

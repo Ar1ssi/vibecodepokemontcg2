@@ -237,18 +237,6 @@ export function createRemoteCustomSets({ baseUrl, cacheDir, fetchImpl = globalTh
     return true;
   }
 
-  function collectGarbage() {
-    const keep = referencedBlobs({ sets: Object.fromEntries(active) });
-    for (const name of fs.readdirSync(blobsDir)) {
-      if (keep.has(name) || inFlight.has(name)) continue;
-      try {
-        fs.rmSync(path.join(blobsDir, name), { force: true });
-      } catch {
-        // still being sent to a browser (Windows keeps it locked): the next pass removes it
-      }
-    }
-  }
-
   async function refreshOnce() {
     const fetched = await fetchIndex();
     if (!fetched) return null;
@@ -288,7 +276,15 @@ export function createRemoteCustomSets({ baseUrl, cacheDir, fetchImpl = globalTh
     } catch (error) {
       log(`custom sets remote: update listener failed: ${error.message}`);
     }
-    collectGarbage();
+    const keep = referencedBlobs({ sets: Object.fromEntries(active) });
+    for (const name of fs.readdirSync(blobsDir)) {
+      if (keep.has(name) || inFlight.has(name)) continue;
+      try {
+        fs.rmSync(path.join(blobsDir, name), { force: true });
+      } catch {
+        // still being sent to a browser (Windows keeps it locked): the next pass removes it
+      }
+    }
     return { changed };
   }
 

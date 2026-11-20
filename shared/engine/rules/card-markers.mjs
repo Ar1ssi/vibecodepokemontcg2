@@ -29,15 +29,11 @@ const MARKER_BY_KEY = new Map(MARKERS.map((marker) => [collapse(marker), marker]
 // Table keys are TCGdex ids ("swsh9tg-TG18"); printingIds canonicalises to lowercase.
 const MARKERS_BY_ID = new Map(Object.entries(CARD_MARKERS).map(([id, list]) => [id.toLowerCase(), list]));
 
-function subtypeMarkers(card) {
-  const subtypes = Array.isArray(card?.subtypes) ? card.subtypes : [];
-  return subtypes.map((s) => MARKER_BY_KEY.get(collapse(s))).filter(Boolean);
-}
-
 /** The card's printed markers (a subset of MARKERS); [] when it has none or is unknown. */
 export function cardMarkersOf(card) {
   if (!card || typeof card !== 'object') return [];
-  const found = new Set(subtypeMarkers(card));
+  const subtypes = Array.isArray(card?.subtypes) ? card.subtypes : [];
+  const found = new Set(subtypes.map((s) => MARKER_BY_KEY.get(collapse(s))).filter(Boolean));
   for (const id of printingIds(card)) {
     for (const marker of MARKERS_BY_ID.get(canonicalCardId(id)) || []) found.add(marker);
   }

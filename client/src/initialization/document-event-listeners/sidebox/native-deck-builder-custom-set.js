@@ -34,40 +34,8 @@ const tileHtml = (card, index) => {
           </div>`;
 };
 
-const panelHtml = (customSet) => `
-      <div class="db-custom-set-head">
-        <label class="db-custom-set-name-label">
-          <span>Set name</span>
-          <input type="text" class="db-custom-set-name" maxlength="60" value="${escapeHtml(customSet.name)}" />
-        </label>
-        <span class="db-custom-set-count">${customSet.cards.length} card${customSet.cards.length === 1 ? '' : 's'}</span>
-        <div class="db-custom-set-actions">
-          <button type="button" data-custom-set-import>Import Set</button>
-          <button type="button" data-custom-set-export ${customSet.cards.length === 0 ? 'disabled' : ''}>Export Set</button>
-          <button type="button" data-custom-set-new>New Set</button>
-          <input type="file" accept=".json,application/json" data-custom-set-file hidden />
-        </div>
-      </div>
-      <p class="db-custom-set-status" data-custom-set-status role="status"></p>
-      <p class="db-custom-set-hint">Click a card in the search results below to add it here. Click a card above to add it to your deck.</p>
-      <div class="db-custom-set-grid">
-        ${customSet.cards.length === 0 ? '<p class="db-custom-set-empty">This set is empty. Search for cards below and click them to add.</p>' : customSet.cards.map(tileHtml).join('')}
-      </div>`;
-
 // The browser's double-click interval is around 500 ms; a shorter wait would still add on a slow double-click.
 const DOUBLE_CLICK_WINDOW_MS = 300;
-
-const downloadJson = (text, fileName) => {
-  const blob = new Blob([text], { type: 'application/json;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = fileName;
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-  URL.revokeObjectURL(url);
-};
 
 /**
  * @param {object} options
@@ -90,7 +58,25 @@ export const initializeNativeDeckBuilderCustomSet = ({ panelEl, storage, onAddTo
   };
 
   const render = () => {
-    panelEl.innerHTML = panelHtml(customSet);
+    panelEl.innerHTML = `
+      <div class="db-custom-set-head">
+        <label class="db-custom-set-name-label">
+          <span>Set name</span>
+          <input type="text" class="db-custom-set-name" maxlength="60" value="${escapeHtml(customSet.name)}" />
+        </label>
+        <span class="db-custom-set-count">${customSet.cards.length} card${customSet.cards.length === 1 ? '' : 's'}</span>
+        <div class="db-custom-set-actions">
+          <button type="button" data-custom-set-import>Import Set</button>
+          <button type="button" data-custom-set-export ${customSet.cards.length === 0 ? 'disabled' : ''}>Export Set</button>
+          <button type="button" data-custom-set-new>New Set</button>
+          <input type="file" accept=".json,application/json" data-custom-set-file hidden />
+        </div>
+      </div>
+      <p class="db-custom-set-status" data-custom-set-status role="status"></p>
+      <p class="db-custom-set-hint">Click a card in the search results below to add it here. Click a card above to add it to your deck.</p>
+      <div class="db-custom-set-grid">
+        ${customSet.cards.length === 0 ? '<p class="db-custom-set-empty">This set is empty. Search for cards below and click them to add.</p>' : customSet.cards.map(tileHtml).join('')}
+      </div>`;
     setStatus(statusMessage, statusIsError);
   };
 
@@ -158,7 +144,17 @@ export const initializeNativeDeckBuilderCustomSet = ({ panelEl, storage, onAddTo
     }
     if (event.target.closest('[data-custom-set-export]')) {
       if (customSet.cards.length === 0) return;
-      downloadJson(serializeCustomSet(customSet), customSetFileName(customSet.name));
+      const text = serializeCustomSet(customSet);
+      const fileName = customSetFileName(customSet.name);
+      const blob = new Blob([text], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = fileName;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(url);
       setStatus(`Exported “${customSet.name}”.`);
       return;
     }

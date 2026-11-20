@@ -9,10 +9,8 @@ const FETCH_TIMEOUT_MS = 10_000;
 const pending = new Map();
 const loaded = new Map();
 
-const isNode = () => typeof process !== 'undefined' && Boolean(process.versions?.node);
-
 const readCatalog = async (url) => {
-  if (url.protocol === 'file:' && isNode()) {
+  if (url.protocol === 'file:' && (typeof process !== 'undefined' && Boolean(process.versions?.node))) {
     const { readFile } = await import('node:fs/promises');
     return JSON.parse(await readFile(url, 'utf8'));
   }

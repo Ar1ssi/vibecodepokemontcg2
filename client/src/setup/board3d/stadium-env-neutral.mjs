@@ -255,46 +255,6 @@ function wall(props, box, height, face, u) {
   }
 }
 
-/**
- * A floating screen: a dark-green rim round a bright green pane, tilted toward the platform, showing
- * the Poke Ball in pale lines (design 080: anonymous pale blocks on a screen read as fake content).
- */
-function screenPanel(props, s, u) {
-  // Design 084: facing the platform (s.facing: the way to it), leaning back away from it.
-  const face = [Math.cos(s.facing), Math.sin(s.facing)];
-  const along = [-face[1], face[0]];
-  const lean = 0.5;
-  const at = (x, h, push) => {
-    const up = h - s.h / 2;
-    return [s.x + along[0] * x - face[0] * Math.sin(lean) * up + face[0] * push * 0.3, s.y + along[1] * x - face[1] * Math.sin(lean) * up + face[1] * push * 0.3, s.z + Math.cos(lean) * up + push];
-  };
-  const hw = s.w / 2;
-  props.quad(at(-hw, 0, 0), at(hw, 0, 0), at(hw, s.h, 0), at(-hw, s.h, 0), SCREEN_RIM);
-  props.quad(at(-hw + 4 * u, 4 * u, 0.8), at(hw - 4 * u, 4 * u, 0.8), at(hw - 4 * u, s.h - 4 * u, 0.8), at(-hw + 4 * u, s.h - 4 * u, 0.8), SCREEN);
-  // A ring of quads in the pane's plane round (0, cy), from radius r0 out to r1.
-  const ring = (cy, r0, r1, push, steps = 28) => {
-    for (let k = 0; k < steps; k += 1) {
-      const a0 = (k / steps) * 2 * Math.PI;
-      const a1 = ((k + 1) / steps) * 2 * Math.PI;
-      const on = (r, a) => at(Math.cos(a) * r, cy + Math.sin(a) * r, push);
-      props.quad(on(r0, a0), on(r1, a0), on(r1, a1), on(r0, a1), SCREEN_WHITE);
-    }
-  };
-  const cy = s.h / 2;
-  const r = Math.min(hw, s.h / 2) * 0.62;
-  const line = Math.max(1.6 * u, r * 0.1);
-  ring(cy, r - line, r, 1.4);
-  ring(cy, r * 0.22, r * 0.22 + line, 1.4, 16);
-  // Design 083: a status light in the pane's corner blinks, each screen on its own beat.
-  props.look({ kind: LOOK.blink, rate: 0.6 + 0.4 * ((s.x * 0.01) % 1 + 1) % 1, phase: ((s.x * 0.0071) % 1 + 1) % 1 }, () => {
-    const lx = hw - 9 * u;
-    const ly = s.h - 9 * u;
-    props.quad(at(lx - 2.6 * u, ly - 2.6 * u, 1.6), at(lx + 2.6 * u, ly - 2.6 * u, 1.6), at(lx + 2.6 * u, ly + 2.6 * u, 1.6), at(lx - 2.6 * u, ly + 2.6 * u, 1.6), SCREEN_WHITE);
-  });
-  props.quad(at(-r + line * 0.5, cy - line / 2, 1.4), at(-r * 0.22, cy - line / 2, 1.4), at(-r * 0.22, cy + line / 2, 1.4), at(-r + line * 0.5, cy + line / 2, 1.4), SCREEN_WHITE);
-  props.quad(at(r * 0.22, cy - line / 2, 1.4), at(r - line * 0.5, cy - line / 2, 1.4), at(r - line * 0.5, cy + line / 2, 1.4), at(r * 0.22, cy + line / 2, 1.4), SCREEN_WHITE);
-}
-
 /** Everything solid, as one prop geometry. */
 /** The zone's light for the kit (designs 081, 082): a cool blue-white from the beams, a deep blue fill. */
 export const NEUTRAL_MOOD = Object.freeze({
@@ -307,23 +267,57 @@ export const NEUTRAL_MOOD = Object.freeze({
 
 export function neutralProps(spots) {
   const props = createPropBuilder();
-  props.look({ kind: LOOK.chrome }, () => neutralSolids(props, spots));
+  props.look({ kind: LOOK.chrome }, () => {
+    // The walls, the screens and the columns' glowing bases.
+    const { walls, screens, beams, u } = spots;
+    wall(props, walls.left, walls.height, 'right', u);
+    wall(props, walls.right, walls.height, 'left', u);
+    wall(props, walls.far, walls.height, 'near', u);
+    for (const s of screens) {
+      // A floating screen: a dark-green rim round a bright green pane, tilted toward the platform, showing
+      // the Poke Ball in pale lines (design 080: anonymous pale blocks on a screen read as fake content).
+      // Design 084: facing the platform (s.facing: the way to it), leaning back away from it.
+      const face = [Math.cos(s.facing), Math.sin(s.facing)];
+      const along = [-face[1], face[0]];
+      const lean = 0.5;
+      const at = (x, h, push) => {
+        const up = h - s.h / 2;
+        return [s.x + along[0] * x - face[0] * Math.sin(lean) * up + face[0] * push * 0.3, s.y + along[1] * x - face[1] * Math.sin(lean) * up + face[1] * push * 0.3, s.z + Math.cos(lean) * up + push];
+      };
+      const hw = s.w / 2;
+      props.quad(at(-hw, 0, 0), at(hw, 0, 0), at(hw, s.h, 0), at(-hw, s.h, 0), SCREEN_RIM);
+      props.quad(at(-hw + 4 * u, 4 * u, 0.8), at(hw - 4 * u, 4 * u, 0.8), at(hw - 4 * u, s.h - 4 * u, 0.8), at(-hw + 4 * u, s.h - 4 * u, 0.8), SCREEN);
+      // A ring of quads in the pane's plane round (0, cy), from radius r0 out to r1.
+      const ring = (cy, r0, r1, push, steps = 28) => {
+        for (let k = 0; k < steps; k += 1) {
+          const a0 = (k / steps) * 2 * Math.PI;
+          const a1 = ((k + 1) / steps) * 2 * Math.PI;
+          const on = (r, a) => at(Math.cos(a) * r, cy + Math.sin(a) * r, push);
+          props.quad(on(r0, a0), on(r1, a0), on(r1, a1), on(r0, a1), SCREEN_WHITE);
+        }
+      };
+      const cy = s.h / 2;
+      const r = Math.min(hw, s.h / 2) * 0.62;
+      const line = Math.max(1.6 * u, r * 0.1);
+      ring(cy, r - line, r, 1.4);
+      ring(cy, r * 0.22, r * 0.22 + line, 1.4, 16);
+      // Design 083: a status light in the pane's corner blinks, each screen on its own beat.
+      props.look({ kind: LOOK.blink, rate: 0.6 + 0.4 * ((s.x * 0.01) % 1 + 1) % 1, phase: ((s.x * 0.0071) % 1 + 1) % 1 }, () => {
+        const lx = hw - 9 * u;
+        const ly = s.h - 9 * u;
+        props.quad(at(lx - 2.6 * u, ly - 2.6 * u, 1.6), at(lx + 2.6 * u, ly - 2.6 * u, 1.6), at(lx + 2.6 * u, ly + 2.6 * u, 1.6), at(lx - 2.6 * u, ly + 2.6 * u, 1.6), SCREEN_WHITE);
+      });
+      props.quad(at(-r + line * 0.5, cy - line / 2, 1.4), at(-r * 0.22, cy - line / 2, 1.4), at(-r * 0.22, cy + line / 2, 1.4), at(-r + line * 0.5, cy + line / 2, 1.4), SCREEN_WHITE);
+      props.quad(at(r * 0.22, cy - line / 2, 1.4), at(r - line * 0.5, cy - line / 2, 1.4), at(r - line * 0.5, cy + line / 2, 1.4), at(r * 0.22, cy + line / 2, 1.4), SCREEN_WHITE);
+    }
+    // Each column stands on a round base of dark metal with a glowing ring.
+    for (const beam of beams) {
+      props.cylinder({ x: beam.x, y: beam.y, z0: -2, z1: 9 * u, r: beam.r * 1.35, color: FRAME, capColor: WALL_LIGHT, sides: 18 });
+      // Design 084: a bright white-cyan disc at the base, the column's foot of light.
+      props.cylinder({ x: beam.x, y: beam.y, z0: 9 * u, z1: 11 * u, r: beam.r * 1.05, color: STRIP, capColor: BASE_LIGHT, sides: 18 });
+    }
+  });
   return props;
-}
-
-/** The walls, the screens and the columns' glowing bases. */
-function neutralSolids(props, spots) {
-  const { walls, screens, beams, u } = spots;
-  wall(props, walls.left, walls.height, 'right', u);
-  wall(props, walls.right, walls.height, 'left', u);
-  wall(props, walls.far, walls.height, 'near', u);
-  for (const s of screens) screenPanel(props, s, u);
-  // Each column stands on a round base of dark metal with a glowing ring.
-  for (const beam of beams) {
-    props.cylinder({ x: beam.x, y: beam.y, z0: -2, z1: 9 * u, r: beam.r * 1.35, color: FRAME, capColor: WALL_LIGHT, sides: 18 });
-    // Design 084: a bright white-cyan disc at the base, the column's foot of light.
-    props.cylinder({ x: beam.x, y: beam.y, z0: 9 * u, z1: 11 * u, r: beam.r * 1.05, color: STRIP, capColor: BASE_LIGHT, sides: 18 });
-  }
 }
 
 

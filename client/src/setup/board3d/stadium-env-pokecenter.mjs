@@ -112,13 +112,12 @@ export function centerSpots(layout) {
   // Design 084: a doormat inside the entrance, between the glass columns.
   const doormat = { x0: centre.x - 96 * u, x1: centre.x + 96 * u, y0: room.y0 + 6 * u, y1: room.y0 + 58 * u };
   const footprint = (s) => ({ x0: Math.min(s.x, s.x + s.dir * s.depth), x1: Math.max(s.x, s.x + s.dir * s.depth), y0: s.y0, y1: s.y1 });
-  const deskBox = (d) => ({ x0: Math.min(d.x, d.x + d.dir * d.d), x1: Math.max(d.x, d.x + d.dir * d.d), y0: d.y - d.w / 2, y1: d.y + d.w / 2 });
   const blocks = [
     ...walls.map((w) => ({ x0: w.x0, y0: w.y0, x1: w.x1, y1: w.y1, h: w.h })),
     { ...footprint(sofa), h: 58 * u },
     ...shelves.map((s) => ({ ...footprint(s), h: s.h })),
     { ...footprint(bench), h: 26 * u },
-    ...desks.map((d) => ({ ...deskBox(d), h: d.h })),
+    ...desks.map((d) => ({ ...{ x0: Math.min(d.x, d.x + d.dir * d.d), x1: Math.max(d.x, d.x + d.dir * d.d), y0: d.y - d.w / 2, y1: d.y + d.w / 2 }, h: d.h })),
     { x0: table.x - table.w / 2, y0: table.y - table.d / 2, x1: table.x + table.w / 2, y1: table.y + table.d / 2, h: table.h },
   ];
   const discs = [
@@ -594,63 +593,6 @@ function sofa(props, s, u) {
   }
 }
 
-/** A cushion stool: a square pad on four chrome legs. */
-function stool(props, s, u) {
-  props.roundBox({ x: s.x, y: s.y, z0: 8 * u, z1: 16 * u, hw: 10 * u, hh: 10 * u, r: 3.5 * u, color: STOOLS[s.color % STOOLS.length] });
-  for (const [dx, dy] of [[-7, -7], [7, -7], [7, 7], [-7, 7]]) props.roundBox({ x: s.x + dx * u, y: s.y + dy * u, z0: -1, z1: 8 * u, hw: 0.9 * u, hh: 0.9 * u, color: CHROME });
-}
-
-/** A low glass table on a chrome frame. */
-function coffeeTable(props, t, u) {
-  props.roundBox({ x: t.x, y: t.y, z0: 18 * u, z1: 20.5 * u, hw: t.w / 2, hh: t.d / 2, color: TABLE_GLASS });
-  props.roundBox({ x: t.x, y: t.y, z0: 14 * u, z1: 17 * u, hw: t.w / 2 - 2 * u, hh: t.d / 2 - 2 * u, color: CHROME });
-  for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) props.roundBox({ x: t.x + sx * (t.w / 2 - 3 * u), y: t.y + sy * (t.d / 2 - 3 * u), z0: -1, z1: 18 * u, hw: 1.1 * u, hh: 1.1 * u, color: CHROME });
-}
-
-/** A potted plant (the kit's clipped ball of foliage in a pot), terracotta or white by turns. */
-function plant(props, p) {
-  const terracotta = p.seed % 2 === 0;
-  placeAsset(props, 'topiary', {
-    x: p.x,
-    y: p.y,
-    size: p.r * 1.25,
-    seed: p.seed * 13 + 1,
-    sun: CENTER_LIGHT,
-    colors: { leaf: FOLIAGE, leafLight: FOLIAGE_LIT, pot: terracotta ? POT_TERRA : POT_WHITE, stem: [0.2, 0.12, 0.08, 0] },
-  });
-}
-
-/** A bookshelf against a wall: a white case with three shelves of books on its face. */
-function bookshelf(props, s, u) {
-  const at = (dx) => s.x + s.dir * dx;
-  const mid = (s.y0 + s.y1) / 2;
-  props.roundBox({ x: at(s.depth / 2), y: mid, z0: -1, z1: s.h, hw: s.depth / 2, hh: (s.y1 - s.y0) / 2, color: SHELF_WHITE });
-  const length = s.y1 - s.y0;
-  for (let row = 0; row < 3; row += 1) {
-    const z0 = (6 + row * 26) * u;
-    props.quad([at(s.depth + 0.4), s.y0 + 3 * u, z0], [at(s.depth + 0.4), s.y1 - 3 * u, z0], [at(s.depth + 0.4), s.y1 - 3 * u, z0 + 22 * u], [at(s.depth + 0.4), s.y0 + 3 * u, z0 + 22 * u], COUNTER_INNER);
-    let y = s.y0 + 4 * u;
-    for (let k = 0; y < s.y1 - 7 * u; k += 1) {
-      const roll = hash(row, k, s.dir + 3);
-      const w = (3.4 + 3 * roll) * u;
-      const h = (15 + 6 * hash(row, k, 9)) * u;
-      props.quad([at(s.depth + 0.8), y, z0], [at(s.depth + 0.8), y + w, z0], [at(s.depth + 0.8), y + w, z0 + h], [at(s.depth + 0.8), y, z0 + h], BOOKS[Math.floor(roll * BOOKS.length) % BOOKS.length]);
-      y += w + 0.6 * u;
-    }
-  }
-  return length;
-}
-
-/** A PC on its desk: a white desk with a silver top, a monitor with a lit blue screen, a keyboard. */
-function pcDesk(props, d, u) {
-  const at = (dx) => d.x + d.dir * dx;
-  props.roundBox({ x: at(d.d / 2), y: d.y, z0: -1, z1: d.h, hw: d.d / 2, hh: d.w / 2, color: SHELF_WHITE, topColor: SILVER });
-  props.roundBox({ x: at(d.d * 0.7), y: d.y, z0: d.h, z1: d.h + 4 * u, hw: 6 * u, hh: 5 * u, color: MONITOR });
-  props.roundBox({ x: at(d.d * 0.7), y: d.y, z0: d.h + 4 * u, z1: d.h + 28 * u, hw: 2.4 * u, hh: 17 * u, color: MONITOR });
-  props.quad([at(d.d * 0.7 + 2.6 * u), d.y - 15 * u, d.h + 7 * u], [at(d.d * 0.7 + 2.6 * u), d.y + 15 * u, d.h + 7 * u], [at(d.d * 0.7 + 2.6 * u), d.y + 15 * u, d.h + 26 * u], [at(d.d * 0.7 + 2.6 * u), d.y - 15 * u, d.h + 26 * u], SCREEN);
-  props.roundBox({ x: at(d.d * 0.28), y: d.y, z0: d.h, z1: d.h + 2 * u, hw: 6 * u, hh: 14 * u, color: COUNTER_BODY });
-}
-
 /** A long cushioned bench along a wall: a pale base, a blue cushion, a low back. */
 function bench(props, b, u) {
   const at = (dx) => b.x + b.dir * dx;
@@ -658,18 +600,6 @@ function bench(props, b, u) {
   props.roundBox({ x: at(b.depth / 2), y: mid, z0: 3 * u, z1: 14 * u, hw: b.depth / 2, hh: (b.y1 - b.y0) / 2, color: BENCH_BASE });
   props.roundBox({ x: at(b.depth * 0.54), y: mid, z0: 14 * u, z1: 23 * u, hw: b.depth * 0.46, hh: (b.y1 - b.y0) / 2 - 1.5 * u, r: 3.5 * u, color: BENCH_CUSHION });
   props.roundBox({ x: at(b.depth * 0.12), y: mid, z0: 14 * u, z1: 42 * u, hw: b.depth * 0.12, hh: (b.y1 - b.y0) / 2, r: 2.8 * u, color: BENCH_CUSHION });
-}
-
-/** A glass column lit from within: a pale glass drum between white rings, a glowing cap. */
-function glassColumn(props, c, u) {
-  props.cylinder({ x: c.x, y: c.y, z0: -2, z1: c.h, r: c.r, color: COLUMN_GLASS, capColor: COLUMN_GLOW, sides: 24 });
-  props.cylinder({ x: c.x, y: c.y, z0: -2, z1: 10 * u, r: c.r * 1.22, color: CREAM, sides: 24 });
-  props.cylinder({ x: c.x, y: c.y, z0: c.h - 8 * u, z1: c.h, r: c.r * 1.12, color: CREAM, capColor: COLUMN_GLOW, sides: 24 });
-  for (let k = 0; k < 9; k += 1) {
-    const angle = hash(k, c.x, 5) * 6.28;
-    const rad = c.r * 0.6 * hash(k, c.y, 6);
-    props.sphere({ x: c.x + Math.cos(angle) * rad, y: c.y + Math.sin(angle) * rad, z: c.h + 1.5 * u, r: 1.6 * u, color: SCREEN_BALL_WHITE, sides: 6, rings: 4 });
-  }
 }
 
 /** A framed map on a wall (a blue sea, green land), and a Poke Ball poster. */
@@ -697,17 +627,71 @@ export function centerProps(spots) {
   wallScreen(props, spots);
   receptionCounter(props, counter, u);
   sofa(props, sofaSpot, u);
-  coffeeTable(props, table, u);
+  // A low glass table on a chrome frame.
+  props.roundBox({ x: table.x, y: table.y, z0: 18 * u, z1: 20.5 * u, hw: table.w / 2, hh: table.d / 2, color: TABLE_GLASS });
+  props.roundBox({ x: table.x, y: table.y, z0: 14 * u, z1: 17 * u, hw: table.w / 2 - 2 * u, hh: table.d / 2 - 2 * u, color: CHROME });
+  for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) props.roundBox({ x: table.x + sx * (table.w / 2 - 3 * u), y: table.y + sy * (table.d / 2 - 3 * u), z0: -1, z1: 18 * u, hw: 1.1 * u, hh: 1.1 * u, color: CHROME });
   // Design 084: a little plant on the table, and a doormat inside the entrance (the near wall's middle).
   placeAsset(props, 'topiary', { x: table.x, y: table.y, z: 20.5 * u, size: 9 * u, seed: 41, sun: CENTER_LIGHT, colors: { leaf: FOLIAGE, leafLight: FOLIAGE_LIT, pot: POT_WHITE, stem: [0.2, 0.12, 0.08, 0] } });
   const mat = spots.doormat;
   props.roundBox({ x: (mat.x0 + mat.x1) / 2, y: (mat.y0 + mat.y1) / 2, z0: -1, z1: 1.6 * u, hw: (mat.x1 - mat.x0) / 2, hh: (mat.y1 - mat.y0) / 2, r: 1.2 * u, color: MAT_EDGE, topColor: MAT });
-  for (const s of [...stools, ...deskStools]) stool(props, s, u);
-  for (const s of shelves) bookshelf(props, s, u);
-  for (const d of desks) pcDesk(props, d, u);
+  for (const s of [...stools, ...deskStools]) {
+    // A cushion stool: a square pad on four chrome legs.
+    props.roundBox({ x: s.x, y: s.y, z0: 8 * u, z1: 16 * u, hw: 10 * u, hh: 10 * u, r: 3.5 * u, color: STOOLS[s.color % STOOLS.length] });
+    for (const [dx, dy] of [[-7, -7], [7, -7], [7, 7], [-7, 7]]) props.roundBox({ x: s.x + dx * u, y: s.y + dy * u, z0: -1, z1: 8 * u, hw: 0.9 * u, hh: 0.9 * u, color: CHROME });
+  }
+  for (const s of shelves) {
+    // A bookshelf against a wall: a white case with three shelves of books on its face.
+    const at = (dx) => s.x + s.dir * dx;
+    const mid = (s.y0 + s.y1) / 2;
+    props.roundBox({ x: at(s.depth / 2), y: mid, z0: -1, z1: s.h, hw: s.depth / 2, hh: (s.y1 - s.y0) / 2, color: SHELF_WHITE });
+    const length = s.y1 - s.y0;
+    for (let row = 0; row < 3; row += 1) {
+      const z0 = (6 + row * 26) * u;
+      props.quad([at(s.depth + 0.4), s.y0 + 3 * u, z0], [at(s.depth + 0.4), s.y1 - 3 * u, z0], [at(s.depth + 0.4), s.y1 - 3 * u, z0 + 22 * u], [at(s.depth + 0.4), s.y0 + 3 * u, z0 + 22 * u], COUNTER_INNER);
+      let y = s.y0 + 4 * u;
+      for (let k = 0; y < s.y1 - 7 * u; k += 1) {
+        const roll = hash(row, k, s.dir + 3);
+        const w = (3.4 + 3 * roll) * u;
+        const h = (15 + 6 * hash(row, k, 9)) * u;
+        props.quad([at(s.depth + 0.8), y, z0], [at(s.depth + 0.8), y + w, z0], [at(s.depth + 0.8), y + w, z0 + h], [at(s.depth + 0.8), y, z0 + h], BOOKS[Math.floor(roll * BOOKS.length) % BOOKS.length]);
+        y += w + 0.6 * u;
+      }
+    }
+  }
+  for (const d of desks) {
+    // A PC on its desk: a white desk with a silver top, a monitor with a lit blue screen, a keyboard.
+    const at = (dx) => d.x + d.dir * dx;
+    props.roundBox({ x: at(d.d / 2), y: d.y, z0: -1, z1: d.h, hw: d.d / 2, hh: d.w / 2, color: SHELF_WHITE, topColor: SILVER });
+    props.roundBox({ x: at(d.d * 0.7), y: d.y, z0: d.h, z1: d.h + 4 * u, hw: 6 * u, hh: 5 * u, color: MONITOR });
+    props.roundBox({ x: at(d.d * 0.7), y: d.y, z0: d.h + 4 * u, z1: d.h + 28 * u, hw: 2.4 * u, hh: 17 * u, color: MONITOR });
+    props.quad([at(d.d * 0.7 + 2.6 * u), d.y - 15 * u, d.h + 7 * u], [at(d.d * 0.7 + 2.6 * u), d.y + 15 * u, d.h + 7 * u], [at(d.d * 0.7 + 2.6 * u), d.y + 15 * u, d.h + 26 * u], [at(d.d * 0.7 + 2.6 * u), d.y - 15 * u, d.h + 26 * u], SCREEN);
+    props.roundBox({ x: at(d.d * 0.28), y: d.y, z0: d.h, z1: d.h + 2 * u, hw: 6 * u, hh: 14 * u, color: COUNTER_BODY });
+  }
   bench(props, benchSpot, u);
-  for (const c of columns) glassColumn(props, c, u);
-  for (const p of plants) plant(props, p);
+  for (const c of columns) {
+    // A glass column lit from within: a pale glass drum between white rings, a glowing cap.
+    props.cylinder({ x: c.x, y: c.y, z0: -2, z1: c.h, r: c.r, color: COLUMN_GLASS, capColor: COLUMN_GLOW, sides: 24 });
+    props.cylinder({ x: c.x, y: c.y, z0: -2, z1: 10 * u, r: c.r * 1.22, color: CREAM, sides: 24 });
+    props.cylinder({ x: c.x, y: c.y, z0: c.h - 8 * u, z1: c.h, r: c.r * 1.12, color: CREAM, capColor: COLUMN_GLOW, sides: 24 });
+    for (let k = 0; k < 9; k += 1) {
+      const angle = hash(k, c.x, 5) * 6.28;
+      const rad = c.r * 0.6 * hash(k, c.y, 6);
+      props.sphere({ x: c.x + Math.cos(angle) * rad, y: c.y + Math.sin(angle) * rad, z: c.h + 1.5 * u, r: 1.6 * u, color: SCREEN_BALL_WHITE, sides: 6, rings: 4 });
+    }
+  }
+  for (const p of plants) {
+    // A potted plant (the kit's clipped ball of foliage in a pot), terracotta or white by turns.
+    const terracotta = p.seed % 2 === 0;
+    placeAsset(props, 'topiary', {
+      x: p.x,
+      y: p.y,
+      size: p.r * 1.25,
+      seed: p.seed * 13 + 1,
+      sun: CENTER_LIGHT,
+      colors: { leaf: FOLIAGE, leafLight: FOLIAGE_LIT, pot: terracotta ? POT_TERRA : POT_WHITE, stem: [0.2, 0.12, 0.08, 0] },
+    });
+  }
   posters(props, spots);
   return props;
 }

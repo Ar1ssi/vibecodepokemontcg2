@@ -44,7 +44,6 @@ const span = (t, a, b) => clamp01((t - a) / (b - a));
 const lerp = (a, b, t) => a + (b - a) * t;
 const easeOutCubic = (t) => 1 - (1 - t) ** 3;
 const easeInCubic = (t) => t ** 3;
-const easeOutBack = (t) => (t <= 0 ? 0 : 1 + 2.70158 * (t - 1) ** 3 + 1.70158 * (t - 1) ** 2);
 const pulse = (t, peak) => (t <= 0 || t >= 1 ? 0 : t <= peak ? t / peak : 1 - (t - peak) / (1 - peak));
 const spring = (t) => Math.cos(Math.PI * 1.5 * t) * Math.exp(-3 * t);
 
@@ -163,7 +162,7 @@ export function megaShellPose(ms) {
   if (gone >= 1) return null;
   const seconds = (hold - SHELL_FROM_MS) / 1000;
   return {
-    radius: MEGA_SHELL_RADIUS * (0.25 + 0.75 * easeOutBack(grown)) * (1 + 0.05 * strain + 0.16 * easeOutCubic(gone)),
+    radius: MEGA_SHELL_RADIUS * (0.25 + 0.75 * (grown <= 0 ? 0 : 1 + 2.70158 * (grown - 1) ** 3 + 1.70158 * (grown - 1) ** 2)) * (1 + 0.05 * strain + 0.16 * easeOutCubic(gone)),
     z: SHELL_Z,
     alpha: span(hold, SHELL_FROM_MS, SHELL_FROM_MS + 110),
     // It spins up: a slow turn that quickens into the burst.

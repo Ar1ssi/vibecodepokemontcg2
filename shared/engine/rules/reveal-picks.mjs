@@ -16,14 +16,6 @@ export function textRevealsPicks(text) {
   return REVEAL_WORD.test(printed) || SHOW_TO_OPPONENT.test(printed);
 }
 
-const abilityTextsOf = (card) =>
-  [
-    ...(Array.isArray(card?.abilities) ? card.abilities : []).map((ability) =>
-      typeof ability === 'string' ? ability : ability?.text || ''
-    ),
-    typeof card?.abilityText === 'string' ? card.abilityText : '',
-  ].filter(Boolean);
-
 /**
  * The printed text behind the executor steps being run: the text the entry point threaded into
  * the context (an Ability's own text), else the Pokémon's Ability texts, else the Trainer or
@@ -34,7 +26,12 @@ const abilityTextsOf = (card) =>
 export function effectTextFor({ effectType, sourceCard, context } = {}) {
   if (typeof context?.effectText === 'string') return context.effectText;
   if (effectType === 'ability') {
-    const abilities = abilityTextsOf(sourceCard);
+    const abilities = [
+      ...(Array.isArray(sourceCard?.abilities) ? sourceCard.abilities : []).map((ability) =>
+        typeof ability === 'string' ? ability : ability?.text || ''
+      ),
+      typeof sourceCard?.abilityText === 'string' ? sourceCard.abilityText : '',
+    ].filter(Boolean);
     if (abilities.length > 0) return abilities.join(' ');
   }
   return sourceCard?.text || sourceCard?.effect || sourceCard?.cardText || '';

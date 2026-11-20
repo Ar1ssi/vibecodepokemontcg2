@@ -97,98 +97,6 @@ export function createLogIngest({ store, log, io, now = Date.now, limits = LIMIT
     return result;
   }
 
-  function hello(socket, payload, ack) {
-    const clientId = payload?.clientId;
-    const loadId = payload?.loadId;
-    if (!CLIENT_ID.test(clientId ?? '') || !LOAD_ID.test(loadId ?? '')) {
-      ack({ ok: false, reason: 'bad_hello' });
-      return;
-    }
-    // One identity per socket: a socket that could re-hello as someone new would mint a stream
-    // (and its metadata) per call.
-    const bound = socket.data.logClientId;
-    if (bound && (bound !== clientId || socket.data.logLoadId !== loadId)) {
-      ack({ ok: false, reason: 'client_changed' });
-      return;
-    }
-    socket.data.logClientId = clientId;
-    socket.data.logLoadId = loadId;
-    const streamId = `client:${clientId}`;
-    const page = shortString(payload.page, 200) ?? '';
-    const build = shortString(payload.build, BUILD_MAX);
-    const loads = { ...(store.stream(streamId)?.meta?.loads ?? {}), [loadId]: { helloAt: now(), page, build } };
-    const kept = Object.entries(loads)
-      .sort(([, a], [, b]) => b.helloAt - a.helloAt)
-      .slice(0, limits.helloMaxLoads);
-    store.setMeta(streamId, { ua: shortString(payload.ua, 300) ?? '', build, loads: Object.fromEntries(kept) });
-    store.reopen(streamId);
-    for (const room of socket.rooms) {
-      if (room === socket.id || room === NOT_A_ROOM) continue;
-      store.link(clientId, room, { socketId: socket.id });
-    }
-    log.info('log', 'hello', { clientId, loadId, page, build });
-    const key = `${clientId}/${loadId}`;
-    for (const known of seqByLoad.keys()) {
-      if (known !== key && store.stream(`client:${known.split('/')[0]}`) === null) seqByLoad.delete(known);
-    }
-    for (const known of clientLevels.keys()) {
-      if (known !== clientId && store.stream(`client:${known}`) === null) clientLevels.delete(known);
-    }
-    ack({ ok: true, serverT: now(), level: levelForSocket(socket), acked: seqByLoad.get(key) ?? 0 });
-  }
-
-  function batch(socket, payload, ack) {
-    const clientId = socket.data.logClientId;
-    if (!clientId) return ack({ ok: false, reason: 'no_hello' });
-    if (payload?.loadId !== socket.data.logLoadId) return ack({ ok: false, reason: 'bad_load' });
-    if (!Array.isArray(payload.lines)) return ack({ ok: false, reason: 'bad_batch' });
-    if (payload.lines.length > limits.ingestMaxLines) {
-      log.warn('log', 'batch.refused', { clientId, reason: 'too_many', lines: payload.lines.length });
-      return ack({ ok: false, reason: 'too_many' });
-    }
-    let window = windows.get(socket);
-    if (!window || now() - window.start > limits.ingestWindowMs) {
-      window = { start: now(), bytes: 0, warned: false };
-      windows.set(socket, window);
-    }
-    for (const line of payload.lines) if (typeof line === 'string') window.bytes += line.length;
-    if (window.bytes > limits.ingestWindowBytes) {
-      if (!window.warned) {
-        window.warned = true;
-        log.warn('log', 'batch.refused', { clientId, reason: 'rate' });
-      }
-      return ack({ ok: false, reason: 'rate' });
-    }
-    store.reopen(`client:${clientId}`);
-    const result = storeBatch({ clientId, loadId: socket.data.logLoadId, lines: payload.lines, payload });
-    return ack({ ok: true, acked: result.lastSeq, bad: result.bad, level: levelForSocket(socket) });
-  }
-
-  function setLevel(socket, payload, ack) {
-    const level = payload?.level;
-    if (level !== 'debug' && level !== 'trace') return ack({ ok: false, reason: 'bad_request' });
-    if (payload.roomId == null) return setClientLevel(socket, level, ack);
-    // The lobby channel and a socket's own room are Socket.IO rooms too, but never a game room.
-    const isGameRoom = typeof payload.roomId === 'string' && payload.roomId !== NOT_A_ROOM && payload.roomId !== socket.id;
-    if (!isGameRoom || !socket.rooms.has(payload.roomId)) return ack({ ok: false, reason: 'bad_request' });
-    if (level === 'trace') roomLevels.set(payload.roomId, 'trace');
-    else roomLevels.delete(payload.roomId);
-    const by = socket.data.logClientId ?? socket.id;
-    io.to(payload.roomId).emit('log:level', { level, by });
-    log.info('log', 'level', { level, by }, { room: payload.roomId });
-    return ack({ ok: true, level });
-  }
-
-  function setClientLevel(socket, level, ack) {
-    const clientId = socket.data.logClientId;
-    if (!clientId) return ack({ ok: false, reason: 'no_hello' });
-    if (level === 'trace') clientLevels.set(clientId, 'trace');
-    else clientLevels.delete(clientId);
-    socket.emit?.('log:level', { level: levelForSocket(socket), by: clientId });
-    log.info('log', 'level', { level, by: clientId, scope: 'client' });
-    return ack({ ok: true, level: levelForSocket(socket) });
-  }
-
   function guarded(handler) {
     return (payload, maybeAck) => {
       const ack = typeof maybeAck === 'function' ? maybeAck : () => {};
@@ -206,10 +114,94 @@ export function createLogIngest({ store, log, io, now = Date.now, limits = LIMIT
 
   return {
     attachSocket(socket) {
-      socket.on('log:hello', guarded((payload, ack) => hello(socket, payload, ack)));
-      socket.on('log:batch', guarded((payload, ack) => batch(socket, payload, ack)));
+      socket.on('log:hello', guarded((payload, ack) => {
+        const clientId = payload?.clientId;
+        const loadId = payload?.loadId;
+        if (!CLIENT_ID.test(clientId ?? '') || !LOAD_ID.test(loadId ?? '')) {
+          ack({ ok: false, reason: 'bad_hello' });
+          return;
+        }
+        // One identity per socket: a socket that could re-hello as someone new would mint a stream
+        // (and its metadata) per call.
+        const bound = socket.data.logClientId;
+        if (bound && (bound !== clientId || socket.data.logLoadId !== loadId)) {
+          ack({ ok: false, reason: 'client_changed' });
+          return;
+        }
+        socket.data.logClientId = clientId;
+        socket.data.logLoadId = loadId;
+        const streamId = `client:${clientId}`;
+        const page = shortString(payload.page, 200) ?? '';
+        const build = shortString(payload.build, BUILD_MAX);
+        const loads = { ...(store.stream(streamId)?.meta?.loads ?? {}), [loadId]: { helloAt: now(), page, build } };
+        const kept = Object.entries(loads)
+          .sort(([, a], [, b]) => b.helloAt - a.helloAt)
+          .slice(0, limits.helloMaxLoads);
+        store.setMeta(streamId, { ua: shortString(payload.ua, 300) ?? '', build, loads: Object.fromEntries(kept) });
+        store.reopen(streamId);
+        for (const room of socket.rooms) {
+          if (room === socket.id || room === NOT_A_ROOM) continue;
+          store.link(clientId, room, { socketId: socket.id });
+        }
+        log.info('log', 'hello', { clientId, loadId, page, build });
+        const key = `${clientId}/${loadId}`;
+        for (const known of seqByLoad.keys()) {
+          if (known !== key && store.stream(`client:${known.split('/')[0]}`) === null) seqByLoad.delete(known);
+        }
+        for (const known of clientLevels.keys()) {
+          if (known !== clientId && store.stream(`client:${known}`) === null) clientLevels.delete(known);
+        }
+        ack({ ok: true, serverT: now(), level: levelForSocket(socket), acked: seqByLoad.get(key) ?? 0 });
+      }));
+      socket.on('log:batch', guarded((payload, ack) => {
+        const clientId = socket.data.logClientId;
+        if (!clientId) return ack({ ok: false, reason: 'no_hello' });
+        if (payload?.loadId !== socket.data.logLoadId) return ack({ ok: false, reason: 'bad_load' });
+        if (!Array.isArray(payload.lines)) return ack({ ok: false, reason: 'bad_batch' });
+        if (payload.lines.length > limits.ingestMaxLines) {
+          log.warn('log', 'batch.refused', { clientId, reason: 'too_many', lines: payload.lines.length });
+          return ack({ ok: false, reason: 'too_many' });
+        }
+        let window = windows.get(socket);
+        if (!window || now() - window.start > limits.ingestWindowMs) {
+          window = { start: now(), bytes: 0, warned: false };
+          windows.set(socket, window);
+        }
+        for (const line of payload.lines) if (typeof line === 'string') window.bytes += line.length;
+        if (window.bytes > limits.ingestWindowBytes) {
+          if (!window.warned) {
+            window.warned = true;
+            log.warn('log', 'batch.refused', { clientId, reason: 'rate' });
+          }
+          return ack({ ok: false, reason: 'rate' });
+        }
+        store.reopen(`client:${clientId}`);
+        const result = storeBatch({ clientId, loadId: socket.data.logLoadId, lines: payload.lines, payload });
+        return ack({ ok: true, acked: result.lastSeq, bad: result.bad, level: levelForSocket(socket) });
+      }));
       socket.on('log:ping', guarded((payload, ack) => ack({ t0: payload?.t0 ?? null, serverT: now() })));
-      socket.on('log:setLevel', guarded((payload, ack) => setLevel(socket, payload, ack)));
+      socket.on('log:setLevel', guarded((payload, ack) => {
+        const level = payload?.level;
+        if (level !== 'debug' && level !== 'trace') return ack({ ok: false, reason: 'bad_request' });
+        if (payload.roomId == null) {
+          const clientId = socket.data.logClientId;
+          if (!clientId) return ack({ ok: false, reason: 'no_hello' });
+          if (level === 'trace') clientLevels.set(clientId, 'trace');
+          else clientLevels.delete(clientId);
+          socket.emit?.('log:level', { level: levelForSocket(socket), by: clientId });
+          log.info('log', 'level', { level, by: clientId, scope: 'client' });
+          return ack({ ok: true, level: levelForSocket(socket) });
+        }
+        // The lobby channel and a socket's own room are Socket.IO rooms too, but never a game room.
+        const isGameRoom = typeof payload.roomId === 'string' && payload.roomId !== NOT_A_ROOM && payload.roomId !== socket.id;
+        if (!isGameRoom || !socket.rooms.has(payload.roomId)) return ack({ ok: false, reason: 'bad_request' });
+        if (level === 'trace') roomLevels.set(payload.roomId, 'trace');
+        else roomLevels.delete(payload.roomId);
+        const by = socket.data.logClientId ?? socket.id;
+        io.to(payload.roomId).emit('log:level', { level, by });
+        log.info('log', 'level', { level, by }, { room: payload.roomId });
+        return ack({ ok: true, level });
+      }));
       socket.on('disconnect', () => {
         try {
           if (socket.data.logClientId) store.close(`client:${socket.data.logClientId}`);

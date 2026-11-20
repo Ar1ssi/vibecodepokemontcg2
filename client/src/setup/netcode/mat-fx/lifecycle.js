@@ -352,15 +352,16 @@ export const promote = (plan) => {
   });
 };
 
-/**
- * Where each discarded card flies from: its pre-diff snapshot, or the deck for
- * a card that was not on screen. A sweep (`plan.sweep`) flies the cards that
- * were in its source zone. A card whose snapshot another effect already
- * took (the trainer presentation) does not fly. The art is the post-diff
- * element's first: discard is public, so an opponent's hand card shows its
- * face there, not the sleeve it had in hand.
- */
-const discardFlightsFor = (plan, registry, pile) => {
+export const discard = (plan) => {
+  const pile = pileOf(plan.user, 'discard');
+  if (!pile) return 0;
+  // Where each discarded card flies from: its pre-diff snapshot, or the deck for
+  // a card that was not on screen. A sweep (`plan.sweep`) flies the cards that
+  // were in its source zone. A card whose snapshot another effect already
+  // took (the trainer presentation) does not fly. The art is the post-diff
+  // element's first: discard is public, so an opponent's hand card shows its
+  // face there, not the sleeve it had in hand.
+  const registry = getCardRegistry();
   const deck = pileOf(plan.user, 'deck');
   const cards = [];
   const swept = plan.sweep ? takeZoneSweep(plan.user, plan.sweep) : [];
@@ -371,13 +372,7 @@ const discardFlightsFor = (plan, registry, pile) => {
     const src = element?.src || origin?.src;
     if (from?.rect && src) cards.push({ src, rect: cardShapedRect(from.rect), turn: from.turn ?? pile.turn });
   }
-  return cards;
-};
-
-export const discard = (plan) => {
-  const pile = pileOf(plan.user, 'discard');
-  if (!pile) return 0;
-  if (playDiscardFlights(discardFlightsFor(plan, getCardRegistry(), pile), pile) > 0) return;
+  if (playDiscardFlights(cards, pile) > 0) return;
   const host = spawnOverlay({ rect: pile.rect, className: 'fx-overlay fx-discard-puff' });
   runPose(host, DISCARD_PUFF_MS, (t) => {
     const pose = discardPuffPose(t);

@@ -221,30 +221,11 @@ export function citySpots(layout) {
   return { roof, hut, towers, round, beams, clutter, driftEmitters, glows };
 }
 
-/** Design 083: one piece of rooftop clutter: an air-conditioning unit, a vent with a cowl, or stacked crates. */
-function clutterPiece(props, { kind, x, y, size, height, seed }) {
-  const yaw = (seed - 0.5) * 0.6;
-  if (kind === 'unit') {
-    props.roundBox({ x, y, z0: 0, z1: height, hw: size, hh: size * 0.7, yaw, color: MACHINE, topColor: [0.36, 0.38, 0.42, 0.4] });
-    props.cylinder({ x: x + Math.cos(yaw) * size * 0.35, y: y + Math.sin(yaw) * size * 0.35, z0: height, z1: height + 1.5, r: size * 0.42, color: [0.16, 0.17, 0.2, 0.3], sides: 16 });
-  } else if (kind === 'vent') {
-    props.cylinder({ x, y, z0: 0, z1: height, r: size * 0.55, color: [0.34, 0.35, 0.39, 0.6], sides: 12 });
-    props.cylinder({ x, y, z0: height, z1: height + 3, r: size * 0.85, color: [0.28, 0.29, 0.33, 0.6], sides: 12 });
-  } else {
-    props.roundBox({ x, y, z0: 0, z1: height * 0.55, hw: size, hh: size * 0.8, yaw, color: CRATE, topColor: CRATE_TOP });
-    props.roundBox({ x: x + size * 0.2, y: y - size * 0.15, z0: height * 0.55, z1: height, hw: size * 0.7, hh: size * 0.6, yaw: yaw + 0.4, color: CRATE, topColor: CRATE_TOP });
-  }
-}
-
 /** The parapet round the roof, the hut with its door and lamp, the towers' rooftops, billboards' posts and searchlights, the round tower's crown. */
 export function cityProps(spots) {
   const props = createPropBuilder();
-  citySolids(props, spots);
-  return props;
-}
-
-/** The billboards' posts, the searchlights, the parapets and everything on the roofs. */
-function citySolids(props, { roof, hut, towers, round, beams = [], clutter = [] }) {
+  // The billboards' posts, the searchlights, the parapets and everything on the roofs.
+  const { roof, hut, towers, round, beams = [], clutter = [] } = spots;
   // Each billboard's posts: two at its foot, two longer ones up to its top edge.
   for (const tower of towers) {
     if (!tower.board) continue;
@@ -336,7 +317,21 @@ function citySolids(props, { roof, hut, towers, round, beams = [], clutter = [] 
   }
   // Design 083: the rooftop clutter, each piece its own shade.
   for (const piece of clutter) {
-    props.tint(instanceTint(piece.seed * 991, 1.3), () => clutterPiece(props, piece));
+    props.tint(instanceTint(piece.seed * 991, 1.3), () => {
+      // Design 083: one piece of rooftop clutter: an air-conditioning unit, a vent with a cowl, or stacked crates.
+      const { kind, x, y, size, height, seed } = piece;
+      const yaw = (seed - 0.5) * 0.6;
+      if (kind === 'unit') {
+        props.roundBox({ x, y, z0: 0, z1: height, hw: size, hh: size * 0.7, yaw, color: MACHINE, topColor: [0.36, 0.38, 0.42, 0.4] });
+        props.cylinder({ x: x + Math.cos(yaw) * size * 0.35, y: y + Math.sin(yaw) * size * 0.35, z0: height, z1: height + 1.5, r: size * 0.42, color: [0.16, 0.17, 0.2, 0.3], sides: 16 });
+      } else if (kind === 'vent') {
+        props.cylinder({ x, y, z0: 0, z1: height, r: size * 0.55, color: [0.34, 0.35, 0.39, 0.6], sides: 12 });
+        props.cylinder({ x, y, z0: height, z1: height + 3, r: size * 0.85, color: [0.28, 0.29, 0.33, 0.6], sides: 12 });
+      } else {
+        props.roundBox({ x, y, z0: 0, z1: height * 0.55, hw: size, hh: size * 0.8, yaw, color: CRATE, topColor: CRATE_TOP });
+        props.roundBox({ x: x + size * 0.2, y: y - size * 0.15, z0: height * 0.55, z1: height, hw: size * 0.7, hh: size * 0.6, yaw: yaw + 0.4, color: CRATE, topColor: CRATE_TOP });
+      }
+    });
   }
   // The round tower, as the art's: a pale ledge round every floor, and on its roof a lantern of
   // white-lit glass under a dark dome.
@@ -348,6 +343,7 @@ function citySolids(props, { roof, hut, towers, round, beams = [], clutter = [] 
     props.ring({ x: round.x, y: round.y, z0: round.height + 6, z1: round.height + 30, r: round.r * 0.6, color: CROWN_LIGHT, sides: 36 });
     props.cylinder({ x: round.x, y: round.y, z0: round.height + 30, z1: round.height + 34, r: round.r * 0.66, color: LEDGE, sides: 36, capColor: DOME, domeRise: round.r * 0.38 });
   }
+  return props;
 }
 
 /** The towers: boxes from the streets up, and the round tower's column of floors. */

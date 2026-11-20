@@ -133,7 +133,7 @@ try {
       caller = 'B';
       break;
     }
-    // Under design 013 E2E mode, handleServerTurnOrderCall auto-answers the coin call
+    // Under design 013 E2E mode, rules-bridge.js auto-answers the coin call
     // directly over socket without displaying #rulesCoinCallOverlay (matches playtest-bot.mjs
     // and test-card-inspector-e2e.mjs). If hands are already dealt, proceed.
     const [aHandCount, bHandCount] = await Promise.all([

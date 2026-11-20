@@ -8,9 +8,6 @@
 const KEY_PREFIX = 'ptcg.seatToken.';
 const memory = new Map();
 
-const isSeatToken = (value) =>
-  typeof value?.username === 'string' && typeof value?.token === 'string';
-
 const sessionStorageOrNull = () => {
   try {
     return globalThis.sessionStorage ?? null;
@@ -31,7 +28,7 @@ export function readSeatToken(roomId, storage = sessionStorageOrNull()) {
   } catch {
     stored = null;
   }
-  if (!isSeatToken(stored)) stored = memory.get(roomId) ?? null;
+  if (typeof stored?.username !== 'string' || typeof stored?.token !== 'string') stored = memory.get(roomId) ?? null;
   return stored ? { username: stored.username, token: stored.token } : null;
 }
 

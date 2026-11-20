@@ -58,19 +58,6 @@ const readStoredMats = () => {
   }
 };
 
-/** @param {{ self: object|null, opp: object|null }} mats */
-const writeStoredMats = (mats) => {
-  try {
-    if (mats.self || mats.opp) {
-      localStorage.setItem(MAT_STORAGE_KEY, JSON.stringify(mats));
-    } else {
-      localStorage.removeItem(MAT_STORAGE_KEY);
-    }
-  } catch {
-    /* choice simply will not persist */
-  }
-};
-
 /** `--mat-scale` as the page has it, else the stored picker value (percent), else '1'. */
 const currentMatScaleText = () =>
   document.documentElement?.style?.getPropertyValue('--mat-scale') ||
@@ -324,7 +311,16 @@ export const applyMatForTarget = (target, mat) => {
     currentMats[other] = null;
   }
 
-  writeStoredMats(currentMats);
+  const mats = currentMats;
+  try {
+    if (mats.self || mats.opp) {
+      localStorage.setItem(MAT_STORAGE_KEY, JSON.stringify(mats));
+    } else {
+      localStorage.removeItem(MAT_STORAGE_KEY);
+    }
+  } catch {
+    /* choice simply will not persist */
+  }
   syncLayouts();
   syncMatArt();
 
@@ -360,15 +356,10 @@ export const changePlaymat = (user, matId, emit = true) => {
   processAction(user, emit, 'changePlaymat', [matId]);
 };
 
-/** Re-apply the active mat choices. */
-export const refreshMatLayout = () => {
-  syncLayouts();
-  syncMatArt();
-};
-
 export const initializeMatLayout = () => {
   currentMats = readStoredMats();
-  refreshMatLayout();
+  syncLayouts();
+  syncMatArt();
 
   document.addEventListener('playmat-changed', (event) => {
     applyMatForTarget(

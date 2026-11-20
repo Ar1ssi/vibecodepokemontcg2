@@ -8,8 +8,6 @@
 
 const SEATS = ['p1', 'p2'];
 
-const isSeat = (seat) => SEATS.includes(seat);
-
 /**
  * The seat across the table from `nearSeat`.
  *
@@ -28,7 +26,7 @@ export function farSeat(nearSeat) {
  * @returns {'p1'|'p2'}
  */
 export function seatForSide(side, nearSeat) {
-  const near = isSeat(nearSeat) ? nearSeat : 'p1';
+  const near = SEATS.includes(nearSeat) ? nearSeat : 'p1';
   return side === 'opp' ? farSeat(near) : near;
 }
 

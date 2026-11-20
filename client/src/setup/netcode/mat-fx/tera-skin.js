@@ -47,12 +47,6 @@ function sceneHandleFor(scene, instanceId) {
 
 const isSceneHandle = (node) => sceneHandles.get(node?.scene)?.get(node.instanceId) === node;
 
-const skinNodeFor = (record) => {
-  const wrapper = record?.holoCard?.wrapper;
-  if (wrapper?.isConnected) return wrapper;
-  return record?.element?.isConnected ? record.element : null;
-};
-
 function layer(doc, name) {
   const el = doc.createElement('div');
   el.className = `${LAYER_CLASS} fx-tera-crystal__${name}`;
@@ -114,7 +108,12 @@ function removeSkin(node) {
 const skins = createSkinReconciler({
   targetIds: () => (!fxDisabled() && hasAuthoritativeView() ? teraSkinTargets(getAuthoritativeZoneArray) : []),
   nodeFor: (id) => {
-    if (!board3dActive()) return skinNodeFor(getCardRegistry().get(id));
+    if (!board3dActive()) {
+      const record = getCardRegistry().get(id);
+      const wrapper = record?.holoCard?.wrapper;
+      if (wrapper?.isConnected) return wrapper;
+      return record?.element?.isConnected ? record.element : null;
+    }
     const scene = getBoardScene();
     return scene ? sceneHandleFor(scene, id) : null;
   },

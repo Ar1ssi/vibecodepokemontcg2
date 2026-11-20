@@ -21,18 +21,6 @@ function firstKeys(value) {
   return value && typeof value === 'object' ? Object.keys(value).slice(0, KEY_LIMIT) : [];
 }
 
-function summarizeView(bytes, args, trace) {
-  const view = args?.[0];
-  const summary = {
-    bytes,
-    sv: view?.stateVersion ?? null,
-    lastClientSeq: view?.lastClientSeq ?? null,
-    events: Array.isArray(view?.events) ? view.events.map((e) => e?.type) : [],
-    choice: view?.pendingChoice?.choiceId ?? null,
-  };
-  return trace ? { ...summary, args } : summary;
-}
-
 // Events that carry a credential as a bare positional argument (object keys are redacted by name
 // in safeStringify): joinGame(roomId, username, isSpectator, seatToken, options).
 const SECRET_ARGS = { joinGame: [3] };
@@ -47,7 +35,17 @@ export function summarizePayload(event, rawArgs, { trace = false } = {}) {
   if (typeof event === 'string' && event.startsWith('log:')) return null;
   const args = withoutSecretArgs(event, rawArgs);
   const bytes = byteLength(args);
-  if (event === 'view') return summarizeView(bytes, args, trace);
+  if (event === 'view') {
+    const view = args?.[0];
+    const summary = {
+      bytes,
+      sv: view?.stateVersion ?? null,
+      lastClientSeq: view?.lastClientSeq ?? null,
+      events: Array.isArray(view?.events) ? view.events.map((e) => e?.type) : [],
+      choice: view?.pendingChoice?.choiceId ?? null,
+    };
+    return trace ? { ...summary, args } : summary;
+  }
   if (KEYS_ONLY.has(event)) return { bytes, keys: firstKeys(args?.[0]) };
   if (FULL.has(event)) return { bytes, maxBytes: LIMITS.relayDetailBytes, args };
   return { bytes, args };

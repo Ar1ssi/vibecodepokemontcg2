@@ -63,7 +63,6 @@ function stadiumServerConditionMet(condition, player, opponent = null) {
 
 // ── Sky Field (customhb-485): move 1 Energy card from 1 of your {C} Pokémon to another ──
 
-const TYPED_MOVE_EFFECT = 'typedEnergyMove';
 
 function typedRoots(player, type) {
   return ['active', 'bench'].flatMap((zoneId) => {
@@ -80,14 +79,6 @@ function energiesOn(player, root) {
   return ['active', 'bench']
     .flatMap((zoneId) => player.zones?.[zoneId] || [])
     .filter((c) => c.attachedTo === root.instanceId && isEnergyCard(c));
-}
-
-/** Whether the move has a legal source and destination; checked before the activation is spent. */
-function typedEnergyMovePossible(player, opt) {
-  const targets = typedRoots(player, opt.toType);
-  return typedRoots(player, opt.fromType).some(
-    (source) => energiesOn(player, source).length > 0 && targets.some((t) => t.instanceId !== source.instanceId)
-  );
 }
 
 function askTypedMove(draft, { playerId, stadium, prompt, options, memo }) {
@@ -195,8 +186,6 @@ export function executeStadium(draft, {
   // activation ends the turn even though it re-enters without the preview.
   const preview = parseStadiumOncePerTurn(stadium);
   const turnEndsOnResolve = !!preview?.turnEnds;
-  const isEnergy = (c) =>
-    /energy/i.test(String(c?.type || '') + String(c?.name || ''));
 
   if (resumeToken?.typedMove) {
     return runTypedEnergyMove(draft, {
@@ -249,7 +238,7 @@ export function executeStadium(draft, {
   if (
     preview?.cost?.type === 'discard-energy' &&
     !(player.zones.hand || []).some(
-      (c) => isEnergy(c) && matchesEnergyTypeFilter(c, preview.cost.types)
+      (c) => /energy/i.test(String(c?.type || '') + String(c?.name || '')) && matchesEnergyTypeFilter(c, preview.cost.types)
     )
   ) {
     draft.pendingChoice = null;
@@ -296,7 +285,11 @@ export function executeStadium(draft, {
 
   if (opt?.kind === 'move-energy-typed') {
     // Nothing to move: the optional activation does nothing and is not spent.
-    if (!typedEnergyMovePossible(player, opt)) return finishTypedMove(draft);
+    // Whether the move has a legal source and destination; checked before the activation is spent.
+    const targets = typedRoots(player, opt.toType);
+    if (!typedRoots(player, opt.fromType).some(
+      (source) => energiesOn(player, source).length > 0 && targets.some((t) => t.instanceId !== source.instanceId)
+    )) return finishTypedMove(draft);
     if (!player.flags) player.flags = {};
     player.flags.stadiumUsedThisTurn = true;
     events.push({ type: 'stadiumEffectUsed', instanceId: stadium.instanceId, name: stadium.name, playerId });

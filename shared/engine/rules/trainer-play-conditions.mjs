@@ -149,7 +149,9 @@ export function trainerPlayBlockReason({
   if (condition === 'notFirstTurn' && turnNumber <= 2) {
     return "You can't use this card during your first turn.";
   }
-  return playConditionBlockReason(condition, {
+  // Conditions whose state the caller may not know (the playtest bot) are skipped when their
+  // input is null/undefined: the server always supplies them and stays the authority.
+  const ctx = {
     turnNumber,
     opponentPrizes,
     stadiumName,
@@ -161,56 +163,7 @@ export function trainerPlayBlockReason({
     ownActive,
     koedLastOppTurn,
     koedLastOppTurnVictims,
-  });
-}
-
-function normalizeName(name) {
-  return String(name || '')
-    .replace(/[\u2018\u2019]/g, "'")
-    .trim()
-    .toLowerCase();
-}
-
-const TYPE_SYMBOL_WORDS = {
-  g: 'grass',
-  r: 'fire',
-  w: 'water',
-  l: 'lightning',
-  p: 'psychic',
-  f: 'fighting',
-  d: 'darkness',
-  m: 'metal',
-  n: 'dragon',
-  y: 'fairy',
-  c: 'colorless',
-};
-
-function stageName(card) {
-  const subtypes = Array.isArray(card?.subtypes) ? card.subtypes : [];
-  return normalizeStage(card?.stage) || subtypes.map(normalizeStage).find(Boolean) || 'Basic';
-}
-
-function victimMatches(victim, qualifier) {
-  const [kind, value] = qualifier.split('=');
-  if (kind === 'type') {
-    const word = TYPE_SYMBOL_WORDS[value];
-    return (victim?.types || []).some((t) => {
-      const type = String(t).toLowerCase();
-      return type === word || (word === 'darkness' && type === 'dark');
-    });
-  }
-  if (kind === 'name') {
-    return String(victim?.name || '')
-      .replace(/[\u2018\u2019]/g, "'")
-      .toLowerCase()
-      .startsWith(value);
-  }
-  return false;
-}
-
-// Conditions whose state the caller may not know (the playtest bot) are skipped when their
-// input is null/undefined: the server always supplies them and stays the authority.
-function playConditionBlockReason(condition, ctx) {
+  };
   if (!condition) return null;
   const exactPrizes = condition.match(/^opponentPrizes==([\d|]+)$/);
   if (exactPrizes) {
@@ -233,7 +186,9 @@ function playConditionBlockReason(condition, ctx) {
   const oppStage = condition.match(/^opponentActiveStage=(.+)$/);
   if (oppStage) {
     if (ctx.opponentActive === undefined) return null;
-    if (stageName(ctx.opponentActive) !== oppStage[1]) {
+    const card = ctx.opponentActive;
+    const subtypes = Array.isArray(card?.subtypes) ? card.subtypes : [];
+    if ((normalizeStage(card?.stage) || subtypes.map(normalizeStage).find(Boolean) || 'Basic') !== oppStage[1]) {
       return `Your opponent's Active Pokémon must be a ${oppStage[1]} Pokémon.`;
     }
     return null;
@@ -262,7 +217,23 @@ function playConditionBlockReason(condition, ctx) {
     const qualifier = koed[1];
     const met = qualifier
       ? Array.isArray(ctx.koedLastOppTurnVictims) &&
-        ctx.koedLastOppTurnVictims.some((victim) => victimMatches(victim, qualifier))
+        ctx.koedLastOppTurnVictims.some((victim) => {
+          const [kind, value] = qualifier.split('=');
+          if (kind === 'type') {
+            const word = TYPE_SYMBOL_WORDS[value];
+            return (victim?.types || []).some((t) => {
+              const type = String(t).toLowerCase();
+              return type === word || (word === 'darkness' && type === 'dark');
+            });
+          }
+          if (kind === 'name') {
+            return String(victim?.name || '')
+              .replace(/[\u2018\u2019]/g, "'")
+              .toLowerCase()
+              .startsWith(value);
+          }
+          return false;
+        })
       : ctx.koedLastOppTurn;
     return met ? null : "None of the required Pokémon were Knocked Out during your opponent's last turn.";
   }
@@ -304,3 +275,25 @@ function playConditionBlockReason(condition, ctx) {
   }
   return null;
 }
+
+function normalizeName(name) {
+  return String(name || '')
+    .replace(/[\u2018\u2019]/g, "'")
+    .trim()
+    .toLowerCase();
+}
+
+const TYPE_SYMBOL_WORDS = {
+  g: 'grass',
+  r: 'fire',
+  w: 'water',
+  l: 'lightning',
+  p: 'psychic',
+  f: 'fighting',
+  d: 'darkness',
+  m: 'metal',
+  n: 'dragon',
+  y: 'fairy',
+  c: 'colorless',
+};
+

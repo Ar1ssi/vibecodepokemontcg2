@@ -61,14 +61,6 @@ const PUBLIC_PLAYER_ZONES = ['active', 'bench', 'discard', 'lostZone', 'board'];
 // not — it arrives as { count } rather than an array, so it has no length to compare.
 const SECRET_PLAYER_ZONES = ['hand', 'prizes'];
 
-function zoneSnapshot(user, zoneId) {
-  const cards = liveZoneArray(user, zoneId);
-  return {
-    count: liveZoneCount(user, zoneId),
-    names: cards.map((card) => card.name || ''),
-  };
-}
-
 // Design 004 slice 1: plain-JSON read model for the playtest bot. No DOM nodes, no live
 // card references — every field is a primitive or a plain object so `observe()` can cross
 // the Playwright page boundary as JSON. Card stats (hp/attacks/types) only exist once
@@ -95,15 +87,6 @@ function serializePokemonCard(card, attachedCards = []) {
           damage: attack?.damage ?? '',
         }))
       : [],
-  };
-}
-
-function serializeHandCard(card, index) {
-  return {
-    index,
-    name: card?.name || '',
-    supertype: card?.supertype || '',
-    type: card?.type || '',
   };
 }
 
@@ -185,7 +168,12 @@ function serializePlayerObservation(user) {
   );
   const active = boardPokemon(user, 'active')[0] || null;
   return {
-    hand: liveZoneArray(user, 'hand').map((card, index) => serializeHandCard(card, index)),
+    hand: liveZoneArray(user, 'hand').map((card, index) => ({
+      index,
+      name: card?.name || '',
+      supertype: card?.supertype || '',
+      type: card?.type || '',
+    })),
     active: serializePokemonCard(active, attachedCardsFor(user, 'active', active)),
     bench,
     prizeCount: liveZoneArray(user, 'prizes').length,
@@ -631,7 +619,11 @@ export function installE2eApi() {
       return !!btn;
     },
     zone(user, zoneId) {
-      return zoneSnapshot(user, zoneId);
+      const cards = liveZoneArray(user, zoneId);
+      return {
+        count: liveZoneCount(user, zoneId),
+        names: cards.map((card) => card.name || ''),
+      };
     },
     // Design 074 F1: which board draws the cards, so a harness picks where to read geometry.
     boardMode: currentBoardMode,

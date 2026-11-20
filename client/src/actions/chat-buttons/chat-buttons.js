@@ -9,7 +9,7 @@ import { rulesState, canPerformAction, markAttacked, endTurn, ensureCardData, ma
 import { classifyAbility, searchTargetType } from '/shared/engine/rules/ability-effects.mjs';
 import { isAncientCard } from '/shared/engine/rules/paradox-tags.mjs';
 import { computeAttackDamage, canPayAttackCost } from '/shared/engine/rules/attack-engine.mjs';
-import { classifyEnergyEffect, effectiveEnergyType, pokemonHasRedirectEnergy, pokemonHasProtectEnergy, applyProtectCap, isEnergyCard, rewriteEnergyDescriptor } from '/shared/engine/rules/energy-effects.mjs';
+import { classifyEnergyEffect, effectiveEnergyType, pokemonHasRedirectEnergy, pokemonHasProtectEnergy, applyProtectCap, rewriteEnergyDescriptor } from '/shared/engine/rules/energy-effects.mjs';
 import {
   parsePendingAttackEffects,
   parseDiscardOpponentEffect,
@@ -17,21 +17,16 @@ import {
   combinedPendingDamagePrevention,
   pendingDamageVulnerability,
   pendingCantUseAttack,
-  pendingRetreatCostDelta,
 } from '/shared/engine/rules/attack-pending-effects.mjs';
 import {
-  parseDamagePrevention,
   applyDamagePrevention,
-  passiveCostDiscount,
   applyCostDiscount,
-  combinedDamagePrevention,
   combinedPassiveCostDiscount,
   parseStatusInflict,
   parseSwitchAbility,
   parseMoveDamage,
   parseLookAtTop,
   parseRecursionFromDiscard,
-  isPokemonToolCard,
   attachedTools,
 } from '/shared/engine/rules/ability-executors.mjs';
 import {
@@ -41,7 +36,6 @@ import {
   evaluateToolKoPrevention,
   toolPrizeCountAdjust,
   attachedToolOnDamageEffects,
-  combinedToolRetreatCost,
 } from '/shared/engine/rules/tool-combat.mjs';
 import { parseAbility } from '/shared/engine/rules/abilities.mjs';
 import { canEvolve, markEvolvedThisTurn, normalizeStage, pokemonNamesMatch } from '/shared/engine/rules/evolution.mjs';
@@ -51,10 +45,10 @@ import { draw } from '../zones/deck-actions.js';
 import { takePrizes } from '../zones/prizes-actions.js';
 import { promptPrizeTake } from '../zones/prize-take-prompt.js';
 import { shuffleAndDraw } from '../zones/hand-actions.js';
-import { handleKO, promotionGuidance, planPromotion, koOutcome, checkWinConditions, occupiedZoneCount } from '/shared/engine/rules/ko-flow.mjs';
+import { handleKO, planPromotion, koOutcome, checkWinConditions, occupiedZoneCount } from '/shared/engine/rules/ko-flow.mjs';
 import { isPrismStarCard, isExCard } from '/shared/engine/rules/card-classify.mjs';
 import { planSpecialEnergyTriggers, isSpecialEnergyCard, specialEnergyBoard } from '/shared/engine/rules/special-energy-parse.mjs';
-import { markRetreated, getEffectiveRetreatCost, energiesToDiscardForRetreat, canRetreat } from '/shared/engine/rules/retreat.mjs';
+import { markRetreated, getEffectiveRetreatCost, energiesToDiscardForRetreat } from '/shared/engine/rules/retreat.mjs';
 import { moveCard } from '../move-card-bundle/move-card.js';
 import { moveCardBundle } from '../move-card-bundle/move-card-bundle.js';
 import { getZone } from '../../setup/zones/get-zone.js';
@@ -79,7 +73,7 @@ import {
   resolveTurnBoundary,
 } from '/shared/engine/rules/status.mjs';
 import { addDamageCounter, updateDamageCounter, removeDamageCounter } from '../counters/damage-counter.js';
-import { applyStadiumEffect, parseStadiumOncePerTurn, parseStadiumSetupDraw, parseStadiumDamagePrevention, parseStadiumDamagePreventionDetail, stadiumPreventionApplies, getStadiumDamageReduction, getStadiumAttackDamageBonus, getStadiumAttackCostIncrease, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, isStadiumRetreatPrevention, isStadiumHandProtect, stadiumCostDiscountFor, effectiveHp, getStadiumRetreatCost, stadiumBlocksStatusApplication, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumSearch, matchesStadiumEvolveSearch, isStadiumGlimwoodReFlip, stadiumBlocksHealing, isRepeatableStadiumAction, stadiumExtraAttacksFromZone, mergeAttacks } from '/shared/engine/rules/stadium-effects.mjs';
+import { applyStadiumEffect, parseStadiumDamagePreventionDetail, stadiumPreventionApplies, getStadiumDamageReduction, getStadiumAttackDamageBonus, getStadiumAttackCostIncrease, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, isStadiumRetreatPrevention, stadiumCostDiscountFor, effectiveHp, stadiumBlocksStatusApplication, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumSearch, matchesStadiumEvolveSearch, isStadiumGlimwoodReFlip, stadiumBlocksHealing, isRepeatableStadiumAction, stadiumExtraAttacksFromZone, mergeAttacks } from '/shared/engine/rules/stadium-effects.mjs';
 import { flipCoin, parseAttackArgs, parseRetreatArgs, rngFromCoin, splitEmitAndTail, isMirrorReplayCall } from '../../setup/general/sync-action-args.mjs';
 import { dispatchAuthoritativeAction, readCardInstanceId } from '../../setup/netcode/authoritative-dispatch.js';
 import { matchesSearch, filterSearchMatches, energySearchWhat, matchesDiscardCost, isEnergyDiscardCost, searchPickerAllCandidates } from '/shared/engine/rules/search-match.mjs';
@@ -3785,68 +3779,6 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
   });
 };
 
-// Draw ability (taxonomy C, once-per-turn): draw N from deck. Does NOT end turn.
-
-export const drawAbility = async (user, emit = true, targetCard = null) => {
-  const { target } = resolveAbilityTarget(user, targetCard);
-  await ensureCardData(target);
-
-  const abilityText =
-    target.ability?.text ?? target.abilityText ?? target.text ?? '';
-  const drawStep = parseAbility(abilityText).find((s) => s.type === 'drawAbility');
-  const family = classifyAbility(target);
-  if (!drawStep && family !== 'draw') {
-    appendMessage(
-      user,
-      `⛔ ${target.name || 'This Pokémon'} has no draw ability.`,
-      'announcement',
-      false
-    );
-    return;
-  }
-  if (!abilityTurnAndUsageGuard(user, target)) return;
-
-  const deck = getZone(user, 'deck');
-  if (deck.array.length === 0) {
-    appendMessage(user, '⛔ Your deck is empty.', 'announcement', false);
-    return;
-  }
-
-  let drew = 0;
-  if (drawStep?.until) {
-    const targetHand = drawStep.count;
-    while (
-      getZone(user, 'hand').getCount() < targetHand &&
-      getZone(user, 'deck').getCount() > 0
-    ) {
-      moveCardBundle(user, user, 'deck', 'hand', 0, false, 'move', emit);
-      drew++;
-    }
-  } else if (drawStep?.eachPlayer) {
-    for (const who of ['self', 'opp']) {
-      if (getZone(who, 'deck').getCount() > 0) {
-        moveCardBundle(who, who, 'deck', 'hand', 0, false, 'move', emit);
-        if (who === user) drew++;
-      }
-    }
-  } else {
-    const n = drawStep?.count || 1;
-    for (let i = 0; i < n; i++) {
-      if (getZone(user, 'deck').getCount() === 0) break;
-      moveCardBundle(user, user, 'deck', 'hand', 0, false, 'move', emit);
-      drew++;
-    }
-  }
-
-  if (rulesState.enabled) markAbilityUsed(user, target);
-  appendMessage(
-    user,
-    `🃏 ${target.name} draws ${drew} card${drew !== 1 ? 's' : ''}.`,
-    'announcement',
-    false
-  );
-};
-
 // Status ability: apply a Special Condition to the opponent's Active Pokémon.
 export const statusAbility = async (user, emit = true, targetCard = null, opts = {}) => {
   const { target } = resolveAbilityTarget(user, targetCard);
@@ -4603,11 +4535,6 @@ async function executeGrandTreeSpecialRule(user, card, emit) {
   await Promise.all([...inPlay, ...deck.array].map((c) => ensureCardData(c)));
 
   const getEvolvesFrom = (c) => String(c?.evolvesFrom || c?.evolveFrom || '').trim();
-  const isEvolvesFromHost = (c, hostList) => {
-    const from = getEvolvesFrom(c);
-    if (!from) return false;
-    return hostList.some((h) => pokemonNamesMatch(h?.name, from) && formsAllowEvolution(c, h));
-  };
 
   const basicHosts = inPlay.filter((p) => {
     const stage = normalizeStage(p.stage || 'Basic');
@@ -4621,7 +4548,12 @@ async function executeGrandTreeSpecialRule(user, card, emit) {
     if (!isPoke) return false;
     const stg = normalizeStage(c.stage || '');
     const isStage1 = stg === 'Stage 1' || String(c.stage || '').toLowerCase().includes('stage 1') || String(c.stage || '').toLowerCase().includes('stage1');
-    return (isStage1 || !stg || stg === 'Unknown') && isEvolvesFromHost(c, eligibleHosts);
+    const from = getEvolvesFrom(c);
+    return (
+      (isStage1 || !stg || stg === 'Unknown') &&
+      from &&
+      eligibleHosts.some((h) => pokemonNamesMatch(h?.name, from) && formsAllowEvolution(c, h))
+    );
   });
 
   let candidates = stage1Matches;
@@ -4759,8 +4691,6 @@ async function executeGrandTreeSpecialRule(user, card, emit) {
     onCancel: () => finishGrandTree(),
   });
 }
-
-const lowerName = (name) => String(name || '').toLowerCase();
 
 // ── Stadium effect (taxonomy E, once-per-turn / setup-once) ──────────
 // Uses the active stadium's once-per-turn or setup-once effect.

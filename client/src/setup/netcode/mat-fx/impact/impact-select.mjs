@@ -73,8 +73,6 @@ export function isImpactBeat(beat, contactMs) {
   return (beat.params?.target ?? 'defender') === 'defender';
 }
 
-const isImpactBurst = (burst, contactMs) => burst?.anchor === 'defender' && burst.at >= contactMs - AT_CONTACT_SLACK_MS;
-
 const stripped = new WeakMap();
 
 /** `spec` without its impact beats and its contact particle bursts on the defender. */
@@ -86,7 +84,7 @@ export function withoutImpactBeats(spec) {
       Object.freeze({
         ...spec,
         beats: spec.beats.filter((beat) => !isImpactBeat(beat, spec.contactMs)),
-        particles: (spec.particles ?? []).filter((burst) => !isImpactBurst(burst, spec.contactMs)),
+        particles: (spec.particles ?? []).filter((burst) => !(burst?.anchor === 'defender' && burst.at >= spec.contactMs - AT_CONTACT_SLACK_MS)),
       })
     );
   }

@@ -44,7 +44,7 @@ import {
 import { environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
 import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
 import { GLOW, GRASS, LIGHT_MOTION } from './stadium-env-ground.mjs';
-import { RISE_LEAN, frameWeight, patchy, shuffled, visibleArea } from './stadium-env-spots.mjs';
+import { RISE_LEAN, distanceToRect, frameWeight, hash, oppHandRect, patchy, shuffled, union, visibleArea } from './stadium-env-spots.mjs';
 import { clumpPieces, scaledKinds } from './stadium-env-clumps.mjs';
 import { createKitProps, glslColour, paint } from './stadium-kit.mjs';
 import { measureAsset, placeAsset } from './stadium-kit-assets.mjs';
@@ -104,14 +104,6 @@ export const MIST_CARD_GAP_PX = 40;
 /** How far a pad reaches past its radius, seen from above (a margin). */
 const PUFF_REACH = 1.06;
 
-/** A small deterministic 0..1 from three numbers. */
-const hash = (x, y, salt) => {
-  const s = Math.sin(x * 127.1 + y * 311.7 + salt * 74.7) * 43758.5453;
-  return s - Math.floor(s);
-};
-
-const distanceToRect = (x, y, r) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.y - y, 0, y - r.y - r.h));
-
 /** The meadow edge's wander, 0..1, as the shader's `wobble`. */
 export const clearingWobble = (x, y) =>
   0.5 + 0.3 * Math.sin(x * 0.021 + 1.3) * Math.sin(y * 0.017 + 0.4) + 0.2 * Math.sin((x + y) * 0.013 + 2.2);
@@ -119,24 +111,6 @@ export const clearingWobble = (x, y) =>
 /** Signed px from the meadow's edge at (x, y) (negative on the meadow), as the shader's `clearingDistance`. */
 export const clearingDistance = (core, x, y) =>
   distanceToRect(x, y, core) - CLEARING_PX - CLEARING_WOBBLE_PX * clearingWobble(x, y);
-
-const union = (rects) => {
-  const x = Math.min(...rects.map((r) => r.x));
-  const y = Math.min(...rects.map((r) => r.y));
-  return { x, y, w: Math.max(...rects.map((r) => r.x + r.w)) - x, h: Math.max(...rects.map((r) => r.y + r.h)) - y };
-};
-
-/**
- * The opponent's hand where the board fans it, past the far edge: the cards' width either side of
- * the middle (a full hand), its card height deep.
- */
-const oppHandRect = (layout, core) => {
-  const hand = layout.opp?.hand;
-  const cardH = layout.opp?.cardBox?.hand?.h ?? 0;
-  if (!hand || !(cardH > 0) || !Number.isFinite(hand.baselineY)) return null;
-  const halfW = Math.max(Math.abs(core.x), Math.abs(core.x + core.w));
-  return { x: -halfW, y: hand.baselineY - cardH, w: 2 * halfW, h: cardH };
-};
 
 /**
  * The great tree: its trunk's root in the band beside the cards on HERO_SIDE, toward the far end; its
@@ -161,9 +135,6 @@ function growTree(table, scene, core, obstacles, u) {
   const centre = { x: x + side * 50 * u, y: y + 130 * u };
   const toSun = [VITALITY_SUN[0], VITALITY_SUN[1]];
   const sunLength = Math.hypot(toSun[0], toSun[1]) || 1;
-  // The largest a lump at (px, py) may grow and stay clear of every card and the hand seen from above:
-  // a shelf's big lumps shrink by the cards instead of dropping out (so each shelf stays one mass).
-  const fitRadius = (px, py) => (Math.min(...obstacles.map((rect) => distanceToRect(px, py, rect))) - TREE_CARD_GAP_PX) / PUFF_REACH;
   const pads = [];
   SHELVES.forEach((shelf, level) => {
     const lean = level * 28 * u;
@@ -180,7 +151,9 @@ function growTree(table, scene, core, obstacles, u) {
       const px = middle.x + Math.cos(angle) * reach * spread;
       const py = middle.y + Math.sin(angle) * reach * spread * 1.12;
       const wanted = reach * share * (0.9 + 0.2 * roll(2));
-      const r = Math.min(wanted, fitRadius(px, py));
+      // The largest a lump at (px, py) may grow and stay clear of every card and the hand seen from above:
+      // a shelf's big lumps shrink by the cards instead of dropping out (so each shelf stays one mass).
+      const r = Math.min(wanted, (Math.min(...obstacles.map((rect) => distanceToRect(px, py, rect))) - TREE_CARD_GAP_PX) / PUFF_REACH);
       if (r < wanted * 0.45) return;
       const sunSide = ((px - middle.x) * toSun[0] + (py - middle.y) * toSun[1]) / (sunLength * Math.max(reach, 1));
       pads.push({ x: px, y: py, z: (shelf.z + 14 * (roll(3) - 0.5)) * u, r, shelf: level, tier: out, sunSide, seed: roll(4) });
@@ -247,9 +220,6 @@ export function shadowBox(tree) {
   return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) };
 }
 
-/** Design 085: how near p lies to a pool of glow, 1 in its heart, 0 past twice its radius. */
-const poolNear = (pools, x, y) => Math.max(0, ...pools.map((pool) => 1 - Math.hypot(x - pool.x, y - pool.y) / (2 * pool.r)));
-
 /**
  * Forest of Vitality's layout: the meadow (the cards' box, CLEARING_PX and its wander round it), the
  * tree, the pools of glow and the bushes. Null without a table.
@@ -290,7 +260,6 @@ export function vitalitySpots(layout) {
     }
   }
   const clear = (x, y, r) => obstacles.every((rect) => distanceToRect(x, y, rect) >= r);
-  const offPools = (x, y, r) => pools.every((pool) => Math.hypot(x - pool.x, y - pool.y) >= pool.r * 0.55 + r * 0.5);
   const area = visibleArea(table, scene) ?? scene;
   const wanted = (x) => frameWeight(x, table);
 
@@ -303,7 +272,7 @@ export function vitalitySpots(layout) {
     inScene(x, y, reach * 0.5) &&
     clear(x, y, reach + RISE_LEAN * (height + VITALITY_GROUND_CEILING_PX) + gap) &&
     Math.hypot(x - tree.x, y - tree.y) >= tree.reach + reach * 0.4 &&
-    offPools(x, y, reach);
+    pools.every((pool) => Math.hypot(x - pool.x, y - pool.y) >= pool.r * 0.55 + reach * 0.5);
   const groveFits = reachOff(TREE_CARD_GAP_PX);
   // Design 085: real secondary trees: the card's broadleaves big (85-120 px crowns) with two shelves,
   // overlapping in groves, most where the frame shows them (the left and top-left).
@@ -415,7 +384,8 @@ export function vitalitySpots(layout) {
       const roll = (salt) => hash(gx, gy, salt + 900);
       const x = gx + (roll(1) - 0.5) * mistStep * 0.6;
       const y = gy + (roll(2) - 0.5) * mistStep * 0.6;
-      if (roll(3) > 0.45 * (0.4 + 0.6 * wanted(x)) + 0.25 * Math.min(1, poolNear(pools, x, y))) continue;
+      // Design 085: how near p lies to a pool of glow, 1 in its heart, 0 past twice its radius.
+      if (roll(3) > 0.45 * (0.4 + 0.6 * wanted(x)) + 0.25 * Math.min(1, Math.max(0, ...pools.map((pool) => 1 - Math.hypot(x - pool.x, y - pool.y) / (2 * pool.r))))) continue;
       candidates.push({ x, y, r: (60 + 50 * roll(4)) * u, phase: roll(5) });
     }
   }
@@ -944,14 +914,6 @@ const columnGeometry = (three) => {
   return geometry;
 };
 
-/** The mist sprites: two a bank, each its bank's index times two (plus one for the second). */
-const mistGeometry = (three) => {
-  const geometry = new three.BufferGeometry();
-  geometry.setAttribute('position', new three.Float32BufferAttribute(new Array(MAX_MISTS * 2 * 3).fill(0), 3));
-  geometry.setAttribute('aMist', new three.Float32BufferAttribute(Array.from({ length: MAX_MISTS * 2 }, (_, i) => i), 1));
-  return geometry;
-};
-
 const NO_TREE = { x: 0, y: 0, radius: 0, reach: 0, finTurn: 0, pads: [], boughs: [], roots: [], trunk: null };
 
 /** Forest of Vitality's board (stadium-environment-mesh.js BOARDS). */
@@ -982,7 +944,11 @@ export function forestOfVitalityBoard({ three, material, seeded, terrainGrid, re
   const terrain = new three.Mesh(new three.BufferGeometry(), materials.terrain);
   const motes = new three.Points(seeded(MOTE_COUNT), materials.motes);
   motes.renderOrder = 2;
-  const mist = new three.Points(mistGeometry(three), materials.mist);
+  // The mist sprites: two a bank, each its bank's index times two (plus one for the second).
+  const geometry = new three.BufferGeometry();
+  geometry.setAttribute('position', new three.Float32BufferAttribute(new Array(MAX_MISTS * 2 * 3).fill(0), 3));
+  geometry.setAttribute('aMist', new three.Float32BufferAttribute(Array.from({ length: MAX_MISTS * 2 }, (_, i) => i), 1));
+  const mist = new three.Points(geometry, materials.mist);
   mist.renderOrder = 1;
   const columns = new three.Mesh(columnGeometry(three), materials.columns);
   columns.renderOrder = 2;

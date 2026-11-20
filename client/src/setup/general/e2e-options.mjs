@@ -50,14 +50,6 @@ function subtypeSet(card) {
   ]);
 }
 
-function isSupporterCard(card) {
-  return subtypeSet(card).has('supporter') || isSupporterTrainer(card);
-}
-
-function isItemCard(card) {
-  return subtypeSet(card).has('item');
-}
-
 // Attack/retreat cost checks take { type, family } descriptors (see
 // expandEnergyEntries in attack-engine.mjs), so a Double Colorless counts twice.
 // Read the way the authoritative server reads them, so an offered attack is never rejected.
@@ -258,9 +250,9 @@ export async function enumerateOptions({
   // ── play a Trainer ────────────────────────────────────────────────────
   handCards.forEach((card, handIndex) => {
     if (!isTrainer(card) || isEnergy(card) || isPokemon(card)) return;
-    const action = isSupporterCard(card)
+    const action = subtypeSet(card).has('supporter') || isSupporterTrainer(card)
       ? 'playSupporter'
-      : isItemCard(card)
+      : subtypeSet(card).has('item')
         ? 'playItem'
         : 'moveCard';
     if (!canPerformAction({ user, action, initiator: user }).allowed) return;

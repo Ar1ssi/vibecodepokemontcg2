@@ -134,10 +134,6 @@ const OPENING_SETUP_BLOCKED = new Set([
   'takePrizes', 'takePrizesByIndex', 'stadium-effect', 'useVStarGX', 'playRandomCardFaceDown',
 ]);
 
-const startingActivesMissing = (state) =>
-  state.openingDrawPending != null &&
-  Object.values(state.players || {}).some((player) => !(player?.zones?.active || []).length);
-
 export function onceAttackBlockReason(state, playerId, attack, attacker = null) {
   const player = state.players?.[playerId];
   if (isGxAttack(attack)) {
@@ -188,24 +184,6 @@ function opponentActiveTop(opponent) {
   if (!root) return null;
   const top = topPokemonCard(active, root) || root;
   return top === root ? root : { ...top, specialCondition: root.specialCondition, poisoned: root.poisoned, burned: root.burned };
-}
-
-/**
- * The attack-legality reason a printed own-hand cost cannot be paid (D114), or null.
- * Only a required cost counts: "You may discard …" is never a reason to refuse the attack.
- */
-function handCardsCostReason(player, beforeSteps) {
-  const discard = beforeSteps.find(
-    (step) => step.type === 'atkDiscardOwnHand' && !step.optional && typeof step.count === 'number'
-  );
-  if (discard && (player?.zones?.hand || []).length < discard.count) {
-    return `You need ${discard.count} card(s) in your hand to discard.`;
-  }
-  const lostZone = beforeSteps.find((step) => step.type === 'atkLostZoneFromHand' && !step.optional);
-  if (lostZone && handCardsForLostZone(player, lostZone).length < (lostZone.count || 1)) {
-    return `You need ${lostZone.what === 'pokemon' ? 'a Pokémon' : 'a card'} in your hand to put in the Lost Zone.`;
-  }
-  return null;
 }
 
 function isZoneIndex(index, zone) {
@@ -705,7 +683,8 @@ export function validateLegality(state, command) {
 
   // Setup ends when every player has a Starting Active; until then (the starter's turn-1 draw is
   // still owed) the only game action is placing one.
-  if (startingActivesMissing(state) && OPENING_SETUP_BLOCKED.has(type) && !isStartingActiveMove) {
+  if (state.openingDrawPending != null &&
+  Object.values(state.players || {}).some((player) => !(player?.zones?.active || []).length) && OPENING_SETUP_BLOCKED.has(type) && !isStartingActiveMove) {
     return { allowed: false, reason: 'Both players must choose a Starting Active Pokémon first.' };
   }
 
@@ -1298,8 +1277,21 @@ export function validateLegality(state, command) {
           reason: `You need ${handCost.count || 1} ${handCost.energyType ? `{${handCost.energyType}} ` : ''}Energy card(s) in your hand to discard.`,
         };
       }
-      const handCardsNeeded = handCardsCostReason(player, beforeSteps);
-      if (handCardsNeeded) return { allowed: false, reason: handCardsNeeded };
+      // A printed own-hand cost the player cannot pay (D114). Only a required cost counts:
+      // "You may discard …" is never a reason to refuse the attack.
+      const discard = beforeSteps.find(
+        (step) => step.type === 'atkDiscardOwnHand' && !step.optional && typeof step.count === 'number'
+      );
+      if (discard && (player?.zones?.hand || []).length < discard.count) {
+        return { allowed: false, reason: `You need ${discard.count} card(s) in your hand to discard.` };
+      }
+      const lostZone = beforeSteps.find((step) => step.type === 'atkLostZoneFromHand' && !step.optional);
+      if (lostZone && handCardsForLostZone(player, lostZone).length < (lostZone.count || 1)) {
+        return {
+          allowed: false,
+          reason: `You need ${lostZone.what === 'pokemon' ? 'a Pokémon' : 'a card'} in your hand to put in the Lost Zone.`,
+        };
+      }
       return { allowed: true };
     }
 

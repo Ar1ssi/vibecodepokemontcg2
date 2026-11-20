@@ -80,21 +80,6 @@ export function requiresActiveSpot(card) {
   return Boolean(name) && text.includes(`if ${name} is your active pokémon`);
 }
 
-// Legacy powers: "This power can't be used if <this Pokémon> is Asleep, Confused, or Paralyzed"
-// ('rotation') or "… is affected by a Special Condition" ('any'); null when unrestricted.
-export function powerConditionRestriction(card) {
-  const match = textOf(card).match(
-    /power can't be used if [\s\S]*?(asleep, confused, or paralyzed|affected by a special condition)/
-  );
-  if (!match) return null;
-  return match[1].startsWith('asleep') ? 'rotation' : 'any';
-}
-
-// Ditto Transformative Start, Fan Call, Abnormal Outbreak: "Once during your first turn, …".
-export function requiresFirstTurn(card) {
-  return /once during your first turn\b/.test(textOf(card));
-}
-
 // Luxray Swelling Flash / Klinklang Emergency Rotation ("if this Pokémon is in your hand"),
 // Charjabug Battery ("attach this card from your hand"): activated from the hand, not play.
 // Beedrill / Greninja-GX Elusive Master: "if this Pokémon is the last card in your hand".
@@ -103,25 +88,6 @@ const HAND_ACTIVATION_CLAUSE =
 
 export function isHandActivatedAbility(card) {
   return HAND_ACTIVATION_CLAUSE.test(textOf(card));
-}
-
-// Marshadow Resetting Hole: "if this Pokémon is on your Bench, you may …".
-const BENCH_SPOT_CLAUSE = /if this pok[eé]mon is on your bench\b/;
-
-export function requiresBenchSpot(card) {
-  const text = textOf(card);
-  if (BENCH_SPOT_CLAUSE.test(text)) return true;
-  // DP Poké-Powers name the holder: "if Unown Q is on your Bench" (Majestic Dawn 49).
-  const name = lower(card?.name).trim();
-  return Boolean(name) && text.includes(`if ${name} is on your bench`);
-}
-
-// "Once during your turn, if any of your Pokémon were Knocked Out during your opponent's last turn"
-// (Fezandipiti ex Flip the Script) is only activatable the turn after such a Knockout.
-const OPPONENT_TURN_KO_CLAUSE = /knocked out during your opponent.s last turn/;
-
-export function requiresKoOnOpponentTurn(card) {
-  return OPPONENT_TURN_KO_CLAUSE.test(textOf(card));
 }
 
 // "When you play this Pokémon from your hand to evolve 1 of your Pokémon"

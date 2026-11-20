@@ -33,11 +33,6 @@ const hasSubtype = (card, ...tokens) => {
 
 const nameOf = (card) => String(card?.name ?? '').trim();
 
-const textOf = (card) =>
-  lower(
-    card?.ability?.text ?? card?.abilityText ?? card?.text ?? card?.effect ?? ''
-  );
-
 // ── individual card-type predicates ────────────────────────────────────────
 
 // TCGdex carries no "Ultra Beast" subtype, so membership is by name. Plain Necrozma is not an
@@ -102,7 +97,9 @@ export function isTeraCard(card = {}) {
   // the client's cardStats sends a Pokémon's stage but not its subtypes.
   if (collapse(card?.stage) === 'terahb') return true;
   if (hasCardMarker(card, 'Tera')) return true;
-  const text = textOf(card);
+  const text = lower(
+    card?.ability?.text ?? card?.abilityText ?? card?.text ?? card?.effect ?? ''
+  );
   if (
     text.includes('tera: as long as this pokémon is on your bench') ||
     text.includes('tera rule')

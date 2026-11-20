@@ -6,8 +6,9 @@
 # Pruned, folded or shortened lines, verbatim: .agent/archive/DECISIONS-pruned-2026-11-13.md, DECISIONS-pruned-2026-10-15.md (grep the D-number).
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120, D214 each exist twice — cite as `D119[rules]`. Designs 074 and 088 name two each: cite by file name.
-#   Next id = highest D number in this file and the archives + 1 (next: D259).
+#   Next id = highest D number in this file and the archives + 1 (next: D260).
 
+- D259 2026-11-20 [harness] 091-line-cut-refactor: line-cut refactors inline only synchronous code, keep boundary checks and test-imported exports, and never reformat (Prettier 4-space/100-col measured at +79k lines).
 - D258 2026-11-20 [netcode] 090-homebrew-clock: the homebrew chess clock is room-level (never engine state, so replay/undo stay deterministic); 0:00 ends the game through a server-only `timeOut` command.
 - D257 2026-11-12 [logging] 088-unified-logging: an export is complete on purpose (both hands, deck order) and each one is announced in room chat; entries join on sv/cs, no correlation id; format NDJSON v1, read with tools/log.mjs.
 - D256 2026-11-12 [netcode] 088-unified-logging: GameRoom journals every applyCommand (rng cursor + state hash) and rebases on any in-place state change, so an export replays; a new mutation site must call journal.rebase.

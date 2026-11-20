@@ -34,15 +34,6 @@ export function resolveCoinEffect(coin = {}) {
   return { material, finish };
 }
 
-// Characters that could break out of a CSS `url("...")` token.
-const isUnsafeInCssUrl = (src) =>
-  [...src].some((ch) => {
-    const code = ch.charCodeAt(0);
-    return (
-      ch === '"' || ch === '\\' || /\s/.test(ch) || code < 0x20 || code === 0x7f
-    );
-  });
-
 /**
  * The coin's own art doubles as a luminance mask for the specular layer, so
  * highlights only land on bright (raised) metal. Returns an absolute URL for
@@ -52,7 +43,13 @@ const isUnsafeInCssUrl = (src) =>
  */
 export function coinMaskUrl(src, pageOrigin = globalThis.location?.origin) {
   if (typeof src !== 'string' || !src) return null;
-  if (isUnsafeInCssUrl(src)) return null;
+  // Characters that could break out of a CSS `url("...")` token.
+  if ([...src].some((ch) => {
+    const code = ch.charCodeAt(0);
+    return (
+      ch === '"' || ch === '\\' || /\s/.test(ch) || code < 0x20 || code === 0x7f
+    );
+  })) return null;
   let url;
   try {
     url = new URL(src, pageOrigin || undefined);

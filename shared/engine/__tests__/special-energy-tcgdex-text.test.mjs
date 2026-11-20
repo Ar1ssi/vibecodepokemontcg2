@@ -1,7 +1,7 @@
 // Gen 6 (XY) special Energies: the authoritative server receives effect text from the
 // client's TCGdex enrichment, and TCGdex spells types as words ("Fighting Pokémon",
 // "provides Metal Energy", "ColorlessColorless less") where the pkmncards corpus prints
-// {X} symbols. Before normalizeEnergyText every non-provision clause parsed to nothing,
+// {X} symbols. Before special-energy-parse.mjs normalised the text, every non-provision clause parsed to nothing,
 // so Strong Energy's +20, Flash Energy's no-Weakness and the rest were cosmetic in play.
 // Texts below copied verbatim from TCGdex (ids in each test) on 2026-09-27.
 import { test } from 'node:test';

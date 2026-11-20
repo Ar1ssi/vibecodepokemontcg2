@@ -14,7 +14,7 @@
 import { rgbCss } from '../../fx-colors.mjs';
 import { litSideLight, moddedKit, unstyled } from './_kit-mod.js';
 import { mergeFxMods, withFxMod } from './_mods.js';
-import { grainPass, inShadow, shardOutline, styledKit, traceOutline } from './_shared.js';
+import { grainPass, hash, inShadow, shardOutline, styledKit, traceOutline, tracePolygon } from './_shared.js';
 
 // Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
 // Stone: matte faces (few, dim facets), dust halos churn. Ancient: stone with a violet glint.
@@ -54,12 +54,6 @@ const edgeOf = (rgb, gain) => Object.freeze({ dissolve: Object.freeze({ edge: rg
 const TAU = Math.PI * 2;
 const rad = (deg) => (deg * Math.PI) / 180;
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
-
-/** A stable pseudo-random value in [0, 1) for (seed, index). */
-const hash = (seed, index) => {
-  const v = Math.sin(seed * 12.9898 + index * 78.233) * 43758.5453;
-  return v - Math.floor(v);
-};
 
 const STONE_CORNERS = 5;
 // Flying stones share one outline: the drawers' projectile seed drifts with the flight path
@@ -199,12 +193,6 @@ export function crystalOutline(x, y, r, angleDeg = -90) {
   return [at(1, 0), at(0.45, w), at(-0.45, w), at(-1, 0), at(-0.45, -w), at(0.45, -w)];
 }
 
-const tracePoints = (ctx, points) => {
-  ctx.beginPath();
-  points.forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
-  ctx.closePath();
-};
-
 const strokeLine = (ctx, points) => {
   ctx.beginPath();
   points.forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
@@ -266,23 +254,23 @@ function stone(ctx, pal, rim, x, y, r, alpha, hot, seed, spin) {
       face.addColorStop(0.55, rgbCss(pal.body, alpha));
       face.addColorStop(1, rgbCss(pal.body, alpha));
       ctx.fillStyle = face;
-      tracePoints(ctx, points);
+      tracePolygon(ctx, points);
       unstyled(ctx, () => ctx.fill());
       if (facet.length > 2) {
         ctx.fillStyle = rgbCss(pal.lit ?? pal.hot, FACET_ALPHA * alpha);
-        tracePoints(ctx, facet);
+        tracePolygon(ctx, facet);
         ctx.fill();
       }
       if (shade.length > 2) {
         ctx.fillStyle = rgbCss(pal.deep, SHADOW_ALPHA * alpha);
-        tracePoints(ctx, shade);
+        tracePolygon(ctx, shade);
         ctx.fill();
       }
     });
     ctx.strokeStyle = rgbCss(pal.deep, 0.85 * alpha);
     ctx.lineWidth = Math.max(1, r * 0.07);
     ctx.lineJoin = 'round';
-    tracePoints(ctx, points);
+    tracePolygon(ctx, points);
     ctx.stroke();
   });
   const lit = alpha * clamp01(hot);
@@ -418,19 +406,19 @@ function gemKit(palette) {
   function crystal(ctx, x, y, r, alpha, hot, angleDeg) {
     const points = crystalOutline(x, y, r, angleDeg);
     ctx.fillStyle = rgbCss(palette.body, 0.75 * alpha);
-    tracePoints(ctx, points);
+    tracePolygon(ctx, points);
     ctx.fill();
     const lit = alpha * clamp01(hot);
     if (lit > 0) {
       // The facet between the top point, the upper-left shoulder and the centre.
       ctx.fillStyle = rgbCss(palette.core, 0.8 * lit);
-      tracePoints(ctx, [points[0], points[5], points[4], [x, y]]);
+      tracePolygon(ctx, [points[0], points[5], points[4], [x, y]]);
       ctx.fill();
     }
     ctx.strokeStyle = rgbCss(palette.hot, 0.85 * alpha);
     ctx.lineWidth = Math.max(1, r * 0.08);
     ctx.lineJoin = 'miter';
-    tracePoints(ctx, points);
+    tracePolygon(ctx, points);
     ctx.stroke();
   }
 
@@ -460,10 +448,10 @@ function gemKit(palette) {
     const at = (f, side) => [spec.x + ux * spec.length * f - uy * spec.width * side, spec.y + uy * spec.length * f + ux * spec.width * side];
     const spindle = (scale) => [at(0, 0), at(0.3, 0.5 * scale), at(1, 0), at(0.3, -0.5 * scale)];
     ctx.fillStyle = rgbCss(palette.body, 0.6 * alpha);
-    tracePoints(ctx, spindle(1));
+    tracePolygon(ctx, spindle(1));
     ctx.fill();
     ctx.fillStyle = rgbCss(palette.hot, 0.8 * alpha);
-    tracePoints(ctx, spindle(0.45));
+    tracePolygon(ctx, spindle(0.45));
     ctx.fill();
     const lit = alpha * clamp01(hot);
     if (!(lit > 0)) return;

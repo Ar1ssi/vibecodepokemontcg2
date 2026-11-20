@@ -41,24 +41,6 @@ const fetchJson = async (name) => {
 };
 
 let assetsPromise = null;
-/** The import's JSON plus the disc's tangents and radius, loaded once; a failed load is retried next time. */
-const loadAssets = () => {
-  assetsPromise ??= Promise.all([fetchJson('coins.json'), fetchJson('shaders.json'), fetchJson('textures.json'), fetchJson('coin-mesh.json')])
-    .then(([coinFile, shaders, textures, mesh]) => ({
-      coins: coinFile.coins,
-      materials: coinFile.materials,
-      shaders,
-      textures,
-      mesh,
-      tangents: coinTangents(mesh),
-      radius: discRadius(mesh.p),
-    }))
-    .catch((error) => {
-      assetsPromise = null;
-      throw error;
-    });
-  return assetsPromise;
-};
 
 const textureLoader = new THREE.TextureLoader();
 const cubeLoader = new THREE.CubeTextureLoader();
@@ -78,14 +60,6 @@ const cached = (key, load) => {
   return imageCache.get(key);
 };
 
-const builtinTexture = (name) => {
-  if (name === '#grab') throw new Error('TCG Live coin shaders read the grab pass; the coin stage has no grab pass');
-  const texture = new THREE.DataTexture(new Uint8Array(DEFAULT_TEXELS[name]), 1, 1);
-  if (SRGB_DEFAULTS.has(name)) texture.colorSpace = THREE.SRGBColorSpace;
-  texture.needsUpdate = true;
-  return texture;
-};
-
 /**
  * The stand-in for a sampler3D. The importer bound a 2D texture to the Surface shaders' sampler3D, but
  * the branch that reads it is never taken (fcb3[0].x is 0 on every Surface material).
@@ -96,23 +70,17 @@ const unusedSampler3D = () => {
   return texture;
 };
 
-const applySampling = (texture, entry) => {
-  texture.wrapS = WRAPS[entry.wrapU] ?? THREE.RepeatWrapping;
-  texture.wrapT = WRAPS[entry.wrapV] ?? THREE.RepeatWrapping;
-  if (entry.filter === 0) {
-    texture.minFilter = THREE.NearestFilter;
-    texture.magFilter = THREE.NearestFilter;
-  }
-  texture.colorSpace = entry.srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
-  return texture;
-};
-
 /** A sampler's texture: a built-in, an imported 2D or cube map, or a real-world scan (`{ url }`). */
 async function loadSource(assets, sampler) {
   const { source, type } = sampler;
   if (source.builtin) {
     if (type === 'samplerCube') throw new Error(`TCG Live coin sampler ${sampler.uniform} is a cube map bound to the 2D default #${source.builtin}`);
-    return builtinTexture(`#${source.builtin}`);
+    const name = `#${source.builtin}`;
+    if (name === '#grab') throw new Error('TCG Live coin shaders read the grab pass; the coin stage has no grab pass');
+    const texture = new THREE.DataTexture(new Uint8Array(DEFAULT_TEXELS[name]), 1, 1);
+    if (SRGB_DEFAULTS.has(name)) texture.colorSpace = THREE.SRGBColorSpace;
+    texture.needsUpdate = true;
+    return texture;
   }
   if (source.url) {
     return cached(source.url, async () => {
@@ -130,7 +98,15 @@ async function loadSource(assets, sampler) {
       cube.colorSpace = entry.srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
       return cube;
     }
-    return applySampling(await textureLoader.loadAsync(`${ASSET_DIR}textures/${encodeURIComponent(entry.file)}`), entry);
+    const texture = await textureLoader.loadAsync(`${ASSET_DIR}textures/${encodeURIComponent(entry.file)}`);
+    texture.wrapS = WRAPS[entry.wrapU] ?? THREE.RepeatWrapping;
+    texture.wrapT = WRAPS[entry.wrapV] ?? THREE.RepeatWrapping;
+    if (entry.filter === 0) {
+      texture.minFilter = THREE.NearestFilter;
+      texture.magFilter = THREE.NearestFilter;
+    }
+    texture.colorSpace = entry.srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+    return texture;
   });
 }
 
@@ -197,7 +173,22 @@ const submeshNamed = (mesh, name) => {
  * @returns {Promise<{ setCoin: (coin: { id: string, artUrl?: string }) => Promise<void>, draw: (pose: { angle: number, lift: number, yaw?: number }, elapsedMs: number) => void, resize: () => void, dispose: () => void }>}
  */
 export async function createCoinStage({ host, onLost = () => {} }) {
-  const assets = await loadAssets();
+  // The import's JSON plus the disc's tangents and radius, loaded once; a failed load is retried next time.
+  assetsPromise ??= Promise.all([fetchJson('coins.json'), fetchJson('shaders.json'), fetchJson('textures.json'), fetchJson('coin-mesh.json')])
+    .then(([coinFile, shaders, textures, mesh]) => ({
+      coins: coinFile.coins,
+      materials: coinFile.materials,
+      shaders,
+      textures,
+      mesh,
+      tangents: coinTangents(mesh),
+      radius: discRadius(mesh.p),
+    }))
+    .catch((error) => {
+      assetsPromise = null;
+      throw error;
+    });
+  const assets = await assetsPromise;
   const canvas = document.createElement('canvas');
   canvas.className = 'coin-stage-canvas';
   const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, premultipliedAlpha: true });

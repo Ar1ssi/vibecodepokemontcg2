@@ -54,29 +54,6 @@ function setRecordOf(set) {
   };
 }
 
-function setBriefOf(record) {
-  return {
-    id: record.id,
-    name: record.name,
-    logo: record.logo,
-    symbol: record.symbol,
-    cardCount: record.cardCount,
-    releaseDate: record.releaseDate,
-  };
-}
-
-function cardRecordOf(card, set) {
-  return {
-    ...card,
-    set: {
-      id: set.id,
-      name: set.name,
-      cardCount: { official: set.cards.length, total: set.cards.length },
-      releaseDate: set.releaseDate || '',
-    },
-  };
-}
-
 function cardBriefOf(card) {
   return { id: card.id, localId: card.localId, name: card.name, image: card.image };
 }
@@ -141,7 +118,17 @@ export function loadCustomSets(rootDirs, { log = () => {}, previous = null } = {
   for (const dir of [...chosen.keys()].sort()) {
     const entry = chosen.get(dir);
     sets.set(entry.set.id, entry);
-    for (const card of entry.set.cards) cards.set(card.id, cardRecordOf(card, entry.set));
+    for (const card of entry.set.cards) {
+      cards.set(card.id, {
+        ...card,
+        set: {
+          id: entry.set.id,
+          name: entry.set.name,
+          cardCount: { official: entry.set.cards.length, total: entry.set.cards.length },
+          releaseDate: entry.set.releaseDate || '',
+        },
+      });
+    }
   }
   return createCustomSetStore({ sets, cards });
 }
@@ -199,11 +186,6 @@ export function customSetSignatures(rootDirs) {
   return signatures;
 }
 
-function changedSetDirs(before, after) {
-  const dirs = new Set([...before.keys(), ...after.keys()]);
-  return [...dirs].filter((dir) => before.get(dir) !== after.get(dir)).sort();
-}
-
 /**
  * Custom sets that follow their folders while the server runs: the card editor writes a set into a root
  * and the next lookups answer the new cards, no restart. A change to a set's files (fs.watch on each root backed
@@ -230,27 +212,25 @@ export function createLiveCustomSets(
   // Runs from timers: a throw here would take the whole game server down, so it is logged and retried next pass.
   function reload() {
     try {
-      return reloadChanged();
+      const next = customSetSignatures(rootDirs);
+      const before = signatures;
+      const dirs = new Set([...before.keys(), ...next.keys()]);
+      const changed = [...dirs].filter((dir) => before.get(dir) !== next.get(dir)).sort();
+      if (!changed.length) return null;
+      store = loadCustomSets(rootDirs, { log, previous: store });
+      signatures = next;
+      version += 1;
+      const change = { version, sets: changed };
+      try {
+        onChange(change);
+      } catch (error) {
+        log(`custom sets: change listener failed: ${error.message}`);
+      }
+      return change;
     } catch (error) {
       log(`custom sets: reload failed (${error.message}); keeping the sets loaded before`);
       return null;
     }
-  }
-
-  function reloadChanged() {
-    const next = customSetSignatures(rootDirs);
-    const changed = changedSetDirs(signatures, next);
-    if (!changed.length) return null;
-    store = loadCustomSets(rootDirs, { log, previous: store });
-    signatures = next;
-    version += 1;
-    const change = { version, sets: changed };
-    try {
-      onChange(change);
-    } catch (error) {
-      log(`custom sets: change listener failed: ${error.message}`);
-    }
-    return change;
   }
 
   function scheduleReload() {
@@ -324,7 +304,17 @@ export function createCustomSetStore({ sets = new Map(), cards = new Map() } = {
     size: () => sets.size,
     setRecord: (setId) => sets.get(setId)?.record ?? null,
     card: (cardId) => cards.get(cardId) ?? null,
-    setBriefs: () => setList.map((entry) => setBriefOf(entry.record)),
+    setBriefs: () => setList.map((entry) => {
+      const record = entry.record;
+      return {
+        id: record.id,
+        name: record.name,
+        logo: record.logo,
+        symbol: record.symbol,
+        cardCount: record.cardCount,
+        releaseDate: record.releaseDate,
+      };
+    }),
     allCards: () => [...cards.values()],
     manifest: () => ({
       sets: setList.map(({ set }) => ({
@@ -414,11 +404,6 @@ export function matchesTcgdexQuery(record, params) {
   return true;
 }
 
-function parseCanonicalKey(key) {
-  const [pathPart, query = ''] = String(key).split('?');
-  return { path: pathPart, params: [...new URLSearchParams(query)] };
-}
-
 function parseListBody(body) {
   try {
     const parsed = JSON.parse(body);
@@ -448,7 +433,8 @@ export function withCustomSets(proxy, store) {
 
   return {
     async get(key) {
-      const { path: p, params } = parseCanonicalKey(key);
+      const [pathPart, query = ''] = String(key).split('?');
+      const { path: p, params } = { path: pathPart, params: [...new URLSearchParams(query)] };
       const record = /^\/v2\/en\/(cards|sets|series)\/([^/]+)$/.exec(p);
       if (record) {
         const [, kind, id] = record;

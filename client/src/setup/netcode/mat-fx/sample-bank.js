@@ -180,17 +180,6 @@ export function createSampleBank(deps = {}) {
     }
   };
 
-  const fadeOneShot = ({ source, level }, seconds) => {
-    try {
-      const now = ctx.currentTime;
-      level.gain.setValueAtTime(level.gain.value, now);
-      level.gain.linearRampToValueAtTime(0, now + seconds);
-      source.stop(now + seconds);
-    } catch {
-      /* already ended */
-    }
-  };
-
   let reaction = null; // the crowd's one reaction slot: { source, level, startedAt }
 
   /**
@@ -212,7 +201,17 @@ export function createSampleBank(deps = {}) {
     const previous = reaction;
     const started = startOneShot(key, variants, { gain, delayMs: 0, bus: 'crowd' });
     reaction = started && { ...started, startedAt: now };
-    if (previous) fadeOneShot(previous, REACTION_FADE_SECONDS);
+    if (previous) {
+      const { source, level } = previous;
+      try {
+        const now = ctx.currentTime;
+        level.gain.setValueAtTime(level.gain.value, now);
+        level.gain.linearRampToValueAtTime(0, now + REACTION_FADE_SECONDS);
+        source.stop(now + REACTION_FADE_SECONDS);
+      } catch {
+        /* already ended */
+      }
+    }
     return started !== null;
   };
 
@@ -323,8 +322,6 @@ export const initSampleBank = (ctx, master) => {
     /* best-effort */
   }
 };
-export const hasSample = bank.hasSample;
-export const warmSample = bank.warmSample;
 export const playSample = bank.playSample;
 export const playReaction = bank.playReaction;
 export const playSequence = bank.playSequence;

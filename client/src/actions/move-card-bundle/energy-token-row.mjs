@@ -45,7 +45,13 @@ export function planEnergyTokenRow(keys, cardWidth) {
 
   const fontSize = tokenSize * BADGE_FONT;
   let cursor = 0;
-  for (const members of groupIndices(list)) {
+  // Token indices grouped by key, groups in order of first appearance.
+  const groups = new Map();
+  list.forEach((key, index) => {
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(index);
+  });
+  for (const members of [...groups.values()]) {
     for (const index of members) tokens[index].left = cursor;
     if (members.length === 1) {
       cursor += pitch;
@@ -57,16 +63,6 @@ export function planEnergyTokenRow(keys, cardWidth) {
     cursor = badgeLeft + badgeWidth(label, fontSize) + tokenSize * BADGE_GAP_AFTER;
   }
   return fitToCard({ tokenSize, tokens, badges }, rowEnd(tokens, badges, tokenSize), width);
-}
-
-/** Token indices grouped by key, groups in order of first appearance. */
-function groupIndices(keys) {
-  const groups = new Map();
-  keys.forEach((key, index) => {
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(index);
-  });
-  return [...groups.values()];
 }
 
 function badgeWidth(label, fontSize) {

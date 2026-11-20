@@ -16,8 +16,6 @@ import { getCardRegistry, hasAuthoritativeView } from '../netcode/apply-view.js'
 import { topPokemonCard } from '../../../../shared/engine/rules/evolved-pokemon.mjs';
 import { getActivePokemonCard } from '../../../../shared/engine/zones/active-pokemon.mjs';
 
-const isPokemon = (card) => (card?.type2 || card?.type) === 'Pokémon';
-
 const resolveDeps = ({
   authoritative = hasAuthoritativeView(),
   registry = getCardRegistry(),
@@ -54,7 +52,7 @@ export function liveActiveCard(zoneCards, deps) {
   const cards = Array.isArray(zoneCards) ? zoneCards : [];
   const { authoritative } = resolveDeps(deps);
   if (!authoritative) return getActivePokemonCard({ array: cards });
-  const root = cards.find((card) => card?.attachedTo == null && isPokemon(card)) || null;
+  const root = cards.find((card) => card?.attachedTo == null && (card?.type2 || card?.type) === 'Pokémon') || null;
   if (!root) return null;
   return liveCardFor(topPokemonCard(cards, root), deps);
 }

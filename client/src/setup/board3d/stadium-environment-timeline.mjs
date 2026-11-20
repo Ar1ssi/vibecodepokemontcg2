@@ -5,9 +5,6 @@
 export const INTRO_MS = 1600;
 export const EXIT_MS = 900;
 
-const clamp01 = (t) => Math.min(1, Math.max(0, t));
-const easeOutCubic = (t) => 1 - (1 - t) ** 3;
-const easeInQuad = (t) => t * t;
 
 /**
  * @returns {{
@@ -66,10 +63,10 @@ export function createEnvironmentTimeline() {
   const frame = (now) => {
     if (phase) {
       const length = phase.kind === 'exit' ? EXIT_MS : INTRO_MS;
-      const t = phase.startedAt === null ? 0 : clamp01((now - phase.startedAt) / length);
+      const t = phase.startedAt === null ? 0 : Math.min(1, Math.max(0, (now - phase.startedAt) / length));
       if (t < 1) {
-        if (phase.kind === 'exit') return { key: phase.key, under: null, reveal: 1, exit: easeInQuad(t), animating: true };
-        return { key: phase.key, under: phase.under, reveal: easeOutCubic(t), exit: 0, animating: true };
+        if (phase.kind === 'exit') return { key: phase.key, under: null, reveal: 1, exit: t * t, animating: true };
+        return { key: phase.key, under: phase.under, reveal: 1 - (1 - t) ** 3, exit: 0, animating: true };
       }
       finish();
     }

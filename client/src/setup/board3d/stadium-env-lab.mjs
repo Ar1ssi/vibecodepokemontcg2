@@ -24,7 +24,7 @@ import {
   TERRAIN_UNIFORMS,
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
-import { arenaRects, craterEmblem, environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
+import { arenaRects, cornersOf, craterEmblem, environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
 import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
 import { createKitProps } from './stadium-kit.mjs';
 import { tableBounds } from './table-uv.mjs';
@@ -120,13 +120,6 @@ const STATUS_GREEN = [0.2, 1.1, 0.45, 2.0];
 const STATUS_AMBER = [1.2, 0.7, 0.12, 2.0];
 
 const isRect = (rect) => rect && [rect.x, rect.y, rect.w, rect.h].every(Number.isFinite) && rect.w > 0 && rect.h > 0;
-const cornersOf = (rect) => [
-  [rect.x, rect.y],
-  [rect.x + rect.w, rect.y],
-  [rect.x, rect.y + rect.h],
-  [rect.x + rect.w, rect.y + rect.h],
-];
-
 const smin = (a, b, k) => {
   const h = Math.max(k - Math.abs(a - b), 0) / k;
   return Math.min(a, b) - h * h * k * 0.25;
@@ -174,27 +167,6 @@ const padsFor = (rects) => {
   return pads.slice(0, MAX_PADS);
 };
 
-/** The dais's edge round its centre, one point per OUTLINE_STEP_RAD: { x, y, angle, r }. */
-const outlineOf = (dais) => {
-  const points = [];
-  for (let angle = 0; angle < 2 * Math.PI - 1e-9; angle += OUTLINE_STEP_RAD) {
-    const c = Math.cos(angle);
-    const s = Math.sin(angle);
-    const at = (r) => daisDistance(dais.x + c * r, dais.y + s * r, dais);
-    let r = dais.r + 600;
-    while (r > 0 && at(r) > 0) r -= 4;
-    let lo = r;
-    let hi = r + 4;
-    for (let k = 0; k < 20; k += 1) {
-      const mid = (lo + hi) / 2;
-      if (at(mid) > 0) hi = mid;
-      else lo = mid;
-    }
-    points.push({ x: dais.x + c * lo, y: dais.y + s * lo, angle, r: lo });
-  }
-  return points;
-};
-
 /** The point of the outline at a turn (rad), between its two nearest samples. */
 const outlineAt = (outline, angle) => {
   const turn = ((angle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
@@ -223,7 +195,24 @@ export function labSpots(layout) {
   const r = (core.length ? Math.max(...core.map(reach)) : table.h / 3) + DAIS_MARGIN_PX;
   const pads = padsFor(slabs.filter((rect) => reach(rect) > r - DAIS_MARGIN_PX / 2));
   const dais = { x: centre.x, y: centre.y, r, pads };
-  const outline = outlineOf(dais);
+  // The dais's edge round its centre, one point per OUTLINE_STEP_RAD: { x, y, angle, r }.
+  const points = [];
+  for (let angle = 0; angle < 2 * Math.PI - 1e-9; angle += OUTLINE_STEP_RAD) {
+    const c = Math.cos(angle);
+    const s = Math.sin(angle);
+    const at = (r) => daisDistance(dais.x + c * r, dais.y + s * r, dais);
+    let r = dais.r + 600;
+    while (r > 0 && at(r) > 0) r -= 4;
+    let lo = r;
+    let hi = r + 4;
+    for (let k = 0; k < 20; k += 1) {
+      const mid = (lo + hi) / 2;
+      if (at(mid) > 0) hi = mid;
+      else lo = mid;
+    }
+    points.push({ x: dais.x + c * lo, y: dais.y + s * lo, angle, r: lo });
+  }
+  const outline = points;
   const scene = sceneBounds(layout, LAB_KEY);
   const stairFoot = outlineAt(outline, STAIR.angle);
   const stair = {
@@ -382,248 +371,245 @@ const pipeBands = (props, points, radius) => {
 export function labProps(spots) {
   const props = createPropBuilder();
   // Design 081: every part in the kit's chrome (its metal says how much mirror shows).
-  props.look({ kind: LOOK.chrome }, () => labSolids(props, spots));
-  return props;
-}
-
-/** The pipe bundles, the dais's rim and stair, the consoles and the tanks. */
-function labSolids(props, spots) {
-  const { dais, outline, stair, consoles, tanks, bundles = [] } = spots;
-  for (const bundle of bundles) {
-    const dir = [bundle.dx, bundle.dy];
-    const side = [-dir[1], dir[0]];
-    for (const offset of [-0.5, 0.5]) {
-      const at = (t) => [
-        bundle.x + dir[0] * t + side[0] * offset * BUNDLE.spread,
-        bundle.y + dir[1] * t + side[1] * offset * BUNDLE.spread,
-        -DROP_PX + BUNDLE.radius + 1,
-      ];
-      const points = [at(0), at(bundle.length)];
-      props.tube(points, BUNDLE.radius, PIPE, { sides: 10 });
-      pipeBands(props, points, BUNDLE.radius);
+  props.look({ kind: LOOK.chrome }, () => {
+    // The pipe bundles, the dais's rim and stair, the consoles and the tanks.
+    const { dais, outline, stair, consoles, tanks, bundles = [] } = spots;
+    for (const bundle of bundles) {
+      const dir = [bundle.dx, bundle.dy];
+      const side = [-dir[1], dir[0]];
+      for (const offset of [-0.5, 0.5]) {
+        const at = (t) => [
+          bundle.x + dir[0] * t + side[0] * offset * BUNDLE.spread,
+          bundle.y + dir[1] * t + side[1] * offset * BUNDLE.spread,
+          -DROP_PX + BUNDLE.radius + 1,
+        ];
+        const points = [at(0), at(bundle.length)];
+        props.tube(points, BUNDLE.radius, PIPE, { sides: 10 });
+        pipeBands(props, points, BUNDLE.radius);
+      }
+      // A clamp across the pair every so often.
+      for (let t = 40; t < bundle.length - 20; t += 110) {
+        props.roundBox({
+          x: bundle.x + dir[0] * t,
+          y: bundle.y + dir[1] * t,
+          z0: -DROP_PX,
+          z1: -DROP_PX + BUNDLE.radius * 2 + 3,
+          hw: 3,
+          hh: BUNDLE.spread / 2 + BUNDLE.radius + 3,
+          yaw: Math.atan2(dir[1], dir[0]),
+          color: DARK_STEEL,
+        });
+      }
     }
-    // A clamp across the pair every so often.
-    for (let t = 40; t < bundle.length - 20; t += 110) {
+    const halfGap = (STAIR.width / 2 + 10) / outlineAt(outline, STAIR.angle).r;
+    // The railing: from one side of the stair round to the other, inset from the edge. Design 084: on
+    // the round dais's edge only, a clean circle broken where a docking pad bulges out (round the pads
+    // it wandered like a scribble), its posts evenly spaced along each run.
+    const start = STAIR.angle + halfGap;
+    for (const rail of railRuns(dais, outline, start, 2 * Math.PI - 2 * halfGap)) {
+      for (const z of RAIL.heights) props.tube(rail.map(([x, y]) => [x, y, z]), RAIL.radius, YELLOW, { sides: 6 });
+      for (const [x, y] of evenPosts(rail, RAIL.every)) props.cylinder({ x, y, z0: 0, z1: RAIL.post, r: 2.8, color: YELLOW, sides: 8, domeRise: 2.5 });
+    }
+
+    // The stair: blue steps down to the deck, a yellow handrail either side.
+    const along = [Math.cos(stair.angle), Math.sin(stair.angle)];
+    const across = [-along[1], along[0]];
+    const rise = DROP_PX / (STAIR.steps + 1);
+    for (let i = 0; i < STAIR.steps; i += 1) {
+      const centreRun = STAIR.tread * (i + 0.5) - 1;
       props.roundBox({
-        x: bundle.x + dir[0] * t,
-        y: bundle.y + dir[1] * t,
+        x: stair.x + along[0] * centreRun,
+        y: stair.y + along[1] * centreRun,
         z0: -DROP_PX,
-        z1: -DROP_PX + BUNDLE.radius * 2 + 3,
-        hw: 3,
-        hh: BUNDLE.spread / 2 + BUNDLE.radius + 3,
-        yaw: Math.atan2(dir[1], dir[0]),
+        z1: -rise * (i + 1),
+        hw: STAIR.tread / 2 + 0.5,
+        hh: STAIR.width / 2,
+        yaw: stair.angle,
+        color: STEP_SIDE,
+        topColor: i % 2 ? STEP_BLUE : STEP_BLUE_LIGHT,
+      });
+      // A steel nosing along each tread's outer edge, so the steps read one by one from above.
+      const edgeRun = STAIR.tread * (i + 1) - 2.5;
+      props.roundBox({
+        x: stair.x + along[0] * edgeRun,
+        y: stair.y + along[1] * edgeRun,
+        z0: -rise * (i + 1),
+        z1: -rise * (i + 1) + 1,
+        hw: 2,
+        hh: STAIR.width / 2,
+        yaw: stair.angle,
         color: DARK_STEEL,
+        topColor: STEEL,
       });
     }
-  }
-  const halfGap = (STAIR.width / 2 + 10) / outlineAt(outline, STAIR.angle).r;
-  // The railing: from one side of the stair round to the other, inset from the edge. Design 084: on
-  // the round dais's edge only, a clean circle broken where a docking pad bulges out (round the pads
-  // it wandered like a scribble), its posts evenly spaced along each run.
-  const start = STAIR.angle + halfGap;
-  for (const rail of railRuns(dais, outline, start, 2 * Math.PI - 2 * halfGap)) {
-    for (const z of RAIL.heights) props.tube(rail.map(([x, y]) => [x, y, z]), RAIL.radius, YELLOW, { sides: 6 });
-    for (const [x, y] of evenPosts(rail, RAIL.every)) props.cylinder({ x, y, z0: 0, z1: RAIL.post, r: 2.8, color: YELLOW, sides: 8, domeRise: 2.5 });
-  }
+    for (const side of [-1, 1]) {
+      const offset = (STAIR.width / 2 + 3) * side;
+      const top = [stair.x + across[0] * offset - along[0] * 6, stair.y + across[1] * offset - along[1] * 6, 37];
+      const foot = [stair.x + across[0] * offset + along[0] * stair.run, stair.y + across[1] * offset + along[1] * stair.run, 37 - DROP_PX];
+      props.tube([top, foot], RAIL.radius, YELLOW, { sides: 6 });
+      for (const [x, y, z] of [top, foot]) props.cylinder({ x, y, z0: z - 37, z1: z, r: 2.8, color: YELLOW, sides: 8 });
+    }
 
-  // The stair: blue steps down to the deck, a yellow handrail either side.
-  const along = [Math.cos(stair.angle), Math.sin(stair.angle)];
-  const across = [-along[1], along[0]];
-  const rise = DROP_PX / (STAIR.steps + 1);
-  for (let i = 0; i < STAIR.steps; i += 1) {
-    const centreRun = STAIR.tread * (i + 0.5) - 1;
-    props.roundBox({
-      x: stair.x + along[0] * centreRun,
-      y: stair.y + along[1] * centreRun,
-      z0: -DROP_PX,
-      z1: -rise * (i + 1),
-      hw: STAIR.tread / 2 + 0.5,
-      hh: STAIR.width / 2,
-      yaw: stair.angle,
-      color: STEP_SIDE,
-      topColor: i % 2 ? STEP_BLUE : STEP_BLUE_LIGHT,
-    });
-    // A steel nosing along each tread's outer edge, so the steps read one by one from above.
-    const edgeRun = STAIR.tread * (i + 1) - 2.5;
-    props.roundBox({
-      x: stair.x + along[0] * edgeRun,
-      y: stair.y + along[1] * edgeRun,
-      z0: -rise * (i + 1),
-      z1: -rise * (i + 1) + 1,
-      hw: 2,
-      hh: STAIR.width / 2,
-      yaw: stair.angle,
-      color: DARK_STEEL,
-      topColor: STEEL,
-    });
-  }
-  for (const side of [-1, 1]) {
-    const offset = (STAIR.width / 2 + 3) * side;
-    const top = [stair.x + across[0] * offset - along[0] * 6, stair.y + across[1] * offset - along[1] * 6, 37];
-    const foot = [stair.x + across[0] * offset + along[0] * stair.run, stair.y + across[1] * offset + along[1] * stair.run, 37 - DROP_PX];
-    props.tube([top, foot], RAIL.radius, YELLOW, { sides: 6 });
-    for (const [x, y, z] of [top, foot]) props.cylinder({ x, y, z0: z - 37, z1: z, r: 2.8, color: YELLOW, sides: 8 });
-  }
-
-  // The consoles, as the art's row of cabinets on the deck past the rail, standing up over the dais's
-  // lip: two desks whose tops slope up away from the dais, a screen in a pale bezel on each slope over
-  // a row of small buttons, and a taller upright cabinet with a big screen on its face to the dais.
-  for (const { x, y, angle, hw, hh, kind } of consoles) {
-    const yaw = angle + Math.PI / 2;
-    const c = Math.cos(yaw);
-    const s = Math.sin(yaw);
-    // u runs along the row, v out from the dais (-hh the face to the dais, hh the back).
-    const at = (u, v, z) => [x + u * c - v * s, y + u * s + v * c, z];
-    props.roundBox({ x, y, z0: -DROP_PX, z1: CONSOLE.kick, hw: hw - 1, hh: hh - 1, yaw, color: KICK, topColor: KICK });
-    if (kind === 'upright') {
-      props.roundBox({ x, y, z0: CONSOLE.kick, z1: CONSOLE.upright, hw, hh, yaw, color: CONSOLE_GREY, topColor: CONSOLE_GREY });
-      const face = -hh - 0.6;
-      props.quad(at(-hw + 4, face, 0), at(hw - 14, face, 0), at(hw - 14, face, CONSOLE.upright - 6), at(-hw + 4, face, CONSOLE.upright - 6), BEZEL);
-      props.quad(at(-hw + 7, face - 0.3, 3), at(hw - 17, face - 0.3, 3), at(hw - 17, face - 0.3, CONSOLE.upright - 9), at(-hw + 7, face - 0.3, CONSOLE.upright - 9), SCREEN);
-      props.quad(at(-hw + 7, face - 0.6, CONSOLE.upright - 17), at(hw - 17, face - 0.6, CONSOLE.upright - 17), at(hw - 17, face - 0.6, CONSOLE.upright - 13), at(-hw + 7, face - 0.6, CONSOLE.upright - 13), SCREEN_GLARE);
-      for (const [k, z] of [CONSOLE.upright - 16, CONSOLE.upright - 28].entries()) {
-        // Design 083: the status lights blink, green and amber, each on its own beat.
-        props.look({ kind: LOOK.blink, rate: 0.6 + 0.5 * k, phase: (((x * 0.013 + k * 0.37) % 1) + 1) % 1 }, () =>
-          props.quad(at(hw - 10, face - 0.3, z - 3), at(hw - 4, face - 0.3, z - 3), at(hw - 4, face - 0.3, z + 3), at(hw - 10, face - 0.3, z + 3), k ? STATUS_AMBER : STATUS_GREEN)
-        );
+    // The consoles, as the art's row of cabinets on the deck past the rail, standing up over the dais's
+    // lip: two desks whose tops slope up away from the dais, a screen in a pale bezel on each slope over
+    // a row of small buttons, and a taller upright cabinet with a big screen on its face to the dais.
+    for (const { x, y, angle, hw, hh, kind } of consoles) {
+      const yaw = angle + Math.PI / 2;
+      const c = Math.cos(yaw);
+      const s = Math.sin(yaw);
+      // u runs along the row, v out from the dais (-hh the face to the dais, hh the back).
+      const at = (u, v, z) => [x + u * c - v * s, y + u * s + v * c, z];
+      props.roundBox({ x, y, z0: -DROP_PX, z1: CONSOLE.kick, hw: hw - 1, hh: hh - 1, yaw, color: KICK, topColor: KICK });
+      if (kind === 'upright') {
+        props.roundBox({ x, y, z0: CONSOLE.kick, z1: CONSOLE.upright, hw, hh, yaw, color: CONSOLE_GREY, topColor: CONSOLE_GREY });
+        const face = -hh - 0.6;
+        props.quad(at(-hw + 4, face, 0), at(hw - 14, face, 0), at(hw - 14, face, CONSOLE.upright - 6), at(-hw + 4, face, CONSOLE.upright - 6), BEZEL);
+        props.quad(at(-hw + 7, face - 0.3, 3), at(hw - 17, face - 0.3, 3), at(hw - 17, face - 0.3, CONSOLE.upright - 9), at(-hw + 7, face - 0.3, CONSOLE.upright - 9), SCREEN);
+        props.quad(at(-hw + 7, face - 0.6, CONSOLE.upright - 17), at(hw - 17, face - 0.6, CONSOLE.upright - 17), at(hw - 17, face - 0.6, CONSOLE.upright - 13), at(-hw + 7, face - 0.6, CONSOLE.upright - 13), SCREEN_GLARE);
+        for (const [k, z] of [CONSOLE.upright - 16, CONSOLE.upright - 28].entries()) {
+          // Design 083: the status lights blink, green and amber, each on its own beat.
+          props.look({ kind: LOOK.blink, rate: 0.6 + 0.5 * k, phase: (((x * 0.013 + k * 0.37) % 1) + 1) % 1 }, () =>
+            props.quad(at(hw - 10, face - 0.3, z - 3), at(hw - 4, face - 0.3, z - 3), at(hw - 4, face - 0.3, z + 3), at(hw - 10, face - 0.3, z + 3), k ? STATUS_AMBER : STATUS_GREEN)
+          );
+        }
+        continue;
       }
-      continue;
+      props.roundBox({ x, y, z0: CONSOLE.kick, z1: CONSOLE.front, hw, hh, yaw, color: CONSOLE_GREY, topColor: CONSOLE_GREY });
+      props.quad(at(-hw, -hh, CONSOLE.front), at(hw, -hh, CONSOLE.front), at(hw, hh, CONSOLE.back), at(-hw, hh, CONSOLE.back), CONSOLE_GREY);
+      for (const side of [-1, 1]) props.quad(at(side * hw, -hh, CONSOLE.front), at(side * hw, hh, CONSOLE.front), at(side * hw, hh, CONSOLE.back), at(side * hw, -hh, CONSOLE.front), CONSOLE_GREY);
+      props.quad(at(-hw, hh, CONSOLE.front), at(hw, hh, CONSOLE.front), at(hw, hh, CONSOLE.back), at(-hw, hh, CONSOLE.back), CONSOLE_GREY);
+      // A desk: its top slopes from `front` at the face to the dais (v -hh) up to `back` at the back.
+      const on = (u, v, lift) => at(u, v, CONSOLE.front + ((v + hh) / (2 * hh)) * (CONSOLE.back - CONSOLE.front) + lift);
+      const v0 = -hh * 0.35;
+      const v1 = hh - 4;
+      props.quad(on(-hw + 4, v0 - 3, 0.5), on(hw - 4, v0 - 3, 0.5), on(hw - 4, v1, 0.5), on(-hw + 4, v1, 0.5), BEZEL);
+      props.quad(on(-hw + 7, v0, 0.8), on(hw - 7, v0, 0.8), on(hw - 7, v1 - 3, 0.8), on(-hw + 7, v1 - 3, 0.8), SCREEN);
+      props.quad(on(-hw + 7, v1 - 9, 1.0), on(hw - 7, v1 - 9, 1.0), on(hw - 7, v1 - 6, 1.0), on(-hw + 7, v1 - 6, 1.0), SCREEN_GLARE);
+      for (let k = 0; k < 5; k += 1) {
+        const u = -hw + 8 + k * ((2 * hw - 16) / 4);
+        const v = -hh + 5;
+        const button = () => props.quad(on(u - 2.5, v - 2, 0.6), on(u + 2.5, v - 2, 0.6), on(u + 2.5, v + 2, 0.6), on(u - 2.5, v + 2, 0.6), k % 2 ? STATUS_GREEN : BUTTON);
+        // Design 083: every other button is a status light, blinking on its own beat.
+        if (k % 2) props.look({ kind: LOOK.blink, rate: 0.8 + 0.4 * ((((k * 7 + Math.round(x)) % 3) + 3) % 3), phase: ((((y + k * 31) * 0.017) % 1) + 1) % 1 }, button);
+        else button();
+      }
     }
-    // A desk: its top slopes from `front` at the face to the dais (v -hh) up to `back` at the back.
-    const topAt = (v) => CONSOLE.front + ((v + hh) / (2 * hh)) * (CONSOLE.back - CONSOLE.front);
-    props.roundBox({ x, y, z0: CONSOLE.kick, z1: CONSOLE.front, hw, hh, yaw, color: CONSOLE_GREY, topColor: CONSOLE_GREY });
-    props.quad(at(-hw, -hh, CONSOLE.front), at(hw, -hh, CONSOLE.front), at(hw, hh, CONSOLE.back), at(-hw, hh, CONSOLE.back), CONSOLE_GREY);
-    for (const side of [-1, 1]) props.quad(at(side * hw, -hh, CONSOLE.front), at(side * hw, hh, CONSOLE.front), at(side * hw, hh, CONSOLE.back), at(side * hw, -hh, CONSOLE.front), CONSOLE_GREY);
-    props.quad(at(-hw, hh, CONSOLE.front), at(hw, hh, CONSOLE.front), at(hw, hh, CONSOLE.back), at(-hw, hh, CONSOLE.back), CONSOLE_GREY);
-    const on = (u, v, lift) => at(u, v, topAt(v) + lift);
-    const v0 = -hh * 0.35;
-    const v1 = hh - 4;
-    props.quad(on(-hw + 4, v0 - 3, 0.5), on(hw - 4, v0 - 3, 0.5), on(hw - 4, v1, 0.5), on(-hw + 4, v1, 0.5), BEZEL);
-    props.quad(on(-hw + 7, v0, 0.8), on(hw - 7, v0, 0.8), on(hw - 7, v1 - 3, 0.8), on(-hw + 7, v1 - 3, 0.8), SCREEN);
-    props.quad(on(-hw + 7, v1 - 9, 1.0), on(hw - 7, v1 - 9, 1.0), on(hw - 7, v1 - 6, 1.0), on(-hw + 7, v1 - 6, 1.0), SCREEN_GLARE);
-    for (let k = 0; k < 5; k += 1) {
-      const u = -hw + 8 + k * ((2 * hw - 16) / 4);
-      const v = -hh + 5;
-      const button = () => props.quad(on(u - 2.5, v - 2, 0.6), on(u + 2.5, v - 2, 0.6), on(u + 2.5, v + 2, 0.6), on(u - 2.5, v + 2, 0.6), k % 2 ? STATUS_GREEN : BUTTON);
-      // Design 083: every other button is a status light, blinking on its own beat.
-      if (k % 2) props.look({ kind: LOOK.blink, rate: 0.8 + 0.4 * ((((k * 7 + Math.round(x)) % 3) + 3) % 3), phase: ((((y + k * 31) * 0.017) % 1) + 1) % 1 }, button);
-      else button();
-    }
-  }
 
-  // The tanks, as in the art: big steel drums with darker bands and a bulbous domed top, a neck of
-  // stacked collars at its crown under a small cap, a pipe stub beside it. A pipe runs to each from
-  // the ring.
-  for (const tank of tanks) {
-    const body = tank.tint ? BLUE_STEEL : STEEL;
-    const top = -DROP_PX + tank.height;
-    const dome = tank.radius * TANK_DOME;
-    props.cylinder({ x: tank.x, y: tank.y, z0: -DROP_PX, z1: top, r: tank.radius, color: body, sides: 28, capColor: LID, domeRise: dome });
-    for (const band of [0.2, 0.62]) {
-      const z = -DROP_PX + tank.height * band;
-      props.ring({ x: tank.x, y: tank.y, z0: z, z1: z + 8, r: tank.radius + 1.8, color: DARK_STEEL, sides: 28 });
+    // The tanks, as in the art: big steel drums with darker bands and a bulbous domed top, a neck of
+    // stacked collars at its crown under a small cap, a pipe stub beside it. A pipe runs to each from
+    // the ring.
+    for (const tank of tanks) {
+      const body = tank.tint ? BLUE_STEEL : STEEL;
+      const top = -DROP_PX + tank.height;
+      const dome = tank.radius * TANK_DOME;
+      props.cylinder({ x: tank.x, y: tank.y, z0: -DROP_PX, z1: top, r: tank.radius, color: body, sides: 28, capColor: LID, domeRise: dome });
+      for (const band of [0.2, 0.62]) {
+        const z = -DROP_PX + tank.height * band;
+        props.ring({ x: tank.x, y: tank.y, z0: z, z1: z + 8, r: tank.radius + 1.8, color: DARK_STEEL, sides: 28 });
+      }
+      props.ring({ x: tank.x, y: tank.y, z0: top - 5, z1: top + 1, r: tank.radius + 2, color: STEEL, sides: 28 });
+      // Design 084: one bright vertical specular stripe down the face turned to the viewer and the lens.
+      const glint = -Math.PI / 2 + 0.55;
+      const gx = Math.cos(glint);
+      const gy = Math.sin(glint);
+      const half = tank.radius * 0.07;
+      const atSide = (s) => [tank.x + gx * (tank.radius + 0.8) - gy * s, tank.y + gy * (tank.radius + 0.8) + gx * s];
+      props.quad([...atSide(-half), -DROP_PX + 10], [...atSide(half), -DROP_PX + 10], [...atSide(half), top - 6], [...atSide(-half), top - 6], TANK_GLINT);
+      const neck = tank.radius * 0.3;
+      for (let k = 0; k < 3; k += 1) {
+        const z = top + dome * 0.86 + k * 6;
+        props.cylinder({ x: tank.x, y: tank.y, z0: z, z1: z + 5, r: neck * (1 - k * 0.08), color: k % 2 ? DARK_STEEL : STEEL, sides: 18 });
+      }
+      props.cylinder({ x: tank.x, y: tank.y, z0: top + dome * 0.86 + 18, z1: top + dome * 0.86 + 24, r: neck * 0.7, color: DARK_STEEL, capColor: LID, sides: 18 });
+      const stub = tank.angle + 2.2;
+      props.cylinder({
+        x: tank.x + Math.cos(stub) * tank.radius * 0.72,
+        y: tank.y + Math.sin(stub) * tank.radius * 0.72,
+        z0: top,
+        z1: top + 22,
+        r: Math.max(5, tank.radius * 0.13),
+        color: PIPE,
+        sides: 10,
+      });
     }
-    props.ring({ x: tank.x, y: tank.y, z0: top - 5, z1: top + 1, r: tank.radius + 2, color: STEEL, sides: 28 });
-    // Design 084: one bright vertical specular stripe down the face turned to the viewer and the lens.
-    const glint = -Math.PI / 2 + 0.55;
-    const gx = Math.cos(glint);
-    const gy = Math.sin(glint);
-    const half = tank.radius * 0.07;
-    const atSide = (s) => [tank.x + gx * (tank.radius + 0.8) - gy * s, tank.y + gy * (tank.radius + 0.8) + gx * s];
-    props.quad([...atSide(-half), -DROP_PX + 10], [...atSide(half), -DROP_PX + 10], [...atSide(half), top - 6], [...atSide(-half), top - 6], TANK_GLINT);
-    const neck = tank.radius * 0.3;
-    for (let k = 0; k < 3; k += 1) {
-      const z = top + dome * 0.86 + k * 6;
-      props.cylinder({ x: tank.x, y: tank.y, z0: z, z1: z + 5, r: neck * (1 - k * 0.08), color: k % 2 ? DARK_STEEL : STEEL, sides: 18 });
+    // Design 080: no loose cables. From above, the ones snaking to the consoles and hanging between the
+    // risers read as black hooks, and the loops on the dais's band as scribbles beside the far Bench.
+    const ringPipe = [];
+    for (let turn = 0; turn <= 2 * Math.PI - 2 * halfGap + 1e-9; turn += OUTLINE_STEP_RAD * 2) {
+      const edge = outlineAt(outline, start + turn);
+      const angle = Math.atan2(edge.y - dais.y, edge.x - dais.x);
+      ringPipe.push([edge.x + Math.cos(angle) * 22, edge.y + Math.sin(angle) * 22, -DROP_PX + 10]);
     }
-    props.cylinder({ x: tank.x, y: tank.y, z0: top + dome * 0.86 + 18, z1: top + dome * 0.86 + 24, r: neck * 0.7, color: DARK_STEEL, capColor: LID, sides: 18 });
-    const stub = tank.angle + 2.2;
-    props.cylinder({
-      x: tank.x + Math.cos(stub) * tank.radius * 0.72,
-      y: tank.y + Math.sin(stub) * tank.radius * 0.72,
-      z0: top,
-      z1: top + 22,
-      r: Math.max(5, tank.radius * 0.13),
-      color: PIPE,
-      sides: 10,
+    props.tube(ringPipe, 9, PIPE, { sides: 10 });
+    // A second, thinner pipe runs beside it, and a bundle of three low along the deck's far side.
+    props.tube(ringPipe.map(([x, y, z]) => {
+      const angle = Math.atan2(y - dais.y, x - dais.x);
+      return [x + Math.cos(angle) * 19, y + Math.sin(angle) * 19, z - 3];
+    }), 5.5, PIPE, { sides: 8 });
+    ringPipe.forEach((point, i) => {
+      if (i % 9 !== 4) return;
+      const next = ringPipe[Math.min(i + 1, ringPipe.length - 1)];
+      const back = ringPipe[Math.max(i - 1, 0)];
+      const dir = [next[0] - back[0], next[1] - back[1], 0];
+      const length = Math.hypot(dir[0], dir[1]) || 1;
+      const half = [(dir[0] / length) * 4, (dir[1] / length) * 4, 0];
+      props.tube([[point[0] - half[0] * 0.3, point[1] - half[1] * 0.3, point[2]], [point[0] + half[0] * 0.3, point[1] + half[1] * 0.3, point[2]]], 10.6, BAND_WHITE, { sides: 10 });
     });
-  }
-  // Design 080: no loose cables. From above, the ones snaking to the consoles and hanging between the
-  // risers read as black hooks, and the loops on the dais's band as scribbles beside the far Bench.
-  const ringPipe = [];
-  for (let turn = 0; turn <= 2 * Math.PI - 2 * halfGap + 1e-9; turn += OUTLINE_STEP_RAD * 2) {
-    const edge = outlineAt(outline, start + turn);
-    const angle = Math.atan2(edge.y - dais.y, edge.x - dais.x);
-    ringPipe.push([edge.x + Math.cos(angle) * 22, edge.y + Math.sin(angle) * 22, -DROP_PX + 10]);
-  }
-  props.tube(ringPipe, 9, PIPE, { sides: 10 });
-  // A second, thinner pipe runs beside it, and a bundle of three low along the deck's far side.
-  props.tube(ringPipe.map(([x, y, z]) => {
-    const angle = Math.atan2(y - dais.y, x - dais.x);
-    return [x + Math.cos(angle) * 19, y + Math.sin(angle) * 19, z - 3];
-  }), 5.5, PIPE, { sides: 8 });
-  ringPipe.forEach((point, i) => {
-    if (i % 9 !== 4) return;
-    const next = ringPipe[Math.min(i + 1, ringPipe.length - 1)];
-    const back = ringPipe[Math.max(i - 1, 0)];
-    const dir = [next[0] - back[0], next[1] - back[1], 0];
-    const length = Math.hypot(dir[0], dir[1]) || 1;
-    const half = [(dir[0] / length) * 4, (dir[1] / length) * 4, 0];
-    props.tube([[point[0] - half[0] * 0.3, point[1] - half[1] * 0.3, point[2]], [point[0] + half[0] * 0.3, point[1] + half[1] * 0.3, point[2]]], 10.6, BAND_WHITE, { sides: 10 });
+    for (const tank of tanks) {
+      const edge = outlineAt(outline, tank.angle);
+      const from = [edge.x + Math.cos(tank.angle) * 22, edge.y + Math.sin(tank.angle) * 22, -DROP_PX + 10];
+      const to = [tank.x - Math.cos(tank.angle) * (tank.radius - 2), tank.y - Math.sin(tank.angle) * (tank.radius - 2), -DROP_PX + 10];
+      if (Math.hypot(to[0] - from[0], to[1] - from[1]) > 8) props.tube([from, to], 7, PIPE, { sides: 8 });
+    }
+    // Big pipes run out across the deck from the ring, rise at its far side and elbow out level high
+    // over the deck, away from the dais, bent like the art's. (Rising out of view, from above they
+    // pointed at the eye like barrels.)
+    const pastSegment = (point, a, b) => {
+      const abx = b[0] - a[0];
+      const aby = b[1] - a[1];
+      const t = Math.max(0, Math.min(1, ((point.x - a[0]) * abx + (point.y - a[1]) * aby) / (abx * abx + aby * aby || 1)));
+      return Math.hypot(point.x - a[0] - abx * t, point.y - a[1] - aby * t);
+    };
+    for (const deg of BIG_PIPES) {
+      const angle = (deg * Math.PI) / 180;
+      if (turnBetween(angle, STAIR.angle) < 0.3) continue;
+      const edge = outlineAt(outline, angle);
+      const dir = [Math.cos(angle), Math.sin(angle)];
+      const from = [edge.x + dir[0] * (BIG_PIPE.radius + 24), edge.y + dir[1] * (BIG_PIPE.radius + 24)];
+      const corner = [from[0] + dir[0] * BIG_PIPE.run, from[1] + dir[1] * BIG_PIPE.run];
+      const blocked =
+        tanks.some((t) => pastSegment(t, from, corner) < t.radius + BIG_PIPE.radius + 8) ||
+        consoles.some((c) => pastSegment(c, from, corner) < 50);
+      if (blocked) continue;
+      const z = -DROP_PX + BIG_PIPE.radius + 2;
+      const bendFrom = BIG_PIPE.run - BIG_PIPE.bend;
+      const points = [];
+      for (let k = 0; k <= 6; k += 1) {
+        const t = (bendFrom * k) / 6;
+        points.push([from[0] + dir[0] * t, from[1] + dir[1] * t, z]);
+      }
+      for (let k = 1; k <= 8; k += 1) {
+        const phi = (k / 8) * (Math.PI / 2);
+        const t = bendFrom + BIG_PIPE.bend * Math.sin(phi);
+        points.push([from[0] + dir[0] * t, from[1] + dir[1] * t, z + BIG_PIPE.bend * (1 - Math.cos(phi))]);
+      }
+      const elbow = BIG_PIPE.top - BIG_PIPE.bend;
+      for (let up = z + BIG_PIPE.bend + 40; up < elbow; up += 40) points.push([corner[0], corner[1], up]);
+      points.push([corner[0], corner[1], elbow]);
+      for (let k = 1; k <= 8; k += 1) {
+        const phi = (k / 8) * (Math.PI / 2);
+        const out = BIG_PIPE.bend * (1 - Math.cos(phi));
+        points.push([corner[0] + dir[0] * out, corner[1] + dir[1] * out, elbow + BIG_PIPE.bend * Math.sin(phi)]);
+      }
+      for (let k = 1; k <= 6; k += 1) {
+        const out = BIG_PIPE.bend + (BIG_PIPE.reach * k) / 6;
+        points.push([corner[0] + dir[0] * out, corner[1] + dir[1] * out, BIG_PIPE.top]);
+      }
+      props.tube(points, BIG_PIPE.radius, BIG_PIPE_STEEL, { sides: 14 });
+      pipeBands(props, points, BIG_PIPE.radius);
+    }
   });
-  for (const tank of tanks) {
-    const edge = outlineAt(outline, tank.angle);
-    const from = [edge.x + Math.cos(tank.angle) * 22, edge.y + Math.sin(tank.angle) * 22, -DROP_PX + 10];
-    const to = [tank.x - Math.cos(tank.angle) * (tank.radius - 2), tank.y - Math.sin(tank.angle) * (tank.radius - 2), -DROP_PX + 10];
-    if (Math.hypot(to[0] - from[0], to[1] - from[1]) > 8) props.tube([from, to], 7, PIPE, { sides: 8 });
-  }
-  // Big pipes run out across the deck from the ring, rise at its far side and elbow out level high
-  // over the deck, away from the dais, bent like the art's. (Rising out of view, from above they
-  // pointed at the eye like barrels.)
-  const pastSegment = (point, a, b) => {
-    const abx = b[0] - a[0];
-    const aby = b[1] - a[1];
-    const t = Math.max(0, Math.min(1, ((point.x - a[0]) * abx + (point.y - a[1]) * aby) / (abx * abx + aby * aby || 1)));
-    return Math.hypot(point.x - a[0] - abx * t, point.y - a[1] - aby * t);
-  };
-  for (const deg of BIG_PIPES) {
-    const angle = (deg * Math.PI) / 180;
-    if (turnBetween(angle, STAIR.angle) < 0.3) continue;
-    const edge = outlineAt(outline, angle);
-    const dir = [Math.cos(angle), Math.sin(angle)];
-    const from = [edge.x + dir[0] * (BIG_PIPE.radius + 24), edge.y + dir[1] * (BIG_PIPE.radius + 24)];
-    const corner = [from[0] + dir[0] * BIG_PIPE.run, from[1] + dir[1] * BIG_PIPE.run];
-    const blocked =
-      tanks.some((t) => pastSegment(t, from, corner) < t.radius + BIG_PIPE.radius + 8) ||
-      consoles.some((c) => pastSegment(c, from, corner) < 50);
-    if (blocked) continue;
-    const z = -DROP_PX + BIG_PIPE.radius + 2;
-    const bendFrom = BIG_PIPE.run - BIG_PIPE.bend;
-    const points = [];
-    for (let k = 0; k <= 6; k += 1) {
-      const t = (bendFrom * k) / 6;
-      points.push([from[0] + dir[0] * t, from[1] + dir[1] * t, z]);
-    }
-    for (let k = 1; k <= 8; k += 1) {
-      const phi = (k / 8) * (Math.PI / 2);
-      const t = bendFrom + BIG_PIPE.bend * Math.sin(phi);
-      points.push([from[0] + dir[0] * t, from[1] + dir[1] * t, z + BIG_PIPE.bend * (1 - Math.cos(phi))]);
-    }
-    const elbow = BIG_PIPE.top - BIG_PIPE.bend;
-    for (let up = z + BIG_PIPE.bend + 40; up < elbow; up += 40) points.push([corner[0], corner[1], up]);
-    points.push([corner[0], corner[1], elbow]);
-    for (let k = 1; k <= 8; k += 1) {
-      const phi = (k / 8) * (Math.PI / 2);
-      const out = BIG_PIPE.bend * (1 - Math.cos(phi));
-      points.push([corner[0] + dir[0] * out, corner[1] + dir[1] * out, elbow + BIG_PIPE.bend * Math.sin(phi)]);
-    }
-    for (let k = 1; k <= 6; k += 1) {
-      const out = BIG_PIPE.bend + (BIG_PIPE.reach * k) / 6;
-      points.push([corner[0] + dir[0] * out, corner[1] + dir[1] * out, BIG_PIPE.top]);
-    }
-    props.tube(points, BIG_PIPE.radius, BIG_PIPE_STEEL, { sides: 14 });
-    pipeBands(props, points, BIG_PIPE.radius);
-  }
+  return props;
 }
 
 const DAIS = /* glsl */ `

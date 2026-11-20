@@ -4,21 +4,6 @@ import { easeInOut } from './status-loop-frame.mjs';
 
 export const TERA_SKIN_TIMING = Object.freeze({ fadeMs: 450, glintMs: 3300 });
 
-/** `ease-out` = cubic-bezier(0, 0, 0.58, 1), solved for x by bisection. */
-function easeOut(x) {
-  if (!(x > 0)) return 0;
-  if (x >= 1) return 1;
-  const bezier = (t, p1, p2) => 3 * (1 - t) ** 2 * t * p1 + 3 * (1 - t) * t ** 2 * p2 + t ** 3;
-  let lo = 0;
-  let hi = 1;
-  for (let i = 0; i < 30; i++) {
-    const mid = (lo + hi) / 2;
-    if (bezier(mid, 0, 0.58) < x) lo = mid;
-    else hi = mid;
-  }
-  return bezier((lo + hi) / 2, 0, 1);
-}
-
 const cycle = (elapsed, duration) => (((elapsed % duration) + duration) % duration) / duration;
 
 /** Values at keyframes `[[p, ...values]]`, eased in-out per segment. */
@@ -34,7 +19,21 @@ function keyframesAt(keys, p) {
 }
 
 /** The glints fade in over 0.45 s, ease-out, once the coat has formed (`elapsedMs` since then). */
-export const teraSkinFade = (elapsedMs) => easeOut(elapsedMs / TERA_SKIN_TIMING.fadeMs);
+export const teraSkinFade = (elapsedMs) => {
+  // `ease-out` = cubic-bezier(0, 0, 0.58, 1), solved for x by bisection.
+  const x = elapsedMs / TERA_SKIN_TIMING.fadeMs;
+  if (!(x > 0)) return 0;
+  if (x >= 1) return 1;
+  const bezier = (t, p1, p2) => 3 * (1 - t) ** 2 * t * p1 + 3 * (1 - t) * t ** 2 * p2 + t ** 3;
+  let lo = 0;
+  let hi = 1;
+  for (let i = 0; i < 30; i++) {
+    const mid = (lo + hi) / 2;
+    if (bezier(mid, 0, 0.58) < x) lo = mid;
+    else hi = mid;
+  }
+  return bezier((lo + hi) / 2, 0, 1);
+};
 
 /**
  * One glint's 3.3 s cycle, after its `delay` in s: hidden until 62 %, flares to full size turned

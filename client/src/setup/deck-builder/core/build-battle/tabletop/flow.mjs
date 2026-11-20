@@ -30,12 +30,6 @@ const isVisualIndex = (value, packCount) =>
 
 const NAMED_SPOTS = new Set(['deck', 'leaflet', 'promo']);
 const SPOT_LIMIT_MM = 5000;
-const isSpotKey = (key, packCount) =>
-  NAMED_SPOTS.has(key) || (/^pack\d+$/.test(key) && isVisualIndex(Number(key.slice(4)), packCount));
-const isSpot = (spot) =>
-  !!spot &&
-  typeof spot === 'object' &&
-  ['x', 'z', 'rotYDeg', 'y'].every((k) => Number.isFinite(spot[k]) && Math.abs(spot[k]) < SPOT_LIMIT_MM);
 const copySpot = ({ x, z, rotYDeg, y }) => ({ x, z, rotYDeg, y });
 
 /** The well-formed spots of a stored record; a bad entry is dropped on its own. */
@@ -43,7 +37,9 @@ function parseSpots(value, packCount) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
   const spots = {};
   for (const [key, spot] of Object.entries(value)) {
-    if (isSpotKey(key, packCount) && isSpot(spot)) spots[key] = copySpot(spot);
+    if ((NAMED_SPOTS.has(key) || (/^pack\d+$/.test(key) && isVisualIndex(Number(key.slice(4)), packCount))) && (!!spot &&
+    typeof spot === 'object' &&
+    ['x', 'z', 'rotYDeg', 'y'].every((k) => Number.isFinite(spot[k]) && Math.abs(spot[k]) < SPOT_LIMIT_MM))) spots[key] = copySpot(spot);
   }
   return spots;
 }

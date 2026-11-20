@@ -87,47 +87,6 @@ const CONDITION_WORDS = [
 const HOLDER_ACTIVE_CLAUSE =
   /(?:if|as long as) this pok[eé]mon is (?:in the active spot|your active pok[eé]mon)/;
 
-function normalizeCheckup(text) {
-  // "put 1 additional damage counter" (Heatran Burning Will) is the same extra counter as "more".
-  const m = text.match(/put\s+(\d+)\s+(more\s+|additional\s+)?damage/);
-  // "put 4 damage counters … instead of 2" (Pyroar) replaces the condition's own counters, which
-  // Checkup already puts: the ability adds the difference.
-  const instead = text.match(/instead of (\d+)/);
-  const printed = m ? Number(m[1]) : 0;
-  const count = instead ? Math.max(0, printed - Number(instead[1])) : printed;
-  const more = Boolean(m && m[2]) || Boolean(instead);
-  let condition = null;
-  for (const [word, label] of CONDITION_WORDS) {
-    if (new RegExp(`\\b${word}\\b`).test(text)) {
-      condition = label;
-      break;
-    }
-  }
-  const basic = /\bbasic pok[eé]mon\b/.test(text);
-  const typeMatch = text.match(/\{([a-z])\}\s*pok[eé]mon/);
-  const type = typeMatch ? lower(TYPE_LETTER[typeMatch[1]]) : null;
-  const holderActive = HOLDER_ACTIVE_CLAUSE.test(text);
-  const targetActive = /your opponent's active pok[eé]mon/.test(text);
-  const both = /\(both yours and your opponent's\)/.test(text);
-  const opponent = /your opponent's/.test(text);
-  const scope = both ? 'both' : opponent ? 'opponent' : 'own';
-  const hasAbility = /has an ability|with an ability/.test(text);
-  const exceptName =
-    text.match(/except any ([^.,]+)/)?.[1]?.trim().toLowerCase() || null;
-  return {
-    count,
-    more,
-    condition,
-    basic,
-    type,
-    holderActive,
-    targetActive,
-    scope,
-    hasAbility,
-    exceptName,
-  };
-}
-
 function resolveCheckupTargets(effect, entries, holderPlayerId) {
   let pool = entries.filter((e) => e.card && isPokemon(e.card));
   if (effect.scope === 'opponent') {
@@ -167,7 +126,34 @@ export function parseCheckupAbilities(entries = [], ctx = {}) {
     const text = cardAbilityText(printed);
     if (!text || !/checkup/.test(text) || !/damage counter/.test(text)) continue;
     if (!parseAbility(text).some((s) => s.type === 'checkupAbility')) continue;
-    const effect = normalizeCheckup(text);
+    // "put 1 additional damage counter" (Heatran Burning Will) is the same extra counter as "more".
+    const put = text.match(/put\s+(\d+)\s+(more\s+|additional\s+)?damage/);
+    // "put 4 damage counters … instead of 2" (Pyroar) replaces the condition's own counters, which
+    // Checkup already puts: the ability adds the difference.
+    const instead = text.match(/instead of (\d+)/);
+    const printedCount = put ? Number(put[1]) : 0;
+    let condition = null;
+    for (const [word, label] of CONDITION_WORDS) {
+      if (new RegExp(`\\b${word}\\b`).test(text)) {
+        condition = label;
+        break;
+      }
+    }
+    const typeMatch = text.match(/\{([a-z])\}\s*pok[eé]mon/);
+    const both = /\(both yours and your opponent's\)/.test(text);
+    const opponent = /your opponent's/.test(text);
+    const effect = {
+      count: instead ? Math.max(0, printedCount - Number(instead[1])) : printedCount,
+      more: Boolean(put && put[2]) || Boolean(instead),
+      condition,
+      basic: /\bbasic pok[eé]mon\b/.test(text),
+      type: typeMatch ? lower(TYPE_LETTER[typeMatch[1]]) : null,
+      holderActive: HOLDER_ACTIVE_CLAUSE.test(text),
+      targetActive: /your opponent's active pok[eé]mon/.test(text),
+      scope: both ? 'both' : opponent ? 'opponent' : 'own',
+      hasAbility: /has an ability|with an ability/.test(text),
+      exceptName: text.match(/except any ([^.,]+)/)?.[1]?.trim().toLowerCase() || null,
+    };
     if (!(effect.count > 0)) continue;
     // "as long as Pecharunt is your Active Pokémon": the printed name is the holder.
     effect.holderActive ||= HOLDER_ACTIVE_CLAUSE.test(selfNamedText(printed));
@@ -486,7 +472,7 @@ export function parseBetweenTurnsAbilities(entries = [], ctx = {}) {
       source: printed.name,
       kind: 'damage',
       // "put 6 damage counters instead of 2" replaces the condition's own 2, so the
-      // ability contributes the difference (normalizeCheckup's rule).
+      // ability contributes the difference (parseCheckupAbilities' rule).
       count: instead ? Math.max(0, printedCount - Number(instead[1])) : printedCount,
       more: Boolean(put[2]) || Boolean(instead),
       insteadOf: instead ? Number(instead[1]) : null,

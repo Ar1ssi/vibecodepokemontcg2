@@ -322,37 +322,6 @@ function displayTable(props, table, u) {
   }
 }
 
-/** A mannequin on a round base: legs, a clothed torso with broad shoulders, a neck and a smooth head. */
-function mannequin(props, m, u) {
-  const top = MAN_TOPS[m.top];
-  props.cylinder({ x: m.x, y: m.y, z0: -1, z1: 3 * u, r: 18 * u, color: SKIRT, sides: 16 });
-  props.tube([[m.x, m.y, 3 * u], [m.x, m.y, m.h * 0.5]], [5 * u, 7 * u], MAN_LEG, { sides: 10 });
-  props.tube([[m.x, m.y, m.h * 0.46], [m.x, m.y, m.h * 0.62], [m.x, m.y, m.h * 0.8]], [11 * u, 14 * u, 12 * u], top, { sides: 16 });
-  // Shoulders: a broad flat bar across the chest.
-  props.roundBox({ x: m.x, y: m.y, z0: m.h * 0.74, z1: m.h * 0.82, hw: 7 * u, hh: 19 * u, color: top, topColor: top });
-  props.tube([[m.x, m.y, m.h * 0.82], [m.x, m.y, m.h * 0.9]], 4.2 * u, SKIN, { sides: 8 });
-  props.sphere({ x: m.x, y: m.y, z: m.h * 0.97, r: 9.5 * u, color: SKIN, sides: 14, rings: 9, squash: 1.15 });
-  for (const s of [-1, 1]) props.tube([[m.x, m.y + s * 18 * u, m.h * 0.78], [m.x, m.y + s * 21 * u, m.h * 0.5]], [4 * u, 3.2 * u], top, { sides: 8 });
-  // Design 084: a dress: a skirt flaring from the waist.
-  props.cone({ x: m.x, y: m.y, z0: m.h * 0.24, z1: m.h * 0.5, r: 19 * u, color: top, sides: 18 });
-}
-
-/** A rack along a wall: a rail on two posts, shirts hung close along it in the aisle's colours. */
-function shirtRack(props, rack, u) {
-  const step = 9 * u;
-  const count = Math.floor(rack.len / step);
-  props.cylinder({ x: rack.x, y: rack.y - rack.len / 2, z0: -1, z1: 60 * u, r: 2 * u, color: RAIL, sides: 8 });
-  props.cylinder({ x: rack.x, y: rack.y + rack.len / 2, z0: -1, z1: 60 * u, r: 2 * u, color: RAIL, sides: 8 });
-  props.tube([[rack.x, rack.y - rack.len / 2, 60 * u], [rack.x, rack.y + rack.len / 2, 60 * u]], 1.6 * u, RAIL, { sides: 8 });
-  for (let k = 0; k < count; k += 1) {
-    // A rack runs from one colour into its neighbour along its length.
-    const [from, to] = stockColours(rack.seed);
-    const colour = from.map((v, i) => v + (to[i] - v) * (k / Math.max(1, count - 1)));
-    const y = rack.y - rack.len / 2 + (k + 0.5) * step;
-    props.roundBox({ x: rack.x, y, z0: 28 * u, z1: 58 * u, hw: 14 * u, hh: 2.6 * u, color: [colour[0], colour[1], colour[2], 0.2], topColor: [colour[0] * 1.1, colour[1] * 1.1, colour[2] * 1.1, 0.2] });
-  }
-}
-
 /** A balloon on its string tied to a table, a little knot at its foot. */
 function balloon(props, b, u) {
   const hue = BALLOON_HUES[b.hue];
@@ -417,11 +386,38 @@ export function shoppingProps(spots) {
   const props = createPropBuilder();
   walls(props, spots);
   mezzanine(props, spots);
-  for (const rack of racks) shirtRack(props, rack, u);
+  for (const rack of racks) {
+    // A rack along a wall: a rail on two posts, shirts hung close along it in the aisle's colours.
+    const step = 9 * u;
+    const count = Math.floor(rack.len / step);
+    props.cylinder({ x: rack.x, y: rack.y - rack.len / 2, z0: -1, z1: 60 * u, r: 2 * u, color: RAIL, sides: 8 });
+    props.cylinder({ x: rack.x, y: rack.y + rack.len / 2, z0: -1, z1: 60 * u, r: 2 * u, color: RAIL, sides: 8 });
+    props.tube([[rack.x, rack.y - rack.len / 2, 60 * u], [rack.x, rack.y + rack.len / 2, 60 * u]], 1.6 * u, RAIL, { sides: 8 });
+    for (let k = 0; k < count; k += 1) {
+      // A rack runs from one colour into its neighbour along its length.
+      const [from, to] = stockColours(rack.seed);
+      const colour = from.map((v, i) => v + (to[i] - v) * (k / Math.max(1, count - 1)));
+      const y = rack.y - rack.len / 2 + (k + 0.5) * step;
+      props.roundBox({ x: rack.x, y, z0: 28 * u, z1: 58 * u, hw: 14 * u, hh: 2.6 * u, color: [colour[0], colour[1], colour[2], 0.2], topColor: [colour[0] * 1.1, colour[1] * 1.1, colour[2] * 1.1, 0.2] });
+    }
+  }
   // Design 083: each table turned a little its own way (built about its middle, its stock keeping
   // the same colours as at its place).
   for (const table of tables) props.at({ x: table.x, y: table.y, yaw: table.turn ?? 0 }, () => displayTable(props, { ...table, x: 0, y: 0, stockAt: [table.x, table.y] }, u));
-  for (const m of mannequins) mannequin(props, m, u);
+  for (const m of mannequins) {
+    // A mannequin on a round base: legs, a clothed torso with broad shoulders, a neck and a smooth head.
+    const top = MAN_TOPS[m.top];
+    props.cylinder({ x: m.x, y: m.y, z0: -1, z1: 3 * u, r: 18 * u, color: SKIRT, sides: 16 });
+    props.tube([[m.x, m.y, 3 * u], [m.x, m.y, m.h * 0.5]], [5 * u, 7 * u], MAN_LEG, { sides: 10 });
+    props.tube([[m.x, m.y, m.h * 0.46], [m.x, m.y, m.h * 0.62], [m.x, m.y, m.h * 0.8]], [11 * u, 14 * u, 12 * u], top, { sides: 16 });
+    // Shoulders: a broad flat bar across the chest.
+    props.roundBox({ x: m.x, y: m.y, z0: m.h * 0.74, z1: m.h * 0.82, hw: 7 * u, hh: 19 * u, color: top, topColor: top });
+    props.tube([[m.x, m.y, m.h * 0.82], [m.x, m.y, m.h * 0.9]], 4.2 * u, SKIN, { sides: 8 });
+    props.sphere({ x: m.x, y: m.y, z: m.h * 0.97, r: 9.5 * u, color: SKIN, sides: 14, rings: 9, squash: 1.15 });
+    for (const s of [-1, 1]) props.tube([[m.x, m.y + s * 18 * u, m.h * 0.78], [m.x, m.y + s * 21 * u, m.h * 0.5]], [4 * u, 3.2 * u], top, { sides: 8 });
+    // Design 084: a dress: a skirt flaring from the waist.
+    props.cone({ x: m.x, y: m.y, z0: m.h * 0.24, z1: m.h * 0.5, r: 19 * u, color: top, sides: 18 });
+  }
   // Design 083: the balloons bob and drift on their strings, each one whole (built about its own middle).
   props.look({ kind: LOOK.gloss, sway: 3.5 }, () => {
     for (const b of balloons) props.at({ x: b.x, y: b.y, ground: false }, () => balloon(props, { ...b, x: 0, y: 0, anchor: { x: b.anchor.x - b.x, y: b.anchor.y - b.y } }, u));

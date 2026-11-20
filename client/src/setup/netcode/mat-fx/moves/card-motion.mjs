@@ -572,10 +572,6 @@ const REACT_MIN_MS = 240;
 /** The scene's last frames are the cards at rest. */
 const REACT_TAIL_MS = 20;
 
-/** How long a reaction runs in a scene `durationMs` long whose contact is at `c`. */
-const reactWindow = (c, durationMs) =>
-  durationMs > c ? Math.min(REACT_MS, Math.max(REACT_MIN_MS, durationMs - c - REACT_TAIL_MS)) : REACT_MS;
-
 /** The first instant of any hit: 0 → 1 over the first 14 % of the reaction. */
 const kickOf = (k) => easeOutCubic(clamp01(k / 0.14));
 /** After the kick, a damped spring home (1 → 0). */
@@ -587,7 +583,8 @@ const reaction = (shape) => (ms, { contactMs: c, durationMs, params: p }) => {
   const pre = tremble(ms, c);
   if (pre) return pre;
   const heat = heatAt(ms, c, p.heat);
-  const k = span(ms, c, c + reactWindow(c, durationMs));
+  // How long a reaction runs in a scene `durationMs` long whose contact is at `c`.
+  const k = span(ms, c, c + (durationMs > c ? Math.min(REACT_MS, Math.max(REACT_MIN_MS, durationMs - c - REACT_TAIL_MS)) : REACT_MS));
   if (k === null) return defenderPose0({ heat });
   return defenderPose0({ ...shape(k, p, (ms - c) / 1000), heat });
 };
@@ -743,27 +740,25 @@ export const MOTION_PARAMS = Object.freeze({
   defender: Object.freeze(Object.fromEntries(Object.entries(DEFENDER_MOTIONS).map(([k, v]) => [k, v.params]))),
 });
 
-const attackerOpts = (name, opts) => ({
-  durationMs: 0,
-  ...opts,
-  params: fillDefaults(ATTACKER_MOTIONS[name].params, opts?.params),
-});
-const defenderOpts = (name, opts) => ({
-  durationMs: 0,
-  ...opts,
-  params: fillDefaults(DEFENDER_MOTIONS[name].params, opts?.params),
-});
 
 /** Attacker pose at `ms`; an unknown motion is the rest pose. */
 export function attackerPose(name, ms, opts) {
   if (!Object.hasOwn(ATTACKER_MOTIONS, name)) return ATTACKER_REST;
-  return ATTACKER_MOTIONS[name].pose(ms, attackerOpts(name, opts));
+  return ATTACKER_MOTIONS[name].pose(ms, {
+    durationMs: 0,
+    ...opts,
+    params: fillDefaults(ATTACKER_MOTIONS[name].params, opts?.params),
+  });
 }
 
 /** Defender pose at `ms`; an unknown motion is the rest pose. */
 export function defenderPose(name, ms, opts) {
   if (!Object.hasOwn(DEFENDER_MOTIONS, name)) return DEFENDER_REST;
-  return DEFENDER_MOTIONS[name].pose(ms, defenderOpts(name, opts));
+  return DEFENDER_MOTIONS[name].pose(ms, {
+    durationMs: 0,
+    ...opts,
+    params: fillDefaults(DEFENDER_MOTIONS[name].params, opts?.params),
+  });
 }
 
 /** Scene-clock ms after which the attacker pose is the rest pose. */

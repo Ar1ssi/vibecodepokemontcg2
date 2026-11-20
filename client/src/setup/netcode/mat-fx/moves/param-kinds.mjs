@@ -36,14 +36,6 @@ export function defaultOf(entry) {
   return entry[1];
 }
 
-const checkArms = (value) => {
-  if (typeof value === 'string') return ARM_PRESETS.includes(value) ? null : 'a known arms preset';
-  if (!Array.isArray(value) || value.length === 0) return "'dai', 'cross', 'ring' or a non-empty array";
-  return value.every((arm) => isObject(arm) && isNum(arm.angle) && isNum(arm.reach) && arm.reach > 0)
-    ? null
-    : 'arms of { angle, reach > 0 }';
-};
-
 /** The error for one value against one schema entry, or null. */
 function checkEntry(entry, value) {
   const [kind] = entry;
@@ -53,7 +45,13 @@ function checkEntry(entry, value) {
   if (kind === 'deg') return isNum(value) ? null : 'a finite number of degrees';
   if (kind === 'target') return TARGETS.includes(value) ? null : 'attacker or defender';
   if (kind === 'anchor') return ANCHORS.includes(value) ? null : `one of ${ANCHORS.join('/')}`;
-  if (kind === 'arms') return checkArms(value);
+  if (kind === 'arms') {
+    if (typeof value === 'string') return ARM_PRESETS.includes(value) ? null : 'a known arms preset';
+    if (!Array.isArray(value) || value.length === 0) return "'dai', 'cross', 'ring' or a non-empty array";
+    return value.every((arm) => isObject(arm) && isNum(arm.angle) && isNum(arm.reach) && arm.reach > 0)
+      ? null
+      : 'arms of { angle, reach > 0 }';
+  }
   // `null` is the 'none' default of both colour kinds.
   if ((kind === 'palette' || kind === 'hexes') && value === null) return null;
   if (kind === 'palette') {

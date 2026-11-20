@@ -30,32 +30,17 @@ export function canonicalCardId(id) {
   return raw;
 }
 
-function subtypeTag(card) {
-  const subtypes = Array.isArray(card?.subtypes)
-    ? card.subtypes
-    : String(card?.subtypes ?? '').split(',');
-  for (const subtype of subtypes) {
-    const tag = TAG_BY_TOKEN[String(subtype ?? '').trim().toLowerCase()];
-    if (tag) return tag;
-  }
-  return null;
-}
-
-function imageSources(card) {
+/** Every TCGdex-style id a card-shaped object may carry (id, tcgId, image URL, set + number). */
+export function printingIds(card) {
+  const ids = [card?.id, card?.tcgId];
   const image = card?.image;
-  return [
+  for (const src of [
     card?.src,
     typeof image === 'string' ? image : image?.src,
     card?.imageURL,
     card?.images?.small,
     card?.images?.large,
-  ].filter((src) => typeof src === 'string' && src);
-}
-
-/** Every TCGdex-style id a card-shaped object may carry (id, tcgId, image URL, set + number). */
-export function printingIds(card) {
-  const ids = [card?.id, card?.tcgId];
-  for (const src of imageSources(card)) ids.push(extractTcgdexIdFromImageUrl(src));
+  ].filter((src) => typeof src === 'string' && src)) ids.push(extractTcgdexIdFromImageUrl(src));
   const set = card?.set && typeof card.set === 'object' ? card.set.id : card?.set;
   const number = card?.number ?? card?.localId;
   if (set && number != null && number !== '') ids.push(...buildSetCardIdCandidates(set, number));
@@ -65,7 +50,12 @@ export function printingIds(card) {
 /** The printed Paradox tag of a card: 'Ancient', 'Future', or null. */
 export function paradoxTagOf(card) {
   if (!card || typeof card !== 'object') return null;
-  const fromSubtypes = subtypeTag(card);
+  const subtypes = Array.isArray(card?.subtypes)
+    ? card.subtypes
+    : String(card?.subtypes ?? '').split(',');
+  const fromSubtypes = subtypes
+    .map((subtype) => TAG_BY_TOKEN[String(subtype ?? '').trim().toLowerCase()])
+    .find(Boolean);
   if (fromSubtypes) return fromSubtypes;
   for (const id of printingIds(card)) {
     const tag = PARADOX_TAGS[canonicalCardId(id)];

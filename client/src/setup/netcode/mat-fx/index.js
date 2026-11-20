@@ -70,16 +70,6 @@ const STATIC_FALLBACKS = { 'coin-flip': coinFlip };
 // Design 043: the opponent's Trainer sounds with its preview's timing.
 const cardOf = (instanceId) => getCardRegistry().get(instanceId)?.card;
 
-// The coin ceremony's sound follows the coin the player flips with and the motion setting.
-const withCoinSound = (plan) => {
-  const coin = getSelectedCoin(plan.user === 'opp' ? 'opp' : 'self') || pickDefaultCoin();
-  return {
-    ...plan,
-    coinMaterial: coinSoundMaterial(resolveCoinEffect(coin).material),
-    coinReducedMotion: motionReduced(),
-  };
-};
-
 // A Mega or Tera coming into play: when its entry's burst lands, for the cue (sfx-cues.mjs).
 const withSignature = (plan) => {
   const burstMs = signatureBurstMs(signatureEntryKind(cardOf(plan.instanceId)));
@@ -88,7 +78,15 @@ const withSignature = (plan) => {
 
 // Design 063: an attack sounds with its move's family (the same pure pick the scene plays).
 const soundPlanFor = (plan) => {
-  if (plan?.effect === 'coin-flip') return withCoinSound(plan);
+  if (plan?.effect === 'coin-flip') {
+    // The coin ceremony's sound follows the coin the player flips with and the motion setting.
+    const coin = getSelectedCoin(plan.user === 'opp' ? 'opp' : 'self') || pickDefaultCoin();
+    return {
+      ...plan,
+      coinMaterial: coinSoundMaterial(resolveCoinEffect(coin).material),
+      coinReducedMotion: motionReduced(),
+    };
+  }
   if (plan?.effect === 'trainer-play' && playsOppPreview(plan)) return { ...plan, effect: 'opp-trainer-play' };
   if (plan?.effect === 'attack') return { ...plan, ...attackSoundFor(plan) };
   if (plan?.effect === 'enter') return withSignature(withSoundCard(plan, cardOf));

@@ -66,8 +66,6 @@ export function parseEtbQuery(search = '') {
   return { etbKey: etb.key, seed: parseSeed(params.get('seed') ?? '') };
 }
 
-const energyTotal = (etb) => etb.energy.reduce((sum, [, count]) => sum + count, 0);
-
 /** @returns {string[]} the "Inside, you'll find" lines on the box back, from the catalog row. */
 export function etbInsideLines(etb, setName, promos = ETB_PROMOS) {
   const promo = Object.hasOwn(promos || {}, etb.key) ? promos[etb.key] : null;
@@ -76,7 +74,7 @@ export function etbInsideLines(etb, setName, promos = ETB_PROMOS) {
     `${etb.packCount} ${setName} booster packs`,
     promo ? `1 foil promo card featuring ${promo.name}` : null,
     `${etb.sleeveCount} card sleeves`,
-    `${energyTotal(etb)} Pokémon TCG Energy cards`,
+    `${etb.energy.reduce((sum, [, count]) => sum + count, 0)} Pokémon TCG Energy cards`,
     damageDice ? `${damageDice} damage-counter dice` : null,
     flipDie ? `${flipDie} competition-legal coin-flip die` : null,
     coin ? `${coin} plastic coin` : null,

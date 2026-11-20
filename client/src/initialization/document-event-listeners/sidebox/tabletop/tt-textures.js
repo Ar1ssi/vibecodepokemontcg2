@@ -34,7 +34,35 @@ const IMAGE_TIMEOUT_MS = 9000;
  */
 export async function loadImage(url, { timeoutMs = IMAGE_TIMEOUT_MS } = {}) {
   for (const source of artSources(url)) {
-    const image = await loadFrom(source, timeoutMs);
+    const image = await new Promise((resolve) => {
+      const image = new Image();
+      image.crossOrigin = 'anonymous';
+      image.decoding = 'async';
+      let settled = false;
+      const finish = (value) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(value);
+      };
+      let left = timeoutMs;
+      let last = performance.now();
+      let timer = 0;
+      const tick = () => {
+        const now = performance.now();
+        left -= Math.min(now - last, TIMEOUT_TICK_MS * 2);
+        last = now;
+        if (left <= 0) finish(null);
+        else timer = setTimeout(tick, TIMEOUT_TICK_MS);
+      };
+      timer = setTimeout(tick, TIMEOUT_TICK_MS);
+      image.onload = () => {
+        if (typeof image.decode === 'function') image.decode().then(() => finish(image), () => finish(image));
+        else finish(image);
+      };
+      image.onerror = () => finish(null);
+      image.src = source;
+    });
     if (image) return image;
   }
   return null;
@@ -44,43 +72,6 @@ export async function loadImage(url, { timeoutMs = IMAGE_TIMEOUT_MS } = {}) {
 // shader compile (seconds on software WebGL, which compiles synchronously) would otherwise time
 // out an image that arrived long ago, and the art would fall back to a source that fails.
 const TIMEOUT_TICK_MS = 250;
-
-function stallProofTimeout(timeoutMs, onTimeout) {
-  let left = timeoutMs;
-  let last = performance.now();
-  let timer = 0;
-  const tick = () => {
-    const now = performance.now();
-    left -= Math.min(now - last, TIMEOUT_TICK_MS * 2);
-    last = now;
-    if (left <= 0) onTimeout();
-    else timer = setTimeout(tick, TIMEOUT_TICK_MS);
-  };
-  timer = setTimeout(tick, TIMEOUT_TICK_MS);
-  return () => clearTimeout(timer);
-}
-
-function loadFrom(url, timeoutMs) {
-  return new Promise((resolve) => {
-    const image = new Image();
-    image.crossOrigin = 'anonymous';
-    image.decoding = 'async';
-    let settled = false;
-    const finish = (value) => {
-      if (settled) return;
-      settled = true;
-      stopTimeout();
-      resolve(value);
-    };
-    const stopTimeout = stallProofTimeout(timeoutMs, () => finish(null));
-    image.onload = () => {
-      if (typeof image.decode === 'function') image.decode().then(() => finish(image), () => finish(image));
-      else finish(image);
-    };
-    image.onerror = () => finish(null);
-    image.src = url;
-  });
-}
 
 /** Wraps a loaded image (or canvas) as a texture. */
 export function imageTexture(source, renderer, { srgb = true, repeat = false, anisotropy = 8 } = {}) {
@@ -306,7 +297,7 @@ export function stackEdgeTexture(renderer, count = 40) {
   return canvasTexture(
     8,
     rows * 8,
-    (ctx, w, h) => {
+    (ctx, w) => {
       for (let r = 0; r < rows; r += 1) {
         const y = r * 8;
         ctx.fillStyle = '#ecebe5';

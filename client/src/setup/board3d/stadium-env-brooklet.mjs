@@ -1365,18 +1365,6 @@ const fenceGeometry = (three, posts) => {
   return geometry;
 };
 
-/** The towers', the basin's kerb's and the ledge's stone (stadium-env-brooklet-layout.mjs stonework) as one mesh. */
-const stoneworkGeometry = (three, spots) => {
-  const { positions, normals, parts, levels, index } = stonework(spots);
-  const geometry = new three.BufferGeometry();
-  geometry.setAttribute('position', new three.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute('normal', new three.Float32BufferAttribute(normals, 3));
-  geometry.setAttribute('aPart', new three.Float32BufferAttribute(parts, 3));
-  geometry.setAttribute('aLevels', new three.Float32BufferAttribute(levels, 2));
-  geometry.setIndex(index);
-  return geometry;
-};
-
 /** Sets each vector from the item at its index (`toValues` gives its components), zero past the list. */
 const setEach = (vectors, items, toValues) =>
   vectors.forEach((vector, i) => (items[i] ? vector.set(...toValues(items[i])) : vector.set(0, 0, 0, 0)));
@@ -1505,7 +1493,15 @@ export function brookletHillBoard({ three, material, seeded, terrainGrid, replac
       );
       replaceGeometry(fence, fenceGeometry(three, posts));
       fence.visible = posts.length > 0;
-      replaceGeometry(stone, stoneworkGeometry(three, spots));
+      // The towers', the basin's kerb's and the ledge's stone (stadium-env-brooklet-layout.mjs stonework) as one mesh.
+      const { positions, normals, parts, levels, index } = stonework(spots);
+      const geometry = new three.BufferGeometry();
+      geometry.setAttribute('position', new three.Float32BufferAttribute(positions, 3));
+      geometry.setAttribute('normal', new three.Float32BufferAttribute(normals, 3));
+      geometry.setAttribute('aPart', new three.Float32BufferAttribute(parts, 3));
+      geometry.setAttribute('aLevels', new three.Float32BufferAttribute(levels, 2));
+      geometry.setIndex(index);
+      replaceGeometry(stone, geometry);
       kit.set(brookletProps(spots));
     },
   };

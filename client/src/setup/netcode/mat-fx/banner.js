@@ -2,7 +2,7 @@
 // to flow.js (turn + ability banners); the attack-name banner is the third
 // caller, so it moves here rather than being copied a third time.
 import { animateFrames, removeWhen, sampleKeyframes, spawnOverlay } from '../../image-logic/mat-fx.mjs';
-import { BANNER_MS, EDGE_GLOW_MS, bannerPose, edgeGlowPose, sweepPose } from './flow-pose.mjs';
+import { BANNER_MS, bannerPose, sweepPose } from './flow-pose.mjs';
 
 const BACKSTOP_PAD_MS = 400;
 
@@ -13,7 +13,7 @@ export const viewportRect = () => ({
   height: globalThis.innerHeight || 0,
 });
 
-const textNode = (className, text) => {
+export const textNode = (className, text) => {
   const el = document.createElement('div');
   el.className = className;
   el.textContent = text;
@@ -80,14 +80,4 @@ export const playBanner = ({ title, sub, tag }, side, variant) => {
     ],
     BANNER_MS + BACKSTOP_PAD_MS
   );
-};
-
-/** Brief glow around the screen edge, tinted by side. */
-export const playEdgeGlow = (side) => {
-  const host = spawnOverlay({
-    rect: viewportRect(),
-    className: `fx-overlay fx-edge-glow fx-edge-glow--${side}`,
-  });
-  const frames = sampleKeyframes(edgeGlowPose, (p) => ({ opacity: p.opacity }), 16);
-  removeWhen(host, [animateFrames(host, frames, { duration: EDGE_GLOW_MS })], EDGE_GLOW_MS + BACKSTOP_PAD_MS);
 };

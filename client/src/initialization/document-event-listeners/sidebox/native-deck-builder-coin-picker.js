@@ -193,32 +193,28 @@
       const regionSelect = panelEl.querySelector('.coin-region-filter');
       const imageOnlyInput = panelEl.querySelector('.coin-image-only');
     
-      const renderTcglPreview = (coin) => {
-        previewEl.innerHTML = [
-          `<span class="coin-stage-preview" data-coin-stage-preview>`,
-          `  <img src="${escapeHtml(coinArtUrl(coin.thumb))}" alt="${escapeHtml(coin.name)}" />`,
-          `</span>`,
-          `<div class="native-deck-builder-coin-preview-text">`,
-          `  <strong>${escapeHtml(coin.name)}</strong>`,
-          `  <span>TCG Live · ${escapeHtml(coin.family === 'Metal' ? 'Metal' : `${coin.family} holofoil`)}</span>`,
-          `  <span>Move the pointer over the coin to tilt it</span>`,
-          `</div>`,
-        ].join('');
-        const host = previewEl.querySelector('[data-coin-stage-preview]');
-        const token = previewToken;
-        mountTcglPreview(host, coin, () => token === previewToken).then((teardown) => {
-          if (token === previewToken) previewTeardown = teardown;
-          else teardown();
-        });
-      };
-
       const renderPreview = () => {
         previewToken += 1;
         previewTeardown();
         previewTeardown = () => {};
         const coin = coinById(selectedId);
         if (coin && tcglIds.has(coin.id)) {
-          renderTcglPreview(coin);
+          previewEl.innerHTML = [
+            `<span class="coin-stage-preview" data-coin-stage-preview>`,
+            `  <img src="${escapeHtml(coinArtUrl(coin.thumb))}" alt="${escapeHtml(coin.name)}" />`,
+            `</span>`,
+            `<div class="native-deck-builder-coin-preview-text">`,
+            `  <strong>${escapeHtml(coin.name)}</strong>`,
+            `  <span>TCG Live · ${escapeHtml(coin.family === 'Metal' ? 'Metal' : `${coin.family} holofoil`)}</span>`,
+            `  <span>Move the pointer over the coin to tilt it</span>`,
+            `</div>`,
+          ].join('');
+          const host = previewEl.querySelector('[data-coin-stage-preview]');
+          const token = previewToken;
+          mountTcglPreview(host, coin, () => token === previewToken).then((teardown) => {
+            if (token === previewToken) previewTeardown = teardown;
+            else teardown();
+          });
           return;
         }
         if (!coin) {
@@ -257,27 +253,24 @@
           ...metaLines,
           `</div>`,
         ].join('');
-        wirePreviewCoin(coin);
-      };
-    
-      const wirePreviewCoin = (coin) => {
         const el = panelEl.querySelector('[data-coin-preview]');
-        if (!el) return;
-        applyCoinEffect(el, coin);
-        const wrap = el.closest('[data-coin-toss]');
-        let tosses = 0;
-        el.addEventListener('click', () => {
-          tosses += 1;
-          el.style.setProperty('--coin-flip', (tosses * 1620) + 'deg');
-          if (wrap) {
-            wrap.classList.remove('tossing');
-            void wrap.offsetWidth; // restart the arc
-            wrap.classList.add('tossing');
-          }
-        });
-        wrap?.addEventListener('animationend', () => wrap.classList.remove('tossing'));
-        // fixed virtual light: the highlight follows the coin's angle, not the cursor
-        wireCoinPointerLight(el);
+        if (el) {
+          applyCoinEffect(el, coin);
+          const wrap = el.closest('[data-coin-toss]');
+          let tosses = 0;
+          el.addEventListener('click', () => {
+            tosses += 1;
+            el.style.setProperty('--coin-flip', (tosses * 1620) + 'deg');
+            if (wrap) {
+              wrap.classList.remove('tossing');
+              void wrap.offsetWidth; // restart the arc
+              wrap.classList.add('tossing');
+            }
+          });
+          wrap?.addEventListener('animationend', () => wrap.classList.remove('tossing'));
+          // fixed virtual light: the highlight follows the coin's angle, not the cursor
+          wireCoinPointerLight(el);
+        }
       };
     
       const selectCoin = (id) => {
@@ -287,28 +280,26 @@
         onChange?.(coinById(selectedId));
       };
 
-      const renderTcglGallery = (visible) => {
-        galleryEl.innerHTML = visible
-          .map((coin) =>
-            [
-              `<button class="coin-cell coin-cell-tcgl${coin.id === selectedId ? ' selected' : ''}" data-coin-id="${escapeHtml(coin.id)}" title="${escapeHtml(coin.name)}">`,
-              `  <img class="coin-cell-thumb" src="${escapeHtml(coinArtUrl(coin.thumb))}" alt="${escapeHtml(coin.name)}" loading="lazy" />`,
-              `  <span class="coin-cell-name">${escapeHtml(coin.name)}</span>`,
-              `  <span class="coin-cell-meta">${escapeHtml(coin.family)}</span>`,
-              `</button>`,
-            ].join('')
-          )
-          .join('');
-        galleryEl.querySelectorAll('[data-coin-id]').forEach((button) => {
-          button.addEventListener('click', () => selectCoin(button.dataset.coinId));
-        });
-      };
-
       const renderGallery = () => {
         if (source === SOURCE_TCGL) {
           const visible = filterCoins(tcglCoins, { term: filterTerm });
           if (visible.length === 0) galleryEl.innerHTML = '<div class="native-deck-builder-coin-empty">No coins match.</div>';
-          else renderTcglGallery(visible);
+          else {
+            galleryEl.innerHTML = visible
+              .map((coin) =>
+                [
+                  `<button class="coin-cell coin-cell-tcgl${coin.id === selectedId ? ' selected' : ''}" data-coin-id="${escapeHtml(coin.id)}" title="${escapeHtml(coin.name)}">`,
+                  `  <img class="coin-cell-thumb" src="${escapeHtml(coinArtUrl(coin.thumb))}" alt="${escapeHtml(coin.name)}" loading="lazy" />`,
+                  `  <span class="coin-cell-name">${escapeHtml(coin.name)}</span>`,
+                  `  <span class="coin-cell-meta">${escapeHtml(coin.family)}</span>`,
+                  `</button>`,
+                ].join('')
+              )
+              .join('');
+            galleryEl.querySelectorAll('[data-coin-id]').forEach((button) => {
+              button.addEventListener('click', () => selectCoin(button.dataset.coinId));
+            });
+          }
           return;
         }
         const ownedIds = new Set(getOwnedIds());

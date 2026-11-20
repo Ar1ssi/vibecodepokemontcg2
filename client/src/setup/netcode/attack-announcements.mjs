@@ -5,10 +5,6 @@
 //
 // Pure: no DOM, no imports. `attack-announcements.js` is the thin caller that appends.
 
-/** The Pokémon name a bench event refers to, or null when the caller cannot resolve it. */
-const nameOf = (event, resolveName) =>
-  (typeof resolveName === 'function' ? resolveName(event.instanceId) : null) || null;
-
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 /**
@@ -60,7 +56,8 @@ export function attackAnnouncementLines(event, selfPlayerId, resolveName, names 
 
     case 'benchDamaged': {
       // event.playerId is the OWNER of the damaged Pokémon, not the attacker.
-      const target = nameOf(event, resolveName);
+      // The Pokémon name a bench event refers to, or null when the caller cannot resolve it.
+      const target = (typeof resolveName === 'function' ? resolveName(event.instanceId) : null) || null;
       const owner = names ? `${names[event.playerId] || 'A player'}'s` : null;
       const where = owner ? `${owner} benched` : mine ? 'your benched' : "the opponent's benched";
       const lines = [`💥 ${event.dealt} damage to ${where} ${target || 'Pokémon'}.`];

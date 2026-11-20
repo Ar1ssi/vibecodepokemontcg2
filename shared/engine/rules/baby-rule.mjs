@@ -41,8 +41,6 @@ const plainName = (card) =>
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '');
 
-const isBasicStage = (card) => String(card?.stage ?? '').toLowerCase().replace(/[^a-z]/g, '') === 'basic';
-
 /** True when the card is a printed Baby Pokémon (the top card of the Pokémon in play). */
 export const isBabyPokemon = (card) => Boolean(card) && hasCardMarker(card, 'Baby');
 
@@ -52,7 +50,7 @@ export const isBabyPokemon = (card) => Boolean(card) && hasCardMarker(card, 'Bab
  * Exact names only: "Erika's Clefairy", "Dark Magmar" and "Pikachu ex" are other cards.
  */
 export function isBabyEvolution(baby, evolution) {
-  if (!isBabyPokemon(baby) || !isBasicStage(evolution)) return false;
+  if (!isBabyPokemon(baby) || !(String(evolution?.stage ?? '').toLowerCase().replace(/[^a-z]/g, '') === 'basic')) return false;
   const targets = BABY_EVOLVES_INTO.get(plainName(baby)) || [];
   return targets.includes(plainName(evolution));
 }

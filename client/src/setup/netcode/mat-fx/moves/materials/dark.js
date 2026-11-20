@@ -66,7 +66,6 @@ const LIFT = Object.freeze({ ripples: 0.06, core: 0.1, spark: 0.11, halo: 0.02, 
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 const fract = (v) => v - Math.floor(v);
-const rad = (deg) => (deg * Math.PI) / 180;
 
 const PALETTE = Object.freeze({
   deep: Object.freeze([16, 16, 24]),
@@ -212,7 +211,7 @@ function darkKit(palette) {
       // A narrow tail streaming behind, not a fan: a wide spread of spikes reads as a sunburst.
       const spread = tongues > 1 ? -TAIL_SPREAD + (2 * TAIL_SPREAD * k) / (tongues - 1) : 0;
       const angleDeg = back + spread + 8 * Math.sin(time * 4 + k * 1.7 + seed);
-      const a = rad(angleDeg);
+      const a = (angleDeg * Math.PI) / 180;
       tongue(
         ctx,
         {

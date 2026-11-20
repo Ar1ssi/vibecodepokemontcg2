@@ -524,10 +524,6 @@ export function distributedPrompt(attackName, clause, left) {
     : `${attackName}: Choose a Pokémon to take ${clause.amount} damage (${left} left)`;
 }
 
-/** Whose Pokémon a chosen-target clause hits: the opponent's, or (`side: 'own'`) the attacker's. */
-export const targetPlayerOf = (clause, attackerPlayerId, defenderPlayerId) =>
-  clause?.side === 'own' ? attackerPlayerId : defenderPlayerId;
-
 // Flat damage to an Active target: no W/R for counter placement, and the printed
 // snipe clause is treated as unmodified. Bench targets go through
 // damageBenchedPokemon (Tera/bench-shield guards + KO).

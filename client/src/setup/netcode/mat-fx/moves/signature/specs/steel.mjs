@@ -2,27 +2,11 @@
 // board mapping (`.agent/designs/065-signature-move-animations.md` § Appendix S › Steel);
 // departures from an entry are listed under the design's Deviations (slice 12).
 
-const motes = (at, count, over = {}) =>
-  Object.freeze({
-    at,
-    anchor: 'defender',
-    count,
-    distance: 1.1,
-    direction: -90,
-    spread: 360,
-    size: [0.03, 0.07],
-    aspect: 1,
-    gravity: 0,
-    maxDelay: 0.2,
-    durationMs: 800,
-    kind: 'mote',
-    ...over,
-  });
+import { motes } from '../../move-spec.mjs';
 
 const CROWN = Object.freeze({ deep: '#A8301A', body: '#FF5A2E', hot: '#FFB13B', core: '#FFF27A' });
 const BLAST = Object.freeze({ deep: '#A8301A', body: '#FF7A1E', hot: '#FFB13B', core: '#FFE08A' });
 const AMBER = Object.freeze({ deep: '#A8501A', body: '#FFB13B', hot: '#FFD98A', core: '#FFFFFF' });
-const FLECK = Object.freeze({ deep: '#1E8AA8', body: '#3FE0FF', hot: '#C8F8FF', core: '#FFFFFF' });
 
 // Zamazenta: a crown-shield of orange-red blades fans from its back, it charges down the lane
 // and smashes into the defender in a yellow-white explosion with cyan flecks.
@@ -156,7 +140,6 @@ export const doubleIronBash = Object.freeze({
 });
 
 const SUN = Object.freeze({ deep: '#FF8A1F', body: '#FFD23F', hot: '#FFF3A0', core: '#FFFFFF' });
-const HALO = Object.freeze({ deep: '#C8901E', body: '#FFD23F', hot: '#FFF3A0', core: '#FFFFFF' });
 
 // Solgaleo: it leaps high, builds a spiked gold sun at its chest that flies down the lane with
 // rainbow streaks, and bursts into a yellow-white starburst with rings on the defender.

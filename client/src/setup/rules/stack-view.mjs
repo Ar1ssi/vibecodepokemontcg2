@@ -20,6 +20,7 @@ import {
 } from '../deck-builder/core/holo.mjs';
 import { suppressHoverPreview } from '../image-logic/hover-preview-bus.mjs';
 import { stackViewModelFor } from './card-inspector.mjs';
+import { el } from './attack-options.mjs';
 import { buildStackInfoPanel } from './stack-view-panel.mjs';
 import { closeStatusPopup, isStatusPopupOpen, openStatusPopup } from './status-popup.mjs';
 
@@ -29,13 +30,6 @@ const CLOSE_EVENTS = ['rules-turn-began', 'rules-session-reset'];
 let viewState = null;
 
 export const isStackViewOpen = () => viewState !== null;
-
-const el = (tag, className, text) => {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text != null) node.textContent = String(text);
-  return node;
-};
 
 // One round sprite button (shadow_32, circle_32 stroke round a circle_26 face, #333333 icon).
 const roundButton = (className, label, onClick) => {
@@ -51,22 +45,6 @@ const roundButton = (className, label, onClick) => {
     if (!button.disabled) onClick();
   });
   return button;
-};
-
-// CardCarousel: one card at a time between the left / right arrows.
-const buildCarousel = (state) => {
-  const region = el('section', 'tcgl-stack__carousel');
-  const stage = el('div', 'tcgl-stack__card');
-  const left = roundButton('tcgl-stack__arrow tcgl-stack__arrow--left', 'Previous card', () =>
-    showCard(state, state.index - 1)
-  );
-  const right = roundButton('tcgl-stack__arrow tcgl-stack__arrow--right', 'Next card', () =>
-    showCard(state, state.index + 1)
-  );
-  const dots = el('div', 'tcgl-stack__dots');
-  region.append(left, stage, right, dots);
-  state.carousel = { stage, left, right, dots };
-  return region;
 };
 
 const showCard = (state, index) => {
@@ -122,7 +100,19 @@ export function openStackView({
     root.setAttribute('aria-modal', 'true');
     root.setAttribute('aria-label', `${card.name ?? 'Pokémon'} — stack view`);
     const layout = el('div', 'tcgl-stack__layout');
-    layout.appendChild(buildCarousel(state));
+    // CardCarousel: one card at a time between the left / right arrows.
+    const region = el('section', 'tcgl-stack__carousel');
+    const stage = el('div', 'tcgl-stack__card');
+    const left = roundButton('tcgl-stack__arrow tcgl-stack__arrow--left', 'Previous card', () =>
+      showCard(state, state.index - 1)
+    );
+    const right = roundButton('tcgl-stack__arrow tcgl-stack__arrow--right', 'Next card', () =>
+      showCard(state, state.index + 1)
+    );
+    const dots = el('div', 'tcgl-stack__dots');
+    region.append(left, stage, right, dots);
+    state.carousel = { stage, left, right, dots };
+    layout.appendChild(region);
     const { model, energyTypes } = stackViewModelFor(card, zone);
     layout.appendChild(
       buildStackInfoPanel({ card, model, energyTypes, statuses, onStatus: () => openStatusPopup(statuses) })

@@ -49,7 +49,6 @@ import {
   requiresTurnEndOnEvolve,
 } from '/shared/engine/rules/evolution.mjs';
 import {
-  clearUntilLeavesActive,
   clearActiveSpotPendingEffects,
 } from '/shared/engine/rules/attack-pending-effects.mjs';
 import {
@@ -68,7 +67,6 @@ import {
   isStadiumConfusedPersist,
   getEffectiveBenchLimit,
   playerHasTeraInPlay,
-  isTeraCard,
   parseStadiumBenchLimit,
   stadiumBlocksStatusApplication,
 } from '/shared/engine/rules/stadium-effects.mjs';
@@ -87,13 +85,10 @@ import {
   reconcileHandStacks,
 } from '../../setup/zones/hand-stack-dom.js';
 
-const pokemonInPlay = (user) =>
-  [...getZone(user, 'active').array, ...getZone(user, 'bench').array].filter(
+const benchLimitFor = (user, extraPokemon = null) => {
+  let inPlay = [...getZone(user, 'active').array, ...getZone(user, 'bench').array].filter(
     isBoardPokemon
   );
-
-const benchLimitFor = (user, extraPokemon = null) => {
-  let inPlay = pokemonInPlay(user);
   if (
     extraPokemon &&
     extraPokemon.type === 'Pokémon' &&

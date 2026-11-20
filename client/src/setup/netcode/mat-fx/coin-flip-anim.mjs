@@ -4,11 +4,6 @@
 
 import { MAX_CEREMONY_FLIPS, coinCeremonyTimeline, coinFlipAngle } from './coin-pose.mjs';
 
-const clamp01 = (value) => Math.max(0, Math.min(1, value));
-
-/** Fast off the table, slow into the landing. Maps 0 to 0 and 1 to 1, so a toss ends on its exact angle. */
-const easeOutCubic = (progress) => 1 - (1 - progress) ** 3;
-
 /**
  * Where the coin is `elapsedMs` after the first toss starts, for the printed `faces` (at most
  * MAX_CEREMONY_FLIPS). Each toss turns from the previous landing angle to its own (coinFlipAngle), so
@@ -27,12 +22,13 @@ export function coinPoseAt(faces, elapsedMs) {
   const landedIndex = landsAt.findIndex((landAt) => elapsedMs < landAt);
   const index = landedIndex === -1 ? lastIndex : landedIndex;
   const tossStartMs = index === 0 ? 0 : landsAt[index - 1];
-  const progress = clamp01((elapsedMs - tossStartMs) / tossesMs[index]);
+  const progress = Math.max(0, Math.min(1, (elapsedMs - tossStartMs) / tossesMs[index]));
   const fromAngle = index === 0 ? 0 : coinFlipAngle(index - 1, tosses[index - 1]);
   const toAngle = coinFlipAngle(index, tosses[index]);
+  // Fast off the table, slow into the landing. Maps 0 to 0 and 1 to 1, so a toss ends on its exact angle.
   return {
     index,
-    angle: fromAngle + (toAngle - fromAngle) * easeOutCubic(progress),
+    angle: fromAngle + (toAngle - fromAngle) * (1 - (1 - progress) ** 3),
     lift: 4 * progress * (1 - progress),
   };
 }

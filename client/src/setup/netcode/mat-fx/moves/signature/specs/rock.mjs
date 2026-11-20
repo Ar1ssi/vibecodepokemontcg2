@@ -3,7 +3,6 @@
 // departures from an entry are listed under the design's Deviations (slice 8).
 
 const DIAMOND = Object.freeze({ deep: '#2E7CE6', body: '#F9C5F0', hot: '#7FF7FF', core: '#FFFFFF' });
-const SPARK_GOLD = Object.freeze({ deep: '#F9C5F0', body: '#FFE14D', hot: '#FFF6B8', core: '#FFFFFF' });
 
 // Diancie: a halo of pink-white diamonds orbits the attacker, flies down the lane and bursts on
 // the defender, then a yellow star and a sparkle shower.

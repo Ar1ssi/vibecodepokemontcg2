@@ -273,7 +273,7 @@ try {
   };
   // The focus stands the card's own mesh in for its face (design 074 H2): the scene holds that mesh
   // lifted (`focusLifted`) and leaves the board image alone. A card the scene does not draw falls
-  // back to card-focus.mjs hideSource: the image (or its holo wrapper) goes visibility:hidden and
+  // back to card-focus.mjs hiding the source: the image (or its holo wrapper) goes visibility:hidden and
   // the mirror then reports the card hidden to the scene.
   const sourceState = () =>
     actor.page.evaluate(async () => {

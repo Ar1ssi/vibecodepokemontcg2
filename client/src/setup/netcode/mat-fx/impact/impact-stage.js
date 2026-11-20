@@ -553,29 +553,6 @@ function drawItem(effect, item) {
   gl.colorMask(true, true, true, true);
 }
 
-function drawEffect(effect) {
-  const { gl, targets } = stage;
-  // Every effect starts from the same state, whatever the one before it left (it may have stopped mid-draw).
-  gl.bindFramebuffer(gl.FRAMEBUFFER, targets.scene.framebuffer);
-  gl.disable(gl.SCISSOR_TEST);
-  gl.colorMask(true, true, true, true);
-  gl.enable(gl.DEPTH_TEST);
-  gl.depthMask(true);
-  gl.clear(gl.DEPTH_BUFFER_BIT);
-  drawGround(effect);
-  const items = [];
-  for (const system of effect.simulation.systems) {
-    const { renderer } = system;
-    if (!renderer || system.particles.length === 0) continue;
-    const centre = boundsCentre(system);
-    const geometry = buildGeometry(system, effect.camera, renderer.mesh ? effect.assets.meshes[renderer.mesh] : null);
-    if (geometry) items.push({ queue: effect.materials[renderer.mat].queue, order: renderer.order, fudge: renderer.fudge, centre, geometry, material: effect.materials[renderer.mat] });
-    const trail = renderer.trailMat === undefined ? null : buildTrailGeometry(system, effect.camera);
-    if (trail) items.push({ queue: effect.materials[renderer.trailMat].queue, order: renderer.order, fudge: renderer.fudge, centre, geometry: trail, material: effect.materials[renderer.trailMat] });
-  }
-  for (const item of drawOrder(items, effect.camera.position)) drawItem(effect, item);
-}
-
 /** Where the game's camera puts the effect on our canvas: its view-projection matrix. */
 function placeEffect(effect) {
   const { rect, bench } = effect;
@@ -604,21 +581,6 @@ function placeEffect(effect) {
   ];
 }
 
-/**
- * Design 075: where the board camera puts the effect: where its card stood when the hit landed. A
- * knocked-out card's scene flies it to the discard pile on that same hit, and the impact must not
- * ride along with it.
- */
-function placeEffectInScene(effect, view) {
-  const { placement } = effect;
-  if (!placement) throw new Error('its card is not on the board');
-  const frame = sceneEffectFrame({ ...view, ...placement, bench: effect.bench });
-  effect.viewProjection = frame.viewProjection;
-  effect.camera = frame.camera;
-  // The GrabPass reads the whole board picture.
-  effect.region = [0, 0, stage.width, stage.height];
-}
-
 /** Every live effect into the stage's scene target. `place` positions each one first. */
 function drawEffects(target, place) {
   const { gl } = target;
@@ -636,24 +598,32 @@ function drawEffects(target, place) {
       effect.simulation.advanceTo((Number(effect.clock.currentTime) || 0) / 1000);
       effect.shaderTime = effect.timeOffset + effect.simulation.time;
       place(effect);
-      drawEffect(effect);
+      const { gl, targets } = stage;
+      // Every effect starts from the same state, whatever the one before it left (it may have stopped mid-draw).
+      gl.bindFramebuffer(gl.FRAMEBUFFER, targets.scene.framebuffer);
+      gl.disable(gl.SCISSOR_TEST);
+      gl.colorMask(true, true, true, true);
+      gl.enable(gl.DEPTH_TEST);
+      gl.depthMask(true);
+      gl.clear(gl.DEPTH_BUFFER_BIT);
+      drawGround(effect);
+      const items = [];
+      for (const system of effect.simulation.systems) {
+        const { renderer } = system;
+        if (!renderer || system.particles.length === 0) continue;
+        const centre = boundsCentre(system);
+        const geometry = buildGeometry(system, effect.camera, renderer.mesh ? effect.assets.meshes[renderer.mesh] : null);
+        if (geometry) items.push({ queue: effect.materials[renderer.mat].queue, order: renderer.order, fudge: renderer.fudge, centre, geometry, material: effect.materials[renderer.mat] });
+        const trail = renderer.trailMat === undefined ? null : buildTrailGeometry(system, effect.camera);
+        if (trail) items.push({ queue: effect.materials[renderer.trailMat].queue, order: renderer.order, fudge: renderer.fudge, centre, geometry: trail, material: effect.materials[renderer.trailMat] });
+      }
+      for (const item of drawOrder(items, effect.camera.position)) drawItem(effect, item);
     } catch (error) {
       // One bad effect must not take the frame down: it ends, the rest play on.
       warnOnce(`${effect.type} impact stopped`, error);
       effect.clock.cancel();
     }
   }
-}
-
-function drawFrame(target) {
-  const { gl } = target;
-  drawEffects(target, placeEffect);
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  gl.disable(gl.DEPTH_TEST);
-  gl.disable(gl.CULL_FACE);
-  gl.disable(gl.BLEND);
-  gl.clear(gl.COLOR_BUFFER_BIT);
-  drawUtility({ vertices: FULLSCREEN, texture: target.targets.scene.texture, mode: 0 });
 }
 
 const liveEffects = (target) =>
@@ -691,7 +661,18 @@ function drawInScene(target, camera) {
   gl.disable(gl.SCISSOR_TEST);
   gl.disable(gl.STENCIL_TEST);
   gl.colorMask(true, true, true, true);
-  drawEffects(target, (effect) => placeEffectInScene(effect, view));
+  drawEffects(target, (effect) => {
+    // Design 075: where the board camera puts the effect: where its card stood when the hit landed. A
+    // knocked-out card's scene flies it to the discard pile on that same hit, and the impact must not
+    // ride along with it.
+    const { placement } = effect;
+    if (!placement) throw new Error('its card is not on the board');
+    const frame = sceneEffectFrame({ ...view, ...placement, bench: effect.bench });
+    effect.viewProjection = frame.viewProjection;
+    effect.camera = frame.camera;
+    // The GrabPass reads the whole board picture.
+    effect.region = [0, 0, stage.width, stage.height];
+  });
   gl.bindFramebuffer(gl.FRAMEBUFFER, out);
   gl.viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
   gl.disable(gl.DEPTH_TEST);
@@ -759,7 +740,14 @@ function renderFrame() {
     return;
   }
   try {
-    drawFrame(target);
+    const { gl } = target;
+    drawEffects(target, placeEffect);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.disable(gl.DEPTH_TEST);
+    gl.disable(gl.CULL_FACE);
+    gl.disable(gl.BLEND);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    drawUtility({ vertices: FULLSCREEN, texture: target.targets.scene.texture, mode: 0 });
   } catch (error) {
     // The stage itself failed (a framebuffer, the resolve). A loop that died quietly would keep
     // `playImpact` answering yes with nothing on screen, so the stage goes and hits take

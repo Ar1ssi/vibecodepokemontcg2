@@ -19,22 +19,6 @@ export const closeDiscardPileViewer = (event) => {
 };
 
 /**
- * I57: the discard pile of a server-drawn board lives in the authoritative view, not in the
- * legacy zone array (which stays empty there), so the viewer reads whichever source is live.
- *
- * @param {string} user 'self' | 'opp'
- * @returns {object[]} cards the picker can render, bottom of the pile first
- */
-const discardPileCards = (user) => {
-  if (isAuthoritativeDispatchActive() && hasAuthoritativeView()) {
-    return toViewerCards(
-      getAuthoritativeZoneArray(user === 'self' ? 'you' : 'them', 'discard')
-    );
-  }
-  return getZone(user, 'discard').array;
-};
-
-/**
  * @param {string} user 'self' | 'opp'
  * @param {number|null} [startIndex] zone index to open on
  * @param {number|null} [instanceId] server id of the clicked card, when there is one
@@ -44,7 +28,12 @@ export const openDiscardPileViewer = async (
   startIndex = null,
   instanceId = null
 ) => {
-  const cards = discardPileCards(user);
+  // I57: the discard pile of a server-drawn board lives in the authoritative view, not in the
+  // legacy zone array (which stays empty there), so the viewer reads whichever source is live.
+  const cards =
+    isAuthoritativeDispatchActive() && hasAuthoritativeView()
+      ? toViewerCards(getAuthoritativeZoneArray(user === 'self' ? 'you' : 'them', 'discard'))
+      : getZone(user, 'discard').array;
   const initialIndex = resolveViewerIndex(cards, { startIndex, instanceId });
   if (initialIndex < 0) return;
 

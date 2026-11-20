@@ -64,14 +64,6 @@ export function topPokemonCard(zoneCards, root) {
   );
 }
 
-// The highest-stage card below the top, i.e. the Pokémon a BREAK card
-// evolved from (root when the stack has no other evolution).
-function previousTopPokemonCard(zoneCards, root, top) {
-  return stackEvolutions(zoneCards, root)
-    .filter((card) => card !== top)
-    .reduce((best, card) => (stageRank(card) >= stageRank(best) ? card : best), root);
-}
-
 // Union of two printed entry lists (attacks / abilities), with the top card's
 // own entry replacing the base's on a name collision.
 function mergeNamedEntries(baseEntries, topEntries) {
@@ -106,7 +98,11 @@ export function evolvedView(zoneCards, root) {
     if (top[field] !== undefined && top[field] !== null) view[field] = top[field];
   }
   if (normalizeStage(top.stage) === 'BREAK') {
-    const base = previousTopPokemonCard(zoneCards, root, top);
+    // The highest-stage card below the top, i.e. the Pokémon a BREAK card
+    // evolved from (root when the stack has no other evolution).
+    const base = stackEvolutions(zoneCards, root)
+      .filter((card) => card !== top)
+      .reduce((best, card) => (stageRank(card) >= stageRank(best) ? card : best), root);
     view.attacks = mergeNamedEntries(base?.attacks, top.attacks);
     view.abilities = mergeNamedEntries(base?.abilities, top.abilities);
     for (const field of ['weakness', 'resistance', 'retreatCost']) {
@@ -116,7 +112,7 @@ export function evolvedView(zoneCards, root) {
   return view;
 }
 
-function isToolKind(card) {
+export function isToolKind(card) {
   const subtypes = Array.isArray(card?.subtypes) ? card.subtypes.join(' ') : card?.subtypes || '';
   return `${card?.type || ''} ${card?.trainerType || ''} ${subtypes}`.toLowerCase().includes('tool');
 }

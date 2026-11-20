@@ -6,7 +6,7 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I298). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I300). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Umbrella lines name every member as `(merged I<a>, I<b>…)`: grep any id to find its line.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (`pnpm harness:check`); maintain.md moves older Closed lines to .agent/archive/ISSUES-closed.md.
@@ -14,6 +14,8 @@
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I299 2026-11-20 P2 [rules] `pnpm audit:abilities` and `pnpm audit:attacks` are red on main (d4bf6659, before PR #258): abilities 9 failures (look-at-top 54/67 vs 59, search 212/295 vs 218, status, 4 new clauses); attacks 8 regressions ok → partial (Muk & Alolan Muk-GX, Altaria-EX, Mamoswine…)
+- I298 2026-11-20 P3 [client] Line-cut follow-ups (design 091): 13 duplicate-helper groups spanning areas (~150 lines); audit whether the client-side rules path (`client/src/setup/rules`, chat-buttons, ~17k lines) is still reachable now the server runs the rules (design 087) (refs: D259)
 - I297 2026-11-19 P3 [rules] customhb HB 554 Giratina ex Alpha Rage: the chosen Pokémon's attack does its damage as that Pokémon (reduce/controlled-attack.mjs) but its other printed effects (status, self-discard, draws) do not run — mapping "you"/"Defending Pokémon" for a controlled attack needs a design
 - I296 2026-11-19 P2 [client] The attack-button glow ignores marker cost increases (Head Ringer Tool, Flapple V Sour Spit): listUsableActions gets only `costDiscounts`, so it lights an attack the server then refuses (legality.mjs attackCostPayable markerIncrease). Needs a view `costIncreases` map.
 - I295 2026-11-12 P2 [netcode] An undo lowers stateVersion (draw,draw,undo,draw → 3,4,3,4 from GameRoom) and apply-view.js's monotonic guard drops any view ≤ lastRenderedVersion, so the undo may not render; in a log: view/apply applied:false out_of_order (refs: design 088 Review)
@@ -21,7 +23,7 @@
 - I293 2026-11-12 P3 [netcode] applyView's own diff is always "initial": no caller passes options.previousView, so the returned diff lists every card as added. Unused today; apply-view-logged.js keeps its own previous view (refs: design 088)
 - I292 2026-11-13 P3 [rules] From commit flags since October: a failed "can use only if" attack fizzles and ends the turn instead of being unselectable; Handheld Fan/Rugged Helmet auto-pick; `.types`/`.name` readers unaudited for top-Evolution reads; tcgl-foil-sparkles.mjs is unused
 - I291 2026-11-13 P2 [netcode] No independent review (CLAUDE.md § Delegation) of design 087 slices 1–2 (relay removal, 6852bd1f) or of 078/079; run review.md on them before the next netcode change builds on top
-- I290 2026-11-13 P3 [tooling] `pnpm lint` shows ~29,900 prettier warnings in 560 of 592 non-client files, burying 470 real ones; a reformat touches ~500 files at any printWidth. Decide: one format commit, or drop the prettier rule from eslint (CI gates errors only, D253)
+- I290 2026-11-13 P3 [tooling] `pnpm lint` shows ~29,900 prettier warnings in 560 of 592 non-client files, burying 470 real ones. A reformat is ruled out (D259: it adds ~79k lines). Left to decide: drop the prettier rule from eslint (CI gates errors only, D253)
 - I289 2026-11-13 P3 [tooling] `pnpm audit` leftovers after the lockfile refresh: sqlite3 5.1.7's install-time tar 6 (1 critical, 8 high; the fix is sqlite3 6, a native rebuild untested on Render) and nodemon's minimatch (dev only)
 - I288 2026-11-15 P3 [tooling] oracle harness deck has no {Y}/{N} Energy and no card named like the holder, so `engine-check.mjs` reads homebrew {Y} attaches and "search for <own name>" as gaps that parse fine (Xerneas ex Geocharge, Grookey Supporting Act); adding them shifts audit baselines
 - I287 2026-11-15 P2 [rules] printed Trainers still misread: Raihan (attach from discard, then search any card → parses as one Basic Energy search), Café Master (per-Bench attach from deck → plain search), Cyrus Prism Star keeps 2 whatever is printed; Trainer parser residual drift: `node scripts/reword-drift.mjs trainer numbers`

@@ -18,7 +18,7 @@ import { formatWeakResist } from './card-inspector-model.mjs';
 
 const ICON_DIR = '/src/assets/attack-ui/';
 
-const el = (tag, className, text) => {
+export const el = (tag, className, text) => {
   const node = document.createElement(tag);
   if (className) node.className = className;
   if (text != null) node.textContent = String(text);
@@ -45,23 +45,19 @@ export const typeIcon = (type, filled = true, className = 'tcgl-icon') => {
   return img;
 };
 
-// Card text writes Energy as {R}, {W}, …; the game swaps those for its icon sprites inline.
-const textWithIcons = (target, text) => {
+const description = (text) => {
+  const body = el('p', 'tcgl-opt__text');
+  // Card text writes Energy as {R}, {W}, …; the game swaps those for its icon sprites inline.
   for (const part of String(text ?? '').split(/(\{[a-z]\})/gi)) {
     const match = /^\{([a-z])\}$/i.exec(part);
     if (!match) {
-      if (part) target.appendChild(document.createTextNode(part));
+      if (part) body.appendChild(document.createTextNode(part));
       continue;
     }
     const named = ENERGY_SYMBOL_TO_TYPE[match[1].toLowerCase()];
-    if (named) target.appendChild(typeIcon(named, true, 'tcgl-icon tcgl-icon--inline'));
-    else target.appendChild(document.createTextNode(part));
+    if (named) body.appendChild(typeIcon(named, true, 'tcgl-icon tcgl-icon--inline'));
+    else body.appendChild(document.createTextNode(part));
   }
-};
-
-const description = (text) => {
-  const body = el('p', 'tcgl-opt__text');
-  textWithIcons(body, text);
   return body;
 };
 
@@ -70,14 +66,6 @@ const vpowerStrip = () => {
   const strip = el('div', 'tcgl-opt__vpower');
   strip.appendChild(el('span', 'tcgl-opt__vpower-title', 'VSTAR Power'));
   return strip;
-};
-
-// AttackDamageModIndicator: the up arrow on its tab for a buffed hit, the down arrow for a debuffed one.
-const damageMod = (mod) => {
-  const indicator = el('span', `tcgl-opt__mod tcgl-opt__mod--${mod}`);
-  indicator.appendChild(el('span', 'tcgl-opt__mod-bg'));
-  indicator.appendChild(el('span', 'tcgl-opt__mod-icon'));
-  return indicator;
 };
 
 const shell = (classes, type) => {
@@ -123,7 +111,13 @@ export function buildAttackOption(attack, cardType) {
   if (readout.text.length > 4) damage.classList.add('tcgl-opt__dmg--long');
   tab.appendChild(damage);
   bar.appendChild(tab);
-  if (readout.mod) bar.appendChild(damageMod(readout.mod));
+  if (readout.mod) {
+    // AttackDamageModIndicator: the up arrow on its tab for a buffed hit, the down arrow for a debuffed one.
+    const indicator = el('span', `tcgl-opt__mod tcgl-opt__mod--${readout.mod}`);
+    indicator.appendChild(el('span', 'tcgl-opt__mod-bg'));
+    indicator.appendChild(el('span', 'tcgl-opt__mod-icon'));
+    bar.appendChild(indicator);
+  }
   if (hasText) bar.appendChild(el('span', 'tcgl-opt__divider'));
   content.appendChild(bar);
 

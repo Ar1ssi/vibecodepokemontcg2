@@ -15,7 +15,7 @@
 import { rgbCss } from '../../fx-colors.mjs';
 import { moddedKit } from './_kit-mod.js';
 import { withFxMod } from './_mods.js';
-import { grainPass, inShadow, shardOutline, sphere, styledKit, tongueOutline, traceOutline } from './_shared.js';
+import { framer, grainPass, inShadow, shardOutline, sphere, styledKit, tongueOutline, traceOutline } from './_shared.js';
 
 // Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
 // Shells and wing blades catch a dull sheen; buzzing wings shimmer; silver powder twinkles.
@@ -78,17 +78,6 @@ const SILVER_PALETTE = Object.freeze({
   white: Object.freeze([255, 255, 255]),
 });
 
-/** Map (f along, side across) in units of `length` / `width` from the base (x, y) along `angleDeg`. */
-const framer = ({ x, y, angleDeg, length, width }) => {
-  const a = rad(angleDeg);
-  const ux = Math.cos(a);
-  const uy = Math.sin(a);
-  return (f, side) => [x + ux * length * f - uy * width * side, y + uy * length * f + ux * width * side];
-};
-
-/** Half the needle's width (in units of `width`) at `f` along it: widest at the waist, 0 at the tip. */
-const needleHalf = (f) => (f <= NEEDLE_WAIST ? BASE_HALF + (WAIST_HALF - BASE_HALF) * (f / NEEDLE_WAIST) : (WAIST_HALF * (1 - f)) / (1 - NEEDLE_WAIST));
-
 /**
  * A needle from its base (x, y) along `angleDeg`: a blunt base 0.2 `width` across, widening to
  * 0.6 `width` at 28 % of `length`, then straight to a sharp tip on the axis. Both chains run base
@@ -106,7 +95,8 @@ export function needleOutline(spec) {
 /** The needle's dark tip: the triangle from 80 % of its length to the point. */
 export function needleTip(spec) {
   const at = framer(spec);
-  const half = needleHalf(TIP_FROM);
+  // Half the needle's width (in units of `width`) at `f` along it: widest at the waist, 0 at the tip.
+  const half = TIP_FROM <= NEEDLE_WAIST ? BASE_HALF + (WAIST_HALF - BASE_HALF) * (TIP_FROM / NEEDLE_WAIST) : (WAIST_HALF * (1 - TIP_FROM)) / (1 - NEEDLE_WAIST);
   return [at(TIP_FROM, half), at(1, 0), at(TIP_FROM, -half)];
 }
 
@@ -119,12 +109,6 @@ export function wingOpen(phase) {
 export function soundAlphas(phase) {
   return SOUND_RINGS.map((_, k) => 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(phase + (k * TAU) / SOUND_RINGS.length)));
 }
-
-const tracePoints = (ctx, points) => {
-  ctx.beginPath();
-  points.forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
-  ctx.closePath();
-};
 
 /** A soft halo: the pale core fading through the body colour to nothing. */
 const haloOf = (pal, coreAlpha, bodyAlpha) =>
@@ -179,7 +163,10 @@ function needle(ctx, pal, spec, { alpha = 1, hot = 1, jag = 0 } = {}) {
   }
   inShadow(ctx, () => {
     ctx.fillStyle = rgbCss(pal.deep, TIP_ALPHA * alpha);
-    tracePoints(ctx, needleTip(spec));
+    const points = needleTip(spec);
+    ctx.beginPath();
+    points.forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
+    ctx.closePath();
     ctx.fill();
   });
 }

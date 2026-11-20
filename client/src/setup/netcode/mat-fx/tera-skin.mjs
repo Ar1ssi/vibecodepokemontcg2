@@ -93,18 +93,6 @@ export const FACET_VIEW = { width: 100, height: 140, cols: 4, rows: 6 };
 const FACET_JITTER = 0.32; // of a cell, interior points only
 const hex = (rgb) =>
   `#${rgb.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
-const darken = (rgb, t) => rgb.map((v) => Math.round(v * (1 - t)));
-
-// Mostly clear glass with bright and deep planes, like the clip's crystal
-// skin; the coloured planes take the palette's (type's) crystal tones.
-const facetFills = (palette) => [
-  ['#ffffff', 0.34],
-  ['#ffffff', 0.18],
-  [hex(palette.ice), 0.28],
-  [hex(palette.cyan), 0.22],
-  [hex(palette.deep), 0.2],
-  [hex(darken(palette.deep, 0.45)), 0.26],
-];
 
 /** Grid points for the facet mesh; the border stays on the card edge. */
 function facetPoints(rand) {
@@ -140,7 +128,16 @@ const f1 = (n) => Math.round(n * 10) / 10;
  */
 export function teraSkinFacets(seed, palette = TERA_PALETTE) {
   const rand = seededRandom(skinSeed(seed));
-  const fills = facetFills(palette);
+  // Mostly clear glass with bright and deep planes, like the clip's crystal
+  // skin; the coloured planes take the palette's (type's) crystal tones.
+  const fills = [
+    ['#ffffff', 0.34],
+    ['#ffffff', 0.18],
+    [hex(palette.ice), 0.28],
+    [hex(palette.cyan), 0.22],
+    [hex(palette.deep), 0.2],
+    [hex(palette.deep.map((v) => Math.round(v * (1 - 0.45)))), 0.26],
+  ];
   const { width, height, cols, rows } = FACET_VIEW;
   const p = facetPoints(rand);
   const triangles = [];

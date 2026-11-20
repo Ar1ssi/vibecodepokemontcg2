@@ -64,38 +64,6 @@ function placement(spec, world, local) {
 
 const uniformScale = (scales) => Math.cbrt(Math.abs(scales[0] * scales[1] * scales[2]));
 
-function buildSystems(prefab, rootMatrix, rootRotation) {
-  const systems = [];
-  const visit = (node, parent) => {
-    const matrix = mat4Mul(parent.matrix, mat4Compose(node.p, node.q, node.s));
-    const world = {
-      matrix,
-      rotation: quatMul(parent.rotation, node.q),
-      position: transformPoint(parent.matrix, node.p),
-      lossy: axisScales(matrix),
-    };
-    if (node.ps) {
-      const placed = placement(node.ps, world, node);
-      systems.push({
-        name: node.n,
-        spec: node.ps,
-        renderer: node.r ?? null,
-        subId: node.subId ?? null,
-        matrix: placed.matrix,
-        rotation: world.rotation,
-        position: world.position,
-        sizeScale: placed.sizeScale,
-        shapeScale: placed.shapeScale,
-        // Scalar module values (speed limits, noise strength, radial speed) are in the system's own units.
-        unit: uniformScale(axisScales(placed.matrix)),
-      });
-    }
-    (node.c ?? []).forEach((child) => visit(child, world));
-  };
-  visit(prefab, { matrix: rootMatrix, rotation: rootRotation });
-  return systems;
-}
-
 const upperBound = (value) => (Array.isArray(value) ? Math.max(value[0], value[1]) : maxMagnitude(value));
 
 /** When each system can still have a live particle, following sub-emitter chains. */
@@ -139,7 +107,34 @@ function sheetFrame(sheet, particle, age01, speed) {
  * @returns {{systems: object[], duration: number, time: number, advanceTo: (seconds: number) => void}}
  */
 export function createEffect(prefab, { seed = 1, rootMatrix = mat4Identity(), rootRotation = QUAT_IDENTITY } = {}) {
-  const systems = buildSystems(prefab, rootMatrix, rootRotation);
+  const systems = [];
+  const visit = (node, parent) => {
+    const matrix = mat4Mul(parent.matrix, mat4Compose(node.p, node.q, node.s));
+    const world = {
+      matrix,
+      rotation: quatMul(parent.rotation, node.q),
+      position: transformPoint(parent.matrix, node.p),
+      lossy: axisScales(matrix),
+    };
+    if (node.ps) {
+      const placed = placement(node.ps, world, node);
+      systems.push({
+        name: node.n,
+        spec: node.ps,
+        renderer: node.r ?? null,
+        subId: node.subId ?? null,
+        matrix: placed.matrix,
+        rotation: world.rotation,
+        position: world.position,
+        sizeScale: placed.sizeScale,
+        shapeScale: placed.shapeScale,
+        // Scalar module values (speed limits, noise strength, radial speed) are in the system's own units.
+        unit: uniformScale(axisScales(placed.matrix)),
+      });
+    }
+    (node.c ?? []).forEach((child) => visit(child, world));
+  };
+  visit(prefab, { matrix: rootMatrix, rotation: rootRotation });
   const bySubId = new Map(systems.filter((system) => system.subId).map((system) => [system.subId, system]));
   const ends = systemEnds(systems);
   const duration = Math.min(GAME_CLEANUP_S, Math.max(0, ...ends.values()));
@@ -311,15 +306,6 @@ export function createEffect(prefab, { seed = 1, rootMatrix = mat4Identity(), ro
     return speed === start ? total : scale(total, speed / start);
   }
 
-  function growTrail(system, particle, time) {
-    const trail = system.spec.trail;
-    const points = particle.trail;
-    const last = points[points.length - 1];
-    if (!last || length(sub(particle.pos, last.pos)) >= trail.minDist * system.unit) points.push({ pos: [...particle.pos], time });
-    const keep = evalMinMax(trail.life, 0, particle.rand[R.CUSTOM]) * particle.life;
-    while (points.length > 0 && time - points[0].time > keep) points.shift();
-  }
-
   /** Advance one particle by `dt`; false when it has died. */
   function update(system, particle, dt, time) {
     const { spec } = system;
@@ -351,7 +337,14 @@ export function createEffect(prefab, { seed = 1, rootMatrix = mat4Identity(), ro
       particle.rot[2] += particle.noise[0] * evalMinMax(spec.noise.rot, age01, particle.rand[R.NOISE]) * dt;
     }
     refresh(system, particle, length(particle.move));
-    if (particle.trail) growTrail(system, particle, time);
+    if (particle.trail) {
+      const trail = system.spec.trail;
+      const points = particle.trail;
+      const last = points[points.length - 1];
+      if (!last || length(sub(particle.pos, last.pos)) >= trail.minDist * system.unit) points.push({ pos: [...particle.pos], time });
+      const keep = evalMinMax(trail.life, 0, particle.rand[R.CUSTOM]) * particle.life;
+      while (points.length > 0 && time - points[0].time > keep) points.shift();
+    }
     return true;
   }
 
@@ -378,30 +371,6 @@ export function createEffect(prefab, { seed = 1, rootMatrix = mat4Identity(), ro
     });
   }
 
-  function emitRate(system, emitter, from, to, time) {
-    const { spec, random } = system;
-    const rate = evalMinMax(spec.em.rate, spec.dur > 0 ? from / spec.dur : 0, Array.isArray(spec.em.rate) ? random.next() : 0);
-    if (rate > 0 && Number.isFinite(rate)) {
-      emitter.acc += rate * (to - from);
-      // A whole particle is owed once the sum is within rounding of 1 (120 steps of 1/120 fall short).
-      while (emitter.acc >= 1 - RATE_EPSILON) {
-        emitter.acc = Math.max(0, emitter.acc - 1);
-        const at = to - emitter.acc / rate;
-        const particle = spawn(system, emitter, emitter.start + at, null);
-        if (particle && !update(system, particle, Math.max(0, time - (emitter.start + at)), time)) system.particles.pop();
-      }
-    }
-    const perUnit = evalMinMax(spec.em.dist, 0, 0);
-    if (perUnit > 0 && Number.isFinite(perUnit) && emitter.follow) {
-      emitter.accDistance += perUnit * length(sub(emitter.follow.pos, emitter.last));
-      emitter.last = [...emitter.follow.pos];
-      while (emitter.accDistance >= 1) {
-        emitter.accDistance -= 1;
-        spawn(system, emitter, time, null);
-      }
-    }
-  }
-
   /** Emit what `emitter` owes for the step ending at `time`; false once it is spent. */
   function emit(system, emitter, time, dt) {
     const { spec } = system;
@@ -412,7 +381,29 @@ export function createEffect(prefab, { seed = 1, rootMatrix = mat4Identity(), ro
       const start = Math.max(0, from);
       const end = Math.min(to, spec.dur);
       emitBursts(system, emitter, to, time);
-      if (end > start) emitRate(system, emitter, start, end, time);
+      if (end > start) {
+        const { spec, random } = system;
+        const rate = evalMinMax(spec.em.rate, spec.dur > 0 ? start / spec.dur : 0, Array.isArray(spec.em.rate) ? random.next() : 0);
+        if (rate > 0 && Number.isFinite(rate)) {
+          emitter.acc += rate * (end - start);
+          // A whole particle is owed once the sum is within rounding of 1 (120 steps of 1/120 fall short).
+          while (emitter.acc >= 1 - RATE_EPSILON) {
+            emitter.acc = Math.max(0, emitter.acc - 1);
+            const at = end - emitter.acc / rate;
+            const particle = spawn(system, emitter, emitter.start + at, null);
+            if (particle && !update(system, particle, Math.max(0, time - (emitter.start + at)), time)) system.particles.pop();
+          }
+        }
+        const perUnit = evalMinMax(spec.em.dist, 0, 0);
+        if (perUnit > 0 && Number.isFinite(perUnit) && emitter.follow) {
+          emitter.accDistance += perUnit * length(sub(emitter.follow.pos, emitter.last));
+          emitter.last = [...emitter.follow.pos];
+          while (emitter.accDistance >= 1) {
+            emitter.accDistance -= 1;
+            spawn(system, emitter, time, null);
+          }
+        }
+      }
     }
     if (emitter.follow && emitter.follow.age >= emitter.follow.life) return false;
     return to < spec.dur;

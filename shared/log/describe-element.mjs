@@ -13,10 +13,6 @@ function classesOf(el) {
   return typeof el.className === 'string' ? el.className.split(/\s+/).filter(Boolean) : [];
 }
 
-function kebab(key) {
-  return `data-${String(key).replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
-}
-
 function dataPairsOf(el) {
   const attrs = el.attributes;
   if (attrs && typeof attrs.length === 'number') {
@@ -25,7 +21,7 @@ function dataPairsOf(el) {
       .map((a) => [a.name, a.value]);
   }
   if (el.dataset && typeof el.dataset === 'object') {
-    return Object.keys(el.dataset).map((k) => [kebab(k), el.dataset[k]]);
+    return Object.keys(el.dataset).map((k) => [`data-${String(k).replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`, el.dataset[k]]);
   }
   return [];
 }

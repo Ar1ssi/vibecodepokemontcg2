@@ -336,21 +336,20 @@ function optional(handler, question) {
   };
 }
 
-// "1 of your Benched {L} Pokémon" / "1 of your Benched Murkrow" (design 036 D).
-function benchQualifierMatches(player, root, step) {
-  const top = topPokemonCard(player, root) || root;
-  if (step.benchType && !pokemonHasType(top, step.benchType)) return false;
-  if (step.benchName && String(top.name || '').toLowerCase() !== step.benchName) return false;
-  return true;
-}
-
 // ── switch / gust ───────────────────────────────────────────────────────────
 
 function atkSwitchSelf(ctx) {
   const { player } = ctx;
   const ref = attackerRef(ctx);
   if (!ref || ref.zoneId !== 'active') return skip(ctx, 'attacker_not_active');
-  const bench = benchRootsOf(player).filter((c) => benchQualifierMatches(player, c, ctx.step));
+  const bench = benchRootsOf(player).filter((c) => {
+    // "1 of your Benched {L} Pokémon" / "1 of your Benched Murkrow" (design 036 D).
+    const step = ctx.step;
+    const top = topPokemonCard(player, c) || c;
+    if (step.benchType && !pokemonHasType(top, step.benchType)) return false;
+    if (step.benchName && String(top.name || '').toLowerCase() !== step.benchName) return false;
+    return true;
+  });
   const turn = ctx.draft?.turn?.number;
   if (ctx.selection) {
     const root = bench.find((c) => c.instanceId === ctx.selection[0]);
@@ -897,7 +896,44 @@ function atkSearchDeckFallback(ctx) {
 function atkDiscardBothActiveEnergy(ctx) {
   const { player, opponent, step } = ctx;
   const matches = (c) => energyMatches(c, step);
-  if (!step.all && step.count) return discardCountFromBothActives(ctx, matches);
+  if (!step.all && step.count) {
+    // "Discard 1 Energy from both Active Pokémon": the attacker picks each side's Energy when it has
+    // a choice; the opponent's Active is skipped when an effect shield protects it.
+    const { player, opponent, step } = ctx;
+    const sides = [];
+    const oppRoot = opponent ? activeOf(opponent) : null;
+    if (oppRoot && !attackEffectShielded(ctx, opponent, oppRoot, 'effect')) sides.push({ owner: opponent, root: oppRoot });
+    const ownRoot = activeOf(player);
+    if (ownRoot) sides.push({ owner: player, root: ownRoot });
+    const energiesOf = ({ owner, root }) =>
+      removableEnergy(ctx, owner, attachedCards(owner, root.instanceId).filter(matches));
+
+    let index = ctx.memo?.index ?? 0;
+    let discarded = ctx.memo?.discarded ?? 0;
+    if (ctx.memo && ctx.selection) {
+      const picked = pickById(energiesOf(sides[index]), ctx.selection);
+      for (const card of picked) discardCard(ctx.draft, card, ctx.events);
+      discarded += picked.length;
+      index += 1;
+    }
+    for (; index < sides.length; index++) {
+      const energies = energiesOf(sides[index]);
+      if (energies.length === 0) continue;
+      if (energies.length <= step.count) {
+        for (const card of energies) discardCard(ctx.draft, card, ctx.events);
+        discarded += energies.length;
+        continue;
+      }
+      return ctx.ask({
+        prompt: `${attackName(ctx)}: Choose ${step.count} Energy to discard from ${sides[index].root.name || 'that Pokémon'}`,
+        options: energies,
+        min: step.count,
+        max: step.count,
+        memo: { index, discarded },
+      });
+    }
+    return discarded === 0 ? skip(ctx, 'no_energy') : null;
+  }
   let discarded = 0;
   const drain = (owner, root) => {
     if (!root) return;
@@ -911,45 +947,6 @@ function atkDiscardBothActiveEnergy(ctx) {
     if (root && !attackEffectShielded(ctx, opponent, root, 'effect')) drain(opponent, root);
   }
   drain(player, activeOf(player));
-  return discarded === 0 ? skip(ctx, 'no_energy') : null;
-}
-
-// "Discard 1 Energy from both Active Pokémon": the attacker picks each side's Energy when it has
-// a choice; the opponent's Active is skipped when an effect shield protects it.
-function discardCountFromBothActives(ctx, matches) {
-  const { player, opponent, step } = ctx;
-  const sides = [];
-  const oppRoot = opponent ? activeOf(opponent) : null;
-  if (oppRoot && !attackEffectShielded(ctx, opponent, oppRoot, 'effect')) sides.push({ owner: opponent, root: oppRoot });
-  const ownRoot = activeOf(player);
-  if (ownRoot) sides.push({ owner: player, root: ownRoot });
-  const energiesOf = ({ owner, root }) =>
-    removableEnergy(ctx, owner, attachedCards(owner, root.instanceId).filter(matches));
-
-  let index = ctx.memo?.index ?? 0;
-  let discarded = ctx.memo?.discarded ?? 0;
-  if (ctx.memo && ctx.selection) {
-    const picked = pickById(energiesOf(sides[index]), ctx.selection);
-    for (const card of picked) discardCard(ctx.draft, card, ctx.events);
-    discarded += picked.length;
-    index += 1;
-  }
-  for (; index < sides.length; index++) {
-    const energies = energiesOf(sides[index]);
-    if (energies.length === 0) continue;
-    if (energies.length <= step.count) {
-      for (const card of energies) discardCard(ctx.draft, card, ctx.events);
-      discarded += energies.length;
-      continue;
-    }
-    return ctx.ask({
-      prompt: `${attackName(ctx)}: Choose ${step.count} Energy to discard from ${sides[index].root.name || 'that Pokémon'}`,
-      options: energies,
-      min: step.count,
-      max: step.count,
-      memo: { index, discarded },
-    });
-  }
   return discarded === 0 ? skip(ctx, 'no_energy') : null;
 }
 
@@ -1358,10 +1355,25 @@ function atkBenchFromDeckTop(ctx) {
   });
 }
 
-// Any stage unless the text says "Basic" (step.basic). Design 048 adds the typed GX/EX combination
-// (Eternal Flame-GX, Dark Union-GX) and the Fossil-evolution filter (Stone Age-GX) plus the extra-Energy attach.
-function benchDiscardCandidates(player, step) {
-  return (player.zones.discard || []).filter((c) => {
+/** Dark Union-GX: attach N Energy from the discard pile to every Pokémon placed this way. */
+function attachPlacedBenchEnergy(ctx, placed) {
+  const { player, step } = ctx;
+  const per = step.thenAttachPerPlaced;
+  if (!per || placed.length === 0 || !extraEnergySatisfied(ctx, step.requiresExtraEnergy)) return;
+  for (const root of placed) {
+    for (let i = 0; i < per; i++) {
+      const energy = (player.zones.discard || []).find(isEnergy);
+      if (!energy) return;
+      attachTo(player, energy, root, ctx.events);
+    }
+  }
+}
+
+function atkBenchFromDiscard(ctx) {
+  const { player, step } = ctx;
+  // Any stage unless the text says "Basic" (step.basic). Design 048 adds the typed GX/EX combination
+  // (Eternal Flame-GX, Dark Union-GX) and the Fossil-evolution filter (Stone Age-GX) plus the extra-Energy attach.
+  const candidates = (player.zones.discard || []).filter((c) => {
     if (!isPokemon(c)) return false;
     if (step.evolvesFrom) {
       const from = String(c.evolvesFrom || c.evolvesFromName || '').toLowerCase();
@@ -1381,25 +1393,6 @@ function benchDiscardCandidates(player, step) {
     }
     return true;
   });
-}
-
-/** Dark Union-GX: attach N Energy from the discard pile to every Pokémon placed this way. */
-function attachPlacedBenchEnergy(ctx, placed) {
-  const { player, step } = ctx;
-  const per = step.thenAttachPerPlaced;
-  if (!per || placed.length === 0 || !extraEnergySatisfied(ctx, step.requiresExtraEnergy)) return;
-  for (const root of placed) {
-    for (let i = 0; i < per; i++) {
-      const energy = (player.zones.discard || []).find(isEnergy);
-      if (!energy) return;
-      attachTo(player, energy, root, ctx.events);
-    }
-  }
-}
-
-function atkBenchFromDiscard(ctx) {
-  const { player, step } = ctx;
-  const candidates = benchDiscardCandidates(player, step);
   const what = step.evolvesFrom
     ? `Pokémon that evolve from ${step.evolvesFrom}`
     : step.ruleBoxes
@@ -2202,12 +2195,37 @@ function moveAttachedThenDiscard(ctx, attacker, target) {
 function atkBenchDiscardDamageEach(ctx) {
   const { player, opponent, step } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
-  if (ctx.memo?.picksLeft != null) return damageOnePick(ctx, ctx.memo);
+  if (ctx.memo?.picksLeft != null) {
+    const memo = ctx.memo;
+    const { opponent, step } = ctx;
+    const target = rootsOf(opponent).find((c) => c.instanceId === ctx.selection?.[0] && !memo.hit.includes(c.instanceId));
+    const hit = target ? [...memo.hit, target.instanceId] : memo.hit;
+    if (target && memo.picksLeft > 1 && rootsOf(opponent).some((c) => !hit.includes(c.instanceId))) {
+      return askOpposingDamageTarget(ctx, memo.picksLeft - 1, hit);
+    }
+    for (const instanceId of hit) {
+      ctx.events.push({
+        type: 'attackDamageRequest',
+        instanceId,
+        victimPlayerId: opponent.playerId,
+        amount: step.amount,
+        immunity: step.immunity || null,
+        attackName: attackName(ctx),
+      });
+    }
+    return target ? null : skip(ctx, 'target_not_found');
+  }
   // A Benched Drakloak's root card is still named Dreepy: match the Pokémon on top of the stack.
   const candidates = benchRootsOf(player).filter(
     (c) => String(topPokemonCard(player, c)?.name || c.name || '').toLowerCase() === step.name
   );
-  if (ctx.selection) return discardChosenBench(ctx, candidates);
+  if (ctx.selection) {
+    const { player } = ctx;
+    const picked = pickById(candidates, ctx.selection);
+    for (const root of picked) discardCards(player, [root, ...attachedCards(player, root.instanceId)], ctx.events);
+    if (picked.length === 0) return null;
+    return askOpposingDamageTarget(ctx, picked.length, []);
+  }
   const cap = Math.min(candidates.length, rootsOf(opponent).length);
   if (cap === 0) return skip(ctx, 'no_target');
   return ctx.ask({
@@ -2218,14 +2236,6 @@ function atkBenchDiscardDamageEach(ctx) {
   });
 }
 
-function discardChosenBench(ctx, candidates) {
-  const { player } = ctx;
-  const picked = pickById(candidates, ctx.selection);
-  for (const root of picked) discardCards(player, [root, ...attachedCards(player, root.instanceId)], ctx.events);
-  if (picked.length === 0) return null;
-  return askOpposingDamageTarget(ctx, picked.length, []);
-}
-
 function askOpposingDamageTarget(ctx, picksLeft, hit) {
   return ctx.ask({
     prompt: `${attackName(ctx)}: Choose one of your opponent's Pokémon to do ${ctx.step.amount} damage to (${picksLeft} left)`,
@@ -2234,26 +2244,6 @@ function askOpposingDamageTarget(ctx, picksLeft, hit) {
     max: 1,
     memo: { picksLeft, hit },
   });
-}
-
-function damageOnePick(ctx, memo) {
-  const { opponent, step } = ctx;
-  const target = rootsOf(opponent).find((c) => c.instanceId === ctx.selection?.[0] && !memo.hit.includes(c.instanceId));
-  const hit = target ? [...memo.hit, target.instanceId] : memo.hit;
-  if (target && memo.picksLeft > 1 && rootsOf(opponent).some((c) => !hit.includes(c.instanceId))) {
-    return askOpposingDamageTarget(ctx, memo.picksLeft - 1, hit);
-  }
-  for (const instanceId of hit) {
-    ctx.events.push({
-      type: 'attackDamageRequest',
-      instanceId,
-      victimPlayerId: opponent.playerId,
-      amount: step.amount,
-      immunity: step.immunity || null,
-      attackName: attackName(ctx),
-    });
-  }
-  return target ? null : skip(ctx, 'target_not_found');
 }
 
 // Giratina ex Alpha Rage (customhb): "Choose 1 of your opponent's Pokémon. That Pokémon attacks 1 of
@@ -2267,11 +2257,9 @@ function atkOpponentAttacksOwn(ctx) {
   const viewOf = (root) => topPokemonCard(opponent, root) || root;
   const printedDamage = (attack) => parseInt(String(attack?.damage ?? ''), 10) || 0;
   // Its printed attacks and those its attached Tools grant it (Technical Machines, Core Memory).
-  const toolAttacks = (root) =>
-    (opponent.zones?.[findCard(ctx.draft, root.instanceId)?.zoneId] || [])
-      .filter((c) => c.attachedTo === root.instanceId && !isPokemon(c) && !isEnergy(c) && toolGrantsAttackTo(c, viewOf(root)))
-      .flatMap((tool) => parseGrantedAttacks(tool));
-  const damaging = (root) => [...(viewOf(root).attacks || []), ...toolAttacks(root)].filter((a) => printedDamage(a) > 0);
+  const damaging = (root) => [...(viewOf(root).attacks || []), ...(opponent.zones?.[findCard(ctx.draft, root.instanceId)?.zoneId] || [])
+    .filter((c) => c.attachedTo === root.instanceId && !isPokemon(c) && !isEnergy(c) && toolGrantsAttackTo(c, viewOf(root)))
+    .flatMap((tool) => parseGrantedAttacks(tool))].filter((a) => printedDamage(a) > 0);
   if (memo.stage === 'target') {
     const user = rootsOf(opponent).find((c) => c.instanceId === memo.userId);
     const target = rootsOf(opponent).find((c) => c.instanceId === ctx.selection?.[0] && c.instanceId !== memo.userId);
@@ -3031,36 +3019,34 @@ function atkOppDiscardToPrizes(ctx) {
   });
 }
 
-// Blacephalon Blazer: one still-face-down Prize of the user's choice turns face up.
-function atkOnePrizeFaceUp(ctx, prizes) {
-  const { player } = ctx;
-  const turnUp = (card) => {
-    card.revealed = true;
-    ctx.events.push({ type: 'prizesRevealed', playerId: player.playerId, count: 1 });
-    return null;
-  };
-  if (ctx.selection) {
-    const card = prizes.find((c) => c.instanceId === ctx.selection[0] && !c.revealed);
-    return card ? turnUp(card) : skip(ctx, 'target_not_found');
-  }
-  const faceDown = prizes.filter((c) => !c.revealed);
-  if (faceDown.length === 0) return skip(ctx, 'no_face_down_prizes');
-  if (faceDown.length === 1) return turnUp(faceDown[0]);
-  return ctx.ask({
-    prompt: `${attackName(ctx)}: Choose 1 of your face-down Prize cards to turn face up`,
-    // Identity only: Prize cards stay face down.
-    options: faceDown.map((c) => ({ instanceId: c.instanceId })),
-    min: 1,
-    max: 1,
-  });
-}
-
 // Celesteela-GX Blaster-GX: every Prize card is turned face up for the rest of the game. The
 // per-card `revealed` flag is what `view.mjs` exposes, and it survives the flags rebuild.
 function atkPrizesFaceUp(ctx) {
   const { player } = ctx;
   const prizes = player.zones.prizes || [];
-  if (ctx.step.count === 1) return atkOnePrizeFaceUp(ctx, prizes);
+  if (ctx.step.count === 1) {
+    // Blacephalon Blazer: one still-face-down Prize of the user's choice turns face up.
+    const { player } = ctx;
+    const turnUp = (card) => {
+      card.revealed = true;
+      ctx.events.push({ type: 'prizesRevealed', playerId: player.playerId, count: 1 });
+      return null;
+    };
+    if (ctx.selection) {
+      const card = prizes.find((c) => c.instanceId === ctx.selection[0] && !c.revealed);
+      return card ? turnUp(card) : skip(ctx, 'target_not_found');
+    }
+    const faceDown = prizes.filter((c) => !c.revealed);
+    if (faceDown.length === 0) return skip(ctx, 'no_face_down_prizes');
+    if (faceDown.length === 1) return turnUp(faceDown[0]);
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: Choose 1 of your face-down Prize cards to turn face up`,
+      // Identity only: Prize cards stay face down.
+      options: faceDown.map((c) => ({ instanceId: c.instanceId })),
+      min: 1,
+      max: 1,
+    });
+  }
   if (prizes.length === 0) return skip(ctx, 'no_prizes');
   for (const card of prizes) card.revealed = true;
   ctx.events.push({ type: 'prizesRevealed', playerId: player.playerId, count: prizes.length });
@@ -3198,8 +3184,6 @@ function devolveRoot(ctx, owner, root, to) {
   return true;
 }
 
-const isLvX = (card) => /lv\.?\s*x$/i.test(String(card?.name || ''));
-
 // Unown Hidden Power: 1 evolved Pokémon of either player, its top card to its owner's hand.
 // Technical Machine TS-2 Devoluter: 1 of the opponent's, excluding Pokémon LV.X.
 function devolveChosen(ctx, sides = [ctx.player, ctx.opponent]) {
@@ -3207,7 +3191,7 @@ function devolveChosen(ctx, sides = [ctx.player, ctx.opponent]) {
     rootsOf(owner)
       .filter((root) => {
         const top = topPokemonCard(owner, root);
-        return top !== root && !(ctx.step.excludeLvX && isLvX(top));
+        return top !== root && !(ctx.step.excludeLvX && /lv\.?\s*x$/i.test(String(top?.name || '')));
       })
       .map((root) => ({ owner, root }))
   );
@@ -3983,7 +3967,7 @@ function atkCountersByRetreat(ctx) {
   if (!opponent) return skip(ctx, 'no_opponent');
   let placed = 0;
   for (const root of rootsOf(opponent)) {
-    // Stamped by reduce.mjs stampOpponentRetreatCosts; the printed cost is the fallback.
+    // Stamped by resolveAttackEffectPhase (reduce/attack-effect.mjs); the printed cost is the fallback.
     const cost = root.effectiveRetreatCost ?? getRetreatCostCount(topPokemonCard(opponent, root) || root);
     if (cost > 0 && !attackEffectShielded(ctx, opponent, root)) {
       placeCounters(ctx, root, opponent.playerId, cost * 10);

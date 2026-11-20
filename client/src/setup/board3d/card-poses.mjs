@@ -27,59 +27,7 @@ const centreOf = (rect) => ({ x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 });
 /** 180° about the seam centre `(0, depth)`: the far seat's copy of a near-seat point. */
 const mirrorPoint = (point, depth) => ({ x: -point.x, y: 2 * depth - point.y });
 
-/**
- * The Trainer board row (`#board`: `display: flex; justify-content: center; align-items:
- * flex-end`): cards one zone-height tall less 1.5vh, `.25vw` margins, centred along the bottom
- * of the content box, in view order from the left. A row wider than the box overlaps its cards
- * to fit instead of wrapping (CSS wraps into a scrolled second line the 3D board cannot show).
- * Computed in the near seat's frame; the far seat mirrors it.
- */
-function boardSlot(layout, index, count) {
-  const rect = layout.self.board;
-  const vh = layout.half.h / 100;
-  const vw = layout.half.w / 100;
-  const inner = {
-    x: rect.x + BOARD_PADDING_PX,
-    y: rect.y + BOARD_PADDING_PX,
-    w: rect.w - 2 * BOARD_PADDING_PX,
-    h: rect.h - 2 * BOARD_PADDING_PX,
-  };
-  const cardH = Math.max(1, inner.h - BOARD_CARD_HEIGHT_INSET_VH * vh);
-  const cardW = cardH * PLAY_CARD_ASPECT;
-  const margin = BOARD_CARD_MARGIN_VW * vw;
-  const n = Math.max(1, count);
-  const natural = cardW + 2 * margin;
-  const pitch =
-    n > 1 ? Math.min(natural, (inner.w - natural) / (n - 1)) : natural;
-  const rowW = natural + (n - 1) * pitch;
-  const left = inner.x + (inner.w - rowW) / 2;
-  return {
-    centre: {
-      x: left + index * pitch + natural / 2,
-      y: inner.y + margin + cardH / 2,
-    },
-    widthPx: cardW,
-  };
-}
-
 const OPEN_PILES = new Set(['discard', 'lostZone']);
-
-/**
- * The top card of a discard / Lost Zone pile rests on the plain layers pile-mesh.js draws under
- * it (`pileVisualCount(count) - 1` of them); every other card of the pile has no slot.
- */
-function openPileSlot(placement, layout, piles) {
-  const pile = piles?.[placement.side]?.[placement.zone];
-  if (!pile?.top || pile.top.instanceId !== placement.instanceId) return null;
-  const pose = pilePose(placement.side, placement.zone, layout);
-  if (!pose) return null;
-  const layers = Math.max(0, pileVisualCount(pile.count) - 1);
-  return {
-    centre: { x: pose.x, y: pose.y },
-    widthPx: pose.widthPx,
-    z: pileThicknessPx(layers, cardScaleFor(pose.widthPx)),
-  };
-}
 
 /** Slot centre (flat px), card width and resting height for a placement's zone, or null. */
 function slotFor(placement, layout, { boardCounts, piles }) {
@@ -95,7 +43,37 @@ function slotFor(placement, layout, { boardCounts, piles }) {
     };
   }
   if (zone === 'board') {
-    const slot = boardSlot(layout, index, boardCounts?.[side] ?? index + 1);
+    // The Trainer board row (`#board`: `display: flex; justify-content: center; align-items:
+    // flex-end`): cards one zone-height tall less 1.5vh, `.25vw` margins, centred along the bottom
+    // of the content box, in view order from the left. A row wider than the box overlaps its cards
+    // to fit instead of wrapping (CSS wraps into a scrolled second line the 3D board cannot show).
+    // Computed in the near seat's frame; the far seat mirrors it.
+    const count = boardCounts?.[side] ?? index + 1;
+    const rect = layout.self.board;
+    const vh = layout.half.h / 100;
+    const vw = layout.half.w / 100;
+    const inner = {
+      x: rect.x + BOARD_PADDING_PX,
+      y: rect.y + BOARD_PADDING_PX,
+      w: rect.w - 2 * BOARD_PADDING_PX,
+      h: rect.h - 2 * BOARD_PADDING_PX,
+    };
+    const cardH = Math.max(1, inner.h - BOARD_CARD_HEIGHT_INSET_VH * vh);
+    const cardW = cardH * PLAY_CARD_ASPECT;
+    const margin = BOARD_CARD_MARGIN_VW * vw;
+    const n = Math.max(1, count);
+    const natural = cardW + 2 * margin;
+    const pitch =
+      n > 1 ? Math.min(natural, (inner.w - natural) / (n - 1)) : natural;
+    const rowW = natural + (n - 1) * pitch;
+    const left = inner.x + (inner.w - rowW) / 2;
+    const slot = {
+      centre: {
+        x: left + index * pitch + natural / 2,
+        y: inner.y + margin + cardH / 2,
+      },
+      widthPx: cardW,
+    };
     return {
       centre:
         side === 'opp' ? mirrorPoint(slot.centre, layout.depth) : slot.centre,
@@ -106,7 +84,20 @@ function slotFor(placement, layout, { boardCounts, piles }) {
     const pose = prizeSlotPose(side, index, layout);
     return pose && { centre: { x: pose.x, y: pose.y }, widthPx: pose.widthPx, z: pose.z };
   }
-  if (OPEN_PILES.has(zone)) return openPileSlot(placement, layout, piles);
+  if (OPEN_PILES.has(zone)) {
+    // The top card of a discard / Lost Zone pile rests on the plain layers pile-mesh.js draws under
+    // it (`pileVisualCount(count) - 1` of them); every other card of the pile has no slot.
+    const pile = piles?.[placement.side]?.[placement.zone];
+    if (!pile?.top || pile.top.instanceId !== placement.instanceId) return null;
+    const pose = pilePose(placement.side, placement.zone, layout);
+    if (!pose) return null;
+    const layers = Math.max(0, pileVisualCount(pile.count) - 1);
+    return {
+      centre: { x: pose.x, y: pose.y },
+      widthPx: pose.widthPx,
+      z: pileThicknessPx(layers, cardScaleFor(pose.widthPx)),
+    };
+  }
   return null;
 }
 

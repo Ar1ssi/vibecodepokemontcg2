@@ -466,25 +466,6 @@ function resolveZone(side, zoneId, options = {}) {
 }
 
 /**
- * Probes one render target per side before any mutation. A blind renderer (no resolvable
- * zone element on one or both sides — e.g. `window.__getZone` unset and no injected
- * `options.getZone`) must not write to the DOM at all: see file header invariant.
- *
- * @param {object} options Renderer options (forwarded to resolveZone)
- * @returns {{ ok: boolean, reason?: string }}
- */
-function resolveRenderTargets(options = {}) {
-  const sides = ['you', 'them'];
-  for (const side of sides) {
-    const zone = resolveZone(side, 'active', options);
-    if (!zone.element) {
-      return { ok: false, reason: 'no_render_target' };
-    }
-  }
-  return { ok: true };
-}
-
-/**
  * Resolves the per-player card-back skin ("sleeve") a redacted card or a deck
  * cover should display, mirroring `updateDestinationCover`'s inline choice
  * (`client/src/actions/move-card-bundle/update-cover.js`): the owner's own
@@ -1171,37 +1152,6 @@ function unhydrateCard(record, options = {}) {
 }
 
 /**
- * Gives a face-up card in a holo zone its holofoil wrapper (async, idempotent:
- * hydrateHolo returns early once `card.wrapper` exists), and strips it from
- * face-down cards and cards in zones legacy never foils.
- *
- * @param {object} record
- * @param {string} zoneId
- * @param {boolean} isAttached
- * @param {object} options
- */
-function reconcileHolo(record, zoneId, isAttached, options = {}) {
-  const holo = holoApi(options);
-  if (!holo) return;
-  const wantsHolo =
-    !isAttached &&
-    !record.isRedacted &&
-    Boolean(record.holoCard.name) &&
-    HOLO_ZONES.includes(zoneId);
-  if (!wantsHolo) {
-    unhydrateCard(record, options);
-    return;
-  }
-  if (!record.element.parentNode) return;
-  try {
-    const pending = holo.hydrate?.(record.holoCard);
-    pending?.catch?.(() => {});
-  } catch {
-    // A holo failure is cosmetic; the card is already placed.
-  }
-}
-
-/**
  * Undoes every inline style and token swap `layoutCardStack` wrote, so a card
  * that left a stack (or changed its place in one) starts from a clean <img>.
  * `createOrUpdateCardElement` has already reset `src` to the card art.
@@ -1221,48 +1171,6 @@ function setStackStyle(img, styles) {
   if (board3dActive()) return;
   img.style.position = 'absolute';
   for (const [key, value] of Object.entries(styles)) img.style[key] = value;
-}
-
-/**
- * Draws an attached Energy as the same small round type token legacy
- * attach-card.js uses: full card art stashed in `data-energy-card-src` (the
- * double-click carousel shows it), layered above the visible card's face at
- * the spot its row plan gives it.
- */
-function applyEnergyToken(img, { tokenSrc, double }, tokenSize, slot, bottom) {
-  const cardArt = img.getAttribute('src');
-  setStackStyle(img, {
-    width: `${tokenSize}px`,
-    height: `${tokenSize}px`,
-    left: `${slot.left}px`,
-    bottom: `${bottom}px`,
-    zIndex: String(slot.zIndex),
-  });
-  img.dataset.energyCardSrc = cardArt;
-  img.setAttribute('src', tokenSrc);
-  img.classList.add('energy-token-3d');
-  if (double) img.classList.add(ENERGY_TOKEN_DOUBLE_CLASS);
-  img.energyLayer = slot.zIndex - 100;
-}
-
-/**
- * The token row along the visible card's bottom edge (energy-token-row.mjs):
- * side by side up to four, past that one token per type with an "Nx" badge.
- *
- * @param {object} rootRecord owns the badges
- * @param {{ img: object, tokenSrc: string, double: boolean }[]} tokens in attach order
- */
-function layoutEnergyTokens(rootRecord, tokens, cardWidth, cardHeight) {
-  const plan = planEnergyTokenRow(
-    tokens.map((token) => token.tokenSrc),
-    cardWidth
-  );
-  const bottom = cardHeight * ENERGY_TOKEN_BOTTOM;
-  tokens.forEach((token, i) =>
-    applyEnergyToken(token.img, token, plan.tokenSize, plan.tokens[i], bottom)
-  );
-  const parent = rootRecord.container || tokens[0]?.img.parentNode || null;
-  renderEnergyCountBadges(rootRecord, parent, plan.badges, bottom);
 }
 
 /**
@@ -1321,7 +1229,40 @@ function layoutCardStack(rootRecord, attached) {
       zIndex: String(-shiftLayer),
     });
   }
-  layoutEnergyTokens(rootRecord, tokens, cardWidth, cardHeight);
+  // The token row along the visible card's bottom edge (energy-token-row.mjs):
+  // side by side up to four, past that one token per type with an "Nx" badge.
+  const plan = planEnergyTokenRow(
+    tokens.map((token) => token.tokenSrc),
+    cardWidth
+  );
+  const bottom = cardHeight * ENERGY_TOKEN_BOTTOM;
+  tokens.forEach((token, i) =>
+    {
+      // Draws an attached Energy as the same small round type token legacy
+      // attach-card.js uses: full card art stashed in `data-energy-card-src` (the
+      // double-click carousel shows it), layered above the visible card's face at
+      // the spot its row plan gives it.
+      const img = token.img;
+      const { tokenSrc, double } = token;
+      const tokenSize = plan.tokenSize;
+      const slot = plan.tokens[i];
+      const cardArt = img.getAttribute('src');
+      setStackStyle(img, {
+        width: `${tokenSize}px`,
+        height: `${tokenSize}px`,
+        left: `${slot.left}px`,
+        bottom: `${bottom}px`,
+        zIndex: String(slot.zIndex),
+      });
+      img.dataset.energyCardSrc = cardArt;
+      img.setAttribute('src', tokenSrc);
+      img.classList.add('energy-token-3d');
+      if (double) img.classList.add(ENERGY_TOKEN_DOUBLE_CLASS);
+      img.energyLayer = slot.zIndex - 100;
+    }
+  );
+  const parent = rootRecord.container || tokens[0]?.img.parentNode || null;
+  renderEnergyCountBadges(rootRecord, parent, plan.badges, bottom);
   if (rootRecord.container?.style && !board3dActive()) {
     rootRecord.container.style.width =
       shiftLayer > 0 && cardWidth
@@ -1363,40 +1304,6 @@ function relayoutWhenLoaded(rootRecord, displayImg) {
 }
 
 /**
- * @param {{ cardData: object, zoneId: string, record: object, attachedParent: object|null }[]} placed
- * @returns {Map<object, object>} root record -> visible card record
- */
-function layoutCardStacks(placed) {
-  const attachedByRoot = new Map();
-  for (const entry of placed) {
-    if (!entry.attachedParent) continue;
-    if (!attachedByRoot.has(entry.attachedParent))
-      attachedByRoot.set(entry.attachedParent, []);
-    attachedByRoot.get(entry.attachedParent).push(entry);
-  }
-  const displayByRoot = new Map();
-  for (const entry of placed) {
-    if (entry.attachedParent || !PLAY_ZONES.includes(entry.zoneId)) continue;
-    displayByRoot.set(
-      entry.record,
-      layoutCardStack(entry.record, attachedByRoot.get(entry.record) || [])
-    );
-  }
-  return displayByRoot;
-}
-
-function bindOverlayResize() {
-  if (
-    resizeListenerBound ||
-    typeof window === 'undefined' ||
-    typeof window.addEventListener !== 'function'
-  )
-    return;
-  resizeListenerBound = true;
-  window.addEventListener('resize', () => repositionCardOverlays());
-}
-
-/**
  * Server rotation (reduce.mjs rotateCard) as the inline transform legacy
  * rotate-card.js writes. Attached cards turn with their root (syncRotation).
  */
@@ -1428,7 +1335,27 @@ function reconcilePlacedCard(entry, displayByRoot, options = {}) {
   const isVisible = record === displayRecord;
 
   applyRotation(record.element, root.card.rotation);
-  reconcileHolo(record, zoneId, !isVisible, options);
+  // Gives a face-up card in a holo zone its holofoil wrapper (async, idempotent:
+  // hydrateHolo returns early once `card.wrapper` exists), and strips it from
+  // face-down cards and cards in zones legacy never foils.
+  const holo = holoApi(options);
+  if (holo) {
+    const wantsHolo =
+      isVisible &&
+      !record.isRedacted &&
+      Boolean(record.holoCard.name) &&
+      HOLO_ZONES.includes(zoneId);
+    if (!wantsHolo) {
+      unhydrateCard(record, options);
+    } else if (record.element.parentNode) {
+      try {
+        const pending = holo.hydrate?.(record.holoCard);
+        pending?.catch?.(() => {});
+      } catch {
+        // A holo failure is cosmetic; the card is already placed.
+      }
+    }
+  }
 
   const zone = resolveZone(side, zoneId, options);
   if (attachedParent) {
@@ -1846,12 +1773,6 @@ function reconcilePendingChoice(pendingChoice, localPlayerId, options = {}, choo
   footer.appendChild(createViewBoardButton(doc, modal));
   footer.appendChild(confirmBtn);
 
-  const updateConfirmState = () => {
-    const count = selectedIds.size;
-    confirmBtn.disabled = count < min || count > max;
-    confirmBtn.textContent = `Confirm (${count}/${max})`;
-  };
-
   const optionsList = Array.isArray(pendingChoice.options)
     ? pendingChoice.options
     : [];
@@ -1880,7 +1801,9 @@ function reconcilePendingChoice(pendingChoice, localPlayerId, options = {}, choo
         selectedIds.add(opt.instanceId);
         optDiv.classList.add('selected');
       }
-      updateConfirmState();
+      const count = selectedIds.size;
+      confirmBtn.disabled = count < min || count > max;
+      confirmBtn.textContent = `Confirm (${count}/${max})`;
     });
 
     optionsContainer?.appendChild(optDiv);
@@ -2399,9 +2322,13 @@ export function applyView(view, events = [], options = {}) {
   // §0.2 guard: a renderer that cannot see the whole board writes to no part of it.
   // Must run before the monotonic version guard so a blind view never advances
   // lastRenderedVersion and is never mistaken for "already applied".
-  const renderTargets = resolveRenderTargets(options);
-  if (!renderTargets.ok) {
-    return { applied: false, reason: renderTargets.reason };
+  // Probes one render target per side before any mutation. A blind renderer (no resolvable
+  // zone element on one or both sides — e.g. `window.__getZone` unset and no injected
+  // `options.getZone`) must not write to the DOM at all: see file header invariant.
+  for (const side of ['you', 'them']) {
+    if (!resolveZone(side, 'active', options).element) {
+      return { applied: false, reason: 'no_render_target' };
+    }
   }
 
   // Edge Case 8: Monotonic stateVersion guard (ignore out-of-order or duplicate views)
@@ -2486,12 +2413,33 @@ export function applyView(view, events = [], options = {}) {
   }
   // Stack layout needs every card of a stack placed first: a root can come
   // after its attachments in view order.
-  const displayByRoot = layoutCardStacks(placed);
+  const attachedByRoot = new Map();
+  for (const entry of placed) {
+    if (!entry.attachedParent) continue;
+    if (!attachedByRoot.has(entry.attachedParent))
+      attachedByRoot.set(entry.attachedParent, []);
+    attachedByRoot.get(entry.attachedParent).push(entry);
+  }
+  const displayByRoot = new Map();
+  for (const entry of placed) {
+    if (entry.attachedParent || !PLAY_ZONES.includes(entry.zoneId)) continue;
+    displayByRoot.set(
+      entry.record,
+      layoutCardStack(entry.record, attachedByRoot.get(entry.record) || [])
+    );
+  }
   for (const entry of placed) {
     reconcilePlacedCard(entry, displayByRoot, options);
   }
   lastOverlayOptions = options;
-  bindOverlayResize();
+  if (
+    !resizeListenerBound &&
+    typeof window !== 'undefined' &&
+    typeof window.addEventListener === 'function'
+  ) {
+    resizeListenerBound = true;
+    window.addEventListener('resize', () => repositionCardOverlays());
+  }
 
   const lockWatch = newlyRetreatLocked(
     retreatLockedIds,

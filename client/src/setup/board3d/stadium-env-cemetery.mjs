@@ -50,7 +50,7 @@ export const MOONLIT = Object.freeze({
   shadow: [0.38, 0.46, 0.5, 0.55],
 });
 import { tableBounds } from './table-uv.mjs';
-import { patchy, shuffled } from './stadium-env-spots.mjs';
+import { distanceToRect, hash, oppHandRect, patchy, shuffled, union } from './stadium-env-spots.mjs';
 
 export const CEMETERY_KEY = 'old-cemetery';
 /**
@@ -72,50 +72,6 @@ export const MAX_PINES = 24;
 export const PROP_CARD_GAP_PX = 14;
 /** Grave kinds. */
 export const GRAVE = Object.freeze({ round: 0, pointed: 1 });
-
-/** A small deterministic 0..1 from three numbers. */
-const hash = (x, y, salt) => {
-  const s = Math.sin(x * 127.1 + y * 311.7 + salt * 74.7) * 43758.5453;
-  return s - Math.floor(s);
-};
-
-const distanceToRect = (x, y, r) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.y - y, 0, y - r.y - r.h));
-
-const union = (rects) => {
-  const x = Math.min(...rects.map((r) => r.x));
-  const y = Math.min(...rects.map((r) => r.y));
-  return { x, y, w: Math.max(...rects.map((r) => r.x + r.w)) - x, h: Math.max(...rects.map((r) => r.y + r.h)) - y };
-};
-
-/** The opponent's hand where the board fans it, past the far edge: the cards' width either side of the middle. */
-const oppHandRect = (layout, core) => {
-  const hand = layout.opp?.hand;
-  const cardH = layout.opp?.cardBox?.hand?.h ?? 0;
-  if (!hand || !(cardH > 0) || !Number.isFinite(hand.baselineY)) return null;
-  const halfW = Math.max(Math.abs(core.x), Math.abs(core.x + core.w));
-  return { x: -halfW, y: hand.baselineY - cardH, w: 2 * halfW, h: cardH };
-};
-
-/** Catmull-Rom through `points` ([x, y]), `per` steps a span. */
-const smoothPath = (points, per) => {
-  const out = [];
-  for (let i = 0; i < points.length - 1; i += 1) {
-    const p0 = points[Math.max(0, i - 1)];
-    const p1 = points[i];
-    const p2 = points[i + 1];
-    const p3 = points[Math.min(points.length - 1, i + 2)];
-    for (let k = 0; k < per; k += 1) {
-      const t = k / per;
-      const t2 = t * t;
-      const t3 = t2 * t;
-      out.push(
-        [0, 1].map((a) => 0.5 * (2 * p1[a] + (-p0[a] + p2[a]) * t + (2 * p0[a] - 5 * p1[a] + 4 * p2[a] - p3[a]) * t2 + (-p0[a] + 3 * p1[a] - 3 * p2[a] + p3[a]) * t3))
-      );
-    }
-  }
-  out.push(points[points.length - 1]);
-  return out;
-};
 
 /** px from (x, y) to the polyline. */
 const distanceToPath = (path, x, y) => {
@@ -155,8 +111,8 @@ export function cemeterySpots(layout) {
   const far = core.y + core.h;
   // The path meanders: each bend pushed a little off the line, its own way.
   const sway = (k) => (hash(core.x, k, 21) - 0.5) * 46 * u;
-  const path = smoothPath(
-    [
+  // Catmull-Rom through `points` ([x, y]), `per` steps a span.
+  const points = [
       [core.x - side * 0.8 + sway(1), scene.y - 20],
       [core.x - side + sway(2) * 0.5, core.y + core.h * 0.18],
       [core.x - side * 1.05 + sway(3) * 0.5, core.y + core.h * 0.5],
@@ -167,9 +123,25 @@ export function cemeterySpots(layout) {
       [core.x + core.w * 0.5, far + 100 * u + sway(6)],
       [core.x + core.w * 0.85, far + 120 * u + sway(7)],
       [scene.x + scene.w + 20, far + 160 * u],
-    ],
-    5
-  ).slice(0, MAX_PATH_POINTS);
+    ];
+  const per = 5;
+  const out = [];
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const p0 = points[Math.max(0, i - 1)];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[Math.min(points.length - 1, i + 2)];
+    for (let k = 0; k < per; k += 1) {
+      const t = k / per;
+      const t2 = t * t;
+      const t3 = t2 * t;
+      out.push(
+        [0, 1].map((a) => 0.5 * (2 * p1[a] + (-p0[a] + p2[a]) * t + (2 * p0[a] - 5 * p1[a] + 4 * p2[a] - p3[a]) * t2 + (-p0[a] + 3 * p1[a] - 3 * p2[a] + p3[a]) * t3))
+      );
+    }
+  }
+  out.push(points[points.length - 1]);
+  const path = out.slice(0, MAX_PATH_POINTS);
   const pathClear = (x, y, r) => distanceToPath(path, x, y) >= halfPath + r;
 
   // The boulder in the right band, and the bare tree off the far end on the left.
@@ -533,50 +505,51 @@ const PINE_COLOR = [0.025, 0.07, 0.075, 0];
 const DEAD_WOOD = [0.62, 0.78, 0.76, 0];
 const WOOD = [0.2, 0.17, 0.16, 0];
 
-/**
- * A headstone, BDSP's: a slab, leaning back a little (higher up, further from the path) and a little
- * aside, a rounded or pointed top; moss on the crown of some. Design 084: a flat face (its edges only
- * just rounded, so from above it reads as a slab, not a pill) on a darker, wider base.
- */
-const headstone = (props, g) => {
-  const halfW = g.width / 2;
-  const shoulder = g.height - halfW;
-  const half = g.thick / 2;
-  const crown = g.seed > 0.4 ? MOSS_COLOR : STONE_PALE;
-  const base = Math.min(g.height * 0.12, 7 * (g.width / 40));
-  props.at({ x: g.x, y: g.y, yaw: g.yaw }, () =>
-    props.roundBox({ x: 0, y: 0, z0: -2, z1: base, hw: halfW * 1.22, hh: half * 2.1, r: half * 0.35, color: STONE_BASE, topColor: STONE_BASE })
-  );
-  props.at({ x: g.x, y: g.y, z: base * 0.6, yaw: g.yaw, lean: [-Math.atan(g.lean), g.tilt ?? 0] }, () => {
-    props.roundBox({ x: 0, y: 0, z0: 0, z1: shoulder + half, hw: halfW, hh: half, r: half * 0.22, color: STONE_COLOR, topColor: STONE_PALE });
-    if (g.kind === GRAVE.pointed) {
-      // A pointed arch: a low four-sided cap over the slab's shoulder.
-      const points = [[-halfW, -half, shoulder], [halfW, -half, shoulder], [halfW, half, shoulder], [-halfW, half, shoulder], [0, 0, shoulder + halfW * 1.2]];
-      props.facets(points, [[0, 1, 4], [1, 2, 4], [2, 3, 4], [3, 0, 4]], (centre, n) => (n[2] > 0.6 ? crown : STONE_COLOR));
-    } else {
-      // A half disc: a cylinder lying through the slab at its shoulder, its round side the crown.
-      props.at({ z: shoulder, lean: [Math.PI / 2, 0] }, () => props.cylinder({ x: 0, y: 0, z0: -half, z1: half, r: halfW, color: crown, capColor: STONE_COLOR, sides: 20 }));
-    }
-  });
-};
-
-/** A pine (the kit's star-tiered conifer) in the night's dark teal; the bake already shades under it. */
-const pine = (props, p) => {
-  placeAsset(props, 'pine', {
-    x: p.x,
-    y: p.y,
-    size: p.r * 0.95,
-    height: p.h,
-    tiers: p.h > p.r * 3.6 ? 4 : 3,
-    seed: p.seed * 977,
-    sun: MOON,
-    shadows: false,
-    colors: { pine: PINE_COLOR, pineLight: [0.04, 0.1, 0.105, 0], pineDark: [0.015, 0.04, 0.045, 0], tip: [0.07, 0.15, 0.13, 0], bark: WOOD },
-  });
-};
-
-/** The bare tree: a pale trunk forking into crooked branches, as the art's. */
-const bareTree = (props, t, u) => {
+/** Every grave, the pines, the bare tree and the post: one prop geometry. */
+export function cemeteryProps({ graves, pines, tree, post, tufts = [], u }) {
+  const props = createPropBuilder();
+  for (const g of graves) {
+    // Design 083: each stone its own shade of the grey, weathered lighter or darker.
+    props.tint(instanceTint(g.seed * 991, 1.4), () => {
+      // A headstone, BDSP's: a slab, leaning back a little (higher up, further from the path) and a little
+      // aside, a rounded or pointed top; moss on the crown of some. Design 084: a flat face (its edges only
+      // just rounded, so from above it reads as a slab, not a pill) on a darker, wider base.
+      const halfW = g.width / 2;
+      const shoulder = g.height - halfW;
+      const half = g.thick / 2;
+      const crown = g.seed > 0.4 ? MOSS_COLOR : STONE_PALE;
+      const base = Math.min(g.height * 0.12, 7 * (g.width / 40));
+      props.at({ x: g.x, y: g.y, yaw: g.yaw }, () =>
+        props.roundBox({ x: 0, y: 0, z0: -2, z1: base, hw: halfW * 1.22, hh: half * 2.1, r: half * 0.35, color: STONE_BASE, topColor: STONE_BASE })
+      );
+      props.at({ x: g.x, y: g.y, z: base * 0.6, yaw: g.yaw, lean: [-Math.atan(g.lean), g.tilt ?? 0] }, () => {
+        props.roundBox({ x: 0, y: 0, z0: 0, z1: shoulder + half, hw: halfW, hh: half, r: half * 0.22, color: STONE_COLOR, topColor: STONE_PALE });
+        if (g.kind === GRAVE.pointed) {
+          // A pointed arch: a low four-sided cap over the slab's shoulder.
+          const points = [[-halfW, -half, shoulder], [halfW, -half, shoulder], [halfW, half, shoulder], [-halfW, half, shoulder], [0, 0, shoulder + halfW * 1.2]];
+          props.facets(points, [[0, 1, 4], [1, 2, 4], [2, 3, 4], [3, 0, 4]], (centre, n) => (n[2] > 0.6 ? crown : STONE_COLOR));
+        } else {
+          // A half disc: a cylinder lying through the slab at its shoulder, its round side the crown.
+          props.at({ z: shoulder, lean: [Math.PI / 2, 0] }, () => props.cylinder({ x: 0, y: 0, z0: -half, z1: half, r: halfW, color: crown, capColor: STONE_COLOR, sides: 20 }));
+        }
+      });
+    });
+  }
+  for (const p of pines) {
+    // A pine (the kit's star-tiered conifer) in the night's dark teal; the bake already shades under it.
+    placeAsset(props, 'pine', {
+      x: p.x,
+      y: p.y,
+      size: p.r * 0.95,
+      height: p.h,
+      tiers: p.h > p.r * 3.6 ? 4 : 3,
+      seed: p.seed * 977,
+      sun: MOON,
+      shadows: false,
+      colors: { pine: PINE_COLOR, pineLight: [0.04, 0.1, 0.105, 0], pineDark: [0.015, 0.04, 0.045, 0], tip: [0.07, 0.15, 0.13, 0], bark: WOOD },
+    });
+  }
+  // The bare tree: a pale trunk forking into crooked branches, as the art's.
   const branch = (from, angle, tilt, length, radius, depth) => {
     const to = [from[0] + Math.cos(angle) * Math.sin(tilt) * length, from[1] + Math.sin(angle) * Math.sin(tilt) * length, from[2] + Math.cos(tilt) * length];
     props.tube([from, [(from[0] + to[0]) / 2 + 3, (from[1] + to[1]) / 2, (from[2] + to[2]) / 2], to], [radius, radius * 0.75, radius * 0.5], DEAD_WOOD, { sides: 6 });
@@ -586,25 +559,10 @@ const bareTree = (props, t, u) => {
       branch(to, angle + (k - 1) * 0.9 + (roll - 0.5) * 0.5, Math.min(1.3, tilt + 0.25 + 0.3 * roll), length * 0.62, radius * 0.5, depth - 1);
     }
   };
-  branch([t.x, t.y, -4], 0, 0.05, t.h * 0.42, 8 * u, 3);
-};
-
-/** A broken wooden grave post: a leaning upright, its crossbar snapped short. */
-const brokenPost = (props, p, u) => {
-  props.roundBox({ x: p.x, y: p.y, z0: -2, z1: p.h, hw: 5 * u, hh: 5 * u, r: 1.6 * u, yaw: 0.3, color: WOOD });
-  props.roundBox({ x: p.x + 9 * u, y: p.y + 3 * u, z0: p.h * 0.66, z1: p.h * 0.66 + 9 * u, hw: 13 * u, hh: 4 * u, r: 1.6 * u, yaw: 0.3, color: WOOD });
-};
-
-/** Every grave, the pines, the bare tree and the post: one prop geometry. */
-export function cemeteryProps({ graves, pines, tree, post, tufts = [], u }) {
-  const props = createPropBuilder();
-  for (const g of graves) {
-    // Design 083: each stone its own shade of the grey, weathered lighter or darker.
-    props.tint(instanceTint(g.seed * 991, 1.4), () => headstone(props, g));
-  }
-  for (const p of pines) pine(props, p);
-  bareTree(props, tree, u);
-  brokenPost(props, post, u);
+  branch([tree.x, tree.y, -4], 0, 0.05, tree.h * 0.42, 8 * u, 3);
+  // A broken wooden grave post: a leaning upright, its crossbar snapped short.
+  props.roundBox({ x: post.x, y: post.y, z0: -2, z1: post.h, hw: 5 * u, hh: 5 * u, r: 1.6 * u, yaw: 0.3, color: WOOD });
+  props.roundBox({ x: post.x + 9 * u, y: post.y + 3 * u, z0: post.h * 0.66, z1: post.h * 0.66 + 9 * u, hw: 13 * u, hh: 4 * u, r: 1.6 * u, yaw: 0.3, color: WOOD });
   for (const t of tufts) {
     placeAsset(props, 'tallGrass', { x: t.x, y: t.y, size: t.size, blade: 16 * u, seed: t.seed * 991, sun: MOON, colors: { grass: [0.04, 0.13, 0.12, 0], tip: MOON_RIM } });
   }
@@ -681,11 +639,9 @@ export function oldCemeteryBoard({ three, material, terrainGrid, replaceGeometry
     uCore: { value: new three.Vector4() },
   };
   const make = (vertex, fragment, extra, uniforms = own) => material(vertex, fragment, extra, uniforms);
-  const mistLayer = (layer) =>
-    make(MIST_VERTEX, MIST_FRAGMENT, { transparent: true, depthWrite: false }, { ...own, uLayer: { value: layer } });
   const materials = {
     terrain: make(TERRAIN_VERTEX, TERRAIN_FRAGMENT),
-    mistLow: mistLayer(0),
+    mistLow: make(MIST_VERTEX, MIST_FRAGMENT, { transparent: true, depthWrite: false }, { ...own, uLayer: { value: 0 } }),
     bakeField: make(FULLSCREEN_VERTEX, BAKE_FIELD_FRAGMENT, bakeOptions),
     bakeLight: make(FULLSCREEN_VERTEX, bakeLightFragment(), bakeOptions),
   };

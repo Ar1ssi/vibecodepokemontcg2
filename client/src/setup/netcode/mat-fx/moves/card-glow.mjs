@@ -4,6 +4,7 @@
 // extracted as data. A heat the CSS multiplied is drawn as a darkening veil (over blend) and a
 // screened one as light (additive): the FX layer composites over the board, so neither CSS
 // blend can read the card underneath.
+import { parseHex } from './materials/_shared.js';
 
 const ICE = Object.freeze({ core: [236, 249, 255], hot: [214, 243, 255], body: [143, 211, 255], deep: [62, 143, 209] });
 
@@ -63,17 +64,12 @@ export const HEAT_VARIANTS = Object.freeze({
 const rgba = ([r, g, b], a) => `rgba(${r}, ${g}, ${b}, ${a})`;
 const coloursOf = (materialKey) => GLOW_COLOURS[materialKey] ?? GLOW_COLOURS.fire;
 
-const hexRgb = (hex) => {
-  const n = Number.parseInt(String(hex).slice(1), 16);
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-};
-
 /** A material's glow colours with a spec `tint` ('#RRGGBB' per palette key) laid over them. */
 export function tintedGlow(materialKey, tint) {
   const base = coloursOf(materialKey);
   if (!tint) return base;
   const out = { ...base };
-  for (const [key, hex] of Object.entries(tint)) out[key] = hexRgb(hex);
+  for (const [key, hex] of Object.entries(tint)) out[key] = parseHex(hex);
   return out;
 }
 

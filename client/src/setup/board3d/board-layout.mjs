@@ -153,38 +153,6 @@ function benchGeometry(zone, benchRect, frame) {
   return { gap, columnW, pitch: columnW + gap };
 }
 
-const benchSlotAt = (benchRect, geometry, index) => ({
-  x: benchRect.x + index * geometry.pitch,
-  y: benchRect.y,
-  w: geometry.columnW,
-  h: benchRect.h,
-});
-
-/**
- * Prize slots in DOM order (self-containers.css:607-672): three rows of two
- * overlapping cards. Odd children (slots 0, 2, 4) span the first two column
- * tracks and drop 6.75% of their height; even children (1, 3, 5) span the
- * last two and sit on top. Every profile has `columns: 2`, and the stylesheet
- * never reads `--prizes-columns`, so the grid is always two across.
- */
-function prizeSlots(prizesRect) {
-  const rowH = prizesRect.h / PRIZE_ROWS;
-  const slotW = prizesRect.w * (1 - PRIZE_EDGE_TRACK);
-  const slots = [];
-  for (let index = 0; index < PRIZE_SLOTS; index++) {
-    const row = Math.floor(index / 2);
-    const isBack = index % 2 === 0;
-    const top = prizesRect.y + prizesRect.h - row * rowH;
-    slots.push({
-      x: prizesRect.x + (isBack ? 0 : prizesRect.w * PRIZE_EDGE_TRACK),
-      y: top - rowH - (isBack ? rowH * PRIZE_BACK_DROP : 0),
-      w: slotW,
-      h: rowH,
-    });
-  }
-  return slots;
-}
-
 /**
  * The Stadium lives on the parent page (`#stadium`, index.css:384-401),
  * fixed to the viewport: `vh`/`%` resolve against the viewport, an aspect
@@ -214,25 +182,6 @@ function stadiumRect(zone, { half, viewport, scale, profile }) {
 /** 180° rotation about the seam centre `(0, depth)`, kept as a positive-size rect. */
 function mirrorRect(rect, depth) {
   return { x: -(rect.x + rect.w), y: 2 * depth - (rect.y + rect.h), w: rect.w, h: rect.h };
-}
-
-function mirrorSide(side, depth) {
-  return {
-    active: mirrorRect(side.active, depth),
-    bench: side.bench.map((rect) => mirrorRect(rect, depth)),
-    prizes: side.prizes.map((rect) => mirrorRect(rect, depth)),
-    deck: mirrorRect(side.deck, depth),
-    discard: mirrorRect(side.discard, depth),
-    lostZone: mirrorRect(side.lostZone, depth),
-    board: mirrorRect(side.board, depth),
-    hand: {
-      baselineY: 2 * depth - side.hand.baselineY,
-      edgeY: 2 * depth - side.hand.edgeY,
-      width: side.hand.width,
-    },
-    cardBox: side.cardBox,
-    benchPitch: side.benchPitch,
-  };
 }
 
 /**
@@ -278,7 +227,26 @@ export function flatLayout(profile, half, { viewport, matScale = 1 } = {}) {
   const benchRect = rectOf(zones.bench);
   const geometry = benchGeometry(zones.bench, benchRect, frame);
   const prizesRect = rectOf(zones.prizes);
-  const prizes = prizeSlots(prizesRect);
+  // Prize slots in DOM order (self-containers.css:607-672): three rows of two
+  // overlapping cards. Odd children (slots 0, 2, 4) span the first two column
+  // tracks and drop 6.75% of their height; even children (1, 3, 5) span the
+  // last two and sit on top. Every profile has `columns: 2`, and the stylesheet
+  // never reads `--prizes-columns`, so the grid is always two across.
+  const rowH = prizesRect.h / PRIZE_ROWS;
+  const slotW = prizesRect.w * (1 - PRIZE_EDGE_TRACK);
+  const slots = [];
+  for (let index = 0; index < PRIZE_SLOTS; index++) {
+    const row = Math.floor(index / 2);
+    const isBack = index % 2 === 0;
+    const top = prizesRect.y + prizesRect.h - row * rowH;
+    slots.push({
+      x: prizesRect.x + (isBack ? 0 : prizesRect.w * PRIZE_EDGE_TRACK),
+      y: top - rowH - (isBack ? rowH * PRIZE_BACK_DROP : 0),
+      w: slotW,
+      h: rowH,
+    });
+  }
+  const prizes = slots;
   const deck = rectOf(zones.deck);
   const discard = rectOf(zones.discard);
   const lostZone = rectOf(zones.lostZone);
@@ -294,7 +262,12 @@ export function flatLayout(profile, half, { viewport, matScale = 1 } = {}) {
 
   const self = {
     active,
-    bench: Array.from({ length: BENCH_COLUMNS }, (_, i) => benchSlotAt(benchRect, geometry, i)),
+    bench: Array.from({ length: BENCH_COLUMNS }, (_, i) => ({
+      x: benchRect.x + i * geometry.pitch,
+      y: benchRect.y,
+      w: geometry.columnW,
+      h: benchRect.h,
+    })),
     prizes,
     deck,
     discard,
@@ -318,7 +291,22 @@ export function flatLayout(profile, half, { viewport, matScale = 1 } = {}) {
     half: { w: half.w, h: half.h },
     depth: D,
     self,
-    opp: mirrorSide(self, D),
+    opp: {
+      active: mirrorRect(self.active, D),
+      bench: self.bench.map((rect) => mirrorRect(rect, D)),
+      prizes: self.prizes.map((rect) => mirrorRect(rect, D)),
+      deck: mirrorRect(self.deck, D),
+      discard: mirrorRect(self.discard, D),
+      lostZone: mirrorRect(self.lostZone, D),
+      board: mirrorRect(self.board, D),
+      hand: {
+        baselineY: 2 * D - self.hand.baselineY,
+        edgeY: 2 * D - self.hand.edgeY,
+        width: self.hand.width,
+      },
+      cardBox: self.cardBox,
+      benchPitch: self.benchPitch,
+    },
     stadium: stadiumRect(zones.stadium, { half, viewport: view, scale: matScale, profile: resolved }),
   };
 }

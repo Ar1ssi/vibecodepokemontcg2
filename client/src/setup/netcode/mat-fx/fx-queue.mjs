@@ -135,16 +135,12 @@ export const createFxQueue = ({
     timer = schedule(step, hold);
   };
 
-  // Idle means no hold outstanding, so the plan can start in this same tick.
-  const start = () => {
-    if (timer === null) step();
-  };
-
   return {
     push(plan) {
       if (!plan) return;
       queue.push(plan);
-      start();
+      // Idle means no hold outstanding, so the plan can start in this same tick.
+      if (timer === null) step();
     },
 
     /** Drop everything pending without running it (mirror guard, fx-off). */

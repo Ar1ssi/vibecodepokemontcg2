@@ -260,78 +260,70 @@ const STATUS_VOICES = Object.freeze({
 const DEFAULT_STATUS_VOICES = Object.freeze([tone(300, 0.2, 0.13, { wave: 'triangle' })]);
 
 /**
- * A hit reads heavier the harder it lands: the thud's pitch falls and its gain
- * rises with `amount`, over the same 0–200 damage span the screen shake uses.
- *
- * The hit is read through `classifyHitOnce`, the SAME classification the visual
- * uses — including its fallback to the delta against the last total seen. Most
- * engine emitters (checkup Poison/Burn, Tool pings, special energy) send only
- * a cumulative `damage`, and reading `plan.dealt` alone left every one of those
- * hits silent while still drawing the number and shaking the table.
- */
-function damageVoices(plan) {
-  const hit = classifyHitOnce(plan);
-  if (!hit) return EMPTY;
-  if (hit.kind === 'heal') {
-    return arpeggio([523, 698, 880], { step: 0.06, dur: 0.22, gain: 0.14, wave: 'sine' });
-  }
-
-  const amount = hit.amount;
-  const weight = clamp(amount / 200, 0, 1);
-  const body = [
-    noise(0.16 + 0.12 * weight, 0.16 + 0.2 * weight, {
-      type: 'lowpass',
-      freq: 900 - 500 * weight,
-      q: 0.8,
-    }),
-    tone(260 - 140 * weight, 0.16 + 0.14 * weight, 0.14 + 0.14 * weight, {
-      wave: 'square',
-      freqTo: 90 - 40 * weight,
-    }),
-  ];
-  // Weakness is the ×2 moment; a bright overtone makes it audibly different.
-  if (hit.weakness) {
-    body.push(tone(1568, 0.18, 0.13, { wave: 'sine', freqTo: 2093, delay: 0.03 }));
-  }
-  return Object.freeze(body);
-}
-
-// One chime per flip, timed to the moment that coin lands in the ceremony
-// (coin-pose.mjs), so the sound never gives the result away mid-toss.
-function coinVoices(plan) {
-  const faces = Array.isArray(plan?.faces) && plan.faces.length > 0 ? plan.faces : [plan?.face];
-  const { landsAt } = coinCeremonyTimeline(faces.length);
-  return Object.freeze(
-    faces.flatMap((face, i) => {
-      const high = face === 'heads';
-      const at = landsAt[i] / 1000;
-      return [
-        tone(high ? 1319 : 880, 0.12, 0.15, { wave: 'sine', delay: at }),
-        tone(high ? 1760 : 659, 0.2, 0.11, { wave: 'sine', delay: at + 0.09 }),
-      ];
-    })
-  );
-}
-
-function gameOverVoices(plan) {
-  if (plan?.user === 'self') {
-    return arpeggio([523, 659, 784, 1047], { step: 0.14, dur: 0.5, gain: 0.2, wave: 'triangle' });
-  }
-  if (plan?.user === 'opp') {
-    return arpeggio([440, 370, 294, 220], { step: 0.18, dur: 0.6, gain: 0.16, wave: 'sine' });
-  }
-  return EMPTY;
-}
-
-/**
  * Voices for one fx plan. Unknown effects are silent rather than a fallback
  * beep: a wrong sound is worse than none.
  * @returns {object[]}
  */
 export function voicesFor(effect, plan = {}) {
-  if (effect === 'damage') return damageVoices(plan);
-  if (effect === 'coin-flip') return coinVoices(plan);
-  if (effect === 'game-over') return gameOverVoices(plan);
+  if (effect === 'damage') {
+    // A hit reads heavier the harder it lands: the thud's pitch falls and its gain
+    // rises with `amount`, over the same 0–200 damage span the screen shake uses.
+    //
+    // The hit is read through `classifyHitOnce`, the SAME classification the visual
+    // uses — including its fallback to the delta against the last total seen. Most
+    // engine emitters (checkup Poison/Burn, Tool pings, special energy) send only
+    // a cumulative `damage`, and reading `plan.dealt` alone left every one of those
+    // hits silent while still drawing the number and shaking the table.
+    const hit = classifyHitOnce(plan);
+    if (!hit) return EMPTY;
+    if (hit.kind === 'heal') {
+      return arpeggio([523, 698, 880], { step: 0.06, dur: 0.22, gain: 0.14, wave: 'sine' });
+    }
+
+    const amount = hit.amount;
+    const weight = clamp(amount / 200, 0, 1);
+    const body = [
+      noise(0.16 + 0.12 * weight, 0.16 + 0.2 * weight, {
+        type: 'lowpass',
+        freq: 900 - 500 * weight,
+        q: 0.8,
+      }),
+      tone(260 - 140 * weight, 0.16 + 0.14 * weight, 0.14 + 0.14 * weight, {
+        wave: 'square',
+        freqTo: 90 - 40 * weight,
+      }),
+    ];
+    // Weakness is the ×2 moment; a bright overtone makes it audibly different.
+    if (hit.weakness) {
+      body.push(tone(1568, 0.18, 0.13, { wave: 'sine', freqTo: 2093, delay: 0.03 }));
+    }
+    return Object.freeze(body);
+  }
+  if (effect === 'coin-flip') {
+    // One chime per flip, timed to the moment that coin lands in the ceremony
+    // (coin-pose.mjs), so the sound never gives the result away mid-toss.
+    const faces = Array.isArray(plan?.faces) && plan.faces.length > 0 ? plan.faces : [plan?.face];
+    const { landsAt } = coinCeremonyTimeline(faces.length);
+    return Object.freeze(
+      faces.flatMap((face, i) => {
+        const high = face === 'heads';
+        const at = landsAt[i] / 1000;
+        return [
+          tone(high ? 1319 : 880, 0.12, 0.15, { wave: 'sine', delay: at }),
+          tone(high ? 1760 : 659, 0.2, 0.11, { wave: 'sine', delay: at + 0.09 }),
+        ];
+      })
+    );
+  }
+  if (effect === 'game-over') {
+    if (plan?.user === 'self') {
+      return arpeggio([523, 659, 784, 1047], { step: 0.14, dur: 0.5, gain: 0.2, wave: 'triangle' });
+    }
+    if (plan?.user === 'opp') {
+      return arpeggio([440, 370, 294, 220], { step: 0.18, dur: 0.6, gain: 0.16, wave: 'sine' });
+    }
+    return EMPTY;
+  }
   if (effect === 'attack' && Object.hasOwn(FAMILY_VOICES, plan?.family)) return FAMILY_VOICES[plan.family];
   if (effect === 'status') {
     return Object.freeze(

@@ -151,18 +151,6 @@ function shuffleSearchedDeck(draft, ctx) {
   ctx.events.push({ type: 'deckShuffled', playerId: ctx.hostPlayerId });
 }
 
-function ctxFor(token, host, attacker) {
-  return {
-    hostInstanceId: host?.instanceId ?? null,
-    hostPlayerId: token.hostPlayerId,
-    hostZoneId: token.hostZoneId,
-    attackerInstanceId: attacker?.instanceId ?? token.attackerInstanceId ?? null,
-    attackerPlayerId: token.attackerPlayerId ?? null,
-    fromZone: token.fromZone ?? null,
-    trigger: token.trigger,
-  };
-}
-
 /** Applies a single plan. `selection` is only used when resuming a choice plan. */
 function applyPlan(draft, plan, ctx, selection = null) {
   const events = ctx.events;
@@ -327,15 +315,6 @@ function discardFromHand(draft, ctx, instanceIds) {
   }
 }
 
-function planIsChoice(plan) {
-  return (
-    plan.action === 'search' ||
-    plan.action === 'switch' ||
-    plan.action === 'discardHand' ||
-    (plan.action === 'devolve' && plan.optional)
-  );
-}
-
 /** Builds a PendingChoice for a choice plan, or applies it when deterministic. */
 function handleChoicePlan(draft, item, ctx, queue, index) {
   const plan = item.plan;
@@ -468,7 +447,11 @@ function handleChoicePlan(draft, item, ctx, queue, index) {
 function runQueue(draft, queue, index, ctx) {
   for (let i = index; i < queue.length; i++) {
     const item = queue[i];
-    if (planIsChoice(item.plan)) {
+    const plan = item.plan;
+    if (plan.action === 'search' ||
+    plan.action === 'switch' ||
+    plan.action === 'discardHand' ||
+    (plan.action === 'devolve' && plan.optional)) {
       const res = handleChoicePlan(draft, item, ctx, queue, i);
       if (res && res !== 'done') {
         draft.pendingChoice = res;
@@ -549,7 +532,15 @@ export function resumeSpecialEnergyTrigger(draft, { selection, events, resumeTok
   }
   const attacker =
     token.attackerInstanceId != null ? findCard(draft, token.attackerInstanceId)?.card : null;
-  const ctx = { ...ctxFor(token, host, attacker), events, rng };
+  const ctx = { ...{
+    hostInstanceId: host?.instanceId ?? null,
+    hostPlayerId: token.hostPlayerId,
+    hostZoneId: token.hostZoneId,
+    attackerInstanceId: attacker?.instanceId ?? token.attackerInstanceId ?? null,
+    attackerPlayerId: token.attackerPlayerId ?? null,
+    fromZone: token.fromZone ?? null,
+    trigger: token.trigger,
+  }, events, rng };
   const pending = queue[index];
   if (pending) applyPlan(draft, pending.plan, ctx, selection || []);
   draft.pendingChoice = null;
@@ -641,14 +632,13 @@ export function resolveSpecialEnergyKnockout(
   // Every on-knockout special Energy needs a KO by attack damage (placed counters are not
   // damage); each plan's `source` says whether the attack must be the opponent's.
   if (!host || !byAttackDamage) return out;
-  const sourceMet = (plan) => plan.source === 'attack' || byOpponentAttack;
   const zone = zoneOf(draft, hostPlayerId, hostZoneId);
   for (const energy of zone.filter(
     (c) => c && isSpecialEnergyCard(c) && c.attachedTo === host.instanceId
   )) {
     const plans = planSpecialEnergyTriggers(energy, { trigger: 'knockout', host: hostTop || host, zoneArray: zone });
     for (const plan of plans) {
-      if (!sourceMet(plan)) continue;
+      if (!(plan.source === 'attack' || byOpponentAttack)) continue;
       if (plan.action === 'returnToHand') out.returnToHand = true;
       if (plan.action === 'drawUntil') out.drawUntil = Math.max(out.drawUntil, plan.until);
     }

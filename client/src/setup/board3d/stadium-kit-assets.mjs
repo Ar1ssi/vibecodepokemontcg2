@@ -166,7 +166,76 @@ const ASSETS = {
       return { reach: size * 1.12, height: (height ?? size * 2.1) + size * 0.06 };
     },
     draw(props, options, dims, ctx) {
-      if (options.crown === 'umbrella') return drawUmbrella(props, options, ctx);
+      if (options.crown === 'umbrella') {
+        // The umbrella broadleaf (treeRound `crown: 'umbrella'`): a trunk flaring at its foot, three limbs
+        // forking out under the crown, a wide flat crown of leafy lumps (a broad flat middle, a ring of lumps
+        // round its rim) with a band of lighter lumps on top leaning sunward. Every lump lies within 1.14 R
+        // of the trunk and under umbrellaShape's top.
+        const { size: R = 60, height, colors, tiers = 1 } = options;
+        const { rand, shift, sunward } = ctx;
+        const H = height ?? R * 2.3;
+        const { base } = umbrellaShape(R, H, tiers);
+        const c = coloursOf({ leaf: 'leaf', leafLight: 'leafLight', bark: 'bark', barkDark: 'barkDark' }, colors);
+        props.lathe(
+          [
+            [0.3 * R, 0],
+            [0.2 * R, 0.04 * H],
+            [0.13 * R, 0.12 * H],
+            [0.11 * R, 0.5 * base],
+            [0.09 * R, base - 0.04 * R],
+            [0, base + 0.02 * R],
+          ],
+          { color: (i) => (i < 1 ? c.barkDark : c.bark), sides: 14 }
+        );
+        const turn = rand() * 6.28;
+        for (let k = 0; k < 3; k += 1) {
+          const angle = turn + (k / 3) * 2 * Math.PI + (rand() - 0.5) * 0.5;
+          const out = (0.38 + 0.1 * rand()) * R;
+          const from = [0, 0, 0.55 * base];
+          const to = [Math.cos(angle) * out, Math.sin(angle) * out, base + 0.02 * R];
+          const via = [to[0] * 0.35, to[1] * 0.35, (from[2] + to[2]) / 2 + 0.06 * R];
+          props.tube([from, via, to], [0.075 * R, 0.055 * R, 0.035 * R], c.bark, { sides: 8 });
+        }
+        const top = blend(c.leaf, c.leafLight, 0.65);
+        const lumps = [{ z: base + 0.12 * R, rx: 0.95 * R, rz: 0.3 * R, color: c.leaf }];
+        const rim = 7 + Math.floor(rand() * 2);
+        for (let k = 0; k < rim; k += 1) {
+          const angle = turn + (k / rim) * 2 * Math.PI + (rand() - 0.5) * 0.35;
+          const r = (0.38 + 0.08 * rand()) * R;
+          lumps.push({ x: Math.cos(angle) * 0.68 * R, y: Math.sin(angle) * 0.68 * R, z: base + 0.04 * R + rand() * 0.04 * R, rx: r, rz: r * 0.6, color: c.leaf });
+        }
+        // Design 085 (tiers 2): a second, smaller shelf over the first, leaning sunward, the lighter band
+        // on it instead.
+        const upper = tiers > 1;
+        if (upper) {
+          const mid = blend(c.leaf, c.leafLight, 0.3);
+          lumps.push({ x: sunward[0] * 0.1 * R, y: sunward[1] * 0.1 * R, z: base + 0.36 * R, rx: 0.58 * R, rz: 0.2 * R, color: mid });
+          const ring = 5 + Math.floor(rand() * 2);
+          for (let k = 0; k < ring; k += 1) {
+            const angle = turn + 0.3 + (k / ring) * 2 * Math.PI + (rand() - 0.5) * 0.3;
+            const r = (0.24 + 0.05 * rand()) * R;
+            lumps.push({ x: Math.cos(angle) * 0.4 * R + sunward[0] * 0.1 * R, y: Math.sin(angle) * 0.4 * R + sunward[1] * 0.1 * R, z: base + 0.32 * R, rx: r, rz: r * 0.55, color: mid });
+          }
+        }
+        const tops = 3 + Math.floor(rand() * 2);
+        for (let k = 0; k < tops; k += 1) {
+          const angle = turn + 0.6 + (k / tops) * 2 * Math.PI;
+          const r = (upper ? 0.22 + 0.04 * rand() : 0.34 + 0.05 * rand()) * R;
+          const out = upper ? 0.22 : 0.34;
+          lumps.push({
+            x: Math.cos(angle) * out * R + sunward[0] * 0.14 * R,
+            y: Math.sin(angle) * out * R + sunward[1] * 0.14 * R,
+            z: base + (upper ? 0.54 : 0.3) * R,
+            rx: r,
+            rz: r * 0.55,
+            color: top,
+          });
+        }
+        props.look({ kind: LOOK.foliage, leaf: 0.15 * R, sway: 0.9 }, () => props.lumps(lumps));
+        props.shadow({ x: shift[0] * base, y: shift[1] * base, rx: 1.08 * R, strength: 0.6 });
+        props.shadow({ rx: 0.36 * R, strength: 0.55 });
+        return;
+      }
       const { size: R = 60, height, colors } = options;
       const { rand, shift, sunward } = ctx;
       const H = height ?? R * 2.1;
@@ -1108,76 +1177,6 @@ const ASSETS = {
     },
   },
 };
-
-/**
- * The umbrella broadleaf (treeRound `crown: 'umbrella'`): a trunk flaring at its foot, three limbs
- * forking out under the crown, a wide flat crown of leafy lumps (a broad flat middle, a ring of lumps
- * round its rim) with a band of lighter lumps on top leaning sunward. Every lump lies within 1.14 R
- * of the trunk and under umbrellaShape's top.
- */
-function drawUmbrella(props, { size: R = 60, height, colors, tiers = 1 }, { rand, shift, sunward }) {
-  const H = height ?? R * 2.3;
-  const { base } = umbrellaShape(R, H, tiers);
-  const c = coloursOf({ leaf: 'leaf', leafLight: 'leafLight', bark: 'bark', barkDark: 'barkDark' }, colors);
-  props.lathe(
-    [
-      [0.3 * R, 0],
-      [0.2 * R, 0.04 * H],
-      [0.13 * R, 0.12 * H],
-      [0.11 * R, 0.5 * base],
-      [0.09 * R, base - 0.04 * R],
-      [0, base + 0.02 * R],
-    ],
-    { color: (i) => (i < 1 ? c.barkDark : c.bark), sides: 14 }
-  );
-  const turn = rand() * 6.28;
-  for (let k = 0; k < 3; k += 1) {
-    const angle = turn + (k / 3) * 2 * Math.PI + (rand() - 0.5) * 0.5;
-    const out = (0.38 + 0.1 * rand()) * R;
-    const from = [0, 0, 0.55 * base];
-    const to = [Math.cos(angle) * out, Math.sin(angle) * out, base + 0.02 * R];
-    const via = [to[0] * 0.35, to[1] * 0.35, (from[2] + to[2]) / 2 + 0.06 * R];
-    props.tube([from, via, to], [0.075 * R, 0.055 * R, 0.035 * R], c.bark, { sides: 8 });
-  }
-  const top = blend(c.leaf, c.leafLight, 0.65);
-  const lumps = [{ z: base + 0.12 * R, rx: 0.95 * R, rz: 0.3 * R, color: c.leaf }];
-  const rim = 7 + Math.floor(rand() * 2);
-  for (let k = 0; k < rim; k += 1) {
-    const angle = turn + (k / rim) * 2 * Math.PI + (rand() - 0.5) * 0.35;
-    const r = (0.38 + 0.08 * rand()) * R;
-    lumps.push({ x: Math.cos(angle) * 0.68 * R, y: Math.sin(angle) * 0.68 * R, z: base + 0.04 * R + rand() * 0.04 * R, rx: r, rz: r * 0.6, color: c.leaf });
-  }
-  // Design 085 (tiers 2): a second, smaller shelf over the first, leaning sunward, the lighter band
-  // on it instead.
-  const upper = tiers > 1;
-  if (upper) {
-    const mid = blend(c.leaf, c.leafLight, 0.3);
-    lumps.push({ x: sunward[0] * 0.1 * R, y: sunward[1] * 0.1 * R, z: base + 0.36 * R, rx: 0.58 * R, rz: 0.2 * R, color: mid });
-    const ring = 5 + Math.floor(rand() * 2);
-    for (let k = 0; k < ring; k += 1) {
-      const angle = turn + 0.3 + (k / ring) * 2 * Math.PI + (rand() - 0.5) * 0.3;
-      const r = (0.24 + 0.05 * rand()) * R;
-      lumps.push({ x: Math.cos(angle) * 0.4 * R + sunward[0] * 0.1 * R, y: Math.sin(angle) * 0.4 * R + sunward[1] * 0.1 * R, z: base + 0.32 * R, rx: r, rz: r * 0.55, color: mid });
-    }
-  }
-  const tops = 3 + Math.floor(rand() * 2);
-  for (let k = 0; k < tops; k += 1) {
-    const angle = turn + 0.6 + (k / tops) * 2 * Math.PI;
-    const r = (upper ? 0.22 + 0.04 * rand() : 0.34 + 0.05 * rand()) * R;
-    const out = upper ? 0.22 : 0.34;
-    lumps.push({
-      x: Math.cos(angle) * out * R + sunward[0] * 0.14 * R,
-      y: Math.sin(angle) * out * R + sunward[1] * 0.14 * R,
-      z: base + (upper ? 0.54 : 0.3) * R,
-      rx: r,
-      rz: r * 0.55,
-      color: top,
-    });
-  }
-  props.look({ kind: LOOK.foliage, leaf: 0.15 * R, sway: 0.9 }, () => props.lumps(lumps));
-  props.shadow({ x: shift[0] * base, y: shift[1] * base, rx: 1.08 * R, strength: 0.6 });
-  props.shadow({ rx: 0.36 * R, strength: 0.55 });
-}
 
 /** How high in a planter (× its half width) the plant stands: on the soil, a little under the rim's top. */
 const PLANTER_SOIL = 0.75;

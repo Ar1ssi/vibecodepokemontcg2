@@ -78,27 +78,6 @@ export const BOARD_DRIFT = Object.freeze({
 
 const vec4Of = (three, values) => new three.Vector4(...values);
 
-/** A drift's own uniforms, from its kind and spec. */
-function driftUniforms(three, kindName, spec) {
-  const kind = DRIFT_KINDS[kindName];
-  if (!kind) throw new Error(`unknown Stadium drift kind: ${kindName}`);
-  const colours = (spec.colours?.length ? spec.colours : ['#ffffff']).slice(0, 4).map((hex) => paint(hex, 2).slice(0, 3));
-  while (colours.length < 4) colours.push(colours[colours.length - 1]);
-  const wind = Array.isArray(spec.wind) && spec.wind.every(Number.isFinite) ? spec.wind : [0, 0];
-  return {
-    uDriftA: { value: vec4Of(three, [kind.fall, kind.sway, kind.spin, kind.wander]) },
-    uDriftB: { value: vec4Of(three, [kind.size[0], kind.size[1], kind.life[0], kind.life[1]]) },
-    uDriftC: { value: vec4Of(three, [kind.z[0], kind.z[1], kind.twinkle, SHAPES[kind.shape]]) },
-    uWind: { value: new three.Vector2(wind[0], wind[1]) },
-    uDriftColours: { value: colours.map((c) => new three.Vector3(...c)) },
-    uDriftColourCount: { value: Math.min(4, Math.max(1, spec.colours?.length ?? 1)) },
-    uEmitters: { value: Array.from({ length: MAX_EMITTERS }, () => new three.Vector4()) },
-    uEmitterCount: { value: 0 },
-    uDriftArea: { value: new three.Vector4(0, 0, 0, 0) },
-    uDriftAvoid: { value: new three.Vector4(0, 0, 0, 0) },
-  };
-}
-
 export const DRIFT_VERTEX = /* glsl */ `
 ${TABLE_UNIFORMS}
 uniform float uTime;
@@ -261,7 +240,25 @@ export function createDrift({ three, material, seeded }, specs = []) {
   const materials = [];
   const emitting = [];
   for (const spec of specs ?? []) {
-    const own = driftUniforms(three, spec.kind, spec);
+    // A drift's own uniforms, from its kind and spec.
+    const kindName = spec.kind;
+    const kind = DRIFT_KINDS[kindName];
+    if (!kind) throw new Error(`unknown Stadium drift kind: ${kindName}`);
+    const colours = (spec.colours?.length ? spec.colours : ['#ffffff']).slice(0, 4).map((hex) => paint(hex, 2).slice(0, 3));
+    while (colours.length < 4) colours.push(colours[colours.length - 1]);
+    const wind = Array.isArray(spec.wind) && spec.wind.every(Number.isFinite) ? spec.wind : [0, 0];
+    const own = {
+      uDriftA: { value: vec4Of(three, [kind.fall, kind.sway, kind.spin, kind.wander]) },
+      uDriftB: { value: vec4Of(three, [kind.size[0], kind.size[1], kind.life[0], kind.life[1]]) },
+      uDriftC: { value: vec4Of(three, [kind.z[0], kind.z[1], kind.twinkle, SHAPES[kind.shape]]) },
+      uWind: { value: new three.Vector2(wind[0], wind[1]) },
+      uDriftColours: { value: colours.map((c) => new three.Vector3(...c)) },
+      uDriftColourCount: { value: Math.min(4, Math.max(1, spec.colours?.length ?? 1)) },
+      uEmitters: { value: Array.from({ length: MAX_EMITTERS }, () => new three.Vector4()) },
+      uEmitterCount: { value: 0 },
+      uDriftArea: { value: new three.Vector4(0, 0, 0, 0) },
+      uDriftAvoid: { value: new three.Vector4(0, 0, 0, 0) },
+    };
     const additive = DRIFT_KINDS[spec.kind].blend === 'additive';
     const made = material(
       DRIFT_VERTEX,

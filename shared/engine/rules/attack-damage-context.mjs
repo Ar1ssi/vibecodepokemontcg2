@@ -10,7 +10,7 @@ import { isEnergy, isPokemon, isTrainer, isBasicPokemon, getRetreatCostCount } f
 import { serverEnergyDescriptor } from './server-energy.mjs';
 import { expandEnergyEntries } from './attack-engine.mjs';
 import { normalizeStage } from './evolution.mjs';
-import { evolvedView } from './evolved-pokemon.mjs';
+import { evolvedView, isToolKind, priorEvolutionCards } from './evolved-pokemon.mjs';
 import { classifyEnergyEffect } from './energy-effects.mjs';
 import { isAncientCard, isFutureCard } from './paradox-tags.mjs';
 import { listConditions } from './special-conditions.mjs';
@@ -26,7 +26,6 @@ import {
   isTagTeamCard,
   isUltraBeastCard,
 } from './card-classify.mjs';
-import { priorEvolutionCards } from './evolved-pokemon.mjs';
 import { liveAttackMarkers } from './attack-markers.mjs';
 
 const zoneOf = (player, zoneId) =>
@@ -129,15 +128,10 @@ const isGrassPokemon = ({ card, view }) =>
 const isDamagedTauros = ({ card, view }) =>
   /tauros/i.test(card?.name || view?.name || '') && (card?.damage || 0) > 0;
 
-const isTool = (card) => {
-  const subtypes = Array.isArray(card?.subtypes) ? card.subtypes.join(' ') : card?.subtypes || '';
-  return `${card?.type || ''} ${card?.trainerType || ''} ${subtypes}`.toLowerCase().includes('tool');
-};
-
 function toolCountOn(player, pokemon) {
   if (!pokemon) return 0;
   return [...zoneOf(player, 'active'), ...zoneOf(player, 'bench')].filter(
-    (card) => card.attachedTo === pokemon.instanceId && isTool(card)
+    (card) => card.attachedTo === pokemon.instanceId && isToolKind(card)
   ).length;
 }
 
@@ -224,9 +218,6 @@ const pokemonEntry = (bench) => ({ card, view }) => ({
   delta: /δ|delta species/i.test(`${view?.name || ''} ${view?.subtypes || ''} ${card?.subtypes || ''}`),
 });
 
-const attackerZone = (player, pokemon) =>
-  ['active', 'bench'].map((zoneId) => zoneOf(player, zoneId)).find((cards) => cards.includes(pokemon)) || [];
-
 /** 'self' / 'opponent' for the player who put the Stadium in play; null when none or unknown. */
 function stadiumOwnerOf(stadiumCard, attackerPlayerId, defenderPlayerId) {
   const owner = stadiumCard?.ownerId ?? stadiumCard?.playerId ?? stadiumCard?.playedBy ?? null;
@@ -235,15 +226,7 @@ function stadiumOwnerOf(stadiumCard, attackerPlayerId, defenderPlayerId) {
   return owner === defenderPlayerId ? 'opponent' : null;
 }
 
-function weaknessTypes(view) {
-  const raw = view?.weakness ?? view?.weaknesses;
-  return (Array.isArray(raw) ? raw : raw ? [raw] : [])
-    .map((entry) => (typeof entry === 'string' ? entry : entry?.type))
-    .filter(Boolean);
-}
-
-function resistanceTypes(view) {
-  const raw = view?.resistance ?? view?.resistances;
+function typeNames(raw) {
   return (Array.isArray(raw) ? raw : raw ? [raw] : [])
     .map((entry) => (typeof entry === 'string' ? entry : entry?.type))
     .filter(Boolean);
@@ -393,7 +376,7 @@ export function buildServerAttackContext(
     attackCost: Array.isArray(attack?.cost) ? [...attack.cost] : [],
     attackerToolCount: toolCountOn(own, attacker),
     attackerStackNames: attacker
-      ? priorEvolutionCards(attackerZone(own, attacker), attacker).map((card) => card.name || '')
+      ? priorEvolutionCards(['active', 'bench'].map((zoneId) => zoneOf(own, zoneId)).find((cards) => cards.includes(attacker)) || [], attacker).map((card) => card.name || '')
       : [],
     attackerHealedThisTurn: attacker != null && Number(attacker.healedTurn) === turnNumber,
     attackerHealedLastOwnTurn:
@@ -438,7 +421,7 @@ export function buildServerAttackContext(
         energy: isEnergy(card) && !isTrainer(card),
         basicEnergy: classifyEnergyEffect(card) === 'basic',
         energyType: isEnergy(card) ? serverEnergyDescriptor(card).type : null,
-        tool: isTool(card),
+        tool: isToolKind(card),
       })),
     // Energy this attack's before-damage attach moved (Shaymin LV.X Seed Flare); absent when
     // the attack has no such attach.
@@ -503,8 +486,8 @@ export function buildServerAttackContext(
     ctx.defenderKinds = ruleBoxKinds(defenderCard);
     ctx.defenderName = defenderCard.name || '';
     ctx.defenderAbilityKinds = abilityKinds(defenderCard);
-    ctx.defenderResistanceTypes = resistanceTypes(defenderCard);
-    ctx.defenderWeaknessTypes = weaknessTypes(defenderCard);
+    ctx.defenderResistanceTypes = typeNames(defenderCard?.resistance ?? defenderCard?.resistances);
+    ctx.defenderWeaknessTypes = typeNames(defenderCard?.weakness ?? defenderCard?.weaknesses);
     ctx.defenderToolCount = toolCountOn(opponent, defender);
     ctx.defenderBasicEnergyCount = attachedEnergyCards(opponent, defender).filter(
       (card) => classifyEnergyEffect(card) === 'basic'

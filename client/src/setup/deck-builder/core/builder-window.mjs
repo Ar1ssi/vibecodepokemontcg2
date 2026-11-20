@@ -71,9 +71,7 @@ export function buildBuilderMessage(type, payload = {}) {
 
 const isTarget = (value) => value === 'self' || value === 'opp';
 
-const isId = (value) => typeof value === 'string' && value.length > 0 && value.length <= MAX_ID_LENGTH;
-
-const isNullableId = (value) => value === null || isId(value);
+const isNullableId = (value) => value === null || typeof value === 'string' && value.length > 0 && value.length <= MAX_ID_LENGTH;
 
 // Card backs and sleeve art are either absolute web URLs or site-rooted
 // asset paths; anything else (javascript:, data:, protocol-relative) is refused.

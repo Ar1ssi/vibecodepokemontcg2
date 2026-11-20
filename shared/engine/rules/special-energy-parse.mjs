@@ -108,15 +108,6 @@ const TYPE_WORD_SYMBOLS = [
   [/\bfairy\b/g, '{y}'],
 ];
 
-function normalizeEnergyText(text) {
-  let out = normalizeText(text);
-  // {C}{C} arrives with no separator as "colorlesscolorless": convert each member of
-  // the run before the single-word pass sees it.
-  out = out.replace(/colorless(?=colorless)/g, '{c}');
-  for (const [re, symbol] of TYPE_WORD_SYMBOLS) out = out.replace(re, symbol);
-  return out;
-}
-
 function symbolTypes(segment) {
   const seen = new Set();
   const out = [];
@@ -128,15 +119,6 @@ function symbolTypes(segment) {
     }
   }
   return out;
-}
-
-function repeatedSymbolCount(segment) {
-  // "provides {C}{C} Energy" → 2; only when a single distinct symbol repeats.
-  const types = symbolTypes(segment);
-  if (types.length !== 1) return null;
-  const symbols = [...String(segment).matchAll(/\{([a-z])\}/g)];
-  if (symbols.length > 1) return symbols.length;
-  return null;
 }
 
 // Energy-provided clause conditions → machine-readable tags.
@@ -177,8 +159,9 @@ function pickCount(segment, fallback = 1) {
   if (anyCombo) return Number(anyCombo[1]);
   const atATime = segment.match(/provides? (\d+) energy at a time/);
   if (atATime) return Number(atATime[1]);
-  const repeated = repeatedSymbolCount(segment);
-  if (repeated) return repeated;
+  // "provides {C}{C} Energy" → 2; only when a single distinct symbol repeats.
+  const symbols = [...String(segment).matchAll(/\{([a-z])\}/g)];
+  if (symbolTypes(segment).length === 1 && symbols.length > 1) return symbols.length;
   return fallback;
 }
 
@@ -362,19 +345,19 @@ const CONDITIONAL_PROVISION = [
   [/^miracle energy$/, () => [{ type: 'provide', energyTypes: ['Any'], count: 2 }]],
 ];
 
-// A name-keyed "provides {Y} only while attached to a {Y} Pokémon" (Wonder Energy) yields to a text
-// that provides the Energy unconditionally: the homebrew Wonder Energy (customhb) reads "As long as
-// this card is attached to a Pokémon, it provides {Y} Energy."
-function textOverridesHostCondition(steps, lower) {
-  if (!steps.length || !steps.every((step) => String(step.condition || '').startsWith('host:'))) return false;
-  return /^as long as this card is attached to a pok[eé]mon, it provides \{[a-z]\} energy\./.test(lower) && !/\bonly while\b/.test(lower);
-}
-
 function parseProvision(name, lower) {
   for (const [re, build] of CONDITIONAL_PROVISION) {
     if (!re.test(name)) continue;
     const steps = build(lower);
-    if (!textOverridesHostCondition(steps, lower)) return steps;
+    // A name-keyed "provides {Y} only while attached to a {Y} Pokémon" (Wonder Energy) yields to a text
+    // that provides the Energy unconditionally: the homebrew Wonder Energy (customhb) reads "As long as
+    // this card is attached to a Pokémon, it provides {Y} Energy."
+    const textOverridesHostCondition =
+      steps.length > 0 &&
+      steps.every((step) => String(step.condition || '').startsWith('host:')) &&
+      /^as long as this card is attached to a pok[eé]mon, it provides \{[a-z]\} energy\./.test(lower) &&
+      !/\bonly while\b/.test(lower);
+    if (!textOverridesHostCondition) return steps;
     break;
   }
   const steps = [];
@@ -942,7 +925,12 @@ export function parseSpecialEnergyEffects(card) {
   const name = String(card.name);
   const lowerName = normalizeText(name);
   const text = card.text ?? card.effect ?? '';
-  const lower = normalizeEnergyText(text);
+  let out = normalizeText(text);
+  // {C}{C} arrives with no separator as "colorlesscolorless": convert each member of
+  // the run before the single-word pass sees it.
+  out = out.replace(/colorless(?=colorless)/g, '{c}');
+  for (const [re, symbol] of TYPE_WORD_SYMBOLS) out = out.replace(re, symbol);
+  const lower = out;
   const canonical = { ...card, subtypes: cardSubtypes(card) };
 
   const steps = [];
@@ -1148,32 +1136,19 @@ export function getAttachedSpecialEnergies(pokemonCard, zoneArray = []) {
 
 // "Ignore these effects if Holon Energy GL is attached to Pokémon-ex" / Heal Energy (I173).
 // The host may be an evolved stack: any Pokémon-ex card in it counts.
-function hostIsPokemonEx(host, zoneArray = []) {
-  if (!host) return false;
-  if (isExCard(host)) return true;
-  return (zoneArray || []).some((c) => c?.attachedTo === host.instanceId && c.type !== 'Energy' && isExCard(c));
-}
-
 function effectsIgnoredOnHost(parsed, host, zoneArray) {
-  return (parsed?.steps || []).some((s) => s.type === 'ignoredOn' && s.host === 'pokemonEx') && hostIsPokemonEx(host, zoneArray);
+  return (
+    (parsed?.steps || []).some((s) => s.type === 'ignoredOn' && s.host === 'pokemonEx') &&
+    host &&
+    (isExCard(host) ||
+      (zoneArray || []).some((c) => c?.attachedTo === host.instanceId && c.type !== 'Energy' && isExCard(c)))
+  );
 }
 
 /** Attached special Energy whose effects apply to `pokemonCard` (drops the ones its host switches off). */
 function effectiveSpecialEnergies(pokemonCard, zoneArray = []) {
   return getAttachedSpecialEnergies(pokemonCard, zoneArray).filter(
     (energy) => !effectsIgnoredOnHost(parseSpecialEnergyEffects(energy), pokemonCard, zoneArray)
-  );
-}
-
-function hostHasBasicEnergy(zoneArray, hostImage, typeName, hostId) {
-  return (zoneArray || []).some(
-    (c) =>
-      c &&
-      c.type === 'Energy' &&
-      ((hostId != null && c.attachedTo === hostId) ||
-        (hostImage && c.image?.relative === hostImage)) &&
-      !isSpecialEnergyCard(c) &&
-      String(c.name ?? '').toLowerCase().includes(String(typeName ?? '').toLowerCase().split('|')[0]),
   );
 }
 
@@ -1212,7 +1187,19 @@ function conditionMet(condition, pokemon, zoneArray) {
   if (!condition) return true;
   const img = pokemon?.image;
   if (condition.startsWith('host:')) return hostIsType(pokemon, condition.slice(5));
-  if (condition.startsWith('hostHasBasic:')) return hostHasBasicEnergy(zoneArray, img, condition.slice('hostHasBasic:'.length), pokemon?.instanceId);
+  if (condition.startsWith('hostHasBasic:')) {
+    const typeName = condition.slice('hostHasBasic:'.length);
+    const hostId = pokemon?.instanceId;
+    return (zoneArray || []).some(
+      (c) =>
+        c &&
+        c.type === 'Energy' &&
+        ((hostId != null && c.attachedTo === hostId) ||
+          (img && c.image?.relative === img)) &&
+        !isSpecialEnergyCard(c) &&
+        String(c.name ?? '').toLowerCase().includes(String(typeName ?? '').toLowerCase().split('|')[0]),
+    );
+  }
   if (condition.startsWith('not:')) return !hostIsType(pokemon, condition.slice(4));
   switch (condition) {
     case 'hostBasic':
@@ -1464,7 +1451,14 @@ export function failedSpecialEnergyRestriction(energy, host, zoneArray = [], { a
   for (const step of parsed?.steps || []) {
     if (step.type === 'attachRestriction') {
       if (step.kind === 'basicEnergyBearer') {
-        if (atAttach && !hostHasAnyBasicEnergy(zoneArray, host)) return { kind: step.kind, discardIfNot: false };
+        if (atAttach && !(zoneArray || []).some(
+          (c) =>
+            c &&
+            c.type === 'Energy' &&
+            c.attachedTo != null &&
+            c.attachedTo === host.instanceId &&
+            !isSpecialEnergyCard(c)
+        )) return { kind: step.kind, discardIfNot: false };
         continue;
       }
       const check = RESTRICTION_HOSTS[step.kind];
@@ -1482,17 +1476,6 @@ export function failedSpecialEnergyRestriction(energy, host, zoneArray = [], { a
   return null;
 }
 
-function hostHasAnyBasicEnergy(zoneArray, host) {
-  return (zoneArray || []).some(
-    (c) =>
-      c &&
-      c.type === 'Energy' &&
-      c.attachedTo != null &&
-      c.attachedTo === host.instanceId &&
-      !isSpecialEnergyCard(c)
-  );
-}
-
 /** True when this Energy discards itself at the end of its owner's turn (Ignition, Boost). */
 export function discardsAtEndOfTurn(energy) {
   return !!parseSpecialEnergyEffects(energy)?.steps.some((s) => s.type === 'discardAtEndOfTurn');
@@ -1501,14 +1484,6 @@ export function discardsAtEndOfTurn(energy) {
 // Pool tokens use the cost-symbol spelling (TCGdex writes {D} costs "Darkness").
 const POOL_TYPE = { Dark: 'Darkness' };
 const poolType = (type) => POOL_TYPE[type] ?? type;
-
-const isSpPokemon = (pokemon) =>
-  (pokemon?.subtypes || []).some((s) => /^sp$/i.test(String(s))) ||
-  /\s(?:G|GL|FB|C|E4|4)$/.test(String(pokemon?.name ?? ''));
-
-const isLvXPokemon = (pokemon) =>
-  /lv\.?\s*x$/i.test(String(pokemon?.name ?? '')) ||
-  (pokemon?.subtypes || []).some((s) => /lv\.?\s*x/i.test(String(s)));
 
 const isUltraBeast = isUltraBeastCard;
 
@@ -1597,7 +1572,8 @@ function provisionConditionMet(condition, { host = null, attached = [], self = n
     case 'delta':
       return conditionMet('delta', host, []);
     case 'hostSP':
-      return isSpPokemon(host);
+      return (host?.subtypes || []).some((s) => /^sp$/i.test(String(s))) ||
+      /\s(?:G|GL|FB|C|E4|4)$/.test(String(host?.name ?? ''));
     case 'ultraBeast':
       return isUltraBeast(host);
     case 'teamMagma':
@@ -1619,7 +1595,8 @@ function provisionConditionMet(condition, { host = null, attached = [], self = n
     case 'trailingPrizesNotGxEx':
       return trailing && !isGxCard(host) && !isExCard(host);
     case 'trailingPrizesNotLvX':
-      return trailing && !isLvXPokemon(host);
+      return trailing && !(/lv\.?\s*x$/i.test(String(host?.name ?? '')) ||
+      (host?.subtypes || []).some((s) => /lv\.?\s*x/i.test(String(s))));
     case 'trailingPrizesEvolutionNoRuleBox':
       return trailing && stageKey(host) !== 'basic' && !isRuleBoxPokemon(host);
     default:

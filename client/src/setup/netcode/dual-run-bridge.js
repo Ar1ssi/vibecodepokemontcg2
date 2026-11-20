@@ -13,14 +13,6 @@ const SPECIAL_CONDITIONS = [
   'Poisoned',
 ];
 
-// True under `node --test` and any bundler/dev-server that sets NODE_ENV; false when
-// `process` doesn't exist at all (a real browser bundle with no env shim), which is an
-// acceptable degrade-to-logging default since there's no other dev/prod signal in client/src.
-const isDevLikeEnvironment = () =>
-  typeof process !== 'undefined' &&
-  !!process.env &&
-  process.env.NODE_ENV !== 'production';
-
 // Server-issued { syncInstance -> instanceId } lookups, one per seat (see design 002 §3.1 /
 // decision D10). The server is the sole minter of instanceId; the client's syncInstance
 // numbering is a purely local, per-player sequence that does not match it. Every outgoing
@@ -883,7 +875,12 @@ function translateAction(action, parameters) {
       // no disposition classification at all. This must never silently no-op.
       if (!entry) {
         const message = `translateActionToCmd: unknown action "${action}" has no DISPOSITION_TABLE entry`;
-        if (isDevLikeEnvironment()) {
+        // True under `node --test` and any bundler/dev-server that sets NODE_ENV; false when
+        // `process` doesn't exist at all (a real browser bundle with no env shim), which is an
+        // acceptable degrade-to-logging default since there's no other dev/prod signal in client/src.
+        if (typeof process !== 'undefined' &&
+        !!process.env &&
+        process.env.NODE_ENV !== 'production') {
           throw new Error(message);
         }
         console.error(message);

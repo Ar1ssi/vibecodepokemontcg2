@@ -298,30 +298,27 @@ function applyEndOfTurnToolHeals(draft, { endingPlayerId, events }) {
 function discardEndOfTurnTools(draft, { endingPlayerId, events }) {
   if (!draft.players?.[endingPlayerId]) return;
   for (const player of Object.values(draft.players)) {
-    discardSideEndOfTurnTools(player, { ownTurn: player.playerId === endingPlayerId, events });
-  }
-}
-
-function discardSideEndOfTurnTools(player, { ownTurn, events }) {
-  for (const zoneId of ['active', 'bench']) {
-    const zone = player.zones?.[zoneId] || [];
-    for (const card of [...zone]) {
-      if (!card.attachedTo) continue;
-      const expires = ownTurn
-        ? card.discardAtEndOfTurn || toolDiscardsAtEndOfTurn(card)
-        : toolDiscardsAtEndOfOpponentTurn(card);
-      if (!expires) continue;
-      zone.splice(zone.indexOf(card), 1);
-      card.attachedTo = null;
-      delete card.discardAtEndOfTurn;
-      const to = discardCardToPlayerZone(player, card);
-      events.push({
-        type: 'cardMoved',
-        instanceId: card.instanceId,
-        from: zoneId,
-        to,
-        playerId: player.playerId,
-      });
+    const ownTurn = player.playerId === endingPlayerId;
+    for (const zoneId of ['active', 'bench']) {
+      const zone = player.zones?.[zoneId] || [];
+      for (const card of [...zone]) {
+        if (!card.attachedTo) continue;
+        const expires = ownTurn
+          ? card.discardAtEndOfTurn || toolDiscardsAtEndOfTurn(card)
+          : toolDiscardsAtEndOfOpponentTurn(card);
+        if (!expires) continue;
+        zone.splice(zone.indexOf(card), 1);
+        card.attachedTo = null;
+        delete card.discardAtEndOfTurn;
+        const to = discardCardToPlayerZone(player, card);
+        events.push({
+          type: 'cardMoved',
+          instanceId: card.instanceId,
+          from: zoneId,
+          to,
+          playerId: player.playerId,
+        });
+      }
     }
   }
 }
@@ -759,21 +756,6 @@ function applyOpponentTurnStartBarriers(draft, { rng, events, ctx, endingPlayerI
 }
 
 /**
- * Tickling Machine gym1-119: "At the end of your opponent's next turn, your opponent puts those
- * cards back into his or her hand." The set-aside hand lives off the zones (trainer-steps
- * opponentHandSetAside) and comes back when the turn it names ends.
- */
-function returnSetAsideHands(draft, { endingTurn, events }) {
-  for (const player of Object.values(draft.players || {})) {
-    const setAside = player?.setAsideHand;
-    if (!setAside || (setAside.returnTurn || 0) > endingTurn) continue;
-    player.zones.hand.push(...(setAside.cards || []));
-    delete player.setAsideHand;
-    events.push({ type: 'setAsideHandReturned', playerId: player.playerId, count: (setAside.cards || []).length });
-  }
-}
-
-/**
  * Landorus Abundance: a holder on the side that is not starting its turn may draw at the start of
  * that turn. The engine takes the optional draw whenever the deck has a card (no prompt exists for
  * it), and never draws from an empty deck.
@@ -803,7 +785,17 @@ function applyOpponentTurnStartDraws(draft, { nextPlayerId, events }) {
 export function advanceTurn(draft, { nextPlayerId, events }) {
   delete draft.attackDiscardedForDamage;
   delete draft.attackAttachedForDamage;
-  returnSetAsideHands(draft, { endingTurn: draft.turn.number || 1, events });
+  // Tickling Machine gym1-119: "At the end of your opponent's next turn, your opponent puts those
+  // cards back into his or her hand." The set-aside hand lives off the zones (trainer-steps
+  // opponentHandSetAside) and comes back when the turn it names ends.
+  const endingTurn = draft.turn.number || 1;
+  for (const player of Object.values(draft.players || {})) {
+    const setAside = player?.setAsideHand;
+    if (!setAside || (setAside.returnTurn || 0) > endingTurn) continue;
+    player.zones.hand.push(...(setAside.cards || []));
+    delete player.setAsideHand;
+    events.push({ type: 'setAsideHandReturned', playerId: player.playerId, count: (setAside.cards || []).length });
+  }
   // The flags object is replaced wholesale below; a Checkup Knockout may have just
   // entitled the incoming player, and that entitlement must survive the reset so the
   // prize choice raised at the end of the command can be settled.

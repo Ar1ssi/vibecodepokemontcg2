@@ -12,7 +12,6 @@ const ACTIVE_CLASS = 'board3d-active';
 const MIRROR_SETTLE_MS = 400;
 // Reasons the player is told about; 'no-host' is a page bug and only reaches the console.
 const ANNOUNCED_REASONS = new Set(['legacy-netcode', 'no-webgl2', 'context-lost-twice', 'load-failed']);
-const unavailableNotice = (reason) => `3D board unavailable: ${reason}; this browser needs WebGL2`;
 
 const defaultDeps = {
   importThree: () => import('three'),
@@ -148,7 +147,7 @@ const report = (deps, reason) => {
   console.error(`board3d: unavailable (${reason})`);
   if (!ANNOUNCED_REASONS.has(reason)) return;
   try {
-    Promise.resolve(deps.chat(unavailableNotice(reason))).catch((error) =>
+    Promise.resolve(deps.chat(`3D board unavailable: ${reason}; this browser needs WebGL2`)).catch((error) =>
       console.warn('board3d: chat line failed', error)
     );
   } catch (error) {
@@ -159,18 +158,6 @@ const report = (deps, reason) => {
 const fail = (deps, reason) => {
   report(deps, reason);
   return { active: false, reason };
-};
-
-const viewportOf = (host, win) => ({
-  w: host.clientWidth || win?.innerWidth || 0,
-  h: host.clientHeight || win?.innerHeight || 0,
-});
-
-/** Swaps in a fresh canvas: a lost WebGL context stays bound to its canvas. */
-const freshCanvas = (host, old) => {
-  const canvas = old.cloneNode(false);
-  host.replaceChild(canvas, old);
-  return canvas;
 };
 
 /**
@@ -321,7 +308,10 @@ export async function initializeBoard3d({
 
   const relayout = () => {
     if (!session) return;
-    const viewport = viewportOf(host, win);
+    const viewport = {
+      w: host.clientWidth || win?.innerWidth || 0,
+      h: host.clientHeight || win?.innerHeight || 0,
+    };
     if (!(viewport.w > 0 && viewport.h > 0)) return;
     const half = halfFromViewport(viewport, boardWidthFrac(doc.body?.classList));
     const spec = session.mat;
@@ -351,7 +341,10 @@ export async function initializeBoard3d({
       }
       current.model = session.scene.inspect?.().model ?? current.model;
       teardownGraphics();
-      const canvas = freshCanvas(host, session.canvas);
+      // Swaps in a fresh canvas: a lost WebGL context stays bound to its canvas.
+      const old = session.canvas;
+      const canvas = old.cloneNode(false);
+      host.replaceChild(canvas, old);
       if (!buildGraphics(canvas)) {
         disposeBoard3d();
         report(deps, 'no-webgl2');

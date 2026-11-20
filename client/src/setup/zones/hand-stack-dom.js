@@ -67,62 +67,6 @@ function getCardName(img, card) {
 }
 
 /**
- * Collects all card root DOM nodes (bare <img> or .mat-holo wrapper) from #hand,
- * unwrapping cards from any existing .hand-card-stack containers.
- *
- * @param {HTMLElement} handElement
- * @returns {Array<{ rootNode: HTMLElement, img: HTMLImageElement, card: object|null, name: string, isHidden: boolean, src: string }>}
- */
-function collectHandCardDescriptors(handElement) {
-  const descriptors = [];
-  const children = Array.from(handElement.children);
-
-  for (const child of children) {
-    if (child.classList.contains('hand-card-stack')) {
-      // Collect cards nested inside an existing stack
-      const stackCards = Array.from(child.children).filter(
-        (el) => !el.classList.contains('hand-card-stack__badge')
-      );
-      for (const cardNode of stackCards) {
-        const img =
-          cardNode.tagName === 'IMG' ? cardNode : cardNode.querySelector('img');
-        if (!img) continue;
-        const card = img.card || null;
-        const hidden = isImageHidden(img, card);
-        const name = hidden ? '' : getCardName(img, card);
-        descriptors.push({
-          rootNode: cardNode,
-          img,
-          card,
-          name,
-          isHidden: hidden,
-          src: img.currentSrc || img.src || '',
-        });
-      }
-    } else if (
-      child.classList.contains('mat-holo') ||
-      child.tagName === 'IMG'
-    ) {
-      const img = child.tagName === 'IMG' ? child : child.querySelector('img');
-      if (!img) continue;
-      const card = img.card || null;
-      const hidden = isImageHidden(img, card);
-      const name = hidden ? '' : getCardName(img, card);
-      descriptors.push({
-        rootNode: child,
-        img,
-        card,
-        name,
-        isHidden: hidden,
-        src: img.currentSrc || img.src || '',
-      });
-    }
-  }
-
-  return descriptors;
-}
-
-/**
  * Clears stacking inline styles from a card root node.
  *
  * @param {HTMLElement} node
@@ -190,7 +134,52 @@ export function reconcileHandStacks(user = 'self', options = {}) {
 
   isReconciling = true;
   try {
-    const descriptors = collectHandCardDescriptors(handElement);
+    // Collects all card root DOM nodes (bare <img> or .mat-holo wrapper) from #hand,
+    // unwrapping cards from any existing .hand-card-stack containers.
+    const descriptors = [];
+    const children = Array.from(handElement.children);
+
+    for (const child of children) {
+      if (child.classList.contains('hand-card-stack')) {
+        // Collect cards nested inside an existing stack
+        const stackCards = Array.from(child.children).filter(
+          (el) => !el.classList.contains('hand-card-stack__badge')
+        );
+        for (const cardNode of stackCards) {
+          const img =
+            cardNode.tagName === 'IMG' ? cardNode : cardNode.querySelector('img');
+          if (!img) continue;
+          const card = img.card || null;
+          const hidden = isImageHidden(img, card);
+          const name = hidden ? '' : getCardName(img, card);
+          descriptors.push({
+            rootNode: cardNode,
+            img,
+            card,
+            name,
+            isHidden: hidden,
+            src: img.currentSrc || img.src || '',
+          });
+        }
+      } else if (
+        child.classList.contains('mat-holo') ||
+        child.tagName === 'IMG'
+      ) {
+        const img = child.tagName === 'IMG' ? child : child.querySelector('img');
+        if (!img) continue;
+        const card = img.card || null;
+        const hidden = isImageHidden(img, card);
+        const name = hidden ? '' : getCardName(img, card);
+        descriptors.push({
+          rootNode: child,
+          img,
+          card,
+          name,
+          isHidden: hidden,
+          src: img.currentSrc || img.src || '',
+        });
+      }
+    }
     if (descriptors.length === 0) {
       // Clean up any stray stack elements
       const existingStacks = handElement.querySelectorAll('.hand-card-stack');

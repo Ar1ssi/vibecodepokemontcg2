@@ -9,8 +9,6 @@ const HOVER_SPREAD = 0.25;
 const positive = (value, fallback) =>
   Number.isFinite(value) && value > 0 ? value : fallback;
 
-const toRad = (deg) => (deg * Math.PI) / 180;
-const toDeg = (rad) => (rad * 180) / Math.PI;
 // -0 would make mirrored poses compare unequal.
 const clean = (value) => (Object.is(value, -0) ? 0 : value);
 
@@ -23,7 +21,7 @@ function fanPitch(count, { width, radius, maxSpreadDeg, cardW, overlapMin }) {
   if (count < 2) return 0;
   const gaps = count - 1;
   const natural = cardW / radius;
-  const spreadCap = toRad(Math.max(0, maxSpreadDeg)) / gaps;
+  const spreadCap = (Math.max(0, maxSpreadDeg) * Math.PI) / 180 / gaps;
   const halfFit = Math.asin(Math.min(1, Math.max(0, (width - cardW) / (2 * radius))));
   const fit = (2 * halfFit) / gaps;
   const floor = (Math.max(0, overlapMin) * cardW) / radius;
@@ -84,7 +82,7 @@ export function handFanPoses(
       x: clean(x),
       y: clean(y),
       z: i === hovered ? total : i,
-      yawDeg: clean(-toDeg(angle)),
+      yawDeg: clean(-((angle * 180) / Math.PI)),
       lift: cardLift,
     };
   });

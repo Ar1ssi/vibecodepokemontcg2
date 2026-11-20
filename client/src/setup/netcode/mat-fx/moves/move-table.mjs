@@ -151,18 +151,17 @@ const slug = (name) => name.trim().replace(/\s+/g, '-');
 const parseCell = (text) =>
   text === 'N/A' ? null : text.split(/\s*[,/]\s*/).map(slug);
 
-const buildTable = (rows) =>
+export const MOVE_TABLE = Object.freeze(
   Object.fromEntries(
-    Object.entries(rows).map(([vgType, cells]) => [
+    Object.entries(SPEC_ROWS).map(([vgType, cells]) => [
       vgType,
       {
         physical: cells.slice(0, 3).map(parseCell),
         special: cells.slice(3, 6).map(parseCell),
       },
     ])
-  );
-
-export const MOVE_TABLE = Object.freeze(buildTable(SPEC_ROWS));
+  )
+);
 
 export const VG_TYPES = Object.freeze(Object.keys(MOVE_TABLE));
 
@@ -177,18 +176,6 @@ export const ALL_MOVES = Object.freeze([
   ),
 ]);
 
-const otherClass = (statClass) =>
-  statClass === 'physical' ? 'special' : 'physical';
-
-// Tier visiting order for an N/A cell: its own tier, then lower tiers down to 1, then higher ones.
-const tierOrder = (tier) => {
-  const lower = [];
-  for (let t = tier - 1; t >= 1; t -= 1) lower.push(t);
-  const higher = [];
-  for (let t = tier + 1; t <= TIERS.length; t += 1) higher.push(t);
-  return [tier, ...lower, ...higher];
-};
-
 /**
  * Candidate moves for a cell, walking the design's N/A order: same tier other class, then each
  * lower tier (same class, other class), then each higher tier. Null for an unknown type.
@@ -198,8 +185,16 @@ export function cellLookup(vgType, statClass, tier) {
   const rows = MOVE_TABLE[vgType];
   if (!rows || !STAT_CLASSES.includes(statClass)) return null;
   const clamped = Math.min(Math.max(Math.trunc(tier) || 1, 1), TIERS.length);
-  for (const t of tierOrder(clamped)) {
-    for (const cls of [statClass, otherClass(statClass)]) {
+  // Tier visiting order for an N/A cell: its own tier, then lower tiers down to 1, then higher ones.
+  const lower = [];
+  for (let t = clamped - 1; t >= 1; t -= 1) lower.push(t);
+  const higher = [];
+  for (let t = clamped + 1; t <= TIERS.length; t += 1) higher.push(t);
+  for (const t of [clamped, ...lower, ...higher]) {
+    for (const cls of [
+      statClass,
+      statClass === 'physical' ? 'special' : 'physical',
+    ]) {
       const cell = rows[cls][t - 1];
       if (cell?.length) return cell;
     }

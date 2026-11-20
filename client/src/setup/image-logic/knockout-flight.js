@@ -57,12 +57,6 @@ export const captureKnockoutGhost = (user, cardImageEl) => {
   return { rect, src: flightSrcOf(cardImageEl), user, turn: frameTurnOf(cardImageEl) };
 };
 
-const applyPose = (host, img, pose, turn) => {
-  host.style.transform = `translate3d(${pose.x}px, ${pose.y}px, 0) rotate(${turn + pose.rotate}deg) scale(${pose.scale})`;
-  host.style.opacity = String(pose.opacity);
-  img.style.filter = `brightness(${pose.brightness}) saturate(${pose.saturate})`;
-};
-
 export const KO_START_BACKSTOP_MS = 1500;
 
 /**
@@ -115,7 +109,12 @@ export const playKnockoutGhost = (ghost, { deferStart } = {}) => {
     standIn ??= buildStandIn();
     const { host, img } = standIn;
     runPose(host, KNOCKOUT_DURATION_MS, (t) =>
-      applyPose(host, img, knockoutPose(t, { fromRect: ghost.rect, toRect }), turn)
+      {
+        const pose = knockoutPose(t, { fromRect: ghost.rect, toRect });
+        host.style.transform = `translate3d(${pose.x}px, ${pose.y}px, 0) rotate(${turn + pose.rotate}deg) scale(${pose.scale})`;
+        host.style.opacity = String(pose.opacity);
+        img.style.filter = `brightness(${pose.brightness}) saturate(${pose.saturate})`;
+      }
     );
   };
   if (typeof deferStart !== 'function') {

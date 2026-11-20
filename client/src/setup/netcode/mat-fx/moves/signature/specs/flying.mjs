@@ -2,22 +2,7 @@
 // board mapping (`.agent/designs/065-signature-move-animations.md` § Appendix S › Flying);
 // departures from an entry are listed under the design's Deviations (slice 12).
 
-const motes = (at, count, over = {}) =>
-  Object.freeze({
-    at,
-    anchor: 'defender',
-    count,
-    distance: 1.1,
-    direction: -90,
-    spread: 360,
-    size: [0.03, 0.07],
-    aspect: 1,
-    gravity: 0,
-    maxDelay: 0.2,
-    durationMs: 800,
-    kind: 'mote',
-    ...over,
-  });
+import { motes } from '../../move-spec.mjs';
 
 const CYAN = Object.freeze({ deep: '#1E63E0', body: '#26E0FF', hot: '#A8F3FF', core: '#FFFFFF' });
 const VORTEX = Object.freeze({ deep: '#0E1F5C', body: '#1E63E0', hot: '#26E0FF', core: '#A8F3FF' });
@@ -82,7 +67,6 @@ export const bleakwindStorm = Object.freeze({
   grain: 0.15,
 });
 
-const GOLD = Object.freeze({ deep: '#B89A1E', body: '#F4E84A', hot: '#FFF9C0', core: '#FFFFFF' });
 const LIME = Object.freeze({ deep: '#5E8A1E', body: '#B8F04A', hot: '#E8FFB0', core: '#FFFFFF' });
 const SPHERE = Object.freeze({ deep: '#1E7A3C', body: '#3CC86A', hot: '#B8F04A', core: '#FFFFFF' });
 const BURST = Object.freeze({ deep: '#2AA6A6', body: '#5FF0F0', hot: '#E0FFFF', core: '#FFFFFF' });

@@ -16,16 +16,6 @@ function sanitizeList(items, state, depth) {
   return out;
 }
 
-function sanitizeError(err, state, depth) {
-  const out = {
-    name: sanitize(err.name, state, depth + 1),
-    message: sanitize(err.message, state, depth + 1),
-    stack: typeof err.stack === 'string' ? err.stack.slice(0, STACK_CHARS) : undefined,
-  };
-  if (err.cause !== undefined) out.cause = sanitize(err.cause, state, depth + 1);
-  return out;
-}
-
 function sanitizeObject(obj, state, depth) {
   const out = {};
   for (const key of Object.keys(obj)) {
@@ -41,21 +31,6 @@ function sanitizeObject(obj, state, depth) {
     }
   }
   return out;
-}
-
-function sanitizeContainer(value, state, depth) {
-  if (value instanceof Date) {
-    return Number.isNaN(value.getTime()) ? '[Invalid Date]' : value.toISOString();
-  }
-  if (typeof value.nodeType === 'number') return describeElement(value);
-  if (value instanceof Error) return sanitizeError(value, state, depth);
-  if (value instanceof Map) return sanitizeList(Array.from(value.entries()), state, depth);
-  if (value instanceof Set) return sanitizeList(Array.from(value), state, depth);
-  if (Array.isArray(value)) return sanitizeList(value, state, depth);
-  if (ArrayBuffer.isView(value) && !(value instanceof DataView)) {
-    return sanitizeList(Array.from(value), state, depth);
-  }
-  return sanitizeObject(value, state, depth);
 }
 
 function sanitize(value, state, depth) {
@@ -80,7 +55,26 @@ function sanitize(value, state, depth) {
   if (depth > state.maxDepth) return '[Depth]';
   state.path.add(value);
   try {
-    return sanitizeContainer(value, state, depth);
+    if (value instanceof Date) {
+      return Number.isNaN(value.getTime()) ? '[Invalid Date]' : value.toISOString();
+    }
+    if (typeof value.nodeType === 'number') return describeElement(value);
+    if (value instanceof Error) {
+      const out = {
+        name: sanitize(value.name, state, depth + 1),
+        message: sanitize(value.message, state, depth + 1),
+        stack: typeof value.stack === 'string' ? value.stack.slice(0, STACK_CHARS) : undefined,
+      };
+      if (value.cause !== undefined) out.cause = sanitize(value.cause, state, depth + 1);
+      return out;
+    }
+    if (value instanceof Map) return sanitizeList(Array.from(value.entries()), state, depth);
+    if (value instanceof Set) return sanitizeList(Array.from(value), state, depth);
+    if (Array.isArray(value)) return sanitizeList(value, state, depth);
+    if (ArrayBuffer.isView(value) && !(value instanceof DataView)) {
+      return sanitizeList(Array.from(value), state, depth);
+    }
+    return sanitizeObject(value, state, depth);
   } finally {
     state.path.delete(value);
   }

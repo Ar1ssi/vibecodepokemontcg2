@@ -39,12 +39,6 @@ const rotateVector = (q, v) => {
 
 const finite = (value, fallback = 0) => (Number.isFinite(value) ? value : fallback);
 
-const usableRect = (rect) =>
-  Boolean(rect) &&
-  [rect.left, rect.top, rect.width, rect.height].every(Number.isFinite) &&
-  rect.width > 0 &&
-  rect.height > 0;
-
 /**
  * @param {ReturnType<typeof import('./board-camera.mjs').cameraFromCssTilt>} camera
  * @param {{ rect: { left: number, top: number, width: number, height: number },
@@ -63,7 +57,10 @@ const usableRect = (rect) =>
  */
 export function flightPlacement(camera, pose, card, origin = { left: 0, top: 0 }) {
   const rect = pose?.rect;
-  if (!camera || !usableRect(rect) || !(card?.heightPx > 0)) return null;
+  if (!camera || !(Boolean(rect) &&
+  [rect.left, rect.top, rect.width, rect.height].every(Number.isFinite) &&
+  rect.width > 0 &&
+  rect.height > 0) || !(card?.heightPx > 0)) return null;
   const lift = finite(pose.lift);
   const centre = screenToPlane(
     camera,
@@ -141,8 +138,6 @@ export const FLIGHT_LIFT_FRAC = 0.3;
 /** Share of a track over which the flight rises off the cloth at its start and settles at its end. */
 const LIFT_RAMP = 0.15;
 
-const smoothstep = (x) => x * x * (3 - 2 * x);
-
 /**
  * A 2D mat-fx track sample as a mesh pose. `p` is what the `*-pose.mjs` modules return at progress
  * `u` (`x`/`y` px from the centre of `rect`, `scale` of it, `rotate`, `tiltX`, optional `flip`);
@@ -161,7 +156,7 @@ export function flightPoseFromTrack(rect, p, u, liftPx) {
     rect: { left: cx - width / 2, top: cy - height / 2, width, height },
     rotateZDeg: finite(p?.rotate),
     tiltXDeg: finite(p?.tiltX),
-    lift: finite(liftPx) * smoothstep(edge),
+    lift: finite(liftPx) * (edge * edge * (3 - 2 * edge)),
   };
   if (Number.isFinite(p?.flip)) pose.flipDeg = p.flip;
   return pose;

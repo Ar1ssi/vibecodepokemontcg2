@@ -112,25 +112,6 @@ const timeOk = (t) => (Number.isFinite(t) ? t : 0);
 const local = (t, beat) => ageOf(timeOk(t), beat.delay, beat.life);
 const scaleRgb = (rgb, tint) => rgb.map((c, i) => c * tint[i]);
 
-function backOps(scene, t) {
-  const ops = [];
-  const smoke = local(t, T.smokes);
-  if (smoke != null) {
-    for (const s of scene.smokes) {
-      const g = gradientAt(s.gradient, smoke);
-      const size = s.size * 2 * lerp(0.426, 0.639, smoke);
-      ops.push({ kind: 'dissolve', mask: 'cloudRound', noise: 'renderClouds', x: 0, y: 0, w: size, h: size, rot: s.rot, amount: lerp(-1, 0.622, smoke), soft: 0.2, detail: 0.4, rgb: g.rgb, alpha: 0.561 * 0.58 * g.a });
-    }
-  }
-  const core = local(t, T.glowCore);
-  if (core != null) {
-    const g = gradientAt(GRADIENTS.glowCore, core);
-    const size = 16 * 2 * lerp(0.462, 0.954, core);
-    ops.push({ kind: 'sprite', tex: 'gradRadial', x: 0, y: 0, w: size, h: size, rot: 0, rgb: g.rgb, alpha: 0.525 * g.a });
-  }
-  return ops;
-}
-
 function cardOps(t) {
   const ops = [];
   const intro = local(t, T.auraIntro);
@@ -244,5 +225,20 @@ function sparkOps(scene, t) {
 /** The frame at scene time `t` (s): back layers, the card cutout, then the front layers. */
 export function devolveOps(scene, t) {
   if (!scene) return [];
-  return [...backOps(scene, t), { kind: 'cutout' }, ...cardOps(t), ...ovalOps(scene, t), ...sparkOps(scene, t)];
+  const ops = [];
+  const smoke = local(t, T.smokes);
+  if (smoke != null) {
+    for (const s of scene.smokes) {
+      const g = gradientAt(s.gradient, smoke);
+      const size = s.size * 2 * lerp(0.426, 0.639, smoke);
+      ops.push({ kind: 'dissolve', mask: 'cloudRound', noise: 'renderClouds', x: 0, y: 0, w: size, h: size, rot: s.rot, amount: lerp(-1, 0.622, smoke), soft: 0.2, detail: 0.4, rgb: g.rgb, alpha: 0.561 * 0.58 * g.a });
+    }
+  }
+  const core = local(t, T.glowCore);
+  if (core != null) {
+    const g = gradientAt(GRADIENTS.glowCore, core);
+    const size = 16 * 2 * lerp(0.462, 0.954, core);
+    ops.push({ kind: 'sprite', tex: 'gradRadial', x: 0, y: 0, w: size, h: size, rot: 0, rgb: g.rgb, alpha: 0.525 * g.a });
+  }
+  return [...ops, { kind: 'cutout' }, ...cardOps(t), ...ovalOps(scene, t), ...sparkOps(scene, t)];
 }

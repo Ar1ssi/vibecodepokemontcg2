@@ -325,14 +325,6 @@ async function loadDetailedCard(summary) {
   }
 }
 
-function reportProgress(onProgress, progress) {
-  try {
-    onProgress(progress);
-  } catch {
-    // A throwing listener must not drop the card or fail the search.
-  }
-}
-
 /**
  * Searches TCGdex by card name, by filter params, or both (design 050).
  *
@@ -409,11 +401,16 @@ export async function queryCards({ term = '', params = {}, onProgress = null } =
       if (!card) return null;
       arrived[index] = card;
       if (typeof onProgress === 'function') {
-        reportProgress(onProgress, {
+        const progress = {
           results: arrived.filter(Boolean),
           totalSummaries: allSummaries.length,
           detailedCount: summariesToFetch.length,
-        });
+        };
+        try {
+          onProgress(progress);
+        } catch {
+          // A throwing listener must not drop the card or fail the search.
+        }
       }
       return card;
     })

@@ -13,22 +13,21 @@ export const BUILD_BATTLE_DECK_SIZE = 40;
 const SUPERTYPE_ORDER = ['Pokémon', 'Trainer', 'Energy'];
 const FILLER_POOLS = new Set([REVERSE_POOL, RARE_POOL]);
 
-// Weights are normalized by their total; a row with weight ≤ 0 is never picked.
-function pickWeighted(rows, rng) {
-  const live = rows.filter((row) => row.weight > 0);
-  const total = live.reduce((sum, row) => sum + row.weight, 0);
-  const roll = rng.next() * total;
-  let cumulative = 0;
-  for (const row of live) {
-    cumulative += row.weight;
-    if (roll < cumulative) return row;
-  }
-  return live.at(-1) || rows[0];
-}
-
 // A pools slot picks with `rng.int` (no roll for a single pool), a table slot always rolls.
 function pickRow(slot, rng) {
-  if (slot.kind === 'table') return pickWeighted(slot.rows, rng);
+  if (slot.kind === 'table') {
+    // Weights are normalized by their total; a row with weight ≤ 0 is never picked.
+    const rows = slot.rows;
+    const live = rows.filter((row) => row.weight > 0);
+    const total = live.reduce((sum, row) => sum + row.weight, 0);
+    const roll = rng.next() * total;
+    let cumulative = 0;
+    for (const row of live) {
+      cumulative += row.weight;
+      if (roll < cumulative) return row;
+    }
+    return live.at(-1) || rows[0];
+  }
   return slot.rows[rng.int(slot.rows.length)];
 }
 
@@ -105,22 +104,6 @@ function trainerTarget(pools, fill) {
   return Math.min(Math.max(fill, lo), hi);
 }
 
-// Splits `total` draws over the pools inside each pool's bounds, first pool first.
-function poolCounts(pools, total, rng) {
-  const bounds = pools.map(poolBounds);
-  let left = total;
-  return bounds.map(([lo, hi], index) => {
-    const rest = bounds.slice(index + 1);
-    const restLo = rest.reduce((sum, [low]) => sum + low, 0);
-    const restHi = rest.reduce((sum, [, high]) => sum + high, 0);
-    const low = Math.max(lo, left - restHi);
-    const high = Math.min(hi, left - restLo);
-    const count = low <= high ? between(low, high, rng) : Math.max(0, Math.min(hi, left));
-    left -= count;
-    return count;
-  });
-}
-
 // Each card's minimum first, then draws among the cards still under their maximum until the
 // pool's count is reached or no card can be drawn (design 054 row 3).
 function drawPool(pool, count, rng) {
@@ -156,7 +139,19 @@ export function drawEvolutionPack({ data, groupKeys, rng }) {
   const pools = data.trainers || [];
   if (pools.length) {
     const target = trainerTarget(pools, EVOLUTION_PACK_SIZE - ids.length);
-    poolCounts(pools, target, rng).forEach((count, index) => ids.push(...drawPool(pools[index], count, rng)));
+    // Splits `total` draws over the pools inside each pool's bounds, first pool first.
+    const bounds = pools.map(poolBounds);
+    let left = target;
+    bounds.map(([lo, hi], index) => {
+      const rest = bounds.slice(index + 1);
+      const restLo = rest.reduce((sum, [low]) => sum + low, 0);
+      const restHi = rest.reduce((sum, [, high]) => sum + high, 0);
+      const low = Math.max(lo, left - restHi);
+      const high = Math.min(hi, left - restLo);
+      const count = low <= high ? between(low, high, rng) : Math.max(0, Math.min(hi, left));
+      left -= count;
+      return count;
+    }).forEach((count, index) => ids.push(...drawPool(pools[index], count, rng)));
   }
   for (const swap of data.energySwaps || []) {
     if (!swap.when?.some((key) => groupKeys.includes(key))) continue;
@@ -300,15 +295,9 @@ export function openBox({ box, data, cards = [], setInfo = {}, rng }) {
 }
 
 // ── What the box holds ───────────────────────────────────────────────────────────────────────
-function withoutQty(card) {
+export function withoutQty(card) {
   const { qty: _qty, ...rest } = card;
   return rest;
-}
-
-/** A baked Basic Energy row (the SVE print, as 051's decks bake it). */
-export function basicEnergyRow(label, qty) {
-  const { qty: _qty, ...card } = buildModernBasicEnergy(label, qty);
-  return { ...card, rarity: null, category: 'Energy', stage: null, types: [], hp: null, qty };
 }
 
 // Card ids (one per copy) → rows with qty, first appearance first.
@@ -335,7 +324,11 @@ export function startingDeckRows({ box, data, opened }) {
   if (!isKnownDeck(box, opened?.deckKey)) return [];
   if (box.kind === 'fixed-decks') return (data?.decks?.[opened.deckKey] || []).map((row) => ({ ...row }));
   const rows = rowsFromIds(opened.evolutionPack, data?.cardsById);
-  for (const [label, qty] of opened.energy || []) rows.push(basicEnergyRow(label, qty));
+  for (const [label, qty] of opened.energy || []) {
+    // A baked Basic Energy row (the SVE print, as 051's decks bake it).
+    const { qty: _qty, ...card } = buildModernBasicEnergy(label, qty);
+    rows.push({ ...card, rarity: null, category: 'Energy', stage: null, types: [], hp: null, qty });
+  }
   return rows;
 }
 

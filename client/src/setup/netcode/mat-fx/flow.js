@@ -1,8 +1,8 @@
 // Design 022 slice 6 / design 026: flow effects — turn banner (+ screen-edge
 // glow), the ability tag over the Pokémon that used it, and the game-over
 // celebration (confetti cannons on a win, dim on a loss). Design 024: the
-// banner/edge-glow overlays live in banner.js, shared with the attack-name
-// banner. The game-over modal itself is apply-view's `reconcileGameEnded`;
+// banner overlay lives in banner.js, shared with the attack-name banner; the
+// edge glow is drawn here. The game-over modal itself is apply-view's `reconcileGameEnded`;
 // these play on top of it and never take pointer events.
 import { getCardRegistry } from '../apply-view.js';
 import { spectatorSeatName } from '../../spectator/spectator-session.js';
@@ -13,11 +13,12 @@ import {
   sampleKeyframes,
   spawnOverlay,
 } from '../../image-logic/mat-fx.mjs';
-import { playBanner, playEdgeGlow, viewportRect } from './banner.js';
+import { playBanner, textNode, viewportRect } from './banner.js';
 import {
   ABILITY_TAG_MS,
   CONFETTI_MS,
   DIM_MS,
+  EDGE_GLOW_MS,
   abilityBannerText,
   abilityTagPose,
   abilityTagRect,
@@ -25,27 +26,40 @@ import {
   confettiPiecePose,
   confettiPieces,
   dimPose,
+  edgeGlowPose,
   sweepPose,
   turnBannerText,
 } from './flow-pose.mjs';
 
 const BACKSTOP_PAD_MS = 400;
 
-const textNode = (className, text) => {
-  const el = document.createElement('div');
-  el.className = className;
-  el.textContent = text;
-  return el;
-};
-
 export const turnBanner = (plan) => {
   const text = turnBannerText(plan.user, plan.number, spectatorSeatName(plan.user));
   if (!text) return 0;
   playBanner(text, plan.user);
-  playEdgeGlow(plan.user);
+  // Brief glow around the screen edge, tinted by side.
+  const host = spawnOverlay({
+    rect: viewportRect(),
+    className: `fx-overlay fx-edge-glow fx-edge-glow--${plan.user}`,
+  });
+  const frames = sampleKeyframes(edgeGlowPose, (p) => ({ opacity: p.opacity }), 16);
+  removeWhen(host, [animateFrames(host, frames, { duration: EDGE_GLOW_MS })], EDGE_GLOW_MS + BACKSTOP_PAD_MS);
 };
 
-const playAbilityTag = (text, cardRect, side) => {
+// Anchored over the Pokémon when it is on the board; the full-width banner is
+// the fallback when its card cannot be found.
+export const abilityBanner = (plan) => {
+  const registry = getCardRegistry();
+  const cardRect = rectForInstance(plan.instanceId, registry);
+  if (!cardRect) {
+    const text = abilityBannerText(plan.name);
+    if (!text) return 0;
+    playBanner(text, plan.user);
+    return;
+  }
+  const text = abilityTagText(registry.get(plan.instanceId)?.card, plan.name);
+  if (!text) return 0;
+  const side = plan.user;
   const rect = abilityTagRect(cardRect, viewportRect());
   const host = spawnOverlay({
     rect,
@@ -78,22 +92,6 @@ const playAbilityTag = (text, cardRect, side) => {
   );
 };
 
-// Anchored over the Pokémon when it is on the board; the full-width banner is
-// the fallback when its card cannot be found.
-export const abilityBanner = (plan) => {
-  const registry = getCardRegistry();
-  const cardRect = rectForInstance(plan.instanceId, registry);
-  if (!cardRect) {
-    const text = abilityBannerText(plan.name);
-    if (!text) return 0;
-    playBanner(text, plan.user);
-    return;
-  }
-  const text = abilityTagText(registry.get(plan.instanceId)?.card, plan.name);
-  if (!text) return 0;
-  playAbilityTag(text, cardRect, plan.user);
-};
-
 const playConfetti = () => {
   const rect = viewportRect();
   if (rect.width < 2) return 0;
@@ -118,14 +116,12 @@ const playConfetti = () => {
   removeWhen(host, done, CONFETTI_MS + BACKSTOP_PAD_MS);
 };
 
-const playDim = () => {
-  const host = spawnOverlay({ rect: viewportRect(), className: 'fx-overlay fx-dim' });
-  const frames = sampleKeyframes(dimPose, (p) => ({ opacity: p.opacity }), 16);
-  removeWhen(host, [animateFrames(host, frames, { duration: DIM_MS })], DIM_MS + BACKSTOP_PAD_MS);
-};
-
 // user is the winner's side: self = you won, opp = you lost, null = no winner.
 export const gameOver = (plan) => {
   if (plan.user === 'self') playConfetti();
-  else if (plan.user === 'opp') playDim();
+  else if (plan.user === 'opp') {
+    const host = spawnOverlay({ rect: viewportRect(), className: 'fx-overlay fx-dim' });
+    const frames = sampleKeyframes(dimPose, (p) => ({ opacity: p.opacity }), 16);
+    removeWhen(host, [animateFrames(host, frames, { duration: DIM_MS })], DIM_MS + BACKSTOP_PAD_MS);
+  }
 };

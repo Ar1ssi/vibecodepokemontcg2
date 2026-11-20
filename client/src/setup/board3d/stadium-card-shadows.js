@@ -70,28 +70,6 @@ void main() {
 }
 `;
 
-/** The contact shadow: dark at the card's edge, fading out over its margin; only where the Stadium shows. */
-const contactFragment = (cutoutGlsl) => /* glsl */ `
-${cutoutGlsl}
-uniform vec3 uShadowTint;
-uniform float uShadowStrength;
-varying vec2 vLocal;
-varying vec2 vCard;
-varying vec2 vTablePos;
-void main() {
-  if (environmentShown(vTablePos) < 0.5) discard;
-  vec2 halfSize = vCard * 0.5;
-  float corner = 0.06 * vCard.x;
-  vec2 q = abs(vLocal) - (halfSize - corner);
-  float outside = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - corner;
-  float reach = ${CONTACT_MARGIN.toFixed(3)} * vCard.x;
-  float a = (1.0 - smoothstep(-0.15 * reach, reach, outside)) * uShadowStrength;
-  a *= a > 0.004 ? 1.0 : 0.0;
-  // Premultiplied for MultiplyBlending: the ground ends up times mix(1, tint, a).
-  gl_FragColor = vec4(uShadowTint * a, a);
-}
-`;
-
 /**
  * @param {{ three: typeof import('three'), parent: import('three').Object3D,
  *   cutout: { glsl: string, uniforms: object } }} deps
@@ -134,9 +112,29 @@ export function createStadiumCardShadows({ three, parent, cutout }) {
   catcher.renderOrder = 1;
   group.add(catcher);
 
+  // The contact shadow: dark at the card's edge, fading out over its margin; only where the Stadium shows.
   const contactMaterial = new three.ShaderMaterial({
     vertexShader: CONTACT_VERTEX,
-    fragmentShader: contactFragment(cutout.glsl),
+    fragmentShader: `
+${cutout.glsl}
+uniform vec3 uShadowTint;
+uniform float uShadowStrength;
+varying vec2 vLocal;
+varying vec2 vCard;
+varying vec2 vTablePos;
+void main() {
+  if (environmentShown(vTablePos) < 0.5) discard;
+  vec2 halfSize = vCard * 0.5;
+  float corner = 0.06 * vCard.x;
+  vec2 q = abs(vLocal) - (halfSize - corner);
+  float outside = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - corner;
+  float reach = ${CONTACT_MARGIN.toFixed(3)} * vCard.x;
+  float a = (1.0 - smoothstep(-0.15 * reach, reach, outside)) * uShadowStrength;
+  a *= a > 0.004 ? 1.0 : 0.0;
+  // Premultiplied for MultiplyBlending: the ground ends up times mix(1, tint, a).
+  gl_FragColor = vec4(uShadowTint * a, a);
+}
+`,
     uniforms: {
       ...cutout.uniforms,
       uShadowTint: { value: new three.Vector3(1, 1, 1) },

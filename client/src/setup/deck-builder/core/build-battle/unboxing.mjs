@@ -50,7 +50,6 @@ export const TAP_SLOP_PX = 6;
 const clamp01 = (value) =>
   Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
 const lerp = (from, to, t) => from + (to - from) * t;
-const easeOutCubic = (t) => 1 - (1 - t) ** 3;
 // Symmetric, so a flip passes 90° exactly at the middle of its window: the card face is swapped
 // in at 50 % of CARD_FLIP_MS and is edge-on at that instant (design 052 row 14).
 const easeInOutSine = (t) => (1 - Math.cos(Math.PI * t)) / 2;
@@ -112,8 +111,6 @@ export function finishedUnboxing({ packCount = PACK_COUNT, cardsPerPack = CARDS_
   };
 }
 
-const sizesOf = (u) => ({ packCount: u.packsTorn.length, cardsPerPack: u.cardsPerPack });
-
 const isPackIndex = (u, index) =>
   Number.isInteger(index) && index >= 0 && index < u.packsTorn.length;
 
@@ -131,11 +128,6 @@ const hasPackMidReveal = (u) =>
 export function nextPackToTear(u) {
   if (!u || (u.stage !== 'deckShown' && u.stage !== 'packs') || hasPackMidReveal(u)) return -1;
   return u.packsTorn.indexOf(false);
-}
-
-function withReveal(u, packIndex, count) {
-  const revealed = u.revealed.map((value, index) => (index === packIndex ? count : value));
-  return { ...u, revealed, stage: allRevealed(u, revealed) ? 'done' : u.stage };
 }
 
 /**
@@ -171,10 +163,12 @@ export function advanceUnboxing(u, event) {
       if (u.stage !== 'packs' || !isPackIndex(u, packIndex)) return u;
       const count = u.revealed[packIndex];
       if (!u.packsTorn[packIndex] || count >= u.cardsPerPack) return u;
-      return withReveal(u, packIndex, type === 'revealAll' ? u.cardsPerPack : count + 1);
+      const shown = type === 'revealAll' ? u.cardsPerPack : count + 1;
+      const revealed = u.revealed.map((value, index) => (index === packIndex ? shown : value));
+      return { ...u, revealed, stage: allRevealed(u, revealed) ? 'done' : u.stage };
     }
     case 'finish':
-      return hasPackMidReveal(u) ? u : finishedUnboxing(sizesOf(u));
+      return hasPackMidReveal(u) ? u : finishedUnboxing({ packCount: u.packsTorn.length, cardsPerPack: u.cardsPerPack });
     default:
       return u;
   }
@@ -242,8 +236,17 @@ export function lidPose(t) {
   return { rotateXDeg: LID_OPEN_DEG * eased + 0, translateYPx: -LID_RAISE_PX * eased + 0 };
 }
 
-// Clips the unit square (percent units) to the half-plane `value(point) >= cut`.
-function clipSquare(value, cut) {
+const WRAP_POINTS = 5;
+const pct = (value) => `${Number(value.toFixed(2))}%`;
+
+/**
+ * The shrink-wrap still on the box: a diagonal wipe from the top-right corner. Always five
+ * points (the last repeated as needed) so neighbouring keyframes interpolate.
+ */
+export function wrapTearPose(t) {
+  const cut = 200 * (1 - (1 - clamp01(t)) ** 3);
+  const distanceFromTopRight = ([x, y]) => 100 - x + y;
+  // Clips the unit square (percent units) to the half-plane `value(point) >= cut`.
   const square = [
     [0, 0],
     [100, 0],
@@ -253,28 +256,15 @@ function clipSquare(value, cut) {
   const out = [];
   square.forEach((point, index) => {
     const next = square[(index + 1) % square.length];
-    const a = value(point) - cut;
-    const b = value(next) - cut;
+    const a = distanceFromTopRight(point) - cut;
+    const b = distanceFromTopRight(next) - cut;
     if (a >= 0) out.push(point);
     if (a >= 0 !== b >= 0) {
       const s = a / (a - b);
       out.push([lerp(point[0], next[0], s), lerp(point[1], next[1], s)]);
     }
   });
-  return out;
-}
-
-const WRAP_POINTS = 5;
-const pct = (value) => `${Number(value.toFixed(2))}%`;
-
-/**
- * The shrink-wrap still on the box: a diagonal wipe from the top-right corner. Always five
- * points (the last repeated as needed) so neighbouring keyframes interpolate.
- */
-export function wrapTearPose(t) {
-  const cut = 200 * easeOutCubic(clamp01(t));
-  const distanceFromTopRight = ([x, y]) => 100 - x + y;
-  let points = clipSquare(distanceFromTopRight, cut);
+  let points = out;
   if (!points.length) points = [[0, 100]];
   while (points.length < WRAP_POINTS) points.push(points.at(-1));
   const list = points.map(([x, y]) => `${pct(x)} ${pct(y)}`).join(', ');
@@ -317,17 +307,6 @@ const DIE_FACE_ROTATIONS = [
   [0, 270],
 ];
 
-// Die `index`'s landing: its face, direction out of the pouch and resting spin. A stream of its
-// own (`seed ^ 0x5bd1e995`), so the props never shift a pool draw.
-function dieLanding(index, seed) {
-  const rng = createRng(seed ^ 0x5bd1e995);
-  let landing = null;
-  for (let die = 0; die <= index; die += 1) {
-    landing = { face: rng.int(DIE_FACE_ROTATIONS.length), angle: rng.next(), spin: rng.next() };
-  }
-  return landing;
-}
-
 /**
  * Die `index` (six damage-counter dice, then the flip die at 6) tumbling 18 px out of the pouch
  * and landing on a seeded face.
@@ -335,7 +314,14 @@ function dieLanding(index, seed) {
 export function dicePose(t, index, seed) {
   const x = easeLift(clamp01(t));
   const die = Math.max(0, index | 0);
-  const { face, angle, spin } = dieLanding(die, seed);
+  // Die `index`'s landing: its face, direction out of the pouch and resting spin. A stream of its
+  // own (`seed ^ 0x5bd1e995`), so the props never shift a pool draw.
+  const rng = createRng(seed ^ 0x5bd1e995);
+  let landing = null;
+  for (let roll = 0; roll <= die; roll += 1) {
+    landing = { face: rng.int(DIE_FACE_ROTATIONS.length), angle: rng.next(), spin: rng.next() };
+  }
+  const { face, angle, spin } = landing;
   const direction = 2 * Math.PI * ((die + angle) / 7);
   const [faceX, faceY] = DIE_FACE_ROTATIONS[face];
   const tumble = 360 * DICE_TUMBLE_TURNS;
@@ -685,7 +671,6 @@ export function boxArt(box) {
   return box?.key && Object.hasOwn(BOX_ART, box.key) ? BOX_ART[box.key] : null;
 }
 
-const withWebp = (base) => (base ? `${base}.webp` : null);
 const largeImageOf = (card) => card?.images?.large || card?.image || null;
 
 /**
@@ -717,7 +702,7 @@ export function boxSkin({ box, setInfo = {}, cards = [], data = {} }) {
     }));
   }
   return {
-    setLogoUrl: withWebp(setInfo.logo),
+    setLogoUrl: setInfo.logo ? `${setInfo.logo}.webp` : null,
     keyArtUrl: largeImageOf(cardById(skin.keyArtCardId)),
     palette: skin.palette || box?.era || 'me',
     packArts,
