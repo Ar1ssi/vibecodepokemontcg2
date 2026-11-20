@@ -30,7 +30,11 @@ export function createTabletopAudio({ muted = () => false, volume = () => 0.8 } 
         ctx = new Ctor();
         master = ctx.createGain();
         master.connect(ctx.destination);
-        noise = makeNoise(ctx);
+        const length = Math.floor(ctx.sampleRate * 2);
+        const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < length; i += 1) data[i] = Math.random() * 2 - 1;
+        noise = buffer;
         loadSamples();
       }
       if (ctx.state === 'suspended') ctx.resume().catch(() => {});
@@ -205,12 +209,4 @@ export function createTabletopAudio({ muted = () => false, volume = () => 0.8 } 
       ctx = null;
     },
   };
-}
-
-function makeNoise(ctx) {
-  const length = Math.floor(ctx.sampleRate * 2);
-  const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < length; i += 1) data[i] = Math.random() * 2 - 1;
-  return buffer;
 }

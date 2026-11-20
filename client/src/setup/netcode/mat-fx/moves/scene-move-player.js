@@ -30,17 +30,13 @@ const TRAILS = Object.freeze([
 /** The 2D trails' `blur(2px)`. */
 const TRAIL_BLUR_PX = 2;
 
-/**
- * Design 078 § Depth: a burst's particles are thrown up and out of the struck card's centre, not
- * slid across the cloth; lifted, the cast pass gives them shadows and light pools too.
- */
-export const particleLift = (centre) => burstLift(centre, { stand: LIFT.particleStand, z: LIFT.particleZ });
-
 /** Every live particle of `bursts` at `elapsed`, each burst lifted off its anchor card. */
 const drawBursts = (ctx, bursts, elapsed, colour) => {
   for (const { burst, anchor, rows } of bursts) {
     ctx.save();
-    ctx.fxLift = particleLift(anchor.centre);
+    // Design 078 § Depth: a burst's particles are thrown up and out of the struck card's centre, not
+    // slid across the cloth; lifted, the cast pass gives them shadows and light pools too.
+    ctx.fxLift = burstLift(anchor.centre, { stand: LIFT.particleStand, z: LIFT.particleZ });
     rows.forEach((row, index) => {
       drawParticle(ctx, burst.kind, particleState(row, elapsed, { durationMs: burst.durationMs, delayMs: burst.at }), {
         originX: anchor.centre.x,

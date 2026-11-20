@@ -48,6 +48,13 @@ export const el = (tag, className, text) => {
   return node;
 };
 
+export const button = (className, text, onClick) => {
+  const node = el('button', className, text);
+  node.type = 'button';
+  node.addEventListener('click', onClick);
+  return node;
+};
+
 export const cardImage = (card, size = 'small') =>
   card?.images?.[size] || card?.images?.small || card?.image || '';
 

@@ -191,8 +191,6 @@ const cornerLobe = ({ side, end }, rects, bounds, seam) => {
   return best && { x: best.x, y: best.y, r: best.r };
 };
 
-const angleBetween = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
-
 /**
  * The smaller lobes bulging off a bog's biggest lobe `main`, so no bog is round: up to
  * MAX_BOG_LOBES - 1 of them, headed apart, clear of the cards and within `bounds` as the biggest
@@ -215,7 +213,7 @@ const sideLobes = (main, rects, bounds, end) => {
   const lobes = [];
   for (const option of options) {
     if (lobes.length >= MAX_BOG_LOBES - 1) break;
-    if (lobes.some((lobe) => angleBetween(lobe.angle, option.angle) < 1.5)) continue;
+    if (lobes.some((lobe) => Math.abs(Math.atan2(Math.sin(lobe.angle - option.angle), Math.cos(lobe.angle - option.angle))) < 1.5)) continue;
     lobes.push(option);
   }
   return lobes.map(({ x, y, r }) => ({ x, y, r }));
@@ -293,9 +291,6 @@ const shorePoints = (spots, spacing, out, salt) => {
   }
   return points;
 };
-
-/** Whether (x, y) lies on one of the bogs' islands. */
-const onIsland = (spots, x, y) => (spots.bogs ?? []).some(({ island }) => Math.hypot(x - island.x, y - island.y) < island.r);
 
 /** Whether a flower may stand at (x, y): out in the jungle, clear of the cards, on dry ground. */
 const flowerSpot = (spots, x, y) =>
@@ -683,7 +678,8 @@ const islandLeaves = (spots) => {
 const rosetteLeaves = (spots) => {
   const leaves = [];
   for (const spike of spots.spikes ?? []) {
-    if (onIsland(spots, spike.x, spike.y)) continue;
+    // Not on one of the bogs' islands.
+    if ((spots.bogs ?? []).some(({ island }) => Math.hypot(spike.x - island.x, spike.y - island.y) < island.r)) continue;
     const count = 4 + Math.floor(spike.seed * 3);
     for (let k = 0; k < count; k += 1) {
       const angle = (k / count) * 2 * Math.PI + spike.seed * 9;

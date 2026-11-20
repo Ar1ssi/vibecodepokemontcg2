@@ -8,6 +8,9 @@ import {
   packSpreadSlot,
   packTearPoints,
 } from './unboxing.mjs';
+import { smoothstep } from './tabletop/poses.mjs';
+
+export { smoothstep };
 
 // ── Pack shape (measured on the vendored 780 × 1426 art) ────────────────────
 export const PACK_ASPECT = 1426 / 780;
@@ -80,13 +83,6 @@ const clampUnit = (value) =>
 const lerp = (from, to, t) => from + (to - from) * t;
 const easeLift = cubicBezier(0.2, 0.8, 0.2, 1);
 const radians = (deg) => (deg * Math.PI) / 180;
-
-/** Hermite smoothstep of `x` between `edge0` and `edge1`, 0..1. */
-export function smoothstep(edge0, edge1, x) {
-  if (!(edge1 > edge0)) return x >= edge1 ? 1 : 0;
-  const t = clamp01((x - edge0) / (edge1 - edge0));
-  return t * t * (3 - 2 * t);
-}
 
 const isRect = (rect) =>
   Number.isFinite(rect?.left) &&

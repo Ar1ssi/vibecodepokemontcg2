@@ -220,7 +220,7 @@ export function clearActiveSpotPendingEffects(state, player) {
   );
 }
 
-function liveEffects(state, player) {
+export function liveEffects(state, player) {
   return (state.pendingEffects?.[player] || []).filter((e) => !e.waiting);
 }
 
@@ -279,22 +279,6 @@ export function pendingCantRetreat(state, player) {
   return liveEffects(state, player).some(
     (e) => e.kind === 'cant-retreat' && (e.scope === 'defender-active' || e.scope === 'active')
   );
-}
-
-export function pendingCantPlayItem(state, player) {
-  return liveEffects(state, player).some((e) => e.kind === 'cant-play-item');
-}
-
-export function pendingCantPlaySupporter(state, player) {
-  return liveEffects(state, player).some((e) => e.kind === 'cant-play-supporter');
-}
-
-export function pendingCantEvolveFromHand(state, player) {
-  return liveEffects(state, player).some((e) => e.kind === 'cant-evolve-from-hand');
-}
-
-export function pendingCantAttachEnergyFromHand(state, player) {
-  return liveEffects(state, player).some((e) => e.kind === 'cant-attach-energy-from-hand');
 }
 
 /** Merge ability/tool prevention with pending attack-window prevention. */

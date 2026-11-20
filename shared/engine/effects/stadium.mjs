@@ -63,7 +63,6 @@ function stadiumServerConditionMet(condition, player, opponent = null) {
 
 // ── Sky Field (customhb-485): move 1 Energy card from 1 of your {C} Pokémon to another ──
 
-const TYPED_MOVE_EFFECT = 'typedEnergyMove';
 
 function typedRoots(player, type) {
   return ['active', 'bench'].flatMap((zoneId) => {

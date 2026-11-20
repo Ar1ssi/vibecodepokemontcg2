@@ -28,12 +28,6 @@ const onSoloRoomRefused = (event) => {
   appendMessage('', roomRejectMessage(reason).replace('\n', ' '), 'announcement', false);
 };
 
-const installRefusalListener = () => {
-  if (refusalListenerInstalled) return;
-  refusalListenerInstalled = true;
-  document.addEventListener('solo-room-refused', onSoloRoomRefused);
-};
-
 /**
  * Asks the server for a fresh solo room. No-op while already in (or joining) a room, and
  * once the server has said it cannot host one.
@@ -41,7 +35,10 @@ const installRefusalListener = () => {
  * @returns {boolean} true when a join was sent
  */
 export function joinSoloRoom() {
-  installRefusalListener();
+  if (!refusalListenerInstalled) {
+    refusalListenerInstalled = true;
+    document.addEventListener('solo-room-refused', onSoloRoomRefused);
+  }
   if (systemState.solo || systemState.isTwoPlayer || systemState.roomId) {
     return false;
   }

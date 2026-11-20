@@ -438,6 +438,23 @@ export function deriveFamily(spec) {
   return base;
 }
 
+export const motes = (at, count, over = {}) =>
+  Object.freeze({
+    at,
+    anchor: 'defender',
+    count,
+    distance: 1.1,
+    direction: -90,
+    spread: 360,
+    size: [0.03, 0.07],
+    aspect: 1,
+    gravity: 0,
+    maxDelay: 0.2,
+    durationMs: 800,
+    kind: 'mote',
+    ...over,
+  });
+
 export const PARTICLE_PARAMS = Object.freeze({
   at: ['num', 0, 4000, 0],
   anchor: ['target', 'defender'],

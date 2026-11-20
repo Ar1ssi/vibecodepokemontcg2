@@ -733,14 +733,6 @@ function buildStage({
   // The floor reflections: for each band, the strip of this frame's picture just above its floor,
   // flipped below it and faded out, drawn right after the render (the WebGL buffer is only
   // readable in this task). Only that strip is copied, so the cost stays small.
-  const reflectionFade = (y, fade) => {
-    // destination-out keeps (1 − source alpha): REFLECTION_ALPHA at the floor, nothing at `fade`.
-    const band = mirrorContext.createLinearGradient(0, y, 0, y + fade);
-    band.addColorStop(0, `rgba(0, 0, 0, ${1 - REFLECTION_ALPHA})`);
-    band.addColorStop(1, 'rgba(0, 0, 0, 1)');
-    return band;
-  };
-
   const drawMirror = () => {
     const { width, height } = canvas;
     if (mirror.width !== width || mirror.height !== height) {
@@ -760,7 +752,11 @@ function buildStage({
       mirrorContext.drawImage(canvas, x0, y - fade, x1 - x0, fade, x0, y - fade, x1 - x0, fade);
       mirrorContext.setTransform(1, 0, 0, 1, 0, 0);
       mirrorContext.globalCompositeOperation = 'destination-out';
-      mirrorContext.fillStyle = reflectionFade(y, fade);
+      // destination-out keeps (1 − source alpha): REFLECTION_ALPHA at the floor, nothing at `fade`.
+      const band = mirrorContext.createLinearGradient(0, y, 0, y + fade);
+      band.addColorStop(0, `rgba(0, 0, 0, ${1 - REFLECTION_ALPHA})`);
+      band.addColorStop(1, 'rgba(0, 0, 0, 1)');
+      mirrorContext.fillStyle = band;
       mirrorContext.fillRect(x0, y, x1 - x0, fade);
       mirrorContext.globalCompositeOperation = 'source-over';
     }
@@ -901,23 +897,6 @@ function buildStage({
     group.visible = false;
     scene.add(group);
     return { pack, plane, geometry, materials, mesh, group, clipped: true };
-  };
-
-  // The top card's face, when it is not a hidden hit and arrives within the timeout (row 4).
-  const dressStack = (stack, topCard) => {
-    if (!topCard?.imageUrl || topCard.faceDown) return;
-    Promise.race([
-      loadCardTexture(topCard.imageUrl),
-      sleep(CARD_TEXTURE_TIMEOUT_MS).then(() => null),
-    ]).then((texture) => {
-      if (!texture || disposed || cards !== stack) return;
-      const face = stack.materials[STACK_FACE_FRONT];
-      face.map = texture;
-      face.color.set(0xffffff);
-      face.alphaTest = ALPHA_TEST;
-      face.needsUpdate = true;
-      requestRender();
-    });
   };
 
   // ── Viewport, pointer, context ────────────────────────────────────────
@@ -1087,7 +1066,21 @@ function buildStage({
     clearCards();
     const stack = buildStack(pack);
     cards = stack;
-    dressStack(stack, topCard);
+    // The top card's face, when it is not a hidden hit and arrives within the timeout (row 4).
+    if (topCard?.imageUrl && !topCard.faceDown) {
+      Promise.race([
+        loadCardTexture(topCard.imageUrl),
+        sleep(CARD_TEXTURE_TIMEOUT_MS).then(() => null),
+      ]).then((texture) => {
+        if (!texture || disposed || cards !== stack) return;
+        const face = stack.materials[STACK_FACE_FRONT];
+        face.map = texture;
+        face.color.set(0xffffff);
+        face.alphaTest = ALPHA_TEST;
+        face.needsUpdate = true;
+        requestRender();
+      });
+    }
     const startProgress = Math.max(pack.progress, clamp01(fromProgress));
     const riseDelay = RIP_FINISH_MS + CARDS_RISE_AT * STRIP_FLIGHT_MS;
     animate({

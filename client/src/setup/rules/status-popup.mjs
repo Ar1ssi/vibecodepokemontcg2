@@ -8,6 +8,8 @@
  * as the game toggles the overlay's close hitbox. Entries come from attack-ui-model's statusEffectsFor.
  */
 
+import { el } from './attack-options.mjs';
+
 const CLOSE_EVENTS = ['rules-turn-began', 'rules-session-reset'];
 const ARROW_SRC = {
   positive: '/src/assets/attack-ui/arrow-up.png',
@@ -19,13 +21,6 @@ let popupState = null;
 
 export const isStatusPopupOpen = () => popupState !== null;
 
-const el = (tag, className, text) => {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text != null) node.textContent = String(text);
-  return node;
-};
-
 const arrow = (polarity, className) => {
   const img = el('img', className);
   img.src = ARROW_SRC[polarity];
@@ -36,23 +31,6 @@ const arrow = (polarity, className) => {
 
 // CardDescriptionModalOption: the source card's art when there is one, its name, the effect text and
 // the polarity arrow.
-const entryEl = (entry, polarity) => {
-  const node = el('li', `tcgl-status__entry tcgl-status__entry--${polarity}`);
-  if (entry.src) {
-    const thumb = el('img', 'tcgl-status__thumb');
-    thumb.src = entry.src;
-    thumb.alt = '';
-    thumb.draggable = false;
-    node.appendChild(thumb);
-  }
-  const body = el('div', 'tcgl-status__body');
-  body.appendChild(el('span', 'tcgl-status__title', entry.title));
-  if (entry.text) body.appendChild(el('p', 'tcgl-status__text', entry.text));
-  node.appendChild(body);
-  node.appendChild(arrow(polarity, 'tcgl-status__arrow'));
-  return node;
-};
-
 const column = (polarity, label, entries) => {
   const region = el('section', `tcgl-status__column tcgl-status__column--${polarity}`);
   const header = el('header', 'tcgl-status__header');
@@ -60,7 +38,22 @@ const column = (polarity, label, entries) => {
   header.appendChild(el('span', 'tcgl-status__header-text', label));
   region.appendChild(header);
   const list = el('ul', 'tcgl-status__list');
-  for (const entry of entries) list.appendChild(entryEl(entry, polarity));
+  for (const entry of entries) {
+    const node = el('li', `tcgl-status__entry tcgl-status__entry--${polarity}`);
+    if (entry.src) {
+      const thumb = el('img', 'tcgl-status__thumb');
+      thumb.src = entry.src;
+      thumb.alt = '';
+      thumb.draggable = false;
+      node.appendChild(thumb);
+    }
+    const body = el('div', 'tcgl-status__body');
+    body.appendChild(el('span', 'tcgl-status__title', entry.title));
+    if (entry.text) body.appendChild(el('p', 'tcgl-status__text', entry.text));
+    node.appendChild(body);
+    node.appendChild(arrow(polarity, 'tcgl-status__arrow'));
+    list.appendChild(node);
+  }
   region.appendChild(list);
   return region;
 };

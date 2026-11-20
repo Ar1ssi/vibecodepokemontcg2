@@ -43,23 +43,6 @@ function section(build) {
   }
 }
 
-function metaSection({ win, doc, nav }) {
-  return {
-    url: win.location.pathname + win.location.search,
-    w: win.innerWidth,
-    h: win.innerHeight,
-    dpr: win.devicePixelRatio,
-    ua: nav.userAgent,
-    lang: nav.language,
-    tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    visibility: doc.visibilityState,
-    online: nav.onLine,
-    cores: nav.hardwareConcurrency ?? null,
-    memoryGB: nav.deviceMemory ?? null,
-    gpu: getGpuRenderer(),
-  };
-}
-
 function registrySection(applyView) {
   const out = [];
   for (const [instanceId, record] of applyView.getCardRegistry()) {
@@ -113,16 +96,6 @@ function perfSection({ win, doc }) {
   };
 }
 
-function trimToBudget(snapshot) {
-  // The reply also carries the unshipped tail, and both must fit one socket message.
-  while (JSON.stringify(snapshot).length > LIMITS.snapshotMaxBytes - LIMITS.snapshotTailChars) {
-    const victim = DROP_ORDER.findLast((name) => name in snapshot);
-    if (!victim) return;
-    delete snapshot[victim];
-    snapshot.omitted.push(victim);
-  }
-}
-
 let preloaded = null;
 
 /**
@@ -164,7 +137,20 @@ export function buildSnapshotSync({ win = window, doc = document, nav = navigato
     loadId,
     takenAt: Date.now(),
     omitted: [],
-    meta: section(() => metaSection({ win, doc, nav })),
+    meta: section(() => ({
+      url: win.location.pathname + win.location.search,
+      w: win.innerWidth,
+      h: win.innerHeight,
+      dpr: win.devicePixelRatio,
+      ua: nav.userAgent,
+      lang: nav.language,
+      tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      visibility: doc.visibilityState,
+      online: nav.onLine,
+      cores: nav.hardwareConcurrency ?? null,
+      memoryGB: nav.deviceMemory ?? null,
+      gpu: getGpuRenderer(),
+    })),
     socket: section(() => {
       const socket = state?.socket;
       if (!socket) return null;
@@ -189,6 +175,12 @@ export function buildSnapshotSync({ win = window, doc = document, nav = navigato
     storage: section(() => storageSection(storage())),
     perf: section(() => perfSection({ win, doc })),
   };
-  trimToBudget(snapshot);
+  // The reply also carries the unshipped tail, and both must fit one socket message.
+  while (JSON.stringify(snapshot).length > LIMITS.snapshotMaxBytes - LIMITS.snapshotTailChars) {
+    const victim = DROP_ORDER.findLast((name) => name in snapshot);
+    if (!victim) break;
+    delete snapshot[victim];
+    snapshot.omitted.push(victim);
+  }
   return snapshot;
 }

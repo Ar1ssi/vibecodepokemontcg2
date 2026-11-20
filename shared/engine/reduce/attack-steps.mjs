@@ -87,20 +87,6 @@ export function buildAttackSearchChoice(
 }
 
 /**
- * Pure and total command reducer.
- *
- * @param {object} state GameState
- * @param {object} command Command envelope { type, payload, playerId, clientSeq }
- * @param {object} [rng] Optional seeded PRNG
- * @returns {{
- *   state: object,
- *   events: object[],
- *   pendingChoice: object|null,
- *   error?: string|null,
- *   reason?: string
- * }}
- */
-/**
  * Candidate groups for a discard-to-scale attack: one per printed "… or …" group
  * (Dragon Burst: all basic {R} or all basic {L}), else the single clause. Only groups
  * with Energy to discard are returned; `max` is capped at the group's card count.
@@ -348,7 +334,6 @@ export function millDecksForAttack(draft, { playerId, oppId, mill, count, events
   return matchedIds;
 }
 
-/** Moves milled cards still in the discard pile onto `root` (Raikou). */
 /**
  * Raises the next "which Benched Pokémon gets an Energy" pick for a spread attach
  * (Aura Jab). Returns false — no choice raised — when nothing is left to attach or
@@ -479,7 +464,10 @@ export function optionalCostOffer(draft, { playerId, attacker, attack, clause })
     case 'discardStadium':
       return draft.stadium ? yesNo('discard the Stadium in play') : null;
     case 'discardTool': {
-      const tools = attachedToolCards(draft, playerId, attacker);
+      const player = draft.players[playerId];
+      const tools = [...(player?.zones?.active || []), ...(player?.zones?.bench || [])].filter(
+        (c) => attacker && c.attachedTo === attacker.instanceId && isPokemonToolCard(c)
+      );
       if (tools.length === 0) return null;
       return {
         prompt: `${attack.name}: choose a Pokémon Tool to discard from this Pokémon for ${bonus} more damage (pick none to decline).`,
@@ -551,15 +539,6 @@ function costEnergyCards(draft, { playerId, attacker, cost }) {
   );
   if (types.length === 0) return cards;
   return cards.filter((c) => types.some((type) => matchesSearch(c, `${type} Energy`)));
-}
-
-/** The Pokémon Tools attached to the attacker. */
-function attachedToolCards(draft, playerId, attacker) {
-  if (!attacker) return [];
-  const player = draft.players[playerId];
-  return [...(player?.zones?.active || []), ...(player?.zones?.bench || [])].filter(
-    (c) => c.attachedTo === attacker.instanceId && isPokemonToolCard(c)
-  );
 }
 
 /** Moves attached cards (by id) off the attacker to their owner's discard pile or hand. */
@@ -894,17 +873,30 @@ export function settleVacatedActive(draft, { playerId, oppId, events }) {
  * are resolved immediately so they count before the turn ends. Returns false while a
  * choice is pending — the `attackSteps` resume continues from the token.
  */
-/**
- * Applies the `attackDamageRequest` events steps queue (Dragapult Dragon Launcher) as attack damage
- * through the same path as a chosen-target clause, so damage prevention, Knock Out hooks and
- * Prize entitlements all run. A step handler cannot call them itself: knockout.mjs imports it.
- */
-function applyAttackDamageRequests(draft, { events, playerId, activeRng }) {
+export function runAttackSteps(
+  draft,
+  { steps, fromStepIndex = 0, attackerId, playerId, oppId, activeRng, events, selection = null, context, budget }
+) {
+  const attacker = attackerId != null ? findCard(draft, attackerId)?.card : null;
+  const result = executeSteps(draft, {
+    steps,
+    fromStepIndex,
+    effectType: 'attackSteps',
+    sourceCard: attacker || (attackerId != null ? { instanceId: attackerId } : null),
+    playerId,
+    activeRng,
+    events,
+    selection,
+    context,
+    budget,
+  });
+  // The `attackDamageRequest` events steps queue (Dragapult Dragon Launcher) apply as attack damage
+  // through the same path as a chosen-target clause, so damage prevention, Knock Out hooks and
+  // Prize entitlements all run. A step handler cannot call them itself: knockout.mjs imports it.
   const requests = events.filter((e) => e.type === 'attackDamageRequest');
-  if (requests.length === 0) return;
   for (let i = events.length - 1; i >= 0; i--) if (events[i].type === 'attackDamageRequest') events.splice(i, 1);
   for (const request of requests) {
-    if (isGameConcluded(draft)) return;
+    if (isGameConcluded(draft)) break;
     if (request.controlled) {
       applyControlledAttack(draft, {
         userId: request.controlled.userId,
@@ -928,26 +920,6 @@ function applyAttackDamageRequests(draft, { events, playerId, activeRng }) {
       events,
     });
   }
-}
-
-export function runAttackSteps(
-  draft,
-  { steps, fromStepIndex = 0, attackerId, playerId, oppId, activeRng, events, selection = null, context, budget }
-) {
-  const attacker = attackerId != null ? findCard(draft, attackerId)?.card : null;
-  const result = executeSteps(draft, {
-    steps,
-    fromStepIndex,
-    effectType: 'attackSteps',
-    sourceCard: attacker || (attackerId != null ? { instanceId: attackerId } : null),
-    playerId,
-    activeRng,
-    events,
-    selection,
-    context,
-    budget,
-  });
-  applyAttackDamageRequests(draft, { events, playerId, activeRng });
   resolveDamageCounterKnockouts(draft, { events });
   // A discard effect (GG End-GX / Big Throw-GX) can wipe a side without any Knock Out event;
   // prize entitlements keep their own tail settlement, so this only reads the board for an

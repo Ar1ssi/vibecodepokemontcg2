@@ -89,7 +89,6 @@ const PALETTE = freezeAll({
 });
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
-const rad = (deg) => (deg * Math.PI) / 180;
 
 /** A generator for one flicker frame: the same (seed, time bucket) always rolls the same jags. */
 const flickerRandom = (seed, time) => seededRandom(Math.floor(seed * 1013) + Math.floor(time * REROLL_HZ) * 7919);
@@ -147,7 +146,7 @@ export function wrapStrand(line, width, phase = 0) {
  * @returns {{x: number, y: number, nx: number, ny: number, half: number}[]}
  */
 export function jagOutline({ x, y, angleDeg, length, width, time, seed }, { jag = 0, segments } = {}) {
-  const a = rad(angleDeg);
+  const a = (angleDeg * Math.PI) / 180;
   const ux = Math.cos(a);
   const uy = Math.sin(a);
   const count = segments ?? Math.max(3, Math.min(10, Math.round(length / Math.max(width * 0.6, 1))));

@@ -7,7 +7,6 @@ import { flightPose, planFlight } from './card-flight.mjs';
 export const FAN_UP_MS = 520;
 export const FAN_BACK_MS = 420;
 
-const usable = (r) => Boolean(r) && r.width >= 2 && r.height >= 2;
 const rectCenter = (r) => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
 
 /**
@@ -18,7 +17,7 @@ const rectCenter = (r) => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 })
  */
 export function fanFlightPose({ from, to, fromTurn = 0, reverse = false, seed = 1 }) {
   const slot = rectCenter(to);
-  const prize = usable(from)
+  const prize = from && from.width >= 2 && from.height >= 2
     ? {
         x: rectCenter(from).x - slot.x,
         y: rectCenter(from).y - slot.y,

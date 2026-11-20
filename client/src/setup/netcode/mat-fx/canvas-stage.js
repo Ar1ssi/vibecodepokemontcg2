@@ -2,15 +2,6 @@
 // evolution scene) draws through this one stage, so all of them keep D118's
 // single clock: the redraw reads a WAAPI animation's `currentTime`.
 
-/** Size and centre `el` on (cx, cy) in its host's pixels. */
-export const placeCentered = (el, cx, cy, width, height = width) => {
-  el.style.width = `${width}px`;
-  el.style.height = `${height}px`;
-  el.style.left = `${cx - width / 2}px`;
-  el.style.top = `${cy - height / 2}px`;
-  return el;
-};
-
 /**
  * A square canvas of `size` px centred on (cx, cy) in `host`, cleared and
  * redrawn every frame by `draw(ctx, t, elapsedMs)` in CSS pixels. Its clock
@@ -21,7 +12,11 @@ export function playCanvasStage(
   host,
   { className, cx, cy, size, duration, draw, before = null }
 ) {
-  const canvas = placeCentered(document.createElement('canvas'), cx, cy, size);
+  const canvas = document.createElement('canvas');
+  canvas.style.width = `${size}px`;
+  canvas.style.height = `${size}px`;
+  canvas.style.left = `${cx - size / 2}px`;
+  canvas.style.top = `${cy - size / 2}px`;
   canvas.className = className;
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   canvas.width = Math.round(size * dpr);

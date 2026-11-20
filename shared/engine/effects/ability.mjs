@@ -77,7 +77,7 @@ export function executeAbility(draft, {
   // Marking up front consumed the ability with no effect and locked out a retry.
   const markUsed = () => {
     // "As often as you like during your turn" is never spent; it is still announced.
-    if (!isRepeatableAbility(text)) {
+    if (!REPEATABLE_ABILITY.test(String(text || '').trim().toLowerCase())) {
       // A card the ability moved out of play (Stance Change's old Aegislash) keeps no marker;
       // advanceTurn only resets in-play cards.
       const zoneAfter = findCard(draft, card.instanceId)?.zoneId;
@@ -100,7 +100,7 @@ export function executeAbility(draft, {
   const text = typeof ability === 'string'
     ? ability
     : ability?.text || card.abilityText || card.text || card.effect || '';
-  const endsTurn = abilityEndsTurn(text);
+  const endsTurn = ABILITY_ENDS_TURN.test(String(text || '').toLowerCase());
   const plan = resolveAbilitySteps(text, { selfName: card.name });
   let actionableSteps = plan.steps;
   const holderZone = plan.holderZone;
@@ -192,19 +192,11 @@ export function applyAutomaticEvolveAbility(draft, { evolvedCard, playerId, even
 // Steps that attach the Ability's own card to a Pokémon the player names.
 const SELF_ATTACH_STEPS = new Set(['selfAttachEnergyAbility', 'selfAttachToolAbility']);
 
+// "If you use this Ability, your turn ends." (Koraidon ex Dino Cry and others).
 const ABILITY_ENDS_TURN = /if you use this ability, your turn ends/;
 
-/** "If you use this Ability, your turn ends." (Koraidon ex Dino Cry and others). */
-export function abilityEndsTurn(text) {
-  return ABILITY_ENDS_TURN.test(String(text || '').toLowerCase());
-}
-
+// "As often as you like during your turn, …": usable any number of times, never marked used.
 const REPEATABLE_ABILITY = /^as often as you like\b/;
-
-/** "As often as you like during your turn, …": usable any number of times, never marked used. */
-export function isRepeatableAbility(text) {
-  return REPEATABLE_ABILITY.test(String(text || '').trim().toLowerCase());
-}
 
 /**
  * The steps an activated ability runs: the parser's actionable (non-passive) steps, or the

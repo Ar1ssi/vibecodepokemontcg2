@@ -1,6 +1,7 @@
 import {
   formatImageUrl,
   parseCsvMeta,
+  parseDeckDataRows,
   parseSimCsv,
   serializeDeckToSimCsv,
 } from '../../../setup/deck-builder/core/csv-adapter.mjs';
@@ -75,7 +76,6 @@ import {
   cycleWallpaper,
   findWallpaper,
 } from '../../../setup/deck-builder/core/box-wallpapers.mjs';
-import { syncDeckFromLoadedRows } from './native-deck-builder-sync.js';
 import {
   importDeckEntries,
   parseDeckText,
@@ -156,31 +156,6 @@ import {
   openFloatingCardPreview,
 } from '../../../setup/image-logic/full-view.js';
 import { toHighResCardImageUrl } from '../../../setup/image-logic/card-image-url.mjs';
-
-const deckToSimRows = (deck = {}) => {
-  const rows = [];
-
-  for (const cardName in deck) {
-    const group = deck[cardName];
-    for (const variant of group?.cards || []) {
-      rows.push([
-        String(variant.count),
-        cardName,
-        variant?.data?.supertype || '',
-        formatImageUrl(variant?.data || {}),
-        // Collector number (TCGdex localId). Decks built here know exactly
-        // which printing was picked; carrying the number keeps the rules
-        // engine from re-guessing it by name later — see resolveCardId() in
-        // shared/engine/rules/rules-state.mjs.
-        variant?.data?.number || variant?.data?.localId || null,
-        variant?.data?.set?.id || null,
-        variant?.data?.id || null,
-      ]);
-    }
-  }
-
-  return rows;
-};
 
 let restoreLastUsedDeckImpl = null;
 
@@ -915,7 +890,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
           // relevant player's playmat only (they read the card-back state
           // on next flip), and re-point existing back images so the change
           // is immediately visible.
-          const applySleeveToPlaymat = (image, target = 'self') => {
+          document.addEventListener('deck-sleeve-changed', (e) => {
+            const target = e.detail?.target || 'self';
             try {
               const fallback = resolveDefaultCardBackSrc();
               // when no sleeve is set for this deck, fall back to whatever
@@ -930,7 +906,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
               // player's sleeve/deck silently overwrites the other player's
               // custom sleeve back to the default the next time either of
               // their card backs happens to be redrawn (e.g. on shuffle).
-              const resolvedTarget = image || (target === 'opp'
+              const resolvedTarget = e.detail?.image || (target === 'opp'
                 ? (systemState.isTwoPlayer ? systemState.p2OppCardBackSrc : systemState.p1OppCardBackSrc)
                 : systemState.cardBackSrc) || fallback;
               const doc = target === 'opp' ? oppContainerDocument : selfContainerDocument;
@@ -967,8 +943,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
             } catch {
               // The board root is unavailable; its next build reads the new back.
             }
-          };
-          document.addEventListener('deck-sleeve-changed', (e) => applySleeveToPlaymat(e.detail?.image, e.detail?.target || 'self'));
+          });
     
           const customizeSwitcher = document.getElementById('nativeDeckBuilderCustomizeSwitcher');
           const customizeFilter = document.getElementById('nativeDeckBuilderCustomizeFilter');
@@ -1302,18 +1277,6 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         }
       };
     
-      const deckBuilderSleeveSrc = () => {
-        const sleeveId = deckLibrary?.getActiveSleeve?.(currentLoadTarget);
-        const sleeve = sleeveId
-          ? getSleeves().find((entry) => entry.id === sleeveId)
-          : null;
-        return (
-          sleeve?.image ||
-          systemState.cardBackSrc ||
-          'https://ptcgsim.online/src/assets/cardback.png'
-        );
-      };
-
       const showCardPreview = async (imageUrl, card = null, sourceEl = null) => {
         if (!imageUrl) return;
         if (card?.id && !card.rarity) {
@@ -1323,11 +1286,18 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
           sourceEl?.querySelector?.('img.native-deck-builder-result-image') ||
           sourceEl?.querySelector?.('img') ||
           sourceEl;
+        const sleeveId = deckLibrary?.getActiveSleeve?.(currentLoadTarget);
+        const sleeve = sleeveId
+          ? getSleeves().find((entry) => entry.id === sleeveId)
+          : null;
         openFloatingCardPreview({
           sourceEl: origin || previewImage,
           imageUrl: toHighResCardImageUrl(imageUrl),
           card,
-          sleeveSrc: deckBuilderSleeveSrc(),
+          sleeveSrc:
+            sleeve?.image ||
+            systemState.cardBackSrc ||
+            'https://ptcgsim.online/src/assets/cardback.png',
         });
       };
     
@@ -1406,7 +1376,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     const deckData = event.detail?.deckData;
     if (!user || !Array.isArray(deckData)) return;
 
-    syncedDecks[user] = syncDeckFromLoadedRows(deckData);
+    syncedDecks[user] = parseDeckDataRows(deckData);
 
     if (currentLoadTarget === user) {
       deck = syncedDecks[user];
@@ -1423,8 +1393,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     customCardPreviewPlaceholder.textContent = text;
   };
 
-  const updateCustomCardPreview = (url) => {
-    const trimmed = url.trim();
+  customCardImageUrl.addEventListener('input', () => {
+    const trimmed = customCardImageUrl.value.trim();
     customCardImageLoaded = false;
 
     if (!trimmed) {
@@ -1447,10 +1417,6 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
 
     showPreviewPlaceholder('Loading…');
     customCardPreviewImage.src = trimmed;
-  };
-
-  customCardImageUrl.addEventListener('input', () => {
-    updateCustomCardPreview(customCardImageUrl.value);
   });
 
   customCardPreviewImage.addEventListener('error', () => {
@@ -1763,7 +1729,25 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     if (!deckDirty) return;
     deckDirty = false;
     syncedDecks[currentLoadTarget] = deck;
-    const deckRows = deckToSimRows(deck);
+    const deckRows = [];
+    for (const cardName in deck) {
+      const group = deck[cardName];
+      for (const variant of group?.cards || []) {
+        deckRows.push([
+          String(variant.count),
+          cardName,
+          variant?.data?.supertype || '',
+          formatImageUrl(variant?.data || {}),
+          // Collector number (TCGdex localId). Decks built here know exactly
+          // which printing was picked; carrying the number keeps the rules
+          // engine from re-guessing it by name later — see resolveCardId() in
+          // shared/engine/rules/rules-state.mjs.
+          variant?.data?.number || variant?.data?.localId || null,
+          variant?.data?.set?.id || null,
+          variant?.data?.id || null,
+        ]);
+      }
+    }
     if (deckRows.length > 0) {
       // Design 073: the board learns the box first, so the deck packet names it.
       gameLink.announceDeckBox(currentLoadTarget, currentDeckBoxId());
@@ -2037,27 +2021,23 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
   };
 
   // ── TCG Live filter drawer (design 050) ──────────────────────────────
-  // Expansions come from the results, plus any picked earlier that the
-  // current results no longer contain, so a picked set can always be unpicked.
-  const drawerSetOptions = () => {
-    const options =
+  const renderDrawer = () => {
+    // Expansions come from the results, plus any picked earlier that the
+    // current results no longer contain, so a picked set can always be unpicked.
+    const setOptions =
       activeMode === 'browse'
         ? setBrowser?.getSetOptions?.() || []
         : deriveSetOptions(currentRawResults);
-    for (const option of options) knownSetNames[option.value] = option.label;
-    const listed = new Set(options.map((option) => option.value));
+    for (const option of setOptions) knownSetNames[option.value] = option.label;
+    const listed = new Set(setOptions.map((option) => option.value));
     for (const setId of draftFilters.sets) {
-      if (!listed.has(setId)) options.push({ value: setId, label: knownSetNames[setId] || setId });
+      if (!listed.has(setId)) setOptions.push({ value: setId, label: knownSetNames[setId] || setId });
     }
-    return options;
-  };
-
-  const renderDrawer = () => {
     renderFilterDrawer({
       drawerEl: filterDrawer,
       groups: BUILDER_FILTER_GROUPS,
       filters: draftFilters,
-      setOptions: drawerSetOptions(),
+      setOptions,
       onToggle: (group, value) => {
         draftFilters = toggleFilter(draftFilters, group, value);
         renderDrawer();
@@ -2082,18 +2062,6 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     if (event.key === 'Escape') closeFilterDrawer();
   };
 
-  const openFilterDrawer = (opener) => {
-    if (!filterDrawer) return;
-    drawerOpener = opener;
-    draftFilters = cardFilters;
-    renderDrawer();
-    filterDrawer.hidden = false;
-    if (filterScrim) filterScrim.hidden = false;
-    opener?.setAttribute('aria-expanded', 'true');
-    document.addEventListener('keydown', onDrawerKeydown);
-    filterDrawer.querySelector('[data-fdrawer-close]')?.focus();
-  };
-
   // Closing without Apply keeps the applied filters and drops the draft.
   // A function declaration: switchMode, defined earlier, closes it too.
   function closeFilterDrawer() {
@@ -2108,8 +2076,16 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
 
   for (const button of filtersButtons) {
     button.addEventListener('click', () => {
-      if (filterDrawer?.hidden) openFilterDrawer(button);
-      else closeFilterDrawer();
+      if (filterDrawer?.hidden) {
+        drawerOpener = button;
+        draftFilters = cardFilters;
+        renderDrawer();
+        filterDrawer.hidden = false;
+        if (filterScrim) filterScrim.hidden = false;
+        button.setAttribute('aria-expanded', 'true');
+        document.addEventListener('keydown', onDrawerKeydown);
+        filterDrawer.querySelector('[data-fdrawer-close]')?.focus();
+      } else closeFilterDrawer();
     });
   }
   filterScrim?.addEventListener('click', () => closeFilterDrawer());

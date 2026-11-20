@@ -48,6 +48,7 @@ import { buildModernBasicEnergy } from '../../../setup/deck-builder/core/modern-
 import { loadCoinCatalog } from '../../../setup/deck-builder/core/coins.mjs';
 import { loadSleeveCatalog } from '../../../setup/deck-builder/core/sleeves.mjs';
 import { createStage } from './native-deck-builder-stage.js';
+import { browserStorage, cardImage, el } from './native-deck-builder-bb-shared.js';
 import { mountUnboxingScene } from './native-deck-builder-unboxing.js';
 
 /**
@@ -65,25 +66,6 @@ const POOL_GROUPS = [
   ['Pokémon', 'Pokémon'],
   ['Trainer', 'Trainers'],
 ];
-
-// Reading `window.localStorage` itself throws when site data is blocked.
-const browserStorage = () => {
-  try {
-    return window.localStorage;
-  } catch {
-    return null;
-  }
-};
-
-const el = (tag, className, text) => {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text !== undefined) node.textContent = text;
-  return node;
-};
-
-const cardImage = (card, size = 'small') =>
-  card?.images?.[size] || card?.images?.small || card?.image || '';
 
 const LOADING_TEXT = 'Loading the card data…';
 const LOAD_FAILED_TEXT = 'The card data could not be loaded. Reload the page to try again.';
@@ -289,30 +271,6 @@ export const initializeEliteTrainerBox = ({
     return card;
   };
 
-  const renderShelf = () => {
-    if (!shelfPanelEl) return;
-    // A finished opening is done with once the Shelf shows again.
-    if (session && !inFlight()) {
-      session = null;
-      clearEtbSession(storage);
-    }
-    shelfPanelEl.replaceChildren();
-    banner(shelfPanelEl);
-    const etb = sessionEtb();
-    if (etb) {
-      const note = el('div', 'etb-shelf__inflight');
-      const resume = el('button', 'bb-primary', 'Resume');
-      resume.id = 'etbResume';
-      resume.type = 'button';
-      resume.addEventListener('click', playScene);
-      note.append(el('p', 'bb-note', inFlightLine(etb)), resume);
-      shelfPanelEl.append(note);
-    }
-    const list = el('div', 'etb-shelf');
-    for (const row of availableEtbs()) list.append(shelfCard(row));
-    shelfPanelEl.append(list);
-  };
-
   // ── Collection ──────────────────────────────────────────────────────────
   const tile = (card, key) => {
     const node = el('button', 'bb-pool-card etb-owned-card');
@@ -423,7 +381,28 @@ export const initializeEliteTrainerBox = ({
   });
 
   function renderAll() {
-    renderShelf();
+    if (shelfPanelEl) {
+      // A finished opening is done with once the Shelf shows again.
+      if (session && !inFlight()) {
+        session = null;
+        clearEtbSession(storage);
+      }
+      shelfPanelEl.replaceChildren();
+      banner(shelfPanelEl);
+      const etb = sessionEtb();
+      if (etb) {
+        const note = el('div', 'etb-shelf__inflight');
+        const resume = el('button', 'bb-primary', 'Resume');
+        resume.id = 'etbResume';
+        resume.type = 'button';
+        resume.addEventListener('click', playScene);
+        note.append(el('p', 'bb-note', inFlightLine(etb)), resume);
+        shelfPanelEl.append(note);
+      }
+      const list = el('div', 'etb-shelf');
+      for (const row of availableEtbs()) list.append(shelfCard(row));
+      shelfPanelEl.append(list);
+    }
     renderCollection();
   }
 

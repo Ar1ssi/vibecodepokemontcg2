@@ -32,7 +32,7 @@
 import { rgbCss } from '../../fx-colors.mjs';
 import { moddedKit } from './_kit-mod.js';
 import { withFxMod, withLiftZ } from './_mods.js';
-import { grainPass, inShadow, shardOutline, sphere, traceOutline } from './_shared.js';
+import { alongAxis, framer, grainPass, inShadow, shardOutline, sphere, traceOutline } from './_shared.js';
 
 const TAU = Math.PI * 2;
 const SPOKES = 6;
@@ -103,21 +103,6 @@ const AURORA_PALETTE = Object.freeze({
   core: ICE_PALETTE.core,
   white: ICE_PALETTE.white,
 });
-
-/** `rgb` at `alpha` as a one-stop gradient from the crystal's base toward its tip (flat on Canvas2D). */
-const alongCrystal = (ctx, { x, y, angleDeg, length }, rgb, alpha) => {
-  const g = ctx.createLinearGradient(x, y, x + Math.cos(rad(angleDeg)) * length, y + Math.sin(rad(angleDeg)) * length);
-  g.addColorStop(0, rgbCss(rgb, alpha));
-  return g;
-};
-
-/** Map (f along, side across) in units of `length` / `width` from the base (x, y) along `angleDeg`. */
-const framer = ({ x, y, angleDeg, length, width }) => {
-  const a = rad(angleDeg);
-  const ux = Math.cos(a);
-  const uy = Math.sin(a);
-  return (f, side) => [x + ux * length * f - uy * width * side, y + uy * length * f + ux * width * side];
-};
 
 /**
  * An icicle from its base (x, y) along `angleDeg`: a squared base `width` wide, straight sides
@@ -242,7 +227,7 @@ function litCrystal(ctx, pal, spec, { alpha = 1, hot = 1, jag = 0 } = {}) {
   const outline = jag ? shardOutline(spec) : icicleOutline(spec);
   inShadow(ctx, () => {
     ctx.fxStyle = CRYSTAL_BODY;
-    ctx.fillStyle = alongCrystal(ctx, spec, pal.body, CRYSTAL_ALPHA * alpha);
+    ctx.fillStyle = alongAxis(ctx, spec, pal.body, CRYSTAL_ALPHA * alpha);
     traceOutline(ctx, outline);
     withFxMod(ctx, FROST_MOD, () => ctx.fill());
     ctx.fxStyle = null;

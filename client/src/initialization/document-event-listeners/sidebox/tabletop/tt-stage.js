@@ -22,7 +22,7 @@ import { cameraBlend } from '../../../../setup/deck-builder/core/build-battle/ta
 import { createStudioEnvironment } from './tt-environment.js';
 import { cardSlab } from './tt-geometry.js';
 import { EYE_ONLY_LAYER, createStudio } from './tt-studio.js';
-import { clothNormalTexture, loadTexture } from './tt-textures.js';
+import { clothNormalTexture, imageTexture, loadImage } from './tt-textures.js';
 
 /**
  * The tabletop's stage (design 073 § Browser modules): one WebGL canvas, the TCG Pocket studio
@@ -48,8 +48,8 @@ const HORIZON_FAR = 5;
 const BACKSTOP_SLACK_MS = 700;
 
 /**
- * @param {{host: HTMLElement, quality?: 'high'|'low', surface?: {kind: 'mat'|'art', src?: string},
- *   instant?: () => boolean, onLost?: () => void, timeScale?: number, manual?: boolean}} options —
+ * @param {{host: HTMLElement, quality?: 'high'|'low', instant?: () => boolean, onLost?: () => void,
+ *   timeScale?: number, manual?: boolean}} options —
  *   `timeScale` below 1 plays every animation in slow motion (the test bench's `?slowmo=`);
  *   `manual` stops the clock until `advance(ms)` moves it (the bench's `?film`, frame by frame)
  * @returns {object|null} null when WebGL is unavailable.
@@ -57,7 +57,6 @@ const BACKSTOP_SLACK_MS = 700;
 export function createStage({
   host,
   quality = 'high',
-  surface = { kind: 'mat' },
   instant = () => false,
   onLost,
   timeScale = 1,
@@ -171,7 +170,8 @@ export function createStage({
    */
   const setSurface = async (next) => {
     if (next?.kind === 'art' && next.src) {
-      const texture = await loadTexture(next.src, renderer);
+      const image = await loadImage(next.src);
+      const texture = image ? imageTexture(image, renderer) : null;
       if (texture) {
         track(texture);
         matFace.map = texture;

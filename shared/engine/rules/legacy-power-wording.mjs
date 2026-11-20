@@ -16,8 +16,6 @@ function legacyMoveDestination(destination) {
   return 'this pokémon';
 }
 
-const counters = (n) => `${n} damage counter${n === '1' ? '' : 's'}`;
-
 // Passive Powers whose modern Ability wording the passive readers already enforce.
 const LEGACY_PASSIVE_REWRITES = [
   // Dark Vileplume Hay Fever [Team Rocket 13/30]: a Trainer lock on both players.
@@ -32,7 +30,7 @@ const LEGACY_PASSIVE_REWRITES = [
   [
     /(^|\. )whenever your opponent's attack damages ([^(.]+?) \(even if \2 is knocked out\), this power does (\d+)0 damage to the attacking pokémon\. \(don't apply weakness and resistance\.\)/,
     (_m, lead, _name, tens) =>
-      `${lead}if this pokémon is damaged by an attack from your opponent's pokémon (even if this pokémon is knocked out), put ${counters(tens)} on the attacking pokémon.`,
+      `${lead}if this pokémon is damaged by an attack from your opponent's pokémon (even if this pokémon is knocked out), put ${tens} damage counter${tens === '1' ? '' : 's'} on the attacking pokémon.`,
   ],
   // Feraligatr Berserk [Neo Genesis 4] (a Stage 2, so it is played to evolve): Feraligatr
   // Rowdy [Fusion Strike 057] wording. The coin is not optional in either printing.
@@ -108,8 +106,6 @@ export function parseLegacyDamageModifier(lower) {
   return null;
 }
 
-const roundToTen = (value, round) => (round === 'up' ? Math.ceil(value / 10) : Math.floor(value / 10)) * 10;
-
 /** `damage` after one parsed modifier; 0 stays 0 (an attack that does no damage is untouched). */
 export function applyLegacyDamageModifier(damage, spec) {
   if (!(damage > 0) || !spec) return damage;
@@ -117,7 +113,7 @@ export function applyLegacyDamageModifier(damage, spec) {
     case 'preventAtLeast':
       return damage >= spec.min ? 0 : damage;
     case 'halve':
-      return roundToTen(damage / 2, spec.round);
+      return (spec.round === 'up' ? Math.ceil(damage / 2 / 10) : Math.floor(damage / 2 / 10)) * 10;
     case 'reduceTo': {
       const inRange = spec.max != null ? damage <= spec.max : damage >= spec.min;
       return inRange ? Math.min(damage, spec.to) : damage;

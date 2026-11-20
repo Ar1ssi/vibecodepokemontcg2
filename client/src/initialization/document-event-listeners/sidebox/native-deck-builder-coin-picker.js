@@ -253,27 +253,24 @@
           ...metaLines,
           `</div>`,
         ].join('');
-        wirePreviewCoin(coin);
-      };
-    
-      const wirePreviewCoin = (coin) => {
         const el = panelEl.querySelector('[data-coin-preview]');
-        if (!el) return;
-        applyCoinEffect(el, coin);
-        const wrap = el.closest('[data-coin-toss]');
-        let tosses = 0;
-        el.addEventListener('click', () => {
-          tosses += 1;
-          el.style.setProperty('--coin-flip', (tosses * 1620) + 'deg');
-          if (wrap) {
-            wrap.classList.remove('tossing');
-            void wrap.offsetWidth; // restart the arc
-            wrap.classList.add('tossing');
-          }
-        });
-        wrap?.addEventListener('animationend', () => wrap.classList.remove('tossing'));
-        // fixed virtual light: the highlight follows the coin's angle, not the cursor
-        wireCoinPointerLight(el);
+        if (el) {
+          applyCoinEffect(el, coin);
+          const wrap = el.closest('[data-coin-toss]');
+          let tosses = 0;
+          el.addEventListener('click', () => {
+            tosses += 1;
+            el.style.setProperty('--coin-flip', (tosses * 1620) + 'deg');
+            if (wrap) {
+              wrap.classList.remove('tossing');
+              void wrap.offsetWidth; // restart the arc
+              wrap.classList.add('tossing');
+            }
+          });
+          wrap?.addEventListener('animationend', () => wrap.classList.remove('tossing'));
+          // fixed virtual light: the highlight follows the coin's angle, not the cursor
+          wireCoinPointerLight(el);
+        }
       };
     
       const selectCoin = (id) => {

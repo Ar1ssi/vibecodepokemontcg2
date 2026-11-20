@@ -32,29 +32,6 @@ vec3 edgeHaze(vec3 col, vec2 uv, float floorShade) {
 `;
 
 /**
- * Grass and reeds: `bladeFan(v, h, len)` is a fan of `blades` strokes out of a tuft's foot, as
- * (stroke 0..1, how far up the blade 0..1); v is the px offset from the foot, h the tuft's hash,
- * len the longest blade (px). Each blade bends over as it rises.
- */
-export const BLADES = /* glsl */ `
-vec2 bladeFan(vec2 v, float h, float len) {
-  float stroke = 0.0;
-  float tip = 0.0;
-  for (int k = 0; k < 4; k++) {
-    float a = 1.571 + (float(k) - 1.5) * 0.46 + (fract(h * (7.0 + float(k) * 3.1)) - 0.5) * 0.7;
-    vec2 d = vec2(cos(a), sin(a));
-    float l = len * (0.55 + 0.45 * fract(h * (11.0 + float(k))));
-    float s = clamp(dot(v, d), 0.0, l);
-    vec2 bent = d * s + vec2(-d.y, d.x) * (s * s / l) * 0.17;
-    float m = 1.0 - smoothstep(0.3, 0.95, length(v - bent) / mix(1.15, 0.4, s / l));
-    stroke = max(stroke, m);
-    tip = max(tip, m * s / l);
-  }
-  return vec2(stroke, tip);
-}
-`;
-
-/**
  * `boxShadow(o, sun, box, top)`: how much of a box is in the way of the sun from the ground point o
  * (0..1, twelve taps over the sun's disc so its edge is soft): the box covers `box` = (x0, y0, x1, y1)
  * from the ground up to `top`.

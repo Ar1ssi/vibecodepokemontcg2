@@ -54,7 +54,7 @@ import {
 import {
   damageBenchedPokemon, abilityEffectShield, resolveAttackTargetClause, attackTargetOptions, infiltratorPreventsDamage,
   energyAttackerShieldPrevents,
-  computedCounterTarget, distributedPrompt, targetPlayerOf, legacyModifiedDamage, prizeFlags,
+  computedCounterTarget, distributedPrompt, legacyModifiedDamage, prizeFlags,
   trainerIgnoresDefenderEffects, attackAbilityReads, applyRetaliation, applyAttackTargets,
   chosenTargetPerUnitCount,
 } from './attack-damage.mjs';
@@ -128,33 +128,6 @@ function attachedEnergyOfType(draft, root, letter) {
       return (t === 'dark' ? 'darkness' : t) === wanted;
     });
   }).length;
-}
-
-// Dusknoir Night Spin: "… done to Dusknoir by your opponent's Pokémon that has 2 or less Energy
-// attached to it" — marker filters (attack-markers.mjs attackerMatchesFilter) read the attacker's
-// attached Energy cards as the attack's effects resolve. Counts Energy *units* (a Double Colorless
-// or other double-provider counts as 2), not Energy cards.
-// Bronzong Heavy Potential reads each opponent Pokémon's Retreat Cost "after applying effects"
-// (I194); the executor cannot import this reducer, so the cost is stamped on the root here.
-function stampOpponentRetreatCosts(draft, oppId) {
-  const opponent = draft.players?.[oppId];
-  if (!opponent) return;
-  for (const zoneId of ['active', 'bench']) {
-    for (const root of (opponent.zones?.[zoneId] || []).filter((c) => !c.attachedTo)) {
-      root.effectiveRetreatCost = computeEffectiveRetreatCost(draft, root, oppId, { zoneId });
-    }
-  }
-}
-
-function stampAttackEnergyCount(draft, attacker, attackerView) {
-  const ref = attacker ? findCard(draft, attacker.instanceId) : null;
-  if (!ref) return;
-  const zone = ref.player.zones[ref.zoneId] || [];
-  const count = zone
-    .filter((c) => c.attachedTo === attacker.instanceId && isEnergy(c))
-    .reduce((sum, c) => sum + getEnergyValue(c), 0);
-  attacker.attackEnergyCount = count;
-  if (attackerView && attackerView !== attacker) attackerView.attackEnergyCount = count;
 }
 
 // A typed special Energy ("Nitro {R} Energy") counts as the type it provides.
@@ -276,8 +249,26 @@ export function resolveAttackEffectPhase(draft, ctx) {
   } = ctx;
 
   let { defender } = ctx;
-  stampAttackEnergyCount(draft, attacker, attackerView);
-  stampOpponentRetreatCosts(draft, oppId);
+  // Dusknoir Night Spin: "… done to Dusknoir by your opponent's Pokémon that has 2 or less Energy
+  // attached to it" — marker filters (attack-markers.mjs attackerMatchesFilter) read the attacker's
+  // attached Energy cards as the attack's effects resolve. Counts Energy *units* (a Double Colorless
+  // or other double-provider counts as 2), not Energy cards.
+  const attackerRef = attacker ? findCard(draft, attacker.instanceId) : null;
+  if (attackerRef) {
+    const zone = attackerRef.player.zones[attackerRef.zoneId] || [];
+    const count = zone
+      .filter((c) => c.attachedTo === attacker.instanceId && isEnergy(c))
+      .reduce((sum, c) => sum + getEnergyValue(c), 0);
+    attacker.attackEnergyCount = count;
+    if (attackerView && attackerView !== attacker) attackerView.attackEnergyCount = count;
+  }
+  // Bronzong Heavy Potential reads each opponent Pokémon's Retreat Cost "after applying effects"
+  // (I194); the executor cannot import this reducer, so the cost is stamped on the root here.
+  for (const zoneId of ['active', 'bench']) {
+    for (const root of (draft.players?.[oppId]?.zones?.[zoneId] || []).filter((c) => !c.attachedTo)) {
+      root.effectiveRetreatCost = computeEffectiveRetreatCost(draft, root, oppId, { zoneId });
+    }
+  }
 
   // A printed whole-attack condition ("If …, this attack does nothing", design 036 A1) gates the
   // damage and every effect step, so it resolves before any of them. It runs once per attack:
@@ -481,10 +472,22 @@ export function resolveAttackEffectPhase(draft, ctx) {
       });
       return;
     } else if (max > 0) {
+      // The prompt names what each card is worth as printed: "N (more) damage for each"
+      // (Genesect-EX Rapid Blaster +20), "do N damage to it" (Bronzong BREAK Metal Rain), else the
+      // printed damage.
+      const text = String(attack?.text || '');
+      const per =
+        /(\d+) (?:more )?damage (?:for each|times)/i.exec(text)?.[1] ||
+        /do (\d+) damage to it/i.exec(text)?.[1] ||
+        // Garchomp ex Surf: "For each Energy you discard, this attack does 30 damage to each …".
+        /for each energy[^,.]* discard(?:ed)?[^,.]*, this attack does (\d+) damage/i.exec(text)?.[1] ||
+        parseInt(attack?.damage, 10) ||
+        0;
+      const verb = discardScaling.destination === 'deck' ? 'shuffle into your deck' : 'discard';
       draft.pendingChoice = createPendingChoice({
         player: playerId,
         source: 'attack',
-        prompt: discardScalePrompt(attack, discardScaling),
+        prompt: `${attack.name}: choose Energy to ${verb} (${per} damage each).`,
         options: candidates.map((c) => ({
           instanceId: c.instanceId,
           name: c.name,
@@ -1763,22 +1766,6 @@ function searchCoinGateOpen(attack, coinResult) {
   return !gate || coinResult?.coin === gate;
 }
 
-// The discard-to-scale prompt names what each card is worth as printed: "N (more) damage for each"
-// (Genesect-EX Rapid Blaster +20), "do N damage to it" (Bronzong BREAK Metal Rain), else the
-// printed damage.
-function discardScalePrompt(attack, discardScaling) {
-  const text = String(attack?.text || '');
-  const per =
-    /(\d+) (?:more )?damage (?:for each|times)/i.exec(text)?.[1] ||
-    /do (\d+) damage to it/i.exec(text)?.[1] ||
-    // Garchomp ex Surf: "For each Energy you discard, this attack does 30 damage to each …".
-    /for each energy[^,.]* discard(?:ed)?[^,.]*, this attack does (\d+) damage/i.exec(text)?.[1] ||
-    parseInt(attack?.damage, 10) ||
-    0;
-  const verb = discardScaling.destination === 'deck' ? 'shuffle into your deck' : 'discard';
-  return `${attack.name}: choose Energy to ${verb} (${per} damage each).`;
-}
-
 // Beast Game-GX's "… take 3 more Prize cards instead" condition, read against the attacker.
 function prizeInsteadHolds(draft, playerId, attack, instead) {
   const condition = parseConditionClause(instead.condition);
@@ -1932,7 +1919,7 @@ export function finishAttackTail(draft, { tail, activeRng, events }) {
         // Drapion V Dynamic Tail / Giratina Shadow Impact hit the attacker's own Pokémon; a
         // Knock Out there gives the opponent the Prize cards.
         const ownSide = attackTarget.side === 'own';
-        const targetOwnerId = targetPlayerOf(attackTarget, playerId, defenderPlayerId);
+        const targetOwnerId = ownSide ? playerId : defenderPlayerId;
         const creditedId = ownSide ? oppId : playerId;
         const candidates = attackTargetOptions(draft, targetOwnerId, attackTarget.scope, attackTarget.filter);
         if (candidates.length === 0) {

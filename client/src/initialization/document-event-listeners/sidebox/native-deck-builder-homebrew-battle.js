@@ -33,7 +33,7 @@ import {
   verifyHomebrewSession,
   HOMEBREW_STORAGE_KEY,
 } from '../../../setup/deck-builder/core/homebrew-battle/homebrew-session.mjs';
-import { browserStorage, cardImage, createPoolTab, el, unlimitedEnergyCards } from './native-deck-builder-bb-shared.js';
+import { browserStorage, button, cardImage, createPoolTab, el, unlimitedEnergyCards } from './native-deck-builder-bb-shared.js';
 import { createStage } from './native-deck-builder-stage.js';
 import { mountUnboxingScene } from './native-deck-builder-unboxing.js';
 
@@ -53,13 +53,6 @@ const STALE_SET_TEXT = 'Your saved packs no longer match the Homebrew set, so th
 const NO_BOX_PLAY_TEXT = 'Open your packs on the Packs tab to play';
 const OPENING_PLAY_TEXT = 'Finish opening your packs to play';
 const EMPTY_POOL_TEXT = 'Open your packs first: the Packs tab holds the box.';
-
-const button = (className, text, onClick) => {
-  const node = el('button', className, text);
-  node.type = 'button';
-  node.addEventListener('click', onClick);
-  return node;
-};
 
 /**
  * @param {object} options
@@ -258,60 +251,6 @@ export const initializeHomebrewBattle = ({
     if (session && !session.deckId) parent.append(el('p', 'bb-banner', UNSAVED_DECK_TEXT));
   };
 
-  const boxShot = () => {
-    const img = el('img', 'bb-boxshot');
-    img.alt = 'Scarlet & Violet—151 Ultra-Premium Collection';
-    img.width = HOMEBREW_BOX_RENDER.width;
-    img.height = HOMEBREW_BOX_RENDER.height;
-    img.draggable = false;
-    img.addEventListener('error', () => img.remove(), { once: true });
-    img.src = `/${HOMEBREW_BOX_RENDER.src}`;
-    return img;
-  };
-
-  const poolLine = () => {
-    const total = pool.reduce((sum, entry) => sum + entry.count, 0);
-    const by = (supertype) =>
-      pool.filter((entry) => entry.card.supertype === supertype).reduce((sum, entry) => sum + entry.count, 0);
-    return (
-      `${total} cards · ${pool.length} different · ${by('Pokémon')} Pokémon · ${by('Trainer')} Trainer · ` +
-      `${by('Energy')} Energy, plus unlimited Basic Energy`
-    );
-  };
-
-  const renderReady = (parent) => {
-    const screen = el('div', 'bnb-screen bnb-lobby');
-    screen.append(
-      el('h2', 'bnb-title', 'Homebrew Build & Battle'),
-      el('p', 'bb-note', `Box #${session.seed} · ${HOMEBREW_PACK_COUNT} packs opened`),
-      el('p', 'bb-note', poolLine()),
-      el('p', 'bb-note', `Build exactly ${HOMEBREW_DECK_SIZE} cards from your pool, then press Play. Games use 6 Prizes.`)
-    );
-    if (confirmingRestart) {
-      screen.append(el('p', 'bb-note', 'Starting over removes these packs and this pool. Decks stay in My Decks.'));
-    }
-    const actions = el('div', 'bnb-actions');
-    actions.append(button('bb-primary', 'Build your deck', () => showPool()));
-    if (confirmingRestart) {
-      actions.append(
-        button('bb-secondary bnb-forfeit', 'Yes, start over', startOver),
-        button('bb-secondary', 'Keep my packs', () => {
-          confirmingRestart = false;
-          renderBox();
-        })
-      );
-    } else {
-      actions.append(
-        button('bb-secondary bnb-forfeit', 'Start over', () => {
-          confirmingRestart = true;
-          renderBox();
-        })
-      );
-    }
-    screen.append(actions);
-    parent.append(screen);
-  };
-
   const renderBox = () => {
     if (!boxPanelEl) return;
     scene?.unmount();
@@ -321,7 +260,14 @@ export const initializeHomebrewBattle = ({
     renderBanner(boxPanelEl);
     if (!session) {
       const screen = el('div', 'bnb-screen bnb-buyin');
-      screen.append(el('h2', 'bnb-title', 'Homebrew Build & Battle'), boxShot());
+      const boxImg = el('img', 'bb-boxshot');
+      boxImg.alt = 'Scarlet & Violet—151 Ultra-Premium Collection';
+      boxImg.width = HOMEBREW_BOX_RENDER.width;
+      boxImg.height = HOMEBREW_BOX_RENDER.height;
+      boxImg.draggable = false;
+      boxImg.addEventListener('error', () => boxImg.remove(), { once: true });
+      boxImg.src = `/${HOMEBREW_BOX_RENDER.src}`;
+      screen.append(el('h2', 'bnb-title', 'Homebrew Build & Battle'), boxImg);
       const note = el(
         'p',
         'bb-note',
@@ -383,7 +329,44 @@ export const initializeHomebrewBattle = ({
       scene = mountUnboxingScene(options);
       return;
     }
-    renderReady(boxPanelEl);
+    const screen = el('div', 'bnb-screen bnb-lobby');
+    const total = pool.reduce((sum, entry) => sum + entry.count, 0);
+    const by = (supertype) =>
+      pool.filter((entry) => entry.card.supertype === supertype).reduce((sum, entry) => sum + entry.count, 0);
+    screen.append(
+      el('h2', 'bnb-title', 'Homebrew Build & Battle'),
+      el('p', 'bb-note', `Box #${session.seed} · ${HOMEBREW_PACK_COUNT} packs opened`),
+      el(
+        'p',
+        'bb-note',
+        `${total} cards · ${pool.length} different · ${by('Pokémon')} Pokémon · ${by('Trainer')} Trainer · ` +
+          `${by('Energy')} Energy, plus unlimited Basic Energy`
+      ),
+      el('p', 'bb-note', `Build exactly ${HOMEBREW_DECK_SIZE} cards from your pool, then press Play. Games use 6 Prizes.`)
+    );
+    if (confirmingRestart) {
+      screen.append(el('p', 'bb-note', 'Starting over removes these packs and this pool. Decks stay in My Decks.'));
+    }
+    const actions = el('div', 'bnb-actions');
+    actions.append(button('bb-primary', 'Build your deck', () => showPool()));
+    if (confirmingRestart) {
+      actions.append(
+        button('bb-secondary bnb-forfeit', 'Yes, start over', startOver),
+        button('bb-secondary', 'Keep my packs', () => {
+          confirmingRestart = false;
+          renderBox();
+        })
+      );
+    } else {
+      actions.append(
+        button('bb-secondary bnb-forfeit', 'Start over', () => {
+          confirmingRestart = true;
+          renderBox();
+        })
+      );
+    }
+    screen.append(actions);
+    boxPanelEl.append(screen);
   };
 
   // ── Pool tab ──────────────────────────────────────────────────────────────

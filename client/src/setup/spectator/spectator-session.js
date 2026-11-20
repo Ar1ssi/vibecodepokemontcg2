@@ -90,11 +90,6 @@ const announceLayoutChange = () => {
   });
 };
 
-const isOlder = (view, than) =>
-  typeof view?.stateVersion === 'number' &&
-  typeof than?.stateVersion === 'number' &&
-  view.stateVersion < than.stateVersion;
-
 export function startSpectatorSession() {
   active = true;
   lastRawView = null;
@@ -129,7 +124,13 @@ export function endSpectatorSession() {
 export function applySpectatorView(rawView, events = [], options = {}) {
   const view = spectatorPerspective(rawView, mode);
   if (!view) return { applied: false, reason: 'not_spectator_view' };
-  if (!isOlder(rawView, lastRawView)) {
+  if (
+    !(
+      typeof rawView?.stateVersion === 'number' &&
+      typeof lastRawView?.stateVersion === 'number' &&
+      rawView.stateVersion < lastRawView.stateVersion
+    )
+  ) {
     lastRawView = rawView;
     lastOptions = options;
   }

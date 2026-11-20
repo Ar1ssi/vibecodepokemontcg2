@@ -91,6 +91,40 @@ export function traceOutline(ctx, { left, right }) {
   ctx.closePath();
 }
 
+/** A closed polygon through `points`. */
+export const tracePolygon = (ctx, points) => {
+  ctx.beginPath();
+  points.forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
+  ctx.closePath();
+};
+
+/** Map (f along, side across) in units of `length` / `width` from the base (x, y) along `angleDeg`. */
+export const framer = ({ x, y, angleDeg, length, width }) => {
+  const a = rad(angleDeg);
+  const ux = Math.cos(a);
+  const uy = Math.sin(a);
+  return (f, side) => [x + ux * length * f - uy * width * side, y + uy * length * f + ux * width * side];
+};
+
+/** `rgb` at `alpha` as a one-stop gradient from a shape's base toward its tip (flat on Canvas2D). */
+export const alongAxis = (ctx, { x, y, angleDeg, length }, rgb, alpha) => {
+  const g = ctx.createLinearGradient(x, y, x + Math.cos(rad(angleDeg)) * length, y + Math.sin(rad(angleDeg)) * length);
+  g.addColorStop(0, rgbCss(rgb, alpha));
+  return g;
+};
+
+/** A stable pseudo-random value in [0, 1) for a seed. */
+export const seedHash = (seed) => {
+  const v = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
+  return v - Math.floor(v);
+};
+
+/** A stable pseudo-random value in [0, 1) for (seed, index). */
+export const hash = (seed, index) => {
+  const v = Math.sin(seed * 12.9898 + index * 78.233) * 43758.5453;
+  return v - Math.floor(v);
+};
+
 /** Trace one tongue (see `tongueOutline`) as a closed path on `ctx`. */
 export function tonguePath(ctx, spec, scale = 1) {
   traceOutline(ctx, tongueOutline(spec, scale));

@@ -89,12 +89,6 @@ export function imageTexture(source, renderer, { srgb = true, repeat = false, an
   return texture;
 }
 
-/** @returns {Promise<Texture|null>} */
-export async function loadTexture(url, renderer, options) {
-  const image = await loadImage(url, options);
-  return image ? imageTexture(image, renderer, options) : null;
-}
-
 export function makeCanvas(width, height) {
   const canvas = document.createElement('canvas');
   canvas.width = width;
@@ -297,7 +291,7 @@ export function stackEdgeTexture(renderer, count = 40) {
   return canvasTexture(
     8,
     rows * 8,
-    (ctx, w, h) => {
+    (ctx, w) => {
       for (let r = 0; r < rows; r += 1) {
         const y = r * 8;
         ctx.fillStyle = '#ecebe5';

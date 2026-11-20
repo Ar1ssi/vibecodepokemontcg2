@@ -42,14 +42,6 @@ export const drawOpeningHand = async (user, initiator, emit = false) => {
   }
 };
 
-// Draw the starting hand of 7 and the format's Prizes (non-rules / legacy setup path).
-// moveCard is async (ensureCardData). Firing the loop without await raced
-// every deal off deck[0]; the sync log sometimes showed only 3 prize moves.
-export const drawHand = async (user, initiator) => {
-  await drawOpeningHand(user, initiator);
-  await setOpeningPrizes(user, initiator);
-};
-
 export const discardAndDraw = async (user, initiator, drawAmount, emit = true) => {
   drawAmount =
     typeof drawAmount === 'number'

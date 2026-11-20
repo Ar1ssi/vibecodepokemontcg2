@@ -15,21 +15,6 @@ import {
 import { parseStadiumCostModifier, mergeAttacks } from './stadium-effects.mjs';
 
 /**
- * Merge prior-evolution attacks when the active has attack-inheritance.
- */
-export function mergeInheritedAttacks(card, priorAttacks = []) {
-  const base = [...(card?.attacks || [])];
-  if (!parseAttackInheritance(card)) return base;
-  const seen = new Set(base.map((a) => a.name));
-  for (const atk of priorAttacks) {
-    if (!atk?.name || seen.has(atk.name)) continue;
-    base.push({ ...atk, inherited: true });
-    seen.add(atk.name);
-  }
-  return base;
-}
-
-/**
  * Special Conditions that outright prevent attacking. Confused is deliberately
  * NOT a lock: the attack is legal and only risks the coin flip, so blocking it
  * would hide a legal action.
@@ -91,7 +76,16 @@ export function listAttacks(card, opts = {}) {
   // `priorAttacks` are merged only when the card's own text grants inheritance
   // (`parseAttackInheritance`); `extraAttacks` (Stadium inheritance / grants)
   // apply unconditionally.
-  const attacks = mergeAttacks(mergeInheritedAttacks(card, priorAttacks), extraAttacks);
+  const ownAttacks = [...(card?.attacks || [])];
+  if (parseAttackInheritance(card)) {
+    const seen = new Set(ownAttacks.map((a) => a.name));
+    for (const atk of priorAttacks) {
+      if (!atk?.name || seen.has(atk.name)) continue;
+      ownAttacks.push({ ...atk, inherited: true });
+      seen.add(atk.name);
+    }
+  }
+  const attacks = mergeAttacks(ownAttacks, extraAttacks);
   const passiveReads = !rulesEnabled
     ? []
     : Array.isArray(passiveDiscounts)

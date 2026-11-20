@@ -34,12 +34,6 @@ const CHECKBOX_ID = {
   lostZone: 'sortLostZoneCheckbox',
 };
 
-function isSortChecked(user, zoneId) {
-  const doc = user === 'self' ? selfContainerDocument : oppContainerDocument;
-  const checkbox = doc?.getElementById?.(CHECKBOX_ID[zoneId]);
-  return Boolean(checkbox?.checked);
-}
-
 /**
  * Reorders a zone's authoritative card array for rendering, without mutating
  * the view. Returns the input array unchanged for zones the checkbox/2P-force
@@ -60,7 +54,8 @@ export function sortZoneCardsForRender(side, zoneId, cards) {
   if (!deckData) return cards;
 
   const isForced2P = systemState.isTwoPlayer && FORCED_2P_SORT_ZONES.includes(zoneId);
-  if (!isForced2P && !isSortChecked(user, zoneId)) return cards;
+  const doc = user === 'self' ? selfContainerDocument : oppContainerDocument;
+  if (!isForced2P && !doc?.getElementById?.(CHECKBOX_ID[zoneId])?.checked) return cards;
 
   return sortCardsByDeckList(cards, deckData);
 }

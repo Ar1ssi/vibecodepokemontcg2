@@ -12,19 +12,11 @@ import { isCardFocusOpen } from '../rules/card-focus.mjs';
 import { isStackViewOpen } from '../rules/stack-view.mjs';
 import { isStatusPopupOpen } from '../rules/status-popup.mjs';
 import { isCardInspectorOpen } from '../rules/card-inspector.mjs';
-import { onFxSettingsChanged } from './fx-settings.js';
+import { onFxSettingsChanged, storage } from './fx-settings.js';
 import { readSettings } from './fx-settings.mjs';
 import { isCardPreviewOpen } from './full-view.js';
 import { registerHoverPreviewSuppressor } from './hover-preview-bus.mjs';
 import { createHoverPreview } from './hover-preview-dom.mjs';
-
-const storage = () => {
-  try {
-    return globalThis.localStorage ?? null;
-  } catch {
-    return null;
-  }
-};
 
 let preview = null;
 

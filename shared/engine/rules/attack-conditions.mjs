@@ -100,12 +100,6 @@ function energyFromPhrase(phrase) {
   return { type: ENERGY_LETTER_TYPES[String(symbol || '').toLowerCase()] || null };
 }
 
-function energyWordType(phrase) {
-  const symbol = /\{([a-z])\}/i.exec(String(phrase || ''))?.[1];
-  if (symbol) return ENERGY_LETTER_TYPES[symbol.toLowerCase()] || null;
-  return ENERGY_WORD_TYPES[String(phrase || '').trim().toLowerCase()] || null;
-}
-
 const DEFENDER = "(?:your opponent's active pokémon|the defending pokémon)";
 const NOT_A_NAME = new Set(['damaged', 'evolved', 'active', 'benched', 'healthy', 'unaffected', 'knocked']);
 
@@ -269,7 +263,11 @@ const CLAUSES = [
   [
     /^you have (\d+) or fewer (?:(?:basic )?(?:([a-z]+)|\{([a-z])\}) )?pokémon on your bench$/,
     (m) => {
-      const type = energyWordType(m[2] || (m[3] ? `{${m[3]}}` : ''));
+      const phrase = m[2] || (m[3] ? `{${m[3]}}` : '');
+      const symbol = /\{([a-z])\}/i.exec(phrase)?.[1];
+      const type = symbol
+        ? ENERGY_LETTER_TYPES[symbol.toLowerCase()] || null
+        : ENERGY_WORD_TYPES[phrase.trim().toLowerCase()] || null;
       return {
         desc: { kind: 'benchCount', op: 'lte', n: Number(m[1]), ...(type ? { type } : {}) },
         printedNegated: false,

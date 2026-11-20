@@ -4,7 +4,7 @@
 // Design 084 (the visual audit): three or four palms in two sizes, kept out from under the chat panel
 // (frameWeight); the rocks larger lumpy clusters, as the card's; at most one parasol.
 import { TERRAIN_SPACING_PX } from './stadium-environment-glsl.mjs';
-import { RISE_LEAN, clumpAround, frameWeight, patchy } from './stadium-env-spots.mjs';
+import { RISE_LEAN, clumpAround, frameWeight, patchy, spotHash } from './stadium-env-spots.mjs';
 import { measureAsset } from './stadium-kit-assets.mjs';
 import { tableBounds } from './table-uv.mjs';
 
@@ -107,12 +107,6 @@ const shorePoint = (shore, t, offshore) => {
     x: shore.a.x + dir.x * t * span + seaward.x * across,
     y: shore.a.y + dir.y * t * span + seaward.y * across,
   };
-};
-
-/** A repeatable 0..1 value for a table point: picks and tie-breaks never change between loads. */
-const spotHash = (x, y, salt = 0) => {
-  const value = Math.sin(x * 12.9898 + y * 78.233 + salt * 37.719) * 43758.5453;
-  return value - Math.floor(value);
 };
 
 const insideBounds = (bounds, x, y, inset) =>

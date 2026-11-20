@@ -15,7 +15,7 @@
 import { rgbCss } from '../../fx-colors.mjs';
 import { litSideLight, moddedKit, unstyled } from './_kit-mod.js';
 import { mergeFxMods, withFxMod } from './_mods.js';
-import { grainPass, inShadow, shardOutline, styledKit, tongueOutline, traceOutline } from './_shared.js';
+import { grainPass, hash, inShadow, shardOutline, styledKit, tongueOutline, traceOutline } from './_shared.js';
 import { streamGlobs } from './poison.js';
 
 // Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
@@ -57,12 +57,6 @@ const edgeOf = (rgb) => Object.freeze({ dissolve: Object.freeze({ edge: rgb, gai
 const TAU = Math.PI * 2;
 const rad = (deg) => (deg * Math.PI) / 180;
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
-
-/** A stable pseudo-random value in [0, 1) for (seed, index). */
-const hash = (seed, index) => {
-  const v = Math.sin(seed * 12.9898 + index * 78.233) * 43758.5453;
-  return v - Math.floor(v);
-};
 
 const CLOD_CORNERS = 7;
 const SPIKE_SHOULDER = 0.68;

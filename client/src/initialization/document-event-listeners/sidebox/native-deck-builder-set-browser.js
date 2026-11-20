@@ -195,16 +195,6 @@ import {
           .join('');
       };
 
-      const renderSetTab = (set, { expanded }) => {
-        const safeSetName = escapeHtml(set.name);
-        return [
-          `<button class="native-deck-builder-set-browser-tab${expanded ? ' expanded' : ''}" data-toggle-set="${escapeHtml(set.setId)}" aria-expanded="${expanded ? 'true' : 'false'}" title="${safeSetName}">`,
-          set.logo ? `<img class="native-deck-builder-set-browser-tab-logo" src="${escapeHtml(set.logo)}" alt="" loading="lazy" />` : `<span class="native-deck-builder-set-browser-tab-name">${safeSetName}</span>`,
-          `  <span class="native-deck-builder-set-browser-tab-count">${set.cardCount}</span>`,
-          '</button>',
-        ].join('');
-      };
-
       const renderDropdownSection = (set, { cardsHtml = '', loadingCards = false, showLabel = false }) => {
         const safeSetName = escapeHtml(set.name);
         const label = showLabel ? `<div class="native-deck-builder-set-browser-dropdown-label">${safeSetName}</div>` : '';
@@ -327,60 +317,6 @@ import {
         const owned = getOwned ? getOwned() : {};
         const dropdownSections = [];
 
-        const renderGroup = (label, groupSets) => {
-          if (groupSets.length === 0) return '';
-          const tabsHtml = [];
-          for (const set of groupSets) {
-            let expanded = set.setId === expandedSetId;
-
-            if (expanded || isFiltering) {
-              const cards = cardsBySet.get(set.setId);
-              if (cards) {
-                const filtered = filterCardsBySupertype(
-                  filterCardsByName(cards, filterTerm),
-                  supertypeFilter
-                ).filter((card) => {
-                  const setId = set.setId;
-                  if (filterMatches === null) return true;
-                  if (!filterMatches.get(setId)?.has(card.id)) return false;
-                  return !cardFilters?.inDeck || quantities[card.id] > 0;
-                });
-                if (isFiltering) {
-                  expanded = filtered.length > 0;
-                }
-                if (expanded) {
-                  const cardsHtml = filtered.length
-                    ? renderCardsGrid(
-                        // These Other-tab sets arrive in their own order; number order would undo it. So does a custom
-                        // set: its set.json lists the cards in the order its editor wants them shown (ids stay).
-                        KEEP_FETCH_ORDER_SET_IDS.has(set.setId) || isCustomSetId(set.setId)
-                          ? filtered
-                          : sortCardsWithinGroup(filtered, { sortBy: 'number', sortDirection: 'asc' }),
-                        quantities,
-                        owned
-                      )
-                    : '<div class="native-deck-builder-set-browser-empty">No cards match your filter.</div>';
-                  dropdownSections.push(renderDropdownSection(set, { cardsHtml, showLabel: isFiltering }));
-                }
-              } else if (expanded && !isFiltering) {
-                // clicked but not loaded yet — show a loading placeholder
-                dropdownSections.push(renderDropdownSection(set, { loadingCards: true }));
-              } else if (isFiltering) {
-                expanded = false;
-              }
-            }
-
-            tabsHtml.push(renderSetTab(set, { expanded }));
-          }
-          const key = label.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'generation';
-          return [
-            `<div class="native-deck-builder-set-browser-group" data-category="${escapeHtml(key)}">`,
-            label ? `  <div class="native-deck-builder-set-browser-group-label">${escapeHtml(label)}</div>` : '',
-            `  <div class="native-deck-builder-set-browser-group-tabs">${tabsHtml.join('')}</div>`,
-            '</div>',
-          ].join('');
-        };
-
         const { label: groupLabel, sets: groupSets } = activeGroup();
 
         if (groupSets.length === 0) {
@@ -389,7 +325,62 @@ import {
           return;
         }
 
-        tabsEl.innerHTML = renderGroup(groupLabel, groupSets);
+        const tabsHtml = [];
+        for (const set of groupSets) {
+          let expanded = set.setId === expandedSetId;
+
+          if (expanded || isFiltering) {
+            const cards = cardsBySet.get(set.setId);
+            if (cards) {
+              const filtered = filterCardsBySupertype(
+                filterCardsByName(cards, filterTerm),
+                supertypeFilter
+              ).filter((card) => {
+                const setId = set.setId;
+                if (filterMatches === null) return true;
+                if (!filterMatches.get(setId)?.has(card.id)) return false;
+                return !cardFilters?.inDeck || quantities[card.id] > 0;
+              });
+              if (isFiltering) {
+                expanded = filtered.length > 0;
+              }
+              if (expanded) {
+                const cardsHtml = filtered.length
+                  ? renderCardsGrid(
+                      // These Other-tab sets arrive in their own order; number order would undo it. So does a custom
+                      // set: its set.json lists the cards in the order its editor wants them shown (ids stay).
+                      KEEP_FETCH_ORDER_SET_IDS.has(set.setId) || isCustomSetId(set.setId)
+                        ? filtered
+                        : sortCardsWithinGroup(filtered, { sortBy: 'number', sortDirection: 'asc' }),
+                      quantities,
+                      owned
+                    )
+                  : '<div class="native-deck-builder-set-browser-empty">No cards match your filter.</div>';
+                dropdownSections.push(renderDropdownSection(set, { cardsHtml, showLabel: isFiltering }));
+              }
+            } else if (expanded && !isFiltering) {
+              // clicked but not loaded yet — show a loading placeholder
+              dropdownSections.push(renderDropdownSection(set, { loadingCards: true }));
+            } else if (isFiltering) {
+              expanded = false;
+            }
+          }
+
+          const safeSetName = escapeHtml(set.name);
+          tabsHtml.push([
+            `<button class="native-deck-builder-set-browser-tab${expanded ? ' expanded' : ''}" data-toggle-set="${escapeHtml(set.setId)}" aria-expanded="${expanded ? 'true' : 'false'}" title="${safeSetName}">`,
+            set.logo ? `<img class="native-deck-builder-set-browser-tab-logo" src="${escapeHtml(set.logo)}" alt="" loading="lazy" />` : `<span class="native-deck-builder-set-browser-tab-name">${safeSetName}</span>`,
+            `  <span class="native-deck-builder-set-browser-tab-count">${set.cardCount}</span>`,
+            '</button>',
+          ].join(''));
+        }
+        const key = groupLabel.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'generation';
+        tabsEl.innerHTML = [
+          `<div class="native-deck-builder-set-browser-group" data-category="${escapeHtml(key)}">`,
+          groupLabel ? `  <div class="native-deck-builder-set-browser-group-label">${escapeHtml(groupLabel)}</div>` : '',
+          `  <div class="native-deck-builder-set-browser-group-tabs">${tabsHtml.join('')}</div>`,
+          '</div>',
+        ].join('');
         resultsEl.innerHTML = dropdownSections.length
           ? dropdownSections.join('')
           : '<div class="native-deck-builder-set-browser-dropdown-empty">Select a set above to browse its cards.</div>';
@@ -549,14 +540,13 @@ import {
 
       // The card editor pushed a set and the server reloaded it: drop what this panel holds of custom
       // sets, then redraw the custom pill (and its open set) on screen with the new cards.
-      const isCustomPill = (category) => category === CUSTOM_CATEGORY || category === HOMEBREW_SETS_CATEGORY;
       const refreshCustomSets = async () => {
         forgetCustomSetRecords();
         categoryState.delete(CUSTOM_CATEGORY);
         categoryState.delete(HOMEBREW_SETS_CATEGORY);
         for (const setId of [...cardsBySet.keys()]) if (isCustomSetId(setId)) cardsBySet.delete(setId);
         for (const setId of [...pendingBySet.keys()]) if (isCustomSetId(setId)) pendingBySet.delete(setId);
-        if (!isCustomPill(activeCategory)) return;
+        if (activeCategory !== CUSTOM_CATEGORY && activeCategory !== HOMEBREW_SETS_CATEGORY) return;
         const category = activeCategory;
         await loadCategory(category);
         const openSetId = expandedSetId;

@@ -61,11 +61,6 @@ const RULE_BOX_TESTS = [
   isRadiantCard,
 ];
 
-const collapseStage = (stage) =>
-  String(stage || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, '');
-
 export { hashString };
 
 /**
@@ -86,7 +81,9 @@ export function speciesFor(card) {
 export function tierFor(card) {
   if (!card || typeof card !== 'object') return 1;
   if (RULE_BOX_TESTS.some((isRuleBox) => isRuleBox(card))) return 3;
-  const stage = collapseStage(card.stage || card.subtypes?.[0] || 'Basic');
+  const stage = String(card.stage || card.subtypes?.[0] || 'Basic')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
   if (stage === 'stage2' || stage === 'megahb' || stage === 'terahb' || stage === 'break') return 3;
   if (stage === 'stage1') return 2;
   return 1;

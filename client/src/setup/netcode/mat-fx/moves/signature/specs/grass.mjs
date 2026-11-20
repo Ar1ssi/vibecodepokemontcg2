@@ -2,7 +2,6 @@
 // board mapping (`.agent/designs/065-signature-move-animations.md` § Appendix S › Grass);
 // departures from an entry are listed under the design's Deviations (slice 5).
 
-const IVY_CYAN = Object.freeze({ body: '#7FFFD4', hot: '#C6FFE3', core: '#FFFFFF' });
 
 // Ogerpon: the club wrapped in a spinning ivy ball with pale-cyan rings slams down into a
 // cyan-yellow shard burst and a ground ring. Material follows the mask (signatureMaterial).

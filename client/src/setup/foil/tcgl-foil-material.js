@@ -83,13 +83,6 @@ function acquireTexture(url, meta = {}, { pinned = false, single = false } = {})
   return entry;
 }
 
-function releaseTexture(entry) {
-  entry.refs -= 1;
-  if (entry.refs > 0 || entry.pinned) return;
-  textureCache.delete(entry.key);
-  entry.texture.dispose();
-}
-
 const plainTexture = (r, g, b) => {
   const texture = new THREE.DataTexture(new Uint8Array([r, g, b, 255]), 1, 1);
   texture.wrapS = THREE.RepeatWrapping;
@@ -333,7 +326,12 @@ export function createFoilMaterial(record) {
   };
   material.release = () => {
     material.dispose();
-    for (const entry of held.splice(0)) releaseTexture(entry);
+    for (const entry of held.splice(0)) {
+      entry.refs -= 1;
+      if (entry.refs > 0 || entry.pinned) continue;
+      textureCache.delete(entry.key);
+      entry.texture.dispose();
+    }
   };
   return material;
 }

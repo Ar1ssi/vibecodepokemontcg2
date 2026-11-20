@@ -149,12 +149,6 @@ export const initializeBuildBattle = ({
   const boxStartingRows = () =>
     session && isLoaded() ? startingDeckRows({ box: activeBox, data: loaded.data, opened: session }) : [];
 
-  // A fixed deck shows its own two sprites; an Evolution deck each group's promo Pokémon.
-  const deckSprites = () => {
-    if (!session.groupKeys) return deckEntryOf(session)?.sprites || [];
-    return session.groupKeys.map((key) => deckEntryOf(session, key)?.sprites?.[0]).filter(Boolean);
-  };
-
   // The box deck goes into My Decks as a Build & Battle record and opens in the editor. When
   // storage refuses the write it still opens, unsaved, and the session keeps its cards so edits survive a
   // reload (I207); the Box tab says so until the player saves it.
@@ -165,7 +159,13 @@ export const initializeBuildBattle = ({
         getTarget(),
         buildBattleDeckName(activeBox, deckEntry.name, session.seed),
         cards,
-        { format: DECK_FORMAT_BUILD_BATTLE, sprites: deckSprites() }
+        {
+          format: DECK_FORMAT_BUILD_BATTLE,
+          // A fixed deck shows its own two sprites; an Evolution deck each group's promo Pokémon.
+          sprites: session.groupKeys
+            ? session.groupKeys.map((key) => deckEntryOf(session, key)?.sprites?.[0]).filter(Boolean)
+            : deckEntry.sprites || [],
+        }
       ) || null;
     if (!deckId) showUnsavedDeck(cards);
     session = { ...session, deckId, unsavedDeck: deckId ? null : deckCardCounts(cards) };
@@ -268,25 +268,6 @@ export const initializeBuildBattle = ({
     );
   };
 
-  const openNewBox = (seedText) => {
-    if (session || !isLoaded()) return;
-    const seed = parseSeed(seedText.trim()) ?? randomSeed();
-    const opened = openBox({
-      box: activeBox,
-      data: loaded.data,
-      cards: loaded.cards,
-      setInfo: loaded.setInfo,
-      rng: createRng(seed),
-    });
-    session = createSession({ boxKey: activeBox.key, seed, roomId: currentRoomId, ...opened });
-    computePool();
-    clearPoolStatus();
-    newRoomNote = false;
-    staleBoxNote = false;
-    openBoxDeck();
-    renderAll();
-  };
-
   // The scene's beats: a refused event returns null and the scene does nothing (design 052 row 3).
   const dispatchUnboxing = (event) => {
     if (!session) return null;
@@ -297,21 +278,18 @@ export const initializeBuildBattle = ({
     return next;
   };
 
-  // The Pool tab fades in when the scene hands over to it.
-  const handOverToPool = () => {
-    showPool();
-    if (!poolPanelEl) return;
-    poolPanelEl.classList.remove('bb-enter');
-    void poolPanelEl.offsetWidth;
-    poolPanelEl.classList.add('bb-enter');
-  };
-
   const finishOpening = () => {
     if (stage.el) {
       stage.close();
       renderBox();
     }
-    handOverToPool();
+    // The Pool tab fades in when the scene hands over to it.
+    showPool();
+    if (poolPanelEl) {
+      poolPanelEl.classList.remove('bb-enter');
+      void poolPanelEl.offsetWidth;
+      poolPanelEl.classList.add('bb-enter');
+    }
   };
 
   const discardBox = () => {
@@ -351,13 +329,6 @@ export const initializeBuildBattle = ({
     if (!boxPanelEl?.contains(active)) return null;
     if (active.id === 'buildBattleBox' || active.id === 'buildBattleSeed') return `#${active.id}`;
     return active.dataset?.era ? `.bb-era-chip[data-era="${active.dataset.era}"]` : null;
-  };
-
-  const refocus = (selector) => {
-    const control = selector && boxPanelEl.querySelector(selector);
-    if (!control) return;
-    control.focus();
-    if (control.id === 'buildBattleSeed') control.setSelectionRange(control.value.length, control.value.length);
   };
 
   const sealedNote = () => {
@@ -406,7 +377,22 @@ export const initializeBuildBattle = ({
     openButton.disabled = !isLoaded();
     openButton.addEventListener('click', () => {
       openButton.disabled = true;
-      openNewBox(seedInput.value);
+      if (session || !isLoaded()) return;
+      const seed = parseSeed(seedInput.value.trim()) ?? randomSeed();
+      const opened = openBox({
+        box: activeBox,
+        data: loaded.data,
+        cards: loaded.cards,
+        setInfo: loaded.setInfo,
+        rng: createRng(seed),
+      });
+      session = createSession({ boxKey: activeBox.key, seed, roomId: currentRoomId, ...opened });
+      computePool();
+      clearPoolStatus();
+      newRoomNote = false;
+      staleBoxNote = false;
+      openBoxDeck();
+      renderAll();
     });
     sealed.append(seedLabel, openButton);
     boxPanelEl.append(sealed);
@@ -459,7 +445,11 @@ export const initializeBuildBattle = ({
       }
     }
     else renderSealedBox();
-    refocus(focused);
+    const control = focused && boxPanelEl.querySelector(focused);
+    if (control) {
+      control.focus();
+      if (control.id === 'buildBattleSeed') control.setSelectionRange(control.value.length, control.value.length);
+    }
   };
 
   // ── Pool tab ────────────────────────────────────────────────────────────

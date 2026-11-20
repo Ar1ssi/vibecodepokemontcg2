@@ -10,15 +10,9 @@ import {
   buildAbilityOption,
   buildAttackOption,
   buildWeakResistBar,
+  el,
   typeIcon,
 } from './attack-options.mjs';
-
-const el = (tag, className, text) => {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text != null) node.textContent = String(text);
-  return node;
-};
 
 // AttachedEnergyDisplayUI / PokemonToolDisplayUI: a title, the "x<b>count</b>" total and the icons.
 const attachedRow = (className, title, count, icons) => {

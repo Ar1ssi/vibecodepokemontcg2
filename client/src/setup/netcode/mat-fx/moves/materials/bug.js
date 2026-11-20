@@ -15,7 +15,7 @@
 import { rgbCss } from '../../fx-colors.mjs';
 import { moddedKit } from './_kit-mod.js';
 import { withFxMod } from './_mods.js';
-import { grainPass, inShadow, shardOutline, sphere, styledKit, tongueOutline, traceOutline } from './_shared.js';
+import { framer, grainPass, inShadow, shardOutline, sphere, styledKit, tongueOutline, traceOutline } from './_shared.js';
 
 // Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
 // Shells and wing blades catch a dull sheen; buzzing wings shimmer; silver powder twinkles.
@@ -77,14 +77,6 @@ const SILVER_PALETTE = Object.freeze({
   core: Object.freeze([246, 248, 250]),
   white: Object.freeze([255, 255, 255]),
 });
-
-/** Map (f along, side across) in units of `length` / `width` from the base (x, y) along `angleDeg`. */
-const framer = ({ x, y, angleDeg, length, width }) => {
-  const a = rad(angleDeg);
-  const ux = Math.cos(a);
-  const uy = Math.sin(a);
-  return (f, side) => [x + ux * length * f - uy * width * side, y + uy * length * f + ux * width * side];
-};
 
 /**
  * A needle from its base (x, y) along `angleDeg`: a blunt base 0.2 `width` across, widening to

@@ -19,6 +19,12 @@ export const hash = (x, y, salt) => {
   return s - Math.floor(s);
 };
 
+/** A repeatable 0..1 value for a table point: picks and tie-breaks never change between loads. */
+export const spotHash = (x, y, salt = 0) => {
+  const value = Math.sin(x * 12.9898 + y * 78.233 + salt * 37.719) * 43758.5453;
+  return value - Math.floor(value);
+};
+
 export const distanceToRect = (x, y, r) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.y - y, 0, y - r.y - r.h));
 
 export const union = (rects) => {

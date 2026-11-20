@@ -257,21 +257,17 @@ export const prizeFanSlots = (
   }));
 };
 
-const applyHostTransform = (host, translate, scale, rotateY) => {
-  if (!host) return;
-  host.style.transform = `translate3d(${translate.x}px, ${translate.y}px, 0.1px) scale(${scale})`;
-  const flip = host.querySelector?.('.card-preview-flip');
-  if (flip) {
-    flip.style.transform = `rotateY(${rotateY}deg)`;
-  }
-};
-
 export const createPopoverMotion = (host, { homeScale = 1 } = {}) => {
   const scale = createSpring(homeScale, POPOVER_SPRING);
   const translate = createSpring({ x: 0, y: 0 }, POPOVER_SPRING);
   const rotateDelta = createSpring(0, POPOVER_SPRING);
   const paint = () => {
-    applyHostTransform(host, translate.value, scale.value, rotateDelta.value);
+    if (!host) return;
+    host.style.transform = `translate3d(${translate.value.x}px, ${translate.value.y}px, 0.1px) scale(${scale.value})`;
+    const flip = host.querySelector?.('.card-preview-flip');
+    if (flip) {
+      flip.style.transform = `rotateY(${rotateDelta.value}deg)`;
+    }
   };
   const unsubs = [scale.subscribe(paint), translate.subscribe(paint), rotateDelta.subscribe(paint)];
 

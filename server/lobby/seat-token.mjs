@@ -8,11 +8,6 @@ import { randomUUID } from 'node:crypto';
 
 const MAX_TOKEN_LENGTH = 100;
 
-const tokensOf = (room) => {
-  if (!room.seatTokens) room.seatTokens = new Map();
-  return room.seatTokens;
-};
-
 /**
  * @param {{ seatTokens?: Map<string, string> }} room
  * @param {string} username
@@ -21,7 +16,8 @@ const tokensOf = (room) => {
  */
 export function issueSeatToken(room, username, mint = randomUUID) {
   const token = mint();
-  tokensOf(room).set(username, token);
+  if (!room.seatTokens) room.seatTokens = new Map();
+  room.seatTokens.set(username, token);
   return token;
 }
 

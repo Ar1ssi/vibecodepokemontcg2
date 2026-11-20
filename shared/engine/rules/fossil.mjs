@@ -85,17 +85,6 @@ export function becomeFossilPokemon(card, { hp = null, turnNumber = null } = {})
   return card;
 }
 
-/** Restores the Item a fossil was before it was played. */
-export function revertFossilPokemon(card) {
-  if (!card?.fossilOrigin) return card;
-  for (const field of ORIGIN_FIELDS) card[field] = card.fossilOrigin[field];
-  delete card.fossilOrigin;
-  delete card.playedAsPokemon;
-  delete card.fossilCantRetreat;
-  delete card.fossilNoConditions;
-  return card;
-}
-
 /**
  * Post-command sweep: a fossil that left play (discarded, Knocked Out, returned to hand or
  * deck) is the Item again, and its own "can't retreat / no Special Conditions" clauses only
@@ -108,7 +97,12 @@ export function settleFossilCards(state) {
       for (const card of zone) {
         if (!card?.fossilOrigin) continue;
         if (!IN_PLAY_ZONES.has(zoneId) || card.attachedTo != null) {
-          revertFossilPokemon(card);
+          // Restores the Item the fossil was before it was played.
+          for (const field of ORIGIN_FIELDS) card[field] = card.fossilOrigin[field];
+          delete card.fossilOrigin;
+          delete card.playedAsPokemon;
+          delete card.fossilCantRetreat;
+          delete card.fossilNoConditions;
           continue;
         }
         // A printed-stats resync (room.mjs cardStats) can write the Item text back.

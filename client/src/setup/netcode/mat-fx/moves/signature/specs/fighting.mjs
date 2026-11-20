@@ -21,7 +21,6 @@ const burst = (at, count, kind, over = {}) =>
   });
 
 const FLAME_RING = Object.freeze({ deep: '#FF7A1A', body: '#F4C93E', hot: '#FFC85E', core: '#FFFFBE' });
-const CREST = Object.freeze({ deep: '#5A2A8A', body: '#D85EFF', hot: '#F2E6FF', core: '#FFFFFF' });
 
 // Koraidon: its violet-white crest loops, it leaps down the lane behind a gold-orange flame ring
 // that rolls into the defender and bursts in gold-white with rock chunks.

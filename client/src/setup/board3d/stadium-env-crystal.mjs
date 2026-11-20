@@ -44,7 +44,7 @@ import { createKitProps } from './stadium-kit.mjs';
 import { placeAsset } from './stadium-kit-assets.mjs';
 import { craterEmblem, environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
 import { tableBounds } from './table-uv.mjs';
-import { shuffled } from './stadium-env-spots.mjs';
+import { distanceToRect, hash, oppHandRect, shuffled, union } from './stadium-env-spots.mjs';
 
 export const CRYSTAL_KEY = 'crystal-cave';
 /** The skylight (toward it, table frame): from high above, a little toward the far left. */
@@ -78,29 +78,6 @@ const CLUSTER_HEIGHT = { far: [150, 250], side: [85, 150], near: [34, 62] };
 const CLUSTER_LIGHT = Object.freeze({ reach: 1.5, strength: 0.55, breath: 0.08 });
 const EMBLEM_LIGHT = Object.freeze({ colour: '#ffc94d', reach: 40, strength: 0.35 });
 const SPARKLE_COUNT = 70;
-
-/** A small deterministic 0..1 from three numbers. */
-const hash = (x, y, salt) => {
-  const s = Math.sin(x * 127.1 + y * 311.7 + salt * 74.7) * 43758.5453;
-  return s - Math.floor(s);
-};
-
-const distanceToRect = (x, y, r) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.y - y, 0, y - r.y - r.h));
-
-const union = (rects) => {
-  const x = Math.min(...rects.map((r) => r.x));
-  const y = Math.min(...rects.map((r) => r.y));
-  return { x, y, w: Math.max(...rects.map((r) => r.x + r.w)) - x, h: Math.max(...rects.map((r) => r.y + r.h)) - y };
-};
-
-/** The opponent's hand where the board fans it, past the far edge: the cards' width either side of the middle. */
-const oppHandRect = (layout, core) => {
-  const hand = layout.opp?.hand;
-  const cardH = layout.opp?.cardBox?.hand?.h ?? 0;
-  if (!hand || !(cardH > 0) || !Number.isFinite(hand.baselineY)) return null;
-  const halfW = Math.max(Math.abs(core.x), Math.abs(core.x + core.w));
-  return { x: -halfW, y: hand.baselineY - cardH, w: 2 * halfW, h: cardH };
-};
 
 /**
  * One cluster's crystals: `count` prisms out of a common foot, each leaning out from the cluster's

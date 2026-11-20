@@ -24,7 +24,7 @@
 import { rgbCss } from '../../fx-colors.mjs';
 import { moddedKit } from './_kit-mod.js';
 import { withFxMod, withLiftZ } from './_mods.js';
-import { grainPass, inShadow, sphere, tongueOutline, traceOutline, wobble } from './_shared.js';
+import { alongAxis, grainPass, inShadow, sphere, tongueOutline, traceOutline, wobble } from './_shared.js';
 
 const TAU = Math.PI * 2;
 const SHEET_AMP = 0.4;
@@ -65,14 +65,6 @@ const PALETTE = Object.freeze({
   core: Object.freeze([228, 247, 255]),
   white: Object.freeze([255, 255, 255]),
 });
-
-/** `rgb` at `alpha` as a one-stop gradient laid from a sheet's base toward its tip (flat on Canvas2D). */
-function alongSheet(ctx, { x, y, angleDeg, length }, rgb, alpha) {
-  const a = (angleDeg * Math.PI) / 180;
-  const g = ctx.createLinearGradient(x, y, x + Math.cos(a) * length, y + Math.sin(a) * length);
-  g.addColorStop(0, rgbCss(rgb, alpha));
-  return g;
-}
 
 /** The water material drawn in `palette` (any palette with the same keys). */
 function waterKit(palette) {
@@ -168,7 +160,7 @@ function waterKit(palette) {
     const outline = tongueOutline(sheet, 1);
     inShadow(ctx, () => {
       ctx.fxStyle = LIQUID_SHEET;
-      ctx.fillStyle = alongSheet(ctx, sheet, palette.body, 0.55 * alpha);
+      ctx.fillStyle = alongAxis(ctx, sheet, palette.body, 0.55 * alpha);
       traceOutline(ctx, outline);
       withLiftZ(ctx, LIFT.sheet, () => withFxMod(ctx, sheetMod(spec.angleDeg), () => ctx.fill()));
       ctx.fxStyle = null;

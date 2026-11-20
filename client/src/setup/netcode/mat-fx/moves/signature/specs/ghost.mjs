@@ -2,22 +2,7 @@
 // board mapping (`.agent/designs/065-signature-move-animations.md` § Appendix S › Ghost);
 // departures from an entry are listed under the design's Deviations (slice 14).
 
-const motes = (at, count, over = {}) =>
-  Object.freeze({
-    at,
-    anchor: 'defender',
-    count,
-    distance: 1.1,
-    direction: -90,
-    spread: 360,
-    size: [0.03, 0.07],
-    aspect: 1,
-    gravity: 0,
-    maxDelay: 0.2,
-    durationMs: 800,
-    kind: 'mote',
-    ...over,
-  });
+import { motes } from '../../move-spec.mjs';
 
 const STEED = Object.freeze({ deep: '#1A0A2E', body: '#7A3CFF', hot: '#C9A8FF', core: '#FFFFFF' });
 const GROUND_FLAME = Object.freeze({ deep: '#7A3CFF', body: '#E43BE0', hot: '#FFC0F5', core: '#FFFFFF' });
@@ -55,7 +40,6 @@ export const astralBarrage = Object.freeze({
 const MOON = Object.freeze({ deep: '#6A3FE0', body: '#B8A4FF', hot: '#E6DEFF', core: '#FAF8FF' });
 const MOON_CYAN = Object.freeze({ deep: '#0B1733', body: '#5FE6F5', hot: '#E8F7FF', core: '#FFFFFF' });
 const WING = Object.freeze({ deep: '#0B1733', body: '#7A4FFF', hot: '#C9B8FF', core: '#FFFFFF' });
-const CREST = Object.freeze({ deep: '#7A4FFF', body: '#FFD86B', hot: '#FFF3C0', core: '#FFFFFF' });
 
 // Lunala: violet wings spread round a white-blue orb at its chest under a moon crest, then a
 // cyan-white beam crosses the lane and bursts on the defender.

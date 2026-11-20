@@ -53,95 +53,8 @@ export function energyAttachPlanMatch(state, player, energy, targetInstanceId) {
   return name.includes(plan.nameTag) ? { plan, hostId } : null;
 }
 
-/**
- * "Instead of attaching your free Energy card, you may instead attach 2 Fire Energy cards to 1 of
- * your Pokémon with Blaine in its name": the turn's first attach, when it fits the plan, picks the
- * host; each later fitting attach to that host uses up the plan's remaining count.
- */
-function recordEnergyAttachPlan(draft, player, energy, hostId) {
-  const match = energyAttachPlanMatch(draft, player, energy, hostId);
-  if (!match) return;
-  if (!player.flags.energyAttached) {
-    match.plan.hostId = match.hostId;
-    match.plan.attached = 1;
-  } else if (match.plan.hostId === match.hostId) {
-    match.plan.attached += 1;
-  }
-}
-
-/**
- * "Whenever your opponent plays a Pokémon from their hand to evolve 1 of their
- * Pokémon, put N damage counters on that Pokémon" (Team Rocket's Ampharos Darkest
- * Impulse). Fires after the evolve lands, before any turn-end check.
- */
-function applyOnOpponentEvolve(draft, { evolvedCard, evolvingPlayerId, events }) {
-  const entries = inPlayEntries(draft).filter(
-    (entry) => entry.playerId !== evolvingPlayerId
-  );
-  const ctx = abilitySideContext(draft, evolvingPlayerId);
-  const effects = parseOnOpponentEvolveAbilities(entries, ctx);
-  if (effects.length === 0) return;
-  for (const effect of effects) {
-    const damage = effect.count * 10;
-    evolvedCard.damage = (evolvedCard.damage || 0) + damage;
-    events.push({
-      type: 'damageUpdated',
-      instanceId: evolvedCard.instanceId,
-      damage: evolvedCard.damage,
-      dealt: damage,
-      reason: 'onOpponentEvolve',
-      source: effect.source,
-    });
-  }
-  const hp = cardEffectiveHp(draft, evolvedCard, evolvingPlayerId);
-  if (hp > 0 && (evolvedCard.damage || 0) >= hp) {
-    handleKnockout(draft, {
-      victimPlayerId: evolvingPlayerId,
-      attackerPlayerId: Object.keys(draft.players || {}).find(
-        (id) => id !== evolvingPlayerId
-      ),
-      victim: evolvedCard,
-      events,
-    });
-  }
-}
-
 export const GROWTH_ATTACH_EFFECT = 'alphaGrowth';
 export const STADIUM_EVOLVE_SEARCH_EFFECT = 'stadiumEvolveSearch';
-
-/**
- * Gengar ex Gnawing Curse: an Energy the opponent attaches from hand puts damage counters on the
- * receiving Pokémon (one counter is 10 damage). The Stadium's version is stadium-triggers
- * (Old Cemetery). A Knock Out from the counters resolves in the command tail
- * (resolveDamageCounterKnockouts).
- */
-function applyGnawingCurseCounters(draft, { host, playerId, events }) {
-  for (const [ownerId, owner] of Object.entries(draft.players || {})) {
-    if (ownerId === playerId) continue;
-    const ctx = abilitySideContext(draft, ownerId);
-    for (const holder of [...(owner.zones?.active || []), ...(owner.zones?.bench || [])]) {
-      if (holder.attachedTo) continue;
-      const counters = abilityEnergyAttachCounters(inPlayView(draft, holder), ctx);
-      if (counters <= 0) continue;
-      host.damage = (host.damage || 0) + counters * 10;
-      events.push({
-        type: 'damageUpdated',
-        instanceId: host.instanceId,
-        damage: host.damage,
-        dealt: counters * 10,
-        source: holder.name,
-      });
-      // Lethal counters become a Knock Out via the reducer's post-command sweep.
-      events.push({
-        type: 'damageCountersPlaced',
-        instanceId: host.instanceId,
-        victimPlayerId: playerId,
-        attackerPlayerId: null,
-        damage: host.damage,
-      });
-    }
-  }
-}
 
 /** Runs the Ability triggers of an Energy attached from the hand (`parseOnEnergyAttachAbilities`). */
 function applyEnergyAttachTriggers(draft, { host, hostTop, energy, playerId, events }) {
@@ -331,7 +244,16 @@ export function attachCardCommand({ draft, payload, playerId, activeRng, events 
         draft.players[playerId].flags = {};
       }
       if (cardRef.zoneId === 'hand') {
-        recordEnergyAttachPlan(draft, draft.players[playerId], cardRef.card, hostRef.card.instanceId);
+        // "Instead of attaching your free Energy card, you may instead attach 2 Fire Energy cards to
+        // 1 of your Pokémon with Blaine in its name": the turn's first attach, when it fits the plan,
+        // picks the host; each later fitting attach to that host uses up the plan's remaining count.
+        const match = energyAttachPlanMatch(draft, draft.players[playerId], cardRef.card, hostRef.card.instanceId);
+        if (match && !draft.players[playerId].flags.energyAttached) {
+          match.plan.hostId = match.hostId;
+          match.plan.attached = 1;
+        } else if (match && match.plan.hostId === match.hostId) {
+          match.plan.attached += 1;
+        }
       }
       draft.players[playerId].flags.energyAttached = true;
       // "If you attach a {F} Energy card from your hand to this Pokémon during this turn"
@@ -385,7 +307,34 @@ export function attachCardCommand({ draft, payload, playerId, activeRng, events 
           playerId,
           events,
         });
-        applyGnawingCurseCounters(draft, { host: hostRef.card, playerId, events });
+        // Gengar ex Gnawing Curse: an Energy the opponent attaches from hand puts damage counters on
+        // the receiving Pokémon (one counter is 10 damage). A Knock Out from the counters resolves in
+        // the command tail (resolveDamageCounterKnockouts).
+        for (const [ownerId, owner] of Object.entries(draft.players || {})) {
+          if (ownerId === playerId) continue;
+          const ctx = abilitySideContext(draft, ownerId);
+          for (const holder of [...(owner.zones?.active || []), ...(owner.zones?.bench || [])]) {
+            if (holder.attachedTo) continue;
+            const counters = abilityEnergyAttachCounters(inPlayView(draft, holder), ctx);
+            if (counters <= 0) continue;
+            hostRef.card.damage = (hostRef.card.damage || 0) + counters * 10;
+            events.push({
+              type: 'damageUpdated',
+              instanceId: hostRef.card.instanceId,
+              damage: hostRef.card.damage,
+              dealt: counters * 10,
+              source: holder.name,
+            });
+            // Lethal counters become a Knock Out via the reducer's post-command sweep.
+            events.push({
+              type: 'damageCountersPlaced',
+              instanceId: hostRef.card.instanceId,
+              victimPlayerId: playerId,
+              attackerPlayerId: null,
+              damage: hostRef.card.damage,
+            });
+          }
+        }
       }
     } else if (isPokemon(cardRef.card)) {
       if (!draft.players[playerId].flags) {
@@ -454,12 +403,38 @@ export function attachCardCommand({ draft, payload, playerId, activeRng, events 
         events,
       });
 
-      // Opponent-evolves ability trigger (design 034 slice 4).
-      applyOnOpponentEvolve(draft, {
-        evolvedCard: hostRef.card,
-        evolvingPlayerId: hostRef.playerId,
-        events,
-      });
+      // "Whenever your opponent plays a Pokémon from their hand to evolve 1 of their Pokémon, put N
+      // damage counters on that Pokémon" (Team Rocket's Ampharos Darkest Impulse; design 034 slice 4).
+      // Fires after the evolve lands, before any turn-end check.
+      const onEvolveEffects = parseOnOpponentEvolveAbilities(
+        inPlayEntries(draft).filter((entry) => entry.playerId !== hostRef.playerId),
+        abilitySideContext(draft, hostRef.playerId)
+      );
+      if (onEvolveEffects.length > 0) {
+        for (const effect of onEvolveEffects) {
+          const damage = effect.count * 10;
+          hostRef.card.damage = (hostRef.card.damage || 0) + damage;
+          events.push({
+            type: 'damageUpdated',
+            instanceId: hostRef.card.instanceId,
+            damage: hostRef.card.damage,
+            dealt: damage,
+            reason: 'onOpponentEvolve',
+            source: effect.source,
+          });
+        }
+        const hp = cardEffectiveHp(draft, hostRef.card, hostRef.playerId);
+        if (hp > 0 && (hostRef.card.damage || 0) >= hp) {
+          handleKnockout(draft, {
+            victimPlayerId: hostRef.playerId,
+            attackerPlayerId: Object.keys(draft.players || {}).find(
+              (id) => id !== hostRef.playerId
+            ),
+            victim: hostRef.card,
+            events,
+          });
+        }
+      }
 
       // Gen 6 Mega Evolution / Primal Reversion: the evolve ends the turn
       // immediately unless the matching Spirit Link is already attached

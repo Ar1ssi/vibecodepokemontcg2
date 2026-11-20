@@ -15,17 +15,6 @@ const getJson = (fetchImpl, url) =>
     return response.json();
   });
 
-// The config names each custom set that ships a foil.json (design 075): `customFoil: [{ setId, url }]`. A set whose
-// file is missing or malformed is skipped with a warning; it never takes the TCG Live foil down with it.
-const mergeCustomSets = (fetchImpl, parsed, sets) =>
-  Promise.all(
-    (Array.isArray(sets) ? sets : []).map(({ setId, url } = {}) =>
-      getJson(fetchImpl, url)
-        .then((json) => mergeCustomFoil(parsed, parseCustomFoil(setId, json)))
-        .catch((error) => console.warn(`custom set foil ${setId} skipped: ${error.message}`))
-    )
-  );
-
 /** @returns {Promise<object|null>} the parsed manifest, or null when it or the texture host is unavailable. */
 export function loadFoilManifest(fetchImpl = globalThis.fetch) {
   if (manifestPromise) return manifestPromise;
@@ -36,7 +25,15 @@ export function loadFoilManifest(fetchImpl = globalThis.fetch) {
       if (typeof base !== 'string' || !base) throw new Error('no texture host configured');
       const parsed = parseFoilManifest(json);
       textureBase = base.replace(/\/+$/, '');
-      return mergeCustomSets(fetchImpl, parsed, config.customFoil).then(() => {
+      // The config names each custom set that ships a foil.json (design 075): `customFoil: [{ setId, url }]`. A set
+      // whose file is missing or malformed is skipped with a warning; it never takes the TCG Live foil down with it.
+      return Promise.all(
+        (Array.isArray(config.customFoil) ? config.customFoil : []).map(({ setId, url } = {}) =>
+          getJson(fetchImpl, url)
+            .then((json) => mergeCustomFoil(parsed, parseCustomFoil(setId, json)))
+            .catch((error) => console.warn(`custom set foil ${setId} skipped: ${error.message}`))
+        )
+      ).then(() => {
         parsedManifest = parsed;
         return parsedManifest;
       });

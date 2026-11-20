@@ -135,37 +135,6 @@ export function coinCountReader(draft, { playerId, attacker, attackerView, targe
 
 export const NINJA_TRICK_EFFECT = 'ninjaTrick';
 
-/**
- * Koga's Ninja Trick (gym2-115): "When your opponent attacks, you may switch this Pokémon with 1
- * of your Benched Pokémon (before damage or other effects of attacks)." The defending player
- * chooses (none = keep) before the attack resolves; returns true when the attack suspended.
- */
-function offerNinjaTrick(draft, declared) {
-  const { oppId, playerId, attacker, attack, atkIdx, targetInstanceId } = declared;
-  const side = draft.players[oppId];
-  const active = (side?.zones?.active || []).find((c) => !c.attachedTo);
-  if (!active || !hasAttachedTrainerEffect(side.zones.active, active, 'switchWhenAttacked')) return false;
-  const bench = benchTargets(side);
-  if (bench.length === 0) return false;
-  draft.pendingChoice = createPendingChoice({
-    player: oppId,
-    source: 'trainer',
-    prompt: `${attack.name}: Koga's Ninja Trick lets you switch ${inPlayView(draft, active)?.name || 'your Active Pokémon'} with 1 of your Benched Pokémon first (choose none to stay).`,
-    options: bench,
-    min: 0,
-    max: 1,
-    resumeToken: {
-      effectType: NINJA_TRICK_EFFECT,
-      initiatorPlayerId: playerId,
-      attackerId: attacker?.instanceId ?? null,
-      attackIndex: atkIdx,
-      switchedOutId: active.instanceId,
-      targetInstanceId,
-    },
-  });
-  return true;
-}
-
 /** Swaps the defending side's Active for the chosen Benched Pokémon, attachments following. */
 export function ninjaTrickSwitch(draft, player, benchRoot, events) {
   const active = player.zones.active.find((c) => !c.attachedTo);
@@ -330,29 +299,6 @@ export function endTurnAfterFailedAttack(draft, { playerId, oppId, activeRng, ev
   if (isGameConcluded(draft)) return;
   resolveCheckup(draft, { rng: activeRng, events, endingPlayerId: playerId });
   if (!isGameConcluded(draft)) advanceTurn(draft, { nextPlayerId: oppId, events });
-}
-
-/**
- * Baby rule (I230, baby-rule.mjs): when the opponent's Active is a Baby Pokémon, the attacker
- * flips before anything else — before Confusion (WotC chat Nov 14, 2002, Q8: "Baby rule.") and
- * before any cost is paid. Tails ends the turn without an attack. True when the attack stops.
- */
-function babyRuleStopsAttack(draft, { playerId, oppId, attacker, attack, activeRng, events }) {
-  const oppActive = draft.players[oppId]?.zones?.active || [];
-  const root = oppActive.find((c) => !c.attachedTo);
-  if (!isBabyPokemon(topPokemonCard(oppActive, root))) return false;
-  const face = flipCoin(activeRng);
-  events.push({ type: 'coinFlipped', playerId, face, source: 'Baby rule', instanceId: root.instanceId });
-  if (face === 'heads') return false;
-  events.push({
-    type: 'attackPrevented',
-    playerId,
-    attackerId: attacker?.instanceId ?? null,
-    attackName: attack?.name,
-    source: 'Baby rule',
-  });
-  endTurnAfterFailedAttack(draft, { playerId, oppId, activeRng, events });
-  return true;
 }
 
 /**
@@ -822,7 +768,32 @@ function copyCandidateAllowed(draft, { copy, playerId, attacker, attack }) {
  */
 function copyAttackCandidates(draft, { copy, playerId, oppId, attacker, deckTopCard }) {
   if (copy.source === 'oppLastAttack') {
-    return lastTurnAttackCandidates(draft, { copy, oppId, playerId, attacker });
+    // The single attack the opponent used during their last turn (design 039). Empty when they
+    // did not attack, when the wording excludes GX attacks and theirs was one, or when the attack
+    // they used was itself a copy.
+    const last = draft.players?.[oppId]?.lastAttack;
+    const currentTurn = Math.max(1, Number(draft.turn?.number) || 1);
+    if (!last || Number(last.turnNumber) !== currentTurn - 1) return [];
+    if (copy.excludeGx && last.isGx) return [];
+    // Smeargle Sketch (design 049): the Defending Pokémon must be the one that attacked, and the
+    // copier must have been in play during that attack.
+    if (copy.fromDefending) {
+      const defending = rootsIn(draft.players?.[oppId]?.zones?.active)[0];
+      if (!defending || defending.instanceId !== last.attackerInstanceId) return [];
+    }
+    if (copy.requiresInPlayDuring && !(last.opponentInPlayIds || []).includes(attacker?.instanceId)) {
+      return [];
+    }
+    const attack = last.attack;
+    if (!attack?.name || parseCopyAttack(attack.text)) return [];
+    if (!copyCandidateAllowed(draft, { copy, playerId, attacker, attack })) return [];
+    return [
+      {
+        sourceId: last.attackerInstanceId ?? null,
+        sourceName: last.attackerName || 'Opponent',
+        attack: { ...attack },
+      },
+    ];
   }
   const candidates = [];
   for (const card of copySourceCards(draft, { copy, playerId, oppId, attacker, deckTopCard })) {
@@ -842,37 +813,6 @@ function copyAttackCandidates(draft, { copy, playerId, oppId, attacker, deckTopC
     }
   }
   return candidates;
-}
-
-/**
- * The single attack the opponent used during their last turn (design 039). Empty when they
- * did not attack, when the wording excludes GX attacks and theirs was one, or when the attack
- * they used was itself a copy.
- */
-function lastTurnAttackCandidates(draft, { copy, oppId, playerId, attacker }) {
-  const last = draft.players?.[oppId]?.lastAttack;
-  const currentTurn = Math.max(1, Number(draft.turn?.number) || 1);
-  if (!last || Number(last.turnNumber) !== currentTurn - 1) return [];
-  if (copy.excludeGx && last.isGx) return [];
-  // Smeargle Sketch (design 049): the Defending Pokémon must be the one that attacked, and the
-  // copier must have been in play during that attack.
-  if (copy.fromDefending) {
-    const defending = rootsIn(draft.players?.[oppId]?.zones?.active)[0];
-    if (!defending || defending.instanceId !== last.attackerInstanceId) return [];
-  }
-  if (copy.requiresInPlayDuring && !(last.opponentInPlayIds || []).includes(attacker?.instanceId)) {
-    return [];
-  }
-  const attack = last.attack;
-  if (!attack?.name || parseCopyAttack(attack.text)) return [];
-  if (!copyCandidateAllowed(draft, { copy, playerId, attacker, attack })) return [];
-  return [
-    {
-      sourceId: last.attackerInstanceId ?? null,
-      sourceName: last.attackerName || 'Opponent',
-      attack: { ...attack },
-    },
-  ];
 }
 
 /**
@@ -998,17 +938,6 @@ function offerCopiedAttack(
   return true;
 }
 
-/** Moves the hand card a copy attack used to its owner's discard pile (Hypnotic Reign, Skill Copy). */
-function discardCopySourceFromHand(draft, ownerId, instanceId, events) {
-  const owner = draft.players?.[ownerId];
-  const hand = owner?.zones?.hand || [];
-  const index = hand.findIndex((c) => c.instanceId === instanceId);
-  if (index < 0) return;
-  const [card] = hand.splice(index, 1);
-  discardCardToPlayerZone(owner, card);
-  events.push({ type: 'cardsDiscarded', playerId: ownerId, cards: [{ instanceId: card.instanceId, name: card.name }] });
-}
-
 /** Resumes a copy attack with the chosen attack (or its own text when declined). */
 export function resumeCopiedAttack(draft, { token, selection, activeRng, events }) {
   const playerId = token.initiatorPlayerId;
@@ -1036,7 +965,17 @@ export function resumeCopiedAttack(draft, { token, selection, activeRng, events 
       copiedName: copiedAttack.name,
       sourceId: picked.sourceId,
     });
-    if (token.discardSource) discardCopySourceFromHand(draft, token.sourceZoneOwner, picked.sourceId, events);
+    // Hypnotic Reign, Skill Copy: the hand card the copy attack used goes to its owner's discard pile.
+    if (token.discardSource) {
+      const owner = draft.players?.[token.sourceZoneOwner];
+      const hand = owner?.zones?.hand || [];
+      const index = hand.findIndex((c) => c.instanceId === picked.sourceId);
+      if (index >= 0) {
+        const [card] = hand.splice(index, 1);
+        discardCardToPlayerZone(owner, card);
+        events.push({ type: 'cardsDiscarded', playerId: token.sourceZoneOwner, cards: [{ instanceId: card.instanceId, name: card.name }] });
+      }
+    }
   }
   let defender = null;
   let defenderPlayerId = oppId;
@@ -1079,7 +1018,26 @@ export function attackCommand({ draft, playerId, payload, activeRng, events }) {
   const oppId = Object.keys(draft.players || {}).find(
     (id) => id !== playerId
   );
-  if (babyRuleStopsAttack(draft, { playerId, oppId, attacker, attack, activeRng, events })) return;
+  // Baby rule (I230, baby-rule.mjs): when the opponent's Active is a Baby Pokémon, the attacker
+  // flips before anything else — before Confusion (WotC chat Nov 14, 2002, Q8: "Baby rule.") and
+  // before any cost is paid. Tails ends the turn without an attack.
+  const oppActive = draft.players[oppId]?.zones?.active || [];
+  const oppActiveRoot = oppActive.find((c) => !c.attachedTo);
+  if (isBabyPokemon(topPokemonCard(oppActive, oppActiveRoot))) {
+    const face = flipCoin(activeRng);
+    events.push({ type: 'coinFlipped', playerId, face, source: 'Baby rule', instanceId: oppActiveRoot.instanceId });
+    if (face !== 'heads') {
+      events.push({
+        type: 'attackPrevented',
+        playerId,
+        attackerId: attacker?.instanceId ?? null,
+        attackName: attack?.name,
+        source: 'Baby rule',
+      });
+      endTurnAfterFailedAttack(draft, { playerId, oppId, activeRng, events });
+      return;
+    }
+  }
 
   // Memory Berry (Aquapolis 128, Crystal Guardians 80): "discard this card at the end of any
   // turn the Pokémon attacks" — the end-of-turn Tool sweep discards it (design 049).
@@ -1191,6 +1149,32 @@ export function attackCommand({ draft, playerId, payload, activeRng, events }) {
     atkIdx,
     targetInstanceId: payload?.targetInstanceId ?? null,
   };
-  if (offerNinjaTrick(draft, declared)) return;
+  // Koga's Ninja Trick (gym2-115): "When your opponent attacks, you may switch this Pokémon with 1
+  // of your Benched Pokémon (before damage or other effects of attacks)." The defending player
+  // chooses (none = keep) before the attack resolves.
+  const ninjaSide = draft.players[oppId];
+  const ninjaActive = (ninjaSide?.zones?.active || []).find((c) => !c.attachedTo);
+  if (ninjaActive && hasAttachedTrainerEffect(ninjaSide.zones.active, ninjaActive, 'switchWhenAttacked')) {
+    const ninjaBench = benchTargets(ninjaSide);
+    if (ninjaBench.length > 0) {
+      draft.pendingChoice = createPendingChoice({
+        player: oppId,
+        source: 'trainer',
+        prompt: `${attack.name}: Koga's Ninja Trick lets you switch ${inPlayView(draft, ninjaActive)?.name || 'your Active Pokémon'} with 1 of your Benched Pokémon first (choose none to stay).`,
+        options: ninjaBench,
+        min: 0,
+        max: 1,
+        resumeToken: {
+          effectType: NINJA_TRICK_EFFECT,
+          initiatorPlayerId: playerId,
+          attackerId: attacker?.instanceId ?? null,
+          attackIndex: atkIdx,
+          switchedOutId: ninjaActive.instanceId,
+          targetInstanceId: declared.targetInstanceId,
+        },
+      });
+      return;
+    }
+  }
   resolveDeclaredAttack(draft, declared);
 }

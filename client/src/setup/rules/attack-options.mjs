@@ -18,7 +18,7 @@ import { formatWeakResist } from './card-inspector-model.mjs';
 
 const ICON_DIR = '/src/assets/attack-ui/';
 
-const el = (tag, className, text) => {
+export const el = (tag, className, text) => {
   const node = document.createElement(tag);
   if (className) node.className = className;
   if (text != null) node.textContent = String(text);
@@ -68,14 +68,6 @@ const vpowerStrip = () => {
   return strip;
 };
 
-// AttackDamageModIndicator: the up arrow on its tab for a buffed hit, the down arrow for a debuffed one.
-const damageMod = (mod) => {
-  const indicator = el('span', `tcgl-opt__mod tcgl-opt__mod--${mod}`);
-  indicator.appendChild(el('span', 'tcgl-opt__mod-bg'));
-  indicator.appendChild(el('span', 'tcgl-opt__mod-icon'));
-  return indicator;
-};
-
 const shell = (classes, type) => {
   const row = el('section', ['tcgl-opt', ...classes].join(' '));
   row.dataset.ptcgType = typeKeyFor(type);
@@ -119,7 +111,13 @@ export function buildAttackOption(attack, cardType) {
   if (readout.text.length > 4) damage.classList.add('tcgl-opt__dmg--long');
   tab.appendChild(damage);
   bar.appendChild(tab);
-  if (readout.mod) bar.appendChild(damageMod(readout.mod));
+  if (readout.mod) {
+    // AttackDamageModIndicator: the up arrow on its tab for a buffed hit, the down arrow for a debuffed one.
+    const indicator = el('span', `tcgl-opt__mod tcgl-opt__mod--${readout.mod}`);
+    indicator.appendChild(el('span', 'tcgl-opt__mod-bg'));
+    indicator.appendChild(el('span', 'tcgl-opt__mod-icon'));
+    bar.appendChild(indicator);
+  }
   if (hasText) bar.appendChild(el('span', 'tcgl-opt__divider'));
   content.appendChild(bar);
 

@@ -251,15 +251,12 @@ export function flipbookKeyframes(layer, sheet) {
   const cells = layer.cells ?? range(sheet.cols * sheet.rows);
   const curve = layer.frameCurve ?? [[0, 0], [1, 1]];
   const span = layer.end - layer.start;
-  const at = (cell) => {
-    const { x, y } = flipbookOffset(cell, sheet.cols, sheet.rows);
-    return `translate(${x}%, ${y}%)`;
-  };
   const frames = [];
   cells.forEach((cell, i) => {
     const t = curveTimeOf(curve, i / cells.length);
     if (t == null) return;
-    frames.push({ offset: clamp01(layer.start + span * t), transform: at(cell), easing: 'step-end' });
+    const { x, y } = flipbookOffset(cell, sheet.cols, sheet.rows);
+    frames.push({ offset: clamp01(layer.start + span * t), transform: `translate(${x}%, ${y}%)`, easing: 'step-end' });
   });
   if (frames[0].offset > 0) frames.unshift({ offset: 0, transform: frames[0].transform, easing: 'step-end' });
   frames.push({ offset: 1, transform: frames[frames.length - 1].transform });

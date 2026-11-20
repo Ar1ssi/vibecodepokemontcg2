@@ -20,6 +20,7 @@ import {
 } from '../deck-builder/core/holo.mjs';
 import { suppressHoverPreview } from '../image-logic/hover-preview-bus.mjs';
 import { stackViewModelFor } from './card-inspector.mjs';
+import { el } from './attack-options.mjs';
 import { buildStackInfoPanel } from './stack-view-panel.mjs';
 import { closeStatusPopup, isStatusPopupOpen, openStatusPopup } from './status-popup.mjs';
 
@@ -29,13 +30,6 @@ const CLOSE_EVENTS = ['rules-turn-began', 'rules-session-reset'];
 let viewState = null;
 
 export const isStackViewOpen = () => viewState !== null;
-
-const el = (tag, className, text) => {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text != null) node.textContent = String(text);
-  return node;
-};
 
 // One round sprite button (shadow_32, circle_32 stroke round a circle_26 face, #333333 icon).
 const roundButton = (className, label, onClick) => {

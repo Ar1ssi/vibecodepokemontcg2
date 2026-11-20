@@ -81,23 +81,6 @@ export const initializeDeckBuilderMatPicker = ({ panelEl, onChange }) => {
   const matImageSrc = (mat) => matThumbFallbackChain(mat).primary;
   const matImageFallback = (mat) => matThumbFallbackChain(mat).fallback;
 
-  const imgTag = (mat, className = '') => {
-    const src = matImageSrc(mat);
-    const fallback = matImageFallback(mat);
-    return [
-      `<img class="${className}" src="${escapeHtml(src)}"`,
-      ' referrerpolicy="no-referrer"',
-      fallback ? ` data-fallback="${escapeHtml(fallback)}"` : '',
-      ` alt="${escapeHtml(mat.title)}" />`,
-    ].join('');
-  };
-
-  const layoutLabel = (mat) => {
-    const base =
-      mat.layout === 'two-player' ? 'Full size · both players' : 'One-player mat';
-    return mat.fit === 'cover' ? `${base} · Edge-to-edge` : base;
-  };
-
   const findMat = (id) => mats.find((mat) => mat.id === id) || null;
 
   // The thumbnails live in a gitignored directory, so a checkout without the
@@ -120,11 +103,17 @@ export const initializeDeckBuilderMatPicker = ({ panelEl, onChange }) => {
         '<span class="native-deck-builder-mat-preview-none">No mat selected — the board uses the simulator playmat.</span>';
       return;
     }
+    const src = matImageSrc(mat);
+    const fallback = matImageFallback(mat);
+    const layout = mat.layout === 'two-player' ? 'Full size · both players' : 'One-player mat';
     previewEl.innerHTML = [
-      imgTag(mat, 'native-deck-builder-mat-preview-image'),
+      `<img class="native-deck-builder-mat-preview-image" src="${escapeHtml(src)}"`,
+      ' referrerpolicy="no-referrer"',
+      fallback ? ` data-fallback="${escapeHtml(fallback)}"` : '',
+      ` alt="${escapeHtml(mat.title)}" />`,
       '<div class="native-deck-builder-mat-preview-text">',
       `  <strong>${escapeHtml(mat.title)}</strong>`,
-      `  <span>${escapeHtml(layoutLabel(mat))}</span>`,
+      `  <span>${escapeHtml(mat.fit === 'cover' ? `${layout} · Edge-to-edge` : layout)}</span>`,
       '</div>',
     ].join('');
     wireImageFallbacks(previewEl);

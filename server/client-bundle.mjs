@@ -11,7 +11,6 @@ export const BUNDLE_URL_PREFIX = `/${BUNDLE_DIR_NAME}/`;
 export const BUNDLE_MANIFEST_FILE = 'manifest.json';
 
 const isOn = (value) => /^(1|true|on|yes)$/i.test(String(value ?? '').trim());
-const isOff = (value) => /^(0|false|off|no)$/i.test(String(value ?? '').trim());
 
 /** True on a host that deploys the site: Render sets `RENDER`; anything else sets NODE_ENV. */
 export function isDeployHost(env = {}) {
@@ -21,7 +20,7 @@ export function isDeployHost(env = {}) {
 /** `CLIENT_BUNDLE=1|0` decides; unset, a deploy host serves the bundle and a dev machine does not. */
 export function wantsClientBundle(env = {}) {
   if (isOn(env.CLIENT_BUNDLE)) return true;
-  if (isOff(env.CLIENT_BUNDLE)) return false;
+  if (/^(0|false|off|no)$/i.test(String(env.CLIENT_BUNDLE ?? '').trim())) return false;
   return isDeployHost(env);
 }
 

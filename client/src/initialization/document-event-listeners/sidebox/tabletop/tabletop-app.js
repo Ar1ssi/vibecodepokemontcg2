@@ -119,7 +119,6 @@ const STACK_STEP = CARD.thickness + 0.04;
 const qFlat = (yawDeg, faceUp = true) =>
   new Quaternion().setFromEuler(new Euler(faceUp ? -Math.PI / 2 : Math.PI / 2, yawDeg * DEG, 0, 'YXZ'));
 
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const HAND_FACE_WAIT_MS = 6000;
 // The share of a pull taken by sliding the wrapper down rather than drawing the cards up.
 const WRAPPER_SLIDE = 0.72;
@@ -144,12 +143,6 @@ const CARRY_LEAN_DEG = 12;
 // rest follows, short of it and the film settles back.
 const WRAP_DRAG_PX = 260;
 const WRAP_DRAG_SPAN = 0.4;
-
-const el = (tag, className) => {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  return node;
-};
 
 const cardImageOf = (card) => card?.images?.large || card?.image || card?.images?.small || '';
 
@@ -195,7 +188,8 @@ async function buildTabletopApp(options, life) {
     isCancelled = () => false,
   } = options;
 
-  const host = el('div', 'tt-root');
+  const host = document.createElement('div');
+  host.className = 'tt-root';
   root.append(host);
   const stage = createStage({ host, quality, instant, timeScale, manual: manualClock, onLost: () => onLost() });
   if (!stage) {
@@ -732,7 +726,10 @@ async function buildTabletopApp(options, life) {
       // A torn pack on a reloaded table: finished → its cards piled; current → in hand, part shown.
       const pack = packObjects[visual];
       pack.model.strip.visible = false;
-      layWrapper(pack, logical);
+      pack.wrapperDown = true;
+      const wrapperAt = wrapperSpot(logical);
+      place(pack.model.group, flatPose(wrapperAt, 1.2 + logical * 0.6, true));
+      pack.model.group.scale.set(1, 1, 0.35);
       const items = stackFor(logical);
       const revealed = u.revealed[logical];
       if (revealed >= u.cardsPerPack) {
@@ -766,14 +763,6 @@ async function buildTabletopApp(options, life) {
 
   // A torn pack's cards pile where the pack lay.
   const pileSpotOf = (visual) => cosmetic.spots[packItems[visual].key] || packRowSpot(visual, packCount);
-
-  function layWrapper(pack, logical) {
-    pack.wrapperDown = true;
-    pack.model.strip.visible = false;
-    const spot = wrapperSpot(logical);
-    place(pack.model.group, flatPose(spot, 1.2 + logical * 0.6, true));
-    pack.model.group.scale.set(1, 1, 0.35);
-  }
 
   // ── Piles on the mat ────────────────────────────────────────────────────
   const revealPile = [];
@@ -915,76 +904,6 @@ async function buildTabletopApp(options, life) {
     });
     mesh.material = clipped;
     return clipped;
-  }
-
-  // Shaders the opening needs later compile now, behind the loading screen. `compile` builds the
-  // card stack's programs without the clipping a pack's mouth puts on it (only a draw sets that),
-  // so the clipped probe is also drawn for real, once per pass, by `warmFrames`. Its materials stay
-  // alive so three keeps those programs until the tear uses them.
-  let clippedProbe = null;
-  async function warmShaders() {
-    const probe = kit.makeCard({ map: backTexture, name: 'tt-warm' });
-    const probeMaterials = clipCard(probe, new Plane(new Vector3(0, 1, 0), 0));
-    disposers.push(() => probeMaterials.forEach((material) => material.dispose()));
-    // Far below the table: drawn (never culled), seen by nothing.
-    probe.frustumCulled = false;
-    probe.position.set(0, -PROBE_DEPTH_MM, 0);
-    clippedProbe = probe;
-    const warm = new Group();
-    warm.add(probe);
-    // The tear's light too (only the eye draws it): its shaders would otherwise compile as the
-    // first pack comes up.
-    const eyeOnly = new Group();
-    if (packObjects.length) {
-      const lightProbe = createTearFx({ model: packObjects[0].model, shape: packShapeOf(0) });
-      eyeOnly.add(lightProbe.group);
-      disposers.push(() => lightProbe.dispose());
-    }
-    try {
-      await renderer.compileAsync(warm, camera, scene);
-      await renderer.compileAsync(eyeOnly, camera, scene);
-      await stage.compileForMirror(warm);
-    } catch {
-      // A shader that fails here fails again where it is used, and three reports it there.
-    }
-  }
-
-  // Things start casting shadows as they land on the mat, and the shadow pass compiles a depth
-  // shader for each kind of material the first time it meets one. One frame per pass (the eye's,
-  // then the floor's mirror), drawn with every shadow on and nothing culled (a narrow screen has
-  // packs off to the side), behind the loading screen, compiles them all up front.
-  async function warmFrames() {
-    const switched = [];
-    const uncullable = [];
-    scene.add(clippedProbe);
-    scene.traverse((node) => {
-      if (!node.isMesh) return;
-      if (!node.castShadow) {
-        node.castShadow = true;
-        switched.push(node);
-      }
-      if (node.frustumCulled) {
-        node.frustumCulled = false;
-        uncullable.push(node);
-      }
-    });
-    try {
-      renderer.shadowMap.needsUpdate = true;
-      renderer.render(scene, camera);
-      // The mirror's shaders compile in a task of their own, so images that arrive meanwhile are
-      // taken in between (software WebGL compiles block).
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      if (!stopped()) stage.renderReflection();
-    } finally {
-      clippedProbe.removeFromParent();
-      switched.forEach((node) => {
-        node.castShadow = false;
-      });
-      uncullable.forEach((node) => {
-        node.frustumCulled = true;
-      });
-      renderer.shadowMap.needsUpdate = true;
-    }
   }
 
   // ── Beats ───────────────────────────────────────────────────────────────
@@ -1160,21 +1079,7 @@ async function buildTabletopApp(options, life) {
     startSeamHint();
   }
 
-  /** A finger lands on the held pack at `worldPoint`: a rainbow ring opens there (the latest touch's). */
   let touches = 0;
-  function touchPack(worldPoint) {
-    if (hand?.kind !== 'pack' || !tearFx || !worldPoint) return;
-    stopSeamHint();
-    const local = packObjects[hand.visual].model.group.worldToLocal(worldPoint.clone());
-    const fx = tearFx;
-    const touch = (touches += 1);
-    stage.animate({
-      durationMs: 420,
-      update: (t) => {
-        if (touch === touches) fx.setTouch(local, t);
-      },
-    });
-  }
 
   /**
    * The TCG Pocket tear: the finger runs the cut through to the far end (a tap or the button runs
@@ -1644,7 +1549,19 @@ async function buildTabletopApp(options, life) {
     else if (hit?.tag.kind === 'box' && !v.lidOpen && boxModel.isLidMesh(hit.object)) press.mode = 'lid';
     else if (hand?.kind === 'pack' && hit?.node === packObjects[hand.visual].model.group) {
       press.mode = 'peel';
-      touchPack(hit.point);
+      // A finger lands on the held pack: a rainbow ring opens there (the latest touch's).
+      if (tearFx && hit.point) {
+        stopSeamHint();
+        const local = packObjects[hand.visual].model.group.worldToLocal(hit.point.clone());
+        const fx = tearFx;
+        const touch = (touches += 1);
+        stage.animate({
+          durationMs: 420,
+          update: (t) => {
+            if (touch === touches) fx.setTouch(local, t);
+          },
+        });
+      }
     }
     else if (hand?.kind === 'stack' && hit?.tag.kind === 'handStack') press.mode = 'swipe';
     else if (!hand) {
@@ -1661,7 +1578,11 @@ async function buildTabletopApp(options, life) {
       y: ((event.clientY - rect.top) / Math.max(1, rect.height)) * 2 - 1,
     };
     if (!press) {
-      hoverCursor(event);
+      if (busy) return;
+      const hit = hitAt(event);
+      const v = view();
+      const grabbable = !hand && (movableOf(hit, v) || (hit?.tag.kind === 'box' && !v.lidOpen));
+      canvas.style.cursor = grabbable ? 'grab' : hit ? 'pointer' : 'default';
       return;
     }
     const dx = event.clientX - press.x;
@@ -1792,7 +1713,29 @@ async function buildTabletopApp(options, life) {
     press = null;
     canvas.releasePointerCapture?.(event.pointerId);
     if (carry) {
-      dropCarry();
+      // Let go: the carried thing settles where it is, or back into the box if it never left it.
+      const { item, cleared, start, yawDeg } = carry;
+      stopCarry?.();
+      stopCarry = null;
+      carry = null;
+      canvas.style.cursor = 'default';
+      const object = item.object;
+      if (!cleared) {
+        run(async () => {
+          await flyTo(object, start, { durationMs: 220, lift: 0 });
+          boxModel.group.add(object);
+          const slot = item.slot();
+          object.position.set(slot.x, slot.y, slot.z);
+          object.quaternion.setFromEuler(new Euler(slot.rotX, 0, 0));
+        });
+        return;
+      }
+      const spot = setDownSpot(item, { x: object.position.x, z: object.position.z, rotYDeg: yawDeg });
+      recordSpot(item, spot);
+      run(async () => {
+        await flyTo(object, restPose(item, spot), { durationMs: 240, lift: 3 });
+        audio.play(item.sound);
+      });
       return;
     }
     if (!current || busy) return;
@@ -1875,14 +1818,6 @@ async function buildTabletopApp(options, life) {
     return undefined;
   }
 
-  const hoverCursor = (event) => {
-    if (busy) return;
-    const hit = hitAt(event);
-    const v = view();
-    const grabbable = !hand && (movableOf(hit, v) || (hit?.tag.kind === 'box' && !v.lidOpen));
-    canvas.style.cursor = grabbable ? 'grab' : hit ? 'pointer' : 'default';
-  };
-
   /** What a press on `hit` would pick up off the floor or out of the box, if anything. */
   function movableOf(hit, v) {
     const kind = hit?.tag.kind;
@@ -1911,31 +1846,6 @@ async function buildTabletopApp(options, life) {
   const carryHit = new Vector3();
   const clampLean = (deg) => Math.max(-CARRY_LEAN_DEG, Math.min(CARRY_LEAN_DEG, deg));
 
-  /** Let go: the carried thing settles where it is, or back into the box if it never left it. */
-  function dropCarry() {
-    const { item, cleared, start, yawDeg } = carry;
-    stopCarry?.();
-    stopCarry = null;
-    carry = null;
-    canvas.style.cursor = 'default';
-    const object = item.object;
-    if (!cleared) {
-      return run(async () => {
-        await flyTo(object, start, { durationMs: 220, lift: 0 });
-        boxModel.group.add(object);
-        const slot = item.slot();
-        object.position.set(slot.x, slot.y, slot.z);
-        object.quaternion.setFromEuler(new Euler(slot.rotX, 0, 0));
-      });
-    }
-    const spot = setDownSpot(item, { x: object.position.x, z: object.position.z, rotYDeg: yawDeg });
-    recordSpot(item, spot);
-    return run(async () => {
-      await flyTo(object, restPose(item, spot), { durationMs: 240, lift: 3 });
-      audio.play(item.sound);
-    });
-  }
-
   const onKeyDown = (event) => {
     if (event.target?.closest?.('input, textarea, select')) return;
     if (event.key === ' ' || event.key === 'Enter') {
@@ -1957,29 +1867,86 @@ async function buildTabletopApp(options, life) {
     stage.applyCamera(cameraPose(framingFor(view()), aspect()));
   });
 
-  // A reload mid-pack: the cards in hand show their faces before the loading screen lifts (a front
-  // card showing its back reads as a card held the wrong way round). Bounded by a slow host.
-  const handFacesReady = () => {
-    if (hand?.kind !== 'stack') return Promise.resolve();
-    const showing = hand.items.slice(hand.position, hand.position + 2).filter((item) => item.url);
-    return Promise.race([
-      Promise.all(showing.map((item) => faceTexture(item.url, item.card))),
-      wait(HAND_FACE_WAIT_MS),
-    ]);
-  };
-
   // ── Start ───────────────────────────────────────────────────────────────
   // The table's surface (a mat's print loads over the network) starts now and is waited for before
   // the warm-up draws: the mat in the frame is one more set of shaders.
   const surfaceReady = stage.setSurface(surface);
-  await warmShaders();
+  // Shaders the opening needs later compile now, behind the loading screen. `compile` builds the
+  // card stack's programs without the clipping a pack's mouth puts on it (only a draw sets that),
+  // so the clipped probe is also drawn for real, once per pass, by the frames below. Its materials stay
+  // alive so three keeps those programs until the tear uses them.
+  const clippedProbe = kit.makeCard({ map: backTexture, name: 'tt-warm' });
+  const probeMaterials = clipCard(clippedProbe, new Plane(new Vector3(0, 1, 0), 0));
+  disposers.push(() => probeMaterials.forEach((material) => material.dispose()));
+  // Far below the table: drawn (never culled), seen by nothing.
+  clippedProbe.frustumCulled = false;
+  clippedProbe.position.set(0, -PROBE_DEPTH_MM, 0);
+  const warm = new Group();
+  warm.add(clippedProbe);
+  // The tear's light too (only the eye draws it): its shaders would otherwise compile as the
+  // first pack comes up.
+  const eyeOnly = new Group();
+  if (packObjects.length) {
+    const lightProbe = createTearFx({ model: packObjects[0].model, shape: packShapeOf(0) });
+    eyeOnly.add(lightProbe.group);
+    disposers.push(() => lightProbe.dispose());
+  }
+  try {
+    await renderer.compileAsync(warm, camera, scene);
+    await renderer.compileAsync(eyeOnly, camera, scene);
+    await stage.compileForMirror(warm);
+  } catch {
+    // A shader that fails here fails again where it is used, and three reports it there.
+  }
   if (stopped()) return abandon();
   settle();
   await surfaceReady;
   if (stopped()) return abandon();
-  await warmFrames();
+  // Things start casting shadows as they land on the mat, and the shadow pass compiles a depth
+  // shader for each kind of material the first time it meets one. One frame per pass (the eye's,
+  // then the floor's mirror), drawn with every shadow on and nothing culled (a narrow screen has
+  // packs off to the side), behind the loading screen, compiles them all up front.
+  const switched = [];
+  const uncullable = [];
+  scene.add(clippedProbe);
+  scene.traverse((node) => {
+    if (!node.isMesh) return;
+    if (!node.castShadow) {
+      node.castShadow = true;
+      switched.push(node);
+    }
+    if (node.frustumCulled) {
+      node.frustumCulled = false;
+      uncullable.push(node);
+    }
+  });
+  try {
+    renderer.shadowMap.needsUpdate = true;
+    renderer.render(scene, camera);
+    // The mirror's shaders compile in a task of their own, so images that arrive meanwhile are
+    // taken in between (software WebGL compiles block).
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    if (!stopped()) stage.renderReflection();
+  } finally {
+    clippedProbe.removeFromParent();
+    switched.forEach((node) => {
+      node.castShadow = false;
+    });
+    uncullable.forEach((node) => {
+      node.frustumCulled = true;
+    });
+    renderer.shadowMap.needsUpdate = true;
+  }
   if (stopped()) return abandon();
-  await handFacesReady();
+  // A reload mid-pack: the cards in hand show their faces before the loading screen lifts (a front
+  // card showing its back reads as a card held the wrong way round). Bounded by a slow host.
+  if (hand?.kind === 'stack') {
+    const showing = hand.items.slice(hand.position, hand.position + 2).filter((item) => item.url);
+    await Promise.race([
+      Promise.all(showing.map((item) => faceTexture(item.url, item.card))),
+      new Promise((resolve) => setTimeout(resolve, HAND_FACE_WAIT_MS)),
+    ]);
+  }
   if (stopped()) return abandon();
   ui.setLoading(false);
   stage.requestRender();

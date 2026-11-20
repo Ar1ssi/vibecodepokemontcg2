@@ -13,10 +13,6 @@
 
 import { emitCmd } from './cmd-emitter.js';
 
-function isEnergyCard(card) {
-  return /energy/i.test(card.type || card.supertype || '');
-}
-
 // The printed kind ("Pokemon Power", "Poke-POWER", "Poke-BODY", "Ability", ...) is how the
 // server tells a Pokémon Power from a Poké-Body (Toxic Gas, Goop Gas, Seal Off read nothing else).
 function abilityStat(ability) {
@@ -104,7 +100,10 @@ function extractStats(card) {
   // computeAttackDamage, retreatCost for getRetreatCostCount, stage for evolution legality,
   // text/trainerType/subtypes for playTrainer and special Energy, evolvesFrom for Salvatore,
   // abilities for useAbility.
-  if (!(Boolean(card.trainerType) || /trainer|item|supporter|stadium|tool/i.test(card.type || '')) && !isEnergyCard(card)) {
+  if (
+    !(Boolean(card.trainerType) || /trainer|item|supporter|stadium|tool/i.test(card.type || '')) &&
+    !/energy/i.test(card.type || card.supertype || '')
+  ) {
     // Exception: "Ultra Beast" exists only as a subtype, and Beast Energy's provision and
     // bonus read it server-side (review of audit SE2). Same for the Ancient/Future tag
     // (design 058), which the server also derives from the printing when a card carries an id,

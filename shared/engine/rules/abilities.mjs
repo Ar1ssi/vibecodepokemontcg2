@@ -70,11 +70,6 @@ export const isBenchActiveSwitchText = (t) =>
   (t.includes('benched') || t.includes('bench')) &&
   t.includes('active');
 
-// Printed once-per-turn usage cap — not effect prevention.
-export const isAbilityUsageLimitText = (t) =>
-  /can't use more than \d+/.test(t) ||
-  /cannot use more than \d+/.test(t);
-
 // App. 23: Ancient Traits are printed with an α/Ω/Δ/θ marker and are neither
 // attacks nor Abilities, so effects that block/remove Abilities must not affect
 // them. Returns a trait kind ('alpha'|'omega'|'delta'|'theta'), 'ancient' for a
@@ -586,17 +581,6 @@ function withIfYouDoHalves(lower, parsed) {
     steps = [...steps, { type: 'selfLeavesAbility', to: 'lostZone', guidance: 'Put this Pokémon in the Lost Zone; discard its attached cards.' }];
   }
   return steps;
-}
-
-// Unown MISSING / HAND / DAMAGE: the printed threshold that wins the game.
-function parseWinCondition(lower) {
-  const lostZone = lower.match(/opponent has (\d+) or more supporter cards in the lost zone/);
-  if (lostZone) return { kind: 'opponentLostZoneSupporters', count: Number(lostZone[1]) };
-  const hand = lower.match(/you have (\d+) or more cards in your hand/);
-  if (hand) return { kind: 'handSize', count: Number(hand[1]) };
-  const counters = lower.match(/(\d+) or more damage counters on your benched pok[eé]mon/);
-  if (counters) return { kind: 'benchDamageCounters', count: Number(counters[1]) };
-  return null;
 }
 
 export function parseAbility(text = '') {
@@ -1533,8 +1517,10 @@ export function parseAbility(text = '') {
 
   // ── 27. Effect prevention / negation ────────────────────────────────────
   // "This power can't be used if …" restricts use (statusText drops it); it prevents nothing.
+  // A printed once-per-turn usage cap ("can't use more than N") is not effect prevention.
   if (
-    !isAbilityUsageLimitText(lower) &&
+    !/can't use more than \d+/.test(lower) &&
+    !/cannot use more than \d+/.test(lower) &&
     !MIST_CONCEALMENT.test(lower) &&
     (((lower.includes('prevent') ||
       statusText.includes("can't") ||
@@ -2021,9 +2007,17 @@ export function parseAbility(text = '') {
 
   // ── 55. Win condition (Unown MISSING / HAND) ────────────────────────────
   if (/you win this game/.test(lower)) {
+    // Unown MISSING / HAND / DAMAGE: the printed threshold that wins the game.
+    const lostZoneSupporters = lower.match(/opponent has (\d+) or more supporter cards in the lost zone/);
+    const handSize = lower.match(/you have (\d+) or more cards in your hand/);
+    const benchCounters = lower.match(/(\d+) or more damage counters on your benched pok[eé]mon/);
+    let winCondition = null;
+    if (lostZoneSupporters) winCondition = { kind: 'opponentLostZoneSupporters', count: Number(lostZoneSupporters[1]) };
+    else if (handSize) winCondition = { kind: 'handSize', count: Number(handSize[1]) };
+    else if (benchCounters) winCondition = { kind: 'benchDamageCounters', count: Number(benchCounters[1]) };
     steps.push({
       type: 'winGameAbility',
-      condition: parseWinCondition(lower),
+      condition: winCondition,
       guidance: 'Once during your turn: if the stated condition holds, you win this game (as described).',
     });
   }

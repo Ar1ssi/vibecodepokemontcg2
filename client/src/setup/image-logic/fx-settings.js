@@ -26,7 +26,7 @@ import {
 } from './fx-settings.mjs';
 import { fxDisabled, motionReduced } from './mat-fx.mjs';
 
-const storage = () => {
+export const storage = () => {
   try {
     return globalThis.localStorage ?? null;
   } catch {

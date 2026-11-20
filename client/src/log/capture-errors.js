@@ -8,11 +8,6 @@ export function getGpuRenderer() {
   return gpuRenderer;
 }
 
-function readRenderer(gl) {
-  const info = gl.getExtension?.('WEBGL_debug_renderer_info');
-  return info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : null;
-}
-
 function wrapGetContext(win, log) {
   const proto = win.HTMLCanvasElement?.prototype;
   if (!proto || typeof proto.getContext !== 'function') return () => {};
@@ -27,7 +22,10 @@ function wrapGetContext(win, log) {
           log.warn('fx', 'gl.context.failed', { type, el });
         } else if (!seen.has(this)) {
           seen.add(this);
-          if (gpuRenderer === null) gpuRenderer = readRenderer(result);
+          if (gpuRenderer === null) {
+            const info = result.getExtension?.('WEBGL_debug_renderer_info');
+            gpuRenderer = info ? String(result.getParameter(info.UNMASKED_RENDERER_WEBGL)) : null;
+          }
           log.debug('fx', 'gl.context', { type, el, w: this.width, h: this.height, gpu: gpuRenderer });
           this.addEventListener?.('webglcontextlost', () => log.warn('fx', 'gl.context.lost', { el }));
           this.addEventListener?.('webglcontextrestored', () => log.info('fx', 'gl.context.restored', { el }));

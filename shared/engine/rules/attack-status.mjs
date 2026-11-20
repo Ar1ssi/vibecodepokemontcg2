@@ -125,34 +125,6 @@ function statusesIn(sentence, { conditional = false } = {}) {
   return null;
 }
 
-// The legacy family detection, kept as a fallback for bare wordings the clause patterns above
-// do not read ("Your opponent's Active Pokémon is Poisoned.").
-function legacyBranches(normalized) {
-  const familyStatus = {
-    'status-asleep': 'Asleep',
-    'status-paralyzed': 'Paralyzed',
-    'status-poisoned': 'Poisoned',
-    'status-burned': 'Burned',
-    'status-confused': 'Confused',
-  }[classifyAttackEffect({ text: normalized, damage: 0 })];
-  return familyStatus
-    ? [{ when: 'always', target: 'defender', statuses: [familyStatus] }]
-    : [];
-}
-
-// "If <board condition>, [this attack does N more damage, and] <status clause>" (design 036
-// A10): a branch whose `when` is `{ condition }`, the attack-conditions descriptor that holds
-// when the printed clause is true. Null when the clause or the status is not read.
-function conditionBranch(sentence) {
-  const lead = /^if ([^,]+),\s*(.+)$/.exec(sentence);
-  if (!lead) return null;
-  const condition = parseConditionClause(lead[1]);
-  if (!condition) return null;
-  const application = statusesIn(lead[2], { conditional: true });
-  if (!application || application.statuses.length === 0) return null;
-  return { when: { condition }, target: application.target, statuses: application.statuses };
-}
-
 /**
  * @param {string} text Printed attack effect text
  * @param {{ selfName?: string }} [options] The attacker's printed name
@@ -182,11 +154,19 @@ export function parseAttackStatusBranches(text, { selfName = '' } = {}) {
     }
     const gate = sentenceGate(sentence);
     if (!gate && /^if\b/.test(sentence)) {
-      const condition = conditionBranch(sentence);
-      if (condition) branches.push(condition);
-      // A conditional wording this parser cannot evaluate: apply nothing rather than
-      // everything (the condition may be a damage gate, a discard chain or a prize count).
-      else sawConditional = true;
+      // "If <board condition>, [this attack does N more damage, and] <status clause>" (design 036
+      // A10): a branch whose `when` is `{ condition }`, the attack-conditions descriptor that
+      // holds when the printed clause is true.
+      const lead = /^if ([^,]+),\s*(.+)$/.exec(sentence);
+      const condition = lead && parseConditionClause(lead[1]);
+      const application = condition && statusesIn(lead[2], { conditional: true });
+      if (application && application.statuses.length > 0) {
+        branches.push({ when: { condition }, target: application.target, statuses: application.statuses });
+      } else {
+        // A conditional wording this parser cannot evaluate: apply nothing rather than
+        // everything (the condition may be a damage gate, a discard chain or a prize count).
+        sawConditional = true;
+      }
       continue;
     }
     const body = gate ? sentence.slice(gate.length).trim() : sentence;
@@ -202,7 +182,17 @@ export function parseAttackStatusBranches(text, { selfName = '' } = {}) {
   // "This Pokémon can't become Asleep, Confused, Paralyzed, or Poisoned" names statuses it
   // blocks (a statusImmunity marker), not ones it applies.
   const applied = normalized.replace(/can't (?:be|become) (?:asleep|burned|confused|paralyzed|poisoned)[^.]*/g, '');
-  return sawConditional ? [] : legacyBranches(applied);
+  if (sawConditional) return [];
+  // The legacy family detection, kept as a fallback for bare wordings the clause patterns above
+  // do not read ("Your opponent's Active Pokémon is Poisoned.").
+  const familyStatus = {
+    'status-asleep': 'Asleep',
+    'status-paralyzed': 'Paralyzed',
+    'status-poisoned': 'Poisoned',
+    'status-burned': 'Burned',
+    'status-confused': 'Confused',
+  }[classifyAttackEffect({ text: applied, damage: 0 })];
+  return familyStatus ? [{ when: 'always', target: 'defender', statuses: [familyStatus] }] : [];
 }
 
 // `firstFlip` is a one-off condition, not a rung on the heads-count ladder.

@@ -108,9 +108,6 @@ const markAttackScene = (durationMs) => {
 /** When the last attack scene ends, on the `performance.now()` clock (0 before any attack). */
 export const attackSceneEndsAt = () => attackSceneEnd;
 
-/** Design 063: a move scene announces its own contact moment (ms from now) with its context. */
-export const announceStrike = (ms, ctx = null) => impacts.strikeIn(ms, ctx);
-
 // Design 069: each attack's contact and context, by the strike key its plans share.
 const strikes = createStrikeBook({ now: () => performance.now(), setTimer: (fn, ms) => setTimeout(fn, ms) });
 
@@ -197,13 +194,6 @@ const playImpactPrefab = (ctx, target, hit) => {
  * hit, so a Bench snipe's target counts.
  */
 const sceneSpecFor = (spec, impactType, defenderHit) => (impactType && defenderHit ? withoutImpactBeats(spec) : spec);
-
-const shakeTable = (amount) => {
-  const amplitude = screenShakeAmplitude(amount);
-  if (amplitude === 0) return 0;
-  // Design 074 §D6: the three.js board shakes its camera; the page elements stay put.
-  getBoardScene()?.shake(screenShakeKeyframes(amplitude, SCREEN_SHAKE_MS));
-};
 
 /**
  * Design 069: knock a card the attack reached after its main target back from the attacker
@@ -359,7 +349,9 @@ export const damage = (plan) => {
       ];
       removeWhen(host, done, HIT_SPARKS_MS + BACKSTOP_PAD_MS);
     }
-    shakeTable(hit.amount * dressing.shakeMul);
+    const amplitude = screenShakeAmplitude(hit.amount * dressing.shakeMul);
+    // Design 074 §D6: the three.js board shakes its camera; the page elements stay put.
+    if (amplitude !== 0) getBoardScene()?.shake(screenShakeKeyframes(amplitude, SCREEN_SHAKE_MS));
     if (secondary) recoilCard(plan.instanceId, rect, ctx, registry);
   });
   return ripple ? 0 : undefined;

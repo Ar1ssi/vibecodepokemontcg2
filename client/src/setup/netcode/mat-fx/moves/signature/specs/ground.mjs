@@ -3,11 +3,9 @@
 // departures from an entry are listed under the design's Deviations (slice 8).
 
 /** Five spikes 72° apart: "starFlare arms 'ring'" inside the 30-tongue budget (slice 5). */
-const RING5 = Object.freeze([-90, -18, 54, 126, 198].map((angle) => Object.freeze({ angle, reach: 0.85 })));
 /** Three spikes up and out: an arrow-strike star that leaves room for the rain. */
 const TRIAD = Object.freeze([-90, 30, 150].map((angle) => Object.freeze({ angle, reach: 0.9 })));
 
-const FRONDS = Object.freeze({ deep: '#0A0A0C', body: '#1A1C14', hot: '#C8E84A', core: '#FFFBE6' });
 const GOLD_LIGHT = Object.freeze({ deep: '#B07A1A', body: '#F2B233', hot: '#FFE15A', core: '#FFFBE6' });
 
 // Zygarde: a black frond fan rises behind the attacker over a gold floor ring, then gold light

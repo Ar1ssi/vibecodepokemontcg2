@@ -42,16 +42,6 @@ const TEXTURE_FILES = {
 
 const textures = new Map();
 
-const readPixels = (img) => {
-  const canvas = document.createElement('canvas');
-  canvas.width = img.naturalWidth;
-  canvas.height = img.naturalHeight;
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  if (!ctx) return null;
-  ctx.drawImage(img, 0, 0);
-  return ctx.getImageData(0, 0, canvas.width, canvas.height);
-};
-
 /** Start loading every scene texture (idempotent; the first evolution should not miss them). */
 export function preloadTcglTextures() {
   if (typeof Image !== 'function') return;
@@ -61,8 +51,13 @@ export function preloadTcglTextures() {
     const img = new Image();
     img.decoding = 'async';
     img.onload = () => {
-      const pixels = readPixels(img);
-      if (!pixels) return;
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (!ctx) return;
+      ctx.drawImage(img, 0, 0);
+      const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const alpha = new Uint8Array(pixels.width * pixels.height);
       for (let i = 0; i < alpha.length; i += 1) alpha[i] = pixels.data[i * 4 + 3];
       Object.assign(entry, { img, pixels, field: { w: pixels.width, h: pixels.height, data: alpha }, ready: true });
@@ -312,9 +307,6 @@ function drawRibbon(ctx, view, state, op) {
 }
 
 const DRAW = { sprite: drawSprite, dissolve: drawDissolve, polar: drawPolar, ribbon: drawRibbon, frame: drawFrame };
-
-/** Per-play caches (tinted sprites, scratch buffers, colour rows). */
-export const createDrawState = () => ({ tints: new Map(), pool: new Map(), luts: new Map(), ribbon: null });
 
 /**
  * Draw one frame's ops. `view` = { cx, cy, unit, size, cardW, cardH } in CSS

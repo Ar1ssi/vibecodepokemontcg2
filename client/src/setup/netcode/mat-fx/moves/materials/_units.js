@@ -8,6 +8,7 @@
 //   4's hand-off); the function here is the palette-only fallback (a hot → body sphere) so the
 //   table is total.
 import { rgbCss } from '../../fx-colors.mjs';
+import { tracePolygon } from './_shared.js';
 
 const TAU = Math.PI * 2;
 const rad = (deg) => (deg * Math.PI) / 180;
@@ -27,13 +28,6 @@ function disc(ctx, r, rgb, alpha = 1) {
   ctx.beginPath();
   ctx.arc(0, 0, r, 0, TAU);
   ctx.fill();
-}
-
-/** A closed polygon through `points`. */
-function poly(ctx, points) {
-  ctx.beginPath();
-  points.forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
-  ctx.closePath();
 }
 
 /** The six corners of a flat hexagon of radius r about the origin. */
@@ -108,12 +102,12 @@ function facetUnit(ctx, x, y, r, angleDeg, s, palette) {
     corners.forEach((corner, k) => {
       const [key, alpha] = FACET_SHADES[k];
       ctx.fillStyle = rgbCss(palette[key], alpha);
-      poly(ctx, [[0, 0], corner, corners[(k + 1) % 6]]);
+      tracePolygon(ctx, [[0, 0], corner, corners[(k + 1) % 6]]);
       ctx.fill();
     });
     ctx.strokeStyle = rgbCss(palette.core, 0.9);
     ctx.lineWidth = 1;
-    poly(ctx, corners);
+    tracePolygon(ctx, corners);
     ctx.stroke();
   });
 }
@@ -169,7 +163,7 @@ function crescentUnit(ctx, x, y, r, angleDeg, s, palette) {
       back.push([along - half, t * r]);
     }
     ctx.fillStyle = rgbCss(palette.body, 0.85);
-    poly(ctx, [...front, ...back.reverse()]);
+    tracePolygon(ctx, [...front, ...back.reverse()]);
     ctx.fill();
     ctx.strokeStyle = rgbCss(palette.core, 0.95);
     ctx.lineWidth = 1;
@@ -217,11 +211,11 @@ function hexUnit(ctx, x, y, r, angleDeg, s, palette) {
   framed(ctx, x, y, 360 * s, () => {
     const corners = hexCorners(r);
     ctx.fillStyle = rgbCss(palette.body, 0.85);
-    poly(ctx, corners);
+    tracePolygon(ctx, corners);
     ctx.fill();
     ctx.strokeStyle = rgbCss(palette.core, 1);
     ctx.lineWidth = 1;
-    poly(ctx, corners);
+    tracePolygon(ctx, corners);
     ctx.stroke();
   });
 }

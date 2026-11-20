@@ -129,13 +129,6 @@ function serverCount(unit, ctx, attacker) {
   return countUnit(normalizeUnit(unit, attacker?.name), ctx);
 }
 
-function sharedCondition(cond, ctx, attacker) {
-  if (!Array.isArray(ctx?.benchNames)) return null;
-  const desc = parseConditionClause(normalizeAttackText(cond, attacker?.name));
-  if (!desc) return null;
-  return attackConditionMet(desc, ctx);
-}
-
 // Evaluate a single printed "if …" condition against the available card data.
 // `cond` is the lowercased condition clause (text between "if" and the
 // "…more damage" clause). Returns true/false when determinable, or null when
@@ -163,7 +156,10 @@ function evalCondition(cond, defender, ctx, attacker = {}) {
       return false;
     }
   }
-  const shared = sharedCondition(cond, ctx, attacker);
+  const desc = Array.isArray(ctx?.benchNames)
+    ? parseConditionClause(normalizeAttackText(cond, attacker?.name))
+    : null;
+  const shared = desc ? attackConditionMet(desc, ctx) : null;
   if (shared !== null) return shared;
   // Design 036 A11: the hand cards the attack's own before-damage discard took
   // (ctx.handDiscarded, set by the reducer only for such attacks).

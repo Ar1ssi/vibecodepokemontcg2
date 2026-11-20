@@ -95,7 +95,42 @@ export function createLogExport({
     inFlight.add(socket);
     lastExportAt.set(socket, now());
     try {
-      return await buildAndStore(socket, payload, roomId);
+      const snapshots = await collectSnapshots(socket, roomId);
+      const who = describe(socket.id, roomId);
+      const lines = buildExport({
+        store,
+        journal: roomId ? journalFor(roomId) : null,
+        snapshots,
+        scope: roomId ? { roomId } : { clientId: socket.data.logClientId },
+        requester: { clientId: socket.data.logClientId ?? null, ...who },
+        note: payload?.note ?? '',
+        build,
+        netcode,
+        now,
+        levelFor,
+        describe: (clientId, row) => describe(row?.socketId, roomId),
+      });
+      const filename = filenameFor(roomId);
+      const entry = { lines, filename, expires: now() + limits.exportTokenMs };
+      for (const [token, held] of tokens) if (held.expires <= now()) tokens.delete(token);
+      while (tokens.size >= MAX_TOKENS) tokens.delete(tokens.keys().next().value);
+      const token = randomToken();
+      tokens.set(token, entry);
+
+      if (roomId) announce(roomId, who.username);
+      log.info(
+        'log',
+        'export',
+        { by: socket.data.logClientId ?? socket.id, records: lines.length, bytes: lines.reduce((sum, line) => sum + line.length, 0) },
+        { room: roomId ?? undefined }
+      );
+      const header = JSON.parse(lines[0]);
+      return {
+        ok: true,
+        url: `/api/log/export/${token}`,
+        filename,
+        sources: header.sources.map(({ src, snapshot }) => ({ src, snapshot })),
+      };
     } finally {
       inFlight.delete(socket);
     }
@@ -111,46 +146,6 @@ export function createLogExport({
       type: 'announcement',
       emit: false,
     });
-  }
-
-  async function buildAndStore(socket, payload, roomId) {
-
-    const snapshots = await collectSnapshots(socket, roomId);
-    const who = describe(socket.id, roomId);
-    const lines = buildExport({
-      store,
-      journal: roomId ? journalFor(roomId) : null,
-      snapshots,
-      scope: roomId ? { roomId } : { clientId: socket.data.logClientId },
-      requester: { clientId: socket.data.logClientId ?? null, ...who },
-      note: payload?.note ?? '',
-      build,
-      netcode,
-      now,
-      levelFor,
-      describe: (clientId, row) => describe(row?.socketId, roomId),
-    });
-    const filename = filenameFor(roomId);
-    const entry = { lines, filename, expires: now() + limits.exportTokenMs };
-    for (const [token, held] of tokens) if (held.expires <= now()) tokens.delete(token);
-    while (tokens.size >= MAX_TOKENS) tokens.delete(tokens.keys().next().value);
-    const token = randomToken();
-    tokens.set(token, entry);
-
-    if (roomId) announce(roomId, who.username);
-    log.info(
-      'log',
-      'export',
-      { by: socket.data.logClientId ?? socket.id, records: lines.length, bytes: lines.reduce((sum, line) => sum + line.length, 0) },
-      { room: roomId ?? undefined }
-    );
-    const header = JSON.parse(lines[0]);
-    return {
-      ok: true,
-      url: `/api/log/export/${token}`,
-      filename,
-      sources: header.sources.map(({ src, snapshot }) => ({ src, snapshot })),
-    };
   }
 
   return {

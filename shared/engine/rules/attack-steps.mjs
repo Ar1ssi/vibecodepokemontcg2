@@ -1938,19 +1938,17 @@ export function parseAbilityEffectSteps(text, { selfName = '' } = {}) {
   // (ability-combat.mjs abilityActivationBlockReason).
   effect = effect.replace(/^if this pokémon was healed during this turn, (?:you may )?/, '');
   if (/^if /.test(effect)) return { steps: [], holderZone: null };
-  const parsed = parseAttackSteps(abilityRevealVoice(effect));
+  // Abilities print a reveal in the player's voice ("have your opponent reveal their hand, and
+  // then you choose …"); the attack templates read the attack voice ("your opponent reveals
+  // their hand. choose …").
+  const parsed = parseAttackSteps(
+    effect
+      .replace(/^have your opponent reveal their hand/, 'your opponent reveals their hand')
+      .replace(/^(your opponent reveals their hand),? and (?:then )?(?:you )?/, '$1. ')
+      .replace(/^(your opponent reveals their hand\.) then, /, '$1 ')
+      .replace(/(your opponent reveals their hand\. \w+ .*?)\byour opponent's (deck|bench)\b/, '$1their $2')
+  );
   return { steps: [...parsed.before, ...parsed.after], holderZone };
-}
-
-// Abilities print a reveal in the player's voice ("have your opponent reveal their hand, and
-// then you choose …"); the attack templates read the attack voice ("your opponent reveals
-// their hand. choose …").
-function abilityRevealVoice(effect) {
-  return effect
-    .replace(/^have your opponent reveal their hand/, 'your opponent reveals their hand')
-    .replace(/^(your opponent reveals their hand),? and (?:then )?(?:you )?/, '$1. ')
-    .replace(/^(your opponent reveals their hand\.) then, /, '$1 ')
-    .replace(/(your opponent reveals their hand\. \w+ .*?)\byour opponent's (deck|bench)\b/, '$1their $2');
 }
 
 const HOLDER_POSITION =

@@ -807,23 +807,6 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
   // deck/hand zones directly.
   let lastProcessedTurn = -1;
 
-  const drawCard = (player) => {
-    try {
-      const deck = getZone(player, 'deck');
-      const hand = getZone(player, 'hand');
-      if (deck.getCount() > 0) {
-        // moveCardBundle(user, initiator, fromZone, toZone, index, targetIndex, action)
-        import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
-          moveCardBundle(player, player, 'deck', 'hand', 0, false, 'move');
-        });
-        return true;
-      }
-      return false;
-    } catch {
-      return false;
-    }
-  };
-
   const checkDeckOut = () => {
     if (!rulesState.enabled || rulesState.phase === 'ended') return;
     if (rulesState.phase !== 'main') return;
@@ -3527,9 +3510,6 @@ if (!isTrainer) {
         }
       });
     };
-    
-    const escapeHtml = (v = '') => String(v)
-      .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
     
     export { buildRulesToggle };
     

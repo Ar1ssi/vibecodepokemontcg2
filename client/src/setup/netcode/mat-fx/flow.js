@@ -13,11 +13,12 @@ import {
   sampleKeyframes,
   spawnOverlay,
 } from '../../image-logic/mat-fx.mjs';
-import { playBanner, playEdgeGlow, viewportRect } from './banner.js';
+import { playBanner, textNode, viewportRect } from './banner.js';
 import {
   ABILITY_TAG_MS,
   CONFETTI_MS,
   DIM_MS,
+  EDGE_GLOW_MS,
   abilityBannerText,
   abilityTagPose,
   abilityTagRect,
@@ -25,24 +26,24 @@ import {
   confettiPiecePose,
   confettiPieces,
   dimPose,
+  edgeGlowPose,
   sweepPose,
   turnBannerText,
 } from './flow-pose.mjs';
 
 const BACKSTOP_PAD_MS = 400;
 
-const textNode = (className, text) => {
-  const el = document.createElement('div');
-  el.className = className;
-  el.textContent = text;
-  return el;
-};
-
 export const turnBanner = (plan) => {
   const text = turnBannerText(plan.user, plan.number, spectatorSeatName(plan.user));
   if (!text) return 0;
   playBanner(text, plan.user);
-  playEdgeGlow(plan.user);
+  // Brief glow around the screen edge, tinted by side.
+  const host = spawnOverlay({
+    rect: viewportRect(),
+    className: `fx-overlay fx-edge-glow fx-edge-glow--${plan.user}`,
+  });
+  const frames = sampleKeyframes(edgeGlowPose, (p) => ({ opacity: p.opacity }), 16);
+  removeWhen(host, [animateFrames(host, frames, { duration: EDGE_GLOW_MS })], EDGE_GLOW_MS + BACKSTOP_PAD_MS);
 };
 
 // Anchored over the Pokémon when it is on the board; the full-width banner is

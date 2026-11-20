@@ -33,7 +33,7 @@ import { craterEmblem, environmentFootprints, sceneBounds } from './stadium-envi
 import { createPropBuilder } from './stadium-env-props.mjs';
 import { createKitProps } from './stadium-kit.mjs';
 import { tableBounds } from './table-uv.mjs';
-import { RISE_LEAN, visibleArea } from './stadium-env-spots.mjs';
+import { RISE_LEAN, distanceToRect, visibleArea } from './stadium-env-spots.mjs';
 import { clumpPieces } from './stadium-env-clumps.mjs';
 import { instanceTint, placeAsset } from './stadium-kit-assets.mjs';
 
@@ -97,8 +97,6 @@ const ROPE_DARK = [0.17, 0.12, 0.085, 0.05];
 const RUST = [0.44, 0.31, 0.23, 0.4];
 const RUST_DARK = [0.32, 0.22, 0.16, 0.35];
 
-const turnBetween = (a, b) => Math.abs(((a - b + 3 * Math.PI) % (2 * Math.PI)) - Math.PI);
-
 /** A small deterministic 0..1 from a number. */
 const hashOf = (n) => {
   const s = Math.sin(n * 127.1 + 311.7) * 43758.5453;
@@ -106,8 +104,6 @@ const hashOf = (n) => {
 };
 
 /** px from (x, y) to the rect (0 inside it). */
-const distanceToRect = (x, y, r) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.y - y, 0, y - r.y - r.h));
-
 /**
  * The chain's links, [x, y, z] centres in order: from the anchor stone's inner face, half way up it,
  * down to the paving and on along its edge (CHAIN.inset in from it) toward the far end, while each
@@ -189,7 +185,7 @@ export function ringSpots(layout) {
     });
   }
   // The chain hangs off the stone nearest its turn and lies on along the paving's edge.
-  const turnOf = (stone) => turnBetween(Math.atan2(stone.y - arena.y, stone.x - arena.x), CHAIN.angle);
+  const turnOf = (stone) => Math.abs(((Math.atan2(stone.y - arena.y, stone.x - arena.x) - CHAIN.angle + 3 * Math.PI) % (2 * Math.PI)) - Math.PI);
   const anchor = stones.reduce((best, stone) => (turnOf(stone) < turnOf(best) ? stone : best));
   const rects = [...slabs, ...flats];
   const chain = anchor.inside ? chainLinks(arena, anchor, rects, scene) : [];
