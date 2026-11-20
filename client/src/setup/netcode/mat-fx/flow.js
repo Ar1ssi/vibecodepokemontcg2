@@ -1,8 +1,8 @@
 // Design 022 slice 6 / design 026: flow effects — turn banner (+ screen-edge
 // glow), the ability tag over the Pokémon that used it, and the game-over
 // celebration (confetti cannons on a win, dim on a loss). Design 024: the
-// banner/edge-glow overlays live in banner.js, shared with the attack-name
-// banner. The game-over modal itself is apply-view's `reconcileGameEnded`;
+// banner overlay lives in banner.js, shared with the attack-name banner; the
+// edge glow is drawn here. The game-over modal itself is apply-view's `reconcileGameEnded`;
 // these play on top of it and never take pointer events.
 import { getCardRegistry } from '../apply-view.js';
 import { spectatorSeatName } from '../../spectator/spectator-session.js';

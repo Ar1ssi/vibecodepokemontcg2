@@ -67,6 +67,12 @@ export function createSampleBank(deps = {}) {
 
   const isStreamed = (key) => (cues[key]?.dur ?? 0) > STREAM_SECONDS;
 
+  const fetchBuffer = async (url) => {
+    const response = await fetchFn(url);
+    if (!response?.ok) throw new Error(`HTTP ${response?.status}`);
+    return ctx.decodeAudioData(await response.arrayBuffer());
+  };
+
   // A failed file drops out of its cue; a cue with no decodable file is dead for the session.
   const loadCue = (key) => {
     if (dead.has(key) || !cues[key] || isStreamed(key)) return Promise.resolve();
@@ -76,9 +82,7 @@ export function createSampleBank(deps = {}) {
     const job = Promise.all(
       entries.map(async (entry) => {
         try {
-          const response = await fetchFn(entry.url);
-          if (!response?.ok) throw new Error(`HTTP ${response?.status}`);
-          entry.buffer = await ctx.decodeAudioData(await response.arrayBuffer());
+          entry.buffer = await fetchBuffer(entry.url);
         } catch {
           entry.buffer = null;
         }
@@ -94,6 +98,22 @@ export function createSampleBank(deps = {}) {
 
   const preload = () => Promise.all(Object.keys(cues).filter((key) => CUES[key]?.preload).map(loadCue));
 
+  const readManifest = async () => {
+    try {
+      const response = await fetchFn(MANIFEST_URL);
+      if (!response?.ok) throw new Error(`HTTP ${response?.status}`);
+      const manifest = await response.json();
+      const valid = manifest?.version === MANIFEST_VERSION && manifest.cues && typeof manifest.cues === 'object';
+      if (!valid) throw new Error('unsupported manifest');
+      return Object.fromEntries(
+        Object.entries(manifest.cues).filter(([, cue]) => Array.isArray(cue?.files) && cue.files.length > 0),
+      );
+    } catch (err) {
+      log(`[sfx] no sampled audio (${err.message}); using synthesized sounds`);
+      return {};
+    }
+  };
+
   /**
    * Fetch the manifest and start preloading. Resolves when preload settles; never rejects.
    * Preload waits for the context to be running, i.e. for the first user gesture.
@@ -102,19 +122,7 @@ export function createSampleBank(deps = {}) {
     if (ctx || !audioContext || !masterGain || !fetchFn) return;
     ctx = audioContext;
     master = masterGain;
-    try {
-      const response = await fetchFn(MANIFEST_URL);
-      if (!response?.ok) throw new Error(`HTTP ${response?.status}`);
-      const manifest = await response.json();
-      const valid = manifest?.version === MANIFEST_VERSION && manifest.cues && typeof manifest.cues === 'object';
-      if (!valid) throw new Error('unsupported manifest');
-      cues = Object.fromEntries(
-        Object.entries(manifest.cues).filter(([, cue]) => Array.isArray(cue?.files) && cue.files.length > 0),
-      );
-    } catch (err) {
-      log(`[sfx] no sampled audio (${err.message}); using synthesized sounds`);
-      cues = {};
-    }
+    cues = await readManifest();
     ready = true;
     if (ctx.state === 'running') return preload();
     return new Promise((resolve) => {

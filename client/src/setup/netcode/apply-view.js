@@ -1825,27 +1825,7 @@ async function submitChoiceSelection(pendingChoice, selection, options = {}) {
     options.onResolveChoice({ choiceId: pendingChoice.choiceId, selection });
     return;
   }
-  const defaultCtx = getDefaultNetcodeContext();
-  let socket = options.socket || defaultCtx.socket;
-  let roomId = options.roomId || defaultCtx.roomId;
-
-  if (typeof window !== 'undefined') {
-    if (!socket && window.socket) socket = window.socket;
-    if (!roomId && window.systemState?.roomId)
-      roomId = window.systemState.roomId;
-  }
-
-  if ((!socket || !roomId) && typeof window !== 'undefined') {
-    try {
-      const state = await import('../../state.js');
-      if (!socket && state.socket) socket = state.socket;
-      if (!roomId && state.systemState?.roomId)
-        roomId = state.systemState.roomId;
-    } catch {
-      // dynamic import fallback ignored if unavailable
-    }
-  }
-
+  const { socket, roomId } = await resolveNetcodeContext(options);
   if (socket && roomId) {
     emitResolveChoice({
       socket,
@@ -2292,6 +2272,37 @@ export function clearRenderedBoard(options = {}) {
   }
   lastRenderedVersion = -1;
   lastAppliedView = null;
+}
+
+/**
+ * Resolves netcode socket and roomId context from options, defaults, or dynamic state import.
+ *
+ * @param {object} [options={}]
+ * @returns {Promise<{ socket: any, roomId: string|null }>}
+ */
+async function resolveNetcodeContext(options = {}) {
+  const defaultCtx = getDefaultNetcodeContext();
+  let socket = options.socket || defaultCtx.socket;
+  let roomId = options.roomId || defaultCtx.roomId;
+
+  if (typeof window !== 'undefined') {
+    if (!socket && window.socket) socket = window.socket;
+    if (!roomId && window.systemState?.roomId)
+      roomId = window.systemState.roomId;
+  }
+
+  if ((!socket || !roomId) && typeof window !== 'undefined') {
+    try {
+      const state = await import('../../state.js');
+      if (!socket && state.socket) socket = state.socket;
+      if (!roomId && state.systemState?.roomId)
+        roomId = state.systemState.roomId;
+    } catch {
+      // dynamic import fallback ignored if unavailable
+    }
+  }
+
+  return { socket, roomId };
 }
 
 /**
