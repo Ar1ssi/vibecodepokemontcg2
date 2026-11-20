@@ -89,6 +89,12 @@ export function imageTexture(source, renderer, { srgb = true, repeat = false, an
   return texture;
 }
 
+/** @returns {Promise<Texture|null>} */
+export async function loadTexture(url, renderer, options) {
+  const image = await loadImage(url, options);
+  return image ? imageTexture(image, renderer, options) : null;
+}
+
 export function makeCanvas(width, height) {
   const canvas = document.createElement('canvas');
   canvas.width = width;

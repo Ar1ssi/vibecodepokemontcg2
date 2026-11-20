@@ -119,6 +119,7 @@ const STACK_STEP = CARD.thickness + 0.04;
 const qFlat = (yawDeg, faceUp = true) =>
   new Quaternion().setFromEuler(new Euler(faceUp ? -Math.PI / 2 : Math.PI / 2, yawDeg * DEG, 0, 'YXZ'));
 
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const HAND_FACE_WAIT_MS = 6000;
 // The share of a pull taken by sliding the wrapper down rather than drawing the cards up.
 const WRAPPER_SLIDE = 0.72;
@@ -904,6 +905,76 @@ async function buildTabletopApp(options, life) {
     });
     mesh.material = clipped;
     return clipped;
+  }
+
+  // Shaders the opening needs later compile now, behind the loading screen. `compile` builds the
+  // card stack's programs without the clipping a pack's mouth puts on it (only a draw sets that),
+  // so the clipped probe is also drawn for real, once per pass, by `warmFrames`. Its materials stay
+  // alive so three keeps those programs until the tear uses them.
+  let clippedProbe = null;
+  async function warmShaders() {
+    const probe = kit.makeCard({ map: backTexture, name: 'tt-warm' });
+    const probeMaterials = clipCard(probe, new Plane(new Vector3(0, 1, 0), 0));
+    disposers.push(() => probeMaterials.forEach((material) => material.dispose()));
+    // Far below the table: drawn (never culled), seen by nothing.
+    probe.frustumCulled = false;
+    probe.position.set(0, -PROBE_DEPTH_MM, 0);
+    clippedProbe = probe;
+    const warm = new Group();
+    warm.add(probe);
+    // The tear's light too (only the eye draws it): its shaders would otherwise compile as the
+    // first pack comes up.
+    const eyeOnly = new Group();
+    if (packObjects.length) {
+      const lightProbe = createTearFx({ model: packObjects[0].model, shape: packShapeOf(0) });
+      eyeOnly.add(lightProbe.group);
+      disposers.push(() => lightProbe.dispose());
+    }
+    try {
+      await renderer.compileAsync(warm, camera, scene);
+      await renderer.compileAsync(eyeOnly, camera, scene);
+      await stage.compileForMirror(warm);
+    } catch {
+      // A shader that fails here fails again where it is used, and three reports it there.
+    }
+  }
+
+  // Things start casting shadows as they land on the mat, and the shadow pass compiles a depth
+  // shader for each kind of material the first time it meets one. One frame per pass (the eye's,
+  // then the floor's mirror), drawn with every shadow on and nothing culled (a narrow screen has
+  // packs off to the side), behind the loading screen, compiles them all up front.
+  async function warmFrames() {
+    const switched = [];
+    const uncullable = [];
+    scene.add(clippedProbe);
+    scene.traverse((node) => {
+      if (!node.isMesh) return;
+      if (!node.castShadow) {
+        node.castShadow = true;
+        switched.push(node);
+      }
+      if (node.frustumCulled) {
+        node.frustumCulled = false;
+        uncullable.push(node);
+      }
+    });
+    try {
+      renderer.shadowMap.needsUpdate = true;
+      renderer.render(scene, camera);
+      // The mirror's shaders compile in a task of their own, so images that arrive meanwhile are
+      // taken in between (software WebGL compiles block).
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      if (!stopped()) stage.renderReflection();
+    } finally {
+      clippedProbe.removeFromParent();
+      switched.forEach((node) => {
+        node.castShadow = false;
+      });
+      uncullable.forEach((node) => {
+        node.frustumCulled = true;
+      });
+      renderer.shadowMap.needsUpdate = true;
+    }
   }
 
   // ── Beats ───────────────────────────────────────────────────────────────
@@ -1867,86 +1938,29 @@ async function buildTabletopApp(options, life) {
     stage.applyCamera(cameraPose(framingFor(view()), aspect()));
   });
 
+  // A reload mid-pack: the cards in hand show their faces before the loading screen lifts (a front
+  // card showing its back reads as a card held the wrong way round). Bounded by a slow host.
+  const handFacesReady = () => {
+    if (hand?.kind !== 'stack') return Promise.resolve();
+    const showing = hand.items.slice(hand.position, hand.position + 2).filter((item) => item.url);
+    return Promise.race([
+      Promise.all(showing.map((item) => faceTexture(item.url, item.card))),
+      wait(HAND_FACE_WAIT_MS),
+    ]);
+  };
+
   // ── Start ───────────────────────────────────────────────────────────────
   // The table's surface (a mat's print loads over the network) starts now and is waited for before
   // the warm-up draws: the mat in the frame is one more set of shaders.
   const surfaceReady = stage.setSurface(surface);
-  // Shaders the opening needs later compile now, behind the loading screen. `compile` builds the
-  // card stack's programs without the clipping a pack's mouth puts on it (only a draw sets that),
-  // so the clipped probe is also drawn for real, once per pass, by the frames below. Its materials stay
-  // alive so three keeps those programs until the tear uses them.
-  const clippedProbe = kit.makeCard({ map: backTexture, name: 'tt-warm' });
-  const probeMaterials = clipCard(clippedProbe, new Plane(new Vector3(0, 1, 0), 0));
-  disposers.push(() => probeMaterials.forEach((material) => material.dispose()));
-  // Far below the table: drawn (never culled), seen by nothing.
-  clippedProbe.frustumCulled = false;
-  clippedProbe.position.set(0, -PROBE_DEPTH_MM, 0);
-  const warm = new Group();
-  warm.add(clippedProbe);
-  // The tear's light too (only the eye draws it): its shaders would otherwise compile as the
-  // first pack comes up.
-  const eyeOnly = new Group();
-  if (packObjects.length) {
-    const lightProbe = createTearFx({ model: packObjects[0].model, shape: packShapeOf(0) });
-    eyeOnly.add(lightProbe.group);
-    disposers.push(() => lightProbe.dispose());
-  }
-  try {
-    await renderer.compileAsync(warm, camera, scene);
-    await renderer.compileAsync(eyeOnly, camera, scene);
-    await stage.compileForMirror(warm);
-  } catch {
-    // A shader that fails here fails again where it is used, and three reports it there.
-  }
+  await warmShaders();
   if (stopped()) return abandon();
   settle();
   await surfaceReady;
   if (stopped()) return abandon();
-  // Things start casting shadows as they land on the mat, and the shadow pass compiles a depth
-  // shader for each kind of material the first time it meets one. One frame per pass (the eye's,
-  // then the floor's mirror), drawn with every shadow on and nothing culled (a narrow screen has
-  // packs off to the side), behind the loading screen, compiles them all up front.
-  const switched = [];
-  const uncullable = [];
-  scene.add(clippedProbe);
-  scene.traverse((node) => {
-    if (!node.isMesh) return;
-    if (!node.castShadow) {
-      node.castShadow = true;
-      switched.push(node);
-    }
-    if (node.frustumCulled) {
-      node.frustumCulled = false;
-      uncullable.push(node);
-    }
-  });
-  try {
-    renderer.shadowMap.needsUpdate = true;
-    renderer.render(scene, camera);
-    // The mirror's shaders compile in a task of their own, so images that arrive meanwhile are
-    // taken in between (software WebGL compiles block).
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    if (!stopped()) stage.renderReflection();
-  } finally {
-    clippedProbe.removeFromParent();
-    switched.forEach((node) => {
-      node.castShadow = false;
-    });
-    uncullable.forEach((node) => {
-      node.frustumCulled = true;
-    });
-    renderer.shadowMap.needsUpdate = true;
-  }
+  await warmFrames();
   if (stopped()) return abandon();
-  // A reload mid-pack: the cards in hand show their faces before the loading screen lifts (a front
-  // card showing its back reads as a card held the wrong way round). Bounded by a slow host.
-  if (hand?.kind === 'stack') {
-    const showing = hand.items.slice(hand.position, hand.position + 2).filter((item) => item.url);
-    await Promise.race([
-      Promise.all(showing.map((item) => faceTexture(item.url, item.card))),
-      new Promise((resolve) => setTimeout(resolve, HAND_FACE_WAIT_MS)),
-    ]);
-  }
+  await handFacesReady();
   if (stopped()) return abandon();
   ui.setLoading(false);
   stage.requestRender();

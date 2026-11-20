@@ -22,7 +22,7 @@ import { cameraBlend } from '../../../../setup/deck-builder/core/build-battle/ta
 import { createStudioEnvironment } from './tt-environment.js';
 import { cardSlab } from './tt-geometry.js';
 import { EYE_ONLY_LAYER, createStudio } from './tt-studio.js';
-import { clothNormalTexture, imageTexture, loadImage } from './tt-textures.js';
+import { clothNormalTexture, loadTexture } from './tt-textures.js';
 
 /**
  * The tabletop's stage (design 073 § Browser modules): one WebGL canvas, the TCG Pocket studio
@@ -170,8 +170,7 @@ export function createStage({
    */
   const setSurface = async (next) => {
     if (next?.kind === 'art' && next.src) {
-      const image = await loadImage(next.src);
-      const texture = image ? imageTexture(image, renderer) : null;
+      const texture = await loadTexture(next.src, renderer);
       if (texture) {
         track(texture);
         matFace.map = texture;
