@@ -98,6 +98,9 @@ export function isVCard(card = {}) {
 
 export function isTeraCard(card = {}) {
   if (hasSubtype(card, 'tera')) return true;
+  // Homebrew Tera (customhb "TERAHB" stage, evolution.mjs): no printed id in the marker table, and
+  // the client's cardStats sends a Pokémon's stage but not its subtypes.
+  if (collapse(card?.stage) === 'terahb') return true;
   if (hasCardMarker(card, 'Tera')) return true;
   const text = textOf(card);
   if (
