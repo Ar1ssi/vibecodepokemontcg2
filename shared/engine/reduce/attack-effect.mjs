@@ -472,10 +472,22 @@ export function resolveAttackEffectPhase(draft, ctx) {
       });
       return;
     } else if (max > 0) {
+      // The prompt names what each card is worth as printed: "N (more) damage for each"
+      // (Genesect-EX Rapid Blaster +20), "do N damage to it" (Bronzong BREAK Metal Rain), else the
+      // printed damage.
+      const text = String(attack?.text || '');
+      const per =
+        /(\d+) (?:more )?damage (?:for each|times)/i.exec(text)?.[1] ||
+        /do (\d+) damage to it/i.exec(text)?.[1] ||
+        // Garchomp ex Surf: "For each Energy you discard, this attack does 30 damage to each …".
+        /for each energy[^,.]* discard(?:ed)?[^,.]*, this attack does (\d+) damage/i.exec(text)?.[1] ||
+        parseInt(attack?.damage, 10) ||
+        0;
+      const verb = discardScaling.destination === 'deck' ? 'shuffle into your deck' : 'discard';
       draft.pendingChoice = createPendingChoice({
         player: playerId,
         source: 'attack',
-        prompt: discardScalePrompt(attack, discardScaling),
+        prompt: `${attack.name}: choose Energy to ${verb} (${per} damage each).`,
         options: candidates.map((c) => ({
           instanceId: c.instanceId,
           name: c.name,
@@ -1752,22 +1764,6 @@ function searchCoinGateOpen(attack, coinResult) {
     .find((s) => s.includes('search your deck for'));
   const gate = /^if (heads|tails),/.exec(sentence || '')?.[1];
   return !gate || coinResult?.coin === gate;
-}
-
-// The discard-to-scale prompt names what each card is worth as printed: "N (more) damage for each"
-// (Genesect-EX Rapid Blaster +20), "do N damage to it" (Bronzong BREAK Metal Rain), else the
-// printed damage.
-function discardScalePrompt(attack, discardScaling) {
-  const text = String(attack?.text || '');
-  const per =
-    /(\d+) (?:more )?damage (?:for each|times)/i.exec(text)?.[1] ||
-    /do (\d+) damage to it/i.exec(text)?.[1] ||
-    // Garchomp ex Surf: "For each Energy you discard, this attack does 30 damage to each …".
-    /for each energy[^,.]* discard(?:ed)?[^,.]*, this attack does (\d+) damage/i.exec(text)?.[1] ||
-    parseInt(attack?.damage, 10) ||
-    0;
-  const verb = discardScaling.destination === 'deck' ? 'shuffle into your deck' : 'discard';
-  return `${attack.name}: choose Energy to ${verb} (${per} damage each).`;
 }
 
 // Beast Game-GX's "… take 3 more Prize cards instead" condition, read against the attacker.

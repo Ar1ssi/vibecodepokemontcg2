@@ -26,32 +26,6 @@ import {
   trainerIgnoresDefenderEffects,
 } from './attack-damage.mjs';
 
-/** The chosen attack's printed damage after its own coins and board counts, as its user reads them. */
-function printedDamageFor(draft, { attack, user, userView, ownerId, target, targetView, controllerId, activeRng, events }) {
-  const countOf = coinCountReader(draft, { playerId: ownerId, attacker: user, attackerView: userView, targetInstanceId: target.instanceId });
-  const { coin, headsCount, flips } = flipAttackCoins(attack, activeRng, countOf);
-  if (flips.length > 0) {
-    events.push({ type: 'attackCoinFlipped', playerId: controllerId, attackName: attack.name, coin, headsCount, flips });
-  }
-  const parsed = parseAttackDamage(
-    attack,
-    userView,
-    targetView,
-    buildServerAttackContext(draft, {
-      attackerPlayerId: ownerId,
-      defenderPlayerId: ownerId,
-      attacker: user,
-      defender: target,
-      attackerView: userView,
-      attack,
-      defenderView: targetView,
-      coin,
-      headsCount,
-    })
-  );
-  return parsed.total;
-}
-
 /**
  * Applies one controlled attack: `userId` (owned by `ownerId`) uses `attack` on `targetId`, another
  * of `ownerId`'s Pokémon, for `controllerId`. Returns the damage dealt.
@@ -68,7 +42,28 @@ export function applyControlledAttack(draft, { userId, ownerId, targetId, attack
   const targetView = inPlayView(draft, target);
   const targetIsActive = targetRef.zoneId === 'active';
 
-  const amount = printedDamageFor(draft, { attack, user, userView, ownerId, target, targetView, controllerId, activeRng, events });
+  // The chosen attack's printed damage after its own coins and board counts, as its user reads them.
+  const countOf = coinCountReader(draft, { playerId: ownerId, attacker: user, attackerView: userView, targetInstanceId: target.instanceId });
+  const { coin, headsCount, flips } = flipAttackCoins(attack, activeRng, countOf);
+  if (flips.length > 0) {
+    events.push({ type: 'attackCoinFlipped', playerId: controllerId, attackName: attack.name, coin, headsCount, flips });
+  }
+  const amount = parseAttackDamage(
+    attack,
+    userView,
+    targetView,
+    buildServerAttackContext(draft, {
+      attackerPlayerId: ownerId,
+      defenderPlayerId: ownerId,
+      attacker: user,
+      defender: target,
+      attackerView: userView,
+      attack,
+      defenderView: targetView,
+      coin,
+      headsCount,
+    })
+  ).total;
   events.push({
     type: 'controlledAttackUsed',
     playerId: controllerId,
@@ -141,7 +136,27 @@ export function applyControlledAttack(draft, { userId, ownerId, targetId, attack
     });
     return dealt;
   }
-  if (activeKoPrevented(draft, { target, ownerId, dealt, activeRng, events })) return dealt;
+  // Focus Sash / Survival Brace on the Active target: the same Knock Out prevention an attack meets.
+  const koHp = cardEffectiveHp(draft, target, ownerId);
+  if (koHp > 0 && (target.damage || 0) + dealt >= koHp) {
+    const koEval = evaluateToolKoPrevention(target, draft.players[ownerId]?.zones?.active || [], {
+      currentDamage: target.damage || 0,
+      incomingDamage: dealt,
+      baseHp: koHp,
+      stadium: draft.stadium,
+      inHp: true,
+      onlyPokemonInPlay: onlyPokemonInPlay(draft, ownerId),
+      flipCoin: () => (activeRng.next() < 0.5 ? 'heads' : 'tails'),
+    });
+    if (koEval.coinFace) events.push({ type: 'coinFlipped', playerId: ownerId, face: koEval.coinFace });
+    if (koEval.prevented) {
+      target.damage = koEval.totalDamage;
+      events.push({ type: 'damageUpdated', instanceId: target.instanceId, damage: target.damage, dealt });
+      events.push({ type: 'koPrevented', instanceId: target.instanceId, tool: koEval.tool, surviveHp: koEval.surviveHp });
+      if (koEval.discardOnUse && koEval.toolCard) discardCardFromPlayerZone(draft, koEval.toolCard.instanceId, ownerId);
+      return dealt;
+    }
+  }
   return applyFlatDamageToTarget(draft, {
     ref: targetRef,
     amount: dealt,
@@ -149,27 +164,4 @@ export function applyControlledAttack(draft, { userId, ownerId, targetId, attack
     legacyApplied: true,
     events,
   });
-}
-
-// Focus Sash / Survival Brace on the Active target: the same Knock Out prevention an attack meets.
-function activeKoPrevented(draft, { target, ownerId, dealt, activeRng, events }) {
-  const koHp = cardEffectiveHp(draft, target, ownerId);
-  if (!(koHp > 0 && (target.damage || 0) + dealt >= koHp)) return false;
-  const zoneCards = draft.players[ownerId]?.zones?.active || [];
-  const koEval = evaluateToolKoPrevention(target, zoneCards, {
-    currentDamage: target.damage || 0,
-    incomingDamage: dealt,
-    baseHp: koHp,
-    stadium: draft.stadium,
-    inHp: true,
-    onlyPokemonInPlay: onlyPokemonInPlay(draft, ownerId),
-    flipCoin: () => (activeRng.next() < 0.5 ? 'heads' : 'tails'),
-  });
-  if (koEval.coinFace) events.push({ type: 'coinFlipped', playerId: ownerId, face: koEval.coinFace });
-  if (!koEval.prevented) return false;
-  target.damage = koEval.totalDamage;
-  events.push({ type: 'damageUpdated', instanceId: target.instanceId, damage: target.damage, dealt });
-  events.push({ type: 'koPrevented', instanceId: target.instanceId, tool: koEval.tool, surviveHp: koEval.surviveHp });
-  if (koEval.discardOnUse && koEval.toolCard) discardCardFromPlayerZone(draft, koEval.toolCard.instanceId, ownerId);
-  return true;
 }
