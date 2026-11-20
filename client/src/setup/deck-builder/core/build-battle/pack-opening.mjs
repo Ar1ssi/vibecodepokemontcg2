@@ -300,12 +300,6 @@ export function withoutQty(card) {
   return rest;
 }
 
-/** A baked Basic Energy row (the SVE print, as 051's decks bake it). */
-export function basicEnergyRow(label, qty) {
-  const { qty: _qty, ...card } = buildModernBasicEnergy(label, qty);
-  return { ...card, rarity: null, category: 'Energy', stage: null, types: [], hp: null, qty };
-}
-
 // Card ids (one per copy) → rows with qty, first appearance first.
 function rowsFromIds(ids, cardsById) {
   const rows = new Map();
@@ -330,7 +324,11 @@ export function startingDeckRows({ box, data, opened }) {
   if (!isKnownDeck(box, opened?.deckKey)) return [];
   if (box.kind === 'fixed-decks') return (data?.decks?.[opened.deckKey] || []).map((row) => ({ ...row }));
   const rows = rowsFromIds(opened.evolutionPack, data?.cardsById);
-  for (const [label, qty] of opened.energy || []) rows.push(basicEnergyRow(label, qty));
+  for (const [label, qty] of opened.energy || []) {
+    // A baked Basic Energy row (the SVE print, as 051's decks bake it).
+    const { qty: _qty, ...card } = buildModernBasicEnergy(label, qty);
+    rows.push({ ...card, rarity: null, category: 'Energy', stage: null, types: [], hp: null, qty });
+  }
   return rows;
 }
 

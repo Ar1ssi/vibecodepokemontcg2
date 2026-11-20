@@ -276,18 +276,6 @@ const MECHANIC_TESTS = {
   Future: (card) => isFutureCard(card),
 };
 
-function matchesHp(card, filters) {
-  const hp = Number(card?.hp);
-  if (!Number.isFinite(hp) || hp <= 0) return false;
-  if (filters.hpMin != null && hp < filters.hpMin) return false;
-  if (filters.hpMax != null && hp > filters.hpMax) return false;
-  return true;
-}
-
-function matchesFormat(card, format) {
-  return card?.legal?.[format] === true;
-}
-
 /**
  * Narrows a result set by the active filters.
  *
@@ -359,8 +347,13 @@ export function applyCardFilters(cards = [], filters = {}, context = {}) {
     ) {
       return false;
     }
-    if (state.format && !matchesFormat(card, state.format)) return false;
-    if (hasHpRange(state) && !matchesHp(card, state)) return false;
+    if (state.format && card?.legal?.[state.format] !== true) return false;
+    if (hasHpRange(state)) {
+      const hp = Number(card?.hp);
+      if (!Number.isFinite(hp) || hp <= 0) return false;
+      if (state.hpMin != null && hp < state.hpMin) return false;
+      if (state.hpMax != null && hp > state.hpMax) return false;
+    }
     if (state.hasAbility && !(Array.isArray(card.abilities) && card.abilities.length > 0)) {
       return false;
     }

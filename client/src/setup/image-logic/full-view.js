@@ -36,11 +36,6 @@ let cardPreviewState = null;
 
 export const isCardPreviewOpen = () => cardPreviewState != null;
 
-export const resolvePreviewSleeveSrc = (card, image) => {
-  const user = card?.user ?? card?.image?.user ?? image?.user ?? 'self';
-  return cardBackSrcForUser(user) || DEFAULT_SLEEVE;
-};
-
 // Deck-list/search previews have a real cursor to track — real
 // pointer-tracked hover, not the auto-sweep. A preview cloned from a mat card
 // (double-click) keeps the board's auto-sweep instead, so it flows the way the
@@ -183,7 +178,8 @@ export const openCardPreview = (targetImage, card) => {
     ...(board3dActive() ? { sourceRect: viewportRectOf(targetImage) } : {}),
     imageUrl: toHighResCardImageUrl(targetImage.currentSrc || targetImage.src),
     card,
-    sleeveSrc: resolvePreviewSleeveSrc(card, targetImage),
+    sleeveSrc:
+      cardBackSrcForUser(card?.user ?? card?.image?.user ?? targetImage.user ?? 'self') || DEFAULT_SLEEVE,
     cloneFrom: card?.wrapper ?? (anchor.classList?.contains('mat-holo') ? anchor : null),
     hideSource: true,
     matHolo: true,

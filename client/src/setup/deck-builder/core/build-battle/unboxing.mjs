@@ -130,11 +130,6 @@ export function nextPackToTear(u) {
   return u.packsTorn.indexOf(false);
 }
 
-function withReveal(u, packIndex, count) {
-  const revealed = u.revealed.map((value, index) => (index === packIndex ? count : value));
-  return { ...u, revealed, stage: allRevealed(u, revealed) ? 'done' : u.stage };
-}
-
 /**
  * The scene's reducer. `event` is `{ type, packIndex? }` with type one of `tearWrap`, `openLid`,
  * `unwrapDeck`, `tearPack`, `revealCard`, `revealAll`, `finish`. An event the current state does
@@ -168,7 +163,9 @@ export function advanceUnboxing(u, event) {
       if (u.stage !== 'packs' || !isPackIndex(u, packIndex)) return u;
       const count = u.revealed[packIndex];
       if (!u.packsTorn[packIndex] || count >= u.cardsPerPack) return u;
-      return withReveal(u, packIndex, type === 'revealAll' ? u.cardsPerPack : count + 1);
+      const shown = type === 'revealAll' ? u.cardsPerPack : count + 1;
+      const revealed = u.revealed.map((value, index) => (index === packIndex ? shown : value));
+      return { ...u, revealed, stage: allRevealed(u, revealed) ? 'done' : u.stage };
     }
     case 'finish':
       return hasPackMidReveal(u) ? u : finishedUnboxing({ packCount: u.packsTorn.length, cardsPerPack: u.cardsPerPack });
@@ -310,17 +307,6 @@ const DIE_FACE_ROTATIONS = [
   [0, 270],
 ];
 
-// Die `index`'s landing: its face, direction out of the pouch and resting spin. A stream of its
-// own (`seed ^ 0x5bd1e995`), so the props never shift a pool draw.
-function dieLanding(index, seed) {
-  const rng = createRng(seed ^ 0x5bd1e995);
-  let landing = null;
-  for (let die = 0; die <= index; die += 1) {
-    landing = { face: rng.int(DIE_FACE_ROTATIONS.length), angle: rng.next(), spin: rng.next() };
-  }
-  return landing;
-}
-
 /**
  * Die `index` (six damage-counter dice, then the flip die at 6) tumbling 18 px out of the pouch
  * and landing on a seeded face.
@@ -328,7 +314,14 @@ function dieLanding(index, seed) {
 export function dicePose(t, index, seed) {
   const x = easeLift(clamp01(t));
   const die = Math.max(0, index | 0);
-  const { face, angle, spin } = dieLanding(die, seed);
+  // Die `index`'s landing: its face, direction out of the pouch and resting spin. A stream of its
+  // own (`seed ^ 0x5bd1e995`), so the props never shift a pool draw.
+  const rng = createRng(seed ^ 0x5bd1e995);
+  let landing = null;
+  for (let roll = 0; roll <= die; roll += 1) {
+    landing = { face: rng.int(DIE_FACE_ROTATIONS.length), angle: rng.next(), spin: rng.next() };
+  }
+  const { face, angle, spin } = landing;
   const direction = 2 * Math.PI * ((die + angle) / 7);
   const [faceX, faceY] = DIE_FACE_ROTATIONS[face];
   const tumble = 360 * DICE_TUMBLE_TURNS;
@@ -678,7 +671,6 @@ export function boxArt(box) {
   return box?.key && Object.hasOwn(BOX_ART, box.key) ? BOX_ART[box.key] : null;
 }
 
-const withWebp = (base) => (base ? `${base}.webp` : null);
 const largeImageOf = (card) => card?.images?.large || card?.image || null;
 
 /**
@@ -710,7 +702,7 @@ export function boxSkin({ box, setInfo = {}, cards = [], data = {} }) {
     }));
   }
   return {
-    setLogoUrl: withWebp(setInfo.logo),
+    setLogoUrl: setInfo.logo ? `${setInfo.logo}.webp` : null,
     keyArtUrl: largeImageOf(cardById(skin.keyArtCardId)),
     palette: skin.palette || box?.era || 'me',
     packArts,
