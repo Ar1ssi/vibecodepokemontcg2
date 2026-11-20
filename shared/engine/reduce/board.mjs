@@ -15,6 +15,8 @@ import { resolveSpecialEnergyDiscard } from '../effects/special-energy.mjs';
 import { addCondition, removeCondition, clearConditions } from '../rules/special-conditions.mjs';
 import { inPlayView, conditionsUpdatedEvent } from './shared.mjs';
 
+const IN_PLAY_ZONES = ['active', 'bench'];
+
 /**
  * Design 012: `faceDown` only means something on the board. Every path that takes a card off
  * the board (moves, mass discards, shuffles, undo replay) would otherwise have to clear it, and
@@ -103,6 +105,16 @@ export function moveCardCommand({ payload, draft, playerId, events, activeRng })
       });
     } else {
       const destZone = draft.players[playerId].zones[payload.to];
+      // A card that leaves play forgets its damage counters, conditions and timed effects; put
+      // back into play later (Acerola, then the Bench), it starts fresh.
+      if (IN_PLAY_ZONES.includes(payload.from) && !IN_PLAY_ZONES.includes(payload.to)) {
+        card.damage = 0;
+        clearConditions(card);
+        clearAttackMarkers(card);
+        delete card.cannotAttackUntilTurn;
+        delete card.cannotAttackAttackName;
+        delete card.cannotRetreatUntilTurn;
+      }
       if (
         payload.targetIndex != null &&
         payload.targetIndex >= 0 &&

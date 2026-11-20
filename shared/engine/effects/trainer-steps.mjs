@@ -11,7 +11,7 @@ import { shuffleInPlace } from '../rng.mjs';
 import { formsAllowEvolution } from '../rules/pokemon-forms.mjs';
 import { isAttachedAsTool, isEnergy, isPokemon, isTrainer } from '../cards.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
-import { isUltraBeastCard, isRuleBoxPokemon, isVCard, isVmaxCard } from '../rules/card-classify.mjs';
+import { isGxCard, isUltraBeastCard, isRuleBoxPokemon, isVCard, isVmaxCard } from '../rules/card-classify.mjs';
 import { isAncientCard, isFutureCard } from '../rules/paradox-tags.mjs';
 import { becomeFossilPokemon } from '../rules/fossil.mjs';
 import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
@@ -1611,11 +1611,14 @@ function damageCounters(ctx) {
     return true;
   };
   const targets = (/active/i.test(step.target || '') ? [activeOf(side)].filter(Boolean) : rootsOf(side)).filter(
-    (root) => !shieldBlocks(root) && !effectShieldBlocks(ctx, side, root)
+    (root) =>
+      (!step.gxExOnly || isGxOrEx(topPokemonCard(side, root) || root)) &&
+      !shieldBlocks(root) &&
+      !effectShieldBlocks(ctx, side, root)
   );
 
-  const apply = (card) => {
-    card.damage = (card.damage || 0) + amount;
+  const apply = (card, placed = amount) => {
+    card.damage = (card.damage || 0) + placed;
     ctx.events.push({ type: 'damageUpdated', instanceId: card.instanceId, damage: card.damage });
     // Lethal counters must become a knockout. handleKnockout lives in reduce.mjs,
     // which imports this module (importing it back would be circular), so mark
@@ -1629,6 +1632,8 @@ function damageCounters(ctx) {
     });
   };
 
+  if (step.distribute) return distributeDamageCounters(ctx, targets, (card) => apply(card, 10));
+
   // "choose 2 of your opponent's Pokémon and put 2 damage counters on each of them"
   const targetCount = step.targetCount || 1;
   if (ctx.selection) {
@@ -1637,7 +1642,7 @@ function damageCounters(ctx) {
   }
   if (targets.length === 0) return skip(ctx, 'no_target');
   if (targets.length <= targetCount) {
-    targets.forEach(apply);
+    targets.forEach((card) => apply(card));
     return null;
   }
   const which = targetCount > 1 ? `${targetCount} Pokémon` : 'a Pokémon';
@@ -1646,6 +1651,29 @@ function damageCounters(ctx) {
     options: targets,
     min: targetCount,
     max: targetCount,
+  });
+}
+
+const isGxOrEx = (card) => isGxCard(card) || /-EX$/.test(String(card?.name || ''));
+
+// "Put 6 damage counters on your opponent's Pokémon in any way you like": one counter per pick,
+// so the player splits them freely; `memo.remaining` carries the count across prompts.
+function distributeDamageCounters(ctx, targets, placeOne) {
+  let remaining = ctx.memo?.remaining ?? (ctx.step.count || 1);
+  if (ctx.selection) {
+    const [card] = pickById(targets, ctx.selection);
+    if (!card) return skip(ctx, 'target_not_found');
+    placeOne(card);
+    remaining -= 1;
+  }
+  if (remaining <= 0) return null;
+  if (targets.length === 0) return skip(ctx, 'no_target');
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Trainer')}: Put a damage counter on 1 of your opponent's Pokémon (${remaining} left)`,
+    options: targets,
+    min: 1,
+    max: 1,
+    memo: { remaining },
   });
 }
 
@@ -1780,7 +1808,7 @@ function returnPokemonToHand(ctx) {
     const returnRoot = (root) => {
       for (const card of [root, ...attachedCards(opponent, root.instanceId)]) {
         removeFromZones(opponent, card);
-        card.attachedTo = null;
+        resetLeftPlay(card);
         opponent.zones.hand.push(card);
       }
       ctx.events.push({
@@ -1806,7 +1834,7 @@ function returnPokemonToHand(ctx) {
     });
   }
 
-  const roots = rootsOf(player);
+  const roots = rootsOf(player).filter((root) => returnLimitsAllow(player, root, step));
 
   if (ctx.memo?.phase === 'promote') {
     const newActive = benchRootsOf(player).find((c) => c.instanceId === ctx.selection?.[0]);
@@ -1820,7 +1848,8 @@ function returnPokemonToHand(ctx) {
     const wasActive = zoneIdOf(player, root) === 'active';
     for (const card of [root, ...attachedCards(player, root.instanceId)]) {
       removeFromZones(player, card);
-      card.attachedTo = null;
+      // Acerola: the Pokémon comes back to the hand as a fresh card, without its damage counters.
+      resetLeftPlay(card);
       const keep = step.keepAttached || isPokemon(card);
       if (keep) player.zones.hand.push(card);
       else discardCardToPlayerZone(player, card);
@@ -1842,7 +1871,7 @@ function returnPokemonToHand(ctx) {
   }
 
   // The Active may only be picked up when a Benched Pokémon can replace it.
-  const options = benchRootsOf(player).length > 0 ? roots : benchRootsOf(player);
+  const options = benchRootsOf(player).length > 0 ? roots : roots.filter((root) => zoneIdOf(player, root) === 'bench');
   if (options.length === 0) return skip(ctx, 'no_pokemon');
   return ctx.ask({
     prompt: `${sourceName(ctx, 'Trainer')}: Choose 1 of your Pokémon to put into your hand`,
@@ -1850,6 +1879,22 @@ function returnPokemonToHand(ctx) {
     min: 1,
     max: 1,
   });
+}
+
+// Pokémon SP carry their owner's mark after the name: G, GL, FB, C or 4 (Garchomp C LV.X).
+const POKEMON_SP_NAME = / (?:G|GL|FB|C|4)(?: LV\.X)?$/;
+
+const colorless = (card) => (card.types || []).some((type) => String(type).toLowerCase() === 'colorless');
+
+// The printed limits of a returnPokemonToHand step (trainer-effects.mjs returnPokemonLimits).
+function returnLimitsAllow(player, root, step) {
+  const top = topPokemonCard(player, root) || root;
+  if (step.damagedOnly && !(root.damage > 0)) return false;
+  if (step.basicOnly && stageOf(top) !== 'Basic') return false;
+  if (step.pokemonType && !(step.pokemonType === 'c' ? colorless(top) : pokemonHasType(top, step.pokemonType))) return false;
+  if (step.excludeVGx && (isVCard(top) || isGxCard(top))) return false;
+  if (step.spOnly && !POKEMON_SP_NAME.test(String(top.name || ''))) return false;
+  return true;
 }
 
 function promoteToActive(player, benchRoot, events, turnNumber = 1) {

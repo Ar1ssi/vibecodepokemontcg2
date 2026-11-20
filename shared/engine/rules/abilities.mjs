@@ -1188,6 +1188,10 @@ export function parseAbility(text = '') {
         onOpponent,
         ...(targetCount > 1 ? { targetCount } : {}),
         ...(fromOwn ? { fromOwn } : {}),
+        // Shadow Pain / Cursed Shadow / Six Feet Under: "… in any way you like", one counter per pick.
+        ...(!fromOwn && /in any way you like/.test(lower) ? { distribute: true } : {}),
+        // Gengar [UNM] Shadow Pain: "… on your opponent's Pokémon-GX and Pokémon-EX …".
+        ...(/opponent's pok[eé]mon-gx and pok[eé]mon-ex/.test(lower) ? { gxExOnly: true } : {}),
         ...(requiresAttachedEnergy ? { requiresAttachedEnergy } : {}),
         selfKnockOut: selfKoOnUse,
         guidance: count
