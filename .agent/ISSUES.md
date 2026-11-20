@@ -6,7 +6,7 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I299). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I300). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Umbrella lines name every member as `(merged I<a>, I<b>…)`: grep any id to find its line.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (`pnpm harness:check`); maintain.md moves older Closed lines to .agent/archive/ISSUES-closed.md.
@@ -14,6 +14,7 @@
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I299 2026-11-20 P2 [rules] `pnpm audit:abilities` and `pnpm audit:attacks` are red on main (d4bf6659, before PR #258): abilities 9 failures (look-at-top 54/67 vs 59, search 212/295 vs 218, status, 4 new clauses); attacks 8 regressions ok → partial (Muk & Alolan Muk-GX, Altaria-EX, Mamoswine…)
 - I298 2026-11-20 P3 [client] Line-cut follow-ups (design 091): 13 duplicate-helper groups spanning areas (~150 lines); audit whether the client-side rules path (`client/src/setup/rules`, chat-buttons, ~17k lines) is still reachable now the server runs the rules (design 087) (refs: D259)
 - I297 2026-11-19 P3 [rules] customhb HB 554 Giratina ex Alpha Rage: the chosen Pokémon's attack does its damage as that Pokémon (reduce/controlled-attack.mjs) but its other printed effects (status, self-discard, draws) do not run — mapping "you"/"Defending Pokémon" for a controlled attack needs a design
 - I296 2026-11-19 P2 [client] The attack-button glow ignores marker cost increases (Head Ringer Tool, Flapple V Sour Spit): listUsableActions gets only `costDiscounts`, so it lights an attack the server then refuses (legality.mjs attackCostPayable markerIncrease). Needs a view `costIncreases` map.
