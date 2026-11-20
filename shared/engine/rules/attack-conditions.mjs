@@ -624,6 +624,13 @@ const CLAUSES = [
     }),
   ],
 
+  // Mega Golisopod ex First Impression: "your Active Pokémon was Knocked Out by damage from an
+  // attack during your opponent's last turn".
+  [
+    /^your active pokémon was knocked out by damage from (?:an|an opponent's|your opponent's) attack during (?:your opponent's|their) last turn$/,
+    () => ({ desc: { kind: 'koLastOpponentTurn', byAttackDamage: true, wasActive: true }, printedNegated: false }),
+  ],
+
   // ── Damage counters ────────────────────────────────────────────────────────
   [
     /^this pokémon has no damage counters on it$/,
@@ -870,6 +877,15 @@ function parseClause(raw) {
     const printed = m ? build(m, clause) : null;
     // A row that matches but cannot read its phrase (an unknown name or kind) falls through.
     if (printed) return printed;
+  }
+  // "<clause>, or if <clause>" (Mega Golisopod ex First Impression): either side opens the gate.
+  const either = /^(.+?), or (?:if )?(.+)$/.exec(clause);
+  if (either) {
+    const sides = [parseClause(either[1]), parseClause(either[2])];
+    if (sides.every(Boolean)) {
+      const of = sides.map((side) => ({ ...side.desc, negated: side.printedNegated }));
+      return { desc: { kind: 'anyOf', of }, printedNegated: false };
+    }
   }
   return null;
 }
@@ -1132,10 +1148,12 @@ const CHECKS = {
   },
   usedAttackLastTurn: (cond, ctx) =>
     String(ctx.attackerLastTurnAttackName || '').toLowerCase() === String(cond.attackName).toLowerCase(),
+  anyOf: (cond, ctx) => list(cond.of).some((sub) => attackConditionMet(sub, ctx)),
   koLastOpponentTurn: (cond, ctx) =>
     list(ctx.koLastOpponentTurnVictims).some(
       (victim) =>
         (!cond.byAttackDamage || victim?.byAttackDamage === true) &&
+        (!cond.wasActive || victim?.wasActive === true) &&
         (!cond.type || list(victim?.types).some((t) => String(t).toLowerCase() === String(cond.type).toLowerCase()))
     ),
   handPokemonCount: (cond, ctx) => compare(num(ctx.ownHandPokemonCount), cond.op, cond.n),

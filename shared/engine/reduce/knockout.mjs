@@ -321,6 +321,8 @@ export function handleKnockout(
       types: [...(top.types || [])],
       // "Knocked Out by damage from an attack" (Revenge, Orichalcum Fang) excludes Poison/ability KOs.
       byAttackDamage: Boolean(byAttack && byDamage),
+      // Mega Golisopod ex First Impression: "your Active Pokémon was Knocked Out by damage".
+      wasActive,
     };
     victimPlayer.flags = {
       ...victimPlayer.flags,

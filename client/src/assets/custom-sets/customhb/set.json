@@ -24905,7 +24905,7 @@
        ],
        "name": "First Impression",
        "damage": "140",
-       "effect": "You can use this attack only if this Pokémon moved into your Active Spot this turn."
+       "effect": "You can use this attack only if this Pokémon moved into your Active Spot this turn, or if your Active Pokémon was Knocked Out by damage from an attack during your opponent's last turn."
       },
       {
        "cost": [
@@ -24953,7 +24953,7 @@
       "Grass"
      ],
      "name": "First Impression",
-     "effect": "You can use this attack only if this Pokémon moved into your Active Spot this turn.",
+     "effect": "You can use this attack only if this Pokémon moved into your Active Spot this turn, or if your Active Pokémon was Knocked Out by damage from an attack during your opponent's last turn.",
      "damage": 140
     },
     {
@@ -55929,7 +55929,7 @@
       "Colorless"
      ],
      "name": "Shadow Force",
-     "effect": "Prevent all damage done to this Pokémon by your opponent's Active Pokémon. This Pokémon can't be affected by Trainer cards or Abilities. At the end of your opponent's next turn, their Active Pokémon takes 150 damage. This Pokémon cannot use Shadow Force during your next turn. This Pokémon cannot retreat during your next turn.",
+     "effect": "During your opponent's next turn, this Pokémon takes no damage and isn't affected by any effects of Trainer cards or Abilities. At the end of your opponent's next turn, this attack does 150 damage to their Active Pokémon. This Pokémon can't use Shadow Force during your next turn. This Pokémon can't retreat during your next turn.",
      "damage": ""
     }
    ],

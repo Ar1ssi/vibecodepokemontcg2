@@ -139,3 +139,50 @@ test('Swing and Skedaddle: with no Energy to discard, "if you do" fails and the 
   assert.equal(res.error, null);
   assert.equal(activeId(res.state, 'p1'), attacker.instanceId);
 });
+
+// Mega Golisopod ex (DLR 011, user's scan): the printed First Impression gate has a second way in.
+const MEGA_FIRST_IMPRESSION =
+  "You can use this attack only if this Pokémon moved into your Active Spot this turn, or if your Active Pokémon was Knocked Out by damage from an attack during your opponent's last turn.";
+const activeKo = { name: 'Prior Active', types: ['Grass'], byAttackDamage: true, wasActive: true };
+
+test('First Impression (printed): the gate is "moved into the Active Spot" or "Active was Knocked Out by damage"', () => {
+  const gate = parseAttackUseGate(MEGA_FIRST_IMPRESSION, { selfName: 'Mega Golisopod ex' });
+  assert.equal(gate?.kind, 'anyOf');
+  assert.deepEqual(
+    gate.of.map((c) => c.kind),
+    ['movedToActiveThisTurn', 'koLastOpponentTurn']
+  );
+});
+
+test('First Impression (printed): an Active Pokémon Knocked Out by attack damage last turn opens the gate', () => {
+  const { state } = board({ attackerText: MEGA_FIRST_IMPRESSION });
+  state.players.p1.flags = { ...state.players.p1.flags, koedLastOppTurnVictims: [activeKo] };
+  const res = attack(state);
+  assert.ok(!res.events.some((e) => e.type === 'attackConditionFailed'));
+  assert.equal(res.events.find((e) => e.type === 'attackExecuted')?.damage, 10);
+});
+
+test('First Impression (printed): a Benched or non-damage Knock Out does not open the gate', () => {
+  for (const victim of [
+    { ...activeKo, wasActive: false },
+    { ...activeKo, byAttackDamage: false },
+  ]) {
+    const { state } = board({ attackerText: MEGA_FIRST_IMPRESSION });
+    state.players.p1.flags = { ...state.players.p1.flags, koedLastOppTurnVictims: [victim] };
+    const res = attack(state);
+    assert.ok(res.events.some((e) => e.type === 'attackConditionFailed'));
+  }
+});
+
+test('First Impression (printed): fizzles with neither a move nor a Knock Out', () => {
+  const { state } = board({ attackerText: MEGA_FIRST_IMPRESSION });
+  assert.ok(attack(state).events.some((e) => e.type === 'attackConditionFailed'));
+});
+
+test('A Knock Out on the opponent\'s turn records whether the victim was Active', () => {
+  const { state } = board({ defenderExtra: { hp: 10, abilities: [] } });
+  const res = attack(state);
+  const victims = res.state.players.p2.flags?.koedLastOppTurnVictims;
+  assert.equal(victims?.[0]?.wasActive, true);
+  assert.equal(victims?.[0]?.byAttackDamage, true);
+});

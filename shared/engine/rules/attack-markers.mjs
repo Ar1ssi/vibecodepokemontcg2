@@ -620,6 +620,14 @@ export const MARKER_TEMPLATES = [
     /^prevent all damage done to this pokémon by your opponent's active pokémon$/,
     () => ({ type: 'atkAddMarker', target: 'self', window: 'opponentNextTurn', marker: { kind: 'incomingPrevent', filter: null } }),
   ],
+  // Giratina ex Shadow Force (SWSH259 print): one sentence carries both shields.
+  [
+    /^during your opponent's next turn, this pokémon takes no damage and isn't affected by any effects of trainer cards or abilities$/,
+    () => [
+      { type: 'atkAddMarker', target: 'self', window: 'opponentNextTurn', marker: { kind: 'incomingPrevent', filter: null } },
+      { type: 'atkAddMarker', target: 'self', window: 'opponentNextTurn', marker: { kind: 'cardEffectImmunity' } },
+    ],
+  ],
   // Read by effects/trainer-steps.mjs freezeShields, like Temporal Freeze's position shield.
   [
     /^this pokémon can't be affected by trainer cards or abilities$/,
