@@ -186,24 +186,6 @@ function opponentActiveTop(opponent) {
   return top === root ? root : { ...top, specialCondition: root.specialCondition, poisoned: root.poisoned, burned: root.burned };
 }
 
-/**
- * The attack-legality reason a printed own-hand cost cannot be paid (D114), or null.
- * Only a required cost counts: "You may discard …" is never a reason to refuse the attack.
- */
-function handCardsCostReason(player, beforeSteps) {
-  const discard = beforeSteps.find(
-    (step) => step.type === 'atkDiscardOwnHand' && !step.optional && typeof step.count === 'number'
-  );
-  if (discard && (player?.zones?.hand || []).length < discard.count) {
-    return `You need ${discard.count} card(s) in your hand to discard.`;
-  }
-  const lostZone = beforeSteps.find((step) => step.type === 'atkLostZoneFromHand' && !step.optional);
-  if (lostZone && handCardsForLostZone(player, lostZone).length < (lostZone.count || 1)) {
-    return `You need ${lostZone.what === 'pokemon' ? 'a Pokémon' : 'a card'} in your hand to put in the Lost Zone.`;
-  }
-  return null;
-}
-
 function isZoneIndex(index, zone) {
   return Number.isInteger(index) && index >= 0 && index < zone.length;
 }
@@ -1295,8 +1277,21 @@ export function validateLegality(state, command) {
           reason: `You need ${handCost.count || 1} ${handCost.energyType ? `{${handCost.energyType}} ` : ''}Energy card(s) in your hand to discard.`,
         };
       }
-      const handCardsNeeded = handCardsCostReason(player, beforeSteps);
-      if (handCardsNeeded) return { allowed: false, reason: handCardsNeeded };
+      // A printed own-hand cost the player cannot pay (D114). Only a required cost counts:
+      // "You may discard …" is never a reason to refuse the attack.
+      const discard = beforeSteps.find(
+        (step) => step.type === 'atkDiscardOwnHand' && !step.optional && typeof step.count === 'number'
+      );
+      if (discard && (player?.zones?.hand || []).length < discard.count) {
+        return { allowed: false, reason: `You need ${discard.count} card(s) in your hand to discard.` };
+      }
+      const lostZone = beforeSteps.find((step) => step.type === 'atkLostZoneFromHand' && !step.optional);
+      if (lostZone && handCardsForLostZone(player, lostZone).length < (lostZone.count || 1)) {
+        return {
+          allowed: false,
+          reason: `You need ${lostZone.what === 'pokemon' ? 'a Pokémon' : 'a card'} in your hand to put in the Lost Zone.`,
+        };
+      }
       return { allowed: true };
     }
 
