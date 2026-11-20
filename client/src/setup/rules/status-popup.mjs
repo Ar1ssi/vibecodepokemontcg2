@@ -8,6 +8,8 @@
  * as the game toggles the overlay's close hitbox. Entries come from attack-ui-model's statusEffectsFor.
  */
 
+import { el } from './attack-options.mjs';
+
 const CLOSE_EVENTS = ['rules-turn-began', 'rules-session-reset'];
 const ARROW_SRC = {
   positive: '/src/assets/attack-ui/arrow-up.png',
@@ -18,13 +20,6 @@ const ARROW_SRC = {
 let popupState = null;
 
 export const isStatusPopupOpen = () => popupState !== null;
-
-const el = (tag, className, text) => {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text != null) node.textContent = String(text);
-  return node;
-};
 
 const arrow = (polarity, className) => {
   const img = el('img', className);

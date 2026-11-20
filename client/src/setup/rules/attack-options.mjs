@@ -18,7 +18,7 @@ import { formatWeakResist } from './card-inspector-model.mjs';
 
 const ICON_DIR = '/src/assets/attack-ui/';
 
-const el = (tag, className, text) => {
+export const el = (tag, className, text) => {
   const node = document.createElement(tag);
   if (className) node.className = className;
   if (text != null) node.textContent = String(text);

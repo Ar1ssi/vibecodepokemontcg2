@@ -53,6 +53,7 @@ import {
   buildAttackOption,
   buildStadiumOption,
   buildWeakResistBar,
+  el,
 } from './attack-options.mjs';
 
 // Events that can change what the inspector reports while it is open. Owned here because this
@@ -81,13 +82,6 @@ const TYPE_GLYPHS = {
   Dark: '🌑',
   Dragon: '🐉',
   Fairy: '✨',
-};
-
-const el = (tag, className, text) => {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text != null) node.textContent = String(text);
-  return node;
 };
 
 const orb = (type, className) => {
