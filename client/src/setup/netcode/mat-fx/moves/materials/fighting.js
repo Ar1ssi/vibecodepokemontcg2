@@ -79,7 +79,6 @@ const edgedIn = (palette) => {
 const freezeAll = (palette) => Object.freeze(Object.fromEntries(Object.entries(palette).map(([k, v]) => [k, Object.freeze(v)])));
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
-const rad = (deg) => (deg * Math.PI) / 180;
 const fract = (v) => v - Math.floor(v);
 
 const fightingPalette = freezeAll({
@@ -105,7 +104,7 @@ const auraPalette = freezeAll({
  * @returns {number[][]} the four corners: base, left shoulder, tip, right shoulder
  */
 export function streakOutline({ x, y, angleDeg, length, width }, scale = 1) {
-  const a = rad(angleDeg);
+  const a = (angleDeg * Math.PI) / 180;
   const ux = Math.cos(a);
   const uy = Math.sin(a);
   const len = length * (0.8 + 0.2 * scale);

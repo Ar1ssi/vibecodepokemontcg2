@@ -22,11 +22,10 @@ import { mergeFxMods, withFxMod, withLiftZ } from './_mods.js';
 import { grainPass, sphere, tonguePath, wobble } from './_shared.js';
 
 const TAU = Math.PI * 2;
-const rad = (deg) => (deg * Math.PI) / 180;
 
 /** `rgb` at `alpha` as a gradient from the tongue's base to its tip: one colour, one axis. */
 function alongTongue(ctx, spec, rgb, alpha) {
-  const a = rad(spec.angleDeg);
+  const a = (spec.angleDeg * Math.PI) / 180;
   const g = ctx.createLinearGradient(spec.x, spec.y, spec.x + Math.cos(a) * spec.length, spec.y + Math.sin(a) * spec.length);
   const colour = rgbCss(rgb, alpha);
   g.addColorStop(0, colour);

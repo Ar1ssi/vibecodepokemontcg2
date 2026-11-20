@@ -859,7 +859,6 @@ const chain = (ctx, lane, s, info) => {
   if (!(pose.alpha > 0)) return;
   const { palette } = info.material;
   const R = info.params.r * lane.h;
-  const toScreen = (x, y) => ({ x: lane.bx + lane.ux * x + lane.nx * y, y: lane.by + lane.uy * x + lane.ny * y });
   const lane0 = (lane.angleDeg * Math.PI) / 180;
   for (const [rgb, width, alpha] of [
     [palette.body, lane.h * 0.025, 1],
@@ -868,7 +867,7 @@ const chain = (ctx, lane, s, info) => {
     ctx.strokeStyle = rgbCss(rgb, alpha * pose.alpha);
     ctx.lineWidth = width;
     for (const link of pose.links) {
-      const at = toScreen(link.x, link.y);
+      const at = { x: lane.bx + lane.ux * link.x + lane.nx * link.y, y: lane.by + lane.uy * link.x + lane.ny * link.y };
       ctx.beginPath();
       ctx.ellipse(at.x, at.y, R * 1.2, R, lane0 + (link.rotDeg * Math.PI) / 180, 0, TAU);
       ctx.stroke();
