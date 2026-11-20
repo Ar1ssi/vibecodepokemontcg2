@@ -85,16 +85,14 @@ export function buildDeck({ envMap, count, promoMap, promoFinish, backMap, edgeT
 export function buildLeaflet({ renderer, envMap, title, deckRows, palette, heading }) {
   const width = 680;
   const height = 896;
-  const draw = (ctx, w, h) => drawLeafletCover(ctx, w, h, { title, deckRows, palette, heading });
   const canvas = makeCanvas(width, height);
-  draw(canvas.getContext('2d'), width, height);
+  drawLeafletCover(canvas.getContext('2d'), width, height, { title, deckRows, palette, heading });
   const texture = new CanvasTexture(canvas);
   texture.colorSpace = SRGBColorSpace;
   texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   texture.needsUpdate = true;
-  const cover = texture;
   const geometry = cardSlab(LEAFLET.width, LEAFLET.height, LEAFLET.thickness, 0.8, 2);
-  const face = new MeshStandardMaterial({ map: cover, roughness: 0.82, envMap, envMapIntensity: 0.5 });
+  const face = new MeshStandardMaterial({ map: texture, roughness: 0.82, envMap, envMapIntensity: 0.5 });
   const back = new MeshStandardMaterial({ color: new Color(0xf1efe8), roughness: 0.85, envMap, envMapIntensity: 0.5 });
   const edge = new MeshStandardMaterial({ color: new Color(0xe9e6dc), roughness: 0.9 });
   const mesh = new Mesh(geometry, [face, back, edge]);
@@ -105,7 +103,7 @@ export function buildLeaflet({ renderer, envMap, title, deckRows, palette, headi
     mesh,
     dispose: () => {
       geometry.dispose();
-      cover.dispose();
+      texture.dispose();
       face.dispose();
       back.dispose();
       edge.dispose();
