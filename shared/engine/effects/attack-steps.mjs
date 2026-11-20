@@ -3967,7 +3967,7 @@ function atkCountersByRetreat(ctx) {
   if (!opponent) return skip(ctx, 'no_opponent');
   let placed = 0;
   for (const root of rootsOf(opponent)) {
-    // Stamped by reduce.mjs stampOpponentRetreatCosts; the printed cost is the fallback.
+    // Stamped by resolveAttackEffectPhase (reduce/attack-effect.mjs); the printed cost is the fallback.
     const cost = root.effectiveRetreatCost ?? getRetreatCostCount(topPokemonCard(opponent, root) || root);
     if (cost > 0 && !attackEffectShielded(ctx, opponent, root)) {
       placeCounters(ctx, root, opponent.playerId, cost * 10);

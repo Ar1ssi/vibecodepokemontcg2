@@ -270,6 +270,23 @@
       }
     }
 
+    // Deterministic id resolution for the legacy sets we have a code→set-id
+    // table for: "TRR 32" is unambiguously ex7-32, no name search and no
+    // tiebreaking required. The table was hand-built for limitlesstcg's URL
+    // scheme and has never been verified card-by-card against TCGdex, so the
+    // id it produces is only a *candidate* — the fetched card's name has to
+    // match the board card's before we trust it. Returns the id, or null to
+    // tell the caller to fall back to the by-name search.
+    async function resolveSetCardId(card) {
+      for (const candidate of buildSetCardIdCandidates(card.set, card.number)) {
+        const detail = await fetchCardDetail(candidate);
+        if (!detail) continue;
+        if (normalizeCardName(detail.name) !== normalizeCardName(card.name)) continue;
+        return candidate;
+      }
+      return null;
+    }
+
     // Damage-only labels ("0", "30+") are not effect text — treat as missing so
     // TCGdex enrichment is not skipped (Call for Family and other text effects).
     function isPlaceholderAttackText(text, damage) {
@@ -403,20 +420,9 @@
         // Zone cards arrive without an id. Prefer the deterministic
         // (set code, collector number) → id mapping; only guess by name if
         // that isn't available or doesn't check out.
-        // Deterministic id resolution for the legacy sets we have a code→set-id
-        // table for: "TRR 32" is unambiguously ex7-32, no name search and no
-        // tiebreaking required. The table was hand-built for limitlesstcg's URL
-        // scheme and has never been verified card-by-card against TCGdex, so the
-        // id it produces is only a *candidate* — the fetched card's name has to
-        // match the board card's before we trust it.
         try {
-          for (const candidate of buildSetCardIdCandidates(card.set, card.number)) {
-            const detail = await fetchCardDetail(candidate);
-            if (!detail) continue;
-            if (normalizeCardName(detail.name) !== normalizeCardName(card.name)) continue;
-            card.id = candidate;
-            break;
-          }
+          const setId = await resolveSetCardId(card);
+          if (setId != null) card.id = setId;
         } catch {
           /* fall through to the by-name search */
         }

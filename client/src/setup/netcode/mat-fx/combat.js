@@ -108,6 +108,12 @@ const markAttackScene = (durationMs) => {
 /** When the last attack scene ends, on the `performance.now()` clock (0 before any attack). */
 export const attackSceneEndsAt = () => attackSceneEnd;
 
+/**
+ * Design 063: a move scene announces its own contact moment (ms from now) with its context.
+ * Imported by the fx-preview recorder (.claude/skills/fx-preview/rec/rec-move.mjs).
+ */
+export const announceStrike = (ms, ctx = null) => impacts.strikeIn(ms, ctx);
+
 // Design 069: each attack's contact and context, by the strike key its plans share.
 const strikes = createStrikeBook({ now: () => performance.now(), setTimer: (fn, ms) => setTimeout(fn, ms) });
 

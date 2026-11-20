@@ -103,7 +103,6 @@ const hashOf = (n) => {
   return s - Math.floor(s);
 };
 
-/** px from (x, y) to the rect (0 inside it). */
 /**
  * The chain's links, [x, y, z] centres in order: from the anchor stone's inner face, half way up it,
  * down to the paving and on along its edge (CHAIN.inset in from it) toward the far end, while each

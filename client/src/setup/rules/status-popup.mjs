@@ -29,8 +29,6 @@ const arrow = (polarity, className) => {
   return img;
 };
 
-// CardDescriptionModalOption: the source card's art when there is one, its name, the effect text and
-// the polarity arrow.
 const column = (polarity, label, entries) => {
   const region = el('section', `tcgl-status__column tcgl-status__column--${polarity}`);
   const header = el('header', 'tcgl-status__header');
@@ -39,6 +37,8 @@ const column = (polarity, label, entries) => {
   region.appendChild(header);
   const list = el('ul', 'tcgl-status__list');
   for (const entry of entries) {
+    // CardDescriptionModalOption: the source card's art when there is one, its name, the effect text
+    // and the polarity arrow.
     const node = el('li', `tcgl-status__entry tcgl-status__entry--${polarity}`);
     if (entry.src) {
       const thumb = el('img', 'tcgl-status__thumb');

@@ -492,7 +492,7 @@ Ranked roughly by "how much is missing to make a card actually work":
 
 | Module | Key exports | Role |
 |---|---|---|
-| `rules-state.mjs` | `ensureCardData`, `canPerformAction`, `beginTurn`, `endTurn`, `markAttacked`, `markEnergyAttached`, `markEvolved`, `markPrizeTaken`, `markSupporterPlayed`, `supporterPlayGate`, `markStadiumPlayed`, `getStadium`, `abilityKey`, `markAbilityUsed`, `abilityUsed` | state + action gating |
+| `rules-state.mjs` | `ensureCardData`, `canPerformAction`, `beginTurn`, `endTurn`, `markAttacked`, `markEnergyAttached`, `markSupporterPlayed`, `supporterPlayGate`, `markStadiumPlayed`, `getStadium`, `abilityKey`, `markAbilityUsed`, `abilityUsed` | state + action gating |
 | `attack-engine.mjs` | `computeAttackDamage`, `canPayAttackCost`, `executeAttack` (❌ dead) | damage/cost math — `computeAttackDamage` + `canPayAttackCost` wired into live `attack()` (`chat-buttons.js`); `executeAttack` still unused |
 | `attack-window.mjs` | `listAttacks`, `listAbilities`, `listUsableActions` | pure, DOM-free: computes which attacks + abilities are currently usable (payable, cost discount, once-per-turn) for the attack-window UI + unit tests |
 | `chat-buttons.js` (abilities) | `healAbility`, `switchAbility`, `attachAbility`, `energyRedirectAbility`, `searchAbility` | once-per-turn ability executors (taxonomy C families), each gated on turn; invoked from the attack-window ability rows |
