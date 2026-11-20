@@ -73,12 +73,6 @@ export function parseTurnDamageBonus(text) {
   return null;
 }
 
-function defenderMatches(filter, defender) {
-  if (filter === 'ex') return isExCard(defender);
-  if (filter === 'exOrV') return isExCard(defender) || isVCard(defender);
-  return true;
-}
-
 // Battle Style (Single/Fusion/Rapid Strike) is printed as a name prefix or a subtype.
 function matchesBattleStyle(attacker, style) {
   const wanted = BATTLE_STYLES[style] || [style];
@@ -119,7 +113,8 @@ export function turnDamageBonusTotal(
     if (bonus.attackerNoRuleBox && isRuleBoxPokemon(attacker)) continue;
     if (bonus.attackerStyle && !matchesBattleStyle(attacker, bonus.attackerStyle)) continue;
     if (bonus.attackerBasic && !isBasicCard(attacker)) continue;
-    if (!defenderMatches(bonus.defenderFilter, defender)) continue;
+    if (bonus.defenderFilter === 'ex' && !isExCard(defender)) continue;
+    if (bonus.defenderFilter === 'exOrV' && !(isExCard(defender) || isVCard(defender))) continue;
     total += bonus.perPrizeTaken ? bonus.amount * prizesTaken : bonus.amount;
   }
   return total;

@@ -125,22 +125,6 @@ function pokemonHasTypeWord(card, word) {
   });
 }
 
-function remainingHp(card) {
-  const hp = card?.hp;
-  if (!hp) return null;
-  return hp - (card.damage || 0);
-}
-
-function holderHasEnergy(holder, zoneCards) {
-  if (!holder) return false;
-  return (zoneCards || []).some(
-    (c) =>
-      isEnergy(c) &&
-      (c.attachedTo === holder.instanceId ||
-        (holder.image && c.image?.relative === holder.image))
-  );
-}
-
 // The holder phrase: "The <X> this card is attached to", where X is a stage,
 // a subtype or the Pokémon's name. "…of the Pokémon this card is attached to"
 // (Heavy Boots) must not be read as a name, hence the `of` guard.
@@ -379,7 +363,16 @@ export function toolConditionMet(cond, ctx = {}) {
     const weakTo = (holder?.weaknesses || []).map((w) => lower(w?.type ?? w));
     if (!attacker || !(attacker.types || []).some((ty) => weakTo.includes(lower(ty)))) return false;
   }
-  if (cond.noEnergyAttached && holderHasEnergy(holder, ctx.zoneCards)) {
+  if (
+    cond.noEnergyAttached &&
+    holder &&
+    (ctx.zoneCards || []).some(
+      (c) =>
+        isEnergy(c) &&
+        (c.attachedTo === holder.instanceId ||
+          (holder.image && c.image?.relative === holder.image))
+    )
+  ) {
     return false;
   }
 
@@ -397,7 +390,7 @@ export function toolConditionMet(cond, ctx = {}) {
   if (cond.attackerAbility && !hasAbility(attacker)) return false;
   if (cond.attackerUltraBeast && !isUltraBeastCard(attacker)) return false;
   if (cond.attackerHpAtMost != null) {
-    const hp = remainingHp(attacker);
+    const hp = attacker?.hp ? attacker.hp - (attacker.damage || 0) : null;
     if (hp == null || hp > cond.attackerHpAtMost) return false;
   }
 

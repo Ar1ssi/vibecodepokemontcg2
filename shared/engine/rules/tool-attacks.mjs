@@ -191,9 +191,6 @@ export function parseTmAttachRestriction(text) {
   return Object.keys(out).length > 0 ? out : null;
 }
 
-// Owner's Pokémon print a possessive trainer name ("Team Magma's Groudon", "Brock's Onix").
-const hasOwnerInName = (name) => /'s\s/.test(normalizeText(name));
-
 /**
  * Whether a Technical Machine with `restriction` may attach to the Pokémon whose top card is
  * `top`. `evolved` says the stack holds an Evolution; `mayAttachAnyTm` is Xatu Synchronicity
@@ -205,7 +202,8 @@ export function tmAttachAllowed(restriction, { top, evolved = false, mayAttachAn
   const name = normalizeText(top.name);
   if (restriction.evolved && !evolved) return false;
   if (restriction.excludeEx && isExCard(top)) return false;
-  if (restriction.excludeOwners && hasOwnerInName(top.name)) return false;
+  // Owner's Pokémon print a possessive trainer name ("Team Magma's Groudon", "Brock's Onix").
+  if (restriction.excludeOwners && /'s\s/.test(normalizeText(top.name))) return false;
   if (restriction.sp && !((top?.subtypes || []).some((s) => /^sp$/i.test(String(s))) ||
   /\s(?:G|GL|FB|C|E4|4)(?:\s+LV\.?\s*X)?$/.test(String(top?.name ?? '')))) return false;
   if (restriction.nameIncludes && !name.includes(restriction.nameIncludes)) return false;
