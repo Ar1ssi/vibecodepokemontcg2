@@ -122,13 +122,6 @@ function undoCommand({ payload, state }) {
   };
 }
 
-// Design 090: the acting player's homebrew clock hit 0:00, so the opponent wins.
-function timeOutCommand({ draft, playerId, events }) {
-  const winner = Object.keys(draft.players || {}).find((id) => id !== playerId) || null;
-  draft.pendingChoice = null;
-  setGameEnded(draft, { winner, reason: TIME_OUT_REASON, events });
-}
-
 export function applyCommand(state, command, rng = null) {
   if (!state || typeof state !== 'object') {
     return {
@@ -452,9 +445,13 @@ export function applyCommand(state, command, rng = null) {
       break;
     case 'undo':
       return undoCommand({ payload, state });
-    case 'timeOut':
-      timeOutCommand({ draft, playerId, events });
+    case 'timeOut': {
+      // Design 090: the acting player's homebrew clock hit 0:00, so the opponent wins.
+      const winner = Object.keys(draft.players || {}).find((id) => id !== playerId) || null;
+      draft.pendingChoice = null;
+      setGameEnded(draft, { winner, reason: TIME_OUT_REASON, events });
       break;
+    }
 
     default:
       break;

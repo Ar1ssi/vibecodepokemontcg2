@@ -124,23 +124,6 @@ function redactOpponentZones(player, { setupHidden = false } = {}) {
 }
 
 /**
- * Redacts pending choice for a player who is not the choice's recipient.
- *
- * @param {object} choice
- * @returns {object}
- */
-function redactPendingChoiceForOpponent(choice) {
-  if (!choice) return null;
-  return {
-    choiceId: choice.choiceId,
-    player: choice.player,
-    prompt: choice.prompt,
-    cancellable: false,
-    optionsCount: Array.isArray(choice.options) ? choice.options.length : 0,
-  };
-}
-
-/**
  * `{ attackExtras: { [instanceId]: Attack[] } }` for the owner's in-play Pokémon that can use
  * attacks they do not print (Memory Helix, Tool/Stadium grants; design 049), or `{}` when none
  * do or no gatherer was given. Only the owner attacks with them, so the opponent never gets it.
@@ -190,7 +173,14 @@ export function viewFor(state, playerId, { attackExtrasFor, costDiscountsFor } =
     if (!isSpectator && state.pendingChoice.player === playerId) {
       pendingChoice = JSON.parse(JSON.stringify(state.pendingChoice));
     } else {
-      pendingChoice = redactPendingChoiceForOpponent(state.pendingChoice);
+      const choice = state.pendingChoice;
+      pendingChoice = {
+        choiceId: choice.choiceId,
+        player: choice.player,
+        prompt: choice.prompt,
+        cancellable: false,
+        optionsCount: Array.isArray(choice.options) ? choice.options.length : 0,
+      };
     }
   }
 

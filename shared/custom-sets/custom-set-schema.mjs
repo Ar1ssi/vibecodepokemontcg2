@@ -227,19 +227,15 @@ export function validateCustomSet(json, { setDirName, reservedCodes = [] } = {})
   return { ok: errors.length === 0, errors, set: errors.length === 0 ? withHomebrewStages(json) : null };
 }
 
-/** A Pokémon cardback edited as MEGA (custom.edits.stage 3) plays at the MEGAHB stage, whatever the export wrote. */
-export function isEditorMegaCard(card) {
-  return card?.category === 'Pokemon' && Number(card.custom?.edits?.stage) === EDITOR_MEGA_STAGE;
-}
-
-/** A Pokémon cardback edited as Tera (custom.edits.stage 4) plays at the TERAHB stage. */
-export function isEditorTeraCard(card) {
-  return card?.category === 'Pokemon' && Number(card.custom?.edits?.stage) === EDITOR_TERA_STAGE;
-}
-
+/**
+ * A Pokémon cardback edited as MEGA (custom.edits.stage 3) plays at the MEGAHB stage, whatever the export wrote;
+ * one edited as Tera (stage 4) plays at the TERAHB stage.
+ */
 function editorStageOf(card) {
-  if (isEditorMegaCard(card)) return 'MEGAHB';
-  if (isEditorTeraCard(card)) return 'TERAHB';
+  if (card?.category !== 'Pokemon') return null;
+  const stage = Number(card.custom?.edits?.stage);
+  if (stage === EDITOR_MEGA_STAGE) return 'MEGAHB';
+  if (stage === EDITOR_TERA_STAGE) return 'TERAHB';
   return null;
 }
 
