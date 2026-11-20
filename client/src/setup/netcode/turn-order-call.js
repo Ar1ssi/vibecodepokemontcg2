@@ -154,8 +154,6 @@ export function relabelForNearSeat(copy, copySeat, nearSeat, fields) {
   return relabeled;
 }
 
-const isSeat = (value) => value === 'p1' || value === 'p2';
-
 /**
  * Wires the inbound turn-order messages onto `document` events.
  *
@@ -173,7 +171,7 @@ export function registerTurnOrderCallListeners(socket, doc = document, { systemS
   const soloCopySeat = (type, data) => {
     const index = soloCopies[type];
     soloCopies[type] = index + 1;
-    if (isSeat(data?.seat)) return data.seat;
+    if (data?.seat === 'p1' || data?.seat === 'p2') return data.seat;
     return index % 2 === 0 ? 'p1' : 'p2';
   };
 

@@ -24,13 +24,6 @@ function isInPlayPokemon(record) {
   return record.card?.attachedTo == null;
 }
 
-// The Prize swap step (Peonia, Gladion) asks twice: Prize cards into the hand, then hand cards set
-// back as Prizes. Both picks carry that step in the resume token.
-function isPrizeSwapChoice(choice) {
-  const token = choice?.resumeToken;
-  return token?.steps?.[token.stepIndex]?.type === 'prizeToHand';
-}
-
 // A hand card on the mat. Only the Prize swap's hand pick is made there: every other hand pick
 // keeps the card carousel.
 function isHandCard(record) {
@@ -57,7 +50,13 @@ export function buildMatPickerRequest(choice, registry) {
     const record = records[i];
     return opt?.faceDown === true && Boolean(record?.element) && record.zone === 'prizes';
   });
-  const pickingSwapHand = !pickingPrizes && isPrizeSwapChoice(choice) && records.every(isHandCard);
+  // The Prize swap step (Peonia, Gladion) asks twice: Prize cards into the hand, then hand cards set
+  // back as Prizes. Both picks carry that step in the resume token.
+  const token = choice?.resumeToken;
+  const pickingSwapHand =
+    !pickingPrizes &&
+    token?.steps?.[token.stepIndex]?.type === 'prizeToHand' &&
+    records.every(isHandCard);
   if (!pickingPrizes && !pickingSwapHand && !records.every(isInPlayPokemon)) {
     return null;
   }
