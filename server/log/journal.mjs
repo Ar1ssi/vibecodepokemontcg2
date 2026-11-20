@@ -17,15 +17,6 @@ export const NO_JOURNAL = Object.freeze({
 
 const clientSeqOf = (cmd) => (Number.isInteger(cmd?.clientSeq) ? cmd.clientSeq : undefined);
 
-function choiceSummary(pending) {
-  if (!pending) return null;
-  return {
-    choiceId: pending.choiceId ?? null,
-    player: pending.player ?? null,
-    options: Array.isArray(pending.options) ? pending.options.length : null,
-  };
-}
-
 export function createJournal({
   roomId,
   log,
@@ -126,7 +117,13 @@ export function createJournal({
         reason: result.reason ?? null,
         after: { sv: stateAfter.stateVersion, cursor: cursorAfter, hash: hash(stateAfter) },
         events: ok ? (result.events ?? []) : [],
-        choice: choiceSummary(result.pendingChoice),
+        choice: result.pendingChoice
+          ? {
+              choiceId: result.pendingChoice.choiceId ?? null,
+              player: result.pendingChoice.player ?? null,
+              options: Array.isArray(result.pendingChoice.options) ? result.pendingChoice.options.length : null,
+            }
+          : null,
         ms: Math.round(ms * 100) / 100,
       };
       let line = JSON.stringify(record);

@@ -94,17 +94,6 @@ function exportableServerEntry(entry, clientIds) {
   return clientIds.some((id) => entry.line.includes(`"client":"${id}"`));
 }
 
-function gatherClients({ store, scope }) {
-  const rows = scope.roomId == null ? [{ clientId: scope.clientId }] : store.participants(scope.roomId);
-  const clients = [];
-  for (const row of rows) {
-    const stream = store.stream(`client:${row.clientId}`);
-    if (!stream) continue;
-    clients.push({ row, stream, src: `c:${row.clientId.slice(0, 8)}`, entries: stream.entries() });
-  }
-  return clients;
-}
-
 export function buildExport({
   store,
   journal = null,
@@ -120,7 +109,13 @@ export function buildExport({
 }) {
   const roomStream = scope.roomId == null ? null : store.stream(`room:${scope.roomId}`);
   const roomEntries = roomStream?.entries() ?? [];
-  const clients = gatherClients({ store, scope });
+  const rows = scope.roomId == null ? [{ clientId: scope.clientId }] : store.participants(scope.roomId);
+  const clients = [];
+  for (const row of rows) {
+    const stream = store.stream(`client:${row.clientId}`);
+    if (!stream) continue;
+    clients.push({ row, stream, src: `c:${row.clientId.slice(0, 8)}`, entries: stream.entries() });
+  }
 
   const clientIds = clients.map((client) => client.row.clientId);
   let from = Infinity;

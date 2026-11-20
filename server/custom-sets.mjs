@@ -54,18 +54,6 @@ function setRecordOf(set) {
   };
 }
 
-function cardRecordOf(card, set) {
-  return {
-    ...card,
-    set: {
-      id: set.id,
-      name: set.name,
-      cardCount: { official: set.cards.length, total: set.cards.length },
-      releaseDate: set.releaseDate || '',
-    },
-  };
-}
-
 function cardBriefOf(card) {
   return { id: card.id, localId: card.localId, name: card.name, image: card.image };
 }
@@ -130,7 +118,17 @@ export function loadCustomSets(rootDirs, { log = () => {}, previous = null } = {
   for (const dir of [...chosen.keys()].sort()) {
     const entry = chosen.get(dir);
     sets.set(entry.set.id, entry);
-    for (const card of entry.set.cards) cards.set(card.id, cardRecordOf(card, entry.set));
+    for (const card of entry.set.cards) {
+      cards.set(card.id, {
+        ...card,
+        set: {
+          id: entry.set.id,
+          name: entry.set.name,
+          cardCount: { official: entry.set.cards.length, total: entry.set.cards.length },
+          releaseDate: entry.set.releaseDate || '',
+        },
+      });
+    }
   }
   return createCustomSetStore({ sets, cards });
 }

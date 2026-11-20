@@ -8,15 +8,13 @@ export const KEEP_AWAKE_PATH = '/healthz';
 export const KEEP_AWAKE_INTERVAL_MS = 10 * 60 * 1000;
 const PING_TIMEOUT_MS = 10_000;
 
-const isOn = (value) => /^(1|true|on|yes)$/i.test(String(value ?? '').trim());
-
 /**
  * @param {object} [env] `KEEP_AWAKE` turns it on; the address is `KEEP_AWAKE_URL`, else the
  *   `RENDER_EXTERNAL_URL` Render sets on every web service.
  * @returns {{url: string, intervalMs: number}|{error: string}|null} null when switched off.
  */
 export function planKeepAwake(env = {}) {
-  if (!isOn(env.KEEP_AWAKE)) return null;
+  if (!/^(1|true|on|yes)$/i.test(String(env.KEEP_AWAKE ?? '').trim())) return null;
   const base = String(env.KEEP_AWAKE_URL || env.RENDER_EXTERNAL_URL || '').trim();
   if (!base) {
     return { error: 'keep-awake: KEEP_AWAKE is on but neither KEEP_AWAKE_URL nor RENDER_EXTERNAL_URL is set; not pinging.' };
