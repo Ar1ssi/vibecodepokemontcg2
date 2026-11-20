@@ -266,7 +266,6 @@ export function boxTravel(timeline, ms) {
 
 export const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 export const easeOutCubic = (t) => 1 - (1 - t) ** 3;
-export const easeInCubic = (t) => t * t * t;
 /** Overshoots past 1 and settles: the lid swinging open. */
 export const easeOutBack = (t, overshoot = 1.4) => 1 + (overshoot + 1) * (t - 1) ** 3 + overshoot * (t - 1) ** 2;
 

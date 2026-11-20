@@ -322,8 +322,6 @@ export const initSampleBank = (ctx, master) => {
     /* best-effort */
   }
 };
-export const hasSample = bank.hasSample;
-export const warmSample = bank.warmSample;
 export const playSample = bank.playSample;
 export const playReaction = bank.playReaction;
 export const playSequence = bank.playSequence;
