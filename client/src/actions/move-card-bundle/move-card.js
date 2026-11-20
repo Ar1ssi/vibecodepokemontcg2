@@ -49,7 +49,6 @@ import {
   requiresTurnEndOnEvolve,
 } from '/shared/engine/rules/evolution.mjs';
 import {
-  clearUntilLeavesActive,
   clearActiveSpotPendingEffects,
 } from '/shared/engine/rules/attack-pending-effects.mjs';
 import {
@@ -68,7 +67,6 @@ import {
   isStadiumConfusedPersist,
   getEffectiveBenchLimit,
   playerHasTeraInPlay,
-  isTeraCard,
   parseStadiumBenchLimit,
   stadiumBlocksStatusApplication,
 } from '/shared/engine/rules/stadium-effects.mjs';

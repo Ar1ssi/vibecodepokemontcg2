@@ -230,19 +230,6 @@ const clearRequestActionStaleTimer = () => {
   }
 };
 
-// A gap in requestAction counters that never closes means we're missing an
-// action the peer thinks it sent. Fall through to the 1.1 catch-up rather
-// than misapply the buffered actions out of order.
-const armRequestActionStaleTimer = () => {
-  if (requestActionStaleTimer) return;
-  requestActionStaleTimer = setTimeout(() => {
-    requestActionStaleTimer = null;
-    requestActionQueue.clear();
-    logSync('requestAction.stale_gap', {}, 'local');
-    requestPeerLogCatchup();
-  }, STALE_ACTION_TIMEOUT_MS);
-};
-
 // Applies one requestAction payload, then drains any buffered actions that
 // are now contiguous with the updated selfCounter.
 const applyRequestAction = (action, parameters) => {
@@ -685,7 +672,17 @@ export const initializeSocketEventListeners = () => {
       action: data.action,
       parameters: data.parameters,
     });
-    armRequestActionStaleTimer();
+    // A gap in requestAction counters that never closes means we're missing an
+    // action the peer thinks it sent. Fall through to the 1.1 catch-up rather
+    // than misapply the buffered actions out of order.
+    if (!requestActionStaleTimer) {
+      requestActionStaleTimer = setTimeout(() => {
+        requestActionStaleTimer = null;
+        requestActionQueue.clear();
+        logSync('requestAction.stale_gap', {}, 'local');
+        requestPeerLogCatchup();
+      }, STALE_ACTION_TIMEOUT_MS);
+    }
   });
 
   // reset counter when importing game state

@@ -356,15 +356,10 @@ export const changePlaymat = (user, matId, emit = true) => {
   processAction(user, emit, 'changePlaymat', [matId]);
 };
 
-/** Re-apply the active mat choices. */
-export const refreshMatLayout = () => {
-  syncLayouts();
-  syncMatArt();
-};
-
 export const initializeMatLayout = () => {
   currentMats = readStoredMats();
-  refreshMatLayout();
+  syncLayouts();
+  syncMatArt();
 
   document.addEventListener('playmat-changed', (event) => {
     applyMatForTarget(

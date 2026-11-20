@@ -5,7 +5,7 @@ import { determineUsername } from '../../setup/general/determine-username.js';
 import { processAction } from '../../setup/general/process-action.js';
 import { shuffleIndices } from '../../setup/general/shuffle.js';
 import { getZone } from '../../setup/zones/get-zone.js';
-import { drawHand, setOpeningPrizes } from '../zones/hand-actions.js';
+import { drawOpeningHand, setOpeningPrizes } from '../zones/hand-actions.js';
 import { shuffleZone } from '../zones/shuffle-zone.js';
 import { reset } from './reset.js';
 import { OPENING_DEAL_WAIT_MS, waitForDealOrder } from '../../setup/netcode/deal-order.js';
@@ -31,7 +31,10 @@ export const setup = async (user, indices, emit = true) => {
   indices = indices ? indices : shuffleIndices(deck.getCount());
   if (deck.getCount() > 0) {
     shuffleZone(user, user, 'deck', indices, false, false);
-    await drawHand(user, user);
+    // moveCard is async (ensureCardData). Firing the loop without await raced
+    // every deal off deck[0]; the sync log sometimes showed only 3 prize moves.
+    await drawOpeningHand(user, user);
+    await setOpeningPrizes(user, user);
     appendMessage(
       user,
       determineUsername(user) + ' drew starting hand and set prizes',

@@ -52,13 +52,6 @@ const flyHost = (host, pose, { duration, delay = 0, fill }) => {
 
 const flightSeed = () => Math.floor(Math.random() * 1e6);
 
-const flyUp = (entry, delay) =>
-  flyHost(entry.host, fanFlightPose({ from: entry.origin, to: entry.dest, fromTurn: entry.turn, seed: flightSeed() }), {
-    duration: FAN_UP_MS,
-    delay,
-    fill: 'backwards',
-  });
-
 const flyBack = (entry) =>
   flyHost(
     entry.host,
@@ -72,8 +65,10 @@ const unhideSources = (cards) => {
   }
 };
 
-const teardownOverlay = (unhideAll) => {
-  if (!pending) return;
+const finishPrizeTake = (taken, unhideAll = taken === 0) => {
+  if (!pending || pending.resolving) return;
+  pending.resolving = true;
+  const { resolve } = pending;
   pending.overlay.remove();
   if (unhideAll) {
     unhideSources(pending.entries.map((entry) => entry.card));
@@ -84,13 +79,6 @@ const teardownOverlay = (unhideAll) => {
         .map((entry) => entry.card)
     );
   }
-};
-
-const finishPrizeTake = (taken, unhideAll = taken === 0) => {
-  if (!pending || pending.resolving) return;
-  pending.resolving = true;
-  const { resolve } = pending;
-  teardownOverlay(unhideAll);
   pending = null;
   resolve(taken);
 };
@@ -134,13 +122,6 @@ const selectEntry = (card, host) => {
   pending.selected.add(card);
   host.classList.add('is-selected');
   return pending.selected.size >= pending.needed;
-};
-
-const toggleSelect = (card, host) => {
-  if (!pending?.ready || pending.resolving) return;
-  if (selectEntry(card, host)) {
-    globalThis.setTimeout(confirmSelection, 220);
-  }
 };
 
 export const cancelPrizeTake = () => {
@@ -214,7 +195,10 @@ const openPrizeFan = ({ user, cards, needed, onChosen }) => {
     host.appendChild(img);
     host.addEventListener('click', (event) => {
       event.stopPropagation();
-      toggleSelect(card, host);
+      if (!pending?.ready || pending.resolving) return;
+      if (selectEntry(card, host)) {
+        globalThis.setTimeout(confirmSelection, 220);
+      }
     });
     overlay.appendChild(host);
     return { card, host, origin, turn, dest: dests[i] };
@@ -237,7 +221,11 @@ const openPrizeFan = ({ user, cards, needed, onChosen }) => {
 
     let arrived = 0;
     entries.forEach((entry, i) => {
-      flyUp(entry, i * STAGGER_MS).then(() => {
+      flyHost(
+        entry.host,
+        fanFlightPose({ from: entry.origin, to: entry.dest, fromTurn: entry.turn, seed: flightSeed() }),
+        { duration: FAN_UP_MS, delay: i * STAGGER_MS, fill: 'backwards' }
+      ).then(() => {
         if (!pending || pending.overlay !== overlay) return;
         arrived += 1;
         if (arrived >= pending.entries.length) {
