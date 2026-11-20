@@ -5081,10 +5081,11 @@ body.side-menu-collapsed .opp {
 }
 
 /* View Board (view-board-toggle.mjs): the menu turns see-through except its own
-   Back button; the overlay still blocks the board underneath. */
+   Back button, and clicks pass to the board, which only inspects while viewing. */
 .is-viewing-board,
 .is-viewing-board * {
   visibility: hidden;
+  pointer-events: none;
 }
 .card-picker-overlay.is-viewing-board,
 .choice-modal-overlay.is-viewing-board {
@@ -5094,6 +5095,7 @@ body.side-menu-collapsed .opp {
 }
 .is-viewing-board .view-board-button {
   visibility: visible;
+  pointer-events: auto;
 }
 
 /* Pending-choice overlays block the board, never the side menu: Reset, chat and

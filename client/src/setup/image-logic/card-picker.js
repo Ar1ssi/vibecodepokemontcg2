@@ -26,6 +26,35 @@ import { uiCue } from '../netcode/mat-fx/ui-cue.mjs';
 
 /** @type {object | null} */
 let pickerState = null;
+// View Board over a pick: a pile opened from the board parks the pick (hidden, keys off) until
+// that pile view closes; a forced close (the choice ended or was replaced) drops both.
+let parkedPicker = null;
+
+const parkPicker = (state) => {
+  document.removeEventListener('keydown', state.onKeyDown);
+  if (state.onResize) window.removeEventListener('resize', state.onResize);
+  state.overlay.id = 'cardPickerOverlayParked';
+  state.overlay.style.display = 'none';
+  parkedPicker = state;
+  pickerState = null;
+};
+
+const restoreParkedPicker = () => {
+  const state = parkedPicker;
+  parkedPicker = null;
+  if (!state) return;
+  state.overlay.id = 'cardPickerOverlay';
+  state.overlay.style.display = '';
+  document.addEventListener('keydown', state.onKeyDown);
+  if (state.onResize) window.addEventListener('resize', state.onResize);
+  pickerState = state;
+};
+
+const dropParkedPicker = () => {
+  const state = parkedPicker;
+  parkedPicker = null;
+  if (state) teardownPicker(state);
+};
 
 const PEEK_PERCENT = 24;
 const SWIPE_THRESHOLD = 18;
@@ -644,13 +673,18 @@ const teardownPicker = (state) => {
 };
 
 export const closeCardPicker = (event, force = false) => {
-  if (!pickerState) return;
+  if (!pickerState) {
+    if (force) dropParkedPicker();
+    return;
+  }
   if (!canCloseCardPicker({ mode: pickerState.mode, force })) return;
   if (event?.target) {
     const { overlay } = pickerState;
     if (overlay.contains(event.target) && event.target !== overlay) return;
   }
   teardownPicker(pickerState);
+  if (force) dropParkedPicker();
+  else restoreParkedPicker();
 };
 
 const toggleSelection = (state) => {
@@ -1089,10 +1123,14 @@ export const openCardPicker = async ({
   // the buildSlideContent() result and must keep `holoWrapper` inside the node it returns,
   // or slideWrapper() and the holo hover sync break.
   decorate = null,
+  // A browse view stacked over a parked pick (openCarouselViewer from View Board).
+  nested = false,
 }) => {
   closeCardPreview(null, true);
-  closeCardPicker(null, true);
-  document.getElementById('rulesChoicePicker')?.remove();
+  if (!nested) {
+    closeCardPicker(null, true);
+    document.getElementById('rulesChoicePicker')?.remove();
+  }
 
   if (!candidates.length) {
     onCancel?.();
@@ -1412,6 +1450,7 @@ export const openCarouselViewer = async ({
   initialIndex = 0,
   decorate = null,
 }) => {
+  const nested = parkForBoardView(candidates);
   await openCardPicker({
     title,
     candidates,
@@ -1420,5 +1459,21 @@ export const openCarouselViewer = async ({
     minCount: 0,
     maxCount: 0,
     decorate,
+    nested,
   });
+};
+
+// A pile opened through View Board while a pick waits: park the pick (or swap the pile view
+// already over it) so the pile does not replace it. Returns whether the new view is nested.
+const parkForBoardView = (candidates) => {
+  if (!candidates?.length) return false;
+  if (parkedPicker && pickerState?.mode === 'browse') {
+    teardownPicker(pickerState);
+    return true;
+  }
+  if (pickerState && pickerState.mode !== 'browse' && pickerState.overlay.classList.contains('is-viewing-board')) {
+    parkPicker(pickerState);
+    return true;
+  }
+  return false;
 };

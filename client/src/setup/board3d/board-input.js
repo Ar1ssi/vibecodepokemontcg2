@@ -8,6 +8,7 @@
 // an HTML5 drag out of an open panel drops on the canvas through the same router.
 import { dropTargetFor, routeDrop } from './drop-router.mjs';
 import { clickHitFor, createClickTracker, mirrorSelectorFor } from './input-gestures.mjs';
+import { isViewingBoard } from '../image-logic/view-board-toggle.mjs';
 
 const MOUSE_INIT_KEYS = ['clientX', 'clientY', 'screenX', 'screenY', 'ctrlKey', 'shiftKey', 'altKey', 'metaKey'];
 const PRIMARY_BUTTON = 0;
@@ -176,6 +177,8 @@ export function createBoardInput({
     const { hit, el } = press;
     press = null;
     if (!dragActions || !el || hit?.pile || hit?.zone === 'stadium' || !Number.isFinite(hit?.instanceId)) return;
+    // View Board only looks (view-board-toggle.mjs): no card leaves its slot until Back.
+    if (isViewingBoard(doc)) return;
     const state = dragActions.state();
     if (state.isSpectator || (hit.side !== state.initiator && !state.solo)) return;
     const dragging = dragActions.begin(el);

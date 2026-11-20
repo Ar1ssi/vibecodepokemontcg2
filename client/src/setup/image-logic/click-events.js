@@ -17,6 +17,7 @@ import { findZoneCardIndex } from './zone-card-lookup.js';
 import { readCardInstanceId } from '../netcode/authoritative-dispatch.js';
 import { closeCardPreview, openCardPreview } from './full-view.js';
 import { openDiscardPileViewer } from './discard-pile-viewer.js';
+import { isViewingBoard, viewBoardTapRoute } from './view-board-toggle.mjs';
 import { openCarouselViewer } from './card-picker.js';
 import { attachedSlidesOf, openAttachedCardsCarousel } from './attached-carousel.js';
 import { orderAttachedForCarousel } from './carousel-order.mjs';
@@ -110,6 +111,12 @@ const board3dMenuAnchorRect = (target) => {
 };
 
 export const openCardContextMenu = (event) => {
+  // View Board only looks: the card menu's actions (discard, shuffle, draw…) wait for Back.
+  if (isViewingBoard()) {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    return;
+  }
   const cardContextMenu = document.getElementById('cardContextMenu');
 
   closeFullView(event);
@@ -303,8 +310,32 @@ const routeInPlayTap = (card, zoneId, cardUser) => {
   return false;
 };
 
+// View Board (view-board-toggle.mjs): a click under a see-through menu inspects, never acts.
+const inspectWhileViewing = (event) => {
+  identifyCard(event);
+  const route = viewBoardTapRoute({ zoneId: mouseClick.zoneId });
+  if (route === 'pile') {
+    openDiscardPileViewer(mouseClick.cardUser, mouseClick.cardIndex, mouseClick.cardInstanceId);
+    return;
+  }
+  const card = resolvePreviewCard(mouseClick.card, event.target);
+  if (!card) return;
+  if (route === 'stack') {
+    if (!isStackViewOpen()) openStackFor(card, mouseClick.zoneId, mouseClick.cardUser);
+    return;
+  }
+  if (route === 'preview' && card.image) {
+    closeCardPreview(null, true);
+    openCardPreview(card.image, card);
+  }
+};
+
 export const imageClick = (event) => {
   event.stopPropagation();
+  if (isViewingBoard()) {
+    inspectWhileViewing(event);
+    return;
+  }
   // Attach mode on a server-drawn card (keybinds `e`/`q`): this click names the target.
   const serverAttach = takeServerAttach(event.target);
   identifyCard(event);
@@ -376,6 +407,11 @@ export const imageClick = (event) => {
 };
 
 export const doubleClick = (event) => {
+  if (event && isViewingBoard()) {
+    event.stopPropagation();
+    inspectWhileViewing(event);
+    return;
+  }
   if (event) {
     event.stopPropagation();
     identifyCard(event);
