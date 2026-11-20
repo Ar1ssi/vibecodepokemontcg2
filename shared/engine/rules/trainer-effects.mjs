@@ -1343,6 +1343,16 @@ function parseCoinFlipStep(lower) {
     return { type: 'coinFlip', heads: [{ type: 'clearStatus', target: 'yourActive' }, { type: 'healAmount', amount: 2, target: 'Active Pokémon' }], tails: [] };
   }
 
+  // Homebrew Crushing Hammer (the user's scan, 2026-11-20): "Flip a coin. If heads, discard an
+  // Energy from your opponent's Active Pokémon." Only the Active's Energy can go.
+  if (/if heads,?\s+discard an energy from your opponent's active pokémon/.test(lower)) {
+    return {
+      type: 'coinFlip',
+      heads: [{ type: 'discardEnergyFromOpponent', energy: 'any Energy', count: 1, scope: 'Active' }],
+      tails: [],
+    };
+  }
+
   const headsEnergy = lower.match(/if heads,?\s+discard an energy from 1 of your opponent's pokémon/);
   if (headsEnergy) {
     return {
