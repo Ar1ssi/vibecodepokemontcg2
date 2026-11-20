@@ -3426,6 +3426,21 @@ function atkFreezeBoth(ctx) {
   return null;
 }
 
+// Giratina ex Shadow Force (customhb): "At the end of your opponent's next turn, their Active
+// Pokémon takes 150 damage." Lives on the opponent, not a card: whichever Pokémon is Active then
+// takes it (turn.mjs resolveDeferredKnockouts).
+function atkDeferredActiveDamage(ctx) {
+  const { opponent, player } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const atTurn = (ctx.draft.turn?.number || 1) + 1;
+  opponent.deferredActiveDamage = [
+    ...(opponent.deferredActiveDamage || []),
+    { atTurn, amount: ctx.step.amount, sourceAttack: attackName(ctx), sourcePlayerId: player.playerId },
+  ];
+  ctx.events.push({ type: 'deferredDamageScheduled', playerId: opponent.playerId, atTurn, amount: ctx.step.amount });
+  return null;
+}
+
 // Dialga-GX Timeless-GX / Togepi & Cleffa & Igglybuff-GX Supreme Puff-GX: the attack tail
 // consumes `flags.extraTurn` and advances the turn to the same player without a checkup.
 function atkTakeAnotherTurn(ctx) {
@@ -4641,6 +4656,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkOppPlayLock,
   atkOppAttackLock,
   atkFreezeBoth,
+  atkDeferredActiveDamage,
   atkTakeAnotherTurn,
   atkShuffleOppAllBench,
   atkBothDrawUntil,

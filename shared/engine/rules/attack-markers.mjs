@@ -613,6 +613,18 @@ export function parseMarkerSentence(sentence, context = {}) {
 
 // Same [regex, build] shape as rules/attack-steps.mjs TEMPLATES; last in that list.
 export const MARKER_TEMPLATES = [
+  // Giratina ex Shadow Force (customhb): both shields print no window; the attack's own "at the end
+  // of your opponent's next turn" sets it, so they hold through that turn. Every attack the
+  // opponent can use comes from their Active Pokémon, so the damage shield needs no attacker filter.
+  [
+    /^prevent all damage done to this pokémon by your opponent's active pokémon$/,
+    () => ({ type: 'atkAddMarker', target: 'self', window: 'opponentNextTurn', marker: { kind: 'incomingPrevent', filter: null } }),
+  ],
+  // Read by effects/trainer-steps.mjs freezeShields, like Temporal Freeze's position shield.
+  [
+    /^this pokémon can't be affected by trainer cards or abilities$/,
+    () => ({ type: 'atkAddMarker', target: 'self', window: 'opponentNextTurn', marker: { kind: 'cardEffectImmunity' } }),
+  ],
   [
     /^(?:during your|as long as this pokémon remains in the active spot, |at the end of your opponent's next turn|if an attack does damage to this pokémon during|if your opponent's active pokémon attacks this pokémon during your opponent's next turn, |if your opponent's active pokémon is knocked out during your next turn|until the end of your next turn, |.+ (?:during your opponent's|during their|until the end of your) next turn$)/,
     (m, rest, context) => parseMarkerSentence(rest, context),

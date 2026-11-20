@@ -1511,6 +1511,20 @@ export function trainerEndsTurn(card) {
 // "You can use this card during your first turn or on a Pokémon that was put into play this turn." (Wally)
 const PRINTED_FIRST_TURN_OR_PLAYED_RE = /you can use this card during your first turn or on a pokémon that was put into play this turn/;
 
+// The printed limits on the Pokémon a returnPokemonToHand Trainer may pick: Acerola / Cheren's Care
+// "that has any damage counters on it", Cheren's Care "{C} Pokémon", Penny "Basic Pokémon",
+// Scoop Up Net "that isn't a Pokémon V or a Pokémon-GX", Poké Turn "Pokémon SP".
+function returnPokemonLimits(lower) {
+  const limits = {};
+  const typed = /^(?:put|return) 1 of your \{([a-z])\} pokémon/.exec(lower);
+  if (typed) limits.pokemonType = typed[1];
+  if (/^(?:put|return) 1 of your basic pokémon/.test(lower)) limits.basicOnly = true;
+  if (/pokémon that has any damage counters on it/.test(lower)) limits.damagedOnly = true;
+  if (/that isn['’]t a pokémon v or a pokémon-gx/.test(lower)) limits.excludeVGx = true;
+  if (/^(?:put|return) 1 of your pokémon sp\b/.test(lower)) limits.spOnly = true;
+  return limits;
+}
+
 export function parseTrainerEffect(text = '') {
   const lower = rewriteLegacyTrainerWording(normalizeText(text));
   // Fossil Items: the "play as a Basic Pokémon" clause is the whole effect; legacy wordings
@@ -2623,7 +2637,7 @@ function parseTrainerStepsInner(lower) {
       (lower.includes('into your hand') || lower.includes('to your hand'))) {
     const keepAttached = /(?:all attached cards|all cards attached)[^.]*?(?:into|to) your hand/.test(lower) ||
       lower.includes('and all attached cards');
-    steps.push({ type: 'returnPokemonToHand', keepAttached });
+    steps.push({ type: 'returnPokemonToHand', keepAttached, ...returnPokemonLimits(lower) });
     return { steps, recognizable: true };
   }
 

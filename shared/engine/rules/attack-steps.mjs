@@ -216,6 +216,12 @@ const TEMPLATES = [
       marker: { kind: 'deferredCounters', count: Number(m[1]) },
     }),
   ],
+  // Giratina ex Shadow Force (customhb): whichever Pokémon is Active then takes the damage
+  // (turn.mjs resolveDeferredKnockouts).
+  [
+    /^at the end of your opponent's next turn, (?:their|your opponent's) active pokémon takes (\d+) damage$/,
+    (m) => ({ type: 'atkDeferredActiveDamage', amount: Number(m[1]) }),
+  ],
   // Unown Hidden Power (Unseen Forces I): after its switch, "The new Defending Pokémon is now
   // Burned and Confused."
   [

@@ -1,7 +1,7 @@
 # Homebrew set (customhb): rules-engine check
 
-Cards: 690 (471 Pokémon; 75 Items, 42 Supporters, 44 Tools, 32 Stadiums; 9 basic and 17 special Energy).
-Parts checked: 1135 (every attack, Ability and Trainer/Energy text).
+Cards: 691 (472 Pokémon; 75 Items, 42 Supporters, 44 Tools, 32 Stadiums; 9 basic and 17 special Energy).
+Parts checked: 1137 (every attack, Ability and Trainer/Energy text).
 Re-run: `node scripts/custom-sets/engine-check.mjs` (attacks through the oracle's rich board, abilities through the ability-behaviour classifier, Trainers through `classifyTrainer`).
 
 Every card was audited in play (attacks with their secondary effects, Abilities, Items, Supporters, Tools, Stadiums, Special Energy). The texts the engine ran wrongly, partly or not at all are fixed and each has an engine test named by its HB number that reads the card's own text from `set.json`: `shared/engine/__tests__/customhb-*.test.mjs` (attacks, attacks2, attacks3, abilities1–4, trainers-tools, iron-burden), plus the Forest of Vitality test (`stadium-forest-of-vitality.test.mjs`).
