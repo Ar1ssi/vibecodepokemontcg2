@@ -2,28 +2,11 @@
 // board mapping (`.agent/designs/065-signature-move-animations.md` § Appendix S › Dragon);
 // departures from an entry are listed under the design's Deviations (slice 13).
 
-const motes = (at, count, over = {}) =>
-  Object.freeze({
-    at,
-    anchor: 'defender',
-    count,
-    distance: 1.1,
-    direction: -90,
-    spread: 360,
-    size: [0.03, 0.07],
-    aspect: 1,
-    gravity: 0,
-    maxDelay: 0.2,
-    durationMs: 800,
-    kind: 'mote',
-    ...over,
-  });
+import { motes } from '../../move-spec.mjs';
 
-const RING5 = Object.freeze([-90, -18, 54, 126, 198].map((angle) => Object.freeze({ angle, reach: 0.85 })));
 
 // Zygarde's palette (Core Enforcer's EB reference; Nihil Light borrows it, unverified).
 const ZY_GREEN = Object.freeze({ deep: '#2E8A3C', body: '#B8FF8A', hot: '#F2E94A', core: '#FFFFFF' });
-const ZY_CYAN = Object.freeze({ deep: '#1E8A9A', body: '#5FE6F5', hot: '#E0FFFF', core: '#FFFFFF' });
 const ZY_WHITE = Object.freeze({ deep: '#B8FF8A', body: '#E8FFD8', hot: '#FFFFFF', core: '#FFFFFF' });
 const ZY_YELLOW = Object.freeze({ deep: '#A89A1E', body: '#F2E94A', hot: '#FFF9C0', core: '#FFFFFF' });
 
@@ -55,7 +38,6 @@ export const coreEnforcer = Object.freeze({
 });
 
 const MAGENTA = Object.freeze({ deep: '#C828C8', body: '#FF3CF0', hot: '#FFD2F5', core: '#FFFFFF' });
-const LILAC = Object.freeze({ deep: '#7A3CC8', body: '#BE78FF', hot: '#FFD2F5', core: '#FFFFFF' });
 const PINK_WHITE = Object.freeze({ deep: '#FF3CF0', body: '#FFD2F5', hot: '#FFFFFF', core: '#FFFFFF' });
 
 // Regidrago: magenta orbs cluster round it and fire white-pink rays outward, then its white-lit
@@ -122,9 +104,7 @@ export const dynamaxCannon = Object.freeze({
 });
 
 const VORTEX = Object.freeze({ deep: '#6A1FD0', body: '#C81EFF', hot: '#FF2E7A', core: '#FFFFFF' });
-const BLADE = Object.freeze({ deep: '#14101C', body: '#3A3446', hot: '#C8C8D8', core: '#FFFFFF' });
 const PINK_BEAM = Object.freeze({ deep: '#C81EFF', body: '#FF2E7A', hot: '#FFC0D8', core: '#FFFFFF' });
-const WHITE_CYAN = Object.freeze({ deep: '#5FD8FF', body: '#E0F8FF', hot: '#FFFFFF', core: '#FFFFFF' });
 
 // Eternatus: a dark four-bladed star turns over a red-pink core inside a magenta vortex, then
 // pink beams rain and a white column drives down onto the defender.

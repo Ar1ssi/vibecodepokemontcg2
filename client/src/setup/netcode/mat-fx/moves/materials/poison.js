@@ -29,7 +29,7 @@
 import { rgbCss } from '../../fx-colors.mjs';
 import { moddedKit } from './_kit-mod.js';
 import { withFxMod, withLiftZ } from './_mods.js';
-import { grainPass, inShadow, shardOutline, tongueOutline, traceOutline } from './_shared.js';
+import { alongAxis, grainPass, inShadow, shardOutline, tongueOutline, tracePolygon, traceOutline } from './_shared.js';
 
 const TAU = Math.PI * 2;
 const rad = (deg) => (deg * Math.PI) / 180;
@@ -158,21 +158,8 @@ export function bubbleRise(s, r) {
   return out;
 }
 
-/** `rgb` at `alpha` as a one-stop gradient from a stream's base toward its tip (flat on Canvas2D). */
-const alongStream = (ctx, { x, y, angleDeg, length }, rgb, alpha) => {
-  const g = ctx.createLinearGradient(x, y, x + Math.cos(rad(angleDeg)) * length, y + Math.sin(rad(angleDeg)) * length);
-  g.addColorStop(0, rgbCss(rgb, alpha));
-  return g;
-};
-
 /** The poison material drawn in `palette` (any palette with the same keys). */
 function poisonKit(palette) {
-  const tracePoints = (ctx, points) => {
-    ctx.beginPath();
-    points.forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
-    ctx.closePath();
-  };
-
   /** Adds one circle to the current path as its own sub-path. */
   const addCircle = (ctx, x, y, r) => {
     ctx.moveTo(x + r, y);
@@ -215,7 +202,7 @@ function poisonKit(palette) {
       ctx.fxStyle = VENOM_GLOB;
       withFxMod(ctx, GOO_MOD, () => {
         ctx.fillStyle = globFill(ctx, x, y, r, alpha);
-        tracePoints(ctx, globOutline(x, y, r, phase));
+        tracePolygon(ctx, globOutline(x, y, r, phase));
         ctx.fill();
         if (!drip) return;
         const dr = r * DRIP_R;
@@ -229,7 +216,7 @@ function poisonKit(palette) {
       ctx.strokeStyle = rgbCss(palette.deep, RIM_ALPHA * alpha);
       ctx.lineWidth = Math.max(1, r * 0.08);
       ctx.lineJoin = 'round';
-      tracePoints(ctx, globOutline(x, y, r * RIM_INSET, phase));
+      tracePolygon(ctx, globOutline(x, y, r * RIM_INSET, phase));
       ctx.stroke();
     });
     const glint = alpha * clamp01(hot);
@@ -266,7 +253,7 @@ function poisonKit(palette) {
     const globs = streamGlobs(spec);
     inShadow(ctx, () => {
       ctx.fxStyle = VENOM_OOZE;
-      ctx.fillStyle = alongStream(ctx, spec, palette.body, OOZE_ALPHA * alpha);
+      ctx.fillStyle = alongAxis(ctx, spec, palette.body, OOZE_ALPHA * alpha);
       traceOutline(ctx, tongueOutline({ ...spec, amp: 0.5 }, 0.8));
       // A stream's ooze wavering along it, lit as a tube round its axis.
       withLiftZ(ctx, LIFT.ooze, () => withFxMod(ctx, {
@@ -330,7 +317,7 @@ function poisonKit(palette) {
     inShadow(ctx, () => {
       ctx.fillStyle = g;
       ctx.fxStyle = VENOM_POOL;
-      tracePoints(ctx, outline);
+      tracePolygon(ctx, outline);
       withFxMod(ctx, POOL_MOD, () => ctx.fill());
       ctx.fxStyle = null;
     });

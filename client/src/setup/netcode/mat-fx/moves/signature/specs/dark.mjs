@@ -2,28 +2,11 @@
 // board mapping (`.agent/designs/065-signature-move-animations.md` § Appendix S › Dark);
 // departures from an entry are listed under the design's Deviations (slice 14).
 
-const motes = (at, count, over = {}) =>
-  Object.freeze({
-    at,
-    anchor: 'defender',
-    count,
-    distance: 1.1,
-    direction: -90,
-    spread: 360,
-    size: [0.03, 0.07],
-    aspect: 1,
-    gravity: 0,
-    maxDelay: 0.2,
-    durationMs: 800,
-    kind: 'mote',
-    ...over,
-  });
+import { motes } from '../../move-spec.mjs';
 
-const RING5 = Object.freeze([-90, -18, 54, 126, 198].map((angle) => Object.freeze({ angle, reach: 0.85 })));
 
 const VOID = Object.freeze({ deep: '#1A1028', body: '#5B2BD6', hot: '#FF3DA0', core: '#B43CFF' });
 const VOID_VIOLET = Object.freeze({ deep: '#1A1028', body: '#B43CFF', hot: '#FF3DA0', core: '#FFFFFF' });
-const SLEEP = Object.freeze({ deep: '#5B2BD6', body: '#6FD7FF', hot: '#E0F8FF', core: '#FFFFFF' });
 
 // Darkrai: a violet-black void sphere with magenta cracks drops onto the defender's ground and
 // opens into a dark dome; the defender sinks asleep under drifting Z motes. A status move.

@@ -21,7 +21,7 @@
 // over the drawer's lift, so the white centre sits on the body and the cast pass pools light.
 import { rgbCss } from '../../fx-colors.mjs';
 import { mergeFxMods, withFxMod, withLiftZ } from './_mods.js';
-import { grainPass, sphere, styledKit } from './_shared.js';
+import { grainPass, sphere, styledKit, tracePolygon } from './_shared.js';
 
 // Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
 // Force: impact discs boil, motion blades streak. Aura: steady blue current.
@@ -119,12 +119,6 @@ export function streakOutline({ x, y, angleDeg, length, width }, scale = 1) {
     [sx + uy * half, sy - ux * half],
   ];
 }
-
-const tracePolygon = (ctx, points) => {
-  ctx.beginPath();
-  points.forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
-  ctx.closePath();
-};
 
 /**
  * The barrage the fighting sigil lays over a defender as the glyph beat runs (`s` 0-1):

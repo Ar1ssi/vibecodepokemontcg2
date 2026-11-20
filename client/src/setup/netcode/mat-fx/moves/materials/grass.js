@@ -11,7 +11,7 @@
 import { rgbCss } from '../../fx-colors.mjs';
 import { moddedKit } from './_kit-mod.js';
 import { withFxMod, withLiftZ } from './_mods.js';
-import { grainPass, inShadow, sphere, styledKit, tonguePath, wobble } from './_shared.js';
+import { grainPass, inShadow, seedHash, sphere, styledKit, tonguePath, wobble } from './_shared.js';
 
 // Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
 // Blades and leaves: a few broad facets (leaf halves) with a slow glint; seeds and spores boil softly.
@@ -44,14 +44,8 @@ const SEED_SPHERE = Object.freeze({
 const LEAF_Z = Object.freeze({ low: 0.02, high: 0.12 });
 const PINWHEEL_Z_STEP = 0.02;
 
-/** A stable pseudo-random value in [0, 1) for a seed. */
-const hash = (seed) => {
-  const v = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
-  return v - Math.floor(v);
-};
-
 /** The height (lane units) a lone leaf floats at: stable per seed, so a flurry's layers hold. */
-const leafZ = (seed) => LEAF_Z.low + (LEAF_Z.high - LEAF_Z.low) * hash(Number(seed) || 0);
+const leafZ = (seed) => LEAF_Z.low + (LEAF_Z.high - LEAF_Z.low) * seedHash(Number(seed) || 0);
 const edgeOf = (rgb, gain) => Object.freeze({ dissolve: Object.freeze({ edge: rgb, gain }) });
 
 const TAU = Math.PI * 2;
