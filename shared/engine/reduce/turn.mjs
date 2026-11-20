@@ -207,6 +207,7 @@ function resolveDeferredKnockouts(draft, { events }) {
     }
   }
   for (const pid of Object.keys(draft.players || {})) {
+    if (applyDeferredActiveDamage(draft, pid, { events })) continue;
     const active = draft.players[pid].zones?.active?.find((c) => !c.attachedTo);
     // Wobbuffet Shadow Tag: "Put 7 damage counters on the Defending Pokémon at the end of your
     // opponent's next turn."
@@ -237,6 +238,33 @@ function resolveDeferredKnockouts(draft, { events }) {
       events,
     });
   }
+}
+
+// Giratina ex Shadow Force (customhb): "At the end of your opponent's next turn, their Active Pokémon
+// takes 150 damage" — the Pokémon Active now, whichever it is. True when it was Knocked Out.
+function applyDeferredActiveDamage(draft, pid, { events }) {
+  const player = draft.players[pid];
+  const pending = player.deferredActiveDamage;
+  if (!Array.isArray(pending) || pending.length === 0) return false;
+  const turn = draft.turn?.number || 0;
+  const due = pending.filter((entry) => entry.atTurn === turn);
+  const later = pending.filter((entry) => entry.atTurn > turn);
+  if (later.length > 0) player.deferredActiveDamage = later;
+  else delete player.deferredActiveDamage;
+  const active = player.zones?.active?.find((c) => !c.attachedTo);
+  if (!active || due.length === 0) return false;
+  const amount = due.reduce((sum, entry) => sum + (entry.amount || 0), 0);
+  active.damage = (active.damage || 0) + amount;
+  events.push({ type: 'damageUpdated', instanceId: active.instanceId, damage: active.damage, source: due[0].sourceAttack });
+  const hp = cardEffectiveHp(draft, active, pid);
+  if (!(hp > 0 && active.damage >= hp)) return false;
+  handleKnockout(draft, {
+    victimPlayerId: pid,
+    attackerPlayerId: due[0].sourcePlayerId ?? Object.keys(draft.players).find((id) => id !== pid),
+    victim: active,
+    events,
+  });
+  return true;
 }
 
 // Leftovers: "At the end of your turn, if the Pokémon this card is attached to is in the Active

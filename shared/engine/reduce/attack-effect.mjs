@@ -1694,6 +1694,9 @@ export function resolveAttackEffectPhase(draft, ctx) {
             activeSince: attacker.movedToActiveTurn ?? 0,
           };
         }
+        if (locks.selfCannotRetreat && attacker) {
+          attacker.cannotRetreatUntilTurn = (draft.turn.number || 1) + 2;
+        }
         if (locks.oppCannotRetreat && defender) {
           const defRef = findCard(draft, defender.instanceId);
           if (defRef && defRef.zoneId === 'active') {

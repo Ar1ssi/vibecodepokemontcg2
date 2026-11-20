@@ -284,6 +284,7 @@ const MARKER_TEXT = {
   freeRetreat: () => 'This Pokémon has no Retreat Cost.',
   retreatDelta: (m) => `This Pokémon's Retreat Cost is changed by ${m.amount ?? m.count ?? ''}.`,
   statusImmunity: () => "This Pokémon can't be affected by Special Conditions.",
+  cardEffectImmunity: () => "This Pokémon can't be affected by Trainer cards or Abilities.",
   healLock: () => "This Pokémon can't be healed.",
   abilityLock: () => 'This Pokémon has no Abilities.',
   attackLock: (m) => (m.attackName ? `This Pokémon can't use ${m.attackName}.` : "This Pokémon can't attack."),

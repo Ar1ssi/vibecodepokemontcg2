@@ -22,7 +22,7 @@ import {
   copyConditions,
   hasAnyCondition,
 } from '../rules/special-conditions.mjs';
-import { clearAttackMarkers, healLocked } from '../rules/attack-markers.mjs';
+import { clearAttackMarkers, healLocked, liveAttackMarkers } from '../rules/attack-markers.mjs';
 import { classifyStadiumEffect, stadiumAllowsSameTurnEvolution, stadiumBlocksHealing } from '../rules/stadium-effects.mjs';
 import {
   evolvedView,
@@ -177,11 +177,16 @@ export function cardEffectSource(effectType, sourceCard) {
 /**
  * Origin Forme Dialga ex Temporal Freeze: "Trainer cards and Abilities can't affect either Active
  * Pokémon", for both sides until `effectFreezeUntilTurn`. Position-based, so a promoted Active is covered.
+ * Giratina ex Shadow Force (customhb) "This Pokémon can't be affected by Trainer cards or Abilities":
+ * a `cardEffectImmunity` marker on that Pokémon, live while it stays Active.
  */
 function freezeShields(draft, owner, root, source) {
   if (!owner || !root || !['Item', 'Supporter', 'Stadium', 'Ability'].includes(source)) return false;
-  if (!(owner.effectFreezeUntilTurn >= (draft?.turn?.number || 1))) return false;
-  return (owner.zones?.active || []).includes(root) && !root.attachedTo;
+  const active = owner.zones?.active || [];
+  if (!active.includes(root) || root.attachedTo) return false;
+  const turnNumber = draft?.turn?.number || 1;
+  if (owner.effectFreezeUntilTurn >= turnNumber) return true;
+  return liveAttackMarkers(root, { turnNumber, zoneCards: active }).some((m) => m.kind === 'cardEffectImmunity');
 }
 
 /** Whether an Ability on `owner`'s side shields its in-play `root` from `source` (I219). */

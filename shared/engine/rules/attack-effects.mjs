@@ -946,6 +946,9 @@ export function parseNextTurnLock(
     out.selfCannotAttack = true;
   }
 
+  // Giratina ex Shadow Force (customhb): "This Pokémon cannot retreat during your next turn."
+  if (/this pok[ée]mon can't retreat during your next turn/.test(t)) out.selfCannotRetreat = true;
+
   // Gouging Fire ex Blaze Blitz: "This Pokémon can't use Blaze Blitz again until it leaves the
   // Active Spot."
   const whileActive = t.match(/this pok[ée]mon can(?:'t|not) use ([^.]+?) again until it leaves the active spot/);
@@ -955,6 +958,7 @@ export function parseNextTurnLock(
     !out.selfCannotAttack &&
     !out.selfCannotUseAttack &&
     !out.selfCannotUseAttackWhileActive &&
+    !out.selfCannotRetreat &&
     !out.oppCannotRetreat &&
     !out.oppCannotAttack
   ) {
