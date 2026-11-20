@@ -99,8 +99,6 @@ function zonePlaneRects(layout) {
   return out;
 }
 
-const samePose = (a, b) => Boolean(a && b) && POSE_FIELDS.every((field) => a[field] === b[field]);
-
 const defaultRequestFrame = (fn) => globalThis.requestAnimationFrame?.(fn) ?? globalThis.setTimeout(fn, 16);
 const defaultCancelFrame = (id) => (globalThis.cancelAnimationFrame ?? globalThis.clearTimeout)?.(id);
 
@@ -641,7 +639,8 @@ export function createBoardScene({
         pool.setFaces(id, facesOf(card));
         pool.setHidden(id, hiddenOf(id, pose));
       }
-      const posed = !samePose(appliedPoses.get(id), pose);
+      const applied = appliedPoses.get(id);
+      const posed = !(applied && pose && POSE_FIELDS.every((field) => applied[field] === pose[field]));
       if (posed && held?.id === id) endHold();
       // A held card stays under the pointer; dropCard sends it to its latest pose.
       if (lifted?.id !== id) {

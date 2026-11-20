@@ -14,11 +14,6 @@
  */
 export const TONE = Object.freeze({ knee: 0.68, whiten: 0.32, whitenFrom: 1.8, whitenTo: 7 });
 
-const smoothstep = (a, b, x) => {
-  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
-  return t * t * (3 - 2 * t);
-};
-
 /** The roll-off of one linear colour `[r, g, b]` (each ≥ 0, any may exceed 1). */
 export function rollOff(colour, tone = TONE) {
   const c = colour.map((v) => Math.max(0, Number(v) || 0));
@@ -26,7 +21,8 @@ export function rollOff(colour, tone = TONE) {
   if (peak <= tone.knee) return c;
   const over = (peak - tone.knee) / (1 - tone.knee);
   const mapped = tone.knee + (1 - tone.knee) * (1 - Math.exp(-over));
-  const lean = tone.whiten * smoothstep(tone.whitenFrom, tone.whitenTo, peak);
+  const t = Math.min(1, Math.max(0, (peak - tone.whitenFrom) / (tone.whitenTo - tone.whitenFrom)));
+  const lean = tone.whiten * (t * t * (3 - 2 * t));
   return c.map((v) => (v / peak) * mapped * (1 - lean) + mapped * lean);
 }
 
