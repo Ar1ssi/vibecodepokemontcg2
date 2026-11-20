@@ -40,30 +40,6 @@ export function callEnergyBlockReason(state, cardRef, playerId) {
   return null;
 }
 
-function startCallEnergy(draft, { cardRef, playerId, activeRng, events }) {
-  const step = callEnergyStep(cardRef.card);
-  const player = draft.players[playerId];
-  if (!player.flags) player.flags = {};
-  player.flags.abilitiesUsed = { ...(player.flags.abilitiesUsed || {}), [cardRef.card.instanceId]: true };
-  events.push({ type: 'abilityUsed', instanceId: cardRef.card.instanceId, name: cardRef.card.name, playerId });
-  const room = 5 - rootsIn(player.zones.bench).length;
-  const options = (player.zones.deck || []).filter((c) => isBasicPokemon(c));
-  const max = Math.min(step.count || 1, room, options.length);
-  if (max <= 0) {
-    finishCallEnergy(draft, { playerId, activeRng, events });
-    return;
-  }
-  draft.pendingChoice = createPendingChoice({
-    player: playerId,
-    source: cardRef.card.name,
-    prompt: `${cardRef.card.name}: put up to ${max} Basic Pokémon onto your Bench`,
-    options,
-    min: 0,
-    max,
-    resumeToken: { effectType: CALL_ENERGY_EFFECT, initiatorPlayerId: playerId, max },
-  });
-}
-
 export function resumeCallEnergy(draft, { token, selection, activeRng, events }) {
   draft.pendingChoice = null;
   const playerId = token.initiatorPlayerId;
@@ -177,8 +153,28 @@ export function promoteSelfAttachDrop(state, command) {
 
 export function useAbilityCommand({ draft, payload, playerId, activeRng, events }) {
   const cardRef = findCard(draft, payload.instanceId);
-  if (cardRef && callEnergyStep(cardRef.card)) {
-    startCallEnergy(draft, { cardRef, playerId, activeRng, events });
+  const callEnergy = cardRef && callEnergyStep(cardRef.card);
+  if (callEnergy) {
+    const player = draft.players[playerId];
+    if (!player.flags) player.flags = {};
+    player.flags.abilitiesUsed = { ...(player.flags.abilitiesUsed || {}), [cardRef.card.instanceId]: true };
+    events.push({ type: 'abilityUsed', instanceId: cardRef.card.instanceId, name: cardRef.card.name, playerId });
+    const room = 5 - rootsIn(player.zones.bench).length;
+    const options = (player.zones.deck || []).filter((c) => isBasicPokemon(c));
+    const max = Math.min(callEnergy.count || 1, room, options.length);
+    if (max <= 0) {
+      finishCallEnergy(draft, { playerId, activeRng, events });
+      return;
+    }
+    draft.pendingChoice = createPendingChoice({
+      player: playerId,
+      source: cardRef.card.name,
+      prompt: `${cardRef.card.name}: put up to ${max} Basic Pokémon onto your Bench`,
+      options,
+      min: 0,
+      max,
+      resumeToken: { effectType: CALL_ENERGY_EFFECT, initiatorPlayerId: playerId, max },
+    });
     return;
   }
   if (cardRef) {
