@@ -41,11 +41,7 @@ import {
   attachedTools,
   isActivatedAbility,
   requiresActiveSpot,
-  requiresBenchSpot,
-  powerConditionRestriction,
   isHandActivatedAbility,
-  requiresFirstTurn,
-  requiresKoOnOpponentTurn,
   isEvolvePlayedTrigger,
   isBenchPlayedTrigger,
   isPokemonToolCard,
@@ -180,18 +176,6 @@ function typeSymbols(text) {
   return [...String(text).matchAll(/\{([a-z])\}/g)]
     .map((m) => TYPE_LETTER[m[1]])
     .filter(Boolean);
-}
-
-/**
- * The printed "from your opponent's {R} and {W} Pokémon" requirement, checked
- * here so `reductionForCard`'s generic symbol scan can be skipped: that scan
- * also fires on defender conditions like "that have any {W} Energy attached".
- */
-function attackerTypeRequirementMet(text, attacker) {
-  const m = text.match(/opponent's ((?:\{[a-z]\}\s*(?:and|or)?\s*)+)pok[eé]mon/);
-  if (!m) return true;
-  const need = typeSymbols(m[1]);
-  return need.some((ty) => attackerTypes(attacker).includes(lower(ty)));
 }
 
 /**
@@ -642,7 +626,13 @@ export function abilityDamageReduction(defender, attacker, ctx = {}) {
     const named = m ? m[1].split(' and ').map((n) => n.trim()) : null;
     if (named && !named.some((n) => lower(defender?.name).includes(n))) continue;
     if (!sourceConditionMet(t, holder, defender, attacker, ctx)) continue;
-    if (!attackerTypeRequirementMet(t, attacker)) continue;
+    // The printed "from your opponent's {R} and {W} Pokémon" requirement, checked here so
+    // `reductionForCard`'s generic symbol scan can be skipped: that scan also fires on defender
+    // conditions like "that have any {W} Energy attached".
+    const attackerTypeNeed = t.match(/opponent's ((?:\{[a-z]\}\s*(?:and|or)?\s*)+)pok[eé]mon/);
+    if (attackerTypeNeed && !typeSymbols(attackerTypeNeed[1]).some((ty) => attackerTypes(attacker).includes(lower(ty)))) {
+      continue;
+    }
     const red = reductionForCard(holder, defender, attacker, {
       skipSymbolFilter: true,
     });
@@ -740,14 +730,6 @@ function legacyModifierApplies(spec, holder, defender, attacker, ctx) {
 // holder condition sourceConditionMet already reads, so the halve shares that check.
 const MULTISCALE_HALVE = /if this pok[eé]mon has full hp, damage done to (?:it|this pok[eé]mon) by attacks is halved/;
 
-/** `{ kind: 'halve', round: 'down' }` when the defending holder's Multiscale condition is met, else null. */
-function multiscaleHalveSpec(defender, attacker, ctx) {
-  const text = cardAbilityText(defender);
-  if (!MULTISCALE_HALVE.test(text) || isAbilitySuppressed(defender, ctx)) return null;
-  if (!sourceConditionMet(text, defender, defender, attacker, ctx)) return null;
-  return { kind: 'halve', round: 'down' };
-}
-
 /**
  * WotC Powers that change an attack's damage after Weakness and Resistance (Invisible Wall,
  * Kabuto Armor, Hard Shell, Strange Barrier, Relaxing Scent, Unown D/M/N): the parsed modifiers
@@ -757,8 +739,14 @@ function multiscaleHalveSpec(defender, attacker, ctx) {
 export function abilityLegacyDamageModifiers(defender, attacker, ctx = {}) {
   if (!defender) return [];
   const out = [];
-  const multiscale = multiscaleHalveSpec(defender, attacker, ctx);
-  if (multiscale) out.push(multiscale);
+  const defenderText = cardAbilityText(defender);
+  if (
+    MULTISCALE_HALVE.test(defenderText) &&
+    !isAbilitySuppressed(defender, ctx) &&
+    sourceConditionMet(defenderText, defender, defender, attacker, ctx)
+  ) {
+    out.push({ kind: 'halve', round: 'down' });
+  }
   for (const holder of dedupe([defender, ...sideInPlay(ctx), ...opponentInPlay(ctx)])) {
     const spec = parseLegacyDamageModifier(cardAbilityText(holder));
     if (!spec || isAbilitySuppressed(holder, ctx)) continue;
@@ -1518,17 +1506,6 @@ function holderPositionMet(text, holder, ctx) {
   return containsCard(bench, holder);
 }
 
-/** "except for <AbilityName>" exempts the holder itself; other exceptions filter targets. */
-function selfExemptFromSuppression(text, holder, card) {
-  const m = text.match(/except for ([^.]+)/);
-  if (!m) return false;
-  const clause = m[1].trim();
-  if (/[{\u007b]/.test(clause) || /pok[eé]mon/.test(clause) || /rule box/.test(clause)) {
-    return false;
-  }
-  return sameCard(holder, card);
-}
-
 /** True when the suppression text's target filter matches `card`. */
 function suppressionTargets(text, holder, card, ctx) {
   const holderSide = sideOf(holder, ctx);
@@ -1578,26 +1555,6 @@ function suppressionTargets(text, holder, card, ctx) {
   return true;
 }
 
-/**
- * Shiftry Seal Off ("The Defending Pokémon can't use any Poké-Powers or Poké-Bodies during your
- * opponent's next turn"): a live `abilityLock` marker covering this card's ability kind also
- * silences its passive Poké-Body. Without a turn number the window cannot be read: no lock.
- */
-function attackLockedAbility(card, turnNumber) {
-  if (typeof turnNumber !== 'number') return false;
-  const kinds = (card.abilities || []).map((a) => {
-    const type = String(a?.type || '').toLowerCase();
-    return /body/.test(type) ? 'body' : /power/.test(type) ? 'power' : 'ability';
-  });
-  return (card.attackMarkers || []).some(
-    (m) =>
-      m.kind === 'abilityLock' &&
-      (m.fromTurn ?? 0) <= turnNumber &&
-      turnNumber <= (m.untilTurn ?? 0) &&
-      (m.abilityKinds || []).some((kind) => kinds.includes(kind))
-  );
-}
-
 const ROTATION_CONDITIONS = ['Asleep', 'Confused', 'Paralyzed'];
 
 /**
@@ -1616,22 +1573,6 @@ export function legacyPowerStopped(card) {
 const TOXIC_GAS = /ignore all pok[eé]mon powers other than toxic gases/;
 
 /**
- * Muk Toxic Gas [Fossil 13]: "Ignore all Pokémon Powers other than Toxic Gases." True when a
- * working Toxic Gas is in play on either side and `card`'s Power is not itself a Toxic Gas.
- */
-function toxicGasIgnores(card, ctx) {
-  // The printed kind is the only mark of a Pokémon Power: the WotC texts carry none.
-  const entries = Array.isArray(card?.abilities) ? card.abilities : card?.ability ? [card.ability] : [];
-  if (!entries.some((entry) => /pok[eé]mon power/i.test(String(entry?.type || ''))) || TOXIC_GAS.test(cardAbilityText(card))) return false;
-  const holders = dedupe([
-    ...inPlayViews(ctx.sideCards),
-    ...inPlayViews(ctx.opponentSideCards),
-    ...inPlayViews(ctx.inPlayCards),
-  ]);
-  return holders.some((holder) => TOXIC_GAS.test(cardAbilityText(holder)) && !legacyPowerStopped(holder));
-}
-
-/**
  * "Each Pokémon … has no Abilities" (design 034 slice 3): true when an in-play
  * source suppresses `card`'s Abilities. Sources on either side are scanned;
  * holder-position conditions fail closed, Ancient Traits are exempt (D72), and
@@ -1645,11 +1586,38 @@ export function isAbilitySuppressed(card, ctx = {}) {
   if (ctx.powersOff && (card.abilities || []).some((a) => /power/i.test(String(a?.type || '')))) return true;
   // An activated Power's printed condition is its activation gate (abilityActivationBlockReason).
   if (legacyPowerStopped(card) && !isActivatedAbility(card)) return true;
-  if (toxicGasIgnores(card, ctx)) return true;
+  // Muk Toxic Gas [Fossil 13]: "Ignore all Pokémon Powers other than Toxic Gases." A working Toxic
+  // Gas in play on either side suppresses `card`'s Power unless that Power is itself a Toxic Gas.
+  // The printed kind is the only mark of a Pokémon Power: the WotC texts carry none.
+  const powerEntries = Array.isArray(card.abilities) ? card.abilities : card.ability ? [card.ability] : [];
+  if (powerEntries.some((entry) => /pok[eé]mon power/i.test(String(entry?.type || ''))) && !TOXIC_GAS.test(cardAbilityText(card))) {
+    const gasHolders = dedupe([
+      ...inPlayViews(ctx.sideCards),
+      ...inPlayViews(ctx.opponentSideCards),
+      ...inPlayViews(ctx.inPlayCards),
+    ]);
+    if (gasHolders.some((holder) => TOXIC_GAS.test(cardAbilityText(holder)) && !legacyPowerStopped(holder))) return true;
+  }
   // The marker binds the Defending Pokémon: it lapses once the card leaves the Active Spot.
   const actives = [...(ctx.sideActive || []), ...(ctx.opponentActive || [])];
   const stillActive = actives.some((c) => c.instanceId === card.instanceId || c.instanceId === card.attachedTo);
-  if (stillActive && attackLockedAbility(card, ctx.turnNumber)) return true;
+  // Shiftry Seal Off ("The Defending Pokémon can't use any Poké-Powers or Poké-Bodies during your
+  // opponent's next turn"): a live `abilityLock` marker covering this card's ability kind also
+  // silences its passive Poké-Body. Without a turn number the window cannot be read: no lock.
+  if (stillActive && typeof ctx.turnNumber === 'number') {
+    const kinds = (card.abilities || []).map((a) => {
+      const type = String(a?.type || '').toLowerCase();
+      return /body/.test(type) ? 'body' : /power/.test(type) ? 'power' : 'ability';
+    });
+    const locked = (card.attackMarkers || []).some(
+      (m) =>
+        m.kind === 'abilityLock' &&
+        (m.fromTurn ?? 0) <= ctx.turnNumber &&
+        ctx.turnNumber <= (m.untilTurn ?? 0) &&
+        (m.abilityKinds || []).some((kind) => kinds.includes(kind))
+    );
+    if (locked) return true;
+  }
   const sources = dedupe([
     ...inPlayViews(ctx.sideCards),
     ...inPlayViews(ctx.opponentSideCards),
@@ -1661,7 +1629,17 @@ export function isAbilitySuppressed(card, ctx = {}) {
     if (isAncientTraitAbility(holder)) continue;
     if (!holderPositionMet(t, holder, ctx)) continue;
     if (!suppressionTargets(t, holder, card, ctx)) continue;
-    if (selfExemptFromSuppression(t, holder, card)) continue;
+    // "except for <AbilityName>" exempts the holder itself; other exceptions filter targets.
+    const exemptClause = t.match(/except for ([^.]+)/)?.[1].trim();
+    if (
+      exemptClause !== undefined &&
+      !/[{\u007b]/.test(exemptClause) &&
+      !/pok[eé]mon/.test(exemptClause) &&
+      !/rule box/.test(exemptClause) &&
+      sameCard(holder, card)
+    ) {
+      continue;
+    }
     if (
       /requires the pok[eé]mon using it to knock out itself/.test(t) &&
       !SELF_KO_ABILITY.test(cardAbilityText(card))
@@ -1707,7 +1685,7 @@ export function abilityActivationBlockReason(card, ctx = {}) {
   if (isAbilitySuppressed(card, ctx)) {
     return "This Pokémon's Ability is suppressed.";
   }
-  if (requiresKoOnOpponentTurn(card) && !koedLastOppTurn) {
+  if (/knocked out during your opponent.s last turn/.test(cardAbilityText(card)) && !koedLastOppTurn) {
     return "None of your Pokémon were Knocked Out during your opponent's last turn.";
   }
   if (rulesEnabled && zone !== 'active' && requiresActiveSpot(card)) {
@@ -1718,11 +1696,23 @@ export function abilityActivationBlockReason(card, ctx = {}) {
       ? 'This ability can only be used while the Pokémon is in play.'
       : 'This ability can only be used from your hand.';
   }
-  if (rulesEnabled && zone !== 'bench' && requiresBenchSpot(card)) {
+  // Marshadow Resetting Hole: "if this Pokémon is on your Bench, you may …".
+  // DP Poké-Powers name the holder: "if Unown Q is on your Bench" (Majestic Dawn 49).
+  const benchText = cardAbilityText(card);
+  const benchName = String(card?.name ?? '')
+    .toLowerCase()
+    .replace(/[\u2018\u2019]/g, "'")
+    .trim();
+  if (
+    rulesEnabled &&
+    zone !== 'bench' &&
+    (/if this pok[eé]mon is on your bench\b/.test(benchText) ||
+      (Boolean(benchName) && benchText.includes(`if ${benchName} is on your bench`)))
+  ) {
     return 'This ability can only be used from the Bench.';
   }
   // Turn 1 is the first player's first turn and turn 2 the second player's (reduce.mjs).
-  if (rulesEnabled && requiresFirstTurn(card) && turnNumber > 2) {
+  if (rulesEnabled && /once during your first turn\b/.test(cardAbilityText(card)) && turnNumber > 2) {
     return 'This ability can only be used during your first turn.';
   }
   // "If you have any {R} Mega Evolution Pokémon ex in play, you may use this Ability"
@@ -1760,7 +1750,10 @@ export function abilityActivationBlockReason(card, ctx = {}) {
   }
   // Legacy powers are off while the holder has the printed Special Conditions. Callers
   // without `holderConditions` (presence-only pickers) fail open.
-  const restriction = powerConditionRestriction(card);
+  const restrictionMatch = cardAbilityText(card).match(
+    /power can't be used if [\s\S]*?(asleep, confused, or paralyzed|affected by a special condition)/
+  );
+  const restriction = restrictionMatch ? (restrictionMatch[1].startsWith('asleep') ? 'rotation' : 'any') : null;
   const conditions = ctx.holderConditions || [];
   if (
     rulesEnabled &&
@@ -1795,7 +1788,10 @@ export function abilityActivationBlockReason(card, ctx = {}) {
   // (design 034 slice 4b). A caller without the stamp (presence-only pickers,
   // oracle rows that place cards directly in the Active) fails OPEN — only a
   // *stale* stamp is rejected.
-  if (rulesEnabled && isOnPromotionTrigger(card)) {
+  // "Once during your turn, when this Pokémon moves from your Bench to the Active
+  // Spot, …" — the parse step that marks a Bench→Active trigger.
+  const promotionText = cardAbilityText(card);
+  if (rulesEnabled && promotionText && parseAbility(promotionText).some((s) => s.type === 'onPromotionAbility')) {
     // Weavile Assaulting Hunt (customhb): only the Pokémon that moved into the Active Spot.
     if (zone !== 'active') return 'This ability can only be used the turn this Pokémon moved to the Active Spot.';
     if (
@@ -1834,32 +1830,7 @@ function requiredInPlayDescriptor(card) {
 
 const EXACT_SAME_NAME = /if you have exactly (\d+) pok[eé]mon with the same name in play, you may/;
 
-// "Once during your turn, when this Pokémon moves from your Bench to the Active
-// Spot, …" — the parse step that marks a Bench→Active trigger.
-function isOnPromotionTrigger(card) {
-  const text = cardAbilityText(card);
-  if (!text) return false;
-  return parseAbility(text).some((s) => s.type === 'onPromotionAbility');
-}
-
 // --- play / evolve / retreat / counter locks -----------------------------
-
-/** Trainer/Pokémon categories a play lock can name, read off the played card. */
-function playableCategories(card) {
-  if (!card) return [];
-  const kind = lower(
-    `${card.type || ''} ${card.supertype || ''} ${card.trainerType || ''} ` +
-      `${Array.isArray(card.subtypes) ? card.subtypes.join(' ') : card.subtypes || ''}`
-  );
-  const out = [];
-  if (isPokemon(card)) out.push('Pokémon');
-  if (/stadium/.test(kind)) out.push('Stadium');
-  else if (/supporter/.test(kind)) out.push('Supporter');
-  else if (/tool/.test(kind)) out.push('Pokémon Tool');
-  else if (/item/.test(kind) || /trainer/.test(kind)) out.push('Item');
-  if (/ace spec/.test(kind)) out.push('ACE SPEC');
-  return out;
-}
 
 const PLAY_LOCK_CLAUSE = /can'?t play [^.]*from (?:his or her|their) hand/;
 // A lock on "Trainer cards" (Dark Vileplume Hay Fever) covers every Trainer kind.
@@ -1875,7 +1846,19 @@ const EACH_PLAYER_LOCK =
  * "except for Team Rocket's Pokémon" clauses.
  */
 export function abilityPlayLocks(card, ctx = {}) {
-  const categories = playableCategories(card);
+  if (!card) return null;
+  // Trainer/Pokémon categories a play lock can name, read off the played card.
+  const kind = lower(
+    `${card.type || ''} ${card.supertype || ''} ${card.trainerType || ''} ` +
+      `${Array.isArray(card.subtypes) ? card.subtypes.join(' ') : card.subtypes || ''}`
+  );
+  const categories = [];
+  if (isPokemon(card)) categories.push('Pokémon');
+  if (/stadium/.test(kind)) categories.push('Stadium');
+  else if (/supporter/.test(kind)) categories.push('Supporter');
+  else if (/tool/.test(kind)) categories.push('Pokémon Tool');
+  else if (/item/.test(kind) || /trainer/.test(kind)) categories.push('Item');
+  if (/ace spec/.test(kind)) categories.push('ACE SPEC');
   if (categories.length === 0) return null;
   const groups = [
     { cards: opponentInPlay(ctx), own: false },
