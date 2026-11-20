@@ -8,7 +8,7 @@ import { removeWhen, spawnOverlay } from '../../image-logic/mat-fx.mjs';
 import { playCanvasStage } from './canvas-stage.js';
 import { DEVOLVE_SCENE_MS, buildDevolveScene, devolveOps } from './devolve-scene.mjs';
 import { EVOLVE_SCENE_MS, EVOLVE_STAGE, buildEvolveScene, evolveOps } from './evolve-scene.mjs';
-import { createDrawState, drawTcglOps, preloadTcglTextures } from './tcgl-canvas.js';
+import { drawTcglOps, preloadTcglTextures } from './tcgl-canvas.js';
 import { CARD_UNITS } from './tcgl-fx.mjs';
 
 const BACKSTOP_PAD_MS = 400;
@@ -23,7 +23,8 @@ function playScene(rect, turn, { className, durationMs, build, opsAt }) {
   // The opponent's board is turned 180°; the effect turns with its card.
   if (turn) host.style.transform = `rotate(${turn}deg)`;
   const scene = build(Math.floor(Math.random() * 1e6));
-  const state = createDrawState();
+  // Per-play caches (tinted sprites, scratch buffers, colour rows).
+  const state = { tints: new Map(), pool: new Map(), luts: new Map(), ribbon: null };
   const size = rect.height * EVOLVE_STAGE;
   const view = { cx: size / 2, cy: size / 2, unit: rect.height / CARD_UNITS, size, cardW: rect.width, cardH: rect.height };
   const clock = playCanvasStage(host, {

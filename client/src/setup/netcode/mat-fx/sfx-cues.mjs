@@ -234,15 +234,13 @@ function placePlays(plan) {
   return [[plan.user === 'opp' ? 'opp-place-active' : 'place-active-opening', 0]];
 }
 
-/** The attack's type key; unknown or missing type is colorless (Addendum A). */
-const attackTypeKey = (type) => POKEMON_TYPE_KEYS[normalizeEnergyType(type)] ?? 'colorless';
-
 // Addendum A: the sized hit lands on contact; a signature adds its type's sting at the start; an
 // aura (zero damage) hits nothing, so its small hit plays unaligned.
 function attackPlays(plan) {
   const size = ATTACK_SIZE_FOR_TIER[plan?.attackTier];
   if (!size) return [];
-  const type = attackTypeKey(plan.attackType);
+  // Unknown or missing type is colorless.
+  const type = POKEMON_TYPE_KEYS[normalizeEnergyType(plan.attackType)] ?? 'colorless';
   const hit = `attack-${type}-${size}`;
   if (plan.attackTier === 'aura') return [[hit, 0]];
   const contact = Number.isFinite(plan.contactMs) && plan.contactMs >= 0 ? plan.contactMs : 0;
