@@ -19,7 +19,7 @@
 // room inside the view (the sim mat's cards run to the table's side edges), its pieces move round to
 // the near shore. stadium-env-brooklet.mjs draws all of it. Pure: no three.js, no DOM.
 import { environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
-import { RISE_LEAN } from './stadium-env-spots.mjs';
+import { RISE_LEAN, spotHash } from './stadium-env-spots.mjs';
 import { measureAsset } from './stadium-kit-assets.mjs';
 import { clumpPieces } from './stadium-env-clumps.mjs';
 import { clumpAround } from './stadium-env-spots.mjs';
@@ -298,12 +298,6 @@ const smoothstep = (from, to, x) => {
 export const smin = (a, b, k) => {
   const h = Math.min(1, Math.max(0, 0.5 + (0.5 * (b - a)) / k));
   return b + (a - b) * h - k * h * (1 - h);
-};
-
-/** A repeatable 0..1 for a point, so picks never change between loads. */
-const spotHash = (x, y, salt = 0) => {
-  const value = Math.sin(x * 12.9898 + y * 78.233 + salt * 37.719) * 43758.5453;
-  return value - Math.floor(value);
 };
 
 /** Signed px from a rounded box `{ x0, y0, x1, y1, r }`, negative inside. */

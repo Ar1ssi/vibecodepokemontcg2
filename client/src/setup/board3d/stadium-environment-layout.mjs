@@ -388,7 +388,7 @@ export function lavaPath(layout, volcano, { slabs = [], flats = [] } = {}) {
   });
 }
 
-const cornersOf = (rect) => [
+export const cornersOf = (rect) => [
   [rect.x, rect.y],
   [rect.x + rect.w, rect.y],
   [rect.x, rect.y + rect.h],

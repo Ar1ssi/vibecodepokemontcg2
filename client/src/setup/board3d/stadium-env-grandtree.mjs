@@ -87,8 +87,7 @@ export function grandSpots(layout) {
   for (let k = 0; k < MAX_ROOTS; k += 1) {
     const angle = (k / MAX_ROOTS) * 2 * Math.PI + hash(x, k, 1) * 0.5;
     let length = (90 + 110 * hash(k, 3, 2)) * u;
-    const endAt = (len) => [x + Math.cos(angle) * (tree.foot + len), y + Math.sin(angle) * (tree.foot + len)];
-    while (length > 40 * u && !ctx.clear(...endAt(length), 14 * u, gap)) length -= 12 * u;
+    while (length > 40 * u && !ctx.clear(x + Math.cos(angle) * (tree.foot + length), y + Math.sin(angle) * (tree.foot + length), 14 * u, gap)) length -= 12 * u;
     roots.push({ angle, length, radius: (27 + 11 * hash(k, 3, 3)) * u, seed: hash(k, 3, 4) });
   }
   // The crown: balls on a dome over the top-left, kept clear of the cards (and the hand) seen from above.

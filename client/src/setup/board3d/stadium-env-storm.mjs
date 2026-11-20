@@ -72,13 +72,6 @@ const BOLT_POINTS = 16;
 const PAD_POST_PX = 46;
 const POLE_PX = 150;
 
-/** A signed distance in px from the clearing's edge at (x, y), negative on it (the shader's `clearingDistance`). */
-export const clearingWobble = (x, y) =>
-  0.5 +
-  0.3 * Math.sin(x * 0.021 + 1.3) * Math.sin(y * 0.017 + 0.4) +
-  0.2 * Math.sin((x + y) * 0.013 + 2.2) +
-  0.16 * Math.sin(x * 0.047 - y * 0.039 + 0.7);
-
 /**
  * One lightning bolt from `from` to `to` ([x, y, z]), jagged: each point pushed a little aside in the
  * plane and up and down, more in the middle, the whole arching up by `arch` px. Seeded, so it is the

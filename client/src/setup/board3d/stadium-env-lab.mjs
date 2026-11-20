@@ -24,7 +24,7 @@ import {
   TERRAIN_UNIFORMS,
   bakeLightFragment,
 } from './stadium-environment-glsl.mjs';
-import { arenaRects, craterEmblem, environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
+import { arenaRects, cornersOf, craterEmblem, environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
 import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
 import { createKitProps } from './stadium-kit.mjs';
 import { tableBounds } from './table-uv.mjs';
@@ -120,13 +120,6 @@ const STATUS_GREEN = [0.2, 1.1, 0.45, 2.0];
 const STATUS_AMBER = [1.2, 0.7, 0.12, 2.0];
 
 const isRect = (rect) => rect && [rect.x, rect.y, rect.w, rect.h].every(Number.isFinite) && rect.w > 0 && rect.h > 0;
-const cornersOf = (rect) => [
-  [rect.x, rect.y],
-  [rect.x + rect.w, rect.y],
-  [rect.x, rect.y + rect.h],
-  [rect.x + rect.w, rect.y + rect.h],
-];
-
 const smin = (a, b, k) => {
   const h = Math.max(k - Math.abs(a - b), 0) / k;
   return Math.min(a, b) - h * h * k * 0.25;

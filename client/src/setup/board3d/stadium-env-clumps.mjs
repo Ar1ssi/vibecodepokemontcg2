@@ -67,7 +67,6 @@ export function clumpPieces(area, { step, mix, satellites = null, fits, thick = 
   if (!area || !(area.w > 0 && area.h > 0) || !(step > 0) || !mix?.length || typeof fits !== 'function') return [];
   const pieces = [];
   const others = taken.map((spot) => ({ ...spot }));
-  const room = (x, y, reach) => others.every((spot) => Math.hypot(x - spot.x, y - spot.y) >= (spot.r + reach) * spacing);
   const tryPlace = (kind, x, y, share, seed, hero) => {
     const [low, high] = kind.size;
     const spread = Math.min(0.6, Math.max(0, kind.spread ?? 0));
@@ -75,7 +74,7 @@ export function clumpPieces(area, { step, mix, satellites = null, fits, thick = 
     const dims = measureAsset(kind.asset, { ...(kind.options ?? {}), size });
     const lean = pieceLean(x, y, Math.min(0.5, kind.lean ?? 0), salt);
     const reach = dims.reach + (lean ? dims.height * Math.sin(Math.hypot(lean[0], lean[1])) : 0);
-    if (!fits(x, y, reach, dims.height) || !room(x, y, reach)) return null;
+    if (!fits(x, y, reach, dims.height) || !others.every((spot) => Math.hypot(x - spot.x, y - spot.y) >= (spot.r + reach) * spacing)) return null;
     const piece = { asset: kind.asset, x, y, size, seed, yaw: seed * 2 * Math.PI, lean, reach, height: dims.height, hero, options: kind.options ?? {} };
     pieces.push(piece);
     others.push({ x, y, r: reach });

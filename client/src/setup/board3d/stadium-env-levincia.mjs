@@ -34,6 +34,7 @@ import {
 import { environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
 import { WATER as WATER_KIT } from './stadium-env-ground.mjs';
 import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
+import { hash } from './stadium-env-spots.mjs';
 import { createKitProps } from './stadium-kit.mjs';
 import { tableBounds } from './table-uv.mjs';
 
@@ -53,12 +54,6 @@ export const MAX_TOWERS = 8;
 /** The bridges across the water, turned this far round from the table's width (rad). */
 export const BRIDGE_TURNS = Object.freeze([Math.PI / 4, (3 * Math.PI) / 4, (5 * Math.PI) / 4, (7 * Math.PI) / 4]);
 export const BRIDGE_WIDTH_PX = 52;
-
-/** A small deterministic 0..1 from three numbers. */
-const hash = (x, y, salt) => {
-  const s = Math.sin(x * 127.1 + y * 311.7 + salt * 74.7) * 43758.5453;
-  return s - Math.floor(s);
-};
 
 /**
  * Levincia's layout: the stage (a circle round every card footprint, STAGE_MARGIN_PX clear), the
