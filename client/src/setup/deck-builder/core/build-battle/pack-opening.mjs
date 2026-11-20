@@ -295,7 +295,7 @@ export function openBox({ box, data, cards = [], setInfo = {}, rng }) {
 }
 
 // ── What the box holds ───────────────────────────────────────────────────────────────────────
-function withoutQty(card) {
+export function withoutQty(card) {
   const { qty: _qty, ...rest } = card;
   return rest;
 }

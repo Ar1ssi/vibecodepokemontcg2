@@ -5,6 +5,7 @@
 // sleeves.json and loads on demand (design 073 § D): until `loadSleeveCatalog()` resolves, the getters
 // below see an empty catalog.
 import { loadCatalog, loadedCatalog } from './catalog-loader.mjs';
+import { ownedFirst } from './coins.mjs';
 
 const CATALOG = 'sleeves';
 const tcglSleeves = () => loadedCatalog(CATALOG) ?? [];
@@ -29,12 +30,4 @@ export function filterSleevesByName(sleeves = [], term = '') {
   return sleeves.filter((sleeve) => String(sleeve.name || '').toLowerCase().includes(needle));
 }
 
-/**
- * The catalog with the ids the player owns first (design 057: the Elite Trainer Box collection),
- * each group in its original order. Items carry `id`; a missing or empty owned list keeps the order.
- */
-export function ownedFirst(items = [], ownedIds = []) {
-  const owned = new Set(ownedIds || []);
-  if (!owned.size) return [...items];
-  return [...items.filter((item) => owned.has(item.id)), ...items.filter((item) => !owned.has(item.id))];
-}
+export { ownedFirst };

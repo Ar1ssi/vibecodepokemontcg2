@@ -3,7 +3,7 @@
 // guarded, and a storage that throws means the collection lives in memory only.
 
 import { BASIC_ENERGY_LABELS } from '../build-battle/box-catalog.mjs';
-import { comparePoolEntries } from '../build-battle/pack-opening.mjs';
+import { comparePoolEntries, withoutQty } from '../build-battle/pack-opening.mjs';
 
 export const COLLECTION_STORAGE_KEY = 'ptcg-sim.collection.v1';
 const COLLECTION_VERSION = 1;
@@ -160,11 +160,6 @@ export function clearCollection(storage) {
 export function withFreshCollection(storage, mutate) {
   const collection = mutate(loadCollection(storage));
   return { collection, saved: saveCollection(storage, collection) };
-}
-
-function withoutQty(card) {
-  const { qty: _qty, ...rest } = card;
-  return rest;
 }
 
 /**
