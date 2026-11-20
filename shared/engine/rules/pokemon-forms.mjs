@@ -45,11 +45,6 @@ function lineOf(name) {
   return FORM_LINES[formSpecies(name)] || null;
 }
 
-function stageRank(stage) {
-  const rank = STAGE_RANK[String(stage || '').toLowerCase().replace(/[^a-z0-9]/g, '')];
-  return rank ?? null;
-}
-
 function indexFromEntry(line, description) {
   const text = String(description || '').replace(/’/g, "'").toLowerCase();
   if (!text.trim()) return null;
@@ -83,7 +78,7 @@ function formIndex(line, card) {
   if (byKey >= 0) return byKey;
   const byEntry = indexFromEntry(line, card?.description);
   if (byEntry != null) return byEntry;
-  const rank = stageRank(card?.stage);
+  const rank = STAGE_RANK[String(card?.stage || '').toLowerCase().replace(/[^a-z0-9]/g, '')] ?? null;
   return rank != null && rank < line.forms.length ? rank : null;
 }
 

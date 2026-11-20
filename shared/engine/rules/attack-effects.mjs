@@ -107,31 +107,6 @@ const TYPES = [
 ];
 const TYPE_RE = TYPES.join('|');
 
-// Detect a dual-status application: "now Asleep and Poisoned",
-// "is now Burned and Confused", etc. Returns the two status nouns or null.
-export function dualStatus(t) {
-  // The printed nouns may be quoted ("'Paralyzed' and 'Poisoned'") or bare; both apostrophes
-  // are optional (the old pattern required a closing one, so bare printings never matched).
-  const m = t.match(
-    /now\s+'?(asleep|paralyzed|poisoned|burned|confused)'?\s+and\s+'?(asleep|paralyzed|poisoned|burned|confused)'?/
-  );
-  if (m && m[1] !== m[2]) return [m[1], m[2]];
-  // Any "X and Y" pair (the nouns are explicit even when the "now" clause is phrased oddly).
-  const m2 = t.match(
-    /(asleep|paralyzed|poisoned|burned|confused)\s+and\s+(asleep|paralyzed|poisoned|burned|confused)/
-  );
-  return m2 && m2[1] !== m2[2] ? [m2[1], m2[2]] : null;
-}
-
-// Detect a self-status application: "This Pokémon is now Asleep."
-// (status applied to the attacker, not the opponent's Active).
-export function selfStatus(t) {
-  const m = t.match(
-    /this pok[ée]mon\s+is\s+now\s+(asleep|paralyzed|poisoned|burned|confused)/
-  );
-  return m ? m[1] : null;
-}
-
 // Whether the text *applies* a status (an application verb / "is now X"),
 // as opposed to merely referencing it inside a condition ("if … is Burned,
 // … more damage"). This is what lets conditional-damage win over status when
@@ -176,10 +151,23 @@ export function classifyAttackEffect(attack) {
   }
   const t = text;
 
-  // Dual-status application (two statuses at once) — most specific status form.
-  if (dualStatus(t)) return 'dual-status';
-  // Self-status application (status on the attacker, not the opponent).
-  if (selfStatus(t)) return 'self-status';
+  // Dual-status application (two statuses at once) — most specific status form: "now Asleep and
+  // Poisoned", "is now Burned and Confused". The printed nouns may be quoted ("'Paralyzed' and
+  // 'Poisoned'") or bare; both apostrophes are optional (the old pattern required a closing one,
+  // so bare printings never matched).
+  const dualNow = t.match(
+    /now\s+'?(asleep|paralyzed|poisoned|burned|confused)'?\s+and\s+'?(asleep|paralyzed|poisoned|burned|confused)'?/
+  );
+  // Any "X and Y" pair (the nouns are explicit even when the "now" clause is phrased oddly).
+  const dualPair = t.match(
+    /(asleep|paralyzed|poisoned|burned|confused)\s+and\s+(asleep|paralyzed|poisoned|burned|confused)/
+  );
+  if ((dualNow && dualNow[1] !== dualNow[2]) || (dualPair && dualPair[1] !== dualPair[2]))
+    return 'dual-status';
+  // Self-status application: "This Pokémon is now Asleep." (status on the attacker, not the
+  // opponent's Active).
+  if (/this pok[ée]mon\s+is\s+now\s+(asleep|paralyzed|poisoned|burned|confused)/.test(t))
+    return 'self-status';
 
   // Conditional / type-gated extra damage — BEFORE bare status so a status
   // noun inside the condition clause is not misfiled as a status application.

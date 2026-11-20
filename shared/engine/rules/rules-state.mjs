@@ -18,10 +18,7 @@
       expirePendingEffectsForTurnEnd,
       pendingCantAttack,
       pendingCantRetreat,
-      pendingCantPlayItem,
-      pendingCantPlaySupporter,
-      pendingCantEvolveFromHand,
-      pendingCantAttachEnergyFromHand,
+      liveEffects,
     } from './attack-pending-effects.mjs';
     
     export const RULES_STORAGE_KEY = 'ptcg-sim.rules-enforced.v1';
@@ -273,32 +270,6 @@
       }
     }
 
-    // Deterministic id resolution for the legacy sets we have a code→set-id
-    // table for: "TRR 32" is unambiguously ex7-32, no name search and no
-    // tiebreaking required. The table was hand-built for limitlesstcg's URL
-    // scheme and has never been verified card-by-card against TCGdex, so the
-    // id it produces is only a *candidate* — the fetched card's name has to
-    // match the board card's before we trust it. Returns the id, or null to
-    // tell the caller to fall back to the by-name search.
-    async function resolveSetCardId(card) {
-      for (const candidate of buildSetCardIdCandidates(card.set, card.number)) {
-        const detail = await fetchCardDetail(candidate);
-        if (!detail) continue;
-        if (normalizeCardName(detail.name) !== normalizeCardName(card.name)) continue;
-        return candidate;
-      }
-      return null;
-    }
-
-    function mapDetailAttacks(detailAttacks) {
-      return (detailAttacks || []).map((a) => ({
-        name: a.name,
-        cost: a.cost || [],
-        damage: parseDamage(a.damage),
-        text: a.effect || a.text || '',
-      }));
-    }
-
     // Damage-only labels ("0", "30+") are not effect text — treat as missing so
     // TCGdex enrichment is not skipped (Call for Family and other text effects).
     function isPlaceholderAttackText(text, damage) {
@@ -355,7 +326,6 @@
     // straight to the Bench and were refused as evolutions. Rebuild it from the chain:
     // no evolveFrom → Basic; otherwise one step past the pre-evolution's stage.
     const STAGE_AFTER = { basic: 'Stage1', stage1: 'Stage2' };
-    const collapseStageName = (stage) => String(stage || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
     export async function inferMissingStage(detail) {
       if (detail?.stage) return detail.stage;
@@ -370,7 +340,7 @@
       for (const summary of summaries.slice(0, 3)) {
         const pre = await fetchCardDetail(summary.id);
         if (!pre) continue;
-        const next = STAGE_AFTER[collapseStageName(pre.stage)];
+        const next = STAGE_AFTER[String(pre.stage || '').toLowerCase().replace(/[^a-z0-9]/g, '')];
         if (next) return next;
         if (!pre.stage) return pre.evolveFrom ? 'Stage2' : 'Stage1';
       }
@@ -384,11 +354,6 @@
       '30th-109': { stage: 'Stage2', evolveFrom: 'Shelgon' },
       '30th-156': { stage: 'Stage2', evolveFrom: 'Shelgon' },
     };
-
-    export function withPrintedStageFix(detail) {
-      const fix = PRINTED_STAGE_FIXES[detail?.id];
-      return fix ? { ...detail, ...fix } : detail;
-    }
 
     // TCGdex carries the rule-box marker in `suffix` ("GX", "TAG TEAM-GX", "EX") and has
     // no `subtypes`; card-classify predicates read subtypes first.
@@ -407,27 +372,19 @@
           card[k] = v;
         }
       }
-      normalizeTrainerEnrichment(card);
-      addParadoxSubtype(card);
-    }
-
-    // TCGdex has no Ancient/Future field and a merge never replaces a present `subtypes`
-    // array, so the printing's tag is appended here (design 058).
-    function addParadoxSubtype(card) {
-      if (card.subtypes != null && !Array.isArray(card.subtypes)) return;
-      const subtypes = withParadoxSubtype(card.subtypes, card);
-      if (subtypes.length !== (card.subtypes?.length ?? 0)) card.subtypes = subtypes;
-    }
-
-    /** TCGdex stores Trainer/Stadium/Tool text in `effect`; parsers read `text`. */
-    function normalizeTrainerEnrichment(card) {
-      const tt = String(card?.trainerType || '').trim();
-      if (!tt && !card?.effect) return;
+      // TCGdex stores Trainer/Stadium/Tool text in `effect`; parsers read `text`.
+      const tt = String(card.trainerType || '').trim();
       if (!card.text && card.effect) {
         card.text = card.effect;
       }
       if (tt && (!Array.isArray(card.subtypes) || card.subtypes.length === 0)) {
         card.subtypes = [tt];
+      }
+      // TCGdex has no Ancient/Future field and a merge never replaces a present `subtypes`
+      // array, so the printing's tag is appended here (design 058).
+      if (card.subtypes == null || Array.isArray(card.subtypes)) {
+        const subtypes = withParadoxSubtype(card.subtypes, card);
+        if (subtypes.length !== (card.subtypes?.length ?? 0)) card.subtypes = subtypes;
       }
     }
 
@@ -446,9 +403,20 @@
         // Zone cards arrive without an id. Prefer the deterministic
         // (set code, collector number) → id mapping; only guess by name if
         // that isn't available or doesn't check out.
+        // Deterministic id resolution for the legacy sets we have a code→set-id
+        // table for: "TRR 32" is unambiguously ex7-32, no name search and no
+        // tiebreaking required. The table was hand-built for limitlesstcg's URL
+        // scheme and has never been verified card-by-card against TCGdex, so the
+        // id it produces is only a *candidate* — the fetched card's name has to
+        // match the board card's before we trust it.
         try {
-          const setId = await resolveSetCardId(card);
-          if (setId != null) card.id = setId;
+          for (const candidate of buildSetCardIdCandidates(card.set, card.number)) {
+            const detail = await fetchCardDetail(candidate);
+            if (!detail) continue;
+            if (normalizeCardName(detail.name) !== normalizeCardName(card.name)) continue;
+            card.id = candidate;
+            break;
+          }
         } catch {
           /* fall through to the by-name search */
         }
@@ -499,7 +467,8 @@
       try {
         const fetched = await fetchCardDetail(card.id);
         if (!fetched) throw new Error(`no detail for ${card.id}`);
-        const detail = withPrintedStageFix(fetched);
+        const fix = PRINTED_STAGE_FIXES[fetched.id];
+        const detail = fix ? { ...fetched, ...fix } : fetched;
         const form = pokemonFormKey(detail);
         const data = {
           hp: detail.hp ? Number(detail.hp) : null,
@@ -507,7 +476,12 @@
           weakness: parseTypeValue(detail.weaknesses?.[0]),
           resistance: parseTypeValue(detail.resistances?.[0]),
           retreatCost: parseRetreatCost(detail),
-          attacks: mapDetailAttacks(detail.attacks),
+          attacks: (detail.attacks || []).map((a) => ({
+            name: a.name,
+            cost: a.cost || [],
+            damage: parseDamage(a.damage),
+            text: a.effect || a.text || '',
+          })),
           stage: (await inferMissingStage(detail)) || null,
           evolvesFrom: detail.evolvesFrom || detail.evolveFrom || null,
           // Zygarde's forms play as different Pokémon (pokemon-forms.mjs); read off the Pokédex entry.
@@ -803,13 +777,6 @@
       if (rulesState.flags[player]) rulesState.flags[player].attackerAttacked = true;
       rulesState.phase = 'attack'; // attacking ends the turn (auto)
     }
-    export function markEvolved(player, cardName) {
-      const f = rulesState.flags[player];
-      if (f) f.evolved[cardName] = true;
-    }
-    export function markPrizeTaken(player) {
-      // prize-taking after a KO doesn't change phase; just tracked
-    }
     
     // ── action gating ────────────────────────────────────────────────────
     // Every free-form sim action flows through here when rules are enabled.
@@ -869,7 +836,7 @@
           // from your opponent's hand to the Defending Pokémon"), so a Bench
           // target stays legal. Callers without a target keep the safe block.
           if (
-            pendingCantAttachEnergyFromHand(S, user) &&
+            liveEffects(S, user).some((e) => e.kind === 'cant-attach-energy-from-hand') &&
             targetZoneId !== 'bench'
           ) {
             return { allowed: false, reason: "Energy can't be attached from hand to the Defending Pokémon (attack effect)." };
@@ -881,14 +848,14 @@
           if (S.flags[user]?.supporterPlayed) {
             return { allowed: false, reason: 'You already played a Supporter this turn (one per turn).' };
           }
-          if (pendingCantPlaySupporter(S, user)) {
+          if (liveEffects(S, user).some((e) => e.kind === 'cant-play-supporter')) {
             return { allowed: false, reason: "You can't play Supporter cards during this turn (attack effect)." };
           }
           return { allowed: true };
 
         case 'playItem':
           if (!isYourTurn) return { allowed: false, reason: "It's not your turn." };
-          if (pendingCantPlayItem(S, user)) {
+          if (liveEffects(S, user).some((e) => e.kind === 'cant-play-item')) {
             return { allowed: false, reason: "You can't play Item cards during this turn (attack effect)." };
           }
           return { allowed: true };
@@ -898,7 +865,7 @@
           if (S.turnNumber <= 1 || (S.playerTurnCount && S.playerTurnCount[user] <= 1)) {
             return { allowed: false, reason: "Can't evolve on the first turn." };
           }
-          if (pendingCantEvolveFromHand(S, user)) {
+          if (liveEffects(S, user).some((e) => e.kind === 'cant-evolve-from-hand')) {
             return { allowed: false, reason: "You can't play Pokémon from your hand to evolve (attack effect)." };
           }
           return { allowed: true };
@@ -934,8 +901,6 @@
       }
     }
     
-    function flow() { return false; }
-    
     // Gate for MANUAL (button/keybind/drag) deck & hand<->deck actions.
     // Parsed card-effect flows (setup draws, Iono, stadium effects, etc.) call
     // the shared action functions directly and never pass through here.
@@ -966,10 +931,6 @@
         default:
           return { allowed: true };
       }
-    }
-    
-    export function isRulesEnabled() {
-      return rulesState.enabled;
     }
     
     // persistence for the toggle

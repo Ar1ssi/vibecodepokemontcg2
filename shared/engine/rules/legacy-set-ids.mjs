@@ -127,7 +127,7 @@ export const LEGACY_SET_CODE_TO_TCGDEX_ID = {
 // Limitless / PTCGL short codes for Scarlet & Violet onward (and Mega
 // Evolution). Collector numbers repeat across sets — "24" alone cannot
 // distinguish Phantasmal Flames Piloswine (me02-024) from Skyridge Piloswine
-// (ecard3-24). Pair the short code with the number via buildSetCardId().
+// (ecard3-24). Pair the short code with the number via buildLegacyCardId().
 export const MODERN_SET_CODE_TO_TCGDEX_ID = {
   // Mega Evolution era (keep in sync with scripts/generate-starter-decks.mjs SET_MAP)
   MEG: 'me01',
@@ -256,10 +256,6 @@ export function buildPreferredCardId(setCode, number) {
     if (padded) return padded;
   }
   return candidates[0];
-}
-
-export function buildSetCardId(setCode, number) {
-  return buildLegacyCardId(setCode, number);
 }
 
 // Pull a TCGdex card id out of image URLs we already host on board cards.

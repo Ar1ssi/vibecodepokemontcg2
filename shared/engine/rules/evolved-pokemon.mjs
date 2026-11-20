@@ -112,7 +112,7 @@ export function evolvedView(zoneCards, root) {
   return view;
 }
 
-function isToolKind(card) {
+export function isToolKind(card) {
   const subtypes = Array.isArray(card?.subtypes) ? card.subtypes.join(' ') : card?.subtypes || '';
   return `${card?.type || ''} ${card?.trainerType || ''} ${subtypes}`.toLowerCase().includes('tool');
 }

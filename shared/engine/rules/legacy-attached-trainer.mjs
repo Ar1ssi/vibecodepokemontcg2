@@ -78,8 +78,6 @@ export function legacyAttachedTrainer(card) {
   };
 }
 
-const straightName = (name) => String(name || '').replace(/[‘’]/g, "'");
-
 /**
  * Whether the printed target allows `top` (the Pokémon's top card) in the given spot.
  * "with Sabrina in its name" matches the word in the Pokémon's name (Sabrina's Abra).
@@ -89,7 +87,7 @@ export function attachTargetAllowed(spec, { top, isActive }) {
   if (spec.activeOnly && !isActive) return false;
   if (!spec.nameIncludes) return true;
   const word = spec.nameIncludes.replace(/[^\p{L}\p{N}]/gu, '');
-  return new RegExp(`(^|[^\\p{L}])${word}(?=$|[^\\p{L}])`, 'iu').test(straightName(top.name));
+  return new RegExp(`(^|[^\\p{L}])${word}(?=$|[^\\p{L}])`, 'iu').test(String(top.name || '').replace(/[‘’]/g, "'"));
 }
 
 /** Attach-Trainers on the Pokémon whose root is `root`, each with its spec. */
