@@ -150,12 +150,22 @@ async function main() {
   const db = new sqlite3.Database(dbFilePath);
   let isDatabaseCapacityReached = false;
 
-  // Perform size check periodically (async stat to avoid blocking the event loop)
+  // Check database size (async to avoid blocking the event loop)
+  const checkDatabaseSizeGB = async () => {
+    try {
+      const stats = await fs.promises.stat(dbFilePath);
+      const fileSizeInBytes = stats.size;
+      return fileSizeInBytes / (1024 * 1024 * 1024); // Convert bytes to gigabytes
+    } catch {
+      return 0; // File may not exist yet
+    }
+  };
+
+  // Perform size check periodically
   setInterval(
     async () => {
-      // The file may not exist yet
-      const stats = await fs.promises.stat(dbFilePath).catch(() => null);
-      if (stats && stats.size / (1024 * 1024 * 1024) > maxSizeGB) {
+      const currentSize = await checkDatabaseSizeGB();
+      if (currentSize > maxSizeGB) {
         isDatabaseCapacityReached = true;
       }
     },

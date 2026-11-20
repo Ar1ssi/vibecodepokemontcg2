@@ -2967,6 +2967,21 @@ export const switchAbility = async (user, emit = true, targetCard = null) => {
 
   const switcherName = target.name || 'This Pokémon';
 
+  const benchMatchesSwitchFilter = async (card) => {
+    if (card.type !== 'Pokémon') return false;
+    await ensureCardData(card);
+    if (switchParsed.pokemonType && !pokemonMatchesType(card, switchParsed.pokemonType)) {
+      return false;
+    }
+    if (
+      switchParsed.exceptName &&
+      String(card.name || '').toLowerCase().includes(switchParsed.exceptName)
+    ) {
+      return false;
+    }
+    return true;
+  };
+
   const performSwap = async (benchCard) => {
     if (targetIsBench) {
       const idx = getZone(user, 'bench').array.indexOf(benchCard);
@@ -3003,18 +3018,9 @@ export const switchAbility = async (user, emit = true, targetCard = null) => {
     const candidates = [];
     for (let i = 0; i < bench.array.length; i++) {
       const card = bench.array[i];
-      if (card.type !== 'Pokémon') continue;
-      await ensureCardData(card);
-      if (switchParsed.pokemonType && !pokemonMatchesType(card, switchParsed.pokemonType)) {
-        continue;
+      if (await benchMatchesSwitchFilter(card)) {
+        candidates.push({ card, idx: i });
       }
-      if (
-        switchParsed.exceptName &&
-        String(card.name || '').toLowerCase().includes(switchParsed.exceptName)
-      ) {
-        continue;
-      }
-      candidates.push({ card, idx: i });
     }
     if (candidates.length === 0) {
       appendMessage(
@@ -3908,6 +3914,28 @@ export const moveDamageAbility = async (user, emit = true, targetCard = null, op
     return;
   }
 
+  const applySelfKoIfNeeded = async () => {
+    if (!damageStep?.selfKnockOut) return;
+    await ensureCardData(target);
+    const hp = effectiveHp(target.hp ?? 0, user, target);
+    const current =
+      parseInt(target.image?.damageCounter?.textContent || '0', 10) || 0;
+    const needed = Math.max(0, hp - current);
+    if (needed > 0) {
+      if (target.image?.damageCounter) {
+        updateDamageCounter(user, targetZone, targetIdx, current + needed, emit);
+      } else {
+        addDamageCounter(user, targetZone, targetIdx, needed, emit);
+      }
+    }
+    appendMessage(
+      user,
+      `💀 ${target.name} is Knocked Out from using its Ability!`,
+      'announcement',
+      false
+    );
+  };
+
   const applyDamage = async (pick) => {
     const { card, zone, idx } = pick;
     if (card.image?.damageCounter) {
@@ -3924,26 +3952,7 @@ export const moveDamageAbility = async (user, emit = true, targetCard = null, op
       'announcement',
       false
     );
-    if (damageStep?.selfKnockOut) {
-      await ensureCardData(target);
-      const hp = effectiveHp(target.hp ?? 0, user, target);
-      const current =
-        parseInt(target.image?.damageCounter?.textContent || '0', 10) || 0;
-      const needed = Math.max(0, hp - current);
-      if (needed > 0) {
-        if (target.image?.damageCounter) {
-          updateDamageCounter(user, targetZone, targetIdx, current + needed, emit);
-        } else {
-          addDamageCounter(user, targetZone, targetIdx, needed, emit);
-        }
-      }
-      appendMessage(
-        user,
-        `💀 ${target.name} is Knocked Out from using its Ability!`,
-        'announcement',
-        false
-      );
-    }
+    await applySelfKoIfNeeded();
   };
 
   if (candidates.length === 1) {
