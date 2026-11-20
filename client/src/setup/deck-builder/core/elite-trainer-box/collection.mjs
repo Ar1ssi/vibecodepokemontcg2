@@ -65,12 +65,10 @@ export function addProduct(collection, { etb, seed, packs = [], contents, now = 
   };
 }
 
-const isCount = (value) => Number.isInteger(value) && value > 0 && value <= MAX_COUNT;
-
 function parseCounts(value, isKey) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const entries = Object.entries(value);
-  if (!entries.every(([key, count]) => isKey(key) && isCount(count))) return null;
+  if (!entries.every(([key, count]) => isKey(key) && (Number.isInteger(count) && count > 0 && count <= MAX_COUNT))) return null;
   return Object.fromEntries(entries);
 }
 

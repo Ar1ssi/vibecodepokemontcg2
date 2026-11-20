@@ -252,106 +252,6 @@ export const stoneGirth = (t, stone) => {
   return base * (1 - 0.45 * cap ** 1.6);
 };
 
-/**
- * One standing stone, a menhir as in the art: a rough twelve-sided column, a little flattened and
- * wider at its foot, tapering to a blunt rounded top (on the taller ones set a little to one side);
- * chiselled faces, no two alike.
- */
-const standingStone = (props, stone) => {
-  // Design 084: a slab of five to seven faces, flatter than a column, laid in strata.
-  const sides = 5 + Math.floor(hashOf(stone.index * 7 + 9) * 3);
-  const levels = [0, 0.14, 0.28, 0.42, 0.56, 0.68, 0.78, 0.86, 0.93, 0.97, 1];
-  const side = hashOf(stone.index * 7 + 2) < 0.5 ? -1 : 1;
-  const tipShift = stone.height < 125 ? 0 : side * stone.radius * 0.35 * hashOf(stone.index * 7 + 3);
-  const rings = levels.map((t, level) => {
-    const taper = Math.max(stoneGirth(t, stone), level === levels.length - 1 ? 0.04 : 0.1);
-    const lean = stone.lean * t * stone.height;
-    const drift = tipShift * Math.max(0, (t - 0.5) / 0.5) ** 2;
-    return Array.from({ length: sides }, (_, k) => {
-      const angle = (k / sides) * 2 * Math.PI + stone.seed * 6;
-      // Chiselled: each face column its own depth, nicked a little from level to level.
-      const wobble = 0.9 + 0.16 * hashOf(stone.index * 31 + k * 7) + 0.05 * hashOf(stone.index * 17 + k * 3 + level * 5);
-      const r = stone.radius * taper * wobble;
-      // A flattened section turned by the stone's yaw.
-      const u = Math.cos(angle) * r + drift;
-      const v = Math.sin(angle) * r * stone.flat * 0.62;
-      const c = Math.cos(stone.yaw);
-      const sn = Math.sin(stone.yaw);
-      return [stone.x + u * c - v * sn + lean, stone.y + u * sn + v * c, stone.height * t];
-    });
-  });
-  const tone = 0.88 + 0.2 * stone.seed;
-  // Dark streaks run down some of its faces, as weathering down the art's stones; each course of the
-  // strata its own shade; the top courses lighter (design 084).
-  const colorOf = (k, level) => {
-    const streak = hashOf(stone.index * 19 + k * 5) < 0.3 ? 0.78 : 1.0;
-    const course = 0.9 + 0.16 * hashOf(stone.index * 13 + level * 3);
-    const t = levels[Math.min(level, levels.length - 1)];
-    const lift = 1 + 0.2 * Math.max(0, (t - 0.7) / 0.3);
-    const shade = tone * streak * course * lift;
-    return [GREY_STONE[0] * shade, GREY_STONE[1] * shade, GREY_STONE[2] * shade, GREY_STONE[3]];
-  };
-  // A broad top broken off at a slant (design 084), lighter as weathered stone's tops are: the top
-  // ring tipped about its middle before the faces are built, so they meet it.
-  const last = rings.length - 1;
-  const middle = rings[last].reduce((sum, p) => [sum[0] + p[0] / sides, sum[1] + p[1] / sides, sum[2] + p[2] / sides], [0, 0, 0]);
-  const slant = [Math.cos(stone.seed * 9), Math.sin(stone.seed * 9)];
-  rings[last] = rings[last].map((p) => [p[0], p[1], p[2] + ((p[0] - middle[0]) * slant[0] + (p[1] - middle[1]) * slant[1]) * 0.25]);
-  for (let level = 0; level < rings.length - 1; level += 1) {
-    for (let k = 0; k < sides; k += 1) {
-      const a = rings[level][k];
-      const b = rings[level][(k + 1) % sides];
-      props.quad(a, b, rings[level + 1][(k + 1) % sides], rings[level + 1][k], colorOf(k, level));
-    }
-  }
-  const color = colorOf(-1, levels.length - 1).map((v, k) => (k < 3 ? v * 1.08 : v));
-  for (let k = 0; k < sides; k += 1) props.quad(rings[last][k], rings[last][(k + 1) % sides], middle, middle, color);
-};
-
-/**
- * One rock spire, as the art's dark crags: a tower of ten-sided blocks stacked a little off-centre,
- * narrowing as it climbs, its top broken off at a slant. Faces flat, so they take the light as broad
- * planes; the blocks only gently uneven (rougher ones read as crumpled paper from above).
- */
-const rockSpire = (props, spire) => {
-  const sides = 10;
-  const levels = 7;
-  const c = Math.cos(spire.yaw);
-  const sn = Math.sin(spire.yaw);
-  let drift = [0, 0];
-  const rings = [];
-  for (let level = 0; level <= levels; level += 1) {
-    const t = level / levels;
-    const roll = (k) => hashOf(spire.index * 53 + level * 11 + k);
-    // Each block sits a little off the one below: the tower kinks as it climbs.
-    if (level > 0) drift = [drift[0] + (roll(1) - 0.5) * spire.radius * 0.12, drift[1] + (roll(2) - 0.5) * spire.radius * 0.12];
-    const girth = spire.radius * (1.0 - 0.7 * t ** 1.1) * (0.92 + 0.14 * roll(3));
-    // The top breaks off at a slant.
-    const slant = level === levels ? (roll(4) - 0.5) * spire.radius * 0.9 : 0;
-    rings.push(
-      Array.from({ length: sides }, (_, k) => {
-        const angle = (k / sides) * 2 * Math.PI + spire.seed * 6;
-        const r = girth * (0.9 + 0.18 * hashOf(spire.index * 31 + k * 7 + level * 3));
-        const u = Math.cos(angle) * r;
-        const v = Math.sin(angle) * r * spire.flat;
-        const x = u * c - v * sn + drift[0];
-        const y = u * sn + v * c + drift[1];
-        return [spire.x + x, spire.y + y, spire.height * t + (slant * x) / Math.max(spire.radius, 1)];
-      })
-    );
-  }
-  const tone = 0.82 + 0.3 * spire.seed;
-  const color = [SPIRE_STONE[0] * tone, SPIRE_STONE[1] * tone, SPIRE_STONE[2] * tone, SPIRE_STONE[3]];
-  for (let level = 0; level < levels; level += 1) {
-    for (let k = 0; k < sides; k += 1) {
-      props.quad(rings[level][k], rings[level][(k + 1) % sides], rings[level + 1][(k + 1) % sides], rings[level + 1][k], color);
-    }
-  }
-  const top = rings[levels];
-  const middle = top.reduce((sum, point) => [sum[0] + point[0] / sides, sum[1] + point[1] / sides, sum[2] + point[2] / sides], [0, 0, 0]);
-  for (let k = 0; k < sides; k += 1) props.quad(top[k], top[(k + 1) % sides], middle, middle, color);
-};
-
 /** One chain link: an oval loop of tube round its centre, along `axis`, its loop opening toward `up`. */
 const chainLink = (props, centre, axis, up, { length, width, thick }, color) => {
   const points = [];
@@ -377,23 +277,103 @@ export const RING_MOOD = Object.freeze({
 /** The standing stones, the spires, the ropes between them, and the chain. */
 export function ringProps(spots) {
   const props = createPropBuilder();
-  ringSolids(props, spots);
-  for (const piece of spots.rubble ?? []) placeAsset(props, piece.asset, { ...piece.options, x: piece.x, y: piece.y, size: piece.size, seed: piece.seed * 997, yaw: piece.yaw });
-  return props;
-}
-
-/** Design 083: the rubble's clumps (px): fallen stone in the stones' greys, dry grass, a few low stones. */
-const RUBBLE = Object.freeze([
-  { asset: 'boulder', weight: 2, size: [12, 22], options: { colors: { body: '#8c8478', light: '#b8b0a2', dark: '#5c564e' } } },
-  { asset: 'tallGrass', weight: 1.6, size: [12, 18], options: { blade: 14, colors: { grass: '#8a8a52', tip: '#cfc88a' } } },
-  { asset: 'ledgeRock', weight: 0.8, size: [14, 22], options: { colors: { body: '#837c70', top: '#aea697' } } },
-]);
-
-/** The standing stones and spires, the ropes wound round them and sagging between, the chain. */
-function ringSolids(props, { stones, allStones, chain = [], spires = [] }) {
+  // The standing stones and spires, the ropes wound round them and sagging between, the chain.
+  const { stones, allStones, chain = [], spires = [] } = spots;
   // Design 083: each stone its own shade of grey.
-  for (const stone of stones) props.tint(instanceTint(stone.seed * 991, 1.3), () => standingStone(props, stone));
-  for (const spire of spires) rockSpire(props, spire);
+  for (const stone of stones) props.tint(instanceTint(stone.seed * 991, 1.3), () => {
+    // One standing stone, a menhir as in the art: a rough twelve-sided column, a little flattened and
+    // wider at its foot, tapering to a blunt rounded top (on the taller ones set a little to one side);
+    // chiselled faces, no two alike.
+    // Design 084: a slab of five to seven faces, flatter than a column, laid in strata.
+    const sides = 5 + Math.floor(hashOf(stone.index * 7 + 9) * 3);
+    const levels = [0, 0.14, 0.28, 0.42, 0.56, 0.68, 0.78, 0.86, 0.93, 0.97, 1];
+    const side = hashOf(stone.index * 7 + 2) < 0.5 ? -1 : 1;
+    const tipShift = stone.height < 125 ? 0 : side * stone.radius * 0.35 * hashOf(stone.index * 7 + 3);
+    const rings = levels.map((t, level) => {
+      const taper = Math.max(stoneGirth(t, stone), level === levels.length - 1 ? 0.04 : 0.1);
+      const lean = stone.lean * t * stone.height;
+      const drift = tipShift * Math.max(0, (t - 0.5) / 0.5) ** 2;
+      return Array.from({ length: sides }, (_, k) => {
+        const angle = (k / sides) * 2 * Math.PI + stone.seed * 6;
+        // Chiselled: each face column its own depth, nicked a little from level to level.
+        const wobble = 0.9 + 0.16 * hashOf(stone.index * 31 + k * 7) + 0.05 * hashOf(stone.index * 17 + k * 3 + level * 5);
+        const r = stone.radius * taper * wobble;
+        // A flattened section turned by the stone's yaw.
+        const u = Math.cos(angle) * r + drift;
+        const v = Math.sin(angle) * r * stone.flat * 0.62;
+        const c = Math.cos(stone.yaw);
+        const sn = Math.sin(stone.yaw);
+        return [stone.x + u * c - v * sn + lean, stone.y + u * sn + v * c, stone.height * t];
+      });
+    });
+    const tone = 0.88 + 0.2 * stone.seed;
+    // Dark streaks run down some of its faces, as weathering down the art's stones; each course of the
+    // strata its own shade; the top courses lighter (design 084).
+    const colorOf = (k, level) => {
+      const streak = hashOf(stone.index * 19 + k * 5) < 0.3 ? 0.78 : 1.0;
+      const course = 0.9 + 0.16 * hashOf(stone.index * 13 + level * 3);
+      const t = levels[Math.min(level, levels.length - 1)];
+      const lift = 1 + 0.2 * Math.max(0, (t - 0.7) / 0.3);
+      const shade = tone * streak * course * lift;
+      return [GREY_STONE[0] * shade, GREY_STONE[1] * shade, GREY_STONE[2] * shade, GREY_STONE[3]];
+    };
+    // A broad top broken off at a slant (design 084), lighter as weathered stone's tops are: the top
+    // ring tipped about its middle before the faces are built, so they meet it.
+    const last = rings.length - 1;
+    const middle = rings[last].reduce((sum, p) => [sum[0] + p[0] / sides, sum[1] + p[1] / sides, sum[2] + p[2] / sides], [0, 0, 0]);
+    const slant = [Math.cos(stone.seed * 9), Math.sin(stone.seed * 9)];
+    rings[last] = rings[last].map((p) => [p[0], p[1], p[2] + ((p[0] - middle[0]) * slant[0] + (p[1] - middle[1]) * slant[1]) * 0.25]);
+    for (let level = 0; level < rings.length - 1; level += 1) {
+      for (let k = 0; k < sides; k += 1) {
+        const a = rings[level][k];
+        const b = rings[level][(k + 1) % sides];
+        props.quad(a, b, rings[level + 1][(k + 1) % sides], rings[level + 1][k], colorOf(k, level));
+      }
+    }
+    const color = colorOf(-1, levels.length - 1).map((v, k) => (k < 3 ? v * 1.08 : v));
+    for (let k = 0; k < sides; k += 1) props.quad(rings[last][k], rings[last][(k + 1) % sides], middle, middle, color);
+  });
+  for (const spire of spires) {
+    // One rock spire, as the art's dark crags: a tower of ten-sided blocks stacked a little off-centre,
+    // narrowing as it climbs, its top broken off at a slant. Faces flat, so they take the light as broad
+    // planes; the blocks only gently uneven (rougher ones read as crumpled paper from above).
+    const sides = 10;
+    const levels = 7;
+    const c = Math.cos(spire.yaw);
+    const sn = Math.sin(spire.yaw);
+    let drift = [0, 0];
+    const rings = [];
+    for (let level = 0; level <= levels; level += 1) {
+      const t = level / levels;
+      const roll = (k) => hashOf(spire.index * 53 + level * 11 + k);
+      // Each block sits a little off the one below: the tower kinks as it climbs.
+      if (level > 0) drift = [drift[0] + (roll(1) - 0.5) * spire.radius * 0.12, drift[1] + (roll(2) - 0.5) * spire.radius * 0.12];
+      const girth = spire.radius * (1.0 - 0.7 * t ** 1.1) * (0.92 + 0.14 * roll(3));
+      // The top breaks off at a slant.
+      const slant = level === levels ? (roll(4) - 0.5) * spire.radius * 0.9 : 0;
+      rings.push(
+        Array.from({ length: sides }, (_, k) => {
+          const angle = (k / sides) * 2 * Math.PI + spire.seed * 6;
+          const r = girth * (0.9 + 0.18 * hashOf(spire.index * 31 + k * 7 + level * 3));
+          const u = Math.cos(angle) * r;
+          const v = Math.sin(angle) * r * spire.flat;
+          const x = u * c - v * sn + drift[0];
+          const y = u * sn + v * c + drift[1];
+          return [spire.x + x, spire.y + y, spire.height * t + (slant * x) / Math.max(spire.radius, 1)];
+        })
+      );
+    }
+    const tone = 0.82 + 0.3 * spire.seed;
+    const color = [SPIRE_STONE[0] * tone, SPIRE_STONE[1] * tone, SPIRE_STONE[2] * tone, SPIRE_STONE[3]];
+    for (let level = 0; level < levels; level += 1) {
+      for (let k = 0; k < sides; k += 1) {
+        props.quad(rings[level][k], rings[level][(k + 1) % sides], rings[level + 1][(k + 1) % sides], rings[level + 1][k], color);
+      }
+    }
+    const top = rings[levels];
+    const middle = top.reduce((sum, point) => [sum[0] + point[0] / sides, sum[1] + point[1] / sides, sum[2] + point[2] / sides], [0, 0, 0]);
+    for (let k = 0; k < sides; k += 1) props.quad(top[k], top[(k + 1) % sides], middle, middle, color);
+  }
   // Ropes, as in the art: two strands, each wound round every stone in a band of turns and sagging
   // to the next stone where both stand in the scene.
   const ropeColor = (i) => (i % 2 ? ROPE_DARK : ROPE_LIGHT);
@@ -449,7 +429,16 @@ function ringSolids(props, { stones, allStones, chain = [], spires = [] }) {
     const up = [axis[1] * across[2] - axis[2] * across[1], axis[2] * across[0] - axis[0] * across[2], axis[0] * across[1] - axis[1] * across[0]];
     chainLink(props, centre, axis, i % 2 ? up : across, CHAIN, i % 3 ? RUST : RUST_DARK);
   });
+  for (const piece of spots.rubble ?? []) placeAsset(props, piece.asset, { ...piece.options, x: piece.x, y: piece.y, size: piece.size, seed: piece.seed * 997, yaw: piece.yaw });
+  return props;
 }
+
+/** Design 083: the rubble's clumps (px): fallen stone in the stones' greys, dry grass, a few low stones. */
+const RUBBLE = Object.freeze([
+  { asset: 'boulder', weight: 2, size: [12, 22], options: { colors: { body: '#8c8478', light: '#b8b0a2', dark: '#5c564e' } } },
+  { asset: 'tallGrass', weight: 1.6, size: [12, 18], options: { blade: 14, colors: { grass: '#8a8a52', tip: '#cfc88a' } } },
+  { asset: 'ledgeRock', weight: 0.8, size: [14, 22], options: { colors: { body: '#837c70', top: '#aea697' } } },
+]);
 
 const RING = /* glsl */ `
 // The arena: centre x, y and its paving's radius (ringSpots).

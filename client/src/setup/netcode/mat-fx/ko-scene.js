@@ -34,39 +34,9 @@ const STAR_COUNT = 11;
 // Each card of the stack rides this much higher than the one under it, so they never cut through each other.
 const STACK_LIFT_STEP = 0.12;
 
-function playStars(rect) {
-  const host = spawnOverlay({ rect, className: 'fx-overlay fx-ko-stars' });
-  const stars = burstParticles({
-    count: STAR_COUNT,
-    distance: rect.width * 1.15,
-    size: [rect.width * 0.24, rect.width * 0.4],
-    gravity: rect.width * 0.15,
-    maxDelay: 0.08,
-    seed: Math.floor(Math.random() * 1e6),
-  });
-  removeWhen(host, spawnParticles(host, stars, { className: 'fx-particle--star', duration: STAR_MS }), STAR_MS + BACKSTOP_PAD_MS);
-}
-
 /** Burns the knocked-out card's mesh by `dissolveAt(elapsedMs)` over `ms` (design 078). */
 function burnCard(instanceId, dissolveAt, ms) {
   getBoardScene()?.cardFx?.(instanceId, { at: (elapsed) => ({ dissolve: dissolveAt(elapsed) }), ms, cut: true });
-}
-
-/**
- * Reduced motion (design 078): no knock, no flight, no stars; the card's mesh holds still where
- * it stood and burns away, then the board shows it in the pile. False when the board has no mesh.
- */
-function playReducedBurn(ghost) {
-  const scene = getBoardScene();
-  if (!scene?.cardFx || !meshCanFly(ghost.instanceId)) return false;
-  const still = flightPoseFromTrack(ghost.rect, { rotate: ghost.turn || 0 }, 0, 0);
-  // Retained for the hold: the view has already buried the card, and it burns where it stood.
-  const retained = Boolean(scene.retainCard?.(ghost.instanceId));
-  const held = scene.tween(ghost.instanceId, () => still, KO_REDUCED_HOLD_MS, { still: true });
-  if (retained) held.then(() => scene.releaseCard?.(ghost.instanceId));
-  takeSlidePin(ghost.instanceId);
-  burnCard(ghost.instanceId, koReducedDissolveAt, KO_REDUCED_BURN_MS);
-  return true;
 }
 
 /**
@@ -79,7 +49,20 @@ function playReducedBurn(ghost) {
 export function playKnockoutScene(ghost, { reduced = false } = {}) {
   const rect = ghost?.rect;
   if (!rect || !(rect.width > 1) || !(rect.height > 1) || !ghost.src) return false;
-  if (reduced) return playReducedBurn(ghost);
+  if (reduced) {
+    // Reduced motion (design 078): no knock, no flight, no stars; the card's mesh holds still where
+    // it stood and burns away, then the board shows it in the pile. False when the board has no mesh.
+    const scene = getBoardScene();
+    if (!scene?.cardFx || !meshCanFly(ghost.instanceId)) return false;
+    const still = flightPoseFromTrack(ghost.rect, { rotate: ghost.turn || 0 }, 0, 0);
+    // Retained for the hold: the view has already buried the card, and it burns where it stood.
+    const retained = Boolean(scene.retainCard?.(ghost.instanceId));
+    const held = scene.tween(ghost.instanceId, () => still, KO_REDUCED_HOLD_MS, { still: true });
+    if (retained) held.then(() => scene.releaseCard?.(ghost.instanceId));
+    takeSlidePin(ghost.instanceId);
+    burnCard(ghost.instanceId, koReducedDissolveAt, KO_REDUCED_BURN_MS);
+    return true;
+  }
   const turn = ghost.turn || 0;
   const pile = pileOf(ghost.user, 'discard');
   // Away from the attacker: the opponent's card goes up the screen, yours down.
@@ -121,6 +104,15 @@ export function playKnockoutScene(ghost, { reduced = false } = {}) {
     }
     if (pile) playPileCatch(pile.rect, track.landsAtMs - 60);
   }
-  playStars(rect);
+  const host = spawnOverlay({ rect, className: 'fx-overlay fx-ko-stars' });
+  const stars = burstParticles({
+    count: STAR_COUNT,
+    distance: rect.width * 1.15,
+    size: [rect.width * 0.24, rect.width * 0.4],
+    gravity: rect.width * 0.15,
+    maxDelay: 0.08,
+    seed: Math.floor(Math.random() * 1e6),
+  });
+  removeWhen(host, spawnParticles(host, stars, { className: 'fx-particle--star', duration: STAR_MS }), STAR_MS + BACKSTOP_PAD_MS);
   return true;
 }

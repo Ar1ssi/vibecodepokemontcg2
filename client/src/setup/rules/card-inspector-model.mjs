@@ -175,16 +175,6 @@ const isBwXyEraSet = (set) =>
   BW_XY_PRINTED_CODES.has(String(set ?? '').trim().toUpperCase()) ||
   BW_XY_SET_ID.test(resolveTcgdexSetId(set) ?? '');
 
-function stadiumFrameKeyFor(set) {
-  const printed = String(set ?? '').trim().toUpperCase();
-  if (BW_XY_PRINTED_CODES.has(printed)) return 'stadium-modern';
-  const id = resolveTcgdexSetId(set) ?? '';
-  if (ECARD_SET_ID.test(id)) return 'stadium-ecard';
-  if (CLASSIC_SET_ID.test(id)) return 'stadium-classic';
-  if (MODERN_SET_ID.test(id)) return 'stadium-modern';
-  return 'default';
-}
-
 /** Left/right inset of a frame; a frame gives one `sideInsetPct` and may override the left. */
 const sideInsetsOf = (frame) => ({
   sideInsetLeftPct: frame.sideInsetLeftPct ?? frame.sideInsetPct,
@@ -194,7 +184,14 @@ const sideInsetsOf = (frame) => ({
 /** Which INSPECTOR_BANDS frame a card is printed in; `default` when no frame is known for it. */
 export function frameKeyFor(card) {
   if (isStadiumCard(card ?? {})) {
-    return stadiumFrameKeyFor(card?.set);
+    const set = card?.set;
+    const printed = String(set ?? '').trim().toUpperCase();
+    if (BW_XY_PRINTED_CODES.has(printed)) return 'stadium-modern';
+    const id = resolveTcgdexSetId(set) ?? '';
+    if (ECARD_SET_ID.test(id)) return 'stadium-ecard';
+    if (CLASSIC_SET_ID.test(id)) return 'stadium-classic';
+    if (MODERN_SET_ID.test(id)) return 'stadium-modern';
+    return 'default';
   }
   if (isModernMegaCard(card ?? {})) return 'mega-ex';
   if (!isBwXyEraSet(card?.set)) {
@@ -275,8 +272,6 @@ function retreatGateFor({ card, cost, energyTypes, user, zoneCards, benchCards }
   }
 }
 
-const supertypeOf = (card) => String(card?.supertype ?? '').trim();
-
 /**
  * A card the inspector can lay out as a Pokémon. Energy and Trainers are deliberately
  * excluded: they have no HP row, no attack box and no weakness strip, so the chrome would
@@ -286,7 +281,7 @@ export function isInspectablePokemon(card) {
   if (!card) return false;
   if (card.hp == null || card.hp === '') return false;
   if (!Number.isFinite(Number(card.hp))) return false;
-  const supertype = supertypeOf(card);
+  const supertype = String(card?.supertype ?? '').trim();
   if (supertype && !POKEMON_SUPERTYPES.includes(supertype)) return false;
   if (/energy|trainer|item|supporter|stadium/i.test(String(card.type ?? '')))
     return false;

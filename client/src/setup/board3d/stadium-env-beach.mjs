@@ -587,21 +587,20 @@ export function surfingBeachBoard({ three, material, terrainGrid, replaceGeometr
   // The sand first, so the sea under the beach fails the depth test early.
   sea.renderOrder = 1;
 
-  const setSpots = ({ shore, barAt, rocks }) => {
-    own.uShoreA.value.set(shore.a.x, shore.a.y);
-    own.uShoreB.value.set(shore.b.x, shore.b.y);
-    own.uShoreBend.value = shore.bend;
-    own.uBarAt.value = barAt;
-    own.uRocks.value.forEach((rock, i) => rock.set(rocks[i]?.x ?? 0, rocks[i]?.y ?? 0, rocks[i]?.r ?? 0, rocks[i]?.seed ?? 0));
-  };
-
   return {
     objects: [sand, sea, ...kit.objects],
     materials: [...Object.values(materials), ...kit.materials],
     bakeField: materials.bakeField,
     spots: (layout) => beachSpots(layout, environmentFootprints(layout)),
     apply(spots, bounds) {
-      if (spots) setSpots(spots);
+      if (spots) {
+        const { shore, barAt, rocks } = spots;
+        own.uShoreA.value.set(shore.a.x, shore.a.y);
+        own.uShoreB.value.set(shore.b.x, shore.b.y);
+        own.uShoreBend.value = shore.bend;
+        own.uBarAt.value = barAt;
+        own.uRocks.value.forEach((rock, i) => rock.set(rocks[i]?.x ?? 0, rocks[i]?.y ?? 0, rocks[i]?.r ?? 0, rocks[i]?.seed ?? 0));
+      }
       kit.set(spots ? beachProps(spots) : null);
       replaceGeometry(sand, terrainGrid(bounds));
       replaceGeometry(

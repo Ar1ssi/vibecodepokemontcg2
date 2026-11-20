@@ -451,21 +451,6 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
       return pool;
     }
 
-    // Energy check: does the attacker have enough attached energy for the cost?
-    // `attachedEnergies` entries may be plain type strings or `{ type, family }`
-    // objects (see `expandEnergyEntries`). The wildcard direction is one-way, per
-    // the real TCG rules: a Colorless cost symbol can be paid by any attached
-    // energy, but Colorless-*type* energy itself pays only Colorless cost symbols
-    // — it cannot cover a colored (e.g. Fire, Psychic) requirement. A 'Wildcard'
-    // pool entry (Prism/Stellar Energy) is the one genuine exception and pays any
-    // symbol, colored or Colorless.
-    // Pool tokens are plain type strings; a Holon Research Tower unit is "A|B"
-    // (satisfies either type, still one Energy). 'Wildcard' pays any symbol.
-    const dualMatches = (token, symbol) =>
-      typeof token === 'string' &&
-      token.includes('|') &&
-      token.split('|').includes(symbol);
-
     // The Darkness type is spelled 'Dark' by some Energy sources (a name guess, Ancient and
     // Obsidian Energy) and 'Darkness' by attack costs and the rest: one type when a cost is paid.
     const costType = (type) => (type === 'Dark' ? 'Darkness' : type);
@@ -488,7 +473,19 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
           else pool.pop(); // any single energy (including Wildcard/dual) pays a Colorless symbol
         } else {
           let idx = pool.indexOf(symbol);
-          if (idx === -1) idx = pool.findIndex((token) => dualMatches(token, symbol));
+          // Energy check: does the attacker have enough attached energy for the cost?
+          // `attachedEnergies` entries may be plain type strings or `{ type, family }`
+          // objects (see `expandEnergyEntries`). The wildcard direction is one-way, per
+          // the real TCG rules: a Colorless cost symbol can be paid by any attached
+          // energy, but Colorless-*type* energy itself pays only Colorless cost symbols
+          // — it cannot cover a colored (e.g. Fire, Psychic) requirement. A 'Wildcard'
+          // pool entry (Prism/Stellar Energy) is the one genuine exception and pays any
+          // symbol, colored or Colorless.
+          // Pool tokens are plain type strings; a Holon Research Tower unit is "A|B"
+          // (satisfies either type, still one Energy). 'Wildcard' pays any symbol.
+          if (idx === -1) idx = pool.findIndex((token) => typeof token === 'string' &&
+          token.includes('|') &&
+          token.split('|').includes(symbol));
           if (idx === -1) idx = pool.indexOf('Wildcard');
           if (idx === -1) return false;
           pool.splice(idx, 1);

@@ -208,9 +208,6 @@ const boardKeyOfName = (name) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
 
-const isHomebrew = (card) =>
-  card.set === HOMEBREW_SET || (typeof card.id === 'string' && card.id.startsWith(`${HOMEBREW_SET}-`));
-
 /**
  * The environment key for the Stadium in play: the board named after it, when the card is a
  * Homebrew one (by id `customhb-…` or by set). Null for any other Stadium, a Homebrew Stadium
@@ -219,7 +216,7 @@ const isHomebrew = (card) =>
  * @returns {string|null}
  */
 export function environmentKeyFor(card) {
-  if (!card || !isHomebrew(card)) return null;
+  if (!card || !(card.set === HOMEBREW_SET || (typeof card.id === 'string' && card.id.startsWith(`${HOMEBREW_SET}-`)))) return null;
   const key = boardKeyOfName(card.name);
   return ENVIRONMENT_KEY_SET.has(key) ? key : null;
 }
@@ -422,33 +419,6 @@ export function craterBowl(layout) {
 }
 
 /**
- * The largest circle near a recipe's angle, its centre between the crater wall's middle and the
- * foot, clear of every obstacle by PEAK_CARD_GAP_PX and at most PEAK_EDGE_OVERHANG of its radius
- * past a table edge; bigger wins, less turned from the recipe's angle and nearer its spot down the
- * slope wins ties. Null when no circle of PEAK_MIN_RADIUS fits.
- */
-const peakFor = (recipe, bowl, bounds, obstacles) => {
-  const preferred = bowl.rim + recipe.out * (bowl.foot - bowl.rim);
-  let best = null;
-  for (let turn = -PEAK_ANGLE_SPAN; turn <= PEAK_ANGLE_SPAN + 1e-9; turn += PEAK_ANGLE_STEP) {
-    const angle = recipe.angle + turn;
-    for (let out = bowl.rim - CRATER_WALL_RUN_PX / 2; out <= bowl.foot + 1e-9; out += PEAK_STEP_PX) {
-      const x = bowl.x + Math.cos(angle) * out;
-      const y = bowl.y + Math.sin(angle) * out;
-      const edge = Math.min(x - bounds.x, bounds.x + bounds.w - x, y - bounds.y, bounds.y + bounds.h - y);
-      if (edge <= 0) continue;
-      let clearance = Infinity;
-      for (const distanceTo of obstacles) clearance = Math.min(clearance, distanceTo(x, y));
-      const r = Math.min(PEAK_MAX_RADIUS, clearance - PEAK_CARD_GAP_PX, edge / (1 - PEAK_EDGE_OVERHANG));
-      if (r < PEAK_MIN_RADIUS) continue;
-      const score = r - 120 * Math.abs(turn) - 0.15 * Math.abs(out - preferred);
-      if (!best || score > best.score) best = { x, y, r, score };
-    }
-  }
-  return best && { x: best.x, y: best.y, r: best.r, h: Math.min(recipe.maxHeight, best.r * recipe.steepness) };
-};
-
-/**
  * Where a peak's ridge ends: round the mountain from its summit by the ridge's share of its radius,
  * shortened in tenths until the band RIDGE_HALF_WIDTH of the radius either side of it is clear of
  * every card footprint by PEAK_CARD_GAP_PX; the summit itself when no ridge fits.
@@ -492,7 +462,29 @@ export function mountainPeaks(layout, bowl) {
   const cards = [...slabs, ...flats].map((rect) => (x, y) => distanceToRect(x, y, rect));
   const obstacles = [...cards];
   for (const name of Object.keys(peaks)) {
-    const spot = peakFor(PEAK_RECIPES[name], bowl, bounds, obstacles);
+    // The largest circle near a recipe's angle, its centre between the crater wall's middle and the
+    // foot, clear of every obstacle by PEAK_CARD_GAP_PX and at most PEAK_EDGE_OVERHANG of its radius
+    // past a table edge; bigger wins, less turned from the recipe's angle and nearer its spot down the
+    // slope wins ties. Null when no circle of PEAK_MIN_RADIUS fits.
+    const recipe = PEAK_RECIPES[name];
+    const preferred = bowl.rim + recipe.out * (bowl.foot - bowl.rim);
+    let best = null;
+    for (let turn = -PEAK_ANGLE_SPAN; turn <= PEAK_ANGLE_SPAN + 1e-9; turn += PEAK_ANGLE_STEP) {
+      const angle = recipe.angle + turn;
+      for (let out = bowl.rim - CRATER_WALL_RUN_PX / 2; out <= bowl.foot + 1e-9; out += PEAK_STEP_PX) {
+        const x = bowl.x + Math.cos(angle) * out;
+        const y = bowl.y + Math.sin(angle) * out;
+        const edge = Math.min(x - bounds.x, bounds.x + bounds.w - x, y - bounds.y, bounds.y + bounds.h - y);
+        if (edge <= 0) continue;
+        let clearance = Infinity;
+        for (const distanceTo of obstacles) clearance = Math.min(clearance, distanceTo(x, y));
+        const r = Math.min(PEAK_MAX_RADIUS, clearance - PEAK_CARD_GAP_PX, edge / (1 - PEAK_EDGE_OVERHANG));
+        if (r < PEAK_MIN_RADIUS) continue;
+        const score = r - 120 * Math.abs(turn) - 0.15 * Math.abs(out - preferred);
+        if (!best || score > best.score) best = { x, y, r, score };
+      }
+    }
+    const spot = best && { x: best.x, y: best.y, r: best.r, h: Math.min(recipe.maxHeight, best.r * recipe.steepness) };
     if (!spot) continue;
     peaks[name] = { ...spot, ridge: ridgeEndFor(spot, PEAK_RIDGES[name], bowl, cards) };
     obstacles.push((x, y) => Math.hypot(x - spot.x, y - spot.y) - spot.r / 2 + PEAK_CARD_GAP_PX);

@@ -43,17 +43,6 @@ export function imageFileName(url) {
   return /\.[A-Za-z0-9]{2,4}$/.test(name) ? name : `${name}.png`;
 }
 
-const stripHtml = (html) =>
-  String(html ?? '')
-    .replace(/<style[\s\S]*?<\/style>/g, ' ')
-    .replace(/<script[\s\S]*?<\/script>/g, ' ')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(Number(d)))
-    .replace(/&amp;/g, '&')
-    .replace(/&[a-z]+;/gi, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
 /**
  * Parse Bulbapedia coin pages into `{ imageUrl, description, text }` entries.
  * Each coin is one `<table class="roundy">` block whose stripped text ends with
@@ -66,7 +55,15 @@ export function parseCoinTables(html) {
 
   const entries = [];
   for (const block of blocks) {
-    const text = stripHtml(block);
+    const text = String(block ?? '')
+      .replace(/<style[\s\S]*?<\/style>/g, ' ')
+      .replace(/<script[\s\S]*?<\/script>/g, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(Number(d)))
+      .replace(/&amp;/g, '&')
+      .replace(/&[a-z]+;/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
     const description = (text.match(/[Dd]escription:\s*([\s\S]*)$/) || [])[1]?.trim() ?? '';
     // A coin table always carries a Description; its scan usually says "Coin", but a
     // few (e.g. 2022_Q1_Stacking_Tins_Grookey.png) do not — fall back to the upload image.

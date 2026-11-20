@@ -11,19 +11,6 @@ export const RENUMBER_SET_ID = 'customhb';
 export const RENUMBER_DONE_KEY = 'ptcg-sim.customhb-renumber-fix.v1';
 export const RENUMBER_BACKUP_KEY = `${LIBRARY_STORAGE_KEY}.backup-customhb-renumber`;
 
-function candidatesFor(byName, name, data) {
-  let candidates = byName.get(name) || [];
-  if (candidates.length > 1 && data.hp != null) {
-    const sameHp = candidates.filter((card) => Number(card.hp) === Number(data.hp));
-    if (sameHp.length) candidates = sameHp;
-  }
-  if (candidates.length > 1 && Array.isArray(data.types) && data.types.length) {
-    const sameTypes = candidates.filter((card) => (card.types || []).join('/') === data.types.join('/'));
-    if (sameTypes.length) candidates = sameTypes;
-  }
-  return candidates;
-}
-
 /**
  * Points every deck entry of `setId` whose stored id no longer names a card of that name at the card that has the
  * name now. An entry still on the right card is left alone, and so is one that cannot be placed (the card is gone, or
@@ -55,7 +42,15 @@ export function remapRenumberedCards(library, setCards, setId = RENUMBER_SET_ID)
         const name = typeof data.name === 'string' ? data.name : cardName;
         if (byNumber.get(oldNumber)?.name === name) continue;
 
-        const candidates = candidatesFor(byName, name, data);
+        let candidates = byName.get(name) || [];
+        if (candidates.length > 1 && data.hp != null) {
+          const sameHp = candidates.filter((card) => Number(card.hp) === Number(data.hp));
+          if (sameHp.length) candidates = sameHp;
+        }
+        if (candidates.length > 1 && Array.isArray(data.types) && data.types.length) {
+          const sameTypes = candidates.filter((card) => (card.types || []).join('/') === data.types.join('/'));
+          if (sameTypes.length) candidates = sameTypes;
+        }
         if (candidates.length !== 1) {
           unplaced += 1;
           continue;

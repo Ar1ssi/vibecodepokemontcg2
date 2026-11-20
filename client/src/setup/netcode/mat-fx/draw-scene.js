@@ -24,8 +24,6 @@ const BACKSTOP_PAD_MS = 400;
 
 const usable = (r) => Boolean(r) && r.width >= 2 && r.height >= 2;
 
-const boardFrameRects = () => ['opp', 'self'].map(boardRect);
-
 /** The side's deck cover: its page rect and board turn, or null. */
 function deckOf(user) {
   const doc = docForSide(user, selfContainerDocument, oppContainerDocument);
@@ -36,12 +34,10 @@ function deckOf(user) {
   return usable(rect) ? { rect, turn: frameTurnOf(el) } : null;
 }
 
-// The node that stands for the card in the hand: its holo wrapper, else the <img>.
-const handNodeOf = (card) => card.wrapper ?? imageAnchor(card.image);
-
 /** A hand card's page rect and board turn (its holo wrapper when it has one), or null. */
 export function handSpotOf(card) {
-  const node = handNodeOf(card);
+  // The node that stands for the card in the hand: its holo wrapper, else the <img>.
+  const node = card.wrapper ?? imageAnchor(card.image);
   if (!node?.isConnected) return null;
   // The scene's projection, not the mirror <img> (synced only on a drawn frame).
   const projected = boardCardRect(Number(card.image?.dataset?.instanceId));
@@ -89,7 +85,7 @@ export function playDrawScene(user, cards, show) {
     cards.forEach(show);
     return 0;
   }
-  const slots = drawSpreadRects(cards.length, matCenter(boardFrameRects(), viewport), viewport);
+  const slots = drawSpreadRects(cards.length, matCenter(['opp', 'self'].map(boardRect), viewport), viewport);
   const deck = deckOf(user);
   let played = 0;
   cards.forEach((card, index) => {

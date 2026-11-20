@@ -235,16 +235,6 @@ import { DECK_FORMAT_TCG, isDeckFormat } from '../../../../../shared/engine/form
       return JSON.stringify(library);
     }
     
-    function isValidLibraryShape(value) {
-      return Boolean(
-        value &&
-          typeof value === 'object' &&
-          value.decks &&
-          typeof value.decks === 'object' &&
-          Array.isArray(value.order)
-      );
-    }
-    
     export function parseLibrary(json = '') {
       let parsed;
       try {
@@ -252,7 +242,12 @@ import { DECK_FORMAT_TCG, isDeckFormat } from '../../../../../shared/engine/form
       } catch {
         return createEmptyLibrary();
       }
-      if (!isValidLibraryShape(parsed)) return createEmptyLibrary();
+      const value = parsed;
+      if (!(value &&
+        typeof value === 'object' &&
+        value.decks &&
+        typeof value.decks === 'object' &&
+        Array.isArray(value.order))) return createEmptyLibrary();
     
       // Drop malformed entries and repair ordering so the library always renders.
       const decks = {};

@@ -41,33 +41,6 @@ const SIGN_FILL = 0.7;
 /** The jewel's height over the card, in card heights (the prefab's sign is 12.4 units on a 13-unit card). */
 const SIGN_HEIGHT = 0.95;
 
-/** A gem's shadow on the cloth under it, and the light it throws past its tip. */
-function gemGround(ctx, x, y, headingDeg, reach, width, rgb, alpha) {
-  const heading = headingDeg * DEG;
-  const cx = x + Math.cos(heading) * reach * 0.55;
-  const cy = y + Math.sin(heading) * reach * 0.55;
-  const radius = Math.max(reach * 0.6, width);
-  ctx.save();
-  const shade = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
-  shade.addColorStop(0, `rgba(4, 6, 18, ${(0.34 * alpha).toFixed(3)})`);
-  shade.addColorStop(1, 'rgba(4, 6, 18, 0)');
-  ctx.fillStyle = shade;
-  ctx.beginPath();
-  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-  ctx.fill();
-  const tx = x + Math.cos(heading) * reach * 1.05;
-  const ty = y + Math.sin(heading) * reach * 1.05;
-  const caustic = ctx.createRadialGradient(tx, ty, 0, tx, ty, width * 1.6);
-  caustic.addColorStop(0, `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${(0.3 * alpha).toFixed(3)})`);
-  caustic.addColorStop(1, `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 0)`);
-  ctx.globalCompositeOperation = 'lighter';
-  ctx.fillStyle = caustic;
-  ctx.beginPath();
-  ctx.arc(tx, ty, width * 1.6, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-}
-
 /**
  * Plays the Tera entry on the card `instanceId`. Returns the hold the queue waits (ms), or false
  * when no scene draws the card.
@@ -120,7 +93,36 @@ export function playTeraEntry(instanceId, cardData) {
         for (const { point, pose } of points) {
           if (!pose) continue;
           const reach = pose.length * Math.cos(point.elevationDeg * DEG) * h;
-          gemGround(ctx, card.x + point.root.x * h, card.y + point.root.y * h, pose.headingDeg, reach, pose.width * h, gem.body, 1);
+          // A gem's shadow on the cloth under it, and the light it throws past its tip.
+          const x = card.x + point.root.x * h;
+          const y = card.y + point.root.y * h;
+          const headingDeg = pose.headingDeg;
+          const width = pose.width * h;
+          const rgb = gem.body;
+          const alpha = 1;
+          const heading = headingDeg * DEG;
+          const cx = x + Math.cos(heading) * reach * 0.55;
+          const cy = y + Math.sin(heading) * reach * 0.55;
+          const radius = Math.max(reach * 0.6, width);
+          ctx.save();
+          const shade = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+          shade.addColorStop(0, `rgba(4, 6, 18, ${(0.34 * alpha).toFixed(3)})`);
+          shade.addColorStop(1, 'rgba(4, 6, 18, 0)');
+          ctx.fillStyle = shade;
+          ctx.beginPath();
+          ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+          ctx.fill();
+          const tx = x + Math.cos(heading) * reach * 1.05;
+          const ty = y + Math.sin(heading) * reach * 1.05;
+          const caustic = ctx.createRadialGradient(tx, ty, 0, tx, ty, width * 1.6);
+          caustic.addColorStop(0, `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${(0.3 * alpha).toFixed(3)})`);
+          caustic.addColorStop(1, `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 0)`);
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.fillStyle = caustic;
+          ctx.beginPath();
+          ctx.arc(tx, ty, width * 1.6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
         }
       });
       top(card.z, (ctx) => {

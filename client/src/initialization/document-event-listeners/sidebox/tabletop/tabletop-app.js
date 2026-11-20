@@ -437,11 +437,9 @@ async function buildTabletopApp(options, life) {
 
   // ── Poses in the world ──────────────────────────────────────────────────
   const aspect = () => stage.size.width / stage.size.height;
-  const handDistance = (halfWidth, halfHeight, base) =>
-    Math.max(base, fitDistance(halfWidth, halfHeight, camera.fov, aspect()));
   const handPose = ({ x = 0, y = 0, z = null, tiltXDeg = HAND.tiltXDeg, halfWidth = 48, halfHeight = 72 } = {}) => {
     camera.updateMatrixWorld();
-    const distance = z === null ? handDistance(halfWidth, halfHeight, -HAND.z) : -z;
+    const distance = z === null ? Math.max(-HAND.z, fitDistance(halfWidth, halfHeight, camera.fov, aspect())) : -z;
     const position = camera.localToWorld(new Vector3(HAND.x + x, HAND.y + y, -distance));
     const quaternion = camera.quaternion.clone().multiply(new Quaternion().setFromEuler(new Euler(tiltXDeg * DEG, 0, 0)));
     return { position, quaternion };
@@ -509,15 +507,6 @@ async function buildTabletopApp(options, life) {
     center: new Vector3(WRAP_SPOT.x, WRAP_BALL_RADIUS * 0.7, WRAP_SPOT.z),
     radius: WRAP_BALL_RADIUS,
   };
-  const crumpledFilm = (uniforms, group, worldCenter) => {
-    const local = group.worldToLocal(worldCenter.clone());
-    uniforms.uTear.value.set(dims.width / 2, dims.height, dims.depth / 2, 62);
-    uniforms.uLoosen.value = 1;
-    uniforms.uCrumple.value = 1;
-    uniforms.uBallCenter.value.copy(local);
-    uniforms.uBallRadius.value = wrapBall.radius;
-    uniforms.uDrift.value.set(0, 0, 0);
-  };
   const wrapShadow = contactShadow({
     texture: blob,
     width: WRAP_BALL_RADIUS * 1.6,
@@ -582,7 +571,6 @@ async function buildTabletopApp(options, life) {
     slot: () => slots.packs[pack.visual],
     sound: 'pack-land',
   }));
-  const boxItems = () => [deckItem, leafletItem, ...packItems];
 
   const spotOf = (item) => cosmetic.spots[item.key] || { ...item.home, y: item.base() };
   const restPose = (item, spot) => flatPose(spot, spot.y, item.faceUp());
@@ -701,7 +689,16 @@ async function buildTabletopApp(options, life) {
       resetFilm(boxModel.film.uniforms);
       wrapShadow.mesh.visible = false;
     } else {
-      crumpledFilm(boxModel.film.uniforms, boxModel.group, wrapBall.center);
+      const uniforms = boxModel.film.uniforms;
+      const group = boxModel.group;
+      const worldCenter = wrapBall.center;
+      const local = group.worldToLocal(worldCenter.clone());
+      uniforms.uTear.value.set(dims.width / 2, dims.height, dims.depth / 2, 62);
+      uniforms.uLoosen.value = 1;
+      uniforms.uCrumple.value = 1;
+      uniforms.uBallCenter.value.copy(local);
+      uniforms.uBallRadius.value = wrapBall.radius;
+      uniforms.uDrift.value.set(0, 0, 0);
       wrapShadow.mesh.visible = true;
     }
 
@@ -731,7 +728,35 @@ async function buildTabletopApp(options, life) {
       if (isOutOfBox(cosmetic, item.key)) layDown(item);
       else putInBox(item.object, slots.packs[visual]);
     });
-    v.tornVisual.forEach((visual, logical) => layTornPack(visual, logical, u, v));
+    v.tornVisual.forEach((visual, logical) => {
+      // A torn pack on a reloaded table: finished → its cards piled; current → in hand, part shown.
+      const pack = packObjects[visual];
+      pack.model.strip.visible = false;
+      layWrapper(pack, logical);
+      const items = stackFor(logical);
+      const revealed = u.revealed[logical];
+      if (revealed >= u.cardsPerPack) {
+        const pileCards = items.filter((item) => item.kind === 'card');
+        pileCards.forEach((item, k) => {
+          const mesh = makeStackMesh(item);
+          const jitter = pileJitter(k);
+          const spot = pileSpotOf(visual);
+          place(mesh, flatPose({ x: spot.x + jitter.dx, z: spot.z + jitter.dz, rotYDeg: spot.rotYDeg + jitter.rotYDeg }, pileHeight(k)));
+          mesh.userData.tt = { kind: 'tableCard' };
+          pack.pile.push(mesh);
+        });
+        items.filter((item) => item.kind !== 'card').forEach((item) => landExtra(makeStackMesh(item), false));
+        return;
+      }
+      if (v.currentVisual !== visual) return;
+      const position = stackPositionFor(items, revealed);
+      items.slice(0, position).forEach((item) => {
+        const mesh = makeStackMesh(item);
+        if (item.kind === 'card') landOnRevealPile(mesh, false);
+        else landExtra(mesh, false);
+      });
+      holdStack(visual, logical, items, position);
+    });
     tableFramed = framingFor(v) === 'table';
     focusChange += 1;
     focus = hand ? 1 : 0;
@@ -741,36 +766,6 @@ async function buildTabletopApp(options, life) {
 
   // A torn pack's cards pile where the pack lay.
   const pileSpotOf = (visual) => cosmetic.spots[packItems[visual].key] || packRowSpot(visual, packCount);
-
-  /** A torn pack on a reloaded table: finished → its cards piled; current → in hand, part shown. */
-  function layTornPack(visual, logical, u, v) {
-    const pack = packObjects[visual];
-    pack.model.strip.visible = false;
-    layWrapper(pack, logical);
-    const items = stackFor(logical);
-    const revealed = u.revealed[logical];
-    if (revealed >= u.cardsPerPack) {
-      const pileCards = items.filter((item) => item.kind === 'card');
-      pileCards.forEach((item, k) => {
-        const mesh = makeStackMesh(item);
-        const jitter = pileJitter(k);
-        const spot = pileSpotOf(visual);
-        place(mesh, flatPose({ x: spot.x + jitter.dx, z: spot.z + jitter.dz, rotYDeg: spot.rotYDeg + jitter.rotYDeg }, pileHeight(k)));
-        mesh.userData.tt = { kind: 'tableCard' };
-        pack.pile.push(mesh);
-      });
-      items.filter((item) => item.kind !== 'card').forEach((item) => landExtra(makeStackMesh(item), false));
-      return;
-    }
-    if (v.currentVisual !== visual) return;
-    const position = stackPositionFor(items, revealed);
-    items.slice(0, position).forEach((item) => {
-      const mesh = makeStackMesh(item);
-      if (item.kind === 'card') landOnRevealPile(mesh, false);
-      else landExtra(mesh, false);
-    });
-    holdStack(visual, logical, items, position);
-  }
 
   function layWrapper(pack, logical) {
     pack.wrapperDown = true;
@@ -1048,7 +1043,7 @@ async function buildTabletopApp(options, life) {
   }
 
   /** Takes `items` (by default all still in the box) out to their usual places, one after another. */
-  async function takeOut(items = boxItems().filter((item) => !isOutOfBox(cosmetic, item.key))) {
+  async function takeOut(items = [deckItem, leafletItem, ...packItems].filter((item) => !isOutOfBox(cosmetic, item.key))) {
     const due = items.filter((item) => !isOutOfBox(cosmetic, item.key));
     if (!view().lidOpen || !due.length) return;
     const cameraMove = frameTable();
@@ -1216,18 +1211,9 @@ async function buildTabletopApp(options, life) {
       update: (t) => fx?.setLight(pocketTearLight(t * POCKET_TEAR_MS)),
     });
     await stage.wait(STRIP_POP_DELAY_MS);
-    flingStrip(pack, logical, side);
-    await stage.wait(CARDS_AFTER_POP_MS);
-    await Promise.all([pullCards(pack, visual, logical), light]);
-    if (tearFx === fx) dropTearFx();
-  }
-
-  /**
-   * The cut strip springs up off the pack and whips away spinning and rippling like a ribbon, up
-   * out of view (the game's strip), then flutters down onto the floor by the emptied wrappers.
-   * It turns about its own middle; its landing pose is the one reviewed in iteration 9.
-   */
-  function flingStrip(pack, logical, side) {
+    // The cut strip springs up off the pack and whips away spinning and rippling like a ribbon, up
+    // out of view (the game's strip), then flutters down onto the floor by the emptied wrappers.
+    // It turns about its own middle; its landing pose is the one reviewed in iteration 9.
     const strip = pack.model.strip;
     const group = pack.model.group;
     group.updateMatrixWorld();
@@ -1275,6 +1261,9 @@ async function buildTabletopApp(options, life) {
         });
       },
     });
+    await stage.wait(CARDS_AFTER_POP_MS);
+    await Promise.all([pullCards(pack, visual, logical), light]);
+    if (tearFx === fx) dropTearFx();
   }
 
   /** The stack is drawn up out of the mouth, the empty wrapper is set down, the cards are held. */
@@ -1464,12 +1453,6 @@ async function buildTabletopApp(options, life) {
     focusTable(true);
     await flyTo(mesh, pose, { durationMs: 560, lift: 16 });
     hand = { kind: 'inspect', mesh, back, pose };
-    followPointer(mesh, pose);
-  }
-
-  // The held card turns toward the pointer, so the light rakes across its foil.
-  let pointer = { x: 0, y: 0 };
-  function followPointer(object, pose) {
     stopSway?.();
     const tilt = { x: 0, y: 0 };
     const extra = new Quaternion();
@@ -1480,10 +1463,13 @@ async function buildTabletopApp(options, life) {
       tilt.y += (pointer.x * 24 - tilt.y) * k;
       const sway = handSway(now);
       euler.set((tilt.x + sway.rotXDeg) * DEG, (tilt.y + sway.rotYDeg) * DEG, 0);
-      object.position.copy(pose.position);
-      object.quaternion.copy(pose.quaternion).multiply(extra.setFromEuler(euler));
+      mesh.position.copy(pose.position);
+      mesh.quaternion.copy(pose.quaternion).multiply(extra.setFromEuler(euler));
     });
   }
+
+  // The held card turns toward the pointer, so the light rakes across its foil.
+  let pointer = { x: 0, y: 0 };
 
   async function putBack() {
     if (hand?.kind !== 'inspect') return;
@@ -1494,9 +1480,6 @@ async function buildTabletopApp(options, life) {
     await flyTo(mesh, back, { durationMs: 520, lift: 30 });
     audio.play('card-land');
   }
-
-  // ── The one "next step" ─────────────────────────────────────────────────
-  const firstUntorn = () => view().untornVisual[0];
 
   function nextAction() {
     const v = view();
@@ -1519,7 +1502,8 @@ async function buildTabletopApp(options, life) {
       case 'revealCard':
         return { label: 'Next card', run: () => revealNext(1) };
       case 'openPack':
-        return { label: 'Pick up a pack', run: () => pickPack(firstUntorn()) };
+        // ── The one "next step" ─────────────────────────────────────────────────
+        return { label: 'Pick up a pack', run: () => pickPack(view().untornVisual[0]) };
       default:
         return { label: finishLabel, run: finishScene };
     }
@@ -1613,14 +1597,6 @@ async function buildTabletopApp(options, life) {
   // ── Pointer ─────────────────────────────────────────────────────────────
   const canvas = stage.canvas;
   let press = null;
-  const pickables = () => [
-    boxModel.group,
-    deck.group,
-    promoCard,
-    leaflet.mesh,
-    ...packObjects.map((pack) => pack.model.group),
-    ...looseMeshes,
-  ];
   const tagOf = (object) => {
     let node = object;
     while (node) {
@@ -1632,11 +1608,15 @@ async function buildTabletopApp(options, life) {
   // Balled up, the shrink-wrap's mesh still spans the box (the crumple is drawn by its shader): it
   // must not stop the pointer reaching what is inside.
   const boxFilm = new Set(boxModel.film.meshes);
-  // With the lid up, a press on the box reaches what stands in it: from the table's height the
-  // walls and the open lid cover most of the contents.
-  const inTheBox = (found) => found.node.parent === boxModel.group && found.tag.kind !== 'box';
   const hitAt = (event) => {
-    const hits = stage.pick(event.clientX, event.clientY, pickables());
+    const hits = stage.pick(event.clientX, event.clientY, [
+      boxModel.group,
+      deck.group,
+      promoCard,
+      leaflet.mesh,
+      ...packObjects.map((pack) => pack.model.group),
+      ...looseMeshes,
+    ]);
     const v = view();
     let first = null;
     for (const hit of hits) {
@@ -1644,10 +1624,12 @@ async function buildTabletopApp(options, life) {
       const found = tagOf(hit.object);
       if (!found) continue;
       const tagged = { ...found, point: hit.point, object: hit.object };
+      // With the lid up, a press on the box reaches what stands in it: from the table's height the
+      // walls and the open lid cover most of the contents.
       if (!first) {
         first = tagged;
         if (found.tag.kind !== 'box' || !v.lidOpen) return first;
-      } else if (inTheBox(found)) return tagged;
+      } else if (found.node.parent === boxModel.group && found.tag.kind !== 'box') return tagged;
     }
     return first;
   };
@@ -1693,7 +1675,68 @@ async function buildTabletopApp(options, life) {
     if (!moved || busy) return;
     press.dragged = true;
     if (press.mode === 'carry') {
-      startCarry(press.item, { x: event.clientX, y: event.clientY });
+      // The press on `item` became a drag: it comes up (straight out of the box first, clear of the
+      // walls), turns to lie flat, and follows the pointer over the floor, leaning into its motion.
+      const item = press.item;
+      const client = { x: event.clientX, y: event.clientY };
+      const object = item.object;
+      const fromBox = !isOutOfBox(cosmetic, item.key);
+      scene.attach(object);
+      carry = {
+        item,
+        cleared: !fromBox,
+        rimY: dims.height + item.halfD + 4,
+        start: { position: object.position.clone(), quaternion: object.quaternion.clone() },
+        yawDeg: fromBox ? item.home.rotYDeg : spotOf(item).rotYDeg,
+        client: { ...client },
+        last: object.position.clone(),
+        lean: { x: 0, z: 0 },
+      };
+      canvas.style.cursor = 'grabbing';
+      ui.setHint('Let go to set it down.');
+      audio.play('item-lift');
+      // Near the floor its shadow shows where it will land.
+      setCastShadow(object, true);
+      if (fromBox) frameTable();
+      // Whatever lay on it comes down.
+      settleStacks();
+      const target = object.position.clone();
+      const flat = new Quaternion();
+      const lean = new Quaternion();
+      const euler = new Euler();
+      stopCarry = stage.addTicker((now, dt) => {
+        const step = Math.max(1, dt || 16);
+        const k = instant() ? 1 : 1 - Math.exp(-step / CARRY_FOLLOW_MS);
+        if (!carry.cleared) {
+          target.set(carry.start.position.x, carry.rimY + 2, carry.start.position.z);
+          object.position.lerp(target, k);
+          if (object.position.y >= carry.rimY - 1) carry.cleared = true;
+          return;
+        }
+        const height = item.base() + CARRY_LIFT_MM;
+        // Where the pointer's ray meets the level `height` over the floor, or null.
+        const client = carry.client;
+        const rect = canvas.getBoundingClientRect();
+        carryNdc.set(((client.x - rect.left) / rect.width) * 2 - 1, -((client.y - rect.top) / rect.height) * 2 + 1);
+        carryRay.setFromCamera(carryNdc, camera);
+        carryLevel.constant = -height;
+        const point = carryRay.ray.intersectPlane(carryLevel, carryHit);
+        if (point) {
+          const spot = clampToTable({ x: point.x, z: point.z, rotYDeg: carry.yawDeg }, item.halfW, item.halfD);
+          // Over the box it is lifted clear of the walls.
+          const overBox = clearOfBox(spot, boxClearance(item), boxRect) !== spot;
+          target.set(spot.x, overBox ? dims.height + item.base() + 14 : height, spot.z);
+        }
+        object.position.lerp(target, k);
+        const vx = (object.position.x - carry.last.x) / step;
+        const vz = (object.position.z - carry.last.z) / step;
+        carry.last.copy(object.position);
+        carry.lean.x += (clampLean(-vz * 30) - carry.lean.x) * k;
+        carry.lean.z += (clampLean(vx * 30) - carry.lean.z) * k;
+        lean.setFromEuler(euler.set(carry.lean.x * DEG, 0, carry.lean.z * DEG));
+        flat.copy(qFlat(carry.yawDeg, item.faceUp())).premultiply(lean);
+        object.quaternion.slerp(flat, k);
+      });
     } else if (press.mode === 'lid') {
       const angle = LID_OPEN_DEG * dragProgress(-dy, 220);
       press.progress = angle / LID_OPEN_DEG;
@@ -1702,7 +1745,10 @@ async function buildTabletopApp(options, life) {
     } else if (press.mode === 'peel') {
       const pack = packObjects[hand.visual].model;
       press.side = dx >= 0 ? 1 : -1;
-      const width = packScreenWidth(pack);
+      pack.group.updateMatrixWorld();
+      const left = stage.toClient(pack.group.localToWorld(new Vector3(-33, 50, 0)));
+      const right = stage.toClient(pack.group.localToWorld(new Vector3(33, 50, 0)));
+      const width = Math.max(40, Math.hypot(right.x - left.x, right.y - left.y));
       press.progress = dragProgress(Math.abs(dx), width);
       pack.setPeel(press.progress, press.side, PEEL_FLEX_DEG);
       tearFx?.setCut(press.progress, press.side, 1);
@@ -1863,74 +1909,7 @@ async function buildTabletopApp(options, life) {
   const carryNdc = new Vector2();
   const carryLevel = new Plane(new Vector3(0, 1, 0), 0);
   const carryHit = new Vector3();
-  /** Where the pointer's ray meets the level `height` over the floor, or null. */
-  const pointerAt = (client, height) => {
-    const rect = canvas.getBoundingClientRect();
-    carryNdc.set(((client.x - rect.left) / rect.width) * 2 - 1, -((client.y - rect.top) / rect.height) * 2 + 1);
-    carryRay.setFromCamera(carryNdc, camera);
-    carryLevel.constant = -height;
-    return carryRay.ray.intersectPlane(carryLevel, carryHit);
-  };
   const clampLean = (deg) => Math.max(-CARRY_LEAN_DEG, Math.min(CARRY_LEAN_DEG, deg));
-
-  /**
-   * The press on `item` became a drag: it comes up (straight out of the box first, clear of the
-   * walls), turns to lie flat, and follows the pointer over the floor, leaning into its motion.
-   */
-  function startCarry(item, client) {
-    const object = item.object;
-    const fromBox = !isOutOfBox(cosmetic, item.key);
-    scene.attach(object);
-    carry = {
-      item,
-      cleared: !fromBox,
-      rimY: dims.height + item.halfD + 4,
-      start: { position: object.position.clone(), quaternion: object.quaternion.clone() },
-      yawDeg: fromBox ? item.home.rotYDeg : spotOf(item).rotYDeg,
-      client: { ...client },
-      last: object.position.clone(),
-      lean: { x: 0, z: 0 },
-    };
-    canvas.style.cursor = 'grabbing';
-    ui.setHint('Let go to set it down.');
-    audio.play('item-lift');
-    // Near the floor its shadow shows where it will land.
-    setCastShadow(object, true);
-    if (fromBox) frameTable();
-    // Whatever lay on it comes down.
-    settleStacks();
-    const target = object.position.clone();
-    const flat = new Quaternion();
-    const lean = new Quaternion();
-    const euler = new Euler();
-    stopCarry = stage.addTicker((now, dt) => {
-      const step = Math.max(1, dt || 16);
-      const k = instant() ? 1 : 1 - Math.exp(-step / CARRY_FOLLOW_MS);
-      if (!carry.cleared) {
-        target.set(carry.start.position.x, carry.rimY + 2, carry.start.position.z);
-        object.position.lerp(target, k);
-        if (object.position.y >= carry.rimY - 1) carry.cleared = true;
-        return;
-      }
-      const height = item.base() + CARRY_LIFT_MM;
-      const point = pointerAt(carry.client, height);
-      if (point) {
-        const spot = clampToTable({ x: point.x, z: point.z, rotYDeg: carry.yawDeg }, item.halfW, item.halfD);
-        // Over the box it is lifted clear of the walls.
-        const overBox = clearOfBox(spot, boxClearance(item), boxRect) !== spot;
-        target.set(spot.x, overBox ? dims.height + item.base() + 14 : height, spot.z);
-      }
-      object.position.lerp(target, k);
-      const vx = (object.position.x - carry.last.x) / step;
-      const vz = (object.position.z - carry.last.z) / step;
-      carry.last.copy(object.position);
-      carry.lean.x += (clampLean(-vz * 30) - carry.lean.x) * k;
-      carry.lean.z += (clampLean(vx * 30) - carry.lean.z) * k;
-      lean.setFromEuler(euler.set(carry.lean.x * DEG, 0, carry.lean.z * DEG));
-      flat.copy(qFlat(carry.yawDeg, item.faceUp())).premultiply(lean);
-      object.quaternion.slerp(flat, k);
-    });
-  }
 
   /** Let go: the carried thing settles where it is, or back into the box if it never left it. */
   function dropCarry() {
@@ -1955,13 +1934,6 @@ async function buildTabletopApp(options, life) {
       await flyTo(object, restPose(item, spot), { durationMs: 240, lift: 3 });
       audio.play(item.sound);
     });
-  }
-
-  function packScreenWidth(pack) {
-    pack.group.updateMatrixWorld();
-    const left = stage.toClient(pack.group.localToWorld(new Vector3(-33, 50, 0)));
-    const right = stage.toClient(pack.group.localToWorld(new Vector3(33, 50, 0)));
-    return Math.max(40, Math.hypot(right.x - left.x, right.y - left.y));
   }
 
   const onKeyDown = (event) => {

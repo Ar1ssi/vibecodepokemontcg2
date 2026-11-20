@@ -51,23 +51,6 @@ export function createLogStore({
   };
   const totalSize = () => ringBytes() + externalBytes();
 
-  function oldestClosed() {
-    let oldest = null;
-    for (const s of streams.values()) {
-      if (s.closedAt !== null && (oldest === null || s.closedAt < oldest.closedAt)) oldest = s;
-    }
-    return oldest;
-  }
-
-  function largestTrimmable() {
-    let largest = null;
-    for (const s of streams.values()) {
-      if (s.closedAt !== null || s.ring.size() <= 1) continue;
-      if (largest === null || s.ring.bytes() > largest.ring.bytes()) largest = s;
-    }
-    return largest;
-  }
-
   return {
     append(streamId, { seq, t, ts = t, lvl, line, load, diskLine }) {
       const s = open(streamId);
@@ -140,13 +123,22 @@ export function createLogStore({
         }
       }
       while (totalSize() > totalBytes) {
-        const victim = oldestClosed();
+        let oldest = null;
+        for (const s of streams.values()) {
+          if (s.closedAt !== null && (oldest === null || s.closedAt < oldest.closedAt)) oldest = s;
+        }
+        const victim = oldest;
         if (!victim) break;
         deleteStream(victim.id);
         result.evicted.push(victim.id);
       }
       for (let round = 0; round < MAX_TRIM_ROUNDS && totalSize() > totalBytes; round++) {
-        const victim = largestTrimmable();
+        let largest = null;
+        for (const s of streams.values()) {
+          if (s.closedAt !== null || s.ring.size() <= 1) continue;
+          if (largest === null || s.ring.bytes() > largest.ring.bytes()) largest = s;
+        }
+        const victim = largest;
         if (!victim) break;
         victim.ring.dropOldest(Math.ceil(victim.ring.size() / 4));
         if (!result.trimmed.includes(victim.id)) result.trimmed.push(victim.id);

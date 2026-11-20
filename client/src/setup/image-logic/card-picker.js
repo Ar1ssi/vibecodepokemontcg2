@@ -30,15 +30,6 @@ let pickerState = null;
 // that pile view closes; a forced close (the choice ended or was replaced) drops both.
 let parkedPicker = null;
 
-const parkPicker = (state) => {
-  document.removeEventListener('keydown', state.onKeyDown);
-  if (state.onResize) window.removeEventListener('resize', state.onResize);
-  state.overlay.id = 'cardPickerOverlayParked';
-  state.overlay.style.display = 'none';
-  parkedPicker = state;
-  pickerState = null;
-};
-
 const restoreParkedPicker = () => {
   const state = parkedPicker;
   parkedPicker = null;
@@ -64,11 +55,6 @@ const DRAG_CARD_SCALE = 1.65;
 const DRAG_LERP = 0.12;
 const Z_HANDOFF_START = 0.68;
 const Z_HANDOFF_MAX = 6;
-
-const smoothstep = (t) => {
-  const x = Math.max(0, Math.min(1, t));
-  return x * x * (3 - 2 * x);
-};
 
 export const isCardPickerOpen = () => pickerState != null;
 export const getCardPickerMode = () => pickerState?.mode ?? null;
@@ -158,26 +144,6 @@ const computeVirtualIndex = (index, dragPx, peekPx, slideCount) => {
   return Math.max(0, Math.min(slideCount - 1, index + progress));
 };
 
-const resolveSwipeIndex = (state, dragPx) => {
-  const stackWidth = state.stack?.clientWidth || 380;
-  const peekPx = (getPeekPercent(state) / 100) * stackWidth;
-  const virtual = computeVirtualIndex(
-    state.index,
-    dragPx,
-    peekPx,
-    state.slides.length
-  );
-  const progress = virtual - state.index;
-  let next = Math.round(virtual);
-  if (next === state.index && Math.abs(progress) >= 0.18) {
-    next = state.index + Math.sign(progress);
-  }
-  if (next === state.index && Math.abs(dragPx) >= SWIPE_THRESHOLD) {
-    next = state.index + (dragPx > 0 ? -1 : 1);
-  }
-  return clampIndex(next, state.slides.length - 1);
-};
-
 const computeSlideLayout = (slideIndex, virtualIndex) => {
   const peekOffset = virtualIndex - slideIndex;
   const absPeek = Math.abs(peekOffset);
@@ -200,7 +166,8 @@ const computeSlideZIndex = (slideIndex, virtualIndex, index, dragPx) => {
       handoffSpan > 0
         ? Math.max(0, Math.min(1, (absProgress - Z_HANDOFF_START) / handoffSpan))
         : 0;
-    const handoff = smoothstep(t) * Z_HANDOFF_MAX;
+    const x = Math.max(0, Math.min(1, t));
+    const handoff = x * x * (3 - 2 * x) * Z_HANDOFF_MAX;
 
     if (slideIndex === index) {
       z -= handoff;
@@ -258,30 +225,6 @@ const isSlideOnScreen = (stackRect, stackWidth, peekOffset, peekPercent = PEEK_P
     cardCenterX + cardWidth / 2 >= -SCREEN_EDGE_MARGIN &&
     cardCenterX - cardWidth / 2 <= window.innerWidth + SCREEN_EDGE_MARGIN
   );
-};
-
-const syncHoloAnimations = (state) => {
-  state.slides.forEach((slide, i) => {
-    const wrapper = slideWrapper(slide);
-    if (!wrapper) return;
-
-    const visible = !slide.classList.contains('is-hidden');
-    if (!visible) {
-      if (slide.holoRunning) {
-        stopHoloAnimation(wrapper);
-        slide.holoRunning = false;
-      }
-      return;
-    }
-
-    if (!slide.holoRunning) {
-      // Carousel slides are enlarged cards (inspector, discard/pile viewers,
-      // deck pickers) — run the same mat sweep as the board so their foil
-      // flows instead of holding the light under the cursor.
-      startHoloAnimation(wrapper, MAT_HOLO_OPTIONS);
-      slide.holoRunning = true;
-    }
-  });
 };
 
 const CHOOSE_PEEK_PERCENT = PEEK_PERCENT;
@@ -620,7 +563,27 @@ const layoutStack = (state) => {
     }
   });
 
-  syncHoloAnimations(state);
+  state.slides.forEach((slide, i) => {
+    const wrapper = slideWrapper(slide);
+    if (!wrapper) return;
+
+    const visible = !slide.classList.contains('is-hidden');
+    if (!visible) {
+      if (slide.holoRunning) {
+        stopHoloAnimation(wrapper);
+        slide.holoRunning = false;
+      }
+      return;
+    }
+
+    if (!slide.holoRunning) {
+      // Carousel slides are enlarged cards (inspector, discard/pile viewers,
+      // deck pickers) — run the same mat sweep as the board so their foil
+      // flows instead of holding the light under the cursor.
+      startHoloAnimation(wrapper, MAT_HOLO_OPTIONS);
+      slide.holoRunning = true;
+    }
+  });
   updateFooter(state);
 };
 
@@ -858,16 +821,6 @@ const setCandidateList = (state, candidates) => {
   if (state.slotElements?.length) renderSlotCards(state);
 };
 
-const isSwipeBlockedTarget = (target) =>
-  target.closest(
-    // `.ptcg-chrome` is the design-013 card inspector overlay. It is not a swipe
-    // surface: a pointerdown here must NOT set pointer capture, because the
-    // browser then dispatches the follow-up `click` to the capturing stage
-    // instead of the attack/ability panel, and the inspector's delegated
-    // listener (a stage descendant) never fires — a silent dead click.
-    '.discard-pile-nav, .card-picker-done, .card-picker-cancel, .card-picker-filter, .card-picker-drop-slot, .card-picker-slot-row, .card-picker-bottom-bar, .ptcg-chrome, button, a'
-  );
-
 const attachSwipe = (state) => {
   const { stage, stack } = state;
   let startX = 0;
@@ -882,20 +835,8 @@ const attachSwipe = (state) => {
 
   const blockNativeDrag = (event) => event.preventDefault();
 
-  const cleanupGhost = () => {
-    ghost?.remove();
-    ghost = null;
-  };
-
   const clearSlotHighlights = () => {
     state.slotElements?.forEach((slot) => slot.classList.remove('is-drop-target'));
-  };
-
-  const unbindCardDrag = () => {
-    document.removeEventListener('pointermove', onDocPointerMove, true);
-    document.removeEventListener('pointerup', onDocPointerEnd, true);
-    document.removeEventListener('pointercancel', onDocPointerEnd, true);
-    clearSlotHighlights();
   };
 
   const onDocPointerMove = (event) => {
@@ -917,8 +858,12 @@ const attachSwipe = (state) => {
     state.draggingToSlotIndex = null;
     if (slotIdx >= 0) addFocusedCardToSlot(state, slotIdx);
     else layoutStack(state);
-    cleanupGhost();
-    unbindCardDrag();
+    ghost?.remove();
+    ghost = null;
+    document.removeEventListener('pointermove', onDocPointerMove, true);
+    document.removeEventListener('pointerup', onDocPointerEnd, true);
+    document.removeEventListener('pointercancel', onDocPointerEnd, true);
+    clearSlotHighlights();
     tracking = false;
     state.tracking = false;
     activePointerId = null;
@@ -927,41 +872,16 @@ const attachSwipe = (state) => {
     event.stopPropagation();
   };
 
-  const beginCardDrag = (event, cardNode) => {
-    gesture = 'cardDrag';
-    dragging = false;
-    activePointerId = event.pointerId;
-    tracking = false;
-    state.tracking = false;
-    state.pointerId = null;
-    state.draggingToSlotIndex = state.index;
-    stopDragLoop(state);
-    state.targetDragPx = 0;
-    state.renderDragPx = 0;
-    layoutStack(state);
-    stage.classList.remove('is-dragging');
-    stack.classList.remove('is-dragging');
-    const rect = cardNode.getBoundingClientRect();
-    ghost = cardNode.cloneNode(true);
-    ghost.classList.add('card-picker-drag-ghost');
-    ghost.style.width = `${rect.width}px`;
-    ghost.style.height = `${rect.height}px`;
-    ghost.style.left = `${event.clientX}px`;
-    ghost.style.top = `${event.clientY}px`;
-    document.body.appendChild(ghost);
-    try {
-      stage.releasePointerCapture(event.pointerId);
-    } catch {
-      // already released
-    }
-    document.addEventListener('pointermove', onDocPointerMove, true);
-    document.addEventListener('pointerup', onDocPointerEnd, true);
-    document.addEventListener('pointercancel', onDocPointerEnd, true);
-  };
-
   const onPointerDown = (event) => {
     if (event.button !== 0) return;
-    if (isSwipeBlockedTarget(event.target)) return;
+    if (event.target.closest(
+      // `.ptcg-chrome` is the design-013 card inspector overlay. It is not a swipe
+      // surface: a pointerdown here must NOT set pointer capture, because the
+      // browser then dispatches the follow-up `click` to the capturing stage
+      // instead of the attack/ability panel, and the inspector's delegated
+      // listener (a stage descendant) never fires — a silent dead click.
+      '.discard-pile-nav, .card-picker-done, .card-picker-cancel, .card-picker-filter, .card-picker-drop-slot, .card-picker-slot-row, .card-picker-bottom-bar, .ptcg-chrome, button, a'
+    )) return;
     if (activePointerId != null) return;
     stopDragLoop(state);
     tracking = true;
@@ -995,7 +915,37 @@ const attachSwipe = (state) => {
         const slide = state.slides[state.index];
         const cardNode =
           slide?.querySelector('.discard-pile-card, .mat-holo') ?? slide;
-        if (cardNode) beginCardDrag(event, cardNode);
+        if (cardNode) {
+          gesture = 'cardDrag';
+          dragging = false;
+          activePointerId = event.pointerId;
+          tracking = false;
+          state.tracking = false;
+          state.pointerId = null;
+          state.draggingToSlotIndex = state.index;
+          stopDragLoop(state);
+          state.targetDragPx = 0;
+          state.renderDragPx = 0;
+          layoutStack(state);
+          stage.classList.remove('is-dragging');
+          stack.classList.remove('is-dragging');
+          const rect = cardNode.getBoundingClientRect();
+          ghost = cardNode.cloneNode(true);
+          ghost.classList.add('card-picker-drag-ghost');
+          ghost.style.width = `${rect.width}px`;
+          ghost.style.height = `${rect.height}px`;
+          ghost.style.left = `${event.clientX}px`;
+          ghost.style.top = `${event.clientY}px`;
+          document.body.appendChild(ghost);
+          try {
+            stage.releasePointerCapture(event.pointerId);
+          } catch {
+            // already released
+          }
+          document.addEventListener('pointermove', onDocPointerMove, true);
+          document.addEventListener('pointerup', onDocPointerEnd, true);
+          document.addEventListener('pointercancel', onDocPointerEnd, true);
+        }
         return;
       }
       if (Math.abs(dx) > Math.abs(dy) * 1.15) {
@@ -1050,7 +1000,23 @@ const attachSwipe = (state) => {
 
     const dx = event.clientX - startX;
     if (!isCancelled && wasDragging && Math.abs(dx) >= SWIPE_LOCK_PX) {
-      goToIndex(state, resolveSwipeIndex(state, dx));
+      const stackWidth = state.stack?.clientWidth || 380;
+      const peekPx = (getPeekPercent(state) / 100) * stackWidth;
+      const virtual = computeVirtualIndex(
+        state.index,
+        dx,
+        peekPx,
+        state.slides.length
+      );
+      const progress = virtual - state.index;
+      let next = Math.round(virtual);
+      if (next === state.index && Math.abs(progress) >= 0.18) {
+        next = state.index + Math.sign(progress);
+      }
+      if (next === state.index && Math.abs(dx) >= SWIPE_THRESHOLD) {
+        next = state.index + (dx > 0 ? -1 : 1);
+      }
+      goToIndex(state, clampIndex(next, state.slides.length - 1));
     } else if (isTap && state.mode !== 'browse') {
       const slotIdx = findDropSlotAt(state, event.clientX, event.clientY);
       if (slotIdx >= 0) {
@@ -1472,7 +1438,13 @@ const parkForBoardView = (candidates) => {
     return true;
   }
   if (pickerState && pickerState.mode !== 'browse' && pickerState.overlay.classList.contains('is-viewing-board')) {
-    parkPicker(pickerState);
+    const state = pickerState;
+    document.removeEventListener('keydown', state.onKeyDown);
+    if (state.onResize) window.removeEventListener('resize', state.onResize);
+    state.overlay.id = 'cardPickerOverlayParked';
+    state.overlay.style.display = 'none';
+    parkedPicker = state;
+    pickerState = null;
     return true;
   }
   return false;

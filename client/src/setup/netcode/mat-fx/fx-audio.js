@@ -37,19 +37,6 @@ let master = null;
 let noiseBuffer = null;
 let gestureBound = false;
 
-const AudioContextCtor = () =>
-  typeof globalThis !== 'undefined'
-    ? globalThis.AudioContext || globalThis.webkitAudioContext || null
-    : null;
-
-/** One second of white noise, reused by every noise voice. */
-const buildNoiseBuffer = (ctx) => {
-  const buffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate * NOISE_SECONDS), ctx.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < data.length; i += 1) data[i] = Math.random() * 2 - 1;
-  return buffer;
-};
-
 const resumeContext = () => {
   try {
     if (context?.state === 'suspended') context.resume();
@@ -79,14 +66,21 @@ const bindGestureUnlock = () => {
 
 const ensureContext = () => {
   if (context) return context;
-  const Ctor = AudioContextCtor();
+  const Ctor = typeof globalThis !== 'undefined'
+    ? globalThis.AudioContext || globalThis.webkitAudioContext || null
+    : null;
   if (!Ctor) return null;
   try {
     context = new Ctor();
     master = context.createGain();
     master.gain.value = clampGain(fxVolume());
     master.connect(context.destination);
-    noiseBuffer = buildNoiseBuffer(context);
+    // One second of white noise, reused by every noise voice.
+    const ctx = context;
+    const buffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate * NOISE_SECONDS), ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i += 1) data[i] = Math.random() * 2 - 1;
+    noiseBuffer = buffer;
     bindGestureUnlock();
     resumeContext();
     initSampleBank(context, master);
@@ -119,12 +113,6 @@ const buildFilter = (ctx, spec, start, duration) => {
   return filter;
 };
 
-// A swell must still leave some decay, or the voice would stop at its peak.
-const attackFor = (voice, duration) =>
-  Number.isFinite(voice.attack) && voice.attack > 0
-    ? Math.min(voice.attack, duration * 0.9)
-    : ATTACK_SECONDS;
-
 /**
  * One voice: source -> [filter] -> envelope gain -> master. The envelope is a
  * linear attack (fast unless the voice asks for a swell) and an exponential
@@ -155,7 +143,10 @@ const playVoice = (ctx, voice) => {
 
   const envelope = ctx.createGain();
   envelope.gain.setValueAtTime(0.0001, start);
-  envelope.gain.linearRampToValueAtTime(peak, start + attackFor(voice, duration));
+  // A swell must still leave some decay, or the voice would stop at its peak.
+  envelope.gain.linearRampToValueAtTime(peak, start + (Number.isFinite(voice.attack) && voice.attack > 0
+    ? Math.min(voice.attack, duration * 0.9)
+    : ATTACK_SECONDS));
   envelope.gain.exponentialRampToValueAtTime(0.0001, start + duration);
 
   const filter = buildFilter(ctx, voice.filter, start, duration);
@@ -188,7 +179,18 @@ const playVoice = (ctx, voice) => {
 export function playFxSound(plan) {
   if (!plan?.effect || soundDisabled()) return;
   if (plan.effect === 'game-over') statusAmbience.halt();
-  playCrowdReaction(plan);
+  // The crowd answers a moment independently of its sampled cue or synth voice. A game's end is
+  // answered, then the beds fade out.
+  try {
+    const pool = crowdDisabled() ? null : crowdReactionFor(plan.effect, plan);
+    if (pool && ensureContext()) {
+      resumeContext();
+      playReaction(pool, { gain: CUES[pool].gain });
+    }
+    if (plan.effect === 'game-over') crowdBed.finish();
+  } catch {
+    /* the crowd is best-effort */
+  }
   const cues = cuesFor(plan.effect, plan);
   const voices = voicesFor(plan.effect, plan);
   if (cues.length === 0 && voices.length === 0) return;
@@ -203,21 +205,6 @@ export function playFxSound(plan) {
     } catch {
       /* one bad voice must not silence the rest of the sound */
     }
-  }
-}
-
-// The crowd answers a moment independently of its sampled cue or synth voice. A game's end is
-// answered, then the beds fade out.
-function playCrowdReaction(plan) {
-  try {
-    const pool = crowdDisabled() ? null : crowdReactionFor(plan.effect, plan);
-    if (pool && ensureContext()) {
-      resumeContext();
-      playReaction(pool, { gain: CUES[pool].gain });
-    }
-    if (plan.effect === 'game-over') crowdBed.finish();
-  } catch {
-    /* the crowd is best-effort */
   }
 }
 

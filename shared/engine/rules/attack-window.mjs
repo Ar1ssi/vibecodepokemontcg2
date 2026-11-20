@@ -129,7 +129,10 @@ export function listAttacks(card, opts = {}) {
     } else if (onceUsed) {
       reason = 'Already used this turn (once per turn).';
     } else if (!payable) {
-      const costStr = rawCost.map((s) => symbolLabel(s)).join(' ');
+      const costStr = rawCost.map((s) => {
+        if (typeof s !== 'string') return '?';
+        return SYMBOL_LABELS[s] || s;
+      }).join(' ');
       reason = `Not enough energy (needs: ${costStr}).`;
     }
 
@@ -222,7 +225,3 @@ const SYMBOL_LABELS = {
   Dragon: '🐉',
 };
 
-function symbolLabel(sym) {
-  if (typeof sym !== 'string') return '?';
-  return SYMBOL_LABELS[sym] || sym;
-}

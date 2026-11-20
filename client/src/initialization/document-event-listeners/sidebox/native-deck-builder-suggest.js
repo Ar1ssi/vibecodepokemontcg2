@@ -184,57 +184,6 @@ export const initializeNativeDeckBuilderSuggest = ({
       }).join('')}
     </div>`;
 
-  const metaHtml = (intro) => {
-    const rows = metaOverview(index).map(
-      (row) => `<li class="db-suggest-row db-suggest-meta-row">
-        <div class="db-suggest-info">
-          <div class="db-suggest-name">${escapeHtml(row.archetype)}</div>
-          <div class="db-suggest-share"><span style="width:${Math.max(2, Math.round(row.share * 100))}%"></span></div>
-          <div class="db-suggest-evidence">${escapeHtml(formatPercent(row.share))} of the meta · ${row.lists} lists · best: ${escapeHtml(describeList(index, row.bestListIdx))}</div>
-        </div>
-        <div class="db-suggest-actions">
-          <button type="button" class="db-suggest-btn db-suggest-btn-primary" data-action="start-list" data-list="${row.bestListIdx}"${busy ? ' disabled' : ''}>Start from this list</button>
-        </div>
-      </li>`
-    );
-    return `<section class="db-suggest-section">
-        <h3 class="db-suggest-section-title">The meta · ${escapeHtml(windowLabel(index.dataset))}</h3>
-        <p class="db-suggest-blurb">${escapeHtml(intro)}</p>
-        <ul class="db-suggest-list">${rows.join('')}</ul>
-      </section>`;
-  };
-
-  const steeringHtml = (result, prefs) => {
-    const counts = steeringCounts(prefs);
-    const core = result.deckKeys
-      .slice()
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .map(
-        (entry) => `<li><button type="button" class="db-suggest-lock${entry.locked ? ' active' : ''}" data-action="${entry.locked ? 'unlock' : 'lock'}" data-key="${escapeHtml(entry.key)}" aria-pressed="${entry.locked}">${entry.locked ? '🔒' : '🔓'} ${escapeHtml(entry.name)} ×${entry.count}</button></li>`
-      )
-      .join('');
-    const dismissed = prefs.dismissed
-      .map((key) => {
-        const idx = index.keyIndex.get(key);
-        const name = idx === undefined ? key.replace(/^x:/, '') : index.dataset.cards[idx].name;
-        return `<li><span>${escapeHtml(name)}</span> <button type="button" class="db-suggest-btn db-suggest-btn-quiet" data-action="restore" data-key="${escapeHtml(key)}">Restore</button></li>`;
-      })
-      .join('');
-    const open = (fold) => (openFolds.has(fold) ? ' open' : '');
-    return `<details class="db-suggest-fold" data-fold="core"${open('core')}>
-        <summary>Your core — lock the cards you're keeping (${counts.locked} locked)</summary>
-        <ul class="db-suggest-core">${core}</ul>
-      </details>
-      <details class="db-suggest-fold" data-fold="dismissed"${open('dismissed')}${counts.dismissed ? '' : ' hidden'}>
-        <summary>Dismissed (${counts.dismissed})</summary>
-        <ul class="db-suggest-dismissed">${dismissed}</ul>
-      </details>
-      <div class="db-suggest-steering">
-        Steering: ${counts.locked} locked · ${counts.accepted} accepted · ${counts.dismissed} dismissed
-        <button type="button" class="db-suggest-btn db-suggest-btn-quiet" data-action="reset"${counts.locked + counts.accepted + counts.dismissed ? '' : ' disabled'}>Reset</button>
-      </div>`;
-  };
-
   const resultHtml = (result, prefs) => {
     const showPrice = prefs.goals.includes(BUDGET_GOAL);
     const parts = [`<p class="db-suggest-head">${escapeHtml(headerText(result))} · ${escapeHtml(windowLabel(index.dataset))}</p>`];
@@ -269,7 +218,34 @@ export const initializeNativeDeckBuilderSuggest = ({
           : '<p class="db-suggest-empty">Your deck already matches what similar lists play.</p>'
       );
     }
-    parts.push(steeringHtml(result, prefs));
+    const counts = steeringCounts(prefs);
+    const core = result.deckKeys
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map(
+        (entry) => `<li><button type="button" class="db-suggest-lock${entry.locked ? ' active' : ''}" data-action="${entry.locked ? 'unlock' : 'lock'}" data-key="${escapeHtml(entry.key)}" aria-pressed="${entry.locked}">${entry.locked ? '🔒' : '🔓'} ${escapeHtml(entry.name)} ×${entry.count}</button></li>`
+      )
+      .join('');
+    const dismissed = prefs.dismissed
+      .map((key) => {
+        const idx = index.keyIndex.get(key);
+        const name = idx === undefined ? key.replace(/^x:/, '') : index.dataset.cards[idx].name;
+        return `<li><span>${escapeHtml(name)}</span> <button type="button" class="db-suggest-btn db-suggest-btn-quiet" data-action="restore" data-key="${escapeHtml(key)}">Restore</button></li>`;
+      })
+      .join('');
+    const open = (fold) => (openFolds.has(fold) ? ' open' : '');
+    parts.push(`<details class="db-suggest-fold" data-fold="core"${open('core')}>
+        <summary>Your core — lock the cards you're keeping (${counts.locked} locked)</summary>
+        <ul class="db-suggest-core">${core}</ul>
+      </details>
+      <details class="db-suggest-fold" data-fold="dismissed"${open('dismissed')}${counts.dismissed ? '' : ' hidden'}>
+        <summary>Dismissed (${counts.dismissed})</summary>
+        <ul class="db-suggest-dismissed">${dismissed}</ul>
+      </details>
+      <div class="db-suggest-steering">
+        Steering: ${counts.locked} locked · ${counts.accepted} accepted · ${counts.dismissed} dismissed
+        <button type="button" class="db-suggest-btn db-suggest-btn-quiet" data-action="reset"${counts.locked + counts.accepted + counts.dismissed ? '' : ' disabled'}>Reset</button>
+      </div>`);
     return parts.join('');
   };
 
@@ -306,7 +282,23 @@ export const initializeNativeDeckBuilderSuggest = ({
         result.reason === 'empty'
           ? 'Start from a top list, or add a few cards and suggestions appear here.'
           : 'No tournament list shares a card with this deck yet. Here is what is winning.';
-      body = metaHtml(intro);
+      const rows = metaOverview(index).map(
+        (row) => `<li class="db-suggest-row db-suggest-meta-row">
+        <div class="db-suggest-info">
+          <div class="db-suggest-name">${escapeHtml(row.archetype)}</div>
+          <div class="db-suggest-share"><span style="width:${Math.max(2, Math.round(row.share * 100))}%"></span></div>
+          <div class="db-suggest-evidence">${escapeHtml(formatPercent(row.share))} of the meta · ${row.lists} lists · best: ${escapeHtml(describeList(index, row.bestListIdx))}</div>
+        </div>
+        <div class="db-suggest-actions">
+          <button type="button" class="db-suggest-btn db-suggest-btn-primary" data-action="start-list" data-list="${row.bestListIdx}"${busy ? ' disabled' : ''}>Start from this list</button>
+        </div>
+      </li>`
+      );
+      body = `<section class="db-suggest-section">
+        <h3 class="db-suggest-section-title">The meta · ${escapeHtml(windowLabel(index.dataset))}</h3>
+        <p class="db-suggest-blurb">${escapeHtml(intro)}</p>
+        <ul class="db-suggest-list">${rows.join('')}</ul>
+      </section>`;
     } else {
       body = resultHtml(result, prefs);
     }

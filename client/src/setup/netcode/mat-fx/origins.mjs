@@ -25,10 +25,8 @@ const remember = (instanceId, ghost) => {
 };
 
 const movesToDiscard = (event) => event?.type === 'cardMoved' && event.to === 'discard' && isId(event.instanceId);
-const sweepsToDiscard = (event) => event?.type === 'zoneMoved' && event.to === 'discard' && Boolean(event.from);
 // Design 089: the zone whose cards an event sweeps into a pile — the discard pile, or the deck.
-const sweepSourceOf = (event) => (sweepsToDiscard(event) ? event.from : deckSweepSource(event) || null);
-const isDiscard = (event) => event?.type === 'cardsDiscarded' || movesToDiscard(event);
+const sweepSourceOf = (event) => (event?.type === 'zoneMoved' && event.to === 'discard' && Boolean(event.from) ? event.from : deckSweepSource(event) || null);
 // apply-view tags every rendered card with its side ('you'/'them') and zone.
 const SIDE_TAG = { self: 'you', opp: 'them' };
 const sweepKey = (user, zoneId) => `${user}:${zoneId}`;
@@ -152,7 +150,7 @@ export function captureOrigins(events, registry, capture, sideOf, rectOf = null)
       const element = registry.get(id)?.element;
       const ghost = element && capture(sideOf(event), element);
       if (ghost) remember(id, ghost);
-      else if (isDiscard(event)) remember(id, { hidden: true });
+      else if (event?.type === 'cardsDiscarded' || movesToDiscard(event)) remember(id, { hidden: true });
     }
   }
 }

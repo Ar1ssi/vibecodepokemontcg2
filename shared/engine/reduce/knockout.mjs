@@ -800,7 +800,22 @@ function captureOnKoEnergyMoves(draft, { victimPlayerId, victim, events }) {
     );
     if (ab.basic) energy = energy.filter((c) => isBasicEnergy(c));
     if (ab.energyType) {
-      energy = energy.filter((c) => energyMatchesType(c, ab.energyType));
+      energy = energy.filter((c) => {
+        const typeName = ab.energyType;
+        const want = String(typeName || '').toLowerCase();
+        const types = [c.energyType, ...(Array.isArray(c.types) ? c.types : [])]
+          .filter(Boolean)
+          .map((t) => String(t).toLowerCase());
+        if (types.some((t) => t === want || (want === 'darkness' && t === 'dark'))) {
+          return true;
+        }
+        // Basic Energy rows sometimes carry no `types`; the printed name is then the
+        // only signal ("Water Energy").
+        return (
+          typeof c.name === 'string' &&
+          new RegExp(`\\b${want}\\b`, 'i').test(c.name)
+        );
+      });
     }
     if (energy.length === 0) continue;
     obligations.push({
@@ -821,22 +836,6 @@ function captureOnKoEnergyMoves(draft, { victimPlayerId, victim, events }) {
   if (obligations.length > 0) {
     draft.__koEnergyMoves = [...(draft.__koEnergyMoves || []), ...obligations];
   }
-}
-
-function energyMatchesType(card, typeName) {
-  const want = String(typeName || '').toLowerCase();
-  const types = [card.energyType, ...(Array.isArray(card.types) ? card.types : [])]
-    .filter(Boolean)
-    .map((t) => String(t).toLowerCase());
-  if (types.some((t) => t === want || (want === 'darkness' && t === 'dark'))) {
-    return true;
-  }
-  // Basic Energy rows sometimes carry no `types`; the printed name is then the
-  // only signal ("Water Energy").
-  return (
-    typeof card.name === 'string' &&
-    new RegExp(`\\b${want}\\b`, 'i').test(card.name)
-  );
 }
 
 export function koEnergyTargets(player, obligation) {

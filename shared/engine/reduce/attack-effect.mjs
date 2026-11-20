@@ -86,12 +86,6 @@ function survivesOnCoin(activeRng, playerId, events) {
   return coin === 'heads';
 }
 
-// The bench zone of the player's first Benched Pokémon (Handheld Fan's destination).
-function firstBenchRootZone(state, playerId) {
-  const bench = state.players?.[playerId]?.zones?.bench || [];
-  return bench.some((c) => !c.attachedTo) ? bench : null;
-}
-
 const LOST_ZONE_KNOCKOUT =
   /knocked out by (?:damage from )?this (?:attack|damage), put (?:that pokémon|your opponent's active pokémon) and all cards attached to it in the lost zone instead of (?:discarding it|the discard pile)/;
 
@@ -1142,7 +1136,9 @@ export function resolveAttackEffectPhase(draft, ctx) {
               const energy = attackerZone.find(
                 (c) => c.attachedTo === attacker.instanceId && isEnergy(c)
               );
-              const benchZone = firstBenchRootZone(draft, playerId);
+              // The bench zone of the player's first Benched Pokémon (Handheld Fan's destination).
+              const bench = draft.players?.[playerId]?.zones?.bench || [];
+              const benchZone = bench.some((c) => !c.attachedTo) ? bench : null;
               const benchRoot = benchZone?.find((c) => !c.attachedTo) || null;
               const toHand = eff.moveEnergyOnKo.to === 'opponentHand';
               const dest = toHand ? draft.players[playerId]?.zones?.hand : benchZone;

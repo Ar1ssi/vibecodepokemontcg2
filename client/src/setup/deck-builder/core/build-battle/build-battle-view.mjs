@@ -140,7 +140,8 @@ export function boxContentsLine(box, setName = box.shortName) {
   );
 }
 
-function deckCountsById(deck) {
+/** @returns {Map<string, number>} pool count minus deck count for every pool card id, never below 0. */
+export function poolRemaining(deck, pool = []) {
   const counts = new Map();
   for (const group of Object.values(deck || {})) {
     for (const variant of group?.cards || []) {
@@ -149,12 +150,7 @@ function deckCountsById(deck) {
       counts.set(id, (counts.get(id) || 0) + (Number(variant.count) || 0));
     }
   }
-  return counts;
-}
-
-/** @returns {Map<string, number>} pool count minus deck count for every pool card id, never below 0. */
-export function poolRemaining(deck, pool = []) {
-  const inDeck = deckCountsById(deck);
+  const inDeck = counts;
   return new Map(
     pool.map(({ card, count }) => [card.id, Math.max(0, count - (inDeck.get(card.id) || 0))])
   );

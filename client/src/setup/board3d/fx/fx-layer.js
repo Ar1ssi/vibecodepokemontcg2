@@ -32,34 +32,6 @@ void main() {
   gl_Position = vec4(position.xy, 0.0, 1.0);
 }
 `;
-// Design 089: the FX meet the board in two draws of the same texel. The FX target is premultiplied:
-// alpha is how much of the board a texel covers (smoke, water, the board bent by a lens), and light
-// is colour its alpha cannot account for. tone.mjs splits a texel into the two (`fxSplit`): the
-// matter goes over the board exactly as before; the light is rolled off by its brightest channel,
-// so it keeps its hue as it saturates, and is screened on. A card under a strong hit stays a card
-// with coloured light on it: the old single draw added clamped light, which turned every strong
-// hit into a white slab over the art.
-//   board' = (board × (1 − a) + matter) × (1 − light) + light
-// The cover draw multiplies the board by (1 − a)(1 − light); the light draw adds the rest.
-const compositeFragment = (pass) => `
-precision highp float;
-uniform sampler2D uFx;
-in vec2 vUv;
-out vec4 outColor;
-${ROLL_OFF_GLSL}
-${SPLIT_COVER_GLSL}
-void main() {
-  vec3 matter;
-  vec3 light;
-  float cover;
-  fxSplit(texture(uFx, vUv), matter, light, cover);
-  ${
-    pass === 'cover'
-      ? 'outColor = vec4(vec3(1.0) - (1.0 - cover) * (vec3(1.0) - light), cover);'
-      : 'outColor = vec4(matter * (vec3(1.0) - light) + light, cover);'
-  }
-}
-`;
 
 /**
  * @param {{ three: typeof import('three'), renderer: import('three').WebGLRenderer,
@@ -116,12 +88,39 @@ export function createFxLayer({
   const clearColour = new three.Color();
 
   const compositeUniforms = { uFx: { value: null } };
+  // Design 089: the FX meet the board in two draws of the same texel. The FX target is premultiplied:
+  // alpha is how much of the board a texel covers (smoke, water, the board bent by a lens), and light
+  // is colour its alpha cannot account for. tone.mjs splits a texel into the two (`fxSplit`): the
+  // matter goes over the board exactly as before; the light is rolled off by its brightest channel,
+  // so it keeps its hue as it saturates, and is screened on. A card under a strong hit stays a card
+  // with coloured light on it: the old single draw added clamped light, which turned every strong
+  // hit into a white slab over the art.
+  //   board' = (board × (1 − a) + matter) × (1 − light) + light
+  // The cover draw multiplies the board by (1 − a)(1 − light); the light draw adds the rest.
   const compositeMaterialOf = (pass, blend) =>
     new three.RawShaderMaterial({
       name: `fx-composite-${pass}`,
       glslVersion: three.GLSL3,
       vertexShader: COMPOSITE_VERTEX,
-      fragmentShader: compositeFragment(pass),
+      fragmentShader: `
+precision highp float;
+uniform sampler2D uFx;
+in vec2 vUv;
+out vec4 outColor;
+${ROLL_OFF_GLSL}
+${SPLIT_COVER_GLSL}
+void main() {
+  vec3 matter;
+  vec3 light;
+  float cover;
+  fxSplit(texture(uFx, vUv), matter, light, cover);
+  ${
+          pass === 'cover'
+            ? 'outColor = vec4(vec3(1.0) - (1.0 - cover) * (vec3(1.0) - light), cover);'
+            : 'outColor = vec4(matter * (vec3(1.0) - light) + light, cover);'
+        }
+}
+`,
       uniforms: compositeUniforms,
       depthTest: false,
       depthWrite: false,
@@ -155,40 +154,6 @@ export function createFxLayer({
   });
   const compositeCamera = new three.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
-  /** The FX target and bloom at the drawing buffer's CSS-pixel size (re-made when it changes). */
-  const ensureTarget = () => {
-    renderer.getDrawingBufferSize(size);
-    const scale = fxTargetScale(renderer.getPixelRatio?.() ?? 1);
-    const width = Math.max(1, Math.round(size.x * scale));
-    const height = Math.max(1, Math.round(size.y * scale));
-    if (!target) {
-      target = new three.WebGLRenderTarget(width, height, {
-        type: three.HalfFloatType,
-        depthBuffer: true,
-        stencilBuffer: true,
-        samples: 0,
-      });
-      target.texture.name = 'board3d-fx-target';
-    } else if (target.width !== width || target.height !== height) {
-      target.setSize(width, height);
-    }
-    if (UnrealBloomPass && !bloom) {
-      bloom = new UnrealBloomPass(new three.Vector2(width, height), BLOOM.strength, BLOOM.radius, BLOOM.threshold);
-      // The pass adds its own alpha on composite, which would darken the board under every
-      // glow; glow is light only, so its alpha write is turned off.
-      bloom.blendMaterial.blending = three.CustomBlending;
-      bloom.blendMaterial.blendEquation = three.AddEquation;
-      bloom.blendMaterial.blendSrc = three.OneFactor;
-      bloom.blendMaterial.blendDst = three.OneFactor;
-      bloom.blendMaterial.blendSrcAlpha = three.ZeroFactor;
-      bloom.blendMaterial.blendDstAlpha = three.OneFactor;
-    } else if (bloom && (bloom.resolution.x !== width || bloom.resolution.y !== height)) {
-      bloom.resolution.set(width, height);
-      bloom.setSize(width, height);
-    }
-    return target;
-  };
-
   const add = (entry) => {
     if (disposed || typeof entry?.frame !== 'function') return () => {};
     entries.add(entry);
@@ -197,7 +162,11 @@ export function createFxLayer({
 
   const active = () => !disposed && (entries.size > 0 || Boolean(impacts?.active?.()));
 
-  const recordEntries = (now) => {
+  const render = () => {
+    if (!active()) return false;
+    const now = clock.now();
+    const stageToWorld = stageToWorldMatrix(tiltDeg());
+    elements.begin();
     recorder.reset();
     for (const entry of [...entries]) {
       let keep = false;
@@ -211,14 +180,6 @@ export function createFxLayer({
       }
       if (!keep) entries.delete(entry);
     }
-  };
-
-  const render = () => {
-    if (!active()) return false;
-    const now = clock.now();
-    const stageToWorld = stageToWorldMatrix(tiltDeg());
-    elements.begin();
-    recordEntries(now);
     mesh.upload(recorder.recording(), { timeSeconds: now / 1000, stageToWorld });
     elements.finish({ timeSeconds: now / 1000, stageToWorld });
 
@@ -236,7 +197,37 @@ export function createFxLayer({
     try {
       // Refracting kinds read the board as drawn this frame, copied before the FX target binds.
       elements.captureBoard();
-      const fxTarget = ensureTarget();
+      // The FX target and bloom at the drawing buffer's CSS-pixel size (re-made when it changes).
+      renderer.getDrawingBufferSize(size);
+      const scale = fxTargetScale(renderer.getPixelRatio?.() ?? 1);
+      const width = Math.max(1, Math.round(size.x * scale));
+      const height = Math.max(1, Math.round(size.y * scale));
+      if (!target) {
+        target = new three.WebGLRenderTarget(width, height, {
+          type: three.HalfFloatType,
+          depthBuffer: true,
+          stencilBuffer: true,
+          samples: 0,
+        });
+        target.texture.name = 'board3d-fx-target';
+      } else if (target.width !== width || target.height !== height) {
+        target.setSize(width, height);
+      }
+      if (UnrealBloomPass && !bloom) {
+        bloom = new UnrealBloomPass(new three.Vector2(width, height), BLOOM.strength, BLOOM.radius, BLOOM.threshold);
+        // The pass adds its own alpha on composite, which would darken the board under every
+        // glow; glow is light only, so its alpha write is turned off.
+        bloom.blendMaterial.blending = three.CustomBlending;
+        bloom.blendMaterial.blendEquation = three.AddEquation;
+        bloom.blendMaterial.blendSrc = three.OneFactor;
+        bloom.blendMaterial.blendDst = three.OneFactor;
+        bloom.blendMaterial.blendSrcAlpha = three.ZeroFactor;
+        bloom.blendMaterial.blendDstAlpha = three.OneFactor;
+      } else if (bloom && (bloom.resolution.x !== width || bloom.resolution.y !== height)) {
+        bloom.resolution.set(width, height);
+        bloom.setSize(width, height);
+      }
+      const fxTarget = target;
       elements.setViewport(fxTarget.width, fxTarget.height);
       renderer.setRenderTarget(fxTarget);
       renderer.setClearColor(0x000000, 0);

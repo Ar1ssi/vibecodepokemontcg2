@@ -120,7 +120,10 @@ export const removeSyncIntervals = () => {
     clearTimeout(peerLogTimeout);
     peerLogTimeout = null;
   }
-  stopSyncCheckHeartbeat();
+  if (syncCheckIntervalId) {
+    clearInterval(syncCheckIntervalId);
+    syncCheckIntervalId = null;
+  }
   clearRequestActionStaleTimer();
   requestActionQueue.clear();
 };
@@ -160,13 +163,6 @@ const startSyncCheckHeartbeat = () => {
       stateVersion: getLastRenderedVersion(),
     });
   }, SYNC_CHECK_INTERVAL_MS);
-};
-
-const stopSyncCheckHeartbeat = () => {
-  if (syncCheckIntervalId) {
-    clearInterval(syncCheckIntervalId);
-    syncCheckIntervalId = null;
-  }
 };
 
 // Design 074 D7: a solo room's views are drawn from its near seat. After a board flip the
@@ -346,7 +342,28 @@ export const initializeSocketEventListeners = () => {
       return;
     }
     if (data?.solo === true) {
-      handleSoloJoinGame();
+      // Design 074 D7: the server seated this socket as both players of a solo room. The Solo
+      // tab stays as it is (no room lobby or chat); both decks load into their seats.
+      resetNetcodeForRoomChange();
+      document.dispatchEvent(new CustomEvent('room-changed'));
+      // Put 'self' back at the bottom while the iframe flip still applies.
+      if (systemState.initiator === 'opp') flipBoard();
+      systemState.initiator = 'self';
+      systemState.solo = true;
+      systemState.nearSeat = 'p1';
+      systemState.isTwoPlayer = true;
+      systemState.p2OppUsername = soloFarName(systemState.p2SelfUsername);
+      startSyncCheckHeartbeat();
+      forceRulesEnabledForMultiplayer();
+      cleanActionData('self');
+      cleanActionData('opp');
+      if (systemState.selfDeckData) {
+        loadDeckData('self', systemState.selfDeckData, systemState.deckFormat.self);
+      }
+      if (systemState.p1OppDeckData) {
+        loadDeckData('opp', systemState.p1OppDeckData, systemState.deckFormat.p1Opp);
+      }
+      appendMessage('', 'Solo game started — you play both seats.', 'announcement', false);
       return;
     }
     // Design 002 slice 3.10: a fresh room must not inherit the previous
@@ -405,30 +422,6 @@ export const initializeSocketEventListeners = () => {
     if (shouldRequestViewOnJoin(data)) {
       emitRequestView({ socket, roomId: systemState.roomId });
     }
-  };
-  // Design 074 D7: the server seated this socket as both players of a solo room. The Solo
-  // tab stays as it is (no room lobby or chat); both decks load into their seats.
-  const handleSoloJoinGame = () => {
-    resetNetcodeForRoomChange();
-    document.dispatchEvent(new CustomEvent('room-changed'));
-    // Put 'self' back at the bottom while the iframe flip still applies.
-    if (systemState.initiator === 'opp') flipBoard();
-    systemState.initiator = 'self';
-    systemState.solo = true;
-    systemState.nearSeat = 'p1';
-    systemState.isTwoPlayer = true;
-    systemState.p2OppUsername = soloFarName(systemState.p2SelfUsername);
-    startSyncCheckHeartbeat();
-    forceRulesEnabledForMultiplayer();
-    cleanActionData('self');
-    cleanActionData('opp');
-    if (systemState.selfDeckData) {
-      loadDeckData('self', systemState.selfDeckData, systemState.deckFormat.self);
-    }
-    if (systemState.p1OppDeckData) {
-      loadDeckData('opp', systemState.p1OppDeckData, systemState.deckFormat.p1Opp);
-    }
-    appendMessage('', 'Solo game started — you play both seats.', 'announcement', false);
   };
   socket.on('spectatorJoin', (data) => {
     systemState.serverAuthoritative = Boolean(data?.serverAuthoritative);

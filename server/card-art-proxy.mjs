@@ -112,13 +112,6 @@ export function createCardArtProxy({
     }
   }
 
-  function rememberMissing(href) {
-    missing.delete(href);
-    missing.set(href, now() + NOT_FOUND_TTL_MS);
-    // Bounded like the image cache, by count: a miss costs a few bytes.
-    while (missing.size > 4096) missing.delete(missing.keys().next().value);
-  }
-
   async function withSlot(task) {
     if (active >= concurrency) await new Promise((resolve) => waiting.push(resolve));
     active += 1;
@@ -165,7 +158,12 @@ export function createCardArtProxy({
     if (active >= concurrency && waiting.length >= maxWaiting) return { status: 503 };
     const result = await withSlot(() => fetchUpstream(href));
     if (result.status === 200) remember(href, { type: result.type, body: result.body });
-    else if (result.status === 404) rememberMissing(href);
+    else if (result.status === 404) {
+      missing.delete(href);
+      missing.set(href, now() + NOT_FOUND_TTL_MS);
+      // Bounded like the image cache, by count: a miss costs a few bytes.
+      while (missing.size > 4096) missing.delete(missing.keys().next().value);
+    }
     else if (isPushBack(result.upstream)) cooldownUntil = now() + COOLDOWN_MS;
     return { status: result.status, type: result.type, body: result.body };
   }

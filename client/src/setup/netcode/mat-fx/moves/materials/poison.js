@@ -34,8 +34,6 @@ import { grainPass, inShadow, shardOutline, tongueOutline, traceOutline } from '
 const TAU = Math.PI * 2;
 const rad = (deg) => (deg * Math.PI) / 180;
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
-const easeOutCubic = (t) => 1 - (1 - t) ** 3;
-const easeOutQuad = (t) => 1 - (1 - t) ** 2;
 
 const GLOB_POINTS = 24;
 const GLOB_AMP = 0.08;
@@ -75,11 +73,6 @@ const POOL_MOD = Object.freeze({
   volume: Object.freeze({ amount: 0.6, spec: 0.6, rim: 0.2, light: 120, bump: 0.6, bumpScale: 4, ambient: 0.4 }),
 });
 const SKIN_MOD = Object.freeze({ volume: Object.freeze({ amount: 0.7, spec: 0.5, rim: 0.4, light: 120, bump: 0, ambient: 0.4 }) });
-/** A stream's ooze wavering along it, lit as a tube round its axis. */
-const oozeMod = (angleDeg) => ({
-  distort: { strength: 0.06, speed: 1, scale: 4, angle: angleDeg },
-  volume: { amount: 0.75, spec: 0.6, rim: 0.4, light: 120, bump: 0.3, radius: 0.07, ambient: 0.4 },
-});
 // Heights (lane units) over the drawer's lift: the pool on the card, ooze just above the cloth,
 // its riding globs and glints over it, bubbles off the pool, a glob (a projectile's head) highest.
 const LIFT = Object.freeze({ ooze: 0.04, ride: 0.05, rideGlint: 0.055, bubbles: 0.06, glob: 0.1 });
@@ -134,7 +127,7 @@ export function streamGlobs({ x, y, angleDeg, length, width, time, seed }) {
 
 /** How far the venom pool has spread at glyph progress `s` (0 -> 1 over the first quarter). */
 export function poolSpread(s) {
-  return easeOutCubic(clamp01(clamp01(s) / POOL_RISE));
+  return 1 - (1 - clamp01(clamp01(s) / POOL_RISE)) ** 3;
 }
 
 /**
@@ -157,7 +150,7 @@ export function bubbleRise(s, r) {
     else if (local > 1 - BUBBLE_POP) alpha = (1 - local) / BUBBLE_POP;
     out.push({
       dx: r * (lane * 0.7 + 0.08 * Math.sin(local * TAU * 1.5 + i)),
-      dy: -r * (0.1 + BUBBLE_RISE * easeOutQuad(local)),
+      dy: -r * (0.1 + BUBBLE_RISE * (1 - (1 - local) ** 2)),
       radius: r * size * (0.6 + 0.6 * local),
       alpha,
     });
@@ -275,7 +268,11 @@ function poisonKit(palette) {
       ctx.fxStyle = VENOM_OOZE;
       ctx.fillStyle = alongStream(ctx, spec, palette.body, OOZE_ALPHA * alpha);
       traceOutline(ctx, tongueOutline({ ...spec, amp: 0.5 }, 0.8));
-      withLiftZ(ctx, LIFT.ooze, () => withFxMod(ctx, oozeMod(spec.angleDeg), () => ctx.fill()));
+      // A stream's ooze wavering along it, lit as a tube round its axis.
+      withLiftZ(ctx, LIFT.ooze, () => withFxMod(ctx, {
+        distort: { strength: 0.06, speed: 1, scale: 4, angle: spec.angleDeg },
+        volume: { amount: 0.75, spec: 0.6, rim: 0.4, light: 120, bump: 0.3, radius: 0.07, ambient: 0.4 },
+      }, () => ctx.fill()));
       ctx.fxStyle = null;
       ctx.fillStyle = rgbCss(palette.body, GLOB_ALPHA * alpha);
       ctx.beginPath();

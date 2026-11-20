@@ -321,52 +321,6 @@ function scorchedEarthBoard({ three, material, seeded }) {
   };
 }
 
-/** One lightning ribbon: a stroke and its fork, each a strip of quads along 0..1, two sides. */
-const boltGeometry = (three) => {
-  const along = [];
-  const side = [];
-  const fork = [];
-  const index = [];
-  let first = 0;
-  for (const [isFork, segments] of [
-    [0, highland.BOLT_SEGMENTS.stroke],
-    [1, highland.BOLT_SEGMENTS.fork],
-  ]) {
-    for (let i = 0; i <= segments; i += 1) {
-      for (const s of [-1, 1]) {
-        along.push(i / segments);
-        side.push(s);
-        fork.push(isFork);
-      }
-    }
-    for (let i = 0; i < segments; i += 1) {
-      const a = first + i * 2;
-      index.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
-    }
-    first += (segments + 1) * 2;
-  }
-  const geometry = new three.BufferGeometry();
-  geometry.setAttribute('position', new three.Float32BufferAttribute(new Float32Array(along.length * 3), 3));
-  geometry.setAttribute('aAlong', new three.Float32BufferAttribute(along, 1));
-  geometry.setAttribute('aSide', new three.Float32BufferAttribute(side, 1));
-  geometry.setAttribute('aFork', new three.Float32BufferAttribute(fork, 1));
-  geometry.setIndex(index);
-  return geometry;
-};
-
-/**
- * The turns (rad, 0 along the table's width, pi/2 along its length) at which a point `radius` from
- * the mountain's centre, toward any corner, lies inside `bounds` by STORM_PX.inset; null when none.
- */
-const cornerWindow = (bowl, bounds, radius) => {
-  const across = Math.min(bowl.x - bounds.x, bounds.x + bounds.w - bowl.x) - STORM_PX.inset;
-  const along = Math.min(bowl.y - bounds.y, bounds.y + bounds.h - bowl.y) - STORM_PX.inset;
-  if (!(across > 0 && along > 0 && radius > 0)) return null;
-  const from = Math.acos(Math.min(1, across / radius));
-  const to = Math.asin(Math.min(1, along / radius));
-  return to - from >= STORM_MIN_TURN ? { from, to } : null;
-};
-
 /**
  * Where strike `index` of lightning slot `slot` runs: two times in three from the storm down onto a
  * peak's summit, falling from over the crater's side of it (a stroke from out past a peak at the
@@ -393,7 +347,16 @@ export function strikePath(index, slot, { bowl, peaks }, bounds) {
   for (let attempt = 0; attempt < STORM_ATTEMPTS; attempt += 1) {
     const salt = 10 + attempt * 8;
     const radii = [3, 4].map((k) => bowl.rim + STORM_PX.from + STORM_PX.span * roll(salt + k));
-    const windows = radii.map((radius) => cornerWindow(bowl, bounds, radius));
+    const windows = radii.map((radius) => {
+      // The turns (rad, 0 along the table's width, pi/2 along its length) at which a point `radius` from
+      // the mountain's centre, toward any corner, lies inside `bounds` by STORM_PX.inset; null when none.
+      const across = Math.min(bowl.x - bounds.x, bounds.x + bounds.w - bowl.x) - STORM_PX.inset;
+      const along = Math.min(bowl.y - bounds.y, bounds.y + bounds.h - bowl.y) - STORM_PX.inset;
+      if (!(across > 0 && along > 0 && radius > 0)) return null;
+      const from = Math.acos(Math.min(1, across / radius));
+      const to = Math.asin(Math.min(1, along / radius));
+      return to - from >= STORM_MIN_TURN ? { from, to } : null;
+    });
     if (!windows[0] || !windows[1]) continue;
     const from = Math.max(windows[0].from, windows[1].from);
     const to = Math.min(windows[0].to, windows[1].to);
@@ -468,7 +431,36 @@ function stormyMountainsBoard({ three, material }) {
       { transparent: true, depthWrite: false, blending: three.AdditiveBlending, side: three.DoubleSide },
       uniforms
     );
-    const mesh = new three.Mesh(boltGeometry(three), boltMaterial);
+    // One lightning ribbon: a stroke and its fork, each a strip of quads along 0..1, two sides.
+    const along = [];
+    const side = [];
+    const fork = [];
+    const index = [];
+    let first = 0;
+    for (const [isFork, segments] of [
+      [0, highland.BOLT_SEGMENTS.stroke],
+      [1, highland.BOLT_SEGMENTS.fork],
+    ]) {
+      for (let i = 0; i <= segments; i += 1) {
+        for (const s of [-1, 1]) {
+          along.push(i / segments);
+          side.push(s);
+          fork.push(isFork);
+        }
+      }
+      for (let i = 0; i < segments; i += 1) {
+        const a = first + i * 2;
+        index.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+      }
+      first += (segments + 1) * 2;
+    }
+    const geometry = new three.BufferGeometry();
+    geometry.setAttribute('position', new three.Float32BufferAttribute(new Float32Array(along.length * 3), 3));
+    geometry.setAttribute('aAlong', new three.Float32BufferAttribute(along, 1));
+    geometry.setAttribute('aSide', new three.Float32BufferAttribute(side, 1));
+    geometry.setAttribute('aFork', new three.Float32BufferAttribute(fork, 1));
+    geometry.setIndex(index);
+    const mesh = new three.Mesh(geometry, boltMaterial);
     mesh.renderOrder = 2;
     mesh.visible = false;
     return { mesh, uniforms, material: boltMaterial };
@@ -985,29 +977,6 @@ export function createStadiumEnvironment({
     return plateTarget;
   };
 
-  /** True when the camera, the table or the canvas differ from the last time it was asked. */
-  const viewChanged = (camera) => {
-    let changed = false;
-    const mark = (index, value) => {
-      if (watched[index] === value) return;
-      watched[index] = value;
-      changed = true;
-    };
-    let index = 0;
-    for (const value of [
-      ...camera.position.toArray(),
-      ...camera.quaternion.toArray(),
-      ...camera.projectionMatrix.elements,
-      ...group.matrixWorld.elements,
-      bufferSize.x,
-      bufferSize.y,
-    ]) {
-      mark(index, value);
-      index += 1;
-    }
-    return changed;
-  };
-
   const boardOf = (wanted) => {
     if (!boards.has(wanted)) {
       const board = BOARDS[wanted](kit);
@@ -1063,43 +1032,6 @@ export function createStadiumEnvironment({
   };
 
   /**
-   * The board's ground field and its light, at ~BAKE_TEXELS_PER_PX texels per px of its scene, fewer
-   * when that would pass BAKE_MAX_TEXEL_AREA. A board's first pass (`bakePre`) bakes before its
-   * field, which reads it as uPre.
-   */
-  const bake = (bounds, board) => {
-    const texelsPerPx = Math.min(glsl.BAKE_TEXELS_PER_PX, Math.sqrt(glsl.BAKE_MAX_TEXEL_AREA / (bounds.w * bounds.h)));
-    const width = Math.max(2, Math.min(glsl.BAKE_MAX_TEXELS, Math.round(bounds.w * texelsPerPx)));
-    const height = Math.max(2, Math.round((width * bounds.h) / bounds.w));
-    if (!targets || targets.field.width !== width || targets.field.height !== height) {
-      disposeTargets();
-      targets = {
-        pre: null,
-        field: halfFloatTarget(width, height),
-        light: new three.WebGLRenderTarget(width, height, {
-          type: three.UnsignedByteType,
-          minFilter: three.LinearMipmapLinearFilter,
-          magFilter: three.LinearFilter,
-          generateMipmaps: true,
-          depthBuffer: false,
-        }),
-      };
-    }
-    uniforms.uTexel.value.set(1 / width, 1 / height);
-    const previous = renderer.getRenderTarget();
-    if (board.bakePre) {
-      targets.pre ??= halfFloatTarget(width, height);
-      renderBake(targets.pre, board.bakePre);
-      uniforms.uPre.value = targets.pre.texture;
-    }
-    renderBake(targets.field, board.bakeField);
-    uniforms.uField.value = targets.field.texture;
-    renderBake(targets.light, board.bakeLight ?? bakeLight);
-    uniforms.uLight.value = targets.light.texture;
-    renderer.setRenderTarget(previous);
-  };
-
-  /**
    * The shown board's landmarks from the layout: its meshes and uniforms, then (unless `bakeToo` is
    * false) its bake. Each runs again only when the landmarks or the board changed.
    */
@@ -1129,7 +1061,38 @@ export function createStadiumEnvironment({
       appliedFor = signature;
     }
     if (!bakeToo || signature === bakedFor) return true;
-    bake(bounds, board);
+    // The board's ground field and its light, at ~BAKE_TEXELS_PER_PX texels per px of its scene, fewer
+    // when that would pass BAKE_MAX_TEXEL_AREA. A board's first pass (`bakePre`) bakes before its
+    // field, which reads it as uPre.
+    const texelsPerPx = Math.min(glsl.BAKE_TEXELS_PER_PX, Math.sqrt(glsl.BAKE_MAX_TEXEL_AREA / (bounds.w * bounds.h)));
+    const width = Math.max(2, Math.min(glsl.BAKE_MAX_TEXELS, Math.round(bounds.w * texelsPerPx)));
+    const height = Math.max(2, Math.round((width * bounds.h) / bounds.w));
+    if (!targets || targets.field.width !== width || targets.field.height !== height) {
+      disposeTargets();
+      targets = {
+        pre: null,
+        field: halfFloatTarget(width, height),
+        light: new three.WebGLRenderTarget(width, height, {
+          type: three.UnsignedByteType,
+          minFilter: three.LinearMipmapLinearFilter,
+          magFilter: three.LinearFilter,
+          generateMipmaps: true,
+          depthBuffer: false,
+        }),
+      };
+    }
+    uniforms.uTexel.value.set(1 / width, 1 / height);
+    const previous = renderer.getRenderTarget();
+    if (board.bakePre) {
+      targets.pre ??= halfFloatTarget(width, height);
+      renderBake(targets.pre, board.bakePre);
+      uniforms.uPre.value = targets.pre.texture;
+    }
+    renderBake(targets.field, board.bakeField);
+    uniforms.uField.value = targets.field.texture;
+    renderBake(targets.light, board.bakeLight ?? bakeLight);
+    uniforms.uLight.value = targets.light.texture;
+    renderer.setRenderTarget(previous);
     bakedFor = signature;
     return true;
   };
@@ -1163,23 +1126,6 @@ export function createStadiumEnvironment({
     }
   };
 
-  /** compileAsync on the bake passes, a render target bound as when they bake. */
-  const compileBakes = (board) => {
-    const passes = new three.Scene();
-    for (const material of new Set([board.bakePre, board.bakeField, board.bakeLight ?? bakeLight].filter(Boolean))) {
-      const quad = new three.Mesh(bakeQuad.geometry, material);
-      quad.frustumCulled = false;
-      passes.add(quad);
-    }
-    const previous = renderer.getRenderTarget();
-    try {
-      renderer.setRenderTarget(compileTarget);
-      return renderer.compileAsync(passes, bakeCamera);
-    } finally {
-      renderer.setRenderTarget(previous);
-    }
-  };
-
   /**
    * Compiles a board's programs with compileAsync, so the driver compiles and links them in
    * parallel (KHR_parallel_shader_compile) while frames go on: its bake passes, and every mesh,
@@ -1200,16 +1146,29 @@ export function createStadiumEnvironment({
     }
   };
 
-  /** A lost context never reports a program linked: compileAsync would poll for ever. */
-  const contextLost = () => renderer.getContext?.()?.isContextLost?.() === true;
-
   const prepare = (board, camera) => {
     if (board.preparing) return;
     // Each compile on its own, so one that throws doesn't stop the other; each tracked from the
     // moment it starts, so dispose knows three still polls its materials.
-    const compiles = contextLost()
+    // A lost context never reports a program linked: compileAsync would poll for ever.
+    const compiles = renderer.getContext?.()?.isContextLost?.() === true
       ? []
-      : [attempt(() => compileBakes(board)), attempt(() => compileMeshes(renderer.compileAsync.bind(renderer), board, camera))];
+      : [attempt(() => {
+        // compileAsync on the bake passes, a render target bound as when they bake.
+        const passes = new three.Scene();
+        for (const material of new Set([board.bakePre, board.bakeField, board.bakeLight ?? bakeLight].filter(Boolean))) {
+          const quad = new three.Mesh(bakeQuad.geometry, material);
+          quad.frustumCulled = false;
+          passes.add(quad);
+        }
+        const previous = renderer.getRenderTarget();
+        try {
+          renderer.setRenderTarget(compileTarget);
+          return renderer.compileAsync(passes, bakeCamera);
+        } finally {
+          renderer.setRenderTarget(previous);
+        }
+      }), attempt(() => compileMeshes(renderer.compileAsync.bind(renderer), board, camera))];
     for (const compile of compiles) {
       inFlight.add(compile);
       compile.then(() => inFlight.delete(compile));
@@ -1362,7 +1321,26 @@ export function createStadiumEnvironment({
     if (camera) {
       const scale = plateScale(bufferSize.x, bufferSize.y, renderer.getPixelRatio?.());
       uniforms.uFocal.value = (camera.projectionMatrix.elements[5] * bufferSize.y * scale) / 2;
-      if (viewChanged(camera)) plateStale = true;
+      // True when the camera, the table or the canvas differ from the last time it was asked.
+      let changed = false;
+      const mark = (index, value) => {
+        if (watched[index] === value) return;
+        watched[index] = value;
+        changed = true;
+      };
+      let index = 0;
+      for (const value of [
+        ...camera.position.toArray(),
+        ...camera.quaternion.toArray(),
+        ...camera.projectionMatrix.elements,
+        ...group.matrixWorld.elements,
+        bufferSize.x,
+        bufferSize.y,
+      ]) {
+        mark(index, value);
+        index += 1;
+      }
+      if (changed) plateStale = true;
     }
     cutout.uniforms.uTableFromWorld.value.copy(group.matrixWorld).invert();
     if (camera) uniforms.uEye.value.copy(camera.position).applyMatrix4(cutout.uniforms.uTableFromWorld.value);

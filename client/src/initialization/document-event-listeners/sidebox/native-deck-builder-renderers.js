@@ -42,35 +42,11 @@ const escapeHtml = (value = '') => String(value)
     // click listener per grid reads this state at click time, so no tile holds a stale onSelect.
     const renderedSearchGrids = new WeakMap(); // grid element -> { key, results, onSelect }
 
-    const searchResultsKey = (results) => results.map((card) => card.id).join('\n');
-
     // Shared by the fresh render and the in-place patch so both produce the same badge nodes.
     const searchBadgesHtml = (qty, ownedCount) => `
                 ${qty > 0 ? `<span class="native-deck-builder-result-qty" aria-label="${qty} in deck">${qty}</span>` : ''}
                 ${ownedBadgeHtml(ownedCount)}
                 `;
-
-    const searchTileHtml = (card, index, quantities, owned) => {
-      const previewImage = card.images?.large || card.images?.small || card.image || '';
-      const thumbImage = tileScanUrl(card.images?.small || card.image || '');
-      const setName = escapeHtml(card.set?.name || 'Unknown Set');
-      const qty = quantities[card.id] || 0;
-
-      // Image-first, as in Pokémon TCG Live: the card scan IS the tile.
-      // The name/set caption stays in the DOM for screen readers and for
-      // the light theme, but reads as a hover-in footer over the art.
-      // data-in-deck comes last so a patched attribute lands in the same position.
-      return `
-            <button class="native-deck-builder-result" data-card-id="${escapeHtml(card.id)}" data-result-index="${index}"${previewImage ? ` data-preview-image="${escapeHtml(previewImage)}"` : ''} title="${escapeHtml(card.name)} · ${setName}"${qty > 0 ? ` data-in-deck="${qty}"` : ''}>
-              <span class="native-deck-builder-result-frame">
-                <img src="${escapeHtml(thumbImage)}" alt="${escapeHtml(card.name)}" class="native-deck-builder-result-image" loading="lazy" />${searchBadgesHtml(qty, owned[card.id])}<span class="native-deck-builder-result-text">
-                  <strong>${escapeHtml(card.name)}${shownPokemonForm(card) ? ` <small>${escapeHtml(shownPokemonForm(card).label)}</small>` : ''}</strong>
-                  <span>${setName}</span>
-                </span>
-              </span>
-            </button>
-          `;
-    };
 
     const selectTile = (grid, button) => {
       const state = renderedSearchGrids.get(grid);
@@ -79,24 +55,23 @@ const escapeHtml = (value = '') => String(value)
 
     // Phone layout: tap previews, double tap adds.
     const gridTaps = new WeakMap(); // grid element -> tap resolver
-    const phoneTap = (grid, button) => {
-      if (!gridTaps.has(grid)) {
-        gridTaps.set(
-          grid,
-          createTapGesture({
-            onSingle: previewTile,
-            onDouble: (tile) => selectTile(grid, tile),
-          })
-        );
-      }
-      gridTaps.get(grid)(button);
-    };
 
     const handleSearchGridClick = (event) => {
       const grid = event.currentTarget;
       const button = event.target.closest('[data-result-index]');
       if (!button || !renderedSearchGrids.has(grid) || !grid.contains(button)) return;
-      if (isPhoneLayout()) phoneTap(grid, button);
+      if (isPhoneLayout()) {
+        if (!gridTaps.has(grid)) {
+          gridTaps.set(
+            grid,
+            createTapGesture({
+              onSingle: previewTile,
+              onDouble: (tile) => selectTile(grid, tile),
+            })
+          );
+        }
+        gridTaps.get(grid)(button);
+      }
       else selectTile(grid, button);
     };
 
@@ -117,16 +92,6 @@ const escapeHtml = (value = '') => String(value)
       text.before(template.content);
     };
 
-    const patchSearchBadges = (grid, results, quantities, owned) => {
-      grid.querySelectorAll('[data-result-index]').forEach((button) => {
-        const card = results[Number(button.dataset.resultIndex)];
-        const qty = quantities[card.id] || 0;
-        if (qty > 0) button.dataset.inDeck = String(qty);
-        else delete button.dataset.inDeck;
-        replaceTileBadges(button, searchBadgesHtml(qty, owned[card.id]));
-      });
-    };
-
     export const renderSearchResults = ({ searchResultsEl, results, onSelect, quantities = {}, owned = {} }) => {
       if (!searchResultsEl) return;
 
@@ -134,12 +99,38 @@ const escapeHtml = (value = '') => String(value)
       if (!previous) searchResultsEl.addEventListener('click', handleSearchGridClick);
 
       const nextResults = results || [];
-      const key = searchResultsKey(nextResults);
+      const key = nextResults.map((card) => card.id).join('\n');
       if (previous?.key === key) {
-        patchSearchBadges(searchResultsEl, nextResults, quantities, owned);
+        searchResultsEl.querySelectorAll('[data-result-index]').forEach((button) => {
+          const card = nextResults[Number(button.dataset.resultIndex)];
+          const qty = quantities[card.id] || 0;
+          if (qty > 0) button.dataset.inDeck = String(qty);
+          else delete button.dataset.inDeck;
+          replaceTileBadges(button, searchBadgesHtml(qty, owned[card.id]));
+        });
       } else {
         searchResultsEl.innerHTML = nextResults
-          .map((card, index) => searchTileHtml(card, index, quantities, owned))
+          .map((card, index) => {
+            const previewImage = card.images?.large || card.images?.small || card.image || '';
+            const thumbImage = tileScanUrl(card.images?.small || card.image || '');
+            const setName = escapeHtml(card.set?.name || 'Unknown Set');
+            const qty = quantities[card.id] || 0;
+
+            // Image-first, as in Pokémon TCG Live: the card scan IS the tile.
+            // The name/set caption stays in the DOM for screen readers and for
+            // the light theme, but reads as a hover-in footer over the art.
+            // data-in-deck comes last so a patched attribute lands in the same position.
+            return `
+            <button class="native-deck-builder-result" data-card-id="${escapeHtml(card.id)}" data-result-index="${index}"${previewImage ? ` data-preview-image="${escapeHtml(previewImage)}"` : ''} title="${escapeHtml(card.name)} · ${setName}"${qty > 0 ? ` data-in-deck="${qty}"` : ''}>
+              <span class="native-deck-builder-result-frame">
+                <img src="${escapeHtml(thumbImage)}" alt="${escapeHtml(card.name)}" class="native-deck-builder-result-image" loading="lazy" />${searchBadgesHtml(qty, owned[card.id])}<span class="native-deck-builder-result-text">
+                  <strong>${escapeHtml(card.name)}${shownPokemonForm(card) ? ` <small>${escapeHtml(shownPokemonForm(card).label)}</small>` : ''}</strong>
+                  <span>${setName}</span>
+                </span>
+              </span>
+            </button>
+          `;
+          })
           .join('');
       }
       renderedSearchGrids.set(searchResultsEl, { key, results: nextResults, onSelect });
@@ -156,41 +147,6 @@ const escapeHtml = (value = '') => String(value)
     const groupActiveCount = (group, filters) => {
       if (group.kind === 'range') return filters?.hpMin != null || filters?.hpMax != null ? 1 : 0;
       return group.options.filter((option) => isOptionOn(group, option, filters)).length;
-    };
-
-    const renderFilterControl = (group, option, filters) => {
-      const isOn = isOptionOn(group, option, filters);
-      const label = escapeHtml(option.label);
-      // Toggles flip a boolean named by the option itself, not by the group.
-      const dataGroup = escapeHtml(group.kind === 'toggles' ? option.value : group.key);
-      const data = `data-filter-group="${dataGroup}" data-filter-value="${escapeHtml(option.value)}"`;
-
-      if (group.kind === 'toggles') {
-        return `<button type="button" role="switch" aria-checked="${isOn}" class="native-deck-builder-ftoggle${isOn ? ' on' : ''}" ${data}>
-            <span class="native-deck-builder-ftoggle-label">${label}</span>
-            <span class="native-deck-builder-ftoggle-track" aria-hidden="true"><span class="native-deck-builder-ftoggle-dot"></span></span>
-          </button>`;
-      }
-      if (group.kind === 'icons') {
-        return `<button type="button" class="native-deck-builder-ficon${isOn ? ' on' : ''}" ${data} aria-pressed="${isOn}" title="${label}" aria-label="${label}">
-            <img src="${escapeHtml(option.icon)}" alt="" />
-          </button>`;
-      }
-      if (group.kind === 'pips') {
-        return `<button type="button" class="native-deck-builder-fpip${isOn ? ' on' : ''}" ${data} aria-pressed="${isOn}" title="Retreat ${label}">${label}</button>`;
-      }
-      return `<button type="button" class="native-deck-builder-fpill${isOn ? ' on' : ''}" ${data} aria-pressed="${isOn}">${label}</button>`;
-    };
-
-    const renderHpRange = (filters) => {
-      const low = filters?.hpMin ?? HP_SLIDER.min;
-      const high = filters?.hpMax ?? HP_SLIDER.max;
-      const range = `min="${HP_SLIDER.min}" max="${HP_SLIDER.max}" step="${HP_SLIDER.step}"`;
-      return `<div class="native-deck-builder-frange">
-          <input type="range" ${range} value="${low}" data-hp-bound="min" aria-label="Minimum HP" />
-          <input type="range" ${range} value="${high}" data-hp-bound="max" aria-label="Maximum HP" />
-        </div>
-        <div class="native-deck-builder-frange-readout"><span data-hp-readout="min">${low}</span><span data-hp-readout="max">${high}</span></div>`;
     };
 
     /**
@@ -225,11 +181,40 @@ const escapeHtml = (value = '') => String(value)
           const count = groupActiveCount({ ...group, options }, filters);
           let body;
           if (group.kind === 'range') {
-            body = renderHpRange(filters);
+            const low = filters?.hpMin ?? HP_SLIDER.min;
+            const high = filters?.hpMax ?? HP_SLIDER.max;
+            const range = `min="${HP_SLIDER.min}" max="${HP_SLIDER.max}" step="${HP_SLIDER.step}"`;
+            body = `<div class="native-deck-builder-frange">
+          <input type="range" ${range} value="${low}" data-hp-bound="min" aria-label="Minimum HP" />
+          <input type="range" ${range} value="${high}" data-hp-bound="max" aria-label="Maximum HP" />
+        </div>
+        <div class="native-deck-builder-frange-readout"><span data-hp-readout="min">${low}</span><span data-hp-readout="max">${high}</span></div>`;
           } else if (!options.length) {
             body = '<span class="native-deck-builder-fsec-empty">Search first — the expansions in your results appear here.</span>';
           } else {
-            body = options.map((option) => renderFilterControl(group, option, filters)).join('');
+            body = options.map((option) => {
+              const isOn = isOptionOn(group, option, filters);
+              const label = escapeHtml(option.label);
+              // Toggles flip a boolean named by the option itself, not by the group.
+              const dataGroup = escapeHtml(group.kind === 'toggles' ? option.value : group.key);
+              const data = `data-filter-group="${dataGroup}" data-filter-value="${escapeHtml(option.value)}"`;
+
+              if (group.kind === 'toggles') {
+                return `<button type="button" role="switch" aria-checked="${isOn}" class="native-deck-builder-ftoggle${isOn ? ' on' : ''}" ${data}>
+            <span class="native-deck-builder-ftoggle-label">${label}</span>
+            <span class="native-deck-builder-ftoggle-track" aria-hidden="true"><span class="native-deck-builder-ftoggle-dot"></span></span>
+          </button>`;
+              }
+              if (group.kind === 'icons') {
+                return `<button type="button" class="native-deck-builder-ficon${isOn ? ' on' : ''}" ${data} aria-pressed="${isOn}" title="${label}" aria-label="${label}">
+            <img src="${escapeHtml(option.icon)}" alt="" />
+          </button>`;
+              }
+              if (group.kind === 'pips') {
+                return `<button type="button" class="native-deck-builder-fpip${isOn ? ' on' : ''}" ${data} aria-pressed="${isOn}" title="Retreat ${label}">${label}</button>`;
+              }
+              return `<button type="button" class="native-deck-builder-fpill${isOn ? ' on' : ''}" ${data} aria-pressed="${isOn}">${label}</button>`;
+            }).join('');
           }
           return `
             <section class="native-deck-builder-fsec${group.span === 2 ? ' span2' : ''}" data-fsec="${escapeHtml(group.key)}">

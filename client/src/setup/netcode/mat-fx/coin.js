@@ -11,14 +11,6 @@ import { coinCeremonyTimeline } from './coin-pose.mjs';
 // flood, so a second flip can arrive while the first is still on screen.
 let ceremonyChain = Promise.resolve();
 
-const headingFor = (plan) => {
-  const owner = plan.user === 'opp' ? "Opponent's" : 'Your';
-  const context = [plan.attackName, plan.source].find(
-    (value) => typeof value === 'string' && value.trim() !== ''
-  );
-  return context ? `${owner} coin flip — ${context}` : `${owner} coin flip`;
-};
-
 export const coinFlip = (plan) => {
   const faces = Array.isArray(plan.faces) ? plan.faces : [];
   if (faces.length === 0) return 0;
@@ -26,7 +18,11 @@ export const coinFlip = (plan) => {
   const reducedMotion = motionReduced();
   const side = plan.user === 'opp' ? 'opp' : 'self';
   const coin = getSelectedCoin(side) || pickDefaultCoin();
-  const label = headingFor(plan);
+  const owner = plan.user === 'opp' ? "Opponent's" : 'Your';
+  const context = [plan.attackName, plan.source].find(
+    (value) => typeof value === 'string' && value.trim() !== ''
+  );
+  const label = context ? `${owner} coin flip — ${context}` : `${owner} coin flip`;
 
   ceremonyChain = ceremonyChain
     .then(() => playCoinFlipCeremony({ coin, results: faces, label, passive: true, reducedMotion }))

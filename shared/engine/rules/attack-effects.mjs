@@ -106,7 +106,6 @@ const TYPES = [
   'dragon',
 ];
 const TYPE_RE = TYPES.join('|');
-const hasTypeMention = (t) => new RegExp(`\\b(${TYPE_RE})\\b`).test(t);
 
 // Detect a dual-status application: "now Asleep and Poisoned",
 // "is now Burned and Confused", etc. Returns the two status nouns or null.
@@ -187,7 +186,7 @@ export function classifyAttackEffect(attack) {
   // Coin-conditional bonuses ("if heads/if tails … more damage") are excluded
   // here and handled by the coin-flip / per-heads-coin families below.
   const hasCoin = /flip a coin|flip \d+ coins?|a coin/.test(t);
-  if (/if the defending pok[ée]mon is/.test(t) && hasTypeMention(t))
+  if (/if the defending pok[ée]mon is/.test(t) && new RegExp(`\\b(${TYPE_RE})\\b`).test(t))
     return 'extra-by-type';
   if (
     !hasCoin &&

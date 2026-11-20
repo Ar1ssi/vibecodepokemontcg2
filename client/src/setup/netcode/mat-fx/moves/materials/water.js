@@ -94,43 +94,41 @@ function waterKit(palette) {
   /** A droplet: a translucent covering sphere lit from 30 % up-left, a deep rim, a white specular dot. */
   function body(ctx, x, y, r, alpha, hot = 1) {
     if (!(r > 0) || !(alpha > 0)) return;
-    withLiftZ(ctx, LIFT.drop, () => droplet(ctx, x, y, r, alpha, hot));
-  }
-
-  /** The droplet's sphere, rim and specular dot at the current lift. */
-  function droplet(ctx, x, y, r, alpha, hot) {
-    inShadow(ctx, () => {
-      ctx.fxStyle = LIQUID_DROP;
-      withFxMod(ctx, DROP_MOD, () =>
-        sphere(
-          ctx,
-          x,
-          y,
-          r,
-          [
-            [0, palette.core, alpha * 0.6],
-            [0.5, palette.hot, alpha * 0.45],
-            [0.85, palette.body, alpha * 0.6],
-            [1, palette.deep, alpha * 0.5],
-          ],
-          0.3
-        )
-      );
-      ctx.fxStyle = null;
-    });
-    const rim = Math.min(2, Math.max(0.75, r * 0.12));
-    ctx.strokeStyle = rgbCss(palette.deep, 0.3 * alpha);
-    ctx.lineWidth = rim;
-    ctx.beginPath();
-    ctx.arc(x, y, Math.max(r - rim / 2, rim / 2), 0, TAU);
-    ctx.stroke();
-    const shine = clamp01(hot);
-    if (shine > 0) {
-      ctx.fillStyle = rgbCss(palette.white, 0.55 * alpha * shine);
+    withLiftZ(ctx, LIFT.drop, () => {
+      // The droplet's sphere, rim and specular dot at the current lift.
+      inShadow(ctx, () => {
+        ctx.fxStyle = LIQUID_DROP;
+        withFxMod(ctx, DROP_MOD, () =>
+          sphere(
+            ctx,
+            x,
+            y,
+            r,
+            [
+              [0, palette.core, alpha * 0.6],
+              [0.5, palette.hot, alpha * 0.45],
+              [0.85, palette.body, alpha * 0.6],
+              [1, palette.deep, alpha * 0.5],
+            ],
+            0.3
+          )
+        );
+        ctx.fxStyle = null;
+      });
+      const rim = Math.min(2, Math.max(0.75, r * 0.12));
+      ctx.strokeStyle = rgbCss(palette.deep, 0.3 * alpha);
+      ctx.lineWidth = rim;
       ctx.beginPath();
-      ctx.arc(x - r * 0.3, y - r * 0.3, r * 0.11, 0, TAU);
-      ctx.fill();
-    }
+      ctx.arc(x, y, Math.max(r - rim / 2, rim / 2), 0, TAU);
+      ctx.stroke();
+      const shine = clamp01(hot);
+      if (shine > 0) {
+        ctx.fillStyle = rgbCss(palette.white, 0.55 * alpha * shine);
+        ctx.beginPath();
+        ctx.arc(x - r * 0.3, y - r * 0.3, r * 0.11, 0, TAU);
+        ctx.fill();
+      }
+    });
   }
 
   /** Small round drops in one path, one covering fill: `drops` = [[x, y, r]...]. */

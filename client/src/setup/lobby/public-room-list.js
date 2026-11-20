@@ -56,19 +56,18 @@ const renderRow = (row) => {
   return item;
 };
 
-const renderRooms = (rooms) => {
-  const list = document.getElementById('publicRoomList');
-  if (!list) return;
-  const heldSeatName = (roomId) => readSeatToken(roomId)?.username ?? null;
-  list.replaceChildren(...publicRoomRows(rooms, heldSeatName).map(renderRow));
-};
-
 const subscribeWhileInLobby = () => {
   if (!systemState.isTwoPlayer) socket.emit('lobbySubscribe');
 };
 
 export const initializePublicRoomList = () => {
-  socket.on('lobbyRooms', (data) => renderRooms(data?.rooms));
+  socket.on('lobbyRooms', (data) => {
+    const rooms = data?.rooms;
+    const list = document.getElementById('publicRoomList');
+    if (!list) return;
+    const heldSeatName = (roomId) => readSeatToken(roomId)?.username ?? null;
+    list.replaceChildren(...publicRoomRows(rooms, heldSeatName).map(renderRow));
+  });
   // A reconnect is a new server-side socket with no subscription.
   socket.on('connect', subscribeWhileInLobby);
   document.addEventListener('room-changed', subscribeWhileInLobby);

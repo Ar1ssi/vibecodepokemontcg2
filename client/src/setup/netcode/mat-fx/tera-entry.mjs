@@ -54,14 +54,6 @@ export function lurch(u) {
 /** How hard the cluster strains before it breaks: 0 until the strain begins, 1 at the burst. */
 export const teraStrain = (ms) => easeInCubic(span(ms, STRAIN_FROM_MS, TERA_BURST_MS));
 
-/** Where the ray from a card's centre toward `angle` (radians, y down) leaves its outline, in h. */
-function edgePoint(angle) {
-  const cos = Math.cos(angle);
-  const sin = Math.sin(angle);
-  const reach = Math.min(CARD_ASPECT / 2 / Math.max(Math.abs(cos), 1e-6), 0.5 / Math.max(Math.abs(sin), 1e-6));
-  return { x: cos * reach, y: sin * reach };
-}
-
 const MAIN_POINTS = 10;
 const SMALL_POINTS = 7;
 const SHARD_SPLITS = Object.freeze({ main: [0.16, 0.5, 0.86], small: [0.3, 0.8] });
@@ -69,7 +61,11 @@ const SHARD_SPLITS = Object.freeze({ main: [0.16, 0.5, 0.86], small: [0.3, 0.8] 
 function buildPoint(rand, index, count, tier) {
   const main = tier === 'main';
   const angle = ((index + 0.15 + 0.7 * rand()) / count) * TAU + (main ? 0 : Math.PI / count);
-  const edge = edgePoint(angle);
+  // Where the ray from a card's centre toward `angle` (radians, y down) leaves its outline, in h.
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const reach = Math.min(CARD_ASPECT / 2 / Math.max(Math.abs(cos), 1e-6), 0.5 / Math.max(Math.abs(sin), 1e-6));
+  const edge = { x: cos * reach, y: sin * reach };
   // The root sits a little inside the outline, so the card hides where the point leaves the cloth.
   const inset = main ? 0.9 : 0.84;
   const length = main ? 0.36 + 0.26 * rand() : 0.17 + 0.13 * rand();

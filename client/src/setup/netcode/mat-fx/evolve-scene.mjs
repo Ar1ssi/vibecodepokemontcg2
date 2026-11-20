@@ -256,58 +256,6 @@ function cardLayerOps(t) {
   return ops;
 }
 
-function backOps(scene, t) {
-  const ops = [];
-  const smoke = local(t, T.smokes);
-  if (smoke != null) {
-    const g = gradientAt(scene.smoke.gradient, smoke);
-    const size = scene.smoke.size;
-    ops.push({ kind: 'dissolve', mask: 'cloudRound', noise: 'renderClouds', x: 0, y: 0, w: size, h: size, rot: scene.smoke.rot, amount: lerp(-1, 0.622, smoke), soft: 0.2, detail: 0.4, rgb: g.rgb, alpha: 0.561 * 0.58 * g.a });
-  }
-  const core = local(t, T.glowCore);
-  if (core != null) {
-    const g = gradientAt(GRADIENTS.glowCore, core);
-    const size = 20.15 * 2 * lerp(0.462, 0.954, core);
-    ops.push({ kind: 'sprite', tex: 'gradRadial', x: 0, y: 0, w: size, h: size, rot: 0, rgb: g.rgb, alpha: LEVEL.glowCore * g.a });
-  }
-  const wisp = local(t, T.wisps);
-  if (wisp != null) {
-    const g = gradientAt(GRADIENTS.wisp, wisp);
-    const elapsed = wisp * T.wisps.life;
-    for (const w of scene.wisps) {
-      const size = w.size * 2 * lerp(0.66, 1, wisp);
-      ops.push({ kind: 'polar', noise: 'tileClouds', mask: 'glowSquare', shape: 'disc', x: 0, y: 0, size, rot: w.rot, tileU: 2.14, tileV: 0.25, offU: 0, offV: -2 * elapsed, levels: [0.25, 1], detail: 0.5, rgb: g.rgb, alpha: LEVEL.wisps * g.a });
-    }
-  }
-  const rays = local(t, T.raysRad);
-  if (rays != null) {
-    const g = gradientAt(GRADIENTS.raysRad, rays);
-    const elapsed = rays * T.raysRad.life;
-    for (const r of scene.raysRad) {
-      const size = r.size * 2 * lerp(0.462, 0.954, rays);
-      ops.push({ kind: 'polar', noise: 'streaks', mask: 'gradRadial', shape: 'open', x: 0, y: 0, size, rot: r.rot + r.spin * elapsed, tileU: 1, tileV: 1, offU: 0.15 * elapsed, offV: elapsed, levels: [0, 0.5], detail: 1.2, rgb: g.rgb, alpha: LEVEL.raysRad * g.a });
-    }
-  }
-  for (const p of scene.softy) {
-    const age = ageOf(timeOk(t) - T.softy.delay, p.birth, p.life);
-    if (age == null) continue;
-    const [x, y] = along(p.x, p.y, p.dir, p.speed * age * p.life);
-    const s = 1.2 * lerp(1, 0.694, age);
-    const alpha = lerp(0.298, 0.325, p.tint) * gradientAt(GRADIENTS.softy, age).a;
-    ops.push(streakOp('raysPrismatic', [1, 4, p.row], x, y, p.dir, p.w * s, p.h * s, [lerp(1, 0.325, p.tint), lerp(1, 0.893, p.tint), 1], alpha));
-  }
-  const sparkT = timeOk(t) - T.sparkles.delay;
-  for (const p of scene.sparkles) {
-    const age = ageOf(sparkT, 0, p.life);
-    if (age == null) continue;
-    const g = gradientAt(p.gradient, age);
-    const [x, y] = along(p.x, p.y, p.dir, limitedTravel(p.speed, { limit: 4, limitCurve: [[0, 1], [1, 0]], dampen: 0.05 }, sparkT, p.life));
-    const size = p.size * 2 * lerp(0.462, 0.621, age);
-    ops.push({ kind: 'sprite', tex: 'starVariants', frame: [2, 2, p.frame], x, y, w: size, h: size, rot: p.rot, rgb: g.rgb, alpha: Math.min(1, 1.28 * g.a) });
-  }
-  return ops;
-}
-
 const SPIN = {
   helix1: { scalar: 10.472, curve: [[0, -0.315], [0.822, -1]], life: 0.81, shrink: 0.559 },
   helix4: { scalar: 10.472, curve: [[0, -0.034], [0.853, -1]], life: 1.0, shrink: 0.09 },
@@ -460,8 +408,56 @@ function popOps(scene, t) {
 /** The frame at scene time `t` (s): back layers, the card cutout, then the front layers. */
 export function evolveOps(scene, t) {
   if (!scene) return [];
+  const ops = [];
+  const smoke = local(t, T.smokes);
+  if (smoke != null) {
+    const g = gradientAt(scene.smoke.gradient, smoke);
+    const size = scene.smoke.size;
+    ops.push({ kind: 'dissolve', mask: 'cloudRound', noise: 'renderClouds', x: 0, y: 0, w: size, h: size, rot: scene.smoke.rot, amount: lerp(-1, 0.622, smoke), soft: 0.2, detail: 0.4, rgb: g.rgb, alpha: 0.561 * 0.58 * g.a });
+  }
+  const core = local(t, T.glowCore);
+  if (core != null) {
+    const g = gradientAt(GRADIENTS.glowCore, core);
+    const size = 20.15 * 2 * lerp(0.462, 0.954, core);
+    ops.push({ kind: 'sprite', tex: 'gradRadial', x: 0, y: 0, w: size, h: size, rot: 0, rgb: g.rgb, alpha: LEVEL.glowCore * g.a });
+  }
+  const wisp = local(t, T.wisps);
+  if (wisp != null) {
+    const g = gradientAt(GRADIENTS.wisp, wisp);
+    const elapsed = wisp * T.wisps.life;
+    for (const w of scene.wisps) {
+      const size = w.size * 2 * lerp(0.66, 1, wisp);
+      ops.push({ kind: 'polar', noise: 'tileClouds', mask: 'glowSquare', shape: 'disc', x: 0, y: 0, size, rot: w.rot, tileU: 2.14, tileV: 0.25, offU: 0, offV: -2 * elapsed, levels: [0.25, 1], detail: 0.5, rgb: g.rgb, alpha: LEVEL.wisps * g.a });
+    }
+  }
+  const rays = local(t, T.raysRad);
+  if (rays != null) {
+    const g = gradientAt(GRADIENTS.raysRad, rays);
+    const elapsed = rays * T.raysRad.life;
+    for (const r of scene.raysRad) {
+      const size = r.size * 2 * lerp(0.462, 0.954, rays);
+      ops.push({ kind: 'polar', noise: 'streaks', mask: 'gradRadial', shape: 'open', x: 0, y: 0, size, rot: r.rot + r.spin * elapsed, tileU: 1, tileV: 1, offU: 0.15 * elapsed, offV: elapsed, levels: [0, 0.5], detail: 1.2, rgb: g.rgb, alpha: LEVEL.raysRad * g.a });
+    }
+  }
+  for (const p of scene.softy) {
+    const age = ageOf(timeOk(t) - T.softy.delay, p.birth, p.life);
+    if (age == null) continue;
+    const [x, y] = along(p.x, p.y, p.dir, p.speed * age * p.life);
+    const s = 1.2 * lerp(1, 0.694, age);
+    const alpha = lerp(0.298, 0.325, p.tint) * gradientAt(GRADIENTS.softy, age).a;
+    ops.push(streakOp('raysPrismatic', [1, 4, p.row], x, y, p.dir, p.w * s, p.h * s, [lerp(1, 0.325, p.tint), lerp(1, 0.893, p.tint), 1], alpha));
+  }
+  const sparkT = timeOk(t) - T.sparkles.delay;
+  for (const p of scene.sparkles) {
+    const age = ageOf(sparkT, 0, p.life);
+    if (age == null) continue;
+    const g = gradientAt(p.gradient, age);
+    const [x, y] = along(p.x, p.y, p.dir, limitedTravel(p.speed, { limit: 4, limitCurve: [[0, 1], [1, 0]], dampen: 0.05 }, sparkT, p.life));
+    const size = p.size * 2 * lerp(0.462, 0.621, age);
+    ops.push({ kind: 'sprite', tex: 'starVariants', frame: [2, 2, p.frame], x, y, w: size, h: size, rot: p.rot, rgb: g.rgb, alpha: Math.min(1, 1.28 * g.a) });
+  }
   return [
-    ...backOps(scene, t),
+    ...ops,
     { kind: 'cutout' },
     ...chargeParticleOps(scene, t),
     ...spiralOps(scene, t),

@@ -3,14 +3,10 @@ import {
   selfContainerDocument,
 } from '../../state.js';
 
-const scrollToBottom = (element) => {
-  element.scrollTop = element.scrollHeight;
-};
-
 const handleMutations = (element, mutations) => {
   mutations.forEach((mutation) => {
     if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-      scrollToBottom(element);
+      element.scrollTop = element.scrollHeight;
     }
   });
 };

@@ -13,9 +13,6 @@ const REJECTION_TEXT = Object.freeze({
   not_seated: 'Only the two seated players choose the format.',
 });
 
-const isSpectating = () =>
-  systemState.isTwoPlayer && Boolean(document.getElementById('spectatorModeCheckbox')?.checked);
-
 const currentView = () => {
   const room = systemState.roomFormat;
   if (!systemState.isTwoPlayer || room.roomId !== systemState.roomId) {
@@ -26,17 +23,16 @@ const currentView = () => {
     proposal: room.proposal,
     seated: room.seated,
     self: systemState.p2SelfUsername,
-    spectator: isSpectating(),
+    spectator: systemState.isTwoPlayer && Boolean(document.getElementById('spectatorModeCheckbox')?.checked),
     dealt: room.dealt,
   });
 };
 
-const setBlockedNote = (panel, blocked) => {
+const openBox = (panel) => {
+  const blocked = !openBuildBattleWindow();
   const note = panel.querySelector('.room-format-blocked');
   if (note) note.hidden = !blocked;
 };
-
-const openBox = (panel) => setBlockedNote(panel, !openBuildBattleWindow());
 
 export const renderRoomFormatPanel = () => {
   const panel = document.getElementById('roomFormatPanel');

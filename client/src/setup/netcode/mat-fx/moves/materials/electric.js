@@ -214,33 +214,6 @@ function electricKit(palette) {
     ctx.fxStyle = null;
   }
 
-  /** Six short two-kink jags radiating off a ball, all in one path, blue fringe then white. */
-  function crackle(ctx, x, y, r, alpha, rand) {
-    ctx.beginPath();
-    const turn = rand() * TAU;
-    for (let k = 0; k < BALL_JAGS; k += 1) {
-      const a = turn + (k / BALL_JAGS) * TAU + (rand() - 0.5) * 0.6;
-      const reach = r * (1.3 + 0.45 * rand());
-      const start = r * 0.75;
-      ctx.moveTo(x + Math.cos(a) * start, y + Math.sin(a) * start);
-      for (const f of [0.45, 1]) {
-        const d = start + (reach - start) * f;
-        const kink = f < 1 ? (rand() - 0.5) * 0.7 : (rand() - 0.5) * 0.3;
-        ctx.lineTo(x + Math.cos(a + kink) * d, y + Math.sin(a + kink) * d);
-      }
-    }
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.fxStyle = ENERGY;
-    ctx.strokeStyle = rgbCss(palette.edge, 0.55 * alpha);
-    ctx.lineWidth = Math.max(1, r * 0.12);
-    layered(ctx, Z_SPARK, TUBE, () => ctx.stroke());
-    ctx.strokeStyle = rgbCss(palette.white, 0.9 * alpha);
-    ctx.lineWidth = Math.max(1, r * 0.05);
-    layered(ctx, Z_SPARK, CENTRE_TUBE, () => ctx.stroke());
-    ctx.fxStyle = null;
-  }
-
   /**
    * The crackling ball: a small white heart fading through yellow to amber, jags round it. The
    * white stays inside a quarter of the radius so a big ball reads as a ball, not a white slab.
@@ -275,7 +248,30 @@ function electricKit(palette) {
       ])
     );
     ctx.fxStyle = null;
-    crackle(ctx, x, y, r, alpha, rand);
+    // Six short two-kink jags radiating off a ball, all in one path, blue fringe then white.
+    ctx.beginPath();
+    const turn = rand() * TAU;
+    for (let k = 0; k < BALL_JAGS; k += 1) {
+      const a = turn + (k / BALL_JAGS) * TAU + (rand() - 0.5) * 0.6;
+      const reach = r * (1.3 + 0.45 * rand());
+      const start = r * 0.75;
+      ctx.moveTo(x + Math.cos(a) * start, y + Math.sin(a) * start);
+      for (const f of [0.45, 1]) {
+        const d = start + (reach - start) * f;
+        const kink = f < 1 ? (rand() - 0.5) * 0.7 : (rand() - 0.5) * 0.3;
+        ctx.lineTo(x + Math.cos(a + kink) * d, y + Math.sin(a + kink) * d);
+      }
+    }
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.fxStyle = ENERGY;
+    ctx.strokeStyle = rgbCss(palette.edge, 0.55 * alpha);
+    ctx.lineWidth = Math.max(1, r * 0.12);
+    layered(ctx, Z_SPARK, TUBE, () => ctx.stroke());
+    ctx.strokeStyle = rgbCss(palette.white, 0.9 * alpha);
+    ctx.lineWidth = Math.max(1, r * 0.05);
+    layered(ctx, Z_SPARK, CENTRE_TUBE, () => ctx.stroke());
+    ctx.fxStyle = null;
   }
 
   // The interface's `body` carries no clock, so its jags are rolled from where the ball is

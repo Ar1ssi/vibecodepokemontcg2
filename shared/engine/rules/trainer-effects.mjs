@@ -107,19 +107,6 @@ function typedPokemonSearchWhat(lower) {
   return `${stage}${type} Pokémon`;
 }
 
-// Normalize printed card text before matching. Real card text (and the
-// pkmncards.com dump) uses curly apostrophes (U+2019) and renders energy
-// symbols with inner spaces ("{ P }"). Both broke exact substring matches,
-// so normalize them once up front:
-//   curly quotes  ’ ‘ ‚ ʼ `  →  straight '
-//   energy symbol { P } {G}  →  {P} (no inner spaces)
-function normalizeText(text) {
-  return canonicalEffectWording(text)
-    .replace(/[\u2018\u2019\u201A\u201B\u201A`]/g, "'")
-    .replace(/\{\s*([A-Za-z])\s*\}/g, '{$1}')
-    .toLowerCase();
-}
-
 // A "You can use this card only if you discard…" cost. Two printed wordings
 // both resolve to the same cost: the newer "discard N other cards" and the
 // older "Discard N cards from your hand. If you do, …" (e.g. Ultra Ball
@@ -286,11 +273,6 @@ function isPassiveText(lower) {
   return PASSIVE_KEYWORDS.some((k) => lower.includes(k)) || /gets \+\d+ hp/.test(lower);
 }
 
-function parseEnergyType(lower) {
-  const m = lower.match(/\{([a-z])\}/);
-  return m ? `{${m[1].toUpperCase()}}` : null;
-}
-
 // Legacy discard-pile wording ("Search your discard pile for X …") names the
 // target loosely; map it to the closest search filter.
 // Energy-type word → symbol, for "a Fire Energy card" / "basic Water Energy" kinds.
@@ -423,11 +405,6 @@ const KIND_LIST_SEARCH_RE = new RegExp(
   `search your deck for (${KIND_ITEM}(?:, ${KIND_ITEM})*,? and ${KIND_ITEM})(?=,|\\.| that you find| and (?:reveal|put|show|attach|switch))`
 );
 
-function kindCount(article) {
-  const n = article.match(/\d+/);
-  return n ? Number(n[0]) : 1;
-}
-
 function parseTwoKindSearch(lower) {
   const m = lower.match(KIND_LIST_SEARCH_RE);
   if (!m) return null;
@@ -436,9 +413,11 @@ function parseTwoKindSearch(lower) {
     const parts = item.match(/^(an?|\d+|up to \d+) (.+)$/);
     const what = parts && knownKindWhat(parts[2]);
     if (!what) return null;
+    const article = parts[1];
+    const n = article.match(/\d+/);
     stages.push({
       what,
-      count: kindCount(parts[1]),
+      count: n ? Number(n[0]) : 1,
       destination: 'hand',
       ...(parts[1].startsWith('up to') ? { upTo: true } : {}),
     });
@@ -532,19 +511,6 @@ function combinationDiscardWhat(clause) {
     return knownKindWhat(part) || 'card';
   });
   return converted.join(' or ');
-}
-
-// Boss's Orders, Lisia's Appeal, etc. — optional stage/type words between "Benched" and "Pokémon".
-function matchesSwitchOpponentIn(lower) {
-  return (
-    (lower.includes("switch in 1 of your opponent's benched") &&
-      lower.includes('pokémon') &&
-      lower.includes('active spot')) ||
-    (lower.includes("switch 1 of your opponent's benched") &&
-      lower.includes('pokémon') &&
-      (lower.includes('active pokémon') || lower.includes('active spot') || lower.includes('defending pokémon'))) ||
-    (lower.includes("choose 1 of your opponent's benched pokémon") && lower.includes('switch'))
-  );
 }
 
 const POKEMON_TYPE_BY_SYMBOL = {
@@ -1536,7 +1502,16 @@ function returnPokemonLimits(lower) {
 }
 
 export function parseTrainerEffect(text = '') {
-  const lower = rewriteLegacyTrainerWording(normalizeText(text));
+  // Normalize printed card text before matching. Real card text (and the
+  // pkmncards.com dump) uses curly apostrophes (U+2019) and renders energy
+  // symbols with inner spaces ("{ P }"). Both broke exact substring matches,
+  // so normalize them once up front:
+  //   curly quotes  ’ ‘ ‚ ʼ `  →  straight '
+  //   energy symbol { P } {G}  →  {P} (no inner spaces)
+  const lower = rewriteLegacyTrainerWording(canonicalEffectWording(text)
+    .replace(/[\u2018\u2019\u201A\u201B\u201A`]/g, "'")
+    .replace(/\{\s*([A-Za-z])\s*\}/g, '{$1}')
+    .toLowerCase());
   // Fossil Items: the "play as a Basic Pokémon" clause is the whole effect; legacy wordings
   // ("Play Skull Fossil as if it were a Colorless Basic Pokémon … Poké-BODY") would otherwise
   // fall into the passive or search branches.
@@ -1634,16 +1609,6 @@ function splitModeTexts(body) {
   return modes;
 }
 
-// The corpus text is lowercased for matching; restore the casing the picker shows.
-function modeLabel(text) {
-  const label = text
-    .replace(/\.$/, '')
-    .replace(/\bpokémon\b/g, 'Pokémon')
-    .replace(/\benergy\b/g, 'Energy')
-    .replace(/\{([a-z])\}/g, (_, letter) => `{${letter.toUpperCase()}}`);
-  return label.charAt(0).toUpperCase() + label.slice(1);
-}
-
 function parseModeSteps(text) {
   if (/^during this turn,.*\bmore damage\b/.test(text)) {
     const bonus = parseTurnDamageBonus(text);
@@ -1665,7 +1630,13 @@ function parseChooseModes(lower) {
     const parsed = parseModeSteps(text);
     if (!parsed?.recognizable || !Array.isArray(parsed.steps) || parsed.steps.length === 0) return unrecognized;
     if (parsed.steps.some((s) => s.type === 'passive')) return unrecognized;
-    modes.push({ label: modeLabel(text), steps: parsed.steps });
+    // The corpus text is lowercased for matching; restore the casing the picker shows.
+    const label = text
+      .replace(/\.$/, '')
+      .replace(/\bpokémon\b/g, 'Pokémon')
+      .replace(/\benergy\b/g, 'Energy')
+      .replace(/\{([a-z])\}/g, (_, letter) => `{${letter.toUpperCase()}}`);
+    modes.push({ label: label.charAt(0).toUpperCase() + label.slice(1), steps: parsed.steps });
   }
   const steps = [{ type: 'chooseMode', max: head[2] ? 2 : 1, modes }];
   if (head[1]) steps.unshift({ type: 'lookAtTop', count: 1, lookOnly: true });
@@ -1729,12 +1700,6 @@ function applyOptionalHandCost(steps, optional) {
 // Spinner): the searchDeck count the executor uses on the second player's first turn.
 const GOING_SECOND_SEARCH_RE = /if you go second and it's your first turn, search for (?:up to )?(\d+) [^.]*? instead of (?:1|a)\b/;
 
-function applyGoingSecondCount(steps, lower) {
-  const m = lower.match(GOING_SECOND_SEARCH_RE);
-  const search = m && steps.find((s) => s.type === 'searchDeck');
-  if (search) search.countIf = { goingSecondFirstTurn: Number(m[1]) };
-}
-
 function parseTrainerSteps(lower) {
   const chosen = parseChooseModes(lower);
   if (chosen) return chosen;
@@ -1745,7 +1710,10 @@ function parseTrainerSteps(lower) {
     appendLeadingHandDiscardCost(result.steps, main);
     appendMissingOwnSwitch(result.steps, main);
     prependWholeHandDiscard(result.steps, main);
-    applyGoingSecondCount(result.steps, main);
+    const steps = result.steps;
+    const m = main.match(GOING_SECOND_SEARCH_RE);
+    const search = m && steps.find((s) => s.type === 'searchDeck');
+    if (search) search.countIf = { goingSecondFirstTurn: Number(m[1]) };
     if (optional) applyOptionalHandCost(result.steps, optional);
   }
   return result;
@@ -2194,7 +2162,14 @@ function parseTrainerStepsInner(lower) {
   }
 
   // switches (with optional trailing draw)
-  if (matchesSwitchOpponentIn(lower)) {
+  // Boss's Orders, Lisia's Appeal, etc. — optional stage/type words between "Benched" and "Pokémon".
+  if ((lower.includes("switch in 1 of your opponent's benched") &&
+    lower.includes('pokémon') &&
+    lower.includes('active spot')) ||
+  (lower.includes("switch 1 of your opponent's benched") &&
+    lower.includes('pokémon') &&
+    (lower.includes('active pokémon') || lower.includes('active spot') || lower.includes('defending pokémon'))) ||
+  (lower.includes("choose 1 of your opponent's benched pokémon") && lower.includes('switch'))) {
     // Giovanni: switch your own Team Rocket's Pokémon, then the opponent's. Prime Catcher
     // (Temporal Forces) prints the opponent's switch first and gates yours on it ("If you do").
     if (
@@ -2465,7 +2440,8 @@ function parseTrainerStepsInner(lower) {
   ) {
     const countMatch = lower.match(/attach\s+(?:up to\s+)?(\d+)/);
     const count = countMatch ? Number(countMatch[1]) : 2;
-    const type = parseEnergyType(lower);
+    const m = lower.match(/\{([a-z])\}/);
+    const type = m ? `{${m[1].toUpperCase()}}` : null;
     const energy = type ? `Basic ${type} Energy` : 'Basic Energy';
     let target = '1 of your Pokémon';
     if (type && lower.includes(`${type.toLowerCase()} pokémon`)) target = `1 of your ${type} Pokémon`;

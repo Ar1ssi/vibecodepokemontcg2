@@ -61,12 +61,6 @@ const button = (className, text, onClick) => {
   return node;
 };
 
-const loadHomebrewSet = () =>
-  fetch(HOMEBREW_SET_PATH).then((response) => {
-    if (!response.ok) throw new Error(`Homebrew set: ${response.status}`);
-    return response.json().then(hydrateHomebrewSet);
-  });
-
 /**
  * @param {object} options
  * @param {HTMLElement|null} options.boxPanelEl `#buildBattleBoxPanel`, labelled "Packs"
@@ -124,9 +118,6 @@ export const initializeHomebrewBattle = ({
     pool = session && loaded ? poolFromPacks({ cards: loaded.cards, packs: session.packs }) : [];
   };
 
-  // Every card an unsaved deck may name: the pool and the unlimited Energy.
-  const knownCards = () => [...pool.map((entry) => entry.card), ...energyCards];
-
   // The session's deck goes into My Decks as an empty deck named for the box and opens in the
   // editor. When storage refuses the write it still opens, unsaved, and the session keeps its cards so edits
   // survive a reload.
@@ -171,11 +162,15 @@ export const initializeHomebrewBattle = ({
     const reopened = session.deckId && deckLibrary?.openDeckById?.(getTarget(), session.deckId);
     if (!reopened) {
       // A bound deck deleted from My Decks is built again from the session's own edits.
-      openBoxDeck(session.unsavedDeck ? deckFromCardCounts(session.unsavedDeck, knownCards()) : {});
+      // Every card an unsaved deck may name: the pool and the unlimited Energy.
+      openBoxDeck(session.unsavedDeck ? deckFromCardCounts(session.unsavedDeck, [...pool.map((entry) => entry.card), ...energyCards]) : {});
     }
   };
 
-  loadHomebrewSet().then(
+  fetch(HOMEBREW_SET_PATH).then((response) => {
+    if (!response.ok) throw new Error(`Homebrew set: ${response.status}`);
+    return response.json().then(hydrateHomebrewSet);
+  }).then(
     ({ setInfo, cards }) => {
       loaded = { setInfo, cards, cardsById: new Map(cards.map((card) => [card.id, card])) };
       resumeLoadedSession();
@@ -256,39 +251,6 @@ export const initializeHomebrewBattle = ({
     onPreviewCard(cardImage(card, 'large'), card, image);
   };
 
-  const renderOpening = (parent) => {
-    const { setInfo, cards, cardsById } = loaded;
-    const look = homebrewLook();
-    const root = el('div', 'bb-scene');
-    root.id = 'bbUnboxing';
-    root.dataset.era = look.skin.palette;
-    root.addEventListener('contextmenu', onScenePreview);
-    const options = {
-      root,
-      getUnboxing: () => session.unboxing,
-      dispatch: dispatchUnboxing,
-      packs: session.packs.map((pack) => pack.map((id) => cardsById.get(id) || null)),
-      packModel: buildHomebrewPackModel(cards),
-      classOf: (card) => homebrewCardClass(card, setInfo),
-      look,
-      seed: session.seed,
-      promo: null,
-      contents: homebrewContents(),
-      presentation: homebrewPresentation(),
-      onFinish: finishOpening,
-    };
-    // Without a workspace to host the stage the scene plays inline.
-    const stageEl = stage.open('Opening your Homebrew packs');
-    if (stageEl) {
-      parent.append(el('p', 'bb-note', 'Your box is being opened.'));
-      root.classList.add('bb-scene--stage');
-      stageEl.replaceChildren(root);
-    } else {
-      parent.append(root);
-    }
-    scene = mountUnboxingScene(options);
-  };
-
   // ── Packs tab ─────────────────────────────────────────────────────────────
   const renderBanner = (parent) => {
     if (staleSetNote && !session) parent.append(el('p', 'bb-banner', STALE_SET_TEXT));
@@ -305,29 +267,6 @@ export const initializeHomebrewBattle = ({
     img.addEventListener('error', () => img.remove(), { once: true });
     img.src = `/${HOMEBREW_BOX_RENDER.src}`;
     return img;
-  };
-
-  const renderBuyIn = (parent) => {
-    const screen = el('div', 'bnb-screen bnb-buyin');
-    screen.append(el('h2', 'bnb-title', 'Homebrew Build & Battle'), boxShot());
-    const note = el(
-      'p',
-      'bb-note',
-      loadError
-        ? 'Could not load the Homebrew set. Reload to try again.'
-        : !loaded
-          ? 'Loading the Homebrew set…'
-          : `${HOMEBREW_PACK_COUNT} Homebrew booster packs, every pack with at least one Trainer and one Energy. ` +
-            `Build a ${HOMEBREW_DECK_SIZE}-card deck from your pull; games use 6 Prizes.`
-    );
-    note.id = 'homebrewBoxNote';
-    note.setAttribute('role', 'status');
-    if (loadError) note.classList.add('is-error');
-    const open = button('bb-primary', `Open ${HOMEBREW_PACK_COUNT} packs`, openBox);
-    open.id = 'homebrewOpenBox';
-    open.disabled = !loaded;
-    screen.append(note, open);
-    parent.append(screen);
   };
 
   const poolLine = () => {
@@ -381,7 +320,26 @@ export const initializeHomebrewBattle = ({
     boxPanelEl.replaceChildren();
     renderBanner(boxPanelEl);
     if (!session) {
-      renderBuyIn(boxPanelEl);
+      const screen = el('div', 'bnb-screen bnb-buyin');
+      screen.append(el('h2', 'bnb-title', 'Homebrew Build & Battle'), boxShot());
+      const note = el(
+        'p',
+        'bb-note',
+        loadError
+          ? 'Could not load the Homebrew set. Reload to try again.'
+          : !loaded
+            ? 'Loading the Homebrew set…'
+            : `${HOMEBREW_PACK_COUNT} Homebrew booster packs, every pack with at least one Trainer and one Energy. ` +
+              `Build a ${HOMEBREW_DECK_SIZE}-card deck from your pull; games use 6 Prizes.`
+      );
+      note.id = 'homebrewBoxNote';
+      note.setAttribute('role', 'status');
+      if (loadError) note.classList.add('is-error');
+      const open = button('bb-primary', `Open ${HOMEBREW_PACK_COUNT} packs`, openBox);
+      open.id = 'homebrewOpenBox';
+      open.disabled = !loaded;
+      screen.append(note, open);
+      boxPanelEl.append(screen);
       return;
     }
     if (loadError) {
@@ -393,7 +351,36 @@ export const initializeHomebrewBattle = ({
       return;
     }
     if (!unboxingDone()) {
-      renderOpening(boxPanelEl);
+      const { setInfo, cards, cardsById } = loaded;
+      const look = homebrewLook();
+      const root = el('div', 'bb-scene');
+      root.id = 'bbUnboxing';
+      root.dataset.era = look.skin.palette;
+      root.addEventListener('contextmenu', onScenePreview);
+      const options = {
+        root,
+        getUnboxing: () => session.unboxing,
+        dispatch: dispatchUnboxing,
+        packs: session.packs.map((pack) => pack.map((id) => cardsById.get(id) || null)),
+        packModel: buildHomebrewPackModel(cards),
+        classOf: (card) => homebrewCardClass(card, setInfo),
+        look,
+        seed: session.seed,
+        promo: null,
+        contents: homebrewContents(),
+        presentation: homebrewPresentation(),
+        onFinish: finishOpening,
+      };
+      // Without a workspace to host the stage the scene plays inline.
+      const stageEl = stage.open('Opening your Homebrew packs');
+      if (stageEl) {
+        boxPanelEl.append(el('p', 'bb-note', 'Your box is being opened.'));
+        root.classList.add('bb-scene--stage');
+        stageEl.replaceChildren(root);
+      } else {
+        boxPanelEl.append(root);
+      }
+      scene = mountUnboxingScene(options);
       return;
     }
     renderReady(boxPanelEl);

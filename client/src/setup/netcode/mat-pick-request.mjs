@@ -24,13 +24,6 @@ function isInPlayPokemon(record) {
   return record.card?.attachedTo == null;
 }
 
-// A blind Prize pick (Peonia, Gladion): the options are face-down Prize cards, so the player clicks
-// the Prize card itself rather than choosing among identical card backs in a menu. A Prize option
-// the owner has looked at carries its name and art, and keeps the menu that shows what it is.
-function isBlindPrize(record, option) {
-  return option?.faceDown === true && Boolean(record?.element) && record.zone === 'prizes';
-}
-
 // The Prize swap step (Peonia, Gladion) asks twice: Prize cards into the hand, then hand cards set
 // back as Prizes. Both picks carry that step in the resume token.
 function isPrizeSwapChoice(choice) {
@@ -57,7 +50,13 @@ export function buildMatPickerRequest(choice, registry) {
   const records = options.map((opt) => registry?.get?.(opt.instanceId));
   // All in-play Pokémon, all blind Prize cards, or the Prize swap's hand cards: a mixed set has no
   // single thing to click.
-  const pickingPrizes = options.every((opt, i) => isBlindPrize(records[i], opt));
+  const pickingPrizes = options.every((opt, i) => {
+    // A blind Prize pick (Peonia, Gladion): the options are face-down Prize cards, so the player clicks
+    // the Prize card itself rather than choosing among identical card backs in a menu. A Prize option
+    // the owner has looked at carries its name and art, and keeps the menu that shows what it is.
+    const record = records[i];
+    return opt?.faceDown === true && Boolean(record?.element) && record.zone === 'prizes';
+  });
   const pickingSwapHand = !pickingPrizes && isPrizeSwapChoice(choice) && records.every(isHandCard);
   if (!pickingPrizes && !pickingSwapHand && !records.every(isInPlayPokemon)) {
     return null;

@@ -312,25 +312,6 @@ export function createStudio({ renderer, scene, camera, reflect = true }) {
   const tooHigh = [];
   // Mirror about the floor: y → 2·floorY − y.
   const mirrorPoint = (point, floorY) => point.setY(2 * floorY - point.y);
-  // What stands wholly above the height the mirror fades out by (a held pack, the fanned cards)
-  // can't show in it: the mirror skips drawing it.
-  const hideTooHigh = (floorY) => {
-    scene.updateMatrixWorld();
-    scene.traverseVisible((node) => {
-      if (!node.isMesh || !node.layers.test(mirror.layers) || !node.geometry) return;
-      if (!node.geometry.boundingSphere) node.geometry.computeBoundingSphere();
-      bounds.copy(node.geometry.boundingSphere).applyMatrix4(node.matrixWorld);
-      if (bounds.center.y - bounds.radius > floorY + REFLECT_FADE_MM) tooHigh.push(node);
-    });
-    tooHigh.forEach((node) => {
-      node.visible = false;
-    });
-  };
-  const showTooHigh = () => {
-    tooHigh.splice(0).forEach((node) => {
-      node.visible = true;
-    });
-  };
 
   let reflecting = Boolean(target);
 
@@ -378,11 +359,24 @@ export function createStudio({ renderer, scene, camera, reflect = true }) {
     // A transparent last draw can leave the depth mask off, and the clear would keep old depth.
     renderer.state.buffers.depth.setMask(true);
     renderer.clear();
-    hideTooHigh(floorY);
+    // What stands wholly above the height the mirror fades out by (a held pack, the fanned cards)
+    // can't show in it: the mirror skips drawing it.
+    scene.updateMatrixWorld();
+    scene.traverseVisible((node) => {
+      if (!node.isMesh || !node.layers.test(mirror.layers) || !node.geometry) return;
+      if (!node.geometry.boundingSphere) node.geometry.computeBoundingSphere();
+      bounds.copy(node.geometry.boundingSphere).applyMatrix4(node.matrixWorld);
+      if (bounds.center.y - bounds.radius > floorY + REFLECT_FADE_MM) tooHigh.push(node);
+    });
+    tooHigh.forEach((node) => {
+      node.visible = false;
+    });
     try {
       renderer.render(scene, mirror);
     } finally {
-      showTooHigh();
+      tooHigh.splice(0).forEach((node) => {
+        node.visible = true;
+      });
     }
     renderer.setRenderTarget(previous);
     renderer.setClearColor(clearColor, clearAlpha);

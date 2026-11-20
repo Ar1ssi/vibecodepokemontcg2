@@ -181,13 +181,6 @@ export const initializeEliteTrainerBox = ({
     return next;
   };
 
-  const closeScene = () => {
-    scene?.unmount();
-    scene = null;
-    stage?.close();
-    stage = null;
-  };
-
   const handOver = (panelEl, show) => {
     show();
     if (!panelEl) return;
@@ -200,7 +193,10 @@ export const initializeEliteTrainerBox = ({
   // A tapped player's guide wins: the scene hands over to Browse Sets on the box's set.
   const finishOpening = (destination, { wantsGuide = false } = {}) => {
     const setId = sessionEtb()?.setId;
-    closeScene();
+    scene?.unmount();
+    scene = null;
+    stage?.close();
+    stage = null;
     session = null;
     clearEtbSession(storage);
     reloadCollection();
@@ -252,19 +248,6 @@ export const initializeEliteTrainerBox = ({
     });
   }
 
-  // ── Shelf ───────────────────────────────────────────────────────────────
-  const miniBox = (etb) => {
-    const box = el('div', 'etb-shelf__box');
-    const keyArt = cardsById.get(etb.keyArtCardId);
-    const img = el('img', 'etb-shelf__art');
-    img.alt = '';
-    img.loading = 'lazy';
-    img.addEventListener('error', () => img.remove(), { once: true });
-    img.src = cardImage(keyArt, 'large');
-    box.append(img, el('span', 'etb-shelf__plate', 'Elite Trainer Box'));
-    return box;
-  };
-
   const shelfCard = (etb) => {
     const card = el('article', 'etb-shelf__card');
     card.dataset.etb = etb.key;
@@ -293,7 +276,16 @@ export const initializeEliteTrainerBox = ({
     const actions = el('div', 'etb-shelf__actions');
     actions.append(seedLabel, openButton);
     body.append(actions);
-    card.append(miniBox(etb), body);
+    // ── Shelf ───────────────────────────────────────────────────────────────
+    const box = el('div', 'etb-shelf__box');
+    const keyArt = cardsById.get(etb.keyArtCardId);
+    const img = el('img', 'etb-shelf__art');
+    img.alt = '';
+    img.loading = 'lazy';
+    img.addEventListener('error', () => img.remove(), { once: true });
+    img.src = cardImage(keyArt, 'large');
+    box.append(img, el('span', 'etb-shelf__plate', 'Elite Trainer Box'));
+    card.append(box, body);
     return card;
   };
 
@@ -344,9 +336,6 @@ export const initializeEliteTrainerBox = ({
     return section;
   };
 
-  const ownedEnergy = () =>
-    Object.entries(collection.energy).filter(([, count]) => count > 0);
-
   const renderCollection = () => {
     if (!collectionPanelEl) return;
     reloadCollection();
@@ -366,7 +355,7 @@ export const initializeEliteTrainerBox = ({
 
     if (loadState === 'loading') return;
     const pool = collectionPool(collection, cardsById);
-    const energy = ownedEnergy();
+    const energy = Object.entries(collection.energy).filter(([, count]) => count > 0);
     if (!pool.length && !energy.length) {
       reset.disabled = true;
       collectionPanelEl.append(el('p', 'bb-pool-status', EMPTY_COLLECTION_TEXT));
@@ -438,19 +427,16 @@ export const initializeEliteTrainerBox = ({
     renderCollection();
   }
 
-  // The ETB sets and the sets the owned cards come from (promo sets are not baked: their rows
-  // come from ETB_PROMOS). A set that fails to load leaves its cards out and shows the banner.
-  const setsToLoad = () =>
-    new Set(
-      [
-        ...availableEtbs().map((etb) => etb.setId),
-        ...Object.keys(collection.cards).map(setIdOfCardId),
-      ].filter((setId) => BAKED_SET_IDS.has(setId))
-    );
-
   const loadSets = async () => {
+    // The ETB sets and the sets the owned cards come from (promo sets are not baked: their rows
+    // come from ETB_PROMOS). A set that fails to load leaves its cards out and shows the banner.
     const [results] = await Promise.all([
-      Promise.allSettled([...setsToLoad()].map(async (setId) => [setId, await loadSetData(setId)])),
+      Promise.allSettled([...new Set(
+        [
+          ...availableEtbs().map((etb) => etb.setId),
+          ...Object.keys(collection.cards).map(setIdOfCardId),
+        ].filter((setId) => BAKED_SET_IDS.has(setId))
+      )].map(async (setId) => [setId, await loadSetData(setId)])),
       // The opening's sleeve and coin props read these catalogs (JSON loaded on demand, design 073);
       // without them the props show no art, as with any missing image.
       Promise.allSettled([loadCoinCatalog(), loadSleeveCatalog()]),

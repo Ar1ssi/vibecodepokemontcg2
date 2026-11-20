@@ -124,18 +124,6 @@ function redactOpponentZones(player, { setupHidden = false } = {}) {
 }
 
 /**
- * Redacts a player's zones for a spectator: both hands are shown so the spectator can follow
- * either player's point of view or the side-by-side broadcast layout (design 069). The client
- * hides the off-perspective hand itself; decks and unrevealed prizes stay hidden.
- *
- * @param {object} player
- * @returns {object} Redacted zones
- */
-function redactSpectatorZones(player) {
-  return redactOwnerZones(player);
-}
-
-/**
  * Redacts pending choice for a player who is not the choice's recipient.
  *
  * @param {object} choice
@@ -225,12 +213,15 @@ export function viewFor(state, playerId, { attackExtrasFor, costDiscountsFor } =
   if (isSpectator) {
     const spectatorPlayers = {};
     for (const [id, player] of Object.entries(state.players || {})) {
+      // Redacts a player's zones for a spectator: both hands are shown so the spectator can follow
+      // either player's point of view or the side-by-side broadcast layout (design 069). The client
+      // hides the off-perspective hand itself; decks and unrevealed prizes stay hidden.
       spectatorPlayers[id] = {
         playerId: id,
         username: player.username,
         deckFormat: player.deckFormat,
         flags: playerFlags(player),
-        zones: redactSpectatorZones(player),
+        zones: redactOwnerZones(player),
       };
     }
     return {

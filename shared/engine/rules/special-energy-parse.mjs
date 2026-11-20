@@ -108,15 +108,6 @@ const TYPE_WORD_SYMBOLS = [
   [/\bfairy\b/g, '{y}'],
 ];
 
-function normalizeEnergyText(text) {
-  let out = normalizeText(text);
-  // {C}{C} arrives with no separator as "colorlesscolorless": convert each member of
-  // the run before the single-word pass sees it.
-  out = out.replace(/colorless(?=colorless)/g, '{c}');
-  for (const [re, symbol] of TYPE_WORD_SYMBOLS) out = out.replace(re, symbol);
-  return out;
-}
-
 function symbolTypes(segment) {
   const seen = new Set();
   const out = [];
@@ -942,7 +933,12 @@ export function parseSpecialEnergyEffects(card) {
   const name = String(card.name);
   const lowerName = normalizeText(name);
   const text = card.text ?? card.effect ?? '';
-  const lower = normalizeEnergyText(text);
+  let out = normalizeText(text);
+  // {C}{C} arrives with no separator as "colorlesscolorless": convert each member of
+  // the run before the single-word pass sees it.
+  out = out.replace(/colorless(?=colorless)/g, '{c}');
+  for (const [re, symbol] of TYPE_WORD_SYMBOLS) out = out.replace(re, symbol);
+  const lower = out;
   const canonical = { ...card, subtypes: cardSubtypes(card) };
 
   const steps = [];
@@ -1165,18 +1161,6 @@ function effectiveSpecialEnergies(pokemonCard, zoneArray = []) {
   );
 }
 
-function hostHasBasicEnergy(zoneArray, hostImage, typeName, hostId) {
-  return (zoneArray || []).some(
-    (c) =>
-      c &&
-      c.type === 'Energy' &&
-      ((hostId != null && c.attachedTo === hostId) ||
-        (hostImage && c.image?.relative === hostImage)) &&
-      !isSpecialEnergyCard(c) &&
-      String(c.name ?? '').toLowerCase().includes(String(typeName ?? '').toLowerCase().split('|')[0]),
-  );
-}
-
 const normalizeTypeName = (name) => {
   const lowered = String(name ?? '').toLowerCase();
   return lowered === 'darkness' ? 'dark' : lowered;
@@ -1212,7 +1196,19 @@ function conditionMet(condition, pokemon, zoneArray) {
   if (!condition) return true;
   const img = pokemon?.image;
   if (condition.startsWith('host:')) return hostIsType(pokemon, condition.slice(5));
-  if (condition.startsWith('hostHasBasic:')) return hostHasBasicEnergy(zoneArray, img, condition.slice('hostHasBasic:'.length), pokemon?.instanceId);
+  if (condition.startsWith('hostHasBasic:')) {
+    const typeName = condition.slice('hostHasBasic:'.length);
+    const hostId = pokemon?.instanceId;
+    return (zoneArray || []).some(
+      (c) =>
+        c &&
+        c.type === 'Energy' &&
+        ((hostId != null && c.attachedTo === hostId) ||
+          (img && c.image?.relative === img)) &&
+        !isSpecialEnergyCard(c) &&
+        String(c.name ?? '').toLowerCase().includes(String(typeName ?? '').toLowerCase().split('|')[0]),
+    );
+  }
   if (condition.startsWith('not:')) return !hostIsType(pokemon, condition.slice(4));
   switch (condition) {
     case 'hostBasic':
@@ -1464,7 +1460,14 @@ export function failedSpecialEnergyRestriction(energy, host, zoneArray = [], { a
   for (const step of parsed?.steps || []) {
     if (step.type === 'attachRestriction') {
       if (step.kind === 'basicEnergyBearer') {
-        if (atAttach && !hostHasAnyBasicEnergy(zoneArray, host)) return { kind: step.kind, discardIfNot: false };
+        if (atAttach && !(zoneArray || []).some(
+          (c) =>
+            c &&
+            c.type === 'Energy' &&
+            c.attachedTo != null &&
+            c.attachedTo === host.instanceId &&
+            !isSpecialEnergyCard(c)
+        )) return { kind: step.kind, discardIfNot: false };
         continue;
       }
       const check = RESTRICTION_HOSTS[step.kind];
@@ -1482,17 +1485,6 @@ export function failedSpecialEnergyRestriction(energy, host, zoneArray = [], { a
   return null;
 }
 
-function hostHasAnyBasicEnergy(zoneArray, host) {
-  return (zoneArray || []).some(
-    (c) =>
-      c &&
-      c.type === 'Energy' &&
-      c.attachedTo != null &&
-      c.attachedTo === host.instanceId &&
-      !isSpecialEnergyCard(c)
-  );
-}
-
 /** True when this Energy discards itself at the end of its owner's turn (Ignition, Boost). */
 export function discardsAtEndOfTurn(energy) {
   return !!parseSpecialEnergyEffects(energy)?.steps.some((s) => s.type === 'discardAtEndOfTurn');
@@ -1501,14 +1493,6 @@ export function discardsAtEndOfTurn(energy) {
 // Pool tokens use the cost-symbol spelling (TCGdex writes {D} costs "Darkness").
 const POOL_TYPE = { Dark: 'Darkness' };
 const poolType = (type) => POOL_TYPE[type] ?? type;
-
-const isSpPokemon = (pokemon) =>
-  (pokemon?.subtypes || []).some((s) => /^sp$/i.test(String(s))) ||
-  /\s(?:G|GL|FB|C|E4|4)$/.test(String(pokemon?.name ?? ''));
-
-const isLvXPokemon = (pokemon) =>
-  /lv\.?\s*x$/i.test(String(pokemon?.name ?? '')) ||
-  (pokemon?.subtypes || []).some((s) => /lv\.?\s*x/i.test(String(s)));
 
 const isUltraBeast = isUltraBeastCard;
 
@@ -1597,7 +1581,8 @@ function provisionConditionMet(condition, { host = null, attached = [], self = n
     case 'delta':
       return conditionMet('delta', host, []);
     case 'hostSP':
-      return isSpPokemon(host);
+      return (host?.subtypes || []).some((s) => /^sp$/i.test(String(s))) ||
+      /\s(?:G|GL|FB|C|E4|4)$/.test(String(host?.name ?? ''));
     case 'ultraBeast':
       return isUltraBeast(host);
     case 'teamMagma':
@@ -1619,7 +1604,8 @@ function provisionConditionMet(condition, { host = null, attached = [], self = n
     case 'trailingPrizesNotGxEx':
       return trailing && !isGxCard(host) && !isExCard(host);
     case 'trailingPrizesNotLvX':
-      return trailing && !isLvXPokemon(host);
+      return trailing && !(/lv\.?\s*x$/i.test(String(host?.name ?? '')) ||
+      (host?.subtypes || []).some((s) => /lv\.?\s*x/i.test(String(s))));
     case 'trailingPrizesEvolutionNoRuleBox':
       return trailing && stageKey(host) !== 'basic' && !isRuleBoxPokemon(host);
     default:

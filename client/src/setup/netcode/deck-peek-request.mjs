@@ -7,8 +7,6 @@
  * player's zones.
  */
 
-const plural = (count) => (count === 1 ? 'card' : 'cards');
-
 /**
  * @param {object} input
  * @param {object[]} input.cards peeked cards, in deck order
@@ -28,7 +26,7 @@ export function buildDeckPeekPickerRequest({ cards, side, fromTop, onTake }) {
     type: card.type || '',
     image: { src: card.src || '' },
   }));
-  const where = `${fromTop === false ? 'Bottom' : 'Top'} ${shown.length} ${plural(shown.length)}`;
+  const where = `${fromTop === false ? 'Bottom' : 'Top'} ${shown.length} ${shown.length === 1 ? 'card' : 'cards'}`;
 
   if (side === 'them') {
     return {

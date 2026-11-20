@@ -43,15 +43,6 @@ export const originRectForHandFlight = (user, oZoneId, card) => {
 const PRIZE_HANDOFF_MS = 4000;
 const prizeHandoffs = new Map();
 
-const onceOnly = (fn) => {
-  let called = false;
-  return () => {
-    if (called) return;
-    called = true;
-    fn?.();
-  };
-};
-
 /**
  * @param {object} card - the prize card (`instanceId` optional)
  * @param {{rect: object, release: () => void}} handoff - the sleeve's page rect and how to remove it
@@ -59,7 +50,12 @@ const onceOnly = (fn) => {
 export const registerPrizeHandoff = (card, { rect, release }) => {
   const keys = [card, card?.instanceId].filter((key) => key != null);
   if (keys.length === 0 || !rect) return;
-  const entry = { rect, turn: 0, release: onceOnly(release) };
+  let called = false;
+  const entry = { rect, turn: 0, release: () => {
+    if (called) return;
+    called = true;
+    release?.();
+  } };
   entry.timer = globalThis.setTimeout(() => {
     dropHandoff(entry);
     entry.release();
@@ -109,21 +105,17 @@ const sideKey = (user) => (user === 'self' ? 'self' : 'opp');
 /** When the last queued draw flight lands (performance.now clock); the FX queue's own holds end before it. */
 export const drawFlightsEndAt = () => Math.max(sideBusyUntil.self, sideBusyUntil.opp);
 
-const runBatch = (user, items) => {
-  const live = items.filter((item) => item.image?.isConnected);
-  items.filter((item) => !live.includes(item)).forEach(settle);
-  const faceDown = live.filter((item) => user === 'opp' && (item.redacted || isCardHidden(item)));
-  const faceUp = live.filter((item) => !faceDown.includes(item));
-  const sceneMs = faceUp.length > 0 ? playDrawScene(user, faceUp, settle) : 0;
-  const flightMs = faceDown.length > 0 ? playOppDrawFlights(user, faceDown, settle) : 0;
-  return Math.max(sceneMs, flightMs);
-};
-
 const queueBatch = (user, items) => {
   const key = sideKey(user);
   const wait = Math.max(0, sideBusyUntil[key] - performance.now());
   const start = () => {
-    const ms = runBatch(user, items);
+    const live = items.filter((item) => item.image?.isConnected);
+    items.filter((item) => !live.includes(item)).forEach(settle);
+    const faceDown = live.filter((item) => user === 'opp' && (item.redacted || isCardHidden(item)));
+    const faceUp = live.filter((item) => !faceDown.includes(item));
+    const sceneMs = faceUp.length > 0 ? playDrawScene(user, faceUp, settle) : 0;
+    const flightMs = faceDown.length > 0 ? playOppDrawFlights(user, faceDown, settle) : 0;
+    const ms = Math.max(sceneMs, flightMs);
     sideBusyUntil[key] = Math.max(sideBusyUntil[key], performance.now() + ms);
   };
   // Held back until the previous draw has landed, so two draws never share the mat.
@@ -154,19 +146,16 @@ export const playDrawBatch = (user, cards) => {
   return valid.length;
 };
 
-// Where a legacy prize take starts: its fan sleeve, else the prize card's seat.
-const prizeStartOf = (card, fromRect) =>
-  takePrizeHandoff(card) || (fromRect ? { rect: fromRect, turn: frameTurnOf(card.image) } : null);
-
 // Pokémon TCG Live draw / prize take (designs 044/045): deck draws and prize
 // takes join the side's batch; prizes start where the prize was.
 export const playDrawToHand = (user, card, { fromRect, source = 'deck' } = {}) => {
   if (!card?.image) return;
+  // Where a legacy prize take starts: its fan sleeve, else the prize card's seat.
   const item = {
     image: card.image,
     wrapper: card.wrapper,
     user: card.user,
-    from: source === 'prizes' ? prizeStartOf(card, fromRect) : null,
+    from: source === 'prizes' ? takePrizeHandoff(card) || (fromRect ? { rect: fromRect, turn: frameTurnOf(card.image) } : null) : null,
   };
   if (!drawFlightAllowed()) {
     item.from?.release?.();

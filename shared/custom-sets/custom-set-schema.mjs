@@ -136,65 +136,6 @@ function checkAbilities(abilities, where, errors) {
   });
 }
 
-function checkPokemon(card, where, errors) {
-  if (!isInt(card.hp) || card.hp < 10 || card.hp > 990 || card.hp % 10 !== 0) {
-    errors.push(`${where}.hp: a multiple of 10 from 10 to 990`);
-  }
-  checkTypes(card.types, `${where}.types`, errors);
-  if (Array.isArray(card.types) && card.types.length === 0) errors.push(`${where}.types: at least one type`);
-  if (!POKEMON_STAGES.includes(card.stage)) errors.push(`${where}.stage: one of ${POKEMON_STAGES.join(', ')}`);
-  if (card.stage !== 'Basic' && !isText(card.evolveFrom)) errors.push(`${where}.evolveFrom: required for an evolution`);
-  if (card.suffix !== undefined && typeof card.suffix !== 'string') errors.push(`${where}.suffix: expected text`);
-  checkAttacks(card.attacks, `${where}.attacks`, errors);
-  checkAbilities(card.abilities, `${where}.abilities`, errors);
-  for (const side of ['weaknesses', 'resistances']) {
-    if (card[side] === undefined) continue;
-    if (!Array.isArray(card[side])) errors.push(`${where}.${side}: expected a list`);
-    else card[side].forEach((entry, i) => checkSide(entry, `${where}.${side}[${i}]`, errors));
-  }
-  if (card.retreat !== undefined && (!isInt(card.retreat) || card.retreat < 0 || card.retreat > 5)) {
-    errors.push(`${where}.retreat: a whole number from 0 to 5`);
-  }
-}
-
-function checkTrainer(card, where, errors) {
-  if (!TRAINER_TYPES.includes(card.trainerType)) errors.push(`${where}.trainerType: one of ${TRAINER_TYPES.join(', ')}`);
-  if (typeof card.effect !== 'string') errors.push(`${where}.effect: expected text`);
-  if (card.hp !== undefined && card.hp !== null && (!isInt(card.hp) || card.hp % 10 !== 0)) {
-    errors.push(`${where}.hp: a multiple of 10 (fossils and dolls only)`);
-  }
-  checkAttacks(card.attacks, `${where}.attacks`, errors);
-  checkAbilities(card.abilities, `${where}.abilities`, errors);
-}
-
-function checkEnergy(card, where, errors) {
-  if (!ENERGY_KINDS.includes(card.energyType)) errors.push(`${where}.energyType: one of ${ENERGY_KINDS.join(', ')}`);
-  if (card.energyType === 'Special') {
-    if (typeof card.effect !== 'string' || card.effect.trim().length === 0) errors.push(`${where}.effect: required`);
-  } else if (card.effect !== undefined && typeof card.effect !== 'string') errors.push(`${where}.effect: expected text`);
-}
-
-function checkCard(card, setId, where, errors, seenLocalIds) {
-  if (!card || typeof card !== 'object') {
-    errors.push(`${where}: expected an object`);
-    return;
-  }
-  if (typeof card.localId !== 'string' || !LOCAL_ID_RE.test(card.localId)) {
-    errors.push(`${where}.localId: three digits, like "001"`);
-    return;
-  }
-  if (seenLocalIds.has(card.localId)) errors.push(`${where}.localId: ${card.localId} is used twice`);
-  else seenLocalIds.add(card.localId);
-  if (card.id !== `${setId}-${card.localId}`) errors.push(`${where}.id: expected "${setId}-${card.localId}"`);
-  if (!isText(card.name)) errors.push(`${where}.name: required, at most ${MAX_NAME} characters`);
-  if (!CARD_CATEGORIES.includes(card.category)) errors.push(`${where}.category: one of ${CARD_CATEGORIES.join(', ')}`);
-  const image = customCardImageBase(setId, card.localId);
-  if (card.image !== image) errors.push(`${where}.image: expected "${image}"`);
-  if (card.category === 'Pokemon') checkPokemon(card, where, errors);
-  if (card.category === 'Trainer') checkTrainer(card, where, errors);
-  if (card.category === 'Energy') checkEnergy(card, where, errors);
-}
-
 /**
  * Validates one set.json document.
  * @param {unknown} json parsed file content
@@ -228,7 +169,60 @@ export function validateCustomSet(json, { setDirName, reservedCodes = [] } = {})
   else if (json.cards.length > MAX_CARDS) errors.push(`cards: at most ${MAX_CARDS}`);
   else if (isCustomSetId(json.id)) {
     const seen = new Set();
-    json.cards.forEach((card, i) => checkCard(card, json.id, `cards[${i}]`, errors, seen));
+    json.cards.forEach((card, i) => {
+      const setId = json.id;
+      const where = `cards[${i}]`;
+      if (!card || typeof card !== 'object') {
+        errors.push(`${where}: expected an object`);
+        return;
+      }
+      if (typeof card.localId !== 'string' || !LOCAL_ID_RE.test(card.localId)) {
+        errors.push(`${where}.localId: three digits, like "001"`);
+        return;
+      }
+      if (seen.has(card.localId)) errors.push(`${where}.localId: ${card.localId} is used twice`);
+      else seen.add(card.localId);
+      if (card.id !== `${setId}-${card.localId}`) errors.push(`${where}.id: expected "${setId}-${card.localId}"`);
+      if (!isText(card.name)) errors.push(`${where}.name: required, at most ${MAX_NAME} characters`);
+      if (!CARD_CATEGORIES.includes(card.category)) errors.push(`${where}.category: one of ${CARD_CATEGORIES.join(', ')}`);
+      const image = customCardImageBase(setId, card.localId);
+      if (card.image !== image) errors.push(`${where}.image: expected "${image}"`);
+      if (card.category === 'Pokemon') {
+        if (!isInt(card.hp) || card.hp < 10 || card.hp > 990 || card.hp % 10 !== 0) {
+          errors.push(`${where}.hp: a multiple of 10 from 10 to 990`);
+        }
+        checkTypes(card.types, `${where}.types`, errors);
+        if (Array.isArray(card.types) && card.types.length === 0) errors.push(`${where}.types: at least one type`);
+        if (!POKEMON_STAGES.includes(card.stage)) errors.push(`${where}.stage: one of ${POKEMON_STAGES.join(', ')}`);
+        if (card.stage !== 'Basic' && !isText(card.evolveFrom)) errors.push(`${where}.evolveFrom: required for an evolution`);
+        if (card.suffix !== undefined && typeof card.suffix !== 'string') errors.push(`${where}.suffix: expected text`);
+        checkAttacks(card.attacks, `${where}.attacks`, errors);
+        checkAbilities(card.abilities, `${where}.abilities`, errors);
+        for (const side of ['weaknesses', 'resistances']) {
+          if (card[side] === undefined) continue;
+          if (!Array.isArray(card[side])) errors.push(`${where}.${side}: expected a list`);
+          else card[side].forEach((entry, i) => checkSide(entry, `${where}.${side}[${i}]`, errors));
+        }
+        if (card.retreat !== undefined && (!isInt(card.retreat) || card.retreat < 0 || card.retreat > 5)) {
+          errors.push(`${where}.retreat: a whole number from 0 to 5`);
+        }
+      }
+      if (card.category === 'Trainer') {
+        if (!TRAINER_TYPES.includes(card.trainerType)) errors.push(`${where}.trainerType: one of ${TRAINER_TYPES.join(', ')}`);
+        if (typeof card.effect !== 'string') errors.push(`${where}.effect: expected text`);
+        if (card.hp !== undefined && card.hp !== null && (!isInt(card.hp) || card.hp % 10 !== 0)) {
+          errors.push(`${where}.hp: a multiple of 10 (fossils and dolls only)`);
+        }
+        checkAttacks(card.attacks, `${where}.attacks`, errors);
+        checkAbilities(card.abilities, `${where}.abilities`, errors);
+      }
+      if (card.category === 'Energy') {
+        if (!ENERGY_KINDS.includes(card.energyType)) errors.push(`${where}.energyType: one of ${ENERGY_KINDS.join(', ')}`);
+        if (card.energyType === 'Special') {
+          if (typeof card.effect !== 'string' || card.effect.trim().length === 0) errors.push(`${where}.effect: required`);
+        } else if (card.effect !== undefined && typeof card.effect !== 'string') errors.push(`${where}.effect: expected text`);
+      }
+    });
   }
   return { ok: errors.length === 0, errors, set: errors.length === 0 ? withHomebrewStages(json) : null };
 }

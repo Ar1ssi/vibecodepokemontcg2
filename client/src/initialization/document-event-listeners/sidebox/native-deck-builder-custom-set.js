@@ -57,18 +57,6 @@ const panelHtml = (customSet) => `
 // The browser's double-click interval is around 500 ms; a shorter wait would still add on a slow double-click.
 const DOUBLE_CLICK_WINDOW_MS = 300;
 
-const downloadJson = (text, fileName) => {
-  const blob = new Blob([text], { type: 'application/json;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = fileName;
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-  URL.revokeObjectURL(url);
-};
-
 /**
  * @param {object} options
  * @param {HTMLElement} options.panelEl
@@ -158,7 +146,17 @@ export const initializeNativeDeckBuilderCustomSet = ({ panelEl, storage, onAddTo
     }
     if (event.target.closest('[data-custom-set-export]')) {
       if (customSet.cards.length === 0) return;
-      downloadJson(serializeCustomSet(customSet), customSetFileName(customSet.name));
+      const text = serializeCustomSet(customSet);
+      const fileName = customSetFileName(customSet.name);
+      const blob = new Blob([text], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = fileName;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(url);
       setStatus(`Exported “${customSet.name}”.`);
       return;
     }

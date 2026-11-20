@@ -53,12 +53,6 @@ const EFFECTS = [
   [/attached to attacks, don't apply Resistance for that attack\./i, () => ({ kind: 'ignoreResistance' })],
 ];
 
-const kindText = (card) =>
-  [card.type, card.trainerType, ...(Array.isArray(card.subtypes) ? card.subtypes : [card.subtypes])]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
-
 /**
  * The attach-Trainer spec of a WotC card, or null when the card is not one.
  * @param {object} card
@@ -66,7 +60,10 @@ const kindText = (card) =>
  *   effect: { kind: string, amount?: number } }|null}
  */
 export function legacyAttachedTrainer(card) {
-  if (!card || !isTrainer(card) || /tool|stadium|supporter/.test(kindText(card))) return null;
+  if (!card || !isTrainer(card) || /tool|stadium|supporter/.test([card.type, card.trainerType, ...(Array.isArray(card.subtypes) ? card.subtypes : [card.subtypes])]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase())) return null;
   const text = normalizedText(card);
   const attach = ATTACH.exec(`${text} `);
   if (!attach) return null;

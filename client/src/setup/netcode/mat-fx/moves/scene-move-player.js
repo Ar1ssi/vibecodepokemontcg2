@@ -30,14 +30,6 @@ const TRAILS = Object.freeze([
 /** The 2D trails' `blur(2px)`. */
 const TRAIL_BLUR_PX = 2;
 
-const isSourceOver = (beat) =>
-  beat.drawer === 'vignette' ||
-  beat.drawer === 'smoke' ||
-  beat.drawer === 'shade' ||
-  (beat.drawer === 'terrain' && beat.params.kind === 'crack');
-
-const centreOf = (rect) => ({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
-
 /**
  * Design 078 § Depth: a burst's particles are thrown up and out of the struck card's centre, not
  * slid across the cloth; lifted, the cast pass gives them shadows and light pools too.
@@ -65,33 +57,35 @@ const drawBursts = (ctx, bursts, elapsed, colour) => {
 };
 
 const warned = new Set();
-const runBeat = (beat, index, ctx, lane, progress, info) => {
-  try {
-    DRAWERS[beat.drawer]?.draw(ctx, lane, progress, {
-      ...info,
-      material: beat.material,
-      materialAt: beat.materialAt,
-      params: beat.params,
-      beatMs: beat.until - beat.at,
-    });
-  } catch (error) {
-    // One bad spec must never blank the scene: log once per beat, keep drawing the rest.
-    const key = `${info.spec.id}:${index}`;
-    if (!warned.has(key)) {
-      warned.add(key);
-      console.debug('move beat failed', key, error);
-    }
-  }
-};
 
 /** The beats of `layer` that are live at `ms`: the source-over ones (veils, smoke) first, then the light. */
 const drawBeats = (ctx, beats, layer, lane, ms, info) => {
   for (const composite of ['source-over', 'lighter']) {
     ctx.globalCompositeOperation = composite;
     beats.forEach((beat, index) => {
-      if ((layer && beat.layer !== layer) || isSourceOver(beat) !== (composite === 'source-over')) return;
+      if ((layer && beat.layer !== layer) || (beat.drawer === 'vignette' ||
+      beat.drawer === 'smoke' ||
+      beat.drawer === 'shade' ||
+      (beat.drawer === 'terrain' && beat.params.kind === 'crack')) !== (composite === 'source-over')) return;
       const progress = phaseProgress(ms, [beat.at, beat.until]);
-      if (progress !== null) runBeat(beat, index, ctx, lane, progress, info);
+      if (progress !== null) {
+        try {
+          DRAWERS[beat.drawer]?.draw(ctx, lane, progress, {
+            ...info,
+            material: beat.material,
+            materialAt: beat.materialAt,
+            params: beat.params,
+            beatMs: beat.until - beat.at,
+          });
+        } catch (error) {
+          // One bad spec must never blank the scene: log once per beat, keep drawing the rest.
+          const key = `${info.spec.id}:${index}`;
+          if (!warned.has(key)) {
+            warned.add(key);
+            console.debug('move beat failed', key, error);
+          }
+        }
+      }
     });
   }
   ctx.globalCompositeOperation = 'source-over';
@@ -133,7 +127,7 @@ const sceneCard = (scene, id) => {
   const pose = id == null ? null : scene.cardTablePose(id);
   if (!pose) return null;
   const rect = stageRectOf(pose);
-  return { id, rect, centre: centreOf(rect), width: rect.width, height: rect.height, yawDeg: pose.yawDeg ?? 0 };
+  return { id, rect, centre: { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }, width: rect.width, height: rect.height, yawDeg: pose.yawDeg ?? 0 };
 };
 
 /**
@@ -173,7 +167,6 @@ export function playMoveInScene({
   const beats = spec.beats.map(resolve);
   const quakes = beats.filter((beat) => beat.drawer === 'terrain' && beat.params.kind === 'quake');
   const time0 = seed * 0.37;
-  const sceneInfo = (elapsedMs) => ({ elapsedMs, time: time0 + elapsedMs / 1000, seed, material, spec });
 
   const laneH = lane.length / lane.h;
   const attackerAt = (ms) => {
@@ -285,7 +278,7 @@ export function playMoveInScene({
       if (wall > endMs + stopMs) return false;
       const elapsed = sceneMs(wall);
       const ctx = canvas.ctx;
-      const info = sceneInfo(elapsed);
+      const info = { elapsedMs: elapsed, time: time0 + elapsed / 1000, seed, material, spec };
       const jitter = jitterAt(elapsed);
       const live = elapsed <= durationMs;
       const a = live ? attackerAt(elapsed) : null;

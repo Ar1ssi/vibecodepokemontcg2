@@ -16,10 +16,8 @@ const BACKSTOP_PAD_MS = 400;
 /** Degrees the card's board is turned on screen: 180 for the far seat's mirror root, else 0. */
 export const frameTurnOf = (element) => seatTurnOf(element) ?? 0;
 
-const validRect = (rect) => Boolean(rect) && rect.width > 1 && rect.height > 1;
-
 function playScene(rect, turn, { className, durationMs, build, opsAt }) {
-  if (!validRect(rect)) return false;
+  if (!(Boolean(rect) && rect.width > 1 && rect.height > 1)) return false;
   preloadTcglTextures();
   const host = spawnOverlay({ rect, className: `fx-overlay fx-tcgl-scene ${className}` });
   // The opponent's board is turned 180°; the effect turns with its card.

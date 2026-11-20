@@ -153,16 +153,12 @@ export const initializeBuildBattleRun = ({
   const deckEntryOf = (activeSession, key = activeSession.deckKey) =>
     getBuildBattleBox(activeSession.boxKey)?.decks.find((deck) => deck.key === key);
 
-  // ── Run record ────────────────────────────────────────────────────────────
-  // The stored copy of this run, if another tab changed it; else the one in memory.
-  const freshRun = () => {
-    const stored = loadRun(storage);
-    return stored && run && stored.startedAt === run.startedAt ? stored : run;
-  };
-
   // Applies `change` to the freshest copy of the run and stores it. Returns the new run.
   const mutateRun = (change) => {
-    const base = freshRun();
+    // ── Run record ────────────────────────────────────────────────────────────
+    // The stored copy of this run, if another tab changed it; else the one in memory.
+    const stored = loadRun(storage);
+    const base = stored && run && stored.startedAt === run.startedAt ? stored : run;
     if (!base) return null;
     run = change(base);
     memoryOnly = !saveRun(storage, run);
@@ -181,14 +177,6 @@ export const initializeBuildBattleRun = ({
 
   const boxStartingRows = () =>
     run && isLoaded() ? startingDeckRows({ box: activeBox, data: loaded.data, opened: run.session }) : [];
-
-  // Every card an unsaved deck may name: the pool, the box's own deck rows (their Basic Energy is
-  // not a pool entry) and the unlimited Energy.
-  const knownCards = () => [
-    ...pool.map((entry) => entry.card),
-    ...boxStartingRows(),
-    ...energyCards,
-  ];
 
   const deckSprites = () => {
     const current = session();
@@ -253,8 +241,14 @@ export const initializeBuildBattleRun = ({
     const reopened = current.deckId && deckLibrary?.openDeckById?.(getTarget(), current.deckId);
     if (!reopened) {
       // A bound deck deleted from My Decks is built again from the box.
+      // Every card an unsaved deck may name: the pool, the box's own deck rows (their Basic Energy is
+      // not a pool entry) and the unlimited Energy.
       openBoxDeck(
-        current.unsavedDeck ? deckFromCardCounts(current.unsavedDeck, knownCards()) : undefined
+        current.unsavedDeck ? deckFromCardCounts(current.unsavedDeck, [
+          ...pool.map((entry) => entry.card),
+          ...boxStartingRows(),
+          ...energyCards,
+        ]) : undefined
       );
     }
   };
@@ -441,37 +435,10 @@ export const initializeBuildBattleRun = ({
     return wrap;
   };
 
-  const renderPicker = () => renderBoxPicker({ getActiveBox: () => activeBox, onPick: pickBox, selectId: 'bnbBox' });
-
   const loadNote = () => {
     if (loadError) return `Could not load ${activeBox.name}. Reload to try again.`;
     if (!isLoaded()) return `Loading ${activeBox.name}…`;
     return boxContentsLine(activeBox, loaded.setInfo.name);
-  };
-
-  const renderBuyIn = (parent) => {
-    const screen = el('div', 'bnb-screen bnb-buyin');
-    screen.append(el('h2', 'bnb-title', RUN_TEXT.title), renderCarousel(), renderPicker());
-    const shot = boxShot(activeBox);
-    if (shot) screen.append(shot);
-    const note = el('p', 'bb-note', loadNote());
-    note.id = 'bnbBoxNote';
-    note.setAttribute('role', 'status');
-    if (loadError) note.classList.add('is-error');
-    screen.append(el('h3', 'bb-title', activeBox.name), note);
-    const start = button('bb-primary', RUN_TEXT.startButton, () =>
-      showDialog({
-        title: RUN_TEXT.title,
-        body: [RUN_TEXT.startConfirm],
-        actions: [cancelAction, { label: RUN_TEXT.startButton, primary: true, onClick: startRun }],
-      })
-    );
-    start.id = 'bnbStartRun';
-    start.disabled = !isLoaded();
-    const legacy = el('a', 'bnb-legacy-link', 'Classic box opener');
-    legacy.href = BUILD_BATTLE_LEGACY_PATH;
-    screen.append(start, legacy);
-    parent.append(screen);
   };
 
   const renderNodes = (progress) => {
@@ -492,82 +459,6 @@ export const initializeBuildBattleRun = ({
     return map;
   };
 
-  const renderLobby = (parent, progress) => {
-    const screen = el('div', 'bnb-screen bnb-lobby');
-    const deckEntry = deckEntryOf(run.session);
-    screen.append(
-      el('h2', 'bnb-title', RUN_TEXT.title),
-      el('p', 'bb-note', boxHeadline(activeBox, deckEntry, run.session.seed))
-    );
-    const meter = el('div', 'bnb-meter');
-    meter.setAttribute('role', 'progressbar');
-    meter.setAttribute('aria-valuemin', '0');
-    meter.setAttribute('aria-valuemax', String(progress.total));
-    meter.setAttribute('aria-valuenow', String(progress.played));
-    meter.append(el('span', 'bnb-meter-label', progressLabel(progress)));
-    const fill = el('span', 'bnb-meter-fill');
-    fill.style.width = `${(progress.played / progress.total) * 100}%`;
-    meter.append(fill);
-    screen.append(meter, renderNodes(progress));
-
-    const invalid = el('p', 'bnb-deck-invalid');
-    invalid.dataset.bnbDeckInvalid = '';
-    invalid.setAttribute('role', 'status');
-    screen.append(invalid);
-
-    const actions = el('div', 'bnb-actions');
-    const play = button('bb-primary bnb-play', RUN_TEXT.playButton, () => requestPlay());
-    play.dataset.bnbPlay = '';
-    actions.append(
-      play,
-      button('bb-secondary', RUN_TEXT.editDeckButton, () => showPool()),
-      button('bb-secondary', RUN_TEXT.modeInfoButton, () =>
-        showDialog({
-          title: RUN_TEXT.title,
-          body: RUN_TEXT.modeInfo,
-          actions: [{ label: 'Close', primary: true }],
-        })
-      ),
-      button('bb-secondary bnb-forfeit', RUN_TEXT.forfeitButton, () =>
-        showDialog({
-          title: RUN_TEXT.forfeitButton,
-          body: [RUN_TEXT.forfeitConfirm],
-          actions: [cancelAction, { label: RUN_TEXT.forfeitButton, primary: true, onClick: forfeit }],
-        })
-      )
-    );
-    screen.append(actions);
-
-    const manual = el('details', 'bnb-manual');
-    manual.append(
-      el('summary', '', RUN_TEXT.manualResultSummary),
-      button('bb-secondary', RUN_TEXT.manualWin, () => recordByHand(true)),
-      button('bb-secondary', RUN_TEXT.manualLoss, () => recordByHand(false))
-    );
-    screen.append(manual);
-    parent.append(screen);
-    updatePlayState();
-  };
-
-  const renderSummary = (parent, progress) => {
-    const screen = el('div', 'bnb-screen bnb-summary');
-    screen.append(
-      el('h2', 'bnb-title', summaryHeadline({ ...progress, endedEarly: run.endedEarly })),
-      renderNodes(progress)
-    );
-    const list = el('ul', 'bnb-results');
-    run.results.forEach((won, index) => list.append(el('li', '', matchResultLine(index, won))));
-    screen.append(list);
-    if (isLoaded()) {
-      const cardCount = pool.reduce((sum, entry) => sum + entry.count, 0);
-      screen.append(el('p', 'bb-note', `${cardCount} cards were in your pool.`));
-    }
-    const done = button('bb-primary', RUN_TEXT.doneButton, finishRun);
-    done.id = 'bnbDone';
-    screen.append(done);
-    parent.append(screen);
-  };
-
   // The lobby's Play and its invalid-deck line follow the deck pane's own Play state.
   const updatePlayState = () => {
     if (!runPanelEl) return;
@@ -580,33 +471,6 @@ export const initializeBuildBattleRun = ({
     note.hidden = !note.textContent;
   };
 
-  const renderOpening = (parent) => {
-    const { setInfo, cards, data } = loaded;
-    const skin = boxSkin({ box: activeBox, setInfo, cards, data });
-    const root = el('div', 'bb-scene');
-    root.id = 'bbUnboxing';
-    root.dataset.era = skin.palette;
-    const sceneOptions = boxUnboxingOptions({
-      root,
-      box: activeBox,
-      loaded,
-      skin,
-      opened: run.session,
-      getUnboxing: () => run.session.unboxing,
-      dispatch: dispatchUnboxing,
-      onFinish: finishOpening,
-    });
-    // Without a workspace to host the stage the DOM scene plays inline, as in the legacy flow.
-    const stageEl = stage.open(`Opening your ${activeBox.name}`);
-    if (stageEl) {
-      parent.append(el('p', 'bb-note', 'Your box is being opened.'));
-      scene = mountBoxOnStage({ stageEl, sceneOptions, box: activeBox, deckRows: boxStartingRows(), storage });
-    } else {
-      parent.append(root);
-      scene = mountUnboxingScene(sceneOptions);
-    }
-  };
-
   const renderRun = () => {
     if (!runPanelEl) return;
     scene?.unmount();
@@ -616,7 +480,28 @@ export const initializeBuildBattleRun = ({
     runPanelEl.replaceChildren();
     renderBanner(runPanelEl);
     if (!run) {
-      renderBuyIn(runPanelEl);
+      const screen = el('div', 'bnb-screen bnb-buyin');
+      screen.append(el('h2', 'bnb-title', RUN_TEXT.title), renderCarousel(), renderBoxPicker({ getActiveBox: () => activeBox, onPick: pickBox, selectId: 'bnbBox' }));
+      const shot = boxShot(activeBox);
+      if (shot) screen.append(shot);
+      const note = el('p', 'bb-note', loadNote());
+      note.id = 'bnbBoxNote';
+      note.setAttribute('role', 'status');
+      if (loadError) note.classList.add('is-error');
+      screen.append(el('h3', 'bb-title', activeBox.name), note);
+      const start = button('bb-primary', RUN_TEXT.startButton, () =>
+        showDialog({
+          title: RUN_TEXT.title,
+          body: [RUN_TEXT.startConfirm],
+          actions: [cancelAction, { label: RUN_TEXT.startButton, primary: true, onClick: startRun }],
+        })
+      );
+      start.id = 'bnbStartRun';
+      start.disabled = !isLoaded();
+      const legacy = el('a', 'bnb-legacy-link', 'Classic box opener');
+      legacy.href = BUILD_BATTLE_LEGACY_PATH;
+      screen.append(start, legacy);
+      runPanelEl.append(screen);
       return;
     }
     if (loadError) {
@@ -628,12 +513,107 @@ export const initializeBuildBattleRun = ({
       return;
     }
     if (!unboxingDone()) {
-      renderOpening(runPanelEl);
+      const { setInfo, cards, data } = loaded;
+      const skin = boxSkin({ box: activeBox, setInfo, cards, data });
+      const root = el('div', 'bb-scene');
+      root.id = 'bbUnboxing';
+      root.dataset.era = skin.palette;
+      const sceneOptions = boxUnboxingOptions({
+        root,
+        box: activeBox,
+        loaded,
+        skin,
+        opened: run.session,
+        getUnboxing: () => run.session.unboxing,
+        dispatch: dispatchUnboxing,
+        onFinish: finishOpening,
+      });
+      // Without a workspace to host the stage the DOM scene plays inline, as in the legacy flow.
+      const stageEl = stage.open(`Opening your ${activeBox.name}`);
+      if (stageEl) {
+        runPanelEl.append(el('p', 'bb-note', 'Your box is being opened.'));
+        scene = mountBoxOnStage({ stageEl, sceneOptions, box: activeBox, deckRows: boxStartingRows(), storage });
+      } else {
+        runPanelEl.append(root);
+        scene = mountUnboxingScene(sceneOptions);
+      }
       return;
     }
     const progress = runProgress(run);
-    if (progress.finished) renderSummary(runPanelEl, progress);
-    else renderLobby(runPanelEl, progress);
+    if (progress.finished) {
+      const screen = el('div', 'bnb-screen bnb-summary');
+      screen.append(
+        el('h2', 'bnb-title', summaryHeadline({ ...progress, endedEarly: run.endedEarly })),
+        renderNodes(progress)
+      );
+      const list = el('ul', 'bnb-results');
+      run.results.forEach((won, index) => list.append(el('li', '', matchResultLine(index, won))));
+      screen.append(list);
+      if (isLoaded()) {
+        const cardCount = pool.reduce((sum, entry) => sum + entry.count, 0);
+        screen.append(el('p', 'bb-note', `${cardCount} cards were in your pool.`));
+      }
+      const done = button('bb-primary', RUN_TEXT.doneButton, finishRun);
+      done.id = 'bnbDone';
+      screen.append(done);
+      runPanelEl.append(screen);
+    }
+    else {
+      const screen = el('div', 'bnb-screen bnb-lobby');
+      const deckEntry = deckEntryOf(run.session);
+      screen.append(
+        el('h2', 'bnb-title', RUN_TEXT.title),
+        el('p', 'bb-note', boxHeadline(activeBox, deckEntry, run.session.seed))
+      );
+      const meter = el('div', 'bnb-meter');
+      meter.setAttribute('role', 'progressbar');
+      meter.setAttribute('aria-valuemin', '0');
+      meter.setAttribute('aria-valuemax', String(progress.total));
+      meter.setAttribute('aria-valuenow', String(progress.played));
+      meter.append(el('span', 'bnb-meter-label', progressLabel(progress)));
+      const fill = el('span', 'bnb-meter-fill');
+      fill.style.width = `${(progress.played / progress.total) * 100}%`;
+      meter.append(fill);
+      screen.append(meter, renderNodes(progress));
+
+      const invalid = el('p', 'bnb-deck-invalid');
+      invalid.dataset.bnbDeckInvalid = '';
+      invalid.setAttribute('role', 'status');
+      screen.append(invalid);
+
+      const actions = el('div', 'bnb-actions');
+      const play = button('bb-primary bnb-play', RUN_TEXT.playButton, () => requestPlay());
+      play.dataset.bnbPlay = '';
+      actions.append(
+        play,
+        button('bb-secondary', RUN_TEXT.editDeckButton, () => showPool()),
+        button('bb-secondary', RUN_TEXT.modeInfoButton, () =>
+          showDialog({
+            title: RUN_TEXT.title,
+            body: RUN_TEXT.modeInfo,
+            actions: [{ label: 'Close', primary: true }],
+          })
+        ),
+        button('bb-secondary bnb-forfeit', RUN_TEXT.forfeitButton, () =>
+          showDialog({
+            title: RUN_TEXT.forfeitButton,
+            body: [RUN_TEXT.forfeitConfirm],
+            actions: [cancelAction, { label: RUN_TEXT.forfeitButton, primary: true, onClick: forfeit }],
+          })
+        )
+      );
+      screen.append(actions);
+
+      const manual = el('details', 'bnb-manual');
+      manual.append(
+        el('summary', '', RUN_TEXT.manualResultSummary),
+        button('bb-secondary', RUN_TEXT.manualWin, () => recordByHand(true)),
+        button('bb-secondary', RUN_TEXT.manualLoss, () => recordByHand(false))
+      );
+      screen.append(manual);
+      runPanelEl.append(screen);
+      updatePlayState();
+    }
   };
 
   // ── Pool tab ──────────────────────────────────────────────────────────────

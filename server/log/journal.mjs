@@ -100,61 +100,60 @@ export function createJournal({
   }
 
   function command(args) {
-    guarded(() => doCommand(args));
-  }
+    guarded(() => {
+      const { cmd, playerId, stateBefore, cursorBefore, result, cursorAfter, ms } = args;
+      if (stateBefore !== last.state || stateBefore.stateVersion !== last.sv) {
+        doRebase(stateBefore, { cursor: cursorBefore }, 'unjournaled-change');
+      } else if (cursorBefore !== last.cursor) {
+        append(JSON.stringify({ k: 'rng', game, t: now(), cursor: cursorBefore }));
+        last.cursor = cursorBefore;
+      }
 
-  function doCommand({ cmd, playerId, stateBefore, cursorBefore, result, cursorAfter, ms }) {
-    if (stateBefore !== last.state || stateBefore.stateVersion !== last.sv) {
-      doRebase(stateBefore, { cursor: cursorBefore }, 'unjournaled-change');
-    } else if (cursorBefore !== last.cursor) {
-      append(JSON.stringify({ k: 'rng', game, t: now(), cursor: cursorBefore }));
-      last.cursor = cursorBefore;
-    }
-
-    const ok = !result.error;
-    const stateAfter = ok ? result.state : stateBefore;
-    n += 1;
-    last = { state: stateAfter, sv: stateAfter.stateVersion, cursor: cursorAfter };
-    const record = {
-      k: 'cmd',
-      game,
-      n,
-      t: now(),
-      playerId,
-      cmd,
-      before: { sv: stateBefore.stateVersion, cursor: cursorBefore },
-      ok,
-      error: result.error ?? null,
-      reason: result.reason ?? null,
-      after: { sv: stateAfter.stateVersion, cursor: cursorAfter, hash: hash(stateAfter) },
-      events: ok ? (result.events ?? []) : [],
-      choice: choiceSummary(result.pendingChoice),
-      ms: Math.round(ms * 100) / 100,
-    };
-    let line = JSON.stringify(record);
-    if (overBudget(line)) {
-      line = JSON.stringify({ ...record, cmd: { type: cmd?.type, _truncated: true }, events: [] });
-      current().complete = false;
-    }
-    append(line);
-
-    if (ok) pushRing(stateAfter.stateVersion, stateAfter);
-
-    log[ok ? 'debug' : 'info'](
-      'engine',
-      ok ? 'applied' : 'rejected',
-      {
-        type: cmd?.type ?? null,
-        playerId,
-        n,
+      const ok = !result.error;
+      const stateAfter = ok ? result.state : stateBefore;
+      n += 1;
+      last = { state: stateAfter, sv: stateAfter.stateVersion, cursor: cursorAfter };
+      const record = {
+        k: 'cmd',
         game,
-        ms: record.ms,
-        events: (result.events ?? []).map((e) => e?.type),
+        n,
+        t: now(),
+        playerId,
+        cmd,
+        before: { sv: stateBefore.stateVersion, cursor: cursorBefore },
+        ok,
         error: result.error ?? null,
         reason: result.reason ?? null,
-      },
-      { room: roomId, seat: playerId, sv: stateAfter.stateVersion, cs: clientSeqOf(cmd) }
-    );
+        after: { sv: stateAfter.stateVersion, cursor: cursorAfter, hash: hash(stateAfter) },
+        events: ok ? (result.events ?? []) : [],
+        choice: choiceSummary(result.pendingChoice),
+        ms: Math.round(ms * 100) / 100,
+      };
+      let line = JSON.stringify(record);
+      if (overBudget(line)) {
+        line = JSON.stringify({ ...record, cmd: { type: cmd?.type, _truncated: true }, events: [] });
+        current().complete = false;
+      }
+      append(line);
+
+      if (ok) pushRing(stateAfter.stateVersion, stateAfter);
+
+      log[ok ? 'debug' : 'info'](
+        'engine',
+        ok ? 'applied' : 'rejected',
+        {
+          type: cmd?.type ?? null,
+          playerId,
+          n,
+          game,
+          ms: record.ms,
+          events: (result.events ?? []).map((e) => e?.type),
+          error: result.error ?? null,
+          reason: result.reason ?? null,
+        },
+        { room: roomId, seat: playerId, sv: stateAfter.stateVersion, cs: clientSeqOf(cmd) }
+      );
+    });
   }
 
   function refused({ cmd, playerId = null, error, reason = null }) {

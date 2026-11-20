@@ -285,18 +285,1047 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
   document.body.classList.toggle('rules-mode', rulesState.enabled);
       initMatCoins();
       buildTurnHUD();
-      hookTurnButton();
-      hookSetupButton();
-      hookDeckView();
-  hookTrainerPlay();
-  turnAutomation();
-  koWatcher();
-  renderStatusBadges();
+      // ── turn flow: attack ends turn; +Turn advances ──────────────────────
+      const handlePassClick = async (event) => {
+        if (!rulesState.enabled) return;
+        // Suppress pass() and legacy takeTurn before any await — otherwise
+        // the bubble handler runs while this async listener is suspended and
+        // the turn advances twice (double start-of-turn draw for the opponent).
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        if (turnEndedByAttack) {
+          turnEndedByAttack = false;
+          return; // turn already ended by an attack
+        }
+
+        // Pokémon Checkup passive abilities (Froslass pattern) before status boundary
+        if (rulesState.enabled) {
+          for (const player of ['self', 'opp']) {
+            for (const zoneId of ['active', 'bench']) {
+              for (const source of getZone(player, zoneId).array) {
+                if (source.type !== 'Pokémon') continue;
+                const checkup = parseCheckupEffect(source);
+                if (!checkup?.count) continue;
+                appendMessage(
+                  '',
+                  `🩺 ${checkup.source}: Pokémon Checkup — ${checkup.count} damage counter${checkup.count !== 1 ? 's' : ''}.`,
+                  'announcement',
+                  false
+                );
+                for (const targetPlayer of ['self', 'opp']) {
+                  for (const targetZone of ['active', 'bench']) {
+                    const tZone = getZone(targetPlayer, targetZone);
+                    for (let tIdx = 0; tIdx < tZone.array.length; tIdx++) {
+                      const target = tZone.array[tIdx];
+                      if (target.type !== 'Pokémon') continue;
+                      if (
+                        checkup.exceptName &&
+                        String(target.name || '').toLowerCase().includes(checkup.exceptName)
+                      ) {
+                        continue;
+                      }
+                      if (
+                        checkup.targetHasAbility &&
+                        !(target.ability?.text || target.abilityText)
+                      ) {
+                        continue;
+                      }
+                      const existing = parseInt(
+                        target.image?.damageCounter?.textContent || '0',
+                        10
+                      ) || 0;
+                      if (target.image?.damageCounter) {
+                        updateDamageCounter(targetPlayer, targetZone, tIdx, existing + checkup.count, true);
+                      } else {
+                        addDamageCounter(targetPlayer, targetZone, tIdx, checkup.count, true);
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        // end-of-turn: resolve the turn player's statuses before passing
+        const endingPlayer = rulesState.turnPlayer;
+        try {
+          const active = getZone(endingPlayer, 'active').array[0];
+          if (active) {
+            const key = active.image?.dataset?.cardId || active.name;
+            const boundary = resolveTurnBoundary(endingPlayer, key, Math.random, {
+              checkupPoisonBonus: getStadiumCheckupPoisonBonus(active, endingPlayer),
+            });
+            if (boundary.damage > 0) {
+              const current = parseInt(active.image?.damageCounter?.textContent || '0', 10) || 0;
+              if (active.image?.damageCounter) {
+                updateDamageCounter(endingPlayer, 'active', 0, current + boundary.damage, true);
+              } else {
+                addDamageCounter(endingPlayer, 'active', 0, boundary.damage, true);
+              }
+            }
+            for (const note of boundary.notes) {
+              appendMessage('', note, 'announcement', false);
+            }
+          }
+        } catch (error) {
+          console.warn('rules-bridge: end-of-turn status resolution failed', error);
+        }
+
+        // end-of-turn ability effects (ability family: end-of-turn):
+        // resolve for the ending player's Active + bench, once per turn
+        if (rulesState.enabled) {
+          for (const zoneId of ['active', 'bench']) {
+            for (const card of getZone(endingPlayer, zoneId).array) {
+              if (abilityUsed(endingPlayer, card)) continue;
+              try {
+                await ensureCardData(card);
+              } catch (error) {
+                console.warn('rules-bridge: card data for an end-of-turn Ability could not be loaded', error);
+              }
+              const effect = parseEndOfTurnEffect(card);
+              if (!effect) continue;
+              markAbilityUsed(endingPlayer, card);
+              if (effect.kind === 'draw') {
+                import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
+                  for (let k = 0; k < effect.n; k++) {
+                    if (getZone(endingPlayer, 'deck').getCount() > 0) {
+                      moveCardBundle(endingPlayer, endingPlayer, 'deck', 'hand', 0, false, 'move', true);
+                    }
+                  }
+                });
+                appendMessage(
+                  '',
+                  `⏰ End of turn: ${card.name || 'your Pokémon'} draws ${effect.n} card(s).`,
+                  'announcement',
+                  false
+                );
+              } else if (effect.kind === 'search') {
+                appendMessage(
+                  '',
+                  `⏰ End of turn: ${card.name || 'your Pokémon'} searches for a card (see Search ability).`,
+                  'announcement',
+                  false
+                );
+              }
+            }
+          }
+        }
+
+        // end-of-turn special-energy effects (legacy Darkness Energy): "at the
+        // end of every turn" applies to both players' in-play Pokémon.
+        if (rulesState.enabled) {
+          for (const player of ['self', 'opp']) {
+            for (const zoneId of ['active', 'bench']) {
+              const z = getZone(player, zoneId);
+              for (let i = 0; i < z.array.length; i++) {
+                const host = z.array[i];
+                if (!host || host.image?.attached) continue;
+                const energies = z.array.filter(
+                  (c) => c && c.type === 'Energy' && c.image?.relative === host.image && isSpecialEnergyCard(c)
+                );
+                for (const energy of energies) {
+                  const plans = planSpecialEnergyTriggers(energy, {
+                    trigger: 'endTurn',
+                    host,
+                    zoneArray: z.array,
+                  });
+                  for (const plan of plans) {
+                    if (plan.action !== 'addDamage') continue;
+                    const amount = plan.count * 10;
+                    const current =
+                      parseInt(host.image?.damageCounter?.textContent || '0', 10) || 0;
+                    if (host.image?.damageCounter) {
+                      updateDamageCounter(player, zoneId, i, current + amount, true);
+                    } else {
+                      addDamageCounter(player, zoneId, i, amount, true);
+                    }
+                    appendMessage(
+                      '',
+                      `⏰ End of turn: ${plan.count} damage counter(s) on ${host.name || 'a Pokémon'} (${energy.name}).`,
+                      'announcement',
+                      false
+                    );
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        // win-condition sweep before passing
+        if (evaluateAndApplyWinConditions(endingPlayer)) {
+          return;
+        }
+
+        // This is the only path that actually ends the turn (the three
+        // early-return paths above all bail before reaching it). The rules
+        // capture handler is registered before the board bubble handler
+        // (initializeSidebox() runs before initializeTable()), so suppressing
+        // the event here stops the legacy takeTurn(...) bubble handler from
+        // also firing — otherwise it would start the initiator's own turn and
+        // "interrupt" the opponent right after we passed the turn. Deliberate,
+        // rules-mode-only exception to the "capture hooks don't suppress"
+        // invariant (which protects the Set Up / Reset hooks).
+        const next = endTurn(endingPlayer);
+        appendMessage('', `Turn passes to ${next === 'self' ? 'P1' : 'P2'}`, 'announcement', false);
+        updateTurnBanner();
+        // Capture-phase stop keeps pass() from double-ending the turn, so
+        // 2P still needs an explicit pass relay (the log's extra draw was
+        // the peer also emitting a start-of-turn draw for this client).
+        if (systemState.isTwoPlayer && endingPlayer === 'self') {
+          processAction('self', true, 'pass', [{}]);
+        }
+      };
+      ['passButton', 'p2PassButton'].forEach((id) => {
+        const btn = document.getElementById(id);
+        if (!btn || btn.dataset.rulesPassHooked) return;
+        btn.dataset.rulesPassHooked = '1';
+        btn.addEventListener('click', handlePassClick, true);
+      });
+      // The coin flip used to fire the instant a Set Up button was
+      // clicked. Set Up is now a "ready check" (see ready.js) — the
+      // actual game/hand setup only happens once BOTH players have
+      // pressed their button, at which point ready.js dispatches
+      // 'both-players-ready' on document. Listen for that instead of the
+      // raw click so the coin flip happens after setup is complete.
+      document.addEventListener('both-players-ready', () => {
+        openingSetupReadyForCoinFlip = true;
+        handleSetupClick();
+      });
+      // Design 013: raised by turn-order-call.js from the server's messages. The server calls the
+      // coin the moment both players are ready; design 073's deck box deal plays first, so these run
+      // in arrival order once it ends (at once when no deal plays).
+      document.addEventListener('rules-turn-order-call', (event) => {
+        afterOpeningDeal(() => {
+          // The server nominated a caller. Only the nominated seat gets a callId.
+          const detail = event.detail;
+          if (!isServerOwnedTurnOrder()) return;
+          // `seat`: a solo room's caller seat (design 074 D7), echoed in the call.
+          const { callId, waiting, roomId, seat } = detail || {};
+          const seatField = seat ? { seat } : {};
+          const targetRoomId = roomId || systemState.roomId;
+
+          if (waiting || !callId) {
+            if (rulesState.enabled) {
+              appendMessage(
+                '',
+                'Your opponent is calling the starting coin flip…',
+                'announcement',
+                false
+              );
+            }
+            return;
+          }
+
+          // Two cases with nobody to click the picker: free play (rules mode off has
+          // no coin ceremony) and the Playwright harness. The deal still waits on this
+          // answer, so answer at once rather than stalling both seats until the
+          // server's timeout fires. The face is immaterial — the server flips either
+          // way, and neither mode shows the call or the flip.
+          if (!rulesState.enabled || isE2eMode()) {
+            rulesSocket?.emit('turnOrderCall', {
+              roomId: targetRoomId,
+              callId,
+              call: 'heads',
+              coinId: getSelectedCoin('self')?.id || null,
+              ...seatField,
+            });
+            return;
+          }
+
+          if (coinCallPending) return;
+          coinCallPending = true;
+          openCoinCallPicker({
+            subtitle: 'Call the starting coin flip. Choose heads or tails.',
+            onCall: (call) => {
+              coinCallPending = false;
+              rulesSocket?.emit('turnOrderCall', {
+                roomId: targetRoomId,
+                callId,
+                call,
+                // The caller's chosen coin, echoed by the server so both screens
+                // show the same art during the ceremony (display only; the flip
+                // result still comes from the server's seeded rng).
+                coinId: getSelectedCoin('self')?.id || null,
+                ...seatField,
+              });
+            },
+          });
+        });
+      });
+      document.addEventListener('rules-turn-order-flip', (event) => {
+        afterOpeningDeal(() => {
+          if (!isServerOwnedTurnOrder()) return;
+          showServerCoinFlip(event.detail);
+        });
+      });
+      document.addEventListener('rules-turn-order-result', (event) => {
+        afterOpeningDeal(() => {
+          if (!isServerOwnedTurnOrder()) return;
+          applyServerTurnOrderResult(event.detail);
+        });
+      });
+      document.addEventListener('deal-order-received', () => {
+        if (!isServerOwnedTurnOrder() || !rulesState.enabled) return;
+        maybeBeginServerTurnOrder();
+      });
+      document.addEventListener('rules-turn-order-choice-rejected', (event) => {
+        if (!isServerOwnedTurnOrder() || !rulesState.enabled) return;
+        closeTurnOrderChoicePicker();
+        appendMessage(
+          '',
+          `First/second choice not accepted (${event.detail?.reason || 'unknown'}) — waiting for the server.`,
+          'announcement',
+          false
+        );
+      });
+      document.addEventListener('rules-turn-order-call-rejected', (event) => {
+        if (!isServerOwnedTurnOrder() || !rulesState.enabled) return;
+        // The server refused our call (stale id, not our turn to call, malformed
+        // face). Say so instead of leaving a dead picker behind.
+        coinCallPending = false;
+        document.getElementById('rulesCoinCallOverlay')?.remove();
+        appendMessage(
+          '',
+          `Coin call not accepted (${event.detail?.reason || 'unknown'}) — waiting for the server's flip.`,
+          'announcement',
+          false
+        );
+      });
+      ['resetButton', 'p2ResetButton', 'resetBothButton', 'restartButton'].forEach((id) => {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        btn.addEventListener('click', () => {
+          if (!rulesState.enabled) return;
+          resetRulesSession();
+        }, true);
+      });
+      document.addEventListener('game-restarted', () => {
+        if (!rulesState.enabled) return;
+        resetRulesSession();
+      });
+      // Leaving or joining a room ends the previous game. Unlike the Reset
+      // buttons this is not gated on rulesState.enabled: a stale phase or a
+      // stale openingSetupReadyForCoinFlip carried into the next room shows
+      // the old turn HUD and lets the next peerSocketId/turnOrderCoinFlip
+      // auto-start a game nobody set up.
+      document.addEventListener('room-changed', resetRulesSession);
+      // The deck cover (click to open) and the deck zone's own click/context
+      // handlers both show deck contents. Gate both — the cover is the real
+      // entry point (opens the face-up card list), so without gating it too
+      // a player could always peek their deck regardless of the rule below.
+      document.addEventListener('click', (event) => {
+        if (!rulesState.enabled) return;
+        // composedPath: a board-mirror card's click arrives retargeted to its shadow host (design 074 D4).
+        const origin = event.composedPath?.()[0] ?? event.target;
+        const target = origin.closest?.('[id="deck"], [id="deckCover"]');
+        if (!target) return;
+        if (deckAccess.open) return; // a card effect unlocked it
+        const owner = target.id === 'deckCover' ? (target.user || 'self') : rulesState.turnPlayer;
+        const check = canPerformAction({ user: owner, action: 'viewDeck' });
+        if (!check.allowed) {
+          event.stopImmediatePropagation();
+          event.preventDefault();
+          const reason = check.reason;
+          appendMessage('', `⛔ ${reason}`, 'announcement', false);
+        }
+      }, true);
+  // Guided trainer/auto-execution runs even when rules enforcement is off
+  // (easier solo testing). Turn gating still applies when rules are on.
+  // Instant path: react the same tick a card lands on 'board'.
+  document.addEventListener('rules-card-on-board', (event) => {
+    if (rulesState.phase === 'ended') return;
+    const { user, card, localPlay = false } = event.detail || {};
+    if (
+      !shouldExecuteLocalRulesEffect({
+        isTwoPlayer: systemState.isTwoPlayer,
+        localPlay,
+        owner: user,
+      }) ||
+      !card
+    ) {
+      return;
+    }
+    if (rulesState.enabled && rulesState.turnPlayer !== user) return;
+    processBoardCard(card, user);
+  });
+
+  document.addEventListener('rules-pokemon-in-play', (event) => {
+    if (!rulesState.enabled || rulesState.phase === 'ended') return;
+    const { user, card, zoneId, fromZone, localPlay = false } = event.detail || {};
+    if (
+      !shouldExecuteLocalRulesEffect({
+        isTwoPlayer: systemState.isTwoPlayer,
+        localPlay,
+        owner: user,
+      })
+    ) {
+      return;
+    }
+    if (!card?.image) return;
+    // The flag marks a one-shot per *entering play* (setup face-down below), but a
+    // card already in play can still move Bench→Active many times — the promotion
+    // trigger must fire on every such move, so it is deliberately outside the guard.
+    const firstTimeInPlay = !card.image.__rulesPokemonInPlay;
+    card.image.__rulesPokemonInPlay = true;
+    ensureCardData(card).then(() => {
+      if (firstTimeInPlay && parseSetupFaceDown(card) && !card.image.__rulesSetupFaceDown) {
+        card.image.__rulesSetupFaceDown = true;
+        hideCard(user, card);
+        appendMessage(
+          '',
+          `🎭 ${card.name}: placed face-down (setup ability).`,
+          'announcement',
+          false
+        );
+      }
+      if (fromZone === 'bench' && zoneId === 'active') {
+        const steps = parseAbility(card.ability?.text || card.abilityText || '');
+        const promo = steps.find((s) => s.type === 'onPromotionAbility');
+        if (promo) {
+          runPromotionAbilityEffect(user, card, promo);
+        }
+      }
+    });
+  });
+
+  document.addEventListener('rules-opponent-evolved', (event) => {
+    if (!rulesState.enabled || rulesState.phase === 'ended') return;
+    const { user: evolvingPlayer, evolvedCard, zoneId } = event.detail || {};
+    const reactivePlayer = evolvingPlayer === 'self' ? 'opp' : 'self';
+    const sources = [
+      ...getZone(reactivePlayer, 'active').array,
+      ...getZone(reactivePlayer, 'bench').array,
+    ].filter((c) => c.type === 'Pokémon');
+    for (const source of sources) {
+      ensureCardData(source).then(() => {
+        const trigger = parseOnOpponentEvolve(source);
+        if (!trigger?.count) return;
+        const tZone = getZone(evolvingPlayer, zoneId);
+        const tIdx = tZone.array.findIndex((c) => c.image === evolvedCard.image);
+        if (tIdx < 0) return;
+        const existing =
+          parseInt(
+            evolvedCard.image?.damageCounter?.textContent || '0',
+            10
+          ) || 0;
+        if (evolvedCard.image?.damageCounter) {
+          evolvedCard.image.damageCounter.textContent = existing + trigger.count;
+        } else {
+          addDamageCounter(evolvingPlayer, zoneId, tIdx, trigger.count);
+        }
+        appendMessage(
+          '',
+          `⚡ ${source.name}: ${trigger.count} damage counter(s) on evolved ${evolvedCard.name}!`,
+          'announcement',
+          false
+        );
+      });
+    }
+  });
+
+  // Special-energy on-evolve triggers (e.g. Regenerative Energy: "whenever
+  // you play a Pokémon from your hand to evolve the Pokémon V this card is
+  // attached to, heal 30 damage"). The energy re-points to the evolved card
+  // in evolve-card.js, so scan the evolving player's zone for energies whose
+  // relative is the evolved card.
+  document.addEventListener('rules-opponent-evolved', (event) => {
+    if (!rulesState.enabled || rulesState.phase === 'ended') return;
+    const { user: evolvingPlayer, evolvedCard, zoneId } = event.detail || {};
+    if (!evolvedCard) return;
+    const z = getZone(evolvingPlayer, zoneId);
+    const idx = z.array.findIndex((c) => c.image === evolvedCard.image);
+    if (idx < 0) return;
+    for (const energy of z.array.filter(
+      (c) => c && c.type === 'Energy' && c.image?.relative === evolvedCard.image && isSpecialEnergyCard(c)
+    )) {
+      const plans = planSpecialEnergyTriggers(energy, {
+        trigger: 'evolve',
+        host: evolvedCard,
+        zoneArray: z.array,
+      });
+      for (const plan of plans) {
+        if (plan.action !== 'heal') continue;
+        const current =
+          parseInt(evolvedCard.image?.damageCounter?.textContent || '0', 10) || 0;
+        if (current <= 0) continue;
+        const next = Math.max(0, current - plan.amount);
+        if (next <= 0) removeDamageCounter(evolvingPlayer, zoneId, idx);
+        else updateDamageCounter(evolvingPlayer, zoneId, idx, next, true);
+        appendMessage(
+          '',
+          `💚 ${evolvedCard.name}: healed ${plan.amount} on evolve (${energy.name}).`,
+          'announcement',
+          false
+        );
+      }
+    }
+  });
+
+  // Gen 6 Mega Evolution / Primal Reversion rule: move-card.js already
+  // decided (requiresTurnEndOnEvolve) that this evolve must end the
+  // turn — route through the Pass button click so the capture hook's
+  // handlePassClick runs its full pipeline (status boundary, end-of-turn
+  // abilities, endTurn, banner, 2P sync) exactly as a normal pass does.
+  // Same pattern as keybinds.js's Alt+T "end turn" shortcut.
+  document.addEventListener('rules-mega-evolution-forces-turn-end', () => {
+    if (!rulesState.enabled || rulesState.phase === 'ended') return;
+    const passBtn = document.getElementById('passButton') || document.getElementById('p2PassButton');
+    passBtn?.click();
+  });
+
+  // Backstop: catches anything that (for whatever reason) didn't fire
+  // the event above — same logic, just on a slow poll so it's never
+  // the thing the player is waiting on. Disabled in online 2P: mirror
+  // replays must not re-trigger trainer auto-exec (see rules-local-effects).
+  if (!systemState.isTwoPlayer) {
+    const checkBoardCards = () => {
+      if (rulesState.phase === 'ended') return;
+      try {
+        for (const side of ['self', 'opp']) {
+          if (rulesState.enabled && rulesState.turnPlayer !== side) continue;
+          const board = getZone(side, 'board');
+          if (!board?.array) continue;
+          for (const card of board.array) processBoardCard(card, side);
+        }
+      } catch (error) {
+        console.warn('rules-bridge: checkBoardCards failed', error);
+      }
+    };
+    document.addEventListener('rules-card-moved', checkBoardCards);
+    document.addEventListener('action-processed', checkBoardCards);
+  }
+  document.addEventListener('rules-card-moved', () => {
+    if (rulesState.enabled && rulesState.phase !== 'setup' && rulesState.phase !== 'ended') {
+      evaluateAndApplyWinConditions();
+    }
+  });
+  // ── turn automation: auto-draw, KO watch ────────────────────────────
+  // TCG Live draws automatically at turn start. We hook the turn flow via
+  // the chatbox watcher (the sim announces turns) and drive the
+  // deck/hand zones directly.
+  let lastProcessedTurn = -1;
+
+  const drawCard = (player) => {
+    try {
+      const deck = getZone(player, 'deck');
+      const hand = getZone(player, 'hand');
+      if (deck.getCount() > 0) {
+        // moveCardBundle(user, initiator, fromZone, toZone, index, targetIndex, action)
+        import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
+          moveCardBundle(player, player, 'deck', 'hand', 0, false, 'move');
+        });
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  };
+
+  const checkDeckOut = () => {
+    if (!rulesState.enabled || rulesState.phase === 'ended') return;
+    if (rulesState.phase !== 'main') return;
+
+    // auto-draw once per new turn for the turn player (skip turn 1's
+    // opening hand — setup handles that)
+    if (rulesState.turnNumber !== lastProcessedTurn) {
+      lastProcessedTurn = rulesState.turnNumber;
+      if (rulesState.turnNumber > 1) {
+        // NOTE: the sim's +Turn button already draws the card for the
+        // turn player; we only track deck-out here.
+        const player = rulesState.turnPlayer;
+        const deckCount = (() => { try { return getZone(player, 'deck').getCount(); } catch { return 0; } })();
+        if (deckCount === 0) {
+          appendMessage('', 'Deck empty — deck-out loss!', 'announcement', false);
+          rulesState.phase = 'ended';
+          document.dispatchEvent(new CustomEvent('rules-game-ended', { detail: { reason: 'Deck empty — deck-out loss!' } }));
+        }
+      }
+    }
+  };
+
+  document.addEventListener('rules-turn-began', checkDeckOut);
+  // continuous KO detection: watch all in-play Pokémon for damage >= HP
+  // per-turn ability flags now live in rulesState.flags[player].abilitiesUsed
+  // and are cleared by resetTurnFlags() each turn — no DOM-flag reset here.
+  const checkKnockouts = async () => {
+    if (!rulesState.enabled || rulesState.phase === 'ended') return;
+
+    try {
+      for (const player of ['self', 'opp']) {
+        for (const zoneId of ['active', 'bench']) {
+          const zone = getZone(player, zoneId);
+          if (!zone?.array) continue;
+          for (const card of zone.array) {
+            if (!card?.image || card.__rulesKODetected) continue;
+            const dmgText = card.image.damageCounter?.textContent || '0';
+            const damage = parseInt(dmgText, 10) || 0;
+            if (damage <= 0 || !card.hp) continue;
+            await ensureCardData(card);
+            const effHp = effectiveHp(card.hp, player, card, zone.array);
+            if (effHp > 0 && damage >= effHp) {
+              card.__rulesKODetected = true;
+
+              // Design 009 slice 6: ghost the KO'd card BEFORE the owner's
+              // discard move (below) removes the real one. Runs for BOTH
+              // player values — this loop already watches both sides'
+              // zones for local detection (see the comment on the
+              // owner-only discard branch below).
+              if (
+                shouldAnimateMirror({
+                  syncReplaying: !!systemState.syncReplaying,
+                  isCatchingUp: !!systemState.isCatchingUp,
+                  hidden: typeof document !== 'undefined' && !!document.hidden,
+                })
+              ) {
+                const ghost = captureKnockoutGhost(player, card.image);
+                if (ghost) playKnockoutGhost(ghost);
+              }
+
+              const who = player === 'self' ? 'Your' : "Opponent's";
+              // Prism Star cards go to the Lost Zone, not the discard pile (App. 17).
+              let koDestination = isPrismStarCard(card) ? 'lostZone' : 'discard';
+
+              // Special-energy on-KO triggers (Splash/Rescue return to hand,
+              // Gift draw-until-7). Plans come from the shared parser; only
+              // the destination-changing return-to-hand is applied here.
+              const koPlans = [];
+              for (const e of zone.array) {
+                if (e && e.type === 'Energy' && e.image?.relative === card.image) {
+                  koPlans.push(
+                    ...planSpecialEnergyTriggers(e, {
+                      trigger: 'knockout',
+                      host: card,
+                      zoneArray: zone.array,
+                    }),
+                  );
+                }
+              }
+              const koReturnToHand = koPlans.some((p) => p.action === 'returnToHand');
+              const koDrawUntil = koPlans.find((p) => p.action === 'drawUntil');
+              if (koReturnToHand) koDestination = 'hand';
+
+              const destinationLabel =
+                koDestination === 'lostZone' ? 'the Lost Zone' : koDestination === 'hand' ? 'your hand' : 'discard';
+              appendMessage('', `💀 ${who} ${card.name || 'Pokémon'} has ${damage}/${effHp} damage — KO! Move it to ${destinationLabel}${zoneId === 'active' ? ' and promote a new Active' : ''}.`, 'announcement', false);
+
+              playAttackFeedback(true);
+
+              // Auto-discard the KO'd Pokémon — but ONLY on the side that
+              // actually owns this zone. This loop runs on BOTH clients,
+              // watching BOTH 'self' and 'opp' (their mirrored view of
+              // the other player's board), purely for local detection —
+              // it isn't authoritative for a zone it doesn't own.
+              // Calling the raw moveCard() primitive here for 'opp' too
+              // (as this used to) mutated each client's local copy of
+              // the other player's zone WITHOUT ever broadcasting the
+              // change — the two clients' boards, discard piles, and
+              // battle logs would silently drift apart over the game.
+              // Only the owning client (player === 'self' from its own
+              // perspective) performs the move, and it does so through
+              // moveCardBundle — the same synced wrapper used by manual
+              // drag/discard — so the peer receives and replays the
+              // identical action instead of guessing at it locally.
+              if (player === 'self' || (!systemState.isTwoPlayer && player === 'opp')) {
+                import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
+                  try {
+                    // Rescue/Splash Energy: discard the attached cards, then
+                    // return the Pokémon itself to the owner's hand.
+                    if (koReturnToHand) {
+                      for (const e of [...zone.array]) {
+                        if (e && e.type === 'Energy' && e.image?.relative === card.image) {
+                          const ei = zone.array.indexOf(e);
+                          if (ei >= 0) moveCardBundle(player, player, zoneId, 'discard', ei, false, 'move');
+                        }
+                      }
+                      appendMessage('', `♻️ ${card.name || 'Pokémon'} returns to your hand.`, 'announcement', false);
+                    }
+                    const idx = zone.array.indexOf(card);
+                    if (idx >= 0) {
+                      moveCardBundle(player, player, zoneId, koDestination, idx, false, 'move');
+                      appendMessage('', `auto: KO'd Pokémon moved to ${destinationLabel}`, 'announcement', false);
+                      if (koDrawUntil) {
+                        const hand = getZone(player, 'hand');
+                        const need = koDrawUntil.until - hand.getCount();
+                        if (need > 0) draw(player, player, need, true);
+                      }
+
+                      if (zoneId === 'active') {
+                        const benchZone = getZone(player, 'bench');
+                        const candidates = (benchZone?.array || []).filter(
+                          (c) => c && !c.image?.attached && ((c.type2 || c.type) === 'Pokémon')
+                        );
+                        if (candidates.length > 0) {
+                          import('./mat-picker.js').then(({ openMatPick }) => {
+                            openMatPick({
+                              title: `${card.name || 'Active Pokémon'} was KO'd — click a Bench Pokémon to promote to Active`,
+                              candidates,
+                              cancellable: false,
+                              onPick: (picked) => {
+                                const bIdx = benchZone.array.indexOf(picked);
+                                if (bIdx >= 0) {
+                                  moveCardBundle(player, player, 'bench', 'active', bIdx, false, 'move');
+                                  appendMessage('', `⬆️ ${picked.name || 'A benched Pokémon'} promotes to Active.`, 'announcement', false);
+                                }
+                              },
+                            });
+                          });
+                        }
+                      }
+                    }
+                  } catch (error) {
+                    console.warn('rules-bridge: moving a Knocked Out Pokémon\'s cards failed', error);
+                  }
+                });
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('rules-bridge: checkKnockouts failed', error);
+    }
+  };
+
+  document.addEventListener('rules-damage-changed', checkKnockouts);
+  document.addEventListener('rules-card-moved', checkKnockouts);
+  document.addEventListener('rules-turn-began', checkKnockouts);
+  document.addEventListener('action-processed', checkKnockouts);
+  const updateBadges = () => {
+    if (!rulesState.enabled) return;
+    try {
+      for (const player of ['self', 'opp']) {
+        for (const zoneId of ['active', 'bench']) {
+          const zone = getZone(player, zoneId);
+          if (!zone?.array) continue;
+          for (const card of zone.array) {
+            const img = card.image;
+            if (!img) continue;
+            const key = img.dataset?.cardId || card.name;
+            const s = statusState[player][key];
+            let badge = img.__rulesStatusBadge;
+            if (s && Object.keys(s).length > 0) {
+              const text = Object.keys(s).map(k => STATUS_EMOJI[k] || '').join('');
+              if (!badge) {
+                badge = document.createElement('div');
+                badge.className = 'rules-status-badge';
+                img.parentElement?.appendChild(badge);
+                img.__rulesStatusBadge = badge;
+              }
+              badge.textContent = text;
+              badge.title = Object.keys(s).join(', ');
+            } else if (badge) {
+              badge.remove();
+              img.__rulesStatusBadge = null;
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('rules-bridge: updating status badges failed', error);
+    }
+  };
+
+  document.addEventListener('rules-status-changed', updateBadges);
+  document.addEventListener('rules-turn-began', updateBadges);
+  document.addEventListener('rules-turn-view-applied', updateBadges);
+  document.addEventListener('rules-card-moved', updateBadges);
+  document.addEventListener('rules-session-reset', updateBadges);
+  document.addEventListener('action-processed', updateBadges);
   hookActionAffordances();
   hookMultiplayerSync();
   buildEndScreen();
-      hookMoveCard();
-      hookEnergyAttach();
+      // ── move gating ──────────────────────────────────────────────────────
+      window.addEventListener('rules-check-move', (event) => {
+        const { user, fromZone, toZone, callback } = event.detail || {};
+        const check = canPerformAction({ user, action: 'moveCard', zoneId: fromZone, targetZoneId: toZone });
+        callback?.(check);
+      });
+      // ── energy attach: once per turn ─────────────────────────────────────
+      // The sim attaches energy by dragging a card onto a Pokémon. We can't
+      // intercept drag-drop cleanly, so we watch the attachedCards zone: the
+      // first energy attached to any of the turn player's Pokémon each turn
+      // flips the flag; later attaches while the flag is set are announced as
+      // rule warnings (the sim's free drag can't be hard-blocked without
+      // patching its internals, so rules mode surfaces violations immediately).
+      document.addEventListener('rules-attach-energy', (event) => {
+        markEnergyAttached(event.detail.player || rulesState.turnPlayer);
+      });
+
+      // observe self attached cards for energy adds
+      const checkEnergyAdds = () => {
+        if (!rulesState.enabled || rulesState.phase === 'ended') return;
+        const player = rulesState.turnPlayer;
+        if (player !== 'self') return;
+        try {
+          const zone = getZone('self', 'attachedCards');
+          if (!zone?.array) return;
+          for (const card of zone.array) {
+            const img = card.image;
+            if (!img || img.__rulesEnergyChecked) continue;
+            img.__rulesEnergyChecked = true;
+            if (!isEnergyCard(card)) continue;
+            if (rulesState.flags.self?.energyAttached) {
+              appendMessage('', '⚠️ Rules: energy already attached this turn (extra attach detected)', 'announcement', false);
+            } else {
+              markEnergyAttached('self');
+              appendMessage('', 'Energy attached (1/1 this turn)', 'announcement', false);
+              const energyCard = { name: card.name, type: card.type, subtypes: card.subtypes, effect: card.effect, text: card.text };
+              const applied = applyEnergyEffect(energyCard);
+              if (applied.message) {
+                appendMessage('', applied.message.replace(/^⚡ /, ''), 'announcement', false);
+              } else {
+                const family = classifyEnergyEffect(energyCard);
+                if (family && family !== 'basic' && family !== 'unknown') {
+                  appendMessage('', describeEnergyEffect(energyCard), 'announcement', false);
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.warn('rules-bridge: checkEnergyAdds failed', error);
+        }
+      };
+
+      document.addEventListener('rules-energy-attached', checkEnergyAdds);
+      document.addEventListener('rules-card-moved', checkEnergyAdds);
+      document.addEventListener('action-processed', checkEnergyAdds);
+
+      // Pokémon Park: attaching an Energy from hand to a Benched Pokémon
+      // removes 1 damage counter (once per player per turn).
+      document.addEventListener('rules-energy-attached', (event) => {
+        if (!rulesState.enabled) return;
+        const { user, energy, pokemon, fromZone, toZone } = event.detail || {};
+        if (!energy || !pokemon || fromZone !== 'hand' || toZone !== 'bench') return;
+        const stadium = getStadium();
+        if (!isStadiumEnergyAttachHeal(stadium?.card || stadium)) return;
+        if (!rulesState.flags[user]) rulesState.flags[user] = {};
+        if (rulesState.flags[user].pokemonParkHealed) return;
+        rulesState.flags[user].pokemonParkHealed = true;
+        import('../../actions/counters/damage-counter.js').then(
+          ({ updateDamageCounter, removeDamageCounter }) => {
+            const bench = getZone(user, 'bench');
+            const idx = bench.array.indexOf(pokemon);
+            if (idx < 0) return;
+            const current =
+              parseInt(pokemon.image?.damageCounter?.textContent || '0', 10) || 0;
+            if (current <= 0) return;
+            if (current - 10 <= 0) removeDamageCounter(user, 'bench', idx);
+            else updateDamageCounter(user, 'bench', idx, current - 10);
+            appendMessage(
+              '',
+              `💚 Pokémon Park: removed 1 damage counter from ${pokemon.name}.`,
+              'announcement',
+              false
+            );
+          }
+        );
+      });
+
+      document.addEventListener('rules-energy-attached', async (event) => {
+        if (!rulesState.enabled) return;
+        const { user, energy, pokemon, fromZone, toZone } = event.detail || {};
+        if (!energy || !pokemon) return;
+        try {
+          await ensureCardData(energy);
+          await ensureCardData(pokemon);
+          const parsed = parseSpecialEnergyEffects(energy);
+          if (!parsed) return;
+
+          const desc = describeSpecialEnergyEffects(energy) || describeEnergyEffect(energy);
+          appendMessage('', `⚡ ${desc}`, 'announcement', false);
+          // The server runs on-attach triggers itself (reduce.mjs attachCard). Running them
+          // here too would draw/search/switch twice (audit SE17).
+          if (systemState.serverAuthoritative) return;
+
+          const hostZoneId = toZone === 'active' ? 'active' : 'bench';
+          const hostZone = getZone(user, hostZoneId);
+          const hostIndex = hostZone?.array ? hostZone.array.indexOf(pokemon) : -1;
+          const statusKey = pokemon.image?.dataset?.cardId || pokemon.name;
+          const currentDamage = () =>
+            parseInt(pokemon.image?.damageCounter?.textContent || '0', 10) || 0;
+          const setDamage = (value) => {
+            if (hostIndex < 0) return;
+            const v = Math.max(0, value);
+            if (v <= 0) removeDamageCounter(user, hostZoneId, hostIndex);
+            else updateDamageCounter(user, hostZoneId, hostIndex, v);
+          };
+
+          const plans = planSpecialEnergyTriggers(energy, {
+            trigger: 'attach',
+            host: pokemon,
+            zoneArray: hostZone?.array || [],
+            fromZone,
+          });
+
+          for (const plan of plans) {
+            switch (plan.action) {
+              case 'draw':
+                if (plan.count > 0) draw(user, user, plan.count, true);
+                break;
+              case 'heal':
+                if (currentDamage() > 0) {
+                  setDamage(currentDamage() - plan.amount);
+                  appendMessage('', `  💚 ${pokemon.name}: healed ${plan.amount}.`, 'announcement', false);
+                }
+                break;
+              case 'removeDamage': {
+                if (currentDamage() > 0) setDamage(currentDamage() - plan.count * 10);
+                if (plan.alsoCure) clearStatuses(user, statusKey);
+                appendMessage(
+                  '',
+                  `  💚 ${pokemon.name}: removed ${plan.count} damage counter${plan.count === 1 ? '' : 's'}${plan.alsoCure ? ' and Special Conditions' : ''}.`,
+                  'announcement',
+                  false,
+                );
+                break;
+              }
+              case 'addDamage':
+                setDamage(currentDamage() + plan.count * 10);
+                appendMessage(
+                  '',
+                  `  ⚠️ ${pokemon.name}: ${plan.count} damage counter${plan.count === 1 ? '' : 's'}.`,
+                  'announcement',
+                  false,
+                );
+                break;
+              case 'clearStatus':
+                clearStatuses(user, statusKey);
+                appendMessage('', `  💧 ${pokemon.name}: recovered from all Special Conditions.`, 'announcement', false);
+                break;
+              case 'search': {
+                openDeckSearchWindow(`${energy.name} — search your deck`);
+                const deck = getZone(user, 'deck');
+                const matches = [];
+                for (const c of deck.array) {
+                  await ensureCardData(c);
+                  if (matchesSearch(c, plan.what)) matches.push(c);
+                }
+                // "search … for up to N" — an empty match set is a legal whiff,
+                // and offering the whole deck as a fallback let the player Bench
+                // arbitrary cards. The player may also take fewer than N.
+                const pool = matches;
+                if (pool.length === 0) {
+                  appendMessage('', `  no matching cards in your deck`, 'announcement', false);
+                  break;
+                }
+                const toHand = plan.destination === 'hand';
+                openChoicePicker({
+                  title: `${energy.name} — choose up to ${plan.count} ${plan.what} for your ${toHand ? 'hand' : 'Bench'}`,
+                  candidates: pool,
+                  zoneFrom: 'deck',
+                  destination: toHand ? 'hand' : 'bench',
+                  multiSelect: true,
+                  requiredCount: Math.min(plan.count, pool.length),
+                  minCount: 0,
+                  maxCount: Math.min(plan.count, pool.length),
+                  // openCardPicker's confirm already moved (and relayed) every
+                  // pick via zoneFrom/destination before calling this.
+                  onConfirm: (selected) => {
+                    appendMessage(
+                      '',
+                      `  ${selected.map((s) => s.name).join(', ')} → ${toHand ? 'hand' : 'Bench'}`,
+                      'announcement',
+                      false,
+                    );
+                    shuffleDeckAfterSearch(user, appendMessage, shuffleZone, { sourceName: energy.name });
+                  },
+                  onCancel: () => {
+                    appendMessage('', '  search canceled — shuffle your deck', 'announcement', false);
+                    shuffleDeckAfterSearch(user, appendMessage, shuffleZone, { sourceName: energy.name, message: null });
+                  },
+                });
+                break;
+              }
+              case 'switch': {
+                const oppSide = user === 'self' ? 'opp' : 'self';
+                const switchSide = plan.side === 'opponent' ? oppSide : user;
+                if (plan.side === 'self' && plan.target === 'benchedToActive') {
+                  switchBenchToActive(user, pokemon);
+                  break;
+                }
+                const bench = getZone(switchSide, 'bench').array.filter((c) => c && !c.image?.attached);
+                if (bench.length === 1) {
+                  switchBenchToActive(switchSide, bench[0]);
+                } else if (bench.length > 1) {
+                  import('./mat-picker.js').then(({ openMatPick }) => {
+                    openMatPick({
+                      title: `${energy.name} — click a Benched Pokémon to switch in`,
+                      candidates: bench,
+                      onPick: (b) => switchBenchToActive(switchSide, b),
+                    });
+                  });
+                }
+                break;
+              }
+              case 'devolve': {
+                if (currentDamage() > 0) setDamage(currentDamage() - plan.count * 10);
+                const base = (hostZone?.array || []).find(
+                  (c) => c && c !== pokemon && c.parentCard === pokemon && (c.type2 || c.type) === 'Pokémon'
+                );
+                if (!base) {
+                  appendMessage('', `  ${pokemon.name} is not an evolved Pokémon — nothing to discard.`, 'announcement', false);
+                  break;
+                }
+                // Detach the base so moving the top card out does not drag it
+                // (and the host's energy/tools) to the discard pile with it.
+                if (Array.isArray(pokemon.attachedCards)) {
+                  pokemon.attachedCards = pokemon.attachedCards.filter((c) => c !== base);
+                }
+                base.attached = false;
+                base.parentCard = null;
+                base.parentCardId = null;
+                if (base.image) base.image.relative = null;
+                // Re-point the host's remaining attachments to the base.
+                for (const c of hostZone.array) {
+                  if (c === base || c === pokemon) continue;
+                  if (c.parentCard === pokemon || c.image?.relative === pokemon.image) {
+                    c.parentCard = base;
+                    c.parentCardId = base.cardId ?? base.syncInstance ?? null;
+                    if (c.image) c.image.relative = base.image;
+                    if (!Array.isArray(base.attachedCards)) base.attachedCards = [];
+                    if (!base.attachedCards.includes(c)) base.attachedCards.push(c);
+                  }
+                }
+                const { moveCardBundle } = await import('../../actions/move-card-bundle/move-card-bundle.js');
+                const topIdx = hostZone.array.indexOf(pokemon);
+                if (topIdx >= 0) moveCardBundle(user, user, hostZoneId, 'discard', topIdx, false, 'move');
+                appendMessage(
+                  '',
+                  `  🔄 ${pokemon.name}: top Evolution card discarded — ${base.name} devolved.`,
+                  'announcement',
+                  false
+                );
+                break;
+              }
+              case 'returnBasicEnergy': {
+                const attached = (hostZone?.array || []).filter(
+                  (c) =>
+                    c &&
+                    c.type === 'Energy' &&
+                    c.image?.relative === pokemon.image &&
+                    !isSpecialEnergyCard(c),
+                );
+                if (attached.length) {
+                  const i = hostZone.array.indexOf(attached[0]);
+                  if (i >= 0) {
+                    const { moveCardBundle } = await import('../../actions/move-card-bundle/move-card-bundle.js');
+                    moveCardBundle(user, user, hostZoneId, 'hand', i, false, 'move');
+                    appendMessage('', `  ↩️ ${attached[0].name} returned to your hand.`, 'announcement', false);
+                  }
+                }
+                break;
+              }
+              default:
+                break;
+            }
+          }
+        } catch {
+          /* card data may not be ready */
+        }
+      });
       syncRulesToggleUI();
       hookTurnStartDraw();
       hookStartingActiveWatcher();
@@ -314,13 +1343,10 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
         <span class="rules-hud-flags"></span>`;
       document.body.appendChild(hud);
     
-      // startGame leaves phase 'draw' on turn 0 while the Starting Actives are still being
-      // chosen: that is still setup, so no "draw phase" banner over the placement.
-      const placingStartingActives = () =>
-        rulesState.phase === 'draw' && !(rulesState.turnNumber > 0) && !rulesState.startingActiveDone;
-
       const refresh = () => {
-        if (!rulesState.enabled || rulesState.phase === 'setup' || placingStartingActives()) {
+        // startGame leaves phase 'draw' on turn 0 while the Starting Actives are still being
+        // chosen: that is still setup, so no "draw phase" banner over the placement.
+        if (!rulesState.enabled || rulesState.phase === 'setup' || rulesState.phase === 'draw' && !(rulesState.turnNumber > 0) && !rulesState.startingActiveDone) {
           hud.hidden = true;
           return;
         }
@@ -487,266 +1513,6 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
       return false;
     }
 
-    // ── turn flow: attack ends turn; +Turn advances ──────────────────────
-    const hookTurnButton = () => {
-      const handlePassClick = async (event) => {
-        if (!rulesState.enabled) return;
-        // Suppress pass() and legacy takeTurn before any await — otherwise
-        // the bubble handler runs while this async listener is suspended and
-        // the turn advances twice (double start-of-turn draw for the opponent).
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        if (turnEndedByAttack) {
-          turnEndedByAttack = false;
-          return; // turn already ended by an attack
-        }
-    
-        // Pokémon Checkup passive abilities (Froslass pattern) before status boundary
-        if (rulesState.enabled) {
-          for (const player of ['self', 'opp']) {
-            for (const zoneId of ['active', 'bench']) {
-              for (const source of getZone(player, zoneId).array) {
-                if (source.type !== 'Pokémon') continue;
-                const checkup = parseCheckupEffect(source);
-                if (!checkup?.count) continue;
-                appendMessage(
-                  '',
-                  `🩺 ${checkup.source}: Pokémon Checkup — ${checkup.count} damage counter${checkup.count !== 1 ? 's' : ''}.`,
-                  'announcement',
-                  false
-                );
-                for (const targetPlayer of ['self', 'opp']) {
-                  for (const targetZone of ['active', 'bench']) {
-                    const tZone = getZone(targetPlayer, targetZone);
-                    for (let tIdx = 0; tIdx < tZone.array.length; tIdx++) {
-                      const target = tZone.array[tIdx];
-                      if (target.type !== 'Pokémon') continue;
-                      if (
-                        checkup.exceptName &&
-                        String(target.name || '').toLowerCase().includes(checkup.exceptName)
-                      ) {
-                        continue;
-                      }
-                      if (
-                        checkup.targetHasAbility &&
-                        !(target.ability?.text || target.abilityText)
-                      ) {
-                        continue;
-                      }
-                      const existing = parseInt(
-                        target.image?.damageCounter?.textContent || '0',
-                        10
-                      ) || 0;
-                      if (target.image?.damageCounter) {
-                        updateDamageCounter(targetPlayer, targetZone, tIdx, existing + checkup.count, true);
-                      } else {
-                        addDamageCounter(targetPlayer, targetZone, tIdx, checkup.count, true);
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-
-        // end-of-turn: resolve the turn player's statuses before passing
-        const endingPlayer = rulesState.turnPlayer;
-        try {
-          const active = getZone(endingPlayer, 'active').array[0];
-          if (active) {
-            const key = active.image?.dataset?.cardId || active.name;
-            const boundary = resolveTurnBoundary(endingPlayer, key, Math.random, {
-              checkupPoisonBonus: getStadiumCheckupPoisonBonus(active, endingPlayer),
-            });
-            if (boundary.damage > 0) {
-              const current = parseInt(active.image?.damageCounter?.textContent || '0', 10) || 0;
-              if (active.image?.damageCounter) {
-                updateDamageCounter(endingPlayer, 'active', 0, current + boundary.damage, true);
-              } else {
-                addDamageCounter(endingPlayer, 'active', 0, boundary.damage, true);
-              }
-            }
-            for (const note of boundary.notes) {
-              appendMessage('', note, 'announcement', false);
-            }
-          }
-        } catch (error) {
-          console.warn('rules-bridge: end-of-turn status resolution failed', error);
-        }
-    
-        // end-of-turn ability effects (ability family: end-of-turn):
-        // resolve for the ending player's Active + bench, once per turn
-        if (rulesState.enabled) {
-          for (const zoneId of ['active', 'bench']) {
-            for (const card of getZone(endingPlayer, zoneId).array) {
-              if (abilityUsed(endingPlayer, card)) continue;
-              try {
-                await ensureCardData(card);
-              } catch (error) {
-                console.warn('rules-bridge: card data for an end-of-turn Ability could not be loaded', error);
-              }
-              const effect = parseEndOfTurnEffect(card);
-              if (!effect) continue;
-              markAbilityUsed(endingPlayer, card);
-              if (effect.kind === 'draw') {
-                import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
-                  for (let k = 0; k < effect.n; k++) {
-                    if (getZone(endingPlayer, 'deck').getCount() > 0) {
-                      moveCardBundle(endingPlayer, endingPlayer, 'deck', 'hand', 0, false, 'move', true);
-                    }
-                  }
-                });
-                appendMessage(
-                  '',
-                  `⏰ End of turn: ${card.name || 'your Pokémon'} draws ${effect.n} card(s).`,
-                  'announcement',
-                  false
-                );
-              } else if (effect.kind === 'search') {
-                appendMessage(
-                  '',
-                  `⏰ End of turn: ${card.name || 'your Pokémon'} searches for a card (see Search ability).`,
-                  'announcement',
-                  false
-                );
-              }
-            }
-          }
-        }
-    
-        // end-of-turn special-energy effects (legacy Darkness Energy): "at the
-        // end of every turn" applies to both players' in-play Pokémon.
-        if (rulesState.enabled) {
-          for (const player of ['self', 'opp']) {
-            for (const zoneId of ['active', 'bench']) {
-              const z = getZone(player, zoneId);
-              for (let i = 0; i < z.array.length; i++) {
-                const host = z.array[i];
-                if (!host || host.image?.attached) continue;
-                const energies = z.array.filter(
-                  (c) => c && c.type === 'Energy' && c.image?.relative === host.image && isSpecialEnergyCard(c)
-                );
-                for (const energy of energies) {
-                  const plans = planSpecialEnergyTriggers(energy, {
-                    trigger: 'endTurn',
-                    host,
-                    zoneArray: z.array,
-                  });
-                  for (const plan of plans) {
-                    if (plan.action !== 'addDamage') continue;
-                    const amount = plan.count * 10;
-                    const current =
-                      parseInt(host.image?.damageCounter?.textContent || '0', 10) || 0;
-                    if (host.image?.damageCounter) {
-                      updateDamageCounter(player, zoneId, i, current + amount, true);
-                    } else {
-                      addDamageCounter(player, zoneId, i, amount, true);
-                    }
-                    appendMessage(
-                      '',
-                      `⏰ End of turn: ${plan.count} damage counter(s) on ${host.name || 'a Pokémon'} (${energy.name}).`,
-                      'announcement',
-                      false
-                    );
-                  }
-                }
-              }
-            }
-          }
-        }
-
-        // win-condition sweep before passing
-        if (evaluateAndApplyWinConditions(endingPlayer)) {
-          return;
-        }
-    
-        // This is the only path that actually ends the turn (the three
-        // early-return paths above all bail before reaching it). The rules
-        // capture handler is registered before the board bubble handler
-        // (initializeSidebox() runs before initializeTable()), so suppressing
-        // the event here stops the legacy takeTurn(...) bubble handler from
-        // also firing — otherwise it would start the initiator's own turn and
-        // "interrupt" the opponent right after we passed the turn. Deliberate,
-        // rules-mode-only exception to the "capture hooks don't suppress"
-        // invariant (which protects the Set Up / Reset hooks).
-        const next = endTurn(endingPlayer);
-        appendMessage('', `Turn passes to ${next === 'self' ? 'P1' : 'P2'}`, 'announcement', false);
-        updateTurnBanner();
-        // Capture-phase stop keeps pass() from double-ending the turn, so
-        // 2P still needs an explicit pass relay (the log's extra draw was
-        // the peer also emitting a start-of-turn draw for this client).
-        if (systemState.isTwoPlayer && endingPlayer === 'self') {
-          processAction('self', true, 'pass', [{}]);
-        }
-      };
-      ['passButton', 'p2PassButton'].forEach((id) => {
-        const btn = document.getElementById(id);
-        if (!btn || btn.dataset.rulesPassHooked) return;
-        btn.dataset.rulesPassHooked = '1';
-        btn.addEventListener('click', handlePassClick, true);
-      });
-    };
-    
-    const hookSetupButton = () => {
-      // The coin flip used to fire the instant a Set Up button was
-      // clicked. Set Up is now a "ready check" (see ready.js) — the
-      // actual game/hand setup only happens once BOTH players have
-      // pressed their button, at which point ready.js dispatches
-      // 'both-players-ready' on document. Listen for that instead of the
-      // raw click so the coin flip happens after setup is complete.
-      document.addEventListener('both-players-ready', () => {
-        openingSetupReadyForCoinFlip = true;
-        handleSetupClick();
-      });
-      // Design 013: raised by turn-order-call.js from the server's messages. The server calls the
-      // coin the moment both players are ready; design 073's deck box deal plays first, so these run
-      // in arrival order once it ends (at once when no deal plays).
-      document.addEventListener('rules-turn-order-call', (event) => {
-        afterOpeningDeal(() => handleServerTurnOrderCall(event.detail));
-      });
-      document.addEventListener('rules-turn-order-flip', (event) => {
-        afterOpeningDeal(() => {
-          if (!isServerOwnedTurnOrder()) return;
-          showServerCoinFlip(event.detail);
-        });
-      });
-      document.addEventListener('rules-turn-order-result', (event) => {
-        afterOpeningDeal(() => {
-          if (!isServerOwnedTurnOrder()) return;
-          applyServerTurnOrderResult(event.detail);
-        });
-      });
-      document.addEventListener('deal-order-received', () => {
-        if (!isServerOwnedTurnOrder() || !rulesState.enabled) return;
-        maybeBeginServerTurnOrder();
-      });
-      document.addEventListener('rules-turn-order-choice-rejected', (event) => {
-        if (!isServerOwnedTurnOrder() || !rulesState.enabled) return;
-        closeTurnOrderChoicePicker();
-        appendMessage(
-          '',
-          `First/second choice not accepted (${event.detail?.reason || 'unknown'}) — waiting for the server.`,
-          'announcement',
-          false
-        );
-      });
-      document.addEventListener('rules-turn-order-call-rejected', (event) => {
-        if (!isServerOwnedTurnOrder() || !rulesState.enabled) return;
-        // The server refused our call (stale id, not our turn to call, malformed
-        // face). Say so instead of leaving a dead picker behind.
-        coinCallPending = false;
-        document.getElementById('rulesCoinCallOverlay')?.remove();
-        appendMessage(
-          '',
-          `Coin call not accepted (${event.detail?.reason || 'unknown'}) — waiting for the server's flip.`,
-          'announcement',
-          false
-        );
-      });
-      hookResetButtons();
-    };
-    
     // Non-rules Reset handlers don't touch rulesState, so without this the
     // phase would stay 'draw' and a later Set Up would skip the coin flip.
     const resetRulesSession = () => {
@@ -786,27 +1552,6 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
       document.dispatchEvent(new CustomEvent('rules-session-reset'));
     };
 
-    const hookResetButtons = () => {
-      ['resetButton', 'p2ResetButton', 'resetBothButton', 'restartButton'].forEach((id) => {
-        const btn = document.getElementById(id);
-        if (!btn) return;
-        btn.addEventListener('click', () => {
-          if (!rulesState.enabled) return;
-          resetRulesSession();
-        }, true);
-      });
-      document.addEventListener('game-restarted', () => {
-        if (!rulesState.enabled) return;
-        resetRulesSession();
-      });
-      // Leaving or joining a room ends the previous game. Unlike the Reset
-      // buttons this is not gated on rulesState.enabled: a stale phase or a
-      // stale openingSetupReadyForCoinFlip carried into the next room shows
-      // the old turn HUD and lets the next peerSocketId/turnOrderCoinFlip
-      // auto-start a game nobody set up.
-      document.addEventListener('room-changed', resetRulesSession);
-    };
-    
     const liveZoneArray = (user, zoneId) => {
       if (hasAuthoritativeView()) {
         const side = user === 'self' ? 'you' : 'them';
@@ -1180,11 +1925,22 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
       }
       if (!flip.choiceId || turnOrderChoicePending) return;
       turnOrderChoicePending = true;
-      openTurnOrderChoicePicker({
+      // TCG Live's pl_calling_turn: the toss winner answers Yes (go first) or No.
+      const { onChoose } = {
         onChoose: (goFirst) => {
           turnOrderChoicePending = false;
           sendTurnOrderChoice({ ...turnOrderChoiceOf(flip), goFirst });
         },
+      };
+      openTurnOrderPrompt({
+        id: TURN_ORDER_CHOICE_OVERLAY_ID,
+        title: 'You won the coin flip!',
+        subtitle: 'Do you want to go first?',
+        options: [
+          { label: 'Yes', value: true, data: { turnOrderChoice: 'first' } },
+          { label: 'No', value: false, data: { turnOrderChoice: 'second' } },
+        ],
+        onPick: onChoose,
       });
     };
 
@@ -1277,62 +2033,6 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
       return true;
     };
 
-    // The server nominated a caller. Only the nominated seat gets a callId.
-    const handleServerTurnOrderCall = (detail) => {
-      if (!isServerOwnedTurnOrder()) return;
-      // `seat`: a solo room's caller seat (design 074 D7), echoed in the call.
-      const { callId, waiting, roomId, seat } = detail || {};
-      const seatField = seat ? { seat } : {};
-      const targetRoomId = roomId || systemState.roomId;
-
-      if (waiting || !callId) {
-        if (rulesState.enabled) {
-          appendMessage(
-            '',
-            'Your opponent is calling the starting coin flip…',
-            'announcement',
-            false
-          );
-        }
-        return;
-      }
-
-      // Two cases with nobody to click the picker: free play (rules mode off has
-      // no coin ceremony) and the Playwright harness. The deal still waits on this
-      // answer, so answer at once rather than stalling both seats until the
-      // server's timeout fires. The face is immaterial — the server flips either
-      // way, and neither mode shows the call or the flip.
-      if (!rulesState.enabled || isE2eMode()) {
-        rulesSocket?.emit('turnOrderCall', {
-          roomId: targetRoomId,
-          callId,
-          call: 'heads',
-          coinId: getSelectedCoin('self')?.id || null,
-          ...seatField,
-        });
-        return;
-      }
-
-      if (coinCallPending) return;
-      coinCallPending = true;
-      openCoinCallPicker({
-        subtitle: 'Call the starting coin flip. Choose heads or tails.',
-        onCall: (call) => {
-          coinCallPending = false;
-          rulesSocket?.emit('turnOrderCall', {
-            roomId: targetRoomId,
-            callId,
-            call,
-            // The caller's chosen coin, echoed by the server so both screens
-            // show the same art during the ceremony (display only; the flip
-            // result still comes from the server's seeded rng).
-            coinId: getSelectedCoin('self')?.id || null,
-            ...seatField,
-          });
-        },
-      });
-    };
-
     // Fires once both players have pressed Set Up and their prize cards
     // are on the mat (see the 'both-players-ready' event dispatched by
     // ready.js). Decides turn order via a coin flip, draws opening hands,
@@ -1368,20 +2068,6 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
         beginSetupWithTurnOrder(firstPlayer);
         return;
       }
-    
-      const beginFlip = (call, caller = 'self') => {
-        const session = rulesSessionGeneration;
-        coinFlipPending = true;
-        runTurnOrderCoinFlip({ call, caller })
-          .then(({ turnPlayer }) => {
-            if (flipSuperseded) return; // authoritative remote flip took over
-            if (session !== rulesSessionGeneration) return;
-            beginSetupWithTurnOrder(turnPlayer);
-          })
-          .finally(() => {
-            coinFlipPending = false;
-          });
-      };
     
       // Opponent called the coin first (they clicked Set Up before us) —
       // do NOT flip our own coin: the caller's flip is the single
@@ -1433,7 +2119,17 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
               data: { caller: 'self', call },
             });
           }
-          beginFlip(call);
+          const session = rulesSessionGeneration;
+          coinFlipPending = true;
+          runTurnOrderCoinFlip({ call, caller: 'self' })
+            .then(({ turnPlayer }) => {
+              if (flipSuperseded) return; // authoritative remote flip took over
+              if (session !== rulesSessionGeneration) return;
+              beginSetupWithTurnOrder(turnPlayer);
+            })
+            .finally(() => {
+              coinFlipPending = false;
+            });
         },
       });
     };
@@ -1537,20 +2233,6 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
       });
     };
 
-    // TCG Live's pl_calling_turn: the toss winner answers Yes (go first) or No.
-    const openTurnOrderChoicePicker = ({ onChoose }) => {
-      openTurnOrderPrompt({
-        id: TURN_ORDER_CHOICE_OVERLAY_ID,
-        title: 'You won the coin flip!',
-        subtitle: 'Do you want to go first?',
-        options: [
-          { label: 'Yes', value: true, data: { turnOrderChoice: 'first' } },
-          { label: 'No', value: false, data: { turnOrderChoice: 'second' } },
-        ],
-        onPick: onChoose,
-      });
-    };
-
     // TCG Live-style full-screen ceremony: dim the board, tumble the chosen
     // coin at centre screen, reveal the call/winner, fade out.
     const playTurnOrderCoinAnimation = ({ coin, result, coinOwner, turnPlayer, isRemote }) => {
@@ -1618,560 +2300,10 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
       if (deckAccess.closer) clearTimeout(deckAccess.closer);
     };
     
-    const hookDeckView = () => {
-      // The deck cover (click to open) and the deck zone's own click/context
-      // handlers both show deck contents. Gate both — the cover is the real
-      // entry point (opens the face-up card list), so without gating it too
-      // a player could always peek their deck regardless of the rule below.
-      document.addEventListener('click', (event) => {
-        if (!rulesState.enabled) return;
-        // composedPath: a board-mirror card's click arrives retargeted to its shadow host (design 074 D4).
-        const origin = event.composedPath?.()[0] ?? event.target;
-        const target = origin.closest?.('[id="deck"], [id="deckCover"]');
-        if (!target) return;
-        if (deckAccess.open) return; // a card effect unlocked it
-        const owner = target.id === 'deckCover' ? (target.user || 'self') : rulesState.turnPlayer;
-        const check = canPerformAction({ user: owner, action: 'viewDeck' });
-        if (!check.allowed) {
-          event.stopImmediatePropagation();
-          event.preventDefault();
-          toastRulesBlocked(check.reason);
-        }
-      }, true);
-    };
-    
-    // ── energy attach: once per turn ─────────────────────────────────────
-    // The sim attaches energy by dragging a card onto a Pokémon. We can't
-    // intercept drag-drop cleanly, so we watch the attachedCards zone: the
-    // first energy attached to any of the turn player's Pokémon each turn
-    // flips the flag; later attaches while the flag is set are announced as
-    // rule warnings (the sim's free drag can't be hard-blocked without
-    // patching its internals, so rules mode surfaces violations immediately).
-    const hookEnergyAttach = () => {
-      document.addEventListener('rules-attach-energy', (event) => {
-        markEnergyAttached(event.detail.player || rulesState.turnPlayer);
-      });
-    
-      // observe self attached cards for energy adds
-      const checkEnergyAdds = () => {
-        if (!rulesState.enabled || rulesState.phase === 'ended') return;
-        const player = rulesState.turnPlayer;
-        if (player !== 'self') return;
-        try {
-          const zone = getZone('self', 'attachedCards');
-          if (!zone?.array) return;
-          for (const card of zone.array) {
-            const img = card.image;
-            if (!img || img.__rulesEnergyChecked) continue;
-            img.__rulesEnergyChecked = true;
-            if (!isEnergyCard(card)) continue;
-            if (rulesState.flags.self?.energyAttached) {
-              appendMessage('', '⚠️ Rules: energy already attached this turn (extra attach detected)', 'announcement', false);
-            } else {
-              markEnergyAttached('self');
-              appendMessage('', 'Energy attached (1/1 this turn)', 'announcement', false);
-              const energyCard = { name: card.name, type: card.type, subtypes: card.subtypes, effect: card.effect, text: card.text };
-              const applied = applyEnergyEffect(energyCard);
-              if (applied.message) {
-                appendMessage('', applied.message.replace(/^⚡ /, ''), 'announcement', false);
-              } else {
-                const family = classifyEnergyEffect(energyCard);
-                if (family && family !== 'basic' && family !== 'unknown') {
-                  appendMessage('', describeEnergyEffect(energyCard), 'announcement', false);
-                }
-              }
-            }
-          }
-        } catch (error) {
-          console.warn('rules-bridge: checkEnergyAdds failed', error);
-        }
-      };
-
-      document.addEventListener('rules-energy-attached', checkEnergyAdds);
-      document.addEventListener('rules-card-moved', checkEnergyAdds);
-      document.addEventListener('action-processed', checkEnergyAdds);
-
-      // Pokémon Park: attaching an Energy from hand to a Benched Pokémon
-      // removes 1 damage counter (once per player per turn).
-      document.addEventListener('rules-energy-attached', (event) => {
-        if (!rulesState.enabled) return;
-        const { user, energy, pokemon, fromZone, toZone } = event.detail || {};
-        if (!energy || !pokemon || fromZone !== 'hand' || toZone !== 'bench') return;
-        const stadium = getStadium();
-        if (!isStadiumEnergyAttachHeal(stadium?.card || stadium)) return;
-        if (!rulesState.flags[user]) rulesState.flags[user] = {};
-        if (rulesState.flags[user].pokemonParkHealed) return;
-        rulesState.flags[user].pokemonParkHealed = true;
-        import('../../actions/counters/damage-counter.js').then(
-          ({ updateDamageCounter, removeDamageCounter }) => {
-            const bench = getZone(user, 'bench');
-            const idx = bench.array.indexOf(pokemon);
-            if (idx < 0) return;
-            const current =
-              parseInt(pokemon.image?.damageCounter?.textContent || '0', 10) || 0;
-            if (current <= 0) return;
-            if (current - 10 <= 0) removeDamageCounter(user, 'bench', idx);
-            else updateDamageCounter(user, 'bench', idx, current - 10);
-            appendMessage(
-              '',
-              `💚 Pokémon Park: removed 1 damage counter from ${pokemon.name}.`,
-              'announcement',
-              false
-            );
-          }
-        );
-      });
-
-      document.addEventListener('rules-energy-attached', async (event) => {
-        if (!rulesState.enabled) return;
-        const { user, energy, pokemon, fromZone, toZone } = event.detail || {};
-        if (!energy || !pokemon) return;
-        try {
-          await ensureCardData(energy);
-          await ensureCardData(pokemon);
-          const parsed = parseSpecialEnergyEffects(energy);
-          if (!parsed) return;
-
-          const desc = describeSpecialEnergyEffects(energy) || describeEnergyEffect(energy);
-          appendMessage('', `⚡ ${desc}`, 'announcement', false);
-          // The server runs on-attach triggers itself (reduce.mjs attachCard). Running them
-          // here too would draw/search/switch twice (audit SE17).
-          if (systemState.serverAuthoritative) return;
-
-          const hostZoneId = toZone === 'active' ? 'active' : 'bench';
-          const hostZone = getZone(user, hostZoneId);
-          const hostIndex = hostZone?.array ? hostZone.array.indexOf(pokemon) : -1;
-          const statusKey = pokemon.image?.dataset?.cardId || pokemon.name;
-          const currentDamage = () =>
-            parseInt(pokemon.image?.damageCounter?.textContent || '0', 10) || 0;
-          const setDamage = (value) => {
-            if (hostIndex < 0) return;
-            const v = Math.max(0, value);
-            if (v <= 0) removeDamageCounter(user, hostZoneId, hostIndex);
-            else updateDamageCounter(user, hostZoneId, hostIndex, v);
-          };
-
-          const plans = planSpecialEnergyTriggers(energy, {
-            trigger: 'attach',
-            host: pokemon,
-            zoneArray: hostZone?.array || [],
-            fromZone,
-          });
-
-          for (const plan of plans) {
-            switch (plan.action) {
-              case 'draw':
-                if (plan.count > 0) draw(user, user, plan.count, true);
-                break;
-              case 'heal':
-                if (currentDamage() > 0) {
-                  setDamage(currentDamage() - plan.amount);
-                  appendMessage('', `  💚 ${pokemon.name}: healed ${plan.amount}.`, 'announcement', false);
-                }
-                break;
-              case 'removeDamage': {
-                if (currentDamage() > 0) setDamage(currentDamage() - plan.count * 10);
-                if (plan.alsoCure) clearStatuses(user, statusKey);
-                appendMessage(
-                  '',
-                  `  💚 ${pokemon.name}: removed ${plan.count} damage counter${plan.count === 1 ? '' : 's'}${plan.alsoCure ? ' and Special Conditions' : ''}.`,
-                  'announcement',
-                  false,
-                );
-                break;
-              }
-              case 'addDamage':
-                setDamage(currentDamage() + plan.count * 10);
-                appendMessage(
-                  '',
-                  `  ⚠️ ${pokemon.name}: ${plan.count} damage counter${plan.count === 1 ? '' : 's'}.`,
-                  'announcement',
-                  false,
-                );
-                break;
-              case 'clearStatus':
-                clearStatuses(user, statusKey);
-                appendMessage('', `  💧 ${pokemon.name}: recovered from all Special Conditions.`, 'announcement', false);
-                break;
-              case 'search': {
-                openDeckSearchWindow(`${energy.name} — search your deck`);
-                const deck = getZone(user, 'deck');
-                const matches = [];
-                for (const c of deck.array) {
-                  await ensureCardData(c);
-                  if (matchesSearch(c, plan.what)) matches.push(c);
-                }
-                // "search … for up to N" — an empty match set is a legal whiff,
-                // and offering the whole deck as a fallback let the player Bench
-                // arbitrary cards. The player may also take fewer than N.
-                const pool = matches;
-                if (pool.length === 0) {
-                  appendMessage('', `  no matching cards in your deck`, 'announcement', false);
-                  break;
-                }
-                const toHand = plan.destination === 'hand';
-                openChoicePicker({
-                  title: `${energy.name} — choose up to ${plan.count} ${plan.what} for your ${toHand ? 'hand' : 'Bench'}`,
-                  candidates: pool,
-                  zoneFrom: 'deck',
-                  destination: toHand ? 'hand' : 'bench',
-                  multiSelect: true,
-                  requiredCount: Math.min(plan.count, pool.length),
-                  minCount: 0,
-                  maxCount: Math.min(plan.count, pool.length),
-                  // openCardPicker's confirm already moved (and relayed) every
-                  // pick via zoneFrom/destination before calling this.
-                  onConfirm: (selected) => {
-                    appendMessage(
-                      '',
-                      `  ${selected.map((s) => s.name).join(', ')} → ${toHand ? 'hand' : 'Bench'}`,
-                      'announcement',
-                      false,
-                    );
-                    shuffleDeckAfterSearch(user, appendMessage, shuffleZone, { sourceName: energy.name });
-                  },
-                  onCancel: () => {
-                    appendMessage('', '  search canceled — shuffle your deck', 'announcement', false);
-                    shuffleDeckAfterSearch(user, appendMessage, shuffleZone, { sourceName: energy.name, message: null });
-                  },
-                });
-                break;
-              }
-              case 'switch': {
-                const oppSide = user === 'self' ? 'opp' : 'self';
-                const switchSide = plan.side === 'opponent' ? oppSide : user;
-                if (plan.side === 'self' && plan.target === 'benchedToActive') {
-                  switchBenchToActive(user, pokemon);
-                  break;
-                }
-                const bench = getZone(switchSide, 'bench').array.filter((c) => c && !c.image?.attached);
-                if (bench.length === 1) {
-                  switchBenchToActive(switchSide, bench[0]);
-                } else if (bench.length > 1) {
-                  import('./mat-picker.js').then(({ openMatPick }) => {
-                    openMatPick({
-                      title: `${energy.name} — click a Benched Pokémon to switch in`,
-                      candidates: bench,
-                      onPick: (b) => switchBenchToActive(switchSide, b),
-                    });
-                  });
-                }
-                break;
-              }
-              case 'devolve': {
-                if (currentDamage() > 0) setDamage(currentDamage() - plan.count * 10);
-                const base = (hostZone?.array || []).find(
-                  (c) => c && c !== pokemon && c.parentCard === pokemon && (c.type2 || c.type) === 'Pokémon'
-                );
-                if (!base) {
-                  appendMessage('', `  ${pokemon.name} is not an evolved Pokémon — nothing to discard.`, 'announcement', false);
-                  break;
-                }
-                // Detach the base so moving the top card out does not drag it
-                // (and the host's energy/tools) to the discard pile with it.
-                if (Array.isArray(pokemon.attachedCards)) {
-                  pokemon.attachedCards = pokemon.attachedCards.filter((c) => c !== base);
-                }
-                base.attached = false;
-                base.parentCard = null;
-                base.parentCardId = null;
-                if (base.image) base.image.relative = null;
-                // Re-point the host's remaining attachments to the base.
-                for (const c of hostZone.array) {
-                  if (c === base || c === pokemon) continue;
-                  if (c.parentCard === pokemon || c.image?.relative === pokemon.image) {
-                    c.parentCard = base;
-                    c.parentCardId = base.cardId ?? base.syncInstance ?? null;
-                    if (c.image) c.image.relative = base.image;
-                    if (!Array.isArray(base.attachedCards)) base.attachedCards = [];
-                    if (!base.attachedCards.includes(c)) base.attachedCards.push(c);
-                  }
-                }
-                const { moveCardBundle } = await import('../../actions/move-card-bundle/move-card-bundle.js');
-                const topIdx = hostZone.array.indexOf(pokemon);
-                if (topIdx >= 0) moveCardBundle(user, user, hostZoneId, 'discard', topIdx, false, 'move');
-                appendMessage(
-                  '',
-                  `  🔄 ${pokemon.name}: top Evolution card discarded — ${base.name} devolved.`,
-                  'announcement',
-                  false
-                );
-                break;
-              }
-              case 'returnBasicEnergy': {
-                const attached = (hostZone?.array || []).filter(
-                  (c) =>
-                    c &&
-                    c.type === 'Energy' &&
-                    c.image?.relative === pokemon.image &&
-                    !isSpecialEnergyCard(c),
-                );
-                if (attached.length) {
-                  const i = hostZone.array.indexOf(attached[0]);
-                  if (i >= 0) {
-                    const { moveCardBundle } = await import('../../actions/move-card-bundle/move-card-bundle.js');
-                    moveCardBundle(user, user, hostZoneId, 'hand', i, false, 'move');
-                    appendMessage('', `  ↩️ ${attached[0].name} returned to your hand.`, 'announcement', false);
-                  }
-                }
-                break;
-              }
-              default:
-                break;
-            }
-          }
-        } catch {
-          /* card data may not be ready */
-        }
-      });
-    };
-    
-    // ── turn automation: auto-draw, KO watch ────────────────────────────
-    // TCG Live draws automatically at turn start. We hook the turn flow via
-    // the chatbox watcher (the sim announces turns) and drive the
-    // deck/hand zones directly.
-    const turnAutomation = () => {
-      let lastProcessedTurn = -1;
-    
-      const drawCard = (player) => {
-        try {
-          const deck = getZone(player, 'deck');
-          const hand = getZone(player, 'hand');
-          if (deck.getCount() > 0) {
-            // moveCardBundle(user, initiator, fromZone, toZone, index, targetIndex, action)
-            import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
-              moveCardBundle(player, player, 'deck', 'hand', 0, false, 'move');
-            });
-            return true;
-          }
-          return false;
-        } catch {
-          return false;
-        }
-      };
-    
-      const checkDeckOut = () => {
-        if (!rulesState.enabled || rulesState.phase === 'ended') return;
-        if (rulesState.phase !== 'main') return;
-
-        // auto-draw once per new turn for the turn player (skip turn 1's
-        // opening hand — setup handles that)
-        if (rulesState.turnNumber !== lastProcessedTurn) {
-          lastProcessedTurn = rulesState.turnNumber;
-          if (rulesState.turnNumber > 1) {
-            // NOTE: the sim's +Turn button already draws the card for the
-            // turn player; we only track deck-out here.
-            const player = rulesState.turnPlayer;
-            const deckCount = (() => { try { return getZone(player, 'deck').getCount(); } catch { return 0; } })();
-            if (deckCount === 0) {
-              appendMessage('', 'Deck empty — deck-out loss!', 'announcement', false);
-              rulesState.phase = 'ended';
-              document.dispatchEvent(new CustomEvent('rules-game-ended', { detail: { reason: 'Deck empty — deck-out loss!' } }));
-            }
-          }
-        }
-      };
-
-      document.addEventListener('rules-turn-began', checkDeckOut);
-    };
-    
-    // continuous KO detection: watch all in-play Pokémon for damage >= HP
-    const koWatcher = () => {
-      // per-turn ability flags now live in rulesState.flags[player].abilitiesUsed
-      // and are cleared by resetTurnFlags() each turn — no DOM-flag reset here.
-      const checkKnockouts = async () => {
-        if (!rulesState.enabled || rulesState.phase === 'ended') return;
-
-        try {
-          for (const player of ['self', 'opp']) {
-            for (const zoneId of ['active', 'bench']) {
-              const zone = getZone(player, zoneId);
-              if (!zone?.array) continue;
-              for (const card of zone.array) {
-                if (!card?.image || card.__rulesKODetected) continue;
-                const dmgText = card.image.damageCounter?.textContent || '0';
-                const damage = parseInt(dmgText, 10) || 0;
-                if (damage <= 0 || !card.hp) continue;
-                await ensureCardData(card);
-                const effHp = effectiveHp(card.hp, player, card, zone.array);
-                if (effHp > 0 && damage >= effHp) {
-                  card.__rulesKODetected = true;
-
-                  // Design 009 slice 6: ghost the KO'd card BEFORE the owner's
-                  // discard move (below) removes the real one. Runs for BOTH
-                  // player values — this loop already watches both sides'
-                  // zones for local detection (see the comment on the
-                  // owner-only discard branch below).
-                  if (
-                    shouldAnimateMirror({
-                      syncReplaying: !!systemState.syncReplaying,
-                      isCatchingUp: !!systemState.isCatchingUp,
-                      hidden: typeof document !== 'undefined' && !!document.hidden,
-                    })
-                  ) {
-                    const ghost = captureKnockoutGhost(player, card.image);
-                    if (ghost) playKnockoutGhost(ghost);
-                  }
-
-                  const who = player === 'self' ? 'Your' : "Opponent's";
-                  // Prism Star cards go to the Lost Zone, not the discard pile (App. 17).
-                  let koDestination = isPrismStarCard(card) ? 'lostZone' : 'discard';
-
-                  // Special-energy on-KO triggers (Splash/Rescue return to hand,
-                  // Gift draw-until-7). Plans come from the shared parser; only
-                  // the destination-changing return-to-hand is applied here.
-                  const koPlans = [];
-                  for (const e of zone.array) {
-                    if (e && e.type === 'Energy' && e.image?.relative === card.image) {
-                      koPlans.push(
-                        ...planSpecialEnergyTriggers(e, {
-                          trigger: 'knockout',
-                          host: card,
-                          zoneArray: zone.array,
-                        }),
-                      );
-                    }
-                  }
-                  const koReturnToHand = koPlans.some((p) => p.action === 'returnToHand');
-                  const koDrawUntil = koPlans.find((p) => p.action === 'drawUntil');
-                  if (koReturnToHand) koDestination = 'hand';
-
-                  const destinationLabel =
-                    koDestination === 'lostZone' ? 'the Lost Zone' : koDestination === 'hand' ? 'your hand' : 'discard';
-                  appendMessage('', `💀 ${who} ${card.name || 'Pokémon'} has ${damage}/${effHp} damage — KO! Move it to ${destinationLabel}${zoneId === 'active' ? ' and promote a new Active' : ''}.`, 'announcement', false);
-    
-                  playAttackFeedback(true);
-    
-                  // Auto-discard the KO'd Pokémon — but ONLY on the side that
-                  // actually owns this zone. This loop runs on BOTH clients,
-                  // watching BOTH 'self' and 'opp' (their mirrored view of
-                  // the other player's board), purely for local detection —
-                  // it isn't authoritative for a zone it doesn't own.
-                  // Calling the raw moveCard() primitive here for 'opp' too
-                  // (as this used to) mutated each client's local copy of
-                  // the other player's zone WITHOUT ever broadcasting the
-                  // change — the two clients' boards, discard piles, and
-                  // battle logs would silently drift apart over the game.
-                  // Only the owning client (player === 'self' from its own
-                  // perspective) performs the move, and it does so through
-                  // moveCardBundle — the same synced wrapper used by manual
-                  // drag/discard — so the peer receives and replays the
-                  // identical action instead of guessing at it locally.
-                  if (player === 'self' || (!systemState.isTwoPlayer && player === 'opp')) {
-                    import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
-                      try {
-                        // Rescue/Splash Energy: discard the attached cards, then
-                        // return the Pokémon itself to the owner's hand.
-                        if (koReturnToHand) {
-                          for (const e of [...zone.array]) {
-                            if (e && e.type === 'Energy' && e.image?.relative === card.image) {
-                              const ei = zone.array.indexOf(e);
-                              if (ei >= 0) moveCardBundle(player, player, zoneId, 'discard', ei, false, 'move');
-                            }
-                          }
-                          appendMessage('', `♻️ ${card.name || 'Pokémon'} returns to your hand.`, 'announcement', false);
-                        }
-                        const idx = zone.array.indexOf(card);
-                        if (idx >= 0) {
-                          moveCardBundle(player, player, zoneId, koDestination, idx, false, 'move');
-                          appendMessage('', `auto: KO'd Pokémon moved to ${destinationLabel}`, 'announcement', false);
-                          if (koDrawUntil) {
-                            const hand = getZone(player, 'hand');
-                            const need = koDrawUntil.until - hand.getCount();
-                            if (need > 0) draw(player, player, need, true);
-                          }
-
-                          if (zoneId === 'active') {
-                            const benchZone = getZone(player, 'bench');
-                            const candidates = (benchZone?.array || []).filter(
-                              (c) => c && !c.image?.attached && ((c.type2 || c.type) === 'Pokémon')
-                            );
-                            if (candidates.length > 0) {
-                              import('./mat-picker.js').then(({ openMatPick }) => {
-                                openMatPick({
-                                  title: `${card.name || 'Active Pokémon'} was KO'd — click a Bench Pokémon to promote to Active`,
-                                  candidates,
-                                  cancellable: false,
-                                  onPick: (picked) => {
-                                    const bIdx = benchZone.array.indexOf(picked);
-                                    if (bIdx >= 0) {
-                                      moveCardBundle(player, player, 'bench', 'active', bIdx, false, 'move');
-                                      appendMessage('', `⬆️ ${picked.name || 'A benched Pokémon'} promotes to Active.`, 'announcement', false);
-                                    }
-                                  },
-                                });
-                              });
-                            }
-                          }
-                        }
-                      } catch (error) {
-                        console.warn('rules-bridge: moving a Knocked Out Pokémon\'s cards failed', error);
-                      }
-                    });
-                  }
-                }
-              }
-            }
-          }
-        } catch (error) {
-          console.warn('rules-bridge: checkKnockouts failed', error);
-        }
-      };
-
-      document.addEventListener('rules-damage-changed', checkKnockouts);
-      document.addEventListener('rules-card-moved', checkKnockouts);
-      document.addEventListener('rules-turn-began', checkKnockouts);
-      document.addEventListener('action-processed', checkKnockouts);
-    };
-    
     
     // ── status badges: visual markers on afflicted Pokémon ───────────────
     const STATUS_EMOJI = { asleep: '💤', paralyzed: '⚡', poisoned: '☠️', burned: '🔥', confused: '❓' };
     
-    const renderStatusBadges = () => {
-      const updateBadges = () => {
-        if (!rulesState.enabled) return;
-        try {
-          for (const player of ['self', 'opp']) {
-            for (const zoneId of ['active', 'bench']) {
-              const zone = getZone(player, zoneId);
-              if (!zone?.array) continue;
-              for (const card of zone.array) {
-                const img = card.image;
-                if (!img) continue;
-                const key = img.dataset?.cardId || card.name;
-                const s = statusState[player][key];
-                let badge = img.__rulesStatusBadge;
-                if (s && Object.keys(s).length > 0) {
-                  const text = Object.keys(s).map(k => STATUS_EMOJI[k] || '').join('');
-                  if (!badge) {
-                    badge = document.createElement('div');
-                    badge.className = 'rules-status-badge';
-                    img.parentElement?.appendChild(badge);
-                    img.__rulesStatusBadge = badge;
-                  }
-                  badge.textContent = text;
-                  badge.title = Object.keys(s).join(', ');
-                } else if (badge) {
-                  badge.remove();
-                  img.__rulesStatusBadge = null;
-                }
-              }
-            }
-          }
-        } catch (error) {
-          console.warn('rules-bridge: updating status badges failed', error);
-        }
-      };
-
-      document.addEventListener('rules-status-changed', updateBadges);
-      document.addEventListener('rules-turn-began', updateBadges);
-      document.addEventListener('rules-turn-view-applied', updateBadges);
-      document.addEventListener('rules-card-moved', updateBadges);
-      document.addEventListener('rules-session-reset', updateBadges);
-      document.addEventListener('action-processed', updateBadges);
-    };
-
     // ── action affordances: turn-aware sidebox buttons + board ability glow ──
     // Highlight-parity plan gaps B1/B3/C3. Each sidebox is scored for the same
     // user its click handlers act as (see sidebox/p1|p2/chat-buttons.js), so
@@ -2194,18 +2326,6 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
       const glowNodes = new Set();
       let generation = 0;
 
-      const clearGlow = () => {
-        for (const node of glowNodes) {
-          node.classList?.remove(...GLOW_CLASSES);
-          node.style?.removeProperty('--glow-rgb');
-        }
-        glowNodes.clear();
-      };
-
-      // The in-play Stadium is the parent-owned `#stadium` element (D93), not the
-      // card node `getZone` returns, so its glow targets that element directly.
-      const stadiumNode = () => document.getElementById('stadium');
-
       // Glows are collected per refresh and reconciled against the painted set,
       // so a node that stays lit is never touched: clearing up front and
       // re-adding after the async scan blinked every glow (and restarted its
@@ -2218,33 +2338,14 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
         next.set(node, { rgb: rgb.join(','), ability: ability || !!prev?.ability });
       };
 
-      const applyGlows = (next) => {
-        for (const node of glowNodes) {
-          if (next.has(node)) continue;
-          node.classList?.remove(...GLOW_CLASSES);
-          node.style?.removeProperty('--glow-rgb');
-          glowNodes.delete(node);
-        }
-        for (const [node, { rgb, ability }] of next) {
-          node.classList.add('has-glow');
-          node.classList.toggle('has-usable-ability', ability);
-          if (node.style?.getPropertyValue('--glow-rgb') !== rgb) node.style?.setProperty('--glow-rgb', rgb);
-          glowNodes.add(node);
-        }
-      };
-
-      const isAbilitySpent = (user, card) =>
-        isPlayedToBenchTriggerCard(card)
-          ? !canUsePlayedToBenchTrigger(user, card)
-          : isEvolvePlayedTriggerCard(card)
-            ? abilityUsedFor(card, abilityUsed(user, card), rulesState.flags?.[user]?.abilitiesUsed) ||
-              card?.enteredPlayTurn !== rulesState.turnNumber
-            : abilityUsedFor(card, abilityUsed(user, card), rulesState.flags?.[user]?.abilitiesUsed);
-
       const refresh = async () => {
         const gen = ++generation;
         if (!rulesState.enabled || rulesState.phase === 'setup' || rulesState.phase === 'ended') {
-          clearGlow();
+          for (const node of glowNodes) {
+            node.classList?.remove(...GLOW_CLASSES);
+            node.style?.removeProperty('--glow-rgb');
+          }
+          glowNodes.clear();
           for (const box of sideboxes) {
             box.attackButton?.classList.remove('attacks-available', 'turn-disabled');
             box.abilityButton?.classList.remove('abilities-available', 'turn-disabled');
@@ -2304,7 +2405,12 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
                 // The server prices board-conditional cost discounts (Kartana, Zapdos ex); its view
                 // carries them for your own Pokémon.
                 costDiscounts: user === 'self' ? getAuthoritativeCostDiscounts(activeCard?.instanceId) : null,
-                isAbilityUsed: (card) => isAbilitySpent(user, card),
+                isAbilityUsed: (card) => isPlayedToBenchTriggerCard(card)
+                  ? !canUsePlayedToBenchTrigger(user, card)
+                  : isEvolvePlayedTriggerCard(card)
+                    ? abilityUsedFor(card, abilityUsed(user, card), rulesState.flags?.[user]?.abilitiesUsed) ||
+                      card?.enteredPlayTurn !== rulesState.turnNumber
+                    : abilityUsedFor(card, abilityUsed(user, card), rulesState.flags?.[user]?.abilitiesUsed),
                 ensureCardData,
                 prizeCounts: {
                   self: prizes.length,
@@ -2331,10 +2437,23 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
           for (const { card } of glows.abilityCards) collectGlow(next, card, { ability: true });
           if (glows.activeCanAttack) collectGlow(next, activeCard, { color: glows.activeColor });
           if (glows.stadiumUsable) {
-            collectGlow(next, stadiumCard, { node: stadiumNode(), color: glows.stadiumColor });
+            // The in-play Stadium is the parent-owned `#stadium` element (D93), not the
+            // card node `getZone` returns, so its glow targets that element directly.
+            collectGlow(next, stadiumCard, { node: document.getElementById('stadium'), color: glows.stadiumColor });
           }
         }
-        applyGlows(next);
+        for (const node of glowNodes) {
+          if (next.has(node)) continue;
+          node.classList?.remove(...GLOW_CLASSES);
+          node.style?.removeProperty('--glow-rgb');
+          glowNodes.delete(node);
+        }
+        for (const [node, { rgb, ability }] of next) {
+          node.classList.add('has-glow');
+          node.classList.toggle('has-usable-ability', ability);
+          if (node.style?.getPropertyValue('--glow-rgb') !== rgb) node.style?.setProperty('--glow-rgb', rgb);
+          glowNodes.add(node);
+        }
       };
 
       [
@@ -2880,33 +2999,6 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
       return false;
     };
 
-    const autoExecuteAbilitySteps = (user, card, steps) => {
-      const plan = planAbilitySteps(steps, { mode: 'auto' });
-      for (const item of plan) {
-        try {
-          if (item.action === 'draw' && !abilityUsed(user, card)) {
-            executeAbilityDraw(user, item.step).then((ran) => {
-              if (ran) {
-                markAbilityUsed(user, card);
-                appendMessage('', '  auto: ability used this turn (draw)', 'announcement', false);
-              }
-            });
-          } else if (item.action === 'when-played') {
-            runWhenPlayedStep(user, card, steps, item.stepIndex);
-          } else if (item.action === 'announce' && item.step.type === 'opponentDraw') {
-            appendMessage(
-              '',
-              `  ${item.step.guidance} (announce-only — opponent must consent to draw)`,
-              'announcement',
-              false
-            );
-          }
-        } catch (error) {
-          console.warn('rules-bridge: autoExecuteAbilitySteps failed', error);
-        }
-      }
-    };
-
     // "Heal all damage from 1 of your Pokémon" (Primarina Enriching Melody) lets the
     // player choose among their damaged Pokémon. Returns the chosen card, or null
     // when nothing is damaged / the pick is canceled (so the ability is not spent).
@@ -3251,7 +3343,30 @@ if (!isTrainer) {
                         }
     
                         // compound ability orchestration (auto: draw + when-played chains)
-                        autoExecuteAbilitySteps(ownerUser, card, steps);
+                        const plan = planAbilitySteps(steps, { mode: 'auto' });
+                        for (const item of plan) {
+                          try {
+                            if (item.action === 'draw' && !abilityUsed(ownerUser, card)) {
+                              executeAbilityDraw(ownerUser, item.step).then((ran) => {
+                                if (ran) {
+                                  markAbilityUsed(ownerUser, card);
+                                  appendMessage('', '  auto: ability used this turn (draw)', 'announcement', false);
+                                }
+                              });
+                            } else if (item.action === 'when-played') {
+                              runWhenPlayedStep(ownerUser, card, steps, item.stepIndex);
+                            } else if (item.action === 'announce' && item.step.type === 'opponentDraw') {
+                              appendMessage(
+                                '',
+                                `  ${item.step.guidance} (announce-only — opponent must consent to draw)`,
+                                'announcement',
+                                false
+                              );
+                            }
+                          } catch (error) {
+                            console.warn('rules-bridge: autoExecuteAbilitySteps failed', error);
+                          }
+                        }
 
                         if (parseSetupFaceDown(card) && !img.__rulesSetupFaceDown) {
                           img.__rulesSetupFaceDown = true;
@@ -3358,188 +3473,6 @@ if (!isTrainer) {
       }
     };
 
-    const hookTrainerPlay = () => {
-      // Guided trainer/auto-execution runs even when rules enforcement is off
-      // (easier solo testing). Turn gating still applies when rules are on.
-      // Instant path: react the same tick a card lands on 'board'.
-      document.addEventListener('rules-card-on-board', (event) => {
-        if (rulesState.phase === 'ended') return;
-        const { user, card, localPlay = false } = event.detail || {};
-        if (
-          !shouldExecuteLocalRulesEffect({
-            isTwoPlayer: systemState.isTwoPlayer,
-            localPlay,
-            owner: user,
-          }) ||
-          !card
-        ) {
-          return;
-        }
-        if (rulesState.enabled && rulesState.turnPlayer !== user) return;
-        processBoardCard(card, user);
-      });
-
-      document.addEventListener('rules-pokemon-in-play', (event) => {
-        if (!rulesState.enabled || rulesState.phase === 'ended') return;
-        const { user, card, zoneId, fromZone, localPlay = false } = event.detail || {};
-        if (
-          !shouldExecuteLocalRulesEffect({
-            isTwoPlayer: systemState.isTwoPlayer,
-            localPlay,
-            owner: user,
-          })
-        ) {
-          return;
-        }
-        if (!card?.image) return;
-        // The flag marks a one-shot per *entering play* (setup face-down below), but a
-        // card already in play can still move Bench→Active many times — the promotion
-        // trigger must fire on every such move, so it is deliberately outside the guard.
-        const firstTimeInPlay = !card.image.__rulesPokemonInPlay;
-        card.image.__rulesPokemonInPlay = true;
-        ensureCardData(card).then(() => {
-          if (firstTimeInPlay && parseSetupFaceDown(card) && !card.image.__rulesSetupFaceDown) {
-            card.image.__rulesSetupFaceDown = true;
-            hideCard(user, card);
-            appendMessage(
-              '',
-              `🎭 ${card.name}: placed face-down (setup ability).`,
-              'announcement',
-              false
-            );
-          }
-          if (fromZone === 'bench' && zoneId === 'active') {
-            const steps = parseAbility(card.ability?.text || card.abilityText || '');
-            const promo = steps.find((s) => s.type === 'onPromotionAbility');
-            if (promo) {
-              runPromotionAbilityEffect(user, card, promo);
-            }
-          }
-        });
-      });
-
-      document.addEventListener('rules-opponent-evolved', (event) => {
-        if (!rulesState.enabled || rulesState.phase === 'ended') return;
-        const { user: evolvingPlayer, evolvedCard, zoneId } = event.detail || {};
-        const reactivePlayer = evolvingPlayer === 'self' ? 'opp' : 'self';
-        const sources = [
-          ...getZone(reactivePlayer, 'active').array,
-          ...getZone(reactivePlayer, 'bench').array,
-        ].filter((c) => c.type === 'Pokémon');
-        for (const source of sources) {
-          ensureCardData(source).then(() => {
-            const trigger = parseOnOpponentEvolve(source);
-            if (!trigger?.count) return;
-            const tZone = getZone(evolvingPlayer, zoneId);
-            const tIdx = tZone.array.findIndex((c) => c.image === evolvedCard.image);
-            if (tIdx < 0) return;
-            const existing =
-              parseInt(
-                evolvedCard.image?.damageCounter?.textContent || '0',
-                10
-              ) || 0;
-            if (evolvedCard.image?.damageCounter) {
-              evolvedCard.image.damageCounter.textContent = existing + trigger.count;
-            } else {
-              addDamageCounter(evolvingPlayer, zoneId, tIdx, trigger.count);
-            }
-            appendMessage(
-              '',
-              `⚡ ${source.name}: ${trigger.count} damage counter(s) on evolved ${evolvedCard.name}!`,
-              'announcement',
-              false
-            );
-          });
-        }
-      });
-
-      // Special-energy on-evolve triggers (e.g. Regenerative Energy: "whenever
-      // you play a Pokémon from your hand to evolve the Pokémon V this card is
-      // attached to, heal 30 damage"). The energy re-points to the evolved card
-      // in evolve-card.js, so scan the evolving player's zone for energies whose
-      // relative is the evolved card.
-      document.addEventListener('rules-opponent-evolved', (event) => {
-        if (!rulesState.enabled || rulesState.phase === 'ended') return;
-        const { user: evolvingPlayer, evolvedCard, zoneId } = event.detail || {};
-        if (!evolvedCard) return;
-        const z = getZone(evolvingPlayer, zoneId);
-        const idx = z.array.findIndex((c) => c.image === evolvedCard.image);
-        if (idx < 0) return;
-        for (const energy of z.array.filter(
-          (c) => c && c.type === 'Energy' && c.image?.relative === evolvedCard.image && isSpecialEnergyCard(c)
-        )) {
-          const plans = planSpecialEnergyTriggers(energy, {
-            trigger: 'evolve',
-            host: evolvedCard,
-            zoneArray: z.array,
-          });
-          for (const plan of plans) {
-            if (plan.action !== 'heal') continue;
-            const current =
-              parseInt(evolvedCard.image?.damageCounter?.textContent || '0', 10) || 0;
-            if (current <= 0) continue;
-            const next = Math.max(0, current - plan.amount);
-            if (next <= 0) removeDamageCounter(evolvingPlayer, zoneId, idx);
-            else updateDamageCounter(evolvingPlayer, zoneId, idx, next, true);
-            appendMessage(
-              '',
-              `💚 ${evolvedCard.name}: healed ${plan.amount} on evolve (${energy.name}).`,
-              'announcement',
-              false
-            );
-          }
-        }
-      });
-
-      // Gen 6 Mega Evolution / Primal Reversion rule: move-card.js already
-      // decided (requiresTurnEndOnEvolve) that this evolve must end the
-      // turn — route through the Pass button click so hookTurnButton's
-      // handlePassClick runs its full pipeline (status boundary, end-of-turn
-      // abilities, endTurn, banner, 2P sync) exactly as a normal pass does.
-      // Same pattern as keybinds.js's Alt+T "end turn" shortcut.
-      document.addEventListener('rules-mega-evolution-forces-turn-end', () => {
-        if (!rulesState.enabled || rulesState.phase === 'ended') return;
-        const passBtn = document.getElementById('passButton') || document.getElementById('p2PassButton');
-        passBtn?.click();
-      });
-
-      // Backstop: catches anything that (for whatever reason) didn't fire
-      // the event above — same logic, just on a slow poll so it's never
-      // the thing the player is waiting on. Disabled in online 2P: mirror
-      // replays must not re-trigger trainer auto-exec (see rules-local-effects).
-      if (!systemState.isTwoPlayer) {
-        const checkBoardCards = () => {
-          if (rulesState.phase === 'ended') return;
-          try {
-            for (const side of ['self', 'opp']) {
-              if (rulesState.enabled && rulesState.turnPlayer !== side) continue;
-              const board = getZone(side, 'board');
-              if (!board?.array) continue;
-              for (const card of board.array) processBoardCard(card, side);
-            }
-          } catch (error) {
-            console.warn('rules-bridge: checkBoardCards failed', error);
-          }
-        };
-        document.addEventListener('rules-card-moved', checkBoardCards);
-        document.addEventListener('action-processed', checkBoardCards);
-      }
-      document.addEventListener('rules-card-moved', () => {
-        if (rulesState.enabled && rulesState.phase !== 'setup' && rulesState.phase !== 'ended') {
-          evaluateAndApplyWinConditions();
-        }
-      });
-    };
-    
-    // ── move gating ──────────────────────────────────────────────────────
-    const hookMoveCard = () => {
-      window.addEventListener('rules-check-move', (event) => {
-        const { user, fromZone, toZone, callback } = event.detail || {};
-        const check = canPerformAction({ user, action: 'moveCard', zoneId: fromZone, targetZoneId: toZone });
-        callback?.(check);
-      });
-    };
-    
     
     const updateTurnBanner = () => {
       document.dispatchEvent(new CustomEvent('rules-turn-began', { detail: { player: rulesState.turnPlayer } }));
@@ -3547,7 +3480,7 @@ if (!isTrainer) {
 
     // ── start-of-turn draw (taxonomy B) ──────────────────────────────
     // Every live turn transition dispatches `rules-turn-began` (solo attack/
-    // pass via chat-buttons.js, the +Turn button via hookTurnButton, and the
+    // pass via chat-buttons.js, the +Turn button via its capture hook, and the
     // multiplayer mirror via hookMultiplayerSync). A single listener here
     // covers all three: it auto-draws one card for the incoming turn player,
     // once per turn (guarded by `drewThisTurn`), and announces deck-out when
@@ -3597,10 +3530,6 @@ if (!isTrainer) {
     
     const escapeHtml = (v = '') => String(v)
       .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
-    
-    const toastRulesBlocked = (reason) => {
-      appendMessage('', `⛔ ${reason}`, 'announcement', false);
-    };
     
     export { buildRulesToggle };
     

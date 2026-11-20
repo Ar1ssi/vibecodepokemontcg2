@@ -141,20 +141,6 @@ const isAttach = (t) =>
 // Fixes the 'remove' ⊃ 'move' false-positive (split on non-letters, no regex).
 const hasWord = (t, w) => t.split(/[^a-z]/).includes(w);
 
-const hasPromotionTrigger = (t) =>
-  t.includes('moves from your bench to the active spot') ||
-  t.includes('move from your bench to the active spot');
-
-const hasDamageCounterPlacement = (t) =>
-  /\bdamage counters?\s+(?:on|to|onto)\b/.test(t) ||
-  /(?:place|move)\s+(?:up to\s+)?\d+\s+damage counters?\s+on\b/.test(t);
-
-const isSelfHandDiscardCost = (t) =>
-  t.includes('discard') &&
-  t.includes('from your hand') &&
-  !t.includes("opponent's hand") &&
-  !t.includes('from your opponent');
-
 const isMoveEnergy = (t) => {
   const movesEnergy =
     hasWord(t, 'move') &&
@@ -167,7 +153,8 @@ const isMoveEnergy = (t) => {
   const unlimited =
     t.includes('as often as you like') && hasWord(t, 'move') && t.includes('energy');
   const onPromotion =
-    hasPromotionTrigger(t) && hasWord(t, 'move') && t.includes('energy');
+    (t.includes('moves from your bench to the active spot') ||
+    t.includes('move from your bench to the active spot')) && hasWord(t, 'move') && t.includes('energy');
   return movesEnergy || unlimited || onPromotion;
 };
 
@@ -184,7 +171,8 @@ const isMoveDamage = (t) => {
   return (
     betweenOwn ||
     ((hasWord(t, 'move') || t.includes('place') || hasWord(t, 'put')) &&
-      (hasDamageCounterPlacement(t) ||
+      (/\bdamage counters?\s+(?:on|to|onto)\b/.test(t) ||
+      /(?:place|move)\s+(?:up to\s+)?\d+\s+damage counters?\s+on\b/.test(t) ||
         t.includes('on 1 of your opponent') ||
         t.includes('on this pokémon') ||
         t.includes('on this pokemon') ||
@@ -198,7 +186,10 @@ const isMoveDamage = (t) => {
 
 const isOpponentDisrupt = (t) =>
   (t.includes('opponent') &&
-    !isSelfHandDiscardCost(t) &&
+    !(t.includes('discard') &&
+    t.includes('from your hand') &&
+    !t.includes("opponent's hand") &&
+    !t.includes('from your opponent')) &&
     (t.includes('discard') ||
       t.includes('shuffle') ||
       t.includes("can't") ||
@@ -209,12 +200,9 @@ const isOpponentDisrupt = (t) =>
         (t.includes('into their hand') || t.includes("into your opponent's hand"))))) ||
   (t.includes('defending pokémon') && t.includes('retreat') && t.includes('discard'));
 
-const isSelfKoOnUse = (t) =>
-  /if you use this ability.*knocked out/i.test(t) ||
-  (/this pokémon is knocked out/i.test(t) && t.includes('if you'));
-
 const isRecursion = (t) => {
-  if (isSelfKoOnUse(t)) return false;
+  if (/if you use this ability.*knocked out/i.test(t) ||
+  (/this pokémon is knocked out/i.test(t) && t.includes('if you'))) return false;
   return (
     (t.includes('knocked out') &&
       (t.includes('search') || t.includes('put') || t.includes('return') || t.includes('add'))) ||
@@ -322,12 +310,9 @@ const isPrizeModify = (t) =>
     (t.includes('less') || t.includes('fewer') || t.includes('more') || t.includes('extra'))) ||
   /(?:doesn't|don't|does not) take any prize/.test(t);
 
-const isAbilityUsageLimit = (t) =>
-  /can't use more than \d+/.test(t) ||
-  /cannot use more than \d+/.test(t);
-
 const isEffectPrevent = (t) =>
-  (!isAbilityUsageLimit(t) &&
+  (!(/can't use more than \d+/.test(t) ||
+  /cannot use more than \d+/.test(t)) &&
     (t.includes('prevent') ||
       t.includes("can't") ||
       t.includes('have no effect') ||

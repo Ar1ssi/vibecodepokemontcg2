@@ -132,20 +132,6 @@ export function slashPose(t) {
   };
 }
 
-/** The shake's damped sine as numeric screen offsets, ending at rest. */
-function screenShakePoints(amplitude, steps) {
-  const out = [];
-  for (let i = 0; i < steps; i += 1) {
-    const f = i / steps;
-    const decay = (1 - f) ** 2;
-    out.push({
-      x: amplitude * Math.cos(f * Math.PI * 5) * decay,
-      y: amplitude * 0.6 * Math.sin(f * Math.PI * 4) * decay,
-    });
-  }
-  return out;
-}
-
 /** The table shake's WAAPI easing (combat.js), `cubic-bezier(0.2, 0.6, 0.4, 1)`. */
 export const SCREEN_SHAKE_EASING = [0.2, 0.6, 0.4, 1];
 
@@ -171,7 +157,17 @@ export function easingTimeFor(progress, [x1, y1, x2, y2] = SCREEN_SHAKE_EASING) 
  * i/steps of the eased progress over `durationMs`.
  */
 export function screenShakeKeyframes(amplitude, durationMs = SCREEN_SHAKE_MS, steps = 12) {
-  const points = [...screenShakePoints(amplitude, steps), { x: 0, y: 0 }];
+  // The shake's damped sine as numeric screen offsets, ending at rest.
+  const out = [];
+  for (let i = 0; i < steps; i += 1) {
+    const f = i / steps;
+    const decay = (1 - f) ** 2;
+    out.push({
+      x: amplitude * Math.cos(f * Math.PI * 5) * decay,
+      y: amplitude * 0.6 * Math.sin(f * Math.PI * 4) * decay,
+    });
+  }
+  const points = [...out, { x: 0, y: 0 }];
   return points.map((p, i) => ({ x: p.x, y: p.y, ms: easingTimeFor(i / steps) * durationMs }));
 }
 

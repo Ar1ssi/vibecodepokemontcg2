@@ -319,14 +319,6 @@ const humanize = (kind) =>
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .replace(/^./, (c) => c.toUpperCase());
 
-const markerEntry = (marker) => ({
-  // EffectDescriptionGenerator titles an entry with the source card / attack name; the marker only
-  // knows the attack, which is what the game shows for an attack-applied effect.
-  title: marker.sourceAttack ? titleCase(marker.sourceAttack) : humanize(marker.kind),
-  text: (MARKER_TEXT[marker.kind] ?? (() => `${humanize(marker.kind)}.`))(marker),
-  kind: marker.kind,
-});
-
 /**
  * The card's `posStatusEffects` / `negsStatusEffects`. Timed attack effects count only while the
  * Pokémon is Active (attack-markers.mjs), so a benched card passes no turn window and gets none.
@@ -349,7 +341,13 @@ export function statusEffectsFor(card, ctx = {}) {
       : [];
   for (const marker of markers) {
     const target = POSITIVE_MARKERS.has(marker.kind) ? positive : negative;
-    const entry = markerEntry(marker);
+    const entry = {
+      // EffectDescriptionGenerator titles an entry with the source card / attack name; the marker only
+      // knows the attack, which is what the game shows for an attack-applied effect.
+      title: marker.sourceAttack ? titleCase(marker.sourceAttack) : humanize(marker.kind),
+      text: (MARKER_TEXT[marker.kind] ?? (() => `${humanize(marker.kind)}.`))(marker),
+      kind: marker.kind,
+    };
     const same = target.find((e) => e.title === entry.title && e.kind !== 'condition');
     if (same && marker.sourceAttack) same.text += `\n${entry.text}`;
     else target.push(entry);

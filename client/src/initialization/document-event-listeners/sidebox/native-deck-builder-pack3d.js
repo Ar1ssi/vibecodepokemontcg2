@@ -210,25 +210,6 @@ const tearMasks = (line) => {
   return { body: new CanvasTexture(body), strip: new CanvasTexture(strip) };
 };
 
-/** The pack's back: the art's silhouette filled with the silver of the real pack. */
-const silverBack = (image) => {
-  const width = image.naturalWidth || image.width;
-  const height = image.naturalHeight || image.height;
-  const canvas = makeCanvas(width, height);
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(image, 0, 0, width, height);
-  ctx.globalCompositeOperation = 'source-in';
-  const gradient = ctx.createLinearGradient(0, 0, 0, height);
-  SILVER_STOPS.forEach((stop, index) =>
-    gradient.addColorStop(index / (SILVER_STOPS.length - 1), stop)
-  );
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, width, height);
-  const texture = new CanvasTexture(canvas);
-  texture.colorSpace = SRGBColorSpace;
-  return texture;
-};
-
 const shadowTexture = () => {
   const size = SHADOW_TEXTURE_PX;
   const canvas = makeCanvas(size, size);
@@ -281,12 +262,6 @@ const cardMaterial = (map, clippingPlanes) =>
     toneMapped: false,
     alphaTest: map ? ALPHA_TEST : 0,
     clippingPlanes,
-  });
-
-const loadTexture = (loader, url) =>
-  loader.loadAsync(url).then((texture) => {
-    texture.colorSpace = SRGBColorSpace;
-    return texture;
   });
 
 /**
@@ -344,7 +319,10 @@ export async function createPackStage({
   const urls = [...new Set(packArtUrls)];
   let arts;
   try {
-    arts = await Promise.all(urls.map((url) => loadTexture(loader, url)));
+    arts = await Promise.all(urls.map((url) => loader.loadAsync(url).then((texture) => {
+      texture.colorSpace = SRGBColorSpace;
+      return texture;
+    })));
   } catch {
     release();
     return null;
@@ -417,16 +395,6 @@ function buildStage({
   // Shared by every pack of one shape: the body is never deformed; the strips peel, so they are
   // per pack.
   const bodies = new Map();
-  const bodyFor = (shape) => {
-    const key = packShapeKey(shape);
-    if (!bodies.has(key)) {
-      bodies.set(key, {
-        front: pillowPlane({ v0: 0, v1: 1, rows: GRID_Y, sign: 1, shape }),
-        back: pillowPlane({ v0: 0, v1: 1, rows: GRID_Y, sign: -1, shape }),
-      });
-    }
-    return bodies.get(key);
-  };
   const shadowGeometry = new PlaneGeometry(
     SHADOW_SIZE,
     SHADOW_SIZE * PACK_ASPECT
@@ -439,7 +407,23 @@ function buildStage({
   const silvers = new Map();
   for (const [url, art] of arts) {
     art.anisotropy = anisotropy;
-    const silver = silverBack(art.image);
+    // The pack's back: the art's silhouette filled with the silver of the real pack.
+    const image = art.image;
+    const width = image.naturalWidth || image.width;
+    const height = image.naturalHeight || image.height;
+    const canvas = makeCanvas(width, height);
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(image, 0, 0, width, height);
+    ctx.globalCompositeOperation = 'source-in';
+    const gradient = ctx.createLinearGradient(0, 0, 0, height);
+    SILVER_STOPS.forEach((stop, index) =>
+      gradient.addColorStop(index / (SILVER_STOPS.length - 1), stop)
+    );
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
+    const texture = new CanvasTexture(canvas);
+    texture.colorSpace = SRGBColorSpace;
+    const silver = texture;
     silver.anisotropy = anisotropy;
     silvers.set(url, silver);
   }
@@ -495,7 +479,14 @@ function buildStage({
   const buildPack = (packIndex) => {
     const url = packArtUrls[packIndex] ?? packArtUrls[0];
     const shape = packShapes[packIndex] ?? packShapes[0] ?? null;
-    const body = bodyFor(shape);
+    const key = packShapeKey(shape);
+    if (!bodies.has(key)) {
+      bodies.set(key, {
+        front: pillowPlane({ v0: 0, v1: 1, rows: GRID_Y, sign: 1, shape }),
+        back: pillowPlane({ v0: 0, v1: 1, rows: GRID_Y, sign: -1, shape }),
+      });
+    }
+    const body = bodies.get(key);
     const art = arts.get(url);
     const silver = silvers.get(url);
     const line = packTearLine(seed, packIndex);
@@ -622,11 +613,6 @@ function buildStage({
 
   // ── Clock ─────────────────────────────────────────────────────────────
   const still = () => motionReduced();
-  const needsLoop = () =>
-    !disposed &&
-    (animations.size > 0 ||
-      (!still() &&
-        [...packs.values()].some((pack) => pack.anchor && !pack.torn)));
 
   const requestRender = () => {
     if (!disposed && !rafId) rafId = requestAnimationFrame(frame);
@@ -643,23 +629,6 @@ function buildStage({
     animation.started = true;
     animation.setup?.();
     return true;
-  };
-
-  // Every animation is a pure pose sampled on this clock. Before its delay it holds frame 0, unless
-  // it has a `setup` (a mesh that does not exist yet). `onStart` is its sound or spray: played when
-  // it starts on time, skipped when it is landed early.
-  const stepAnimations = (now) => {
-    for (const animation of [...animations]) {
-      const local = now - animation.start - animation.delay;
-      if (local < 0) {
-        if (!animation.setup) animation.apply(animation.pose(0));
-        continue;
-      }
-      if (begin(animation)) animation.onStart?.();
-      const t = Math.min(1, local / animation.durationMs);
-      animation.apply(animation.pose(t));
-      if (t >= 1) finish(animation);
-    }
   };
 
   /** Play `pose` over `durationMs`; reduced motion applies the last frame at once. */
@@ -742,67 +711,6 @@ function buildStage({
     height: rect.height,
   });
 
-  const placePacks = (now, dtMs) => {
-    floors = stackFloor ? [stackFloor] : [];
-    const viewport = viewportRect();
-    const perPx = worldPerPixel(viewport.height);
-    const moving = !still();
-    const focusWidth = packs.get(focus)?.anchor?.offsetWidth || 200;
-    for (const pack of packs.values()) {
-      let rect = null;
-      let home;
-      let slot;
-      if (pack.gone) {
-        pack.group.visible = false;
-        continue;
-      }
-      if (pack.torn && pack.frozen?.home) {
-        // A torn pack no longer follows its anchor: it falls from where it was ripped.
-        ({ home, slot } = pack.frozen);
-      } else if (pack.anchor?.isConnected) {
-        rect = pack.anchor.getBoundingClientRect();
-        home = rectToWorld(relativeTo(rect, viewport), viewport);
-        slot = packSpreadSlot3d(pack.packIndex, focus, focusWidth);
-      } else {
-        pack.group.visible = false;
-        continue;
-      }
-      pack.lastHome = home;
-      pack.lastSlot = slot;
-      // Each pack reflects under its resting place; a torn pack keeps the floor it was ripped over.
-      if (rect) pack.floor = reflectionFloor(relativeTo(rect, viewport), viewport.height);
-      if (pack.floor) floors.push(pack.floor);
-      const target =
-        moving && rect && pack.packIndex === focus
-          ? tiltTarget(pointer, rect)
-          : { rotateYDeg: 0, rotateXDeg: 0 };
-      pack.tilt = moving ? followTilt(pack.tilt, target, dtMs) : target;
-      const placed = packPlacement({
-        home,
-        slot,
-        sway: moving ? swayPose(now, pack.packIndex) : null,
-        tilt: pack.tilt,
-        fly: pack.fly,
-        worldPerPx: perPx,
-        level: pack.level,
-        drop: pack.drop,
-      });
-      pack.group.visible = Boolean(placed);
-      if (!placed) continue;
-      pack.group.position.set(placed.x, placed.y, placed.z);
-      pack.group.rotation.set(
-        radians(placed.rotateXDeg),
-        radians(placed.rotateYDeg),
-        radians(placed.rotateZDeg)
-      );
-      pack.group.scale.setScalar(placed.scale);
-      setBrightness(
-        pack,
-        linearBrightness((slot?.brightness ?? 1) * (pack.drop?.brightness ?? 1))
-      );
-    }
-  };
-
   // The stack shows only above the torn pack's mouth, so it rises out of the pack, not through it.
   const mouthPoint = new Vector3();
   const mouthNormal = new Vector3();
@@ -879,95 +787,88 @@ function buildStage({
     const now = performance.now();
     const dtMs = lastFrame ? now - lastFrame : 0;
     lastFrame = now;
-    stepAnimations(now);
+    // Every animation is a pure pose sampled on this clock. Before its delay it holds frame 0, unless
+    // it has a `setup` (a mesh that does not exist yet). `onStart` is its sound or spray: played when
+    // it starts on time, skipped when it is landed early.
+    for (const animation of [...animations]) {
+      const local = now - animation.start - animation.delay;
+      if (local < 0) {
+        if (!animation.setup) animation.apply(animation.pose(0));
+        continue;
+      }
+      if (begin(animation)) animation.onStart?.();
+      const t = Math.min(1, local / animation.durationMs);
+      animation.apply(animation.pose(t));
+      if (t >= 1) finish(animation);
+    }
     if (canvas.isConnected) {
-      placePacks(now, dtMs);
+      floors = stackFloor ? [stackFloor] : [];
+      const viewport = viewportRect();
+      const perPx = worldPerPixel(viewport.height);
+      const moving = !still();
+      const focusWidth = packs.get(focus)?.anchor?.offsetWidth || 200;
+      for (const pack of packs.values()) {
+        let rect = null;
+        let home;
+        let slot;
+        if (pack.gone) {
+          pack.group.visible = false;
+          continue;
+        }
+        if (pack.torn && pack.frozen?.home) {
+          // A torn pack no longer follows its anchor: it falls from where it was ripped.
+          ({ home, slot } = pack.frozen);
+        } else if (pack.anchor?.isConnected) {
+          rect = pack.anchor.getBoundingClientRect();
+          home = rectToWorld(relativeTo(rect, viewport), viewport);
+          slot = packSpreadSlot3d(pack.packIndex, focus, focusWidth);
+        } else {
+          pack.group.visible = false;
+          continue;
+        }
+        pack.lastHome = home;
+        pack.lastSlot = slot;
+        // Each pack reflects under its resting place; a torn pack keeps the floor it was ripped over.
+        if (rect) pack.floor = reflectionFloor(relativeTo(rect, viewport), viewport.height);
+        if (pack.floor) floors.push(pack.floor);
+        const target =
+          moving && rect && pack.packIndex === focus
+            ? tiltTarget(pointer, rect)
+            : { rotateYDeg: 0, rotateXDeg: 0 };
+        pack.tilt = moving ? followTilt(pack.tilt, target, dtMs) : target;
+        const placed = packPlacement({
+          home,
+          slot,
+          sway: moving ? swayPose(now, pack.packIndex) : null,
+          tilt: pack.tilt,
+          fly: pack.fly,
+          worldPerPx: perPx,
+          level: pack.level,
+          drop: pack.drop,
+        });
+        pack.group.visible = Boolean(placed);
+        if (!placed) continue;
+        pack.group.position.set(placed.x, placed.y, placed.z);
+        pack.group.rotation.set(
+          radians(placed.rotateXDeg),
+          radians(placed.rotateYDeg),
+          radians(placed.rotateZDeg)
+        );
+        pack.group.scale.setScalar(placed.scale);
+        setBrightness(
+          pack,
+          linearBrightness((slot?.brightness ?? 1) * (pack.drop?.brightness ?? 1))
+        );
+      }
       clipAtMouth();
       draw();
     }
-    if (needsLoop()) rafId = requestAnimationFrame(frame);
+    if (!disposed &&
+    (animations.size > 0 ||
+      (!still() &&
+        [...packs.values()].some((pack) => pack.anchor && !pack.torn)))) rafId = requestAnimationFrame(frame);
     else lastFrame = 0;
   }
-
-  // ── The rip: strip flight, flecks, card stack ────────────────────────
-  /** The peeled strip leaves the pack, keeping its world transform, pivoting on the tear line. */
-  const detachStrip = (pack) => {
-    pack.group.updateMatrixWorld(true);
-    const group = new Group();
-    pack.group.matrixWorld.decompose(
-      group.position,
-      group.quaternion,
-      group.scale
-    );
-    const pivot = new Group();
-    pivot.position.set(0, pack.hingeY, 0);
-    group.add(pivot);
-    for (const mesh of pack.stripMeshes) {
-      mesh.position.set(0, -pack.hingeY, 0);
-      pivot.add(mesh);
-    }
-    scene.add(group);
-    for (const material of pack.stripMaterials) {
-      material.transparent = true;
-      material.needsUpdate = true;
-    }
-    pack.flight = { group, pivot, origin: group.position.clone() };
-  };
-
-  const flyStrip = (pack, pose) => {
-    const flight = pack.flight;
-    if (!flight) return;
-    flight.group.position.set(
-      flight.origin.x + pose.x,
-      flight.origin.y + pose.y,
-      flight.origin.z + pose.z
-    );
-    flight.pivot.rotation.set(pose.rotX, pose.rotY, pose.rotZ);
-    for (const material of pack.stripMaterials) material.opacity = pose.opacity;
-  };
-
-  const dropStrip = (pack) => {
-    if (!pack.flight) return;
-    scene.remove(pack.flight.group);
-    pack.flight = null;
-  };
-
-  /** Silver flecks from the far end of the tear line, in the DOM over the canvas. */
-  const sprayFlecks = (pack) => {
-    if (still() || !host.isConnected) return;
-    const end = tearFarEnd(pack.line, pack.side);
-    const point = new Vector3(end.x, end.y, 0)
-      .applyMatrix4(pack.group.matrixWorld)
-      .project(camera);
-    const viewport = viewportRect();
-    const packWidthPx = pack.group.scale.x / worldPerPixel(viewport.height);
-    if (!(packWidthPx > 0)) return;
-    const spot = document.createElement('div');
-    spot.className = 'bb-flecks';
-    spot.style.left = `${viewport.left + ((point.x + 1) / 2) * viewport.width}px`;
-    spot.style.top = `${viewport.top + ((1 - point.y) / 2) * viewport.height}px`;
-    host.append(spot);
-    const flecks = spawnParticles(
-      spot,
-      burstParticles({
-        count: FLECK_COUNT,
-        distance: packWidthPx * FLECK_REACH,
-        direction: pack.side === -1 ? 180 : 0,
-        spread: FLECK_SPREAD_DEG,
-        size: FLECK_SIZE_PX,
-        gravity: packWidthPx * FLECK_GRAVITY,
-        maxDelay: 0.12,
-        seed: seed + pack.packIndex,
-      }),
-      {
-        className: 'fx-particle--shard',
-        color: SILVER_STOPS[0],
-        duration: FLECK_MS,
-      }
-    );
-    Promise.all(flecks).then(() => spot.remove());
-    setTimeout(() => spot.remove(), FLECK_MS * 2);
-  };
 
   const clearCards = () => {
     if (!cards) return;
@@ -1017,19 +918,6 @@ function buildStage({
       face.needsUpdate = true;
       requestRender();
     });
-  };
-
-  /** The stack starts inside the pack, in the pack's frame at the moment it rises. */
-  const launchStack = (stack) => {
-    const pack = stack.pack;
-    pack.group.updateMatrixWorld(true);
-    pack.group.matrixWorld.decompose(
-      stack.group.position,
-      stack.group.quaternion,
-      stack.group.scale
-    );
-    stack.mesh.position.set(0, cardsEmergePose(0).y, 0);
-    stack.group.visible = true;
   };
 
   // ── Viewport, pointer, context ────────────────────────────────────────
@@ -1212,17 +1100,100 @@ function buildStage({
       kind: 'strip',
       delay: RIP_FINISH_MS,
       durationMs: STRIP_FLIGHT_MS,
-      setup: () => detachStrip(pack),
-      onStart: () => sprayFlecks(pack),
+      setup: () => {
+        // ── The rip: strip flight, flecks, card stack ────────────────────────
+        // The peeled strip leaves the pack, keeping its world transform, pivoting on the tear line.
+        pack.group.updateMatrixWorld(true);
+        const group = new Group();
+        pack.group.matrixWorld.decompose(
+          group.position,
+          group.quaternion,
+          group.scale
+        );
+        const pivot = new Group();
+        pivot.position.set(0, pack.hingeY, 0);
+        group.add(pivot);
+        for (const mesh of pack.stripMeshes) {
+          mesh.position.set(0, -pack.hingeY, 0);
+          pivot.add(mesh);
+        }
+        scene.add(group);
+        for (const material of pack.stripMaterials) {
+          material.transparent = true;
+          material.needsUpdate = true;
+        }
+        pack.flight = { group, pivot, origin: group.position.clone() };
+      },
+      onStart: () => {
+        // Silver flecks from the far end of the tear line, in the DOM over the canvas.
+        if (still() || !host.isConnected) return;
+        const end = tearFarEnd(pack.line, pack.side);
+        const point = new Vector3(end.x, end.y, 0)
+          .applyMatrix4(pack.group.matrixWorld)
+          .project(camera);
+        const viewport = viewportRect();
+        const packWidthPx = pack.group.scale.x / worldPerPixel(viewport.height);
+        if (!(packWidthPx > 0)) return;
+        const spot = document.createElement('div');
+        spot.className = 'bb-flecks';
+        spot.style.left = `${viewport.left + ((point.x + 1) / 2) * viewport.width}px`;
+        spot.style.top = `${viewport.top + ((1 - point.y) / 2) * viewport.height}px`;
+        host.append(spot);
+        const flecks = spawnParticles(
+          spot,
+          burstParticles({
+            count: FLECK_COUNT,
+            distance: packWidthPx * FLECK_REACH,
+            direction: pack.side === -1 ? 180 : 0,
+            spread: FLECK_SPREAD_DEG,
+            size: FLECK_SIZE_PX,
+            gravity: packWidthPx * FLECK_GRAVITY,
+            maxDelay: 0.12,
+            seed: seed + pack.packIndex,
+          }),
+          {
+            className: 'fx-particle--shard',
+            color: SILVER_STOPS[0],
+            duration: FLECK_MS,
+          }
+        );
+        Promise.all(flecks).then(() => spot.remove());
+        setTimeout(() => spot.remove(), FLECK_MS * 2);
+      },
       pose: (t) => stripFlightPose(t, { side: pack.side }),
-      apply: (pose) => flyStrip(pack, pose),
-      done: () => dropStrip(pack),
+      apply: (pose) => {
+        const flight = pack.flight;
+        if (!flight) return;
+        flight.group.position.set(
+          flight.origin.x + pose.x,
+          flight.origin.y + pose.y,
+          flight.origin.z + pose.z
+        );
+        flight.pivot.rotation.set(pose.rotX, pose.rotY, pose.rotZ);
+        for (const material of pack.stripMaterials) material.opacity = pose.opacity;
+      },
+      done: () => {
+        if (!pack.flight) return;
+        scene.remove(pack.flight.group);
+        pack.flight = null;
+      },
     });
     const risen = animate({
       kind: 'rise',
       delay: riseDelay,
       durationMs: CARDS_RISE_MS,
-      setup: () => launchStack(stack),
+      setup: () => {
+        // The stack starts inside the pack, in the pack's frame at the moment it rises.
+        const pack = stack.pack;
+        pack.group.updateMatrixWorld(true);
+        pack.group.matrixWorld.decompose(
+          stack.group.position,
+          stack.group.quaternion,
+          stack.group.scale
+        );
+        stack.mesh.position.set(0, cardsEmergePose(0).y, 0);
+        stack.group.visible = true;
+      },
       pose: cardsEmergePose,
       apply: (pose) => {
         stack.mesh.position.y = pose.y;

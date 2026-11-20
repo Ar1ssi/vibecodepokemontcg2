@@ -27,7 +27,6 @@ const METAL = Object.freeze({ byKind: { linear: { id: 'crystal', facets: 3, shee
 
 const COOL_SHIMMER = Object.freeze({ distort: Object.freeze({ strength: 0.06, speed: 0.8, scale: 2.5, angle: 0 }) });
 const SPHERE_BRUSH = Object.freeze({ detail: Object.freeze({ amount: 0.25, speed: 0.3, scale: 5, angle: 0 }) });
-const bladeBrush = (angleDeg) => ({ detail: { amount: 0.3, speed: 0.4, scale: 6, angle: angleDeg } });
 
 // Heights (lane units) over the drawer's lift.
 const Z_HAZE = 0.01;
@@ -180,7 +179,7 @@ function steelKit(palette) {
     brush.addColorStop(1, rgbCss(palette.deep, 0.85 * alpha));
     ctx.fillStyle = brush;
     traceOutline(ctx, blade);
-    layered(ctx, Z_BLADE, bladeBrush(spec.angleDeg), () => ctx.fill());
+    layered(ctx, Z_BLADE, { detail: { amount: 0.3, speed: 0.4, scale: 6, angle: spec.angleDeg } }, () => ctx.fill());
 
     const shine = alpha * clamp01(hot);
     if (!(shine > 0)) return;

@@ -180,12 +180,6 @@ export function matchesEnergyTypeFilter(card, energyTypes) {
 // case-sensitive — "EX" is the XY-era rule box, "ex" the Scarlet & Violet / EX-era one.
 const RULE_BOX_SUFFIX = { GX: /[- ]GX$/, EX: /[- ]EX$/, ex: /[- ]ex$/ };
 
-function hasRuleBoxKind(player, root, kind) {
-  const zone = [...(player.zones.active || []), ...(player.zones.bench || [])];
-  const name = String((topPokemonCard(zone, root) || root).name || '');
-  return Boolean(RULE_BOX_SUFFIX[kind]?.test(name));
-}
-
 /**
  * Deterministically creates a PendingChoice without Math.random (Invariant 6).
  */
@@ -610,14 +604,6 @@ export function executeSteps(draft, {
       effectShieldBlocks({ draft, player, effectType, sourceCard, events }, side, root);
     // Iron Burden: the side's Active Pokémon holds a Tool that forbids Ability/Trainer switch-outs.
     const switchLocked = (side, root) => switchOutBlocked({ draft, effectType, sourceCard }, side, root);
-    // An option that is a frozen side's Active Pokémon or a card attached to it.
-    const frozenPick = (opt) =>
-      Object.values(draft.players || {}).some((side) => {
-        const host = (side.zones?.active || []).find(
-          (c) => c.instanceId === opt.instanceId || (opt.attachedTo != null && c.instanceId === opt.attachedTo)
-        );
-        return Boolean(host) && !host.attachedTo && shieldedTarget(side, host);
-      });
 
     // Handle choice resumption for the current step
     const stepSelection = currentSelection;
@@ -658,7 +644,13 @@ export function executeSteps(draft, {
         },
         ask: ({ player: chooser = playerId, prompt, options, min, max, memo = {} }) => {
           // Temporal Freeze: a frozen Active Pokémon (and what is attached to it) is not offered.
-          const allowed = options.filter((opt) => !frozenPick(opt));
+          // An option that is a frozen side's Active Pokémon or a card attached to it.
+          const allowed = options.filter((opt) => !Object.values(draft.players || {}).some((side) => {
+            const host = (side.zones?.active || []).find(
+              (c) => c.instanceId === opt.instanceId || (opt.attachedTo != null && c.instanceId === opt.attachedTo)
+            );
+            return Boolean(host) && !host.attachedTo && shieldedTarget(side, host);
+          }));
           if (allowed.length < options.length) {
             events.push({ type: 'effectStepSkipped', reason: 'effect_shield', step: step.type });
             if (allowed.length === 0) return null;
@@ -2060,16 +2052,14 @@ export function executeSteps(draft, {
       }
 
       case 'returnTool': {
-        // Shopping Center: return an attached Pokémon Tool to hand.
-        const isTool = (c) =>
-          /tool/i.test(
+        let moved = null;
+        for (const zone of [player.zones.active || [], player.zones.bench || []]) {
+          // Shopping Center: return an attached Pokémon Tool to hand.
+          const idx = zone.findIndex((c) => c.attachedTo && /tool/i.test(
             String(c?.trainerType || '') +
               ',' +
               (Array.isArray(c?.subtypes) ? c.subtypes.join(',') : '')
-          );
-        let moved = null;
-        for (const zone of [player.zones.active || [], player.zones.bench || []]) {
-          const idx = zone.findIndex((c) => c.attachedTo && isTool(c));
+          ));
           if (idx >= 0) {
             moved = zone.splice(idx, 1)[0];
             break;
@@ -2421,11 +2411,9 @@ export function executeSteps(draft, {
         const maxCount = step.count || 1;
         const energyTypes =
           step.energyTypes || (step.typeFilter ? [step.typeFilter] : null);
-        const isEnergy = (c) =>
-          /energy/i.test(String(c?.type || '') + String(c?.name || ''));
         const candidates = discard.filter(
           (c) =>
-            isEnergy(c) &&
+            /energy/i.test(String(c?.type || '') + String(c?.name || '')) &&
             matchesEnergyTypeFilter(c, energyTypes) &&
             (!step.basicOnly || classifyEnergyEffect(c) === 'basic')
         );
@@ -2500,7 +2488,11 @@ export function executeSteps(draft, {
             rootMatchesTarget(player, c, step.target) &&
             // `excludeSelf`: the Ability's Pokémon is Knocked Out by the same Ability (Milotic).
             !(step.excludeSelf && c.instanceId === selfRootId) &&
-            !(step.excludeKinds || []).some((kind) => hasRuleBoxKind(player, c, kind)) &&
+            !(step.excludeKinds || []).some((kind) => {
+              const zone = [...(player.zones.active || []), ...(player.zones.bench || [])];
+              const name = String((topPokemonCard(zone, c) || c).name || '');
+              return Boolean(RULE_BOX_SUFFIX[kind]?.test(name));
+            }) &&
             !(progress.lockedTargetId != null && c.instanceId !== progress.lockedTargetId) &&
             !(progress.usedTargetIds || []).includes(c.instanceId)
         );

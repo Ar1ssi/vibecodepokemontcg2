@@ -3,7 +3,7 @@ import { uiCue } from '../netcode/mat-fx/ui-cue.mjs';
 /**
  * The board's End Turn button. It clicks the Pass button rather than calling pass()
  * directly: rules mode ends the turn from a capture-phase hook on that button
- * (hookTurnButton in rules-bridge.js), and server authority dispatches from its
+ * (set up in rules-bridge.js), and server authority dispatches from its
  * bubble handler — the same route as the Alt+T shortcut (keybinds.js).
  *
  * @param {Document} doc

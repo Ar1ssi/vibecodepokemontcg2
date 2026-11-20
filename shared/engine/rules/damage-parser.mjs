@@ -318,25 +318,6 @@ function amountScale(unit, ctx) {
   return null;
 }
 
-// Older prints scale with "does 10 damage times the number of damage counters on this Pokémon".
-// Non-Energy units read as the "for each" form the per-each chain resolves; Energy units keep
-// the "times" wording for the per-energy branch.
-function timesAsForEach(text) {
-  return text
-    .split(/(?<=\.)\s+/)
-    .map((printed) => {
-      // Older prints drop the "more" (Granbull [Neo Genesis 37] Raging Charge: "10 damage plus 10
-      // damage for each damage counter on Granbull").
-      const sentence = printed.replace(/plus (\d+) damage for each/, 'plus $1 more damage for each');
-      const unit = /damage times the (?:amount|number) of (.+)/.exec(sentence)?.[1];
-      if (!unit || /\benergy\b/.test(unit)) return sentence;
-      return sentence
-        .replace(/plus (\d+) (?:more )?damage times the (?:amount|number) of/, 'plus $1 more damage for each')
-        .replace(/(\d+) (more )?damage times the (?:amount|number) of/, '$1 $2damage for each');
-    })
-    .join(' ');
-}
-
 const BASE_SWAP = [
   /^if (.+?), this attack's base damage is (\d+)(?: instead of \d+)?\.?$/,
   /^if (.+?), this attack does (\d+) damage instead of \d+\.?$/,
@@ -384,7 +365,22 @@ export function parseAttackDamage(
     attack = { ...attack, text: attacker?.name ? replaceSelfName(straight, attacker.name) : straight };
   }
   // Mewtwo / Gardevoir Energy Burst: "times the total amount of Energy attached to …".
-  const text = timesAsForEach(lower(attack?.text ?? '').replace(/times the total amount of/g, 'times the amount of'));
+  // Older prints scale with "does 10 damage times the number of damage counters on this Pokémon".
+  // Non-Energy units read as the "for each" form the per-each chain resolves; Energy units keep
+  // the "times" wording for the per-energy branch.
+  const text = lower(attack?.text ?? '').replace(/times the total amount of/g, 'times the amount of')
+    .split(/(?<=\.)\s+/)
+    .map((printed) => {
+      // Older prints drop the "more" (Granbull [Neo Genesis 37] Raging Charge: "10 damage plus 10
+      // damage for each damage counter on Granbull").
+      const sentence = printed.replace(/plus (\d+) damage for each/, 'plus $1 more damage for each');
+      const unit = /damage times the (?:amount|number) of (.+)/.exec(sentence)?.[1];
+      if (!unit || /\benergy\b/.test(unit)) return sentence;
+      return sentence
+        .replace(/plus (\d+) (?:more )?damage times the (?:amount|number) of/, 'plus $1 more damage for each')
+        .replace(/(\d+) (more )?damage times the (?:amount|number) of/, '$1 $2damage for each');
+    })
+    .join(' ');
   // TCGdex prints scaling attacks' damage as strings ("30+", "20×"); their printed number
   // is still the base the "more damage" clauses add to (I117).
   const base = Number.isFinite(attack?.damage)
@@ -471,7 +467,7 @@ export function parseAttackDamage(
     text &&
     discardEnergyScaling(attack?.text) &&
     // Electivire Discharge: the discard sets the coin count; the heads scale the damage.
-    // (timesAsForEach has already rewritten "times the number of heads" to "for each heads").
+    // (The text arrives with "times the number of heads" rewritten to "for each heads".)
     !/damage (?:times the number of|for each) heads/.test(text)
   ) {
     const discarded = ctx.energyDiscarded ?? 0;
@@ -520,7 +516,7 @@ export function parseAttackDamage(
     }
   } else if (
     text &&
-    // timesAsForEach has already rewritten "times the number of" to "for each" for non-Energy units.
+    // The text arrives with "times the number of" rewritten to "for each" for non-Energy units.
     /damage for each [^.(]+? to \d+ of your opponent['’]s pok[ée]mon/.test(text)
   ) {
     // 7/108 Beedrill Swarming Sting: the chosen Pokémon takes the per-unit damage (attack-effect.mjs),
@@ -1773,10 +1769,6 @@ const TARGET_FILTERS = [
   [/^pok[ée]mon-gx or pok[ée]mon-ex$/i, 'gxOrEx'],
   [/^pok[ée]mon lv\.x$/i, 'lvx'],
 ];
-const targetFilter = (phrase) => {
-  const row = TARGET_FILTERS.find(([re]) => re.test(phrase.trim()));
-  return row ? { filter: row[1] } : null;
-};
 
 export function attackTargetClause(attackText) {
   // TCGdex prints typographic apostrophes ("opponent’s"); normalize them so the
@@ -1785,7 +1777,8 @@ export function attackTargetClause(attackText) {
   // Gardevoir Telekinesis: the snipe and its Energy move are one step (atkSnipeMoveEnergy).
   if (/damage to 1 of your opponent's pok[ée]mon\. move an energy from that pok[ée]mon to another of their pok[ée]mon/i.test(t)) return null;
   const withFilter = (clause, phrase) => {
-    const described = targetFilter(phrase);
+    const row = TARGET_FILTERS.find(([re]) => re.test(phrase.trim()));
+    const described = row ? { filter: row[1] } : null;
     if (!described) return null;
     return described.filter ? { ...clause, filter: described.filter } : clause;
   };

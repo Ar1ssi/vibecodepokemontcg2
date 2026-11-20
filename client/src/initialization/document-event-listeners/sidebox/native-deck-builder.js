@@ -187,33 +187,6 @@ let restoreLastUsedDeckImpl = null;
 /** Restore the last played deck (and its customization) onto the self playmat. */
 export const restoreLastUsedDeckToPlaymat = () => Boolean(restoreLastUsedDeckImpl?.());
 
-const coinPayload = (coin) =>
-  coin ? { id: coin.id, name: coin.name, thumb: coin.thumb, material: coin.material } : null;
-
-// apply-mat-layout.js listens for this to render the mat and re-fit the
-// board zones; nothing here touches the board.
-const matPayload = (mat) =>
-  mat
-    ? {
-        id: mat.id,
-        title: mat.title,
-        image: mat.image,
-        imageUrl: mat.imageUrl,
-        thumb: mat.thumb,
-        board: mat.board,
-        layout: mat.layout,
-      }
-    : null;
-
-// Shows the game's own sidebox again after Play.
-const showGameSidebox = () => {
-  if (systemState.isTwoPlayer && !systemState.solo) {
-    show('p2Box', document.getElementById('p2Button'));
-  } else {
-    show('p1Box', document.getElementById('p1Button'));
-  }
-};
-
 /**
  * Where the builder's game side effects land (design 050). On the game tab
  * (host) they touch this page's board directly; in the builder's own tab
@@ -229,19 +202,38 @@ const createLocalGameLink = () => ({
       changePlaymat(target, mat?.id ?? null, true);
       return;
     }
+    // apply-mat-layout.js listens for this to render the mat and re-fit the
+    // board zones; nothing here touches the board.
     document.dispatchEvent(
-      new CustomEvent('playmat-changed', { detail: { target, mat: matPayload(mat) } })
+      new CustomEvent('playmat-changed', { detail: { target, mat: mat
+        ? {
+            id: mat.id,
+            title: mat.title,
+            image: mat.image,
+            imageUrl: mat.imageUrl,
+            thumb: mat.thumb,
+            board: mat.board,
+            layout: mat.layout,
+          }
+        : null } })
     );
   },
   announceCoin: (target, coin) =>
     document.dispatchEvent(
-      new CustomEvent('rules-coin-changed', { detail: { target, coin: coinPayload(coin) } })
+      new CustomEvent('rules-coin-changed', { detail: { target, coin: coin ? { id: coin.id, name: coin.name, thumb: coin.thumb, material: coin.material } : null } })
     ),
   announceDeckBox: (target, deckBoxId) =>
     document.dispatchEvent(
       new CustomEvent('deck-box-changed', { detail: { target, deckBoxId: deckBoxId ?? null } })
     ),
-  play: () => showGameSidebox(),
+  play: () => {
+    // Shows the game's own sidebox again after Play.
+    if (systemState.isTwoPlayer && !systemState.solo) {
+      show('p2Box', document.getElementById('p2Button'));
+    } else {
+      show('p1Box', document.getElementById('p1Button'));
+    }
+  },
   isTwoPlayer: () => systemState.isTwoPlayer,
   isConnected: () => true,
 });
@@ -554,11 +546,6 @@ export const initializeNativeDeckBuilder = ({
         spritePicker?.toggle();
       });
 
-      const persistLastUsedSession = () => {
-        const deckId = deckLibrary?.getActiveDeckId?.('self');
-        if (deckId) saveLastSession(window.localStorage, { deckId, target: 'self' });
-      };
-    
       // ── Set browser (Mega Evolution / TCGdex) ─────────────────────────────
       const tabSearch = document.getElementById('nativeDeckBuilderTabSearch');
       const tabBrowse = document.getElementById('nativeDeckBuilderTabBrowse');
@@ -924,20 +911,6 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
           // Until the catalogs land the stage names the default sleeve and coin; then it redraws.
           if (!cosmeticsLoaded()) withCosmetics(() => customizeStage?.refresh());
 
-      // Customize switcher: Deck Box <-> Card Sleeve <-> Coin <-> Mat toggle + shared filter
-          // ── playmat sleeve application ─────────────────────────────────
-          // Card backs are tracked per-player (systemState.cardBackSrc for
-          // self; p1OppCardBackSrc/p2OppCardBackSrc for the opponent) —
-          // writing/applying a sleeve must only ever touch the target it
-          // was actually picked for, or picking (or even just opening) one
-          // player's sleeve/deck silently overwrites the other player's
-          // custom sleeve back to the default the next time either of
-          // their card backs happens to be redrawn (e.g. on shuffle).
-          const getCardBackForTarget = (target) => (
-            target === 'opp'
-              ? (systemState.isTwoPlayer ? systemState.p2OppCardBackSrc : systemState.p1OppCardBackSrc)
-              : systemState.cardBackSrc
-          );
           // On sleeve change: update every currently face-down card on the
           // relevant player's playmat only (they read the card-back state
           // on next flip), and re-point existing back images so the change
@@ -948,7 +921,18 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
               // when no sleeve is set for this deck, fall back to whatever
               // this player's own card back already is — never borrow the
               // default and never touch the other player's playmat
-              const resolvedTarget = image || getCardBackForTarget(target) || fallback;
+              // Customize switcher: Deck Box <-> Card Sleeve <-> Coin <-> Mat toggle + shared filter
+              // ── playmat sleeve application ─────────────────────────────────
+              // Card backs are tracked per-player (systemState.cardBackSrc for
+              // self; p1OppCardBackSrc/p2OppCardBackSrc for the opponent) —
+              // writing/applying a sleeve must only ever touch the target it
+              // was actually picked for, or picking (or even just opening) one
+              // player's sleeve/deck silently overwrites the other player's
+              // custom sleeve back to the default the next time either of
+              // their card backs happens to be redrawn (e.g. on shuffle).
+              const resolvedTarget = image || (target === 'opp'
+                ? (systemState.isTwoPlayer ? systemState.p2OppCardBackSrc : systemState.p1OppCardBackSrc)
+                : systemState.cardBackSrc) || fallback;
               const doc = target === 'opp' ? oppContainerDocument : selfContainerDocument;
               if (!doc) return;
               // `img.src` is always the browser-resolved absolute URL; the
@@ -985,22 +969,6 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
             }
           };
           document.addEventListener('deck-sleeve-changed', (e) => applySleeveToPlaymat(e.detail?.image, e.detail?.target || 'self'));
-    
-          // ── per-deck customization restore ─────────────────────────────
-          // Board-side only (restoreLastUsedDeckToPlaymat): the game tab
-          // restores the sleeve of the deck it holds.
-          const syncCustomizationToDeck = () => withCosmetics(() => {
-            // sleeve -> playmat card back via the library's own data
-            const sleeveId = deckLibrary?.getActiveSleeve?.(currentLoadTarget);
-            const sleeve = getSleeves().find((s) => s.id === sleeveId) || null;
-            const backImage = sleeve?.image || null;
-            // only write/apply for the target actually being viewed — an
-            // unset sleeve on this deck must never clobber the OTHER
-            // player's already-chosen card back
-            // emit=false: runs locally on init/switch; do not broadcast on load.
-            if (backImage) changeCardBack(currentLoadTarget, backImage, false);
-            document.dispatchEvent(new CustomEvent('deck-sleeve-changed', { detail: { target: currentLoadTarget, image: backImage } }));
-          });
     
           const customizeSwitcher = document.getElementById('nativeDeckBuilderCustomizeSwitcher');
           const customizeFilter = document.getElementById('nativeDeckBuilderCustomizeFilter');
@@ -1177,13 +1145,6 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     );
   // The Box / Pool controller; null outside Build & Battle, and until it boots below.
   let buildBattle = null;
-  // null means "read it from the cards" (detectDeckFormat): only Build & Battle is recorded.
-  const currentDeckFormat = () =>
-    isHomebrew
-      ? DECK_FORMAT_TCG
-      : isBuildBattle
-        ? DECK_FORMAT_BUILD_BATTLE
-        : deckLibrary?.getActiveDeckFormat?.(currentLoadTarget) || null;
   // What the game is told: the saved record's own format wins, so a Standard deck
   // opened from My Decks in the Build & Battle tab still plays with 6 Prizes.
   const loadFormat = () =>
@@ -1456,11 +1417,6 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
 
   let customCardImageLoaded = false;
 
-  const showPreviewImage = () => {
-    customCardPreviewImage.style.display = '';
-    customCardPreviewPlaceholder.style.display = 'none';
-  };
-
   const showPreviewPlaceholder = (text = 'No image') => {
     customCardPreviewImage.style.display = 'none';
     customCardPreviewPlaceholder.style.display = '';
@@ -1504,7 +1460,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
 
   customCardPreviewImage.addEventListener('load', () => {
     customCardImageLoaded = true;
-    showPreviewImage();
+    customCardPreviewImage.style.display = '';
+    customCardPreviewPlaceholder.style.display = 'none';
   });
 
   const openCustomCardModal = () => {
@@ -1671,8 +1628,13 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         // the active deck binding is session state and starts null.
         deckLibrary?.saveActiveDeck(deck);
         const counts = getDeckCounts(deck);
+    // null means "read it from the cards" (detectDeckFormat): only Build & Battle is recorded.
     const result = withPoolErrors(
-      validateDeck(deck, currentDeckFormat() || detectDeckFormat(deck)),
+      validateDeck(deck, (isHomebrew
+        ? DECK_FORMAT_TCG
+        : isBuildBattle
+          ? DECK_FORMAT_BUILD_BATTLE
+          : deckLibrary?.getActiveDeckFormat?.(currentLoadTarget) || null) || detectDeckFormat(deck)),
       buildBattle?.poolErrors(deck) || []
     );
     const sortedCards = deckListCards();
@@ -1811,7 +1773,10 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         deckLibrary?.getActiveDeckId?.(currentLoadTarget) || null,
         loadFormat()
       );
-      if (currentLoadTarget === 'self') persistLastUsedSession();
+      if (currentLoadTarget === 'self') {
+        const deckId = deckLibrary?.getActiveDeckId?.('self');
+        if (deckId) saveLastSession(window.localStorage, { deckId, target: 'self' });
+      }
     }
     render();
   };
@@ -2374,7 +2339,21 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       refreshCoinSelection();
       refreshMatSelection();
       refreshDeckBoxSelection();
-      syncCustomizationToDeck();
+      // ── per-deck customization restore ─────────────────────────────
+      // Board-side only (restoreLastUsedDeckToPlaymat): the game tab
+      // restores the sleeve of the deck it holds.
+      withCosmetics(() => {
+        // sleeve -> playmat card back via the library's own data
+        const sleeveId = deckLibrary?.getActiveSleeve?.(currentLoadTarget);
+        const sleeve = getSleeves().find((s) => s.id === sleeveId) || null;
+        const backImage = sleeve?.image || null;
+        // only write/apply for the target actually being viewed — an
+        // unset sleeve on this deck must never clobber the OTHER
+        // player's already-chosen card back
+        // emit=false: runs locally on init/switch; do not broadcast on load.
+        if (backImage) changeCardBack(currentLoadTarget, backImage, false);
+        document.dispatchEvent(new CustomEvent('deck-sleeve-changed', { detail: { target: currentLoadTarget, image: backImage } }));
+      });
       updateReadyButtons();
       return true;
     } catch {

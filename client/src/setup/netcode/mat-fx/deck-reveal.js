@@ -41,68 +41,6 @@ const hostOpacity = (p) => ({ opacity: p.opacity });
 // The hand card's spot, found from the <img> each time: a holo wrapper can wrap it mid-scene.
 const landingOf = (card) => handSpotOf({ image: card.image });
 
-function whenLaidOut(isLaidOut, start) {
-  const began = performance.now();
-  const attempt = () => {
-    if (isLaidOut() || performance.now() - began >= LAYOUT_WAIT_MS) start();
-    else setTimeout(attempt, LAYOUT_POLL_MS);
-  };
-  setTimeout(attempt, LAYOUT_POLL_MS);
-}
-
-function playSpread(user, cards, show, holdMs) {
-  const viewport = viewportRect();
-  const slots = drawSpreadRects(cards.length, matCenter(boardFrameRects(), viewport), viewport);
-  const deck = pileOf(user, 'deck');
-  const times = deckRevealTimes(cards.length, holdMs);
-  // The sleeve apply-view draws for this side's face-down cards, so the landing matches the hand.
-  const sleeve = resolveCardBackSrc(user === 'self' ? 'you' : 'them');
-  cards.forEach((card, index) => {
-    const slot = slots[index];
-    if (!slot) {
-      show(card);
-      return;
-    }
-    const trackTo = (spot) =>
-      oppPlayTrack({
-        from: deck?.rect || null,
-        preview: slot,
-        to: spot?.rect || null,
-        fromTurn: deck?.turn || 0,
-        toTurn: spot?.turn || 0,
-        toFade: !spot,
-        holdMs: times.holdOf(index),
-        toFaceDown: Boolean(card.redacted),
-      });
-    const hand = landingOf(card);
-    const pose = trackTo(hand);
-    const { host, card: flip, band } = spawnFlipCard({
-      rect: slot,
-      backSrc: sleeve,
-      frontSrc: toHighResCardImageUrl(card.faceSrc),
-      className: 'fx-deck-reveal',
-    });
-    const duration = times.duration(index);
-    const timing = { duration, delay: times.start(index) };
-    const cardPlay = playFrames(flip, sampleKeyframes(pose, cardTransform(slot.height), SAMPLES), timing);
-    // Opacity on the 3D card would flatten it and hide the sleeve (design 043).
-    const hostPlay = playFrames(host, sampleKeyframes(pose, hostOpacity, SAMPLES), timing);
-    const done = [cardPlay.finished, hostPlay.finished, animateFrames(band, revealShineFrames(duration), timing)];
-    // Re-aim just before the card is placed: the in and hold frames do not depend on the
-    // landing, so swapping the keyframes on the same clock changes only the way down.
-    setTimeout(() => {
-      const now = landingOf(card);
-      if (!landingMoved(hand, now)) return;
-      const next = trackTo(now);
-      cardPlay.setFrames(sampleKeyframes(next, cardTransform(slot.height), SAMPLES));
-      hostPlay.setFrames(sampleKeyframes(next, hostOpacity, SAMPLES));
-    }, retargetAtMs(times, index));
-    const backstop = timing.delay + duration + BACKSTOP_PAD_MS;
-    removeWhen(host, done, backstop);
-    revealWhen(card, show, done, backstop);
-  });
-}
-
 /**
  * @param {'self'|'opp'} user the side that revealed
  * @param {{image: HTMLImageElement, wrapper?: Element, redacted?: boolean,
@@ -126,7 +64,56 @@ export function playDeckReveal(user, cards, show, { onStart } = {}) {
   const hold = deckRevealHold(spread.length, holdMs);
   const start = () => {
     onStart?.();
-    playSpread(user, spread, show, holdMs);
+    const viewport = viewportRect();
+    const slots = drawSpreadRects(spread.length, matCenter(boardFrameRects(), viewport), viewport);
+    const deck = pileOf(user, 'deck');
+    const times = deckRevealTimes(spread.length, holdMs);
+    // The sleeve apply-view draws for this side's face-down cards, so the landing matches the hand.
+    const sleeve = resolveCardBackSrc(user === 'self' ? 'you' : 'them');
+    spread.forEach((card, index) => {
+      const slot = slots[index];
+      if (!slot) {
+        show(card);
+        return;
+      }
+      const trackTo = (spot) =>
+        oppPlayTrack({
+          from: deck?.rect || null,
+          preview: slot,
+          to: spot?.rect || null,
+          fromTurn: deck?.turn || 0,
+          toTurn: spot?.turn || 0,
+          toFade: !spot,
+          holdMs: times.holdOf(index),
+          toFaceDown: Boolean(card.redacted),
+        });
+      const hand = landingOf(card);
+      const pose = trackTo(hand);
+      const { host, card: flip, band } = spawnFlipCard({
+        rect: slot,
+        backSrc: sleeve,
+        frontSrc: toHighResCardImageUrl(card.faceSrc),
+        className: 'fx-deck-reveal',
+      });
+      const duration = times.duration(index);
+      const timing = { duration, delay: times.start(index) };
+      const cardPlay = playFrames(flip, sampleKeyframes(pose, cardTransform(slot.height), SAMPLES), timing);
+      // Opacity on the 3D card would flatten it and hide the sleeve (design 043).
+      const hostPlay = playFrames(host, sampleKeyframes(pose, hostOpacity, SAMPLES), timing);
+      const done = [cardPlay.finished, hostPlay.finished, animateFrames(band, revealShineFrames(duration), timing)];
+      // Re-aim just before the card is placed: the in and hold frames do not depend on the
+      // landing, so swapping the keyframes on the same clock changes only the way down.
+      setTimeout(() => {
+        const now = landingOf(card);
+        if (!landingMoved(hand, now)) return;
+        const next = trackTo(now);
+        cardPlay.setFrames(sampleKeyframes(next, cardTransform(slot.height), SAMPLES));
+        hostPlay.setFrames(sampleKeyframes(next, hostOpacity, SAMPLES));
+      }, retargetAtMs(times, index));
+      const backstop = timing.delay + duration + BACKSTOP_PAD_MS;
+      removeWhen(host, done, backstop);
+      revealWhen(card, show, done, backstop);
+    });
   };
   const laidOut = () =>
     Boolean(pileOf(user, 'deck')) && spread.every((card) => !card.image?.isConnected || landingOf(card));
@@ -134,7 +121,12 @@ export function playDeckReveal(user, cards, show, { onStart } = {}) {
     start();
     return hold;
   }
-  whenLaidOut(laidOut, start);
+  const began = performance.now();
+  const attempt = () => {
+    if (laidOut() || performance.now() - began >= LAYOUT_WAIT_MS) start();
+    else setTimeout(attempt, LAYOUT_POLL_MS);
+  };
+  setTimeout(attempt, LAYOUT_POLL_MS);
   // The scene starts up to LAYOUT_WAIT_MS late, so what follows waits that much longer.
   return hold + LAYOUT_WAIT_MS;
 }

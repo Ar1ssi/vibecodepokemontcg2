@@ -246,16 +246,6 @@ const lower = (value) => String(value ?? '').toLowerCase();
 
 const isPokemon = (card) => lower(card?.supertype).startsWith('pok');
 
-function cardSupertype(card) {
-  return String(card?.supertype || '');
-}
-
-/** Canonical energy-type keys a card can be filtered by. */
-function cardEnergyTypeKeys(card) {
-  const declared = Array.isArray(card?.types) ? card.types : [];
-  return declared.map((type) => normalizeEnergyType(type)).filter(Boolean);
-}
-
 function cardTrainerType(card) {
   // TCGdex spells Pokémon Tools as "Tool" on modern cards but older printings
   // carry the longer form; match on the leading word either way.
@@ -263,13 +253,6 @@ function cardTrainerType(card) {
   if (!raw) return '';
   if (/^tool\b/i.test(raw) || /pok[eé]mon tool/i.test(raw)) return 'Tool';
   return raw;
-}
-
-function cardWeaknessKeys(card) {
-  const weaknesses = Array.isArray(card?.weaknesses) ? card.weaknesses : [];
-  return weaknesses
-    .map((entry) => normalizeEnergyType(typeof entry === 'string' ? entry : entry?.type))
-    .filter(Boolean);
 }
 
 // Suffix first (TCGdex prints "ex" vs "EX" exactly); the case-sensitive name
@@ -292,19 +275,6 @@ const MECHANIC_TESTS = {
   Ancient: (card) => isAncientCard(card),
   Future: (card) => isFutureCard(card),
 };
-
-function matchesEnergyKind(card, kind) {
-  if (lower(card?.supertype) !== 'energy') return false;
-  if (kind === 'Basic') return isBasicEnergy(card);
-  if (kind === 'Special') return !isBasicEnergy(card);
-  return false;
-}
-
-function matchesRetreat(card, cost) {
-  const retreat = Number(card?.retreat);
-  if (!isPokemon(card) || !Number.isFinite(retreat)) return false;
-  return cost === '5' ? retreat >= 5 : retreat === Number(cost);
-}
 
 function matchesHp(card, filters) {
   const hp = Number(card?.hp);
@@ -335,11 +305,13 @@ export function applyCardFilters(cards = [], filters = {}, context = {}) {
   return list.filter((card) => {
     if (!card) return false;
 
-    if (state.supertypes.length && !state.supertypes.includes(cardSupertype(card))) {
+    if (state.supertypes.length && !state.supertypes.includes(String(card?.supertype || ''))) {
       return false;
     }
     if (state.energyTypes.length) {
-      const keys = cardEnergyTypeKeys(card);
+      // Canonical energy-type keys a card can be filtered by.
+      const declared = Array.isArray(card?.types) ? card.types : [];
+      const keys = declared.map((type) => normalizeEnergyType(type)).filter(Boolean);
       if (!keys.some((key) => state.energyTypes.includes(key))) return false;
     }
     if (state.trainerTypes.length && !state.trainerTypes.includes(cardTrainerType(card))) {
@@ -347,7 +319,12 @@ export function applyCardFilters(cards = [], filters = {}, context = {}) {
     }
     if (
       state.energyKinds.length &&
-      !state.energyKinds.some((kind) => matchesEnergyKind(card, kind))
+      !state.energyKinds.some((kind) => {
+        if (lower(card?.supertype) !== 'energy') return false;
+        if (kind === 'Basic') return isBasicEnergy(card);
+        if (kind === 'Special') return !isBasicEnergy(card);
+        return false;
+      })
     ) {
       return false;
     }
@@ -366,12 +343,19 @@ export function applyCardFilters(cards = [], filters = {}, context = {}) {
       return false;
     }
     if (state.weaknessTypes.length) {
-      const keys = cardWeaknessKeys(card);
+      const weaknesses = Array.isArray(card?.weaknesses) ? card.weaknesses : [];
+      const keys = weaknesses
+        .map((entry) => normalizeEnergyType(typeof entry === 'string' ? entry : entry?.type))
+        .filter(Boolean);
       if (!keys.some((key) => state.weaknessTypes.includes(key))) return false;
     }
     if (
       state.retreatCosts.length &&
-      !state.retreatCosts.some((cost) => matchesRetreat(card, cost))
+      !state.retreatCosts.some((cost) => {
+        const retreat = Number(card?.retreat);
+        if (!isPokemon(card) || !Number.isFinite(retreat)) return false;
+        return cost === '5' ? retreat >= 5 : retreat === Number(cost);
+      })
     ) {
       return false;
     }

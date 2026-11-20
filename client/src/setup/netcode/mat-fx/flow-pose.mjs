@@ -11,8 +11,6 @@ export const DIM_PEAK = 0.45;
 
 const clamp01 = (t) => Math.max(0, Math.min(1, t));
 const easeOutCubic = (t) => 1 - (1 - t) ** 3;
-const easeInCubic = (t) => t ** 3;
-const easeInOutCubic = (t) => (t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2);
 
 /**
  * @param {'self'|'opp'} user
@@ -74,7 +72,7 @@ export function abilityTagPose(t) {
 export function sweepPose(t, { start = 0.15, end = 0.55 } = {}) {
   const c = clamp01(t);
   const local = clamp01((c - start) / (end - start));
-  return { x: -1 + 2 * easeInOutCubic(local), opacity: local > 0 && local < 1 ? 1 : 0 };
+  return { x: -1 + 2 * (local < 0.5 ? 4 * local ** 3 : 1 - (-2 * local + 2) ** 3 / 2), opacity: local > 0 && local < 1 ? 1 : 0 };
 }
 
 /**
@@ -86,7 +84,7 @@ export function bannerPose(t) {
   if (c < 0.2) return { x: -(1 - easeOutCubic(c / 0.2)), opacity: c / 0.2 };
   if (c < 0.8) return { x: 0, opacity: 1 };
   const out = (c - 0.8) / 0.2;
-  return { x: easeInCubic(out), opacity: 1 - out };
+  return { x: out ** 3, opacity: 1 - out };
 }
 
 /** Screen-edge glow: rises fast, falls slowly. */

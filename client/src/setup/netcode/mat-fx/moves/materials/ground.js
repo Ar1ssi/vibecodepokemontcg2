@@ -57,7 +57,6 @@ const edgeOf = (rgb) => Object.freeze({ dissolve: Object.freeze({ edge: rgb, gai
 const TAU = Math.PI * 2;
 const rad = (deg) => (deg * Math.PI) / 180;
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
-const easeOutCubic = (t) => 1 - (1 - t) ** 3;
 
 /** A stable pseudo-random value in [0, 1) for (seed, index). */
 const hash = (seed, index) => {
@@ -135,7 +134,7 @@ export function spikeOutline({ x, y, angleDeg, length, width, seed = 0 }) {
  * @returns {{spread: number, seams: number[][][]}}
  */
 export function fissureSeams(s, r) {
-  const spread = easeOutCubic(clamp01(clamp01(s) / SEAM_GROW));
+  const spread = 1 - (1 - clamp01(clamp01(s) / SEAM_GROW)) ** 3;
   if (!(spread > 0) || !(r > 0)) return { spread: 0, seams: [] };
   const seams = [];
   for (let i = 0; i < SEAMS; i += 1) {
@@ -154,22 +153,10 @@ export function fissureSeams(s, r) {
   return { spread, seams };
 }
 
-const tracePoints = (ctx, points) => {
-  ctx.beginPath();
-  points.forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
-  ctx.closePath();
-};
-
 /** Adds one circle to the current path as its own sub-path. */
 const addCircle = (ctx, x, y, r) => {
   ctx.moveTo(x + r, y);
   ctx.arc(x, y, r, 0, TAU);
-};
-
-const strokeLine = (ctx, points) => {
-  ctx.beginPath();
-  points.forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
-  ctx.stroke();
 };
 
 /** A soft halo of lit dust: hot -> body -> 0 (additive). */
@@ -223,7 +210,10 @@ function groundKit(palette) {
       g.addColorStop(0.5, rgbCss(palette.body, alpha));
       g.addColorStop(1, rgbCss(palette.deep, alpha));
       ctx.fillStyle = g;
-      tracePoints(ctx, clodOutline(x, y, r, seed, spin));
+      const points = clodOutline(x, y, r, seed, spin);
+      ctx.beginPath();
+      points.forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
+      ctx.closePath();
       withFxMod(ctx, SOLID_EARTH, () => unstyled(ctx, () => ctx.fill()));
     });
     const lit = alpha * clamp01(hot);
@@ -270,7 +260,12 @@ function groundKit(palette) {
     ctx.strokeStyle = rgbCss(palette.hot, EDGE_ALPHA * lit);
     ctx.lineWidth = Math.max(1, spec.width * 0.06);
     ctx.lineJoin = 'round';
-    withFxMod(ctx, mergeFxMods(BEVEL, litFrom), () => strokeLine(ctx, outline.left));
+    withFxMod(ctx, mergeFxMods(BEVEL, litFrom), () => {
+      const points = outline.left;
+      ctx.beginPath();
+      points.forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
+      ctx.stroke();
+    });
   }
 
   /** A clod tumbling along `headingDeg` with the scene clock, trailing `tongues` dust puffs. */

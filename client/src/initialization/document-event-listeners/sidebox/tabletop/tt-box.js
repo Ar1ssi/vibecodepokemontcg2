@@ -360,32 +360,9 @@ function buildFilmShell({ W, H, D, envMap, crinkle, renderer, track }) {
     start += face.count;
   });
   geometry.setAttribute('uv1', new Float32BufferAttribute(uv1, 2));
-  const seams = track(filmAtlasTexture(renderer));
-  const crinkleTexture = crinkle.clone();
-  crinkleTexture.channel = 1;
-  crinkleTexture.wrapS = crinkleTexture.wrapT = RepeatWrapping;
-  crinkleTexture.needsUpdate = true;
-  track(crinkleTexture);
-  const film = createFilmMaterials({ envMap, crinkle: crinkleTexture, seams });
-  track(film);
-  film.uniforms.uOrigin.value.set(0, H / 2, 0);
-  film.uniforms.uFlapLift.value = 4.5;
-  const haze = new Mesh(geometry, film.haze);
-  haze.renderOrder = 4;
-  const gloss = new Mesh(geometry, film.gloss);
-  gloss.renderOrder = 5;
-  const group = new Group();
-  group.name = 'tt-wrap';
-  group.add(haze, gloss);
-  return { group, uniforms: film.uniforms, meshes: [haze, gloss], size: { x: sx, y: sy, z: sz } };
-}
-
-/**
- * The film's milkiness and seams per face (alpha in the green channel): a side seam down the left
- * face, gift-wrap folds sealed across the top and bottom, whiter film along every edge where it is
- * stretched over the board.
- */
-function filmAtlasTexture(renderer) {
+  // The film's milkiness and seams per face (alpha in the green channel): a side seam down the left
+  // face, gift-wrap folds sealed across the top and bottom, whiter film along every edge where it is
+  // stretched over the board.
   const cell = 256;
   const canvas = makeCanvas(cell * 3, cell * 2);
   const ctx = canvas.getContext('2d');
@@ -440,7 +417,24 @@ function filmAtlasTexture(renderer) {
   texture.colorSpace = NoColorSpace;
   texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   texture.needsUpdate = true;
-  return texture;
+  const seams = track(texture);
+  const crinkleTexture = crinkle.clone();
+  crinkleTexture.channel = 1;
+  crinkleTexture.wrapS = crinkleTexture.wrapT = RepeatWrapping;
+  crinkleTexture.needsUpdate = true;
+  track(crinkleTexture);
+  const film = createFilmMaterials({ envMap, crinkle: crinkleTexture, seams });
+  track(film);
+  film.uniforms.uOrigin.value.set(0, H / 2, 0);
+  film.uniforms.uFlapLift.value = 4.5;
+  const haze = new Mesh(geometry, film.haze);
+  haze.renderOrder = 4;
+  const gloss = new Mesh(geometry, film.gloss);
+  gloss.renderOrder = 5;
+  const group = new Group();
+  group.name = 'tt-wrap';
+  group.add(haze, gloss);
+  return { group, uniforms: film.uniforms, meshes: [haze, gloss], size: { x: sx, y: sy, z: sz } };
 }
 
 // ── What sits inside ───────────────────────────────────────────────────────

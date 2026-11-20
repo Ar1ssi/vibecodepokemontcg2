@@ -77,24 +77,23 @@ export function executeAbility(draft, {
   // Marking up front consumed the ability with no effect and locked out a retry.
   const markUsed = () => {
     // "As often as you like during your turn" is never spent; it is still announced.
-    if (!isRepeatableAbility(text)) spendAbility();
+    if (!isRepeatableAbility(text)) {
+      // A card the ability moved out of play (Stance Change's old Aegislash) keeps no marker;
+      // advanceTurn only resets in-play cards.
+      const zoneAfter = findCard(draft, card.instanceId)?.zoneId;
+      if (zoneAfter === 'active' || zoneAfter === 'bench') card.abilityUsed = true;
+      if (!player.flags) player.flags = {};
+      if (!player.flags.abilitiesUsed) player.flags.abilitiesUsed = {};
+      // instanceId first: two Pokémon sharing a name must not share one used-flag
+      // slot, or using one blocks the other's separate ability (I48).
+      player.flags.abilitiesUsed[card.instanceId != null ? card.instanceId : card.name] = true;
+    }
     events.push({
       type: 'abilityUsed',
       instanceId: card.instanceId,
       name: card.name,
       playerId,
     });
-  };
-  const spendAbility = () => {
-    // A card the ability moved out of play (Stance Change's old Aegislash) keeps no marker;
-    // advanceTurn only resets in-play cards.
-    const zoneAfter = findCard(draft, card.instanceId)?.zoneId;
-    if (zoneAfter === 'active' || zoneAfter === 'bench') card.abilityUsed = true;
-    if (!player.flags) player.flags = {};
-    if (!player.flags.abilitiesUsed) player.flags.abilitiesUsed = {};
-    // instanceId first: two Pokémon sharing a name must not share one used-flag
-    // slot, or using one blocks the other's separate ability (I48).
-    player.flags.abilitiesUsed[card.instanceId != null ? card.instanceId : card.name] = true;
   };
 
   const ability = card.abilities?.[abilityIndex];
@@ -207,14 +206,6 @@ export function isRepeatableAbility(text) {
   return REPEATABLE_ABILITY.test(String(text || '').trim().toLowerCase());
 }
 
-// A WotC Power read in its modern wording (legacy-power-wording.mjs) so the effect templates see
-// the same text the parser does (Feraligatr Berserk → Rowdy). Other texts pass through untouched.
-function modernPowerText(text) {
-  const lowered = String(text || '').toLowerCase().replace(/[\u2018\u2019]/g, "'");
-  const rewritten = rewriteLegacyPowerWording(lowered);
-  return rewritten === lowered ? text : rewritten;
-}
-
 /**
  * The steps an activated ability runs: the parser's actionable (non-passive) steps, or the
  * shared effect templates when the parser reads none or leaves one without an executor (I89)
@@ -222,7 +213,11 @@ function modernPowerText(text) {
  * is the template's position clause. Pure — the ability-behaviour audit reads the same plan.
  */
 export function resolveAbilitySteps(rawText, { selfName } = {}) {
-  const text = modernPowerText(rawText);
+  // A WotC Power read in its modern wording (legacy-power-wording.mjs) so the effect templates see
+  // the same text the parser does (Feraligatr Berserk → Rowdy). Other texts pass through untouched.
+  const lowered = String(rawText || '').toLowerCase().replace(/[\u2018\u2019]/g, "'");
+  const rewritten = rewriteLegacyPowerWording(lowered);
+  const text = rewritten === lowered ? rawText : rewritten;
   const parsedSteps = parseAbility(text);
   const steps = Array.isArray(parsedSteps) ? parsedSteps : (parsedSteps?.steps || []);
   const actionable = planAbilitySteps(steps, { mode: 'interactive' })

@@ -240,16 +240,6 @@ const signedArea = (points) => {
   return area / 2;
 };
 
-const insidePolygon = (point, polygon) => {
-  let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
-    const a = polygon[i];
-    const b = polygon[j];
-    if (a.y > point.y !== b.y > point.y && point.x < ((b.x - a.x) * (point.y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
-  }
-  return inside;
-};
-
 /** Drops repeated consecutive points and a closing point equal to the first. */
 const cleanRing = (points) => {
   const out = [];
@@ -408,7 +398,6 @@ export function createGpuCanvas({ triangulate, size = 4096, maxVertices = MAX_VE
 
   // ---- runs ----
   const blendOf = () => (state.composite === 'lighter' ? 'add' : 'over');
-  const stencilOf = () => (state.clipDepth > 0 ? { op: 'test', ref: state.clipDepth } : { op: 'none', ref: 0 });
 
   const openRun = (key) => {
     const last = runs[runs.length - 1];
@@ -436,7 +425,7 @@ export function createGpuCanvas({ triangulate, size = 4096, maxVertices = MAX_VE
     depthTest: pass.depthTest,
     blend: blendOf(),
     colorWrite: true,
-    stencil: stencilOf(),
+    stencil: state.clipDepth > 0 ? { op: 'test', ref: state.clipDepth } : { op: 'none', ref: 0 },
     ...overrides,
   });
 
@@ -773,7 +762,16 @@ export function createGpuCanvas({ triangulate, size = 4096, maxVertices = MAX_VE
         warnOnce(`clip depth > ${MAX_CLIP_DEPTH}`);
         return;
       }
-      const triangles = interiorTriangles(subpaths);
+      const paths = subpaths;
+      const out = [];
+      for (const group of ringsOf(paths)) {
+        const points = [group.outer, ...group.holes].flat();
+        for (const face of triangulateGroup(group)) {
+          const tri = face.map((i) => points[i]);
+          if (tri.every(Boolean)) out.push(tri);
+        }
+      }
+      const triangles = out;
       const depth = state.clipDepth + 1;
       emitStencil(triangles, 'write', depth);
       state.clips = [...state.clips, { triangles, depth }];
@@ -838,7 +836,16 @@ export function createGpuCanvas({ triangulate, size = 4096, maxVertices = MAX_VE
       const area = signedArea(ring);
       if (Math.abs(area) < 1e-9) continue;
       const host = groups.find(
-        (group) => Math.sign(group.area) !== Math.sign(area) && ring.every((p) => insidePolygon(p, group.outer))
+        (group) => Math.sign(group.area) !== Math.sign(area) && ring.every((p) => {
+          const polygon = group.outer;
+          let inside = false;
+          for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
+            const a = polygon[i];
+            const b = polygon[j];
+            if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+          }
+          return inside;
+        })
       );
       if (host) host.holes.push(ring);
       else groups.push({ outer: ring, area, holes: [] });
@@ -858,31 +865,6 @@ export function createGpuCanvas({ triangulate, size = 4096, maxVertices = MAX_VE
       return [];
     }
   };
-
-  const interiorTriangles = (paths) => {
-    const out = [];
-    for (const group of ringsOf(paths)) {
-      const points = [group.outer, ...group.holes].flat();
-      for (const face of triangulateGroup(group)) {
-        const tri = face.map((i) => points[i]);
-        if (tri.every(Boolean)) out.push(tri);
-      }
-    }
-    return out;
-  };
-
-  /** Outward (from the filled side) offset of each ring point, mitred and clamped. */
-  const ringOffsets = (ring, sign, distance) =>
-    ring.map((p, i) => {
-      const prev = ring[(i - 1 + ring.length) % ring.length];
-      const next = ring[(i + 1) % ring.length];
-      const n0 = unit(sign * (p.y - prev.y), -sign * (p.x - prev.x));
-      const n1 = unit(sign * (next.y - p.y), -sign * (next.x - p.x));
-      const m = unit(n0.x + n1.x, n0.y + n1.y);
-      const cos = m.x * n1.x + m.y * n1.y;
-      const length = cos > 1 / MITER_LIMIT_FILL ? distance / cos : distance * MITER_LIMIT_FILL;
-      return { x: p.x + m.x * length, y: p.y + m.y * length };
-    });
 
   const fillSubpaths = (paths, { image = null } = {}) => {
     const groups = ringsOf(paths);
@@ -907,7 +889,17 @@ export function createGpuCanvas({ triangulate, size = 4096, maxVertices = MAX_VE
       // from the filled side on both.
       const sign = Math.sign(group.area) || 1;
       for (const ring of [group.outer, ...group.holes]) {
-        const outer = ringOffsets(ring, sign, feather);
+        // Outward (from the filled side) offset of each ring point, mitred and clamped.
+        const outer = ring.map((p, i) => {
+          const prev = ring[(i - 1 + ring.length) % ring.length];
+          const next = ring[(i + 1) % ring.length];
+          const n0 = unit(sign * (p.y - prev.y), -sign * (p.x - prev.x));
+          const n1 = unit(sign * (next.y - p.y), -sign * (next.x - p.x));
+          const m = unit(n0.x + n1.x, n0.y + n1.y);
+          const cos = m.x * n1.x + m.y * n1.y;
+          const length = cos > 1 / MITER_LIMIT_FILL ? feather / cos : feather * MITER_LIMIT_FILL;
+          return { x: p.x + m.x * length, y: p.y + m.y * length };
+        });
         for (let i = 0; i < ring.length; i += 1) {
           const j = (i + 1) % ring.length;
           const a = ring[i];
@@ -941,7 +933,48 @@ export function createGpuCanvas({ triangulate, size = 4096, maxVertices = MAX_VE
     const feather = featherNow();
     const reach = halfWidth + feather;
     for (const line of lines) {
-      const strip = strokeStrip(line.points, line.closed, reach);
+      // Left/right vertex pairs along a polyline, mitred at gentle joins and bevelled past the limit.
+      const points = line.points;
+      const closed = line.closed;
+      const n = points.length;
+      const ring = closed ? [...points, points[0]] : points;
+      const along = [0];
+      for (let i = 1; i < ring.length; i += 1) along.push(along[i - 1] + Math.hypot(ring[i].x - ring[i - 1].x, ring[i].y - ring[i - 1].y));
+      const normalOf = (a, b) => {
+        const d = unit(b.x - a.x, b.y - a.y);
+        return { x: -d.y, y: d.x, dx: d.x, dy: d.y };
+      };
+      const pair = (p, normal, length, at) => [
+        { x: p.x + normal.x * length, y: p.y + normal.y * length, along: at },
+        { x: p.x - normal.x * length, y: p.y - normal.y * length, along: at },
+      ];
+      const limit = state.lineJoin === 'miter' ? state.miterLimit : 1.05;
+      const pairs = [];
+      for (let i = 0; i < ring.length; i += 1) {
+        const p = ring[i];
+        const hasPrev = i > 0 || closed;
+        const hasNext = i < ring.length - 1;
+        const prev = i > 0 ? ring[i - 1] : points[n - 1];
+        const next = hasNext ? ring[i + 1] : closed ? ring[1] : null;
+        let n0 = hasPrev ? normalOf(prev, p) : null;
+        let n1 = next ? normalOf(p, next) : null;
+        if (!n0) n0 = n1;
+        if (!n1) n1 = n0;
+        let shift = { x: 0, y: 0 };
+        if (!closed && state.lineCap === 'square') {
+          if (i === 0) shift = { x: -n1.dx * reach, y: -n1.dy * reach };
+          if (i === ring.length - 1) shift = { x: n0.dx * reach, y: n0.dy * reach };
+        }
+        const at = { x: p.x + shift.x, y: p.y + shift.y };
+        const m = unit(n0.x + n1.x, n0.y + n1.y);
+        const cos = m.x * n1.x + m.y * n1.y;
+        if (cos > 1e-6 && 1 / cos <= limit) pairs.push(pair(at, m, reach / cos, along[i]));
+        else {
+          pairs.push(pair(at, n0, reach, along[i]));
+          pairs.push(pair(at, n1, reach, along[i]));
+        }
+      }
+      const strip = { pairs, length: along[along.length - 1] };
       const caps = line.closed ? [] : capFans(line.points, reach, strip.length);
       const count = (strip.pairs.length - 1) * 6 + caps.length;
       if (!ensureVertices(count)) return capped();
@@ -961,49 +994,6 @@ export function createGpuCanvas({ triangulate, size = 4096, maxVertices = MAX_VE
       run.count += vertexCount - start;
     }
     return undefined;
-  };
-
-  /** Left/right vertex pairs along a polyline, mitred at gentle joins and bevelled past the limit. */
-  const strokeStrip = (points, closed, reach) => {
-    const n = points.length;
-    const ring = closed ? [...points, points[0]] : points;
-    const along = [0];
-    for (let i = 1; i < ring.length; i += 1) along.push(along[i - 1] + Math.hypot(ring[i].x - ring[i - 1].x, ring[i].y - ring[i - 1].y));
-    const normalOf = (a, b) => {
-      const d = unit(b.x - a.x, b.y - a.y);
-      return { x: -d.y, y: d.x, dx: d.x, dy: d.y };
-    };
-    const pair = (p, normal, length, at) => [
-      { x: p.x + normal.x * length, y: p.y + normal.y * length, along: at },
-      { x: p.x - normal.x * length, y: p.y - normal.y * length, along: at },
-    ];
-    const limit = state.lineJoin === 'miter' ? state.miterLimit : 1.05;
-    const pairs = [];
-    for (let i = 0; i < ring.length; i += 1) {
-      const p = ring[i];
-      const hasPrev = i > 0 || closed;
-      const hasNext = i < ring.length - 1;
-      const prev = i > 0 ? ring[i - 1] : points[n - 1];
-      const next = hasNext ? ring[i + 1] : closed ? ring[1] : null;
-      let n0 = hasPrev ? normalOf(prev, p) : null;
-      let n1 = next ? normalOf(p, next) : null;
-      if (!n0) n0 = n1;
-      if (!n1) n1 = n0;
-      let shift = { x: 0, y: 0 };
-      if (!closed && state.lineCap === 'square') {
-        if (i === 0) shift = { x: -n1.dx * reach, y: -n1.dy * reach };
-        if (i === ring.length - 1) shift = { x: n0.dx * reach, y: n0.dy * reach };
-      }
-      const at = { x: p.x + shift.x, y: p.y + shift.y };
-      const m = unit(n0.x + n1.x, n0.y + n1.y);
-      const cos = m.x * n1.x + m.y * n1.y;
-      if (cos > 1e-6 && 1 / cos <= limit) pairs.push(pair(at, m, reach / cos, along[i]));
-      else {
-        pairs.push(pair(at, n0, reach, along[i]));
-        pairs.push(pair(at, n1, reach, along[i]));
-      }
-    }
-    return { pairs, length: along[along.length - 1] };
   };
 
   /** Round caps: half-disc fans past each open end (radial `across` from the end point). */

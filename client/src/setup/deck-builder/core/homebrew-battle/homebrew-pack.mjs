@@ -66,8 +66,6 @@ export function hydrateHomebrewSet(raw) {
   return { setInfo, cards };
 }
 
-const isSpecialEnergy = (card) => card.supertype === 'Energy' && !isBasicEnergy(card);
-
 /** @returns {Record<string, string[]>} the named pools of the pack model, as card ids. */
 function packPools(cards) {
   const ids = (matches) => cards.filter(matches).map((card) => card.id);
@@ -77,7 +75,7 @@ function packPools(cards) {
   const uncommon = ids((card) => plain(card) && card.rarity === 'Uncommon');
   const rare = ids((card) => plain(card) && card.rarity === 'Rare');
   return {
-    [POOL.specialEnergy]: ids((card) => isSpecialEnergy(card) && !isAceSpecCard(card)),
+    [POOL.specialEnergy]: ids((card) => card.supertype === 'Energy' && !isBasicEnergy(card) && !isAceSpecCard(card)),
     [POOL.basicEnergy]: ids(isBasicEnergy),
     [POOL.trainer]: ids((card) => card.supertype === 'Trainer' && !isAceSpecCard(card)),
     [POOL.common]: common,

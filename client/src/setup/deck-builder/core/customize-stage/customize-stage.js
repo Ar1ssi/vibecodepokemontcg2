@@ -129,19 +129,15 @@ export const initializeCustomizeStage = ({ panelEl, getSelection, onStep, loadSt
     }
   };
 
-  const paintCaption = (selection) => {
+  /** Pushes changed picks into the three stages and the caption. */
+  const applySelection = () => {
+    const selection = getSelection();
     const lines = {
       box: `Deck Box: ${selection.boxName}`,
       sleeve: `Card Sleeve: ${selection.sleeveName}`,
       coin: `Coin: ${selection.coinName}`,
     };
     captionEl.textContent = state.mode === 'focused' ? lines[state.view].replace(/^[^:]+: /, '') : VIEWS.map((view) => lines[view]).join(' · ');
-  };
-
-  /** Pushes changed picks into the three stages and the caption. */
-  const applySelection = () => {
-    const selection = getSelection();
-    paintCaption(selection);
     const { objects, coin, applied } = state;
     if (objects && applied.box !== selection.boxAtlasUrl) {
       applied.box = selection.boxAtlasUrl;
@@ -226,47 +222,32 @@ export const initializeCustomizeStage = ({ panelEl, getSelection, onStep, loadSt
   const frame = (now) => {
     if (!state.shown || !state.objects || !state.coin) return;
     try {
-      drawFrame(now);
+      const dt = Math.min(0.05, Math.max(0, (now - state.lastFrameAt) / 1000));
+      state.lastFrameAt = now;
+
+      let settled = true;
+      if (state.tween) {
+        const progress = (now - state.tween.startedAt) / 1000 / SLIDE_SECONDS;
+        settled = progress >= 1;
+        for (const slot of VIEWS) {
+          state.current[slot] = blendPose(state.tween.from[slot], state.tween.to[slot], progress);
+        }
+        if (settled) state.tween = null;
+      }
+      const focused = focusSlot();
+      if (focused && settled && !state.drag && !motionReduced()) {
+        state.yaw[focused] += passiveYaw(dt);
+      }
+
+      state.objects.setPose('box', state.current.box, state.yaw.box);
+      state.objects.setPose('sleeve', state.current.sleeve, state.yaw.sleeve);
+      state.objects.render();
+      placeCoin(state.current.coin, (state.yaw.coin * 180) / Math.PI);
     } catch (error) {
       markUnavailable(error);
       return;
     }
     state.frameId = requestAnimationFrame(frame);
-  };
-
-  const drawFrame = (now) => {
-    const dt = Math.min(0.05, Math.max(0, (now - state.lastFrameAt) / 1000));
-    state.lastFrameAt = now;
-
-    let settled = true;
-    if (state.tween) {
-      const progress = (now - state.tween.startedAt) / 1000 / SLIDE_SECONDS;
-      settled = progress >= 1;
-      for (const slot of VIEWS) {
-        state.current[slot] = blendPose(state.tween.from[slot], state.tween.to[slot], progress);
-      }
-      if (settled) state.tween = null;
-    }
-    const focused = focusSlot();
-    if (focused && settled && !state.drag && !motionReduced()) {
-      state.yaw[focused] += passiveYaw(dt);
-    }
-
-    state.objects.setPose('box', state.current.box, state.yaw.box);
-    state.objects.setPose('sleeve', state.current.sleeve, state.yaw.sleeve);
-    state.objects.render();
-    placeCoin(state.current.coin, (state.yaw.coin * 180) / Math.PI);
-  };
-
-  const teardown = () => {
-    stopLoop();
-    state.objects?.dispose();
-    state.coin?.dispose();
-    state.objects = null;
-    state.coin = null;
-    state.tween = null;
-    state.coinSide = 0;
-    state.applied = { box: undefined, sleeve: undefined, coin: undefined };
   };
 
   const build = async () => {
@@ -324,20 +305,26 @@ export const initializeCustomizeStage = ({ panelEl, getSelection, onStep, loadSt
     if (!state.shown) return;
     state.shown = false;
     state.token += 1;
-    teardown();
+    stopLoop();
+    state.objects?.dispose();
+    state.coin?.dispose();
+    state.objects = null;
+    state.coin = null;
+    state.tween = null;
+    state.coinSide = 0;
+    state.applied = { box: undefined, sleeve: undefined, coin: undefined };
     panelEl.hidden = true;
   };
 
-  const setMode = (mode) => {
-    if (state.mode === mode) return;
-    state.mode = mode;
-    paintToggle();
-    retarget(performance.now());
-    if (state.shown) applySelection();
-  };
-
   for (const button of modeButtons) {
-    button.addEventListener('click', () => setMode(button.dataset.mode));
+    button.addEventListener('click', () => {
+      const mode = button.dataset.mode;
+      if (state.mode === mode) return;
+      state.mode = mode;
+      paintToggle();
+      retarget(performance.now());
+      if (state.shown) applySelection();
+    });
   }
   for (const arrow of panelEl.querySelectorAll('[data-dir]')) {
     arrow.addEventListener('click', () => {

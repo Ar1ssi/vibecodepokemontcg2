@@ -132,25 +132,6 @@ const nearestFootprint = (rects, x, y) => {
   return best;
 };
 
-/** One rock cluster per band: the spot along the shore with the most free sand around it. */
-const pickRocks = (shore, bounds, rects) => {
-  const rocks = [];
-  for (const band of ROCK_BANDS) {
-    let best = null;
-    for (let t = band.from; t <= band.to + 1e-9; t += ROCK_STEP) {
-      for (let offshore = band.offshore[0]; offshore <= band.offshore[1]; offshore += ROCK_OFFSHORE_STEP_PX) {
-        const { x, y } = shorePoint(shore, t, offshore);
-        if (!insideBounds(bounds, x, y, band.r + 6)) continue;
-        const clearance = nearestFootprint(rects, x, y).distance - band.r * 1.4;
-        if (clearance < ROCK_CLEARANCE_PX) continue;
-        if (!best || clearance > best.clearance) best = { x, y, clearance };
-      }
-    }
-    if (best) rocks.push({ x: best.x, y: best.y, r: band.r, seed: band.seed });
-  }
-  return rocks;
-};
-
 /**
  * Palms on the dry sand near the table's edges (they frame the board, never stand between card
  * rows), the freest spots first, spread out. Each leans away from the nearest card (its crown over
@@ -176,13 +157,11 @@ const pickPalms = (shore, bounds, rects, rocks) => {
   }
   const { seaward } = shoreAxes(shore);
   const palms = [];
-  const crowding = (spot) =>
-    palms.reduce((sum, palm) => sum + PALM_SPREAD * Math.exp(-Math.hypot(palm.x - spot.x, palm.y - spot.y) / 220), 0);
   while (palms.length < PALM_MAX) {
     let spot = null;
     for (const candidate of candidates) {
       if (palms.some((palm) => Math.hypot(palm.x - candidate.x, palm.y - candidate.y) < PALM_SPACING_PX)) continue;
-      const value = candidate.score - crowding(candidate);
+      const value = candidate.score - palms.reduce((sum, palm) => sum + PALM_SPREAD * Math.exp(-Math.hypot(palm.x - candidate.x, palm.y - candidate.y) / 220), 0);
       if (!spot || value > spot.value) spot = { ...candidate, value };
     }
     if (!spot) break;
@@ -202,25 +181,6 @@ const pickPalms = (shore, bounds, rects, rocks) => {
 
 /** How far a palm's fronds reach from its crown (the kit's palm: up to 0.62 of its height). */
 export const PALM_FROND_REACH = 0.64;
-
-/**
- * Every palm's crown clear of the cards seen from above: the fronds' circle round the crown (the
- * trunk's top, leant over) keeps PALM_CLEARANCE_PX off every card, and more by RISE_LEAN of the
- * sand's rise under the palm; a palm too close shrinks, to 0.6 of its height at most, or goes.
- */
-const fitPalms = (palms, rects, shore) =>
-  palms
-    .map((palm) => {
-      const rise = RISE_LEAN * sandCeiling(shore, palm.x, palm.y);
-      for (let scale = 1; scale >= 0.6 - 1e-9; scale -= 0.05) {
-        const height = palm.height * scale;
-        const out = Math.sin(palm.lean) * height;
-        const crown = { x: palm.x + Math.cos(palm.leanAngle) * out, y: palm.y + Math.sin(palm.leanAngle) * out };
-        if (nearestFootprint(rects, crown.x, crown.y).distance >= height * PALM_FROND_REACH + PALM_CLEARANCE_PX + rise) return { ...palm, height };
-      }
-      return null;
-    })
-    .filter(Boolean);
 
 /** Least gap between a piece of the beach's dressing, seen from above, and a card footprint. */
 export const DRESSING_CARD_GAP_PX = 14;
@@ -355,8 +315,36 @@ export function beachSpots(layout, { slabs = [], flats = [] } = {}) {
   const rects = [...slabs, ...flats].filter(isRect);
   const corner = shoreFrame(shore, bounds.x, bounds.y + bounds.h).offshore;
   const barAt = Math.min(220, Math.max(110, corner * 0.4));
-  const rocks = pickRocks(shore, bounds, rects);
-  const palms = fitPalms(pickPalms(shore, bounds, rects, rocks), rects, shore);
+  // One rock cluster per band: the spot along the shore with the most free sand around it.
+  const rocks = [];
+  for (const band of ROCK_BANDS) {
+    let best = null;
+    for (let t = band.from; t <= band.to + 1e-9; t += ROCK_STEP) {
+      for (let offshore = band.offshore[0]; offshore <= band.offshore[1]; offshore += ROCK_OFFSHORE_STEP_PX) {
+        const { x, y } = shorePoint(shore, t, offshore);
+        if (!insideBounds(bounds, x, y, band.r + 6)) continue;
+        const clearance = nearestFootprint(rects, x, y).distance - band.r * 1.4;
+        if (clearance < ROCK_CLEARANCE_PX) continue;
+        if (!best || clearance > best.clearance) best = { x, y, clearance };
+      }
+    }
+    if (best) rocks.push({ x: best.x, y: best.y, r: band.r, seed: band.seed });
+  }
+  // Every palm's crown clear of the cards seen from above: the fronds' circle round the crown (the
+  // trunk's top, leant over) keeps PALM_CLEARANCE_PX off every card, and more by RISE_LEAN of the
+  // sand's rise under the palm; a palm too close shrinks, to 0.6 of its height at most, or goes.
+  const palms = pickPalms(shore, bounds, rects, rocks)
+    .map((palm) => {
+      const rise = RISE_LEAN * sandCeiling(shore, palm.x, palm.y);
+      for (let scale = 1; scale >= 0.6 - 1e-9; scale -= 0.05) {
+        const height = palm.height * scale;
+        const out = Math.sin(palm.lean) * height;
+        const crown = { x: palm.x + Math.cos(palm.leanAngle) * out, y: palm.y + Math.sin(palm.leanAngle) * out };
+        if (nearestFootprint(rects, crown.x, crown.y).distance >= height * PALM_FROND_REACH + PALM_CLEARANCE_PX + rise) return { ...palm, height };
+      }
+      return null;
+    })
+    .filter(Boolean);
   const u = (layout?.self?.cardBox?.active?.w ?? 100) / 100;
   return { shore, barAt, rocks, palms, u, dressing: pickDressing(shore, bounds, rects, rocks, palms, u) };
 }

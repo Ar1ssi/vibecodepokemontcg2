@@ -143,11 +143,6 @@ function findBaseSpecies(name) {
   return null;
 }
 
-function namedFormKey(prefix) {
-  const key = prefix.toLowerCase().replace(/\s+/g, '-');
-  return key === 'teal-mask' ? null : key;
-}
-
 function paldeanTaurosForm(types) {
   const list = Array.isArray(types) ? types : [];
   for (const type of list) {
@@ -207,7 +202,9 @@ export function pokemonSpriteForName(cardName, { types } = {}) {
     form = REGIONAL_PREFIXES[regional[1].toLowerCase()];
   } else if (named) {
     name = named[2];
-    form = namedFormKey(named[1]);
+    const prefix = named[1];
+    const key = prefix.toLowerCase().replace(/\s+/g, '-');
+    form = key === 'teal-mask' ? null : key;
   } else if (strike) {
     // pokesprite has no regular Rapid Strike art; only the VMAX form maps.
     name = strike[2];
@@ -248,14 +245,6 @@ export function itemSpriteForName(cardName) {
   return ITEM_BY_NAME.get(nameKey(raw)) || null;
 }
 
-// TCGdex cards carry `trainerType`; pokemontcg.io-shaped data carries `subtypes`.
-function isNonItemTrainer(card) {
-  const subtypes = Array.isArray(card?.subtypes) ? card.subtypes : [];
-  return [card?.trainerType, ...subtypes].some((subtype) =>
-    /supporter|stadium/i.test(String(subtype ?? ''))
-  );
-}
-
 /**
  * @param {{name?: string, supertype?: string, trainerType?: string, subtypes?: string[]}} card
  * @returns {{kind: 'pokemon'|'item', url: string, label: string, slug?: string}|null}
@@ -276,7 +265,11 @@ export function cardSpriteFor(card) {
     };
   }
   if (supertype === 'trainer') {
-    if (isNonItemTrainer(card)) return null;
+    // TCGdex cards carry `trainerType`; pokemontcg.io-shaped data carries `subtypes`.
+    const subtypes = Array.isArray(card?.subtypes) ? card.subtypes : [];
+    if ([card?.trainerType, ...subtypes].some((subtype) =>
+      /supporter|stadium/i.test(String(subtype ?? ''))
+    )) return null;
     const item = itemSpriteForName(card?.name);
     if (!item) return null;
     return {

@@ -621,7 +621,7 @@ export const keyDown = (event) => {
       isAltKeyPressed(event)
     ) {
       // "End turn": route through the button click so the rules-mode
-      // capture hook (hookTurnButton in rules-bridge.js) ends the current
+      // capture hook (the Pass button's, in rules-bridge.js) ends the current
       // turn and suppresses the legacy takeTurn bubble handler. In
       // non-rules mode the capture hook no-ops and the button's bubble
       // handler runs takeTurn as before.

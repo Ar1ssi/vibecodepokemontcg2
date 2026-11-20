@@ -443,57 +443,56 @@ function pylon(props, p, u) {
   props.sphere({ x: p.x, y: p.y, z: p.h + p.r * 0.45, r: p.r * 0.5, color: p.orb, sides: 16, rings: 10 });
 }
 
-/** A bare tree: a forking trunk of tapering boughs reaching up and out, twisted. */
-function bareTree(props, tree, u) {
-  const branch = (from, angle, tilt, length, radius, depth) => {
-    const mid = [
-      from[0] + Math.cos(angle) * Math.sin(tilt) * length * 0.5 + (hash(from[0], depth, 3) - 0.5) * 8 * u,
-      from[1] + Math.sin(angle) * Math.sin(tilt) * length * 0.5 + (hash(from[1], depth, 4) - 0.5) * 8 * u,
-      from[2] + Math.cos(tilt) * length * 0.5,
-    ];
-    const to = [
-      from[0] + Math.cos(angle) * Math.sin(tilt) * length,
-      from[1] + Math.sin(angle) * Math.sin(tilt) * length,
-      from[2] + Math.cos(tilt) * length,
-    ];
-    props.tube([from, mid, to], [radius, radius * 0.8, radius * 0.55], BARK, { sides: 8 });
-    if (depth <= 0) return;
-    for (let k = 0; k < 3; k += 1) {
-      const roll = hash(to[0] + k, to[1] + depth, 9);
-      branch(to, angle + (k - 1) * 1.0 + (roll - 0.5) * 0.6, Math.min(1.35, tilt + 0.2 + 0.3 * roll), length * 0.66, radius * 0.6, depth - 1);
-    }
-  };
-  props.tube([[tree.x, tree.y, -3], [tree.x, tree.y, tree.h * 0.12], [tree.x, tree.y, tree.h * 0.2]], [16 * u, 11 * u, 8.5 * u], BARK, { sides: 10 });
-  for (let k = 0; k < 3; k += 1) {
-    branch([tree.x, tree.y, tree.h * 0.18], tree.seed * 6 + k * 2.1, 0.22 + 0.15 * k, tree.h * 0.45, 8.4 * u, 3);
-  }
-}
-
-/** Reed clumps: each a fan of thin tapering blades leaning out, dry olive-brown, some bent over. */
-function reedClumps(props, clumps, u) {
-  for (const clump of clumps) {
-    for (let b = 0; b < clump.blades; b += 1) {
-      const roll = (salt) => hash(clump.seed * 100, b, salt);
-      const angle = clump.lean + (b / clump.blades) * 6.28 + roll(1) * 0.5;
-      const lean = 0.18 + 0.4 * roll(2);
-      const h = clump.h * (0.6 + 0.4 * roll(3));
-      const tip = [clump.x + Math.cos(angle) * h * lean, clump.y + Math.sin(angle) * h * lean, h];
-      const mid = [clump.x + Math.cos(angle) * h * lean * 0.35, clump.y + Math.sin(angle) * h * lean * 0.35, h * 0.55];
-      props.tube([[clump.x, clump.y, -1], mid, tip], [1.5 * u, 1.1 * u, 0.15 * u], REED_COLOR, { sides: 4 });
-    }
-  }
-}
-
 /** The props, as one geometry. */
 export function stormProps(spots) {
   const props = createPropBuilder();
-  for (const tree of spots.trees) bareTree(props, tree, spots.u);
+  for (const tree of spots.trees) {
+    // A bare tree: a forking trunk of tapering boughs reaching up and out, twisted.
+    const u = spots.u;
+    const branch = (from, angle, tilt, length, radius, depth) => {
+      const mid = [
+        from[0] + Math.cos(angle) * Math.sin(tilt) * length * 0.5 + (hash(from[0], depth, 3) - 0.5) * 8 * u,
+        from[1] + Math.sin(angle) * Math.sin(tilt) * length * 0.5 + (hash(from[1], depth, 4) - 0.5) * 8 * u,
+        from[2] + Math.cos(tilt) * length * 0.5,
+      ];
+      const to = [
+        from[0] + Math.cos(angle) * Math.sin(tilt) * length,
+        from[1] + Math.sin(angle) * Math.sin(tilt) * length,
+        from[2] + Math.cos(tilt) * length,
+      ];
+      props.tube([from, mid, to], [radius, radius * 0.8, radius * 0.55], BARK, { sides: 8 });
+      if (depth <= 0) return;
+      for (let k = 0; k < 3; k += 1) {
+        const roll = hash(to[0] + k, to[1] + depth, 9);
+        branch(to, angle + (k - 1) * 1.0 + (roll - 0.5) * 0.6, Math.min(1.35, tilt + 0.2 + 0.3 * roll), length * 0.66, radius * 0.6, depth - 1);
+      }
+    };
+    props.tube([[tree.x, tree.y, -3], [tree.x, tree.y, tree.h * 0.12], [tree.x, tree.y, tree.h * 0.2]], [16 * u, 11 * u, 8.5 * u], BARK, { sides: 10 });
+    for (let k = 0; k < 3; k += 1) {
+      branch([tree.x, tree.y, tree.h * 0.18], tree.seed * 6 + k * 2.1, 0.22 + 0.15 * k, tree.h * 0.45, 8.4 * u, 3);
+    }
+  }
   // Design 084: every coil tower topped with the pink light.
   for (const pole of spots.poles) pylon(props, { ...pole, orb: ORB_PINK }, spots.u);
   for (const pad of spots.pads) pylon(props, { x: pad.x, y: pad.y, r: 11 * spots.u, h: PAD_POST_PX * spots.u, orb: ORB_PINK }, spots.u);
   spots.boulders.forEach((rock, k) => placeAsset(props, 'boulder', { x: rock.x, y: rock.y, z: -2, size: rock.r * 1.05, seed: k * 11 + 3, yaw: k, sun: STORM_LIGHT, colors: ROCK }));
   // Design 083: the reeds sway in the storm's wind.
-  props.look({ kind: LOOK.matte, sway: 1.1 }, () => reedClumps(props, spots.clumps, spots.u));
+  props.look({ kind: LOOK.matte, sway: 1.1 }, () => {
+    // Reed clumps: each a fan of thin tapering blades leaning out, dry olive-brown, some bent over.
+    const clumps = spots.clumps;
+    const u = spots.u;
+    for (const clump of clumps) {
+      for (let b = 0; b < clump.blades; b += 1) {
+        const roll = (salt) => hash(clump.seed * 100, b, salt);
+        const angle = clump.lean + (b / clump.blades) * 6.28 + roll(1) * 0.5;
+        const lean = 0.18 + 0.4 * roll(2);
+        const h = clump.h * (0.6 + 0.4 * roll(3));
+        const tip = [clump.x + Math.cos(angle) * h * lean, clump.y + Math.sin(angle) * h * lean, h];
+        const mid = [clump.x + Math.cos(angle) * h * lean * 0.35, clump.y + Math.sin(angle) * h * lean * 0.35, h * 0.55];
+        props.tube([[clump.x, clump.y, -1], mid, tip], [1.5 * u, 1.1 * u, 0.15 * u], REED_COLOR, { sides: 4 });
+      }
+    }
+  });
   return props;
 }
 
@@ -719,11 +718,10 @@ export function magneticStormBoard({ three, material, terrainGrid, replaceGeomet
   const dome = new three.Mesh(domeGeometry(three), materials.dome);
   bolts.renderOrder = 2;
   dome.renderOrder = 3;
-  // The strike's clock: where in its period it is, 0..1.
-  const clockAt = (period, phase, now) => (((now / period + phase) % 1) + 1) % 1;
   // Each frame the strikes' flashes, the pads' brightness and the landings' ripples follow the clock, on the CPU: a handful of numbers.
   const strikeAt = (period, phase, now) => {
-    const t = clockAt(period, phase, now);
+    // The strike's clock: where in its period it is, 0..1.
+    const t = (((now / period + phase) % 1) + 1) % 1;
     const flash = Math.min(1, t / 0.012) * (1 - Math.min(1, Math.max(0, (t - 0.03) / 0.17)));
     // No strobe (design 080): one soft flash and its tail.
     const tail = 0.18 * Math.min(1, t / 0.03) * (1 - Math.min(1, Math.max(0, (t - 0.2) / 0.3)));

@@ -361,14 +361,6 @@ export const beachWidth = (x, y) => BEACH_PX + BEACH_WANDER_PX * beachWander(x, 
 /** The near path's width at (x, y): the shaders' pathWidth. */
 export const pathWidth = (x, y) => PATH_PX + PATH_WANDER_PX * pathWander(x, y);
 
-/** The view box (VIEW_NEAR_SHARE, VIEW_FAR_SHARE) as x0, y0, x1, y1. */
-const viewBox = (table) => ({
-  x0: table.x,
-  x1: table.x + table.w,
-  y0: table.y - VIEW_NEAR_SHARE * table.h,
-  y1: table.y + table.h * (1 + VIEW_FAR_SHARE),
-});
-
 const insideBox = (box, x, y, margin = 0) => x - margin >= box.x0 && x + margin <= box.x1 && y - margin >= box.y0 && y + margin <= box.y1;
 
 /** The lake's core: the block of card footprints grown by LAKE_MARGIN_PX; without cards, the table's middle. */
@@ -398,9 +390,6 @@ const sidePoint = (core, side, t) => {
   return { x: core.x0, y: core.y1 - t * h, out: { x: -1, y: 0 } };
 };
 
-/** px of room in view past each side of the core (sides as sidePoint's). */
-const roomPast = (core, view) => [core.y0 - view.y0, view.x1 - core.x1, view.y1 - core.y1, core.x0 - view.x0];
-
 /** A frame on the shore: the point at `origin`, u out of the lake along `out`, v along the shore (toward the far end on the left shore). */
 const frameAt = (origin, out) => ({ origin, out, along: { x: out.y, y: -out.x } });
 const framePoint = (frame, u, v) => ({
@@ -418,15 +407,6 @@ const circleGap = (rects, c) => cardGap(rects, c.x, c.y) - c.r;
 
 const atTurn = (c, r, turn) => ({ x: c.x + Math.cos(turn) * r, y: c.y + Math.sin(turn) * r });
 
-/** Moves a shape along `away` (unit) in 6 px steps until `gapOf` clears STRUCTURE_CARD_GAP_PX; null if it never does. */
-const pushClear = (shape, away, gapOf) => {
-  let moved = shape;
-  for (let step = 0; step < 60 && gapOf(moved) < STRUCTURE_CARD_GAP_PX; step += 1) {
-    moved = { ...moved, x: moved.x + away.x * 6, y: moved.y + away.y * 6 };
-  }
-  return gapOf(moved) >= STRUCTURE_CARD_GAP_PX ? moved : null;
-};
-
 /**
  * The far-left group: the main tower (its notch toward the lake), the upper tower behind it sharing a
  * wall (its notch toward the main one's pool) and the cave in the upper one's wall, opening onto the
@@ -435,18 +415,22 @@ const pushClear = (shape, away, gapOf) => {
  */
 const placeFarLeft = (core, scene, rects, ledgeY) => {
   const width = core.x1 - core.x0;
-  const main = pushClear(
-    {
+  // Moves a shape along `away` (unit) in 6 px steps until `gapOf` clears STRUCTURE_CARD_GAP_PX; null if it never does.
+  const shape = {
       x: core.x0 + MAIN_TOWER.share * width,
       y: core.y1 + MAIN_TOWER.front + MAIN_TOWER.r,
       r: MAIN_TOWER.r,
       rim: MAIN_TOWER.rim,
       notch: -Math.PI / 2,
       notchHalf: 30 / MAIN_TOWER.r,
-    },
-    { x: 0, y: 1 },
-    (c) => circleGap(rects, c)
-  );
+    };
+  const away = { x: 0, y: 1 };
+  const gapOf = (c) => circleGap(rects, c);
+  let moved = shape;
+  for (let step = 0; step < 60 && gapOf(moved) < STRUCTURE_CARD_GAP_PX; step += 1) {
+    moved = { ...moved, x: moved.x + away.x * 6, y: moved.y + away.y * 6 };
+  }
+  const main = gapOf(moved) >= STRUCTURE_CARD_GAP_PX ? moved : null;
   if (!main || main.y - main.r > scene.y + scene.h) return { main: null, upper: null, cave: null };
   const upperCentre = { x: main.x + UPPER_TOWER.x, y: main.y + UPPER_TOWER.y };
   const toMain = Math.atan2(main.y - upperCentre.y, main.x - upperCentre.x);
@@ -597,22 +581,6 @@ const placeLedge = (spots, ledgeY, scene, main, towers) => {
   return { y: ledgeY, runs };
 };
 
-/** Whether the pier from `start` along `dir` for `length` px, `halfWidth` each side, keeps DOCK_CARD_GAP_PX off every card. */
-const dockClear = (rects, start, dir, length, halfWidth) => {
-  const end = { x: start.x + dir.x * length, y: start.y + dir.y * length };
-  const box = {
-    x: Math.min(start.x, end.x) - Math.abs(dir.y) * halfWidth,
-    y: Math.min(start.y, end.y) - Math.abs(dir.x) * halfWidth,
-  };
-  box.w = Math.abs(end.x - start.x) + 2 * Math.abs(dir.y) * halfWidth;
-  box.h = Math.abs(end.y - start.y) + 2 * Math.abs(dir.x) * halfWidth;
-  return rects.every((rect) => {
-    const dx = Math.max(rect.x - (box.x + box.w), 0, box.x - (rect.x + rect.w));
-    const dy = Math.max(rect.y - (box.y + box.h), 0, box.y - (rect.y + rect.h));
-    return Math.hypot(dx, dy) >= DOCK_CARD_GAP_PX;
-  });
-};
-
 /**
  * The pier: off the right shore, as the map's, else the near or far one, in a bay of its own whose
  * outer shore lies DOCK_BAY.reach past the core (less where the view has less room), straight out over
@@ -634,7 +602,20 @@ const pickDock = (core, room, rects) => {
         const start = { x: point.x + point.out.x * reach, y: point.y + point.out.y * reach };
         let run = 0;
         for (let step = DOCK_STEP_PX; step <= DOCK_LENGTH_PX; step += DOCK_STEP_PX) {
-          if (!dockClear(rects, start, dir, step, halfWidth)) break;
+          // Whether the pier from `start` along `dir` for `length` px, `halfWidth` each side, keeps DOCK_CARD_GAP_PX off every card.
+          const length = step;
+          const end = { x: start.x + dir.x * length, y: start.y + dir.y * length };
+          const box = {
+            x: Math.min(start.x, end.x) - Math.abs(dir.y) * halfWidth,
+            y: Math.min(start.y, end.y) - Math.abs(dir.x) * halfWidth,
+          };
+          box.w = Math.abs(end.x - start.x) + 2 * Math.abs(dir.y) * halfWidth;
+          box.h = Math.abs(end.y - start.y) + 2 * Math.abs(dir.x) * halfWidth;
+          if (!rects.every((rect) => {
+            const dx = Math.max(rect.x - (box.x + box.w), 0, box.x - (rect.x + rect.w));
+            const dy = Math.max(rect.y - (box.y + box.h), 0, box.y - (rect.y + rect.h));
+            return Math.hypot(dx, dy) >= DOCK_CARD_GAP_PX;
+          })) break;
           run = step;
         }
         if (run < DOCK_MIN_LENGTH_PX) continue;
@@ -922,7 +903,13 @@ export function brookletSpots(layout) {
   const table = tableBounds(layout);
   if (!(table.w > 0 && table.h > 0)) return null;
   const scene = sceneBounds(layout, BROOKLET_KEY);
-  const view = viewBox(table);
+  // The view box (VIEW_NEAR_SHARE, VIEW_FAR_SHARE) as x0, y0, x1, y1.
+  const view = {
+    x0: table.x,
+    x1: table.x + table.w,
+    y0: table.y - VIEW_NEAR_SHARE * table.h,
+    y1: table.y + table.h * (1 + VIEW_FAR_SHARE),
+  };
   const { slabs, flats } = environmentFootprints(layout);
   const rects = [...slabs, ...flats].filter(isRect);
   const core = lakeCore(rects, table);
@@ -934,7 +921,8 @@ export function brookletSpots(layout) {
     nearY: core.y0,
     pathEndX: core.x0 + PATH_END_SHARE * width,
   };
-  const room = roomPast(core, view);
+  // px of room in view past each side of the core (sides as sidePoint's).
+  const room = [core.y0 - view.y0, view.x1 - core.x1, view.y1 - core.y1, core.x0 - view.x0];
 
   const spill = placeSpill(core, room, scene, rects);
   const spillLeft = spill?.ledgeY != null;
@@ -990,15 +978,13 @@ export function brookletSpots(layout) {
       avoid.push({ x: dock.x + dock.dx * along, y: dock.y + dock.dy * along, r: dock.halfWidth + 6 });
     }
   }
-  const underSheet = (rock) =>
-    falls.some((fall) => {
+  const rocks = [];
+  const add = (rock) => {
+    const placed = rock && !falls.some((fall) => {
       const along = (rock.x - fall.x) * fall.dx + (rock.y - fall.y) * fall.dy;
       const across = (rock.x - fall.x) * -fall.dy + (rock.y - fall.y) * fall.dx;
       return along > -rock.r && along < fall.landing && Math.abs(across) < fall.halfWidth + rock.r * 0.5;
-    });
-  const rocks = [];
-  const add = (rock) => {
-    const placed = rock && !underSheet(rock) && clearRock(rects, [...avoid, ...rocks.map((other) => ({ ...other, r: other.r + 3 }))], rock);
+    }) && clearRock(rects, [...avoid, ...rocks.map((other) => ({ ...other, r: other.r + 3 }))], rock);
     if (placed && rocks.length < ROCK_MAX) rocks.push(placed);
   };
   if (main) {

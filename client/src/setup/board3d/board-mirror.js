@@ -96,53 +96,6 @@ const popupZone = (id, buttons, view) => `
     <label for="sort${id[0].toUpperCase()}${id.slice(1)}Checkbox">Sort</label>
   </div></div>`;
 
-/** The id skeleton the retired `self-containers.html` / `opp-containers.html` had (same ids both sides). */
-const mirrorMarkup = (view) => `<link rel="stylesheet" href="${PANEL_STYLESHEET}">
-<link rel="stylesheet" href="${COIN_STYLESHEET}"><style>${MIRROR_STYLE}</style>
-<div id="playfield">
-  <div id="boardCenterDesign"><div id="boardCircle"></div><div id="innerCircle"></div></div>
-  ${popupZone('deck', [['shuffleDeckButton', 'Shuffle'], ['closeDeckButton', 'Close']], view)}
-  ${popupZone('discard', [['shuffleDiscardButton', 'Shuffle all to Deck'], ['closeDiscardButton', 'Close']], view)}
-  ${popupZone('lostZone', [['closeLostZoneButton', 'Close']], view)}
-  <div id="discardCover" class="outline"></div>
-  <div id="deckStack" aria-hidden="true"></div>
-  <div id="deckCover" class="outline"></div>
-  <div id="lostZoneCover" class="outline"></div>
-  <div id="bench" class="outline"></div>
-  <div id="active" class="outline"></div>
-  <div id="matCoinSlot" class="mat-coin-slot"></div>
-  <div id="prizes" class="outline"></div>
-  <div id="board" class="${view}-board"></div>
-</div>
-<div id="handLabel"><input type="checkbox" id="sortHandCheckbox" class="${view}-text">
-  <div id="sortHandText" class="${view}-text">Sort</div></div>
-<div id="handText" class="${view}-text">(<span id="handCount">0</span>)</div>
-<div id="hand"></div>
-<div id="attachedCards" class="${view}-view">
-  <div id="attachedCardsHeader" class="header ${view}-header">${view === 'self' ? 'Move attached cards' : 'Opponent moving cards...'}</div>
-  <div id="attachedCardsButtonContainer" class="${view}-zone-button-container">
-    ${zoneButtons([
-      ['discardAttachedCardsButton', 'Discard all'],
-      ['shuffleAttachedCardsButton', 'Shuffle all'],
-      ['lostZoneAttachedCardsButton', 'Lost Zone all'],
-      ['handAttachedCardsButton', 'To Hand'],
-      ['leaveAttachedCardsButton', 'Leave in play'],
-    ])}
-  </div>
-</div>
-<div id="viewCards" class="${view}-view">
-  <div id="viewCardsHeader" class="header ${view}-header">Looking at cards...</div>
-  <div id="viewCardsButtonContainer" class="${view}-zone-button-container">
-    ${zoneButtons([
-      ['discardViewCardsButton', 'Discard all'],
-      ['shuffleViewCardsButton', 'Shuffle all'],
-      ['shuffleBottomViewCardsButton', 'Shuffle to bottom'],
-      ['lostZoneViewCardsButton', 'Lost Zone all'],
-      ['handViewCardsButton', 'To Hand'],
-    ])}
-  </div>
-</div>`;
-
 const instanceIdOf = (node) => {
   const raw = node?.dataset?.instanceId;
   if (raw === undefined || raw === '') return null;
@@ -271,7 +224,52 @@ export function createBoardMirror({ hostSelf, hostOpp, doc = globalThis.document
   const roots = {};
   for (const side of SIDES) {
     const root = hosts[side].shadowRoot ?? hosts[side].attachShadow({ mode: 'open' });
-    root.innerHTML = mirrorMarkup(side);
+    // The id skeleton the retired `self-containers.html` / `opp-containers.html` had (same ids both sides).
+    root.innerHTML = `<link rel="stylesheet" href="${PANEL_STYLESHEET}">
+<link rel="stylesheet" href="${COIN_STYLESHEET}"><style>${MIRROR_STYLE}</style>
+<div id="playfield">
+  <div id="boardCenterDesign"><div id="boardCircle"></div><div id="innerCircle"></div></div>
+  ${popupZone('deck', [['shuffleDeckButton', 'Shuffle'], ['closeDeckButton', 'Close']], side)}
+  ${popupZone('discard', [['shuffleDiscardButton', 'Shuffle all to Deck'], ['closeDiscardButton', 'Close']], side)}
+  ${popupZone('lostZone', [['closeLostZoneButton', 'Close']], side)}
+  <div id="discardCover" class="outline"></div>
+  <div id="deckStack" aria-hidden="true"></div>
+  <div id="deckCover" class="outline"></div>
+  <div id="lostZoneCover" class="outline"></div>
+  <div id="bench" class="outline"></div>
+  <div id="active" class="outline"></div>
+  <div id="matCoinSlot" class="mat-coin-slot"></div>
+  <div id="prizes" class="outline"></div>
+  <div id="board" class="${side}-board"></div>
+</div>
+<div id="handLabel"><input type="checkbox" id="sortHandCheckbox" class="${side}-text">
+  <div id="sortHandText" class="${side}-text">Sort</div></div>
+<div id="handText" class="${side}-text">(<span id="handCount">0</span>)</div>
+<div id="hand"></div>
+<div id="attachedCards" class="${side}-view">
+  <div id="attachedCardsHeader" class="header ${side}-header">${side === 'self' ? 'Move attached cards' : 'Opponent moving cards...'}</div>
+  <div id="attachedCardsButtonContainer" class="${side}-zone-button-container">
+    ${zoneButtons([
+          ['discardAttachedCardsButton', 'Discard all'],
+          ['shuffleAttachedCardsButton', 'Shuffle all'],
+          ['lostZoneAttachedCardsButton', 'Lost Zone all'],
+          ['handAttachedCardsButton', 'To Hand'],
+          ['leaveAttachedCardsButton', 'Leave in play'],
+        ])}
+  </div>
+</div>
+<div id="viewCards" class="${side}-view">
+  <div id="viewCardsHeader" class="header ${side}-header">Looking at cards...</div>
+  <div id="viewCardsButtonContainer" class="${side}-zone-button-container">
+    ${zoneButtons([
+          ['discardViewCardsButton', 'Discard all'],
+          ['shuffleViewCardsButton', 'Shuffle all'],
+          ['shuffleBottomViewCardsButton', 'Shuffle to bottom'],
+          ['lostZoneViewCardsButton', 'Lost Zone all'],
+          ['handViewCardsButton', 'To Hand'],
+        ])}
+  </div>
+</div>`;
     // Legacy counters and hand stacks build their nodes with `<container document>.createElement`;
     // a shadow root has no factory of its own, so it lends the page's.
     if (typeof root.createElement !== 'function') {
@@ -302,11 +300,12 @@ export function createBoardMirror({ hostSelf, hostOpp, doc = globalThis.document
     return stadiumElement()?.querySelector?.(`img[data-instance-id="${id}"]`) ?? null;
   };
 
-  /**
-   * Every node that carries this card's UI state: the <img>, its holo wrapper, its slot — for
-   * the Stadium, the page's #stadium, where rules-bridge.js puts the usable glow.
-   */
-  const nodesOf = (img, id) => {
+  /** The full UI state of one card instance, read off its mirror nodes. */
+  const stateOf = (id) => {
+    const img = cardImage(id);
+    if (!img) return { ...NEUTRAL_STATE };
+    // Every node that carries this card's UI state: the <img>, its holo wrapper, its slot — for
+    // the Stadium, the page's #stadium, where rules-bridge.js puts the usable glow.
     const nodes = [img];
     const wrapper = img.parentElement?.closest?.('.mat-holo');
     if (wrapper) nodes.push(wrapper);
@@ -314,14 +313,6 @@ export function createBoardMirror({ hostSelf, hostOpp, doc = globalThis.document
     if (slot && instanceIdOf(slot) === id) nodes.push(slot);
     const stadium = img.closest?.(`#${STADIUM_ID}`);
     if (stadium) nodes.push(stadium);
-    return nodes;
-  };
-
-  /** The full UI state of one card instance, read off its mirror nodes. */
-  const stateOf = (id) => {
-    const img = cardImage(id);
-    if (!img) return { ...NEUTRAL_STATE };
-    const nodes = nodesOf(img, id);
     const glowNode = nodes.find((node) => node.classList?.contains('has-glow'));
     const picks = nodes.map(outlineState);
     return {
@@ -343,15 +334,13 @@ export function createBoardMirror({ hostSelf, hostOpp, doc = globalThis.document
     a.hidden === b.hidden &&
     a.pending === b.pending;
 
-  /** Every card <img> whose state the scene draws: both roots' and the page Stadium's. */
-  const cardImages = () => [
-    ...SIDES.flatMap((side) => [...roots[side].querySelectorAll('img[data-instance-id]')]),
-    ...(stadiumElement()?.querySelectorAll?.('img[data-instance-id]') ?? []),
-  ];
-
   const uiState = () => {
     const state = { selected: new Set(), glows: new Map(), matPick: new Map(), hidden: new Set() };
-    for (const img of cardImages()) {
+    // Every card <img> whose state the scene draws: both roots' and the page Stadium's.
+    for (const img of [
+      ...SIDES.flatMap((side) => [...roots[side].querySelectorAll('img[data-instance-id]')]),
+      ...(stadiumElement()?.querySelectorAll?.('img[data-instance-id]') ?? []),
+    ]) {
       const id = instanceIdOf(img);
       if (id === null) continue;
       const card = stateOf(id);
@@ -396,11 +385,6 @@ export function createBoardMirror({ hostSelf, hostOpp, doc = globalThis.document
     };
   };
 
-  const hostBox = (side) => {
-    const box = hosts[side].getBoundingClientRect?.();
-    return box ? { left: box.left, top: box.top, width: box.width, height: box.height } : null;
-  };
-
   // `zones` is board-scene.js `zoneRects()` (`<side>:<zone>` footprints); its hand strips place
   // each side's Sort box and count, kept inside `bounds` (the board column's client rect), and
   // its Active footprints each side's coin token.
@@ -408,7 +392,8 @@ export function createBoardMirror({ hostSelf, hostOpp, doc = globalThis.document
     if (disposed || !rects || typeof rects !== 'object') return;
     const placements = Array.isArray(model?.placements) ? model.placements : [];
     for (const side of SIDES) {
-      const origin = hostBox(side) ?? { left: 0, top: 0, width: 0, height: 0 };
+      const box = hosts[side].getBoundingClientRect?.();
+      const origin = (box ? { left: box.left, top: box.top, width: box.width, height: box.height } : null) ?? { left: 0, top: 0, width: 0, height: 0 };
       for (const img of roots[side].querySelectorAll('img[data-instance-id]')) {
         // A popup lays its cards out itself (board3d-panels.css outranks a rect this <img> still
         // carries from the board), so they show where the panel puts them.

@@ -229,7 +229,19 @@ export function shaderUniformBlocks(shader, material, frame) {
   ]) {
     buffers.forEach((buffer, index) => {
       const values = Float32Array.from(material[group][index] ?? []);
-      for (const slot of buffer.dynamic ?? []) writeDynamic(values, slot, frame, shader.name);
+      for (const slot of buffer.dynamic ?? []) {
+        const { at, kind } = slot;
+        const shaderName = shader.name;
+        if (kind === 'viewProjection') values.set(frame.viewProjection, at);
+        else if (kind === 'cameraPosition') values.set(frame.cameraPosition, at);
+        else if (kind === 'time') {
+          const seconds = frame.timeSeconds;
+          values.set([seconds / 20, seconds, seconds * 2, seconds * 3], at);
+        } else if (kind === 'lightColor') values.set([...COIN_LIGHT.color, 1], at);
+        else if (kind === 'lightDirection') values.set([...COIN_LIGHT.direction, 0], at);
+        else if (kind in AMBIENT_CHANNELS) values.set([0, 0, 0, COIN_AMBIENT[AMBIENT_CHANNELS[kind]]], at);
+        else throw new Error(`coin shader ${shaderName} asks for the built-in "${kind}", which the coin stage does not fill`);
+      }
       blocks[buffer.uniform] = values;
     });
   }
@@ -237,18 +249,6 @@ export function shaderUniformBlocks(shader, material, frame) {
 }
 
 const AMBIENT_CHANNELS = Object.freeze({ ambientRed: 0, ambientGreen: 1, ambientBlue: 2 });
-
-function writeDynamic(values, { at, kind }, frame, shaderName) {
-  if (kind === 'viewProjection') values.set(frame.viewProjection, at);
-  else if (kind === 'cameraPosition') values.set(frame.cameraPosition, at);
-  else if (kind === 'time') {
-    const seconds = frame.timeSeconds;
-    values.set([seconds / 20, seconds, seconds * 2, seconds * 3], at);
-  } else if (kind === 'lightColor') values.set([...COIN_LIGHT.color, 1], at);
-  else if (kind === 'lightDirection') values.set([...COIN_LIGHT.direction, 0], at);
-  else if (kind in AMBIENT_CHANNELS) values.set([0, 0, 0, COIN_AMBIENT[AMBIENT_CHANNELS[kind]]], at);
-  else throw new Error(`coin shader ${shaderName} asks for the built-in "${kind}", which the coin stage does not fill`);
-}
 
 /**
  * A translated shader's GLSL ES 3.00 body. three.js writes its own `#version 300 es` line (glslVersion GLSL3)

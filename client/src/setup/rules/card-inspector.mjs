@@ -208,15 +208,6 @@ const detachState = (state) => {
   state.observer?.disconnect();
 };
 
-const unwireBoundaryIfIdle = () => {
-  if (boundaryWired && states.size === 0) {
-    CLOSE_EVENTS.forEach((name) =>
-      document.removeEventListener(name, teardownAll)
-    );
-    boundaryWired = false;
-  }
-};
-
 const teardownAll = () => {
   states.forEach(detachState);
   states.clear();
@@ -296,7 +287,57 @@ export const decorateInspectorSlide = (built, card, getContext, actions = null) 
   states.add(state);
   wireBoundary();
   applyAffordances(state, model);
-  wirePanelClicks(state);
+  // A press and release that land on different children (cursor drift, hover repaint) make the
+  // browser dispatch the click on their common ancestor, where `closest` finds no panel. Fall back
+  // to the panel the press started on.
+  let pressedTarget = null;
+  state.wrap.addEventListener(
+    'pointerdown',
+    (event) => {
+      pressedTarget = event.target;
+    },
+    true
+  );
+  state.wrap.addEventListener('click', (rawEvent) => {
+    const event = {
+      target: rawEvent.target.closest?.(ACTION_PANEL_SELECTOR)
+        ? rawEvent.target
+        : pressedTarget?.closest?.(ACTION_PANEL_SELECTOR)
+          ? pressedTarget
+          : rawEvent.target,
+      stopPropagation: () => rawEvent.stopPropagation(),
+    };
+    pressedTarget = null;
+    const stadiumPanel = event.target.closest?.('[data-ptcg-stadium]');
+    if (stadiumPanel) {
+      if (!state.model.usable) return;
+      event.stopPropagation();
+      state.actions?.onUse?.();
+      return;
+    }
+    const attackPanel = event.target.closest?.('[data-ptcg-attack]');
+    if (attackPanel) {
+      const attack =
+        state.model.attacks[Number(attackPanel.dataset.ptcgAttack)];
+      if (!attack?.usable) return;
+      uiCue('attack-button');
+      event.stopPropagation();
+      state.actions?.onAttack?.(attack.index);
+      return;
+    }
+    if (event.target.closest?.('[data-ptcg-ability]')) {
+      if (!state.model.ability?.usable) return;
+      event.stopPropagation();
+      state.actions?.onAbility?.();
+      return;
+    }
+    const retreatPanel = event.target.closest?.('[data-ptcg-retreat]');
+    if (retreatPanel) {
+      if (!state.model.retreatUsable) return;
+      event.stopPropagation();
+      state.actions?.onRetreat?.();
+    }
+  });
   hydrateContext(state);
 
   // Positioned after layout, once the image has its natural size and the slide its final box.
@@ -351,60 +392,6 @@ const applyAffordances = (state, model) => {
  */
 const ACTION_PANEL_SELECTOR =
   '[data-ptcg-stadium], [data-ptcg-attack], [data-ptcg-ability], [data-ptcg-retreat]';
-
-const wirePanelClicks = (state) => {
-  // A press and release that land on different children (cursor drift, hover repaint) make the
-  // browser dispatch the click on their common ancestor, where `closest` finds no panel. Fall back
-  // to the panel the press started on.
-  let pressedTarget = null;
-  state.wrap.addEventListener(
-    'pointerdown',
-    (event) => {
-      pressedTarget = event.target;
-    },
-    true
-  );
-  state.wrap.addEventListener('click', (rawEvent) => {
-    const event = {
-      target: rawEvent.target.closest?.(ACTION_PANEL_SELECTOR)
-        ? rawEvent.target
-        : pressedTarget?.closest?.(ACTION_PANEL_SELECTOR)
-          ? pressedTarget
-          : rawEvent.target,
-      stopPropagation: () => rawEvent.stopPropagation(),
-    };
-    pressedTarget = null;
-    const stadiumPanel = event.target.closest?.('[data-ptcg-stadium]');
-    if (stadiumPanel) {
-      if (!state.model.usable) return;
-      event.stopPropagation();
-      state.actions?.onUse?.();
-      return;
-    }
-    const attackPanel = event.target.closest?.('[data-ptcg-attack]');
-    if (attackPanel) {
-      const attack =
-        state.model.attacks[Number(attackPanel.dataset.ptcgAttack)];
-      if (!attack?.usable) return;
-      uiCue('attack-button');
-      event.stopPropagation();
-      state.actions?.onAttack?.(attack.index);
-      return;
-    }
-    if (event.target.closest?.('[data-ptcg-ability]')) {
-      if (!state.model.ability?.usable) return;
-      event.stopPropagation();
-      state.actions?.onAbility?.();
-      return;
-    }
-    const retreatPanel = event.target.closest?.('[data-ptcg-retreat]');
-    if (retreatPanel) {
-      if (!state.model.retreatUsable) return;
-      event.stopPropagation();
-      state.actions?.onRetreat?.();
-    }
-  });
-};
 
 /**
  * First paint only. The card stamp carries attached Energy and damage but not the Stadium cost
@@ -659,7 +646,12 @@ export const releaseInspectorCard = (wrap) => {
     detachState(state);
     states.delete(state);
   }
-  unwireBoundaryIfIdle();
+  if (boundaryWired && states.size === 0) {
+    CLOSE_EVENTS.forEach((name) =>
+      document.removeEventListener(name, teardownAll)
+    );
+    boundaryWired = false;
+  }
 };
 
 export const isCardInspectorOpen = () => states.size > 0;

@@ -131,29 +131,27 @@ function ghostKit(palette) {
   /** A shadow puff: deep shadow covering what is under it, ringed by a faint violet fringe. */
   function glow(ctx, x, y, r, alpha) {
     if (!(r > 0) || !(alpha > 0)) return;
-    withLiftZ(ctx, LIFT.puff, () => withFxMod(ctx, PUFF_MOD, () => puff(ctx, x, y, r, alpha)));
-  }
-
-  /** The shadow puff's two fills: the covering shadow, then the violet fringe. */
-  function puff(ctx, x, y, r, alpha) {
-    inShadow(ctx, () => {
-      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-      g.addColorStop(0, rgbCss(palette.deep, alpha * SHADOW_ALPHA));
-      g.addColorStop(0.6, rgbCss(palette.deep, alpha * SHADOW_ALPHA * 0.5));
-      g.addColorStop(1, rgbCss(palette.deep, 0));
-      ctx.fillStyle = g;
+    withLiftZ(ctx, LIFT.puff, () => withFxMod(ctx, PUFF_MOD, () => {
+      // The shadow puff's two fills: the covering shadow, then the violet fringe.
+      inShadow(ctx, () => {
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+        g.addColorStop(0, rgbCss(palette.deep, alpha * SHADOW_ALPHA));
+        g.addColorStop(0.6, rgbCss(palette.deep, alpha * SHADOW_ALPHA * 0.5));
+        g.addColorStop(1, rgbCss(palette.deep, 0));
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, TAU);
+        ctx.fill();
+      });
+      const f = ctx.createRadialGradient(x, y, r * 0.45, x, y, r);
+      f.addColorStop(0, rgbCss(palette.body, 0));
+      f.addColorStop(0.65, rgbCss(palette.body, alpha * 0.22));
+      f.addColorStop(1, rgbCss(palette.body, 0));
+      ctx.fillStyle = f;
       ctx.beginPath();
       ctx.arc(x, y, r, 0, TAU);
       ctx.fill();
-    });
-    const f = ctx.createRadialGradient(x, y, r * 0.45, x, y, r);
-    f.addColorStop(0, rgbCss(palette.body, 0));
-    f.addColorStop(0.65, rgbCss(palette.body, alpha * 0.22));
-    f.addColorStop(1, rgbCss(palette.body, 0));
-    ctx.fillStyle = f;
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, TAU);
-    ctx.fill();
+    }));
   }
 
   /** Violet light, additive: the haze a shadow ball flies in. */

@@ -135,11 +135,8 @@ export function chooseCandidate(candidates = [], entry = {}, setIds = {}) {
     if (card.legal?.standard) score += 1;
     return score;
   };
-  const byRecency = (a, b) => String(b.set?.releaseDate || '').localeCompare(String(a.set?.releaseDate || ''));
-  return [...exact].sort((a, b) => rank(b) - rank(a) || byRecency(a, b))[0];
+  return [...exact].sort((a, b) => rank(b) - rank(a) || String(b.set?.releaseDate || '').localeCompare(String(a.set?.releaseDate || '')))[0];
 }
-
-const padNumber = (number) => String(number).padStart(3, '0');
 
 function energyDeckCard(label, qty) {
   const card = buildModernBasicEnergy(label, qty);
@@ -177,7 +174,7 @@ export async function resolveEntry(entry, deps) {
 
   const setId = setIdForCode(entry.setCode, deps.setIds);
   if (setId && entry.number) {
-    for (const localId of [padNumber(entry.number), entry.number]) {
+    for (const localId of [String(entry.number).padStart(3, '0'), entry.number]) {
       try {
         const card = await deps.fetchCardDetail(`${setId}-${localId}`);
         if (card?.image && normalize(card.name) === normalize(entry.name)) return { card };

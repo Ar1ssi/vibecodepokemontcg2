@@ -173,12 +173,6 @@ export function auroraAlphas(phase) {
   return AURORA_RINGS.map((_, k) => 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(phase + (k * TAU) / AURORA_RINGS.length)));
 }
 
-const tracePoints = (ctx, points) => {
-  ctx.beginPath();
-  points.forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
-  ctx.closePath();
-};
-
 /** Cold mist: the pale core fading through the ice blue to nothing. */
 const mistOf = (pal) =>
   function glow(ctx, x, y, r, alpha) {
@@ -199,41 +193,39 @@ const restingPhase = (x, y, r) => x * 0.02 + y * 0.03 + r * 0.15;
 
 /** A snowflake: a bright centre, a wide ice-blue pass of every stroke, a thin white pass. */
 function snowflake(ctx, pal, x, y, r, alpha, hot, phase) {
-  withLiftZ(ctx, LIFT.flake, () => litFlake(ctx, pal, x, y, r, alpha, hot, phase));
-}
-
-/** The snowflake's bead and rods at the current lift. */
-function litFlake(ctx, pal, x, y, r, alpha, hot, phase) {
-  ctx.fxStyle = CRYSTAL_EDGE;
-  withFxMod(ctx, BEAD_MOD, () => sphere(
-    ctx,
-    x,
-    y,
-    r * 0.22,
-    [
-      [0, pal.white, alpha * 0.9],
-      [0.6, pal.hot, alpha * 0.6],
-      [1, pal.body, 0],
-    ],
-    0
-  ));
-  const segments = snowflakeSegments(x, y, r, phase);
-  ctx.lineCap = 'round';
-  const passes = [
-    [pal.body, 0.55 * alpha, Math.max(1, r * 0.14)],
-    [pal.white, 0.95 * alpha * (0.5 + 0.5 * clamp01(hot)), Math.max(1, r * 0.05)],
-  ];
-  for (const [rgb, a, lineWidth] of passes) {
-    ctx.strokeStyle = rgbCss(rgb, a);
-    ctx.lineWidth = lineWidth;
-    ctx.beginPath();
-    for (const [[x0, y0], [x1, y1]] of segments) {
-      ctx.moveTo(x0, y0);
-      ctx.lineTo(x1, y1);
+  withLiftZ(ctx, LIFT.flake, () => {
+    // The snowflake's bead and rods at the current lift.
+    ctx.fxStyle = CRYSTAL_EDGE;
+    withFxMod(ctx, BEAD_MOD, () => sphere(
+      ctx,
+      x,
+      y,
+      r * 0.22,
+      [
+        [0, pal.white, alpha * 0.9],
+        [0.6, pal.hot, alpha * 0.6],
+        [1, pal.body, 0],
+      ],
+      0
+    ));
+    const segments = snowflakeSegments(x, y, r, phase);
+    ctx.lineCap = 'round';
+    const passes = [
+      [pal.body, 0.55 * alpha, Math.max(1, r * 0.14)],
+      [pal.white, 0.95 * alpha * (0.5 + 0.5 * clamp01(hot)), Math.max(1, r * 0.05)],
+    ];
+    for (const [rgb, a, lineWidth] of passes) {
+      ctx.strokeStyle = rgbCss(rgb, a);
+      ctx.lineWidth = lineWidth;
+      ctx.beginPath();
+      for (const [[x0, y0], [x1, y1]] of segments) {
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x1, y1);
+      }
+      withFxMod(ctx, ROD_MOD, () => ctx.stroke());
     }
-    withFxMod(ctx, ROD_MOD, () => ctx.stroke());
-  }
-  ctx.fxStyle = null;
+    ctx.fxStyle = null;
+  });
 }
 
 /**
@@ -258,7 +250,10 @@ function litCrystal(ctx, pal, spec, { alpha = 1, hot = 1, jag = 0 } = {}) {
   const lit = FACET_ALPHA * alpha * clamp01(hot);
   if (lit > 0) {
     ctx.fillStyle = rgbCss(pal.hot, lit);
-    tracePoints(ctx, jag ? [...outline.left] : icicleFacet(spec));
+    const points = jag ? [...outline.left] : icicleFacet(spec);
+    ctx.beginPath();
+    points.forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
+    ctx.closePath();
     ctx.fill();
   }
   ctx.strokeStyle = rgbCss(pal.white, EDGE_ALPHA * alpha);

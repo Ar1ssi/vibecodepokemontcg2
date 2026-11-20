@@ -135,21 +135,6 @@ function arePacksWellFormed(packs, box) {
 
 const isBoxDeckKey = (box, key) => box.decks.some((deck) => deck.key === key);
 
-function isEnergyList(value) {
-  return (
-    Array.isArray(value) &&
-    value.every(
-      (entry) =>
-        Array.isArray(entry) &&
-        entry.length === 2 &&
-        BASIC_ENERGY_LABELS.includes(entry[0]) &&
-        Number.isInteger(entry[1]) &&
-        entry[1] > 0 &&
-        entry[1] <= MAX_COPIES
-    )
-  );
-}
-
 // An Evolution box must carry its two groups (promo's first), its pack and, for a 40-card
 // Evolution deck, its Energy; a fixed-decks box must carry none of them.
 function evolutionFieldsFit(value, box) {
@@ -166,7 +151,18 @@ function evolutionFieldsFit(value, box) {
     evolutionPack.length > 0 &&
     evolutionPack.length <= MAX_EVOLUTION_PACK &&
     evolutionPack.every(isCardId);
-  const energyFits = box.kind === 'evolution-deck' ? isEnergyList(energy) : energy == null;
+  const energyFits = box.kind === 'evolution-deck' ? (
+    Array.isArray(energy) &&
+    energy.every(
+      (entry) =>
+        Array.isArray(entry) &&
+        entry.length === 2 &&
+        BASIC_ENERGY_LABELS.includes(entry[0]) &&
+        Number.isInteger(entry[1]) &&
+        entry[1] > 0 &&
+        entry[1] <= MAX_COPIES
+    )
+  ) : energy == null;
   return groupsFit && packFits && energyFits;
 }
 

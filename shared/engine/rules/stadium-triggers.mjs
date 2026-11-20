@@ -10,9 +10,8 @@ import { hasCondition } from './special-conditions.mjs';
 
 const lower = (v) => String(v ?? '').toLowerCase().replace(/[\u2018\u2019]/g, "'");
 const textOf = (card) => lower(card?.text ?? card?.effect ?? card?.cardText ?? '');
-const typesOf = (card) => (Array.isArray(card?.types) ? card.types : []).map(lower);
 const hasType = (card, type) =>
-  typesOf(card).some((t) => t === type || (type === 'darkness' && t === 'dark'));
+  (Array.isArray(card?.types) ? card.types : []).map(lower).some((t) => t === type || (type === 'darkness' && t === 'dark'));
 const isBasic = (card) => {
   const stage = lower(card?.stage);
   return stage ? stage === 'basic' : !card?.evolvesFrom;

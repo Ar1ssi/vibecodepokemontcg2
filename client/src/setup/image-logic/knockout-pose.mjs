@@ -15,8 +15,6 @@ export const knockoutStackIds = (ghost) =>
 export const KNOCKOUT_DURATION_MS = 900;
 export const KNOCKOUT_FLASH_END = 0.35;
 
-const easeInOutCubic = (t) => (t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2);
-
 const rectCenter = (rect) => ({
   x: rect.left + rect.width / 2,
   y: rect.top + rect.height / 2,
@@ -44,7 +42,7 @@ export function knockoutPose(t, { fromRect, toRect }) {
   }
 
   const driftT = (clamped - KNOCKOUT_FLASH_END) / (1 - KNOCKOUT_FLASH_END);
-  const eased = easeInOutCubic(driftT);
+  const eased = driftT < 0.5 ? 4 * driftT ** 3 : 1 - (-2 * driftT + 2) ** 3 / 2;
   const from = rectCenter(fromRect);
   const to = rectCenter(toRect);
   return {

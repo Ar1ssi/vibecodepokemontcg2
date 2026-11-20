@@ -72,7 +72,10 @@ export function parseGrantedAttacks(card) {
 
   const text = cardTextOf(card);
   const segments = text.split(ARROW);
-  if (segments.length < 2) return knownAttacksFor(card);
+  if (segments.length < 2) {
+    const known = KNOWN_TM_ATTACKS[normalizeName(card?.name)];
+    return known ? [{ ...known, granted: true }] : [];
+  }
 
   const out = [];
   for (let i = 1; i < segments.length; i++) {
@@ -115,11 +118,6 @@ const KNOWN_TM_ATTACKS = {
     cost: [],
   },
 };
-
-function knownAttacksFor(card) {
-  const known = KNOWN_TM_ATTACKS[normalizeName(card?.name)];
-  return known ? [{ ...known, granted: true }] : [];
-}
 
 const normalizeText = (text) => String(text || '').replace(/[‘’]/g, "'").toLowerCase();
 
@@ -195,9 +193,6 @@ export function parseTmAttachRestriction(text) {
 
 // Owner's Pokémon print a possessive trainer name ("Team Magma's Groudon", "Brock's Onix").
 const hasOwnerInName = (name) => /'s\s/.test(normalizeText(name));
-const isSpPokemon = (card) =>
-  (card?.subtypes || []).some((s) => /^sp$/i.test(String(s))) ||
-  /\s(?:G|GL|FB|C|E4|4)(?:\s+LV\.?\s*X)?$/.test(String(card?.name ?? ''));
 
 /**
  * Whether a Technical Machine with `restriction` may attach to the Pokémon whose top card is
@@ -211,7 +206,8 @@ export function tmAttachAllowed(restriction, { top, evolved = false, mayAttachAn
   if (restriction.evolved && !evolved) return false;
   if (restriction.excludeEx && isExCard(top)) return false;
   if (restriction.excludeOwners && hasOwnerInName(top.name)) return false;
-  if (restriction.sp && !isSpPokemon(top)) return false;
+  if (restriction.sp && !((top?.subtypes || []).some((s) => /^sp$/i.test(String(s))) ||
+  /\s(?:G|GL|FB|C|E4|4)(?:\s+LV\.?\s*X)?$/.test(String(top?.name ?? '')))) return false;
   if (restriction.nameIncludes && !name.includes(restriction.nameIncludes)) return false;
   return true;
 }

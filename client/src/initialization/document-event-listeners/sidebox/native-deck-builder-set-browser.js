@@ -47,7 +47,6 @@ import {
     const KEEP_FETCH_ORDER_SET_IDS = new Set([OTHER_151_SET_ID, BLACK_BOLT_WHITE_FLARE_SET_ID, GEN_1_2_SET_ID]);
 
     const GENERATION_CATEGORY_PREFIX = 'gen';
-    const generationCategoryId = (gen) => `${GENERATION_CATEGORY_PREFIX}${gen}`;
 
     /**
      * "Browse Sets" panel for the native deck builder. Pills switch between the
@@ -109,7 +108,7 @@ import {
       ).join('');
       const generationPillsHtml = GENERATIONS.map(
         (gen) =>
-          `<button class="native-deck-builder-set-browser-series-tag native-deck-builder-set-browser-series-tag--generation" data-category="${generationCategoryId(gen)}" type="button">Generation ${gen}</button>`
+          `<button class="native-deck-builder-set-browser-series-tag native-deck-builder-set-browser-series-tag--generation" data-category="${`${GENERATION_CATEGORY_PREFIX}${gen}`}" type="button">Generation ${gen}</button>`
       ).join('');
 
       panelEl.innerHTML = [
@@ -326,14 +325,10 @@ import {
         const isFiltering = hasNameFilter || Boolean(supertypeFilter) || filterMatches !== null;
         const quantities = getQuantities ? getQuantities() : {};
         const owned = getOwned ? getOwned() : {};
-        const passesCardFilters = (setId, card) => {
-          if (filterMatches === null) return true;
-          if (!filterMatches.get(setId)?.has(card.id)) return false;
-          return !cardFilters?.inDeck || quantities[card.id] > 0;
-        };
         const dropdownSections = [];
 
-        const buildTabsFor = (groupSets) => {
+        const renderGroup = (label, groupSets) => {
+          if (groupSets.length === 0) return '';
           const tabsHtml = [];
           for (const set of groupSets) {
             let expanded = set.setId === expandedSetId;
@@ -344,7 +339,12 @@ import {
                 const filtered = filterCardsBySupertype(
                   filterCardsByName(cards, filterTerm),
                   supertypeFilter
-                ).filter((card) => passesCardFilters(set.setId, card));
+                ).filter((card) => {
+                  const setId = set.setId;
+                  if (filterMatches === null) return true;
+                  if (!filterMatches.get(setId)?.has(card.id)) return false;
+                  return !cardFilters?.inDeck || quantities[card.id] > 0;
+                });
                 if (isFiltering) {
                   expanded = filtered.length > 0;
                 }
@@ -372,12 +372,6 @@ import {
 
             tabsHtml.push(renderSetTab(set, { expanded }));
           }
-          return tabsHtml;
-        };
-
-        const renderGroup = (label, groupSets) => {
-          if (groupSets.length === 0) return '';
-          const tabsHtml = buildTabsFor(groupSets);
           const key = label.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'generation';
           return [
             `<div class="native-deck-builder-set-browser-group" data-category="${escapeHtml(key)}">`,
@@ -399,10 +393,6 @@ import {
         resultsEl.innerHTML = dropdownSections.length
           ? dropdownSections.join('')
           : '<div class="native-deck-builder-set-browser-dropdown-empty">Select a set above to browse its cards.</div>';
-        wireEvents();
-      };
-
-      const wireEvents = () => {
         tabsEl.querySelectorAll('[data-toggle-set]').forEach((button) => {
           button.addEventListener('click', async () => {
             const setId = button.dataset.toggleSet;

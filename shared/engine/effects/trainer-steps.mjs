@@ -259,13 +259,9 @@ export function removeFromZones(player, card) {
   return false;
 }
 
-function ownerOf(draft, card) {
-  const ref = findCard(draft, card.instanceId);
-  return ref ? draft.players[ref.playerId] : null;
-}
-
 export function discardCard(draft, card, events) {
-  const owner = ownerOf(draft, card);
+  const ref = findCard(draft, card.instanceId);
+  const owner = ref ? draft.players[ref.playerId] : null;
   if (!owner) return;
   // Special-energy on-discard triggers: Recycle Energy returns to hand, while
   // Boomerang/Burning Energy stay attached when discarded by their own attack.
@@ -950,24 +946,23 @@ function lookPickMatches(card, pick) {
   if (pick === 'any') return true;
   if (pick === 'Supporter') return matchesSearch(card, 'Supporter');
   if (pick.startsWith('Basic Energy')) return isBasicEnergy(card);
-  if (pick.endsWith(' (bench)')) return benchPickMatches(card, pick.slice(0, -8));
+  if (pick.endsWith(' (bench)')) {
+    // `(bench)` forms (I132): a named Pokémon ("Anorith (bench)"), a typed Pokémon
+    // of any Stage ("Darkness Pokémon (bench)" — Grimsley's Move says "a {D} Pokémon"),
+    // or any Basic ("Pokémon (bench)").
+    const what = pick.slice(0, -8);
+    if (!isPokemon(card)) return false;
+    const label = what.trim();
+    if (label === 'Pokémon') return stageOf(card) === 'Basic';
+    const typed = label.match(/^(.+) Pokémon$/);
+    if (typed) {
+      const symbol = typeSymbolForWord(typed[1]);
+      return symbol != null && pokemonHasType(card, symbol);
+    }
+    return String(card.name || '').trim().toLowerCase() === label.toLowerCase();
+  }
   if (pick === 'Pokémon') return isPokemon(card);
   return matchesSearch(card, pick);
-}
-
-// `(bench)` forms (I132): a named Pokémon ("Anorith (bench)"), a typed Pokémon
-// of any Stage ("Darkness Pokémon (bench)" — Grimsley's Move says "a {D} Pokémon"),
-// or any Basic ("Pokémon (bench)").
-function benchPickMatches(card, what) {
-  if (!isPokemon(card)) return false;
-  const label = what.trim();
-  if (label === 'Pokémon') return stageOf(card) === 'Basic';
-  const typed = label.match(/^(.+) Pokémon$/);
-  if (typed) {
-    const symbol = typeSymbolForWord(typed[1]);
-    return symbol != null && pokemonHasType(card, symbol);
-  }
-  return String(card.name || '').trim().toLowerCase() === label.toLowerCase();
 }
 
 function typeSymbolForWord(word) {
@@ -980,7 +975,31 @@ function typeSymbolForWord(word) {
 
 function finishLook(ctx, viewed) {
   const { player, step } = ctx;
-  if (step.restTo === 'discard' || step.restTo === 'lostZone') return disposeLookRest(ctx, viewed);
+  if (step.restTo === 'discard' || step.restTo === 'lostZone') {
+    // Explorer's Guidance discards the untaken cards, Colress's Experiment Lost-Zones them; neither
+    // shuffles. Trekking Shoes draws when its one card was not taken.
+    const { player, step } = ctx;
+    const rest = viewed.filter((card) => player.zones.deck.includes(card));
+    const noneTaken = rest.length === viewed.length;
+    for (const card of rest) {
+      removeFromZones(player, card);
+      if (step.restTo === 'lostZone') {
+        pushToLostZone(player, card);
+        ctx.events.push({ type: 'cardMoved', instanceId: card.instanceId, from: 'deck', to: 'lostZone', playerId: player.playerId });
+      } else {
+        discardCardToPlayerZone(player, card);
+      }
+    }
+    if (step.restTo === 'discard' && rest.length > 0) {
+      ctx.events.push({
+        type: 'cardsDiscarded',
+        playerId: player.playerId,
+        cards: rest.map((c) => ({ instanceId: c.instanceId, name: c.name })),
+      });
+    }
+    if (noneTaken && step.drawIfNoneTaken) drawCards(player, step.drawIfNoneTaken, ctx.events);
+    return null;
+  }
   if (!step.restToBottom) {
     shuffleDeck(player, ctx);
     return null;
@@ -992,32 +1011,6 @@ function finishLook(ctx, viewed) {
   if (ctx.activeRng) shuffleInPlace(ctx.activeRng, rest);
   deck.push(...rest);
   ctx.events.push({ type: 'cardsMovedToDeckBottom', count: rest.length, playerId: player.playerId });
-  return null;
-}
-
-// Explorer's Guidance discards the untaken cards, Colress's Experiment Lost-Zones them; neither
-// shuffles. Trekking Shoes draws when its one card was not taken.
-function disposeLookRest(ctx, viewed) {
-  const { player, step } = ctx;
-  const rest = viewed.filter((card) => player.zones.deck.includes(card));
-  const noneTaken = rest.length === viewed.length;
-  for (const card of rest) {
-    removeFromZones(player, card);
-    if (step.restTo === 'lostZone') {
-      pushToLostZone(player, card);
-      ctx.events.push({ type: 'cardMoved', instanceId: card.instanceId, from: 'deck', to: 'lostZone', playerId: player.playerId });
-    } else {
-      discardCardToPlayerZone(player, card);
-    }
-  }
-  if (step.restTo === 'discard' && rest.length > 0) {
-    ctx.events.push({
-      type: 'cardsDiscarded',
-      playerId: player.playerId,
-      cards: rest.map((c) => ({ instanceId: c.instanceId, name: c.name })),
-    });
-  }
-  if (noneTaken && step.drawIfNoneTaken) drawCards(player, step.drawIfNoneTaken, ctx.events);
   return null;
 }
 
@@ -1334,7 +1327,33 @@ function discardEnergyFromOpponent(ctx) {
   const kindMatches = step.energy === 'Special Energy' ? isSpecialEnergy : isEnergy;
   const matchesEnergy = (c) => kindMatches(c) && energyRemovable(ctx, opponent, c);
 
-  if (step.scope === 'each Pokémon') return discardEnergyFromEach(ctx, matchesEnergy);
+  if (step.scope === 'each Pokémon') {
+    // "Discard an Energy from each of your opponent's Pokémon": one per Pokémon, the player picking
+    // wherever a Pokémon has different Energy attached.
+    const { opponent } = ctx;
+    const energyOn = (rootId) => attachedCards(opponent, rootId).filter(matchesEnergy);
+    let pending = ctx.memo?.rootIds || targetableRoots(ctx, opponent).map((root) => root.instanceId);
+    if (ctx.memo?.rootIds && ctx.selection) {
+      const [current, ...rest] = pending;
+      const energy = energyOn(current).find((c) => c.instanceId === ctx.selection[0]);
+      if (energy) discardCard(ctx.draft, energy, ctx.events);
+      pending = rest;
+    }
+    for (let index = 0; index < pending.length; index += 1) {
+      const energies = energyOn(pending[index]);
+      if (new Set(energies.map((c) => c.name)).size > 1) {
+        return ctx.ask({
+          prompt: `${sourceName(ctx, 'Trainer')}: Choose an Energy to discard from ${topPokemonCard(opponent, findCard(ctx.draft, pending[index])?.card)?.name || 'that Pokémon'}`,
+          options: energies,
+          min: 1,
+          max: 1,
+          memo: { rootIds: pending.slice(index) },
+        });
+      }
+      if (energies.length > 0) discardCard(ctx.draft, energies[0], ctx.events);
+    }
+    return null;
+  }
 
   // scope 'Active': only the opponent's Active Pokémon (Crawdaunt Unruly Claw).
   const active = step.scope === 'Active' ? targetableRoots(ctx, opponent).find((r) => r === activeOf(opponent)) : null;
@@ -1342,7 +1361,39 @@ function discardEnergyFromOpponent(ctx) {
     step.scope === 'Active'
       ? (active ? attachedCards(opponent, active.instanceId).filter(matchesEnergy) : [])
       : allAttachedMatching(ctx, [opponent], matchesEnergy);
-  if ((step.count || 1) > 1 && step.scope === '1 Pokémon') return discardEnergiesFromOneHost(ctx, matchesEnergy);
+  if ((step.count || 1) > 1 && step.scope === '1 Pokémon') {
+    // Super Energy Removal: choose 1 opponent Pokémon, then up to `count` Energy attached to it.
+    const { opponent, step } = ctx;
+    const energyOn = (root) => attachedCards(opponent, root.instanceId).filter(matchesEnergy);
+    const hosts = targetableRoots(ctx, opponent).filter((root) => energyOn(root).length > 0);
+
+    if (ctx.memo?.stage === 'energy') {
+      const host = hosts.find((root) => root.instanceId === ctx.memo.hostId);
+      if (!host) return skip(ctx, 'target_not_found');
+      for (const energy of pickById(energyOn(host), ctx.selection)) discardCard(ctx.draft, energy, ctx.events);
+      return null;
+    }
+    if (ctx.memo?.stage === 'host') {
+      const host = hosts.find((root) => root.instanceId === ctx.selection?.[0]);
+      if (!host) return skip(ctx, 'target_not_found');
+      const energies = energyOn(host);
+      return ctx.ask({
+        prompt: `${sourceName(ctx, 'Trainer')}: Choose up to ${step.count} Energy attached to ${topPokemonCard(opponent, host)?.name || 'that Pokémon'} to discard`,
+        options: energies,
+        min: 1,
+        max: Math.min(step.count, energies.length),
+        memo: { stage: 'energy', hostId: host.instanceId },
+      });
+    }
+    if (hosts.length === 0) return skip(ctx, 'no_opponent_energy');
+    return ctx.ask({
+      prompt: `${sourceName(ctx, 'Trainer')}: Choose 1 of your opponent's Pokémon with Energy attached`,
+      options: hosts,
+      min: 1,
+      max: 1,
+      memo: { stage: 'host' },
+    });
+  }
   if (ctx.selection) {
     const energy = energies.find((c) => c.instanceId === ctx.selection[0]);
     if (!energy) return skip(ctx, 'target_not_found');
@@ -1362,68 +1413,6 @@ function discardEnergyFromOpponent(ctx) {
     options: energies,
     min: 1,
     max: 1,
-  });
-}
-
-// "Discard an Energy from each of your opponent's Pokémon": one per Pokémon, the player picking
-// wherever a Pokémon has different Energy attached.
-function discardEnergyFromEach(ctx, matchesEnergy) {
-  const { opponent } = ctx;
-  const energyOn = (rootId) => attachedCards(opponent, rootId).filter(matchesEnergy);
-  let pending = ctx.memo?.rootIds || targetableRoots(ctx, opponent).map((root) => root.instanceId);
-  if (ctx.memo?.rootIds && ctx.selection) {
-    const [current, ...rest] = pending;
-    const energy = energyOn(current).find((c) => c.instanceId === ctx.selection[0]);
-    if (energy) discardCard(ctx.draft, energy, ctx.events);
-    pending = rest;
-  }
-  for (let index = 0; index < pending.length; index += 1) {
-    const energies = energyOn(pending[index]);
-    if (new Set(energies.map((c) => c.name)).size > 1) {
-      return ctx.ask({
-        prompt: `${sourceName(ctx, 'Trainer')}: Choose an Energy to discard from ${topPokemonCard(opponent, findCard(ctx.draft, pending[index])?.card)?.name || 'that Pokémon'}`,
-        options: energies,
-        min: 1,
-        max: 1,
-        memo: { rootIds: pending.slice(index) },
-      });
-    }
-    if (energies.length > 0) discardCard(ctx.draft, energies[0], ctx.events);
-  }
-  return null;
-}
-
-// Super Energy Removal: choose 1 opponent Pokémon, then up to `count` Energy attached to it.
-function discardEnergiesFromOneHost(ctx, matchesEnergy) {
-  const { opponent, step } = ctx;
-  const energyOn = (root) => attachedCards(opponent, root.instanceId).filter(matchesEnergy);
-  const hosts = targetableRoots(ctx, opponent).filter((root) => energyOn(root).length > 0);
-
-  if (ctx.memo?.stage === 'energy') {
-    const host = hosts.find((root) => root.instanceId === ctx.memo.hostId);
-    if (!host) return skip(ctx, 'target_not_found');
-    for (const energy of pickById(energyOn(host), ctx.selection)) discardCard(ctx.draft, energy, ctx.events);
-    return null;
-  }
-  if (ctx.memo?.stage === 'host') {
-    const host = hosts.find((root) => root.instanceId === ctx.selection?.[0]);
-    if (!host) return skip(ctx, 'target_not_found');
-    const energies = energyOn(host);
-    return ctx.ask({
-      prompt: `${sourceName(ctx, 'Trainer')}: Choose up to ${step.count} Energy attached to ${topPokemonCard(opponent, host)?.name || 'that Pokémon'} to discard`,
-      options: energies,
-      min: 1,
-      max: Math.min(step.count, energies.length),
-      memo: { stage: 'energy', hostId: host.instanceId },
-    });
-  }
-  if (hosts.length === 0) return skip(ctx, 'no_opponent_energy');
-  return ctx.ask({
-    prompt: `${sourceName(ctx, 'Trainer')}: Choose 1 of your opponent's Pokémon with Energy attached`,
-    options: hosts,
-    min: 1,
-    max: 1,
-    memo: { stage: 'host' },
   });
 }
 
@@ -1485,7 +1474,9 @@ function discardOwnAttachedEnergy(ctx) {
     .flatMap((root) => attachedCards(player, root.instanceId))
     .filter((card) => isEnergy(card) && (!step.special || isSpecialEnergy(card)));
 
-  const applyDiscard = (energy) => {
+  if (ctx.selection) {
+    const energy = attached.find((c) => c.instanceId === ctx.selection[0]);
+    if (!energy) return skip(ctx, 'target_not_found');
     const host = hosts.find((root) => root.instanceId === energy.attachedTo);
     discardCard(ctx.draft, energy, ctx.events);
     // A Trainer's "Discard 1 Energy card attached to your Pokémon in order to …" cost:
@@ -1503,12 +1494,6 @@ function discardOwnAttachedEnergy(ctx) {
       });
     }
     return null;
-  };
-
-  if (ctx.selection) {
-    const energy = attached.find((c) => c.instanceId === ctx.selection[0]);
-    if (!energy) return skip(ctx, 'target_not_found');
-    return applyDiscard(energy);
   }
   if (attached.length === 0) return skip(ctx, 'no_energy_to_discard');
   return ctx.ask({
@@ -1632,7 +1617,26 @@ function damageCounters(ctx) {
     });
   };
 
-  if (step.distribute) return distributeDamageCounters(ctx, targets, (card) => apply(card, 10));
+  if (step.distribute) {
+    let remaining = ctx.memo?.remaining ?? (ctx.step.count || 1);
+    if (ctx.selection) {
+      const [card] = pickById(targets, ctx.selection);
+      if (!card) return skip(ctx, 'target_not_found');
+      // "Put 6 damage counters on your opponent's Pokémon in any way you like": one counter per pick,
+      // so the player splits them freely; `memo.remaining` carries the count across prompts.
+      apply(card, 10);
+      remaining -= 1;
+    }
+    if (remaining <= 0) return null;
+    if (targets.length === 0) return skip(ctx, 'no_target');
+    return ctx.ask({
+      prompt: `${sourceName(ctx, 'Trainer')}: Put a damage counter on 1 of your opponent's Pokémon (${remaining} left)`,
+      options: targets,
+      min: 1,
+      max: 1,
+      memo: { remaining },
+    });
+  }
 
   // "choose 2 of your opponent's Pokémon and put 2 damage counters on each of them"
   const targetCount = step.targetCount || 1;
@@ -1656,35 +1660,9 @@ function damageCounters(ctx) {
 
 const isGxOrEx = (card) => isGxCard(card) || /-EX$/.test(String(card?.name || ''));
 
-// "Put 6 damage counters on your opponent's Pokémon in any way you like": one counter per pick,
-// so the player splits them freely; `memo.remaining` carries the count across prompts.
-function distributeDamageCounters(ctx, targets, placeOne) {
-  let remaining = ctx.memo?.remaining ?? (ctx.step.count || 1);
-  if (ctx.selection) {
-    const [card] = pickById(targets, ctx.selection);
-    if (!card) return skip(ctx, 'target_not_found');
-    placeOne(card);
-    remaining -= 1;
-  }
-  if (remaining <= 0) return null;
-  if (targets.length === 0) return skip(ctx, 'no_target');
-  return ctx.ask({
-    prompt: `${sourceName(ctx, 'Trainer')}: Put a damage counter on 1 of your opponent's Pokémon (${remaining} left)`,
-    options: targets,
-    min: 1,
-    max: 1,
-    memo: { remaining },
-  });
-}
-
 // Pseudo-option ids for "how many counters" prompts: -101 = 1 counter, -102 = 2, …
 // (negative so they never collide with card instanceIds or BARGAIN_YES/NO).
 const COUNTER_OPTION_BASE = -100;
-const counterCountOption = (n) => COUNTER_OPTION_BASE - n;
-function counterCountFromOption(id) {
-  const n = COUNTER_OPTION_BASE - Number(id);
-  return Number.isInteger(n) && n >= 1 ? n : null;
-}
 
 function maxMovableCounters(step, from) {
   return Math.min(step.count || 1, Math.floor((from.damage || 0) / 10));
@@ -1733,7 +1711,9 @@ function moveOwnDamageToOpponent(ctx) {
   if (ctx.selection && ctx.memo?.toId != null) {
     const from = sources.find((c) => c.instanceId === ctx.memo.fromId);
     const to = destinations.find((c) => c.instanceId === ctx.memo.toId);
-    const counters = counterCountFromOption(ctx.selection[0]);
+    const id = ctx.selection[0];
+    const n = COUNTER_OPTION_BASE - Number(id);
+    const counters = Number.isInteger(n) && n >= 1 ? n : null;
     if (!from || !to || counters == null) return skip(ctx, 'target_not_found');
     return moveDamageCounters(ctx, from, to, Math.min(counters, maxMovableCounters(step, from)));
   }
@@ -1748,7 +1728,7 @@ function moveOwnDamageToOpponent(ctx) {
     return ctx.ask({
       prompt: `${sourceName(ctx, 'Ability')}: How many damage counters to move?`,
       options: Array.from({ length: maxCounters }, (_, i) => ({
-        instanceId: counterCountOption(maxCounters - i),
+        instanceId: COUNTER_OPTION_BASE - (maxCounters - i),
         name: `${maxCounters - i} damage counter${maxCounters - i === 1 ? '' : 's'}`,
       })),
       min: 1,
@@ -1834,7 +1814,16 @@ function returnPokemonToHand(ctx) {
     });
   }
 
-  const roots = rootsOf(player).filter((root) => returnLimitsAllow(player, root, step));
+  const roots = rootsOf(player).filter((root) => {
+    // The printed limits of a returnPokemonToHand step (trainer-effects.mjs returnPokemonLimits).
+    const top = topPokemonCard(player, root) || root;
+    if (step.damagedOnly && !(root.damage > 0)) return false;
+    if (step.basicOnly && stageOf(top) !== 'Basic') return false;
+    if (step.pokemonType && !(step.pokemonType === 'c' ? colorless(top) : pokemonHasType(top, step.pokemonType))) return false;
+    if (step.excludeVGx && (isVCard(top) || isGxCard(top))) return false;
+    if (step.spOnly && !POKEMON_SP_NAME.test(String(top.name || ''))) return false;
+    return true;
+  });
 
   if (ctx.memo?.phase === 'promote') {
     const newActive = benchRootsOf(player).find((c) => c.instanceId === ctx.selection?.[0]);
@@ -1885,17 +1874,6 @@ function returnPokemonToHand(ctx) {
 const POKEMON_SP_NAME = / (?:G|GL|FB|C|4)(?: LV\.X)?$/;
 
 const colorless = (card) => (card.types || []).some((type) => String(type).toLowerCase() === 'colorless');
-
-// The printed limits of a returnPokemonToHand step (trainer-effects.mjs returnPokemonLimits).
-function returnLimitsAllow(player, root, step) {
-  const top = topPokemonCard(player, root) || root;
-  if (step.damagedOnly && !(root.damage > 0)) return false;
-  if (step.basicOnly && stageOf(top) !== 'Basic') return false;
-  if (step.pokemonType && !(step.pokemonType === 'c' ? colorless(top) : pokemonHasType(top, step.pokemonType))) return false;
-  if (step.excludeVGx && (isVCard(top) || isGxCard(top))) return false;
-  if (step.spOnly && !POKEMON_SP_NAME.test(String(top.name || ''))) return false;
-  return true;
-}
 
 function promoteToActive(player, benchRoot, events, turnNumber = 1) {
   for (const card of [benchRoot, ...attachedCards(player, benchRoot.instanceId)]) {
@@ -2166,10 +2144,6 @@ function eachPlayerDiscardUntil(ctx) {
   return null;
 }
 
-function hasAbility(card) {
-  return Boolean(card.ability) || (Array.isArray(card.abilities) && card.abilities.length > 0);
-}
-
 function evolvesFromTop(player, card) {
   const from = String(card.evolvesFrom || '').toLowerCase();
   if (!from) return [];
@@ -2190,16 +2164,14 @@ function searchEvolve(ctx) {
   // A printed "first turn or … put into play this turn" card (Wally) lifts that and the just-played gate.
   const gameTurn = ctx.draft?.turn?.number;
   const onFirstTurns = gameTurn != null && gameTurn <= 2;
-  // The just-played and once-per-turn gates from canEvolve; an evolution-speed Stadium lifts them.
-  const evolvedOrPlayedThisTurn = (root) =>
-    gameTurn != null &&
-    ((!step.printedEvolveTiming && root.enteredPlayTurn === gameTurn) || Boolean(player.flags?.evolved?.[root.instanceId]));
   const evolveTargets = (card) => {
     if (onFirstTurns && !step.printedEvolveTiming) return [];
+    // The just-played and once-per-turn gates from canEvolve; an evolution-speed Stadium lifts them.
     return evolvesFromTop(player, card).filter(
       (root) =>
         (!step.ontoSource || root.instanceId === ctx.sourceCard?.instanceId) &&
-        (!evolvedOrPlayedThisTurn(root) ||
+        (!(gameTurn != null &&
+        ((!step.printedEvolveTiming && root.enteredPlayTurn === gameTurn) || Boolean(player.flags?.evolved?.[root.instanceId]))) ||
           stadiumAllowsSameTurnEvolution(ctx.draft?.stadium, { playerId: player.playerId, pokemon: root, evolution: card }))
     );
   };
@@ -2269,7 +2241,7 @@ function searchEvolve(ctx) {
     (c) =>
       isPokemon(c) &&
       evolveTargets(c).length > 0 &&
-      !(step.noAbilities && hasAbility(c)) &&
+      !(step.noAbilities && (Boolean(c.ability) || (Array.isArray(c.abilities) && c.abilities.length > 0))) &&
       (!step.what || matchesSearch(c, step.what))
   );
 
@@ -2784,21 +2756,6 @@ function reviveFromDiscard(ctx) {
   });
 }
 
-function moveCountersBetween(ctx, from, to, counters, fromSide, toSide) {
-  const moved = counters * 10;
-  from.damage = Math.max(0, (from.damage || 0) - moved);
-  to.damage = (to.damage || 0) + moved;
-  ctx.events.push({ type: 'damageUpdated', instanceId: from.instanceId, damage: from.damage });
-  ctx.events.push({ type: 'damageUpdated', instanceId: to.instanceId, damage: to.damage });
-  ctx.events.push({
-    type: 'damageCountersPlaced',
-    instanceId: to.instanceId,
-    victimPlayerId: toSide.playerId,
-    attackerPlayerId: fromSide.playerId,
-    damage: to.damage,
-  });
-}
-
 // Damage Pump / Agatha / Grimsley / Damage Mover — move damage counters between Pokémon.
 function moveDamageCountersStep(ctx) {
   const { player, opponent, step } = ctx;
@@ -2813,12 +2770,22 @@ function moveDamageCountersStep(ctx) {
     (step.to === 'opponentActive' ? [activeOf(toSide)].filter(Boolean) : rootsOf(toSide)).filter(
       (c) => !effectShieldBlocks(ctx, toSide, c)
     );
-  const countersFor = (from) => Math.min(step.count || 1, Math.floor((from.damage || 0) / 10));
 
   const move = (from, to) => {
-    const counters = countersFor(from);
+    const counters = Math.min(step.count || 1, Math.floor((from.damage || 0) / 10));
     if (counters <= 0) return skip(ctx, 'no_damage_to_move');
-    moveCountersBetween(ctx, from, to, counters, fromSide, toSide);
+    const moved = counters * 10;
+    from.damage = Math.max(0, (from.damage || 0) - moved);
+    to.damage = (to.damage || 0) + moved;
+    ctx.events.push({ type: 'damageUpdated', instanceId: from.instanceId, damage: from.damage });
+    ctx.events.push({ type: 'damageUpdated', instanceId: to.instanceId, damage: to.damage });
+    ctx.events.push({
+      type: 'damageCountersPlaced',
+      instanceId: to.instanceId,
+      victimPlayerId: toSide.playerId,
+      attackerPlayerId: fromSide.playerId,
+      damage: to.damage,
+    });
     return null;
   };
 
@@ -3539,16 +3506,6 @@ function attachAttackTool(ctx) {
 
 // ── design 034 slice 5b: generic energy-move ability ─────────────────────
 
-function moveEnergyMatches(step, card) {
-  if (!isEnergy(card)) return false;
-  if (step.basic && !isBasicEnergy(card)) return false;
-  if (step.special && !isSpecialEnergy(card)) return false;
-  if (!step.energyType) return true;
-  const want = String(step.energyType).toLowerCase();
-  const types = (Array.isArray(card.types) ? card.types : []).map((t) => String(t).toLowerCase());
-  return types.includes(want) || String(card.name || '').toLowerCase().includes(want);
-}
-
 function rootHasTag(player, root, tag) {
   if (!tag) return true;
   const top = topPokemonCard(player, root);
@@ -3595,7 +3552,15 @@ function moveEnergyAbility(ctx) {
     (c) => c.instanceId !== fixedDestination?.instanceId
   );
   const energiesOn = (root) =>
-    attachedCards(player, root?.instanceId).filter((c) => moveEnergyMatches(step, c));
+    attachedCards(player, root?.instanceId).filter((c) => {
+      if (!isEnergy(c)) return false;
+      if (step.basic && !isBasicEnergy(c)) return false;
+      if (step.special && !isSpecialEnergy(c)) return false;
+      if (!step.energyType) return true;
+      const want = String(step.energyType).toLowerCase();
+      const types = (Array.isArray(c.types) ? c.types : []).map((t) => String(t).toLowerCase());
+      return types.includes(want) || String(c.name || '').toLowerCase().includes(want);
+    });
   const allEnergies = () => sources.flatMap((root) => energiesOn(root));
 
   const moveAll = (chosen, target) => {
@@ -3872,15 +3837,6 @@ function opponentHasStage2(ctx) {
   return rootsOf(ctx.opponent).some(
     (root) => normalizeStage(root.stage) === 'Stage 2'
   );
-}
-
-// False for a switch step with nothing on the Bench it may switch in (Serena's gust takes only a
-// Benched Pokémon V). Every other step counts as able to resolve.
-function switchHasTarget(ctx, step) {
-  const benched = (who) => (who?.zones.bench || []).filter((c) => !c.attachedTo);
-  if (step.type === 'switchOwn') return benched(ctx.player).length > 0;
-  if (step.type !== 'switchOpponent') return true;
-  return benched(ctx.opponent).some((c) => step.filter !== 'V' || isVCard(c));
 }
 
 /** A Supporter mode's "during this turn, attacks do N more damage" boost (parseTurnDamageBonus shape). */
@@ -4247,24 +4203,6 @@ function energySwapAbility(ctx) {
   });
 }
 
-function putStadiumIntoPlay(ctx, card) {
-  const { draft, player } = ctx;
-  removeFromZones(player, card);
-  card.attachedTo = null;
-  card.ownerId = card.ownerId || player.playerId;
-  draft.stadium = card;
-  for (const p of Object.values(draft.players || {})) {
-    if (p.flags) p.flags.stadiumUsedThisTurn = false;
-  }
-  ctx.events.push({
-    type: 'cardMoved',
-    instanceId: card.instanceId,
-    from: 'discard',
-    to: 'stadium',
-    playerId: player.playerId,
-  });
-}
-
 /**
  * "Discard any Stadium card in play" (Haxorus Grind Up, Marshadow Resetting Hole, Gothitelle
  * Teleport Room). `replace` then puts a differently named Stadium from your discard pile into
@@ -4277,7 +4215,23 @@ function stadiumManipAbility(ctx) {
     const incoming = player.zones.discard.find(
       (c) => c.instanceId === ctx.selection?.[0] && isStadiumCard(c) && c.name !== ctx.memo.discardedName
     );
-    if (incoming) putStadiumIntoPlay(ctx, incoming);
+    if (incoming) {
+      const { draft, player } = ctx;
+      removeFromZones(player, incoming);
+      incoming.attachedTo = null;
+      incoming.ownerId = incoming.ownerId || player.playerId;
+      draft.stadium = incoming;
+      for (const p of Object.values(draft.players || {})) {
+        if (p.flags) p.flags.stadiumUsedThisTurn = false;
+      }
+      ctx.events.push({
+        type: 'cardMoved',
+        instanceId: incoming.instanceId,
+        from: 'discard',
+        to: 'stadium',
+        playerId: player.playerId,
+      });
+    }
     return null;
   }
   if (!draft.stadium) return skip(ctx, 'no_stadium');
@@ -4328,52 +4282,6 @@ function transformCandidates(ctx, outgoing) {
   });
 }
 
-// `incoming` takes `outgoing`'s place in play with everything on it (Stance Change, Schooling,
-// V Transformation). An evolution card on a stack is swapped within the stack.
-function swapInPlace(player, outgoing, incoming, events) {
-  const zone = player.zones[zoneIdOf(player, outgoing)];
-  removeFromZones(player, incoming);
-  zone.splice(zone.indexOf(outgoing), 1, incoming);
-  if (outgoing.attachedTo != null) {
-    incoming.attachedTo = outgoing.attachedTo;
-  } else {
-    incoming.attachedTo = null;
-    for (const key of IN_PLAY_STATE_KEYS) {
-      if (outgoing[key] !== undefined) incoming[key] = outgoing[key];
-      delete outgoing[key];
-    }
-    outgoing.damage = 0;
-    copyConditions(outgoing, incoming);
-    clearConditions(outgoing);
-    for (const card of attachedCards(player, outgoing.instanceId)) {
-      card.attachedTo = incoming.instanceId;
-    }
-  }
-  outgoing.attachedTo = null;
-  // "Any other effects remain on the new Pokémon": attack effects that end when the Pokémon
-  // evolves follow the new top card, and an Ability already used this turn stays used, so the
-  // new Aegislash cannot Stance Change straight back.
-  const root = incoming.attachedTo != null ? zone.find((c) => c.instanceId === incoming.attachedTo) : incoming;
-  if (Array.isArray(root?.attackMarkers)) {
-    root.attackMarkers = root.attackMarkers.map((m) =>
-      m.topId === outgoing.instanceId ? { ...m, topId: incoming.instanceId } : m
-    );
-  }
-  const used = player.flags?.abilitiesUsed || {};
-  if (outgoing.abilityUsed || used[outgoing.instanceId]) {
-    incoming.abilityUsed = true;
-    player.flags = { ...player.flags, abilitiesUsed: { ...used, [incoming.instanceId]: true } };
-  }
-  // The card leaving play keeps no once-per-turn marker.
-  outgoing.abilityUsed = false;
-  events.push({
-    type: 'pokemonSwapped',
-    playerId: player.playerId,
-    instanceId: incoming.instanceId,
-    replacedInstanceId: outgoing.instanceId,
-  });
-}
-
 /**
  * Transform Abilities (design 034 slice 6): Aegislash Stance Change / Wishiwashi Schooling
  * (a named card from hand, the old one returns to hand), Ditto V V Transformation (discard
@@ -4395,7 +4303,50 @@ function transformAbility(ctx) {
     if (step.onTop) {
       attachTo(player, incoming, root, ctx.events);
     } else if (step.keepState) {
-      swapInPlace(player, outgoing, incoming, ctx.events);
+      // `incoming` takes `outgoing`'s place in play with everything on it (Stance Change, Schooling,
+      // V Transformation). An evolution card on a stack is swapped within the stack.
+      const events = ctx.events;
+      const zone = player.zones[zoneIdOf(player, outgoing)];
+      removeFromZones(player, incoming);
+      zone.splice(zone.indexOf(outgoing), 1, incoming);
+      if (outgoing.attachedTo != null) {
+        incoming.attachedTo = outgoing.attachedTo;
+      } else {
+        incoming.attachedTo = null;
+        for (const key of IN_PLAY_STATE_KEYS) {
+          if (outgoing[key] !== undefined) incoming[key] = outgoing[key];
+          delete outgoing[key];
+        }
+        outgoing.damage = 0;
+        copyConditions(outgoing, incoming);
+        clearConditions(outgoing);
+        for (const card of attachedCards(player, outgoing.instanceId)) {
+          card.attachedTo = incoming.instanceId;
+        }
+      }
+      outgoing.attachedTo = null;
+      // "Any other effects remain on the new Pokémon": attack effects that end when the Pokémon
+      // evolves follow the new top card, and an Ability already used this turn stays used, so the
+      // new Aegislash cannot Stance Change straight back.
+      const root = incoming.attachedTo != null ? zone.find((c) => c.instanceId === incoming.attachedTo) : incoming;
+      if (Array.isArray(root?.attackMarkers)) {
+        root.attackMarkers = root.attackMarkers.map((m) =>
+          m.topId === outgoing.instanceId ? { ...m, topId: incoming.instanceId } : m
+        );
+      }
+      const used = player.flags?.abilitiesUsed || {};
+      if (outgoing.abilityUsed || used[outgoing.instanceId]) {
+        incoming.abilityUsed = true;
+        player.flags = { ...player.flags, abilitiesUsed: { ...used, [incoming.instanceId]: true } };
+      }
+      // The card leaving play keeps no once-per-turn marker.
+      outgoing.abilityUsed = false;
+      events.push({
+        type: 'pokemonSwapped',
+        playerId: player.playerId,
+        instanceId: incoming.instanceId,
+        replacedInstanceId: outgoing.instanceId,
+      });
       // Deoxys Form Change (customhb): attached cards and damage counters move over; the
       // Pokémon that went back to the hand took its Special Conditions with it.
       if (step.keepConditions === false) clearConditions(incoming);
@@ -4676,15 +4627,6 @@ export const FROM_DISCARD_OPTION = -202;
 function searchOrRecover(ctx) {
   const { player, step } = ctx;
   const matching = (zone) => (player.zones[zone] || []).filter((c) => matchesSearch(c, step.what));
-  const toHand = (card, from) => {
-    removeFromZones(player, card);
-    player.zones.hand.push(card);
-    ctx.events.push({ type: 'cardMoved', instanceId: card.instanceId, from, to: 'hand', playerId: player.playerId });
-    // A discard-pile card was public already; a deck card is named only when revealed (design 059).
-    if (from !== 'deck' || ctx.revealsPicks) {
-      ctx.events.push({ type: 'cardsRevealed', playerId: player.playerId, cards: [{ instanceId: card.instanceId, name: card.name }] });
-    }
-  };
   const askFrom = (zone) => {
     const options = matching(zone);
     if (zone === 'deck' && options.length === 0) {
@@ -4705,7 +4647,15 @@ function searchOrRecover(ctx) {
   const phase = ctx.memo?.phase;
   if (ctx.selection && (phase === 'deck' || phase === 'discard')) {
     const card = pickById(matching(phase), ctx.selection)[0];
-    if (card) toHand(card, phase);
+    if (card) {
+      removeFromZones(player, card);
+      player.zones.hand.push(card);
+      ctx.events.push({ type: 'cardMoved', instanceId: card.instanceId, from: phase, to: 'hand', playerId: player.playerId });
+      // A discard-pile card was public already; a deck card is named only when revealed (design 059).
+      if (phase !== 'deck' || ctx.revealsPicks) {
+        ctx.events.push({ type: 'cardsRevealed', playerId: player.playerId, cards: [{ instanceId: card.instanceId, name: card.name }] });
+      }
+    }
     if (phase === 'deck') shuffleDeck(player, ctx);
     return null;
   }
@@ -4729,22 +4679,20 @@ function searchOrRecover(ctx) {
 function eachPlayerRecoverPokemon(ctx) {
   const order = [ctx.opponent, ctx.player].filter(Boolean);
   let turn = ctx.memo?.turn ?? 0;
-  const recover = (owner, card) => {
-    removeFromZones(owner, card);
-    owner.zones.hand.push(card);
-    ctx.events.push({
-      type: 'cardMoved',
-      instanceId: card.instanceId,
-      from: 'discard',
-      to: 'hand',
-      playerId: owner.playerId,
-    });
-    return null;
-  };
   if (ctx.selection) {
     const owner = order[turn];
     const card = owner.zones.discard.find((c) => c.instanceId === ctx.selection[0]);
-    if (card) recover(owner, card);
+    if (card) {
+      removeFromZones(owner, card);
+      owner.zones.hand.push(card);
+      ctx.events.push({
+        type: 'cardMoved',
+        instanceId: card.instanceId,
+        from: 'discard',
+        to: 'hand',
+        playerId: owner.playerId,
+      });
+    }
     turn += 1;
   }
   for (; turn < order.length; turn++) {
@@ -5464,7 +5412,10 @@ function opponentShuffleBenchToDeck(ctx) {
   const { opponent } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
   const bench = benchRootsOf(opponent);
-  const shuffleRest = (keepIds) => {
+  // At 2 or fewer Benched Pokémon the whole board is kept (printed "chooses 2").
+  if (bench.length <= 2) return null;
+  if (ctx.selection) {
+    const keepIds = ctx.selection.map(Number);
     const rest = bench.filter((root) => !keepIds.includes(root.instanceId));
     if (rest.length === 0) return null;
     let moved = 0;
@@ -5485,10 +5436,7 @@ function opponentShuffleBenchToDeck(ctx) {
       from: 'bench',
     });
     return null;
-  };
-  // At 2 or fewer Benched Pokémon the whole board is kept (printed "chooses 2").
-  if (bench.length <= 2) return null;
-  if (ctx.selection) return shuffleRest(ctx.selection.map(Number));
+  }
   return ctx.ask({
     player: opponent.playerId,
     prompt: `${sourceName(ctx, 'Trainer')}: Choose 2 Benched Pokémon to keep; the rest shuffle into your deck`,
@@ -5607,7 +5555,14 @@ function chooseMode(ctx) {
   if (modes.length === 0) return skip(ctx, 'no_modes');
   const offered = modes
     .map((mode, i) => ({ mode, n: i + 1 }))
-    .filter(({ mode }) => mode.steps.every((s) => switchHasTarget(ctx, s)));
+    .filter(({ mode }) => mode.steps.every((s) => {
+      // False for a switch step with nothing on the Bench it may switch in (Serena's gust takes only a
+      // Benched Pokémon V). Every other step counts as able to resolve.
+      const benched = (who) => (who?.zones.bench || []).filter((c) => !c.attachedTo);
+      if (s.type === 'switchOwn') return benched(ctx.player).length > 0;
+      if (s.type !== 'switchOpponent') return true;
+      return benched(ctx.opponent).some((c) => s.filter !== 'V' || isVCard(c));
+    }));
   if (offered.length === 0) return skip(ctx, 'no_legal_mode');
   if (ctx.selection) {
     const legal = new Set(offered.map(({ n }) => n));
@@ -5672,17 +5627,16 @@ function playCopiesChoice(ctx) {
   const { step } = ctx;
   const count = step.count || 2;
   const copies = otherCopiesInHand(ctx);
-  const playAll = () => {
-    discardPlayedCopies(ctx, copies.slice(0, count - 1));
-    ctx.insertSteps(step.multi || []);
-    return null;
-  };
   if (copies.length < count - 1) {
     ctx.insertSteps(step.single || []);
     return null;
   }
   if (ctx.selection) {
-    if (ctx.selection.map(Number).includes(2)) return playAll();
+    if (ctx.selection.map(Number).includes(2)) {
+      discardPlayedCopies(ctx, copies.slice(0, count - 1));
+      ctx.insertSteps(step.multi || []);
+      return null;
+    }
     ctx.insertSteps(step.single || []);
     return null;
   }

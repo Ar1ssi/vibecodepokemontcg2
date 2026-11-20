@@ -93,8 +93,6 @@ const decodeWithin = (root, capMs) => {
   ]);
 };
 
-const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
-
 // The card's pose in px, on the host and on the root: the HUD and the Energy row position themselves
 // from the root's copy (card-focus.css), so they follow a resize with no JS layout of their own.
 const applyPose = (state, rect) => {
@@ -125,12 +123,6 @@ const raiseHand = (state) => {
   getBoardScene()?.setHandPose('normal');
 };
 
-const hideSource = (state) => {
-  const target = state.sourceImg.closest?.('.mat-holo') ?? state.sourceImg;
-  state.hidden = { target, visibility: target.style.visibility };
-  target.style.visibility = 'hidden';
-};
-
 const restoreSource = (state) => {
   if (!state.hidden) return;
   state.hidden.target.style.visibility = state.hidden.visibility;
@@ -153,49 +145,6 @@ const hudButton = (className, label, onClick, { enabled = true, filled = false }
     if (!button.disabled) onClick();
   });
   return button;
-};
-
-const startOpenAnimations = (state, from, to) => {
-  const { host, root } = state;
-  host.style.visibility = '';
-  root.classList.add('card-focus--open');
-  // A source with no box (hidden, collapsed) has nowhere to fly from: grow in place instead.
-  const fromStart =
-    from.width > 0 && from.height > 0
-      ? transformString(flightTransform(from, to, { tiltDeg: DEFAULT_TILT_DEG }))
-      : 'scale(0.85)';
-  // The mesh casts its own shadow; the host's would frame an empty box.
-  state.flight = host.animate(
-    state.meshId === null
-      ? [
-          { transform: fromStart, boxShadow: LIFT_SHADOW_FROM },
-          { transform: 'none', boxShadow: LIFT_SHADOW_TO },
-        ]
-      : [{ transform: fromStart }, { transform: 'none' }],
-    { duration: FLIGHT_MS, easing: FLIGHT_EASE, fill: 'both' }
-  );
-  if (state.meshId !== null) {
-    getBoardScene()?.lift(state.meshId, {
-      ...focusMeshPose(to, getBoardScene()),
-      ms: FLIGHT_MS,
-      ease: flightEase,
-    });
-  }
-  host.classList.add(REVEALING_CLASS);
-  state.reveal = host.animate(
-    { '--focus-reveal': [REVEAL_START, REVEAL_END] },
-    {
-      duration: expandDurationMs(COLLAPSED_FRACTION, 1),
-      easing: EXPAND_EASE,
-      fill: 'both',
-    }
-  );
-  state.reveal.finished
-    .then(() => {
-      if (focusState === state && !state.closing) host.classList.remove(REVEALING_CLASS);
-    })
-    .catch(() => {});
-  state.opened = true;
 };
 
 /**
@@ -225,37 +174,10 @@ const buildHud = ({ statuses, onStatus, onClose, onStack }) => {
   return hud;
 };
 
-const buildCover = () => {
-  const backdrop = el('div', 'card-focus__backdrop');
-  for (const part of ['top', 'middle', 'bottom']) {
-    backdrop.appendChild(el('div', `card-focus__cover card-focus__cover--${part}`));
-  }
-  return backdrop;
-};
-
 // The attached Energy as big tokens under the card, like the game draws it. Anything that is not an
 // Energy with a token (a Tool, a Special Energy with no type) stays reachable behind the Stack button.
 const isEnergyCard = (attached) =>
   attached?.type === 'Energy' || /energy/i.test(String(attached?.name ?? ''));
-
-const buildEnergyRow = (card) => {
-  const row = el('div', 'card-focus__energies');
-  for (const attached of card.attachedCards || []) {
-    if (!isEnergyCard(attached)) continue;
-    const key = energyTypeKeyFor({
-      types: attached.types ?? (attached.energyType ? [attached.energyType] : undefined),
-      name: attached.name,
-    });
-    const src = key ? getEnergyTokenSrcForType(key) : null;
-    if (!src) continue;
-    const img = el('img', 'card-focus__energy');
-    img.src = src;
-    img.alt = String(attached.name ?? 'Energy');
-    img.draggable = false;
-    row.appendChild(img);
-  }
-  return row.childElementCount > 0 ? row : null;
-};
 
 const onResize = () => {
   const state = focusState;
@@ -354,7 +276,10 @@ export function openCardFocus({
     });
 
     state.root = el('div', 'card-focus');
-    const backdrop = buildCover();
+    const backdrop = el('div', 'card-focus__backdrop');
+    for (const part of ['top', 'middle', 'bottom']) {
+      backdrop.appendChild(el('div', `card-focus__cover card-focus__cover--${part}`));
+    }
     state.stage = el('div', 'card-focus__stage');
     state.stage.style.perspective = `${perspectiveFor(viewport.height)}px`;
     state.host = el('div', 'card-focus__card');
@@ -368,7 +293,22 @@ export function openCardFocus({
     state.inspectorWrap = content;
     state.tiltEl = el('div', 'card-focus__tilt');
     state.tiltEl.appendChild(content);
-    const energies = buildEnergyRow(card);
+    const row = el('div', 'card-focus__energies');
+    for (const attached of card.attachedCards || []) {
+      if (!isEnergyCard(attached)) continue;
+      const key = energyTypeKeyFor({
+        types: attached.types ?? (attached.energyType ? [attached.energyType] : undefined),
+        name: attached.name,
+      });
+      const src = key ? getEnergyTokenSrcForType(key) : null;
+      if (!src) continue;
+      const img = el('img', 'card-focus__energy');
+      img.src = src;
+      img.alt = String(attached.name ?? 'Energy');
+      img.draggable = false;
+      row.appendChild(img);
+    }
+    const energies = row.childElementCount > 0 ? row : null;
     if (energies) state.tiltEl.appendChild(energies);
     state.host.appendChild(state.tiltEl);
     state.stage.appendChild(state.host);
@@ -421,7 +361,11 @@ export function openCardFocus({
 
     document.body.appendChild(state.root);
     lowerHand(state);
-    if (state.meshId === null) hideSource(state);
+    if (state.meshId === null) {
+      const target = state.sourceImg.closest?.('.mat-holo') ?? state.sourceImg;
+      state.hidden = { target, visibility: target.style.visibility };
+      target.style.visibility = 'hidden';
+    }
     state.cleanups = [
       watchForPickers(),
     ];
@@ -453,9 +397,49 @@ const isArmed = (state) => performance.now() - state.openedAt >= CLICK_GUARD_MS;
 const start = async (state, from) => {
   try {
     await decodeWithin(state.root, DECODE_CAP_MS);
-    await nextFrame();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
     if (focusState !== state || state.closing) return;
-    startOpenAnimations(state, from, state.to);
+    const to = state.to;
+    const { host, root } = state;
+    host.style.visibility = '';
+    root.classList.add('card-focus--open');
+    // A source with no box (hidden, collapsed) has nowhere to fly from: grow in place instead.
+    const fromStart =
+      from.width > 0 && from.height > 0
+        ? transformString(flightTransform(from, to, { tiltDeg: DEFAULT_TILT_DEG }))
+        : 'scale(0.85)';
+    // The mesh casts its own shadow; the host's would frame an empty box.
+    state.flight = host.animate(
+      state.meshId === null
+        ? [
+            { transform: fromStart, boxShadow: LIFT_SHADOW_FROM },
+            { transform: 'none', boxShadow: LIFT_SHADOW_TO },
+          ]
+        : [{ transform: fromStart }, { transform: 'none' }],
+      { duration: FLIGHT_MS, easing: FLIGHT_EASE, fill: 'both' }
+    );
+    if (state.meshId !== null) {
+      getBoardScene()?.lift(state.meshId, {
+        ...focusMeshPose(to, getBoardScene()),
+        ms: FLIGHT_MS,
+        ease: flightEase,
+      });
+    }
+    host.classList.add(REVEALING_CLASS);
+    state.reveal = host.animate(
+      { '--focus-reveal': [REVEAL_START, REVEAL_END] },
+      {
+        duration: expandDurationMs(COLLAPSED_FRACTION, 1),
+        easing: EXPAND_EASE,
+        fill: 'both',
+      }
+    );
+    state.reveal.finished
+      .then(() => {
+        if (focusState === state && !state.closing) host.classList.remove(REVEALING_CLASS);
+      })
+      .catch(() => {});
+    state.opened = true;
   } catch (error) {
     console.error('card focus failed to start', error);
     closeCardFocus({ immediate: true });

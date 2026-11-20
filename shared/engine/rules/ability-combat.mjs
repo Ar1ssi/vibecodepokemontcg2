@@ -182,12 +182,6 @@ function typeSymbols(text) {
     .filter(Boolean);
 }
 
-/** Canonical (capitalised) type name for a symbol letter. */
-function typeName(letter) {
-  const lower = TYPE_LETTER[letter];
-  return lower ? lower[0].toUpperCase() + lower.slice(1) : null;
-}
-
 /**
  * The printed "from your opponent's {R} and {W} Pokémon" requirement, checked
  * here so `reductionForCard`'s generic symbol scan can be skipped: that scan
@@ -330,14 +324,6 @@ function sourceConditionMet(text, holder, target, attacker, ctx) {
     if (holderZone(holder, ctx) !== 'active') return false;
   }
   return inPlayConditionMet(text, target, ctx);
-}
-
-// "your Solgaleo and Lunala take 50 less damage": the printed names a team reduction covers, or
-// null when the wording names a category ("your Pokémon", "your {W} Pokémon") instead.
-function namedReductionTargets(text) {
-  const plain = "(?:(?!pok[eé]mon)[a-z0-9 .'’-])+?";
-  const m = text.match(new RegExp(`\\byour (${plain}(?: and ${plain})*) take \\d+ less damage`));
-  return m ? m[1].split(' and ').map((n) => n.trim()) : null;
 }
 
 /** True when the holder itself is the only legal target ("this Pokémon"). */
@@ -648,7 +634,12 @@ export function abilityDamageReduction(defender, attacker, ctx = {}) {
     if (isAbilitySuppressed(holder, ctx)) continue;
     if (isSelfScoped(t) && !sameCard(holder, defender)) continue;
     // The printed text, not `t`: `t` reads the holder's own name as "this pokémon".
-    const named = namedReductionTargets(lower(cardAbilityText(holder)));
+    // "your Solgaleo and Lunala take 50 less damage": the printed names a team reduction covers, or
+    // null when the wording names a category ("your Pokémon", "your {W} Pokémon") instead.
+    const text = lower(cardAbilityText(holder));
+    const plain = "(?:(?!pok[eé]mon)[a-z0-9 .'’-])+?";
+    const m = text.match(new RegExp(`\\byour (${plain}(?: and ${plain})*) take \\d+ less damage`));
+    const named = m ? m[1].split(' and ').map((n) => n.trim()) : null;
     if (named && !named.some((n) => lower(defender?.name).includes(n))) continue;
     if (!sourceConditionMet(t, holder, defender, attacker, ctx)) continue;
     if (!attackerTypeRequirementMet(t, attacker)) continue;
@@ -869,13 +860,6 @@ function effectShieldCovers(target, holder, defender, ctx) {
 const ATTACKER_KIND_SHIELD =
   /^prevent all effects of attacks, including damage, done to this pok[eé]mon by your opponent's (pok[eé]mon-ex|pok[eé]mon-gx)\.?$/;
 
-function attackerKindShields(holder, defender, attacker, ctx) {
-  if (!sameCard(holder, defender)) return false;
-  const kind = selfNamedText(holder).match(ATTACKER_KIND_SHIELD)?.[1];
-  if (!kind || isAbilitySuppressed(holder, ctx)) return false;
-  return /-gx$/.test(kind) ? isGxCard(attacker) : isExCard(attacker);
-}
-
 /**
  * Does an Ability on the defender (or its side) prevent the effects of `attacker`'s attack done to
  * `defender`? `defender` is the in-play view (the printed Ability sits on the top card); `ctx` is the
@@ -885,7 +869,12 @@ export function abilityPreventsAttackEffects(defender, attacker, ctx = {}) {
   if (!defender) return false;
   // Pain Points: an attack that is not affected by Abilities gets past every Ability shield.
   if (abilityIgnoresDefenderAbilities(attacker)) return toolPreventsAttackEffects(defender, ctx);
-  if (sideInPlay(ctx).concat(defender).some((holder) => attackerKindShields(holder, defender, attacker, ctx))) return true;
+  if (sideInPlay(ctx).concat(defender).some((holder) => {
+    if (!sameCard(holder, defender)) return false;
+    const kind = selfNamedText(holder).match(ATTACKER_KIND_SHIELD)?.[1];
+    if (!kind || isAbilitySuppressed(holder, ctx)) return false;
+    return /-gx$/.test(kind) ? isGxCard(attacker) : isExCard(attacker);
+  })) return true;
   for (const holder of dedupe([defender, ...sideInPlay(ctx)])) {
     const shield = selfNamedText(holder).match(ATTACK_EFFECT_SHIELD);
     // "Prevent all effects done to …" with neither an attack clause nor a damage exclusion is unread.
@@ -928,17 +917,13 @@ const SHIELD_SOURCES = {
   'any stadium': ['Stadium'],
 };
 
-function abilityTextsOf(card) {
-  const list = Array.isArray(card?.abilities) ? card.abilities : [];
+function cardEffectShields(holder) {
+  const shields = [];
+  const list = Array.isArray(holder?.abilities) ? holder.abilities : [];
   const texts = list
     .map((a) => lower(typeof a === 'string' ? a : a?.text ?? a?.effect ?? ''))
     .filter(Boolean);
-  return texts.length > 0 ? texts : [cardAbilityText(card)];
-}
-
-function cardEffectShields(holder) {
-  const shields = [];
-  for (const text of abilityTextsOf(holder)) {
+  for (const text of texts.length > 0 ? texts : [cardAbilityText(holder)]) {
     for (const sentence of text.replace(/[’‘]/g, "'").split(/(?<=\.)\s+/)) {
       const m = sentence.trim().match(CARD_EFFECT_SHIELD);
       if (m) shields.push({ condition: m[1], sources: SHIELD_SOURCES[(m[2] || m[3]).replace('pokemon', 'pokémon')] || [], target: m[4] });
@@ -1100,7 +1085,10 @@ export function abilityWeaknessOverride(defender, ctx = {}) {
         if (attackerTypes(defender).includes(from)) {
           // Klefki Fairy Lock: the printed "(Apply Weakness as x2)" sets the multiplier.
           const amount = Number(t.match(/apply weakness as [x×](\d)/)?.[1]);
-          return { type: typeName(replace[2]), ...(amount > 0 && amount !== 2 ? { multiplier: amount } : {}) };
+          // Canonical (capitalised) type name for a symbol letter.
+          const letter = replace[2];
+          const lower = TYPE_LETTER[letter];
+          return { type: lower ? lower[0].toUpperCase() + lower.slice(1) : null, ...(amount > 0 && amount !== 2 ? { multiplier: amount } : {}) };
         }
       }
     }
@@ -1178,15 +1166,6 @@ export function abilityRetreatCost(target, ctx = {}) {
   // "{C}{C} less" / "2 less": the number, or how many Energy symbols are printed.
   const amount = (digits, symbols) =>
     digits ? Number(digits) : ((symbols || '').match(/\{c\}/g) || []).length;
-  const hasTypedEnergy = (letter) => {
-    const want = lower(TYPE_LETTER[letter]);
-    return attachedEnergy(target, ctx.sideCards || []).some((e) =>
-      [e.energyType, ...(Array.isArray(e.types) ? e.types : []), e.name]
-        .map(lower)
-        .join(' ')
-        .includes(want)
-    );
-  };
   let delta = 0;
   const seenTeamTexts = new Set();
   for (const card of dedupe(sideInPlay(ctx))) {
@@ -1226,7 +1205,14 @@ export function abilityRetreatCost(target, ctx = {}) {
       /the retreat cost of each of your pok[eé]mon that has any \{([a-z])\} energy attached is (?:(\d+)|((?:\{c\})+)) less/
     );
     if (teamLess) {
-      if (hasTypedEnergy(teamLess[1])) delta -= amount(teamLess[2], teamLess[3]) || 2;
+      const letter = teamLess[1];
+      const want = lower(TYPE_LETTER[letter]);
+      if (attachedEnergy(target, ctx.sideCards || []).some((e) =>
+        [e.energyType, ...(Array.isArray(e.types) ? e.types : []), e.name]
+          .map(lower)
+          .join(' ')
+          .includes(want)
+      )) delta -= amount(teamLess[2], teamLess[3]) || 2;
       continue;
     }
     const less =
@@ -1543,12 +1529,6 @@ function selfExemptFromSuppression(text, holder, card) {
   return sameCard(holder, card);
 }
 
-/** Lowercased printed names of the Abilities `card` has (plural server shape or singular). */
-function abilityNamesOf(card) {
-  const entries = Array.isArray(card?.abilities) ? card.abilities : card?.ability ? [card.ability] : [];
-  return entries.map((entry) => lower(typeof entry === 'string' ? entry : entry?.name)).filter(Boolean);
-}
-
 /** True when the suppression text's target filter matches `card`. */
 function suppressionTargets(text, holder, card, ctx) {
   const holderSide = sideOf(holder, ctx);
@@ -1562,7 +1542,9 @@ function suppressionTargets(text, holder, card, ctx) {
   const named = /pok[eé]mon with the (.+?) abilit(?:y|ies) have no abilities/.exec(text);
   if (named) {
     const wanted = named[1].split(/\s*(?:,|\bor\b|\band\b)\s*/).filter(Boolean);
-    const own = abilityNamesOf(card);
+    // Lowercased printed names of the Abilities `card` has (plural server shape or singular).
+    const entries = Array.isArray(card?.abilities) ? card.abilities : card?.ability ? [card.ability] : [];
+    const own = entries.map((entry) => lower(typeof entry === 'string' ? entry : entry?.name)).filter(Boolean);
     if (!wanted.some((name) => own.includes(name))) return false;
   }
   if (/pok[eé]mon-gx and pok[eé]mon-ex/.test(text) && !isExCard(card) && !isGxCard(card)) {
@@ -1633,18 +1615,14 @@ export function legacyPowerStopped(card) {
 
 const TOXIC_GAS = /ignore all pok[eé]mon powers other than toxic gases/;
 
-/** The printed kind is the only mark of a Pokémon Power: the WotC texts carry none. */
-function hasPokemonPower(card) {
-  const entries = Array.isArray(card?.abilities) ? card.abilities : card?.ability ? [card.ability] : [];
-  return entries.some((entry) => /pok[eé]mon power/i.test(String(entry?.type || '')));
-}
-
 /**
  * Muk Toxic Gas [Fossil 13]: "Ignore all Pokémon Powers other than Toxic Gases." True when a
  * working Toxic Gas is in play on either side and `card`'s Power is not itself a Toxic Gas.
  */
 function toxicGasIgnores(card, ctx) {
-  if (!hasPokemonPower(card) || TOXIC_GAS.test(cardAbilityText(card))) return false;
+  // The printed kind is the only mark of a Pokémon Power: the WotC texts carry none.
+  const entries = Array.isArray(card?.abilities) ? card.abilities : card?.ability ? [card.ability] : [];
+  if (!entries.some((entry) => /pok[eé]mon power/i.test(String(entry?.type || ''))) || TOXIC_GAS.test(cardAbilityText(card))) return false;
   const holders = dedupe([
     ...inPlayViews(ctx.sideCards),
     ...inPlayViews(ctx.opponentSideCards),
@@ -1753,7 +1731,12 @@ export function abilityActivationBlockReason(card, ctx = {}) {
   const sideTopCards = needed && Array.isArray(ctx.sideCards) ? sideTops(ctx.sideCards) : [];
   const neededInPlay = needed?.names
     ? needed.names.every((name) => sideTopCards.some((top) => lower(top.name).includes(name)))
-    : sideTopCards.some((top) => matchesInPlayDescriptor(top, needed));
+    : sideTopCards.some((top) => {
+      if (!isPokemon(top)) return false;
+      if (needed.type && !attackerTypes(top).includes(needed.type)) return false;
+      if (needed.mega && !isMegaCard(top)) return false;
+      return !needed.ex || isExCard(top);
+    });
   if (rulesEnabled && needed && Array.isArray(ctx.sideCards) && !neededInPlay) {
     return `You need ${needed.label} in play to use this Ability.`;
   }
@@ -1766,7 +1749,8 @@ export function abilityActivationBlockReason(card, ctx = {}) {
     return 'This Pokémon has not been healed this turn.';
   }
   // Homebrew Dodrio Three of a Kind: "if you have exactly 3 Pokémon with the same name in play".
-  const sameNameCount = exactSameNameCount(card);
+  const count = lower(cardAbilityText(card)).match(EXACT_SAME_NAME)?.[1];
+  const sameNameCount = count ? Number(count) : 0;
   if (rulesEnabled && sameNameCount && Array.isArray(ctx.sideCards)) {
     const byName = new Map();
     for (const top of sideTops(ctx.sideCards)) byName.set(lower(top.name), (byName.get(lower(top.name)) || 0) + 1);
@@ -1849,18 +1833,6 @@ function requiredInPlayDescriptor(card) {
 }
 
 const EXACT_SAME_NAME = /if you have exactly (\d+) pok[eé]mon with the same name in play, you may/;
-
-function exactSameNameCount(card) {
-  const count = lower(cardAbilityText(card)).match(EXACT_SAME_NAME)?.[1];
-  return count ? Number(count) : 0;
-}
-
-function matchesInPlayDescriptor(card, needed) {
-  if (!isPokemon(card)) return false;
-  if (needed.type && !attackerTypes(card).includes(needed.type)) return false;
-  if (needed.mega && !isMegaCard(card)) return false;
-  return !needed.ex || isExCard(card);
-}
 
 // "Once during your turn, when this Pokémon moves from your Bench to the Active
 // Spot, …" — the parse step that marks a Bench→Active trigger.

@@ -29,14 +29,6 @@ const OVERLAY_SLOTS = ['damageCounter', 'specialCondition', 'poisonMarker', 'bur
 
 const imagesIn = (element) => Array.from(element?.querySelectorAll?.('img') ?? []);
 
-// The card a counter overlay belongs to, matched by element identity rather
-// than geometry: the overlay is a sibling inside the zone and the card keeps
-// the only reference to it.
-const owningImageOf = (target) =>
-  imagesIn(target?.parentElement).find((image) =>
-    OVERLAY_SLOTS.some((slot) => image[slot] === target)
-  ) ?? null;
-
 // A click on zone decoration (a mat plate, the empty slot itself) in a zone
 // holding exactly one card. Several cards is a guess, so it stays unresolved.
 const loneImageOfZone = (target) => {
@@ -51,7 +43,12 @@ const stampedImageOf = (target) => {
   if (target.card) return target;
   const holoImage = target.closest?.('.mat-holo')?.querySelector?.('img');
   if (holoImage?.card) return holoImage;
-  for (const candidate of [owningImageOf(target), loneImageOfZone(target)]) {
+  // The card a counter overlay belongs to, matched by element identity rather
+  // than geometry: the overlay is a sibling inside the zone and the card keeps
+  // the only reference to it.
+  for (const candidate of [imagesIn(target?.parentElement).find((image) =>
+    OVERLAY_SLOTS.some((slot) => image[slot] === target)
+  ) ?? null, loneImageOfZone(target)]) {
     if (candidate?.card) return candidate;
   }
   return null;

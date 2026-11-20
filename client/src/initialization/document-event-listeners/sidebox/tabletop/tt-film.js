@@ -133,20 +133,6 @@ if (uTear.w > 0.0) {
 }
 `;
 
-const makeUniforms = () => ({
-  uLoosen: { value: 0 },
-  uCrumple: { value: 0 },
-  // The film's centre at rest, in its mesh's space: where a point's bearing on the ball is taken from.
-  uOrigin: { value: new Vector3() },
-  uBallCenter: { value: new Vector3() },
-  uBallRadius: { value: 14 },
-  uDrift: { value: new Vector3() },
-  uTear: { value: new Vector4(0, 0, 0, 0) },
-  // How far (mm) the film round a tear lifts off what it wraps; 0 keeps it flat.
-  uFlapLift: { value: 0 },
-  uFade: { value: 1 },
-});
-
 /**
  * `crumpleLight` scales what the layer adds once balled up, `crumpleTint` darkens its colour and
  * `crumpleAlpha` gives it body, most where its folds turn edge-on: on the studio's white floor a
@@ -194,7 +180,19 @@ function inject(
  *   dispose: () => void}}
  */
 export function createFilmMaterials({ envMap, crinkle, seams = null, envIntensity = 0.85, haze = 0.07 }) {
-  const uniforms = makeUniforms();
+  const uniforms = {
+    uLoosen: { value: 0 },
+    uCrumple: { value: 0 },
+    // The film's centre at rest, in its mesh's space: where a point's bearing on the ball is taken from.
+    uOrigin: { value: new Vector3() },
+    uBallCenter: { value: new Vector3() },
+    uBallRadius: { value: 14 },
+    uDrift: { value: new Vector3() },
+    uTear: { value: new Vector4(0, 0, 0, 0) },
+    // How far (mm) the film round a tear lifts off what it wraps; 0 keeps it flat.
+    uFlapLift: { value: 0 },
+    uFade: { value: 1 },
+  };
   // A tight film is nearly flat; the crinkle only breaks up its reflections.
   const normalScale = new Vector2(0.22, 0.22);
   const gloss = new MeshPhysicalMaterial({

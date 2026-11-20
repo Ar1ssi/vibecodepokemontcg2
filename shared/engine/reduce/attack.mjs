@@ -502,9 +502,6 @@ function abilityBorrowedAttacks(state, card) {
   return borrowed;
 }
 
-const abilityTexts = (view) =>
-  (view?.abilities || []).map((a) => (typeof a === 'string' ? a : a?.text ?? a?.effect ?? ''));
-
 /**
  * Attacks other cards let `card` use (design 049 slice 4): an in-play Ability on either side
  * (Relicanth Memory Dive, Celebi-EX Time Recall, Aerodactyl Prehistoric Memory, Honchkrow Dark
@@ -527,7 +524,7 @@ function grantedAttacksFor(state, card) {
     for (const root of ['active', 'bench'].flatMap((z) => rootsIn(owner?.zones?.[z]))) {
       const holder = inPlayView(state, root);
       // Cheap prefilter: this runs for every root on every attack view.
-      const grants = abilityTexts(holder)
+      const grants = (holder?.abilities || []).map((a) => (typeof a === 'string' ? a : a?.text ?? a?.effect ?? ''))
         .filter((t) => /can use any attack|attack as its own/i.test(t))
         .map(parseAttackGrant)
         .filter(Boolean);

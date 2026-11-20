@@ -26,10 +26,6 @@ const STATUS_KEY = {
   Paralyzed: 'paralyzed',
 };
 
-function cardKey(card) {
-  return card?.image?.dataset?.cardId || card?.name || '';
-}
-
 function normalizeCoinBranch(branch) {
   if (!branch) return [];
   if (Array.isArray(branch)) return branch;
@@ -142,7 +138,7 @@ function getRemainingPrizes(who) {
 }
 
 function applyStatusToCard(player, card, conditions = []) {
-  const key = cardKey(card);
+  const key = card?.image?.dataset?.cardId || card?.name || '';
   if (!key) return;
   for (const condition of conditions) {
     const st = STATUS_KEY[condition] || String(condition).toLowerCase();
@@ -317,15 +313,6 @@ export function switchBenchToActive(user, benchCard) {
   if (benchIdx < 0) return;
   moveCardBundle(user, user, 'bench', 'active', benchIdx, false, 'move');
   msg(`  auto: switched in ${benchCard.name}`);
-}
-
-function matchesHealTarget(card, target) {
-  if (target === 'Mega Evolution Pokémon ex') {
-    const name = String(card.name || '').toLowerCase();
-    return /mega evolution.*\bex\b/i.test(String(card.name || '')) ||
-      (name.includes('mega') && name.includes(' ex'));
-  }
-  return true;
 }
 
 async function runSearchStep(card, searchStep, done) {
@@ -998,7 +985,15 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
           break;
         }
         case 'heal': {
-          const candidates = getInPlayPokemon(_effectOwner).filter((c) => matchesHealTarget(c, step.target));
+          const candidates = getInPlayPokemon(_effectOwner).filter((c) => {
+            const target = step.target;
+            if (target === 'Mega Evolution Pokémon ex') {
+              const name = String(c.name || '').toLowerCase();
+              return /mega evolution.*\bex\b/i.test(String(c.name || '')) ||
+                (name.includes('mega') && name.includes(' ex'));
+            }
+            return true;
+          });
           if (!candidates.length) {
             msg('  no valid Pokémon to heal');
             break;

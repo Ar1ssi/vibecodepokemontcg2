@@ -222,17 +222,6 @@ const sideLobes = (main, rects, bounds, end) => {
 };
 
 /**
- * The grassy island in a bog's middle (its lobes' centroid by area, which the smaller lobes can't
- * pull out of the biggest one), ISLAND_SHARE of the biggest lobe's radius.
- */
-const islandOf = (lobes) => {
-  const area = lobes.reduce((sum, lobe) => sum + lobe.r * lobe.r, 0);
-  const x = lobes.reduce((sum, lobe) => sum + lobe.x * lobe.r * lobe.r, 0) / area;
-  const y = lobes.reduce((sum, lobe) => sum + lobe.y * lobe.r * lobe.r, 0) / area;
-  return { x, y, r: ISLAND_SHARE * lobes[0].r };
-};
-
-/**
  * One bog of poison: its lobes (circles, the first the biggest), merged softly, and the grassy
  * island in its biggest lobe.
  * @typedef {{ lobes: { x: number, y: number, r: number }[], island: { x: number, y: number, r: number } }} Bog
@@ -259,7 +248,12 @@ export function poisonBogs(layout) {
     }
     if (!main) continue;
     const lobes = [main, ...sideLobes(main, rects, bounds, corner.end)];
-    bogs.push({ lobes, island: islandOf(lobes) });
+    // The grassy island in a bog's middle (its lobes' centroid by area, which the smaller lobes can't
+    // pull out of the biggest one), ISLAND_SHARE of the biggest lobe's radius.
+    const area = lobes.reduce((sum, lobe) => sum + lobe.r * lobe.r, 0);
+    const x = lobes.reduce((sum, lobe) => sum + lobe.x * lobe.r * lobe.r, 0) / area;
+    const y = lobes.reduce((sum, lobe) => sum + lobe.y * lobe.r * lobe.r, 0) / area;
+    bogs.push({ lobes, island: { x, y, r: ISLAND_SHARE * lobes[0].r } });
   }
   return bogs;
 }
@@ -659,30 +653,6 @@ const leafOf = (x, y, salt, overrides) => {
 const widthFor = (kind, length, roll) =>
   length * (kind === LEAF_KINDS.broad ? 0.5 + 0.1 * roll : kind === LEAF_KINDS.frond ? 0.36 : 0.3 + 0.08 * roll);
 
-/** Each plant's leaves, fanned round its root and arching up and over (spike plants grow a rosette instead). */
-const plantLeaves = (spots) => {
-  const leaves = [];
-  for (const plant of spots.plants ?? []) {
-    if (plant.spike) continue;
-    for (let k = 0; k < plant.count; k += 1) {
-      const roll = (j) => hash(plant.x, plant.y, 600 + k * 8 + j);
-      const length = plant.size * (0.75 + 0.35 * roll(1));
-      leaves.push(
-        leafOf(plant.x, plant.y, 20 + k, {
-          yaw: plant.seed * 2 * Math.PI + (k / plant.count) * 2 * Math.PI + (roll(2) - 0.5) * 0.5,
-          kind: plant.kind,
-          length,
-          width: widthFor(plant.kind, length, roll(3)),
-          tint: roll(4) < 0.85 ? plant.tint : Math.floor(roll(5) * 4),
-          lift: 0.65 + 0.45 * roll(6),
-          droop: 1.0 + 0.8 * roll(7),
-        })
-      );
-    }
-  }
-  return leaves;
-};
-
 /** Fronds and small leaves sprouting round the islands' flower spikes. */
 const islandLeaves = (spots) => {
   const leaves = [];
@@ -781,7 +751,27 @@ const shoreLeaves = (spots) => {
  */
 export function jungleLeaves(spots) {
   if (!spots?.cards) return [];
-  return [...plantLeaves(spots), ...shoreLeaves(spots), ...islandLeaves(spots), ...rosetteLeaves(spots)];
+  // Each plant's leaves, fanned round its root and arching up and over (spike plants grow a rosette instead).
+  const leaves = [];
+  for (const plant of spots.plants ?? []) {
+    if (plant.spike) continue;
+    for (let k = 0; k < plant.count; k += 1) {
+      const roll = (j) => hash(plant.x, plant.y, 600 + k * 8 + j);
+      const length = plant.size * (0.75 + 0.35 * roll(1));
+      leaves.push(
+        leafOf(plant.x, plant.y, 20 + k, {
+          yaw: plant.seed * 2 * Math.PI + (k / plant.count) * 2 * Math.PI + (roll(2) - 0.5) * 0.5,
+          kind: plant.kind,
+          length,
+          width: widthFor(plant.kind, length, roll(3)),
+          tint: roll(4) < 0.85 ? plant.tint : Math.floor(roll(5) * 4),
+          lift: 0.65 + 0.45 * roll(6),
+          droop: 1.0 + 0.8 * roll(7),
+        })
+      );
+    }
+  }
+  return [...leaves, ...shoreLeaves(spots), ...islandLeaves(spots), ...rosetteLeaves(spots)];
 }
 
 /**

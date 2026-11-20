@@ -70,10 +70,8 @@ const knockoutScenes = createKnockoutScenes({
   clearTimer: (id) => clearTimeout(id),
 });
 
-const sideFor = (user) => (user === 'self' ? 'you' : 'them');
-
 const shuffleZoneCount = (user, zoneId) => {
-  const side = sideFor(user);
+  const side = user === 'self' ? 'you' : 'them';
   return zoneId === 'deck'
     ? getAuthoritativeDeckCount(side)
     : getAuthoritativeZoneArray(side, zoneId).length;
@@ -117,54 +115,11 @@ let handRuns = new Map();
 let transitTaken = new Set();
 let powersOf = new Map();
 
-// Design 089: each card's Special Conditions before this batch, for the cards whose conditions an
-// event of the batch updates. Read off the board before the diff applies the new ones.
-const conditionsBefore = (events, registry) =>
-  new Map(
-    events
-      .filter((event) => event?.type === 'specialConditionUpdated' && event.instanceId != null)
-      .map((event) => [event.instanceId, listConditions(registry.get(event.instanceId)?.card)])
-  );
-
-// Design 069: each damaged card's total before this batch, from its counter on the board (no
-// counter = 0). Read before the diff applies the new totals.
-const damageBaselinesBefore = (events, registry) =>
-  events
-    .filter((event) => event?.type === 'damageUpdated' && event.instanceId != null)
-    .map((event) => ({ event, element: registry.get(event.instanceId)?.element }))
-    .filter(({ element }) => element)
-    .map(({ event, element }) => ({ instanceId: event.instanceId, damage: Number(element.dataset?.damage ?? 0) }));
-
-const capturePrizeSeats = (events, registry, selfPlayerId) => {
-  prizeSeats = new Map();
-  for (const event of events) {
-    if (event?.type !== 'prizesTaken' && event?.type !== 'prizeTaken') continue;
-    const user = event.playerId === selfPlayerId ? 'self' : 'opp';
-    for (const { instanceId } of drawnCards(event.cards)) {
-      const element = registry.get(instanceId)?.element;
-      const ghost = element && captureKnockoutGhost(user, element);
-      if (ghost) prizeSeats.set(instanceId, { rect: ghost.rect, turn: ghost.turn || 0 });
-    }
-  }
-};
-
 // A taken prize starts at its fan sleeve, else where it sat on the mat.
 const prizeStartOf = (instanceId) => {
   const seat = prizeSeats.get(instanceId) || null;
   prizeSeats.delete(instanceId);
   return takePrizeHandoff(instanceId) || seat;
-};
-
-// Design 089: a card taken out of the discard pile or the Lost Zone starts its flight there.
-const pileStartOf = (plan) => (plan.source === 'discard' || plan.source === 'lostZone' ? pileOf(plan.user, plan.source) : null);
-
-/** The registry cards `ids` that are on the board now, as the flights' hide/show handles. */
-const heldCards = (ids) => {
-  const registry = getCardRegistry();
-  return ids
-    .map((instanceId) => ({ instanceId, record: registry.get(instanceId) }))
-    .filter(({ record }) => record?.element?.isConnected)
-    .map(({ instanceId, record }) => ({ instanceId, image: record.element, wrapper: record.holoCard?.wrapper }));
 };
 
 /**
@@ -174,75 +129,18 @@ const heldCards = (ids) => {
  */
 const holdUntilFlown = (plan, ids) => {
   if (fxDisabled() || motionReduced()) return { ...plan, held: [] };
-  const held = heldCards(ids);
+  // The registry cards `ids` that are on the board now, as the flights' hide/show handles.
+  const registry = getCardRegistry();
+  const held = ids
+    .map((instanceId) => ({ instanceId, record: registry.get(instanceId) }))
+    .filter(({ record }) => record?.element?.isConnected)
+    .map(({ instanceId, record }) => ({ instanceId, image: record.element, wrapper: record.holoCard?.wrapper }));
   held.forEach(hideForFlight);
   const backstop = setTimeout(() => held.forEach(showAfterFlight), HELD_DRAW_BACKSTOP_MS);
   return { ...plan, held, backstop };
 };
 
 const FLOWN_ENTRY_SOURCES = new Set(['deck', 'discard']);
-
-/**
- * Design 044: the drawn cards are in the hand as soon as the view applies.
- * Hide them now, so they do not show while earlier effects play; they fly in
- * when their plan runs. Cards no longer in the hand (a mulligan put them back)
- * are left out.
- */
-const holdDrawnCards = (plan) => {
-  const registry = getCardRegistry();
-  const drawn = [];
-  for (const { instanceId } of plan.cards) {
-    const record = registry.get(instanceId);
-    if (!record?.element?.isConnected || record.zone !== 'hand') continue;
-    drawn.push({
-      image: record.element,
-      wrapper: record.holoCard?.wrapper,
-      redacted: !!record.isRedacted,
-      from: plan.source === 'prizes' ? prizeStartOf(instanceId) : pileStartOf(plan),
-    });
-  }
-  drawn.forEach(hideForFlight);
-  const backstop = setTimeout(() => {
-    for (const card of drawn) {
-      card.from?.release?.();
-      showAfterFlight(card);
-    }
-  }, HELD_DRAW_BACKSTOP_MS);
-  return { ...plan, drawn, backstop };
-};
-
-// Your own draw holds the queue for its scene; the opponent's flies alongside.
-const playDrawPlan = (plan) => {
-  clearTimeout(plan.backstop);
-  const played = playDrawBatch(plan.user, plan.drawn || []);
-  return plan.user === 'self' ? drawSceneHold(played) : 0;
-};
-
-// Design 059: the reveal is a mat effect like the Trainer preview it reuses, so it
-// is skipped with effects off or reduced motion and the cards simply show.
-const revealSceneAllowed = () => !fxDisabled() && !motionReduced();
-
-/**
- * Design 059: the revealed cards are in the hand as soon as the view applies. Hide
- * them now, so they do not show while earlier effects play; they fly in when their
- * plan runs. A card no longer in the hand is left out. The art is the event's
- * (the opponent's hand shows only their sleeve), else the card's own face.
- */
-const holdRevealedCards = (plan) => {
-  const registry = getCardRegistry();
-  const held = [];
-  for (const { instanceId, src } of plan.cards) {
-    const record = registry.get(instanceId);
-    if (!record?.element?.isConnected || record.zone !== 'hand') continue;
-    const redacted = !!record.isRedacted;
-    const ownFace = redacted ? null : record.element.currentSrc || record.element.src || null;
-    held.push({ image: record.element, wrapper: record.holoCard?.wrapper, redacted, faceSrc: src || ownFace });
-  }
-  if (!revealSceneAllowed()) return { ...plan, held };
-  held.forEach(hideForFlight);
-  const backstop = setTimeout(() => held.forEach(showAfterFlight), HELD_DRAW_BACKSTOP_MS);
-  return { ...plan, held, backstop };
-};
 
 // Sound for a plan that never reaches the fx dispatcher. Audio is best-effort: it never breaks the plan.
 const soundPlan = (plan) => {
@@ -254,30 +152,6 @@ const soundPlan = (plan) => {
 };
 
 const playRevealSound = (user) => soundPlan({ effect: 'deck-reveal', user });
-
-// Sound follows the dispatcher's rule: off with effects off, on under reduced motion;
-// with the scene it plays as the cards leave the deck.
-const playRevealPlan = (plan) => {
-  clearTimeout(plan.backstop);
-  const held = plan.held || [];
-  if (held.length === 0 || fxDisabled()) {
-    held.forEach(showAfterFlight);
-    return 0;
-  }
-  if (motionReduced()) {
-    playRevealSound(plan.user);
-    held.forEach(showAfterFlight);
-    return 0;
-  }
-  held.forEach(hideForFlight);
-  try {
-    return playDeckReveal(plan.user, held, showAfterFlight, { onStart: () => playRevealSound(plan.user) });
-  } catch (err) {
-    console.warn('[mat-fx] deck-reveal failed', err);
-    held.forEach(showAfterFlight);
-    return 0;
-  }
-};
 
 /**
  * Called by apply-view.js's `onBeforeApply` hook, BEFORE the DOM diff removes
@@ -313,9 +187,30 @@ export function handleBeforeApply(events, selfPlayerId) {
   // Design 074 §D6: on the 3D board the batch's effects start once its moved cards have landed.
   holdFxQueue(fxSettleHoldMs(events));
   const registry = getCardRegistry();
-  seedDamageBaselines(damageBaselinesBefore(events, registry));
-  capturePrizeSeats(events, registry, selfPlayerId);
-  conditionPlansOf = conditionChanges(events, conditionsBefore(events, registry));
+  // Design 069: each damaged card's total before this batch, from its counter on the board (no
+  // counter = 0). Read before the diff applies the new totals.
+  seedDamageBaselines(events
+    .filter((event) => event?.type === 'damageUpdated' && event.instanceId != null)
+    .map((event) => ({ event, element: registry.get(event.instanceId)?.element }))
+    .filter(({ element }) => element)
+    .map(({ event, element }) => ({ instanceId: event.instanceId, damage: Number(element.dataset?.damage ?? 0) })));
+  prizeSeats = new Map();
+  for (const event of events) {
+    if (event?.type !== 'prizesTaken' && event?.type !== 'prizeTaken') continue;
+    const user = event.playerId === selfPlayerId ? 'self' : 'opp';
+    for (const { instanceId } of drawnCards(event.cards)) {
+      const element = registry.get(instanceId)?.element;
+      const ghost = element && captureKnockoutGhost(user, element);
+      if (ghost) prizeSeats.set(instanceId, { rect: ghost.rect, turn: ghost.turn || 0 });
+    }
+  }
+  // Design 089: each card's Special Conditions before this batch, for the cards whose conditions an
+  // event of the batch updates. Read off the board before the diff applies the new ones.
+  conditionPlansOf = conditionChanges(events, new Map(
+    events
+      .filter((event) => event?.type === 'specialConditionUpdated' && event.instanceId != null)
+      .map((event) => [event.instanceId, listConditions(registry.get(event.instanceId)?.card)])
+  ));
   for (const event of events) {
     if (!event || event.type !== 'pokemonKnockedOut' || event.instanceId == null) continue;
     // Design 042: the card drawn on top (an evolution sits over its Basic),
@@ -362,8 +257,35 @@ function runPlan(plan) {
     soundPlan({ effect: plan.sound || 'shuffle-flight', user: plan.user });
     return hold;
   }
-  if (plan.kind === 'draw') return playDrawPlan(plan);
-  if (plan.kind === 'reveal') return playRevealPlan(plan);
+  if (plan.kind === 'draw') {
+    // Your own draw holds the queue for its scene; the opponent's flies alongside.
+    clearTimeout(plan.backstop);
+    const played = playDrawBatch(plan.user, plan.drawn || []);
+    return plan.user === 'self' ? drawSceneHold(played) : 0;
+  }
+  if (plan.kind === 'reveal') {
+    // Sound follows the dispatcher's rule: off with effects off, on under reduced motion;
+    // with the scene it plays as the cards leave the deck.
+    clearTimeout(plan.backstop);
+    const held = plan.held || [];
+    if (held.length === 0 || fxDisabled()) {
+      held.forEach(showAfterFlight);
+      return 0;
+    }
+    if (motionReduced()) {
+      playRevealSound(plan.user);
+      held.forEach(showAfterFlight);
+      return 0;
+    }
+    held.forEach(hideForFlight);
+    try {
+      return playDeckReveal(plan.user, held, showAfterFlight, { onStart: () => playRevealSound(plan.user) });
+    } catch (err) {
+      console.warn('[mat-fx] deck-reveal failed', err);
+      held.forEach(showAfterFlight);
+      return 0;
+    }
+  }
   if (plan.kind === 'knockout') {
     const ghost = pendingKnockoutGhosts.get(plan.instanceId);
     pendingKnockoutGhosts.delete(plan.instanceId);
@@ -600,8 +522,54 @@ function queueEvent(event, selfPlayerId) {
 
 // Cards a plan flies into the hand are hidden from the moment it is queued.
 const queuedPlan = (plan) => {
-  if (plan.kind === 'draw') return holdDrawnCards(plan);
-  if (plan.kind === 'reveal') return holdRevealedCards(plan);
+  if (plan.kind === 'draw') {
+    // Design 044: the drawn cards are in the hand as soon as the view applies.
+    // Hide them now, so they do not show while earlier effects play; they fly in
+    // when their plan runs. Cards no longer in the hand (a mulligan put them back)
+    // are left out.
+    const registry = getCardRegistry();
+    const drawn = [];
+    for (const { instanceId } of plan.cards) {
+      const record = registry.get(instanceId);
+      if (!record?.element?.isConnected || record.zone !== 'hand') continue;
+      // Design 089: a card taken out of the discard pile or the Lost Zone starts its flight there.
+      drawn.push({
+        image: record.element,
+        wrapper: record.holoCard?.wrapper,
+        redacted: !!record.isRedacted,
+        from: plan.source === 'prizes' ? prizeStartOf(instanceId) : plan.source === 'discard' || plan.source === 'lostZone' ? pileOf(plan.user, plan.source) : null,
+      });
+    }
+    drawn.forEach(hideForFlight);
+    const backstop = setTimeout(() => {
+      for (const card of drawn) {
+        card.from?.release?.();
+        showAfterFlight(card);
+      }
+    }, HELD_DRAW_BACKSTOP_MS);
+    return { ...plan, drawn, backstop };
+  }
+  if (plan.kind === 'reveal') {
+    // Design 059: the revealed cards are in the hand as soon as the view applies. Hide
+    // them now, so they do not show while earlier effects play; they fly in when their
+    // plan runs. A card no longer in the hand is left out. The art is the event's
+    // (the opponent's hand shows only their sleeve), else the card's own face.
+    const registry = getCardRegistry();
+    const held = [];
+    for (const { instanceId, src } of plan.cards) {
+      const record = registry.get(instanceId);
+      if (!record?.element?.isConnected || record.zone !== 'hand') continue;
+      const redacted = !!record.isRedacted;
+      const ownFace = redacted ? null : record.element.currentSrc || record.element.src || null;
+      held.push({ image: record.element, wrapper: record.holoCard?.wrapper, redacted, faceSrc: src || ownFace });
+    }
+    // Design 059: the reveal is a mat effect like the Trainer preview it reuses, so it
+    // is skipped with effects off or reduced motion and the cards simply show.
+    if (!(!fxDisabled() && !motionReduced())) return { ...plan, held };
+    held.forEach(hideForFlight);
+    const backstop = setTimeout(() => held.forEach(showAfterFlight), HELD_DRAW_BACKSTOP_MS);
+    return { ...plan, held, backstop };
+  }
   if (plan.kind !== 'fx') return plan;
   // Design 089: the Prize cards wait hidden for their deal; so does a Pokémon that flies in from a pile.
   if (plan.effect === 'prizes-set' && plan.user) {

@@ -29,23 +29,6 @@ const STAGGER_MS = 70;
  * } | null} */
 let pending = null;
 
-const sleeveSrcFor = (user) => cardBackSrcForUser(user) || DEFAULT_SLEEVE;
-
-const buildSleeveHost = (dest, sleeveSrc) => {
-  const host = document.createElement('div');
-  host.className = 'prize-take-card';
-  host.style.left = `${dest.left}px`;
-  host.style.top = `${dest.top}px`;
-  host.style.width = `${dest.width}px`;
-  host.style.height = `${dest.height}px`;
-  const img = document.createElement('img');
-  img.src = sleeveSrc;
-  img.alt = '';
-  img.draggable = false;
-  host.appendChild(img);
-  return host;
-};
-
 // Design 045: the sleeves fly up and drop back on design 042's arc (WAAPI).
 // Flying up holds the start pose through its delay and then lets go, so the
 // selected-card CSS still applies; dropping back holds its end until teardown.
@@ -129,18 +112,16 @@ const confirmSelection = (force = false) => {
   pending.overlay.classList.remove('is-ready');
 
   const chosen = entries.filter((entry) => selected.has(entry.card));
-  for (const entry of chosen) handOffChosen(entry);
+  for (const entry of chosen) {
+    // Design 045: a picked sleeve leaves the overlay (it outlives the teardown) and
+    // waits for the flight into the hand to start from it.
+    const face = entry.host.querySelector('img') || entry.host;
+    const rect = viewportRectOf(face);
+    document.body.appendChild(entry.host);
+    registerPrizeHandoff(entry.card, { rect, release: () => entry.host.remove() });
+  }
 
   returnUnselectedThenFinish(onChosen(chosen));
-};
-
-// Design 045: a picked sleeve leaves the overlay (it outlives the teardown) and
-// waits for the flight into the hand to start from it.
-const handOffChosen = (entry) => {
-  const face = entry.host.querySelector('img') || entry.host;
-  const rect = viewportRectOf(face);
-  document.body.appendChild(entry.host);
-  registerPrizeHandoff(entry.card, { rect, release: () => entry.host.remove() });
 };
 
 const selectEntry = (card, host) => {
@@ -199,7 +180,7 @@ const openPrizeFan = ({ user, cards, needed, onChosen }) => {
   };
   const size = prizeFanCardSize(cards.length, viewport);
   const dests = prizeFanSlots(cards.length, viewport, size);
-  const sleeveSrc = sleeveSrcFor(user);
+  const sleeveSrc = cardBackSrcForUser(user) || DEFAULT_SLEEVE;
 
   const overlay = document.createElement('div');
   overlay.id = 'prizeTakeOverlay';
@@ -219,7 +200,18 @@ const openPrizeFan = ({ user, cards, needed, onChosen }) => {
       : { left: 40, top: viewport.height - 180, width: 70, height: 98 };
     const turn = originEl ? frameTurnOf(card.image) : 0;
     hideForFlight(card);
-    const host = buildSleeveHost(dests[i], sleeveSrc);
+    const dest = dests[i];
+    const host = document.createElement('div');
+    host.className = 'prize-take-card';
+    host.style.left = `${dest.left}px`;
+    host.style.top = `${dest.top}px`;
+    host.style.width = `${dest.width}px`;
+    host.style.height = `${dest.height}px`;
+    const img = document.createElement('img');
+    img.src = sleeveSrc;
+    img.alt = '';
+    img.draggable = false;
+    host.appendChild(img);
     host.addEventListener('click', (event) => {
       event.stopPropagation();
       toggleSelect(card, host);

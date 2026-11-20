@@ -119,14 +119,12 @@ export function createPileMeshes({
     entry.geometry.dispose();
   };
 
-  /** The deck's top face: its sleeve once loaded, plain paper until then (or if it fails). */
-  const topMaterialOf = (pile) => (pile.sleeve?.state === 'ready' ? pile.sleeve.material : paper);
-
   // While a pile shuffles its layers lie apart as single cards: each shows the top face.
   const dressLayers = (pile) => {
     const last = pile.meshes.length - 1;
     pile.meshes.forEach((mesh, i) => {
-      mesh.material = [i === last || pile.shuffle ? topMaterialOf(pile) : paper, paper, rim];
+      // The deck's top face: its sleeve once loaded, plain paper until then (or if it fails).
+      mesh.material = [i === last || pile.shuffle ? pile.sleeve?.state === 'ready' ? pile.sleeve.material : paper : paper, paper, rim];
     });
   };
 
@@ -218,15 +216,6 @@ export function createPileMeshes({
       mesh.rotation.set(0, -roll, -pose.yawDeg * DEG, 'ZYX');
     });
     return t >= 1;
-  };
-
-  /** Ends a shuffle: the pile is drawn again as the last `setPile` asked. */
-  const endShuffle = (pile) => {
-    const rest = pile.rest;
-    pile.shuffle = null;
-    pile.rest = null;
-    if (rest) setLayers(pile, rest.layers, rest.thicknessPx);
-    onNeedsRender();
   };
 
   const shuffle = (side, zone, { count } = {}) => {
@@ -323,7 +312,14 @@ export function createPileMeshes({
       placeHeight(pile, now);
       if (!pile.height.done(now)) moving = true;
       if (!pile.shuffle) continue;
-      if (placeShuffle(pile, now)) endShuffle(pile);
+      if (placeShuffle(pile, now)) {
+        // Ends a shuffle: the pile is drawn again as the last `setPile` asked.
+        const rest = pile.rest;
+        pile.shuffle = null;
+        pile.rest = null;
+        if (rest) setLayers(pile, rest.layers, rest.thicknessPx);
+        onNeedsRender();
+      }
       moving = true;
     }
     return moving;

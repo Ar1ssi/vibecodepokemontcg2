@@ -761,30 +761,18 @@ export function parseToolOnDamageEffect(tool) {
 
   const th = parseThorns(tool);
   if (th.count && !out.damageAttacker) out.damageAttacker = th.count;
-  if (hasToolOnDamageEffect(out)) return out;
+  if (out.draw ||
+    out.drawUntil ||
+    out.damageAttacker ||
+    out.searchDeckOnKo ||
+    out.moveDamage ||
+    out.moveEnergyOnKo ||
+    out.discardPrizes ||
+    out.statusAttacker ||
+    out.millOpponent ||
+    out.returnSelfToHand ||
+    out.countersOnOpponent) return out;
   return null;
-}
-
-function hasToolOnDamageEffect(out) {
-  return Boolean(
-    out.draw ||
-      out.drawUntil ||
-      out.damageAttacker ||
-      out.searchDeckOnKo ||
-      out.moveDamage ||
-      out.moveEnergyOnKo ||
-      out.discardPrizes ||
-      out.statusAttacker ||
-      out.millOpponent ||
-      out.returnSelfToHand ||
-      out.countersOnOpponent
-  );
-}
-
-// Whether an effect only resolves when the holder is Knocked Out (the on-KO hook
-// applies these; the on-damage consumer applies the 'damage' phase).
-function isOnKoEffect(parsed) {
-  return parsed.phase === 'ko';
 }
 
 /**
@@ -807,7 +795,9 @@ export function attachedToolOnKoEffects(
     const isVictim = holder.instanceId === victim.instanceId;
     for (const tool of attachedTools(holder, zone)) {
       const parsed = parseToolOnDamageEffect(tool);
-      if (!parsed || !isOnKoEffect(parsed)) continue;
+      // Whether an effect only resolves when the holder is Knocked Out (the on-KO hook
+      // applies these; the on-damage consumer applies the 'damage' phase).
+      if (!parsed || !(parsed.phase === 'ko')) continue;
       if (parsed.requiresActive && !isActive) continue;
       if (parsed.trigger === 'selfKo' && !isVictim) continue;
       if (parsed.trigger === 'activeKo' && !isActive) continue;

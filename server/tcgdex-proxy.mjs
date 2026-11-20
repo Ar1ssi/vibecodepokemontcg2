@@ -55,10 +55,6 @@ export function ttlForTcgdexPath(canonical) {
   return RECORD_PATH.test(canonical) ? RECORD_TTL_MS : LIST_TTL_MS;
 }
 
-function isBlockStatus(status) {
-  return status === 403 || status === 429 || status === 503;
-}
-
 /**
  * @param {object} [options]
  * @param {typeof fetch} [options.fetchImpl]
@@ -172,7 +168,8 @@ export function createTcgdexProxy({
         gzip: null,
       };
     }
-    if (isBlockStatus(upstream.status)) cooldownUntil = now() + COOLDOWN_MS;
+    const status = upstream.status;
+    if (status === 403 || status === 429 || status === 503) cooldownUntil = now() + COOLDOWN_MS;
     return unavailable(stale);
   }
 

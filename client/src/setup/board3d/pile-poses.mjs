@@ -6,7 +6,7 @@ import { CARD_UNITS, cardScaleFor } from './card-geometry.mjs';
 export const PILE_ZONES = ['deck', 'discard', 'lostZone'];
 
 /**
- * Draw order of the overlapping prize slots, bottom first (board-layout.mjs `prizeSlots`): the
+ * Draw order of the overlapping prize slots, bottom first (board-layout.mjs): the
  * back column (slots 0, 2, 4, z-index 1) under the front column (1, 3, 5, z-index 2), and within
  * a column the DOM-later slot on top. The reverse of board-layout's PRIZE_HIT_ORDER.
  */

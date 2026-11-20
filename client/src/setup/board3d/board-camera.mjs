@@ -42,9 +42,6 @@ export function tableToWorld({ x, y, z = 0 }, { tiltDeg = DEFAULT_TILT_DEG } = {
   return [x, y * cos + z * sin, -y * sin + z * cos];
 }
 
-/** Vertical field of view whose focal length in px is `perspectivePx` over `viewportH`. */
-const fovFor = (viewportH, perspectivePx) => (2 * Math.atan(viewportH / 2 / perspectivePx)) / DEG;
-
 /**
  * three's `setViewOffset(fullWidth, fullHeight, x, y, width, height)` keeps the
  * principal axis at the centre of the full image and renders the window that
@@ -138,8 +135,9 @@ export function cameraFromCssTilt({
   const pose = broadcast
     ? broadcastPose({ viewportH, perspectivePx, nearHalf: half })
     : tiltedPose({ viewportW, viewportH, tiltDeg, perspectivePx, nearHalf: half });
+  // Vertical field of view whose focal length in px is `perspectivePx` over `viewportH`.
   return {
-    fov: fovFor(viewportH, perspectivePx),
+    fov: (2 * Math.atan(viewportH / 2 / perspectivePx)) / DEG,
     aspect: viewportW / viewportH,
     position: [0, 0, pose.distance],
     target: [0, 0, 0],

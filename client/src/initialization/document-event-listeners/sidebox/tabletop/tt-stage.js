@@ -82,7 +82,7 @@ export function createStage({
   renderer.toneMappingExposure = 1.0;
   renderer.shadowMap.enabled = !low;
   renderer.shadowMap.type = PCFShadowMap;
-  // Redrawn only when what casts a shadow moved or changed (`castersChanged`): a held thing casts
+  // Redrawn only when what casts a shadow moved or changed: a held thing casts
   // none, so while it sways the shadow map stays as it is.
   renderer.shadowMap.autoUpdate = false;
   renderer.shadowMap.needsUpdate = true;
@@ -212,20 +212,6 @@ export function createStage({
     nextCasterState.push(material.alphaMap?.id ?? -1, material.alphaMap?.version ?? -1);
     material.clippingPlanes?.forEach((plane) => nextCasterState.push(plane.constant, plane.normal.x, plane.normal.y, plane.normal.z));
   };
-  const castersChanged = () => {
-    nextCasterState.length = 0;
-    scene.updateMatrixWorld();
-    scene.traverseVisible((node) => {
-      if (!node.isMesh || !node.castShadow) return;
-      nextCasterState.push(node.id, node.geometry.id, ...node.matrixWorld.elements);
-      if (Array.isArray(node.material)) node.material.forEach(pushMaterial);
-      else pushMaterial(node.material);
-    });
-    const changed =
-      nextCasterState.length !== casterState.length || nextCasterState.some((value, i) => value !== casterState[i]);
-    if (changed) casterState = nextCasterState.slice();
-    return changed;
-  };
 
   const finish = (animation) => {
     if (!animations.has(animation)) return;
@@ -247,7 +233,18 @@ export function createStage({
     for (const ticker of [...tickers]) ticker(clock, Math.min(100, sceneMs));
     // The mirror reuses the shadow maps the eye's pass last drew, so it waits for the first.
     if (drawn) studio.renderReflection();
-    if (castersChanged()) renderer.shadowMap.needsUpdate = true;
+    nextCasterState.length = 0;
+    scene.updateMatrixWorld();
+    scene.traverseVisible((node) => {
+      if (!node.isMesh || !node.castShadow) return;
+      nextCasterState.push(node.id, node.geometry.id, ...node.matrixWorld.elements);
+      if (Array.isArray(node.material)) node.material.forEach(pushMaterial);
+      else pushMaterial(node.material);
+    });
+    const changed =
+      nextCasterState.length !== casterState.length || nextCasterState.some((value, i) => value !== casterState[i]);
+    if (changed) casterState = nextCasterState.slice();
+    if (changed) renderer.shadowMap.needsUpdate = true;
     renderer.render(scene, camera);
     drawn = true;
   };

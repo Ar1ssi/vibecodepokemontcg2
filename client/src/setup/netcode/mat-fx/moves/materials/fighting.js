@@ -68,7 +68,6 @@ const KI_ORB = Object.freeze({ volume: Object.freeze({ amount: 0.85, spec: 1, ri
 const RING_TUBE = Object.freeze({ volume: Object.freeze({ amount: 0.7, spec: 0.8, rim: 0.3, ambient: 0.35, light: 120, bump: 0 }) });
 /** `draw` at `z` lane units over the current lift with `mod` merged over the current fxMod. */
 const layered = (ctx, z, mod, draw) => withLiftZ(ctx, z, () => withFxMod(ctx, mod, draw));
-const streakGrain = (angleDeg) => ({ detail: { amount: 0.35, speed: 3, scale: 5, angle: angleDeg } });
 
 /** `draw` with a dissolve edge in `palette`'s hot tone named for every fill it makes. */
 const edgedIn = (palette) => {
@@ -81,7 +80,6 @@ const freezeAll = (palette) => Object.freeze(Object.fromEntries(Object.entries(p
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 const rad = (deg) => (deg * Math.PI) / 180;
-const easeOutCubic = (t) => 1 - (1 - t) ** 3;
 const fract = (v) => v - Math.floor(v);
 
 const fightingPalette = freezeAll({
@@ -148,7 +146,7 @@ export function barrageStamps(s, r, count = BARRAGE_STAMPS) {
     stamps.push({
       dx: Math.cos(angle) * reach,
       dy: Math.sin(angle) * reach,
-      r: r * size * (0.7 + 0.3 * easeOutCubic(local)),
+      r: r * size * (0.7 + 0.3 * (1 - (1 - local) ** 3)),
       alpha: (1 - local) ** 1.3,
       hot: 1 - 0.6 * order,
     });
@@ -179,7 +177,7 @@ function makeTongue(palette) {
     ctx.filter = `blur(${Math.max(1, spec.width * STREAK_BLUR).toFixed(1)}px)`;
     ctx.fillStyle = rgbCss(palette.body, 0.55 * alpha);
     tracePolygon(ctx, streakOutline(spec, 1));
-    layered(ctx, Z_STREAK, streakGrain(spec.angleDeg), () => ctx.fill());
+    layered(ctx, Z_STREAK, { detail: { amount: 0.35, speed: 3, scale: 5, angle: spec.angleDeg } }, () => ctx.fill());
     ctx.filter = 'none';
     ctx.fillStyle = rgbCss(palette.hot, 0.85 * alpha);
     tracePolygon(ctx, streakOutline(spec, STREAK_MID));

@@ -224,9 +224,6 @@ const pokemonEntry = (bench) => ({ card, view }) => ({
   delta: /δ|delta species/i.test(`${view?.name || ''} ${view?.subtypes || ''} ${card?.subtypes || ''}`),
 });
 
-const attackerZone = (player, pokemon) =>
-  ['active', 'bench'].map((zoneId) => zoneOf(player, zoneId)).find((cards) => cards.includes(pokemon)) || [];
-
 /** 'self' / 'opponent' for the player who put the Stadium in play; null when none or unknown. */
 function stadiumOwnerOf(stadiumCard, attackerPlayerId, defenderPlayerId) {
   const owner = stadiumCard?.ownerId ?? stadiumCard?.playerId ?? stadiumCard?.playedBy ?? null;
@@ -393,7 +390,7 @@ export function buildServerAttackContext(
     attackCost: Array.isArray(attack?.cost) ? [...attack.cost] : [],
     attackerToolCount: toolCountOn(own, attacker),
     attackerStackNames: attacker
-      ? priorEvolutionCards(attackerZone(own, attacker), attacker).map((card) => card.name || '')
+      ? priorEvolutionCards(['active', 'bench'].map((zoneId) => zoneOf(own, zoneId)).find((cards) => cards.includes(attacker)) || [], attacker).map((card) => card.name || '')
       : [],
     attackerHealedThisTurn: attacker != null && Number(attacker.healedTurn) === turnNumber,
     attackerHealedLastOwnTurn:

@@ -172,94 +172,6 @@ export const initializeP1BottomButtons = () => {
     clearChatboxContent();
   };
 
-  function addReplayListeners() {
-    setupButton.addEventListener('click', rewindToStartReplay);
-    resetButton.addEventListener('click', rewindPreviousReplayAction);
-    setupBothButton.addEventListener('click', playNextReplayAction);
-    resetBothButton.addEventListener('click', fastForwardReplay);
-  }
-
-  function addNormalListeners() {
-    setupButton.addEventListener('click', setupFunction);
-    setupBothButton.addEventListener('click', setupBothFunction);
-    resetButton.addEventListener('click', resetFunction);
-    resetBothButton.addEventListener('click', resetBothFunction);
-    restartButton.addEventListener('click', restartFunction);
-  }
-
-  function removeReplayListeners() {
-    setupButton.removeEventListener('click', rewindToStartReplay);
-    resetButton.removeEventListener('click', rewindPreviousReplayAction);
-    setupBothButton.removeEventListener('click', playNextReplayAction);
-    resetBothButton.removeEventListener('click', fastForwardReplay);
-  }
-
-  function removeNormalListeners() {
-    setupButton.removeEventListener('click', setupFunction);
-    setupBothButton.removeEventListener('click', setupBothFunction);
-    resetButton.removeEventListener('click', resetFunction);
-    resetBothButton.removeEventListener('click', resetBothFunction);
-    restartButton.removeEventListener('click', restartFunction);
-  }
-
-  function enterReplayMode() {
-    clearChatboxContent();
-
-    document.getElementById('p1Button').innerHTML = 'Replay';
-    document.getElementById('p1Button').style.width = '50%';
-    document.getElementById('settingsButton').style.width = '50%';
-    document.getElementById('p2Button').style.display = 'none';
-    document.getElementById('deckImportButton').style.display = 'none';
-    document.getElementById('chatboxButtonContainer').style.display = 'none';
-    document.getElementById('messageInput').style.display = 'none';
-    exitReplay.style.display = 'block';
-    document.getElementById('jsonReplayDiv').style.display = 'none';
-    document.getElementById('jsonDiv').style.display = 'none';
-    exportState.style.display = 'block';
-    exportLog.style.display = 'block';
-    clearLog.style.display = 'none';
-    document.getElementById('passBoardButton').style.display = 'none';
-    document.getElementById('flipCoinButton').style.display = 'none';
-    restartButton.style.display = 'none';
-
-    [oppContainerDocument, selfContainerDocument].forEach((doc) => {
-      [
-        'shuffleDeckButton',
-        'shuffleDiscardButton',
-        'discardViewCardsButton',
-        'shuffleViewCardsButton',
-        'shuffleBottomViewCardsButton',
-        'lostZoneViewCardsButton',
-        'handViewCardsButton',
-        'discardAttachedCardsButton',
-        'shuffleAttachedCardsButton',
-        'lostZoneAttachedCardsButton',
-        'handAttachedCardsButton',
-        'leaveAttachedCardsButton',
-      ].forEach((id) => {
-        doc.getElementById(id).style.display = 'none';
-      });
-    });
-
-    removeNormalListeners();
-    addReplayListeners();
-
-    setupButton.innerHTML = '⏮';
-    resetButton.innerHTML = '◀';
-    setupBothButton.innerHTML = '▶';
-    resetBothButton.innerHTML = '⏭';
-    setupButton.className = '';
-    resetButton.className = '';
-    setupBothButton.className = '';
-    resetBothButton.className = '';
-
-    setupButton.classList.add('neutral-color');
-    resetButton.classList.add('spectator-color');
-    setupBothButton.classList.add('spectator-color');
-    resetBothButton.classList.add('neutral-color');
-    optionsContextMenu.style.display = 'none';
-  }
-
   function exitReplayMode() {
     document.getElementById('p1Button').innerHTML = 'Solo';
     document.getElementById('p1Button').style.width = '';
@@ -297,8 +209,15 @@ export const initializeP1BottomButtons = () => {
       });
     });
 
-    removeReplayListeners();
-    addNormalListeners();
+    setupButton.removeEventListener('click', rewindToStartReplay);
+    resetButton.removeEventListener('click', rewindPreviousReplayAction);
+    setupBothButton.removeEventListener('click', playNextReplayAction);
+    resetBothButton.removeEventListener('click', fastForwardReplay);
+    setupButton.addEventListener('click', setupFunction);
+    setupBothButton.addEventListener('click', setupBothFunction);
+    resetButton.addEventListener('click', resetFunction);
+    resetBothButton.addEventListener('click', resetBothFunction);
+    restartButton.addEventListener('click', restartFunction);
 
     setupButton.innerHTML = 'Set Up';
     setupBothButton.innerHTML = 'Set Up Both';
@@ -362,7 +281,68 @@ export const initializeP1BottomButtons = () => {
           actions.shift();
           actions.shift();
           systemState.replayActionData = structuredClone(actions);
-          enterReplayMode();
+          clearChatboxContent();
+
+          document.getElementById('p1Button').innerHTML = 'Replay';
+          document.getElementById('p1Button').style.width = '50%';
+          document.getElementById('settingsButton').style.width = '50%';
+          document.getElementById('p2Button').style.display = 'none';
+          document.getElementById('deckImportButton').style.display = 'none';
+          document.getElementById('chatboxButtonContainer').style.display = 'none';
+          document.getElementById('messageInput').style.display = 'none';
+          exitReplay.style.display = 'block';
+          document.getElementById('jsonReplayDiv').style.display = 'none';
+          document.getElementById('jsonDiv').style.display = 'none';
+          exportState.style.display = 'block';
+          exportLog.style.display = 'block';
+          clearLog.style.display = 'none';
+          document.getElementById('passBoardButton').style.display = 'none';
+          document.getElementById('flipCoinButton').style.display = 'none';
+          restartButton.style.display = 'none';
+
+          [oppContainerDocument, selfContainerDocument].forEach((doc) => {
+            [
+              'shuffleDeckButton',
+              'shuffleDiscardButton',
+              'discardViewCardsButton',
+              'shuffleViewCardsButton',
+              'shuffleBottomViewCardsButton',
+              'lostZoneViewCardsButton',
+              'handViewCardsButton',
+              'discardAttachedCardsButton',
+              'shuffleAttachedCardsButton',
+              'lostZoneAttachedCardsButton',
+              'handAttachedCardsButton',
+              'leaveAttachedCardsButton',
+            ].forEach((id) => {
+              doc.getElementById(id).style.display = 'none';
+            });
+          });
+
+          setupButton.removeEventListener('click', setupFunction);
+          setupBothButton.removeEventListener('click', setupBothFunction);
+          resetButton.removeEventListener('click', resetFunction);
+          resetBothButton.removeEventListener('click', resetBothFunction);
+          restartButton.removeEventListener('click', restartFunction);
+          setupButton.addEventListener('click', rewindToStartReplay);
+          resetButton.addEventListener('click', rewindPreviousReplayAction);
+          setupBothButton.addEventListener('click', playNextReplayAction);
+          resetBothButton.addEventListener('click', fastForwardReplay);
+
+          setupButton.innerHTML = '⏮';
+          resetButton.innerHTML = '◀';
+          setupBothButton.innerHTML = '▶';
+          resetBothButton.innerHTML = '⏭';
+          setupButton.className = '';
+          resetButton.className = '';
+          setupBothButton.className = '';
+          resetBothButton.className = '';
+
+          setupButton.classList.add('neutral-color');
+          resetButton.classList.add('spectator-color');
+          setupBothButton.classList.add('spectator-color');
+          resetBothButton.classList.add('neutral-color');
+          optionsContextMenu.style.display = 'none';
         }
       } catch {
         alert('Error reading file. Please make sure the file is valid.');
@@ -389,21 +369,6 @@ export const initializeP1BottomButtons = () => {
   }
 
   const exportState = document.getElementById('exportState');
-
-  // Function to handle the user's choice
-  function handleUserChoice(choice, jsonData) {
-    if (choice === '2') {
-      socket.emit('storeGameState', jsonData);
-    } else if (choice === '1') {
-      const blob = new Blob([jsonData], { type: 'application/json' });
-      const link = document.createElement('a');
-      link.href = window.URL.createObjectURL(blob);
-      link.download = 'data.json';
-      link.click();
-    }
-    // Hide the options menu after handling the choice
-    optionsContextMenu.style.display = 'none';
-  }
 
   exportState.addEventListener('click', () => {
     const selfData = {
@@ -436,7 +401,18 @@ export const initializeP1BottomButtons = () => {
       "Enter '1' to save a file or enter '2' to generate a URL"
     );
     if (userChoice === '1' || userChoice === '2') {
-      handleUserChoice(userChoice, jsonData);
+      // Function to handle the user's choice
+      if (userChoice === '2') {
+        socket.emit('storeGameState', jsonData);
+      } else if (userChoice === '1') {
+        const blob = new Blob([jsonData], { type: 'application/json' });
+        const link = document.createElement('a');
+        link.href = window.URL.createObjectURL(blob);
+        link.download = 'data.json';
+        link.click();
+      }
+      // Hide the options menu after handling the choice
+      optionsContextMenu.style.display = 'none';
     }
   });
 

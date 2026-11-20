@@ -45,23 +45,19 @@ export const typeIcon = (type, filled = true, className = 'tcgl-icon') => {
   return img;
 };
 
-// Card text writes Energy as {R}, {W}, …; the game swaps those for its icon sprites inline.
-const textWithIcons = (target, text) => {
+const description = (text) => {
+  const body = el('p', 'tcgl-opt__text');
+  // Card text writes Energy as {R}, {W}, …; the game swaps those for its icon sprites inline.
   for (const part of String(text ?? '').split(/(\{[a-z]\})/gi)) {
     const match = /^\{([a-z])\}$/i.exec(part);
     if (!match) {
-      if (part) target.appendChild(document.createTextNode(part));
+      if (part) body.appendChild(document.createTextNode(part));
       continue;
     }
     const named = ENERGY_SYMBOL_TO_TYPE[match[1].toLowerCase()];
-    if (named) target.appendChild(typeIcon(named, true, 'tcgl-icon tcgl-icon--inline'));
-    else target.appendChild(document.createTextNode(part));
+    if (named) body.appendChild(typeIcon(named, true, 'tcgl-icon tcgl-icon--inline'));
+    else body.appendChild(document.createTextNode(part));
   }
-};
-
-const description = (text) => {
-  const body = el('p', 'tcgl-opt__text');
-  textWithIcons(body, text);
   return body;
 };
 

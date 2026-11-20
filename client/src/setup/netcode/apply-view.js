@@ -1224,48 +1224,6 @@ function setStackStyle(img, styles) {
 }
 
 /**
- * Draws an attached Energy as the same small round type token legacy
- * attach-card.js uses: full card art stashed in `data-energy-card-src` (the
- * double-click carousel shows it), layered above the visible card's face at
- * the spot its row plan gives it.
- */
-function applyEnergyToken(img, { tokenSrc, double }, tokenSize, slot, bottom) {
-  const cardArt = img.getAttribute('src');
-  setStackStyle(img, {
-    width: `${tokenSize}px`,
-    height: `${tokenSize}px`,
-    left: `${slot.left}px`,
-    bottom: `${bottom}px`,
-    zIndex: String(slot.zIndex),
-  });
-  img.dataset.energyCardSrc = cardArt;
-  img.setAttribute('src', tokenSrc);
-  img.classList.add('energy-token-3d');
-  if (double) img.classList.add(ENERGY_TOKEN_DOUBLE_CLASS);
-  img.energyLayer = slot.zIndex - 100;
-}
-
-/**
- * The token row along the visible card's bottom edge (energy-token-row.mjs):
- * side by side up to four, past that one token per type with an "Nx" badge.
- *
- * @param {object} rootRecord owns the badges
- * @param {{ img: object, tokenSrc: string, double: boolean }[]} tokens in attach order
- */
-function layoutEnergyTokens(rootRecord, tokens, cardWidth, cardHeight) {
-  const plan = planEnergyTokenRow(
-    tokens.map((token) => token.tokenSrc),
-    cardWidth
-  );
-  const bottom = cardHeight * ENERGY_TOKEN_BOTTOM;
-  tokens.forEach((token, i) =>
-    applyEnergyToken(token.img, token, plan.tokenSize, plan.tokens[i], bottom)
-  );
-  const parent = rootRecord.container || tokens[0]?.img.parentNode || null;
-  renderEnergyCountBadges(rootRecord, parent, plan.badges, bottom);
-}
-
-/**
  * Lays out one in-play Pokémon's stack the way legacy attach/evolve does.
  * The server keeps evolutions attached under the Basic (D40), so the highest
  * Stage card is drawn as the visible card; the Basic and lower Stages peek out
@@ -1321,7 +1279,40 @@ function layoutCardStack(rootRecord, attached) {
       zIndex: String(-shiftLayer),
     });
   }
-  layoutEnergyTokens(rootRecord, tokens, cardWidth, cardHeight);
+  // The token row along the visible card's bottom edge (energy-token-row.mjs):
+  // side by side up to four, past that one token per type with an "Nx" badge.
+  const plan = planEnergyTokenRow(
+    tokens.map((token) => token.tokenSrc),
+    cardWidth
+  );
+  const bottom = cardHeight * ENERGY_TOKEN_BOTTOM;
+  tokens.forEach((token, i) =>
+    {
+      // Draws an attached Energy as the same small round type token legacy
+      // attach-card.js uses: full card art stashed in `data-energy-card-src` (the
+      // double-click carousel shows it), layered above the visible card's face at
+      // the spot its row plan gives it.
+      const img = token.img;
+      const { tokenSrc, double } = token;
+      const tokenSize = plan.tokenSize;
+      const slot = plan.tokens[i];
+      const cardArt = img.getAttribute('src');
+      setStackStyle(img, {
+        width: `${tokenSize}px`,
+        height: `${tokenSize}px`,
+        left: `${slot.left}px`,
+        bottom: `${bottom}px`,
+        zIndex: String(slot.zIndex),
+      });
+      img.dataset.energyCardSrc = cardArt;
+      img.setAttribute('src', tokenSrc);
+      img.classList.add('energy-token-3d');
+      if (double) img.classList.add(ENERGY_TOKEN_DOUBLE_CLASS);
+      img.energyLayer = slot.zIndex - 100;
+    }
+  );
+  const parent = rootRecord.container || tokens[0]?.img.parentNode || null;
+  renderEnergyCountBadges(rootRecord, parent, plan.badges, bottom);
   if (rootRecord.container?.style && !board3dActive()) {
     rootRecord.container.style.width =
       shiftLayer > 0 && cardWidth
@@ -1360,29 +1351,6 @@ function relayoutWhenLoaded(rootRecord, displayImg) {
     },
     { once: true }
   );
-}
-
-/**
- * @param {{ cardData: object, zoneId: string, record: object, attachedParent: object|null }[]} placed
- * @returns {Map<object, object>} root record -> visible card record
- */
-function layoutCardStacks(placed) {
-  const attachedByRoot = new Map();
-  for (const entry of placed) {
-    if (!entry.attachedParent) continue;
-    if (!attachedByRoot.has(entry.attachedParent))
-      attachedByRoot.set(entry.attachedParent, []);
-    attachedByRoot.get(entry.attachedParent).push(entry);
-  }
-  const displayByRoot = new Map();
-  for (const entry of placed) {
-    if (entry.attachedParent || !PLAY_ZONES.includes(entry.zoneId)) continue;
-    displayByRoot.set(
-      entry.record,
-      layoutCardStack(entry.record, attachedByRoot.get(entry.record) || [])
-    );
-  }
-  return displayByRoot;
 }
 
 function bindOverlayResize() {
@@ -1846,12 +1814,6 @@ function reconcilePendingChoice(pendingChoice, localPlayerId, options = {}, choo
   footer.appendChild(createViewBoardButton(doc, modal));
   footer.appendChild(confirmBtn);
 
-  const updateConfirmState = () => {
-    const count = selectedIds.size;
-    confirmBtn.disabled = count < min || count > max;
-    confirmBtn.textContent = `Confirm (${count}/${max})`;
-  };
-
   const optionsList = Array.isArray(pendingChoice.options)
     ? pendingChoice.options
     : [];
@@ -1880,7 +1842,9 @@ function reconcilePendingChoice(pendingChoice, localPlayerId, options = {}, choo
         selectedIds.add(opt.instanceId);
         optDiv.classList.add('selected');
       }
-      updateConfirmState();
+      const count = selectedIds.size;
+      confirmBtn.disabled = count < min || count > max;
+      confirmBtn.textContent = `Confirm (${count}/${max})`;
     });
 
     optionsContainer?.appendChild(optDiv);
@@ -2486,7 +2450,21 @@ export function applyView(view, events = [], options = {}) {
   }
   // Stack layout needs every card of a stack placed first: a root can come
   // after its attachments in view order.
-  const displayByRoot = layoutCardStacks(placed);
+  const attachedByRoot = new Map();
+  for (const entry of placed) {
+    if (!entry.attachedParent) continue;
+    if (!attachedByRoot.has(entry.attachedParent))
+      attachedByRoot.set(entry.attachedParent, []);
+    attachedByRoot.get(entry.attachedParent).push(entry);
+  }
+  const displayByRoot = new Map();
+  for (const entry of placed) {
+    if (entry.attachedParent || !PLAY_ZONES.includes(entry.zoneId)) continue;
+    displayByRoot.set(
+      entry.record,
+      layoutCardStack(entry.record, attachedByRoot.get(entry.record) || [])
+    );
+  }
   for (const entry of placed) {
     reconcilePlacedCard(entry, displayByRoot, options);
   }

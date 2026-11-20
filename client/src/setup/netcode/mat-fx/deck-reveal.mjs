@@ -20,8 +20,6 @@ const SHINE_END_MS = 400;
 /** How long a reveal holds at the spot for the side that revealed. */
 export const revealHoldFor = (user) => (user === 'opp' ? OPP_PLAY_HOLD_MS : SELF_REVEAL_HOLD_MS);
 
-const cardCount = (count) => Math.max(0, Math.floor(Number(count) || 0));
-
 /**
  * When each card of a `count`-card reveal starts, how long it holds at its spot
  * and how long it plays, in ms from the scene start. The cards hold together for
@@ -32,7 +30,7 @@ const cardCount = (count) => Math.max(0, Math.floor(Number(count) || 0));
  *   duration: (i: number) => number, total: number}}
  */
 export function deckRevealTimes(count, holdMs) {
-  const n = Math.min(cardCount(count), MAX_REVEAL_SPREAD);
+  const n = Math.min(Math.max(0, Math.floor(Number(count) || 0)), MAX_REVEAL_SPREAD);
   const hold = Math.max(0, Number(holdMs) || 0);
   const start = (i) => i * REVEAL_IN_STAGGER_MS;
   const allIn = n > 0 ? start(n - 1) + PREVIEW_GROW_MS : 0;

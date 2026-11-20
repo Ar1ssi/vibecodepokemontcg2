@@ -111,10 +111,6 @@ const sharedDir = path.join(__dirname, '../shared');
 const envFilePath = path.join(__dirname, 'socket-admin-password.env');
 dotenv.config({ path: envFilePath });
 
-function generateRandomKey(length = 8) {
-  return crypto.randomBytes(length).toString('base64url').slice(0, length);
-}
-
 async function main() {
   const logging = createServerLogging({ repoRoot: path.join(__dirname, '..') });
   const app = express();
@@ -494,19 +490,6 @@ async function main() {
     broadcastFreshGame(gameRoom, roomId, remaining);
   };
 
-  // A player's Reset button (legacy 'reset' pushAction with clean === false, see
-  // isPlayerRequestedReset) ends the game for both seats: the server owns turn/phase,
-  // so a one-sided reset can't be represented.
-  const resetGameOnPlayerRequest = (gameRoom, roomId) => {
-    clearTurnOrderTimer(roomId);
-    const players = gameRoom.resetGame();
-    for (const { socketId } of gameRoom.viewTargets()) {
-      io.to(socketId).emit('gameReset', { roomId });
-    }
-    broadcastFreshGame(gameRoom, roomId, players);
-    broadcastRoomFormat(roomId);
-  };
-
   const emitFreshView = (gameRoom, roomId, socketId, view) => {
     io.to(socketId).emit('view', {
       gameId: roomId,
@@ -816,20 +799,6 @@ async function main() {
     // events (and cached deck exchanges) from its own members: its id is listed for anyone to see.
     const mayRelayTo = (roomId) =>
       roomId !== LOBBY_WATCHERS && (!isPublicRoomId(roomId) || socket.rooms.has(roomId));
-    const emitToRoom = (eventName, data) => {
-      socket.broadcast.to(data.roomId).emit(eventName, data);
-      if (eventName === 'leaveRoom') {
-        socket.leave(data.roomId);
-        // Design 069: a spectator that left must stop receiving the room's views.
-        gameRooms.get(data.roomId)?.removeSpectator(socket.id);
-        if (socket.data.disconnectListener) {
-          socket.data.leaveRoom = true;
-          socket.data.disconnectListener();
-          socket.removeListener('disconnect', socket.data.disconnectListener);
-          socket.data.leaveRoom = false;
-        }
-      }
-    };
     // Design 069: a disconnected spectator socket is gone for good (a reconnect registers its
     // new socket), so it leaves the room's view broadcasts and stops keeping the room alive.
     const dropSpectatorOnDisconnect = (roomId) => {
@@ -859,7 +828,7 @@ async function main() {
             );
             return;
           }
-          const key = generateRandomKey();
+          const key = crypto.randomBytes(8).toString('base64url').slice(0, 8);
           db.get(
             'SELECT key FROM KeyValuePairs WHERE key = ?',
             [key],
@@ -1301,7 +1270,18 @@ async function main() {
       // they land in commandLog, which undo's replay depends on.
       const outcome = applySetupAction(gameRoom, socket.id, seat, data);
       if (outcome.readied) dealOpeningHandsIfReady(gameRoom, roomId);
-      if (outcome.resetRequested) resetGameOnPlayerRequest(gameRoom, roomId);
+      if (outcome.resetRequested) {
+        // A player's Reset button (legacy 'reset' pushAction with clean === false, see
+        // isPlayerRequestedReset) ends the game for both seats: the server owns turn/phase,
+        // so a one-sided reset can't be represented.
+        clearTurnOrderTimer(roomId);
+        const players = gameRoom.resetGame();
+        for (const { socketId } of gameRoom.viewTargets()) {
+          io.to(socketId).emit('gameReset', { roomId });
+        }
+        broadcastFreshGame(gameRoom, roomId, players);
+        broadcastRoomFormat(roomId);
+      }
       if (outcome.deckLoaded) {
         // Server is the sole minter of instanceId (design 002 §3.1 / D10). Only the seat's
         // own socket gets its lookup: broadcast, it would leak the opponent's ids.
@@ -1331,7 +1311,18 @@ async function main() {
             return;
           }
         }
-        emitToRoom(event, data);
+        socket.broadcast.to(data.roomId).emit(event, data);
+        if (event === 'leaveRoom') {
+          socket.leave(data.roomId);
+          // Design 069: a spectator that left must stop receiving the room's views.
+          gameRooms.get(data.roomId)?.removeSpectator(socket.id);
+          if (socket.data.disconnectListener) {
+            socket.data.leaveRoom = true;
+            socket.data.disconnectListener();
+            socket.removeListener('disconnect', socket.data.disconnectListener);
+            socket.data.leaveRoom = false;
+          }
+        }
         if (event === 'pushAction' && data) handleSeatSetupAction(data);
       });
     }

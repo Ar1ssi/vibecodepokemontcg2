@@ -135,13 +135,7 @@ export async function abilityPicker(user) {
   }
 
   // >1 usable → show popup
-  showAbilityPopup(user, usable);
-}
-
-/**
- * Render the ability picker popup with one row per usable ability.
- */
-function showAbilityPopup(user, usable) {
+  // Render the ability picker popup with one row per usable ability.
   // Close any existing popups first
   const existing = document.querySelector('.ability-picker-popup');
   if (existing) existing.remove();

@@ -27,11 +27,6 @@ const DECK_SOURCES = new Set(['deck', 'viewCards']);
  *   `findZoneCardIndex` gives the target <img>) and `attached` (that <img>'s `.attached`).
  */
 
-/** The DOM zone id of a hit: what `zoneOf(event.target)?.id` answers in drag.js. */
-// A pile's drawn stack, its empty footprint and an open pile's face-up top card all sit in its
-// cover (`#discardCover`, …).
-const domZoneOf = (hit) => (COVER_ZONES.has(hit.zone) ? `${hit.zone}Cover` : hit.zone);
-
 /** A zone id without its cover suffix: `discardCover` and `discard` are one pile. */
 const pileOf = (zoneId) => String(zoneId ?? '').replace(/Cover$/, '');
 
@@ -83,7 +78,10 @@ export function dropTargetFor(hit, dragging, state) {
   const kind = kindOf(hit);
   const side = kind === 'stadium' ? null : hit.side;
   if (kind !== 'stadium' && side !== dragging.side) return null;
-  const zone = kind === 'rail' ? hit.zone : domZoneOf(hit);
+  // The DOM zone id of a hit: what `zoneOf(event.target)?.id` answers in drag.js.
+  // A pile's drawn stack, its empty footprint and an open pile's face-up top card all sit in its
+  // cover (`#discardCover`, …).
+  const zone = kind === 'rail' ? hit.zone : COVER_ZONES.has(hit.zone) ? `${hit.zone}Cover` : hit.zone;
   if (!zone) return null;
   if (zone === 'board' && dragging.zone !== 'board' && dragging.boardRefuses) {
     return { kind, side, zone, instanceId: null, highlight: null, refused: true };

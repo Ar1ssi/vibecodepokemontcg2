@@ -16,16 +16,6 @@ function eventTypesOf(events) {
   return Array.isArray(events) ? events.map((event) => event?.type) : [];
 }
 
-function sideSummary(sideDiff) {
-  return {
-    added: sideDiff.added.length,
-    removed: sideDiff.removed.length,
-    moved: sideDiff.moved.length,
-    updated: sideDiff.updated.length,
-    deck: sideDiff.deckCount.current,
-  };
-}
-
 function summarizeDiff(d) {
   const summary = {
     initial: d.isInitial,
@@ -38,7 +28,13 @@ function summarizeDiff(d) {
   for (const side of ['you', 'them']) {
     const sideDiff = d.players?.[side];
     if (!sideDiff) continue;
-    summary[side] = sideSummary(sideDiff);
+    summary[side] = {
+      added: sideDiff.added.length,
+      removed: sideDiff.removed.length,
+      moved: sideDiff.moved.length,
+      updated: sideDiff.updated.length,
+      deck: sideDiff.deckCount.current,
+    };
     for (const m of sideDiff.moved) {
       moves.push({ id: m.instanceId, from: `${m.fromSide}.${m.fromZone}`, to: `${m.toSide}.${m.toZone}` });
     }

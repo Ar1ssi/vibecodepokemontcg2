@@ -582,8 +582,12 @@ function communityTent(props, spots) {
   }
 }
 
-/** Round trees: a trunk and a crown of a few overlapping balls, the boulders by the pool. */
-function communityTrees(props, spots) {
+/** Everything solid, as one prop geometry. */
+export function communityProps(spots) {
+  const props = createPropBuilder();
+  communityHall(props, spots);
+  communityTent(props, spots);
+  // Round trees: a trunk and a crown of a few overlapping balls, the boulders by the pool.
   const { trees, boulders, plants, u } = spots;
   const kit = { sun: COMMUNITY_SUN };
   // The terrain shades under the trees itself (uTrees), so they cast no contact shadow of their own.
@@ -595,14 +599,6 @@ function communityTrees(props, spots) {
     const colors = plant.kind === 'bush' ? { leaf: TREE.leaf, leafLight: TREE.leafLight } : plant.options?.colors;
     placeAsset(props, plant.kind, { ...kit, petals: ['#fff7ec', '#ffd84a', '#f6a6c8'], ...plant.options, x: plant.x, y: plant.y, size: plant.size, seed: plant.seed * 991, yaw: plant.yaw, colors });
   }
-}
-
-/** Everything solid, as one prop geometry. */
-export function communityProps(spots) {
-  const props = createPropBuilder();
-  communityHall(props, spots);
-  communityTent(props, spots);
-  communityTrees(props, spots);
   return props;
 }
 

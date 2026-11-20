@@ -13,15 +13,6 @@
 
 import { emitCmd } from './cmd-emitter.js';
 
-// Exactly the fields the server's own reducers read: hp for the KO check
-// (reduce.mjs 'attack'), attacks for damage/name, types+weakness+resistance for
-// computeAttackDamage, retreatCost for getRetreatCostCount, stage for evolution legality,
-// text/trainerType/subtypes for playTrainer and special Energy, evolvesFrom for Salvatore,
-// abilities for useAbility.
-function isTrainerCard(card) {
-  return Boolean(card.trainerType) || /trainer|item|supporter|stadium|tool/i.test(card.type || '');
-}
-
 function isEnergyCard(card) {
   return /energy/i.test(card.type || card.supertype || '');
 }
@@ -108,7 +99,12 @@ function extractStats(card) {
   // text server-side (audit SE1 — without it every text-derived special Energy did nothing
   // under server authority). Kept off Pokémon, where the server reads card.text as an
   // ability fallback and subtypes as a stage fallback.
-  if (!isTrainerCard(card) && !isEnergyCard(card)) {
+  // Exactly the fields the server's own reducers read: hp for the KO check
+  // (reduce.mjs 'attack'), attacks for damage/name, types+weakness+resistance for
+  // computeAttackDamage, retreatCost for getRetreatCostCount, stage for evolution legality,
+  // text/trainerType/subtypes for playTrainer and special Energy, evolvesFrom for Salvatore,
+  // abilities for useAbility.
+  if (!(Boolean(card.trainerType) || /trainer|item|supporter|stadium|tool/i.test(card.type || '')) && !isEnergyCard(card)) {
     // Exception: "Ultra Beast" exists only as a subtype, and Beast Energy's provision and
     // bonus read it server-side (review of audit SE2). Same for the Ancient/Future tag
     // (design 058), which the server also derives from the printing when a card carries an id,

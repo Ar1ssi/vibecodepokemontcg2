@@ -620,35 +620,6 @@ function roof(props, b, face, u) {
   props.roundBox({ x: sky.x, y: sky.y, z0: z2, z1: z2 + 4 * u, hw: Math.min(10 * u, w / 2 - 1), hh: 8 * u, color: TRIM, topColor: GLASS });
 }
 
-/** The Pokemon Center's blade sign: a Poke Ball on a bracket, standing out from the wall. */
-function pokeSign(props, b, face, u) {
-  // Design 084: bigger, a landmark (the art's sign over the street).
-  const r = 25 * u;
-  const s = face.length * 0.5;
-  const z = 140 * u;
-  const wall = onFace(face, s, 0, z);
-  const centre = [wall[0] + face.out[0] * (r + 8 * u), wall[1] + face.out[1] * (r + 8 * u), z];
-  props.tube([wall, [wall[0] + face.out[0] * 8 * u, wall[1] + face.out[1] * 8 * u, z]], 1.3 * u, IRON, { sides: 6 });
-  const across = [face.along[0] * 0.4 * u, face.along[1] * 0.4 * u, 0];
-  const lift = (p, k) => [p[0] + across[0] * k, p[1] + across[1] * k, p[2]];
-  for (const side of [-1, 1]) {
-    const c = lift(centre, side);
-    disc(props, { centre: c, out: face.out, r, color: BALL_RED, from: 0, to: Math.PI });
-    disc(props, { centre: c, out: face.out, r, color: BALL_WHITE, from: Math.PI, to: 2 * Math.PI });
-    const band = 2.6 * u;
-    props.quad(
-      [c[0] - face.out[0] * r, c[1] - face.out[1] * r, z - band],
-      [c[0] + face.out[0] * r, c[1] + face.out[1] * r, z - band],
-      [c[0] + face.out[0] * r, c[1] + face.out[1] * r, z + band],
-      [c[0] - face.out[0] * r, c[1] - face.out[1] * r, z + band],
-      BALL_BLACK
-    );
-    const sideShift = lift(c, side * 0.5);
-    disc(props, { centre: sideShift, out: face.out, r: r * 0.36, color: BALL_BLACK });
-    disc(props, { centre: lift(sideShift, side * 0.4), out: face.out, r: r * 0.24, color: BALL_WHITE });
-  }
-}
-
 /** One building: a stone block, long windows in floors with a trim band between, a shopfront awning, a cornice, a mansard roof. */
 function building(props, b, u) {
   const wall = WALLS[b.palette];
@@ -706,44 +677,34 @@ function building(props, b, u) {
   wallBand(props, { a, b: c, depth: 10 * u, z0: b.height - 7 * u, z1: b.height, over: 7 * u, color: trim });
   const face = { a, along, out, length };
   roof(props, b, face, u);
-  if (isCenter) pokeSign(props, b, face, u);
-}
-
-/** A round street tree (the kit's), trimmed, in Lumiose's greens. */
-function tree(props, t) {
-  placeAsset(props, 'treeRound', {
-    x: t.x,
-    y: t.y,
-    size: t.r * 0.94,
-    height: t.h + t.r * 0.6,
-    seed: t.seed * 1009,
-    sun: LUMIOSE_SUN,
-    colors: { leaf: [0.1, 0.28, 0.12, 0], leafLight: [0.19, 0.42, 0.19, 0], bark: TRUNK, barkDark: TRUNK },
-  });
-}
-
-/** A lamppost: a fluted iron post, a bracket with three globes, a green banner hung from it. */
-function lamp(props, l, u) {
-  lampPost(props, l, u);
-  // Design 083: the banner stirs in the breeze (a little: it hangs from the post).
-  props.look({ kind: LOOK.plain, sway: 0.6 }, () =>
-    props.quad([l.x + l.side * -0.6 * u, l.y - 5 * u, l.h * 0.46], [l.x + l.side * -0.6 * u, l.y + 5 * u, l.h * 0.46], [l.x + l.side * -0.6 * u, l.y + 5 * u, l.h * 0.78], [l.x + l.side * -0.6 * u, l.y - 5 * u, l.h * 0.78], BANNER)
-  );
-}
-
-function lampPost(props, l, u) {
-  props.tube([[l.x, l.y, -2], [l.x, l.y, l.h * 0.5], [l.x, l.y, l.h]], [6 * u, 3.6 * u, 2.6 * u], IRON, { sides: 12 });
-  props.cylinder({ x: l.x, y: l.y, z0: -2, z1: 14 * u, r: 9 * u, color: IRON, sides: 12 });
-  props.ring({ x: l.x, y: l.y, z0: l.h * 0.46, z1: l.h * 0.46 + 3 * u, r: 5 * u, color: IRON, sides: 12 });
-  props.cylinder({ x: l.x, y: l.y, z0: l.h, z1: l.h + 4 * u, r: 5 * u, color: IRON, sides: 12 });
-  for (const s of [-1, 0, 1]) {
-    props.tube([[l.x, l.y, l.h - 4 * u], [l.x, l.y + s * 10 * u, l.h + 6 * u], [l.x, l.y + s * 17 * u, l.h + 6 * u]], 1.5 * u, IRON, { sides: 6 });
-    props.cylinder({ x: l.x, y: l.y + s * 17 * u, z0: l.h + 4 * u, z1: l.h + 6.5 * u, r: 4 * u, color: IRON, sides: 8 });
-    props.sphere({ x: l.x, y: l.y + s * 17 * u, z: l.h + 12 * u, r: 6.2 * u, color: LAMP_GLOBE, sides: 12, rings: 8 });
+  if (isCenter) {
+    // The Pokemon Center's blade sign: a Poke Ball on a bracket, standing out from the wall.
+    // Design 084: bigger, a landmark (the art's sign over the street).
+    const r = 25 * u;
+    const s = face.length * 0.5;
+    const z = 140 * u;
+    const wall = onFace(face, s, 0, z);
+    const centre = [wall[0] + face.out[0] * (r + 8 * u), wall[1] + face.out[1] * (r + 8 * u), z];
+    props.tube([wall, [wall[0] + face.out[0] * 8 * u, wall[1] + face.out[1] * 8 * u, z]], 1.3 * u, IRON, { sides: 6 });
+    const across = [face.along[0] * 0.4 * u, face.along[1] * 0.4 * u, 0];
+    const lift = (p, k) => [p[0] + across[0] * k, p[1] + across[1] * k, p[2]];
+    for (const side of [-1, 1]) {
+      const c = lift(centre, side);
+      disc(props, { centre: c, out: face.out, r, color: BALL_RED, from: 0, to: Math.PI });
+      disc(props, { centre: c, out: face.out, r, color: BALL_WHITE, from: Math.PI, to: 2 * Math.PI });
+      const band = 2.6 * u;
+      props.quad(
+        [c[0] - face.out[0] * r, c[1] - face.out[1] * r, z - band],
+        [c[0] + face.out[0] * r, c[1] + face.out[1] * r, z - band],
+        [c[0] + face.out[0] * r, c[1] + face.out[1] * r, z + band],
+        [c[0] - face.out[0] * r, c[1] - face.out[1] * r, z + band],
+        BALL_BLACK
+      );
+      const sideShift = lift(c, side * 0.5);
+      disc(props, { centre: sideShift, out: face.out, r: r * 0.36, color: BALL_BLACK });
+      disc(props, { centre: lift(sideShift, side * 0.4), out: face.out, r: r * 0.24, color: BALL_WHITE });
+    }
   }
-  // A basket of flowers hung from the post, and the banner.
-  props.sphere({ x: l.x + l.side * 7 * u, y: l.y, z: l.h * 0.62, r: 5 * u, color: FOLIAGE_MID, sides: 10, rings: 7, squash: 0.7 });
-  props.sphere({ x: l.x + l.side * 7 * u, y: l.y + 1.5 * u, z: l.h * 0.62 + 3 * u, r: 2.4 * u, color: FLOWER_PINK, sides: 8, rings: 5 });
 }
 
 /** A bench (the kit's), its back to the strip's edge. */
@@ -755,71 +716,6 @@ function bench(props, b) {
 function cafe(props, c, u) {
   const [stripe, white] = PARASOLS[Math.floor(c.seed * PARASOLS.length) % PARASOLS.length];
   placeAsset(props, 'parasol', { x: c.x, y: c.y, size: c.r, height: 70 * u, seed: c.seed * 997, stripes: [stripe, white], sun: LUMIOSE_SUN, colors: { pole: IRON, table: TABLE_TOP, chair: IRON } });
-}
-
-/** Flowers in clumps down each bed (the kit's), pink, yellow and white by turns. */
-function bedFlowers(props, bed, u) {
-  const across = bed.x1 - bed.x0;
-  const size = across * 0.32;
-  const count = Math.max(1, Math.floor((bed.y1 - bed.y0) / (size * 2.6)));
-  for (let k = 0; k < count; k += 1) {
-    const y = bed.y0 + ((bed.y1 - bed.y0) * (k + 0.5)) / count;
-    const petals = [[FLOWER_PINK, '#fff6ea'], ['#ffd84a', '#fff6ea'], [FLOWER_PINK, '#ffd84a']][k % 3];
-    placeAsset(props, 'flowers', { x: (bed.x0 + bed.x1) / 2, y, size, head: 4.6 * u, count: 6, seed: k * 31 + bed.x0, petals, sun: LUMIOSE_SUN });
-  }
-}
-
-/**
- * The Prism Tower: a white lattice square in section that flares to four legs at the foot, narrows to a
- * waist, swells to a crown whose four corners rise as fins around a mast; light-blue glass fills the long
- * window of the shaft and the arches of the foot. Four corner legs, a ring of bars and a pair of braces
- * on each face at every level.
- */
-function prismTower(props, t, u) {
-  const levels = 20;
-  const radius = (s) => towerRadius(s, t.h);
-  const corner = (k, s, scale = 1) => {
-    const angle = (k / 4) * 2 * Math.PI + Math.PI / 4;
-    return [t.x + Math.cos(angle) * radius(s) * scale, t.y + Math.sin(angle) * radius(s) * scale, -2 + s * t.h];
-  };
-  const top = 0.93;
-  for (let k = 0; k < 4; k += 1) {
-    props.tube(Array.from({ length: levels + 1 }, (_, i) => corner(k, (i / levels) * top)), [3 * u, 2.4 * u, 2 * u, ...Array(levels - 2).fill(2 * u)], TOWER_WHITE, { sides: 6 });
-  }
-  const glassBands = [[0.06, 0.15, TOWER_GLASS_DEEP], [0.3, 0.7, TOWER_GLASS]];
-  for (let i = 0; i < levels; i += 1) {
-    const s0 = (i / levels) * top;
-    const s1 = ((i + 1) / levels) * top;
-    for (let k = 0; k < 4; k += 1) {
-      const n = (k + 1) % 4;
-      props.tube([corner(k, s1), corner(n, s1)], 1.5 * u, TOWER_WHITE, { sides: 6 });
-      props.tube([corner(k, s0), corner(n, s1)], 1.1 * u, TOWER_SHADE, { sides: 4 });
-      props.tube([corner(n, s0), corner(k, s1)], 1.1 * u, TOWER_SHADE, { sides: 4 });
-    }
-    for (const [from, to, color] of glassBands) {
-      if (s0 < from || s1 > to + 0.001) continue;
-      for (let k = 0; k < 4; k += 1) props.quad(corner(k, s0, 0.9), corner((k + 1) % 4, s0, 0.9), corner((k + 1) % 4, s1, 0.9), corner(k, s1, 0.9), color);
-    }
-  }
-  // The foot: a white pavilion between the legs, arched windows on its faces.
-  const pavilion = radius(0.02) * 0.62;
-  props.roundBox({ x: t.x, y: t.y, z0: -2, z1: 0.075 * t.h, hw: pavilion, hh: pavilion, yaw: Math.PI / 4, color: TOWER_WHITE, topColor: [0.5, 0.58, 0.68, 0.3] });
-  for (let k = 0; k < 4; k += 1) {
-    const angle = (k / 4) * 2 * Math.PI;
-    const px = t.x + Math.cos(angle) * (pavilion * 1.0 + 0.3);
-    const py = t.y + Math.sin(angle) * (pavilion * 1.0 + 0.3);
-    const tx = -Math.sin(angle);
-    const ty = Math.cos(angle);
-    props.quad([px - tx * pavilion * 0.55, py - ty * pavilion * 0.55, 6 * u], [px + tx * pavilion * 0.55, py + ty * pavilion * 0.55, 6 * u], [px + tx * pavilion * 0.55, py + ty * pavilion * 0.55, 0.062 * t.h], [px - tx * pavilion * 0.55, py - ty * pavilion * 0.55, 0.062 * t.h], TOWER_GLASS_DEEP);
-  }
-  // The crown: four fins rising from the corners, a mast between them with a light on top.
-  for (let k = 0; k < 4; k += 1) {
-    const base = corner(k, top);
-    const tip = [t.x + (base[0] - t.x) * 1.18, t.y + (base[1] - t.y) * 1.18, -2 + t.h * 1.0];
-    props.tube([base, [(base[0] + tip[0]) / 2 + (base[0] - t.x) * 0.04, (base[1] + tip[1]) / 2 + (base[1] - t.y) * 0.04, (base[2] + tip[2]) / 2], tip], [2.6 * u, 1.8 * u, 0.5 * u], TOWER_WHITE, { sides: 6 });
-  }
-  props.tube([[t.x, t.y, -2 + t.h * 0.9], [t.x, t.y, t.h + 70 * u]], [3 * u, 1.2 * u], TOWER_WHITE, { sides: 6 });
-  props.sphere({ x: t.x, y: t.y, z: t.h + 72 * u, r: 2.6 * u, color: SIGN_ROSE, sides: 8, rings: 5 });
 }
 
 /** The big billboard on the dark purple corner building: a lit blue screen with a pink panel. */
@@ -843,12 +739,98 @@ export function lumioseProps(spots) {
     building(props, b, u);
     billboard(props, b, u);
   }
-  for (const t of trees) tree(props, t);
-  for (const l of lamps) lamp(props, l, u);
+  for (const t of trees) {
+    // A round street tree (the kit's), trimmed, in Lumiose's greens.
+    placeAsset(props, 'treeRound', {
+      x: t.x,
+      y: t.y,
+      size: t.r * 0.94,
+      height: t.h + t.r * 0.6,
+      seed: t.seed * 1009,
+      sun: LUMIOSE_SUN,
+      colors: { leaf: [0.1, 0.28, 0.12, 0], leafLight: [0.19, 0.42, 0.19, 0], bark: TRUNK, barkDark: TRUNK },
+    });
+  }
+  for (const l of lamps) {
+    // A lamppost: a fluted iron post, a bracket with three globes, a green banner hung from it.
+    props.tube([[l.x, l.y, -2], [l.x, l.y, l.h * 0.5], [l.x, l.y, l.h]], [6 * u, 3.6 * u, 2.6 * u], IRON, { sides: 12 });
+    props.cylinder({ x: l.x, y: l.y, z0: -2, z1: 14 * u, r: 9 * u, color: IRON, sides: 12 });
+    props.ring({ x: l.x, y: l.y, z0: l.h * 0.46, z1: l.h * 0.46 + 3 * u, r: 5 * u, color: IRON, sides: 12 });
+    props.cylinder({ x: l.x, y: l.y, z0: l.h, z1: l.h + 4 * u, r: 5 * u, color: IRON, sides: 12 });
+    for (const s of [-1, 0, 1]) {
+      props.tube([[l.x, l.y, l.h - 4 * u], [l.x, l.y + s * 10 * u, l.h + 6 * u], [l.x, l.y + s * 17 * u, l.h + 6 * u]], 1.5 * u, IRON, { sides: 6 });
+      props.cylinder({ x: l.x, y: l.y + s * 17 * u, z0: l.h + 4 * u, z1: l.h + 6.5 * u, r: 4 * u, color: IRON, sides: 8 });
+      props.sphere({ x: l.x, y: l.y + s * 17 * u, z: l.h + 12 * u, r: 6.2 * u, color: LAMP_GLOBE, sides: 12, rings: 8 });
+    }
+    // A basket of flowers hung from the post, and the banner.
+    props.sphere({ x: l.x + l.side * 7 * u, y: l.y, z: l.h * 0.62, r: 5 * u, color: FOLIAGE_MID, sides: 10, rings: 7, squash: 0.7 });
+    props.sphere({ x: l.x + l.side * 7 * u, y: l.y + 1.5 * u, z: l.h * 0.62 + 3 * u, r: 2.4 * u, color: FLOWER_PINK, sides: 8, rings: 5 });
+    // Design 083: the banner stirs in the breeze (a little: it hangs from the post).
+    props.look({ kind: LOOK.plain, sway: 0.6 }, () =>
+      props.quad([l.x + l.side * -0.6 * u, l.y - 5 * u, l.h * 0.46], [l.x + l.side * -0.6 * u, l.y + 5 * u, l.h * 0.46], [l.x + l.side * -0.6 * u, l.y + 5 * u, l.h * 0.78], [l.x + l.side * -0.6 * u, l.y - 5 * u, l.h * 0.78], BANNER)
+    );
+  }
   for (const b of benches) bench(props, b);
   for (const c of cafes) cafe(props, c, u);
-  for (const bed of spots.beds) bedFlowers(props, bed, u);
-  prismTower(props, tower, u);
+  for (const bed of spots.beds) {
+    // Flowers in clumps down each bed (the kit's), pink, yellow and white by turns.
+    const across = bed.x1 - bed.x0;
+    const size = across * 0.32;
+    const count = Math.max(1, Math.floor((bed.y1 - bed.y0) / (size * 2.6)));
+    for (let k = 0; k < count; k += 1) {
+      const y = bed.y0 + ((bed.y1 - bed.y0) * (k + 0.5)) / count;
+      const petals = [[FLOWER_PINK, '#fff6ea'], ['#ffd84a', '#fff6ea'], [FLOWER_PINK, '#ffd84a']][k % 3];
+      placeAsset(props, 'flowers', { x: (bed.x0 + bed.x1) / 2, y, size, head: 4.6 * u, count: 6, seed: k * 31 + bed.x0, petals, sun: LUMIOSE_SUN });
+    }
+  }
+  // The Prism Tower: a white lattice square in section that flares to four legs at the foot, narrows to a
+  // waist, swells to a crown whose four corners rise as fins around a mast; light-blue glass fills the long
+  // window of the shaft and the arches of the foot. Four corner legs, a ring of bars and a pair of braces
+  // on each face at every level.
+  const levels = 20;
+  const radius = (s) => towerRadius(s, tower.h);
+  const corner = (k, s, scale = 1) => {
+    const angle = (k / 4) * 2 * Math.PI + Math.PI / 4;
+    return [tower.x + Math.cos(angle) * radius(s) * scale, tower.y + Math.sin(angle) * radius(s) * scale, -2 + s * tower.h];
+  };
+  const top = 0.93;
+  for (let k = 0; k < 4; k += 1) {
+    props.tube(Array.from({ length: levels + 1 }, (_, i) => corner(k, (i / levels) * top)), [3 * u, 2.4 * u, 2 * u, ...Array(levels - 2).fill(2 * u)], TOWER_WHITE, { sides: 6 });
+  }
+  const glassBands = [[0.06, 0.15, TOWER_GLASS_DEEP], [0.3, 0.7, TOWER_GLASS]];
+  for (let i = 0; i < levels; i += 1) {
+    const s0 = (i / levels) * top;
+    const s1 = ((i + 1) / levels) * top;
+    for (let k = 0; k < 4; k += 1) {
+      const n = (k + 1) % 4;
+      props.tube([corner(k, s1), corner(n, s1)], 1.5 * u, TOWER_WHITE, { sides: 6 });
+      props.tube([corner(k, s0), corner(n, s1)], 1.1 * u, TOWER_SHADE, { sides: 4 });
+      props.tube([corner(n, s0), corner(k, s1)], 1.1 * u, TOWER_SHADE, { sides: 4 });
+    }
+    for (const [from, to, color] of glassBands) {
+      if (s0 < from || s1 > to + 0.001) continue;
+      for (let k = 0; k < 4; k += 1) props.quad(corner(k, s0, 0.9), corner((k + 1) % 4, s0, 0.9), corner((k + 1) % 4, s1, 0.9), corner(k, s1, 0.9), color);
+    }
+  }
+  // The foot: a white pavilion between the legs, arched windows on its faces.
+  const pavilion = radius(0.02) * 0.62;
+  props.roundBox({ x: tower.x, y: tower.y, z0: -2, z1: 0.075 * tower.h, hw: pavilion, hh: pavilion, yaw: Math.PI / 4, color: TOWER_WHITE, topColor: [0.5, 0.58, 0.68, 0.3] });
+  for (let k = 0; k < 4; k += 1) {
+    const angle = (k / 4) * 2 * Math.PI;
+    const px = tower.x + Math.cos(angle) * (pavilion * 1.0 + 0.3);
+    const py = tower.y + Math.sin(angle) * (pavilion * 1.0 + 0.3);
+    const tx = -Math.sin(angle);
+    const ty = Math.cos(angle);
+    props.quad([px - tx * pavilion * 0.55, py - ty * pavilion * 0.55, 6 * u], [px + tx * pavilion * 0.55, py + ty * pavilion * 0.55, 6 * u], [px + tx * pavilion * 0.55, py + ty * pavilion * 0.55, 0.062 * tower.h], [px - tx * pavilion * 0.55, py - ty * pavilion * 0.55, 0.062 * tower.h], TOWER_GLASS_DEEP);
+  }
+  // The crown: four fins rising from the corners, a mast between them with a light on top.
+  for (let k = 0; k < 4; k += 1) {
+    const base = corner(k, top);
+    const tip = [tower.x + (base[0] - tower.x) * 1.18, tower.y + (base[1] - tower.y) * 1.18, -2 + tower.h * 1.0];
+    props.tube([base, [(base[0] + tip[0]) / 2 + (base[0] - tower.x) * 0.04, (base[1] + tip[1]) / 2 + (base[1] - tower.y) * 0.04, (base[2] + tip[2]) / 2], tip], [2.6 * u, 1.8 * u, 0.5 * u], TOWER_WHITE, { sides: 6 });
+  }
+  props.tube([[tower.x, tower.y, -2 + tower.h * 0.9], [tower.x, tower.y, tower.h + 70 * u]], [3 * u, 1.2 * u], TOWER_WHITE, { sides: 6 });
+  props.sphere({ x: tower.x, y: tower.y, z: tower.h + 72 * u, r: 2.6 * u, color: SIGN_ROSE, sides: 8, rings: 5 });
   return props;
 }
 

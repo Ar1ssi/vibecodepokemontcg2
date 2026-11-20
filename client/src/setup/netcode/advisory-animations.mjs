@@ -130,9 +130,6 @@ export const drawnCards = (cards) => {
     .filter((card) => card.instanceId != null);
 };
 
-const entersPlay = (event) =>
-  event.instanceId != null && ENTRY_SOURCES.has(event.from) && ENTRY_TARGETS.has(event.to);
-
 // Design 089: piles a card can come out of into the hand without a draw or a reveal naming it.
 const HAND_SOURCES = new Set(['deck', 'discard', 'lostZone']);
 
@@ -146,23 +143,6 @@ const ATTACK_FAIL_CAUSE = {
 // Design 045: taken prizes naming their cards also fly into the hand, after the
 // claim burst on the prize zone.
 const PRIZE_TAKES = new Set(['prizesTaken', 'prizeTaken']);
-
-const prizePlans = (event, selfPlayerId) => {
-  const burst = fxPlan(event, selfPlayerId);
-  const cards = drawnCards(event.cards);
-  if (cards.length === 0 || burst.user == null) return burst;
-  return [burst, { kind: 'draw', user: burst.user, cards, count: cards.length, source: 'prizes' }];
-};
-
-// `run` is this event's faces from coinFlipRuns: the whole run for its first
-// flip, [] for a flip already folded into an earlier event's ceremony.
-const coinPlan = (event, selfPlayerId, run) => {
-  const faces = Array.isArray(run) ? run : coinFlipFaces(event);
-  if (faces.length === 0) return null;
-  // A marker event's own `kind` must not replace the plan kind. `blocking`: the
-  // ceremony covers the board, so its hold survives the FX queue's flood budget.
-  return { ...fxPlan(event, selfPlayerId, 'coin-flip'), kind: 'fx', blocking: true, faces };
-};
 
 /**
  * @param {object} event
@@ -203,38 +183,6 @@ const deckShufflePlan = (event, selfPlayerId, shuffleSound) => {
   return shuffleSound && user ? { kind: 'shuffle', user, zoneId: 'deck', sound: shuffleSound } : null;
 };
 
-/**
- * Design 089: a zone's cards put into the deck. The cards on screen fly there (`transit` with
- * `sweep`: the zone they left), a zone that shows no cards pulses the deck instead; then the
- * shuffle the event stands for, then the cards it drew.
- */
-function sweepToDeckPlans(event, selfPlayerId, shuffleSound) {
-  const user = sideOf(event.playerId, selfPlayerId);
-  if (!user) return null;
-  const source = deckSweepSource(event);
-  const plans = [
-    source
-      ? { kind: 'fx', effect: 'transit', user, to: 'deck', sweep: source }
-      : { kind: 'fx', effect: 'pile-catch', user, zoneId: 'deck' },
-  ];
-  if (DECK_SHUFFLE_EVENTS.has(event.type)) plans.push(deckShufflePlan(event, selfPlayerId, shuffleSound));
-  // event.zoneId is the SOURCE zone (hand, discard, board); the shuffle itself happens in the deck.
-  else if (event.type === 'zoneShuffledIntoDeck') plans.push({ kind: 'shuffle', user, zoneId: 'deck' });
-  const drawn = drawnCards(event.drawn);
-  if (drawn.length > 0) plans.push({ kind: 'draw', user, cards: drawn, count: drawn.length });
-  return plans.filter(Boolean);
-}
-
-/** Design 089: cards an event names as put into a pile, minus those a `cardMoved` already flies. */
-function namedTransitPlan(event, selfPlayerId, transitTaken) {
-  const user = sideOf(event.playerId, selfPlayerId);
-  if (!user) return null;
-  const { to, ids: named } = pileTransitOf(event);
-  if (named.length === 0) return { kind: 'fx', effect: 'pile-catch', user, zoneId: to };
-  const cards = named.filter((id) => !transitTaken?.has(id));
-  return cards.length > 0 ? { kind: 'fx', effect: 'transit', user, to, cards } : null;
-}
-
 function planFor(
   event,
   selfPlayerId,
@@ -252,9 +200,35 @@ function planFor(
   } = {}
 ) {
   if (!event || typeof event !== 'object') return null;
-  if (deckSweepSource(event) !== undefined) return sweepToDeckPlans(event, selfPlayerId, shuffleSound);
+  if (deckSweepSource(event) !== undefined) {
+    // Design 089: a zone's cards put into the deck. The cards on screen fly there (`transit` with
+    // `sweep`: the zone they left), a zone that shows no cards pulses the deck instead; then the
+    // shuffle the event stands for, then the cards it drew.
+    const user = sideOf(event.playerId, selfPlayerId);
+    if (!user) return null;
+    const source = deckSweepSource(event);
+    const plans = [
+      source
+        ? { kind: 'fx', effect: 'transit', user, to: 'deck', sweep: source }
+        : { kind: 'fx', effect: 'pile-catch', user, zoneId: 'deck' },
+    ];
+    if (DECK_SHUFFLE_EVENTS.has(event.type)) plans.push(deckShufflePlan(event, selfPlayerId, shuffleSound));
+    // event.zoneId is the SOURCE zone (hand, discard, board); the shuffle itself happens in the deck.
+    else if (event.type === 'zoneShuffledIntoDeck') plans.push({ kind: 'shuffle', user, zoneId: 'deck' });
+    const drawn = drawnCards(event.drawn);
+    if (drawn.length > 0) plans.push({ kind: 'draw', user, cards: drawn, count: drawn.length });
+    return plans.filter(Boolean);
+  }
   if (DECK_SHUFFLE_EVENTS.has(event.type)) return deckShufflePlan(event, selfPlayerId, shuffleSound);
-  if (event.type !== 'cardMoved' && pileTransitOf(event)) return namedTransitPlan(event, selfPlayerId, transitTaken);
+  if (event.type !== 'cardMoved' && pileTransitOf(event)) {
+    // Design 089: cards an event names as put into a pile, minus those a `cardMoved` already flies.
+    const user = sideOf(event.playerId, selfPlayerId);
+    if (!user) return null;
+    const { to, ids: named } = pileTransitOf(event);
+    if (named.length === 0) return { kind: 'fx', effect: 'pile-catch', user, zoneId: to };
+    const cards = named.filter((id) => !transitTaken?.has(id));
+    return cards.length > 0 ? { kind: 'fx', effect: 'transit', user, to, cards } : null;
+  }
   if (event.type === 'specialConditionUpdated') {
     return Array.isArray(conditionPlans) && conditionPlans.length > 0 ? conditionPlans : null;
   }
@@ -274,8 +248,21 @@ function planFor(
   }
   // `vstarUsed` carries its own `kind: 'vstar'`, which the spread would turn into the plan kind.
   if (event.type === 'vstarUsed') return { ...fxPlan(event, selfPlayerId), kind: 'fx' };
-  if (COIN_EVENTS.has(event.type)) return coinPlan(event, selfPlayerId, coinRun);
-  if (PRIZE_TAKES.has(event.type)) return prizePlans(event, selfPlayerId);
+  if (COIN_EVENTS.has(event.type)) {
+    // `run` is this event's faces from coinFlipRuns: the whole run for its first
+    // flip, [] for a flip already folded into an earlier event's ceremony.
+    const faces = Array.isArray(coinRun) ? coinRun : coinFlipFaces(event);
+    if (faces.length === 0) return null;
+    // A marker event's own `kind` must not replace the plan kind. `blocking`: the
+    // ceremony covers the board, so its hold survives the FX queue's flood budget.
+    return { ...fxPlan(event, selfPlayerId, 'coin-flip'), kind: 'fx', blocking: true, faces };
+  }
+  if (PRIZE_TAKES.has(event.type)) {
+    const burst = fxPlan(event, selfPlayerId);
+    const cards = drawnCards(event.cards);
+    if (cards.length === 0 || burst.user == null) return burst;
+    return [burst, { kind: 'draw', user: burst.user, cards, count: cards.length, source: 'prizes' }];
+  }
   if (event.type === 'attackExecuted' && (Array.isArray(hits) || power)) {
     const extra = { ...(Array.isArray(hits) ? { hits } : {}), ...(power ? { power } : {}) };
     return fxPlan(event, selfPlayerId).map((plan) => ({ ...plan, ...extra }));
@@ -285,7 +272,7 @@ function planFor(
     if (event.to === 'discard' && event.instanceId != null) {
       return { ...fxPlan(event, selfPlayerId, 'discard'), cards: [event.instanceId] };
     }
-    if (entersPlay(event)) return withSetup(fxPlan(event, selfPlayerId, 'enter'), setup);
+    if (event.instanceId != null && ENTRY_SOURCES.has(event.from) && ENTRY_TARGETS.has(event.to)) return withSetup(fxPlan(event, selfPlayerId, 'enter'), setup);
     // Design 089: into the deck or the Lost Zone, the card flies there from where it was.
     if (pileTransitOf(event)) return { ...fxPlan(event, selfPlayerId, 'transit'), cards: [event.instanceId] };
     // Out of a pile into the hand with no draw or reveal naming it: it flies in like a draw.
@@ -342,22 +329,6 @@ function planFor(
   }
 }
 
-// A reveal both seats see: not a look only its player had (`peek`), not one shown
-// to a single player (`revealedTo`), not a hand shown where it lies (`hand`).
-const isPublicReveal = (event) =>
-  event?.type === 'cardsRevealed' &&
-  event.playerId != null &&
-  !event.peek &&
-  event.revealedTo == null &&
-  !event.hand;
-
-const movedDeckToHand = (event) =>
-  event?.type === 'cardMoved' &&
-  event.from === 'deck' &&
-  event.to === 'hand' &&
-  event.instanceId != null &&
-  event.playerId != null;
-
 /**
  * Design 059: the cards each player revealed from their deck into their hand in
  * one batch. A card counts when the batch both moves it deck → hand
@@ -374,13 +345,23 @@ export function deckRevealRuns(events) {
   if (!Array.isArray(events)) return runs;
   const drawnFromDeck = new Map();
   for (const event of events) {
-    if (!movedDeckToHand(event)) continue;
+    if (!(event?.type === 'cardMoved' &&
+    event.from === 'deck' &&
+    event.to === 'hand' &&
+    event.instanceId != null &&
+    event.playerId != null)) continue;
     if (!drawnFromDeck.has(event.playerId)) drawnFromDeck.set(event.playerId, new Set());
     drawnFromDeck.get(event.playerId).add(event.instanceId);
   }
   const leaders = new Map();
   for (const event of events) {
-    if (!isPublicReveal(event)) continue;
+    // A reveal both seats see: not a look only its player had (`peek`), not one shown
+    // to a single player (`revealedTo`), not a hand shown where it lies (`hand`).
+    if (!(event?.type === 'cardsRevealed' &&
+    event.playerId != null &&
+    !event.peek &&
+    event.revealedTo == null &&
+    !event.hand)) continue;
     const fromDeck = drawnFromDeck.get(event.playerId);
     const cards = fromDeck ? drawnCards(event.cards).filter((card) => fromDeck.has(card.instanceId)) : [];
     if (cards.length === 0) continue;

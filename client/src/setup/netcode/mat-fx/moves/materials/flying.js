@@ -32,7 +32,6 @@ const WISPS = Object.freeze({
   detail: Object.freeze({ amount: 0.5, speed: 1.5, scale: 4, angle: FLOW_DEG }),
 });
 const FIBRE = Object.freeze({ detail: Object.freeze({ amount: 0.25, speed: 0, scale: 18 }) });
-const edgeOf = (rgb) => Object.freeze({ dissolve: Object.freeze({ edge: rgb, gain: 0.6, width: 0.14 }) });
 // Depth (078 § Depth): a gust is a stack of translucent sheets, not one decal. Each blade sits at
 // its own height above whatever lift the drawer gives the beat (a whirl's blades by their stable
 // seed, a projectile's pinwheel by blade order, its orb on top), so the camera sees the layers
@@ -189,20 +188,6 @@ function flyingKit(palette) {
     orb(ctx, x, y, r, alpha, hot, x * 0.02 + y * 0.03 + r * 0.15);
   }
 
-  /** A feather: one vane fill and its vein in the deep sky blue. */
-  function feather(ctx, spec, alpha) {
-    const { left, right, rachis } = featherOutline(spec);
-    ctx.fillStyle = rgbCss(palette.body, VANE_ALPHA * alpha);
-    traceOutline(ctx, { left, right });
-    withFxMod(ctx, FIBRE, () => ctx.fill());
-    ctx.strokeStyle = rgbCss(palette.deep, 0.8 * alpha);
-    ctx.lineWidth = Math.max(1, spec.width * 0.06);
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    rachis.forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
-    ctx.stroke();
-  }
-
   /**
    * A wind blade: one translucent fill, then a bright stroke along its outer edge (`hot` 0 drops
    * the stroke). `jag` draws a feather instead.
@@ -210,7 +195,17 @@ function flyingKit(palette) {
   function tongue(ctx, spec, { alpha = 1, hot = 1, jag = 0 } = {}) {
     if (!(spec.length > 0) || !(spec.width > 0) || !(alpha > 0)) return;
     if (jag) {
-      feather(ctx, spec, alpha);
+      // A feather: one vane fill and its vein in the deep sky blue.
+      const { left, right, rachis } = featherOutline(spec);
+      ctx.fillStyle = rgbCss(palette.body, VANE_ALPHA * alpha);
+      traceOutline(ctx, { left, right });
+      withFxMod(ctx, FIBRE, () => ctx.fill());
+      ctx.strokeStyle = rgbCss(palette.deep, 0.8 * alpha);
+      ctx.lineWidth = Math.max(1, spec.width * 0.06);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      rachis.forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
+      ctx.stroke();
       return;
     }
     withLiftZ(ctx, sheetZ(spec.seed), () => blade(ctx, spec, { alpha, hot }));
@@ -280,7 +275,7 @@ function flyingKit(palette) {
     projectile,
     grain: grainPass,
     withPalette: (p) => flyingKit(p),
-  }, edgeOf(palette.hot));
+  }, Object.freeze({ dissolve: Object.freeze({ edge: palette.hot, gain: 0.6, width: 0.14 }) }));
 }
 
 export const flying = styledKit(flyingKit(PALETTE), GUST);

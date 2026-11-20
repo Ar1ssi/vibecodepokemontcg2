@@ -50,7 +50,6 @@ export const TAP_SLOP_PX = 6;
 const clamp01 = (value) =>
   Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
 const lerp = (from, to, t) => from + (to - from) * t;
-const easeOutCubic = (t) => 1 - (1 - t) ** 3;
 // Symmetric, so a flip passes 90° exactly at the middle of its window: the card face is swapped
 // in at 50 % of CARD_FLIP_MS and is edge-on at that instant (design 052 row 14).
 const easeInOutSine = (t) => (1 - Math.cos(Math.PI * t)) / 2;
@@ -112,8 +111,6 @@ export function finishedUnboxing({ packCount = PACK_COUNT, cardsPerPack = CARDS_
   };
 }
 
-const sizesOf = (u) => ({ packCount: u.packsTorn.length, cardsPerPack: u.cardsPerPack });
-
 const isPackIndex = (u, index) =>
   Number.isInteger(index) && index >= 0 && index < u.packsTorn.length;
 
@@ -174,7 +171,7 @@ export function advanceUnboxing(u, event) {
       return withReveal(u, packIndex, type === 'revealAll' ? u.cardsPerPack : count + 1);
     }
     case 'finish':
-      return hasPackMidReveal(u) ? u : finishedUnboxing(sizesOf(u));
+      return hasPackMidReveal(u) ? u : finishedUnboxing({ packCount: u.packsTorn.length, cardsPerPack: u.cardsPerPack });
     default:
       return u;
   }
@@ -242,8 +239,17 @@ export function lidPose(t) {
   return { rotateXDeg: LID_OPEN_DEG * eased + 0, translateYPx: -LID_RAISE_PX * eased + 0 };
 }
 
-// Clips the unit square (percent units) to the half-plane `value(point) >= cut`.
-function clipSquare(value, cut) {
+const WRAP_POINTS = 5;
+const pct = (value) => `${Number(value.toFixed(2))}%`;
+
+/**
+ * The shrink-wrap still on the box: a diagonal wipe from the top-right corner. Always five
+ * points (the last repeated as needed) so neighbouring keyframes interpolate.
+ */
+export function wrapTearPose(t) {
+  const cut = 200 * (1 - (1 - clamp01(t)) ** 3);
+  const distanceFromTopRight = ([x, y]) => 100 - x + y;
+  // Clips the unit square (percent units) to the half-plane `value(point) >= cut`.
   const square = [
     [0, 0],
     [100, 0],
@@ -253,28 +259,15 @@ function clipSquare(value, cut) {
   const out = [];
   square.forEach((point, index) => {
     const next = square[(index + 1) % square.length];
-    const a = value(point) - cut;
-    const b = value(next) - cut;
+    const a = distanceFromTopRight(point) - cut;
+    const b = distanceFromTopRight(next) - cut;
     if (a >= 0) out.push(point);
     if (a >= 0 !== b >= 0) {
       const s = a / (a - b);
       out.push([lerp(point[0], next[0], s), lerp(point[1], next[1], s)]);
     }
   });
-  return out;
-}
-
-const WRAP_POINTS = 5;
-const pct = (value) => `${Number(value.toFixed(2))}%`;
-
-/**
- * The shrink-wrap still on the box: a diagonal wipe from the top-right corner. Always five
- * points (the last repeated as needed) so neighbouring keyframes interpolate.
- */
-export function wrapTearPose(t) {
-  const cut = 200 * easeOutCubic(clamp01(t));
-  const distanceFromTopRight = ([x, y]) => 100 - x + y;
-  let points = clipSquare(distanceFromTopRight, cut);
+  let points = out;
   if (!points.length) points = [[0, 100]];
   while (points.length < WRAP_POINTS) points.push(points.at(-1));
   const list = points.map(([x, y]) => `${pct(x)} ${pct(y)}`).join(', ');

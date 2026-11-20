@@ -85,8 +85,6 @@ const TERA_GLINT_PX = 64;
 
 const rgbOf = (palette, key) => (Array.isArray(palette?.[key]) ? palette[key].join(', ') : '255, 255, 255');
 
-const isSideways = (rotation) => Math.abs(Math.round((Number(rotation) || 0) / 90)) % 2 === 1;
-
 /** A canvas `wPx` × `hPx` CSS px at the device pixel ratio, its context scaled to CSS px. */
 function makeCanvas(wPx, hPx) {
   const ratio = pixelRatio();
@@ -230,17 +228,6 @@ export function createOverlayMeshes({
     entry.material.dispose();
   };
 
-  const tabMaterial = (side) =>
-    holdShared(`tab:${side}`, () => {
-      const { canvas, ctx } = makeCanvas(100, 20);
-      if (ctx) {
-        roundedRectPath(ctx, 0, 0, 100, 20, 10, 2);
-        ctx.fillStyle = TAB_COLOR[side] ?? TAB_COLOR.self;
-        ctx.fill();
-      }
-      return { material: basicMaterial(canvasTexture(canvas)) };
-    });
-
   /** A ring around a card `w` × `h` px: `draw(ctx, x, y, w, h)` paints it inside `margin`. */
   const ringMaterial = (key, w, h, margin, draw, extra = {}) =>
     holdShared(key, () => {
@@ -255,42 +242,6 @@ export function createOverlayMeshes({
 
   const cardPath = (ctx, x, y, w, h, grow = 0, newPath = true) =>
     roundedRectPath(ctx, x - grow, y - grow, w + 2 * grow, h + 2 * grow, w * CORNER.x + grow, h * CORNER.y + grow, newPath);
-
-  const selectedRing = (w, h) =>
-    ringMaterial(`selected-ring:${sizeKey(w, h)}`, w, h, SELECTED.ringPx + 1, (ctx, x, y, cw, ch) => {
-      cardPath(ctx, x, y, cw, ch, SELECTED.ringPx / 2);
-      ctx.lineWidth = SELECTED.ringPx;
-      ctx.strokeStyle = `rgba(${SELECTED.rgb}, ${SELECTED.alpha})`;
-      ctx.stroke();
-    });
-
-  const selectedHalo = (w, h) =>
-    ringMaterial(
-      `selected-halo:${sizeKey(w, h)}`,
-      w,
-      h,
-      SELECTED.haloBlurPx + SELECTED.haloSpreadPx + 4,
-      (ctx, x, y, cw, ch) => {
-        ctx.shadowColor = `rgba(${SELECTED.rgb}, 0.55)`;
-        ctx.shadowBlur = SELECTED.haloBlurPx;
-        cardPath(ctx, x, y, cw, ch, SELECTED.ringPx + SELECTED.haloSpreadPx);
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = `rgba(${SELECTED.rgb}, 0.55)`;
-        ctx.stroke();
-      },
-      { animated: 'pulse' }
-    );
-
-  const matPickRing = (state, w, h) => {
-    const color = state === 'picked' ? MAT_PICK.picked : MAT_PICK.idle;
-    const grow = MAT_PICK.offsetPx + MAT_PICK.widthPx / 2;
-    return ringMaterial(`matpick:${state}:${sizeKey(w, h)}`, w, h, grow + MAT_PICK.widthPx, (ctx, x, y, cw, ch) => {
-      cardPath(ctx, x, y, cw, ch, grow);
-      ctx.lineWidth = MAT_PICK.widthPx;
-      ctx.strokeStyle = color;
-      ctx.stroke();
-    });
-  };
 
   /** The glow's blurred halo, which never changes: painted once, then copied under each rim frame. */
   const bakeGlowHalo = ({ w, h, margin, rgb, size }) => {
@@ -345,26 +296,6 @@ export function createOverlayMeshes({
       rgb,
     });
 
-  // ── idle-loop sprite sheets, processed once per (sprite, tint) as the stylesheet paints them.
-  const sheetImage = (src) => {
-    let pending = sheetImages.get(src);
-    if (!pending) {
-      pending = { image: null, failed: false };
-      sheetImages.set(src, pending);
-      loadImage(src).then(
-        (image) => {
-          pending.image = image;
-          onNeedsRender();
-        },
-        (error) => {
-          pending.failed = true;
-          console.warn('board3d: status loop sheet failed', error?.message || error);
-        }
-      );
-    }
-    return pending.image;
-  };
-
   const processSheet = (image, paint, tint) => {
     const w = image.naturalWidth || image.width;
     const h = image.naturalHeight || image.height;
@@ -414,7 +345,24 @@ export function createOverlayMeshes({
     if (!look?.src) return null;
     const key = `${part.sprite}|${part.tint ?? ''}`;
     if (sheets.has(key)) return sheets.get(key);
-    const image = sheetImage(look.src);
+    // ── idle-loop sprite sheets, processed once per (sprite, tint) as the stylesheet paints them.
+    const src = look.src;
+    let pending = sheetImages.get(src);
+    if (!pending) {
+      pending = { image: null, failed: false };
+      sheetImages.set(src, pending);
+      loadImage(src).then(
+        (image) => {
+          pending.image = image;
+          onNeedsRender();
+        },
+        (error) => {
+          pending.failed = true;
+          console.warn('board3d: status loop sheet failed', error?.message || error);
+        }
+      );
+    }
+    const image = pending.image;
     if (!image) return null;
     const sheet = processSheet(image, look.paint, part.tint);
     sheets.set(key, sheet);
@@ -518,42 +466,6 @@ export function createOverlayMeshes({
     return addMesh(entry, parent, plane, material, { ...layout, w: wPx, h: hPx });
   };
 
-  const buildCounter = (entry, root, plan, box) => {
-    const size = plan.size * box.w;
-    const [u, v] = plan.anchor;
-    const x = u * box.w;
-    const y = v * box.h;
-    entry.art.push(COUNTER_BACK_ART, COUNTER_ART);
-    const back = COUNTER_BACK.scale * size;
-    addMesh(entry, root, disc, holdArt(COUNTER_BACK_ART).material, {
-      x,
-      y: y - COUNTER_BACK.drop * size,
-      z: LAYER.counterBack.z,
-      w: back,
-      h: back,
-      order: LAYER.counterBack.order,
-    });
-    addMesh(entry, root, disc, holdArt(COUNTER_ART).material, { x, y, z: LAYER.counter.z, w: size, h: size, order: LAYER.counter.order });
-    // The old DOM damage counter: font-size = card width / 6 (half the coin), heavy, stroked, dropped shadow.
-    const fontPx = size / 2;
-    addCanvasPlane(entry, root, size * 1.4, size, (ctx) => {
-      ctx.font = fontOf(fontPx, 900);
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.lineJoin = 'round';
-      const cx = (size * 1.4) / 2;
-      const cy = size / 2;
-      ctx.lineWidth = COUNTER_TEXT.strokeEm * fontPx * 2;
-      ctx.strokeStyle = COUNTER_TEXT.stroke;
-      ctx.fillStyle = COUNTER_TEXT.stroke;
-      ctx.strokeText(plan.digits, cx, cy + COUNTER_TEXT.dropEm * fontPx);
-      ctx.fillText(plan.digits, cx, cy + COUNTER_TEXT.dropEm * fontPx);
-      ctx.strokeText(plan.digits, cx, cy);
-      ctx.fillStyle = COUNTER_TEXT.fill;
-      ctx.fillText(plan.digits, cx, cy);
-    }, { x, y, z: LAYER.text.z, order: LAYER.text.order });
-  };
-
   const buildMarkers = (entry, root, plan, box, side) => {
     const size = plan.markerSize * box.w;
     for (const key of ['poison', 'burn']) {
@@ -595,60 +507,21 @@ export function createOverlayMeshes({
     if (plan.abilityTab) {
       const [tw, th] = plan.abilityTabSize;
       entry.shared.push(`tab:${side}`);
-      addMesh(entry, root, plane, tabMaterial(side).material, {
+      addMesh(entry, root, plane, holdShared(`tab:${side}`, () => {
+        const { canvas, ctx } = makeCanvas(100, 20);
+        if (ctx) {
+          roundedRectPath(ctx, 0, 0, 100, 20, 10, 2);
+          ctx.fillStyle = TAB_COLOR[side] ?? TAB_COLOR.self;
+          ctx.fill();
+        }
+        return { material: basicMaterial(canvasTexture(canvas)) };
+      }).material, {
         x: plan.abilityTab[0] * box.w,
         y: plan.abilityTab[1] * box.h,
         z: LAYER.tab.z,
         w: tw * box.w,
         h: th * box.w,
         order: LAYER.tab.order,
-      });
-    }
-  };
-
-  const buildTokens = (entry, root, tokens, box) => {
-    const ordered = [...tokens].sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
-    const row = energyRowPlan(
-      ordered.map((token) => token.src),
-      1,
-      { aspect: box.h / box.w }
-    );
-    const size = row.tokenSize * box.w;
-    row.tokens.forEach((token, i) => {
-      const { src, double } = ordered[i];
-      entry.art.push(src);
-      // The old DOM energy token: single tokens are round-cropped discs; two-orb tokens keep their square art.
-      addMesh(entry, root, double ? plane : disc, holdArt(src).material, {
-        x: token.anchor[0] * box.w,
-        y: token.anchor[1] * box.h,
-        z: LAYER.token.z + i * 0.02,
-        w: size,
-        h: size,
-        order: LAYER.token.order,
-      });
-    });
-    for (const badge of row.badges) {
-      const fontPx = badge.fontSize * box.w;
-      const heightPx = 1.4 * fontPx;
-      const ctxProbe = makeCanvas(1, 1).ctx;
-      if (ctxProbe) ctxProbe.font = fontOf(fontPx, 800);
-      const textW = ctxProbe ? ctxProbe.measureText(badge.label).width : badge.label.length * 0.62 * fontPx;
-      const widthPx = textW + 0.5 * fontPx;
-      addCanvasPlane(entry, root, widthPx, heightPx, (ctx) => {
-        roundedRectPath(ctx, 0, 0, widthPx, heightPx, heightPx / 2, heightPx / 2);
-        ctx.fillStyle = PILL_BACKGROUND;
-        ctx.fill();
-        ctx.font = fontOf(fontPx, 800);
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = '#fff';
-        ctx.fillText(badge.label, widthPx / 2, heightPx / 2);
-      }, {
-        x: badge.anchor[0] * box.w + widthPx / 2,
-        // `margin-bottom: 0.3em` lifts the pill off the tokens' bottom line.
-        y: badge.anchor[1] * box.h + 0.3 * fontPx + heightPx / 2,
-        z: LAYER.text.z,
-        order: LAYER.text.order,
       });
     }
   };
@@ -661,9 +534,28 @@ export function createOverlayMeshes({
       addMesh(entry, ringRoot, plane, material, { z: 0, w: W, h: H, order: LAYER.ring.order });
     };
     if (placement.selected) {
-      const halo = selectedHalo(w, h);
+      const halo = ringMaterial(
+        `selected-halo:${sizeKey(w, h)}`,
+        w,
+        h,
+        SELECTED.haloBlurPx + SELECTED.haloSpreadPx + 4,
+        (ctx, x, y, cw, ch) => {
+          ctx.shadowColor = `rgba(${SELECTED.rgb}, 0.55)`;
+          ctx.shadowBlur = SELECTED.haloBlurPx;
+          cardPath(ctx, x, y, cw, ch, SELECTED.ringPx + SELECTED.haloSpreadPx);
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = `rgba(${SELECTED.rgb}, 0.55)`;
+          ctx.stroke();
+        },
+        { animated: 'pulse' }
+      );
       add(halo, halo.material);
-      const ring = selectedRing(w, h);
+      const ring = ringMaterial(`selected-ring:${sizeKey(w, h)}`, w, h, SELECTED.ringPx + 1, (ctx, x, y, cw, ch) => {
+        cardPath(ctx, x, y, cw, ch, SELECTED.ringPx / 2);
+        ctx.lineWidth = SELECTED.ringPx;
+        ctx.strokeStyle = `rgba(${SELECTED.rgb}, ${SELECTED.alpha})`;
+        ctx.stroke();
+      });
       add(ring, ring.material);
     }
     if (placement.glow) {
@@ -675,7 +567,15 @@ export function createOverlayMeshes({
       add(glow, glow.material);
     }
     if (placement.matPick === 'idle' || placement.matPick === 'picked') {
-      const ring = matPickRing(placement.matPick, w, h);
+      const state = placement.matPick;
+      const color = state === 'picked' ? MAT_PICK.picked : MAT_PICK.idle;
+      const grow = MAT_PICK.offsetPx + MAT_PICK.widthPx / 2;
+      const ring = ringMaterial(`matpick:${state}:${sizeKey(w, h)}`, w, h, grow + MAT_PICK.widthPx, (ctx, x, y, cw, ch) => {
+        cardPath(ctx, x, y, cw, ch, grow);
+        ctx.lineWidth = MAT_PICK.widthPx;
+        ctx.strokeStyle = color;
+        ctx.stroke();
+      });
       add(ring, ring.material);
     }
   };
@@ -751,8 +651,8 @@ export function createOverlayMeshes({
     return material;
   };
 
-  /** The coat's star glint: a radial star with two crossed diamond rays. */
-  const glintTexture = (palette) => {
+  const buildTeraGlints = (entry, instanceId, palette, w, h) => {
+    // The coat's star glint: a radial star with two crossed diamond rays.
     const S = TERA_GLINT_PX;
     const { canvas, ctx } = makeCanvas(S, S);
     if (ctx) {
@@ -787,11 +687,7 @@ export function createOverlayMeshes({
         ctx.restore();
       }
     }
-    return canvasTexture(canvas);
-  };
-
-  const buildTeraGlints = (entry, instanceId, palette, w, h) => {
-    const texture = glintTexture(palette);
+    const texture = canvasTexture(canvas);
     entry.owned.push({ dispose: () => texture.dispose() });
     return teraSkinGlints(instanceId).map((glint) => {
       const material = basicMaterial(texture);
@@ -827,19 +723,6 @@ export function createOverlayMeshes({
       glint.mesh.rotation.z = -frame.rotateDeg * DEG;
       glint.material.opacity = frame.opacity * fade;
     }
-  };
-
-  const buildTera = (entry, instanceId, palette, card, now, formAt) => {
-    // An entry (mat-fx/entry.js) says when its coat forms; any other card's forms as it goes on.
-    if (Number.isFinite(formAt)) teraSince.set(instanceId, formAt);
-    else if (!teraSince.has(instanceId)) teraSince.set(instanceId, now);
-    const { w, h } = card;
-    entry.tera = {
-      start: teraSince.get(instanceId),
-      coat: buildTeraCoat(entry, instanceId, palette, w, h),
-      glints: buildTeraGlints(entry, instanceId, palette, w, h),
-    };
-    paintTera(entry.tera, frozenAt ?? now, motionReduced());
   };
 
   const clearEntry = (entry) => {
@@ -915,7 +798,7 @@ export function createOverlayMeshes({
     const t = CARD_UNITS.t * cardScaleFor(w);
     const card = { w, h, t };
     const rotation = Number(placement.rotation) || 0;
-    const sideways = isSideways(rotation);
+    const sideways = Math.abs(Math.round((Number(rotation) || 0) / 90)) % 2 === 1;
     const box = sideways ? { w: h, h: w } : { w, h };
     const front = placement.face !== 'back';
     const seatYaw = rotation + (placement.side === 'opp' ? 180 : 0);
@@ -942,14 +825,107 @@ export function createOverlayMeshes({
     if (front) {
       const aspect = box.h / box.w;
       const counter = counterPlan(placement, { aspect });
-      if (counter) buildCounter(entry, root, counter, box);
+      if (counter) {
+        const size = counter.size * box.w;
+        const [u, v] = counter.anchor;
+        const x = u * box.w;
+        const y = v * box.h;
+        entry.art.push(COUNTER_BACK_ART, COUNTER_ART);
+        const back = COUNTER_BACK.scale * size;
+        addMesh(entry, root, disc, holdArt(COUNTER_BACK_ART).material, {
+          x,
+          y: y - COUNTER_BACK.drop * size,
+          z: LAYER.counterBack.z,
+          w: back,
+          h: back,
+          order: LAYER.counterBack.order,
+        });
+        addMesh(entry, root, disc, holdArt(COUNTER_ART).material, { x, y, z: LAYER.counter.z, w: size, h: size, order: LAYER.counter.order });
+        // The old DOM damage counter: font-size = card width / 6 (half the coin), heavy, stroked, dropped shadow.
+        const fontPx = size / 2;
+        addCanvasPlane(entry, root, size * 1.4, size, (ctx) => {
+          ctx.font = fontOf(fontPx, 900);
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.lineJoin = 'round';
+          const cx = (size * 1.4) / 2;
+          const cy = size / 2;
+          ctx.lineWidth = COUNTER_TEXT.strokeEm * fontPx * 2;
+          ctx.strokeStyle = COUNTER_TEXT.stroke;
+          ctx.fillStyle = COUNTER_TEXT.stroke;
+          ctx.strokeText(counter.digits, cx, cy + COUNTER_TEXT.dropEm * fontPx);
+          ctx.fillText(counter.digits, cx, cy + COUNTER_TEXT.dropEm * fontPx);
+          ctx.strokeText(counter.digits, cx, cy);
+          ctx.fillStyle = COUNTER_TEXT.fill;
+          ctx.fillText(counter.digits, cx, cy);
+        }, { x, y, z: LAYER.text.z, order: LAYER.text.order });
+      }
       buildMarkers(entry, root, markerPlan(placement, { aspect }), box, placement.side === 'opp' ? 'opp' : 'self');
-      if (list.length > 0) buildTokens(entry, root, list, box);
+      if (list.length > 0) {
+        const ordered = [...list].sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
+        const row = energyRowPlan(
+          ordered.map((token) => token.src),
+          1,
+          { aspect: box.h / box.w }
+        );
+        const size = row.tokenSize * box.w;
+        row.tokens.forEach((token, i) => {
+          const { src, double } = ordered[i];
+          entry.art.push(src);
+          // The old DOM energy token: single tokens are round-cropped discs; two-orb tokens keep their square art.
+          addMesh(entry, root, double ? plane : disc, holdArt(src).material, {
+            x: token.anchor[0] * box.w,
+            y: token.anchor[1] * box.h,
+            z: LAYER.token.z + i * 0.02,
+            w: size,
+            h: size,
+            order: LAYER.token.order,
+          });
+        });
+        for (const badge of row.badges) {
+          const fontPx = badge.fontSize * box.w;
+          const heightPx = 1.4 * fontPx;
+          const ctxProbe = makeCanvas(1, 1).ctx;
+          if (ctxProbe) ctxProbe.font = fontOf(fontPx, 800);
+          const textW = ctxProbe ? ctxProbe.measureText(badge.label).width : badge.label.length * 0.62 * fontPx;
+          const widthPx = textW + 0.5 * fontPx;
+          addCanvasPlane(entry, root, widthPx, heightPx, (ctx) => {
+            roundedRectPath(ctx, 0, 0, widthPx, heightPx, heightPx / 2, heightPx / 2);
+            ctx.fillStyle = PILL_BACKGROUND;
+            ctx.fill();
+            ctx.font = fontOf(fontPx, 800);
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#fff';
+            ctx.fillText(badge.label, widthPx / 2, heightPx / 2);
+          }, {
+            x: badge.anchor[0] * box.w + widthPx / 2,
+            // `margin-bottom: 0.3em` lifts the pill off the tokens' bottom line.
+            y: badge.anchor[1] * box.h + 0.3 * fontPx + heightPx / 2,
+            z: LAYER.text.z,
+            order: LAYER.text.order,
+          });
+        }
+      }
       // status-loop.mjs statusLoopKeys over the placement's conditions (already in Checkup order).
       const keys = (placement.conditions ?? []).map((c) => STATUS_CONDITION_KEYS[c]).filter(Boolean);
       if (keys.length > 0) buildLoop(entry, root, sky, keys, card, sideways, clock.now());
     }
-    if (front && placement.teraSkin) buildTera(entry, instanceId, placement.teraSkin, card, clock.now(), placement.teraFormAt);
+    if (front && placement.teraSkin) {
+      const palette = placement.teraSkin;
+      const now = clock.now();
+      const formAt = placement.teraFormAt;
+      // An entry (mat-fx/entry.js) says when its coat forms; any other card's forms as it goes on.
+      if (Number.isFinite(formAt)) teraSince.set(instanceId, formAt);
+      else if (!teraSince.has(instanceId)) teraSince.set(instanceId, now);
+      const { w, h } = card;
+      entry.tera = {
+        start: teraSince.get(instanceId),
+        coat: buildTeraCoat(entry, instanceId, palette, w, h),
+        glints: buildTeraGlints(entry, instanceId, palette, w, h),
+      };
+      paintTera(entry.tera, frozenAt ?? now, motionReduced());
+    }
     else teraSince.delete(instanceId);
     buildRings(entry, ringRoot, placement, card);
     onNeedsRender();

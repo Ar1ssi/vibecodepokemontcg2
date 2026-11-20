@@ -148,17 +148,6 @@ export function createHoverPreview({
     return img;
   };
 
-  const measure = (source) => {
-    const viewport = { width: view.innerWidth, height: view.innerHeight };
-    const boardRect = doc.getElementById('battleMat')?.getBoundingClientRect() ?? null;
-    const probeRects = probes.filter((probe) => probe.isConnected).map(viewportRectOf);
-    const gutter = gutterBox({ boardRect, probeRects, viewport });
-    return previewPlacement({ gutter, boardRect, sourceRect: viewportRectOf(source), viewport });
-  };
-
-  // A board re-render can detach, flip or re-stack the shown card without a pointerout.
-  const stillValid = (image) =>
-    image.isConnected && previewImageOf(image) === image && resolveSource(image)?.image === image;
   const watch = (image) => {
     observer?.disconnect();
     observer = null;
@@ -185,7 +174,11 @@ export function createHoverPreview({
     releaseContent();
     const content = buildContent(source);
     el.appendChild(content);
-    const box = measure(image);
+    const viewport = { width: view.innerWidth, height: view.innerHeight };
+    const boardRect = doc.getElementById('battleMat')?.getBoundingClientRect() ?? null;
+    const probeRects = probes.filter((probe) => probe.isConnected).map(viewportRectOf);
+    const gutter = gutterBox({ boardRect, probeRects, viewport });
+    const box = previewPlacement({ gutter, boardRect, sourceRect: viewportRectOf(image), viewport });
     Object.assign(el.style, {
       left: `${box.left}px`,
       top: `${box.top}px`,
@@ -220,7 +213,8 @@ export function createHoverPreview({
   function revalidate() {
     const { phase, key } = model.state();
     if (phase === 'idle' || !key) return;
-    if (!stillValid(key)) model.suppress('detached');
+    // A board re-render can detach, flip or re-stack the shown card without a pointerout.
+    if (!(key.isConnected && previewImageOf(key) === key && resolveSource(key)?.image === key)) model.suppress('detached');
   }
 
   /**

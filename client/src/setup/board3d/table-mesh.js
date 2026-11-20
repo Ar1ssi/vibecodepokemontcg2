@@ -52,19 +52,15 @@ const isSvgUrl = (url) => {
   }
 };
 
-/** viewBox aspect of an SVG document's text, or null. */
-function svgAspect(text) {
-  const match = /viewBox\s*=\s*["']\s*[-\d.]+[\s,]+[-\d.]+[\s,]+([\d.]+)[\s,]+([\d.]+)\s*["']/i.exec(text);
-  const w = Number(match?.[1]);
-  const h = Number(match?.[2]);
-  return positive(w) && positive(h) ? w / h : null;
-}
-
 async function rasterizeSvg(three, url, fetchImpl) {
   const response = await fetchImpl(url);
   if (!response.ok) throw new Error(`svg ${response.status}`);
   const text = await response.text();
-  const aspect = svgAspect(text) ?? 2;
+  // viewBox aspect of an SVG document's text, or null.
+  const match = /viewBox\s*=\s*["']\s*[-\d.]+[\s,]+[-\d.]+[\s,]+([\d.]+)[\s,]+([\d.]+)\s*["']/i.exec(text);
+  const w = Number(match?.[1]);
+  const h = Number(match?.[2]);
+  const aspect = (positive(w) && positive(h) ? w / h : null) ?? 2;
   const blobUrl = URL.createObjectURL(new Blob([text], { type: 'image/svg+xml' }));
   try {
     const image = new Image();
@@ -171,22 +167,6 @@ function vignetteTexture(three) {
   const texture = new three.CanvasTexture(canvas);
   texture.colorSpace = three.SRGBColorSpace;
   return texture;
-}
-
-/** A unit quad whose UVs we rewrite; PlaneGeometry(1, 1) vertex order is TL, TR, BL, BR. */
-function setQuadUv(geometry, { u0, v0, u1, v1 }) {
-  const uv = geometry.getAttribute('uv');
-  uv.setXY(0, u0, v1);
-  uv.setXY(1, u1, v1);
-  uv.setXY(2, u0, v0);
-  uv.setXY(3, u1, v0);
-  uv.needsUpdate = true;
-}
-
-/** Places a unit quad over the plane-fraction rect `rect` of a `w` × `h` half centred at its origin. */
-function placeQuad(mesh, rect, w, h, z) {
-  mesh.scale.set((rect.x1 - rect.x0) * w, (rect.y1 - rect.y0) * h, 1);
-  mesh.position.set(((rect.x0 + rect.x1) / 2) * w - w / 2, ((rect.y0 + rect.y1) / 2) * h - h / 2, z);
 }
 
 const FULL_UV = { u0: 0, v0: 0, u1: 1, v1: 1 };
@@ -335,8 +315,19 @@ export function createTable({ scene, textures, three, renderer = null, RoomEnvir
     const clipped = quad ? clipQuad(quad) : null;
     mesh.visible = Boolean(hasTexture && clipped);
     if (!clipped) return;
-    setQuadUv(mesh.geometry, clipped.uv);
-    placeQuad(mesh, clipped.rect, w, h, z);
+    // A unit quad whose UVs we rewrite; PlaneGeometry(1, 1) vertex order is TL, TR, BL, BR.
+    const geometry = mesh.geometry;
+    const { u0, v0, u1, v1 } = clipped.uv;
+    const uv = geometry.getAttribute('uv');
+    uv.setXY(0, u0, v1);
+    uv.setXY(1, u1, v1);
+    uv.setXY(2, u0, v0);
+    uv.setXY(3, u1, v0);
+    uv.needsUpdate = true;
+    // Places a unit quad over the plane-fraction rect `rect` of a `w` × `h` half centred at its origin.
+    const rect = clipped.rect;
+    mesh.scale.set((rect.x1 - rect.x0) * w, (rect.y1 - rect.y0) * h, 1);
+    mesh.position.set(((rect.x0 + rect.x1) / 2) * w - w / 2, ((rect.y0 + rect.y1) / 2) * h - h / 2, z);
   };
 
   /** Fits one half's art and overlay quads to its plane, mat box and loaded image. */
@@ -438,69 +429,18 @@ export function createTable({ scene, textures, three, renderer = null, RoomEnvir
     textures.release(entry.url);
   };
 
-  const materialFor = (slot) => {
-    const key = slot.startsWith('self') ? 'self' : 'opp';
-    return slot.endsWith('Art') ? halves[key].art.material : halves[key].overlay.material;
-  };
-
   const assign = (slot, texture) => {
-    const material = materialFor(slot);
+    const key = slot.startsWith('self') ? 'self' : 'opp';
+    const material = slot.endsWith('Art') ? halves[key].art.material : halves[key].overlay.material;
     material.map = texture;
     material.needsUpdate = true;
-    if (slot.endsWith('Art')) setAmbient(halves[slot.startsWith('self') ? 'self' : 'opp'], texture);
-  };
-
-  /** Rebuilds a half's ambient backdrop from its art (or clears it). */
-  const setAmbient = (parts, texture) => {
-    parts.ambientTexture?.dispose();
-    parts.ambientTexture = texture ? ambientTexture(three, texture.image, { flipY: texture.flipY }) : null;
-    parts.ambient.material.map = parts.ambientTexture;
-    parts.ambient.material.needsUpdate = true;
-  };
-
-  const wantedUrls = () => ({
-    selfArt: mat.self.src,
-    oppArt: mat.opp.src,
-    selfOverlay: mat.self.overlaySrc,
-    oppOverlay: mat.opp.overlaySrc,
-  });
-
-  const loadSlot = (slot, src) => {
-    const url = textureUrlFor(src);
-    const entry = { url, texture: null, released: false };
-    held.set(slot, entry);
-    textures.acquire(url, { colorSpace: 'srgb' }).then(
-      (texture) => {
-        // Superseded or disposed while loading: releaseSlot already gave the reference back.
-        if (disposed || entry.released) return;
-        if (renderer?.capabilities?.getMaxAnisotropy) texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
-        entry.texture = texture;
-        assign(slot, texture);
-        placeGeometry();
-        notify();
-      },
-      (error) => {
-        if (disposed || entry.released) return;
-        // A failed load leaves nothing in the cache to release.
-        held.delete(slot);
-        console.warn(`board3d: mat texture failed (${url})`, error?.message || error);
-        assign(slot, null);
-        placeGeometry();
-        notify();
-      }
-    );
-  };
-
-  const syncTextures = () => {
-    const wanted = wantedUrls();
-    for (const slot of SLOTS) {
-      const src = wanted[slot];
-      const current = held.get(slot);
-      const url = src ? textureUrlFor(src) : null;
-      if (current && current.url === url) continue;
-      releaseSlot(slot);
-      assign(slot, null);
-      if (url) loadSlot(slot, src);
+    if (slot.endsWith('Art')) {
+      // Rebuilds a half's ambient backdrop from its art (or clears it).
+      const parts = halves[slot.startsWith('self') ? 'self' : 'opp'];
+      parts.ambientTexture?.dispose();
+      parts.ambientTexture = texture ? ambientTexture(three, texture.image, { flipY: texture.flipY }) : null;
+      parts.ambient.material.map = parts.ambientTexture;
+      parts.ambient.material.needsUpdate = true;
     }
   };
 
@@ -513,20 +453,47 @@ export function createTable({ scene, textures, three, renderer = null, RoomEnvir
   const setMat = (spec) => {
     if (disposed) return;
     mat = halvesFromSpec(spec);
-    syncTextures();
+    const wanted = {
+      selfArt: mat.self.src,
+      oppArt: mat.opp.src,
+      selfOverlay: mat.self.overlaySrc,
+      oppOverlay: mat.opp.overlaySrc,
+    };
+    for (const slot of SLOTS) {
+      const src = wanted[slot];
+      const current = held.get(slot);
+      const url = src ? textureUrlFor(src) : null;
+      if (current && current.url === url) continue;
+      releaseSlot(slot);
+      assign(slot, null);
+      if (url) {
+        const url = textureUrlFor(src);
+        const entry = { url, texture: null, released: false };
+        held.set(slot, entry);
+        textures.acquire(url, { colorSpace: 'srgb' }).then(
+          (texture) => {
+            // Superseded or disposed while loading: releaseSlot already gave the reference back.
+            if (disposed || entry.released) return;
+            if (renderer?.capabilities?.getMaxAnisotropy) texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+            entry.texture = texture;
+            assign(slot, texture);
+            placeGeometry();
+            notify();
+          },
+          (error) => {
+            if (disposed || entry.released) return;
+            // A failed load leaves nothing in the cache to release.
+            held.delete(slot);
+            console.warn(`board3d: mat texture failed (${url})`, error?.message || error);
+            assign(slot, null);
+            placeGeometry();
+            notify();
+          }
+        );
+      }
+    }
     placeGeometry();
   };
-
-  /** The materials a Stadium environment covers: the cloth, its art, backdrop and zone outlines, the floor. */
-  const coveredMaterials = () => [
-    floor.material,
-    ...HALVES.flatMap((key) => [
-      halves[key].backing.material,
-      halves[key].ambient.material,
-      halves[key].art.material,
-      halves[key].overlay.material,
-    ]),
-  ];
 
   /**
    * Design 077: with a cutout, the covered materials discard their fragments wherever the Stadium
@@ -537,7 +504,16 @@ export function createTable({ scene, textures, three, renderer = null, RoomEnvir
    */
   const setCutout = (cutout) => {
     if (disposed) return;
-    for (const material of coveredMaterials()) {
+    // The materials a Stadium environment covers: the cloth, its art, backdrop and zone outlines, the floor.
+    for (const material of [
+      floor.material,
+      ...HALVES.flatMap((key) => [
+        halves[key].backing.material,
+        halves[key].ambient.material,
+        halves[key].art.material,
+        halves[key].overlay.material,
+      ]),
+    ]) {
       if (cutout) {
         material.onBeforeCompile = (shader) => {
           Object.assign(shader.uniforms, cutout.uniforms);

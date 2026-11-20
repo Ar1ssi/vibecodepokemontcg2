@@ -25,10 +25,6 @@ export function issueSeatToken(room, username, mint = randomUUID) {
   return token;
 }
 
-/** @param {unknown} token */
-const isWellFormedToken = (token) =>
-  typeof token === 'string' && token.length > 0 && token.length <= MAX_TOKEN_LENGTH;
-
 /**
  * @param {{ players: Set<string>, seatTokens?: Map<string, string> }} room
  * @param {string} username
@@ -38,6 +34,6 @@ const isWellFormedToken = (token) =>
 export function checkSeatClaim(room, username, token) {
   if (!room?.players?.has(username)) return 'new';
   const expected = room.seatTokens?.get(username);
-  if (expected && isWellFormedToken(token) && token === expected) return 'owner';
+  if (expected && (typeof token === 'string' && token.length > 0 && token.length <= MAX_TOKEN_LENGTH) && token === expected) return 'owner';
   return 'taken';
 }

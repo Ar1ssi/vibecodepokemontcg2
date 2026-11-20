@@ -127,35 +127,6 @@ const tracePolyline = (ctx, points, start = 0, end = points.length - 1) => {
   for (let i = start + 1; i <= end; i += 1) ctx.lineTo(points[i][0], points[i][1]);
 };
 
-const traceLeaf = (ctx, { left, right }) => {
-  ctx.beginPath();
-  tracePolyline(ctx, left);
-  for (let i = right.length - 2; i >= 0; i -= 1) ctx.lineTo(right[i][0], right[i][1]);
-  ctx.closePath();
-};
-
-/** The sunlit half: the lit edge out and the centre line back. */
-const traceHalf = (ctx, edge, mid) => {
-  ctx.beginPath();
-  tracePolyline(ctx, edge);
-  for (let i = mid.length - 2; i >= 0; i -= 1) ctx.lineTo(mid[i][0], mid[i][1]);
-  ctx.closePath();
-};
-
-/** Mid-vein plus one side vein each way, all in one path. */
-const traceVeins = (ctx, { left, right, mid }) => {
-  ctx.beginPath();
-  tracePolyline(ctx, mid, 1, mid.length - 2);
-  const root = Math.round(LEAF_SAMPLES * 0.35);
-  const reach = Math.round(LEAF_SAMPLES * 0.6);
-  for (const edge of [left, right]) {
-    ctx.moveTo(mid[root][0], mid[root][1]);
-    const [ex, ey] = edge[reach];
-    const [mx, my] = mid[reach];
-    ctx.lineTo(mx + (ex - mx) * 0.7, my + (ey - my) * 0.7);
-  }
-};
-
 /** A leaf material: leaf tongues, seed bodies and spinning leaf clusters in `palette`. */
 function leafKit(palette, shape, { veins }) {
   function glow(ctx, x, y, r, alpha) {
@@ -200,12 +171,22 @@ function leafKit(palette, shape, { veins }) {
     inShadow(ctx, () => {
       withFxMod(ctx, LEAF_SHEET, () => {
         ctx.fillStyle = rgbCss(palette.body, 0.9 * alpha);
-        traceLeaf(ctx, leaf);
+        const { left, right } = leaf;
+        ctx.beginPath();
+        tracePolyline(ctx, left);
+        for (let i = right.length - 2; i >= 0; i -= 1) ctx.lineTo(right[i][0], right[i][1]);
+        ctx.closePath();
         ctx.fill();
         const lit = 0.75 * alpha * clamp01(hot);
         if (lit > 0) {
           ctx.fillStyle = rgbCss(palette.hot, lit);
-          traceHalf(ctx, leaf.sunlitLeft ? leaf.left : leaf.right, leaf.mid);
+          // The sunlit half: the lit edge out and the centre line back.
+          const edge = leaf.sunlitLeft ? leaf.left : leaf.right;
+          const mid = leaf.mid;
+          ctx.beginPath();
+          tracePolyline(ctx, edge);
+          for (let i = mid.length - 2; i >= 0; i -= 1) ctx.lineTo(mid[i][0], mid[i][1]);
+          ctx.closePath();
           ctx.fill();
         }
       });
@@ -213,17 +194,22 @@ function leafKit(palette, shape, { veins }) {
         ctx.strokeStyle = rgbCss(palette.deep, 0.85 * alpha);
         ctx.lineWidth = 1;
         ctx.lineCap = 'round';
-        traceVeins(ctx, leaf);
+        // Mid-vein plus one side vein each way, all in one path.
+        const { left, right, mid } = leaf;
+        ctx.beginPath();
+        tracePolyline(ctx, mid, 1, mid.length - 2);
+        const root = Math.round(LEAF_SAMPLES * 0.35);
+        const reach = Math.round(LEAF_SAMPLES * 0.6);
+        for (const edge of [left, right]) {
+          ctx.moveTo(mid[root][0], mid[root][1]);
+          const [ex, ey] = edge[reach];
+          const [mx, my] = mid[reach];
+          ctx.lineTo(mx + (ex - mx) * 0.7, my + (ey - my) * 0.7);
+        }
         ctx.stroke();
       }
     });
   }
-
-  /** A leaf spun about its own centre (its base trails half a length behind (x, y)). */
-  const spunLeaf = (ctx, x, y, angleDeg, length, width, time, seed, opts) => {
-    const a = rad(angleDeg);
-    leafAt(ctx, { x: x - (Math.cos(a) * length) / 2, y: y - (Math.sin(a) * length) / 2, angleDeg, length, width, time, seed }, opts);
-  };
 
   /**
    * Leaves in flight along `headingDeg`. `tongues` 0 = a bare seed, 1 = one leaf tumbling
@@ -238,7 +224,12 @@ function leafKit(palette, shape, { veins }) {
       return;
     }
     if (tongues === 1) {
-      spunLeaf(ctx, x, y, spin, r * 2.2, r * 0.95, time, seed, { alpha, hot });
+      // A leaf spun about its own centre (its base trails half a length behind (x, y)).
+      const length = r * 2.2;
+      const width = r * 0.95;
+      const opts = { alpha, hot };
+      const a = rad(spin);
+      leafAt(ctx, { x: x - (Math.cos(a) * length) / 2, y: y - (Math.sin(a) * length) / 2, angleDeg: spin, length, width, time, seed }, opts);
       return;
     }
     // Heights by leaf order, not seed: a volley's projectile seed drifts along its path.

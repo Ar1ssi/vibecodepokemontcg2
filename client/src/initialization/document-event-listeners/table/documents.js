@@ -7,16 +7,17 @@ import {
   selfContainerDocument,
 } from '../../../state.js';
 
-// Design 074 D4: a click inside a board-mirror shadow root reaches the page too, retargeted to
-// the root's host. The root's own listener already ran closePopups with the real target, so the
-// page's copy (which would see a click "outside" every zone) stands down.
-const fromMirrorRoot = (event) =>
-  (event.target === selfContainer || event.target === oppContainer) &&
-  (event.composedPath?.()[0] ?? event.target) !== event.target;
-
 const addDocumentEventListeners = (document, { isPage = false } = {}) => {
   const onPopupEvent = (event) => {
-    if (isPage && fromMirrorRoot(event)) return;
+    // Design 074 D4: a click inside a board-mirror shadow root reaches the page too, retargeted to
+    // the root's host. The root's own listener already ran closePopups with the real target, so the
+    // page's copy (which would see a click "outside" every zone) stands down.
+    if (
+      isPage &&
+      (event.target === selfContainer || event.target === oppContainer) &&
+      (event.composedPath?.()[0] ?? event.target) !== event.target
+    )
+      return;
     closePopups(event);
   };
   document.addEventListener('click', onPopupEvent);

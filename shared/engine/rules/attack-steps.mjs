@@ -1796,7 +1796,32 @@ const BLOCKS = [
   // reveals …" stays unparsed instead of losing its condition.
   [
     /(?<=(?:^|\. )(?:(?:if heads|if tails|for each heads), )?)your opponent reveals their hand(?:, and you discard (a) card you find there|\. (discard|choose|add) (a|\d+|all) (trainer |supporter |energy )?cards? (?:you find there|from it)(?: (and put it on the bottom of their deck|to their prize cards face down|and shuffle them into their deck))?)?\./g,
-    (m) => revealHandStep(m[1] ? 'discard' : m[2], m[1] || m[3], m[4], m[5]),
+    (m) => {
+      // "Your opponent reveals their hand. Discard a Trainer card you find there." →
+      // { type: 'atkRevealOppHand', then: { action: 'discard', count: 1, filter: 'trainer' } }.
+      // A bare reveal has no `then`; "choose … and put" / "add … to" name the destination.
+      const verb = m[1] ? 'discard' : m[2];
+      const countWord = m[1] || m[3];
+      const kindWord = m[4];
+      const destination = m[5];
+      if (!verb) return { type: 'atkRevealOppHand' };
+      let action = 'discard';
+      if (verb === 'choose') {
+        if (/shuffle them into their deck/.test(destination || '')) action = 'deckShuffle';
+        else if (/bottom of their deck/.test(destination || '')) action = 'deckBottom';
+        else return null;
+      } else if (verb === 'add') {
+        if (!/prize cards/.test(destination || '')) return null;
+        action = 'prize';
+      } else if (destination) {
+        return null;
+      }
+      const filter = kindWord ? kindWord.trim() : undefined;
+      return {
+        type: 'atkRevealOppHand',
+        then: { action, count: countWord === 'all' ? 'all' : countOf(countWord), ...(filter ? { filter } : {}) },
+      };
+    },
   ],
 ];
 
@@ -1830,29 +1855,6 @@ function chainedMarkerStep(step, markerSentence) {
   const wrOrder = /<wr:(before|after)>/.exec(markerSentence)?.[1];
   const then = parseMarkerSentence(markerSentence.replace(/\s*<wr:(?:before|after)>/g, '').trim(), { wrOrder });
   return then ? { ...step, then } : null;
-}
-
-// "Your opponent reveals their hand. Discard a Trainer card you find there." →
-// { type: 'atkRevealOppHand', then: { action: 'discard', count: 1, filter: 'trainer' } }.
-// A bare reveal has no `then`; "choose … and put" / "add … to" name the destination.
-function revealHandStep(verb, countWord, kindWord, destination) {
-  if (!verb) return { type: 'atkRevealOppHand' };
-  let action = 'discard';
-  if (verb === 'choose') {
-    if (/shuffle them into their deck/.test(destination || '')) action = 'deckShuffle';
-    else if (/bottom of their deck/.test(destination || '')) action = 'deckBottom';
-    else return null;
-  } else if (verb === 'add') {
-    if (!/prize cards/.test(destination || '')) return null;
-    action = 'prize';
-  } else if (destination) {
-    return null;
-  }
-  const filter = kindWord ? kindWord.trim() : undefined;
-  return {
-    type: 'atkRevealOppHand',
-    then: { action, count: countWord === 'all' ? 'all' : countOf(countWord), ...(filter ? { filter } : {}) },
-  };
 }
 
 // "search your deck for up to 2 Basic {G} Energy cards" → { what, count, upTo }

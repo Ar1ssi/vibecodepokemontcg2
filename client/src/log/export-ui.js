@@ -16,10 +16,6 @@ let doc = null;
 let systemState = null;
 let lastToastAt = -Infinity;
 
-const shortSrc = () => `c:${clientId.slice(0, 8)}`;
-
-const utcStamp = (ms) => new Date(ms).toISOString().slice(0, 19).replace(/[-:]/g, '').replace('T', '-');
-
 function refreshLabel() {
   const el = doc?.getElementById('verboseLogging');
   if (!el || !log) return;
@@ -41,7 +37,13 @@ function download({ href, filename }) {
   link.remove();
 }
 
-function showToast() {
+function maybeToast(entry) {
+  const problem = entry.lvl === 'error' || (entry.cat === 'sync' && entry.ev === 'desync.detected');
+  if (!problem) return;
+  if (win.location?.search?.includes('e2e=1') || win.location?.href?.includes('e2e=1')) return;
+  const at = Date.now();
+  if (at - lastToastAt < LIMITS.toastMinMs) return;
+  lastToastAt = at;
   const toast = doc.createElement('div');
   toast.style.cssText =
     'position:fixed;right:16px;bottom:16px;z-index:2147483000;display:flex;gap:8px;align-items:center;' +
@@ -62,16 +64,6 @@ function showToast() {
   setTimeout(() => toast.remove(), TOAST_VISIBLE_MS);
 }
 
-function maybeToast(entry) {
-  const problem = entry.lvl === 'error' || (entry.cat === 'sync' && entry.ev === 'desync.detected');
-  if (!problem) return;
-  if (win.location?.search?.includes('e2e=1') || win.location?.href?.includes('e2e=1')) return;
-  const at = Date.now();
-  if (at - lastToastAt < LIMITS.toastMinMs) return;
-  lastToastAt = at;
-  showToast();
-}
-
 // One synchronous step when the modules are preloaded (the normal case): the server waits a
 // bounded time, and a janking tab gets few turns. The unshipped tail rides in the same reply.
 async function answerSnapshot(ack) {
@@ -79,12 +71,6 @@ async function answerSnapshot(ack) {
   const snapshot = buildSnapshotSync({ win, doc, modules });
   const tail = shipping?.tail?.() ?? null;
   ack(tail && tail.lines.length > 0 ? { ...snapshot, tail } : snapshot);
-}
-
-function preloadWhenLoaded() {
-  const start = () => preloadSnapshotModules().catch(() => {});
-  if (doc.readyState === 'complete') start();
-  else win.addEventListener('load', start, { once: true });
 }
 
 export function initExport({ socket: appSocket = null, shipping: shipper = null, log: logger, win: w = window, doc: d = document }) {
@@ -110,11 +96,15 @@ export function initExport({ socket: appSocket = null, shipping: shipper = null,
   }
   onEntry(maybeToast);
   refreshLabel();
-  if (socket) preloadWhenLoaded();
+  if (socket) {
+    const start = () => preloadSnapshotModules().catch(() => {});
+    if (doc.readyState === 'complete') start();
+    else win.addEventListener('load', start, { once: true });
+  }
 }
 
 export async function exportLocal(note = '') {
-  const src = shortSrc();
+  const src = `c:${clientId.slice(0, 8)}`;
   const offset = shipping?.state().offset ?? 0;
   const snapshot = await buildSnapshot();
   const header = {
@@ -141,7 +131,7 @@ export async function exportLocal(note = '') {
   for (const entry of clientRing.toArray()) {
     lines.push(`{"k":"e","ts":${entry.t + offset},"src":${JSON.stringify(src)},"load":${JSON.stringify(loadId)},${entry.line.slice(1)}`);
   }
-  const filename = `ptcg-log_local_${utcStamp(Date.now())}.ndjson`;
+  const filename = `ptcg-log_local_${new Date(Date.now()).toISOString().slice(0, 19).replace(/[-:]/g, '').replace('T', '-')}.ndjson`;
   const url = URL.createObjectURL(new Blob([`${lines.join('\n')}\n`], { type: 'application/x-ndjson' }));
   try {
     download({ href: url, filename });
@@ -149,16 +139,6 @@ export async function exportLocal(note = '') {
     setTimeout(() => URL.revokeObjectURL(url), 0);
   }
   return { ok: true, mode: 'local', filename };
-}
-
-function requestServerExport(note) {
-  return new Promise((resolve) => {
-    socket.timeout(LIMITS.exportAckMs + LIMITS.snapshotTimeoutMs).emit(
-      'log:export',
-      { roomId: systemState?.roomId || null, note },
-      (err, ack) => resolve({ err, ack })
-    );
-  });
 }
 
 // The server answering "not now" (an export already running, or one seconds ago): the file from
@@ -171,7 +151,13 @@ export async function exportFullLog(options = {}) {
   log.info('user', 'export.request', { note: String(note).slice(0, NOTE_MAX) });
   if (!socket?.connected) return exportLocal(note);
   await shipping?.flushNow();
-  const { err, ack } = await requestServerExport(note);
+  const { err, ack } = await new Promise((resolve) => {
+    socket.timeout(LIMITS.exportAckMs + LIMITS.snapshotTimeoutMs).emit(
+      'log:export',
+      { roomId: systemState?.roomId || null, note },
+      (err, ack) => resolve({ err, ack })
+    );
+  });
   if (err || !ack?.ok) {
     const reason = err ? 'timeout' : (ack?.reason ?? 'refused');
     log.warn('log', 'export.failed', { reason });

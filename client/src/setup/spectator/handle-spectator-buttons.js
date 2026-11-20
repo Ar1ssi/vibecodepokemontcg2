@@ -16,15 +16,6 @@ const toggleElementsVisibility = (elementIds, isVisible) => {
   }
 };
 
-const toggleZoneElementsVisibility = (elementIds, isVisible) => {
-  elementIds.forEach((id) => {
-    const selfElement = selfContainerDocument.getElementById(id);
-    const oppElement = oppContainerDocument.getElementById(id);
-    selfElement.style.display = isVisible ? '' : 'none';
-    oppElement.style.display = isVisible ? '' : 'none';
-  });
-};
-
 export const handleSpectatorButtons = () => {
   const buttonIdsToToggle = [
     'p2AttackButton',
@@ -48,11 +39,14 @@ export const handleSpectatorButtons = () => {
     'viewCardsButtonContainer',
     'attachedCardsButtonContainer',
   ];
-  toggleZoneElementsVisibility(
-    zoneButtonIdsToToggle,
-    !(
-      document.getElementById('spectatorModeCheckbox').checked &&
-      systemState.isTwoPlayer
-    )
+  const isVisible = !(
+    document.getElementById('spectatorModeCheckbox').checked &&
+    systemState.isTwoPlayer
   );
+  zoneButtonIdsToToggle.forEach((id) => {
+    const selfElement = selfContainerDocument.getElementById(id);
+    const oppElement = oppContainerDocument.getElementById(id);
+    selfElement.style.display = isVisible ? '' : 'none';
+    oppElement.style.display = isVisible ? '' : 'none';
+  });
 };

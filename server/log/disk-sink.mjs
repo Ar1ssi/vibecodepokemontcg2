@@ -10,26 +10,9 @@ export function resolveLogDir(env, repoRoot) {
   return env.NODE_ENV !== 'production' ? path.join(repoRoot, 'out', 'logs') : null;
 }
 
-const fileNameOf = (streamId) => `${streamId.replace(/[^A-Za-z0-9._-]/g, '_')}.ndjson`;
-
 // Only folders this sink names itself (`<base36 time>-<pid>`) are ever removed: LOG_DIR can point
 // at a directory that holds other things.
 const BOOT_ID = /^[0-9a-z]+-\d+$/;
-
-function pruneOldBoots(dir, bootId, keep, fsRef) {
-  try {
-    const boots = fsRef
-      .readdirSync(dir, { withFileTypes: true })
-      .filter((d) => d.isDirectory() && d.name !== bootId && BOOT_ID.test(d.name))
-      .map((d) => ({ name: d.name, mtimeMs: fsRef.statSync(path.join(dir, d.name)).mtimeMs }))
-      .sort((a, b) => b.mtimeMs - a.mtimeMs);
-    for (const old of boots.slice(Math.max(0, keep - 1))) {
-      fsRef.rmSync(path.join(dir, old.name), { recursive: true, force: true });
-    }
-  } catch {
-    // pruning is housekeeping; ignore failures
-  }
-}
 
 export function createDiskSink({
   dir,
@@ -53,7 +36,19 @@ export function createDiskSink({
 
   try {
     fsRef.mkdirSync(bootDir, { recursive: true });
-    pruneOldBoots(dir, bootId, limits.diskKeepBoots, fsRef);
+    const keep = limits.diskKeepBoots;
+    try {
+      const boots = fsRef
+        .readdirSync(dir, { withFileTypes: true })
+        .filter((d) => d.isDirectory() && d.name !== bootId && BOOT_ID.test(d.name))
+        .map((d) => ({ name: d.name, mtimeMs: fsRef.statSync(path.join(dir, d.name)).mtimeMs }))
+        .sort((a, b) => b.mtimeMs - a.mtimeMs);
+      for (const old of boots.slice(Math.max(0, keep - 1))) {
+        fsRef.rmSync(path.join(dir, old.name), { recursive: true, force: true });
+      }
+    } catch {
+      // pruning is housekeeping; ignore failures
+    }
   } catch (err) {
     allDisabled = true;
     warn({ streamId: '*', reason: err?.message ?? String(err) });
@@ -109,7 +104,7 @@ export function createDiskSink({
       if (allDisabled) return;
       let s = streams.get(streamId);
       if (!s) {
-        s = { file: path.join(bootDir, fileNameOf(streamId)), buffer: [], written: 0, disabled: false, failed: false };
+        s = { file: path.join(bootDir, `${streamId.replace(/[^A-Za-z0-9._-]/g, '_')}.ndjson`), buffer: [], written: 0, disabled: false, failed: false };
         streams.set(streamId, s);
       }
       if (s.disabled) return;

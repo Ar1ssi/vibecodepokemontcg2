@@ -62,26 +62,6 @@ const CARD_ARC_HEIGHTS = 0.3;
 const SLEEVE_WAIT_MS = 1200;
 const STRIPE_REPEAT = 30;
 
-const displayColor = (r, g, b) => new THREE.Color().setRGB(r, g, b, THREE.SRGBColorSpace);
-
-/** Top edges of a stack of cards: thin light and grey rows, repeated along the stack's depth. */
-const stripeTexture = () => {
-  const canvas = document.createElement('canvas');
-  canvas.width = 2;
-  canvas.height = 4;
-  const context = canvas.getContext('2d');
-  context.fillStyle = '#f2efe8';
-  context.fillRect(0, 0, 2, 3);
-  context.fillStyle = '#a9a59c';
-  context.fillRect(0, 3, 2, 1);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping;
-  texture.magFilter = THREE.NearestFilter;
-  return texture;
-};
-
 /** A flat ring between two rectangles in box space's xz plane, at y = 0. */
 const rimGeometry = ({ outer, inner }) => {
   const shape = new THREE.Shape([
@@ -187,7 +167,7 @@ export async function createDeckBoxRigs({ parent, onNeedsRender, findPile }) {
   const ringGeometry = own(rimGeometry(split.rim));
   const stackGeometry = own(new THREE.BoxGeometry(CARD_SIZE.width, CARD_SIZE.height, 1));
 
-  const tint = displayColor(INTERIOR_TINT, INTERIOR_TINT, INTERIOR_TINT);
+  const tint = new THREE.Color().setRGB(INTERIOR_TINT, INTERIOR_TINT, INTERIOR_TINT, THREE.SRGBColorSpace);
   const interior = own(new THREE.MeshStandardMaterial({ color: tint, map: interiorTexture, roughness: BOX_ROUGHNESS }));
   const rim = own(new THREE.MeshStandardMaterial({ color: tint, roughness: BOX_ROUGHNESS, side: THREE.DoubleSide }));
   const cardEdge = own(new THREE.MeshStandardMaterial({ color: CARD_EDGE_COLOR, roughness: 0.8 }));
@@ -201,7 +181,21 @@ export async function createDeckBoxRigs({ parent, onNeedsRender, findPile }) {
   const createRig = () => {
     const exterior = own(new THREE.MeshStandardMaterial({ color: BOX_FALLBACK_COLOR, roughness: BOX_ROUGHNESS }));
     const sleeve = own(createCardArtMaterial(THREE, { map: fittedBack }));
-    const stripes = own(stripeTexture());
+    // Top edges of a stack of cards: thin light and grey rows, repeated along the stack's depth.
+    const canvas = document.createElement('canvas');
+    canvas.width = 2;
+    canvas.height = 4;
+    const context = canvas.getContext('2d');
+    context.fillStyle = '#f2efe8';
+    context.fillRect(0, 0, 2, 3);
+    context.fillStyle = '#a9a59c';
+    context.fillRect(0, 3, 2, 1);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.magFilter = THREE.NearestFilter;
+    const stripes = own(texture);
     const stackTop = own(new THREE.MeshStandardMaterial({ color: 0xffffff, map: stripes, roughness: 0.8 }));
 
     const root = new THREE.Group();

@@ -65,22 +65,19 @@ export const clearReady = (user) => {
   }
 };
 
-// Design 051 / I202: both decks deal under one format, checked here at the deal rather than
-// at deck load (a deck restored on room join must stay replaceable). Mirrors the server's
-// GameRoom.refuseDealOnFormatMismatch: both Set Ups clear, so the players load a matching
-// deck and press Set Up again.
-const agreedRoomFormat = () =>
-  systemState.isTwoPlayer && systemState.roomFormat?.roomId === systemState.roomId
-    ? systemState.roomFormat.format
-    : null;
-
 const refuseDealOnFormatMismatch = () => {
   const players = [
     { username: determineUsername('self'), format: deckFormatOf(systemState, 'self') },
     { username: determineUsername('opp'), format: deckFormatOf(systemState, 'opp') },
   ];
   // Design 053: in a room both players agreed on a format, every deck must be that format.
-  const roomFormat = agreedRoomFormat();
+  // Design 051 / I202: both decks deal under one format, checked here at the deal rather than
+  // at deck load (a deck restored on room join must stay replaceable). Mirrors the server's
+  // GameRoom.refuseDealOnFormatMismatch: both Set Ups clear, so the players load a matching
+  // deck and press Set Up again.
+  const roomFormat = systemState.isTwoPlayer && systemState.roomFormat?.roomId === systemState.roomId
+    ? systemState.roomFormat.format
+    : null;
   if (!decksMismatchFormat(players, roomFormat)) return false;
   systemState.selfReady = false;
   systemState.oppReady = false;

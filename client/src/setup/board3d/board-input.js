@@ -126,10 +126,6 @@ export function createBoardInput({
     return { hit: null };
   };
 
-  /** The scene zone a target lights: the hit's own zone id (piles unsuffixed), or the Stadium. */
-  const litZoneOf = (target, hit) =>
-    target.kind === 'stadium' ? { side: null, zone: 'stadium' } : { side: target.side, zone: hit.zone };
-
   const sameZone = (a, b) => (a === null && b === null) || (a && b && a.side === b.side && a.zone === b.zone);
 
   const lightZone = (zone, on) => {
@@ -137,22 +133,6 @@ export function createBoardInput({
     // The Trainer board stays lit for the whole drag of an Item/Supporter (drag.js markBoardReady).
     if (!on && drag?.boardReady && zone.side === drag.dragging.side && zone.zone === 'board') return;
     scene.setZoneHighlight?.(zone.side, zone.zone, on);
-  };
-
-  const showTarget = (target, hit, railEl) => {
-    const lit = target?.highlight ?? null;
-    scene.setCardHighlight?.(lit === 'card' || lit === 'both' ? target.instanceId : null);
-    const zone = lit === 'zone' || lit === 'both' ? litZoneOf(target, hit) : null;
-    if (!sameZone(zone, drag.litZone)) {
-      lightZone(drag.litZone, false);
-      lightZone(zone, true);
-      drag.litZone = zone;
-    }
-    if (railEl !== drag.railEl) {
-      drag.railEl?.classList.remove(RAIL_LIT_CLASS);
-      railEl?.classList.add(RAIL_LIT_CLASS);
-      drag.railEl = railEl ?? null;
-    }
   };
 
   /** What the held card is over now, as drop-router.mjs reads it, lit as drag.js lights it. */
@@ -166,7 +146,21 @@ export function createBoardInput({
       target.targetIndex = el ? dragActions.targetIndexOf(el, target.side, target.zone) : -1;
     }
     drag.target = target;
-    showTarget(target, hit, target?.kind === 'rail' ? page?.rail : null);
+    const railEl = target?.kind === 'rail' ? page?.rail : null;
+    const lit = target?.highlight ?? null;
+    scene.setCardHighlight?.(lit === 'card' || lit === 'both' ? target.instanceId : null);
+    // The scene zone a target lights: the hit's own zone id (piles unsuffixed), or the Stadium.
+    const zone = lit === 'zone' || lit === 'both' ? target.kind === 'stadium' ? { side: null, zone: 'stadium' } : { side: target.side, zone: hit.zone } : null;
+    if (!sameZone(zone, drag.litZone)) {
+      lightZone(drag.litZone, false);
+      lightZone(zone, true);
+      drag.litZone = zone;
+    }
+    if (railEl !== drag.railEl) {
+      drag.railEl?.classList.remove(RAIL_LIT_CLASS);
+      railEl?.classList.add(RAIL_LIT_CLASS);
+      drag.railEl = railEl ?? null;
+    }
   };
 
   const onDragKey = (event) => {
@@ -346,13 +340,10 @@ export function createBoardInput({
   // A pile viewer's, Looking at cards' or the attached cards' <img> is still dragged by drag.js;
   // the board it crosses is the canvas, so the canvas takes the drop through the same router.
 
-  /** The panel <img> drag.js is dragging (it carries `.dragging`), or null. */
-  const draggedPanelImage = () =>
-    mirror?.roots?.self?.querySelector?.('.dragging') ?? mirror?.roots?.opp?.querySelector?.('.dragging') ?? null;
-
   const onHtmlDragOver = (event) => {
     if (!dragActions || (drag && !drag.html5)) return;
-    const image = draggedPanelImage();
+    // The panel <img> drag.js is dragging (it carries `.dragging`), or null.
+    const image = mirror?.roots?.self?.querySelector?.('.dragging') ?? mirror?.roots?.opp?.querySelector?.('.dragging') ?? null;
     if (!image) return;
     if (drag?.image !== image) {
       if (drag) finishDrag(false);

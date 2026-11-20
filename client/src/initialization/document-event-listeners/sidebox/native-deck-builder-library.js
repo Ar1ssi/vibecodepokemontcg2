@@ -393,25 +393,23 @@ import {
         createNewDeck();
       });
 
-      // Another tab rewrote a deck this tab has open: adopt its cards, so this
-      // tab's next autosave builds on them instead of reverting them.
-      const adoptExternalDeckChanges = () => {
-        for (const key of ['self', 'opp']) {
-          const deckId = activeDeckIds[key];
-          const cards = deckId ? getDeckFromLibrary(library, deckId) : null;
-          if (!cards) continue;
-          const storedKey = deckCardsKey(cards);
-          if (storedKey === baselines[key]) continue;
-          baselines[key] = storedKey;
-          onExternalDeckChange?.(key, deckId, cards);
-        }
-      };
-
       // The other tab changed the library (key null = storage cleared).
       window.addEventListener('storage', (event) => {
         if (event.key !== null && event.key !== LIBRARY_STORAGE_KEY) return;
         reload();
-        if (allowDeckWrites) adoptExternalDeckChanges();
+        if (allowDeckWrites) {
+          // Another tab rewrote a deck this tab has open: adopt its cards, so this
+          // tab's next autosave builds on them instead of reverting them.
+          for (const key of ['self', 'opp']) {
+            const deckId = activeDeckIds[key];
+            const cards = deckId ? getDeckFromLibrary(library, deckId) : null;
+            if (!cards) continue;
+            const storedKey = deckCardsKey(cards);
+            if (storedKey === baselines[key]) continue;
+            baselines[key] = storedKey;
+            onExternalDeckChange?.(key, deckId, cards);
+          }
+        }
         render();
       });
 

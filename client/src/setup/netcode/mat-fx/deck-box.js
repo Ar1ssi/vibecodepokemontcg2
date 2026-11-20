@@ -171,33 +171,6 @@ function scheduleSync() {
   requestAnimationFrame(syncRest);
 }
 
-const shouldSkipDeal = () =>
-  isE2eMode() || fxDisabled() || motionReduced() || document.hidden || boardHidden() || Boolean(systemState.isReplay);
-
-const waitForRigs = (scene) =>
-  Promise.race([ensureRigs(scene), new Promise((resolve) => setTimeout(() => resolve(null), RIGS_WAIT_MS))]);
-
-const dealPlanFor = (scene, side) => {
-  const deck = deckOf(scene, side);
-  const table = tableSpanOf(scene);
-  if (!deck || !table) return null;
-  const hover = hoverPose({ deck: deck.pose, table });
-  const rest = restFor(scene, side);
-  const start = rest ?? offTablePose({ deck: deck.pose, table });
-  if (!hover || !start) return null;
-  return {
-    side,
-    rest,
-    start,
-    hover,
-    deck: deck.pose,
-    deckCount: deck.count,
-    topZ: deck.topZ,
-    seatYawDeg: SEAT_YAW_DEG[side],
-    sleeveSrc: deck.sleeveSrc,
-  };
-};
-
 /**
  * Both players are ready: every side with a deck on the board deals it out of its box. Resolves once
  * the boxes are home (at once when the deal is skipped: e2e, effects off, reduced motion, a hidden
@@ -211,12 +184,31 @@ export async function playOpeningDeal() {
   const sides = DECK_BOX_SIDES.filter((side) => deckOf(scene, side));
   if (sides.length === 0) return;
   const markDealt = () => sides.forEach((side) => deckBoxes.setDealt(side, true));
-  if (shouldSkipDeal()) {
+  if (isE2eMode() || fxDisabled() || motionReduced() || document.hidden || boardHidden() || Boolean(systemState.isReplay)) {
     markDealt();
     return;
   }
-  const ready = await waitForRigs(scene);
-  const plans = sides.map((side) => dealPlanFor(scene, side)).filter(Boolean);
+  const ready = await Promise.race([ensureRigs(scene), new Promise((resolve) => setTimeout(() => resolve(null), RIGS_WAIT_MS))]);
+  const plans = sides.map((side) => {
+    const deck = deckOf(scene, side);
+    const table = tableSpanOf(scene);
+    if (!deck || !table) return null;
+    const hover = hoverPose({ deck: deck.pose, table });
+    const rest = restFor(scene, side);
+    const start = rest ?? offTablePose({ deck: deck.pose, table });
+    if (!hover || !start) return null;
+    return {
+      side,
+      rest,
+      start,
+      hover,
+      deck: deck.pose,
+      deckCount: deck.count,
+      topZ: deck.topZ,
+      seatYawDeg: SEAT_YAW_DEG[side],
+      sleeveSrc: deck.sleeveSrc,
+    };
+  }).filter(Boolean);
   if (!ready || ready.isDealing() || plans.length === 0) {
     markDealt();
     return;

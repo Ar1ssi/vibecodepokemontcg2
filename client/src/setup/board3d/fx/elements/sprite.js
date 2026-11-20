@@ -103,44 +103,6 @@ export function defineSprite({ three, textures, uniforms, layer, debug = (...arg
   let capWarned = false;
   let renderOrder = 20;
 
-  const makeBucket = (key, sprite) => {
-    const data = new Float32Array(SPRITE_CAPACITY * SPRITE_FLOATS);
-    const buffer = new three.InstancedInterleavedBuffer(data, SPRITE_FLOATS);
-    buffer.setUsage(three.DynamicDrawUsage);
-    const geometry = new three.InstancedBufferGeometry();
-    geometry.setAttribute('position', new three.Float32BufferAttribute(QUAD.positions, 3));
-    geometry.setIndex(QUAD.index);
-    geometry.setAttribute('iPosSize', new three.InterleavedBufferAttribute(buffer, 4, 0));
-    geometry.setAttribute('iShape', new three.InterleavedBufferAttribute(buffer, 4, 4));
-    geometry.setAttribute('iColour', new three.InterleavedBufferAttribute(buffer, 4, 8));
-    geometry.setAttribute('iAlign', new three.InterleavedBufferAttribute(buffer, 4, 12));
-    geometry.instanceCount = 0;
-    const material = new three.ShaderMaterial({
-      glslVersion: three.GLSL3,
-      vertexShader: VERTEX,
-      fragmentShader: FRAGMENT,
-      uniforms: {
-        ...uniforms,
-        uGrid: { value: new three.Vector2(1, 1) },
-        uMap: { value: null },
-        uHasTex: { value: 0 },
-        uChannel: { value: SPRITE_CHANNELS.indexOf(sprite.channel) },
-      },
-      transparent: true,
-      depthTest: true,
-      depthWrite: false,
-      side: three.DoubleSide,
-      ...blendSettings(three, sprite.blend),
-    });
-    const mesh = new three.Mesh(geometry, material);
-    mesh.frustumCulled = false;
-    mesh.renderOrder = renderOrder;
-    renderOrder = Math.min(renderOrder + 1, 29);
-    mesh.layers.set(layer);
-    object3d.add(mesh);
-    return { texture: sprite.texture, data, buffer, geometry, material, mesh, count: 0 };
-  };
-
   const write = (bucket, sprite) => {
     packSprite(sprite, bucket.data, bucket.count);
     bucket.count += 1;
@@ -160,7 +122,41 @@ export function defineSprite({ three, textures, uniforms, layer, debug = (...arg
       const key = spriteBucketKey(sprite);
       let bucket = buckets.get(key);
       if (!bucket) {
-        bucket = makeBucket(key, sprite);
+        const data = new Float32Array(SPRITE_CAPACITY * SPRITE_FLOATS);
+        const buffer = new three.InstancedInterleavedBuffer(data, SPRITE_FLOATS);
+        buffer.setUsage(three.DynamicDrawUsage);
+        const geometry = new three.InstancedBufferGeometry();
+        geometry.setAttribute('position', new three.Float32BufferAttribute(QUAD.positions, 3));
+        geometry.setIndex(QUAD.index);
+        geometry.setAttribute('iPosSize', new three.InterleavedBufferAttribute(buffer, 4, 0));
+        geometry.setAttribute('iShape', new three.InterleavedBufferAttribute(buffer, 4, 4));
+        geometry.setAttribute('iColour', new three.InterleavedBufferAttribute(buffer, 4, 8));
+        geometry.setAttribute('iAlign', new three.InterleavedBufferAttribute(buffer, 4, 12));
+        geometry.instanceCount = 0;
+        const material = new three.ShaderMaterial({
+          glslVersion: three.GLSL3,
+          vertexShader: VERTEX,
+          fragmentShader: FRAGMENT,
+          uniforms: {
+            ...uniforms,
+            uGrid: { value: new three.Vector2(1, 1) },
+            uMap: { value: null },
+            uHasTex: { value: 0 },
+            uChannel: { value: SPRITE_CHANNELS.indexOf(sprite.channel) },
+          },
+          transparent: true,
+          depthTest: true,
+          depthWrite: false,
+          side: three.DoubleSide,
+          ...blendSettings(three, sprite.blend),
+        });
+        const mesh = new three.Mesh(geometry, material);
+        mesh.frustumCulled = false;
+        mesh.renderOrder = renderOrder;
+        renderOrder = Math.min(renderOrder + 1, 29);
+        mesh.layers.set(layer);
+        object3d.add(mesh);
+        bucket = { texture: sprite.texture, data, buffer, geometry, material, mesh, count: 0 };
         buckets.set(key, bucket);
       }
       if (bucket.count >= SPRITE_CAPACITY) {

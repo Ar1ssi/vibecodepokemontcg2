@@ -26,8 +26,6 @@ import {
   trainerIgnoresDefenderEffects,
 } from './attack-damage.mjs';
 
-const inPlayCards = (player) => [...(player?.zones?.active || []), ...(player?.zones?.bench || [])];
-
 /** The chosen attack's printed damage after its own coins and board counts, as its user reads them. */
 function printedDamageFor(draft, { attack, user, userView, ownerId, target, targetView, controllerId, activeRng, events }) {
   const countOf = coinCountReader(draft, { playerId: ownerId, attacker: user, attackerView: userView, targetInstanceId: target.instanceId });
@@ -89,7 +87,7 @@ export function applyControlledAttack(draft, { userId, ownerId, targetId, attack
     playerId: ownerId,
     defenderPlayerId: ownerId,
   });
-  const sideCards = inPlayCards(owner);
+  const sideCards = [...(owner?.zones?.active || []), ...(owner?.zones?.bench || [])];
   const result = computeAttackDamage(abilityReads.attacker, targetView, { ...attack, damage: amount }, {
     attackerZoneCards: sideCards,
     defenderZoneCards: sideCards,

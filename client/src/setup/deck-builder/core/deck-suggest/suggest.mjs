@@ -165,7 +165,6 @@ export function suggestCards(deck, index, { prefs, ...neighborOptions } = {}) {
       samples.get(idx).push([count, weight]);
     }
   }
-  const inclusionOf = (idx) => (totalWeight > 0 ? (inclusionWeight.get(idx) || 0) / totalWeight : 0);
 
   const itemFor = (countKey) => {
     const isCard = typeof countKey === 'number';
@@ -177,7 +176,7 @@ export function suggestCards(deck, index, { prefs, ...neighborOptions } = {}) {
       name: card ? card.name : labels.get(countKey),
       print: card ? card.print : null,
       kind: card ? card.kind : null,
-      inclusion: isCard ? inclusionOf(countKey) : 0,
+      inclusion: isCard ? totalWeight > 0 ? (inclusionWeight.get(countKey) || 0) / totalWeight : 0 : 0,
       typicalCount: isCard && samples.has(countKey) ? weightedMedian(samples.get(countKey)) : 0,
       yourCount: counts.get(countKey) || 0,
       price: card && Number.isFinite(card.price) ? card.price : null,

@@ -52,25 +52,23 @@ const readPixels = (img) => {
   return ctx.getImageData(0, 0, canvas.width, canvas.height);
 };
 
-function loadTexture(name) {
-  const entry = { img: null, field: null, pixels: null, ready: false };
-  textures.set(name, entry);
-  const img = new Image();
-  img.decoding = 'async';
-  img.onload = () => {
-    const pixels = readPixels(img);
-    if (!pixels) return;
-    const alpha = new Uint8Array(pixels.width * pixels.height);
-    for (let i = 0; i < alpha.length; i += 1) alpha[i] = pixels.data[i * 4 + 3];
-    Object.assign(entry, { img, pixels, field: { w: pixels.width, h: pixels.height, data: alpha }, ready: true });
-  };
-  img.src = `${BASE_URL}${TEXTURE_FILES[name]}.webp`;
-}
-
 /** Start loading every scene texture (idempotent; the first evolution should not miss them). */
 export function preloadTcglTextures() {
   if (typeof Image !== 'function') return;
-  for (const name of Object.keys(TEXTURE_FILES)) if (!textures.has(name)) loadTexture(name);
+  for (const name of Object.keys(TEXTURE_FILES)) if (!textures.has(name)) {
+    const entry = { img: null, field: null, pixels: null, ready: false };
+    textures.set(name, entry);
+    const img = new Image();
+    img.decoding = 'async';
+    img.onload = () => {
+      const pixels = readPixels(img);
+      if (!pixels) return;
+      const alpha = new Uint8Array(pixels.width * pixels.height);
+      for (let i = 0; i < alpha.length; i += 1) alpha[i] = pixels.data[i * 4 + 3];
+      Object.assign(entry, { img, pixels, field: { w: pixels.width, h: pixels.height, data: alpha }, ready: true });
+    };
+    img.src = `${BASE_URL}${TEXTURE_FILES[name]}.webp`;
+  }
 }
 
 const textureOf = (name) => {
@@ -165,8 +163,6 @@ function drawSprite(ctx, view, state, op) {
 
 const resFor = (px, detail = 1) => Math.max(24, Math.min(256, Math.round(px * 0.5 * detail)));
 
-const pixelsOf = (entry) => (entry ? { w: entry.pixels.width, h: entry.pixels.height, data: entry.pixels.data } : null);
-
 function drawDissolve(ctx, view, state, op) {
   const mask = textureOf(op.mask);
   const noise = op.noise ? textureOf(op.noise) : null;
@@ -179,7 +175,7 @@ function drawDissolve(ctx, view, state, op) {
   fillDissolve(buf.image.data, buf.canvas.width, buf.canvas.height, {
     mask: mask.field,
     noise: noise?.field || null,
-    colors: pixelsOf(colors),
+    colors: colors ? { w: colors.pixels.width, h: colors.pixels.height, data: colors.pixels.data } : null,
     amount: op.amount,
     soft: op.soft,
     noiseRot: op.noiseRot || 0,
@@ -247,15 +243,13 @@ function drawPolar(ctx, view, state, op) {
   placeQuad(ctx, view, op, sizePx, sizePx, (x, y, w, h) => ctx.drawImage(buf.canvas, x, y, w, h));
 }
 
-// LightRay_Prismatic has no fade along its length (the shader's custom data did
-// that); a tapered ribbon fades in from its hub and out toward its tip.
-const taperAt = (t) => Math.min(1, t / 0.2) * (1 - Math.max(0, (t - 0.45) / 0.55)) ** 1.5;
-
 function alongAlpha(op, lut, band, column, t) {
   if (band) return columnAlpha(band, 0.5, Math.min(0.999, t));
   if (column) return 1;
   const along = columnAlpha(lut, 0.5, Math.min(0.999, t) + (op.pan || 0));
-  return op.taper ? along * taperAt(t) : along;
+  // LightRay_Prismatic has no fade along its length (the shader's custom data did
+  // that); a tapered ribbon fades in from its hub and out toward its tip.
+  return op.taper ? along * (Math.min(1, t / 0.2) * (1 - Math.max(0, (t - 0.45) / 0.55)) ** 1.5) : along;
 }
 
 const rgba = (rgb, a) => `rgba(${Math.round(rgb[0] * 255)}, ${Math.round(rgb[1] * 255)}, ${Math.round(rgb[2] * 255)}, ${Math.max(0, Math.min(1, a))})`;
@@ -317,37 +311,6 @@ function drawRibbon(ctx, view, state, op) {
   ctx.restore();
 }
 
-function cutCard(ctx, view) {
-  const { cardW, cardH } = view;
-  const r = Math.min(cardW, cardH) * 0.06;
-  const x = view.cx - cardW / 2;
-  const y = view.cy - cardH / 2;
-  ctx.save();
-  ctx.globalCompositeOperation = 'destination-out';
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + cardW, y, x + cardW, y + cardH, r);
-  ctx.arcTo(x + cardW, y + cardH, x, y + cardH, r);
-  ctx.arcTo(x, y + cardH, x, y, r);
-  ctx.arcTo(x, y, x + cardW, y, r);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-}
-
-// The stage fades out toward its rim so no layer is ever cut by the canvas edge.
-function fadeRim(ctx, view) {
-  const radius = view.size / 2;
-  const gradient = ctx.createRadialGradient(view.cx, view.cy, radius * 0.72, view.cx, view.cy, radius);
-  gradient.addColorStop(0, 'rgba(0,0,0,1)');
-  gradient.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.save();
-  ctx.globalCompositeOperation = 'destination-in';
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, view.size, view.size);
-  ctx.restore();
-}
-
 const DRAW = { sprite: drawSprite, dissolve: drawDissolve, polar: drawPolar, ribbon: drawRibbon, frame: drawFrame };
 
 /** Per-play caches (tinted sprites, scratch buffers, colour rows). */
@@ -361,11 +324,34 @@ export function drawTcglOps(ctx, ops, view, state) {
   ctx.globalCompositeOperation = 'lighter';
   for (const op of ops) {
     if (op.kind === 'cutout') {
-      cutCard(ctx, view);
+      const { cardW, cardH } = view;
+      const r = Math.min(cardW, cardH) * 0.06;
+      const x = view.cx - cardW / 2;
+      const y = view.cy - cardH / 2;
+      ctx.save();
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + cardW, y, x + cardW, y + cardH, r);
+      ctx.arcTo(x + cardW, y + cardH, x, y + cardH, r);
+      ctx.arcTo(x, y + cardH, x, y, r);
+      ctx.arcTo(x, y, x + cardW, y, r);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
       continue;
     }
     DRAW[op.kind]?.(ctx, view, state, op);
   }
   ctx.globalCompositeOperation = 'source-over';
-  fadeRim(ctx, view);
+  // The stage fades out toward its rim so no layer is ever cut by the canvas edge.
+  const radius = view.size / 2;
+  const gradient = ctx.createRadialGradient(view.cx, view.cy, radius * 0.72, view.cx, view.cy, radius);
+  gradient.addColorStop(0, 'rgba(0,0,0,1)');
+  gradient.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.save();
+  ctx.globalCompositeOperation = 'destination-in';
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, view.size, view.size);
+  ctx.restore();
 }

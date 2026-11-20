@@ -13,22 +13,6 @@ class ProxyError extends Error {
   }
 }
 
-const isAbort = (error) => error?.name === 'AbortError' || error?.name === 'TimeoutError';
-
-function parseTarget(raw) {
-  if (!raw || typeof raw !== 'string') throw new ProxyError(400, 'missing url');
-  let target;
-  try {
-    target = new URL(raw);
-  } catch {
-    throw new ProxyError(400, 'invalid url');
-  }
-  if (target.protocol !== 'https:' && target.protocol !== 'http:') {
-    throw new ProxyError(400, 'invalid url');
-  }
-  return target;
-}
-
 function assertAllowed(url, allowedHosts) {
   if (!allowedHosts.has(url.hostname) || url.username || url.password) {
     throw new ProxyError(403, 'host not allowed');
@@ -59,25 +43,6 @@ async function readCapped(response, maxBytes) {
   return Buffer.concat(chunks, total);
 }
 
-function createLru(maxEntries, now) {
-  const entries = new Map();
-  return {
-    get(key) {
-      const entry = entries.get(key);
-      if (!entry) return null;
-      entries.delete(key);
-      if (now() - entry.storedAt > DAY_MS) return null;
-      entries.set(key, entry);
-      return entry;
-    },
-    set(key, value) {
-      entries.delete(key);
-      entries.set(key, { ...value, storedAt: now() });
-      while (entries.size > maxEntries) entries.delete(entries.keys().next().value);
-    },
-  };
-}
-
 function sendImage(res, { body, contentType }) {
   res.setHeader('Content-Type', contentType);
   res.setHeader('Cache-Control', CACHE_CONTROL);
@@ -99,7 +64,22 @@ export function createCardImageHandler({
   timeoutMs = 10_000,
 } = {}) {
   if (!(allowedHosts instanceof Set)) throw new TypeError('createCardImageHandler needs an allowedHosts Set');
-  const cache = createLru(maxEntries, now);
+  const entries = new Map();
+  const cache = {
+    get(key) {
+      const entry = entries.get(key);
+      if (!entry) return null;
+      entries.delete(key);
+      if (now() - entry.storedAt > DAY_MS) return null;
+      entries.set(key, entry);
+      return entry;
+    },
+    set(key, value) {
+      entries.delete(key);
+      entries.set(key, { ...value, storedAt: now() });
+      while (entries.size > maxEntries) entries.delete(entries.keys().next().value);
+    },
+  };
 
   async function fetchImage(target, signal) {
     let url = target;
@@ -132,7 +112,17 @@ export function createCardImageHandler({
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const target = parseTarget(req.query?.url);
+      const raw = req.query?.url;
+      if (!raw || typeof raw !== 'string') throw new ProxyError(400, 'missing url');
+      let target;
+      try {
+        target = new URL(raw);
+      } catch {
+        throw new ProxyError(400, 'invalid url');
+      }
+      if (target.protocol !== 'https:' && target.protocol !== 'http:') {
+        throw new ProxyError(400, 'invalid url');
+      }
       assertAllowed(target, allowedHosts);
       const cached = cache.get(target.href);
       if (cached) {
@@ -145,7 +135,7 @@ export function createCardImageHandler({
     } catch (error) {
       if (error instanceof ProxyError) {
         res.status(error.status).send(error.message);
-      } else if (isAbort(error)) {
+      } else if (error?.name === 'AbortError' || error?.name === 'TimeoutError') {
         res.status(504).send('upstream timeout');
       } else {
         res.status(502).send('fetch failed');

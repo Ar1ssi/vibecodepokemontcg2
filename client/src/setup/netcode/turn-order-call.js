@@ -138,8 +138,6 @@ export function normalizeTurnOrderResult(data) {
   };
 }
 
-const otherSide = (side) => (side === 'self' ? 'opp' : 'self');
-
 /**
  * Rewrites a copy's seat-relative sides to the near seat's point of view.
  *
@@ -152,7 +150,7 @@ const otherSide = (side) => (side === 'self' ? 'opp' : 'self');
 export function relabelForNearSeat(copy, copySeat, nearSeat, fields) {
   if (sideForSeat(copySeat, nearSeat) === 'self') return copy;
   const relabeled = { ...copy };
-  for (const field of fields) relabeled[field] = otherSide(copy[field]);
+  for (const field of fields) relabeled[field] = copy[field] === 'self' ? 'opp' : 'self';
   return relabeled;
 }
 

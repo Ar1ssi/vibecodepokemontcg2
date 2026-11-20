@@ -134,10 +134,6 @@ const OPENING_SETUP_BLOCKED = new Set([
   'takePrizes', 'takePrizesByIndex', 'stadium-effect', 'useVStarGX', 'playRandomCardFaceDown',
 ]);
 
-const startingActivesMissing = (state) =>
-  state.openingDrawPending != null &&
-  Object.values(state.players || {}).some((player) => !(player?.zones?.active || []).length);
-
 export function onceAttackBlockReason(state, playerId, attack, attacker = null) {
   const player = state.players?.[playerId];
   if (isGxAttack(attack)) {
@@ -705,7 +701,8 @@ export function validateLegality(state, command) {
 
   // Setup ends when every player has a Starting Active; until then (the starter's turn-1 draw is
   // still owed) the only game action is placing one.
-  if (startingActivesMissing(state) && OPENING_SETUP_BLOCKED.has(type) && !isStartingActiveMove) {
+  if (state.openingDrawPending != null &&
+  Object.values(state.players || {}).some((player) => !(player?.zones?.active || []).length) && OPENING_SETUP_BLOCKED.has(type) && !isStartingActiveMove) {
     return { allowed: false, reason: 'Both players must choose a Starting Active Pokémon first.' };
   }
 

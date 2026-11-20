@@ -60,16 +60,6 @@ function metaSection({ win, doc, nav }) {
   };
 }
 
-function socketSection(socket) {
-  if (!socket) return null;
-  return {
-    id: socket.id,
-    connected: socket.connected,
-    transport: socket.io?.engine?.transport?.name ?? null,
-    recovered: Boolean(socket.recovered),
-  };
-}
-
 function registrySection(applyView) {
   const out = [];
   for (const [instanceId, record] of applyView.getCardRegistry()) {
@@ -175,7 +165,16 @@ export function buildSnapshotSync({ win = window, doc = document, nav = navigato
     takenAt: Date.now(),
     omitted: [],
     meta: section(() => metaSection({ win, doc, nav })),
-    socket: section(() => socketSection(state?.socket)),
+    socket: section(() => {
+      const socket = state?.socket;
+      if (!socket) return null;
+      return {
+        id: socket.id,
+        connected: socket.connected,
+        transport: socket.io?.engine?.transport?.name ?? null,
+        recovered: Boolean(socket.recovered),
+      };
+    }),
     netcode: section(() => ({
       lastRenderedVersion: applyView?.getLastRenderedVersion() ?? null,
       clientSeq: cmdEmitter?.getClientSeq() ?? null,

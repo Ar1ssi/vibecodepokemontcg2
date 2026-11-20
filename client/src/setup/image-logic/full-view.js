@@ -59,15 +59,6 @@ const hideCardCounters = (image) => {
   if (image.abilityCounter) image.abilityCounter.style.display = 'none';
 };
 
-const showCardCounters = (image) => {
-  if (image.damageCounter) image.damageCounter.style.display = '';
-  if (image.specialCondition) image.specialCondition.style.display = '';
-  if (image.poisonMarker) image.poisonMarker.style.display = '';
-  if (image.burnMarker) image.burnMarker.style.display = '';
-  if (image.statusLoop) image.statusLoop.style.display = '';
-  if (image.abilityCounter) image.abilityCounter.style.display = '';
-};
-
 // A clone of a board-mirror <img> (design 074 D4) copies the projected rect board-mirror.js
 // sync wrote inline; the preview sizes its card itself.
 const MIRROR_RECT_KEYS = ['left', 'top', 'width', 'height'];
@@ -198,7 +189,12 @@ export const openCardPreview = (targetImage, card) => {
     matHolo: true,
     onClosed: () => {
       anchor.style.visibility = '';
-      showCardCounters(targetImage);
+      if (targetImage.damageCounter) targetImage.damageCounter.style.display = '';
+      if (targetImage.specialCondition) targetImage.specialCondition.style.display = '';
+      if (targetImage.poisonMarker) targetImage.poisonMarker.style.display = '';
+      if (targetImage.burnMarker) targetImage.burnMarker.style.display = '';
+      if (targetImage.statusLoop) targetImage.statusLoop.style.display = '';
+      if (targetImage.abilityCounter) targetImage.abilityCounter.style.display = '';
       attachedImages.forEach((image) => {
         image.style.visibility = '';
       });

@@ -28,54 +28,15 @@ import { parseSearchDeckParams } from './trainer-effects.mjs';
 
 export { rewriteLegacyPowerWording };
 
-// Normalize printed card text before matching.
-//   curly quotes  ' ' `  →  straight '
-//   energy symbol { P } {G}  →  {P} (no inner spaces)
-function normalizeText(text) {
-  return symbolizeTypeWords(text)
-    .replace(/[\u2018\u2019\u201A\u201B`]/g, "'")
-    .replace(/\{\s*([A-Za-z])\s*\}/g, '{$1}')
-    .toLowerCase();
-}
-
-// Detect "attach" as a VERB (not the adjective "attached" describing state).
-// /\battach\b/ matches "attach an Energy", "attach up to 2", "attach energy"
-// but NOT "attached to this Pokémon" (no word boundary between h and e).
-// Also matches the common "Put an Energy card ... onto a Pokémon" attach wording.
-const hasVerbAttach = (t) =>
-  t.includes('energy') &&
-  (/\battach\b/.test(t) || (t.includes('put') && t.includes('onto')));
-
 // True if `w` appears as a whole word (not a substring of a longer word).
 // Fixes the 'remove' ⊃ 'move' false-positive (split on non-letters, no regex).
 const hasWord = (t, w) => t.split(/[^a-z]/).includes(w);
-
-// "Place 6 damage counters on …" uses "on", not only "to/onto". Do not rely on
-// incidental "to" elsewhere (e.g. "in order to use this Ability").
-const hasDamageCounterPlacement = (t) =>
-  /\bdamage counters?\s+(?:on|to|onto)\b/.test(t) ||
-  /(?:place|move)\s+(?:up to\s+)?\d+\s+damage counters?\s+on\b/.test(t);
 
 // Continuous "damage from this Pokémon's attacks ignores effects/Resistance
 // on the Defending Pokémon" (Azure Seas, Bladed Armament, Despotic Fang, …).
 const ignoresDefenderEffects = (t) =>
   /(?:isn't|aren't|is not|are not) affected by (?:any )?effects? on/.test(t) ||
   /(?:isn't|aren't|is not|are not) affected by resistance/.test(t);
-
-// Borrowing another Pokémon's printed attacks ("can use the attacks of any …",
-// "can use any attack from any …", "can use X's attack as its own").
-// Excludes the previous-Evolution case, which has its own family + step.
-const canUseAttacksOf = (t) =>
-  (/\bcan use the attacks? of\b/.test(t) ||
-    /can use any attack from any/.test(t) ||
-    /\bcan use [^.]*'s attack\b/.test(t)) &&
-  !t.includes('previous evolution');
-
-// Extra attacks per turn ("may attack twice a turn", Festival Lead, Ω Barrage).
-const attacksTwice = (t) =>
-  /may attack twice/.test(t) ||
-  /attack twice (?:a|each) turn/.test(t) ||
-  /may use an attack it has twice/.test(t);
 
 // Special-Condition immunity: 'all' for the unnamed wording, else the named
 // condition. Report E: "This Pokémon can't be Asleep" (Hoothoot PRE and the
@@ -95,16 +56,6 @@ const statusImmunityCondition = (t) => {
   );
   return named ? named[1] : null;
 };
-
-// Type-changing continuous text ("it is {F} and {P} type", "type is the same…",
-// "in addition to its existing types", "provides … Energy of every type").
-const typeChangeText = (t) =>
-  /\bit is (?:a )?\{[a-z]\}/.test(t) ||
-  /\btype is (?:the same|now|both|also|\{[a-z]\})/.test(t) ||
-  /same type as/.test(t) ||
-  /in addition to its existing type/.test(t) ||
-  /provides? .*energy of every type/.test(t) ||
-  /is both \{[a-z]\} and \{[a-z]\}/.test(t);
 
 const OPPONENT_ACTIVE_ENERGY_DISCARD = /when you play [^.]*from your hand to evolve[^.]*, you may discard an energy attached to your opponent's active pok[eé]mon/;
 // Mawile Energy Crunch (HB 160): played onto the Bench, one Energy from any of the opponent's Pokémon.
@@ -181,13 +132,6 @@ export function isAncientTraitAbility(card) {
   const steps = parseAbility(`${name} ${text}`.trim());
   return steps.length > 0 && steps.every((s) => s.trait);
 }
-
-// Discard-from-your-hand costs that affect the opponent are NOT opponent-disrupt.
-const isSelfHandDiscardCost = (t) =>
-  t.includes('discard') &&
-  t.includes('from your hand') &&
-  !t.includes("opponent's hand") &&
-  !t.includes('from your opponent');
 
 const parseEnergyTypeHint = (t) => {
   const types = [
@@ -474,10 +418,6 @@ export const POWER_CONDITION_CLAUSE =
 // the power's effect; it inflicts nothing either.
 const POWER_ENDS_CLAUSE = /if [^.]*? becomes asleep, confused, or paralyzed[^.]*\./g;
 
-function stripPowerConditionClause(lower) {
-  return lower.replace(POWER_CONDITION_CLAUSE, '').replace(POWER_ENDS_CLAUSE, '');
-}
-
 // Stance Change / Schooling (hand, by name), V Transformation / Phantom Transformation
 // (discard pile), Transformative Start (deck) and Ditto Transform (hand Basic on top).
 // `keepState`: attached cards, counters, conditions and effects stay on the new Pokémon;
@@ -660,7 +600,13 @@ function parseWinCondition(lower) {
 }
 
 export function parseAbility(text = '') {
-  const lower = rewriteLegacyPowerWording(normalizeText(text));
+  // Normalize printed card text before matching.
+  //   curly quotes  ' ' `  →  straight '
+  //   energy symbol { P } {G}  →  {P} (no inner spaces)
+  const lower = rewriteLegacyPowerWording(symbolizeTypeWords(text)
+    .replace(/[\u2018\u2019\u201A\u201B`]/g, "'")
+    .replace(/\{\s*([A-Za-z])\s*\}/g, '{$1}')
+    .toLowerCase());
   let steps = [];
 
   // Shedinja Vessel of Life, Klefki Wonder Lock, Unown Q/G/E: the card attaches itself as a
@@ -932,6 +878,10 @@ export function parseAbility(text = '') {
   // Magcargo-GX Crushing Charge (design 048): "Discard the top card of your deck. If it's a
   // basic Energy card, attach it to 1 of your Pokémon." is ONE mill-then-maybe-attach step; the
   // generic attach branch below would drop the mill (and a source-less attach does not execute).
+  // Detect "attach" as a VERB (not the adjective "attached" describing state).
+  // /\battach\b/ matches "attach an Energy", "attach up to 2", "attach energy"
+  // but NOT "attached to this Pokémon" (no word boundary between h and e).
+  // Also matches the common "Put an Energy card ... onto a Pokémon" attach wording.
   if (
     /discard the top card of your deck/.test(lower) &&
     /if it(?:'s| is) a basic energy card, attach it to 1 of your pok[eé]mon/.test(lower)
@@ -941,7 +891,8 @@ export function parseAbility(text = '') {
       guidance:
         "Once during your turn: discard the top card of your deck and attach it if it's a Basic Energy card.",
     });
-  } else if (hasVerbAttach(lower) && !/can(?:'|’|no)t attach/.test(lower) && !(
+  } else if (lower.includes('energy') &&
+  (/\battach\b/.test(lower) || (lower.includes('put') && lower.includes('onto'))) && !/can(?:'|’|no)t attach/.test(lower) && !(
     hasWord(lower, 'move') &&
     lower.includes('energy') &&
     (lower.includes('to 1 of your') || lower.includes('to another') || lower.includes('to your active'))
@@ -1116,6 +1067,8 @@ export function parseAbility(text = '') {
     lower.includes('opponent') &&
     lower.includes('evolve') &&
     !/when you play this pok[eé]mon from your hand to evolve/.test(lower);
+  // "Place 6 damage counters on …" uses "on", not only "to/onto". Do not rely on
+  // incidental "to" elsewhere (e.g. "in order to use this Ability").
   if (
     !coinHealOrCounters &&
     !hasPromotionTrigger &&
@@ -1125,7 +1078,8 @@ export function parseAbility(text = '') {
     (hasWord(lower, 'move') || lower.includes('place') || hasWord(lower, 'put')) &&
     lower.includes('damage counter') &&
     (betweenOwnDamage ||
-      hasDamageCounterPlacement(lower) ||
+      (/\bdamage counters?\s+(?:on|to|onto)\b/.test(lower) ||
+      /(?:place|move)\s+(?:up to\s+)?\d+\s+damage counters?\s+on\b/.test(lower)) ||
       lower.includes('on this pokémon') ||
       lower.includes('on this pokemon') ||
       lower.includes('on 1 of your opponent') ||
@@ -1239,9 +1193,13 @@ export function parseAbility(text = '') {
   }
 
   // ── 9. Opponent disruption (discard / shuffle / return to opp hand) ─────
+  // Discard-from-your-hand costs that affect the opponent are NOT opponent-disrupt.
   if (
     lower.includes('opponent') &&
-    !isSelfHandDiscardCost(lower) &&
+    !(lower.includes('discard') &&
+    lower.includes('from your hand') &&
+    !lower.includes("opponent's hand") &&
+    !lower.includes('from your opponent')) &&
     !/if you do, discard this pok[eé]mon and all attached cards/.test(lower) &&
     (lower.includes('discard') || lower.includes('shuffle') || lower.includes('reveal') ||
      (lower.includes('put') && (lower.includes('into their hand') || lower.includes("into your opponent's hand"))))
@@ -1364,7 +1322,7 @@ export function parseAbility(text = '') {
   // ── 14. Status conditions (Confuse / Burn / Poison / Asleep) ────────────
   // "This power can't be used if … is Asleep, Confused, or Paralyzed" is a use
   // restriction (abilityConditionUseBlocked), not a condition the power inflicts.
-  const statusText = stripPowerConditionClause(lower);
+  const statusText = lower.replace(POWER_CONDITION_CLAUSE, '').replace(POWER_ENDS_CLAUSE, '');
   const namesStatus =
     statusText.includes('confused') ||
     statusText.includes('burned') ||
@@ -1739,8 +1697,15 @@ export function parseAbility(text = '') {
   }
 
   // ── 35. Continuous type change ──────────────────────────────────────────
+  // Type-changing continuous text ("it is {F} and {P} type", "type is the same…",
+  // "in addition to its existing types", "provides … Energy of every type").
   if (
-    typeChangeText(lower) ||
+    /\bit is (?:a )?\{[a-z]\}/.test(lower) ||
+    /\btype is (?:the same|now|both|also|\{[a-z]\})/.test(lower) ||
+    /same type as/.test(lower) ||
+    /in addition to its existing type/.test(lower) ||
+    /provides? .*energy of every type/.test(lower) ||
+    /is both \{[a-z]\} and \{[a-z]\}/.test(lower) ||
     /\b(?:is|are)\s+\{[a-z]\}(?:\s*,\s*\{[a-z]\})+(?:\s*,?\s*and\s+\{[a-z]\})?\s*type/.test(lower) ||
     /treat .* as a pok[eé]mon that has δ/.test(lower)
   ) {
@@ -1764,7 +1729,13 @@ export function parseAbility(text = '') {
   }
 
   // ── 37. Attack copying (borrow another Pokémon's attacks) ───────────────
-  if (canUseAttacksOf(lower)) {
+  // Borrowing another Pokémon's printed attacks ("can use the attacks of any …",
+  // "can use any attack from any …", "can use X's attack as its own").
+  // Excludes the previous-Evolution case, which has its own family + step.
+  if ((/\bcan use the attacks? of\b/.test(lower) ||
+    /can use any attack from any/.test(lower) ||
+    /\bcan use [^.]*'s attack\b/.test(lower)) &&
+  !lower.includes('previous evolution')) {
     steps.push({
       type: 'attackCopyAbility',
       guidance: 'Passive: this Pokémon can use the listed Pokémon\'s attacks (Energy still required, as described).',
@@ -1772,7 +1743,10 @@ export function parseAbility(text = '') {
   }
 
   // ── 38. Extra attacks per turn ──────────────────────────────────────────
-  if (attacksTwice(lower)) {
+  // Extra attacks per turn ("may attack twice a turn", Festival Lead, Ω Barrage).
+  if (/may attack twice/.test(lower) ||
+  /attack twice (?:a|each) turn/.test(lower) ||
+  /may use an attack it has twice/.test(lower)) {
     steps.push({
       type: 'extraAttackAbility',
       guidance: 'Passive: this Pokémon may attack twice during your turn (as described).',

@@ -169,37 +169,6 @@ const lightMaterial = (fragmentShader, uniforms, vertexShader = QUAD_VERTEX) =>
     blendDstAlpha: OneFactor,
   });
 
-/**
- * The tear's path in pack space: the line sampled evenly across the pack and smoothed over about
- * a tooth, so the light runs as one clean cut (the game's seam is straight) near the teeth.
- * @returns {{u: number, x: number, y: number, z: number}[]}
- */
-function cutPath(line, shape) {
-  const points = [...line].sort((a, b) => a.x - b.x);
-  const vAt = (u) => {
-    const k = points.findIndex((point) => point.x >= u);
-    if (k < 0) return points.at(-1).y;
-    if (k === 0) return points[0].y;
-    const a = points[k - 1];
-    const b = points[k];
-    return a.y + ((b.y - a.y) * (u - a.x)) / Math.max(1e-6, b.x - a.x);
-  };
-  const raw = Array.from({ length: TRAIL_SAMPLES }, (_, i) => vAt(i / (TRAIL_SAMPLES - 1)));
-  const reach = Math.round(TRAIL_SAMPLES / 12 / 2);
-  const hinge = tearHingeV(line);
-  return raw.map((_, i) => {
-    let sum = 0;
-    let count = 0;
-    for (let j = Math.max(0, i - reach); j <= Math.min(raw.length - 1, i + reach); j += 1) {
-      sum += raw[j];
-      count += 1;
-    }
-    const u = i / (TRAIL_SAMPLES - 1);
-    const v = (sum / count + hinge) / 2;
-    return { u, x: (u - 0.5) * PW, y: packSpaceY(v) * PW, z: pillowZ(u, v, shape) * PW + LIFT_MM };
-  });
-}
-
 function ribbonGeometry(path) {
   const n = path.length;
   const positions = new Float32Array(n * 6);
@@ -246,7 +215,32 @@ export function createTearFx({ model, shape }) {
   const group = new Group();
   group.name = 'tt-tear-fx';
   model.group.add(group);
-  const path = cutPath(model.line, shape);
+  // The tear's path in pack space: the line sampled evenly across the pack and smoothed over about
+  // a tooth, so the light runs as one clean cut (the game's seam is straight) near the teeth.
+  const line = model.line;
+  const points = [...line].sort((a, b) => a.x - b.x);
+  const raw = Array.from({ length: TRAIL_SAMPLES }, (_, i) => {
+    const u = i / (TRAIL_SAMPLES - 1);
+    const k = points.findIndex((point) => point.x >= u);
+    if (k < 0) return points.at(-1).y;
+    if (k === 0) return points[0].y;
+    const a = points[k - 1];
+    const b = points[k];
+    return a.y + ((b.y - a.y) * (u - a.x)) / Math.max(1e-6, b.x - a.x);
+  });
+  const reach = Math.round(TRAIL_SAMPLES / 12 / 2);
+  const hinge = tearHingeV(line);
+  const path = raw.map((_, i) => {
+    let sum = 0;
+    let count = 0;
+    for (let j = Math.max(0, i - reach); j <= Math.min(raw.length - 1, i + reach); j += 1) {
+      sum += raw[j];
+      count += 1;
+    }
+    const u = i / (TRAIL_SAMPLES - 1);
+    const v = (sum / count + hinge) / 2;
+    return { u, x: (u - 0.5) * PW, y: packSpaceY(v) * PW, z: pillowZ(u, v, shape) * PW + LIFT_MM };
+  });
   const hingeY = packSpaceY(tearHingeV(model.line)) * PW;
   const quad = track(new PlaneGeometry(2, 2));
   const add = (mesh, order) => {
@@ -284,16 +278,15 @@ export function createTearFx({ model, shape }) {
     );
 
   const ribbon = track(ribbonGeometry(path));
-  const cutUniforms = (color, fringe, head) => ({
-    uFront: { value: 0 },
-    uSide: { value: 1 },
-    uAlpha: { value: 0 },
-    uCore: { value: color.clone() },
-    uFringe: { value: fringe },
-    uHead: { value: head },
-  });
   const cutMaterial = (color, fringe, head) =>
-    track(lightMaterial(RIBBON_FRAGMENT, cutUniforms(color, fringe, head), RIBBON_VERTEX));
+    track(lightMaterial(RIBBON_FRAGMENT, {
+      uFront: { value: 0 },
+      uSide: { value: 1 },
+      uAlpha: { value: 0 },
+      uCore: { value: color.clone() },
+      uFringe: { value: fringe },
+      uHead: { value: head },
+    }, RIBBON_VERTEX));
   const trail = add(new Mesh(ribbon, cutMaterial(HOT_COLOR, 0.9, 1.6)), 2);
   const glint = add(new Mesh(ribbon, cutMaterial(GLINT_COLOR, 0.25, 0)), 3);
   glint.material.uniforms.uFront.value = 1.2;
@@ -315,12 +308,6 @@ export function createTearFx({ model, shape }) {
   const beam = add(new Mesh(track(new PlaneGeometry(BEAM_LENGTH_MM, 2)), beamMaterial), 8);
   beam.position.set(0, hingeY, LIFT_MM + 0.8);
 
-  /** The cut's front in pack space at `front` (u). */
-  const frontPoint = (front) => {
-    const i = Math.max(0, Math.min(path.length - 1, Math.round(front * (path.length - 1))));
-    return path[i];
-  };
-
   return {
     group,
     /** The glow at the seam's start, 0 → 1. */
@@ -340,7 +327,9 @@ export function createTearFx({ model, shape }) {
       trail.material.uniforms.uFront.value = along;
       wash.material.uniforms.uSide.value = side;
       show(trail, alpha);
-      const at = frontPoint(along);
+      // The cut's front in pack space at `front` (u).
+      const i = Math.max(0, Math.min(path.length - 1, Math.round(along * (path.length - 1))));
+      const at = path[i];
       head.position.set(at.x, at.y, at.z + 0.2);
       show(head, alpha * (front > 0 && front < 1 ? 1 : 0.4));
     },

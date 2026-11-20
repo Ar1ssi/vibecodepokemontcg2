@@ -323,10 +323,36 @@ export function createBoardScene({
     const pilesMoving = piles.update(now);
     const overlaysAnimating = overlays.update(now);
     const environmentAnimating = environment.update(now, camera);
-    const sunMoved = syncGroundShadows(environment.active() ? environment.lighting() : null);
+    // With a Stadium showing: the key light along its sun, and the shadows of every card and pile
+    // resting on the table (the hands' cards fan over the edges, not on the ground) laid on its
+    // ground; without one, the table's own light and no ground shadows. True when the sun moved
+    // (the shadow map is redrawn).
+    const lighting = environment.active() ? environment.lighting() : null;
+    const sun = lighting?.sun ?? null;
+    const moved = sun?.join(',') !== groundSun?.join(',');
+    if (moved) {
+      table.setSun(sun);
+      groundSun = sun;
+    }
+    let footprints = [];
+    if (lighting) {
+      const hand = new Set((model?.placements ?? []).filter((p) => p.zone === 'hand').map((p) => p.instanceId));
+      footprints = [...pool.restingPoses().filter((pose) => !hand.has(pose.id)), ...piles.footprints()];
+    }
+    groundShadows.update({ lighting, footprints });
+    const sunMoved = moved;
     const shadowPass = kind === 'change' || cardsMoving || pilesMoving || sunMoved;
     renderer.shadowMap.needsUpdate = shadowPass;
-    if (environment.active()) renderUnderEnvironment();
+    if (environment.active()) {
+      // Design 077: the environment's plate laid on the canvas, then the board over it with the depth
+      // cleared, so cards, piles and labels always lie on top and the ground under them can rise freely.
+      const autoClear = renderer.autoClear;
+      environment.drawPlate(scene, camera);
+      renderer.clearDepth();
+      renderer.autoClear = false;
+      renderer.render(scene, camera);
+      renderer.autoClear = autoClear;
+    }
     else renderer.render(scene, camera);
     // The board pass's counts: the FX passes below reset renderer.info as they draw.
     const calls = renderer.info?.render?.calls ?? 0;
@@ -345,41 +371,6 @@ export function createBoardScene({
     posedSinceRender = false;
   };
 
-  /**
-   * With a Stadium showing: the key light along its sun, and the shadows of every card and pile
-   * resting on the table (the hands' cards fan over the edges, not on the ground) laid on its
-   * ground; without one, the table's own light and no ground shadows. True when the sun moved
-   * (the shadow map is redrawn).
-   */
-  const syncGroundShadows = (lighting) => {
-    const sun = lighting?.sun ?? null;
-    const moved = sun?.join(',') !== groundSun?.join(',');
-    if (moved) {
-      table.setSun(sun);
-      groundSun = sun;
-    }
-    let footprints = [];
-    if (lighting) {
-      const hand = new Set((model?.placements ?? []).filter((p) => p.zone === 'hand').map((p) => p.instanceId));
-      footprints = [...pool.restingPoses().filter((pose) => !hand.has(pose.id)), ...piles.footprints()];
-    }
-    groundShadows.update({ lighting, footprints });
-    return moved;
-  };
-
-  /**
-   * Design 077: the environment's plate laid on the canvas, then the board over it with the depth
-   * cleared, so cards, piles and labels always lie on top and the ground under them can rise freely.
-   */
-  const renderUnderEnvironment = () => {
-    const autoClear = renderer.autoClear;
-    environment.drawPlate(scene, camera);
-    renderer.clearDepth();
-    renderer.autoClear = false;
-    renderer.render(scene, camera);
-    renderer.autoClear = autoClear;
-  };
-
   const pacer = createFramePacer({ onFrame: render, requestFrame, cancelFrame });
   const invalidate = () => {
     if (disposed) return;
@@ -394,7 +385,12 @@ export function createBoardScene({
     foil,
     motionReduced,
     onNeedsRender: invalidate,
-    onUnretained: (id) => freeIfOrphan(id),
+    onUnretained: (id) => {
+      // The last effect let go of card `id`: free it if the model dropped it meanwhile.
+      if (disposed || !orphans.has(id)) return;
+      freeCard(id);
+      invalidate();
+    },
     viewOrigin: () => canvasBox() ?? { left: 0, top: 0 },
   });
 
@@ -520,7 +516,28 @@ export function createBoardScene({
     table.setLayout(next);
     environment.setLayout(next);
     groundShadows.setBounds(tableBounds(next));
-    syncZonePlanes();
+    // Rebuilds the zone pick planes for the current layout (they keep their lit state).
+    for (const entry of zonePlanes.values()) {
+      zonePlanesGroup.remove(entry.mesh);
+      entry.mesh.geometry.dispose();
+      entry.mesh.material.dispose();
+    }
+    zonePlanes.clear();
+    for (const { side, zone, rect } of zonePlaneRects(layout)) {
+      const key = planeKey(side, zone);
+      const material = new three.MeshBasicMaterial({
+        color: DROP_GLOW_HEX,
+        transparent: true,
+        opacity: planeOpacity(key),
+        depthWrite: false,
+      });
+      const mesh = new three.Mesh(new three.PlaneGeometry(rect.w, rect.h), material);
+      mesh.name = `board3d-zone-${key}`;
+      mesh.position.set(rect.x + rect.w / 2, rect.y + rect.h / 2, ZONE_PLANE_Z);
+      mesh.userData.boardZonePlane = { side, zone };
+      zonePlanesGroup.add(mesh);
+      zonePlanes.set(key, { mesh, rect, side, zone });
+    }
     syncCards(model, model, { relayout: true });
     syncPiles(model);
     invalidate();
@@ -633,7 +650,19 @@ export function createBoardScene({
       }
       appliedPoses.set(id, pose);
     }
-    syncStackBadges(next);
+    // "×N" on the front card of every hand stack of two or more (design 014), centred near its top.
+    const wanted = [];
+    const fontPx = countFontPx();
+    for (const side of SIDES) {
+      for (const ids of next ? handGroupsOf(next, side) : []) {
+        const mesh = ids.length >= 2 ? pool.meshOf(ids[0]) : null;
+        if (!mesh) continue;
+        const widthPx = appliedPoses.get(ids[0])?.widthPx ?? 0;
+        const offsetY = (widthPx * CARD_HEIGHT_PER_WIDTH) / 2 - fontPx * 0.8;
+        wanted.push({ id: ids[0], mesh, text: `×${ids.length}`, offsetY, fontPx });
+      }
+    }
+    badges.sync(wanted);
     // A pinned card still shows where it stood, so it keeps the overlays it had there.
     for (const id of poses.keys()) if (!pool.pinned(id)) syncOverlaysOf(next, id);
   }
@@ -644,13 +673,6 @@ export function createBoardScene({
     overlays.remove(id);
     pool.release(id);
     appliedPoses.delete(id);
-  }
-
-  /** The last effect let go of card `id`: free it if the model dropped it meanwhile. */
-  function freeIfOrphan(id) {
-    if (disposed || !orphans.has(id)) return;
-    freeCard(id);
-    invalidate();
   }
 
   /**
@@ -708,13 +730,6 @@ export function createBoardScene({
     if (!disposed && typeof id === 'number' && id < 0) pool.unretain(id);
   };
 
-  /** A card's placement with the scene's UI state (selection, glow, mat pick, hidden) over it. */
-  const withUiState = (card, id) => ({
-    ...card,
-    ...(uiState.get(id) || {}),
-    ...(id === litCard ? { glow: DROP_GLOW_RGB } : {}),
-  });
-
   const hiddenOf = (id, pose) => {
     const hidden = uiState.get(id)?.hidden;
     return typeof hidden === 'boolean' ? hidden : Boolean(pose?.hidden);
@@ -738,26 +753,15 @@ export function createBoardScene({
   function syncOverlaysOf(source, id) {
     const card = cardOf(source, id);
     const widthPx = appliedPoses.get(id)?.widthPx;
-    overlays.sync(id, card ? withUiState(card, id) : null, pool.meshOf(id), {
+    // A card's placement with the scene's UI state (selection, glow, mat pick, hidden) over it.
+    overlays.sync(id, card ? {
+      ...card,
+      ...(uiState.get(id) || {}),
+      ...(id === litCard ? { glow: DROP_GLOW_RGB } : {}),
+    } : null, pool.meshOf(id), {
       widthPx,
       tokens: tokensOf(source, card),
     });
-  }
-
-  /** "×N" on the front card of every hand stack of two or more (design 014), centred near its top. */
-  function syncStackBadges(source) {
-    const wanted = [];
-    const fontPx = countFontPx();
-    for (const side of SIDES) {
-      for (const ids of source ? handGroupsOf(source, side) : []) {
-        const mesh = ids.length >= 2 ? pool.meshOf(ids[0]) : null;
-        if (!mesh) continue;
-        const widthPx = appliedPoses.get(ids[0])?.widthPx ?? 0;
-        const offsetY = (widthPx * CARD_HEIGHT_PER_WIDTH) / 2 - fontPx * 0.8;
-        wanted.push({ id: ids[0], mesh, text: `×${ids.length}`, offsetY, fontPx });
-      }
-    }
-    badges.sync(wanted);
   }
 
   /** Lifts the hovered hand card's fan slot (null = none); the hand re-poses on a 180 ms tween. */
@@ -1046,31 +1050,6 @@ export function createBoardScene({
 
   const planeOpacity = (key) => (litZones.has(key) ? ZONE_LIT_OPACITY : 0);
 
-  /** Rebuilds the zone pick planes for the current layout (they keep their lit state). */
-  function syncZonePlanes() {
-    for (const entry of zonePlanes.values()) {
-      zonePlanesGroup.remove(entry.mesh);
-      entry.mesh.geometry.dispose();
-      entry.mesh.material.dispose();
-    }
-    zonePlanes.clear();
-    for (const { side, zone, rect } of zonePlaneRects(layout)) {
-      const key = planeKey(side, zone);
-      const material = new three.MeshBasicMaterial({
-        color: DROP_GLOW_HEX,
-        transparent: true,
-        opacity: planeOpacity(key),
-        depthWrite: false,
-      });
-      const mesh = new three.Mesh(new three.PlaneGeometry(rect.w, rect.h), material);
-      mesh.name = `board3d-zone-${key}`;
-      mesh.position.set(rect.x + rect.w / 2, rect.y + rect.h / 2, ZONE_PLANE_Z);
-      mesh.userData.boardZonePlane = { side, zone };
-      zonePlanesGroup.add(mesh);
-      zonePlanes.set(key, { mesh, rect, side, zone });
-    }
-  }
-
   /** Lights (or clears) a zone's footprint as the drop target; `side` null is the Stadium slot. */
   const setZoneHighlight = (side, zone, on) => {
     if (disposed) return;
@@ -1154,10 +1133,6 @@ export function createBoardScene({
     shadow.mesh.visible = true;
   };
 
-  const hideSoftShadow = () => {
-    if (softShadow) softShadow.mesh.visible = false;
-  };
-
   /** One frame of a held card: it rises over LIFT_MS, follows the pointer and swings (drag-tilt.mjs). */
   const stepLift = (time) => {
     if (!lifted) return;
@@ -1188,7 +1163,7 @@ export function createBoardScene({
     pool.setTilt(id, null);
     const mesh = pool.meshOf(id);
     if (mesh) mesh.castShadow = true;
-    hideSoftShadow();
+    if (softShadow) softShadow.mesh.visible = false;
     invalidate();
   }
 

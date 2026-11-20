@@ -60,13 +60,6 @@ const scheduleFrame = (doc, fn) => {
   setTimeout(fn, 0);
 };
 
-// Commits the element's current style. A CSS transition only runs from a style
-// the browser has already computed: set the spin target on a node that was
-// never styled and it jumps straight to the end (the coin that never turned).
-const flushStyle = (el) => {
-  if (el) void el.offsetWidth;
-};
-
 const faceName = (face) => (face === 'tails' ? 'Tails' : 'Heads');
 
 const defaultLabel = ({ ownerLabel, turnOrder }) => {
@@ -277,7 +270,10 @@ export const playCoinFlipCeremony = ({
       const angle = `${coinFlipAngle(index, faces[index])}deg`;
       // Restart the arc keyframes and give the spin a committed start angle.
       wrap?.classList.remove('tossing');
-      flushStyle(coinEl);
+      // Commits the element's current style. A CSS transition only runs from a style
+      // the browser has already computed: set the spin target on a node that was
+      // never styled and it jumps straight to the end (the coin that never turned).
+      if (coinEl) void coinEl.offsetWidth;
       overlay.style.setProperty('--coin-toss-ms', `${timeline.tossesMs[index]}ms`);
       wrap?.classList.add('tossing');
       coinEl?.style.setProperty('--coin-flip', angle);

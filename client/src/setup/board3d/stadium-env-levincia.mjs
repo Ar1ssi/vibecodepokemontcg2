@@ -403,16 +403,6 @@ const GLASS_LIT = [0.62, 0.76, 1.0, 0.9];
 const GLASS_GLINT = [1.3, 1.45, 1.7, 2.3];
 const BASE = [0.55, 0.62, 0.74, 0.3];
 
-/** A disc (or the arc a0..a1 of one) laid on a billboard's screen at (s, h), `push` px proud of it. */
-const screenDisc = (props, frontAt, [s, h], r, color, push, a0 = 0, a1 = 2 * Math.PI) => {
-  const steps = Math.max(6, Math.round(((a1 - a0) / (2 * Math.PI)) * 32));
-  const centre = frontAt(s, h, push);
-  const rimAt = (a) => frontAt(s + Math.cos(a) * r, h + Math.sin(a) * r, push);
-  for (let k = 0; k < steps; k += 1) {
-    props.triangle(centre, rimAt(a0 + ((a1 - a0) * k) / steps), rimAt(a0 + ((a1 - a0) * (k + 1)) / steps), color);
-  }
-};
-
 /**
  * A billboard: a dark frame on two legs at the walkway's outer edge, leaning back away from the stage,
  * its screen a bright field with one bold icon you can name from across the water (design 080: the
@@ -449,7 +439,20 @@ const billboard = (props, board, centre, deck, u) => {
     );
   }
   // Design 083: a little light in the frame's corner blinks, each board on its own beat.
-  props.look({ kind: LOOK.blink, rate: 0.7 + 0.6 * board.seed, phase: board.seed }, () => screenDisc(props, frontAt, [halfW - inset * 1.6, board.height - inset * 1.6], 2.6 * u, SCREEN_WHITE, 2.4));
+  props.look({ kind: LOOK.blink, rate: 0.7 + 0.6 * board.seed, phase: board.seed }, () => {
+    // A disc (or the arc a0..a1 of one) laid on a billboard's screen at (s, h), `push` px proud of it.
+    const [s, h] = [halfW - inset * 1.6, board.height - inset * 1.6];
+    const r = 2.6 * u;
+    const push = 2.4;
+    const a0 = 0;
+    const a1 = 2 * Math.PI;
+    const steps = Math.max(6, Math.round(((a1 - a0) / (2 * Math.PI)) * 32));
+    const centre = frontAt(s, h, push);
+    const rimAt = (a) => frontAt(s + Math.cos(a) * r, h + Math.sin(a) * r, push);
+    for (let k = 0; k < steps; k += 1) {
+      props.triangle(centre, rimAt(a0 + ((a1 - a0) * k) / steps), rimAt(a0 + ((a1 - a0) * (k + 1)) / steps), SCREEN_WHITE);
+    }
+  });
 };
 
 /** Design 084: the LED gradient's colour at `t` (wrapping): yellow to pink to cyan and round again. */
@@ -463,55 +466,11 @@ const ledGradient = (t) => {
   return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f, a[3]];
 };
 
-/**
- * A glass tower: a prism on a pale base in the water, its top cut at a slant (the art's crystal
- * tops), its faces dark blue glass, the cut face pale with the sky.
- */
-const tower = (props, t, u) => {
-  props.cylinder({ x: t.x, y: t.y, z0: WATER_BED, z1: WATER_LEVEL + 10 * u, r: t.r * 1.15, color: BASE, sides: t.sides });
-  const ring = Array.from({ length: t.sides }, (_, k) => {
-    const angle = t.turn + (k / t.sides) * 2 * Math.PI;
-    return [t.x + Math.cos(angle) * t.r, t.y + Math.sin(angle) * t.r];
-  });
-  // The slanted cut: the top rises toward one side by 45% of the tower's height.
-  const cutDir = [Math.cos(t.cut), Math.sin(t.cut)];
-  const topAt = ([x, y]) => t.h * (0.78 + 0.22 * ((x - t.x) * cutDir[0] + (y - t.y) * cutDir[1]) / t.r);
-  const z0 = WATER_LEVEL + 10 * u;
-  for (let k = 0; k < t.sides; k += 1) {
-    const a = ring[k];
-    const b = ring[(k + 1) % t.sides];
-    const facing = Math.cos(t.turn + ((k + 0.5) / t.sides) * 2 * Math.PI - 0.6);
-    props.quad([...a, z0], [...b, z0], [...b, topAt(b)], [...a, topAt(a)], facing > 0.3 ? GLASS_LIT : GLASS);
-  }
-  const middle = [t.x, t.y, ring.reduce((sum, p) => sum + topAt(p), 0) / t.sides];
-  for (let k = 0; k < t.sides; k += 1) {
-    const a = ring[k];
-    const b = ring[(k + 1) % t.sides];
-    props.quad([...a, topAt(a)], [...b, topAt(b)], middle, middle, GLASS_LIT);
-  }
-  // Design 084: one bright vertical highlight down the edge turned most to the sun.
-  let best = 0;
-  for (let k = 1; k < t.sides; k += 1) {
-    if (Math.cos(t.turn + (k / t.sides) * 2 * Math.PI - 0.6) > Math.cos(t.turn + (best / t.sides) * 2 * Math.PI - 0.6)) best = k;
-  }
-  const edge = ring[best];
-  const outward = [(edge[0] - t.x) / t.r, (edge[1] - t.y) / t.r];
-  const side = [-outward[1], outward[0]];
-  const w = 2.2 * u;
-  const lift = (s) => [edge[0] + outward[0] * 0.6 + side[0] * s, edge[1] + outward[1] * 0.6 + side[1] * s];
-  props.quad([...lift(-w), z0 + 6 * u], [...lift(w), z0 + 6 * u], [...lift(w), topAt(edge) - 4 * u], [...lift(-w), topAt(edge) - 4 * u], GLASS_GLINT);
-};
-
 /** Railings along the walkway's two edges and the bridges' sides, the billboards, the towers. */
 export function levinciaProps({ centre, stage, walkIn, walkOut, billboards, towers, scene, u }) {
   const props = createPropBuilder();
   const deck = WALKWAY.height;
   const inside = (x, y) => x > scene.x + 6 && x < scene.x + scene.w - 6 && y > scene.y + 6 && y < scene.y + scene.h - 6;
-  const bridgeGap = (angle, radius) =>
-    BRIDGE_TURNS.some((turn) => {
-      const d = Math.abs(((angle - turn + 3 * Math.PI) % (2 * Math.PI)) - Math.PI);
-      return d * radius < BRIDGE_WIDTH_PX * u * 0.55;
-    });
   // Railings: posts every ~30 px along each edge, a rail along their tops, broken where a bridge
   // joins the inner edge.
   for (const [radius, gaps] of [
@@ -528,7 +487,10 @@ export function levinciaProps({ centre, stage, walkIn, walkOut, billboards, towe
       const angle = (k / count) * 2 * Math.PI;
       const x = centre.x + Math.cos(angle) * radius;
       const y = centre.y + Math.sin(angle) * radius;
-      if (!inside(x, y) || (gaps && bridgeGap(angle, radius))) {
+      if (!inside(x, y) || (gaps && BRIDGE_TURNS.some((turn) => {
+        const d = Math.abs(((angle - turn + 3 * Math.PI) % (2 * Math.PI)) - Math.PI);
+        return d * radius < BRIDGE_WIDTH_PX * u * 0.55;
+      }))) {
         flush();
         continue;
       }
@@ -558,7 +520,42 @@ export function levinciaProps({ centre, stage, walkIn, walkOut, billboards, towe
     }
   }
   for (const board of billboards) billboard(props, board, centre, deck, u);
-  for (const t of towers) tower(props, t, u);
+  for (const t of towers) {
+    // A glass tower: a prism on a pale base in the water, its top cut at a slant (the art's crystal
+    // tops), its faces dark blue glass, the cut face pale with the sky.
+    props.cylinder({ x: t.x, y: t.y, z0: WATER_BED, z1: WATER_LEVEL + 10 * u, r: t.r * 1.15, color: BASE, sides: t.sides });
+    const ring = Array.from({ length: t.sides }, (_, k) => {
+      const angle = t.turn + (k / t.sides) * 2 * Math.PI;
+      return [t.x + Math.cos(angle) * t.r, t.y + Math.sin(angle) * t.r];
+    });
+    // The slanted cut: the top rises toward one side by 45% of the tower's height.
+    const cutDir = [Math.cos(t.cut), Math.sin(t.cut)];
+    const topAt = ([x, y]) => t.h * (0.78 + 0.22 * ((x - t.x) * cutDir[0] + (y - t.y) * cutDir[1]) / t.r);
+    const z0 = WATER_LEVEL + 10 * u;
+    for (let k = 0; k < t.sides; k += 1) {
+      const a = ring[k];
+      const b = ring[(k + 1) % t.sides];
+      const facing = Math.cos(t.turn + ((k + 0.5) / t.sides) * 2 * Math.PI - 0.6);
+      props.quad([...a, z0], [...b, z0], [...b, topAt(b)], [...a, topAt(a)], facing > 0.3 ? GLASS_LIT : GLASS);
+    }
+    const middle = [t.x, t.y, ring.reduce((sum, p) => sum + topAt(p), 0) / t.sides];
+    for (let k = 0; k < t.sides; k += 1) {
+      const a = ring[k];
+      const b = ring[(k + 1) % t.sides];
+      props.quad([...a, topAt(a)], [...b, topAt(b)], middle, middle, GLASS_LIT);
+    }
+    // Design 084: one bright vertical highlight down the edge turned most to the sun.
+    let best = 0;
+    for (let k = 1; k < t.sides; k += 1) {
+      if (Math.cos(t.turn + (k / t.sides) * 2 * Math.PI - 0.6) > Math.cos(t.turn + (best / t.sides) * 2 * Math.PI - 0.6)) best = k;
+    }
+    const edge = ring[best];
+    const outward = [(edge[0] - t.x) / t.r, (edge[1] - t.y) / t.r];
+    const side = [-outward[1], outward[0]];
+    const w = 2.2 * u;
+    const lift = (s) => [edge[0] + outward[0] * 0.6 + side[0] * s, edge[1] + outward[1] * 0.6 + side[1] * s];
+    props.quad([...lift(-w), z0 + 6 * u], [...lift(w), z0 + 6 * u], [...lift(w), topAt(edge) - 4 * u], [...lift(-w), topAt(edge) - 4 * u], GLASS_GLINT);
+  }
   return props;
 }
 
