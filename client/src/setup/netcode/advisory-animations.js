@@ -70,13 +70,6 @@ const knockoutScenes = createKnockoutScenes({
   clearTimer: (id) => clearTimeout(id),
 });
 
-const shuffleZoneCount = (user, zoneId) => {
-  const side = user === 'self' ? 'you' : 'them';
-  return zoneId === 'deck'
-    ? getAuthoritativeDeckCount(side)
-    : getAuthoritativeZoneArray(side, zoneId).length;
-};
-
 // Deals a later mulligan replaced in the batch being applied (design 044).
 let skippedDeals = new Set();
 // Revealed by this if their plan never runs (the queue was cleared). Covers the
@@ -253,7 +246,14 @@ export function handleBeforeApply(events, selfPlayerId) {
  */
 function runPlan(plan) {
   if (plan.kind === 'shuffle') {
-    const hold = playShuffleFlight(plan.user, plan.zoneId, shuffleZoneCount(plan.user, plan.zoneId));
+    const side = plan.user === 'self' ? 'you' : 'them';
+    const hold = playShuffleFlight(
+      plan.user,
+      plan.zoneId,
+      plan.zoneId === 'deck'
+        ? getAuthoritativeDeckCount(side)
+        : getAuthoritativeZoneArray(side, plan.zoneId).length
+    );
     soundPlan({ effect: plan.sound || 'shuffle-flight', user: plan.user });
     return hold;
   }

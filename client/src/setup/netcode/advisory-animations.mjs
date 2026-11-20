@@ -730,14 +730,6 @@ const dealtSoFar = (segment, { attackerId, defenderId }) => {
   return { damage, benchDealt };
 };
 
-const openAttackOf = ({ playerId, attackerId, defenderId, attackName }) => ({
-  playerId,
-  attackerId: attackerId ?? null,
-  defenderId: defenderId ?? null,
-  attackName,
-  played: false,
-});
-
 /**
  * Design 089: fits a batch's attacks to what the client should play.
  *
@@ -785,7 +777,13 @@ export function prepareAttackBatch(events, open = null) {
       // left open by a batch whose end this client never saw (its connection dropped before the
       // `attackExecuted`, and a resync view carries no events) must not pass for the next attack:
       // that attack's real `attackExecuted` was skipped, and it played with no banner or scene.
-      current = openAttackOf(event);
+      current = {
+        playerId: event.playerId,
+        attackerId: event.attackerId ?? null,
+        defenderId: event.defenderId ?? null,
+        attackName: event.attackName,
+        played: false,
+      };
       segment = [];
       acted = false;
     } else {
@@ -830,7 +828,16 @@ export function attackHitIds(events) {
     }
     if (ATTACK_SEGMENT_BOUNDS.has(event?.type)) segment = new Map();
     else if (event?.type === 'damageUpdated' && event.instanceId != null) {
-      segment.set(event.instanceId, mergeHit(segment.get(event.instanceId), event));
+      // A card hit twice in one attack (a clause, then a counter placement) is one hit: the last
+      // cumulative total, and `dealt` summed while every event names it (else the total decides).
+      const previous = segment.get(event.instanceId);
+      const hit = { instanceId: event.instanceId };
+      if (isAmount(event.damage)) hit.damage = event.damage;
+      else if (isAmount(previous?.damage)) hit.damage = previous.damage;
+      const priorDealt = previous ? previous.dealt : 0;
+      if (isAmount(event.dealt) && isAmount(priorDealt)) hit.dealt = priorDealt + event.dealt;
+      if (event.weakness || previous?.weakness) hit.weakness = true;
+      segment.set(event.instanceId, hit);
     }
   }
   return hits;
@@ -925,15 +932,3 @@ export function settleDroppedPlan(plan, { show, clearTimer, forgetKnockout }) {
     show(card);
   }
 }
-
-// A card hit twice in one attack (a clause, then a counter placement) is one hit: the last
-// cumulative total, and `dealt` summed while every event names it (else the total decides).
-const mergeHit = (previous, event) => {
-  const hit = { instanceId: event.instanceId };
-  if (isAmount(event.damage)) hit.damage = event.damage;
-  else if (isAmount(previous?.damage)) hit.damage = previous.damage;
-  const priorDealt = previous ? previous.dealt : 0;
-  if (isAmount(event.dealt) && isAmount(priorDealt)) hit.dealt = priorDealt + event.dealt;
-  if (event.weakness || previous?.weakness) hit.weakness = true;
-  return hit;
-};
