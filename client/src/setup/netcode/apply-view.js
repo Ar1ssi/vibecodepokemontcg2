@@ -466,25 +466,6 @@ function resolveZone(side, zoneId, options = {}) {
 }
 
 /**
- * Probes one render target per side before any mutation. A blind renderer (no resolvable
- * zone element on one or both sides — e.g. `window.__getZone` unset and no injected
- * `options.getZone`) must not write to the DOM at all: see file header invariant.
- *
- * @param {object} options Renderer options (forwarded to resolveZone)
- * @returns {{ ok: boolean, reason?: string }}
- */
-function resolveRenderTargets(options = {}) {
-  const sides = ['you', 'them'];
-  for (const side of sides) {
-    const zone = resolveZone(side, 'active', options);
-    if (!zone.element) {
-      return { ok: false, reason: 'no_render_target' };
-    }
-  }
-  return { ok: true };
-}
-
-/**
  * Resolves the per-player card-back skin ("sleeve") a redacted card or a deck
  * cover should display, mirroring `updateDestinationCover`'s inline choice
  * (`client/src/actions/move-card-bundle/update-cover.js`): the owner's own
@@ -1171,37 +1152,6 @@ function unhydrateCard(record, options = {}) {
 }
 
 /**
- * Gives a face-up card in a holo zone its holofoil wrapper (async, idempotent:
- * hydrateHolo returns early once `card.wrapper` exists), and strips it from
- * face-down cards and cards in zones legacy never foils.
- *
- * @param {object} record
- * @param {string} zoneId
- * @param {boolean} isAttached
- * @param {object} options
- */
-function reconcileHolo(record, zoneId, isAttached, options = {}) {
-  const holo = holoApi(options);
-  if (!holo) return;
-  const wantsHolo =
-    !isAttached &&
-    !record.isRedacted &&
-    Boolean(record.holoCard.name) &&
-    HOLO_ZONES.includes(zoneId);
-  if (!wantsHolo) {
-    unhydrateCard(record, options);
-    return;
-  }
-  if (!record.element.parentNode) return;
-  try {
-    const pending = holo.hydrate?.(record.holoCard);
-    pending?.catch?.(() => {});
-  } catch {
-    // A holo failure is cosmetic; the card is already placed.
-  }
-}
-
-/**
  * Undoes every inline style and token swap `layoutCardStack` wrote, so a card
  * that left a stack (or changed its place in one) starts from a clean <img>.
  * `createOrUpdateCardElement` has already reset `src` to the card art.
@@ -1353,17 +1303,6 @@ function relayoutWhenLoaded(rootRecord, displayImg) {
   );
 }
 
-function bindOverlayResize() {
-  if (
-    resizeListenerBound ||
-    typeof window === 'undefined' ||
-    typeof window.addEventListener !== 'function'
-  )
-    return;
-  resizeListenerBound = true;
-  window.addEventListener('resize', () => repositionCardOverlays());
-}
-
 /**
  * Server rotation (reduce.mjs rotateCard) as the inline transform legacy
  * rotate-card.js writes. Attached cards turn with their root (syncRotation).
@@ -1396,7 +1335,27 @@ function reconcilePlacedCard(entry, displayByRoot, options = {}) {
   const isVisible = record === displayRecord;
 
   applyRotation(record.element, root.card.rotation);
-  reconcileHolo(record, zoneId, !isVisible, options);
+  // Gives a face-up card in a holo zone its holofoil wrapper (async, idempotent:
+  // hydrateHolo returns early once `card.wrapper` exists), and strips it from
+  // face-down cards and cards in zones legacy never foils.
+  const holo = holoApi(options);
+  if (holo) {
+    const wantsHolo =
+      isVisible &&
+      !record.isRedacted &&
+      Boolean(record.holoCard.name) &&
+      HOLO_ZONES.includes(zoneId);
+    if (!wantsHolo) {
+      unhydrateCard(record, options);
+    } else if (record.element.parentNode) {
+      try {
+        const pending = holo.hydrate?.(record.holoCard);
+        pending?.catch?.(() => {});
+      } catch {
+        // A holo failure is cosmetic; the card is already placed.
+      }
+    }
+  }
 
   const zone = resolveZone(side, zoneId, options);
   if (attachedParent) {
@@ -1866,7 +1825,27 @@ async function submitChoiceSelection(pendingChoice, selection, options = {}) {
     options.onResolveChoice({ choiceId: pendingChoice.choiceId, selection });
     return;
   }
-  const { socket, roomId } = await resolveNetcodeContext(options);
+  const defaultCtx = getDefaultNetcodeContext();
+  let socket = options.socket || defaultCtx.socket;
+  let roomId = options.roomId || defaultCtx.roomId;
+
+  if (typeof window !== 'undefined') {
+    if (!socket && window.socket) socket = window.socket;
+    if (!roomId && window.systemState?.roomId)
+      roomId = window.systemState.roomId;
+  }
+
+  if ((!socket || !roomId) && typeof window !== 'undefined') {
+    try {
+      const state = await import('../../state.js');
+      if (!socket && state.socket) socket = state.socket;
+      if (!roomId && state.systemState?.roomId)
+        roomId = state.systemState.roomId;
+    } catch {
+      // dynamic import fallback ignored if unavailable
+    }
+  }
+
   if (socket && roomId) {
     emitResolveChoice({
       socket,
@@ -2316,37 +2295,6 @@ export function clearRenderedBoard(options = {}) {
 }
 
 /**
- * Resolves netcode socket and roomId context from options, defaults, or dynamic state import.
- *
- * @param {object} [options={}]
- * @returns {Promise<{ socket: any, roomId: string|null }>}
- */
-async function resolveNetcodeContext(options = {}) {
-  const defaultCtx = getDefaultNetcodeContext();
-  let socket = options.socket || defaultCtx.socket;
-  let roomId = options.roomId || defaultCtx.roomId;
-
-  if (typeof window !== 'undefined') {
-    if (!socket && window.socket) socket = window.socket;
-    if (!roomId && window.systemState?.roomId)
-      roomId = window.systemState.roomId;
-  }
-
-  if ((!socket || !roomId) && typeof window !== 'undefined') {
-    try {
-      const state = await import('../../state.js');
-      if (!socket && state.socket) socket = state.socket;
-      if (!roomId && state.systemState?.roomId)
-        roomId = state.systemState.roomId;
-    } catch {
-      // dynamic import fallback ignored if unavailable
-    }
-  }
-
-  return { socket, roomId };
-}
-
-/**
  * Main authoritative view renderer.
  * Reconciles browser DOM directly from authoritative view snapshot.
  *
@@ -2363,9 +2311,13 @@ export function applyView(view, events = [], options = {}) {
   // §0.2 guard: a renderer that cannot see the whole board writes to no part of it.
   // Must run before the monotonic version guard so a blind view never advances
   // lastRenderedVersion and is never mistaken for "already applied".
-  const renderTargets = resolveRenderTargets(options);
-  if (!renderTargets.ok) {
-    return { applied: false, reason: renderTargets.reason };
+  // Probes one render target per side before any mutation. A blind renderer (no resolvable
+  // zone element on one or both sides — e.g. `window.__getZone` unset and no injected
+  // `options.getZone`) must not write to the DOM at all: see file header invariant.
+  for (const side of ['you', 'them']) {
+    if (!resolveZone(side, 'active', options).element) {
+      return { applied: false, reason: 'no_render_target' };
+    }
   }
 
   // Edge Case 8: Monotonic stateVersion guard (ignore out-of-order or duplicate views)
@@ -2469,7 +2421,14 @@ export function applyView(view, events = [], options = {}) {
     reconcilePlacedCard(entry, displayByRoot, options);
   }
   lastOverlayOptions = options;
-  bindOverlayResize();
+  if (
+    !resizeListenerBound &&
+    typeof window !== 'undefined' &&
+    typeof window.addEventListener === 'function'
+  ) {
+    resizeListenerBound = true;
+    window.addEventListener('resize', () => repositionCardOverlays());
+  }
 
   const lockWatch = newlyRetreatLocked(
     retreatLockedIds,
