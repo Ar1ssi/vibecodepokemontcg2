@@ -103,35 +103,6 @@ export function isBasicCard(card = {}) {
   return stage === 'basic' || subs.includes('basic');
 }
 
-export function isStage1Card(card = {}) {
-  if (!card) return false;
-  const stage = String(card.stage || '').toLowerCase();
-  const subs = (card.subtypes || []).map((s) => String(s).toLowerCase());
-  return (
-    stage === 'stage 1' || subs.includes('stage 1') || subs.includes('stage1')
-  );
-}
-
-export function isStage2Card(card = {}) {
-  if (!card) return false;
-  const stage = String(card.stage || '').toLowerCase();
-  const subs = (card.subtypes || []).map((s) => String(s).toLowerCase());
-  return (
-    stage === 'stage 2' || subs.includes('stage 2') || subs.includes('stage2')
-  );
-}
-
-export function attachedCards(pokemon, zoneCards = []) {
-  if (!pokemon) return [];
-  return (zoneCards || []).filter((c) => {
-    if (c === pokemon) return false;
-    if (pokemon.instanceId != null && c.attachedTo === pokemon.instanceId)
-      return true;
-    if (pokemon.image && c.image?.relative === pokemon.image) return true;
-    return false;
-  });
-}
-
 function toolBlocked(blockTools, stadium = null) {
   return Boolean(blockTools || stadiumBlocksToolEffects(stadium));
 }
@@ -262,10 +233,14 @@ export function reductionForCard(card, defender, attacker, { skipSymbolFilter = 
     if (!attackerTypes(defender).includes('grass')) return 0;
   }
   if (/the stage 1 pokémon|the stage 1 pokemon/i.test(t)) {
-    if (!isStage1Card(defender)) return 0;
+    const stage = String(defender?.stage || '').toLowerCase();
+    const subs = (defender?.subtypes || []).map((s) => String(s).toLowerCase());
+    if (!(stage === 'stage 1' || subs.includes('stage 1') || subs.includes('stage1'))) return 0;
   }
   if (/the stage 2 pokémon|the stage 2 pokemon/i.test(t)) {
-    if (!isStage2Card(defender)) return 0;
+    const stage = String(defender?.stage || '').toLowerCase();
+    const subs = (defender?.subtypes || []).map((s) => String(s).toLowerCase());
+    if (!(stage === 'stage 2' || subs.includes('stage 2') || subs.includes('stage2'))) return 0;
   }
 
   return red;
@@ -658,7 +633,13 @@ export function toolPrizeCountAdjust(
     zoneCards,
     flags,
   };
-  for (const card of attachedCards(defender, zoneCards)) {
+  const attachedToDefender = (zoneCards || []).filter(
+    (c) =>
+      c !== defender &&
+      ((defender.instanceId != null && c.attachedTo === defender.instanceId) ||
+        (defender.image && c.image?.relative === defender.image))
+  );
+  for (const card of attachedToDefender) {
     if (isPokemonToolCard(card) && toolsBlocked) continue;
     // Legacy Energy's once-per-game reduction can be spent; when it is, its
     // (generic) prize-modify text must be ignored.

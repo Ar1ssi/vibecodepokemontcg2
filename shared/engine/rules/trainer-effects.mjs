@@ -439,11 +439,6 @@ function discardSearchWhat(lower) {
   return 'card';
 }
 
-function discardSearchCount(lower) {
-  const m = lower.match(/\bfor\s+(?:up to\s+)?(\d+)\b/);
-  return m ? Number(m[1]) : 1;
-}
-
 // Energy-symbol → type word for the Pokémon half of "any combination" discard
 // clauses (matchesSearch filters typed Pokémon by word form, not by symbol).
 const SYMBOL_TYPE_WORDS = {
@@ -1584,16 +1579,6 @@ function appendLeadingHandDiscardCost(steps, lower) {
   if (plain) steps.unshift({ type: 'discardCost', count: Number(plain[1]) });
 }
 
-// Primary switches some branches parse past (Switch Raft parses only its heal;
-// Mallow & Lana already emits switchOwn). A "Choose 1:" card must NOT get this:
-// its switch is an alternative mode, not a follow-up (Tate & Liza).
-function appendMissingOwnSwitch(steps, lower) {
-  if (steps.some((s) => s.type === 'switchOwn')) return;
-  if (/\bchoose 1\b/.test(lower)) return;
-  if (!/switch your active (?:\{[a-z]\} )?pokémon with 1 of your benched pokémon/.test(lower)) return;
-  steps.unshift({ type: 'switchOwn' });
-}
-
 // "Choose 1:" / "Choose 1 or both:" cards (Kieran, Klara, Judge Whistle, …). Modes are the
 // printed bullets, or — where the corpus dropped them — the sentences, a "Then, …" sentence
 // belonging to the mode before it. Ingo & Emmet first looks at the top card.
@@ -1650,12 +1635,6 @@ function parseChooseModes(lower) {
 const OPTIONAL_HAND_COST_RE =
   /\s*when you play this card, you may discard (\d+) other cards? from your hand\.\s*if you do,\s*(.*)$/;
 
-function splitOptionalHandCost(lower) {
-  const m = lower.match(OPTIONAL_HAND_COST_RE);
-  if (!m) return null;
-  return { main: lower.slice(0, m.index).trim(), count: Number(m[1]), tail: m[2].trim() };
-}
-
 // The bonus after "If you do,". Only the printed wordings below are understood; any other
 // bonus yields no steps, so its card keeps just the main effect and the optional discard.
 function parseOptionalCostBonus(tail) {
@@ -1689,13 +1668,6 @@ function parseOptionalCostBonus(tail) {
   return [];
 }
 
-function applyOptionalHandCost(steps, optional) {
-  const bonus = parseOptionalCostBonus(optional.tail);
-  if (bonus.length === 0) return;
-  steps.unshift({ type: 'optionalDiscardCost', count: optional.count });
-  for (const step of bonus) steps.push({ ...step, requiresHandCost: true });
-}
-
 // "If you go second and it's your first turn, search for N X instead of 1." (Jasmine, Energy
 // Spinner): the searchDeck count the executor uses on the second player's first turn.
 const GOING_SECOND_SEARCH_RE = /if you go second and it's your first turn, search for (?:up to )?(\d+) [^.]*? instead of (?:1|a)\b/;
@@ -1703,26 +1675,41 @@ const GOING_SECOND_SEARCH_RE = /if you go second and it's your first turn, searc
 function parseTrainerSteps(lower) {
   const chosen = parseChooseModes(lower);
   if (chosen) return chosen;
-  const optional = splitOptionalHandCost(lower);
+  const optionalMatch = lower.match(OPTIONAL_HAND_COST_RE);
+  const optional = optionalMatch
+    ? { main: lower.slice(0, optionalMatch.index).trim(), count: Number(optionalMatch[1]), tail: optionalMatch[2].trim() }
+    : null;
   const main = optional ? optional.main : lower;
   const result = parseTrainerStepsInner(main);
   if (result?.recognizable && Array.isArray(result.steps) && result.steps.length > 0) {
     appendLeadingHandDiscardCost(result.steps, main);
-    appendMissingOwnSwitch(result.steps, main);
-    prependWholeHandDiscard(result.steps, main);
+    // Primary switches some branches parse past (Switch Raft parses only its heal;
+    // Mallow & Lana already emits switchOwn). A "Choose 1:" card must NOT get this:
+    // its switch is an alternative mode, not a follow-up (Tate & Liza).
+    if (
+      !result.steps.some((s) => s.type === 'switchOwn') &&
+      !/\bchoose 1\b/.test(main) &&
+      /switch your active (?:\{[a-z]\} )?pokémon with 1 of your benched pokémon/.test(main)
+    ) {
+      result.steps.unshift({ type: 'switchOwn' });
+    }
+    // Peony, Larry's Skill: the whole hand is discarded before the search resolves.
+    if (main.trimStart().startsWith('discard your hand and search your deck')) {
+      result.steps.unshift({ type: 'discardHand' });
+    }
     const steps = result.steps;
     const m = main.match(GOING_SECOND_SEARCH_RE);
     const search = m && steps.find((s) => s.type === 'searchDeck');
     if (search) search.countIf = { goingSecondFirstTurn: Number(m[1]) };
-    if (optional) applyOptionalHandCost(result.steps, optional);
+    if (optional) {
+      const bonus = parseOptionalCostBonus(optional.tail);
+      if (bonus.length > 0) {
+        result.steps.unshift({ type: 'optionalDiscardCost', count: optional.count });
+        for (const step of bonus) result.steps.push({ ...step, requiresHandCost: true });
+      }
+    }
   }
   return result;
-}
-
-// Peony, Larry's Skill: the whole hand is discarded before the search resolves.
-function prependWholeHandDiscard(steps, lower) {
-  if (!lower.trimStart().startsWith('discard your hand and search your deck')) return;
-  steps.unshift({ type: 'discardHand' });
 }
 
 // Status words a WotC Trainer can attach to an attack this turn (Koga gym2-19).
@@ -2283,7 +2270,7 @@ function parseTrainerStepsInner(lower) {
     steps.push({
       type: 'shuffleFromDiscard',
       what: discardSearchWhat(lower).replace(' or Basic Energy', ''),
-      count: discardSearchCount(lower),
+      count: Number(lower.match(/\bfor\s+(?:up to\s+)?(\d+)\b/)?.[1] ?? 1),
     });
     return { steps, recognizable: true };
   }
