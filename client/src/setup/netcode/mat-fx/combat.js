@@ -195,13 +195,6 @@ const playImpactPrefab = (ctx, target, hit) => {
  */
 const sceneSpecFor = (spec, impactType, defenderHit) => (impactType && defenderHit ? withoutImpactBeats(spec) : spec);
 
-const shakeTable = (amount) => {
-  const amplitude = screenShakeAmplitude(amount);
-  if (amplitude === 0) return 0;
-  // Design 074 §D6: the three.js board shakes its camera; the page elements stay put.
-  getBoardScene()?.shake(screenShakeKeyframes(amplitude, SCREEN_SHAKE_MS));
-};
-
 /**
  * Design 069: knock a card the attack reached after its main target back from the attacker
  * (WAAPI `translate`, added onto whatever the card already plays).
@@ -356,7 +349,9 @@ export const damage = (plan) => {
       ];
       removeWhen(host, done, HIT_SPARKS_MS + BACKSTOP_PAD_MS);
     }
-    shakeTable(hit.amount * dressing.shakeMul);
+    const amplitude = screenShakeAmplitude(hit.amount * dressing.shakeMul);
+    // Design 074 §D6: the three.js board shakes its camera; the page elements stay put.
+    if (amplitude !== 0) getBoardScene()?.shake(screenShakeKeyframes(amplitude, SCREEN_SHAKE_MS));
     if (secondary) recoilCard(plan.instanceId, rect, ctx, registry);
   });
   return ripple ? 0 : undefined;

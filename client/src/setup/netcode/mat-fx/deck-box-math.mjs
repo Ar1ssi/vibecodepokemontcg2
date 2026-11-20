@@ -65,7 +65,6 @@ const grow = (bounds, [x, , z]) => {
  * @param {number} [cutZ]
  */
 export function splitBoxMesh(mesh, cutZ = LID_CUT_Z) {
-  const position = (v) => [mesh.p[v * 3], mesh.p[v * 3 + 1], mesh.p[v * 3 + 2]];
   const isFlapVertex = (v) => mesh.p[v * 3 + 1] < FLAP_FRONT_Y && mesh.p[v * 3 + 2] < FLAP_FLOOR_Z;
   const parts = { body: { index: [], submeshes: [] }, lid: { index: [], submeshes: [] } };
   const rim = { outer: emptyBounds(), inner: emptyBounds() };
@@ -80,7 +79,7 @@ export function splitBoxMesh(mesh, cutZ = LID_CUT_Z) {
       part.index.push(...triangle);
       if (flap) continue;
       for (const v of triangle) {
-        const point = position(v);
+        const point = [mesh.p[v * 3], mesh.p[v * 3 + 1], mesh.p[v * 3 + 2]];
         if (Math.abs(point[2] - cutZ) <= RIM_BAND) grow(submeshIndex === 0 ? rim.outer : rim.inner, meshToBox(point));
       }
     }
