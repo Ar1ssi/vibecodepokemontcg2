@@ -1,6 +1,7 @@
 import {
   formatImageUrl,
   parseCsvMeta,
+  parseDeckDataRows,
   parseSimCsv,
   serializeDeckToSimCsv,
 } from '../../../setup/deck-builder/core/csv-adapter.mjs';
@@ -75,7 +76,6 @@ import {
   cycleWallpaper,
   findWallpaper,
 } from '../../../setup/deck-builder/core/box-wallpapers.mjs';
-import { syncDeckFromLoadedRows } from './native-deck-builder-sync.js';
 import {
   importDeckEntries,
   parseDeckText,
@@ -1406,7 +1406,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     const deckData = event.detail?.deckData;
     if (!user || !Array.isArray(deckData)) return;
 
-    syncedDecks[user] = syncDeckFromLoadedRows(deckData);
+    syncedDecks[user] = parseDeckDataRows(deckData);
 
     if (currentLoadTarget === user) {
       deck = syncedDecks[user];

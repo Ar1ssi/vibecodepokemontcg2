@@ -47,6 +47,7 @@ import {
   boxShot,
   boxUnboxingOptions,
   browserStorage,
+  button,
   createPoolTab,
   el,
   mountBoxOnStage,
@@ -80,13 +81,6 @@ const EMPTY_DECK_TEXT = 'Build a 40-card deck to play.';
 const NO_RUN_PLAY_TEXT = 'Start a run on the Run tab to play';
 const RUN_OVER_PLAY_TEXT = 'This run is over';
 const SPLASH_BASE = '/src/assets/build-battle/run';
-
-const button = (className, text, onClick) => {
-  const node = el('button', className, text);
-  node.type = 'button';
-  node.addEventListener('click', onClick);
-  return node;
-};
 
 /**
  * @param {object} options
@@ -178,12 +172,6 @@ export const initializeBuildBattleRun = ({
   const boxStartingRows = () =>
     run && isLoaded() ? startingDeckRows({ box: activeBox, data: loaded.data, opened: run.session }) : [];
 
-  const deckSprites = () => {
-    const current = session();
-    if (!current.groupKeys) return deckEntryOf(current)?.sprites || [];
-    return current.groupKeys.map((key) => deckEntryOf(current, key)?.sprites?.[0]).filter(Boolean);
-  };
-
   // The box deck goes into My Decks as a Build & Battle record and opens in the editor. When storage
   // refuses the write it still opens, unsaved, and the session keeps its cards so edits survive a reload.
   const openBoxDeck = (cards = deckFromRows(boxStartingRows())) => {
@@ -194,7 +182,12 @@ export const initializeBuildBattleRun = ({
         getTarget(),
         buildBattleDeckName(activeBox, deckEntry.name, current.seed),
         cards,
-        { format: DECK_FORMAT_BUILD_BATTLE, sprites: deckSprites() }
+        {
+          format: DECK_FORMAT_BUILD_BATTLE,
+          sprites: current.groupKeys
+            ? current.groupKeys.map((key) => deckEntryOf(current, key)?.sprites?.[0]).filter(Boolean)
+            : deckEntry.sprites || [],
+        }
       ) || null;
     if (!deckId) showUnsavedDeck(cards);
     updateSession({

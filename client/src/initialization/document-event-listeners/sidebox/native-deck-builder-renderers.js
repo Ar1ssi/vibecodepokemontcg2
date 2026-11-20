@@ -14,11 +14,6 @@ const escapeHtml = (value = '') => String(value)
       .replaceAll('"', '&quot;')
       .replaceAll("'", '&#39;');
     
-    const escapeCssUrl = (url = '') => String(url)
-      .replaceAll("'", '%27')
-      .replaceAll(')', '%29')
-      .replaceAll('\\', '%5C');
-    
     /**
      * The "×n owned" badge a result tile wears when the player's Elite Trainer Box collection
      * holds the card (design 057); '' when it holds none.
@@ -35,7 +30,6 @@ const escapeHtml = (value = '') => String(value)
     // the low scan, so the grid loads low; the hover/right-click preview keeps high.
     // Custom sets (design 075) mirror that layout under /src/assets/custom-sets/<set>/<n>/.
     const TCGDEX_HIGH_SCAN = /^(https:\/\/assets\.tcgdex\.net\/.+|\/src\/assets\/custom-sets\/[^/]+\/[^/]+)\/high\.webp$/;
-    const tileScanUrl = (url = '') => String(url).replace(TCGDEX_HIGH_SCAN, '$1/low.webp');
 
     // Each grid remembers the results it last drew, keyed by card ids, so a re-render with the same
     // ids patches the badges in place instead of rebuilding up to 150 <img> tiles. A single delegated
@@ -75,23 +69,6 @@ const escapeHtml = (value = '') => String(value)
       else selectTile(grid, button);
     };
 
-    // Swaps the nodes between the image and the caption for freshly parsed badge markup.
-    const replaceTileBadges = (button, badgesHtml) => {
-      const img = button.querySelector('.native-deck-builder-result-image');
-      const text = button.querySelector('.native-deck-builder-result-text');
-      if (!img || !text) return;
-
-      let node = img.nextSibling;
-      while (node && node !== text) {
-        const next = node.nextSibling;
-        node.remove();
-        node = next;
-      }
-      const template = button.ownerDocument.createElement('template');
-      template.innerHTML = badgesHtml;
-      text.before(template.content);
-    };
-
     export const renderSearchResults = ({ searchResultsEl, results, onSelect, quantities = {}, owned = {} }) => {
       if (!searchResultsEl) return;
 
@@ -106,13 +83,27 @@ const escapeHtml = (value = '') => String(value)
           const qty = quantities[card.id] || 0;
           if (qty > 0) button.dataset.inDeck = String(qty);
           else delete button.dataset.inDeck;
-          replaceTileBadges(button, searchBadgesHtml(qty, owned[card.id]));
+          const badgesHtml = searchBadgesHtml(qty, owned[card.id]);
+          // Swaps the nodes between the image and the caption for freshly parsed badge markup.
+          const img = button.querySelector('.native-deck-builder-result-image');
+          const text = button.querySelector('.native-deck-builder-result-text');
+          if (!img || !text) return;
+
+          let node = img.nextSibling;
+          while (node && node !== text) {
+            const next = node.nextSibling;
+            node.remove();
+            node = next;
+          }
+          const template = button.ownerDocument.createElement('template');
+          template.innerHTML = badgesHtml;
+          text.before(template.content);
         });
       } else {
         searchResultsEl.innerHTML = nextResults
           .map((card, index) => {
             const previewImage = card.images?.large || card.images?.small || card.image || '';
-            const thumbImage = tileScanUrl(card.images?.small || card.image || '');
+            const thumbImage = String(card.images?.small || card.image || '').replace(TCGDEX_HIGH_SCAN, '$1/low.webp');
             const setName = escapeHtml(card.set?.name || 'Unknown Set');
             const qty = quantities[card.id] || 0;
 
@@ -144,11 +135,6 @@ const escapeHtml = (value = '') => String(value)
       return (filters?.[group.key] || []).includes(option.value);
     };
 
-    const groupActiveCount = (group, filters) => {
-      if (group.kind === 'range') return filters?.hpMin != null || filters?.hpMax != null ? 1 : 0;
-      return group.options.filter((option) => isOptionOn(group, option, filters)).length;
-    };
-
     /**
      * Renders the TCG Live filter drawer (design 050) from card-filters.mjs's
      * BUILDER_FILTER_GROUPS. `filters` is the draft being edited; this function
@@ -178,7 +164,10 @@ const escapeHtml = (value = '') => String(value)
       const sections = groups
         .map((group) => {
           const options = group.dynamic === 'sets' ? setOptions : group.options;
-          const count = groupActiveCount({ ...group, options }, filters);
+          const count =
+            group.kind === 'range'
+              ? filters?.hpMin != null || filters?.hpMax != null ? 1 : 0
+              : options.filter((option) => isOptionOn(group, option, filters)).length;
           let body;
           if (group.kind === 'range') {
             const low = filters?.hpMin ?? HP_SLIDER.min;
@@ -311,7 +300,9 @@ const escapeHtml = (value = '') => String(value)
             ? `${safeSupertype} · Reverse Holo`
             : safeSupertype;
           const safeImageUrl = escapeHtml(imageUrl);
-          const safeCssUrl = escapeHtml(escapeCssUrl(imageUrl));
+          const safeCssUrl = escapeHtml(
+            String(imageUrl).replaceAll("'", '%27').replaceAll(')', '%29').replaceAll('\\', '%5C')
+          );
           const sprite = cardSpriteFor(card);
           // Rows without a sprite keep an empty slot so every name lines up.
           const spriteHtml = sprite
