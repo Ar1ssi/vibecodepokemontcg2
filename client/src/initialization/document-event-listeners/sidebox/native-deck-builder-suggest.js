@@ -132,13 +132,6 @@ export const initializeNativeDeckBuilderSuggest = ({
   };
 
   // ── markup ─────────────────────────────────────────────────────────────
-  const thumbHtml = (idx) => {
-    const card = idx === null ? null : index.dataset.cards[idx];
-    const src = thumbnailUrl(card?.image);
-    if (!src) return '<span class="db-suggest-thumb db-suggest-thumb-empty" aria-hidden="true"></span>';
-    return `<button type="button" class="db-suggest-thumb" data-action="preview" data-idx="${idx}" aria-label="Preview ${escapeHtml(card.name)}"><img src="${escapeHtml(src)}" alt="" loading="lazy"></button>`;
-  };
-
   const rowHtml = (item, bucket, { showPrice, ownGoal = null } = {}) => {
     const badges = tagBadges(item, ownGoal)
       .map((label) => `<span class="db-suggest-badge">${escapeHtml(label)}</span>`)
@@ -159,9 +152,15 @@ export const initializeNativeDeckBuilderSuggest = ({
       actions = `${addButton}
            <button type="button" class="db-suggest-btn db-suggest-btn-quiet" data-action="dismiss" data-key="${key}">Dismiss</button>`;
     }
+    const card = item.idx === null ? null : index.dataset.cards[item.idx];
+    const src = thumbnailUrl(card?.image);
     const lockedMark = item.locked ? '<span class="db-suggest-badge db-suggest-badge-lock">Kept</span>' : '';
     return `<li class="db-suggest-row">
-      ${thumbHtml(item.idx)}
+      ${
+        src
+          ? `<button type="button" class="db-suggest-thumb" data-action="preview" data-idx="${item.idx}" aria-label="Preview ${escapeHtml(card.name)}"><img src="${escapeHtml(src)}" alt="" loading="lazy"></button>`
+          : '<span class="db-suggest-thumb db-suggest-thumb-empty" aria-hidden="true"></span>'
+      }
       <div class="db-suggest-info">
         <div class="db-suggest-name">${escapeHtml(item.name)} ${price}${lockedMark}${badges}</div>
         <div class="db-suggest-evidence">${escapeHtml(evidenceLine(item, bucket))}</div>

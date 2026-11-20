@@ -188,12 +188,6 @@ const launchRectFrom = (rect) => {
 const promoTransform = ({ translateYPx, rotateXDeg, rotateYDeg, scale }) =>
   `translateY(${translateYPx}px) rotateX(${rotateXDeg}deg) rotateY(${rotateYDeg}deg) scale(${scale})`;
 
-// The body of a torn pack: everything below the tear line `packTearEdge` cut.
-const packBodyClip = (tearEdge) => {
-  const points = tearEdge.slice('polygon('.length, -1).split(', ').slice(2);
-  return `polygon(${[...points, '0% 100%', '100% 100%'].join(', ')})`;
-};
-
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // A drag writes inline transforms; a pose that finished earlier still fills and would win.
@@ -596,17 +590,16 @@ export const mountUnboxingScene = ({
     return holder;
   };
 
-  // A card TCG Live prints wears its base printing's foil (or none); a reverse-slot card wears TCG Live's
-  // reverse-holo printing, else the CSS reverse holo (design 069).
-  const faceRarity = (card, slot) => {
-    const coverage = tcglFoilCoverage(card, undefined, { reverse: slot === 'reverse' });
-    if (coverage === 'foil') return TCGL_FOIL_RARITY;
-    if (coverage === 'flat') return null;
-    return unboxingHoloRarity(card, slot);
-  };
-
   const cardFaceNode = (card, slot) => {
-    const rarity = faceRarity(card, slot);
+    // A card TCG Live prints wears its base printing's foil (or none); a reverse-slot card wears TCG Live's
+    // reverse-holo printing, else the CSS reverse holo (design 069).
+    const coverage = tcglFoilCoverage(card, undefined, { reverse: slot === 'reverse' });
+    const rarity =
+      coverage === 'foil'
+        ? TCGL_FOIL_RARITY
+        : coverage === 'flat'
+          ? null
+          : unboxingHoloRarity(card, slot);
     const src = cardImage(card, 'small');
     if (!card || !src) return cardFallback(card);
     if (!rarity) {
@@ -643,23 +636,6 @@ export const mountUnboxingScene = ({
     }
     if (u.stage === 'deckShown' && packsOut) return 'spread';
     return 'box';
-  };
-
-  // Elite Trainer Box: the box lies flat with the key-art lid toward the camera (+z). The lid is
-  // a host carrying its cover and four rim strips; once lifted it is gone and the well shows.
-  const appendLiftBox = (body, u, wrapped) => {
-    const faceOptions = { wrapped, look, packCount: packs.length };
-    for (const name of ['under', 'left', 'right', 'far', 'near']) body.append(etbFace(name, faceOptions));
-    body.append(el('div', 'etb-box__floor'));
-    for (const name of ['near', 'far', 'left', 'right']) body.append(el('div', `etb-box__wall etb-box__wall--${name}`));
-    if (u.stage !== 'sealed') return;
-    const lid = el('div', 'bb-box__lid etb-lid');
-    lid.append(etbFace('lid', faceOptions, 'etb-lid__face'));
-    for (const name of ['near', 'far', 'left', 'right']) {
-      lid.append(etbFace('rim', faceOptions, `etb-lid__face etb-lid__rim etb-lid__rim--${name}`));
-    }
-    lid.style.transform = liftLidTransform(liftLidPose(0, lidSize));
-    body.append(lid);
   };
 
   const wrapLayers = () => [...root.querySelectorAll('.bb-face__wrap')];
@@ -1263,7 +1239,23 @@ export const mountUnboxingScene = ({
       host.style.setProperty('--bb-d', `${size.depth}px`);
       const body = el('div', 'bb-box__body');
       const wrapped = !u.wrapTorn;
-      if (isLift) appendLiftBox(body, u, wrapped);
+      if (isLift) {
+        // Elite Trainer Box: the box lies flat with the key-art lid toward the camera (+z). The lid is
+        // a host carrying its cover and four rim strips; once lifted it is gone and the well shows.
+        const faceOptions = { wrapped, look, packCount: packs.length };
+        for (const name of ['under', 'left', 'right', 'far', 'near']) body.append(etbFace(name, faceOptions));
+        body.append(el('div', 'etb-box__floor'));
+        for (const name of ['near', 'far', 'left', 'right']) body.append(el('div', `etb-box__wall etb-box__wall--${name}`));
+        if (u.stage === 'sealed') {
+          const lid = el('div', 'bb-box__lid etb-lid');
+          lid.append(etbFace('lid', faceOptions, 'etb-lid__face'));
+          for (const name of ['near', 'far', 'left', 'right']) {
+            lid.append(etbFace('rim', faceOptions, `etb-lid__face etb-lid__rim etb-lid__rim--${name}`));
+          }
+          lid.style.transform = liftLidTransform(liftLidPose(0, lidSize));
+          body.append(lid);
+        }
+      }
       else {
         // Build & Battle: a tall box, the lid hinged on the back edge of its top.
         const faceOptions = { wrapped, textures, look };
@@ -1613,7 +1605,9 @@ export const mountUnboxingScene = ({
     const u = getUnboxing();
     const packIndex = lastTorn(u);
     const packEl = el('div', 'bb-pocket__pack');
-    packEl.style.clipPath = packBodyClip(tearEdges[packIndex]);
+    // The body of a torn pack: everything below the tear line `packTearEdge` cut.
+    const bodyPoints = tearEdges[packIndex].slice('polygon('.length, -1).split(', ').slice(2);
+    packEl.style.clipPath = `polygon(${[...bodyPoints, '0% 100%', '100% 100%'].join(', ')})`;
     packEl.append(packArt('bb-pack__art', packIndex), el('div', 'bb-pack__foil'));
     stack.after(packEl);
     const drop = playPose(
