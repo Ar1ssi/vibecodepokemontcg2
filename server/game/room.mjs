@@ -506,6 +506,14 @@ export class GameRoom {
       }
     }
 
+    // Design 090: a bank at 0:00 is out even before its timer fires; nothing more is applied and
+    // the re-armed timer (due at once) ends the game.
+    if (cmd.type !== 'timeOut' && flaggedRunner(this.clock, this.now())) {
+      this.journal.refused({ cmd, playerId, error: 'out_of_time' });
+      this.#notifyClock();
+      return { success: false, error: 'out_of_time', reason: 'Time ran out', clientSeq: cmd.clientSeq };
+    }
+
     // Dispatch to applyCommand
     const commandWithPlayer = {
       ...cmd,
@@ -1134,8 +1142,12 @@ export class GameRoom {
   flagTimeOut() {
     const loser = flaggedRunner(this.clock, this.now());
     if (!loser) return null;
-    this.clock.flagged = loser;
-    return this.handleCommand(null, { type: 'timeOut' }, loser);
+    const result = this.handleCommand(null, { type: 'timeOut' }, loser);
+    if (result.success) {
+      this.clock.flagged = loser;
+      this.#syncClock();
+    }
+    return result;
   }
 
   #syncClock() {

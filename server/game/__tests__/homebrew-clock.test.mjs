@@ -147,6 +147,18 @@ test('room: flagTimeOut ends the game for the runner only once their bank is emp
   assert.equal(room.flagTimeOut(), null);
 });
 
+test('room: a move that arrives after 0:00 is refused, and the time-out still lands', () => {
+  const { room, advance } = roomInPlay();
+  pass(room, 'sock-1', 0);
+  advance(CLOCK_BANK_MS + 1);
+  const late = pass(room, 'sock-2', 0);
+  assert.equal(late.success, false);
+  assert.equal(late.error, 'out_of_time');
+  assert.equal(room.state.turn.player, 'p2');
+  assert.equal(room.flagTimeOut().success, true);
+  assert.equal(room.state.winner, 'p1');
+});
+
 test('room: a client cannot send timeOut', () => {
   const { room } = roomInPlay();
   const result = room.handleClientCommand('sock-1', { type: 'timeOut', clientSeq: 0 });

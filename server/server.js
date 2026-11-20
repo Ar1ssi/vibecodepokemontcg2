@@ -470,6 +470,7 @@ async function main() {
     for (const { roomId, forgetRoomInfo } of due) {
       gameRooms.get(roomId).clearTurnOrderCall();
       clearTurnOrderTimer(roomId);
+      clockTransport.clear(roomId);
       gameRooms.delete(roomId);
       if (forgetRoomInfo) roomInfo.delete(roomId);
     }
