@@ -50,17 +50,6 @@ function matchesHpCap(card, maxHp) {
   return true;
 }
 
-/**
- * Printed Retreat Cost count, or null when the card's data has not loaded yet (deck cards are
- * enriched lazily, like HP above). Reads the symbol array, a plain number, or TCGdex's `retreat`.
- */
-function printedRetreatCount(card) {
-  const cost = card.retreatCost ?? card.retreat;
-  if (Array.isArray(cost)) return cost.length;
-  const count = Number(cost);
-  return cost != null && Number.isFinite(count) ? count : null;
-}
-
 /** "Retreat Cost of 3 or more" (Heavy Ball), "of exactly 4" (Poké Maniac), "no Retreat Cost" (Feather Ball). */
 function retreatRequirement(w) {
   if (/\bno retreat cost\b/.test(w)) return { exactly: 0 };
@@ -70,10 +59,15 @@ function retreatRequirement(w) {
   return exactly ? { exactly: Number(exactly[1]) } : null;
 }
 
-/** A card whose Retreat Cost is unknown stays in the pool, so the picker is usable (see matchesHpCap). */
+/**
+ * A card whose Retreat Cost is unknown stays in the pool, so the picker is usable (see matchesHpCap).
+ * The printed count is null when the card's data has not loaded yet (deck cards are enriched
+ * lazily, like HP above); it reads the symbol array, a plain number, or TCGdex's `retreat`.
+ */
 function matchesRetreatRequirement(card, { atLeast, exactly }) {
-  const count = printedRetreatCount(card);
-  if (count === null) return true;
+  const cost = card.retreatCost ?? card.retreat;
+  const count = Array.isArray(cost) ? cost.length : Number(cost);
+  if (!Array.isArray(cost) && (cost == null || !Number.isFinite(count))) return true;
   return exactly !== undefined ? count === exactly : count >= atLeast;
 }
 

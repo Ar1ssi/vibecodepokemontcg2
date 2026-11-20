@@ -195,18 +195,6 @@ export function parseStadiumAttackGrant(card) {
   return { filter };
 }
 
-/** Whether `pokemon` qualifies for a Stadium's granted-attack filter. */
-export function stadiumAttackGrantMatches(stadiumCard, pokemon) {
-  const parsed = parseStadiumAttackGrant(stadiumCard);
-  if (!parsed || !pokemon) return false;
-  if (parsed.filter === 'delta-species') return isDeltaSpecies(pokemon);
-  if (parsed.filter === 'dark-or-rockets') {
-    const name = lower(pokemon?.name || '');
-    return name.includes('dark') || name.includes("rocket's") || name.includes('rockets');
-  }
-  return true;
-}
-
 /**
  * The attack(s) a Stadium grants to a qualifying Pokémon:
  * - Holon Lake → Delta Call (search a {Delta Species} Pokémon into hand).
@@ -217,7 +205,13 @@ export function stadiumAttackGrantMatches(stadiumCard, pokemon) {
  * `granted`, or [] when the card grants nothing / the Pokémon does not qualify.
  */
 export function stadiumGrantedAttacks(stadiumCard, pokemon) {
-  if (!stadiumAttackGrantMatches(stadiumCard, pokemon)) return [];
+  const parsed = parseStadiumAttackGrant(stadiumCard);
+  if (!parsed || !pokemon) return [];
+  if (parsed.filter === 'delta-species' && !isDeltaSpecies(pokemon)) return [];
+  if (parsed.filter === 'dark-or-rockets') {
+    const name = lower(pokemon.name || '');
+    if (!(name.includes('dark') || name.includes("rocket's") || name.includes('rockets'))) return [];
+  }
   const t = textOf(stadiumCard);
   if (/delta call/.test(t)) {
     return [
@@ -524,7 +518,7 @@ export function hasRecognizedPassiveStadiumEffect(card) {
     isStadiumWeaknessTimesTwo(card) ||
     isStadiumResistanceIgnore(card) ||
     parseStadiumTypeDamageReduction(card) > 0 ||
-    isStadiumBetweenTurnsDamage(card) ||
+    parseStadiumBetweenTurnsDamage(card) !== null ||
     isStadiumLostCity(card) ||
     isStadiumBlocksHealing(card) ||
     isStadiumStatusPersistsOnEvolve(card) ||
@@ -542,18 +536,6 @@ export function stadiumAffectsBothPlayers(card) {
   return BOTH_PLAYERS_RE.test(textOf(card));
 }
 
-/** True when the card has a real when-you-play effect, not stay-in-play reminder text. */
-export function stadiumHasWhenPlayedEffect(card) {
-  const t = textOf(card);
-  const clause = t.match(/when you play (?:this card|it),\s*([^.]+)/);
-  if (!clause) return false;
-  const body = clause[1].trim();
-  if (!body) return false;
-  if (/^discard (?:this|it) if another stadium/.test(body)) return false;
-  if (/^stays in play/.test(body)) return false;
-  return true;
-}
-
 // Bucket a card into a stadium-effect family. Non-stadium / unrecognizable
 // cards return 'unknown'. Precedence: the most restrictive trigger wins.
 export function classifyStadiumEffect(card) {
@@ -561,7 +543,12 @@ export function classifyStadiumEffect(card) {
   const t = textOf(card);
   if (!t) return 'none';
   // Real "When you play this card, draw 2" — not stay-in-play reminder text.
-  if (stadiumHasWhenPlayedEffect(card)) {
+  const whenPlayed = t.match(/when you play (?:this card|it),\s*([^.]+)/)?.[1].trim();
+  if (
+    whenPlayed &&
+    !/^discard (?:this|it) if another stadium/.test(whenPlayed) &&
+    !/^stays in play/.test(whenPlayed)
+  ) {
     return 'setup-once';
   }
   // Pokémon Park triggers on Energy attachment and Glimwood Tangle on attack
@@ -686,18 +673,6 @@ function stadiumSearchWhat(t) {
   if (/basic\b/.test(t) && /energy/.test(t)) return 'Basic Energy';
   if (/energy/.test(t)) return 'Energy';
   return 'card';
-}
-
-/** Append the Rule Box qualifier so `matchesSearch` excludes Rule Box mons. */
-function withRuleBoxQualifier(what, t) {
-  if (
-    /doesn't have a rule box|does not have a rule box|don't have a rule box|do not have a rule box|without a rule box|no rule box/.test(
-      t
-    )
-  ) {
-    return `${what} that doesn't have a Rule Box`;
-  }
-  return what;
 }
 
 /**
@@ -1111,11 +1086,18 @@ export function parseStadiumOncePerTurn(card) {
     };
   }
   if (/search.*basic.*pok[ée]mon.*bench/.test(t)) {
+    const what = stadiumSearchWhat(t);
     return {
       ...base,
       kind: 'search-bench',
       n: 1,
-      searchWhat: withRuleBoxQualifier(stadiumSearchWhat(t), t),
+      // Append the Rule Box qualifier so `matchesSearch` excludes Rule Box mons.
+      searchWhat:
+        /doesn't have a rule box|does not have a rule box|don't have a rule box|do not have a rule box|without a rule box|no rule box/.test(
+          t
+        )
+          ? `${what} that doesn't have a Rule Box`
+          : what,
     };
   }
   // Printings quote the name with straight or curly quotes (Fossil Quarry: “Antique”).
@@ -1652,12 +1634,6 @@ export function stadiumAttackLockReason(stadiumCard, pokemon) {
   }).`;
 }
 
-/** Stadium HP modifier applies to this Pokémon (stage/name/type filters). */
-export function stadiumHpModifierMatches(stadiumCard, pokemon) {
-  if (!pokemon) return true;
-  return stadiumFilterMatches(pokemon, stadiumCard);
-}
-
 /** Who receives a stadium modifier: owner, opponent, or both. */
 function stadiumTargetScope(stadiumCard) {
   const t = textOf(stadiumCard);
@@ -1686,7 +1662,8 @@ export function getStadiumHpBonus(
   if (!stadium?.card) return 0;
   const bonus = parseStadiumHpModifier(stadium.card);
   if (bonus === 0) return 0;
-  if (pokemon && !stadiumHpModifierMatches(stadium.card, pokemon)) return 0;
+  // The HP modifier's stage/name/type filters.
+  if (pokemon && !stadiumFilterMatches(pokemon, stadium.card)) return 0;
   const scope = stadiumTargetScope(stadium.card);
   if (scope === 'opponent') return targetPlayer !== stadium.user ? bonus : 0;
   if (scope === 'owner') return targetPlayer === stadium.user ? bonus : 0;
@@ -2076,15 +2053,6 @@ function stadiumSubjectPredicate(segment) {
 const ENERGY_ATTACKER_REDUCTION =
   /^(?:all|each) ([^.]*?pok[eé]mon)(?: in play)? take \d+ less damage from pok[eé]mon with ((?:\{[a-z]\}(?:,? (?:or|and) |, )?)+) energy attached/;
 
-function energyAttackerReductionApplies(match, defender, attacker, attackerZoneCards) {
-  const matchesDefender = stadiumSubjectPredicate(match[1]);
-  if (!matchesDefender || !matchesDefender(defender) || !attacker) return false;
-  const wanted = [...match[2].matchAll(/\{([a-z])\}/g)].map((m) => SUBJECT_TYPE_WORDS[m[1]]).filter(Boolean);
-  return (attackerZoneCards || [])
-    .filter((c) => c?.attachedTo === attacker.instanceId && /energy/i.test(String(c.supertype || c.category || c.type || '')))
-    .some((c) => wanted.includes(lower(resolveAttachedEnergyType(c))));
-}
-
 const BOTH_SIDES_RE = /\s*\(both yours and your opponent'?s\)/;
 
 /**
@@ -2098,20 +2066,17 @@ export function stadiumAttackDamageReductionFor(stadiumCard, defender, { attacke
   const t = textOf(stadiumCard);
   const fromEnergy = t.match(ENERGY_ATTACKER_REDUCTION);
   if (fromEnergy) {
-    return energyAttackerReductionApplies(fromEnergy, defender, attacker, attackerZoneCards) ? amount : 0;
+    const matchesDefender = stadiumSubjectPredicate(fromEnergy[1]);
+    if (!matchesDefender || !matchesDefender(defender) || !attacker) return 0;
+    const wanted = [...fromEnergy[2].matchAll(/\{([a-z])\}/g)].map((m) => SUBJECT_TYPE_WORDS[m[1]]).filter(Boolean);
+    const attackerHasWantedEnergy = (attackerZoneCards || [])
+      .filter((c) => c?.attachedTo === attacker.instanceId && /energy/i.test(String(c.supertype || c.category || c.type || '')))
+      .some((c) => wanted.includes(lower(resolveAttachedEnergyType(c))));
+    return attackerHasWantedEnergy ? amount : 0;
   }
   const m = t.match(/(?:^|\.\s+)([^.]*?)\s*\(both yours and your opponent'?s\)\s+takes?\s+\d+\s+less damage/);
   const matches = m ? stadiumSubjectPredicate(m[1]) : null;
   return matches && matches(defender) ? amount : 0;
-}
-
-// Pokémon-EX (XY/BW, uppercase) — not the lowercase Pokémon ex. TCGdex names them "Lucario EX"
-// with suffix "EX" and no subtypes (xy3-54); other sources write "Lucario-EX".
-function isLegacyPokemonEx(card) {
-  if (!card) return false;
-  if (card.suffix === 'EX') return true;
-  if (Array.isArray(card.subtypes) && card.subtypes.map(String).includes('EX')) return true;
-  return /[\s-]EX$/.test(String(card.name || ''));
 }
 
 /**
@@ -2130,7 +2095,14 @@ export function stadiumAttackDamageBonusFor(stadiumCard, attacker, defender, { d
   const target = m[2].trim();
   if (!defenderIsActive) return 0;
   if (/pok[eé]mon-ex$/.test(target)) {
-    return isLegacyPokemonEx(defender) ? bonus : 0;
+    // Pokémon-EX (XY/BW, uppercase) — not the lowercase Pokémon ex. TCGdex names them "Lucario EX"
+    // with suffix "EX" and no subtypes (xy3-54); other sources write "Lucario-EX".
+    const isLegacyEx =
+      defender &&
+      (defender.suffix === 'EX' ||
+        (Array.isArray(defender.subtypes) && defender.subtypes.map(String).includes('EX')) ||
+        /[\s-]EX$/.test(String(defender.name || '')));
+    return isLegacyEx ? bonus : 0;
   }
   return /^(?:opponent'?s active pok[eé]mon|defending pok[eé]mon)$/.test(target) ? bonus : 0;
 }
@@ -2262,16 +2234,6 @@ export function getStadiumCheckupPoisonBonus(pokemon, targetPlayer) {
 
 // ── Between-turns damage counters (continuous) ─────────────────────────────
 
-/** Legacy ability "Poké-Power" tag (Cursed Stone's filter). */
-function pokemonHasPokePower(pokemon) {
-  const abilities = Array.isArray(pokemon?.abilities) ? pokemon.abilities : [];
-  return abilities.some(
-    (a) =>
-      /pok[eé]-power/.test(lower(a?.type || '')) ||
-      /pok[eé]-power/.test(lower(a?.text || ''))
-  );
-}
-
 /**
  * "Between turns, put 1 damage counter on each …" — Shrine of Punishment
  * (GX/EX), Cursed Stone (Pokémon with a Poké-Power), Desert Ruins (ex with
@@ -2296,10 +2258,6 @@ export function parseStadiumBetweenTurnsDamage(card) {
   return { amount: counters * 10, counters, filter };
 }
 
-export function isStadiumBetweenTurnsDamage(card) {
-  return parseStadiumBetweenTurnsDamage(card) !== null;
-}
-
 /** Damage counters this Stadium's between-turns effect places on `pokemon`. */
 export function stadiumBetweenTurnsDamageFor(pokemon, card, { affected = false } = {}) {
   const parsed = parseStadiumBetweenTurnsDamage(card);
@@ -2312,8 +2270,15 @@ export function stadiumBetweenTurnsDamageFor(pokemon, card, { affected = false }
       const hp = parseInt(pokemon.hp, 10) || 0;
       return hp >= 100 ? parsed.amount : 0;
     }
+    // Legacy ability "Poké-Power" tag (Cursed Stone's filter).
     case 'poke-power':
-      return pokemonHasPokePower(pokemon) ? parsed.amount : 0;
+      return (Array.isArray(pokemon.abilities) ? pokemon.abilities : []).some(
+        (a) =>
+          /pok[eé]-power/.test(lower(a?.type || '')) ||
+          /pok[eé]-power/.test(lower(a?.text || ''))
+      )
+        ? parsed.amount
+        : 0;
     // Perilous Jungle (Mega Evolution wording, user's scan): only a non-{D} Pokémon with a Special Condition.
     case 'conditioned-non-d':
       return affected && !pokemonHasTypeWord(pokemon, 'darkness') ? parsed.amount : 0;

@@ -121,15 +121,6 @@ function symbolTypes(segment) {
   return out;
 }
 
-function repeatedSymbolCount(segment) {
-  // "provides {C}{C} Energy" → 2; only when a single distinct symbol repeats.
-  const types = symbolTypes(segment);
-  if (types.length !== 1) return null;
-  const symbols = [...String(segment).matchAll(/\{([a-z])\}/g)];
-  if (symbols.length > 1) return symbols.length;
-  return null;
-}
-
 // Energy-provided clause conditions → machine-readable tags.
 function provisionCondition(segment) {
   if (/3 or more stage 2 pok/.test(segment)) return 'threeStage2';
@@ -168,8 +159,9 @@ function pickCount(segment, fallback = 1) {
   if (anyCombo) return Number(anyCombo[1]);
   const atATime = segment.match(/provides? (\d+) energy at a time/);
   if (atATime) return Number(atATime[1]);
-  const repeated = repeatedSymbolCount(segment);
-  if (repeated) return repeated;
+  // "provides {C}{C} Energy" → 2; only when a single distinct symbol repeats.
+  const symbols = [...String(segment).matchAll(/\{([a-z])\}/g)];
+  if (symbolTypes(segment).length === 1 && symbols.length > 1) return symbols.length;
   return fallback;
 }
 
@@ -353,19 +345,19 @@ const CONDITIONAL_PROVISION = [
   [/^miracle energy$/, () => [{ type: 'provide', energyTypes: ['Any'], count: 2 }]],
 ];
 
-// A name-keyed "provides {Y} only while attached to a {Y} Pokémon" (Wonder Energy) yields to a text
-// that provides the Energy unconditionally: the homebrew Wonder Energy (customhb) reads "As long as
-// this card is attached to a Pokémon, it provides {Y} Energy."
-function textOverridesHostCondition(steps, lower) {
-  if (!steps.length || !steps.every((step) => String(step.condition || '').startsWith('host:'))) return false;
-  return /^as long as this card is attached to a pok[eé]mon, it provides \{[a-z]\} energy\./.test(lower) && !/\bonly while\b/.test(lower);
-}
-
 function parseProvision(name, lower) {
   for (const [re, build] of CONDITIONAL_PROVISION) {
     if (!re.test(name)) continue;
     const steps = build(lower);
-    if (!textOverridesHostCondition(steps, lower)) return steps;
+    // A name-keyed "provides {Y} only while attached to a {Y} Pokémon" (Wonder Energy) yields to a text
+    // that provides the Energy unconditionally: the homebrew Wonder Energy (customhb) reads "As long as
+    // this card is attached to a Pokémon, it provides {Y} Energy."
+    const textOverridesHostCondition =
+      steps.length > 0 &&
+      steps.every((step) => String(step.condition || '').startsWith('host:')) &&
+      /^as long as this card is attached to a pok[eé]mon, it provides \{[a-z]\} energy\./.test(lower) &&
+      !/\bonly while\b/.test(lower);
+    if (!textOverridesHostCondition) return steps;
     break;
   }
   const steps = [];
@@ -1144,14 +1136,13 @@ export function getAttachedSpecialEnergies(pokemonCard, zoneArray = []) {
 
 // "Ignore these effects if Holon Energy GL is attached to Pokémon-ex" / Heal Energy (I173).
 // The host may be an evolved stack: any Pokémon-ex card in it counts.
-function hostIsPokemonEx(host, zoneArray = []) {
-  if (!host) return false;
-  if (isExCard(host)) return true;
-  return (zoneArray || []).some((c) => c?.attachedTo === host.instanceId && c.type !== 'Energy' && isExCard(c));
-}
-
 function effectsIgnoredOnHost(parsed, host, zoneArray) {
-  return (parsed?.steps || []).some((s) => s.type === 'ignoredOn' && s.host === 'pokemonEx') && hostIsPokemonEx(host, zoneArray);
+  return (
+    (parsed?.steps || []).some((s) => s.type === 'ignoredOn' && s.host === 'pokemonEx') &&
+    host &&
+    (isExCard(host) ||
+      (zoneArray || []).some((c) => c?.attachedTo === host.instanceId && c.type !== 'Energy' && isExCard(c)))
+  );
 }
 
 /** Attached special Energy whose effects apply to `pokemonCard` (drops the ones its host switches off). */
