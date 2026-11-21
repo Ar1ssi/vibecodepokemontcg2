@@ -820,3 +820,22 @@ test('Look-only attacks show the attacker the card without naming it to the oppo
     assert.ok(!pc.prompt.includes(hidden), `${name} prompt names the card`);
   }
 });
+
+test('Magneton Electric Blast (pkmncards Skyridge 19): all Lightning Energy, paid back as Bench counters', () => {
+  const text =
+    "You may discard all {L} Energy cards attached to Magneton when you use this attack. If you do, put damage counters equal to the amount of Energy cards removed in this way on any number of your opponent's Benched Pokémon in the way you like. (For example, if you discard 3 {L} Energy cards, you can put 1 damage counter on 1 of your opponent's Benched Pokémon and 2 on another.)";
+  const setup = (state, { attacker }) => {
+    state.players.p1.zones.active.push(energy('Lightning', attacker.instanceId), energy('Lightning', attacker.instanceId), energy('Fire', attacker.instanceId));
+    state.players.p2.zones.bench.push(mon('Bench A'), mon('Bench B'));
+  };
+  const answer = (yes) => (pc) => {
+    const option = pc.options.find((o) => o.name === (yes ? 'Yes' : 'No')) || pc.options.find((o) => o.name === 'Bench B');
+    return [option.instanceId];
+  };
+  const paid = attack(board('Magneton', text, { setup }), answer(true)).state;
+  assert.equal(paid.players.p2.zones.bench.find((c) => c.name === 'Bench B').damage, 20);
+  assert.deepEqual(zoneNames(paid, 'p1', 'discard').sort(), ['Basic Lightning Energy', 'Basic Lightning Energy']);
+  const declined = attack(board('Magneton', text, { setup }), answer(false)).state;
+  assert.equal(declined.players.p1.zones.discard.length, 0);
+  assert.ok(declined.players.p2.zones.bench.every((c) => !c.damage));
+});

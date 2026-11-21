@@ -577,6 +577,12 @@ const TEMPLATES = [
   ],
   // Darkrai-GX Restoration / Giratina Distortion Door: the Ability's own card, from the discard.
   [/^put it onto your bench$/, () => ({ type: 'atkSourceFromDiscardToBench' })],
+  // Gengar Netherworld Gate (SWSH241): "If you do, put 3 damage counters on this Pokémon."
+  // Attacks read self-counters through the damage parser, so only an Ability takes this step.
+  [
+    /^put (\d+) damage counters? on this pokémon$/,
+    (m, rest, context) => (context?.forAbility ? { type: 'selfDamageAbility', count: Number(m[1]) } : null),
+  ],
   // Wishiwashi Cowardice (sm1-44): an Ability's effect.
   [/^discard all cards attached to this pokémon and return it to your hand$/, () => ({ type: 'atkReturnSelfToHand' })],
   // Florges Wondrous Gift (sm6-86), after "Flip a coin. If heads,".
@@ -1561,6 +1567,11 @@ const BLOCKS = [
   [
     /you may discard any number of (?:\{([a-z])\} )?energy cards attached to this pokémon when you use this attack\. if you do, discard that many cards from the top of your opponent's deck\./g,
     (m) => ({ type: 'atkDiscardSelfEnergyMillOpp', ...(m[1] ? { energyType: m[1].toUpperCase() } : {}) }),
+  ],
+  // Magneton [Skyridge 19] Electric Blast: all the {L} Energy, paid back as counters on the Bench.
+  [
+    /you may discard all (?:\{([a-z])\} )?energy cards attached to this pokémon when you use this attack\. if you do, put damage counters equal to the amount of energy cards removed in this way on any number of your opponent's benched pokémon in the way you like\./g,
+    (m) => ({ type: 'atkDiscardAllSelfEnergyBenchCounters', optional: true, ...(m[1] ? { energyType: m[1].toUpperCase() } : {}) }),
   ],
   // customhb Regigigas ex Creation: the Wildfire discard, paid back in draws.
   [

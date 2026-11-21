@@ -659,6 +659,41 @@ function atkDiscardSelfEnergyMillOpp(ctx) {
   });
 }
 
+// Magneton [Skyridge 19] Electric Blast: discard every matching Energy, then put that many damage
+// counters on the opponent's Benched Pokémon, one pick per counter.
+function atkDiscardAllSelfEnergyBenchCounters(ctx) {
+  const { player, opponent, step } = ctx;
+  let remaining = ctx.memo?.remaining;
+  if (remaining == null) {
+    const ref = attackerRef(ctx);
+    const energies = ref ? attachedCards(player, ref.card.instanceId).filter((c) => energyMatches(c, step)) : [];
+    if (energies.length === 0) return skip(ctx, 'no_energy');
+    for (const card of energies) discardCard(ctx.draft, card, ctx.events);
+    remaining = energies.length;
+  }
+  const pool = opponent ? benchRootsOf(opponent) : [];
+  if (pool.length === 0) return skip(ctx, 'no_target');
+  if (ctx.selection && ctx.memo?.remaining != null) {
+    const [card] = pickById(pool, ctx.selection);
+    if (card) {
+      placeCounters(ctx, card, opponent.playerId, 10);
+      remaining -= 1;
+    }
+  }
+  if (remaining <= 0) return null;
+  if (pool.length === 1) {
+    placeCounters(ctx, pool[0], opponent.playerId, remaining * 10);
+    return null;
+  }
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Put a damage counter on 1 of your opponent's Benched Pokémon (${remaining} left)`,
+    options: pool,
+    min: 1,
+    max: 1,
+    memo: { remaining },
+  });
+}
+
 // customhb Regigigas ex Creation: "… If you do, draw 2 cards for each card you discarded in this way."
 function atkDiscardSelfEnergyDraw(ctx) {
   return discardAnySelfEnergyThen(ctx, (count) => drawCards(ctx.player, count * (ctx.step.drawEach || 1), ctx.events));
@@ -5201,6 +5236,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkShuffleOwnDeck,
   atkChangeType,
   atkDiscardSelfEnergyMillOpp,
+  atkDiscardAllSelfEnergyBenchCounters: optional(atkDiscardAllSelfEnergyBenchCounters, (step) => `Discard all ${energyLabel(step)} attached to this Pokémon`),
   atkDiscardSelfEnergyDraw,
   atkCureOppConditions,
   atkKnockOutChoose,

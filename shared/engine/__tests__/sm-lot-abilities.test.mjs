@@ -659,3 +659,15 @@ test('Metagross Extend (sm7-95): Steven’s Resolve does not end the turn while 
   assert.equal(run('active'), 'p1');
   assert.equal(run('bench'), 'p2');
 });
+
+test('Gengar Netherworld Gate (SWSH241): benched from the discard pile with 3 damage counters', () => {
+  const state = board();
+  state.players.p1.zones.active.push(mon('Active'));
+  state.players.p2.zones.active.push(mon('Opponent'));
+  const gengar = mon('Gengar', ability('Once during your turn, if this Pokémon is in your discard pile, you may put it onto your Bench. If you do, put 3 damage counters on this Pokémon.'));
+  state.players.p1.zones.discard.push(gengar);
+  const res = useAbility(state, gengar);
+  assert.equal(res.error ?? null, null, res.reason);
+  const benched = res.state.players.p1.zones.bench.find((c) => c.name === 'Gengar');
+  assert.equal(benched?.damage, 30);
+});
