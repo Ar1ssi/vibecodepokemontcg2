@@ -107,7 +107,7 @@
     },
     "ability:heal": {
       "n": 211,
-      "observed": 211
+      "observed": 209
     },
     "ability:hp-bonus": {
       "n": 22,
@@ -123,7 +123,7 @@
     },
     "ability:look-at-top": {
       "n": 67,
-      "observed": 61
+      "observed": 60
     },
     "ability:lost-zone": {
       "n": 2,
@@ -131,7 +131,7 @@
     },
     "ability:move-damage": {
       "n": 294,
-      "observed": 294
+      "observed": 289
     },
     "ability:on-opponent-evolve": {
       "n": 30,
@@ -151,7 +151,7 @@
     },
     "ability:recursion": {
       "n": 119,
-      "observed": 117
+      "observed": 110
     },
     "ability:retreat-cost": {
       "n": 172,
