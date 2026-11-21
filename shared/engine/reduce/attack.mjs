@@ -654,7 +654,11 @@ function flipAndResolveAttack(draft, ctx) {
     // the attack, not to the attack a next-turn copier reads (design 049 review).
     const printedAttack = { ...attack };
     for (const key of ['bonusBeforeWR', 'grantedBy', 'copiedFrom', 'waivesUseGate']) delete printedAttack[key];
+    // The attack it replaces stays readable for this attack's own "used … during your last turn"
+    // reads (Araquanid Bubble Trap, attack-damage-context.mjs lastTurnAttackOf); one level only.
+    const { previous: _older, ...previous } = attackerPlayer.lastAttack || {};
     attackerPlayer.lastAttack = {
+      ...(attackerPlayer.lastAttack ? { previous } : {}),
       attack: printedAttack,
       isGx: isGxAttack(attack),
       attackerName: ctx.attackerView?.name || ctx.attacker?.name || '',

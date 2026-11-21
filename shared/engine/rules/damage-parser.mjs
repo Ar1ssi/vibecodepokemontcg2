@@ -780,7 +780,15 @@ export function parseAttackDamage(
     // Work Together): tails leaves the printed damage.
     const scaleSentence = text.split(/(?<=\.)\s+/).find((s) => /damage for each/.test(s)) || '';
     const headsGated = /^if heads,/.test(scaleSentence) && !/heads/.test(unit);
-    if (headsGated && ctx.coin !== 'heads') {
+    // Toxapex Venom Fever (sm8-69): "If your opponent's Active Pokémon is Poisoned, this attack does
+    // 50 damage for each …" — a "does N damage for each" scaling gated by a board condition.
+    const stateGate = !isMore && !headsGated ? /^if (.+?), this attack does \d+ damage for each\b/.exec(scaleSentence)?.[1] : null;
+    const stateGateMet = stateGate ? sharedCondition(stateGate, ctx, attacker) : null;
+    if (stateGateMet === false) {
+      total = 0;
+      components.push('per-each');
+      notes.push(`scaling not applied (condition not met: ${stateGate})`);
+    } else if (headsGated && ctx.coin !== 'heads') {
       components.push('per-each');
       notes.push(
         ctx.coin === 'tails' ? 'scaling not applied (tails)' : 'heads-gated scaling — resolve the coin'

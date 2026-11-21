@@ -296,6 +296,72 @@ const CLAUSES = [
       printedNegated: false,
     }),
   ],
+  // ── SM-LOT bonus conditions (TCGdex sm-series texts named per row) ─────────
+  // Dedenne Electrichain (sm6-88): "If you have any Lightning Pokémon on your Bench".
+  [
+    /^you have any (?:\{([a-z])\} )?pokémon on your bench$/,
+    (m) => ({ desc: { kind: 'benchHasType', ...(m[1] ? { type: ENERGY_LETTER_TYPES[m[1]] } : {}) }, printedNegated: false }),
+  ],
+  // Slowbro Facade (sm2-49): "If this Pokémon is Burned or Poisoned".
+  [
+    new RegExp(`^this pokémon is (${STATUS_RE}) or (${STATUS_RE})$`),
+    (m) => ({ desc: { kind: 'attackerStatus', statuses: [STATUS_WORDS[m[1]], STATUS_WORDS[m[2]]] }, printedNegated: false }),
+  ],
+  // Darkrai Dark Raid (sm3-87) / Zygarde Calm Strike (sm6-72).
+  [/^your opponent has (?:already )?used their gx attack$/, () => ({ desc: { kind: 'opponentGxUsed' }, printedNegated: false })],
+  [/^you have (?:already )?used your gx attack$/, () => ({ desc: { kind: 'ownGxUsed' }, printedNegated: false })],
+  // Wigglytuff Punishing Slap (sm4-72).
+  [
+    /^any of your opponent's pokémon (?:have|has) any \{([a-z])\} energy(?: cards?)? attached(?: to (?:them|it))?$/,
+    (m) => ({ desc: { kind: 'opponentInPlayEnergyType', type: ENERGY_LETTER_TYPES[m[1]] }, printedNegated: false }),
+  ],
+  // Hippopotas Eleventh Hour Tackle (sm5-68).
+  [
+    /^there (?:are|is) (\d+) or fewer cards? in your deck$/,
+    (m) => ({ desc: { kind: 'ownDeckCount', op: 'lte', n: Number(m[1]) }, printedNegated: false }),
+  ],
+  // Araquanid Bubble Trap (sm6-33): any of your Pokémon; Volbeat Pheromone Catch (sm7-17): a named one.
+  [
+    /^1 of your pokémon used (.+?) during your last turn$/,
+    (m) => ({ desc: { kind: 'ownUsedAttackLastTurn', attackName: m[1].trim() }, printedNegated: false }),
+  ],
+  [
+    /^your (?!opponent)(.+?) used (.+?) during your last turn$/,
+    (m) => ({
+      desc: { kind: 'ownUsedAttackLastTurn', attackName: m[2].trim(), attackerName: m[1].trim() },
+      printedNegated: false,
+    }),
+  ],
+  // Grumpig Mirror Step (sm7-60).
+  [
+    /^1 of your opponent's pokémon in play has the same name as 1 of your pokémon in play$/,
+    () => ({ desc: { kind: 'sameNameInPlay' }, printedNegated: false }),
+  ],
+  // Medicham Strike of Enlightenment (sm7-77).
+  [
+    /^this pokémon's remaining hp is (\d+) or less$/,
+    (m) => ({ desc: { kind: 'attackerRemainingHp', op: 'lte', n: Number(m[1]) }, printedNegated: false }),
+  ],
+  // Raikou Lost Voltage (sm8-79).
+  [
+    /^you have any \{([a-z])\} energy cards? in the lost zone$/,
+    (m) => ({ desc: { kind: 'lostZoneEnergyType', type: ENERGY_LETTER_TYPES[m[1]] }, printedNegated: false }),
+  ],
+  // Sudowoodo Reply Strongly (sm8-110): attack damage is only recorded on the Active.
+  [
+    /^this pokémon was damaged by an attack during your opponent's last turn while it was your active pokémon$/,
+    () => ({ desc: { kind: 'damagedLastOpponentTurn' }, printedNegated: false }),
+  ],
+  // Alolan Meowth Spoil the Fun (sm8-118): "If you go second, … during your first turn."
+  [/^you go second$/, () => ({ desc: { kind: 'goingSecondFirstTurn' }, printedNegated: false })],
+  // Wigglytuff Charmed Slap (sm8-134).
+  [
+    /^this pokémon has a pokémon tool(?: card)? that has ["“](.+?)["”] in its name attached to it$/,
+    (m) => ({ desc: { kind: 'attackerToolNamed', nameContains: m[1] }, printedNegated: false }),
+  ],
+  // Gumshoos Identify (sm5-113) / Xatu Energy Gaze (sm8-88): after "Your opponent reveals their hand."
+  [/^you find (?:a|any) pokémon there$/, () => ({ desc: { kind: 'opponentHandHas', what: 'pokemon' }, printedNegated: false })],
+  [/^you find (?:an|any) energy(?: cards?)? there$/, () => ({ desc: { kind: 'opponentHandHas', what: 'energy' }, printedNegated: false })],
   // Sableye Cocky Claw (me02-059): "any Stage 2 {D} Pokémon on your Bench".
   [
     /^you have any (stage [12]) (?:\{([a-z])\} )?pokémon on your bench$/,
@@ -1061,7 +1127,36 @@ function extraEnergyCount(ctx, type) {
 const CHECKS = {
   optionalCostPaid: (cond, ctx) => ctx.optionalCostPaid === true,
   defenderStatus: (cond, ctx) => (cond.statuses || [cond.status]).some((status) => list(ctx.defenderConditions).includes(status)),
-  attackerStatus: (cond, ctx) => list(ctx.attackerConditions).includes(cond.status),
+  attackerStatus: (cond, ctx) => (cond.statuses || [cond.status]).some((status) => list(ctx.attackerConditions).includes(status)),
+  benchHasType: (cond, ctx) =>
+    cond.type
+      ? list(ctx.benchTypes).some((types) => list(types).some((t) => sameType(t, cond.type)))
+      : list(ctx.benchNames).length > 0,
+  opponentGxUsed: (cond, ctx) => ctx.opponentGxUsed === true,
+  ownGxUsed: (cond, ctx) => ctx.ownGxUsed === true,
+  opponentInPlayEnergyType: (cond, ctx) =>
+    list(ctx.opponentInPlayEnergyUnits).some((unit) =>
+      String(unit)
+        .split('|')
+        .some((part) => sameType(part, cond.type))
+    ),
+  ownDeckCount: (cond, ctx) => compare(num(ctx.ownDeckCount), cond.op, cond.n),
+  ownUsedAttackLastTurn: (cond, ctx) =>
+    Boolean(ctx.ownLastTurnAttack) &&
+    String(ctx.ownLastTurnAttack.name).toLowerCase() === String(cond.attackName).toLowerCase() &&
+    (!cond.attackerName || nameMatches(ctx.ownLastTurnAttack.attackerName, cond.attackerName)),
+  sameNameInPlay: (cond, ctx) =>
+    list(ctx.opponentInPlayNames).some((theirs) =>
+      list(ctx.ownInPlayNames).some((ours) => String(ours).trim().toLowerCase() === String(theirs).trim().toLowerCase())
+    ),
+  lostZoneEnergyType: (cond, ctx) => list(ctx.ownLostZoneEnergyTypes).some((t) => sameType(t, cond.type)),
+  goingSecondFirstTurn: (cond, ctx) => ctx.goingSecondFirstTurn === true,
+  attackerToolNamed: (cond, ctx) =>
+    list(ctx.attackerAttachedCards).some(
+      (card) => card.tool && String(card.name).toLowerCase().includes(String(cond.nameContains).toLowerCase())
+    ),
+  opponentHandHas: (cond, ctx) =>
+    num(cond.what === 'pokemon' ? ctx.opponentHandPokemonCount : ctx.opponentHandEnergyCount) > 0,
   noStadium: (cond, ctx) => !ctx.stadiumInPlay,
   handCount: (cond, ctx) => compare(num(ctx.ownHandCount), cond.op, cond.n),
   handCountVsOpponent: (cond, ctx) => compare(num(ctx.ownHandCount), cond.op, num(ctx.opponentHandCount)),

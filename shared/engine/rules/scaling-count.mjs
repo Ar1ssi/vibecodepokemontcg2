@@ -43,6 +43,8 @@ export function normalizeUnit(unit, selfName = '') {
     .replace(/pokemon/g, 'pokémon')
     // Empoleon / Grumpig: "Pokémon in play (both yours and your opponent's), excluding Grumpig".
     .replace(/ \(both yours and your opponent's\)/, '')
+    // Jumpluff Lost March: "except {*} (Prism Star) Pokémon" — keep it past the "(" split below.
+    .replace(/\{\*\} \(prism star\) pokémon/g, 'prism star pokémon')
     .split(/\.\s|\.$|;|\(/)[0]
     .replace(/\s+/g, ' ')
     .trim();
@@ -128,6 +130,13 @@ function discardMatcher(phrase) {
 }
 
 function discardCount(unit, ctx) {
+  // Alolan Exeggutor Tropical Shake (sm6-2): "each type of basic Energy card in your discard pile".
+  if (/^(?:different )?types? of basic energy cards? in your discard pile$/.test(unit) && Array.isArray(ctx.ownDiscardCards)) {
+    const types = new Set(
+      ctx.ownDiscardCards.filter((c) => c.category === 'energy' && c.basicEnergy).map((c) => lower(c.energyType))
+    );
+    return { count: types.size, label: 'types of basic Energy in your discard pile' };
+  }
   const m = /^(.+?) in your (opponent's )?discard pile(?: that has the (.+?) attack)?$/.exec(unit);
   if (!m) return null;
   const matches = discardMatcher(m[1]);
@@ -159,6 +168,22 @@ function inPlayCount(unit, ctx) {
     return { count: own.length + opp.length - (m[1] ? 1 : 0), label: `Pokémon in play${m[1] ? ', excluding this Pokémon' : ''}` };
   }
   if (/^pokémon your opponent has in play$/.test(unit)) return { count: opp.length, label: "opponent's Pokémon in play" };
+  // Weavile Evil Admonition (sm5-74): "each of your opponent's Pokémon that has an Ability".
+  if (/^your opponent's pokémon (?:in play )?that (?:has|have) an ability$/.test(unit)) {
+    return { count: opp.filter((e) => e.hasAbility).length, label: "opponent's Pokémon with an Ability" };
+  }
+  // Eevee Palette of Friends (sm5-105): "each different type of Pokémon on your Bench".
+  if (/^different types? of pokémon on your bench$/.test(unit)) {
+    const types = new Set(own.filter((e) => e.bench).flatMap((e) => list(e.types).map((t) => (lower(t) === 'dark' ? 'darkness' : lower(t)))));
+    return { count: types.size, label: 'types of Pokémon on your Bench' };
+  }
+  // Jumpluff Lost March (sm8-14): "each of your Pokémon, except Prism Star Pokémon, in the Lost Zone".
+  if ((m = /^your pokémon(, except prism star pokémon,)? in the lost zone$/.exec(unit)) && Array.isArray(ctx.ownLostZonePokemon)) {
+    return {
+      count: ctx.ownLostZonePokemon.filter((e) => !m[1] || !e.prismStar).length,
+      label: 'your Pokémon in the Lost Zone',
+    };
+  }
   if ((m = /^your opponent's benched (.+)$/.exec(unit))) return count(opp.filter((e) => e.bench), m[1], `opponent's Benched ${m[1]}`);
   if ((m = /^your opponent's (.+?)(?: in play)?$/.exec(unit))) return count(opp, m[1], `opponent's ${m[1]}`);
   if ((m = /^your benched (.+)$/.exec(unit))) return count(own.filter((e) => e.bench), m[1], `benched ${m[1]}`);
@@ -271,6 +296,17 @@ function counterCount(unit, ctx) {
     if (!matches) return null;
     const total = ctx.ownPokemon.filter((e) => e.bench && matches(e)).reduce((sum, e) => sum + (e.counters || 0), 0);
     return { count: total, label: `damage counters on your Benched ${m[1]}` };
+  }
+  // Honchkrow Raven's Claw (sm2-79), Chandelure Vortex of Pain (sm8-103).
+  if (/^damage counters? on all (?:of )?your opponent's pokémon$/.test(unit) && Array.isArray(ctx.opponentPokemon)) {
+    return {
+      count: ctx.opponentPokemon.reduce((sum, e) => sum + (e.counters || 0), 0),
+      label: "damage counters on all of your opponent's Pokémon",
+    };
+  }
+  // Toxapex Venom Fever (sm8-69): "… Active Pokémon is Poisoned, … each damage counter on that Pokémon".
+  if (/^damage counters? on that pokémon$/.test(unit) && ctx.defenderDamage != null) {
+    return { count: counters(ctx.defenderDamage), label: "damage counters on the Defending Pokémon" };
   }
   if (/^special conditions? affecting this pokémon$/.test(unit)) {
     return { count: list(ctx.attackerConditions).length, label: 'Special Conditions on this Pokémon' };
