@@ -90,12 +90,12 @@ try {
   const running = await waitFor(a.page, () => document.getElementById('homebrewClockPanel').dataset.mode === 'clock', 20000);
   T('once play starts both seats see the clocks', Boolean(running) && Boolean(await waitFor(b.page, () => document.getElementById('homebrewClockPanel').dataset.mode === 'clock')), JSON.stringify(await panel(a)));
   const before = await panel(a);
-  T('own row first, banks start at 3:00', before.rows[0]?.name === 'You' && before.rows.every((r) => /^(3:00|2:5\d)$/.test(r.time)), JSON.stringify(before.rows));
+  T('own row first, banks start at 6:00', before.rows[0]?.name === 'You' && before.rows.every((r) => /^(6:00|5:5\d)$/.test(r.time)), JSON.stringify(before.rows));
   T('exactly one clock runs', before.rows.filter((r) => r.running).length === 1);
   await a.page.waitForTimeout(2200);
   const after = await panel(a);
   const ticking = after.rows.find((r) => r.running);
-  T('the running clock counts down', ticking && ticking.time !== '3:00', JSON.stringify(after.rows));
+  T('the running clock counts down', ticking && ticking.time !== '6:00', JSON.stringify(after.rows));
   await shot(a, '2-clocks');
 } catch (err) {
   failed += 1;

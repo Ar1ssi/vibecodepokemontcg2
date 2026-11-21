@@ -14,7 +14,7 @@ import {
   syncClock,
 } from '../../../shared/engine/homebrew-clock.mjs';
 
-// Design 090: the homebrew chess clock (3:00 bank, +15 s per finished turn, 0:00 loses).
+// Design 090: the homebrew chess clock (6:00 bank, +15 s per finished turn, 0:00 loses).
 
 const card = (id, ownerId, n) => createCard({ instanceId: `${ownerId}-${n}`, ownerId, name: 'Card', id });
 
@@ -94,7 +94,7 @@ test('the clock stays off unless both decks are homebrew, or when the toggle is 
 });
 
 test('formatClock rounds up to whole seconds', () => {
-  assert.equal(formatClock(CLOCK_BANK_MS), '3:00');
+  assert.equal(formatClock(CLOCK_BANK_MS), '6:00');
   assert.equal(formatClock(14_001), '0:15');
   assert.equal(formatClock(0), '0:00');
   assert.equal(formatClock(-5), '0:00');

@@ -4,7 +4,7 @@ Date: 2026-11-20
 
 ## Problem
 User request: a toggleable timer for homebrew games (both decks hold ≥1 homebrew card), on by
-default, 3:00, each turn played adds 15 s. User answers (2026-11-20): chess clock per player;
+default, 3:00 (6:00 from 2026-11-21, user request), each turn played adds 15 s. User answers (2026-11-20): chess clock per player;
 0:00 loses; room setting either seated player toggles until the deal; homebrew = customhb cards.
 
 ## Constraints
