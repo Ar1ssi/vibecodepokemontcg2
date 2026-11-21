@@ -45,3 +45,16 @@ test('Rhyperior Toppling Wind (TCGdex sm3-67) plans its mill without "during you
   );
   assert.ok(steps.length > 0 && steps.every((s) => s.type !== 'whenPlayedAbility'), JSON.stringify(steps));
 });
+
+test('Switch (sm3.5-67) and Counter Catcher (sm4-120) get the text TCGdex leaves blank', async () => {
+  const { withPrintedStageFix } = await import('../rules-state.mjs');
+  const { parseTrainerEffect } = await import('../trainer-effects.mjs');
+  const sw = withPrintedStageFix({ id: 'sm3.5-67', name: 'Switch', effect: '' });
+  assert.equal(sw.effect, 'Switch your Active Pokémon with 1 of your Benched Pokémon.');
+  assert.ok(parseTrainerEffect(sw.effect).recognizable);
+  const cc = withPrintedStageFix({ id: 'sm4-120', name: 'Counter Catcher', effect: '' });
+  const parsed = parseTrainerEffect(cc.effect);
+  assert.ok(parsed.recognizable && parsed.playCondition, JSON.stringify(parsed));
+  // A filled text from TCGdex is kept.
+  assert.equal(withPrintedStageFix({ id: 'sm3.5-67', effect: 'Fixed upstream.' }).effect, 'Fixed upstream.');
+});

@@ -380,14 +380,25 @@
 
     // TCGdex lists these printings as Basic with no evolveFrom, but the cards are printed
     // Stage 2 (live API 2026-10-11: 30th-109 and 30th-156 Salamence ex; sv09-114 is correct).
+    // TCGdex also leaves these Trainers' effect blank (live API 2026-11-21), so in play they did
+    // nothing; the text is the same card's at TCGdex sm1-132 (Switch) and sm4-91 (Counter Catcher).
     const PRINTED_STAGE_FIXES = {
       '30th-109': { stage: 'Stage2', evolveFrom: 'Shelgon' },
       '30th-156': { stage: 'Stage2', evolveFrom: 'Shelgon' },
+      'sm3.5-67': { effect: 'Switch your Active Pokémon with 1 of your Benched Pokémon.' },
+      'sm4-120': {
+        effect:
+          'You can play this card only if you have more Prize cards remaining than your opponent.\n\nSwitch 1 of your opponent’s Benched Pokémon with their Active Pokémon.',
+      },
     };
 
     export function withPrintedStageFix(detail) {
       const fix = PRINTED_STAGE_FIXES[detail?.id];
-      return fix ? { ...detail, ...fix } : detail;
+      if (!fix) return detail;
+      // A blank-text fix only fills a blank: a later TCGdex correction wins.
+      const merged = { ...detail, ...fix };
+      if (fix.effect && String(detail.effect || '').trim()) merged.effect = detail.effect;
+      return merged;
     }
 
     // TCGdex carries the rule-box marker in `suffix` ("GX", "TAG TEAM-GX", "EX") and has
