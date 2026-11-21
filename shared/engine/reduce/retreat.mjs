@@ -46,7 +46,7 @@ export function computeEffectiveRetreatCost(state, card, playerId, { zoneId = 'a
   );
   if (isActive && teamNoRetreatCostForActive(inPlayView(state, card), benchViews, activeZone)) return 0;
   // Magnetic Metal / Hiding Darkness / Holon WP Energy (audit SE6): "has no Retreat Cost".
-  if (hasSpecialEnergyFreeRetreat(inPlayView(state, card), activeZone)) return 0;
+  if (hasSpecialEnergyFreeRetreat(inPlayView(state, card), activeZone, state.stadium)) return 0;
   // Giratina Dimension Breach, Wimpod Punk Out (customhb).
   if (abilityNoRetreatCost(inPlayView(state, card), { ...abilitySideContext(state, playerId), zone: zoneId, isActive })) return 0;
 
@@ -86,7 +86,7 @@ export function computeEffectiveRetreatCost(state, card, playerId, { zoneId = 'a
   cost += markerCount(activeAttackMarkers(state, playerId, card), 'retreatDelta', 'amount');
 
   // 5. Mystery Energy: "Retreat Cost is {C}{C} less".
-  cost -= getSpecialEnergyRetreatReduction(inPlayView(state, card), activeZone);
+  cost -= getSpecialEnergyRetreatReduction(inPlayView(state, card), activeZone, state.stadium);
 
   return Math.max(0, cost);
 }

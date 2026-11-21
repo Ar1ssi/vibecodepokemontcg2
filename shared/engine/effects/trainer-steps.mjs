@@ -149,13 +149,13 @@ export function zoneOfRoot(player, root) {
  * effects: 'effect' (Mist/Rocky/Wash/Wonder, attack effects) or 'ability'
  * (Fusion Strike, opponent Abilities). Reads the top of an evolution stack.
  */
-export function specialEnergyShielded(player, root, kind = 'effect') {
+export function specialEnergyShielded(player, root, kind = 'effect', stadium = null) {
   const zone = zoneOfRoot(player, root);
   if (!zone || !root) return false;
   const view = evolvedView(zone, root);
   return kind === 'ability'
-    ? hasSpecialEnergyAbilityShield(view, zone)
-    : hasSpecialEnergyEffectShield(view, zone);
+    ? hasSpecialEnergyAbilityShield(view, zone, stadium)
+    : hasSpecialEnergyEffectShield(view, zone, stadium);
 }
 
 /**
@@ -212,7 +212,7 @@ export function effectShieldBlocks(ctx, side, root) {
   // Card and Ability shields name the opponent's; Lunatone's "any Stadium" includes its own side's.
   // Temporal Freeze guards both Active Pokémon, the attacker's own included.
   if (side === ctx.player && source !== 'Stadium') return freezeShields(ctx.draft, side, root, source);
-  if (source === 'Ability' && specialEnergyShielded(side, root, 'ability')) return true;
+  if (source === 'Ability' && specialEnergyShielded(side, root, 'ability', ctx.draft.stadium)) return true;
   return cardEffectShielded(ctx.draft, { owner: side, root, source });
 }
 
@@ -1602,7 +1602,7 @@ function damageCounters(ctx) {
   // Energy prevents them on its host. Trainers keep the effect shield's own path.
   const shieldKind = step.abilityShield && onOpponent ? 'ability' : null;
   const shieldBlocks = (root) => {
-    if (!shieldKind || !specialEnergyShielded(side, root, shieldKind)) return false;
+    if (!shieldKind || !specialEnergyShielded(side, root, shieldKind, ctx.draft.stadium)) return false;
     ctx.events.push({
       type: 'damagePrevented',
       instanceId: root.instanceId,
@@ -1721,7 +1721,7 @@ function moveOwnDamageToOpponent(ctx) {
   // Fusion Strike Energy: the counters an opponent's Ability would place on its host
   // are prevented, so the host is not a legal destination.
   const destinations = rootsOf(opponent).filter((root) => {
-    if (!specialEnergyShielded(opponent, root, 'ability')) return !effectShieldBlocks(ctx, opponent, root);
+    if (!specialEnergyShielded(opponent, root, 'ability', ctx.draft.stadium)) return !effectShieldBlocks(ctx, opponent, root);
     ctx.events.push({
       type: 'damagePrevented',
       instanceId: root.instanceId,

@@ -1345,6 +1345,7 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
             (c) => c && c.type === 'Energy' && c.image?.relative === oppActive.image && isSpecialEnergyCard(c)
           )) {
             const plans = planSpecialEnergyTriggers(energy, {
+              stadium: getStadium(),
               trigger: 'damaged',
               host: oppActive,
               zoneArray: oppActiveZoneForKo.array,

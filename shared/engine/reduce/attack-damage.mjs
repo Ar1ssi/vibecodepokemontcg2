@@ -135,7 +135,7 @@ export function damageBenchedPokemon(
   const victimActive = draft.players[victimPlayerId]?.zones?.active || [];
   const allVictimCards = [...victimActive, ...victimBench];
   // Shadowy Darkness Energy (audit SE5): its benched {D} host takes no attack damage.
-  if (!ownAttack && blocksSpecialEnergyBenchDamage(inPlayView(draft, victim), 'bench', victimBench)) {
+  if (!ownAttack && blocksSpecialEnergyBenchDamage(inPlayView(draft, victim), 'bench', victimBench, draft.stadium)) {
     events.push({
       type: 'damagePrevented',
       instanceId: victim.instanceId,
@@ -359,7 +359,7 @@ function thornsOnBenchDamage(draft, { counters, victimPlayerId, attackerPlayerId
 // effect of that attack, not damage, so the effect shield stops them (review of audit SE5).
 // An `effectPrevent` marker (Jirachi-GX Star Shield-GX) stops them too.
 function counterEffectShielded(draft, victim, zoneCards) {
-  if (hasSpecialEnergyEffectShield(inPlayView(draft, victim), zoneCards)) return true;
+  if (hasSpecialEnergyEffectShield(inPlayView(draft, victim), zoneCards, draft.stadium)) return true;
   const ref = findCard(draft, victim.instanceId);
   const attacker = rootsIn(draft.players[draft.turn?.player]?.zones?.active)[0];
   const attackerView = attacker ? inPlayView(draft, attacker) : null;

@@ -145,8 +145,8 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
   // Gap #4c). Applied BEFORE Weakness and Resistance, like tool bonuses.
   const specialEnergyBonus = ignoreAttackerBoosts
     ? 0
-    : getSpecialEnergyAttackBonus(attacker, attackerZoneCards, { defenderIsActive });
-  const specialEnergyPenalty = getSpecialEnergyAttackPenalty(attacker, attackerZoneCards);
+    : getSpecialEnergyAttackBonus(attacker, attackerZoneCards, { defenderIsActive }, stadium);
+  const specialEnergyPenalty = getSpecialEnergyAttackPenalty(attacker, attackerZoneCards, {}, stadium);
 
   // Step 2c: Trainer turn boosts (Premium Power Pro), also BEFORE Weakness/Resistance.
   const turnBonus = ignoreAttackerBoosts
@@ -186,7 +186,7 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
   // Step 2e: Defender special-energy reduction applied BEFORE W/R (Shield Energy, Holon GL).
   const specialEnergyReductionBeforeWR = ignoreDefenderEffects
     ? 0
-    : getSpecialEnergyDamageReduction(defender, defenderZoneCards, { attacker, afterWR: false });
+    : getSpecialEnergyDamageReduction(defender, defenderZoneCards, { attacker, afterWR: false }, stadium);
 
   const damageBeforeWR = Math.max(
     0,
@@ -219,7 +219,7 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     !weaknessOverride?.none &&
     !hasMarker(defenderEffects, 'noWeakness') &&
     // Coating Metal / Weakness Guard / Flash / Holon FF Energy (audit SE7).
-    !(!ignoreDefenderEffects && hasSpecialEnergyNoWeakness(defender, defenderZoneCards));
+    !(!ignoreDefenderEffects && hasSpecialEnergyNoWeakness(defender, defenderZoneCards, stadium));
   // An ability can give a Weakness the card does not print (Klefki Fairy Lock).
   if (attacker?.types?.length && (defender?.weakness || weaknessOverride?.type) && weaknessType && weaknessApplies) {
     // Any of a dual-typed attacker's types triggers Weakness (audit A-5). A
@@ -252,7 +252,7 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     !hasMarker(attackerMarkers, 'ignoreResistance') &&
     !resistanceOverride?.ignore &&
     // Holon FF Energy with a basic {F} Energy beside it (audit SE7).
-    !hasSpecialEnergyIgnoresResistance(attacker, attackerZoneCards) &&
+    !hasSpecialEnergyIgnoresResistance(attacker, attackerZoneCards, stadium) &&
     attacker?.types?.length &&
     defender?.resistance &&
     !(stadiumCard && stadiumIgnoresResistance(stadiumCard, attacker))
@@ -286,14 +286,14 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     : getSpecialEnergyDamageReduction(defender, defenderZoneCards, {
         attacker,
         afterWR: true,
-      });
+      }, stadium);
   const incomingBonusAfterWR =
     damageBeforeWR > 0 ? markerSum(defenderEffects, (m) => m.kind === 'incomingBonus' && m.afterWR) : 0;
-  const specialEnergyPenaltyAfterWR = getSpecialEnergyAttackPenalty(attacker, attackerZoneCards, { afterWR: true });
+  const specialEnergyPenaltyAfterWR = getSpecialEnergyAttackPenalty(attacker, attackerZoneCards, { afterWR: true }, stadium);
   // Darkness Energy AQ/EX: "+10 after applying Weakness and Resistance" only when it damages.
   const specialEnergyBonusAfterWR =
     damageAfterWR > 0 && !ignoreAttackerBoosts
-      ? getSpecialEnergyAttackBonus(attacker, attackerZoneCards, { defenderIsActive, afterWR: true })
+      ? getSpecialEnergyAttackBonus(attacker, attackerZoneCards, { defenderIsActive, afterWR: true }, stadium)
       : 0;
   // PlusPower (base1-84): "If this Pokémon's attack does damage to the Defending Pokémon (after
   // applying Weakness and Resistance), the attack does 10 more damage to the Defending Pokémon."
