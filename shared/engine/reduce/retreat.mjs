@@ -7,7 +7,7 @@
 import { discardCardToPlayerZone } from '../state.mjs';
 import { isEnergy, getRetreatCostCount } from '../cards.mjs';
 import { expandEnergyEntries, canPayAttackCost } from '../rules/attack-engine.mjs';
-import { combinedToolRetreatCost } from '../rules/tool-combat.mjs';
+import { combinedToolRetreatCost, toolRetreatEnergyToHand } from '../rules/tool-combat.mjs';
 import { teamNoRetreatCostForActive } from '../rules/ability-executors.mjs';
 import { stadiumRetreatCoin } from '../rules/stadium-triggers.mjs';
 import { applyStadiumSwitchTriggers } from '../effects/stadium-trigger-apply.mjs';
@@ -184,6 +184,17 @@ export function applyRetreatSwap(
   const active = player?.zones?.active?.find((c) => !c.attachedTo);
   if (!player || !active) return;
   const costN = computeEffectiveRetreatCost(draft, active, playerId);
+  const stadiumCard = draft.stadium?.card || draft.stadium || null;
+  const toHand = toolRetreatEnergyToHand(active, player.zones.active, {
+    blockTools: isStadiumToolNegation(stadiumCard),
+    stadium: stadiumCard,
+  });
+  const payEnergy = (card) => {
+    card.attachedTo = null;
+    if (!toHand) return discardCardToPlayerZone(player, card);
+    player.zones.hand.push(card);
+    return 'hand';
+  };
 
   // Discard energy cost
   if (Array.isArray(discardEnergyIds) && discardEnergyIds.length > 0) {
@@ -191,8 +202,7 @@ export function applyRetreatSwap(
       const idx = player.zones.active.findIndex((c) => c.instanceId === id);
       if (idx >= 0) {
         const [discarded] = player.zones.active.splice(idx, 1);
-        discarded.attachedTo = null;
-        const to = discardCardToPlayerZone(player, discarded);
+        const to = payEnergy(discarded);
         events.push({
           type: 'cardMoved',
           instanceId: id,
@@ -212,8 +222,7 @@ export function applyRetreatSwap(
       const card = player.zones.active[i];
       if (card.attachedTo === active.instanceId && isEnergy(card)) {
         player.zones.active.splice(i, 1);
-        card.attachedTo = null;
-        const to = discardCardToPlayerZone(player, card);
+        const to = payEnergy(card);
         discardedCount++;
         events.push({
           type: 'cardMoved',

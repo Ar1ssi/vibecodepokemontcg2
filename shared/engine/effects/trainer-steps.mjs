@@ -5053,7 +5053,7 @@ function putHandBasicAsActive(ctx) {
 function opponentDiscardToLostZonePerPokemon(ctx) {
   const { player, opponent, step } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
-  const symbol = String(step.energyType || '').match(/\{([a-z])\}/)?.[1];
+  const symbol = String(step.energyType || '').match(/\{([a-z])\}/i)?.[1]?.toLowerCase();
   const count = rootsOf(player).filter(
     (root) => !symbol || pokemonHasType(topPokemonCard(player, root), symbol)
   ).length;

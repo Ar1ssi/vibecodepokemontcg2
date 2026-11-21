@@ -71,7 +71,7 @@
 // 'lostZone>=N', 'koedLastTurn:type=p', 'handCount<=N') when the card can only be played under it.
 
 import { WORD_POKEMON_TYPES } from './pokemon-type-words.mjs';
-import { canonicalEffectWording } from './effect-wording.mjs';
+import { symbolizeTypeWords } from './attack-text.mjs';
 import { parseFossilPlay, parseNamedFossilSearch } from './fossil.mjs';
 import { parseTurnDamageBonus } from './turn-damage-bonus.mjs';
 import { rewriteLegacyTrainerWording } from './legacy-trainer-wording.mjs';
@@ -113,8 +113,9 @@ function typedPokemonSearchWhat(lower) {
 // so normalize them once up front:
 //   curly quotes  ’ ‘ ‚ ʼ `  →  straight '
 //   energy symbol { P } {G}  →  {P} (no inner spaces)
+// TCGdex spells Energy symbols as type words ("your Fire Pokémon"); symbolizeTypeWords turns them back.
 function normalizeText(text) {
-  return canonicalEffectWording(text)
+  return symbolizeTypeWords(String(text ?? ''))
     .replace(/[\u2018\u2019\u201A\u201B\u201A`]/g, "'")
     .replace(/\{\s*([A-Za-z])\s*\}/g, '{$1}')
     .toLowerCase();

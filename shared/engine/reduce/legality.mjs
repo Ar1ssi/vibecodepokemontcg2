@@ -12,7 +12,7 @@ import { legacyAttachedTrainer } from '../rules/legacy-attached-trainer.mjs';
 import {
   mayAttachAnyTechnicalMachine, parseTmAttachRestriction, tmAttachAllowed,
 } from '../rules/tool-attacks.mjs';
-import { isPokemonToolCard, attachedTools, isExCard } from '../rules/tool-combat.mjs';
+import { isPokemonToolCard, attachedTools, isExCard, toolRetreatIgnoresConditions } from '../rules/tool-combat.mjs';
 import {
   toolCapacity, parseUnlimitedHandEnergyAcceleration, costDiscountRead, applyCostDiscount,
   isHandActivatedAbility,
@@ -1338,13 +1338,17 @@ export function validateLegality(state, command) {
       if (!active) {
         return { allowed: false, reason: 'No active Pokémon to retreat.' };
       }
-      if (active.specialCondition === 'Paralyzed') {
+      const retreatsThrough = toolRetreatIgnoresConditions(active, player.zones?.active || [], {
+        blockTools: isStadiumToolNegation(state.stadium?.card || state.stadium),
+        stadium: state.stadium?.card || state.stadium,
+      });
+      if (active.specialCondition === 'Paralyzed' && !retreatsThrough.includes('paralyzed')) {
         return {
           allowed: false,
           reason: "Paralyzed — this Pokémon can't retreat.",
         };
       }
-      if (active.specialCondition === 'Asleep') {
+      if (active.specialCondition === 'Asleep' && !retreatsThrough.includes('asleep')) {
         return {
           allowed: false,
           reason: "Asleep — this Pokémon can't retreat.",

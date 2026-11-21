@@ -77,8 +77,13 @@ const symbolOf = (word) => `{${TYPE_WORD_SYMBOLS[word.toLowerCase()]}}`;
  * reads one notation (ea389d92 did the same for special Energy). Case is kept.
  */
 export function symbolizeTypeWords(text) {
+  return symbolizeTypeWordsOnly(canonicalEffectWording(text));
+}
+
+/** symbolizeTypeWords without the wording canonicalization (readers keyed to printed phrasing). */
+export function symbolizeTypeWordsOnly(text) {
   const each = new RegExp(`(?:${TYPE_WORD})`, 'gi');
-  return canonicalEffectWording(text)
+  return String(text ?? '')
     .replace(ENERGY_SYMBOL_SPAN, (_, word) => symbolOf(word))
     .replace(TYPE_WORD_RUN, (run) => run.replace(each, symbolOf))
     .replace(TYPE_WORD_LIST, (list) => list.replace(each, symbolOf))
