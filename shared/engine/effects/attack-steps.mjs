@@ -2431,8 +2431,9 @@ function placeCounters(ctx, card, victimPlayerId, amount, { effectShield = true 
     });
     return false;
   }
+  // `dealt` keeps the client from reading a bare cumulative total as a heal (a stale baseline).
   card.damage = (card.damage || 0) + amount;
-  ctx.events.push({ type: 'damageUpdated', instanceId: card.instanceId, damage: card.damage });
+  ctx.events.push({ type: 'damageUpdated', instanceId: card.instanceId, damage: card.damage, dealt: amount });
   ctx.events.push({
     type: 'damageCountersPlaced',
     instanceId: card.instanceId,

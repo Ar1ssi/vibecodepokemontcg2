@@ -1697,7 +1697,7 @@ export function isVstarPowerAttack(attack) {
 function benchSpreadClauses(attackText) {
   const text = String(attackText || '').replace(/[‘’]/g, "'");
   const clauses = [];
-  const re = /(\d+)\s*damage\s+to\s+(?:each|every|all)\b([^.;]*?)benched pok[ée]mon(\s*\(both yours and your opponent's\))?/gi;
+  const re = /(\d+)\s*damage\s+to\s+(?:each|every|all)\b([^.;()]*?)benched pok[ée]mon(\s*\(both yours and your opponent's\))?/gi;
   for (const m of text.matchAll(re)) {
     const owner = m[2].toLowerCase();
     const both = Boolean(m[3]);
