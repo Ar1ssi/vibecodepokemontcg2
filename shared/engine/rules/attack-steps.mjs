@@ -1082,6 +1082,9 @@ const TEMPLATES = [
     /^during your next turn, you may attach any number of energy cards from your hand to your pokémon$/,
     () => ({ type: 'atkUnlimitedAttachNextTurn' }),
   ],
+  // Plusle Draw for Everybody (sm7-53): "draw a card for each Benched Pokémon (both yours and your
+  // opponent's)" — the reminder is stripped before templates read the sentence.
+  [/^draw a card for each benched pokémon$/, () => ({ type: 'atkDrawPerBench', sides: 'both' })],
   // Pinsir Roof Fling (TCGdex sm1-6): "put your opponent's Active Pokémon and all cards attached
   // to it into your opponent's hand".
   [
@@ -1553,6 +1556,15 @@ const BLOCKS = [
         rest: /shuffle/.test(m[4]) ? 'shuffle' : /discard/.test(m[4]) ? 'discard' : 'keep',
       };
     },
+  ],
+  // Dunsparce Strike and Run (sm7-110): the Bench search runs as a step so the switch after it can
+  // read whether it put a Pokémon onto the Bench (executor.mjs attackBenchedFromDeck).
+  [
+    /search your deck for up to (\d+) basic pokémon and put them onto your bench\. then, shuffle your deck\. if you put any pokémon onto your bench in this way, you may switch this pokémon with 1 of your benched pokémon\./g,
+    (m) => [
+      { type: 'searchAbility', what: 'Basic Pokémon', count: Number(m[1]), destination: 'bench', upTo: true, reveal: false },
+      { type: 'atkSwitchSelf', optional: true, requiresBenchedThisAttack: true },
+    ],
   ],
   // Thwackey Jungle Opener (customhb, via effect-wording.mjs): one Basic Energy of a type from the
   // top of the deck to a Benched Pokémon.
@@ -2064,6 +2076,8 @@ function isAttachStep(step) {
 
 // Sentences that only make sense after an attach: "it" / "that Pokémon" is the Pokémon the
 // Energy went to.
+const SWITCH_STEP_TYPES = new Set(['atkGust', 'atkSwitchSelf']);
+
 const CHAIN_TEMPLATES = [
   [/^switch it with 1 of your benched pokémon$/, () => ({ type: 'atkSwitchSelf' })],
   [
@@ -2184,14 +2198,26 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
     // it …" runs only when the printed discard moved an Energy (requiresEnergyDiscard).
     const discardChain =
       Boolean(chained) && IF_YOU_DO.test(body) && ENERGY_DISCARD_SENTENCE.test((sentences[index - 1] || '').trim());
-    if (chained && !handChain && !isAttachStep(previous) && !optionalChain && !discardChain) continue;
+    // Floette Swirling Petals / Donphan Rapid Spin (sm6-85, sm7-73): "Switch …. If you do, switch …"
+    // — the first switch is the cost; with no Benched Pokémon to switch, nothing follows.
+    const switchChain =
+      Boolean(chained) && IF_YOU_DO.test(body) && !optionalChain && SWITCH_STEP_TYPES.has(previous?.type);
+    if (switchChain) previous.cost = true;
+    if (chained && !handChain && !isAttachStep(previous) && !optionalChain && !discardChain && !switchChain) continue;
     let { rest, flags } = stripGates(chained ? body.slice(chained[0].length) : body);
     if (extra) flags.requiresExtraEnergy = extra.requirements;
     if (attached) flags.requiresAttachedEnergy = attached.energyType;
     if (handChain) flags.requiresHandCost = true;
     else if (discardChain) flags.requiresEnergyDiscard = true;
-    else if (chained && !optionalChain) flags.requiresAttach = true;
-    const templates = chained && !handChain && !optionalChain ? [...CHAIN_TEMPLATES, ...TEMPLATES] : TEMPLATES;
+    else if (chained && !optionalChain && !switchChain) flags.requiresAttach = true;
+    const templates = chained && !handChain && !optionalChain && !switchChain ? [...CHAIN_TEMPLATES, ...TEMPLATES] : TEMPLATES;
+    // Ariados Spider Trap (sm7-6): a status printed after a switch of the opponent's Active lands on
+    // the new Active, so it runs as a step after the switch (attack-status.mjs leaves it alone).
+    const afterGust = previous?.type === 'atkGust' && /^your opponent's active pokémon is now (.+)$/.exec(rest);
+    if (afterGust) {
+      result.after.push(...conditionList(afterGust[1]).map((condition) => ({ type: 'atkApplyCondition', condition })));
+      continue;
+    }
     // "If <board condition>, <effect>" (Paldean Tauros Jet Headbutt: "If this Pokémon has any {F}
     // Energy attached, discard a random card from your opponent's hand"): the executor runs the
     // effect only when the condition holds (attack-conditions.mjs reads it).

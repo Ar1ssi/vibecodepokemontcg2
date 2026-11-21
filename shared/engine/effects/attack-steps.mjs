@@ -3462,6 +3462,15 @@ function atkOppPlayLock(ctx) {
   return null;
 }
 
+// Plusle Draw for Everybody: a card for each Benched Pokémon, both players' (`sides: 'both'`).
+function atkDrawPerBench(ctx) {
+  const sides = ctx.step.sides === 'both' ? [ctx.player, ctx.opponent] : [ctx.player];
+  const count = sides.filter(Boolean).reduce((sum, side) => sum + benchRootsOf(side).length, 0);
+  if (count === 0) return skip(ctx, 'no_bench_pokemon');
+  drawCards(ctx.player, count, ctx.events);
+  return null;
+}
+
 // Dragonair Dragon's Wish: any number of Energy from the hand during this player's next turn.
 function atkUnlimitedAttachNextTurn(ctx) {
   const turn = ctx.draft.turn?.number || 1;
@@ -4644,6 +4653,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkBenchFromDiscard: optional(atkBenchFromDiscard, () => 'Put Pokémon from your discard pile onto your Bench'),
   atkBenchFromAnyDiscard,
   atkUnlimitedAttachNextTurn,
+  atkDrawPerBench,
   atkRecover: optional(atkRecover, (step) => `Put ${step.what || 'a card'} from your discard pile into your hand`),
   atkShuffleSelf: optional(atkShuffleSelf, () => 'Shuffle this Pokémon and all attached cards into your deck'),
   atkMoveAttachedToBench: optional(atkMoveAttachedToBench, () => 'Move attached Energy and Tools to your Bench, then discard this Pokémon'),

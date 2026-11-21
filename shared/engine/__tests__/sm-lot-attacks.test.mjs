@@ -487,3 +487,51 @@ test('Beedrill Sudden Sting (sm4-3): Paralyzed and Poisoned only after evolving 
   assert.deepEqual(conditionsOf(attack(board('Weedle', text, { damage: '10', setup: stack(true) })).state, 'p2').sort(), ['Paralyzed', 'Poisoned']);
   assert.deepEqual(conditionsOf(attack(board('Weedle', text, { damage: '10', setup: stack(false) })).state, 'p2'), []);
 });
+
+// ── switches and draws ──────────────────────────────────────────────────────
+
+const benches = (s) => {
+  s.players.p1.zones.bench.push(mon('MyBench'));
+  s.players.p2.zones.bench.push(mon('TheirBench'));
+};
+const activeName = (state, playerId) => state.players[playerId].zones.active.find((c) => !c.attachedTo)?.name;
+
+test('Floette Swirling Petals (sm6-85) switches itself only after switching the opponent', () => {
+  const text = 'Switch 1 of your opponent’s Benched Pokémon with their Active Pokémon. If you do, switch this Pokémon with 1 of your Benched Pokémon.';
+  const both = attack(board('Floette', text, { setup: benches })).state;
+  assert.equal(activeName(both, 'p2'), 'TheirBench');
+  assert.equal(activeName(both, 'p1'), 'MyBench');
+  const noTarget = attack(board('Floette', text, { setup: (s) => s.players.p1.zones.bench.push(mon('MyBench')) })).state;
+  assert.equal(activeName(noTarget, 'p1'), 'Floette');
+});
+
+test('Donphan Rapid Spin (sm7-73) makes the opponent switch after it switches', () => {
+  const text = 'Switch this Pokémon with 1 of your Benched Pokémon. If you do, your opponent switches their Active Pokémon with 1 of their Benched Pokémon.';
+  const res = attack(board('Donphan', text, { damage: '50', setup: benches })).state;
+  assert.equal(activeName(res, 'p1'), 'MyBench');
+  assert.equal(activeName(res, 'p2'), 'TheirBench');
+});
+
+test('Ariados Spider Trap (sm7-6): the switched-in Active is the one left Asleep and Poisoned', () => {
+  const text = 'You may switch 1 of your opponent’s Benched Pokémon with their Active Pokémon. Your opponent’s Active Pokémon is now Asleep and Poisoned.';
+  const res = attack(board('Ariados', text, { setup: benches }), (pc) => [pc.options[0].instanceId ?? pc.options[0].id]).state;
+  assert.equal(activeName(res, 'p2'), 'TheirBench');
+  assert.deepEqual(conditionsOf(res, 'p2').sort(), ['Asleep', 'Poisoned']);
+  assert.deepEqual(listConditions(res.players.p2.zones.bench.find((c) => c.name === 'Defender')), []);
+});
+
+test('Plusle Draw for Everybody (sm7-53) draws one card per Benched Pokémon on both sides', () => {
+  const text = 'Shuffle your hand into your deck. Then, draw a card for each Benched Pokémon (both yours and your opponent’s).';
+  const res = attack(board('Plusle', text, { setup: (s) => benches(s) || s.players.p2.zones.bench.push(mon('Another')) })).state;
+  assert.equal(res.players.p1.zones.hand.length, 3);
+});
+
+test('Dunsparce Strike and Run (sm7-110) may switch only after benching from its search', () => {
+  const text =
+    'Search your deck for up to 3 Basic Pokémon and put them onto your Bench. Then, shuffle your deck. If you put any Pokémon onto your Bench in this way, you may switch this Pokémon with 1 of your Benched Pokémon.';
+  const yes = (pc) => [(pc.options.find((o) => o.name === 'Yes') || pc.options[0]).instanceId ?? pc.options[0].id];
+  const found = attack(board('Dunsparce', text, { setup: (s) => s.players.p1.zones.deck.push(mon('Found')) }), yes).state;
+  assert.equal(activeName(found, 'p1'), 'Found');
+  const none = attack(board('Dunsparce', text, { setup: (s) => s.players.p1.zones.bench.push(mon('Old')) }), yes).state;
+  assert.equal(activeName(none, 'p1'), 'Dunsparce');
+});

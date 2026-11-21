@@ -523,6 +523,11 @@ export function executeSteps(draft, {
       events.push({ type: 'effectStepSkipped', reason: 'nothing_attached', step: step.type });
       continue;
     }
+    // Dunsparce Strike and Run: only after this attack's own search put a Pokémon on the Bench.
+    if (step.requiresBenchedThisAttack && !draft.attackBenchedFromDeck) {
+      events.push({ type: 'effectStepSkipped', reason: 'nothing_benched', step: step.type });
+      continue;
+    }
     // "Discard an Energy from this Pokémon. If you do, …" (Swing and Skedaddle): the printed
     // discard must have moved an Energy this attack.
     if (
@@ -1065,6 +1070,8 @@ export function executeSteps(draft, {
                 if (isFossilItem(c)) becomeFossilPokemon(c);
                 c.enteredPlayTurn = draft.turn?.number ?? null;
                 player.zones.bench.push(c);
+                // Dunsparce Strike and Run: "If you put any Pokémon onto your Bench in this way".
+                draft.attackBenchedFromDeck = true;
               } else if (dest === 'discard') {
                 player.zones.discard.push(c);
               } else {
