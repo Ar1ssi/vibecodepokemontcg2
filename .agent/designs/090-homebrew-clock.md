@@ -4,7 +4,7 @@ Date: 2026-11-20
 
 ## Problem
 User request: a toggleable timer for homebrew games (both decks hold ≥1 homebrew card), on by
-default, 3:00 (6:00 from 2026-11-21, user request), each turn played adds 15 s. User answers (2026-11-20): chess clock per player;
+default, 3:00, each turn played adds 15 s (user request 2026-11-21: 10:00 and +40 s). User answers (2026-11-20): chess clock per player;
 0:00 loses; room setting either seated player toggles until the deal; homebrew = customhb cards.
 
 ## Constraints
@@ -29,7 +29,7 @@ default, 3:00 (6:00 from 2026-11-21, user request), each turn played adds 15 s. 
 
 ## Design
 - shared/engine/homebrew-clock.mjs (pure): `createClock`, `syncClock(clock, state, now)` (charge
-  runner, +15 s to the previous turn player when turn.number rises above the highest seen, pick
+  runner, the increment to the previous turn player when turn.number rises above the highest seen, pick
   new runner), `clockRunner`, `decksAreHomebrew`, `msUntilFlag`, `flaggedRunner`, `clockSnapshot`,
   `formatClock`. Arms once, at the first sync in play (turn ≥1, no openingDrawPending): on iff
   enabled and both seats hold a `customhb-*` card.
@@ -53,7 +53,7 @@ default, 3:00 (6:00 from 2026-11-21, user request), each turn played adds 15 s. 
 | 3 | bank at 1 ms / 0 ms | not flagged / flagged | [x] `flagTimeOut ends the game … only once` |
 | 4 | timer fires early | room re-checks, transport re-arms | [x] flagTimeOut null path; onFlag refresh |
 | 5 | runner owes a prompt on opp's turn; times out | timeOut passes the choice gate | [x] `engine timeOut … pending prompt` |
-| 6 | undo back over a turn end | no second +15 s | [x] `never twice after undo` |
+| 6 | undo back over a turn end | no second increment | [x] `never twice after undo` |
 | 7 | toggle after deal | refused already_dealt / setClockEnabled false | [x] `locks once the clock arms` |
 | 8 | reset | fresh clock with room setting | [x] `reset starts a fresh clock` |
 | 9 | joiner hears snapshot before its room switch | kept, rendered on join | [x] e2e homebrew-clock-test row 1 |

@@ -1,14 +1,14 @@
 /**
  * @file The homebrew game clock (design 090). Pure; wall time comes in as `now` (ms).
- * A chess clock: each player has a 6:00 bank that runs only while that player owes the game an
+ * A chess clock: each player has a 10:00 bank that runs only while that player owes the game an
  * action (their turn, or a prompt they must answer on the opponent's turn); every turn a player
  * finishes adds 15 s to their bank. A bank at 0:00 loses the game (the room sends `timeOut`).
  * It runs only when the room's toggle is on and both decks hold at least one homebrew card.
  */
 
 export const HOMEBREW_SET_ID = 'customhb';
-export const CLOCK_BANK_MS = 6 * 60 * 1000;
-export const CLOCK_INCREMENT_MS = 15 * 1000;
+export const CLOCK_BANK_MS = 10 * 60 * 1000;
+export const CLOCK_INCREMENT_MS = 40 * 1000;
 export const TIME_OUT_REASON = 'time ran out';
 
 /** @returns {boolean} true for a card of the homebrew set (TCGdex-shaped id `customhb-<n>`). */
@@ -64,7 +64,7 @@ export function remainingMs(clock, playerId, now) {
 
 /**
  * Brings the clock up to date with the game after a state change: charges the elapsed time to
- * the old runner, credits +15 s to the player whose turn just ended, and starts the new runner.
+ * the old runner, credits +40 s to the player whose turn just ended, and starts the new runner.
  * Mutates and returns `clock`.
  */
 export function syncClock(clock, state, now) {
