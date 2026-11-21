@@ -345,6 +345,8 @@ function knownKindWhat(phrase) {
   // A clause, not a kind ("card that evolves from that Pokémon", "Basic Pokémon card other
   // than a Baby Pokémon"): the caller keeps what it already had.
   if (/\b(?:that|from|which|with|other|than|named|in|and)\b/.test(p)) return null;
+  // Lisia (sm7-137): "up to 2 ◇ (Prism Star) cards" (pkmncards prints "{*} (Prism Star)").
+  if (/^(?:◇|\{\*\})? ?\(?prism star\)?$/.test(p)) return 'Prism Star card';
   if (/^(?:pokémon )?tool$/.test(p)) return 'Pokémon Tool';
   if (p === 'item') return 'Item';
   if (p === 'supporter') return 'Supporter';
@@ -1552,6 +1554,9 @@ export function parseTrainerEffect(text = '') {
   if (fossil) {
     return { steps: [{ type: 'fossilItem', ...(fossil.hp ? { hp: fossil.hp } : {}) }], recognizable: true };
   }
+  // Rotom Dex—Poké Finder Mode (sm3-122): nothing is taken; the cards go back or are shuffled in.
+  const lookBack = lower.match(/^look at the top (\d+) cards of your deck and put them back in any order or shuffle them into your deck\.?$/);
+  if (lookBack) return { steps: [{ type: 'rearrangeTop', count: Number(lookBack[1]), orShuffle: true }], recognizable: true };
   const fossilSearch = parseNamedFossilSearch(lower);
   if (fossilSearch) return { steps: [fossilSearch], recognizable: true };
   const playCondition = parsePlayCondition(lower);
@@ -3057,6 +3062,12 @@ function parseTrainerStepsInner(lower) {
     else if (lower.includes('pokémon') && lower.includes('basic energy')) what = 'Pokémon or Basic Energy';
     else if (lower.includes('basic energy')) what = 'Basic Energy';
     else if (lower.includes('pokémon')) what = 'Pokémon';
+    else {
+      // Pal Pad (sm5-132): "Shuffle 2 Supporter cards from your discard pile into your deck."
+      const kind = lower.match(/shuffle\s+(?:up to\s+)?\d+\s+([a-z ]+?) cards? from your discard pile/)?.[1];
+      const known = kind ? knownKindWhat(kind) : null;
+      if (known) what = known;
+    }
     steps.push({ type: 'shuffleFromDiscard', what, count });
     return { steps, recognizable: true };
   }

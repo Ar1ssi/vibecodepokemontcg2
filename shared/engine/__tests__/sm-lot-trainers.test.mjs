@@ -272,3 +272,47 @@ test('Cyrus ◇ (sm5-120) gets its printed play condition in place of TCGdex’s
   assert.match(play(card, setup('Fire')).error || '', /Active Pokémon must be/);
   assert.equal(play(card, setup('Metal')).error ?? null, null);
 });
+
+test('Lisia (sm7-137) finds only Prism Star cards', () => {
+  const card = () => trainer('Lisia', 'Supporter', 'Search your deck for up to 2 ◇ (Prism Star) cards, reveal them, and put them into your hand. Then, shuffle your deck.');
+  let offered = [];
+  const res = play(card, (state) => {
+    state.players.p1.zones.deck.push(trainer('Lysandre ◇', 'Supporter', ''), mon('Giratina ◇', { subtypes: ['Basic', 'Prism Star'] }));
+  }, (pc) => {
+    offered = pc.options.map((o) => o.name).sort();
+    return pc.options.map((o) => o.instanceId);
+  });
+  assert.equal(res.error ?? null, null, res.reason);
+  assert.deepEqual(offered, ['Giratina ◇', 'Lysandre ◇']);
+});
+
+test('Pal Pad (sm5-132) shuffles only Supporter cards back', () => {
+  const card = () => trainer('Pal Pad', 'Item', 'Shuffle 2 Supporter cards from your discard pile into your deck.');
+  let offered = [];
+  const res = play(card, (state) => {
+    state.players.p1.zones.discard.push(trainer('Guzma', 'Supporter', ''), trainer('Ultra Ball', 'Item', ''), mon('Pikachu'));
+  }, (pc) => {
+    offered = pc.options.map((o) => o.name);
+    return pc.options.slice(0, pc.max || 1).map((o) => o.instanceId);
+  });
+  assert.equal(res.error ?? null, null, res.reason);
+  assert.deepEqual(offered, ['Guzma']);
+});
+
+test('Rotom Dex—Poké Finder Mode (sm3-122) puts the top 4 back or shuffles them, never into the hand', () => {
+  const text = 'Look at the top 4 cards of your deck and put them back in any order or shuffle them into your deck.';
+  const card = () => trainer('Rotom Dex—Poké Finder Mode', 'Item', text);
+  let order = [];
+  const res = play(card, () => {}, (pc) => {
+    if (pc.options.some((o) => o.name === 'Put back in any order')) return [pc.options.find((o) => o.name === 'Put back in any order').instanceId];
+    order = pc.options.map((o) => o.instanceId).reverse();
+    return order;
+  });
+  assert.equal(res.error ?? null, null, res.reason);
+  assert.equal(res.state.players.p1.zones.hand.length, 0);
+  assert.deepEqual(res.state.players.p1.zones.deck.slice(0, 4).map((c) => c.instanceId), order);
+  const shuffled = play(card, () => {}, (pc) => [pc.options.find((o) => o.name === 'Shuffle into deck').instanceId]);
+  assert.equal(shuffled.error ?? null, null);
+  assert.equal(shuffled.state.players.p1.zones.hand.length, 0);
+  assert.equal(shuffled.state.players.p1.zones.deck.length, 8);
+});
