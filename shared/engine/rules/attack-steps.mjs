@@ -32,6 +32,8 @@ function countOf(word) {
 // Card kinds a printed play lock names ("Pokémon Tool, Special Energy, or Stadium") → the
 // kinds reduce.mjs playLockReason compares against. No list is "any card".
 const PLAY_LOCK_KINDS = {
+  // Chimecho Bell of Silence (sm4-43): "any Pokémon that has an Ability" (played or evolved).
+  'pokémon that has an ability': ['pokemonWithAbility'],
   item: ['item'],
   supporter: ['supporter'],
   stadium: ['stadium'],
@@ -1056,6 +1058,16 @@ const TEMPLATES = [
   [
     /^your opponent returns your opponent's active pokémon and all cards attached to it to their hand$/,
     () => ({ type: 'atkBounceOppActive' }),
+  ],
+  // Phanpy Endure / Meditite Bide (sm7-72, sm7-76), after "If heads,".
+  [
+    /^if this pokémon would be knocked out by damage from an attack during your opponent's next turn, it is not knocked out, and its remaining hp becomes 10$/,
+    () => ({ type: 'atkAddMarker', target: 'self', window: 'opponentNextTurn', marker: { kind: 'surviveKnockOutHp10' } }),
+  ],
+  // Dragonair Dragon's Wish (sm1-95): reduce/legality.mjs lifts the one-Energy rule next turn.
+  [
+    /^during your next turn, you may attach any number of energy cards from your hand to your pokémon$/,
+    () => ({ type: 'atkUnlimitedAttachNextTurn' }),
   ],
   // Pinsir Roof Fling (TCGdex sm1-6): "put your opponent's Active Pokémon and all cards attached
   // to it into your opponent's hand".

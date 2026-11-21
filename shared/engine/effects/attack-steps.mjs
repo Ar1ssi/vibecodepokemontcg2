@@ -3446,6 +3446,14 @@ function atkOppPlayLock(ctx) {
   return null;
 }
 
+// Dragonair Dragon's Wish: any number of Energy from the hand during this player's next turn.
+function atkUnlimitedAttachNextTurn(ctx) {
+  const turn = ctx.draft.turn?.number || 1;
+  ctx.player.handAttachUnlimitedTurn = turn + 2;
+  ctx.events.push({ type: 'attachLimitLifted', playerId: ctx.player.playerId, turn: turn + 2 });
+  return null;
+}
+
 // Cobalion-GX Iron Rule-GX: "their Pokémon can't attack" on their next turn, including
 // Pokémon that come into play then, so the lock lives on the player.
 function atkOppAttackLock(ctx) {
@@ -4618,6 +4626,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkBenchFromDeckTop: atkBenchFromDeckTop,
   atkBenchFromDiscard: optional(atkBenchFromDiscard, () => 'Put Pokémon from your discard pile onto your Bench'),
   atkBenchFromAnyDiscard,
+  atkUnlimitedAttachNextTurn,
   atkRecover: optional(atkRecover, (step) => `Put ${step.what || 'a card'} from your discard pile into your hand`),
   atkShuffleSelf: optional(atkShuffleSelf, () => 'Shuffle this Pokémon and all attached cards into your deck'),
   atkMoveAttachedToBench: optional(atkMoveAttachedToBench, () => 'Move attached Energy and Tools to your Bench, then discard this Pokémon'),

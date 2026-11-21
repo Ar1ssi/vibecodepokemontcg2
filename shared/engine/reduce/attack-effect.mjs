@@ -973,6 +973,10 @@ export function resolveAttackEffectPhase(draft, ctx) {
           });
 
           const koHp = cardEffectiveHp(draft, defender, defenderPlayerId);
+          // Aegislash Ticking Knock Out: damaged by an attack while marked, it is Knocked Out.
+          if (koHp > 0 && defenderMarkers.some((m) => m.kind === 'koIfDamaged')) {
+            dmgDealt = Math.max(dmgDealt, koHp - (defender.damage || 0));
+          }
           const wouldKo = koHp > 0 && (defender.damage || 0) + dmgDealt >= koHp;
 
           if (wouldKo) {

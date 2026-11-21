@@ -452,6 +452,8 @@ export function handleKnockout(
     .filter((marker) => prizeFilterMatches(marker.filter, prizeRuleBoxes(victimView)))
     .reduce((sum, marker) => sum + (marker.count || 0), 0);
   prizeCount += markerBonus;
+  // Poipole Knockout Reviver: "your opponent can't take any Prize cards for it".
+  if (activeAttackMarkers(draft, victimPlayerId, victim).some((marker) => marker.kind === 'noPrizesOnKo')) prizeCount = 0;
 
   if (attacker) {
     if (!attacker.flags) attacker.flags = {};

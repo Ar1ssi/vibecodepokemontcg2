@@ -317,3 +317,100 @@ test('Guzzlord Lord’s Valley (sm6-80) mills 10 only with exactly 2, 4 or 6 Pri
   const five = attack(board('Guzzlord', text, { damage: '160', setup: (s) => s.players.p1.zones.prizes.pop() }));
   assert.equal(five.state.players.p1.zones.deck.length, 10);
 });
+
+// ── next-turn effects ───────────────────────────────────────────────────────
+
+/** Hands the board to `playerId` on turn `number` (a fresh turn: no Energy attached yet). */
+function turnTo(state, playerId, number) {
+  // Rules on, so attach and play legality apply.
+  state.rulesEnabled = true;
+  state.turn = { player: playerId, number, phase: 'main' };
+  for (const player of Object.values(state.players)) player.flags = { ...(player.flags || {}), energyAttached: false, attackerAttacked: false };
+  return state;
+}
+const command = (state, playerId, type, payload) => applyCommand(state, { type, playerId, payload }, createRng(5));
+
+test('Espurr Perplexing Eyes (sm3-59) makes the Defending Pokémon weak to Psychic', () => {
+  const res = attack(board('Espurr', 'The Defending Pokémon’s Weakness is now Psychic until the end of your next turn. (The amount of Weakness doesn’t change.)'));
+  const marker = res.state.players.p2.zones.active[0].attackMarkers?.find((m) => m.kind === 'weaknessOverride');
+  assert.equal(marker?.type, 'psychic');
+});
+
+test('Aegislash Ticking Knock Out (sm6-49) Knocks Out the Defending Pokémon the next time an attack damages it', () => {
+  const marked = attack(board('Aegislash', 'During your next turn, if the Defending Pokémon is damaged by an attack, it will be Knocked Out.', {
+    setup: (s) => s.players.p2.zones.bench.push(mon('Spare')),
+  })).state;
+  turnTo(marked, 'p1', 7);
+  marked.players.p1.zones.active[0].attacks = [{ name: 'Tap', cost: [], damage: '10', text: '' }];
+  const res = attack(marked);
+  assert.ok(res.state.players.p2.zones.discard.some((c) => c.name === 'Defender'), 'Knocked Out by 10 damage');
+});
+
+test('Poipole Knockout Reviver (sm6-55): no Prizes for it during the opponent’s next turn', () => {
+  const marked = attack(board('Poipole', 'During your opponent’s next turn, if this Pokémon is Knocked Out, your opponent can’t take any Prize cards for it.', {
+    setup: (s) => s.players.p1.zones.bench.push(mon('Spare')),
+  })).state;
+  const poipole = marked.players.p1.zones.active[0];
+  poipole.hp = 30;
+  turnTo(marked, 'p2', 6);
+  marked.players.p2.zones.active[0].attacks = [{ name: 'Hit', cost: [], damage: '50', text: '' }];
+  const res = applyCommand(marked, { type: 'attack', playerId: 'p2', payload: { attackIndex: 0 } }, createRng(3));
+  assert.equal(res.error ?? null, null);
+  assert.ok(res.state.players.p1.zones.discard.some((c) => c.name === 'Poipole'));
+  assert.equal(res.state.players.p2.flags?.prizesOwed || 0, 0);
+});
+
+test('Seedot Harden (sm7-11) and Phanpy Endure (sm7-72) set their opponent-turn shields', () => {
+  const harden = attack(board('Seedot', 'During your opponent’s next turn, prevent all damage done to this Pokémon by attacks if that damage is 40 or less.'));
+  const shield = harden.state.players.p1.zones.active[0].attackMarkers?.find((m) => m.kind === 'incomingPrevent');
+  assert.equal(shield?.maxDamage, 40);
+  const endure = 'Flip a coin. If heads, if this Pokémon would be Knocked Out by damage from an attack during your opponent’s next turn, it is not Knocked Out, and its remaining HP becomes 10.';
+  const kinds = [1, 2, 3, 4, 5, 6, 7, 8].map((seed) => {
+    const res = applyCommand(board('Phanpy', endure), { type: 'attack', playerId: 'p1', payload: { attackIndex: 0 } }, createRng(seed));
+    return (res.state.players.p1.zones.active[0].attackMarkers || []).map((m) => m.kind).join();
+  });
+  assert.ok(kinds.includes('surviveKnockOutHp10') && kinds.includes(''), kinds.join('|'));
+});
+
+test('Alolan Geodude Rock Polish (sm2-40) retreats for free next turn', () => {
+  const marked = attack(board('Alolan Geodude', 'During your next turn, this Pokémon has no Retreat Cost.', {
+    setup: (s, { attacker }) => {
+      attacker.retreatCost = ['Colorless', 'Colorless'];
+      s.players.p1.zones.bench.push(mon('Spare'));
+    },
+  })).state;
+  turnTo(marked, 'p1', 7);
+  const spare = marked.players.p1.zones.bench[0];
+  const res = command(marked, 'p1', 'retreat', { benchInstanceId: spare.instanceId, discardEnergyIds: [] });
+  assert.equal(res.error ?? null, null, res.reason);
+  assert.equal(res.state.players.p1.zones.active[0].name, 'Spare');
+});
+
+test('Dragonair Dragon’s Wish (sm1-95) lifts the one-Energy attach rule next turn', () => {
+  const marked = attack(board('Dragonair', 'During your next turn, you may attach any number of Energy cards from your hand to your Pokémon.')).state;
+  turnTo(marked, 'p1', 7);
+  const [a, b] = [energy('Water'), energy('Lightning')];
+  marked.players.p1.zones.hand.push(a, b);
+  const host = marked.players.p1.zones.active[0].instanceId;
+  let res = command(marked, 'p1', 'attachCard', { instanceId: a.instanceId, targetInstanceId: host });
+  assert.equal(res.error ?? null, null, res.reason);
+  res = command(res.state, 'p1', 'attachCard', { instanceId: b.instanceId, targetInstanceId: host });
+  assert.equal(res.error ?? null, null, res.reason);
+  turnTo(res.state, 'p1', 9);
+  const c = energy('Fire');
+  const d = energy('Fire');
+  res.state.players.p1.zones.hand.push(c, d);
+  res = command(res.state, 'p1', 'attachCard', { instanceId: c.instanceId, targetInstanceId: host });
+  assert.ok(command(res.state, 'p1', 'attachCard', { instanceId: d.instanceId, targetInstanceId: host }).error, 'one per turn again');
+});
+
+test('Chimecho Bell of Silence (sm4-43) stops Pokémon with an Ability being played next turn', () => {
+  const locked = attack(board('Chimecho', 'Your opponent can’t play any Pokémon that has an Ability from their hand during their next turn.', { damage: '10' })).state;
+  turnTo(locked, 'p2', 6);
+  const withAbility = mon('Shiinotic', { abilities: [{ name: 'Illuminate', type: 'Ability', text: 'x' }] });
+  const plain = mon('Morelull');
+  locked.players.p2.zones.hand.push(withAbility, plain);
+  const play = (card) => command(locked, 'p2', 'moveCard', { instanceId: card.instanceId, from: 'hand', to: 'bench' });
+  assert.ok(play(withAbility).error);
+  assert.equal(play(plain).error ?? null, null);
+});

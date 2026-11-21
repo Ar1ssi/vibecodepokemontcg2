@@ -94,6 +94,14 @@ function playLockReason(player, kinds, turnNumber) {
     : "Your opponent's attack stops you playing that card during this turn.";
 }
 
+/** Chimecho Bell of Silence: a Pokémon card that prints an Ability is also 'pokemonWithAbility'. */
+function abilityPokemonKind(card) {
+  if (!card || !isPokemon(card)) return [];
+  const abilities = Array.isArray(card.abilities) ? card.abilities : card.ability ? [card.ability] : [];
+  const printsAbility = abilities.some((a) => a && !/power|body|ancient trait/i.test(String(a.type || '')));
+  return printsAbility ? ['pokemonWithAbility'] : [];
+}
+
 /** Printed kind of one of a card's abilities: 'power' (Poké-Power), 'body' (Poké-Body), 'ability'. */
 function abilityKindAt(view, index) {
   const abilities = Array.isArray(view?.abilities) ? view.abilities : view?.ability ? [view.ability] : [];
@@ -831,9 +839,13 @@ export function validateLegality(state, command) {
       ) {
         // Heavy Rock/Horror House: "can't play any cards from their hand" blocks playing
         // Basic Pokémon from hand as well (design 048).
-        const handPlayLock = playLockReason(player, ['pokemon'], state.turn?.number || 1);
-        if (handPlayLock) return { allowed: false, reason: handPlayLock };
         const cardRef = findCard(state, payload.instanceId);
+        const handPlayLock = playLockReason(
+          player,
+          ['pokemon', ...abilityPokemonKind(cardRef?.card)],
+          state.turn?.number || 1
+        );
+        if (handPlayLock) return { allowed: false, reason: handPlayLock };
         if (cardRef && !isPokemon(cardRef.card)) {
           return {
             allowed: false,
@@ -888,7 +900,7 @@ export function validateLegality(state, command) {
         // Chaos Wheel / Trick Wind lock Pokémon Tools; an Item lock (Itchy Pollen) does not
         // reach Tools or Technical Machines. Evolution Jammer locks evolving from hand.
         const attachKinds = isPokemon(cardRef.card)
-          ? ['evolve']
+          ? ['evolve', ...abilityPokemonKind(cardRef.card)]
           : isToolOrMachineTrainer(cardRef.card)
             ? ['tool', 'trainer']
             : [];
@@ -929,7 +941,9 @@ export function validateLegality(state, command) {
       if (cardRef && isEnergy(cardRef.card)) {
         const plan = cardRef.zoneId === 'hand' ? energyAttachPlanMatch(state, player, cardRef.card, payload.targetInstanceId) : null;
         const planAllows = Boolean(plan && plan.plan.hostId === plan.hostId && plan.plan.attached < plan.plan.count);
-        if (player.flags?.energyAttached && !planAllows) {
+        // Dragonair Dragon's Wish: "During your next turn, you may attach any number of Energy cards".
+        const attachLimitLifted = player.handAttachUnlimitedTurn === (state.turn?.number || 1) && cardRef.zoneId === 'hand';
+        if (player.flags?.energyAttached && !planAllows && !attachLimitLifted) {
           // Check for unlimited energy acceleration abilities (Phase 4)
           const inPlayPokemon = [
             ...(player.zones?.active || []),

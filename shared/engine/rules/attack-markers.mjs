@@ -310,7 +310,8 @@ const MARKER_BODIES = [
     () => ({ kind: 'incomingPrevent', filter: null }),
   ],
   [
-    /^if this pokémon would be damaged by an attack, prevent that attack's damage done to this pokémon if that damage is (\d+) or (less|more)$/,
+    // Seedot Harden (sm7-11): "prevent all damage done to this Pokémon by attacks if that damage is 40 or less".
+    /^(?:if this pokémon would be damaged by an attack, prevent that attack's damage done to this pokémon|prevent all damage done to this pokémon by attacks) if that damage is (\d+) or (less|more)$/,
     'self',
     null,
     // Light Jolteon [Neo Destiny 48] Pulse Guard prints "30 or more".
@@ -518,6 +519,23 @@ const MARKER_BODIES = [
     'yourNextTurn',
     (m) => ({ kind: 'nextTurnBaseDamage', attackName: m[1], doubled: true }),
   ],
+  // Aegislash Ticking Knock Out (sm6-49): reduce/attack-effect.mjs Knocks Out the marked Pokémon
+  // when an attack damages it during the window.
+  [
+    /^if your opponent's active pokémon is damaged by an attack, it will be knocked out$/,
+    'opponentActive',
+    'yourNextTurn',
+    () => ({ kind: 'koIfDamaged' }),
+  ],
+  // Poipole Knockout Reviver (sm6-55): handleKnockout pays no Prizes for the marked Pokémon.
+  [
+    /^if this pokémon is knocked out, your opponent can't take any prize cards for it$/,
+    'self',
+    null,
+    () => ({ kind: 'noPrizesOnKo' }),
+  ],
+  // Alolan Geodude Rock Polish (sm2-40): the freeRetreat marker reduce/retreat.mjs reads.
+  [/^this pokémon has no retreat cost$/, 'self', 'yourNextTurn', () => ({ kind: 'freeRetreat' })],
   // Galarian Slowking V Word of Ruin: resolveCheckup knocks the marked Pokémon out.
   [
     /^at the end of the turn, your opponent's active pokémon will be knocked out$/,
