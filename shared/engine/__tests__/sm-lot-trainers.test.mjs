@@ -316,3 +316,40 @@ test('Rotom Dex—Poké Finder Mode (sm3-122) puts the top 4 back or shuffles th
   assert.equal(shuffled.state.players.p1.zones.hand.length, 0);
   assert.equal(shuffled.state.players.p1.zones.deck.length, 8);
 });
+
+// --- Special Energy: TCGdex names the Prism Star cards with "◇", not "Prism Star". ---
+
+const specialEnergy = (name, text, attachedTo) =>
+  createCard({ instanceId: nextId++, name, supertype: 'Energy', type: 'Energy', subtypes: ['Special Energy'], text, effect: text, attachedTo });
+
+/** Whether p1's attacker (built by `extra`) can pay `cost` with `setup`'s Energy; damage dealt or null. */
+function attackWith(cost, setup, extra = {}) {
+  const state = board();
+  const attacker = mon('Attacker', { attacks: [{ name: 'Hit', cost, damage: '50', text: '' }], ...extra });
+  state.players.p1.zones.active.push(attacker);
+  state.players.p2.zones.active.push(mon('Defender', { hp: 500 }));
+  setup(state, attacker);
+  const res = resolveAll(command(state, 'p1', 'attack', { attackIndex: 0 }));
+  return res.error ? null : res.state.players.p2.zones.active[0].damage || 0;
+}
+
+test('Super Boost Energy ◇ (sm5-136): 1 of any type on a Stage 2, 4 with 3 Stage 2 in play', () => {
+  const text = 'This card provides Colorless Energy.   While this card is attached to a Stage 2 Pokémon, it provides every type of Energy but provides only 1 Energy at a time. If you have 3 or more Stage 2 Pokémon in play, it provides every type of Energy but provides 4 Energy at a time.';
+  const stage2 = { stage: 'Stage 2', subtypes: ['Stage 2'] };
+  const boost = (benchStage2 = 0) => (state, attacker) => {
+    state.players.p1.zones.active.push(specialEnergy('Super Boost Energy ◇', text, attacker.instanceId));
+    for (let i = 0; i < benchStage2; i++) state.players.p1.zones.bench.push(mon(`Stage 2 ${i}`, stage2));
+  };
+  assert.equal(attackWith(['Fire'], boost(), stage2), 50);
+  assert.equal(attackWith(['Fire'], boost()), null);
+  assert.equal(attackWith(['Fire', 'Fire', 'Fire', 'Fire'], boost(), stage2), null);
+  assert.equal(attackWith(['Fire', 'Fire', 'Fire', 'Fire'], boost(2), stage2), 50);
+});
+
+test('Beast Energy ◇ (sm6-117): any type and 30 more damage, on an Ultra Beast only', () => {
+  const text = 'This card provides Colorless Energy.  While this card is attached to an Ultra Beast, it provides every type of Energy but provides only 1 Energy at a time. The attacks of the Ultra Beast this card is attached to do 30 more damage to your opponent’s Active Pokémon (before applying Weakness and Resistance).';
+  const beast = (state, attacker) => state.players.p1.zones.active.push(specialEnergy('Beast Energy ◇', text, attacker.instanceId));
+  assert.equal(attackWith(['Fighting'], beast, { name: 'Buzzwole-GX', subtypes: ['Basic', 'GX', 'Ultra Beast'] }), 80);
+  assert.equal(attackWith(['Fighting'], beast), null);
+  assert.equal(attackWith(['Colorless'], beast), 50);
+});
