@@ -353,7 +353,8 @@ const CLAUSES = [
     () => ({ desc: { kind: 'damagedLastOpponentTurn' }, printedNegated: false }),
   ],
   // Alolan Meowth Spoil the Fun (sm8-118): "If you go second, … during your first turn."
-  [/^you go second$/, () => ({ desc: { kind: 'goingSecondFirstTurn' }, printedNegated: false })],
+  // Azelf Psychic Abduction (sm6-43): "only if you go second, and only on your first turn".
+  [/^you go second(?:,? and only on your first turn)?$/, () => ({ desc: { kind: 'goingSecondFirstTurn' }, printedNegated: false })],
   // Wigglytuff Charmed Slap (sm8-134).
   [
     /^this pokémon has a pokémon tool(?: card)? that has ["“](.+?)["”] in its name attached to it$/,

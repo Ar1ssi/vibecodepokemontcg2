@@ -407,6 +407,12 @@ const TEMPLATES = [
     (m, s) => ({ type: 'atkAttach', source: 'discard', countFrom: 'opponentInPlay', ...energyFilter(m[1], s), target: 'any', spread: true }),
   ],
   // Shuffle clauses.
+  // Flabébé Secret Blessings (sm6-84): "Shuffle 3 in any combination of Pokémon and basic Energy
+  // cards from your discard pile into your deck."
+  [
+    /^shuffle (up to \d+|\d+) in any combination of pokémon and basic energy cards from your discard pile into your deck$/,
+    (m) => ({ type: 'atkShuffleFromDiscard', ...attachCount(m[1]), what: 'Pokémon or Basic Energy' }),
+  ],
   [
     new RegExp(String.raw`^shuffle (up to \d+|\d+|an?) ((?:basic )?(?:\{[a-z]\} )?(?:basic )?energy|item|trainer|pokémon)?\s?cards? from your discard pile into your deck$`),
     (m, s) => ({
@@ -417,7 +423,7 @@ const TEMPLATES = [
     }),
   ],
   [
-    /^(?:your opponent shuffles their active pokémon and all attached cards into their deck|shuffle your opponent's active pokémon and all cards attached to it into their deck)$/,
+    /^(?:your opponent shuffles their active pokémon and all (?:attached cards|cards attached to it) into their deck|shuffle your opponent's active pokémon and all cards attached to it into their deck)$/,
     () => ({ type: 'atkShuffleOppActive' }),
   ],
   [
@@ -737,6 +743,21 @@ const TEMPLATES = [
     /^put all (.+?) cards? from your discard pile into your hand$/,
     (m) => ({ type: 'atkRecover', all: true, what: m[1].trim() }),
   ],
+  // Mareanie / Keldeo Bail Out (sm2-39, sm3.5-26): "Put a [Water] Pokémon from your discard pile
+  // into your hand" (no "card").
+  [
+    /^put (up to \d+|an?|\d+) ((?:basic )?(?:\{[a-z]\} )?)pokémon from your discard pile into your hand$/,
+    (m) => ({
+      type: 'atkRecover',
+      ...attachCount(m[1]),
+      what: `${m[2].replace(/\{([a-z])\}/, (_, l) => `{${l.toUpperCase()}}`).replace(/^basic/, 'Basic')}Pokémon`,
+    }),
+  ],
+  // Oranguru Resource Management (sm5-114).
+  [
+    /^put (\d+) cards from your discard pile on the bottom of your deck(?: in any order)?$/,
+    (m) => ({ type: 'atkRecover', count: Number(m[1]), what: null, to: 'deckBottom' }),
+  ],
   // Any card: Dialga-EX Reverse Edge, Xatu Warp Hole, Unown Hidden Power; Azurill Delivery
   // ("Put any 1 card …").
   [/^put (?:a|any 1) card from your discard pile into your hand$/, () => ({ type: 'atkRecover', count: 1, what: null })],
@@ -1035,6 +1056,32 @@ const TEMPLATES = [
   [
     /^your opponent returns your opponent's active pokémon and all cards attached to it to their hand$/,
     () => ({ type: 'atkBounceOppActive' }),
+  ],
+  // Pinsir Roof Fling (TCGdex sm1-6): "put your opponent's Active Pokémon and all cards attached
+  // to it into your opponent's hand".
+  [
+    /^put your opponent's active pokémon and all cards attached to it into (?:your opponent's|their) hand$/,
+    () => ({ type: 'atkBounceOppActive' }),
+  ],
+  // Pelipper Courier (sm1-38): one Benched Pokémon back to your hand.
+  [
+    /^put (1|a) of your benched pokémon and all cards attached to it into your hand$/,
+    () => ({ type: 'atkBounceOwnInPlay', count: 1, scope: 'bench' }),
+  ],
+  // Milotic TLC (sm4-27): only a damaged Benched Pokémon.
+  [
+    /^shuffle 1 of your opponent's benched pokémon that has any damage counters on it and all cards attached to it into their deck$/,
+    () => ({ type: 'atkShuffleOppBench', count: 1, scope: 'bench', damagedOnly: true }),
+  ],
+  // Azelf Psychic Abduction (sm6-43).
+  [
+    /^shuffle 1 of your opponent's benched pokémon and all cards attached to it into their deck$/,
+    () => ({ type: 'atkShuffleOppBench', count: 1, scope: 'bench' }),
+  ],
+  // Alomomola Borne Ashore (sm2-36) / Marshadow Shadowy Echoes (SM93).
+  [
+    /^put a basic pokémon from (either|each) player's discard pile onto its owner's bench$/,
+    (m) => ({ type: 'atkBenchFromAnyDiscard', each: m[1] === 'each' }),
   ],
   // Sylveon-GX Plea-GX / Greninja-GX Dark Mist-GX (design 048).
   [
@@ -2008,6 +2055,17 @@ const CHAIN_TEMPLATES = [
  *   `handlesSearch` means a deck search-and-attach was emitted here, so the attack
  *   phase's own search clause must not run it again.
  */
+// "If <condition>, <effect>" split at the comma after which a template reads the effect. The
+// condition may hold commas of its own (Guzzlord Lord's Valley: "exactly 2, 4, or 6 Prize cards").
+function splitBoardGate(sentence, templates) {
+  if (!/^if /.test(sentence)) return null;
+  for (let at = sentence.indexOf(', '); at > 0; at = sentence.indexOf(', ', at + 2)) {
+    const effect = sentence.slice(at + 2);
+    if (templates.some(([re]) => re.test(effect))) return [sentence, sentence.slice(3, at), effect];
+  }
+  return null;
+}
+
 export function parseAttackSteps(text, { selfName = '' } = {}) {
   const result = { before: [], after: [], handlesSearch: false };
   // EX-era "Pokémon-ex" (Deoxys ex) and XY-era "Pokémon-EX" differ only by case, which the
@@ -2112,8 +2170,8 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
     // "If <board condition>, <effect>" (Paldean Tauros Jet Headbutt: "If this Pokémon has any {F}
     // Energy attached, discard a random card from your opponent's hand"): the executor runs the
     // effect only when the condition holds (attack-conditions.mjs reads it).
-    const boardGate = !templates.some(([re]) => re.test(rest)) && /^if ([^,]+), (.+)$/.exec(rest);
-    if (boardGate && templates.some(([re]) => re.test(boardGate[2]))) {
+    const boardGate = !templates.some(([re]) => re.test(rest)) && splitBoardGate(rest, templates);
+    if (boardGate) {
       rest = boardGate[2];
       flags = { ...flags, boardCondition: boardGate[1] };
     }

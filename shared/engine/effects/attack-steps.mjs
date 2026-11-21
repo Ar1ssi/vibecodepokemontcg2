@@ -1430,19 +1430,63 @@ function atkBenchFromDiscard(ctx) {
   });
 }
 
+// Alomomola Borne Ashore: a Basic Pokémon from either player's discard pile onto its owner's
+// Bench; Marshadow Shadowy Echoes (`each`): one from each player's. The attacker chooses.
+function atkBenchFromAnyDiscard(ctx) {
+  const { player, opponent, step } = ctx;
+  const sides = [player, opponent].filter(Boolean);
+  const basicsOf = (side) =>
+    benchSpace(side) > 0 ? (side.zones.discard || []).filter((c) => isPokemon(c) && stageOf(c) === 'Basic') : [];
+  const place = (picked) => {
+    for (const card of picked) {
+      const owner = sides.find((side) => (side.zones.discard || []).includes(card));
+      if (owner) putOnBench(owner, [card], 'discard', ctx.events);
+    }
+  };
+  const ask = (pool, memo) =>
+    ctx.ask({
+      prompt: `${attackName(ctx)}: Choose a Basic Pokémon to put onto its owner's Bench`,
+      options: pool,
+      min: 1,
+      max: 1,
+      memo,
+    });
+  if (!step.each) {
+    const pool = sides.flatMap(basicsOf);
+    if (pool.length === 0 && !ctx.selection) return skip(ctx, 'no_pokemon_in_discard');
+    if (!ctx.selection && pool.length > 1) return ask(pool);
+    place(ctx.selection ? pickById(pool, ctx.selection).slice(0, 1) : pool);
+    return null;
+  }
+  let index = ctx.memo?.side ?? 0;
+  if (ctx.selection) {
+    place(pickById(basicsOf(sides[index]), ctx.selection).slice(0, 1));
+    index += 1;
+  }
+  for (; index < sides.length; index++) {
+    const pool = basicsOf(sides[index]);
+    if (pool.length > 1) return ask(pool, { side: index });
+    place(pool);
+  }
+  return null;
+}
+
 // `what: null` takes any card; `to: 'deckTop'` puts it on top of the deck (Xatu Warp Hole).
 function atkRecover(ctx) {
   const { player, step } = ctx;
   const candidates = (player.zones.discard || []).filter((c) => !step.what || matchesSearch(c, step.what));
   const toDeckTop = step.to === 'deckTop';
+  // Oranguru Resource Management: `to: 'deckBottom'` puts the cards under the deck.
+  const toDeck = toDeckTop || step.to === 'deckBottom';
   const recover = (cards) => {
     for (const card of cards) {
-      if (!toDeckTop) {
+      if (!toDeck) {
         moveToZone(player, card, 'hand', 'discard', ctx.events);
         continue;
       }
       removeFromZones(player, card);
-      player.zones.deck.unshift(card);
+      if (toDeckTop) player.zones.deck.unshift(card);
+      else player.zones.deck.push(card);
       ctx.events.push({ type: 'cardMoved', instanceId: card.instanceId, from: 'discard', to: 'deck', playerId: player.playerId });
     }
     return null;
@@ -1455,7 +1499,7 @@ function atkRecover(ctx) {
   const min = step.upTo ? 0 : max;
   if (min === max && max === candidates.length) return recover(candidates);
   const kind = step.what ? `${step.what} ` : '';
-  const where = toDeckTop ? 'on top of your deck' : 'into your hand';
+  const where = toDeckTop ? 'on top of your deck' : toDeck ? 'on the bottom of your deck' : 'into your hand';
   return ctx.ask({
     prompt: `${attackName(ctx)}: Choose ${min === max ? max : `up to ${max}`} ${kind}card${max === 1 ? '' : 's'} to put ${where}`,
     options: candidates,
@@ -1551,7 +1595,10 @@ function atkShuffleOppBench(ctx) {
   const { opponent, step } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
   // `scope: 'any'` (Den of Iniquity-GX) reaches the Active as well as the Bench.
-  const pool = step.scope === 'any' ? rootsOf(opponent) : benchRootsOf(opponent);
+  // Milotic TLC: `damagedOnly` takes a Benched Pokémon with damage counters on it.
+  const pool = (step.scope === 'any' ? rootsOf(opponent) : benchRootsOf(opponent)).filter(
+    (root) => !step.damagedOnly || (root.damage || 0) > 0
+  );
   const shuffleIn = (roots) => {
     for (const root of roots) {
       const ref = findCard(ctx.draft, root.instanceId);
@@ -3345,7 +3392,8 @@ function atkBounceOppBench(ctx) {
 // Active is settled by the attack phase's `settleVacatedActive`.
 function atkBounceOwnInPlay(ctx) {
   const { player, step } = ctx;
-  const roots = rootsOf(player);
+  // Pelipper Courier: `scope: 'bench'` takes a Benched Pokémon only.
+  const roots = step.scope === 'bench' ? benchRootsOf(player) : rootsOf(player);
   const bounce = (picked) => {
     for (const root of picked) {
       for (const card of [root, ...attachedCards(player, root.instanceId)]) {
@@ -3372,7 +3420,9 @@ function atkBounceOwnInPlay(ctx) {
   if (step.count && roots.length <= step.count) return bounce(roots);
   const max = Math.min(step.count || roots.length, roots.length);
   return ctx.ask({
-    prompt: `${attackName(ctx)}: Choose any number of your Pokémon to return to your hand`,
+    prompt: step.scope === 'bench'
+      ? `${attackName(ctx)}: Choose ${max} of your Benched Pokémon to put into your hand`
+      : `${attackName(ctx)}: Choose any number of your Pokémon to return to your hand`,
     options: roots,
     min: step.upTo || step.anyNumber ? 0 : 1,
     max,
@@ -4567,6 +4617,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkAttach: optional(atkAttach, (step) => `Attach ${whatOf(step)} from your ${step.source === 'hand' ? 'hand' : 'discard pile'}`),
   atkBenchFromDeckTop: atkBenchFromDeckTop,
   atkBenchFromDiscard: optional(atkBenchFromDiscard, () => 'Put Pokémon from your discard pile onto your Bench'),
+  atkBenchFromAnyDiscard,
   atkRecover: optional(atkRecover, (step) => `Put ${step.what || 'a card'} from your discard pile into your hand`),
   atkShuffleSelf: optional(atkShuffleSelf, () => 'Shuffle this Pokémon and all attached cards into your deck'),
   atkMoveAttachedToBench: optional(atkMoveAttachedToBench, () => 'Move attached Energy and Tools to your Bench, then discard this Pokémon'),

@@ -57,6 +57,7 @@ function attack(state, pick) {
   return { state: res.state, events, dealt: events.find((e) => e.type === 'attackExecuted')?.damage };
 }
 
+const zoneNames = (state, playerId, zone) => state.players[playerId].zones[zone].map((c) => c.name);
 const dealt = (name, text, damage, setup) => attack(board(name, text, { damage, setup })).dealt;
 
 // ── conditional bonuses ─────────────────────────────────────────────────────
@@ -213,4 +214,106 @@ test('Jumpluff Lost March (sm8-14): 20 per own Pokémon in the Lost Zone, Prism 
   const text = 'This attack does 20 damage for each of your Pokémon, except {*} (Prism Star) Pokémon, in the Lost Zone.';
   const lost = (s) => s.players.p1.zones.lostZone.push(mon('Hoppip'), mon('Skiploom'), mon('Lunala ◇'), energy('Grass'));
   assert.equal(dealt('Jumpluff', text, '20×', lost), 40);
+});
+
+// ── cards moved between zones ───────────────────────────────────────────────
+
+
+test('Bail Out (sm2-39 Mareanie, sm3.5-26 Keldeo) puts a [Water] Pokémon from the discard into the hand', () => {
+  const discard = (s) => s.players.p1.zones.discard.push(mon('Lapras', { types: ['Water'] }), mon('Vulpix', { types: ['Fire'] }), energy('Water'));
+  const any = attack(board('Mareanie', 'Put a Pokémon from your discard pile into your hand.', { setup: discard }), (pc) => [pc.options.at(-1).instanceId]);
+  assert.deepEqual(zoneNames(any.state, 'p1', 'hand'), ['Vulpix']);
+  const water = attack(board('Keldeo', 'Put a Water Pokémon from your discard pile into your hand.', { setup: discard }));
+  assert.deepEqual(zoneNames(water.state, 'p1', 'hand'), ['Lapras']);
+});
+
+test('Pinsir Roof Fling (sm1-6): heads returns the opposing Active and its cards to their hand', () => {
+  const text = 'Flip a coin. If heads, put your opponent’s Active Pokémon and all cards attached to it into your opponent’s hand.';
+  const setup = (s, { defender }) => s.players.p2.zones.active.push(energy('Fire', defender.instanceId)) && s.players.p2.zones.bench.push(mon('Next'));
+  const outcomes = [1, 2, 3, 4, 5, 6, 7, 8].map((seed) => {
+    const state = board('Pinsir', text, { setup });
+    const res = applyCommand(state, { type: 'attack', playerId: 'p1', payload: { attackIndex: 0 } }, createRng(seed));
+    return zoneNames(res.state, 'p2', 'hand').filter((name) => !name.startsWith('p2 deck')).sort().join(',');
+  });
+  assert.ok(outcomes.includes('Basic Fire Energy,Defender'), outcomes.join(' | '));
+  assert.ok(outcomes.includes(''), 'tails leaves it in play');
+});
+
+test('Pelipper Courier (sm1-38) returns one Benched Pokémon with its cards to the hand', () => {
+  const setup = (s) => {
+    const b = mon('Wingull');
+    s.players.p1.zones.bench.push(b, energy('Water', b.instanceId));
+  };
+  const res = attack(board('Pelipper', 'Put 1 of your Benched Pokémon and all cards attached to it into your hand.', { setup }));
+  assert.deepEqual(zoneNames(res.state, 'p1', 'hand').sort(), ['Basic Water Energy', 'Wingull']);
+  assert.deepEqual(zoneNames(res.state, 'p1', 'active'), ['Pelipper']);
+});
+
+test('Alomomola Borne Ashore (sm2-36) and Marshadow Shadowy Echoes (SM93) bench Basics onto their owners’ Benches', () => {
+  const discards = (s) => {
+    s.players.p1.zones.discard.push(mon('Mine'));
+    s.players.p2.zones.discard.push(mon('Theirs'), mon('Evolved', { stage: 'Stage 1', subtypes: ['Stage 1'] }));
+  };
+  const either = attack(
+    board('Alomomola', 'Put a Basic Pokémon from either player’s discard pile onto its owner’s Bench.', { setup: discards }),
+    (pc) => [pc.options.find((o) => o.name === 'Theirs').instanceId]
+  );
+  assert.deepEqual(zoneNames(either.state, 'p2', 'bench'), ['Theirs']);
+  assert.deepEqual(zoneNames(either.state, 'p1', 'bench'), []);
+  const each = attack(board('Marshadow', 'Put a Basic Pokémon from each player’s discard pile onto its owner’s Bench.', { setup: discards }));
+  assert.deepEqual(zoneNames(each.state, 'p1', 'bench'), ['Mine']);
+  assert.deepEqual(zoneNames(each.state, 'p2', 'bench'), ['Theirs']);
+});
+
+test('Oranguru Resource Management (sm5-114) puts 3 discard cards on the bottom of the deck', () => {
+  const setup = (s) => s.players.p1.zones.discard.push(trainer('A'), trainer('B'), trainer('C'), trainer('D'));
+  const res = attack(board('Oranguru', 'Put 3 cards from your discard pile on the bottom of your deck in any order.', { setup }), (pc) =>
+    pc.options.slice(0, 3).map((o) => o.instanceId)
+  );
+  assert.deepEqual(zoneNames(res.state, 'p1', 'discard'), ['D']);
+  assert.deepEqual(zoneNames(res.state, 'p1', 'deck').slice(-3), ['A', 'B', 'C']);
+});
+
+test('Flabébé Secret Blessings (sm6-84) shuffles Pokémon and basic Energy only', () => {
+  const setup = (s) => s.players.p1.zones.discard.push(mon('M'), energy('Fairy'), trainer('T'), energy('Grass'));
+  const res = attack(
+    board('Flabébé', 'Shuffle 3 in any combination of Pokémon and basic Energy cards from your discard pile into your deck.', { setup })
+  );
+  assert.deepEqual(zoneNames(res.state, 'p1', 'discard'), ['T']);
+});
+
+test('Milotic TLC (sm4-27) shuffles only a damaged Benched Pokémon; Tapu Fini Dream Away (sm8-151) the Active on heads', () => {
+  const setup = (s) => {
+    const hurt = mon('Hurt');
+    hurt.damage = 10;
+    s.players.p2.zones.bench.push(mon('Fresh'), hurt);
+  };
+  const tlc = attack(
+    board('Milotic', 'Shuffle 1 of your opponent’s Benched Pokémon that has any damage counters on it and all cards attached to it into their deck.', { setup })
+  );
+  assert.deepEqual(zoneNames(tlc.state, 'p2', 'bench'), ['Fresh']);
+  const dream = 'Flip a coin. If heads, your opponent shuffles their Active Pokémon and all cards attached to it into their deck.';
+  const shuffled = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].some((seed) => {
+    const state = board('Tapu Fini', dream, { setup });
+    const res = applyCommand(state, { type: 'attack', playerId: 'p1', payload: { attackIndex: 0 } }, createRng(seed));
+    return res.state.players.p2.zones.deck.some((c) => c.name === 'Defender');
+  });
+  assert.ok(shuffled);
+});
+
+test('Azelf Psychic Abduction (sm6-43) works only on the second player’s first turn', () => {
+  const text =
+    'You can use this attack only if you go second, and only on your first turn. Shuffle 1 of your opponent’s Benched Pokémon and all cards attached to it into their deck.';
+  const setup = (s) => s.players.p2.zones.bench.push(mon('Target'));
+  const firstTurn = attack(board('Azelf', text, { setup, turn: 2 }));
+  assert.deepEqual(zoneNames(firstTurn.state, 'p2', 'bench'), []);
+  const later = applyCommand(board('Azelf', text, { setup, turn: 4 }), { type: 'attack', playerId: 'p1', payload: { attackIndex: 0 } }, createRng(3));
+  assert.ok(later.error || later.state.players.p2.zones.bench.length === 1);
+});
+
+test('Guzzlord Lord’s Valley (sm6-80) mills 10 only with exactly 2, 4 or 6 Prizes left', () => {
+  const text = 'If you have exactly 2, 4, or 6 Prize cards remaining, discard the top 10 cards of your deck.';
+  assert.equal(attack(board('Guzzlord', text, { damage: '160' })).state.players.p1.zones.deck.length, 0);
+  const five = attack(board('Guzzlord', text, { damage: '160', setup: (s) => s.players.p1.zones.prizes.pop() }));
+  assert.equal(five.state.players.p1.zones.deck.length, 10);
 });
