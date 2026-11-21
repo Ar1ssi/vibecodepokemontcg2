@@ -2309,3 +2309,14 @@ test('Xerneas Geomancy: with only 1 Benched Pokémon, it takes the one Fairy Ene
   assert.equal(hostOf(res.state, fairy[0]), bench.instanceId);
   assert.equal(res.state.players.p1.zones.hand.length, 0);
 });
+
+test('Malamar Drag Off (customhb set.json): with no printed number, the text\'s 30 damage lands on the new Active Pokémon', () => {
+  const text =
+    "Switch 1 of your opponent’s Benched Pokémon with their Active Pokémon. This attack does 30 damage to the new Active Pokémon.";
+  let bench;
+  const { state, defender } = board('Malamar', text, { damage: '', setup: (s) => (bench = addBench(s, 'p2', 'Inkay')) });
+  const res = attack(state);
+  assert.equal(oppActive(res.state).instanceId, bench[0].instanceId);
+  assert.equal(oppActive(res.state).damage, 30);
+  assert.equal(root(res.state, 'p2', defender.instanceId).damage || 0, 0);
+});
