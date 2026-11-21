@@ -104,9 +104,9 @@ function targetsOpponentActiveAbilityOnly(step) {
 
 // Rocky Fighting / Mist / Wash Water / Wonder Energy (audit SE5): "Prevent all effects of
 // attacks used by your opponent's Pokémon done to the Pokémon this card is attached to."
-function opponentActiveEffectShielded(opponent) {
+function opponentActiveEffectShielded(draft, opponent) {
   const active = (opponent?.zones?.active || []).find((c) => !c.attachedTo);
-  return Boolean(active) && specialEnergyShielded(opponent, active, 'effect');
+  return Boolean(active) && specialEnergyShielded(opponent, active, 'effect', draft.stadium);
 }
 
 // Fusion Strike Energy: same shape, for the opponent's Abilities; also an Ability shield on that
@@ -115,7 +115,7 @@ function opponentActiveAbilityShielded(draft, opponent) {
   const active = (opponent?.zones?.active || []).find((c) => !c.attachedTo);
   if (!active) return false;
   return (
-    specialEnergyShielded(opponent, active, 'ability') ||
+    specialEnergyShielded(opponent, active, 'ability', draft.stadium) ||
     cardEffectShielded(draft, { owner: opponent, root: active, source: 'Ability' })
   );
 }
@@ -577,7 +577,7 @@ export function executeSteps(draft, {
     if (
       effectType === 'attackSteps' &&
       targetsOpponentActiveOnly(step) &&
-      opponentActiveEffectShielded(opponent)
+      opponentActiveEffectShielded(draft, opponent)
     ) {
       events.push({ type: 'effectStepSkipped', reason: 'effect_shield', step: step.type });
       continue;

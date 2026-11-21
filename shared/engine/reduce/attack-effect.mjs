@@ -1327,7 +1327,7 @@ export function resolveAttackEffectPhase(draft, ctx) {
         const defMarkers = defRef ? activeAttackMarkers(draft, defRef.playerId, defRef.card) : [];
         const shielded =
           defRef &&
-          (hasSpecialEnergyEffectShield(inPlayView(draft, defRef.card), defZone) ||
+          (hasSpecialEnergyEffectShield(inPlayView(draft, defRef.card), defZone, draft.stadium) ||
             markersPreventEffects(defMarkers, attackerView) ||
             abilityEffectShield(draft, defRef, attackerView));
         if (defRef && defRef.zoneId === 'active' && !shielded) {

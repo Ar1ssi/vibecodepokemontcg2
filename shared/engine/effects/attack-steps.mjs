@@ -87,7 +87,7 @@ export const ATTACK_NO = -12;
  * same shield printed as an Ability on that side.
  */
 function attackEffectShielded(ctx, owner, root, kind = 'effect') {
-  if (specialEnergyShielded(owner, root, kind)) return true;
+  if (specialEnergyShielded(owner, root, kind, ctx.draft.stadium)) return true;
   if (kind !== 'effect' || owner !== ctx.opponent || !root) return false;
   const zone = [...(owner.zones?.active || []), ...(owner.zones?.bench || [])];
   const markers = liveAttackMarkers(root, { turnNumber: ctx.draft.turn?.number || 1, zoneCards: zone });

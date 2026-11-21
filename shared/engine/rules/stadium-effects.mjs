@@ -17,7 +17,7 @@ import { getAttachedSpecialEnergies, parseSpecialEnergyEffects } from './special
 import { isAncientTraitAbility } from './abilities.mjs';
 import { isRuleBoxPokemon, isTeraCard, isExCard, isGxCard, isVCard } from './card-classify.mjs';
 import { isDeltaSpecies, resolveAttachedEnergyType } from './energy-effects.mjs';
-import { getSpecialEnergyHpBonus } from './special-energy-parse.mjs';
+import { getSpecialEnergyHpBonus, stadiumBlanksSpecialEnergy } from './special-energy-parse.mjs';
 import { matchesSearch } from './search-match.mjs';
 //
 // Layers:
@@ -137,12 +137,7 @@ export function isStadiumStatusPersistsOnEvolve(card) {
 
 /** Temple of Sinnoh: Special Energy provides {C} and has no other effect. */
 export function isStadiumSpecialEnergyColorless(card) {
-  const t = textOf(card);
-  return (
-    /special energy/.test(t) &&
-    /provide \{c\}/.test(t) &&
-    /no other effect/.test(t)
-  );
+  return stadiumBlanksSpecialEnergy(card);
 }
 
 /** Crystal Beach: Special Energy providing ≥2 now provides only 1 {C}. */
@@ -1715,7 +1710,11 @@ export function effectiveHp(
   let total = base + getStadiumHpBonus(targetPlayer, pokemon, stadiumOverride);
   // Special-energy +HP modifiers (Growing Grass, Heat, …): taxonomy §F Gap #4c.
   if (zoneCards?.length && pokemon) {
-    total += getSpecialEnergyHpBonus(pokemon, zoneCards);
+    total += getSpecialEnergyHpBonus(
+      pokemon,
+      zoneCards,
+      stadiumOverride || (rulesState.enabled ? getStadium() : null)
+    );
   }
   const blockTools = stadiumOverride
     ? isStadiumToolNegation(stadiumOverride.card || stadiumOverride)

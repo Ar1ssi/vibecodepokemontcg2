@@ -1353,7 +1353,7 @@ export function validateLegality(state, command) {
         return { allowed: false, reason: `${active.name} can't retreat.` };
       }
       // Boost Energy: "The Pokémon this card is attached to can't retreat."
-      if (hasSpecialEnergyCannotRetreat(inPlayView(state, active), player.zones?.active || [])) {
+      if (hasSpecialEnergyCannotRetreat(inPlayView(state, active), player.zones?.active || [], state.stadium)) {
         return { allowed: false, reason: "This Pokémon's Energy says it can't retreat." };
       }
       // Omastar 151: the opponent's Active can't retreat while the holder is

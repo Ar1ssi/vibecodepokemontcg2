@@ -513,6 +513,7 @@ export const moveCard = async (
       (c) => c.type === 'Pokémon' && c.image === movingCard.image.relative
     );
     const discardPlans = planSpecialEnergyTriggers(movingCard, {
+      stadium: getStadium(),
       trigger: 'discard',
       host: hostPokemon,
       zoneArray: oZone.array,

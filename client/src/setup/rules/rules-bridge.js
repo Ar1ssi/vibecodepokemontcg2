@@ -629,6 +629,7 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
                 );
                 for (const energy of energies) {
                   const plans = planSpecialEnergyTriggers(energy, {
+                    stadium: getStadium(),
                     trigger: 'endTurn',
                     host,
                     zoneArray: z.array,
@@ -1752,6 +1753,7 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
           };
 
           const plans = planSpecialEnergyTriggers(energy, {
+            stadium: getStadium(),
             trigger: 'attach',
             host: pokemon,
             zoneArray: hostZone?.array || [],
@@ -2025,6 +2027,7 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
                     if (e && e.type === 'Energy' && e.image?.relative === card.image) {
                       koPlans.push(
                         ...planSpecialEnergyTriggers(e, {
+                          stadium: getStadium(),
                           trigger: 'knockout',
                           host: card,
                           zoneArray: zone.array,
@@ -3469,6 +3472,7 @@ if (!isTrainer) {
           (c) => c && c.type === 'Energy' && c.image?.relative === evolvedCard.image && isSpecialEnergyCard(c)
         )) {
           const plans = planSpecialEnergyTriggers(energy, {
+            stadium: getStadium(),
             trigger: 'evolve',
             host: evolvedCard,
             zoneArray: z.array,
