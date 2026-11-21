@@ -207,3 +207,60 @@ test('resolveEntry and chooseCandidate resolve custom set codes from deps.setIds
   assert.equal(unknownCode.card.id, 'swsh3-88', 'an unknown code falls back to the name search as before');
   assert.deepEqual(fetched, ['customhbw-001'], 'no id lookup for a code nobody knows');
 });
+
+// Lines from justinbasil.com/retro/sum-lot (Limitless-style SM-era lists); names checked against
+// TCGdex: sm5-136 "Super Boost Energy ◇", sm3.5-53 "Zoroark GX", sm8-188 "Professor Elm’s Lecture",
+// sm6-118 "Unit Energy FightingDarknessFairy".
+test('parseDeckText handles "Trainer Cards - 27" headers and SWSHEnergy-series codes', () => {
+  const { entries, skipped } = parseDeckText(
+    ['Energy - 8', 'Trainer Cards - 27', '4 Grass Energy SWSHEnergy 1', '3 Cynthia UPR 119'].join('\n')
+  );
+  assert.deepEqual(skipped, []);
+  assert.deepEqual(
+    entries.map(({ name, setCode, number }) => ({ name, setCode, number })),
+    [
+      { name: 'Grass Energy', setCode: 'SWSHEnergy', number: '1' },
+      { name: 'Cynthia', setCode: 'UPR', number: '119' },
+    ]
+  );
+});
+
+test('setIdForCode knows Sun & Moon and Sword & Shield codes', () => {
+  assert.equal(setIdForCode('LOT'), 'sm8');
+  assert.equal(setIdForCode('SLG'), 'sm3.5');
+  assert.equal(setIdForCode('CPA'), 'swsh3.5');
+  assert.equal(setIdForCode('PR-SM'), 'smp');
+});
+
+test('resolveEntry matches list spellings to TCGdex names (Prism Star, -GX, apostrophes, Unit Energy)', async () => {
+  const cases = [
+    { line: '1 Super Boost Energy {*} UPR 136', id: 'sm5-136', tcgdex: 'Super Boost Energy ◇', search: 'Super Boost Energy' },
+    { line: '3 Zoroark-GX SLG 53', id: 'sm3.5-53', tcgdex: 'Zoroark GX', search: 'Zoroark GX' },
+    { line: "3 Professor Elm's Lecture LOT 188", id: 'sm8-188', tcgdex: 'Professor Elm’s Lecture', search: 'Professor Elm’s Lecture' },
+    { line: '4 Unit Energy FDY FLI 118', id: 'sm6-118', tcgdex: 'Unit Energy FightingDarknessFairy', search: 'Unit Energy FightingDarknessFairy' },
+  ];
+  for (const { line, id, tcgdex, search } of cases) {
+    const [entry] = parseDeckText(line).entries;
+    const [setId, number] = [id.split('-')[0], id.split('-')[1]];
+    const target = card(id, tcgdex, setId, number);
+    // Name search only (no id hit): proves the search term and the name comparison.
+    const searched = [];
+    const byName = await resolveEntry(entry, {
+      fetchCardDetail: async () => {
+        throw new Error('404');
+      },
+      searchByName: async (term) => {
+        searched.push(term);
+        return [target];
+      },
+    });
+    assert.equal(byName.card?.id, id, line);
+    assert.deepEqual(searched, [search], line);
+    // Direct id hit: the name guard accepts the TCGdex spelling.
+    const byId = await resolveEntry(entry, {
+      fetchCardDetail: async (requested) => (requested.startsWith(`${setId}-`) ? target : Promise.reject(new Error('404'))),
+      searchByName: async () => [],
+    });
+    assert.equal(byId.card?.id, id, line);
+  }
+});
