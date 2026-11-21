@@ -408,6 +408,11 @@ const TEMPLATES = [
     new RegExp(String.raw`^for each of your opponent's pokémon in play, attach an? ${ENERGY_TYPE}energy card from your discard pile to your pokémon in any way you like$`),
     (m, s) => ({ type: 'atkAttach', source: 'discard', countFrom: 'opponentInPlay', ...energyFilter(m[1], s), target: 'any', spread: true }),
   ],
+  // Alolan Marowak Dance of Flames (sm4-12).
+  [
+    new RegExp(String.raw`^for each energy attached to your opponent's pokémon, attach an? ${ENERGY_TYPE}energy card from your discard pile to your pokémon in any way you like$`),
+    (m, s) => ({ type: 'atkAttach', source: 'discard', countFrom: 'opponentEnergy', ...energyFilter(m[1], s), target: 'any', spread: true }),
+  ],
   // Shuffle clauses.
   // Flabébé Secret Blessings (sm6-84): "Shuffle 3 in any combination of Pokémon and basic Energy
   // cards from your discard pile into your deck."
@@ -1541,7 +1546,7 @@ const BLOCKS = [
   // Deck-top Energy attach: Lapras ex Larimar Rain, Dragonite VSTAR Draconic Star ("{W} or {L}"),
   // Ampharos-EX Thunder Rod, Hatterene V Horoscope ("put the other cards back in any order").
   [
-    /look at the top (\d+) cards of your deck(?: and|\. you may) attach (?:any number of|as many) ((?:\{[a-z]\}(?: or \{[a-z]\})? )?)energy cards you find there (?:as you like )?to (this pokémon|your pokémon in any way you like)\. (shuffle the other cards back into your deck|put the other cards back in any order|discard the other cards)\./g,
+    /look at the top (\d+) cards of your deck(?: and|\. you may) attach (?:any number of|as many) ((?:\{[a-z]\}(?: or \{[a-z]\})? )?)energy cards you find there (?:as you like )?to (this pokémon|your pokémon in any way you like|1 of your pokémon)\. (shuffle the other cards back into your deck|put the other cards back in any order|discard the other cards)\./g,
     (m) => {
       const types = [...m[2].matchAll(/\{([a-z])\}/g)].map((t) => t[1].toUpperCase());
       return {
@@ -1551,7 +1556,8 @@ const BLOCKS = [
         anyNumber: true,
         ...(types.length ? { energyTypes: types } : {}),
         target: m[3] === 'this pokémon' ? 'self' : 'any',
-        ...(m[3] === 'this pokémon' ? {} : { spread: true }),
+        // Heatran Steelworks (sm7-98): "to 1 of your Pokémon" — every card to the one Pokémon.
+        ...(m[3] === 'your pokémon in any way you like' ? { spread: true } : {}),
         // Hydreigon Tri Howl (customhb): "Discard the other cards."
         rest: /shuffle/.test(m[4]) ? 'shuffle' : /discard/.test(m[4]) ? 'discard' : 'keep',
       };
@@ -1670,6 +1676,31 @@ const BLOCKS = [
   [
     /discard 1 of your prize cards\. if it's an energy card, attach it to 1 of your pokémon\./g,
     () => ({ type: 'atkDiscardPrize', count: 1, attachIfEnergy: true }),
+  ],
+  // Mawile Mining (sm7-91): an Item to the hand; a Pokémon Tool may be attached instead.
+  [
+    /search your deck for an item card, reveal it, and put it into your hand\. then, shuffle your deck\. if that card is a pokémon tool card, instead of putting it into your hand, you may attach it to 1 of your pokémon that doesn't already have a pokémon tool attached to it\./g,
+    () => ({ type: 'atkSearchItemToolOption' }),
+  ],
+  // Pachirisu Snuggly Generator (sm5-49).
+  [
+    /for each of your benched pokémon that has the (.+?) attack, search your deck for an? \{([a-z])\} energy card and attach it to that pokémon\. then, shuffle your deck\./g,
+    (m) => ({ type: 'atkAttachEachBench', source: 'deck', withAttack: m[1], energyType: m[2].toUpperCase() }),
+  ],
+  // Delibird Happy Delivery (sm8-57).
+  [
+    /choose any number of your benched pokémon that don't already have a pokémon tool attached to them\. for each of those pokémon, search your deck for a pokémon tool card and attach it to that pokémon\. then, shuffle your deck\./g,
+    () => ({ type: 'atkAttachEachBench', source: 'deck', what: 'tool', anyNumber: true, noTool: true }),
+  ],
+  // Guzzlord-GX Eat Sloppily (sm4-63) / Torkoal Flaming Honk (sm7-29): the milled Energy is attached.
+  [
+    /discard the top (\d+) cards of your deck\. if any of those cards are (?:\{([a-z])\} )?energy cards, attach them to (this pokémon|your pokémon in any way you like)\./g,
+    (m) => ({
+      type: 'atkMillAttachMatching',
+      count: Number(m[1]),
+      ...(m[2] ? { energyType: m[2].toUpperCase() } : {}),
+      target: m[3] === 'this pokémon' ? 'self' : 'any',
+    }),
   ],
   // Magcargo-GX Crushing Charge (design 048): mill the deck top, attach it if it is a Basic
   // Energy. The block consumes both sentences so the plain atkMill template cannot drop the
@@ -2130,7 +2161,12 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
       const placeholders = [];
       for (const step of [].concat(built)) {
         blockSteps.push(step);
-        if (step.type === 'searchAbility' || step.type === 'searchEvolve' || step.type === 'atkSearchDeckFallback') {
+        if (
+          step.type === 'searchAbility' ||
+          step.type === 'searchEvolve' ||
+          step.type === 'atkSearchDeckFallback' ||
+          step.type === 'atkSearchItemToolOption'
+        ) {
           result.handlesSearch = true;
         }
         placeholders.push(`@block${blockSteps.length - 1}.`);

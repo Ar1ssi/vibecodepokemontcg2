@@ -535,3 +535,104 @@ test('Dunsparce Strike and Run (sm7-110) may switch only after benching from its
   const none = attack(board('Dunsparce', text, { setup: (s) => s.players.p1.zones.bench.push(mon('Old')) }), yes).state;
   assert.equal(activeName(none, 'p1'), 'Dunsparce');
 });
+
+// ── searches and attaches ───────────────────────────────────────────────────
+
+const attachedTo = (state, playerId, host) =>
+  [...state.players[playerId].zones.active, ...state.players[playerId].zones.bench]
+    .filter((c) => c.attachedTo === host.instanceId)
+    .map((c) => c.name)
+    .sort();
+const deckTop = (cards) => (s) => s.players.p1.zones.deck.unshift(...cards);
+
+test('Guzzlord-GX Eat Sloppily (sm4-63) attaches every Energy among the 5 discarded cards', () => {
+  const text = 'Discard the top 5 cards of your deck. If any of those cards are Energy cards, attach them to this Pokémon.';
+  const state = board('Guzzlord GX', text, { setup: deckTop([energy('Darkness'), trainer('X'), energy('Fire')]) });
+  const res = attack(state);
+  const guzzlord = res.state.players.p1.zones.active.find((c) => !c.attachedTo);
+  assert.deepEqual(attachedTo(res.state, 'p1', guzzlord), ['Basic Darkness Energy', 'Basic Fire Energy']);
+  assert.equal(res.state.players.p1.zones.discard.length, 3);
+});
+
+test('Torkoal Flaming Honk (sm7-29) attaches only the discarded Fire Energy, to any Pokémon', () => {
+  const text = 'Discard the top 4 cards of your deck. If any of those cards are Fire Energy cards, attach them to your Pokémon in any way you like.';
+  const setup = (s) => {
+    deckTop([energy('Fire'), energy('Water'), energy('Fire')])(s);
+    s.players.p1.zones.bench.push(mon('Slugma'));
+  };
+  const res = attack(board('Torkoal', text, { damage: '30', setup }), (pc) => [pc.options.find((o) => o.name === 'Slugma').instanceId]);
+  const slugma = res.state.players.p1.zones.bench[0];
+  assert.deepEqual(attachedTo(res.state, 'p1', slugma), ['Basic Fire Energy', 'Basic Fire Energy']);
+  assert.ok(zoneNames(res.state, 'p1', 'discard').includes('Basic Water Energy'));
+});
+
+test('Pachirisu Snuggly Generator (sm5-49) powers only Benched Pokémon with Nuzzle', () => {
+  const text =
+    'For each of your Benched Pokémon that has the Nuzzle attack, search your deck for a Lightning Energy card and attach it to that Pokémon. Then, shuffle your deck.';
+  const setup = (s) => {
+    s.players.p1.zones.bench.push(mon('Dedenne', { attacks: [{ name: 'Nuzzle', cost: [], damage: '', text: '' }] }), mon('Plain'));
+    s.players.p1.zones.deck.push(energy('Lightning'), energy('Lightning'));
+  };
+  const res = attack(board('Pachirisu', text, { setup }));
+  const [dedenne, plain] = res.state.players.p1.zones.bench;
+  assert.deepEqual(attachedTo(res.state, 'p1', dedenne), ['Basic Lightning Energy']);
+  assert.deepEqual(attachedTo(res.state, 'p1', plain), []);
+});
+
+test('Delibird Happy Delivery (sm8-57) attaches a chosen Tool from the deck to each chosen Pokémon without one', () => {
+  const text =
+    'Choose any number of your Benched Pokémon that don’t already have a Pokémon Tool attached to them. For each of those Pokémon, search your deck for a Pokémon Tool card and attach it to that Pokémon. Then, shuffle your deck.';
+  const tool = (name) => trainer(name, 'Pokémon Tool', { trainerType: 'Tool' });
+  const setup = (s) => {
+    const holding = mon('Holding');
+    s.players.p1.zones.bench.push(mon('Empty'), holding, Object.assign(tool('Old Tool'), { attachedTo: holding.instanceId }));
+    s.players.p1.zones.deck.push(tool('Choice Band'), tool('Float Stone'));
+  };
+  const res = attack(board('Delibird', text, { setup }), (pc) =>
+    pc.max > 1 ? pc.options.map((o) => o.instanceId) : [pc.options.find((o) => o.name === 'Float Stone')?.instanceId ?? pc.options[0].instanceId]
+  );
+  const [empty, holding] = res.state.players.p1.zones.bench.filter((c) => !c.attachedTo);
+  assert.deepEqual(attachedTo(res.state, 'p1', empty), ['Float Stone']);
+  assert.deepEqual(attachedTo(res.state, 'p1', holding), ['Old Tool']);
+});
+
+test('Mawile Mining (sm7-91): an Item goes to the hand; only a Tool may be attached instead', () => {
+  const text =
+    'Search your deck for an Item card, reveal it, and put it into your hand. Then, shuffle your deck. If that card is a Pokémon Tool card, instead of putting it into your hand, you may attach it to 1 of your Pokémon that doesn’t already have a Pokémon Tool attached to it.';
+  const pickNamed = (name) => (pc) => [(pc.options.find((o) => o.name === name || o.name === 'Yes') || pc.options[0]).instanceId];
+  const potion = attack(board('Mawile', text, { setup: (s) => s.players.p1.zones.deck.push(trainer('Potion')) }), pickNamed('Potion'));
+  assert.deepEqual(zoneNames(potion.state, 'p1', 'hand'), ['Potion']);
+  const band = attack(
+    board('Mawile', text, { setup: (s) => s.players.p1.zones.deck.push(trainer('Choice Band', 'Pokémon Tool', { trainerType: 'Tool' })) }),
+    pickNamed('Choice Band')
+  );
+  const mawile = band.state.players.p1.zones.active.find((c) => !c.attachedTo);
+  assert.deepEqual(attachedTo(band.state, 'p1', mawile), ['Choice Band']);
+});
+
+test('Alolan Marowak Dance of Flames (sm4-12) attaches one Fire Energy per opposing Energy', () => {
+  const text = 'For each Energy attached to your opponent’s Pokémon, attach a Fire Energy card from your discard pile to your Pokémon in any way you like.';
+  const setup = (s, { defender }) => {
+    s.players.p2.zones.active.push(energy('Water', defender.instanceId), energy('Grass', defender.instanceId));
+    s.players.p1.zones.discard.push(energy('Fire'), energy('Fire'), energy('Fire'));
+  };
+  const res = attack(board('Alolan Marowak', text, { setup }), (pc) => pc.options.slice(0, pc.min || 1).map((o) => o.instanceId));
+  assert.equal(zoneNames(res.state, 'p1', 'discard').length, 1);
+});
+
+test('Heatran Steelworks (sm7-98) attaches the Metal Energy from the top 4 to one Pokémon', () => {
+  const text =
+    'Look at the top 4 cards of your deck and attach any number of Metal Energy cards you find there to 1 of your Pokémon. Shuffle the other cards back into your deck.';
+  const res = attack(board('Heatran', text, { setup: deckTop([energy('Metal'), trainer('X'), energy('Metal'), energy('Fire')]) }), (pc) =>
+    pc.options.map((o) => o.instanceId).slice(0, pc.max)
+  );
+  const heatran = res.state.players.p1.zones.active.find((c) => !c.attachedTo);
+  assert.deepEqual(attachedTo(res.state, 'p1', heatran), ['Basic Metal Energy', 'Basic Metal Energy']);
+});
+
+test('Silcoon Cocoon Collector (sm8-25) benches Silcoon and Cascoon in any combination', () => {
+  const text = 'Search your deck for up to 4 in any combination of Silcoon and Cascoon and put them onto your Bench. Then, shuffle your deck.';
+  const setup = (s) => s.players.p1.zones.deck.push(mon('Silcoon'), mon('Cascoon'), mon('Wurmple'));
+  const res = attack(board('Silcoon', text, { setup }), (pc) => pc.options.map((o) => o.instanceId).slice(0, pc.max));
+  assert.deepEqual(zoneNames(res.state, 'p1', 'bench').sort(), ['Cascoon', 'Silcoon']);
+});

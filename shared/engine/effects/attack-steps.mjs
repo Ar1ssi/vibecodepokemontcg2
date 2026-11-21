@@ -1222,6 +1222,56 @@ function atkMillAttachIfEnergy(ctx) {
   });
 }
 
+// Guzzlord-GX Eat Sloppily / Torkoal Flaming Honk: discard the top N cards, then attach the
+// Energy cards (of the printed type) among them to this Pokémon, or to your Pokémon one by one.
+function atkMillAttachMatching(ctx) {
+  const { player, step } = ctx;
+  let pending = ctx.memo?.pending;
+  if (!pending) {
+    const deck = player.zones.deck || [];
+    if (deck.length === 0) return skip(ctx, 'empty_deck');
+    const milled = deck.splice(0, Math.min(step.count || 1, deck.length));
+    discardCards(player, milled, ctx.events);
+    pending = milled
+      .filter((c) => isEnergy(c) && (!step.energyType || energyMatches(c, { energyType: step.energyType })))
+      .map((c) => c.instanceId);
+  }
+  const inDiscard = (id) => (player.zones.discard || []).find((c) => c.instanceId === id);
+  if (step.target === 'self') {
+    const ref = attackerRef(ctx);
+    if (!ref) return skip(ctx, 'attacker_left_play');
+    for (const id of pending) {
+      const card = inDiscard(id);
+      if (card) attachTo(player, card, ref.card, ctx.events);
+    }
+    return null;
+  }
+  const targets = rootsOf(player);
+  let [current, ...rest] = pending;
+  if (ctx.memo?.pending && ctx.selection) {
+    const target = targets.find((c) => c.instanceId === ctx.selection[0]);
+    const card = inDiscard(current);
+    if (target && card) attachTo(player, card, target, ctx.events);
+    [current, ...rest] = rest;
+  }
+  for (; current != null; [current, ...rest] = rest) {
+    const card = inDiscard(current);
+    if (!card || targets.length === 0) continue;
+    if (targets.length === 1) {
+      attachTo(player, card, targets[0], ctx.events);
+      continue;
+    }
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: Attach ${card.name} to which Pokémon?`,
+      options: targets,
+      min: 1,
+      max: 1,
+      memo: { pending: [current, ...rest] },
+    });
+  }
+  return null;
+}
+
 // ── attach from the discard pile / hand ─────────────────────────────────────
 
 // A printed group or mark on the Pokémon: 'rapid strike' (subtypes), 'team plasma' (the name),
@@ -1326,7 +1376,15 @@ function attachFromZone(ctx) {
   if (targets.length === 0) return skip(ctx, 'no_target');
 
   // Solgaleo / Lunala Prism Star: one Energy for each of the opponent's Pokémon in play.
-  const count = step.countFrom === 'opponentInPlay' ? rootsOf(ctx.opponent).length : step.count || 1;
+  // Alolan Marowak Dance of Flames: one per Energy attached to the opponent's Pokémon.
+  const opponentEnergy = () =>
+    rootsOf(ctx.opponent).reduce((sum, root) => sum + attachedCards(ctx.opponent, root.instanceId).filter(isEnergy).length, 0);
+  const count =
+    step.countFrom === 'opponentInPlay'
+      ? rootsOf(ctx.opponent).length
+      : step.countFrom === 'opponentEnergy'
+        ? opponentEnergy()
+        : step.count || 1;
   const max = step.anyNumber ? candidates.length : Math.min(count, candidates.length);
   const min = step.anyNumber || step.upTo ? 0 : max;
   if (min === max && max === candidates.length) return attachPicked(ctx, candidates, targets);
@@ -4367,11 +4425,15 @@ function atkLookDeckReorder(ctx) {
 // Pokémon". Energy of one type is interchangeable, so each Pokémon takes the next match.
 function atkAttachEachBench(ctx) {
   const { player, step } = ctx;
-  // Blaziken VMAX (Rapid Strike), Latias Prism Star (Basic {N}).
+  if (ctx.memo?.toolTargets) return attachEachBenchTools(ctx, ctx.memo.toolTargets);
+  // Blaziken VMAX (Rapid Strike), Latias Prism Star (Basic {N}); Pachirisu Snuggly Generator
+  // (`withAttack`: "that has the Nuzzle attack"), Delibird Happy Delivery (`noTool`).
   const bench = benchRootsOf(player).filter((c) => {
     const top = topPokemonCard(player, c) || c;
     if (step.tag && !rootHasTag(player, c, step.tag)) return false;
     if (step.basicOnly && stageOf(top) !== 'Basic') return false;
+    if (step.withAttack && !(top.attacks || []).some((a) => String(a?.name || '').toLowerCase() === step.withAttack)) return false;
+    if (step.noTool && attachedCards(player, c.instanceId).some(isToolCard)) return false;
     return !step.pokemonType || pokemonHasType(top, step.pokemonType);
   });
   if (bench.length === 0) return skip(ctx, 'no_bench_pokemon');
@@ -4381,6 +4443,20 @@ function atkAttachEachBench(ctx) {
   let selection = ctx.selection;
   if (shortageStage) {
     chosen = bench.filter((c) => ctx.memo.targetIds.includes(c.instanceId));
+  } else if (step.anyNumber) {
+    // Happy Delivery: "Choose any number of your Benched Pokémon …".
+    if (!ctx.memo?.picked) {
+      return ctx.ask({
+        prompt: `${attackName(ctx)}: Choose any number of your Benched Pokémon`,
+        options: bench,
+        min: 0,
+        max: bench.length,
+        memo: { picked: true },
+      });
+    }
+    chosen = pickById(bench, selection || []);
+    selection = null;
+    if (step.what === 'tool') return attachEachBenchTools({ ...ctx, selection: null }, chosen.map((c) => c.instanceId));
   } else if (step.max && bench.length > step.max) {
     if (!selection) {
       return ctx.ask({
@@ -4415,6 +4491,82 @@ function atkAttachEachBench(ctx) {
   }
   if (step.source === 'deck') shuffleOwnDeck(player, ctx);
   return null;
+}
+
+// Mawile Mining: search for an Item card (Pokémon Tools are Items) and put it into the hand; a Tool
+// may instead be attached to 1 of your Pokémon that has no Tool.
+function atkSearchItemToolOption(ctx) {
+  const { player } = ctx;
+  const deck = player.zones.deck || [];
+  const memo = ctx.memo || {};
+  const toolHosts = () => rootsOf(player).filter((c) => !attachedCards(player, c.instanceId).some(isToolCard));
+  const finish = (card) => {
+    if (card) moveToZone(player, card, 'hand', 'deck', ctx.events);
+    shuffleOwnDeck(player, ctx);
+    return null;
+  };
+  if (memo.attachTo) {
+    const card = deck.find((c) => c.instanceId === memo.cardId);
+    const host = toolHosts().find((c) => c.instanceId === ctx.selection?.[0]);
+    if (!card || !host) return finish(card);
+    attachTo(player, card, host, ctx.events);
+    return finish(null);
+  }
+  if (memo.offer) {
+    const card = deck.find((c) => c.instanceId === memo.cardId);
+    if (ctx.selection?.[0] !== ATTACK_YES) return finish(card);
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: Attach ${card?.name || 'the Pokémon Tool'} to which Pokémon?`,
+      options: toolHosts(),
+      min: 1,
+      max: 1,
+      memo: { attachTo: true, cardId: memo.cardId },
+    });
+  }
+  const items = deck.filter((c) => matchesSearch(c, 'Item') || isToolCard(c));
+  if (!memo.searched) {
+    if (items.length === 0) return finish(null);
+    return ctx.ask({ prompt: `${attackName(ctx)}: Choose an Item card`, options: items, min: 0, max: 1, memo: { searched: true } });
+  }
+  const card = items.find((c) => c.instanceId === ctx.selection?.[0]);
+  if (!card) return finish(null);
+  ctx.events.push({ type: 'cardsRevealed', playerId: player.playerId, cards: [revealedCard(card)] });
+  if (!isToolCard(card) || toolHosts().length === 0) return finish(card);
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Attach ${card.name} to 1 of your Pokémon instead of putting it into your hand?`,
+    options: [
+      { instanceId: ATTACK_YES, name: 'Yes', type: 'option' },
+      { instanceId: ATTACK_NO, name: 'No', type: 'option' },
+    ],
+    min: 1,
+    max: 1,
+    memo: { offer: true, cardId: card.instanceId },
+  });
+}
+
+// Happy Delivery: for each chosen Pokémon in turn, the player picks a Pokémon Tool from the deck.
+function attachEachBenchTools(ctx, targetIds) {
+  const { player } = ctx;
+  const [current, ...rest] = targetIds;
+  const tools = () => (player.zones.deck || []).filter(isToolCard);
+  if (current != null && ctx.selection) {
+    const tool = tools().find((c) => c.instanceId === ctx.selection[0]);
+    const host = benchRootsOf(player).find((c) => c.instanceId === current);
+    if (tool && host) attachTo(player, tool, host, ctx.events);
+    return attachEachBenchTools({ ...ctx, selection: null }, rest);
+  }
+  if (current == null || tools().length === 0) {
+    shuffleOwnDeck(player, ctx);
+    return null;
+  }
+  const host = benchRootsOf(player).find((c) => c.instanceId === current);
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose a Pokémon Tool to attach to ${host?.name || 'that Pokémon'}`,
+    options: tools(),
+    min: 1,
+    max: 1,
+    memo: { toolTargets: targetIds },
+  });
 }
 
 function atkShuffleFromDiscard(ctx) {
@@ -4645,6 +4797,8 @@ export const ATTACK_STEP_HANDLERS = {
   atkDiscardHandEnergy: optional(atkDiscardHandEnergy, (step) => `Discard ${energyLabel(step)} from your hand`),
   atkMill: optional(atkMill, (step) => `Discard the top ${step.count || 1} card(s) of the deck`),
   atkMillAttachIfEnergy,
+  atkMillAttachMatching,
+  atkSearchItemToolOption,
   atkAttachDiscardedForDamage,
   atkPickOppHandCard,
   atkDiscardRecordedIf,
