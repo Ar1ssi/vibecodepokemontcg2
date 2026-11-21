@@ -96,7 +96,8 @@ const DO_MORE =
 // 80 instead of 40." — the bonus is the difference.
 const BASE_BONUS = /^if you do, this attack's base damage is (\d+) instead of (\d+)/;
 
-const PUT_COUNTERS = /^put up to (\d+) damage counters on this pokémon\.$/;
+// Mamoswine Forceful Tackle (sm4-21) prints "You may put up to 9 …".
+const PUT_COUNTERS = /^(?:you may )?put up to (\d+) damage counters on this pokémon\.$/;
 const PER_COUNTER = /^this attack does (\d+) (?:more )?damage for each damage counter you (?:put|placed)(?: on this pokémon)? in this way\.$/;
 
 // Blacephalon (Cosmic Eclipse 104) Mind Blown: the self-counter cost picks which spread lands.
@@ -112,8 +113,17 @@ const BENCH_IF_PAID = /^if you do, this attack does (\d+) damage to each of your
 // Tsareena V / Aegislash ex Royal Command: "You may discard any number of your Benched Pokémon.
 // This attack does 40 more damage for each Benched Pokémon you discarded in this way." M
 // Gardevoir-EX: "Discard as many of your Benched Pokémon as you like. …".
-const DISCARD_BENCH = /^(?:you may discard any number of your benched pokémon|discard as many of your benched pokémon as you like)\.$/;
+// Cofagrigus Spirit Juggling (sm8-100): "Discard any number of your Benched Pokémon."
+const DISCARD_BENCH = /^(?:(?:you may )?discard any number of your benched pokémon|discard as many of your benched pokémon as you like)\.$/;
 const PER_BENCH = /^this attack does (\d+) more damage for each benched pokémon you discarded in this way\.$/;
+
+// Gourgeist Pumpkin Bomb (sm4-45): "Before doing damage, you may discard any number of Pokémon Tool
+// cards from your Pokémon. This attack does 40 more damage for each card you discarded in this way."
+const DISCARD_OWN_TOOLS = /^(?:before doing damage, )?you may discard any number of pokémon tool cards from your pokémon\.$/;
+// Miltank Milk Cannon (sm8-158): "Reveal any number of Moomoo Milk cards in your hand. This attack
+// does 60 damage for each card you revealed in this way."
+const REVEAL_NAMED = /^reveal any number of (.+?) cards in your hand\.$/;
+const PER_CARD = /^this attack does (\d+) (more )?damage for each card you (discarded|revealed) in this way\.$/;
 
 const stripPeriod = (sentence) => sentence.replace(/\.$/, '');
 
@@ -150,6 +160,18 @@ export function optionalCostBonusClause(attackText, selfName = '') {
         perEach: false,
         benchSpread: { amount: Number(benchIfPaid[1]) },
         consumed: [i, i + 1].map((j) => stripPeriod(sentences[j])),
+      };
+    }
+    const perCard = PER_CARD.exec(sentences[i + 1]);
+    const ownTools = perCard?.[3] === 'discarded' && DISCARD_OWN_TOOLS.test(sentences[i]);
+    const revealed = perCard?.[3] === 'revealed' && REVEAL_NAMED.exec(sentences[i]);
+    if (ownTools || revealed) {
+      return {
+        cost: ownTools ? { kind: 'discardOwnTools' } : { kind: 'revealHandNamed', name: revealed[1] },
+        bonus: Number(perCard[1]),
+        extraCondition: null,
+        perEach: true,
+        consumed: [stripPeriod(sentences[i])],
       };
     }
     const perBench = DISCARD_BENCH.test(sentences[i]) && PER_BENCH.exec(sentences[i + 1]);

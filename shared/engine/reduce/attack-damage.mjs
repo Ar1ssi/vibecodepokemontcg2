@@ -432,6 +432,7 @@ export function resolveAttackTargetClause(text, parsed, spread) {
       ...(damage.upTo ? { upTo: true } : {}),
       ...(damage.chooser ? { chooser: damage.chooser } : {}),
       ...(damage.amountPerEnergy ? { amountPerEnergy: true } : {}),
+      ...(damage.amountPerEnergyType ? { amountPerEnergyType: damage.amountPerEnergyType } : {}),
       ...(damage.remainingFromDiscard ? { remainingFromDiscard: true } : {}),
       // Attack damage to the Active applies Weakness/Resistance unless the text
       // waives it for every target ("... for Benched Pokémon" waives only those;

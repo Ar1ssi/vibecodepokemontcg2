@@ -11,7 +11,7 @@
  */
 
 import { kindsOf } from './attack-conditions.mjs';
-import { escapeRegExp } from './attack-text.mjs';
+import { escapeRegExp, symbolizeTypeWords } from './attack-text.mjs';
 import { prizesTakenFor } from '../formats.mjs';
 
 const LETTER_TYPES = {
@@ -38,7 +38,8 @@ const sameType = (a, b) => {
 
 /** The unit text a count reads: its own clause only, own name and Defending Pokémon normalized. */
 export function normalizeUnit(unit, selfName = '') {
-  let out = lower(unit)
+  // TCGdex type words ("Water Energy", Corsola Bubble Shoot sm7.5-27) read as {X} symbols.
+  let out = lower(symbolizeTypeWords(String(unit ?? '')))
     .replace(/[’‘]/g, "'")
     .replace(/pokemon/g, 'pokémon')
     // Empoleon / Grumpig: "Pokémon in play (both yours and your opponent's), excluding Grumpig".

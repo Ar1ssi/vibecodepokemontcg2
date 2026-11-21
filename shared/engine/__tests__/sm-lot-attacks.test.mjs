@@ -636,3 +636,187 @@ test('Silcoon Cocoon Collector (sm8-25) benches Silcoon and Cascoon in any combi
   const res = attack(board('Silcoon', text, { setup }), (pc) => pc.options.map((o) => o.instanceId).slice(0, pc.max));
   assert.deepEqual(zoneNames(res.state, 'p1', 'bench').sort(), ['Cascoon', 'Silcoon']);
 });
+
+// ── costs paid for damage ───────────────────────────────────────────────────
+
+const pickAll = (pc) => pc.options.filter((o) => !/^(?:don't|no)$/i.test(o.name)).slice(0, pc.max).map((o) => o.instanceId ?? o.id);
+
+test('Pay-for-damage attacks count what was paid (Forceful Tackle, Spirit Juggling, Pumpkin Bomb, Milk Cannon, Make a Mess)', () => {
+  const tackle = attack(
+    board('Mamoswine', 'You may put up to 9 damage counters on this Pokémon. This attack does 10 more damage for each damage counter you placed in this way.', { damage: '90+' }),
+    (pc) => [pc.options.at(-1).instanceId]
+  );
+  assert.equal(tackle.dealt, 180);
+  const juggling = attack(
+    board('Cofagrigus', 'Discard any number of your Benched Pokémon. This attack does 30 more damage for each Benched Pokémon you discarded in this way.', {
+      damage: '10+',
+      setup: (s) => s.players.p1.zones.bench.push(mon('A'), mon('B')),
+    }),
+    pickAll
+  );
+  assert.equal(juggling.dealt, 70);
+  const tool = (host) => trainer('Tool', 'Pokémon Tool', { trainerType: 'Tool', attachedTo: host.instanceId });
+  const bomb = attack(
+    board('Gourgeist', 'Before doing damage, you may discard any number of Pokémon Tool cards from your Pokémon. This attack does 40 more damage for each card you discarded in this way.', {
+      damage: '10+',
+      setup: (s, { attacker }) => {
+        const b = mon('B');
+        s.players.p1.zones.active.push(tool(attacker));
+        s.players.p1.zones.bench.push(b, tool(b));
+      },
+    }),
+    pickAll
+  );
+  assert.equal(bomb.dealt, 90);
+  const milk = attack(
+    board('Miltank', 'Reveal any number of Moomoo Milk cards in your hand. This attack does 60 damage for each card you revealed in this way.', {
+      damage: '60×',
+      setup: (s) => s.players.p1.zones.hand.push(trainer('Moomoo Milk'), trainer('Moomoo Milk'), trainer('Potion')),
+    }),
+    pickAll
+  );
+  assert.equal(milk.dealt, 120);
+  assert.equal(milk.state.players.p1.zones.hand.length, 3, 'revealed, not discarded');
+  const mess = attack(
+    board('Snubbull', 'Discard up to 2 Trainer cards from your hand. This attack does 20 damage for each card you discarded in this way.', {
+      damage: '20×',
+      setup: (s) => s.players.p1.zones.hand.push(trainer('A'), trainer('B'), trainer('C'), mon('M')),
+    }),
+    pickAll
+  );
+  assert.equal(mess.dealt, 40);
+});
+
+// ── the opponent's hand, deck and board ─────────────────────────────────────
+
+test('Purugly Toss Aside (sm5-109), Slowking Memory Melt (sm8-55), Nuzleaf Clear the Room (sm7-13)', () => {
+  const hand = (s) => s.players.p2.zones.hand.push(trainer('A'), trainer('B'), trainer('C'), trainer('D'), trainer('Cynthia', 'Supporter'));
+  const toss = attack(board('Purugly', 'Discard random cards from your opponent’s hand until they have 3 cards in their hand.', { damage: '60', setup: hand }));
+  assert.equal(toss.state.players.p2.zones.discard.length, 2);
+  const melt = attack(board('Slowking', 'Look at your opponent’s hand and put a card you find there in the Lost Zone.', { setup: hand }));
+  assert.equal(melt.state.players.p2.zones.lostZone.length, 1);
+  const room = attack(
+    board('Nuzleaf', 'Your opponent reveals their hand. Choose a Supporter card you find there. Your opponent shuffles that card into their deck.', { setup: hand })
+  );
+  assert.ok(room.state.players.p2.zones.deck.some((c) => c.name === 'Cynthia'));
+  assert.ok(!room.state.players.p2.zones.hand.some((c) => c.name === 'Cynthia'));
+});
+
+test('Watchog Scrutinize (sm2-108) discards 1 of the top 2 and leaves the other on top', () => {
+  const res = attack(board('Watchog', 'Look at the top 2 cards of your opponent’s deck, discard 1 of them, and put the other card back.'), (pc) => [pc.options[1].instanceId]);
+  assert.deepEqual(zoneNames(res.state, 'p2', 'discard'), ['p2 deck 1']);
+  assert.ok(zoneNames(res.state, 'p2', 'hand').includes('p2 deck 0'), 'the kept card is drawn next');
+});
+
+test('Espurr Energy Teaser (sm6-44) moves an Energy off an opposing Benched Pokémon', () => {
+  const setup = (s) => {
+    const b = mon('Bench');
+    s.players.p2.zones.bench.push(b, energy('Fire', b.instanceId));
+  };
+  const res = attack(board('Espurr', 'Move an Energy from 1 of your opponent’s Benched Pokémon to another of their Pokémon.', { setup }));
+  const defender = res.state.players.p2.zones.active.find((c) => !c.attachedTo);
+  assert.deepEqual(attachedTo(res.state, 'p2', defender), ['Basic Fire Energy']);
+});
+
+test('Tapu Lele Magical Swap (sm5-94) moves counters between the opponent’s Pokémon until Done', () => {
+  let picks = 0;
+  const res = attack(
+    board('Tapu Lele', 'Move any number of damage counters on your opponent’s Pokémon to their other Pokémon in any way you like.', {
+      setup: (s, { defender }) => {
+        defender.damage = 30;
+        s.players.p2.zones.bench.push(mon('Bench'));
+      },
+    }),
+    (pc) => {
+      picks += 1;
+      const done = pc.options.find((o) => o.name === 'Done');
+      if (done && picks > 4) return [done.instanceId];
+      return [(pc.options.find((o) => (/to which/.test(pc.prompt) ? o.name === 'Bench' : o.name === 'Defender')) || pc.options[0]).instanceId];
+    }
+  );
+  assert.equal(res.state.players.p2.zones.active.find((c) => !c.attachedTo).damage, 10);
+  assert.equal(res.state.players.p2.zones.bench[0].damage, 20);
+});
+
+test('Cinccino Amazing Plea (sm4-86): the opponent’s answer decides cards or 80 damage', () => {
+  const text =
+    'Choose 2 cards from your discard pile. Then, ask your opponent if you may put them into your hand. If yes, put those cards into your hand. If no, this attack does 80 damage to your opponent’s Active Pokémon.';
+  const setup = (s) => s.players.p1.zones.discard.push(trainer('A'), trainer('B'), trainer('C'));
+  const answer = (name) => (pc) =>
+    pc.options.some((o) => o.name === name) ? [pc.options.find((o) => o.name === name).instanceId] : pc.options.slice(0, pc.min).map((o) => o.instanceId);
+  const yes = attack(board('Cinccino', text, { setup }), answer('Yes'));
+  assert.equal(yes.dealt, 0);
+  assert.deepEqual(zoneNames(yes.state, 'p1', 'hand'), ['A', 'B']);
+  const no = attack(board('Cinccino', text, { setup }), answer('No'));
+  assert.equal(no.dealt, 80);
+  assert.deepEqual(zoneNames(no.state, 'p1', 'hand'), []);
+});
+
+test('Shining Jirachi Stellar Reign (sm3.5-42) returns every Evolution card to the hand', () => {
+  const setup = (s, { defender }) => {
+    defender.name = 'Charmander';
+    s.players.p2.zones.active.push(
+      mon('Charmeleon', { stage: 'Stage 1', subtypes: ['Stage 1'], attachedTo: defender.instanceId }),
+      mon('Charizard', { stage: 'Stage 2', subtypes: ['Stage 2'], attachedTo: defender.instanceId })
+    );
+  };
+  const text = 'If your opponent’s Active Pokémon is an evolved Pokémon, devolve it by putting all of the Evolution cards on it into your opponent’s hand.';
+  const res = attack(board('Shining Jirachi', text, { damage: '10', setup }));
+  assert.deepEqual(zoneNames(res.state, 'p2', 'active'), ['Charmander']);
+  assert.deepEqual(zoneNames(res.state, 'p2', 'hand').filter((n) => !n.startsWith('p2 deck')).sort(), ['Charizard', 'Charmeleon']);
+});
+
+// ── spreads and Special Energy ──────────────────────────────────────────────
+
+test('Corsola Bubble Shoot (sm7.5-27) scales with Water Energy only', () => {
+  const text =
+    'This attack does 20 damage times the amount of Water Energy attached to this Pokémon to 1 of your opponent’s Pokémon. (Don’t apply Weakness and Resistance for Benched Pokémon.)';
+  const setup = (s, { attacker }) => s.players.p1.zones.active.push(energy('Water', attacker.instanceId), energy('Water', attacker.instanceId), energy('Fire', attacker.instanceId));
+  const res = attack(board('Corsola', text, { setup }));
+  assert.equal(res.state.players.p2.zones.active.find((c) => !c.attachedTo).damage, 40);
+});
+
+test('Pupitar Dust Devil (sm7-75) hits every non-Fighting Pokémon on both sides', () => {
+  const setup = (s) => {
+    s.players.p1.zones.bench.push(mon('Rock', { types: ['Fighting'] }), mon('Wet', { types: ['Water'] }));
+  };
+  const res = attack(board('Pupitar', 'This attack does 20 damage to each non-Fighting Pokémon (both yours and your opponent’s). (Don’t apply Weakness and Resistance for Benched Pokémon.)', { setup }));
+  const [rock, wet] = res.state.players.p1.zones.bench;
+  assert.equal(rock.damage || 0, 0);
+  assert.equal(wet.damage, 20);
+  assert.equal(res.state.players.p2.zones.active[0].damage, 20);
+});
+
+test('Skarmory Metallic Sound (sm1-88) and Masquerain Surprising Pattern (sm7-16) discard Special Energy', () => {
+  const special = (name, host) =>
+    createCard({ instanceId: 800 + host.instanceId, name, supertype: 'Energy', subtypes: ['Special'], attachedTo: host.instanceId });
+  const setup = (s, { attacker, defender }) => {
+    s.players.p1.zones.active.push(special('Rainbow Energy', attacker), energy('Metal', attacker.instanceId));
+    s.players.p2.zones.active.push(special('Double Colorless Energy', defender), energy('Water', defender.instanceId));
+  };
+  const both = attack(board('Skarmory', 'Discard all Special Energy from each Pokémon.', { setup }));
+  assert.deepEqual(zoneNames(both.state, 'p1', 'discard'), ['Rainbow Energy']);
+  assert.deepEqual(zoneNames(both.state, 'p2', 'discard'), ['Double Colorless Energy']);
+  const theirs = attack(board('Masquerain', 'Discard all Special Energy from each of your opponent’s Pokémon.', { setup }));
+  assert.deepEqual(zoneNames(theirs.state, 'p1', 'discard'), []);
+  assert.deepEqual(zoneNames(theirs.state, 'p2', 'discard'), ['Double Colorless Energy']);
+});
+
+test('Look-only attacks show the attacker the card without naming it to the opponent', () => {
+  const looks = [
+    ['Glance', 'Look at the top card of your opponent’s deck.', 'p2 deck 0'],
+    ['Code Check', 'Look at 1 of your opponent’s face-down Prize cards.', 'p2 prize 0'],
+    ['Searching Light', 'Look at 1 of your face-down Prize cards.', 'p1 prize 0'],
+    ['Eye Opener', 'Look at your face-down Prize cards.', 'p1 prize 5'],
+  ];
+  for (const [name, text, hidden] of looks) {
+    let res = applyCommand(board(name, text), { type: 'attack', playerId: 'p1', payload: { attackIndex: 0 } }, createRng(3));
+    if (/Choose a face-down/.test(res.state.pendingChoice?.prompt || '')) {
+      const pc = res.state.pendingChoice;
+      res = applyCommand(res.state, { type: 'resolveChoice', playerId: 'p1', payload: { choiceId: pc.choiceId, selection: [1] } }, createRng(4));
+    }
+    const pc = res.state.pendingChoice;
+    assert.ok(pc?.options?.[0]?.name.includes(hidden), `${name}: ${pc?.options?.[0]?.name}`);
+    assert.ok(!pc.prompt.includes(hidden), `${name} prompt names the card`);
+  }
+});

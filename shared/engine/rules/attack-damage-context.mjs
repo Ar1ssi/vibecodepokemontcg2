@@ -451,6 +451,7 @@ export function buildServerAttackContext(
       .map((card) => ({ name: card.name || '', prismStar: isPrismStarCard(card) })),
     // Alolan Meowth Spoil the Fun: turn 2 is the second player's first turn.
     goingSecondFirstTurn: turnNumber === 2,
+    pleaRefused: state?.attackPleaRefused === true,
     benchDamaged: ownBench.map(({ card }) => (card.damage || 0) > 0),
     ownDiscardNames: zoneOf(own, 'discard').map((card) => card.name || ''),
     ownInPlayAbilityKinds: ownInPlay.map(({ view }) => abilityKinds(view)),

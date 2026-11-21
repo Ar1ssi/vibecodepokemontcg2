@@ -1417,9 +1417,11 @@ export function resolveAttackEffectPhase(draft, ctx) {
       // Alolan Exeggutor-GX Tropical Head: the snipe scales with the attacker's Energy cards.
       if (attackTarget?.amountPerEnergy) {
         const ref = attacker ? findCard(draft, attacker.instanceId) : null;
-        const energyCards = ref
-          ? (ref.player.zones[ref.zoneId] || []).filter((c) => c.attachedTo === attacker.instanceId && isEnergy(c)).length
-          : 0;
+        const energyCards = attackTarget.amountPerEnergyType
+          ? attachedEnergyOfType(draft, attacker, attackTarget.amountPerEnergyType)
+          : ref
+            ? (ref.player.zones[ref.zoneId] || []).filter((c) => c.attachedTo === attacker.instanceId && isEnergy(c)).length
+            : 0;
         attackTarget = energyCards > 0 ? { ...attackTarget, amount: attackTarget.amount * energyCards } : null;
       }
       // Probopass Metal Bomber: as many picks as the attacker has Energy of the printed type.

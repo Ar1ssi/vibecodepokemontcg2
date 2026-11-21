@@ -354,6 +354,8 @@ const CLAUSES = [
   ],
   // Alolan Meowth Spoil the Fun (sm8-118): "If you go second, … during your first turn."
   // Azelf Psychic Abduction (sm6-43): "only if you go second, and only on your first turn".
+  // Cinccino Amazing Plea: the opponent answered "no" (effects/attack-steps.mjs atkPleaRecover).
+  [/^no$/, () => ({ desc: { kind: 'pleaRefused' }, printedNegated: false })],
   [/^you go second(?:,? and only on your first turn)?$/, () => ({ desc: { kind: 'goingSecondFirstTurn' }, printedNegated: false })],
   // Wigglytuff Charmed Slap (sm8-134).
   [
@@ -1152,6 +1154,7 @@ const CHECKS = {
     ),
   lostZoneEnergyType: (cond, ctx) => list(ctx.ownLostZoneEnergyTypes).some((t) => sameType(t, cond.type)),
   goingSecondFirstTurn: (cond, ctx) => ctx.goingSecondFirstTurn === true,
+  pleaRefused: (cond, ctx) => ctx.pleaRefused === true,
   attackerToolNamed: (cond, ctx) =>
     list(ctx.attackerAttachedCards).some(
       (card) => card.tool && String(card.name).toLowerCase().includes(String(cond.nameContains).toLowerCase())

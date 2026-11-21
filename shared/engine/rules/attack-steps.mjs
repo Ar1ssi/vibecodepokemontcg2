@@ -550,6 +550,34 @@ const TEMPLATES = [
       { type: 'atkDiscardOppEnergy', scope: 'active', count: 1, special: true },
     ],
   ],
+  // Patrat Glance (sm2-107), Chinchou Searching Light (sm1-49), Porygon Code Check (sm3-103),
+  // Poipole Eye Opener (sm8-107): the attacker sees the card(s), privately.
+  [
+    /^look at 1 of your (opponent's )?face-down prize cards$/,
+    (m) => ({ type: 'atkLookAt', source: m[1] ? 'oppPrize' : 'ownPrize' }),
+  ],
+  [/^look at your face-down prize cards$/, () => ({ type: 'atkLookAt', source: 'ownPrize', all: true })],
+  // Espurr Energy Teaser (sm6-44).
+  [
+    /^move an? energy from 1 of your opponent's benched pokémon to another of (?:their|your opponent's) pokémon$/,
+    () => ({ type: 'atkMoveEnergy', from: 'opponentBenchAny', to: 'opponentAny', count: 1 }),
+  ],
+  // Watchog Scrutinize (sm2-108).
+  [
+    /^look at the top (\d+) cards of your opponent's deck, discard (\d+) of them, and put the other cards? back$/,
+    (m) => ({ type: 'atkOppDeckTopDiscard', look: Number(m[1]), discard: Number(m[2]) }),
+  ],
+  // Tapu Lele Magical Swap (sm5-94).
+  [
+    /^move any number of damage counters on your opponent's pokémon to their other pokémon in any way you like$/,
+    () => ({ type: 'atkMoveOppCountersAnyWay' }),
+  ],
+  // Masquerain Surprising Pattern (sm7-16) / Skarmory Metallic Sound (sm1-88, both sides).
+  [
+    /^discard all special energy from each of your opponent's pokémon$/,
+    () => ({ type: 'atkDiscardOppEnergy', scope: 'any', all: true, special: true }),
+  ],
+  [/^discard all special energy from each pokémon$/, () => ({ type: 'atkDiscardAllSpecialEnergy' })],
   // Mega Dragalge ex Corrosive Liquid.
   [
     /^discard all pokémon tools and special energy from all of your opponent's pokémon$/,
@@ -630,6 +658,11 @@ const TEMPLATES = [
     /^if your opponent has \d+ o[rf] more cards in their hand, (?:discard a number of cards without looking|your opponent discards a number of cards) until your opponent has (\d+) cards left in their hand$/,
     (m) => ({ type: 'atkDiscardOppHand', leaveCount: Number(m[1]), random: /without looking/.test(m[0]) }),
   ],
+  // Purugly Toss Aside (sm5-109): random cards until the hand holds N.
+  [
+    /^discard random cards from your opponent's hand until they have (\d+) cards in their hand$/,
+    (m) => ({ type: 'atkDiscardOppHand', leaveCount: Number(m[1]), random: true }),
+  ],
   // Glaceon Ice Bind.
   [
     /^if your opponent doesn't discard a card from their hand, your opponent's active pokémon is now (asleep|burned|confused|paralyzed|poisoned)$/,
@@ -654,6 +687,11 @@ const TEMPLATES = [
   [
     /^discard any number of supporter cards? from your hand$/,
     () => ({ type: 'atkDiscardOwnHand', count: 'any', what: 'Supporter' }),
+  ],
+  // Snubbull Make a Mess (sm8-137): its damage counts the discard (parseAttackSteps moves it first).
+  [
+    /^discard up to (\d+) trainer cards? from your hand$/,
+    (m) => ({ type: 'atkDiscardOwnHand', count: Number(m[1]), upTo: true, what: 'Trainer' }),
   ],
   [
     /^discard up to (\d+) cards? from your hand$/,
@@ -1196,6 +1234,11 @@ const TEMPLATES = [
     /^if your opponent's active pokémon is an evolved pokémon, devolve it by putting the highest stage evolution card on it into your opponent's hand$/,
     () => ({ type: 'atkDevolve', scope: 'active', to: 'hand' }),
   ],
+  // Shining Jirachi Stellar Reign (sm3.5-42): every Evolution card, back to the Basic.
+  [
+    /^if your opponent's active pokémon is an evolved pokémon, devolve it by putting all of the evolution cards on it into your opponent's hand$/,
+    () => ({ type: 'atkDevolve', scope: 'active', to: 'hand', toBasic: true }),
+  ],
 
   // Alolan Exeggutor ex Swinging Sphene
   [/^knock out your opponent's active basic pokémon$/, () => ({ type: 'atkKnockOut', condition: 'basic' })],
@@ -1676,6 +1719,24 @@ const BLOCKS = [
   [
     /discard 1 of your prize cards\. if it's an energy card, attach it to 1 of your pokémon\./g,
     () => ({ type: 'atkDiscardPrize', count: 1, attachIfEnergy: true }),
+  ],
+  // Cinccino Amazing Plea (sm4-86): the opponent's "no" is read by the damage parser's base swap.
+  [
+    /choose (\d+) cards from your discard pile\. then, ask your opponent if you may put them into your hand\. if yes, put those cards into your hand\. if no, this attack does \d+ damage to your opponent's active pokémon\./g,
+    (m) => ({ type: 'atkPleaRecover', count: Number(m[1]), beforeDamage: true }),
+  ],
+  // Patrat Glance (sm2-107): only as the whole attack text, so an Ability's "look at the top card
+  // of your opponent's deck. If you do, …" (Malamar Psychic Insight) keeps its own reader.
+  [/^look at the top card of your opponent's deck\.$/g, () => ({ type: 'atkLookAt', source: 'oppDeckTop', count: 1 })],
+  // Nuzleaf Clear the Room (sm7-13).
+  [
+    /your opponent reveals their hand\. choose a supporter card you find there\. your opponent shuffles that card into their deck\./g,
+    () => ({ type: 'atkRevealOppHand', then: { action: 'deckShuffle', count: 1, filter: 'supporter' } }),
+  ],
+  // Slowking Memory Melt (sm8-55).
+  [
+    /look at your opponent's hand and put a card you find there in the lost zone\./g,
+    () => ({ type: 'atkRevealOppHand', then: { action: 'lostZone', count: 1 } }),
   ],
   // Mawile Mining (sm7-91): an Item to the hand; a Pokémon Tool may be attached instead.
   [
@@ -2210,7 +2271,10 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
     }
     const block = /^@block(\d+)$/.exec(sentence);
     if (block) {
-      result.after.push(...[blockSteps[Number(block[1])]].flat());
+      // A block step marked `beforeDamage` (Cinccino Amazing Plea) runs ahead of the damage.
+      for (const { beforeDamage, ...built } of [blockSteps[Number(block[1])]].flat()) {
+        (beforeDamage ? result.before : result.after).push(built);
+      }
       continue;
     }
     // "If you do, …" / "If you attached Energy in this way, …" after an attach: the executor
