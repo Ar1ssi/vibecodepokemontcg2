@@ -550,6 +550,30 @@ const TEMPLATES = [
       { type: 'atkDiscardOppEnergy', scope: 'active', count: 1, special: true },
     ],
   ],
+  // Giratina Distortion Door (sm8-97), via effect-wording.mjs: "put 1 damage counter on 2 of your
+  // opponent's Benched Pokémon" reads as choosing the 2 first.
+  [
+    /^choose (\d+) of your opponent's (benched )?pokémon and put (\d+) damage counters? on each of them$/,
+    // Attacks place these counters through the damage parser's target clause (attackTargetClause).
+    (m, rest, context) =>
+      context?.forAbility
+        ? { type: 'atkCountersOnChosen', targets: Number(m[1]), count: Number(m[3]), scope: m[2] ? 'bench' : 'all' }
+        : null,
+  ],
+  // Darkrai-GX Restoration / Giratina Distortion Door: the Ability's own card, from the discard.
+  [/^put it onto your bench$/, () => ({ type: 'atkSourceFromDiscardToBench' })],
+  // Wishiwashi Cowardice (sm1-44): an Ability's effect.
+  [/^discard all cards attached to this pokémon and return it to your hand$/, () => ({ type: 'atkReturnSelfToHand' })],
+  // Florges Wondrous Gift (sm6-86), after "Flip a coin. If heads,".
+  [
+    /^put an? (item|supporter|pokémon tool|trainer) card from your discard pile on top of your deck$/,
+    (m) => ({ type: 'atkRecover', count: 1, what: recoverWhat(m[1]), to: 'deckTop' }),
+  ],
+  // Typhlosion Blazing Energy (sm8-42): every attached Energy provides {R} this turn.
+  [
+    /^all energy attached to your pokémon are \{([a-z])\} energy instead of their usual type until the end of your turn$/,
+    (m) => ({ type: 'abilityEnergyTypeThisTurn', energyType: m[1].toUpperCase() }),
+  ],
   // Patrat Glance (sm2-107), Chinchou Searching Light (sm1-49), Porygon Code Check (sm3-103),
   // Poipole Eye Opener (sm8-107): the attacker sees the card(s), privately.
   [
@@ -1728,6 +1752,11 @@ const BLOCKS = [
   // Patrat Glance (sm2-107): only as the whole attack text, so an Ability's "look at the top card
   // of your opponent's deck. If you do, …" (Malamar Psychic Insight) keeps its own reader.
   [/^look at the top card of your opponent's deck\.$/g, () => ({ type: 'atkLookAt', source: 'oppDeckTop', count: 1 })],
+  // Meganium Quick-Ripening Herb (sm8-8): a Stage 2 from the hand onto a chosen Basic.
+  [
+    /choose 1 of your basic pokémon in play\. if you have a stage 2 card in your hand that evolves from that pokémon, put that card onto the basic pokémon to evolve it\./g,
+    () => ({ type: 'abilityStage2OntoBasic' }),
+  ],
   // Nuzleaf Clear the Room (sm7-13).
   [
     /your opponent reveals their hand\. choose a supporter card you find there\. your opponent shuffles that card into their deck\./g,
@@ -2105,14 +2134,14 @@ export function parseAbilityEffectSteps(text, { selfName = '' } = {}) {
   let holderZone = null;
   const position = HOLDER_POSITION.exec(effect);
   if (position) {
-    holderZone = /bench/.test(position[1]) ? 'bench' : 'active';
+    holderZone = /bench/.test(position[1]) ? 'bench' : /discard/.test(position[1]) ? 'discard' : 'active';
     effect = effect.slice(position[0].length);
   }
   // Milk Drink's "if this Pokémon was healed during this turn" is its activation gate
   // (ability-combat.mjs abilityActivationBlockReason).
   effect = effect.replace(/^if this pokémon was healed during this turn, (?:you may )?/, '');
   if (/^if /.test(effect)) return { steps: [], holderZone: null };
-  const parsed = parseAttackSteps(abilityRevealVoice(effect));
+  const parsed = parseAttackSteps(abilityRevealVoice(effect), { forAbility: true });
   return { steps: [...parsed.before, ...parsed.after], holderZone };
 }
 
@@ -2128,7 +2157,7 @@ function abilityRevealVoice(effect) {
 }
 
 const HOLDER_POSITION =
-  /^if this pokémon is (in the active spot|your active pokémon|on your bench), (?:you may )?/;
+  /^if this pokémon is (in the active spot|your active pokémon|on your bench|in your discard pile), (?:you may )?/;
 
 /**
  * Applies a coin result to gated steps: "If heads/tails" steps are dropped on the other face
@@ -2168,7 +2197,8 @@ function isAttachStep(step) {
 
 // Sentences that only make sense after an attach: "it" / "that Pokémon" is the Pokémon the
 // Energy went to.
-const SWITCH_STEP_TYPES = new Set(['atkGust', 'atkSwitchSelf']);
+// Steps whose "If you do, …" runs only when they happened (a switch, Distortion Door's return).
+const SWITCH_STEP_TYPES = new Set(['atkGust', 'atkSwitchSelf', 'atkSourceFromDiscardToBench']);
 
 const CHAIN_TEMPLATES = [
   [/^switch it with 1 of your benched pokémon$/, () => ({ type: 'atkSwitchSelf' })],
@@ -2197,7 +2227,7 @@ function splitBoardGate(sentence, templates) {
   return null;
 }
 
-export function parseAttackSteps(text, { selfName = '' } = {}) {
+export function parseAttackSteps(text, { selfName = '', forAbility = false } = {}) {
   const result = { before: [], after: [], handlesSearch: false };
   // EX-era "Pokémon-ex" (Deoxys ex) and XY-era "Pokémon-EX" differ only by case, which the
   // normalizer drops; the lowercase printing keeps an explicit marker for attacker filters.
@@ -2329,7 +2359,7 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
     for (const [re, build] of templates) {
       const m = re.exec(rest);
       if (!m) continue;
-      const step = build(m, rest, { wrOrder, fullText: normalized });
+      const step = build(m, rest, { wrOrder, fullText: normalized, forAbility });
       if (!step) break;
       // One sentence, several steps (Scizor V Hack Off: a Tool and a Special Energy).
       if (Array.isArray(step)) {

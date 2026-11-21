@@ -123,6 +123,11 @@ export function energyProvisionContext(state, playerId, host) {
       // Zygarde Aura Break (customhb): "{Y} Energy attached to your Pokémon also count as {D}
       // Energy, and {D} Energy … also count as {Y} Energy" — [from, to] pairs from live holders.
       energyAlsoCounts: energyAlsoCountsPairs(state, playerId, roots),
+      // Typhlosion Blazing Energy (effects/attack-steps.mjs abilityEnergyTypeThisTurn).
+      allEnergyType:
+        player?.flags?.allEnergyType && player.flags.allEnergyTypeTurn === (state.turn?.number ?? null)
+          ? player.flags.allEnergyType
+          : null,
       ownPrizes: (player?.zones?.prizes || []).length,
       opponentPrizes: (state.players?.[opponentId]?.zones?.prizes || []).length,
       ownStage2InPlay: roots.filter(

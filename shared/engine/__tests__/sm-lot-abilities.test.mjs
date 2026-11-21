@@ -170,3 +170,200 @@ test('Attack gates: Sticky Membrane (sm6-91), Disgusting Pollen (sm3-6), Seal of
   assert.equal(attackRefused(seal(['Regirock', 'Regice'])), true);
   assert.equal(attackRefused(seal(['Regirock', 'Regice', 'Registeel'])), false);
 });
+
+// ── activated Abilities ─────────────────────────────────────────────────────
+
+const trainer = (name, subtype = 'Item', extra = {}) =>
+  createCard({ instanceId: nextId++, name, supertype: 'Trainer', subtypes: [subtype], type: subtype, trainerType: subtype, ...extra });
+
+/** p1 uses `holder`'s Ability, answering choices with `pick` (default: the first `min` options). */
+function useAbility(state, holder, pick) {
+  let res = command(state, 'p1', 'useAbility', { instanceId: holder.instanceId, abilityIndex: 0 });
+  for (let n = 0; n < 10 && !res.error && res.state?.pendingChoice; n++) {
+    const pc = res.state.pendingChoice;
+    const selection = pick ? pick(pc) : pc.options.slice(0, Math.max(1, pc.min || 0)).map((o) => o.instanceId);
+    res = applyCommand(res.state, { type: 'resolveChoice', playerId: pc.player, payload: { choiceId: pc.choiceId, selection } }, createRng(4));
+  }
+  return res;
+}
+const names = (state, playerId, zone) => state.players[playerId].zones[zone].map((c) => c.name);
+
+function abilityBoard(turn = 5) {
+  const state = board(turn);
+  state.players.p1.zones.active.push(mon('Active'));
+  state.players.p2.zones.active.push(mon('Opponent'));
+  return state;
+}
+
+test('Wishiwashi Cowardice (sm1-44): back to the hand, not on the first turn or the turn it came into play', () => {
+  const text =
+    'Once during your turn (before your attack), you may discard all cards attached to this Pokémon and return it to your hand. You can’t use this Ability during your first turn or on the turn this Pokémon was put into play.';
+  const play = (turn, entered) => {
+    const state = abilityBoard(turn);
+    const wishiwashi = mon('Wishiwashi', { ...ability(text), enteredPlayTurn: entered });
+    state.players.p1.zones.bench.push(wishiwashi, energy('Water', wishiwashi.instanceId));
+    return useAbility(state, wishiwashi);
+  };
+  const used = play(5, 3);
+  assert.deepEqual(names(used.state, 'p1', 'hand'), ['Wishiwashi']);
+  assert.deepEqual(names(used.state, 'p1', 'discard'), ['Basic Water Energy']);
+  assert.ok(play(5, 5).error, 'put into play this turn');
+  assert.ok(play(1, 1).error, 'first turn');
+});
+
+test('Florges Wondrous Gift (sm6-86): heads puts an Item from the discard on top of the deck', () => {
+  const text = 'Once during your turn (before your attack), you may flip a coin. If heads, put an Item card from your discard pile on top of your deck.';
+  const tops = [1, 2, 3, 4, 5, 6, 7, 8].map((seed) => {
+    const state = abilityBoard();
+    const florges = mon('Florges', ability(text));
+    state.players.p1.zones.bench.push(florges);
+    state.players.p1.zones.discard.push(trainer('Ultra Ball'));
+    const res = applyCommand(state, { type: 'useAbility', playerId: 'p1', payload: { instanceId: florges.instanceId, abilityIndex: 0 } }, createRng(seed));
+    return res.state.players.p1.zones.deck[0]?.name;
+  });
+  assert.ok(tops.includes('Ultra Ball') && tops.some((name) => name !== 'Ultra Ball'), tops.join());
+});
+
+test('Meganium Quick-Ripening Herb (sm8-8) puts a Stage 2 from the hand onto its Basic, even on turn 1', () => {
+  const text =
+    'Once during your turn (before your attack), you may use this Ability. Choose 1 of your Basic Pokémon in play. If you have a Stage 2 card in your hand that evolves from that Pokémon, put that card onto the Basic Pokémon to evolve it. You can use this Ability during your first turn or on a Pokémon that was put into play this turn.';
+  const state = abilityBoard(1);
+  const meganium = mon('Meganium', { stage: 'Stage 2', subtypes: ['Stage 2'], ...ability(text) });
+  const chikorita = mon('Chikorita', { enteredPlayTurn: 1 });
+  state.players.p1.zones.bench.push(meganium, chikorita);
+  state.players.p1.zones.hand.push(mon('Meganium', { stage: 'Stage 2', subtypes: ['Stage 2'], evolvesFrom: 'Bayleef', evolvesFromBase: 'Chikorita' }));
+  const res = useAbility(state, meganium);
+  assert.equal(res.error ?? null, null, res.reason);
+  assert.ok(res.state.players.p1.zones.bench.some((c) => c.name === 'Meganium' && c.attachedTo === chikorita.instanceId));
+});
+
+test('Typhlosion Blazing Energy (sm8-42): every Energy provides Fire for the rest of the turn', () => {
+  const text =
+    'Once during your turn (before your attack), you may use this Ability. All Energy attached to your Pokémon are Fire Energy instead of their usual type until the end of your turn. (This includes cards that come into play on this turn.)';
+  const state = board();
+  const typhlosion = mon('Typhlosion', { attacks: [{ name: 'Flare', cost: ['Fire'], damage: '10', text: '' }], ...ability(text) });
+  state.players.p1.zones.active.push(typhlosion, energy('Water', typhlosion.instanceId));
+  state.players.p2.zones.active.push(mon('Opponent'));
+  assert.ok(command(structuredClone(state), 'p1', 'attack', { attackIndex: 0 }).error, 'Water cannot pay {R} before');
+  const used = useAbility(state, typhlosion);
+  assert.equal(command(used.state, 'p1', 'attack', { attackIndex: 0 }).error ?? null, null);
+});
+
+test('Karrablast Shell On (sm4-7) and Ditto Prism Star Almighty Evolution (sm8-154) evolve the holder', () => {
+  const shellOn =
+    'Once during your turn (before your attack), you may discard a Shelmet from your hand. If you do, search your deck for a card that evolves from this Pokémon and put it onto this Pokémon to evolve it. Then, shuffle your deck.';
+  const state = abilityBoard();
+  const karrablast = mon('Karrablast', ability(shellOn));
+  state.players.p1.zones.bench.push(karrablast);
+  state.players.p1.zones.hand.push(mon('Shelmet'));
+  state.players.p1.zones.deck.push(mon('Escavalier', { stage: 'Stage 1', subtypes: ['Stage 1'], evolvesFrom: 'Karrablast' }));
+  const shelled = useAbility(state, karrablast);
+  assert.ok(shelled.state.players.p1.zones.bench.some((c) => c.name === 'Escavalier' && c.attachedTo === karrablast.instanceId));
+  assert.deepEqual(names(shelled.state, 'p1', 'discard'), ['Shelmet']);
+  const almighty =
+    'Once during your turn (before your attack), you may put any Stage 1 card from your hand onto this Pokémon to evolve it. You can’t use this Ability during your first turn or the turn this Pokémon was put into play.';
+  const dittoBoard = abilityBoard();
+  const ditto = mon('Ditto ◇', { ...ability(almighty), enteredPlayTurn: 3 });
+  dittoBoard.players.p1.zones.bench.push(ditto);
+  dittoBoard.players.p1.zones.hand.push(mon('Raichu', { stage: 'Stage 1', subtypes: ['Stage 1'], evolvesFrom: 'Pikachu' }));
+  const evolved = useAbility(dittoBoard, ditto);
+  assert.ok(evolved.state.players.p1.zones.bench.some((c) => c.name === 'Raichu' && c.attachedTo === ditto.instanceId));
+});
+
+test('Darkrai-GX Restoration (sm3-88) and Giratina Distortion Door (sm8-97) work from the discard pile', () => {
+  const restoration =
+    'Once during your turn (before your attack), if this Pokémon is in your discard pile, you may put it onto your Bench. Then, attach a Darkness Energy card from your discard pile to this Pokémon.';
+  const state = abilityBoard();
+  const darkrai = mon('Darkrai GX', ability(restoration));
+  state.players.p1.zones.discard.push(darkrai, energy('Darkness'), energy('Fire'));
+  const res = useAbility(state, darkrai);
+  assert.equal(res.error ?? null, null, res.reason);
+  assert.deepEqual(names(res.state, 'p1', 'bench'), ['Darkrai GX', 'Basic Darkness Energy']);
+  const inPlay = abilityBoard();
+  const benched = mon('Darkrai GX', ability(restoration));
+  inPlay.players.p1.zones.bench.push(benched);
+  assert.ok(useAbility(inPlay, benched).error, 'not from the Bench');
+  const door =
+    'Once during your turn (before your attack), if this Pokémon is in your discard pile, you may put it onto your Bench. If you do, put 1 damage counter on 2 of your opponent’s Benched Pokémon.';
+  const doorBoard = abilityBoard();
+  const giratina = mon('Giratina', ability(door));
+  doorBoard.players.p1.zones.discard.push(giratina);
+  doorBoard.players.p2.zones.bench.push(mon('B1'), mon('B2'), mon('B3'));
+  const opened = useAbility(doorBoard, giratina);
+  assert.deepEqual(names(opened.state, 'p1', 'bench'), ['Giratina']);
+  assert.deepEqual(opened.state.players.p2.zones.bench.map((c) => c.damage || 0).sort(), [0, 10, 10]);
+});
+
+// ── board-wide passives ─────────────────────────────────────────────────────
+
+test('Solrock Sunbeam (sm7-62): each Lunatone has 130 HP', () => {
+  const state = board();
+  const attacker = mon('Attacker', { attacks: [{ name: 'Hit', cost: [], damage: '100', text: '' }] });
+  state.players.p1.zones.active.push(attacker);
+  state.players.p2.zones.active.push(mon('Lunatone', { hp: 90 }));
+  state.players.p2.zones.bench.push(mon('Solrock', ability('The maximum HP of each of your Lunatone in play is 130.')));
+  const res = command(state, 'p1', 'attack', { attackIndex: 0 });
+  assert.deepEqual(names(res.state, 'p2', 'active'), ['Lunatone']);
+});
+
+test('Lunatone Heal Block (sm3-68): no Pokémon can be healed while Solrock is in play', () => {
+  const blocked = (withSolrock) => {
+    const state = board();
+    const hurt = mon('Hurt');
+    hurt.damage = 50;
+    state.players.p1.zones.active.push(hurt);
+    state.players.p2.zones.active.push(mon('Lunatone', ability('If you have Solrock in play, Pokémon (both yours and your opponent’s) can’t be healed.')));
+    if (withSolrock) state.players.p2.zones.bench.push(mon('Solrock'));
+    const potion = trainer('Potion', 'Item', { text: 'Heal 30 damage from 1 of your Pokémon.' });
+    state.players.p1.zones.hand.push(potion);
+    let res = command(state, 'p1', 'playTrainer', { instanceId: potion.instanceId, targetInstanceId: hurt.instanceId });
+    for (let n = 0; n < 4 && !res.error && res.state.pendingChoice; n++) {
+      const pc = res.state.pendingChoice;
+      res = applyCommand(res.state, { type: 'resolveChoice', playerId: pc.player, payload: { choiceId: pc.choiceId, selection: [pc.options[0].instanceId] } }, createRng(4));
+    }
+    return res.error ? 50 : res.state.players.p1.zones.active[0].damage;
+  };
+  assert.equal(blocked(true), 50);
+  assert.equal(blocked(false), 20);
+});
+
+test('Kecleon Unit Color (sm8-161): with Unit Energy GrassFireWater it is also a Fire Pokémon', () => {
+  const text = 'As long as this Pokémon has Unit Energy GrassFireWater attached to it, it is a Grass, Fire, and Water Pokémon.';
+  const hit = (withUnit) =>
+    dealt((state, attacker, defender) => {
+      Object.assign(attacker, ability(text), { name: 'Kecleon' });
+      if (withUnit) {
+        state.players.p1.zones.active.push(
+          createCard({ instanceId: nextId++, name: 'Unit Energy GrassFireWater', supertype: 'Energy', subtypes: ['Special'], attachedTo: attacker.instanceId })
+        );
+      }
+      weakTo(defender, 'Fire');
+    });
+  assert.equal(hit(true), 20);
+  assert.equal(hit(false), 10);
+});
+
+test('Sudowoodo Roadblock (sm2-66): 4 Benched Pokémon at most, and a 5th is discarded', () => {
+  const roadblock = mon('Sudowoodo', ability('Your opponent can’t have more than 4 Benched Pokémon. If they have 5 or more Benched Pokémon, they discard Benched Pokémon until they have 4 Pokémon on the Bench. If more than one effect changes the number of Benched Pokémon allowed, use the smaller number.'));
+  const state = board();
+  state.players.p1.zones.active.push(mon('Active'));
+  for (let i = 0; i < 4; i++) state.players.p1.zones.bench.push(mon(`Bench ${i}`));
+  state.players.p2.zones.active.push(roadblock);
+  const extra = mon('Fifth');
+  state.players.p1.zones.hand.push(extra);
+  assert.ok(command(state, 'p1', 'moveCard', { instanceId: extra.instanceId, from: 'hand', to: 'bench' }).error);
+  // Sudowoodo arriving when the opponent already has 5: they choose one to discard.
+  const crowded = board();
+  crowded.turn = { player: 'p2', number: 6, phase: 'main' };
+  crowded.players.p1.zones.active.push(mon('Active'));
+  for (let i = 0; i < 5; i++) crowded.players.p1.zones.bench.push(mon(`Bench ${i}`));
+  crowded.players.p2.zones.active.push(mon('Opponent'));
+  const sudowoodo = mon('Sudowoodo', roadblock.abilities ? { abilities: roadblock.abilities } : {});
+  crowded.players.p2.zones.hand.push(sudowoodo);
+  let res = command(crowded, 'p2', 'moveCard', { instanceId: sudowoodo.instanceId, from: 'hand', to: 'bench' });
+  assert.equal(res.state.pendingChoice?.player, 'p1');
+  const pc = res.state.pendingChoice;
+  res = applyCommand(res.state, { type: 'resolveChoice', playerId: 'p1', payload: { choiceId: pc.choiceId, selection: [pc.options[0].instanceId] } }, createRng(4));
+  assert.equal(res.state.players.p1.zones.bench.length, 4);
+  assert.deepEqual(names(res.state, 'p1', 'discard'), ['Bench 0']);
+});

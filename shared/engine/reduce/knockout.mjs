@@ -14,7 +14,7 @@ import {
   toolPrizeCountAdjust, attachedToolOnKoEffects, attachedTools, isExCard, isTeraCard,
 } from '../rules/tool-combat.mjs';
 import { parsePrizeModify, cardAbilityText } from '../rules/ability-executors.mjs';
-import { isAbilitySuppressed, sideContextFor } from '../rules/ability-combat.mjs';
+import { isAbilitySuppressed, sideContextFor, abilityBenchLimit } from '../rules/ability-combat.mjs';
 import { parseToolCondition, toolConditionMet } from '../rules/tool-conditions.mjs';
 import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
 import {
@@ -1492,6 +1492,52 @@ export function settleKoHandDiscards(draft, { events }) {
   }
   if (queue.length > 0) draft.__koHandDiscards = queue;
   else delete draft.__koHandDiscards;
+}
+
+export const BENCH_LIMIT_EFFECT = 'benchLimitTrim';
+
+/**
+ * Sudowoodo Roadblock: "If they have 5 or more Benched Pokémon, they discard Benched Pokémon until
+ * they have 4." The over-limit player picks which go, after any other pending choice.
+ */
+export function settleBenchLimits(draft) {
+  if (draft.pendingChoice) return;
+  for (const [playerId, player] of Object.entries(draft.players || {})) {
+    const bench = (player?.zones?.bench || []).filter((c) => !c.attachedTo);
+    const excess = bench.length - abilityBenchLimit(sideContextFor(draft, playerId));
+    if (excess <= 0) continue;
+    draft.pendingChoice = createPendingChoice({
+      player: playerId,
+      source: 'Roadblock',
+      prompt: `Your Bench holds too many Pokémon: discard ${excess} Benched Pokémon`,
+      options: bench,
+      min: excess,
+      max: excess,
+      stateVersion: draft.stateVersion || 0,
+      resumeToken: { effectType: BENCH_LIMIT_EFFECT, initiatorPlayerId: playerId, count: excess },
+    });
+    return;
+  }
+}
+
+/** Discards the chosen Benched Pokémon and everything attached to them. */
+export function resolveBenchLimitTrim(draft, { playerId, selection, count, events }) {
+  const player = draft.players?.[playerId];
+  if (!player) return;
+  const bench = player.zones.bench || [];
+  for (const id of [...new Set(selection || [])].slice(0, count)) {
+    const root = bench.find((c) => c.instanceId === id && !c.attachedTo);
+    if (!root) continue;
+    const stack = [root, ...bench.filter((c) => c.attachedTo === id)];
+    for (const card of stack) {
+      bench.splice(bench.indexOf(card), 1);
+      card.attachedTo = null;
+      discardCardToPlayerZone(player, card);
+    }
+    root.damage = 0;
+    clearConditions(root);
+    events.push({ type: 'cardsDiscarded', playerId, reason: 'bench-limit', cards: stack.map((c) => ({ instanceId: c.instanceId, name: c.name })) });
+  }
 }
 
 export const KO_TOOL_COUNTERS_EFFECT = 'koToolCounters';

@@ -48,8 +48,8 @@ import {
 } from '../rules/attack-markers.mjs';
 import { eachFilterMatches } from '../rules/each-filter.mjs';
 import { energyRemovalGuarded } from '../rules/legacy-attached-trainer.mjs';
-import { abilityPreventsAttackEffects, healBlockedByAbility, sideContextFor } from '../rules/ability-combat.mjs';
-import { evolvedView } from '../rules/evolved-pokemon.mjs';
+import { abilityPreventsAttackEffects, healBlockedByAbility, sideContextFor, abilityBenchLimit } from '../rules/ability-combat.mjs';
+import { evolvedView, rareCandyOptions, ownedCards } from '../rules/evolved-pokemon.mjs';
 import { discardCurrentStadium } from './trainer.mjs';
 import {
   BENCH_LIMIT,
@@ -1409,8 +1409,10 @@ function attachFromZone(ctx) {
 
 // ── Bench placement / recovery ──────────────────────────────────────────────
 
-function benchSpace(player) {
-  return Math.max(0, BENCH_LIMIT - benchRootsOf(player).length);
+// Room on a Bench: 5, or fewer under Sudowoodo Roadblock when the board is known.
+function benchSpace(player, draft = null) {
+  const limit = draft ? abilityBenchLimit(sideContextFor(draft, player.playerId)) : BENCH_LIMIT;
+  return Math.max(0, limit - benchRootsOf(player).length);
 }
 
 function putOnBench(player, cards, from, events) {
@@ -1422,14 +1424,14 @@ function atkBenchFromDeckTop(ctx) {
   const deck = player.zones.deck;
   const viewed = deck.slice(0, Math.min(step.look || 1, deck.length));
   if (ctx.selection) {
-    const picked = pickById(viewed, ctx.selection).slice(0, benchSpace(player));
+    const picked = pickById(viewed, ctx.selection).slice(0, benchSpace(player, ctx.draft));
     putOnBench(player, picked, 'deck', ctx.events);
     shuffleOwnDeck(player, ctx);
     return null;
   }
   if (viewed.length === 0) return skip(ctx, 'empty_deck');
   const basics = viewed.filter((c) => isPokemon(c) && stageOf(c) === 'Basic');
-  const space = benchSpace(player);
+  const space = benchSpace(player, ctx.draft);
   ctx.events.push({ type: 'cardsLookedAt', playerId: player.playerId, count: viewed.length });
   if (basics.length === 0 || space === 0) {
     shuffleOwnDeck(player, ctx);
@@ -1494,7 +1496,7 @@ function atkBenchFromDiscard(ctx) {
         : step.basic
           ? 'Basic Pokémon'
           : 'Pokémon';
-  const space = benchSpace(player);
+  const space = benchSpace(player, ctx.draft);
   const place = (picked) => {
     putOnBench(player, picked, 'discard', ctx.events);
     attachPlacedBenchEnergy(ctx, picked);
@@ -1521,7 +1523,7 @@ function atkBenchFromAnyDiscard(ctx) {
   const { player, opponent, step } = ctx;
   const sides = [player, opponent].filter(Boolean);
   const basicsOf = (side) =>
-    benchSpace(side) > 0 ? (side.zones.discard || []).filter((c) => isPokemon(c) && stageOf(c) === 'Basic') : [];
+    benchSpace(side, ctx.draft) > 0 ? (side.zones.discard || []).filter((c) => isPokemon(c) && stageOf(c) === 'Basic') : [];
   const place = (picked) => {
     for (const card of picked) {
       const owner = sides.find((side) => (side.zones.discard || []).includes(card));
@@ -1748,7 +1750,7 @@ function applyRevealAction(ctx, cards) {
 // included), and a Bench placement is capped by the room on the opponent's Bench.
 function revealPickRange(ctx, matching) {
   const { opponent, step } = ctx;
-  const room = step.then.action === 'bench' ? benchSpace(opponent) : Infinity;
+  const room = step.then.action === 'bench' ? benchSpace(opponent, ctx.draft) : Infinity;
   if (step.then.count === 'any') return { min: 0, max: Math.min(matching.length, room) };
   if (step.then.count === 'all') return { min: Math.min(matching.length, room), max: Math.min(matching.length, room) };
   const n = Math.min(step.then.count, matching.length, room);
@@ -2589,6 +2591,27 @@ function atkCountersEach(ctx) {
   if (amount <= 0) return skip(ctx, 'no_counters');
   for (const card of targets) placeCounters(ctx, card, opponent.playerId, amount * 10);
   return null;
+}
+
+// Giratina Distortion Door: the player picks N of the opponent's (Benched) Pokémon, M counters each.
+function atkCountersOnChosen(ctx) {
+  const { opponent, step } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const pool = step.scope === 'bench' ? benchRootsOf(opponent) : rootsOf(opponent);
+  const place = (cards) => {
+    for (const card of cards) placeCounters(ctx, card, opponent.playerId, (step.count || 1) * 10);
+    return null;
+  };
+  const n = Math.min(step.targets || 1, pool.length);
+  if (ctx.selection) return place(pickById(pool, ctx.selection).slice(0, n));
+  if (pool.length === 0) return skip(ctx, 'no_target');
+  if (pool.length <= n) return place(pool);
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose ${n} of your opponent's ${step.scope === 'bench' ? 'Benched ' : ''}Pokémon`,
+    options: pool,
+    min: n,
+    max: n,
+  });
 }
 
 // Design 036 A9: filtered and both-sides counter spread. Targets are picked before any
@@ -3696,6 +3719,109 @@ function atkDiscardAllSpecialEnergy(ctx) {
     discarded += removable.length;
   }
   return discarded > 0 ? null : skip(ctx, 'nothing_to_discard');
+}
+
+// Darkrai-GX Restoration / Giratina Distortion Door: the Ability's card goes from the discard
+// pile onto the Bench.
+function atkSourceFromDiscardToBench(ctx) {
+  const { player } = ctx;
+  const card = (player.zones.discard || []).find((c) => c.instanceId === ctx.sourceCard?.instanceId);
+  if (!card) return skip(ctx, 'source_not_in_discard');
+  if (benchSpace(player, ctx.draft) === 0) return skip(ctx, 'bench_full');
+  putOnBench(player, [card], 'discard', ctx.events);
+  card.enteredPlayTurn = ctx.draft.turn?.number ?? null;
+  return null;
+}
+
+// Wishiwashi Cowardice: discard everything attached to this Pokémon and return it to the hand.
+function atkReturnSelfToHand(ctx) {
+  const { player } = ctx;
+  const ref = attackerRef(ctx);
+  if (!ref) return skip(ctx, 'source_not_in_play');
+  const root = ref.card;
+  const attached = attachedCards(player, root.instanceId);
+  discardCards(player, attached.filter((c) => !isPokemon(c)), ctx.events);
+  for (const card of [...attached.filter(isPokemon), root]) {
+    removeFromZones(player, card);
+    card.attachedTo = null;
+    card.damage = 0;
+    clearConditions(card);
+    clearAttackMarkers(card);
+    player.zones.hand.push(card);
+    ctx.events.push({ type: 'cardMoved', instanceId: card.instanceId, from: ref.zoneId, to: 'hand', playerId: player.playerId });
+  }
+  if (ref.zoneId === 'active') player.promotionPending = true;
+  return null;
+}
+
+/** Puts `card` (from the hand) onto `root` as its evolution. */
+function evolveFromHand(ctx, card, root) {
+  const { player } = ctx;
+  attachTo(player, card, root, ctx.events);
+  const turnNumber = ctx.draft?.turn?.number;
+  if (turnNumber != null) {
+    card.enteredPlayTurn = turnNumber;
+    root.lastEvolvedTurn = turnNumber;
+  }
+  clearConditions(root);
+  player.flags = player.flags || {};
+  player.flags.evolved = { ...(player.flags.evolved || {}), [root.instanceId]: true };
+  ctx.events.push({ type: 'pokemonEvolved', playerId: player.playerId, instanceId: card.instanceId, targetInstanceId: root.instanceId });
+}
+
+// Ditto Prism Star Almighty Evolution: any Stage 1 card from the hand onto this Pokémon.
+function evolveSelfFromHand(ctx) {
+  const { player, step } = ctx;
+  const ref = attackerRef(ctx);
+  if (!ref) return skip(ctx, 'source_not_in_play');
+  const wanted = String(step.stage || 'Stage 1').toLowerCase().replace(/\s+/g, '');
+  const cards = (player.zones.hand || []).filter(
+    (c) => isPokemon(c) && String(c.stage || '').toLowerCase().replace(/\s+/g, '') === wanted
+  );
+  if (ctx.selection) {
+    const card = cards.find((c) => c.instanceId === ctx.selection[0]);
+    if (card) evolveFromHand(ctx, card, ref.card);
+    return null;
+  }
+  if (cards.length === 0) return skip(ctx, 'no_evolution_in_hand');
+  return ctx.ask({ prompt: `${attackName(ctx)}: Choose a ${step.stage} card to evolve this Pokémon into`, options: cards, min: 1, max: 1 });
+}
+
+// Meganium Quick-Ripening Herb: a Stage 2 from the hand onto 1 of your Basic Pokémon it evolves
+// from (Rare Candy's line check); usable on the first turn and on a Pokémon put into play this turn.
+function abilityStage2OntoBasic(ctx) {
+  const { player } = ctx;
+  const options = rareCandyOptions(player, ownedCards(player), null);
+  const basics = [...new Map(options.flatMap((o) => o.basics).map((b) => [b.instanceId, b])).values()];
+  if (ctx.memo?.basicId != null) {
+    const basic = basics.find((b) => b.instanceId === ctx.memo.basicId);
+    const card = options.find((o) => o.stage2.instanceId === ctx.selection?.[0] && o.basics.includes(basic))?.stage2;
+    if (basic && card) evolveFromHand(ctx, card, basic);
+    return null;
+  }
+  if (ctx.selection) {
+    const basic = basics.find((b) => b.instanceId === ctx.selection[0]);
+    if (!basic) return null;
+    const stage2s = options.filter((o) => o.basics.includes(basic)).map((o) => o.stage2);
+    if (stage2s.length === 1) {
+      evolveFromHand(ctx, stage2s[0], basic);
+      return null;
+    }
+    return ctx.ask({ prompt: `${attackName(ctx)}: Choose the Stage 2 card`, options: stage2s, min: 1, max: 1, memo: { basicId: basic.instanceId } });
+  }
+  if (basics.length === 0) return skip(ctx, 'no_stage2_for_basic');
+  return ctx.ask({ prompt: `${attackName(ctx)}: Choose 1 of your Basic Pokémon to evolve`, options: basics, min: 1, max: 1 });
+}
+
+// Typhlosion Blazing Energy: every Energy attached to this player's Pokémon provides the printed
+// type until the turn ends (reduce/shared.mjs energyProvisionContext reads the flag).
+function abilityEnergyTypeThisTurn(ctx) {
+  const { player, step } = ctx;
+  const word = ENERGY_LETTER_WORDS[step.energyType];
+  const allEnergyType = word ? word[0].toUpperCase() + word.slice(1) : null;
+  player.flags = { ...(player.flags || {}), allEnergyType, allEnergyTypeTurn: ctx.draft.turn?.number ?? null };
+  ctx.events.push({ type: 'energyTypeOverride', playerId: player.playerId, energyType: player.flags.allEnergyType });
+  return null;
 }
 
 // Plusle Draw for Everybody: a card for each Benched Pokémon, both players' (`sides: 'both'`).
@@ -4988,6 +5114,12 @@ export const ATTACK_STEP_HANDLERS = {
   atkBenchFromAnyDiscard,
   atkUnlimitedAttachNextTurn,
   atkDrawPerBench,
+  atkReturnSelfToHand,
+  atkSourceFromDiscardToBench,
+  atkCountersOnChosen,
+  evolveSelfFromHand,
+  abilityStage2OntoBasic,
+  abilityEnergyTypeThisTurn,
   atkDiscardAllSpecialEnergy,
   atkOppDeckTopDiscard,
   atkLookAt,

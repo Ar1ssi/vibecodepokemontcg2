@@ -345,7 +345,17 @@ const ANY_TYPE_NAME = /(^|\b)(prism|stellar) energy/;
 export function rewriteEnergyDescriptor(descriptor, args = {}) {
   const rewritten = rewriteForStadium(descriptor, args);
   const retyped = retypeForHost(rewritten, args?.hostPokemon);
-  return megaSignalDualType(alsoCountsAs(retyped, args?.board?.energyAlsoCounts), args);
+  return allEnergyAs(megaSignalDualType(alsoCountsAs(retyped, args?.board?.energyAlsoCounts), args), args?.board?.allEnergyType);
+}
+
+// Typhlosion Blazing Energy: "All Energy attached to your Pokémon are {R} Energy instead of their
+// usual type" — every unit the card provides becomes that type; how many it provides is kept.
+function allEnergyAs(descriptor, type) {
+  if (!descriptor || !type) return descriptor;
+  const { dualType, ...rest } = descriptor;
+  if (Array.isArray(rest.provides)) return { ...rest, type, provides: rest.provides.map(() => type) };
+  if (rest.family === 'double-colorless') return { ...rest, type, family: 'double', provides: [type, type] };
+  return { ...rest, type };
 }
 
 // Mega Signal (customhb Tool): "If a Basic Energy attached to the Mega Evolution Pokémon ex this card

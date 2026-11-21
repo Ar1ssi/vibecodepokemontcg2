@@ -116,7 +116,7 @@ const REWRITES = [
   ],
   // Ting-Lu ex Earthquake: "Put 2 damage counters on 2 of your opponent's Benched Pokémon".
   [
-    /\bput (\d+) damage counters on ([2-9]) of your opponent's (benched )?pok[ée]mon\b/gi,
+    /\bput (\d+) damage counters? on ([2-9]) of your opponent's (benched )?pok[ée]mon\b/gi,
     "choose $2 of your opponent's $3Pokémon and put $1 damage counters on each of them",
   ],
   // Bergmite Break Open (TCGdex sm6-29): "If you do," after the Stadium discard is Flygon Desert
@@ -142,7 +142,9 @@ const REWRITES = [
 
 /** The text with every known synonym rewritten to the printed spelling. Idempotent. */
 export function canonicalEffectWording(text) {
-  let out = String(text ?? '');
+  // TCGdex prints typographic apostrophes ("opponent’s"); the rewrites are written with straight
+  // ones, so without this none that names "your opponent's" read TCGdex text (SM-LOT audit).
+  let out = String(text ?? '').replace(/[\u2018\u2019]/g, "'");
   for (const [pattern, replacement] of REWRITES) out = out.replace(pattern, replacement);
   return out;
 }

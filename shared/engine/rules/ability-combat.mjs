@@ -44,6 +44,7 @@ import {
   requiresBenchSpot,
   powerConditionRestriction,
   isHandActivatedAbility,
+  isDiscardActivatedAbility,
   requiresFirstTurn,
   requiresKoOnOpponentTurn,
   isEvolvePlayedTrigger,
@@ -76,6 +77,7 @@ import { isAncientCard, isFutureCard } from './paradox-tags.mjs';
 import { legacyPowerStopCondition, parseLegacyDamageModifier } from './legacy-power-wording.mjs';
 import { normalizeStage } from './evolution.mjs';
 import { findCard } from '../state.mjs';
+import { symbolizeTypeWords } from './attack-text.mjs';
 import { prizesTakenFor } from '../formats.mjs';
 
 const lower = (v) => String(v ?? '').toLowerCase();
@@ -249,7 +251,15 @@ function inPlayConditionMet(text, target, ctx) {
     energyCount ||
     anyBasic ||
     /if (?:this pok[eé]mon|it) has any (?:special )?energy attached/.test(text);
-  const namedTool = energyCondition
+  // Kecleon Unit Color: "As long as this Pokémon has Unit Energy {G}{R}{W} attached to it" names
+  // an Energy card, compared in symbols.
+  const namedEnergy = energyCondition ? null : text.match(/has ([a-z .'’-]*energy ?(?:\{[a-z]\})+) attached/);
+  if (namedEnergy) {
+    const wanted = namedEnergy[1].trim();
+    const attached = attachedEnergy(target, ctx.sideCards || ctx.inPlayCards);
+    if (!attached.some((c) => lower(symbolizeTypeWords(c.name || '')) === wanted)) return false;
+  }
+  const namedTool = energyCondition || namedEnergy
     ? null
     : text.match(/has (?:a )?([a-z0-9 .'’-]+?) attached/);
   if (namedTool && !/pok[eé]mon tool/.test(namedTool[1])) {
@@ -1152,6 +1162,13 @@ export function abilityHpBonus(pokemon, ctx = {}) {
   let total = 0;
   for (const holder of nonStackingOnce(dedupe([pokemon, ...sideInPlay(ctx)]))) {
     const t = cardAbilityText(holder);
+    // Solrock Sunbeam (sm7-62): "The maximum HP of each of your Lunatone in play is 130." —
+    // read as the difference from the printed HP.
+    const setHp = t.match(/the maximum hp of each of your (.+?) in play is (\d+)/);
+    if (setHp && !isAbilitySuppressed(holder, ctx) && lower(pokemon.name).includes(setHp[1].trim())) {
+      total += Math.max(0, Number(setHp[2]) - (Number(pokemon.hp) || 0));
+      continue;
+    }
     if (!t || !parseHpBonus(holder).bonus) continue;
     if (isAbilitySuppressed(holder, ctx)) continue;
     if (/for each/.test(t)) continue;
@@ -1505,7 +1522,8 @@ export function abilityExtraTypes(card, ctx = {}) {
   const t = cardAbilityText(card);
   if (!t) return [];
   if (isAbilitySuppressed(card, ctx)) return [];
-  if (!/it is .*type|is both .* type/.test(t)) return [];
+  // Kecleon Unit Color (sm7-122): "… it is a {L}, {P}, and {M} Pokémon."
+  if (!/it is .*type|is both .* type|it is an? \{[a-z]\}[^.]* pok[eé]mon/.test(t)) return [];
   if (!inPlayConditionMet(t, card, ctx)) return [];
   const printed = attackerTypes(card);
   return typeSymbols(t)
@@ -1794,7 +1812,16 @@ export function abilityActivationBlockReason(card, ctx = {}) {
   if (rulesEnabled && zone !== 'active' && requiresActiveSpot(card)) {
     return 'This ability can only be used from the Active Spot.';
   }
-  if (rulesEnabled && isHandActivatedAbility(card) !== (zone === 'hand')) {
+  // Darkrai-GX Restoration: used from the discard pile, with room on the Bench.
+  if (rulesEnabled && isDiscardActivatedAbility(card) !== (zone === 'discard')) {
+    return zone === 'discard'
+      ? "This Pokémon's Ability can't be used from the discard pile."
+      : 'This ability can only be used while this Pokémon is in your discard pile.';
+  }
+  if (rulesEnabled && zone === 'discard' && Array.isArray(ctx.sideBench) && sideTops(ctx.sideBench).length >= 5) {
+    return 'Your Bench is full.';
+  }
+  if (rulesEnabled && zone !== 'discard' && isHandActivatedAbility(card) !== (zone === 'hand')) {
     return zone === 'hand'
       ? 'This ability can only be used while the Pokémon is in play.'
       : 'This ability can only be used from your hand.';
@@ -1805,6 +1832,17 @@ export function abilityActivationBlockReason(card, ctx = {}) {
   // Turn 1 is the first player's first turn and turn 2 the second player's (reduce.mjs).
   if (rulesEnabled && requiresFirstTurn(card) && turnNumber > 2) {
     return 'This ability can only be used during your first turn.';
+  }
+  // Wishiwashi Cowardice (sm1-44), Ditto Prism Star Almighty Evolution (sm8-154): "You can't use
+  // this Ability during your first turn or [on] the turn this Pokémon was put into play."
+  const notFirstOrPlayed = /you can't use this ability during your first turn or (?:on )?the turn this pok[eé]mon was put into play/.test(
+    lower(cardAbilityText(card))
+  );
+  if (rulesEnabled && notFirstOrPlayed && turnNumber > 0) {
+    if (turnNumber <= 2) return "You can't use this Ability during your first turn.";
+    if (enteredPlayTurn != null && Number(enteredPlayTurn) === Number(turnNumber)) {
+      return "You can't use this Ability on the turn this Pokémon was put into play.";
+    }
   }
   // "If you have any {R} Mega Evolution Pokémon ex in play, you may use this Ability"
   // (Oricorio ex, I164). Callers without `sideCards` fail open.
@@ -2104,7 +2142,20 @@ export function abilityRetreatLock(active, ctx = {}) {
  * owner's side context, so the locking Ability is read from the opponent's side.
  */
 export function abilityHealLocked(active, ctx = {}) {
-  if (!active || !containsCard(ctx.sideActive, active)) return false;
+  if (!active) return false;
+  // Lunatone Heal Block (sm3-68): "If you have Solrock in play, Pokémon (both yours and your
+  // opponent's) can't be healed." Every Pokémon, from either side's holder.
+  const everyoneLocked = (holder, holderCtx) => {
+    const t = cardAbilityText(holder);
+    return (
+      /pok[eé]mon \(both yours and your opponent's\) can'?t be healed/.test(t) &&
+      !isAbilitySuppressed(holder, holderCtx) &&
+      inPlayConditionMet(t, holder, holderCtx)
+    );
+  };
+  if (dedupe(sideInPlay(ctx)).some((holder) => everyoneLocked(holder, ctx))) return true;
+  if (dedupe(opponentInPlay(ctx)).some((holder) => everyoneLocked(holder, opponentHolderCtx(ctx)))) return true;
+  if (!containsCard(ctx.sideActive, active)) return false;
   return dedupe(opponentInPlay(ctx)).some(
     (holder) =>
       /if this pok[eé]mon is in play, your opponent's active pok[eé]mon can'?t be healed/.test(cardAbilityText(holder)) &&
@@ -2122,6 +2173,19 @@ export function abilitySleepLock(ctx = {}) {
       /while this pok[eé]mon is in play, your active pok[eé]mon can'?t become asleep/.test(cardAbilityText(holder)) &&
       !isAbilitySuppressed(holder, ctx)
   );
+}
+
+/**
+ * How many Benched Pokémon the side in `ctx` may have: 5, or fewer while an opposing Ability
+ * caps it (Sudowoodo Roadblock, sm2-66: "Your opponent can't have more than 4 Benched Pokémon").
+ */
+export function abilityBenchLimit(ctx = {}) {
+  let limit = 5;
+  for (const holder of dedupe(opponentInPlay(ctx))) {
+    const m = cardAbilityText(holder).match(/your opponent can't have more than (\d+) benched pok[eé]mon/);
+    if (m && !isAbilitySuppressed(holder, opponentHolderCtx(ctx))) limit = Math.min(limit, Number(m[1]));
+  }
+  return limit;
 }
 
 /** abilityHealLocked for a Pokémon in `state`: the owner's side context is built from the state. */

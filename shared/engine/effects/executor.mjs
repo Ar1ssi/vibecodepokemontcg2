@@ -26,7 +26,7 @@ import { effectTextFor, stepRevealsPicks } from '../rules/reveal-picks.mjs';
 import {
   healLocked, addAttackMarker, markerFromTurn, markerUntilTurn,
 } from '../rules/attack-markers.mjs';
-import { healBlockedByAbility } from '../rules/ability-combat.mjs';
+import { healBlockedByAbility, abilityBenchLimit, sideContextFor } from '../rules/ability-combat.mjs';
 import { classifyEnergyEffect, resolveAttachedEnergyType } from '../rules/energy-effects.mjs';
 import {
   isSingleStrikeCard,
@@ -144,6 +144,11 @@ function healTargetAllowed(draft, player, root, step) {
     if (remaining > step.maxRemainingHp) return false;
   }
   return true;
+}
+
+/** A player's Bench limit: 5, or fewer under an opposing Sudowoodo Roadblock. */
+function benchLimitOf(draft, player) {
+  return player?.playerId ? abilityBenchLimit(sideContextFor(draft, player.playerId)) : 5;
 }
 
 /** Whether executeSteps has a handler for a step kind (switch case or handler table). */
@@ -1057,7 +1062,7 @@ export function executeSteps(draft, {
             if (dest === 'bench') {
               const currentBench = player.zones.bench || [];
               const benchCount = currentBench.filter((b) => !b.attachedTo).length;
-              if (benchCount >= 5) {
+              if (benchCount >= benchLimitOf(draft, player)) {
                 // Hard limit: bench is full, do not overfill bench
                 continue;
               }
@@ -1113,7 +1118,7 @@ export function executeSteps(draft, {
         if (dest === 'bench') {
           const bench = player.zones.bench || [];
           const benchCount = bench.filter((c) => !c.attachedTo).length;
-          const availableBenchSlots = Math.max(0, 5 - benchCount);
+          const availableBenchSlots = Math.max(0, benchLimitOf(draft, player) - benchCount);
           if (availableBenchSlots <= 0) {
             events.push({
               type: 'effectStepSkipped',
@@ -1141,7 +1146,7 @@ export function executeSteps(draft, {
         if (dest === 'bench') {
           const bench = player.zones.bench || [];
           const benchCount = bench.filter((c) => !c.attachedTo).length;
-          const availableBenchSlots = Math.max(0, 5 - benchCount);
+          const availableBenchSlots = Math.max(0, benchLimitOf(draft, player) - benchCount);
           effectiveMaxCount = Math.min(maxCount, availableBenchSlots);
         }
 
@@ -2317,7 +2322,7 @@ export function executeSteps(draft, {
         // Twist Mountain: Restored Pokémon from hand to Bench.
         const hand = player.zones.hand || [];
         const bench = player.zones.bench || [];
-        if (bench.filter((c) => !c.attachedTo).length >= 5) {
+        if (bench.filter((c) => !c.attachedTo).length >= benchLimitOf(draft, player)) {
           events.push({ type: 'effectStepSkipped', reason: 'bench_full' });
           break;
         }
@@ -2344,7 +2349,7 @@ export function executeSteps(draft, {
         const zoneKey = step.source === 'discard' ? 'discard' : 'hand';
         const zone = player.zones[zoneKey] || [];
         const bench = player.zones.bench || [];
-        if (bench.filter((c) => !c.attachedTo).length >= 5) {
+        if (bench.filter((c) => !c.attachedTo).length >= benchLimitOf(draft, player)) {
           events.push({ type: 'effectStepSkipped', reason: 'bench_full' });
           break;
         }

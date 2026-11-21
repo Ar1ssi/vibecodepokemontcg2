@@ -16,12 +16,13 @@ import { isPokemonToolCard, attachedTools, isExCard } from '../rules/tool-combat
 import {
   toolCapacity, parseUnlimitedHandEnergyAcceleration, costDiscountRead, applyCostDiscount,
   isHandActivatedAbility,
+  isDiscardActivatedAbility,
 } from '../rules/ability-executors.mjs';
 import {
   abilityAttackCostDiscount, applyEnergyMultiplier, abilityActivationBlockReason,
   abilitySupporterLimit, abilitySetupActive, abilityPlayLocks, abilityEvolvePermission,
   abilityEvolveLock, abilityEvolutionCardLock, abilityRetreatLock, abilitySummonRestricted,
-  abilityFirstTurnAttack, extraAttackAvailable, abilityAttackHandMinimum, abilityAttackLockReason, abilityOpponentAttackCostIncrease,
+  abilityFirstTurnAttack, extraAttackAvailable, abilityAttackHandMinimum, abilityAttackLockReason, abilityBenchLimit, abilityOpponentAttackCostIncrease,
   sideContextFor,
 } from '../rules/ability-combat.mjs';
 import { handEnergyForDiscard, handCardsForLostZone } from '../effects/attack-steps.mjs';
@@ -418,7 +419,9 @@ export function validateReferences(state, command) {
       // Luxray Swelling Flash / Charjabug Battery are activated from the hand.
       const legalZones = isHandActivatedAbility(cardRef?.card)
         ? ['hand']
-        : ['active', 'bench'];
+        : isDiscardActivatedAbility(cardRef?.card)
+          ? ['discard']
+          : ['active', 'bench'];
       if (
         !cardRef ||
         !legalZones.includes(cardRef.zoneId) ||
@@ -816,7 +819,8 @@ export function validateLegality(state, command) {
       if (payload.to === 'bench' && payload.from !== 'bench') {
         const bench = player.zones?.bench || [];
         const benchPokemonCount = bench.filter((c) => !c.attachedTo).length;
-        if (benchPokemonCount >= 5) {
+        // Sudowoodo Roadblock lowers the limit below 5.
+        if (benchPokemonCount >= abilityBenchLimit(sideContextFor(state, playerId))) {
           return { allowed: false, reason: 'bench_full' };
         }
       }

@@ -28,6 +28,7 @@ import {
 import {
   promoteBenchToActive, koEnergyTargets, moveKoEnergy, PRIZE_CHOICE_EFFECT, resolvePrizeChoice,
   KO_HAND_DISCARD_EFFECT, resolveKoHandDiscard, KO_TOOL_COUNTERS_EFFECT, resolveKoToolCounter,
+  BENCH_LIMIT_EFFECT, resolveBenchLimitTrim,
   PRIZE_BENCH_EFFECT, PRIZE_ATTACH_EFFECT, resumePrizeAttach, resumePrizeToBench,
   PRIZE_TRAINER_EFFECT, resumePrizeTrainer, TOOL_ENERGY_BENCH_EFFECT, moveToolEnergyToBench,
 } from './knockout.mjs';
@@ -489,6 +490,14 @@ export function resolveChoiceCommand({ draft, playerId, activeRng, events, paylo
       playerId: initiatorPlayerId,
       targetPlayerId: token.targetPlayerId,
       selection: payload.selection || [],
+      events,
+    });
+  } else if (token.effectType === BENCH_LIMIT_EFFECT) {
+    draft.pendingChoice = null;
+    resolveBenchLimitTrim(draft, {
+      playerId: initiatorPlayerId,
+      selection: payload.selection || [],
+      count: token.count || 0,
       events,
     });
   } else if (token.effectType === KO_HAND_DISCARD_EFFECT) {

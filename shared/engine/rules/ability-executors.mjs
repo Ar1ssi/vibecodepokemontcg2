@@ -107,6 +107,14 @@ export function isHandActivatedAbility(card) {
   return HAND_ACTIVATION_CLAUSE.test(textOf(card));
 }
 
+// Darkrai-GX Restoration (sm3-88) / Giratina Distortion Door (sm8-97): "if this Pokémon is in your
+// discard pile, you may put it onto your Bench" — used from the discard pile.
+const DISCARD_ACTIVATION_CLAUSE = /if this pok[eé]mon is in your discard pile, you may put it onto your bench/;
+
+export function isDiscardActivatedAbility(card) {
+  return DISCARD_ACTIVATION_CLAUSE.test(textOf(card));
+}
+
 // Marshadow Resetting Hole: "if this Pokémon is on your Bench, you may …".
 const BENCH_SPOT_CLAUSE = /if this pok[eé]mon is on your bench\b/;
 
