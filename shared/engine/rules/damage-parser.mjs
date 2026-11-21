@@ -373,6 +373,8 @@ function replacedBase(text, conditionHolds) {
 
 // Parse the attack text into an effective base damage number + breakdown.
 // See the module header for the shape contract and ctx options.
+const NEW_ACTIVE_DAMAGE = /this attack does (\d+) damage to the new (?:active|defending) pokémon/;
+
 export function parseAttackDamage(
   attack,
   attacker = {},
@@ -427,7 +429,9 @@ export function parseAttackDamage(
   const stage2BenchCount = ctx.stage2BenchCount;
   const stage2InPlayCount = ctx.stage2InPlayCount;
 
-  let total = base;
+  // Malamar Drag Off (customhb set.json) prints no number: "This attack does 30 damage to the new
+  // Active Pokémon" is the attack's damage, dealt after the switch.
+  let total = base || Number(NEW_ACTIVE_DAMAGE.exec(text)?.[1] ?? 0);
 
   // Raticate Super Fang / Scizor False Swipe ("?" damage): "Does damage … equal to half the
   // Defending Pokémon's remaining HP (rounded up / down to the nearest 10)." Weakness and
